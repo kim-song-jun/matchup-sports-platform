@@ -1,12 +1,15 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Providers } from '@/app/providers';
 import {
   useV1ActivePopup,
   useV1AdminLeagueMatch,
+  useV1AdminLeagueTeams,
   useV1AdminTeam,
+  useV1CancelLeagueFixture,
   useV1GenerateLeagueFixtures,
   useV1RecordLeagueForfeit,
+  useV1RegenerateLeagueFixtures,
   useV1UpdateLeagueFixture,
 } from '@/hooks/use-v1-api';
 import LeagueMatchFixturesClient from './league-match-fixtures-client';
@@ -18,11 +21,14 @@ vi.mock('@/components/auth/pending-social-signup-gate', () => ({
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1ActivePopup: vi.fn(),
   useV1AdminLeagueMatch: vi.fn(),
+  useV1AdminLeagueTeams: vi.fn(),
   // R11(C-6): 몰수 모달이 열릴 때만 의미 있는 데이터를 쓴다 — 다른 테스트들은 모달을
   // 열지 않으므로 data: undefined인 기본값으로 충분하다.
   useV1AdminTeam: vi.fn(() => ({ data: undefined })),
+  useV1CancelLeagueFixture: vi.fn(),
   useV1GenerateLeagueFixtures: vi.fn(),
   useV1RecordLeagueForfeit: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  useV1RegenerateLeagueFixtures: vi.fn(),
   useV1UpdateLeagueFixture: vi.fn(),
   // Providers 안의 ThemeProvider가 전역으로 호출한다 — 이 테스트가 <Providers>로 렌더하는 한 필요.
   useV1Settings: vi.fn(() => ({ data: undefined, isError: false, refetch: vi.fn() })),
@@ -31,9 +37,12 @@ vi.mock('@/hooks/use-v1-api', () => ({
 
 const useV1ActivePopupMock = vi.mocked(useV1ActivePopup, { partial: true });
 const useV1AdminLeagueMatchMock = vi.mocked(useV1AdminLeagueMatch, { partial: true });
+const useV1AdminLeagueTeamsMock = vi.mocked(useV1AdminLeagueTeams, { partial: true });
 const useV1AdminTeamMock = vi.mocked(useV1AdminTeam, { partial: true });
-const useV1GenerateLeagueFixturesMock = vi.mocked(useV1GenerateLeagueFixtures, { partial: true });
+const useV1CancelLeagueFixtureMock = vi.mocked(useV1CancelLeagueFixture, { partial: true });
 const useV1RecordLeagueForfeitMock = vi.mocked(useV1RecordLeagueForfeit, { partial: true });
+const useV1GenerateLeagueFixturesMock = vi.mocked(useV1GenerateLeagueFixtures, { partial: true });
+const useV1RegenerateLeagueFixturesMock = vi.mocked(useV1RegenerateLeagueFixtures, { partial: true });
 const useV1UpdateLeagueFixtureMock = vi.mocked(useV1UpdateLeagueFixture, { partial: true });
 
 describe('LeagueMatchFixturesClient', () => {
@@ -46,6 +55,14 @@ describe('LeagueMatchFixturesClient', () => {
   });
   afterAll(() => {
     process.env.TZ = originalTz;
+  });
+
+  // R12/R13: 기존 테스트는 이 두 훅을 전혀 참조하지 않으므로, 매 테스트 전에 무해한 기본값을
+  // 채워둔다 — 안 채우면 컴포넌트가 undefined에서 .data/.mutate를 읽다 그 10개 테스트가 전부 깨진다.
+  beforeEach(() => {
+    useV1AdminLeagueTeamsMock.mockReturnValue({ data: undefined } as never);
+    useV1CancelLeagueFixtureMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
+    useV1RegenerateLeagueFixturesMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
   });
 
   it('일시 입력 칸에 표시되는 값이 서버가 내려준 UTC 시각과 동일한 순간(instant)을 나타낸다 (로컬시간 미변환 시 9시간 어긋남 회귀 방지)', () => {
@@ -312,6 +329,167 @@ describe('LeagueMatchFixturesClient', () => {
     expect(screen.queryByText('최근 사용한 장소')).not.toBeInTheDocument();
   });
 
+  // R12
+  it('취소 버튼을 누르면 확인 모달이 뜨고, 사유를 입력해 확인해야 취소 mutation을 호출한다', async () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1AdminLeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1',
+        title: '가을 풋살 리그',
+        state: 'active',
+        teamIds: ['t1', 't2'],
+        fixtures: [
+          { teamMatchId: 'tm-1', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched' },
+        ],
+      },
+      isPending: false,
+    } as never);
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+    const cancelMutate = vi.fn();
+    useV1CancelLeagueFixtureMock.mockReturnValue({ mutate: cancelMutate, isPending: false } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    // AdminDataTable은 데스크톱 표 + 모바일 카드 리스트를 동시에 렌더한다(CSS로만 숨김) —
+    // 같은 행이라 첫 번째 매치를 눌러도 대표성이 있다(기존 테스트 주석과 동일한 전제).
+    fireEvent.click(screen.getAllByRole('button', { name: '취소' })[0]);
+    expect(screen.getByText('대진을 취소할까요?')).toBeInTheDocument();
+    expect(cancelMutate).not.toHaveBeenCalled();
+
+    fireEvent.change(
+      screen.getByPlaceholderText('이 작업이 왜 필요한지 남겨 주세요. 감사 로그에 그대로 기록돼요.'),
+      { target: { value: '우천으로 인한 취소' } },
+    );
+    fireEvent.click(screen.getByRole('button', { name: '대진 취소' }));
+
+    await waitFor(() =>
+      expect(cancelMutate).toHaveBeenCalledWith(
+        { teamMatchId: 'tm-1', body: { reason: '우천으로 인한 취소' } },
+        expect.anything(),
+      ),
+    );
+  });
+
+  // R12
+  it('사유 없이는 취소 확인 버튼이 비활성 상태라 취소 mutation이 호출되지 않는다', () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1AdminLeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1',
+        title: '가을 풋살 리그',
+        state: 'active',
+        teamIds: ['t1', 't2'],
+        fixtures: [
+          { teamMatchId: 'tm-1', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched' },
+        ],
+      },
+      isPending: false,
+    } as never);
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+    const cancelMutate = vi.fn();
+    useV1CancelLeagueFixtureMock.mockReturnValue({ mutate: cancelMutate, isPending: false } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    fireEvent.click(screen.getAllByRole('button', { name: '취소' })[0]);
+    fireEvent.click(screen.getByRole('button', { name: '대진 취소' }));
+
+    expect(cancelMutate).not.toHaveBeenCalled();
+  });
+
+  // R13
+  it('대진 재생성 버튼을 누르면 확인 모달이 뜨고, 재생성 문구를 정확히 입력해야 재생성 mutation을 호출한다', async () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1AdminLeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1',
+        title: '가을 풋살 리그',
+        state: 'active',
+        teamIds: ['t1', 't2'],
+        fixtures: [
+          { teamMatchId: 'tm-1', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched' },
+        ],
+      },
+      isPending: false,
+    } as never);
+    useV1AdminLeagueTeamsMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1',
+        teams: [
+          { teamId: 't1', name: 'A팀', status: 'active', memberCount: 5, logoUrl: null },
+          { teamId: 't2', name: 'B팀', status: 'active', memberCount: 5, logoUrl: null },
+        ],
+      },
+    } as never);
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+    const regenMutate = vi.fn();
+    useV1RegenerateLeagueFixturesMock.mockReturnValue({ mutate: regenMutate, isPending: false } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    fireEvent.click(screen.getAllByRole('button', { name: '대진 재생성' })[0]);
+    expect(screen.getByText('대진을 다시 만들까요?')).toBeInTheDocument();
+    expect(screen.getByText('A팀, B팀', { exact: false })).toBeInTheDocument();
+
+    fireEvent.change(
+      screen.getByPlaceholderText('이 작업이 왜 필요한지 남겨 주세요. 감사 로그에 그대로 기록돼요.'),
+      { target: { value: '팀 로스터 변경으로 재생성' } },
+    );
+    // 사유만 입력하고(재생성 문구 미입력) 제출 시도 — 버튼이 비활성이라 클릭해도 호출되지 않는다.
+    const submitButtons = screen.getAllByRole('button', { name: '대진 재생성' });
+    fireEvent.click(submitButtons[submitButtons.length - 1]);
+    expect(regenMutate).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByPlaceholderText('재생성'), { target: { value: '재생성' } });
+    fireEvent.click(screen.getAllByRole('button', { name: '대진 재생성' })[screen.getAllByRole('button', { name: '대진 재생성' }).length - 1]);
+
+    await waitFor(() =>
+      expect(regenMutate).toHaveBeenCalledWith({ weeksCount: 7, reason: '팀 로스터 변경으로 재생성' }, expect.anything()),
+    );
+  });
+
+  // R13
+  it('취소된 대진은 상태 배지가 빨간 톤이고 취소 버튼 대신 "취소됨" 텍스트를 보여준다', () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1AdminLeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1',
+        title: '가을 풋살 리그',
+        state: 'active',
+        teamIds: ['t1', 't2'],
+        fixtures: [
+          { teamMatchId: 'tm-1', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'cancelled' },
+        ],
+      },
+      isPending: false,
+    } as never);
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    expect(screen.queryAllByRole('button', { name: '취소' })).toHaveLength(0);
+    expect(screen.getAllByText('취소됨').length).toBeGreaterThan(0);
+  });
   // R11(C-6): 몰수패 처리 버튼 -> 모달 -> 제출까지의 배선을 검증한다.
   it('몰수패 처리 버튼을 눌러 불참팀·사유를 입력하고 제출하면 forfeit mutation을 호출한다', async () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);

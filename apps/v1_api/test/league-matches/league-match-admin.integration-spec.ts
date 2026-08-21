@@ -519,4 +519,368 @@ describe('POST /admin/league-matches + fixtures', () => {
       expect(res.body.code).toBe('UNAUTHENTICATED');
     });
   });
+
+  // R12: 리그 대진 전용 취소 — team-matches.service.ts의 cancel()이 호스트 자가취소에서
+  // 하는 후처리(신청 반려·일정 cascade·감사 로그)를 어드민 액터로 반복하는지 검증한다.
+  describe('POST /admin/league-matches/:leagueId/fixtures/:teamMatchId/cancel', () => {
+    async function createLeagueWithOneFixture(title: string) {
+      const createRes = await request(app.getHttpServer())
+        .post('/api/v1/admin/league-matches')
+        .set('x-v1-user-id', ownerUserId)
+        .send({
+          title,
+          sportId,
+          regionId,
+          startsOn: new Date().toISOString(),
+          endsOn: new Date(Date.now() + 7 * 86_400_000).toISOString(),
+          teamIds: [teamAId, teamBId],
+        });
+      const leagueId = createRes.body.data.leagueId;
+      const fixturesRes = await request(app.getHttpServer())
+        .post(`/api/v1/admin/league-matches/${leagueId}/fixtures`)
+        .set('x-v1-user-id', ownerUserId)
+        .send({ weeksCount: 1 });
+      return { leagueId, teamMatchId: fixturesRes.body.data.teamMatchIds[0] as string };
+    }
+
+    it('대진을 취소하면 status=cancelled + cancelledAt이 남고, 감사 로그(admin 액션 로그 + 상태변경 로그)가 기록된다', async () => {
+      const { leagueId, teamMatchId } = await createLeagueWithOneFixture(`취소 테스트 리그-${suiteId}`);
+
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/admin/league-matches/${leagueId}/fixtures/${teamMatchId}/cancel`)
+        .set('x-v1-user-id', ownerUserId)
+        .send({ reason: '우천으로 인한 경기 취소' });
+      expect(res.status).toBe(200);
+      expect(res.body.data).toMatchObject({ teamMatchId, status: 'cancelled', alreadyProcessed: false });
+
+      const updated = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: teamMatchId } });
+      expect(updated.status).toBe('cancelled');
+      expect(updated.cancelledAt).not.toBeNull();
+
+      const statusLog = await prisma.v1StatusChangeLog.findFirst({
+        where: { targetType: 'team_match', targetId: teamMatchId, toStatus: 'cancelled' },
+      });
+      expect(statusLog).not.toBeNull();
+      expect(statusLog!.actorType).toBe('admin');
+      expect(statusLog!.reason).toBe('우천으로 인한 경기 취소');
+
+      const actionLog = await prisma.v1AdminActionLog.findFirst({
+        where: { action: 'league_match.cancel_fixture', targetId: teamMatchId },
+      });
+      expect(actionLog).not.toBeNull();
+    });
+
+    it('이미 취소된 대진을 다시 취소하면 멱등하게 alreadyProcessed: true를 반환하고 로그가 추가되지 않는다', async () => {
+      const { leagueId, teamMatchId } = await createLeagueWithOneFixture(`멱등 취소 리그-${suiteId}`);
+      await request(app.getHttpServer())
+        .post(`/api/v1/admin/league-matches/${leagueId}/fixtures/${teamMatchId}/cancel`)
+        .set('x-v1-user-id', ownerUserId)
+        .send({ reason: '최초 취소' });
+      const logCountBefore = await prisma.v1AdminActionLog.count({
+        where: { action: 'league_match.cancel_fixture', targetId: teamMatchId },
+      });
+
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/admin/league-matches/${leagueId}/fixtures/${teamMatchId}/cancel`)
+        .set('x-v1-user-id', ownerUserId)
+        .send({ reason: '중복 취소 시도' });
+      expect(res.status).toBe(200);
+      expect(res.body.data).toEqual({ teamMatchId, status: 'cancelled', cancelledApplications: 0, alreadyProcessed: true });
+
+      const logCountAfter = await prisma.v1AdminActionLog.count({
+        where: { action: 'league_match.cancel_fixture', targetId: teamMatchId },
+      });
+      expect(logCountAfter).toBe(logCountBefore);
+    });
+
+    it('다른 리그의 대진을 취소하려 하면 404 LEAGUE_NOT_FOUND로 거부되고 아무 것도 바뀌지 않는다', async () => {
+      const { teamMatchId } = await createLeagueWithOneFixture(`IDOR 대상 리그-${suiteId}`);
+      const { leagueId: otherLeagueId } = await createLeagueWithOneFixture(`엉뚱한 리그-${suiteId}`);
+
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/admin/league-matches/${otherLeagueId}/fixtures/${teamMatchId}/cancel`)
+        .set('x-v1-user-id', ownerUserId)
+        .send({ reason: '탈취 시도' });
+      expect(res.status).toBe(404);
+      expect(res.body.code).toBe('LEAGUE_NOT_FOUND');
+
+      const untouched = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: teamMatchId } });
+      expect(untouched.status).toBe('matched');
+    });
+
+    it('사유 없이 요청하면 400으로 거부된다', async () => {
+      const { leagueId, teamMatchId } = await createLeagueWithOneFixture(`사유 누락 리그-${suiteId}`);
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/admin/league-matches/${leagueId}/fixtures/${teamMatchId}/cancel`)
+        .set('x-v1-user-id', ownerUserId)
+        .send({});
+      expect(res.status).toBe(400);
+    });
+
+    it('V1AdminUser 행이 없는 일반 유저는 403, 인증 헤더 없는 요청은 401로 거부된다', async () => {
+      const { leagueId, teamMatchId } = await createLeagueWithOneFixture(`권한 경계 리그-${suiteId}`);
+
+      const forbiddenRes = await request(app.getHttpServer())
+        .post(`/api/v1/admin/league-matches/${leagueId}/fixtures/${teamMatchId}/cancel`)
+        .set('x-v1-user-id', regularUserId)
+        .send({ reason: '권한 없는 시도' });
+      expect(forbiddenRes.status).toBe(403);
+      expect(forbiddenRes.body.code).toBe('PERMISSION_DENIED');
+
+      const unauthRes = await request(app.getHttpServer())
+        .post(`/api/v1/admin/league-matches/${leagueId}/fixtures/${teamMatchId}/cancel`)
+        .send({ reason: '무인증 시도' });
+      expect(unauthRes.status).toBe(401);
+      expect(unauthRes.body.code).toBe('UNAUTHENTICATED');
+
+      const untouched = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: teamMatchId } });
+      expect(untouched.status).toBe('matched');
+    });
+  });
+
+  // R13: 참가팀 조회 — 팀 이름/상태를 붙여 돌려주는지 확인한다.
+  describe('GET /admin/league-matches/:leagueId/teams', () => {
+    it('참가팀 id·이름·상태·멤버 수를 돌려준다', async () => {
+      const createRes = await request(app.getHttpServer())
+        .post('/api/v1/admin/league-matches')
+        .set('x-v1-user-id', ownerUserId)
+        .send({
+          title: `참가팀 조회 리그-${suiteId}`,
+          sportId,
+          regionId,
+          startsOn: new Date().toISOString(),
+          endsOn: new Date(Date.now() + 7 * 86_400_000).toISOString(),
+          teamIds: [teamAId, teamBId],
+        });
+      const leagueId = createRes.body.data.leagueId;
+
+      const res = await request(app.getHttpServer())
+        .get(`/api/v1/admin/league-matches/${leagueId}/teams`)
+        .set('x-v1-user-id', ownerUserId);
+      expect(res.status).toBe(200);
+      expect(res.body.data.leagueId).toBe(leagueId);
+      expect(res.body.data.teams).toHaveLength(2);
+      // createMany로 등록된 두 리그팀 행은 createdAt이 같은 트랜잭션 타임스탬프를 공유할 수
+      // 있어(F1 주석 참고) teamId(무작위 UUID) tie-break 순서가 입력 순서와 다를 수 있다 —
+      // 그래서 정렬 순서가 아니라 "두 팀이 다 나오는지"와 각 필드의 형태만 검증한다.
+      const teamIds = res.body.data.teams.map((t: { teamId: string }) => t.teamId);
+      expect(new Set(teamIds)).toEqual(new Set([teamAId, teamBId]));
+      const teamA = res.body.data.teams.find((t: { teamId: string }) => t.teamId === teamAId);
+      expect(teamA).toMatchObject({ teamId: teamAId, status: 'active' });
+      expect(typeof teamA.name).toBe('string');
+      expect(teamA.name.length).toBeGreaterThan(0);
+    });
+
+    it('V1AdminUser 행이 없는 일반 유저는 403, 인증 헤더 없는 요청은 401로 거부된다', async () => {
+      const forbiddenRes = await request(app.getHttpServer())
+        .get(`/api/v1/admin/league-matches/${randomUUID()}/teams`)
+        .set('x-v1-user-id', regularUserId);
+      expect(forbiddenRes.status).toBe(403);
+      expect(forbiddenRes.body.code).toBe('PERMISSION_DENIED');
+
+      const unauthRes = await request(app.getHttpServer()).get(`/api/v1/admin/league-matches/${randomUUID()}/teams`);
+      expect(unauthRes.status).toBe(401);
+      expect(unauthRes.body.code).toBe('UNAUTHENTICATED');
+    });
+  });
+
+  // R13: 대진 재생성 — generateFixtures()와 동일한 계약(라운드로빈·시각/장소 템플릿)으로 새
+  // 대진을 만들되, 기존 대진은 전부 취소하고 공식 결과가 확정된 대진이 있으면 거부한다.
+  describe('POST /admin/league-matches/:leagueId/fixtures/regenerate', () => {
+    async function officializeFixture(teamMatchId: string, score: { home: number; away: number }) {
+      const game = await prisma.v1Game.findUniqueOrThrow({ where: { teamMatchId } });
+      const revision = await prisma.v1GameResultRevision.create({
+        data: {
+          gameId: game.id,
+          revision: 1,
+          state: 'OFFICIAL',
+          score,
+          eventsHash: `t4-league-regenerate-hash-${randomUUID()}`,
+          createdByActorType: 'SYSTEM',
+          createdBySystemActor: 'T4_LEAGUE_REGENERATE_TEST',
+          submittedAt: new Date(),
+          officialAt: new Date(),
+        },
+      });
+      await prisma.v1Game.update({ where: { id: game.id }, data: { currentOfficialRevisionId: revision.id } });
+      return revision;
+    }
+
+    it('기존 대진을 전부 취소하고 같은 팀 로스터로 새 대진을 만든다', async () => {
+      const createRes = await request(app.getHttpServer())
+        .post('/api/v1/admin/league-matches')
+        .set('x-v1-user-id', ownerUserId)
+        .send({
+          title: `재생성 리그-${suiteId}`,
+          sportId,
+          regionId,
+          startsOn: new Date().toISOString(),
+          endsOn: new Date(Date.now() + 7 * 86_400_000).toISOString(),
+          teamIds: [teamAId, teamBId],
+        });
+      const leagueId = createRes.body.data.leagueId;
+      const firstGenRes = await request(app.getHttpServer())
+        .post(`/api/v1/admin/league-matches/${leagueId}/fixtures`)
+        .set('x-v1-user-id', ownerUserId)
+        .send({ weeksCount: 1 });
+      const originalFixtureId = firstGenRes.body.data.teamMatchIds[0] as string;
+
+      const regenRes = await request(app.getHttpServer())
+        .post(`/api/v1/admin/league-matches/${leagueId}/fixtures/regenerate`)
+        .set('x-v1-user-id', ownerUserId)
+        .send({ weeksCount: 1, reason: '팀 로스터 변경으로 재생성' });
+      expect(regenRes.status).toBe(201);
+      expect(regenRes.body.data.cancelledCount).toBe(1);
+      expect(regenRes.body.data.teamMatchIds).toHaveLength(1);
+      const newFixtureId = regenRes.body.data.teamMatchIds[0] as string;
+      expect(newFixtureId).not.toBe(originalFixtureId);
+
+      const original = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: originalFixtureId } });
+      expect(original.status).toBe('cancelled');
+      const created = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: newFixtureId } });
+      expect(created.status).toBe('matched');
+      expect(created.leagueId).toBe(leagueId);
+
+      const actionLog = await prisma.v1AdminActionLog.findFirst({
+        where: { action: 'league_match.regenerate_fixtures', targetId: leagueId },
+      });
+      expect(actionLog).not.toBeNull();
+      expect(actionLog!.reason).toBe('팀 로스터 변경으로 재생성');
+    });
+
+    it('공식 결과가 확정된 대진이 하나라도 있으면 409 LEAGUE_FIXTURES_HAVE_OFFICIAL_RESULTS로 거부되고 아무 것도 바뀌지 않는다', async () => {
+      const createRes = await request(app.getHttpServer())
+        .post('/api/v1/admin/league-matches')
+        .set('x-v1-user-id', ownerUserId)
+        .send({
+          title: `확정결과 재생성 거부 리그-${suiteId}`,
+          sportId,
+          regionId,
+          startsOn: new Date().toISOString(),
+          endsOn: new Date(Date.now() + 14 * 86_400_000).toISOString(),
+          teamIds: [teamAId, teamBId],
+        });
+      const leagueId = createRes.body.data.leagueId;
+      const fixturesRes = await request(app.getHttpServer())
+        .post(`/api/v1/admin/league-matches/${leagueId}/fixtures`)
+        .set('x-v1-user-id', ownerUserId)
+        .send({ weeksCount: 2 });
+      const [fixture1Id] = fixturesRes.body.data.teamMatchIds;
+      await officializeFixture(fixture1Id, { home: 3, away: 1 });
+
+      const regenRes = await request(app.getHttpServer())
+        .post(`/api/v1/admin/league-matches/${leagueId}/fixtures/regenerate`)
+        .set('x-v1-user-id', ownerUserId)
+        .send({ weeksCount: 2, reason: '실수로 재생성 시도' });
+      expect(regenRes.status).toBe(409);
+      expect(regenRes.body.code).toBe('LEAGUE_FIXTURES_HAVE_OFFICIAL_RESULTS');
+
+      const fixtureCount = await prisma.v1TeamMatch.count({ where: { leagueId } });
+      expect(fixtureCount).toBe(2);
+      const untouched = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: fixture1Id } });
+      expect(untouched.status).toBe('matched');
+    });
+
+    it('사유 없이 요청하면 400으로 거부된다', async () => {
+      const createRes = await request(app.getHttpServer())
+        .post('/api/v1/admin/league-matches')
+        .set('x-v1-user-id', ownerUserId)
+        .send({
+          title: `사유 누락 재생성 리그-${suiteId}`,
+          sportId,
+          regionId,
+          startsOn: new Date().toISOString(),
+          endsOn: new Date(Date.now() + 7 * 86_400_000).toISOString(),
+          teamIds: [teamAId, teamBId],
+        });
+      const leagueId = createRes.body.data.leagueId;
+
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/admin/league-matches/${leagueId}/fixtures/regenerate`)
+        .set('x-v1-user-id', ownerUserId)
+        .send({ weeksCount: 1 });
+      expect(res.status).toBe(400);
+    });
+
+    it('대진이 아직 없는 리그에서도(팀 2개 이상이면) 재생성 요청이 그대로 첫 생성처럼 동작한다', async () => {
+      const createRes = await request(app.getHttpServer())
+        .post('/api/v1/admin/league-matches')
+        .set('x-v1-user-id', ownerUserId)
+        .send({
+          title: `대진 없는 리그 재생성-${suiteId}`,
+          sportId,
+          regionId,
+          startsOn: new Date().toISOString(),
+          endsOn: new Date(Date.now() + 7 * 86_400_000).toISOString(),
+          teamIds: [teamAId, teamBId],
+        });
+      const leagueId = createRes.body.data.leagueId;
+
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/admin/league-matches/${leagueId}/fixtures/regenerate`)
+        .set('x-v1-user-id', ownerUserId)
+        .send({ weeksCount: 1, reason: '최초 생성을 재생성 경로로' });
+      expect(res.status).toBe(201);
+      expect(res.body.data.cancelledCount).toBe(0);
+      expect(res.body.data.teamMatchIds).toHaveLength(1);
+    });
+
+    it('V1AdminUser 행이 없는 일반 유저는 403, 인증 헤더 없는 요청은 401로 거부된다', async () => {
+      const forbiddenRes = await request(app.getHttpServer())
+        .post(`/api/v1/admin/league-matches/${randomUUID()}/fixtures/regenerate`)
+        .set('x-v1-user-id', regularUserId)
+        .send({ weeksCount: 1, reason: '권한 없는 시도' });
+      expect(forbiddenRes.status).toBe(403);
+      expect(forbiddenRes.body.code).toBe('PERMISSION_DENIED');
+
+      const unauthRes = await request(app.getHttpServer())
+        .post(`/api/v1/admin/league-matches/${randomUUID()}/fixtures/regenerate`)
+        .send({ weeksCount: 1, reason: '무인증 시도' });
+      expect(unauthRes.status).toBe(401);
+      expect(unauthRes.body.code).toBe('UNAUTHENTICATED');
+    });
+  });
+
+  // placeAddress: UpdateLeagueFixtureDto에는 이미 있었지만 실제 저장 경로를 검증하는
+  // 테스트가 없었다(어드민 표에 입력 컬럼도 없었다 — 이 태스크에서 함께 추가).
+  describe('PATCH /admin/league-matches/:leagueId/fixtures/:teamMatchId — placeAddress', () => {
+    it('placeAddress를 보내면 저장되고, 응답에 그대로 반영된다', async () => {
+      const createRes = await request(app.getHttpServer())
+        .post('/api/v1/admin/league-matches')
+        .set('x-v1-user-id', ownerUserId)
+        .send({
+          title: `주소 저장 리그-${suiteId}`,
+          sportId,
+          regionId,
+          startsOn: new Date().toISOString(),
+          endsOn: new Date(Date.now() + 7 * 86_400_000).toISOString(),
+          teamIds: [teamAId, teamBId],
+        });
+      const leagueId = createRes.body.data.leagueId;
+      const fixturesRes = await request(app.getHttpServer())
+        .post(`/api/v1/admin/league-matches/${leagueId}/fixtures`)
+        .set('x-v1-user-id', ownerUserId)
+        .send({ weeksCount: 1 });
+      const teamMatchId = fixturesRes.body.data.teamMatchIds[0];
+
+      const res = await request(app.getHttpServer())
+        .patch(`/api/v1/admin/league-matches/${leagueId}/fixtures/${teamMatchId}`)
+        .set('x-v1-user-id', ownerUserId)
+        .send({ placeAddress: '서울 마포구 상암동 1600' });
+      expect(res.status).toBe(200);
+      expect(res.body.data.placeAddress).toBe('서울 마포구 상암동 1600');
+
+      const updated = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: teamMatchId } });
+      expect(updated.placeAddress).toBe('서울 마포구 상암동 1600');
+
+      // detail()도 placeAddress를 내려줘야 어드민 표가 기존 값을 채워 보여줄 수 있다 —
+      // updateFixture()는 이미 이 필드를 저장하고 있었는데 조회 경로(select)가 빠져 있었다.
+      const detailRes = await request(app.getHttpServer())
+        .get(`/api/v1/admin/league-matches/${leagueId}`)
+        .set('x-v1-user-id', ownerUserId);
+      expect(detailRes.status).toBe(200);
+      const fixture = detailRes.body.data.fixtures.find((f: { teamMatchId: string }) => f.teamMatchId === teamMatchId);
+      expect(fixture.placeAddress).toBe('서울 마포구 상암동 1600');
+    });
+  });
 });

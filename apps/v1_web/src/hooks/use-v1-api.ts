@@ -4444,6 +4444,9 @@ export function useV1RevokeTournamentStaff(tournamentId: string) {
 import type {
   V1AdminLeagueDetail,
   V1AdminLeagueListItem,
+  V1AdminLeagueTeamsResponse,
+  V1CancelLeagueFixturePayload,
+  V1CancelLeagueFixtureResult,
   V1CreateLeaguePayload,
   V1CreateLeagueResult,
   V1GenerateLeagueFixturesPayload,
@@ -4455,6 +4458,8 @@ import type {
   V1LeagueStandingsResponse,
   V1RecordLeagueForfeitPayload,
   V1RecordLeagueForfeitResult,
+  V1RegenerateLeagueFixturesPayload,
+  V1RegenerateLeagueFixturesResult,
   V1UpdateLeagueFixturePayload,
   V1UpdateLeagueFixtureResult,
 } from '@/types/league-match';
@@ -4524,6 +4529,42 @@ export function useV1RecordLeagueForfeit(leagueId: string) {
       v1Post<V1RecordLeagueForfeitResult>(`/admin/league-matches/${leagueId}/fixtures/${teamMatchId}/forfeit`, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
+    },
+  });
+}
+
+// R13: 참가팀 조회 — 재생성 확인 모달에서 "지금 이 팀들로 다시 만든다"를 보여주는 용도.
+export function useV1AdminLeagueTeams(leagueId: string) {
+  return useQuery({
+    queryKey: v1Keys.adminLeagueTeams(leagueId),
+    queryFn: () => v1Get<V1AdminLeagueTeamsResponse>(`/admin/league-matches/${leagueId}/teams`),
+    enabled: Boolean(leagueId),
+  });
+}
+
+// R12: 리그 대진 취소 — POST /admin/league-matches/:leagueId/fixtures/:teamMatchId/cancel.
+export function useV1CancelLeagueFixture(leagueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ teamMatchId, body }: { teamMatchId: string; body: V1CancelLeagueFixturePayload }) =>
+      v1Post<V1CancelLeagueFixtureResult>(`/admin/league-matches/${leagueId}/fixtures/${teamMatchId}/cancel`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
+    },
+  });
+}
+
+// R13: 대진 재생성 — POST /admin/league-matches/:leagueId/fixtures/regenerate. 기존 대진 전부를
+// 취소하고 새로 만들므로 fixtures 목록 캐시를 통째로 무효화한다(update-fixture와 동일하게).
+export function useV1RegenerateLeagueFixtures(leagueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1RegenerateLeagueFixturesPayload) =>
+      v1Post<V1RegenerateLeagueFixturesResult>(`/admin/league-matches/${leagueId}/fixtures/regenerate`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
     },
   });
 }

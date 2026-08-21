@@ -131,6 +131,8 @@ export interface V1PromotionPreviewResponse {
   seriesId: string;
   seasonNo: number;
   rule: V1PromotionRule;
+  /** 이 preview 를 만든 규칙의 지문. commit 에 그대로 실어 보내 규칙 변경을 감지한다. */
+  ruleFingerprint: string;
   alreadyDecided: boolean;
   warnings: V1PromotionWarning[];
   tiers: V1PromotionPreviewTier[];
@@ -146,6 +148,8 @@ export interface V1CommitPromotionEntry {
 export interface V1CommitPromotionsPayload {
   entries: V1CommitPromotionEntry[];
   createNextSeason?: boolean;
+  /** preview 응답의 ruleFingerprint. 불일치 시 서버가 409 PROMOTION_RULE_CHANGED 로 막는다. */
+  ruleFingerprint?: string;
 }
 
 export interface V1CommitPromotionsResult {

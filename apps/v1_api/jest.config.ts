@@ -59,6 +59,19 @@ const config: Config = {
         // test/team-matches/ noted above) so it can be registered without
         // reviving the other 6 pre-existing, unrelated failures.
         '<rootDir>/test/team-matches/team-match-lineup-size.integration-spec.ts',
+        // Task 153 승강 확정 경로. test/league-matches/ 는 이 줄이 생기기 전까지
+        // integration testMatch 에 **한 번도 등록된 적이 없다** — 그 디렉터리의 기존 4개
+        // 스펙(admin·public·forfeit·completion-projection)은 디스크에만 있고
+        // `jest --selectProjects integration`(CI 의 migration replay + drift gate 가 그대로
+        // 호출)으로 선택된 적이 없다. 위 team-schedules·team-match-series·team-lineups
+        // 주석이 경고하는 그 silent-omission 함정이 여기서도 반복됐다.
+        //
+        // 그 4개를 와일드카드로 한꺼번에 되살리면 이 PR 과 무관한 이유로 CI 가 깨진다
+        // (로컬 실측: 45건 중 44건 통과, 1건은 league-match-public 의 "state 필터" 케이스가
+        // 종목을 새로 만들어 경기 설정이 없는 탓에 409 COMPETITION_CONFIG_REQUIRED —
+        // 내 변경과 무관한 선재 결함이다). 그래서 team-matches 선례를 따라 이 레인이
+        // 새로 추가한 파일 하나만 명시 경로로 등록한다.
+        '<rootDir>/test/league-matches/league-promotion.integration-spec.ts',
         // team-contacts (Task 8): 이 글롭이 없으면 `jest --selectProjects integration`
         // (= CI 의 migration replay + drift gate) 가 이 디렉터리를 절대 선택하지 않는다.
         // 이 레포에서 같은 실수가 이미 4회 반복 지적됐다 — 위 team-schedules/team-match-series/

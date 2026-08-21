@@ -34,6 +34,9 @@ interface PromotionCommitPanelProps {
  */
 export function PromotionCommitPanel({ preview, submitting, onCommit }: PromotionCommitPanelProps) {
   const [overrides, setOverrides] = useState<Record<string, V1PromotionKind>>({});
+  // 수정 사유는 어드민이 직접 적는다. 예전에는 '어드민이 직접 조정' 이라는 고정 문자열을
+  // 보내서, 감사 로그를 열어도 "왜 규칙과 다르게 정했는지"가 어디에도 남지 않았다.
+  const [notes, setNotes] = useState<Record<string, string>>({});
 
   const entries = useMemo(
     () => preview.tiers.flatMap((tier) => tier.entries.map((entry) => ({ ...entry, tierLabel: tier.tierLabel }))),
@@ -72,16 +75,25 @@ export function PromotionCommitPanel({ preview, submitting, onCommit }: Promotio
     return counts;
   }, [entries, overrides, preview.tiers]);
 
+  // 서버는 다음 시즌에 1팀만 남는 티어가 있으면 422 로 막는다(리그는 2팀 이상이어야 하고,
+  // 1팀 리그는 대진 생성이 영구히 거부돼 시작도 종료도 못 하는 죽은 리그가 된다).
+  // 확정 버튼을 누르기 전에 같은 판정을 화면에서 보여 준다.
+  const undersizedTiers = preview.tiers
+    .map((tier) => ({ tier, count: projectedByTier.get(tier.tier) ?? 0 }))
+    .filter((row) => row.count === 1);
+
   const handleCommit = () => {
     onCommit(
-      entries.map((entry) => ({
-        teamId: entry.teamId,
-        fromTier: entry.tier,
-        kind: kindOf(entry.teamId, entry.computedKind),
-        ...(kindOf(entry.teamId, entry.computedKind) === entry.computedKind
-          ? {}
-          : { overrideNote: '어드민이 직접 조정' }),
-      })),
+      entries.map((entry) => {
+        const kind = kindOf(entry.teamId, entry.computedKind);
+        const note = notes[entry.teamId]?.trim();
+        return {
+          teamId: entry.teamId,
+          fromTier: entry.tier,
+          kind,
+          ...(kind === entry.computedKind || !note ? {} : { overrideNote: note }),
+        };
+      }),
     );
   };
 
@@ -165,6 +177,23 @@ export function PromotionCommitPanel({ preview, submitting, onCommit }: Promotio
                         </option>
                       ))}
                     </select>
+                    {changed && (
+                      <span className="flex w-full items-center gap-2">
+                        <label className="sr-only" htmlFor={`note-${entry.teamId}`}>
+                          {entry.teamName} 수정 사유
+                        </label>
+                        <input
+                          id={`note-${entry.teamId}`}
+                          type="text"
+                          maxLength={200}
+                          disabled={submitting}
+                          value={notes[entry.teamId] ?? ''}
+                          onChange={(e) => setNotes((prev) => ({ ...prev, [entry.teamId]: e.target.value }))}
+                          placeholder="수정 사유 (예: 다음 시즌 불참 통보)"
+                          className="h-[44px] w-full rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)] placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50"
+                        />
+                      </span>
+                    )}
                   </li>
                 );
               })}
@@ -183,6 +212,11 @@ export function PromotionCommitPanel({ preview, submitting, onCommit }: Promotio
               갈 곳이 없는 결정이 {impossible.length}개 있어요. 가장 위 티어는 승격할 수 없고 가장 아래
               티어는 강등할 수 없어요.
             </span>
+          ) : undersizedTiers.length > 0 ? (
+            <span className="font-semibold text-red-700 dark:text-red-300">
+              {undersizedTiers.map((row) => row.tier.tierLabel).join(' · ')}가 다음 시즌에 1팀만 남아요.
+              리그는 2팀 이상이어야 해요. 불참 처리한 팀이나 승강 결정을 조정해 주세요.
+            </span>
           ) : (
             '최종 승인하면 다음 시즌 리그가 만들어지고 되돌릴 수 없어요.'
           )}
@@ -190,7 +224,7 @@ export function PromotionCommitPanel({ preview, submitting, onCommit }: Promotio
         <button
           type="button"
           onClick={handleCommit}
-          disabled={submitting || entries.length === 0 || impossible.length > 0}
+          disabled={submitting || entries.length === 0 || impossible.length > 0 || undersizedTiers.length > 0}
           className="inline-flex min-h-[44px] items-center rounded-xl bg-blue-500 px-5 text-sm font-semibold text-white disabled:opacity-50"
         >
           {submitting ? '확정하는 중…' : '승강 최종 승인'}

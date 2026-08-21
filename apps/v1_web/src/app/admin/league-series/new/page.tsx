@@ -118,7 +118,9 @@ export default function AdminLeagueSeriesNewPage() {
           </div>
         </div>
 
-        {tierCount > 1 && <PromotionRuleForm value={promotionRule} onChange={setPromotionRule} />}
+        {tierCount > 1 && (
+          <PromotionRuleForm value={promotionRule} tierCount={tierCount} onChange={setPromotionRule} />
+        )}
 
         <div className="flex justify-end gap-2">
           <button

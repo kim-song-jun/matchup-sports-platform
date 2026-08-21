@@ -9,6 +9,14 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import type { V1LeagueFixture } from '@/types/league-match';
 
+// 승강 표시 — 색만으로 정보를 전달하지 않도록 기호(↑/↓/–/×)와 텍스트를 함께 쓴다.
+const PROMOTION_META: Record<'promoted' | 'relegated' | 'stayed' | 'withdrawn', { label: string; glyph: string; className: string }> = {
+  promoted: { label: '승격', glyph: '↑', className: 'text-blue-700 dark:text-blue-300' },
+  relegated: { label: '강등', glyph: '↓', className: 'text-red-700 dark:text-red-300' },
+  stayed: { label: '잔류', glyph: '–', className: 'text-[var(--text-muted)]' },
+  withdrawn: { label: '불참', glyph: '×', className: 'text-amber-700 dark:text-amber-300' },
+};
+
 const TIE_BREAK_LABELS: Record<string, string> = {
   points: '승점',
   goalDifference: '골득실',
@@ -179,6 +187,9 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
                   <th scope="col">전적</th>
                   <th scope="col">승점</th>
                   <th scope="col">득실</th>
+                  {/* 승강 열은 확정된 뒤에만 생긴다 — 확정 전에는 열 자체가 없어
+                      기존 순위표 모양이 그대로 유지된다. */}
+                  {standings.promotionDecided && <th scope="col">승강</th>}
                 </tr>
               </thead>
               <tbody>
@@ -198,6 +209,24 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
                     </td>
                     <td>{row.points}</td>
                     <td>{row.goalsFor}-{row.goalsAgainst}</td>
+                    {standings.promotionDecided && (
+                      <td>
+                        {row.promotionKind === null ? (
+                          <span className="text-[var(--text-muted)]">—</span>
+                        ) : (
+                          // 색만으로 구분하지 않는다 — 화살표/기호 + 텍스트를 함께 쓴다.
+                          <span className={`inline-flex items-center gap-1 whitespace-nowrap font-semibold ${PROMOTION_META[row.promotionKind].className}`}>
+                            <span aria-hidden="true">{PROMOTION_META[row.promotionKind].glyph}</span>
+                            {PROMOTION_META[row.promotionKind].label}
+                            {row.promotionKind === 'promoted' || row.promotionKind === 'relegated'
+                              ? row.promotionToTierLabel !== null && (
+                                  <span className="font-normal text-[var(--text-muted)]">({row.promotionToTierLabel})</span>
+                                )
+                              : null}
+                          </span>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

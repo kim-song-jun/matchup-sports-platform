@@ -145,12 +145,18 @@ export class LeagueSeriesAdminService {
         _count: { select: { leagues: true } },
       },
     });
-    return rows.map((row) => ({
-      ...this.serializeSeries(row),
-      sport: row.sport,
-      region: row.region,
-      leagueCount: row._count.leagues,
-    }));
+    // 목록 응답은 배열이 아니라 { items } 로 감싼다 — 이 저장소의 다른 어드민 목록 API
+    // (admin/league-matches 등)와 같은 형태이고, 프론트 훅도 data.items 를 읽는다.
+    // 배열을 그대로 돌려주면 타입은 통과하지만(제네릭은 런타임을 검증하지 않는다) 화면은
+    // 영원히 "아직 리그 체계가 없어요"만 띄운다 — alpha 실화면 캡처로 잡은 결함이다.
+    return {
+      items: rows.map((row) => ({
+        ...this.serializeSeries(row),
+        sport: row.sport,
+        region: row.region,
+        leagueCount: row._count.leagues,
+      })),
+    };
   }
 
   async detail(user: V1AuthUser, seriesId: string) {

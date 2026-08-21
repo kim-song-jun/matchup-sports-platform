@@ -605,7 +605,7 @@ describe('ScheduleContent — 진행 중 경기의 라이브 스코어/경과 �
 /* ── 득점자 타임라인 + 영상 링크 (관전자에게 노출) ── */
 
 describe('MatchDetailContent — 골/카드 타임라인의 이름·팀 귀속', () => {
-  it('참가자 이름이 있으면 그대로 보여주고, null이면 익명 라벨을 보여준다', () => {
+  it('참가자 이름이 있으면 그대로 보여주고, null 골은 익명으로 보여준다', () => {
     render(
       <MatchDetailContent
         data={makeMatch({
@@ -618,7 +618,7 @@ describe('MatchDetailContent — 골/카드 타임라인의 이름·팀 귀속',
       />,
     );
     expect(screen.getByText('김철수')).toBeInTheDocument();
-    expect(screen.getByText(WITHHELD_IDENTITY_LABEL)).toBeInTheDocument();
+    expect(screen.getByText('익명')).toBeInTheDocument();
   });
 
   it('라인업이 null(미공개)이어도 이벤트의 이름은 그대로 보인다 -- 라인업 게이트와 독립인 계약', () => {

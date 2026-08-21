@@ -127,13 +127,18 @@ export function PromotionCommitPanel({ preview, submitting, onCommit }: Promotio
                 const changed = kind !== entry.computedKind;
                 return (
                   <li key={entry.teamId} className="flex flex-wrap items-center gap-3 py-2">
-                    <span className="w-8 text-sm font-semibold tabular-nums text-[var(--text-muted)]">
-                      {entry.position}위
+                    {/* 좁은 화면에서는 순위+팀이름이 한 줄을 통째로 쓰고 상태·선택은 다음 줄로 내려간다.
+                        승강을 정하는 화면에서 팀 이름이 잘리면 어떤 팀인지 모르고 결정하게 된다
+                        (390 실측: "리그 QA 브라보…" 로 잘려 브라보FC 인지 구분 불가). */}
+                    <span className="flex w-full min-w-0 items-baseline gap-3 sm:w-auto sm:flex-1">
+                      <span className="w-8 shrink-0 text-sm font-semibold tabular-nums text-[var(--text-muted)]">
+                        {entry.position}위
+                      </span>
+                      <span className="min-w-0 break-keep text-sm font-medium text-[var(--text-strong)]">
+                        {entry.teamName}
+                      </span>
                     </span>
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--text-strong)]">
-                      {entry.teamName}
-                    </span>
-                    <span className={`inline-flex items-center gap-1 text-xs font-semibold ${meta.className}`}>
+                    <span className={`ml-auto inline-flex items-center gap-1 text-xs font-semibold sm:ml-0 ${meta.className}`}>
                       <Icon size={14} aria-hidden="true" />
                       {meta.label}
                     </span>

@@ -1855,6 +1855,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         status: true,
         relatedType: true,
         relatedId: true,
+        reportReason: true,
         createdAt: true,
         updatedAt: true,
         closedAt: true,
@@ -1927,6 +1928,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         contact: true,
         relatedType: true,
         relatedId: true,
+        reportReason: true,
         status: true,
         closedAt: true,
         createdAt: true,
@@ -2821,6 +2823,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     status: string;
     relatedType: string | null;
     relatedId: string | null;
+    reportReason: string | null;
     createdAt: Date;
     updatedAt: Date;
     closedAt: Date | null;
@@ -2840,6 +2843,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       status: row.status,
       relatedType: row.relatedType,
       relatedId: row.relatedId,
+      reportReason: row.reportReason,
       replyCount: row._count.replies,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
@@ -2858,6 +2862,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     contact: string | null;
     relatedType: string | null;
     relatedId: string | null;
+    reportReason: string | null;
     status: string;
     closedAt: Date | null;
     createdAt: Date;
@@ -2886,6 +2891,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         status: row.status,
         relatedType: row.relatedType,
         relatedId: row.relatedId,
+        reportReason: row.reportReason,
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
         closedAt: row.closedAt,

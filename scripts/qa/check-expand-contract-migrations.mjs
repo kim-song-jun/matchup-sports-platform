@@ -22,6 +22,20 @@ class UnparsableSqlError extends Error {}
 // the gate exists to catch does not apply. Keep this list SHORT: every entry
 // weakens the gate for exactly one (file, statement) pair and nothing else.
 const REVIEWED_NON_ADDITIVE = [
+  {
+    file: 'apps/v1_api/prisma/migrations/20260821115900_v1_team_record_facts_played_at_compat/migration.sql',
+    statement:
+      "CREATE OR REPLACE FUNCTION v1_block_team_record_fact_mutation() RETURNS trigger LANGUAGE plpgsql AS $function$ BEGIN IF TG_OP = 'UPDATE' AND (to_jsonb(NEW) - 'played_at') IS NOT DISTINCT FROM (to_jsonb(OLD) - 'played_at') AND OLD.played_at IS NULL AND NEW.played_at IS NOT NULL THEN RETURN NEW; END IF; RAISE EXCEPTION 'team record facts are append-only' USING ERRCODE = '55000'; END $function$",
+    reason:
+      'Hotfix 2026-08-21. The existing append-only trigger remains installed and continues rejecting every DELETE and every UPDATE except a row-preserving NULL-to-value write of the newly introduced played_at field. Before that field exists, OLD.played_at fails closed; after the backfill, NOT NULL makes the exception unreachable. The following migration restores the original unconditional rejection. Reviewed after alpha exposed SQLSTATE 55000.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260821120100_v1_team_record_facts_played_at_relock/migration.sql',
+    statement:
+      "CREATE OR REPLACE FUNCTION v1_block_team_record_fact_mutation() RETURNS trigger LANGUAGE plpgsql AS $function$ BEGIN RAISE EXCEPTION 'team record facts are append-only' USING ERRCODE = '55000'; END $function$",
+    reason:
+      'Hotfix 2026-08-21. Restores the original unconditional append-only trigger function immediately after played_at becomes NOT NULL. It narrows permissions and mutates no data or schema shape. Reviewed after alpha exposed SQLSTATE 55000.',
+  },
   // --- records played-at hotfix (2026-08-21) ---------------------------------
   {
     file: 'apps/v1_api/prisma/migrations/20260821120000_v1_team_record_facts_played_at/migration.sql',

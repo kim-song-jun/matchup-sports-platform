@@ -42,6 +42,12 @@ export class InquiriesService {
     if (!dto.relatedType && relatedId) {
       throw new BadRequestException({ code: 'INVALID_INQUIRY_RELATED_TARGET', message: 'relatedType is required when relatedId is provided' });
     }
+    if (dto.reportReason && dto.category !== 'report') {
+      throw new BadRequestException({
+        code: 'INVALID_INQUIRY_REPORT_REASON',
+        message: 'reportReason is only allowed when category is report',
+      });
+    }
     const inquiry = await this.prisma.v1Inquiry.create({
       data: {
         userId: user.id,
@@ -53,6 +59,7 @@ export class InquiriesService {
         contact: contact || null,
         relatedType: dto.relatedType ?? null,
         relatedId: relatedId || null,
+        reportReason: dto.reportReason ?? null,
       },
     });
 
@@ -109,6 +116,7 @@ function serializeInquiry(
     contact: inquiry.contact,
     relatedType: inquiry.relatedType,
     relatedId: inquiry.relatedId,
+    reportReason: inquiry.reportReason,
     status: inquiry.status,
     createdAt: inquiry.createdAt,
     updatedAt: inquiry.updatedAt,

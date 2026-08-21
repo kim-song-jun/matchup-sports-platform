@@ -71,6 +71,49 @@ describe('InquiriesService', () => {
     })).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  it('stores the report reason when the category is report', async () => {
+    prisma.v1Inquiry.create.mockResolvedValue({
+      id: 'inquiry-2',
+      userId: user.id,
+      category: 'report',
+      title: 'Spam contact requests',
+      body: 'This team keeps spamming us.',
+      contact: null,
+      relatedType: 'team_contact',
+      relatedId: 'team-contact-1',
+      reportReason: 'spam',
+      status: 'received',
+      createdAt: now,
+      updatedAt: now,
+      closedAt: null,
+    });
+
+    await expect(service.create(user, {
+      category: 'report',
+      title: 'Spam contact requests',
+      body: 'This team keeps spamming us.',
+      relatedType: 'team_contact',
+      relatedId: 'team-contact-1',
+      reportReason: 'spam',
+    })).resolves.toMatchObject({ reportReason: 'spam' });
+
+    expect(prisma.v1Inquiry.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ reportReason: 'spam' }),
+    });
+  });
+
+  it('rejects a report reason on a non-report inquiry', async () => {
+    await expect(service.create(user, {
+      category: 'account',
+      title: 'Login issue',
+      body: 'I cannot log in.',
+      reportReason: 'spam',
+    })).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'INVALID_INQUIRY_REPORT_REASON' }),
+    });
+    expect(prisma.v1Inquiry.create).not.toHaveBeenCalled();
+  });
+
   it('lists only current user inquiries', async () => {
     prisma.v1Inquiry.findMany.mockResolvedValue([
       {

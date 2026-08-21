@@ -1755,6 +1755,12 @@ model V1League {
   @@unique([seriesId, seasonNo, tier], map: "v1_leagues_series_season_tier_key")
   @@index([sportId, state])
   @@index([seriesId, seasonNo])
+  // 공개 리그 목록(league-match-public.service.ts list())이 실제로 쓰는 접근 경로 둘.
+  // 그 API 는 regionId 로 필터하고 createdAt desc + id desc 로 정렬·커서 페이지네이션을
+  // 하는데, 인덱스가 [sportId, state] 뿐이라 region 필터와 정렬이 둘 다 인덱스를 못 탔다
+  // (2026-08-21 재감사). sportId 쪽과 같은 모양으로 맞춘다.
+  @@index([regionId, state])
+  @@index([createdAt(sort: Desc), id(sort: Desc)])
   @@map("v1_leagues")
 }
 

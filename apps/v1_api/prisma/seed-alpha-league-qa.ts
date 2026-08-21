@@ -53,6 +53,16 @@ import { assertAlphaSeedAllowed, ensureAlphaQaRecordConsent } from './seed-alpha
  */
 
 const LEAGUE_QA_ID = 'ad100000-0000-4000-8000-000000000001';
+// 티어(1부/2부) 표본용 시리즈. 리그 QA 시드에 시리즈가 0건이라 "N부" 뱃지·시리즈 부제가
+// alpha 화면에서 한 번도 확인된 적이 없었다(2026-08-21 재감사) — 티어 리그는 전부 손으로
+// API 를 친 세션들이 만든 것이었다. 대진은 만들지 않는다: 뱃지·시리즈 문맥 노출이 목적이고,
+// 경기 진행 검증은 위 단발 리그가 이미 덮는다.
+const LEAGUE_QA_SERIES_ID = 'ad200000-0000-4000-8000-000000000001';
+const LEAGUE_QA_SERIES_TITLE = '(테스트) 리그 QA 풋살 리그 체계';
+const TIER_LEAGUE_IDS: readonly string[] = [
+  'ad210000-0000-4000-8000-000000000001', // 1부
+  'ad210000-0000-4000-8000-000000000002', // 2부
+];
 const LEAGUE_TITLE = '(테스트) 리그 QA 풋살 정기 리그';
 
 const TEAM_COUNT = 4;
@@ -239,11 +249,27 @@ interface FixtureSpec {
     readonly awayScore: number;
     readonly scorers: readonly ScorerSpec[];
   };
+  /**
+   * 취소된 대진. **공식 결과가 있는 채로 취소된 상태**를 만든다 — R8(순위 집계에서 제외)과
+   * 화면 표기("취소됨 · 집계 제외"), 그리고 득점 순위에서도 빠지는지를 한 번에 볼 수 있어야
+   * 하는데 그동안 시드에 취소 대진이 0건이라 alpha 에서 그 경로를 눈으로 확인할 방법이
+   * 없었다(2026-08-21 재감사).
+   */
+  readonly cancelled?: boolean;
+  /**
+   * 몰수패(부전승). 실 제품에서는 어드민 액션이 결과 리비전의 reason 에 마커를 붙여
+   * 만든다 — 시드는 그 결과 상태를 재현한다(참가자 0명·이벤트 0건·1:0 고정 스코어).
+   * 공개 화면에서 일반 1:0 승리와 구분되지 않는 것이 현재 설계의 알려진 한계이고,
+   * 이 대진이 그 한계를 실제로 보여주는 예시가 된다.
+   */
+  readonly forfeit?: boolean;
 }
 
 /**
- * 4팀 완전 라운드로빈(3주차 × 2경기 = 6경기). 일부러 확정 3 / 미확정 3으로 섞고, 1경기는
- * 무승부로 만들어 순위표·"확인 중" 배너·득점 순위 화면을 전부 한 번에 검증할 수 있게 한다.
+ * 4팀 완전 라운드로빈(3주차 × 2경기 = 6경기) + 취소·몰수 표본 2경기.
+ * 라운드로빈 6경기는 일부러 확정 3 / 미확정 3으로 섞고 1경기를 무승부로 만들어
+ * 순위표·"확인 중" 배너·득점 순위를 한 번에 검증할 수 있게 한다.
+ * 7·8번은 취소(공식 결과 有)·몰수 경로 전용이다 — 아래 각 항목 주석 참고.
  */
 const FIXTURES: readonly FixtureSpec[] = [
   {
@@ -296,6 +322,36 @@ const FIXTURES: readonly FixtureSpec[] = [
   { no: 4, round: 2, homeTeamNo: 4, awayTeamNo: 2, startAtOffsetDays: -7, result: null },
   { no: 5, round: 3, homeTeamNo: 1, awayTeamNo: 4, startAtOffsetDays: 7, result: null },
   { no: 6, round: 3, homeTeamNo: 2, awayTeamNo: 3, startAtOffsetDays: 7, result: null },
+  // 7·8번은 라운드로빈의 일부가 아니라 **취소·몰수 경로 전용 표본**이다. 그 전까지 시드에
+  // 취소 대진이 0건, 몰수 0건이라 R8(순위 제외)·N-4(득점 순위 제외)·"집계 제외" 표기·
+  // 몰수 결과가 alpha 화면에서 한 번도 확인된 적이 없었다(2026-08-21 재감사).
+  {
+    // 공식 결과가 **있는데 취소된** 대진. 순위표·득점 순위 양쪽에서 빠져야 하고, 경기 일정에는
+    // 점수 대신 "집계 제외"가 떠야 한다. 득점자를 일부러 넣어 둔다 — 이 골이 득점 순위에
+    // 나타나면 N-4 회귀다.
+    no: 7,
+    round: 4,
+    homeTeamNo: 1,
+    awayTeamNo: 3,
+    startAtOffsetDays: -3,
+    cancelled: true,
+    result: {
+      homeScore: 5,
+      awayScore: 0,
+      scorers: [{ sideKey: 'HOME', playerIdx: 4, goals: 5, assists: 0 }],
+    },
+  },
+  {
+    // 몰수패(부전승). 승자 1 : 몰수팀 0 고정, 참가자 스탯 없음. 공개 화면에서 실제 1:0
+    // 승리와 구분되지 않는 것이 현재 설계의 알려진 한계이고, 이 대진이 그 예시다.
+    no: 8,
+    round: 4,
+    homeTeamNo: 2,
+    awayTeamNo: 4,
+    startAtOffsetDays: -3,
+    forfeit: true,
+    result: { homeScore: 1, awayScore: 0, scorers: [] },
+  },
 ] as const;
 
 async function createSideWithRoster(
@@ -442,8 +498,13 @@ async function ensureFixture(
       id,
       ...commonFixtureData,
       createdByUserId,
-      status: spec.result ? V1TeamMatchStatus.completed : V1TeamMatchStatus.matched,
-      completedAt: spec.result ? officialAt : null,
+      status: spec.cancelled
+        ? V1TeamMatchStatus.cancelled
+        : spec.result
+          ? V1TeamMatchStatus.completed
+          : V1TeamMatchStatus.matched,
+      completedAt: spec.result && !spec.cancelled ? officialAt : null,
+      cancelledAt: spec.cancelled ? officialAt : null,
     },
   });
 
@@ -483,6 +544,11 @@ async function ensureFixture(
       eventsHash,
       createdByActorType: V1IdentityActorType.SYSTEM,
       createdBySystemActor: 'LEAGUE_QA_SEED',
+      // 몰수 마커는 문자열 컨벤션이다 — league-match-forfeit.service.ts 의
+      // FORFEIT_REASON_MARKER 와 같은 값을 쓴다(그 파일은 src/ 라 여기서 import 할 수 없다).
+      // 값이 갈리면 어드민이 만든 몰수와 시드가 만든 몰수가 서로 다른 것이 되므로
+      // 문자열을 바꿀 때 두 곳을 함께 고쳐야 한다.
+      ...(spec.forfeit ? { reason: '[LEAGUE_FORFEIT] 리그 QA 시드 — 상대팀 불참' } : {}),
     },
   });
 
@@ -587,6 +653,78 @@ async function ensureLeague(
   return league;
 }
 
+/**
+ * 티어 시리즈 + 1부/2부 리그. 4팀을 2팀씩 나눠 넣는다(리그 최소 인원 = 2팀).
+ * 단발 리그와 같은 팀을 재사용하므로 팀을 새로 만들지 않는다 — 한 팀이 여러 리그에
+ * 참가하는 것은 실제로도 정상이고, 마이 화면의 "내 리그"가 여러 건 뜨는 표본도 된다.
+ */
+async function ensureTierSeries(
+  tx: Prisma.TransactionClient,
+  sportId: string,
+  regionId: string,
+  createdByAdminUserId: string,
+  teams: readonly LeagueTeamRoster[],
+  now: Date,
+) {
+  const startsOn = new Date(now.getTime() - 7 * DAY_MS);
+  const endsOn = new Date(now.getTime() + 21 * DAY_MS);
+
+  await tx.v1LeagueSeries.upsert({
+    where: { id: LEAGUE_QA_SERIES_ID },
+    update: { title: LEAGUE_QA_SERIES_TITLE, sportId, regionId },
+    create: {
+      id: LEAGUE_QA_SERIES_ID,
+      title: LEAGUE_QA_SERIES_TITLE,
+      sportId,
+      regionId,
+      createdByAdminUserId,
+      tierCount: 2,
+      // league-promotion.ts 의 DEFAULT_PROMOTION_RULE 과 같은 값. 이 파일은 src/ 를
+      // import 할 수 없어 값을 복제한다 — 기본 규칙이 바뀌면 두 곳을 함께 고친다.
+      promotionRuleJson: { mode: 'ratio', ratio: 0.2, rounding: 'ceil', minSlots: 1 },
+      state: 'active',
+    },
+  });
+
+  for (const [index, leagueId] of TIER_LEAGUE_IDS.entries()) {
+    const tier = index + 1;
+    const tierTeams = teams.slice(index * 2, index * 2 + 2);
+    if (tierTeams.length < 2) continue;
+    const commonData = {
+      title: `${LEAGUE_QA_SERIES_TITLE} 1시즌 ${tier}부`,
+      sportId,
+      regionId,
+      startsOn,
+      endsOn,
+    };
+    await tx.v1League.upsert({
+      where: { id: leagueId },
+      update: commonData,
+      // state·tier·seasonNo 는 create 전용 — 단발 리그와 같은 이유로, 스태프가 alpha 에서
+      // 직접 바꾼 상태를 재배포가 되돌리면 안 된다.
+      create: {
+        id: leagueId,
+        ...commonData,
+        createdByAdminUserId,
+        tieBreakJson: { order: ['points', 'goalDifference', 'goalsFor', 'headToHead'] },
+        state: 'draft',
+        seriesId: LEAGUE_QA_SERIES_ID,
+        tier,
+        seasonNo: 1,
+      },
+    });
+    for (const team of tierTeams) {
+      await tx.v1LeagueTeam.upsert({
+        where: { leagueId_teamId: { leagueId, teamId: team.id } },
+        update: {},
+        create: { leagueId, teamId: team.id },
+      });
+    }
+  }
+
+  return { seriesId: LEAGUE_QA_SERIES_ID, tierLeagues: TIER_LEAGUE_IDS.length };
+}
+
 async function main() {
   assertAlphaSeedAllowed(process.env);
   const prisma = new PrismaClient();
@@ -627,18 +765,28 @@ async function main() {
 
         let confirmedCount = 0;
         let pendingCount = 0;
+        let cancelledCount = 0;
+        let forfeitCount = 0;
         for (const spec of FIXTURES) {
           await ensureFixture(tx, spec, league, teamsByNo, admin.userId, competitionConfig.id, now);
-          if (spec.result) confirmedCount += 1;
+          if (spec.cancelled) cancelledCount += 1;
+          else if (spec.result) confirmedCount += 1;
           else pendingCount += 1;
+          if (spec.forfeit) forfeitCount += 1;
         }
+
+        const series = await ensureTierSeries(tx, sport.id, region.id, admin.id, teams, now);
 
         return {
           leagueId: league.id,
+          seriesId: series.seriesId,
+          tierLeagues: series.tierLeagues,
           teams: teams.length,
           fixtures: FIXTURES.length,
           confirmedFixtures: confirmedCount,
           pendingFixtures: pendingCount,
+          cancelledFixtures: cancelledCount,
+          forfeitFixtures: forfeitCount,
         };
       },
       // 팀 4 × 선수 4 + 픽스처 6 × (게임 스켈레톤 + 결과) 규모라 Prisma 기본 timeout(5초)을

@@ -11,6 +11,7 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
@@ -87,8 +88,17 @@ export class LeagueSeriesAdminController {
     return this.service.seedSeason(user, seriesId, dto);
   }
 
-  /** 승강 후보 계산 (dry-run). DB 를 바꾸지 않는다. */
+  /**
+   * 승강 후보 계산 (dry-run). DB 를 바꾸지 않는다.
+   *
+   * 읽기 전용이지만 이 저장소에서 손꼽히게 무거운 어드민 조회다 — 티어마다 리그 전체의
+   * 팀매치·게임·공식결과를 훑어 순위표를 처음부터 계산한다(3티어면 3회). 권한도
+   * getActiveAdmin(읽기 전용 support 어드민 포함)이라 쓰기 권한 없이도 무제한 호출할 수
+   * 있었다. 같은 성격의 팀 자동구성 preview 에는 이미 레이트리밋이 걸려 있다.
+   * V1ThrottlerGuard 는 NODE_ENV !== 'production' 이면 스킵하므로 테스트는 영향받지 않는다.
+   */
   @Post(':seriesId/seasons/:seasonNo/promotions/preview')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   previewPromotions(
     @CurrentUser() user: V1AuthUser,
     @Param('seriesId', seriesIdPipe) seriesId: string,

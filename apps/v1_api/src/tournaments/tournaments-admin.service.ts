@@ -631,17 +631,21 @@ export class TournamentsAdminService {
       where: {
         tournamentId,
         status: 'confirmed',
+        // 수신자는 대회 후기 작성 권한과 정확히 같아야 한다. 2026-08-18 에 상대 팀 후기를
+        // 모든 참가 멤버에게 열었으므로(#554) 여기서도 역할 필터를 걷는다 — 그대로 두면
+        // 팀장·운영진만 알림을 받고 나머지 팀원은 쓸 수 있는데 알 방법이 없다
+        // (프로덕션 실측: 작성 가능 164명 중 알림 대상 29명).
         team: {
           status: 'active',
           deletedAt: null,
-          memberships: { some: { status: 'active', role: { in: ['owner', 'manager'] } } },
+          memberships: { some: { status: 'active' } },
         },
       },
       select: {
         team: {
           select: {
             memberships: {
-              where: { status: 'active', role: { in: ['owner', 'manager'] } },
+              where: { status: 'active' },
               select: { userId: true },
             },
           },

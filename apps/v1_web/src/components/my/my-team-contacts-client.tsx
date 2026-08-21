@@ -18,7 +18,7 @@ import type { V1TeamContact, V1TeamContactStatus } from '@/hooks/use-v1-api';
 import { chatRoomHref } from '@/lib/chat-route';
 import { formatTournamentDateTimeLong, formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
-import { isTeamOperatorRole } from '@/lib/team-role';
+import { isTeamOperatorRole, normalizeMyTeamsResponse } from '@/lib/team-role';
 import type { V1MyTeam, V1MyTeamsResponse } from '@/types/api';
 
 type Direction = 'inbound' | 'outbound';
@@ -44,10 +44,6 @@ const STATUS_BADGE_CLASS: Record<V1TeamContactStatus, string> = {
  * team-contact-new-client.tsx의 동일 헬퍼와 같은 관례(2곳 이상 중복은 이 저장소의
  * 기존 관행 — team-matches-create-client.tsx/teams-client.tsx도 각자 로컬 정의).
  */
-function normalizeMyTeams(data: V1MyTeamsResponse | undefined): V1MyTeam[] {
-  if (!data) return [];
-  return 'items' in data ? data.items : (data as V1MyTeam[]);
-}
 
 function truncateMessage(message: string, max = 30) {
   const trimmed = message.trim();
@@ -71,7 +67,7 @@ function formatExpiresIn(expiresAt: string): string {
 export function MyTeamContactsListClient() {
   const myTeamsQuery = useV1MyTeams();
   const operatorTeams = useMemo(
-    () => normalizeMyTeams(myTeamsQuery.data).filter((team) => isTeamOperatorRole(team.role)),
+    () => normalizeMyTeamsResponse(myTeamsQuery.data).filter((team) => isTeamOperatorRole(team.role)),
     [myTeamsQuery.data],
   );
   const [selectedTeamId, setSelectedTeamId] = useState('');
@@ -220,7 +216,7 @@ export function MyTeamContactDetailClient({ contactId }: { contactId: string }) 
   const operatorTeamIds = useMemo(
     () =>
       new Set(
-        normalizeMyTeams(myTeamsQuery.data)
+        normalizeMyTeamsResponse(myTeamsQuery.data)
           .filter((team) => isTeamOperatorRole(team.role))
           .map((team) => team.teamId),
       ),

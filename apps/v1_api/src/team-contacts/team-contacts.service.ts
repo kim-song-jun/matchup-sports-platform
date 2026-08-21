@@ -1,4 +1,11 @@
-import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { NotificationsService, type NotificationEventType } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -6,6 +13,8 @@ import { CreateTeamContactDto, DeclineTeamContactDto, ListTeamContactsQueryDto }
 
 /** 한 팀이 24시간 동안 보낼 수 있는 컨택 수. 확정값 — 스펙 §2. */
 const DAILY_SEND_LIMIT = 10;
+/** 일일 한도 초과 응답이 클라이언트에 알려주는 재시도 대기(초). 24시간 rolling window 기준. */
+const RETRY_AFTER_SECONDS = 24 * 60 * 60;
 /** 무응답 컨택이 만료되기까지의 일수. 확정값 — 스펙 §6. */
 const EXPIRY_DAYS = 7;
 /** 목록 조회 기본/최대 페이지 크기. */
@@ -105,9 +114,15 @@ export class TeamContactsService {
         where: { fromTeamId: dto.fromTeamId, createdAt: { gte: since } },
       });
       if (sentToday >= DAILY_SEND_LIMIT) {
-        throw stateConflict(
-          '오늘 보낼 수 있는 컨택을 모두 사용했어요. 내일 다시 시도해 주세요.',
-          'TEAM_CONTACT_DAILY_LIMIT_EXCEEDED',
+        // 레이트 리밋은 상태 충돌이 아니다 — 스펙 §8(a) 가 429 를 요구하고 프론트도 그렇게 가정한다.
+        // 실제 Retry-After 헤더는 서비스에서 던지는 예외로는 붙일 수 없어 details 로 내려보낸다.
+        throw new HttpException(
+          {
+            code: 'TEAM_CONTACT_DAILY_LIMIT_EXCEEDED',
+            message: '오늘 보낼 수 있는 컨택을 모두 사용했어요. 내일 다시 시도해 주세요.',
+            details: { retryAfterSeconds: RETRY_AFTER_SECONDS },
+          },
+          HttpStatus.TOO_MANY_REQUESTS,
         );
       }
 
@@ -244,10 +259,19 @@ export class TeamContactsService {
   async listForTeam(user: V1AuthUser, teamId: string, query: ListTeamContactsQueryDto) {
     await this.assertCanManageTeam(user.id, teamId);
     const limit = Math.min(Math.max(query.limit ?? DEFAULT_PAGE_SIZE, 1), MAX_PAGE_SIZE);
+    const directionWhere =
+      query.direction === 'outbound' ? { fromTeamId: teamId } : { toTeamId: teamId };
+
+    // 조회 **전에** 이 팀·방향의 만료된 대기 건을 정리한다. 이걸 안 하면 status 필터가 원시 DB 값을
+    // 보기 때문에 `status=expired` 가 표시상 만료된 행(DB 는 아직 requested)을 통째로 놓친다.
+    await this.prisma.v1TeamContact.updateMany({
+      where: { ...directionWhere, status: 'requested', expiresAt: { lt: new Date() } },
+      data: { status: 'expired' },
+    });
 
     const rows = await this.prisma.v1TeamContact.findMany({
       where: {
-        ...(query.direction === 'outbound' ? { fromTeamId: teamId } : { toTeamId: teamId }),
+        ...directionWhere,
         ...(query.status ? { status: query.status as TeamContactStatus } : {}),
       },
       orderBy: { createdAt: 'desc' },
@@ -269,7 +293,9 @@ export class TeamContactsService {
       throw new NotFoundException({ code: 'TEAM_CONTACT_NOT_FOUND', message: '컨택을 찾을 수 없어요.' });
     }
     await this.assertParticipantSide(user.id, contact);
-    return this.toListItem(contact);
+    // 단건 경로이므로 respond() 와 같은 lazy-flip 을 적용해 DB 상태까지 맞춘다.
+    const status = await this.settleExpiry(contact);
+    return this.toListItem({ ...contact, status });
   }
 
   /** 받는 팀 → 보낸 팀 순으로 본다. 어느 한쪽 운영진이면 통과. */

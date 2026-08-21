@@ -144,7 +144,9 @@ describe('TeamContactsService.create', () => {
     prisma.v1TeamContact.count.mockResolvedValue(10);
     const service = new TeamContactsService(prisma, makeNotifications());
 
+    // 레이트 리밋은 409(상태 충돌)가 아니라 429 여야 한다 — 스펙 §8(a) 와 프론트가 그렇게 가정한다.
     await expect(service.create(actor, 'B', dto)).rejects.toMatchObject({
+      status: 429,
       response: { code: 'TEAM_CONTACT_DAILY_LIMIT_EXCEEDED' },
     });
     expect(prisma.v1TeamContact.create).not.toHaveBeenCalled();
@@ -391,6 +393,28 @@ describe('TeamContactsService.listForTeam', () => {
 
     const result = await service.listForTeam(actor, 'B', { direction: 'inbound' });
     expect(result.items[0].status).toBe('expired');
+  });
+
+  // 이 정리가 없으면 status 필터가 원시 DB 값을 보기 때문에
+  // `status=expired` 가 표시상 만료된 행(DB 는 requested)을 통째로 놓친다.
+  it('목록 조회 전에 해당 팀·방향의 만료된 대기 건을 정리한다', async () => {
+    const prisma = makePrisma();
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
+    prisma.v1TeamContact.findMany.mockResolvedValue([]);
+    const service = new TeamContactsService(prisma, makeNotifications());
+
+    await service.listForTeam(actor, 'B', { direction: 'inbound' });
+
+    expect(prisma.v1TeamContact.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          toTeamId: 'B',
+          status: 'requested',
+          expiresAt: expect.objectContaining({ lt: expect.any(Date) }),
+        }),
+        data: { status: 'expired' },
+      }),
+    );
   });
 
   it('상세는 보낸 팀 운영진도 볼 수 있다', async () => {

@@ -11,11 +11,14 @@
  */
 import type { Prisma } from '@prisma/client';
 import {
+  deriveTournamentFixtureOfficialGoals,
   hasTournamentFixtureOfficialResult,
+  isPeriodUnknown,
   parseTournamentFixtureOfficialScore,
   resolveTournamentFixtureOfficialResult,
   resolveTournamentFixtureOfficialScore,
   resolveTournamentFixtureOfficialTimestamp,
+  type TournamentFixtureGoalEventRow,
   type TournamentFixtureGameForResult,
   type TournamentFixtureLegacyResult,
 } from './tournament-fixture-official-result';
@@ -28,7 +31,15 @@ function officialGame(overrides: Record<string, unknown> = {}): TournamentFixtur
     ],
     participants: [{ id: 'player-1', displayNameSnapshot: '새경로 선수' }],
     events: [
-      { id: 'event-1', type: 'GOAL', sideId: 'side-home', participantId: 'player-1', clockMs: 60000, reversesEventId: null },
+      {
+        id: 'event-1',
+        type: 'GOAL',
+        sideId: 'side-home',
+        participantId: 'player-1',
+        clockMs: 60000,
+        payload: null,
+        reversesEventId: null,
+      },
     ],
     currentOfficialRevision: {
       id: 'revision-new-path',
@@ -264,6 +275,7 @@ describe('deriveTournamentFixtureOfficialGoals — minuteKnown', () => {
       sideId: 'side-home',
       participantId: null,
       clockMs: 0,
+      payload: null,
       reversesEventId: null,
       ...overrides,
     } as TournamentFixtureGoalEventRow;

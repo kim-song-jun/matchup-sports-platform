@@ -148,6 +148,7 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
               sideId: 'side-home',
               participantId: 'participant-1',
               clockMs: 300_000,
+              payload: null,
               reversesEventId: null,
             },
           ],
@@ -199,6 +200,7 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
               sideId: 'side-home',
               participantId: null,
               clockMs: 60_000,
+              payload: null,
               reversesEventId: null,
             },
             {
@@ -207,6 +209,7 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
               sideId: 'side-home',
               participantId: null,
               clockMs: 65_000,
+              payload: null,
               reversesEventId: 'event-goal-cancelled',
             },
           ],

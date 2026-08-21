@@ -85,3 +85,21 @@ ALTER TABLE "v1_team_contact_blocks" ADD CONSTRAINT "v1_team_contact_blocks_crea
 -- AddForeignKey
 ALTER TABLE "v1_chat_rooms" ADD CONSTRAINT "v1_chat_rooms_team_contact_id_fkey" FOREIGN KEY ("team_contact_id") REFERENCES "v1_team_contacts"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
+
+-- v1_chat_rooms 의 "링크 대상은 정확히 하나" CHECK 제약에 team_contact_id 를 편입한다.
+-- 이 제약은 raw SQL 이라 schema.prisma 에 나타나지 않는다 — 컬럼만 추가하고 제약을 그대로 두면
+-- team_contact_id 만 채운 행이 "0개 채움"으로 판정돼 23514 로 거부된다(CI 통합테스트가 잡은 실제 500).
+-- team_id 를 추가했을 때의 선례(20260630000000_v1_chat_room_team_target_constraint)와 같은 방식이다.
+ALTER TABLE "v1_chat_rooms"
+  DROP CONSTRAINT IF EXISTS "v1_chat_rooms_exactly_one_target_check";
+
+ALTER TABLE "v1_chat_rooms"
+  ADD CONSTRAINT "v1_chat_rooms_exactly_one_target_check"
+  CHECK (
+    (
+      ("match_id" IS NOT NULL)::int
+      + ("team_id" IS NOT NULL)::int
+      + ("team_match_id" IS NOT NULL)::int
+      + ("team_contact_id" IS NOT NULL)::int
+    ) = 1
+  );

@@ -288,6 +288,8 @@ export interface GameResultEvent {
   clockMs: number;
   reversed?: boolean;
   card?: 'YELLOW' | 'RED';
+  /** Explicit operator choice to record a GOAL/OWN_GOAL without identifying a player. */
+  anonymous?: boolean;
 }
 
 export interface GameResultInvariantInput {

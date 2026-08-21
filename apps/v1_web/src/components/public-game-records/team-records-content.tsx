@@ -12,6 +12,7 @@ import {
   formatGoalMinute,
   formatTeamRecordPenaltyScoreline,
   isClockAbnormal,
+  presentGameEventParticipantName,
   presentParticipantName,
   teamRecordResultLabel,
 } from './format';
@@ -45,7 +46,7 @@ function TeamRecordEventRow({ event }: { event: PublicTeamRecordEvent }) {
         <span className="tab-num" style={{ color: 'var(--text-caption)', fontSize: 12 }}>{event.jerseyNumber}</span>
       ) : null}
       <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-strong)' }}>
-        {presentParticipantName(event.participantName)}
+        {presentGameEventParticipantName(event.type, event.participantName)}
       </span>
     </span>
   );
@@ -192,7 +193,7 @@ function TeamRecordRow({
             whiteSpace: 'nowrap',
           }}
         >
-          {formatTournamentDateShort(item.officialAt) ?? ''}
+          {formatTournamentDateShort(item.playedAt) ?? ''}
           {item.tournamentTitle ? ` · ${item.tournamentTitle}` : ''}
         </span>
       </div>

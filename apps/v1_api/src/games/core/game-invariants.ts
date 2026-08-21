@@ -65,8 +65,12 @@ function validateEventShape(event: GameResultEvent): void {
   if (event.type === V1GameEventType.FOUL && event.participantId === undefined) {
     throw new GameContractError('EVENT_INVALID', 'Foul event requires a participant');
   }
-  if (event.type === V1GameEventType.OWN_GOAL && event.participantId === undefined) {
-    throw new GameContractError('EVENT_INVALID', 'Own goal event requires a participant');
+  if (
+    event.type === V1GameEventType.OWN_GOAL &&
+    event.participantId === undefined &&
+    event.anonymous !== true
+  ) {
+    throw new GameContractError('EVENT_INVALID', 'Anonymous own goal must be explicitly marked');
   }
   if (event.assistParticipantId !== undefined && event.type !== V1GameEventType.GOAL) {
     throw new GameContractError('EVENT_INVALID', 'Assist can only be recorded on a GOAL event');
@@ -156,8 +160,8 @@ export function validateGameResultInvariants(input: GameResultInvariantInput): v
       if (event.type === V1GameEventType.OWN_GOAL) {
         // 자책골은 상대 팀 점수만 올리고 행위 선수의 개인 득점에는 넣지 않는다.
       } else if (participant === undefined) {
-        hasMissingScorer = true;
-        if (input.scorerPolicy === 'required') {
+        if (event.anonymous !== true) hasMissingScorer = true;
+        if (input.scorerPolicy === 'required' && event.anonymous !== true) {
           throw new GameContractError('PARTICIPANT_INVALID', 'Scorer is required for every goal');
         }
       } else {

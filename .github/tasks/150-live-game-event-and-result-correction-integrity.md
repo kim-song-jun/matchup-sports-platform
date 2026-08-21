@@ -19,6 +19,7 @@
 - [x] 결과 정정에서 승부차기 점수와 선축을 고칠 수 있다.
 - [x] 라인업을 다시 불러올 때 저장 등번호와 최근 등번호가 복원된다.
 - [x] 공개 경기 기록 시간은 초를 노출하지 않고 다음 분으로 올림한다 (`2:04` → `3분`).
+- [x] 골과 자책골은 선수를 지정하지 않고 명시적 익명 이벤트로 등록할 수 있으며, 공개 기록은 각각 `익명`과 `OG`로 표시한다.
 
 ## Acceptance criteria
 
@@ -40,6 +41,7 @@
 - 정정 타임라인은 원본 이벤트를 즉시 변경하지 않는다. 리비전 스냅샷으로 저장해 OFFICIAL pointer 전환 시에만 공개 projection이 바뀌게 한다.
 - 2026-08-19 구현 완료: OWN_GOAL, 라이브 reverse/re-entry, goalEvents 리비전 스냅샷, 점수·개인 득점 서버 정합성 검증, 승부차기 정정, 공개 올림 분 표시를 반영했다.
 - 2026-08-20 자책골 표시 계약 보완: 득점 귀속 side는 점수 계산에만 사용하고, 일정·상세·팀 전적의 이벤트 행은 자책골 선수 소속팀 영역에 표시한다. 대회 득점자 집계에서도 자책골을 제외한다.
+- 2026-08-21 익명 득점 계약 보완: 라이브 운영·결과 입력에서 GOAL/OWN_GOAL의 선수 미지정 등록을 허용하고 `payload.anonymous=true`로 의도적인 익명과 누락을 구분한다. 익명 GOAL은 `익명`, OWN_GOAL은 `OG`로 표시한다.
 - 2026-08-19 자동 검증: API target suite 103/103 + 신규 정합성 suite, Web target suite 124/124 + 신규 UI 회귀.
 - 2026-08-19 최종 검증: API 결과 정정/승부차기 통합 테스트 20/20 통과. headed Chromium에서 데스크톱 1440×900, 모바일 390×844 정정 모달과 LIVE 운영 콘솔을 캡처했으며 console/network 오류와 가로 넘침은 0건이었다.
 - Screenshot evidence: `output/playwright/task150/desktop-result-edit-modal.png`, `output/playwright/task150/mobile-result-edit-modal.png`, `output/playwright/task150/desktop-operate-console-live-events.png`.

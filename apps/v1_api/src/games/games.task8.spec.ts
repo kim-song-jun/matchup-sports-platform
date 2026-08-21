@@ -180,6 +180,11 @@ async function createTask8Service(initialSequences: readonly number[], lastSeque
         return { id: 'task8-side' };
       },
     },
+    v1CompetitionConfigVersion: {
+      async findUnique() {
+        return { result: { tournamentScorerPolicy: 'required' } };
+      },
+    },
     v1IdempotencyRecord: {
       async findUnique({
         where,
@@ -239,6 +244,40 @@ async function createTask8Service(initialSequences: readonly number[], lastSeque
 }
 
 describe('Task 8 HTTP event backfill PIN and RED', () => {
+  it('accepts an explicitly anonymous goal even when tournament scorer policy is required', async () => {
+    const fixture = await createTask8Service([], 0);
+    const takeover = await fixture.service.requestTakeover(reader, 'task8-game', {
+      clientInstanceId: 'task8-client',
+      lastSequence: 0,
+    });
+    const anonymousGoal = {
+      ...eventInput('anonymous-goal', { anonymous: true }),
+      takeoverToken: takeover.takeoverToken,
+      type: V1GameEventType.GOAL,
+    };
+
+    try {
+      const result = await fixture.service.appendEvent(
+        reader,
+        'task8-game',
+        anonymousGoal.clientEventId,
+        anonymousGoal,
+      );
+      expect(result.event).toEqual(
+        expect.objectContaining({
+          type: 'GOAL',
+          participantId: null,
+          payload: { anonymous: true },
+        }),
+      );
+      expect(fixture.state.events[0]).toEqual(
+        expect.objectContaining({ payload: { anonymous: true } }),
+      );
+    } finally {
+      await fixture.close();
+    }
+  });
+
   it('Task 8 PIN returns only ascending events after the requested sequence and the durable lastSequence', async () => {
     const fixture = await createTask8Service([3, 1, 2], 3);
 

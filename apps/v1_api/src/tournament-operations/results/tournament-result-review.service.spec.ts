@@ -427,6 +427,29 @@ describe('공식 득점 타임라인 정합성', () => {
     expect(harness.createdRevisions).toHaveLength(1);
   });
 
+  it('명시적인 익명 자책골은 선수 없이 저장하고 missingScorer 경고를 만들지 않는다', async () => {
+    const harness = createHarness();
+    await harness.correct({
+      actualParticipants: [
+        { ...validParticipants[0], goals: 0 },
+        { ...validParticipants[1], goals: 0 },
+      ],
+      goalEvents: [
+        {
+          id: 'anonymous-own-goal-1',
+          sideId: ids.homeSide,
+          anonymous: true,
+          minute: 3,
+          period: 1,
+          ownGoal: true,
+        },
+      ],
+    });
+
+    expect(harness.createdRevisions).toHaveLength(1);
+    expect(harness.createdRevisions[0].missingScorer).toBe(false);
+  });
+
   it('득점 타임라인 합계가 전체 점수와 다르면 리비전을 만들지 않는다', async () => {
     const harness = createHarness();
     const error = await captureFailure(() =>

@@ -125,7 +125,7 @@ describe('ActionTargetPicker — 액션 우선(액션 먼저, 대상은 나중)'
     expect(onCommit).toHaveBeenCalledWith(expect.objectContaining({ payload: { card: 'RED' } }));
   });
 
-  it('FOUL만 선수 없이 팀 단위로 기록하는 경로를 제공한다', () => {
+  it('GOAL은 선수 없이 익명으로 팀 득점을 기록한다', async () => {
     const onCommitGoal = vi.fn();
     render(
       <ActionTargetPicker
@@ -135,12 +135,38 @@ describe('ActionTargetPicker — 액션 우선(액션 먼저, 대상은 나중)'
         frozen={FROZEN}
         sides={SIDES}
         lineups={LINEUPS}
-        allowTeamOnly={false}
+        allowTeamOnly
         onCommit={onCommitGoal}
         onCancel={vi.fn()}
       />,
     );
-    expect(screen.queryByText(/선수 지정 없이/)).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: /강남 풋살 클럽 · 익명 골로 기록/ }));
+    expect(onCommitGoal).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'GOAL', sideId: 's-home', payload: { anonymous: true } }),
+    );
+    expect(onCommitGoal.mock.calls[0]![0].participantId).toBeUndefined();
+  });
+
+  it('OWN_GOAL은 선수 없이 득점 팀 기준으로 OG를 기록한다', async () => {
+    const onCommit = vi.fn();
+    render(
+      <ActionTargetPicker
+        open
+        actionLabel="자책골"
+        actionType="OWN_GOAL"
+        frozen={FROZEN}
+        sides={SIDES}
+        lineups={LINEUPS}
+        allowTeamOnly
+        onCommit={onCommit}
+        onCancel={vi.fn()}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: /성수 풋살 클럽 득점 · OG로 기록/ }));
+    expect(onCommit).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'OWN_GOAL', sideId: 's-away', payload: { anonymous: true } }),
+    );
+    expect(onCommit.mock.calls[0]![0].participantId).toBeUndefined();
   });
 
   it('FOUL에서 "선수 지정 없이"를 고르면 participantId 없이 sideId만으로 커밋한다', async () => {

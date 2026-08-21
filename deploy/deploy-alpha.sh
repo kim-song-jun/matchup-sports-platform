@@ -243,6 +243,7 @@ for attempt in $(seq 1 30); do
 done
 
 readonly RECORDS_PROFILE_REPAIR_MIGRATION="20260819090000_v1_records_profile_integration_repair"
+readonly PLAYED_AT_MIGRATION="20260821120000_v1_team_record_facts_played_at"
 
 recover_known_records_profile_migration_failure() {
   local migration_table_exists failed_count failure_logs
@@ -295,7 +296,59 @@ recover_known_records_profile_migration_failure() {
     "cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate resolve --rolled-back ${RECORDS_PROFILE_REPAIR_MIGRATION}"
 }
 
+recover_known_played_at_migration_failure() {
+  local migration_table_exists failed_count failure_logs
+  migration_table_exists="$("${compose[@]}" exec -T v1_postgres \
+    psql -v ON_ERROR_STOP=1 -At \
+    -U "${V1_DB_USER:-teameet_v1}" \
+    -d "${V1_DB_NAME:-teameet_v1}" \
+    -c "SELECT to_regclass('public.\"_prisma_migrations\"') IS NOT NULL")"
+  if [[ "${migration_table_exists}" == "f" ]]; then
+    return 0
+  fi
+  [[ "${migration_table_exists}" == "t" ]] || {
+    echo "[alpha-deploy] Could not verify the Prisma migration table" >&2
+    return 1
+  }
+
+  failed_count="$("${compose[@]}" exec -T v1_postgres \
+    psql -v ON_ERROR_STOP=1 -At \
+    -U "${V1_DB_USER:-teameet_v1}" \
+    -d "${V1_DB_NAME:-teameet_v1}" \
+    -c "SELECT COUNT(*) FROM \"_prisma_migrations\" WHERE migration_name = '${PLAYED_AT_MIGRATION}' AND finished_at IS NULL AND rolled_back_at IS NULL")"
+
+  [[ "${failed_count}" =~ ^[0-9]+$ ]] || {
+    echo "[alpha-deploy] Could not verify the played-at migration failure state" >&2
+    return 1
+  }
+  if [[ "${failed_count}" == "0" ]]; then
+    return 0
+  fi
+  if [[ "${failed_count}" != "1" ]]; then
+    echo "[alpha-deploy] Refusing to auto-recover ${failed_count} unresolved ${PLAYED_AT_MIGRATION} attempts" >&2
+    return 1
+  fi
+
+  failure_logs="$("${compose[@]}" exec -T v1_postgres \
+    psql -v ON_ERROR_STOP=1 -At \
+    -U "${V1_DB_USER:-teameet_v1}" \
+    -d "${V1_DB_NAME:-teameet_v1}" \
+    -c "SELECT COALESCE(logs, '') FROM \"_prisma_migrations\" WHERE migration_name = '${PLAYED_AT_MIGRATION}' AND finished_at IS NULL AND rolled_back_at IS NULL")"
+
+  if [[ "${failure_logs}" != *'team record facts are append-only'* ]] ||
+    [[ "${failure_logs}" != *'v1_block_team_record_fact_mutation'* ]] ||
+    [[ "${failure_logs}" != *'55000'* ]]; then
+    echo "[alpha-deploy] Refusing to auto-recover an unrecognized ${PLAYED_AT_MIGRATION} failure" >&2
+    return 1
+  fi
+
+  echo "[alpha-deploy] Marking the reviewed played-at append-only failure rolled back before retry"
+  "${compose[@]}" run --rm --no-deps -T v1_api sh -c \
+    "cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate resolve --rolled-back ${PLAYED_AT_MIGRATION}"
+}
+
 recover_known_records_profile_migration_failure
+recover_known_played_at_migration_failure
 "${compose[@]}" run --rm --no-deps -T v1_api sh -c \
   'cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate deploy'
 # 게임 운영 플래그 불변 행 시드. 마이그레이션에 DML 을 넣을 수 없고(expand-contract 게이트)

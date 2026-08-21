@@ -26,6 +26,10 @@ export class GameResultGoalEventDto {
   participantId?: string;
 
   @IsOptional()
+  @IsBoolean()
+  anonymous?: boolean;
+
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(0)

@@ -209,7 +209,7 @@ function makeTeamRecords(overrides: Partial<PublicTeamRecordsResponse> = {}): Pu
         goalsAgainst: 1,
         penalties: null,
         events: [],
-        officialAt: '2026-08-10T11:00:00.000Z',
+        playedAt: '2026-08-09T02:00:00.000Z',
       },
     ],
     nextCursor: null,
@@ -228,6 +228,11 @@ describe('TeamRecordsContent — 정정 배지', () => {
   it('팀 전적 행에는 정정됨 배지를 보여주지 않는다', () => {
     render(<TeamRecordsContent data={makeTeamRecords()} />);
     expect(screen.queryByText('정정됨')).not.toBeInTheDocument();
+  });
+
+  it('결과 정정 시각이 아니라 실제 경기 일자를 표시한다', () => {
+    render(<TeamRecordsContent data={makeTeamRecords()} />);
+    expect(screen.getByText(/8\/9 \(일\)/)).toBeInTheDocument();
   });
 });
 
@@ -476,7 +481,7 @@ describe('ScheduleContent — 진행 중 경기의 라이브 스코어/경과 �
 /* ── 득점자 타임라인 + 영상 링크 (관전자에게 노출) ── */
 
 describe('MatchDetailContent — 골/카드 타임라인의 이름·팀 귀속', () => {
-  it('참가자 이름이 있으면 그대로 보여주고, null이면 익명 라벨을 보여준다', () => {
+  it('참가자 이름이 있으면 그대로 보여주고, null 골은 익명으로 보여준다', () => {
     render(
       <MatchDetailContent
         data={makeMatch({
@@ -489,7 +494,7 @@ describe('MatchDetailContent — 골/카드 타임라인의 이름·팀 귀속',
       />,
     );
     expect(screen.getByText('김철수')).toBeInTheDocument();
-    expect(screen.getByText(WITHHELD_IDENTITY_LABEL)).toBeInTheDocument();
+    expect(screen.getByText('익명')).toBeInTheDocument();
   });
 
   it('라인업이 null(미공개)이어도 이벤트의 이름은 그대로 보인다 -- 라인업 게이트와 독립인 계약', () => {

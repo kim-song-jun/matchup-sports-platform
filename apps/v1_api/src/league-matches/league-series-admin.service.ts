@@ -3,6 +3,7 @@ import { AdminContextService } from '../common/admin-context.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { LeagueMatchPublicService } from './league-match-public.service';
+import { findUnfinishedSeasonLeagues, planNextSeasonTiers } from './league-lifecycle-rules';
 import {
   calculatePromotions,
   validatePromotionRule,
@@ -470,11 +471,15 @@ export class LeagueSeriesAdminService {
       });
 
       const createdLeagues: Array<{ id: string; tier: number; teamCount: number }> = [];
+      // 팀 2개 미만인 티어는 만들지 않는다 -- 규칙과 근거는 planNextSeasonTiers 참고.
+      const plan = planNextSeasonTiers({ resolved, tierCount: series.tierCount });
+      const skippedTiers = plan.skipped.map((entry) => ({
+        tier: entry.tier,
+        tierLabel: tierLabel(entry.tier),
+        teamCount: entry.teamIds.length,
+      }));
       if (dto.createNextSeason !== false) {
-        for (let tier = 1; tier <= series.tierCount; tier += 1) {
-          // 탈퇴 팀은 다음 시즌에 넣지 않는다.
-          const teamIds = resolved.filter((row) => row.kind !== 'withdrawn' && row.toTier === tier).map((row) => row.teamId);
-          if (teamIds.length === 0) continue;
+        for (const { tier, teamIds } of plan.tiers) {
           const league = await tx.v1League.create({
             data: {
               title: `${series.title} ${nextSeasonNo}시즌 ${tierLabel(tier)}`,
@@ -501,7 +506,7 @@ export class LeagueSeriesAdminService {
         targetId: seriesId,
       });
 
-      return createdLeagues;
+      return { createdLeagues, skippedTiers };
     });
 
     return {
@@ -510,7 +515,10 @@ export class LeagueSeriesAdminService {
       nextSeasonNo,
       decidedCount: resolved.length,
       overriddenCount: resolved.filter((row) => row.overriddenByAdmin).length,
-      nextSeasonLeagues: result.map((league) => ({ ...league, tierLabel: tierLabel(league.tier) })),
+      nextSeasonLeagues: result.createdLeagues.map((league) => ({ ...league, tierLabel: tierLabel(league.tier) })),
+      // 팀이 2개 미만이라 다음 시즌에 만들지 않은 티어. 조용히 빠지면 운영자가
+      // "왜 3부가 없지?"를 알 방법이 없다.
+      skippedTiers: result.skippedTiers,
     };
   }
 
@@ -539,17 +547,49 @@ export class LeagueSeriesAdminService {
     return series;
   }
 
-  /** 시즌의 티어별 확정 순위표. 미확정 경기가 남아 있으면 승강을 계산하지 않는다. */
+  /**
+   * 시즌의 티어별 확정 순위표. 시즌이 실제로 끝나지 않았으면 승강을 계산하지 않는다.
+   *
+   * 게이트가 `pendingFixtures > 0`이면 안 된다(2026-08-21 재감사에서 실측으로 잡힌 결함).
+   * `pendingFixtures`는 **존재하는** 대진 중 미확정인 것만 세므로, 대진이 아직 하나도
+   * 없는 리그(`state=draft`)나 전 대진이 취소된 리그는 pending이 0이라 게이트를 그냥
+   * 통과한다. 그러면 전 팀 0승0무0패·0점인 순위표가 넘어가고, tie-break가 전부 소진된
+   * 뒤 `calculateLeagueStandings`의 결정적 폴백(팀ID 사전순)이 순위를 정한다 --
+   * 즉 **한 경기도 치르지 않은 시즌의 강등 팀이 UUID 사전순으로 뽑힌다.**
+   * alpha에서 3티어 전부 draft·대진 0건인 시리즈로 재현해 201 + 완전한 승강안을 받았다.
+   *
+   * 그래서 판정 기준을 D-3이 이미 만들어 둔 리그 상태(`completed`)로 옮긴다. 이 상태는
+   * "취소 제외 전 대진이 공식 결과를 확보했다"를 뜻하므로 승강이 요구하는 "확정 순위표"와
+   * 정확히 같은 조건이고, draft·빈 리그를 자동으로 배제한다.
+   * (대진을 취소로 끝낸 리그도 `completed`가 되도록 `cancelFixture`에 완료 재평가를
+   * 함께 넣었다 -- 그게 없으면 이 게이트가 교착을 만든다.)
+   */
   private async loadSeasonStandings(seriesId: string, seasonNo: number) {
     const leagues = await this.prisma.v1League.findMany({
       where: { seriesId, seasonNo },
       orderBy: { tier: 'asc' },
-      select: { id: true, tier: true },
+      select: { id: true, tier: true, state: true },
     });
     if (leagues.length === 0) {
       throw new NotFoundException({
         code: 'LEAGUE_SEASON_NOT_FOUND',
         message: '해당 시즌의 리그를 찾을 수 없어요.',
+      });
+    }
+
+    const unfinished = findUnfinishedSeasonLeagues(leagues);
+    if (unfinished.length > 0) {
+      const labels = unfinished.map((league) => tierLabel(league.tier ?? 1)).join(' · ');
+      throw new ConflictException({
+        code: 'LEAGUE_SEASON_NOT_FINISHED',
+        message: `${labels}가 아직 끝나지 않았어요. 모든 경기 결과가 확정돼야 승강을 계산할 수 있어요.`,
+        details: {
+          unfinished: unfinished.map((league) => ({
+            leagueId: league.id,
+            tier: league.tier ?? 1,
+            state: league.state,
+          })),
+        },
       });
     }
 
@@ -560,13 +600,6 @@ export class LeagueSeriesAdminService {
     for (const league of leagues) {
       const tier = league.tier ?? 1;
       const result = await this.publicService.standings(league.id);
-      if (result.pendingFixtures.length > 0) {
-        throw new ConflictException({
-          code: 'LEAGUE_SEASON_NOT_FINISHED',
-          message: `${tierLabel(tier)}에 아직 결과가 확정되지 않은 경기가 ${result.pendingFixtures.length}개 있어요.`,
-          details: { tier, pendingCount: result.pendingFixtures.length },
-        });
-      }
       for (const row of result.standings) teamNameById.set(row.teamId, row.teamName);
       leagueByTier.set(tier, league.id);
       tiers.push({ leagueId: league.id, input: { tier, standings: result.standings } });

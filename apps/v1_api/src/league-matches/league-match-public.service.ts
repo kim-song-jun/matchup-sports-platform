@@ -47,6 +47,12 @@ export class LeagueMatchPublicService {
         // 쓰고 있어(apps/v1_web/src/types/api.ts) 같은 관례를 그대로 맞춘다.
         sport: { select: { id: true, code: true, name: true } },
         region: { select: { id: true, name: true } },
+        // 티어는 목록에서도 필요하다 -- 이 목록은 "자기 수준의 리그를 고르는" 화면이라
+        // 상세에 들어가야만 몇 부인지 알 수 있으면 고를 수가 없다(Task 153 시나리오 3).
+        // 제목에 "1부"가 들어 있어서 읽히는 것에 기대면 안 된다: 제목은 운영자 자유입력이다.
+        tier: true,
+        seasonNo: true,
+        series: { select: { id: true, title: true } },
         _count: { select: { teams: true } },
       },
     });
@@ -63,6 +69,11 @@ export class LeagueMatchPublicService {
         endsOn: league.endsOn,
         sport: { sportId: league.sport.id, code: league.sport.code, name: league.sport.name },
         region: { regionId: league.region.id, name: league.region.name },
+        // 단발 리그는 셋 다 null -- 화면은 null이면 티어 뱃지를 아예 띄우지 않는다.
+        tier: league.tier,
+        tierLabel: league.tier === null ? null : `${league.tier}부`,
+        seasonNo: league.seasonNo,
+        seriesTitle: league.series?.title ?? null,
         teamCount: league._count.teams,
       })),
       pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
@@ -179,14 +190,49 @@ export class LeagueMatchPublicService {
     const standings = calculateLeagueStandings({ teamIds, fixtures: confirmedFixtures, tieBreakOrder });
     const teamNameById = new Map(league.teams.map((entry) => [entry.teamId, entry.team.name]));
     const teamLogoById = new Map(league.teams.map((entry) => [entry.teamId, entry.team.profile?.logoUrl ?? null]));
-    const standingsWithTeamName = standings.map((row) => ({ ...row, teamName: teamNameById.get(row.teamId) ?? '', teamLogoUrl: teamLogoById.get(row.teamId) ?? null }));
 
-    return { leagueId: league.id, tieBreakOrder, standings: standingsWithTeamName, pendingFixtures };
+    // 확정된 승강 결과를 순위표에 함께 싣는다(Task 153 시나리오 4). preview 단계에서는
+    // 행이 아예 만들어지지 않으므로, 여기 값이 있다는 것은 곧 어드민이 최종 승인했다는 뜻이다.
+    // 어드민 전용 필드(computedKind/overriddenByAdmin/overrideNote/결정자)는 노출하지 않는다 --
+    // "왜 규칙과 다르게 조정했는지"는 운영 판단이라 공개 대상이 아니다(153 Security Notes).
+    const promotions = await this.prisma.v1LeaguePromotion.findMany({
+      where: { fromLeagueId: leagueId },
+      select: { teamId: true, kind: true, toTier: true },
+    });
+    const promotionByTeamId = new Map(promotions.map((row) => [row.teamId, row]));
+
+    const standingsWithTeamName = standings.map((row) => {
+      const promotion = promotionByTeamId.get(row.teamId);
+      return {
+        ...row,
+        teamName: teamNameById.get(row.teamId) ?? '',
+        teamLogoUrl: teamLogoById.get(row.teamId) ?? null,
+        promotionKind: promotion?.kind ?? null,
+        promotionToTier: promotion?.toTier ?? null,
+        promotionToTierLabel: promotion === undefined ? null : `${promotion.toTier}부`,
+      };
+    });
+
+    return {
+      leagueId: league.id,
+      tieBreakOrder,
+      standings: standingsWithTeamName,
+      pendingFixtures,
+      promotionsDecided: promotions.length > 0,
+    };
   }
 
   async playerRecords(leagueId: string) {
     const league = await this.loadLeague(leagueId);
-    const teamMatchIds = (await this.prisma.v1TeamMatch.findMany({ where: { leagueId }, select: { id: true } })).map((tm) => tm.id);
+    // 취소된 대진은 standings()와 동일한 기준으로 제외한다(R8). 이 필터가 없으면
+    // "순위표에서는 빠진 경기의 득점이 득점 순위에는 남아 있는" 상태가 만들어져
+    // 같은 화면 안에서 두 집계가 서로 다른 경기 집합을 쓰게 된다.
+    const teamMatchIds = (
+      await this.prisma.v1TeamMatch.findMany({
+        where: { leagueId, status: { not: 'cancelled' } },
+        select: { id: true },
+      })
+    ).map((tm) => tm.id);
     if (teamMatchIds.length === 0) return { leagueId: league.id, goals: [], assists: [] };
 
     const games = await this.prisma.v1Game.findMany({

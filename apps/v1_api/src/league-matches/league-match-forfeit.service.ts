@@ -4,6 +4,7 @@ import { canonicalGameCommandPayloadHash, GamesService } from '../games/games.se
 import { PrismaService } from '../prisma/prisma.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { RecordLeagueForfeitDto } from './dto/league-match-forfeit.dto';
+import { resolveStoredForfeit } from './league-lifecycle-rules';
 
 /**
  * R11(C-6) 몰수패·부전승 결과 입력 경로.
@@ -109,19 +110,27 @@ export class LeagueMatchForfeitService {
     const latestRevision = await this.prisma.v1GameResultRevision.findFirst({
       where: { gameId },
       orderBy: { revision: 'desc' },
-      select: { id: true, state: true, reason: true },
+      select: { id: true, revision: true, state: true, reason: true, score: true },
     });
     const isOurForfeit = latestRevision?.reason?.startsWith(FORFEIT_REASON_MARKER) ?? false;
 
     if (latestRevision !== null && latestRevision.state === 'OFFICIAL') {
       if (isOurForfeit) {
+        // 멱등 응답은 **저장된 리비전**을 그대로 되읽어 돌려준다. 요청 dto로 계산한 값을
+        // 돌려주면 운영자가 몰수팀을 반대로 지정해 재호출했을 때 "0:1 · B팀 몰수, 처리
+        // 완료"라는 응답을 받는데 DB에는 여전히 1:0 · A팀 몰수가 남는다 -- 잘못 넣은
+        // 몰수를 고쳤다고 착각하게 만드는 거짓 성공이다(alpha 실측으로 재현됨).
+        const outcome = resolveStoredForfeit({
+          storedScore: latestRevision.score,
+          hostTeamId: teamMatch.hostTeamId,
+          awayTeamId: teamMatch.approvedApplicantTeamId,
+          requestedNoShowTeamId: dto.noShowTeamId,
+          fallback: { homeScore, awayScore },
+        });
         return {
           teamMatchId,
           leagueId,
-          noShowTeamId: dto.noShowTeamId,
-          winningTeamId,
-          homeScore,
-          awayScore,
+          ...outcome,
           resultRevisionId: latestRevision.id,
           alreadyProcessed: true,
         };
@@ -145,6 +154,15 @@ export class LeagueMatchForfeitService {
       });
     }
 
+    // 커맨드 ID에 리비전 번호를 섞는다. gameId만으로 고정하면 CHANGE_REQUESTED 이후
+    // 재몰수(이 서비스가 :159 주석에서 의도된 경로로 열어 둔 흐름)에서 첫 몰수가 이미
+    // 쓴 idempotency 레코드에 부딪힌다 -- payload가 같으면 withCommand가 REPLAY로 옛
+    // 응답을 돌려줘 새 리비전이 생기지 않는데 응답은 성공이고, payload가 다르면
+    // IDEMPOTENCY_PAYLOAD_CONFLICT가 난다. 시도 차수를 키에 넣으면 두 경우 모두 사라지고,
+    // 같은 차수 안에서의 재시도(resumable 경로)는 여전히 같은 키를 써 멱등을 유지한다.
+    const attempt = (latestRevision?.revision ?? 0) + (resumable ? 0 : 1);
+    const commandPrefix = `league-forfeit:${gameId}:${attempt}`;
+
     let revisionId: string;
     let revisionState: string;
     let version: number;
@@ -160,7 +178,7 @@ export class LeagueMatchForfeitService {
       // createResultRevision 자체가 "최신 리비전이 없거나 CHANGE_REQUESTED여야
       // 새 DRAFT를 만들 수 있다"를 검증하므로(RESULT_REVISION_ALREADY_EXISTS),
       // 위의 사전 가드와 정확히 같은 조건에서만 이 분기에 도달한다.
-      const createCommandId = `league-forfeit:${gameId}:create`;
+      const createCommandId = `${commandPrefix}:create`;
       const created = await this.games.createResultRevision(user, gameId, createCommandId, {
         expectedVersion: initialGameVersion,
         clientCommandId: createCommandId,
@@ -175,7 +193,7 @@ export class LeagueMatchForfeitService {
     }
 
     if (revisionState === 'DRAFT') {
-      const submitCommandId = `league-forfeit:${gameId}:submit`;
+      const submitCommandId = `${commandPrefix}:submit`;
       const submitted = await this.games.submitResultRevision(user, gameId, revisionId, submitCommandId, {
         expectedVersion: version,
         clientCommandId: submitCommandId,
@@ -185,7 +203,7 @@ export class LeagueMatchForfeitService {
     }
 
     if (revisionState === 'SUBMITTED') {
-      const decideCommandId = `league-forfeit:${gameId}:decide`;
+      const decideCommandId = `${commandPrefix}:decide`;
       const decided = await this.games.decideResultRevision(user, gameId, revisionId, decideCommandId, {
         expectedVersion: version,
         clientCommandId: decideCommandId,

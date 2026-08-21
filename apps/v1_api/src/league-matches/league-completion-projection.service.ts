@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import type { OfficialRevisionRow } from '../game-operations/game-result-official-projection.types';
+import { shouldCompleteLeague } from './league-lifecycle-rules';
 
 /**
  * `GameResultOfficialProjectionService.handler`가 여는 같은 트랜잭션(tx) 위에서
@@ -28,26 +29,45 @@ export class LeagueCompletionProjectionService {
     const leagueId = game.teamMatch?.leagueId ?? null;
     if (leagueId === null) return;
 
+    await this.settle(tx, leagueId, 'all_fixtures_confirmed');
+  }
+
+  /**
+   * "취소되지 않은 모든 대진이 공식 결과를 확보했는가"를 판정해 `active -> completed`로
+   * 전이한다. 조건을 만족하지 않으면 아무것도 하지 않는다(멱등).
+   *
+   * `project()` 말고 **대진 취소 경로에서도** 불러야 한다. 결과 확정만 훅으로 잡으면
+   * 마지막 미확정 대진을 "취소"로 끝낸 리그가 D-3의 완료 조건을 충족하면서도 영원히
+   * `active`로 남는다(alpha 실측으로 재현됨). 취소는 남은 대진 집합을 줄이는 조작이라
+   * 결과 확정과 정확히 같은 판정을 다시 돌려야 한다.
+   */
+  async settle(
+    tx: Prisma.TransactionClient,
+    leagueId: string,
+    reason: 'all_fixtures_confirmed' | 'remaining_fixture_cancelled',
+  ): Promise<boolean> {
     // 조회만으로 이미 completed/draft(대진 없음)인 리그를 조기에 걸러 아래 대진 전수
     // 스캔 비용을 아낀다 -- 실제 멱등성·동시성 보장은 맨 아래 조건부 updateMany(WHERE
     // state='active')가 담당하므로 이 조회 자체엔 락이 필요 없다(동시 트랜잭션 둘 다
     // 이 지점까지 도달해도 안전하다 -- 아래 주석 참고).
     const league = await tx.v1League.findUnique({ where: { id: leagueId }, select: { state: true } });
-    if (league === null || league.state !== 'active') return;
+    if (league === null) return false;
 
-    // 취소된 대진은 R8과 동일한 기준으로 완전히 제외한다 -- 결과가 영원히 안 생길
-    // 대진(취소됨)까지 "전부 확정"의 조건에 넣으면 취소된 대진이 하나라도 남은 리그는
-    // 절대 자동 완료되지 않는다.
+    // status까지 읽어 판정은 shouldCompleteLeague에 맡긴다 -- 취소 제외/빈 리그 배제
+    // 규칙이 서비스 안에 인라인으로 있으면 그 규칙만 검증하는 테스트를 로컬에서 돌릴 수
+    // 없다(이 파일은 @prisma/client를 import 한다). league-lifecycle-rules.ts 참고.
     const fixtures = await tx.v1TeamMatch.findMany({
-      where: { leagueId, status: { not: 'cancelled' } },
-      select: { game: { select: { currentOfficialRevisionId: true } } },
+      where: { leagueId },
+      select: { status: true, game: { select: { currentOfficialRevisionId: true } } },
     });
-    // 대진이 하나도 없거나(생성 전) 전부 취소된 리그는 "모두 확정"의 의미가 없어
-    // 자동 완료 대상에서 제외한다 -- 이 시점은 방금 대진 하나가 확정되어 호출된
-    // 경로라 실제로 비는 경우는 없지만, 방어적으로 남겨둔다.
-    if (fixtures.length === 0) return;
-    const allConfirmed = fixtures.every((fixture) => fixture.game?.currentOfficialRevisionId != null);
-    if (!allConfirmed) return;
+    const ready = shouldCompleteLeague({
+      state: league.state,
+      fixtures: fixtures.map((fixture) => ({
+        status: fixture.status,
+        hasOfficialResult: fixture.game?.currentOfficialRevisionId != null,
+      })),
+    });
+    if (!ready) return false;
 
     // 동시성: 두 대진의 결과가 거의 동시에 OFFICIAL이 되면 두 트랜잭션 모두 이 지점까지
     // 도달할 수 있다. WHERE state = 'active' 조건부 UPDATE가 행 잠금을 통해 오직 먼저
@@ -59,7 +79,7 @@ export class LeagueCompletionProjectionService {
       where: { id: leagueId, state: 'active' },
       data: { state: 'completed' },
     });
-    if (result.count === 0) return;
+    if (result.count === 0) return false;
 
     await tx.v1StatusChangeLog.create({
       data: {
@@ -68,8 +88,9 @@ export class LeagueCompletionProjectionService {
         fromStatus: 'active',
         toStatus: 'completed',
         actorType: 'system',
-        reason: 'all_fixtures_confirmed',
+        reason,
       },
     });
+    return true;
   }
 }

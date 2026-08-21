@@ -1,5 +1,6 @@
 import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { V1AuthUser } from '../auth/v1-auth-user';
+import { NotificationEventType, NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTeamContactDto, DeclineTeamContactDto, ListTeamContactsQueryDto } from './dto/team-contact.dto';
 
@@ -25,7 +26,30 @@ function stateConflict(message: string, code = 'STATE_CONFLICT', details?: unkno
 
 @Injectable()
 export class TeamContactsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
+
+  /**
+   * team-matches.service.ts 의 emitNotificationToTeamManagers 와 같은 패턴이다.
+   * emitToManyDeferred 는 수신자 해석을 지연시키고 에러를 삼키므로,
+   * 알림 실패가 컨택 생성/수락 자체를 되돌리지 않는다.
+   */
+  private notifyTeamManagers(teamId: string, type: NotificationEventType, targetId: string) {
+    this.notifications.emitToManyDeferred(
+      async () => {
+        const rows = await this.prisma.v1TeamMembership.findMany({
+          where: { teamId, status: 'active', role: { in: ['owner', 'manager'] } },
+          select: { userId: true },
+        });
+        return rows.map((row) => row.userId);
+      },
+      type,
+      targetId,
+      undefined,
+    );
+  }
 
   async create(user: V1AuthUser, toTeamId: string, dto: CreateTeamContactDto) {
     await this.assertCanManageTeam(user.id, dto.fromTeamId);
@@ -37,7 +61,7 @@ export class TeamContactsService {
     const expiresAt = new Date(Date.now() + EXPIRY_DAYS * 24 * 60 * 60 * 1000);
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-    return this.prisma.$transaction(async (tx) => {
+    const created = await this.prisma.$transaction(async (tx) => {
       // 락 키의 팀 id 를 정렬한다. A→B 와 B→A 가 같은 락을 잡아야 양방향 중복 검사가
       // 실제로 상호배제된다 — 정렬하지 않으면 두 방향이 서로 다른 락을 잡고 동시 통과한다.
       const [left, right] = [dto.fromTeamId, toTeamId].sort();
@@ -97,6 +121,9 @@ export class TeamContactsService {
         },
       });
     });
+    // 트랜잭션 밖에서 쏜다 — 트랜잭션 안에서 쏘면 이후 커밋 실패로 롤백돼도 알림은 이미 나간 뒤다.
+    this.notifyTeamManagers(created.toTeamId, 'team_contact_received', created.id);
+    return created;
   }
 
   async accept(user: V1AuthUser, contactId: string) {
@@ -164,6 +191,14 @@ export class TeamContactsService {
     }
 
     const updated = await this.prisma.v1TeamContact.findUniqueOrThrow({ where: { id: contactId } });
+    if (nextStatus === 'accepted' || nextStatus === 'declined') {
+      // 응답 결과는 '보낸 팀' 이 알아야 한다. 철회는 상대가 아직 안 봤으므로 알리지 않는다.
+      this.notifyTeamManagers(
+        contact.fromTeamId,
+        nextStatus === 'accepted' ? 'team_contact_accepted' : 'team_contact_declined',
+        contactId,
+      );
+    }
     return { contact: updated, alreadyProcessed: false };
   }
 

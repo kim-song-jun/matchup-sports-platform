@@ -21,6 +21,12 @@ function makePrisma() {
   return prisma;
 }
 
+// Task 8: TeamContactsService 생성자가 NotificationsService 를 받게 되면서 추가된 헬퍼.
+// emitToManyDeferred/emitNotification 만 스텁하면 되므로 실제 클래스를 만들지 않는다.
+function makeNotifications() {
+  return { emitToManyDeferred: jest.fn(), emitNotification: jest.fn() } as any;
+}
+
 const actor = { id: 'u1', email: 'u1@t.example.test', accountStatus: 'active', onboardingStatus: 'completed' } as any;
 const dto = { fromTeamId: 'A', message: '주말 경기 가능하실까요?' };
 
@@ -28,7 +34,7 @@ describe('TeamContactsService.create', () => {
   it('보내는 팀의 owner/manager 가 아니면 PERMISSION_DENIED 로 거부한다', async () => {
     const prisma = makePrisma();
     prisma.v1TeamMembership.findFirst.mockResolvedValue(null);
-    const service = new TeamContactsService(prisma);
+    const service = new TeamContactsService(prisma, makeNotifications());
 
     await expect(service.create(actor, 'B', dto)).rejects.toMatchObject({
       response: { code: 'PERMISSION_DENIED' },
@@ -40,7 +46,7 @@ describe('TeamContactsService.create', () => {
   it('자기 팀에는 보낼 수 없다', async () => {
     const prisma = makePrisma();
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
-    const service = new TeamContactsService(prisma);
+    const service = new TeamContactsService(prisma, makeNotifications());
 
     await expect(service.create(actor, 'A', dto)).rejects.toMatchObject({
       response: { code: 'TEAM_CONTACT_SELF_NOT_ALLOWED' },
@@ -52,7 +58,7 @@ describe('TeamContactsService.create', () => {
     const prisma = makePrisma();
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
     prisma.v1TeamContact.findFirst.mockResolvedValue({ id: 'existing', status: 'accepted' });
-    const service = new TeamContactsService(prisma);
+    const service = new TeamContactsService(prisma, makeNotifications());
 
     await expect(service.create(actor, 'B', dto)).rejects.toMatchObject({
       response: {
@@ -67,7 +73,7 @@ describe('TeamContactsService.create', () => {
     const prisma = makePrisma();
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
     prisma.v1TeamContact.findFirst.mockResolvedValue({ id: 'inbound', status: 'requested' });
-    const service = new TeamContactsService(prisma);
+    const service = new TeamContactsService(prisma, makeNotifications());
 
     await expect(service.create(actor, 'B', dto)).rejects.toBeInstanceOf(ConflictException);
 
@@ -102,7 +108,7 @@ describe('TeamContactsService.create', () => {
     prisma.v1TeamContact.findFirst.mockResolvedValue(null);
     prisma.v1TeamContact.count.mockResolvedValue(0);
     prisma.v1TeamContact.create.mockResolvedValue({ id: 'new', status: 'requested' });
-    const service = new TeamContactsService(prisma);
+    const service = new TeamContactsService(prisma, makeNotifications());
 
     await expect(service.create(actor, 'B', dto)).resolves.toMatchObject({ id: 'new' });
 
@@ -123,7 +129,7 @@ describe('TeamContactsService.create', () => {
     const prisma = makePrisma();
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
     prisma.v1TeamContact.findFirst.mockResolvedValue({ id: 'still-active', status: 'requested' });
-    const service = new TeamContactsService(prisma);
+    const service = new TeamContactsService(prisma, makeNotifications());
 
     await expect(service.create(actor, 'B', dto)).rejects.toMatchObject({
       response: { code: 'TEAM_CONTACT_ALREADY_ACTIVE' },
@@ -136,7 +142,7 @@ describe('TeamContactsService.create', () => {
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
     prisma.v1TeamContact.findFirst.mockResolvedValue(null);
     prisma.v1TeamContact.count.mockResolvedValue(10);
-    const service = new TeamContactsService(prisma);
+    const service = new TeamContactsService(prisma, makeNotifications());
 
     await expect(service.create(actor, 'B', dto)).rejects.toMatchObject({
       response: { code: 'TEAM_CONTACT_DAILY_LIMIT_EXCEEDED' },
@@ -150,7 +156,7 @@ describe('TeamContactsService.create', () => {
     prisma.v1TeamContact.findFirst.mockResolvedValue(null);
     prisma.v1TeamContact.count.mockResolvedValue(9);
     prisma.v1TeamContact.create.mockResolvedValue({ id: 'new', status: 'requested' });
-    const service = new TeamContactsService(prisma);
+    const service = new TeamContactsService(prisma, makeNotifications());
 
     await expect(service.create(actor, 'B', dto)).resolves.toMatchObject({ id: 'new' });
   });
@@ -161,7 +167,7 @@ describe('TeamContactsService.create', () => {
     prisma.v1TeamContact.findFirst.mockResolvedValue(null);
     prisma.v1TeamContact.count.mockResolvedValue(0);
     prisma.v1TeamContact.create.mockResolvedValue({ id: 'new', status: 'requested' });
-    const service = new TeamContactsService(prisma);
+    const service = new TeamContactsService(prisma, makeNotifications());
 
     const order: string[] = [];
     prisma.$executeRaw.mockImplementation(() => { order.push('lock'); return Promise.resolve(1); });
@@ -178,7 +184,7 @@ describe('TeamContactsService.create', () => {
     prisma.v1TeamContact.findFirst.mockResolvedValue(null);
     prisma.v1TeamContact.count.mockResolvedValue(0);
     prisma.v1TeamContact.create.mockResolvedValue({ id: 'new' });
-    const service = new TeamContactsService(prisma);
+    const service = new TeamContactsService(prisma, makeNotifications());
 
     await service.create(actor, 'zzz', { fromTeamId: 'aaa', message: 'hi there' });
     const forward = JSON.stringify(prisma.$executeRaw.mock.calls[0]);
@@ -203,7 +209,7 @@ describe('TeamContactsService 응답 처리', () => {
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
     prisma.v1TeamContact.updateMany.mockResolvedValue({ count: 1 });
     prisma.v1TeamContact.findUniqueOrThrow.mockResolvedValue({ ...contact, status: 'accepted' });
-    const service = new TeamContactsService(prisma);
+    const service = new TeamContactsService(prisma, makeNotifications());
 
     const result = await service.accept(actor, 'c1');
     expect(result.contact.status).toBe('accepted');
@@ -214,7 +220,7 @@ describe('TeamContactsService 응답 처리', () => {
     const prisma = makePrisma();
     prisma.v1TeamContact.findUnique.mockResolvedValue({ ...contact, status: 'accepted' });
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
-    const service = new TeamContactsService(prisma);
+    const service = new TeamContactsService(prisma, makeNotifications());
 
     const result = await service.accept(actor, 'c1');
     expect(result.alreadyProcessed).toBe(true);
@@ -225,7 +231,7 @@ describe('TeamContactsService 응답 처리', () => {
     const prisma = makePrisma();
     prisma.v1TeamContact.findUnique.mockResolvedValue({ ...contact, status: 'declined' });
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
-    const service = new TeamContactsService(prisma);
+    const service = new TeamContactsService(prisma, makeNotifications());
 
     await expect(service.accept(actor, 'c1')).rejects.toMatchObject({
       response: { code: 'TEAM_CONTACT_STATE_CONFLICT' },
@@ -237,7 +243,7 @@ describe('TeamContactsService 응답 처리', () => {
     prisma.v1TeamContact.findUnique.mockResolvedValue(contact);
     // 'B'(받는 팀) 멤버십 조회는 실패해야 한다
     prisma.v1TeamMembership.findFirst.mockResolvedValue(null);
-    const service = new TeamContactsService(prisma);
+    const service = new TeamContactsService(prisma, makeNotifications());
 
     await expect(service.accept(actor, 'c1')).rejects.toBeInstanceOf(ForbiddenException);
     const where = prisma.v1TeamMembership.findFirst.mock.calls[0][0].where;
@@ -250,7 +256,7 @@ describe('TeamContactsService 응답 처리', () => {
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
     prisma.v1TeamContact.updateMany.mockResolvedValue({ count: 1 });
     prisma.v1TeamContact.findUniqueOrThrow.mockResolvedValue({ ...contact, status: 'withdrawn' });
-    const service = new TeamContactsService(prisma);
+    const service = new TeamContactsService(prisma, makeNotifications());
 
     const result = await service.withdraw(actor, 'c1');
     expect(result.contact.status).toBe('withdrawn');
@@ -266,7 +272,7 @@ describe('TeamContactsService 응답 처리', () => {
       expiresAt: new Date(Date.now() - 1000),
     });
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
-    const service = new TeamContactsService(prisma);
+    const service = new TeamContactsService(prisma, makeNotifications());
 
     await expect(service.accept(actor, 'c1')).rejects.toMatchObject({
       response: { code: 'TEAM_CONTACT_STATE_CONFLICT' },
@@ -280,7 +286,7 @@ describe('TeamContactsService 응답 처리', () => {
       expiresAt: new Date(Date.now() - 1000),
     });
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
-    const service = new TeamContactsService(prisma);
+    const service = new TeamContactsService(prisma, makeNotifications());
 
     await service.accept(actor, 'c1').catch(() => undefined);
     expect(prisma.v1TeamContact.updateMany).toHaveBeenCalledWith(
@@ -301,7 +307,7 @@ describe('TeamContactsService 응답 처리', () => {
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
     prisma.v1TeamContact.updateMany.mockResolvedValue({ count: 1 });
     prisma.v1TeamContact.findUniqueOrThrow.mockResolvedValue({ ...contact, status: 'accepted' });
-    const service = new TeamContactsService(prisma);
+    const service = new TeamContactsService(prisma, makeNotifications());
 
     await service.accept(actor, 'c1');
 
@@ -320,7 +326,7 @@ describe('TeamContactsService 응답 처리', () => {
     prisma.v1TeamContact.updateMany.mockResolvedValue({ count: 0 });
     prisma.v1TeamContact.findUnique.mockResolvedValueOnce(contact)
       .mockResolvedValueOnce({ ...contact, status: 'accepted' });
-    const service = new TeamContactsService(prisma);
+    const service = new TeamContactsService(prisma, makeNotifications());
 
     const result = await service.accept(actor, 'c1');
     expect(result.alreadyProcessed).toBe(true);
@@ -334,7 +340,7 @@ describe('TeamContactsService 응답 처리', () => {
     // 최초 findUnique 는 requested 를 보여줬지만, 쓰기 직전에 다른 응답자가 declined 로 전이시켰다
     prisma.v1TeamContact.findUnique.mockResolvedValueOnce(contact)
       .mockResolvedValueOnce({ ...contact, status: 'declined' });
-    const service = new TeamContactsService(prisma);
+    const service = new TeamContactsService(prisma, makeNotifications());
 
     await expect(service.accept(actor, 'c1')).rejects.toMatchObject({
       response: { code: 'TEAM_CONTACT_STATE_CONFLICT', details: { currentStatus: 'declined' } },
@@ -347,7 +353,7 @@ describe('TeamContactsService.listForTeam', () => {
     const prisma = makePrisma();
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
     prisma.v1TeamContact.findMany.mockResolvedValue([]);
-    const service = new TeamContactsService(prisma);
+    const service = new TeamContactsService(prisma, makeNotifications());
 
     await service.listForTeam(actor, 'B', { direction: 'inbound' });
     expect(prisma.v1TeamContact.findMany.mock.calls[0][0].where).toMatchObject({ toTeamId: 'B' });
@@ -365,7 +371,7 @@ describe('TeamContactsService.listForTeam', () => {
       fromTeamId: 'A', toTeamId: 'B', message: 'hi', createdAt: new Date(),
     }));
     prisma.v1TeamContact.findMany.mockResolvedValue(rows);
-    const service = new TeamContactsService(prisma);
+    const service = new TeamContactsService(prisma, makeNotifications());
 
     const result = await service.listForTeam(actor, 'B', { direction: 'inbound', limit: 2 });
     expect(prisma.v1TeamContact.findMany.mock.calls[0][0].take).toBe(3);
@@ -381,7 +387,7 @@ describe('TeamContactsService.listForTeam', () => {
       id: 'c1', status: 'requested', expiresAt: new Date(Date.now() - 1000),
       fromTeamId: 'A', toTeamId: 'B', message: 'hi', createdAt: new Date(),
     }]);
-    const service = new TeamContactsService(prisma);
+    const service = new TeamContactsService(prisma, makeNotifications());
 
     const result = await service.listForTeam(actor, 'B', { direction: 'inbound' });
     expect(result.items[0].status).toBe('expired');
@@ -397,7 +403,7 @@ describe('TeamContactsService.listForTeam', () => {
     prisma.v1TeamMembership.findFirst
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ id: 'm1' });
-    const service = new TeamContactsService(prisma);
+    const service = new TeamContactsService(prisma, makeNotifications());
 
     await expect(service.detail(actor, 'c1')).resolves.toMatchObject({ id: 'c1' });
   });
@@ -409,8 +415,88 @@ describe('TeamContactsService.listForTeam', () => {
       expiresAt: new Date(Date.now() + 86_400_000), message: 'hi', createdAt: new Date(),
     });
     prisma.v1TeamMembership.findFirst.mockResolvedValue(null);
-    const service = new TeamContactsService(prisma);
+    const service = new TeamContactsService(prisma, makeNotifications());
 
     await expect(service.detail(actor, 'c1')).rejects.toBeInstanceOf(ForbiddenException);
+  });
+});
+
+describe('TeamContactsService 알림 발송', () => {
+  it('컨택을 보내면 받는 팀 운영진 전원에게 알림을 예약한다', async () => {
+    const prisma = makePrisma();
+    const notifications = makeNotifications();
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
+    prisma.v1TeamContact.findFirst.mockResolvedValue(null);
+    prisma.v1TeamContact.count.mockResolvedValue(0);
+    prisma.v1TeamContact.create.mockResolvedValue({ id: 'new', toTeamId: 'B', fromTeamId: 'A' });
+    const service = new TeamContactsService(prisma, notifications);
+
+    await service.create(actor, 'B', dto);
+
+    expect(notifications.emitToManyDeferred).toHaveBeenCalledWith(
+      expect.any(Function), 'team_contact_received', 'new', undefined,
+    );
+    // 수신자 해석 함수가 실제로 받는 팀의 owner/manager 를 조회하는지
+    const resolveUserIds = notifications.emitToManyDeferred.mock.calls[0][0];
+    prisma.v1TeamMembership.findMany = jest.fn().mockResolvedValue([{ userId: 'x' }]);
+    await expect(resolveUserIds()).resolves.toEqual(['x']);
+    expect(prisma.v1TeamMembership.findMany.mock.calls[0][0].where).toMatchObject({
+      teamId: 'B', status: 'active', role: { in: ['owner', 'manager'] },
+    });
+  });
+
+  it('수락하면 보낸 팀 운영진에게 알린다', async () => {
+    const prisma = makePrisma();
+    const notifications = makeNotifications();
+    prisma.v1TeamContact.findUnique.mockResolvedValue({
+      id: 'c1', fromTeamId: 'A', toTeamId: 'B', status: 'requested',
+      expiresAt: new Date(Date.now() + 86_400_000),
+    });
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
+    // 브리프 원안은 `.update` 를 목했지만 respond() 는 동시 응답 경쟁을 막기 위해
+    // status=requested 가드를 건 `updateMany` 를 쓴다(위 '응답 처리' describe 참고).
+    // `.update` 만 목하면 makePrisma() 기본값인 updateMany→{count:0} 때문에 이 콜이
+    // 선점당한 것으로 오인돼 STATE_CONFLICT 로 던져버린다 — 실제 성공 경로를 타도록 맞춘다.
+    prisma.v1TeamContact.updateMany.mockResolvedValue({ count: 1 });
+    prisma.v1TeamContact.findUniqueOrThrow.mockResolvedValue({
+      id: 'c1', fromTeamId: 'A', toTeamId: 'B', status: 'accepted',
+    });
+    const service = new TeamContactsService(prisma, notifications);
+
+    await service.accept(actor, 'c1');
+    expect(notifications.emitToManyDeferred).toHaveBeenCalledWith(
+      expect.any(Function), 'team_contact_accepted', 'c1', undefined,
+    );
+  });
+
+  it('철회는 알림을 보내지 않는다 — 상대가 아직 반응하지 않았으므로 소음이다', async () => {
+    const prisma = makePrisma();
+    const notifications = makeNotifications();
+    prisma.v1TeamContact.findUnique.mockResolvedValue({
+      id: 'c1', fromTeamId: 'A', toTeamId: 'B', status: 'requested',
+      expiresAt: new Date(Date.now() + 86_400_000),
+    });
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
+    // 위 accept 테스트와 같은 이유로 updateMany 를 성공 경로로 목한다.
+    prisma.v1TeamContact.updateMany.mockResolvedValue({ count: 1 });
+    prisma.v1TeamContact.findUniqueOrThrow.mockResolvedValue({ id: 'c1', status: 'withdrawn' });
+    const service = new TeamContactsService(prisma, notifications);
+
+    await service.withdraw(actor, 'c1');
+    expect(notifications.emitToManyDeferred).not.toHaveBeenCalled();
+  });
+
+  it('멱등 재수락이면 알림을 다시 보내지 않는다', async () => {
+    const prisma = makePrisma();
+    const notifications = makeNotifications();
+    prisma.v1TeamContact.findUnique.mockResolvedValue({
+      id: 'c1', fromTeamId: 'A', toTeamId: 'B', status: 'accepted',
+      expiresAt: new Date(Date.now() + 86_400_000),
+    });
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
+    const service = new TeamContactsService(prisma, notifications);
+
+    await service.accept(actor, 'c1');
+    expect(notifications.emitToManyDeferred).not.toHaveBeenCalled();
   });
 });

@@ -24,6 +24,9 @@ const WIDTHS = [['mobile', 390], ['tablet', 768], ['desktop', 1440]];
 const PAGES = [
   { key: 'admin-series-list', url: '/admin/league-series', token: ADMIN },
   { key: 'admin-series-new', url: '/admin/league-series/new', token: ADMIN },
+  // 공개 리그 목록 — 티어 뱃지가 붙는 주 발견 경로다(Task 153 User Scenario 3).
+  // 목록 API 가 tier 를 아예 안 보내던 시절에는 찍을 것이 없어 빠져 있었다.
+  { key: 'public-league-list', url: '/league-matches', token: null },
 ];
 if (SERIES_ID) {
   PAGES.push({ key: 'admin-series-detail', url: `/admin/league-series/${SERIES_ID}`, token: ADMIN });
@@ -63,12 +66,18 @@ async function settle(page, ms = 2500) {
 
       if (spec.clickPreview) {
         const btn = page.getByRole('button', { name: '승강 후보 계산' }).first();
-        await btn.click({ timeout: 15000 }).catch((e) => console.warn('preview click 실패:', e.message));
+        // 시즌이 끝나지 않았으면 버튼이 disabled 다(정상). 그 상태를 그대로 찍어야
+        // "안내 문구는 못 한다는데 버튼은 눌린다"가 사라졌음을 화면으로 보여줄 수 있다.
+        const enabled = await btn.isEnabled().catch(() => false);
+        console.log(`  승강 후보 계산 버튼 enabled=${enabled}`);
+        if (enabled) await btn.click({ timeout: 15000 }).catch((e) => console.warn('preview click 실패:', e.message));
         // 계산 결과가 렌더될 때까지 기다린다. 안 뜨면 그대로 찍어 원인을 눈으로 본다.
-        await page
-          .getByRole('button', { name: '승강 최종 승인' })
-          .waitFor({ timeout: 20000 })
-          .catch(() => console.warn('승강 패널이 나타나지 않음'));
+        if (enabled) {
+          await page
+            .getByRole('button', { name: '승강 최종 승인' })
+            .waitFor({ timeout: 20000 })
+            .catch(() => console.warn('승강 패널이 나타나지 않음'));
+        }
         await page.waitForTimeout(800);
       }
 

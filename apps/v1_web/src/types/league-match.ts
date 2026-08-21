@@ -227,13 +227,14 @@ export interface V1LeagueStandingsResponse {
   leagueId: string;
   tier: number | null;
   tierLabel: string | null;
-  /** 이 리그(시즌)의 승강이 확정됐는지. false 면 순위표에 승강 열을 띄우지 않는다. */
-  promotionDecided: boolean;
   tieBreakOrder: string[];
   standings: V1LeagueStandingRow[];
   pendingFixtures: V1LeaguePendingFixture[];
-  /** 이 시즌의 승강이 확정됐는지. false면 순위표에 승강 열을 띄우지 않는다. */
-  promotionsDecided?: boolean;
+  /**
+   * 이 시즌의 승강이 확정됐는지. false 면 순위표에 승강 열을 띄우지 않는다.
+   * 서버가 항상 내려주므로 optional 이 아니다.
+   */
+  promotionsDecided: boolean;
 }
 
 export interface V1LeaguePlayerRecordRow {

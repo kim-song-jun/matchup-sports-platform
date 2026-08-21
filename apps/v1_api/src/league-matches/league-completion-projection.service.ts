@@ -46,12 +46,13 @@ export class LeagueCompletionProjectionService {
     leagueId: string,
     reason: 'all_fixtures_confirmed' | 'remaining_fixture_cancelled',
   ): Promise<boolean> {
-    // 조회만으로 이미 completed/draft(대진 없음)인 리그를 조기에 걸러 아래 대진 전수
-    // 스캔 비용을 아낀다 -- 실제 멱등성·동시성 보장은 맨 아래 조건부 updateMany(WHERE
-    // state='active')가 담당하므로 이 조회 자체엔 락이 필요 없다(동시 트랜잭션 둘 다
-    // 이 지점까지 도달해도 안전하다 -- 아래 주석 참고).
     const league = await tx.v1League.findUnique({ where: { id: leagueId }, select: { state: true } });
-    if (league === null) return false;
+    // active 가 아니면 여기서 끝낸다. shouldCompleteLeague 도 같은 판정을 하지만, 그건
+    // 아래 findMany 를 이미 돌린 뒤다 -- 이 조기 반환이 없으면 completed/draft 리그마다
+    // 대진 전수 스캔이 헛돈다(결과 확정마다 호출되는 경로라 그냥 낭비가 아니다).
+    // 멱등성·동시성 보장은 맨 아래 조건부 updateMany(WHERE state='active')가 담당하므로
+    // 이 조회 자체엔 락이 필요 없다.
+    if (league === null || league.state !== 'active') return false;
 
     // status까지 읽어 판정은 shouldCompleteLeague에 맡긴다 -- 취소 제외/빈 리그 배제
     // 규칙이 서비스 안에 인라인으로 있으면 그 규칙만 검증하는 테스트를 로컬에서 돌릴 수

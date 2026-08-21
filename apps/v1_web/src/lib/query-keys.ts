@@ -120,6 +120,10 @@ export const v1Keys = {
   adminTournamentSponsors: (tournamentId: string) =>
     [...v1Keys.all, 'admin', 'tournaments', tournamentId, 'sponsors'] as const,
   adminLeagueMatchList: () => [...v1Keys.all, 'admin', 'league-matches'] as const,
+  adminLeagueSeriesList: () => [...v1Keys.all, 'admin', 'league-series'] as const,
+  adminLeagueSeries: (seriesId: string) => [...v1Keys.all, 'admin', 'league-series', seriesId] as const,
+  adminLeagueSeriesPromotionPreview: (seriesId: string, seasonNo: number) =>
+    [...v1Keys.all, 'admin', 'league-series', seriesId, 'seasons', seasonNo, 'promotions'] as const,
   adminLeagueMatch: (leagueId: string) => [...v1Keys.all, 'admin', 'league-matches', leagueId] as const,
   adminLeagueTeams: (leagueId: string) => [...v1Keys.all, 'admin', 'league-matches', leagueId, 'teams'] as const,
   // R5: 공개 리그 목록. leagueMatch(leagueId)와 같은 'league-matches' 네임스페이스를

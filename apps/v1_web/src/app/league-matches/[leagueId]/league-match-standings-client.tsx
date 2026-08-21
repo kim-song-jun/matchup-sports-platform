@@ -124,6 +124,23 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
+      {/* 티어 뱃지는 리그 체계에 속한 리그에만 붙인다 — 단발 리그는 tierLabel 이 null 이라
+          "1부"로 잘못 보이지 않는다. 색만으로 구분하지 않도록 텍스트를 함께 쓴다.
+          상태 뱃지(진행중/종료)는 제목 옆에 그대로 두고, 티어·시즌 문맥만 윗줄에 얹는다 —
+          둘은 다른 축이라 한 줄에 섞으면 무엇이 무엇인지 읽히지 않는다. */}
+      {series.tierLabel != null && (
+        <p className="mb-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+          <span className="rounded-md bg-blue-100 px-2 py-0.5 font-bold text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
+            {series.tierLabel}
+          </span>
+          {series.seriesTitle != null && (
+            <span className="text-[var(--text-muted)]">
+              {series.seriesTitle}
+              {series.seasonNo != null && ` · ${series.seasonNo}시즌`}
+            </span>
+          )}
+        </p>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="text-xl font-bold text-[var(--text-strong)]">{series.title}</h1>
         <span className={`tm-badge ${stateMeta.badgeClass}`}>{stateMeta.label}</span>

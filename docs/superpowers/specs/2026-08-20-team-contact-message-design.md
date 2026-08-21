@@ -343,7 +343,33 @@ $transaction 내부:
 - **실패 사유 통일**: 차단됨 / `contactPolicy='closed'` / `recruiting_only`인데 모집 중이 아님 — **전부 같은 응답**을 준다.
   `403 TEAM_CONTACT_NOT_ACCEPTING` + "이 팀은 지금 컨택을 받지 않고 있어요"
   → 응답 차이로 "우리가 차단당했구나"를 역추론할 수 없게 한다.
-- **신고**: 새 모델 0개. `V1Inquiry(category='report', relatedType='team_contact', relatedId=contactId)` 생성. 프론트가 기존 `/my/inquiries/new`를 프리필해 여는 것으로 끝난다. 처리도 기존 문의 워크플로 그대로.
+- **신고**: 새 모델 0개. `V1Inquiry(category='report', relatedType='team_contact', relatedId=contactId)` 생성.
+  처리도 기존 문의 워크플로(`received→reviewing→answered→closed`) 그대로.
+- **신고 사유는 구조화한다** (2026-08-21 사용자 결정 — Phase 1 때의 "자유서술" 결정을 뒤집음).
+  Phase 1 설계는 사유를 `V1Inquiry.body` 자유서술로만 받기로 했고, 그 트레이드오프로 **카테고리별 집계 불가**를
+  명시했다. Phase 2 착수 시점에 재확인한 결과 "어느 팀이 무슨 사유로 몇 번 신고됐는지"를 볼 수 없으면
+  운영이 대응할 근거가 없어, 사유를 enum 으로 받기로 했다.
+
+  ```prisma
+  enum V1InquiryReportReason {
+    spam            // 반복·무관한 컨택
+    harassment      // 모욕·괴롭힘
+    impersonation   // 사칭·허위 팀
+    inappropriate   // 부적절한 내용
+    other
+  }
+
+  model V1Inquiry {
+    // ... 기존 필드 유지 ...
+    reportReason V1InquiryReportReason? @map("report_reason")
+
+    @@index([reportReason, createdAt])   // "사유별 신고 추이" 집계용
+  }
+  ```
+  `V1Inquiry` 는 범용 문의 모델이라 enum 이름도 컨택 전용으로 좁히지 않는다 — 다른 신고 대상
+  (매치·사용자 등)이 생겨도 같은 값을 재사용할 수 있다. nullable 이므로 기존 문의 행은 영향 없다.
+- **여전히 안 하는 것**: 어드민 신고 화면에서 바로 차단·정지를 누르는 원클릭 조치는 이번에도 없다.
+  실제 조치는 관리자가 `contact-blocks` API 나 별도 관리 도구로 수동 연결한다.
 
 ### (c) 수신 설정
 
@@ -401,15 +427,21 @@ $transaction 내부:
 
 ### Phase 2 — 차단·신고(b)
 
-- 스키마 변경 없음. `contact-blocks` CRUD 3개, 발신 시 양방향 차단 체크, 신고는 기존 `/my/inquiries/new` 프리필 연결(신규 엔드포인트 0개).
+- **스키마 변경 있음(2026-08-21 정정)**: 신고 사유 구조화 결정으로 `V1InquiryReportReason` enum 과
+  `V1Inquiry.reportReason` nullable 컬럼이 추가된다. 순수 additive 지만 `schema.prisma` 를 건드리므로
+  **`SOURCE_SNAPSHOT` 재핀이 다시 필요하다**(Phase 1 §3.4 절차 동일).
+- `contact-blocks` CRUD 3개, 발신 시 양방향 차단 체크, 신고는 `/my/inquiries/new` 프리필 연결.
 - 프론트: 팀 관리 화면 "차단한 팀" 섹션, 컨택 상세의 "신고하기".
 - **끝나면 동작하는 것**: 팀이 특정 팀을 차단해 상호 컨택을 막을 수 있고, 부적절한 컨택을 기존 문의 파이프라인으로 신고할 수 있다. → **남용방지(b) 충족.**
 
 ### Phase 3 — 수신 설정(c)
 
-- 스키마 변경 없음. `PATCH /teams/:teamId/contact-policy` + `recruiting_only` 서브쿼리 판정.
+- 스키마 변경 없음(컬럼은 Phase 1 에서 선반영됨). `PATCH /teams/:teamId/contact-policy` + `recruiting_only` 서브쿼리 판정.
 - 프론트: 팀 관리 화면 수신 설정 3지선다.
 - **끝나면 동작하는 것**: 팀이 컨택을 끄거나 "모집 중일 때만 받기"로 제한할 수 있다. → **확정 결정 전부(1~8) 충족.**
+
+> **2026-08-21 결정**: Phase 2 와 3 을 **한 PR 로** 진행한다. 둘 다 팀 관리 화면에 UI 가 붙고 서로 인접해서,
+> 나눠서 하면 같은 화면 구성을 두 번 고민하게 된다. 대신 PR 이 커지는 것은 감수한다.
 
 ### Phase 4 — 운영 고도화 (선택, 확정 범위 밖)
 

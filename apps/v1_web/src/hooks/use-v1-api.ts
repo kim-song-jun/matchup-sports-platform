@@ -4456,6 +4456,8 @@ import type {
   V1PublicLeagueListResponse,
   V1LeaguePlayerRecordsResponse,
   V1LeagueStandingsResponse,
+  V1RecordLeagueForfeitPayload,
+  V1RecordLeagueForfeitResult,
   V1RegenerateLeagueFixturesPayload,
   V1RegenerateLeagueFixturesResult,
   V1UpdateLeagueFixturePayload,
@@ -4525,6 +4527,18 @@ export function useV1UpdateLeagueFixture(leagueId: string) {
   return useMutation({
     mutationFn: ({ teamMatchId, body }: { teamMatchId: string; body: V1UpdateLeagueFixturePayload }) =>
       v1Patch<V1UpdateLeagueFixtureResult>(`/admin/league-matches/${leagueId}/fixtures/${teamMatchId}`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
+    },
+  });
+}
+
+// R11(C-6): 몰수패·부전승 결과 입력 — league-match-forfeit.controller.ts(레인 G 신규 파일).
+export function useV1RecordLeagueForfeit(leagueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ teamMatchId, body }: { teamMatchId: string; body: V1RecordLeagueForfeitPayload }) =>
+      v1Post<V1RecordLeagueForfeitResult>(`/admin/league-matches/${leagueId}/fixtures/${teamMatchId}/forfeit`, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
     },

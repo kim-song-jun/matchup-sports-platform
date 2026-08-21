@@ -1,13 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import { AdminPageHeader, AdminDataTable, AdminStatusPill, AdminTableSkeleton, AdminToasts, useAdminToast } from '@/components/admin';
+import { AdminPageHeader, AdminDataTable, AdminReasonModal, AdminStatusPill, AdminTableSkeleton, AdminToasts, useAdminToast } from '@/components/admin';
 import { GateConfirmModal } from '@/components/admin/operation-flag-gate-confirm-modal';
 import {
   useV1AdminLeagueMatch,
   useV1AdminLeagueTeams,
+  useV1AdminTeam,
   useV1CancelLeagueFixture,
   useV1GenerateLeagueFixtures,
+  useV1RecordLeagueForfeit,
   useV1RegenerateLeagueFixtures,
   useV1UpdateLeagueFixture,
 } from '@/hooks/use-v1-api';
@@ -36,7 +38,14 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
   const cancelFixture = useV1CancelLeagueFixture(leagueId);
   const regenerateFixtures = useV1RegenerateLeagueFixtures(leagueId);
   const { data: teamsData } = useV1AdminLeagueTeams(leagueId);
+  const recordForfeit = useV1RecordLeagueForfeit(leagueId);
   const { toasts, showToast } = useAdminToast();
+
+  // 몰수패 처리 모달(R11) — 어느 대진을 처리 중인지만 들고, 팀 이름은 모달이 열릴 때만
+  // useV1AdminTeam으로 조회한다(표 전체에 대해 팀마다 조회하지 않는다 — N+1 방지).
+  const [forfeitFixture, setForfeitFixture] = useState<V1LeagueFixture | null>(null);
+  const forfeitHostTeam = useV1AdminTeam(forfeitFixture?.homeTeamId ?? '');
+  const forfeitAwayTeam = useV1AdminTeam(forfeitFixture?.awayTeamId ?? '');
   const [weeksCount, setWeeksCount] = useState(7);
   const [dayOfWeek, setDayOfWeek] = useState<number | ''>('');
   const [time, setTime] = useState('18:00');
@@ -97,6 +106,25 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
     updateFixture.mutate(
       { teamMatchId: fixture.teamMatchId, body: patch },
       { onError: (error) => showToast(extractErrorMessage(error, '경기 정보를 저장하지 못했어요.'), 'error') },
+    );
+  };
+
+  // R11(C-6): AdminReasonModal의 "상태" 선택을 "어느 팀이 불참했는지" 선택으로 재사용한다
+  // (컴포넌트 재사용 원칙 — 새 모달을 만들지 않는다).
+  const onForfeitSubmit = (noShowTeamId: string, reason: string) => {
+    if (!forfeitFixture) return;
+    recordForfeit.mutate(
+      { teamMatchId: forfeitFixture.teamMatchId, body: { noShowTeamId, reason } },
+      {
+        onSuccess: (result) => {
+          setForfeitFixture(null);
+          showToast(
+            result.alreadyProcessed ? '이미 몰수 처리된 대진이에요.' : '몰수패로 처리했어요.',
+            'success',
+          );
+        },
+        onError: (error) => showToast(extractErrorMessage(error, '몰수 처리에 실패했어요.'), 'error'),
+      },
     );
   };
 
@@ -290,13 +318,27 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
               row.status === 'cancelled' ? (
                 <span className="text-xs text-[var(--text-muted)]">취소됨</span>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => setCancelTarget(row)}
-                  className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-[var(--red50)] px-3 text-[13px] font-medium text-[var(--red700)] transition-colors hover:bg-red-100 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-                >
-                  취소
-                </button>
+                <div className="flex items-center gap-2">
+                  {/* R11(C-6): 상대팀이 확정된(matched) 대진만 몰수 처리 대상이다 — 아직 상대가
+                      없거나(awayTeamId null) 이미 완료된 대진은 버튼을 숨긴다. */}
+                  {row.status === 'matched' && row.awayTeamId !== null ? (
+                    <button
+                      type="button"
+                      onClick={() => setForfeitFixture(row)}
+                      aria-label={`${row.title} 몰수패 처리`}
+                      className="inline-flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-lg bg-[var(--red50)] px-3 text-[13px] font-medium text-[var(--red700)] transition-colors hover:bg-red-100 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                    >
+                      몰수패 처리
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => setCancelTarget(row)}
+                    className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-[var(--red50)] px-3 text-[13px] font-medium text-[var(--red700)] transition-colors hover:bg-red-100 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                  >
+                    취소
+                  </button>
+                </div>
               )
             }
             columns={[
@@ -359,6 +401,25 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
           />
         </div>
       )}
+
+      {/* R11(C-6): 몰수패·부전승 처리 모달 — 되돌리기 어려운 조작이라 사유를 필수로 받는다. */}
+      <AdminReasonModal
+        open={forfeitFixture !== null}
+        title="몰수패 처리"
+        statusOptions={
+          forfeitFixture
+            ? [
+                { value: forfeitFixture.homeTeamId, label: `${forfeitHostTeam.data?.name ?? '홈팀'} 불참` },
+                ...(forfeitFixture.awayTeamId
+                  ? [{ value: forfeitFixture.awayTeamId, label: `${forfeitAwayTeam.data?.name ?? '원정팀'} 불참` }]
+                  : []),
+              ]
+            : []
+        }
+        onSubmit={onForfeitSubmit}
+        onClose={() => setForfeitFixture(null)}
+        pending={recordForfeit.isPending}
+      />
 
       <AdminToasts toasts={toasts} />
 

@@ -5,8 +5,10 @@ import {
   useV1ActivePopup,
   useV1AdminLeagueMatch,
   useV1AdminLeagueTeams,
+  useV1AdminTeam,
   useV1CancelLeagueFixture,
   useV1GenerateLeagueFixtures,
+  useV1RecordLeagueForfeit,
   useV1RegenerateLeagueFixtures,
   useV1UpdateLeagueFixture,
 } from '@/hooks/use-v1-api';
@@ -20,8 +22,12 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1ActivePopup: vi.fn(),
   useV1AdminLeagueMatch: vi.fn(),
   useV1AdminLeagueTeams: vi.fn(),
+  // R11(C-6): 몰수 모달이 열릴 때만 의미 있는 데이터를 쓴다 — 다른 테스트들은 모달을
+  // 열지 않으므로 data: undefined인 기본값으로 충분하다.
+  useV1AdminTeam: vi.fn(() => ({ data: undefined })),
   useV1CancelLeagueFixture: vi.fn(),
   useV1GenerateLeagueFixtures: vi.fn(),
+  useV1RecordLeagueForfeit: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useV1RegenerateLeagueFixtures: vi.fn(),
   useV1UpdateLeagueFixture: vi.fn(),
   // Providers 안의 ThemeProvider가 전역으로 호출한다 — 이 테스트가 <Providers>로 렌더하는 한 필요.
@@ -32,7 +38,9 @@ vi.mock('@/hooks/use-v1-api', () => ({
 const useV1ActivePopupMock = vi.mocked(useV1ActivePopup, { partial: true });
 const useV1AdminLeagueMatchMock = vi.mocked(useV1AdminLeagueMatch, { partial: true });
 const useV1AdminLeagueTeamsMock = vi.mocked(useV1AdminLeagueTeams, { partial: true });
+const useV1AdminTeamMock = vi.mocked(useV1AdminTeam, { partial: true });
 const useV1CancelLeagueFixtureMock = vi.mocked(useV1CancelLeagueFixture, { partial: true });
+const useV1RecordLeagueForfeitMock = vi.mocked(useV1RecordLeagueForfeit, { partial: true });
 const useV1GenerateLeagueFixturesMock = vi.mocked(useV1GenerateLeagueFixtures, { partial: true });
 const useV1RegenerateLeagueFixturesMock = vi.mocked(useV1RegenerateLeagueFixtures, { partial: true });
 const useV1UpdateLeagueFixtureMock = vi.mocked(useV1UpdateLeagueFixture, { partial: true });
@@ -481,5 +489,50 @@ describe('LeagueMatchFixturesClient', () => {
 
     expect(screen.queryAllByRole('button', { name: '취소' })).toHaveLength(0);
     expect(screen.getAllByText('취소됨').length).toBeGreaterThan(0);
+  });
+  // R11(C-6): 몰수패 처리 버튼 -> 모달 -> 제출까지의 배선을 검증한다.
+  it('몰수패 처리 버튼을 눌러 불참팀·사유를 입력하고 제출하면 forfeit mutation을 호출한다', async () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1AdminLeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1',
+        title: '가을 풋살 리그',
+        state: 'active',
+        teamIds: ['t1', 't2'],
+        fixtures: [
+          { teamMatchId: 'tm-1', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched' },
+        ],
+      },
+      isPending: false,
+    } as never);
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+    useV1AdminTeamMock.mockImplementation(((teamId: string) => ({
+      data: teamId === 't1' ? { name: '홈팀FC' } : teamId === 't2' ? { name: '원정팀FC' } : undefined,
+    })) as never);
+    const mutate = vi.fn();
+    useV1RecordLeagueForfeitMock.mockReturnValue({ mutate, isPending: false } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    const [forfeitButton] = screen.getAllByRole('button', { name: '가을 풋살 리그 1주차 몰수패 처리' });
+    fireEvent.click(forfeitButton);
+
+    expect(await screen.findByText('원정팀FC 불참')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('변경할 상태'), { target: { value: 't2' } });
+    fireEvent.change(screen.getByLabelText(/^사유/), { target: { value: '원정팀이 경기 시작 30분 후에도 도착하지 않았어요.' } });
+    fireEvent.click(screen.getByRole('button', { name: '확인' }));
+
+    await waitFor(() => expect(mutate).toHaveBeenCalledWith(
+      {
+        teamMatchId: 'tm-1',
+        body: { noShowTeamId: 't2', reason: '원정팀이 경기 시작 30분 후에도 도착하지 않았어요.' },
+      },
+      expect.anything(),
+    ));
   });
 });

@@ -1,6 +1,7 @@
 'use client';
 
 import { Handshake, Undo2 } from 'lucide-react';
+import { isBackfilledEvent, isBackfilledMinuteUnknown } from '@/lib/backfilled-goal-event';
 import { formatMatchClock } from '@/lib/game-operations-clock';
 import { periodLabel } from './period-label';
 import type { GameEventRecord, GameLineup } from '@/types/game-operations';
@@ -91,7 +92,7 @@ export function RecordedEventList({
     lineups.flatMap((lineup) =>
       lineup.participants.map((participant) => [
         participant.id,
-        `${participant.jerseyNumber ?? '-'} ${participant.displayNameSnapshot}`,
+        formatPlayerLabel(participant.jerseyNumber, participant.displayNameSnapshot),
       ]),
     ),
   );
@@ -145,11 +146,9 @@ export function RecordedEventList({
                     구분 가능하게 한다 — ms 는 여기서는 산만하기만 하다(초 단위로 이미
                     충분히 구분되고, 커맨드 왕복 지연처럼 액션 가능한 값이 아니다). */}
                 <span className="shrink-0 rounded bg-[var(--surface-soft)] px-1.5 py-0.5 text-xs font-medium tabular-nums text-[var(--text-muted)]">
-                  {periodLabel(event.period)} {formatMatchClock(event.clockMs)}
+                  {eventTimeLabel(event)}
                 </span>
-<<<<<<< HEAD
-                <p className="truncate text-sm font-medium text-[var(--text-strong)]">
-=======
+
                 <span
                   aria-hidden="true"
                   className={`h-2.5 w-2.5 shrink-0 rounded-full ${eventDotClass(event)}`}
@@ -184,7 +183,6 @@ export function RecordedEventList({
                     덜 잃을 뿐 0 은 아니다. 근본 원인은 이 폭의 사이드바 컬럼이 202px 로
                     모바일(292px)보다도 좁다는 레이아웃 쪽에 있다. */}
                 <p className="line-clamp-2 text-sm font-medium text-[var(--text-strong)]">
->>>>>>> 9dd0872d (Merge pull request #587 from kim-song-jun/fix/v1-record-row-narrow-column)
                   {eventTypeLabel(event)}
                   {event.type === 'SUBSTITUTION'
                     ? substitutionDetailSuffix(event, playerName)
@@ -235,6 +233,7 @@ export function RecordedEventList({
                   {event.sideId ? (sideName.get(event.sideId) ?? '') : ''}
                 </span>
               </div>
+            </div>
             </div>
           </li>
         );

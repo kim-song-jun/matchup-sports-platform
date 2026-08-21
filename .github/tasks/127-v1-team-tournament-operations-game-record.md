@@ -1866,6 +1866,10 @@ Validation:
   to match-stable `playedAt`.
 - [x] Updated the web record row and API/frontend contract tests so correcting
   a result no longer changes the displayed date or list position.
+- [x] Alpha deployment follow-up: added a narrow compatibility function before
+  the legacy backfill that permits only `played_at: NULL -> value`, restores the
+  strict append-only function immediately after, and signature-checks recovery
+  of the single failed alpha attempt.
 
 Acceptance criteria:
 

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useRef, useState, useCallback, type ReactNode } from 'react';
+import { Fragment, useEffect, useRef, useState, useCallback, type ReactNode } from 'react';
 import { useV1AdminInquiriesPendingCount } from '@/hooks/use-v1-api';
 import { CommandPalette } from './command-palette';
 import {
@@ -45,6 +45,19 @@ interface NavItem {
   badgeCount?: number;
   /** Accessible description appended to the link's aria-label when badgeCount > 0, e.g. "미확인 문의 3건" */
   badgeAriaLabel?: string;
+  /**
+   * 같은 구획 안의 소구획 라벨. 값이 바뀌는 지점에 얇은 구분선과 캡션을 그린다.
+   *
+   * 구획을 하나 더 만들지 않고 소구획으로 나눈 이유: 사이드바는 이미 20개 넘는 항목 + 4구획
+   * 헤더라 헤더를 늘리면 1080p 에서 첫 화면에 보이는 항목이 더 줄어든다. '운영' 이라는
+   * 목적지 이름은 유지한 채 그 안에서 읽기와 쓰기를 가른다.
+   */
+  subgroup?: string;
+  /**
+   * 누르면 사용자에게 즉시 영향이 가는 항목(발송·킬스위치). 색만으로 알리지 않는다 —
+   * 소구획 캡션('제어 · 발송')이 글자로 같은 사실을 말하고, 톤은 그 위에 얹는 강조다.
+   */
+  tone?: 'control';
 }
 
 /**
@@ -91,14 +104,16 @@ const BASE_NAV_GROUPS: NavGroup[] = [
   {
     label: '운영',
     items: [
-      { label: '대회 현장 운영', href: '/admin/ops/tournaments', icon: <Activity size={18} /> },
+      // 살펴보는 화면과 누르면 사용자에게 즉시 영향이 가는 화면이 같은 무게로 붙어 있었다.
+      // 순서를 바꿔 읽기 → 쓰기로 모으고 그 경계에 소구획 캡션을 둔다.
+      { label: '대회 현장 운영', href: '/admin/ops/tournaments', icon: <Activity size={18} />, subgroup: '모니터링' },
       // 정식 페이지인데 nav 에 없어 URL 을 아는 사람만 들어갈 수 있었다(2026-08-16 IA 감사).
-      { label: '에러 로그', href: '/admin/ops/errors', icon: <Bug size={18} /> },
-      { label: '웹 푸시 실패', href: '/admin/ops/push-failures', icon: <BellRing size={18} /> },
-      { label: 'SMS · 인증 실패', href: '/admin/ops/sms-failures', icon: <MessageSquareWarning size={18} /> },
-      { label: '웹 푸시 발송', href: '/admin/ops/push-send', icon: <Send size={18} /> },
-      { label: '경기 운영 플래그', href: '/admin/ops/operation-flags', icon: <Radio size={18} /> },
-      { label: '감사 로그', href: '/admin/audit', icon: <ClipboardList size={18} /> },
+      { label: '에러 로그', href: '/admin/ops/errors', icon: <Bug size={18} />, subgroup: '모니터링' },
+      { label: '웹 푸시 실패', href: '/admin/ops/push-failures', icon: <BellRing size={18} />, subgroup: '모니터링' },
+      { label: 'SMS · 인증 실패', href: '/admin/ops/sms-failures', icon: <MessageSquareWarning size={18} />, subgroup: '모니터링' },
+      { label: '감사 로그', href: '/admin/audit', icon: <ClipboardList size={18} />, subgroup: '모니터링' },
+      { label: '웹 푸시 발송', href: '/admin/ops/push-send', icon: <Send size={18} />, subgroup: '제어 · 발송', tone: 'control' },
+      { label: '경기 운영 플래그', href: '/admin/ops/operation-flags', icon: <Radio size={18} />, subgroup: '제어 · 발송', tone: 'control' },
     ],
   },
   {
@@ -189,6 +204,15 @@ function NavGroupLabel({ label }: { label: string }) {
   );
 }
 
+/** 구획 안의 소구획 캡션. 구획 헤더보다 한 단계 약하게 — 새 목적지가 아니라 경계 표시다. */
+function NavSubgroupLabel({ label }: { label: string }) {
+  return (
+    <p className="mt-2 border-t border-[var(--border)] px-4 pt-2 pb-1 leading-none text-[length:var(--font-size-micro)] font-semibold text-[var(--text-caption)]">
+      {label}
+    </p>
+  );
+}
+
 /** Numeric pill badge shown at the end of a nav link. Caps the visible number at 99+. */
 function NavBadge({ count }: { count: number }) {
   return (
@@ -217,7 +241,10 @@ function SidebarLink({ item, active }: { item: NavItem; active: boolean }) {
           : 'border-transparent text-[var(--text-muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--text-strong)]',
       ].join(' ')}
     >
-      <span className={active ? 'text-blue-500' : 'text-[var(--text-muted)]'} aria-hidden="true">
+      <span
+        className={active ? 'text-blue-500' : item.tone === 'control' ? 'text-[var(--orange700)]' : 'text-[var(--text-muted)]'}
+        aria-hidden="true"
+      >
         {item.icon}
       </span>
       <span>{item.label}</span>
@@ -391,12 +418,17 @@ function Drawer({
               aria-label={group.label}
             >
               {group.label && <NavGroupLabel label={group.label} />}
-              {group.items.map((item) => {
+              {group.items.map((item, itemIndex) => {
                 const active = isActive(item);
                 const hasBadge = typeof item.badgeCount === 'number' && item.badgeCount > 0;
+                const subgroupStart =
+                  item.subgroup && item.subgroup !== group.items[itemIndex - 1]?.subgroup
+                    ? item.subgroup
+                    : null;
                 return (
+                  <Fragment key={item.href}>
+                  {subgroupStart && <NavSubgroupLabel label={subgroupStart} />}
                   <Link
-                    key={item.href}
                     href={item.href}
                     aria-current={active ? 'page' : undefined}
                     aria-label={hasBadge && item.badgeAriaLabel ? `${item.label} (${item.badgeAriaLabel})` : undefined}
@@ -409,12 +441,16 @@ function Drawer({
                         : 'border-transparent text-[var(--text-muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--text-strong)]',
                     ].join(' ')}
                   >
-                    <span className={active ? 'text-blue-500' : 'text-[var(--text-muted)]'} aria-hidden="true">
+                    <span
+                      className={active ? 'text-blue-500' : item.tone === 'control' ? 'text-[var(--orange700)]' : 'text-[var(--text-muted)]'}
+                      aria-hidden="true"
+                    >
                       {item.icon}
                     </span>
                     <span>{item.label}</span>
                     {hasBadge && <NavBadge count={item.badgeCount!} />}
                   </Link>
+                  </Fragment>
                 );
               })}
             </div>
@@ -516,8 +552,13 @@ export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmin
               aria-label={group.label}
             >
               {group.label && <NavGroupLabel label={group.label} />}
-              {group.items.map((item) => (
-                <SidebarLink key={item.href} item={item} active={isActive(item)} />
+              {group.items.map((item, itemIndex) => (
+                <Fragment key={item.href}>
+                  {item.subgroup && item.subgroup !== group.items[itemIndex - 1]?.subgroup && (
+                    <NavSubgroupLabel label={item.subgroup} />
+                  )}
+                  <SidebarLink item={item} active={isActive(item)} />
+                </Fragment>
               ))}
             </div>
           ))}

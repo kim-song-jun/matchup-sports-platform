@@ -2189,40 +2189,50 @@ cd apps/v1_web && npx vitest run src/components/my/
 cd apps/v1_web && pnpm lint
 ```
 
-- [ ] **Step 5: 라이브 시각 검증 (필수 — 생략 불가)**
+- [ ] **Step 5: 시각 검증은 alpha 에서 한다 — 로컬 next 서버를 띄우지 않는다**
 
-UI 변경 PR 이므로 스크린샷 없이는 완료가 아니다.
+> **사용자 명시 지시(2026-08-09, 2026-08-13 재확인)**: 팀밋(v1_web/v1_api) 검증은 로컬에서
+> `next dev`/`next start`/standalone 을 띄우지 말고 **전부 alpha 배포로 테스트한다.**
+> 이유: ① 공유 dev 머신에 여러 세션이 돌아 이미 과부하 ② 로컬 `next start` 좀비 서버가
+> stale 빌드를 서빙해 **거짓 진단**을 낸 실사고가 있었다. alpha 실측이 이 레포의 ground truth 다.
+> 검증 환경은 **alpha 하나**다 — 프로덕션(teameet.co.kr)에서 검증하지 않고 `dev → main` 승격을
+> 먼저 제안하지도 않는다.
 
-v1 스택을 띄운다 (이미 떠 있으면 재사용한다 — 새로 띄우기 전에 반드시 확인):
+따라서 순서가 바뀐다:
+1. 로컬 게이트(`tsc` / `vitest` / `v1-pattern-check`)를 통과시킨다 — **서버 불필요**.
+2. base=`dev` PR 을 연다.
+3. **dev 머지 = 즉시 alpha 실배포**이므로, 머지는 사용자 결정이다. 에이전트가 임의로 머지하지 않는다.
+4. 머지 후 alpha 가 배포되면 **alpha 에서** 스크린샷을 찍어 PR 에 갤러리를 올린다.
 
+alpha 측정 전 반드시 확인할 것(CLAUDE.md "Alpha 실측 검증" 절):
 ```bash
-lsof -nP -iTCP -sTCP:LISTEN | grep -E ':(3013|8121)'
+gh run list --workflow deploy-alpha.yml --branch dev --limit 1 --json headSha,status,conclusion --jq '.[0]'
+curl -fsSI https://alpha.teameet.co.kr/landing | grep -i 'x-teameet-commit'
+git merge-base --is-ancestor <내 머지 커밋> <배포 SHA> && echo "포함됨"
 ```
+배포 중에는 502 가 뜬다 — 그 창에서 측정하면 **멀쩡한 화면을 결함으로 오진한다.**
 
-`scripts/capture-team-contact-screens.mjs` 를 만든다. **스크립트는 반드시 `scripts/` 안에 둔다** (`/tmp` 는 모듈 해석이 실패한다). 캡처 대상 4화면 × 3폭:
+- [ ] **Step 6: alpha 에서 3폭 캡처 + computed 값 확인**
+
+캡처 대상 4화면 × 3폭(📱390 / 📲768 / 🖥1440) × 라이트·다크:
 
 | 화면 | 경로 |
 |---|---|
 | 팀 상세 (컨택 CTA 노출) | `/teams/{teamId}` |
 | 컨택 작성 | `/teams/{teamId}/contact/new` |
-| 컨택함 목록 (받은 탭) | `/my/team-contacts` |
-| 컨택 상세 (requested) | `/my/team-contacts/{contactId}` |
+| 컨택함 목록 | `/my/team-contacts` |
+| 컨택 상세 | `/my/team-contacts/{contactId}` |
 
-폭: 📱390 / 📲768 / 🖥1440. **라이트/다크 양쪽** 을 찍는다.
+alpha 는 프로덕션 모드라 **헤더 dev 인증이 401** 이다 — `login` API 로 세션 쿠키를 받아야 한다
+(계정은 저장소 밖 비공개 메모리에 있다. **저장소에 자격증명을 적지 마라 — 이 레포는 PUBLIC 이다**).
+캡처 스크립트는 **`scripts/` 안**에 둔다(`/tmp` 는 모듈 해석 실패).
 
-- [ ] **Step 6: 육안이 아니라 computed 값으로 확인한다**
-
-스크린샷 대조만으로 "괜찮다"고 결론내지 않는다. Playwright 로 직접 읽는다:
-
+**육안 대조로 결론내지 마라.** computed 값을 직접 읽는다:
 ```js
-// 터치 타겟 44px 이상인지
 const h = await page.$eval('[data-testid="contact-cta"]', (el) => el.getBoundingClientRect().height);
-// 다크모드에서 배경/전경이 실제로 바뀌는지
 const bg = await page.$eval('body', (el) => getComputedStyle(el).backgroundColor);
-// 390 에서 가로 스크롤이 생기지 않는지
 const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
 ```
-
 `overflow` 가 true 면 레이아웃을 고친다.
 
 - [ ] **Step 7: 커밋 + PR**

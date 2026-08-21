@@ -87,4 +87,37 @@ describe('AdminShell nav', () => {
       expect(link).toHaveAttribute('href', '/admin/admins');
     }
   });
+
+  // 살펴보는 화면과 누르면 사용자에게 즉시 영향이 가는 화면이 같은 무게로 붙어 있었다.
+  // 구획을 하나 더 만들면 사이드바 세로가 더 넘치므로, '운영' 안에서 소구획으로 가른다.
+  it("'운영' 안에서 모니터링과 제어·발송을 갈라 놓는다", () => {
+    render(
+      <AdminShell>
+        <div>content</div>
+      </AdminShell>,
+    );
+
+    const ops = screen.getAllByRole('group', { name: '운영' })[0];
+    expect(within(ops).getByText('모니터링')).toBeInTheDocument();
+    expect(within(ops).getByText('제어 · 발송')).toBeInTheDocument();
+
+    // 순서: 읽기 항목이 먼저, 그다음 경계, 그다음 쓰기 항목.
+    const texts = Array.from(ops.querySelectorAll('a, p')).map((el) => el.textContent?.trim());
+    const boundary = texts.indexOf('제어 · 발송');
+    expect(boundary).toBeGreaterThan(-1);
+    expect(texts.indexOf('감사 로그')).toBeLessThan(boundary);
+    expect(texts.indexOf('웹 푸시 발송')).toBeGreaterThan(boundary);
+    expect(texts.indexOf('경기 운영 플래그')).toBeGreaterThan(boundary);
+  });
+
+  it('구획 라벨은 그대로 4개다 — 목적지 이름을 바꾸지 않았다', () => {
+    render(
+      <AdminShell>
+        <div>content</div>
+      </AdminShell>,
+    );
+    for (const label of ['플랫폼', '콘텐츠', '운영', '설정']) {
+      expect(screen.getAllByRole('group', { name: label }).length).toBeGreaterThan(0);
+    }
+  });
 });

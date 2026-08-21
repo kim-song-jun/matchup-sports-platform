@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsDateString, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsDateString, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 
 export class CreateLeagueMatchDto {
   @IsString()
@@ -73,4 +73,59 @@ export class UpdateLeagueFixtureDto {
   @IsString()
   @MaxLength(200)
   placeAddress?: string;
+}
+
+// R6: 결과 정정 등으로 completed -> active 역전이할 때, 왜 되돌렸는지 감사 로그에
+// 남기기 위한 선택 필드. 본문 없이 보내도(빈 객체) 유효하다.
+export class RevertLeagueCompletionDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  reason?: string;
+}
+
+// R12: 리그 대진 취소는 되돌릴 수 없는 운영 조작이라 사유를 필수로 받는다
+// (프론트 GateConfirmModal의 REASON_MAX=500과 동일 상한).
+export class CancelLeagueFixtureDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(500)
+  reason!: string;
+}
+
+// R13: 대진 재생성은 기존 대진을 전부 취소하고 새로 만드는 파괴적 조작이라 사유를 필수로
+// 받는다. weeksCount/schedule/placeName은 GenerateLeagueFixturesDto와 동일 계약을 그대로
+// 재사용한다(생성 로직 자체를 공유하므로 DTO도 같은 형태를 유지).
+export class RegenerateLeagueFixturesDto extends GenerateLeagueFixturesDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(500)
+  reason!: string;
+}
+
+// R5: 공개 리그 목록 필터/페이지네이션. team-matches의 TeamMatchesQueryDto(cursor·limit
+// 1~50)와 동일한 커서 관례를 따른다 — 두 목록 다 같은 프론트 스크롤/더보기 UX를 쓴다.
+export class ListLeagueMatchesQueryDto {
+  @IsOptional()
+  @IsUUID()
+  sportId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  regionId?: string;
+
+  @IsOptional()
+  @IsIn(['draft', 'active', 'completed'])
+  state?: 'draft' | 'active' | 'completed';
+
+  @IsOptional()
+  @IsString()
+  cursor?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  limit?: number;
 }

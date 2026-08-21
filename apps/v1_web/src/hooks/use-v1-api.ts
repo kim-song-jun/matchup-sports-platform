@@ -2302,6 +2302,9 @@ export function useV1AdminOverview() {
   return useQuery({
     queryKey: v1Keys.adminOverview(),
     queryFn: () => v1Get<V1AdminOverview>('/admin/overview'),
+    // 열어 둔 채 방치하면 숫자가 멈춘다 — 전역 staleTime 은 탭 재포커스에서만 다시 받는다.
+    // 같은 파일의 인박스·에러로그 훅이 쓰는 것과 같은 주기다.
+    refetchInterval: 30_000,
   });
 }
 
@@ -2962,6 +2965,9 @@ export function useV1AdminOpsSummary() {
   return useQuery({
     queryKey: v1Keys.adminOpsSummary(),
     queryFn: () => v1Get<V1AdminOpsSummary>('/admin/ops/summary'),
+    // 열어 둔 채 방치하면 숫자가 멈춘다 — 전역 staleTime 은 탭 재포커스에서만 다시 받는다.
+    // 같은 파일의 인박스·에러로그 훅이 쓰는 것과 같은 주기다.
+    refetchInterval: 30_000,
   });
 }
 
@@ -4530,16 +4536,46 @@ export function useV1RevokeTournamentStaff(tournamentId: string) {
 import type {
   V1AdminLeagueDetail,
   V1AdminLeagueListItem,
+  V1AdminLeagueTeamsResponse,
+  V1CancelLeagueFixturePayload,
+  V1CancelLeagueFixtureResult,
   V1CreateLeaguePayload,
   V1CreateLeagueResult,
   V1GenerateLeagueFixturesPayload,
   V1GenerateLeagueFixturesResult,
+  V1LeagueMatchesFilters,
   V1PublicLeagueDetail,
+  V1PublicLeagueListResponse,
   V1LeaguePlayerRecordsResponse,
   V1LeagueStandingsResponse,
+  V1RecordLeagueForfeitPayload,
+  V1RecordLeagueForfeitResult,
+  V1RegenerateLeagueFixturesPayload,
+  V1RegenerateLeagueFixturesResult,
   V1UpdateLeagueFixturePayload,
   V1UpdateLeagueFixtureResult,
 } from '@/types/league-match';
+import type {
+  V1CommitPromotionsPayload,
+  V1CommitPromotionsResult,
+  V1CreateLeagueSeriesPayload,
+  V1LeagueSeries,
+  V1LeagueSeriesDetail,
+  V1LeagueSeriesListItem,
+  V1PromotionPreviewResponse,
+  V1SeedSeasonPayload,
+  V1SeedSeasonResult,
+  V1UpdateLeagueSeriesPayload,
+} from '@/types/league-series';
+
+// R5: 공개 리그 목록. team-matches의 useV1TeamMatches(filters)와 동일한 형태 --
+// filters 객체 전체가 쿼리 키에 들어가 필터가 바뀌면 자동으로 새 쿼리로 취급된다.
+export function useV1LeagueMatches(filters?: V1LeagueMatchesFilters) {
+  return useQuery({
+    queryKey: v1Keys.leagueMatches(filters as Record<string, unknown> | undefined),
+    queryFn: () => v1Get<V1PublicLeagueListResponse>('/league-matches', filters),
+  });
+}
 
 export function useV1AdminLeagueMatchList() {
   return useQuery({
@@ -4589,6 +4625,54 @@ export function useV1UpdateLeagueFixture(leagueId: string) {
   });
 }
 
+// R11(C-6): 몰수패·부전승 결과 입력 — league-match-forfeit.controller.ts(레인 G 신규 파일).
+export function useV1RecordLeagueForfeit(leagueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ teamMatchId, body }: { teamMatchId: string; body: V1RecordLeagueForfeitPayload }) =>
+      v1Post<V1RecordLeagueForfeitResult>(`/admin/league-matches/${leagueId}/fixtures/${teamMatchId}/forfeit`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
+    },
+  });
+}
+
+// R13: 참가팀 조회 — 재생성 확인 모달에서 "지금 이 팀들로 다시 만든다"를 보여주는 용도.
+export function useV1AdminLeagueTeams(leagueId: string) {
+  return useQuery({
+    queryKey: v1Keys.adminLeagueTeams(leagueId),
+    queryFn: () => v1Get<V1AdminLeagueTeamsResponse>(`/admin/league-matches/${leagueId}/teams`),
+    enabled: Boolean(leagueId),
+  });
+}
+
+// R12: 리그 대진 취소 — POST /admin/league-matches/:leagueId/fixtures/:teamMatchId/cancel.
+export function useV1CancelLeagueFixture(leagueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ teamMatchId, body }: { teamMatchId: string; body: V1CancelLeagueFixturePayload }) =>
+      v1Post<V1CancelLeagueFixtureResult>(`/admin/league-matches/${leagueId}/fixtures/${teamMatchId}/cancel`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
+    },
+  });
+}
+
+// R13: 대진 재생성 — POST /admin/league-matches/:leagueId/fixtures/regenerate. 기존 대진 전부를
+// 취소하고 새로 만들므로 fixtures 목록 캐시를 통째로 무효화한다(update-fixture와 동일하게).
+export function useV1RegenerateLeagueFixtures(leagueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1RegenerateLeagueFixturesPayload) =>
+      v1Post<V1RegenerateLeagueFixturesResult>(`/admin/league-matches/${leagueId}/fixtures/regenerate`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
+    },
+  });
+}
+
 export function useV1LeagueMatch(leagueId: string) {
   return useQuery({
     queryKey: v1Keys.leagueMatch(leagueId),
@@ -4610,5 +4694,88 @@ export function useV1LeagueMatchPlayerRecords(leagueId: string) {
     queryKey: v1Keys.leagueMatchPlayerRecords(leagueId),
     queryFn: () => v1Get<V1LeaguePlayerRecordsResponse>(`/league-matches/${leagueId}/player-records`),
     enabled: Boolean(leagueId),
+  });
+}
+
+
+// ── 리그 체계(시리즈) — 티어 + 시즌 + 승강 (Task 153) ────────────────────────
+
+export function useV1AdminLeagueSeriesList() {
+  return useQuery({
+    queryKey: v1Keys.adminLeagueSeriesList(),
+    queryFn: () => v1Get<{ items: V1LeagueSeriesListItem[] }>('/admin/league-series'),
+  });
+}
+
+export function useV1AdminLeagueSeries(seriesId: string) {
+  return useQuery({
+    queryKey: v1Keys.adminLeagueSeries(seriesId),
+    queryFn: () => v1Get<V1LeagueSeriesDetail>(`/admin/league-series/${seriesId}`),
+    enabled: Boolean(seriesId),
+  });
+}
+
+export function useV1CreateLeagueSeries() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1CreateLeagueSeriesPayload) => v1Post<V1LeagueSeries>('/admin/league-series', body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueSeriesList() });
+    },
+  });
+}
+
+export function useV1UpdateLeagueSeries(seriesId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1UpdateLeagueSeriesPayload) =>
+      v1Patch<V1LeagueSeries>(`/admin/league-series/${seriesId}`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueSeries(seriesId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueSeriesList() });
+    },
+  });
+}
+
+/** 시즌 1 시딩 — 티어별 팀 배정은 어드민 수동이다. */
+export function useV1SeedLeagueSeason(seriesId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1SeedSeasonPayload) =>
+      v1Post<V1SeedSeasonResult>(`/admin/league-series/${seriesId}/seasons/seed`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueSeries(seriesId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
+    },
+  });
+}
+
+/**
+ * 승강 후보 계산 (dry-run). mutation 으로 두는 이유 — 어드민이 "계산하기"를 눌렀을 때만
+ * 돌아야 하고, 화면을 열 때 자동으로 계산되면 안 된다(미확정 경기가 남아 있으면 409).
+ */
+export function useV1PreviewLeaguePromotions(seriesId: string) {
+  return useMutation({
+    mutationFn: (seasonNo: number) =>
+      v1Post<V1PromotionPreviewResponse>(
+        `/admin/league-series/${seriesId}/seasons/${seasonNo}/promotions/preview`,
+        {},
+      ),
+  });
+}
+
+/** 최종 승인 — 이때 비로소 다음 시즌 리그와 참가 팀이 생긴다. */
+export function useV1CommitLeaguePromotions(seriesId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ seasonNo, body }: { seasonNo: number; body: V1CommitPromotionsPayload }) =>
+      v1Post<V1CommitPromotionsResult>(
+        `/admin/league-series/${seriesId}/seasons/${seasonNo}/promotions/commit`,
+        body,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueSeries(seriesId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
+    },
   });
 }

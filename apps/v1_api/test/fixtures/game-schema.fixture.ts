@@ -255,9 +255,21 @@ export const gameSchemaSourceManifest = {
   // V1TeamContactBlock, V1ChatRoom.teamContactId, V1Team.contactPolicy,
   // V1InquiryRelatedType.team_contact — 전부 additive 이고 game domain(V1Game*) 은 건드리지 않았다.
   // 이 guard 가 발동한 것은 schema.prisma 파일 전체 바이트를 결속하기 때문이며, game 도메인
-  // 변경 때문이 아니다. 뒷받침 마이그레이션: prisma/migrations/20260820210000_v1_team_contacts.
+  // 변경 때문이 아니다. 뒷받침 마이그레이션: 20260821000000_v1_team_contacts.
   // 바인딩된 20260729000100_v1_game_operations 는 그대로이므로 .migration 해시는 바뀌지 않았다.
-  schema: 'b81b8caa8b647f78755e1debbd84d929c9d81758018281770623d160fd80a9f5',
+  // 2026-08-20 재핀(Task 153): 리그 티어·시즌·승강 도입. 신규 모델 V1LeagueSeries /
+  // V1LeaguePromotion 과 enum V1LeagueSeriesState / V1LeaguePromotionKind 를 추가하고,
+  // V1League 에 nullable seriesId / tier / seasonNo 와 그 relation·인덱스를 붙였다.
+  // 전부 additive 이며 삭제는 없다. game domain(V1Game*) 모델은 건드리지 않았고 바인딩된
+  // 20260729000100_v1_game_operations 도 그대로라 migration 해시는 변하지 않는다.
+  // 뒷받침 마이그레이션: 20260820210000_v1_league_tier_and_promotion.
+  // (같은 PR 내 재핀: 리뷰 지적으로 리그 도메인 주석 한 줄을 고쳤다 — 단발 리그의
+  //  tier/seasonNo 가 1 이 아니라 null 이라는 설명. 모델·필드 변경은 없다.)
+  // 2026-08-21 병합 재핀: 위 두 재핀(팀 컨택 / 리그 티어)이 각자 자기 브랜치 기준 해시를
+  // 넣어 둔 채 충돌했다. 아래 값은 **두 변경이 병합된 뒤**의 schema.prisma 에 shasum 을 다시
+  // 돌려 계산한 것이다 — 어느 한쪽 브랜치의 해시를 그대로 쓰면 CI 가 깨진다(이 파일 상단
+  // 2026-08-19 병합 재핀 주석과 같은 사유).
+  schema: '20188bd7d344d99d6ca2c0338dbef250c736730a11324b30f044b403e18f88ed',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

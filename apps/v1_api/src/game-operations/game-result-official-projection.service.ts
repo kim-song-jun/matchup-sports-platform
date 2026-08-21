@@ -9,6 +9,11 @@ import { GameResultPublicCacheService } from './game-result-public-cache.service
 import { GameResultStandingsProjectionService } from './game-result-standings-projection.service';
 import { officialRevisionRowSelect } from './official-revision-row.query';
 import { parseOfficialScore } from './parse-official-score';
+// 리그 도메인 소유(apps/v1_api/src/league-matches/) -- R6: 리그 대진(team-match)이
+// 공식 결과를 얻을 때마다 그 리그가 자동으로 completed 전이할 수 있는지 확인한다.
+// team-match가 아닌 게임(토너먼트 픽스처)에는 no-op이라 여기 추가해도 기존 흐름에
+// 영향이 없다.
+import { LeagueCompletionProjectionService } from '../league-matches/league-completion-projection.service';
 
 type LockedOfficialRevisionRow = Omit<OfficialRevisionRow, 'officialAt'> & {
   state: string;
@@ -22,6 +27,7 @@ export class GameResultOfficialProjectionService {
   private readonly standings = new GameResultStandingsProjectionService();
   private readonly terminal = new GameResultEscalationTerminalService();
   private readonly watermarks = new GameResultProjectionWatermarkService();
+  private readonly leagueCompletion = new LeagueCompletionProjectionService();
 
   readonly handler: GameOperationHandler = async (claim, tx) => {
     const revision = await this.lockOfficialRevision(tx, this.revisionId(claim.payload));
@@ -42,6 +48,7 @@ export class GameResultOfficialProjectionService {
 
     await this.bracket.project(tx, revision, score);
     await this.standings.project(tx, revision);
+    await this.leagueCompletion.project(tx, revision);
     await this.terminal.close(tx, revision);
     await this.writeAggregateWatermarks(tx, revision, teamIds);
     await this.watermarks.write(tx, {

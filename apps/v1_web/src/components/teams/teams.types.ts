@@ -106,6 +106,13 @@ export type TeamDetailViewModel = {
   /** Recruiting matches this team currently hosts — "이 팀의 열린 매치" section. */
   openMatches?: Array<{ id: string; title: string; dateLabel: string; venue: string }>;
   openMatchesLoading?: boolean;
+  /**
+   * 이 팀의 팀매치 목록(host/신청 모두)에서 distinct 로 추린 리그 — "내 리그" section.
+   * R4: 전용 리그 API 없이 GET /team-matches?teamId= 응답의 league 필드만으로 구성한다.
+   * 값이 비어 있으면(리그 소속 매치 없음) 섹션 자체를 렌더하지 않는다.
+   */
+  myLeagues?: Array<{ leagueId: string; title: string }>;
+  myLeaguesLoading?: boolean;
 };
 
 export type TeamFormMode = 'create' | 'edit';

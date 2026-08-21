@@ -20,6 +20,7 @@ import { TournamentFlowNav } from '@/components/tournaments/tournament-flow-nav'
 import { formatEntryFee } from '@/lib/date-utils';
 import { parsePrizeRows, isPrizeAmountValue, formatPrizeRowValue } from '@/lib/prize-breakdown';
 import { PrizeRankIcon } from '@/components/tournaments/prize-rank-icon';
+import { PendingReviewsCard } from '@/components/tournaments/pending-review-card';
 import { publicAssetPath } from '@/lib/assets';
 import { TournamentAwardIcon } from '@/components/tournaments/tournament-award-icon';
 
@@ -618,6 +619,15 @@ function ReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
       {showForm && (
         <ReviewFormModal tournamentId={tournament.id} onClose={() => setShowForm(false)} />
       )}
+      {/* 대회 완료 알림(`tournament_completed_review_request`)은 참가 확정 팀의 **활성 멤버
+          전원**에게 가고 이 화면으로 보낸다. 그런데 이 섹션의 대회 후기는 설계상 팀장·운영진
+          전용(`eligibleTeamWhere`)이라, 팀원은 여기까지 와서 "쓸 수 없다"는 안내만 보고
+          끝났다 — 정작 팀원이 쓸 수 있는 **상대 선수 후기** 진입점은 홈·마이페이지에만
+          있었다(2026-08-20 확인).
+
+          이 카드가 그 간극을 메운다. 남은 후기가 0건이면 스스로 아무것도 그리지 않으므로
+          쓸 것이 없는 사용자에게는 화면이 그대로다. */}
+      <PendingReviewsCard />
       <section style={{ marginBottom: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <h3 className="tm-hub-section-title" style={{ margin: 0 }}>참가팀 후기</h3>
@@ -656,7 +666,11 @@ function ReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
                 : isCompleted && !hasSession
                   ? '아직 등록된 후기가 없어요. 로그인하면 참가팀의 팀장·운영진은 후기를 작성할 수 있어요.'
                   : isCompleted && hasSession && !isParticipant
-                    ? '아직 등록된 후기가 없어요. 후기는 대회에 참가한 팀의 팀장·운영진만 작성할 수 있어요.'
+                    ? // 팀원(member)도 여기까지 온다 — 대회 완료 알림이 모든 활성 멤버에게
+                      // 가기 때문이다. 대회 후기는 설계상 팀장·운영진 전용이 맞지만, 팀원에게도
+                      // **쓸 수 있는 후기가 따로 있다**(상대 선수 후기). 그 사실을 함께 알려
+                      // 알림이 막다른 길로 끝나지 않게 한다 — 진입 카드는 이 섹션 위에 있다.
+                      '대회 후기는 참가팀의 팀장·운영진이 작성해요. 팀원은 맞붙은 상대 선수에 대한 후기를 남길 수 있어요.'
                     : '아직 등록된 후기가 없어요.'}
             </p>
           </Card>

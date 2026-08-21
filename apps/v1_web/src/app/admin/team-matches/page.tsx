@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
@@ -176,11 +177,27 @@ function AdminTeamMatchesPageContent() {
             header: '팀매칭',
             render: (row) => (
               <div className="min-w-0">
-                <span className="block truncate font-medium text-[var(--text-strong)]" title={row.title}>
-                  {row.title}
-                </span>
+                <div className="flex min-w-0 items-center gap-1.5">
+                  {/* 리그는 팀매치를 묶는 컨테이너다 — 어느 리그 소속인지 목록에서 바로 보이지
+                      않으면 운영자는 단발 경기와 리그전을 구분하지 못한다. 색만으로 알리지
+                      않도록 '리그' 글자를 함께 둔다. */}
+                  {row.league && (
+                    <Link
+                      href={`/admin/league-matches/${encodeURIComponent(row.league.leagueId)}`}
+                      onClick={(event) => event.stopPropagation()}
+                      title={row.league.title}
+                      aria-label={`리그 ${row.league.title} 상세 보기`}
+                      className="shrink-0 rounded-full bg-[var(--blue50)] px-2 py-0.5 text-[length:var(--font-size-micro)] font-bold text-[var(--blue700)] hover:bg-[var(--tint-blue)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                    >
+                      리그
+                    </Link>
+                  )}
+                  <span className="block truncate font-medium text-[var(--text-strong)]" title={row.title}>
+                    {row.title}
+                  </span>
+                </div>
                 <span className="block truncate text-[length:var(--font-size-micro)] text-[var(--text-muted)]">
-                  {row.hostTeamName}
+                  {row.league ? `${row.league.title} · ${row.hostTeamName}` : row.hostTeamName}
                 </span>
               </div>
             ),

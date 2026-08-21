@@ -620,11 +620,16 @@ export class TournamentsAdminService {
   }
 
   /**
-   * 대회가 종료되는 순간, 후기를 쓸 수 있는 사람에게만 후기 요청 알림을 보낸다.
+   * 대회가 종료되는 순간, 후기를 쓸 수 있는 사람에게 후기 요청 알림을 보낸다.
    *
-   * 수신자 조건은 대회 후기 작성 권한과 정확히 같아야 한다(tournament-reviews.service.ts
-   * eligibleTeamWhere) — 참가 확정(confirmed) 팀의 active owner/manager. 넓게 보내면 열어봐야
-   * 쓸 수 없는 알림이 되고, 좁게 보내면 정작 쓸 사람이 못 받는다.
+   * 수신자는 참가 확정(confirmed) 팀의 **활성 멤버 전원**이다 — 대회 후기 권한
+   * (`eligibleTeamWhere`, owner/manager)보다 넓지만 그게 맞다. 후기는 세 종류이고
+   * 팀원(member)도 **상대 선수 후기**를 쓸 수 있어서, 역할로 좁히면 정작 쓸 사람이
+   * 못 받는다. 역할별 경계는 아래 인라인 주석의 표를 참고.
+   *
+   * "열어봐야 쓸 수 없는 알림"은 수신자를 좁혀서가 아니라 **도착지**로 푼다 — 이 알림이
+   * 보내는 `/tournaments/:id/awards` 에 팀원용 진입점(`PendingReviewsCard`)이 함께 붙어
+   * 있다. 그게 빠지면 팀원에게 막다른 길이 된다(2026-08-20 그 상태를 고쳤다).
    *
    * 발송 실패가 상태 전이를 되돌리면 안 되므로 트랜잭션 밖에서 **best-effort** 로 호출한다
    * (호출부에서 await + try/catch — 실패는 삼키되 응답 전에 끝낸다). 진짜 fire-and-forget
@@ -636,19 +641,21 @@ export class TournamentsAdminService {
       where: {
         tournamentId,
         status: 'confirmed',
-        // 확정된 참가 팀의 **활성 멤버 전원**에게 보낸다.
+        // 확정된 참가 팀의 **활성 멤버 전원**에게 보낸다 — 역할로 좁히지 않는 것이 맞다.
         //
-        // ⚠️ 이 수신자 집합은 **대회 후기 작성 권한보다 넓다**(2026-08-20 확인).
-        // `TournamentReviewsService.eligibleTeamWhere` 는 여전히
-        // `role: { in: ['owner', 'manager'] }` 로 제한하므로, 일반 팀원은 알림을 받지만
-        // 아직 대회 후기를 쓸 수는 없다. 이는 **의도된 현재 상태**다 — 팀원이 대회가
-        // 끝났다는 사실과 후기 요청을 알게 하고, 권한 확대는 별도로 판단한다.
+        // 후기는 세 종류이고 역할별로 쓸 수 있는 것이 다르다(2026-08-20 오너 확인):
+        //   팀원(member)         상대 선수 후기
+        //   팀장·운영진(owner/manager)  상대 선수 + 상대 팀 + 대회 후기
         //
-        // (#554 가 넓힌 것은 **상대 팀 후기**이고 대회 후기가 아니다. 이 주석의 이전
-        //  버전이 그 둘을 근거로 뒤섞고 있었다.)
+        // 즉 **팀원에게도 쓸 것이 있으므로** 알림 대상에서 빼면 안 된다. 대회 후기가
+        // `eligibleTeamWhere` 로 팀장·운영진에 한정되는 것은 격차가 아니라 설계다
+        // (`tournament-fixture-reviews.service.ts` 의 `canReviewOpponentTeam` 이 같은
+        //  경계를 상대 팀 후기에 적용한다).
         //
-        // 권한을 넓히기로 하면 고칠 곳은 `eligibleTeamWhere` 한 곳이고, 그때 이 주석의
-        // 경고도 함께 지워야 한다.
+        // 다만 이 알림이 보내는 `/tournaments/:id/awards` 는 **대회 후기** 화면이라,
+        // 팀원이 자기가 쓸 수 있는 상대 선수 후기로 가는 길이 그 화면에 없었다. 그래서
+        // 같은 변경에서 그 화면에 `PendingReviewsCard` 진입점을 붙였다 — 알림이 막다른
+        // 길로 끝나지 않게 하는 쪽이 수신자를 좁히는 것보다 맞다.
         team: {
           status: 'active',
           deletedAt: null,

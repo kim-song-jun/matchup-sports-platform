@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import type { ReactNode } from 'react';
 import { ArrowLeft, CalendarClock, ListOrdered, MapPin, Trophy, Users } from 'lucide-react';
 import {
   AdminDetailRow,

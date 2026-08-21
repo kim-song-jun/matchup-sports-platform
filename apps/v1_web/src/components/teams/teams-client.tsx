@@ -32,6 +32,7 @@ import { trackEvent } from '@/lib/analytics';
 import { V1ApiError, v1Get } from '@/lib/api-client';
 import { chatRoomHref } from '@/lib/chat-route';
 import { formatTournamentDateShort } from '@/lib/date-utils';
+import { isTeamOperatorRole } from '@/lib/team-role';
 import { teamSharePath } from '@/lib/team-share-route';
 import { v1Keys } from '@/lib/query-keys';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
@@ -833,10 +834,6 @@ function roleLabel(role: string) {
   if (role === 'owner') return '팀장';
   if (role === 'manager' || role === 'admin') return '운영진';
   return '멤버';
-}
-
-function isTeamOperatorRole(role?: string | null) {
-  return role === 'owner' || role === 'manager' || role === 'admin';
 }
 
 function isTeamMemberRole(role?: string | null) {

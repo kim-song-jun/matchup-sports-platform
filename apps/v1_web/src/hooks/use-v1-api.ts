@@ -1082,6 +1082,78 @@ export function useV1LeaveTeam(teamId: string) {
   });
 }
 
+// ── Team contacts (Task 9) ────────────────────────────────────────────────
+// 팀 간 컨택 메시지. `toTeamId` 는 받는 팀(경로 파라미터), `fromTeamId` 는 보내는 팀(body).
+export type V1TeamContactStatus = 'requested' | 'accepted' | 'declined' | 'withdrawn' | 'expired';
+
+export type V1TeamContact = {
+  id: string;
+  fromTeamId: string;
+  toTeamId: string;
+  message: string;
+  status: V1TeamContactStatus;
+  declineReason: string | null;
+  expiresAt: string;
+  createdAt: string;
+};
+
+export type V1TeamContactList = {
+  items: V1TeamContact[];
+  pageInfo: { nextCursor: string | null; hasNext: boolean };
+};
+
+export function useV1TeamContacts(teamId: string, filters?: { direction?: 'inbound' | 'outbound'; status?: string }) {
+  return useQuery({
+    queryKey: v1Keys.teamContacts(teamId, filters),
+    queryFn: () => v1Get<V1TeamContactList>(`/teams/${teamId}/contacts`, filters),
+    enabled: Boolean(teamId),
+  });
+}
+
+export function useV1TeamContact(contactId: string) {
+  return useQuery({
+    queryKey: v1Keys.teamContact(contactId),
+    queryFn: () => v1Get<V1TeamContact>(`/team-contacts/${contactId}`),
+    enabled: Boolean(contactId),
+  });
+}
+
+export function useV1CreateTeamContact(toTeamId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { fromTeamId: string; message: string }) =>
+      v1Post<V1TeamContact>(`/teams/${toTeamId}/contacts`, body),
+    onSuccess: (_result, variables) => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamContactsAll(variables.fromTeamId) });
+    },
+  });
+}
+
+export function useV1AcceptTeamContact(contactId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => v1Patch<{ contact: V1TeamContact; alreadyProcessed: boolean }>(`/team-contacts/${contactId}/accept`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.teamContact(contactId) }),
+  });
+}
+
+export function useV1DeclineTeamContact(contactId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { reason?: string }) =>
+      v1Patch<{ contact: V1TeamContact; alreadyProcessed: boolean }>(`/team-contacts/${contactId}/decline`, body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.teamContact(contactId) }),
+  });
+}
+
+export function useV1WithdrawTeamContact(contactId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => v1Post<{ contact: V1TeamContact; alreadyProcessed: boolean }>(`/team-contacts/${contactId}/withdraw`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.teamContact(contactId) }),
+  });
+}
+
 // ── Team schedules (Task 12 backend / Task 13 frontend) ──────────────────────
 // 프론트엔드에서 Idempotency-Key 를 보내는 첫 도메인 — 모든 스케줄 mutation은 얼어붙은
 // REST 계약(글로벌 계약 문서)에 따라 매 호출마다 새 키가 필요하다. 자동 재시도(react-query
@@ -1916,7 +1988,7 @@ export function useV1ChatRoom(roomId: string) {
 export function useV1ResolveChatRoom() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { targetType: 'match' | 'team' | 'team_match'; targetId: string }) =>
+    mutationFn: (body: { targetType: 'match' | 'team' | 'team_match' | 'team_contact'; targetId: string }) =>
       v1Post<V1ChatRoomResolveResult>('/chat/rooms/resolve', body),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: v1Keys.chatRooms() });

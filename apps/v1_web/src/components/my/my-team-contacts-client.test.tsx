@@ -171,6 +171,18 @@ describe('MyTeamContactsListClient', () => {
     expect(screen.getByText('아직 받은 컨택이 없어요')).toBeInTheDocument();
   });
 
+  // 로딩 분기가 없으면 data 가 undefined 인 동안 items 가 [] 라서
+  // "아직 받은 컨택이 없어요" 가 먼저 떴다가 목록으로 바뀐다(진입·탭전환마다 깜빡임).
+  it('목록을 불러오는 동안에는 빈 상태 대신 로딩 안내를 보여준다', () => {
+    setMyTeams([{ teamId: MY_TEAM_ID, name: '우리 팀', role: 'owner' }]);
+    useV1TeamContactsMock.mockReturnValue({ data: undefined, isError: false, isLoading: true });
+
+    render(<MyTeamContactsListClient />);
+
+    expect(screen.getByText('컨택 목록을 불러오는 중이에요.')).toBeInTheDocument();
+    expect(screen.queryByText('아직 받은 컨택이 없어요')).not.toBeInTheDocument();
+  });
+
   it('운영 권한 팀이 2개 이상이면 팀 선택 UI 가 보인다', () => {
     setMyTeams([
       { teamId: 'team-a', name: 'A팀', role: 'owner' },

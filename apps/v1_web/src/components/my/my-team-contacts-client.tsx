@@ -127,12 +127,19 @@ export function MyTeamContactsListClient() {
             </div>
           ) : (
             <>
-              <div className="tm-review-tabs" role="tablist" aria-label="컨택 방향" style={{ marginBottom: 14 }}>
+              <div
+                className="tm-seg-tabs"
+                role="tablist"
+                aria-label="컨택 방향"
+                /* tm-review-tabs 는 3컬럼 고정이라 2탭에서는 오른쪽 1/3 이 빈다.
+                   컬럼 수를 소비처가 정하는 tm-seg-tabs 를 쓴다(bracket-page-client 선례). */
+                style={{ marginBottom: 14, gridTemplateColumns: '1fr 1fr' }}
+              >
                 <button
                   type="button"
                   role="tab"
                   aria-selected={direction === 'inbound'}
-                  className="tm-review-tab"
+                  className="tm-seg-tab"
                   data-active={direction === 'inbound'}
                   onClick={() => setDirection('inbound')}
                 >
@@ -142,7 +149,7 @@ export function MyTeamContactsListClient() {
                   type="button"
                   role="tab"
                   aria-selected={direction === 'outbound'}
-                  className="tm-review-tab"
+                  className="tm-seg-tab"
                   data-active={direction === 'outbound'}
                   onClick={() => setDirection('outbound')}
                 >
@@ -155,6 +162,12 @@ export function MyTeamContactsListClient() {
                   message="컨택 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
                   onRetry={() => void contactsQuery.refetch()}
                 />
+              ) : contactsQuery.isLoading ? (
+                /* 로딩을 빈 상태와 구분한다. 이 분기가 없으면 data 가 undefined 인 동안
+                   items 가 [] 라서 "아직 컨택이 없어요" 가 먼저 떴다가 목록으로 바뀐다. */
+                <Card pad={16}>
+                  <div className="tm-text-body-lg">컨택 목록을 불러오는 중이에요.</div>
+                </Card>
               ) : items.length === 0 ? (
                 <EmptyState
                   title={direction === 'inbound' ? '아직 받은 컨택이 없어요' : '아직 보낸 컨택이 없어요'}

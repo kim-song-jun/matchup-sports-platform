@@ -58,6 +58,7 @@ import type {
   V1SimplifiedOperationFlagTogglePayload,
   V1SetSimplifiedOperationFlagGatePayload,
   V1AdminMatchDetail,
+  V1AdminTeamMatchDetail,
   V1AdminMatchRow,
   V1AdminMe,
   V1AdminOverview,
@@ -2284,6 +2285,14 @@ export function useV1AdminMatches(filters?: AdminListFilters) {
     // 페이지를 넘기는 동안 직전 페이지를 그대로 보여준다 — 표가 빈 화면으로 깜빡이면
     // 운영자가 위치를 잃는다. isFetching 이 하단 페이지 버튼의 잠금 상태를 담당한다.
     placeholderData: keepPreviousData,
+  });
+}
+
+export function useV1AdminTeamMatch(teamMatchId: string) {
+  return useQuery({
+    queryKey: v1Keys.adminTeamMatch(teamMatchId),
+    queryFn: () => v1Get<V1AdminTeamMatchDetail>(`/admin/team-matches/${teamMatchId}`),
+    enabled: !!teamMatchId,
   });
 }
 

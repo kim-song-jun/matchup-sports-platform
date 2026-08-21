@@ -4,13 +4,19 @@
  * 버리고 있었다 — 운영자는 단발 경기와 리그전을 목록에서 구분할 수 없었다.
  */
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { V1AdminTeamMatchRow } from '@/types/api';
 import AdminTeamMatchesPage from './page';
 
 const { hooks } = vi.hoisted(() => ({ hooks: { rows: [] as V1AdminTeamMatchRow[] } }));
 
-vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams() }));
+const { routerPush } = vi.hoisted(() => ({ routerPush: vi.fn() }));
+
+vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({ push: routerPush }),
+}));
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminTeamMatches: () => ({
     data: {
@@ -62,5 +68,14 @@ describe('AdminTeamMatchesPage 리그 표시', () => {
 
     expect(screen.queryByRole('link', { name: /상세 보기/ })).not.toBeInTheDocument();
     expect(screen.getAllByText('성수 FC').length).toBeGreaterThan(0);
+  });
+
+  it('행을 누르면 팀매치 상세로 간다', async () => {
+    const user = userEvent.setup();
+    renderWith([BASE]);
+
+    // 상세 라우트가 생기기 전에는 행을 눌러도 아무 일이 없었다(⌘K 로만 도달).
+    await user.click(screen.getAllByRole('button', { name: '주말 정기전 상세 보기' })[0]);
+    expect(routerPush).toHaveBeenCalledWith('/admin/team-matches/tm-1');
   });
 });

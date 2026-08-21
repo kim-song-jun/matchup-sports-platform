@@ -69,6 +69,7 @@ export const v1Keys = {
   adminUser: (id: string) => [...v1Keys.all, 'admin', 'users', id] as const,
   adminMatches: (filters?: Record<string, unknown>) => [...v1Keys.all, 'admin', 'matches', filters ?? {}] as const,
   adminMatch: (id: string) => [...v1Keys.all, 'admin', 'matches', id] as const,
+  adminTeamMatch: (teamMatchId: string) => [...v1Keys.all, 'admin', 'team-matches', teamMatchId] as const,
   adminTeams: (filters?: Record<string, unknown>) => [...v1Keys.all, 'admin', 'teams', filters ?? {}] as const,
   adminTeam: (id: string) => [...v1Keys.all, 'admin', 'teams', id] as const,
   adminPopups: (filters?: Record<string, unknown>) => [...v1Keys.all, 'admin', 'popups', filters ?? {}] as const,

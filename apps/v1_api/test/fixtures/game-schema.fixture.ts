@@ -211,7 +211,7 @@ export const gameSchemaSourceManifest = {
   // 2026-08-21 hotfix: V1TeamRecordFact.playedAt is backed by the
   // 20260821120000_v1_team_record_facts_played_at migration. The bound
   // game-operations migration itself remains unchanged.
-  schema: 'a0f25ad863220a52d138bf3218d6fcd3a6934c2f35ae084907c181482976c167',
+  schema: '63ab7ca29c3d4d644881b14525289fad71254518d121c8636507ba94c4fd06ff',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

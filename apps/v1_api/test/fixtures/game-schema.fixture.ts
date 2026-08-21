@@ -206,8 +206,10 @@ export const gameSchemaSourceManifest = {
   // 결속하기 때문에 걸리는 것이지 game operations 계약 변경이 아니다. 뒷받침 마이그레이션은
   // 20260818120000_v1_review_policy_settings 이며, 바인딩된 20260729000100_v1_game_operations 는
   // 그대로라 migration 해시는 변하지 않는다.
-  schema: 'e8274afb46d97ed1b9ba1589a327ccbada9708de9be1ff3b8890168fbdd3ff7a',
-  migration: '50b6662bebb9aee49eef76649b04f9a385d03d9a7097b2a6c4f35e96f1e7cad5',
+  // Hash normalized LF text so the same committed source verifies on Linux CI
+  // and Windows checkouts whose Git configuration materializes CRLF.
+  schema: 'b6ebe1dc1d0e5fc4112c071938d62689effb3b84655c03a446a526b9ac459090',
+  migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 
 type GameSchemaSourcePaths = {
@@ -223,7 +225,8 @@ export function verifyGameSchemaSourceSnapshot(
     ['schema', candidates.schema, manifest.schema],
     ['migration', candidates.migration, manifest.migration],
   ] as const) {
-    const actual = createHash('sha256').update(readFileSync(path)).digest('hex');
+    const normalizedSource = readFileSync(path, 'utf8').replace(/\r\n/g, '\n');
+    const actual = createHash('sha256').update(normalizedSource).digest('hex');
     if (actual !== expected) {
       throw new Error(`SOURCE_SNAPSHOT_DRIFT: ${name} bytes differ from bound source snapshot`);
     }

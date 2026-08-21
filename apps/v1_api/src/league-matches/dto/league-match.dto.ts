@@ -110,6 +110,15 @@ export class ListLeagueMatchesQueryDto {
   @IsUUID()
   sportId?: string;
 
+  /**
+   * 이 팀이 참가한 리그만. `V1LeagueTeam` 을 직접 보므로 **대진이 아직 없는 draft 리그도
+   * 걸린다** -- 팀 상세의 "내 리그" 가 그동안 팀매치에서 distinct 로 리그를 뽑느라 대진
+   * 생성 전에는 아무것도 못 띄웠던 문제(2026-08-21 재감사)를 이 필터로 대체한다.
+   */
+  @IsOptional()
+  @IsUUID()
+  teamId?: string;
+
   @IsOptional()
   @IsUUID()
   regionId?: string;

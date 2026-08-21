@@ -32,6 +32,7 @@ export class LeagueMatchPublicService {
         ...(query.sportId ? { sportId: query.sportId } : {}),
         ...(query.regionId ? { regionId: query.regionId } : {}),
         ...(query.state ? { state: query.state } : {}),
+        ...(query.teamId ? { teams: { some: { teamId: query.teamId } } } : {}),
       },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
@@ -81,6 +82,73 @@ export class LeagueMatchPublicService {
         teamCount: league._count.teams,
       })),
       pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
+    };
+  }
+
+  /**
+   * 내가 속한 팀들이 참가한 리그 (R4 -- 마이 화면 "내 리그").
+   *
+   * `V1LeagueTeam` 을 직접 보므로 **대진이 아직 없는 draft 리그도 나온다.** 팀 상세의
+   * 기존 "내 리그" 는 `GET /team-matches?teamId=` 결과에서 distinct 로 리그를 뽑았는데,
+   * 그건 대진이 생겨야만 보인다 -- 운영자가 팀을 리그에 넣은 시점부터 대진을 만들 때까지
+   * 팀은 자기가 리그에 들어간 걸 알 방법이 없었다(2026-08-21 재감사, alpha 에서 draft
+   * 티어 리그의 참가팀이 team-matches 0건인 것으로 확인). D-2("참가팀은 운영자 지정")가
+   * 그 대가로 약속한 "노출로 푼다" 를 성립시키려면 이 경로가 참가 테이블을 봐야 한다.
+   *
+   * 페이지네이션을 두지 않는다 -- 한 사용자가 속한 팀 수가 곧 상한이고, 그 팀들이 동시에
+   * 참가 중인 리그는 현실적으로 한 화면에 들어간다. 목록이 길어지면 그때 커서를 붙인다.
+   */
+  async listMine(userId: string) {
+    const memberships = await this.prisma.v1TeamMembership.findMany({
+      where: { userId, status: 'active' },
+      select: { teamId: true },
+    });
+    const teamIds = memberships.map((row) => row.teamId);
+    if (teamIds.length === 0) return { items: [] };
+
+    const leagues = await this.prisma.v1League.findMany({
+      where: { teams: { some: { teamId: { in: teamIds } } } },
+      // 진행 중을 먼저, 그 다음 최근 개설순. 종료된 리그가 위로 올라오면 "지금 뛰는 리그"를
+      // 찾으러 온 사용자가 스크롤해야 한다.
+      orderBy: [{ state: 'asc' }, { createdAt: 'desc' }, { id: 'desc' }],
+      select: {
+        id: true,
+        title: true,
+        state: true,
+        startsOn: true,
+        endsOn: true,
+        tier: true,
+        seasonNo: true,
+        sport: { select: { id: true, code: true, name: true } },
+        region: { select: { id: true, name: true } },
+        series: { select: { title: true } },
+        teams: { select: { teamId: true, team: { select: { name: true } } } },
+        _count: { select: { teams: true } },
+      },
+    });
+
+    const myTeamIds = new Set(teamIds);
+    return {
+      items: leagues.map((league) => {
+        // 한 리그에 내 팀이 둘 이상 있을 수 있다(같은 사용자가 두 팀 소속). 전부 싣는다 --
+        // 하나만 고르면 화면이 "왜 내 다른 팀은 안 보이지"가 된다.
+        const mine = league.teams.filter((entry) => myTeamIds.has(entry.teamId));
+        return {
+          leagueId: league.id,
+          title: league.title,
+          state: league.state,
+          startsOn: league.startsOn,
+          endsOn: league.endsOn,
+          sport: { sportId: league.sport.id, code: league.sport.code, name: league.sport.name },
+          region: { regionId: league.region.id, name: league.region.name },
+          tier: league.tier,
+          tierLabel: league.tier === null ? null : `${league.tier}부`,
+          seasonNo: league.seasonNo,
+          seriesTitle: league.series?.title ?? null,
+          teamCount: league._count.teams,
+          myTeams: mine.map((entry) => ({ teamId: entry.teamId, name: entry.team.name })),
+        };
+      }),
     };
   }
 

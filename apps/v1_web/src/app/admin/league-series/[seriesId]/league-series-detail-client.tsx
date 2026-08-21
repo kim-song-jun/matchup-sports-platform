@@ -4,13 +4,15 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { AdminPageHeader, AdminStatusPill, AdminToasts, useAdminToast } from '@/components/admin';
 import { PromotionCommitPanel } from '@/components/admin/promotion-commit-panel';
+import { SeasonSeedPanel } from '@/components/admin/season-seed-panel';
 import {
   useV1AdminLeagueSeries,
   useV1CommitLeaguePromotions,
   useV1PreviewLeaguePromotions,
+  useV1SeedLeagueSeason,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
-import type { V1CommitPromotionEntry, V1PromotionPreviewResponse } from '@/types/league-series';
+import type { V1CommitPromotionEntry, V1PromotionPreviewResponse, V1SeedSeasonTier } from '@/types/league-series';
 
 export default function LeagueSeriesDetailClient({ seriesId }: { seriesId: string }) {
   const { toasts, showToast } = useAdminToast();
@@ -23,6 +25,20 @@ export default function LeagueSeriesDetailClient({ seriesId }: { seriesId: strin
 
   const previewPromotions = useV1PreviewLeaguePromotions(seriesId);
   const commitPromotions = useV1CommitLeaguePromotions(seriesId);
+  const seedSeason = useV1SeedLeagueSeason(seriesId);
+
+  const handleSeed = (tiers: V1SeedSeasonTier[]) => {
+    seedSeason.mutate(
+      { tiers },
+      {
+        onSuccess: (result) => {
+          void refetch();
+          showToast(`${result.seasonNo}시즌 리그 ${result.leagues.length}개를 만들었어요.`, 'success');
+        },
+        onError: (error) => showToast(extractErrorMessage(error, '시즌을 만들지 못했어요.'), 'error'),
+      },
+    );
+  };
 
   const handlePreview = (seasonNo: number) => {
     previewPromotions.mutate(seasonNo, {
@@ -48,6 +64,15 @@ export default function LeagueSeriesDetailClient({ seriesId }: { seriesId: strin
             `${result.nextSeasonNo}시즌 리그 ${result.nextSeasonLeagues.length}개를 만들었어요.`,
             'success',
           );
+          // 팀이 2개 미만이라 만들지 않은 티어는 조용히 빠지면 안 된다 — 운영자가
+          // "왜 3부가 없지?"를 알 방법이 없다.
+          const skipped = result.skippedTiers ?? [];
+          if (skipped.length > 0) {
+            showToast(
+              `${skipped.map((entry) => `${entry.tierLabel}(${entry.teamCount}팀)`).join(' · ')}은 팀이 2개 미만이라 만들지 않았어요.`,
+              'error',
+            );
+          }
         },
         onError: (error) => showToast(extractErrorMessage(error, '승강을 확정하지 못했어요.'), 'error'),
       },
@@ -90,12 +115,13 @@ export default function LeagueSeriesDetailClient({ seriesId }: { seriesId: strin
       />
 
       {series.seasons.length === 0 ? (
-        <div className="rounded-2xl border border-[var(--border-strong)] bg-[var(--card-surface)] p-6 text-center">
-          <p className="text-sm font-semibold text-[var(--text-strong)]">아직 시즌이 없어요</p>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">
-            첫 시즌은 승강 이력이 없어서 티어별 팀을 직접 배정해야 해요.
-          </p>
-        </div>
+        <SeasonSeedPanel
+          seriesTitle={series.title}
+          tierCount={series.tierCount}
+          sportId={series.sportId}
+          submitting={seedSeason.isPending}
+          onSeed={handleSeed}
+        />
       ) : (
         <div className="space-y-4">
           {series.seasons.map((season) => (
@@ -106,10 +132,15 @@ export default function LeagueSeriesDetailClient({ seriesId }: { seriesId: strin
               <header className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-sm font-bold text-[var(--text-strong)]">{season.seasonNo}시즌</h2>
                 {series.tierCount > 1 && (
+                  // 시즌이 안 끝났으면 서버가 409 LEAGUE_SEASON_NOT_FINISHED 로 막는다.
+                  // 예전에는 이 버튼이 열려 있고 아래 문구로만 경고해서, 문구는 "계산할 수
+                  // 없어요"라고 하는데 눌리면 계산이 되는 모순이 있었다(그때는 서버 게이트도
+                  // 대진 0건을 통과시켰다). 화면과 서버가 같은 조건을 쓰게 맞춘다.
                   <button
                     type="button"
                     onClick={() => handlePreview(season.seasonNo)}
-                    disabled={previewPromotions.isPending}
+                    disabled={previewPromotions.isPending || !season.allCompleted}
+                    aria-describedby={season.allCompleted ? undefined : `season-${season.seasonNo}-gate`}
                     className="inline-flex min-h-[44px] items-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--text-strong)] disabled:opacity-50"
                   >
                     {previewPromotions.isPending ? '계산하는 중…' : '승강 후보 계산'}
@@ -118,8 +149,8 @@ export default function LeagueSeriesDetailClient({ seriesId }: { seriesId: strin
               </header>
 
               {!season.allCompleted && (
-                <p className="mt-2 text-xs text-[var(--text-muted)]">
-                  아직 진행 중인 리그가 있어요. 모든 경기 결과가 확정돼야 승강을 계산할 수 있어요.
+                <p id={`season-${season.seasonNo}-gate`} className="mt-2 text-xs text-[var(--text-muted)]">
+                  아직 끝나지 않은 리그가 있어요. 모든 티어가 종료돼야 승강을 계산할 수 있어요.
                 </p>
               )}
 

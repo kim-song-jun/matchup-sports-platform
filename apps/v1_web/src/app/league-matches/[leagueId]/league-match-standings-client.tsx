@@ -45,10 +45,31 @@ function fixtureStatusMeta(status: string): { label: string; badgeClass: string 
 }
 
 /**
- * 점수 필드(homeScore/awayScore)는 백엔드 채움 작업이 병행 진행 중이라(Task 152) 항상
- * undefined일 수 있다 — 값이 없으면 화면이 깨지는 대신 상태 기반 문구로 대체한다.
+ * 확정된 승강 결과 표기(Task 153 시나리오 4). 컬러만으로 뜻을 전달하지 않도록
+ * 화살표 기호 + 텍스트를 함께 싣는다(DESIGN.md — 색맹 대응).
+ * `stayed`는 별도 표시를 하지 않는다 — 전 행의 대부분이 잔류라 표시하면 노이즈만 늘고,
+ * "아무 일도 없었음"은 빈 칸으로 읽히는 편이 정확하다.
+ */
+const PROMOTION_META: Record<string, { label: string; mark: string; className: string }> = {
+  promoted: { label: '승격', mark: '↑', className: 'text-blue-700 dark:text-blue-300' },
+  relegated: { label: '강등', mark: '↓', className: 'text-red-700 dark:text-red-300' },
+  withdrawn: { label: '불참', mark: '—', className: 'text-[var(--text-muted)]' },
+};
+
+/**
+ * 점수 필드(homeScore/awayScore)는 값이 없을 수 있다(미확정 대진) — 그때는 0:0으로
+ * 오인되지 않게 상태 기반 문구로 대체한다.
+ *
+ * **취소된 대진은 점수가 있어도 점수를 보여주지 않는다.** 순위표는 취소 대진을 완전히
+ * 제외하는데(R8) 일정 목록에만 "취소됨 1 : 0"이 굵게 남으면, 존재하는 점수가 왜 순위에
+ * 반영되지 않는지 알 수 없다 — 같은 화면 안에서 두 집계가 서로 다른 말을 하게 된다.
+ * 대신 "집계 제외"라고 명시해 그 경기가 기록에서 빠졌음을 그대로 읽히게 한다.
+ * (취소 대진에 '예정'이 붙던 문제도 여기서 함께 사라진다.)
  */
 function fixtureResultLabel(fixture: V1LeagueFixture): { text: string; hasScore: boolean } {
+  if (fixture.status === 'cancelled') {
+    return { text: '집계 제외', hasScore: false };
+  }
   if (typeof fixture.homeScore === 'number' && typeof fixture.awayScore === 'number') {
     return { text: `${fixture.homeScore} : ${fixture.awayScore}`, hasScore: true };
   }
@@ -179,6 +200,9 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
                   <th scope="col">전적</th>
                   <th scope="col">승점</th>
                   <th scope="col">득실</th>
+                  {/* 승강이 확정되기 전에는 열 자체를 만들지 않는다 — 빈 칸만 늘어난 표가
+                      "아직 안 정해졌다"보다 읽기 어렵다. */}
+                  {standings.promotionsDecided && <th scope="col">승강</th>}
                 </tr>
               </thead>
               <tbody>
@@ -198,6 +222,23 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
                     </td>
                     <td>{row.points}</td>
                     <td>{row.goalsFor}-{row.goalsAgainst}</td>
+                    {standings.promotionsDecided && (
+                      <td>
+                        {(() => {
+                          const meta = row.promotionKind == null ? undefined : PROMOTION_META[row.promotionKind];
+                          if (meta === undefined) return <span className="text-[var(--text-muted)]">잔류</span>;
+                          return (
+                            <span className={`inline-flex items-center gap-1 font-semibold ${meta.className}`}>
+                              <span aria-hidden="true">{meta.mark}</span>
+                              {meta.label}
+                              {row.promotionToTierLabel != null && row.promotionKind !== 'withdrawn' && (
+                                <span className="font-normal text-[var(--text-muted)]">{row.promotionToTierLabel}</span>
+                              )}
+                            </span>
+                          );
+                        })()}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

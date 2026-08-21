@@ -155,4 +155,10 @@ export interface V1CommitPromotionsResult {
   decidedCount: number;
   overriddenCount: number;
   nextSeasonLeagues: Array<{ id: string; tier: number; tierLabel: string; teamCount: number }>;
+  /**
+   * 팀이 2개 미만이라 다음 시즌에 만들지 않은 티어. 1팀짜리 리그는 라운드로빈 대진이
+   * 0건이라 영원히 완료되지 않고 재생성도 막혀 복구가 안 되므로 아예 만들지 않는다.
+   * 조용히 빠지면 운영자가 "왜 3부가 없지?"를 알 수 없어 응답으로 반드시 알린다.
+   */
+  skippedTiers?: Array<{ tier: number; tierLabel: string; teamCount: number }>;
 }

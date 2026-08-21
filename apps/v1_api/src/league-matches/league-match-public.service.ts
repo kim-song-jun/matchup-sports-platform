@@ -227,8 +227,10 @@ export class LeagueMatchPublicService {
       tieBreakOrder,
       standings: standingsWithTeamName,
       pendingFixtures,
-      // 이름은 promotionsDecided 로 통일한다 -- 위 promotions 배열과 수를 맞춘다.
-      promotionsDecided: promotions.length > 0,
+      // 이름은 dev 에 이미 머지된 #628 계약을 따른다(promotionDecided). 이 브랜치는
+      // 한때 promotionsDecided 로 바꿨었지만, 그 사이 #628 이 dev 에 들어가 배포된
+      // 계약이 되었으므로 새로 이름을 바꿀 이유가 없다 -- 통합 테스트도 이 이름을 본다.
+      promotionDecided: promotions.length > 0,
     };
   }
 

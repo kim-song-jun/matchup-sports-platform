@@ -234,7 +234,7 @@ export interface V1LeagueStandingsResponse {
    * 이 시즌의 승강이 확정됐는지. false 면 순위표에 승강 열을 띄우지 않는다.
    * 서버가 항상 내려주므로 optional 이 아니다.
    */
-  promotionsDecided: boolean;
+  promotionDecided: boolean;
 }
 
 export interface V1LeaguePlayerRecordRow {

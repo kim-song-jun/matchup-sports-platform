@@ -203,7 +203,7 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
                   <th scope="col">득실</th>
                   {/* 승강 열은 확정된 뒤에만 생긴다 — 확정 전에 빈 칸만 늘어난 표는
                       "아직 안 정해졌다"보다 읽기 어렵고, 기존 순위표 모양도 그대로 유지된다. */}
-                  {standings.promotionsDecided && <th scope="col">승강</th>}
+                  {standings.promotionDecided && <th scope="col">승강</th>}
                 </tr>
               </thead>
               <tbody>
@@ -223,7 +223,7 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
                     </td>
                     <td>{row.points}</td>
                     <td>{row.goalsFor}-{row.goalsAgainst}</td>
-                    {standings.promotionsDecided && (
+                    {standings.promotionDecided && (
                       <td>
                         {row.promotionKind == null ? (
                           <span className="text-[var(--text-muted)]">—</span>

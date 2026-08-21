@@ -300,7 +300,7 @@ describe('LeagueMatchStandingsClient', () => {
       data: {
         leagueId: 'league-1', tieBreakOrder: ['points'],
         standings: rows.map((r) => ({ ...r, promotionKind: null, promotionToTier: null, promotionToTierLabel: null })),
-        pendingFixtures: [], promotionsDecided: false,
+        pendingFixtures: [], promotionDecided: false,
       },
     } as never);
     const before = render(
@@ -320,7 +320,7 @@ describe('LeagueMatchStandingsClient', () => {
           { ...rows[0], promotionKind: 'stayed', promotionToTier: 1, promotionToTierLabel: '1부' },
           { ...rows[1], promotionKind: 'relegated', promotionToTier: 2, promotionToTierLabel: '2부' },
         ],
-        pendingFixtures: [], promotionsDecided: true,
+        pendingFixtures: [], promotionDecided: true,
       },
     } as never);
     render(

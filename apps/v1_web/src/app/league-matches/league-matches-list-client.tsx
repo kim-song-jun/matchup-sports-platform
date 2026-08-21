@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { useV1LeagueMatches, useV1MasterSports } from '@/hooks/use-v1-api';
-import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { formatTournamentDateRangeShort } from '@/lib/date-utils';
@@ -85,9 +84,7 @@ export default function LeagueMatchesListClient() {
   const activeSportLabel = sportId ? filterSports.find((sport) => sport.id === sportId)?.label : null;
 
   return (
-    <>
-      <MatchTypeSegment active="league" />
-      <div className="mx-auto max-w-4xl px-4 py-6">
+    <div className="mx-auto max-w-4xl px-4 py-6">
       <h1 className="text-xl font-bold text-[var(--text-strong)]">리그전 찾기</h1>
       <p className="mt-1 text-sm text-[var(--text-muted)]">종목과 상태로 좁혀 관심 있는 리그를 찾아보세요.</p>
 
@@ -218,8 +215,7 @@ export default function LeagueMatchesListClient() {
           </>
         )}
       </div>
-      </div>
-    </>
+    </div>
   );
 }
 

@@ -7,18 +7,8 @@ import { useV1MyLeagues } from '@/hooks/use-v1-api';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { formatTournamentDateRangeShort } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
+import { LEAGUE_STATE_META } from '@/lib/league-state-meta';
 
-type LeagueState = 'draft' | 'active' | 'completed';
-
-/**
- * 리그 목록·상세와 같은 라벨·배지 클래스를 쓴다. 세 화면이 같은 상태를 다르게 부르면
- * 사용자가 다른 개념으로 읽는다.
- */
-const LEAGUE_STATE_META: Record<LeagueState, { label: string; badgeClass: string }> = {
-  draft: { label: '준비 중', badgeClass: 'tm-badge-grey' },
-  active: { label: '진행 중', badgeClass: 'tm-badge-blue' },
-  completed: { label: '종료', badgeClass: 'tm-badge-green' },
-};
 
 /**
  * R4 — 마이 화면 "내 리그".

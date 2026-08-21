@@ -6,6 +6,7 @@ import { useV1LeagueMatch, useV1LeagueMatchPlayerRecords, useV1LeagueMatchStandi
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { extractErrorMessage } from '@/lib/error-message';
+import { LEAGUE_STATE_META } from '@/lib/league-state-meta';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import type { V1LeagueFixture } from '@/types/league-match';
 
@@ -29,13 +30,6 @@ const TIE_BREAK_LABELS: Record<string, string> = {
   headToHead: '승자승',
 };
 
-type LeagueState = 'draft' | 'active' | 'completed';
-
-const LEAGUE_STATE_META: Record<LeagueState, { label: string; badgeClass: string }> = {
-  draft: { label: '준비 중', badgeClass: 'tm-badge-grey' },
-  active: { label: '진행 중', badgeClass: 'tm-badge-blue' },
-  completed: { label: '종료', badgeClass: 'tm-badge-green' },
-};
 
 /**
  * 리그 대진(fixture)은 팀 매칭(team-match) 레코드 그대로다 — status는

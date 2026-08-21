@@ -125,7 +125,13 @@ export class LeagueMatchPublicService {
         sport: { select: { id: true, code: true, name: true } },
         region: { select: { id: true, name: true } },
         series: { select: { title: true } },
-        teams: { select: { teamId: true, team: { select: { name: true } } } },
+        // 내 팀만 가져온다 -- 화면이 쓰는 건 "내 어느 팀이 이 리그에 있나" 뿐이고,
+        // 전체 참가팀을 실어 오면 리그가 커질수록 쓰지도 않을 행을 join 해 온다.
+        // 전체 팀 수는 아래 _count 가 따로 세므로 이 필터에 영향받지 않는다.
+        teams: {
+          where: { teamId: { in: teamIds } },
+          select: { teamId: true, team: { select: { name: true } } },
+        },
         _count: { select: { teams: true } },
       },
     });
@@ -134,12 +140,12 @@ export class LeagueMatchPublicService {
     // 메모리 정렬로 충분하다. 규칙과 근거는 sortMyLeaguesByState 참고.
     const ordered = sortMyLeaguesByState(leagues);
 
-    const myTeamIds = new Set(teamIds);
     return {
       items: ordered.map((league) => {
-        // 한 리그에 내 팀이 둘 이상 있을 수 있다(같은 사용자가 두 팀 소속). 전부 싣는다 --
-        // 하나만 고르면 화면이 "왜 내 다른 팀은 안 보이지"가 된다.
-        const mine = league.teams.filter((entry) => myTeamIds.has(entry.teamId));
+        // league.teams 는 위에서 이미 내 팀으로 좁혀져 있다. 한 리그에 내 팀이 둘 이상
+        // 있을 수 있어(같은 사용자가 두 팀 소속) 배열 그대로 싣는다 -- 하나만 고르면
+        // 화면이 "왜 내 다른 팀은 안 보이지"가 된다.
+        const mine = league.teams;
         return {
           leagueId: league.id,
           title: league.title,

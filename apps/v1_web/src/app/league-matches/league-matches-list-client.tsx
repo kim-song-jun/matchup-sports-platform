@@ -8,23 +8,11 @@ import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { formatTournamentDateRangeShort } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
+import { LEAGUE_STATE_META, type V1LeagueState } from '@/lib/league-state-meta';
 import type { V1PublicLeagueListItem } from '@/types/league-match';
 
-type LeagueState = 'draft' | 'active' | 'completed';
 
-/**
- * league-match-standings-client.tsx(Wave 1, R1/R7)의 LEAGUE_STATE_META와 라벨·배지
- * 클래스가 동일해야 한다(R5 요구사항). 두 파일이 서로 다른 병렬 작업 트랙(Task 152
- * R1/R7 vs R5)에서 동시에 편집되고 있어 import로 묶지 않고 값만 그대로 맞춘다 --
- * 상태 라벨을 바꿀 일이 생기면 두 파일 모두 갱신해야 한다.
- */
-const LEAGUE_STATE_META: Record<LeagueState, { label: string; badgeClass: string }> = {
-  draft: { label: '준비 중', badgeClass: 'tm-badge-grey' },
-  active: { label: '진행 중', badgeClass: 'tm-badge-blue' },
-  completed: { label: '종료', badgeClass: 'tm-badge-green' },
-};
-
-const LEAGUE_STATE_FILTERS: Array<{ value: LeagueState | null; label: string }> = [
+const LEAGUE_STATE_FILTERS: Array<{ value: V1LeagueState | null; label: string }> = [
   { value: null, label: '전체' },
   { value: 'active', label: '진행 중' },
   { value: 'draft', label: '준비 중' },
@@ -34,7 +22,7 @@ const LEAGUE_STATE_FILTERS: Array<{ value: LeagueState | null; label: string }> 
 const LEAGUE_LIST_ERROR_FALLBACK = '리그 목록을 불러오지 못했어요.';
 const LEAGUE_LIST_PAGE_SIZE = 20;
 
-function parseLeagueState(value: string | null): LeagueState | undefined {
+function parseLeagueState(value: string | null): V1LeagueState | undefined {
   return value === 'active' || value === 'draft' || value === 'completed' ? value : undefined;
 }
 
@@ -60,7 +48,7 @@ export default function LeagueMatchesListClient() {
     : pageItems;
   const hasNext = leaguesQuery.data?.pageInfo.hasNext ?? false;
 
-  function updateFilter(next: { sportId?: string | null; state?: LeagueState | null }) {
+  function updateFilter(next: { sportId?: string | null; state?: V1LeagueState | null }) {
     const params = new URLSearchParams(searchParams.toString());
     if (next.sportId !== undefined) {
       if (next.sportId === null) params.delete('sportId');

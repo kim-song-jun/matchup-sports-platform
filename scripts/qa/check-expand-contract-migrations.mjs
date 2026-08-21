@@ -22,20 +22,6 @@ class UnparsableSqlError extends Error {}
 // the gate exists to catch does not apply. Keep this list SHORT: every entry
 // weakens the gate for exactly one (file, statement) pair and nothing else.
 const REVIEWED_NON_ADDITIVE = [
-  {
-    file: 'apps/v1_api/prisma/migrations/20260821120000_v1_team_record_facts_played_at/migration.sql',
-    statement:
-      'ALTER TABLE v1_team_record_facts DISABLE TRIGGER v1_block_team_record_fact_mutation',
-    reason:
-      'Hotfix 2026-08-21. Temporarily disables the existing append-only trigger only inside the Prisma migration transaction so the two reviewed played_at backfills can populate the newly added column. PostgreSQL takes an ACCESS EXCLUSIVE lock, concurrent writers wait, and any failure rolls the trigger state back. Reviewed after alpha exposed SQLSTATE 55000.',
-  },
-  {
-    file: 'apps/v1_api/prisma/migrations/20260821120000_v1_team_record_facts_played_at/migration.sql',
-    statement:
-      'ALTER TABLE v1_team_record_facts ENABLE TRIGGER v1_block_team_record_fact_mutation',
-    reason:
-      'Hotfix 2026-08-21. Restores the append-only trigger in the same migration transaction immediately after the played_at backfill. A failed transaction cannot commit a disabled trigger. Reviewed after alpha exposed SQLSTATE 55000.',
-  },
   // --- records played-at hotfix (2026-08-21) ---------------------------------
   {
     file: 'apps/v1_api/prisma/migrations/20260821120000_v1_team_record_facts_played_at/migration.sql',

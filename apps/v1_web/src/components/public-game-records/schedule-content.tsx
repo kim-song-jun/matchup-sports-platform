@@ -20,6 +20,7 @@ import {
   formatScoreline,
   isClockAbnormal,
   isCorrectedOrVoid,
+  presentGameEventParticipantName,
   resultStateLabel,
 } from './format';
 import { PenaltyScoreline } from './penalty-scoreline';
@@ -113,6 +114,7 @@ const SCORE_AXIS_COLUMN_GAP = 10;
  */
 type ScheduleEventItem = {
   key: string;
+  eventType: string;
   side: 'home' | 'away';
   icon: string;
   label: string;
@@ -126,6 +128,7 @@ type ScheduleEventItem = {
 function toScheduleEventItems(entry: PublicScheduleEntry): ScheduleEventItem[] {
   const goals = entry.scorers.map((scorer, index) => ({
     key: `goal-${index}`,
+    eventType: scorer.ownGoal ? 'OWN_GOAL' : 'GOAL',
     side: scorer.side,
     ...eventPresentation({ type: scorer.ownGoal ? 'OWN_GOAL' : 'GOAL', cardColor: null }),
     participantName: scorer.participantName,
@@ -137,6 +140,7 @@ function toScheduleEventItems(entry: PublicScheduleEntry): ScheduleEventItem[] {
   // 같은 이유로 방어한다). 시스템 경계에서 들어오는 값이라 키 부재를 정상 입력으로 다룬다.
   const cards = (entry.cards ?? []).map((card, index) => ({
     key: `card-${index}`,
+    eventType: 'CARD',
     side: card.side,
     ...eventPresentation({ type: 'CARD', cardColor: card.cardColor }),
     participantName: card.participantName,
@@ -203,7 +207,7 @@ function ScheduleEventRow({ item }: { item: ScheduleEventItem }) {
   const content = (
     <span>
       {formatGoalMinute(item.clockMs)}
-      {item.participantName ? ` ${item.participantName}` : ''}
+      {` ${presentGameEventParticipantName(item.eventType, item.participantName)}`}
       {isClockAbnormal(item.clockMs) ? <AbnormalClockBadge /> : null}
     </span>
   );

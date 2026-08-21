@@ -56,11 +56,11 @@ export class GameResultOfficialFactsService {
       await tx.$executeRaw`
         INSERT INTO v1_team_record_facts (
           id, revision_id, game_id, team_id, opponent_team_id, tournament_id,
-          result, goals_for, goals_against, source_hash, official_at, recorded_at
+          result, goals_for, goals_against, source_hash, played_at, official_at, recorded_at
         ) VALUES (
           ${randomUUID()}, ${revision.revisionId}, ${revision.gameId}, ${side.teamId},
           ${side.opponentTeamId}, ${revision.tournamentId}, ${result}, ${side.goalsFor},
-          ${side.goalsAgainst}, ${revision.sourceHash}, ${revision.officialAt}, CURRENT_TIMESTAMP
+          ${side.goalsAgainst}, ${revision.sourceHash}, ${revision.playedAt}, ${revision.officialAt}, CURRENT_TIMESTAMP
         )
         ON CONFLICT (revision_id, team_id) DO NOTHING
       `;

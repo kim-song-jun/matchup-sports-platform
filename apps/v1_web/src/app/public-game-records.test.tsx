@@ -208,9 +208,9 @@ function makeTeamRecords(overrides: Partial<PublicTeamRecordsResponse> = {}): Pu
         result: 'WON',
         goalsFor: 2,
         goalsAgainst: 1,
-        officialAt: '2026-08-10T11:00:00.000Z',
         penalties: null,
         events: [],
+        playedAt: '2026-08-09T02:00:00.000Z',
       },
     ],
     nextCursor: null,
@@ -302,6 +302,11 @@ describe('TeamRecordsContent — 경기 기록 아코디언', () => {
     expect(link).toBeInTheDocument();
     // 버튼은 <a> 안이 아니라 형제 요소여야 한다(a 안에 button 중첩 금지).
     expect(link?.querySelector('button')).toBeNull();
+  });
+
+  it('결과 정정 시각이 아니라 실제 경기 일자를 표시한다', () => {
+    render(<TeamRecordsContent data={makeTeamRecords()} />);
+    expect(screen.getByText(/8\/9 \(일\)/)).toBeInTheDocument();
   });
 });
 

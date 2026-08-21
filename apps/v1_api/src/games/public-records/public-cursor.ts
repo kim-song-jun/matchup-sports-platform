@@ -1,8 +1,8 @@
 /**
  * Task 24 -- opaque cursor for the `{items,nextCursor}` collection contract
  * (frozen REST contract: "opaque cursor"). `key` is whichever ISO-8601
- * instant the list is ordered by (`officialAt` for team/user records,
- * `scheduledAt` for the tournament schedule); `id` is the tie-breaker for
+ * instant the list is ordered by (`playedAt` for team records, `officialAt`
+ * for user records, `scheduledAt` for the tournament schedule); `id` is the tie-breaker for
  * rows that land on the same instant, so a page boundary on a tie still
  * resumes at the exact row instead of skipping or repeating siblings.
  */

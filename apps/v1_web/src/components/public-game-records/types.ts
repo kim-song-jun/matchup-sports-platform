@@ -292,7 +292,8 @@ export interface PublicTeamRecordItem {
   /** 정규시간 점수 그대로 -- 승부차기가 있어도 이 값을 승부차기 스코어로 덮어쓰지 않는다. */
   readonly goalsFor: number;
   readonly goalsAgainst: number;
-  readonly officialAt: string;
+  /** Scheduled match instant (`teamMatch.startAt` or tournament fixture `scheduledAt`). */
+  readonly playedAt: string;
   /** 승부차기가 있었던 경기(결선 무승부 후 승부차기)만 채워진다. */
   readonly penalties: PublicTeamRecordPenalties | null;
   /** 시간순(period asc, clockMs asc) 정렬. 골·카드 이벤트만 담긴다. */

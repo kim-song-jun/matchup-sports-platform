@@ -123,6 +123,20 @@ describe('MatchDetailContent — 전반/후반 섹션 분리', () => {
 });
 
 describe('MatchDetailContent — 카드 색상', () => {
+  it('익명 골은 "익명", 익명 자책골은 "OG"로 표시한다', () => {
+    const data = makeDetail({
+      events: [
+        { type: 'GOAL', cardColor: null, sideId: 'side-home', side: 'home', participantId: null, participantName: null, jerseyNumber: null, period: 1, clockMs: 60_000 },
+        { type: 'OWN_GOAL', cardColor: null, sideId: 'side-away', side: 'away', participantId: null, participantName: null, jerseyNumber: null, period: 1, clockMs: 120_000 },
+      ],
+    });
+
+    render(<MatchDetailContent data={data} />);
+
+    expect(screen.getByText('익명')).toBeInTheDocument();
+    expect(screen.getAllByText('OG')).toHaveLength(2);
+  });
+
   it('옐로카드와 레드카드를 서로 다른 아이콘과 접근 가능한 이름으로 표시한다', () => {
     const data = makeDetail({
       events: [

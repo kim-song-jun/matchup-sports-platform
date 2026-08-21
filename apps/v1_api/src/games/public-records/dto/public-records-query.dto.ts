@@ -36,7 +36,7 @@ export class PublicRecordsQueryDto {
   @Max(100)
   limit?: number;
 
-  /** Four-digit calendar year of `officialAt`, e.g. `2026`. */
+  /** Four-digit calendar year (`playedAt` for team records, `officialAt` for user records). */
   @IsOptional()
   @Matches(/^[0-9]{4}$/)
   season?: string;

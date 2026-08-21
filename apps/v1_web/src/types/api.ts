@@ -1341,6 +1341,7 @@ export type V1GameResultGoalEventInput = {
   id: string;
   sideId: string;
   participantId?: string;
+  anonymous?: boolean;
   minute?: number;
   period?: number;
   ownGoal: boolean;

@@ -6,7 +6,7 @@ import type {
   V1TeamMatchLineupStarter,
 } from '@/types/api';
 
-/** 득점 이벤트 한 건 — participantId가 null이면 "미지정"(누가 넣었는지 특정하지 않음). */
+/** 득점 이벤트 한 건 — participantId가 null이면 "익명"(선수를 특정하지 않고 기록). */
 export type GoalDraft = { key: string; participantId: string | null };
 /** 카드 이벤트 한 건. participantId가 ''이면 아직 선수를 고르지 않은 상태(제출 차단 대상). */
 export type CardDraft = { key: string; participantId: string; type: 'yellow' | 'red' };

@@ -13,6 +13,7 @@ import {
   formatScoreline,
   isClockAbnormal,
   periodLabel,
+  presentGameEventParticipantName,
   presentParticipantName,
   resultStateLabel,
 } from './format';
@@ -79,7 +80,7 @@ function EventRow({ event }: { event: PublicMatchEvent }) {
         <span className="tab-num" style={{ color: 'var(--text-caption)', fontSize: 12 }}>{event.jerseyNumber}</span>
       ) : null}
       <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-strong)' }}>
-        {presentParticipantName(event.participantName)}
+        {presentGameEventParticipantName(event.type, event.participantName)}
       </span>
     </span>
   );

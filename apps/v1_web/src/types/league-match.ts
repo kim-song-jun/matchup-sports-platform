@@ -23,6 +23,11 @@ export interface V1PublicLeagueListItem {
   endsOn: string;
   sport: { sportId: string; code: string; name: string };
   region: { regionId: string; name: string };
+  /** 리그 체계에 속한 리그만 값이 있다. 단발 리그는 셋 다 null — 티어 개념 자체가 없다. */
+  seriesId: string | null;
+  tier: number | null;
+  tierLabel: string | null;
+  seasonNo: number | null;
   teamCount: number;
 }
 
@@ -191,6 +196,9 @@ export interface V1LeagueStandingRow {
   goalsAgainst: number;
   points: number;
   position: number;
+  /** 승강이 확정된 시즌에만 값이 있다. 확정 전에는 null. */
+  promotionKind: 'promoted' | 'relegated' | 'stayed' | 'withdrawn' | null;
+  promotionToTierLabel: string | null;
 }
 
 export interface V1LeaguePendingFixture {
@@ -202,6 +210,10 @@ export interface V1LeaguePendingFixture {
 
 export interface V1LeagueStandingsResponse {
   leagueId: string;
+  tier: number | null;
+  tierLabel: string | null;
+  /** 이 리그(시즌)의 승강이 확정됐는지. false 면 순위표에 승강 열을 띄우지 않는다. */
+  promotionDecided: boolean;
   tieBreakOrder: string[];
   standings: V1LeagueStandingRow[];
   pendingFixtures: V1LeaguePendingFixture[];

@@ -1,6 +1,8 @@
 import {
   calculatePromotions,
   validatePromotionRule,
+  tierSlotCounts,
+  promotionRuleFingerprint,
   DEFAULT_PROMOTION_RULE,
   type PromotionRule,
   type TierStandingsInput,
@@ -279,5 +281,96 @@ describe('validatePromotionRule', () => {
   it('알 수 없는 rounding 값을 거부한다', () => {
     const errors = validatePromotionRule({ ...RULE, rounding: 'nearest' as never });
     expect(errors.map((e) => e.field)).toContain('rounding');
+  });
+});
+
+// ── Task 153 하드닝 (감사 2026-08-21) ──────────────────────────────────────
+describe('validatePromotionRule — tierOverrides 값 타입', () => {
+  const RULE_R: PromotionRule = { mode: 'ratio', ratio: 0.2, rounding: 'ceil', minSlots: 1 };
+
+  // alpha 실측: tierOverrides:{"1":null} 이 DTO(@IsObject)를 통과해 서비스에서
+  // TypeError 로 터지며 500 이 나갔다. 검증기가 값 타입을 직접 막아야 한다.
+  it('tierOverrides 값이 null 이면 던지지 않고 거부한다', () => {
+    expect(() => validatePromotionRule({ ...RULE_R, tierOverrides: { '1': null as never } })).not.toThrow();
+    const errors = validatePromotionRule({ ...RULE_R, tierOverrides: { '1': null as never } });
+    expect(errors.map((e) => e.field)).toContain('tierOverrides.1');
+  });
+
+  it('tierOverrides 값이 객체가 아니면 조용히 무시하지 않고 거부한다', () => {
+    for (const bad of [42, 'abc', true, []]) {
+      const errors = validatePromotionRule({ ...RULE_R, tierOverrides: { '2': bad as never } });
+      expect(errors.map((e) => e.field)).toContain('tierOverrides.2');
+    }
+  });
+
+  it('정상 객체 override 는 통과시킨다', () => {
+    expect(validatePromotionRule({ ...RULE_R, tierOverrides: { '1': { relegate: 2 } } })).toEqual([]);
+  });
+});
+
+describe('tierSlotCounts — 프론트/백엔드 공용 계산', () => {
+  const RULE_R: PromotionRule = { mode: 'ratio', ratio: 0.2, rounding: 'ceil', minSlots: 1 };
+
+  // alpha 감사에서 프론트 hitsMajorityGuard 가 티어 위치를 모른 채 항상 2*slots 로
+  // 판정해 24개 조합 중 15개가 서버와 어긋났다. 두 쪽이 같은 함수를 써야 한다.
+  it('1부는 승격이 없다', () => {
+    expect(tierSlotCounts(RULE_R, 1, 3, 8)).toMatchObject({ promoteCount: 0, relegateCount: 2 });
+  });
+
+  it('최하위 티어는 강등이 없다', () => {
+    expect(tierSlotCounts(RULE_R, 3, 3, 8)).toMatchObject({ promoteCount: 2, relegateCount: 0 });
+  });
+
+  it('중간 티어는 승격·강등 둘 다 있다', () => {
+    expect(tierSlotCounts(RULE_R, 2, 3, 8)).toMatchObject({ promoteCount: 2, relegateCount: 2 });
+  });
+
+  it('단일 티어 시리즈는 승강이 아예 없고 과반 가드도 걸리지 않는다', () => {
+    expect(tierSlotCounts(RULE_R, 1, 1, 8)).toMatchObject({
+      promoteCount: 0, relegateCount: 0, skippedByMajorityGuard: false,
+    });
+  });
+
+  it('minSlots=3·8팀: 1부/최하위는 가드에 안 걸리고 중간 티어만 걸린다', () => {
+    const rule: PromotionRule = { ...RULE_R, minSlots: 3 };
+    expect(tierSlotCounts(rule, 1, 3, 8).skippedByMajorityGuard).toBe(false);
+    expect(tierSlotCounts(rule, 2, 3, 8).skippedByMajorityGuard).toBe(true);
+    expect(tierSlotCounts(rule, 3, 3, 8).skippedByMajorityGuard).toBe(false);
+  });
+
+  it('calculatePromotions 결과와 정확히 일치한다', () => {
+    const rule: PromotionRule = { mode: 'ratio', ratio: 0.5, rounding: 'ceil', minSlots: 1 };
+    const plan = calculatePromotions({
+      tierCount: 3,
+      rule,
+      tiers: [tier(1, teamIds('a', 8)), tier(2, teamIds('b', 8)), tier(3, teamIds('c', 8))],
+    });
+    for (const result of plan.tiers) {
+      expect(tierSlotCounts(rule, result.tier, 3, result.teamCount)).toEqual({
+        promoteCount: result.promoteCount,
+        relegateCount: result.relegateCount,
+        skippedByMajorityGuard: result.skippedByMajorityGuard,
+      });
+    }
+  });
+});
+
+describe('promotionRuleFingerprint — preview~commit 사이 규칙 변경 감지', () => {
+  it('키 순서가 달라도 같은 규칙이면 같은 값이다', () => {
+    const a = promotionRuleFingerprint({ mode: 'ratio', ratio: 0.2, minSlots: 1, rounding: 'ceil' });
+    const b = promotionRuleFingerprint({ rounding: 'ceil', minSlots: 1, ratio: 0.2, mode: 'ratio' } as PromotionRule);
+    expect(a).toBe(b);
+  });
+
+  it('규칙이 달라지면 값이 달라진다', () => {
+    const before = promotionRuleFingerprint({ mode: 'ratio', ratio: 0.5, rounding: 'ceil', minSlots: 1 });
+    const after = promotionRuleFingerprint({ mode: 'fixed', fixedCount: 1, minSlots: 1 });
+    expect(before).not.toBe(after);
+  });
+
+  it('tierOverrides 의 키 순서도 정규화한다', () => {
+    const a = promotionRuleFingerprint({ mode: 'fixed', fixedCount: 1, tierOverrides: { '2': { relegate: 1 }, '1': { promote: 2 } } });
+    const b = promotionRuleFingerprint({ mode: 'fixed', fixedCount: 1, tierOverrides: { '1': { promote: 2 }, '2': { relegate: 1 } } });
+    expect(a).toBe(b);
   });
 });

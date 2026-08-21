@@ -1,10 +1,12 @@
 import { ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { AdminContextService } from '../common/admin-context.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { LeagueMatchPublicService } from './league-match-public.service';
 import {
   calculatePromotions,
+  promotionRuleFingerprint,
   validatePromotionRule,
   DEFAULT_PROMOTION_RULE,
   type PromotionKind,
@@ -300,6 +302,9 @@ export class LeagueSeriesAdminService {
       seriesId,
       seasonNo,
       rule: this.ruleOf(series),
+      // 이 preview 를 만들어 낸 규칙의 지문. commit 이 그대로 되돌려 보내면 서버가
+      // 그 사이 규칙이 바뀌었는지 판정한다(Task 72 participantHash 와 같은 패턴).
+      ruleFingerprint: promotionRuleFingerprint(this.ruleOf(series)),
       alreadyDecided: alreadyDecided > 0,
       warnings: plan.warnings,
       tiers: plan.tiers.map((tier) => {
@@ -345,9 +350,23 @@ export class LeagueSeriesAdminService {
       });
     }
 
+    const rule = this.ruleOf(series);
+
+    // preview 이후 어드민이 승강 규칙을 바꿨다면 어드민이 화면에서 보고 승인한 계산과
+    // 지금 서버가 하는 계산이 다르다. fromTier 는 규칙과 무관해 그대로라
+    // PROMOTION_ENTRIES_TIER_MISMATCH 로는 절대 잡히지 않고, 대신 손대지도 않은 팀이
+    // overriddenByAdmin=true 로 박제된다(alpha 실측: 수정 0건 · overriddenCount=2).
+    // 지문이 어긋나면 다시 계산하게 돌려보낸다.
+    if (dto.ruleFingerprint !== undefined && dto.ruleFingerprint !== promotionRuleFingerprint(rule)) {
+      throw new ConflictException({
+        code: 'PROMOTION_RULE_CHANGED',
+        message: '승강 규칙이 바뀌었어요. 승강 후보를 다시 계산해 주세요.',
+      });
+    }
+
     const plan = calculatePromotions({
       tierCount: series.tierCount,
-      rule: this.ruleOf(series),
+      rule,
       tiers: tiers.map((t) => t.input),
     });
     const computedByTeamId = new Map(
@@ -441,6 +460,29 @@ export class LeagueSeriesAdminService {
       };
     });
 
+    // 다음 시즌 티어별 팀 수를 미리 세어, 리그로 성립하지 않는 티어가 있으면 확정을 막는다.
+    // 시딩(seedSeason)은 "티어당 2팀 이상"을 422 로 강제하는데 승강 경로에는 그 가드가
+    // 없어서, 1팀짜리 리그가 만들어질 수 있었다(alpha 실측: teamCount:1 리그 생성).
+    // 그 리그는 대진 생성이 영구히 422 LEAGUE_TEAM_INVALID 라 시작도 종료도 못 하는
+    // 죽은 리그가 되고, 승강으로 만들어졌으니 어드민이 팀을 더 넣을 경로도 없다.
+    if (dto.createNextSeason !== false) {
+      const undersized = [];
+      for (let tier = 1; tier <= series.tierCount; tier += 1) {
+        const count = resolved.filter((row) => row.kind !== 'withdrawn' && row.toTier === tier).length;
+        // 0팀 티어는 다음 시즌에 그 티어를 열지 않는다는 뜻이라 정상(아래에서 skip 된다).
+        if (count === 1) undersized.push({ tier, teamCount: count });
+      }
+      if (undersized.length > 0) {
+        throw new UnprocessableEntityException({
+          code: 'PROMOTION_NEXT_SEASON_TIER_TOO_SMALL',
+          message:
+            `${undersized.map((t) => tierLabel(t.tier)).join(' · ')}가 다음 시즌에 1팀만 남아요. ` +
+            '리그는 2팀 이상이어야 해요. 불참 처리한 팀이나 승강 결정을 조정해 주세요.',
+          details: { tiers: undersized },
+        });
+      }
+    }
+
     const nextSeasonNo = seasonNo + 1;
     const lastSeason = await this.prisma.v1League.findFirst({
       where: { seriesId, seasonNo },
@@ -454,7 +496,7 @@ export class LeagueSeriesAdminService {
     const nextStartsOn = lastSeason === null ? new Date() : new Date(lastSeason.endsOn.getTime() + 24 * 60 * 60 * 1000);
     const nextEndsOn = new Date(nextStartsOn.getTime() + spanMs);
 
-    const result = await this.prisma.$transaction(async (tx) => {
+    const result = await this.runCommitTransaction(async (tx) => {
       await tx.v1LeaguePromotion.createMany({
         data: resolved.map((row) => ({
           fromLeagueId: row.fromLeagueId,
@@ -515,6 +557,31 @@ export class LeagueSeriesAdminService {
   }
 
   /**
+   * commit 트랜잭션 실행 + 중복 확정 경합 처리.
+   *
+   * PROMOTION_ALREADY_DECIDED 는 findFirst 로 먼저 확인하지만, 그 확인과 createMany
+   * 사이에는 틈이 있다. 두 어드민이 동시에 최종 승인을 누르면 둘 다 확인을 통과한 뒤
+   * 하나가 (fromLeagueId, teamId) unique 제약에 걸린다. 그 P2002 는 HttpException 이
+   * 아니라 전역 필터가 그대로 500 INTERNAL_ERROR 로 내보냈다 — alpha 실측: 동시 6발 중
+   * 1건 201 · **5건 500**. 데이터 자체는 unique 제약 + 트랜잭션 롤백이 지켜 냈지만
+   * (중복 리그 0건 확인), 어드민에게는 "서버 오류"로 보여 재시도를 유발한다.
+   * 진 쪽에도 선착 확인과 같은 409 를 돌려준다.
+   */
+  private async runCommitTransaction<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+    try {
+      return await this.prisma.$transaction(fn);
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictException({
+          code: 'PROMOTION_ALREADY_DECIDED',
+          message: '이미 승강이 확정된 시즌이에요.',
+        });
+      }
+      throw error;
+    }
+  }
+
+  /**
    * 경계를 넘는 조합(1부 승격 / 최하위 강등)은 commitPromotions 가 이미 422 로 막는다.
    * 그래서 여기서 clamp 하지 않는다 — clamp 하면 "승격인데 티어는 그대로"인 모순 행을
    * 조용히 만들어 버린다.
@@ -539,12 +606,12 @@ export class LeagueSeriesAdminService {
     return series;
   }
 
-  /** 시즌의 티어별 확정 순위표. 미확정 경기가 남아 있으면 승강을 계산하지 않는다. */
+  /** 시즌의 티어별 확정 순위표. 시즌이 실제로 끝나지 않았으면 승강을 계산하지 않는다. */
   private async loadSeasonStandings(seriesId: string, seasonNo: number) {
     const leagues = await this.prisma.v1League.findMany({
       where: { seriesId, seasonNo },
       orderBy: { tier: 'asc' },
-      select: { id: true, tier: true },
+      select: { id: true, tier: true, state: true },
     });
     if (leagues.length === 0) {
       throw new NotFoundException({
@@ -553,13 +620,43 @@ export class LeagueSeriesAdminService {
       });
     }
 
+    // [감사 2026-08-21] 원래 게이트는 pendingFixtures > 0 하나뿐이었는데, 그건 "예정된
+    // 경기 중 미확정이 있는가"만 본다. 대진이 **한 건도 없는** draft 리그는 pending 이
+    // 0 이라 그대로 통과했다 — alpha 실측: 시딩 직후 경기 0건 상태에서 preview 201,
+    // commit 201 로 다음 시즌까지 생성됐고, 전원 0승0무0패 동률이라 강등 대상이
+    // tie-break/삽입 순서로 정해졌다. 화면은 "모든 경기 결과가 확정돼야 승강을 계산할
+    // 수 있어요"라고 안내하면서 버튼은 열려 있었다.
+    //
+    // V1League.state 는 이 조건의 정확한 투영이다: draft -> active 는 대진 생성 시,
+    // active -> completed 는 LeagueCompletionProjectionService 가 "취소 아닌 대진이
+    // 1건 이상 있고 전부 공식 확정" 일 때만 전이시킨다(수동 전이 경로 없음).
+    // 그래서 completed 를 요구하면 "대진 0건"과 "미확정 잔존"이 한 번에 막힌다.
+    const unfinished = leagues.filter((league) => league.state !== 'completed');
+    if (unfinished.length > 0) {
+      throw new ConflictException({
+        code: 'LEAGUE_SEASON_NOT_FINISHED',
+        message:
+          `${unfinished.map((l) => tierLabel(l.tier ?? 1)).join(' · ')}가 아직 끝나지 않았어요. ` +
+          '모든 경기 결과가 확정돼야 승강을 계산할 수 있어요.',
+        details: {
+          tiers: unfinished.map((league) => ({ tier: league.tier ?? 1, state: league.state })),
+        },
+      });
+    }
+
     const tiers: Array<{ leagueId: string; input: TierStandingsInput }> = [];
     const leagueByTier = new Map<number, string>();
     const teamNameById = new Map<string, string>();
 
-    for (const league of leagues) {
+    // 티어별 순위표는 서로 독립이라 직렬로 기다릴 이유가 없다 — 티어마다 리그 전체
+    // 경기·공식결과를 훑는 무거운 조회다(3티어면 왕복 3번).
+    const results = await Promise.all(leagues.map((league) => this.publicService.standings(league.id)));
+
+    for (const [index, league] of leagues.entries()) {
       const tier = league.tier ?? 1;
-      const result = await this.publicService.standings(league.id);
+      const result = results[index];
+      // state=completed 면 여기 걸릴 일이 없지만, 프로젝션이 놓친 경로가 생겨도
+      // 미확정 경기가 순위에 섞이지 않도록 방어선을 남긴다.
       if (result.pendingFixtures.length > 0) {
         throw new ConflictException({
           code: 'LEAGUE_SEASON_NOT_FINISHED',

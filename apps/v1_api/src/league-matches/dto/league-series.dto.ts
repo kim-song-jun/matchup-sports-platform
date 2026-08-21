@@ -9,6 +9,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   Max,
   MaxLength,
   Min,
@@ -157,4 +158,14 @@ export class CommitPromotionsDto {
   @IsOptional()
   @IsBoolean()
   createNextSeason?: boolean;
+
+  /**
+   * 이 결정을 만들어 낸 preview 의 `ruleFingerprint`. 서버가 지금 규칙의 지문과 비교해
+   * preview 이후 규칙이 바뀌었으면 409 PROMOTION_RULE_CHANGED 로 되돌린다.
+   * 안 보내면 검사를 건너뛴다(구 클라이언트 하위호환).
+   */
+  @IsOptional()
+  @IsString()
+  @Matches(/^[0-9a-f]{64}$/, { message: 'ruleFingerprint 형식이 올바르지 않아요.' })
+  ruleFingerprint?: string;
 }

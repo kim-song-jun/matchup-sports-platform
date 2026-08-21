@@ -48,6 +48,12 @@ export class LeagueMatchPublicService {
         sport: { select: { id: true, code: true, name: true } },
         region: { select: { id: true, name: true } },
         _count: { select: { teams: true } },
+        // 티어 뱃지는 목록이 주 무대다 -- Task 153 User Scenario 3 이 "리그 목록에서
+        // 1부/2부/3부 뱃지를 보고 자기 수준의 리그에 신청"이다. 상세에만 있으면 팀이
+        // 리그를 고르는 그 순간에 정보가 없다.
+        seriesId: true,
+        tier: true,
+        seasonNo: true,
       },
     });
 
@@ -64,6 +70,12 @@ export class LeagueMatchPublicService {
         sport: { sportId: league.sport.id, code: league.sport.code, name: league.sport.name },
         region: { regionId: league.region.id, name: league.region.name },
         teamCount: league._count.teams,
+        seriesId: league.seriesId,
+        tier: league.tier,
+        // 단발 리그는 tier 가 null 이라 뱃지가 붙지 않는다 -- 티어가 "1부"인 게 아니라
+        // 티어 개념 자체가 없다는 뜻이므로 상세 응답과 같은 규칙으로 null 을 유지한다.
+        tierLabel: league.tier === null ? null : `${league.tier}부`,
+        seasonNo: league.seasonNo,
       })),
       pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
     };
@@ -179,9 +191,38 @@ export class LeagueMatchPublicService {
     const standings = calculateLeagueStandings({ teamIds, fixtures: confirmedFixtures, tieBreakOrder });
     const teamNameById = new Map(league.teams.map((entry) => [entry.teamId, entry.team.name]));
     const teamLogoById = new Map(league.teams.map((entry) => [entry.teamId, entry.team.profile?.logoUrl ?? null]));
-    const standingsWithTeamName = standings.map((row) => ({ ...row, teamName: teamNameById.get(row.teamId) ?? '', teamLogoUrl: teamLogoById.get(row.teamId) ?? null }));
 
-    return { leagueId: league.id, tieBreakOrder, standings: standingsWithTeamName, pendingFixtures };
+    // 확정된 승강 결과를 순위표에 얹는다 — Task 153 User Scenario 4("시즌 종료 후
+    // 순위표에서 자기 팀 행에 승격/강등/잔류 상태가 표시된다").
+    // V1LeaguePromotion 은 그동안 createMany 로 쓰기만 하고 아무도 읽지 않는
+    // 테이블이었다: 감사 추적을 위해 만들었는데 정작 어디에도 드러나지 않았다.
+    // 확정 전(행 0건)에는 전부 null 이라 순위표 모양이 바뀌지 않는다.
+    const promotions = await this.prisma.v1LeaguePromotion.findMany({
+      where: { fromLeagueId: league.id },
+      select: { teamId: true, kind: true, toTier: true },
+    });
+    const promotionByTeamId = new Map(promotions.map((row) => [row.teamId, row]));
+
+    const standingsWithTeamName = standings.map((row) => {
+      const promotion = promotionByTeamId.get(row.teamId);
+      return {
+        ...row,
+        teamName: teamNameById.get(row.teamId) ?? '',
+        teamLogoUrl: teamLogoById.get(row.teamId) ?? null,
+        promotionKind: promotion?.kind ?? null,
+        promotionToTierLabel: promotion === undefined ? null : `${promotion.toTier}부`,
+      };
+    });
+
+    return {
+      leagueId: league.id,
+      tier: league.tier,
+      tierLabel: league.tier === null ? null : `${league.tier}부`,
+      promotionDecided: promotions.length > 0,
+      tieBreakOrder,
+      standings: standingsWithTeamName,
+      pendingFixtures,
+    };
   }
 
   async playerRecords(leagueId: string) {

@@ -39,7 +39,9 @@ export default function LeagueSeriesDetailClient({ seriesId }: { seriesId: strin
   const handleCommit = (entries: V1CommitPromotionEntry[]) => {
     if (preview === null) return;
     commitPromotions.mutate(
-      { seasonNo: preview.seasonNo, body: { entries } },
+      // preview 를 만든 규칙의 지문을 함께 보낸다 — 그 사이 어드민이 규칙을 바꿨다면
+      // 서버가 409 PROMOTION_RULE_CHANGED 로 막고 다시 계산하게 한다.
+      { seasonNo: preview.seasonNo, body: { entries, ruleFingerprint: preview.ruleFingerprint } },
       {
         onSuccess: (result) => {
           setPreview(null);
@@ -109,7 +111,11 @@ export default function LeagueSeriesDetailClient({ seriesId }: { seriesId: strin
                   <button
                     type="button"
                     onClick={() => handlePreview(season.seasonNo)}
-                    disabled={previewPromotions.isPending}
+                    // 시즌이 끝나지 않았으면 서버가 409 로 막는다. 버튼을 열어 두면
+                    // 바로 위 "모든 경기 결과가 확정돼야 계산할 수 있어요" 안내와 화면이
+                    // 모순된다 — 실제로 경기 0건 draft 시즌에서 그대로 눌려 승강이
+                    // 확정됐다(alpha 실측).
+                    disabled={previewPromotions.isPending || !season.allCompleted}
                     className="inline-flex min-h-[44px] items-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--text-strong)] disabled:opacity-50"
                   >
                     {previewPromotions.isPending ? '계산하는 중…' : '승강 후보 계산'}

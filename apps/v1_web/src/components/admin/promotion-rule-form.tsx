@@ -12,6 +12,8 @@ const PREVIEW_TEAM_COUNTS = [5, 8, 12] as const;
 
 interface PromotionRuleFormProps {
   value: V1PromotionRule;
+  /** 시리즈의 티어 수. 1부/최하위는 한쪽 방향이 없어 미리보기가 달라진다. */
+  tierCount: number;
   onChange: (next: V1PromotionRule) => void;
   disabled?: boolean;
 }
@@ -32,13 +34,48 @@ export function previewSlots(rule: V1PromotionRule, teamCount: number): number {
   return Math.max(minSlots, rounded);
 }
 
-/** 잔류 과반 가드 — 승격+강등이 팀 수의 절반을 넘으면 서버가 그 티어를 건너뛴다. */
-export function hitsMajorityGuard(rule: V1PromotionRule, teamCount: number): boolean {
-  const slots = previewSlots(rule, teamCount);
-  return slots * 2 > Math.floor(teamCount / 2);
+export interface TierSlotPreview {
+  promoteCount: number;
+  relegateCount: number;
+  skippedByMajorityGuard: boolean;
 }
 
-export function PromotionRuleForm({ value, onChange, disabled = false }: PromotionRuleFormProps) {
+/**
+ * 티어 하나의 승격·강등 수와 과반 가드 판정 — 서버 `tierSlotCounts`
+ * (apps/v1_api/src/league-matches/league-promotion.ts)의 정확한 사본이다.
+ *
+ * 이전 버전은 티어 위치를 모른 채 언제나 `slots * 2 > floor(n/2)` 로 판정했다. 그래서
+ * "1부는 승격이 없다 / 최하위는 강등이 없다 / 단일 티어는 승강 자체가 없다"를 반영하지
+ * 못해 서버와 어긋났다 — 24개 조합 중 15개 불일치. 폼이 허용하는 값으로 재현된다:
+ * minSlots=3·8팀이면 폼은 "승강을 건너뛰어요"라고 경고하지만 서버는 실제로 1부에서
+ * 3팀을 강등시킨다. 어드민이 "아무 일도 안 일어난다"고 믿는 설정이 8팀 중 3팀을
+ * 내리는 설정이었다. 두 곳의 식이 다르면 반드시 다시 갈리므로 서버 함수를 그대로 옮긴다.
+ */
+export function tierSlotPreview(
+  rule: V1PromotionRule,
+  tier: number,
+  tierCount: number,
+  teamCount: number,
+): TierSlotPreview {
+  if (teamCount === 0) return { promoteCount: 0, relegateCount: 0, skippedByMajorityGuard: false };
+
+  const override = rule.tierOverrides?.[String(tier)];
+  const slots = previewSlots(rule, teamCount);
+  const canPromote = tier > 1;
+  const canRelegate = tier < tierCount;
+
+  let promoteCount = Math.min(canPromote ? (override?.promote ?? slots) : 0, teamCount);
+  let relegateCount = Math.min(canRelegate ? (override?.relegate ?? slots) : 0, teamCount);
+
+  const skippedByMajorityGuard = promoteCount + relegateCount > Math.floor(teamCount / 2);
+  if (skippedByMajorityGuard) {
+    promoteCount = 0;
+    relegateCount = 0;
+  }
+  return { promoteCount, relegateCount, skippedByMajorityGuard };
+}
+
+export function PromotionRuleForm({ value, tierCount, onChange, disabled = false }: PromotionRuleFormProps) {
   // 숫자 입력을 지우는 순간 Number('') === 0 이 규칙에 박히면 서버가 422 로 거부한다.
   // 그렇다고 즉시 최솟값으로 되돌리면 "20"을 "5"로 고치려고 지웠을 때 커서 앞에 1 이 남아
   // "15"가 되어버린다. 그래서 화면에 보이는 문자열(draft)과 실제 규칙 값을 분리하고,
@@ -53,14 +90,19 @@ export function PromotionRuleForm({ value, onChange, disabled = false }: Promoti
     apply(parsed);
   };
 
+  // 티어마다 결과가 다르다(1부는 승격 없음 · 최하위는 강등 없음)이므로 티어별로 보여준다.
+  // "8팀 리그 → 승격 2 · 강등 2" 한 줄만 띄우면 1부·최하위에서 실제로 무슨 일이
+  // 일어나는지 어드민이 알 수 없다.
   const previews = useMemo(
     () =>
       PREVIEW_TEAM_COUNTS.map((teamCount) => ({
         teamCount,
-        slots: previewSlots(value, teamCount),
-        guarded: hitsMajorityGuard(value, teamCount),
+        tiers: Array.from({ length: tierCount }, (_, i) => ({
+          tier: i + 1,
+          ...tierSlotPreview(value, i + 1, tierCount, teamCount),
+        })),
       })),
-    [value],
+    [value, tierCount],
   );
 
   return (
@@ -174,19 +216,31 @@ export function PromotionRuleForm({ value, onChange, disabled = false }: Promoti
 
       <div className="mt-4 rounded-xl bg-[var(--surface-muted)] p-3">
         <p className="text-xs font-semibold text-[var(--text-strong)]">이 규칙이면 이렇게 움직여요</p>
-        <ul className="mt-2 space-y-1">
+        <ul className="mt-2 space-y-2">
           {previews.map((preview) => (
-            <li key={preview.teamCount} className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
-              <span className="font-semibold text-[var(--text-strong)]">{preview.teamCount}팀 리그</span>
-              <span aria-hidden="true">→</span>
-              <span>
-                승격 {preview.slots}팀 · 강등 {preview.slots}팀
-              </span>
-              {preview.guarded && (
-                <span className="rounded-md bg-amber-100 px-1.5 py-0.5 font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
-                  ! 잔류 팀이 과반에 못 미쳐 승강을 건너뛰어요
-                </span>
-              )}
+            <li key={preview.teamCount} className="text-xs text-[var(--text-muted)]">
+              <span className="font-semibold text-[var(--text-strong)]">티어마다 {preview.teamCount}팀일 때</span>
+              <ul className="mt-1 space-y-1 pl-3">
+                {preview.tiers.map((tier) => (
+                  <li key={tier.tier} className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span className="font-semibold text-[var(--text-strong)]">{tier.tier}부</span>
+                    <span aria-hidden="true">→</span>
+                    {tier.skippedByMajorityGuard ? (
+                      <span className="rounded-md bg-amber-100 px-1.5 py-0.5 font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+                        ! 잔류 팀이 과반에 못 미쳐 승강을 건너뛰어요
+                      </span>
+                    ) : tier.promoteCount === 0 && tier.relegateCount === 0 ? (
+                      <span>승강 없음</span>
+                    ) : (
+                      <span>
+                        {tier.promoteCount > 0 && `승격 ${tier.promoteCount}팀`}
+                        {tier.promoteCount > 0 && tier.relegateCount > 0 && ' · '}
+                        {tier.relegateCount > 0 && `강등 ${tier.relegateCount}팀`}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
             </li>
           ))}
         </ul>

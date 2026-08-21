@@ -38,10 +38,13 @@ const APPLICATION_STATUS_LABEL: Record<string, string> = {
 };
 
 function DetailRow({ label, value }: { label: string; value: string | number | null | undefined }) {
+  // `value || '-'` 는 0 을 빈 값으로 삼키고, `value ?? '-'` 는 빈 문자열을 빈 칸으로 남긴다.
+  // 둘 다 틀리므로 "값이 없다"를 명시적으로 판정한다.
+  const isEmpty = value === null || value === undefined || value === '';
   return (
     <div className="min-w-0 rounded-xl bg-[var(--surface-soft)] px-4 py-3">
       <dt className="text-xs font-semibold text-gray-400">{label}</dt>
-      <dd className="mt-1 break-words text-sm font-semibold text-[var(--text-strong)]">{value || '-'}</dd>
+      <dd className="mt-1 break-words text-sm font-semibold text-[var(--text-strong)]">{isEmpty ? '-' : value}</dd>
     </div>
   );
 }
@@ -71,12 +74,19 @@ function BackLink() {
 }
 
 function Applications({ teamMatch }: { teamMatch: V1AdminTeamMatchDetail }) {
+  const truncated = teamMatch.applications.length < teamMatch.applicationCount;
   return (
     <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5" aria-label="상대팀 신청">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-[17px] font-bold text-[var(--text-strong)]">상대팀 신청</h2>
-        <span className="text-sm font-semibold tabular-nums text-[var(--text-muted)]">{teamMatch.applicationCount}건</span>
+        <span className="text-sm font-semibold tabular-nums text-[var(--text-muted)]">
+          {/* 서버가 최근 50건만 내려준다 — 총계만 적으면 목록이 전부인 것처럼 읽힌다. */}
+          {truncated ? `${teamMatch.applications.length} / ${teamMatch.applicationCount}건` : `${teamMatch.applicationCount}건`}
+        </span>
       </div>
+      {truncated && (
+        <p className="mt-2 text-xs text-[var(--text-muted)]">최근 {teamMatch.applications.length}건만 표시해요.</p>
+      )}
       {teamMatch.applications.length > 0 ? (
         <ol className="mt-4 flex flex-col gap-2">
           {teamMatch.applications.map((application) => (

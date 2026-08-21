@@ -87,6 +87,28 @@ describe('AdminTeamMatchDetailPage', () => {
     expect(within(conditions).getByText('남녀 혼성')).toBeInTheDocument();
   });
 
+  it('서버가 잘라 보낸 목록을 총계처럼 보여주지 않는다', () => {
+    // 서버는 최근 50건만 준다. 총계만 적으면 목록이 전부인 것처럼 읽힌다.
+    renderWith({ ...OK, data: { ...DETAIL, applicationCount: 57 } });
+
+    const section = screen.getByRole('region', { name: '상대팀 신청' });
+    expect(within(section).getByText('2 / 57건')).toBeInTheDocument();
+    expect(within(section).getByText('최근 2건만 표시해요.')).toBeInTheDocument();
+  });
+
+  it('전부 보여줄 때는 총계만 적는다', () => {
+    renderWith(OK);
+    const section = screen.getByRole('region', { name: '상대팀 신청' });
+    expect(within(section).getByText('2건')).toBeInTheDocument();
+    expect(within(section).queryByText(/만 표시해요/)).not.toBeInTheDocument();
+  });
+
+  it('빈 문자열은 대시로, 0 은 0 으로 보여준다', () => {
+    renderWith({ ...OK, data: { ...DETAIL, placeAddress: '', uniformColor: null } });
+    const conditions = screen.getByRole('region', { name: '경기 조건' });
+    expect(within(conditions).getAllByText('-').length).toBeGreaterThan(0);
+  });
+
   it('신청이 없으면 빈칸 대신 안내를 보여준다', () => {
     renderWith({ ...OK, data: { ...DETAIL, applications: [], applicationCount: 0 } });
     expect(screen.getByText('아직 신청한 팀이 없어요.')).toBeInTheDocument();

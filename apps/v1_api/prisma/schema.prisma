@@ -3164,13 +3164,14 @@ model V1TeamRecordFact {
   goalsFor       Int                  @map("goals_for")
   goalsAgainst   Int                  @map("goals_against")
   sourceHash     String               @map("source_hash")
+  playedAt       DateTime             @map("played_at")
   officialAt     DateTime             @map("official_at")
   recordedAt     DateTime             @default(now()) @map("recorded_at")
   resultRevision V1GameResultRevision @relation(fields: [revisionId], references: [id], onDelete: Restrict, map: "v1_team_record_facts_revision_fk")
 
   @@unique([revisionId, teamId], map: "v1_team_record_facts_revision_team_key")
-  @@index([teamId, officialAt], map: "v1_team_record_facts_team_official_at_idx")
-  @@index([teamId, tournamentId, officialAt], map: "v1_team_record_facts_team_tournament_idx")
+  @@index([teamId, playedAt], map: "v1_team_record_facts_team_played_at_idx")
+  @@index([teamId, tournamentId, playedAt], map: "v1_team_record_facts_team_tournament_played_at_idx")
   @@map("v1_team_record_facts")
 }
 

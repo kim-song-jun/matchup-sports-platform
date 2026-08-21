@@ -310,7 +310,10 @@ export function ResultEditModal({
     initialPenalties?.firstKickSideKey ?? '',
   );
   const [goalEvents, setGoalEvents] = useState<GameResultGoalEventInput[]>(() =>
-    (base.goalEvents ?? []).map((event) => ({ ...event })),
+    (base.goalEvents ?? []).map((event) => ({
+      ...event,
+      ...(event.participantId ? {} : { anonymous: true }),
+    })),
   );
   const [participants, setParticipants] = useState<EditableParticipant[]>(() =>
     base.participants.map(toEditable),
@@ -655,6 +658,7 @@ export function ResultEditModal({
                     {
                       id: `correction-${Date.now()}`,
                       sideId: scoringSide.id,
+                      anonymous: true,
                       minute: 0,
                       period: 1,
                       ownGoal: false,
@@ -676,7 +680,12 @@ export function ResultEditModal({
                       onChange={(event) =>
                         replaceGoalEvents(goalEvents.map((item, itemIndex) =>
                           itemIndex === index
-                            ? { ...item, sideId: event.target.value, participantId: undefined }
+                            ? {
+                                ...item,
+                                sideId: event.target.value,
+                                participantId: undefined,
+                                anonymous: true,
+                              }
                             : item,
                         ))
                       }
@@ -690,12 +699,16 @@ export function ResultEditModal({
                       onChange={(event) =>
                         replaceGoalEvents(goalEvents.map((item, itemIndex) =>
                           itemIndex === index
-                            ? { ...item, participantId: event.target.value || undefined }
+                            ? {
+                                ...item,
+                                participantId: event.target.value || undefined,
+                                anonymous: event.target.value ? undefined : true,
+                              }
                             : item,
                         ))
                       }
                     >
-                      <option value="">선수 미지정</option>
+                      <option value="">익명</option>
                       {participants.filter((participant) => participantFitsGoal(goal, participant)).map((participant) => (
                         <option key={participant.participantId} value={participant.participantId}>
                           {participantLabel(sides, participantNameMap, participant.participantId, participant.sideId)}
@@ -713,6 +726,7 @@ export function ResultEditModal({
                                 ...item,
                                 ownGoal: event.target.value === 'OWN_GOAL',
                                 participantId: undefined,
+                                anonymous: true,
                               }
                             : item,
                         ))

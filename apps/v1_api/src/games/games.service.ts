@@ -4513,7 +4513,8 @@ export class GamesService {
     if (
       dto.type === V1GameEventType.GOAL &&
       dto.participantId === undefined &&
-      game.sourceType === V1GameSourceType.TOURNAMENT_FIXTURE
+      game.sourceType === V1GameSourceType.TOURNAMENT_FIXTURE &&
+      dto.payload.anonymous !== true
     ) {
       const config = await tx.v1CompetitionConfigVersion.findUnique({
         where: { id: game.competitionConfigVersionId },
@@ -4665,6 +4666,7 @@ export class GamesService {
         ...(payload.card === 'YELLOW' || payload.card === 'RED'
           ? { card: payload.card }
           : {}),
+        ...(payload.anonymous === true ? { anonymous: true } : {}),
       };
     });
     const resultConfig = config === null ? {} : jsonObject(config.result);
@@ -4676,7 +4678,8 @@ export class GamesService {
       (event) =>
         event.type === V1GameEventType.GOAL &&
         event.reversed !== true &&
-        event.participantId === undefined,
+        event.participantId === undefined &&
+        event.anonymous !== true,
     );
     const participants: GameResultParticipant[] = dto.actualParticipants.map((participant) => ({
       id: participant.participantId,
@@ -4932,7 +4935,7 @@ export class GamesService {
         );
       }
       if (event.participantId === null) {
-        if (event.type === V1GameEventType.GOAL) {
+        if (event.type === V1GameEventType.GOAL && jsonObject(event.payload).anonymous !== true) {
           missingScorer = true;
         }
         continue;

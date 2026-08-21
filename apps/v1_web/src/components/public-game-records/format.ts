@@ -15,6 +15,14 @@ export function presentParticipantName(displayName: string | null): string {
   return displayName ?? WITHHELD_IDENTITY_LABEL;
 }
 
+/** Event rows use explicit football notation for intentionally anonymous scoring facts. */
+export function presentGameEventParticipantName(type: string, displayName: string | null): string {
+  if (displayName !== null) return displayName;
+  if (type === 'OWN_GOAL') return 'OG';
+  if (type === 'GOAL') return '익명';
+  return WITHHELD_IDENTITY_LABEL;
+}
+
 /** `pending | official | corrected | void` -> Korean label shown next to a result. */
 const RESULT_STATE_LABEL: Record<PublicResultState, string> = {
   pending: '결과 대기',
@@ -148,7 +156,7 @@ export function eventPresentation(event: {
   cardColor: 'YELLOW' | 'RED' | null;
 }): { icon: string; label: string; badge?: string } {
   if (event.type === 'GOAL') return { icon: '⚽', label: '골' };
-  if (event.type === 'OWN_GOAL') return { icon: '⚽', label: '자책골', badge: '자책' };
+  if (event.type === 'OWN_GOAL') return { icon: '⚽', label: '자책골', badge: 'OG' };
   if (event.type === 'CARD' && event.cardColor === 'RED') return { icon: '🟥', label: '레드카드' };
   if (event.type === 'CARD' && event.cardColor === 'YELLOW') return { icon: '🟨', label: '옐로카드' };
   if (event.type === 'CARD') return { icon: '□', label: '카드 색상 확인 필요' };

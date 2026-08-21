@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   isMinuteUnknown,
@@ -38,7 +38,7 @@ interface TeamRecordFactRow {
   readonly result: string;
   readonly goalsFor: number;
   readonly goalsAgainst: number;
-  readonly officialAt: Date;
+  readonly playedAt: Date;
   readonly resultRevision: {
     readonly score: Prisma.JsonValue;
     readonly goalEvents: Prisma.JsonValue | null;
@@ -149,13 +149,13 @@ export class PublicTeamRecordsService {
       goalsAgainst: row.goalsAgainst,
       penalties: resolveTeamPenalties(row.resultRevision.score, row.resultRevision.game.sides, teamId),
       events: eventsByGameId.get(row.gameId) ?? [],
-      officialAt: row.officialAt.toISOString(),
+      playedAt: row.playedAt.toISOString(),
     }));
 
     const lastPageRow = pageRows[pageRows.length - 1];
     const nextCursor =
       hasMore && lastPageRow !== undefined
-        ? encodeRecordCursor({ key: lastPageRow.officialAt.toISOString(), id: lastPageRow.id })
+        ? encodeRecordCursor({ key: lastPageRow.playedAt.toISOString(), id: lastPageRow.id })
         : null;
 
     return {
@@ -174,21 +174,29 @@ export class PublicTeamRecordsService {
     cursor: RecordCursor | null,
     seasonRange: { readonly gte: Date; readonly lt: Date } | null,
   ): Promise<TeamRecordFactRow[]> {
-    return this.prisma.v1TeamRecordFact.findMany({
-      where: {
-        teamId,
-        ...(seasonRange ? { officialAt: seasonRange } : {}),
-        ...(cursor
-          ? {
-              OR: [
-                { officialAt: { lt: new Date(cursor.key) } },
-                { officialAt: new Date(cursor.key), id: { lt: cursor.id } },
-              ],
-            }
-          : {}),
-      },
-      orderBy: [{ officialAt: 'desc' }, { id: 'desc' }],
-      take: limit + 1,
+    type PageKeyRow = { readonly id: string; readonly playedAt: Date };
+    const seasonFilter = seasonRange
+      ? Prisma.sql`AND trf.played_at >= ${seasonRange.gte} AND trf.played_at < ${seasonRange.lt}`
+      : Prisma.empty;
+    const cursorFilter = cursor
+      ? Prisma.sql`AND (trf.played_at < ${new Date(cursor.key)} OR (trf.played_at = ${new Date(cursor.key)} AND trf.id < ${cursor.id}))`
+      : Prisma.empty;
+    const pageKeys = await this.prisma.$queryRaw<PageKeyRow[]>(Prisma.sql`
+      SELECT trf.id, trf.played_at AS "playedAt"
+      FROM v1_team_record_facts trf
+      INNER JOIN v1_games game
+        ON game.id = trf.game_id
+       AND game.current_official_revision_id = trf.revision_id
+      WHERE trf.team_id = ${teamId}
+      ${seasonFilter}
+      ${cursorFilter}
+      ORDER BY trf.played_at DESC, trf.id DESC
+      LIMIT ${limit + 1}
+    `);
+    if (pageKeys.length === 0) return [];
+
+    const rows = await this.prisma.v1TeamRecordFact.findMany({
+      where: { id: { in: pageKeys.map(({ id }) => id) } },
       select: {
         id: true,
         revisionId: true,
@@ -198,7 +206,7 @@ export class PublicTeamRecordsService {
         result: true,
         goalsFor: true,
         goalsAgainst: true,
-        officialAt: true,
+        playedAt: true,
         resultRevision: {
           select: {
             score: true,
@@ -220,6 +228,13 @@ export class PublicTeamRecordsService {
         },
       },
     });
+    const rowById = new Map(rows.map((row) => [row.id, row]));
+    const orderedRows: TeamRecordFactRow[] = [];
+    for (const { id } of pageKeys) {
+      const row = rowById.get(id);
+      if (row !== undefined) orderedRows.push(row);
+    }
+    return orderedRows;
   }
 
   /**
@@ -406,8 +421,8 @@ export class PublicTeamRecordsService {
           FROM v1_team_record_facts trf
           INNER JOIN v1_games g ON g.id = trf.game_id AND g.current_official_revision_id = trf.revision_id
           WHERE trf.team_id = ${teamId}
-            AND trf.official_at >= ${seasonRange.gte}
-            AND trf.official_at < ${seasonRange.lt}
+            AND trf.played_at >= ${seasonRange.gte}
+            AND trf.played_at < ${seasonRange.lt}
         `
       : await this.prisma.$queryRaw<SummaryRow[]>`
           SELECT

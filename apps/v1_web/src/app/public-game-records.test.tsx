@@ -209,7 +209,7 @@ function makeTeamRecords(overrides: Partial<PublicTeamRecordsResponse> = {}): Pu
         goalsAgainst: 1,
         penalties: null,
         events: [],
-        officialAt: '2026-08-10T11:00:00.000Z',
+        playedAt: '2026-08-09T02:00:00.000Z',
       },
     ],
     nextCursor: null,
@@ -228,6 +228,11 @@ describe('TeamRecordsContent — 정정 배지', () => {
   it('팀 전적 행에는 정정됨 배지를 보여주지 않는다', () => {
     render(<TeamRecordsContent data={makeTeamRecords()} />);
     expect(screen.queryByText('정정됨')).not.toBeInTheDocument();
+  });
+
+  it('결과 정정 시각이 아니라 실제 경기 일자를 표시한다', () => {
+    render(<TeamRecordsContent data={makeTeamRecords()} />);
+    expect(screen.getByText(/8\/9 \(일\)/)).toBeInTheDocument();
   });
 });
 

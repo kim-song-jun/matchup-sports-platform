@@ -45,6 +45,18 @@ function eventDotClass(event: GameEventRecord): string {
   }
 }
 
+function participantSuffix(
+  event: GameEventRecord,
+  playerName: ReadonlyMap<string, string>,
+): string {
+  if (event.participantId !== null) {
+    return playerName.has(event.participantId) ? ' · ' + playerName.get(event.participantId) : '';
+  }
+  if (event.type === 'GOAL') return ' · 익명';
+  if (event.type === 'OWN_GOAL') return ' · OG';
+  return '';
+}
+
 /**
  * 서버에 확정된 경기 이벤트 로그.
  *
@@ -185,11 +197,7 @@ export function RecordedEventList({
                   {eventTypeLabel(event)}
                   {event.type === 'SUBSTITUTION'
                     ? substitutionDetailSuffix(event, playerName)
-                    : `${
-                        event.participantId && playerName.has(event.participantId)
-                          ? ` · ${playerName.get(event.participantId)}`
-                          : ''
-                      }${assistSuffix(event, playerName)}`}
+                    : participantSuffix(event, playerName) + assistSuffix(event, playerName)}
                 </p>
               </div>
               <div className="flex shrink-0 items-center justify-end gap-2">

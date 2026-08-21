@@ -24,6 +24,7 @@ export function deriveEditableGoalEvents(
       id: event.id,
       sideId: event.sideId as string,
       ...(event.participantId ? { participantId: event.participantId } : {}),
+      ...(event.payload.anonymous === true ? { anonymous: true } : {}),
       minute: Math.ceil(event.clockMs / 60_000),
       period: event.period,
       ownGoal: event.type === 'OWN_GOAL',

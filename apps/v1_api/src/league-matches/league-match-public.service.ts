@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { isParticipantPubliclyEligible, loadParticipantConsentEligibility } from '../games/public-records/public-consent';
+import { sortMyLeaguesByState } from './league-lifecycle-rules';
 import { calculateLeagueStandings, LeagueTieBreakCriterion } from './league-standings';
 import { ListLeagueMatchesQueryDto } from './dto/league-match.dto';
 
@@ -108,9 +109,11 @@ export class LeagueMatchPublicService {
 
     const leagues = await this.prisma.v1League.findMany({
       where: { teams: { some: { teamId: { in: teamIds } } } },
-      // 진행 중을 먼저, 그 다음 최근 개설순. 종료된 리그가 위로 올라오면 "지금 뛰는 리그"를
-      // 찾으러 온 사용자가 스크롤해야 한다.
-      orderBy: [{ state: 'asc' }, { createdAt: 'desc' }, { id: 'desc' }],
+      // 같은 상태 안에서는 최근 개설순. 상태 우선순위는 DB 정렬로 표현할 수 없어 아래에서
+      // 다시 정렬한다 -- `state: 'asc'` 는 enum 선언 순서(draft -> active -> completed)를
+      // 따르므로 draft 가 맨 위로 올라온다. "지금 뛰는 리그"를 찾으러 온 사용자에게
+      // 아직 시작도 안 한 리그가 먼저 보이면 안 된다.
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       select: {
         id: true,
         title: true,
@@ -127,9 +130,13 @@ export class LeagueMatchPublicService {
       },
     });
 
+    // 진행 중 -> 준비 중 -> 종료. 목록이 사용자의 소속 팀 수로 묶여 있어(페이지네이션 없음)
+    // 메모리 정렬로 충분하다. 규칙과 근거는 sortMyLeaguesByState 참고.
+    const ordered = sortMyLeaguesByState(leagues);
+
     const myTeamIds = new Set(teamIds);
     return {
-      items: leagues.map((league) => {
+      items: ordered.map((league) => {
         // 한 리그에 내 팀이 둘 이상 있을 수 있다(같은 사용자가 두 팀 소속). 전부 싣는다 --
         // 하나만 고르면 화면이 "왜 내 다른 팀은 안 보이지"가 된다.
         const mine = league.teams.filter((entry) => myTeamIds.has(entry.teamId));

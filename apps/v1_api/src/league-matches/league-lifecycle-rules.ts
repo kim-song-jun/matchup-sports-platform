@@ -119,6 +119,25 @@ export function planNextSeasonTiers(input: {
 }
 
 /**
+ * "내 리그" 목록의 상태 우선순위: 진행 중 -> 준비 중 -> 종료.
+ *
+ * Prisma 의 enum 정렬(`state: 'asc'`)은 **선언 순서**를 쓰는데 V1LeagueState 는
+ * `draft -> active -> completed` 라, 그대로 쓰면 아직 시작도 안 한 리그가 맨 위로 온다.
+ * "지금 뛰는 리그"를 찾으러 온 사용자에게는 정확히 반대다(Copilot 리뷰가 잡은 결함).
+ * DB 정렬로는 표현할 수 없으므로 우선순위를 여기서 명시한다.
+ *
+ * 입력 순서(같은 상태 안에서의 정렬)는 보존한다 — Array.prototype.sort 는 안정 정렬이라
+ * 호출부가 넘긴 createdAt desc 순서가 그대로 유지된다.
+ */
+const MY_LEAGUE_STATE_PRIORITY: Record<string, number> = { active: 0, draft: 1, completed: 2 };
+
+export function sortMyLeaguesByState<T extends { state: string }>(leagues: readonly T[]): T[] {
+  return [...leagues].sort(
+    (a, b) => (MY_LEAGUE_STATE_PRIORITY[a.state] ?? 99) - (MY_LEAGUE_STATE_PRIORITY[b.state] ?? 99),
+  );
+}
+
+/**
  * 이미 확정된 몰수 결과를 **저장된 값 그대로** 되읽는다 (멱등 응답용).
  *
  * 요청 dto 로 계산한 값을 돌려주면, 운영자가 몰수팀을 반대로 지정해 재호출했을 때

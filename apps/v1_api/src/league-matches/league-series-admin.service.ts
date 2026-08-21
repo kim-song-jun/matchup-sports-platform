@@ -246,6 +246,16 @@ export class LeagueSeriesAdminService {
     // 운영자가 기간을 주면 그것을 쓰고, 없으면 종래 폴백(오늘 + 90일)을 유지한다.
     // 이후 시즌은 commitPromotions 가 직전 시즌 길이를 승계하므로 여기서 정한 기간이
     // 시리즈 전체의 시즌 리듬이 된다.
+    //
+    // 한쪽만 오면 거부한다. endsOn 만 오면 startsOn 이 조용히 "오늘"로 채워져 운영자가
+    // 의도하지 않은 기간이 만들어지는데, 그 리듬을 다음 시즌들이 그대로 승계한다.
+    // 프론트도 같은 조건으로 막지만 그건 서버 보장이 아니다.
+    if ((dto.startsOn === undefined) !== (dto.endsOn === undefined)) {
+      throw new UnprocessableEntityException({
+        code: 'LEAGUE_PERIOD_INVALID',
+        message: '시즌 시작일과 종료일은 함께 입력하거나 함께 비워 주세요.',
+      });
+    }
     const startsOn = dto.startsOn === undefined ? new Date() : new Date(dto.startsOn);
     const endsOn =
       dto.endsOn === undefined

@@ -114,7 +114,8 @@ describe('getV1Socket — 네임스페이스와 핸드셰이크 메타데이터'
     ioMock.mock.calls[0][1].auth(cb);
     const notificationId = cb.mock.calls[0][0].clientInstanceId;
     expect(window.sessionStorage.getItem('teameet.v1.notifications.clientInstanceId')).toBe(notificationId);
-    expect(window.sessionStorage.getItem('teameet.v1.gameOps.clientInstanceId')).toBeNull();
+    // 값이 없든(현재) 다른 테스트가 남겼든, 알림 소켓의 id 와 같아서는 안 된다.
+    expect(window.sessionStorage.getItem('teameet.v1.gameOps.clientInstanceId')).not.toBe(notificationId);
   });
 });
 

@@ -94,7 +94,18 @@ export class LeagueMatchForfeitService {
       return await this.recordForfeitOnce(user, leagueId, teamMatchId, dto);
     } catch (error) {
       if (!isConcurrencyConflict(error)) throw error;
-      return await this.recordForfeitOnce(user, leagueId, teamMatchId, dto);
+      try {
+        return await this.recordForfeitOnce(user, leagueId, teamMatchId, dto);
+      } catch (retryError) {
+        if (!isConcurrencyConflict(retryError)) throw retryError;
+        // GamesService 가 붙이는 기본 메시지는 영문("A concurrent command won; ...")이라
+        // 그대로 올리면 한국어 화면에 영문이 뜬다. 코드는 그대로 두고(클라이언트가 코드로
+        // 분기할 수 있어야 한다) 운영자가 읽을 문장만 바꾼다.
+        throw new ConflictException({
+          code: 'COMMAND_CONCURRENCY_CONFLICT',
+          message: '같은 대진을 동시에 처리하고 있어요. 잠시 후 다시 시도해 주세요.',
+        });
+      }
     }
   }
 

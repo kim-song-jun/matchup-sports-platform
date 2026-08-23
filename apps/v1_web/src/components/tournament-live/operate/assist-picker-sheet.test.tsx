@@ -35,6 +35,7 @@ const TEAMMATE: GameLineupParticipant = {
   positionX: null,
   positionY: null,
   started: true,
+  arrivedAt: null,
   createdAt: '',
   updatedAt: '',
 };

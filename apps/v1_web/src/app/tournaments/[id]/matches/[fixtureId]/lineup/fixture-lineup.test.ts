@@ -22,6 +22,7 @@ function participant(overrides: Partial<GameLineupParticipant>): GameLineupParti
     positionX: null,
     positionY: null,
     started: true,
+    arrivedAt: null,
     createdAt: '2026-08-01T00:00:00.000Z',
     updatedAt: '2026-08-01T00:00:00.000Z',
     ...overrides,
@@ -264,6 +265,7 @@ describe('fixture-lineup.view-model — 피치 배치', () => {
             positionX: 50,
             positionY: 6,
             started: true,
+            arrivedAt: null,
           }),
         ]),
       ],
@@ -298,6 +300,7 @@ describe('applyLoadedSelection', () => {
       positionX: null,
       positionY: null,
       started: true,
+      arrivedAt: null,
       goalkeeper: false,
       ...overrides,
     };

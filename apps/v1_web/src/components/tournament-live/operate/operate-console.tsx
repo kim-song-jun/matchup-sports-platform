@@ -19,7 +19,12 @@ import {
 import { Button } from '@/components/v1-ui/button';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useV1AuthMe, useV1GameResultRevisions } from '@/hooks/use-v1-api';
-import { useV1FixtureLineup, useV1Game, postV1GameCommand } from '@/hooks/use-v1-game-operations';
+import {
+  useV1FixtureLineup,
+  useV1Game,
+  useV1SetParticipantArrival,
+  postV1GameCommand,
+} from '@/hooks/use-v1-game-operations';
 import { readGameResultScore } from '@/lib/game-result-score';
 import { gameOperationsErrorMessage, useV1GameOperationsConsole } from '@/hooks/use-v1-game-operations-console';
 import { isTakeoverHeld } from '@/lib/game-operations-queue';
@@ -37,6 +42,7 @@ import { QueueStatusPanel, hasUnsettledQueueItems } from './queue-status-panel';
 import { RecordedEventList } from './recorded-event-list';
 import { AssistPickerSheet } from './assist-picker-sheet';
 import { QuickSubstitutionPanel } from './quick-substitution-panel';
+import { ArrivalCheckinPanel } from './arrival-checkin-panel';
 import { RestTimer } from './rest-timer';
 import { PenaltyShootoutPanel } from './penalty-shootout-panel';
 import { useEventToast, EventToasts } from '@/components/game-operations/event-toast';
@@ -180,6 +186,10 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   const myUserId = authMe.data?.user.id;
 
   const fixtureLineup = useV1FixtureLineup(tournamentId, fixtureId);
+  const setArrival = useV1SetParticipantArrival(fixtureLineup.data?.gameId ?? null, {
+    tournamentId,
+    fixtureId,
+  });
   const gameId = fixtureLineup.data?.gameId ?? null;
 
   const gameDetail = useV1Game(gameId);
@@ -1326,6 +1336,26 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           다섯 액션 버튼과 동급 빈도가 아니라 그 아래 얹는 보조 토글이라,
           높이까지 h-16으로 맞추면 오히려 "6번째 액션 버튼"처럼 위계가
           부풀어 보인다. */}
+      {/* 명단 검인은 **킥오프 전에만** 띄운다. 경기가 시작되면 이 자리는 이벤트 기록이
+          차지해야 하고, 그때까지도 안 온 사람은 애초에 라인업에서 빠졌어야 한다.
+          takeover 를 쥔 운영자만 조작할 수 있게 하는 것도 다른 액션과 동일하다. */}
+      {gameState === 'SCHEDULED' && (
+        <ArrivalCheckinPanel
+          sides={sides}
+          lineups={lineups}
+          disabled={!isTakeoverHeld(ops.takeover)}
+          pendingParticipantId={setArrival.isPending ? setArrival.variables?.participantId ?? null : null}
+          onToggleArrival={({ participantId, arrived }) => {
+            setArrival.mutate(
+              { participantId, arrived },
+              {
+                onError: (err) => showToast(extractErrorMessage(err, '검인을 저장하지 못했어요.')),
+              },
+            );
+          }}
+        />
+      )}
+
       {gameDetail.data?.substitutionPolicy?.mode === 'rolling' && (
         <div className="flex flex-col gap-2 px-4">
           <Button

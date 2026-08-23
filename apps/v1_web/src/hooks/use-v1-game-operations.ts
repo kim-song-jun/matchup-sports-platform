@@ -1,5 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
-import { retryTransientFailure, v1Get, v1Post } from '@/lib/api-client';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { retryTransientFailure, v1Get, v1Patch, v1Post } from '@/lib/api-client';
 import { v1Keys } from '@/lib/query-keys';
 import type {
   FixtureLineupResponse,
@@ -50,6 +50,41 @@ export function useV1GameEventsBackfill(gameId: string | null, afterSequence: nu
       v1Get<GameEventsBackfill>(`/games/${gameId}/events`, { afterSequence }),
     enabled: Boolean(gameId),
     retry: retryTransientFailure,
+  });
+}
+
+/**
+ * 명단 검인(체크인) 토글. 1차 대회 회고 "명단 검인 과정에서 오지 않거나, 하지 않은
+ * 사람들에 대한 확인이 어려움".
+ *
+ * 라인업 저장/제출과 달리 `expectedVersion`·idempotency 헤더를 보내지 않는다 —
+ * 서버도 이 경로를 라인업 revision 과 분리해 두었다(GamesService.setParticipantArrival).
+ * 킥오프 직전 여러 명을 연달아 누르는 조작이라 버전 커맨드로 만들면 두 번째 사람부터
+ * 곧바로 409 가 난다.
+ *
+ * 콘솔이 읽는 목록(fixtureLineup)과 팀매치 경량 콘솔이 읽는 목록(gameOperationsLineup)
+ * 둘 다 무효화한다 — 같은 참가자를 서로 다른 두 경로가 보여주므로 한쪽만 갱신하면
+ * 화면에 따라 체크 상태가 엇갈린다.
+ */
+export function useV1SetParticipantArrival(
+  gameId: string | null,
+  scope: { tournamentId: string; fixtureId: string } | null,
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { participantId: string; arrived: boolean }) =>
+      v1Patch<{ id: string; sideId: string; arrivedAt: string | null }>(
+        `/games/${gameId}/participants/${vars.participantId}/arrival`,
+        { arrived: vars.arrived },
+      ),
+    onSuccess: () => {
+      if (gameId) queryClient.invalidateQueries({ queryKey: v1Keys.gameOperationsLineup(gameId) });
+      if (scope) {
+        queryClient.invalidateQueries({
+          queryKey: v1Keys.fixtureLineup(scope.tournamentId, scope.fixtureId),
+        });
+      }
+    },
   });
 }
 

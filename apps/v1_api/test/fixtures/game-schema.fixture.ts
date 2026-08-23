@@ -290,7 +290,19 @@ export const gameSchemaSourceManifest = {
   //
   // 아래 값은 **두 변경이 병합된 뒤**의 schema.prisma 에 sha256 을 다시 돌려 계산한 것이다 —
   // 어느 한쪽 브랜치의 해시를 그대로 쓰면 CI 가 깨진다(이 파일 위쪽 병합 재핀 주석과 같은 사유).
-  schema: 'ea5b9634f6020efe874bcd24cd02181de567134a6fe346c78f08d6f51464262d',
+  //
+  // 명단 검인(체크인) 재핀: `V1GameParticipant` 에 nullable `arrived_at` 컬럼 하나가 늘었다.
+  // 위 두 재핀과 달리 이번엔 **game domain 모델을 실제로 건드린다**(V1GameParticipant) —
+  // 다만 순수 additive 이고 기존 계약을 하나도 바꾸지 않는다: `started`(팀이 제출한 선발/후보
+  // 계획)는 그대로 두고, "현장에서 도착을 확인한 사실"이라는 **다른 축**을 새 컬럼으로 더한다.
+  // 둘을 한 컬럼으로 합치면 "선발로 제출됐는데 안 온 사람"(회고가 지목한 바로 그 상태)을
+  // 표현할 수 없어 분리했다. NULL = 아직 확인 안 함이며 기존 행 백필은 없다(과거 경기를
+  // 소급 검인할 수는 없다). v1_guard_identity_event 등 게임 도메인 트리거·불변식은 이 컬럼을
+  // 읽지 않으므로 영향 없음. 뒷받침 마이그레이션:
+  // 20260823130000_v1_game_participant_arrival_checkin (ADD COLUMN IF NOT EXISTS 1줄).
+  // 바인딩된 20260729000100_v1_game_operations 는 그대로라 .migration 해시는 변하지 않는다.
+  // 아래 값은 이 브랜치의 schema.prisma 에 `shasum -a 256` 을 다시 돌려 계산한 것이다.
+  schema: '14dc004c7e27f6327d524c7f4a11a692a7862084d1fc5adbb322c6e158987750',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

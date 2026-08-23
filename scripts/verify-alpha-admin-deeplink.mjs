@@ -26,9 +26,14 @@ const cookies = res.headers.getSetCookie?.() ?? [res.headers.get('set-cookie') ?
 const token = cookies.map((c) => c.match(/teameet_v1_session=([^;]+)/)?.[1]).find(Boolean);
 if (!token) throw new Error('세션 쿠키를 못 받았다');
 
+// /admin/inquiries/pending-count 같은 이웃 엔드포인트를 제외하고 목록 호출만 골라낸다.
+// 요청·응답 양쪽이 같은 기준을 써야 한다 — 한쪽만 좁히면 거짓 통과가 남는다.
+function isListCall(url) {
+  return /\/api\/v1\/admin\/inquiries\?/.test(url);
+}
+
 function listCalls(urls) {
-  // /admin/inquiries/pending-count 같은 이웃 엔드포인트를 제외하고 목록 호출만 남긴다.
-  return urls.filter((u) => /\/api\/v1\/admin\/inquiries\?/.test(u));
+  return urls.filter(isListCall);
 }
 
 const browser = await chromium.launch();
@@ -95,15 +100,23 @@ function check(name, pass, detail) {
   const page = await ctx.newPage();
   const apiCalls = [];
   page.on('request', (r) => { if (r.url().includes('/api/v1/admin/inquiries')) apiCalls.push(r.url()); });
-  const responses = [];
-  page.on('response', (r) => { if (r.url().includes('/api/v1/admin/inquiries')) responses.push(r.status()); });
+  // 응답도 **목록 호출만** 모은다. 이웃 엔드포인트(/pending-count)를 섞으면 목록 요청이
+  // 아예 안 나가도 그쪽 200 때문에 통과해버린다 — 요청 쪽만 좁히고 여기를 빠뜨렸었다.
+  const listResponses = [];
+  page.on('response', (r) => {
+    if (isListCall(r.url())) listResponses.push(r.status());
+  });
   await page.goto(`${BASE}/admin/inquiries?status=bogus&category=nope&reportReason=whatever`, { waitUntil: 'domcontentloaded', timeout: 45_000 });
   await page.waitForTimeout(3500);
 
   const list = listCalls(apiCalls);
   const leaked = list.some((u) => /status=bogus|category=nope|reportReason=whatever/.test(u));
   check('잘못된 값이 API 로 새지 않는다', !leaked, list.at(-1)?.split('/api/v1')[1] ?? '(목록 요청 없음)');
-  check('목록이 400 없이 뜬다', responses.length > 0 && responses.every((s) => s < 400), `상태=${responses.join(',') || '(응답 없음)'}`);
+  check(
+    '목록이 400 없이 뜬다',
+    listResponses.length > 0 && listResponses.every((code) => code < 400),
+    `목록 응답=${listResponses.join(',') || '(목록 응답 없음)'}`,
+  );
   await page.close();
 }
 

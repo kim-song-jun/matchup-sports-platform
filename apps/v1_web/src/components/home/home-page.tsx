@@ -71,15 +71,21 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
               카드가 화면 끝에서 끝까지 늘어나 아래 콘텐츠의 여백선과 어긋났다(390 실측: 배너
               0~390 vs 다른 카드 20~370). 배너 슬롯이 그 여백을 책임진다. */}
           <div className="tm-home-banner-slot">
-            {model.recordConsentNudge ? (
+            {/* Task 154 P2-1: 조건이 맞아도 이번 방문에 선택된 유도 배너 하나만 렌더한다.
+                차단성인 휴대폰 인증은 이 예산 밖이라 조건만 맞으면 항상 보인다 --
+                밀려서 안 보이면 사용자는 신청이 왜 거부되는지 알 길이 없다.
+                판정은 model.bannerDecision(lib/home-banner-policy.ts) 하나로 모았다. */}
+            {model.phoneVerifyNudge ? <PhoneVerifyBanner phoneVerifyNudge={model.phoneVerifyNudge} /> : null}
+            {model.bannerDecision.nudge === 'recordConsent' && model.recordConsentNudge ? (
               <RecordConsentNudgeBanner recordConsentNudge={model.recordConsentNudge} />
             ) : null}
-            {model.pushNudge ? <PushNudgeBanner pushNudge={model.pushNudge} /> : null}
-            {model.phoneVerifyNudge ? <PhoneVerifyBanner phoneVerifyNudge={model.phoneVerifyNudge} /> : null}
+            {model.bannerDecision.nudge === 'push' && model.pushNudge ? (
+              <PushNudgeBanner pushNudge={model.pushNudge} />
+            ) : null}
           {/* 남은 후기 유도 — 홈에는 대회 후기 전용 바텀시트 모달만 있어서 경기 후기는
               마이 메뉴 서브텍스트 한 줄 말고 알릴 길이 없었다. 마이페이지와 같은 컴포넌트를
               써서 두 화면의 숫자가 갈리지 않게 한다(남은 게 없으면 스스로 null). */}
-            <PendingReviewsCard />
+            {model.bannerDecision.nudge === 'pendingReviews' ? <PendingReviewsCard /> : null}
           </div>
 
           {/* Greeting + activity stats */}

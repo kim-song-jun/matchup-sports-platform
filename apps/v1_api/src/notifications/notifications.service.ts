@@ -261,7 +261,13 @@ function deepLinkForEvent(
   // 대회 상세로 보내면 알림을 눌러도 동의를 켤 방법이 없는 막다른 길이 된다
   // (match_completed 가 같은 이유로 후기 작성 화면으로 가는 것과 같은 판단).
   if (type === 'tournament_record_consent_invite') {
-    return '/my/settings/record-consent';
+    // 동의를 켤 수 있는 화면으로 보내되, 어느 대회 때문에 왔는지도 실어 보낸다 --
+    // 설정 화면은 원래 맥락 없는 토글이라, 알림에서 온 사람에게 "왜 지금 이걸 보고
+    // 있는지" 를 설명해 줄 근거가 없으면 그냥 나가버린다. 착지 화면이 이 값으로
+    // 대회 이름을 띄운다. targetId 가 없으면 파라미터 없이 기본 화면으로 간다.
+    return targetId
+      ? `/my/settings/record-consent?from=tournament&tournamentId=${encodeURIComponent(targetId)}`
+      : '/my/settings/record-consent';
   }
   // Task 12, reminders lane: targetId is the compound "${teamId}:${scheduleId}" string (see
   // schedule-reminder.service.ts) — parsed only here, never used for authorization anywhere in

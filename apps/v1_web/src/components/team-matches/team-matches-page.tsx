@@ -98,17 +98,34 @@ function TeamMatchCreateFloatingButton() {
   );
 }
 
-function teamMatchOpponentLabel(mode: TeamMatchDetailViewModel['mode']) {
+/*
+ * mode('default'/'pending'/'approved'/'mine')만으로는 "상대가 이미 정해졌거나 경기가
+ * 끝난 매치를 guest/비참여자가 보는 경우"를 구분할 수 없다 — mode는 항상 'default'로
+ * 떨어진다(viewerState 기준일 뿐 경기 진행 상태를 안 본다). match.status(카드 레벨
+ * open/closed 판정, toTeamMatch의 statusToCardStatus)는 API status까지 반영하므로
+ * 여기서 함께 봐야 완료된 리그 경기를 열어도 "모집 중"이 뜨지 않는다(alpha 실측 C-1).
+ */
+function teamMatchOpponentLabel(mode: TeamMatchDetailViewModel['mode'], match: TeamMatchDetailViewModel['match']) {
   if (mode === 'pending') return '검토 중';
   if (mode === 'approved') return '승인 완료';
   if (mode === 'mine') return '신청팀';
+  if (match.status === 'closed') {
+    // approvedOpponentTeam이 있으면 applicantTeams에 그 팀 하나만 '승인 완료' 상태로 담겨
+    // 온다(team-matches-client.tsx toApplicantTeamsWithActions) — guest에게도 이 필드는
+    // 그대로 내려오므로 실제 상대팀 이름을 보여줄 수 있다.
+    const approvedOpponent = match.applicantTeams.find((team) => team.status === '승인 완료');
+    return approvedOpponent?.name ?? '모집 마감';
+  }
   return '모집 중';
 }
 
-function teamMatchOpponentSub(mode: TeamMatchDetailViewModel['mode']) {
+function teamMatchOpponentSub(mode: TeamMatchDetailViewModel['mode'], match: TeamMatchDetailViewModel['match'], statusLabel?: string) {
   if (mode === 'pending') return '홈팀 검토 중';
   if (mode === 'approved') return '참가 확정';
   if (mode === 'mine') return '승인 후 확정';
+  // statusLabel(모델에서 이미 계산돼 온 문구)이 matched/completed/cancelled를
+  // 구분해 정확한 상태를 준다 — team-matches-client.tsx statusLabel() 참고.
+  if (match.status === 'closed') return statusLabel ?? '신청 마감';
   return '신청 후 승인';
 }
 
@@ -275,8 +292,8 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
                 <div className="tm-text-label" style={{ color: 'var(--overlay-white-76)' }}>vs</div>
                 <div style={{ textAlign: 'right' }}>
                   <div className="tm-text-caption" style={{ color: 'var(--overlay-white-68)' }}>상대팀</div>
-                  <div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{teamMatchOpponentLabel(mode)}</div>
-                  <div className="tm-text-micro" style={{ color: 'var(--overlay-white-72)' }}>{teamMatchOpponentSub(mode)}</div>
+                  <div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{teamMatchOpponentLabel(mode, match)}</div>
+                  <div className="tm-text-micro" style={{ color: 'var(--overlay-white-72)' }}>{teamMatchOpponentSub(mode, match, model.statusLabel)}</div>
                 </div>
               </div>
               {/* P2: 완료 피드백 .tm-complete-check 마이크로인터랙션 */}

@@ -104,7 +104,19 @@ export default function LeagueSeriesDetailClient({ seriesId }: { seriesId: strin
         eyebrow="리그 체계"
         title={series.title}
         description={`${series.tierLabels.join(' · ')} · ${ruleSummary}`}
-        action={<AdminStatusPill status={series.state} />}
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            <AdminStatusPill status={series.state} />
+            {/* 수정 화면으로 가는 유일한 진입점이다 — 이 링크가 없으면 이름 오타나 승강 규칙을
+                고칠 방법이 아예 없다(PATCH API·훅은 완성돼 있는데 소비처가 0개였다, 감사 H-8). */}
+            <Link
+              href={`/admin/league-series/${series.id}/edit`}
+              className="inline-flex min-h-[44px] items-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--text-strong)]"
+            >
+              수정
+            </Link>
+          </div>
+        }
       />
 
       {series.seasons.length === 0 ? (
@@ -117,14 +129,23 @@ export default function LeagueSeriesDetailClient({ seriesId }: { seriesId: strin
         />
       ) : (
         <div className="space-y-4">
-          {series.seasons.map((season) => (
+          {series.seasons.map((season) => {
+            // 응답에 '확정' 필드가 따로 없다 — 하지만 확정(commitPromotions)은 항상 같은
+            // 트랜잭션에서 다음 시즌 리그를 만든다(그 경로가 유일하다: seedSeason 은 1시즌만
+            // 만든다). 그래서 seasons 목록에 다음 시즌 번호가 있다는 것 자체가 "이 시즌은 이미
+            // 확정됐다"는 뜻이다 — 백엔드에 새 필드를 추가하지 않고 이미 있는 데이터로 유도.
+            const decided = series.seasons.some((other) => other.seasonNo === season.seasonNo + 1);
+            return (
             <section
               key={season.seasonNo}
               className="rounded-2xl border border-[var(--border-strong)] bg-[var(--card-surface)] p-4"
             >
               <header className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-sm font-bold text-[var(--text-strong)]">{season.seasonNo}시즌</h2>
-                {series.tierCount > 1 && (
+                <span className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-sm font-bold text-[var(--text-strong)]">{season.seasonNo}시즌</h2>
+                  {decided && <AdminStatusPill status="confirmed" label="승강 확정됨" />}
+                </span>
+                {series.tierCount > 1 && !decided && (
                   // 시즌이 안 끝났으면 서버가 409 LEAGUE_SEASON_NOT_FINISHED 로 막는다.
                   // 예전에는 이 버튼이 열려 있고 아래 문구로만 경고해서, 문구는 "계산할 수
                   // 없어요"라고 하는데 눌리면 계산이 되는 모순이 있었다(그때는 서버 게이트도
@@ -141,10 +162,16 @@ export default function LeagueSeriesDetailClient({ seriesId }: { seriesId: strin
                 )}
               </header>
 
-              {!season.allCompleted && (
-                <p id={`season-${season.seasonNo}-gate`} className="mt-2 text-xs text-[var(--text-muted)]">
-                  아직 끝나지 않은 리그가 있어요. 모든 티어가 종료돼야 승강을 계산할 수 있어요.
+              {decided ? (
+                <p className="mt-2 text-xs text-[var(--text-muted)]">
+                  다음 시즌 리그가 이미 만들어졌어요. 아래 {season.seasonNo + 1}시즌 카드에서 결과를 볼 수 있어요.
                 </p>
+              ) : (
+                !season.allCompleted && (
+                  <p id={`season-${season.seasonNo}-gate`} className="mt-2 text-xs text-[var(--text-muted)]">
+                    아직 끝나지 않은 리그가 있어요. 모든 티어가 종료돼야 승강을 계산할 수 있어요.
+                  </p>
+                )
               )}
 
               <ul className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
@@ -170,7 +197,8 @@ export default function LeagueSeriesDetailClient({ seriesId }: { seriesId: strin
                 ))}
               </ul>
             </section>
-          ))}
+            );
+          })}
         </div>
       )}
 

@@ -38,12 +38,47 @@ export interface V1PublicLeagueListItem {
 }
 
 /**
+ * "내 리그" 목록의 내 팀 순위 요약. draft 리그(대진 없음)거나 이 팀이 아직 순위표에
+ * 없으면(이론상 없어야 하지만 방어적으로) null. `V1LeagueStandingRow`의 부분집합이다 --
+ * 목록 화면은 순위표 전체가 아니라 "몇 등·승점"만 필요하다.
+ */
+export interface V1MyLeagueStandingSummary {
+  position: number;
+  points: number;
+  played: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  goalDifference: number;
+}
+
+/**
+ * "내 리그" 목록의 다음 예정 경기. completed 리그(남은 대진 없음)거나 draft 리그면 null.
+ * opponentTeamId 가 null 이면 상대팀이 아직 확정되지 않은 대진(신청 대기 등)이다.
+ */
+export interface V1MyLeagueNextFixture {
+  teamMatchId: string;
+  startAt: string;
+  opponentTeamId: string | null;
+  opponentTeamName: string | null;
+}
+
+/**
  * R4: 내 리그 (GET /league-matches/me). 목록 아이템에 "내 팀이 어느 팀인지"를 얹는다 --
  * 한 리그에 내 팀이 둘 이상일 수 있어(같은 사용자가 두 팀 소속) 배열이다.
  * 참가 테이블 기준이라 **대진이 아직 없는 draft 리그도 들어온다.**
+ *
+ * 감사 보통 항목(Task 153 Wave 2) — 팀장이 가장 궁금한 "우리 팀 몇 등?" / "다음 경기
+ * 언제?"를 목록에서 바로 보여준다. standing/nextFixture 는 draft 리그에서 둘 다 null,
+ * completed 리그에서는 standing만(최종 순위) 채워지고 nextFixture는 null이다.
  */
 export interface V1MyLeagueListItem extends V1PublicLeagueListItem {
-  myTeams: Array<{ teamId: string; name: string }>;
+  myTeams: Array<{
+    teamId: string;
+    name: string;
+    standing: V1MyLeagueStandingSummary | null;
+    nextFixture: V1MyLeagueNextFixture | null;
+  }>;
 }
 
 export interface V1MyLeagueListResponse {
@@ -247,6 +282,21 @@ export interface V1LeagueStandingRow {
   promotionKind: 'promoted' | 'relegated' | 'stayed' | 'withdrawn' | null;
   promotionToTier: number | null;
   promotionToTierLabel: string | null;
+  /**
+   * 감사 H-2 — 시즌 중에도 "지금 순위라면 승격/강안권인가"를 보여주는 예상값.
+   * `promotionKind`(확정)와 절대 같은 의미가 아니다 -- 확정 전(promotionDecided=false)에만
+   * 값이 있고, 확정되면 이 필드는 다시 전부 null 이 된다(그때부터는 promotionKind가 진실).
+   * 시리즈에 속하지 않은 단발 리그는 애초에 항상 null.
+   */
+  expectedPromotionKind: 'promoted' | 'relegated' | 'stayed' | null;
+  expectedPromotionToTier: number | null;
+  expectedPromotionToTierLabel: string | null;
+}
+
+/** 감사 H-5 — tie-break 기준을 전부 소진하고도 갈리지 않아 팀ID 사전순 폴백으로 순위가 결정된 팀 그룹. */
+export interface V1LeagueTieBreakGroup {
+  teamIds: string[];
+  teamNames: string[];
 }
 
 export interface V1LeaguePendingFixture {
@@ -268,6 +318,13 @@ export interface V1LeagueStandingsResponse {
    * 서버가 항상 내려주므로 optional 이 아니다.
    */
   promotionDecided: boolean;
+  /**
+   * 이 시즌·티어에 적용되는 승강 슬롯 수(확정 전에만 값 있음). standings[].expectedPromotionKind
+   * 와 짝이다 -- 시리즈에 속하지 않거나(단발 리그) 이미 확정됐으면 null.
+   */
+  promotionForecast: { promoteSlots: number; relegateSlots: number; skippedByMajorityGuard: boolean } | null;
+  /** 감사 H-5 — 대부분의 시즌은 빈 배열이다. */
+  tieBreakGroups: V1LeagueTieBreakGroup[];
 }
 
 export interface V1LeaguePlayerRecordRow {

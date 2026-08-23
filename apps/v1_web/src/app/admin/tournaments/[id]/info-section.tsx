@@ -75,6 +75,9 @@ export function TournamentInfoSection() {
   const [editBankAccount, setEditBankAccount] = useState('');
   const [editBankHolder, setEditBankHolder] = useState('');
   const [editRulesText, setEditRulesText] = useState('');
+  // 카드 정지 규정 — 빈 문자열 = 미적용. 생성 폼과 같은 표현을 쓴다.
+  const [editYellowLimit, setEditYellowLimit] = useState('');
+  const [editRedSuspension, setEditRedSuspension] = useState('');
   const [editRefundPolicyText, setEditRefundPolicyText] = useState('');
   const [promoOpen, setPromoOpen] = useState(false);
   const [promoHomeEnabled, setPromoHomeEnabled] = useState(false);
@@ -142,6 +145,16 @@ export function TournamentInfoSection() {
     setEditBankAccount(tournament.bankAccount ?? '');
     setEditBankHolder(tournament.bankHolder ?? '');
     setEditRulesText(tournament.rulesText ?? '');
+    setEditYellowLimit(
+      tournament.yellowAccumulationLimit === null || tournament.yellowAccumulationLimit === undefined
+        ? ''
+        : String(tournament.yellowAccumulationLimit),
+    );
+    setEditRedSuspension(
+      tournament.redCardSuspensionMatches === null || tournament.redCardSuspensionMatches === undefined
+        ? ''
+        : String(tournament.redCardSuspensionMatches),
+    );
     setEditRefundPolicyText(tournament.refundPolicyText ?? '');
     setEditOpen(true);
   };
@@ -300,6 +313,16 @@ export function TournamentInfoSection() {
     }
     if (normalizedBankHolder !== tournament.bankHolder) payload.bankHolder = normalizedBankHolder;
     if (normalizedRulesText !== tournament.rulesText) payload.rulesText = normalizedRulesText;
+    // 비우면 null 을 **명시적으로** 보낸다 — 그래야 한 번 켠 규정을 끌 수 있다.
+    // undefined 로 보내면 서버가 "안 건드림"으로 읽어 영영 못 끈다.
+    const normalizedYellowLimit = editYellowLimit.trim() ? Number(editYellowLimit) : null;
+    const normalizedRedSuspension = editRedSuspension.trim() ? Number(editRedSuspension) : null;
+    if (normalizedYellowLimit !== (tournament.yellowAccumulationLimit ?? null)) {
+      payload.yellowAccumulationLimit = normalizedYellowLimit;
+    }
+    if (normalizedRedSuspension !== (tournament.redCardSuspensionMatches ?? null)) {
+      payload.redCardSuspensionMatches = normalizedRedSuspension;
+    }
     if (normalizedRefundPolicyText !== tournament.refundPolicyText) {
       payload.refundPolicyText = normalizedRefundPolicyText;
     }
@@ -958,6 +981,45 @@ export function TournamentInfoSection() {
               placeholder="대회 규정을 입력해 주세요. 참가 자격, 경기 방식, 경기 진행, 순위 결정 기준 등 긴 문서도 그대로 붙여넣을 수 있어요."
               className={`${textareaCls} text-[12px] leading-relaxed`}
             />
+          </div>
+
+          {/* 카드 정지 규정. 비우면 이 대회에는 적용하지 않는다 — 이미 진행된 대회에
+              소급 적용되는 것을 막으려고 기본값을 두지 않았다. */}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="edit-yellow-limit" className="text-[13px] text-[var(--text-strong)]">
+                경고 누적 출전정지 (장)
+              </label>
+              <input
+                id="edit-yellow-limit"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={20}
+                value={editYellowLimit}
+                onChange={(e) => setEditYellowLimit(e.target.value)}
+                disabled={updateTournament.isPending}
+                placeholder="비우면 적용 안 함"
+                className={inputCls}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="edit-red-suspension" className="text-[13px] text-[var(--text-strong)]">
+                퇴장 시 출전정지 (경기)
+              </label>
+              <input
+                id="edit-red-suspension"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={20}
+                value={editRedSuspension}
+                onChange={(e) => setEditRedSuspension(e.target.value)}
+                disabled={updateTournament.isPending}
+                placeholder="비우면 적용 안 함"
+                className={inputCls}
+              />
+            </div>
           </div>
 
           <div className="flex flex-col gap-1.5">

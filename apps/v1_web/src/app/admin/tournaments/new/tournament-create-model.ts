@@ -78,6 +78,10 @@ export type TournamentCreateState = {
   prizePool: string;
   prizeSummary: string;
   prizeRows: TournamentPrizeRow[];
+  /** 경고 누적 출전정지 기준(장). 빈 문자열 = 이 대회에는 규정 미적용. */
+  yellowAccumulationLimit: string;
+  /** 퇴장 1장당 정지 경기 수. 빈 문자열 = 미적용. */
+  redCardSuspensionMatches: string;
   rulesText: string;
   refundPolicyText: string;
   coverImageUrl: string | null;
@@ -139,6 +143,10 @@ export const INITIAL_TOURNAMENT_CREATE_STATE: TournamentCreateState = {
     { id: 'prize-2', label: '2위', value: '' },
     { id: 'prize-3', label: '3위', value: '' },
   ],
+  // 기본값은 빈 문자열(미적용)이다 — 기본값을 넣으면 운영자가 의식하지 못한 채
+  // 정지 규정이 켜진 대회가 만들어진다.
+  yellowAccumulationLimit: '',
+  redCardSuspensionMatches: '',
   rulesText: '',
   refundPolicyText: '',
   coverImageUrl: null,
@@ -373,6 +381,14 @@ export function mapTournamentToWizardFields(tournament: V1Tournament): Tournamen
     prizePool: tournament.prizePool !== null ? String(tournament.prizePool) : '',
     prizeSummary: tournament.prizeSummary ?? '',
     prizeRows,
+    yellowAccumulationLimit:
+      tournament.yellowAccumulationLimit === null || tournament.yellowAccumulationLimit === undefined
+        ? ''
+        : String(tournament.yellowAccumulationLimit),
+    redCardSuspensionMatches:
+      tournament.redCardSuspensionMatches === null || tournament.redCardSuspensionMatches === undefined
+        ? ''
+        : String(tournament.redCardSuspensionMatches),
     rulesText: tournament.rulesText ?? '',
     refundPolicyText: tournament.refundPolicyText ?? '',
     coverImageUrl: tournament.coverImageUrl,
@@ -665,6 +681,15 @@ export function buildTournamentCreatePayload(
     prizePool: state.prizePool ? Number(state.prizePool) : undefined,
     prizeSummary: state.prizeSummary.trim() || undefined,
     prizeBreakdown: serializeTournamentPrizeRows(state.prizeRows) || undefined,
+    // 빈 문자열은 undefined 로 보낸다(= 값을 건드리지 않음). 규정을 **끄려면**
+    // 화면에서 비우는 것만으로는 부족하고 null 을 명시해야 하는데, 생성 폼에는
+    // 끌 대상이 없으므로 여기서는 undefined 로 충분하다.
+    yellowAccumulationLimit: state.yellowAccumulationLimit.trim()
+      ? Number(state.yellowAccumulationLimit)
+      : undefined,
+    redCardSuspensionMatches: state.redCardSuspensionMatches.trim()
+      ? Number(state.redCardSuspensionMatches)
+      : undefined,
     rulesText: state.rulesText.trim() || undefined,
     refundPolicyText: state.refundPolicyText.trim() || undefined,
     ...promoPayload('promoHome', state.promoHome),

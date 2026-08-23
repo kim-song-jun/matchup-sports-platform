@@ -58,6 +58,8 @@ function makeTournament(overrides: Partial<V1TournamentDetail> & Pick<V1Tourname
     promoListPriority: 0,
     campaignSlug: null,
     rulesText: null,
+    yellowAccumulationLimit: null,
+    redCardSuspensionMatches: null,
     refundPolicyText: null,
     confirmedCount: 0,
     participantTeams: [],

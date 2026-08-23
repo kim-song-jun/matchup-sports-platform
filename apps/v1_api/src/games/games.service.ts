@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   HttpException,
@@ -31,6 +32,7 @@ import type {
 } from '../common/audit/operation-audit.contract';
 import { OperationAuditWriterService } from '../common/audit/operation-audit-writer.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { TournamentDisciplineService } from '../tournaments/discipline/tournament-discipline.service';
 import { cascadeCompleteTeamMatchSchedulesInTx } from '../team-schedules/team-schedules.service';
 import {
   parseLineupCatalog,
@@ -657,6 +659,7 @@ export class GamesService {
     private readonly prisma: PrismaService,
     private readonly operationAuditWriter: OperationAuditWriterService,
     private readonly takeover: GameTakeoverService,
+    private readonly discipline: TournamentDisciplineService,
   ) {}
 
   async createFromSourceInTransaction(
@@ -2429,6 +2432,13 @@ export class GamesService {
             throw this.forbidden();
           }
         }
+        // 경고 누적·퇴장 출전정지 가드. 1차 대회 회고 "옐로카드 누적, 레드카드 퇴장등
+        // 필요해보임" — 지금까지 이 경로는 정지 여부를 **전혀 검사하지 않아** 퇴장당한
+        // 선수가 다음 경기에 그대로 뛸 수 있었다.
+        //
+        // **저장(saveLineup)이 아니라 제출에 건다.** 초안을 짜는 동안 막으면 팀장이
+        // 명단을 구성조차 못 한다 — 제출이 "이 명단으로 뛰겠다"고 확정하는 지점이다.
+        await this.assertNoSuspendedStarters(tx, game, lineup.id);
         if (lineup.state !== V1GameLineupState.DRAFT) {
           throw new ConflictException({
             code: 'INVALID_LINEUP_STATE',
@@ -4078,6 +4088,52 @@ export class GamesService {
         responseBody: jsonInput(input.response),
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       },
+    });
+  }
+
+  /**
+   * 이 라인업의 **선발** 중 출전정지 선수가 있으면 400 `DISCIPLINE_SUSPENDED` 로 막는다.
+   *
+   * 후보(started=false)는 막지 않는다 — 정지 선수를 벤치에 앉히는 것 자체는 규정
+   * 위반이 아니고, 실제로 뛰는 순간은 교체 이벤트라 그때 별도로 다룰 문제다.
+   * (지금은 교체까지 막지 않는다 — 그건 이 변경의 범위를 넘고, 라인업 제출을 막는
+   * 것만으로 회고가 지적한 "퇴장 선수가 다음 경기에 그대로 선발 출전"은 닫힌다.)
+   *
+   * 대회 픽스처가 아니거나 규정이 꺼진 대회면 조회 없이 즉시 통과한다.
+   */
+  private async assertNoSuspendedStarters(
+    tx: Transaction,
+    game: LockedGame,
+    lineupId: string,
+  ): Promise<void> {
+    if (game.sourceType !== V1GameSourceType.TOURNAMENT_FIXTURE) return;
+    const fixture = await tx.v1TournamentFixture.findFirst({
+      where: { gameId: game.id },
+      select: { id: true, tournamentId: true },
+    });
+    if (fixture === null) return;
+
+    const verdicts = await this.discipline.verdictsForFixture(fixture.tournamentId, fixture.id);
+    if (verdicts.size === 0) return; // 규정 미적용이거나 누적 카드가 아직 없다.
+
+    const starters = await tx.v1GameParticipant.findMany({
+      where: { lineupId, started: true },
+      select: { userId: true, displayNameSnapshot: true },
+    });
+    const blocked = starters
+      .map((starter) => {
+        const verdict = starter.userId === null ? undefined : verdicts.get(starter.userId);
+        return verdict?.suspended === true
+          ? { name: starter.displayNameSnapshot, reason: verdict.reason }
+          : null;
+      })
+      .filter((entry): entry is { name: string; reason: string | null } => entry !== null);
+    if (blocked.length === 0) return;
+
+    throw new BadRequestException({
+      code: 'DISCIPLINE_SUSPENDED',
+      message: `${blocked.map((entry) => entry.name).join(', ')} 선수는 출전정지 상태예요. 선발에서 빼고 다시 제출해 주세요.`,
+      details: { blocked },
     });
   }
 

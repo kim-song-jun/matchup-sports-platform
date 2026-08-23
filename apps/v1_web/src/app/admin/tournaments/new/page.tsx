@@ -1162,6 +1162,46 @@ function PresentationStep({
         </Field>
       </section>
 
+      {/* 카드 정지 규정 — 비워 두면 이 대회에는 적용되지 않는다. 기본값을 채워 두지
+          않는 것이 의도다: 운영자가 의식하지 못한 채 정지 규정이 켜진 대회가 만들어지면,
+          이미 카드를 받은 선수가 갑자기 못 뛰게 된다. */}
+      <section className="grid gap-4 sm:grid-cols-2">
+        <Field id="yellow-accumulation-limit" label="경고 누적 출전정지 (장)">
+          <input
+            id="yellow-accumulation-limit"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={20}
+            value={state.yellowAccumulationLimit}
+            onChange={(event) => setField('yellowAccumulationLimit', event.target.value)}
+            disabled={pending}
+            placeholder="비우면 적용 안 함"
+            className={inputClass}
+          />
+          <p className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>
+            옐로카드가 이 장수만큼 쌓일 때마다 다음 1경기 출전이 막혀요. 비워 두면 적용하지 않아요.
+          </p>
+        </Field>
+        <Field id="red-card-suspension-matches" label="퇴장 시 출전정지 (경기)">
+          <input
+            id="red-card-suspension-matches"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={20}
+            value={state.redCardSuspensionMatches}
+            onChange={(event) => setField('redCardSuspensionMatches', event.target.value)}
+            disabled={pending}
+            placeholder="비우면 적용 안 함"
+            className={inputClass}
+          />
+          <p className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>
+            레드카드 1장당 막히는 경기 수예요. 비워 두면 적용하지 않아요.
+          </p>
+        </Field>
+      </section>
+
       <section className="grid gap-4 sm:grid-cols-2">
         <Field id="rules-text" label="대회 규정">
           <textarea

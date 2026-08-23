@@ -25,7 +25,7 @@ function makePrisma() {
       deleteMany: jest.fn(),
     },
     v1Team: {
-      findUnique: jest.fn().mockResolvedValue({ contactPolicy: 'open' }),
+      findFirst: jest.fn().mockResolvedValue({ contactPolicy: 'open' }),
       update: jest.fn(),
     },
     v1TeamMatch: { findFirst: jest.fn() },
@@ -547,7 +547,7 @@ describe('발신 가드 — 차단·수신정책', () => {
     prisma.v1TeamContact.count.mockResolvedValue(0);
     prisma.v1TeamContact.create.mockResolvedValue({ id: 'new', fromTeamId: 'A', toTeamId: 'B' });
     prisma.v1TeamContactBlock.findFirst.mockResolvedValue(null);
-    prisma.v1Team.findUnique.mockResolvedValue({ contactPolicy: 'open' });
+    prisma.v1Team.findFirst.mockResolvedValue({ contactPolicy: 'open' });
     return prisma;
   }
 
@@ -584,7 +584,7 @@ describe('발신 가드 — 차단·수신정책', () => {
 
   it("정책이 closed 면 거부한다 — 차단과 **같은** 코드·메시지여야 한다", async () => {
     const prisma = acceptingPrisma();
-    prisma.v1Team.findUnique.mockResolvedValue({ contactPolicy: 'closed' });
+    prisma.v1Team.findFirst.mockResolvedValue({ contactPolicy: 'closed' });
     const service = new TeamContactsService(prisma, makeNotifications());
     await expect(service.create(actor, 'B', dto)).rejects.toMatchObject({
       status: 403,
@@ -594,7 +594,7 @@ describe('발신 가드 — 차단·수신정책', () => {
 
   it('recruiting_only 인데 모집 중인 팀매치가 없으면 거부한다', async () => {
     const prisma = acceptingPrisma();
-    prisma.v1Team.findUnique.mockResolvedValue({ contactPolicy: 'recruiting_only' });
+    prisma.v1Team.findFirst.mockResolvedValue({ contactPolicy: 'recruiting_only' });
     prisma.v1TeamMatch.findFirst.mockResolvedValue(null);
     const service = new TeamContactsService(prisma, makeNotifications());
     await expect(service.create(actor, 'B', dto)).rejects.toMatchObject({
@@ -604,7 +604,7 @@ describe('발신 가드 — 차단·수신정책', () => {
 
   it('recruiting_only 이고 host 로 모집 중인 팀매치가 있으면 발신된다', async () => {
     const prisma = acceptingPrisma();
-    prisma.v1Team.findUnique.mockResolvedValue({ contactPolicy: 'recruiting_only' });
+    prisma.v1Team.findFirst.mockResolvedValue({ contactPolicy: 'recruiting_only' });
     prisma.v1TeamMatch.findFirst.mockResolvedValue({ id: 'tm1' });
     const service = new TeamContactsService(prisma, makeNotifications());
     await expect(service.create(actor, 'B', dto)).resolves.toMatchObject({ id: 'new' });
@@ -617,9 +617,9 @@ describe('발신 가드 — 차단·수신정책', () => {
     const bodies: unknown[] = [];
     for (const setup of [
       (p: any) => { p.v1TeamContactBlock.findFirst.mockResolvedValue({ id: 'b1' }); },
-      (p: any) => { p.v1Team.findUnique.mockResolvedValue({ contactPolicy: 'closed' }); },
+      (p: any) => { p.v1Team.findFirst.mockResolvedValue({ contactPolicy: 'closed' }); },
       (p: any) => {
-        p.v1Team.findUnique.mockResolvedValue({ contactPolicy: 'recruiting_only' });
+        p.v1Team.findFirst.mockResolvedValue({ contactPolicy: 'recruiting_only' });
         p.v1TeamMatch.findFirst.mockResolvedValue(null);
       },
     ]) {
@@ -637,13 +637,30 @@ describe('발신 가드 — 차단·수신정책', () => {
   // closed=2, recruiting_only=3) 발신자가 응답 지연시간으로 "우리가 차단당했구나"를
   // 역추론할 수 있다. 세 조회를 항상 병렬 실행하도록 고쳤으니, 세 거부 사유 모두
   // block/team/teamMatch 조회가 정확히 같은 횟수(1회씩) 일어나야 한다.
+  // 소프트 삭제된 팀이 컨택을 계속 받으면 고아 row 가 생긴다. 같은 파일의 assertCanManageTeam·
+  // assertParticipantSide 는 둘 다 status/deletedAt 을 거는데 이 조회만 빠져 있었다.
+  // mock 환경에서는 where 절을 직접 단언하는 것이 이 필터를 잠글 유일한 방법이다 —
+  // 필터를 지우면 이 단언이 깨진다(구현을 되읊는 게 아니라 계약을 고정한다).
+  it('수신 팀 조회가 삭제·비활성 팀을 제외한다', async () => {
+    const prisma = acceptingPrisma();
+    const service = new TeamContactsService(prisma, makeNotifications());
+
+    await service.create(actor, 'B', dto).catch(() => undefined);
+
+    expect(prisma.v1Team.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ status: 'active', deletedAt: null }),
+      }),
+    );
+  });
+
   it('왕복 횟수가 거부 사유와 무관하게 일정하다 — 타이밍으로 차단 여부를 역추론할 수 없어야 한다', async () => {
     const counts: Array<{ block: number; team: number; teamMatch: number }> = [];
     for (const setup of [
       (p: any) => { p.v1TeamContactBlock.findFirst.mockResolvedValue({ id: 'b1' }); },
-      (p: any) => { p.v1Team.findUnique.mockResolvedValue({ contactPolicy: 'closed' }); },
+      (p: any) => { p.v1Team.findFirst.mockResolvedValue({ contactPolicy: 'closed' }); },
       (p: any) => {
-        p.v1Team.findUnique.mockResolvedValue({ contactPolicy: 'recruiting_only' });
+        p.v1Team.findFirst.mockResolvedValue({ contactPolicy: 'recruiting_only' });
         p.v1TeamMatch.findFirst.mockResolvedValue(null);
       },
     ]) {
@@ -653,7 +670,7 @@ describe('발신 가드 — 차단·수신정책', () => {
       await service.create(actor, 'B', dto).catch(() => undefined);
       counts.push({
         block: prisma.v1TeamContactBlock.findFirst.mock.calls.length,
-        team: prisma.v1Team.findUnique.mock.calls.length,
+        team: prisma.v1Team.findFirst.mock.calls.length,
         teamMatch: prisma.v1TeamMatch.findFirst.mock.calls.length,
       });
     }
@@ -698,7 +715,7 @@ describe('차단 관리', () => {
   it('없는 팀을 차단 대상으로 지정하면 TEAM_NOT_FOUND 404 를 던진다', async () => {
     const prisma = makePrisma();
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
-    prisma.v1Team.findUnique.mockResolvedValue(null);
+    prisma.v1Team.findFirst.mockResolvedValue(null);
     const service = new TeamContactsService(prisma, makeNotifications());
     await expect(service.createBlock(actor, 'A', { blockedTeamId: 'ghost' })).rejects.toMatchObject({
       status: 404,
@@ -715,7 +732,7 @@ describe('차단 관리', () => {
   it('findFirst 와 create 사이 경합으로 P2002 가 나면 raw 500 대신 멱등하게 수렴한다', async () => {
     const prisma = makePrisma();
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
-    prisma.v1Team.findUnique.mockResolvedValue({ id: 'B', contactPolicy: 'open' });
+    prisma.v1Team.findFirst.mockResolvedValue({ id: 'B', contactPolicy: 'open' });
     // 사전 조회 시점엔 없었지만(findFirst → null), create() 가 경합에 져 P2002 로 실패한다.
     prisma.v1TeamContactBlock.findFirst
       .mockResolvedValueOnce(null)
@@ -737,7 +754,7 @@ describe('차단 관리', () => {
   it('P2002 가 아닌 다른 에러는 그대로 다시 던진다', async () => {
     const prisma = makePrisma();
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
-    prisma.v1Team.findUnique.mockResolvedValue({ id: 'B', contactPolicy: 'open' });
+    prisma.v1Team.findFirst.mockResolvedValue({ id: 'B', contactPolicy: 'open' });
     prisma.v1TeamContactBlock.findFirst.mockResolvedValue(null);
     const boom = new Error('connection lost');
     prisma.v1TeamContactBlock.create.mockRejectedValue(boom);

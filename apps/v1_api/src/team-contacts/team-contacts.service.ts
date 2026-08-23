@@ -298,8 +298,11 @@ export class TeamContactsService {
         },
         select: { id: true },
       }),
-      this.prisma.v1Team.findUnique({
-        where: { id: toTeamId },
+      // status/deletedAt 을 함께 건다 — 같은 파일의 assertCanManageTeam·assertParticipantSide 가
+      // 쓰는 필터와 맞춘다. 걸지 않으면 소프트 삭제된 팀도 contactPolicy 가 open 인 한 컨택을
+      // 계속 받아 고아 row 가 생긴다. (unique 아닌 조건이 붙으므로 findFirst 다.)
+      this.prisma.v1Team.findFirst({
+        where: { id: toTeamId, status: 'active', deletedAt: null },
         select: { contactPolicy: true },
       }),
       // '모집 중' = 이 팀이 host 인 recruiting 팀매치가 하나라도 있음 (스펙 §2 확정 결정 5).
@@ -327,8 +330,8 @@ export class TeamContactsService {
     // 리뷰 라운드 1 (I2): 없는 팀 id 를 차단 대상으로 보내면 create() 시점에 FK 위반
     // (P2003)으로 raw 500 이 났다. 팀 실재 여부는 공개 정보라 여기서 404 를 줘도 새는
     // 정보가 없다 — assertRecipientAccepting 이 쓰는 것과 같은 코드·문구를 재사용한다.
-    const targetTeam = await this.prisma.v1Team.findUnique({
-      where: { id: dto.blockedTeamId },
+    const targetTeam = await this.prisma.v1Team.findFirst({
+      where: { id: dto.blockedTeamId, status: 'active', deletedAt: null },
       select: { id: true },
     });
     if (!targetTeam) {

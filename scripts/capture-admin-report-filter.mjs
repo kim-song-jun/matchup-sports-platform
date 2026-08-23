@@ -29,7 +29,10 @@ const res = await fetch(`${BASE}/api/v1/auth/login`, {
   body: JSON.stringify({ email, password }),
 });
 if (!res.ok) throw new Error(`login failed ${res.status}`);
-const token = (res.headers.get('set-cookie') ?? '').match(/teameet_v1_session=([^;]+)/)?.[1];
+// getSetCookie() 를 먼저 쓴다 — get() 은 Set-Cookie 가 여러 개일 때 하나로 합쳐 돌려줘
+// 쿠키 경계가 흐려진다. 구형 런타임 대비로 get() 폴백을 둔다.
+const cookies = res.headers.getSetCookie?.() ?? [res.headers.get('set-cookie') ?? ''];
+const token = cookies.map((c) => c.match(/teameet_v1_session=([^;]+)/)?.[1]).find(Boolean);
 if (!token) throw new Error('세션 쿠키를 못 받았다');
 
 await mkdir(OUT, { recursive: true });

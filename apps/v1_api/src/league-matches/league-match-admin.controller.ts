@@ -1,8 +1,9 @@
-import { BadRequestException, Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import {
+  AddLeagueTeamDto,
   CancelLeagueFixtureDto,
   CreateLeagueMatchDto,
   GenerateLeagueFixturesDto,
@@ -21,6 +22,10 @@ const leagueIdPipe = new ParseUUIDPipe({
 const teamMatchIdPipe = new ParseUUIDPipe({
   exceptionFactory: () =>
     new BadRequestException({ code: 'TEAM_MATCH_ID_INVALID', message: '올바르지 않은 경기 ID예요.' }),
+});
+const teamIdPipe = new ParseUUIDPipe({
+  exceptionFactory: () =>
+    new BadRequestException({ code: 'LEAGUE_TEAM_ID_INVALID', message: '올바르지 않은 팀 ID예요.' }),
 });
 
 @Controller('admin/league-matches')
@@ -47,6 +52,44 @@ export class LeagueMatchAdminController {
   @Get(':leagueId/teams')
   listTeams(@CurrentUser() user: V1AuthUser, @Param('leagueId', leagueIdPipe) leagueId: string) {
     return this.service.listTeams(user, leagueId);
+  }
+
+  // 그룹 B 감사 결함 1: 개설 후 참가팀 추가. 로스터 변경 자체는 언제나 허용하고(대진에
+  // 즉시 반영되지는 않는다 — 서비스 응답의 hasExistingFixtures 참고), create()와 동일한
+  // "활성 + 리그 종목과 일치" 규칙을 재사용한다.
+  @Post(':leagueId/teams')
+  addTeam(
+    @CurrentUser() user: V1AuthUser,
+    @Param('leagueId', leagueIdPipe) leagueId: string,
+    @Body() dto: AddLeagueTeamDto,
+  ) {
+    return this.service.addTeam(user, leagueId, dto);
+  }
+
+  // 그룹 B 감사 결함 1: 개설 후 참가팀 제거. 이 팀이 낀 대진에 공식 결과가 확정돼 있으면
+  // 서비스가 409로 거부한다(league-lifecycle-rules.checkLeagueTeamRemovalAllowed 참고 —
+  // standings 계산이 로스터 기준으로 팀을 필터링해 데이터 손상으로 이어지기 때문).
+  // 허용되면 이 팀이 낀 미확정 대진을 cancelFixture와 동일한 후처리로 함께 취소한다.
+  @Delete(':leagueId/teams/:teamId')
+  removeTeam(
+    @CurrentUser() user: V1AuthUser,
+    @Param('leagueId', leagueIdPipe) leagueId: string,
+    @Param('teamId', teamIdPipe) teamId: string,
+  ) {
+    return this.service.removeTeam(user, leagueId, teamId);
+  }
+
+  // 그룹 B 감사 결함 3: 최초 대진 생성 전 미리보기. DB를 바꾸지 않는다 — 팀 자동구성
+  // preview(matches/:id/teams/preview)와 같은 dry-run 패턴. generateFixtures와 완전히
+  // 같은 전제 검증(팀 2개 이상·활성 경기 설정·비활성/삭제 팀 없음)을 그대로 돌려서
+  // "미리보기는 통과했는데 실제 생성은 실패"가 나지 않게 한다.
+  @Post(':leagueId/fixtures/preview')
+  previewFixtures(
+    @CurrentUser() user: V1AuthUser,
+    @Param('leagueId', leagueIdPipe) leagueId: string,
+    @Body() dto: GenerateLeagueFixturesDto,
+  ) {
+    return this.service.previewFixtures(user, leagueId, dto);
   }
 
   @Post(':leagueId/fixtures')

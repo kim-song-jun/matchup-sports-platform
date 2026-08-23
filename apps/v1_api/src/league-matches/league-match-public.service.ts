@@ -274,6 +274,21 @@ export class LeagueMatchPublicService {
         });
     const factByGameId = new Map(facts.map((fact) => [fact.gameId, fact]));
 
+    // 이슈 1(감사 보통) — seriesId 는 응답에 이미 있었지만 "같은 시리즈의 다른 시즌·
+    // 티어로 이동"할 링크가 어디에도 없었다. 새 엔드포인트 대신 이 상세 응답을
+    // 확장한다 — 형제 리그 목록은 상세 화면 하나에서만 쓰이고, 별도 조회로 쪼개면
+    // 왕복이 하나 늘 뿐 얻는 게 없다. 단발 리그(seriesId === null)는 쿼리 자체를
+    // 건너뛰어 빈 배열조차 만들지 않는다 — 무의미한 쿼리를 매 상세 조회마다 날리지 않는다.
+    const siblings = league.seriesId === null
+      ? []
+      : await this.prisma.v1League.findMany({
+          where: { seriesId: league.seriesId, id: { not: league.id } },
+          // 최신 시즌이 먼저, 같은 시즌 안에서는 1부부터 — 사용자가 "지금 시즌의 다른
+          // 티어"를 가장 먼저 찾는다는 전제(승강 체계는 시즌 단위로 갱신되므로).
+          orderBy: [{ seasonNo: 'desc' }, { tier: 'asc' }],
+          select: { id: true, tier: true, seasonNo: true, state: true },
+        });
+
     return {
       leagueId: league.id,
       title: league.title,
@@ -286,6 +301,15 @@ export class LeagueMatchPublicService {
       tier: league.tier,
       tierLabel: league.tier === null ? null : `${league.tier}부`,
       seasonNo: league.seasonNo,
+      // 단발 리그는 항상 빈 배열 — 화면은 길이 0이면 탐색 섹션을 아예 그리지 않는다.
+      // 티어·시즌은 시리즈에 속한 리그라면(위 모델 불변식) 항상 채워져 있어 non-null.
+      seriesSiblings: siblings.map((sibling) => ({
+        leagueId: sibling.id,
+        tier: sibling.tier as number,
+        tierLabel: `${sibling.tier}부`,
+        seasonNo: sibling.seasonNo as number,
+        state: sibling.state,
+      })),
       teamIds: league.teams.map((entry) => entry.teamId),
       fixtures: fixtures.map((fixture) => {
         const fact = fixture.game === null ? undefined : factByGameId.get(fixture.game.id);
@@ -337,6 +361,7 @@ export class LeagueMatchPublicService {
 
     const confirmedFixtures: Array<{ homeTeamId: string; awayTeamId: string; homeScore: number; awayScore: number }> = [];
     const pendingFixtures: Array<{ teamMatchId: string; homeTeamId: string; awayTeamId: string | null; startAt: Date }> = [];
+    let cancelledFixtureCount = 0;
     for (const tm of teamMatches) {
       // [정책 변경 이력 — R8] 이 분기는 원래 "공식 결과 fact가 있으면 팀매치 status와
       // 무관하게 confirmed로 남긴다"는 의도된 동작이었다(이미 열린 경기의 결과는
@@ -347,7 +372,14 @@ export class LeagueMatchPublicService {
       // 운영 리스크이므로, cancelled는 fact 존재 여부와 무관하게 confirmed·pending
       // 양쪽에서 전부 제외하도록 뒤집는다. 취소된 대진은 앞으로도 치러지지 않으므로
       // "예정 경기"로도 영구 집계되지 않는다.
-      if (tm.status === 'cancelled') continue;
+      // 이슈 3(감사 보통) — "왜 팀마다 치른 경기 수가 다른가"는 취소 대진이 집계에서
+      // 빠지기 때문인데, 순위표 자체에는 그 사실을 알 근거가 없었다(일정 쪽 "취소됨"
+      // 배지를 보고 스스로 유추해야 했다). 위 R8 필터가 이미 취소 건을 걸러내는 지점에서
+      // 그대로 개수만 센다 — 별도 쿼리 없이 이 루프 한 번으로 충분하다.
+      if (tm.status === 'cancelled') {
+        cancelledFixtureCount += 1;
+        continue;
+      }
 
       const fact = tm.game === null ? undefined : factByGameId.get(tm.game.id);
       if (fact === undefined || tm.approvedApplicantTeamId === null) {
@@ -436,6 +468,10 @@ export class LeagueMatchPublicService {
       tieBreakOrder,
       standings: standingsWithTeamName,
       pendingFixtures,
+      // 이슈 3 — 팀마다 치른 경기 수가 다른 이유(취소된 대진은 집계에서 빠진다)를
+      // 순위표 화면이 스스로 설명할 수 있게 한다. 취소가 0건이면 0 그대로 내려주고,
+      // 화면은 0이면 안내 자체를 그리지 않는다.
+      cancelledFixtureCount,
       // 이름은 dev 에 이미 머지된 #628 계약을 따른다(promotionDecided). 이 브랜치는
       // 한때 promotionsDecided 로 바꿨었지만, 그 사이 #628 이 dev 에 들어가 배포된
       // 계약이 되었으므로 새로 이름을 바꿀 이유가 없다 -- 통합 테스트도 이 이름을 본다.

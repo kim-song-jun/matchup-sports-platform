@@ -4622,6 +4622,8 @@ export function useV1RevokeTournamentStaff(tournamentId: string) {
 }
 
 import type {
+  V1AddLeagueTeamPayload,
+  V1AddLeagueTeamResult,
   V1AdminLeagueDetail,
   V1AdminLeagueListItem,
   V1AdminLeagueTeamsResponse,
@@ -4633,6 +4635,7 @@ import type {
   V1GenerateLeagueFixturesResult,
   V1LeagueMatchesFilters,
   V1MyLeagueListResponse,
+  V1PreviewLeagueFixturesResult,
   V1PublicLeagueDetail,
   V1PublicLeagueListResponse,
   V1LeaguePlayerRecordsResponse,
@@ -4641,6 +4644,7 @@ import type {
   V1RecordLeagueForfeitResult,
   V1RegenerateLeagueFixturesPayload,
   V1RegenerateLeagueFixturesResult,
+  V1RemoveLeagueTeamResult,
   V1RevertLeagueCompletionPayload,
   V1RevertLeagueCompletionResult,
   V1UpdateLeagueFixturePayload,
@@ -4661,10 +4665,15 @@ import type {
 
 // R5: 공개 리그 목록. team-matches의 useV1TeamMatches(filters)와 동일한 형태 --
 // filters 객체 전체가 쿼리 키에 들어가 필터가 바뀌면 자동으로 새 쿼리로 취급된다.
-export function useV1LeagueMatches(filters?: V1LeagueMatchesFilters) {
+// options?.enabled — 그룹 C(리그 발견성 감사): 홈 사이드바 위젯과 통합검색이 로그인
+// 여부와 무관하게 이 훅을 쓰는데, 검색은 useV1Matches/useV1TeamMatches/useV1Teams와
+// 같이 "제출된 검색어가 있을 때만" 호출해야 해서 다른 공개 목록 훅들(useV1Teams 등)과
+// 동일하게 QueryOptions를 받게 확장한다.
+export function useV1LeagueMatches(filters?: V1LeagueMatchesFilters, options?: QueryOptions) {
   return useQuery({
     queryKey: v1Keys.leagueMatches(filters as Record<string, unknown> | undefined),
     queryFn: () => v1Get<V1PublicLeagueListResponse>('/league-matches', filters),
+    enabled: options?.enabled,
   });
 }
 
@@ -4744,6 +4753,47 @@ export function useV1AdminLeagueTeams(leagueId: string) {
     queryKey: v1Keys.adminLeagueTeams(leagueId),
     queryFn: () => v1Get<V1AdminLeagueTeamsResponse>(`/admin/league-matches/${leagueId}/teams`),
     enabled: Boolean(leagueId),
+  });
+}
+
+// 그룹 B 감사 결함 1: 개설 후 참가팀 추가 — POST /admin/league-matches/:leagueId/teams.
+// 로스터 화면(adminLeagueTeams)과 상세(팀 수 표시)를 함께 갱신한다.
+export function useV1AddLeagueTeam(leagueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1AddLeagueTeamPayload) =>
+      v1Post<V1AddLeagueTeamResult>(`/admin/league-matches/${leagueId}/teams`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueTeams(leagueId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
+      // 목록 화면이 "참가 팀" 수를 보여주므로 팀을 더한 뒤에도 목록을 무효화한다 —
+      // 제거(useV1RemoveLeagueTeam)만 무효화하고 추가는 빼면 두 조작의 결과가 달라 보인다.
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
+    },
+  });
+}
+
+// 그룹 B 감사 결함 1: 개설 후 참가팀 제거 — DELETE /admin/league-matches/:leagueId/teams/:teamId.
+// 이 팀이 낀 미확정 대진을 함께 취소하므로 대진 목록(adminLeagueMatch)도 무효화한다.
+export function useV1RemoveLeagueTeam(leagueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (teamId: string) =>
+      v1Delete<V1RemoveLeagueTeamResult>(`/admin/league-matches/${leagueId}/teams/${teamId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueTeams(leagueId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
+    },
+  });
+}
+
+// 그룹 B 감사 결함 3: 최초 대진 생성 미리보기 — POST /admin/league-matches/:leagueId/fixtures/preview.
+// DB를 바꾸지 않으므로 캐시 무효화가 필요 없다(팀 자동구성 previewTeams와 동일 관례).
+export function useV1PreviewLeagueFixtures(leagueId: string) {
+  return useMutation({
+    mutationFn: (body: V1GenerateLeagueFixturesPayload) =>
+      v1Post<V1PreviewLeagueFixturesResult>(`/admin/league-matches/${leagueId}/fixtures/preview`, body),
   });
 }
 

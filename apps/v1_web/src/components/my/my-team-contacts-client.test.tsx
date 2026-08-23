@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import { render as rtlRender, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MyTeamContactDetailClient, MyTeamContactsListClient } from './my-team-contacts-client';
 import type { V1TeamContact, V1TeamContactStatus } from '@/hooks/use-v1-api';
 
@@ -167,10 +167,24 @@ describe('MyTeamContactDetailClient', () => {
   // 컨택 만료 창은 7일이다. 시간 단위만 쓰면 "167시간 58분 후 만료돼요" 처럼 사람이 못 읽는
   // 숫자가 나온다 — alpha 시각 검증에서 실제로 그렇게 보였다.
   describe('만료 남은 시간 표기', () => {
+    // 시간을 고정한다. expiresAt 을 Date.now() 로 만들고 컴포넌트가 다시 Date.now() 를 읽는
+    // 구조라, 실시간에 의존하면 그 사이 흐른 ms 때문에 내림이 한 단위 떨어져 흔들린다
+    // (처음 작성했을 때 실제로 흔들렸다). 고정하면 경계값을 그대로 쓸 수 있다.
+    const NOW = new Date('2026-08-23T09:00:00.000Z');
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(NOW);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
     function renderWithExpiry(msFromNow: number) {
       setMyTeams([{ teamId: MY_TEAM_ID, name: '우리 팀', role: 'owner' }]);
       useV1TeamContactMock.mockReturnValue({
-        data: makeContact({ expiresAt: new Date(Date.now() + msFromNow).toISOString() }),
+        data: makeContact({ expiresAt: new Date(NOW.getTime() + msFromNow).toISOString() }),
         isError: false,
       });
       return render(<MyTeamContactDetailClient contactId="contact-1" />);
@@ -178,20 +192,19 @@ describe('MyTeamContactDetailClient', () => {
 
     it('하루 이상 남으면 일 단위로 접는다', () => {
       // 6일 23시간 58분 — 예전 구현이 "167시간 58분 후" 로 쏟아내던 값이다.
-      // 경계에 딱 맞추면 실행 중 흐른 ms 때문에 내림이 한 단위 떨어져 flaky 해진다 — 30초 여유.
-      renderWithExpiry(167 * 3_600_000 + 58 * 60_000 + 30_000);
+      renderWithExpiry(167 * 3_600_000 + 58 * 60_000);
 
       expect(screen.getByText('6일 23시간 후 만료돼요')).toBeInTheDocument();
     });
 
     it('일 단위가 딱 떨어지면 시간을 붙이지 않는다', () => {
-      renderWithExpiry(2 * 24 * 3_600_000 + 30_000);
+      renderWithExpiry(2 * 24 * 3_600_000);
 
       expect(screen.getByText('2일 후 만료돼요')).toBeInTheDocument();
     });
 
     it('하루 미만이면 시간·분으로 보여준다', () => {
-      renderWithExpiry(3 * 3_600_000 + 25 * 60_000 + 30_000);
+      renderWithExpiry(3 * 3_600_000 + 25 * 60_000);
 
       expect(screen.getByText('3시간 25분 후 만료돼요')).toBeInTheDocument();
     });

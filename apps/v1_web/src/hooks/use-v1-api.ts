@@ -2358,6 +2358,8 @@ export function useV1UpdateProfile() {
       phoneProofToken?: string | null;
       birthDate?: string | null;
       gender: 'male' | 'female';
+      /** 한 줄 소개 (Task 154 P1). undefined 로 보내면 기존 값을 건드리지 않는다. */
+      bio?: string | null;
     }) =>
       v1Patch<{ profile: V1Profile['profile']; updatedAt: string }>('/me/profile', body),
     // 응답에 이미 최신 profile이 있는데도 invalidate만 하면, 리페치가 끝나기 전에

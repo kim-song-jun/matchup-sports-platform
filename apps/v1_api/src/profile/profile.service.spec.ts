@@ -663,7 +663,7 @@ describe('ProfileService tournament appearance aggregation', () => {
       const prisma = {
         v1User: { findFirst: jest.fn().mockResolvedValue(baseUser) },
         v1MatchParticipant: { count: jest.fn().mockResolvedValue(0) },
-        v1TeamMembership: { count: jest.fn().mockResolvedValue(0) },
+        v1TeamMembership: { count: jest.fn().mockResolvedValue(0), findMany: jest.fn().mockResolvedValue([]) },
         v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
         v1ParticipantIdentityLinkCurrent: {
           // 사용자 단위/participant 단위 동의를 아예 조회하지 않는다 — 이 집계는 게이트 대상이 아니다.
@@ -741,7 +741,7 @@ describe('ProfileService public profile activity summary (reveal filtering)', ()
     return {
       v1User: { findFirst: jest.fn().mockResolvedValue(baseUser) },
       v1MatchParticipant: { count: jest.fn().mockResolvedValue(0) },
-      v1TeamMembership: { count: jest.fn().mockResolvedValue(0) },
+      v1TeamMembership: { count: jest.fn().mockResolvedValue(0), findMany: jest.fn().mockResolvedValue([]) },
       v1PostEventReview: { findMany },
       v1ParticipantIdentityLinkCurrent: { findMany: jest.fn().mockResolvedValue([]) },
     };

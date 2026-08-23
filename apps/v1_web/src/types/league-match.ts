@@ -132,6 +132,13 @@ export interface V1AdminLeagueDetail {
   leagueId: string;
   title: string;
   state: 'draft' | 'active' | 'completed';
+  /**
+   * 그룹 B 감사 결함 1 — 참가팀 추가 화면이 "이 리그 종목과 같은 팀만" 검색을 좁히는 데
+   * 쓴다. public 조회(V1PublicLeagueDetail)는 `sport: { sportId, code, name }` 중첩
+   * 객체로 이미 같은 정보를 들고 있어서(league-match-public.service.ts) 이 평평한
+   * 필드는 어드민 응답에만 있다 — optional.
+   */
+  sportId?: string;
   teamIds: string[];
   /**
    * 참가 팀들이 과거에 실제로 썼던 장소(최신순, distinct, 최대 5개) — 대진 일괄
@@ -140,6 +147,19 @@ export interface V1AdminLeagueDetail {
    */
   recentVenues?: string[];
   fixtures: V1LeagueFixture[];
+}
+
+/**
+ * 이슈 1(감사 보통) — 같은 시리즈의 다른 시즌·티어 리그. 상세 화면의 탐색 링크에 쓴다.
+ * tier·seasonNo 는 시리즈에 속한 리그라면(V1League 모델 불변식 — 셋은 항상 함께
+ * 채워지거나 함께 null) 항상 값이 있어 non-null 이다.
+ */
+export interface V1LeagueSeriesSibling {
+  leagueId: string;
+  tier: number;
+  tierLabel: string;
+  seasonNo: number;
+  state: 'draft' | 'active' | 'completed';
 }
 
 export interface V1PublicLeagueDetail extends V1AdminLeagueDetail {
@@ -156,6 +176,11 @@ export interface V1PublicLeagueDetail extends V1AdminLeagueDetail {
   /** '1부' / '2부' / '3부'. 서버가 만들어 준다. */
   tierLabel?: string | null;
   seasonNo?: number | null;
+  /**
+   * 이슈 1 — 단발 리그(seriesId === null)는 항상 빈 배열. 서버가 항상 키를 내려주므로
+   * optional 이 아니다.
+   */
+  seriesSiblings: V1LeagueSeriesSibling[];
 }
 
 export interface V1CreateLeaguePayload {
@@ -188,10 +213,60 @@ export interface V1GenerateLeagueFixturesPayload {
   placeName?: string;
 }
 
+/** 그룹 B 감사 결함 2 — 서버가 명시적으로 알려주는 대진 생성 부수효과 경고. 지금은
+ * ODD_TEAM_COUNT_BYE(홀수 팀 bye) 하나뿐이지만, tournaments 쪽 SCHEDULE_NOT_SET처럼
+ * 서버가 추가하면 화면이 코드를 모른 채로도 message만 그대로 보여줄 수 있게 배열로 둔다. */
+export interface V1LeagueFixtureWarning {
+  code: string;
+  message: string;
+}
+
 export interface V1GenerateLeagueFixturesResult {
   leagueId: string;
   createdCount: number;
   teamMatchIds: string[];
+  warnings: V1LeagueFixtureWarning[];
+}
+
+// 그룹 B 감사 결함 3 — POST /admin/league-matches/:leagueId/fixtures/preview. DB를 바꾸지
+// 않는 dry-run. GenerateLeagueFixturesDto와 완전히 같은 body를 받는다(생성·재생성 둘 다
+// 이 미리보기를 공유한다).
+export interface V1PreviewLeagueFixture {
+  round: number;
+  homeTeamId: string;
+  awayTeamId: string;
+  startAt: string;
+}
+
+export interface V1PreviewLeagueFixturesResult {
+  leagueId: string;
+  rounds: number;
+  fixtureCount: number;
+  placeName: string;
+  fixtures: V1PreviewLeagueFixture[];
+  warnings: V1LeagueFixtureWarning[];
+}
+
+// 그룹 B 감사 결함 1 — 개설 후 참가팀 추가·제거.
+export interface V1AddLeagueTeamPayload {
+  teamId: string;
+}
+
+export interface V1AddLeagueTeamResult {
+  leagueId: string;
+  teamId: string;
+  teamCount: number;
+  /** true면 이 리그에 이미 대진이 있다는 뜻 — 새로 추가한 팀은 다음 "대진 재생성" 전까지
+   * 대진표에 반영되지 않는다. 화면이 이 값으로 안내 문구를 띄운다. */
+  hasExistingFixtures: boolean;
+}
+
+export interface V1RemoveLeagueTeamResult {
+  leagueId: string;
+  teamId: string;
+  /** 이 팀이 낀 미확정 대진 중 함께 취소된 수. */
+  cancelledFixtureCount: number;
+  leagueCompleted: boolean;
 }
 
 // R13: 참가팀 조회 — GET /admin/league-matches/:leagueId/teams
@@ -248,6 +323,7 @@ export interface V1RegenerateLeagueFixturesResult {
   cancelledCount: number;
   createdCount: number;
   teamMatchIds: string[];
+  warnings: V1LeagueFixtureWarning[];
 }
 
 export interface V1UpdateLeagueFixturePayload {
@@ -313,6 +389,11 @@ export interface V1LeagueStandingsResponse {
   tieBreakOrder: string[];
   standings: V1LeagueStandingRow[];
   pendingFixtures: V1LeaguePendingFixture[];
+  /**
+   * 이슈 3 — 취소돼 집계에서 빠진 대진 수. 0이면 화면은 안내를 그리지 않는다.
+   * 서버가 항상 내려주므로 optional 이 아니다.
+   */
+  cancelledFixtureCount: number;
   /**
    * 이 시즌의 승강이 확정됐는지. false 면 순위표에 승강 열을 띄우지 않는다.
    * 서버가 항상 내려주므로 optional 이 아니다.

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { V1ApiError } from '@/lib/api-client';
 import type { V1FixtureLineupAccess } from '@/hooks/use-v1-api';
@@ -798,5 +798,199 @@ describe('FixtureLineupPageClient — 선발이 0명이어도 피치는 그린�
     // 하나도 없어도 항상 남는 항목이라 피치 렌더 여부의 안정적인 신호다.
     expect(screen.getAllByRole('button', { name: /^자유 배치/ }).length).toBeGreaterThan(0);
     expect(screen.getByText(/카드를 아래 피치로 끌어다 놓으면/)).toBeInTheDocument();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 1차 대회(2026-08-15~16) 회고의 실제 사고에 대한 회귀 테스트.
+//   "라인업이 일부 팀에서 등록이 안되던 문제 … 새로고침을 사이트에서 사용자가 제대로
+//    못해서 어드민에서 직접 입력해줌"
+// 동시 저장 충돌 자체는 이미 사이드별 revision 으로 막혔지만, 충돌이 났을 때 **빠져나오는
+// 길이 브라우저 새로고침뿐**이라 결국 사람이 대신 입력해야 했다. 서버 문구도
+// "새로고침 후 다시 시도해 주세요"라 사용자에게 브라우저 조작을 요구한다.
+//
+// 여기서 검증하는 계약은 두 가지고, 둘은 서로를 견제한다.
+//   ① 충돌해도 화면의 편집을 **자동으로 덮어쓰지 않는다** (충돌 시점엔 반드시 미저장
+//      편집이 있다 — dirty 는 저장 성공에서만 풀린다).
+//   ② 그러면서도 새로고침 없이 최신본으로 다시 시작할 수 있다.
+// 하나만 지키면 실패다: ①만이면 여전히 갇히고, ②만이면 편집을 조용히 날린다.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('FixtureLineupPageClient — 라인업 충돌(VERSION_CONFLICT)에서 빠져나오기', () => {
+  function conflictError() {
+    return new V1ApiError({
+      status: 'error',
+      statusCode: 409,
+      code: 'VERSION_CONFLICT',
+      message: '라인업이 그새 변경됐어요. 새로고침 후 다시 시도해 주세요.',
+      timestamp: '2026-08-23T00:00:00.000Z',
+    });
+  }
+
+  let lineupsRefetch: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    lineupsRefetch = vi.fn().mockResolvedValue({ isError: false, data: [baseGameLineup()] });
+    hoisted.useV1FixtureLineupRosterMock.mockReturnValue(baseRoster());
+    hoisted.useV1TournamentMock.mockReturnValue({ data: { sport: { name: '풋살' } }, isLoading: false, isError: false });
+    hoisted.useV1FixtureLineupAccessMock.mockReturnValue({
+      data: baseAccess(), isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    });
+    hoisted.useV1GameMock.mockReturnValue({ data: baseGame(), isLoading: false, isError: false, error: null, refetch: vi.fn() });
+    hoisted.useV1GameLineupsMock.mockReturnValue({
+      data: [baseGameLineup()], isLoading: false, isError: false, error: null, refetch: lineupsRefetch,
+    });
+  });
+
+  it('저장이 409 VERSION_CONFLICT로 막혀도 화면의 편집을 지우지 않고, 새로고침 대신 누를 버튼을 준다', async () => {
+    hoisted.saveMutateAsync.mockRejectedValue(conflictError());
+
+    render(<FixtureLineupPageClient tournamentId="t-1" fixtureId="f-1" />);
+    fireEvent.click(screen.getByRole('checkbox', { name: '김후보 선발' }));
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '최신 명단 불러오기' })).toBeInTheDocument();
+    });
+    // ① 편집이 살아 있어야 한다 — 자동 재로드로 덮어썼다면 이 체크가 풀린다.
+    expect(screen.getByRole('checkbox', { name: '김후보 선발' })).toBeChecked();
+    // 최신본은 버튼을 누르는 순간 기다리지 않도록 미리 받아 둔다.
+    expect(lineupsRefetch).toHaveBeenCalled();
+  });
+
+  // Copilot 리뷰 지적 — 서버 문구("새로고침 후 다시 시도")와 새 복구 버튼이 동시에
+  // 뜨면 사용자가 무엇을 해야 하는지 갈린다. 행동 지시는 복구 카드 하나로 몬다.
+  it('충돌 안내에 "새로고침" 요구를 남기지 않는다 (버튼과 상충하는 지시 금지)', async () => {
+    hoisted.saveMutateAsync.mockRejectedValue(conflictError());
+
+    render(<FixtureLineupPageClient tournamentId="t-1" fixtureId="f-1" />);
+    fireEvent.click(screen.getByRole('checkbox', { name: '김후보 선발' }));
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '최신 명단 불러오기' })).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/새로고침/)).not.toBeInTheDocument();
+  });
+
+  it('"최신 명단 불러오기"를 누르면 서버를 다시 조회해 화면을 최신본으로 다시 세운다', async () => {
+    hoisted.saveMutateAsync.mockRejectedValue(conflictError());
+
+    render(<FixtureLineupPageClient tournamentId="t-1" fixtureId="f-1" />);
+    fireEvent.click(screen.getByRole('checkbox', { name: '김후보 선발' }));
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '최신 명단 불러오기' })).toBeInTheDocument();
+    });
+
+    // 그새 다른 곳(운영진 어드민 등)에서 저장된 최신 라인업 — 선발이 김알파로 바뀌었다.
+    const serverLatest = baseGameLineup({
+      revision: 3,
+      participants: [
+        {
+          id: 'p-9', gameId: 'game-1', sideId: 'side-host', lineupId: 'lineup-1', userId: null,
+          displayNameSnapshot: '김알파', jerseyNumber: 11, position: 'GK',
+          positionX: null, positionY: null, started: true,
+          createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
+        },
+      ],
+    });
+    /**
+     * refetch 를 **deferred** 로 만든다(Copilot 리뷰 지적). 클릭 전에 목 데이터를
+     * 최신본으로 바꿔 두면 `await` 를 빼먹어도 테스트가 통과해서, PR 이 내세운
+     * "refetch 를 먼저 await 한다"는 계약을 하나도 고정하지 못한다.
+     *
+     * 최신 데이터는 **resolve 시점에** 들어가게 한다 — 그래야 await 를 빼먹은 구현은
+     * 아직 낡은 데이터로 재하이드레이션해서(=김후보 편집이 사라지고 김알파도 없는
+     * 상태) 아래 단언에 걸린다.
+     */
+    let resolveRefetch: (() => void) | null = null;
+    lineupsRefetch.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveRefetch = () => {
+            hoisted.useV1GameLineupsMock.mockReturnValue({
+              data: [serverLatest], isLoading: false, isError: false, error: null, refetch: lineupsRefetch,
+            });
+            resolve({ isError: false, data: [serverLatest] });
+          };
+        }),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '최신 명단 불러오기' }));
+
+    // resolve 전에는 아무것도 바뀌지 않는다 — 내 편집이 그대로 남아 있어야 한다.
+    expect(screen.getByRole('checkbox', { name: '김후보 선발' })).toBeChecked();
+    expect(screen.queryByRole('checkbox', { name: '김알파 선발' })).not.toBeChecked();
+
+    await act(async () => {
+      resolveRefetch?.();
+    });
+
+    // ② 새로고침 없이 최신본으로 다시 선다 — 서버의 김알파가 선발로 올라오고,
+    //    버렸다고 명시한 내 편집(김후보)은 사라진다.
+    await waitFor(() => {
+      expect(screen.getByRole('checkbox', { name: '김알파 선발' })).toBeChecked();
+    });
+    expect(screen.getByRole('checkbox', { name: '김후보 선발' })).not.toBeChecked();
+    expect(screen.queryByRole('button', { name: '최신 명단 불러오기' })).not.toBeInTheDocument();
+  });
+
+  // Copilot 리뷰 지적 — 저장 경로만 409 를 주입하고 있어서, 제출에서 충돌이 나도 같은
+  // 계약(복구 UI 노출 + '새로고침' 문구 없음)이 지켜지는지 잡지 못했다. 제출도
+  // expectedVersion 을 보내므로 같은 409 가 실제로 난다.
+  it('제출이 409 로 막혀도 같은 복구 경로를 준다', async () => {
+    hoisted.submitMutateAsync.mockRejectedValue(conflictError());
+
+    render(<FixtureLineupPageClient tournamentId="t-1" fixtureId="f-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '라인업 제출하기' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '최신 명단 불러오기' })).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/새로고침/)).not.toBeInTheDocument();
+    expect(lineupsRefetch).toHaveBeenCalled();
+  });
+
+  // Copilot 리뷰 지적 — React Query 는 refetch 실패에도 기존 data 를 들고 있다. 성공을
+  // 확인하지 않으면 최신본도 못 준 채 편집만 날리는, 의도와 정반대 결과가 된다.
+  it('최신 명단 불러오기가 실패하면 편집과 충돌 상태를 그대로 두고 사유만 알린다', async () => {
+    hoisted.saveMutateAsync.mockRejectedValue(conflictError());
+    lineupsRefetch.mockResolvedValue({ isError: true, data: undefined });
+
+    render(<FixtureLineupPageClient tournamentId="t-1" fixtureId="f-1" />);
+    fireEvent.click(screen.getByRole('checkbox', { name: '김후보 선발' }));
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '최신 명단 불러오기' })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '최신 명단 불러오기' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('최신 명단을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.')).toBeInTheDocument();
+    });
+    // 편집이 살아 있고, 다시 시도할 버튼도 그대로 남는다.
+    expect(screen.getByRole('checkbox', { name: '김후보 선발' })).toBeChecked();
+    expect(screen.getByRole('button', { name: '최신 명단 불러오기' })).toBeInTheDocument();
+  });
+
+  it('충돌이 아닌 저장 실패에는 최신 명단 불러오기를 권하지 않는다 (엉뚱한 편집 유실 방지)', async () => {
+    hoisted.saveMutateAsync.mockRejectedValue(
+      new V1ApiError({
+        status: 'error', statusCode: 500, code: 'INTERNAL_ERROR',
+        message: '일시적인 오류가 발생했어요.', timestamp: '2026-08-23T00:00:00.000Z',
+      }),
+    );
+
+    render(<FixtureLineupPageClient tournamentId="t-1" fixtureId="f-1" />);
+    fireEvent.click(screen.getByRole('checkbox', { name: '김후보 선발' }));
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('일시적인 오류가 발생했어요.')).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('button', { name: '최신 명단 불러오기' })).not.toBeInTheDocument();
+    expect(lineupsRefetch).not.toHaveBeenCalled();
   });
 });

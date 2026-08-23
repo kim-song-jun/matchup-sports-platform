@@ -10,6 +10,8 @@
  * the API at all (same 404 as "does not exist"), so `'hidden'` is
  * deliberately not part of this union.
  */
+
+import type { MatchOutcomeReason } from '@/lib/match-outcome';
 export type PublicVisibilityMode = 'status_only' | 'live' | 'official_only';
 
 /** `pending` covers both "no official revision yet" and "a correction draft is mid-review". */
@@ -123,6 +125,21 @@ export interface PublicScheduleEntry {
   readonly scorers: readonly PublicScheduleScorer[];
   readonly cards: readonly PublicScheduleCard[];
   readonly hasVideo: boolean;
+}
+
+/**
+ * 몰수·중단으로 종결된 경기의 표기. 정상 종료(`NORMAL`)면 서버가 `null` 로 내려
+ * 기존 화면 계약이 그대로다 — 관전자에게 매번 "정상 종료"라고 말할 이유는 없다.
+ *
+ * `note` 가 이 타입의 존재 이유다. 점수만 보이면 몰수 0:0 과 실제 0:0 무승부가
+ * 화면에서 같아 보이고, 1차 대회에서 문제가 됐던 "왜 그 점수인지 아무 데도 없다"가
+ * 그대로 남는다. 서버는 사유 없는 몰수 종료를 422 로 거절하므로(`extractEndOutcome`)
+ * `reason !== null` 이면 실무상 `note` 도 있지만, 스키마상 nullable 이라 타입은
+ * 그대로 둔다 — 소비처가 빈 사유를 렌더하지 않도록 분기한다.
+ */
+export interface PublicMatchOutcome {
+  readonly reason: MatchOutcomeReason;
+  readonly note: string | null;
 }
 
 /** teamId/teamName/teamLogoUrl 비공개 규칙은 PublicSideSummary와 동일. */
@@ -245,6 +262,8 @@ export interface PublicMatchDetail {
   readonly lineup: PublicLineup | null;
   readonly events: readonly PublicMatchEvent[];
   readonly mvp: PublicMatchMvp | null;
+  /** 몰수·중단 종결 표기. 정상 종료거나 아직 공식 결과가 공개되기 전이면 `null`. */
+  readonly outcome: PublicMatchOutcome | null;
   readonly pendingProjection: boolean;
   readonly history: readonly PublicMatchHistoryEntry[];
   readonly videos: readonly PublicMatchVideo[];

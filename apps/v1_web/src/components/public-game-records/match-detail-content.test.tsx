@@ -34,6 +34,7 @@ function makeDetail(overrides: Partial<PublicMatchDetail> = {}): PublicMatchDeta
     lineup: null,
     events: [],
     mvp: null,
+    outcome: null,
     pendingProjection: false,
     history: [],
     videos: [],
@@ -151,5 +152,50 @@ describe('MatchDetailContent — 카드 색상', () => {
     expect(screen.getByText('옐로카드')).toHaveClass('sr-only');
     expect(screen.getByText('🟥')).toBeInTheDocument();
     expect(screen.getByText('레드카드')).toHaveClass('sr-only');
+  });
+  /**
+   * BRACKET-6 — 몰수 0:0 과 실제 0:0 무승부가 관전자 화면에서 같아 보이면 안 된다.
+   * 서버는 사유를 저장하고 공개 API 로도 내보내고 있었는데(alpha 실측 확인) 화면이
+   * 그 값을 아예 읽지 않아, 운영자가 종료 다이얼로그에서 읽은 "사유는 공개 경기
+   * 기록에 함께 남아요" 안내가 실제로는 지켜지지 않고 있었다.
+   */
+  describe('몰수·중단 종결 표기', () => {
+    it('몰수로 끝난 경기는 사유 라벨과 사유 본문을 함께 보여준다', () => {
+      const data = makeDetail({
+        score: { home: 0, away: 0, penalties: null },
+        outcome: { reason: 'FORFEIT', note: '원정팀이 킥오프 15분 경과까지 미출석' },
+      });
+
+      render(<MatchDetailContent data={data} />);
+
+      expect(screen.getByText('몰수·기권으로 종료된 경기예요')).toBeInTheDocument();
+      expect(screen.getByText('원정팀이 킥오프 15분 경과까지 미출석')).toBeInTheDocument();
+    });
+
+    it('경기 중단은 몰수와 다른 라벨로 구분한다', () => {
+      const data = makeDetail({ outcome: { reason: 'ABANDONED', note: '폭우로 후반 중단' } });
+
+      render(<MatchDetailContent data={data} />);
+
+      expect(screen.getByText('경기 중단으로 종료된 경기예요')).toBeInTheDocument();
+      expect(screen.queryByText('몰수·기권으로 종료된 경기예요')).not.toBeInTheDocument();
+    });
+
+    it('정상 종료 경기에는 아무 표기도 붙이지 않는다', () => {
+      render(<MatchDetailContent data={makeDetail({ outcome: null })} />);
+
+      expect(screen.queryByText(/종료된 경기예요/)).not.toBeInTheDocument();
+    });
+
+    it('사유가 비어 있으면 라벨만 보여주고 빈 줄을 남기지 않는다', () => {
+      // 서버가 사유를 422 로 강제하기 전에 종료된 과거 경기.
+      const data = makeDetail({ outcome: { reason: 'FORFEIT', note: '   ' } });
+
+      render(<MatchDetailContent data={data} />);
+
+      const notice = screen.getByText('몰수·기권으로 종료된 경기예요').parentElement;
+      expect(notice).not.toBeNull();
+      expect(within(notice as HTMLElement).getAllByText(/./)).toHaveLength(1);
+    });
   });
 });

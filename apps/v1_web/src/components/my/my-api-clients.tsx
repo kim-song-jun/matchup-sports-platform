@@ -347,6 +347,7 @@ export function ProfileEditPageClient() {
   const checkNickname = useV1CheckNickname();
   const [realName, setRealName] = useState('');
   const [nickname, setNickname] = useState('');
+  const [bio, setBio] = useState('');
   const [email, setEmail] = useState('');
   const [phoneDigits, setPhoneDigits] = useState('');
   const [birthDateDigits, setBirthDateDigits] = useState('');
@@ -371,6 +372,7 @@ export function ProfileEditPageClient() {
     if (!profile.data) return;
     setRealName(profile.data.profile.realName ?? '');
     setNickname(profile.data.profile.nickname ?? '');
+    setBio(profile.data.profile.bio ?? '');
     setEmail(profile.data.email ?? '');
     setPhoneDigits(profile.data.phone ?? '');
     setBirthDateDigits(profile.data.profile.birthDate ?? '');
@@ -576,6 +578,7 @@ export function ProfileEditPageClient() {
       await update.mutateAsync({
         realName: realName.trim() || null,
         nickname: normalizedNickname,
+        bio: bio.trim() || null,
         email: normalizedEmail || null,
         profileImageUrl: profileImageUrl || null,
         phone: phoneDigits || null,
@@ -646,6 +649,26 @@ export function ProfileEditPageClient() {
           />
           {fieldErrors.realName ? <span id="profile-realName-error" role="alert" className="tm-text-caption tm-auth-field-helper-error">{fieldErrors.realName}</span> : null}
         </label>
+        {/* 한 줄 소개 (Task 154 P1) -- 컬럼은 오래전부터 있었지만 저장 경로가 없어
+            프로덕션 245개 프로필 중 값이 들어간 게 1건뿐이었다. 300자 상한은 공개
+            프로필에서 카드 한 장에 접힘 없이 들어가는 분량 기준. */}
+        <div className="tm-create-field">
+          <label className="tm-text-label" htmlFor="v1-profile-bio">한 줄 소개</label>
+          <textarea
+            id="v1-profile-bio"
+            className="tm-input"
+            value={bio}
+            onChange={(event) => setBio(event.target.value)}
+            maxLength={300}
+            rows={3}
+            placeholder="어떤 선수인지 소개해 주세요"
+            style={{ resize: 'vertical', minHeight: 76 }}
+            aria-describedby="v1-profile-bio-counter"
+          />
+          <span id="v1-profile-bio-counter" className="tm-text-caption">
+            공개 프로필에 표시돼요 · {bio.length}/300
+          </span>
+        </div>
         <div className="tm-create-field">
           <label className="tm-text-label" htmlFor="v1-profile-nickname">닉네임</label>
           <span className="tm-auth-field-with-action">

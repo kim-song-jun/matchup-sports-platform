@@ -2574,6 +2574,65 @@ export class GamesService {
    * 인가는 resolveActor('read')를 그대로 재사용해 team-match/tournament-fixture
    * 분기 로직을 여기서 다시 만들지 않는다.
    */
+  /**
+   * "이 기록은 제 것입니다" 화면이 쓰는 목록 (Task 154 P0-5, 사용자 선택 B안).
+   *
+   * 라인업에 **이름만 올라가고 계정이 연결되지 않은** 참가자를 돌려준다. 선수가 자기
+   * 이름을 골라 신원 연결을 신청하는 것이 이 목록의 유일한 용도다.
+   *
+   * ## 노출 범위를 왜 이렇게 잡았나
+   * 인가를 `participant_identity` 스코프로 건다 -- **신청할 수 있는 사람에게만 목록을
+   * 보여준다**는 뜻이다. 볼 수만 있고 신청할 수 없는 사람을 만들지 않으므로, 이 API 가
+   * 새로운 노출 판단을 만들지 않는다(#673 에서 이미 정한 범위를 그대로 따른다).
+   * `read` 스코프로 걸면 관전자 전원에게 미연결 명단이 보이게 되어 훨씬 넓어진다.
+   *
+   * ## version 을 함께 내리는 이유
+   * `requestIdentityLink` 는 `expectedVersion` 을 요구하는데(낙관적 동시성), 공개 경기
+   * 응답에는 그 값이 없어 클라이언트가 알 길이 없었다. 목록과 같은 시점의 값을 함께
+   * 내려 클라이언트가 별도 조회 없이 바로 신청할 수 있게 한다.
+   */
+  async listClaimableParticipants(user: V1AuthUser, tournamentId: string, fixtureId: string) {
+    const fixture = await this.prisma.v1TournamentFixture.findUnique({
+      where: { tournamentId_id: { tournamentId, id: fixtureId } },
+      select: { game: { select: { id: true, version: true } } },
+    });
+    if (fixture === null || fixture.game === null) {
+      throw this.notFound('TOURNAMENT_FIXTURE_GAME_NOT_FOUND');
+    }
+    const gameId = fixture.game.id;
+    // 신청 자격과 동일한 스코프. 비참가자는 여기서 403 으로 끊긴다.
+    await this.resolveActor(this.prisma, gameId, user.id, 'participant_identity');
+
+    const participants = await this.prisma.v1GameParticipant.findMany({
+      where: { gameId },
+      select: { id: true, sideId: true, displayNameSnapshot: true, jerseyNumber: true },
+      orderBy: [{ sideId: 'asc' }, { jerseyNumber: 'asc' }],
+    });
+    if (participants.length === 0) {
+      return { gameId, version: fixture.game.version, participants: [] };
+    }
+    // 이미 연결된 참가자는 뺀다 -- 남의 연결을 빼앗는 경로를 애초에 안 만든다.
+    // (설령 목록에 넣어도 requestIdentityLink 가 409 로 막지만, 고를 수 있게 보여주는
+    //  것 자체가 "가능하다"는 신호가 된다.)
+    const linked = await this.prisma.v1ParticipantIdentityLinkCurrent.findMany({
+      where: { participantId: { in: participants.map((participant) => participant.id) } },
+      select: { participantId: true },
+    });
+    const linkedIds = new Set(linked.map((row) => row.participantId));
+    return {
+      gameId,
+      version: fixture.game.version,
+      participants: participants
+        .filter((participant) => !linkedIds.has(participant.id))
+        .map((participant) => ({
+          participantId: participant.id,
+          sideId: participant.sideId,
+          displayName: participant.displayNameSnapshot,
+          jerseyNumber: participant.jerseyNumber,
+        })),
+    };
+  }
+
   async resolveFixtureLineupAccess(user: V1AuthUser, tournamentId: string, fixtureId: string) {
     const fixture = await this.prisma.v1TournamentFixture.findUnique({
       where: { tournamentId_id: { tournamentId, id: fixtureId } },

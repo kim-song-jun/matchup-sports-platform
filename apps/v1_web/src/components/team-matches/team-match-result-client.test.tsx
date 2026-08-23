@@ -120,6 +120,8 @@ function revision(overrides: Partial<V1GameResultRevision> = {}): V1GameResultRe
     missingScorer: false,
     mvpParticipantId: null,
     reason: null,
+    outcomeReason: 'NORMAL',
+    outcomeNote: null,
     createdByActorType: 'USER',
     createdByUserId: 'user-host',
     createdBySystemActor: null,

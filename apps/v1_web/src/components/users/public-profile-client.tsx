@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { formatTournamentDateShort } from '@/lib/date-utils';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { useV1PublicProfile } from '@/hooks/use-v1-api';
@@ -28,7 +29,12 @@ function trustConfig(trustState: TrustState) {
     default:
       return {
         label: '샘플',
-        description: '아직 검증된 활동 기록이 없어요. 매치·팀·대회에 참가해 보세요.',
+        // alpha 실화면(2026-08-24)에서 잡은 모순: 이 문구는 "활동이 없다"고 말하는데,
+        // 바로 아래 활동 요약 카드가 "2경기 · 2대회 · 3팀"을 보여준다. 한 화면에서 서로
+        // 다른 말을 한다. sample 상태의 실제 의미는 **후기가 모자라 신뢰 신호를 계산할 수
+        // 없다**는 것이고(이 카드 하단도 "매너 점수는 활동 후기를 기반으로 계산돼요"라고
+        // 적고 있다), 활동 유무와는 다른 축이다. 뜻하는 바를 그대로 쓴다.
+        description: '아직 받은 후기가 없어 신뢰 신호를 계산할 수 없어요. 경기 후 상호 평가가 쌓이면 표시돼요.',
         badgeClass: 'tm-badge tm-badge-grey',
         icon: <AlertCircle size={15} aria-hidden="true" />,
       };
@@ -84,6 +90,49 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
             ) : null}
           </div>
         </section>
+
+        {/* 한 줄 소개 · 소속팀 (Task 154 P1)
+            기록이 0건인 프로필이 통계 카드 하나만 남아 완전히 비어 보이던 문제를 메운다.
+            둘 다 **있을 때만** 렌더한다 -- 빈 카드를 남기면 채우려던 문제를 오히려 키운다. */}
+        {data.bio ? (
+          <Card pad={16}>
+            <div className="tm-text-body" style={{ whiteSpace: 'pre-wrap', wordBreak: 'keep-all' }}>
+              {data.bio}
+            </div>
+          </Card>
+        ) : null}
+        {/* 최근 활동 한 줄 (Task 154 P2-3). 새로 공개되는 정보가 아니라 기록 목록에
+            이미 있는 값을 앞으로 당긴 것이다 -- 같은 게이트를 통과한 것만 서버가 준다. */}
+        {data.recentActivity ? (
+          <Card pad={16}>
+            <div className="tm-text-label" style={{ marginBottom: 6 }}>최근 활동</div>
+            <div className="tm-text-body">
+              {data.recentActivity.teamName}
+              {data.recentActivity.jerseyNumber !== null ? ` · ${data.recentActivity.jerseyNumber}번` : ''}
+              {data.recentActivity.position ? ` · ${data.recentActivity.position}` : ''}
+            </div>
+            <div className="tm-text-caption" style={{ marginTop: 4 }}>
+              {formatTournamentDateShort(data.recentActivity.playedAt)}
+            </div>
+          </Card>
+        ) : null}
+        {data.teams && data.teams.length > 0 ? (
+          <Card pad={16}>
+            <div className="tm-text-label" style={{ marginBottom: 10 }}>소속팀</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {data.teams.map((team) => (
+                <Link
+                  key={team.id}
+                  href={`/teams/${team.id}`}
+                  className="tm-btn tm-btn-sm tm-btn-neutral"
+                  style={{ minHeight: 44, textDecoration: 'none' }}
+                >
+                  {team.name}
+                </Link>
+              ))}
+            </div>
+          </Card>
+        ) : null}
 
         {/* 신뢰 신호 카드 */}
         <Card pad={16}>

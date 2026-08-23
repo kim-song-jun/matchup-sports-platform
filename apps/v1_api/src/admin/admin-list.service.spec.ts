@@ -909,7 +909,7 @@ describe('AdminService — list/detail endpoints', () => {
         status: 'active',
         recentReportCount: 3,
       });
-      expect(result.reportedTeam.reasonBreakdown).toEqual({ spam: 2, harassment: 1 });
+      expect(result.reportedTeam?.reasonBreakdown).toEqual({ spam: 2, harassment: 1 });
     });
 
     it('대상 팀이 없는 문의는 요약이 null 이다', async () => {

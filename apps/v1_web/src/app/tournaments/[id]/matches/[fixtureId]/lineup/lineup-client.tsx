@@ -630,8 +630,16 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
       setSaveStatus('saved');
     } catch (err) {
       setSaveStatus('idle');
-      if (isVersionConflict(err)) markStaleConflict();
-      setSaveError(extractErrorMessage(err, '저장하지 못했어요.'));
+      // 충돌이면 서버 메시지를 그대로 쓰지 않는다. 서버 문구는 "새로고침 후 다시
+      // 시도해 주세요"인데, 바로 아래 배너는 "버튼 한 번으로 복구하라"고 말한다 —
+      // 두 안내가 동시에 뜨면 사용자가 무엇을 해야 하는지 갈린다(Copilot 리뷰 지적).
+      // 행동 지시는 아래 복구 카드 하나로 몰고, 여기서는 사실만 알린다.
+      if (isVersionConflict(err)) {
+        markStaleConflict();
+        setSaveError('저장하지 못했어요 — 이 라인업이 다른 곳에서 먼저 바뀌었어요.');
+      } else {
+        setSaveError(extractErrorMessage(err, '저장하지 못했어요.'));
+      }
     }
   }
 
@@ -648,8 +656,12 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
       setReopened(false);
       setStaleConflict(false);
     } catch (err) {
-      if (isVersionConflict(err)) markStaleConflict();
-      setSaveError(extractErrorMessage(err, '제출하지 못했어요.'));
+      if (isVersionConflict(err)) {
+        markStaleConflict();
+        setSaveError('제출하지 못했어요 — 이 라인업이 다른 곳에서 먼저 바뀌었어요.');
+      } else {
+        setSaveError(extractErrorMessage(err, '제출하지 못했어요.'));
+      }
     }
   }
 

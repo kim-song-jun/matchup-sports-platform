@@ -858,6 +858,21 @@ describe('FixtureLineupPageClient — 라인업 충돌(VERSION_CONFLICT)에서 �
     expect(lineupsRefetch).toHaveBeenCalled();
   });
 
+  // Copilot 리뷰 지적 — 서버 문구("새로고침 후 다시 시도")와 새 복구 버튼이 동시에
+  // 뜨면 사용자가 무엇을 해야 하는지 갈린다. 행동 지시는 복구 카드 하나로 몬다.
+  it('충돌 안내에 "새로고침" 요구를 남기지 않는다 (버튼과 상충하는 지시 금지)', async () => {
+    hoisted.saveMutateAsync.mockRejectedValue(conflictError());
+
+    render(<FixtureLineupPageClient tournamentId="t-1" fixtureId="f-1" />);
+    fireEvent.click(screen.getByRole('checkbox', { name: '김후보 선발' }));
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '최신 명단 불러오기' })).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/새로고침/)).not.toBeInTheDocument();
+  });
+
   it('"최신 명단 불러오기"를 누르면 서버를 다시 조회해 화면을 최신본으로 다시 세운다', async () => {
     hoisted.saveMutateAsync.mockRejectedValue(conflictError());
 

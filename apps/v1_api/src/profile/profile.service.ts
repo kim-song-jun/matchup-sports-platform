@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { Prisma, V1AuthProvider, V1ConsentState } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
+import { countOwnerVisibleParticipations } from '../games/public-records/public-consent';
 import { PrismaService } from '../prisma/prisma.service';
 import { isReviewRevealed } from '../reviews/review-visibility';
 import { removeUserFromActiveRosters } from '../tournaments/roster-cleanup';
@@ -771,7 +772,27 @@ export class ProfileService {
    */
   async myRecordConsent(user: V1AuthUser) {
     const consent = await this.prisma.v1UserRecordConsent.findUnique({ where: { userId: user.id } });
-    return toRecordConsentResponse(consent);
+    return this.withPendingRecordSignal(user.id, consent);
+  }
+
+  /**
+   * 동의 응답에 유도 UI 용 신호 두 개를 얹는다.
+   *
+   * - `hasResponded`: GRANTED/REVOKED 와 무관하게 **한 번이라도 답한 적 있는지**.
+   *   `granted:false` 는 "거부"와 "아직 안 물어봄"을 구분하지 못하는데, 유도 배너는
+   *   그 둘을 반드시 다르게 취급해야 한다(명시적 거부는 다시 조르지 않는다).
+   * - `pendingRecordCount`: 지금 켜면 즉시 공개될 경기 수. 이미 GRANTED 면 유도할
+   *   이유가 없으므로 세지 않고 0 으로 둔다(불필요한 3쿼리 절약).
+   *
+   * 이 두 필드는 기존 필드에 **추가만** 한다 — 옛 클라이언트는 그대로 동작한다.
+   */
+  private async withPendingRecordSignal(
+    userId: string,
+    consent: { state: V1ConsentState; effectiveAt: Date } | null,
+  ) {
+    const base = toRecordConsentResponse(consent);
+    const pendingRecordCount = base.granted ? 0 : await countOwnerVisibleParticipations(this.prisma, userId);
+    return { ...base, hasResponded: consent !== null, pendingRecordCount };
   }
 
   /**
@@ -787,7 +808,7 @@ export class ProfileService {
       update: { state, policyHash: dto.policyHash, effectiveAt: new Date() },
       create: { userId: user.id, state, policyHash: dto.policyHash },
     });
-    return toRecordConsentResponse(consent);
+    return this.withPendingRecordSignal(user.id, consent);
   }
 
   /**

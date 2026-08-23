@@ -290,7 +290,15 @@ export const gameSchemaSourceManifest = {
   //
   // 아래 값은 **두 변경이 병합된 뒤**의 schema.prisma 에 sha256 을 다시 돌려 계산한 것이다 —
   // 어느 한쪽 브랜치의 해시를 그대로 쓰면 CI 가 깨진다(이 파일 위쪽 병합 재핀 주석과 같은 사유).
-  schema: 'ea5b9634f6020efe874bcd24cd02181de567134a6fe346c78f08d6f51464262d',
+  //
+  // 2026-08-23 재핀 (Task 154 P0-2): `V1ParticipantIdentityLinkCurrent` 에
+  // `@@index([userId], map: "v1_identity_link_current_user_id_idx")` 하나만 추가했다.
+  // **게임 도메인 모델의 컬럼·관계는 건드리지 않았고**, 인덱스 추가라 순수 additive 다
+  // (기존 행·쿼리 결과가 달라지지 않는다). 뒷받침 마이그레이션:
+  // 20260823120000_v1_identity_link_current_user_id_index — CREATE INDEX IF NOT EXISTS 로
+  // idempotent 하게 작성했다. 바인딩된 20260729000100_v1_game_operations 는 그대로이므로
+  // `migration` 값은 유지한다.
+  schema: '89f0d4c6f230503ba0d42bb799336936b91ba0d143b1a1df4b9355d9bc4c54fd',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

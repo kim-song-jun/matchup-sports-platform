@@ -4,13 +4,11 @@
 --
 -- 순수 additive. 기존 리비전은 전부 DEFAULT 'NORMAL' 이 되며 그것이 올바른 값이다
 -- (과거 경기를 소급해 몰수로 재분류할 수는 없다) — 별도 백필 UPDATE 없음.
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'V1GameOutcomeReason') THEN
-    CREATE TYPE "V1GameOutcomeReason" AS ENUM ('NORMAL', 'FORFEIT', 'ABANDONED');
-  END IF;
-END
-$$;
+-- 이 저장소의 enum 생성 관례를 그대로 따른다(예: 20260710000000_v1_chat_room_polish).
+-- DO $$ ... $$ 가드로 감싸면 expand-contract 게이트가 그 블록을 통째로 non-additive
+-- 문장으로 읽어 거부한다 — 게이트는 CREATE TYPE 자체는 additive 로 허용한다.
+-- Prisma 는 마이그레이션을 _prisma_migrations 로 한 번만 적용하므로 가드도 불필요하다.
+CREATE TYPE "V1GameOutcomeReason" AS ENUM ('NORMAL', 'FORFEIT', 'ABANDONED');
 
 ALTER TABLE "v1_game_result_revisions"
   ADD COLUMN IF NOT EXISTS "outcome_reason" "V1GameOutcomeReason" NOT NULL DEFAULT 'NORMAL';

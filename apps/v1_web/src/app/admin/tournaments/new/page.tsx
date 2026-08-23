@@ -587,7 +587,7 @@ function BasicStep({
           {([
             ['group_knockout', '조별리그 + 토너먼트', '예선 순위 후 결선'],
             ['knockout', '토너먼트', '패하면 탈락'],
-            ['league', '리그', '모든 팀이 순위 경쟁'],
+            ['league', '리그 방식', '모든 팀이 순위 경쟁'],
           ] as const).map(([value, label, description]) => (
             <label
               key={value}

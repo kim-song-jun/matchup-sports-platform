@@ -1,14 +1,15 @@
 'use client';
 
 import Link from 'next/link';
+import { Trophy } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useV1LeagueMatch, useV1LeagueMatchPlayerRecords, useV1LeagueMatchStandings } from '@/hooks/use-v1-api';
-import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
+import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { extractErrorMessage } from '@/lib/error-message';
 import { LEAGUE_STATE_META } from '@/lib/league-state-meta';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
-import type { V1LeagueFixture } from '@/types/league-match';
+import type { V1LeagueChampionTeam, V1LeagueFixture } from '@/types/league-match';
 
 /**
  * 확정된 승강 결과 표기(Task 153 시나리오 4). 컬러만으로 뜻을 전달하지 않도록
@@ -55,7 +56,7 @@ function fixtureStatusMeta(status: string): { label: string; badgeClass: string 
  * 승격/강등/잔류/불참 뱃지 — 열(390px 이상)과 팀명 아래 인라인(390px 미만) 양쪽에서 재사용한다.
  * 아이콘+텍스트를 함께 실어 컬러만으로 뜻을 전달하지 않는다.
  */
-function PromotionBadge({ kind, toTierLabel }: { kind: 'promoted' | 'relegated' | 'stayed' | 'withdrawn'; toTierLabel: string | null }) {
+export function PromotionBadge({ kind, toTierLabel }: { kind: 'promoted' | 'relegated' | 'stayed' | 'withdrawn'; toTierLabel: string | null }) {
   const meta = PROMOTION_META[kind];
   return (
     <span className={`inline-flex items-center gap-1 whitespace-nowrap font-semibold ${meta.className}`}>
@@ -95,7 +96,7 @@ function ExpectedPromotionBadge({ kind, toTierLabel }: { kind: 'promoted' | 'rel
  * 표준 경쟁 순위(1,1,3 — 동점은 같은 등수, 다음 등수는 동점자 수만큼 건너뜀)를 계산한다).
  * 응답 배열은 값 내림차순 정렬로 온다는 전제(기존 index+1 표기도 같은 전제를 썼다).
  */
-function competitionRanks(values: number[]): number[] {
+export function competitionRanks(values: number[]): number[] {
   const ranks: number[] = [];
   let previousValue: number | null = null;
   let previousRank = 0;
@@ -192,6 +193,86 @@ function ParticipantTeamList({ teams }: { teams: Array<{ teamId: string; teamNam
   );
 }
 
+/**
+ * 사용자 확정(2026-08-23) — 종료된 리그를 열면 시즌의 결론(우승팀·승강 결과·득점왕)이
+ * 스크롤 없이 먼저 읽혀야 한다. **호출부가 `series.state === 'completed'`일 때만
+ * 렌더한다** — 진행 중·준비 중 리그는 "우승팀" 개념 자체가 성립하지 않으므로 이 카드는
+ * 아무것도 늘어나지 않는다(빈 카드도 그리지 않는다).
+ *
+ * standings/records 쿼리는 이 화면 아래쪽 섹션들과 동일한 react-query 키를 공유하므로
+ * 이 카드 때문에 추가 네트워크 요청이 생기지 않는다. 아직 로딩 중이면 스켈레톤을,
+ * 실패했으면 그 줄만 조용히 생략한다(전체 화면을 에러로 막지 않는다 — 아래 순위표
+ * 섹션이 이미 자체 ErrorState+재시도를 갖고 있다).
+ */
+function SeasonSummaryCard({
+  leagueId,
+  standingsLoading,
+  standingsError,
+  champions,
+  promotedCount,
+  relegatedCount,
+  recordsLoading,
+  recordsError,
+  topScorerNames,
+}: {
+  leagueId: string;
+  standingsLoading: boolean;
+  standingsError: boolean;
+  champions: V1LeagueChampionTeam[];
+  promotedCount: number;
+  relegatedCount: number;
+  recordsLoading: boolean;
+  recordsError: boolean;
+  topScorerNames: string[];
+}) {
+  const isCoChampion = champions.length > 1;
+  return (
+    <Card pad={16} className="mb-4">
+      <div className="mb-2 flex items-center gap-1.5">
+        <Trophy size={16} className="tm-medal-gold" aria-hidden="true" />
+        <h2 className="text-sm font-bold text-[var(--text-strong)]">이번 시즌 요약</h2>
+      </div>
+      {/* 에러를 로딩보다 **먼저** 본다. 호출부가 loading 을 `standings === undefined` 로 넘기는데
+          요청이 실패해도 데이터는 undefined 라, 로딩을 먼저 검사하면 실패한 요청이 영원히
+          스켈레톤으로 남고 아래 에러 분기에 도달하지 못한다(사용자는 계속 로딩 중으로 오해한다). */}
+      {standingsError ? (
+        // 화면 전체를 막지 않는다 — 아래 순위표 섹션이 이 같은 요청의 재시도 버튼을 갖고 있다.
+        <p className="text-sm text-[var(--text-muted)]">시즌 요약을 불러오지 못했어요.</p>
+      ) : standingsLoading ? (
+        <div className="tm-skeleton" style={{ height: 44, borderRadius: 8 }} />
+      ) : (
+        <div className="space-y-1 text-sm">
+          {champions.length > 0 && (
+            <p className="text-[var(--text-strong)]">
+              <span className="font-semibold">{isCoChampion ? '공동 우승' : '우승'}</span>
+              {' · '}
+              {champions.map((c) => c.teamName).join(', ')}
+            </p>
+          )}
+          {(promotedCount > 0 || relegatedCount > 0) && (
+            <p className="text-[var(--text-muted)]">
+              승강 결과 · 승격 {promotedCount}팀 · 강등 {relegatedCount}팀
+            </p>
+          )}
+          {!recordsLoading && !recordsError && topScorerNames.length > 0 && (
+            <p className="text-[var(--text-muted)]">
+              <span className="font-medium">{topScorerNames.length > 1 ? '공동 득점왕' : '득점왕'}</span>
+              {' · '}
+              {topScorerNames.join(', ')}
+            </p>
+          )}
+        </div>
+      )}
+      <Link
+        href={`/league-matches/${leagueId}/awards`}
+        className="tm-btn tm-btn-sm tm-btn-outline mt-3"
+      >
+        시즌 결산 자세히 보기 →
+      </Link>
+    </Card>
+  );
+}
+
 export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: string }) {
   const seriesQuery = useV1LeagueMatch(leagueId);
   const standingsQuery = useV1LeagueMatchStandings(leagueId);
@@ -212,6 +293,22 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
 
   const goalRanks = useMemo(() => competitionRanks((records?.goals ?? []).map((row) => row.goals)), [records]);
   const assistRanks = useMemo(() => competitionRanks((records?.assists ?? []).map((row) => row.assists)), [records]);
+
+  // 시즌 결산 카드(SeasonSummaryCard) 전용 파생값 — 승격/강등 집계와 공동 득점왕(1위
+  // 동점자 전원) 이름. promotionKind가 아직 없는(단발 리그·확정 전) 시즌은 두 카운트
+  // 모두 0이라 그 줄 자체가 렌더되지 않는다.
+  const promotedCount = useMemo(
+    () => (standings?.standings ?? []).filter((row) => row.promotionKind === 'promoted').length,
+    [standings],
+  );
+  const relegatedCount = useMemo(
+    () => (standings?.standings ?? []).filter((row) => row.promotionKind === 'relegated').length,
+    [standings],
+  );
+  const topScorerNames = useMemo(
+    () => (records?.goals ?? []).filter((_, index) => goalRanks[index] === 1).map((row) => row.nickname ?? '선수'),
+    [records, goalRanks],
+  );
 
   // 감사 H-2 — promotionDecided(확정)와 promotionForecast(예상)는 서버 계약상 서로
   // 배타적이다(확정되면 promotionForecast가 다시 null). 열 표시 여부와 헤더 문구를
@@ -295,6 +392,23 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
         <h1 className="text-xl font-bold text-[var(--text-strong)]">{series.title}</h1>
         <span className={`tm-badge ${stateMeta.badgeClass}`}>{stateMeta.label}</span>
       </div>
+      {/* 사용자 확정(2026-08-23) — 종료된 리그에만 뜬다. 진행 중·준비 중 리그에는
+          이 자리에 아무것도 늘어나지 않는다(우승팀 개념이 아직 성립하지 않는다). */}
+      {series.state === 'completed' && (
+        <div className="mt-3">
+          <SeasonSummaryCard
+            leagueId={leagueId}
+            standingsLoading={standings === undefined}
+            standingsError={standingsQuery.isError}
+            champions={standings?.champions ?? []}
+            promotedCount={promotedCount}
+            relegatedCount={relegatedCount}
+            recordsLoading={records === undefined}
+            recordsError={recordsQuery.isError}
+            topScorerNames={topScorerNames}
+          />
+        </div>
+      )}
       {/* 이슈 1(감사 보통) — seriesId 가 응답에 있어도 같은 시리즈의 다른 시즌·티어로
           이동할 링크가 없어 "1부"를 보는 사용자가 "2부는 어떤 팀들이 있지?"를 클릭으로
           확인할 수 없었다. 단발 리그(seriesSiblings 빈 배열)에는 아무것도 늘어나지 않는다. */}

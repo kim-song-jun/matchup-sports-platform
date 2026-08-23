@@ -10,7 +10,7 @@ interface Props {
 export default async function LeagueMatchPage({ params }: Props) {
   const { leagueId } = await params;
   return (
-    <AppChrome title="리그" activeTab="tournaments" backHref="/league-matches">
+    <AppChrome title="정규 리그" activeTab="tournaments" backHref="/league-matches">
       <LeagueMatchStandingsClient leagueId={leagueId} />
     </AppChrome>
   );

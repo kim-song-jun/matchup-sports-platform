@@ -1,4 +1,4 @@
-import { calculateLeagueStandings, calculateLeagueStandingsWithTieBreakInfo } from './league-standings';
+import { calculateLeagueStandings, calculateLeagueStandingsWithTieBreakInfo, resolveLeagueChampions } from './league-standings';
 
 const ORDER = ['points', 'goalDifference', 'goalsFor', 'headToHead'] as const;
 
@@ -140,5 +140,87 @@ describe('calculateLeagueStandingsWithTieBreakInfo', () => {
     const fixtures = [{ homeTeamId: 'A', awayTeamId: 'B', homeScore: 2, awayScore: 1 }];
     const { tieGroups } = calculateLeagueStandingsWithTieBreakInfo({ teamIds: ['A', 'B'], fixtures, tieBreakOrder: ORDER });
     expect(tieGroups).toEqual([]);
+  });
+});
+
+// 그룹 B(시즌 결산·시상 화면 감사) — 우승팀 판정. 우승팀은 이미 계산된 standings/tieGroups를
+// 그대로 조회하는 함수라 새 fixture 시나리오를 다시 만들지 않고, 위에서 이미 검증된
+// tieGroups 산출 케이스를 그대로 재사용해 "1위가 tieGroups에 속하면 공동 우승"이라는
+// 계약만 단언한다.
+describe('resolveLeagueChampions', () => {
+  const withTeamNames = (
+    standings: ReturnType<typeof calculateLeagueStandings>,
+  ): Array<{ teamId: string; teamName: string; teamLogoUrl: string | null }> =>
+    standings.map((row) => ({ teamId: row.teamId, teamName: `팀 ${row.teamId}`, teamLogoUrl: null }));
+
+  it('단독 우승 — tieGroups에 1위가 없으면 1위 팀 하나만 반환한다', () => {
+    const fixtures = [{ homeTeamId: 'A', awayTeamId: 'B', homeScore: 2, awayScore: 1 }];
+    const { standings, tieGroups } = calculateLeagueStandingsWithTieBreakInfo({
+      teamIds: ['A', 'B'],
+      fixtures,
+      tieBreakOrder: ORDER,
+    });
+    const champions = resolveLeagueChampions(withTeamNames(standings), tieGroups);
+    expect(champions).toEqual([{ teamId: 'A', teamName: '팀 A', teamLogoUrl: null }]);
+  });
+
+  it('공동 우승 — 3팀 순환 동률(전체가 tieGroups)이면 전원이 champions에 들어간다', () => {
+    // 위 calculateLeagueStandingsWithTieBreakInfo 스위트와 동일한 순환 동률 픽스처 --
+    // A·B·C가 승점·골득실·다득점·headToHead까지 완전히 같아 tieGroups = [{A,B,C}] 다.
+    const fixtures = [
+      { homeTeamId: 'A', awayTeamId: 'B', homeScore: 1, awayScore: 0 },
+      { homeTeamId: 'B', awayTeamId: 'C', homeScore: 1, awayScore: 0 },
+      { homeTeamId: 'C', awayTeamId: 'A', homeScore: 1, awayScore: 0 },
+    ];
+    const { standings, tieGroups } = calculateLeagueStandingsWithTieBreakInfo({
+      teamIds: ['A', 'B', 'C'],
+      fixtures,
+      tieBreakOrder: ORDER,
+    });
+    const champions = resolveLeagueChampions(withTeamNames(standings), tieGroups);
+    // 전원 공동 우승 -- 1등이 사전순 폴백으로 A가 됐다고 해서 A 혼자만 우승이 아니다.
+    expect(champions.map((c) => c.teamId).sort()).toEqual(['A', 'B', 'C']);
+  });
+
+  it('부분 동률(1위와 갈린 팀)이면 tieGroups가 있어도 1위만 champions에 들어간다', () => {
+    // A·B는 승점만 같고 goalDifference로 이미 갈린다(위 스위트의 "부분 동률 오탐 방지"
+    // 케이스 재사용) -- tieGroups는 빈 배열이라 어차피 1위(A) 혼자 champions.
+    const fixtures = [
+      { homeTeamId: 'A', awayTeamId: 'C', homeScore: 3, awayScore: 0 },
+      { homeTeamId: 'B', awayTeamId: 'C', homeScore: 1, awayScore: 0 },
+    ];
+    const { standings, tieGroups } = calculateLeagueStandingsWithTieBreakInfo({
+      teamIds: ['A', 'B', 'C'],
+      fixtures,
+      tieBreakOrder: ORDER,
+    });
+    const champions = resolveLeagueChampions(withTeamNames(standings), tieGroups);
+    expect(champions).toEqual([{ teamId: 'A', teamName: '팀 A', teamLogoUrl: null }]);
+  });
+
+  it('참가팀이 없으면(standings 빈 배열) champions도 빈 배열이다', () => {
+    expect(resolveLeagueChampions([], [])).toEqual([]);
+  });
+
+  it('2위 이하가 낀 3팀 동률(감사 H-5 두 번째 픽스처)에서도 1위가 속한 그룹만 champions로 잡는다', () => {
+    // 위 calculateLeagueStandingsWithTieBreakInfo 스위트의 "headToHead가 1팀만 분리" 픽스처를
+    // 재사용하되 tieBreakOrder를 짧게 잘라(headToHead까지만) A·C를 완전 동률로 남긴다.
+    const fixtures = [
+      { homeTeamId: 'A', awayTeamId: 'B', homeScore: 1, awayScore: 0 },
+      { homeTeamId: 'C', awayTeamId: 'B', homeScore: 2, awayScore: 0 },
+      { homeTeamId: 'A', awayTeamId: 'C', homeScore: 1, awayScore: 1 },
+      { homeTeamId: 'B', awayTeamId: 'D', homeScore: 6, awayScore: 0 },
+      { homeTeamId: 'B', awayTeamId: 'D', homeScore: 0, awayScore: 0 },
+    ];
+    const { standings, tieGroups } = calculateLeagueStandingsWithTieBreakInfo({
+      teamIds: ['A', 'B', 'C', 'D'],
+      fixtures,
+      tieBreakOrder: ['points', 'headToHead'],
+    });
+    // 이 tieBreakOrder(points, headToHead)로는 A·C가 h2h까지도 동률(1-1 무승부 1경기뿐이라
+    // 승자승 자체가 없음)이라 완전히 갈리지 않는다 -- B만 h2h로 먼저 분리된다.
+    expect(tieGroups).toEqual([{ teamIds: ['A', 'C'] }]);
+    const champions = resolveLeagueChampions(withTeamNames(standings), tieGroups);
+    expect(champions.map((c) => c.teamId).sort()).toEqual(['A', 'C']);
   });
 });

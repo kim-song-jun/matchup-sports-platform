@@ -323,7 +323,7 @@ function TeamMyLeaguesSection({
               }}
             >
               <div style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span className="tm-badge tm-badge-grey" style={{ flexShrink: 0 }}>리그전</span>
+                <span className="tm-badge tm-badge-grey" style={{ flexShrink: 0 }}>정규 리그</span>
                 <div className="tm-text-label" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{league.title}</div>
               </div>
               <ChevronRightIcon size={18} strokeWidth={2} aria-hidden="true" style={{ flexShrink: 0, color: 'var(--text-caption)' }} />

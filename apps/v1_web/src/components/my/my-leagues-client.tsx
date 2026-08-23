@@ -52,7 +52,7 @@ export function MyLeaguesPageClient() {
           ) : items.length === 0 ? (
             <EmptyState
               title="참가 중인 리그가 없어요"
-              sub="리그 참가는 운영자가 지정해요. 리그전 찾기에서 어떤 리그가 열리는지 볼 수 있어요."
+              sub="리그 참가는 운영자가 지정해요. 정규 리그 찾기에서 어떤 리그가 열리는지 볼 수 있어요."
             />
           ) : (
             <ul className="space-y-2" role="list" aria-label="내 리그 목록">

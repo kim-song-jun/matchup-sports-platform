@@ -435,7 +435,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
           <p>경기 일정과 조별 순위, 결선 진행 상황을 확인하세요.</p>
         </div>
         <span className="tm-bracket-page-format">
-          {format === 'league' ? '리그' : format === 'knockout' ? '토너먼트' : '조별리그 + 토너먼트'}
+          {format === 'league' ? '리그 방식' : format === 'knockout' ? '토너먼트' : '조별리그 + 토너먼트'}
         </span>
       </header>
       {/* 진행 단계 */}

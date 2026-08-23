@@ -246,7 +246,7 @@ export function buildTournamentStages(tournament: V1TournamentDetail): Tournamen
           : 'upcoming';
 
     return [
-      { key: 'league', label: '리그전', status: leagueStatus },
+      { key: 'league', label: '리그 방식', status: leagueStatus },
       { key: 'awards', label: '시상', status: allDone ? 'active' : 'upcoming' },
     ];
   }

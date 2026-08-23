@@ -603,6 +603,12 @@ export type V1TeamDetail = {
   regionName?: string | null;
   region: { regionId: string; name: string; parentName?: string | null } | null;
   joinPolicy?: 'approval_required' | 'closed';
+  /**
+   * 팀 컨택 수신 정책(Phase 2/3 Task 5). `/teams/:teamId/contact-policy` PATCH 응답은
+   * `{ id, contactPolicy }` 두 필드만 반환하므로(team-contacts.service.ts:394-398), 화면이
+   * "현재 선택된 정책"을 렌더하려면 이 GET 응답에서 읽어야 한다.
+   */
+  contactPolicy?: 'open' | 'recruiting_only' | 'closed';
   trustState?: TrustState | 'none';
   version?: string;
   membersVisibilityEnabled: boolean;

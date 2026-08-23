@@ -164,6 +164,17 @@ export class TeamsService {
       regionName: formatRegionDisplayName(team.region),
       region: team.region ? { regionId: team.region.id, name: team.region.name, parentName: team.region.parent?.name ?? null } : null,
       joinPolicy: team.joinPolicy,
+      // 컨택 수신 정책. 팀 컨택 설정 화면이 "현재 정책이 선택된 상태로" 렌더하려면 현재 값을
+      // 읽을 GET 경로가 필요한데, PATCH teams/:teamId/contact-policy 는 { id, contactPolicy }
+      // 만 반환하고 팀 상세를 되돌려주지 않는다(team-contacts.service.ts 의 updateContactPolicy).
+      //
+      // **운영진에게만 노출한다.** 이 값을 공개하면 스펙 §8 의 핵심 성질이 깨진다 — 컨택 거절은
+      // 차단당함 / closed / recruiting_only 세 사유가 발신자 입장에서 구분되지 않아야 하는데,
+      // 상대 팀 정책이 'open' 인 것이 보이는 상태에서 TEAM_CONTACT_NOT_ACCEPTING 을 받으면
+      // "우리가 차단당했다" 가 곧바로 역산된다. 설정 화면은 owner/manager 전용이므로
+      // 운영진 한정 노출로 화면 요구사항은 그대로 충족된다.
+      contactPolicy:
+        viewer.role === 'owner' || viewer.role === 'manager' ? team.contactPolicy : undefined,
       trustState: team.trustScore?.trustState ?? 'none',
       version: team.updatedAt.toISOString(),
       profile: {

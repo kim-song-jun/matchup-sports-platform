@@ -700,6 +700,70 @@ describe('ProfileService tournament appearance aggregation', () => {
   });
 });
 
+/**
+ * alpha 실측(2026-08-24)에서 잡은 회귀. bio 는 DB 에 저장됐는데 `toProfilePayload` 가
+ * 그 필드를 안 실어 보내서, `PATCH /me/profile` 응답과 `GET /me/profile` 둘 다 값을
+ * 돌려주지 않았다. 프론트는 그 응답으로 캐시를 갱신하고 편집 폼 초깃값을 채우므로,
+ * **저장 직후 편집 화면에 다시 들어가면 방금 쓴 소개가 비어 보였다**(DB 엔 남아 있는데).
+ *
+ * 공개 프로필에는 별도 경로로 나갔기 때문에 "저장은 됐다"는 착시가 생겨 더 늦게 발견된다.
+ */
+describe('ProfileService 내 프로필 응답의 bio 왕복', () => {
+  function buildMePrisma(bio: string | null) {
+    return {
+      v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
+      v1MatchParticipant: { count: jest.fn().mockResolvedValue(0) },
+      v1User: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'user-1',
+          email: 'a@b.test',
+          phone: null,
+          emailVerifiedAt: null,
+          phoneVerifiedAt: null,
+          accountStatus: 'active',
+          onboardingStatus: 'completed',
+          themePreference: 'system',
+          profile: {
+            nickname: '테스트닉',
+            displayName: null,
+            realName: null,
+            profileImageUrl: null,
+            birthDate: null,
+            gender: 'male',
+            bio,
+          },
+          regions: [],
+          sportPreferences: [],
+          reputationSummary: null,
+          authIdentities: [],
+        }),
+      },
+    };
+  }
+
+  const authUser = {
+    id: 'user-1',
+    email: 'a@b.test',
+    accountStatus: 'active',
+    onboardingStatus: 'completed',
+  } as never;
+
+  it('저장한 bio 를 응답으로 다시 돌려준다', async () => {
+    const service = new ProfileService(buildMePrisma('풋살 좋아하는 미드필더예요.') as never);
+    const result = await service.me(authUser);
+    expect(result.profile.bio).toBe('풋살 좋아하는 미드필더예요.');
+  });
+
+  it('bio 가 없으면 키를 빼지 않고 null 로 내려준다', async () => {
+    // undefined 로 새면 JSON 직렬화에서 키 자체가 사라져, 클라이언트가 "필드를 모르는
+    // 옛 서버"와 "값이 비어 있음"을 구분하지 못한다.
+    const service = new ProfileService(buildMePrisma(null) as never);
+    const result = await service.me(authUser);
+    expect(result.profile).toHaveProperty('bio');
+    expect(result.profile.bio).toBeNull();
+  });
+});
+
 describe('ProfileService public profile moderation', () => {
   it('queries only publicly available account states', async () => {
     const prisma = {

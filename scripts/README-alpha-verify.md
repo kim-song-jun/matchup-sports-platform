@@ -30,6 +30,11 @@ export ALPHA_SESSION_TOKEN='v1.<payload>.<signature>'
 |---|---|---|
 | `verify_alpha_penalty_video_group.mjs` | 공개 화면 — 일정의 승부차기 표기(computed font-size/color 까지), 최종결과의 조별리그 경기 조회, 경기 영상 탭 | 불필요 |
 | `verify_alpha_staff_full_walk.mjs` | 대회 스태프 진입 동선 — 담당 대회 목록 → 카드 클릭 → 담당 경기 목록 → 경기 콘솔. **링크를 직접 클릭해 따라가고** 4xx 요청을 모아 보고한다 | 스태프 세션 |
+| `capture_alpha_league_audit.mjs` | 정규 리그 화면 — 📱390/📲768/🖥1440 3폭 캡처 + **DOM computed 진단**(가로 오버플로, 표의 scrollWidth/clientWidth, 44px 터치 타겟, 콘솔 에러, 4xx/5xx). `TARGET_SET=main\|series\|extra\|fixture\|dark\|wave4` 로 대상 세트 선택 | 팀장·운영자 |
+| `verify_alpha_league_theme_badges.mjs` | 다크 모드(`localStorage 'tm-theme'`) 강제 전환 + 배지 형제 높이 실측. `LEAGUE_IDS` 로 대상 지정 | 불필요 |
+| `verify_alpha_league_e2e.mjs` | **리그 운영 전 구간** — 체계 생성 → 시즌 시딩 → 대진 → 몰수 → 승강 preview → commit → 다음 시즌. `STRICT_PICKER=1` 이면 드롭다운이 안 열릴 때 `C-0 미해결` 로 던진다(= 통과 자체가 회귀 증거) | 운영자 |
+| `verify_alpha_league_notifications.mjs` | 대진 배정 알림 1종 — 팀장 알림의 **id 차집합**으로 판정 | 운영자+팀장 |
+| `verify_alpha_league_notifications_full.mjs` | 알림 3종 전수 — ① 대진 배정 ② 결과 공식 확정 ③ 승격·강등 확정. `SERIES_ID` 를 주면 기존 시리즈를 재사용한다 | 운영자+팀장 |
 
 ```bash
 # 공개 화면 (기본 대상 대회는 스크립트 상단 TID 상수, 환경변수로 교체 가능)
@@ -42,8 +47,40 @@ ALPHA_SESSION_TOKEN="$ALPHA_SESSION_TOKEN" TARGET_TITLE='이승민 test' \
   node scripts/verify_alpha_staff_full_walk.mjs
 ```
 
-두 스크립트 모두 **mutation 을 보내지 않는다**(읽기·클릭만). 스크린샷은 `OUT_DIR`
-(기본값은 각 스크립트 상단) 에 남는다.
+```bash
+# 정규 리그 캡처 — 계정은 환경변수로만 넘긴다(스크립트에 리터럴로 적지 않는다).
+ALPHA_PASSWORD="$ALPHA_PASSWORD" ALPHA_CAPTAIN_EMAIL='<팀장 계정>' \
+  TARGET_SET=main node scripts/capture_alpha_league_audit.mjs
+
+# 다크 캡처. v1_web 은 OS 다크모드를 무시하므로 스크립트가 localStorage 'tm-theme' 를 심는다.
+LEAGUE_IDS='{"tier":"<리그 id>"}' TARGET_SET=dark \
+  node scripts/capture_alpha_league_audit.mjs
+
+# 리그 운영 전 구간. STRICT_PICKER=1 은 우회 없이 실패시키는 모드다.
+ALPHA_PASSWORD="$ALPHA_PASSWORD" ALPHA_ADMIN_EMAIL='<운영자 계정>' \
+  STRICT_PICKER=1 node scripts/verify_alpha_league_e2e.mjs
+
+# 알림 3종. 두 번째부터는 SERIES_ID 로 같은 시리즈를 재사용한다.
+ALPHA_PASSWORD="$ALPHA_PASSWORD" ALPHA_ADMIN_EMAIL='<운영자>' ALPHA_CAPTAIN_EMAIL='<팀장>' \
+  SERIES_ID='<앞서 만든 시리즈 id>' node scripts/verify_alpha_league_notifications_full.mjs
+```
+
+### mutation 을 보내는가
+
+**읽기 전용** — `verify_alpha_penalty_video_group.mjs`, `verify_alpha_staff_full_walk.mjs`,
+`capture_alpha_league_audit.mjs`, `verify_alpha_league_theme_badges.mjs`.
+클릭·캡처만 하므로 몇 번을 돌려도 alpha 데이터가 변하지 않는다.
+
+**쓰기 있음** — `verify_alpha_league_e2e.mjs`, `verify_alpha_league_notifications*.mjs`.
+alpha 에 `(테스트) …` 로 시작하는 리그 체계·시즌·대진을 **실제로 만든다.** 리그 상태 전이는
+운영자 경로를 그대로 밟아야만 재현되기 때문에 읽기만으로는 검증이 불가능하다. 대신:
+
+- 만드는 것은 전부 `(테스트)` 접두사를 달아 실제 운영 데이터와 구분한다.
+- 알림 스크립트는 `SERIES_ID` 를 받아 **이미 만든 시리즈를 재사용**한다 — 재실행이 데이터를
+  계속 불리지 않게 하려는 것이니, 재현 시엔 새로 만들지 말고 이 환경변수를 쓴다.
+- 지우지는 않는다. 정리는 운영자 판단이라 스크립트가 임의로 삭제하지 않는다.
+
+스크린샷은 `OUT_DIR`(기본값은 각 스크립트 상단) 에 남는다.
 
 ## 배포 창을 피할 것
 

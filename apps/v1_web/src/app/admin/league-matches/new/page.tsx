@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AdminPageHeader, AdminToasts, useAdminToast } from '@/components/admin';
 import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-picker';
@@ -67,6 +68,19 @@ export default function AdminLeagueMatchNewPage() {
   const canSubmit =
     title.trim().length > 0 && sportId !== '' && regionId !== '' && startsOn !== '' && endsOn !== '' && selectedTeams.length >= 2;
 
+  // 그룹 B 감사 결함 4: canSubmit이 false일 때 "왜"를 알려준다 — 지금까지는 버튼이 그냥
+  // 비활성으로만 보여서 뭐가 덜 채워졌는지 화면에서 알 방법이 없었다. 위에서 아래로 채우는
+  // 순서(이름 -> 종목/지역 -> 기간 -> 팀)대로 하나씩만 짚는다 — 한꺼번에 다 나열하면
+  // 오히려 뭐부터 고쳐야 할지 헷갈린다.
+  const missingFieldHint = (() => {
+    if (title.trim().length === 0) return '리그 이름을 입력해 주세요.';
+    if (sportId === '') return '종목을 선택해 주세요.';
+    if (regionId === '') return '지역을 선택해 주세요.';
+    if (startsOn === '' || endsOn === '') return '시작일·종료일을 입력해 주세요.';
+    if (selectedTeams.length < 2) return `참가 팀을 2팀 이상 추가해 주세요. (현재 ${selectedTeams.length}팀)`;
+    return null;
+  })();
+
   const addTeam = (item: EntityPickerItem | null) => {
     if (item === null) return;
     const picked = item as LeagueTeamPick;
@@ -101,6 +115,17 @@ export default function AdminLeagueMatchNewPage() {
   return (
     <div className="mx-auto max-w-2xl">
       <AdminPageHeader eyebrow="플랫폼 · 리그" title="리그 개설" description="팀을 등록하고 라운드로빈 대진을 자동으로 만들어요." />
+
+      {/* 그룹 B 감사 결함 4: 이 폼은 항상 단발 리그만 만든다 — 1부·2부처럼 승격·강등이
+          있는 리그 체계는 이 폼이 아니라 리그 체계(시즌 시딩) 경로로만 생긴다. 두 화면이
+          서로를 언급하지 않아 "1부 리그를 만들자"며 여기 온 운영자는 방법이 없었다. */}
+      <div className="mb-5 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] p-3 text-sm text-[var(--text-muted)]">
+        1부·2부처럼 승격·강등이 있는 리그 체계를 만들려면{' '}
+        <Link href="/admin/league-series/new" className="font-medium text-[var(--blue700)] underline underline-offset-2">
+          리그 체계 만들기
+        </Link>
+        로 가 주세요. 이 화면은 승격·강등이 없는 단발 리그 하나만 만들어요.
+      </div>
 
       <div className="space-y-5">
         <div>
@@ -187,10 +212,17 @@ export default function AdminLeagueMatchNewPage() {
           type="button"
           onClick={submit}
           disabled={!canSubmit || createLeague.isPending}
+          aria-describedby={missingFieldHint ? 'league-submit-hint' : undefined}
           className="min-h-[44px] w-full rounded-xl bg-blue-500 text-sm font-semibold text-white disabled:opacity-50"
         >
           리그 만들기
         </button>
+        {/* 그룹 B 감사 결함 4: 버튼이 비활성일 때 아무 안내도 없던 것을 고친다. */}
+        {missingFieldHint && (
+          <p id="league-submit-hint" className="text-center text-xs text-[var(--text-muted)]">
+            {missingFieldHint}
+          </p>
+        )}
       </div>
 
       <AdminToasts toasts={toasts} />

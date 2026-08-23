@@ -31,6 +31,7 @@ const apiMocks = vi.hoisted(() => ({
   matches: { items: [{ id: 'match-1', title: '성수 저녁 풋살' }] } as { items: unknown[] },
   teamMatches: { items: [] } as { items: unknown[] },
   teams: { items: [] } as { items: unknown[] },
+  leagues: { items: [] } as { items: unknown[] },
 }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
@@ -39,6 +40,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1Matches: () => ({ data: apiMocks.matches, isLoading: false, isError: false }),
   useV1TeamMatches: () => ({ data: apiMocks.teamMatches, isLoading: false, isError: false }),
   useV1Teams: () => ({ data: apiMocks.teams, isLoading: false, isError: false }),
+  useV1LeagueMatches: () => ({ data: apiMocks.leagues, isLoading: false, isError: false }),
 }));
 
 describe('SearchExperience GA events', () => {
@@ -48,6 +50,7 @@ describe('SearchExperience GA events', () => {
     apiMocks.matches = { items: [{ id: 'match-1', title: '성수 저녁 풋살' }] };
     apiMocks.teamMatches = { items: [] };
     apiMocks.teams = { items: [] };
+    apiMocks.leagues = { items: [] };
   });
 
   it('tracks a search event with the query length (not raw text) and the domain that actually returned results', async () => {
@@ -85,10 +88,11 @@ describe('SearchExperience GA events', () => {
   });
 
   it('reports an empty domain string when no domain returns results', async () => {
-    // Given: all three domains are empty
+    // Given: all four domains are empty
     apiMocks.matches = { items: [] };
     apiMocks.teamMatches = { items: [] };
     apiMocks.teams = { items: [] };
+    apiMocks.leagues = { items: [] };
 
     // When
     render(<SearchExperience state="results" />);
@@ -96,6 +100,61 @@ describe('SearchExperience GA events', () => {
     // Then
     await waitFor(() =>
       expect(analytics.trackEvent).toHaveBeenCalledWith('search', { queryLength: 6, resultCount: 0, domain: '' }),
+    );
+  });
+
+  // 감사 결함 재현: '/league-matches' 는 매치/팀매치/팀과 함께 조회되지 않아서 리그명을
+  // 그대로 검색해도 0건이었다(그룹 C, Task 153 Wave 3). GET /league-matches 에는 서버
+  // 텍스트 query 필터가 없어(ListLeagueMatchesQueryDto) search-experience.tsx 가 클라이언트
+  // 에서 제목/시리즈명을 substring 매칭한다 — 그 매칭이 실제로 리그를 domain에 반영하는지,
+  // 그리고 무관한 제목의 리그는 걸러내는지를 검증한다.
+  it('includes leagues whose title matches the query in results and the league domain', async () => {
+    // Given: only the league domain has a matching item ('Futsal' 대소문자 무시 substring),
+    // 무관한 리그('배드민턴 챔피언십')는 매칭돼선 안 된다.
+    apiMocks.matches = { items: [] };
+    apiMocks.teamMatches = { items: [] };
+    apiMocks.teams = { items: [] };
+    apiMocks.leagues = {
+      items: [
+        {
+          leagueId: 'league-1',
+          title: '성수 Futsal 리그',
+          state: 'active',
+          startsOn: '2026-09-01T00:00:00.000Z',
+          endsOn: '2026-11-30T00:00:00.000Z',
+          sport: { sportId: 's1', code: 'futsal', name: '풋살' },
+          region: { regionId: 'r1', name: '성동구' },
+          seriesId: null,
+          tier: null,
+          tierLabel: null,
+          seasonNo: null,
+          seriesTitle: null,
+          teamCount: 8,
+        },
+        {
+          leagueId: 'league-2',
+          title: '배드민턴 챔피언십',
+          state: 'active',
+          startsOn: '2026-09-01T00:00:00.000Z',
+          endsOn: '2026-11-30T00:00:00.000Z',
+          sport: { sportId: 's2', code: 'badminton', name: '배드민턴' },
+          region: { regionId: 'r1', name: '성동구' },
+          seriesId: null,
+          tier: null,
+          tierLabel: null,
+          seasonNo: null,
+          seriesTitle: null,
+          teamCount: 4,
+        },
+      ],
+    };
+
+    // When
+    render(<SearchExperience state="results" />);
+
+    // Then — 매칭된 리그 1건만 domain에 반영되고, 무관한 리그는 세지 않는다.
+    await waitFor(() =>
+      expect(analytics.trackEvent).toHaveBeenCalledWith('search', { queryLength: 6, resultCount: 1, domain: 'league' }),
     );
   });
 });

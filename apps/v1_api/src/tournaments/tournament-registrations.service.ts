@@ -338,6 +338,11 @@ export class TournamentRegistrationsService {
       //   이 구분은 현재 불가능하다는 걸 알고 default-false를 true로 뒤집는다.
       // - 미동의로 신청해도 여기서 false로 되돌리지 않는다(다른 대회에서 이미 켠 상태일 수
       //   있음 -- 이 토글은 대회 단위가 아니라 계정 단위 전역 스위치다).
+      // - 2026-08-23(Task 154 P0-4): 이 블록은 **그대로 둔다.** 여기서 켜는 건 호출자
+      //   본인(팀장) 계정의 실명 표시뿐이라 "본인이 본인 것에 동의"라는 옵트인 전제를
+      //   깨지 않는다. 다만 이 동의 항목의 이름("대회 경기 기록 공개")이 약속하는 **기록
+      //   공개** 축(`V1UserRecordConsent`)은 여기서 켜지지 않고, 명단에 오른 다른 선수에게도
+      //   아무 일이 일어나지 않는다 -- 그 공백은 아래 트랜잭션 밖의 동의 안내 알림이 메운다.
       if (termsDecisions.acceptedCodes.has(TOURNAMENT_RECORD_DISCLOSURE_CODE)) {
         await tx.v1UserProfile.updateMany({
           where: { userId: user.id, tournamentRealNameVisible: false },
@@ -354,6 +359,40 @@ export class TournamentRegistrationsService {
       tournamentId,
       `"${result.tournament.title}" 대회 입금 안내를 확인해 주세요.`,
     );
+
+    // Task 154 P0-4 / 사용자 결정 ⑤ (2026-08-23): 기록 공개 동의를 **명단에 오른 선수
+    // 본인에게** 묻는다.
+    //
+    // 여기서 어떤 계정의 공개 상태도 바꾸지 않는다는 점이 이 블록의 핵심 불변식이다 --
+    // 이 메서드를 호출할 수 있는 사람은 `assertTeamManager`를 통과한 팀장뿐이므로,
+    // 팀장의 체크 하나로 선수들의 기록을 공개해버리면 그건 "선수 본인이 켠다"는 옵트인
+    // 구조를 팀장 대리 동의로 바꾸는 것이다(사용자가 명시적으로 배제한 방향).
+    // 그래서 팀장의 동의는 **알림을 보내는 방아쇠로만** 쓰고, 실제 전환은 알림을 받은
+    // 선수가 딥링크에서 직접 누를 때만 일어난다.
+    //
+    // 이미 응답한 사람(GRANTED/REVOKED 무관)은 제외한다 -- 켠 사람에겐 불필요하고,
+    // 끈 사람에게 다시 묻는 건 그 거부를 무시하는 것이다.
+    if (termsDecisions.acceptedCodes.has(TOURNAMENT_RECORD_DISCLOSURE_CODE)) {
+      this.notifications.emitToManyDeferred(
+        async () => {
+          const roster = await this.prisma.v1TournamentPlayer.findMany({
+            where: { registrationId, removedAt: null },
+            select: { userId: true },
+          });
+          const userIds = Array.from(new Set(roster.map((row) => row.userId)));
+          if (userIds.length === 0) return [];
+          const responded = await this.prisma.v1UserRecordConsent.findMany({
+            where: { userId: { in: userIds } },
+            select: { userId: true },
+          });
+          const respondedIds = new Set(responded.map((row) => row.userId));
+          return userIds.filter((userId) => !respondedIds.has(userId));
+        },
+        'tournament_record_consent_invite',
+        tournamentId,
+        `"${result.tournament.title}" 대회 기록을 프로필에 공개할지 정해 주세요.`,
+      );
+    }
 
     const playerCount = await this.prisma.v1TournamentPlayer.count({
       where: { registrationId, removedAt: null },

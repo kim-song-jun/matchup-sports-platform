@@ -29,7 +29,12 @@ function trustConfig(trustState: TrustState) {
     default:
       return {
         label: '샘플',
-        description: '아직 검증된 활동 기록이 없어요. 매치·팀·대회에 참가해 보세요.',
+        // alpha 실화면(2026-08-24)에서 잡은 모순: 이 문구는 "활동이 없다"고 말하는데,
+        // 바로 아래 활동 요약 카드가 "2경기 · 2대회 · 3팀"을 보여준다. 한 화면에서 서로
+        // 다른 말을 한다. sample 상태의 실제 의미는 **후기가 모자라 신뢰 신호를 계산할 수
+        // 없다**는 것이고(이 카드 하단도 "매너 점수는 활동 후기를 기반으로 계산돼요"라고
+        // 적고 있다), 활동 유무와는 다른 축이다. 뜻하는 바를 그대로 쓴다.
+        description: '아직 받은 후기가 없어 신뢰 신호를 계산할 수 없어요. 경기 후 상호 평가가 쌓이면 표시돼요.',
         badgeClass: 'tm-badge tm-badge-grey',
         icon: <AlertCircle size={15} aria-hidden="true" />,
       };

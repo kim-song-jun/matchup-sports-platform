@@ -49,6 +49,15 @@ import {
 } from './fixture-lineup.view-model';
 
 /**
+ * 라인업 저장·제출이 "그새 남이 바꿨다"로 거부된 경우인지. 서버는 사이드별 revision 이
+ * 어긋나면 409 VERSION_CONFLICT 를 낸다(games.service.ts 의 라인업 커맨드 경계).
+ * 코드로 판별한다 — 메시지 문자열 비교는 문구가 바뀌는 순간 조용히 깨진다.
+ */
+function isVersionConflict(err: unknown): boolean {
+  return err instanceof V1ApiError && err.code === 'VERSION_CONFLICT';
+}
+
+/**
  * 대회 경기(tournament fixture) 참가팀 자기 서비스 라인업 화면 — team-match
  * 라인업(app/team-matches/[id]/lineup)과 같은 피치 배치 컴포넌트를 재사용한다.
  *
@@ -132,6 +141,18 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
   const [activeView, setActiveView] = useState<'roster' | 'pitch'>('pitch');
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  /**
+   * 저장·제출이 409 VERSION_CONFLICT 로 막혔다는 표시. 1차 대회 회고의 실제 사고가
+   * 여기다 — 팀 사용자가 브라우저를 새로고침하지 못해 결국 운영진이 어드민에서 대신
+   * 라인업을 입력해 줬다. 서버 메시지("새로고침 후 다시 시도해 주세요")는 사용자에게
+   * 브라우저 조작을 요구하는데, 그걸 못 하는 사람이 바로 이 화면의 주 사용자다.
+   *
+   * 그렇다고 자동으로 다시 불러오면 안 된다 — 충돌 시점의 화면에는 **반드시 미저장
+   * 편집이 남아 있다**(dirty 는 저장 성공에서만 풀린다). 자동 재로드는 그 편집을 통째로
+   * 덮어쓴다. 그래서 편집은 그대로 두고, 최신본을 미리 받아 둔 뒤 **버리고 새로 시작할지
+   * 사용자가 고르게** 한다.
+   */
+  const [staleConflict, setStaleConflict] = useState(false);
   /**
    * 이슈 #378: SUBMITTED가 되면 editable이 영구히 false로 고정돼 재편집 진입점 자체가
    * 없었다. 서버 상태(lineupState)와는 분리된 순수 로컬 UI 플래그로 재편집 세션을 연다 —
@@ -605,9 +626,11 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
           ? prev
           : { ...prev, lineupRevision: result.lineupRevision, lineupId: result.lineupId, lineupState: 'DRAFT', dirty: false },
       );
+      setStaleConflict(false);
       setSaveStatus('saved');
     } catch (err) {
       setSaveStatus('idle');
+      if (isVersionConflict(err)) markStaleConflict();
       setSaveError(extractErrorMessage(err, '저장하지 못했어요.'));
     }
   }
@@ -623,9 +646,31 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
       // 새로 제출됐으니 재편집 세션은 닫는다 — 다시 바꾸려면 "다시 편집하기"를 또 눌러야
       // 한다(제출 완료를 매번 인지한 뒤 편집하게 하려는 의도, 실수로 이어지는 편집 방지).
       setReopened(false);
+      setStaleConflict(false);
     } catch (err) {
+      if (isVersionConflict(err)) markStaleConflict();
       setSaveError(extractErrorMessage(err, '제출하지 못했어요.'));
     }
+  }
+
+  function markStaleConflict() {
+    setStaleConflict(true);
+    // 사용자가 "최신 명단 불러오기"를 누르는 순간 기다리지 않도록 미리 받아 둔다.
+    // 지금 화면의 state 는 건드리지 않는다 — 재하이드레이션은 hydrated 를 풀 때만 일어난다.
+    void lineupsQuery.refetch();
+  }
+
+  /**
+   * 충돌에서 빠져나오는 유일한 경로. 지금 편집 내용을 버리고 서버 최신본으로 다시 시작한다.
+   * refetch 를 **먼저 await** 한다 — hydrated 를 먼저 풀면 아직 낡은 lineupsQuery.data 로
+   * 재하이드레이션돼 저장을 눌러도 같은 충돌이 반복된다.
+   */
+  async function handleLoadLatestLineup() {
+    setSaveError(null);
+    setSaveStatus('idle');
+    await lineupsQuery.refetch();
+    setStaleConflict(false);
+    setHydrated(false);
   }
 
   const homeName = access.data.homeTeamName ?? '홈팀';
@@ -666,6 +711,26 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
         </Card>
 
         {saveError ? <AlertBanner message={saveError} tone="error" /> : null}
+
+        {staleConflict ? (
+          <Card pad={16}>
+            <AlertBanner
+              message="이 라인업이 다른 곳에서 먼저 바뀌었어요. 지금 화면의 편집 내용은 그대로 두었어요."
+              tone="warning"
+            />
+            <p className="tm-text-caption" style={{ margin: '10px 0 0', color: 'var(--text-muted)' }}>
+              최신 명단을 불러오면 지금 화면에서 고친 내용은 사라져요. 남겨야 할 변경이 있다면 먼저 메모해 두세요.
+            </p>
+            <button
+              type="button"
+              className="tm-btn tm-btn-outline"
+              style={{ marginTop: 10, width: '100%' }}
+              onClick={handleLoadLatestLineup}
+            >
+              최신 명단 불러오기
+            </button>
+          </Card>
+        ) : null}
 
         {/* 탭은 좁은 폭(모바일·태블릿) 전용 — 데스크톱(≥1024px)에서는 두 영역이
             .tm-fixture-lineup-grid로 동시에 보이므로 탭 자체가 필요 없다(tm-hide-desktop).

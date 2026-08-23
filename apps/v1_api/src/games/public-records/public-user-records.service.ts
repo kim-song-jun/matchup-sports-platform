@@ -5,7 +5,11 @@ import { resolveTeamRecordResult } from '../../game-operations/team-record-resul
 import { parseTournamentFixtureOfficialScore } from '../../tournaments/tournament-fixture-official-result';
 import { PublicRecordsQueryDto } from './dto/public-records-query.dto';
 import { decodeRecordCursor, encodeRecordCursor, isAfterCursor, type RecordCursor } from './public-cursor';
-import { isParticipantPubliclyEligible, loadParticipantConsentEligibility } from './public-consent';
+import {
+  isParticipantOwnerVisible,
+  isParticipantPubliclyEligible,
+  loadParticipantConsentEligibility,
+} from './public-consent';
 
 interface EligibleResultRow {
   readonly participantResultId: string;
@@ -227,8 +231,11 @@ export class PublicUserRecordsService {
         // (이론상 항상 참이다. 위 links 쿼리가 이미 userId로 필터링했으므로), participant
         // 단위 개별 숨김(REVOKED 스냅샷)은 본인이 "이 경기 하나만 숨기겠다"고 명시적으로
         // 끈 것이므로 본인 화면에서도 그대로 존중한다.
-        if (consent.linkedUserId === null) continue;
-        if (consent.latestParticipantSnapshotState === 'REVOKED') continue;
+        //
+        // 이 판정은 `countOwnerVisibleParticipations`("지금 동의를 켜면 공개될 경기 수",
+        // 동의 유도 UI 가 쓴다)와 **반드시 같아야** 하므로 조건을 여기 인라인으로 두지
+        // 않고 `isParticipantOwnerVisible` 하나를 양쪽이 공유한다.
+        if (!isParticipantOwnerVisible(consent)) continue;
       } else if (!isParticipantPubliclyEligible(consent)) {
         continue;
       }

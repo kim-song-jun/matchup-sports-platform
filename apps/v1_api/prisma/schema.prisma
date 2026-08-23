@@ -3055,6 +3055,10 @@ model V1ParticipantIdentityLinkCurrent {
   effectiveFrom DateTime @map("effective_from")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
+  // userId 역방향 조회 인덱스. `PublicUserRecordsService.loadEligibleRows` 와
+  // `countOwnerVisibleParticipations` 가 둘 다 findMany({ where: { userId } }) 로
+  // 시작하는데 지금까지 이 컬럼에 인덱스가 없어 전체 스캔이었다.
+  @@index([userId], map: "v1_identity_link_current_user_id_idx")
   @@map("v1_participant_identity_link_current")
 }
 

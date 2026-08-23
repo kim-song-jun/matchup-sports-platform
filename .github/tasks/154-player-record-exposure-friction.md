@@ -1,7 +1,7 @@
 # Task 154 — 선수 기록 공개 게이트 마찰 해소 + 선수 프로필 채우기
 
 > 상태: 계획 확정 (2026-08-23). 사용자 결정 4건 반영 완료.
-> 진단·비교 아티팩트: https://claude.ai/code/artifact/aa6a0795-72e1-4ae7-8947-b82a4e6f818b
+> 진단·비교 아티팩트: https://claude.ai/code/artifact/5572b31c-309b-4e04-b2c9-23a110bf2d70
 
 ## Context
 

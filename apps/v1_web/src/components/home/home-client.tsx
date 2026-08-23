@@ -25,6 +25,8 @@ import {
   markRecordConsentNudgeSeen,
   shouldShowRecordConsentNudge,
 } from '@/lib/session-storage';
+import { decideHomeBanners } from '@/lib/home-banner-policy';
+import { usePendingReviewsSummary } from '@/components/tournaments/pending-review-card';
 
 export function HomePageClient() {
   const router = useRouter();
@@ -130,6 +132,23 @@ export function HomePageClient() {
       : undefined;
   const fallback = getHomeViewModel();
   const chatUnreadCount = chatRooms.data?.items.reduce((sum, room) => sum + room.unreadCount, 0) ?? 0;
+  // ─── 홈 배너 표시 상한 (Task 154 P2-1) ──────────────────────────────────────
+  //
+  // 각 배너는 자기 조건만 보고 뜨므로, 조건이 겹치면 넷이 한꺼번에 쌓여 인사말·통계·
+  // 추천이 전부 접힘 아래로 밀린다. 어느 것을 이번 방문에 보여줄지 여기서 한 번에
+  // 정한다 -- 판정 자체는 순수 함수(lib/home-banner-policy.ts)라 테스트로 고정돼 있다.
+  //
+  // 후기 카드는 자기 데이터를 직접 가져와 0건이면 스스로 사라진다. 그 사실을 모르고
+  // 자리를 내주면 그 방문엔 유도 배너가 하나도 안 보이므로, 같은 훅으로 총계를 먼저
+  // 확인한다(React Query 가 dedupe 하므로 요청은 늘지 않는다).
+  const pendingReviews = usePendingReviewsSummary();
+  const bannerDecision = decideHomeBanners({
+    phoneVerify: phoneVerifyNudge !== undefined,
+    recordConsent: recordConsentNudge !== undefined,
+    pendingReviews: pendingReviews.total > 0,
+    push: pushNudge !== undefined,
+  });
+
   const chatStatus: HomeViewModel['chatStatus'] = !isAuthenticated ? 'ready' : chatRooms.isPending ? 'loading' : chatRooms.isError ? 'error' : 'ready';
   const chatRoomSummaries = chatRooms.data?.items ? toHomeChatRooms(chatRooms.data.items) : [];
   const nonDataFallback = withoutHomeContent(fallback);
@@ -172,6 +191,7 @@ export function HomePageClient() {
                 refreshWeather,
                 pushNudge,
                 recordConsentNudge,
+                bannerDecision,
                 phoneVerifyNudge,
                 chatRetry: () => void chatRooms.refetch(),
               }

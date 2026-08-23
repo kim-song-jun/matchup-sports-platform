@@ -1,3 +1,5 @@
+import type { HomeBannerDecision } from '@/lib/home-banner-policy';
+
 export type HomeMatchCard = {
   id: string;
   sport: string;
@@ -96,6 +98,13 @@ export type HomeViewModel = {
     onSubscribe: () => void;
     onDismiss: () => void;
   };
+  /**
+   * 홈 상단 배너 표시 결정 (Task 154 P2-1). 각 배너의 `undefined` 여부와 **별개**로,
+   * 이 값이 "이번 방문에 실제로 어느 유도 배너를 보여줄지"를 정한다 -- 조건이 맞아도
+   * 여기서 선택되지 않은 유도 배너는 렌더하지 않는다. 차단성(휴대폰 인증)은 이 예산
+   * 밖이라 조건만 맞으면 항상 보인다. 정책은 `lib/home-banner-policy.ts`.
+   */
+  bannerDecision: HomeBannerDecision;
   /**
    * 경기 기록 공개 동의 유도 배너 (Task 154 P0-3). undefined면 렌더하지 않는다.
    * 아직 응답한 적 없고, **켜면 실제로 공개될 기록이 있는** 사용자에게만 뜬다 --

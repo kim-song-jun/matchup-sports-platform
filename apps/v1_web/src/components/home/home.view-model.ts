@@ -61,6 +61,9 @@ export function getHomeViewModel(): HomeViewModel {
   );
 
   return {
+    // 이 함수는 로그인 전/디자인용 정적 모델이다 -- 배너는 전부 인증 사용자 대상이라
+    // 여기서는 아무것도 보여주지 않는다(실제 판정은 home-client 가 한다).
+    bannerDecision: { showPhoneVerify: false, nudge: null, deferred: [] },
     viewerName: '정민',
     signedOut: false,
     network: false,

@@ -168,6 +168,14 @@ export function TeamContactSettingsPageClient({ teamId }: { teamId: string }) {
                       <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
                         {formatMonthDay(block.createdAt) ?? '날짜 미상'}에 차단함
                       </span>
+                      {/* 운영자가 신고를 근거로 대리 차단하면 이 팀 운영진은 자기가 만들지 않은
+                          차단을 보게 된다. 사유가 없으면 "이게 왜 여기 있지?" 가 되므로, 사유가
+                          있을 때만 한 줄 덧붙인다 — 빈 줄이 생기면 안 된다. */}
+                      {block.reason ? (
+                        <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+                          {block.reason}
+                        </span>
+                      ) : null}
                     </span>
                     {/* 버튼 이름은 '차단 해제' 로 두고, 어느 팀인지는 aria-describedby 로 전달한다 —
                         describedby 는 접근성 이름을 바꾸지 않으므로 목록 안에서 이름이 흐려지지 않는다. */}

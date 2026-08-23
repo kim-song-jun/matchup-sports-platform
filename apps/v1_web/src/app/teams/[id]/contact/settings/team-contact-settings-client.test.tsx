@@ -144,4 +144,55 @@ describe('TeamContactSettingsPageClient', () => {
     expect(removeBlockMutate).toHaveBeenCalledTimes(1);
     expect(removeBlockMutate).toHaveBeenCalledWith('team-blocked-1', expect.objectContaining({ onError: expect.any(Function) }));
   });
+
+  // 운영자가 신고를 근거로 대리 차단하면 팀 운영진은 자기가 만들지 않은 차단을 보게 된다.
+  // 사유가 없으면 "이게 왜 여기 있지?" 가 되므로, 사유가 있을 때만 화면에 붙여 보여준다.
+  it('차단 사유가 있으면 함께 보여준다', () => {
+    useV1TeamContactBlocksMock.mockReturnValue({
+      data: {
+        items: [
+          {
+            id: 'b1',
+            teamId: 'A',
+            blockedTeamId: 'B',
+            createdByUserId: 'u1',
+            reason: '운영자 조치 (신고 inq-1)',
+            createdAt: '2026-08-24T00:00:00.000Z',
+            blockedTeam: { id: 'B', name: '상대팀' },
+          },
+        ],
+      },
+      isLoading: false,
+      isError: false,
+    });
+
+    render(<TeamContactSettingsPageClient teamId="team-1" />);
+
+    expect(screen.getByText('운영자 조치 (신고 inq-1)')).toBeInTheDocument();
+  });
+
+  it('사유가 없으면 아무것도 덧붙이지 않는다', () => {
+    useV1TeamContactBlocksMock.mockReturnValue({
+      data: {
+        items: [
+          {
+            id: 'b1',
+            teamId: 'A',
+            blockedTeamId: 'B',
+            createdByUserId: 'u1',
+            reason: null,
+            createdAt: '2026-08-24T00:00:00.000Z',
+            blockedTeam: { id: 'B', name: '상대팀' },
+          },
+        ],
+      },
+      isLoading: false,
+      isError: false,
+    });
+
+    render(<TeamContactSettingsPageClient teamId="team-1" />);
+
+    expect(screen.getByText('상대팀')).toBeInTheDocument();
+    expect(screen.queryByText(/운영자 조치/)).not.toBeInTheDocument();
+  });
 });

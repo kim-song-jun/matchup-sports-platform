@@ -378,6 +378,17 @@ The sections below fill project-specific gaps while preserving curated content a
 - **worktree는 항상 `git fetch origin dev` **직후** `origin/dev`에서 만든다.**
   로컬 `dev` 브랜치를 체크아웃해 base로 쓰지 않는다 — 여러 세션이 각자
   `.claude/worktrees/*`를 쓰는 공유 환경이라 로컬 `dev`가 이미 다른 worktree에 물려 있다.
+- **착수 전 `fetch`, 머지 후 로컬 `dev` 동기화 (2026-08-23 사용자 지시, 양쪽 다 필수).**
+  어떤 작업이든 시작 전에 `git fetch origin dev`를 먼저 돌린다 — 뒤처진 ref를 현행으로 착각하면
+  이미 고쳐진 것을 다시 고친다. 그리고 PR이 `origin/dev`에 머지되면 **머지 하나당 한 번, 즉시**
+  메인 작업트리의 로컬 `dev`를 따라잡힌다:
+  ```bash
+  cd /Users/sungjun/Dev/projects/matchup-sports-platform
+  git fetch origin dev -q && git merge --ff-only origin/dev
+  ```
+  **반드시 `--ff-only`** (`git pull`·rebase·`reset` 금지 — 공유 트리의 타 세션 변경을 건드린다).
+  FF가 거부되면 `git status --porcelain` ∩ `git diff --name-only HEAD origin/dev`로 충돌 파일만
+  특정해 스크래치패드에 백업한 뒤 원복·FF 하고, 백업 경로를 사용자에게 알린다. 지우지 않는다.
 
 ## S2) 공유 작업트리 git 안전 (Critical)
 

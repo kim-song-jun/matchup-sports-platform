@@ -118,10 +118,13 @@ describe('팀 컨택 수신 가드(차단/정책) — 프라이버시 응답 통
     // TEAM_CONTACT_ALREADY_ACTIVE(409) 가 아니라 실제 성공(201)을 검증하게 된다 — 차단/정책
     // 판정은 create() 안에서 "이미 진행 중인 컨택" 충돌 판정보다 먼저 실행되므로(서비스 코드 순서),
     // 이 철회는 시나리오 2(차단)의 403 판정 자체에는 영향이 없다.
+    // 201 이다. withdraw 는 @Post 인데 @HttpCode 가 없어 NestJS 기본값 201 이 나간다
+    // (Phase 1 에서 이미 배포된 동작이다 — 여기서 바꾸지 않는다). 200 을 기대하면 CI 에서
+    // 깨진다: 실제로 이 첫 CI 실행에서 그렇게 깨졌다.
     const withdrawRes = await request(app.getHttpServer())
       .post(`/api/v1/team-contacts/${firstContactId}/withdraw`)
       .set('x-v1-user-id', ids.ownerA)
-      .expect(200);
+      .expect(201);
     expect(withdrawRes.body.data.contact.status).toBe('withdrawn');
   });
 

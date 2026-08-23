@@ -121,16 +121,24 @@ const leagues = season1?.tiers ?? [];
 note('2-시딩', `티어 리그 ${leagues.length}개`);
 
 // ── ① 대진 배정 알림 ──────────────────────────────────────────────
+// SKIP_FIXTURES=1 은 ①이 이미 확인된 시리즈로 ②③만 다시 볼 때 쓴다 —
+// 대진이 이미 있는 리그에 다시 생성하면 중복 대진이 생긴다.
+const skipFixtures = process.env.SKIP_FIXTURES === '1';
 let before = await snap(capToken);
-for (const lg of leagues) {
-  const f = await api(adminToken, 'POST', `/admin/league-matches/${lg.leagueId}/fixtures`, { weeksCount: 1 });
-  note('3-대진', `${lg.tierLabel} 대진 생성 → ${f.status}`);
+let ok1 = false;
+if (skipFixtures) {
+  note('3-대진', '기존 대진 재사용 (SKIP_FIXTURES=1) — ① 판정은 건너뛴다');
+} else {
+  for (const lg of leagues) {
+    const f = await api(adminToken, 'POST', `/admin/league-matches/${lg.leagueId}/fixtures`, { weeksCount: 1 });
+    note('3-대진', `${lg.tierLabel} 대진 생성 → ${f.status}`);
+  }
+  const r1 = await freshSince(capToken, before, '판정①-배정');
+  ok1 = r1.fresh.some((n) => /리그 대진/.test(n.title));
+  before = r1.after;
 }
-const r1 = await freshSince(capToken, before, '판정①-배정');
-const ok1 = r1.fresh.some((n) => /리그 대진/.test(n.title));
 
 // ── ② 결과 공식 확정 알림 (몰수로 공식 결과를 만든다) ──────────────
-before = r1.after;
 for (const lg of leagues) {
   const det = await api(adminToken, 'GET', `/admin/league-matches/${lg.leagueId}`);
   for (const fx of det.body?.data?.fixtures ?? []) {
@@ -147,7 +155,9 @@ for (const lg of leagues) {
 // 공식 결과 projection 은 워커가 비동기로 처리한다 — 조금 더 기다린다.
 await wait(9000);
 const r2 = await freshSince(capToken, before, '판정②-결과확정');
-const ok2 = r2.fresh.some((n) => /경기 결과|결과가 확정|completed/i.test(`${n.title}${n.type}`));
+// 실측 문구는 "팀매치가 완료됐어요. 리뷰를 남겨보세요!" 이고 타입은 team_match 다.
+// 처음엔 /결과가 확정/ 으로 찾다가 발송된 알림을 미발송으로 오판했다 — 판정은 실제 문구로 한다.
+const ok2 = r2.fresh.some((n) => n.type === 'team_match' && /완료됐어요/.test(String(n.title)));
 
 // ── ③ 승강 확정 알림 ──────────────────────────────────────────────
 before = r2.after;
@@ -167,7 +177,7 @@ const r3 = await freshSince(capToken, before, '판정③-승강');
 const ok3 = r3.fresh.some((n) => /승격|강등|잔류|승강/.test(`${n.title}${n.body}`));
 
 console.log('\n════ 최종 판정 ════');
-console.log(` ① 대진 배정 알림      : ${ok1 ? '✅ 발송 확인' : '❌ 미확인'}`);
+console.log(` ① 대진 배정 알림      : ${skipFixtures ? '⏭️  이번 실행에서 건너뜀' : ok1 ? '✅ 발송 확인' : '❌ 미확인'}`);
 console.log(` ② 결과 공식 확정 알림 : ${ok2 ? '✅ 발송 확인' : '❌ 미확인'}`);
 console.log(` ③ 승격·강등 확정 알림 : ${ok3 ? '✅ 발송 확인' : '❌ 미확인'}`);
 console.log(`\n시리즈: ${BASE}/admin/league-series/${seriesId}`);

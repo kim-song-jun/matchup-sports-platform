@@ -224,8 +224,12 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
         match: {
           ...fallback.match,
           ...toTeamMatch(query.data, fallback.match),
-          description: query.data.description ?? query.data.descriptionPreview ?? fallback.match.description,
-          address: query.data.place?.addressText ?? query.data.placeName ?? fallback.match.address,
+          // fallback.match.description/address는 로딩 스켈레톤(fallback 전체를 그대로 보여주는
+          // 케이스)에서만 써야 하는 하드코딩 목업이다 — 실제 매치가 로드된 뒤 API가 값을 안 주면
+          // ''로 둔다. 렌더 쪽(team-matches-page.tsx)이 falsy면 이미 섹션 자체를 숨긴다
+          // (설명 카드: `{match.description ? ... : null}`, 주소: InfoRow의 `sub` optional 처리).
+          description: query.data.description ?? query.data.descriptionPreview ?? '',
+          address: query.data.place?.addressText ?? query.data.placeName ?? '',
           hostTeamHref: query.data.hostTeam?.teamId ? `/teams/${query.data.hostTeam.teamId}` : undefined,
           hostTeamId: query.data.hostTeam?.teamId ?? null,
           hostTeamLogoUrl: query.data.hostTeam?.logoUrl ?? null,
@@ -236,7 +240,6 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
           applicantTeams: toApplicantTeamsWithActions(
             query.data,
             applications.data,
-            fallback.match.applicantTeams,
             canManageHostTeam ? `/team-matches/${teamMatchId}/edit` : undefined,
             (applicationId) => {
               setActionError(null);
@@ -320,7 +323,7 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
 // page-view component tree.
 export function toTeamMatch(match: V1TeamMatch, fallback: TeamMatchModel): TeamMatchModel {
   const status = statusToCardStatus(getStatus(match), getViewerState(match));
-  const costs = parseCosts(match.costNote, fallback);
+  const costs = parseCosts(match.costNote);
   const hasStructuredConditions = Boolean(match.matchFormat) || (match.matchStyle?.length ?? 0) > 0 || Boolean(match.uniformColor);
   const legacyNote = !hasStructuredConditions ? match.rulesText ?? '' : '';
 
@@ -344,6 +347,13 @@ export function toTeamMatch(match: V1TeamMatch, fallback: TeamMatchModel): TeamM
     league: match.league ?? null,
     uniform: match.uniformColor || '',
     gender: match.genderRule ?? fallback.gender,
+    // V1TeamMatch(hostTeam)는 신뢰상태(trustState, 등급 문자열)만 내려줄 뿐 매너 평점·승수 같은
+    // 숫자 통계는 API 어디에도 없다 — `...fallback` 스프레드에 맡겨두면 매치마다 다른 실제 팀인데도
+    // 항상 같은 목업(매너 4.8·승 23 등)이 그대로 노출됐다(실사고 원인). 0으로 채우는 것도
+    // "매너 0점·0승"이라는 새 거짓말이라(실제로 잘하는 팀이 최악으로 보인다) null 로 두고
+    // 화면이 그 줄을 감춘다 — 값이 생기면(백엔드가 팀 통계를 내려주면) 그때 다시 채우면 된다.
+    manner: null,
+    wins: null,
     status,
   };
 }
@@ -464,7 +474,6 @@ function countTeamMatchFilters(
 function toApplicantTeamsWithActions(
   match: V1TeamMatch,
   applications: import('@/types/api').V1TeamMatchApplicationsPage | undefined,
-  fallback: TeamMatchDetailViewModel['match']['applicantTeams'],
   manageHref: string | undefined,
   onApprove: (applicationId: string) => void,
   onReject: (applicationId: string) => void,
@@ -487,7 +496,10 @@ function toApplicantTeamsWithActions(
     }));
   }
 
-  return fallback.map((team) => ({ ...team, href: manageHref }));
+  // 아직 신청팀이 없거나(정말 0건) applications가 로딩 중이면 목업 신청팀 목록(fallback)으로
+  // 채우지 않는다 — 실제로 신청한 적 없는 팀 이름이 화면에 뜨는 회귀였다. 빈 배열이면
+  // team-matches-page.tsx가 신청팀 카드를 비워서 보여준다(별도 안내 문구 없음, .map() 결과만 없음).
+  return [];
 }
 
 function getStatus(match: V1TeamMatch): V1TeamMatchApiStatus {
@@ -697,11 +709,15 @@ function reasonLabel(reasonCode?: string) {
   return '팀을 만들고 신청할 수 있어요';
 }
 
-function parseCosts(value: string | null | undefined, fallback: TeamMatchModel) {
+function parseCosts(value: string | null | undefined) {
   const amounts = value?.match(/\d[\d,]*/g)?.map((item) => Number(item.replace(/,/g, ''))) ?? [];
+  // costNote가 없으면(호스트가 비용을 안 적었으면) 이 매치의 실제 비용은 "모른다"이지, 다른
+  // 목업 매치의 280,000원/140,000원이 아니다. 0으로 채우면 '무료초청' 배지가 붙어 "공짜다"라는
+  // 또 다른 거짓말이 되므로(리그 대진처럼 costNote가 항상 비는 매치가 통째로 무료초청으로
+  // 표시된다), 모르는 값은 null 로 두고 화면이 그 자리를 감추게 한다.
   return {
-    cost: amounts[0] ?? fallback.cost,
-    opponentCost: amounts[1] ?? fallback.opponentCost,
+    cost: amounts[0] ?? null,
+    opponentCost: amounts[1] ?? null,
   };
 }
 

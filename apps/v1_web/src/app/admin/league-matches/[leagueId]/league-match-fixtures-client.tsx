@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { AlertTriangle } from 'lucide-react';
 import { AdminPageHeader, AdminDataTable, AdminReasonModal, AdminStatusPill, AdminTableSkeleton, AdminToasts, useAdminToast } from '@/components/admin';
 import { GateConfirmModal } from '@/components/admin/operation-flag-gate-confirm-modal';
 import {
@@ -57,6 +58,15 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
   const [cancelTarget, setCancelTarget] = useState<V1LeagueFixture | null>(null);
   // R13: 대진 재생성 확인 모달 열림 상태.
   const [regenerateModalOpen, setRegenerateModalOpen] = useState(false);
+  // 감사 결함 1: 대진 표의 title은 자동 생성이라 리그 전체가 "N주차"로 똑같이 보인다 —
+  // 어느 팀 경기인지는 표에 별도로 없는 teamId를 이름으로 바꿔야 알 수 있다. 행마다
+  // useV1AdminTeam을 부르면 훅 규칙 위반 + N+1이라, 리그 참가팀 목록(이미 재생성 카드에
+  // 쓰고 있는 teamsData)으로 id -> name 맵을 한 번만 만들어 표 렌더에서 조회한다.
+  const teamNameById = new Map((teamsData?.teams ?? []).map((team) => [team.teamId, team.name]));
+  // 감사 결함 4: 인라인 편집(일시/구장/주소) 실패가 토스트에만 뜨고 필드에는 안 남아,
+  // 토스트를 놓치면 실패를 알 방법이 없다. teamMatchId -> 실패한 필드 key 집합으로
+  // 추적해 해당 입력에 aria-invalid + 시각 표시(테두리 + 아이콘, 컬러 단독 아님)를 남긴다.
+  const [failedFields, setFailedFields] = useState<Record<string, Set<'startAt' | 'placeName' | 'placeAddress'>>>({});
 
   if (isPending) {
     return (
@@ -105,10 +115,35 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
     }
   };
 
-  const onFieldBlur = (fixture: V1LeagueFixture, patch: { startsAt?: string; placeName?: string; placeAddress?: string }) => {
+  // 감사 결함 4: 필드별 실패 표시를 지우거나(성공) 남기는(실패) 헬퍼. teamMatchId 하나에
+  // 여러 필드가 동시에 실패해 있을 수 있어 Set으로 관리한다.
+  const setFieldFailed = (teamMatchId: string, field: 'startAt' | 'placeName' | 'placeAddress', failed: boolean) => {
+    setFailedFields((prev) => {
+      const next = new Set(prev[teamMatchId]);
+      if (failed) next.add(field);
+      else next.delete(field);
+      if (next.size === 0) {
+        const { [teamMatchId]: _removed, ...rest } = prev;
+        return rest;
+      }
+      return { ...prev, [teamMatchId]: next };
+    });
+  };
+
+  const onFieldBlur = (
+    fixture: V1LeagueFixture,
+    field: 'startAt' | 'placeName' | 'placeAddress',
+    patch: { startsAt?: string; placeName?: string; placeAddress?: string },
+  ) => {
     updateFixture.mutate(
       { teamMatchId: fixture.teamMatchId, body: patch },
-      { onError: (error) => showToast(extractErrorMessage(error, '경기 정보를 저장하지 못했어요.'), 'error') },
+      {
+        onSuccess: () => setFieldFailed(fixture.teamMatchId, field, false),
+        onError: (error) => {
+          setFieldFailed(fixture.teamMatchId, field, true);
+          showToast(extractErrorMessage(error, '경기 정보를 저장하지 못했어요.'), 'error');
+        },
+      },
     );
   };
 
@@ -121,6 +156,14 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
       {
         onSuccess: (result) => {
           setForfeitFixture(null);
+          // 감사 결함 2: alreadyProcessed=true라고 항상 성공은 아니다 — 서버는 이미 확정된
+          // 몰수를 "다른 팀"으로 정정하려는 요청은 DB를 바꾸지 않고 requestMatchesStored:
+          // false로 알려준다(league-lifecycle-rules.ts). 이걸 성공 토스트로 덮으면 운영자가
+          // 정정이 반영됐다고 오인한다.
+          if (result.alreadyProcessed && result.requestMatchesStored === false) {
+            showToast('이미 다른 결과로 확정돼 있어 반영되지 않았어요. 되돌린 뒤 다시 처리해 주세요.', 'error');
+            return;
+          }
           showToast(
             result.alreadyProcessed ? '이미 몰수 처리된 대진이에요.' : '몰수패로 처리했어요.',
             'success',
@@ -158,7 +201,19 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
       {
         onSuccess: (result) => {
           setCancelTarget(null);
-          showToast(result.alreadyProcessed ? '이미 취소된 대진이에요.' : '대진을 취소했어요.', 'success');
+          if (result.alreadyProcessed) {
+            showToast('이미 취소된 대진이에요.', 'success');
+            return;
+          }
+          // 감사 결함 3: 마지막 미확정 대진을 취소하면 리그가 그 자리에서 completed로
+          // 자동 전이한다(leagueCompleted). 대진 하나만 취소한 줄 알았던 운영자가 리그
+          // 종료라는 큰 부수효과를 놓치지 않도록 별도 문구로 알린다.
+          showToast(
+            result.leagueCompleted
+              ? '대진을 취소했어요. 남은 대진이 없어 리그가 종료 처리됐어요.'
+              : '대진을 취소했어요.',
+            'success',
+          );
         },
         onError: (error) => showToast(extractErrorMessage(error, '대진을 취소하지 못했어요.'), 'error'),
       },
@@ -369,7 +424,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                       type="button"
                       onClick={() => setForfeitFixture(row)}
                       aria-label={`${row.title} 몰수패 처리`}
-                      className="inline-flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-lg bg-[var(--red50)] px-3 text-[13px] font-medium text-[var(--red700)] transition-colors hover:bg-red-100 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                      className="inline-flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-lg bg-[var(--red50)] px-3 text-sm font-medium text-[var(--red700)] transition-colors hover:bg-red-100 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                     >
                       몰수패 처리
                     </button>
@@ -377,7 +432,8 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                   <button
                     type="button"
                     onClick={() => setCancelTarget(row)}
-                    className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-[var(--red50)] px-3 text-[13px] font-medium text-[var(--red700)] transition-colors hover:bg-red-100 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                    aria-label={`${row.title} 취소`}
+                    className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-[var(--red50)] px-3 text-sm font-medium text-[var(--red700)] transition-colors hover:bg-red-100 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                   >
                     취소
                   </button>
@@ -385,59 +441,119 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
               )
             }
             columns={[
-              { key: 'title', header: '경기', render: (row) => row.title },
+              {
+                key: 'title',
+                header: '경기',
+                render: (row) => {
+                  // 감사 결함 1: title은 "N주차" 자동 생성이라 리그 전체가 똑같이 보인다 —
+                  // teamNameById로 실제 매치업을 보여주고, 원래 title(주차 라벨)은 보조
+                  // 텍스트로 남겨 어느 주차인지도 함께 알 수 있게 한다.
+                  const homeName = teamNameById.get(row.homeTeamId) ?? '홈팀';
+                  const matchupLabel = row.awayTeamId
+                    ? `${homeName} vs ${teamNameById.get(row.awayTeamId) ?? '원정팀'}`
+                    : `${homeName} 부전승`;
+                  return (
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-sm font-medium text-[var(--text-strong)]">{matchupLabel}</span>
+                      <span className="text-xs text-[var(--text-muted)]">{row.title}</span>
+                    </div>
+                  );
+                },
+              },
               {
                 key: 'startAt',
                 header: '일시',
-                render: (row) => (
-                  <input
-                    type="datetime-local"
-                    aria-label={`${row.title} 일시`}
-                    defaultValue={toDatetimeLocalValue(row.startAt)}
-                    disabled={row.status === 'cancelled'}
-                    onBlur={(e) => {
-                      // 값이 그대로면 PATCH를 보내지 않는다 — 표를 탭으로 지나가기만 해도 쓰기가 발생하는 것 방지.
-                      if (e.target.value === toDatetimeLocalValue(row.startAt)) return;
-                      const startsAt = fromDatetimeLocalValue(e.target.value);
-                      if (!startsAt) return;
-                      onFieldBlur(row, { startsAt });
-                    }}
-                    className={`${inputClass} disabled:opacity-50`}
-                  />
-                ),
+                render: (row) => {
+                  const invalid = failedFields[row.teamMatchId]?.has('startAt') ?? false;
+                  const errorId = `${row.teamMatchId}-startAt-error`;
+                  return (
+                    <div className="relative">
+                      <input
+                        type="datetime-local"
+                        aria-label={`${row.title} 일시`}
+                        aria-invalid={invalid}
+                        aria-describedby={invalid ? errorId : undefined}
+                        defaultValue={toDatetimeLocalValue(row.startAt)}
+                        disabled={row.status === 'cancelled'}
+                        onBlur={(e) => {
+                          // 값이 그대로면 PATCH를 보내지 않는다 — 표를 탭으로 지나가기만 해도 쓰기가 발생하는 것 방지.
+                          if (e.target.value === toDatetimeLocalValue(row.startAt)) return;
+                          const startsAt = fromDatetimeLocalValue(e.target.value);
+                          if (!startsAt) return;
+                          onFieldBlur(row, 'startAt', { startsAt });
+                        }}
+                        className={`${inputClass} disabled:opacity-50 ${invalid ? 'border-[var(--red700)] pr-9 focus:border-[var(--red700)]' : ''}`}
+                      />
+                      {invalid ? (
+                        <span id={errorId} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[var(--red700)]">
+                          <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+                          <span className="sr-only">저장하지 못했어요. 다시 시도해 주세요.</span>
+                        </span>
+                      ) : null}
+                    </div>
+                  );
+                },
               },
               {
                 key: 'placeName',
                 header: '구장',
-                render: (row) => (
-                  <input
-                    aria-label={`${row.title} 구장`}
-                    defaultValue={row.placeName}
-                    disabled={row.status === 'cancelled'}
-                    onBlur={(e) => {
-                      if (e.target.value === row.placeName) return;
-                      onFieldBlur(row, { placeName: e.target.value });
-                    }}
-                    className={`${inputClass} disabled:opacity-50`}
-                  />
-                ),
+                render: (row) => {
+                  const invalid = failedFields[row.teamMatchId]?.has('placeName') ?? false;
+                  const errorId = `${row.teamMatchId}-placeName-error`;
+                  return (
+                    <div className="relative">
+                      <input
+                        aria-label={`${row.title} 구장`}
+                        aria-invalid={invalid}
+                        aria-describedby={invalid ? errorId : undefined}
+                        defaultValue={row.placeName}
+                        disabled={row.status === 'cancelled'}
+                        onBlur={(e) => {
+                          if (e.target.value === row.placeName) return;
+                          onFieldBlur(row, 'placeName', { placeName: e.target.value });
+                        }}
+                        className={`${inputClass} disabled:opacity-50 ${invalid ? 'border-[var(--red700)] pr-9 focus:border-[var(--red700)]' : ''}`}
+                      />
+                      {invalid ? (
+                        <span id={errorId} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[var(--red700)]">
+                          <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+                          <span className="sr-only">저장하지 못했어요. 다시 시도해 주세요.</span>
+                        </span>
+                      ) : null}
+                    </div>
+                  );
+                },
               },
               {
                 key: 'placeAddress',
                 header: '주소',
-                render: (row) => (
-                  <input
-                    aria-label={`${row.title} 주소`}
-                    placeholder="상세 주소 (선택)"
-                    defaultValue={row.placeAddress ?? ''}
-                    disabled={row.status === 'cancelled'}
-                    onBlur={(e) => {
-                      if (e.target.value === (row.placeAddress ?? '')) return;
-                      onFieldBlur(row, { placeAddress: e.target.value });
-                    }}
-                    className={`${inputClass} disabled:opacity-50`}
-                  />
-                ),
+                render: (row) => {
+                  const invalid = failedFields[row.teamMatchId]?.has('placeAddress') ?? false;
+                  const errorId = `${row.teamMatchId}-placeAddress-error`;
+                  return (
+                    <div className="relative">
+                      <input
+                        aria-label={`${row.title} 주소`}
+                        aria-invalid={invalid}
+                        aria-describedby={invalid ? errorId : undefined}
+                        placeholder="상세 주소 (선택)"
+                        defaultValue={row.placeAddress ?? ''}
+                        disabled={row.status === 'cancelled'}
+                        onBlur={(e) => {
+                          if (e.target.value === (row.placeAddress ?? '')) return;
+                          onFieldBlur(row, 'placeAddress', { placeAddress: e.target.value });
+                        }}
+                        className={`${inputClass} disabled:opacity-50 ${invalid ? 'border-[var(--red700)] pr-9 focus:border-[var(--red700)]' : ''}`}
+                      />
+                      {invalid ? (
+                        <span id={errorId} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[var(--red700)]">
+                          <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+                          <span className="sr-only">저장하지 못했어요. 다시 시도해 주세요.</span>
+                        </span>
+                      ) : null}
+                    </div>
+                  );
+                },
               },
               { key: 'status', header: '상태', render: (row) => <AdminStatusPill status={row.status} /> },
             ]}

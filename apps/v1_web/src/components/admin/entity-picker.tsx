@@ -213,8 +213,20 @@ export function EntityPicker({
         ref={inputRef}
         type="search"
         value={inputValue}
-        onChange={(e) => setInputValue(e.target.value)}
+        onChange={(e) => {
+          // 타이핑은 항상 "다시 찾고 싶다"는 의도다 — 목록을 연다.
+          // commitEntry/외부 clear가 setInputValue('')로 값을 비우는 경로는 이 DOM 이벤트를
+          // 거치지 않는 프로그램적 상태 갱신이라 여기서 재오픈되지 않는다(의도한 분리).
+          setInputValue(e.target.value);
+          setOpen(true);
+        }}
         onFocus={() => setOpen(true)}
+        onClick={() => {
+          // 선택 직후엔 blur 없이 입력창에 포커스가 남아(메뉴 mousedown preventDefault 때문),
+          // 이미 포커스된 입력을 재클릭해도 onFocus는 새로 안 뜬다. 클릭 자체도 재검색 의도로
+          // 보고 열어준다 — onFocus는 그대로 두고 이 경로를 추가로 연다.
+          setOpen(true);
+        }}
         onBlur={() => {
           commitFreeTextIfNeeded();
           closeMenu();

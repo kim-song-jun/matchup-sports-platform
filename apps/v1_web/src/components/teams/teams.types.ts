@@ -113,6 +113,13 @@ export type TeamDetailViewModel = {
    */
   myLeagues?: Array<{ leagueId: string; title: string }>;
   myLeaguesLoading?: boolean;
+  /**
+   * 그룹 F 재감사: myLeaguesQuery 가 실패해도 items가 빈 배열이 되어 "참가 리그 0개"와
+   * 화면이 100% 동일했다(재시도 버튼도 없음). isError 를 뷰모델까지 끌고 와 통신 오류를
+   * 별도 3번째 상태로 구분한다 — loading / error / empty(진짜 0개) 는 서로 다른 화면.
+   */
+  myLeaguesError?: boolean;
+  onRetryMyLeagues?: () => void;
 };
 
 export type TeamFormMode = 'create' | 'edit';

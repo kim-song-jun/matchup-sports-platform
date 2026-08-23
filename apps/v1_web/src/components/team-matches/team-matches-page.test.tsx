@@ -251,3 +251,52 @@ describe('리그전 배지', () => {
     expect(routerPush).toHaveBeenCalledWith('/league-matches/lg-1');
   });
 });
+
+/**
+ * 2026-08-23 alpha 실측 회귀 방지 — 팀매치 상세/목록이 "모르는 값"을 숫자로 지어내지 않는지.
+ *
+ * 원래 결함: 비용·매너·전적이 비어 있으면 화면 골격용 목업(140,000원 · 매너 4.8 · 승 23)이
+ * 그대로 노출돼 **어느 매치를 열어도 같은 숫자**가 보였다. 1차 수정에서 이를 0으로 바꿨더니
+ * 이번엔 모든 매치가 "매너 0 · 승 0"이 되고 costNote 없는 매치가 전부 '무료초청'으로 둔갑했다.
+ * 최종 계약: 모르는 값은 null 이고, 화면은 그 줄·그룹을 **감춘다**.
+ */
+describe('값을 모를 때(null) 화면이 숫자를 지어내지 않는다', () => {
+  it('상세: 매너·전적이 null 이면 그 줄을 감추고, 비용이 null 이면 비용 그룹 자체를 감춘다', () => {
+    const model = getTeamMatchDetailViewModel();
+    model.match.manner = null;
+    model.match.wins = null;
+    model.match.cost = null;
+    model.match.opponentCost = null;
+
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    expect(screen.queryByText(/매너/)).not.toBeInTheDocument();
+    expect(screen.queryByText('상대팀 부담금')).not.toBeInTheDocument();
+    expect(screen.queryByText('총비용')).not.toBeInTheDocument();
+    // 0원을 '무료'로 단정하던 자리도 사라져야 한다.
+    expect(screen.queryByText('무료초청')).not.toBeInTheDocument();
+    expect(screen.queryByText('실제 청구 없어요')).not.toBeInTheDocument();
+  });
+
+  it('상세: 비용이 실제로 0원이면 무료초청 표기는 그대로 살아 있다(회귀 방지)', () => {
+    const model = getTeamMatchDetailViewModel();
+    model.match.cost = 0;
+    model.match.opponentCost = 0;
+
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    expect(screen.getAllByText('무료초청').length).toBeGreaterThan(0);
+    expect(screen.getByText('실제 청구 없어요')).toBeInTheDocument();
+  });
+
+  it('목록 카드: 비용이 null 이면 금액 대신 비용 미정을 보여주고 무료초청 배지를 붙이지 않는다', () => {
+    const model = getTeamMatchListViewModel();
+    model.matches = model.matches.map((match) => ({ ...match, cost: null, opponentCost: null, manner: null, wins: null }));
+
+    renderPage(<TeamMatchListPageView model={model} />);
+
+    expect(screen.getAllByText('비용 미정').length).toBeGreaterThan(0);
+    expect(screen.queryByText('무료초청')).not.toBeInTheDocument();
+    expect(screen.queryByText(/매너/)).not.toBeInTheDocument();
+  });
+});

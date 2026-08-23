@@ -1,15 +1,27 @@
 /**
- * PR #627 시각 검증 캡처 — 팀 간 컨택 메시지 (Phase 1).
+ * PR #641 시각 검증 캡처 — 팀 간 컨택 메시지 (Phase 1 + Phase 2·3).
  *
  * alpha 는 프로덕션 모드라 헤더 dev 인증(x-v1-user-*)이 401 이다. 로그인 API 로
  * 받은 세션 쿠키(teameet_v1_session)를 컨텍스트에 심어 캡처한다.
  *
  * 자격증명은 **저장소에 적지 않는다**(이 저장소는 PUBLIC). 아래 환경변수로만 받는다:
- *   ALPHA_EMAIL_A / ALPHA_PASSWORD  — 컨택을 보내는 팀(A) 팀장
- *   ALPHA_EMAIL_B                   — 컨택을 받는 팀(B) 팀장 (같은 비밀번호 가정)
- *   ALPHA_TEAM_B_ID                 — B 팀 id (팀 상세·컨택 작성 화면 대상)
  *
- * 사용: CAPTURE_OUT=... ALPHA_EMAIL_A=... node scripts/capture-team-contacts-alpha.mjs
+ *   필수
+ *     ALPHA_EMAIL_A    — 컨택을 보내는 팀(A) 팀장 계정
+ *     ALPHA_PASSWORD   — 위 계정 비밀번호
+ *     ALPHA_TEAM_A_ID  — A 팀 id (컨택 설정 화면은 **내 팀 운영진만** 볼 수 있다)
+ *     ALPHA_TEAM_B_ID  — B 팀 id (팀 상세·컨택 보내기 화면 대상)
+ *
+ *   선택
+ *     ALPHA_CONTACT_ID      — 있으면 컨택 상세(신고·차단 버튼) 화면도 캡처
+ *     ALPHA_ADMIN_EMAIL     — 있으면 어드민 문의 목록·신고 사유 필터도 캡처 (adminRole=ops 필요)
+ *     ALPHA_ADMIN_PASSWORD  — 없으면 ALPHA_PASSWORD 를 쓴다
+ *     CAPTURE_BASE          — 기본 https://alpha.teameet.co.kr
+ *     CAPTURE_OUT           — 기본 .screenshots/team-contacts
+ *
+ * 사용:
+ *   ALPHA_EMAIL_A=... ALPHA_PASSWORD=... ALPHA_TEAM_A_ID=... ALPHA_TEAM_B_ID=... \
+ *     node scripts/capture-team-contacts-alpha.mjs
  */
 import { chromium } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
@@ -24,7 +36,23 @@ const VIEWPORTS = [
   { key: 'desktop', width: 1440, height: 900 },
 ];
 
+/**
+ * 필수 env 를 시작 시점에 한 번에 검증한다. 없으면 login() 에 undefined 가 들어가
+ * 요청이 이상하게 나가고, 실패 메시지를 만들 때 `email.replace` 에서 TypeError 로
+ * 스크립트가 터진다(실제로 그렇게 터졌다) — 원인이 env 누락인지 alpha 장애인지
+ * 구분이 안 된다. 여기서 먼저 죽는 편이 진단이 빠르다.
+ */
+function requireEnv(...names) {
+  const missing = names.filter((n) => !process.env[n]);
+  if (missing.length > 0) {
+    throw new Error(`필수 환경변수가 없습니다: ${missing.join(', ')}`);
+  }
+}
+
 async function login(email, password) {
+  if (typeof email !== 'string' || typeof password !== 'string') {
+    throw new Error('login(email, password) 는 둘 다 문자열이어야 합니다');
+  }
   const res = await fetch(`${BASE}/api/v1/auth/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -60,6 +88,7 @@ async function shoot(ctx, url, file, theme) {
   return probe;
 }
 
+requireEnv('ALPHA_EMAIL_A', 'ALPHA_PASSWORD', 'ALPHA_TEAM_A_ID', 'ALPHA_TEAM_B_ID');
 const token = await login(process.env.ALPHA_EMAIL_A, process.env.ALPHA_PASSWORD);
 const teamA = process.env.ALPHA_TEAM_A_ID;
 const teamB = process.env.ALPHA_TEAM_B_ID;

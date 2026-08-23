@@ -43,9 +43,12 @@ export class InquiriesService {
       throw new BadRequestException({ code: 'INVALID_INQUIRY_RELATED_TARGET', message: 'relatedType is required when relatedId is provided' });
     }
     if (dto.reportReason && dto.category !== 'report') {
+      // 이 파일의 다른 메시지는 영어지만 이건 한국어다 — 프론트의 extractErrorMessage 가
+      // 서버 message 를 fallback 보다 **먼저** 반환하므로(error-message.ts), 영어로 두면
+      // 한국어 사용자에게 그대로 노출된다. 주변 관례보다 사용자 대면 문구 규칙이 우선한다.
       throw new BadRequestException({
         code: 'INVALID_INQUIRY_REPORT_REASON',
-        message: 'reportReason is only allowed when category is report',
+        message: '신고 사유는 신고하기에서만 보낼 수 있어요.',
       });
     }
     const inquiry = await this.prisma.v1Inquiry.create({

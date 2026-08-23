@@ -2569,6 +2569,33 @@ export class GamesService {
       orderBy: { addedAt: 'asc' },
       select: { id: true, userId: true, realName: true },
     });
+    /**
+     * 팀이 지정한 고정 등번호(`V1TeamMembership.jerseyNumber`)를 함께 내려준다.
+     *
+     * 1차 대회(2026-08-15~16) 회고: "라인업에서 선수 번호 등록을 처음에만 하고 추후에는
+     * 안하는 문제". 프론트의 등번호 결정 로직은 `loaded ?? teamFixed ?? recent` 3단계로
+     * 이미 설계돼 있었는데, **2순위 teamFixed 가 死문이었다** — 이 응답에 번호 자체가
+     * 없어서 프론트가 넘길 값을 갖지 못했다. 그래서 팀장이 매 경기 번호를 다시 타이핑해야
+     * 했고, 그 반복 입력이 곧 오탈자 발생원이다.
+     *
+     * 이 사이드 팀의 **active 멤버십만** 본다 — 팀을 떠난 사람의 옛 번호를 되살리면
+     * 이미 그 번호를 물려받은 현재 멤버와 충돌한다(스키마에도 (teamId, jerseyNumber)
+     * 유니크가 걸려 있다).
+     */
+    const memberships =
+      side.teamId === null
+        ? []
+        : await this.prisma.v1TeamMembership.findMany({
+            where: {
+              teamId: side.teamId,
+              status: 'active',
+              userId: { in: players.map((player) => player.userId) },
+            },
+            select: { userId: true, jerseyNumber: true },
+          });
+    const teamJerseyByUserId = new Map(
+      memberships.map((membership) => [membership.userId, membership.jerseyNumber]),
+    );
     return {
       sideId,
       registrationId: resolved.registrationId,
@@ -2576,6 +2603,8 @@ export class GamesService {
         tournamentPlayerId: player.id,
         userId: player.userId,
         name: player.realName,
+        /** 팀 고정 등번호. 팀이 지정하지 않았거나 멤버십이 없으면 null. */
+        teamJerseyNumber: teamJerseyByUserId.get(player.userId) ?? null,
       })),
     };
   }

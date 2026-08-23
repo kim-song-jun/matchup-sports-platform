@@ -489,6 +489,13 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
     if (state === null) return;
     const roster = rosterQuery.data?.players ?? [];
     const recentJersey = buildRecentJerseyMap(historyQuery.data?.items ?? []);
+    // 3단계 우선순위(loaded ?? teamFixed ?? recent)의 **2순위가 여기까지 오지 못하고
+    // 있었다** — 로스터 응답에 팀 고정 번호가 없어 넘길 값 자체가 없었다(死문).
+    const teamFixedJersey = new Map(
+      roster
+        .filter((player) => player.teamJerseyNumber !== null && player.teamJerseyNumber !== undefined)
+        .map((player) => [player.userId, player.teamJerseyNumber as number]),
+    );
     const resolved = resolveLoadableEntries({
       entries: lineup.entries,
       eligible: roster.map((player) => ({ userId: player.userId, displayName: player.name })),
@@ -508,6 +515,7 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
               // 불러온 라인업에 등번호가 없으면 직전에 달았던 번호로 채운다.
               jerseyNumber: resolveJerseyNumber({
                 loaded: entry.jerseyNumber,
+                teamFixed: entry.userId !== null ? teamFixedJersey.get(entry.userId) ?? null : null,
                 recent: entry.userId !== null ? recentJersey.get(entry.userId) ?? null : null,
               }),
             })),

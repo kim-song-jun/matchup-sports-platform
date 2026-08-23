@@ -12,16 +12,15 @@ import { chromium } from 'playwright';
 
 const BASE = process.env.CAPTURE_BASE_URL ?? 'https://alpha.teameet.co.kr';
 const OUT = process.argv[2] ?? '.capture/alpha-league-audit';
+// 자격증명 검사는 login() 안에서 한다 — TARGET_SET=dark 처럼 비로그인으로 도는 세트가 있어서,
+// 최상단에서 무조건 막으면 로그인이 필요 없는 캡처까지 시작도 못 하고 죽는다.
 const PASSWORD = process.env.ALPHA_PASSWORD;
-if (!PASSWORD) {
-  console.error('ALPHA_PASSWORD 환경변수가 필요해요.');
-  process.exit(1);
-}
-
 const ADMIN_EMAIL = process.env.ALPHA_ADMIN_EMAIL;
 const CAPTAIN_EMAIL = process.env.ALPHA_CAPTAIN_EMAIL;
 
 async function login(email) {
+  if (!PASSWORD) throw new Error('로그인이 필요한 캡처예요 — ALPHA_PASSWORD 환경변수를 넣어주세요.');
+  if (!email) throw new Error('로그인이 필요한 캡처예요 — ALPHA_ADMIN_EMAIL / ALPHA_CAPTAIN_EMAIL 을 넣어주세요.');
   const res = await fetch(`${BASE}/api/v1/auth/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },

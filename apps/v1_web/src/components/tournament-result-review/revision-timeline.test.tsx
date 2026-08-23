@@ -18,6 +18,8 @@ function revision(overrides: Partial<GameResultRevision> & { id: string }): Game
     missingScorer: false,
     mvpParticipantId: null,
     reason: null,
+    outcomeReason: 'NORMAL',
+    outcomeNote: null,
     createdByActorType: 'SYSTEM',
     createdByUserId: null,
     createdBySystemActor: 'GAME_END_DERIVER',

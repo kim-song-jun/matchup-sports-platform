@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 import { Button } from '@/components/v1-ui/button';
+import { type MatchOutcomeReason, matchOutcomeReasonLabel } from '@/lib/match-outcome';
 
 /**
  * 몰수·중단으로 경기를 종료할 때 **사유를 받는** 다이얼로그.
@@ -21,11 +22,14 @@ import { Button } from '@/components/v1-ui/button';
  * 텍스트를 받을 수 없다. 사유 입력이 이 기능의 전부라 확인 모달로는 대체 불가다.
  */
 
-export type AbnormalEndReason = 'FORFEIT' | 'ABANDONED';
+/** 이 다이얼로그가 고르는 값이 곧 검토·공개 화면에 표시되는 값이다 — 같은 타입을 쓴다. */
+export type AbnormalEndReason = MatchOutcomeReason;
 
+/** 라벨은 `lib/match-outcome` 한 곳에서 가져온다 — 여기에 문구를 따로 적으면 운영자가
+ *  고른 이름과 관전자가 보는 이름이 갈린다. 힌트 문장은 이 화면에서만 쓰이므로 여기 둔다. */
 const REASON_OPTIONS: ReadonlyArray<{ value: AbnormalEndReason; label: string; hint: string }> = [
-  { value: 'FORFEIT', label: '몰수·기권', hint: '한 팀이 경기를 수행하지 않아 종결해요.' },
-  { value: 'ABANDONED', label: '경기 중단', hint: '날씨·사고 등으로 끝까지 진행하지 못했어요.' },
+  { value: 'FORFEIT', label: matchOutcomeReasonLabel('FORFEIT'), hint: '한 팀이 경기를 수행하지 않아 종결해요.' },
+  { value: 'ABANDONED', label: matchOutcomeReasonLabel('ABANDONED'), hint: '날씨·사고 등으로 끝까지 진행하지 못했어요.' },
 ];
 
 export interface AbnormalEndDialogProps {

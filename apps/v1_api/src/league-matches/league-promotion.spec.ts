@@ -3,6 +3,9 @@ import {
   validatePromotionRule,
   tierSlotCounts,
   promotionRuleFingerprint,
+  classifyPromotionKind,
+  resolvePromotionToTier,
+  resolvePromotionRule,
   DEFAULT_PROMOTION_RULE,
   type PromotionRule,
   type TierStandingsInput,
@@ -372,5 +375,73 @@ describe('promotionRuleFingerprint — preview~commit 사이 규칙 변경 감�
     const a = promotionRuleFingerprint({ mode: 'fixed', fixedCount: 1, tierOverrides: { '2': { relegate: 1 }, '1': { promote: 2 } } });
     const b = promotionRuleFingerprint({ mode: 'fixed', fixedCount: 1, tierOverrides: { '1': { promote: 2 }, '2': { relegate: 1 } } });
     expect(a).toBe(b);
+  });
+});
+
+// Task 153 Wave 2 감사 H-5 — 승강 확정 preview 화면이 "왜 이 팀이 3위인가"를 순위표
+// 주소를 손으로 조합하지 않고도 설명할 수 있어야 한다. entries 가 calculateLeagueStandings
+// 가 이미 계산해 넘겨준 순위 근거(승점·전적·득실)를 그대로 옮겨 담는지 검증한다.
+describe('calculatePromotions — entries 는 순위 근거(승점·전적·득실)를 함께 싣는다', () => {
+  it('입력 standings 의 통계 필드가 entry 에 그대로 복사된다', () => {
+    const standings: LeagueStanding[] = [
+      { teamId: 'A', position: 1, played: 4, wins: 3, draws: 1, losses: 0, goalsFor: 10, goalsAgainst: 2, points: 10 },
+      { teamId: 'B', position: 2, played: 4, wins: 2, draws: 0, losses: 2, goalsFor: 6, goalsAgainst: 5, points: 6 },
+    ];
+    const plan = calculatePromotions({
+      tierCount: 2,
+      rule: RULE,
+      tiers: [{ tier: 1, standings }],
+    });
+    const a = plan.tiers[0].entries.find((e) => e.teamId === 'A')!;
+    expect(a).toMatchObject({ points: 10, played: 4, wins: 3, draws: 1, losses: 0, goalsFor: 10, goalsAgainst: 2, goalDifference: 8 });
+  });
+});
+
+describe('classifyPromotionKind — 승격/강등/잔류 경계 판정 (단일 소스)', () => {
+  it('상위 promoteCount 만큼은 promoted', () => {
+    expect(classifyPromotionKind(0, 8, 2, 2)).toBe('promoted');
+    expect(classifyPromotionKind(1, 8, 2, 2)).toBe('promoted');
+  });
+
+  it('하위 relegateCount 만큼은 relegated', () => {
+    expect(classifyPromotionKind(7, 8, 2, 2)).toBe('relegated');
+    expect(classifyPromotionKind(6, 8, 2, 2)).toBe('relegated');
+  });
+
+  it('그 사이는 stayed', () => {
+    expect(classifyPromotionKind(4, 8, 2, 2)).toBe('stayed');
+  });
+
+  it('promoteCount=relegateCount=0 이면 전원 stayed(단일 티어·과반 가드 케이스)', () => {
+    expect(classifyPromotionKind(0, 3, 0, 0)).toBe('stayed');
+    expect(classifyPromotionKind(2, 3, 0, 0)).toBe('stayed');
+  });
+});
+
+describe('resolvePromotionToTier', () => {
+  it('promoted 는 한 단계 위, relegated 는 한 단계 아래', () => {
+    expect(resolvePromotionToTier(2, 'promoted')).toBe(1);
+    expect(resolvePromotionToTier(2, 'relegated')).toBe(3);
+  });
+
+  it('stayed·withdrawn 은 그대로', () => {
+    expect(resolvePromotionToTier(2, 'stayed')).toBe(2);
+    expect(resolvePromotionToTier(2, 'withdrawn')).toBe(2);
+  });
+});
+
+describe('resolvePromotionRule — Json 컬럼(unknown) 안전 파싱', () => {
+  it('null 이면 기본 규칙으로 폴백한다', () => {
+    expect(resolvePromotionRule(null)).toEqual(DEFAULT_PROMOTION_RULE);
+  });
+
+  it('객체가 아니면(레거시/손상 값) 기본 규칙으로 폴백한다', () => {
+    expect(resolvePromotionRule('not-an-object')).toEqual(DEFAULT_PROMOTION_RULE);
+    expect(resolvePromotionRule(42)).toEqual(DEFAULT_PROMOTION_RULE);
+  });
+
+  it('유효한 규칙 객체는 그대로 통과시킨다', () => {
+    const rule = { mode: 'fixed', fixedCount: 2, minSlots: 1 };
+    expect(resolvePromotionRule(rule)).toEqual(rule);
   });
 });

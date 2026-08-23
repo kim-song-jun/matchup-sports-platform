@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { Providers } from '@/app/providers';
 import { useV1ActivePopup, useV1LeagueMatch, useV1LeagueMatchPlayerRecords, useV1LeagueMatchStandings } from '@/hooks/use-v1-api';
@@ -475,5 +475,272 @@ describe('LeagueMatchStandingsClient', () => {
     expect(screen.getByText('1. 최유진')).toBeInTheDocument();
     expect(screen.getByText('1. 한소희')).toBeInTheDocument();
     expect(screen.getByText('4. 오지훈')).toBeInTheDocument();
+  });
+
+  it('감사 H-2: 확정 전에도 예상 승강을 보여주되 확정 표기와 문구·스타일로 구분한다', async () => {
+    // 시즌 중(promotionDecided=false)에도 expectedPromotionKind/promotionForecast 로
+    // "지금 순위대로면" 승강 경계가 보여야 한다 — 확정 표기('승격'/'강등')와 똑같이
+    // 읽히면 아직 안 정해진 걸 정해진 것처럼 오해하므로 "예상" 접두어로 구분한다.
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1LeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', title: '가을 리그 2부', state: 'active',
+        startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z',
+        teamIds: ['t1', 't2'], fixtures: [], tier: 2, tierLabel: '2부', seasonNo: 1, seriesTitle: '강남 풋살 리그',
+      },
+    } as never);
+    useV1LeagueMatchStandingsMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', tieBreakOrder: ['points'],
+        standings: [
+          {
+            teamId: 't1', teamName: '성수 FC', teamLogoUrl: null, position: 1, played: 3, wins: 3, draws: 0, losses: 0,
+            goalsFor: 9, goalsAgainst: 1, points: 9, promotionKind: null, promotionToTier: null, promotionToTierLabel: null,
+            expectedPromotionKind: 'promoted', expectedPromotionToTier: 1, expectedPromotionToTierLabel: '1부',
+          },
+          {
+            teamId: 't2', teamName: '망원 FC', teamLogoUrl: null, position: 2, played: 3, wins: 1, draws: 0, losses: 2,
+            goalsFor: 2, goalsAgainst: 5, points: 3, promotionKind: null, promotionToTier: null, promotionToTierLabel: null,
+            expectedPromotionKind: 'stayed', expectedPromotionToTier: null, expectedPromotionToTierLabel: null,
+          },
+        ],
+        pendingFixtures: [],
+        promotionDecided: false,
+        promotionForecast: { promoteSlots: 1, relegateSlots: 1, skippedByMajorityGuard: false },
+        tieBreakGroups: [],
+      },
+    } as never);
+    useV1LeagueMatchPlayerRecordsMock.mockReturnValue({ data: { leagueId: 'league-1', goals: [], assists: [] } } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchStandingsClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    // 확정 뱃지 문구('승강')가 아니라 예상 전용 헤더('예상 승강')가 붙는다.
+    expect(await screen.findByRole('columnheader', { name: '예상 승강' })).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: '승강' })).not.toBeInTheDocument();
+    // "예상 승격" 문구 자체가 확정 뱃지('승격')와 구분되는 별도 텍스트다 — 열 + sm 미만
+    // 인라인 두 곳에 렌더되므로 2곳 존재를 확인한다(다른 승강 테스트와 동일한 패턴).
+    expect(screen.getAllByText(/예상 승격/)).toHaveLength(2);
+    // 슬롯 규칙 요약도 함께 보인다.
+    expect(screen.getByText(/상위 1팀 승격 \/ 하위 1팀 강등/)).toBeInTheDocument();
+  });
+
+  it('감사 H-2: skippedByMajorityGuard 면 이번 시즌 승강이 없다고 알려준다', async () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1LeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', title: '가을 리그 2부', state: 'active',
+        startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z',
+        teamIds: ['t1', 't2'], fixtures: [], tier: 2, tierLabel: '2부',
+      },
+    } as never);
+    useV1LeagueMatchStandingsMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', tieBreakOrder: ['points'],
+        standings: [
+          {
+            teamId: 't1', teamName: '성수 FC', teamLogoUrl: null, position: 1, played: 1, wins: 1, draws: 0, losses: 0,
+            goalsFor: 2, goalsAgainst: 0, points: 3, promotionKind: null, promotionToTier: null, promotionToTierLabel: null,
+            expectedPromotionKind: 'stayed', expectedPromotionToTier: null, expectedPromotionToTierLabel: null,
+          },
+        ],
+        pendingFixtures: [],
+        promotionDecided: false,
+        promotionForecast: { promoteSlots: 0, relegateSlots: 0, skippedByMajorityGuard: true },
+        tieBreakGroups: [],
+      },
+    } as never);
+    useV1LeagueMatchPlayerRecordsMock.mockReturnValue({ data: { leagueId: 'league-1', goals: [], assists: [] } } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchStandingsClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    expect(await screen.findByText('이번 시즌은 참가 팀 수가 적어 승강이 적용되지 않아요.')).toBeInTheDocument();
+  });
+
+  it('감사 H-5: tie-break 를 전부 소진한 팀 그룹은 임의 배정 안내가 뜨고, 빈 배열이면 안 뜬다', async () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1LeagueMatchMock.mockReturnValue({
+      data: { leagueId: 'league-1', title: '가을 리그', state: 'active', startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1', 't2'], fixtures: [] },
+    } as never);
+    useV1LeagueMatchStandingsMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', tieBreakOrder: ['points'],
+        standings: [
+          { teamId: 't1', teamName: '성수 FC', teamLogoUrl: null, position: 1, played: 1, wins: 0, draws: 1, losses: 0, goalsFor: 1, goalsAgainst: 1, points: 1 },
+          { teamId: 't2', teamName: '망원 FC', teamLogoUrl: null, position: 2, played: 1, wins: 0, draws: 1, losses: 0, goalsFor: 1, goalsAgainst: 1, points: 1 },
+        ],
+        pendingFixtures: [],
+        tieBreakGroups: [{ teamIds: ['t1', 't2'], teamNames: ['성수 FC', '망원 FC'] }],
+      },
+    } as never);
+    useV1LeagueMatchPlayerRecordsMock.mockReturnValue({ data: { leagueId: 'league-1', goals: [], assists: [] } } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchStandingsClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    expect(await screen.findByText('모든 순위 기준이 같아 팀 순서가 임의로 정해진 팀이 있어요.')).toBeInTheDocument();
+    expect(screen.getByText('성수 FC, 망원 FC')).toBeInTheDocument();
+  });
+
+  it('감사 H-5: 대부분의 시즌처럼 tieBreakGroups 가 빈 배열이면 안내가 뜨지 않는다', async () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1LeagueMatchMock.mockReturnValue({
+      data: { leagueId: 'league-1', title: '가을 리그', state: 'active', startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1'], fixtures: [] },
+    } as never);
+    useV1LeagueMatchStandingsMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', tieBreakOrder: ['points'],
+        standings: [{ teamId: 't1', teamName: '성수 FC', teamLogoUrl: null, position: 1, played: 1, wins: 1, draws: 0, losses: 0, goalsFor: 2, goalsAgainst: 0, points: 3 }],
+        pendingFixtures: [],
+        tieBreakGroups: [],
+      },
+    } as never);
+    useV1LeagueMatchPlayerRecordsMock.mockReturnValue({ data: { leagueId: 'league-1', goals: [], assists: [] } } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchStandingsClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    await screen.findByText('성수 FC');
+    expect(screen.queryByText(/임의로 정해진/)).not.toBeInTheDocument();
+  });
+
+  it('이슈 4: 아직 한 경기도 안 치르고 예정 대진도 없으면 0-0-0 순위표 대신 참가 팀 목록을 보여준다', async () => {
+    // played 합계 0 + pendingFixtures 도 비어 있어야만 발동한다(대진은 잡혔는데 결과만
+    // 미확정인 정상 상태는 기존 "0경기 순위표+확인 중 배너" 테스트로 이미 보장돼 있다).
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1LeagueMatchMock.mockReturnValue({
+      data: { leagueId: 'league-1', title: '가을 리그', state: 'draft', startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1', 't2'], fixtures: [] },
+    } as never);
+    useV1LeagueMatchStandingsMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', tieBreakOrder: ['points'],
+        standings: [
+          { teamId: 't1', teamName: '성수 FC', teamLogoUrl: null, position: 1, played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, points: 0 },
+          { teamId: 't2', teamName: '망원 FC', teamLogoUrl: null, position: 2, played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, points: 0 },
+        ],
+        pendingFixtures: [],
+      },
+    } as never);
+    useV1LeagueMatchPlayerRecordsMock.mockReturnValue({ data: { leagueId: 'league-1', goals: [], assists: [] } } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchStandingsClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    expect(await screen.findByText('참가 팀')).toBeInTheDocument();
+    expect(screen.queryByText('순위표')).not.toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    expect(screen.getByText('성수 FC')).toBeInTheDocument();
+    expect(screen.getByText('망원 FC')).toBeInTheDocument();
+    // 0점/0전 같은 의미 없는 숫자는 더는 렌더되지 않는다.
+    expect(screen.queryByText('0-0-0')).not.toBeInTheDocument();
+  });
+
+  it('이슈 3: "예정만 보기"를 누르면 이미 끝난 경기가 걷히고 다음 경기에 뱃지가 붙는다', async () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1LeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', title: '가을 리그', state: 'active',
+        startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z',
+        teamIds: ['t1', 't2'],
+        fixtures: [
+          { teamMatchId: 'tm-past', title: '1라운드', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '성수 풋살장', status: 'completed', homeScore: 3, awayScore: 1 },
+          { teamMatchId: 'tm-next', title: '2라운드', homeTeamId: 't2', awayTeamId: 't1', startAt: '2026-09-08T20:00:00.000Z', placeName: '망원 풋살장', status: 'matched' },
+        ],
+      },
+    } as never);
+    useV1LeagueMatchStandingsMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', tieBreakOrder: ['points'],
+        standings: [
+          { teamId: 't1', teamName: '성수 FC', teamLogoUrl: null, position: 1, played: 1, wins: 1, draws: 0, losses: 0, goalsFor: 3, goalsAgainst: 1, points: 3 },
+          { teamId: 't2', teamName: '망원 FC', teamLogoUrl: null, position: 2, played: 1, wins: 0, draws: 0, losses: 1, goalsFor: 1, goalsAgainst: 3, points: 0 },
+        ],
+        pendingFixtures: [],
+      },
+    } as never);
+    useV1LeagueMatchPlayerRecordsMock.mockReturnValue({ data: { leagueId: 'league-1', goals: [], assists: [] } } as never);
+
+    const { container } = render(
+      <Providers>
+        <LeagueMatchStandingsClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    // 필터를 켜지 않아도 다음 경기 행에는 뱃지가 붙는다.
+    await waitFor(() => expect(container.querySelector('a[href="/team-matches/tm-next"]')).toBeInTheDocument());
+    const nextLink = container.querySelector('a[href="/team-matches/tm-next"]');
+    expect(nextLink?.textContent).toContain('다음 경기');
+    const pastLinkBefore = container.querySelector('a[href="/team-matches/tm-past"]');
+    expect(pastLinkBefore).toBeInTheDocument();
+
+    // "예정만" 필터를 누르면 이미 끝난 경기가 화면에서 사라진다.
+    fireEvent.click(screen.getByRole('button', { name: '예정만' }));
+    await waitFor(() => expect(container.querySelector('a[href="/team-matches/tm-past"]')).not.toBeInTheDocument());
+    expect(container.querySelector('a[href="/team-matches/tm-next"]')).toBeInTheDocument();
+  });
+  /**
+   * 재검토에서 잡힌 판정 불일치 — isUpcomingFixture 가 "취소 아님 + 스코어 없음"만 보던 시절엔
+   * 이미 치렀지만 공식 결과가 안 붙은 대진(status='completed' + 스코어 null, 행에는 '결과 대기'가
+   * 찍힌다)까지 '예정'으로 세어, "예정만 보기"에 '결과 대기' 행이 섞여 나오고 "다음 경기" 뱃지도
+   * 지난 경기에 붙었다. 판정을 fixtureResultLabel 과 같은 기준으로 맞춘 뒤의 동작을 고정한다.
+   */
+  it('이슈 3 회귀: 결과 대기(치른 뒤 미확정) 경기는 예정으로 세지 않는다', async () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1LeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', title: '가을 리그', state: 'active',
+        startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z',
+        teamIds: ['t1', 't2'],
+        fixtures: [
+          // 이미 치렀지만 공식 결과 미확정 → 행에는 '결과 대기'가 찍힌다.
+          { teamMatchId: 'tm-awaiting', title: '1라운드', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '성수 풋살장', status: 'completed' },
+          // 진짜 예정 경기.
+          { teamMatchId: 'tm-upcoming', title: '2라운드', homeTeamId: 't2', awayTeamId: 't1', startAt: '2026-09-08T20:00:00.000Z', placeName: '망원 풋살장', status: 'matched' },
+        ],
+      },
+    } as never);
+    useV1LeagueMatchStandingsMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', tieBreakOrder: ['points'],
+        standings: [
+          { teamId: 't1', teamName: '성수 FC', teamLogoUrl: null, position: 1, played: 1, wins: 1, draws: 0, losses: 0, goalsFor: 3, goalsAgainst: 1, points: 3 },
+          { teamId: 't2', teamName: '망원 FC', teamLogoUrl: null, position: 2, played: 1, wins: 0, draws: 0, losses: 1, goalsFor: 1, goalsAgainst: 3, points: 0 },
+        ],
+        pendingFixtures: [],
+      },
+    } as never);
+    useV1LeagueMatchPlayerRecordsMock.mockReturnValue({ data: { leagueId: 'league-1', goals: [], assists: [] } } as never);
+
+    const { container } = render(
+      <Providers>
+        <LeagueMatchStandingsClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    // "다음 경기" 뱃지는 결과 대기 행이 아니라 진짜 예정 경기에 붙어야 한다.
+    await waitFor(() => expect(container.querySelector('a[href="/team-matches/tm-upcoming"]')).toBeInTheDocument());
+    expect(container.querySelector('a[href="/team-matches/tm-upcoming"]')?.textContent).toContain('다음 경기');
+    expect(container.querySelector('a[href="/team-matches/tm-awaiting"]')?.textContent).not.toContain('다음 경기');
+
+    // "예정만"을 켜면 결과 대기 행도 함께 걷힌다 — 화면에 찍힌 문구와 필터 기준이 일치해야 한다.
+    fireEvent.click(screen.getByRole('button', { name: '예정만' }));
+    await waitFor(() => expect(container.querySelector('a[href="/team-matches/tm-awaiting"]')).not.toBeInTheDocument());
+    expect(container.querySelector('a[href="/team-matches/tm-upcoming"]')).toBeInTheDocument();
   });
 });

@@ -9,12 +9,14 @@ import { findUnfinishedSeasonLeagues, planNextSeasonTiers } from './league-lifec
 import {
   calculatePromotions,
   promotionRuleFingerprint,
+  resolvePromotionRule,
   validatePromotionRule,
   DEFAULT_PROMOTION_RULE,
   type PromotionKind,
   type PromotionRule,
   type TierStandingsInput,
 } from './league-promotion';
+import type { StandingsTieGroup } from './league-standings';
 import {
   CommitPromotionsDto,
   CreateLeagueSeriesDto,
@@ -344,6 +346,13 @@ export class LeagueSeriesAdminService {
           relegateCount: tier.relegateCount,
           skippedByMajorityGuard: tier.skippedByMajorityGuard,
           nextSeasonTeamCount: tier.nextSeasonTeamCount,
+          // 감사 H-5 추가분 — 이 티어에서 tie-break 기준을 전부 소진하고 팀ID 사전순
+          // 폴백으로 순위가 갈린 팀들. 없으면 빈 배열(정상 — 대부분의 시즌은 여기 안 걸린다).
+          // 운영자가 "왜 이 팀이 강등인지" 순위표만으로 설명 못 하는 유일한 경우다.
+          tieBreakGroups: (source?.tieBreakGroups ?? []).map((group) => ({
+            teamIds: group.teamIds,
+            teamNames: group.teamIds.map((teamId) => teamNameById.get(teamId) ?? ''),
+          })),
           entries: tier.entries.map((entry) => ({
             ...entry,
             teamName: teamNameById.get(entry.teamId) ?? '',
@@ -654,9 +663,7 @@ export class LeagueSeriesAdminService {
   }
 
   private ruleOf(series: { promotionRuleJson: unknown }): PromotionRule {
-    const raw = series.promotionRuleJson;
-    if (raw === null || typeof raw !== 'object') return { ...DEFAULT_PROMOTION_RULE };
-    return raw as PromotionRule;
+    return resolvePromotionRule(series.promotionRuleJson);
   }
 
   private async loadSeries(seriesId: string) {
@@ -718,7 +725,7 @@ export class LeagueSeriesAdminService {
       });
     }
 
-    const tiers: Array<{ leagueId: string; input: TierStandingsInput }> = [];
+    const tiers: Array<{ leagueId: string; input: TierStandingsInput; tieBreakGroups: StandingsTieGroup[] }> = [];
     const leagueByTier = new Map<number, string>();
     const teamNameById = new Map<string, string>();
 
@@ -740,7 +747,9 @@ export class LeagueSeriesAdminService {
       }
       for (const row of result.standings) teamNameById.set(row.teamId, row.teamName);
       leagueByTier.set(tier, league.id);
-      tiers.push({ leagueId: league.id, input: { tier, standings: result.standings } });
+      // tieBreakGroups 는 standings() 가 이미 계산해 둔 값을 그대로 옮긴다 --
+      // 여기서 다시 계산하면 fixtures를 또 훑어야 하는 별도 조회가 생긴다(감사 H-5).
+      tiers.push({ leagueId: league.id, input: { tier, standings: result.standings }, tieBreakGroups: result.tieBreakGroups });
     }
 
     return { tiers, leagueByTier, teamNameById };

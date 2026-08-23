@@ -264,6 +264,10 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
         hostActions: canManageHostTeam
           ? buildHostActions({
               status: getStatus(query.data),
+              // 리그 대진은 서버가 팀 단독 취소를 409 LEAGUE_FIXTURE_HOST_CANCEL_FORBIDDEN 으로
+              // 거부한다(team-matches.service.ts cancel()) — 눌러서 실패를 봐야만 알 수 있게
+              // 두지 않고 애초에 버튼을 노출하지 않는다.
+              isLeagueFixture: Boolean(query.data.league),
               closeTeamMatch: () => closeTeamMatch.mutateAsync({ reason: 'host_closed_from_v1_web' }),
               reopenTeamMatch: () => reopenTeamMatch.mutateAsync({ reason: 'host_reopened_from_v1_web' }),
               cancelTeamMatch: () => cancelTeamMatch.mutateAsync({ reason: 'host_cancelled_from_v1_web' }),
@@ -286,6 +290,7 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
         lineupHref: ownTeamId ? `/team-matches/${teamMatchId}/lineup` : undefined,
         onApply: getApplyAction({
           viewerState,
+          status: getStatus(query.data),
           selectedTeamId: selectedEligibility?.teamId,
           applicationId: selectedEligibility?.applicationId,
           eligible: selectedEligibility?.eligible,
@@ -549,6 +554,11 @@ function statusLabel(viewerState: V1TeamMatchViewerState, status: V1TeamMatchApi
   if (viewerState === 'requested') return '승인 대기';
   if (viewerState === 'approved') return '승인 완료';
   if (status === 'matched') return '상대팀 확정';
+  // completed/cancelled를 뭉뚱그려 '신청 마감'이라 하면 이미 끝난 경기까지 "아직 신청받다
+  // 막 닫혔다"는 인상을 준다 — guest가 완료된 리그 경기를 열어도 "모집 중"이 아니라 정확한
+  // 상태가 보이게 한다(alpha 실측 C-1).
+  if (status === 'completed') return '경기 종료';
+  if (status === 'cancelled') return '매치 취소';
   if (status !== 'recruiting') return '신청 마감';
   return '신청 가능';
 }
@@ -563,27 +573,37 @@ function canOpenTeamMatchChat(viewerState: V1TeamMatchViewerState, _status: V1Te
 
 function buildHostActions({
   status,
+  isLeagueFixture,
   closeTeamMatch,
   reopenTeamMatch,
   cancelTeamMatch,
   pending,
 }: {
   status: V1TeamMatchApiStatus;
+  isLeagueFixture: boolean;
   closeTeamMatch: () => Promise<unknown>;
   reopenTeamMatch: () => Promise<unknown>;
   cancelTeamMatch: () => Promise<unknown>;
   pending: boolean;
 }): TeamMatchDetailViewModel['hostActions'] {
+  // 리그 대진의 팀 단독 취소는 서버가 항상 409로 거부한다(team-matches.service.ts cancel(),
+  // LEAGUE_FIXTURE_HOST_CANCEL_FORBIDDEN) — 모집 마감/재개는 leagueId 가드가 없어 그대로 둔다.
+  const cancelAction: NonNullable<TeamMatchDetailViewModel['hostActions']>[number] = {
+    label: '팀매치 취소',
+    tone: 'danger',
+    pending,
+    onClick: cancelTeamMatch,
+  };
   if (status === 'recruiting') {
     return [
       { label: '모집 마감', tone: 'neutral', pending, onClick: closeTeamMatch },
-      { label: '팀매치 취소', tone: 'danger', pending, onClick: cancelTeamMatch },
+      ...(isLeagueFixture ? [] : [cancelAction]),
     ];
   }
   if (status === 'closed') {
     return [
       { label: '모집 재개', tone: 'primary', pending, onClick: reopenTeamMatch },
-      { label: '팀매치 취소', tone: 'danger', pending, onClick: cancelTeamMatch },
+      ...(isLeagueFixture ? [] : [cancelAction]),
     ];
   }
   if (status === 'matched') {
@@ -591,7 +611,7 @@ function buildHostActions({
     // atomic side effect of the host submitting a validated result revision on
     // /team-matches/:id/result (see buildResultAction below), so cancel is the
     // only remaining direct mutation here.
-    return [{ label: '팀매치 취소', tone: 'danger', pending, onClick: cancelTeamMatch }];
+    return isLeagueFixture ? [] : [cancelAction];
   }
   return [];
 }
@@ -670,6 +690,7 @@ async function shareTeamMatch(match: V1TeamMatch) {
 
 function getApplyAction({
   viewerState,
+  status,
   selectedTeamId,
   applicationId,
   eligible,
@@ -681,6 +702,7 @@ function getApplyAction({
   redirectTo,
 }: {
   viewerState: V1TeamMatchViewerState;
+  status: V1TeamMatchApiStatus;
   selectedTeamId?: string;
   applicationId?: string | null;
   eligible?: boolean;
@@ -692,6 +714,11 @@ function getApplyAction({
   redirectTo: (href: string) => void;
 }): (() => Promise<unknown>) | undefined {
   if ((viewerState === 'requested' || reasonCode === 'ALREADY_REQUESTED') && applicationId) return withdraw;
+  // 이미 마감/확정/종료/취소된 매치는 신청할 게 없다 — 여기서 끊지 않으면 guest/무팀 사용자가
+  // applyLabel()엔 '신청 불가'로 뜨는데 onApply는 여전히 로그인·팀만들기 리다이렉트를 반환해서
+  // 파란 primary 버튼이 "신청 불가"라고 적힌 채 클릭되면 로그인 페이지로 튀는 상태였다
+  // (alpha 실측 C-1: 완료된 리그 경기를 guest로 열면 그런 버튼이 보였다).
+  if (status !== 'recruiting') return undefined;
   if (eligible && selectedTeamId) return () => apply(selectedTeamId);
   // 비인증: 로그인 페이지로 이동하되, 보던 팀매치 상세로 복귀하도록 redirect 전파 (Copilot)
   if (isGuest) return async () => { redirectTo(getLoginPathForRedirect(getCurrentRedirectPath())); };

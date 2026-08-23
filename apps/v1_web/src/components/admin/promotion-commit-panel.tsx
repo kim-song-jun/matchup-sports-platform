@@ -31,12 +31,23 @@ interface PromotionCommitPanelProps {
  *
  * 수정 중간 상태는 여기(로컬)에만 둔다 — preview 를 여러 번 다시 돌릴 수 있어야 하는데
  * 서버에 미리 쓰면 매번 정리해야 한다. 최종 승인 시에만 전체 목록을 보낸다.
+ *
+ * 폰트 크기에 `text-2xs` 를 쓰지 마라 — globals.css 상단(9-10행)이 밝히듯 사용처 0건이라
+ * 삭제된 죽은 클래스라, 붙여도 아무 크기도 적용되지 않고 부모 크기를 물려받는다.
+ * 실제로 존재하는 가장 작은 토큰은 `text-xs`(12px)다.
  */
 export function PromotionCommitPanel({ preview, submitting, onCommit }: PromotionCommitPanelProps) {
   const [overrides, setOverrides] = useState<Record<string, V1PromotionKind>>({});
   // 수정 사유는 어드민이 직접 적는다. 예전에는 '어드민이 직접 조정' 이라는 고정 문자열을
   // 보내서, 감사 로그를 열어도 "왜 규칙과 다르게 정했는지"가 어디에도 남지 않았다.
   const [notes, setNotes] = useState<Record<string, string>>({});
+
+  // 감사 H-4(어드민 쪽) — tie-break 를 전부 소진하고 팀ID 사전순으로 갈린 팀은 이 화면만
+  // 보고는 "왜 이 순서인지" 납득할 수 없다. 소속 티어 전체가 아니라 그 팀에만 경고를 붙인다.
+  const tieBreakTeamIds = useMemo(
+    () => new Set(preview.tiers.flatMap((tier) => tier.tieBreakGroups.flatMap((group) => group.teamIds))),
+    [preview],
+  );
 
   const entries = useMemo(
     () => preview.tiers.flatMap((tier) => tier.entries.map((entry) => ({ ...entry, tierLabel: tier.tierLabel }))),
@@ -150,12 +161,32 @@ export function PromotionCommitPanel({ preview, submitting, onCommit }: Promotio
                         {entry.teamName}
                       </span>
                     </span>
+                    {/* 순위 근거(감사 H-5) — "왜 이 팀이 N위인가"를 이 화면만 보고 설명할 수
+                        있어야 한다. 승점·득실차는 승강 판정의 직접 근거라 접지 않고 항상 보인다.
+                        나머지(전적·득점·실점)는 옆에 옅은 글자로 함께 둔다. */}
+                    <span className="w-full pl-11 text-xs tabular-nums text-[var(--text-muted)] sm:w-auto sm:pl-0">
+                      <span className="font-bold text-[var(--text-strong)]">{entry.points}점</span>
+                      <span>
+                        {' '}
+                        · {entry.played}전 {entry.wins}승{entry.draws}무{entry.losses}패 · {entry.goalsFor}득{' '}
+                        {entry.goalsAgainst}실 ·{' '}
+                      </span>
+                      <span className="font-semibold text-[var(--text-strong)]">
+                        득실차 {entry.goalDifference > 0 ? `+${entry.goalDifference}` : entry.goalDifference}
+                      </span>
+                    </span>
+                    {tieBreakTeamIds.has(entry.teamId) && (
+                      <span className="flex w-full items-center gap-1 text-xs font-semibold text-amber-700 dark:text-amber-300">
+                        <AlertTriangle size={12} aria-hidden="true" />
+                        모든 기준이 같아 임의로 순위가 갈렸어요. 직접 확인해 주세요.
+                      </span>
+                    )}
                     <span className={`ml-auto inline-flex items-center gap-1 text-xs font-semibold sm:ml-0 ${meta.className}`}>
                       <Icon size={14} aria-hidden="true" />
                       {meta.label}
                     </span>
                     {changed && (
-                      <span className="rounded-md bg-blue-100 px-1.5 py-0.5 text-2xs font-semibold text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
+                      <span className="rounded-md bg-blue-100 px-1.5 py-0.5 text-xs font-semibold text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
                         규칙은 {KIND_META[entry.computedKind].label}
                       </span>
                     )}

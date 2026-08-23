@@ -5,7 +5,7 @@ import { AppChrome } from '@/components/v1-ui/shell';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { useV1MyLeagues } from '@/hooks/use-v1-api';
 import { getSportAccent } from '@/lib/v1-sport-accent';
-import { formatTournamentDateRangeShort } from '@/lib/date-utils';
+import { formatTournamentDateRangeShort, formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import { LEAGUE_STATE_META } from '@/lib/league-state-meta';
 
@@ -18,6 +18,10 @@ import { LEAGUE_STATE_META } from '@/lib/league-state-meta';
  * (마이 화면 미구현), 그마저도 팀매치에서 리그를 역산해 **대진이 생기기 전에는 아무것도 뜨지
  * 않았다.** 이 화면은 참가 테이블(`V1LeagueTeam`)을 직접 읽는 `/league-matches/me` 를 쓰므로
  * 운영자가 팀을 넣은 그 순간부터 보인다.
+ *
+ * Task 153 감사(Wave 2, 그룹 C) — 참가 사실만 보여주고 "우리 팀 몇 등?" / "다음 경기 언제?"가
+ * 없어 팀장이 매번 리그 상세까지 들어가야 했다. `myTeams[].standing` / `nextFixture` 를
+ * 카드에 바로 노출해 이 화면이 요약 대시보드로 기능하게 한다.
  */
 export function MyLeaguesPageClient() {
   const query = useV1MyLeagues({ enabled: true });
@@ -56,10 +60,13 @@ export function MyLeaguesPageClient() {
                 const stateMeta = LEAGUE_STATE_META[item.state];
                 const accent = getSportAccent(item.sport.code);
                 return (
-                  <li key={item.leagueId}>
+                  <li
+                    key={item.leagueId}
+                    className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--card-surface)] text-sm"
+                  >
                     <Link
                       href={`/league-matches/${item.leagueId}`}
-                      className="tm-pressable tm-list-row-interactive flex min-h-[44px] flex-col gap-2 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] p-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+                      className="tm-pressable tm-list-row-interactive flex min-h-[44px] flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between"
                       aria-label={`${item.title} 상세로 이동`}
                     >
                       <div className="min-w-0 flex-1">
@@ -70,13 +77,12 @@ export function MyLeaguesPageClient() {
                           )}
                           <span className={`tm-badge tm-badge-sm ${stateMeta.badgeClass}`}>{stateMeta.label}</span>
                         </div>
-                        {/* 어느 팀으로 참가 중인지가 이 화면의 핵심 정보다 — 사용자가 두 팀에
-                            속해 있으면 "내 어느 팀이 이 리그에 있나"가 바로 답이 돼야 한다. */}
-                        <div className="mt-0.5 truncate text-xs text-[var(--text-muted)]">
-                          {item.myTeams.map((team) => team.name).join(' · ')}
-                          {item.seriesTitle != null && ` · ${item.seriesTitle}`}
-                          {item.seasonNo != null && ` ${item.seasonNo}시즌`}
-                        </div>
+                        {item.seriesTitle != null && (
+                          <div className="mt-0.5 text-xs text-[var(--text-muted)]">
+                            {item.seriesTitle}
+                            {item.seasonNo != null && ` ${item.seasonNo}시즌`}
+                          </div>
+                        )}
                         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--text-muted)] sm:text-sm">
                           <span className="inline-flex items-center gap-1.5">
                             <span
@@ -95,6 +101,50 @@ export function MyLeaguesPageClient() {
                         {item.teamCount}팀 참가
                       </div>
                     </Link>
+
+                    {/* 팀별 순위·다음 경기 — 카드 전체를 감싼 위 Link 바깥에 둔다. 다음 경기
+                        칸 자체가 팀매치 상세로 가는 별도 링크라 <a> 안에 <a>를 중첩할 수
+                        없기 때문이다(HTML 무효 + 클릭 이벤트 충돌). 한 사용자가 같은
+                        리그에 팀을 둘 이상 두는 경우(같은 리그에 소속된 여러 팀)를 대비해
+                        팀별로 행을 나누고 이름에 truncate 를 쓰지 않는다 — 접기(collapse)
+                        UI 는 실측상 팀 수가 보통 1~2개뿐이라 과설계라 넣지 않았고, 이름은
+                        항상 노출해 "어느 팀이 뛰는지"가 줄바꿈되더라도 잘리지 않게 한다. */}
+                    <div className="flex flex-col gap-1.5 border-t border-[var(--border)] px-3 py-2">
+                      {item.myTeams.map((team) => (
+                        <div
+                          key={team.teamId}
+                          className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs sm:text-sm"
+                        >
+                          <span className="font-medium text-[var(--text-strong)]">{team.name}</span>
+                          {team.standing ? (
+                            <>
+                              <span className="tm-badge tm-badge-sm tm-badge-grey">
+                                {team.standing.position}위 · {team.standing.points}점
+                              </span>
+                              <span className="text-[var(--text-muted)]">
+                                {team.standing.wins}승 {team.standing.draws}무 {team.standing.losses}패
+                              </span>
+                            </>
+                          ) : (
+                            // draft 리그(대진 없음)는 아직 순위가 계산되지 않은 게 정상이다 —
+                            // 0등처럼 의미 없는 값을 지어내지 않고 상태를 그대로 말한다.
+                            <span className="text-[var(--text-muted)]">순위 준비 중</span>
+                          )}
+                          {team.nextFixture != null && (
+                            <Link
+                              href={`/team-matches/${team.nextFixture.teamMatchId}`}
+                              className="tm-pressable tm-list-row-interactive inline-flex min-h-[44px] items-center gap-1 rounded-lg px-2 font-medium text-[var(--blue500)]"
+                              aria-label={`${team.name} 다음 경기 상세로 이동`}
+                            >
+                              다음 경기 {formatTournamentDateTimeShort(team.nextFixture.startAt)}
+                              {team.nextFixture.opponentTeamName != null
+                                ? ` · vs ${team.nextFixture.opponentTeamName}`
+                                : ' · 상대팀 미정'}
+                            </Link>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </li>
                 );
               })}

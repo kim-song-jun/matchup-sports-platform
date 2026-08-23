@@ -54,6 +54,7 @@ vi.mock('./team-matches-page', () => ({
       <span data-testid="team-match-manner">{model.match.manner}</span>
       <span data-testid="team-match-wins">{model.match.wins}</span>
       <span data-testid="team-match-applicant-count">{model.match.applicantTeams.length}</span>
+      <span data-testid="team-match-host-actions">{model.hostActions?.map((action) => action.label).join(',')}</span>
       {model.onApply && <button onClick={model.onApply}>상대팀 신청</button>}
       {model.resultAction && <a href={model.resultAction.href}>{model.resultAction.label}</a>}
       {model.reviewAction && <a href={model.reviewAction.href}>{model.reviewAction.label}</a>}
@@ -77,7 +78,10 @@ describe('TeamMatchDetailPageClient — GA events', () => {
         placeName: '서울 풋살장',
         startsAt: '2026-08-01T10:00:00.000Z',
         capacityText: '1/2',
-        status: 'open',
+        // 'open'은 V1TeamMatchApiStatus에 없는 값이다(recruiting|closed|matched|cancelled|
+        // completed|expired) — 신청 가능한 매치를 뜻하려면 'recruiting'이어야 getApplyAction의
+        // status 게이트(그룹 A 수정)를 실제로 통과한다.
+        status: 'recruiting',
         viewerState: 'none',
         hostTeam: { teamId: 'team-host', name: '호스트 팀' },
       },
@@ -465,5 +469,124 @@ describe('TeamMatchDetailPageClient — API가 비용/설명/신청팀을 안 �
     expect(screen.getByTestId('team-match-description')).toHaveTextContent('실제로 입력된 설명이에요.');
     expect(screen.getByTestId('team-match-cost')).toHaveTextContent('90000');
     expect(screen.getByTestId('team-match-opponent-cost')).toHaveTextContent('30000');
+  });
+});
+
+// alpha 실측 결함(그룹 A, C-1) — 이미 대진이 확정/종료된 리그 경기를 비로그인 관전자로
+// 열면 applyLabel은 '신청 불가'인데 onApply는 여전히 로그인 리다이렉트를 반환해서,
+// "신청 불가"라고 적힌 파란 primary 버튼이 클릭되면 로그인 페이지로 튀는 상태였다.
+// 신청할 게 없는(recruiting이 아닌) 매치에서는 로그인/팀만들기 유도 자체를 하지 않는다.
+describe('TeamMatchDetailPageClient — 신청 마감된 매치는 로그인/팀만들기 리다이렉트를 제공하지 않는다', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useV1TeamMatchEligibilityMock.mockReturnValue({ data: undefined, isSuccess: false });
+  });
+
+  it('완료된 리그 경기를 비로그인 뷰어로 열면 신청 CTA(onApply)가 아예 없다', () => {
+    useV1TeamMatchMock.mockReturnValue({
+      data: {
+        id: 'league-fixture-1',
+        teamMatchId: 'league-fixture-1',
+        title: '(테스트) 8월 리그 3라운드',
+        sportName: '풋살',
+        placeName: '진짜 경기장',
+        startsAt: '2026-08-01T10:00:00.000Z',
+        status: 'completed',
+        displayState: 'completed',
+        viewer: { state: 'guest', manageableHostTeam: false },
+        hostTeam: { teamId: 'team-host', name: '알파팀' },
+        league: { leagueId: 'league-1', title: '8월 리그' },
+        approvedOpponentTeam: { teamId: 'team-away', name: '브라보FC', applicationId: 'app-away' },
+      },
+      isError: false,
+    });
+
+    render(<TeamMatchDetailPageClient teamMatchId="league-fixture-1" />);
+
+    expect(screen.getByTestId('team-match-apply-label')).toHaveTextContent('신청 불가');
+    // 회귀 지점: 예전엔 onApply가 로그인 리다이렉트라 이 버튼이 여전히 렌더됐다.
+    expect(screen.queryByRole('button', { name: '상대팀 신청' })).not.toBeInTheDocument();
+  });
+
+  it('신청 마감(closed)에서 소속 팀이 없는 뷰어도 팀만들기 리다이렉트를 받지 않는다', () => {
+    useV1TeamMatchMock.mockReturnValue({
+      data: {
+        id: 'team-match-closed-1',
+        teamMatchId: 'team-match-closed-1',
+        title: '모집 마감된 팀매치',
+        sportName: '풋살',
+        placeName: '경기장',
+        startsAt: '2026-08-01T10:00:00.000Z',
+        status: 'closed',
+        displayState: 'closed',
+        viewer: { state: 'none', manageableHostTeam: false },
+        hostTeam: { teamId: 'team-host', name: '알파팀' },
+        approvedOpponentTeam: null,
+      },
+      isError: false,
+    });
+    // hasNoTeam 게이트: teams 배열이 비어 있으면 '팀 없음'으로 잡힌다.
+    useV1TeamMatchEligibilityMock.mockReturnValue({ data: { teamMatchId: 'team-match-closed-1', requiresApproval: true, requiresPayment: false, teams: [] }, isSuccess: true });
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-closed-1" />);
+
+    expect(screen.getByTestId('team-match-apply-label')).toHaveTextContent('신청 불가');
+    expect(screen.queryByRole('button', { name: '상대팀 신청' })).not.toBeInTheDocument();
+  });
+});
+
+// 그룹 A(alpha 실측) — 서버는 리그 대진(leagueId 有)의 팀 단독 취소를 항상 409
+// LEAGUE_FIXTURE_HOST_CANCEL_FORBIDDEN으로 거부한다(team-matches.service.ts cancel()).
+// 눌러서 실패 문구를 봐야만 알 수 있게 두지 않고, 애초에 버튼을 노출하지 않는다.
+describe('TeamMatchDetailPageClient — 리그 대진은 "팀매치 취소"를 노출하지 않는다', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useV1TeamMatchEligibilityMock.mockReturnValue({ data: undefined, isSuccess: false });
+  });
+
+  function mockHostView(status: string, league: { leagueId: string; title: string } | null) {
+    useV1TeamMatchMock.mockReturnValue({
+      data: {
+        id: 'team-match-host-1',
+        teamMatchId: 'team-match-host-1',
+        title: '팀매치',
+        sportName: '풋살',
+        placeName: '경기장',
+        startsAt: '2026-08-01T10:00:00.000Z',
+        status,
+        displayState: status,
+        viewer: { state: 'host_team', manageableHostTeam: true },
+        hostTeam: { teamId: 'team-host', name: '알파팀' },
+        league,
+      },
+      isError: false,
+    });
+  }
+
+  it('리그 대진(모집 중)은 "모집 마감"만 보이고 "팀매치 취소"는 없다', () => {
+    mockHostView('recruiting', { leagueId: 'league-1', title: '8월 리그' });
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-host-1" />);
+
+    const actions = (screen.getByTestId('team-match-host-actions').textContent ?? '').split(',').filter(Boolean);
+    expect(actions).toEqual(['모집 마감']);
+  });
+
+  it('리그 대진(상대팀 확정)은 호스트 액션이 아예 없다', () => {
+    mockHostView('matched', { leagueId: 'league-1', title: '8월 리그' });
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-host-1" />);
+
+    const actions = (screen.getByTestId('team-match-host-actions').textContent ?? '').split(',').filter(Boolean);
+    expect(actions).toEqual([]);
+  });
+
+  it('일반 팀매치(리그 아님, 같은 상태)는 여전히 "팀매치 취소"가 보인다(회귀 방지)', () => {
+    mockHostView('recruiting', null);
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-host-1" />);
+
+    const actions = (screen.getByTestId('team-match-host-actions').textContent ?? '').split(',').filter(Boolean);
+    expect(actions).toContain('팀매치 취소');
   });
 });

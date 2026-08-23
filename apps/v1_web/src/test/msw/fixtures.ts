@@ -6,6 +6,8 @@ import type {
   V1AdminNoticeRow,
   V1AdminPopupRow,
   V1AdminOverview,
+  V1AdminReportedTeamRow,
+  V1AdminReportedTeamSummary,
   V1ChatMessage,
   V1ChatRoom,
   V1Home,
@@ -140,6 +142,49 @@ export const v1InquiriesFixture: { items: V1Inquiry[]; pageInfo: { nextCursor: s
   pageInfo: { nextCursor: null, hasNext: false },
 };
 
+// 신고 문의 -> 신고 대상 팀 매핑. V1Inquiry(공개 타입)엔 reportedTeamId가 없다(어드민 응답도
+// 필터 파라미터로만 받지 행에는 싣지 않는다 — admin.service.ts 실측) — 목 전용으로만 유지한다.
+const REPORTED_TEAM_BY_INQUIRY_ID: Record<string, string> = {
+  'inquiry-2': 'team-2',
+};
+
+// `GET /admin/reports/teams` — 반복 신고되는 팀 랭킹. name/status/topReason/lastReportedAt은
+// nullable(팀 삭제·사유 없음)이라 두 번째 행은 일부러 null로 채워 그 계약을 목에서도 지킨다.
+export const v1ReportedTeamsWindowDays = 30;
+export const v1ReportedTeamsFixture: V1AdminReportedTeamRow[] = [
+  {
+    teamId: 'team-2',
+    name: '문제의 FC',
+    status: 'active',
+    totalCount: 5,
+    recentCount: 3,
+    topReason: 'spam',
+    lastReportedAt: '2026-07-09T00:00:00.000Z',
+  },
+  {
+    teamId: 'team-3',
+    name: null,
+    status: null,
+    totalCount: 2,
+    recentCount: 0,
+    topReason: null,
+    lastReportedAt: null,
+  },
+];
+
+function buildReportedTeamSummaryFixture(teamId: string): V1AdminReportedTeamSummary | null {
+  const row = v1ReportedTeamsFixture.find((team) => team.teamId === teamId);
+  if (!row || row.name === null || row.status === null) return null;
+  return {
+    teamId: row.teamId,
+    name: row.name,
+    status: row.status,
+    windowDays: v1ReportedTeamsWindowDays,
+    recentReportCount: row.recentCount,
+    reasonBreakdown: row.topReason ? { [row.topReason]: row.recentCount } : {},
+  };
+}
+
 export function toAdminInquiryRow(inquiry: V1Inquiry): V1AdminInquiryRow {
   return {
     inquiryId: inquiry.inquiryId,
@@ -162,12 +207,19 @@ export function toAdminInquiryRow(inquiry: V1Inquiry): V1AdminInquiryRow {
   };
 }
 
+/** 신고 문의의 신고 대상 팀 id — MSW 목 전용 헬퍼. handlers.ts의 reportedTeamId 필터·대리 차단 핸들러가 공유한다. */
+export function getReportedTeamIdForInquiry(inquiryId: string): string | null {
+  return REPORTED_TEAM_BY_INQUIRY_ID[inquiryId] ?? null;
+}
+
 export function toAdminInquiryDetail(inquiry: V1Inquiry): V1AdminInquiryDetail {
+  const reportedTeamId = getReportedTeamIdForInquiry(inquiry.inquiryId);
   return {
     ...toAdminInquiryRow(inquiry),
     body: inquiry.body,
     contact: inquiry.contact,
     replies: (inquiry.replies ?? []).map((reply) => ({ ...reply, adminUserId: 'admin-1' })),
+    reportedTeam: reportedTeamId ? buildReportedTeamSummaryFixture(reportedTeamId) : null,
   };
 }
 

@@ -79,12 +79,18 @@ export interface V1LeagueFixture {
   placeAddress?: string | null;
   status: string;
   /**
-   * 경기 결과 점수 — 백엔드 채움 작업이 병행 진행 중이라(Task 152) 당분간 항상
-   * undefined일 수 있다. 소비 측(league-match-standings-client.tsx)은 값이 없으면
-   * 스코어 대신 상태 기반 문구("예정"/"결과 대기")로 대체해 화면이 깨지지 않게 한다.
+   * 경기 결과 점수 — 공식 결과가 확정된 대진에만 채워진다. 미확정이면 null 이고,
+   * 0:0 으로 오인되지 않게 서버가 명시적으로 구분해 내려준다. 소비 측은 값이 없으면
+   * 스코어 대신 상태 기반 문구("예정"/"결과 대기")로 대체한다.
    */
-  homeScore?: number;
-  awayScore?: number;
+  homeScore?: number | null;
+  awayScore?: number | null;
+  /**
+   * 몰수패로 확정된 결과인지. 몰수는 스코어만 보면 실제 1:0 승리와 구분되지 않아서
+   * 서버가 boolean 으로 알려준다(어드민이 쓴 몰수 사유 원문은 공개하지 않는다).
+   * 공개 상세에만 있고 어드민 상세엔 없다.
+   */
+  isForfeit?: boolean;
 }
 
 export interface V1AdminLeagueDetail {

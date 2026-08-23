@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { isParticipantPubliclyEligible, loadParticipantConsentEligibility } from '../games/public-records/public-consent';
 import { sortMyLeaguesByState } from './league-lifecycle-rules';
 import { calculateLeagueStandings, LeagueTieBreakCriterion } from './league-standings';
+import { FORFEIT_REASON_MARKER } from './league-match-forfeit.service';
 import { ListLeagueMatchesQueryDto } from './dto/league-match.dto';
 
 const PLAYER_RECORDS_LIMIT = 30;
@@ -185,7 +186,10 @@ export class LeagueMatchPublicService {
       ? []
       : await this.prisma.v1GameOfficialFact.findMany({
           where: { revisionId: { in: currentRevisionIds } },
-          select: { gameId: true, homeScore: true, awayScore: true },
+          // 몰수 여부는 결과 리비전의 사유 접두어로만 알 수 있다(전용 컬럼이 없다).
+          // 사유 원문은 운영자가 쓴 자유 텍스트라 공개 응답에 절대 싣지 않고, 아래에서
+          // boolean 으로만 환산한다.
+          select: { gameId: true, homeScore: true, awayScore: true, resultRevision: { select: { reason: true } } },
         });
     const factByGameId = new Map(facts.map((fact) => [fact.gameId, fact]));
 
@@ -216,6 +220,9 @@ export class LeagueMatchPublicService {
           // nullable을 유지한다.
           homeScore: fact?.homeScore ?? null,
           awayScore: fact?.awayScore ?? null,
+          // 몰수 결과는 스코어만 보면 실제 1:0 승리와 구분되지 않는다. 관전자가 그 둘을
+          // 같은 경기로 읽지 않도록 boolean 하나만 내보낸다(사유 원문은 비공개).
+          isForfeit: fact?.resultRevision.reason?.startsWith(FORFEIT_REASON_MARKER) ?? false,
         };
       }),
     };

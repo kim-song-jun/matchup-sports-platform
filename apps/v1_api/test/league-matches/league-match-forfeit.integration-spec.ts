@@ -16,6 +16,9 @@ import { createV1IntegrationApp } from '../integration/integration-app';
 const suiteId = randomUUID().slice(0, 8);
 const ownerUserId = `t152-league-forfeit-owner-${suiteId}`;
 
+// 공개 응답에 사유 원문이 새지 않는지 고정하려면, 보낸 값과 검사하는 값이 같은 출처여야 한다.
+const FORFEIT_REASON_TEXT = '원정팀 경기 시작 30분 후에도 미도착';
+
 describe('리그 몰수패·부전승 결과 입력 (R11)', () => {
   let app: INestApplication;
   let cleanup: (() => Promise<void>) | undefined;
@@ -98,7 +101,7 @@ describe('리그 몰수패·부전승 결과 입력 (R11)', () => {
     const res = await request(app.getHttpServer())
       .post(`/api/v1/admin/league-matches/${leagueId}/fixtures/${teamMatchId}/forfeit`)
       .set('x-v1-user-id', ownerUserId)
-      .send({ noShowTeamId: awayTeamId, reason: '원정팀 경기 시작 30분 후에도 미도착' });
+      .send({ noShowTeamId: awayTeamId, reason: FORFEIT_REASON_TEXT });
 
     expect(res.status).toBe(201);
     expect(res.body.data.alreadyProcessed).toBe(false);
@@ -129,6 +132,21 @@ describe('리그 몰수패·부전승 결과 입력 (R11)', () => {
     expect(awayRow.losses).toBe(1);
     expect(awayRow.points).toBe(0);
     expect(standingsRes.body.data.pendingFixtures).toHaveLength(0);
+
+    // 공개 상세는 몰수를 boolean 으로 구분해 준다. 이게 없으면 관전자에게 이 경기가
+    // 실제로 치러진 1:0 승리와 완전히 같아 보인다.
+    const detailRes = await request(app.getHttpServer()).get(`/api/v1/league-matches/${leagueId}`);
+    expect(detailRes.status).toBe(200);
+    const detailFixture = detailRes.body.data.fixtures.find(
+      (row: { teamMatchId: string }) => row.teamMatchId === teamMatchId,
+    );
+    expect(detailFixture).toMatchObject({ homeScore: 1, awayScore: 0, isForfeit: true });
+
+    // 몰수 사유는 운영자가 쓴 자유 텍스트라 공개 응답에 절대 실리면 안 된다 —
+    // boolean 만 나가고 원문·내부 마커는 어디에도 없어야 한다(응답 전체를 훑어 고정).
+    const serialized = JSON.stringify(detailRes.body);
+    expect(serialized).not.toContain('LEAGUE_FORFEIT');
+    expect(serialized).not.toContain(FORFEIT_REASON_TEXT);
   });
 
   it('같은 대진을 다시 몰수 처리하면 새 리비전을 만들지 않고 alreadyProcessed:true를 반환한다(멱등)', async () => {

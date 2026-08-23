@@ -60,15 +60,21 @@ function fixtureStatusMeta(status: string): { label: string; badgeClass: string 
  * 반영되지 않는지 알 수 없다 — 같은 화면 안에서 두 집계가 서로 다른 말을 하게 된다.
  * 대신 "집계 제외"라고 명시해 그 경기가 기록에서 빠졌음을 그대로 읽히게 한다.
  * (취소 대진에 '예정'이 붙던 문제도 여기서 함께 사라진다.)
+ *
+ * **몰수 결과는 점수 옆에 뱃지로 구분한다.** 몰수는 1:0 으로 기록되는데, 그대로 두면
+ * 실제로 치러진 1:0 승리와 화면에서 완전히 같아 보인다 — 관전자가 "이 팀이 이겼다"와
+ * "상대가 안 나왔다"를 구분할 수 없다.
  */
-function fixtureResultLabel(fixture: V1LeagueFixture): { text: string; hasScore: boolean } {
+function fixtureResultLabel(fixture: V1LeagueFixture): { text: string; hasScore: boolean; isForfeit: boolean } {
   if (fixture.status === 'cancelled') {
-    return { text: '집계 제외', hasScore: false };
+    return { text: '집계 제외', hasScore: false, isForfeit: false };
   }
   if (typeof fixture.homeScore === 'number' && typeof fixture.awayScore === 'number') {
-    return { text: `${fixture.homeScore} : ${fixture.awayScore}`, hasScore: true };
+    // 몰수는 스코어만 보면 실제 1:0 승리와 똑같이 읽힌다 — 점수는 그대로 두고 별도
+    // 뱃지로 구분한다. 색만으로 알리지 않도록 "몰수" 텍스트를 함께 싣는다.
+    return { text: `${fixture.homeScore} : ${fixture.awayScore}`, hasScore: true, isForfeit: fixture.isForfeit === true };
   }
-  return { text: fixture.status === 'completed' ? '결과 대기' : '예정', hasScore: false };
+  return { text: fixture.status === 'completed' ? '결과 대기' : '예정', hasScore: false, isForfeit: false };
 }
 
 interface TeamLookupEntry {
@@ -307,6 +313,7 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
                       <span>{fixture.placeName || '장소 미정'}</span>
                       <span className={`tm-badge tm-badge-sm ${statusMeta.badgeClass}`}>{statusMeta.label}</span>
                       <span className={result.hasScore ? 'font-bold text-[var(--text-strong)]' : ''}>{result.text}</span>
+                      {result.isForfeit ? <span className="tm-badge tm-badge-sm tm-badge-grey">몰수</span> : null}
                     </span>
                   </Link>
                 </li>

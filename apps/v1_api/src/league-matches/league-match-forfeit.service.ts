@@ -43,14 +43,18 @@ import { resolveStoredForfeit } from './league-lifecycle-rules';
  *
  * ## 사유 필드 재사용 (신규 컬럼 없이 몰수를 표시하는 유일한 방법)
  * `V1GameResultRevision.reason`(이미 존재하는 자유 텍스트 컬럼)에
- * `FORFEIT_REASON_MARKER` 접두어를 붙여 저장한다. 이 마커는 문자열 컨벤션일
- * 뿐이라 **공개 API(`league-match-public.service.ts`)에는 노출되지 않는다** —
- * 그 파일은 다른 레인(E) 소유라 이 작업 범위에서 고치지 않았다. 리그 상세·순위
- * 화면에서 이 경기가 "일반 결과"와 "몰수 결과"로 구분 표시되길 원하면, 그 필드를
- * `V1GameOfficialFact`까지 실어 보내는 후속 작업(레인 E와 조율 필요)이 있어야 한다.
+ * `FORFEIT_REASON_MARKER` 접두어를 붙여 저장한다. 이 마커가 "이 결과는 몰수다"의
+ * 유일한 표식이라, 상수를 export 해 읽는 쪽과 **단일 출처**로 공유한다.
+ *
+ * 공개 상세(`league-match-public.service.ts`)는 이 접두어를 `isForfeit: boolean` 으로
+ * 환산해 내보낸다 — 그래야 관전자가 몰수 결과를 실제 1:0 승리와 같은 경기로 읽지 않는다.
+ * **사유 원문은 공개하지 않는다**: 운영자가 쓴 자유 텍스트라 그대로 노출하면 내부 메모가
+ * 새어 나간다. 읽는 쪽은 boolean 만 만들고 문자열은 버려야 한다.
  */
 
-const FORFEIT_REASON_MARKER = '[LEAGUE_FORFEIT]';
+// 공개 응답에서 몰수 여부를 판정하는 쪽(league-match-public.service.ts)도 같은 값을 봐야 한다.
+// 문자열을 복제하면 한쪽만 바뀌었을 때 조용히 어긋나므로 여기가 단일 출처다.
+export const FORFEIT_REASON_MARKER = '[LEAGUE_FORFEIT]';
 const WINNER_SCORE = 1;
 const LOSER_SCORE = 0;
 

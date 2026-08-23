@@ -115,7 +115,12 @@ leagueId = created.body.data.leagueId;
 
 const fixtures = await api(adminToken, 'POST', `/admin/league-matches/${leagueId}/fixtures`, { weeksCount: 1 });
 note('3-대진', `대진 생성 → ${fixtures.status} (대진 ${fixtures.body?.data?.fixtures?.length ?? '?'}건)`);
-if (fixtures.status >= 400) note('3-대진', `본문: ${JSON.stringify(fixtures.body).slice(0, 300)}`);
+// 대진이 안 생기면 알림도 없다 — 그 상태의 "0건" 은 미발송 근거가 아니므로 여기서 멈춘다.
+if (fixtures.status >= 400) {
+  note('3-대진', `본문: ${JSON.stringify(fixtures.body).slice(0, 300)}`);
+  console.error('\n대진 생성이 실패해 알림 판정을 진행할 수 없어요.');
+  process.exit(1);
+}
 
 // 알림은 커밋 후 비동기 발송이라 잠깐 기다린다.
 await new Promise((r) => setTimeout(r, 6000));

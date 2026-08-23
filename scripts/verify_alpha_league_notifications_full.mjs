@@ -138,6 +138,12 @@ if (skipFixtures) {
   for (const lg of leagues) {
     const f = await api(adminToken, 'POST', `/admin/league-matches/${lg.leagueId}/fixtures`, { weeksCount: 1 });
     note('3-대진', `${lg.tierLabel} 대진 생성 → ${f.status}`);
+    // 선행 단계가 실패하면 알림도 안 갈 뿐인데 최종 판정은 "미발송" 처럼 보인다 — 여기서 멈춘다.
+    if (f.status >= 400) {
+      note('3-대진', JSON.stringify(f.body).slice(0, 300));
+      console.error('\n대진 생성이 실패해 알림 판정을 진행할 수 없어요. 위 응답을 먼저 보세요.');
+      process.exit(1);
+    }
   }
   const r1 = await freshSince(capToken, before, '판정①-배정');
   ok1 = r1.fresh.some((n) => /리그 대진/.test(n.title));
@@ -155,7 +161,11 @@ for (const lg of leagues) {
       reason: '알림 전수 검증 — 공식 결과 생성을 위한 몰수 처리',
     });
     note('4-몰수', `${lg.tierLabel} ${fx.teamMatchId.slice(0, 8)} → ${res.status}`);
-    if (res.status >= 400) note('4-몰수', JSON.stringify(res.body).slice(0, 250));
+    if (res.status >= 400) {
+      note('4-몰수', JSON.stringify(res.body).slice(0, 250));
+      console.error('\n몰수 처리가 실패해 공식 결과가 안 만들어졌어요 — ② 판정은 의미가 없으니 중단합니다.');
+      process.exit(1);
+    }
   }
 }
 // 공식 결과 projection 은 워커가 비동기로 처리한다 — 조금 더 기다린다.

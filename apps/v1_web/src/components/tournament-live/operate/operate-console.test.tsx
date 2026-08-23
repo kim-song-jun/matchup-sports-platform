@@ -35,6 +35,9 @@ vi.mock('@/hooks/use-v1-game-operations', () => ({
   useV1FixtureLineup: () => mocks.useV1FixtureLineup(),
   useV1Game: () => mocks.useV1Game(),
   postV1GameCommand: (...args: unknown[]) => mocks.postV1GameCommand(...args),
+  // 명단 검인 토글 — 이 스위트는 검인 동작 자체를 검증하지 않지만(전용 스위트가 있다),
+  // 콘솔이 매 렌더 호출하는 훅이라 모듈 목에 반드시 있어야 한다.
+  useV1SetParticipantArrival: () => ({ mutate: vi.fn(), isPending: false, variables: undefined }),
 }));
 vi.mock('@/hooks/use-v1-game-operations-console', () => ({
   useV1GameOperationsConsole: () => mocks.useV1GameOperationsConsole(),

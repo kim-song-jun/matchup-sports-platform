@@ -302,7 +302,24 @@ export const gameSchemaSourceManifest = {
   // 20260823130000_v1_game_participant_arrival_checkin (ADD COLUMN IF NOT EXISTS 1줄).
   // 바인딩된 20260729000100_v1_game_operations 는 그대로라 .migration 해시는 변하지 않는다.
   // 아래 값은 이 브랜치의 schema.prisma 에 `shasum -a 256` 을 다시 돌려 계산한 것이다.
-  schema: '14dc004c7e27f6327d524c7f4a11a692a7862084d1fc5adbb322c6e158987750',
+  // 몰수·중단 종결 사유 재핀: `V1GameOutcomeReason` enum 신설 +
+  // `V1GameResultRevision.outcome_reason` 컬럼(NOT NULL DEFAULT 'NORMAL').
+  // **game domain 을 실제로 건드린다** — 결과 리비전은 이 guard 가 지키는 계약의 중심이다.
+  // 다만 순수 additive 이고 기존 계약을 바꾸지 않는다: 기존 리비전은 전부 NORMAL 이 되며
+  // 그것이 올바른 값이다(과거 경기를 소급해 몰수로 재분류할 수 없다). 점수 계산·이벤트
+  // 집계·불변식(v1_guard_*)은 이 컬럼을 읽지 않는다 — "이 점수가 정상 경기의 결과가
+  // 아니다"라는 표시일 뿐 점수를 대신 정하지 않는다(2026-08-23 사용자 결정 Q3: 표준
+  // 스코어 자동 부여 대신 운영자 입력 + 사유 필수). 뒷받침 마이그레이션:
+  // 20260823140000_v1_game_outcome_reason. 바인딩된 20260729000100_v1_game_operations 는
+  // 그대로라 .migration 해시는 변하지 않는다.
+  // 아래 값은 이 브랜치의 schema.prisma 에 `shasum -a 256` 을 다시 돌려 계산한 것이다.
+  // (같은 브랜치 재핀) Copilot 리뷰 지적으로 사유 본문을 `reason` 재사용에서
+  // 전용 `outcome_note` 컬럼으로 분리했다 — reason 은 정정·시스템 동기화 사유가 쓰는
+  // 칸이라 후속 리비전이 덮어써서 몰수 사유가 조용히 사라진다. 여전히 순수 additive.
+  //
+  // (병합 재핀) 위 두 변경이 **모두 들어간 뒤**의 schema.prisma 해시다 — 어느 한쪽
+  // 브랜치의 값을 그대로 쓰면 CI 가 깨진다(이 파일의 기존 병합 재핀 선례와 동일).
+  schema: '490c8690b88ed8a26cc9d414126010431fa95393e04d699efb02c2243bb71712',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

@@ -3098,6 +3098,25 @@ model V1GameEvent {
   @@map("v1_game_events")
 }
 
+/// 경기가 **왜** 그 점수로 끝났는지. 1차 대회 회고의 "몰수·중단 등 특수 상황 처리"
+/// 항목이다 — 지금까지 운영자는 몰수를 임의 점수(3-0 등)로 수기 입력하는 수밖에
+/// 없었고, 그러면 정상 종료와 구분이 안 돼 **왜 그 점수인지 근거가 남지 않았다**.
+/// 이의제기가 들어오면 방어할 기록이 없었다는 뜻이다.
+///
+/// 2026-08-23 사용자 결정(Q3): 종목별 표준 스코어를 시스템이 자동 부여하지 않고
+/// **운영자가 점수를 직접 입력하되 사유를 필수로 남긴다.** 그래서 이 enum 은 점수를
+/// 대신 정해 주지 않고, "이 점수가 정상 경기의 결과가 아니다"라는 사실만 표시한다.
+/// 사유 본문은 전용 `outcomeNote` 컬럼에 담으며 NORMAL 이 아니면 필수다(서비스 검증) —
+/// `reason` 재사용은 후속 리비전이 덮어써서 폐기했다(그 필드 주석 참고).
+enum V1GameOutcomeReason {
+  /// 정상 종료 — 기존 모든 경기의 값이다(기본값이라 백필 불필요).
+  NORMAL
+  /// 몰수패·기권 — 한쪽이 경기를 수행하지 않아 종결.
+  FORFEIT
+  /// 중단 — 날씨·사고 등으로 경기를 끝까지 진행하지 못하고 종결.
+  ABANDONED
+}
+
 model V1GameResultRevision {
   id                   String                     @id @default(uuid())
   gameId               String                     @map("game_id")
@@ -3108,6 +3127,16 @@ model V1GameResultRevision {
   eventsHash           String                     @map("events_hash")
   missingScorer        Boolean                    @default(false) @map("missing_scorer")
   mvpParticipantId     String?                    @map("mvp_participant_id")
+  /// 정상 종료가 아니면 그 종류. 기본값 NORMAL 이라 기존 리비전 백필이 필요 없다.
+  outcomeReason        V1GameOutcomeReason        @default(NORMAL) @map("outcome_reason")
+  /// 몰수·중단 사유 본문. NORMAL 이 아니면 필수(서비스 검증).
+  ///
+  /// **`reason` 을 재사용하지 않는 이유**(Copilot 리뷰 지적, 실제 결함): `reason` 은
+  /// 정정·시스템 동기화 사유가 쓰는 칸이라 후속 리비전이 덮어쓴다 — 실제로
+  /// `syncAssistsIntoSubmittedRevision` 이 승계 리비전에 '시스템: 어시스트 변경을
+  /// 반영해…' 를 넣는다. 그러면 몰수 사유가 조용히 사라지는데, 사유를 남기는 것이
+  /// 이 기능의 전부라 그 소실은 기능 자체의 무력화다. 별도 칸으로 분리한다.
+  outcomeNote          String?                    @map("outcome_note")
   reason               String?
   createdByActorType   V1IdentityActorType        @map("created_by_actor_type")
   createdByUserId      String?                    @map("created_by_user_id")

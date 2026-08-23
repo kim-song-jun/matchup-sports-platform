@@ -500,6 +500,45 @@ function assertClockNotDrifted(occurredAt: string): void {
  * elsewhere in this file) so this pure parsing rule is unit-testable without
  * a database.
  */
+/**
+ * `end` 커맨드 payload 에서 몰수·중단 종결 사유를 뽑는다.
+ *
+ * 1차 대회 회고 "몰수·중단 등 특수 상황 처리". 지금까지 운영자는 몰수를 임의 점수로
+ * 수기 입력하는 수밖에 없었고, 정상 종료와 구분되지 않아 **왜 그 점수인지 근거가
+ * 남지 않았다**.
+ *
+ * 2026-08-23 사용자 결정(Q3): 종목별 표준 스코어를 자동 부여하지 않는다. 대신
+ * **사유를 필수로** 걸어 임의성이 사람 판단에 남더라도 그 판단이 기록에 남게 한다 —
+ * 이 함수의 존재 이유가 그 "필수"다. 사유 없는 몰수는 여기서 422 로 막힌다.
+ *
+ * `extractEndPenalties` 와 같은 이유로 순수 함수다(payload 가 느슨한 레코드라 DTO
+ * 검증을 못 거치고, DB 없이 단위 테스트할 수 있어야 한다).
+ */
+export function extractEndOutcome(payload: Record<string, unknown>): {
+  outcomeReason: 'NORMAL' | 'FORFEIT' | 'ABANDONED';
+  note: string | null;
+} {
+  const raw = payload.outcomeReason;
+  if (raw === undefined || raw === null || raw === 'NORMAL') {
+    return { outcomeReason: 'NORMAL', note: null };
+  }
+  if (raw !== 'FORFEIT' && raw !== 'ABANDONED') {
+    throw new UnprocessableEntityException({
+      code: 'GAME_OUTCOME_REASON_INVALID',
+      message: "outcomeReason must be one of 'NORMAL', 'FORFEIT', 'ABANDONED'",
+    });
+  }
+  const note = typeof payload.outcomeNote === 'string' ? payload.outcomeNote.trim() : '';
+  if (note.length === 0) {
+    throw new UnprocessableEntityException({
+      code: 'GAME_OUTCOME_NOTE_REQUIRED',
+      message:
+        '몰수·중단으로 종료할 때는 사유를 반드시 남겨야 해요 — 나중에 왜 그 점수인지 설명할 수 있는 유일한 기록이에요.',
+    });
+  }
+  return { outcomeReason: raw, note };
+}
+
 export function extractEndPenalties(payload: Record<string, unknown>): StoredPenalties | undefined {
   const raw = payload.penalties;
   if (raw === undefined) return undefined;
@@ -1123,6 +1162,9 @@ export class GamesService {
             context,
             'END_COMMAND',
             extractEndPenalties(dto.payload),
+            // 몰수·중단 종결 사유. 정상 종료면 NORMAL/null 이라 기존 동작과 같다.
+            // 사유가 비어 있는 몰수는 extractEndOutcome 이 422 로 먼저 막는다.
+            extractEndOutcome(dto.payload),
           );
         }
         return {
@@ -4816,6 +4858,14 @@ export class GamesService {
      */
     penaltyOrigin: 'END_COMMAND' | 'RECOVERY',
     penalties?: StoredPenalties,
+    /**
+     * 몰수·중단 종결 사유. 생략하면 정상 종료(NORMAL)다 — 복구 레인(RECOVERY)은
+     * 이미 저장된 결과를 승계하는 경로라 사유를 새로 만들지 않는다.
+     */
+    outcome: { outcomeReason: 'NORMAL' | 'FORFEIT' | 'ABANDONED'; note: string | null } = {
+      outcomeReason: 'NORMAL',
+      note: null,
+    },
   ): Promise<GameRevisionMutationResult> {
     const [events, participantCandidates, lineups, sides, config] = await Promise.all([
       tx.v1GameEvent.findMany({ where: { gameId: game.id }, orderBy: { sequence: 'asc' } }),
@@ -4862,6 +4912,10 @@ export class GamesService {
       data: {
         gameId: game.id,
         revision: 1,
+        // 몰수·중단이면 그 사실과 사유가 결과 리비전에 함께 박힌다 — 점수만 남기면
+        // 정상 종료와 구분되지 않아 "왜 그 점수인지"를 나중에 설명할 수 없다.
+        outcomeReason: outcome.outcomeReason,
+        outcomeNote: outcome.note,
         score: jsonInput(score),
         goalEvents: jsonInput(
           events
@@ -5320,6 +5374,10 @@ export class GamesService {
         eventsHash: predecessor.eventsHash,
         missingScorer: predecessor.missingScorer,
         mvpParticipantId: predecessor.mvpParticipantId,
+        // 몰수·중단 표식과 사유를 승계한다. 빠뜨리면 기본값 NORMAL 로 떨어져 몰수로
+        // 끝난 경기가 어시스트 동기화 한 번에 정상 종료로 둔갑한다(Copilot 리뷰 지적).
+        outcomeReason: predecessor.outcomeReason,
+        outcomeNote: predecessor.outcomeNote,
         reason: '시스템: 어시스트 변경을 반영해 새 리비전을 제출했어요',
         createdByActorType: context.actor.actorType,
         createdByUserId:

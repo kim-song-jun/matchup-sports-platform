@@ -12,3 +12,9 @@ CREATE TYPE "V1GameOutcomeReason" AS ENUM ('NORMAL', 'FORFEIT', 'ABANDONED');
 
 ALTER TABLE "v1_game_result_revisions"
   ADD COLUMN IF NOT EXISTS "outcome_reason" "V1GameOutcomeReason" NOT NULL DEFAULT 'NORMAL';
+
+-- 사유 본문은 기존 reason 컬럼을 재사용하지 않고 별도로 둔다. reason 은 정정·시스템
+-- 동기화 사유가 쓰는 칸이라 후속 리비전이 덮어쓴다(syncAssistsIntoSubmittedRevision).
+-- 사유를 남기는 것이 이 기능의 전부라 그 소실은 기능 무력화다.
+ALTER TABLE "v1_game_result_revisions"
+  ADD COLUMN IF NOT EXISTS "outcome_note" TEXT;

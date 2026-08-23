@@ -138,7 +138,7 @@ const FIXTURE_MATCH_SELECT = {
           goalEvents: true,
           mvpParticipantId: true,
           outcomeReason: true,
-          reason: true,
+          outcomeNote: true,
         },
       },
       // Lane 1 addition -- see FIXTURE_SCHEDULE_SELECT above.
@@ -552,7 +552,7 @@ export class PublicTournamentRecordsService {
         fixture.game.currentOfficialRevision.outcomeReason !== 'NORMAL'
           ? {
               reason: fixture.game.currentOfficialRevision.outcomeReason,
-              note: fixture.game.currentOfficialRevision.reason,
+              note: fixture.game.currentOfficialRevision.outcomeNote,
             }
           : null,
       pendingProjection: mode === 'live' && resultState === 'pending' && (status === 'live' || status === 'ended'),

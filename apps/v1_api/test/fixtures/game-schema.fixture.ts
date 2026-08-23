@@ -302,7 +302,10 @@ export const gameSchemaSourceManifest = {
   // 20260823140000_v1_game_outcome_reason. 바인딩된 20260729000100_v1_game_operations 는
   // 그대로라 .migration 해시는 변하지 않는다.
   // 아래 값은 이 브랜치의 schema.prisma 에 `shasum -a 256` 을 다시 돌려 계산한 것이다.
-  schema: 'b759e709a17d27d48948044ab8bd6cffddc249275ec13ee17466b0f214da7fc7',
+  // (같은 브랜치 재핀) Copilot 리뷰 지적으로 사유 본문을 `reason` 재사용에서
+  // 전용 `outcome_note` 컬럼으로 분리했다 — reason 은 정정·시스템 동기화 사유가 쓰는
+  // 칸이라 후속 리비전이 덮어써서 몰수 사유가 조용히 사라진다. 여전히 순수 additive.
+  schema: '3538f36422b07a4318e5e84dab41122c3ba4e51a6d897348f394b6c11a2f222f',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

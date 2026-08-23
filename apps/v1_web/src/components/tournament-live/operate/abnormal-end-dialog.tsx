@@ -53,11 +53,13 @@ export function AbnormalEndDialog({ open, onCancel, onConfirm, submitting = fals
   useEffect(() => {
     if (!open) return;
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') onCancel();
+      // 전송 중에는 ESC 로도 닫지 않는다. 버튼만 잠그면 키보드 경로가 그대로 열려 있어
+      // 중복 종료 방지 의도가 반쪽이 된다(Copilot 리뷰 지적).
+      if (event.key === 'Escape' && !submitting) onCancel();
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [open, onCancel]);
+  }, [open, onCancel, submitting]);
 
   if (!open) return null;
 
@@ -69,7 +71,8 @@ export function AbnormalEndDialog({ open, onCancel, onConfirm, submitting = fals
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
       role="presentation"
       onClick={(event) => {
-        if (event.target === event.currentTarget) onCancel();
+        // 백드롭 클릭도 전송 중에는 막는다 — ESC 와 같은 우회 경로다.
+        if (event.target === event.currentTarget && !submitting) onCancel();
       }}
     >
       <div

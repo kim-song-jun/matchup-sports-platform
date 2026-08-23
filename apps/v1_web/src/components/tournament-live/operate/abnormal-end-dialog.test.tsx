@@ -85,6 +85,15 @@ describe('AbnormalEndDialog — 몰수·중단 종료', () => {
     expect(onCancel).toHaveBeenCalled();
   });
 
+  // Copilot 리뷰 지적 — 버튼만 잠그면 키보드/백드롭 경로가 열려 있어 반쪽이다.
+  it('전송 중에는 ESC 로도 닫히지 않는다', () => {
+    const onCancel = vi.fn();
+    render(<AbnormalEndDialog open submitting onCancel={onCancel} onConfirm={vi.fn()} />);
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(onCancel).not.toHaveBeenCalled();
+  });
+
   it('전송 중에는 취소와 확정을 모두 잠근다 (중복 종료 방지)', () => {
     render(<AbnormalEndDialog open submitting onCancel={vi.fn()} onConfirm={vi.fn()} />);
 

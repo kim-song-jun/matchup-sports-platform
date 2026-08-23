@@ -4835,9 +4835,8 @@ export class GamesService {
         revision: 1,
         // 몰수·중단이면 그 사실과 사유가 결과 리비전에 함께 박힌다 — 점수만 남기면
         // 정상 종료와 구분되지 않아 "왜 그 점수인지"를 나중에 설명할 수 없다.
-        // 사유 본문은 기존 `reason` 자유 텍스트 컬럼을 그대로 쓴다(정정 사유와 같은 칸).
         outcomeReason: outcome.outcomeReason,
-        ...(outcome.note === null ? {} : { reason: outcome.note }),
+        outcomeNote: outcome.note,
         score: jsonInput(score),
         goalEvents: jsonInput(
           events
@@ -5296,6 +5295,10 @@ export class GamesService {
         eventsHash: predecessor.eventsHash,
         missingScorer: predecessor.missingScorer,
         mvpParticipantId: predecessor.mvpParticipantId,
+        // 몰수·중단 표식과 사유를 승계한다. 빠뜨리면 기본값 NORMAL 로 떨어져 몰수로
+        // 끝난 경기가 어시스트 동기화 한 번에 정상 종료로 둔갑한다(Copilot 리뷰 지적).
+        outcomeReason: predecessor.outcomeReason,
+        outcomeNote: predecessor.outcomeNote,
         reason: '시스템: 어시스트 변경을 반영해 새 리비전을 제출했어요',
         createdByActorType: context.actor.actorType,
         createdByUserId:

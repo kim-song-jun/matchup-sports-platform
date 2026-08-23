@@ -3114,9 +3114,16 @@ model V1GameResultRevision {
   eventsHash           String                     @map("events_hash")
   missingScorer        Boolean                    @default(false) @map("missing_scorer")
   mvpParticipantId     String?                    @map("mvp_participant_id")
-  /// 정상 종료가 아니면 그 종류. `reason` 이 그 사유 본문이다(NORMAL 이 아니면 필수).
-  /// 기본값 NORMAL 이라 기존 리비전 백필이 필요 없다.
+  /// 정상 종료가 아니면 그 종류. 기본값 NORMAL 이라 기존 리비전 백필이 필요 없다.
   outcomeReason        V1GameOutcomeReason        @default(NORMAL) @map("outcome_reason")
+  /// 몰수·중단 사유 본문. NORMAL 이 아니면 필수(서비스 검증).
+  ///
+  /// **`reason` 을 재사용하지 않는 이유**(Copilot 리뷰 지적, 실제 결함): `reason` 은
+  /// 정정·시스템 동기화 사유가 쓰는 칸이라 후속 리비전이 덮어쓴다 — 실제로
+  /// `syncAssistsIntoSubmittedRevision` 이 승계 리비전에 '시스템: 어시스트 변경을
+  /// 반영해…' 를 넣는다. 그러면 몰수 사유가 조용히 사라지는데, 사유를 남기는 것이
+  /// 이 기능의 전부라 그 소실은 기능 자체의 무력화다. 별도 칸으로 분리한다.
+  outcomeNote          String?                    @map("outcome_note")
   reason               String?
   createdByActorType   V1IdentityActorType        @map("created_by_actor_type")
   createdByUserId      String?                    @map("created_by_user_id")

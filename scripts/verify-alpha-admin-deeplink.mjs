@@ -38,9 +38,14 @@ function listCalls(urls) {
 
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+// secure 를 BASE 프로토콜에서 계산한다. 이 저장소의 다른 alpha 캡처 스크립트들은
+// secure: true 로 고정하는데, 그것들과 달리 이 스크립트는 CAPTURE_BASE 로 대상을 바꿀 수
+// 있다고 문서에 적어뒀다 — http 대상에서 고정 secure 는 쿠키를 조용히 버려 **로그인은
+// 성공했는데 화면은 비인증** 인 상태로 측정하게 만든다. 그러면 원인을 찾기 어렵다.
+const isHttps = new URL(BASE).protocol === 'https:';
 await ctx.addCookies([{
   name: 'teameet_v1_session', value: token,
-  domain: new URL(BASE).hostname, path: '/', httpOnly: true, secure: true, sameSite: 'Lax',
+  domain: new URL(BASE).hostname, path: '/', httpOnly: true, secure: isHttps, sameSite: 'Lax',
 }]);
 
 const results = [];

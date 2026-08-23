@@ -109,6 +109,7 @@ export const v1InquiriesFixture: { items: V1Inquiry[]; pageInfo: { nextCursor: s
     {
       inquiryId: 'inquiry-1',
       category: 'account',
+      reportReason: null,
       title: '로그인 문의',
       body: '이메일 로그인 과정에서 도움이 필요해요.',
       contact: null,

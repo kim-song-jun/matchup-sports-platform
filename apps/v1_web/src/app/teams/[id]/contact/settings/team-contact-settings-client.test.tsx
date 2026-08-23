@@ -57,10 +57,9 @@ describe('TeamContactSettingsPageClient', () => {
 
     render(<TeamContactSettingsPageClient teamId="team-1" />);
 
-    const selected = screen.getByRole('radio', { name: /모집 중일 때만/ });
-    expect(selected).toHaveAttribute('aria-checked', 'true');
-    const notSelected = screen.getByRole('radio', { name: /항상 받기/ });
-    expect(notSelected).toHaveAttribute('aria-checked', 'false');
+    // 네이티브 <input type="radio"> 라 checked 로 단언한다(aria-checked 는 흉내낸 경우에만 필요).
+    expect(screen.getByRole('radio', { name: /모집 중일 때만/ })).toBeChecked();
+    expect(screen.getByRole('radio', { name: /항상 받기/ })).not.toBeChecked();
   });
 
   it('다른 정책을 고르면 mutation 이 그 값으로 호출된다', () => {

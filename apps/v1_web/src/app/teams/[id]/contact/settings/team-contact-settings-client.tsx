@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState } from '@/components/v1-ui/primitives';
 import {
@@ -31,6 +31,7 @@ export function TeamContactSettingsPageClient({ teamId }: { teamId: string }) {
   const updatePolicy = useV1UpdateContactPolicy(teamId);
   const removeBlock = useV1RemoveTeamContactBlock(teamId);
   const [error, setError] = useState<string | null>(null);
+  const idPrefix = useId();
 
   // 정책의 진실은 팀 상세다 — PATCH 응답은 { id, contactPolicy } 만 돌려주므로 화면 상태를
   // 그 응답으로 끌고 가지 않는다. 성공 시 훅이 팀 상세를 무효화하고, 재조회된 값이 여기 반영된다.
@@ -73,48 +74,51 @@ export function TeamContactSettingsPageClient({ teamId }: { teamId: string }) {
             {teamQuery.data?.name ?? '우리 팀'}에 다른 팀이 컨택을 보낼 수 있는 조건이에요.
           </div>
 
-          <div role="radiogroup" aria-label="컨택 수신 설정" style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+          {/* 네이티브 라디오를 쓴다. button + role="radio" 로는 방향키 이동·단일 tab stop 을
+              직접 구현해야 하고(저장소 다른 화면들이 그 상태다), 빼먹으면 키보드·스크린리더
+              사용자가 그룹으로 조작할 수 없다. 네이티브는 그 동작이 전부 공짜다. */}
+          <fieldset style={{ border: 'none', padding: 0, margin: '12px 0 0', display: 'grid', gap: 8 }}>
+            <legend className="tm-text-label" style={{ padding: 0 }}>
+              누가 컨택을 보낼 수 있나요?
+            </legend>
             {POLICY_OPTIONS.map((option) => {
               const selected = option.value === currentPolicy;
+              const inputId = `${idPrefix}-policy-${option.value}`;
               return (
-                <button
+                <label
                   key={option.value}
-                  type="button"
-                  role="radio"
-                  aria-checked={selected}
-                  disabled={updatePolicy.isPending}
-                  onClick={() => handlePolicyChange(option.value)}
-                  className="tm-card-row"
+                  htmlFor={inputId}
                   style={{
                     minHeight: 44,
                     display: 'flex',
                     alignItems: 'center',
                     gap: 10,
                     padding: '10px 12px',
-                    textAlign: 'left',
-                    width: '100%',
                     borderRadius: 10,
+                    cursor: updatePolicy.isPending ? 'default' : 'pointer',
                     border: `1px solid ${selected ? 'var(--blue500)' : 'var(--border)'}`,
                     background: selected ? 'var(--blue50)' : 'var(--surface)',
                   }}
                 >
-                  {/* 선택 상태를 색으로만 알리지 않는다 — 체크 표시와 '선택됨' 텍스트를 함께 둔다. */}
-                  <span aria-hidden="true" style={{ color: selected ? 'var(--blue500)' : 'var(--text-muted)' }}>
-                    {selected ? '◉' : '○'}
-                  </span>
+                  <input
+                    type="radio"
+                    id={inputId}
+                    name={`${idPrefix}-contact-policy`}
+                    value={option.value}
+                    checked={selected}
+                    disabled={updatePolicy.isPending}
+                    onChange={() => handlePolicyChange(option.value)}
+                  />
                   <span style={{ display: 'grid', gap: 2 }}>
-                    <span className="tm-text-label">
-                      {option.label}
-                      {selected ? ' · 선택됨' : null}
-                    </span>
+                    <span className="tm-text-label">{option.label}</span>
                     <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
                       {option.description}
                     </span>
                   </span>
-                </button>
+                </label>
               );
             })}
-          </div>
+          </fieldset>
         </Card>
 
         <Card>

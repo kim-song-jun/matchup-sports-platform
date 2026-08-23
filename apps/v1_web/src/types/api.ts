@@ -325,6 +325,8 @@ export type V1Inquiry = {
   contact: string | null;
   relatedType: V1InquiryRelatedType | null;
   relatedId: string | null;
+  /** 신고(`category: 'report'`)에만 실린다 — 그 외 문의에는 서버가 null 을 넣는다. */
+  reportReason: V1InquiryReportReason | null;
   status: V1InquiryStatus;
   createdAt: string;
   updatedAt: string;

@@ -467,6 +467,7 @@ export const v1MswHandlers = [
     const inquiry: V1Inquiry = {
       inquiryId: `inquiry-${v1InquiriesFixture.items.length + 1}`,
       category: body.category as V1Inquiry['category'],
+      reportReason: null,
       title: body.title,
       body: body.body,
       contact: body.contact ?? null,

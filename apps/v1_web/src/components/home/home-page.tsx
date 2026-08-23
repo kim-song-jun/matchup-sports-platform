@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ShieldAlert, X } from 'lucide-react';
+import { Eye, ShieldAlert, X } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { PendingReviewsCard } from '@/components/tournaments/pending-review-card';
 import { LineupTodoCard } from '@/components/lineup/lineup-todo-card';
@@ -60,6 +60,9 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
               카드가 화면 끝에서 끝까지 늘어나 아래 콘텐츠의 여백선과 어긋났다(390 실측: 배너
               0~390 vs 다른 카드 20~370). 배너 슬롯이 그 여백을 책임진다. */}
           <div className="tm-home-banner-slot">
+            {model.recordConsentNudge ? (
+              <RecordConsentNudgeBanner recordConsentNudge={model.recordConsentNudge} />
+            ) : null}
             {model.pushNudge ? <PushNudgeBanner pushNudge={model.pushNudge} /> : null}
             {model.phoneVerifyNudge ? <PhoneVerifyBanner phoneVerifyNudge={model.phoneVerifyNudge} /> : null}
           {/* 남은 후기 유도 — 홈에는 대회 후기 전용 바텀시트 모달만 있어서 경기 후기는
@@ -336,6 +339,84 @@ function HomeChatFloatingButton({ model }: { model: HomeViewModel }) {
         <span className="tm-floating-count tab-num" aria-hidden="true">{model.chatUnreadCount}</span>
       ) : null}
     </Link>
+  );
+}
+
+/**
+ * 경기 기록 공개 동의 유도 배너 (Task 154 P0-3).
+ *
+ * 형태는 `PushNudgeBanner` 를 그대로 따른다 -- 아이콘 + 문구 2줄 + 닫기, 그리고 CTA 는
+ * 아래 줄로 분리. 390px 에서 한 줄에 다 넣으면 문구 자리가 남지 않는다는 그쪽 주석의
+ * 판단이 여기서도 그대로 적용된다.
+ *
+ * 다른 점은 **문구가 아니라 숫자로 이유를 준다**는 것이다. "공개할까요?" 만으로는 왜 지금
+ * 나에게 뜨는지 알 수 없고, 켜고 나서 뭐가 달라지는지도 모른다. 서버가 계산한
+ * `pendingCount`(지금 켜면 즉시 공개될 경기 수)를 앞세워 그 둘을 한 번에 답한다 --
+ * 이 숫자가 0 인 사용자에겐 배너 자체가 뜨지 않으므로 "0경기" 는 렌더되지 않는다.
+ */
+function RecordConsentNudgeBanner({
+  recordConsentNudge,
+}: {
+  recordConsentNudge: NonNullable<HomeViewModel['recordConsentNudge']>;
+}) {
+  return (
+    <Card pad={14} style={{ marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <span
+          aria-hidden="true"
+          style={{
+            flexShrink: 0,
+            width: 36,
+            height: 36,
+            borderRadius: 10,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'var(--blue-soft)',
+            color: 'var(--blue700)',
+          }}
+        >
+          <Eye size={18} strokeWidth={2} />
+        </span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="tm-text-label">
+            {recordConsentNudge.pendingCount}경기가 공개를 기다려요
+          </div>
+          <div className="tm-text-caption" style={{ marginTop: 2 }}>
+            공개하면 내 출전·득점이 프로필에 표시돼요.
+          </div>
+        </div>
+        <button
+          type="button"
+          aria-label="경기 기록 공개 안내 닫기"
+          className="tm-pressable"
+          style={{ flexShrink: 0, padding: 6, minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={recordConsentNudge.onDismiss}
+        >
+          <X size={18} aria-hidden="true" />
+        </button>
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+        {/* 무엇이 공개되는지 확인할 경로를 항상 함께 둔다 -- 개인정보 공개를 "보지 않고
+            버튼 한 번"으로 켜게 만들지 않기 위한 것이다. */}
+        <Link
+          href="/my/settings/record-consent"
+          className="tm-btn tm-btn-sm tm-btn-neutral"
+          style={{ flex: 1, minHeight: 44 }}
+        >
+          어떤 기록인지 보기
+        </Link>
+        <button
+          type="button"
+          className="tm-btn tm-btn-sm tm-btn-primary"
+          style={{ flex: 1, minHeight: 44 }}
+          disabled={recordConsentNudge.saving}
+          onClick={recordConsentNudge.onGrant}
+        >
+          {recordConsentNudge.saving ? '적용 중' : '공개하기'}
+        </button>
+      </div>
+    </Card>
   );
 }
 

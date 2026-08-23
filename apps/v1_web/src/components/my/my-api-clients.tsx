@@ -71,6 +71,7 @@ import { ErrorState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import type { MyHomeViewModel, MyInvitationItem, MyJoinApplicationItem, MyJoinApplicationsViewModel, MyMember, MyTeam, MyTeamMembersViewModel, MyTeamsViewModel } from './my.types';
 import { myHomeModel, settingsModel } from './my.view-model';
+import { RECORD_CONSENT_POLICY_HASH } from '@/lib/record-consent';
 
 type ProfileEditErrors = Partial<Record<'realName' | 'nickname' | 'email' | 'phone' | 'birthDate' | 'gender' | 'profileImage' | 'form', string>>;
 type DuplicateCheckState = {
@@ -1494,7 +1495,8 @@ export function NotificationSettingsPageClient() {
 // 지금은 v1 최초 버전이라 상수 하나로 고정한다 — 서버는 이 값을 그대로
 // V1UserRecordConsent.policyHash에 저장할 뿐 검증하지 않는다(신뢰 경계는 프론트가 아니라
 // "무엇에 동의했는지" 감사 로그 목적).
-const RECORD_CONSENT_POLICY_HASH = 'v1-public-record-consent-1';
+// 정책 해시는 홈 넛지 배너(Task 154 P0-3)와 공유한다 -- 두 곳이 다른 값을 보내면
+// 같은 동의가 서로 다른 문구에 동의한 것으로 기록된다.
 
 export function RecordConsentSettingsPageClient() {
   const consent = useV1RecordConsent();

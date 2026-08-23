@@ -97,6 +97,18 @@ export type HomeViewModel = {
     onDismiss: () => void;
   };
   /**
+   * 경기 기록 공개 동의 유도 배너 (Task 154 P0-3). undefined면 렌더하지 않는다.
+   * 아직 응답한 적 없고, **켜면 실제로 공개될 기록이 있는** 사용자에게만 뜬다 --
+   * 연결·공식확정이 안 끝난 사람에게 조르면 켜도 화면이 그대로라 신뢰만 잃는다.
+   */
+  recordConsentNudge?: {
+    /** 지금 켜면 공개될 경기 수. 0이면 애초에 이 객체가 undefined 다. */
+    pendingCount: number;
+    saving: boolean;
+    onGrant: () => void;
+    onDismiss: () => void;
+  };
+  /**
    * 휴대폰 본인인증을 아직 완료하지 않은 계정에게 상시 노출하는 배너. undefined면 렌더하지 않는다.
    * 인증 전에는 쓰기가 전부 막히므로 닫기(dismiss)를 제공하지 않는다.
    */

@@ -16,6 +16,11 @@ const chromeMock = vi.fn(({ children }: { children: React.ReactNode }) => <div>{
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1FixtureLineupAccess: (...args: unknown[]) => accessMock(...args),
+  // Task 154 P0-5: 같은 화면에 "이 기록은 제 것입니다" 섹션이 붙으면서 이 훅들도 탄다.
+  // 이 스펙의 관심사는 라인업 CTA 노출 규칙이므로, 목록 조회는 비활성(모달 닫힘) 상태로
+  // 고정한다 -- 섹션 자체의 계약은 별도 스펙이 맡는다.
+  useV1ClaimableParticipants: () => ({ data: undefined, isLoading: false, isError: false, error: null }),
+  useV1RequestIdentityLink: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 vi.mock('@/components/public-game-records/use-public-game-records', () => ({

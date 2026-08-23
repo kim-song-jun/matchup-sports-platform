@@ -326,12 +326,15 @@ export function TournamentInfoSection() {
     const parseRule = (raw: string): number | null | 'invalid' => {
       if (!raw.trim()) return null;
       const parsed = Number(raw);
-      return Number.isInteger(parsed) && parsed > 0 ? parsed : 'invalid';
+      // 서버 DTO 가 1~20 으로 검증한다(admin-tournament.dto.ts) — 클라이언트가 > 0 만
+      // 보면 21 이 통과한 뒤 서버에서 400 으로 깨진다(Copilot 리뷰 지적). input 의
+      // max={20} 은 브라우저에 따라 강제되지 않으므로 여기서 같은 범위를 검사한다.
+      return Number.isInteger(parsed) && parsed >= 1 && parsed <= 20 ? parsed : 'invalid';
     };
     const normalizedYellowLimit = parseRule(editYellowLimit);
     const normalizedRedSuspension = parseRule(editRedSuspension);
     if (normalizedYellowLimit === 'invalid' || normalizedRedSuspension === 'invalid') {
-      showToast('출전정지 기준은 1 이상의 정수로 적어 주세요.', 'error');
+      showToast('출전정지 기준은 1~20 사이의 정수로 적어 주세요.', 'error');
       return;
     }
     if (normalizedYellowLimit !== (tournament.yellowAccumulationLimit ?? null)) {

@@ -4110,15 +4110,14 @@ export class GamesService {
     lineupId: string,
   ): Promise<void> {
     if (game.sourceType !== V1GameSourceType.TOURNAMENT_FIXTURE) return;
-    // FK 는 V1Game.tournamentFixtureId 쪽에 있고 V1TournamentFixture.game 은 역방향
-    // 관계라 fixture 를 gameId 로 직접 찾을 수 없다 — 게임에서 관계를 따라간다.
-    const fixture = (
-      await tx.v1Game.findUnique({
-        where: { id: game.id },
-        select: { tournamentFixture: { select: { id: true, tournamentId: true } } },
-      })
-    )?.tournamentFixture;
-    if (fixture === null || fixture === undefined) return;
+    // `LockedGame` 이 이미 `tournamentFixtureId` 를 들고 있으므로 게임을 다시 조회하지
+    // 않는다 — 앞선 버전은 관계를 따라가느라 쿼리를 한 번 더 썼다(Copilot 리뷰 지적).
+    if (game.tournamentFixtureId === null) return;
+    const fixture = await tx.v1TournamentFixture.findUnique({
+      where: { id: game.tournamentFixtureId },
+      select: { id: true, tournamentId: true },
+    });
+    if (fixture === null) return;
 
     const verdicts = await this.suspensionVerdicts(tx, fixture.tournamentId, fixture.id);
     if (verdicts.size === 0) return; // 규정 미적용이거나 누적 카드가 아직 없다.
@@ -4173,7 +4172,15 @@ export class GamesService {
     // 라운드·번호로 이어 정렬한다 — 순서를 못 정하면 판정 자체가 불가능하다.
     const fixtures = await tx.v1TournamentFixture.findMany({
       where: { tournamentId },
-      orderBy: [{ scheduledAt: 'asc' }, { round: 'asc' }, { fixtureNumber: 'asc' }],
+      // `nulls: 'last'` 를 **명시한다.** Postgres 의 ASC 기본값이 이미 NULLS LAST 라
+      // 동작은 같지만(Copilot 은 "기본이 nulls first"라고 봤는데 그건 DESC 얘기다),
+      // 이 순서가 정지 판정의 기준축이라 기본값에 기대지 않고 의도를 코드에 박는다 —
+      // 일정 미정 픽스처가 앞으로 오면 gameOrder 가 통째로 어긋난다.
+      orderBy: [
+        { scheduledAt: { sort: 'asc', nulls: 'last' } },
+        { round: 'asc' },
+        { fixtureNumber: 'asc' },
+      ],
       select: { id: true, game: { select: { currentOfficialRevisionId: true } } },
     });
     const orderByFixtureId = new Map(fixtures.map((fixture, index) => [fixture.id, index + 1]));

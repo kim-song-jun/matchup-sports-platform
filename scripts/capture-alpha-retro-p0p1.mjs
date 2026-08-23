@@ -29,6 +29,9 @@ const OUT_DIR = process.env.OUT_DIR;
 const TOURNAMENT_ID = process.env.TOURNAMENT_ID;
 const FIXTURE_ID = process.env.FIXTURE_ID;
 const ONLY = (process.env.ONLY ?? '').split(',').filter(Boolean);
+/** 몰수·중단으로 **확정된** 경기 — 표시 캡처(public-outcome / review-outcome)에만 쓴다. */
+const OUTCOME_FIXTURE_ID = process.env.OUTCOME_FIXTURE_ID;
+const OUTCOME_FIXTURE_LABEL = process.env.OUTCOME_FIXTURE_LABEL ?? '';
 
 for (const [k, v] of Object.entries({ ALPHA_EMAIL: EMAIL, ALPHA_PASSWORD: PASSWORD, OUT_DIR, TOURNAMENT_ID, FIXTURE_ID })) {
   if (!v) {
@@ -102,6 +105,34 @@ const PAGES = [
       // 전원이 걸리는 질의(alpha 테스트 계정은 이름이 다 'E2E …' 라 '2' 가 전원 매칭)도
       // 마찬가지다 — 한 명만 남는 질의라야 동작이 화면에 드러난다.
       await search.fill('선수3');
+      await page.waitForTimeout(600);
+      return null;
+    },
+  },
+  {
+    key: 'public-outcome',
+    label: '관전자 경기 상세 — 몰수·중단 표기 (BRACKET-6 표시)',
+    // 몰수로 **확정된** 경기여야 서버가 outcome 을 내려준다(공식 결과 공개 이후에만 노출).
+    url: `${ORIGIN}/tournaments/${TOURNAMENT_ID}/matches/${OUTCOME_FIXTURE_ID ?? FIXTURE_ID}`,
+    async prepare(page) {
+      const notice = page.getByText(/으로 종료된 경기예요/);
+      await notice.first().waitFor({ state: 'visible', timeout: 15_000 });
+      await notice.first().scrollIntoViewIfNeeded();
+      await page.waitForTimeout(600);
+      return null;
+    },
+  },
+  {
+    key: 'review-outcome',
+    label: '어드민 결과 검토 — 몰수 사유 배너 (BRACKET-6 표시)',
+    url: `${ORIGIN}/admin/live/${TOURNAMENT_ID}/result-review`,
+    async prepare(page) {
+      const card = page.locator('a,button,[role="button"]').filter({ hasText: OUTCOME_FIXTURE_LABEL });
+      if ((await card.count()) === 0) return 'fixture-card-missing';
+      await card.first().click();
+      const banner = page.getByText(/으로 종료된 경기예요/);
+      await banner.first().waitFor({ state: 'visible', timeout: 15_000 });
+      await banner.first().scrollIntoViewIfNeeded();
       await page.waitForTimeout(600);
       return null;
     },

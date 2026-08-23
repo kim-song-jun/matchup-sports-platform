@@ -2895,6 +2895,10 @@ export type V1Tournament = {
   bankName: string | null;
   bankAccount: string | null;
   bankHolder: string | null;
+  /** 경고 누적 출전정지 기준(장). null = 이 대회에는 카드 정지 규정 미적용. */
+  yellowAccumulationLimit: number | null;
+  /** 퇴장 1장당 출전정지 경기 수. null = 미적용. */
+  redCardSuspensionMatches: number | null;
   rulesText: string | null;
   refundPolicyText: string | null;
   registrationCount: number;
@@ -3117,6 +3121,10 @@ export type V1TournamentDetail = {
   promoListPrizeText: string | null;
   promoListPriority: number;
   campaignSlug: string | null;
+  /** 경고 누적 출전정지 기준(장). null = 이 대회에는 카드 정지 규정 미적용. */
+  yellowAccumulationLimit: number | null;
+  /** 퇴장 1장당 출전정지 경기 수. null = 미적용. */
+  redCardSuspensionMatches: number | null;
   rulesText: string | null;
   refundPolicyText: string | null;
   confirmedCount: number;
@@ -3557,6 +3565,10 @@ export type V1CreateTournamentPayload = {
   bankName?: string;
   bankAccount?: string;
   bankHolder?: string;
+  /** 경고 누적 출전정지 기준(장). 생략·null = 미적용. */
+  yellowAccumulationLimit?: number | null;
+  /** 퇴장 1장당 출전정지 경기 수. 생략·null = 미적용. */
+  redCardSuspensionMatches?: number | null;
   rulesText?: string;
   refundPolicyText?: string;
 };

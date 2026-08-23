@@ -1657,7 +1657,13 @@ export function useV1FixtureLineupAccess(tournamentId: string, fixtureId: string
 export type V1FixtureLineupRoster = {
   sideId: string;
   registrationId: string;
-  players: Array<{ tournamentPlayerId: string; userId: string; name: string }>;
+  players: Array<{
+    tournamentPlayerId: string;
+    userId: string;
+    name: string;
+    /** 팀이 지정한 고정 등번호(V1TeamMembership.jerseyNumber). 미지정이면 null. */
+    teamJerseyNumber: number | null;
+  }>;
 };
 
 export function useV1FixtureLineupRoster(
@@ -2202,7 +2208,18 @@ export function useV1NotificationPreferences() {
  * 동의하면 과거 경기까지 전부 소급 공개된다(시점 비교 없음, 사용자 명시 결정) — 그래서
  * 토글 문구가 이 소급 효과를 먼저 알려야 한다.
  */
-export type V1RecordConsent = { granted: boolean; effectiveAt: string | null };
+export type V1RecordConsent = {
+  granted: boolean;
+  effectiveAt: string | null;
+  /**
+   * GRANTED/REVOKED 와 무관하게 "한 번이라도 응답했는지". `granted:false` 만으로는
+   * "거부"와 "아직 안 물어봄"이 구분되지 않는데, 유도 배너는 둘을 다르게 다뤄야 한다
+   * (명시적 거부는 다시 조르지 않는다). 옛 서버 응답에는 없으므로 optional.
+   */
+  hasResponded?: boolean;
+  /** 지금 동의를 켜면 즉시 공개될 경기 수. 이미 GRANTED 면 서버가 0 으로 내려준다. */
+  pendingRecordCount?: number;
+};
 
 export function useV1RecordConsent() {
   return useQuery({

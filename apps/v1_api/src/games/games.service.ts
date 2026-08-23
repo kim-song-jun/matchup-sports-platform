@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   HttpException,
@@ -31,6 +32,11 @@ import type {
 } from '../common/audit/operation-audit.contract';
 import { OperationAuditWriterService } from '../common/audit/operation-audit-writer.service';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  evaluateSuspension,
+  suspensionRulesEnabled,
+  type PlayedGameCards,
+} from '../tournaments/discipline/card-suspension';
 import { cascadeCompleteTeamMatchSchedulesInTx } from '../team-schedules/team-schedules.service';
 import {
   parseLineupCatalog,
@@ -500,6 +506,45 @@ function assertClockNotDrifted(occurredAt: string): void {
  * elsewhere in this file) so this pure parsing rule is unit-testable without
  * a database.
  */
+/**
+ * `end` 커맨드 payload 에서 몰수·중단 종결 사유를 뽑는다.
+ *
+ * 1차 대회 회고 "몰수·중단 등 특수 상황 처리". 지금까지 운영자는 몰수를 임의 점수로
+ * 수기 입력하는 수밖에 없었고, 정상 종료와 구분되지 않아 **왜 그 점수인지 근거가
+ * 남지 않았다**.
+ *
+ * 2026-08-23 사용자 결정(Q3): 종목별 표준 스코어를 자동 부여하지 않는다. 대신
+ * **사유를 필수로** 걸어 임의성이 사람 판단에 남더라도 그 판단이 기록에 남게 한다 —
+ * 이 함수의 존재 이유가 그 "필수"다. 사유 없는 몰수는 여기서 422 로 막힌다.
+ *
+ * `extractEndPenalties` 와 같은 이유로 순수 함수다(payload 가 느슨한 레코드라 DTO
+ * 검증을 못 거치고, DB 없이 단위 테스트할 수 있어야 한다).
+ */
+export function extractEndOutcome(payload: Record<string, unknown>): {
+  outcomeReason: 'NORMAL' | 'FORFEIT' | 'ABANDONED';
+  note: string | null;
+} {
+  const raw = payload.outcomeReason;
+  if (raw === undefined || raw === null || raw === 'NORMAL') {
+    return { outcomeReason: 'NORMAL', note: null };
+  }
+  if (raw !== 'FORFEIT' && raw !== 'ABANDONED') {
+    throw new UnprocessableEntityException({
+      code: 'GAME_OUTCOME_REASON_INVALID',
+      message: "outcomeReason must be one of 'NORMAL', 'FORFEIT', 'ABANDONED'",
+    });
+  }
+  const note = typeof payload.outcomeNote === 'string' ? payload.outcomeNote.trim() : '';
+  if (note.length === 0) {
+    throw new UnprocessableEntityException({
+      code: 'GAME_OUTCOME_NOTE_REQUIRED',
+      message:
+        '몰수·중단으로 종료할 때는 사유를 반드시 남겨야 해요 — 나중에 왜 그 점수인지 설명할 수 있는 유일한 기록이에요.',
+    });
+  }
+  return { outcomeReason: raw, note };
+}
+
 export function extractEndPenalties(payload: Record<string, unknown>): StoredPenalties | undefined {
   const raw = payload.penalties;
   if (raw === undefined) return undefined;
@@ -1123,6 +1168,9 @@ export class GamesService {
             context,
             'END_COMMAND',
             extractEndPenalties(dto.payload),
+            // 몰수·중단 종결 사유. 정상 종료면 NORMAL/null 이라 기존 동작과 같다.
+            // 사유가 비어 있는 몰수는 extractEndOutcome 이 422 로 먼저 막는다.
+            extractEndOutcome(dto.payload),
           );
         }
         return {
@@ -2128,6 +2176,56 @@ export class GamesService {
     }));
   }
 
+  /**
+   * 명단 검인(체크인) — 참가자가 실제로 도착했음을 현장에서 확정한다.
+   * 1차 대회 회고: "명단 검인 과정에서 오지 않거나, 하지 않은 사람들에 대한 확인이 어려움".
+   *
+   * **`withCommand` 를 쓰지 않는다.** 체크인은 라인업 내용을 바꾸지 않고 킥오프 직전 여러
+   * 명을 연달아 누르는 조작이라, 버전 커맨드로 만들면 한 명 누를 때마다 revision 이 올라
+   * 다음 사람에서 곧바로 409 VERSION_CONFLICT 가 난다. 그래서 게임/라인업 버전과 완전히
+   * 분리된 단순 토글로 둔다 — 되돌리기(arrived=false → NULL)도 같은 이유로 값싸야 한다.
+   *
+   * **경기 상태로 막지 않는다.** 사람은 킥오프 직전은 물론 경기가 시작된 뒤에도 도착하고,
+   * 늦게 온 사람을 기록하는 것이 이 기능의 목적이다. 라인업 저장의 deadline 게이트
+   * (SCHEDULED 전용)를 여기에 그대로 옮기면 정작 필요한 순간에 잠긴다.
+   */
+  async setParticipantArrival(
+    user: V1AuthUser,
+    gameId: string,
+    participantId: string,
+    arrived: boolean,
+  ) {
+    // lineup_mutate 는 platform_ops · 라인업 권한을 가진 대회 스태프 · 이 fixture 참가팀의
+    // 매니저/오너를 통과시킨다 — 명단 검인을 할 수 있어야 하는 사람과 정확히 같은 집합이다.
+    const actor = await this.resolveActor(this.prisma, gameId, user.id, 'lineup_mutate');
+    const participant = await this.prisma.v1GameParticipant.findFirst({
+      where: { id: participantId, gameId },
+      select: { id: true, sideId: true, arrivedAt: true },
+    });
+    if (participant === null) {
+      throw this.notFound('GAME_PARTICIPANT_NOT_FOUND');
+    }
+    // 팀 액터는 자기 팀 사이드만 검인할 수 있다 — saveLineup 과 같은 규칙이다.
+    // 스태프/platform_ops 는 어느 쪽이든 검인해야 하므로 팀 액터일 때만 검사한다.
+    if (actor.role === 'team_manager' || actor.role === 'team_owner') {
+      const side = await this.prisma.v1GameSide.findFirst({
+        where: { id: participant.sideId, gameId },
+        select: { teamId: true },
+      });
+      if (side === null || actor.teamId !== side.teamId) {
+        throw this.forbidden();
+      }
+    }
+    const arrivedAt = arrived ? (participant.arrivedAt ?? new Date()) : null;
+    // 이미 같은 상태면 시각을 다시 쓰지 않는다 — 같은 사람을 두 번 눌러도 최초 확인 시각이
+    // 유지돼야 분쟁 시 근거가 된다(위 `?? new Date()` 가 그 역할).
+    return this.prisma.v1GameParticipant.update({
+      where: { id: participant.id },
+      data: { arrivedAt },
+      select: { id: true, sideId: true, arrivedAt: true },
+    });
+  }
+
   async saveLineup(
     user: V1AuthUser,
     gameId: string,
@@ -2429,6 +2527,13 @@ export class GamesService {
             throw this.forbidden();
           }
         }
+        // 경고 누적·퇴장 출전정지 가드. 1차 대회 회고 "옐로카드 누적, 레드카드 퇴장등
+        // 필요해보임" — 지금까지 이 경로는 정지 여부를 **전혀 검사하지 않아** 퇴장당한
+        // 선수가 다음 경기에 그대로 뛸 수 있었다.
+        //
+        // **저장(saveLineup)이 아니라 제출에 건다.** 초안을 짜는 동안 막으면 팀장이
+        // 명단을 구성조차 못 한다 — 제출이 "이 명단으로 뛰겠다"고 확정하는 지점이다.
+        await this.assertNoSuspendedStarters(tx, game, lineup.id);
         if (lineup.state !== V1GameLineupState.DRAFT) {
           throw new ConflictException({
             code: 'INVALID_LINEUP_STATE',
@@ -2569,6 +2674,33 @@ export class GamesService {
       orderBy: { addedAt: 'asc' },
       select: { id: true, userId: true, realName: true },
     });
+    /**
+     * 팀이 지정한 고정 등번호(`V1TeamMembership.jerseyNumber`)를 함께 내려준다.
+     *
+     * 1차 대회(2026-08-15~16) 회고: "라인업에서 선수 번호 등록을 처음에만 하고 추후에는
+     * 안하는 문제". 프론트의 등번호 결정 로직은 `loaded ?? teamFixed ?? recent` 3단계로
+     * 이미 설계돼 있었는데, **2순위 teamFixed 가 死문이었다** — 이 응답에 번호 자체가
+     * 없어서 프론트가 넘길 값을 갖지 못했다. 그래서 팀장이 매 경기 번호를 다시 타이핑해야
+     * 했고, 그 반복 입력이 곧 오탈자 발생원이다.
+     *
+     * 이 사이드 팀의 **active 멤버십만** 본다 — 팀을 떠난 사람의 옛 번호를 되살리면
+     * 이미 그 번호를 물려받은 현재 멤버와 충돌한다(스키마에도 (teamId, jerseyNumber)
+     * 유니크가 걸려 있다).
+     */
+    const memberships =
+      side.teamId === null
+        ? []
+        : await this.prisma.v1TeamMembership.findMany({
+            where: {
+              teamId: side.teamId,
+              status: 'active',
+              userId: { in: players.map((player) => player.userId) },
+            },
+            select: { userId: true, jerseyNumber: true },
+          });
+    const teamJerseyByUserId = new Map(
+      memberships.map((membership) => [membership.userId, membership.jerseyNumber]),
+    );
     return {
       sideId,
       registrationId: resolved.registrationId,
@@ -2576,6 +2708,8 @@ export class GamesService {
         tournamentPlayerId: player.id,
         userId: player.userId,
         name: player.realName,
+        /** 팀 고정 등번호. 팀이 지정하지 않았거나 멤버십이 없으면 null. */
+        teamJerseyNumber: teamJerseyByUserId.get(player.userId) ?? null,
       })),
     };
   }
@@ -4081,6 +4215,139 @@ export class GamesService {
     });
   }
 
+  /**
+   * 이 라인업의 **선발** 중 출전정지 선수가 있으면 400 `DISCIPLINE_SUSPENDED` 로 막는다.
+   *
+   * 후보(started=false)는 막지 않는다 — 정지 선수를 벤치에 앉히는 것 자체는 규정
+   * 위반이 아니고, 실제로 뛰는 순간은 교체 이벤트라 그때 별도로 다룰 문제다.
+   * (지금은 교체까지 막지 않는다 — 그건 이 변경의 범위를 넘고, 라인업 제출을 막는
+   * 것만으로 회고가 지적한 "퇴장 선수가 다음 경기에 그대로 선발 출전"은 닫힌다.)
+   *
+   * 대회 픽스처가 아니거나 규정이 꺼진 대회면 조회 없이 즉시 통과한다.
+   */
+  private async assertNoSuspendedStarters(
+    tx: Transaction,
+    game: LockedGame,
+    lineupId: string,
+  ): Promise<void> {
+    if (game.sourceType !== V1GameSourceType.TOURNAMENT_FIXTURE) return;
+    // `LockedGame` 이 이미 `tournamentFixtureId` 를 들고 있으므로 게임을 다시 조회하지
+    // 않는다 — 앞선 버전은 관계를 따라가느라 쿼리를 한 번 더 썼다(Copilot 리뷰 지적).
+    if (game.tournamentFixtureId === null) return;
+    const fixture = await tx.v1TournamentFixture.findUnique({
+      where: { id: game.tournamentFixtureId },
+      select: { id: true, tournamentId: true },
+    });
+    if (fixture === null) return;
+
+    const verdicts = await this.suspensionVerdicts(tx, fixture.tournamentId, fixture.id);
+    if (verdicts.size === 0) return; // 규정 미적용이거나 누적 카드가 아직 없다.
+
+    const starters = await tx.v1GameParticipant.findMany({
+      where: { lineupId, started: true },
+      select: { userId: true, displayNameSnapshot: true },
+    });
+    const blocked = starters
+      .map((starter) => {
+        const verdict = starter.userId === null ? undefined : verdicts.get(starter.userId);
+        return verdict?.suspended === true
+          ? { name: starter.displayNameSnapshot, reason: verdict.reason }
+          : null;
+      })
+      .filter((entry): entry is { name: string; reason: string | null } => entry !== null);
+    if (blocked.length === 0) return;
+
+    throw new BadRequestException({
+      code: 'DISCIPLINE_SUSPENDED',
+      message: `${blocked.map((entry) => entry.name).join(', ')} 선수는 출전정지 상태예요. 선발에서 빼고 다시 제출해 주세요.`,
+      details: { blocked },
+    });
+  }
+
+  /**
+   * 이 대회에서 카드가 누적된 선수들의 `fixtureId` 경기 정지 여부. 규칙 자체는
+   * `card-suspension.ts`(순수 함수, DB 없이 전수 테스트)에 있고 여기서는 조회만 한다.
+   *
+   * **별도 주입 서비스로 빼지 않은 이유**: `GamesService` 생성자에 인자를 하나 더하면
+   * 이 클래스를 직접 `new` 하는 통합 스펙 41곳이 전부 깨진다(CI 실측 — 그 스펙들의
+   * 타입은 로컬 `tsc -p tsconfig.json` 대상 밖이라 로컬에서는 보이지도 않는다).
+   * 게다가 여기서 `tx` 를 쓰면 제출과 **같은 트랜잭션**에서 읽어 더 정확하다.
+   *
+   * **판정 단위는 사용자(userId)다.** 참가자 행은 경기마다 새로 생기므로 그것으로는
+   * 대회 전체 누적을 셀 수 없고, 이름 문자열로 묶으면 동명이인이 서로의 카드를
+   * 뒤집어쓴다. 계정 미연결 참가자는 대상에서 빠진다.
+   */
+  private async suspensionVerdicts(tx: Transaction, tournamentId: string, fixtureId: string) {
+    const tournament = await tx.v1Tournament.findUnique({
+      where: { id: tournamentId },
+      select: { yellowAccumulationLimit: true, redCardSuspensionMatches: true },
+    });
+    const rules = {
+      yellowAccumulationLimit: tournament?.yellowAccumulationLimit ?? null,
+      redCardSuspensionMatches: tournament?.redCardSuspensionMatches ?? null,
+    };
+    // 규정이 꺼져 있으면 **조회조차 하지 않는다** — 대다수 대회가 그렇다.
+    if (!suspensionRulesEnabled(rules)) return new Map<string, ReturnType<typeof evaluateSuspension>>();
+
+    // 일정 순서 = "정지는 다음 경기부터"라는 규칙의 기준틀. scheduledAt 이 없는 픽스처는
+    // 라운드·번호로 이어 정렬한다 — 순서를 못 정하면 판정 자체가 불가능하다.
+    const fixtures = await tx.v1TournamentFixture.findMany({
+      where: { tournamentId },
+      // `nulls: 'last'` 를 **명시한다.** Postgres 의 ASC 기본값이 이미 NULLS LAST 라
+      // 동작은 같지만(Copilot 은 "기본이 nulls first"라고 봤는데 그건 DESC 얘기다),
+      // 이 순서가 정지 판정의 기준축이라 기본값에 기대지 않고 의도를 코드에 박는다 —
+      // 일정 미정 픽스처가 앞으로 오면 gameOrder 가 통째로 어긋난다.
+      orderBy: [
+        { scheduledAt: { sort: 'asc', nulls: 'last' } },
+        { round: 'asc' },
+        { fixtureNumber: 'asc' },
+      ],
+      select: { id: true, game: { select: { currentOfficialRevisionId: true } } },
+    });
+    const orderByFixtureId = new Map(fixtures.map((fixture, index) => [fixture.id, index + 1]));
+    const upcomingGameOrder = orderByFixtureId.get(fixtureId);
+    if (upcomingGameOrder === undefined) return new Map<string, ReturnType<typeof evaluateSuspension>>();
+
+    // **현재 공식 리비전만** 센다. 초안·이전 리비전까지 세면 정정 이력이 카드로 중복
+    // 집계돼 멀쩡한 선수가 정지된다.
+    const revisionToOrder = new Map<string, number>();
+    for (const fixture of fixtures) {
+      const revisionId = fixture.game?.currentOfficialRevisionId ?? null;
+      const order = orderByFixtureId.get(fixture.id);
+      if (revisionId !== null && order !== undefined) revisionToOrder.set(revisionId, order);
+    }
+    if (revisionToOrder.size === 0) return new Map<string, ReturnType<typeof evaluateSuspension>>();
+
+    const resultParticipants = await tx.v1GameResultParticipant.findMany({
+      where: { resultRevisionId: { in: [...revisionToOrder.keys()] } },
+      select: { resultRevisionId: true, participantId: true, cards: true },
+    });
+    if (resultParticipants.length === 0) return new Map<string, ReturnType<typeof evaluateSuspension>>();
+
+    const participants = await tx.v1GameParticipant.findMany({
+      where: { id: { in: resultParticipants.map((row) => row.participantId) } },
+      select: { id: true, userId: true },
+    });
+    const userByParticipantId = new Map(participants.map((row) => [row.id, row.userId]));
+
+    const playedByUserId = new Map<string, PlayedGameCards[]>();
+    for (const row of resultParticipants) {
+      const userId = userByParticipantId.get(row.participantId) ?? null;
+      if (userId === null) continue;
+      const gameOrder = revisionToOrder.get(row.resultRevisionId);
+      if (gameOrder === undefined) continue;
+      const bucket = playedByUserId.get(userId) ?? [];
+      bucket.push({ gameOrder, cards: readResultCards(row.cards) });
+      playedByUserId.set(userId, bucket);
+    }
+
+    const verdicts = new Map<string, ReturnType<typeof evaluateSuspension>>();
+    for (const [userId, played] of playedByUserId) {
+      verdicts.set(userId, evaluateSuspension({ rules, played, upcomingGameOrder }));
+    }
+    return verdicts;
+  }
+
   private async resolveActor(
     tx: Transaction | PrismaService,
     gameId: string,
@@ -4737,6 +5004,14 @@ export class GamesService {
      */
     penaltyOrigin: 'END_COMMAND' | 'RECOVERY',
     penalties?: StoredPenalties,
+    /**
+     * 몰수·중단 종결 사유. 생략하면 정상 종료(NORMAL)다 — 복구 레인(RECOVERY)은
+     * 이미 저장된 결과를 승계하는 경로라 사유를 새로 만들지 않는다.
+     */
+    outcome: { outcomeReason: 'NORMAL' | 'FORFEIT' | 'ABANDONED'; note: string | null } = {
+      outcomeReason: 'NORMAL',
+      note: null,
+    },
   ): Promise<GameRevisionMutationResult> {
     const [events, participantCandidates, lineups, sides, config] = await Promise.all([
       tx.v1GameEvent.findMany({ where: { gameId: game.id }, orderBy: { sequence: 'asc' } }),
@@ -4783,6 +5058,10 @@ export class GamesService {
       data: {
         gameId: game.id,
         revision: 1,
+        // 몰수·중단이면 그 사실과 사유가 결과 리비전에 함께 박힌다 — 점수만 남기면
+        // 정상 종료와 구분되지 않아 "왜 그 점수인지"를 나중에 설명할 수 없다.
+        outcomeReason: outcome.outcomeReason,
+        outcomeNote: outcome.note,
         score: jsonInput(score),
         goalEvents: jsonInput(
           events
@@ -5241,6 +5520,10 @@ export class GamesService {
         eventsHash: predecessor.eventsHash,
         missingScorer: predecessor.missingScorer,
         mvpParticipantId: predecessor.mvpParticipantId,
+        // 몰수·중단 표식과 사유를 승계한다. 빠뜨리면 기본값 NORMAL 로 떨어져 몰수로
+        // 끝난 경기가 어시스트 동기화 한 번에 정상 종료로 둔갑한다(Copilot 리뷰 지적).
+        outcomeReason: predecessor.outcomeReason,
+        outcomeNote: predecessor.outcomeNote,
         reason: '시스템: 어시스트 변경을 반영해 새 리비전을 제출했어요',
         createdByActorType: context.actor.actorType,
         createdByUserId:
@@ -5830,4 +6113,24 @@ export class GamesService {
   private forbidden() {
     return new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Actor scope is not permitted' });
   }
+}
+
+/**
+ * `V1GameResultParticipant.cards`(Json)에서 카드 수를 읽는다. 저장 모양은
+ * `{ yellow: number, red: number }` 뿐이다(`parseFairPlayCards` 주석 참고 — 경고 누적
+ * 퇴장과 직접 퇴장을 구분하는 필드가 데이터 모델에 없다). 모양이 다르면 0으로 본다 —
+ * 판정을 못 하는 것이 잘못 막는 것보다 낫다.
+ */
+function readResultCards(value: unknown): { yellow: number; red: number } {
+  if (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    typeof (value as { yellow?: unknown }).yellow === 'number' &&
+    typeof (value as { red?: unknown }).red === 'number'
+  ) {
+    const record = value as { yellow: number; red: number };
+    return { yellow: record.yellow, red: record.red };
+  }
+  return { yellow: 0, red: 0 };
 }

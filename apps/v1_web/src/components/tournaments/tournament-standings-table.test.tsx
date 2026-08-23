@@ -161,6 +161,8 @@ describe('순위표 컬럼 통일 — 두 소비처(bracket 탭 vs schedule 탭)
       promoListPriority: 0,
       campaignSlug: null,
       rulesText: null,
+      yellowAccumulationLimit: null,
+      redCardSuspensionMatches: null,
       refundPolicyText: null,
       confirmedCount: 0,
       participantTeams: [],

@@ -290,7 +290,66 @@ export const gameSchemaSourceManifest = {
   //
   // 아래 값은 **두 변경이 병합된 뒤**의 schema.prisma 에 sha256 을 다시 돌려 계산한 것이다 —
   // 어느 한쪽 브랜치의 해시를 그대로 쓰면 CI 가 깨진다(이 파일 위쪽 병합 재핀 주석과 같은 사유).
-  schema: 'ea5b9634f6020efe874bcd24cd02181de567134a6fe346c78f08d6f51464262d',
+  //
+  // 명단 검인(체크인) 재핀: `V1GameParticipant` 에 nullable `arrived_at` 컬럼 하나가 늘었다.
+  // 위 두 재핀과 달리 이번엔 **game domain 모델을 실제로 건드린다**(V1GameParticipant) —
+  // 다만 순수 additive 이고 기존 계약을 하나도 바꾸지 않는다: `started`(팀이 제출한 선발/후보
+  // 계획)는 그대로 두고, "현장에서 도착을 확인한 사실"이라는 **다른 축**을 새 컬럼으로 더한다.
+  // 둘을 한 컬럼으로 합치면 "선발로 제출됐는데 안 온 사람"(회고가 지목한 바로 그 상태)을
+  // 표현할 수 없어 분리했다. NULL = 아직 확인 안 함이며 기존 행 백필은 없다(과거 경기를
+  // 소급 검인할 수는 없다). v1_guard_identity_event 등 게임 도메인 트리거·불변식은 이 컬럼을
+  // 읽지 않으므로 영향 없음. 뒷받침 마이그레이션:
+  // 20260823130000_v1_game_participant_arrival_checkin (ADD COLUMN IF NOT EXISTS 1줄).
+  // 바인딩된 20260729000100_v1_game_operations 는 그대로라 .migration 해시는 변하지 않는다.
+  // 아래 값은 이 브랜치의 schema.prisma 에 `shasum -a 256` 을 다시 돌려 계산한 것이다.
+  // 몰수·중단 종결 사유 재핀: `V1GameOutcomeReason` enum 신설 +
+  // `V1GameResultRevision.outcome_reason` 컬럼(NOT NULL DEFAULT 'NORMAL').
+  // **game domain 을 실제로 건드린다** — 결과 리비전은 이 guard 가 지키는 계약의 중심이다.
+  // 다만 순수 additive 이고 기존 계약을 바꾸지 않는다: 기존 리비전은 전부 NORMAL 이 되며
+  // 그것이 올바른 값이다(과거 경기를 소급해 몰수로 재분류할 수 없다). 점수 계산·이벤트
+  // 집계·불변식(v1_guard_*)은 이 컬럼을 읽지 않는다 — "이 점수가 정상 경기의 결과가
+  // 아니다"라는 표시일 뿐 점수를 대신 정하지 않는다(2026-08-23 사용자 결정 Q3: 표준
+  // 스코어 자동 부여 대신 운영자 입력 + 사유 필수). 뒷받침 마이그레이션:
+  // 20260823140000_v1_game_outcome_reason. 바인딩된 20260729000100_v1_game_operations 는
+  // 그대로라 .migration 해시는 변하지 않는다.
+  // 아래 값은 이 브랜치의 schema.prisma 에 `shasum -a 256` 을 다시 돌려 계산한 것이다.
+  // (같은 브랜치 재핀) Copilot 리뷰 지적으로 사유 본문을 `reason` 재사용에서
+  // 전용 `outcome_note` 컬럼으로 분리했다 — reason 은 정정·시스템 동기화 사유가 쓰는
+  // 칸이라 후속 리비전이 덮어써서 몰수 사유가 조용히 사라진다. 여전히 순수 additive.
+  //
+  // (병합 재핀) 위 두 변경이 **모두 들어간 뒤**의 schema.prisma 해시다 — 어느 한쪽
+  // 브랜치의 값을 그대로 쓰면 CI 가 깨진다(이 파일의 기존 병합 재핀 선례와 동일).
+  // 카드 정지 규정값 재핀: `V1Tournament` 에 nullable `yellow_accumulation_limit`·
+  // `red_card_suspension_matches` 두 컬럼이 늘었다. **game domain(V1Game*) 모델·enum 은
+  // 한 줄도 건드리지 않았다** — 이 guard 가 schema.prisma 전체 바이트를 결속하기 때문에
+  // 걸리는 것이지 game operations 계약이 바뀐 게 아니다(위 대회 후기 팀 귀속 재핀과 같은
+  // 성격). 두 컬럼 모두 기본값 없는 nullable 이라 기존 대회는 전부 NULL(=규정 미적용)이고
+  // 백필도 없다 — 값을 넣으면 이미 끝난 대회에 소급 적용돼 다수 선수가 출전정지로 뜬다.
+  // 뒷받침 마이그레이션: 20260823150000_v1_tournament_card_suspension_rules.
+  // 바인딩된 20260729000100_v1_game_operations 는 그대로라 .migration 해시는 변하지 않는다.
+  // 아래 값은 이 브랜치의 schema.prisma 에 `shasum -a 256` 을 다시 돌려 계산한 것이다.
+  //
+  // (병합 재핀) 위 변경들이 **모두 들어간 뒤**의 schema.prisma 해시다 — 어느 한쪽
+  // 브랜치의 값을 그대로 쓰면 CI 가 깨진다(이 파일의 기존 병합 재핀 선례와 동일).
+  //
+  // (병합 재핀) 위 변경들이 **모두 들어간 뒤**의 schema.prisma 해시다.
+  // 2026-08-23 재핀 (Task 154 P0-2): `V1ParticipantIdentityLinkCurrent` 에
+  // `@@index([userId], map: "v1_identity_link_current_user_id_idx")` 하나만 추가했다.
+  // **게임 도메인 모델의 컬럼·관계는 건드리지 않았고**, 인덱스 추가라 순수 additive 다
+  // (기존 행·쿼리 결과가 달라지지 않는다). 뒷받침 마이그레이션:
+  // 20260823120000_v1_identity_link_current_user_id_index — CREATE INDEX IF NOT EXISTS 로
+  // idempotent 하게 작성했다. 바인딩된 20260729000100_v1_game_operations 는 그대로이므로
+  // `migration` 값은 유지한다.
+  //
+  // 병합 재핀: 위 두 변경(도착 검인 컬럼 · 신원연결 userId 인덱스)이 같은 schema.prisma
+  // 안에서 만난다. 어느 한쪽 브랜치의 해시를 그대로 쓰면 CI 가 깨지므로, **병합된 뒤의**
+  // 파일에 sha256 을 다시 돌려 계산한 값이다.
+  //
+  // (병합 재핀) 위 변경들이 **모두 들어간 뒤**의 schema.prisma 해시다. 한쪽 브랜치의
+  // 값을 그대로 쓰면 CI 가 깨진다 — 이 파일에 쌓인 병합 재핀 선례와 같은 처리다.
+  //
+  // (병합 재핀) 위 변경들이 모두 들어간 뒤의 schema.prisma 해시다.
+  schema: '489377454bc06228eb5df6e10c3158a46da381ed064ebd80acab57a4d5750ad0',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

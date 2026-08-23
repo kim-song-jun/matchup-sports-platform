@@ -32,6 +32,7 @@ export type NotificationEventType =
   | 'tournament_registration_waitlisted'
   | 'tournament_registration_cancelled'
   | 'tournament_registration_submitted'
+  | 'tournament_record_consent_invite'
   | 'tournament_payment_confirmed'
   | 'tournament_announcement_published'
   | 'tournament_completed_review_request'
@@ -125,6 +126,7 @@ function preferenceFieldForEvent(type: NotificationEventType): NotificationPrefF
     type === 'tournament_registration_waitlisted' ||
     type === 'tournament_registration_cancelled' ||
     type === 'tournament_registration_submitted' ||
+    type === 'tournament_record_consent_invite' ||
     type === 'tournament_payment_confirmed' ||
     type === 'tournament_announcement_published' ||
     type === 'tournament_completed_review_request'
@@ -176,6 +178,7 @@ function targetTypeForEvent(type: NotificationEventType): V1NotificationTargetTy
     type === 'tournament_registration_waitlisted' ||
     type === 'tournament_registration_cancelled' ||
     type === 'tournament_registration_submitted' ||
+    type === 'tournament_record_consent_invite' ||
     type === 'tournament_payment_confirmed' ||
     type === 'tournament_announcement_published' ||
     type === 'tournament_completed_review_request'
@@ -254,6 +257,18 @@ function deepLinkForEvent(
   if (type === 'tournament_completed_review_request' && targetId) {
     return `/tournaments/${targetId}/awards`;
   }
+  // 기록 공개 동의 안내는 대회 상세가 아니라 동의를 실제로 켤 수 있는 화면으로 보낸다 --
+  // 대회 상세로 보내면 알림을 눌러도 동의를 켤 방법이 없는 막다른 길이 된다
+  // (match_completed 가 같은 이유로 후기 작성 화면으로 가는 것과 같은 판단).
+  if (type === 'tournament_record_consent_invite') {
+    // 동의를 켤 수 있는 화면으로 보내되, 어느 대회 때문에 왔는지도 실어 보낸다 --
+    // 설정 화면은 원래 맥락 없는 토글이라, 알림에서 온 사람에게 "왜 지금 이걸 보고
+    // 있는지" 를 설명해 줄 근거가 없으면 그냥 나가버린다. 착지 화면이 이 값으로
+    // 대회 이름을 띄운다. targetId 가 없으면 파라미터 없이 기본 화면으로 간다.
+    return targetId
+      ? `/my/settings/record-consent?from=tournament&tournamentId=${encodeURIComponent(targetId)}`
+      : '/my/settings/record-consent';
+  }
   // Task 12, reminders lane: targetId is the compound "${teamId}:${scheduleId}" string (see
   // schedule-reminder.service.ts) — parsed only here, never used for authorization anywhere in
   // this service.
@@ -307,6 +322,7 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   tournament_registration_waitlisted: '대기자 명단에 등록됐어요',
   tournament_registration_cancelled: '대회 참가가 취소됐어요',
   tournament_registration_submitted: '대회 신청이 접수됐어요',
+  tournament_record_consent_invite: '내 경기 기록을 공개할까요?',
   tournament_payment_confirmed: '입금이 확인됐어요',
   tournament_announcement_published: '대회 공지가 올라왔어요',
   team_invitation_received: '팀 초대가 도착했어요',
@@ -352,6 +368,7 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   tournament_registration_waitlisted: '대기자 명단에 등록됐어요.',
   tournament_registration_cancelled: '대회 참가 신청이 취소됐어요.',
   tournament_registration_submitted: '입금 안내를 확인해 주세요.',
+  tournament_record_consent_invite: '공개를 켜면 내 출전·득점 기록이 프로필에 표시돼요.',
   tournament_payment_confirmed: '운영진 확정을 기다려 주세요.',
   tournament_announcement_published: '공지를 확인해 보세요.',
   team_invitation_received: '팀 초대를 확인해 보세요.',

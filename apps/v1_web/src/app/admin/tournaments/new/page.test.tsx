@@ -130,6 +130,8 @@ function previousTournament(): V1Tournament {
     bankAccount: '123-456',
     bankHolder: '티밋',
     rulesText: null,
+    yellowAccumulationLimit: null,
+    redCardSuspensionMatches: null,
     refundPolicyText: null,
     registrationCount: 8,
     createdAt: '2026-06-01T00:00:00.000Z',

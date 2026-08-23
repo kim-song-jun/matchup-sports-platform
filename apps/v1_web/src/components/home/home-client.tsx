@@ -2,7 +2,13 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useV1AuthMe, useV1ChatRooms, useV1Home } from '@/hooks/use-v1-api';
+import {
+  useV1AuthMe,
+  useV1ChatRooms,
+  useV1Home,
+  useV1RecordConsent,
+  useV1UpdateRecordConsent,
+} from '@/hooks/use-v1-api';
 import { useV1PushRegistration } from '@/hooks/use-v1-push-registration';
 import { v1Post } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
@@ -13,6 +19,12 @@ import { HomePageView } from './home-page';
 import { toHomeChatRooms, toHomeModel, withoutHomeContent } from './home-client-model';
 import type { HomeViewModel } from './home.types';
 import { getHomeViewModel } from './home.view-model';
+import { RECORD_CONSENT_POLICY_HASH } from '@/lib/record-consent';
+import {
+  dismissRecordConsentNudge,
+  markRecordConsentNudgeSeen,
+  shouldShowRecordConsentNudge,
+} from '@/lib/session-storage';
 
 export function HomePageClient() {
   const router = useRouter();
@@ -64,6 +76,52 @@ export function HomePageClient() {
         },
       }
     : undefined;
+  // ─── 경기 기록 공개 동의 넛지 (Task 154 P0-3) ────────────────────────────────
+  //
+  // 노출 조건이 까다로운 이유: 켜도 아무것도 안 보이는 사람에게 조르면 켜고 나서
+  // 화면이 그대로라 신뢰만 잃는다. 그래서 서버가 계산한 `pendingRecordCount`(지금 켜면
+  // 공개될 경기 수)가 1 이상일 때만 뜬다. `hasResponded` 로 "명시적 거부"와 "아직 안
+  // 물어봄"을 구분해, 한 번 끈 사람은 다시 조르지 않는다.
+  const recordConsent = useV1RecordConsent();
+  const updateRecordConsent = useV1UpdateRecordConsent();
+  const [recordNudgeDismissed, setRecordNudgeDismissed] = useState(true);
+  useEffect(() => {
+    setRecordNudgeDismissed(!shouldShowRecordConsentNudge());
+  }, []);
+  const recordPendingCount = recordConsent.data?.pendingRecordCount ?? 0;
+  const showRecordConsentNudge =
+    isAuthenticated &&
+    onboardingCompleted &&
+    !recordNudgeDismissed &&
+    // 옛 서버 응답에는 이 필드가 없다 -- 그때는 판단 근거가 없으므로 띄우지 않는다.
+    recordConsent.data?.hasResponded === false &&
+    recordPendingCount > 0;
+  // 실제로 렌더될 때만 횟수를 올린다(조건 미충족으로 안 뜬 회차는 세지 않는다).
+  useEffect(() => {
+    if (showRecordConsentNudge) markRecordConsentNudgeSeen();
+  }, [showRecordConsentNudge]);
+  const recordConsentNudge = showRecordConsentNudge
+    ? {
+        pendingCount: recordPendingCount,
+        saving: updateRecordConsent.isPending,
+        onGrant: () => {
+          updateRecordConsent.mutate(
+            { granted: true, policyHash: RECORD_CONSENT_POLICY_HASH },
+            {
+              onSuccess: () => {
+                dismissRecordConsentNudge();
+                setRecordNudgeDismissed(true);
+              },
+            },
+          );
+        },
+        onDismiss: () => {
+          dismissRecordConsentNudge();
+          setRecordNudgeDismissed(true);
+        },
+      }
+    : undefined;
+
   // 인증을 마칠 때까지 계속 보이는 상시 배너 — 닫을 수 있게 두면 한 번 닫은 사용자는
   // 왜 신청·등록이 막히는지 알 방법이 없어진다(조회는 열려 있어 화면상 정상으로 보인다).
   const phoneVerifyNudge =
@@ -113,6 +171,7 @@ export function HomePageClient() {
                 weatherRefreshing,
                 refreshWeather,
                 pushNudge,
+                recordConsentNudge,
                 phoneVerifyNudge,
                 chatRetry: () => void chatRooms.refetch(),
               }

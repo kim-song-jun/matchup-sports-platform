@@ -57,6 +57,8 @@ function makeTournament(
     promoListPriority: 0,
     campaignSlug: null,
     rulesText: null,
+    yellowAccumulationLimit: null,
+    redCardSuspensionMatches: null,
     refundPolicyText: null,
     confirmedCount: 0,
     participantTeams: [],

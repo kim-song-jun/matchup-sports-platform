@@ -70,12 +70,14 @@ describe('TournamentRegistrationsService', () => {
     v1Tournament: { findFirst: jest.Mock };
     v1TournamentRegistration: { findUnique: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock; count: jest.Mock };
     v1TournamentPayment: { upsert: jest.Mock; findUnique: jest.Mock; update: jest.Mock };
-    v1TournamentPlayer: { count: jest.Mock; groupBy: jest.Mock };
+    v1TournamentPlayer: { count: jest.Mock; groupBy: jest.Mock; findMany: jest.Mock };
+    // 쓰기 메서드를 일부러 두지 않는다 -- 구현이 기록 공개 상태를 쓰려 하면 즉시 깨져야 한다.
+    v1UserRecordConsent: { findMany: jest.Mock };
     v1UserProfile: { updateMany: jest.Mock };
     $transaction: jest.Mock;
     $queryRaw: jest.Mock;
   };
-  let notifications: { emitNotification: jest.Mock };
+  let notifications: { emitNotification: jest.Mock; emitToManyDeferred: jest.Mock };
   let managedTerms: {
     assertTournamentAcceptances: jest.Mock;
     recordTournamentDecisions: jest.Mock;
@@ -92,7 +94,8 @@ describe('TournamentRegistrationsService', () => {
       v1Tournament: { findFirst: jest.fn() },
       v1TournamentRegistration: { findUnique: jest.fn(), findFirst: jest.fn(), findMany: jest.fn(), create: jest.fn(), update: jest.fn(), count: jest.fn().mockResolvedValue(0) },
       v1TournamentPayment: { upsert: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
-      v1TournamentPlayer: { count: jest.fn().mockResolvedValue(0), groupBy: jest.fn().mockResolvedValue([]) },
+      v1TournamentPlayer: { count: jest.fn().mockResolvedValue(0), groupBy: jest.fn().mockResolvedValue([]), findMany: jest.fn().mockResolvedValue([]) },
+      v1UserRecordConsent: { findMany: jest.fn().mockResolvedValue([]) },
       v1UserProfile: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
       $transaction: jest.fn(),
       // R17-005 / R16-001 / R17-006: $queryRaw is called inside transactions for
@@ -108,7 +111,12 @@ describe('TournamentRegistrationsService', () => {
       team: { sportId: 'sport-futsal' },
     });
 
-    notifications = { emitNotification: jest.fn().mockResolvedValue(undefined) };
+    notifications = {
+      emitNotification: jest.fn().mockResolvedValue(undefined),
+      // 실제 구현은 resolver 를 즉시 실행하고 에러를 삼킨다. 테스트에서는 resolver 를
+      // 붙잡아 두고 개별 테스트가 직접 await 해서 "누구를 고르는가"를 검증한다.
+      emitToManyDeferred: jest.fn(),
+    };
     managedTerms = {
       assertTournamentAcceptances: jest.fn().mockImplementation(async (documentIds: string[]) => {
         if (![RULES_ID, PRIVACY_ID, REFUND_ID].every((id) => documentIds.includes(id))) {
@@ -435,6 +443,125 @@ describe('TournamentRegistrationsService', () => {
       'tournament-1',
       expect.any(String),
     );
+  });
+
+  // ─── Task 154 P0-4: 기록 공개 동의는 팀장이 대신 켜주지 않는다 ─────────────────
+  //
+  // 이 저장소는 "선수 본인이 켠다"는 옵트인 구조를 유지하기로 결정했다(사용자 결정 ①⑤).
+  // 그런데 대회 참가 신청은 팀장만 할 수 있으므로, 여기서 명단 선수들의 공개 상태를
+  // 건드리는 순간 그 구조가 팀장 대리 동의로 조용히 바뀐다. 아래 첫 테스트가 그
+  // 불변식을 고정하는 회귀 방어선이다 -- 여기가 깨지면 정책이 깨진 것이다.
+
+  function submitWithRecordDisclosure() {
+    // 기본 mock 은 RECORD_DISCLOSURE_ID 를 코드로 매핑하지 않는다(위 '미동의' 테스트들이
+    // 그 기본값에 의존한다) -- 기존 2026-08-18 테스트들과 같은 방식으로 이 호출에만 덮어쓴다.
+    managedTerms.assertTournamentAcceptances.mockResolvedValueOnce({
+      acceptedDocumentIds: [RULES_ID, PRIVACY_ID, REFUND_ID, RECORD_DISCLOSURE_ID],
+      notAcceptedDocumentIds: [MEDIA_ID],
+      acceptedCodes: new Set([
+        'tournament_rules',
+        'tournament_privacy',
+        'tournament_refund',
+        'tournament_record_disclosure',
+      ]),
+    });
+    return service.submit(manager, 'tournament-1', 'reg-1', {
+      ...validSubmit,
+      termsDocumentIds: [RULES_ID, PRIVACY_ID, REFUND_ID, RECORD_DISCLOSURE_ID],
+    });
+  }
+
+  it('submit: 팀장이 기록 공개 동의를 체크해도 어떤 계정의 기록 공개 상태도 바뀌지 않는다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament());
+    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'awaiting_payment' }));
+    prisma.v1TournamentPayment.upsert.mockResolvedValue(paymentRow());
+
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+      { userId: 'player-a' },
+      { userId: 'player-b' },
+    ]);
+
+    await submitWithRecordDisclosure();
+    // 지연 발송 resolver 까지 실제로 실행해 본다 -- 여기서 쓰기가 일어나면 안 된다.
+    const resolveUserIds = notifications.emitToManyDeferred.mock.calls[0][0] as () => Promise<string[]>;
+    await resolveUserIds();
+
+    // 공개 여부를 결정하는 유일한 테이블은 V1UserRecordConsent 다. 이 경로는 "누구에게
+    // 물어볼지" 고르기 위해 읽기만 하고 절대 쓰지 않는다. mock 에 쓰기 메서드를 아예
+    // 두지 않았으므로, 구현이 쓰기를 시도하면 TypeError 로 이 테스트가 깨진다.
+    expect((prisma.v1UserRecordConsent as Record<string, unknown>).upsert).toBeUndefined();
+    expect((prisma.v1UserRecordConsent as Record<string, unknown>).update).toBeUndefined();
+    expect((prisma.v1UserRecordConsent as Record<string, unknown>).create).toBeUndefined();
+
+    // 프로필 토글도 호출자(팀장) 본인 것만 건드린다 -- 명단 선수 계정은 대상이 아니다.
+    for (const call of prisma.v1UserProfile.updateMany.mock.calls) {
+      expect(call[0].where.userId).toBe(manager.id);
+    }
+  });
+
+  it('submit: 기록 공개 동의를 체크하면 명단 선수 각자에게 동의 안내 알림을 예약한다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament());
+    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'awaiting_payment' }));
+    prisma.v1TournamentPayment.upsert.mockResolvedValue(paymentRow());
+
+    await submitWithRecordDisclosure();
+
+    expect(notifications.emitToManyDeferred).toHaveBeenCalledWith(
+      expect.any(Function),
+      'tournament_record_consent_invite',
+      'tournament-1',
+      expect.any(String),
+    );
+  });
+
+  it('submit: 기록 공개 동의를 체크하지 않으면 안내 알림도 보내지 않는다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament());
+    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'awaiting_payment' }));
+    prisma.v1TournamentPayment.upsert.mockResolvedValue(paymentRow());
+
+    await service.submit(manager, 'tournament-1', 'reg-1', validSubmit);
+
+    expect(notifications.emitToManyDeferred).not.toHaveBeenCalled();
+  });
+
+  it('submit: 안내 알림 대상에서 이미 응답한 사람(켠 사람·끈 사람 모두)을 제외한다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament());
+    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'awaiting_payment' }));
+    prisma.v1TournamentPayment.upsert.mockResolvedValue(paymentRow());
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+      { userId: 'player-new' },
+      { userId: 'player-granted' },
+      { userId: 'player-revoked' },
+      { userId: 'player-new' }, // 중복 행이 있어도 한 번만 보낸다
+    ]);
+    // 켠 사람에겐 불필요하고, 끈 사람에게 다시 묻는 건 그 거부를 무시하는 것이다.
+    prisma.v1UserRecordConsent.findMany.mockResolvedValue([
+      { userId: 'player-granted' },
+      { userId: 'player-revoked' },
+    ]);
+
+    await submitWithRecordDisclosure();
+
+    const resolveUserIds = notifications.emitToManyDeferred.mock.calls[0][0] as () => Promise<string[]>;
+    await expect(resolveUserIds()).resolves.toEqual(['player-new']);
+  });
+
+  it('submit: 명단이 비어 있으면 동의 조회를 아예 하지 않는다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament());
+    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'awaiting_payment' }));
+    prisma.v1TournamentPayment.upsert.mockResolvedValue(paymentRow());
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([]);
+
+    await submitWithRecordDisclosure();
+
+    const resolveUserIds = notifications.emitToManyDeferred.mock.calls[0][0] as () => Promise<string[]>;
+    await expect(resolveUserIds()).resolves.toEqual([]);
+    expect(prisma.v1UserRecordConsent.findMany).not.toHaveBeenCalled();
   });
 
   it('submit: pg method does not require depositorName', async () => {

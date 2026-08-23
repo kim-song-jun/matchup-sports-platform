@@ -75,6 +75,9 @@ export function TournamentInfoSection() {
   const [editBankAccount, setEditBankAccount] = useState('');
   const [editBankHolder, setEditBankHolder] = useState('');
   const [editRulesText, setEditRulesText] = useState('');
+  // 카드 정지 규정 — 빈 문자열 = 미적용. 생성 폼과 같은 표현을 쓴다.
+  const [editYellowLimit, setEditYellowLimit] = useState('');
+  const [editRedSuspension, setEditRedSuspension] = useState('');
   const [editRefundPolicyText, setEditRefundPolicyText] = useState('');
   const [promoOpen, setPromoOpen] = useState(false);
   const [promoHomeEnabled, setPromoHomeEnabled] = useState(false);
@@ -142,6 +145,16 @@ export function TournamentInfoSection() {
     setEditBankAccount(tournament.bankAccount ?? '');
     setEditBankHolder(tournament.bankHolder ?? '');
     setEditRulesText(tournament.rulesText ?? '');
+    setEditYellowLimit(
+      tournament.yellowAccumulationLimit === null || tournament.yellowAccumulationLimit === undefined
+        ? ''
+        : String(tournament.yellowAccumulationLimit),
+    );
+    setEditRedSuspension(
+      tournament.redCardSuspensionMatches === null || tournament.redCardSuspensionMatches === undefined
+        ? ''
+        : String(tournament.redCardSuspensionMatches),
+    );
     setEditRefundPolicyText(tournament.refundPolicyText ?? '');
     setEditOpen(true);
   };
@@ -300,6 +313,36 @@ export function TournamentInfoSection() {
     }
     if (normalizedBankHolder !== tournament.bankHolder) payload.bankHolder = normalizedBankHolder;
     if (normalizedRulesText !== tournament.rulesText) payload.rulesText = normalizedRulesText;
+    /**
+     * 비우면 null 을 **명시적으로** 보낸다 — 그래야 한 번 켠 규정을 끌 수 있다
+     * (undefined 면 서버가 "안 건드림"으로 읽어 영영 못 끈다).
+     *
+     * 비정상 입력은 **저장 자체를 막는다**(Copilot 리뷰 지적, real 2건):
+     *  ① `Number('abc')` 는 NaN 이고 JSON 직렬화에서 null 로 바뀐다 — 오타 한 번이
+     *     조용히 "규정 끔"으로 전달된다.
+     *  ② `NaN !== x` 는 항상 true 라 변경이 없어도 payload 에 끼어든다.
+     * 조용히 null 로 흘려보내는 것보다 멈추고 알리는 쪽이 안전하다.
+     */
+    const parseRule = (raw: string): number | null | 'invalid' => {
+      if (!raw.trim()) return null;
+      const parsed = Number(raw);
+      // 서버 DTO 가 1~20 으로 검증한다(admin-tournament.dto.ts) — 클라이언트가 > 0 만
+      // 보면 21 이 통과한 뒤 서버에서 400 으로 깨진다(Copilot 리뷰 지적). input 의
+      // max={20} 은 브라우저에 따라 강제되지 않으므로 여기서 같은 범위를 검사한다.
+      return Number.isInteger(parsed) && parsed >= 1 && parsed <= 20 ? parsed : 'invalid';
+    };
+    const normalizedYellowLimit = parseRule(editYellowLimit);
+    const normalizedRedSuspension = parseRule(editRedSuspension);
+    if (normalizedYellowLimit === 'invalid' || normalizedRedSuspension === 'invalid') {
+      showToast('출전정지 기준은 1~20 사이의 정수로 적어 주세요.', 'error');
+      return;
+    }
+    if (normalizedYellowLimit !== (tournament.yellowAccumulationLimit ?? null)) {
+      payload.yellowAccumulationLimit = normalizedYellowLimit;
+    }
+    if (normalizedRedSuspension !== (tournament.redCardSuspensionMatches ?? null)) {
+      payload.redCardSuspensionMatches = normalizedRedSuspension;
+    }
     if (normalizedRefundPolicyText !== tournament.refundPolicyText) {
       payload.refundPolicyText = normalizedRefundPolicyText;
     }
@@ -958,6 +1001,45 @@ export function TournamentInfoSection() {
               placeholder="대회 규정을 입력해 주세요. 참가 자격, 경기 방식, 경기 진행, 순위 결정 기준 등 긴 문서도 그대로 붙여넣을 수 있어요."
               className={`${textareaCls} text-[12px] leading-relaxed`}
             />
+          </div>
+
+          {/* 카드 정지 규정. 비우면 이 대회에는 적용하지 않는다 — 이미 진행된 대회에
+              소급 적용되는 것을 막으려고 기본값을 두지 않았다. */}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="edit-yellow-limit" className="text-[13px] text-[var(--text-strong)]">
+                경고 누적 출전정지 (장)
+              </label>
+              <input
+                id="edit-yellow-limit"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={20}
+                value={editYellowLimit}
+                onChange={(e) => setEditYellowLimit(e.target.value)}
+                disabled={updateTournament.isPending}
+                placeholder="비우면 적용 안 함"
+                className={inputCls}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="edit-red-suspension" className="text-[13px] text-[var(--text-strong)]">
+                퇴장 시 출전정지 (경기)
+              </label>
+              <input
+                id="edit-red-suspension"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={20}
+                value={editRedSuspension}
+                onChange={(e) => setEditRedSuspension(e.target.value)}
+                disabled={updateTournament.isPending}
+                placeholder="비우면 적용 안 함"
+                className={inputCls}
+              />
+            </div>
           </div>
 
           <div className="flex flex-col gap-1.5">

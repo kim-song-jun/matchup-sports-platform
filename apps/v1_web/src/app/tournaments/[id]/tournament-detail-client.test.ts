@@ -171,6 +171,8 @@ function makeTournament(
     promoListPriority: 0,
     campaignSlug: null,
     rulesText: null,
+    yellowAccumulationLimit: null,
+    redCardSuspensionMatches: null,
     refundPolicyText: null,
     confirmedCount: 0,
     participantTeams: [],
@@ -945,6 +947,8 @@ describe('AccordionSection toggle (rendered via completed TournamentDetailView)'
       format: 'league',
       groups: [],
       rulesText: '경기 시작 10분 전까지 집합해 주세요.',
+      yellowAccumulationLimit: null,
+      redCardSuspensionMatches: null,
     });
 
     render(createElement(TournamentDetailView, { tournament, myRegistration: null }));

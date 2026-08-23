@@ -41,6 +41,7 @@ export function AbnormalEndDialog({ open, onCancel, onConfirm, submitting = fals
   const [reason, setReason] = useState<AbnormalEndReason>('FORFEIT');
   const [note, setNote] = useState('');
   const noteRef = useRef<HTMLTextAreaElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
 
   // 열릴 때마다 초기화한다 — 직전 경기의 사유가 남아 있으면 그대로 확정될 수 있다.
   useEffect(() => {
@@ -48,6 +49,37 @@ export function AbnormalEndDialog({ open, onCancel, onConfirm, submitting = fals
     setReason('FORFEIT');
     setNote('');
     noteRef.current?.focus();
+  }, [open]);
+
+  /**
+   * Tab 포커스 트랩. 이 콘솔의 다른 다이얼로그(ActionTargetPicker·PenaltyShootoutPanel)가
+   * 이미 같은 트랩을 두고 있는데 여기만 빠져 있었다(Copilot 리뷰 지적) — 키보드로 배경의
+   * 다른 버튼을 잘못 누를 수 있고, 경기 운영 화면에서 그건 곧 오조작이다.
+   * 선례와 같은 셀렉터·순환 방식을 그대로 쓴다.
+   */
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!open || dialog === null) return;
+    const focusableSelectors =
+      'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    const trap = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return;
+      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(focusableSelectors));
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey) {
+        if (document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        }
+      } else if (document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', trap);
+    return () => document.removeEventListener('keydown', trap);
   }, [open]);
 
   useEffect(() => {
@@ -76,6 +108,7 @@ export function AbnormalEndDialog({ open, onCancel, onConfirm, submitting = fals
       }}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

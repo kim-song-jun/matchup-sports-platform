@@ -305,7 +305,7 @@ export const gameSchemaSourceManifest = {
   // (같은 브랜치 재핀) Copilot 리뷰 지적으로 사유 본문을 `reason` 재사용에서
   // 전용 `outcome_note` 컬럼으로 분리했다 — reason 은 정정·시스템 동기화 사유가 쓰는
   // 칸이라 후속 리비전이 덮어써서 몰수 사유가 조용히 사라진다. 여전히 순수 additive.
-  schema: '3538f36422b07a4318e5e84dab41122c3ba4e51a6d897348f394b6c11a2f222f',
+  schema: '0edd4c364aca1548737b217038cb2b76adcd54a408094f68eb0110bd66e926e5',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

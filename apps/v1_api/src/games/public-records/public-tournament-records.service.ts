@@ -127,7 +127,7 @@ const FIXTURE_MATCH_SELECT = {
         },
       },
       currentOfficialRevision: {
-        // outcomeReason/reason — 몰수·중단으로 끝난 경기를 관전자 화면에서 정상 종료와
+        // outcomeReason/outcomeNote — 몰수·중단으로 끝난 경기를 관전자 화면에서 정상 종료와
         // 구분해 보여주기 위한 것. 점수만 내보내면 "왜 그 점수인지"가 공개 기록 어디에도
         // 없어서, 1차 대회에서 문제가 됐던 그 상태가 그대로 남는다.
         select: {

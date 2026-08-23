@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { Card } from '@/components/v1-ui/primitives';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -105,12 +106,40 @@ export function ClaimMyRecordSection({
             className="w-full max-w-[420px] overflow-hidden rounded-2xl"
             style={{ background: 'var(--surface, #fff)', boxShadow: 'var(--shadow-modal)', padding: 20 }}
           >
-            <div id="claim-my-record-title" className="tm-text-heading">
-              명단에서 본인을 골라 주세요
-            </div>
-            <div className="tm-text-caption" style={{ marginTop: 6, color: 'var(--text-muted)' }}>
-              이미 계정이 연결된 참가자는 목록에 없어요. 신청 후 다른 참가자의 확인을 거쳐 연결돼요.
-            </div>
+            {/*
+              제목과 안내는 목록 상태를 따라간다. 고를 것이 없는 화면이 "골라 주세요"라고
+              말하면 사용자는 자기가 뭘 잘못했는지 찾게 된다 -- 실제로 alpha 실화면에서
+              그렇게 읽혔다. 0건은 정상 상태이므로 결론을 먼저 말하고, 그래도 기록이
+              안 보이는 진짜 원인(공개 동의)으로 이어 준다.
+            */}
+            {loaded && !hasCandidates ? (
+              <>
+                <div id="claim-my-record-title" className="tm-text-heading">
+                  연결할 참가자가 없어요
+                </div>
+                <div className="tm-text-caption" style={{ marginTop: 6, color: 'var(--text-muted)' }}>
+                  이 경기 명단은 모두 계정에 연결돼 있어요. 그런데도 내 기록이 안 보인다면{' '}
+                  {/* 인라인 텍스트 링크 관례는 auth-page 와 같은 --blue700. 밑줄은
+                      "컬러만으로 정보 전달 금지" 규칙 때문에 함께 둔다. */}
+                  <Link
+                    href="/my/settings/record-consent"
+                    style={{ color: 'var(--blue700)', textDecoration: 'underline' }}
+                  >
+                    기록 공개 설정
+                  </Link>
+                  을 확인해 주세요.
+                </div>
+              </>
+            ) : (
+              <>
+                <div id="claim-my-record-title" className="tm-text-heading">
+                  명단에서 본인을 골라 주세요
+                </div>
+                <div className="tm-text-caption" style={{ marginTop: 6, color: 'var(--text-muted)' }}>
+                  이미 계정이 연결된 참가자는 목록에 없어요. 신청 후 다른 참가자의 확인을 거쳐 연결돼요.
+                </div>
+              </>
+            )}
 
             <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 320, overflowY: 'auto' }}>
               {claimable.isLoading ? (
@@ -120,11 +149,9 @@ export function ClaimMyRecordSection({
                   {extractErrorMessage(claimable.error, '명단을 불러오지 못했어요.')}
                 </div>
               ) : !hasCandidates ? (
-                // 0건은 "연결할 게 없다"는 정상 상태다. 이 경기의 참가자가 전부 이미
-                // 연결돼 있다는 뜻이므로 에러처럼 보이게 하지 않는다.
-                <div className="tm-text-caption">
-                  연결되지 않은 참가자가 없어요. 이 경기 명단은 모두 계정에 연결돼 있어요.
-                </div>
+                // 0건 안내는 제목·부제가 이미 하고 있다. 여기서 한 번 더 말하면 같은
+                // 문장이 한 화면에 두 번 뜬다.
+                null
               ) : (
                 claimable.data?.participants.map((participant) => (
                   <button

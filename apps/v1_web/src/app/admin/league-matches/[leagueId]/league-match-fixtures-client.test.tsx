@@ -139,6 +139,47 @@ describe('LeagueMatchFixturesClient', () => {
     ));
   });
 
+  // 감사 결함 1: title이 "N주차" 자동 생성이라 모든 행이 똑같이 보였다 — 표가 참가팀
+  // 목록(teamsData)으로 id를 이름으로 바꿔 홈팀 vs 원정팀을 보여줘야 한다. 이 단언이
+  // 없으면 title만 다시 렌더하는 회귀를 못 잡는다.
+  it('대진 표는 자동생성 title 대신 홈팀 vs 원정팀 이름을 보여주고, 부전(bye) 행은 부전승으로 표시한다', () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1AdminLeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1',
+        title: '가을 풋살 리그',
+        state: 'active',
+        teamIds: ['t1', 't2', 't3'],
+        fixtures: [
+          { teamMatchId: 'tm-1', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched' },
+          { teamMatchId: 'tm-2', title: '가을 풋살 리그 1주차', homeTeamId: 't3', awayTeamId: null, startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched' },
+        ],
+      },
+      isPending: false,
+    } as never);
+    useV1AdminLeagueTeamsMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1',
+        teams: [
+          { teamId: 't1', name: '독수리FC', status: 'active', memberCount: 5, logoUrl: null },
+          { teamId: 't2', name: '호랑이FC', status: 'active', memberCount: 5, logoUrl: null },
+          { teamId: 't3', name: '사자FC', status: 'active', memberCount: 5, logoUrl: null },
+        ],
+      },
+    } as never);
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    expect(screen.getAllByText('독수리FC vs 호랑이FC').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('사자FC 부전승').length).toBeGreaterThan(0);
+  });
+
   it('대진이 없으면 요일/시각/장소를 선택하지 않아도 주차 수만으로 생성할 수 있다(기존 동작 보존)', async () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1AdminLeagueMatchMock.mockReturnValue({
@@ -363,7 +404,7 @@ describe('LeagueMatchFixturesClient', () => {
 
     // AdminDataTable은 데스크톱 표 + 모바일 카드 리스트를 동시에 렌더한다(CSS로만 숨김) —
     // 같은 행이라 첫 번째 매치를 눌러도 대표성이 있다(기존 테스트 주석과 동일한 전제).
-    fireEvent.click(screen.getAllByRole('button', { name: '취소' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: '가을 풋살 리그 1주차 취소' })[0]);
     expect(screen.getByText('대진을 취소할까요?')).toBeInTheDocument();
     expect(cancelMutate).not.toHaveBeenCalled();
 
@@ -407,7 +448,7 @@ describe('LeagueMatchFixturesClient', () => {
       </Providers>,
     );
 
-    fireEvent.click(screen.getAllByRole('button', { name: '취소' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: '가을 풋살 리그 1주차 취소' })[0]);
     fireEvent.click(screen.getByRole('button', { name: '대진 취소' }));
 
     expect(cancelMutate).not.toHaveBeenCalled();
@@ -540,6 +581,62 @@ describe('LeagueMatchFixturesClient', () => {
       },
       expect.anything(),
     ));
+  });
+
+  // 감사 결함 2: 서버는 이미 확정된 몰수를 "다른 팀"으로 정정하려는 요청을 DB에
+  // 반영하지 않고 alreadyProcessed:true + requestMatchesStored:false 로 응답한다
+  // (league-lifecycle-rules.ts). 화면이 alreadyProcessed만 보고 성공 토스트를 띄우면
+  // 운영자는 정정이 반영된 줄 오인한다 — 실패로 분기하는지 검증한다.
+  it('몰수 정정이 이미 다른 결과로 확정돼 반영되지 않으면(requestMatchesStored:false) 성공이 아니라 경고 토스트를 보여준다', async () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1AdminLeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1',
+        title: '가을 풋살 리그',
+        state: 'active',
+        teamIds: ['t1', 't2'],
+        fixtures: [
+          { teamMatchId: 'tm-1', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched' },
+        ],
+      },
+      isPending: false,
+    } as never);
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+    useV1AdminTeamMock.mockImplementation(((teamId: string) => ({
+      data: teamId === 't1' ? { name: '홈팀FC' } : teamId === 't2' ? { name: '원정팀FC' } : undefined,
+    })) as never);
+    const mutate = vi.fn((_vars, opts) => {
+      opts.onSuccess({
+        teamMatchId: 'tm-1',
+        leagueId: 'league-1',
+        noShowTeamId: 't1',
+        winningTeamId: 't2',
+        homeScore: 0,
+        awayScore: 1,
+        resultRevisionId: 'rev-1',
+        alreadyProcessed: true,
+        requestMatchesStored: false,
+      });
+    });
+    useV1RecordLeagueForfeitMock.mockReturnValue({ mutate, isPending: false } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    const [forfeitButton] = screen.getAllByRole('button', { name: '가을 풋살 리그 1주차 몰수패 처리' });
+    fireEvent.click(forfeitButton);
+    expect(await screen.findByText('원정팀FC 불참')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('변경할 상태'), { target: { value: 't2' } });
+    fireEvent.change(screen.getByLabelText(/^사유/), { target: { value: '반대 팀으로 정정 시도' } });
+    fireEvent.click(screen.getByRole('button', { name: '확인' }));
+
+    expect(await screen.findByText('이미 다른 결과로 확정돼 있어 반영되지 않았어요. 되돌린 뒤 다시 처리해 주세요.')).toBeInTheDocument();
+    expect(screen.queryByText('몰수패로 처리했어요.')).not.toBeInTheDocument();
+    expect(screen.queryByText('이미 몰수 처리된 대진이에요.')).not.toBeInTheDocument();
   });
 
   it('완료된 리그에만 "진행 중으로 되돌리기"가 뜨고, 확인하면 revert mutation을 호출한다', async () => {

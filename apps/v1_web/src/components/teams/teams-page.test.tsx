@@ -642,8 +642,10 @@ describe('TeamDetailPageView — 내 리그 섹션', () => {
   function modelWithLeagues(
     myLeagues: TeamDetailViewModel['myLeagues'],
     myLeaguesLoading = false,
+    myLeaguesError = false,
+    onRetryMyLeagues?: () => void,
   ): TeamDetailViewModel {
-    return { ...getTeamDetailViewModel('default'), myLeagues, myLeaguesLoading };
+    return { ...getTeamDetailViewModel('default'), myLeagues, myLeaguesLoading, myLeaguesError, onRetryMyLeagues };
   }
 
   it('소속 리그가 있으면 리그별로 리그 상세 링크를 보여준다', () => {
@@ -677,5 +679,28 @@ describe('TeamDetailPageView — 내 리그 섹션', () => {
 
     expect(screen.getAllByText('내 리그').length).toBeGreaterThan(0);
     expect(screen.getAllByLabelText('내 리그 불러오는 중').length).toBeGreaterThan(0);
+  });
+
+  /**
+   * 그룹 F 재감사 — myLeaguesQuery 가 실패하면 items도 빈 배열이 되어 위 "소속 리그가
+   * 없으면 섹션을 감춘다" 케이스와 화면이 100% 같아지던 결함. 에러 플래그가 있으면
+   * items가 비어 있어도 섹션이 감춰지지 않고 재시도 UI가 떠야 한다.
+   */
+  it('통신 오류면(items가 비어 있어도) 섹션을 감추지 않고 재시도 안내를 보여준다', () => {
+    render(<TeamDetailPageView model={modelWithLeagues([], false, true)} />);
+
+    expect(screen.queryByLabelText('내 리그 불러오는 중')).not.toBeInTheDocument();
+    expect(screen.getAllByText('내 리그').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('리그 정보를 불러오지 못했어요').length).toBeGreaterThan(0);
+  });
+
+  it('재시도 버튼을 누르면 onRetryMyLeagues가 호출된다', () => {
+    const onRetryMyLeagues = vi.fn();
+    render(<TeamDetailPageView model={modelWithLeagues([], false, true, onRetryMyLeagues)} />);
+
+    const retryButtons = screen.getAllByRole('button', { name: '다시 시도' });
+    fireEvent.click(retryButtons[0]);
+
+    expect(onRetryMyLeagues).toHaveBeenCalledTimes(1);
   });
 });

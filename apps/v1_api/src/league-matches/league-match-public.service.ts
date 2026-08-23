@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { isParticipantPubliclyEligible, loadParticipantConsentEligibility } from '../games/public-records/public-consent';
-import { sortMyLeaguesByState } from './league-lifecycle-rules';
+import { LEAGUE_STATE_PRIORITY_ORDER, paginateByStatePriority, sortMyLeaguesByState } from './league-lifecycle-rules';
 import { calculateLeagueStandings, LeagueTieBreakCriterion } from './league-standings';
 import { FORFEIT_REASON_MARKER } from './league-match-forfeit.service';
 import { ListLeagueMatchesQueryDto } from './dto/league-match.dto';
@@ -15,54 +16,74 @@ export class LeagueMatchPublicService {
   constructor(private readonly prisma: PrismaService) {}
 
   // R5: 공개 리그 목록. team-matches.service.ts list()와 동일한 cursor 관례(take: limit+1,
-  // 마지막 행을 잘라 hasNext 판정)를 따른다.
+  // 마지막 행을 잘라 hasNext 판정)를 기본으로 삼되, 정렬 1순위가 상태 우선순위(진행 중 ->
+  // 준비 중 -> 종료, LEAGUE_STATE_PRIORITY_ORDER)라 단일 쿼리로는 못 만든다.
   //
-  // 정렬 기본값은 createdAt desc(최근 개설순) -- tournaments-read.service.ts list()의
-  // 기본 정렬과 동일하다. 처음에는 startsOn asc(개장일이 가까운 순)를 시도했지만, state
-  // 기본 필터가 없어 draft/active/completed가 한 목록에 섞이는 이 엔드포인트에서는 함정이
-  // 있다: 오래전에 끝난 completed 리그의 startsOn이 과거의 "이른" 날짜라 오름차순 맨 위로
-  // 떠 버린다(발견 목록에서 가장 먼저 보여야 할 대상이 정반대로 뒤바뀜). createdAt desc는
-  // 이 문제가 없고, id desc를 tie-break로 붙여 같은 시각에 만들어진 행(시드·일괄 생성)의
-  // 상대 순서를 고정한다(tournaments 쪽과 동일한 이유 -- 안 붙이면 skip 기반 커서
-  // 페이지네이션에서 행이 중복되거나 통째로 빠질 수 있다).
+  // [정책 변경 이력 — 2026-08-22 재감사] 원래는 createdAt desc(최근 개설순) 단일 정렬이었다
+  // (tournaments-read.service.ts list()의 기본 정렬과 동일하게 맞춘 것). 하지만 alpha 실측
+  // 41건의 상태 분포가 draft 61%(25/41)라, 리그 tab을 열면 대진도 없는 draft 리그가 화면을
+  // 덮고 정작 진행 중인 리그는 아래로 밀렸다. "내 리그"(listMine)는 같은 문제를 이미 상태
+  // 우선순위 정렬로 고쳐 놓았는데(league-lifecycle-rules.ts sortMyLeaguesByState) 공개
+  // 목록만 옛 정렬로 남아 한 제품 안에서 두 화면이 다른 규칙을 쓰고 있었다.
+  //
+  // state 우선순위는 V1LeagueState enum 선언 순서(draft -> active -> completed)와 달라
+  // Prisma의 `orderBy: { state: 'asc' }`로 표현할 수 없다(listMine과 동일한 제약). 그래서
+  // 상태별로 where 절을 나눠 우선순위 순서대로 순회하며 필요한 개수만큼만 채운다 --
+  // 최악의 경우(query.state 미지정 + 앞쪽 그룹에 행이 얼마 없을 때) 페이지당 최대 3개
+  // 쿼리가 나가지만, 공개 목록은 페이지당 최대 50건(LEAGUE_LIST_MAX_LIMIT)이라 N+1 스캔
+  // 규모가 아니다. 이 "그룹을 순회하며 커서를 이어 붙이는" 로직은 Prisma 와 무관한 순수
+  // 페이지네이션 문제라 `paginateByStatePriority`(league-lifecycle-rules.ts)로 뽑아
+  // DB 없이도 로컬에서 검증할 수 있게 했다 -- 로직·근거·불변식은 그 함수의 doc 참고.
   // teamCount는 각 리그마다 별도 COUNT 쿼리를 날리는 대신 findMany의 _count select로
   // 한 번에 집계한다(N+1 없음) -- admin list()의 동일 패턴 재사용.
   async list(query: ListLeagueMatchesQueryDto) {
     const limit = Math.min(Math.max(query.limit ?? LEAGUE_LIST_DEFAULT_LIMIT, 1), LEAGUE_LIST_MAX_LIMIT);
-    const leagues = await this.prisma.v1League.findMany({
-      where: {
-        ...(query.sportId ? { sportId: query.sportId } : {}),
-        ...(query.regionId ? { regionId: query.regionId } : {}),
-        ...(query.state ? { state: query.state } : {}),
-        ...(query.teamId ? { teams: { some: { teamId: query.teamId } } } : {}),
-      },
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
-      select: {
-        id: true,
-        title: true,
-        state: true,
-        startsOn: true,
-        endsOn: true,
-        // code는 프론트의 getSportAccent(code)/SportGlyph가 요구하는 키다 --
-        // 대회 목록(V1TournamentListItem.sport)이 이미 같은 { code, name } 모양을
-        // 쓰고 있어(apps/v1_web/src/types/api.ts) 같은 관례를 그대로 맞춘다.
-        sport: { select: { id: true, code: true, name: true } },
-        region: { select: { id: true, name: true } },
-        // 티어는 목록에서도 필요하다 -- 이 목록은 "자기 수준의 리그를 고르는" 화면이라
-        // 상세에 들어가야만 몇 부인지 알 수 있으면 고를 수가 없다(Task 153 시나리오 3).
-        // 제목에 "1부"가 들어 있어서 읽히는 것에 기대면 안 된다: 제목은 운영자 자유입력이다.
-        tier: true,
-        seasonNo: true,
-        seriesId: true,
-        series: { select: { id: true, title: true } },
-        _count: { select: { teams: true } },
-      },
-    });
 
-    const pageItems = leagues.slice(0, limit);
-    const hasNext = leagues.length > limit;
+    const baseWhere: Prisma.V1LeagueWhereInput = {
+      ...(query.sportId ? { sportId: query.sportId } : {}),
+      ...(query.regionId ? { regionId: query.regionId } : {}),
+      ...(query.teamId ? { teams: { some: { teamId: query.teamId } } } : {}),
+    };
+
+    // query.state 필터가 있으면 애초에 상태 하나만 보므로 그룹핑이 필요 없다 -- 그
+    // 상태 하나짜리 순서로 순회한다(paginateByStatePriority 안에서 자연히 기존과 동일한
+    // 단일 쿼리 커서 페이지네이션으로 축소된다).
+    const stateGroups = query.state ? [query.state] : LEAGUE_STATE_PRIORITY_ORDER;
+
+    const leagueSelect = {
+      id: true,
+      title: true,
+      state: true,
+      startsOn: true,
+      endsOn: true,
+      // code는 프론트의 getSportAccent(code)/SportGlyph가 요구하는 키다 --
+      // 대회 목록(V1TournamentListItem.sport)이 이미 같은 { code, name } 모양을
+      // 쓰고 있어(apps/v1_web/src/types/api.ts) 같은 관례를 그대로 맞춘다.
+      sport: { select: { id: true, code: true, name: true } },
+      region: { select: { id: true, name: true } },
+      // 티어는 목록에서도 필요하다 -- 이 목록은 "자기 수준의 리그를 고르는" 화면이라
+      // 상세에 들어가야만 몇 부인지 알 수 있으면 고를 수가 없다(Task 153 시나리오 3).
+      // 제목에 "1부"가 들어 있어서 읽히는 것에 기대면 안 된다: 제목은 운영자 자유입력이다.
+      tier: true,
+      seasonNo: true,
+      seriesId: true,
+      series: { select: { id: true, title: true } },
+      _count: { select: { teams: true } },
+    } satisfies Prisma.V1LeagueSelect;
+
+    const { items: pageItems, hasNext, nextCursor } = await paginateByStatePriority({
+      stateGroups,
+      limit,
+      cursor: query.cursor,
+      fetchGroup: (state, page) =>
+        this.prisma.v1League.findMany({
+          where: { ...baseWhere, state: state as Prisma.V1LeagueWhereInput['state'] },
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          take: page.take,
+          ...(page.cursorId ? { cursor: { id: page.cursorId }, skip: 1 } : {}),
+          select: leagueSelect,
+        }),
+    });
 
     return {
       items: pageItems.map((league) => ({
@@ -83,7 +104,9 @@ export class LeagueMatchPublicService {
         seriesTitle: league.series?.title ?? null,
         teamCount: league._count.teams,
       })),
-      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
+      // nextCursor는 "<state>:<id>" 복합값이다 -- 다음 요청이 어느 상태 그룹의 어디부터
+      // 이어가야 하는지를 커서 하나로 복원할 수 있어야 한다(paginateByStatePriority 참고).
+      pageInfo: { nextCursor, hasNext },
     };
   }
 

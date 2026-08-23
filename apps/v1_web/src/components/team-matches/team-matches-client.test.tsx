@@ -47,6 +47,13 @@ vi.mock('./team-matches-page', () => ({
       <span data-testid="team-match-mode">{model.mode}</span>
       <span data-testid="team-match-status-label">{model.statusLabel}</span>
       <span data-testid="team-match-apply-label">{model.applyLabel}</span>
+      <span data-testid="team-match-description">{model.match.description}</span>
+      <span data-testid="team-match-address">{model.match.address}</span>
+      <span data-testid="team-match-cost">{model.match.cost}</span>
+      <span data-testid="team-match-opponent-cost">{model.match.opponentCost}</span>
+      <span data-testid="team-match-manner">{model.match.manner}</span>
+      <span data-testid="team-match-wins">{model.match.wins}</span>
+      <span data-testid="team-match-applicant-count">{model.match.applicantTeams.length}</span>
       {model.onApply && <button onClick={model.onApply}>상대팀 신청</button>}
       {model.resultAction && <a href={model.resultAction.href}>{model.resultAction.label}</a>}
       {model.reviewAction && <a href={model.reviewAction.href}>{model.reviewAction.label}</a>}
@@ -371,5 +378,92 @@ describe('TeamMatchDetailPageClient — 후기 진입점', () => {
     render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
 
     expect(screen.queryByRole('link', { name: '후기 남기기' })).not.toBeInTheDocument();
+  });
+});
+
+// alpha 실측 결함(그룹 B): API가 costNote/description을 안 주고(costNote: null, description: null,
+// paymentRequired: false — 실제 응답 그대로), 신청팀도 아직 없는 실제 매치를 열었더니
+// team-matches.view-model.ts의 하드코딩 목업("상대팀 부담금 140,000원", "친선 팀매치를 진행해요...",
+// "매너 4.8 · 승 23", 가짜 신청팀 이름)이 그대로 새어 나왔다 — 서로 다른 매치를 열어도 항상
+// 똑같은 값이 보이는 게 이 버그의 증거였다. 이 스위트는 화면(모델)에 그 목업 값이 더 이상
+// 나타나지 않고, 실제 API 값이 있을 때는 여전히 정상적으로 반영됨을 함께 고정한다.
+describe('TeamMatchDetailPageClient — API가 비용/설명/신청팀을 안 주면 목업으로 채우지 않는다', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    applyTeamMatchMutateAsync.mockResolvedValue({ applicationId: 'app-1' });
+    useV1TeamMatchEligibilityMock.mockReturnValue({ data: undefined, isSuccess: false });
+  });
+
+  it('costNote/description이 null이고 신청팀이 없으면 목업(140,000원·친선 문구·매너 4.8·가짜 신청팀)이 하나도 나타나지 않는다', () => {
+    useV1TeamMatchMock.mockReturnValue({
+      data: {
+        id: 'real-league-match-1',
+        teamMatchId: 'real-league-match-1',
+        title: '(테스트) 8월 리그 3라운드',
+        sportName: '풋살',
+        sport: { sportId: 'sport-futsal', name: '풋살' },
+        placeName: '진짜 경기장',
+        startsAt: '2026-08-01T10:00:00.000Z',
+        capacityText: '1/2',
+        status: 'open',
+        viewer: { state: 'none', manageableHostTeam: false },
+        hostTeam: { teamId: 'team-host', name: '호스트 팀', trustState: 'none' },
+        costNote: null,
+        description: null,
+        paymentRequired: false,
+        approvedOpponentTeam: null,
+      },
+      isError: false,
+    });
+
+    render(<TeamMatchDetailPageClient teamMatchId="real-league-match-1" />);
+
+    // 결함으로 보고된 정확한 목업 값들 — 하나도 렌더되면 안 된다.
+    expect(screen.getByTestId('team-match-opponent-cost')).not.toHaveTextContent('140000');
+    expect(screen.getByTestId('team-match-cost')).not.toHaveTextContent('280000');
+    expect(screen.getByTestId('team-match-manner')).not.toHaveTextContent('4.8');
+    expect(screen.getByTestId('team-match-wins')).not.toHaveTextContent('23');
+    expect(screen.queryByText(/친선 팀매치를 진행해요/)).not.toBeInTheDocument();
+    expect(screen.queryByText('성수 러너스 FC')).not.toBeInTheDocument();
+    expect(screen.queryByText('마포 애슬레틱')).not.toBeInTheDocument();
+
+    // 값 없음은 0 이 아니라 **null** 로 넘긴다 — 0 으로 채우면 화면이 '무료초청 · 실제 청구
+    // 없어요'(비용)나 '매너 0 · 승 0'(팀 통계)이라는 또 다른 거짓 정보를 만들어낸다.
+    // 렌더러(team-matches-page.tsx)는 null 을 받으면 그 줄·그룹을 감춘다.
+    expect(screen.getByTestId('team-match-description')).toHaveTextContent('');
+    expect(screen.getByTestId('team-match-cost')).toHaveTextContent('');
+    expect(screen.getByTestId('team-match-opponent-cost')).toHaveTextContent('');
+    expect(screen.getByTestId('team-match-manner')).toHaveTextContent('');
+    expect(screen.getByTestId('team-match-wins')).toHaveTextContent('');
+    expect(screen.getByTestId('team-match-applicant-count')).toHaveTextContent('0');
+  });
+
+  it('costNote/description이 실제로 있으면 그 값을 그대로 반영한다(목업으로 안 덮는다)', () => {
+    useV1TeamMatchMock.mockReturnValue({
+      data: {
+        id: 'real-league-match-2',
+        teamMatchId: 'real-league-match-2',
+        title: '(테스트) 8월 리그 4라운드',
+        sportName: '풋살',
+        sport: { sportId: 'sport-futsal', name: '풋살' },
+        placeName: '진짜 경기장',
+        startsAt: '2026-08-02T10:00:00.000Z',
+        capacityText: '1/2',
+        status: 'open',
+        viewer: { state: 'none', manageableHostTeam: false },
+        hostTeam: { teamId: 'team-host', name: '호스트 팀', trustState: 'none' },
+        costNote: '총 90,000원 · 상대팀 30,000원',
+        description: '실제로 입력된 설명이에요.',
+        paymentRequired: true,
+        approvedOpponentTeam: null,
+      },
+      isError: false,
+    });
+
+    render(<TeamMatchDetailPageClient teamMatchId="real-league-match-2" />);
+
+    expect(screen.getByTestId('team-match-description')).toHaveTextContent('실제로 입력된 설명이에요.');
+    expect(screen.getByTestId('team-match-cost')).toHaveTextContent('90000');
+    expect(screen.getByTestId('team-match-opponent-cost')).toHaveTextContent('30000');
   });
 });

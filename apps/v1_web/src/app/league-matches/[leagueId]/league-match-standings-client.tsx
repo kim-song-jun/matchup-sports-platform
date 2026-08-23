@@ -52,6 +52,44 @@ function fixtureStatusMeta(status: string): { label: string; badgeClass: string 
 }
 
 /**
+ * 승격/강등/잔류/불참 뱃지 — 열(390px 이상)과 팀명 아래 인라인(390px 미만) 양쪽에서 재사용한다.
+ * 아이콘+텍스트를 함께 실어 컬러만으로 뜻을 전달하지 않는다.
+ */
+function PromotionBadge({ kind, toTierLabel }: { kind: 'promoted' | 'relegated' | 'stayed' | 'withdrawn'; toTierLabel: string | null }) {
+  const meta = PROMOTION_META[kind];
+  return (
+    <span className={`inline-flex items-center gap-1 whitespace-nowrap font-semibold ${meta.className}`}>
+      <span aria-hidden="true">{meta.glyph}</span>
+      {meta.label}
+      {(kind === 'promoted' || kind === 'relegated') && toTierLabel !== null && (
+        <span className="font-normal text-[var(--text-muted)]">({toTierLabel})</span>
+      )}
+    </span>
+  );
+}
+
+/**
+ * 득점·도움 순위는 배열 인덱스+1을 등수로 쓰면 공동 순위가 사라진다 — 5골인 두 선수가
+ * "1위 / 2위"로 갈려 공동 1위가 뒤처진 것처럼 읽힌다. 순위표(standings)는 서버가 이미
+ * `position`을 계산해 주는 것과 대비된다(서버가 이 값은 계산해 주지 않으므로 클라에서
+ * 표준 경쟁 순위(1,1,3 — 동점은 같은 등수, 다음 등수는 동점자 수만큼 건너뜀)를 계산한다).
+ * 응답 배열은 값 내림차순 정렬로 온다는 전제(기존 index+1 표기도 같은 전제를 썼다).
+ */
+function competitionRanks(values: number[]): number[] {
+  const ranks: number[] = [];
+  let previousValue: number | null = null;
+  let previousRank = 0;
+  values.forEach((value, index) => {
+    if (previousValue === null || value !== previousValue) {
+      previousRank = index + 1;
+      previousValue = value;
+    }
+    ranks.push(previousRank);
+  });
+  return ranks;
+}
+
+/**
  * 점수 필드(homeScore/awayScore)는 값이 없을 수 있다(미확정 대진) — 그때는 0:0으로
  * 오인되지 않게 상태 기반 문구로 대체한다.
  *
@@ -120,6 +158,9 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
     return map;
   }, [standings]);
 
+  const goalRanks = useMemo(() => competitionRanks((records?.goals ?? []).map((row) => row.goals)), [records]);
+  const assistRanks = useMemo(() => competitionRanks((records?.assists ?? []).map((row) => row.assists)), [records]);
+
   // 잘못된 leagueId 딥링크(404 등)는 빈 화면이 아니라 에러 안내 + 재시도로 처리한다.
   if (seriesQuery.isError) {
     return (
@@ -152,7 +193,10 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
           둘은 다른 축이라 한 줄에 섞으면 무엇이 무엇인지 읽히지 않는다. */}
       {series.tierLabel != null && (
         <p className="mb-1.5 flex flex-wrap items-center gap-1.5 text-xs">
-          <span className="rounded-md bg-blue-100 px-2 py-0.5 font-bold text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
+          {/* 하드코딩 색 대신 목록(league-matches-list-client.tsx)·마이 리그(my-leagues-client.tsx)와
+              동일한 공용 뱃지 클래스를 쓴다 — 명암비가 이미 검증돼 있고, 목록→상세 이동 시
+              같은 정보의 모양이 바뀌지 않아야 한다. */}
+          <span className="tm-badge tm-badge-sm tm-badge-blue">
             {series.tierLabel}
           </span>
           {series.seriesTitle != null && (
@@ -189,14 +233,14 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
           <EmptyState title="아직 확정된 결과가 없어요" sub="리그 경기 결과가 확정되면 순위표가 나타나요." />
         ) : (
           <div className="overflow-x-auto">
-            {/* 승강 열이 붙으면 6칸이 되는데, 390px 컨테이너(358px)에서는 승점·득실 칸이
-                24px 까지 좁아져 두 글자 헤더가 서로 붙어 버린다(alpha 실측). 이미 감싸고
-                있는 overflow-x-auto 가 일을 하려면 표에 최소 폭이 있어야 하므로, 승강 열이
-                있을 때만 최소 폭을 줘 가로 스크롤로 넘긴다 — 확정 전 5칸일 때는 지금처럼
-                컨테이너에 딱 맞춰 스크롤 없이 보인다.
-                440px = 순위 38 + 팀 160 + 전적 56 + 승점 38 + 득실 38 + 승강 116 (768px
-                실측 칸 폭에서 팀 칸만 최소치로 줄인 값). */}
-            <table className={`w-full text-sm ${standings.promotionDecided ? 'min-w-[440px]' : ''}`}>
+            {/* 승강 열이 6번째 칸으로 붙으면 필요 최소 폭이 440px 인데, 390px 화면의 본문 폭은
+                358px 뿐이다(alpha 실측 — 헤더가 "승…"에서 끊기고 강등 행은 빨간 ↓만 남아
+                "강등 (2부)" 글자가 화면 밖으로 밀렸다). overflow-x-auto 는 스크롤을 열어줄
+                뿐 "잘렸다"는 신호를 주지 않으므로, sm(640px) 미만에서는 승강 열 자체를
+                감추고 그 정보를 팀명 칸 아래 인라인으로 내려 **스크롤 없이** 읽히게 한다.
+                sm 이상에서만 원래의 6칸 열 + 440px 최소 폭(순위38+팀160+전적56+승점38+
+                득실38+승강116, 768px 실측 칸 폭 기준)을 적용한다. */}
+            <table className={`w-full text-sm ${standings.promotionDecided ? 'sm:min-w-[440px]' : ''}`}>
               <thead>
                 <tr className="text-left text-[var(--text-muted)]">
                   <th scope="col" className="py-2">순위</th>
@@ -209,8 +253,9 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
                   <th scope="col">승점</th>
                   <th scope="col">득실</th>
                   {/* 승강 열은 확정된 뒤에만 생긴다 — 확정 전에 빈 칸만 늘어난 표는
-                      "아직 안 정해졌다"보다 읽기 어렵고, 기존 순위표 모양도 그대로 유지된다. */}
-                  {standings.promotionDecided && <th scope="col">승강</th>}
+                      "아직 안 정해졌다"보다 읽기 어렵고, 기존 순위표 모양도 그대로 유지된다.
+                      390px 미만에서는 이 열을 감추고 팀명 칸 아래 인라인으로 대체한다. */}
+                  {standings.promotionDecided && <th scope="col" className="hidden sm:table-cell">승강</th>}
                 </tr>
               </thead>
               <tbody>
@@ -220,7 +265,21 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
                     <th scope="row" className="text-left font-normal text-[var(--text-strong)]">
                       <span className="flex items-center gap-2">
                         <TeamAvatar seed={row.teamId} name={row.teamName} logoUrl={row.teamLogoUrl} size="sm" />
-                        <span>{row.teamName}</span>
+                        <span className="flex flex-col">
+                          <span>{row.teamName}</span>
+                          {/* sm 미만에서만 보이는 인라인 승강 표기 — 열이 숨겨진 화면에서
+                              시즌의 결론(승격/강등)이 스크롤 없이 바로 읽히게 한다. */}
+                          {standings.promotionDecided && row.promotionKind != null && (
+                            // text-2xs 는 globals.css 에서 죽은 코드로 삭제된 유틸리티라 아무 크기도
+                            // 적용되지 않고(그대로 두면 부모 크기를 물려받는다), 공개 화면 하한(12px)
+                            // 미달이기도 하다 — text-xs(12px)를 쓴다.
+                            // (이 괄호 안은 JSX children이 아니라 `&&`의 우변 JS 표현식이라
+                            // `{/* */}` 형태의 JSX 주석은 여기서 문법 오류다 — 일반 JS 주석을 쓴다.)
+                            <span className="text-xs sm:hidden">
+                              <PromotionBadge kind={row.promotionKind} toTierLabel={row.promotionToTierLabel} />
+                            </span>
+                          )}
+                        </span>
                       </span>
                     </th>
                     {/* 1-0-0 압축 표기 — tournament-standings-table.tsx와 동일 정책.
@@ -231,19 +290,11 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
                     <td>{row.points}</td>
                     <td>{row.goalsFor}-{row.goalsAgainst}</td>
                     {standings.promotionDecided && (
-                      <td>
+                      <td className="hidden sm:table-cell">
                         {row.promotionKind == null ? (
                           <span className="text-[var(--text-muted)]">—</span>
                         ) : (
-                          <span className={`inline-flex items-center gap-1 whitespace-nowrap font-semibold ${PROMOTION_META[row.promotionKind].className}`}>
-                            <span aria-hidden="true">{PROMOTION_META[row.promotionKind].glyph}</span>
-                            {PROMOTION_META[row.promotionKind].label}
-                            {row.promotionKind === 'promoted' || row.promotionKind === 'relegated'
-                              ? row.promotionToTierLabel !== null && (
-                                  <span className="font-normal text-[var(--text-muted)]">({row.promotionToTierLabel})</span>
-                                )
-                              : null}
-                          </span>
+                          <PromotionBadge kind={row.promotionKind} toTierLabel={row.promotionToTierLabel} />
                         )}
                       </td>
                     )}
@@ -338,7 +389,7 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
           <ol className="space-y-1">
             {records.goals.map((row, index) => (
               <li key={row.userId} className="flex justify-between text-sm text-[var(--text-strong)]">
-                <span>{index + 1}. {row.nickname ?? '선수'}</span>
+                <span>{goalRanks[index]}. {row.nickname ?? '선수'}</span>
                 <span>{row.goals}골</span>
               </li>
             ))}
@@ -361,7 +412,7 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
           <ol className="space-y-1">
             {records.assists.map((row, index) => (
               <li key={row.userId} className="flex justify-between text-sm text-[var(--text-strong)]">
-                <span>{index + 1}. {row.nickname ?? '선수'}</span>
+                <span>{assistRanks[index]}. {row.nickname ?? '선수'}</span>
                 <span>{row.assists}도움</span>
               </li>
             ))}

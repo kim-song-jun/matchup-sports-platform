@@ -309,6 +309,11 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
             : undefined,
         myLeagues,
         myLeaguesLoading: myLeaguesQuery.isLoading,
+        // 통신 오류를 "리그 0개"로 위장시키지 않기 위한 3번째 상태 — TeamMyLeaguesSection이
+        // 이 플래그로 EmptyState(재시도)를 렌더한다. refetch를 그대로 넘겨 재시도 버튼이
+        // 같은 쿼리를 다시 부르게 한다.
+        myLeaguesError: myLeaguesQuery.isError,
+        onRetryMyLeagues: () => void myLeaguesQuery.refetch(),
       }
     : fallback;
 

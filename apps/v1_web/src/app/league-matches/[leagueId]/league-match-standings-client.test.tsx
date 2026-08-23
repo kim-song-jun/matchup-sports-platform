@@ -419,9 +419,61 @@ describe('LeagueMatchStandingsClient', () => {
     );
 
     expect(await screen.findByRole('columnheader', { name: '승강' })).toBeInTheDocument();
-    expect(screen.getByText('강등')).toBeInTheDocument();
+    // 390px 미만에서 승강 열이 잘리는 결함 수정 후: 같은 승강 정보가 sm 이상 전용 열과
+    // sm 미만 전용 팀명-하단 인라인 표기 두 곳에 함께 렌더된다(실제 표시 여부는 CSS가
+    // 가르지만 jsdom은 CSS를 계산하지 않으므로 DOM에는 항상 둘 다 존재) — 그래서
+    // getByText 단일 매치 대신 정확히 2곳(열 + 인라인)임을 확인한다.
+    expect(screen.getAllByText('강등')).toHaveLength(2);
     // 이동할 티어는 승격·강등에만 붙는다(잔류에는 붙지 않는다).
-    expect(screen.getByText('(2부)')).toBeInTheDocument();
-    expect(screen.getByText('잔류')).toBeInTheDocument();
+    expect(screen.getAllByText('(2부)')).toHaveLength(2);
+    expect(screen.getAllByText('잔류')).toHaveLength(2);
+  });
+
+  it('득점·도움이 동률이면 공동 순위(1,1,3)로 표시하고 배열 인덱스로 매기지 않는다', async () => {
+    // 배열 인덱스+1을 등수로 쓰면 5골 동률 두 명이 "1위/2위"로 갈려 공동 1위가 뒤처진
+    // 것처럼 보인다. 표준 경쟁 순위는 동점을 같은 등수로 묶고, 다음 등수는 동점자 수만큼
+    // 건너뛴다(1,1,3) — 순위표(standings)가 서버 `position`을 그대로 쓰는 것과 대비해서
+    // 득점·도움은 서버가 등수를 안 주므로 클라이언트가 계산한다.
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1LeagueMatchMock.mockReturnValue({
+      data: { leagueId: 'league-1', title: '가을 리그', state: 'active', startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1'], fixtures: [] },
+    } as never);
+    useV1LeagueMatchStandingsMock.mockReturnValue({
+      data: { leagueId: 'league-1', tieBreakOrder: ['points'], standings: [], pendingFixtures: [] },
+    } as never);
+    useV1LeagueMatchPlayerRecordsMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1',
+        // 내림차순 전제(서버 계약) — 5골 동률 2명 다음 3골 1명 → 1, 1, 3위.
+        goals: [
+          { userId: 'u1', nickname: '김철수', goals: 5, assists: 0 },
+          { userId: 'u2', nickname: '이영희', goals: 5, assists: 0 },
+          { userId: 'u3', nickname: '박민수', goals: 3, assists: 0 },
+        ],
+        // 도움도 동일 패턴으로 별도 검증(득점 로직과 독립적으로 계산돼야 한다).
+        assists: [
+          { userId: 'u4', nickname: '정다은', goals: 0, assists: 4 },
+          { userId: 'u5', nickname: '최유진', goals: 0, assists: 4 },
+          { userId: 'u6', nickname: '한소희', goals: 0, assists: 4 },
+          { userId: 'u7', nickname: '오지훈', goals: 0, assists: 1 },
+        ],
+      },
+    } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchStandingsClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    expect(await screen.findByText('1. 김철수')).toBeInTheDocument();
+    expect(screen.getByText('1. 이영희')).toBeInTheDocument();
+    expect(screen.getByText('3. 박민수')).toBeInTheDocument();
+
+    // 3명 동률(1,1,1) 다음은 4위로 건너뛴다.
+    expect(screen.getByText('1. 정다은')).toBeInTheDocument();
+    expect(screen.getByText('1. 최유진')).toBeInTheDocument();
+    expect(screen.getByText('1. 한소희')).toBeInTheDocument();
+    expect(screen.getByText('4. 오지훈')).toBeInTheDocument();
   });
 });

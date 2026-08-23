@@ -93,7 +93,7 @@ export class LeagueSeriesAdminService {
         action: 'league_series.create',
         targetType: 'league_series',
         targetId: created.id,
-      });
+      }, tx);
       return created;
     });
 
@@ -132,7 +132,7 @@ export class LeagueSeriesAdminService {
         action: 'league_series.update',
         targetType: 'league_series',
         targetId: seriesId,
-      });
+      }, tx);
       return next;
     });
 
@@ -298,7 +298,7 @@ export class LeagueSeriesAdminService {
         action: 'league_series.seed_season',
         targetType: 'league_series',
         targetId: seriesId,
-      });
+      }, tx);
       return leagues;
     });
 
@@ -558,11 +558,18 @@ export class LeagueSeriesAdminService {
         }
       }
 
+      // tx 를 반드시 넘긴다. 안 넘기면 logAdminAction 이 this.prisma 로 떨어져
+      // **트랜잭션을 점유한 채 풀에서 두 번째 커넥션을 잡는다.** 동시 요청 N 건이면
+      // 커넥션 2N 개가 필요해지고, 풀 크기보다 커지는 순간 전원이 서로를 기다리는
+      // 자기 교착에 빠진다 — alpha 실측에서 동시 6건이 **한 건도 성공하지 못하고**
+      // 전부 "트랜잭션을 시작할 수 없음"으로 죽은 이유가 이것이다(경합이라면 한 건은
+      // 이겼어야 한다). 감사 로그가 확정과 같은 트랜잭션에 들어가는 것이 의미상으로도
+      // 맞다 — 롤백된 확정이 감사 로그에는 남아 있으면 안 된다.
       await this.adminContext.logAdminAction(admin, {
         action: 'league_series.commit_promotions',
         targetType: 'league_series',
         targetId: seriesId,
-      });
+      }, tx);
 
       return { createdLeagues };
     });

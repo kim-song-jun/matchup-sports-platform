@@ -496,6 +496,70 @@ describe('리그 승강 확정 (Task 153)', () => {
     });
   });
 
+  describe('감사 로그가 확정 트랜잭션에 묶여 있는가', () => {
+    // 근본 원인 회귀 가드. logAdminAction 에 tx 를 넘기지 않으면 this.prisma 로 떨어져
+    // **트랜잭션을 점유한 채 풀에서 두 번째 커넥션을 잡는다** — 동시 N 건이면 커넥션 2N 개가
+    // 필요해지고 풀 크기를 넘는 순간 전원이 서로를 기다리는 자기 교착에 빠진다
+    // (alpha 실측: 동시 6건이 한 건도 성공하지 못했다).
+    //
+    // 커넥션 점유는 테스트로 직접 재기 어렵지만, tx 를 안 넘겼을 때 함께 깨지는 성질이
+    // 하나 더 있다 — 롤백된 확정의 감사 로그가 살아남는다. 그걸 잡으면 원인도 함께 잡힌다.
+    it('확정이 롤백되면 감사 로그도 남지 않는다', async () => {
+      const teams = [
+        await createTeam('audit-a1'), await createTeam('audit-a2'),
+        await createTeam('audit-b1'), await createTeam('audit-b2'),
+      ];
+      const { seriesId, leagueIds } = await seedSeries('감사롤백', [
+        [teams[0].id, teams[1].id],
+        [teams[2].id, teams[3].id],
+      ]);
+      for (const leagueId of leagueIds) await finishLeague(leagueId);
+
+      const previewRes = await asAdmin(
+        http().post(`/api/v1/admin/league-series/${seriesId}/seasons/1/promotions/preview`),
+      );
+      const preview = previewRes.body.data;
+      const entries = preview.tiers.flatMap((tier: { entries: Array<{ teamId: string; tier: number; computedKind: string }> }) =>
+        tier.entries.map((entry) => ({ teamId: entry.teamId, fromTier: entry.tier, kind: entry.computedKind })),
+      );
+
+      const before = await prisma.v1AdminActionLog.count({
+        where: { action: 'league_series.commit_promotions', targetId: seriesId },
+      });
+
+      // 트랜잭션 본문은 끝까지 수행하되(감사 로그 기록 포함) 커밋 직전에 실패시킨다.
+      const prismaService = app.get(PrismaService) as unknown as {
+        $transaction: (...args: unknown[]) => Promise<unknown>;
+      };
+      const original = prismaService.$transaction.bind(prismaService);
+      let armed = true;
+      prismaService.$transaction = async (...args: unknown[]) => {
+        if (!armed) return original(...(args as [never]));
+        armed = false;
+        const fn = args[0] as (tx: unknown) => Promise<unknown>;
+        return original(async (tx: unknown) => {
+          await fn(tx);
+          throw new Error('T153_FORCED_ROLLBACK');
+        }, args[1] as never);
+      };
+
+      try {
+        await asAdmin(
+          http().post(`/api/v1/admin/league-series/${seriesId}/seasons/1/promotions/commit`),
+        ).send({ entries, ruleFingerprint: preview.ruleFingerprint });
+      } finally {
+        prismaService.$transaction = original as never;
+      }
+
+      // 확정이 롤백됐으니 승강 이력도, 감사 로그도 늘어나면 안 된다.
+      expect(await prisma.v1LeaguePromotion.count({ where: { fromLeagueId: { in: leagueIds } } })).toBe(0);
+      const after = await prisma.v1AdminActionLog.count({
+        where: { action: 'league_series.commit_promotions', targetId: seriesId },
+      });
+      expect(after).toBe(before);
+    });
+  });
+
   describe('하위호환 — 단발 리그', () => {
     it('시리즈에 속하지 않은 리그는 티어가 없고 공개 목록·순위표에도 티어가 붙지 않는다', async () => {
       const teamA = await createTeam('solo-a');

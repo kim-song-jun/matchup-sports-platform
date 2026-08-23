@@ -59,6 +59,19 @@ const WINNER_SCORE = 1;
 const LOSER_SCORE = 0;
 
 /**
+ * 재시도 전 대기. alpha 실측에서 0ms 는 3/3 재충돌, 300ms 는 즉시 수렴했다. 이긴 쪽의
+ * create/submit/decide 세 트랜잭션이 끝날 여유를 주되, 실패한 운영자를 오래 붙잡아
+ * 두지 않는 값으로 고른다.
+ */
+const RETRY_BACKOFF_MS = 300;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+/**
  * GamesService 가 동시성 충돌에 붙이는 코드. 여기서 이것만 보고 재시도한다 —
  * 다른 409(이미 확정됨 등)는 재시도해도 결과가 같으므로 그대로 올려 보낸다.
  */
@@ -86,17 +99,25 @@ export class LeagueMatchForfeitService {
    * ID 로 출발한다. 뒤늦은 쪽은 `withCommand` 의 `SELECT ... FOR UPDATE` 에서 Postgres
    * 40001 을 맞고 409 COMMAND_CONCURRENCY_CONFLICT 로 되돌아온다.
    *
-   * 그 시점엔 이긴 쪽이 이미 커밋을 끝냈으므로, 그대로 한 번 더 돌리면 아래 로직이
-   * 확정된 결과를 읽어 `alreadyProcessed: true` 로 정상 수렴한다. 즉 재시도는 새 몰수를
-   * 만들지 않는다 — 이 엔드포인트가 이미 멱등이라서 안전한 것이지, 재시도가 멱등을
-   * 만들어 주는 게 아니다. 그래서 단 한 번만 재시도하고, 그래도 충돌이면 409 를 그대로
-   * 올려 보낸다(무한 재시도로 경합을 키우지 않는다).
+   * 이긴 쪽이 커밋을 끝낸 뒤 다시 돌리면 아래 로직이 확정된 결과를 읽어
+   * `alreadyProcessed: true` 로 수렴한다. 재시도는 새 몰수를 만들지 않는다 — 이
+   * 엔드포인트가 이미 멱등이라서 안전한 것이지, 재시도가 멱등을 만들어 주는 게 아니다.
+   *
+   * **대기 없이 즉시 재시도하면 수렴하지 않는다.** 몰수 한 건은 create -> submit ->
+   * decide 세 개의 **별도 트랜잭션**이라 이긴 쪽이 끝나기까지 창이 길고, 즉시 재시도는
+   * 그 한가운데서 다시 `FOR UPDATE` 를 잡으려다 또 40001 을 맞는다 — alpha 실측
+   * (2026-08-23): 대기 0 이면 3라운드 3/3 재시도까지 409, 0.3초 뒤 재호출은 즉시
+   * `alreadyProcessed: true`. 그래서 이긴 쪽이 세 단계를 끝낼 여유만큼만 기다린다.
+   *
+   * 재시도는 한 번뿐이다. 그래도 충돌이면 409 를 그대로 올려 보낸다 — 무한 재시도로
+   * 경합을 키우지 않고, 운영자에게 다시 누르라고 안내하는 편이 정직하다.
    */
   async recordForfeit(user: V1AuthUser, leagueId: string, teamMatchId: string, dto: RecordLeagueForfeitDto) {
     try {
       return await this.recordForfeitOnce(user, leagueId, teamMatchId, dto);
     } catch (error) {
       if (!isConcurrencyConflict(error)) throw error;
+      await sleep(RETRY_BACKOFF_MS);
       try {
         return await this.recordForfeitOnce(user, leagueId, teamMatchId, dto);
       } catch (retryError) {

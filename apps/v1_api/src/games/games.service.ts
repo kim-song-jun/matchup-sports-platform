@@ -41,6 +41,7 @@ import {
 } from '../tournaments/competition-config/competition-config.parse';
 import { readIsKnockoutFixture, readKnockoutFixtureFacts } from '../tournaments/knockout-fixture';
 import { assertPenaltyShootoutPersistable } from './core/penalty-shootout-outcome';
+import { isCommandConcurrencyConflict } from './command-concurrency-error';
 import {
   assertBracketResolvable,
   assertPenaltiesNotAllowed,
@@ -1784,7 +1785,7 @@ export class GamesService {
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
-        (error.code === 'P2034' || error.code === 'P2002')
+        isCommandConcurrencyConflict(error.code, error.meta, error.message)
       ) {
         throw new ConflictException({
           code: 'COMMAND_CONCURRENCY_CONFLICT',
@@ -3716,7 +3717,7 @@ export class GamesService {
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
-        (error.code === 'P2034' || error.code === 'P2002')
+        isCommandConcurrencyConflict(error.code, error.meta, error.message)
       ) {
         throw new ConflictException({
           code: 'COMMAND_CONCURRENCY_CONFLICT',
@@ -4027,7 +4028,7 @@ export class GamesService {
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
-        (error.code === 'P2034' || error.code === 'P2002')
+        isCommandConcurrencyConflict(error.code, error.meta, error.message)
       ) {
         throw new ConflictException({
           code: 'COMMAND_CONCURRENCY_CONFLICT',

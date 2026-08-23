@@ -5,6 +5,15 @@ import AdminInquiriesPage from './page';
 import type { AdminListFilters, V1AdminInquiryRow } from '@/types/api';
 
 const inquiriesMock = vi.fn<(filters?: AdminListFilters) => unknown>();
+const replaceMock = vi.fn();
+// 딥링크용 초기 쿼리. 테스트마다 바꿔 끼울 수 있게 변수로 둔다.
+let searchParamsValue = new URLSearchParams();
+
+vi.mock('next/navigation', () => ({
+  useSearchParams: () => searchParamsValue,
+  useRouter: () => ({ replace: replaceMock }),
+  usePathname: () => '/admin/inquiries',
+}));
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminInquiries: (filters?: AdminListFilters) => inquiriesMock(filters),
@@ -52,6 +61,8 @@ function mockInquiriesData() {
 
 describe('AdminInquiriesPage — 신고 사유 필터', () => {
   beforeEach(() => {
+    searchParamsValue = new URLSearchParams();
+    replaceMock.mockReset();
     inquiriesMock.mockReset();
     mockInquiriesData();
   });
@@ -103,5 +114,60 @@ describe('AdminInquiriesPage — 신고 사유 필터', () => {
     // 중복으로 나온다(반응형 CSS로만 전환) — 존재 여부만 확인한다.
     expect(screen.getAllByText('신고').length).toBeGreaterThan(0);
     expect(screen.getAllByText('스팸·광고').length).toBeGreaterThan(0);
+  });
+
+  // 딥링크: 운영자가 "스팸 신고 목록" 링크를 받아 그대로 그 화면에 도착해야 한다.
+  describe('URL 딥링크', () => {
+    it('URL 의 분류·사유가 초기 필터로 적용된다', () => {
+      searchParamsValue = new URLSearchParams('category=report&reportReason=spam');
+
+      render(<AdminInquiriesPage />);
+
+      expect(inquiriesMock).toHaveBeenCalledWith(
+        expect.objectContaining({ category: 'report', reportReason: 'spam' }),
+      );
+      expect(screen.getByLabelText('신고 사유 필터')).toBeInTheDocument();
+    });
+
+    it('분류가 신고가 아닌데 사유만 있는 링크는 사유를 무시한다', () => {
+      // 보이지 않는 필터가 목록을 좁혀 "왜 결과가 없지?" 를 만드는 것을 막는다.
+      searchParamsValue = new URLSearchParams('category=team&reportReason=spam');
+
+      render(<AdminInquiriesPage />);
+
+      const args = inquiriesMock.mock.calls.at(-1)?.[0];
+      expect(args).toMatchObject({ category: 'team' });
+      expect(args).not.toHaveProperty('reportReason');
+    });
+
+    it('허용 목록에 없는 값은 무시한다', () => {
+      // 손으로 고친 URL 이 그대로 서버에 실려 400 이 되지 않아야 한다.
+      searchParamsValue = new URLSearchParams('status=bogus&category=nope');
+
+      render(<AdminInquiriesPage />);
+
+      const args = inquiriesMock.mock.calls.at(-1)?.[0];
+      expect(args).not.toHaveProperty('status');
+      expect(args).not.toHaveProperty('category');
+    });
+
+    it('화면에서 필터를 바꾸면 주소가 갱신된다', async () => {
+      const user = userEvent.setup();
+      render(<AdminInquiriesPage />);
+
+      await user.selectOptions(screen.getByLabelText('문의 분류 필터'), 'report');
+
+      expect(replaceMock).toHaveBeenLastCalledWith('/admin/inquiries?category=report', { scroll: false });
+    });
+
+    it('필터를 모두 비우면 쿼리 없는 주소로 되돌린다', async () => {
+      searchParamsValue = new URLSearchParams('category=report');
+      const user = userEvent.setup();
+      render(<AdminInquiriesPage />);
+
+      await user.selectOptions(screen.getByLabelText('문의 분류 필터'), '');
+
+      expect(replaceMock).toHaveBeenLastCalledWith('/admin/inquiries', { scroll: false });
+    });
   });
 });

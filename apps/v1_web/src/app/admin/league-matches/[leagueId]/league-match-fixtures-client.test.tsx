@@ -3,14 +3,18 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { Providers } from '@/app/providers';
 import {
   useV1ActivePopup,
+  useV1AddLeagueTeam,
   useV1AdminLeagueMatch,
   useV1AdminLeagueTeams,
   useV1AdminTeam,
   useV1CancelLeagueFixture,
   useV1GenerateLeagueFixtures,
+  useV1PreviewLeagueFixtures,
   useV1RecordLeagueForfeit,
   useV1RegenerateLeagueFixtures,
+  useV1RemoveLeagueTeam,
   useV1RevertLeagueCompletion,
+  useV1Teams,
   useV1UpdateLeagueFixture,
 } from '@/hooks/use-v1-api';
 import LeagueMatchFixturesClient from './league-match-fixtures-client';
@@ -21,6 +25,9 @@ vi.mock('@/components/auth/pending-social-signup-gate', () => ({
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1ActivePopup: vi.fn(),
+  // 그룹 B 감사 결함 1: 참가팀 추가·제거. 대부분의 테스트는 로스터 조작을 다루지 않으므로
+  // 무해한 기본값이면 충분하다.
+  useV1AddLeagueTeam: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useV1AdminLeagueMatch: vi.fn(),
   useV1AdminLeagueTeams: vi.fn(),
   // R11(C-6): 몰수 모달이 열릴 때만 의미 있는 데이터를 쓴다 — 다른 테스트들은 모달을
@@ -28,11 +35,17 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminTeam: vi.fn(() => ({ data: undefined })),
   useV1CancelLeagueFixture: vi.fn(),
   useV1GenerateLeagueFixtures: vi.fn(),
+  // 그룹 B 감사 결함 3: 최초 생성·재생성 공용 미리보기. 미리보기 자체를 다루는 테스트가
+  // 없으므로 무해한 기본값.
+  useV1PreviewLeagueFixtures: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
   useV1RecordLeagueForfeit: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useV1RegenerateLeagueFixtures: vi.fn(),
+  useV1RemoveLeagueTeam: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   // R6/D-3: 종료 역전이. 대부분의 테스트는 state !== 'completed' 라 버튼 자체가 안 뜨므로
   // 기본값으로 충분하고, 역전이 테스트만 mutate 를 들여다본다.
   useV1RevertLeagueCompletion: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  // 팀 추가 EntityPicker의 검색 후보 — 빈 목록이면 아무것도 렌더하지 않아 무해하다.
+  useV1Teams: vi.fn(() => ({ data: undefined, isFetching: false })),
   useV1UpdateLeagueFixture: vi.fn(),
   // Providers 안의 ThemeProvider가 전역으로 호출한다 — 이 테스트가 <Providers>로 렌더하는 한 필요.
   useV1Settings: vi.fn(() => ({ data: undefined, isError: false, refetch: vi.fn() })),
@@ -40,15 +53,19 @@ vi.mock('@/hooks/use-v1-api', () => ({
 }));
 
 const useV1ActivePopupMock = vi.mocked(useV1ActivePopup, { partial: true });
+const useV1AddLeagueTeamMock = vi.mocked(useV1AddLeagueTeam, { partial: true });
 const useV1AdminLeagueMatchMock = vi.mocked(useV1AdminLeagueMatch, { partial: true });
 const useV1AdminLeagueTeamsMock = vi.mocked(useV1AdminLeagueTeams, { partial: true });
 const useV1AdminTeamMock = vi.mocked(useV1AdminTeam, { partial: true });
 const useV1CancelLeagueFixtureMock = vi.mocked(useV1CancelLeagueFixture, { partial: true });
+const useV1PreviewLeagueFixturesMock = vi.mocked(useV1PreviewLeagueFixtures, { partial: true });
 const useV1RecordLeagueForfeitMock = vi.mocked(useV1RecordLeagueForfeit, { partial: true });
 const useV1GenerateLeagueFixturesMock = vi.mocked(useV1GenerateLeagueFixtures, { partial: true });
 const useV1RegenerateLeagueFixturesMock = vi.mocked(useV1RegenerateLeagueFixtures, { partial: true });
+const useV1RemoveLeagueTeamMock = vi.mocked(useV1RemoveLeagueTeam, { partial: true });
 const useV1UpdateLeagueFixtureMock = vi.mocked(useV1UpdateLeagueFixture, { partial: true });
 const useV1RevertLeagueCompletionMock = vi.mocked(useV1RevertLeagueCompletion, { partial: true });
+const useV1TeamsMock = vi.mocked(useV1Teams, { partial: true });
 
 describe('LeagueMatchFixturesClient', () => {
   // datetime-local 표시값 검증은 UTC와 오프셋이 있는 타임존에서만 회귀를 잡는다

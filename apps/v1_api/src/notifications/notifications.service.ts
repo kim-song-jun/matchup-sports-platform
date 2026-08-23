@@ -53,7 +53,16 @@ export type NotificationEventType =
   // preferenceFieldForEvent/targetTypeForEvent entries) around would have been exactly the kind of
   // tech debt this repo's Core Engineering Principle #1 forbids leaving behind.)
   | 'schedule_rsvp_deadline_reminder'
-  | 'schedule_guest_recruitment_close_reminder';
+  | 'schedule_guest_recruitment_close_reminder'
+  // 리그 감사 그룹 A / R2, R3: 리그 생애주기 알림. 팀에 리그 대진이 배정된 순간과
+  // 승격·강등·잔류가 확정된 순간을 팀장에게 알린다(league-match-admin.service.ts,
+  // league-series-admin.service.ts). 결과 확정(team_match_completed)은 리그 전용이 아니라서
+  // 이 그룹에 넣지 않았다 — 위 team_match_completed 항목이 이미 있다.
+  | 'league_fixture_scheduled'
+  | 'league_promotion_promoted'
+  | 'league_promotion_relegated'
+  | 'league_promotion_stayed'
+  | 'league_promotion_withdrawn';
 
 /** V1NotificationPreference 컬럼 중 이벤트 발송을 게이트하는 필드들. */
 type NotificationPrefField = keyof Pick<
@@ -107,7 +116,8 @@ function preferenceFieldForEvent(type: NotificationEventType): NotificationPrefF
     type === 'team_match_application_rejected' ||
     type === 'team_match_closed' ||
     type === 'team_match_cancelled' ||
-    type === 'team_match_completed'
+    type === 'team_match_completed' ||
+    type === 'league_fixture_scheduled'
   ) {
     return 'teamMatchEnabled';
   }
@@ -122,6 +132,16 @@ function preferenceFieldForEvent(type: NotificationEventType): NotificationPrefF
     type === 'tournament_completed_review_request'
   ) {
     return 'activityEnabled';
+  }
+  // league_promotion_* — 특정 경기가 아니라 팀의 시즌 소속(승격/강등/잔류) 자체가 바뀌는
+  // 이벤트라 teamMatchEnabled가 아니라 team_join/invitation과 같은 teamEnabled로 게이트한다.
+  if (
+    type === 'league_promotion_promoted' ||
+    type === 'league_promotion_relegated' ||
+    type === 'league_promotion_stayed' ||
+    type === 'league_promotion_withdrawn'
+  ) {
+    return 'teamEnabled';
   }
   return 'activityEnabled';
 }
@@ -165,6 +185,23 @@ function targetTypeForEvent(type: NotificationEventType): V1NotificationTargetTy
   ) {
     return 'tournament';
   }
+  // league_promotion_* — 새 V1NotificationTargetType 값을 추가하려면 마이그레이션이
+  // 필요하다(DB enum). 기존 'team' 타입으로 의미가 충분하다: 승격/강등/잔류는 결국
+  // "이 팀의 시즌 소속이 바뀌었다"는 팀 단위 사실이라 team_join/invitation과 같은 부류다.
+  // 실제 목적지(리그 상세 페이지)는 deepLinkForEvent에서 targetType과 무관하게
+  // 명시적으로 오버라이드한다(team_contact_* 항목의 기존 선례와 동일한 패턴).
+  if (
+    type === 'league_promotion_promoted' ||
+    type === 'league_promotion_relegated' ||
+    type === 'league_promotion_stayed' ||
+    type === 'league_promotion_withdrawn'
+  ) {
+    return 'team';
+  }
+  // league_fixture_scheduled도 여기 fallthrough로 떨어진다 — 팀매치(리그 대진) 배정
+  // 이벤트라 'team_match'가 맞다. targetId는 리그당 배치 발송이라 leagueId를 쓴다
+  // (특정 team_match id가 아니라 리그 전체를 가리킴 — deepLinkForEvent에서 명시적으로
+  // 처리한다).
   return 'team_match';
 }
 
@@ -238,6 +275,20 @@ function deepLinkForEvent(
       return `/teams/${teamId}/schedules/${scheduleId}`;
     }
   }
+  // league_fixture_scheduled/league_promotion_* 는 targetType이 'team_match'/'team'이라
+  // ROUTE_BASE_BY_TARGET_TYPE 기본값을 쓰면 각각 /team-matches/{leagueId}, /teams/{leagueId}
+  // 로 잘못 라우팅된다(targetId가 team_match/team의 id가 아니라 leagueId이기 때문 —
+  // team_contact_* 항목의 기존 선례와 동일한 이유). 리그 상세 화면으로 명시적으로 보낸다.
+  if (
+    (type === 'league_fixture_scheduled' ||
+      type === 'league_promotion_promoted' ||
+      type === 'league_promotion_relegated' ||
+      type === 'league_promotion_stayed' ||
+      type === 'league_promotion_withdrawn') &&
+    targetId
+  ) {
+    return `/league-matches/${targetId}`;
+  }
   return deepLinkForTarget(targetType, targetId);
 }
 
@@ -273,6 +324,11 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   inquiry_answered: '문의에 답변이 등록됐어요',
   schedule_rsvp_deadline_reminder: '참석 여부를 알려주세요',
   schedule_guest_recruitment_close_reminder: '용병 모집이 곧 마감돼요',
+  league_fixture_scheduled: '리그 대진이 확정됐어요',
+  league_promotion_promoted: '축하해요! 다음 시즌 상위 리그로 승격했어요',
+  league_promotion_relegated: '다음 시즌 하위 리그로 강등됐어요',
+  league_promotion_stayed: '다음 시즌에도 같은 리그예요',
+  league_promotion_withdrawn: '리그 참가가 종료됐어요',
 };
 
 /**
@@ -314,6 +370,11 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   inquiry_answered: '답변 내용을 확인해 주세요.',
   schedule_rsvp_deadline_reminder: 'RSVP 마감 전에 참석 여부를 남겨주세요.',
   schedule_guest_recruitment_close_reminder: '모집 마감 전에 신청 현황을 확인해 주세요.',
+  league_fixture_scheduled: '리그 대진 일정을 확인해 주세요.',
+  league_promotion_promoted: '다음 시즌 상위 리그에서 시작해요.',
+  league_promotion_relegated: '아쉽지만 다음 시즌은 하위 리그에서 시작해요.',
+  league_promotion_stayed: '현재 리그에서 다음 시즌을 계속해요.',
+  league_promotion_withdrawn: '이번 시즌을 끝으로 리그 참가가 종료됐어요.',
 };
 
 @Injectable()

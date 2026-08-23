@@ -278,6 +278,95 @@ describe('LeagueMatchStandingsClient', () => {
     expect(screen.queryByText('예정')).not.toBeInTheDocument();
   });
 
+  it('몰수 결과는 점수 옆에 "몰수" 뱃지로 실제 승리와 구분한다', async () => {
+    // 몰수는 1:0으로 기록된다 — 뱃지가 없으면 실제로 치러진 1:0 승리와 화면에서 완전히
+    // 같아 보여서, 관전자가 "이 팀이 이겼다"와 "상대가 안 나왔다"를 구분할 수 없다.
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1LeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', title: '가을 리그', state: 'active',
+        startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z',
+        teamIds: ['t1', 't2'],
+        fixtures: [
+          {
+            teamMatchId: 'tm-1', title: '1주차', homeTeamId: 't1', awayTeamId: 't2',
+            startAt: '2026-09-01T20:00:00.000Z', placeName: '성수 풋살장',
+            status: 'completed', homeScore: 1, awayScore: 0, isForfeit: true,
+          },
+          {
+            teamMatchId: 'tm-2', title: '2주차', homeTeamId: 't2', awayTeamId: 't1',
+            startAt: '2026-09-08T20:00:00.000Z', placeName: '성수 풋살장',
+            status: 'completed', homeScore: 1, awayScore: 0, isForfeit: false,
+          },
+        ],
+      },
+    } as never);
+    useV1LeagueMatchStandingsMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', tieBreakOrder: ['points'],
+        standings: [{ teamId: 't1', teamName: '성수 FC', teamLogoUrl: null, position: 1, played: 2, wins: 1, draws: 0, losses: 1, goalsFor: 1, goalsAgainst: 1, points: 3 }],
+        pendingFixtures: [],
+      },
+    } as never);
+    useV1LeagueMatchPlayerRecordsMock.mockReturnValue({ data: { leagueId: 'league-1', goals: [], assists: [] } } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchStandingsClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    // 두 경기 모두 1:0 이지만 뱃지는 몰수 쪽에만 붙는다 — 개수로 고정해야 "전부 몰수로
+    // 표시" 같은 반대 방향 버그도 잡힌다.
+    await waitFor(() => expect(screen.getAllByText('1 : 0')).toHaveLength(2));
+    expect(screen.getAllByText('몰수')).toHaveLength(1);
+
+    // 경기 행 링크의 접근성 이름에는 경기 제목이 없다(팀명·일시·장소·상태·점수만) —
+    // 어느 행인지는 href 로 특정한다.
+    const rowByHref = (teamMatchId: string) => {
+      const row = screen
+        .getAllByRole('link')
+        .find((link) => link.getAttribute('href') === `/team-matches/${teamMatchId}`);
+      if (!row) throw new Error(`fixture row not found: ${teamMatchId}`);
+      return row;
+    };
+    expect(rowByHref('tm-1').textContent).toContain('몰수');
+    expect(rowByHref('tm-2').textContent).not.toContain('몰수');
+  });
+
+  it('몰수 사유 원문은 공개 화면에 실리지 않는다', async () => {
+    // 서버는 isForfeit(boolean)만 내려준다. 어드민이 쓴 사유가 응답에 섞여 들어오더라도
+    // 화면이 그걸 렌더하면 내부 메모가 새어 나간다 — 렌더 경로에 사유가 없어야 한다.
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1LeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', title: '가을 리그', state: 'active',
+        startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z',
+        teamIds: ['t1', 't2'],
+        fixtures: [{
+          teamMatchId: 'tm-1', title: '1주차', homeTeamId: 't1', awayTeamId: 't2',
+          startAt: '2026-09-01T20:00:00.000Z', placeName: '성수 풋살장',
+          status: 'completed', homeScore: 1, awayScore: 0, isForfeit: true,
+          reason: '[LEAGUE_FORFEIT] 원정팀 감독이 전화로 기권 통보',
+        }],
+      },
+    } as never);
+    useV1LeagueMatchStandingsMock.mockReturnValue({
+      data: { leagueId: 'league-1', tieBreakOrder: ['points'], standings: [], pendingFixtures: [] },
+    } as never);
+    useV1LeagueMatchPlayerRecordsMock.mockReturnValue({ data: { leagueId: 'league-1', goals: [], assists: [] } } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchStandingsClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    expect(await screen.findByText('몰수')).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('기권 통보');
+    expect(document.body.textContent).not.toContain('LEAGUE_FORFEIT');
+  });
+
   it('승강이 확정되면 순위표에 승격·강등 열이 붙고, 확정 전에는 열 자체가 없다', async () => {
     // Task 153 시나리오 4. 확정 전에 빈 열을 만들면 "아직 안 정해졌다"가 안 읽힌다.
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);

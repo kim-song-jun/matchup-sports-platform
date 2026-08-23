@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Suspense, useEffect, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { X } from 'lucide-react';
 import {
   AdminDataTable,
   AdminEmpty,
@@ -126,6 +127,11 @@ function AdminInquiriesPageContent() {
       ? pickAllowed(searchParams.get('reportReason'), REPORT_REASON_OPTIONS)
       : '',
   );
+  // 신고 누적 팀 목록(#7)에서 넘어오는 딥링크 전용 필터. teamId 는 자유 문자열이라
+  // pickAllowed(허용 목록 대조)를 쓸 수 없다 — 존재 여부만 본다.
+  const [activeReportedTeamId, setActiveReportedTeamId] = useState(
+    () => searchParams.get('reportedTeamId') ?? '',
+  );
   // 커서 누적 대신 페이지 단위 교체다 — 목록 어디쯤인지와 총량이 보여야 한다.
   const [page, setPage] = useState(1);
   const { toasts, showToast } = useAdminToast();
@@ -137,7 +143,7 @@ function AdminInquiriesPageContent() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, activeStatus, activeCategory, activeReportReason]);
+  }, [debouncedSearch, activeStatus, activeCategory, activeReportReason, activeReportedTeamId]);
 
   // 상태 → URL. 읽기만 지원하면 링크를 손으로 조립해야 해서 사실상 쓰이지 않는다 — 화면에서
   // 필터를 건 뒤 주소창을 그대로 복사해 공유할 수 있어야 딥링크가 의미를 갖는다.
@@ -153,9 +159,19 @@ function AdminInquiriesPageContent() {
     if (activeCategory === 'report' && activeReportReason) {
       next.set('reportReason', activeReportReason);
     }
+    // 다른 필터를 만지는 순간 팀 필터가 주소에서 조용히 사라지지 않도록 항상 함께 싣는다.
+    if (activeReportedTeamId) next.set('reportedTeamId', activeReportedTeamId);
     const query = next.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
-  }, [debouncedSearch, activeStatus, activeCategory, activeReportReason, pathname, router]);
+  }, [
+    debouncedSearch,
+    activeStatus,
+    activeCategory,
+    activeReportReason,
+    activeReportedTeamId,
+    pathname,
+    router,
+  ]);
 
   // 분류가 'report'를 벗어나면 사유 필터는 보이지 않는데, 선택값이 남아 있으면 안 보이는
   // 필터가 목록을 계속 좁혀 "왜 결과가 없지?"를 만든다 — 분류를 바꿀 때 항상 함께 초기화한다.
@@ -169,6 +185,7 @@ function AdminInquiriesPageContent() {
     ...(activeStatus ? { status: activeStatus } : {}),
     ...(activeCategory ? { category: activeCategory } : {}),
     ...(activeCategory === 'report' && activeReportReason ? { reportReason: activeReportReason } : {}),
+    ...(activeReportedTeamId ? { reportedTeamId: activeReportedTeamId } : {}),
     page,
     limit: PAGE_SIZE,
   };
@@ -209,6 +226,26 @@ function AdminInquiriesPageContent() {
       />
 
       <div className="flex flex-col gap-4">
+        {/* 신고 누적 팀 목록(#657 딥링크)에서 넘어온 팀 필터 — 보이지 않는 필터가 목록을
+            좁히면 "왜 결과가 없지?"가 된다. 걸려 있는 동안은 항상 표시하고 해제 수단을 준다. */}
+        {activeReportedTeamId ? (
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--tint-blue-border)] bg-[var(--tint-blue)] px-4 py-2.5">
+            <p className="text-sm text-[var(--blue700)]">
+              이 팀의 신고만 보는 중이에요{' '}
+              <span className="font-mono text-2xs text-[var(--blue700)]">({activeReportedTeamId})</span>
+            </p>
+            <button
+              type="button"
+              onClick={() => setActiveReportedTeamId('')}
+              aria-label="팀 필터 해제"
+              className="inline-flex h-[44px] shrink-0 items-center gap-1 rounded-lg px-2.5 text-sm font-semibold text-[var(--blue700)] transition-colors hover:bg-white/60 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            >
+              <X size={16} aria-hidden="true" />
+              필터 해제
+            </button>
+          </div>
+        ) : null}
+
         <AdminFilterBar
           searchLabel="문의 검색"
           searchPlaceholder="제목, 내용, 사용자 검색"

@@ -43,6 +43,7 @@ function participant(
     positionX: null,
     positionY: null,
     started: true,
+    arrivedAt: null,
     createdAt: '2026-08-23T00:00:00.000Z',
     updatedAt: '2026-08-23T00:00:00.000Z',
   };

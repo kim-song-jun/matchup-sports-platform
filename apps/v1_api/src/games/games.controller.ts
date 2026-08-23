@@ -5,6 +5,7 @@ import {
   Headers,
   Param,
   ParseEnumPipe,
+  Patch,
   Post,
   Put,
   Query,
@@ -21,7 +22,7 @@ import {
   ListGameEventsQueryDto,
   ReverseGameEventDto,
 } from './dto/game-event.dto';
-import { SaveGameLineupDto, SubmitGameLineupDto } from './dto/game-lineup.dto';
+import { SaveGameLineupDto, SetParticipantArrivalDto, SubmitGameLineupDto } from './dto/game-lineup.dto';
 import {
   CreateGameResultRevisionDto,
   DecideGameResultRevisionDto,
@@ -200,6 +201,22 @@ export class GamesController {
     @Body() dto: SubmitGameLineupDto,
   ) {
     return this.gamesService.submitLineup(user, gameId, lineupId, idempotencyKey, dto);
+  }
+
+  /**
+   * 명단 검인(체크인). 라인업 저장/제출과 달리 `lineupId` 가 아니라 participantId 로
+   * 직접 지목한다 — 스태프가 현장에서 명단을 훑으며 한 명씩 누르는 조작이라, 어느
+   * 라인업 리비전에 속하는지를 클라이언트가 알아야 할 이유가 없다.
+   */
+  @Patch(':gameId/participants/:participantId/arrival')
+  @UseGuards(V1AuthGuard)
+  setParticipantArrival(
+    @CurrentUser() user: V1AuthUser,
+    @Param('gameId') gameId: string,
+    @Param('participantId') participantId: string,
+    @Body() dto: SetParticipantArrivalDto,
+  ) {
+    return this.gamesService.setParticipantArrival(user, gameId, participantId, dto.arrived);
   }
 
   @Post(':gameId/result-recovery/derive-and-submit')

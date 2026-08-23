@@ -1657,7 +1657,13 @@ export function useV1FixtureLineupAccess(tournamentId: string, fixtureId: string
 export type V1FixtureLineupRoster = {
   sideId: string;
   registrationId: string;
-  players: Array<{ tournamentPlayerId: string; userId: string; name: string }>;
+  players: Array<{
+    tournamentPlayerId: string;
+    userId: string;
+    name: string;
+    /** 팀이 지정한 고정 등번호(V1TeamMembership.jerseyNumber). 미지정이면 null. */
+    teamJerseyNumber: number | null;
+  }>;
 };
 
 export function useV1FixtureLineupRoster(

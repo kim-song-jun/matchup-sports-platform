@@ -28,6 +28,7 @@ function participant(id: string, sideId: string, name: string) {
     positionX: null,
     positionY: null,
     started: true,
+    arrivedAt: null,
     createdAt: '',
     updatedAt: '',
   };

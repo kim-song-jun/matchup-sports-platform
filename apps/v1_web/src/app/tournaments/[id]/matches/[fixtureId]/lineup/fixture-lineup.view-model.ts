@@ -33,7 +33,15 @@ export type FixtureLineupState = {
 };
 
 /** 라인업을 짤 수 있는 등록 명단의 한 사람. `useV1FixtureLineupRoster` 응답 행과 같은 모양. */
-export type FixtureRosterPlayer = { userId: string; name: string };
+export type FixtureRosterPlayer = {
+  userId: string;
+  name: string;
+  /**
+   * 팀이 지정한 고정 등번호. 팀이 정하지 않았거나 멤버십이 없으면 null/미지정.
+   * 이 값이 없던 시절의 호출부(테스트 픽스처 등)를 그대로 받기 위해 optional 이다.
+   */
+  teamJerseyNumber?: number | null;
+};
 
 export function createEmptyFixtureLineupState(lineupRevision: number): FixtureLineupState {
   return {
@@ -111,7 +119,12 @@ export function hydrateFixtureLineupState(
       key: player.userId,
       userId: player.userId,
       displayName: player.name,
-      jerseyNumber: saved?.jerseyNumber ?? null,
+      // 저장된 번호가 우선, 없으면 **팀 고정 등번호**로 채운다.
+      // 1차 대회 회고 "선수 번호 등록을 처음에만 하고 추후에는 안하는 문제" — 예전에는
+      // 저장된 값이 없으면 그냥 빈칸이라 팀장이 매 경기 다시 타이핑해야 했다. 그 반복이
+      // 곧 오탈자 발생원이다. '불러오기' 시트를 여는 사람만 혜택을 보던 것도 여기서
+      // 함께 닫힌다 — 화면에 처음 들어오는 순간부터 채워진다.
+      jerseyNumber: saved?.jerseyNumber ?? player.teamJerseyNumber ?? null,
       goalkeeper: saved?.position === goalkeeperCode,
       position: saved === undefined || saved.position === goalkeeperCode ? null : saved.position,
       positionX: saved?.positionX ?? null,

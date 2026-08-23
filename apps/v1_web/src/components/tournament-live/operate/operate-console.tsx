@@ -42,6 +42,7 @@ import { QueueStatusPanel, hasUnsettledQueueItems } from './queue-status-panel';
 import { RecordedEventList } from './recorded-event-list';
 import { AssistPickerSheet } from './assist-picker-sheet';
 import { QuickSubstitutionPanel } from './quick-substitution-panel';
+import { AbnormalEndDialog, type AbnormalEndReason } from './abnormal-end-dialog';
 import { ArrivalCheckinPanel } from './arrival-checkin-panel';
 import { RestTimer } from './rest-timer';
 import { PenaltyShootoutPanel } from './penalty-shootout-panel';
@@ -204,6 +205,8 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [commandError, setCommandError] = useState<string | null>(null);
   const [commandPending, setCommandPending] = useState(false);
+  // 몰수·중단 종료 다이얼로그. 사유 자유 텍스트를 받아야 해서 useConfirm(boolean)으로는 안 된다.
+  const [abnormalEndOpen, setAbnormalEndOpen] = useState(false);
   // "재개/경기종료할 때 얼마나 걸렸는지" — 실측 사고에서 나온 요구. 명령 왕복
   // 지연은 커맨드마다 눈에 띄게 다를 수 있고(네트워크/DB 락 경합), 평소엔
   // 보이지 않던 값이라 ms 단위로 보여줄 가치가 있다 — `formatMatchClock`이
@@ -1074,6 +1077,23 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
                       {commandLabel('end', currentPeriod?.number ?? null, halftimePeriod?.number ?? null)}
                     </Button>
                   )}
+                  {/* 몰수·중단 종료. 정상 종료 버튼과 **같은 위계로 두지 않는다** — 거의
+                      쓰이지 않는 예외 경로인데 danger 버튼 둘이 나란히 있으면 현장에서
+                      잘못 누른다. outline 보조 버튼으로 한 단 낮추고, 되돌릴 수 없는
+                      확정은 다이얼로그 안 "이대로 종료"에서만 일어난다.
+                      승부차기 대기 중에는 숨긴다 — 그 상태의 다음 행동은 승부차기 입력이지
+                      몰수가 아니고, 둘을 동시에 노출하면 무엇을 눌러야 하는지 흐려진다. */}
+                  {!penaltyShootoutEligible ? (
+                    <Button
+                      key="abnormal-end"
+                      size="sm"
+                      variant="outline"
+                      disabled={!isTakeoverHeld(ops.takeover) || commandPending}
+                      onClick={() => setAbnormalEndOpen(true)}
+                    >
+                      몰수·중단으로 종료
+                    </Button>
+                  ) : null}
                 </>
               ) : null}
             </div>
@@ -1336,6 +1356,18 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           다섯 액션 버튼과 동급 빈도가 아니라 그 아래 얹는 보조 토글이라,
           높이까지 h-16으로 맞추면 오히려 "6번째 액션 버튼"처럼 위계가
           부풀어 보인다. */}
+      <AbnormalEndDialog
+        open={abnormalEndOpen}
+        submitting={commandPending}
+        onCancel={() => setAbnormalEndOpen(false)}
+        onConfirm={({ reason, note }: { reason: AbnormalEndReason; note: string }) => {
+          setAbnormalEndOpen(false);
+          // 점수는 지금 기록된 이벤트 그대로 확정된다 — 서버가 표준 스코어를 대신
+          // 정해 주지 않는다(2026-08-23 결정 Q3). 여기서 보내는 건 "정상 종료가
+          // 아니다"라는 사실과 그 사유뿐이다.
+          void handleRunCommand('end', { outcomeReason: reason, outcomeNote: note });
+        }}
+      />
       {/* 명단 검인은 **킥오프 전에만** 띄운다. 경기가 시작되면 이 자리는 이벤트 기록이
           차지해야 하고, 그때까지도 안 온 사람은 애초에 라인업에서 빠졌어야 한다.
           takeover 를 쥔 운영자만 조작할 수 있게 하는 것도 다른 액션과 동일하다. */}

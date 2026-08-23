@@ -313,10 +313,27 @@ export function TournamentInfoSection() {
     }
     if (normalizedBankHolder !== tournament.bankHolder) payload.bankHolder = normalizedBankHolder;
     if (normalizedRulesText !== tournament.rulesText) payload.rulesText = normalizedRulesText;
-    // 비우면 null 을 **명시적으로** 보낸다 — 그래야 한 번 켠 규정을 끌 수 있다.
-    // undefined 로 보내면 서버가 "안 건드림"으로 읽어 영영 못 끈다.
-    const normalizedYellowLimit = editYellowLimit.trim() ? Number(editYellowLimit) : null;
-    const normalizedRedSuspension = editRedSuspension.trim() ? Number(editRedSuspension) : null;
+    /**
+     * 비우면 null 을 **명시적으로** 보낸다 — 그래야 한 번 켠 규정을 끌 수 있다
+     * (undefined 면 서버가 "안 건드림"으로 읽어 영영 못 끈다).
+     *
+     * 비정상 입력은 **저장 자체를 막는다**(Copilot 리뷰 지적, real 2건):
+     *  ① `Number('abc')` 는 NaN 이고 JSON 직렬화에서 null 로 바뀐다 — 오타 한 번이
+     *     조용히 "규정 끔"으로 전달된다.
+     *  ② `NaN !== x` 는 항상 true 라 변경이 없어도 payload 에 끼어든다.
+     * 조용히 null 로 흘려보내는 것보다 멈추고 알리는 쪽이 안전하다.
+     */
+    const parseRule = (raw: string): number | null | 'invalid' => {
+      if (!raw.trim()) return null;
+      const parsed = Number(raw);
+      return Number.isInteger(parsed) && parsed > 0 ? parsed : 'invalid';
+    };
+    const normalizedYellowLimit = parseRule(editYellowLimit);
+    const normalizedRedSuspension = parseRule(editRedSuspension);
+    if (normalizedYellowLimit === 'invalid' || normalizedRedSuspension === 'invalid') {
+      showToast('출전정지 기준은 1 이상의 정수로 적어 주세요.', 'error');
+      return;
+    }
     if (normalizedYellowLimit !== (tournament.yellowAccumulationLimit ?? null)) {
       payload.yellowAccumulationLimit = normalizedYellowLimit;
     }

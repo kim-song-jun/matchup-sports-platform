@@ -684,12 +684,11 @@ export function buildTournamentCreatePayload(
     // 빈 문자열은 undefined 로 보낸다(= 값을 건드리지 않음). 규정을 **끄려면**
     // 화면에서 비우는 것만으로는 부족하고 null 을 명시해야 하는데, 생성 폼에는
     // 끌 대상이 없으므로 여기서는 undefined 로 충분하다.
-    yellowAccumulationLimit: state.yellowAccumulationLimit.trim()
-      ? Number(state.yellowAccumulationLimit)
-      : undefined,
-    redCardSuspensionMatches: state.redCardSuspensionMatches.trim()
-      ? Number(state.redCardSuspensionMatches)
-      : undefined,
+    // numeric() 재사용 — 직접 Number() 를 쓰면 비정상 입력이 NaN 이 되고, JSON
+    // 직렬화에서 null 로 바뀌어 서버에 "규정 끔"으로 전달된다(Copilot 리뷰 지적).
+    // numeric() 은 유한수가 아니면 null 을 주므로, ?? undefined 로 "안 보냄"으로 바꾼다.
+    yellowAccumulationLimit: numeric(state.yellowAccumulationLimit) ?? undefined,
+    redCardSuspensionMatches: numeric(state.redCardSuspensionMatches) ?? undefined,
     rulesText: state.rulesText.trim() || undefined,
     refundPolicyText: state.refundPolicyText.trim() || undefined,
     ...promoPayload('promoHome', state.promoHome),

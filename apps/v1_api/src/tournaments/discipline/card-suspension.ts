@@ -87,11 +87,13 @@ function isPositive(value: number | null): value is number {
  *   1경기 정지. 예: 한도 2 → 2장째에 1경기, 4장째에 또 1경기.
  * - 이미 치른 경기는 정지를 **소진**한다. 그래서 정지된 경기를 지나면 자동으로 풀린다.
  *
- * 소진 계산은 "정지가 부과된 시점 이후 실제로 치른 경기 수"를 세는 방식이 아니라,
- * **부과 총량 − 결장 소진량**으로 한다 — 결장한 경기는 로스터에 없으니 `played` 에
- * 나타나지 않고, 따라서 "그 사이 치른 경기"만 세면 정지가 영원히 안 풀린다.
- * 대신 호출자가 `playedOrMissedGameCount`(정지 부과 이후 대회에 편성된 경기 수)를
- * 넘겨 소진을 계산한다.
+ * **소진은 출전 기록이 아니라 일정 순서로 센다.** 결장한 경기는 로스터에 없어
+ * `played` 에 아예 나타나지 않으므로, "그 사이 실제로 치른 경기"를 세는 방식이면
+ * 정지가 영원히 안 풀린다. 그래서 정지 구간을 `gameOrder` 축 위의 구간
+ * (`servedFrom` 미만은 못 뛴다)으로 누적하고, `upcomingGameOrder` 가 그 구간을
+ * 지나면 자동으로 해제된다 — 결장 여부와 무관하게 일정이 흐르면 풀린다.
+ * (Copilot 리뷰 지적: 이 주석이 구현에 없는 `playedOrMissedGameCount` 인자를
+ * 설명하고 있었다 — 설계 초안의 잔재였다.)
  */
 export function evaluateSuspension(input: {
   readonly rules: SuspensionRules;

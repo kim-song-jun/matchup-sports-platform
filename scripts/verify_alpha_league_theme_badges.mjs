@@ -30,8 +30,10 @@ async function themePass(theme, width) {
     await page.goto(`${BASE}${path}`, { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(3500);
     const diag = await page.evaluate(() => {
-      const pick = (sel) => {
-        const el = document.querySelector(sel);
+      // 엘리먼트를 받아 그대로 잰다. 예전엔 selector 를 다시 만들어 querySelector 했는데,
+      // Tailwind 클래스에는 `dark:bg-gray-800`·`rounded-[12px]` 처럼 CSS selector 문법에서
+      // 깨지는 문자가 들어 있어 evaluate 전체가 예외로 죽었다.
+      const styleOf = (el) => {
         if (!el) return null;
         const cs = getComputedStyle(el);
         return { bg: cs.backgroundColor, color: cs.color, border: cs.borderColor };
@@ -56,7 +58,7 @@ async function themePass(theme, width) {
         bodyColor: bodyCs.color,
         bodyContrast: contrast(bodyCs.color, bodyCs.backgroundColor),
         th: th ? { color: getComputedStyle(th).color, contrast: contrast(getComputedStyle(th).color, bodyCs.backgroundColor) } : null,
-        card: card ? pick(card.tagName.toLowerCase() + '.' + card.className.split(' ')[0]) : null,
+        card: styleOf(card),
         sampleText: (document.body.innerText || '').slice(0, 60).replace(/\n/g, ' '),
       };
     });

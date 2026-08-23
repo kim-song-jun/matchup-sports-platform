@@ -4107,11 +4107,15 @@ export class GamesService {
     lineupId: string,
   ): Promise<void> {
     if (game.sourceType !== V1GameSourceType.TOURNAMENT_FIXTURE) return;
-    const fixture = await tx.v1TournamentFixture.findFirst({
-      where: { gameId: game.id },
-      select: { id: true, tournamentId: true },
-    });
-    if (fixture === null) return;
+    // FK 는 V1Game.tournamentFixtureId 쪽에 있고 V1TournamentFixture.game 은 역방향
+    // 관계라 fixture 를 gameId 로 직접 찾을 수 없다 — 게임에서 관계를 따라간다.
+    const fixture = (
+      await tx.v1Game.findUnique({
+        where: { id: game.id },
+        select: { tournamentFixture: { select: { id: true, tournamentId: true } } },
+      })
+    )?.tournamentFixture;
+    if (fixture === null || fixture === undefined) return;
 
     const verdicts = await this.discipline.verdictsForFixture(fixture.tournamentId, fixture.id);
     if (verdicts.size === 0) return; // 규정 미적용이거나 누적 카드가 아직 없다.

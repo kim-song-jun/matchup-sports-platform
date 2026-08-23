@@ -12,6 +12,7 @@ export default function robots(): MetadataRoute.Robots {
           '/teams',
           '/team-matches',
           '/tournaments',
+          '/league-matches',
           '/events',
           '/notices',
         ],

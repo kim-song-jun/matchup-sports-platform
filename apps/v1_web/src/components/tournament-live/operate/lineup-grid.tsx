@@ -57,6 +57,26 @@ export function latestOperableLineup(lineups: readonly GameLineup[], sideId: str
   return candidates.reduce((latest, current) => (current.revision > latest.revision ? current : latest));
 }
 
+/**
+ * 검색어로 선수를 좁힌다. 등번호와 이름 **양쪽**을 본다 — 현장에서 운영자가 아는
+ * 정보는 둘 중 하나이고(유니폼 번호를 보고 찾거나, 후보 선수가 이름을 불러주거나),
+ * 어느 쪽만 지원하면 나머지 절반은 여전히 스크롤로 훑어야 한다.
+ *
+ * 대소문자·앞뒤 공백을 무시한다. 등번호는 **접두 일치**다 — "1"로 1·10·11이 함께
+ * 뜨는 게 맞다(운영자가 두 자리 번호를 한 자만 기억하는 경우가 실제로 있다).
+ * 반대로 이름은 부분 일치라 성만 쳐도 찾힌다.
+ */
+export function matchesPlayerQuery(
+  participant: Pick<GameLineupParticipant, 'displayNameSnapshot' | 'jerseyNumber'>,
+  rawQuery: string,
+): boolean {
+  const query = rawQuery.trim().toLowerCase();
+  if (query.length === 0) return true;
+  if (participant.displayNameSnapshot.toLowerCase().includes(query)) return true;
+  if (participant.jerseyNumber === null) return false;
+  return String(participant.jerseyNumber).startsWith(query);
+}
+
 export function LineupGrid({
   sides,
   lineups,
@@ -76,6 +96,16 @@ export function LineupGrid({
   // `hidden`으로 감춘다(sm 이상에서는 항상 둘 다 보인다).
   const [selectedMobileSideId, setSelectedMobileSideId] = useState<string | null>(null);
   const activeMobileSideId = selectedMobileSideId ?? visibleSides[0]?.id ?? null;
+  /**
+   * 선수 검색어. 1차 대회 회고 — 실시간 입력을 "후보 선수들에게 물어보고 얘기하면서"
+   * 진행했다. 스쿼드가 15~20명이면 등번호순 정렬만으로는 스크롤하며 눈으로 훑어야
+   * 하고, 경기 중 그 몇 초가 오입력으로 이어진다.
+   *
+   * **컴포넌트 로컬 상태**로 둔다 — 부모가 관리하면 이벤트 기록 한 번마다 검색어가
+   * 초기화될지 유지될지가 호출부마다 갈린다. 여기서는 "이 그리드가 떠 있는 동안
+   * 유지"가 유일한 규칙이다.
+   */
+  const [query, setQuery] = useState('');
 
   return (
     <div>
@@ -104,12 +134,34 @@ export function LineupGrid({
           ))}
         </div>
       ) : null}
+      {/* 검색은 교체 대상 선택처럼 목록이 이미 한두 명으로 좁혀진 단계에서는 방해만
+          된다 — filterParticipantIds 가 걸린 호출(ActionTargetPicker 의 교체 1·2단계)에는
+          띄우지 않는다. */}
+      {filterParticipantIds === undefined ? (
+        <div className="mb-3">
+          <label htmlFor="lineup-grid-player-search" className="sr-only">
+            등번호 또는 이름으로 선수 찾기
+          </label>
+          <input
+            id="lineup-grid-player-search"
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            disabled={disabled}
+            placeholder="등번호 또는 이름"
+            autoComplete="off"
+            className="min-h-[44px] w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+          />
+        </div>
+      ) : null}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {visibleSides.map((side) => {
           const lineup = latestOperableLineup(lineups, side.id);
-          const participants = (lineup?.participants ?? []).filter(
-            (participant) => filterParticipantIds === undefined || filterParticipantIds.has(participant.id),
-          );
+          const participants = (lineup?.participants ?? [])
+            .filter(
+              (participant) => filterParticipantIds === undefined || filterParticipantIds.has(participant.id),
+            )
+            .filter((participant) => matchesPlayerQuery(participant, query));
           const isActiveOnMobile = visibleSides.length <= 1 || activeMobileSideId === side.id;
           return (
             <section
@@ -130,7 +182,11 @@ export function LineupGrid({
               {lineup === null || participants.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 py-6 text-center">
                   <p className="text-sm text-[var(--text-muted)]">
-                    {lineup === null ? '제출된 선발 명단이 없어요.' : '표시할 선수가 없어요.'}
+                    {lineup === null
+                      ? '제출된 선발 명단이 없어요.'
+                      : query.trim().length > 0
+                        ? `'${query.trim()}'과 맞는 선수가 없어요.`
+                        : '표시할 선수가 없어요.'}
                   </p>
                   {lineup === null && tournamentId !== undefined && fixtureId !== undefined ? (
                     <Link

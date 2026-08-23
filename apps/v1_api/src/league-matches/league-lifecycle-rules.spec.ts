@@ -10,6 +10,9 @@
  *  - resolveStoredForfeit: 몰수 재호출이 DB 와 다른 값을 성공으로 돌려주던 문제
  */
 import {
+  buildOddTeamCountWarning,
+  checkLeagueTeamAddAllowed,
+  checkLeagueTeamRemovalAllowed,
   findUnfinishedSeasonLeagues,
   parseStoredScore,
   planNextSeasonTiers,
@@ -300,5 +303,59 @@ describe('sortMyLeaguesByState — 내 리그 상태 정렬', () => {
       { id: 'a', state: 'active' },
     ]);
     expect(sorted.map((l) => l.id)).toEqual(['a', 'x']);
+  });
+});
+
+describe('checkLeagueTeamAddAllowed — 참가팀 추가 판정 (그룹 B 감사 결함 1)', () => {
+  const valid = { alreadyInLeague: false, teamActive: true, teamSportId: 'futsal', leagueSportId: 'futsal' };
+
+  it('활성·동일 종목·미등록 팀은 통과한다', () => {
+    expect(checkLeagueTeamAddAllowed(valid)).toBeNull();
+  });
+
+  it('이미 참가 중인 팀은 ALREADY_IN_LEAGUE로 막는다(@@unique 위반 사전 차단)', () => {
+    expect(checkLeagueTeamAddAllowed({ ...valid, alreadyInLeague: true })).toBe('ALREADY_IN_LEAGUE');
+  });
+
+  it('비활성 팀은 TEAM_INVALID로 막는다', () => {
+    expect(checkLeagueTeamAddAllowed({ ...valid, teamActive: false })).toBe('TEAM_INVALID');
+  });
+
+  it('종목이 다른 팀은 TEAM_INVALID로 막는다', () => {
+    expect(checkLeagueTeamAddAllowed({ ...valid, teamSportId: 'basketball' })).toBe('TEAM_INVALID');
+  });
+});
+
+describe('checkLeagueTeamRemovalAllowed — 참가팀 제외 판정 (그룹 B 감사 결함 1)', () => {
+  const valid = { remainingTeamCount: 3, hasOfficialResultForTeam: false };
+
+  it('2팀 이상 남고 공식 결과가 없으면 통과한다', () => {
+    expect(checkLeagueTeamRemovalAllowed(valid)).toBeNull();
+  });
+
+  it('제외 후 팀이 2개 미만이 되면 TEAM_COUNT_BELOW_MINIMUM으로 막는다', () => {
+    expect(checkLeagueTeamRemovalAllowed({ ...valid, remainingTeamCount: 1 })).toBe('TEAM_COUNT_BELOW_MINIMUM');
+  });
+
+  it('이 팀이 낀 대진에 공식 결과가 있으면 HAS_OFFICIAL_RESULT로 막는다 (standings 데이터 손상 방지)', () => {
+    expect(checkLeagueTeamRemovalAllowed({ ...valid, hasOfficialResultForTeam: true })).toBe('HAS_OFFICIAL_RESULT');
+  });
+
+  it('카디널리티 위반이 결과 확정보다 먼저 걸린다(우선순위 고정)', () => {
+    expect(
+      checkLeagueTeamRemovalAllowed({ remainingTeamCount: 1, hasOfficialResultForTeam: true }),
+    ).toBe('TEAM_COUNT_BELOW_MINIMUM');
+  });
+});
+
+describe('buildOddTeamCountWarning — 홀수 팀 bye 경고 (그룹 B 감사 결함 2)', () => {
+  it('짝수 팀은 경고가 없다', () => {
+    expect(buildOddTeamCountWarning(4)).toEqual([]);
+  });
+
+  it('홀수 팀은 ODD_TEAM_COUNT_BYE 경고를 낸다 — tournaments 쪽과 동일 code·message', () => {
+    expect(buildOddTeamCountWarning(5)).toEqual([
+      { code: 'ODD_TEAM_COUNT_BYE', message: '팀 수가 홀수라 라운드마다 한 팀이 쉬어요.' },
+    ]);
   });
 });

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Card } from '@/components/v1-ui/primitives';
 import { MatchVideos } from '@/components/tournaments/match-videos';
 import { formatTournamentDateTimeLong } from '@/lib/date-utils';
+import { matchOutcomeReasonLabel, toDisplayableOutcomeReason } from '@/lib/match-outcome';
 import { AbnormalClockBadge } from './abnormal-clock-badge';
 import { LiveBadge } from './live-badge';
 import {
@@ -36,6 +37,45 @@ function ResultStateBadge({ state }: { state: PublicMatchDetail['resultState'] }
     >
       {resultStateLabel(state)}
     </span>
+  );
+}
+
+/**
+ * 몰수·중단으로 끝난 경기의 표기. 이게 없으면 몰수 0:0 과 실제 0:0 무승부가 관전자
+ * 화면에서 **완전히 같아 보인다** — 회고에서 지적된 "왜 그 점수인지 기록 어디에도 없다"가
+ * 서버에 사유를 저장해 두고도 그대로 남는 상태다. 운영자가 종료 다이얼로그에서 "사유는
+ * 공개 경기 기록에 함께 남는다"는 안내를 읽고 사유를 적으므로, 여기서 보이지 않으면
+ * 그 안내 자체가 거짓이 된다.
+ *
+ * 컬러만으로 구분하지 않는다(WCAG) — 사유 라벨 텍스트가 항상 함께 나온다.
+ */
+function MatchOutcomeNotice({ outcome }: { outcome: PublicMatchDetail['outcome'] }) {
+  const reason = toDisplayableOutcomeReason(outcome?.reason);
+  if (outcome === null || reason === null) return null;
+  const note = outcome.note?.trim() ?? '';
+  return (
+    <div
+      role="status"
+      style={{
+        marginTop: 10,
+        padding: '8px 10px',
+        borderRadius: 10,
+        background: 'var(--orange50)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 4,
+        textAlign: 'center',
+      }}
+    >
+      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--orange500)' }}>
+        {matchOutcomeReasonLabel(reason)}으로 종료된 경기예요
+      </span>
+      {/* 사유가 비어 있으면 빈 줄을 남기지 않는다. 서버가 사유 없는 몰수를 422 로 막지만
+          그 규칙이 생기기 전에 종료된 과거 경기는 사유가 없을 수 있다. */}
+      {note.length > 0 ? (
+        <span style={{ fontSize: 12, color: 'var(--text-body)', wordBreak: 'keep-all' }}>{note}</span>
+      ) : null}
+    </div>
   );
 }
 
@@ -268,6 +308,9 @@ export function MatchDetailContent({ data }: { data: PublicMatchDetail }) {
           </div>
           {/* 스코어 아래 보조 표기 — 승부차기가 없으면 렌더 없음. */}
           <PenaltyScoreline score={data.score} scoreStatus={data.scoreStatus} fontSize={12} />
+          {/* 몰수·중단 표기는 스코어 바로 아래에 둔다 — 점수를 읽은 다음 눈이 가는 자리이자,
+              "이 점수가 정상 경기 결과가 아니다"를 점수와 떼어놓지 않는 유일한 위치다. */}
+          <MatchOutcomeNotice outcome={data.outcome} />
           <div
             style={{
               display: 'flex',

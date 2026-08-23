@@ -1340,6 +1340,13 @@ export type V1GameResultRevision = {
   missingScorer: boolean;
   mvpParticipantId: string | null;
   reason: string | null;
+  /**
+   * 몰수·중단 종결 표기. `reason` 과 별개인 이유: `reason` 은 어시스트 동기화 같은
+   * 시스템 정정이 승계 리비전에 자기 메시지로 덮어쓰는 필드라, 여기에 몰수 사유를
+   * 실으면 그 정정 한 번에 "왜 몰수인지"가 사라진다(설계 초안의 실제 결함).
+   */
+  outcomeReason: 'NORMAL' | 'FORFEIT' | 'ABANDONED';
+  outcomeNote: string | null;
   createdByActorType: 'USER' | 'SYSTEM';
   createdByUserId: string | null;
   createdBySystemActor: string | null;

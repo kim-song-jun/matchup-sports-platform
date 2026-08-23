@@ -125,6 +125,7 @@ function makeMatch(overrides: Partial<PublicMatchDetail> = {}): PublicMatchDetai
     },
     events: [],
     mvp: null,
+    outcome: null,
     pendingProjection: false,
     history: [],
     videos: [],

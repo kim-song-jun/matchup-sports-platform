@@ -319,7 +319,21 @@ export const gameSchemaSourceManifest = {
   //
   // (병합 재핀) 위 두 변경이 **모두 들어간 뒤**의 schema.prisma 해시다 — 어느 한쪽
   // 브랜치의 값을 그대로 쓰면 CI 가 깨진다(이 파일의 기존 병합 재핀 선례와 동일).
-  schema: '490c8690b88ed8a26cc9d414126010431fa95393e04d699efb02c2243bb71712',
+  // 카드 정지 규정값 재핀: `V1Tournament` 에 nullable `yellow_accumulation_limit`·
+  // `red_card_suspension_matches` 두 컬럼이 늘었다. **game domain(V1Game*) 모델·enum 은
+  // 한 줄도 건드리지 않았다** — 이 guard 가 schema.prisma 전체 바이트를 결속하기 때문에
+  // 걸리는 것이지 game operations 계약이 바뀐 게 아니다(위 대회 후기 팀 귀속 재핀과 같은
+  // 성격). 두 컬럼 모두 기본값 없는 nullable 이라 기존 대회는 전부 NULL(=규정 미적용)이고
+  // 백필도 없다 — 값을 넣으면 이미 끝난 대회에 소급 적용돼 다수 선수가 출전정지로 뜬다.
+  // 뒷받침 마이그레이션: 20260823150000_v1_tournament_card_suspension_rules.
+  // 바인딩된 20260729000100_v1_game_operations 는 그대로라 .migration 해시는 변하지 않는다.
+  // 아래 값은 이 브랜치의 schema.prisma 에 `shasum -a 256` 을 다시 돌려 계산한 것이다.
+  //
+  // (병합 재핀) 위 변경들이 **모두 들어간 뒤**의 schema.prisma 해시다 — 어느 한쪽
+  // 브랜치의 값을 그대로 쓰면 CI 가 깨진다(이 파일의 기존 병합 재핀 선례와 동일).
+  //
+  // (병합 재핀) 위 변경들이 **모두 들어간 뒤**의 schema.prisma 해시다.
+  schema: 'fdc0a7b5656a9c0f91d2b99e21ce5d97df37d5b32ece6a355cb8d5cc2e9a5ae2',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

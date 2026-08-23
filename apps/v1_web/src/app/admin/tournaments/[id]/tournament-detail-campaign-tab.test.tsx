@@ -112,6 +112,8 @@ const tournament: V1Tournament = {
   bankAccount: null,
   bankHolder: null,
   rulesText: null,
+  yellowAccumulationLimit: null,
+  redCardSuspensionMatches: null,
   refundPolicyText: null,
   registrationCount: 0,
   createdAt: '2026-07-14T00:00:00.000Z',
@@ -165,6 +167,8 @@ describe('대회 상세 섹션 라우팅 · 정보 수정 폼', () => {
       bankAccount: '123-456',
       bankHolder: '티밋',
       rulesText: '기존 규정',
+      yellowAccumulationLimit: null,
+      redCardSuspensionMatches: null,
       refundPolicyText: '기존 환불 정책',
     };
     const queryClient = new QueryClient({

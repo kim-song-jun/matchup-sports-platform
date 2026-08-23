@@ -2,6 +2,7 @@ import { ConflictException, Injectable, NotFoundException, UnprocessableEntityEx
 import { Prisma } from '@prisma/client';
 import { AdminContextService } from '../common/admin-context.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { isPrismaAvailabilityError } from '../common/prisma-availability-error';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { LeagueMatchPublicService } from './league-match-public.service';
 import { findUnfinishedSeasonLeagues, planNextSeasonTiers } from './league-lifecycle-rules';
@@ -518,7 +519,7 @@ export class LeagueSeriesAdminService {
     const nextStartsOn = lastSeason === null ? new Date() : new Date(lastSeason.endsOn.getTime() + 24 * 60 * 60 * 1000);
     const nextEndsOn = new Date(nextStartsOn.getTime() + spanMs);
 
-    const result = await this.runCommitTransaction(async (tx) => {
+    const result = await this.runCommitTransaction(tiers.map((t) => t.leagueId), async (tx) => {
       await tx.v1LeaguePromotion.createMany({
         data: resolved.map((row) => ({
           fromLeagueId: row.fromLeagueId,
@@ -587,9 +588,22 @@ export class LeagueSeriesAdminService {
    * (중복 리그 0건 확인), 어드민에게는 "서버 오류"로 보여 재시도를 유발한다.
    * 진 쪽에도 선착 확인과 같은 409 를 돌려준다.
    */
-  private async runCommitTransaction<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+  private async runCommitTransaction<T>(
+    fromLeagueIds: readonly string[],
+    fn: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
     try {
-      return await this.prisma.$transaction(fn);
+      return await this.prisma.$transaction(fn, {
+        // 확정 한 번이 승강 이력 + 다음 시즌 리그(최대 3개) + 참가팀 + 감사 로그를 한 묶음으로
+        // 처리한다. Prisma 기본값(maxWait 2초 · timeout 5초)으로는 동시 요청이 겹치는 순간
+        // 커넥션을 못 잡고 줄줄이 실패했다 — alpha 실측: 동시 6~8건에서 대부분 503.
+        // 같은 파일의 대진 생성(league-match-admin.service.ts)이 같은 이유로 이미
+        // maxWait 10초 · timeout 120초를 쓰고 있어 그 선례를 따른다. 넉넉한 maxWait 는
+        // "빨리 실패"가 아니라 "잠깐 줄 서서 성공"을 택하는 것이다 — 확정은 시즌당 한 번뿐이라
+        // 줄을 서는 편이 재시도를 요구하는 것보다 낫다.
+        maxWait: 10_000,
+        timeout: 120_000,
+      });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         throw new ConflictException({
@@ -597,6 +611,26 @@ export class LeagueSeriesAdminService {
           message: '이미 승강이 확정된 시즌이에요.',
         });
       }
+
+      // 가용성 실패(커넥션 풀 포화·트랜잭션 시작/시간 초과)는 "아무 일도 없었다"를 뜻하지
+      // **않는다**. Prisma 인터랙티브 트랜잭션은 커밋이 끝난 뒤에도 래퍼 타임아웃을 던질 수
+      // 있어서, 저장은 됐는데 호출자에게는 503 이 나가는 구간이 있다 — alpha 실측(동시 8건):
+      // 201 을 받은 요청이 하나도 없는데 다음 시즌은 정확히 한 벌 생성됐다.
+      // 그대로 두면 어드민이 "실패했구나" 하고 읽는데 실제로는 확정이 끝나 있다.
+      // 그래서 503 으로 넘기기 전에 이력이 실제로 남았는지 한 번 확인하고, 남았으면
+      // 선착 확인과 같은 409 로 사실대로 답한다.
+      if (isPrismaAvailabilityError(error)) {
+        const landed = await this.prisma.v1LeaguePromotion
+          .findFirst({ where: { fromLeagueId: { in: [...fromLeagueIds] } }, select: { id: true } })
+          .catch(() => null); // 확인 자체가 또 실패하면 원래 에러를 그대로 올린다.
+        if (landed !== null) {
+          throw new ConflictException({
+            code: 'PROMOTION_ALREADY_DECIDED',
+            message: '이미 승강이 확정된 시즌이에요.',
+          });
+        }
+      }
+
       throw error;
     }
   }

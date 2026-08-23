@@ -392,6 +392,110 @@ describe('리그 승강 확정 (Task 153)', () => {
     });
   });
 
+  describe('가용성 실패와 응답의 진실성', () => {
+    // alpha 실측(2026-08-23, 동시 8건): 201 을 받은 요청이 하나도 없는데 다음 시즌은
+    // 정확히 한 벌 생성됐다 — 503 을 받은 요청 중 하나가 실제로는 커밋에 성공한 것이다.
+    // Prisma 인터랙티브 트랜잭션은 커밋 이후에도 래퍼 타임아웃을 던질 수 있다.
+    // 그대로 두면 어드민이 "실패했구나" 로 읽는데 실제로는 확정이 끝나 있다.
+    it('트랜잭션이 가용성 오류로 실패해도 이력이 남았으면 503 이 아니라 409 로 답한다', async () => {
+      const teams = [
+        await createTeam('avail-a1'), await createTeam('avail-a2'),
+        await createTeam('avail-b1'), await createTeam('avail-b2'),
+      ];
+      const { seriesId, leagueIds } = await seedSeries('가용성', [
+        [teams[0].id, teams[1].id],
+        [teams[2].id, teams[3].id],
+      ]);
+      for (const leagueId of leagueIds) await finishLeague(leagueId);
+
+      const previewRes = await asAdmin(
+        http().post(`/api/v1/admin/league-series/${seriesId}/seasons/1/promotions/preview`),
+      );
+      const preview = previewRes.body.data;
+      const entries = preview.tiers.flatMap((tier: { entries: Array<{ teamId: string; tier: number; computedKind: string }> }) =>
+        tier.entries.map((entry) => ({ teamId: entry.teamId, fromTier: entry.tier, kind: entry.computedKind })),
+      );
+
+      // 재현해야 하는 것은 "커밋은 끝났는데 래퍼가 터진" 순간이다. 이미 확정된 시즌으로
+      // 시작하면 commitPromotions 의 사전 체크(findFirst)가 트랜잭션에 닿기도 전에 409 를
+      // 내버려서 이 경로를 전혀 타지 않는다 — 그러면 테스트가 아무것도 증명하지 못한다.
+      // 그래서 아직 확정되지 않은 시즌에서, 트랜잭션을 **실제로 수행한 뒤** 예외를 던진다.
+      const prismaService = app.get(PrismaService) as unknown as {
+        $transaction: (...args: unknown[]) => Promise<unknown>;
+      };
+      const original = prismaService.$transaction.bind(prismaService);
+      let ran = false;
+      prismaService.$transaction = async (...args: unknown[]) => {
+        if (ran) return original(...(args as [never]));
+        ran = true;
+        await original(...(args as [never])); // 여기서 승강 이력이 실제로 저장된다.
+        throw Object.assign(
+          new Error('Transaction API error: Unable to start a transaction in the given time.'),
+          { code: 'P2028' },
+        );
+      };
+
+      try {
+        const res = await asAdmin(
+          http().post(`/api/v1/admin/league-series/${seriesId}/seasons/1/promotions/commit`),
+        ).send({ entries, ruleFingerprint: preview.ruleFingerprint });
+
+        // 503(= 아무 일도 없었다)이 아니라, 사실대로 409 여야 한다.
+        expect(res.status).toBe(409);
+        expect(res.body.code).toBe('PROMOTION_ALREADY_DECIDED');
+      } finally {
+        prismaService.$transaction = original as never;
+      }
+
+      // 그리고 실제로 저장돼 있어야 한다 — 409 가 사실이라는 근거.
+      expect(await prisma.v1LeaguePromotion.count({ where: { fromLeagueId: { in: leagueIds } } })).toBe(4);
+    });
+
+    it('이력이 없는 상태에서 가용성 오류가 나면 그대로 503 이다 — 없는 성공을 지어내지 않는다', async () => {
+      const teams = [
+        await createTeam('avail2-a1'), await createTeam('avail2-a2'),
+        await createTeam('avail2-b1'), await createTeam('avail2-b2'),
+      ];
+      const { seriesId, leagueIds } = await seedSeries('가용성2', [
+        [teams[0].id, teams[1].id],
+        [teams[2].id, teams[3].id],
+      ]);
+      for (const leagueId of leagueIds) await finishLeague(leagueId);
+
+      const previewRes = await asAdmin(
+        http().post(`/api/v1/admin/league-series/${seriesId}/seasons/1/promotions/preview`),
+      );
+      const preview = previewRes.body.data;
+      const entries = preview.tiers.flatMap((tier: { entries: Array<{ teamId: string; tier: number; computedKind: string }> }) =>
+        tier.entries.map((entry) => ({ teamId: entry.teamId, fromTier: entry.tier, kind: entry.computedKind })),
+      );
+
+      const prismaService = app.get(PrismaService) as unknown as {
+        $transaction: (...args: unknown[]) => Promise<unknown>;
+      };
+      const original = prismaService.$transaction.bind(prismaService);
+      prismaService.$transaction = async () => {
+        throw Object.assign(
+          new Error('Transaction API error: Unable to start a transaction in the given time.'),
+          { code: 'P2028' },
+        );
+      };
+
+      try {
+        const res = await asAdmin(
+          http().post(`/api/v1/admin/league-series/${seriesId}/seasons/1/promotions/commit`),
+        ).send({ entries, ruleFingerprint: preview.ruleFingerprint });
+
+        expect(res.status).toBe(503);
+        expect(res.body.code).toBe('SERVICE_TEMPORARILY_BUSY');
+      } finally {
+        prismaService.$transaction = original as never;
+      }
+      // 실제로 아무것도 안 생겼는지 확인 — 거짓 409 를 냈다면 여기서 드러난다.
+      expect(await prisma.v1LeaguePromotion.count({ where: { fromLeagueId: { in: leagueIds } } })).toBe(0);
+    });
+  });
+
   describe('하위호환 — 단발 리그', () => {
     it('시리즈에 속하지 않은 리그는 티어가 없고 공개 목록·순위표에도 티어가 붙지 않는다', async () => {
       const teamA = await createTeam('solo-a');

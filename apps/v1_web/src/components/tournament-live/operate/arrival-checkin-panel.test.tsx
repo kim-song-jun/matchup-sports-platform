@@ -17,7 +17,15 @@ import type { GameLineup, GameLineupParticipant, GameSide } from '@/types/game-o
 // ─────────────────────────────────────────────────────────────────────────────
 
 function side(id: string, name: string): GameSide {
-  return { id, gameId: 'g-1', displayNameSnapshot: name, teamId: null, isHome: id === 'side-home' } as GameSide;
+  return {
+    id,
+    gameId: 'g-1',
+    sideKey: id === 'side-home' ? 'HOME' : 'AWAY',
+    teamId: null,
+    displayNameSnapshot: name,
+    createdAt: '2026-08-23T00:00:00.000Z',
+    updatedAt: '2026-08-23T00:00:00.000Z',
+  };
 }
 
 function participant(
@@ -55,7 +63,7 @@ function lineup(participants: GameLineupParticipant[], overrides: Partial<GameLi
     updatedAt: '2026-08-23T00:00:00.000Z',
     participants,
     ...overrides,
-  } as GameLineup;
+  };
 }
 
 const SIDES = [side('side-home', '홈팀')];

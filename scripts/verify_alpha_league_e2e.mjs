@@ -7,6 +7,14 @@
  * 감사 보고서의 "확인하지 못한 것" 중 두 건(신규 리그 개설 전 과정 / 승강 확정→다음 시즌)을
  * 실측으로 메우기 위한 스크립트다. 각 단계마다 화면을 캡처한다.
  *
+ * 환경변수:
+ *   ALPHA_PASSWORD, ALPHA_ADMIN_EMAIL  필수 (운영자 세션)
+ *   STRICT_PICKER=1                    우회 조작 없이 검색창 재개방만으로 진행 (C-0 회귀 증거)
+ *   SERIES_ID=<id>                     기존 시리즈 재사용 (새로 만들지 않음)
+ *   SKIP_SEED=1                        시즌 시딩 단계 건너뛰기
+ *   RUN_STAMP=<문자열>                 만드는 대회 제목에 붙일 식별자 (기본 'run')
+ *   CAPTURE_BASE_URL                   대상 호스트 (기본 alpha)
+ *
  * 사용법: ALPHA_PASSWORD=... ALPHA_ADMIN_EMAIL=... node scripts/verify_alpha_league_e2e.mjs <outDir>
  */
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -47,14 +55,22 @@ await mkdir(OUT, { recursive: true });
 const token = await login();
 
 const browser = await chromium.launch();
-const ctx = await browser.newContext({
-  viewport: { width: 1280, height: 1000 },
-  deviceScaleFactor: 1,
-  locale: 'ko-KR',
-});
-await ctx.addCookies([{ name: 'teameet_v1_session', value: token, domain: new URL(BASE).hostname, path: '/' }]);
-await ctx.addInitScript(() => window.localStorage.setItem('teameet.v1.session', 'active'));
-const page = await ctx.newPage();
+// 초기화(컨텍스트·쿠키·페이지)는 아래 본문 try 보다 앞이라, 여기서 던지면 chromium 이 그대로 남는다.
+let ctx;
+let page;
+try {
+  ctx = await browser.newContext({
+    viewport: { width: 1280, height: 1000 },
+    deviceScaleFactor: 1,
+    locale: 'ko-KR',
+  });
+  await ctx.addCookies([{ name: 'teameet_v1_session', value: token, domain: new URL(BASE).hostname, path: '/' }]);
+  await ctx.addInitScript(() => window.localStorage.setItem('teameet.v1.session', 'active'));
+  page = await ctx.newPage();
+} catch (err) {
+  await browser.close();
+  throw err;
+}
 
 const consoleErrors = [];
 const badResponses = [];

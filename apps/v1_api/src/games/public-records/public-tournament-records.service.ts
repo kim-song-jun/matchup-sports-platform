@@ -127,7 +127,19 @@ const FIXTURE_MATCH_SELECT = {
         },
       },
       currentOfficialRevision: {
-        select: { state: true, supersedesId: true, officialAt: true, score: true, goalEvents: true, mvpParticipantId: true },
+        // outcomeReason/reason — 몰수·중단으로 끝난 경기를 관전자 화면에서 정상 종료와
+        // 구분해 보여주기 위한 것. 점수만 내보내면 "왜 그 점수인지"가 공개 기록 어디에도
+        // 없어서, 1차 대회에서 문제가 됐던 그 상태가 그대로 남는다.
+        select: {
+          state: true,
+          supersedesId: true,
+          officialAt: true,
+          score: true,
+          goalEvents: true,
+          mvpParticipantId: true,
+          outcomeReason: true,
+          reason: true,
+        },
       },
       // Lane 1 addition -- see FIXTURE_SCHEDULE_SELECT above.
       periods: { select: { number: true, state: true, startedAt: true, pausedTotalMs: true, pausedAt: true } },
@@ -531,6 +543,18 @@ export class PublicTournamentRecordsService {
       lineup,
       events,
       mvp,
+      // 몰수·중단 종결 표시. 정상 종료(NORMAL)면 null 이라 기존 화면 계약은 그대로다 —
+      // 관전자에게 매번 "정상 종료"라고 말할 이유는 없다. 공식 결과가 공개된 경우에만
+      // 내보낸다(showOfficialResult) — 아직 공개 전인 결과의 사유를 미리 흘리면 안 된다.
+      outcome:
+        showOfficialResult &&
+        fixture.game?.currentOfficialRevision != null &&
+        fixture.game.currentOfficialRevision.outcomeReason !== 'NORMAL'
+          ? {
+              reason: fixture.game.currentOfficialRevision.outcomeReason,
+              note: fixture.game.currentOfficialRevision.reason,
+            }
+          : null,
       pendingProjection: mode === 'live' && resultState === 'pending' && (status === 'live' || status === 'ended'),
       history: history.map((revision) => ({
         revision: revision.revision,

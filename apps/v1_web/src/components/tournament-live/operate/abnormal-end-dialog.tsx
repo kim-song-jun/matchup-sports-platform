@@ -1,0 +1,157 @@
+'use client';
+
+import { useEffect, useId, useRef, useState } from 'react';
+import { Button } from '@/components/v1-ui/button';
+
+/**
+ * 몰수·중단으로 경기를 종료할 때 **사유를 받는** 다이얼로그.
+ *
+ * 1차 대회(2026-08-15~16) 회고 "몰수·중단 등 특수 상황 처리". 지금까지 운영자는
+ * 몰수를 임의 점수(3-0 등)로 수기 입력하는 수밖에 없었고, 정상 종료와 구분되지 않아
+ * **왜 그 점수인지 근거가 시스템에 남지 않았다** — 이의제기가 들어오면 방어할 기록이
+ * 없었다는 뜻이다.
+ *
+ * 2026-08-23 사용자 결정(Q3): 종목별 표준 스코어를 자동 부여하지 않는다. 점수는 그대로
+ * 운영자가 정하되 **사유를 필수로** 남긴다. 그래서 이 다이얼로그의 핵심은 예쁜 폼이
+ * 아니라 "사유 없이는 확인 버튼이 눌리지 않는다"는 것 하나다 — 서버도 같은 규칙을
+ * 강제한다(GAME_OUTCOME_NOTE_REQUIRED). 프런트 가드만 두면 API 직접 호출로 그대로
+ * 우회되므로 양쪽에 둔다.
+ *
+ * 기존 `useConfirm` 을 쓰지 않은 이유: 그건 boolean 만 돌려주는 확인 모달이라 자유
+ * 텍스트를 받을 수 없다. 사유 입력이 이 기능의 전부라 확인 모달로는 대체 불가다.
+ */
+
+export type AbnormalEndReason = 'FORFEIT' | 'ABANDONED';
+
+const REASON_OPTIONS: ReadonlyArray<{ value: AbnormalEndReason; label: string; hint: string }> = [
+  { value: 'FORFEIT', label: '몰수·기권', hint: '한 팀이 경기를 수행하지 않아 종결해요.' },
+  { value: 'ABANDONED', label: '경기 중단', hint: '날씨·사고 등으로 끝까지 진행하지 못했어요.' },
+];
+
+export interface AbnormalEndDialogProps {
+  readonly open: boolean;
+  readonly onCancel: () => void;
+  readonly onConfirm: (input: { reason: AbnormalEndReason; note: string }) => void;
+  readonly submitting?: boolean;
+}
+
+export function AbnormalEndDialog({ open, onCancel, onConfirm, submitting = false }: AbnormalEndDialogProps) {
+  const titleId = useId();
+  const noteId = useId();
+  const [reason, setReason] = useState<AbnormalEndReason>('FORFEIT');
+  const [note, setNote] = useState('');
+  const noteRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // 열릴 때마다 초기화한다 — 직전 경기의 사유가 남아 있으면 그대로 확정될 수 있다.
+  useEffect(() => {
+    if (!open) return;
+    setReason('FORFEIT');
+    setNote('');
+    noteRef.current?.focus();
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') onCancel();
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [open, onCancel]);
+
+  if (!open) return null;
+
+  const trimmed = note.trim();
+  const canSubmit = trimmed.length > 0 && !submitting;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
+      role="presentation"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onCancel();
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="w-full max-w-md rounded-2xl bg-[var(--surface)] p-5 shadow-xl"
+      >
+        <h2 id={titleId} className="text-base font-bold">
+          몰수·중단으로 종료
+        </h2>
+        <p className="mt-1.5 text-sm text-[var(--text-muted)]">
+          점수는 지금 기록된 값 그대로 확정돼요. 사유는 공개 경기 기록에 함께 남아, 나중에 이 결과가 왜
+          이런지 설명하는 유일한 근거가 돼요.
+        </p>
+
+        <fieldset className="mt-4">
+          <legend className="text-sm font-semibold">종료 종류</legend>
+          <div className="mt-2 flex flex-col gap-2">
+            {REASON_OPTIONS.map((option) => (
+              <label
+                key={option.value}
+                className={[
+                  'flex min-h-[44px] cursor-pointer items-start gap-3 rounded-lg border px-3 py-2',
+                  reason === option.value
+                    ? 'border-[var(--blue500)] bg-[var(--blue50)]'
+                    : 'border-[var(--border)]',
+                ].join(' ')}
+              >
+                <input
+                  type="radio"
+                  name="abnormal-end-reason"
+                  value={option.value}
+                  checked={reason === option.value}
+                  onChange={() => setReason(option.value)}
+                  className="mt-1"
+                />
+                <span>
+                  <span className="block text-sm font-medium">{option.label}</span>
+                  <span className="block text-xs text-[var(--text-muted)]">{option.hint}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        <div className="mt-4">
+          <label htmlFor={noteId} className="text-sm font-semibold">
+            사유 <span className="text-[var(--red500)]">(필수)</span>
+          </label>
+          <textarea
+            id={noteId}
+            ref={noteRef}
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+            rows={3}
+            placeholder="예) 원정팀이 킥오프 15분 경과까지 미출석"
+            className="mt-1.5 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] p-2.5 text-sm"
+          />
+          {/* 왜 못 누르는지 말해 준다 — 비활성 버튼만 두면 운영자가 현장에서 이유를 못 찾는다. */}
+          {trimmed.length === 0 ? (
+            <p className="mt-1 text-xs text-[var(--text-muted)]">
+              사유를 적어야 종료할 수 있어요.
+            </p>
+          ) : null}
+        </div>
+
+        <div className="mt-5 flex gap-2">
+          <Button variant="outline" block onClick={onCancel} disabled={submitting}>
+            취소
+          </Button>
+          <Button
+            variant="danger"
+            block
+            disabled={!canSubmit}
+            loading={submitting}
+            onClick={() => onConfirm({ reason, note: trimmed })}
+          >
+            이대로 종료
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}

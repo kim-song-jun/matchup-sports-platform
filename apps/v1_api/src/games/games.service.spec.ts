@@ -6,6 +6,7 @@ import { GameContractError } from './core';
 import { GameCommandDto } from './dto/game-command.dto';
 import {
   canonicalGameCommandPayloadHash,
+  extractEndOutcome,
   extractEndPenalties,
   gameAuthorizationAction,
   gameCommandAuditAction,
@@ -239,6 +240,68 @@ describe('GamesService command boundary', () => {
 
       expect(grouped.get('lineup-1')?.map((row) => row.id)).toEqual(['a', 'c']);
       expect(grouped.get('lineup-2')?.map((row) => row.id)).toEqual(['b']);
+    });
+  });
+
+  // 1차 대회 회고 "몰수·중단 등 특수 상황 처리". 지금까지 운영자는 몰수를 임의 점수로
+  // 수기 입력하는 수밖에 없어 정상 종료와 구분되지 않았고, "왜 그 점수인지" 근거가
+  // 남지 않았다. 2026-08-23 사용자 결정(Q3)은 표준 스코어 자동 부여가 아니라
+  // **운영자 입력 + 사유 필수**다 — 이 파서의 존재 이유가 그 "필수"이므로,
+  // 사유 없는 몰수가 실제로 막히는지가 이 스위트의 핵심 계약이다.
+  describe('extractEndOutcome (몰수·중단 종결 사유 파싱)', () => {
+    it('사유가 없으면 정상 종료다 — 기존 end 호출은 그대로 통과해야 한다', () => {
+      expect(extractEndOutcome({})).toEqual({ outcomeReason: 'NORMAL', note: null });
+      expect(extractEndOutcome({ outcomeReason: 'NORMAL' })).toEqual({
+        outcomeReason: 'NORMAL',
+        note: null,
+      });
+    });
+
+    it('몰수·중단은 사유 본문과 함께 통과한다', () => {
+      expect(extractEndOutcome({ outcomeReason: 'FORFEIT', outcomeNote: '원정팀 미출석' })).toEqual({
+        outcomeReason: 'FORFEIT',
+        note: '원정팀 미출석',
+      });
+      expect(extractEndOutcome({ outcomeReason: 'ABANDONED', outcomeNote: '낙뢰로 중단' })).toEqual({
+        outcomeReason: 'ABANDONED',
+        note: '낙뢰로 중단',
+      });
+    });
+
+    // 이 스위트에서 가장 중요한 계약 — 사유를 안 적고 몰수로 끝낼 수 있으면
+    // 이 기능은 회고가 지적한 문제를 하나도 해결하지 못한다(점수의 임의성은
+    // 그대로인데 근거만 없는 상태가 된다).
+    it('사유 없는 몰수·중단은 막는다', () => {
+      expect(() => extractEndOutcome({ outcomeReason: 'FORFEIT' })).toThrow(
+        UnprocessableEntityException,
+      );
+      expect(() => extractEndOutcome({ outcomeReason: 'ABANDONED', outcomeNote: '' })).toThrow(
+        UnprocessableEntityException,
+      );
+      // 공백만 적은 것도 사유가 아니다.
+      expect(() => extractEndOutcome({ outcomeReason: 'FORFEIT', outcomeNote: '   ' })).toThrow(
+        UnprocessableEntityException,
+      );
+      // 문자열이 아닌 값도 사유로 인정하지 않는다.
+      expect(() => extractEndOutcome({ outcomeReason: 'FORFEIT', outcomeNote: 123 })).toThrow(
+        UnprocessableEntityException,
+      );
+    });
+
+    it('앞뒤 공백은 다듬어 저장한다', () => {
+      expect(extractEndOutcome({ outcomeReason: 'FORFEIT', outcomeNote: '  원정팀 미출석  ' })).toEqual({
+        outcomeReason: 'FORFEIT',
+        note: '원정팀 미출석',
+      });
+    });
+
+    it('알 수 없는 사유 값은 막는다 (오타가 조용히 정상 종료로 읽히면 안 된다)', () => {
+      expect(() => extractEndOutcome({ outcomeReason: 'forfeit' })).toThrow(
+        UnprocessableEntityException,
+      );
+      expect(() => extractEndOutcome({ outcomeReason: 'WALKOVER' })).toThrow(
+        UnprocessableEntityException,
+      );
     });
   });
 

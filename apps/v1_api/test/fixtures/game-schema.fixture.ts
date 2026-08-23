@@ -290,7 +290,19 @@ export const gameSchemaSourceManifest = {
   //
   // 아래 값은 **두 변경이 병합된 뒤**의 schema.prisma 에 sha256 을 다시 돌려 계산한 것이다 —
   // 어느 한쪽 브랜치의 해시를 그대로 쓰면 CI 가 깨진다(이 파일 위쪽 병합 재핀 주석과 같은 사유).
-  schema: 'ea5b9634f6020efe874bcd24cd02181de567134a6fe346c78f08d6f51464262d',
+  //
+  // 몰수·중단 종결 사유 재핀: `V1GameOutcomeReason` enum 신설 +
+  // `V1GameResultRevision.outcome_reason` 컬럼(NOT NULL DEFAULT 'NORMAL').
+  // **game domain 을 실제로 건드린다** — 결과 리비전은 이 guard 가 지키는 계약의 중심이다.
+  // 다만 순수 additive 이고 기존 계약을 바꾸지 않는다: 기존 리비전은 전부 NORMAL 이 되며
+  // 그것이 올바른 값이다(과거 경기를 소급해 몰수로 재분류할 수 없다). 점수 계산·이벤트
+  // 집계·불변식(v1_guard_*)은 이 컬럼을 읽지 않는다 — "이 점수가 정상 경기의 결과가
+  // 아니다"라는 표시일 뿐 점수를 대신 정하지 않는다(2026-08-23 사용자 결정 Q3: 표준
+  // 스코어 자동 부여 대신 운영자 입력 + 사유 필수). 뒷받침 마이그레이션:
+  // 20260823140000_v1_game_outcome_reason. 바인딩된 20260729000100_v1_game_operations 는
+  // 그대로라 .migration 해시는 변하지 않는다.
+  // 아래 값은 이 브랜치의 schema.prisma 에 `shasum -a 256` 을 다시 돌려 계산한 것이다.
+  schema: 'b759e709a17d27d48948044ab8bd6cffddc249275ec13ee17466b0f214da7fc7',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

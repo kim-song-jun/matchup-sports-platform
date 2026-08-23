@@ -79,14 +79,24 @@ function criterionValue(
  * group을 criteria[0] 기준 동점 버킷으로 나누고('headToHead'면 group 내부 경기만으로 미니
  * 순위를 다시 계산해 그 승점으로 비교), 남은 criteria로 각 버킷을 재귀 정렬한다. 기준이
  * 모두 소진되면 팀ID 사전순으로 떨어뜨려 결과를 결정적으로 만든다.
+ *
+ * `onTieBreakExhausted` 는 그 마지막 폴백이 실제로 발동한 순간(2팀 이상이 tieBreakOrder
+ * 전체를 소진하고도 갈리지 않은 경우)을 감지용으로 통보한다. 정렬 결과(반환값)는 이
+ * 콜백 유무와 무관하게 항상 동일하다 — 감지는 부수 효과일 뿐 결정성 있는 계산 자체를
+ * 바꾸지 않는다(감사 H-5: 승강 확정 화면이 "동률이라 임의로 갈렸다"를 보여줘야 한다).
  */
 function orderGroup(
   group: readonly string[],
   overallFixtures: readonly LeagueStandingFixture[],
   overallTotals: Map<string, LeagueStandingTotals>,
   criteria: readonly LeagueTieBreakCriterion[],
+  onTieBreakExhausted?: (group: readonly string[]) => void,
 ): string[] {
-  if (group.length <= 1 || criteria.length === 0) return [...group].sort();
+  if (group.length <= 1) return [...group].sort();
+  if (criteria.length === 0) {
+    onTieBreakExhausted?.(group);
+    return [...group].sort();
+  }
   const [criterion, ...rest] = criteria;
   const valueOf: (teamId: string) => number =
     criterion === 'headToHead'
@@ -109,7 +119,7 @@ function orderGroup(
   const orderedValues = [...buckets.keys()].sort((a, b) => b - a);
   const result: string[] = [];
   for (const value of orderedValues) {
-    result.push(...orderGroup(buckets.get(value)!, overallFixtures, overallTotals, rest));
+    result.push(...orderGroup(buckets.get(value)!, overallFixtures, overallTotals, rest, onTieBreakExhausted));
   }
   return result;
 }
@@ -119,7 +129,36 @@ export function calculateLeagueStandings(input: {
   fixtures: readonly LeagueStandingFixture[];
   tieBreakOrder: readonly LeagueTieBreakCriterion[];
 }): LeagueStanding[] {
+  return calculateLeagueStandingsWithTieBreakInfo(input).standings;
+}
+
+/** tieBreakOrder 전체를 소진하고도 갈리지 않아 팀ID 사전순 폴백으로 순위가 결정된 팀들. */
+export interface StandingsTieGroup {
+  teamIds: string[];
+}
+
+/**
+ * `calculateLeagueStandings` 와 완전히 같은 계산(같은 `orderGroup` 호출)을 하면서,
+ * tie-break 기준이 모두 소진돼 결정적 폴백(팀ID 사전순)이 실제로 순위를 정한 그룹을
+ * 함께 수집한다. `calculateLeagueStandings` 는 이 함수의 `standings` 만 돌려주는
+ * 얇은 래퍼라 두 함수의 정렬 결과는 항상 동일하다 — 감지 로직 때문에 계산 로직이
+ * 갈라질 여지가 없다.
+ *
+ * 승강 확정 화면(감사 H-5)이 "N팀이 승점·득실·다득점·맞대결까지 전부 같아서
+ * 팀ID 순으로 갈렸어요" 같은 안내를 띄우는 데 쓴다. 부분적으로만 동률인 경우
+ * (예: 승점만 같고 골득실로 갈림)는 tie-break 가 실제로 순위를 "결정"한 것이므로
+ * 여기 포함하지 않는다 — 오직 모든 기준이 소진된 경우만 그룹으로 잡는다.
+ */
+export function calculateLeagueStandingsWithTieBreakInfo(input: {
+  teamIds: readonly string[];
+  fixtures: readonly LeagueStandingFixture[];
+  tieBreakOrder: readonly LeagueTieBreakCriterion[];
+}): { standings: LeagueStanding[]; tieGroups: StandingsTieGroup[] } {
   const totals = totalsFor(input.teamIds, input.fixtures);
-  const order = orderGroup([...input.teamIds].sort(), input.fixtures, totals, input.tieBreakOrder);
-  return order.map((teamId, index) => ({ ...totals.get(teamId)!, position: index + 1 }));
+  const tieGroups: StandingsTieGroup[] = [];
+  const order = orderGroup([...input.teamIds].sort(), input.fixtures, totals, input.tieBreakOrder, (group) => {
+    tieGroups.push({ teamIds: [...group].sort() });
+  });
+  const standings = order.map((teamId, index) => ({ ...totals.get(teamId)!, position: index + 1 }));
+  return { standings, tieGroups };
 }

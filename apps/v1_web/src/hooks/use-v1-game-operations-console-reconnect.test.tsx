@@ -49,6 +49,7 @@ function lineupParticipant(id: string, started: boolean): GameLineupParticipant 
     positionX: null,
     positionY: null,
     started,
+    arrivedAt: null,
     createdAt: '2026-08-16T00:00:00.000Z',
     updatedAt: '2026-08-16T00:00:00.000Z',
   };

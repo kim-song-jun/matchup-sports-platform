@@ -22,6 +22,7 @@ function participant(overrides: Partial<GameLineupParticipant>): GameLineupParti
     positionX: null,
     positionY: null,
     started: true,
+    arrivedAt: null,
     createdAt: '2026-08-01T00:00:00.000Z',
     updatedAt: '2026-08-01T00:00:00.000Z',
     ...overrides,
@@ -264,6 +265,7 @@ describe('fixture-lineup.view-model — 피치 배치', () => {
             positionX: 50,
             positionY: 6,
             started: true,
+            arrivedAt: null,
           }),
         ]),
       ],
@@ -298,6 +300,7 @@ describe('applyLoadedSelection', () => {
       positionX: null,
       positionY: null,
       started: true,
+      arrivedAt: null,
       goalkeeper: false,
       ...overrides,
     };
@@ -407,5 +410,63 @@ describe('fixture-lineup.view-model — 명단에서 피치로 끌어다 놓기'
     const state = hydrateFixtureLineupState([], 'side-1', 1, 'GK', [HONG, KIM]);
 
     expect(dropPlayerOnPitch(state, 'user-ghost', { kind: 'point', x: 50, y: 50 })).toBe(state);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 1차 대회(2026-08-15~16) 회고: "라인업에서 선수 번호 등록을 처음에만 하고 추후에는
+// 안하는 문제 / 라인업 불러오기시 번호는 등록이 안된건지 확인 필요".
+//
+// 등번호 결정은 `loaded ?? teamFixed ?? recent` 3단계로 **설계는 돼 있었지만**
+// 2순위(팀 고정 등번호)가 死문이었다 — 로스터 응답에 그 번호가 아예 없어서 프론트가
+// 넘길 값을 갖지 못했다. 결과적으로 팀장이 매 경기 번호를 다시 타이핑해야 했고,
+// 그 반복이 곧 오탈자 발생원이다.
+//
+// 이 스위트가 지키는 계약:
+//   ① 저장된 번호가 있으면 그것이 이긴다 (팀 고정 번호가 개별 조정을 덮으면 안 된다)
+//   ② 저장된 번호가 없으면 팀 고정 번호로 채운다 — **'불러오기'를 누르지 않아도**
+// ─────────────────────────────────────────────────────────────────────────────
+describe('hydrateFixtureLineupState — 팀 고정 등번호', () => {
+  const HONG_WITH_JERSEY: FixtureRosterPlayer = { ...HONG, teamJerseyNumber: 7 };
+  const KIM_WITH_JERSEY: FixtureRosterPlayer = { ...KIM, teamJerseyNumber: 11 };
+
+  // ② 화면에 처음 들어오는 순간부터 채워져야 한다.
+  it('저장된 라인업이 아예 없어도 팀 고정 등번호로 채운다', () => {
+    const state = hydrateFixtureLineupState([], 'side-1', 1, 'GK', [HONG_WITH_JERSEY, KIM_WITH_JERSEY]);
+
+    const byName = new Map([...state.starters, ...state.bench].map((e) => [e.displayName, e.jerseyNumber]));
+    expect(byName.get('홍길동')).toBe(7);
+    expect(byName.get('김철수')).toBe(11);
+  });
+
+  // ① 개별 조정이 팀 기본값에 덮이면, 이 경기만 다른 번호를 단 선수가 매번 되돌려진다.
+  it('저장된 번호가 있으면 팀 고정 번호보다 우선한다', () => {
+    const lineup: GameLineup = {
+      id: 'lineup-1', gameId: 'game-1', sideId: 'side-1', revision: 2, state: 'DRAFT', version: 0,
+      submittedAt: null, supersedesId: null, formation: null,
+      createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
+      participants: [participant({ userId: 'user-hong', displayNameSnapshot: '홍길동', jerseyNumber: 99 })],
+    };
+
+    const state = hydrateFixtureLineupState([lineup], 'side-1', 1, 'GK', [HONG_WITH_JERSEY, KIM_WITH_JERSEY]);
+
+    const byName = new Map([...state.starters, ...state.bench].map((e) => [e.displayName, e.jerseyNumber]));
+    expect(byName.get('홍길동')).toBe(99);
+    // 저장된 적 없는 사람은 여전히 팀 고정 번호로 채워진다.
+    expect(byName.get('김철수')).toBe(11);
+  });
+
+  it('팀 고정 번호가 없는 선수는 빈칸으로 둔다 (0 이나 임의 번호를 지어내지 않는다)', () => {
+    const state = hydrateFixtureLineupState([], 'side-1', 1, 'GK', [HONG, KIM_WITH_JERSEY]);
+
+    const byName = new Map([...state.starters, ...state.bench].map((e) => [e.displayName, e.jerseyNumber]));
+    expect(byName.get('홍길동')).toBeNull();
+    expect(byName.get('김철수')).toBe(11);
+  });
+
+  it('teamJerseyNumber 를 아예 안 넘기는 기존 호출부도 그대로 동작한다', () => {
+    const state = hydrateFixtureLineupState([], 'side-1', 1, 'GK', [HONG, KIM]);
+
+    expect([...state.starters, ...state.bench].every((e) => e.jerseyNumber === null)).toBe(true);
   });
 });

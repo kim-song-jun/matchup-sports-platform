@@ -2990,6 +2990,18 @@ model V1GameParticipant {
   /// 서비스(team-match-lineup.service.ts)는 이 컬럼과 무관하게 자체 position='BENCH'
   /// 관례를 그대로 쓴다 — 이미 정상 동작하는 별도 경로라 여기서는 건드리지 않는다.
   started             Boolean  @default(true) @map("started")
+  /// 명단 검인(체크인) — 이 선수가 실제로 경기장에 도착한 것을 확인한 시각.
+  /// 1차 대회(2026-08-15~16) 회고: "명단 검인 과정에서 오지 않거나, 하지 않은
+  /// 사람들에 대한 확인이 어려움". 지금까지 스태프는 육안·구두로만 확인해야 했다.
+  ///
+  /// `started`(선발/후보)와 **다른 축**이다 — started 는 팀이 제출한 계획이고
+  /// 이 값은 현장에서 확인한 사실이다. 선발로 제출됐지만 안 온 사람이 정확히
+  /// 회고가 말한 그 사람이라, 둘을 한 컬럼으로 합치면 그 상태를 표현할 수 없다.
+  ///
+  /// nullable = "아직 확인 안 함". false 를 쓰지 않는 이유: 체크인은 경기 직전에
+  /// 순차적으로 일어나므로 "안 왔다"와 "아직 확인 전"이 구분돼야 하고, 확인 시각
+  /// 자체가 분쟁 시 근거가 된다. 체크를 되돌리면 다시 NULL 로 돌아간다.
+  arrivedAt           DateTime? @map("arrived_at")
   createdAt           DateTime @default(now()) @map("created_at")
   updatedAt           DateTime @updatedAt @map("updated_at")
   game                V1Game   @relation(fields: [gameId], references: [id], onDelete: Restrict, map: "v1_game_participants_game_fk")

@@ -2128,6 +2128,56 @@ export class GamesService {
     }));
   }
 
+  /**
+   * 명단 검인(체크인) — 참가자가 실제로 도착했음을 현장에서 확정한다.
+   * 1차 대회 회고: "명단 검인 과정에서 오지 않거나, 하지 않은 사람들에 대한 확인이 어려움".
+   *
+   * **`withCommand` 를 쓰지 않는다.** 체크인은 라인업 내용을 바꾸지 않고 킥오프 직전 여러
+   * 명을 연달아 누르는 조작이라, 버전 커맨드로 만들면 한 명 누를 때마다 revision 이 올라
+   * 다음 사람에서 곧바로 409 VERSION_CONFLICT 가 난다. 그래서 게임/라인업 버전과 완전히
+   * 분리된 단순 토글로 둔다 — 되돌리기(arrived=false → NULL)도 같은 이유로 값싸야 한다.
+   *
+   * **경기 상태로 막지 않는다.** 사람은 킥오프 직전은 물론 경기가 시작된 뒤에도 도착하고,
+   * 늦게 온 사람을 기록하는 것이 이 기능의 목적이다. 라인업 저장의 deadline 게이트
+   * (SCHEDULED 전용)를 여기에 그대로 옮기면 정작 필요한 순간에 잠긴다.
+   */
+  async setParticipantArrival(
+    user: V1AuthUser,
+    gameId: string,
+    participantId: string,
+    arrived: boolean,
+  ) {
+    // lineup_mutate 는 platform_ops · 라인업 권한을 가진 대회 스태프 · 이 fixture 참가팀의
+    // 매니저/오너를 통과시킨다 — 명단 검인을 할 수 있어야 하는 사람과 정확히 같은 집합이다.
+    const actor = await this.resolveActor(this.prisma, gameId, user.id, 'lineup_mutate');
+    const participant = await this.prisma.v1GameParticipant.findFirst({
+      where: { id: participantId, gameId },
+      select: { id: true, sideId: true, arrivedAt: true },
+    });
+    if (participant === null) {
+      throw this.notFound('GAME_PARTICIPANT_NOT_FOUND');
+    }
+    // 팀 액터는 자기 팀 사이드만 검인할 수 있다 — saveLineup 과 같은 규칙이다.
+    // 스태프/platform_ops 는 어느 쪽이든 검인해야 하므로 팀 액터일 때만 검사한다.
+    if (actor.role === 'team_manager' || actor.role === 'team_owner') {
+      const side = await this.prisma.v1GameSide.findFirst({
+        where: { id: participant.sideId, gameId },
+        select: { teamId: true },
+      });
+      if (side === null || actor.teamId !== side.teamId) {
+        throw this.forbidden();
+      }
+    }
+    const arrivedAt = arrived ? (participant.arrivedAt ?? new Date()) : null;
+    // 이미 같은 상태면 시각을 다시 쓰지 않는다 — 같은 사람을 두 번 눌러도 최초 확인 시각이
+    // 유지돼야 분쟁 시 근거가 된다(위 `?? new Date()` 가 그 역할).
+    return this.prisma.v1GameParticipant.update({
+      where: { id: participant.id },
+      data: { arrivedAt },
+      select: { id: true, sideId: true, arrivedAt: true },
+    });
+  }
+
   async saveLineup(
     user: V1AuthUser,
     gameId: string,
@@ -2569,6 +2619,33 @@ export class GamesService {
       orderBy: { addedAt: 'asc' },
       select: { id: true, userId: true, realName: true },
     });
+    /**
+     * 팀이 지정한 고정 등번호(`V1TeamMembership.jerseyNumber`)를 함께 내려준다.
+     *
+     * 1차 대회(2026-08-15~16) 회고: "라인업에서 선수 번호 등록을 처음에만 하고 추후에는
+     * 안하는 문제". 프론트의 등번호 결정 로직은 `loaded ?? teamFixed ?? recent` 3단계로
+     * 이미 설계돼 있었는데, **2순위 teamFixed 가 死문이었다** — 이 응답에 번호 자체가
+     * 없어서 프론트가 넘길 값을 갖지 못했다. 그래서 팀장이 매 경기 번호를 다시 타이핑해야
+     * 했고, 그 반복 입력이 곧 오탈자 발생원이다.
+     *
+     * 이 사이드 팀의 **active 멤버십만** 본다 — 팀을 떠난 사람의 옛 번호를 되살리면
+     * 이미 그 번호를 물려받은 현재 멤버와 충돌한다(스키마에도 (teamId, jerseyNumber)
+     * 유니크가 걸려 있다).
+     */
+    const memberships =
+      side.teamId === null
+        ? []
+        : await this.prisma.v1TeamMembership.findMany({
+            where: {
+              teamId: side.teamId,
+              status: 'active',
+              userId: { in: players.map((player) => player.userId) },
+            },
+            select: { userId: true, jerseyNumber: true },
+          });
+    const teamJerseyByUserId = new Map(
+      memberships.map((membership) => [membership.userId, membership.jerseyNumber]),
+    );
     return {
       sideId,
       registrationId: resolved.registrationId,
@@ -2576,6 +2653,8 @@ export class GamesService {
         tournamentPlayerId: player.id,
         userId: player.userId,
         name: player.realName,
+        /** 팀 고정 등번호. 팀이 지정하지 않았거나 멤버십이 없으면 null. */
+        teamJerseyNumber: teamJerseyByUserId.get(player.userId) ?? null,
       })),
     };
   }

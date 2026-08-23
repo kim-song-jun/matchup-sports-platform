@@ -85,6 +85,40 @@ describe('TeamContactSettingsPageClient', () => {
     expect(screen.getByText('차단한 팀이 없어요')).toBeInTheDocument();
   });
 
+  // 403 을 빈 목록으로 위장하면 운영진이 아닌 사람이 "차단한 팀이 없어요" 를 보고 권한 문제를
+  // 데이터 없음으로 오해한다. 실제 차단이 있는데도 없는 줄 알게 되는 게 더 나쁘다.
+  it('권한 오류를 빈 상태로 위장하지 않는다', () => {
+    useV1TeamContactBlocksMock.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: { code: 'PERMISSION_DENIED' },
+      refetch: vi.fn(),
+    });
+
+    render(<TeamContactSettingsPageClient teamId="team-1" />);
+
+    expect(screen.getByText('차단 목록을 볼 권한이 없어요')).toBeInTheDocument();
+    expect(screen.queryByText('차단한 팀이 없어요')).not.toBeInTheDocument();
+  });
+
+  it('권한 외 오류는 다시 시도를 제안한다', () => {
+    const refetch = vi.fn();
+    useV1TeamContactBlocksMock.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: { code: 'INTERNAL_ERROR' },
+      refetch,
+    });
+
+    render(<TeamContactSettingsPageClient teamId="team-1" />);
+
+    expect(screen.getByText('차단 목록을 불러오지 못했어요')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
   it('해제 버튼이 blockedTeamId 로 mutation 을 부른다', () => {
     useV1TeamContactBlocksMock.mockReturnValue({
       data: {

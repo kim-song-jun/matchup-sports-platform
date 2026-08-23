@@ -867,6 +867,11 @@ function buildTeamOperations(team: V1TeamDetail): TeamDetailViewModel['operation
       href: `/teams/${team.teamId}/members`,
     },
     {
+      label: '컨택 설정',
+      sub: '다른 팀의 컨택을 받을 조건과 차단 목록을 관리해요.',
+      href: `/teams/${team.teamId}/contact/settings`,
+    },
+    {
       label: '팀매치 만들기',
       sub: '이 팀 명의로 새 팀매치를 모집해요.',
       href: '/team-matches/new/team',

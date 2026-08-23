@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { AppChrome } from '@/components/v1-ui/shell';
-import { Card } from '@/components/v1-ui/primitives';
+import { Card, EmptyState } from '@/components/v1-ui/primitives';
 import {
   useV1RemoveTeamContactBlock,
   useV1TeamContactBlocks,
@@ -10,7 +10,7 @@ import {
   useV1UpdateContactPolicy,
   type V1ContactPolicy,
 } from '@/hooks/use-v1-api';
-import { extractErrorMessage } from '@/lib/error-message';
+import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
 import { formatMonthDay } from '@/lib/date-utils';
 
 // 각 옵션에 한 줄 설명을 붙인다. 특히 recruiting_only 는 이름만으로는 "왜 컨택이 안 오지?" 를
@@ -36,6 +36,7 @@ export function TeamContactSettingsPageClient({ teamId }: { teamId: string }) {
   // 그 응답으로 끌고 가지 않는다. 성공 시 훅이 팀 상세를 무효화하고, 재조회된 값이 여기 반영된다.
   const currentPolicy: V1ContactPolicy = teamQuery.data?.contactPolicy ?? 'open';
   const blocks = blocksQuery.data?.items ?? [];
+  const blocksErrorCode = blocksQuery.isError ? extractErrorCode(blocksQuery.error) : null;
 
   function handlePolicyChange(value: V1ContactPolicy) {
     if (value === currentPolicy) return;
@@ -126,13 +127,21 @@ export function TeamContactSettingsPageClient({ teamId }: { teamId: string }) {
             <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 12 }}>
               불러오는 중이에요.
             </div>
+          ) : blocksQuery.isError ? (
+            // 403 을 빈 목록으로 위장하면 안 된다 — 운영진이 아닌 사람에게 "차단한 팀이 없어요" 를
+            // 보여주면 권한 문제를 데이터 없음으로 오해하고, 실제 차단이 있는데도 없는 줄 안다.
+            blocksErrorCode === 'PERMISSION_DENIED' ? (
+              <EmptyState title="차단 목록을 볼 권한이 없어요" sub="팀장과 운영진만 볼 수 있어요." />
+            ) : (
+              <EmptyState
+                title="차단 목록을 불러오지 못했어요"
+                sub="잠시 후 다시 시도해 주세요."
+                cta="다시 시도"
+                onCta={() => void blocksQuery.refetch()}
+              />
+            )
           ) : blocks.length === 0 ? (
-            <div style={{ marginTop: 12, display: 'grid', gap: 2 }}>
-              <div className="tm-text-label">차단한 팀이 없어요</div>
-              <div className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
-                컨택을 받은 뒤 상대 팀을 차단하면 여기에 모여요.
-              </div>
-            </div>
+            <EmptyState title="차단한 팀이 없어요" sub="컨택을 받은 뒤 상대 팀을 차단하면 여기에 모여요." />
           ) : (
             <ul style={{ listStyle: 'none', margin: '12px 0 0', padding: 0, display: 'grid', gap: 8 }}>
               {blocks.map((block) => {

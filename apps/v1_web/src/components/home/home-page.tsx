@@ -17,8 +17,9 @@ import {
 import { Card, ErrorState, KPIStat, ListItem, NumberDisplay, SectionTitle, WeatherStrip } from '@/components/v1-ui/primitives';
 import { cssUrl } from '@/lib/assets';
 import { formatTournamentDateRangeShort } from '@/lib/date-utils';
-import { useV1AllTournaments } from '@/hooks/use-v1-api';
+import { useV1AllTournaments, useV1LeagueMatches } from '@/hooks/use-v1-api';
 import type { V1TournamentListItem } from '@/types/api';
+import type { V1PublicLeagueListItem } from '@/types/league-match';
 import { TournamentHeroCard } from './tournament-hero-card';
 import type { HomeChatRoom, HomeMatchCard, HomeQuickAction, HomeViewModel } from './home.types';
 
@@ -26,6 +27,16 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
   const dash = model.signedOut || model.network;
   const tournaments = useV1AllTournaments({ status: 'open' });
   const tournamentItems = tournaments.data ?? [];
+  // 그룹 C 리그 발견성 감사(Task 153 Wave 3): 홈에는 관리자가 홍보를 켠 대회만 노출되고
+  // 리그는 동급 프로모션이 전혀 없었다. 대회의 "오늘의 추천"은 V1Tournament의
+  // promoHomeEnabled/promoHomeTitle 등 관리자 토글 필드(V1Tournament 모델)를 그대로
+  // 따르는데, V1League 모델에는 그런 홍보 필드가 없다(schema.prisma 확인) — 새로 추가하려면
+  // 백엔드 스키마 + 마이그레이션 + 어드민 편집 UI까지 필요해 이 프론트엔드 전용 감사
+  // 수정의 범위를 벗어난다. 그래서 관리자 토글 대신 "진행 중(active)" 상태를 자동 홍보
+  // 신호로 쓴다 — 어차피 진행 중 리그는 시즌 중 발견될수록 가치가 있고, 사이드바 위젯
+  // 하나만 추가해 대회 히어로 카드처럼 메인 컬럼 밀도(오늘의 추천)는 건드리지 않는다.
+  const leagues = useV1LeagueMatches({ state: 'active', limit: 4 });
+  const leagueItems = leagues.data?.items ?? [];
   // TournamentHeroCard owns the promoHomeEnabled filter + sort — this only needs
   // to know whether *any* eligible item exists, to decide the section's visibility.
   const hasHomePromo = tournamentItems.some((item) => item.status === 'open' && item.promoHomeEnabled);
@@ -223,6 +234,10 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
 
           {/* Upcoming tournaments — fills remaining sidebar height, avoids ~830px gap */}
           <SidebarTournamentsWidget items={tournamentItems} loading={tournaments.isLoading} />
+
+          {/* 진행 중인 리그 — 대회 위젯과 같은 카드 관례. 위 주석 참조: promoHomeEnabled 같은
+              관리자 토글이 리그엔 없어 자동으로 active 리그를 보여준다. */}
+          <SidebarLeaguesWidget items={leagueItems} loading={leagues.isLoading} />
 
         </div>{/* /tm-home-sidebar */}
 
@@ -660,6 +675,111 @@ function SidebarTournamentsWidget({ items, loading }: { items: V1TournamentListI
                     <span style={{ fontVariantNumeric: 'tabular-nums', display: 'inline-flex', alignItems: 'baseline', gap: 1 }}>
                       <span style={{ fontWeight: 600 }}>{t.confirmedCount}/{t.teamCount}</span>
                       <span style={{ fontSize: 12 }}>팀</span>
+                    </span>
+                  </div>
+                </div>
+                <ChevronRightIcon size={14} strokeWidth={2} style={{ flexShrink: 0, color: 'var(--text-muted)' }} aria-hidden="true" />
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// 대회 위젯(SidebarTournamentsWidget)과 같은 카드 관례 — 컴포넌트 파일 상단 주석 참조:
+// V1League엔 promoHomeEnabled 같은 관리자 토글이 없어 "진행 중(active)" 상태를 그대로
+// 홍보 신호로 쓴다. 아이콘도 같은 TrophyIcon을 재사용한다 — CompetitionTypeSegment가
+// 이미 대회/리그를 같은 "대회 유형" 축으로 묶고 있어(competition-type-segment.tsx)
+// 리그 전용 아이콘을 새로 만드는 대신 그 관례를 그대로 따른다.
+function SidebarLeaguesWidget({ items, loading }: { items: V1PublicLeagueListItem[]; loading: boolean }) {
+  const visibleItems = items.slice(0, 4);
+
+  return (
+    <div className="tm-home-sidebar-notices">
+      <div className="tm-notice-head">
+        <div className="tm-text-body-lg">진행 중인 리그</div>
+        <Link
+          className="tm-btn tm-btn-sm tm-btn-ghost"
+          href="/league-matches"
+          style={{ alignSelf: 'flex-end', padding: '0 4px' }}
+        >
+          전체보기
+        </Link>
+      </div>
+
+      {loading ? (
+        /* [P2 UX 라이팅] 능동형 로딩 안내 */
+        <div
+          className="tm-text-caption"
+          style={{ color: 'var(--text-muted)', paddingTop: 8 }}
+          aria-busy="true"
+          role="status"
+        >
+          리그 목록을 가져오고 있어요…
+        </div>
+      ) : visibleItems.length === 0 ? (
+        <div
+          className="tm-text-caption"
+          style={{ color: 'var(--text-muted)', paddingTop: 8 }}
+        >
+          현재 진행 중인 리그가 없어요.
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gap: 8 }}>
+          {visibleItems.map((l) => {
+            const dateLabel = formatTournamentDateRangeShort(l.startsOn, l.endsOn);
+            return (
+              <Link
+                key={l.leagueId}
+                href={`/league-matches/${l.leagueId}`}
+                className="tm-pressable"
+                aria-label={`리그 상세 보기 — ${l.title}`}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '10px 12px',
+                  borderRadius: 10,
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  minHeight: 44,
+                }}
+              >
+                <span
+                  className="tm-tournament-widget-icon"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    width: 32,
+                    height: 32,
+                    borderRadius: 8,
+                    color: 'var(--text-strong)',
+                  }}
+                  aria-hidden="true"
+                >
+                  <TrophyIcon size={16} strokeWidth={2} />
+                </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    className="tm-text-label line-clamp-1"
+                    style={{ color: 'var(--text-strong)' }}
+                  >
+                    {l.title}
+                  </div>
+                  <div
+                    className="tm-text-micro"
+                    style={{ color: 'var(--text-muted)', marginTop: 2, display: 'flex', alignItems: 'baseline', gap: 2, flexWrap: 'wrap' }}
+                  >
+                    {l.sport.name}
+                    {dateLabel ? ` · ${dateLabel}` : ''}
+                    {' · '}
+                    <span style={{ fontVariantNumeric: 'tabular-nums', display: 'inline-flex', alignItems: 'baseline', gap: 1 }}>
+                      <span style={{ fontWeight: 600 }}>{l.teamCount}</span>
+                      <span style={{ fontSize: 12 }}>팀 참가</span>
                     </span>
                   </div>
                 </div>

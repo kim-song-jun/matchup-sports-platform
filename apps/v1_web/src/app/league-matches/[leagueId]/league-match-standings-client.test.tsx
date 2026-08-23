@@ -743,4 +743,171 @@ describe('LeagueMatchStandingsClient', () => {
     await waitFor(() => expect(container.querySelector('a[href="/team-matches/tm-awaiting"]')).not.toBeInTheDocument());
     expect(container.querySelector('a[href="/team-matches/tm-upcoming"]')).toBeInTheDocument();
   });
+
+  it('이슈 1: 같은 시리즈의 다른 시즌·티어로 가는 링크를 보여준다', async () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1LeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', title: '가을 리그 1부', state: 'active',
+        startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z',
+        teamIds: ['t1'], fixtures: [], seriesId: 'series-1', tier: 1, tierLabel: '1부', seasonNo: 2,
+        seriesSiblings: [
+          { leagueId: 'league-2', tier: 2, tierLabel: '2부', seasonNo: 2, state: 'active' },
+          { leagueId: 'league-3', tier: 1, tierLabel: '1부', seasonNo: 1, state: 'completed' },
+        ],
+      },
+    } as never);
+    useV1LeagueMatchStandingsMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', tieBreakOrder: ['points'],
+        standings: [{ teamId: 't1', teamName: '성수 FC', teamLogoUrl: null, position: 1, played: 1, wins: 1, draws: 0, losses: 0, goalsFor: 2, goalsAgainst: 0, points: 3 }],
+        pendingFixtures: [],
+      },
+    } as never);
+    useV1LeagueMatchPlayerRecordsMock.mockReturnValue({ data: { leagueId: 'league-1', goals: [], assists: [] } } as never);
+
+    const { container } = render(
+      <Providers>
+        <LeagueMatchStandingsClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    await waitFor(() => expect(screen.getByRole('navigation', { name: '같은 시리즈의 다른 리그' })).toBeInTheDocument());
+    const siblingLink = container.querySelector('a[href="/league-matches/league-2"]');
+    expect(siblingLink?.textContent).toContain('2시즌');
+    expect(siblingLink?.textContent).toContain('2부');
+    expect(container.querySelector('a[href="/league-matches/league-3"]')).toBeInTheDocument();
+    // 지금 보고 있는 리그 자기 자신으로 가는 링크는 없다.
+    expect(container.querySelector('a[href="/league-matches/league-1"]')).not.toBeInTheDocument();
+  });
+
+  it('이슈 1: 단발 리그(seriesSiblings 빈 배열)는 탐색 링크를 그리지 않는다', async () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1LeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', title: '단발 리그', state: 'active',
+        startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z',
+        teamIds: ['t1'], fixtures: [], seriesId: null, seriesSiblings: [],
+      },
+    } as never);
+    useV1LeagueMatchStandingsMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', tieBreakOrder: ['points'],
+        standings: [{ teamId: 't1', teamName: '성수 FC', teamLogoUrl: null, position: 1, played: 1, wins: 1, draws: 0, losses: 0, goalsFor: 2, goalsAgainst: 0, points: 3 }],
+        pendingFixtures: [],
+      },
+    } as never);
+    useV1LeagueMatchPlayerRecordsMock.mockReturnValue({ data: { leagueId: 'league-1', goals: [], assists: [] } } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchStandingsClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    await screen.findByText('성수 FC');
+    expect(screen.queryByRole('navigation', { name: '같은 시리즈의 다른 리그' })).not.toBeInTheDocument();
+  });
+
+  it('이슈 2: 몰수 스코어 옆에는 "관례 스코어" 안내가 붙고 실제 결과에는 붙지 않는다', async () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1LeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', title: '가을 리그', state: 'active',
+        startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z',
+        teamIds: ['t1', 't2'],
+        fixtures: [
+          {
+            teamMatchId: 'tm-1', title: '1주차', homeTeamId: 't1', awayTeamId: 't2',
+            startAt: '2026-09-01T20:00:00.000Z', placeName: '성수 풋살장',
+            status: 'completed', homeScore: 1, awayScore: 0, isForfeit: true,
+          },
+          {
+            teamMatchId: 'tm-2', title: '2주차', homeTeamId: 't2', awayTeamId: 't1',
+            startAt: '2026-09-08T20:00:00.000Z', placeName: '성수 풋살장',
+            status: 'completed', homeScore: 1, awayScore: 0, isForfeit: false,
+          },
+        ],
+      },
+    } as never);
+    useV1LeagueMatchStandingsMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', tieBreakOrder: ['points'],
+        standings: [{ teamId: 't1', teamName: '성수 FC', teamLogoUrl: null, position: 1, played: 2, wins: 1, draws: 0, losses: 1, goalsFor: 1, goalsAgainst: 1, points: 3 }],
+        pendingFixtures: [],
+      },
+    } as never);
+    useV1LeagueMatchPlayerRecordsMock.mockReturnValue({ data: { leagueId: 'league-1', goals: [], assists: [] } } as never);
+
+    const { container } = render(
+      <Providers>
+        <LeagueMatchStandingsClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    await waitFor(() => expect(screen.getAllByText('1 : 0')).toHaveLength(2));
+    expect(screen.getByText('(관례 스코어)')).toBeInTheDocument();
+
+    const forfeitRow = container.querySelector('a[href="/team-matches/tm-1"]');
+    const realRow = container.querySelector('a[href="/team-matches/tm-2"]');
+    expect(forfeitRow?.textContent).toContain('관례 스코어');
+    expect(realRow?.textContent).not.toContain('관례 스코어');
+  });
+
+  it('이슈 3: 취소된 대진이 있으면 순위표에 제외 안내가 붙고, 없으면 붙지 않는다', async () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1LeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', title: '가을 리그', state: 'completed',
+        startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z',
+        teamIds: ['t1'], fixtures: [],
+      },
+    } as never);
+    useV1LeagueMatchStandingsMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', tieBreakOrder: ['points'],
+        standings: [{ teamId: 't1', teamName: '성수 FC', teamLogoUrl: null, position: 1, played: 3, wins: 3, draws: 0, losses: 0, goalsFor: 6, goalsAgainst: 0, points: 9 }],
+        pendingFixtures: [],
+        cancelledFixtureCount: 1,
+      },
+    } as never);
+    useV1LeagueMatchPlayerRecordsMock.mockReturnValue({ data: { leagueId: 'league-1', goals: [], assists: [] } } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchStandingsClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    expect(await screen.findByText(/취소된 1경기는 집계에서 제외됐어요/)).toBeInTheDocument();
+  });
+
+  it('이슈 3: 취소된 대진이 0건이면 제외 안내가 뜨지 않는다', async () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1LeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', title: '가을 리그', state: 'completed',
+        startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z',
+        teamIds: ['t1'], fixtures: [],
+      },
+    } as never);
+    useV1LeagueMatchStandingsMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', tieBreakOrder: ['points'],
+        standings: [{ teamId: 't1', teamName: '성수 FC', teamLogoUrl: null, position: 1, played: 3, wins: 3, draws: 0, losses: 0, goalsFor: 6, goalsAgainst: 0, points: 9 }],
+        pendingFixtures: [],
+        cancelledFixtureCount: 0,
+      },
+    } as never);
+    useV1LeagueMatchPlayerRecordsMock.mockReturnValue({ data: { leagueId: 'league-1', goals: [], assists: [] } } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchStandingsClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    await screen.findByText('성수 FC');
+    expect(screen.queryByText(/집계에서 제외됐어요/)).not.toBeInTheDocument();
+  });
 });

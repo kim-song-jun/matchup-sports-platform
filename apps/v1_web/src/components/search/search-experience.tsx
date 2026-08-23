@@ -4,9 +4,11 @@ import { Search, X, ChevronLeft, Clock, AlertCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { useV1Matches, useV1RecentSearches, useV1RecordSearch, useV1TeamMatches, useV1Teams } from '@/hooks/use-v1-api';
+import { useV1LeagueMatches, useV1Matches, useV1RecentSearches, useV1RecordSearch, useV1TeamMatches, useV1Teams } from '@/hooks/use-v1-api';
 import type { V1Match, V1Team, V1TeamMatch } from '@/types/api';
+import type { V1PublicLeagueListItem } from '@/types/league-match';
 import { AppChrome } from '@/components/v1-ui/shell';
+import { formatTournamentDateRangeShort } from '@/lib/date-utils';
 import { trackEvent } from '@/lib/analytics';
 
 type SearchState = 'results' | 'new' | 'empty' | 'error' | 'stale';
@@ -41,16 +43,33 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
   const matchesQuery = useV1Matches(filters, { enabled: shouldSearch });
   const teamMatchesQuery = useV1TeamMatches(filters, { enabled: shouldSearch });
   const teamsQuery = useV1Teams(filters, { enabled: shouldSearch });
+  // 리그: GET /league-matches 는 매치/팀매치/팀과 달리 서버 쪽 텍스트 query 필터가 없다
+  // (ListLeagueMatchesQueryDto — sportId/teamId/regionId/state/cursor/limit 뿐, query 없음).
+  // 이 감사 수정은 프론트엔드 표면(홈·검색·sitemap)만 배정돼 있어 백엔드 DTO 확장은
+  // 범위 밖이다 — 대신 최근 순으로 상위 limit개를 받아 클라이언트에서 제목/시리즈명을
+  // substring 매칭한다. 리그 수가 늘어나면 서버 쪽 query 필터가 필요해지므로, 그때는
+  // 이 client-side 필터를 걷어내고 서버 필터로 옮겨야 한다(임시 조치임을 명시).
+  const leagueMatchesQuery = useV1LeagueMatches({ limit: 30 }, { enabled: shouldSearch });
+  const normalizedQuery = submittedQuery.trim().toLowerCase();
+  const leagueResults = useMemo(() => {
+    if (!shouldSearch || !normalizedQuery) return [];
+    return (leagueMatchesQuery.data?.items ?? []).filter(
+      (item) =>
+        item.title.toLowerCase().includes(normalizedQuery) ||
+        (item.seriesTitle?.toLowerCase().includes(normalizedQuery) ?? false),
+    );
+  }, [leagueMatchesQuery.data?.items, normalizedQuery, shouldSearch]);
   const apiResults = useMemo(() => {
     if (!shouldSearch) return [];
     return [
       ...(matchesQuery.data?.items ?? []).map(toMatchResult),
       ...(teamMatchesQuery.data?.items ?? []).map(toTeamMatchResult),
       ...(teamsQuery.data?.items ?? []).map(toTeamResult),
+      ...leagueResults.map(toLeagueResult),
     ];
-  }, [matchesQuery.data?.items, shouldSearch, teamMatchesQuery.data?.items, teamsQuery.data?.items]);
-  const loading = shouldSearch && (matchesQuery.isLoading || teamMatchesQuery.isLoading || teamsQuery.isLoading);
-  const errored = shouldSearch && (matchesQuery.isError || teamMatchesQuery.isError || teamsQuery.isError);
+  }, [leagueResults, matchesQuery.data?.items, shouldSearch, teamMatchesQuery.data?.items, teamsQuery.data?.items]);
+  const loading = shouldSearch && (matchesQuery.isLoading || teamMatchesQuery.isLoading || teamsQuery.isLoading || leagueMatchesQuery.isLoading);
+  const errored = shouldSearch && (matchesQuery.isError || teamMatchesQuery.isError || teamsQuery.isError || leagueMatchesQuery.isError);
 
   const viewState = useMemo<SearchState>(() => {
     if (state !== 'results') {
@@ -69,12 +88,13 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
     setSubmittedQuery(next);
   }, [state]);
 
-  // 통합 검색(매치/팀매치/팀)이 실제로 완료된 시점에만 1회 기록한다 — 같은 검색어로
+  // 통합 검색(매치/팀매치/팀/리그)이 실제로 완료된 시점에만 1회 기록한다 — 같은 검색어로
   // 로딩 상태가 재렌더링되는 동안 중복 발화되지 않도록 마지막으로 기록한 검색어를 ref로 추적.
   const trackedSearchRef = useRef<string | null>(null);
   const matchResultCount = matchesQuery.data?.items?.length ?? 0;
   const teamMatchResultCount = teamMatchesQuery.data?.items?.length ?? 0;
   const teamResultCount = teamsQuery.data?.items?.length ?? 0;
+  const leagueResultCount = leagueResults.length;
   useEffect(() => {
     if (!shouldSearch || loading || errored) return;
     const trimmedQuery = submittedQuery.trim();
@@ -84,22 +104,25 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
     // 정보를 검색어로 입력할 수 있으므로(제약 없는 open text), 원문 대신 길이만 전송한다.
     //
     // domain: 설계 문서(docs/superpowers/specs/2026-07-18-logging-ga-analytics-design.md)의
-    // domain enum(match|team|tournament)은 이 통합검색 구현과 어긋난다 — 이 화면은
-    // tournament를 조회하지 않고 대신 match/teamMatch/team 3개 도메인을 항상 동시에
-    // 조회한다. 리터럴 'all'은 어떤 도메인이 실제로 결과를 낳았는지 알 수 없어
+    // domain enum(match|team_match|team, tournament는 제외 명시)은 이제 이 통합검색 구현과
+    // 다시 어긋난다 — 그룹 C 리그 발견성 감사(Task 153 Wave 3)로 league 도메인이 추가됐다.
+    // 이 화면은 tournament는 여전히 조회하지 않고 match/teamMatch/team/league 4개 도메인을
+    // 항상 동시에 조회한다. 리터럴 'all'은 어떤 도메인이 실제로 결과를 낳았는지 알 수 없어
     // 세그먼트 분석이 불가능하므로, 실제로 결과가 있었던 도메인만 콤마로 join해
     // 기록한다(전부 0건이면 빈 문자열 — "빈 검색" 세그먼트로 식별 가능).
+    // 문서(2026-07-18-logging-ga-analytics-design.md)도 이 커밋에서 domain enum에 league를 반영했다.
     const respondingDomains = [
       matchResultCount > 0 ? 'match' : null,
       teamMatchResultCount > 0 ? 'team_match' : null,
       teamResultCount > 0 ? 'team' : null,
+      leagueResultCount > 0 ? 'league' : null,
     ].filter((domain): domain is string => domain !== null);
     trackEvent('search', {
       queryLength: trimmedQuery.length,
       resultCount: apiResults.length,
       domain: respondingDomains.join(','),
     });
-  }, [apiResults.length, errored, loading, matchResultCount, shouldSearch, submittedQuery, teamMatchResultCount, teamResultCount]);
+  }, [apiResults.length, errored, leagueResultCount, loading, matchResultCount, shouldSearch, submittedQuery, teamMatchResultCount, teamResultCount]);
 
   function goBack() {
     if (window.history.length > 1) {
@@ -222,7 +245,7 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
               <div className="tm-text-label">검색 결과</div>
               {submittedQuery ? (
                 <div className="tm-text-caption" style={{ marginTop: 2 }}>
-                  {submittedQuery} · 매치/팀매치/팀 통합 조회
+                  {submittedQuery} · 매치/팀매치/팀/리그 통합 조회
                 </div>
               ) : null}
             </div>
@@ -295,6 +318,18 @@ function toTeamMatchResult(item: V1TeamMatch) {
     title: item.title,
     meta: [item.sport?.name ?? item.sportName, item.hostTeam?.name ?? item.hostTeamName, item.place?.name ?? item.placeName, formatDateTime(item.startsAt)].filter(Boolean).join(' · '),
     href: `/team-matches/${item.teamMatchId ?? item.id}`,
+  };
+}
+
+function toLeagueResult(item: V1PublicLeagueListItem) {
+  const dateLabel = formatTournamentDateRangeShort(item.startsOn, item.endsOn);
+  return {
+    type: '리그',
+    title: item.title,
+    meta: [item.sport.name, item.region.name, item.tierLabel, dateLabel ?? '일정 미정', `${item.teamCount}팀 참가`]
+      .filter(Boolean)
+      .join(' · '),
+    href: `/league-matches/${item.leagueId}`,
   };
 }
 

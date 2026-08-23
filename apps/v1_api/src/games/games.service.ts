@@ -4437,8 +4437,45 @@ export class GamesService {
         // never reach this action — only platform_ops may act, exactly like
         // the admin branch below but without falling through to the staff
         // assignment loop.
+        //
+        // Task 154 P0-5 (2026-08-24, 사용자 결정 A안): 위 규칙 때문에 **대회 경기에서는
+        // 선수 본인도 자기 신원 연결을 신청할 수 없었다**(403). 그런데 TEAM_MATCH 쪽은
+        // 같은 action 에 대해 "두 팀 중 한쪽의 활성 멤버면 자기 것을 신청/철회하거나
+        // 별개 확인자로 행동할 수 있다"를 이미 허용하고 있다. 대회라고 다를 이유가 없다 --
+        // 라인업이 마감된 뒤 연결이 누락된 선수에게 남는 경로가 platform_ops 문의뿐이면
+        // 사실상 복구 수단이 없다.
+        //
+        // 그래서 **두 등록팀의 활성 멤버**에게 같은 권한을 준다. 안전장치는 새로 만들지
+        // 않는다 -- Task 14 가 세운 "신청자 ≠ 확인자" 규칙이 서비스와 DB 트리거 양쪽에
+        // 그대로 살아 있어(attestation requires a distinct pending requestor) 혼자서는
+        // 연결을 완성할 수 없다. 여기서 여는 것은 *신청할 자격*이지 *확정할 권한*이 아니다.
+        // platform_ops 는 아래 경로로 계속 통과한다(운영 개입 경로 유지).
         if (eligibleAdmin === null) {
-          throw this.forbidden();
+          const registrationTeamIds = [
+            fixture.homeRegistration?.teamId,
+            fixture.awayRegistration?.teamId,
+          ].filter((teamId): teamId is string => typeof teamId === 'string');
+          const membership =
+            registrationTeamIds.length === 0
+              ? null
+              : await tx.v1TeamMembership.findFirst({
+                  where: { userId, teamId: { in: registrationTeamIds }, status: 'active' },
+                  select: { teamId: true },
+                });
+          if (membership === null) {
+            throw this.forbidden();
+          }
+          return {
+            actorType: 'USER',
+            actorUserId: userId,
+            // 스태프 등급이 아니라 "참가팀 소속" 자격이다. 이 액션에서 role 은 감사
+            // 기록용이고 추가 권한을 열지 않는다(위 tournamentAuthorizationAction 이
+            // participant_identity 를 null 로 막아 스태프 경로로 새지 않는다).
+            role: 'support_readonly',
+            tournamentId: fixture.tournamentId,
+            fixtureId: fixture.id,
+            teamId: membership.teamId,
+          };
         }
         const authorizationSubject = `platform_ops:${userId}@${eligibleAdmin.updatedAt.getTime()}`;
         if (

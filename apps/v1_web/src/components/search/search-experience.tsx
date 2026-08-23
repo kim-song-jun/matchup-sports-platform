@@ -245,7 +245,7 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
               <div className="tm-text-label">검색 결과</div>
               {submittedQuery ? (
                 <div className="tm-text-caption" style={{ marginTop: 2 }}>
-                  {submittedQuery} · 매치/팀매치/팀/리그 통합 조회
+                  {submittedQuery} · 매치/팀매치/팀/정규 리그 통합 조회
                 </div>
               ) : null}
             </div>
@@ -324,7 +324,7 @@ function toTeamMatchResult(item: V1TeamMatch) {
 function toLeagueResult(item: V1PublicLeagueListItem) {
   const dateLabel = formatTournamentDateRangeShort(item.startsOn, item.endsOn);
   return {
-    type: '리그',
+    type: '정규 리그',
     title: item.title,
     meta: [item.sport.name, item.region.name, item.tierLabel, dateLabel ?? '일정 미정', `${item.teamCount}팀 참가`]
       .filter(Boolean)

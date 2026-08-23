@@ -73,8 +73,14 @@ export default function LeagueMatchesListClient() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
-      <h1 className="text-xl font-bold text-[var(--text-strong)]">리그전 찾기</h1>
+      <h1 className="text-xl font-bold text-[var(--text-strong)]">정규 리그 찾기</h1>
       <p className="mt-1 text-sm text-[var(--text-muted)]">종목과 상태로 좁혀 관심 있는 리그를 찾아보세요.</p>
+      {/* 감사 H-11 — 대회(format='league')와 이름이 같아 보이는 이 리그는 참가 신청 버튼이
+          없다. 팀장이 "신청은 어디서?"를 찾다 이탈하지 않도록, 목록에 들어오자마자 참가
+          방식이 다르다는 걸 먼저 알려준다(해요체, 컬러 없이 텍스트만으로 충분한 정보). */}
+      <p className="mt-1 text-xs text-[var(--text-muted)]">
+        정규 리그는 참가 팀을 운영자가 직접 정해요. 여기서는 대진과 순위만 확인할 수 있어요.
+      </p>
 
       <div role="group" aria-label="종목 필터" className="tm-sport-chip-row mt-4">
         <button

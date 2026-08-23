@@ -382,6 +382,17 @@ export interface V1LeaguePendingFixture {
   startAt: string;
 }
 
+/**
+ * 그룹 B(시즌 결산·시상) — 종료된 리그의 우승팀 한 항목. 배열 길이가 1보다 크면
+ * 공동 우승(동점 우승)이다 -- 승점·득실차·다득점·(적용됐다면)맞대결까지 전부 같아
+ * 이 리그의 tieBreakOrder 로는 갈리지 않았다는 뜻(감사 H-5의 tieBreakGroups 재사용).
+ */
+export interface V1LeagueChampionTeam {
+  teamId: string;
+  teamName: string;
+  teamLogoUrl: string | null;
+}
+
 export interface V1LeagueStandingsResponse {
   leagueId: string;
   tier: number | null;
@@ -389,6 +400,16 @@ export interface V1LeagueStandingsResponse {
   tieBreakOrder: string[];
   standings: V1LeagueStandingRow[];
   pendingFixtures: V1LeaguePendingFixture[];
+  /**
+   * 그룹 B(시즌 결산·시상 화면 감사) — 종료된 리그의 우승팀. `state !== 'completed'`
+   * 인 리그(draft/active)는 "우승"이라는 개념 자체가 성립하지 않아 항상 빈 배열이다.
+   * 서버가 항상 키를 내려주므로 optional 이 아니다 -- 화면은 `champions.length === 0`
+   * 을 "아직 우승팀 없음"으로 그대로 읽으면 된다(진행 중인지 준비 중인지는 이 응답만으로
+   * 구분할 필요가 없다 -- 우승 배지를 안 그리면 그만이다).
+   * 새 계산이 아니라 이미 계산해 둔 tieBreakGroups(H-5)에서 1위 팀이 속한 그룹을 그대로
+   * 찾아 쓴다 -- 별도의 "공동 우승 판정" 로직을 새로 만들지 않는다.
+   */
+  champions: V1LeagueChampionTeam[];
   /**
    * 이슈 3 — 취소돼 집계에서 빠진 대진 수. 0이면 화면은 안내를 그리지 않는다.
    * 서버가 항상 내려주므로 optional 이 아니다.

@@ -218,7 +218,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
               }}
               aria-label={`${league.title} 리그 상세로 이동`}
             >
-              리그전 · {league.title}
+              정규 리그 · {league.title}
               <ChevronRightIcon size={12} strokeWidth={2.5} aria-hidden="true" />
             </button>
           ) : null}
@@ -738,7 +738,7 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
               }}
               aria-label={`${league.title} 리그 상세로 이동`}
             >
-              리그전
+              정규 리그
               <ChevronRightIcon size={12} strokeWidth={2.5} aria-hidden="true" />
             </button>
           ) : null}

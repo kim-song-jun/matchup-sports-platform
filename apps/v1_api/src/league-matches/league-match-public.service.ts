@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { isParticipantPubliclyEligible, loadParticipantConsentEligibility } from '../games/public-records/public-consent';
 import { LEAGUE_STATE_PRIORITY_ORDER, paginateByStatePriority, sortMyLeaguesByState } from './league-lifecycle-rules';
-import { calculateLeagueStandingsWithTieBreakInfo, LeagueTieBreakCriterion } from './league-standings';
+import { calculateLeagueStandingsWithTieBreakInfo, LeagueTieBreakCriterion, resolveLeagueChampions } from './league-standings';
 import {
   classifyPromotionKind,
   resolvePromotionRule,
@@ -461,6 +461,12 @@ export class LeagueMatchPublicService {
       };
     });
 
+    // 그룹 B(시즌 결산·시상 화면 감사) — 우승팀(공동 우승 가능, resolveLeagueChampions
+    // 참고 — league-standings.ts, 이미 계산된 tieGroups 를 재사용하는 순수 함수라 jest로
+    // 별도 검증). state가 completed가 아니면(진행 중·준비 중) "우승"이 아직 성립하지
+    // 않으므로 항상 빈 배열이다(사용자 확정 2026-08-23 — 종료된 리그에만 의미가 있음).
+    const champions = league.state !== 'completed' ? [] : resolveLeagueChampions(standingsWithTeamName, tieGroups);
+
     return {
       leagueId: league.id,
       tier: league.tier,
@@ -468,6 +474,8 @@ export class LeagueMatchPublicService {
       tieBreakOrder,
       standings: standingsWithTeamName,
       pendingFixtures,
+      // 그룹 B — 종료된 리그의 우승팀(공동 우승 가능). 위 champions 계산 참고.
+      champions,
       // 이슈 3 — 팀마다 치른 경기 수가 다른 이유(취소된 대진은 집계에서 빠진다)를
       // 순위표 화면이 스스로 설명할 수 있게 한다. 취소가 0건이면 0 그대로 내려주고,
       // 화면은 0이면 안내 자체를 그리지 않는다.

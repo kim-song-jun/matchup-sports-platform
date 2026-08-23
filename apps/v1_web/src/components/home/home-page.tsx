@@ -235,7 +235,9 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
           {/* Upcoming tournaments — fills remaining sidebar height, avoids ~830px gap */}
           <SidebarTournamentsWidget items={tournamentItems} loading={tournaments.isLoading} />
 
-          {/* 진행 중인 리그 — 대회 위젯과 같은 카드 관례. 위 주석 참조: promoHomeEnabled 같은
+          {/* 진행 중인 정규 리그 — 대회 위젯 바로 아래에 붙는다. 두 위젯이 인접해 보이는 이
+              자리가 감사 C-3("리그"가 두 제품을 가리킴)의 핵심 지점이라, 여기서는 반드시
+              "정규 리그"로 불러 대회(리그 방식 대회)와 구분한다. 위 주석 참조: promoHomeEnabled 같은
               관리자 토글이 리그엔 없어 자동으로 active 리그를 보여준다. */}
           <SidebarLeaguesWidget items={leagueItems} loading={leagues.isLoading} />
 
@@ -699,7 +701,7 @@ function SidebarLeaguesWidget({ items, loading }: { items: V1PublicLeagueListIte
   return (
     <div className="tm-home-sidebar-notices">
       <div className="tm-notice-head">
-        <div className="tm-text-body-lg">진행 중인 리그</div>
+        <div className="tm-text-body-lg">진행 중인 정규 리그</div>
         <Link
           className="tm-btn tm-btn-sm tm-btn-ghost"
           href="/league-matches"
@@ -717,14 +719,14 @@ function SidebarLeaguesWidget({ items, loading }: { items: V1PublicLeagueListIte
           aria-busy="true"
           role="status"
         >
-          리그 목록을 가져오고 있어요…
+          정규 리그 목록을 가져오고 있어요…
         </div>
       ) : visibleItems.length === 0 ? (
         <div
           className="tm-text-caption"
           style={{ color: 'var(--text-muted)', paddingTop: 8 }}
         >
-          현재 진행 중인 리그가 없어요.
+          현재 진행 중인 정규 리그가 없어요.
         </div>
       ) : (
         <div style={{ display: 'grid', gap: 8 }}>
@@ -735,7 +737,7 @@ function SidebarLeaguesWidget({ items, loading }: { items: V1PublicLeagueListIte
                 key={l.leagueId}
                 href={`/league-matches/${l.leagueId}`}
                 className="tm-pressable"
-                aria-label={`리그 상세 보기 — ${l.title}`}
+                aria-label={`정규 리그 상세 보기 — ${l.title}`}
                 style={{
                   display: 'flex',
                   alignItems: 'center',

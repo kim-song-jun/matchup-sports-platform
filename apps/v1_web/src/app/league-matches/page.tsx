@@ -5,8 +5,8 @@ import { buildPublicMetadata } from '@/lib/seo';
 import LeagueMatchesListClient from './league-matches-list-client';
 
 export const metadata = buildPublicMetadata({
-  title: '리그전 찾기',
-  description: '진행 중이거나 곧 시작하는 리그전을 종목·지역별로 찾아보세요.',
+  title: '정규 리그 찾기',
+  description: '진행 중이거나 곧 시작하는 정규 리그를 종목·지역별로 찾아보세요.',
   path: '/league-matches',
 });
 
@@ -25,7 +25,7 @@ export const metadata = buildPublicMetadata({
 // CompetitionTypeSegment로 대회 목록과 서로 오간다.
 export default function LeagueMatchesPage() {
   return (
-    <AppChrome title="리그" activeTab="tournaments" showNotifications>
+    <AppChrome title="정규 리그" activeTab="tournaments" showNotifications>
       <CompetitionTypeSegment active="league" />
       <Suspense fallback={null}>
         <LeagueMatchesListClient />

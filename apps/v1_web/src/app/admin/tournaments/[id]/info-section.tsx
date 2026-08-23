@@ -1106,7 +1106,7 @@ export function TournamentInfoSection() {
 // ── Tab: Tournament Info ──────────────────────────────────────────────────
 
 const TOURNAMENT_FORMAT_LABEL: Record<string, string> = {
-  league: '리그 (순위전)',
+  league: '리그 방식 (순위전)',
   knockout: '토너먼트 (녹아웃)',
   group_knockout: '조별리그 + 토너먼트',
 };

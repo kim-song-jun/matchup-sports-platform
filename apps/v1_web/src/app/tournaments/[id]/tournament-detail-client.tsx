@@ -1443,7 +1443,7 @@ function tournamentFormatLabel(format: V1TournamentFormat): string {
   switch (format) {
     case 'group_knockout': return '조별 리그 후 토너먼트';
     case 'knockout': return '토너먼트 (단판 승부)';
-    case 'league': return '리그전 (풀리그)';
+    case 'league': return '리그 방식 (풀리그)';
     default: return '대회';
   }
 }

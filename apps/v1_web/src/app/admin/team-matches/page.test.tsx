@@ -55,11 +55,11 @@ describe('AdminTeamMatchesPage 리그 표시', () => {
   it('리그전은 리그 배지와 리그명이 함께 보이고 리그 상세로 이어진다', () => {
     renderWith([{ ...BASE, league: { leagueId: 'lg-7', title: '가을 리그' } }]);
 
-    const links = screen.getAllByRole('link', { name: '리그 가을 리그 상세 보기' });
+    const links = screen.getAllByRole('link', { name: '정규 리그 가을 리그 상세 보기' });
     expect(links.length).toBeGreaterThan(0);
     for (const link of links) expect(link).toHaveAttribute('href', '/admin/league-matches/lg-7');
-    // 색만으로 구분하지 않는다 — '리그' 글자와 리그명이 함께 나온다.
-    expect(screen.getAllByText('리그').length).toBeGreaterThan(0);
+    // 색만으로 구분하지 않는다 — '정규 리그' 글자와 리그명이 함께 나온다.
+    expect(screen.getAllByText('정규 리그').length).toBeGreaterThan(0);
     expect(screen.getAllByText(/가을 리그/).length).toBeGreaterThan(0);
   });
 

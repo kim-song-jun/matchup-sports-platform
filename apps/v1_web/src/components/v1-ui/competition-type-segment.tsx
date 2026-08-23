@@ -36,7 +36,7 @@ export function CompetitionTypeSegment({ active }: CompetitionTypeSegmentProps) 
         data-active={active === 'league'}
         aria-current={active === 'league' ? 'page' : undefined}
       >
-        리그
+        정규 리그
       </Link>
     </nav>
   );

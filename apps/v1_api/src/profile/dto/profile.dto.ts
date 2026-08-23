@@ -25,6 +25,19 @@ export class UpdateProfileDto {
   email?: string | null;
 
   /**
+   * 한 줄 소개. 컬럼(`V1UserProfile.bio`)은 오래전부터 있었지만 저장 경로가 없어
+   * admin 조회로만 존재했다(프로덕션 실측 2026-08-24: 245개 프로필 중 비어 있지 않은
+   * 값 1건). Task 154 P1 에서 사용자가 직접 쓰고 공개 프로필에 보이게 한다.
+   *
+   * 300자 상한은 카드 한 장에 접힘 없이 들어가는 분량 기준이다 -- 더 길면 프로필의
+   * 다른 정보를 밀어낸다. null 로 보내면 지운다.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  bio?: string | null;
+
+  /**
    * 휴대폰 번호를 바꿀 때만 필요한 본인인증 증명. 가입과 같은 발급 경로
    * (POST /auth/phone/issue → verify)에서 받은 토큰을 그대로 전달한다.
    * 번호를 바꾸지 않는 저장에는 없어도 된다.

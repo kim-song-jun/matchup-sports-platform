@@ -1653,6 +1653,63 @@ export function useV1FixtureLineupAccess(tournamentId: string, fixtureId: string
   });
 }
 
+/**
+ * "이 기록은 제 것입니다" 화면용 미연결 참가자 목록 (Task 154 P0-5).
+ * `version` 은 신청 시 `expectedVersion` 으로 그대로 되돌려 보낸다 -- 공개 경기 응답엔
+ * 그 값이 없어 클라이언트가 알 길이 없었다.
+ */
+export type V1ClaimableParticipants = {
+  gameId: string;
+  version: number;
+  participants: {
+    participantId: string;
+    sideId: string;
+    displayName: string;
+    jerseyNumber: number | null;
+  }[];
+};
+
+export function useV1ClaimableParticipants(
+  tournamentId: string,
+  fixtureId: string,
+  options?: { enabled?: boolean },
+) {
+  return useQuery({
+    queryKey: ['v1', 'claimable-participants', tournamentId, fixtureId] as const,
+    queryFn: () =>
+      v1Get<V1ClaimableParticipants>(
+        `/tournaments/${tournamentId}/fixtures/${fixtureId}/claimable-participants`,
+      ),
+    enabled: Boolean(tournamentId) && Boolean(fixtureId) && (options?.enabled ?? true),
+    // 비참가자는 403 이 정상 응답이다 -- 재시도해도 달라지지 않는다.
+    retry: false,
+  });
+}
+
+export function useV1RequestIdentityLink(tournamentId: string, fixtureId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    // gameId 는 목록 응답이 이미 주므로 호출부가 넘긴다 -- 여기서 또 조회하면
+    // 목록과 다른 시점의 값을 쓰게 될 수 있다.
+    mutationFn: (body: { gameId: string; participantId: string; expectedVersion: number }) => {
+      // 서버가 헤더 Idempotency-Key 와 body.clientCommandId 의 **일치**를 요구한다
+      // (다르면 422 COMMAND_IDEMPOTENCY_KEY_MISMATCH). 한 번의 신청에 하나의 id 를
+      // 만들어 양쪽에 같은 값을 쓴다.
+      const clientCommandId = `claim-${body.participantId}-${Date.now()}`;
+      return v1Post(
+        `/games/${body.gameId}/participants/${body.participantId}/identity-link-requests`,
+        { expectedVersion: body.expectedVersion, clientCommandId },
+        { headers: { 'idempotency-key': clientCommandId } },
+      );
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ['v1', 'claimable-participants', tournamentId, fixtureId],
+      });
+    },
+  });
+}
+
 /** 라인업 편집기가 쓰는 참가 등록 명단 — 대회 경기 라인업 선수의 유일한 출처. */
 export type V1FixtureLineupRoster = {
   sideId: string;
@@ -2301,6 +2358,8 @@ export function useV1UpdateProfile() {
       phoneProofToken?: string | null;
       birthDate?: string | null;
       gender: 'male' | 'female';
+      /** 한 줄 소개 (Task 154 P1). undefined 로 보내면 기존 값을 건드리지 않는다. */
+      bio?: string | null;
     }) =>
       v1Patch<{ profile: V1Profile['profile']; updatedAt: string }>('/me/profile', body),
     // 응답에 이미 최신 profile이 있는데도 invalidate만 하면, 리페치가 끝나기 전에

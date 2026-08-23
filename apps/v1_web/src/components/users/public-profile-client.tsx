@@ -85,6 +85,34 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
           </div>
         </section>
 
+        {/* 한 줄 소개 · 소속팀 (Task 154 P1)
+            기록이 0건인 프로필이 통계 카드 하나만 남아 완전히 비어 보이던 문제를 메운다.
+            둘 다 **있을 때만** 렌더한다 -- 빈 카드를 남기면 채우려던 문제를 오히려 키운다. */}
+        {data.bio ? (
+          <Card pad={16}>
+            <div className="tm-text-body" style={{ whiteSpace: 'pre-wrap', wordBreak: 'keep-all' }}>
+              {data.bio}
+            </div>
+          </Card>
+        ) : null}
+        {data.teams && data.teams.length > 0 ? (
+          <Card pad={16}>
+            <div className="tm-text-label" style={{ marginBottom: 10 }}>소속팀</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {data.teams.map((team) => (
+                <Link
+                  key={team.id}
+                  href={`/teams/${team.id}`}
+                  className="tm-btn tm-btn-sm tm-btn-neutral"
+                  style={{ minHeight: 44, textDecoration: 'none' }}
+                >
+                  {team.name}
+                </Link>
+              ))}
+            </div>
+          </Card>
+        ) : null}
+
         {/* 신뢰 신호 카드 */}
         <Card pad={16}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>

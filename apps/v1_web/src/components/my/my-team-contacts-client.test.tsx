@@ -164,6 +164,45 @@ describe('MyTeamContactDetailClient', () => {
   // 차단을 *거는* 진입점은 여기 하나뿐이다(해제는 팀 설정 화면). 이 UI 가 사라지면 백엔드·훅·
   // 통합테스트가 전부 온전해도 사용자는 앱에서 차단을 걸 방법이 없어진다 — 최종 리뷰에서
   // 실제로 그 상태였던 것을 잡았다.
+  // 컨택 만료 창은 7일이다. 시간 단위만 쓰면 "167시간 58분 후 만료돼요" 처럼 사람이 못 읽는
+  // 숫자가 나온다 — alpha 시각 검증에서 실제로 그렇게 보였다.
+  describe('만료 남은 시간 표기', () => {
+    function renderWithExpiry(msFromNow: number) {
+      setMyTeams([{ teamId: MY_TEAM_ID, name: '우리 팀', role: 'owner' }]);
+      useV1TeamContactMock.mockReturnValue({
+        data: makeContact({ expiresAt: new Date(Date.now() + msFromNow).toISOString() }),
+        isError: false,
+      });
+      return render(<MyTeamContactDetailClient contactId="contact-1" />);
+    }
+
+    it('하루 이상 남으면 일 단위로 접는다', () => {
+      // 6일 23시간 58분 — 예전 구현이 "167시간 58분 후" 로 쏟아내던 값이다.
+      // 경계에 딱 맞추면 실행 중 흐른 ms 때문에 내림이 한 단위 떨어져 flaky 해진다 — 30초 여유.
+      renderWithExpiry(167 * 3_600_000 + 58 * 60_000 + 30_000);
+
+      expect(screen.getByText('6일 23시간 후 만료돼요')).toBeInTheDocument();
+    });
+
+    it('일 단위가 딱 떨어지면 시간을 붙이지 않는다', () => {
+      renderWithExpiry(2 * 24 * 3_600_000 + 30_000);
+
+      expect(screen.getByText('2일 후 만료돼요')).toBeInTheDocument();
+    });
+
+    it('하루 미만이면 시간·분으로 보여준다', () => {
+      renderWithExpiry(3 * 3_600_000 + 25 * 60_000 + 30_000);
+
+      expect(screen.getByText('3시간 25분 후 만료돼요')).toBeInTheDocument();
+    });
+
+    it('이미 지났으면 곧 만료된다고 알린다', () => {
+      renderWithExpiry(-1000);
+
+      expect(screen.getByText('곧 만료돼요')).toBeInTheDocument();
+    });
+  });
+
   describe('차단하기', () => {
     function renderInbound() {
       setMyTeams([{ teamId: MY_TEAM_ID, name: '우리 팀', role: 'owner' }]);

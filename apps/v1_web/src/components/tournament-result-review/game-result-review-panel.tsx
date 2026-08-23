@@ -16,6 +16,7 @@ import { RecordedEventList } from '@/components/tournament-live/operate/recorded
 import { AlertBanner, ErrorState } from '@/components/v1-ui/primitives';
 import { countMissingAssists } from '@/lib/result-review-warnings';
 import { formatGameResultScoreWithPenalties } from '@/lib/game-result-score';
+import { matchOutcomeReasonLabel, toDisplayableOutcomeReason } from '@/lib/match-outcome';
 import { deriveEditableGoalEvents } from '@/lib/result-goal-events';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { Button } from '@/components/v1-ui/button';
@@ -135,6 +136,7 @@ export function GameResultReviewPanel({
       freshRevisions?.data?.[0] ??
       revision;
     const freshGame = freshGameResult?.data ?? game;
+    const freshOutcome = toDisplayableOutcomeReason(freshRevision.outcomeReason);
     const ok = await confirm({
       title: '결과를 확정할까요?',
       // `.home`/`.away` 를 직접 읽으면 백필된 경기(중첩 `{regulation:{…}}` 형태)에서
@@ -142,7 +144,13 @@ export function GameResultReviewPanel({
       // 승부차기까지 넣어 읽어준다: 결선 무승부를 확정하는 자리인데 "0:0 결과를
       // 공식 결과로 확정해요"만 뜨면, 되돌릴 수 없는 확정 직전에 정작 승자를 가른
       // 값이 문구에서 빠진다.
-      message: `${formatGameResultScoreWithPenalties(freshRevision.score)} 결과를 공식 결과로 확정해요. 확정 후에는 정정 절차로만 바꿀 수 있어요.`,
+      // 몰수·중단으로 끝난 경기는 그 사실을 확정 문구에 반드시 넣는다. 넣지 않으면
+      // "0:0 결과를 공식 결과로 확정해요"만 뜨는데, 몰수 0:0 과 실제 0:0 무승부는
+      // 되돌릴 수 없는 확정 직전에 반드시 구분돼야 하는 서로 다른 결과다 — 위의
+      // 승부차기 누락 사고와 같은 종류의 결함이다.
+      message: `${formatGameResultScoreWithPenalties(freshRevision.score)}${
+        freshOutcome !== null ? ` (${matchOutcomeReasonLabel(freshOutcome)})` : ''
+      } 결과를 공식 결과로 확정해요. 확정 후에는 정정 절차로만 바꿀 수 있어요.`,
       confirmLabel: '확정',
     });
     if (!ok) return;
@@ -165,6 +173,13 @@ export function GameResultReviewPanel({
   }
 
   const missingAssists = latest ? countMissingAssists(latest.resultParticipants) : 0;
+  // 확정 전에는 검토 대상(latest)의 사유를, 확정 후에는 공식 리비전의 사유를 보여준다 —
+  // 확정하고 나면 latest 가 그 공식 리비전이라 대개 같지만, 정정으로 새 리비전이 올라온
+  // 동안에는 둘이 갈린다. 그때 화면에 남아야 하는 건 "지금 유효한 결과"의 사유다.
+  const outcomeSource = currentOfficial ?? latest;
+  const outcomeReason = toDisplayableOutcomeReason(outcomeSource?.outcomeReason);
+  const outcomeNotice =
+    outcomeReason !== null ? { reason: outcomeReason, note: outcomeSource?.outcomeNote?.trim() ?? '' } : null;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <GameSummaryHeader game={game} currentRevision={currentOfficial ?? null} />
@@ -175,6 +190,18 @@ export function GameResultReviewPanel({
 
       {readOnly ? (
         <AlertBanner tone="info" message="이 화면에서는 결과를 볼 수만 있어요. 검토·확정 권한이 없어요." />
+      ) : null}
+
+      {/* 몰수·중단 사유. 운영자가 승인 버튼을 누르기 전에 "왜 이 점수인지"를 봐야 하므로
+          세부 기록·승인 CTA보다 위에 둔다. 서버는 사유 없는 몰수 종료를 422 로 막지만,
+          그 규칙 이전에 종료된 경기는 사유가 없을 수 있어 문구를 분기한다. */}
+      {outcomeNotice !== null ? (
+        <AlertBanner
+          tone="warning"
+          message={`${matchOutcomeReasonLabel(outcomeNotice.reason)}으로 종료된 경기예요.${
+            outcomeNotice.note.length > 0 ? ` 사유: ${outcomeNotice.note}` : ''
+          }`}
+        />
       ) : null}
 
       {/* 경기 세부 기록 — 종류·시점·팀·선수·도움. 승인 버튼보다 위에 둔다(근거를

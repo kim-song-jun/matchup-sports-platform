@@ -133,6 +133,8 @@ function buildRevision(
     missingScorer: false,
     mvpParticipantId: null,
     reason: null,
+    outcomeReason: 'NORMAL',
+    outcomeNote: null,
     createdByActorType: 'SYSTEM',
     createdByUserId: null,
     createdBySystemActor: 'GAME_END_DERIVER',
@@ -617,6 +619,64 @@ describe('correction -- create against the current official revision, always cap
     );
     const calledMessage = hookMocks.confirm.mock.calls[0][0].message as string;
     expect(calledMessage).not.toContain('undefined');
+  });
+});
+
+/**
+ * BRACKET-6 — 몰수·중단으로 끝난 경기는 검토 화면과 확정 문구 양쪽에서 정상 종료와
+ * 구분돼야 한다. 서버는 사유를 리비전에 저장하고 목록 API 로도 내보내는데(alpha 실측)
+ * 어드민 화면이 그 값을 아예 읽지 않아, 운영자가 "0:0 결과를 공식 결과로 확정해요"만
+ * 보고 되돌릴 수 없는 확정을 누르던 상태였다 — 승부차기 누락 사고와 같은 종류다.
+ */
+describe('몰수·중단 경기의 검토·확정', () => {
+  it('검토 화면에 몰수 사유가 승인 버튼과 함께 보인다', () => {
+    hookMocks.game.data = buildGame('platform_ops');
+    hookMocks.revisions.data = [
+      buildRevision({
+        id: 'rev-1',
+        revision: 1,
+        state: 'SUBMITTED',
+        score: { home: 0, away: 0 },
+        outcomeReason: 'FORFEIT',
+        outcomeNote: '원정팀 미출석',
+      }),
+    ];
+
+    renderWithClient(<GameResultReviewPanel gameId="game-1" />);
+
+    expect(screen.getByText('몰수·기권으로 종료된 경기예요. 사유: 원정팀 미출석')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '결과 승인(확정)' })).toBeInTheDocument();
+  });
+
+  it('정상 종료 경기에는 몰수 배너가 뜨지 않는다', () => {
+    hookMocks.game.data = buildGame('platform_ops');
+    hookMocks.revisions.data = [buildRevision({ id: 'rev-1', revision: 1, state: 'SUBMITTED' })];
+
+    renderWithClient(<GameResultReviewPanel gameId="game-1" />);
+
+    expect(screen.queryByText(/종료된 경기예요/)).not.toBeInTheDocument();
+  });
+
+  it('확정 확인 문구가 몰수라는 사실을 점수와 함께 말한다', async () => {
+    hookMocks.game.data = buildGame('platform_ops');
+    hookMocks.revisions.data = [
+      buildRevision({
+        id: 'rev-1',
+        revision: 1,
+        state: 'SUBMITTED',
+        score: { home: 0, away: 0 },
+        outcomeReason: 'FORFEIT',
+        outcomeNote: '원정팀 미출석',
+      }),
+    ];
+    const user = userEvent.setup();
+    renderWithClient(<GameResultReviewPanel gameId="game-1" />);
+
+    await user.click(screen.getByRole('button', { name: '결과 승인(확정)' }));
+
+    const message = hookMocks.confirm.mock.calls[0][0].message as string;
+    expect(message).toContain('몰수·기권');
+    expect(message).toContain('0:0');
   });
 });
 

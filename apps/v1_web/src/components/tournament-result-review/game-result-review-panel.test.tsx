@@ -56,6 +56,8 @@ const STALE_REVISION = {
   missingScorer: false,
   mvpParticipantId: null,
   reason: null,
+  outcomeReason: 'NORMAL' as const,
+  outcomeNote: null,
   createdByActorType: 'SYSTEM' as const,
   createdByUserId: null,
   createdBySystemActor: 'GAME_END_DERIVER',

@@ -1087,6 +1087,8 @@ export const v1MswHandlers = [
       missingScorer: false,
       mvpParticipantId: body.mvpParticipantId ?? null,
       reason: body.reason ?? null,
+      outcomeReason: 'NORMAL',
+      outcomeNote: null,
       createdByActorType: 'USER',
       createdByUserId: 'user-1',
       createdBySystemActor: null,

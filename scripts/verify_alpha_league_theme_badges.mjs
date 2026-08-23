@@ -3,7 +3,12 @@
  *   (A) 수동 다크 모드(localStorage 'tm-theme' = dark)에서 리그 화면이 제대로 나오는지
  *   (B) 44px 리그전 배지가 같은 flex 줄의 24px 배지 높이를 늘리는지 (align-items 미지정)
  *
- * 사용법: ALPHA_PASSWORD=... node scripts/verify_alpha_league_theme_badges.mjs <outDir>
+ * 이 스크립트는 로그인하지 않는다 — 리그·팀매치 상세는 비인증으로 열리는 공개 경로다.
+ * 필요한 건 대상 id 뿐이다.
+ *
+ * 사용법:
+ *   LEAGUE_IDS='{"tier":"<리그 id>","fixture":"<팀매치 id>"}' \
+ *     node scripts/verify_alpha_league_theme_badges.mjs <outDir>
  */
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium } from 'playwright';

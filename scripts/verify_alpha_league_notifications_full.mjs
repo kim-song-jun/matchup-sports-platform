@@ -30,7 +30,11 @@ async function login(email) {
     body: JSON.stringify({ email, password: PASSWORD }),
   });
   if (!res.ok) throw new Error(`login ${email} → ${res.status}`);
-  const cookie = (res.headers.getSetCookie?.() ?? []).find((c) => c.startsWith('teameet_v1_session='));
+  // 같은 디렉터리의 다른 하네스와 같은 파싱이다. getSetCookie 가 없는 런타임에서도
+  // 조용히 빈 배열이 되지 않게 단일 헤더로 폴백한다.
+  const raw = res.headers.getSetCookie?.() ?? [res.headers.get('set-cookie')];
+  const cookie = raw.filter(Boolean).find((c) => c.startsWith('teameet_v1_session='));
+  if (!cookie) throw new Error(`세션 쿠키를 못 받았어요 (${email}). 로그인 응답에 teameet_v1_session 이 없습니다.`);
   return cookie.split(';')[0].split('=').slice(1).join('=');
 }
 

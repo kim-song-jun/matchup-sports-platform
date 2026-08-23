@@ -117,6 +117,9 @@ const DIAGNOSE = () => {
 
 const report = {};
 
+// 다크 캡처 여부는 TARGET_SET=dark 또는 CAPTURE_DARK=1 둘 중 하나로 켠다.
+const wantDark = process.env.CAPTURE_DARK === '1' || process.env.TARGET_SET === 'dark';
+
 async function capture(ctxName, token, targets) {
   const browser = await chromium.launch();
   try {
@@ -125,13 +128,18 @@ async function capture(ctxName, token, targets) {
         viewport: { width, height },
         deviceScaleFactor: key === 'desktop' ? 1 : 2,
         locale: 'ko-KR',
-        ...(process.env.CAPTURE_DARK === '1' ? { colorScheme: 'dark' } : {}),
+        ...(wantDark ? { colorScheme: 'dark' } : {}),
       });
       if (token) {
         await context.addCookies([
           { name: 'teameet_v1_session', value: token, domain: new URL(BASE).hostname, path: '/' },
         ]);
         await context.addInitScript(() => window.localStorage.setItem('teameet.v1.session', 'active'));
+      }
+      if (wantDark) {
+        // v1_web 은 OS 다크모드(prefers-color-scheme)를 의도적으로 무시한다 — colorScheme 만
+        // 주면 라이트 화면이 찍혀 "다크를 확인했다"는 거짓 증거가 된다. 실제 토글은 이 키다.
+        await context.addInitScript(() => window.localStorage.setItem('tm-theme', 'dark'));
       }
       const page = await context.newPage();
       const consoleErrors = [];

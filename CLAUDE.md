@@ -43,6 +43,26 @@
   수습 가능하다 — 사전 확인이 유일한 값싼 방어다.
 - **worktree는 항상 최신 `dev`를 fetch한 직후에 만든다.** 새 작업(기능/수정)을 시작할 때 `git worktree add <path> -b <branch> origin/dev` 직전에 반드시 `git fetch origin dev`를 먼저 실행해서 base를 최신으로 맞춘다 — 캐시된(오래된) ref에서 분기하면 나중에 `dev`와의 diff가 불필요하게 커지고, changeset 정책 체크 등 CI 게이트가 실제로는 이미 해결된 옛 상태를 기준으로 오판할 수 있다. dev push = 자동 실배포이므로, 오래된 base에서 분기해 뒤늦게 머지하면 검증 시점과 실제 배포 시점의 코드가 어긋날 위험도 커진다.
   - **로컬 `dev` 브랜치를 직접 체크아웃해서 base로 쓰지 않는다.** git은 같은 브랜치를 두 worktree에 동시 체크아웃할 수 없다 — 이 저장소는 여러 세션이 각자 `.claude/worktrees/*`를 쓰는 공유 환경이라, 로컬 `dev`가 이미 다른 worktree(예: `dev-verify`류)에 uncommitted 상태로 체크아웃돼 있을 수 있다. 그 worktree를 임의로 건드리거나(pull/checkout/reset) 새 작업의 base로 재사용하지 말 것 — 대신 매번 `git fetch origin dev` 후 **원격 ref `origin/dev`**를 base로 분기한다(로컬 `dev` 브랜치 자체는 만들지 않는다). 이렇게 하면 항상 최신이면서도 다른 세션과 절대 충돌하지 않는다.
+- **착수 전에는 `fetch`, 머지 후에는 로컬 `dev` 동기화 — 양쪽 다 예외 없다** (2026-08-23 사용자 지시).
+  - **착수 전 (pull first)**: worktree를 만들기 전이든 메인 트리에서 코드를 읽기 전이든, 어떤 작업이라도
+    시작 전에 먼저 `git fetch origin dev`로 원격을 당겨온다. 캐시된 ref나 뒤처진 로컬 브랜치를 현행으로
+    착각하면 이미 고쳐진 것을 다시 고치거나 살아 있는 기능을 dead code로 오진한다(실사례 2건).
+  - **머지 후 (sync back)**: PR이 `origin/dev`에 머지되면 **그 즉시** 메인 작업트리
+    (`/Users/sungjun/Dev/projects/matchup-sports-platform`)의 로컬 `dev`를 따라잡힌다. 머지 하나당 한 번,
+    나중에 몰아서 하지 않는다:
+    ```bash
+    cd /Users/sungjun/Dev/projects/matchup-sports-platform
+    git fetch origin dev -q && git merge --ff-only origin/dev
+    ```
+    미루면 조용히 벌어진다(실측: 131커밋 → 263커밋 뒤처진 상태로 발견). 사용자는 이 트리에서 직접
+    코드를 보므로, 뒤처진 트리는 곧 사용자가 옛 코드를 보는 것이다.
+  - **반드시 `--ff-only`.** `git pull`(머지 커밋 생성)·rebase·`reset`은 쓰지 않는다 — 공유 트리라 다른
+    세션 작업을 건드린다. `--ff-only`는 위험하면 실패하고 멈추므로 미커밋 변경을 보존한다.
+  - **FF가 거부되면 지우지 말고 백업 후 진행한다.** 원인은 대개 미커밋/untracked 파일이 upstream
+    커밋본과 겹치는 경우다. `git status --porcelain`과 `git diff --name-only HEAD origin/dev`의
+    **교집합**으로 충돌 파일만 특정하고(나머지 미커밋 변경은 손대지 않는다), 스크래치패드에 디렉터리
+    구조를 유지해 복사한 뒤 원복·FF 하고 **백업 경로를 사용자에게 알린다.** 타 세션의 미커밋 변경을
+    되돌려야 하면 그 전에 사용자 승인을 받는다(위 "공유 작업트리 git 안전" 규칙).
 
 ## DB 마이그레이션 규율 (Critical — 2026-07-12 프로덕션 장애 재발 방지)
 

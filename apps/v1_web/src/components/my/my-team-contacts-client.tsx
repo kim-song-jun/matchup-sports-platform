@@ -225,6 +225,9 @@ function TeamContactListRow({ contact, direction }: { contact: V1TeamContact; di
  * 컨택 상세에서 상대 팀을 신고하는 다이얼로그. 공용 Modal 이 없어
  * jersey-number-dialog.tsx 의 관용구(role=dialog + ESC + focus trap)를 그대로 따른다.
  */
+const DIALOG_FOCUSABLE =
+  'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
+
 function ReportContactDialog({
   open,
   saving,
@@ -253,10 +256,24 @@ function ReportContactDialog({
       return;
     }
     const element = previousFocusRef.current;
-    if (element && typeof (element as HTMLElement).focus === 'function') {
+    // document.contains 를 확인한다 — 제출 성공처럼 트리거 버튼이 같은 틱에 사라지는 경우
+    // 분리된 노드에 focus() 를 불러 조용히 아무 일도 안 일어나는 것을 막는다.
+    if (element && document.contains(element) && typeof (element as HTMLElement).focus === 'function') {
       (element as HTMLElement).focus();
     }
     previousFocusRef.current = null;
+  }, [open]);
+
+  // 열릴 때 포커스를 다이얼로그 안으로 옮긴다. 이게 없으면 포커스가 배경에 남고, 아래 트랩은
+  // activeElement 가 첫/마지막 요소일 때만 개입하도록 만들어져 있어 **한 번도 발동하지 않는다** —
+  // 결과적으로 aria-modal="true" 가 실제로는 배경을 격리하지 못하고 Shift+Tab 으로 새어나간다.
+  // 관용구 출처: components/teams/jersey-number-dialog.tsx
+  useEffect(() => {
+    if (!open) return;
+    const id = setTimeout(() => {
+      dialogRef.current?.querySelector<HTMLElement>(DIALOG_FOCUSABLE)?.focus();
+    }, 60);
+    return () => clearTimeout(id);
   }, [open]);
 
   useEffect(() => {
@@ -272,11 +289,9 @@ function ReportContactDialog({
     if (!open) return;
     const dialog = dialogRef.current;
     if (!dialog) return;
-    const FOCUSABLE =
-      'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
     const trap = (event: KeyboardEvent) => {
       if (event.key !== 'Tab') return;
-      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE));
+      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(DIALOG_FOCUSABLE));
       if (focusable.length === 0) return;
       const first = focusable[0];
       const last = focusable[focusable.length - 1];

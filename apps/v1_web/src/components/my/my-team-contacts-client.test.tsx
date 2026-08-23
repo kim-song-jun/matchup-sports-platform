@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
-import { render as rtlRender, screen } from '@testing-library/react';
+import { render as rtlRender, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MyTeamContactDetailClient, MyTeamContactsListClient } from './my-team-contacts-client';
@@ -200,6 +200,21 @@ describe('MyTeamContactDetailClient', () => {
         }),
         expect.anything(),
       );
+    });
+
+    // 포커스 트랩은 activeElement 가 다이얼로그의 첫/마지막 요소일 때만 개입한다. 열릴 때
+    // 포커스를 안으로 옮기지 않으면 포커스가 배경에 남아 트랩이 한 번도 발동하지 않고,
+    // aria-modal="true" 가 실제로는 배경을 격리하지 못한다.
+    it('열리면 포커스가 다이얼로그 안으로 들어온다', async () => {
+      const user = userEvent.setup();
+      renderExpiredContact();
+
+      await user.click(screen.getByRole('button', { name: '신고하기' }));
+      const dialog = screen.getByRole('dialog', { name: '컨택 신고하기' });
+
+      await waitFor(() => {
+        expect(dialog.contains(document.activeElement)).toBe(true);
+      });
     });
 
     it('사유를 안 고르면 보내기가 비활성이다', async () => {

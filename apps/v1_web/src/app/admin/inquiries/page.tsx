@@ -13,10 +13,12 @@ import {
 } from '@/components/admin';
 import { useV1AdminInquiries } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { INQUIRY_REPORT_REASON_OPTIONS, inquiryReportReasonLabel } from '@/lib/v1-status-labels';
 import type {
   AdminListFilters,
   V1AdminInquiryRow,
   V1InquiryCategory,
+  V1InquiryReportReason,
   V1InquiryStatus,
 } from '@/types/api';
 
@@ -56,6 +58,12 @@ const CATEGORY_LABEL: Record<V1InquiryCategory, string> = {
   other: '기타',
 };
 
+// 신고 사유는 분류가 'report'일 때만 의미가 있다 — 다른 분류에서는 항상 null이라 보여줄 게 없다.
+const REPORT_REASON_OPTIONS: Array<{ value: '' | V1InquiryReportReason; label: string }> = [
+  { value: '', label: '전체 사유' },
+  ...INQUIRY_REPORT_REASON_OPTIONS,
+];
+
 function formatDateTime(value: string | null | undefined) {
   if (!value) return '-';
   const date = new Date(value);
@@ -88,6 +96,7 @@ export default function AdminInquiriesPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [activeStatus, setActiveStatus] = useState('');
   const [activeCategory, setActiveCategory] = useState('');
+  const [activeReportReason, setActiveReportReason] = useState('');
   // 커서 누적 대신 페이지 단위 교체다 — 목록 어디쯤인지와 총량이 보여야 한다.
   const [page, setPage] = useState(1);
   const { toasts, showToast } = useAdminToast();
@@ -99,12 +108,20 @@ export default function AdminInquiriesPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, activeStatus, activeCategory]);
+  }, [debouncedSearch, activeStatus, activeCategory, activeReportReason]);
+
+  // 분류가 'report'를 벗어나면 사유 필터는 보이지 않는데, 선택값이 남아 있으면 안 보이는
+  // 필터가 목록을 계속 좁혀 "왜 결과가 없지?"를 만든다 — 분류를 바꿀 때 항상 함께 초기화한다.
+  function handleCategoryChange(value: string) {
+    setActiveCategory(value);
+    if (value !== 'report') setActiveReportReason('');
+  }
 
   const filters: AdminListFilters = {
     ...(debouncedSearch ? { q: debouncedSearch } : {}),
     ...(activeStatus ? { status: activeStatus } : {}),
     ...(activeCategory ? { category: activeCategory } : {}),
+    ...(activeCategory === 'report' && activeReportReason ? { reportReason: activeReportReason } : {}),
     page,
     limit: PAGE_SIZE,
   };
@@ -127,6 +144,14 @@ export default function AdminInquiriesPage() {
     ...option,
     count: option.value ? categoryCounts?.[option.value] : categoryTotal,
   }));
+  const reportReasonCounts = firstPage?.summary.byReportReason;
+  const reportReasonTotal = reportReasonCounts
+    ? Object.values(reportReasonCounts).reduce((sum, count) => sum + count, 0)
+    : undefined;
+  const reportReasonOptions = REPORT_REASON_OPTIONS.map((option) => ({
+    ...option,
+    count: option.value ? reportReasonCounts?.[option.value] : reportReasonTotal,
+  }));
 
   return (
     <>
@@ -146,18 +171,34 @@ export default function AdminInquiriesPage() {
           activeStatus={activeStatus}
           onStatusChange={setActiveStatus}
           rightSlot={
-            <select
-              value={activeCategory}
-              onChange={(event) => setActiveCategory(event.target.value)}
-              aria-label="문의 분류 필터"
-              className="h-[44px] rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-body)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-            >
-              {categoryOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label} {typeof option.count === 'number' ? option.count.toLocaleString('ko-KR') : '—'}
-                </option>
-              ))}
-            </select>
+            <>
+              <select
+                value={activeCategory}
+                onChange={(event) => handleCategoryChange(event.target.value)}
+                aria-label="문의 분류 필터"
+                className="h-[44px] rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-body)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+              >
+                {categoryOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label} {typeof option.count === 'number' ? option.count.toLocaleString('ko-KR') : '—'}
+                  </option>
+                ))}
+              </select>
+              {activeCategory === 'report' ? (
+                <select
+                  value={activeReportReason}
+                  onChange={(event) => setActiveReportReason(event.target.value)}
+                  aria-label="신고 사유 필터"
+                  className="h-[44px] rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-body)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                >
+                  {reportReasonOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label} {typeof option.count === 'number' ? option.count.toLocaleString('ko-KR') : '—'}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
+            </>
           }
         />
 
@@ -204,7 +245,16 @@ export default function AdminInquiriesPage() {
               key: 'category',
               header: '분류',
               width: 'w-[96px]',
-              render: (row) => <span className="text-[var(--text-muted)]">{CATEGORY_LABEL[row.category]}</span>,
+              render: (row) => (
+                <span className="text-[var(--text-muted)]">
+                  {CATEGORY_LABEL[row.category]}
+                  {row.reportReason ? (
+                    <span className="block text-2xs text-[var(--text-muted)]">
+                      {inquiryReportReasonLabel(row.reportReason)}
+                    </span>
+                  ) : null}
+                </span>
+              ),
             },
             {
               key: 'title',

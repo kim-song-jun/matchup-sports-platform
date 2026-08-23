@@ -39,6 +39,8 @@ export type AdminListSummary = {
   byStatus: Record<string, number>;
   byCategory?: Record<string, number>;
   byAudience?: Record<string, number>;
+  /** 문의 목록 전용 — 신고(`category: 'report'`) 사유별 건수. 5개 키 전부 존재, 없으면 0. */
+  byReportReason?: Record<string, number>;
 };
 
 export type AdminCursorPage<T> = CursorPage<T> & {
@@ -2290,6 +2292,8 @@ export type V1AdminInquiryRow = {
   status: V1InquiryStatus;
   relatedType: V1InquiryRelatedType | null;
   relatedId: string | null;
+  /** 신고(`category: 'report'`)에만 실린다 — 그 외 문의에는 서버가 null 을 넣는다. */
+  reportReason: V1InquiryReportReason | null;
   replyCount: number;
   createdAt: string;
   updatedAt: string;
@@ -2497,6 +2501,8 @@ export type AdminListFilters = {
   sportId?: string;
   audience?: string;
   category?: string;
+  /** 문의 목록 전용 — `category: 'report'` 일 때만 의미가 있다. */
+  reportReason?: string;
   targetType?: string;
   cursor?: string;
   /** 페이지 번호(1부터). cursor 와 함께 보내면 서버가 page 를 우선한다. */

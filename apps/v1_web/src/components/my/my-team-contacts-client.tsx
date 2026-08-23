@@ -22,6 +22,7 @@ import { chatRoomHref } from '@/lib/chat-route';
 import { formatTournamentDateTimeLong, formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import { isTeamOperatorRole, normalizeMyTeamsResponse } from '@/lib/team-role';
+import { INQUIRY_REPORT_REASON_OPTIONS as REPORT_REASON_OPTIONS, inquiryReportReasonLabel } from '@/lib/v1-status-labels';
 
 type Direction = 'inbound' | 'outbound';
 
@@ -40,19 +41,6 @@ const STATUS_BADGE_CLASS: Record<V1TeamContactStatus, string> = {
   withdrawn: 'tm-badge-grey',
   expired: 'tm-badge-orange',
 };
-
-const REPORT_REASON_OPTIONS: { value: V1InquiryReportReason; label: string }[] = [
-  { value: 'spam', label: '스팸·광고' },
-  { value: 'harassment', label: '괴롭힘·욕설' },
-  { value: 'impersonation', label: '사칭·허위 팀' },
-  { value: 'inappropriate', label: '부적절한 내용' },
-  { value: 'other', label: '기타' },
-];
-
-const REPORT_REASON_LABEL: Record<V1InquiryReportReason, string> = REPORT_REASON_OPTIONS.reduce(
-  (acc, option) => ({ ...acc, [option.value]: option.label }),
-  {} as Record<V1InquiryReportReason, string>,
-);
 
 /**
  * `useV1MyTeams()` 응답은 배열이면서 `items`도 같이 들고 있는 하이브리드 형태다.
@@ -542,7 +530,7 @@ export function MyTeamContactDetailClient({ contactId }: { contactId: string }) 
 
   function handleReportSubmit(reason: V1InquiryReportReason, detail: string) {
     setReportError(null);
-    const reasonLabel = REPORT_REASON_LABEL[reason];
+    const reasonLabel = inquiryReportReasonLabel(reason);
     const trimmedDetail = detail.trim();
     reportContact.mutate(
       {

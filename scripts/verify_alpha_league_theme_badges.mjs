@@ -16,6 +16,13 @@ import { chromium } from 'playwright';
 const BASE = process.env.CAPTURE_BASE_URL ?? 'https://alpha.teameet.co.kr';
 const OUT = process.argv[2] ?? '.capture/league-theme-badges';
 const L = JSON.parse(process.env.LEAGUE_IDS ?? '{}');
+// id 가 없으면 /league-matches/undefined 를 열어 "화면이 이상하다" 는 엉뚱한 결론이 난다.
+for (const key of ['tier', 'fixture']) {
+  if (!L[key]) {
+    console.error(`LEAGUE_IDS 에 "${key}" 가 필요해요. 예: LEAGUE_IDS='{"tier":"<리그 id>","fixture":"<팀매치 id>"}'`);
+    process.exit(1);
+  }
+}
 
 await mkdir(OUT, { recursive: true });
 const browser = await chromium.launch();
@@ -121,11 +128,16 @@ async function badgePass(width) {
   await ctx.close();
 }
 
-await themePass('dark', 390);
-await themePass('light', 390);
-await badgePass(390);
-await badgePass(1440);
-
-await browser.close();
-await writeFile(`${OUT}/report.json`, JSON.stringify(report, null, 2));
+// 중간에 던져도 chromium 이 남지 않게 finally 로 닫는다 — 실패할수록 여러 번 돌리게 되고,
+// 그때마다 브라우저가 쌓이면 호스트가 먼저 죽는다.
+try {
+  await themePass('dark', 390);
+  await themePass('light', 390);
+  await badgePass(390);
+  await badgePass(1440);
+} finally {
+  await browser.close();
+  // 부분 결과라도 남긴다 — 어디까지 됐는지가 다음 실행의 단서다.
+  await writeFile(`${OUT}/report.json`, JSON.stringify(report, null, 2));
+}
 console.log(`\n완료 → ${OUT}`);

@@ -5,8 +5,11 @@
  * 프로덕션 빌드는 localStorage 힌트로 로그인 여부를 판단하므로 그것도 함께 심는다.
  *
  * 세트별 요구 조건:
- *   TARGET_SET=dark                   자격증명 불필요 (비로그인 캡처) + LEAGUE_IDS
- *   그 외(main/series/extra/fixture/wave4)  ALPHA_PASSWORD + ALPHA_ADMIN_EMAIL / ALPHA_CAPTAIN_EMAIL
+ *   LEAGUE_IDS   main 을 뺀 모든 세트가 쓴다. 세트마다 필요한 키가 다르다 —
+ *                series{2,3}(series) · tier/draft(extra) · completed/active(wave4) ·
+ *                fixture/fixtureMine(fixture) · tier(dark)
+ *   자격증명     TARGET_SET=dark 는 불필요(비로그인 캡처).
+ *                그 외에는 ALPHA_PASSWORD + ALPHA_ADMIN_EMAIL / ALPHA_CAPTAIN_EMAIL
  *
  * 사용법:
  *   ALPHA_PASSWORD=... ALPHA_CAPTAIN_EMAIL=... TARGET_SET=main \

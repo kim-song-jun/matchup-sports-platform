@@ -35,6 +35,9 @@ export ALPHA_SESSION_TOKEN='v1.<payload>.<signature>'
 | `verify_alpha_league_e2e.mjs` | **리그 운영 전 구간** — 체계 생성 → 시즌 시딩 → 대진 → 몰수 → 승강 preview → commit → 다음 시즌. `STRICT_PICKER=1` 이면 드롭다운이 안 열릴 때 `C-0 미해결` 로 던진다(= 통과 자체가 회귀 증거) | 운영자 |
 | `verify_alpha_league_notifications.mjs` | 대진 배정 알림 1종 — 팀장 알림의 **id 차집합**으로 판정 | 운영자+팀장 |
 | `verify_alpha_league_notifications_full.mjs` | 알림 3종 전수 — ① 대진 배정 ② 결과 공식 확정 ③ 승격·강등 확정. `SERIES_ID` 를 주면 기존 시리즈를 재사용한다 | 운영자+팀장 |
+| `capture-record-consent-screens.mjs` | 기록 공개 설정 화면 — 알림 착지(`?from=tournament`, 맥락 배너 있음) / 파라미터 없는 기본 화면 / 홈 넛지 배너를 3폭 캡처. 캡처 전에 `GET /me/record-consent` 를 찍어 **배너가 안 뜬 이유를 서버 응답으로 남긴다**(스크린샷만 보고 추측하지 않기 위해) | 선수 |
+| `capture-claim-my-record.mjs` | 자가 신원 연결 — 경기 상세의 배너와 **모달을 실제로 열어** 3폭 캡처. 후보 0명/N명 두 상태를 각각 찍으라고 만든 것이다(`FIXTURE_ID` 를 바꿔 가며) | 참가팀 멤버 |
+| `capture-public-profile.mjs` | 공개 프로필 + 공개 활동 기록 3폭 캡처. `TARGET_USER_ID` 로 대상 지정 | 선수(타인 프로필도 가능) |
 
 ```bash
 # 공개 화면 (기본 대상 대회는 스크립트 상단 TID 상수, 환경변수로 교체 가능)
@@ -64,6 +67,11 @@ ALPHA_PASSWORD="$ALPHA_PASSWORD" ALPHA_ADMIN_EMAIL='<운영자 계정>' \
 ALPHA_PASSWORD="$ALPHA_PASSWORD" ALPHA_ADMIN_EMAIL='<운영자>' ALPHA_CAPTAIN_EMAIL='<팀장>' \
   SERIES_ID='<앞서 만든 시리즈 id>' node scripts/verify_alpha_league_notifications_full.mjs
 ```
+
+> 위 세 개(`capture-record-consent-*`, `capture-claim-*`, `capture-public-profile`)는 Task 154
+> 에서 만든 것이고, 셋 다 **각 캡처의 `httpStatus` 를 찍는다.** alpha 는 짧은 시간에 캡처를
+> 몰면 전면 403(약 1분)을 거는데, 상태코드를 안 남기면 403 페이지를 정상 화면으로 착각해
+> 저장하고 그걸로 "검증 완료" 라고 보고하게 된다(실제로 41장을 통째로 날린 적이 있다).
 
 ### mutation 을 보내는가
 

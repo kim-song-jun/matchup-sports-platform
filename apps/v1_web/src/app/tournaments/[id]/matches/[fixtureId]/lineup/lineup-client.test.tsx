@@ -895,7 +895,7 @@ describe('FixtureLineupPageClient — 라인업 충돌(VERSION_CONFLICT)에서 �
         {
           id: 'p-9', gameId: 'game-1', sideId: 'side-host', lineupId: 'lineup-1', userId: null,
           displayNameSnapshot: '김알파', jerseyNumber: 11, position: 'GK',
-          positionX: null, positionY: null, started: true,
+          positionX: null, positionY: null, started: true, arrivedAt: null,
           createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
         },
       ],

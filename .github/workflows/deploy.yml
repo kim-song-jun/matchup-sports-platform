@@ -188,6 +188,10 @@ jobs:
             git fetch --no-tags origin "${BASE_REF}"
             BASE_SHA="$(git merge-base FETCH_HEAD "${HEAD_SHA}")"
           fi
+          # 게이트 자신의 규칙(SQL 추가성 판정 + base 해석)을 먼저 돌린다. 이게 없던 동안
+          # base 해석 쪽 결함이 오래 살아남아, 대상 브랜치가 전진할 때마다 마이그레이션과
+          # 무관한 PR 이 죽었다. 임시 저장소 몇 개를 만드는 정도라 수 초면 끝난다.
+          node scripts/qa/check-expand-contract-migrations.mjs --self-test
           echo "expand-contract gate: ${BASE_SHA} -> ${HEAD_SHA}"
           node scripts/qa/check-expand-contract-migrations.mjs "${BASE_SHA}" "${HEAD_SHA}"
 

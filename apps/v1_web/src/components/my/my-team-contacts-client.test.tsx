@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
-import { render as rtlRender, screen, waitFor } from '@testing-library/react';
+import { render as rtlRender, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MyTeamContactDetailClient, MyTeamContactsListClient } from './my-team-contacts-client';
@@ -17,6 +17,7 @@ const {
   useV1WithdrawTeamContactMock,
   useV1ResolveChatRoomMock,
   useV1CreateInquiryMock,
+  useV1CreateTeamContactBlockMock,
 } = vi.hoisted(() => ({
   routerPush: vi.fn(),
   useV1TeamContactMock: vi.fn(),
@@ -28,6 +29,7 @@ const {
   useV1WithdrawTeamContactMock: vi.fn(),
   useV1ResolveChatRoomMock: vi.fn(),
   useV1CreateInquiryMock: vi.fn(),
+  useV1CreateTeamContactBlockMock: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -47,6 +49,7 @@ vi.mock('@/hooks/use-v1-api', async (importOriginal) => ({
   useV1WithdrawTeamContact: useV1WithdrawTeamContactMock,
   useV1ResolveChatRoom: useV1ResolveChatRoomMock,
   useV1CreateInquiry: useV1CreateInquiryMock,
+  useV1CreateTeamContactBlock: useV1CreateTeamContactBlockMock,
 }));
 
 function render(ui: ReactElement) {
@@ -90,6 +93,7 @@ describe('MyTeamContactDetailClient', () => {
     useV1WithdrawTeamContactMock.mockReturnValue({ mutate: vi.fn(), isPending: false });
     useV1ResolveChatRoomMock.mockReturnValue({ mutate: vi.fn(), isPending: false });
     useV1CreateInquiryMock.mockReturnValue({ mutate: vi.fn(), isPending: false });
+    useV1CreateTeamContactBlockMock.mockReturnValue({ mutate: vi.fn(), isPending: false });
   });
 
   it('받은 requested 컨택에는 수락·거절 버튼이 보인다', () => {
@@ -155,6 +159,66 @@ describe('MyTeamContactDetailClient', () => {
     render(<MyTeamContactDetailClient contactId="contact-1" />);
 
     expect(screen.getByText(label)).toBeInTheDocument();
+  });
+
+  // 차단을 *거는* 진입점은 여기 하나뿐이다(해제는 팀 설정 화면). 이 UI 가 사라지면 백엔드·훅·
+  // 통합테스트가 전부 온전해도 사용자는 앱에서 차단을 걸 방법이 없어진다 — 최종 리뷰에서
+  // 실제로 그 상태였던 것을 잡았다.
+  describe('차단하기', () => {
+    function renderInbound() {
+      setMyTeams([{ teamId: MY_TEAM_ID, name: '우리 팀', role: 'owner' }]);
+      useV1TeamContactMock.mockReturnValue({ data: makeContact(), isError: false });
+      return render(<MyTeamContactDetailClient contactId="contact-1" />);
+    }
+
+    it('차단하기를 누르면 확인 단계가 뜬다', async () => {
+      const user = userEvent.setup();
+      renderInbound();
+
+      await user.click(screen.getByRole('button', { name: '차단하기' }));
+
+      expect(screen.getByRole('group', { name: '팀 차단 확인' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '취소' })).toBeInTheDocument();
+    });
+
+    it('확인하면 상대 팀 id 로 mutation 이 호출된다', async () => {
+      const mutate = vi.fn();
+      useV1CreateTeamContactBlockMock.mockReturnValue({ mutate, isPending: false });
+      const user = userEvent.setup();
+      renderInbound();
+
+      await user.click(screen.getByRole('button', { name: '차단하기' }));
+      const confirm = screen.getByRole('group', { name: '팀 차단 확인' });
+      await user.click(within(confirm).getByRole('button', { name: '차단하기' }));
+
+      expect(mutate).toHaveBeenCalledTimes(1);
+      expect(mutate).toHaveBeenCalledWith(
+        { blockedTeamId: OTHER_TEAM_ID },
+        expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
+      );
+    });
+
+    it('한 번 누른 것만으로는 차단되지 않는다', async () => {
+      const mutate = vi.fn();
+      useV1CreateTeamContactBlockMock.mockReturnValue({ mutate, isPending: false });
+      const user = userEvent.setup();
+      renderInbound();
+
+      await user.click(screen.getByRole('button', { name: '차단하기' }));
+
+      expect(mutate).not.toHaveBeenCalled();
+    });
+
+    it('양쪽 팀을 모두 운영하면 차단 버튼이 보이지 않는다', () => {
+      setMyTeams([
+        { teamId: MY_TEAM_ID, name: '우리 팀', role: 'owner' },
+        { teamId: OTHER_TEAM_ID, name: '상대팀', role: 'owner' },
+      ]);
+      useV1TeamContactMock.mockReturnValue({ data: makeContact(), isError: false });
+      render(<MyTeamContactDetailClient contactId="contact-1" />);
+
+      expect(screen.queryByRole('button', { name: '차단하기' })).not.toBeInTheDocument();
+    });
   });
 
   describe('신고하기', () => {

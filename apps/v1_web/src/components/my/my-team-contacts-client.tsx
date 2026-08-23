@@ -7,6 +7,7 @@ import { Card, EmptyState, ErrorState, ListItem } from '@/components/v1-ui/primi
 import {
   useV1AcceptTeamContact,
   useV1CreateInquiry,
+  useV1CreateTeamContactBlock,
   useV1DeclineTeamContact,
   useV1MyTeams,
   useV1ResolveChatRoom,
@@ -429,6 +430,17 @@ export function MyTeamContactDetailClient({ contactId }: { contactId: string }) 
   const fromTeamQuery = useV1Team(contact?.fromTeamId ?? '');
   const toTeamQuery = useV1Team(contact?.toTeamId ?? '');
 
+  // 차단은 "내 팀" 명의로 상대 팀을 막는 것이다. 훅은 조건부로 부를 수 없으므로 아래 early
+  // return 보다 앞에서 팀 id 를 계산해 둔다(컨택이 아직 없으면 빈 문자열 — 그 상태에서는
+  // 차단 UI 자체가 렌더되지 않으므로 mutate 가 불릴 일이 없다).
+  const viewerIsRecipient = contact ? operatorTeamIds.has(contact.toTeamId) : false;
+  const viewerIsSender = contact ? operatorTeamIds.has(contact.fromTeamId) : false;
+  const blockActorTeamId = contact ? (viewerIsRecipient ? contact.toTeamId : contact.fromTeamId) : '';
+  const createBlock = useV1CreateTeamContactBlock(blockActorTeamId);
+  const [blockConfirming, setBlockConfirming] = useState(false);
+  const [blockCreated, setBlockCreated] = useState(false);
+  const [blockError, setBlockError] = useState<string | null>(null);
+
   const acceptContact = useV1AcceptTeamContact(contactId);
   const declineContact = useV1DeclineTeamContact(contactId);
   const withdrawContact = useV1WithdrawTeamContact(contactId);
@@ -466,12 +478,31 @@ export function MyTeamContactDetailClient({ contactId }: { contactId: string }) 
     );
   }
 
-  const isRecipient = operatorTeamIds.has(contact.toTeamId);
-  const isSender = operatorTeamIds.has(contact.fromTeamId);
+  const isRecipient = viewerIsRecipient;
+  const isSender = viewerIsSender;
   const fromTeamName = fromTeamQuery.data?.name ?? '팀';
   const toTeamName = toTeamQuery.data?.name ?? '팀';
+  const counterpartTeamId = isRecipient ? contact.fromTeamId : contact.toTeamId;
+  const counterpartTeamName = isRecipient ? fromTeamName : toTeamName;
+  // 양쪽 팀을 모두 내가 운영하는 경우엔 차단이 자기 차단이 되어 서버가 409 로 막는다 — 숨긴다.
+  const canBlock = isRecipient !== isSender;
   const actionsPending =
     acceptContact.isPending || declineContact.isPending || withdrawContact.isPending || resolveChatRoom.isPending;
+
+  function handleCreateBlock() {
+    setBlockError(null);
+    createBlock.mutate(
+      { blockedTeamId: counterpartTeamId },
+      {
+        onSuccess: () => {
+          setBlockConfirming(false);
+          setBlockCreated(true);
+        },
+        onError: (err) =>
+          setBlockError(extractErrorMessage(err, '차단하지 못했어요. 잠시 후 다시 시도해 주세요.')),
+      },
+    );
+  }
 
   function handleAccept() {
     setActionError(null);
@@ -654,6 +685,56 @@ export function MyTeamContactDetailClient({ contactId }: { contactId: string }) 
               신고하기
             </button>
           )}
+
+          {/* 차단 걸기는 여기가 진입점이다 — 해제는 팀 설정 화면에 있다. 되돌릴 수 있는 동작이고
+              같은 도메인의 '차단 해제' 도 확인 단계를 두지 않으므로, 모달 대신 2단계 인라인
+              확인으로 오클릭만 막는다. */}
+          {!canBlock ? null : blockCreated ? (
+            <div role="status" className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+              {counterpartTeamName} 팀을 차단했어요. 이제 이 팀은 컨택을 보낼 수 없어요. 팀 설정에서 해제할 수 있어요.
+            </div>
+          ) : blockConfirming ? (
+            <div role="group" aria-label="팀 차단 확인" style={{ display: 'grid', gap: 8 }}>
+              <div className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+                차단하면 {counterpartTeamName} 팀은 우리 팀에 컨택을 보낼 수 없어요. 팀 설정에서 언제든 해제할 수 있어요.
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  className="tm-btn tm-btn-lg tm-btn-neutral"
+                  style={{ flex: 1, minHeight: 44 }}
+                  onClick={() => setBlockConfirming(false)}
+                  disabled={createBlock.isPending}
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  className="tm-btn tm-btn-lg tm-btn-danger"
+                  style={{ flex: 1, minHeight: 44 }}
+                  onClick={handleCreateBlock}
+                  disabled={createBlock.isPending}
+                >
+                  {createBlock.isPending ? '차단하는 중' : '차단하기'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="tm-btn tm-btn-lg tm-btn-outline tm-btn-block"
+              style={{ minHeight: 44 }}
+              onClick={() => setBlockConfirming(true)}
+            >
+              차단하기
+            </button>
+          )}
+
+          {blockError ? (
+            <div role="alert" className="tm-text-caption" style={{ color: 'var(--red700)' }}>
+              {blockError}
+            </div>
+          ) : null}
         </div>
       </div>
 

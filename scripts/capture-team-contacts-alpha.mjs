@@ -59,10 +59,13 @@ async function login(email, password) {
     body: JSON.stringify({ email, password }),
   });
   if (!res.ok) throw new Error(`login failed ${res.status} for ${email.replace(/(.{2}).*(@.*)/, '$1***$2')}`);
-  const setCookie = res.headers.get('set-cookie') ?? '';
-  const m = setCookie.match(/teameet_v1_session=([^;]+)/);
-  if (!m) throw new Error('세션 쿠키를 못 받았다');
-  return m[1];
+  // getSetCookie() 를 먼저 쓴다 — get() 은 Set-Cookie 가 여러 개일 때 하나의 문자열로 합쳐
+  // 돌려주므로 쿠키 경계가 흐려진다. 지금 alpha 는 이 쿠키 하나만 보내지만(실측), 나중에
+  // 쿠키가 늘어도 깨지지 않게 표준 API 를 쓴다. 구형 런타임 대비로 get() 폴백을 둔다.
+  const cookies = res.headers.getSetCookie?.() ?? [res.headers.get('set-cookie') ?? ''];
+  const token = cookies.map((c) => c.match(/teameet_v1_session=([^;]+)/)?.[1]).find(Boolean);
+  if (!token) throw new Error('세션 쿠키를 못 받았다');
+  return token;
 }
 
 /** 라이브 컨택 화면은 폴링이 있을 수 있어 networkidle 대신 domcontentloaded + 명시 대기. */

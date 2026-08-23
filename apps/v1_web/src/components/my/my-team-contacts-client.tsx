@@ -54,15 +54,33 @@ function truncateMessage(message: string, max = 30) {
   return `${trimmed.slice(0, max)}…`;
 }
 
-/** 컨택 만료까지 남은 시간을 계산한다 — 기존 date-utils 포맷터와 다른 "카운트다운" 값이라 로컬 계산. */
+const MINUTES_PER_HOUR = 60;
+const MINUTES_PER_DAY = 24 * MINUTES_PER_HOUR;
+
+/**
+ * 컨택 만료까지 남은 시간 — 기존 date-utils 포맷터와 다른 "카운트다운" 값이라 로컬 계산.
+ *
+ * 컨택 만료 창은 7일이라 시간 단위만 쓰면 `167시간 58분 후 만료돼요` 처럼 사람이 못 읽는
+ * 숫자가 나온다(alpha 시각 검증에서 실제로 그렇게 보였다). 하루 이상 남았으면 일 단위로 접는다.
+ *
+ * 남은 시간은 **항상 내림한다.** 만료 안내를 실제보다 길게 말하면 사용자가 늦게 대응하므로,
+ * 6일 23시간이 남았을 때 "7일" 이 아니라 "6일 23시간" 으로 보수적으로 표시한다.
+ */
 function formatExpiresIn(expiresAt: string): string {
   const target = new Date(expiresAt).getTime();
   if (Number.isNaN(target)) return '';
   const diffMs = target - Date.now();
   if (diffMs <= 0) return '곧 만료돼요';
+
   const totalMinutes = Math.floor(diffMs / 60000);
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
+  const days = Math.floor(totalMinutes / MINUTES_PER_DAY);
+  if (days >= 1) {
+    const hours = Math.floor((totalMinutes % MINUTES_PER_DAY) / MINUTES_PER_HOUR);
+    return hours > 0 ? `${days}일 ${hours}시간 후 만료돼요` : `${days}일 후 만료돼요`;
+  }
+
+  const hours = Math.floor(totalMinutes / MINUTES_PER_HOUR);
+  const minutes = totalMinutes % MINUTES_PER_HOUR;
   if (hours > 0) return `${hours}시간 ${minutes}분 후 만료돼요`;
   return `${minutes}분 후 만료돼요`;
 }

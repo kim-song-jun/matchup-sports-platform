@@ -7,6 +7,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService } from '../common/admin-context.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { ArrayMaxSize, IsArray, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -115,6 +116,7 @@ export class TournamentReviewsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly adminContext: AdminContextService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   private buildReviewWhere(
@@ -571,6 +573,16 @@ export class TournamentReviewsService {
       });
     }
 
+    /**
+     * 이번 저장으로 **새로 수상한 사람**만 담는다. 알림 발송 대상이다.
+     *
+     * `setAwards` 는 전체 교체(deleteMany + 재생성)라, 저장할 때마다 전원에게 보내면
+     * 어드민이 오타 하나 고칠 때도 같은 사람에게 축하 알림이 다시 간다. 감사 로그용으로
+     * 이미 뜨는 `before` 스냅샷을 그대로 재사용해 (수상항목, 수상자) 쌍이 새로 생긴
+     * 경우만 고른다 — 같은 사람이 다른 상을 새로 받은 것도 새 수상으로 친다.
+     */
+    const newlyAwarded: Array<{ userId: string; awardLabel: string }> = [];
+
     // 스냅샷 → 전체 교체 → 감사 기록을 한 트랜잭션에서 원자적으로 수행
     // (감사 로그 실패 시 데이터 변경도 함께 롤백, before/after drift 방지 — 타 admin mutation과 동일 패턴)
     await this.prisma.$transaction(async (tx) => {
@@ -578,6 +590,20 @@ export class TournamentReviewsService {
         where: { tournamentId },
         orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
       });
+
+      // 키는 JSON 배열로 만든다 — awardType 이 자유 문자열이라 구분자를 문자로 고르면
+      // 그 문자가 값에 섞였을 때 서로 다른 쌍이 같은 키로 뭉개진다.
+      const pairKey = (awardType: string, userId: string) => JSON.stringify([awardType, userId]);
+      const previousPairs = new Set(
+        before
+          .filter((a) => a.recipientUserId !== null)
+          .map((a) => pairKey(a.awardType, a.recipientUserId as string)),
+      );
+      for (const a of awards) {
+        if (a.recipientUserId === null || a.recipientUserId === undefined) continue;
+        if (previousPairs.has(pairKey(a.awardType, a.recipientUserId))) continue;
+        newlyAwarded.push({ userId: a.recipientUserId, awardLabel: a.awardLabel });
+      }
 
       await tx.v1TournamentAward.deleteMany({ where: { tournamentId } });
       for (const [idx, a] of awards.entries()) {
@@ -624,6 +650,23 @@ export class TournamentReviewsService {
         tx,
       );
     });
+
+    /**
+     * 알림은 **트랜잭션 밖**에서 보낸다. 발송은 fire-and-forget 이고 외부(web-push)로
+     * 나가므로, 트랜잭션 안에 두면 알림 실패가 수상 저장을 롤백시킬 수 있다 —
+     * 이 저장소의 다른 알림 호출부(tournaments-admin.service.ts)도 같은 위치다.
+     *
+     * 사람마다 받은 상이 다르므로 emitNotificationToMany 로 뭉뚱그리지 않고 개별
+     * 발송한다 — 본문에 상 이름을 담아야 "무엇을 받았는지"가 알림만 보고 전해진다.
+     */
+    for (const recipient of newlyAwarded) {
+      await this.notifications.emitNotification(
+        recipient.userId,
+        'tournament_award_received',
+        tournamentId,
+        `${tournament.title} — '${recipient.awardLabel}' 수상자로 선정됐어요.`,
+      );
+    }
 
     return this.listAwardsInternal(tournamentId);
   }

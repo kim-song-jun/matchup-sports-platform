@@ -13,6 +13,7 @@ import {
   AdminMatchListQueryDto,
   AdminOverviewQueryDto,
   AdminPopupListQueryDto,
+  AdminReportedTeamListQueryDto,
   AdminTeamListQueryDto,
   AdminTeamMatchListQueryDto,
   AdminNoticeListQueryDto,
@@ -280,6 +281,13 @@ export class AdminController {
     @Body() dto: ChangeInquiryStatusDto,
   ) {
     return this.adminService.changeInquiryStatus(user, inquiryId, dto);
+  }
+
+  // ─── Reports (신고 롤업 / 대리 차단) ───────────────────────────────────────
+
+  @Get('reports/teams')
+  listReportedTeams(@CurrentUser() user: V1AuthUser, @Query() query: AdminReportedTeamListQueryDto) {
+    return this.adminService.listReportedTeams(user, query);
   }
 
   // ─── Team Matches ─────────────────────────────────────────────────────────

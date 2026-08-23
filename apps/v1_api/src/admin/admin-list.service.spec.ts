@@ -130,6 +130,32 @@ function makeInquiryRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
+// getInquiry()의 select 는 목록보다 필드가 많다(body/contact/replies + reportedTeam 관계).
+function makeInquiryDetailRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'inq-1',
+    userId: 'u-1',
+    guestEmail: null,
+    guestPhone: null,
+    category: 'account',
+    title: '로그인 문의',
+    body: '문의 본문입니다.',
+    contact: null,
+    relatedType: null,
+    relatedId: null,
+    reportReason: null,
+    reportedTeamId: null,
+    reportedTeam: null,
+    status: 'received',
+    closedAt: null,
+    createdAt: new Date('2026-07-18T00:00:00.000Z'),
+    updatedAt: new Date('2026-07-18T00:00:00.000Z'),
+    user: { email: 'user@teameet.v1', profile: { nickname: '문의자', displayName: '문의자' } },
+    replies: [],
+    ...overrides,
+  };
+}
+
 // ─── Test setup ───────────────────────────────────────────────────────────────
 
 describe('AdminService — list/detail endpoints', () => {
@@ -140,7 +166,7 @@ describe('AdminService — list/detail endpoints', () => {
     v1Match: { findMany: jest.Mock; findUnique: jest.Mock; groupBy: jest.Mock };
     v1Team: { findMany: jest.Mock; findUnique: jest.Mock; groupBy: jest.Mock };
     v1TeamMatch: { findMany: jest.Mock; findUnique: jest.Mock; groupBy: jest.Mock };
-    v1Inquiry: { findMany: jest.Mock; groupBy: jest.Mock; count: jest.Mock };
+    v1Inquiry: { findMany: jest.Mock; findUnique: jest.Mock; groupBy: jest.Mock; count: jest.Mock };
     v1Tournament: { count: jest.Mock; findMany: jest.Mock };
     v1TournamentRegistration: { groupBy: jest.Mock };
     v1TournamentFixture: { groupBy: jest.Mock };
@@ -154,7 +180,12 @@ describe('AdminService — list/detail endpoints', () => {
       v1Match: { findMany: jest.fn(), findUnique: jest.fn(), groupBy: jest.fn().mockResolvedValue([]) },
       v1Team: { findMany: jest.fn(), findUnique: jest.fn(), groupBy: jest.fn().mockResolvedValue([]) },
       v1TeamMatch: { findMany: jest.fn(), findUnique: jest.fn(), groupBy: jest.fn().mockResolvedValue([]) },
-      v1Inquiry: { findMany: jest.fn(), groupBy: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(0) },
+      v1Inquiry: {
+        findMany: jest.fn(),
+        findUnique: jest.fn(),
+        groupBy: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+      },
       v1Tournament: { count: jest.fn().mockResolvedValue(0), findMany: jest.fn().mockResolvedValue([]) },
       v1TournamentRegistration: { groupBy: jest.fn().mockResolvedValue([]) },
       v1TournamentFixture: { groupBy: jest.fn().mockResolvedValue([]) },
@@ -841,6 +872,80 @@ describe('AdminService — list/detail endpoints', () => {
       expect(reportReasonGroupByArgs.where).not.toHaveProperty('reportReason');
       // 그래서 고르지 않은 사유의 건수도 그대로 보인다.
       expect(result.summary.byReportReason).toMatchObject({ spam: 2, harassment: 5 });
+    });
+  });
+
+  // ─── 신고 롤업 집계 ─────────────────────────────────────────────────────────
+
+  describe('신고 롤업', () => {
+    it('신고 상세에 대상 팀의 최근 30일 신고 요약이 붙는다', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(activeAdminRecord);
+      prisma.v1Inquiry.findUnique.mockResolvedValue({
+        ...makeInquiryDetailRow(),
+        category: 'report',
+        reportedTeamId: 'team-x',
+        reportedTeam: { id: 'team-x', name: '문제팀', status: 'active' },
+      });
+      prisma.v1Inquiry.count.mockResolvedValue(3);
+      prisma.v1Inquiry.groupBy.mockResolvedValue([
+        { reportReason: 'spam', _count: { _all: 2 } },
+        { reportReason: 'harassment', _count: { _all: 1 } },
+      ]);
+
+      const result = await service.getInquiry(adminAuthUser, 'inq-1');
+
+      expect(result.reportedTeam).toMatchObject({
+        teamId: 'team-x',
+        name: '문제팀',
+        status: 'active',
+        recentReportCount: 3,
+      });
+      expect(result.reportedTeam.reasonBreakdown).toEqual({ spam: 2, harassment: 1 });
+    });
+
+    it('대상 팀이 없는 문의는 요약이 null 이다', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(activeAdminRecord);
+      prisma.v1Inquiry.findUnique.mockResolvedValue({
+        ...makeInquiryDetailRow(),
+        category: 'account',
+        reportedTeamId: null,
+        reportedTeam: null,
+      });
+
+      const result = await service.getInquiry(adminAuthUser, 'inq-1');
+
+      expect(result.reportedTeam).toBeNull();
+      // 대상이 없으면 집계 쿼리를 아예 돌리지 않는다 — 모든 문의 상세가 비용을 치르면 안 된다.
+      expect(prisma.v1Inquiry.count).not.toHaveBeenCalled();
+    });
+
+    it('reportedTeamId 필터가 목록 조회에 걸린다', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(activeAdminRecord);
+      prisma.v1Inquiry.findMany.mockResolvedValue([makeInquiryRow()]);
+      prisma.v1Inquiry.groupBy.mockResolvedValue([]);
+
+      await service.listInquiries(adminAuthUser, { reportedTeamId: 'team-x' } as any);
+
+      expect(prisma.v1Inquiry.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ reportedTeamId: 'team-x' }) }),
+      );
+    });
+
+    it('신고 누적 팀 목록은 건수 내림차순으로 돌려준다', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(activeAdminRecord);
+      prisma.v1Inquiry.groupBy.mockResolvedValue([
+        { reportedTeamId: 'team-a', _count: { _all: 5 }, _max: { createdAt: new Date('2026-08-20') } },
+        { reportedTeamId: 'team-b', _count: { _all: 2 }, _max: { createdAt: new Date('2026-08-22') } },
+      ]);
+      prisma.v1Team.findMany.mockResolvedValue([
+        { id: 'team-a', name: 'A팀', status: 'active' },
+        { id: 'team-b', name: 'B팀', status: 'suspended' },
+      ]);
+
+      const result = await service.listReportedTeams(adminAuthUser, {} as any);
+
+      expect(result.items.map((i: any) => i.teamId)).toEqual(['team-a', 'team-b']);
+      expect(result.items[0]).toMatchObject({ name: 'A팀', status: 'active', totalCount: 5 });
     });
   });
 

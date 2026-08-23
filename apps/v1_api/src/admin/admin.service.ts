@@ -27,6 +27,7 @@ import {
   AdminMatchListQueryDto,
   AdminOverviewQueryDto,
   AdminPopupListQueryDto,
+  AdminReportedTeamListQueryDto,
   AdminGlobalSearchQueryDto,
   AdminTeamListQueryDto,
   AdminTeamMatchListQueryDto,
@@ -83,6 +84,8 @@ const INQUIRY_LIST_STATUSES = ['received', 'reviewing', 'answered', 'closed'] as
 const INQUIRY_CATEGORIES = ['account', 'match', 'team', 'tournament', 'payment_refund', 'report', 'other'] as const;
 const INQUIRY_REPORT_REASONS = ['spam', 'harassment', 'impersonation', 'inappropriate', 'other'] as const;
 const ADMIN_LIST_STATUSES = ['active', 'suspended', 'revoked'] as const;
+// 신고 롤업 집계 윈도우 — 신고 상세 요약과 신고 누적 팀 목록의 "최근" 이 이 값을 공유한다.
+const REPORT_ROLLUP_WINDOW_DAYS = 30;
 
 @Injectable()
 export class AdminService implements OnModuleInit, OnModuleDestroy {
@@ -1838,19 +1841,27 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     const reportReasonWhere: Prisma.V1InquiryWhereInput = query.reportReason
       ? { reportReason: query.reportReason }
       : {};
+    // reportedTeamId 는 칩이 없는 딥링크 필터라 "자기 facet" 이 없다 — 세 facet 모두에 건다.
+    // 그래야 특정 팀 신고함으로 들어왔을 때 사유 칩 건수가 "이 팀 안에서" 의 숫자가 된다.
+    const reportedTeamWhere: Prisma.V1InquiryWhereInput = query.reportedTeamId
+      ? { reportedTeamId: query.reportedTeamId }
+      : {};
     const statusFacetWhere: Prisma.V1InquiryWhereInput = {
       ...(query.category ? { category: query.category } : {}),
       ...reportReasonWhere,
+      ...reportedTeamWhere,
       ...searchWhere,
     };
     const categoryFacetWhere: Prisma.V1InquiryWhereInput = {
       ...(query.status ? { status: query.status } : {}),
       ...reportReasonWhere,
+      ...reportedTeamWhere,
       ...searchWhere,
     };
     const reportReasonFacetWhere: Prisma.V1InquiryWhereInput = {
       ...(query.status ? { status: query.status } : {}),
       ...(query.category ? { category: query.category } : {}),
+      ...reportedTeamWhere,
       ...searchWhere,
     };
     const [rows, statusGroups, categoryGroups, reportReasonGroups] = await Promise.all([this.prisma.v1Inquiry.findMany({
@@ -1954,6 +1965,8 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         relatedType: true,
         relatedId: true,
         reportReason: true,
+        reportedTeamId: true,
+        reportedTeam: { select: { id: true, name: true, status: true } },
         status: true,
         closedAt: true,
         createdAt: true,
@@ -1978,7 +1991,73 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       },
     });
     if (!row) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Inquiry was not found' });
-    return this.toAdminInquiryDetail(row);
+    // 대상 팀이 없으면 집계 쿼리를 돌리지 않는다 — 신고가 아닌 문의 상세가 비용을 치를 이유가 없다.
+    const reportedTeam = row.reportedTeam ? await this.buildReportedTeamSummary(row.reportedTeam) : null;
+    return this.toAdminInquiryDetail(row, reportedTeam);
+  }
+
+  /**
+   * 신고 누적 팀 랭킹 (GET /admin/reports/teams) — 반복 신고되는 팀을 운영자가 한눈에 보는 목록.
+   * 전체 누적 건수로 순위를 매긴다. 최근 30일만으로 세우면 과거에 반복 신고된 팀이 목록에서
+   * 사라진다 — 순위는 전체 누적, "최근" 컬럼만 30일 윈도우로 별도 표기한다.
+   */
+  async listReportedTeams(user: V1AuthUser, query: AdminReportedTeamListQueryDto) {
+    await this.getActiveAdmin(user.id);
+    const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
+    const since = new Date(Date.now() - REPORT_ROLLUP_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+
+    const allGroups = await this.prisma.v1Inquiry.groupBy({
+      by: ['reportedTeamId'],
+      where: { category: 'report', reportedTeamId: { not: null } },
+      _count: { _all: true },
+      _max: { createdAt: true },
+    });
+    // 랭킹 정렬은 JS 에서 한다(hubInbox 와 같은 관용구) — groupBy 의 _count 기준 orderBy 는
+    // 이 저장소 어디서도 쓰지 않아 안전성이 검증돼 있지 않다.
+    const groups = [...allGroups].sort((a, b) => b._count._all - a._count._all).slice(0, limit);
+    const teamIds = groups.map((group) => group.reportedTeamId as string);
+    if (teamIds.length === 0) return { items: [], windowDays: REPORT_ROLLUP_WINDOW_DAYS };
+
+    const [teams, recentGroups, reasonGroups] = await Promise.all([
+      this.prisma.v1Team.findMany({ where: { id: { in: teamIds } }, select: { id: true, name: true, status: true } }),
+      this.prisma.v1Inquiry.groupBy({
+        by: ['reportedTeamId'],
+        where: { category: 'report', reportedTeamId: { in: teamIds }, createdAt: { gte: since } },
+        _count: { _all: true },
+      }),
+      this.prisma.v1Inquiry.groupBy({
+        by: ['reportedTeamId', 'reportReason'],
+        where: { category: 'report', reportedTeamId: { in: teamIds } },
+        _count: { _all: true },
+      }),
+    ]);
+
+    const teamById = new Map(teams.map((team) => [team.id, team]));
+    const recentById = new Map(recentGroups.map((group) => [group.reportedTeamId as string, group._count._all]));
+    const topReasonById = new Map<string, string | null>();
+    for (const teamId of teamIds) {
+      const rows = reasonGroups
+        .filter((group) => group.reportedTeamId === teamId && group.reportReason !== null)
+        .sort((a, b) => b._count._all - a._count._all);
+      topReasonById.set(teamId, (rows[0]?.reportReason as string | undefined) ?? null);
+    }
+
+    return {
+      items: groups.map((group) => {
+        const teamId = group.reportedTeamId as string;
+        const team = teamById.get(teamId);
+        return {
+          teamId,
+          name: team?.name ?? null,
+          status: team?.status ?? null,
+          totalCount: group._count._all,
+          recentCount: recentById.get(teamId) ?? 0,
+          topReason: topReasonById.get(teamId) ?? null,
+          lastReportedAt: group._max.createdAt,
+        };
+      }),
+      windowDays: REPORT_ROLLUP_WINDOW_DAYS,
+    };
   }
 
   async replyInquiry(user: V1AuthUser, inquiryId: string, dto: ReplyInquiryDto) {
@@ -2904,7 +2983,14 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         user: { email: string | null; profile: { nickname: string | null; displayName: string | null } | null };
       } | null;
     }>;
-  }) {
+  }, reportedTeam: {
+    teamId: string;
+    name: string;
+    status: string;
+    windowDays: number;
+    recentReportCount: number;
+    reasonBreakdown: Record<string, number>;
+  } | null) {
     return {
       ...this.toAdminInquiryRow({
         id: row.id,
@@ -2938,6 +3024,33 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         createdAt: reply.createdAt,
         updatedAt: reply.updatedAt,
       })),
+      reportedTeam,
+    };
+  }
+
+  /** 신고 대상 팀의 최근 30일 누적. 조치를 판단하는 자리(문의 상세)에 맥락을 놓는 것이 목적이다. */
+  private async buildReportedTeamSummary(team: { id: string; name: string; status: string }) {
+    const since = new Date(Date.now() - REPORT_ROLLUP_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+    const where: Prisma.V1InquiryWhereInput = {
+      reportedTeamId: team.id,
+      category: 'report',
+      createdAt: { gte: since },
+    };
+    const [recentReportCount, reasonGroups] = await Promise.all([
+      this.prisma.v1Inquiry.count({ where }),
+      this.prisma.v1Inquiry.groupBy({ by: ['reportReason'], where, _count: { _all: true } }),
+    ]);
+    return {
+      teamId: team.id,
+      name: team.name,
+      status: team.status,
+      windowDays: REPORT_ROLLUP_WINDOW_DAYS,
+      recentReportCount,
+      reasonBreakdown: Object.fromEntries(
+        reasonGroups
+          .filter((group) => group.reportReason !== null)
+          .map((group) => [group.reportReason as string, group._count._all]),
+      ),
     };
   }
 }

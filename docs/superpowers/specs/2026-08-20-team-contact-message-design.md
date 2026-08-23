@@ -341,7 +341,7 @@ $transaction 내부:
 
 - **차단**: `V1TeamContactBlock`, `@@unique([teamId, blockedTeamId])`. 발신 시 **양방향** 체크(내가 차단했거나 상대가 나를 차단했으면 실패).
 - **실패 사유 통일**: 차단됨 / `contactPolicy='closed'` / `recruiting_only`인데 모집 중이 아님 — **전부 같은 응답**을 준다.
-  `403 TEAM_CONTACT_NOT_ACCEPTING` + "이 팀은 지금 컨택을 받지 않고 있어요"
+  `403 TEAM_CONTACT_NOT_ACCEPTING` + "이 팀은 지금 컨택을 받지 않고 있어요."
   → 응답 차이로 "우리가 차단당했구나"를 역추론할 수 없게 한다.
 - **신고**: 새 모델 0개. `V1Inquiry(category='report', relatedType='team_contact', relatedId=contactId)` 생성.
   처리도 기존 문의 워크플로(`received→reviewing→answered→closed`) 그대로.

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { V1ApiError } from '@/lib/api-client';
 import type { V1FixtureLineupAccess } from '@/hooks/use-v1-api';
@@ -895,11 +895,37 @@ describe('FixtureLineupPageClient — 라인업 충돌(VERSION_CONFLICT)에서 �
         },
       ],
     });
-    hoisted.useV1GameLineupsMock.mockReturnValue({
-      data: [serverLatest], isLoading: false, isError: false, error: null, refetch: lineupsRefetch,
-    });
+    /**
+     * refetch 를 **deferred** 로 만든다(Copilot 리뷰 지적). 클릭 전에 목 데이터를
+     * 최신본으로 바꿔 두면 `await` 를 빼먹어도 테스트가 통과해서, PR 이 내세운
+     * "refetch 를 먼저 await 한다"는 계약을 하나도 고정하지 못한다.
+     *
+     * 최신 데이터는 **resolve 시점에** 들어가게 한다 — 그래야 await 를 빼먹은 구현은
+     * 아직 낡은 데이터로 재하이드레이션해서(=김후보 편집이 사라지고 김알파도 없는
+     * 상태) 아래 단언에 걸린다.
+     */
+    let resolveRefetch: (() => void) | null = null;
+    lineupsRefetch.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveRefetch = () => {
+            hoisted.useV1GameLineupsMock.mockReturnValue({
+              data: [serverLatest], isLoading: false, isError: false, error: null, refetch: lineupsRefetch,
+            });
+            resolve({ isError: false, data: [serverLatest] });
+          };
+        }),
+    );
 
     fireEvent.click(screen.getByRole('button', { name: '최신 명단 불러오기' }));
+
+    // resolve 전에는 아무것도 바뀌지 않는다 — 내 편집이 그대로 남아 있어야 한다.
+    expect(screen.getByRole('checkbox', { name: '김후보 선발' })).toBeChecked();
+    expect(screen.queryByRole('checkbox', { name: '김알파 선발' })).not.toBeChecked();
+
+    await act(async () => {
+      resolveRefetch?.();
+    });
 
     // ② 새로고침 없이 최신본으로 다시 선다 — 서버의 김알파가 선발로 올라오고,
     //    버렸다고 명시한 내 편집(김후보)은 사라진다.

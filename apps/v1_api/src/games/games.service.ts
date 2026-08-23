@@ -32,7 +32,11 @@ import type {
 } from '../common/audit/operation-audit.contract';
 import { OperationAuditWriterService } from '../common/audit/operation-audit-writer.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { TournamentDisciplineService } from '../tournaments/discipline/tournament-discipline.service';
+import {
+  evaluateSuspension,
+  suspensionRulesEnabled,
+  type PlayedGameCards,
+} from '../tournaments/discipline/card-suspension';
 import { cascadeCompleteTeamMatchSchedulesInTx } from '../team-schedules/team-schedules.service';
 import {
   parseLineupCatalog,
@@ -659,7 +663,6 @@ export class GamesService {
     private readonly prisma: PrismaService,
     private readonly operationAuditWriter: OperationAuditWriterService,
     private readonly takeover: GameTakeoverService,
-    private readonly discipline: TournamentDisciplineService,
   ) {}
 
   async createFromSourceInTransaction(
@@ -4117,7 +4120,7 @@ export class GamesService {
     )?.tournamentFixture;
     if (fixture === null || fixture === undefined) return;
 
-    const verdicts = await this.discipline.verdictsForFixture(fixture.tournamentId, fixture.id);
+    const verdicts = await this.suspensionVerdicts(tx, fixture.tournamentId, fixture.id);
     if (verdicts.size === 0) return; // 규정 미적용이거나 누적 카드가 아직 없다.
 
     const starters = await tx.v1GameParticipant.findMany({
@@ -4139,6 +4142,82 @@ export class GamesService {
       message: `${blocked.map((entry) => entry.name).join(', ')} 선수는 출전정지 상태예요. 선발에서 빼고 다시 제출해 주세요.`,
       details: { blocked },
     });
+  }
+
+  /**
+   * 이 대회에서 카드가 누적된 선수들의 `fixtureId` 경기 정지 여부. 규칙 자체는
+   * `card-suspension.ts`(순수 함수, DB 없이 전수 테스트)에 있고 여기서는 조회만 한다.
+   *
+   * **별도 주입 서비스로 빼지 않은 이유**: `GamesService` 생성자에 인자를 하나 더하면
+   * 이 클래스를 직접 `new` 하는 통합 스펙 41곳이 전부 깨진다(CI 실측 — 그 스펙들의
+   * 타입은 로컬 `tsc -p tsconfig.json` 대상 밖이라 로컬에서는 보이지도 않는다).
+   * 게다가 여기서 `tx` 를 쓰면 제출과 **같은 트랜잭션**에서 읽어 더 정확하다.
+   *
+   * **판정 단위는 사용자(userId)다.** 참가자 행은 경기마다 새로 생기므로 그것으로는
+   * 대회 전체 누적을 셀 수 없고, 이름 문자열로 묶으면 동명이인이 서로의 카드를
+   * 뒤집어쓴다. 계정 미연결 참가자는 대상에서 빠진다.
+   */
+  private async suspensionVerdicts(tx: Transaction, tournamentId: string, fixtureId: string) {
+    const tournament = await tx.v1Tournament.findUnique({
+      where: { id: tournamentId },
+      select: { yellowAccumulationLimit: true, redCardSuspensionMatches: true },
+    });
+    const rules = {
+      yellowAccumulationLimit: tournament?.yellowAccumulationLimit ?? null,
+      redCardSuspensionMatches: tournament?.redCardSuspensionMatches ?? null,
+    };
+    // 규정이 꺼져 있으면 **조회조차 하지 않는다** — 대다수 대회가 그렇다.
+    if (!suspensionRulesEnabled(rules)) return new Map<string, ReturnType<typeof evaluateSuspension>>();
+
+    // 일정 순서 = "정지는 다음 경기부터"라는 규칙의 기준틀. scheduledAt 이 없는 픽스처는
+    // 라운드·번호로 이어 정렬한다 — 순서를 못 정하면 판정 자체가 불가능하다.
+    const fixtures = await tx.v1TournamentFixture.findMany({
+      where: { tournamentId },
+      orderBy: [{ scheduledAt: 'asc' }, { round: 'asc' }, { fixtureNumber: 'asc' }],
+      select: { id: true, game: { select: { currentOfficialRevisionId: true } } },
+    });
+    const orderByFixtureId = new Map(fixtures.map((fixture, index) => [fixture.id, index + 1]));
+    const upcomingGameOrder = orderByFixtureId.get(fixtureId);
+    if (upcomingGameOrder === undefined) return new Map<string, ReturnType<typeof evaluateSuspension>>();
+
+    // **현재 공식 리비전만** 센다. 초안·이전 리비전까지 세면 정정 이력이 카드로 중복
+    // 집계돼 멀쩡한 선수가 정지된다.
+    const revisionToOrder = new Map<string, number>();
+    for (const fixture of fixtures) {
+      const revisionId = fixture.game?.currentOfficialRevisionId ?? null;
+      const order = orderByFixtureId.get(fixture.id);
+      if (revisionId !== null && order !== undefined) revisionToOrder.set(revisionId, order);
+    }
+    if (revisionToOrder.size === 0) return new Map<string, ReturnType<typeof evaluateSuspension>>();
+
+    const resultParticipants = await tx.v1GameResultParticipant.findMany({
+      where: { resultRevisionId: { in: [...revisionToOrder.keys()] } },
+      select: { resultRevisionId: true, participantId: true, cards: true },
+    });
+    if (resultParticipants.length === 0) return new Map<string, ReturnType<typeof evaluateSuspension>>();
+
+    const participants = await tx.v1GameParticipant.findMany({
+      where: { id: { in: resultParticipants.map((row) => row.participantId) } },
+      select: { id: true, userId: true },
+    });
+    const userByParticipantId = new Map(participants.map((row) => [row.id, row.userId]));
+
+    const playedByUserId = new Map<string, PlayedGameCards[]>();
+    for (const row of resultParticipants) {
+      const userId = userByParticipantId.get(row.participantId) ?? null;
+      if (userId === null) continue;
+      const gameOrder = revisionToOrder.get(row.resultRevisionId);
+      if (gameOrder === undefined) continue;
+      const bucket = playedByUserId.get(userId) ?? [];
+      bucket.push({ gameOrder, cards: readResultCards(row.cards) });
+      playedByUserId.set(userId, bucket);
+    }
+
+    const verdicts = new Map<string, ReturnType<typeof evaluateSuspension>>();
+    for (const [userId, played] of playedByUserId) {
+      verdicts.set(userId, evaluateSuspension({ rules, played, upcomingGameOrder }));
+    }
+    return verdicts;
   }
 
   private async resolveActor(
@@ -5890,4 +5969,24 @@ export class GamesService {
   private forbidden() {
     return new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Actor scope is not permitted' });
   }
+}
+
+/**
+ * `V1GameResultParticipant.cards`(Json)에서 카드 수를 읽는다. 저장 모양은
+ * `{ yellow: number, red: number }` 뿐이다(`parseFairPlayCards` 주석 참고 — 경고 누적
+ * 퇴장과 직접 퇴장을 구분하는 필드가 데이터 모델에 없다). 모양이 다르면 0으로 본다 —
+ * 판정을 못 하는 것이 잘못 막는 것보다 낫다.
+ */
+function readResultCards(value: unknown): { yellow: number; red: number } {
+  if (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    typeof (value as { yellow?: unknown }).yellow === 'number' &&
+    typeof (value as { red?: unknown }).red === 'number'
+  ) {
+    const record = value as { yellow: number; red: number };
+    return { yellow: record.yellow, red: record.red };
+  }
+  return { yellow: 0, red: 0 };
 }

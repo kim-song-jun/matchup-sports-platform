@@ -116,6 +116,23 @@ export interface V1PromotionPreviewEntry {
   computedKind: V1PromotionKind;
   toTier: number;
   toTierLabel: string;
+  // ── 순위 근거 (감사 H-5) ─────────────────────────────────────────────────
+  // "왜 이 팀이 3위인가"를 이 화면만 보고 설명할 수 있어야 한다 — 확인하려고 관리자
+  // 화면을 벗어나 공개 순위표 주소를 손으로 조합해 나가지 않아도 된다.
+  points: number;
+  played: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalDifference: number;
+}
+
+/** 감사 H-5 — tie-break 기준을 전부 소진하고도 갈리지 않아 팀ID 사전순 폴백으로 순위가 결정된 팀 그룹. */
+export interface V1PromotionTieBreakGroup {
+  teamIds: string[];
+  teamNames: string[];
 }
 
 export interface V1PromotionPreviewTier {
@@ -127,6 +144,13 @@ export interface V1PromotionPreviewTier {
   relegateCount: number;
   skippedByMajorityGuard: boolean;
   nextSeasonTeamCount: number;
+  /**
+   * 감사 H-5 — 이 티어에서 동률이 실제로 발생해 팀ID 사전순으로 순위가 갈린 팀들.
+   * 없으면 빈 배열(대부분의 시즌은 여기 안 걸린다). 화면은 이 배열이 비어 있지 않으면
+   * "동률이라 임의로 갈렸어요" 안내를 띄워야 한다 — 강등된 팀이 순위표만 보고는 납득할
+   * 수 없는 유일한 경우다.
+   */
+  tieBreakGroups: V1PromotionTieBreakGroup[];
   entries: V1PromotionPreviewEntry[];
 }
 

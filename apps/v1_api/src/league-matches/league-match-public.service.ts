@@ -3,7 +3,14 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { isParticipantPubliclyEligible, loadParticipantConsentEligibility } from '../games/public-records/public-consent';
 import { LEAGUE_STATE_PRIORITY_ORDER, paginateByStatePriority, sortMyLeaguesByState } from './league-lifecycle-rules';
-import { calculateLeagueStandings, LeagueTieBreakCriterion } from './league-standings';
+import { calculateLeagueStandingsWithTieBreakInfo, LeagueTieBreakCriterion } from './league-standings';
+import {
+  classifyPromotionKind,
+  resolvePromotionRule,
+  resolvePromotionToTier,
+  tierSlotCounts,
+  type PromotionKind,
+} from './league-promotion';
 import { FORFEIT_REASON_MARKER } from './league-match-forfeit.service';
 import { ListLeagueMatchesQueryDto } from './dto/league-match.dto';
 
@@ -164,12 +171,30 @@ export class LeagueMatchPublicService {
     // 메모리 정렬로 충분하다. 규칙과 근거는 sortMyLeaguesByState 참고.
     const ordered = sortMyLeaguesByState(leagues);
 
+    // 감사 보통 — "우리 팀 몇 등?" / "다음 경기 언제?" 가 없어서 참가 중인 리그마다
+    // 상세로 들어가야 했다. draft 리그(대진이 아직 없는 상태 -- V1League.state 는
+    // "draft -> active 는 대진 생성 시"의 정확한 투영이다, league-lifecycle-rules.ts 참고)는
+    // 순위·다음 경기 자체가 존재할 수 없어 계산에서 아예 뺀다 -- N+1 을 줄이는 첫 단계.
+    // 남은 리그(active/completed)에 대해서만 standings() 를 병렬 호출한다: 이 목록은
+    // 사용자의 소속 팀 수가 상한이고 페이지네이션이 없어(위 listMine 문서 참고) 최악의
+    // 경우에도 "팀 수" 규모지 "전체 리그 수" 규모가 아니다. standings() 가 이미 계산해
+    // 둔 pendingFixtures 를 다음 경기 후보로 그대로 재사용한다 -- "다음 경기"만을 위한
+    // 별도 쿼리를 새로 만들면 리그당 왕복이 하나 더 늘어난다.
+    const computable = ordered.filter((league) => league.state !== 'draft');
+    const standingsResults = await Promise.all(computable.map((league) => this.standings(league.id)));
+    const standingsByLeagueId = new Map(computable.map((league, index) => [league.id, standingsResults[index]]));
+
     return {
       items: ordered.map((league) => {
         // league.teams 는 위에서 이미 내 팀으로 좁혀져 있다. 한 리그에 내 팀이 둘 이상
         // 있을 수 있어(같은 사용자가 두 팀 소속) 배열 그대로 싣는다 -- 하나만 고르면
         // 화면이 "왜 내 다른 팀은 안 보이지"가 된다.
         const mine = league.teams;
+        const result = standingsByLeagueId.get(league.id) ?? null;
+        // 상대팀 이름 조회용 -- result.standings 는 이 리그의 전체 참가팀을 담고 있어
+        // pendingFixtures 의 상대팀 id 를 항상 여기서 찾을 수 있다(같은 리그 내 대진이므로).
+        const teamNameById = new Map((result?.standings ?? []).map((row) => [row.teamId, row.teamName]));
+
         return {
           leagueId: league.id,
           title: league.title,
@@ -183,7 +208,40 @@ export class LeagueMatchPublicService {
           seasonNo: league.seasonNo,
           seriesTitle: league.series?.title ?? null,
           teamCount: league._count.teams,
-          myTeams: mine.map((entry) => ({ teamId: entry.teamId, name: entry.team.name })),
+          myTeams: mine.map((entry) => {
+            const standingRow = result?.standings.find((row) => row.teamId === entry.teamId) ?? null;
+            // 취소는 standings() 안에서 이미 pendingFixtures 대상에서 빠져 있다(R8) --
+            // 여기서 다시 필터링할 필요가 없다. 시작 시각 오름차순으로 가장 이른 것 하나만 고른다.
+            const nextFixture = (result?.pendingFixtures ?? [])
+              .filter((fixture) => fixture.homeTeamId === entry.teamId || fixture.awayTeamId === entry.teamId)
+              .sort((a, b) => a.startAt.getTime() - b.startAt.getTime())
+              .at(0) ?? null;
+            const opponentTeamId =
+              nextFixture === null ? null : nextFixture.homeTeamId === entry.teamId ? nextFixture.awayTeamId : nextFixture.homeTeamId;
+
+            return {
+              teamId: entry.teamId,
+              name: entry.team.name,
+              // draft 리그거나(result=null) 이 팀이 어떤 이유로든 순위표에 없으면 null.
+              standing: standingRow === null ? null : {
+                position: standingRow.position,
+                points: standingRow.points,
+                played: standingRow.played,
+                wins: standingRow.wins,
+                draws: standingRow.draws,
+                losses: standingRow.losses,
+                goalDifference: standingRow.goalsFor - standingRow.goalsAgainst,
+              },
+              // completed 리그는 남은 대진이 없어(D-3) 자연히 null -- "이미 끝난 리그"와
+              // "아직 대진 자체가 없는 리그" 양쪽 다 여기서 별도 분기 없이 null로 처리된다.
+              nextFixture: nextFixture === null ? null : {
+                teamMatchId: nextFixture.teamMatchId,
+                startAt: nextFixture.startAt,
+                opponentTeamId,
+                opponentTeamName: opponentTeamId === null ? null : teamNameById.get(opponentTeamId) ?? null,
+              },
+            };
+          }),
         };
       }),
     };
@@ -302,7 +360,11 @@ export class LeagueMatchPublicService {
     const tieBreakOrder = (league.tieBreakJson as { order?: LeagueTieBreakCriterion[] }).order ?? [
       'points', 'goalDifference', 'goalsFor', 'headToHead',
     ];
-    const standings = calculateLeagueStandings({ teamIds, fixtures: confirmedFixtures, tieBreakOrder });
+    // calculateLeagueStandingsWithTieBreakInfo 는 calculateLeagueStandings 와 완전히 같은
+    // 정렬을 하면서 tie-break 가 전부 소진돼 팀ID 사전순 폴백으로 갈린 그룹도 함께
+    // 돌려준다(감사 H-5) -- "강등당한 팀이 왜 강등인지 납득할 근거가 없다"는 문제를
+    // 승강 확정 화면뿐 아니라 이 공개 순위표에서도 같은 계산 한 번으로 함께 해결한다.
+    const { standings, tieGroups } = calculateLeagueStandingsWithTieBreakInfo({ teamIds, fixtures: confirmedFixtures, tieBreakOrder });
     const teamNameById = new Map(league.teams.map((entry) => [entry.teamId, entry.team.name]));
     const teamLogoById = new Map(league.teams.map((entry) => [entry.teamId, entry.team.profile?.logoUrl ?? null]));
 
@@ -318,9 +380,42 @@ export class LeagueMatchPublicService {
       select: { teamId: true, kind: true, toTier: true },
     });
     const promotionByTeamId = new Map(promotions.map((row) => [row.teamId, row]));
+    const promotionDecided = promotions.length > 0;
 
-    const standingsWithTeamName = standings.map((row) => {
+    // 예상 승강 경계(감사 H-2) — 지금까지는 어드민이 시즌 끝에 최종 확정한 뒤(V1LeaguePromotion
+    // 행이 생긴 뒤)에만 승강 정보가 보였다. 2부 3위 팀 선수는 시즌 내내 자기가 승격권인지
+    // 강등권인지 모른 채 뛴 것 — 이 리그가 시리즈(티어 체계)에 속할 때만 의미가 있다(단발
+    // 리그는 티어 개념 자체가 없다). 슬롯 수 계산은 tierSlotCounts(league-promotion.ts)를
+    // 그대로 재사용한다 — 승강 확정 preview 와 같은 단일 소스라 20%/올림/최소1 같은 규칙이
+    // 두 화면에서 어긋날 일이 없다. 1티어 시리즈·최상위/최하위 티어의 경계 조건도
+    // tierSlotCounts 안에서 이미 처리된다(canPromote=tier>1, canRelegate=tier<tierCount).
+    //
+    // 확정 전(promotionDecided=false)에만 계산한다 — 확정 뒤에는 promotionKind 가 진실이고
+    // "예상"은 그 순간부터 무의미해진다(순위가 그새 바뀔 일이 없으니 다시 계산해도 값은
+    // 같겠지만, 두 필드가 동시에 화면에 노출되면 어느 쪽을 믿어야 하는지 헷갈린다). 필드
+    // 이름에 항상 "expected"를 붙여 확정 필드(promotionKind)와 타입 수준에서 섞이지 않게 한다.
+    // 지역 const 로 뽑아 두는 이유: `league.tier`(property access)는 아래 .map 클로저
+    // 안에서 narrowing 이 유지되지 않는다 — 지역 변수(`tier`)라야 TS 가 null 아님을
+    // 클로저 경계 너머로도 신뢰한다.
+    const tier = league.tier;
+    const promotionRule = league.series === null ? null : resolvePromotionRule(league.series.promotionRuleJson);
+    const promotionForecast =
+      promotionRule === null || tier === null || promotionDecided
+        ? null
+        : tierSlotCounts(promotionRule, tier, league.series!.tierCount, standings.length);
+
+    const standingsWithTeamName = standings.map((row, index) => {
       const promotion = promotionByTeamId.get(row.teamId);
+      let expectedPromotionKind: PromotionKind | null = null;
+      let expectedPromotionToTier: number | null = null;
+      let expectedPromotionToTierLabel: string | null = null;
+      if (promotionForecast !== null && tier !== null) {
+        expectedPromotionKind = promotionForecast.skippedByMajorityGuard
+          ? 'stayed'
+          : classifyPromotionKind(index, standings.length, promotionForecast.promoteCount, promotionForecast.relegateCount);
+        expectedPromotionToTier = resolvePromotionToTier(tier, expectedPromotionKind);
+        expectedPromotionToTierLabel = `${expectedPromotionToTier}부`;
+      }
       return {
         ...row,
         teamName: teamNameById.get(row.teamId) ?? '',
@@ -328,6 +423,9 @@ export class LeagueMatchPublicService {
         promotionKind: promotion?.kind ?? null,
         promotionToTier: promotion?.toTier ?? null,
         promotionToTierLabel: promotion === undefined ? null : `${promotion.toTier}부`,
+        expectedPromotionKind,
+        expectedPromotionToTier,
+        expectedPromotionToTierLabel,
       };
     });
 
@@ -341,7 +439,20 @@ export class LeagueMatchPublicService {
       // 이름은 dev 에 이미 머지된 #628 계약을 따른다(promotionDecided). 이 브랜치는
       // 한때 promotionsDecided 로 바꿨었지만, 그 사이 #628 이 dev 에 들어가 배포된
       // 계약이 되었으므로 새로 이름을 바꿀 이유가 없다 -- 통합 테스트도 이 이름을 본다.
-      promotionDecided: promotions.length > 0,
+      promotionDecided,
+      // 이 시즌·티어에 적용되는 승강 슬롯 수(확정 전에만 값 있음). 개별 팀 행의
+      // expectedPromotionKind 와 짝이다 -- 시리즈에 속하지 않거나 이미 확정됐으면 null.
+      promotionForecast: promotionForecast === null ? null : {
+        promoteSlots: promotionForecast.promoteCount,
+        relegateSlots: promotionForecast.relegateCount,
+        skippedByMajorityGuard: promotionForecast.skippedByMajorityGuard,
+      },
+      // 감사 H-5 — tie-break 기준을 전부 소진하고도 갈리지 않아 팀ID 사전순 폴백으로
+      // 순위가 결정된 팀 그룹. 대부분의 시즌은 빈 배열이다.
+      tieBreakGroups: tieGroups.map((group) => ({
+        teamIds: group.teamIds,
+        teamNames: group.teamIds.map((teamId) => teamNameById.get(teamId) ?? ''),
+      })),
     };
   }
 
@@ -404,7 +515,10 @@ export class LeagueMatchPublicService {
       where: { id: leagueId },
       include: {
         teams: { select: { teamId: true, team: { select: { name: true, profile: { select: { logoUrl: true } } } } } },
-        series: { select: { id: true, title: true, tierCount: true } },
+        // promotionRuleJson 은 예상 승강 경계(감사 H-2) 계산에 쓴다 -- 시즌 중에도
+        // "지금 순위라면 승격/강등권인가"를 알려주려면 확정 순위표뿐 아니라 이 시리즈의
+        // 승강 규칙까지 필요하다.
+        series: { select: { id: true, title: true, tierCount: true, promotionRuleJson: true } },
       },
     });
     if (league === null) {

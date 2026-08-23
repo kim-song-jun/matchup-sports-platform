@@ -300,3 +300,50 @@ describe('값을 모를 때(null) 화면이 숫자를 지어내지 않는다', (
     expect(screen.queryByText(/매너/)).not.toBeInTheDocument();
   });
 });
+
+/**
+ * alpha 실측 결함(그룹 A, C-1) — 이미 대진이 확정되거나 끝난 리그 경기를 비로그인
+ * 관전자가 열면 히어로가 "상대팀 · 모집 중 · 신청 후 승인"을 보여줬다. mode는
+ * viewerState만 보고 'default'로 떨어지는데(비참여자는 항상 default), 히어로는
+ * mode만 보고 문구를 정했기 때문 — 실제 상대팀 이름(approvedOpponentTeam)과 경기
+ * 진행 상태(API status)는 이미 model에 있는데도 화면이 쓰지 않았다.
+ */
+describe('상세 히어로 — 상대가 정해졌거나 끝난 매치는 "모집 중"이 아니다', () => {
+  it('상대팀이 승인 확정됐으면(승인 완료) 히어로가 실제 상대팀 이름을 보여준다', () => {
+    const model = getTeamMatchDetailViewModel('default');
+    model.match.status = 'closed';
+    model.match.applicantTeams = [{ name: '브라보FC', meta: '승인된 상대팀', status: '승인 완료' }];
+    model.statusLabel = '경기 종료';
+
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    expect(screen.getByText('브라보FC')).toBeInTheDocument();
+    // '경기 종료'는 히어로 서브 문구 + 데스크톱/모바일 CTA 카드 상태줄에도 같은 model.statusLabel을
+    // 재사용해 여러 곳에 나온다(기존 CTA 카드도 동일 패턴 — 위 '무료초청' 테스트 참고).
+    expect(screen.getAllByText('경기 종료').length).toBeGreaterThan(0);
+    expect(screen.queryByText('모집 중')).not.toBeInTheDocument();
+    expect(screen.queryByText('신청 후 승인')).not.toBeInTheDocument();
+  });
+
+  it('상대팀이 아직 없는 채로 마감됐으면(신청팀 0) "모집 마감"을 보여주고 "모집 중"은 보여주지 않는다', () => {
+    const model = getTeamMatchDetailViewModel('default');
+    model.match.status = 'closed';
+    model.match.applicantTeams = [];
+    model.statusLabel = '신청 마감';
+
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    expect(screen.getByText('모집 마감')).toBeInTheDocument();
+    expect(screen.queryByText('모집 중')).not.toBeInTheDocument();
+  });
+
+  it('아직 모집 중인 매치(status=open)는 예전처럼 "모집 중"을 그대로 보여준다(회귀 방지)', () => {
+    const model = getTeamMatchDetailViewModel('default');
+    model.match.status = 'open';
+    model.match.applicantTeams = [];
+
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    expect(screen.getByText('모집 중')).toBeInTheDocument();
+  });
+});

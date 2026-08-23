@@ -5,6 +5,10 @@ import { PromotionCommitPanel } from './promotion-commit-panel';
 import type { V1PromotionPreviewResponse } from '@/types/league-series';
 
 function entry(teamId: string, teamName: string, tier: number, position: number, computedKind: 'promoted' | 'relegated' | 'stayed') {
+  // 순위 근거 필드(감사 H-5)는 이 컴포넌트 테스트가 검증하는 대상이 아니라 위치만
+  // 반영한 임의값이다 — 값 자체의 정확성은 백엔드(league-promotion.spec.ts)가 검증한다.
+  const played = 10;
+  const points = (10 - position) * 2;
   return {
     teamId,
     teamName,
@@ -13,6 +17,14 @@ function entry(teamId: string, teamName: string, tier: number, position: number,
     computedKind,
     toTier: computedKind === 'promoted' ? tier - 1 : computedKind === 'relegated' ? tier + 1 : tier,
     toTierLabel: `${computedKind === 'promoted' ? tier - 1 : computedKind === 'relegated' ? tier + 1 : tier}부`,
+    points,
+    played,
+    wins: Math.floor(points / 3),
+    draws: points % 3,
+    losses: played - Math.floor(points / 3) - (points % 3),
+    goalsFor: played,
+    goalsAgainst: position,
+    goalDifference: played - position,
   } as const;
 }
 
@@ -33,6 +45,7 @@ const PREVIEW: V1PromotionPreviewResponse = {
       relegateCount: 1,
       skippedByMajorityGuard: false,
       nextSeasonTeamCount: 4,
+      tieBreakGroups: [],
       entries: [
         entry('t1', '알파', 1, 1, 'stayed'),
         entry('t2', '브라보', 1, 2, 'stayed'),
@@ -49,6 +62,7 @@ const PREVIEW: V1PromotionPreviewResponse = {
       relegateCount: 0,
       skippedByMajorityGuard: false,
       nextSeasonTeamCount: 4,
+      tieBreakGroups: [],
       entries: [
         entry('t5', '에코', 2, 1, 'promoted'),
         entry('t6', '폭스', 2, 2, 'stayed'),
@@ -147,6 +161,37 @@ describe('PromotionCommitPanel', () => {
     expect(within(tierSection('1부')).getByText('3팀')).toBeInTheDocument();
     // 2부는 영향을 받지 않는다.
     expect(within(tierSection('2부')).getByText('4팀')).toBeInTheDocument();
+  });
+
+  it('승점과 득실차를 항상 보여준다 (감사 H-5)', () => {
+    render(<PromotionCommitPanel preview={PREVIEW} submitting={false} onCommit={vi.fn()} />);
+    const tier1 = tierSection('1부');
+    // 델타(4위): points=(10-4)*2=12, goalDifference=10-4=6 — entry() 헬퍼의 계산 그대로.
+    expect(within(tier1).getByText('12점')).toBeInTheDocument();
+    expect(within(tier1).getByText('득실차 +6')).toBeInTheDocument();
+  });
+
+  it('tie-break 로 갈린 팀에만 임의 배정 경고가 붙는다 (감사 H-4)', () => {
+    const tied: V1PromotionPreviewResponse = {
+      ...PREVIEW,
+      tiers: PREVIEW.tiers.map((tier) =>
+        tier.tier === 1
+          ? { ...tier, tieBreakGroups: [{ teamIds: ['t3', 't4'], teamNames: ['찰리', '델타'] }] }
+          : tier,
+      ),
+    };
+    render(<PromotionCommitPanel preview={tied} submitting={false} onCommit={vi.fn()} />);
+
+    const deltaRow = screen.getByText('델타').closest('li') as HTMLElement;
+    expect(within(deltaRow).getByText(/모든 기준이 같아 임의로 순위가 갈렸어요/)).toBeInTheDocument();
+
+    const alphaRow = screen.getByText('알파').closest('li') as HTMLElement;
+    expect(within(alphaRow).queryByText(/모든 기준이 같아 임의로 순위가 갈렸어요/)).not.toBeInTheDocument();
+  });
+
+  it('tieBreakGroups 가 빈 배열이면 경고가 하나도 늘어나지 않는다', () => {
+    render(<PromotionCommitPanel preview={PREVIEW} submitting={false} onCommit={vi.fn()} />);
+    expect(screen.queryByText(/모든 기준이 같아 임의로 순위가 갈렸어요/)).not.toBeInTheDocument();
   });
 
   it('과반 가드 경고를 그대로 노출한다', () => {

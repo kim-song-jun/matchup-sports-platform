@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useV1LeagueMatch, useV1LeagueMatchPlayerRecords, useV1LeagueMatchStandings } from '@/hooks/use-v1-api';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
@@ -69,6 +69,26 @@ function PromotionBadge({ kind, toTierLabel }: { kind: 'promoted' | 'relegated' 
 }
 
 /**
+ * 감사 H-2 — 시즌 중 예상 승강(expectedPromotionKind)은 확정된 승강(promotionKind)과
+ * 절대 같은 무게로 읽히면 안 된다. "지금 순위대로면"이라는 뜻이지 확정이 아니다.
+ * "예상" 접두어 + 이탤릭 + 옅은 글자 굵기(font-medium, 확정 뱃지는 font-semibold)로
+ * 문구·스타일 두 축에서 확정 표기(PromotionBadge)와 구분한다 — 컬러 하나로만
+ * 구분하지 않는다(DESIGN.md 색맹 대응 원칙).
+ */
+function ExpectedPromotionBadge({ kind, toTierLabel }: { kind: 'promoted' | 'relegated' | 'stayed'; toTierLabel: string | null }) {
+  const meta = PROMOTION_META[kind];
+  return (
+    <span className={`inline-flex items-center gap-1 whitespace-nowrap font-medium italic ${meta.className}`}>
+      <span aria-hidden="true">{meta.glyph}</span>
+      예상 {meta.label}
+      {(kind === 'promoted' || kind === 'relegated') && toTierLabel !== null && (
+        <span className="font-normal not-italic text-[var(--text-muted)]">({toTierLabel})</span>
+      )}
+    </span>
+  );
+}
+
+/**
  * 득점·도움 순위는 배열 인덱스+1을 등수로 쓰면 공동 순위가 사라진다 — 5골인 두 선수가
  * "1위 / 2위"로 갈려 공동 1위가 뒤처진 것처럼 읽힌다. 순위표(standings)는 서버가 이미
  * `position`을 계산해 주는 것과 대비된다(서버가 이 값은 계산해 주지 않으므로 클라에서
@@ -115,6 +135,19 @@ function fixtureResultLabel(fixture: V1LeagueFixture): { text: string; hasScore:
   return { text: fixture.status === 'completed' ? '결과 대기' : '예정', hasScore: false, isForfeit: false };
 }
 
+/**
+ * 이슈 3(감사 보통) — "예정"으로 봐야 할 대진 = 각 행에 실제로 **'예정'이라고 찍히는** 대진.
+ *
+ * 판정을 fixtureResultLabel 과 **같은 기준으로 맞춘다.** 스코어가 없다고 다 '예정'인 게 아니다 —
+ * 이미 치렀지만 공식 결과가 아직 안 붙은 대진(status === 'completed' + 스코어 null)에는
+ * 그 함수가 '결과 대기'를 찍는다. 그런데도 필터가 그걸 '예정'으로 세면, "예정만 보기"를 켰을 때
+ * 화면엔 '결과 대기'라고 적힌 행이 섞여 나오고 "다음 경기" 강조도 지난 경기에 붙는다
+ * (실제로 이 함수가 취소 여부와 스코어 유무만 보고 있어서 그런 상태였다).
+ */
+function isUpcomingFixture(fixture: V1LeagueFixture): boolean {
+  return fixtureResultLabel(fixture).text === '예정';
+}
+
 interface TeamLookupEntry {
   name: string;
   logoUrl: string | null;
@@ -140,6 +173,25 @@ function FixtureTeamLabel({
   );
 }
 
+/**
+ * 이슈 4(감사 보통) — 아직 한 경기도 안 치른 리그는 순위-무의미한 0-0-0 행 대신 참가
+ * 팀 목록을 보여준다. 순위(position)는 전부 동점자 사전순 폴백이라 정렬 근거가 없으므로
+ * 팀 이름 가나다순으로 다시 정렬한다.
+ */
+function ParticipantTeamList({ teams }: { teams: Array<{ teamId: string; teamName: string; teamLogoUrl: string | null }> }) {
+  const sorted = [...teams].sort((a, b) => a.teamName.localeCompare(b.teamName, 'ko'));
+  return (
+    <ul className="divide-y divide-[var(--border)] overflow-hidden rounded-xl border border-[var(--border)]">
+      {sorted.map((team) => (
+        <li key={team.teamId} className="flex min-h-[44px] items-center gap-2 px-3 py-2 text-sm">
+          <TeamAvatar seed={team.teamId} name={team.teamName} logoUrl={team.teamLogoUrl} size="sm" />
+          <span className="text-[var(--text-strong)]">{team.teamName}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: string }) {
   const seriesQuery = useV1LeagueMatch(leagueId);
   const standingsQuery = useV1LeagueMatchStandings(leagueId);
@@ -160,6 +212,38 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
 
   const goalRanks = useMemo(() => competitionRanks((records?.goals ?? []).map((row) => row.goals)), [records]);
   const assistRanks = useMemo(() => competitionRanks((records?.assists ?? []).map((row) => row.assists)), [records]);
+
+  // 감사 H-2 — promotionDecided(확정)와 promotionForecast(예상)는 서버 계약상 서로
+  // 배타적이다(확정되면 promotionForecast가 다시 null). 열 표시 여부와 헤더 문구를
+  // 여기서 한 번만 판정해 표(sm 이상 열)와 팀명 아래 인라인(sm 미만) 두 렌더 지점이
+  // 항상 같은 판단을 쓰게 한다.
+  const hasConfirmedPromotion = standings?.promotionDecided ?? false;
+  const hasPromotionForecast = (standings?.promotionForecast ?? null) !== null;
+  const showPromotionColumn = hasConfirmedPromotion || hasPromotionForecast;
+
+  // 이슈 4 — "아직 한 경기도 안 치렀다"의 판정 기준. state==='draft' 단일 신호도
+  // 후보였지만, 서버 쪽 "draft→active는 대진 생성 시" 불변식(league-match-public.service.ts
+  // 주석)에 암묵적으로 기대는 대신 순위표 응답 자체가 들고 있는 값으로 직접 판정한다 --
+  // 이 불변식이 나중에 바뀌어도 이 조건은 계속 맞는다.
+  // 두 조건을 모두 걸어야 하는 이유: played 합계 0만 보면 "대진은 이미 잡혔는데 아직
+  // 결과만 확정 안 된" 정상적인 0-0-0 순위표(바로 아래 "확인 중" 배너가 뜨는 상태)까지
+  // 참가팀 목록으로 잘못 바뀐다. pendingFixtures가 함께 비어 있어야 "아예 대진조차
+  // 없다"는 뜻이 된다.
+  const preparingNoGames =
+    standings !== undefined &&
+    standings.standings.length > 0 &&
+    standings.pendingFixtures.length === 0 &&
+    standings.standings.every((row) => row.played === 0);
+
+  // 이슈 3 — 대진은 항상 startAt 오름차순(과거→미래)으로 온다. 시즌 중반 리그일수록
+  // "우리 팀 다음 경기"를 찾으려면 이미 끝난 경기를 여러 개 지나야 한다(alpha 실측).
+  // "예정만 보기" 필터로 지난 경기를 걷어내고, 필터를 안 켜도 다음 경기 행 자체에
+  // 뱃지+강조 테두리를 얹어 스크롤 없이 눈에 띄게 한다.
+  const [showUpcomingOnly, setShowUpcomingOnly] = useState(false);
+  const fixtures = series?.fixtures ?? [];
+  const visibleFixtures = showUpcomingOnly ? fixtures.filter(isUpcomingFixture) : fixtures;
+  // 오름차순 정렬 전제이므로 필터링된 배열의 첫 항목이 곧 가장 가까운 다음 경기다.
+  const nextUpcomingFixtureId = fixtures.find(isUpcomingFixture)?.teamMatchId ?? null;
 
   // 잘못된 leagueId 딥링크(404 등)는 빈 화면이 아니라 에러 안내 + 재시도로 처리한다.
   if (seriesQuery.isError) {
@@ -216,10 +300,25 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
           순위 규칙: {standings.tieBreakOrder.map((c) => TIE_BREAK_LABELS[c] ?? c).join(' → ')}
         </p>
       )}
+      {/* 감사 H-2 — 승강 슬롯 규칙 요약. 확정 전(promotionForecast != null)에만 뜨고,
+          게임을 아직 안 치른 시즌에도 "규칙 자체"는 이미 정해져 있어 계속 보여준다
+          (row별 예상 승강은 preparingNoGames 분기에서 표를 아예 안 그려 자연히 숨는다). */}
+      {standings?.promotionForecast != null && (
+        <p className="mt-1 text-xs text-[var(--text-muted)]">
+          {standings.promotionForecast.skippedByMajorityGuard
+            ? '이번 시즌은 참가 팀 수가 적어 승강이 적용되지 않아요.'
+            : `이번 시즌 승강 규칙 · 상위 ${standings.promotionForecast.promoteSlots}팀 승격 / 하위 ${standings.promotionForecast.relegateSlots}팀 강등 (지금 순위 기준 예상이에요)`}
+        </p>
+      )}
 
       <section className="mt-6">
         <div className="mb-2 flex flex-wrap items-center gap-2">
-          <h2 className="text-lg font-semibold text-[var(--text-strong)]">순위표</h2>
+          {/* 이슈 4 — 아직 한 경기도 안 치른 리그는 표 자체가 "참가 팀"으로 바뀌므로
+              제목도 그에 맞춰 바꾼다("순위표"라는 제목 아래 순위 아닌 목록이 뜨면
+              혼란스럽다). */}
+          <h2 className="text-lg font-semibold text-[var(--text-strong)]">
+            {preparingNoGames ? '참가 팀' : '순위표'}
+          </h2>
           {series.state === 'completed' && <span className="tm-badge tm-badge-sm tm-badge-green">최종 순위</span>}
         </div>
         {standingsQuery.isError ? (
@@ -231,7 +330,10 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
           <div className="tm-skeleton" style={{ height: 160, borderRadius: 12 }} />
         ) : standings.standings.length === 0 ? (
           <EmptyState title="아직 확정된 결과가 없어요" sub="리그 경기 결과가 확정되면 순위표가 나타나요." />
+        ) : preparingNoGames ? (
+          <ParticipantTeamList teams={standings.standings} />
         ) : (
+          <>
           <div className="overflow-x-auto">
             {/* 승강 열이 6번째 칸으로 붙으면 필요 최소 폭이 440px 인데, 390px 화면의 본문 폭은
                 358px 뿐이다(alpha 실측 — 헤더가 "승…"에서 끊기고 강등 행은 빨간 ↓만 남아
@@ -239,8 +341,10 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
                 뿐 "잘렸다"는 신호를 주지 않으므로, sm(640px) 미만에서는 승강 열 자체를
                 감추고 그 정보를 팀명 칸 아래 인라인으로 내려 **스크롤 없이** 읽히게 한다.
                 sm 이상에서만 원래의 6칸 열 + 440px 최소 폭(순위38+팀160+전적56+승점38+
-                득실38+승강116, 768px 실측 칸 폭 기준)을 적용한다. */}
-            <table className={`w-full text-sm ${standings.promotionDecided ? 'sm:min-w-[440px]' : ''}`}>
+                득실38+승강116, 768px 실측 칸 폭 기준)을 적용한다.
+                감사 H-2 — 이 폭·숨김 규칙은 확정 승강("승강")과 예상 승강("예상 승강")
+                양쪽 모두에 그대로 적용한다(showPromotionColumn = 둘 중 하나라도 true). */}
+            <table className={`w-full text-sm ${showPromotionColumn ? 'sm:min-w-[440px]' : ''}`}>
               <thead>
                 <tr className="text-left text-[var(--text-muted)]">
                   <th scope="col" className="py-2">순위</th>
@@ -252,10 +356,14 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
                   <th scope="col">전적</th>
                   <th scope="col">승점</th>
                   <th scope="col">득실</th>
-                  {/* 승강 열은 확정된 뒤에만 생긴다 — 확정 전에 빈 칸만 늘어난 표는
-                      "아직 안 정해졌다"보다 읽기 어렵고, 기존 순위표 모양도 그대로 유지된다.
+                  {/* 승강 열은 확정됐거나(promotionDecided) 예상값이 있을 때만 생긴다 —
+                      둘 다 아니면 빈 칸만 늘어난 표가 "아직 안 정해졌다"보다 읽기 어렵다.
                       390px 미만에서는 이 열을 감추고 팀명 칸 아래 인라인으로 대체한다. */}
-                  {standings.promotionDecided && <th scope="col" className="hidden sm:table-cell">승강</th>}
+                  {showPromotionColumn && (
+                    <th scope="col" className="hidden sm:table-cell">
+                      {hasConfirmedPromotion ? '승강' : '예상 승강'}
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -267,17 +375,27 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
                         <TeamAvatar seed={row.teamId} name={row.teamName} logoUrl={row.teamLogoUrl} size="sm" />
                         <span className="flex flex-col">
                           <span>{row.teamName}</span>
-                          {/* sm 미만에서만 보이는 인라인 승강 표기 — 열이 숨겨진 화면에서
-                              시즌의 결론(승격/강등)이 스크롤 없이 바로 읽히게 한다. */}
-                          {standings.promotionDecided && row.promotionKind != null && (
+                          {
+                            // sm 미만에서만 보이는 인라인 승강 표기 — 열이 숨겨진 화면에서
+                            // 시즌의 결론(확정) 또는 지금까지의 예상이 스크롤 없이 바로 읽히게 한다.
                             // text-2xs 는 globals.css 에서 죽은 코드로 삭제된 유틸리티라 아무 크기도
                             // 적용되지 않고(그대로 두면 부모 크기를 물려받는다), 공개 화면 하한(12px)
                             // 미달이기도 하다 — text-xs(12px)를 쓴다.
-                            // (이 괄호 안은 JSX children이 아니라 `&&`의 우변 JS 표현식이라
-                            // `{/* */}` 형태의 JSX 주석은 여기서 문법 오류다 — 일반 JS 주석을 쓴다.)
-                            <span className="text-xs sm:hidden">
-                              <PromotionBadge kind={row.promotionKind} toTierLabel={row.promotionToTierLabel} />
-                            </span>
+                            // 이 블록은 JSX children 직속이 아니라 `&&`/삼항의 우변 JS 표현식이라
+                            // `{/* */}` 형태의 JSX 주석은 여기서 문법 오류다 — `//` 라인 주석을 쓴다.
+                          }
+                          {showPromotionColumn && (
+                            hasConfirmedPromotion
+                              ? row.promotionKind != null && (
+                                  <span className="text-xs sm:hidden">
+                                    <PromotionBadge kind={row.promotionKind} toTierLabel={row.promotionToTierLabel} />
+                                  </span>
+                                )
+                              : row.expectedPromotionKind != null && (
+                                  <span className="text-xs sm:hidden">
+                                    <ExpectedPromotionBadge kind={row.expectedPromotionKind} toTierLabel={row.expectedPromotionToTierLabel} />
+                                  </span>
+                                )
                           )}
                         </span>
                       </span>
@@ -289,12 +407,18 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
                     </td>
                     <td>{row.points}</td>
                     <td>{row.goalsFor}-{row.goalsAgainst}</td>
-                    {standings.promotionDecided && (
+                    {showPromotionColumn && (
                       <td className="hidden sm:table-cell">
-                        {row.promotionKind == null ? (
+                        {hasConfirmedPromotion ? (
+                          row.promotionKind == null ? (
+                            <span className="text-[var(--text-muted)]">—</span>
+                          ) : (
+                            <PromotionBadge kind={row.promotionKind} toTierLabel={row.promotionToTierLabel} />
+                          )
+                        ) : row.expectedPromotionKind == null ? (
                           <span className="text-[var(--text-muted)]">—</span>
                         ) : (
-                          <PromotionBadge kind={row.promotionKind} toTierLabel={row.promotionToTierLabel} />
+                          <ExpectedPromotionBadge kind={row.expectedPromotionKind} toTierLabel={row.expectedPromotionToTierLabel} />
                         )}
                       </td>
                     )}
@@ -303,6 +427,21 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
               </tbody>
             </table>
           </div>
+          {/* 감사 H-5 — tie-break 를 전부 소진하고 팀ID 사전순 폴백으로 순위가 갈린
+              그룹이 있으면 알려준다. 대부분의 시즌은 빈 배열이라 아무것도 늘어나지 않는다. */}
+          {(standings.tieBreakGroups?.length ?? 0) > 0 && (
+            <div className="mt-2 rounded-lg bg-[var(--surface-soft)] p-3 text-xs text-[var(--text-muted)]">
+              <p>
+                <span aria-hidden="true">•</span> 모든 순위 기준이 같아 팀 순서가 임의로 정해진 팀이 있어요.
+              </p>
+              <ul className="mt-1 space-y-0.5">
+                {standings.tieBreakGroups.map((group) => (
+                  <li key={group.teamIds.join('-')} className="text-[var(--text-strong)]">{group.teamNames.join(', ')}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          </>
         )}
 
         {standings !== undefined && standings.pendingFixtures.length > 0 && (
@@ -339,21 +478,52 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
       </section>
 
       <section className="mt-8">
-        <h2 className="mb-2 text-lg font-semibold text-[var(--text-strong)]">경기 일정</h2>
-        {series.fixtures.length === 0 ? (
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-semibold text-[var(--text-strong)]">경기 일정</h2>
+          {/* 이슈 3 — 대진은 항상 오래된 순으로 오므로 시즌 중반 리그는 "다음 경기"가
+              이미 끝난 경기 여러 개 아래 묻힌다. 정렬 자체를 뒤집는 대신(과거 기록을
+              찾으러 온 사람에게는 오름차순이 자연스럽다) "예정만 보기" 필터를 둬서
+              지난 경기를 걷어낼 수 있게 하고, 아래에서 다음 경기 행 자체도 강조한다. */}
+          {fixtures.length > 0 && (
+            <div role="group" aria-label="경기 일정 필터" className="flex gap-1.5">
+              <button
+                type="button"
+                onClick={() => setShowUpcomingOnly(false)}
+                aria-pressed={!showUpcomingOnly}
+                className={`tm-chip${!showUpcomingOnly ? ' tm-chip-active' : ''}`}
+              >
+                전체
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowUpcomingOnly(true)}
+                aria-pressed={showUpcomingOnly}
+                className={`tm-chip${showUpcomingOnly ? ' tm-chip-active' : ''}`}
+              >
+                예정만
+              </button>
+            </div>
+          )}
+        </div>
+        {fixtures.length === 0 ? (
           <EmptyState title="아직 등록된 경기가 없어요" sub="대진이 확정되면 경기 일정이 여기에 나타나요." />
+        ) : visibleFixtures.length === 0 ? (
+          <EmptyState title="예정된 경기가 없어요" sub="'전체'를 눌러 지난 경기를 다시 볼 수 있어요." />
         ) : (
           <ul className="space-y-2">
-            {series.fixtures.map((fixture) => {
+            {visibleFixtures.map((fixture) => {
               const statusMeta = fixtureStatusMeta(fixture.status);
               const result = fixtureResultLabel(fixture);
+              const isNextUpcoming = fixture.teamMatchId === nextUpcomingFixtureId;
               return (
                 <li key={fixture.teamMatchId}>
                   <Link
                     href={`/team-matches/${fixture.teamMatchId}`}
-                    className="tm-pressable tm-list-row-interactive flex min-h-[44px] flex-col gap-2 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] p-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+                    className={`tm-pressable tm-list-row-interactive flex min-h-[44px] flex-col gap-2 rounded-xl border bg-[var(--card-surface)] p-3 text-sm sm:flex-row sm:items-center sm:justify-between ${isNextUpcoming ? 'border-[var(--blue500)]' : 'border-[var(--border)]'}`}
                   >
                     <span className="inline-flex flex-wrap items-center gap-1.5">
+                      {/* 다음 경기는 컬러(파란 테두리)만으로 구분하지 않는다 — 뱃지 텍스트를 함께 싣는다. */}
+                      {isNextUpcoming && <span className="tm-badge tm-badge-sm tm-badge-blue">다음 경기</span>}
                       <FixtureTeamLabel teamId={fixture.homeTeamId} lookup={teamLookup} fallback="홈팀 정보 없음" />
                       <span aria-hidden="true" className="text-[var(--text-muted)]">vs</span>
                       <FixtureTeamLabel teamId={fixture.awayTeamId} lookup={teamLookup} fallback="상대팀 미정" />

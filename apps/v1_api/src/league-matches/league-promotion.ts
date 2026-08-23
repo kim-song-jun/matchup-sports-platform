@@ -47,6 +47,19 @@ export interface PromotionEntry {
   computedKind: PromotionKind;
   /** 이 팀이 다음 시즌에 속할 티어. */
   toTier: number;
+  // ── 순위 근거 (감사 H-5) ─────────────────────────────────────────────────
+  // calculateLeagueStandings 가 이미 계산해 넘겨준 값을 그대로 옮겨 담을 뿐이다 --
+  // 별도 계산을 만들지 않는다. 어드민 승강 확정 화면이 "왜 이 팀이 3위인가"를
+  // preview 응답만 보고 설명할 수 있어야, 관리자 화면을 벗어나 공개 순위표 주소를
+  // 손으로 조합해 나가지 않아도 된다.
+  points: number;
+  played: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalDifference: number;
 }
 
 export interface TierPromotionResult {
@@ -208,6 +221,45 @@ export function tierSlotCounts(
 }
 
 /**
+ * 순위 인덱스(0-based, position 오름차순) 하나가 승격·강등·잔류 중 어디에 해당하는지
+ * 판정한다. `tierSlotCounts` 와 짝을 이루는 두 번째 단일 소스다 -- 승강 여부를 계산하는
+ * 곳이 `calculatePromotions` 하나만이 아니게 되면서(공개 순위표의 "예상 승강 경계",
+ * Task 153 Wave 2 감사 H-2) 각자 fromTop/fromBottom 식을 다시 쓰면 반드시 갈린다.
+ */
+export function classifyPromotionKind(
+  index: number,
+  teamCount: number,
+  promoteCount: number,
+  relegateCount: number,
+): PromotionKind {
+  const fromTop = index;
+  const fromBottom = teamCount - 1 - index;
+  if (fromTop < promoteCount) return 'promoted';
+  if (fromBottom < relegateCount) return 'relegated';
+  return 'stayed';
+}
+
+/** kind 가 정해졌을 때 다음 시즌 티어. 1부 승격/최하위 강등처럼 갈 곳이 없는 조합은 호출부가 막아야 한다. */
+export function resolvePromotionToTier(fromTier: number, kind: PromotionKind): number {
+  if (kind === 'promoted') return fromTier - 1;
+  if (kind === 'relegated') return fromTier + 1;
+  return fromTier;
+}
+
+/**
+ * 저장된 `V1LeagueSeries.promotionRuleJson`(Json 컬럼, 타입 `unknown`)을 안전하게
+ * `PromotionRule` 로 해석한다. null 이거나 객체가 아니면 기본 규칙으로 폴백한다.
+ *
+ * 어드민 승강 확정 서비스(`LeagueSeriesAdminService`)와 공개 순위표의 예상 승강 경계
+ * (`LeagueMatchPublicService`, Task 153 Wave 2)가 이 함수 하나를 공유한다 -- 두 곳이
+ * 각자 파싱하면 한쪽만 고친 폴백 규칙이 서로 어긋날 수 있다.
+ */
+export function resolvePromotionRule(raw: unknown): PromotionRule {
+  if (raw === null || typeof raw !== 'object') return { ...DEFAULT_PROMOTION_RULE };
+  return raw as PromotionRule;
+}
+
+/**
  * 규칙의 내용 지문. preview 응답에 실어 보내고 commit 이 되돌려 받아, 그 사이에 어드민이
  * 규칙을 바꿨는지 감지한다.
  *
@@ -298,21 +350,24 @@ export function calculatePromotions(input: {
   // 2차 패스 — 팀별 kind 배정 + 다음 시즌 예상 팀 수
   const tiers: TierPromotionResult[] = passes.map((pass) => {
     const entries: PromotionEntry[] = pass.sorted.map((standing, index) => {
-      const fromTop = index;
-      const fromBottom = pass.teamCount - 1 - index;
+      const computedKind = classifyPromotionKind(index, pass.teamCount, pass.promoteCount, pass.relegateCount);
+      const toTier = resolvePromotionToTier(pass.tier, computedKind);
 
-      let computedKind: PromotionKind = 'stayed';
-      let toTier = pass.tier;
-
-      if (fromTop < pass.promoteCount) {
-        computedKind = 'promoted';
-        toTier = pass.tier - 1;
-      } else if (fromBottom < pass.relegateCount) {
-        computedKind = 'relegated';
-        toTier = pass.tier + 1;
-      }
-
-      return { teamId: standing.teamId, tier: pass.tier, position: standing.position, computedKind, toTier };
+      return {
+        teamId: standing.teamId,
+        tier: pass.tier,
+        position: standing.position,
+        computedKind,
+        toTier,
+        points: standing.points,
+        played: standing.played,
+        wins: standing.wins,
+        draws: standing.draws,
+        losses: standing.losses,
+        goalsFor: standing.goalsFor,
+        goalsAgainst: standing.goalsAgainst,
+        goalDifference: standing.goalsFor - standing.goalsAgainst,
+      };
     });
 
     return {

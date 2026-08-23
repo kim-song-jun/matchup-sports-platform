@@ -1,11 +1,12 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, ErrorState, ListItem } from '@/components/v1-ui/primitives';
 import {
   useV1AcceptTeamContact,
+  useV1CreateInquiry,
   useV1DeclineTeamContact,
   useV1MyTeams,
   useV1ResolveChatRoom,
@@ -15,6 +16,7 @@ import {
   useV1WithdrawTeamContact,
 } from '@/hooks/use-v1-api';
 import type { V1TeamContact, V1TeamContactStatus } from '@/hooks/use-v1-api';
+import type { V1InquiryReportReason } from '@/types/api';
 import { chatRoomHref } from '@/lib/chat-route';
 import { formatTournamentDateTimeLong, formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -37,6 +39,19 @@ const STATUS_BADGE_CLASS: Record<V1TeamContactStatus, string> = {
   withdrawn: 'tm-badge-grey',
   expired: 'tm-badge-orange',
 };
+
+const REPORT_REASON_OPTIONS: { value: V1InquiryReportReason; label: string }[] = [
+  { value: 'spam', label: '스팸·광고' },
+  { value: 'harassment', label: '괴롭힘·욕설' },
+  { value: 'impersonation', label: '사칭·허위 팀' },
+  { value: 'inappropriate', label: '부적절한 내용' },
+  { value: 'other', label: '기타' },
+];
+
+const REPORT_REASON_LABEL: Record<V1InquiryReportReason, string> = REPORT_REASON_OPTIONS.reduce(
+  (acc, option) => ({ ...acc, [option.value]: option.label }),
+  {} as Record<V1InquiryReportReason, string>,
+);
 
 /**
  * `useV1MyTeams()` 응답은 배열이면서 `items`도 같이 들고 있는 하이브리드 형태다.
@@ -206,6 +221,180 @@ function TeamContactListRow({ contact, direction }: { contact: V1TeamContact; di
   );
 }
 
+/**
+ * 컨택 상세에서 상대 팀을 신고하는 다이얼로그. 공용 Modal 이 없어
+ * jersey-number-dialog.tsx 의 관용구(role=dialog + ESC + focus trap)를 그대로 따른다.
+ */
+function ReportContactDialog({
+  open,
+  saving,
+  error,
+  onClose,
+  onSubmit,
+}: {
+  open: boolean;
+  saving: boolean;
+  error: string | null;
+  onClose: () => void;
+  onSubmit: (reason: V1InquiryReportReason, detail: string) => void;
+}) {
+  const idPrefix = useId();
+  const titleId = `${idPrefix}-report-title`;
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<Element | null>(null);
+  const [reason, setReason] = useState<V1InquiryReportReason | null>(null);
+  const [detail, setDetail] = useState('');
+
+  useEffect(() => {
+    if (open) {
+      previousFocusRef.current = document.activeElement;
+      setReason(null);
+      setDetail('');
+      return;
+    }
+    const element = previousFocusRef.current;
+    if (element && typeof (element as HTMLElement).focus === 'function') {
+      (element as HTMLElement).focus();
+    }
+    previousFocusRef.current = null;
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [open, onClose]);
+
+  useEffect(() => {
+    if (!open) return;
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const FOCUSABLE =
+      'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
+    const trap = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return;
+      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE));
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', trap);
+    return () => document.removeEventListener('keydown', trap);
+  }, [open]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4"
+      style={{ background: 'rgba(25,31,40,0.45)' }}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="w-full max-w-[360px] rounded-2xl overflow-hidden"
+        style={{ background: 'var(--card-surface, #fff)', boxShadow: '0 8px 32px rgba(20,28,45,0.14)' }}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div style={{ padding: '24px 20px 16px', display: 'grid', gap: 12 }}>
+          <p id={titleId} className="tm-text-body-lg" style={{ fontWeight: 700, margin: 0 }}>
+            컨택 신고하기
+          </p>
+          <p className="tm-text-caption" style={{ color: 'var(--text-muted)', margin: 0 }}>
+            신고 사유를 선택해 주세요. 상세 설명은 선택이에요.
+          </p>
+
+          <fieldset style={{ border: 'none', padding: 0, margin: 0, display: 'grid', gap: 4 }}>
+            <legend className="tm-text-label" style={{ padding: 0, marginBottom: 4 }}>
+              신고 사유
+            </legend>
+            {REPORT_REASON_OPTIONS.map((option) => {
+              const inputId = `${idPrefix}-reason-${option.value}`;
+              return (
+                <label
+                  key={option.value}
+                  htmlFor={inputId}
+                  className="tm-text-body"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    minHeight: 44,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <input
+                    type="radio"
+                    id={inputId}
+                    name="team-contact-report-reason"
+                    value={option.value}
+                    checked={reason === option.value}
+                    onChange={() => setReason(option.value)}
+                  />
+                  {option.label}
+                </label>
+              );
+            })}
+          </fieldset>
+
+          <label htmlFor={`${idPrefix}-report-detail`} className="tm-text-label">
+            상세 설명 (선택)
+          </label>
+          <textarea
+            id={`${idPrefix}-report-detail`}
+            className="tm-input"
+            style={{ resize: 'none', lineHeight: 1.5 }}
+            rows={3}
+            maxLength={500}
+            value={detail}
+            placeholder="상황을 알려주시면 검토에 도움이 돼요."
+            onChange={(event) => setDetail(event.target.value)}
+            disabled={saving}
+          />
+
+          {error !== null ? (
+            <p className="tm-text-caption" role="alert" style={{ color: 'var(--red700)', margin: 0 }}>
+              {error}
+            </p>
+          ) : null}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '0 20px 20px' }}>
+          <button type="button" className="tm-btn tm-btn-lg tm-btn-neutral" onClick={onClose} disabled={saving}>
+            취소
+          </button>
+          <button
+            type="button"
+            className="tm-btn tm-btn-lg tm-btn-danger"
+            disabled={reason === null || saving}
+            onClick={() => {
+              if (reason === null) return;
+              onSubmit(reason, detail);
+            }}
+          >
+            {saving ? '접수하는 중' : '신고 접수'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function MyTeamContactDetailClient({ contactId }: { contactId: string }) {
   const router = useRouter();
   const query = useV1TeamContact(contactId);
@@ -229,9 +418,13 @@ export function MyTeamContactDetailClient({ contactId }: { contactId: string }) 
   const declineContact = useV1DeclineTeamContact(contactId);
   const withdrawContact = useV1WithdrawTeamContact(contactId);
   const resolveChatRoom = useV1ResolveChatRoom();
+  const reportContact = useV1CreateInquiry();
 
   const [declineReason, setDeclineReason] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [reportSubmitted, setReportSubmitted] = useState(false);
 
   if (query.isError) {
     return (
@@ -297,6 +490,30 @@ export function MyTeamContactDetailClient({ contactId }: { contactId: string }) 
       {
         onSuccess: (room) => router.push(chatRoomHref(room.roomId, room.route)),
         onError: (err) => setActionError(extractErrorMessage(err, '대화방을 열지 못했어요. 잠시 후 다시 시도해 주세요.')),
+      },
+    );
+  }
+
+  function handleReportSubmit(reason: V1InquiryReportReason, detail: string) {
+    setReportError(null);
+    const reasonLabel = REPORT_REASON_LABEL[reason];
+    const trimmedDetail = detail.trim();
+    reportContact.mutate(
+      {
+        category: 'report',
+        relatedType: 'team_contact',
+        relatedId: contactId,
+        reportReason: reason,
+        title: `팀 컨택 신고: ${reasonLabel}`,
+        // body 는 백엔드가 필수로 검증한다 — 상세 설명을 안 남기면 사유 라벨로 채워 빈 문자열을 막는다.
+        body: trimmedDetail.length > 0 ? trimmedDetail : reasonLabel,
+      },
+      {
+        onSuccess: () => {
+          setReportDialogOpen(false);
+          setReportSubmitted(true);
+        },
+        onError: (err) => setReportError(extractErrorMessage(err, '신고를 접수하지 못했어요. 잠시 후 다시 시도해 주세요.')),
       },
     );
   }
@@ -406,8 +623,35 @@ export function MyTeamContactDetailClient({ contactId }: { contactId: string }) 
               {resolveChatRoom.isPending ? '여는 중' : '대화 열기'}
             </button>
           ) : null}
+
+          {/* 신고는 컨택 상태와 무관하게 항상 노출한다 — 만료·거절된 컨택도 부적절한
+              메시지였을 수 있고, 오히려 거절·만료 이후에 신고할 이유가 생기기도 한다. */}
+          {reportSubmitted ? (
+            <div role="status" className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+              신고가 접수됐어요. 검토 후 처리할게요.
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="tm-btn tm-btn-lg tm-btn-outline tm-btn-block"
+              onClick={() => setReportDialogOpen(true)}
+            >
+              신고하기
+            </button>
+          )}
         </div>
       </div>
+
+      <ReportContactDialog
+        open={reportDialogOpen}
+        saving={reportContact.isPending}
+        error={reportError}
+        onClose={() => {
+          setReportDialogOpen(false);
+          setReportError(null);
+        }}
+        onSubmit={handleReportSubmit}
+      />
     </AppChrome>
   );
 }

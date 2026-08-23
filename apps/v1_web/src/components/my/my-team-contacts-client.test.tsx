@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import { render as rtlRender, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MyTeamContactDetailClient, MyTeamContactsListClient } from './my-team-contacts-client';
 import type { V1TeamContact, V1TeamContactStatus } from '@/hooks/use-v1-api';
@@ -15,6 +16,7 @@ const {
   useV1DeclineTeamContactMock,
   useV1WithdrawTeamContactMock,
   useV1ResolveChatRoomMock,
+  useV1CreateInquiryMock,
 } = vi.hoisted(() => ({
   routerPush: vi.fn(),
   useV1TeamContactMock: vi.fn(),
@@ -25,6 +27,7 @@ const {
   useV1DeclineTeamContactMock: vi.fn(),
   useV1WithdrawTeamContactMock: vi.fn(),
   useV1ResolveChatRoomMock: vi.fn(),
+  useV1CreateInquiryMock: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -43,6 +46,7 @@ vi.mock('@/hooks/use-v1-api', async (importOriginal) => ({
   useV1DeclineTeamContact: useV1DeclineTeamContactMock,
   useV1WithdrawTeamContact: useV1WithdrawTeamContactMock,
   useV1ResolveChatRoom: useV1ResolveChatRoomMock,
+  useV1CreateInquiry: useV1CreateInquiryMock,
 }));
 
 function render(ui: ReactElement) {
@@ -85,6 +89,7 @@ describe('MyTeamContactDetailClient', () => {
     useV1DeclineTeamContactMock.mockReturnValue({ mutate: vi.fn(), isPending: false });
     useV1WithdrawTeamContactMock.mockReturnValue({ mutate: vi.fn(), isPending: false });
     useV1ResolveChatRoomMock.mockReturnValue({ mutate: vi.fn(), isPending: false });
+    useV1CreateInquiryMock.mockReturnValue({ mutate: vi.fn(), isPending: false });
   });
 
   it('받은 requested 컨택에는 수락·거절 버튼이 보인다', () => {
@@ -150,6 +155,61 @@ describe('MyTeamContactDetailClient', () => {
     render(<MyTeamContactDetailClient contactId="contact-1" />);
 
     expect(screen.getByText(label)).toBeInTheDocument();
+  });
+
+  describe('신고하기', () => {
+    // 만료된 컨택으로 렌더한다 — 신고 버튼은 컨택 상태와 무관하게 항상 노출돼야 한다
+    // (거절·만료 이후에 신고할 이유가 생기는 경우가 오히려 많다).
+    function renderExpiredContact() {
+      setMyTeams([{ teamId: MY_TEAM_ID, name: '우리 팀', role: 'owner' }]);
+      useV1TeamContactMock.mockReturnValue({ data: makeContact({ status: 'expired' }), isError: false });
+      return render(<MyTeamContactDetailClient contactId="contact-1" />);
+    }
+
+    it('신고 버튼이 보이고 누르면 사유 선택이 뜬다', async () => {
+      const user = userEvent.setup();
+      renderExpiredContact();
+
+      await user.click(screen.getByRole('button', { name: '신고하기' }));
+
+      expect(screen.getByRole('dialog', { name: '컨택 신고하기' })).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: '스팸·광고' })).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: '괴롭힘·욕설' })).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: '사칭·허위 팀' })).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: '부적절한 내용' })).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: '기타' })).toBeInTheDocument();
+    });
+
+    it('사유를 고르고 보내면 mutation 이 reportReason 을 포함해 호출된다', async () => {
+      const user = userEvent.setup();
+      const mutate = vi.fn();
+      useV1CreateInquiryMock.mockReturnValue({ mutate, isPending: false });
+      renderExpiredContact();
+
+      await user.click(screen.getByRole('button', { name: '신고하기' }));
+      await user.click(screen.getByRole('radio', { name: '부적절한 내용' }));
+      await user.click(screen.getByRole('button', { name: '신고 접수' }));
+
+      expect(mutate).toHaveBeenCalledTimes(1);
+      expect(mutate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          category: 'report',
+          relatedType: 'team_contact',
+          relatedId: 'contact-1',
+          reportReason: 'inappropriate',
+        }),
+        expect.anything(),
+      );
+    });
+
+    it('사유를 안 고르면 보내기가 비활성이다', async () => {
+      const user = userEvent.setup();
+      renderExpiredContact();
+
+      await user.click(screen.getByRole('button', { name: '신고하기' }));
+
+      expect(screen.getByRole('button', { name: '신고 접수' })).toBeDisabled();
+    });
   });
 });
 

@@ -312,7 +312,10 @@ export type V1InquiryRelatedType =
   | 'tournament'
   | 'registration'
   | 'payment'
-  | 'user';
+  | 'user'
+  | 'team_contact';
+
+export type V1InquiryReportReason = 'spam' | 'harassment' | 'impersonation' | 'inappropriate' | 'other';
 
 export type V1Inquiry = {
   inquiryId: string;
@@ -353,6 +356,7 @@ export type V1CreateInquiryPayload = {
   contact?: string;
   relatedType?: V1InquiryRelatedType;
   relatedId?: string;
+  reportReason?: V1InquiryReportReason;
 };
 
 export type V1Match = {

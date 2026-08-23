@@ -910,4 +910,119 @@ describe('LeagueMatchStandingsClient', () => {
     await screen.findByText('성수 FC');
     expect(screen.queryByText(/집계에서 제외됐어요/)).not.toBeInTheDocument();
   });
+
+  it('그룹 C: 진행 중인 리그는 시즌 요약 카드가 뜨지 않는다', async () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1LeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', title: '가을 리그', state: 'active',
+        startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z',
+        teamIds: ['t1'], fixtures: [],
+      },
+    } as never);
+    useV1LeagueMatchStandingsMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', tieBreakOrder: ['points'],
+        standings: [{ teamId: 't1', teamName: '성수 FC', teamLogoUrl: null, position: 1, played: 1, wins: 1, draws: 0, losses: 0, goalsFor: 2, goalsAgainst: 0, points: 3 }],
+        pendingFixtures: [],
+        champions: [],
+      },
+    } as never);
+    useV1LeagueMatchPlayerRecordsMock.mockReturnValue({ data: { leagueId: 'league-1', goals: [], assists: [] } } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchStandingsClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    await screen.findByText('성수 FC');
+    // 종료 전 리그는 "우승" 개념이 아직 성립하지 않는다 — 카드 자체가 렌더되지 않는다.
+    expect(screen.queryByText('이번 시즌 요약')).not.toBeInTheDocument();
+  });
+
+  it('그룹 C: 종료된 리그는 공동 우승·승강 결과·득점왕을 담은 시즌 요약 카드를 보여주고 시상 화면으로 이어진다', async () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1LeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', title: '가을 리그', state: 'completed',
+        startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z',
+        teamIds: ['t1', 't2', 't3'], fixtures: [],
+      },
+    } as never);
+    useV1LeagueMatchStandingsMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', tieBreakOrder: ['points'],
+        standings: [
+          { teamId: 't1', teamName: '성수 FC', teamLogoUrl: null, position: 1, played: 3, wins: 3, draws: 0, losses: 0, goalsFor: 9, goalsAgainst: 0, points: 9, promotionKind: 'promoted', promotionToTierLabel: '1부' },
+          { teamId: 't2', teamName: '망원 FC', teamLogoUrl: null, position: 1, played: 3, wins: 3, draws: 0, losses: 0, goalsFor: 9, goalsAgainst: 0, points: 9, promotionKind: 'promoted', promotionToTierLabel: '1부' },
+          { teamId: 't3', teamName: '연남 FC', teamLogoUrl: null, position: 3, played: 3, wins: 0, draws: 0, losses: 3, goalsFor: 0, goalsAgainst: 9, points: 0, promotionKind: 'relegated', promotionToTierLabel: '3부' },
+        ],
+        pendingFixtures: [],
+        // 공동 우승(승점·득실·다득점 전부 동률) — resolveLeagueChampions가 tieGroups에서
+        // 1위 팀이 속한 그룹 전원을 champions로 내려준다는 서버 계약을 그대로 흉내낸다.
+        champions: [
+          { teamId: 't1', teamName: '성수 FC', teamLogoUrl: null },
+          { teamId: 't2', teamName: '망원 FC', teamLogoUrl: null },
+        ],
+        promotionDecided: true,
+      },
+    } as never);
+    useV1LeagueMatchPlayerRecordsMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1',
+        // 5골 동점 공동 득점왕 두 명 — competitionRanks가 둘 다 1위로 매겨야 한다.
+        goals: [
+          { userId: 'u1', nickname: '김민준', goals: 5 },
+          { userId: 'u2', nickname: '이서준', goals: 5 },
+          { userId: 'u3', nickname: '박도윤', goals: 2 },
+        ],
+        assists: [],
+      },
+    } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchStandingsClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    expect(await screen.findByText('이번 시즌 요약')).toBeInTheDocument();
+    expect(screen.getByText('공동 우승')).toBeInTheDocument();
+    // 두 우승팀 이름이 모두 카드에 보인다 (공동 우승이면 한 팀만 보이는 사고를 막는다).
+    expect(screen.getByText(/성수 FC.*망원 FC/)).toBeInTheDocument();
+    expect(screen.getByText(/승격 2팀 · 강등 1팀/)).toBeInTheDocument();
+    expect(screen.getByText('공동 득점왕')).toBeInTheDocument();
+    expect(screen.getByText(/김민준.*이서준/)).toBeInTheDocument();
+
+    const link = screen.getByRole('link', { name: /시즌 결산 자세히 보기/ });
+    expect(link).toHaveAttribute('href', '/league-matches/league-1/awards');
+  });
+  /**
+   * Wave 4 재검토 — SeasonSummaryCard 가 로딩을 에러보다 먼저 검사하면, 호출부가 loading 을
+   * `standings === undefined` 로 넘기는 탓에 **실패한 요청이 영원히 스켈레톤으로 남는다**
+   * (에러 분기에 도달하지 못해 사용자는 계속 로딩 중으로 오해한다). 분기 순서를 고정한다.
+   */
+  it('그룹 C 회귀: 순위표 조회가 실패하면 시즌 요약이 스켈레톤이 아니라 에러 문구를 보여준다', async () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1LeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', title: '가을 리그', state: 'completed',
+        startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z',
+        teamIds: ['t1', 't2'], fixtures: [],
+      },
+    } as never);
+    // 실패한 쿼리: data 는 undefined 이고 isError 가 true 다.
+    useV1LeagueMatchStandingsMock.mockReturnValue({ data: undefined, isError: true } as never);
+    useV1LeagueMatchPlayerRecordsMock.mockReturnValue({ data: { leagueId: 'league-1', goals: [], assists: [] } } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchStandingsClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    expect(await screen.findByText('이번 시즌 요약')).toBeInTheDocument();
+    expect(await screen.findByText('시즌 요약을 불러오지 못했어요.')).toBeInTheDocument();
+  });
 });

@@ -13,6 +13,10 @@ import {
   saveTournamentOpsOrigin,
   shouldProbeV1Session,
   shouldShowPushNudge,
+  V1_RECORD_CONSENT_NUDGE_SEEN_KEY,
+  dismissRecordConsentNudge,
+  markRecordConsentNudgeSeen,
+  shouldShowRecordConsentNudge,
 } from './session-storage';
 
 afterEach(() => {
@@ -100,5 +104,48 @@ describe('tournament-ops 진입 출처 (T6-2)', () => {
   it('대회 id별로 독립적으로 기록된다', () => {
     saveTournamentOpsOrigin('t-1', 'admin');
     expect(getTournamentOpsOrigin('t-2')).toBe('home');
+  });
+});
+
+/**
+ * 기록 공개 넛지는 "계정 수명 전체에서 총 2회" 라는 사용자 결정(②)을 지켜야 한다.
+ * 푸시 넛지(sessionStorage, 로그인마다 1회)와 저장소가 다른 이유가 여기 있다 --
+ * 세션 단위로 세면 로그아웃할 때마다 다시 2회가 살아나 사실상 무한 노출이 된다.
+ */
+describe('recordConsentNudge 노출 횟수', () => {
+  it('처음에는 보여준다', () => {
+    expect(shouldShowRecordConsentNudge()).toBe(true);
+  });
+
+  it('2회까지만 보여주고 3회째부터 멈춘다', () => {
+    markRecordConsentNudgeSeen();
+    expect(shouldShowRecordConsentNudge()).toBe(true);
+    markRecordConsentNudgeSeen();
+    expect(shouldShowRecordConsentNudge()).toBe(false);
+    markRecordConsentNudgeSeen();
+    expect(shouldShowRecordConsentNudge()).toBe(false);
+  });
+
+  it('사용자가 닫으면 남은 횟수와 무관하게 끝난다', () => {
+    dismissRecordConsentNudge();
+    expect(shouldShowRecordConsentNudge()).toBe(false);
+  });
+
+  it('세션이 끝나도(=sessionStorage 비워져도) 횟수가 남는다', () => {
+    markRecordConsentNudgeSeen();
+    markRecordConsentNudgeSeen();
+    window.sessionStorage.clear();
+    expect(shouldShowRecordConsentNudge()).toBe(false);
+  });
+
+  it('저장된 값이 깨져 있으면 보여주지 않는다 (무한 노출 방지)', () => {
+    // 손으로 편집했거나 옛 버전이 남긴 값. 파싱 실패를 "0회" 로 읽으면 영원히 뜬다.
+    window.localStorage.setItem(V1_RECORD_CONSENT_NUDGE_SEEN_KEY, 'nope');
+    expect(shouldShowRecordConsentNudge()).toBe(false);
+  });
+
+  it('음수가 들어 있어도 보여주지 않는다', () => {
+    window.localStorage.setItem(V1_RECORD_CONSENT_NUDGE_SEEN_KEY, '-5');
+    expect(shouldShowRecordConsentNudge()).toBe(false);
   });
 });

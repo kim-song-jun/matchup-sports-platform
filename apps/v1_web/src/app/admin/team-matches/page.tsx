@@ -190,10 +190,10 @@ function AdminTeamMatchesPageContent() {
                       href={`/admin/league-matches/${encodeURIComponent(row.league.leagueId)}`}
                       onClick={(event) => event.stopPropagation()}
                       title={row.league.title}
-                      aria-label={`리그 ${row.league.title} 상세 보기`}
+                      aria-label={`정규 리그 ${row.league.title} 상세 보기`}
                       className="shrink-0 rounded-full bg-[var(--blue50)] px-2 py-0.5 text-[length:var(--font-size-micro)] font-bold text-[var(--blue700)] hover:bg-[var(--tint-blue)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                     >
-                      리그
+                      정규 리그
                     </Link>
                   )}
                   <span className="block truncate font-medium text-[var(--text-strong)]" title={row.title}>

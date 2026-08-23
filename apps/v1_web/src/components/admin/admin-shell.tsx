@@ -87,7 +87,7 @@ const BASE_NAV_GROUPS: NavGroup[] = [
       { label: '매치', href: '/admin/matches', icon: <Swords size={18} /> },
       { label: '팀', href: '/admin/teams', icon: <UsersRound size={18} /> },
       { label: '팀매치', href: '/admin/team-matches', icon: <Trophy size={18} /> },
-      { label: '리그', href: '/admin/league-matches', icon: <ListOrdered size={18} /> },
+      { label: '정규 리그', href: '/admin/league-matches', icon: <ListOrdered size={18} /> },
       { label: '리그 체계', href: '/admin/league-series', icon: <Layers size={18} /> },
       { label: '대회', href: '/admin/tournaments', icon: <Medal size={18} /> },
     ],

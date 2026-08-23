@@ -333,7 +333,23 @@ export const gameSchemaSourceManifest = {
   // 브랜치의 값을 그대로 쓰면 CI 가 깨진다(이 파일의 기존 병합 재핀 선례와 동일).
   //
   // (병합 재핀) 위 변경들이 **모두 들어간 뒤**의 schema.prisma 해시다.
-  schema: 'fdc0a7b5656a9c0f91d2b99e21ce5d97df37d5b32ece6a355cb8d5cc2e9a5ae2',
+  // 2026-08-23 재핀 (Task 154 P0-2): `V1ParticipantIdentityLinkCurrent` 에
+  // `@@index([userId], map: "v1_identity_link_current_user_id_idx")` 하나만 추가했다.
+  // **게임 도메인 모델의 컬럼·관계는 건드리지 않았고**, 인덱스 추가라 순수 additive 다
+  // (기존 행·쿼리 결과가 달라지지 않는다). 뒷받침 마이그레이션:
+  // 20260823120000_v1_identity_link_current_user_id_index — CREATE INDEX IF NOT EXISTS 로
+  // idempotent 하게 작성했다. 바인딩된 20260729000100_v1_game_operations 는 그대로이므로
+  // `migration` 값은 유지한다.
+  //
+  // 병합 재핀: 위 두 변경(도착 검인 컬럼 · 신원연결 userId 인덱스)이 같은 schema.prisma
+  // 안에서 만난다. 어느 한쪽 브랜치의 해시를 그대로 쓰면 CI 가 깨지므로, **병합된 뒤의**
+  // 파일에 sha256 을 다시 돌려 계산한 값이다.
+  //
+  // (병합 재핀) 위 변경들이 **모두 들어간 뒤**의 schema.prisma 해시다. 한쪽 브랜치의
+  // 값을 그대로 쓰면 CI 가 깨진다 — 이 파일에 쌓인 병합 재핀 선례와 같은 처리다.
+  //
+  // (병합 재핀) 위 변경들이 모두 들어간 뒤의 schema.prisma 해시다.
+  schema: '489377454bc06228eb5df6e10c3158a46da381ed064ebd80acab57a4d5750ad0',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

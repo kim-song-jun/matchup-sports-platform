@@ -156,7 +156,7 @@ export default function AdminTeamMatchDetailPage() {
                 className="mt-4 inline-flex h-[44px] items-center gap-2 rounded-xl bg-[var(--blue50)] px-4 text-sm font-semibold text-[var(--blue700)] hover:bg-[var(--tint-blue)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
               >
                 <ListOrdered size={16} aria-hidden="true" />
-                리그 · {teamMatch.league.title}
+                정규 리그 · {teamMatch.league.title}
               </Link>
             )}
 
@@ -210,7 +210,7 @@ export default function AdminTeamMatchDetailPage() {
             <dl className="mt-4 grid gap-3">
               <AdminSummaryItem icon={<Users size={16} />} label="상대팀 신청" value={`${teamMatch.applicationCount}건`} />
               <AdminSummaryItem icon={<Trophy size={16} />} label="확정 상대팀" value={teamMatch.approvedApplicantTeamName ?? '미확정'} />
-              <AdminSummaryItem icon={<ListOrdered size={16} />} label="리그" value={teamMatch.league?.title ?? '단발 경기'} />
+              <AdminSummaryItem icon={<ListOrdered size={16} />} label="정규 리그" value={teamMatch.league?.title ?? '단발 경기'} />
               <AdminSummaryItem icon={<MapPin size={16} />} label="지역" value={teamMatch.regionName ?? '-'} />
               <AdminSummaryItem icon={<CalendarClock size={16} />} label="시작" value={formatDateTime(teamMatch.startAt)} />
               <AdminSummaryItem icon={<CalendarClock size={16} />} label="경기 기록" value={teamMatch.hasGame ? '연결됨' : '없음'} />

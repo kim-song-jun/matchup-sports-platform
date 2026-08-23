@@ -40,7 +40,13 @@ function createFakePrisma() {
     ),
   };
 
-  return { v1UserRecordConsent } as unknown as PrismaService;
+  // Task 154 P0-3: 응답에 `pendingRecordCount` 가 붙으면서 이 서비스가 신원 연결도
+  // 읽는다. 이 스펙의 관심사는 GRANTED↔REVOKED 왕복이므로 "연결된 참가자 0명"으로
+  // 고정한다 -- 그러면 `countOwnerVisibleParticipations` 가 즉시 0을 돌려주고
+  // 나머지 쿼리는 타지 않는다. 카운트 자체의 계약은 public-consent.spec.ts 가 맡는다.
+  const v1ParticipantIdentityLinkCurrent = { findMany: jest.fn(() => Promise.resolve([])) };
+
+  return { v1UserRecordConsent, v1ParticipantIdentityLinkCurrent } as unknown as PrismaService;
 }
 
 describe('ProfileService record consent', () => {
@@ -49,7 +55,13 @@ describe('ProfileService record consent', () => {
     const service = new ProfileService(prisma);
 
     const granted = await service.updateMyRecordConsent(user, { granted: true, policyHash: 'policy-v1' });
-    expect(granted).toEqual({ granted: true, effectiveAt: expect.any(String) });
+    // 이미 GRANTED 면 유도할 이유가 없으므로 서버가 카운트를 세지 않고 0 으로 둔다.
+    expect(granted).toEqual({
+      granted: true,
+      effectiveAt: expect.any(String),
+      hasResponded: true,
+      pendingRecordCount: 0,
+    });
 
     const afterGrant = await service.myRecordConsent(user);
     expect(afterGrant.granted).toBe(true);
@@ -75,6 +87,13 @@ describe('ProfileService record consent', () => {
     const service = new ProfileService(prisma);
 
     const result = await service.myRecordConsent(user);
-    expect(result).toEqual({ granted: false, effectiveAt: null });
+    // `granted:false` 만으로는 "거부"와 "아직 안 물어봄"이 구분되지 않는다.
+    // 한 번도 응답한 적 없는 사용자는 hasResponded=false 여야 유도 배너가 뜬다.
+    expect(result).toEqual({
+      granted: false,
+      effectiveAt: null,
+      hasResponded: false,
+      pendingRecordCount: 0,
+    });
   });
 });

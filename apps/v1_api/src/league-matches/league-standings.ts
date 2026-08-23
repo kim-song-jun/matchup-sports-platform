@@ -162,3 +162,36 @@ export function calculateLeagueStandingsWithTieBreakInfo(input: {
   const standings = order.map((teamId, index) => ({ ...totals.get(teamId)!, position: index + 1 }));
   return { standings, tieGroups };
 }
+
+/** 그룹 B(시즌 결산·시상 화면 감사) — 우승팀 표시에 필요한 최소 필드. */
+export interface LeagueChampionTeam {
+  teamId: string;
+  teamName: string;
+  teamLogoUrl: string | null;
+}
+
+/**
+ * 우승팀(들) 판정 — 그룹 B(시즌 결산·시상). 1위 팀(`standings[0]`, 이미 순위순으로 정렬돼
+ * 있다고 전제)이 `tieGroups`(calculateLeagueStandingsWithTieBreakInfo 가 감지한, tie-break
+ * 기준을 전부 소진하고도 갈리지 않은 팀 묶음, 감사 H-5) 중 하나에 속해 있으면 그 묶음
+ * 전체를 공동 우승으로 반환한다 -- 승점·득실차·다득점·(적용됐다면)맞대결까지 이 리그의
+ * tieBreakOrder 로는 갈리지 않았다는 뜻이라 팀ID 사전순으로 매겨진 1·2위 구분은 우열이
+ * 아니라 결정적 표시를 위한 임의 폴백일 뿐이기 때문이다(사용자 확정 2026-08-23).
+ * `standings`가 비어 있으면(참가팀 0 또는 아직 아무 경기도 없음) 빈 배열.
+ *
+ * 새로 계산하지 않고 이미 계산된 tieGroups 를 그대로 조회하는 O(그룹 수) 함수라
+ * 별도의 "공동 우승 판정" 로직을 새로 만들지 않는다 -- 판정 자체는 tie-break 계산과
+ * 완전히 같은 소스(criteria exhaustion)를 공유한다.
+ */
+export function resolveLeagueChampions<T extends { teamId: string; teamName: string; teamLogoUrl: string | null }>(
+  standings: readonly T[],
+  tieGroups: readonly StandingsTieGroup[],
+): LeagueChampionTeam[] {
+  if (standings.length === 0) return [];
+  const topTeamId = standings[0].teamId;
+  const coChampionGroup = tieGroups.find((group) => group.teamIds.includes(topTeamId));
+  const championTeamIds = new Set(coChampionGroup?.teamIds ?? [topTeamId]);
+  return standings
+    .filter((row) => championTeamIds.has(row.teamId))
+    .map((row) => ({ teamId: row.teamId, teamName: row.teamName, teamLogoUrl: row.teamLogoUrl }));
+}

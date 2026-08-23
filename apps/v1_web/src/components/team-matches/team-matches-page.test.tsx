@@ -158,7 +158,7 @@ describe('리그전 배지', () => {
 
     const badge = leagueBadge();
     expect(badge).toBeInTheDocument();
-    expect(badge).toHaveTextContent('리그전');
+    expect(badge).toHaveTextContent('정규 리그');
   });
 
   it('리그 소속이 아니면 목록 카드에 리그전 배지가 없다', () => {

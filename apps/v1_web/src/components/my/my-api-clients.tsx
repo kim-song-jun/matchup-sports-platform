@@ -1577,6 +1577,10 @@ export function RecordConsentSettingsPageClient() {
             <div className="tm-text-caption" style={{ marginTop: 4 }}>
               내 프로필의 활동 기록에 출전 경기, 득점, 경고·퇴장, MVP 가 표시돼요.
               팀 라인업에 내 계정으로 연결된 경기만 해당돼요.
+              {/* 소급 공개는 "무엇이 공개되는가"의 일부다(앞으로 것만이 아니라 과거 것도).
+                  켜기 전에 반드시 알아야 하는 조건이라(사용자 명시 결정) 여기 둔다 --
+                  아래 토글 서브텍스트에 있던 같은 말은 지웠다. 토글은 현재 상태만 말한다. */}
+              {' '}켜면 지금까지 참가한 경기 기록도 함께 공개돼요.
             </div>
           </Card>
           {toggleError ? (
@@ -1603,7 +1607,7 @@ export function RecordConsentSettingsPageClient() {
                     ? '저장하는 중이에요…'
                     : granted
                       ? '지금 공개돼 있어요. 끄면 새 경기부터 다시 비공개예요.'
-                      : '지금은 비공개예요. 켜면 과거 경기까지 함께 공개돼요.'}
+                      : '지금은 비공개예요.'}
                 </div>
               </div>
               <span

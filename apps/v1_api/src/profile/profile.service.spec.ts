@@ -666,21 +666,34 @@ describe('ProfileService tournament appearance aggregation', () => {
         v1TeamMembership: { count: jest.fn().mockResolvedValue(0), findMany: jest.fn().mockResolvedValue([]) },
         v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
         v1ParticipantIdentityLinkCurrent: {
-          // 사용자 단위/participant 단위 동의를 아예 조회하지 않는다 — 이 집계는 게이트 대상이 아니다.
-          findMany: jest.fn().mockResolvedValue([{ participantId: 'participant-1' }]),
+          findMany: jest
+            .fn()
+            .mockResolvedValue([{ participantId: 'participant-1', linkId: 'link-1', userId: targetUserId }]),
         },
         v1GameResultParticipant: { findMany: jest.fn().mockResolvedValue(rows) },
-        v1UserRecordConsent: { findMany: jest.fn() },
-        v1ParticipantConsentSnapshot: { findMany: jest.fn() },
+        // Task 154 P2: publicProfile 이 최근 활동(경기별 상세)을 위해 동의를 **조회하게** 됐다.
+        // 그래서 "동의를 호출하지 않는다"는 예전 단언은 더 이상 계약을 정확히 표현하지 않는다 --
+        // 진짜 계약은 "출전 **횟수** 집계가 동의에 좌우되지 않는다" 이므로, 호출 여부(mechanism)
+        // 대신 결과(outcome)로 검증한다: 동의를 REVOKED 로 두고도 matchCount 가 그대로인지 본다.
+        // 이 편이 예전 단언보다 강하다 -- 구현이 동의를 조회하든 말든 집계가 흔들리면 잡힌다.
+        v1UserRecordConsent: {
+          findMany: jest.fn().mockResolvedValue([{ userId: targetUserId, state: 'REVOKED' }]),
+        },
+        v1ParticipantConsentSnapshot: { findMany: jest.fn().mockResolvedValue([]) },
+        v1GameParticipant: { findUnique: jest.fn().mockResolvedValue(null) },
+        v1GameSide: { findUnique: jest.fn().mockResolvedValue(null) },
       };
       const service = new ProfileService(prisma as never);
 
       const result = await service.publicProfile(null, targetUserId);
 
+      // 동의가 REVOKED 인데도 출전 **횟수**는 그대로다 -- 이 집계는 게이트 대상이 아니다
+      // (사용자 결정: 총계 숫자 하나는 개별 경기 상세와 노출 수준이 다르다).
       expect(result.activitySummary.totals.matchCount).toBe(1);
       expect(result.activitySummary.monthly.matchCount).toBe(1);
-      expect(prisma.v1UserRecordConsent.findMany).not.toHaveBeenCalled();
-      expect(prisma.v1ParticipantConsentSnapshot.findMany).not.toHaveBeenCalled();
+      // 반대로 경기별 상세(최근 활동)는 같은 REVOKED 에 막혀야 한다 -- 두 노출 수준이
+      // 실제로 분리돼 있음을 여기서 함께 고정한다.
+      expect(result.recentActivity).toBeNull();
     } finally {
       jest.useRealTimers();
     }
@@ -744,6 +757,8 @@ describe('ProfileService public profile activity summary (reveal filtering)', ()
       v1TeamMembership: { count: jest.fn().mockResolvedValue(0), findMany: jest.fn().mockResolvedValue([]) },
       v1PostEventReview: { findMany },
       v1ParticipantIdentityLinkCurrent: { findMany: jest.fn().mockResolvedValue([]) },
+      // Task 154 P2: 연결이 0개면 최근 활동 조회는 즉시 null 로 끝나지만, 방어적으로 둔다.
+      v1GameResultParticipant: { findMany: jest.fn().mockResolvedValue([]) },
     };
   }
 
@@ -898,8 +913,15 @@ describe('ProfileService public profile activity summary (reveal filtering)', ()
       const prisma = {
         ...buildPrisma(),
         v1ParticipantIdentityLinkCurrent: {
-          findMany: jest.fn().mockResolvedValue([{ participantId: 'participant-1' }]),
+          // linkId/userId 는 최근 활동 조회(loadParticipantConsentEligibility)가 select 한다.
+          findMany: jest
+            .fn()
+            .mockResolvedValue([{ participantId: 'participant-1', linkId: 'link-1', userId: targetUserId }]),
         },
+        // Task 154 P2: 최근 활동은 동의 게이트를 탄다. 이 스펙의 관심사는 출전 수 집계이므로
+        // 동의 없음(=최근 활동 null)으로 두고 집계만 본다.
+        v1UserRecordConsent: { findMany: jest.fn().mockResolvedValue([]) },
+        v1ParticipantConsentSnapshot: { findMany: jest.fn().mockResolvedValue([]) },
         v1GameResultParticipant: {
           findMany: jest.fn().mockResolvedValue([
             row('game-1', 'tournament-1'),

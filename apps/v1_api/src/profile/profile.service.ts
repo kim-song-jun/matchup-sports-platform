@@ -8,7 +8,10 @@ import {
 } from '@nestjs/common';
 import { Prisma, V1AuthProvider, V1ConsentState } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
-import { countOwnerVisibleParticipations } from '../games/public-records/public-consent';
+import {
+  countOwnerVisibleParticipations,
+  findLatestPublicParticipation,
+} from '../games/public-records/public-consent';
 import { PrismaService } from '../prisma/prisma.service';
 import { isReviewRevealed } from '../reviews/review-visibility';
 import { removeUserFromActiveRosters } from '../tournaments/roster-cleanup';
@@ -339,6 +342,9 @@ export class ProfileService {
       // 빈 문자열을 내리면 제목만 있는 빈 카드가 남는다.
       bio: user.profile?.bio?.trim() || null,
       teams: teamMemberships.map((membership) => membership.team),
+      // Task 154 P2: 가장 최근 공개 가능 출전 한 줄. 기록 목록과 **같은 게이트**를 통과한
+      // 것만 쓴다 -- 다르면 같은 프로필에서 "최근 경기"와 "목록 맨 위"가 어긋난다.
+      recentActivity: await findLatestPublicParticipation(this.prisma, user.id),
       reputation: {
         ...toReputationPayload(user.reputationSummary),
         mannerScore: liveReputation.mannerScore,

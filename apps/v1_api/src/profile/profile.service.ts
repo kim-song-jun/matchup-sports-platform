@@ -134,6 +134,7 @@ export class ProfileService {
             profileImageUrl: true,
             birthDate: true,
             gender: true,
+            bio: true,
           },
         },
       },
@@ -248,6 +249,9 @@ export class ProfileService {
           profileImageUrl,
           birthDate,
           gender,
+          // 필드를 아예 안 보낸 클라이언트(옛 버전)의 저장이 기존 소개를 지우면 안 되므로
+          // `undefined` 는 "건드리지 않음", `null`/빈 문자열은 "지움" 으로 갈린다.
+          ...(dto.bio === undefined ? {} : { bio: dto.bio?.trim() || null }),
         },
         create: {
           userId: user.id,
@@ -308,11 +312,33 @@ export class ProfileService {
     const liveReputation = await this.computeRevealedUserReputation(user.id);
     const activitySummary = await this.getPublicActivitySummary(user.id, liveReputation);
 
+    // Task 154 P1: 기록이 0건인 프로필이 완전히 비어 보이던 문제를 소속팀으로 메운다.
+    //
+    // `membersVisible` 을 반드시 존중한다. 이 컬럼은 스키마 기본값이 true 라 "아무도
+    // 신경 안 쓰는 값"으로 보기 쉬운데, 프로덕션 실측(2026-08-24)에서 44개 팀 중 12개가
+    // 명시적으로 false 였다 -- 팀장들이 실제로 쓰는 통제 수단이다. 팀 페이지에서 명단을
+    // 가려둔 팀이 개인 프로필 경로로 새어 나가면 그 설정을 우회하는 셈이 된다.
+    const teamMemberships = await this.prisma.v1TeamMembership.findMany({
+      where: {
+        userId: user.id,
+        status: 'active',
+        team: { membersVisible: true, status: 'active', deletedAt: null },
+      },
+      // V1Team 에 로고 컬럼이 없다 -- 팀 이름만 내린다(프론트는 이니셜 배지로 대체).
+      select: { team: { select: { id: true, name: true } } },
+      orderBy: { createdAt: 'asc' },
+      take: 6,
+    });
+
     return {
       userId: user.id,
       displayName: user.profile?.nickname ?? '사용자',
       nickname: user.profile?.nickname ?? null,
       profileImageUrl: user.profile?.profileImageUrl ?? null,
+      // 값이 없으면 null 로 내려 프론트가 섹션 자체를 렌더하지 않게 한다 --
+      // 빈 문자열을 내리면 제목만 있는 빈 카드가 남는다.
+      bio: user.profile?.bio?.trim() || null,
+      teams: teamMemberships.map((membership) => membership.team),
       reputation: {
         ...toReputationPayload(user.reputationSummary),
         mannerScore: liveReputation.mannerScore,

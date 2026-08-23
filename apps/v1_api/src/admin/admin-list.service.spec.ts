@@ -16,6 +16,7 @@
 
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminService } from './admin.service';
 
@@ -167,6 +168,10 @@ describe('AdminService — list/detail endpoints', () => {
     v1Team: { findMany: jest.Mock; findUnique: jest.Mock; groupBy: jest.Mock };
     v1TeamMatch: { findMany: jest.Mock; findUnique: jest.Mock; groupBy: jest.Mock };
     v1Inquiry: { findMany: jest.Mock; findUnique: jest.Mock; groupBy: jest.Mock; count: jest.Mock };
+    v1TeamContact: { findUnique: jest.Mock };
+    v1TeamContactBlock: { create: jest.Mock };
+    v1AdminActionLog: { create: jest.Mock };
+    v1StatusChangeLog: { create: jest.Mock };
     v1Tournament: { count: jest.Mock; findMany: jest.Mock };
     v1TournamentRegistration: { groupBy: jest.Mock };
     v1TournamentFixture: { groupBy: jest.Mock };
@@ -186,6 +191,10 @@ describe('AdminService — list/detail endpoints', () => {
         groupBy: jest.fn().mockResolvedValue([]),
         count: jest.fn().mockResolvedValue(0),
       },
+      v1TeamContact: { findUnique: jest.fn() },
+      v1TeamContactBlock: { create: jest.fn() },
+      v1AdminActionLog: { create: jest.fn().mockResolvedValue({ id: 'action-log-1' }) },
+      v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },
       v1Tournament: { count: jest.fn().mockResolvedValue(0), findMany: jest.fn().mockResolvedValue([]) },
       v1TournamentRegistration: { groupBy: jest.fn().mockResolvedValue([]) },
       v1TournamentFixture: { groupBy: jest.fn().mockResolvedValue([]) },
@@ -946,6 +955,72 @@ describe('AdminService — list/detail endpoints', () => {
 
       expect(result.items.map((i: any) => i.teamId)).toEqual(['team-a', 'team-b']);
       expect(result.items[0]).toMatchObject({ name: 'A팀', status: 'active', totalCount: 5 });
+    });
+  });
+
+  // ─── 대리 차단 ──────────────────────────────────────────────────────────────
+
+  describe('대리 차단', () => {
+    function reportRow() {
+      return {
+        id: 'inq-1',
+        userId: 'reporter',
+        category: 'report',
+        relatedType: 'team_contact',
+        relatedId: 'c1',
+        reportedTeamId: 'B',
+      };
+    }
+
+    it('신고자 팀 명의로 대상 팀을 차단하고 사유를 남긴다', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(activeAdminRecord);
+      prisma.v1Inquiry.findUnique.mockResolvedValue(reportRow());
+      prisma.v1TeamContact.findUnique.mockResolvedValue({ fromTeamId: 'A', toTeamId: 'B' });
+      prisma.v1TeamContactBlock.create.mockResolvedValue({ id: 'b1' });
+
+      const result = await service.blockReportedTeam(adminAuthUser, 'inq-1');
+
+      expect(prisma.v1TeamContactBlock.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            teamId: 'A',
+            blockedTeamId: 'B',
+            reason: expect.stringContaining('inq-1'),
+          }),
+        }),
+      );
+      expect(result).toMatchObject({ alreadyBlocked: false, teamId: 'A', blockedTeamId: 'B' });
+    });
+
+    // Phase 2·3 과 같은 함정: 이 저장소엔 전역 P2002 필터가 없다.
+    it('이미 차단돼 있으면 500 이 아니라 멱등하게 통과한다', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(activeAdminRecord);
+      prisma.v1Inquiry.findUnique.mockResolvedValue(reportRow());
+      prisma.v1TeamContact.findUnique.mockResolvedValue({ fromTeamId: 'A', toTeamId: 'B' });
+      prisma.v1TeamContactBlock.create.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('dup', { code: 'P2002', clientVersion: 'x' }),
+      );
+
+      const result = await service.blockReportedTeam(adminAuthUser, 'inq-1');
+
+      expect(result).toMatchObject({ alreadyBlocked: true });
+    });
+
+    it('대상 팀이 없는 신고는 409 로 거부한다', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(activeAdminRecord);
+      prisma.v1Inquiry.findUnique.mockResolvedValue({ ...reportRow(), reportedTeamId: null });
+
+      await expect(service.blockReportedTeam(adminAuthUser, 'inq-1')).rejects.toMatchObject({
+        response: { code: 'REPORT_TARGET_UNKNOWN' },
+      });
+    });
+
+    it('support 관리자는 403 이다', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue({ ...activeAdminRecord, adminRole: 'support' });
+
+      await expect(service.blockReportedTeam(adminAuthUser, 'inq-1')).rejects.toMatchObject({
+        response: { code: 'PERMISSION_DENIED' },
+      });
     });
   });
 

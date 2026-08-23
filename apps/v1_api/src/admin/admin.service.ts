@@ -2060,6 +2060,81 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
+  /**
+   * 신고를 근거로 **신고자 팀 명의** 로 대상 팀을 차단한다.
+   *
+   * 이 조치는 운영자가 남의 팀 설정을 대신 바꾸는 것이다. 그래서 reason 에 근거를 남기고(팀
+   * 설정 화면이 이 사유를 보여준다), 팀이 직접 해제할 수 있게 잠그지 않는다 — 신고한 것은 그
+   * 팀이고 나중에 화해하면 풀 수 있어야 한다.
+   */
+  async blockReportedTeam(user: V1AuthUser, inquiryId: string) {
+    const admin = await this.getMutationAdmin(user.id);
+
+    const inquiry = await this.prisma.v1Inquiry.findUnique({
+      where: { id: inquiryId },
+      select: { id: true, category: true, relatedType: true, relatedId: true, reportedTeamId: true },
+    });
+    if (!inquiry) throw new NotFoundException({ code: 'NOT_FOUND', message: '문의를 찾을 수 없어요.' });
+    if (inquiry.category !== 'report' || !inquiry.reportedTeamId) {
+      throw new ConflictException({
+        code: 'REPORT_TARGET_UNKNOWN',
+        message: '신고 대상 팀을 알 수 없어 차단할 수 없어요.',
+      });
+    }
+
+    const contact = inquiry.relatedId
+      ? await this.prisma.v1TeamContact.findUnique({
+          where: { id: inquiry.relatedId },
+          select: { fromTeamId: true, toTeamId: true },
+        })
+      : null;
+    if (!contact) {
+      throw new ConflictException({
+        code: 'REPORT_TARGET_UNKNOWN',
+        message: '신고된 컨택을 찾을 수 없어 차단할 수 없어요.',
+      });
+    }
+
+    // 신고자 팀 = 컨택의 두 팀 중 대상이 아닌 쪽.
+    const reporterTeamId =
+      contact.fromTeamId === inquiry.reportedTeamId ? contact.toTeamId : contact.fromTeamId;
+
+    const reason = `운영자 조치 (신고 ${inquiry.id})`;
+    let alreadyBlocked = false;
+    try {
+      await this.prisma.v1TeamContactBlock.create({
+        data: {
+          teamId: reporterTeamId,
+          blockedTeamId: inquiry.reportedTeamId,
+          createdByUserId: user.id,
+          reason,
+        },
+      });
+    } catch (error) {
+      // @@unique([teamId, blockedTeamId]) — 두 번 눌러도 500 이 되면 안 된다.
+      // 이 저장소엔 전역 P2002 필터가 없어 여기서 직접 잡는다.
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        alreadyBlocked = true;
+      } else {
+        throw error;
+      }
+    }
+
+    await this.writeAdminStatusLogs(admin, {
+      action: 'inquiry.block_reported_team',
+      targetType: 'inquiry',
+      targetId: inquiry.id,
+      previousStatus: alreadyBlocked ? 'blocked' : 'not_blocked',
+      status: 'blocked',
+      reason,
+      beforeState: { blocked: alreadyBlocked ? 'true' : 'false' },
+      afterState: { blocked: 'true' },
+      responseIdKey: 'inquiryId',
+    });
+
+    return { blocked: true, alreadyBlocked, teamId: reporterTeamId, blockedTeamId: inquiry.reportedTeamId };
+  }
+
   async replyInquiry(user: V1AuthUser, inquiryId: string, dto: ReplyInquiryDto) {
     const admin = await this.getMutationAdmin(user.id);
     const body = dto.body.trim();

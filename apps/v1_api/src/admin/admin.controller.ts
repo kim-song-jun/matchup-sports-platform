@@ -1,4 +1,17 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UploadedFiles,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { UPLOAD_HARD_CAP_BYTES } from '../uploads/uploads.controller';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -288,6 +301,14 @@ export class AdminController {
   @Get('reports/teams')
   listReportedTeams(@CurrentUser() user: V1AuthUser, @Query() query: AdminReportedTeamListQueryDto) {
     return this.adminService.listReportedTeams(user, query);
+  }
+
+  // 아무것도 생성하지 않는 멱등 통과(이미 차단됨)가 있어 @HttpCode(200) 없이는 NestJS 가
+  // POST 기본값인 201 을 준다 — 아무것도 만들지 않았는데 "생성됨" 이라고 답하는 셈이 된다.
+  @Post('inquiries/:inquiryId/block-reported-team')
+  @HttpCode(200)
+  blockReportedTeam(@CurrentUser() user: V1AuthUser, @Param('inquiryId') inquiryId: string) {
+    return this.adminService.blockReportedTeam(user, inquiryId);
   }
 
   // ─── Team Matches ─────────────────────────────────────────────────────────

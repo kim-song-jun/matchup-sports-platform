@@ -422,7 +422,7 @@ describe('POST /admin/league-matches + fixtures', () => {
   // R6: 결과 정정을 위한 completed -> active 운영자 역전이. 자동 전이(R6 handler) 경로는
   // league-completion-projection.integration-spec.ts가 전담하므로, 여기서는 이 리그를
   // 곧바로 completed 상태로 합성해 되돌리기 엔드포인트 자체의 계약만 검증한다.
-  describe('PATCH /admin/league-matches/:leagueId/revert-completion', () => {
+  describe('POST /admin/league-matches/:leagueId/revert-completion', () => {
     async function createLeagueWithState(title: string, state: 'draft' | 'active' | 'completed') {
       const admin = await prisma.v1AdminUser.findUniqueOrThrow({ where: { userId: ownerUserId } });
       return prisma.v1League.create({
@@ -443,7 +443,7 @@ describe('POST /admin/league-matches + fixtures', () => {
       const league = await createLeagueWithState(`역전이 테스트 리그-${suiteId}`, 'completed');
 
       const res = await request(app.getHttpServer())
-        .patch(`/api/v1/admin/league-matches/${league.id}/revert-completion`)
+        .post(`/api/v1/admin/league-matches/${league.id}/revert-completion`)
         .set('x-v1-user-id', ownerUserId)
         .send({ reason: '오심 정정' });
       expect(res.status).toBe(200);
@@ -470,7 +470,7 @@ describe('POST /admin/league-matches + fixtures', () => {
       const league = await createLeagueWithState(`멱등 역전이 리그-${suiteId}`, 'active');
 
       const res = await request(app.getHttpServer())
-        .patch(`/api/v1/admin/league-matches/${league.id}/revert-completion`)
+        .post(`/api/v1/admin/league-matches/${league.id}/revert-completion`)
         .set('x-v1-user-id', ownerUserId)
         .send({});
       expect(res.status).toBe(200);
@@ -486,7 +486,7 @@ describe('POST /admin/league-matches + fixtures', () => {
       const league = await createLeagueWithState(`드래프트 리그-${suiteId}`, 'draft');
 
       const res = await request(app.getHttpServer())
-        .patch(`/api/v1/admin/league-matches/${league.id}/revert-completion`)
+        .post(`/api/v1/admin/league-matches/${league.id}/revert-completion`)
         .set('x-v1-user-id', ownerUserId)
         .send({});
       expect(res.status).toBe(409);
@@ -495,7 +495,7 @@ describe('POST /admin/league-matches + fixtures', () => {
 
     it('존재하지 않는 리그를 되돌리려 하면 404 LEAGUE_NOT_FOUND', async () => {
       const res = await request(app.getHttpServer())
-        .patch(`/api/v1/admin/league-matches/${randomUUID()}/revert-completion`)
+        .post(`/api/v1/admin/league-matches/${randomUUID()}/revert-completion`)
         .set('x-v1-user-id', ownerUserId)
         .send({});
       expect(res.status).toBe(404);
@@ -504,7 +504,7 @@ describe('POST /admin/league-matches + fixtures', () => {
 
     it('V1AdminUser 행이 없는 일반 유저는 403 PERMISSION_DENIED로 거부된다', async () => {
       const res = await request(app.getHttpServer())
-        .patch(`/api/v1/admin/league-matches/${randomUUID()}/revert-completion`)
+        .post(`/api/v1/admin/league-matches/${randomUUID()}/revert-completion`)
         .set('x-v1-user-id', regularUserId)
         .send({});
       expect(res.status).toBe(403);
@@ -513,7 +513,7 @@ describe('POST /admin/league-matches + fixtures', () => {
 
     it('인증 헤더 없는 요청은 401 UNAUTHENTICATED로 거부된다', async () => {
       const res = await request(app.getHttpServer())
-        .patch(`/api/v1/admin/league-matches/${randomUUID()}/revert-completion`)
+        .post(`/api/v1/admin/league-matches/${randomUUID()}/revert-completion`)
         .send({});
       expect(res.status).toBe(401);
       expect(res.body.code).toBe('UNAUTHENTICATED');

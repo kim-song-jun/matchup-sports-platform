@@ -5,6 +5,7 @@ import { AdminPageHeader, AdminDataTable, AdminReasonModal, AdminStatusPill, Adm
 import { GateConfirmModal } from '@/components/admin/operation-flag-gate-confirm-modal';
 import {
   useV1AdminLeagueMatch,
+  useV1RevertLeagueCompletion,
   useV1AdminLeagueTeams,
   useV1AdminTeam,
   useV1CancelLeagueFixture,
@@ -33,6 +34,8 @@ const WEEKDAY_OPTIONS = [
 
 export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: string }) {
   const { data: series, isPending, isError, error, refetch } = useV1AdminLeagueMatch(leagueId);
+  const revertCompletion = useV1RevertLeagueCompletion(leagueId);
+  const [revertModalOpen, setRevertModalOpen] = useState(false);
   const generateFixtures = useV1GenerateLeagueFixtures(leagueId);
   const updateFixture = useV1UpdateLeagueFixture(leagueId);
   const cancelFixture = useV1CancelLeagueFixture(leagueId);
@@ -128,6 +131,25 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
     );
   };
 
+  // R6/D-3: 전 대진 확정 시 리그는 자동으로 completed 로 전이한다. 결과를 정정해야 하면
+  // 운영자가 진행 중으로 되돌려야 하는데, 그동안 이 엔드포인트에 화면이 없어서 API 를 직접
+  // 호출하지 않는 한 되돌릴 방법이 없었다(2026-08-21 재감사). 사유는 감사 로그에 남는다.
+  const onConfirmRevert = (reason: string) => {
+    revertCompletion.mutate(
+      { reason: reason.trim() ? reason.trim() : undefined },
+      {
+        onSuccess: (result) => {
+          setRevertModalOpen(false);
+          showToast(
+            result.alreadyProcessed ? '이미 진행 중인 리그예요.' : '리그를 진행 중으로 되돌렸어요.',
+            'success',
+          );
+        },
+        onError: (error) => showToast(extractErrorMessage(error, '리그를 되돌리지 못했어요.'), 'error'),
+      },
+    );
+  };
+
   // R12: 취소는 되돌릴 수 없는 조작이라 GateConfirmModal로 사유를 받은 뒤에만 실행한다.
   const onConfirmCancel = (reason: string) => {
     if (!cancelTarget) return;
@@ -168,7 +190,28 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
 
   return (
     <div>
-      <AdminPageHeader eyebrow="플랫폼 · 리그" title={series.title} description={`${series.teamIds.length}팀 참가 · 대진 ${series.fixtures.length}경기`} />
+      <AdminPageHeader
+        eyebrow="플랫폼 · 리그"
+        title={series.title}
+        description={`${series.teamIds.length}팀 참가 · 대진 ${series.fixtures.length}경기`}
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            <AdminStatusPill status={series.state} />
+            {/* 되돌리기는 completed 일 때만 의미가 있다 — draft/active 에서는 서버가
+                409 LEAGUE_NOT_COMPLETED 로 막으므로 버튼 자체를 내지 않는다. */}
+            {series.state === 'completed' && (
+              <button
+                type="button"
+                onClick={() => setRevertModalOpen(true)}
+                disabled={revertCompletion.isPending}
+                className="inline-flex min-h-[44px] items-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--text-strong)] disabled:opacity-50"
+              >
+                진행 중으로 되돌리기
+              </button>
+            )}
+          </div>
+        }
+      />
 
       {series.fixtures.length === 0 ? (
         <div className="flex flex-col gap-3">
@@ -424,6 +467,21 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
       <AdminToasts toasts={toasts} />
 
       {/* R12: 대진 취소 확인 — 되돌릴 수 없으므로 사유를 필수로 받는다. */}
+      {/* R6/D-3: 종료 역전이 확인. 취소·재생성과 달리 되돌릴 수 있는 조작이라
+          typedChallenge 없이 사유만 받는다. */}
+      <GateConfirmModal
+        open={revertModalOpen}
+        pending={revertCompletion.isPending}
+        title="리그를 진행 중으로 되돌릴까요?"
+        description="종료된 리그를 다시 진행 중으로 바꿔요. 결과를 정정한 뒤 전 대진이 다시 확정되면 자동으로 종료돼요."
+        // 헤더 트리거("진행 중으로 되돌리기")와 접근 이름이 겹치지 않게 짧게 쓴다 —
+        // 겹치면 스크린리더 사용자도 두 버튼을 구분하지 못한다(취소·재생성 모달도 같은 관례).
+        confirmLabel="되돌리기"
+        tone="amber"
+        onConfirm={onConfirmRevert}
+        onClose={() => setRevertModalOpen(false)}
+      />
+
       <GateConfirmModal
         open={cancelTarget !== null}
         pending={cancelFixture.isPending}

@@ -9,6 +9,7 @@ import {
   useV1ChangeMembershipJersey,
   useV1ChangeTeamMembershipRole,
   useV1CreateTeamJoinApplication,
+  useV1LeagueMatches,
   useV1LeaveTeam,
   useV1MasterSports,
   useV1MyTeams,
@@ -215,14 +216,19 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
   }, []);
   const myTeamsQuery = useV1MyTeams(undefined, { enabled: hasSessionHint });
   const operatorTeamCount = normalizeMyTeamsResponse(myTeamsQuery.data).filter((team) => isTeamOperatorRole(team.role)).length;
-  /* R4: "내 리그" — 전용 리그 API 없이 이 팀의 팀매치 목록(host + 신청 모두, status
-   * 필터 없음)에서 league 필드만 distinct 로 추린다. openMatchesQuery는 recruiting +
-   * limit 5로 좁혀져 있어 이미 마감/완료된 리그전을 놓치므로 별도 쿼리로 둔다. */
-  const myLeaguesQuery = useV1TeamMatches(
+  /* R4: "내 리그" — 리그 목록 API 의 teamId 필터로 직접 가져온다.
+   * 원래는 이 팀의 팀매치 목록에서 league 필드를 distinct 로 역산했는데, 그러면
+   * **대진이 생기기 전에는 아무것도 안 뜬다** — 운영자가 팀을 리그에 넣은 시점부터
+   * 대진을 만들 때까지 팀은 자기 참가 사실을 알 수 없었다(2026-08-21 재감사, alpha 의
+   * draft 티어 리그 참가팀이 team-matches 0건인 것으로 확인). D-2 가 "참가 인지는
+   * 노출로 푼다"고 한 이상 이 경로는 참가 테이블을 봐야 한다. */
+  const myLeaguesQuery = useV1LeagueMatches(
     { teamId, limit: 50 },
-    { enabled: Boolean(query.data) },
   );
-  const myLeagues = dedupeLeagues(myLeaguesQuery.data?.items ?? []);
+  const myLeagues = (myLeaguesQuery.data?.items ?? []).map((item) => ({
+    leagueId: item.leagueId,
+    title: item.title,
+  }));
   const fallback = getTeamDetailViewModel();
 
   useEffect(() => {
@@ -739,22 +745,6 @@ function formatTeamDetailLevel(team: V1TeamDetail) {
   return minName ?? maxName ?? '';
 }
 
-/**
- * R4 "내 리그" — GET /team-matches?teamId= 응답의 각 항목이 이미 들고 있는
- * league 필드(leagueId/title)만으로 distinct 목록을 만든다. 전용 리그 API가
- * 없으므로 여기서 클라이언트 사이드로 추린다 — 같은 리그의 여러 팀매치가
- * 섞여 있어도 리그당 한 번만 노출한다. 첫 등장 순서를 유지한다(최신 매치일수록
- * 목록 앞쪽에 오도록 이미 정렬된 응답을 그대로 존중).
- */
-function dedupeLeagues(items: Array<{ league?: { leagueId: string; title: string } | null }>) {
-  const seen = new Map<string, { leagueId: string; title: string }>();
-  for (const item of items) {
-    if (item.league && !seen.has(item.league.leagueId)) {
-      seen.set(item.league.leagueId, item.league);
-    }
-  }
-  return Array.from(seen.values());
-}
 
 function formatTeamRegion(region?: { name: string; parentName?: string | null } | null, fallback?: string | null) {
   if (region?.parentName) return `${region.parentName} ${region.name}`;

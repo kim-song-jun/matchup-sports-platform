@@ -272,15 +272,25 @@ export const gameSchemaSourceManifest = {
   // 2026-08-21 hotfix: V1TeamRecordFact.playedAt is backed by the
   // 20260821120000_v1_team_record_facts_played_at migration. The bound
   // game-operations migration itself remains unchanged.
-  // 2026-08-21 재핀: 팀 간 컨택 메시지 Phase 2·3 착수 — 신고 사유 구조화를 위해
-  // enum V1InquiryReportReason(spam/harassment/impersonation/inappropriate/other)과
-  // V1Inquiry.reportReason nullable 컬럼, @@index([reportReason, createdAt])를 추가했다.
-  // 순수 additive이고(CREATE TYPE + ADD COLUMN nullable + CREATE INDEX) game domain(V1Game*)
-  // 모델·enum은 한 줄도 건드리지 않았다 — 이 guard가 schema.prisma 전체 바이트를 결속하기
-  // 때문에 걸리는 것이지 game operations 계약이 바뀐 게 아니다. 뒷받침 마이그레이션:
-  // 20260821165303_v1_inquiry_report_reason. 바인딩된 20260729000100_v1_game_operations 는
-  // 건드리지 않았으므로 .migration 해시는 그대로다.
-  schema: 'b43105c5c378c2c1a524e44b88fb0a3d10c8500f8a7461adfc09e1db362a0815',
+  // 2026-08-21 재핀(병합): 두 변경이 각자 자기 브랜치 기준 해시를 넣어 둔 채 충돌했다.
+  //
+  // (1) 팀 간 컨택 메시지 Phase 2·3 — 신고 사유 구조화를 위해
+  //     enum V1InquiryReportReason(spam/harassment/impersonation/inappropriate/other)과
+  //     V1Inquiry.reportReason nullable 컬럼, @@index([reportReason, createdAt])를 추가했다.
+  //     순수 additive(CREATE TYPE + ADD COLUMN nullable + CREATE INDEX).
+  //     뒷받침 마이그레이션: 20260821165303_v1_inquiry_report_reason.
+  // (2) V1League 목록 조회용 인덱스 둘 — @@index([regionId, state]),
+  //     @@index([createdAt(sort: Desc), id(sort: Desc)]). 순수 CREATE INDEX.
+  //     뒷받침 마이그레이션: 20260821100000_v1_league_list_indexes.
+  //
+  // 둘 다 game domain(V1Game*) 모델·enum 은 한 줄도 건드리지 않았다 — 이 guard 가
+  // schema.prisma 전체 바이트를 결속하기 때문에 걸리는 것이지 game operations 계약이
+  // 바뀐 게 아니다. 바인딩된 20260729000100_v1_game_operations 도 그대로라 .migration
+  // 해시는 변하지 않는다.
+  //
+  // 아래 값은 **두 변경이 병합된 뒤**의 schema.prisma 에 sha256 을 다시 돌려 계산한 것이다 —
+  // 어느 한쪽 브랜치의 해시를 그대로 쓰면 CI 가 깨진다(이 파일 위쪽 병합 재핀 주석과 같은 사유).
+  schema: 'ea5b9634f6020efe874bcd24cd02181de567134a6fe346c78f08d6f51464262d',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

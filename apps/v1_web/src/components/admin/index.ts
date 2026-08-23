@@ -4,6 +4,7 @@ export { AdminShell } from './admin-shell';
 // ── Page primitives ───────────────────────────────────────────────────────
 export { AdminPageHeader } from './admin-page-header';
 export { AdminKpiCard } from './admin-kpi-card';
+export { AdminDetailRow, AdminSummaryItem } from './admin-detail-row';
 
 // ── Data display ──────────────────────────────────────────────────────────
 export { AdminDataTable } from './admin-data-table';

@@ -19,6 +19,7 @@ import {
   Star,
   UserCheck,
   Users,
+  ListOrdered,
 } from 'lucide-react';
 import { LogoutButton } from '@/components/auth/logout-button';
 import { buildPhoneVerifyHref } from '@/components/auth/phone-verification/phone-verify-route';
@@ -50,6 +51,7 @@ import type {
 /** Lucide 아이콘 이름 → 컴포넌트 매핑. view-model의 icon 문자열을 참조함. */
 const MENU_ICON_MAP: Record<string, React.ComponentType<LucideProps>> = {
   Award,
+  ListOrdered,
   ClipboardList,
   Plus,
   Users,

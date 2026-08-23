@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useState, type FormEvent } from 'react';
 import {
   ArrowLeft,
   Calendar,
@@ -12,9 +12,11 @@ import {
   Users,
 } from 'lucide-react';
 import {
+  AdminDetailRow,
   AdminEmpty,
   AdminPageHeader,
   AdminStatusPill,
+  AdminSummaryItem,
   AdminTableSkeleton,
   AdminToasts,
   useAdminToast,
@@ -76,15 +78,6 @@ const TEAM_ROLE_LABEL: Record<TeamMembershipRole, string> = {
   manager: '운영진',
   member: '멤버',
 };
-
-function DetailRow({ label, value }: { label: string; value: string | number | null | undefined }) {
-  return (
-    <div className="min-w-0 rounded-xl bg-[var(--surface-soft)] px-4 py-3">
-      <dt className="text-xs font-semibold text-gray-400">{label}</dt>
-      <dd className="mt-1 break-words text-sm font-semibold text-[var(--text-strong)]">{value ?? '-'}</dd>
-    </div>
-  );
-}
 
 export default function AdminUserDetailPage() {
   const params = useParams<{ id: string }>();
@@ -181,22 +174,22 @@ export default function AdminUserDetailPage() {
             </div>
 
             <dl className="mt-5 grid gap-3 sm:grid-cols-2">
-              <DetailRow label="회원 ID" value={user.userId} />
-              <DetailRow label="이름" value={user.displayName} />
-              <DetailRow label="닉네임" value={user.nickname} />
-              <DetailRow label="이메일" value={user.email} />
-              <DetailRow label="이메일 인증" value={formatVerification(user.emailVerifiedAt)} />
-              <DetailRow label="전화번호" value={user.phone} />
-              <DetailRow label="전화번호 인증" value={formatVerification(user.phoneVerifiedAt)} />
-              <DetailRow label="성별" value={formatGender(user.gender)} />
-              <DetailRow label="생년월일" value={user.birthDate} />
-              <DetailRow label="활동 지역" value={user.displayRegion} />
-              <DetailRow label="로그인 방식" value={formatAuthProviders(user.authProviders)} />
-              <DetailRow label="온보딩" value={user.onboardingStatus} />
-              <DetailRow label="가입일" value={formatDateTime(user.createdAt)} />
-              <DetailRow label="최근 로그인" value={formatDateTime(user.lastLoginAt)} />
-              <DetailRow label="삭제일" value={formatDateTime(user.deletedAt)} />
-              <DetailRow label="관리자 권한" value={user.adminRole ?? '없음'} />
+              <AdminDetailRow label="회원 ID" value={user.userId} />
+              <AdminDetailRow label="이름" value={user.displayName} />
+              <AdminDetailRow label="닉네임" value={user.nickname} />
+              <AdminDetailRow label="이메일" value={user.email} />
+              <AdminDetailRow label="이메일 인증" value={formatVerification(user.emailVerifiedAt)} />
+              <AdminDetailRow label="전화번호" value={user.phone} />
+              <AdminDetailRow label="전화번호 인증" value={formatVerification(user.phoneVerifiedAt)} />
+              <AdminDetailRow label="성별" value={formatGender(user.gender)} />
+              <AdminDetailRow label="생년월일" value={user.birthDate} />
+              <AdminDetailRow label="활동 지역" value={user.displayRegion} />
+              <AdminDetailRow label="로그인 방식" value={formatAuthProviders(user.authProviders)} />
+              <AdminDetailRow label="온보딩" value={user.onboardingStatus} />
+              <AdminDetailRow label="가입일" value={formatDateTime(user.createdAt)} />
+              <AdminDetailRow label="최근 로그인" value={formatDateTime(user.lastLoginAt)} />
+              <AdminDetailRow label="삭제일" value={formatDateTime(user.deletedAt)} />
+              <AdminDetailRow label="관리자 권한" value={user.adminRole ?? '없음'} />
             </dl>
             {user.bio ? (
               <div className="mt-3 rounded-xl bg-[var(--surface-soft)] px-4 py-3">
@@ -264,13 +257,13 @@ export default function AdminUserDetailPage() {
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
             <h2 className="text-[17px] font-bold text-[var(--text-strong)]">활동 요약</h2>
             <dl className="mt-4 grid gap-3">
-              <SummaryItem icon={<Calendar size={16} />} label="개설 매치" value={user.hostedMatchCount} />
-              <SummaryItem icon={<Users size={16} />} label="생성/소유 팀" value={user.ownedTeamCount} />
-              <SummaryItem icon={<Shield size={16} />} label="팀장 팀" value={teamRoles.owner} />
-              <SummaryItem icon={<Shield size={16} />} label="운영진 팀" value={teamRoles.manager} />
-              <SummaryItem icon={<Users size={16} />} label="소속팀 전체" value={teamMemberships.length} />
-              <SummaryItem icon={<Users size={16} />} label="일반 멤버 팀" value={teamRoles.member} />
-              <SummaryItem icon={<Clock size={16} />} label="리뷰 수" value={user.reputationSummary?.reviewCount ?? 0} />
+              <AdminSummaryItem icon={<Calendar size={16} />} label="개설 매치" value={user.hostedMatchCount} />
+              <AdminSummaryItem icon={<Users size={16} />} label="생성/소유 팀" value={user.ownedTeamCount} />
+              <AdminSummaryItem icon={<Shield size={16} />} label="팀장 팀" value={teamRoles.owner} />
+              <AdminSummaryItem icon={<Shield size={16} />} label="운영진 팀" value={teamRoles.manager} />
+              <AdminSummaryItem icon={<Users size={16} />} label="소속팀 전체" value={teamMemberships.length} />
+              <AdminSummaryItem icon={<Users size={16} />} label="일반 멤버 팀" value={teamRoles.member} />
+              <AdminSummaryItem icon={<Clock size={16} />} label="리뷰 수" value={user.reputationSummary?.reviewCount ?? 0} />
             </dl>
           </section>
 
@@ -361,18 +354,6 @@ export default function AdminUserDetailPage() {
       </button>
     );
   }
-}
-
-function SummaryItem({ icon, label, value }: { icon: ReactNode; label: string; value: number }) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-xl bg-[var(--surface-soft)] px-4 py-3">
-      <dt className="flex items-center gap-2 text-sm font-semibold text-[var(--text-muted)]">
-        <span className="text-gray-400" aria-hidden="true">{icon}</span>
-        {label}
-      </dt>
-      <dd className="text-sm font-bold tabular-nums text-[var(--text-strong)]">{value}</dd>
-    </div>
-  );
 }
 
 function RelatedList({

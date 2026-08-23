@@ -776,6 +776,11 @@ describe('AdminService — list/detail endpoints', () => {
         .mockResolvedValueOnce([
           { category: 'account', _count: { _all: 3 } },
           { category: 'report', _count: { _all: 2 } },
+        ])
+        .mockResolvedValueOnce([
+          // 신고가 아닌 문의는 reportReason 이 null 이라 groupBy 결과에 null 키로 섞여 들어온다.
+          { reportReason: null, _count: { _all: 11 } },
+          { reportReason: 'spam', _count: { _all: 2 } },
         ]);
 
       const result = await service.listInquiries(adminAuthUser, { q: '로그인' });
@@ -793,7 +798,49 @@ describe('AdminService — list/detail endpoints', () => {
           report: 2,
           other: 0,
         },
+        // null 그룹(신고 아닌 문의 11건)은 버려야 한다 — 사유 칩에 넣을 자리가 없고,
+        // 넣으면 "사유 미상 11건" 처럼 보여 실제 신고 건수를 오해하게 만든다.
+        byReportReason: {
+          spam: 2,
+          harassment: 0,
+          impersonation: 0,
+          inappropriate: 0,
+          other: 0,
+        },
       });
+    });
+
+    // facet 규칙: 각 칩의 건수는 "자기 자신을 뺀 나머지 필터" 로 집계해야 "이걸 고르면 몇 건이
+    // 되는지" 를 뜻한다. reportReason 이 자기 facet 집계에 섞여 들어가면 고른 사유만 남아
+    // 다른 사유 칩이 전부 0 이 된다.
+    it('reportReason 필터는 목록에는 걸리지만 자기 facet 집계에는 걸리지 않는다', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(activeAdminRecord);
+      prisma.v1Inquiry.findMany.mockResolvedValue([makeInquiryRow()]);
+      prisma.v1Inquiry.groupBy
+        .mockResolvedValueOnce([{ status: 'received', _count: { _all: 2 } }])
+        .mockResolvedValueOnce([{ category: 'report', _count: { _all: 2 } }])
+        .mockResolvedValueOnce([
+          { reportReason: 'spam', _count: { _all: 2 } },
+          { reportReason: 'harassment', _count: { _all: 5 } },
+        ]);
+
+      const result = await service.listInquiries(adminAuthUser, {
+        category: 'report',
+        reportReason: 'spam',
+      });
+
+      // 목록 조회에는 사유가 걸린다.
+      expect(prisma.v1Inquiry.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ reportReason: 'spam' }),
+        }),
+      );
+      // 사유 facet 집계에는 사유가 빠진다 — 세 번째 groupBy 호출이 그것이다.
+      const reportReasonGroupByArgs = prisma.v1Inquiry.groupBy.mock.calls[2][0];
+      expect(reportReasonGroupByArgs.by).toEqual(['reportReason']);
+      expect(reportReasonGroupByArgs.where).not.toHaveProperty('reportReason');
+      // 그래서 고르지 않은 사유의 건수도 그대로 보인다.
+      expect(result.summary.byReportReason).toMatchObject({ spam: 2, harassment: 5 });
     });
   });
 

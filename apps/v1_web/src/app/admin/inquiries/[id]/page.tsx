@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useState, type FormEvent } from 'react';
-import { ArrowLeft, Clock, Flag, Mail, MessageSquareText, Pencil, Send, Tag, UserRound } from 'lucide-react';
+import { ArrowLeft, Ban, Clock, Flag, Mail, MessageSquareText, Pencil, Send, ShieldOff, Tag, UserRound } from 'lucide-react';
 import {
   AdminEmpty,
   AdminPageHeader,
@@ -12,16 +12,19 @@ import {
   AdminToasts,
   useAdminToast,
 } from '@/components/admin';
+import type { AdminToastVariant } from '@/components/admin';
 import {
   useV1AdminInquiry,
   useV1AdminMe,
+  useV1BlockReportedTeam,
   useV1ChangeAdminInquiryStatus,
+  useV1ChangeTeamStatus,
   useV1ReplyAdminInquiry,
   useV1UpdateAdminInquiryReply,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
-import { inquiryReportReasonLabel } from '@/lib/v1-status-labels';
-import type { V1InquiryCategory, V1InquiryStatus } from '@/types/api';
+import { INQUIRY_REPORT_REASON_OPTIONS, inquiryReportReasonLabel } from '@/lib/v1-status-labels';
+import type { V1AdminReportedTeamSummary, V1InquiryCategory, V1InquiryStatus } from '@/types/api';
 
 const STATUS_LABEL: Record<V1InquiryStatus, string> = {
   received: '접수',
@@ -94,6 +97,213 @@ function requesterContact(inquiry: {
   const phone = inquiry.isGuest ? inquiry.guestPhone : null;
   if (email && phone) return `${email} · ${phone}`;
   return email ?? phone ?? '-';
+}
+
+/**
+ * "이 팀은 최근 30일 동안 3건 신고됐어요 (스팸·광고 2 · 괴롭힘·욕설 1)" 형태의 롤업 문구.
+ * `reasonBreakdown` 은 건수가 0인 사유는 키 자체가 없다(부재 ≠ 0) — `Object.entries` 대신
+ * 사유 옵션 목록을 순회하며 존재하는 키만 뽑아 항상 같은 순서로 보여준다.
+ */
+function reportedTeamSummaryText(reportedTeam: V1AdminReportedTeamSummary): string {
+  const breakdownParts = INQUIRY_REPORT_REASON_OPTIONS.flatMap((option) => {
+    const count = reportedTeam.reasonBreakdown[option.value];
+    return count ? [`${option.label} ${count}`] : [];
+  });
+
+  const base = `이 팀은 최근 ${reportedTeam.windowDays}일 동안 ${reportedTeam.recentReportCount}건 신고됐어요`;
+  return breakdownParts.length > 0 ? `${base} (${breakdownParts.join(' · ')})` : base;
+}
+
+const CONFIRM_ACTION_BUTTON_CLASS =
+  'h-[44px] flex-1 rounded-xl bg-red-500 text-sm font-semibold text-white transition-colors hover:bg-red-600 disabled:cursor-not-allowed disabled:bg-gray-300 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2';
+const CONFIRM_CANCEL_BUTTON_CLASS =
+  'h-[44px] flex-1 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] text-sm font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--surface-soft)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2';
+
+/**
+ * 신고 대상 팀 롤업 + 조치. `reportedTeam` 은 `inquiry.category === 'report'` 인 문의에만
+ * 채워진다(그 외 문의·팀 조회 실패 시 null) — 대상을 모르면 조치 버튼 대신 안내만 보여준다.
+ *
+ * 팀 정지·대리 차단 둘 다 되돌릴 수 있는 조치라 모달 대신 컨택 상세 차단 확인과 같은
+ * 2단계 인라인 확인(`role="group"`)을 쓴다 — 되돌릴 수 있는 동작에 모달 기계장치를
+ * 복제하지 않는다(같은 저장소 관용구, `my-team-contacts-client.tsx`).
+ */
+function ReportedTeamSection({
+  inquiryId,
+  reportedTeam,
+  canWrite,
+  showToast,
+  onActionSuccess,
+}: {
+  inquiryId: string;
+  reportedTeam: V1AdminReportedTeamSummary | null;
+  canWrite: boolean;
+  showToast: (message: string, variant?: AdminToastVariant) => void;
+  onActionSuccess: () => void;
+}) {
+  const blockMutation = useV1BlockReportedTeam();
+  const suspendMutation = useV1ChangeTeamStatus();
+
+  const [suspendConfirming, setSuspendConfirming] = useState(false);
+  const [suspendDone, setSuspendDone] = useState(false);
+  const [suspendError, setSuspendError] = useState<string | null>(null);
+
+  const [blockConfirming, setBlockConfirming] = useState(false);
+  const [blockResult, setBlockResult] = useState<'blocked' | 'already' | null>(null);
+  const [blockError, setBlockError] = useState<string | null>(null);
+
+  function handleSuspend() {
+    if (!reportedTeam) return;
+    setSuspendError(null);
+    suspendMutation.mutate(
+      { id: reportedTeam.teamId, status: 'suspended', reason: `운영자 조치 (신고 ${inquiryId})` },
+      {
+        onSuccess: () => {
+          setSuspendConfirming(false);
+          setSuspendDone(true);
+          showToast('팀을 정지했어요.', 'success');
+          onActionSuccess();
+        },
+        onError: (err) => {
+          const message = extractErrorMessage(err, '조치하지 못했어요. 잠시 후 다시 시도해 주세요.');
+          setSuspendError(message);
+          showToast(message, 'error');
+        },
+      },
+    );
+  }
+
+  function handleBlock() {
+    setBlockError(null);
+    blockMutation.mutate(inquiryId, {
+      onSuccess: (data) => {
+        setBlockConfirming(false);
+        setBlockResult(data.alreadyBlocked ? 'already' : 'blocked');
+        showToast(data.alreadyBlocked ? '이미 차단된 팀이에요.' : '신고한 팀을 대신 차단했어요.', 'success');
+        onActionSuccess();
+      },
+      onError: (err) => {
+        const message = extractErrorMessage(err, '조치하지 못했어요. 잠시 후 다시 시도해 주세요.');
+        setBlockError(message);
+        showToast(message, 'error');
+      },
+    });
+  }
+
+  const isSuspended = reportedTeam?.status === 'suspended' || suspendDone;
+
+  return (
+    <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4" aria-label="신고 대상 팀">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-[16px] font-bold text-[var(--text-strong)]">신고 대상 팀</h2>
+        {reportedTeam ? <AdminStatusPill status={reportedTeam.status} /> : null}
+      </div>
+
+      {!reportedTeam ? (
+        <p className="mt-3 rounded-xl bg-[var(--surface-soft)] px-3 py-2 text-sm text-[var(--text-muted)]">
+          신고 대상 팀을 알 수 없어요
+        </p>
+      ) : (
+        <>
+          <p className="mt-3 text-sm font-semibold text-[var(--text-strong)]">{reportedTeam.name}</p>
+          <p className="mt-1 text-sm leading-relaxed text-[var(--text-body)]">{reportedTeamSummaryText(reportedTeam)}</p>
+
+          {canWrite ? (
+            <div className="mt-4 flex flex-col gap-3">
+              {/* 팀 정지 — 채팅·일정·컨택을 전부 막는 강한 조치라 확인 단계 필수 */}
+              {isSuspended ? (
+                <p role="status" className="text-xs font-medium text-[var(--text-muted)]">
+                  이 팀은 정지된 상태예요.
+                </p>
+              ) : suspendConfirming ? (
+                <div role="group" aria-label="정지 확인" className="flex flex-col gap-2 rounded-xl bg-[var(--surface-soft)] p-3">
+                  <p className="text-xs text-[var(--text-muted)]">
+                    정지하면 이 팀은 채팅·일정·컨택을 모두 할 수 없어요.
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSuspendConfirming(false)}
+                      disabled={suspendMutation.isPending}
+                      className={CONFIRM_CANCEL_BUTTON_CLASS}
+                    >
+                      취소
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSuspend}
+                      disabled={suspendMutation.isPending}
+                      className={CONFIRM_ACTION_BUTTON_CLASS}
+                    >
+                      {suspendMutation.isPending ? '정지하는 중...' : '정지'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setSuspendConfirming(true)}
+                  className="inline-flex h-[44px] items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-4 text-sm font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                >
+                  <ShieldOff size={16} aria-hidden="true" />
+                  팀 정지
+                </button>
+              )}
+              {suspendError ? (
+                <p role="alert" className="text-xs font-medium text-[var(--red700)]">
+                  {suspendError}
+                </p>
+              ) : null}
+
+              {/* 신고한 팀 대신 차단 — 멱등이라 이미 차단돼 있으면 alreadyBlocked: true 로 200 이 온다(에러 아님) */}
+              {blockResult ? (
+                <p role="status" className="text-xs font-medium text-[var(--text-muted)]">
+                  {blockResult === 'already' ? '이미 차단된 팀이에요.' : '신고한 팀을 대신 차단했어요.'}
+                </p>
+              ) : blockConfirming ? (
+                <div role="group" aria-label="차단 확인" className="flex flex-col gap-2 rounded-xl bg-[var(--surface-soft)] p-3">
+                  <p className="text-xs text-[var(--text-muted)]">
+                    신고한 팀 명의로 이 팀을 차단해요. 신고한 팀은 더 이상 이 팀에게 컨택을 받지 않아요.
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setBlockConfirming(false)}
+                      disabled={blockMutation.isPending}
+                      className={CONFIRM_CANCEL_BUTTON_CLASS}
+                    >
+                      취소
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleBlock}
+                      disabled={blockMutation.isPending}
+                      className={CONFIRM_ACTION_BUTTON_CLASS}
+                    >
+                      {blockMutation.isPending ? '차단하는 중...' : '차단'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setBlockConfirming(true)}
+                  className="inline-flex h-[44px] items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-4 text-sm font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                >
+                  <Ban size={16} aria-hidden="true" />
+                  신고한 팀 대신 차단
+                </button>
+              )}
+              {blockError ? (
+                <p role="alert" className="text-xs font-medium text-[var(--red700)]">
+                  {blockError}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+        </>
+      )}
+    </section>
+  );
 }
 
 export default function AdminInquiryDetailPage() {
@@ -362,6 +572,16 @@ export default function AdminInquiryDetailPage() {
         </section>
 
         <aside className="flex flex-col gap-4" aria-label="문의 처리">
+          {inquiry.category === 'report' ? (
+            <ReportedTeamSection
+              inquiryId={inquiryId}
+              reportedTeam={inquiry.reportedTeam}
+              canWrite={canWrite}
+              showToast={showToast}
+              onActionSuccess={() => void refetch()}
+            />
+          ) : null}
+
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
             <h2 className="text-[16px] font-bold text-[var(--text-strong)]">답변 작성</h2>
             <form className="mt-3 flex flex-col gap-3" onSubmit={handleReplySubmit}>

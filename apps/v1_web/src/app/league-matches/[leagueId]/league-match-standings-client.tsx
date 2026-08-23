@@ -189,7 +189,14 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
           <EmptyState title="아직 확정된 결과가 없어요" sub="리그 경기 결과가 확정되면 순위표가 나타나요." />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            {/* 승강 열이 붙으면 6칸이 되는데, 390px 컨테이너(358px)에서는 승점·득실 칸이
+                24px 까지 좁아져 두 글자 헤더가 서로 붙어 버린다(alpha 실측). 이미 감싸고
+                있는 overflow-x-auto 가 일을 하려면 표에 최소 폭이 있어야 하므로, 승강 열이
+                있을 때만 최소 폭을 줘 가로 스크롤로 넘긴다 — 확정 전 5칸일 때는 지금처럼
+                컨테이너에 딱 맞춰 스크롤 없이 보인다.
+                440px = 순위 38 + 팀 160 + 전적 56 + 승점 38 + 득실 38 + 승강 116 (768px
+                실측 칸 폭에서 팀 칸만 최소치로 줄인 값). */}
+            <table className={`w-full text-sm ${standings.promotionDecided ? 'min-w-[440px]' : ''}`}>
               <thead>
                 <tr className="text-left text-[var(--text-muted)]">
                   <th scope="col" className="py-2">순위</th>

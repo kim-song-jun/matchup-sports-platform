@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 
 import { execFileSync } from 'node:child_process';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 // Declared here rather than beside parseStatements because selfTest() runs
 // during module evaluation, before a class declaration further down the file
@@ -858,9 +861,21 @@ for (const [label, sha] of [['base', baseSha], ['head', headSha]]) {
   if (!/^[0-9a-f]{40}$/.test(sha ?? '')) fail(`${label} SHA must be a full lowercase commit`);
 }
 
-runGit(['merge-base', '--is-ancestor', baseSha, headSha]);
+// PR 이벤트가 넘기는 base 는 **대상 브랜치의 현재 tip** 이다(github.event.pull_request.base.sha).
+// 브랜치를 딴 뒤 dev 가 전진하면 그 tip 은 head 의 조상이 아니게 되고, 아래 diff 가 "dev 에는
+// 있고 내 브랜치엔 없는" 남의 마이그레이션까지 D 로 뱉어 `existing migration changed (D)` 로
+// 엉뚱하게 죽는다 — 이 PR 이 마이그레이션을 전혀 건드리지 않아도 그렇다(2026-08-21 리그전
+// 작업에서 5개 PR 이 이 사유로 red 였다). 그래서 조상이 아니면 **실제 분기점** 을 diff base 로
+// 쓴다. 그래야 이 PR 이 정말로 **추가한** 마이그레이션만 A 로 잡힌다.
+//
+// 게이트를 느슨하게 만들지 않는다는 점이 중요하다: 바꾸는 것은 "무엇을 이 PR 의 변경으로 볼
+// 것인가" 뿐이고, 아래 collectBaseFunctionNames 는 계속 **대상 브랜치 tip**(baseSha)을 본다 —
+// 함수 존재 여부는 머지된 뒤의 현실로 판정해야 CREATE OR REPLACE 가 새 함수로 오인되지 않는다.
+const diffBase = isAncestorOf(baseSha, headSha)
+  ? baseSha
+  : runGit(['merge-base', baseSha, headSha]).trim();
 const changes = runGit([
-  'diff', '--name-status', '--find-renames', baseSha, headSha, '--',
+  'diff', '--name-status', '--find-renames', diffBase, headSha, '--',
   'apps/v1_api/prisma/migrations/*/migration.sql',
 ]).trim();
 const addedFiles = [];
@@ -1185,6 +1200,17 @@ function isAdditiveStatement(statement, { newTables, nullableNewColumnsByTable, 
   return false;
 }
 
+// runGit 과 달리 실패를 예외로 흘리지 않고 boolean 으로 돌려준다 — 조상이 아닌 것은
+// 오류가 아니라 판정해야 할 상태다(runGit 은 git 이 non-zero 면 곧바로 fail() 로 종료한다).
+function isAncestorOf(ancestor, descendant) {
+  try {
+    execFileSync('git', ['merge-base', '--is-ancestor', ancestor, descendant], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function runGit(args) {
   try {
     return execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 1024 * 1024 * 64 });
@@ -1353,6 +1379,67 @@ function selfTest() {
   }
 
   console.log('[expand-contract-sql-v1] negative controls passed');
+
+  baseResolutionSelfTest();
+}
+
+/**
+ * base 해석(조상 여부에 따른 diff base 선택)을 임시 저장소로 검증한다.
+ *
+ * 이 케이스가 없으면 조상이 아닐 때의 동작을 CI 가 전혀 보지 못한다 — 실제로 그 구간이
+ * 비어 있어서, 대상 브랜치가 전진할 때마다 무관한 PR 이 죽는 결함이 오래 남아 있었다.
+ * 특히 C 케이스(조상이 아니면서 위험한 마이그레이션)가 중요하다: base 를 느슨하게 고르면
+ * 게이트가 조용히 fail-open 되는데, 그건 원래 결함보다 훨씬 나쁘다.
+ */
+function baseResolutionSelfTest() {
+  const repo = mkdtempSync(join(tmpdir(), 'ec-gate-'));
+  const git = (...args) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  const commit = (dir, sql, message) => {
+    mkdirSync(join(repo, 'apps/v1_api/prisma/migrations', dir), { recursive: true });
+    writeFileSync(join(repo, 'apps/v1_api/prisma/migrations', dir, 'migration.sql'), `${sql}\n`);
+    git('add', '-A');
+    git('-c', 'user.email=selftest@local', '-c', 'user.name=selftest', 'commit', '-qm', message);
+    return git('rev-parse', 'HEAD');
+  };
+  const gateExits = (base, head) => {
+    try {
+      execFileSync(process.execPath, [new URL(import.meta.url).pathname, base, head], { cwd: repo, stdio: 'ignore' });
+      return 0;
+    } catch {
+      return 1;
+    }
+  };
+
+  try {
+    git('init', '-q', '.');
+    const fork = commit('20260101000000_base', 'CREATE TABLE "Thing" ("id" UUID NOT NULL);', 'base');
+
+    git('checkout', '-q', '-b', 'safe');
+    const safeHead = commit('20260102000000_safe', 'ALTER TABLE "Thing" ADD COLUMN "note" TEXT;', 'safe');
+
+    git('checkout', '-q', fork);
+    git('checkout', '-q', '-b', 'risky');
+    const riskyHead = commit('20260102000000_risky', 'ALTER TABLE "Thing" DROP COLUMN "id";', 'risky');
+
+    // 대상 브랜치가 그사이 전진해 fork 이후로 벌어진다 — 여기서 조상 관계가 깨진다.
+    git('checkout', '-q', fork);
+    git('checkout', '-q', '-b', 'mainline');
+    const movedTip = commit('20260103000000_other', 'ALTER TABLE "Thing" ADD COLUMN "other" TEXT;', 'other');
+
+    const cases = [
+      ['ancestor base, additive migration', fork, safeHead, 0],
+      ['moved base, additive migration', movedTip, safeHead, 0],
+      ['moved base, destructive migration', movedTip, riskyHead, 1],
+      ['ancestor base, destructive migration', fork, riskyHead, 1],
+    ];
+    for (const [label, base, head, expected] of cases) {
+      const actual = gateExits(base, head);
+      if (actual !== expected) fail(`base resolution self-test: ${label} expected exit ${expected}, got ${actual}`);
+    }
+    console.log('[expand-contract-sql-v1] base resolution controls passed');
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
 }
 
 function fail(message) {

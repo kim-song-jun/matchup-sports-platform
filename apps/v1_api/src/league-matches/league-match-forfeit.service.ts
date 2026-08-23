@@ -58,6 +58,20 @@ export const FORFEIT_REASON_MARKER = '[LEAGUE_FORFEIT]';
 const WINNER_SCORE = 1;
 const LOSER_SCORE = 0;
 
+/**
+ * GamesService 가 동시성 충돌에 붙이는 코드. 여기서 이것만 보고 재시도한다 —
+ * 다른 409(이미 확정됨 등)는 재시도해도 결과가 같으므로 그대로 올려 보낸다.
+ */
+function isConcurrencyConflict(error: unknown): boolean {
+  if (!(error instanceof ConflictException)) return false;
+  const response = error.getResponse();
+  return (
+    typeof response === 'object' &&
+    response !== null &&
+    (response as { code?: unknown }).code === 'COMMAND_CONCURRENCY_CONFLICT'
+  );
+}
+
 @Injectable()
 export class LeagueMatchForfeitService {
   constructor(
@@ -66,7 +80,44 @@ export class LeagueMatchForfeitService {
     private readonly games: GamesService,
   ) {}
 
+  /**
+   * 몰수 처리. 운영자가 버튼을 빠르게 두 번 누르거나 두 운영자가 같은 대진을 동시에
+   * 처리하면, 아래 `attempt` 계산이 트랜잭션 **밖**에서 이뤄지므로 두 요청이 같은 커맨드
+   * ID 로 출발한다. 뒤늦은 쪽은 `withCommand` 의 `SELECT ... FOR UPDATE` 에서 Postgres
+   * 40001 을 맞고 409 COMMAND_CONCURRENCY_CONFLICT 로 되돌아온다.
+   *
+   * 그 시점엔 이긴 쪽이 이미 커밋을 끝냈으므로, 그대로 한 번 더 돌리면 아래 로직이
+   * 확정된 결과를 읽어 `alreadyProcessed: true` 로 정상 수렴한다. 즉 재시도는 새 몰수를
+   * 만들지 않는다 — 이 엔드포인트가 이미 멱등이라서 안전한 것이지, 재시도가 멱등을
+   * 만들어 주는 게 아니다. 그래서 단 한 번만 재시도하고, 그래도 충돌이면 409 를 그대로
+   * 올려 보낸다(무한 재시도로 경합을 키우지 않는다).
+   */
   async recordForfeit(user: V1AuthUser, leagueId: string, teamMatchId: string, dto: RecordLeagueForfeitDto) {
+    try {
+      return await this.recordForfeitOnce(user, leagueId, teamMatchId, dto);
+    } catch (error) {
+      if (!isConcurrencyConflict(error)) throw error;
+      try {
+        return await this.recordForfeitOnce(user, leagueId, teamMatchId, dto);
+      } catch (retryError) {
+        if (!isConcurrencyConflict(retryError)) throw retryError;
+        // GamesService 가 붙이는 기본 메시지는 영문("A concurrent command won; ...")이라
+        // 그대로 올리면 한국어 화면에 영문이 뜬다. 코드는 그대로 두고(클라이언트가 코드로
+        // 분기할 수 있어야 한다) 운영자가 읽을 문장만 바꾼다.
+        throw new ConflictException({
+          code: 'COMMAND_CONCURRENCY_CONFLICT',
+          message: '같은 대진을 동시에 처리하고 있어요. 잠시 후 다시 시도해 주세요.',
+        });
+      }
+    }
+  }
+
+  private async recordForfeitOnce(
+    user: V1AuthUser,
+    leagueId: string,
+    teamMatchId: string,
+    dto: RecordLeagueForfeitDto,
+  ) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
 
     const teamMatch = await this.prisma.v1TeamMatch.findFirst({

@@ -830,7 +830,7 @@ describe('FixtureLineupPageClient — 라인업 충돌(VERSION_CONFLICT)에서 �
 
   beforeEach(() => {
     vi.clearAllMocks();
-    lineupsRefetch = vi.fn().mockResolvedValue({ data: undefined });
+    lineupsRefetch = vi.fn().mockResolvedValue({ isError: false, data: [baseGameLineup()] });
     hoisted.useV1FixtureLineupRosterMock.mockReturnValue(baseRoster());
     hoisted.useV1TournamentMock.mockReturnValue({ data: { sport: { name: '풋살' } }, isLoading: false, isError: false });
     hoisted.useV1FixtureLineupAccessMock.mockReturnValue({
@@ -908,6 +908,45 @@ describe('FixtureLineupPageClient — 라인업 충돌(VERSION_CONFLICT)에서 �
     });
     expect(screen.getByRole('checkbox', { name: '김후보 선발' })).not.toBeChecked();
     expect(screen.queryByRole('button', { name: '최신 명단 불러오기' })).not.toBeInTheDocument();
+  });
+
+  // Copilot 리뷰 지적 — 저장 경로만 409 를 주입하고 있어서, 제출에서 충돌이 나도 같은
+  // 계약(복구 UI 노출 + '새로고침' 문구 없음)이 지켜지는지 잡지 못했다. 제출도
+  // expectedVersion 을 보내므로 같은 409 가 실제로 난다.
+  it('제출이 409 로 막혀도 같은 복구 경로를 준다', async () => {
+    hoisted.submitMutateAsync.mockRejectedValue(conflictError());
+
+    render(<FixtureLineupPageClient tournamentId="t-1" fixtureId="f-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '라인업 제출하기' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '최신 명단 불러오기' })).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/새로고침/)).not.toBeInTheDocument();
+    expect(lineupsRefetch).toHaveBeenCalled();
+  });
+
+  // Copilot 리뷰 지적 — React Query 는 refetch 실패에도 기존 data 를 들고 있다. 성공을
+  // 확인하지 않으면 최신본도 못 준 채 편집만 날리는, 의도와 정반대 결과가 된다.
+  it('최신 명단 불러오기가 실패하면 편집과 충돌 상태를 그대로 두고 사유만 알린다', async () => {
+    hoisted.saveMutateAsync.mockRejectedValue(conflictError());
+    lineupsRefetch.mockResolvedValue({ isError: true, data: undefined });
+
+    render(<FixtureLineupPageClient tournamentId="t-1" fixtureId="f-1" />);
+    fireEvent.click(screen.getByRole('checkbox', { name: '김후보 선발' }));
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '최신 명단 불러오기' })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '최신 명단 불러오기' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('최신 명단을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.')).toBeInTheDocument();
+    });
+    // 편집이 살아 있고, 다시 시도할 버튼도 그대로 남는다.
+    expect(screen.getByRole('checkbox', { name: '김후보 선발' })).toBeChecked();
+    expect(screen.getByRole('button', { name: '최신 명단 불러오기' })).toBeInTheDocument();
   });
 
   it('충돌이 아닌 저장 실패에는 최신 명단 불러오기를 권하지 않는다 (엉뚱한 편집 유실 방지)', async () => {

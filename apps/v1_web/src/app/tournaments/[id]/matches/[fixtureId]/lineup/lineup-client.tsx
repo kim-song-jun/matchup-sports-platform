@@ -676,11 +676,21 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
    * 충돌에서 빠져나오는 유일한 경로. 지금 편집 내용을 버리고 서버 최신본으로 다시 시작한다.
    * refetch 를 **먼저 await** 한다 — hydrated 를 먼저 풀면 아직 낡은 lineupsQuery.data 로
    * 재하이드레이션돼 저장을 눌러도 같은 충돌이 반복된다.
+   *
+   * **refetch 성공까지 확인한 뒤에만 hydrated 를 푼다**(Copilot 리뷰 지적, real).
+   * React Query 는 refetch 가 실패해도 기존 `data` 를 그대로 들고 있다 — 성공 여부를
+   * 안 보면 최신본을 못 받은 채 낡은 데이터로 재하이드레이션해서, **최신본도 못 주고
+   * 사용자 편집만 날리는** 정확히 반대 결과가 된다. 실패하면 충돌 상태와 편집을 모두
+   * 그대로 두고 사유만 알린다 — 버튼이 남아 있으니 다시 시도할 수 있다.
    */
   async function handleLoadLatestLineup() {
     setSaveError(null);
     setSaveStatus('idle');
-    await lineupsQuery.refetch();
+    const refetched = await lineupsQuery.refetch();
+    if (refetched.isError || refetched.data === undefined) {
+      setSaveError('최신 명단을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
+      return;
+    }
     setStaleConflict(false);
     setHydrated(false);
   }

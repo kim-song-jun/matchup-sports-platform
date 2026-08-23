@@ -657,6 +657,49 @@ describe('몰수·중단 경기의 검토·확정', () => {
     expect(screen.queryByText(/종료된 경기예요/)).not.toBeInTheDocument();
   });
 
+  /**
+   * Copilot 리뷰가 잡은 결함 — 배너 소스를 `currentOfficial ?? latest` 로 고르면, 몰수로
+   * 확정된 경기에 정정 리비전이 올라와 **그것을** 검토하는 동안 배너가 정정안이 아니라
+   * 이전 공식 결과의 사유를 보여준다. 승인 직전에 보는 근거가 승인 대상과 달라지므로
+   * 이 배너를 둔 이유 자체가 무너진다.
+   */
+  it('정정 리비전을 검토하는 중에는 이전 공식 결과가 아니라 검토 대상의 사유를 보여준다', () => {
+    hookMocks.game.data = buildGame('platform_ops', { currentOfficialRevisionId: 'rev-1' });
+    hookMocks.revisions.data = [
+      // 검토 대상: 정상 종료로 되돌리는 정정안.
+      buildRevision({ id: 'rev-2', revision: 2, state: 'SUBMITTED', supersedesId: 'rev-1' }),
+      // 이전 공식 결과: 몰수.
+      buildRevision({
+        id: 'rev-1',
+        revision: 1,
+        state: 'OFFICIAL',
+        outcomeReason: 'FORFEIT',
+        outcomeNote: '원정팀 미출석',
+      }),
+    ];
+
+    renderWithClient(<GameResultReviewPanel gameId="game-1" />);
+
+    expect(screen.queryByText(/몰수·기권으로 종료된 경기예요/)).not.toBeInTheDocument();
+  });
+
+  it('검토 대기 리비전이 없으면 현재 공식 결과의 사유를 보여준다', () => {
+    hookMocks.game.data = buildGame('platform_ops', { currentOfficialRevisionId: 'rev-1' });
+    hookMocks.revisions.data = [
+      buildRevision({
+        id: 'rev-1',
+        revision: 1,
+        state: 'OFFICIAL',
+        outcomeReason: 'FORFEIT',
+        outcomeNote: '원정팀 미출석',
+      }),
+    ];
+
+    renderWithClient(<GameResultReviewPanel gameId="game-1" />);
+
+    expect(screen.getByText('몰수·기권으로 종료된 경기예요. 사유: 원정팀 미출석')).toBeInTheDocument();
+  });
+
   it('확정 확인 문구가 몰수라는 사실을 점수와 함께 말한다', async () => {
     hookMocks.game.data = buildGame('platform_ops');
     hookMocks.revisions.data = [

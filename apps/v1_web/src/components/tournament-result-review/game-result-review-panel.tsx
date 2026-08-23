@@ -173,10 +173,15 @@ export function GameResultReviewPanel({
   }
 
   const missingAssists = latest ? countMissingAssists(latest.resultParticipants) : 0;
-  // 확정 전에는 검토 대상(latest)의 사유를, 확정 후에는 공식 리비전의 사유를 보여준다 —
-  // 확정하고 나면 latest 가 그 공식 리비전이라 대개 같지만, 정정으로 새 리비전이 올라온
-  // 동안에는 둘이 갈린다. 그때 화면에 남아야 하는 건 "지금 유효한 결과"의 사유다.
-  const outcomeSource = currentOfficial ?? latest;
+  // 이 배너는 **지금 승인 버튼을 누를 대상**의 사유를 보여줘야 한다. 검토 대기 리비전이
+  // 있으면(latest.state === 'SUBMITTED') 그게 승인 대상이므로 그것을, 없으면 지금 유효한
+  // 공식 결과의 사유를 보여준다.
+  //
+  // `currentOfficial ?? latest` 로 쓰면 정반대가 된다(Copilot 리뷰 지적): 몰수로 확정된
+  // 경기에 정정 리비전이 올라와 그걸 검토하는 동안, 배너는 **정정안이 아니라 이전 공식
+  // 결과**의 사유를 보여준다 — 검토자가 승인 직전에 보는 근거가 승인 대상과 다른 것이라
+  // 이 배너를 둔 이유 자체가 무너진다.
+  const outcomeSource = latest !== null && latest.state === 'SUBMITTED' ? latest : (currentOfficial ?? null);
   const outcomeReason = toDisplayableOutcomeReason(outcomeSource?.outcomeReason);
   const outcomeNotice =
     outcomeReason !== null ? { reason: outcomeReason, note: outcomeSource?.outcomeNote?.trim() ?? '' } : null;

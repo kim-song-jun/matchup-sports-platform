@@ -122,6 +122,32 @@ describe('evaluateSuspension — 두 규정을 함께 켠 경우', () => {
   });
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 2026-08-24 alpha 실측으로 발견한 결함의 회귀 방어.
+//
+// `suspensionVerdicts`(games.service.ts)가 **공식 확정본만** 세고 있었는데, 경기를
+// `end` 해도 결과 리비전은 `SUBMITTED` 로 남고 `currentOfficialRevisionId` 는 null 이다
+// (공식 확정은 운영진이 결과 검토를 거쳐 따로 누르는 별도 단계). 당일 대회는 다음
+// 경기가 그 검토보다 먼저 시작되는 게 보통이라, **정작 필요한 순간에 가드가 조용히
+// 안 걸렸다** — alpha 에서 레드카드 받은 선수가 다음 경기 라인업에 그대로 제출돼
+// 201 로 통과하는 것을 실측했다.
+//
+// 판정 규칙 자체(이 파일)는 그때도 옳았다 — 문제는 **입력을 모으는 쪽**이었다.
+// 그래서 여기서는 "직전 경기 기록 하나만 들어와도 즉시 정지가 걸린다"는, 그 입력이
+// 제대로 들어왔을 때의 계약을 못박는다.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('evaluateSuspension — 결과 확정 여부와 무관하게 판정한다', () => {
+  it('직전 경기 기록 하나만 있어도 바로 다음 경기를 막는다 (확정 대기 중이어도)', () => {
+    const verdict = evaluateSuspension({
+      rules: RED_ONLY,
+      played: [game(1, 0, 1)],
+      upcomingGameOrder: 2,
+    });
+    expect(verdict.suspended).toBe(true);
+    expect(verdict.remainingMatches).toBe(1);
+  });
+});
+
 describe('evaluateSuspension — 입력이 지저분한 경우', () => {
   it('판정 대상 경기보다 뒤의 기록은 무시한다 (결과 정정으로 미래 카드가 먼저 들어올 수 있다)', () => {
     const played = [game(5, 0, 1)];

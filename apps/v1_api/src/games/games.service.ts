@@ -4302,19 +4302,50 @@ export class GamesService {
         { round: 'asc' },
         { fixtureNumber: 'asc' },
       ],
-      select: { id: true, game: { select: { currentOfficialRevisionId: true } } },
+      select: {
+        id: true,
+        game: {
+          select: {
+            currentOfficialRevisionId: true,
+            // 공식 확정 전 결과도 봐야 한다 — 아래 폴백 주석 참고.
+            resultRevisions: {
+              where: { state: 'SUBMITTED' },
+              orderBy: { revision: 'desc' },
+              take: 1,
+              select: { id: true },
+            },
+          },
+        },
+      },
     });
     const orderByFixtureId = new Map(fixtures.map((fixture, index) => [fixture.id, index + 1]));
     const upcomingGameOrder = orderByFixtureId.get(fixtureId);
     if (upcomingGameOrder === undefined) return new Map<string, ReturnType<typeof evaluateSuspension>>();
 
-    // **현재 공식 리비전만** 센다. 초안·이전 리비전까지 세면 정정 이력이 카드로 중복
-    // 집계돼 멀쩡한 선수가 정지된다.
+    /**
+     * 픽스처마다 **딱 한 개**의 리비전만 센다 — 여러 개를 세면 정정 이력이 카드로 중복
+     * 집계돼 멀쩡한 선수가 정지된다.
+     *
+     * 고르는 순서: **공식 확정본 우선, 없으면 최신 제출본(SUBMITTED)**.
+     *
+     * 공식본만 보면 안 되는 이유(2026-08-24 alpha 실측으로 발견): 경기를 `end` 하면
+     * 결과 리비전은 `SUBMITTED` 로 남고 `currentOfficialRevisionId` 는 **null 이다** —
+     * 공식 확정은 운영진이 결과 검토를 거쳐 따로 눌러야 하는 별도 단계다. 당일 대회는
+     * 다음 경기가 그 검토보다 먼저 시작되는 게 보통이라, 공식본만 세면 **정작 필요한
+     * 순간에 가드가 조용히 안 걸린다**(실측: 레드카드 받은 선수가 다음 경기 라인업에
+     * 그대로 제출돼 201 로 통과했다).
+     *
+     * DRAFT·VOID 는 세지 않는다 — 초안은 아직 아무도 제출하지 않은 값이고 VOID 는
+     * 무효화된 값이다. 제출된 결과는 "심판이 기록을 확정해 올린 것"이라 정지 판정의
+     * 근거로 충분하다. 나중에 정정되면 공식본이 그 자리를 대신한다.
+     */
     const revisionToOrder = new Map<string, number>();
     for (const fixture of fixtures) {
-      const revisionId = fixture.game?.currentOfficialRevisionId ?? null;
       const order = orderByFixtureId.get(fixture.id);
-      if (revisionId !== null && order !== undefined) revisionToOrder.set(revisionId, order);
+      if (order === undefined) continue;
+      const revisionId =
+        fixture.game?.currentOfficialRevisionId ?? fixture.game?.resultRevisions?.[0]?.id ?? null;
+      if (revisionId !== null) revisionToOrder.set(revisionId, order);
     }
     if (revisionToOrder.size === 0) return new Map<string, ReturnType<typeof evaluateSuspension>>();
 

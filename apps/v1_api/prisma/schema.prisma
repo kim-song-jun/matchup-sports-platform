@@ -2347,6 +2347,21 @@ model V1Tournament {
   bankName                   String?                     @map("bank_name")
   bankAccount                String?                     @map("bank_account")
   bankHolder                 String?                     @map("bank_holder")
+  /// 경고 누적 출전정지 규정 — 옐로 몇 장이 쌓이면 다음 경기 출전이 막히는가.
+  /// 1차 대회(2026-08-15~16) 회고 "옐로카드 누적, 레드카드 퇴장등 필요해보임".
+  /// 지금까지 카드는 경기 단위로만 집계됐고 다음 경기 라인업 제출은 아무것도
+  /// 검사하지 않아, 레드카드를 받은 선수가 그대로 다음 경기에 뛸 수 있었다.
+  ///
+  /// **null = 이 대회에는 카드 정지 규정을 적용하지 않는다.** 기본값을 두지 않은
+  /// 이유가 중요하다 — 값이 있으면 배포 즉시 **이미 진행된 대회들에 소급 적용**돼
+  /// 다수 선수가 갑자기 "출전정지"로 뜬다. null 기본값이 그 사고를 원천 차단하고,
+  /// 2026-08-23 사용자 결정(Q4-A "대회 생성 시 관리자가 규정값 직접 설정")과도
+  /// 정확히 맞는다. 운영자가 켜는 순간부터 그 대회에만 적용된다.
+  yellowAccumulationLimit    Int?                        @map("yellow_accumulation_limit")
+  /// 레드카드(퇴장) 1장당 출전정지 경기 수. null 이면 레드카드 정지 미적용.
+  /// `yellowAccumulationLimit` 과 독립적으로 켤 수 있다 — 대회마다 "경고 누적만
+  /// 본다"거나 "퇴장만 본다"가 다르기 때문이다.
+  redCardSuspensionMatches   Int?                        @map("red_card_suspension_matches")
   rulesText                  String?                     @map("rules_text")
   refundPolicyText           String?                     @map("refund_policy_text")
   createdByAdminUserId       String?                     @map("created_by_admin_user_id")

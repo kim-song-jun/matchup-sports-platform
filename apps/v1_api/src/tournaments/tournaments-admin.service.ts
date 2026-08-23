@@ -277,6 +277,10 @@ export class TournamentsAdminService {
           bankName: dto.bankName ?? null,
           bankAccount: dto.bankAccount ?? null,
           bankHolder: dto.bankHolder ?? null,
+          // 카드 정지 규정 — 생략하면 null(미적용)이 그대로 저장된다. 기본값을
+          // 넣지 않는 것이 소급 적용 사고를 막는 안전장치다.
+          yellowAccumulationLimit: dto.yellowAccumulationLimit ?? null,
+          redCardSuspensionMatches: dto.redCardSuspensionMatches ?? null,
           rulesText: dto.rulesText ?? null,
           refundPolicyText: dto.refundPolicyText ?? null,
           prizePool: dto.prizePool ?? null,
@@ -465,6 +469,14 @@ export class TournamentsAdminService {
     if (dto.bankName !== undefined) data.bankName = dto.bankName;
     if (dto.bankAccount !== undefined) data.bankAccount = dto.bankAccount;
     if (dto.bankHolder !== undefined) data.bankHolder = dto.bankHolder;
+    // undefined = 안 보냄(유지), null = 명시적으로 규정 끄기. 둘을 구분해야
+    // "한 번 켜면 못 끄는" 상태가 안 된다.
+    if (dto.yellowAccumulationLimit !== undefined) {
+      data.yellowAccumulationLimit = dto.yellowAccumulationLimit;
+    }
+    if (dto.redCardSuspensionMatches !== undefined) {
+      data.redCardSuspensionMatches = dto.redCardSuspensionMatches;
+    }
     if (dto.rulesText !== undefined) data.rulesText = dto.rulesText;
     if (dto.refundPolicyText !== undefined) data.refundPolicyText = dto.refundPolicyText;
     if (dto.prizePool !== undefined) data.prizePool = dto.prizePool;
@@ -1112,6 +1124,8 @@ export class TournamentsAdminService {
       bankName: row.bankName,
       bankAccount: row.bankAccount,
       bankHolder: row.bankHolder,
+      yellowAccumulationLimit: row.yellowAccumulationLimit,
+      redCardSuspensionMatches: row.redCardSuspensionMatches,
       rulesText: row.rulesText,
       refundPolicyText: row.refundPolicyText,
       prizePool: row.prizePool,

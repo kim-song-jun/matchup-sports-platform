@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   AdminDataTable,
   AdminEmpty,
@@ -91,12 +92,40 @@ function requesterContact(row: V1AdminInquiryRow) {
 
 const PAGE_SIZE = 20;
 
+/**
+ * URL 값은 사용자가 손으로 고칠 수 있으므로 허용 목록과 대조한다. 검증 없이 그대로 필터에
+ * 실으면 서버가 400 을 내고 화면은 원인 모를 에러가 된다.
+ */
+function pickAllowed(raw: string | null, allowed: ReadonlyArray<{ value: string }>): string {
+  if (!raw) return '';
+  return allowed.some((option) => option.value === raw && raw !== '') ? raw : '';
+}
+
+// useSearchParams 는 Suspense 경계를 요구한다(Next.js App Router).
 export default function AdminInquiriesPage() {
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [activeStatus, setActiveStatus] = useState('');
-  const [activeCategory, setActiveCategory] = useState('');
-  const [activeReportReason, setActiveReportReason] = useState('');
+  return (
+    <Suspense fallback={null}>
+      <AdminInquiriesPageContent />
+    </Suspense>
+  );
+}
+
+function AdminInquiriesPageContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  // URL → 초기 상태. 운영자가 "스팸 신고 목록" 같은 링크를 받아 그대로 그 화면에 도착한다.
+  const [search, setSearch] = useState(() => searchParams.get('q') ?? '');
+  const [debouncedSearch, setDebouncedSearch] = useState(() => searchParams.get('q') ?? '');
+  const [activeStatus, setActiveStatus] = useState(() => pickAllowed(searchParams.get('status'), STATUS_OPTIONS));
+  const [activeCategory, setActiveCategory] = useState(() => pickAllowed(searchParams.get('category'), CATEGORY_OPTIONS));
+  const [activeReportReason, setActiveReportReason] = useState(() =>
+    // 분류가 report 가 아닌데 사유만 들어온 링크는 무시한다 — 보이지 않는 필터가 목록을 좁힌다.
+    pickAllowed(searchParams.get('category'), CATEGORY_OPTIONS) === 'report'
+      ? pickAllowed(searchParams.get('reportReason'), REPORT_REASON_OPTIONS)
+      : '',
+  );
   // 커서 누적 대신 페이지 단위 교체다 — 목록 어디쯤인지와 총량이 보여야 한다.
   const [page, setPage] = useState(1);
   const { toasts, showToast } = useAdminToast();
@@ -109,6 +138,24 @@ export default function AdminInquiriesPage() {
   useEffect(() => {
     setPage(1);
   }, [debouncedSearch, activeStatus, activeCategory, activeReportReason]);
+
+  // 상태 → URL. 읽기만 지원하면 링크를 손으로 조립해야 해서 사실상 쓰이지 않는다 — 화면에서
+  // 필터를 건 뒤 주소창을 그대로 복사해 공유할 수 있어야 딥링크가 의미를 갖는다.
+  //
+  // push 가 아니라 **replace** 다. 필터를 만질 때마다 히스토리가 쌓이면 뒤로가기가 목록 안에서
+  // 맴돌아 운영자가 이전 화면으로 못 돌아간다. page 는 싣지 않는다 — 목록은 계속 변하므로
+  // "3페이지" 를 공유해봐야 받는 쪽에서 같은 내용이 아니다.
+  useEffect(() => {
+    const next = new URLSearchParams();
+    if (debouncedSearch) next.set('q', debouncedSearch);
+    if (activeStatus) next.set('status', activeStatus);
+    if (activeCategory) next.set('category', activeCategory);
+    if (activeCategory === 'report' && activeReportReason) {
+      next.set('reportReason', activeReportReason);
+    }
+    const query = next.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }, [debouncedSearch, activeStatus, activeCategory, activeReportReason, pathname, router]);
 
   // 분류가 'report'를 벗어나면 사유 필터는 보이지 않는데, 선택값이 남아 있으면 안 보이는
   // 필터가 목록을 계속 좁혀 "왜 결과가 없지?"를 만든다 — 분류를 바꿀 때 항상 함께 초기화한다.

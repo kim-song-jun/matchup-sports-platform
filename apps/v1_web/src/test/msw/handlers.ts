@@ -467,6 +467,7 @@ export const v1MswHandlers = [
     const inquiry: V1Inquiry = {
       inquiryId: `inquiry-${v1InquiriesFixture.items.length + 1}`,
       category: body.category as V1Inquiry['category'],
+      reportReason: null,
       title: body.title,
       body: body.body,
       contact: body.contact ?? null,
@@ -770,16 +771,29 @@ export const v1MswHandlers = [
     const params = new URL(request.url).searchParams;
     const status = params.get('status');
     const category = params.get('category');
+    const reportReason = params.get('reportReason');
     const q = params.get('q')?.trim().toLowerCase();
     const searched = v1InquiriesFixture.items.map(toAdminInquiryRow).filter((inquiry) => {
       if (q && !`${inquiry.title} ${inquiry.requesterName ?? ''} ${inquiry.requesterEmail ?? ''}`.toLowerCase().includes(q)) return false;
       return true;
     });
+    // 각 facet 은 "자기 자신을 뺀 나머지 필터" 로 집계한다 — admin.service.ts의 실제 규칙을
+    // 그대로 미러링한다(사유 하나를 골라도 다른 사유 칩 건수는 그대로 보여야 한다).
     const statusSource = searched.filter((inquiry) => {
+      if (category && inquiry.category !== category) return false;
+      if (reportReason && inquiry.reportReason !== reportReason) return false;
+      return true;
+    });
+    const categorySource = searched.filter((inquiry) => {
+      if (status && inquiry.status !== status) return false;
+      if (reportReason && inquiry.reportReason !== reportReason) return false;
+      return true;
+    });
+    const reportReasonSource = searched.filter((inquiry) => {
+      if (status && inquiry.status !== status) return false;
       if (category && inquiry.category !== category) return false;
       return true;
     });
-    const categorySource = searched.filter((inquiry) => !status || inquiry.status === status);
     const rows = statusSource.filter((inquiry) => !status || inquiry.status === status);
     return ok({
       ...page(rows),
@@ -787,6 +801,7 @@ export const v1MswHandlers = [
         total: statusSource.length,
         byStatus: countFacet(statusSource, ['received', 'reviewing', 'answered', 'closed'], (inquiry) => inquiry.status),
         byCategory: countFacet(categorySource, ['account', 'match', 'team', 'tournament', 'payment_refund', 'report', 'other'], (inquiry) => inquiry.category),
+        byReportReason: countFacet(reportReasonSource, ['spam', 'harassment', 'impersonation', 'inappropriate', 'other'], (inquiry) => inquiry.reportReason ?? ''),
       },
     });
   }),

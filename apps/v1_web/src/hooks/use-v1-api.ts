@@ -1175,6 +1175,85 @@ export function useV1WithdrawTeamContact(contactId: string) {
   });
 }
 
+// ── Team contact blocks & policy (Task 4, Phase 2/3) ──────────────────────
+// 백엔드 권한 검증(assertCanManageTeam, owner/manager)만 신뢰한다 — 여기서 role 분기하지 않는다.
+
+export type V1TeamContactBlock = {
+  id: string;
+  teamId: string;
+  blockedTeamId: string;
+  createdByUserId: string;
+  reason: string | null;
+  createdAt: string;
+  blockedTeam: { id: string; name: string };
+};
+
+export type V1TeamContactBlockList = {
+  items: V1TeamContactBlock[];
+};
+
+/**
+ * createBlock 의 `block` 은 nullable 이다. 백엔드가 동시 차단 시도(P2002)를 잡고 재조회하는
+ * 좁은 경합 창 사이에 같은 팀의 다른 운영진이 그 차단을 해제하면 재조회가 빈 값을 반환한다
+ * (team-contacts.service.ts `createBlock` 참고, 의도된 동작). 그래서 `block` 필드를 non-null 로
+ * 좁히지 말 것 — 소비자는 block.id 에 의존하지 말고, 아래 훅이 성공 시 무효화하는 차단 목록
+ * 재조회를 진실의 근거로 삼는다.
+ */
+export type V1TeamContactBlockCreateResult = {
+  block: { id: string } | null;
+  alreadyBlocked: boolean;
+};
+
+export type V1ContactPolicy = 'open' | 'recruiting_only' | 'closed';
+
+export function useV1TeamContactBlocks(teamId: string) {
+  return useQuery({
+    queryKey: v1Keys.teamContactBlocks(teamId),
+    queryFn: () => v1Get<V1TeamContactBlockList>(`/teams/${teamId}/contact-blocks`),
+    enabled: Boolean(teamId),
+  });
+}
+
+/**
+ * 차단 추가/해제, 수신정책 변경은 차단 목록만이 아니라 **팀 상세도** 함께 무효화한다 —
+ * 컨택 CTA 노출 조건(차단 여부·정책)이 팀 상세 응답에 실려 있어서다. Phase 1 리뷰에서
+ * 단건만 무효화하는 이 유형이 Critical 로 잡힌 전례가 있다.
+ */
+function invalidateTeamContactBlockCaches(queryClient: QueryClient, teamId: string) {
+  queryClient.invalidateQueries({ queryKey: v1Keys.teamContactBlocks(teamId) });
+  queryClient.invalidateQueries({ queryKey: v1Keys.team(teamId) });
+}
+
+export function useV1CreateTeamContactBlock(teamId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { blockedTeamId: string; reason?: string }) =>
+      v1Post<V1TeamContactBlockCreateResult>(`/teams/${teamId}/contact-blocks`, body),
+    onSuccess: () => invalidateTeamContactBlockCaches(queryClient, teamId),
+  });
+}
+
+export function useV1RemoveTeamContactBlock(teamId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (blockedTeamId: string) =>
+      v1Delete<{ removed: boolean }>(`/teams/${teamId}/contact-blocks/${blockedTeamId}`),
+    onSuccess: () => invalidateTeamContactBlockCaches(queryClient, teamId),
+  });
+}
+
+export function useV1UpdateContactPolicy(teamId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { contactPolicy: V1ContactPolicy }) =>
+      v1Patch<{ id: string; contactPolicy: V1ContactPolicy }>(`/teams/${teamId}/contact-policy`, body),
+    onSuccess: () => {
+      // 정책 변경도 컨택 CTA 노출 조건을 바꾼다 — 팀 상세 무효화.
+      queryClient.invalidateQueries({ queryKey: v1Keys.team(teamId) });
+    },
+  });
+}
+
 // ── Team schedules (Task 12 backend / Task 13 frontend) ──────────────────────
 // 프론트엔드에서 Idempotency-Key 를 보내는 첫 도메인 — 모든 스케줄 mutation은 얼어붙은
 // REST 계약(글로벌 계약 문서)에 따라 매 호출마다 새 키가 필요하다. 자동 재시도(react-query

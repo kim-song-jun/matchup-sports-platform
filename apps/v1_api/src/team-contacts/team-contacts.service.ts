@@ -6,10 +6,17 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { NotificationsService, type NotificationEventType } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateTeamContactDto, DeclineTeamContactDto, ListTeamContactsQueryDto } from './dto/team-contact.dto';
+import {
+  CreateContactBlockDto,
+  CreateTeamContactDto,
+  DeclineTeamContactDto,
+  ListTeamContactsQueryDto,
+  UpdateContactPolicyDto,
+} from './dto/team-contact.dto';
 
 /** 한 팀이 24시간 동안 보낼 수 있는 컨택 수. 확정값 — 스펙 §2. */
 const DAILY_SEND_LIMIT = 10;
@@ -66,6 +73,10 @@ export class TeamContactsService {
     if (dto.fromTeamId === toTeamId) {
       throw stateConflict('같은 팀에는 컨택을 보낼 수 없어요.', 'TEAM_CONTACT_SELF_NOT_ALLOWED');
     }
+
+    // advisory lock 트랜잭션 **앞**에서 부른다 — 이 검사는 팀쌍 경합과 무관해서
+    // 락 안에서 부르면 락 유지 시간만 늘어난다.
+    await this.assertRecipientAccepting(dto.fromTeamId, toTeamId);
 
     const expiresAt = new Date(Date.now() + EXPIRY_DAYS * 24 * 60 * 60 * 1000);
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -254,6 +265,139 @@ export class TeamContactsService {
       });
     }
     return membership;
+  }
+
+  /**
+   * 받는 팀이 지금 컨택을 받는 상태인지 본다. 세 가지 거부 사유(차단 / closed /
+   * recruiting_only 인데 모집 중 아님)를 **하나의 응답으로 통일**한다 — 응답이 갈리면
+   * 발신자가 "우리가 차단당했구나" 를 역추론할 수 있다(스펙 §8(b)).
+   */
+  private async assertRecipientAccepting(fromTeamId: string, toTeamId: string) {
+    const notAccepting = () =>
+      new ForbiddenException({
+        code: 'TEAM_CONTACT_NOT_ACCEPTING',
+        message: '이 팀은 지금 컨택을 받지 않고 있어요.',
+      });
+
+    // 리뷰 라운드 1 (I1): 세 조회(차단 / 팀 정책 / host 모집 매치)를 **항상 병렬**로
+    // 돌린다. 순차 실행이면 사유별 DB 왕복 횟수가 다르다 — 차단=1, closed=2,
+    // recruiting_only=3. 응답 본문(코드·메시지)을 통일해도 발신자가 응답 지연시간으로
+    // "우리가 차단당했구나"를 역추론할 수 있는 타이밍 부수 채널이 남는다(스펙 §8(b)).
+    // 항상 3건을 동시에 조회하면 왕복 횟수가 사유와 무관하게 일정해지고, 최악 경로
+    // (원래 3왕복이던 recruiting_only)는 오히려 빨라진다. 컨택 생성은 팀당 하루 10건
+    // 한도라 추가 조회 비용은 무시할 수 있다. 판정 우선순위(차단 → 팀 실재 → closed →
+    // recruiting_only)는 조회를 병렬화해도 그대로 유지한다 — 조회 시점과 판정 순서는 별개다.
+    const [block, team, recruiting] = await Promise.all([
+      // 양방향: 상대가 나를 차단했거나, 내가 상대를 차단했거나.
+      this.prisma.v1TeamContactBlock.findFirst({
+        where: {
+          OR: [
+            { teamId: toTeamId, blockedTeamId: fromTeamId },
+            { teamId: fromTeamId, blockedTeamId: toTeamId },
+          ],
+        },
+        select: { id: true },
+      }),
+      // status/deletedAt 을 함께 건다 — 같은 파일의 assertCanManageTeam·assertParticipantSide 가
+      // 쓰는 필터와 맞춘다. 걸지 않으면 소프트 삭제된 팀도 contactPolicy 가 open 인 한 컨택을
+      // 계속 받아 고아 row 가 생긴다. (unique 아닌 조건이 붙으므로 findFirst 다.)
+      this.prisma.v1Team.findFirst({
+        where: { id: toTeamId, status: 'active', deletedAt: null },
+        select: { contactPolicy: true },
+      }),
+      // '모집 중' = 이 팀이 host 인 recruiting 팀매치가 하나라도 있음 (스펙 §2 확정 결정 5).
+      // 캐시 컬럼을 두지 않는다 — 두면 공고 생성·마감 시 무효화 책임이 새로 생긴다.
+      // policy 가 recruiting_only 가 아니어도 항상 조회한다(위 타이밍 노트 참고).
+      this.prisma.v1TeamMatch.findFirst({
+        where: { hostTeamId: toTeamId, status: 'recruiting' },
+        select: { id: true },
+      }),
+    ]);
+
+    if (block) throw notAccepting();
+    if (!team) {
+      throw new NotFoundException({ code: 'TEAM_NOT_FOUND', message: '팀을 찾을 수 없어요.' });
+    }
+    if (team.contactPolicy === 'closed') throw notAccepting();
+    if (team.contactPolicy === 'recruiting_only' && !recruiting) throw notAccepting();
+  }
+
+  async createBlock(user: V1AuthUser, teamId: string, dto: CreateContactBlockDto) {
+    await this.assertCanManageTeam(user.id, teamId);
+    if (dto.blockedTeamId === teamId) {
+      throw stateConflict('자기 팀은 차단할 수 없어요.', 'TEAM_CONTACT_SELF_BLOCK_NOT_ALLOWED');
+    }
+    // 리뷰 라운드 1 (I2): 없는 팀 id 를 차단 대상으로 보내면 create() 시점에 FK 위반
+    // (P2003)으로 raw 500 이 났다. 팀 실재 여부는 공개 정보라 여기서 404 를 줘도 새는
+    // 정보가 없다 — assertRecipientAccepting 이 쓰는 것과 같은 코드·문구를 재사용한다.
+    const targetTeam = await this.prisma.v1Team.findFirst({
+      where: { id: dto.blockedTeamId, status: 'active', deletedAt: null },
+      select: { id: true },
+    });
+    if (!targetTeam) {
+      throw new NotFoundException({ code: 'TEAM_NOT_FOUND', message: '팀을 찾을 수 없어요.' });
+    }
+
+    const existing = await this.prisma.v1TeamContactBlock.findFirst({
+      where: { teamId, blockedTeamId: dto.blockedTeamId },
+      select: { id: true },
+    });
+    if (existing) return { block: existing, alreadyBlocked: true };
+
+    try {
+      const block = await this.prisma.v1TeamContactBlock.create({
+        data: {
+          teamId,
+          blockedTeamId: dto.blockedTeamId,
+          createdByUserId: user.id,
+          reason: dto.reason ?? null,
+        },
+      });
+      return { block, alreadyBlocked: false };
+    } catch (error) {
+      // 리뷰 라운드 1 (C1): findFirst 로 사전 확인해도 findFirst 와 create() 사이에
+      // 틈이 있다 — 동시 요청(더블클릭·재시도) 두 개가 그 틈을 지나가면 두 번째 create()
+      // 가 @@unique([teamId, blockedTeamId]) 제약(P2002)에 걸린다. 이 저장소엔 전역
+      // P2002 예외 필터가 없어(12곳 전부 서비스 로컬 try/catch) 잡지 않으면 raw 500 +
+      // 영어 메시지가 나간다. 차단은 멱등이 자연스러운 결과이므로 던지지 않고 다시
+      // 조회해 findFirst 경로와 완전히 같은 응답으로 수렴시킨다(패턴 출처:
+      // teams.service.ts 의 changeMembershipJersey).
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const raced = await this.prisma.v1TeamContactBlock.findFirst({
+          where: { teamId, blockedTeamId: dto.blockedTeamId },
+          select: { id: true },
+        });
+        return { block: raced, alreadyBlocked: true };
+      }
+      throw error;
+    }
+  }
+
+  async listBlocks(user: V1AuthUser, teamId: string) {
+    await this.assertCanManageTeam(user.id, teamId);
+    const items = await this.prisma.v1TeamContactBlock.findMany({
+      where: { teamId },
+      orderBy: { createdAt: 'desc' },
+      include: { blockedTeam: { select: { id: true, name: true } } },
+    });
+    return { items };
+  }
+
+  async removeBlock(user: V1AuthUser, teamId: string, blockedTeamId: string) {
+    await this.assertCanManageTeam(user.id, teamId);
+    const result = await this.prisma.v1TeamContactBlock.deleteMany({ where: { teamId, blockedTeamId } });
+    // 멱등: 이미 없으면 그냥 removed:false. 없는 차단을 지우는 건 오류가 아니다.
+    return { removed: result.count > 0 };
+  }
+
+  async updateContactPolicy(user: V1AuthUser, teamId: string, dto: UpdateContactPolicyDto) {
+    await this.assertCanManageTeam(user.id, teamId);
+    const team = await this.prisma.v1Team.update({
+      where: { id: teamId },
+      data: { contactPolicy: dto.contactPolicy },
+      select: { id: true, contactPolicy: true },
+    });
+    return team;
   }
 
   async listForTeam(user: V1AuthUser, teamId: string, query: ListTeamContactsQueryDto) {

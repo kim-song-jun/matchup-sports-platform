@@ -199,6 +199,10 @@ export class AdminInquiryListQueryDto {
   category?: 'account' | 'match' | 'team' | 'tournament' | 'payment_refund' | 'report' | 'other';
 
   @IsOptional()
+  @IsIn(['spam', 'harassment', 'impersonation', 'inappropriate', 'other'])
+  reportReason?: 'spam' | 'harassment' | 'impersonation' | 'inappropriate' | 'other';
+
+  @IsOptional()
   @IsString()
   @MaxLength(100)
   q?: string;

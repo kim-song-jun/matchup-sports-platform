@@ -1,11 +1,13 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, ErrorState, ListItem } from '@/components/v1-ui/primitives';
 import {
   useV1AcceptTeamContact,
+  useV1CreateInquiry,
+  useV1CreateTeamContactBlock,
   useV1DeclineTeamContact,
   useV1MyTeams,
   useV1ResolveChatRoom,
@@ -15,10 +17,12 @@ import {
   useV1WithdrawTeamContact,
 } from '@/hooks/use-v1-api';
 import type { V1TeamContact, V1TeamContactStatus } from '@/hooks/use-v1-api';
+import type { V1InquiryReportReason } from '@/types/api';
 import { chatRoomHref } from '@/lib/chat-route';
 import { formatTournamentDateTimeLong, formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import { isTeamOperatorRole, normalizeMyTeamsResponse } from '@/lib/team-role';
+import { INQUIRY_REPORT_REASON_OPTIONS as REPORT_REASON_OPTIONS, inquiryReportReasonLabel } from '@/lib/v1-status-labels';
 
 type Direction = 'inbound' | 'outbound';
 
@@ -206,6 +210,195 @@ function TeamContactListRow({ contact, direction }: { contact: V1TeamContact; di
   );
 }
 
+/**
+ * 컨택 상세에서 상대 팀을 신고하는 다이얼로그. 공용 Modal 이 없어
+ * jersey-number-dialog.tsx 의 관용구(role=dialog + ESC + focus trap)를 그대로 따른다.
+ */
+const DIALOG_FOCUSABLE =
+  'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
+
+function ReportContactDialog({
+  open,
+  saving,
+  error,
+  onClose,
+  onSubmit,
+}: {
+  open: boolean;
+  saving: boolean;
+  error: string | null;
+  onClose: () => void;
+  onSubmit: (reason: V1InquiryReportReason, detail: string) => void;
+}) {
+  const idPrefix = useId();
+  const titleId = `${idPrefix}-report-title`;
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<Element | null>(null);
+  const [reason, setReason] = useState<V1InquiryReportReason | null>(null);
+  const [detail, setDetail] = useState('');
+
+  useEffect(() => {
+    if (open) {
+      previousFocusRef.current = document.activeElement;
+      setReason(null);
+      setDetail('');
+      return;
+    }
+    const element = previousFocusRef.current;
+    // document.contains 를 확인한다 — 제출 성공처럼 트리거 버튼이 같은 틱에 사라지는 경우
+    // 분리된 노드에 focus() 를 불러 조용히 아무 일도 안 일어나는 것을 막는다.
+    if (element && document.contains(element) && typeof (element as HTMLElement).focus === 'function') {
+      (element as HTMLElement).focus();
+    }
+    previousFocusRef.current = null;
+  }, [open]);
+
+  // 열릴 때 포커스를 다이얼로그 안으로 옮긴다. 이게 없으면 포커스가 배경에 남고, 아래 트랩은
+  // activeElement 가 첫/마지막 요소일 때만 개입하도록 만들어져 있어 **한 번도 발동하지 않는다** —
+  // 결과적으로 aria-modal="true" 가 실제로는 배경을 격리하지 못하고 Shift+Tab 으로 새어나간다.
+  // 관용구 출처: components/teams/jersey-number-dialog.tsx
+  useEffect(() => {
+    if (!open) return;
+    const id = setTimeout(() => {
+      dialogRef.current?.querySelector<HTMLElement>(DIALOG_FOCUSABLE)?.focus();
+    }, 60);
+    return () => clearTimeout(id);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [open, onClose]);
+
+  useEffect(() => {
+    if (!open) return;
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const trap = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return;
+      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(DIALOG_FOCUSABLE));
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', trap);
+    return () => document.removeEventListener('keydown', trap);
+  }, [open]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4"
+      style={{ background: 'rgba(25,31,40,0.45)' }}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="w-full max-w-[360px] rounded-2xl overflow-hidden"
+        style={{ background: 'var(--card-surface, #fff)', boxShadow: '0 8px 32px rgba(20,28,45,0.14)' }}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div style={{ padding: '24px 20px 16px', display: 'grid', gap: 12 }}>
+          <p id={titleId} className="tm-text-body-lg" style={{ fontWeight: 700, margin: 0 }}>
+            컨택 신고하기
+          </p>
+          <p className="tm-text-caption" style={{ color: 'var(--text-muted)', margin: 0 }}>
+            신고 사유를 선택해 주세요. 상세 설명은 선택이에요.
+          </p>
+
+          <fieldset style={{ border: 'none', padding: 0, margin: 0, display: 'grid', gap: 4 }}>
+            <legend className="tm-text-label" style={{ padding: 0, marginBottom: 4 }}>
+              신고 사유
+            </legend>
+            {REPORT_REASON_OPTIONS.map((option) => {
+              const inputId = `${idPrefix}-reason-${option.value}`;
+              return (
+                <label
+                  key={option.value}
+                  htmlFor={inputId}
+                  className="tm-text-body"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    minHeight: 44,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <input
+                    type="radio"
+                    id={inputId}
+                    name="team-contact-report-reason"
+                    value={option.value}
+                    checked={reason === option.value}
+                    onChange={() => setReason(option.value)}
+                  />
+                  {option.label}
+                </label>
+              );
+            })}
+          </fieldset>
+
+          <label htmlFor={`${idPrefix}-report-detail`} className="tm-text-label">
+            상세 설명 (선택)
+          </label>
+          <textarea
+            id={`${idPrefix}-report-detail`}
+            className="tm-input"
+            style={{ resize: 'none', lineHeight: 1.5 }}
+            rows={3}
+            maxLength={500}
+            value={detail}
+            placeholder="상황을 알려주시면 검토에 도움이 돼요."
+            onChange={(event) => setDetail(event.target.value)}
+            disabled={saving}
+          />
+
+          {error !== null ? (
+            <p className="tm-text-caption" role="alert" style={{ color: 'var(--red700)', margin: 0 }}>
+              {error}
+            </p>
+          ) : null}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '0 20px 20px' }}>
+          <button type="button" className="tm-btn tm-btn-lg tm-btn-neutral" onClick={onClose} disabled={saving}>
+            취소
+          </button>
+          <button
+            type="button"
+            className="tm-btn tm-btn-lg tm-btn-danger"
+            disabled={reason === null || saving}
+            onClick={() => {
+              if (reason === null) return;
+              onSubmit(reason, detail);
+            }}
+          >
+            {saving ? '접수하는 중' : '신고 접수'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function MyTeamContactDetailClient({ contactId }: { contactId: string }) {
   const router = useRouter();
   const query = useV1TeamContact(contactId);
@@ -225,13 +418,28 @@ export function MyTeamContactDetailClient({ contactId }: { contactId: string }) 
   const fromTeamQuery = useV1Team(contact?.fromTeamId ?? '');
   const toTeamQuery = useV1Team(contact?.toTeamId ?? '');
 
+  // 차단은 "내 팀" 명의로 상대 팀을 막는 것이다. 훅은 조건부로 부를 수 없으므로 아래 early
+  // return 보다 앞에서 팀 id 를 계산해 둔다(컨택이 아직 없으면 빈 문자열 — 그 상태에서는
+  // 차단 UI 자체가 렌더되지 않으므로 mutate 가 불릴 일이 없다).
+  const viewerIsRecipient = contact ? operatorTeamIds.has(contact.toTeamId) : false;
+  const viewerIsSender = contact ? operatorTeamIds.has(contact.fromTeamId) : false;
+  const blockActorTeamId = contact ? (viewerIsRecipient ? contact.toTeamId : contact.fromTeamId) : '';
+  const createBlock = useV1CreateTeamContactBlock(blockActorTeamId);
+  const [blockConfirming, setBlockConfirming] = useState(false);
+  const [blockCreated, setBlockCreated] = useState(false);
+  const [blockError, setBlockError] = useState<string | null>(null);
+
   const acceptContact = useV1AcceptTeamContact(contactId);
   const declineContact = useV1DeclineTeamContact(contactId);
   const withdrawContact = useV1WithdrawTeamContact(contactId);
   const resolveChatRoom = useV1ResolveChatRoom();
+  const reportContact = useV1CreateInquiry();
 
   const [declineReason, setDeclineReason] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [reportSubmitted, setReportSubmitted] = useState(false);
 
   if (query.isError) {
     return (
@@ -258,12 +466,31 @@ export function MyTeamContactDetailClient({ contactId }: { contactId: string }) 
     );
   }
 
-  const isRecipient = operatorTeamIds.has(contact.toTeamId);
-  const isSender = operatorTeamIds.has(contact.fromTeamId);
+  const isRecipient = viewerIsRecipient;
+  const isSender = viewerIsSender;
   const fromTeamName = fromTeamQuery.data?.name ?? '팀';
   const toTeamName = toTeamQuery.data?.name ?? '팀';
+  const counterpartTeamId = isRecipient ? contact.fromTeamId : contact.toTeamId;
+  const counterpartTeamName = isRecipient ? fromTeamName : toTeamName;
+  // 양쪽 팀을 모두 내가 운영하는 경우엔 차단이 자기 차단이 되어 서버가 409 로 막는다 — 숨긴다.
+  const canBlock = isRecipient !== isSender;
   const actionsPending =
     acceptContact.isPending || declineContact.isPending || withdrawContact.isPending || resolveChatRoom.isPending;
+
+  function handleCreateBlock() {
+    setBlockError(null);
+    createBlock.mutate(
+      { blockedTeamId: counterpartTeamId },
+      {
+        onSuccess: () => {
+          setBlockConfirming(false);
+          setBlockCreated(true);
+        },
+        onError: (err) =>
+          setBlockError(extractErrorMessage(err, '차단하지 못했어요. 잠시 후 다시 시도해 주세요.')),
+      },
+    );
+  }
 
   function handleAccept() {
     setActionError(null);
@@ -297,6 +524,30 @@ export function MyTeamContactDetailClient({ contactId }: { contactId: string }) 
       {
         onSuccess: (room) => router.push(chatRoomHref(room.roomId, room.route)),
         onError: (err) => setActionError(extractErrorMessage(err, '대화방을 열지 못했어요. 잠시 후 다시 시도해 주세요.')),
+      },
+    );
+  }
+
+  function handleReportSubmit(reason: V1InquiryReportReason, detail: string) {
+    setReportError(null);
+    const reasonLabel = inquiryReportReasonLabel(reason);
+    const trimmedDetail = detail.trim();
+    reportContact.mutate(
+      {
+        category: 'report',
+        relatedType: 'team_contact',
+        relatedId: contactId,
+        reportReason: reason,
+        title: `팀 컨택 신고: ${reasonLabel}`,
+        // body 는 백엔드가 필수로 검증한다 — 상세 설명을 안 남기면 사유 라벨로 채워 빈 문자열을 막는다.
+        body: trimmedDetail.length > 0 ? trimmedDetail : reasonLabel,
+      },
+      {
+        onSuccess: () => {
+          setReportDialogOpen(false);
+          setReportSubmitted(true);
+        },
+        onError: (err) => setReportError(extractErrorMessage(err, '신고를 접수하지 못했어요. 잠시 후 다시 시도해 주세요.')),
       },
     );
   }
@@ -406,8 +657,85 @@ export function MyTeamContactDetailClient({ contactId }: { contactId: string }) 
               {resolveChatRoom.isPending ? '여는 중' : '대화 열기'}
             </button>
           ) : null}
+
+          {/* 신고는 컨택 상태와 무관하게 항상 노출한다 — 만료·거절된 컨택도 부적절한
+              메시지였을 수 있고, 오히려 거절·만료 이후에 신고할 이유가 생기기도 한다. */}
+          {reportSubmitted ? (
+            <div role="status" className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+              신고가 접수됐어요. 검토 후 처리할게요.
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="tm-btn tm-btn-lg tm-btn-outline tm-btn-block"
+              onClick={() => setReportDialogOpen(true)}
+            >
+              신고하기
+            </button>
+          )}
+
+          {/* 차단 걸기는 여기가 진입점이다 — 해제는 팀 설정 화면에 있다. 되돌릴 수 있는 동작이고
+              같은 도메인의 '차단 해제' 도 확인 단계를 두지 않으므로, 모달 대신 2단계 인라인
+              확인으로 오클릭만 막는다. */}
+          {!canBlock ? null : blockCreated ? (
+            <div role="status" className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+              {counterpartTeamName} 팀을 차단했어요. 이제 이 팀은 컨택을 보낼 수 없어요. 팀 설정에서 해제할 수 있어요.
+            </div>
+          ) : blockConfirming ? (
+            <div role="group" aria-label="팀 차단 확인" style={{ display: 'grid', gap: 8 }}>
+              <div className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+                차단하면 {counterpartTeamName} 팀은 우리 팀에 컨택을 보낼 수 없어요. 팀 설정에서 언제든 해제할 수 있어요.
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  className="tm-btn tm-btn-lg tm-btn-neutral"
+                  style={{ flex: 1, minHeight: 44 }}
+                  onClick={() => setBlockConfirming(false)}
+                  disabled={createBlock.isPending}
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  className="tm-btn tm-btn-lg tm-btn-danger"
+                  style={{ flex: 1, minHeight: 44 }}
+                  onClick={handleCreateBlock}
+                  disabled={createBlock.isPending}
+                >
+                  {createBlock.isPending ? '차단하는 중' : '차단하기'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="tm-btn tm-btn-lg tm-btn-outline tm-btn-block"
+              style={{ minHeight: 44 }}
+              onClick={() => setBlockConfirming(true)}
+            >
+              차단하기
+            </button>
+          )}
+
+          {blockError ? (
+            <div role="alert" className="tm-text-caption" style={{ color: 'var(--red700)' }}>
+              {blockError}
+            </div>
+          ) : null}
         </div>
       </div>
+
+      <ReportContactDialog
+        open={reportDialogOpen}
+        saving={reportContact.isPending}
+        error={reportError}
+        onClose={() => {
+          setReportDialogOpen(false);
+          setReportError(null);
+        }}
+        onSubmit={handleReportSubmit}
+      />
     </AppChrome>
   );
 }

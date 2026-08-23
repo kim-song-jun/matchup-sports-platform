@@ -7,6 +7,8 @@
  * 값도 안전한 한글 fallback으로 떨어지게 한다. 새 상태값 추가 시 여기만 갱신한다.
  */
 
+import type { V1InquiryReportReason } from '@/types/api';
+
 /**
  * 팀 가입 신청 상태 — **관리자(검토자) 관점** 라벨.
  *
@@ -92,4 +94,26 @@ const ONBOARDING_STEP_LABEL: Record<string, string> = {
 
 export function onboardingStepLabel(step: string): string {
   return ONBOARDING_STEP_LABEL[step] ?? '종목 선택';
+}
+
+/**
+ * 문의 신고 사유(`V1InquiryReportReason`) — `category: 'report'` 문의에만 실린다.
+ * 신고 작성 화면(my-team-contacts-client.tsx)과 어드민 문의 목록/상세가 공유하는 단일 소스다.
+ * 백엔드 순서(`admin.service.ts`의 `INQUIRY_REPORT_REASONS`)와 값을 그대로 맞춘다.
+ */
+export const INQUIRY_REPORT_REASON_OPTIONS: { value: V1InquiryReportReason; label: string }[] = [
+  { value: 'spam', label: '스팸·광고' },
+  { value: 'harassment', label: '괴롭힘·욕설' },
+  { value: 'impersonation', label: '사칭·허위 팀' },
+  { value: 'inappropriate', label: '부적절한 내용' },
+  { value: 'other', label: '기타' },
+];
+
+const INQUIRY_REPORT_REASON_LABEL: Record<V1InquiryReportReason, string> = INQUIRY_REPORT_REASON_OPTIONS.reduce(
+  (acc, option) => ({ ...acc, [option.value]: option.label }),
+  {} as Record<V1InquiryReportReason, string>,
+);
+
+export function inquiryReportReasonLabel(reason: V1InquiryReportReason): string {
+  return INQUIRY_REPORT_REASON_LABEL[reason];
 }

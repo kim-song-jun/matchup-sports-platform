@@ -1,11 +1,13 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import {
+  CreateContactBlockDto,
   CreateTeamContactDto,
   DeclineTeamContactDto,
   ListTeamContactsQueryDto,
+  UpdateContactPolicyDto,
 } from './dto/team-contact.dto';
 import { TeamContactsService } from './team-contacts.service';
 
@@ -59,5 +61,41 @@ export class TeamContactsController {
   @UseGuards(V1AuthGuard)
   withdraw(@CurrentUser() user: V1AuthUser, @Param('contactId') contactId: string) {
     return this.teamContactsService.withdraw(user, contactId);
+  }
+
+  @Post('teams/:teamId/contact-blocks')
+  @UseGuards(V1AuthGuard)
+  createBlock(
+    @CurrentUser() user: V1AuthUser,
+    @Param('teamId') teamId: string,
+    @Body() dto: CreateContactBlockDto,
+  ) {
+    return this.teamContactsService.createBlock(user, teamId, dto);
+  }
+
+  @Get('teams/:teamId/contact-blocks')
+  @UseGuards(V1AuthGuard)
+  listBlocks(@CurrentUser() user: V1AuthUser, @Param('teamId') teamId: string) {
+    return this.teamContactsService.listBlocks(user, teamId);
+  }
+
+  @Delete('teams/:teamId/contact-blocks/:blockedTeamId')
+  @UseGuards(V1AuthGuard)
+  removeBlock(
+    @CurrentUser() user: V1AuthUser,
+    @Param('teamId') teamId: string,
+    @Param('blockedTeamId') blockedTeamId: string,
+  ) {
+    return this.teamContactsService.removeBlock(user, teamId, blockedTeamId);
+  }
+
+  @Patch('teams/:teamId/contact-policy')
+  @UseGuards(V1AuthGuard)
+  updateContactPolicy(
+    @CurrentUser() user: V1AuthUser,
+    @Param('teamId') teamId: string,
+    @Body() dto: UpdateContactPolicyDto,
+  ) {
+    return this.teamContactsService.updateContactPolicy(user, teamId, dto);
   }
 }

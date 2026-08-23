@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
-import { render as rtlRender, screen } from '@testing-library/react';
+import { render as rtlRender, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MyTeamContactDetailClient, MyTeamContactsListClient } from './my-team-contacts-client';
 import type { V1TeamContact, V1TeamContactStatus } from '@/hooks/use-v1-api';
@@ -15,6 +16,8 @@ const {
   useV1DeclineTeamContactMock,
   useV1WithdrawTeamContactMock,
   useV1ResolveChatRoomMock,
+  useV1CreateInquiryMock,
+  useV1CreateTeamContactBlockMock,
 } = vi.hoisted(() => ({
   routerPush: vi.fn(),
   useV1TeamContactMock: vi.fn(),
@@ -25,6 +28,8 @@ const {
   useV1DeclineTeamContactMock: vi.fn(),
   useV1WithdrawTeamContactMock: vi.fn(),
   useV1ResolveChatRoomMock: vi.fn(),
+  useV1CreateInquiryMock: vi.fn(),
+  useV1CreateTeamContactBlockMock: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -43,6 +48,8 @@ vi.mock('@/hooks/use-v1-api', async (importOriginal) => ({
   useV1DeclineTeamContact: useV1DeclineTeamContactMock,
   useV1WithdrawTeamContact: useV1WithdrawTeamContactMock,
   useV1ResolveChatRoom: useV1ResolveChatRoomMock,
+  useV1CreateInquiry: useV1CreateInquiryMock,
+  useV1CreateTeamContactBlock: useV1CreateTeamContactBlockMock,
 }));
 
 function render(ui: ReactElement) {
@@ -85,6 +92,8 @@ describe('MyTeamContactDetailClient', () => {
     useV1DeclineTeamContactMock.mockReturnValue({ mutate: vi.fn(), isPending: false });
     useV1WithdrawTeamContactMock.mockReturnValue({ mutate: vi.fn(), isPending: false });
     useV1ResolveChatRoomMock.mockReturnValue({ mutate: vi.fn(), isPending: false });
+    useV1CreateInquiryMock.mockReturnValue({ mutate: vi.fn(), isPending: false });
+    useV1CreateTeamContactBlockMock.mockReturnValue({ mutate: vi.fn(), isPending: false });
   });
 
   it('받은 requested 컨택에는 수락·거절 버튼이 보인다', () => {
@@ -150,6 +159,136 @@ describe('MyTeamContactDetailClient', () => {
     render(<MyTeamContactDetailClient contactId="contact-1" />);
 
     expect(screen.getByText(label)).toBeInTheDocument();
+  });
+
+  // 차단을 *거는* 진입점은 여기 하나뿐이다(해제는 팀 설정 화면). 이 UI 가 사라지면 백엔드·훅·
+  // 통합테스트가 전부 온전해도 사용자는 앱에서 차단을 걸 방법이 없어진다 — 최종 리뷰에서
+  // 실제로 그 상태였던 것을 잡았다.
+  describe('차단하기', () => {
+    function renderInbound() {
+      setMyTeams([{ teamId: MY_TEAM_ID, name: '우리 팀', role: 'owner' }]);
+      useV1TeamContactMock.mockReturnValue({ data: makeContact(), isError: false });
+      return render(<MyTeamContactDetailClient contactId="contact-1" />);
+    }
+
+    it('차단하기를 누르면 확인 단계가 뜬다', async () => {
+      const user = userEvent.setup();
+      renderInbound();
+
+      await user.click(screen.getByRole('button', { name: '차단하기' }));
+
+      expect(screen.getByRole('group', { name: '팀 차단 확인' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '취소' })).toBeInTheDocument();
+    });
+
+    it('확인하면 상대 팀 id 로 mutation 이 호출된다', async () => {
+      const mutate = vi.fn();
+      useV1CreateTeamContactBlockMock.mockReturnValue({ mutate, isPending: false });
+      const user = userEvent.setup();
+      renderInbound();
+
+      await user.click(screen.getByRole('button', { name: '차단하기' }));
+      const confirm = screen.getByRole('group', { name: '팀 차단 확인' });
+      await user.click(within(confirm).getByRole('button', { name: '차단하기' }));
+
+      expect(mutate).toHaveBeenCalledTimes(1);
+      expect(mutate).toHaveBeenCalledWith(
+        { blockedTeamId: OTHER_TEAM_ID },
+        expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
+      );
+    });
+
+    it('한 번 누른 것만으로는 차단되지 않는다', async () => {
+      const mutate = vi.fn();
+      useV1CreateTeamContactBlockMock.mockReturnValue({ mutate, isPending: false });
+      const user = userEvent.setup();
+      renderInbound();
+
+      await user.click(screen.getByRole('button', { name: '차단하기' }));
+
+      expect(mutate).not.toHaveBeenCalled();
+    });
+
+    it('양쪽 팀을 모두 운영하면 차단 버튼이 보이지 않는다', () => {
+      setMyTeams([
+        { teamId: MY_TEAM_ID, name: '우리 팀', role: 'owner' },
+        { teamId: OTHER_TEAM_ID, name: '상대팀', role: 'owner' },
+      ]);
+      useV1TeamContactMock.mockReturnValue({ data: makeContact(), isError: false });
+      render(<MyTeamContactDetailClient contactId="contact-1" />);
+
+      expect(screen.queryByRole('button', { name: '차단하기' })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('신고하기', () => {
+    // 만료된 컨택으로 렌더한다 — 신고 버튼은 컨택 상태와 무관하게 항상 노출돼야 한다
+    // (거절·만료 이후에 신고할 이유가 생기는 경우가 오히려 많다).
+    function renderExpiredContact() {
+      setMyTeams([{ teamId: MY_TEAM_ID, name: '우리 팀', role: 'owner' }]);
+      useV1TeamContactMock.mockReturnValue({ data: makeContact({ status: 'expired' }), isError: false });
+      return render(<MyTeamContactDetailClient contactId="contact-1" />);
+    }
+
+    it('신고 버튼이 보이고 누르면 사유 선택이 뜬다', async () => {
+      const user = userEvent.setup();
+      renderExpiredContact();
+
+      await user.click(screen.getByRole('button', { name: '신고하기' }));
+
+      expect(screen.getByRole('dialog', { name: '컨택 신고하기' })).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: '스팸·광고' })).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: '괴롭힘·욕설' })).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: '사칭·허위 팀' })).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: '부적절한 내용' })).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: '기타' })).toBeInTheDocument();
+    });
+
+    it('사유를 고르고 보내면 mutation 이 reportReason 을 포함해 호출된다', async () => {
+      const user = userEvent.setup();
+      const mutate = vi.fn();
+      useV1CreateInquiryMock.mockReturnValue({ mutate, isPending: false });
+      renderExpiredContact();
+
+      await user.click(screen.getByRole('button', { name: '신고하기' }));
+      await user.click(screen.getByRole('radio', { name: '부적절한 내용' }));
+      await user.click(screen.getByRole('button', { name: '신고 접수' }));
+
+      expect(mutate).toHaveBeenCalledTimes(1);
+      expect(mutate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          category: 'report',
+          relatedType: 'team_contact',
+          relatedId: 'contact-1',
+          reportReason: 'inappropriate',
+        }),
+        expect.anything(),
+      );
+    });
+
+    // 포커스 트랩은 activeElement 가 다이얼로그의 첫/마지막 요소일 때만 개입한다. 열릴 때
+    // 포커스를 안으로 옮기지 않으면 포커스가 배경에 남아 트랩이 한 번도 발동하지 않고,
+    // aria-modal="true" 가 실제로는 배경을 격리하지 못한다.
+    it('열리면 포커스가 다이얼로그 안으로 들어온다', async () => {
+      const user = userEvent.setup();
+      renderExpiredContact();
+
+      await user.click(screen.getByRole('button', { name: '신고하기' }));
+      const dialog = screen.getByRole('dialog', { name: '컨택 신고하기' });
+
+      await waitFor(() => {
+        expect(dialog.contains(document.activeElement)).toBe(true);
+      });
+    });
+
+    it('사유를 안 고르면 보내기가 비활성이다', async () => {
+      const user = userEvent.setup();
+      renderExpiredContact();
+
+      await user.click(screen.getByRole('button', { name: '신고하기' }));
+
+      expect(screen.getByRole('button', { name: '신고 접수' })).toBeDisabled();
+    });
   });
 });
 

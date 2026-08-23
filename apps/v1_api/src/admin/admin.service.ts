@@ -81,6 +81,7 @@ const NOTICE_AUDIENCES = ['public', 'users', 'admins'] as const;
 const POPUP_LIST_STATUSES = ['published', 'archived', 'draft'] as const;
 const INQUIRY_LIST_STATUSES = ['received', 'reviewing', 'answered', 'closed'] as const;
 const INQUIRY_CATEGORIES = ['account', 'match', 'team', 'tournament', 'payment_refund', 'report', 'other'] as const;
+const INQUIRY_REPORT_REASONS = ['spam', 'harassment', 'impersonation', 'inappropriate', 'other'] as const;
 const ADMIN_LIST_STATUSES = ['active', 'suspended', 'revoked'] as const;
 
 @Injectable()
@@ -1832,15 +1833,27 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         }
       : {};
 
+    // 각 facet 은 "자기 자신을 뺀 나머지 필터" 로 집계한다 — 그래야 칩에 붙는 건수가
+    // "이걸 고르면 몇 건이 되는지" 를 뜻한다. 새로 들어온 reportReason 도 같은 규칙을 따른다.
+    const reportReasonWhere: Prisma.V1InquiryWhereInput = query.reportReason
+      ? { reportReason: query.reportReason }
+      : {};
     const statusFacetWhere: Prisma.V1InquiryWhereInput = {
       ...(query.category ? { category: query.category } : {}),
+      ...reportReasonWhere,
       ...searchWhere,
     };
     const categoryFacetWhere: Prisma.V1InquiryWhereInput = {
       ...(query.status ? { status: query.status } : {}),
+      ...reportReasonWhere,
       ...searchWhere,
     };
-    const [rows, statusGroups, categoryGroups] = await Promise.all([this.prisma.v1Inquiry.findMany({
+    const reportReasonFacetWhere: Prisma.V1InquiryWhereInput = {
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.category ? { category: query.category } : {}),
+      ...searchWhere,
+    };
+    const [rows, statusGroups, categoryGroups, reportReasonGroups] = await Promise.all([this.prisma.v1Inquiry.findMany({
       where: {
         ...(query.status ? { status: query.status } : {}),
         ...statusFacetWhere,
@@ -1855,6 +1868,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         status: true,
         relatedType: true,
         relatedId: true,
+        reportReason: true,
         createdAt: true,
         updatedAt: true,
         closedAt: true,
@@ -1871,6 +1885,10 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     }), this.prisma.v1Inquiry.groupBy({
       by: ['category'],
       where: categoryFacetWhere,
+      _count: { _all: true },
+    }), this.prisma.v1Inquiry.groupBy({
+      by: ['reportReason'],
+      where: reportReasonFacetWhere,
       _count: { _all: true },
     })]);
 
@@ -1898,6 +1916,14 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         byCategory: buildCountMap(
           INQUIRY_CATEGORIES,
           categoryGroups.map((group) => ({ key: group.category, count: group._count._all })),
+        ),
+        // reportReason 은 nullable 이라 groupBy 결과에 null 키가 섞인다 — 신고가 아닌 문의들이다.
+        // 필터 칩은 실제 사유만 보여주면 되므로 null 그룹은 버린다.
+        byReportReason: buildCountMap(
+          INQUIRY_REPORT_REASONS,
+          reportReasonGroups
+            .filter((group) => group.reportReason !== null)
+            .map((group) => ({ key: group.reportReason as string, count: group._count._all })),
         ),
       },
     };
@@ -1927,6 +1953,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         contact: true,
         relatedType: true,
         relatedId: true,
+        reportReason: true,
         status: true,
         closedAt: true,
         createdAt: true,
@@ -2821,6 +2848,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     status: string;
     relatedType: string | null;
     relatedId: string | null;
+    reportReason: string | null;
     createdAt: Date;
     updatedAt: Date;
     closedAt: Date | null;
@@ -2840,6 +2868,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       status: row.status,
       relatedType: row.relatedType,
       relatedId: row.relatedId,
+      reportReason: row.reportReason,
       replyCount: row._count.replies,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
@@ -2858,6 +2887,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     contact: string | null;
     relatedType: string | null;
     relatedId: string | null;
+    reportReason: string | null;
     status: string;
     closedAt: Date | null;
     createdAt: Date;
@@ -2886,6 +2916,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         status: row.status,
         relatedType: row.relatedType,
         relatedId: row.relatedId,
+        reportReason: row.reportReason,
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
         closedAt: row.closedAt,

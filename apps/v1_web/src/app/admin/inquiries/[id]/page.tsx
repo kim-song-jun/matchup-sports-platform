@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useState, type FormEvent } from 'react';
-import { ArrowLeft, Clock, Mail, MessageSquareText, Pencil, Send, Tag, UserRound } from 'lucide-react';
+import { ArrowLeft, Clock, Flag, Mail, MessageSquareText, Pencil, Send, Tag, UserRound } from 'lucide-react';
 import {
   AdminEmpty,
   AdminPageHeader,
@@ -20,6 +20,7 @@ import {
   useV1UpdateAdminInquiryReply,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { inquiryReportReasonLabel } from '@/lib/v1-status-labels';
 import type { V1InquiryCategory, V1InquiryStatus } from '@/types/api';
 
 const STATUS_LABEL: Record<V1InquiryStatus, string> = {
@@ -248,6 +249,12 @@ export default function AdminInquiryDetailPage() {
                     <Tag size={14} aria-hidden="true" />
                     {CATEGORY_LABEL[inquiry.category]}
                   </span>
+                  {inquiry.reportReason ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      <Flag size={14} aria-hidden="true" />
+                      {inquiryReportReasonLabel(inquiry.reportReason)}
+                    </span>
+                  ) : null}
                   <span className="inline-flex items-center gap-1.5">
                     <UserRound size={14} aria-hidden="true" />
                     {requesterName(inquiry)}

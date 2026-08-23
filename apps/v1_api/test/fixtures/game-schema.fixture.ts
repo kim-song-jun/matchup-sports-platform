@@ -272,18 +272,25 @@ export const gameSchemaSourceManifest = {
   // 2026-08-21 hotfix: V1TeamRecordFact.playedAt is backed by the
   // 20260821120000_v1_team_record_facts_played_at migration. The bound
   // game-operations migration itself remains unchanged.
-  // 2026-08-21 재핀: V1League 에 목록 조회용 인덱스 둘을 추가했다
-  // (@@index([regionId, state]), @@index([createdAt(sort: Desc), id(sort: Desc)])).
-  // 공개 리그 목록이 실제로 쓰는 필터·정렬 경로가 인덱스를 못 타고 있던 것을 덮는 것으로,
-  // 컬럼·모델 변경은 없고 순수 CREATE INDEX 라 expand-contract 게이트도 provably additive 로
-  // 통과한다. game domain(V1Game*) 은 건드리지 않았고 바인딩된 20260729000100_v1_game_operations
-  // 도 그대로라 migration 해시는 변하지 않는다.
-  // 뒷받침 마이그레이션: 20260821100000_v1_league_list_indexes.
-  // 병합 재핀: 위 두 변경(경기일 hotfix / 리그 인덱스)이 각자 자기 브랜치 기준 해시를 넣어
-  // 둔 채 충돌했다. 아래 값은 **두 변경이 병합된 뒤**의 schema.prisma 에 shasum 을 다시 돌려
-  // 계산한 것이다 — 어느 한쪽 브랜치의 해시를 그대로 쓰면 CI 가 깨진다(이 파일 위쪽
-  // 2026-08-19 / 2026-08-21 병합 재핀 주석과 같은 사유).
-  schema: '3a0d0566f2aeeea9f7b94e16f8f6bd63e0df0936d992a827da8c225ce4bdf6d9',
+  // 2026-08-21 재핀(병합): 두 변경이 각자 자기 브랜치 기준 해시를 넣어 둔 채 충돌했다.
+  //
+  // (1) 팀 간 컨택 메시지 Phase 2·3 — 신고 사유 구조화를 위해
+  //     enum V1InquiryReportReason(spam/harassment/impersonation/inappropriate/other)과
+  //     V1Inquiry.reportReason nullable 컬럼, @@index([reportReason, createdAt])를 추가했다.
+  //     순수 additive(CREATE TYPE + ADD COLUMN nullable + CREATE INDEX).
+  //     뒷받침 마이그레이션: 20260821165303_v1_inquiry_report_reason.
+  // (2) V1League 목록 조회용 인덱스 둘 — @@index([regionId, state]),
+  //     @@index([createdAt(sort: Desc), id(sort: Desc)]). 순수 CREATE INDEX.
+  //     뒷받침 마이그레이션: 20260821100000_v1_league_list_indexes.
+  //
+  // 둘 다 game domain(V1Game*) 모델·enum 은 한 줄도 건드리지 않았다 — 이 guard 가
+  // schema.prisma 전체 바이트를 결속하기 때문에 걸리는 것이지 game operations 계약이
+  // 바뀐 게 아니다. 바인딩된 20260729000100_v1_game_operations 도 그대로라 .migration
+  // 해시는 변하지 않는다.
+  //
+  // 아래 값은 **두 변경이 병합된 뒤**의 schema.prisma 에 sha256 을 다시 돌려 계산한 것이다 —
+  // 어느 한쪽 브랜치의 해시를 그대로 쓰면 CI 가 깨진다(이 파일 위쪽 병합 재핀 주석과 같은 사유).
+  schema: 'ea5b9634f6020efe874bcd24cd02181de567134a6fe346c78f08d6f51464262d',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

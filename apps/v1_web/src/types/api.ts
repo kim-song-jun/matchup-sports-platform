@@ -39,6 +39,8 @@ export type AdminListSummary = {
   byStatus: Record<string, number>;
   byCategory?: Record<string, number>;
   byAudience?: Record<string, number>;
+  /** 문의 목록 전용 — 신고(`category: 'report'`) 사유별 건수. 5개 키 전부 존재, 없으면 0. */
+  byReportReason?: Record<string, number>;
 };
 
 export type AdminCursorPage<T> = CursorPage<T> & {
@@ -312,7 +314,10 @@ export type V1InquiryRelatedType =
   | 'tournament'
   | 'registration'
   | 'payment'
-  | 'user';
+  | 'user'
+  | 'team_contact';
+
+export type V1InquiryReportReason = 'spam' | 'harassment' | 'impersonation' | 'inappropriate' | 'other';
 
 export type V1Inquiry = {
   inquiryId: string;
@@ -322,6 +327,8 @@ export type V1Inquiry = {
   contact: string | null;
   relatedType: V1InquiryRelatedType | null;
   relatedId: string | null;
+  /** 신고(`category: 'report'`)에만 실린다 — 그 외 문의에는 서버가 null 을 넣는다. */
+  reportReason: V1InquiryReportReason | null;
   status: V1InquiryStatus;
   createdAt: string;
   updatedAt: string;
@@ -353,6 +360,7 @@ export type V1CreateInquiryPayload = {
   contact?: string;
   relatedType?: V1InquiryRelatedType;
   relatedId?: string;
+  reportReason?: V1InquiryReportReason;
 };
 
 export type V1Match = {
@@ -603,6 +611,12 @@ export type V1TeamDetail = {
   regionName?: string | null;
   region: { regionId: string; name: string; parentName?: string | null } | null;
   joinPolicy?: 'approval_required' | 'closed';
+  /**
+   * 팀 컨택 수신 정책(Phase 2/3 Task 5). `/teams/:teamId/contact-policy` PATCH 응답은
+   * `{ id, contactPolicy }` 두 필드만 반환하므로(team-contacts.service.ts:394-398), 화면이
+   * "현재 선택된 정책"을 렌더하려면 이 GET 응답에서 읽어야 한다.
+   */
+  contactPolicy?: 'open' | 'recruiting_only' | 'closed';
   trustState?: TrustState | 'none';
   version?: string;
   membersVisibilityEnabled: boolean;
@@ -2278,6 +2292,8 @@ export type V1AdminInquiryRow = {
   status: V1InquiryStatus;
   relatedType: V1InquiryRelatedType | null;
   relatedId: string | null;
+  /** 신고(`category: 'report'`)에만 실린다 — 그 외 문의에는 서버가 null 을 넣는다. */
+  reportReason: V1InquiryReportReason | null;
   replyCount: number;
   createdAt: string;
   updatedAt: string;
@@ -2485,6 +2501,8 @@ export type AdminListFilters = {
   sportId?: string;
   audience?: string;
   category?: string;
+  /** 문의 목록 전용 — `category: 'report'` 일 때만 의미가 있다. */
+  reportReason?: string;
   targetType?: string;
   cursor?: string;
   /** 페이지 번호(1부터). cursor 와 함께 보내면 서버가 page 를 우선한다. */

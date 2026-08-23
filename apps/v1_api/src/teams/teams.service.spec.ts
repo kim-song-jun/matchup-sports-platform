@@ -516,6 +516,60 @@ describe('TeamsService', () => {
     });
   });
 
+  // contactPolicy 는 팀 운영진에게만 노출한다. 공개하면 스펙 §8 의 "컨택 거절 사유를 구분할 수
+  // 없어야 한다" 는 성질이 깨진다 — 상대 팀 정책이 'open' 인 것이 보이는데 컨택이 거절되면
+  // "우리가 차단당했다" 가 곧바로 역산되기 때문이다.
+  describe('contact policy visibility', () => {
+    function contactPolicyRow(contactPolicy: string) {
+      return {
+        ...teamRow({ contactPolicy }),
+        sport: { id: 'sport-1', name: 'Soccer' },
+        region: null,
+        profile: null,
+        memberships: [
+          {
+            ...membershipRow({ id: 'manager-membership', role: 'manager', userId: manager.id }),
+            user: { profile: { nickname: 'manager', displayName: null, profileImageUrl: null } },
+          },
+          {
+            ...membershipRow({ id: 'member-membership', role: 'member', userId: member.id }),
+            user: { profile: { nickname: 'member', displayName: null, profileImageUrl: null } },
+          },
+        ],
+        joinApplications: [],
+        trustScore: null,
+        ownerUser: {
+          id: owner.id,
+          profile: { nickname: 'owner', displayName: null, profileImageUrl: null },
+        },
+      };
+    }
+
+    it('detail exposes contactPolicy to team managers', async () => {
+      prisma.v1Team.findFirst.mockResolvedValueOnce(contactPolicyRow('closed'));
+
+      const result = await service.detail(manager, 'team-1');
+
+      expect(result.contactPolicy).toBe('closed');
+    });
+
+    it('detail hides contactPolicy from anonymous viewers so a rejected sender cannot infer a block', async () => {
+      prisma.v1Team.findFirst.mockResolvedValueOnce(contactPolicyRow('open'));
+
+      const result = await service.detail(null, 'team-1');
+
+      expect(result.contactPolicy).toBeUndefined();
+    });
+
+    it('detail hides contactPolicy from ordinary members', async () => {
+      prisma.v1Team.findFirst.mockResolvedValueOnce(contactPolicyRow('open'));
+
+      const result = await service.detail(member, 'team-1');
+
+      expect(result.contactPolicy).toBeUndefined();
+    });
+  });
+
   describe('member list visibility', () => {
     it('detail allows active members to preview members even when public visibility is disabled', async () => {
       prisma.v1Team.findFirst.mockResolvedValueOnce({

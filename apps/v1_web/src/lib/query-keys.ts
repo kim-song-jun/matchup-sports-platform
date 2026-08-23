@@ -32,6 +32,11 @@ export const v1Keys = {
    */
   teamContactsAll: (teamId: string) => [...v1Keys.team(teamId), 'contacts'] as const,
   teamContact: (contactId: string) => [...v1Keys.all, 'team-contacts', contactId] as const,
+  /**
+   * 차단 목록 — 필터 인자가 없으므로 `teamContacts()` 와 달리 별도 `...All` 변형이
+   * 필요 없다. 이 키 자체가 prefix match 로 무효화된다.
+   */
+  teamContactBlocks: (teamId: string) => [...v1Keys.team(teamId), 'contact-blocks'] as const,
   teamSchedules: (teamId: string, filters?: Record<string, unknown>) => [...v1Keys.team(teamId), 'schedules', filters ?? {}] as const,
   teamSchedule: (teamId: string, scheduleId: string) => [...v1Keys.team(teamId), 'schedules', scheduleId] as const,
   mySchedule: (filters?: Record<string, unknown>) => [...v1Keys.all, 'me', 'schedule', filters ?? {}] as const,

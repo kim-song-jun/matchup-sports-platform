@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { formatTournamentDateShort } from '@/lib/date-utils';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { useV1PublicProfile } from '@/hooks/use-v1-api';
@@ -92,6 +93,21 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
           <Card pad={16}>
             <div className="tm-text-body" style={{ whiteSpace: 'pre-wrap', wordBreak: 'keep-all' }}>
               {data.bio}
+            </div>
+          </Card>
+        ) : null}
+        {/* 최근 활동 한 줄 (Task 154 P2-3). 새로 공개되는 정보가 아니라 기록 목록에
+            이미 있는 값을 앞으로 당긴 것이다 -- 같은 게이트를 통과한 것만 서버가 준다. */}
+        {data.recentActivity ? (
+          <Card pad={16}>
+            <div className="tm-text-label" style={{ marginBottom: 6 }}>최근 활동</div>
+            <div className="tm-text-body">
+              {data.recentActivity.teamName}
+              {data.recentActivity.jerseyNumber !== null ? ` · ${data.recentActivity.jerseyNumber}번` : ''}
+              {data.recentActivity.position ? ` · ${data.recentActivity.position}` : ''}
+            </div>
+            <div className="tm-text-caption" style={{ marginTop: 4 }}>
+              {formatTournamentDateShort(data.recentActivity.playedAt)}
             </div>
           </Card>
         ) : null}

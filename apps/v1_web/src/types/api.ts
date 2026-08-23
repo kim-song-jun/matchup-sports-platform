@@ -1895,6 +1895,16 @@ export type V1PublicProfile = {
    * 가려둔 팀이 개인 프로필로 새어 나가지 않게 서버가 걸러 준다.
    */
   teams?: { id: string; name: string }[];
+  /**
+   * 가장 최근 공개 가능 출전 한 줄. 기록 목록과 **같은 게이트**를 통과한 것만 온다 --
+   * 동의 전이거나 확정 전이면 null.
+   */
+  recentActivity?: {
+    position: string | null;
+    jerseyNumber: number | null;
+    teamName: string;
+    playedAt: string;
+  } | null;
   reputation: {
     trustState: TrustState;
     mannerScore: number | null;

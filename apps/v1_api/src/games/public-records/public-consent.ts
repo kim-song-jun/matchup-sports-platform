@@ -189,3 +189,88 @@ export async function countOwnerVisibleParticipations(
   }
   return count;
 }
+
+/** 공개 프로필의 "최근 활동" 한 줄. 없으면 null. */
+export interface LatestPublicParticipation {
+  readonly position: string | null;
+  readonly jerseyNumber: number | null;
+  readonly teamName: string;
+  readonly playedAt: Date;
+}
+
+/**
+ * 공개 프로필에 보여줄 **가장 최근 공개 가능 출전** 한 건.
+ *
+ * 판정을 새로 쓰지 않고 `isParticipantPubliclyEligible` 을 그대로 쓴다 -- 이 값이
+ * `GET /users/:id/records` 의 첫 행과 어긋나면 같은 프로필 안에서 "최근 경기"와
+ * "기록 목록 맨 위"가 다른 경기를 가리키게 된다.
+ *
+ * **새로 공개되는 정보가 아니다.** 포지션·등번호·팀명은 동의가 켜져 있으면 이미 기록
+ * 목록에 그대로 나오는 값이고, 여기서도 같은 게이트를 통과한 것만 쓴다 -- 요약을 한 줄
+ * 앞으로 당길 뿐이다.
+ */
+export async function findLatestPublicParticipation(
+  prisma: PrismaService,
+  userId: string,
+): Promise<LatestPublicParticipation | null> {
+  const links = await prisma.v1ParticipantIdentityLinkCurrent.findMany({
+    where: { userId },
+    select: { participantId: true },
+  });
+  if (links.length === 0) return null;
+  const participantIds = links.map((link) => link.participantId);
+
+  const eligibility = await loadParticipantConsentEligibility(prisma, participantIds);
+  const publiclyVisible = participantIds.filter((participantId) => {
+    const row = eligibility.get(participantId);
+    return row !== undefined && isParticipantPubliclyEligible(row);
+  });
+  if (publiclyVisible.length === 0) return null;
+
+  const rows = await prisma.v1GameResultParticipant.findMany({
+    where: { participantId: { in: publiclyVisible } },
+    select: {
+      participantId: true,
+      resultRevision: {
+        select: {
+          id: true,
+          officialAt: true,
+          game: { select: { currentOfficialRevisionId: true } },
+        },
+      },
+    },
+  });
+  // 공식 확정 + 현재 리비전만. 대체된 옛 결과를 최근 활동으로 내세우면 이미 정정된
+  // 경기를 프로필 맨 앞에 박아두는 셈이 된다.
+  const eligible = rows.filter(
+    (row) =>
+      row.resultRevision.officialAt !== null &&
+      row.resultRevision.game.currentOfficialRevisionId === row.resultRevision.id,
+  );
+  if (eligible.length === 0) return null;
+
+  let latest = eligible[0];
+  for (const row of eligible) {
+    if ((row.resultRevision.officialAt as Date) > (latest.resultRevision.officialAt as Date)) {
+      latest = row;
+    }
+  }
+
+  const participant = await prisma.v1GameParticipant.findUnique({
+    where: { id: latest.participantId },
+    select: { position: true, jerseyNumber: true, sideId: true },
+  });
+  if (participant === null) return null;
+  // V1GameParticipant 에는 side 관계가 없고 sideId 만 있어 한 번 더 조회한다.
+  const side = await prisma.v1GameSide.findUnique({
+    where: { id: participant.sideId },
+    select: { displayNameSnapshot: true },
+  });
+  if (side === null) return null;
+  return {
+    position: participant.position,
+    jerseyNumber: participant.jerseyNumber,
+    teamName: side.displayNameSnapshot,
+    playedAt: latest.resultRevision.officialAt as Date,
+  };
+}

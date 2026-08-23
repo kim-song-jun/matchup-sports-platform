@@ -8,7 +8,10 @@ import {
 } from '@nestjs/common';
 import { Prisma, V1AuthProvider, V1ConsentState } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
-import { countOwnerVisibleParticipations } from '../games/public-records/public-consent';
+import {
+  countOwnerVisibleParticipations,
+  findLatestPublicParticipation,
+} from '../games/public-records/public-consent';
 import { PrismaService } from '../prisma/prisma.service';
 import { isReviewRevealed } from '../reviews/review-visibility';
 import { removeUserFromActiveRosters } from '../tournaments/roster-cleanup';
@@ -339,6 +342,9 @@ export class ProfileService {
       // 빈 문자열을 내리면 제목만 있는 빈 카드가 남는다.
       bio: user.profile?.bio?.trim() || null,
       teams: teamMemberships.map((membership) => membership.team),
+      // Task 154 P2: 가장 최근 공개 가능 출전 한 줄. 기록 목록과 **같은 게이트**를 통과한
+      // 것만 쓴다 -- 다르면 같은 프로필에서 "최근 경기"와 "목록 맨 위"가 어긋난다.
+      recentActivity: await findLatestPublicParticipation(this.prisma, user.id),
       reputation: {
         ...toReputationPayload(user.reputationSummary),
         mannerScore: liveReputation.mannerScore,
@@ -1170,6 +1176,7 @@ function toProfilePayload(profile: {
   profileImageUrl: string | null;
   birthDate: string | null;
   gender: string | null;
+  bio?: string | null;
 } | null) {
   return {
     displayName: profile?.nickname ?? '사용자',
@@ -1178,6 +1185,11 @@ function toProfilePayload(profile: {
     profileImageUrl: profile?.profileImageUrl ?? null,
     birthDate: profile?.birthDate ?? null,
     gender: normalizeProfileGender(profile?.gender),
+    // alpha 실측(2026-08-24)에서 잡은 결함: 저장은 되는데 이 payload 에 bio 가 빠져
+    // `GET /me/profile` 과 `PATCH` 응답 모두 값을 안 돌려줬다. 프론트는 그 응답으로
+    // 캐시를 갱신하고 편집 폼 초깃값을 채우므로, 저장 직후 편집 화면에 다시 들어가면
+    // 방금 쓴 소개가 비어 보였다(DB 엔 남아 있는데).
+    bio: profile?.bio ?? null,
   };
 }
 

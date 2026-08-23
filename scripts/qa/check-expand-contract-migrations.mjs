@@ -842,6 +842,13 @@ END $$`,
       '것이고, 둘이 같은 migration.sql 에 있어 제약 없는 창이 커밋 밖으로 노출되지 않는다. ' +
       'Reviewed 2026-08-21.',
   },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260824100100_v1_inquiry_reported_team_backfill/migration.sql',
+    statement:
+      'UPDATE "v1_inquiries" i SET "reported_team_id" = sub.reported_team_id FROM ( SELECT i2."id" AS id, CASE WHEN EXISTS (SELECT 1 FROM "v1_team_memberships" m WHERE m."team_id" = c."from_team_id" AND m."user_id" = i2."user_id" AND m."status" = \'active\') THEN c."to_team_id" WHEN EXISTS (SELECT 1 FROM "v1_team_memberships" m WHERE m."team_id" = c."to_team_id" AND m."user_id" = i2."user_id" AND m."status" = \'active\') THEN c."from_team_id" ELSE NULL END AS reported_team_id FROM "v1_inquiries" i2 JOIN "v1_team_contacts" c ON c."id" = i2."related_id" WHERE i2."related_type" = \'team_contact\' AND i2."category" = \'report\' AND i2."user_id" IS NOT NULL ) sub WHERE i."id" = sub.id AND sub.reported_team_id IS NOT NULL',
+    reason:
+      'Backfills only the newly introduced nullable reported_team_id. It reads existing rows but writes no pre-existing column, so a rolling deploy running the old code sees an unchanged schema surface. Rollback is DROP COLUMN, which the preceding additive migration owns. Rows whose reporter has no active membership on either side are intentionally left NULL rather than guessed.',
+  },
 ];
 
 const normalizeStatementText = (statement) => statement.replace(/\s+/g, ' ').trim();

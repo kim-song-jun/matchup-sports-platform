@@ -349,7 +349,23 @@ export const gameSchemaSourceManifest = {
   // 값을 그대로 쓰면 CI 가 깨진다 — 이 파일에 쌓인 병합 재핀 선례와 같은 처리다.
   //
   // (병합 재핀) 위 변경들이 모두 들어간 뒤의 schema.prisma 해시다.
-  schema: '489377454bc06228eb5df6e10c3158a46da381ed064ebd80acab57a4d5750ad0',
+  //
+  // 2026-08-24 재핀 (팀 컨택 신고 조치 Task 1): `V1Inquiry` 에 nullable
+  // `reportedTeamId`(`reported_team_id`) 컬럼과 `V1Team` 을 향한 `reportedTeam` 관계
+  // (`@relation("V1InquiryReportedTeam")`, onDelete: SetNull), `@@index([reportedTeamId,
+  // createdAt])` 를 추가했다. `V1Team` 에는 Prisma 가 요구하는 역방향 배열
+  // `reportedInquiries V1Inquiry[]` 만 늘었다 — 새 컬럼도 새 FK 도 아니다. 순수 additive
+  // (ADD COLUMN nullable + ADD CONSTRAINT ... ON DELETE SET NULL + CREATE INDEX)이고
+  // **game domain(V1Game*) 모델·enum 은 한 줄도 건드리지 않았다** — 이 guard 가
+  // schema.prisma 전체 바이트를 결속하기 때문에 걸리는 것이지 game operations 계약이
+  // 바뀐 게 아니다(위 대회 후기 팀 귀속·카드 정지 규정값 재핀과 같은 성격). 팀이 삭제돼도
+  // 신고 기록은 감사 이력으로 남아야 하므로 Cascade 대신 SetNull 을 썼다. 뒷받침
+  // 마이그레이션: `20260824100000_v1_inquiry_reported_team`(스키마 확장) +
+  // `20260824100100_v1_inquiry_reported_team_backfill`(기존 신고 행의 대상 팀을
+  // 컨택의 두 팀 중 신고자가 속하지 않은 쪽으로 계산해 채움; 판정 불가 행은 NULL 유지).
+  // 바인딩된 20260729000100_v1_game_operations 는 그대로라 `.migration` 해시는 변하지
+  // 않는다. 아래 값은 이 브랜치의 schema.prisma 에 `shasum -a 256` 을 다시 돌려 계산한 것이다.
+  schema: '681fde361c63f64bed54df74c08c048ca12a68f5452c9d42b79a2d9650c0f652',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

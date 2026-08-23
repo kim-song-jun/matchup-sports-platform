@@ -295,6 +295,27 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
         <h1 className="text-xl font-bold text-[var(--text-strong)]">{series.title}</h1>
         <span className={`tm-badge ${stateMeta.badgeClass}`}>{stateMeta.label}</span>
       </div>
+      {/* 이슈 1(감사 보통) — seriesId 가 응답에 있어도 같은 시리즈의 다른 시즌·티어로
+          이동할 링크가 없어 "1부"를 보는 사용자가 "2부는 어떤 팀들이 있지?"를 클릭으로
+          확인할 수 없었다. 단발 리그(seriesSiblings 빈 배열)에는 아무것도 늘어나지 않는다. */}
+      {(series.seriesSiblings ?? []).length > 0 && (
+        <nav aria-label="같은 시리즈의 다른 리그" className="mt-2">
+          <ul className="flex flex-wrap gap-1.5">
+            {series.seriesSiblings.map((sibling) => {
+              const siblingStateMeta = LEAGUE_STATE_META[sibling.state];
+              return (
+                <li key={sibling.leagueId}>
+                  <Link href={`/league-matches/${sibling.leagueId}`} className="tm-chip">
+                    {sibling.seasonNo}시즌 · {sibling.tierLabel}
+                    {/* 상태를 컬러 뱃지 + 텍스트로 함께 표기 — 컬러만으로 진행 여부를 전달하지 않는다. */}
+                    <span className={`tm-badge tm-badge-sm ${siblingStateMeta.badgeClass}`}>{siblingStateMeta.label}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+      )}
       {standings !== undefined && (
         <p className="mt-1 text-sm text-[var(--text-muted)]">
           순위 규칙: {standings.tieBreakOrder.map((c) => TIE_BREAK_LABELS[c] ?? c).join(' → ')}
@@ -321,6 +342,14 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
           </h2>
           {series.state === 'completed' && <span className="tm-badge tm-badge-sm tm-badge-green">최종 순위</span>}
         </div>
+        {/* 이슈 3(감사 보통) — 팀마다 치른 경기 수가 다른 이유(취소된 대진은 집계에서
+            빠진다, R8)를 일정 쪽 "취소됨" 배지를 보고 스스로 유추하지 않아도 되게
+            순위표 바로 아래에서 알려준다. 0건이면 아무것도 늘어나지 않는다. */}
+        {standings !== undefined && standings.cancelledFixtureCount > 0 && (
+          <p className="mb-2 text-xs text-[var(--text-muted)]">
+            <span aria-hidden="true">•</span> 취소된 {standings.cancelledFixtureCount}경기는 집계에서 제외됐어요 — 팀마다 치른 경기 수가 다를 수 있어요.
+          </p>
+        )}
         {standingsQuery.isError ? (
           <ErrorState
             message={extractErrorMessage(standingsQuery.error, '순위표를 불러오지 못했어요.')}
@@ -533,8 +562,20 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
                       <span aria-hidden="true">·</span>
                       <span>{fixture.placeName || '장소 미정'}</span>
                       <span className={`tm-badge tm-badge-sm ${statusMeta.badgeClass}`}>{statusMeta.label}</span>
-                      <span className={result.hasScore ? 'font-bold text-[var(--text-strong)]' : ''}>{result.text}</span>
-                      {result.isForfeit ? <span className="tm-badge tm-badge-sm tm-badge-grey">몰수</span> : null}
+                      {/* 이슈 2(감사 보통) — 몰수 스코어는 "몰수" 뱃지가 붙어도 숫자 자체가
+                          bold 로 강조돼 실제 득점(예: 1:0 승리)과 똑같은 무게로 읽혔다.
+                          몰수 스코어는 더 이상 굵게 강조하지 않고, 뱃지 옆에 "관례 스코어"임을
+                          텍스트로 덧붙인다 — 기존 "몰수" 뱃지(정확히 이 문구를 단언하는
+                          테스트가 있다)는 그대로 두고 별도 span으로만 보강한다. */}
+                      <span className={result.hasScore && !result.isForfeit ? 'font-bold text-[var(--text-strong)]' : 'text-[var(--text-strong)]'}>
+                        {result.text}
+                      </span>
+                      {result.isForfeit ? (
+                        <>
+                          <span className="tm-badge tm-badge-sm tm-badge-grey">몰수</span>
+                          <span className="text-[var(--text-muted)]">(관례 스코어)</span>
+                        </>
+                      ) : null}
                     </span>
                   </Link>
                 </li>

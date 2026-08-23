@@ -1,24 +1,29 @@
 'use client';
 
 import { useState } from 'react';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, X } from 'lucide-react';
 import { AdminPageHeader, AdminDataTable, AdminReasonModal, AdminStatusPill, AdminTableSkeleton, AdminToasts, useAdminToast } from '@/components/admin';
+import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-picker';
 import { GateConfirmModal } from '@/components/admin/operation-flag-gate-confirm-modal';
 import {
+  useV1AddLeagueTeam,
   useV1AdminLeagueMatch,
   useV1RevertLeagueCompletion,
   useV1AdminLeagueTeams,
   useV1AdminTeam,
   useV1CancelLeagueFixture,
   useV1GenerateLeagueFixtures,
+  useV1PreviewLeagueFixtures,
   useV1RecordLeagueForfeit,
   useV1RegenerateLeagueFixtures,
+  useV1RemoveLeagueTeam,
+  useV1Teams,
   useV1UpdateLeagueFixture,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { fromDatetimeLocalValue, toDatetimeLocalValue } from '@/components/team-schedules/team-schedules.view-model';
 import { RecentVenueChips } from '@/components/v1-ui/create-form-fields';
-import type { V1LeagueFixture } from '@/types/league-match';
+import type { V1GenerateLeagueFixturesPayload, V1LeagueFixture, V1PreviewLeagueFixturesResult } from '@/types/league-match';
 
 const inputClass =
   'h-[44px] rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20';
@@ -44,6 +49,32 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
   const { data: teamsData } = useV1AdminLeagueTeams(leagueId);
   const recordForfeit = useV1RecordLeagueForfeit(leagueId);
   const { toasts, showToast } = useAdminToast();
+
+  // 그룹 B 감사 결함 1: 개설 후 참가팀 추가·제거.
+  const addTeam = useV1AddLeagueTeam(leagueId);
+  const removeTeam = useV1RemoveLeagueTeam(leagueId);
+  const [teamPickerValue, setTeamPickerValue] = useState<EntityPickerItem | null>(null);
+  const [teamSearch, setTeamSearch] = useState('');
+  const trimmedTeamSearch = teamSearch.trim();
+  // series?.sportId — 이 리그와 같은 종목 팀만 후보로 보여준다(생성 폼과 동일 규칙,
+  // create()의 "리그 종목과 일치하는 활성 팀만" 규칙을 화면에서도 미리 좁힌다).
+  const addTeamCandidatesQuery = useV1Teams(
+    trimmedTeamSearch
+      ? { query: trimmedTeamSearch, limit: 20 }
+      : series?.sportId
+        ? { sportId: series.sportId, limit: 20 }
+        : { limit: 20 },
+  );
+  const existingTeamIds = new Set((teamsData?.teams ?? []).map((team) => team.teamId));
+  const addTeamCandidates: EntityPickerItem[] = (addTeamCandidatesQuery.data?.items ?? [])
+    .filter((team) => !existingTeamIds.has(team.id))
+    .map((team) => ({ id: team.id, label: team.name, description: `${team.sportName} · ${team.regionName}` }));
+
+  // 그룹 B 감사 결함 3: 최초 대진 생성/재생성 미리보기(dry-run). generate/regenerate 두
+  // 폼이 같은 상태(weeksCount/dayOfWeek/time/placeName)를 공유하므로 미리보기 결과도
+  // 하나만 두고 어느 폼에서 눌렀는지는 결과 패널을 각 폼 바로 아래 두는 것으로 구분한다.
+  const previewFixtures = useV1PreviewLeagueFixtures(leagueId);
+  const [previewResult, setPreviewResult] = useState<V1PreviewLeagueFixturesResult | null>(null);
 
   // 몰수패 처리 모달(R11) — 어느 대진을 처리 중인지만 들고, 팀 이름은 모달이 열릴 때만
   // useV1AdminTeam으로 조회한다(표 전체에 대해 팀마다 조회하지 않는다 — N+1 방지).
@@ -96,6 +127,21 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
     );
   }
 
+  // generate/regenerate/preview 세 호출이 전부 같은 폼 상태(weeksCount/dayOfWeek/time/
+  // placeName)에서 같은 모양의 body를 만든다 — 세 곳에서 조립 규칙이 갈리면(예: 트림 여부)
+  // "미리보기는 통과했는데 실제 생성은 다르게 실패"가 생긴다.
+  const buildFixtureFormPayload = (): V1GenerateLeagueFixturesPayload => ({
+    weeksCount,
+    ...(dayOfWeek === '' ? {} : { schedule: { dayOfWeek, time } }),
+    ...(placeName.trim() === '' ? {} : { placeName: placeName.trim() }),
+  });
+
+  // 감사 결함 2: 서버가 응답에 실어 준 경고(현재는 ODD_TEAM_COUNT_BYE 하나)를 성공 메시지에
+  // 이어 붙인다 — AdminToast는 success/error 두 톤뿐이라 별도 토스트를 추가로 띄우지 않고,
+  // code는 화면이 몰라도 message만으로 안내할 수 있게 서버가 문구까지 준다.
+  const appendFixtureWarnings = (message: string, warnings: Array<{ code: string; message: string }>) =>
+    warnings.length === 0 ? message : `${message} ${warnings.map((w) => w.message).join(' ')}`;
+
   const onGenerate = async () => {
     // 요일은 골랐는데 time input(type="time")을 비워 지운 상태로 제출하면 서버가 형식
     // 오류로 400을 내려 사용자는 이유를 모른 채 막힌다 — 제출 전에 여기서 먼저 알려준다.
@@ -104,15 +150,67 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
       return;
     }
     try {
-      const result = await generateFixtures.mutateAsync({
-        weeksCount,
-        ...(dayOfWeek === '' ? {} : { schedule: { dayOfWeek, time } }),
-        ...(placeName.trim() === '' ? {} : { placeName: placeName.trim() }),
-      });
-      showToast(`대진 ${result.createdCount}경기를 만들었어요.`, 'success');
+      const result = await generateFixtures.mutateAsync(buildFixtureFormPayload());
+      showToast(appendFixtureWarnings(`대진 ${result.createdCount}경기를 만들었어요.`, result.warnings), 'success');
+      setPreviewResult(null);
     } catch (error) {
       showToast(extractErrorMessage(error, '대진을 만들지 못했어요.'), 'error');
     }
+  };
+
+  // 감사 결함 3: 최초 생성·재생성 공용 미리보기. DB를 바꾸지 않으므로 실패해도 폼 상태는
+  // 그대로 둔다 — generateFixtures가 던지는 것과 같은 검증 오류를 미리 보여주는 것도
+  // 미리보기의 역할이라, 여기서도 같은 방식으로 토스트한다.
+  const onPreview = async () => {
+    if (dayOfWeek !== '' && time.trim() === '') {
+      showToast('요일을 골랐으면 시각도 입력해 주세요.', 'error');
+      return;
+    }
+    try {
+      const result = await previewFixtures.mutateAsync(buildFixtureFormPayload());
+      setPreviewResult(result);
+    } catch (error) {
+      setPreviewResult(null);
+      showToast(extractErrorMessage(error, '미리보기를 만들지 못했어요.'), 'error');
+    }
+  };
+
+  // 그룹 B 감사 결함 1: 참가팀 추가. EntityPicker의 onChange가 넘기는 item이 null이면
+  // (검색 초기화 등) 아무것도 하지 않는다.
+  const onAddTeam = (item: EntityPickerItem | null) => {
+    if (item === null) return;
+    addTeam.mutate(
+      { teamId: item.id },
+      {
+        onSuccess: (result) => {
+          setTeamPickerValue(null);
+          setTeamSearch('');
+          showToast(
+            result.hasExistingFixtures
+              ? `${item.label}을(를) 추가했어요. 대진에 반영하려면 "대진 재생성"을 눌러 주세요.`
+              : `${item.label}을(를) 추가했어요.`,
+            'success',
+          );
+        },
+        onError: (error) => showToast(extractErrorMessage(error, '팀을 추가하지 못했어요.'), 'error'),
+      },
+    );
+  };
+
+  // 그룹 B 감사 결함 1: 참가팀 제거. 공식 결과가 확정된 대진이 낀 팀은 서버가 409로
+  // 거부한다(checkLeagueTeamRemovalAllowed) — 여기서는 그 실패를 토스트로만 알린다.
+  const onRemoveTeam = (teamId: string, teamName: string) => {
+    removeTeam.mutate(teamId, {
+      onSuccess: (result) => {
+        showToast(
+          result.cancelledFixtureCount > 0
+            ? `${teamName}을(를) 제외했어요. 관련 대진 ${result.cancelledFixtureCount}경기도 함께 취소됐어요.`
+            : `${teamName}을(를) 제외했어요.`,
+          'success',
+        );
+      },
+      onError: (error) => showToast(extractErrorMessage(error, '팀을 제외하지 못했어요.'), 'error'),
+    });
   };
 
   // 감사 결함 4: 필드별 실패 표시를 지우거나(성공) 남기는(실패) 헬퍼. teamMatchId 하나에
@@ -227,16 +325,18 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
       return;
     }
     regenerateFixtures.mutate(
-      {
-        weeksCount,
-        reason,
-        ...(dayOfWeek === '' ? {} : { schedule: { dayOfWeek, time } }),
-        ...(placeName.trim() === '' ? {} : { placeName: placeName.trim() }),
-      },
+      { ...buildFixtureFormPayload(), reason },
       {
         onSuccess: (result) => {
           setRegenerateModalOpen(false);
-          showToast(`기존 대진 ${result.cancelledCount}경기를 취소하고 새 대진 ${result.createdCount}경기를 만들었어요.`, 'success');
+          setPreviewResult(null);
+          showToast(
+            appendFixtureWarnings(
+              `기존 대진 ${result.cancelledCount}경기를 취소하고 새 대진 ${result.createdCount}경기를 만들었어요.`,
+              result.warnings,
+            ),
+            'success',
+          );
         },
         onError: (error) => showToast(extractErrorMessage(error, '대진을 다시 만들지 못했어요.'), 'error'),
       },
@@ -267,6 +367,51 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
           </div>
         }
       />
+
+      {/* 그룹 B 감사 결함 1: 개설 후 참가팀 추가·제거. 대진이 이미 있어도 로스터 자체는
+          바꿀 수 있다 — 대진표에 반영하려면 아래 "대진 재생성"이 필요하다는 걸 추가 성공
+          토스트로 안내한다(onAddTeam). 최소 2팀 규칙은 서버가 최종 판정하지만, 남은 팀이
+          2개일 때 제거 버튼을 미리 비활성화해 뻔한 실패 요청을 걸러낸다. */}
+      <div className="mb-4 rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
+        <p className="mb-1 text-sm font-semibold text-[var(--text-strong)]">참가팀 관리</p>
+        <p className="mb-3 text-xs text-[var(--text-muted)]">
+          팀을 추가하거나 뺄 수 있어요. 대진이 이미 있으면 재생성해야 새 구성이 반영돼요.
+        </p>
+        <ul className="mb-3 flex flex-wrap gap-2">
+          {(teamsData?.teams ?? []).map((team) => (
+            <li
+              key={team.teamId}
+              className="flex min-h-[44px] items-center gap-2 rounded-full bg-[var(--blue50)] px-3 text-sm text-[var(--blue700)]"
+            >
+              {team.name}
+              <button
+                type="button"
+                aria-label={`${team.name} 제외`}
+                disabled={removeTeam.isPending || (teamsData?.teams.length ?? 0) <= 2}
+                title={(teamsData?.teams.length ?? 0) <= 2 ? '리그는 팀이 2개 이상이어야 해요' : undefined}
+                onClick={() => onRemoveTeam(team.teamId, team.name)}
+                className="flex min-h-[44px] min-w-[44px] items-center justify-center disabled:opacity-40"
+              >
+                <X className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </li>
+          ))}
+        </ul>
+        <label htmlFor="league-team-picker" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">
+          팀 추가
+        </label>
+        <EntityPicker
+          id="league-team-picker"
+          value={teamPickerValue}
+          onChange={onAddTeam}
+          items={addTeamCandidates}
+          onSearch={setTeamSearch}
+          showResultsWithoutQuery
+          loading={addTeamCandidatesQuery.isFetching || addTeam.isPending}
+          placeholder="팀 이름으로 검색"
+          emptyText="검색 결과가 없어요"
+        />
+      </div>
 
       {series.fixtures.length === 0 ? (
         <div className="flex flex-col gap-3">
@@ -319,6 +464,17 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                 className={`${inputClass} w-48`}
               />
             </div>
+            {/* 그룹 B 감사 결함 3: 실제 생성 전에 어떤 대진이 만들어질지 먼저 보여준다.
+                DB를 바꾸지 않는다 — generateFixtures와 완전히 같은 검증을 통과해야 결과가
+                나오므로, 미리보기가 성공했는데 실제 생성이 실패하는 불일치가 없다. */}
+            <button
+              type="button"
+              onClick={onPreview}
+              disabled={previewFixtures.isPending}
+              className="min-h-[44px] rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--text-strong)] disabled:opacity-50"
+            >
+              미리보기
+            </button>
             <button
               type="button"
               onClick={onGenerate}
@@ -333,6 +489,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
             selectedValue={placeName}
             onSelect={(venue) => setPlaceName(venue.placeName)}
           />
+          <FixturePreviewPanel result={previewResult} teamNameById={teamNameById} />
           <p className="text-xs text-[var(--text-muted)]">
             요일·시각을 정하면 매주 그 요일 그 시각으로 채워요. 비워두면 시작일 그대로 매주 반복돼요.
             생성 후 특정 주만 다르면 아래 표에서 개별 수정하면 돼요.
@@ -397,6 +554,17 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                   className={`${inputClass} w-48`}
                 />
               </div>
+              {/* 그룹 B 감사 결함 3: 재생성도 같은 미리보기를 공유한다 — 새 로스터로
+                  대진을 다시 계산했을 때 실제로 뭐가 만들어지는지 typedChallenge 확인
+                  전에 먼저 보여준다. */}
+              <button
+                type="button"
+                onClick={onPreview}
+                disabled={previewFixtures.isPending}
+                className="min-h-[44px] rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--text-strong)] disabled:opacity-50"
+              >
+                미리보기
+              </button>
               <button
                 type="button"
                 onClick={() => setRegenerateModalOpen(true)}
@@ -405,6 +573,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                 대진 재생성
               </button>
             </div>
+            <FixturePreviewPanel result={previewResult} teamNameById={teamNameById} />
           </div>
 
           <AdminDataTable<V1LeagueFixture>
@@ -628,6 +797,64 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
         onConfirm={onConfirmRegenerate}
         onClose={() => setRegenerateModalOpen(false)}
       />
+    </div>
+  );
+}
+
+function formatPreviewDateTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString('ko-KR', {
+    year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
+  });
+}
+
+/**
+ * 그룹 B 감사 결함 3 — 최초 생성·재생성 공용 미리보기 패널. DB에 아무것도 쓰지 않은
+ * 상태에서 "이 설정으로 만들면 이렇게 된다"를 그대로 보여준다. result가 null이면(아직
+ * 안 눌렀거나 직전 생성/재생성이 성공해 초기화됐을 때) 아무것도 렌더하지 않는다.
+ */
+function FixturePreviewPanel({
+  result,
+  teamNameById,
+}: {
+  result: V1PreviewLeagueFixturesResult | null;
+  teamNameById: Map<string, string>;
+}) {
+  if (result === null) return null;
+  return (
+    <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+      <p className="mb-1 text-sm font-semibold text-[var(--text-strong)]">
+        미리보기 — {result.rounds}주 · {result.fixtureCount}경기 · 기본 장소 &quot;{result.placeName}&quot;
+      </p>
+      {result.warnings.length > 0 && (
+        <div className="mb-3 flex items-start gap-2 rounded-lg bg-[var(--tint-orange)] px-3 py-2 text-xs text-[var(--orange700)]">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>{result.warnings.map((w) => w.message).join(' ')}</span>
+        </div>
+      )}
+      <div className="max-h-64 overflow-y-auto rounded-lg border border-[var(--border)]">
+        <table className="w-full text-left text-xs">
+          <thead className="sticky top-0 bg-[var(--card-surface)] text-[var(--text-muted)]">
+            <tr>
+              <th className="px-3 py-2 font-medium">주차</th>
+              <th className="px-3 py-2 font-medium">대진</th>
+              <th className="px-3 py-2 font-medium">일시</th>
+            </tr>
+          </thead>
+          <tbody>
+            {result.fixtures.map((fixture, index) => (
+              <tr key={`${fixture.round}-${fixture.homeTeamId}-${fixture.awayTeamId}-${index}`} className="border-t border-[var(--border)]">
+                <td className="px-3 py-2 text-[var(--text-muted)]">{fixture.round}주차</td>
+                <td className="px-3 py-2 text-[var(--text-strong)]">
+                  {teamNameById.get(fixture.homeTeamId) ?? '홈팀'} vs {teamNameById.get(fixture.awayTeamId) ?? '원정팀'}
+                </td>
+                <td className="px-3 py-2 text-[var(--text-muted)]">{formatPreviewDateTime(fixture.startAt)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

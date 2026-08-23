@@ -28,6 +28,14 @@ export class CreateLeagueMatchDto {
   teamIds!: string[];
 }
 
+// 그룹 B 감사 결함 1: 개설 후 참가팀을 추가·제거할 방법이 아예 없었다(V1LeagueTeam write는
+// 생성 시 createMany 한 곳뿐). teamId 하나만 받는다 — 여러 팀을 한 번에 추가하는 배치
+// 형태는 CreateLeagueMatchDto.teamIds가 이미 담당하고, 여기는 "개설 후 한 팀씩" 조작이다.
+export class AddLeagueTeamDto {
+  @IsUUID()
+  teamId!: string;
+}
+
 export class LeagueFixtureScheduleDto {
   /** 0(일)~6(토), KST 기준 요일. */
   @IsInt()

@@ -4,6 +4,7 @@ import { AdminContextService } from '../common/admin-context.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { isPrismaAvailabilityError } from '../common/prisma-availability-error';
 import { V1AuthUser } from '../auth/v1-auth-user';
+import { NotificationsService } from '../notifications/notifications.service';
 import { LeagueMatchPublicService } from './league-match-public.service';
 import { findUnfinishedSeasonLeagues, planNextSeasonTiers } from './league-lifecycle-rules';
 import {
@@ -38,6 +39,7 @@ export class LeagueSeriesAdminService {
     private readonly prisma: PrismaService,
     private readonly adminContext: AdminContextService,
     private readonly publicService: LeagueMatchPublicService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   private assertRuleValid(rule: PromotionRule): void {
@@ -583,6 +585,10 @@ export class LeagueSeriesAdminService {
       return { createdLeagues };
     });
 
+    // 리그 감사 그룹 A / R3: 승강 확정 알림 — 트랜잭션 커밋 후, 대상 팀 각각에 결과를 알린다.
+    // 근거는 notifyPromotionDecisions의 doc comment 참고.
+    this.notifyPromotionDecisions(resolved, result.createdLeagues);
+
     return {
       seriesId,
       seasonNo,
@@ -591,6 +597,65 @@ export class LeagueSeriesAdminService {
       overriddenCount: resolved.filter((row) => row.overriddenByAdmin).length,
       nextSeasonLeagues: result.createdLeagues.map((league) => ({ ...league, tierLabel: tierLabel(league.tier) })),
     };
+  }
+
+  /**
+   * 리그 감사 그룹 A / R3: 승강 확정(commitPromotions) 결과를 팀별로 알린다.
+   *
+   * **새 V1NotificationTargetType을 추가하지 않았다** — 마이그레이션이 필요한 DB enum이고,
+   * 승격/강등/잔류/불참은 결국 "이 팀의 소속이 바뀌었다"는 팀 단위 사실이라 기존 'team'
+   * 타입(team_join_application_*, team_invitation_* 이 이미 쓰는 것과 같은 부류)으로
+   * 충분하다고 판단했다. 실제 클릭 목적지(다음 시즌 리그 상세, 또는 불참 팀은 방금 끝난
+   * 시즌의 리그 상세)는 notifications.service.ts의 deepLinkForEvent가 targetType과 무관하게
+   * 명시적으로 처리한다(team_contact_* 항목의 기존 선례와 동일한 패턴).
+   *
+   * 승격/강등/잔류는 다음 시즌 새 리그(`createdLeagues`, 티어별로 정확히 하나)로 보내고,
+   * 불참(withdrawn)은 다음 시즌 리그 자체가 없으므로 이번 시즌 리그(`fromLeagueId`, 이제
+   * completed 상태)로 보낸다 — 최종 순위표는 여전히 거기서 볼 수 있다.
+   */
+  private notifyPromotionDecisions(
+    resolved: Array<{ teamId: string; fromLeagueId: string; toTier: number; kind: PromotionKind }>,
+    createdLeagues: Array<{ id: string; tier: number }>,
+  ): void {
+    const newLeagueIdByTier = new Map(createdLeagues.map((league) => [league.tier, league.id]));
+    for (const entry of resolved) {
+      const targetLeagueId = entry.kind === 'withdrawn' ? entry.fromLeagueId : newLeagueIdByTier.get(entry.toTier);
+      // undersized 티어는 commitPromotions가 이미 422로 막았으므로 withdrawn 외에는 항상
+      // 존재해야 한다 — 그래도 방어적으로 못 찾으면 알림 없이 건너뛴다(진짜 확정 자체를
+      // 막을 이유는 아니다).
+      if (targetLeagueId === undefined) continue;
+
+      const eventType =
+        entry.kind === 'promoted'
+          ? ('league_promotion_promoted' as const)
+          : entry.kind === 'relegated'
+            ? ('league_promotion_relegated' as const)
+            : entry.kind === 'withdrawn'
+              ? ('league_promotion_withdrawn' as const)
+              : ('league_promotion_stayed' as const);
+      const body =
+        entry.kind === 'promoted'
+          ? `"${tierLabel(entry.toTier)}"로 승격했어요! 다음 시즌도 화이팅이에요.`
+          : entry.kind === 'relegated'
+            ? `"${tierLabel(entry.toTier)}"로 강등됐어요. 다음 시즌에 다시 도전해요.`
+            : entry.kind === 'withdrawn'
+              ? '이번 시즌을 끝으로 리그 참가가 종료됐어요.'
+              : `계속 "${tierLabel(entry.toTier)}"에서 다음 시즌을 이어가요.`;
+
+      const teamId = entry.teamId;
+      this.notifications.emitToManyDeferred(
+        async () =>
+          (
+            await this.prisma.v1TeamMembership.findMany({
+              where: { teamId, status: 'active', role: { in: ['owner', 'manager'] } },
+              select: { userId: true },
+            })
+          ).map((m) => m.userId),
+        eventType,
+        targetLeagueId,
+        body,
+      );
+    }
   }
 
   /**

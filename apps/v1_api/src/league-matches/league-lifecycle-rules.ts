@@ -241,6 +241,86 @@ export function parseStoredScore(value: unknown): { home: number; away: number }
   return { home, away };
 }
 
+// ── 참가팀 추가·제거 판정 (그룹 B 감사 결함 1) ──────────────────────────────────
+//
+// 감사 확정: V1LeagueTeam 에 대한 write 는 리그 생성 시 createMany 한 곳뿐이었다.
+// 아래 두 판정은 "왜 이 조작을 막아야 하는가"를 서비스 밖에서 검증 가능하게 뺀 것 —
+// 서비스 파일은 @prisma/client 를 import 해 로컬에서 컴파일되지 않으므로(이 파일 맨 위
+// 주석과 동일한 이유) 규칙 자체는 여기서 순수 함수로 고정한다.
+
+/** "이 팀을 리그에 추가해도 되는가" 판정에 필요한 최소 정보. */
+export interface LeagueTeamAddCheckInput {
+  /** 이미 이 리그의 참가팀인지(@@unique([leagueId, teamId]) 위반 사전 차단용). */
+  alreadyInLeague: boolean;
+  /** 대상 팀이 활성 상태(active + 미삭제)인지. */
+  teamActive: boolean;
+  teamSportId: string;
+  leagueSportId: string;
+}
+
+export type LeagueTeamAddBlockedReason = 'ALREADY_IN_LEAGUE' | 'TEAM_INVALID';
+
+/**
+ * create()가 이미 강제하는 규칙(활성 팀만, 리그 종목과 일치)을 추가에도 그대로 적용한다 —
+ * 생성 시점과 추가 시점에 서로 다른 팀이 통과하면 "리그 로스터는 항상 활성·동일 종목"이라는
+ * 불변식이 깨진다.
+ */
+export function checkLeagueTeamAddAllowed(input: LeagueTeamAddCheckInput): LeagueTeamAddBlockedReason | null {
+  if (input.alreadyInLeague) return 'ALREADY_IN_LEAGUE';
+  if (!input.teamActive || input.teamSportId !== input.leagueSportId) return 'TEAM_INVALID';
+  return null;
+}
+
+/** "이 팀을 리그에서 빼도 되는가" 판정에 필요한 최소 정보. */
+export interface LeagueTeamRemovalCheckInput {
+  /** 제외 후 남는 참가팀 수. */
+  remainingTeamCount: number;
+  /** 이 팀이 관련된(홈 또는 원정) 대진 중 공식 결과가 확정된 것이 하나라도 있는지. */
+  hasOfficialResultForTeam: boolean;
+}
+
+export type LeagueTeamRemovalBlockedReason = 'TEAM_COUNT_BELOW_MINIMUM' | 'HAS_OFFICIAL_RESULT';
+
+/**
+ * 두 조건 다 데이터 정합성을 지키는 하드 게이트라 서비스가 아니라 여기서 결정한다:
+ *
+ * - **팀 2개 미만**이 되면 라운드로빈 자체가 성립하지 않는다 — create()가 강제하는
+ *   "서로 다른 팀 2개 이상" 카디널리티 규칙과 정확히 같은 이유다.
+ * - **공식 결과가 확정된 대진**이 하나라도 있으면 무조건 막는다. league-standings.ts의
+ *   totalsFor()는 팀ID -> 통계 맵을 `teamIds`(호출부가 넘기는 리그 로스터)로만 만들고,
+ *   `applyFixture()`는 그 맵에 없는 팀ID가 낀 대진을 조용히 건너뛴다(`if (!home || !away)
+ *   return`). 즉 로스터에서 팀을 빼면 "그 팀이 낀 공식 결과"가 상대팀의 승/무/패·득실
+ *   기록에서도 함께 사라진다 — 상대팀 입장에서는 이긴 경기가 통째로 없었던 일이 되는
+ *   조용한 데이터 손상이다. 감사 지시가 예시로 든 "가장 안전한 선택"을, standings 계산
+ *   방식을 실제로 읽고 "이 팀이 낀 공식 결과가 있을 때"로 정확히 좁힌 것이 이 게이트다.
+ *   (리그 전체에 공식 결과가 있다고 전부 막으면 이미 대진이 있다는 이유만으로 무관한
+ *   팀 교체까지 막혀 감사가 지적한 운영 공백이 그대로 남는다.)
+ *
+ * 팀 로스터가 바뀌었을 때 실제 대진표에 반영하는 것은 규모가 다른 별개 조작
+ * (`regenerateFixtures`, typedChallenge 이중 확인)의 몫이다 — 이 함수는 "로스터를
+ * 바꿔도 되는가"만 판정한다.
+ */
+export function checkLeagueTeamRemovalAllowed(
+  input: LeagueTeamRemovalCheckInput,
+): LeagueTeamRemovalBlockedReason | null {
+  if (input.remainingTeamCount < 2) return 'TEAM_COUNT_BELOW_MINIMUM';
+  if (input.hasOfficialResultForTeam) return 'HAS_OFFICIAL_RESULT';
+  return null;
+}
+
+/**
+ * 홀수 팀이면 매주 한 팀이 bye라는 걸 명시적으로 알려준다(그룹 B 감사 결함 2).
+ *
+ * 같은 라운드로빈 커널(common/scheduling/round-robin.ts)을 쓰는
+ * tournaments/league-fixture-generator.service.ts가 이미 이 code·message로
+ * `ODD_TEAM_COUNT_BYE` 경고를 낸다(그 파일 236-242행) — 이 리그 도메인만 조용히
+ * bye를 건너뛰고 있었으므로, 두 화면이 같은 상황에 다른 문구를 쓰지 않도록 그대로 맞춘다.
+ */
+export function buildOddTeamCountWarning(teamCount: number): Array<{ code: string; message: string }> {
+  if (teamCount % 2 === 0) return [];
+  return [{ code: 'ODD_TEAM_COUNT_BYE', message: '팀 수가 홀수라 라운드마다 한 팀이 쉬어요.' }];
+}
+
 export interface StoredForfeitOutcome {
   noShowTeamId: string;
   winningTeamId: string;

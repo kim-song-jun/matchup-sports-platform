@@ -5,6 +5,7 @@ import { GameResultOfficialProjectionService } from '../game-operations/game-res
 import { GameResultVoidProjectionService } from '../game-operations/game-result-void-projection.service';
 import { GameResultSubmittedEscalationService } from './result-escalation/game-result-submitted-escalation.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { WebPushService } from '../notifications/web-push.service';
 
 export const GAME_OPERATION_RETRY_DELAYS_MS = [1_000, 5_000, 30_000, 120_000, 600_000] as const;
 export const GAME_OPERATION_LEASE_MS = 30_000;
@@ -60,12 +61,19 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
   constructor(
     private readonly prisma: PrismaService,
     @Optional() transactionTimeoutMs?: number,
+    // 리그 감사 그룹 A / R1: team_match_completed 알림의 Web Push best-effort 발송용.
+    // ScheduleReminderService(main.ts)가 WebPushService를 받는 것과 같은 이유로 optional이다 —
+    // 이 worktree/모듈 밖에서 `new V1GameOperationsWorkerService(prisma)` 형태로 직접 생성하는
+    // 기존 통합테스트 호출부가 다수 있어(예: test/tournaments/*.integration-spec.ts) 인자 없이도
+    // 계속 동작해야 한다. 실제 워커(v1-game-operations-worker.module.ts)에서는
+    // WorkerNotificationsModule이 내보내는 WebPushService가 DI로 자동 주입된다.
+    @Optional() private readonly webPush?: WebPushService,
   ) {
     this.transactionTimeoutMs = transactionTimeoutMs ?? GAME_OPERATION_TRANSACTION_TIMEOUT_MS;
     if (this.transactionTimeoutMs <= 0 || this.transactionTimeoutMs >= GAME_OPERATION_SHUTDOWN_MS) {
       throw new Error('Worker transaction timeout must be positive and shorter than shutdown grace');
     }
-    const officialProjection = new GameResultOfficialProjectionService();
+    const officialProjection = new GameResultOfficialProjectionService(this.webPush);
     this.registerHandler('GAME_RESULT_OFFICIAL', officialProjection.handler);
     const voidProjection = new GameResultVoidProjectionService();
     this.registerHandler('GAME_RESULT_VOIDED', voidProjection.handler);

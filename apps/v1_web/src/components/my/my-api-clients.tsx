@@ -43,6 +43,7 @@ import {
   useV1TeamDetail,
   useV1TeamJoinApplications,
   useV1TeamMembers,
+  useV1Tournament,
   useV1TournamentRealNameVisibility,
   useV1UploadImages,
   useV1UpdateMyPreferences,
@@ -1498,6 +1499,37 @@ export function NotificationSettingsPageClient() {
 // 정책 해시는 홈 넛지 배너(Task 154 P0-3)와 공유한다 -- 두 곳이 다른 값을 보내면
 // 같은 동의가 서로 다른 문구에 동의한 것으로 기록된다.
 
+/**
+ * 알림에서 온 사람에게만 뜨는 맥락 배너 (Task 154 P0-6, 사용자 선택 A안).
+ *
+ * 이 설정 화면은 원래 맥락 없는 토글이다. 대회 명단에 올라 알림을 받고 들어온 사람에게
+ * "왜 지금 이걸 보고 있는지" 를 설명해 주지 않으면 그냥 나가버린다 -- 그래서 알림
+ * 딥링크가 실어 보낸 대회를 여기서 이름으로 되돌려 준다.
+ *
+ * 설정 메뉴로 직접 들어온 사람에게는 아무것도 렌더하지 않는다(파라미터가 없다).
+ * 대회 조회가 실패하거나 아직 로딩 중이면 이름 없이 "대회 명단" 으로만 말한다 --
+ * 배너가 사라졌다 나타나면 그 아래 토글 위치가 흔들려 오탭을 유발한다.
+ */
+function RecordConsentTournamentContext() {
+  const params = useSearchParams();
+  const fromTournament = params.get('from') === 'tournament';
+  const tournamentId = params.get('tournamentId') ?? '';
+  const tournament = useV1Tournament(fromTournament ? tournamentId : '');
+  if (!fromTournament) return null;
+  const title = tournament.data?.title;
+  return (
+    <Card pad={14} style={{ marginBottom: 8, background: 'var(--blue-soft)' }}>
+      <div className="tm-text-label" style={{ color: 'var(--blue700)' }}>
+        {title ? `"${title}" 명단에 올랐어요` : '대회 명단에 올랐어요'}
+      </div>
+      <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--blue700)' }}>
+        공개를 켜면 이 대회 기록이 프로필에 표시돼요. 켜지 않으면 나에게만 보여요.
+      </div>
+    </Card>
+  );
+}
+
+
 export function RecordConsentSettingsPageClient() {
   const consent = useV1RecordConsent();
   const update = useV1UpdateRecordConsent();
@@ -1532,6 +1564,7 @@ export function RecordConsentSettingsPageClient() {
             </Link>
             <h1 className="tm-text-heading">경기 기록 공개</h1>
           </div>
+          <RecordConsentTournamentContext />
           <Card pad={14} style={{ marginBottom: 8 }}>
             <div className="tm-text-label">공개 프로필에 경기 기록 표시</div>
             <div className="tm-text-caption" style={{ marginTop: 4 }}>

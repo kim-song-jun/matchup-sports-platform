@@ -300,6 +300,44 @@ describe('NotificationsService', () => {
     );
   });
 
+  // ─── tournament_record_consent_invite 딥링크 (Task 154 P0-4·P0-6) ──────────
+  //
+  // 이 알림은 "동의를 켜 달라"고 요청한다. 그러니 눌렀을 때 **켤 수 있는 화면**에
+  // 떨어져야 한다 -- 폴백(ROUTE_BASE_BY_TARGET_TYPE['tournament'])으로 새면
+  // /tournaments/{id} 로 가는데 그 화면엔 동의를 켤 방법이 없어 막다른 길이 된다.
+  // 대회 id 는 착지 화면이 "어느 대회 때문에 왔는지" 를 설명하는 데 쓴다.
+
+  it('tournament_record_consent_invite: 동의를 켤 수 있는 화면으로 가고 대회 맥락을 함께 싣는다', async () => {
+    prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
+    prisma.v1Notification.create.mockResolvedValue(makeNotification());
+
+    await service.emitNotification('user-1', 'tournament_record_consent_invite', 'tour-1');
+    await new Promise(setImmediate);
+
+    expect(prisma.v1Notification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          targetType: 'tournament',
+          deepLink: '/my/settings/record-consent?from=tournament&tournamentId=tour-1',
+        }),
+      }),
+    );
+  });
+
+  it('tournament_record_consent_invite: targetId 가 없으면 파라미터 없이 기본 화면으로 간다', async () => {
+    prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
+    prisma.v1Notification.create.mockResolvedValue(makeNotification());
+
+    await service.emitNotification('user-1', 'tournament_record_consent_invite', null);
+    await new Promise(setImmediate);
+
+    expect(prisma.v1Notification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ deepLink: '/my/settings/record-consent' }),
+      }),
+    );
+  });
+
   // ─── read ──────────────────────────────────────────────────────────────────
 
   it('read: 존재하지 않는 알림 → 404', async () => {

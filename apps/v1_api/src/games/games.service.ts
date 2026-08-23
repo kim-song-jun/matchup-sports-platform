@@ -3897,6 +3897,21 @@ export class GamesService {
     }
   }
 
+  /**
+   * 모든 게임 커맨드가 지나는 단일 경계.
+   *
+   * 트랜잭션은 Serializable 이고, 맨 처음 `SELECT id FROM v1_games ... FOR UPDATE` 로
+   * 게임 행을 잠근다. 그래서 같은 게임에 대한 커맨드는 서로 직렬화되고, 뒤늦은 쪽은
+   * 앞선 쪽이 커밋한 idempotency 레코드를 보게 돼 REPLAY 로 수렴한다.
+   *
+   * 다만 그 잠금 자체가 경합에 걸리면 Postgres 가 40001 을 던지는데, 그것이
+   * **raw query 안에서** 난 것이라 Prisma 는 P2034 가 아니라 P2010 으로 감싼다 — 아래 catch 가
+   * `isCommandConcurrencyConflict` 를 쓰는 이유다(P2034/P2002 만 보던 시절엔 이 경로가
+   * 통째로 새어 500 이 됐다. alpha 실측 2026-08-23).
+   *
+   * 같은 catch 가 이 파일에 세 벌 있는데, 셋 다 같은 `FOR UPDATE` 경계를 감싸므로
+   * 하나를 고칠 때는 나머지 둘도 같이 봐야 한다.
+   */
   private async withCommand<T extends CommandResult>(
     input: CommandBoundaryInput,
     mutate: (

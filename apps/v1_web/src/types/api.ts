@@ -1870,6 +1870,8 @@ export type V1Profile = {
     profileImageUrl: string | null;
     birthDate?: string | null;
     gender: 'male' | 'female' | null;
+    /** 한 줄 소개 (Task 154 P1). 옛 서버 응답엔 없으므로 optional. */
+    bio?: string | null;
   };
   reputation: {
     trustState: TrustState;
@@ -1886,6 +1888,13 @@ export type V1PublicProfile = {
   displayName: string;
   nickname: string | null;
   profileImageUrl: string | null;
+  /** 한 줄 소개. 비어 있으면 null 이 오고, 프론트는 섹션 자체를 렌더하지 않는다. */
+  bio?: string | null;
+  /**
+   * 소속팀. **명단 공개(`membersVisible`)를 켠 팀만** 내려온다 -- 팀 페이지에서 명단을
+   * 가려둔 팀이 개인 프로필로 새어 나가지 않게 서버가 걸러 준다.
+   */
+  teams?: { id: string; name: string }[];
   reputation: {
     trustState: TrustState;
     mannerScore: number | null;

@@ -55,6 +55,8 @@ async function api(token, method, path, body) {
 /** 알림 스냅샷 — 키는 notificationId 다(`id` 가 아니다). */
 async function snap(token) {
   const r = await api(token, 'GET', '/notifications?limit=50');
+  // 401·5xx 를 빈 배열로 삼키면 "신규 0건" 으로 읽혀 발송된 알림을 미발송으로 오판한다.
+  if (r.status >= 400) throw new Error(`알림 조회 실패 ${r.status} — ${JSON.stringify(r.body).slice(0, 200)}`);
   const items = r.body?.data?.items ?? [];
   return new Map(items.map((n) => [n.notificationId, {
     type: n.type, title: n.title, body: n.body, route: n.target?.route,

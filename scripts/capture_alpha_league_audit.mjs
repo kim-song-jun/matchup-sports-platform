@@ -4,8 +4,15 @@
  * 로그인은 login API 로만 가능하다(alpha 는 프로덕션 모드라 헤더 dev 인증이 401).
  * 프로덕션 빌드는 localStorage 힌트로 로그인 여부를 판단하므로 그것도 함께 심는다.
  *
+ * 세트별 요구 조건:
+ *   TARGET_SET=dark                   자격증명 불필요 (비로그인 캡처) + LEAGUE_IDS
+ *   그 외(main/series/extra/fixture/wave4)  ALPHA_PASSWORD + ALPHA_ADMIN_EMAIL / ALPHA_CAPTAIN_EMAIL
+ *
  * 사용법:
- *   ALPHA_PASSWORD=... node scripts/capture_alpha_league_audit.mjs <outDir>
+ *   ALPHA_PASSWORD=... ALPHA_CAPTAIN_EMAIL=... TARGET_SET=main \
+ *     node scripts/capture_alpha_league_audit.mjs <outDir>
+ *   LEAGUE_IDS='{"tier":"<리그 id>"}' TARGET_SET=dark \
+ *     node scripts/capture_alpha_league_audit.mjs <outDir>
  */
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium } from 'playwright';

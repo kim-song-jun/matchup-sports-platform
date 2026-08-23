@@ -55,6 +55,8 @@ async function api(token, method, path, body) {
 /** 알림 목록을 (id -> {type,title,body}) 로 스냅샷한다. */
 async function snapshotNotifications(token) {
   const r = await api(token, 'GET', '/notifications?limit=20');
+  // 401·5xx 를 빈 배열로 삼키면 "신규 0건" 으로 읽혀 발송된 알림을 미발송으로 오판한다.
+  if (r.status >= 400) throw new Error(`알림 조회 실패 ${r.status} — ${JSON.stringify(r.body).slice(0, 200)}`);
   const items = r.body?.data?.items ?? [];
   // 키는 notificationId 다 — `n.id` 로 잡으면 전부 undefined 라 Map 이 1건으로 뭉개진다.
   return new Map(items.map((n) => [n.notificationId, { type: n.type, title: n.title, body: n.body, createdAt: n.createdAt, route: n.target?.route }]));

@@ -1566,12 +1566,17 @@ export function RecordConsentSettingsPageClient() {
           </div>
           <RecordConsentTournamentContext />
           <Card pad={14} style={{ marginBottom: 8 }}>
-            <div className="tm-text-label">공개 프로필에 경기 기록 표시</div>
+            {/* 이 카드는 **무엇이** 공개되는지만 답한다. "왜 지금 이 화면인지"는 위 대회
+                맥락 배너가, "지금 켜져 있는지 / 켜면 어떻게 되는지"는 아래 토글의
+                서브텍스트가 각각 맡는다 -- 셋이 같은 말을 반복하면(실측: 알림에서 들어온
+                화면에 "켜면 공개돼요"가 세 번 나왔다) 정작 무엇이 공개되는지는 아무도
+                말해주지 않는다.
+                경로(/users/:id/records)를 그대로 쓰던 문구는 지웠다. 사용자가 그 URL 을
+                직접 입력하는 일이 없으므로 화면 이름으로 말한다. */}
+            <div className="tm-text-label">공개되는 정보</div>
             <div className="tm-text-caption" style={{ marginTop: 4 }}>
-              팀 라인업에 내 계정으로 연결된 경기가 공개 활동 기록(/users/내ID/records)에 나타나요.
-              {/* 과거 경기까지 소급 공개된다는 게 이 기능의 핵심 조건 — 켜기 전에 반드시
-                  알아야 한다(사용자 명시 결정: "모두 그냥 다 보이게"). */}
-              {' '}켜면 지금까지 참가한 경기 기록도 함께 공개돼요.
+              내 프로필의 활동 기록에 출전 경기, 득점, 경고·퇴장, MVP 가 표시돼요.
+              팀 라인업에 내 계정으로 연결된 경기만 해당돼요.
             </div>
           </Card>
           {toggleError ? (

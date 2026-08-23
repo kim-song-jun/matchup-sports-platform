@@ -38,6 +38,12 @@ export function ClaimMyRecordSection({
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
+  // alpha 실화면(2026-08-24)에서 잡은 것: 고를 참가자가 0명인데 "이 선수가 저예요"
+  // 버튼이 그대로 남아 있었다. disabled 라도 회색 버튼이 보이면 "누를 수 있을 것 같은"
+  // 신호를 주고, 사용자는 왜 안 눌리는지 찾게 된다. 아무것도 할 수 없는 상태에서는
+  // 그 버튼을 아예 렌더하지 않고 닫기만 남긴다.
+  const loaded = claimable.data !== undefined;
+  const hasCandidates = (claimable.data?.participants.length ?? 0) > 0;
 
   useEffect(() => {
     if (!open) return undefined;
@@ -113,7 +119,7 @@ export function ClaimMyRecordSection({
                 <div className="tm-text-caption" style={{ color: 'var(--red700)' }}>
                   {extractErrorMessage(claimable.error, '명단을 불러오지 못했어요.')}
                 </div>
-              ) : (claimable.data?.participants.length ?? 0) === 0 ? (
+              ) : !hasCandidates ? (
                 // 0건은 "연결할 게 없다"는 정상 상태다. 이 경기의 참가자가 전부 이미
                 // 연결돼 있다는 뜻이므로 에러처럼 보이게 하지 않는다.
                 <div className="tm-text-caption">
@@ -145,12 +151,13 @@ export function ClaimMyRecordSection({
             <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
               <button
                 type="button"
-                className="tm-btn tm-btn-md tm-btn-neutral"
+                className={`tm-btn tm-btn-md ${loaded && !hasCandidates ? 'tm-btn-primary' : 'tm-btn-neutral'}`}
                 style={{ flex: 1, minHeight: 44 }}
                 onClick={() => setOpen(false)}
               >
-                취소
+                {loaded && !hasCandidates ? '닫기' : '취소'}
               </button>
+              {loaded && !hasCandidates ? null : (
               <button
                 type="button"
                 className="tm-btn tm-btn-md tm-btn-primary"
@@ -180,6 +187,7 @@ export function ClaimMyRecordSection({
               >
                 {request.isPending ? '신청 중' : '이 선수가 저예요'}
               </button>
+              )}
             </div>
           </div>
         </div>

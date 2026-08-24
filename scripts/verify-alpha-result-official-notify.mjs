@@ -170,13 +170,23 @@ async function main() {
   // 팀장 계정으로 알림 폴링 (outbox 워커 비동기)
   const capCookie = await login(process.env.CAPTAIN_EMAIL, process.env.CAPTAIN_PASSWORD);
   const capApi = apiWith(capCookie);
+  // 판정 신뢰성(리뷰 지적): 제목만 보면 과거 실행이 남긴 같은 제목의 알림으로도
+  // PASS 한다 — 이번 픽스처를 가리키는 route + 스크립트 시작 이후 생성으로 좁힌다.
+  const startedAt = Date.now();
+  const expectedRoute = `/tournaments/${TOURNAMENT}/matches/${FIXTURE}`;
   console.log('팀장 로그인 OK — 알림 폴링(최대 90s)');
   for (let i = 0; i < 18; i += 1) {
     await new Promise((r) => setTimeout(r, 5000));
     const notis = (await capApi('GET', '/notifications?limit=10')).json?.data;
-    const hit = (notis?.items ?? []).find((n) => n.title === '대회 경기 결과가 확정됐어요');
+    const hit = (notis?.items ?? []).find(
+      (n) =>
+        n.title === '대회 경기 결과가 확정됐어요' &&
+        n.target?.route === expectedRoute &&
+        new Date(n.createdAt).getTime() >= startedAt - 60_000,
+    );
     if (hit) {
-      console.log(`\n✅ 알림 도착: "${hit.title}" / "${hit.body}" / deepLink=${hit.deepLink}`);
+      // 알림 목록 API 는 deepLink 를 target.route 로 직렬화한다.
+      console.log(`\n✅ 알림 도착: "${hit.title}" / "${hit.body}" / route=${hit.target?.route}`);
       return;
     }
   }

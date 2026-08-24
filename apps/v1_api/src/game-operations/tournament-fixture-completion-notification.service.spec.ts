@@ -17,7 +17,7 @@ function revisionFixture(overrides: Partial<OfficialRevisionRow> = {}): Official
     tournamentFixtureId: 'fixture-1',
     homeTeamId: 'team-home',
     awayTeamId: 'team-away',
-    visibility: 'PUBLIC' as never,
+    visibility: 'LIVE',
     ...overrides,
   };
 }

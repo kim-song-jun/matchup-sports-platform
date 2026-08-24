@@ -1664,6 +1664,19 @@ button:disabled {
      새는 부작용이 생긴다. 그래서 이 저장소의 다른 a11y 상향 선례와 동일하게 요소
      자체를 44px 로 올린다. */
   min-height: 44px;
+  /* F7: 리그명이 길면 배지가 부모 카드 밖으로 밀려 나가 페이지가 가로로 스크롤됐다
+     (390px alpha 실측: 카드 밖 152px, main.tm-scroll-area scrollWidth 427 vs client 390).
+     .tm-badge 가 nowrap 이라 flex 안에서 줄지 않는 것이 원인 — 최대 폭을 부모로 묶고
+     리그명만 .tm-league-badge-text 에서 말줄임한다(화살표는 항상 보인다). */
+  max-width: 100%;
+  min-width: 0;
+}
+
+.tm-league-badge-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .tm-league-badge-link:focus-visible {

@@ -218,7 +218,12 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
               }}
               aria-label={`${league.title} 리그 상세로 이동`}
             >
-              정규 리그 · {league.title}
+              {/* F7: 리그명이 길면 배지가 카드 밖으로 밀려 나가 화면이 가로로 스크롤됐다
+                  (390px 실측: 카드 밖 152px, 뷰포트 밖 37px). 리그명만 말줄임하고
+                  화살표는 항상 보이게 텍스트를 별도 span 으로 감싼다 — 팀 상세의
+                  "내 리그" 목록이 이미 쓰는 처리와 같은 방식이다.
+                  목록 카드 쪽 배지(아래)는 리그명 없이 '정규 리그'만 실어서 넘치지 않는다. */}
+              <span className="tm-league-badge-text">정규 리그 · {league.title}</span>
               <ChevronRightIcon size={12} strokeWidth={2.5} aria-hidden="true" />
             </button>
           ) : null}
@@ -1086,8 +1091,17 @@ function hostActionClass(tone: NonNullable<TeamMatchDetailViewModel['hostActions
   return 'tm-btn-neutral';
 }
 
+/**
+ * D7(2026-08-24 사용자 확정) — 값이 비어 있으면 **'미정'을 값 자리에 적는다**(행을 숨기지 않는다).
+ *
+ * 리그 대진은 운영자가 만들기 때문에 경기방식·경기 스타일·유니폼 색상을 애초에 입력하지
+ * 않는다. 그동안은 라벨만 있고 값 칸이 통째로 비어 있어서, 화면이 "정보가 없다"가 아니라
+ * "무언가 깨졌다"처럼 보였다. 행을 유지하는 쪽을 고른 것은 **"이 경기엔 그 규정이 없다"는
+ * 사실 자체도 정보**이기 때문이다 — 대신 값이 아니라는 것이 보이도록 흐린 색으로 적는다.
+ */
 function InfoRow({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return <div className="tm-info-row"><div className="tm-text-caption">{label}</div><div style={{ flex: 1, minWidth: 0, textAlign: 'right' }}><div className="tm-text-label">{value}</div>{sub ? <div className="tm-text-micro" style={{ marginTop: 3, color: 'var(--text-caption)' }}>{sub}</div> : null}</div></div>;
+  const filled = value.trim().length > 0;
+  return <div className="tm-info-row"><div className="tm-text-caption">{label}</div><div style={{ flex: 1, minWidth: 0, textAlign: 'right' }}><div className="tm-text-label" style={filled ? undefined : { color: 'var(--text-caption)', fontWeight: 400 }}>{filled ? value : '미정'}</div>{sub ? <div className="tm-text-micro" style={{ marginTop: 3, color: 'var(--text-caption)' }}>{sub}</div> : null}</div></div>;
 }
 
 function StateCard({ tone, title, body }: { tone: 'orange' | 'green'; title: string; body: string }) {

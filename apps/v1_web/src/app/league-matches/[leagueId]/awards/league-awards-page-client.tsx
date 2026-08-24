@@ -65,13 +65,20 @@ function ChampionsHero({ champions }: { champions: V1LeagueChampionTeam[] }) {
         </p>
         <div className="mt-4 flex flex-wrap items-center justify-center gap-5">
           {champions.map((team) => (
-            <div key={team.teamId} className="flex flex-col items-center gap-1.5">
+            // D3(2026-08-24): 시상 화면에서도 팀 이름은 팀 상세로 간다. 우승팀을 보고
+            // "이 팀 뭐 하는 팀이지?" 로 이어지는 게 가장 자연스러운 자리인데 그동안
+            // 여기서 길이 끊겼다.
+            <Link
+              key={team.teamId}
+              href={`/teams/${team.teamId}`}
+              className="tm-pressable flex flex-col items-center gap-1.5"
+            >
               <TeamAvatar seed={team.teamId} name={team.teamName} logoUrl={team.teamLogoUrl} size="lg" />
               <span className="inline-flex items-center gap-1 text-sm font-bold text-[var(--text-strong)]">
                 <Trophy size={14} className="tm-medal-gold" aria-hidden="true" />
                 {team.teamName}
               </span>
-            </div>
+            </Link>
           ))}
         </div>
       </Card>
@@ -109,7 +116,11 @@ function FinalStandingsSection({
       <Card pad={0} className="overflow-hidden">
         <ul className="divide-y divide-[var(--border)]">
           {standings.map((row) => (
-            <li key={row.teamId} className="flex min-h-[44px] items-center gap-2 px-3 py-2 text-sm">
+            <li key={row.teamId} className="text-sm">
+              <Link
+                href={`/teams/${row.teamId}`}
+                className="tm-pressable tm-list-row-interactive flex min-h-[44px] items-center gap-2 px-3 py-2"
+              >
               <span className="w-5 shrink-0 text-[var(--text-muted)]">{row.position}</span>
               <TeamAvatar seed={row.teamId} name={row.teamName} logoUrl={row.teamLogoUrl} size="sm" />
               <span className="flex min-w-0 flex-1 items-center gap-1.5">
@@ -124,6 +135,7 @@ function FinalStandingsSection({
                   <PromotionBadge kind={row.promotionKind} toTierLabel={row.promotionToTierLabel} />
                 </span>
               )}
+              </Link>
             </li>
           ))}
         </ul>

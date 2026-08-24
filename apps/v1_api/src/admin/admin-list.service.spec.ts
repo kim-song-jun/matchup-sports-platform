@@ -990,9 +990,11 @@ describe('AdminService — list/detail endpoints', () => {
       expect(blockReason).not.toContain('inq-1');
       expect(blockReason).toContain('신고');
 
-      // 감사 로그 쪽에는 추적용 id 가 남아야 한다.
+      // 감사 로그의 **reason** 에 추적용 id 가 남아야 한다.
+      // JSON.stringify(logArgs) 로 훑으면 targetId 가 이미 'inq-1' 이라 reason 이 id 를
+      // 잃어도 통과한다 — 검증한다고 주장하는 것을 실제로는 검증하지 못한다.
       const logArgs = prisma.v1AdminActionLog.create.mock.calls[0][0].data;
-      expect(JSON.stringify(logArgs)).toContain('inq-1');
+      expect(logArgs.reason).toContain('inq-1');
     });
 
     it('신고자 팀 명의로 대상 팀을 차단하고 사유를 남긴다', async () => {

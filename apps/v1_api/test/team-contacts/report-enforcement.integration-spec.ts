@@ -173,7 +173,9 @@ describe('팀 컨택 신고 운영 조치 — 롤업 · 대리 차단 · 권한'
       where: { action: 'inquiry.block_reported_team', targetId: inquiryId },
       orderBy: { createdAt: 'desc' },
     });
-    expect(JSON.stringify(actionLog)).toContain(inquiryId);
+    // reason 을 직접 본다 — actionLog 전체를 문자열로 훑으면 targetId 만으로도 통과해
+    // '추적용 id 가 reason 에 남는다' 를 증명하지 못한다.
+    expect(actionLog.reason).toContain(inquiryId);
   });
 
   it('4) 같은 차단 요청을 다시 보내면 500 이 아니라 200 + alreadyBlocked:true', async () => {

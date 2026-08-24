@@ -79,6 +79,9 @@ export const settingsModel: SettingsViewModel = {
         // 실명으로 바꾸는 스위치. 위 record-consent와는 별개 축 -- 그건 "기록이 보이는가",
         // 이건 "보이면 어떤 이름인가". API 계약: GET/PATCH /me/tournament-real-name-visibility.
         { label: '대회 기록 실명 표시', sub: '대회 라인업·득점자 이름을 실명으로 보여줄지 정해요', href: '/my/settings/tournament-real-name', icon: 'UserCheck' },
+        // 선수 카드 숨김(Task 155). 컬럼은 카드와 함께 넣었는데 켜는 경로가 없어
+        // 사용자가 잠글 수 없었다 -- 게임화 거부감에 대한 탈출구가 목적이므로 여기서 연다.
+        { label: '선수 카드', sub: '경기 기록으로 만든 카드를 숨길 수 있어요', href: '/my/settings/player-card', icon: 'Award' },
       ],
     },
     {

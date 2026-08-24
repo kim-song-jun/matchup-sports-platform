@@ -171,6 +171,41 @@ export const STATUS_META: Record<string, StatusMeta> = {
     tone: 'amber',
     icon: <AlertCircle size={12} aria-hidden="true" />,
   },
+
+  // ── 리그 대진의 결과 진행 단계 ────────────────────────────────────────
+  // 팀매치 status(matched/cancelled)와는 **다른 축**이라 어드민 표에서 별도 열로 쓴다.
+  // 키에 result_ 접두를 붙인 이유: 'draft'·'submitted' 는 이미 다른 도메인(대회 공고·
+  // 신청서)이 쓰고 있어서, 같은 단어를 재사용하면 라벨이 조용히 서로 바뀐다.
+  result_not_entered: {
+    label: '결과 미입력',
+    tone: 'amber',
+    icon: <AlertCircle size={12} aria-hidden="true" />,
+  },
+  result_draft: {
+    label: '작성 중',
+    tone: 'gray',
+    icon: <FileText size={12} aria-hidden="true" />,
+  },
+  result_awaiting_approval: {
+    label: '승인 대기',
+    tone: 'amber',
+    icon: <Clock size={12} aria-hidden="true" />,
+  },
+  result_change_requested: {
+    label: '정정 요청',
+    tone: 'red',
+    icon: <AlertCircle size={12} aria-hidden="true" />,
+  },
+  result_official: {
+    label: '확정',
+    tone: 'green',
+    icon: <CheckCircle2 size={12} aria-hidden="true" />,
+  },
+  result_voided: {
+    label: '무효',
+    tone: 'gray',
+    icon: <XCircle size={12} aria-hidden="true" />,
+  },
 };
 
 // ── Component ─────────────────────────────────────────────────────────────

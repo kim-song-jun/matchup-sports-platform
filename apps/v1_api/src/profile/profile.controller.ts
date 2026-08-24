@@ -20,6 +20,7 @@ import {
   UpdateMyRegionsDto,
   UpdateProfileDto,
   UpdateSettingsDto,
+  UpdatePlayerCardHiddenDto,
   UpdateTournamentRealNameVisibilityDto,
   WithdrawalRequestDto,
 } from './dto/profile.dto';
@@ -87,6 +88,19 @@ export class ProfileController {
   @UseGuards(V1AuthGuard)
   updateMyRecordConsent(@CurrentUser() user: V1AuthUser, @Body() dto: UpdateMyRecordConsentDto) {
     return this.profileService.updateMyRecordConsent(user, dto);
+  }
+
+  /** 선수 카드 숨김 토글 (Task 155). 컬럼만 있고 쓰는 경로가 없던 것을 연다. */
+  @Get('me/player-card-hidden')
+  @UseGuards(V1AuthGuard)
+  myPlayerCardHidden(@CurrentUser() user: V1AuthUser) {
+    return this.profileService.myPlayerCardHidden(user);
+  }
+
+  @Patch('me/player-card-hidden')
+  @UseGuards(V1AuthGuard)
+  updateMyPlayerCardHidden(@CurrentUser() user: V1AuthUser, @Body() dto: UpdatePlayerCardHiddenDto) {
+    return this.profileService.updateMyPlayerCardHidden(user, dto);
   }
 
   @Get('me/tournament-real-name-visibility')

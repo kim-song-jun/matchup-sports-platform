@@ -5621,6 +5621,8 @@ Response data:
   "viewer": {
     "state": "guest | none | host_team | requested | approved | matched_team",
     "manageableHostTeam": true,
+    "manageableOpponentTeam": true,
+    "participantMember": true,
     "eligibleTeams": [
       { "teamId": "uuid", "name": "string", "role": "owner | manager", "eligible": true, "reasonCode": "OK" }
     ],
@@ -5635,6 +5637,18 @@ requested = 승인 대기 상태
 matched = 모집 완료 상태
 host_team = 신청팀 관리 CTA
 cancelled/completed/expired = 신청 CTA disabled
+
+`state` 로 판정하면 안 되는 것 3가지 — 각각 전용 boolean 을 쓴다:
+- **결과 입력**(`/team-matches/:id/result`) → `manageableHostTeam`. `state === 'host_team'` 은
+  같은 뜻이지만, 화면은 항상 권한 boolean 을 본다.
+- **결과 승인**(`/team-matches/:id/result/approval`) → `manageableOpponentTeam`.
+  `state === 'approved'` 는 **신청서를 낸 사람 한 명**에게만 붙는다. 리그 대진은 운영자가
+  신청서를 대신 만들기 때문에 상대팀의 owner·manager 전원이 `'none'` 으로 떨어져,
+  결과가 SUBMITTED 에서 멈추고 순위표가 갱신되지 않았다(2026-08-24 alpha 실측).
+  서버 권한 판정(`games.service.ts` resolveActor 의 `opponent_result_decide`)이 팀 멤버십
+  기준이므로 이 필드가 그것과 짝을 이룬다.
+- **후기 작성** → `participantMember`. 두 팀의 active 멤버 전원이 대상이라 역할을 가리지 않는다
+  (`reviews.service.ts` resolveReviewerTeams).
 
 State transition:
 없음. read-only 상세 API.

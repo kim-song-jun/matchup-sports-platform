@@ -179,6 +179,10 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
   const query = useV1TeamMatch(teamMatchId);
   const rawViewerState = query.data ? getViewerState(query.data) : 'none';
   const canManageHostTeam = query.data?.viewer?.manageableHostTeam === true;
+  // 결과 승인 진입 게이트. `viewerState === 'approved'` 를 쓰면 안 된다 — 그건 신청서를
+  // 낸 사람 한 명만 통과하는 값이라, 운영자가 대진을 만드는 리그전에서는 상대팀의 누구도
+  // 승인 버튼을 보지 못했다. 서버는 이미 팀 멤버십으로 판정하므로 화면도 그것을 쓴다.
+  const canManageOpponentTeam = query.data?.viewer?.manageableOpponentTeam === true;
   const viewerState = rawViewerState === 'host_team' && !canManageHostTeam ? 'none' : rawViewerState;
   // 후기 진입점 전용 — 위 `viewerState` 는 관리 권한 기준으로 좁혀진 값이라 쓸 수 없다.
   const isParticipantMember = query.data?.viewer?.participantMember === true;
@@ -274,7 +278,7 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
               pending: closeTeamMatch.isPending || reopenTeamMatch.isPending || cancelTeamMatch.isPending,
             })
           : undefined,
-        resultAction: buildResultAction(teamMatchId, viewerState, getStatus(query.data), canManageHostTeam),
+        resultAction: buildResultAction(teamMatchId, getStatus(query.data), canManageHostTeam, canManageOpponentTeam),
         reviewAction: buildReviewAction(teamMatchId, getStatus(query.data), isParticipantMember),
         statusLabel: statusLabel(viewerState, getStatus(query.data)),
         chatLabel: chatLabel(viewerState, getStatus(query.data)),
@@ -620,11 +624,18 @@ function buildHostActions({
 // the result; the opponent manager only ever approves or requests a change — never
 // drafts or submits (see docs/api/domains/games.md's team_result_submit/opponent_result_decide
 // actor split), so the two viewer roles get distinct destinations.
+//
+// 두 게이트 모두 **팀 멤버십**(viewer.manageableHostTeam / manageableOpponentTeam)을 본다.
+// 예전엔 상대팀 쪽만 `viewerState === 'approved'` 를 봤는데, 그 값은 신청서를 낸 사람
+// 한 명에게만 붙는다 — 리그 대진은 운영자가 신청서를 대신 만들기 때문에 상대팀의 owner도
+// manager도 승인 화면에 닿지 못했고, 결과가 SUBMITTED 에서 멈춰 순위표가 영영 갱신되지
+// 않았다(alpha 실측). 일반 팀매치에서도 "신청한 사람 말고 다른 매니저"가 같은 이유로 막혀
+// 있었다. 서버 권한(games.service.ts resolveActor)이 처음부터 멤버십 기준이라 이쪽이 정답이다.
 function buildResultAction(
   teamMatchId: string,
-  viewerState: V1TeamMatchViewerState,
   status: V1TeamMatchApiStatus,
   canManageHostTeam: boolean,
+  canManageOpponentTeam: boolean,
 ): TeamMatchDetailViewModel['resultAction'] {
   if (status !== 'matched' && status !== 'completed') return null;
   if (canManageHostTeam) {
@@ -634,7 +645,7 @@ function buildResultAction(
       tone: 'primary',
     };
   }
-  if (viewerState === 'approved') {
+  if (canManageOpponentTeam) {
     return {
       label: status === 'completed' ? '경기 결과 확인/승인' : '경기 결과 대기',
       href: `/team-matches/${teamMatchId}/result/approval`,

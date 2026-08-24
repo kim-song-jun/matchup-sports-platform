@@ -165,7 +165,9 @@ describe('TeamMatchResultPageClient — 호스트 결과 입력', () => {
 
   it('상대팀(opponent) 담당자는 결과를 작성할 수 없다', () => {
     useV1TeamMatchMock.mockReturnValue(
-      settledQuery(teamMatch({ viewer: { state: 'approved', manageableHostTeam: false } })),
+      settledQuery(
+        teamMatch({ viewer: { state: 'approved', manageableHostTeam: false, manageableOpponentTeam: true } }),
+      ),
     );
     render(<TeamMatchResultPageClient teamMatchId="tm-1" />);
     expect(screen.getByText('호스트만 결과를 입력할 수 있어요')).toBeInTheDocument();
@@ -479,7 +481,9 @@ describe('TeamMatchResultApprovalPageClient — 상대팀 승인/정정 요청',
   beforeEach(() => {
     vi.clearAllMocks();
     useV1TeamMatchMock.mockReturnValue(
-      settledQuery(teamMatch({ viewer: { state: 'approved', manageableHostTeam: false } })),
+      settledQuery(
+        teamMatch({ viewer: { state: 'approved', manageableHostTeam: false, manageableOpponentTeam: true } }),
+      ),
     );
     useV1GameMock.mockReturnValue(settledQuery(game()));
     // 승인 화면은 own-side 라인업을 쓰지 않지만(needsOwnLineup:false), 훅 자체는 항상 호출되므로
@@ -505,10 +509,32 @@ describe('TeamMatchResultApprovalPageClient — 상대팀 승인/정정 요청',
   });
 
   it('호스트도 상대팀도 아닌 사용자는 승인 화면에 접근할 수 없다', () => {
-    useV1TeamMatchMock.mockReturnValue(settledQuery(teamMatch({ viewer: { state: 'none', manageableHostTeam: false } })));
+    useV1TeamMatchMock.mockReturnValue(
+      settledQuery(teamMatch({ viewer: { state: 'none', manageableHostTeam: false, manageableOpponentTeam: false } })),
+    );
     useV1GameResultRevisionsMock.mockReturnValue(settledQuery<V1GameResultRevision[]>([]));
     render(<TeamMatchResultApprovalPageClient teamMatchId="tm-1" />);
     expect(screen.getByText('상대팀만 결과를 승인할 수 있어요')).toBeInTheDocument();
+  });
+
+  // 리그 대진 회귀: 상대팀 매니저의 viewer.state 는 'none' 이지만 승인 권한은 있다.
+  // 게이트가 state 기반으로 되돌아가면 이 화면 전체가 다시 막힌다.
+  it('신청서를 직접 내지 않은 상대팀 매니저(리그 대진)도 승인 화면에 들어간다', () => {
+    useV1TeamMatchMock.mockReturnValue(
+      settledQuery(teamMatch({ viewer: { state: 'none', manageableHostTeam: false, manageableOpponentTeam: true } })),
+    );
+    useV1GameResultRevisionsMock.mockReturnValue(
+      settledQuery<V1GameResultRevision[]>([
+        revision({
+          state: 'SUBMITTED',
+          score: { regulation: { home: 2, away: 1 }, penalty: null, goals: [], incomplete: false },
+          submittedAt: '2026-08-01T00:00:00.000Z',
+        }),
+      ]),
+    );
+    render(<TeamMatchResultApprovalPageClient teamMatchId="tm-1" />);
+    expect(screen.queryByText('상대팀만 결과를 승인할 수 있어요')).not.toBeInTheDocument();
+    expect(screen.getByText('승인하기')).toBeInTheDocument();
   });
 
   it('409 race: 승인 처리 중 그새 바뀐 버전 충돌을 actionable 메시지로 보여준다', async () => {

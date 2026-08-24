@@ -1077,6 +1077,8 @@ export type V1TeamMatch = V1Match & {
   viewer?: {
     state: V1TeamMatchViewerState;
     manageableHostTeam?: boolean;
+    /** 승인된 신청팀(상대팀)의 owner/manager 인가 — 결과 승인 진입 게이트. */
+    manageableOpponentTeam?: boolean;
     /**
      * 역할을 가리지 않는 "참가팀(host·승인 신청팀) active 멤버" 여부 — 후기 진입점 판정용.
      * `state` 로 대신할 수 없다: 'host_team' 은 host 팀 owner/manager, 'approved' 는 신청서를

@@ -138,9 +138,9 @@ describe('선수 카드', () => {
     fireEvent.click(screen.getByRole('button', { name: /카드 뒤집기/ }));
 
     expect(back?.getAttribute('aria-hidden')).toBe('false');
-    // 뒷면이 산식을 실제로 말하는지 -- 헤더와 총점 규칙 문장으로 확인한다.
+    // 뒷면이 숫자의 출처를 실제로 말하는지 -- 헤더와 총점 규칙 문장으로 확인한다.
     expect(screen.getByText(/어떤 선수인가/)).toBeInTheDocument();
-    expect(screen.getByText(/평균에서 빠져요/)).toBeInTheDocument();
+    expect(screen.getByText(/총점에 넣지 않아요/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /앞면 보기/ })).toBeInTheDocument();
   });
 

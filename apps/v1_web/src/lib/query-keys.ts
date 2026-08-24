@@ -146,6 +146,9 @@ export const v1Keys = {
     [...v1Keys.all, 'admin', 'league-series', seriesId, 'seasons', seasonNo, 'promotions'] as const,
   adminLeagueMatch: (leagueId: string) => [...v1Keys.all, 'admin', 'league-matches', leagueId] as const,
   adminLeagueTeams: (leagueId: string) => [...v1Keys.all, 'admin', 'league-matches', leagueId, 'teams'] as const,
+  // D2 (E4): 어드민 이의 목록 — status 필터('' = 전체)가 다르면 다른 쿼리로 취급한다.
+  adminLeagueMatchDisputes: (status?: string) =>
+    [...v1Keys.all, 'admin', 'league-match-disputes', status ?? 'all'] as const,
   // R5: 공개 리그 목록. leagueMatch(leagueId)와 같은 'league-matches' 네임스페이스를
   // 쓰지만 두 번째 세그먼트가 문자열(leagueId)이 아니라 filters 객체라 값이 절대 겹치지
   // 않는다 -- teamMatches(filters)/teamMatch(teamMatchId) 자매 쌍과 동일한 관례.

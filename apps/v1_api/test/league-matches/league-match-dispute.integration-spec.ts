@@ -356,4 +356,43 @@ describe('리그 결과 이의 제기 (D2)', () => {
     expect(second.alreadyProcessed).toBe(true);
     expect(second.status).toBe('rejected');
   });
+
+  // B안(어드민 이의 목록·처리 독립 페이지)이 raisedByTeamId 같은 raw id 대신 사람이 읽을
+  // 수 있는 리그 제목·팀 이름 매치업을 보여주려면 listDisputes()가 이를 실어야 한다 —
+  // enrichDisputeRows()가 leagueId/teamMatchId/raisedByTeamId 단일 IN 조회로 채우는 값을
+  // 직접 검증한다(N+1 여부는 코드 리뷰 대상이라 여기선 값의 정확성만 본다).
+  it('어드민 이의 목록에 리그 제목·대진 팀 이름 매치업·제기 팀 이름·현재 공식 스코어가 실린다', async () => {
+    const { leagueId, teamMatchId, teamMatch } = await createOfficializedLeague('이의-목록-보강');
+
+    const filerActor: V1AuthUser = {
+      id: hostOwnerUserId,
+      email: null,
+      accountStatus: 'active',
+      onboardingStatus: 'completed',
+    };
+    const dispute = await disputeService.fileDispute(filerActor, leagueId, teamMatchId, { reason: '스코어 오류 이의' });
+
+    const adminActor: V1AuthUser = {
+      id: adminUserId,
+      email: null,
+      accountStatus: 'active',
+      onboardingStatus: 'completed',
+    };
+    const { items } = await disputeService.listDisputes(adminActor);
+    const row = items.find((entry) => entry.id === dispute.id);
+    expect(row).toBeDefined();
+
+    const [homeTeam, awayTeam] = await Promise.all([
+      prisma.v1Team.findUniqueOrThrow({ where: { id: teamMatch.hostTeamId } }),
+      prisma.v1Team.findUniqueOrThrow({ where: { id: teamMatch.approvedApplicantTeamId! } }),
+    ]);
+
+    expect(row!.leagueTitle).toBe('이의-목록-보강');
+    expect(row!.homeTeamName).toBe(homeTeam.name);
+    expect(row!.awayTeamName).toBe(awayTeam.name);
+    expect(row!.raisedByTeamId).toBe(teamMatch.hostTeamId);
+    expect(row!.raisedByTeamName).toBe(homeTeam.name);
+    expect(row!.currentHomeScore).toBe(2);
+    expect(row!.currentAwayScore).toBe(1);
+  });
 });

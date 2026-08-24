@@ -8,6 +8,7 @@ import type {
   PublicTeamRecordsResponse,
   PublicTournamentScheduleResponse,
   PublicUserRecordsResponse,
+  TeamRecordCategory,
 } from './types';
 
 /**
@@ -22,8 +23,8 @@ export const publicGameRecordsKeys = {
     [...publicGameRecordsKeys.all, 'schedule', tournamentId, filters] as const,
   match: (tournamentId: string, fixtureId: string) =>
     [...publicGameRecordsKeys.all, 'match', tournamentId, fixtureId] as const,
-  teamRecords: (teamId: string, season: string | undefined) =>
-    [...publicGameRecordsKeys.all, 'team-records', teamId, season ?? null] as const,
+  teamRecords: (teamId: string, season: string | undefined, type: TeamRecordCategory | null) =>
+    [...publicGameRecordsKeys.all, 'team-records', teamId, season ?? null, type] as const,
   userRecords: (userId: string, season: string | undefined) =>
     [...publicGameRecordsKeys.all, 'user-records', userId, season ?? null] as const,
 };
@@ -95,13 +96,21 @@ export function usePublicMatch(tournamentId: string, fixtureId: string) {
   });
 }
 
-/** `GET /teams/:id/records` -- cursor-paginated team result history + summary. */
-export function usePublicTeamRecords(teamId: string, season?: string) {
+/**
+ * `GET /teams/:id/records` -- cursor-paginated team result history + summary.
+ *
+ * `type`(U2, 리그/대회/친선 필터)은 커서 페이지네이션이 걸린 `items` 목록에만
+ * 적용된다 -- `summary.byType`는 서버가 항상 전체 기준으로 내려주므로 여기서
+ * 다시 필터링하지 않는다. `type`을 쿼리키에 포함해 탭을 바꾸면 캐시가 갈리고
+ * (클라이언트 필터가 아니라) 서버로 새로 요청한다.
+ */
+export function usePublicTeamRecords(teamId: string, season?: string, type?: TeamRecordCategory) {
   return useInfiniteQuery({
-    queryKey: publicGameRecordsKeys.teamRecords(teamId, season),
+    queryKey: publicGameRecordsKeys.teamRecords(teamId, season, type ?? null),
     queryFn: ({ pageParam }: { pageParam: string | null }) =>
       v1Get<PublicTeamRecordsResponse>(`/teams/${teamId}/records`, {
         ...(season ? { season } : {}),
+        ...(type ? { type } : {}),
         ...(pageParam ? { cursor: pageParam } : {}),
       }),
     initialPageParam: null as string | null,

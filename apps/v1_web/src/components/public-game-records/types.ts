@@ -312,11 +312,30 @@ export interface PublicTeamRecordEvent {
   readonly cardColor: 'YELLOW' | 'RED' | null;
 }
 
+/**
+ * U2 -- 팀 전적 한 건이 리그(`league`)/대회(`tournament`)/친선(`friendly`) 중 어디에
+ * 속하는지. 백엔드 판정 함수(`apps/v1_api/src/games/public-records/team-record-category.ts`)의
+ * 값을 그대로 미러링한다 -- `tournamentId`가 있으면 대회 포맷이 "리그 방식"이어도
+ * `tournament`로 분류된다(리그 명칭 정책 확정: "정규 리그" ≠ "리그 방식 대회").
+ */
+export type TeamRecordCategory = 'league' | 'tournament' | 'friendly';
+
+/**
+ * U2 -- 화면 탭 상태 전용 값. '전체'는 서버에 `type` 을 아예 보내지 않는 상태를
+ * 가리키는 로컬 전용 값이라(백엔드 계약: 파라미터 미전달 = 필터 없음)
+ * `TeamRecordCategory` 에는 없다.
+ */
+export type TeamRecordTypeFilter = TeamRecordCategory | 'all';
+
 export interface PublicTeamRecordItem {
   readonly gameId: string;
   readonly teamMatchId: string | null;
   readonly tournamentId: string | null;
   readonly tournamentTitle: string | null;
+  /** 팀매치를 거친 경기에서만 채워진다 (`tournamentId`가 있는 경기는 항상 null). */
+  readonly leagueId: string | null;
+  readonly leagueTitle: string | null;
+  readonly type: TeamRecordCategory;
   readonly opponentTeamId: string | null;
   readonly opponentTeamName: string | null;
   readonly opponentTeamLogoUrl: string | null;
@@ -333,13 +352,24 @@ export interface PublicTeamRecordItem {
   readonly events: readonly PublicTeamRecordEvent[];
 }
 
-export interface PublicTeamRecordsSummary {
+/** `PublicTeamRecordsSummary`와 `byType`의 각 항목이 공유하는 승-무-패-득실 모양. */
+export interface TeamRecordSummaryTotals {
   readonly played: number;
   readonly won: number;
   readonly drawn: number;
   readonly lost: number;
   readonly goalsFor: number;
   readonly goalsAgainst: number;
+}
+
+export interface PublicTeamRecordsSummary extends TeamRecordSummaryTotals {
+  /**
+   * U2 -- `type` 쿼리 필터와 무관하게 항상 전체 기준(백엔드 계약, `fetchSummary`
+   * 주석 참고: "집계는 페이지가 아니라 전체 기준"). 탭이 '전체'가 아닌 종류를
+   * 고르면 화면은 이 맵에서 해당 종류 값을 그대로 꺼내 KPI 를 교체한다 -- 별도
+   * 계산 없이.
+   */
+  readonly byType: Readonly<Record<TeamRecordCategory, TeamRecordSummaryTotals>>;
 }
 
 /** `GET /teams/:id/records` response. */

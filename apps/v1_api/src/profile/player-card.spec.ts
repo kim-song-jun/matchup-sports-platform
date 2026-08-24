@@ -193,7 +193,12 @@ describe('선수 카드 산식', () => {
       expect(resolveTier(14)).toBe('silver');
       expect(resolveTier(15)).toBe('gold');
       expect(resolveTier(29)).toBe('gold');
-      expect(resolveTier(30)).toBe('special');
+      // 30경기는 주말 풋살로 반 년이면 닿는다. 거기서 최상위가 되면 그 뒤로 몇 년을 더
+      // 뛰어도 카드가 그대로라, 사다리를 두 칸으로 나눴다.
+      expect(resolveTier(30)).toBe('legend');
+      expect(resolveTier(99)).toBe('legend');
+      expect(resolveTier(100)).toBe('special');
+      expect(resolveTier(500)).toBe('special');
     });
 
     it('기록을 비공개해도 등급은 출전 수를 따른다', () => {

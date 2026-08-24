@@ -117,6 +117,8 @@ export function AwardsTab({
         <AwardRecommendationChips
           goals={playerRecords.data?.goals}
           assists={playerRecords.data?.assists}
+          isError={playerRecords.isError}
+          onRetry={() => void playerRecords.refetch()}
           onPick={addRecommendedRow}
         />
       )}

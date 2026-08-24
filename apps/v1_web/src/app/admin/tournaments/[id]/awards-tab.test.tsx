@@ -18,7 +18,10 @@ const award: V1TournamentAward = {
 };
 
 const { playerRecordsHolder } = vi.hoisted(() => ({
-  playerRecordsHolder: { current: undefined as undefined | { tournamentId: string; goals: unknown[]; assists: unknown[] } },
+  playerRecordsHolder: {
+    current: undefined as undefined | { tournamentId: string; goals: unknown[]; assists: unknown[] },
+    error: false,
+  },
 }));
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminTournamentRegistrations: () => ({
@@ -31,7 +34,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminTournamentAwards: () => ({ data: [award] }),
   // STATS-3 추천 chip — 기본은 빈 랭킹(기존 테스트 화면 불변). chip 시나리오는
   // holder를 채워 사용한다.
-  useV1AdminTournamentPlayerRecords: () => ({ data: playerRecordsHolder.current }),
+  useV1AdminTournamentPlayerRecords: () => ({ data: playerRecordsHolder.current, isError: playerRecordsHolder.error === true, refetch: vi.fn() }),
   useV1SetTournamentAwards: () => ({ mutate: setAwardsMutate, isPending: false }),
 }));
 
@@ -81,6 +84,15 @@ describe('AwardsTab 추천 근거 chip (STATS-3)', () => {
   });
   afterEach(() => {
     playerRecordsHolder.current = undefined;
+    playerRecordsHolder.error = false;
+  });
+
+  it('랭킹 조회가 실패하면 조용히 사라지지 않고 실패 상태를 명시한다', () => {
+    playerRecordsHolder.current = undefined;
+    playerRecordsHolder.error = true;
+    render(<AwardsTab tournamentId="tournament-1" canWrite showToast={vi.fn()} />);
+    expect(screen.getByText(/조회에 실패한 상태예요/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '다시 시도' })).toBeInTheDocument();
   });
 
   it('chip을 탭하면 이름·계정·팀이 미리 채워진 수상 항목이 추가된다', async () => {

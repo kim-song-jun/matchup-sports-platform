@@ -22,16 +22,39 @@ const TOP_N = 3;
 export function AwardRecommendationChips({
   goals,
   assists,
+  isError = false,
+  onRetry,
   onPick,
 }: {
   goals: V1AdminTournamentPlayerRecordRow[] | undefined;
   assists: V1AdminTournamentPlayerRecordRow[] | undefined;
+  /** 조회 실패를 조용히 숨기면 "기록 없음"으로 오독된다(리뷰 지적) — 명시 렌더. */
+  isError?: boolean;
+  onRetry?: () => void;
   onPick: (recommendation: AwardRecommendation) => void;
 }) {
   const groups: Array<{ kind: 'goals' | 'assists'; label: string; unit: string; rows: V1AdminTournamentPlayerRecordRow[] }> = [
     { kind: 'goals' as const, label: '득점 상위', unit: '골', rows: (goals ?? []).slice(0, TOP_N) },
     { kind: 'assists' as const, label: '도움 상위', unit: '도움', rows: (assists ?? []).slice(0, TOP_N) },
   ].filter((group) => group.rows.length > 0);
+  if (isError) {
+    return (
+      <div className="mb-3 flex items-center justify-between gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2">
+        <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
+          추천 근거(득점·도움 순위)를 불러오지 못했어요 — 기록이 없는 게 아니라 조회에 실패한 상태예요.
+        </p>
+        {onRetry ? (
+          <button
+            type="button"
+            onClick={onRetry}
+            className="inline-flex shrink-0 items-center min-h-[44px] px-3 rounded-lg border border-[var(--tint-blue-border)] text-xs font-semibold text-[var(--blue700)] hover:bg-[var(--blue50)]"
+          >
+            다시 시도
+          </button>
+        ) : null}
+      </div>
+    );
+  }
   if (groups.length === 0) return null;
 
   return (

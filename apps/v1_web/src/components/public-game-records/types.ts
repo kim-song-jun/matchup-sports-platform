@@ -469,16 +469,16 @@ export interface PublicUserRecordsResponse {
 // ── 회고 STATS-1: 대회 단위 개인 득점·도움 랭킹 ─────────────────────────────
 // 리그 `V1LeaguePlayerRecordsResponse`(types/league-match.ts)와 같은 계약에
 // `profileHref`만 더한다 — 랭킹 행은 정의상 전원 동의+계정 연결이라 항상 존재한다.
-export type PublicTournamentPlayerRecordRow = {
-  userId: string;
-  nickname: string | null;
-  profileHref: string;
-  goals: number;
-  assists: number;
-};
+export interface PublicTournamentPlayerRecordRow {
+  readonly userId: string;
+  readonly nickname: string | null;
+  readonly profileHref: string;
+  readonly goals: number;
+  readonly assists: number;
+}
 
-export type PublicTournamentPlayerRecordsResponse = {
-  tournamentId: string;
-  goals: PublicTournamentPlayerRecordRow[];
-  assists: PublicTournamentPlayerRecordRow[];
-};
+export interface PublicTournamentPlayerRecordsResponse {
+  readonly tournamentId: string;
+  readonly goals: readonly PublicTournamentPlayerRecordRow[];
+  readonly assists: readonly PublicTournamentPlayerRecordRow[];
+}

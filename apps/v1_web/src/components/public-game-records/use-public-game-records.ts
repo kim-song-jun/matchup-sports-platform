@@ -151,5 +151,6 @@ export function usePublicTournamentPlayerRecords(tournamentId: string) {
       v1Get<PublicTournamentPlayerRecordsResponse>(`/tournaments/${tournamentId}/player-records`),
     enabled: Boolean(tournamentId),
     staleTime: 60_000,
+    retry: false,
   });
 }

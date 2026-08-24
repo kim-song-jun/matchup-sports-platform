@@ -488,11 +488,12 @@ export class PublicTournamentRecordsService {
         : null;
 
     const participantIds = (fixture.game?.participants ?? []).map((participant) => participant.id);
-    // 정책 공개(기본값)에서는 이 맵이 쓰이지 않는다 -- 위 getSchedule과 동일한 이유로
-    // 되돌린 상태(V1_TOURNAMENT_PARTICIPANT_NAMES_CONSENT_GATE=true)일 때만 조회한다.
-    const consentMap = isTournamentParticipantNameGatingReverted()
-      ? await loadParticipantConsentEligibility(this.prisma, participantIds)
-      : new Map<string, ParticipantConsentEligibility>();
+    // **항상 조회한다.** 이름 게이팅(되돌린 상태에서만 동작)에는 안 쓰이지만, 프로필 링크
+    // (`resolveParticipantProfileHref`)는 정책 공개 기본값에서도 동의를 확인해야 하기
+    // 때문이다 -- 예전처럼 게이팅 플래그로 감싸 두면 기본 운영 설정에서 이 맵이 비어
+    // `profileHref` 가 **항상 null** 이 되어 링크가 하나도 생기지 않는다(Copilot 리뷰가
+    // 잡은 결함). 배치 조회 1회라 N+1 이 아니고, getMatch 는 단일 경기라 대상도 적다.
+    const consentMap = await loadParticipantConsentEligibility(this.prisma, participantIds);
     // 위 consentMap과 달리 이건 게이팅하지 않는다 -- getSchedule과 동일한 이유
     // (resolveParticipantDisplayName 위 doc comment 참고).
     const nameProfileByUserId = await loadParticipantNameProfiles(

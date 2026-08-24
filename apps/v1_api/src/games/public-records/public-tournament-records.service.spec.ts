@@ -83,6 +83,8 @@ function buildFakePrisma(options: {
   scheduledAt: Date;
   consentLinks: FakeConsentLink[];
   consentSnapshots: FakeConsentSnapshot[];
+  /** 사용자 단위 공개 동의. 프로필 링크(profileHref)는 이 값을 직접 본다. */
+  userConsents?: { userId: string; state: 'GRANTED' | 'REVOKED' }[];
   events: FakeGoalEvent[];
   /** Issue #377 -- this fixture's assigned field, for the staff-bypass scope tests below. */
   fieldId?: string | null;
@@ -206,7 +208,7 @@ function buildFakePrisma(options: {
     // 빈 배열을 반환하도록 둔다.
     v1UserRecordConsent: {
       async findMany() {
-        return [];
+        return options.userConsents ?? [];
       },
     },
     // 2026-08-18 대회 실명 표시 정책 -- 위 consent 조회와 달리 게이팅 없이 매 getMatch
@@ -978,5 +980,69 @@ describe('PublicTournamentRecordsService.getMatch -- 대회 경기 기록 실명
     const result = await service.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined);
 
     expect(result.events).toEqual([expect.objectContaining({ participantName: '닉네임러' })]);
+  });
+});
+
+/**
+ * 선수 이름 → 공개 프로필 링크(`profileHref`)를 **실제 조회 경로로** 확인한다.
+ *
+ * 왜 별도 스펙인가: 판정 함수(`resolveParticipantProfileHref`)만 단위로 검증하면
+ * `consent` 를 직접 주입하게 되는데, 그러면 **그 consent 가 실제로 로드되는지**는
+ * 아무도 확인하지 않는다. 실제로 첫 구현은 `consentMap` 을 이름 게이팅 롤백 스위치가
+ * 켜졌을 때만 로드하고 있어서, 기본 운영 설정(스위치 꺼짐)에서 `profileHref` 가 **항상
+ * null** 이었다 — 판정 함수 유닛 6건은 전부 통과하는데 기능은 죽어 있었다(Copilot 리뷰).
+ *
+ * 그래서 이 스펙은 fake-Prisma 로 링크·동의 행까지 태워 getMatch 를 통째로 돌린다.
+ */
+describe('PublicTournamentRecordsService.getMatch -- 선수 프로필 링크(profileHref)', () => {
+  const LINKED = { ...ELIGIBLE_PARTICIPANT, id: 'participant-linked', userId: 'user-1', displayNameSnapshot: '김도윤' };
+  const base = {
+    scheduledAt: new Date(Date.now() - 60_000),
+    events: [],
+    lineups: [{ id: 'lineup-home-1', sideId: 'side-home', revision: 1 }],
+    participants: [LINKED],
+  };
+
+  it('동의를 켠 참가자에게는 기본 설정에서도 프로필 경로가 실린다', async () => {
+    // 이름 게이팅 롤백 스위치는 꺼진 상태(기본) — 그래도 링크는 나와야 한다.
+    const prisma = buildFakePrisma({
+      ...base,
+      consentLinks: [{ participantId: LINKED.id, linkId: 'link-1', userId: 'user-1' }],
+      consentSnapshots: [],
+      userConsents: [{ userId: 'user-1', state: 'GRANTED' }],
+    });
+    const service = new PublicTournamentRecordsService(prisma, NO_ASSIGNMENTS_ACCESS);
+
+    const result = await service.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined);
+
+    expect(result.lineup?.home[0]).toEqual(expect.objectContaining({ profileHref: '/users/user-1' }));
+  });
+
+  it('동의하지 않았으면 프로필 경로가 없다', async () => {
+    const prisma = buildFakePrisma({
+      ...base,
+      consentLinks: [{ participantId: LINKED.id, linkId: 'link-1', userId: 'user-1' }],
+      consentSnapshots: [],
+      userConsents: [],
+    });
+    const service = new PublicTournamentRecordsService(prisma, NO_ASSIGNMENTS_ACCESS);
+
+    const result = await service.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined);
+
+    expect(result.lineup?.home[0]).toEqual(expect.objectContaining({ profileHref: null }));
+  });
+
+  it('계정이 연결되지 않은 참가자(게스트)는 프로필 경로가 없다', async () => {
+    const prisma = buildFakePrisma({
+      ...base,
+      participants: [{ ...ELIGIBLE_PARTICIPANT, userId: null }],
+      consentLinks: [],
+      consentSnapshots: [],
+    });
+    const service = new PublicTournamentRecordsService(prisma, NO_ASSIGNMENTS_ACCESS);
+
+    const result = await service.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined);
+
+    expect(result.lineup?.home[0]).toEqual(expect.objectContaining({ profileHref: null }));
   });
 });

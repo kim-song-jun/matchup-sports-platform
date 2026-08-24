@@ -38,6 +38,7 @@ export ALPHA_SESSION_TOKEN='v1.<payload>.<signature>'
 | `capture-record-consent-screens.mjs` | 기록 공개 설정 화면 — 알림 착지(`?from=tournament`, 맥락 배너 있음) / 파라미터 없는 기본 화면 / 홈 넛지 배너를 3폭 캡처. 캡처 전에 `GET /me/record-consent` 를 찍어 **배너가 안 뜬 이유를 서버 응답으로 남긴다**(스크린샷만 보고 추측하지 않기 위해) | 선수 |
 | `capture-claim-my-record.mjs` | 자가 신원 연결 — 경기 상세의 배너와 **모달을 실제로 열어** 3폭 캡처. 후보 0명/N명 두 상태를 각각 찍으라고 만든 것이다(`FIXTURE_ID` 를 바꿔 가며) | 참가팀 멤버 |
 | `capture-public-profile.mjs` | 공개 프로필 + 공개 활동 기록 3폭 캡처. `TARGET_USER_ID` 로 대상 지정 | 선수(타인 프로필도 가능) |
+| `verify-alpha-og-card.mjs` | 선수 카드 OG 이미지가 **사용자별로 다른 그림**인지 판정. 여러 id 의 응답 바이트를 sha 로 비교해 전원이 같은 폴백을 받는 상태를 잡는다 — HTTP 200·PNG 까지는 통과하므로 상태코드만 보면 못 잡는다 | 불필요 |
 
 ```bash
 # 공개 화면 (기본 대상 대회는 스크립트 상단 TID 상수, 환경변수로 교체 가능)

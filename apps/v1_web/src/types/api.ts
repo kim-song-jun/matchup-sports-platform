@@ -1890,6 +1890,37 @@ export type V1Profile = {
   trustState?: TrustState;
 };
 
+/**
+ * 선수 카드 (Task 155). 산식과 잠금 규칙은 서버가 정하고, 프론트는 **그린다**.
+ * 잠긴 능력치는 `value: null` 로 오며, 프론트가 임의로 0 이나 추정값을 채우면 안 된다.
+ */
+export type V1PlayerCardStat = {
+  code: 'SHO' | 'PAS' | 'APP' | 'SKI' | 'MAN' | 'PUN';
+  label: string;
+  /** 잠겨 있으면 null. */
+  value: number | null;
+  unlocked: boolean;
+  lockedBy:
+    | { type: 'appearances'; remaining: number }
+    | { type: 'reviews'; remaining: number }
+    | { type: 'consent' }
+    | null;
+};
+
+export type V1PlayerCard = {
+  /** 산식 버전. 계수가 바뀌면 올라간다 -- 조용히 바뀌지 않게. */
+  formulaVersion: number;
+  position: 'FW' | 'MF' | 'DF' | 'GK' | null;
+  /** 열린 능력치가 하나도 없으면 null. 0 이 아니다. */
+  overall: number | null;
+  /** 실력이 아니라 **출전 수**로 정해진다. */
+  tier: 'bronze' | 'silver' | 'gold' | 'special';
+  appearances: number;
+  stats: V1PlayerCardStat[];
+  unlockedCount: number;
+  nextUnlock: { code: V1PlayerCardStat['code']; reason: NonNullable<V1PlayerCardStat['lockedBy']> } | null;
+};
+
 export type V1PublicProfile = {
   userId: string;
   displayName: string;
@@ -1918,6 +1949,8 @@ export type V1PublicProfile = {
     activityCount: number;
     reviewCount: number;
   };
+  /** 선수 카드. 사용자가 카드를 숨겼으면 null 이 오고, 프론트는 섹션을 렌더하지 않는다. */
+  playerCard?: V1PlayerCard | null;
   activitySummary: {
     totals: {
       matchCount: number;

@@ -365,7 +365,13 @@ export const gameSchemaSourceManifest = {
   // 컨택의 두 팀 중 신고자가 속하지 않은 쪽으로 계산해 채움; 판정 불가 행은 NULL 유지).
   // 바인딩된 20260729000100_v1_game_operations 는 그대로라 `.migration` 해시는 변하지
   // 않는다. 아래 값은 이 브랜치의 schema.prisma 에 `shasum -a 256` 을 다시 돌려 계산한 것이다.
-  schema: '681fde361c63f64bed54df74c08c048ca12a68f5452c9d42b79a2d9650c0f652',
+  // 2026-08-24 재핀: 선수 카드(Task 155)의 V1UserProfile.player_card_hidden 추가.
+  // game domain(V1Game*) 밖의 nullable 아닌 boolean 기본값 컬럼이지만, 이 guard 는
+  // schema.prisma **전체 바이트**를 결속하므로 여기서 걸린다 -- 파일 해시 노이즈이지
+  // game operations 계약 변화가 아니다. 전용 마이그레이션
+  // 20260824120000_v1_player_card_hidden 이 뒷받침하며, 바인딩된
+  // 20260729000100_v1_game_operations 는 건드리지 않았다(migration 해시 불변).
+  schema: '7cbdebdb092aa78fda6dd7d9f63a3772d68a1804a707213b016903a34a3b6ebe',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

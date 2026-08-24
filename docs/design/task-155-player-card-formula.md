@@ -22,7 +22,8 @@
 | 〃 | 출전 경기 수 (행 수, `gameId` 중복 제거) | |
 | `V1UserReputationSummary` | `metricSkillScore`, `metricMannerScore`, `metricPunctualityScore` | 4항목 후기 평균(1~5) |
 | 〃 | `metricReviewCount` | 표본 수 |
-| `V1GameParticipant` | `position`, `goalkeeper` | 카드의 포지션 표기 |
+| `V1GameParticipant` | `position` | 라인업 스냅샷의 포지션 문자열(축구 `GK` / 풋살 `GOLEIRO`) |
+| `V1GameResultParticipant` | `goalkeeper` | **골키퍼 플래그는 라인업이 아니라 결과 행에 있다** — 구현 중 확인 |
 
 기록 쪽 집계는 **공개 기록 목록과 같은 게이트**를 쓴다(`officialAt != null` +
 `currentOfficialRevisionId == resultRevisionId`). 다르면 카드와 기록 목록이 어긋난다.

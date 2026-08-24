@@ -12,6 +12,8 @@ import {
   countOwnerVisibleParticipations,
   findLatestPublicParticipation,
 } from '../games/public-records/public-consent';
+import { loadPlayerCardRecordStats } from '../games/public-records/player-card-stats';
+import { buildPlayerCard, type PlayerCard } from './player-card';
 import { PrismaService } from '../prisma/prisma.service';
 import { isReviewRevealed } from '../reviews/review-visibility';
 import { removeUserFromActiveRosters } from '../tournaments/roster-cleanup';
@@ -345,6 +347,9 @@ export class ProfileService {
       // Task 154 P2: 가장 최근 공개 가능 출전 한 줄. 기록 목록과 **같은 게이트**를 통과한
       // 것만 쓴다 -- 다르면 같은 프로필에서 "최근 경기"와 "목록 맨 위"가 어긋난다.
       recentActivity: await findLatestPublicParticipation(this.prisma, user.id),
+      // Task 155 선수 카드. 숨김을 켠 사용자에게는 null 을 내려 프론트가 섹션 자체를
+      // 렌더하지 않게 한다 -- 빈 카드를 남기면 "숨겼는데 자리가 남는" 상태가 된다.
+      playerCard: user.profile?.playerCardHidden === true ? null : await this.buildPlayerCardFor(user.id),
       reputation: {
         ...toReputationPayload(user.reputationSummary),
         mannerScore: liveReputation.mannerScore,
@@ -353,6 +358,37 @@ export class ProfileService {
       },
       activitySummary,
     };
+  }
+
+  /**
+   * 선수 카드를 만든다 (Task 155). 산식은 `profile/player-card.ts` 의 순수 함수에 있고,
+   * 여기서는 **입력을 모으는 일만** 한다 -- 그래야 산식을 DB 없이 테스트할 수 있다.
+   *
+   * 기록 쪽은 공개 기록 목록과 같은 게이트를 통과한 것만 쓴다. 후기 쪽(4항목 평균)은
+   * 1층 데이터라 동의와 무관하게 읽는다 -- 두 층의 경계가 카드 안에서도 그대로다.
+   */
+  private async buildPlayerCardFor(userId: string): Promise<PlayerCard> {
+    const [records, reputation, consent] = await Promise.all([
+      loadPlayerCardRecordStats(this.prisma, userId),
+      this.prisma.v1UserReputationSummary.findUnique({ where: { userId } }),
+      this.prisma.v1UserRecordConsent.findUnique({ where: { userId } }),
+    ]);
+
+    const toNumber = (value: Prisma.Decimal | null | undefined): number | null =>
+      value === null || value === undefined ? null : Number(value);
+
+    return buildPlayerCard({
+      appearances: records.appearances,
+      goals: records.goals,
+      assists: records.assists,
+      startedCount: records.startedCount,
+      position: records.position,
+      skillScore: toNumber(reputation?.metricSkillScore),
+      mannerScore: toNumber(reputation?.metricMannerScore),
+      punctualityScore: toNumber(reputation?.metricPunctualityScore),
+      reviewCount: reputation?.metricReviewCount ?? 0,
+      recordsConsented: consent?.state === V1ConsentState.GRANTED,
+    });
   }
 
   private async getPublicActivitySummary(userId: string, precomputedReputation?: { reviewCount: number; mannerScore: number | null }) {

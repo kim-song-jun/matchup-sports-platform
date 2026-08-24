@@ -6,6 +6,7 @@ import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { useV1PublicProfile } from '@/hooks/use-v1-api';
 import { cssUrl } from '@/lib/assets';
+import { PlayerCard } from './player-card';
 import { ShieldCheck, TrendingUp, Activity, Star, AlertCircle, ChevronRight } from 'lucide-react';
 import type { TrustState } from '@/types/api';
 
@@ -90,6 +91,19 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
             ) : null}
           </div>
         </section>
+
+        {/* 선수 카드 (Task 155). 프로필의 첫 화면이다 -- 자랑할 수 있는 것이 맨 위에
+            와야 공유할 이유가 생긴다. 숨김을 켠 사용자에게는 서버가 null 을 주므로
+            섹션 자체가 사라진다(빈 자리를 남기지 않는다). */}
+        {data.playerCard ? (
+          <PlayerCard
+            card={data.playerCard}
+            displayName={data.displayName}
+            profileImageUrl={data.profileImageUrl}
+            teamName={data.teams?.[0]?.name ?? null}
+            isOwner={false}
+          />
+        ) : null}
 
         {/* 한 줄 소개 · 소속팀 (Task 154 P1)
             기록이 0건인 프로필이 통계 카드 하나만 남아 완전히 비어 보이던 문제를 메운다.

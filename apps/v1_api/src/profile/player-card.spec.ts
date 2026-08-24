@@ -26,6 +26,7 @@ const base: PlayerCardInput = {
   punctualityScore: null,
   reviewCount: 0,
   recordsConsented: true,
+  hasRecordLinks: true,
 };
 
 const stat = (input: PlayerCardInput, code: PlayerCardStatCode) =>
@@ -76,6 +77,26 @@ describe('선수 카드 산식', () => {
     });
   });
 
+  describe('연결된 기록이 아예 없는 사용자', () => {
+    // alpha 실측(2026-08-24)에서 잡았다. 출전이 0인 사용자에게도 카드가
+    // "기록 공개를 켜면 골·도움·출전이 열려요" 라고 말하고 있었다 -- 켜도 아무것도
+    // 열리지 않으므로 거짓 약속이다. 그 사람에게 필요한 건 동의가 아니라 경기다.
+    it('동의가 아니라 출전을 안내한다', () => {
+      const card = buildPlayerCard({ ...base, recordsConsented: false, hasRecordLinks: false });
+
+      expect(card.nextUnlock?.reason).toEqual({ type: 'appearances', remaining: 1 });
+      for (const code of ['SHO', 'PAS', 'APP'] as const) {
+        expect(card.stats.find((s) => s.code === code)!.lockedBy).not.toEqual({ type: 'consent' });
+      }
+    });
+
+    it('동의를 이미 켠 사람에게도 마찬가지다 -- 기록이 없으면 열 것이 없다', () => {
+      const card = buildPlayerCard({ ...base, recordsConsented: true, hasRecordLinks: false });
+
+      expect(card.nextUnlock?.reason).toEqual({ type: 'appearances', remaining: 1 });
+    });
+  });
+
   describe('기록 공개 동의', () => {
     it('동의가 없으면 출전이 아무리 많아도 기록 3항목이 잠긴다', () => {
       const card = buildPlayerCard({
@@ -85,6 +106,7 @@ describe('선수 카드 산식', () => {
         assists: 20,
         startedCount: 40,
         recordsConsented: false,
+        hasRecordLinks: true,
       });
 
       for (const code of ['SHO', 'PAS', 'APP'] as const) {
@@ -100,6 +122,7 @@ describe('선수 카드 산식', () => {
         appearances: 40,
         goals: 30,
         recordsConsented: false,
+        hasRecordLinks: true,
         reviewCount: 1,
         skillScore: 4,
         mannerScore: 4,
@@ -139,7 +162,7 @@ describe('선수 카드 산식', () => {
     });
 
     it('열린 능력치가 하나도 없으면 총점은 null 이다 -- 숫자를 짜내지 않는다', () => {
-      const card = buildPlayerCard({ ...base, appearances: 0, recordsConsented: false });
+      const card = buildPlayerCard({ ...base, appearances: 0, recordsConsented: false, hasRecordLinks: true });
 
       expect(card.overall).toBeNull();
       expect(card.unlockedCount).toBe(0);
@@ -173,7 +196,7 @@ describe('선수 카드 산식', () => {
     });
 
     it('기록을 비공개해도 등급은 출전 수를 따른다', () => {
-      const hidden = buildPlayerCard({ ...base, appearances: 20, recordsConsented: false });
+      const hidden = buildPlayerCard({ ...base, appearances: 20, recordsConsented: false, hasRecordLinks: true });
 
       expect(hidden.tier).toBe('gold');
       // 다만 능력치는 잠겨 있으므로 총점은 후기에서만 나온다(여기서는 후기도 없어 null).

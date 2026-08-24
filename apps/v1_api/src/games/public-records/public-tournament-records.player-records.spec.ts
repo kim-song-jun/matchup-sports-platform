@@ -11,7 +11,7 @@ import { PublicTournamentRecordsService } from './public-tournament-records.serv
  */
 function buildPrisma(options: {
   bracketPublishedAt?: Date | null;
-  games?: Array<{ currentOfficialRevisionId: string | null }>;
+  games?: Array<{ currentOfficialRevisionId: string | null; visibilityPolicy?: { mode: string } | null }>;
   participantRows?: Array<{
     participantId: string;
     goals: number;
@@ -32,6 +32,7 @@ function buildPrisma(options: {
       }),
     },
     v1Game: { findMany: jest.fn().mockResolvedValue(options.games ?? []) },
+    v1GameOperationFlag: { findUnique: jest.fn().mockResolvedValue({ value: 'on' }) },
     v1GameResultParticipant: { findMany: jest.fn().mockResolvedValue(options.participantRows ?? []) },
     v1ParticipantIdentityLinkCurrent: { findMany: jest.fn().mockResolvedValue(options.identityLinks ?? []) },
     v1UserRecordConsent: { findMany: jest.fn().mockResolvedValue(options.userConsents ?? []) },
@@ -47,8 +48,8 @@ describe('PublicTournamentRecordsService.getPlayerRecords', () => {
   it('aggregates goals and assists per linked+consented user across games, sorted with profileHref', async () => {
     const prisma = buildPrisma({
       games: [
-        { currentOfficialRevisionId: 'rev-1' },
-        { currentOfficialRevisionId: 'rev-2' },
+        { currentOfficialRevisionId: 'rev-1', visibilityPolicy: { mode: 'LIVE' } },
+        { currentOfficialRevisionId: 'rev-2', visibilityPolicy: { mode: 'LIVE' } },
       ],
       participantRows: [
         { participantId: 'p-a1', goals: 2, assists: 0, resultRevision: OFFICIAL },
@@ -81,7 +82,7 @@ describe('PublicTournamentRecordsService.getPlayerRecords', () => {
 
   it('drops unlinked participants and users without GRANTED consent — the real loader wiring decides', async () => {
     const prisma = buildPrisma({
-      games: [{ currentOfficialRevisionId: 'rev-1' }],
+      games: [{ currentOfficialRevisionId: 'rev-1', visibilityPolicy: { mode: 'LIVE' } }],
       participantRows: [
         { participantId: 'p-linked-consented', goals: 1, assists: 0, resultRevision: OFFICIAL },
         { participantId: 'p-linked-unconsented', goals: 5, assists: 0, resultRevision: OFFICIAL },
@@ -100,7 +101,7 @@ describe('PublicTournamentRecordsService.getPlayerRecords', () => {
 
   it('honours a per-participant REVOKED snapshot even when the user-level consent is GRANTED', async () => {
     const prisma = buildPrisma({
-      games: [{ currentOfficialRevisionId: 'rev-1' }],
+      games: [{ currentOfficialRevisionId: 'rev-1', visibilityPolicy: { mode: 'LIVE' } }],
       participantRows: [
         { participantId: 'p-revoked', goals: 2, assists: 0, resultRevision: OFFICIAL },
       ],
@@ -121,7 +122,7 @@ describe('PublicTournamentRecordsService.getPlayerRecords', () => {
 
   it('shows a withdrawn user as their displayName instead of the deleted_* internal nickname', async () => {
     const prisma = buildPrisma({
-      games: [{ currentOfficialRevisionId: 'rev-1' }],
+      games: [{ currentOfficialRevisionId: 'rev-1', visibilityPolicy: { mode: 'LIVE' } }],
       participantRows: [
         { participantId: 'p-a1', goals: 2, assists: 0, resultRevision: OFFICIAL },
       ],
@@ -137,7 +138,7 @@ describe('PublicTournamentRecordsService.getPlayerRecords', () => {
 
   it('drops zero-contribution rows before the consent lookup', async () => {
     const prisma = buildPrisma({
-      games: [{ currentOfficialRevisionId: 'rev-1' }],
+      games: [{ currentOfficialRevisionId: 'rev-1', visibilityPolicy: { mode: 'LIVE' } }],
       participantRows: [
         { participantId: 'p-zero', goals: 0, assists: 0, resultRevision: OFFICIAL },
         { participantId: 'p-scorer', goals: 1, assists: 0, resultRevision: OFFICIAL },
@@ -152,9 +153,31 @@ describe('PublicTournamentRecordsService.getPlayerRecords', () => {
     expect(linkQuery.where.participantId.in).toEqual(['p-scorer']);
   });
 
+  it('excludes hidden and status_only games from the ranking (lane visibility policy)', async () => {
+    const prisma = buildPrisma({
+      games: [
+        { currentOfficialRevisionId: 'rev-live', visibilityPolicy: { mode: 'LIVE' } },
+        { currentOfficialRevisionId: 'rev-hidden', visibilityPolicy: { mode: 'HIDDEN' } },
+        { currentOfficialRevisionId: 'rev-status', visibilityPolicy: { mode: 'STATUS_ONLY' } },
+        { currentOfficialRevisionId: 'rev-no-policy', visibilityPolicy: null },
+      ],
+      participantRows: [
+        { participantId: 'p-a1', goals: 1, assists: 0, resultRevision: OFFICIAL },
+      ],
+      identityLinks: [{ participantId: 'p-a1', userId: 'user-a' }],
+      userConsents: [{ userId: 'user-a', state: 'GRANTED' }],
+      users: [{ id: 'user-a', profile: { nickname: 'a' } }],
+    });
+    await new PublicTournamentRecordsService(prisma, access).getPlayerRecords('tour-1');
+    const query = (prisma as unknown as { v1GameResultParticipant: { findMany: jest.Mock } })
+      .v1GameResultParticipant.findMany.mock.calls[0][0];
+    // hidden·status_only·정책 없음(fail-closed)은 전부 제외 — LIVE 리비전만 남는다.
+    expect(query.where.resultRevisionId.in).toEqual(['rev-live']);
+  });
+
   it('skips rows whose revision has no officialAt', async () => {
     const prisma = buildPrisma({
-      games: [{ currentOfficialRevisionId: 'rev-1' }],
+      games: [{ currentOfficialRevisionId: 'rev-1', visibilityPolicy: { mode: 'LIVE' } }],
       participantRows: [
         { participantId: 'p-a1', goals: 3, assists: 0, resultRevision: { officialAt: null } },
       ],

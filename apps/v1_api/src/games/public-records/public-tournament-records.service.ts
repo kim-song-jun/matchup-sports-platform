@@ -220,11 +220,21 @@ export class PublicTournamentRecordsService {
       return empty;
     }
 
+    const publicLiveEnabled = await this.isPublicLiveEnabled();
     const games = await this.prisma.v1Game.findMany({
       where: { tournamentFixture: { tournamentId }, currentOfficialRevisionId: { not: null } },
-      select: { currentOfficialRevisionId: true },
+      select: { currentOfficialRevisionId: true, visibilityPolicy: { select: { mode: true } } },
     });
+    // Lane 가시성 정책을 그대로 적용한다(리뷰 지적) — hidden 경기는 존재 자체가
+    // 비공개(fail-closed: 정책 row 없음 = HIDDEN)이고, status_only는 점수도
+    // 가리는 모드다(getMatch/presentScheduleEntry의 `mode === 'status_only'
+    // ? null` 참조). 어느 쪽이든 그 경기의 득점·도움이 공개 랭킹에 실리면
+    // 숨긴 결과가 간접 노출된다.
     const revisionIds = games
+      .filter((game) => {
+        const mode = effectivePublicVisibilityMode(game.visibilityPolicy?.mode ?? 'HIDDEN', publicLiveEnabled);
+        return mode !== 'hidden' && mode !== 'status_only';
+      })
       .map((game) => game.currentOfficialRevisionId)
       .filter((id): id is string => id !== null);
     if (revisionIds.length === 0) return empty;

@@ -337,10 +337,14 @@ identity/side itself:
 
 - **The schedule (`GET /tournaments/:id/schedule`) deliberately does not carry
   `profileHref`.** Its `consentMap` stays behind the name-gating flag because that endpoint
-  *is* polled while any fixture is live (`LIVE_POLL_INTERVAL_MS`), and loading consent
-  unconditionally there would add two queries to every poll for every fixture on the page.
-  The scorer line on a schedule card is a one-line summary; a reader who wants the player
-  opens the match, where the link exists. Revisit only with a cheaper consent source.
+  *is* polled while any fixture is live (`LIVE_POLL_INTERVAL_MS`). Loading consent
+  unconditionally there would add up to **three batched queries per poll** — links, user
+  consents, snapshots (`loadParticipantConsentEligibility`). They are batched across the
+  whole page, *not* per fixture, so the cost grows with `IN`-list size rather than with the
+  number of fixtures. That is a real but modest cost, weighed against a scorer line that is
+  a one-line summary: a reader who wants the player opens the match, where the link exists.
+  Revisit if the schedule ever needs consent for another reason, since the marginal cost
+  would then be zero.
 
 ### Known scope trims (documented, not silently dropped)
 

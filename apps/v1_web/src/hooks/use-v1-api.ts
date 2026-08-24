@@ -4801,6 +4801,8 @@ import type {
   V1LeagueStandingsResponse,
   V1RecordLeagueForfeitPayload,
   V1RecordLeagueForfeitResult,
+  V1RecordLeagueResultPayload,
+  V1RecordLeagueResultResult,
   V1RegenerateLeagueFixturesPayload,
   V1RegenerateLeagueFixturesResult,
   V1RemoveLeagueTeamResult,
@@ -4993,6 +4995,37 @@ export function useV1RegenerateLeagueFixtures(leagueId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
+    },
+  });
+}
+
+// U1: 운영자 결과 입력 — POST /admin/league-matches/:leagueId/fixtures/:teamMatchId/result.
+// 아직 결과가 없는(not_entered/draft/change_requested) 대진 전용 — 서버가 이미 OFFICIAL 인
+// 대진에는 409로 거부하므로 화면은 정정(useV1CorrectLeagueResult)으로 안내한다.
+export function useV1RecordLeagueResult(leagueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ teamMatchId, body }: { teamMatchId: string; body: V1RecordLeagueResultPayload }) =>
+      v1Post<V1RecordLeagueResultResult>(`/admin/league-matches/${leagueId}/fixtures/${teamMatchId}/result`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
+    },
+  });
+}
+
+// U1: 운영자 결과 정정 — POST /admin/league-matches/:leagueId/fixtures/:teamMatchId/result/correct.
+// 이미 OFFICIAL 인 대진 전용 — 요청·응답 모양은 신규 입력과 완전히 같다
+// (league-match-result-entry.dto.ts RecordLeagueResultDto가 두 경로에 공용).
+export function useV1CorrectLeagueResult(leagueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ teamMatchId, body }: { teamMatchId: string; body: V1RecordLeagueResultPayload }) =>
+      v1Post<V1RecordLeagueResultResult>(
+        `/admin/league-matches/${leagueId}/fixtures/${teamMatchId}/result/correct`,
+        body,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
     },
   });
 }

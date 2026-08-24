@@ -9,6 +9,7 @@ import { resolveTeamMatchCompetitionConfig } from '../team-matches/resolve-team-
 import { cascadeCancelTeamMatchSchedulesInTx } from '../team-schedules/team-schedules.service';
 import { LeagueCompletionProjectionService } from './league-completion-projection.service';
 import { buildOddTeamCountWarning, checkLeagueTeamAddAllowed, checkLeagueTeamRemovalAllowed } from './league-lifecycle-rules';
+import { resolveResultStage } from './league-result-stage';
 import { FixtureScheduleTemplate, generateRoundRobinFixtures, resolveFixtureStartAt, RoundRobinFixture } from './round-robin-schedule';
 import {
   AddLeagueTeamDto,
@@ -145,8 +146,33 @@ export class LeagueMatchAdminService {
         // 필요하다 — updateFixture()는 이미 이 필드를 쓰고 있었는데 조회 쪽만 빠져 있었다.
         placeAddress: true,
         status: true,
+        // 결과 진행 단계(2026-08-24). 대진 표가 지금까지 팀매치 status(matched/cancelled)만
+        // 보여줘서, 운영자는 "어느 경기가 아직 결과가 없는지 / 상대팀 승인을 기다리는지"를
+        // 화면에서 알 방법이 없었다. 결과 단계는 팀매치가 아니라 경기(Game) 쪽에 있다:
+        // 확정본은 currentOfficialRevisionId, 진행 중인 것은 최신 리비전의 state 다.
+        // 최신 1건만 가져오면 되므로 take:1 로 N+1 없이 붙인다.
+        game: {
+          select: {
+            id: true,
+            currentOfficialRevisionId: true,
+            resultRevisions: { select: { state: true }, orderBy: { revision: 'desc' }, take: 1 },
+          },
+        },
       },
     });
+    // 확정 스코어는 public 쪽(league-match-public.service.ts detail)과 같은 패턴으로
+    // 확정 리비전 id 를 모아 단일 IN 조회로 가져온다 — 대진 수만큼 반복 조회하지 않는다.
+    const officialRevisionIds = fixtures
+      .map((fixture) => fixture.game?.currentOfficialRevisionId ?? null)
+      .filter((id): id is string => id !== null);
+    const facts =
+      officialRevisionIds.length === 0
+        ? []
+        : await this.prisma.v1GameOfficialFact.findMany({
+            where: { revisionId: { in: officialRevisionIds } },
+            select: { gameId: true, homeScore: true, awayScore: true },
+          });
+    const factByGameId = new Map(facts.map((fact) => [fact.gameId, fact]));
     // 대진을 아직 안 만든 리그에서만 필요하다(일괄 생성 폼의 "기본 장소" 추천용) —
     // 이미 대진이 있으면 관리자는 개별 행을 고치므로 이 쿼리를 건너뛴다.
     const recentVenues = fixtures.length === 0 ? await this.loadRecentVenues(teamIds) : [];
@@ -159,16 +185,22 @@ export class LeagueMatchAdminService {
       sportId: league.sportId,
       teamIds,
       recentVenues,
-      fixtures: fixtures.map((fixture) => ({
-        teamMatchId: fixture.id,
-        title: fixture.title,
-        homeTeamId: fixture.hostTeamId,
-        awayTeamId: fixture.approvedApplicantTeamId,
-        startAt: fixture.startAt,
-        placeName: fixture.placeName,
-        placeAddress: fixture.placeAddress,
-        status: fixture.status,
-      })),
+      fixtures: fixtures.map((fixture) => {
+        const fact = fixture.game === null ? undefined : factByGameId.get(fixture.game.id);
+        return {
+          teamMatchId: fixture.id,
+          title: fixture.title,
+          homeTeamId: fixture.hostTeamId,
+          awayTeamId: fixture.approvedApplicantTeamId,
+          startAt: fixture.startAt,
+          placeName: fixture.placeName,
+          placeAddress: fixture.placeAddress,
+          status: fixture.status,
+          resultStage: resolveResultStage(fixture.game),
+          homeScore: fact?.homeScore ?? null,
+          awayScore: fact?.awayScore ?? null,
+        };
+      }),
     };
   }
 

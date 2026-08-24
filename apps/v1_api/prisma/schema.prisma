@@ -741,6 +741,11 @@ model V1UserProfile {
   /// 켜면 본인에게도 남에게도 카드가 안 보이고 기존 프로필만 남는다 -- 게임화에
   /// 거부감이 있는 사용자를 위한 탈출구다. 카드를 강제하지 않기 위해 존재한다.
   playerCardHidden Boolean @default(false) @map("player_card_hidden")
+  // 선수 카드 **모양**. 코스메틱이라 능력치·등급 계산에는 쓰이지 않는다.
+  // 기본값은 'rect'(네모) -- 처음 받는 카드는 가장 단순해야 하고, 방패는 업적으로 연다.
+  // 잠금 조건을 못 넘은 값이 저장돼 있어도 서버가 매번 재판정해 rect 로 떨어뜨린다
+  // (후기 삭제 등으로 조건이 깨졌을 때 화면과 권한이 어긋나지 않게).
+  playerCardShape String @default("rect") @map("player_card_shape")
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
   deletedAt       DateTime? @map("deleted_at")

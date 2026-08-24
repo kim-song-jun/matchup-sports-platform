@@ -13,7 +13,13 @@ import {
   findLatestPublicParticipation,
 } from '../games/public-records/public-consent';
 import { loadPlayerCardRecordStats } from '../games/public-records/player-card-stats';
-import { buildPlayerCard, type PlayerCard } from './player-card';
+import {
+  buildPlayerCard,
+  resolveCardShape,
+  unlockedCardShapes,
+  MIN_REVIEWS_FOR_SHIELD_SHAPE,
+  type PlayerCard,
+} from './player-card';
 import { PrismaService } from '../prisma/prisma.service';
 import { isReviewRevealed } from '../reviews/review-visibility';
 import { removeUserFromActiveRosters } from '../tournaments/roster-cleanup';
@@ -28,6 +34,7 @@ import {
   UpdatePlayerCardHiddenDto,
   UpdateTournamentRealNameVisibilityDto,
   WithdrawalRequestDto,
+  UpdatePlayerCardShapeDto,
 } from './dto/profile.dto';
 
 // v1_notification_preferences row가 아직 없는 사용자에게 읽기 전용으로 보여줄 기본값 —
@@ -350,7 +357,7 @@ export class ProfileService {
       recentActivity: await findLatestPublicParticipation(this.prisma, user.id),
       // Task 155 선수 카드. 숨김을 켠 사용자에게는 null 을 내려 프론트가 섹션 자체를
       // 렌더하지 않게 한다 -- 빈 카드를 남기면 "숨겼는데 자리가 남는" 상태가 된다.
-      playerCard: user.profile?.playerCardHidden === true ? null : await this.buildPlayerCardFor(user.id),
+      playerCard: user.profile?.playerCardHidden === true ? null : await this.buildPlayerCardFor(user.id, user.profile?.playerCardShape),
       reputation: {
         ...toReputationPayload(user.reputationSummary),
         mannerScore: liveReputation.mannerScore,
@@ -368,7 +375,7 @@ export class ProfileService {
    * 기록 쪽은 공개 기록 목록과 같은 게이트를 통과한 것만 쓴다. 후기 쪽(4항목 평균)은
    * 1층 데이터라 동의와 무관하게 읽는다 -- 두 층의 경계가 카드 안에서도 그대로다.
    */
-  private async buildPlayerCardFor(userId: string): Promise<PlayerCard> {
+  private async buildPlayerCardFor(userId: string, profileShape?: string | null): Promise<PlayerCard> {
     const [records, reputation, consent] = await Promise.all([
       loadPlayerCardRecordStats(this.prisma, userId),
       this.prisma.v1UserReputationSummary.findUnique({ where: { userId } }),
@@ -389,6 +396,7 @@ export class ProfileService {
       mannerScore: toNumber(reputation?.metricMannerScore),
       punctualityScore: toNumber(reputation?.metricPunctualityScore),
       reviewCount: reputation?.metricReviewCount ?? 0,
+      savedShape: profileShape,
       recordsConsented: consent?.state === V1ConsentState.GRANTED,
       // 연결된 기록이 하나도 없으면 동의를 켜도 열릴 것이 없다 -- 그 사실을 산식에
       // 넘겨야 "공개를 켜면 열려요" 라는 거짓 약속을 하지 않는다.
@@ -927,6 +935,52 @@ export class ProfileService {
    * 선수 카드 숨김 토글 조회 (Task 155). 프로필 row 가 없으면 컬럼 기본값과 같은
    * false(= 카드를 보여준다)를 반환한다 -- 대회 실명 토글과 같은 패턴.
    */
+  /**
+   * 카드 모양 설정 화면이 필요한 것 전부.
+   *
+   * `unlocked` 를 서버가 내려주는 이유: 잠금 조건을 화면에도 복사해 두면 규칙이 두 곳이 되고,
+   * 나중에 조건을 바꿀 때 한쪽만 고쳐 "열렸다고 나오는데 저장은 거부되는" 상태가 된다.
+   */
+  async myPlayerCardShape(user: V1AuthUser) {
+    const [profile, reputation] = await Promise.all([
+      this.prisma.v1UserProfile.findUnique({ where: { userId: user.id }, select: { playerCardShape: true } }),
+      this.prisma.v1UserReputationSummary.findUnique({ where: { userId: user.id }, select: { metricReviewCount: true } }),
+    ]);
+    const reviewCount = reputation?.metricReviewCount ?? 0;
+    return {
+      shape: resolveCardShape(profile?.playerCardShape, reviewCount),
+      unlocked: unlockedCardShapes(reviewCount),
+      reviewCount,
+      requiredForShield: MIN_REVIEWS_FOR_SHIELD_SHAPE,
+    };
+  }
+
+  /** 잠긴 모양은 저장 자체를 거부한다 -- 화면이 막는 것과 별개로 서버가 마지막 문이다. */
+  async updateMyPlayerCardShape(user: V1AuthUser, dto: UpdatePlayerCardShapeDto) {
+    this.assertMutableAccount(user);
+    const existing = await this.prisma.v1UserProfile.findUnique({ where: { userId: user.id }, select: { id: true } });
+    if (!existing) {
+      throw new NotFoundException({ code: 'PROFILE_NOT_FOUND', message: '프로필을 먼저 등록해주세요.' });
+    }
+    const reputation = await this.prisma.v1UserReputationSummary.findUnique({
+      where: { userId: user.id },
+      select: { metricReviewCount: true },
+    });
+    const reviewCount = reputation?.metricReviewCount ?? 0;
+    if (!unlockedCardShapes(reviewCount).includes(dto.shape)) {
+      throw new ForbiddenException({
+        code: 'CARD_SHAPE_LOCKED',
+        message: `후기 ${MIN_REVIEWS_FOR_SHIELD_SHAPE}개를 받으면 열려요.`,
+      });
+    }
+    await this.prisma.v1UserProfile.update({
+      where: { userId: user.id },
+      data: { playerCardShape: dto.shape },
+      select: { id: true },
+    });
+    return { shape: dto.shape, unlocked: unlockedCardShapes(reviewCount), reviewCount, requiredForShield: MIN_REVIEWS_FOR_SHIELD_SHAPE };
+  }
+
   async myPlayerCardHidden(user: V1AuthUser) {
     const profile = await this.prisma.v1UserProfile.findUnique({
       where: { userId: user.id },

@@ -98,6 +98,9 @@ export function PlayerCard({
   return (
     <section
       className="tm-player-card"
+      // 모양은 코스메틱이라 data 속성으로만 내보내고 CSS 가 그린다 -- 컴포넌트 로직에
+      // 모양별 분기를 넣으면 새 모양을 더할 때마다 이 파일을 고쳐야 한다.
+      data-shape={card.shape ?? 'rect'}
       style={{ '--tm-card-ring': tier.ring, '--tm-card-glow': tier.glow } as React.CSSProperties}
       aria-label={`${displayName} 선수 카드`}
     >

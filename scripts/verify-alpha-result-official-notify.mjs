@@ -49,6 +49,14 @@ function apiWith(cookie) {
   };
 }
 
+/** 200 이 아니면 status·본문과 함께 즉시 실패 — 재조회·폴링 전 지점 공용 가드. */
+function expectData(res, label) {
+  if (res.status !== 200 || res.json?.data === undefined) {
+    throw new Error(`${label} 실패 HTTP ${res.status}: ${res.text.slice(0, 200)}`);
+  }
+  return res.json.data;
+}
+
 function canonicalize(v) {
   if (Array.isArray(v)) return v.map(canonicalize);
   if (v !== null && typeof v === 'object')
@@ -104,7 +112,7 @@ async function main() {
       console.log(`라인업 저장 ${tag}: HTTP ${saved.status}${saved.status >= 400 ? ' ' + saved.text.slice(0,200) : ''}`);
       if (saved.status >= 400) throw new Error('save 실패');
       // submit 의 expectedVersion 은 저장 직후 **다시 읽은** 라인업 버전 (저장소 관례)
-      g = (await api('GET', `/games/${gameId}`)).json?.data;
+      g = expectData(await api('GET', `/games/${gameId}`), '게임 재조회');
       const fresh = (g.lineups ?? []).find((l) => l.sideId === lineup.sideId);
       if (!fresh) {
         throw new Error(`재조회에서 라인업(sideId=${lineup.sideId})을 찾지 못했어요 — 응답: ${JSON.stringify(g.lineups ?? []).slice(0, 200)}`);
@@ -120,7 +128,7 @@ async function main() {
       }
       console.log(`라인업 제출 ${tag}: HTTP ${sub.status}${sub.status >= 400 ? ' ' + sub.text.slice(0,200) : ''}`);
       if (sub.status >= 400) throw new Error('submit 실패');
-      g = (await api('GET', `/games/${gameId}`)).json?.data;
+      g = expectData(await api('GET', `/games/${gameId}`), '게임 재조회');
     }
   }
 
@@ -139,7 +147,7 @@ async function main() {
   });
   console.log('takeover OK');
   const command = async (name, payload = {}) => {
-    g = (await api('GET', `/games/${gameId}`)).json?.data;
+    g = expectData(await api('GET', `/games/${gameId}`), '게임 재조회');
     const id = randomUUID();
     return api('POST', `/games/${gameId}/commands/${name}`,
       { expectedVersion: g.version, clientCommandId: id, takeoverToken: token, occurredAt: new Date().toISOString(), payload },
@@ -156,10 +164,10 @@ async function main() {
   } finally { socket.close(); }
 
   // SUBMITTED 리비전 → officialize
-  const revs = (await api('GET', `/games/${gameId}/result-revisions`)).json?.data;
+  const revs = expectData(await api('GET', `/games/${gameId}/result-revisions`), '리비전 목록 조회');
   const submitted = (revs?.items ?? revs ?? []).find((r) => r.state === 'SUBMITTED');
   if (!submitted) throw new Error(`SUBMITTED 리비전 없음: ${JSON.stringify(revs).slice(0,300)}`);
-  g = (await api('GET', `/games/${gameId}`)).json?.data;
+  g = expectData(await api('GET', `/games/${gameId}`), '게임 재조회');
   const offId = randomUUID();
   const off = await api('POST', `/games/${gameId}/result-revisions/${submitted.id}/officialize`, {
     expectedVersion: g.version, clientCommandId: offId, projectionPreviewHash: previewHash(submitted),
@@ -177,7 +185,7 @@ async function main() {
   console.log('팀장 로그인 OK — 알림 폴링(최대 90s)');
   for (let i = 0; i < 18; i += 1) {
     await new Promise((r) => setTimeout(r, 5000));
-    const notis = (await capApi('GET', '/notifications?limit=10')).json?.data;
+    const notis = expectData(await capApi('GET', '/notifications?limit=10'), '알림 목록 조회');
     const hit = (notis?.items ?? []).find(
       (n) =>
         n.title === '대회 경기 결과가 확정됐어요' &&

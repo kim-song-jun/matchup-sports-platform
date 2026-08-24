@@ -5,6 +5,10 @@ import { GameResultOfficialProjectionService } from '../game-operations/game-res
 import { GameResultVoidProjectionService } from '../game-operations/game-result-void-projection.service';
 import { GameResultSubmittedEscalationService } from './result-escalation/game-result-submitted-escalation.service';
 import { GameResultLeagueAutoApproveService } from './result-escalation/game-result-league-auto-approve.service';
+import {
+  LEAGUE_RESULT_ENTRY_REMINDER_TYPE,
+  LeagueResultEntryReminderService,
+} from './league-reminders/league-result-entry-reminder.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { WebPushService } from '../notifications/web-push.service';
 
@@ -86,6 +90,12 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
     // 별개 잡이다 -- 이쪽은 실제 OFFICIAL 전이를 일으킨다.
     const leagueAutoApprove = new GameResultLeagueAutoApproveService();
     this.registerHandler('GAME_RESULT_LEAGUE_AUTO_APPROVE', leagueAutoApprove.handler);
+    // 사용자 확정: 리그 대진의 경기 시작 +24시간에도 결과 미입력(not_entered)이면
+    // active admin(owner/ops, support 제외) 전원에게 1회 알림. 스케줄은
+    // league-match-admin.service.ts의 generateFixtures/regenerateFixtures(대진 생성)와
+    // updateFixture(시작 시각 변경)가 건다 — league-result-entry-reminder.service.ts 참고.
+    const leagueResultEntryReminder = new LeagueResultEntryReminderService();
+    this.registerHandler(LEAGUE_RESULT_ENTRY_REMINDER_TYPE, leagueResultEntryReminder.handler);
     // reject/request_supplement close their own review SLA synchronously in
     // the API command (TournamentResultReviewService.closeReviewSla, Task
     // 22); the durable audit handler here only needs to make the outbox's

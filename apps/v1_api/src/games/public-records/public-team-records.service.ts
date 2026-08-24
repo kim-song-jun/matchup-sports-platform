@@ -348,13 +348,13 @@ export class PublicTeamRecordsService {
       .flat()
       .map((event) => event.participantId)
       .filter((id): id is string => id !== null);
-    // 정책 공개(기본값)에서는 이름이 동의와 무관하게 항상 보이므로 이 맵을 채울 필요가
-    // 없다 -- 대회 기록의 동일한 게이팅과 이유가 같다(participant-name-gating.ts).
-    // **항상 조회한다.** 이름 게이팅(되돌린 상태에서만 동작)에는 안 쓰이지만 프로필 링크
-    // (`resolveParticipantProfileHref`)는 정책 공개 기본값에서도 동의를 확인해야 한다 --
-    // 게이팅 플래그로 감싸 두면 기본 운영 설정에서 맵이 비어 `profileHref` 가 항상 null 이
-    // 된다(#707 에서 getMatch 가 같은 결함으로 리뷰에 걸렸다). 이 화면은 관전자 폴링
-    // 경로가 아니라(팀 전적 훅에 refetchInterval 없음) 매 요청 조회 비용도 문제되지 않는다.
+    // **항상 조회한다.** 이름 게이팅(되돌린 상태에서만 동작)에는 쓰이지 않지만, 프로필
+    // 링크(`resolveParticipantProfileHref`)는 정책 공개 기본값에서도 동의를 확인해야 하기
+    // 때문이다 -- 게이팅 플래그로 감싸 두면 기본 운영 설정에서 이 맵이 비어 `profileHref`
+    // 가 항상 null 이 된다(#707 에서 getMatch 가 바로 그 결함으로 리뷰에 걸렸다).
+    // 이 화면은 관전자 폴링 경로가 아니라(`usePublicTeamRecords` 에 refetchInterval 없음)
+    // 매 요청 조회 비용도 문제되지 않는다 -- 폴링되는 일정 카드가 이 맵을 여전히 게이팅
+    // 뒤에 두는 이유와 대비된다.
     const consentMap = await loadParticipantConsentEligibility(this.prisma, scorerParticipantIds);
     const nameProfileByUserId = await loadParticipantNameProfiles(
       this.prisma,

@@ -19,8 +19,11 @@ function RecordsSkeleton() {
 
 export function TeamRecordsPageClient({ teamId }: { teamId: string }) {
   const [activeType, setActiveType] = useState<TeamRecordTypeFilter>('all');
+  // '전체 시즌' 은 로컬 전용 값(undefined)이다 -- 서버 `season` 쿼리 자체를 생략해
+  // 팀 전체 기간을 요청한다(U2의 '전체' 탭과 동일한 계약).
+  const [activeSeason, setActiveSeason] = useState<string | undefined>(undefined);
   const { data, isLoading, isError, error, refetch, hasNextPage, isFetchingNextPage, fetchNextPage } =
-    usePublicTeamRecords(teamId, undefined, activeType === 'all' ? undefined : activeType);
+    usePublicTeamRecords(teamId, activeSeason, activeType === 'all' ? undefined : activeType);
 
   if (isLoading) {
     return (
@@ -63,6 +66,8 @@ export function TeamRecordsPageClient({ teamId }: { teamId: string }) {
         onLoadMore={() => void fetchNextPage()}
         activeType={activeType}
         onChangeType={setActiveType}
+        activeSeason={activeSeason}
+        onChangeSeason={setActiveSeason}
       />
     </AppChrome>
   );

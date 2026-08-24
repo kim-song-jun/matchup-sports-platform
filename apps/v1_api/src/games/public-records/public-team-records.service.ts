@@ -106,9 +106,14 @@ export class PublicTeamRecordsService {
     // 집계(summary/byType)는 `type` 필터와 무관하게 항상 전체 기준이다 -- 필터는
     // items 목록에만 적용된다(과제 지시: "페이지네이션과 집계를 섞지 마라"). 종류별
     // 뱃지·탭을 동시에 보여주려면 요약이 필터에 따라 흔들리면 안 된다.
-    const [rawFacts, summary] = await Promise.all([
+    //
+    // `availableSeasons`도 같은 이유로 `season`/`type` 둘 다와 무관하게 항상 팀
+    // 전체 기준이다 -- 한 시즌을 고른 상태에서 드롭다운을 다시 열어도 선택지 자체가
+    // 줄어들면 안 된다(그 시즌만 있는 것처럼 보이는 함정).
+    const [rawFacts, summary, availableSeasons] = await Promise.all([
       this.fetchRawFacts(teamId, limit, cursor, seasonRange, query.type),
       this.fetchSummary(teamId, seasonRange),
+      this.fetchAvailableSeasons(teamId),
     ]);
 
     const hasMore = rawFacts.length > limit;
@@ -203,9 +208,27 @@ export class PublicTeamRecordsService {
       teamName: team.name,
       teamLogoUrl: team.profile?.logoUrl ?? null,
       summary,
+      availableSeasons,
       items,
       nextCursor,
     };
+  }
+
+  /**
+   * 시즌 드롭다운의 선택지 소스 -- 팀에 공식 경기가 있었던 연도(`playedAt` 4자리 연도)만,
+   * 하드코딩 없이 실데이터 기준으로 내려준다. `fetchSummary`/`fetchRawFacts`와 동일하게
+   * "그 게임의 현재 공식 리비전"만 센다(취소·구버전 리비전은 시즌 목록에 유령 연도를
+   * 남기지 않는다). 내림차순(최신 시즌 먼저) -- 드롭다운 첫 항목이 최근 시즌이 되도록.
+   */
+  private async fetchAvailableSeasons(teamId: string): Promise<readonly string[]> {
+    const rows = await this.prisma.$queryRaw<{ readonly season: string }[]>(Prisma.sql`
+      SELECT DISTINCT to_char(trf.played_at, 'YYYY') AS season
+      FROM v1_team_record_facts trf
+      INNER JOIN v1_games g ON g.id = trf.game_id AND g.current_official_revision_id = trf.revision_id
+      WHERE trf.team_id = ${teamId}
+      ORDER BY season DESC
+    `);
+    return rows.map((row) => row.season);
   }
 
   private async fetchRawFacts(

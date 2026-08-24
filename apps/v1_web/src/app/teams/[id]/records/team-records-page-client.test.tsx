@@ -32,10 +32,18 @@ vi.mock('@/components/public-game-records/use-public-game-records', () => ({
  * `public-game-records.test.tsx`의 `TeamRecordsContent — 종류 탭 (U2)`에서 이미 검증한다.
  */
 vi.mock('@/components/public-game-records/team-records-content', () => ({
-  TeamRecordsContent: ({ onChangeType }: { onChangeType?: (type: TeamRecordTypeFilter) => void }) => (
+  TeamRecordsContent: ({
+    onChangeType,
+    onChangeSeason,
+  }: {
+    onChangeType?: (type: TeamRecordTypeFilter) => void;
+    onChangeSeason?: (season: string | undefined) => void;
+  }) => (
     <div data-testid="records-content">
       <button type="button" onClick={() => onChangeType?.('league')}>정규 리그</button>
       <button type="button" onClick={() => onChangeType?.('tournament')}>대회</button>
+      <button type="button" onClick={() => onChangeSeason?.('2025')}>2025시즌</button>
+      <button type="button" onClick={() => onChangeSeason?.(undefined)}>전체 시즌</button>
     </div>
   ),
 }));
@@ -52,6 +60,7 @@ function page(teamName: string): PublicTeamRecordsResponse {
     teamId: 'team-1',
     teamName,
     summary: { played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0 },
+    availableSeasons: ['2026', '2025'],
     items: [],
     nextCursor: null,
   } as unknown as PublicTeamRecordsResponse;
@@ -119,6 +128,23 @@ describe('TeamRecordsPageClient', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '대회' }));
     expect(mocks.usePublicTeamRecords).toHaveBeenLastCalledWith('team-1', undefined, 'tournament');
+  });
+
+  // 시즌 드롭다운 선택도 탭과 같은 방식(서버 재요청)이어야 한다 -- usePublicTeamRecords
+  // 훅의 두 번째 인자(season)로 그대로 전달되는지 직접 확인한다.
+  it('시즌 선택이 usePublicTeamRecords 훅 호출의 season 파라미터로 그대로 전달된다', () => {
+    mocks.usePublicTeamRecords.mockReturnValue(loaded('강남 러닝 크루'));
+
+    render(<TeamRecordsPageClient teamId="team-1" />);
+
+    // 초기 렌더 -- '전체 시즌' 이라 season 은 undefined 여야 한다.
+    expect(mocks.usePublicTeamRecords).toHaveBeenLastCalledWith('team-1', undefined, undefined);
+
+    fireEvent.click(screen.getByRole('button', { name: '2025시즌' }));
+    expect(mocks.usePublicTeamRecords).toHaveBeenLastCalledWith('team-1', '2025', undefined);
+
+    fireEvent.click(screen.getByRole('button', { name: '전체 시즌' }));
+    expect(mocks.usePublicTeamRecords).toHaveBeenLastCalledWith('team-1', undefined, undefined);
   });
 
   it('renders the desktop page head so the title survives above 1024px', () => {

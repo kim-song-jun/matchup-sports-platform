@@ -53,6 +53,25 @@ describe('fetchPublicProfileForOg', () => {
     await expect(fetchPublicProfileForOg('u-1')).resolves.toBeNull();
   });
 
+  it("no-store 전략은 revalidate 대신 cache: 'no-store' 를 쓴다 -- force-dynamic 라우트와 모순되지 않게", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: null }) });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await fetchPublicProfileForOg('u-1', 'no-store');
+
+    expect(fetchMock).toHaveBeenCalledWith(expect.any(String), { cache: 'no-store' });
+  });
+
+  it('실패를 조용히 삼키지 않는다 -- 원인이 로그에 남아야 다음에 볼 수 있다', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('boom')));
+
+    await fetchPublicProfileForOg('u-1');
+
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
   it('내부 API origin 을 환경변수에서 읽어 공개 엔드포인트를 때린다', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: null }) });
     vi.stubGlobal('fetch', fetchMock);

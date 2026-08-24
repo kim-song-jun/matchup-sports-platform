@@ -41,7 +41,9 @@ export const dynamic = 'force-dynamic';
 
 export default async function Image({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [fonts, profile] = await Promise.all([loadOgFonts(), fetchPublicProfileForOg(id)]);
+  // 이 라우트는 force-dynamic 이므로 fetch 도 no-store 여야 한다 -- revalidate 와 함께
+  // 쓰면 캐시 전략이 모순되고, 그 예외를 헬퍼가 삼켜 모든 사용자가 같은 폴백을 받았다.
+  const [fonts, profile] = await Promise.all([loadOgFonts(), fetchPublicProfileForOg(id, 'no-store')]);
 
   // 폰트를 못 읽었으면 satori 기본 폰트로 간다. 한글은 못 그리지만 500 보다는 낫다 --
   // 깨진 썸네일은 링크를 안 눌리게 만든다. 이 경우 라틴 전용 브랜드 이미지로 떨어진다.

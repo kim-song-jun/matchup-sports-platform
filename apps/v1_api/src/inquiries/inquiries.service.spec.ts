@@ -17,6 +17,12 @@ describe('InquiriesService', () => {
       create: jest.fn(),
       findUnique: jest.fn(),
     },
+    v1TeamContact: {
+      findUnique: jest.fn(),
+    },
+    v1TeamMembership: {
+      findFirst: jest.fn(),
+    },
   };
   let service: InquiriesService;
 
@@ -153,5 +159,60 @@ describe('InquiriesService', () => {
   it('returns not found when inquiry is missing', async () => {
     prisma.v1Inquiry.findUnique.mockResolvedValue(null);
     await expect(service.detail(user, 'missing')).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  describe('신고 대상 팀 기록', () => {
+    it('신고자가 fromTeam 소속이면 대상은 toTeam 이다', async () => {
+      prisma.v1TeamContact.findUnique.mockResolvedValue({ id: 'c1', fromTeamId: 'A', toTeamId: 'B' });
+      prisma.v1TeamMembership.findFirst.mockImplementation(({ where }: any) =>
+        Promise.resolve(where.teamId === 'A' ? { id: 'm1' } : null),
+      );
+
+      await service.create(user, {
+        category: 'report', relatedType: 'team_contact', relatedId: 'c1',
+        reportReason: 'spam', title: '신고', body: '내용',
+      } as any);
+
+      expect(prisma.v1Inquiry.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ reportedTeamId: 'B' }) }),
+      );
+    });
+
+    it('신고자가 toTeam 소속이면 대상은 fromTeam 이다', async () => {
+      prisma.v1TeamContact.findUnique.mockResolvedValue({ id: 'c1', fromTeamId: 'A', toTeamId: 'B' });
+      prisma.v1TeamMembership.findFirst.mockImplementation(({ where }: any) =>
+        Promise.resolve(where.teamId === 'B' ? { id: 'm1' } : null),
+      );
+
+      await service.create(user, {
+        category: 'report', relatedType: 'team_contact', relatedId: 'c1',
+        reportReason: 'spam', title: '신고', body: '내용',
+      } as any);
+
+      expect(prisma.v1Inquiry.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ reportedTeamId: 'A' }) }),
+      );
+    });
+
+    // 남의 컨택 id 를 넣어 신고해도 대상이 정해지지 않는다 — 별도 권한 검사 없이 이것이 방어가 된다.
+    it('어느 팀에도 속하지 않으면 대상은 null 이고 접수는 성공한다', async () => {
+      prisma.v1TeamContact.findUnique.mockResolvedValue({ id: 'c1', fromTeamId: 'A', toTeamId: 'B' });
+      prisma.v1TeamMembership.findFirst.mockResolvedValue(null);
+
+      await service.create(user, {
+        category: 'report', relatedType: 'team_contact', relatedId: 'c1',
+        reportReason: 'spam', title: '신고', body: '내용',
+      } as any);
+
+      expect(prisma.v1Inquiry.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ reportedTeamId: null }) }),
+      );
+    });
+
+    it('신고가 아닌 문의는 컨택을 조회하지 않는다', async () => {
+      await service.create(user, { category: 'account', title: '문의', body: '내용' } as any);
+
+      expect(prisma.v1TeamContact.findUnique).not.toHaveBeenCalled();
+    });
   });
 });

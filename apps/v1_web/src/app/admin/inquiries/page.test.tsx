@@ -169,5 +169,52 @@ describe('AdminInquiriesPage — 신고 사유 필터', () => {
 
       expect(replaceMock).toHaveBeenLastCalledWith('/admin/inquiries', { scroll: false });
     });
+
+    // 신고 누적 팀 목록(#7) → 문의 목록 딥링크. 팀 id 는 자유 문자열이라 pickAllowed(허용
+    // 목록 대조)가 아니라 존재 여부만으로 적용한다.
+    describe('reportedTeamId (신고 누적 팀 딥링크)', () => {
+      it('URL 의 reportedTeamId 가 초기 필터로 적용되고 배너로 보인다', () => {
+        searchParamsValue = new URLSearchParams('category=report&reportedTeamId=team-2');
+
+        render(<AdminInquiriesPage />);
+
+        expect(inquiriesMock).toHaveBeenCalledWith(
+          expect.objectContaining({ reportedTeamId: 'team-2' }),
+        );
+        // 보이지 않는 필터가 목록을 좁히면 안 된다 — 걸려 있다는 표시가 항상 있어야 한다.
+        // 배너 안에 팀 id를 담은 별도 span이 있어 전체 텍스트에는 부가 정보가 더 붙는다 — 부분 일치로 확인.
+        expect(screen.getByText(/이 팀의 신고만 보는 중이에요/)).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: '팀 필터 해제' })).toBeInTheDocument();
+      });
+
+      it('필터 해제 버튼을 누르면 훅과 주소 양쪽에서 reportedTeamId 가 빠진다', async () => {
+        searchParamsValue = new URLSearchParams('reportedTeamId=team-2');
+        const user = userEvent.setup();
+        render(<AdminInquiriesPage />);
+
+        await user.click(screen.getByRole('button', { name: '팀 필터 해제' }));
+
+        expect(screen.queryByText(/이 팀의 신고만 보는 중이에요/)).not.toBeInTheDocument();
+        const args = inquiriesMock.mock.calls.at(-1)?.[0];
+        expect(args).not.toHaveProperty('reportedTeamId');
+        expect(replaceMock).toHaveBeenLastCalledWith('/admin/inquiries', { scroll: false });
+      });
+
+      it('다른 필터를 바꿔도 reportedTeamId 는 주소·훅에서 사라지지 않는다', async () => {
+        // 함정: 안 보이는 필터가 다른 조작 한 번에 조용히 빠지면 "왜 결과가 없지?"가 된다.
+        searchParamsValue = new URLSearchParams('reportedTeamId=team-2');
+        const user = userEvent.setup();
+        render(<AdminInquiriesPage />);
+
+        await user.selectOptions(screen.getByLabelText('문의 분류 필터'), 'report');
+
+        expect(replaceMock).toHaveBeenLastCalledWith(
+          '/admin/inquiries?category=report&reportedTeamId=team-2',
+          { scroll: false },
+        );
+        const args = inquiriesMock.mock.calls.at(-1)?.[0];
+        expect(args).toMatchObject({ category: 'report', reportedTeamId: 'team-2' });
+      });
+    });
   });
 });

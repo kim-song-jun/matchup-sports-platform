@@ -1267,6 +1267,7 @@ model V1Team {
   contactRequestsReceived      V1TeamContact[]             @relation("V1TeamContactToTeam")
   contactBlocksMade            V1TeamContactBlock[]        @relation("V1TeamContactBlockOwner")
   contactBlocksReceived        V1TeamContactBlock[]        @relation("V1TeamContactBlockTarget")
+  reportedInquiries            V1Inquiry[]                 @relation("V1InquiryReportedTeam")
 
   @@index([ownerUserId])
   @@index([sportId, regionId, status])
@@ -2149,29 +2150,32 @@ model V1StatusChangeLog {
 }
 
 model V1Inquiry {
-  id           String                 @id @default(uuid())
-  userId       String?                @map("user_id")
-  guestEmail   String?                @map("guest_email")
-  guestPhone   String?                @map("guest_phone")
-  category     V1InquiryCategory
-  title        String
-  body         String
-  contact      String?
-  relatedType  V1InquiryRelatedType?  @map("related_type")
-  relatedId    String?                @map("related_id")
-  reportReason V1InquiryReportReason? @map("report_reason")
-  status       V1InquiryStatus        @default(received)
-  closedAt     DateTime?              @map("closed_at")
-  createdAt    DateTime               @default(now()) @map("created_at")
-  updatedAt    DateTime               @updatedAt @map("updated_at")
+  id             String                 @id @default(uuid())
+  userId         String?                @map("user_id")
+  guestEmail     String?                @map("guest_email")
+  guestPhone     String?                @map("guest_phone")
+  category       V1InquiryCategory
+  title          String
+  body           String
+  contact        String?
+  relatedType    V1InquiryRelatedType?  @map("related_type")
+  relatedId      String?                @map("related_id")
+  reportReason   V1InquiryReportReason? @map("report_reason")
+  reportedTeamId String?                @map("reported_team_id")
+  status         V1InquiryStatus        @default(received)
+  closedAt       DateTime?              @map("closed_at")
+  createdAt      DateTime               @default(now()) @map("created_at")
+  updatedAt      DateTime               @updatedAt @map("updated_at")
 
-  user    V1User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  replies V1InquiryReply[]
+  user         V1User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reportedTeam V1Team?          @relation("V1InquiryReportedTeam", fields: [reportedTeamId], references: [id], onDelete: SetNull)
+  replies      V1InquiryReply[]
 
   @@index([userId, status, createdAt])
   @@index([category, status, createdAt])
   @@index([relatedType, relatedId])
   @@index([reportReason, createdAt])
+  @@index([reportedTeamId, createdAt])
   @@map("v1_inquiries")
 }
 

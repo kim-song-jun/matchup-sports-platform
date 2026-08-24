@@ -19,6 +19,7 @@ import type {
   V1AdminInquiryReplyPayload,
   V1AdminInquiryRow,
   V1AdminInquiryStatusPayload,
+  V1AdminReportedTeamRow,
   V1AdminLog,
   V1AdminContentAsset,
   V1AdminPopupCreatePayload,
@@ -2686,6 +2687,34 @@ export function useV1AdminInquiriesPendingCount() {
     staleTime: 15_000,
     refetchInterval: 30_000,
     retry: false, // refetchInterval과 겹쳐 일시 실패 시 중복 요청 방지 (Copilot 리뷰 지적, PR #63)
+  });
+}
+
+/** 신고 누적 팀 랭킹 (`GET /admin/reports/teams`) — 반복 신고되는 팀을 운영자가 한눈에 보는 목록. */
+export function useV1AdminReportedTeams(limit?: number) {
+  return useQuery({
+    queryKey: v1Keys.adminReportedTeams(limit),
+    queryFn: () =>
+      v1Get<{ items: V1AdminReportedTeamRow[]; windowDays: number }>(
+        '/admin/reports/teams',
+        limit ? { limit } : undefined,
+      ),
+  });
+}
+
+/** 신고를 근거로 신고자 팀 명의로 대상 팀을 대리 차단한다. 이미 차단돼 있으면 200 + `alreadyBlocked: true`(에러 아님). */
+export function useV1BlockReportedTeam() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (inquiryId: string) =>
+      v1Post<{ blocked: boolean; alreadyBlocked: boolean; teamId: string; blockedTeamId: string }>(
+        `/admin/inquiries/${inquiryId}/block-reported-team`,
+      ),
+    onSuccess: (_data, inquiryId) => {
+      // 차단은 문의 상세의 조치 이력과 신고 누적 목록 양쪽에 영향을 준다.
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminInquiry(inquiryId) });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'reported-teams'] });
+    },
   });
 }
 

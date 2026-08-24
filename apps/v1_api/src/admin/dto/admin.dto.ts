@@ -202,6 +202,11 @@ export class AdminInquiryListQueryDto {
   @IsIn(['spam', 'harassment', 'impersonation', 'inappropriate', 'other'])
   reportReason?: 'spam' | 'harassment' | 'impersonation' | 'inappropriate' | 'other';
 
+  // 신고 롤업 목록(GET /admin/reports/teams)에서 "이 팀 신고만" 딥링크할 때 쓴다.
+  @IsOptional()
+  @IsString()
+  reportedTeamId?: string;
+
   @IsOptional()
   @IsString()
   @MaxLength(100)
@@ -219,6 +224,16 @@ export class AdminInquiryListQueryDto {
   @Min(1)
   page?: number;
 
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  limit?: number;
+}
+
+/** 신고 누적 팀 롤업 목록(GET /admin/reports/teams) 쿼리 — 팀 단위 상위 N 랭킹이라 커서 페이지네이션은 없다. */
+export class AdminReportedTeamListQueryDto {
   @IsOptional()
   @Type(() => Number)
   @IsInt()

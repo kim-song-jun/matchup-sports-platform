@@ -2330,10 +2330,34 @@ export type V1AdminInquiryReply = V1InquiryReply & {
   adminUserId: string | null;
 };
 
+/** 신고 대상 팀의 최근 누적 요약 — 문의 상세(`GET /admin/inquiries/:id`)에서 조치 판단 맥락으로 실린다. */
+export type V1AdminReportedTeamSummary = {
+  teamId: string;
+  name: string;
+  status: string;
+  windowDays: number;
+  recentReportCount: number;
+  /** 사유별 건수 맵. 건수가 0인 사유는 키 자체가 없다(0으로 채워지지 않음). */
+  reasonBreakdown: Partial<Record<V1InquiryReportReason, number>>;
+};
+
+/** 신고 누적 팀 랭킹 한 행 (`GET /admin/reports/teams`). 팀이 삭제됐거나 사유가 없을 수 있어 널값을 그대로 노출한다. */
+export type V1AdminReportedTeamRow = {
+  teamId: string;
+  name: string | null;
+  status: string | null;
+  totalCount: number;
+  recentCount: number;
+  topReason: V1InquiryReportReason | null;
+  lastReportedAt: string | null;
+};
+
 export type V1AdminInquiryDetail = V1AdminInquiryRow & {
   body: string;
   contact: string | null;
   replies: V1AdminInquiryReply[];
+  /** 신고(`category: 'report'`) 문의만 채워진다 — 그 외 문의·대상 팀 조회 실패 시 null. */
+  reportedTeam: V1AdminReportedTeamSummary | null;
 };
 
 export type V1AdminInquiryReplyPayload = {
@@ -2529,6 +2553,8 @@ export type AdminListFilters = {
   category?: string;
   /** 문의 목록 전용 — `category: 'report'` 일 때만 의미가 있다. */
   reportReason?: string;
+  /** 문의 목록 전용 — 신고 누적 팀 랭킹에서 "이 팀 신고만" 딥링크할 때 쓴다. 칩이 없는 필터라 자기 facet은 없다. */
+  reportedTeamId?: string;
   targetType?: string;
   cursor?: string;
   /** 페이지 번호(1부터). cursor 와 함께 보내면 서버가 page 를 우선한다. */

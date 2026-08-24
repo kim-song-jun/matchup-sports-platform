@@ -55,6 +55,22 @@ export function toResultRosterRows(
  * some legacy WebViews (see `lib/uuid.ts`'s randomUUID fallback note) don't either, and
  * this value is never verified server-side, so a lightweight fingerprint is enough.
  */
+/**
+ * 결과 리비전 `reason` 의 표시용 정리 — 맨 앞의 내부 마커(`[LEAGUE_RESULT_ENTRY]` 등)를
+ * 벗겨낸다.
+ *
+ * 마커는 서버(league-match-result-entry.service.ts)가 **멱등 판정**(startsWith)에 쓰는
+ * 저장용 값이라 저장 자체에서 뺄 수 없다. 그런데 화면이 reason 을 그대로 렌더하면서
+ * 사용자에게 "[LEAGUE_RESULT_CORRECTION] 스코어 정정" 처럼 내부 식별자가 노출됐다
+ * (2026-08-25 alpha 실측에서 발견). 형태가 같은 미래의 마커까지 잡도록 특정 문자열이
+ * 아니라 패턴([대문자·숫자·언더스코어])으로 벗긴다 — 사용자가 직접 대괄호로 시작하는
+ * 사유를 쓰는 경우와 충돌하지 않게 대문자 마커 형태로만 한정한다.
+ */
+export function displayRevisionReason(reason: string | null | undefined): string {
+  if (!reason) return '';
+  return reason.replace(/^\[[A-Z0-9_]+\]\s*/, '').trim();
+}
+
 export function hashResultPayload(payload: unknown): string {
   const text = JSON.stringify(payload);
   let hash = 0x811c9dc5;

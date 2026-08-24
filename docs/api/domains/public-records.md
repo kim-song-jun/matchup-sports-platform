@@ -48,6 +48,7 @@ existing file changed.
 |---|---|---|
 | `GET /tournaments/:id/schedule` | `cursor?`, `limit? (1-100, default 20)`, `round?`, `groupId?` | `{ tournamentId, tournamentTitle, bracketPublished, items[], unscheduled[], standings[], nextCursor }` |
 | `GET /tournaments/:id/matches/:fixtureId` | -- | one match projection (see below) |
+| `GET /tournaments/:id/player-records` | -- | `{ tournamentId, goals[], assists[] }` -- per-user `{ userId, nickname, profileHref, goals, assists }`, desc-sorted, top 30 each |
 | `GET /teams/:id/records` | `cursor?`, `limit?`, `season? (YYYY)` | `{ teamId, teamName, teamLogoUrl, summary, items[] (including opponentTeamLogoUrl), nextCursor }` |
 | `GET /users/:id/records` | `cursor?`, `limit?`, `season? (YYYY)` | `{ userId, nickname, summary, tournamentAwards[], items[], nextCursor }` |
 
@@ -328,6 +329,17 @@ identity/side itself:
   is not polled (`usePublicTeamRecords` sets no `refetchInterval`), so the extra lookup is
   paid once per view.
 
+- `GET /tournaments/:id/player-records` (retro STATS-1) is the tournament-domain
+  replica of the league's `playerRecords()` (`league-match-public.service.ts`):
+  per-user goal/assist totals aggregated from `V1GameResultParticipant` rows of
+  each game's **current official revision**, consent-gated with the same
+  `isParticipantPubliclyEligible` rule, rows with zero of the ranked stat
+  dropped, sorted descending, top 30 per list. Before the bracket is published
+  it returns empty lists (same axis as this lane's other unpublished-bracket
+  hiding). Every returned row is by construction a linked+consented user, so
+  each carries a non-null `profileHref` (same server-decides convention as
+  above). A forfeit/abandoned game contributes nothing on its own: an
+  operator-entered score has no participant stat rows.
 - **The schedule (`GET /tournaments/:id/schedule`) deliberately does not carry
   `profileHref`.** Its `consentMap` stays behind the name-gating flag because that endpoint
   *is* polled while any fixture is live (`LIVE_POLL_INTERVAL_MS`). Loading consent

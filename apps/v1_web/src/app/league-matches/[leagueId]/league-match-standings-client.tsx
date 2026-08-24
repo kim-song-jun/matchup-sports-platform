@@ -91,8 +91,9 @@ function ExpectedPromotionBadge({ kind, toTierLabel }: { kind: 'promoted' | 'rel
 }
 
 // competitionRanks 는 lib/competition-ranks.ts 로 이동 — 대회 개인 랭킹(STATS-1)과
-// 공유하기 위해서다. 기존 소비처(수상 페이지·테스트)를 위해 re-export 로 유지한다.
-export { competitionRanks } from '@/lib/competition-ranks';
+// 공유하기 위해서다. 상단에서 import 한 바인딩을 그대로 re-export 해 기존
+// 소비처(수상 페이지·테스트)를 유지한다(같은 모듈 이중 import 방지 — 리뷰 지적).
+export { competitionRanks };
 
 /**
  * 점수 필드(homeScore/awayScore)는 값이 없을 수 있다(미확정 대진) — 그때는 0:0으로

@@ -27,6 +27,7 @@ export function TournamentPlayerRecordsSections({
   errorMessage,
   onRetry,
   emptyBehavior,
+  containerStyle,
 }: {
   goals: readonly PublicTournamentPlayerRecordRow[] | undefined;
   assists: readonly PublicTournamentPlayerRecordRow[] | undefined;
@@ -35,6 +36,12 @@ export function TournamentPlayerRecordsSections({
   errorMessage: string;
   onRetry: () => void;
   emptyBehavior: 'hide' | 'empty-state';
+  /**
+   * 실제로 그릴 내용이 있을 때만 적용되는 래퍼 스타일. 일정 화면(hide 정책)이
+   * 바깥에서 패딩 div로 감싸면 null 반환 시에도 빈 여백이 남는다(리뷰 지적) —
+   * 래퍼를 컴포넌트 안으로 들여 내용과 운명을 같이하게 한다.
+   */
+  containerStyle?: React.CSSProperties;
 }) {
   const goalRows = goals ?? [];
   const assistRows = assists ?? [];
@@ -44,24 +51,27 @@ export function TournamentPlayerRecordsSections({
     [assistRows],
   );
 
+  const wrap = (content: React.ReactNode) =>
+    containerStyle === undefined ? <>{content}</> : <div style={containerStyle}>{content}</div>;
+
   if (isError) {
-    return <ErrorState message={errorMessage} onRetry={onRetry} />;
+    return wrap(<ErrorState message={errorMessage} onRetry={onRetry} />);
   }
   if (isLoading) {
-    return emptyBehavior === 'hide' ? null : (
-      <div className="tm-skeleton" style={{ height: 80, borderRadius: 12 }} />
+    return emptyBehavior === 'hide' ? null : wrap(
+      <div className="tm-skeleton" style={{ height: 80, borderRadius: 12 }} />,
     );
   }
   if (goalRows.length === 0 && assistRows.length === 0) {
-    return emptyBehavior === 'hide' ? null : (
+    return emptyBehavior === 'hide' ? null : wrap(
       <section>
         <h3 className="tm-hub-section-title" style={{ marginBottom: 10 }}>개인 기록</h3>
         <EmptyState title="아직 기록이 없어요" sub="확정된 경기 결과가 쌓이면 득점·도움 순위가 나타나요." />
-      </section>
+      </section>,
     );
   }
 
-  return (
+  return wrap(
     <>
       {goalRows.length > 0 ? (
         <RecordList title="득점 순위" rows={goalRows} ranks={goalRanks} unit="골" value={(row) => row.goals} />
@@ -69,7 +79,7 @@ export function TournamentPlayerRecordsSections({
       {assistRows.length > 0 ? (
         <RecordList title="도움 순위" rows={assistRows} ranks={assistRanks} unit="도움" value={(row) => row.assists} />
       ) : null}
-    </>
+    </>,
   );
 }
 

@@ -59,6 +59,34 @@ describe('TournamentPlayerRecordsSections', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it('hide 모드에서 기록이 없으면 containerStyle 래퍼(여백)도 그리지 않는다', () => {
+    // 리뷰에서 잡힌 버그의 고정: 페이지가 바깥 div로 감싸면 null 반환 시에도
+    // 40px 하단 패딩이 남았다 — 래퍼는 내용이 있을 때만 렌더돼야 한다.
+    const { container } = render(
+      <TournamentPlayerRecordsSections
+        {...base}
+        goals={[]}
+        assists={[]}
+        emptyBehavior="hide"
+        containerStyle={{ padding: '0 20px 40px' }}
+      />,
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it('내용이 있으면 containerStyle 래퍼가 내용과 함께 렌더된다', () => {
+    const { container } = render(
+      <TournamentPlayerRecordsSections
+        {...base}
+        goals={[row({ userId: 'a', nickname: '가', goals: 2 })]}
+        assists={[]}
+        emptyBehavior="hide"
+        containerStyle={{ padding: '0 20px 40px' }}
+      />,
+    );
+    expect((container.firstChild as HTMLElement).style.padding).toBe('0px 20px 40px');
+  });
+
   it('기록이 없으면 empty-state 모드는 EmptyState 문구를 보여준다', () => {
     render(
       <TournamentPlayerRecordsSections {...base} goals={[]} assists={[]} emptyBehavior="empty-state" />,

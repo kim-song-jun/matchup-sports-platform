@@ -244,12 +244,17 @@ export class PublicTournamentRecordsService {
       participantRows.map((row) => row.participantId),
     );
     const totalsByUserId = new Map<string, { goals: number; assists: number }>();
+    const profileHrefByUserId = new Map<string, string>();
     for (const row of participantRows) {
       const eligibilityRow = eligibility.get(row.participantId);
       if (eligibilityRow === undefined) continue;
       // officialAt null(공식 확정 안 됨)은 동의 판정과 무관한 별개 게이트 — 리그와 동일.
       if (row.resultRevision.officialAt === null || !isParticipantPubliclyEligible(eligibilityRow)) continue;
       const userId = eligibilityRow.linkedUserId!;
+      // href는 lane 단일 소스 헬퍼로 생성한다 — 여기서 문자열을 직접 만들면
+      // 동의 게이팅·인코딩 규칙이 두 곳으로 갈라진다(리뷰 지적). 이 지점은
+      // eligibility를 이미 통과했으므로 반환은 항상 non-null이다.
+      profileHrefByUserId.set(userId, resolveParticipantProfileHref(userId, eligibilityRow)!);
       const current = totalsByUserId.get(userId) ?? { goals: 0, assists: 0 };
       current.goals += row.goals;
       current.assists += row.assists;
@@ -268,7 +273,7 @@ export class PublicTournamentRecordsService {
     const rows = userIds.map((userId) => ({
       userId,
       nickname: nicknameByUserId.get(userId) ?? null,
-      profileHref: `/users/${encodeURIComponent(userId)}`,
+      profileHref: profileHrefByUserId.get(userId)!,
       ...totalsByUserId.get(userId)!,
     }));
     return {

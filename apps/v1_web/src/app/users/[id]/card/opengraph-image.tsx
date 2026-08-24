@@ -115,10 +115,23 @@ export default async function Image({ params }: { params: Promise<{ id: string }
         {/* 왼쪽 — 총점·포지션·이름 */}
         <div style={{ display: 'flex', flexDirection: 'column', flex: 1, justifyContent: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 24 }}>
-            <div style={{ fontSize: 148, fontWeight: 700, lineHeight: 1 }}>{String(card.overall ?? '–')}</div>
+            {/* 화면 카드와 같은 이유로 대시를 쓰지 않는다 -- 148px 대시는 거대한 흰 막대가
+                된다. 공유 이미지는 카톡·인스타로 나가는 화면이라 더 눈에 띈다.
+                satori 는 숫자를 자식으로 못 받으므로 String() 래핑은 그대로 유지한다. */}
+            <div
+              style={{
+                fontSize: card.overall === null ? 64 : 148,
+                fontWeight: 700,
+                lineHeight: 1,
+                letterSpacing: card.overall === null ? 6 : 0,
+                color: card.overall === null ? 'rgba(255,255,255,0.62)' : '#ffffff',
+              }}
+            >
+              {String(card.overall ?? 'NEW')}
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column', paddingBottom: 16 }}>
               <div style={{ fontSize: 40, fontWeight: 700, color: '#ffc342', letterSpacing: 4 }}>
-                {card.position ?? '–'}
+                {card.position ?? ''}
               </div>
               <div style={{ fontSize: 22, color: 'rgba(255,255,255,0.6)' }}>
                 {card.position ? OG_POSITION_LABEL[card.position] : '포지션 미정'}

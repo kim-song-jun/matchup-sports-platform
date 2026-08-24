@@ -105,10 +105,19 @@ export function PlayerCard({
       aria-label={`${displayName} 선수 카드`}
     >
       <div className="tm-player-card-top">
+        {/* 총점이 없을 때 대시를 쓰면 52px 짜리 **흰 막대**가 떠 카드가 깨져 보인다
+            (alpha 실측 2026-08-24, 0경기 사용자). 0 을 쓸 수 없다는 계약은 그대로 두고
+            "아직 없음"을 글자로 말한다. 포지션 대시도 같은 이유로 지운다 -- 포지션이
+            없다는 사실은 아래 한 줄(포지션 미정)이 이미 말하고 있다. */}
         <div className="tm-player-card-ovr">
-          <div className="tm-player-card-ovr-value">{card.overall ?? '–'}</div>
+          <div
+            className="tm-player-card-ovr-value"
+            data-empty={card.overall === null ? 'true' : undefined}
+          >
+            {card.overall ?? 'NEW'}
+          </div>
           <div className="tm-player-card-ovr-rule" aria-hidden="true" />
-          <div className="tm-player-card-ovr-pos">{card.position ?? '–'}</div>
+          {card.position ? <div className="tm-player-card-ovr-pos">{card.position}</div> : null}
         </div>
 
         {/* 사진이 카드의 주인공이다. 없으면 이니셜로 대체하되, 본인에게는 올리라고 권한다 --

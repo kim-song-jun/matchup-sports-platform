@@ -60,12 +60,23 @@ describe('선수 카드', () => {
     expect(screen.queryByLabelText(/실력 \d+점/)).not.toBeInTheDocument();
   });
 
-  it('총점이 없으면 0 이 아니라 값 없음으로 그린다', () => {
+  it('총점이 없으면 0 이 아니라 NEW 로 그린다', () => {
+    // alpha 실측(2026-08-24): 0경기 사용자의 카드는 총점 자리에 52px 대시가 그려져
+    // **레이아웃이 깨진 흰 막대**로 보였다. 0 을 쓸 수 없다는 계약은 그대로 두고,
+    // "아직 없음"이 글자로 읽히게 바꾼다.
     const { container } = renderCard(card({ overall: null, unlockedCount: 0 }));
     const ovr = container.querySelector('.tm-player-card-ovr-value');
 
-    expect(ovr?.textContent).toBe('–');
+    expect(ovr?.textContent).toBe('NEW');
     expect(ovr?.textContent).not.toBe('0');
+  });
+
+  it('포지션이 없으면 대시를 그리지 않는다 -- 작은 막대가 떠 있는 것처럼 보였다', () => {
+    const { container } = renderCard(card({ position: null }));
+
+    expect(container.querySelector('.tm-player-card-ovr-pos')).toBeNull();
+    // 포지션이 없다는 사실은 아래 한 줄(포지션 미정)이 이미 말한다 -- 두 번 말할 필요가 없다.
+    expect(screen.getByText(/포지션 미정/)).toBeInTheDocument();
   });
 
   it('등급이 실력이 아니라 출전 수라는 것을 화면에 적는다', () => {

@@ -6805,6 +6805,14 @@ button:disabled {
   font-size: 52px; font-weight: 800; line-height: 0.92;
   letter-spacing: -0.02em; font-variant-numeric: tabular-nums;
 }
+/* 아직 총점이 없는 카드. 52px 숫자 자리에 "NEW" 를 그대로 넣으면 글자가 카드를 넘친다 --
+   크기를 줄이고 톤을 낮춰 "값이 없다"는 사실이 조용히 읽히게 한다. */
+.tm-player-card-ovr-value[data-empty='true'] {
+  font-size: 24px;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.62);
+}
+
 .tm-player-card-ovr-rule { height: 1px; background: rgba(255, 255, 255, 0.22); margin: 8px 4px; }
 .tm-player-card-ovr-pos { font-size: 14px; font-weight: 800; letter-spacing: 0.1em; color: var(--yellow500); }
 .tm-player-card-photo { margin-left: auto; }

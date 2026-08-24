@@ -49,6 +49,22 @@ function nullableText(value: string | null | undefined): string | null | undefin
 }
 
 /**
+ * 잠금 메시지 끝에 붙이는 **해결 경로** 안내.
+ *
+ * 이 잠금은 영구 불가가 아니다 — `PATCH /admin/tournaments/:id/competition-config` 는
+ * 소급 영향(impact)을 먼저 돌려주고, 운영자가 `confirmRecalculation` + `previewHash` 로
+ * 확인 의사를 밝히면 그때 바꿔 준다(`TournamentCompetitionConfig.change`). 이 update 폼은
+ * 그 확인을 넘길 방법이 없어서 막는 것이지, 규칙이 바꿀 수 없다고 말하는 게 아니다.
+ *
+ * 안내를 붙이는 이유: 문구가 "변경할 수 없어요"로 끝나면 운영자는 영구 불가로 읽고
+ * 엉뚱한 우회를 시도한다 — alpha 실측에서 실제로 **경기 결과를 void 해도 풀리지 않는다**
+ * (게이트가 보는 `startedGameCount` 는 결과뿐 아니라 라인업·이벤트·경기 상태까지 세므로
+ * void 로는 구조적으로 0이 되지 않는다). 되돌릴 방법이 있는데 없다고 믿게 두면 안 된다.
+ */
+const LINEUP_LOCK_ESCAPE_HINT =
+  '꼭 바꿔야 하면 대회 설정 변경에서 소급 영향을 확인한 뒤 진행할 수 있어요.';
+
+/**
  * 출전 인원·교체 설정 잠금 메시지에 쓸 라벨. 두 필드군은 같은 competition config 버전에
  * 함께 pin 되어 하나의 게이트를 공유하지만, **거부 메시지는 운영자가 실제로 바꾸려던 것**을
  * 말해야 한다. 늘 "출전 인원"이라고 하면 교체 방식만 건드린 운영자는 자기가 손대지도 않은
@@ -384,7 +400,7 @@ export class TournamentsAdminService {
       if (existing.status === 'in_progress' || existing.status === 'completed') {
         throw new ConflictException({
           code: 'TOURNAMENT_LINEUP_SIZE_LOCKED',
-          message: `대회가 시작된 이후에는 ${lockedFieldLabel}을 변경할 수 없어요.`,
+          message: `대회가 시작된 이후에는 ${lockedFieldLabel}을 변경할 수 없어요. ${LINEUP_LOCK_ESCAPE_HINT}`,
         });
       }
     }
@@ -574,7 +590,7 @@ export class TournamentsAdminService {
             // **이미 시작된 경기**만 있어도 걸린다(TournamentCompetitionConfig.change 의
             // requiresRecalculation). "기록된 경기 결과가 있어"로만 안내하면, 결과가 하나도
             // 없는데 거부당한 운영자는 무엇을 지워야 풀리는지 알 수 없다.
-            message: `이미 진행된 경기나 기록된 결과가 있어 ${lockedFieldLabel}을 변경할 수 없어요.`,
+            message: `이미 진행된 경기나 기록된 결과가 있어 ${lockedFieldLabel}을 변경할 수 없어요. ${LINEUP_LOCK_ESCAPE_HINT}`,
           });
         }
       }

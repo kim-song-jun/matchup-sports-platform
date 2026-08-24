@@ -1184,6 +1184,28 @@ describe('TournamentsAdminService', () => {
     });
   });
 
+  /**
+   * 이 잠금은 **이 폼에서만** 막히는 것이고 소급 영향을 확인하는 전용 경로로는 바꿀 수 있다.
+   * 문구가 "변경할 수 없어요"로 끝나면 운영자는 영구 불가로 읽고 엉뚱한 우회를 시도한다 —
+   * alpha 실측에서 경기 결과를 void 해도 풀리지 않는 것을 확인했다(게이트가 세는
+   * startedGameCount 는 결과뿐 아니라 라인업·이벤트·경기 상태까지 보므로 void 로는 0이
+   * 되지 않는다). 되돌릴 방법이 있는데 없다고 믿게 두면 안 된다.
+   */
+  it('update: 잠금 메시지가 되돌릴 경로를 함께 알려준다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'in_progress' }));
+
+    const message = await service
+      .update(ownerAuthUser, 'tournament-1', { substitutionMode: 'rolling' })
+      .then(
+        () => { throw new Error('거부되지 않았다'); },
+        (err: { response?: { message?: string } }) => err.response?.message ?? '',
+      );
+
+    expect(message).toContain('교체 설정');
+    expect(message).toContain('대회 설정 변경');
+  });
+
   it('update: 둘 다 바꿨다면 둘 다 말한다', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'in_progress' }));

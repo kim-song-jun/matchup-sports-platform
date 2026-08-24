@@ -215,23 +215,33 @@ export class PublicTournamentRecordsService {
       select: { id: true, bracketPublishedAt: true, bracketPublishScheduledAt: true },
     });
     if (tournament === null) {
-      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
+      throw new NotFoundException(NOT_FOUND);
     }
     const empty = { tournamentId: tournament.id, goals: [], assists: [] };
     if (!isBracketPublished(tournament.bracketPublishedAt, tournament.bracketPublishScheduledAt)) {
       return empty;
     }
 
+    const publicLiveEnabled = await this.isPublicLiveEnabled();
     const games = await this.prisma.v1Game.findMany({
       where: { tournamentFixture: { tournamentId }, currentOfficialRevisionId: { not: null } },
-      select: { currentOfficialRevisionId: true },
+      select: { currentOfficialRevisionId: true, visibilityPolicy: { select: { mode: true } } },
     });
+    // Lane 가시성 정책을 그대로 적용한다(리뷰 지적) — hidden 경기는 존재 자체가
+    // 비공개(fail-closed: 정책 row 없음 = HIDDEN)이고, status_only는 점수도
+    // 가리는 모드다(getMatch/presentScheduleEntry의 `mode === 'status_only'
+    // ? null` 참조). 어느 쪽이든 그 경기의 득점·도움이 공개 랭킹에 실리면
+    // 숨긴 결과가 간접 노출된다.
     const revisionIds = games
+      .filter((game) => {
+        const mode = effectivePublicVisibilityMode(game.visibilityPolicy?.mode ?? 'HIDDEN', publicLiveEnabled);
+        return mode !== 'hidden' && mode !== 'status_only';
+      })
       .map((game) => game.currentOfficialRevisionId)
       .filter((id): id is string => id !== null);
     if (revisionIds.length === 0) return empty;
 
-    const participantRows = await this.prisma.v1GameResultParticipant.findMany({
+    const allParticipantRows = await this.prisma.v1GameResultParticipant.findMany({
       where: { resultRevisionId: { in: revisionIds } },
       select: {
         participantId: true,
@@ -240,18 +250,26 @@ export class PublicTournamentRecordsService {
         resultRevision: { select: { officialAt: true } },
       },
     });
+    // 0골·0도움 행은 최종 응답에서 전부 걸러진다 — 동의 3쿼리·프로필 조회 대상에
+    // 넣을 이유가 없다(리뷰 지적). 합산에 0을 더하는 행이라 결과도 동일하다.
+    const participantRows = allParticipantRows.filter((row) => row.goals > 0 || row.assists > 0);
 
     const eligibility = await loadParticipantConsentEligibility(
       this.prisma,
       participantRows.map((row) => row.participantId),
     );
     const totalsByUserId = new Map<string, { goals: number; assists: number }>();
+    const profileHrefByUserId = new Map<string, string>();
     for (const row of participantRows) {
       const eligibilityRow = eligibility.get(row.participantId);
       if (eligibilityRow === undefined) continue;
       // officialAt null(공식 확정 안 됨)은 동의 판정과 무관한 별개 게이트 — 리그와 동일.
       if (row.resultRevision.officialAt === null || !isParticipantPubliclyEligible(eligibilityRow)) continue;
       const userId = eligibilityRow.linkedUserId!;
+      // href는 lane 단일 소스 헬퍼로 생성한다 — 여기서 문자열을 직접 만들면
+      // 동의 게이팅·인코딩 규칙이 두 곳으로 갈라진다(리뷰 지적). 이 지점은
+      // eligibility를 이미 통과했으므로 반환은 항상 non-null이다.
+      profileHrefByUserId.set(userId, resolveParticipantProfileHref(userId, eligibilityRow)!);
       const current = totalsByUserId.get(userId) ?? { goals: 0, assists: 0 };
       current.goals += row.goals;
       current.assists += row.assists;
@@ -263,14 +281,26 @@ export class PublicTournamentRecordsService {
       ? []
       : await this.prisma.v1User.findMany({
           where: { id: { in: userIds } },
-          select: { id: true, profile: { select: { nickname: true } } },
+          select: { id: true, profile: { select: { nickname: true, displayName: true, deletedAt: true } } },
         });
-    const nicknameByUserId = new Map(users.map((user) => [user.id, user.profile?.nickname ?? null]));
+    // 탈퇴 처리(admin.service.ts)는 nickname을 `deleted_<8자>` 내부 식별자로 덮고
+    // displayName에만 '탈퇴 회원'을 남긴다 — nickname만 쓰면 공개 응답에 식별자가
+    // 그대로 노출된다. resolveParticipantDisplayName(participant-name-gating.ts)의
+    // 탈퇴 방어와 같은 규칙이다(실명 공개 규칙은 랭킹 표면에 적용하지 않는다 —
+    // 리그 랭킹도 nickname 표면이다).
+    const nicknameByUserId = new Map(users.map((user) => [
+      user.id,
+      user.profile === null
+        ? null
+        : user.profile.deletedAt !== null
+          ? user.profile.displayName ?? user.profile.nickname ?? null
+          : user.profile.nickname ?? null,
+    ]));
 
     const rows = userIds.map((userId) => ({
       userId,
       nickname: nicknameByUserId.get(userId) ?? null,
-      profileHref: `/users/${encodeURIComponent(userId)}`,
+      profileHref: profileHrefByUserId.get(userId)!,
       ...totalsByUserId.get(userId)!,
     }));
     return {

@@ -828,3 +828,22 @@ describe('scoreLabel', () => {
     expect(scoreLabel(flatRevision)).toBe('3 : 1');
   });
 });
+
+
+describe('displayRevisionReason — 내부 마커 표시 제거', () => {
+  // 서버는 멱등 판정용으로 reason 앞에 [LEAGUE_RESULT_ENTRY]/[LEAGUE_RESULT_CORRECTION]
+  // 마커를 붙여 저장한다. 화면이 그걸 그대로 렌더해 내부 식별자가 사용자에게 노출됐다
+  // (2026-08-25 alpha 실측). 저장값은 못 바꾸므로 표시에서 벗긴다.
+  it('맨 앞의 대문자 마커를 벗기고 본문만 남긴다', async () => {
+    const { displayRevisionReason } = await import('./team-match-result.types');
+    expect(displayRevisionReason('[LEAGUE_RESULT_CORRECTION] 검증: 스코어 정정')).toBe('검증: 스코어 정정');
+    expect(displayRevisionReason('[LEAGUE_RESULT_ENTRY] 1주차 입력')).toBe('1주차 입력');
+  });
+
+  it('마커가 없거나 사용자가 쓴 소문자 대괄호 사유는 건드리지 않는다', async () => {
+    const { displayRevisionReason } = await import('./team-match-result.types');
+    expect(displayRevisionReason('상대 요청으로 정정')).toBe('상대 요청으로 정정');
+    expect(displayRevisionReason('[비고] 우천 단축')).toBe('[비고] 우천 단축');
+    expect(displayRevisionReason(null)).toBe('');
+  });
+});

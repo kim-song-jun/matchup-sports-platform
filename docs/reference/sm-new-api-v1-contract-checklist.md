@@ -5618,6 +5618,13 @@ Response data:
     "name": "string",
     "applicationId": "uuid"
   } | null,
+  "league": {
+    "leagueId": "uuid",
+    "title": "string",
+    "disputeDeadline": "datetime | null",
+    "disputeBlockedReason": "window_expired | promotion_committed | null",
+    "openDisputeExists": true
+  } | null,
   "viewer": {
     "state": "guest | none | host_team | requested | approved | matched_team",
     "manageableHostTeam": true,
@@ -5649,6 +5656,12 @@ cancelled/completed/expired = 신청 CTA disabled
   기준이므로 이 필드가 그것과 짝을 이룬다.
 - **후기 작성** → `participantMember`. 두 팀의 active 멤버 전원이 대상이라 역할을 가리지 않는다
   (`reviews.service.ts` resolveReviewerTeams).
+
+`league`(U3, 2026-08-24 추가): 리그 대진일 때만 non-null. `disputeDeadline`/`disputeBlockedReason`/
+`openDisputeExists`는 화면이 "지금 이의를 제기할 수 있는지"를 재요청 없이 판정할 수 있게 싣는
+필드다 — `POST /league-matches/:leagueId/fixtures/:teamMatchId/dispute`(`fileDispute`)가 실제로
+거부하는 것과 **같은 순수 함수**(`league-result-dispute-eligibility.ts`)를 공유하므로 두 값이
+어긋나지 않는다. `disputeDeadline`은 공식 결과(`OFFICIAL` revision)가 아직 없으면 null.
 
 State transition:
 없음. read-only 상세 API.

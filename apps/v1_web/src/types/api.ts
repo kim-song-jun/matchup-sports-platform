@@ -1049,8 +1049,21 @@ export type V1TeamMatch = V1Match & {
    * 리그전 경기면 소속 리그, 일반 팀 매치면 null. 백엔드
    * team-matches.service.ts 의 toListItem()/detail()/myTeamMatches() 와
    * admin listTeamMatches() 가 같은 모양으로 내려준다.
+   *
+   * U3(2026-08-24): disputeDeadline/disputeBlockedReason/openDisputeExists 는
+   * detail() 응답에만 실린다(목록 계열은 여전히 leagueId/title 만) -- 화면이
+   * "지금 이의를 제기할 수 있는지"를 재요청 없이 판정할 수 있게 한다. 서버의
+   * POST /league-matches/:leagueId/fixtures/:teamMatchId/dispute 가 실제로
+   * 거부하는 것과 같은 판정이다.
    */
-  league?: { leagueId: string; title: string } | null;
+  league?: {
+    leagueId: string;
+    title: string;
+    /** 공식(OFFICIAL) 결과가 아직 없으면 null. officialAt + 7일. */
+    disputeDeadline?: string | null;
+    disputeBlockedReason?: 'window_expired' | 'promotion_committed' | null;
+    openDisputeExists?: boolean;
+  } | null;
   rulesText?: string | null;
   minLevelCode?: string | null;
   maxLevelCode?: string | null;
@@ -1095,6 +1108,20 @@ export type V1TeamMatch = V1Match & {
     manageRoute?: string | null;
   };
   applicantTeamState?: string;
+};
+
+/** POST /league-matches/:leagueId/fixtures/:teamMatchId/dispute 요청 (U3). */
+export type V1FileLeagueDisputeDto = {
+  reason: string;
+};
+
+/** POST /league-matches/:leagueId/fixtures/:teamMatchId/dispute 응답 (U3). */
+export type V1FileLeagueDisputeResult = {
+  id: string;
+  leagueId: string;
+  teamMatchId: string;
+  status: 'open';
+  createdAt: string;
 };
 
 export type V1TeamMatchMutationPayload = {

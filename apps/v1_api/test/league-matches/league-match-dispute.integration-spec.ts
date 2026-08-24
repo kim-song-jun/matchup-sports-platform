@@ -306,6 +306,30 @@ describe('리그 결과 이의 제기 (D2)', () => {
     expect((caught as ForbiddenException).getStatus()).toBe(403);
   });
 
+  // 적대 리뷰가 잡은 결함: 어드민 이의 목록에 권한 검사가 없어 **로그인만 하면** 남의
+  // 리그 분쟁 본문·제기자 id·처리 메모를 전부 읽을 수 있었다. 컨트롤러의 V1AuthGuard 는
+  // "로그인했다"만 증명한다. 목록만 게이트가 빠져 있어도 형제 엔드포인트(resolve/reject)가
+  // 막혀 있으면 눈에 안 띈다 — 그래서 목록 자체를 겨냥한 단언이 필요하다.
+  it('관리자가 아닌 사용자는 이의 목록을 읽을 수 없다', async () => {
+    await createOfficializedLeague('이의-목록-권한');
+
+    const outsiderActor: V1AuthUser = {
+      id: outsiderUserId,
+      email: null,
+      accountStatus: 'active',
+      onboardingStatus: 'completed',
+    };
+
+    let caught: unknown;
+    try {
+      await disputeService.listDisputes(outsiderActor);
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ForbiddenException);
+    expect((caught as ForbiddenException).getStatus()).toBe(403);
+  });
+
   it('이미 처리된 이의를 다시 수락 요청하면 alreadyProcessed=true 로 조용히 반환한다', async () => {
     const { leagueId, teamMatchId } = await createOfficializedLeague('이의-멱등');
 

@@ -198,7 +198,10 @@ export class LeagueMatchDisputeService {
     return { id: disputeId, status: 'rejected' as const, alreadyProcessed: false };
   }
 
-  async listDisputes(status?: 'open' | 'accepted' | 'rejected') {
+  async listDisputes(user: V1AuthUser, status?: 'open' | 'accepted' | 'rejected') {
+    // 읽기 전용이라 getActiveAdmin(변경 권한까지는 요구하지 않음) — 같은 모듈의
+    // LeagueMatchAdminService.list() 와 동일한 게이트다.
+    await this.adminContext.getActiveAdmin(user.id);
     return this.prisma.v1LeagueMatchDispute.findMany({
       where: status === undefined ? {} : { status },
       orderBy: { createdAt: 'desc' },

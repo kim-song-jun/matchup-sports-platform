@@ -64,9 +64,17 @@ export class LeagueMatchDisputeController {
 export class LeagueMatchDisputeAdminController {
   constructor(private readonly service: LeagueMatchDisputeService) {}
 
+  // `@UseGuards(V1AuthGuard)` 는 **로그인했다**만 증명한다 — 관리자인지는 보지 않는다.
+  // 같은 컨트롤러의 resolve/reject 는 서비스 안에서 getMutationAdmin 으로 막고 있는데
+  // 이 목록만 빠져 있었다(적대 리뷰 지적). 이의 본문·제기자 id·처리 메모가 실리므로
+  // 로그인만 하면 남의 리그 분쟁을 전부 읽을 수 있었다. 형제 admin 목록 엔드포인트
+  // (league-match-admin.service.ts list)와 같은 방식으로 서비스에서 막는다.
   @Get()
-  list(@Query('status') status?: 'open' | 'accepted' | 'rejected') {
-    return this.service.listDisputes(status);
+  list(
+    @CurrentUser() user: V1AuthUser,
+    @Query('status') status?: 'open' | 'accepted' | 'rejected',
+  ) {
+    return this.service.listDisputes(user, status);
   }
 
   @Post(':disputeId/resolve')

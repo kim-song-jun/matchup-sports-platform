@@ -1882,9 +1882,12 @@ model V1LeagueMatchDispute {
   id                     String                          @id @default(uuid())
   leagueId               String                          @map("league_id")
   teamMatchId            String                          @map("team_match_id")
-  // 이의를 제기한 시점에 걸려 있던 공식 리비전의 스냅샷 — 해결 시점에 다른 정정이
-  // 먼저 그 자리를 대체했는지 판별하는 근거로 쓴다(대체됐다면 이 이의는 더 이상
-  // "현재" 공식 결과에 대한 것이 아니므로 해결 전에 재확인이 필요하다).
+  // 이의를 제기한 시점에 걸려 있던 공식 리비전 — **감사 기록 전용이다.**
+  // 해결 로직은 이 값을 읽지 않고 그 시점의 game.currentOfficialRevisionId 를 대상으로
+  // 동작한다. 대상이 "지금 공식인 결과" 하나뿐이라 stale 판정이 필요 없기 때문이다:
+  // 이의가 열린 사이 다른 정정이 들어왔다면 운영자가 보는 것도 그 새 결과이고,
+  // 그것을 다시 정정·무효하는 것이 옳다. (초기 주석이 존재하지 않는 stale 검사를
+  // 설명하고 있어 바로잡음 — 적대 리뷰 지적)
   resultRevisionId       String                          @map("result_revision_id")
   raisedByUserId         String                          @map("raised_by_user_id")
   raisedByTeamId         String                          @map("raised_by_team_id")

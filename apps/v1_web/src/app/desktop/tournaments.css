@@ -1209,9 +1209,13 @@
   min-width: 0;
 }
 
-/* Public tournament promo card-news carousel. */
+/* Public tournament promo card-news carousel.
+   top margin 20px(기존 12px) — E5에서 목록 상단의 CompetitionTypeSegment를 제거하면서
+   이 캐러셀이 topbar 바로 아래 첫 콘텐츠가 됐다. 세그먼트가 차지하던 시각적 여백을
+   완전히 복원하진 않되(세그먼트 높이+마진 ≈ 56~60px), topbar에 바로 붙어 답답해
+   보이지 않을 만큼만 보정한다. */
 .tm-tournament-promo-carousel {
-  margin: 12px 20px 0;
+  margin: 20px 20px 0;
 }
 
 .tm-tournament-promo-carousel-body {

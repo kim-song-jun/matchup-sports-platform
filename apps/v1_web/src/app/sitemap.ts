@@ -14,8 +14,8 @@ import type { V1PublicLeagueListItem, V1PublicLeagueListResponse } from '@/types
 
 export const revalidate = 300;
 
-// 리그(/league-matches)는 대회(/tournaments)와 같은 "대회 유형" 축(competition-type-segment.tsx)
-// 인데도 sitemap엔 아예 없었다 — 그룹 C 리그 발견성 감사(Task 153 Wave 3)에서 대회와 동급
+// 리그(/league-matches)는 대회(/tournaments)와 같은 "대회 유형" 축인데도 sitemap엔
+// 아예 없었다 — 그룹 C 리그 발견성 감사(Task 153 Wave 3)에서 대회와 동급
 // priority/changeFrequency로 등록한다.
 const STATIC_ROUTES: Array<{ path: string; priority: number; changeFrequency: MetadataRoute.Sitemap[number]['changeFrequency'] }> = [
   { path: '/landing', priority: 1, changeFrequency: 'weekly' },

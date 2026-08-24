@@ -81,8 +81,10 @@ function ScheduleOutcomeBadge({ outcome }: { outcome: PublicScheduleEntry['outco
   const reason = toDisplayableOutcomeReason(outcome?.reason);
   if (reason === null) return null;
   return (
+    // role="status" 를 쓰지 않는다 — live region 은 값이 실시간으로 바뀌는 곳(LiveBadge 의
+    // 경기 시계)에 쓰는 것이고, 이렇게 렌더 후 변하지 않는 배지에 붙이면 스크린리더가
+    // 상태 변경으로 오인해 불필요하게 공지한다. 문맥 안 정적 텍스트로 충분하다.
     <p
-      role="status"
       style={{
         margin: '4px 0 0',
         textAlign: 'center',

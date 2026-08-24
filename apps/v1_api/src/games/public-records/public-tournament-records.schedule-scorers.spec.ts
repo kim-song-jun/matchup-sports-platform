@@ -44,7 +44,8 @@ type FakeFixture = {
     currentOfficialRevision: {
       state: string;
       supersedesId: null;
-      officialAt: Date;
+      /** 스키마상 nullable — 레거시/백필 OFFICIAL 리비전은 비어 있을 수 있다. */
+      officialAt: Date | null;
       score: unknown;
       /** 프로덕션 select 가 항상 돌려주는 필드라 fake 도 필수로 둔다 — 생략을 허용하면
        *  `undefined !== 'NORMAL'` 이 참이 되어 정상 경기가 몰수로 오판된다. */
@@ -753,7 +754,7 @@ describe('getSchedule — 몰수·중단 표기(outcome)', () => {
         currentOfficialRevision: {
           state: input.revisionState ?? 'OFFICIAL',
           supersedesId: null,
-          officialAt: (input.officialAt === undefined ? new Date('2026-08-01T00:00:00.000Z') : input.officialAt) as Date,
+          officialAt: input.officialAt === undefined ? new Date('2026-08-01T00:00:00.000Z') : input.officialAt,
           score: { home: 0, away: 0 },
           outcomeReason: input.outcomeReason,
           outcomeNote: input.outcomeNote,

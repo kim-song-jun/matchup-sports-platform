@@ -54,8 +54,8 @@ function MatchOutcomeNotice({ outcome }: { outcome: PublicMatchDetail['outcome']
   if (outcome === null || reason === null) return null;
   const note = outcome.note?.trim() ?? '';
   return (
+    // live region 을 쓰지 않는 이유는 일정 카드의 같은 배지와 동일하다 — 정적 텍스트다.
     <div
-      role="status"
       style={{
         marginTop: 10,
         padding: '8px 10px',

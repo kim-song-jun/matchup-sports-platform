@@ -138,13 +138,20 @@ async function main() {
     transports: ['websocket'], extraHeaders: { cookie: adminCookie },
     auth: { clientInstanceId, authorizationSubjectVersion: 0 },
   });
-  const token = await new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('takeover 타임아웃')), 20000);
-    socket.on('connect_error', (e) => { clearTimeout(timer); reject(e); });
-    socket.on('connect', () => socket.emit('game.takeover.request',
-      { gameId, authorizationSubjectVersion: 0, clientInstanceId, lastSequence: 0 },
-      (ack) => { clearTimeout(timer); ack?.status === 'granted' ? resolve(ack.takeoverToken) : reject(new Error(JSON.stringify(ack))); }));
-  });
+  let token;
+  try {
+    token = await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('takeover 타임아웃')), 20000);
+      socket.on('connect_error', (e) => { clearTimeout(timer); reject(e); });
+      socket.on('connect', () => socket.emit('game.takeover.request',
+        { gameId, authorizationSubjectVersion: 0, clientInstanceId, lastSequence: 0 },
+        (ack) => { clearTimeout(timer); ack?.status === 'granted' ? resolve(ack.takeoverToken) : reject(new Error(JSON.stringify(ack))); }));
+    });
+  } catch (err) {
+    // 실패 시에도 소켓을 닫아야 이벤트 루프가 살아남아 프로세스가 매달리지 않는다(리뷰 지적).
+    socket.close();
+    throw err;
+  }
   console.log('takeover OK');
   const command = async (name, payload = {}) => {
     g = expectData(await api('GET', `/games/${gameId}`), '게임 재조회');

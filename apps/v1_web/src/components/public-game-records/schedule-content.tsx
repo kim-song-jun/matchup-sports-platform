@@ -9,6 +9,7 @@ import {
   type TournamentStandingsRow,
 } from '@/components/tournaments/tournament-standings-table';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
+import { matchOutcomeReasonLabel, toDisplayableOutcomeReason } from '@/lib/match-outcome';
 import type { V1MyTournamentFixtures } from '@/hooks/use-v1-api';
 import type { GameLineupState } from '@/types/game-operations';
 import { AbnormalClockBadge } from './abnormal-clock-badge';
@@ -65,6 +66,39 @@ function ScheduleResultBadge({ entry }: { entry: PublicScheduleEntry }) {
     >
       {resultStateLabel(entry.resultState)}
     </span>
+  );
+}
+
+/**
+ * 몰수·중단 배지. 이게 없으면 목록에서 몰수 0:0 과 실제 0:0 무승부가 같아 보이고,
+ * 순위표에 무승부로 집계된 이유를 관전자가 목록에서 추적할 수 없다(alpha 실측).
+ *
+ * 사유 본문은 넣지 않는다 — 일정 카드는 한 줄 요약이 계약이고, 사유는 길이 제한이 없어
+ * 카드 높이를 예측할 수 없게 만든다. 사유는 경기 상세에서 읽는다.
+ * 컬러만으로 구분하지 않는다(WCAG) — 라벨 텍스트가 항상 함께 나온다.
+ */
+function ScheduleOutcomeBadge({ outcome }: { outcome: PublicScheduleEntry['outcome'] }) {
+  const reason = toDisplayableOutcomeReason(outcome?.reason);
+  if (reason === null) return null;
+  return (
+    // role="status" 를 쓰지 않는다 — live region 은 값이 실시간으로 바뀌는 곳(LiveBadge 의
+    // 경기 시계)에 쓰는 것이고, 이렇게 렌더 후 변하지 않는 배지에 붙이면 스크린리더가
+    // 상태 변경으로 오인해 불필요하게 공지한다. 문맥 안 정적 텍스트로 충분하다.
+    <p
+      style={{
+        margin: '4px 0 0',
+        textAlign: 'center',
+        fontSize: 11,
+        fontWeight: 700,
+        // --orange500 은 텍스트로 쓰면 흰 카드 위 2.16:1 로 WCAG AA 에 한참 못 미친다
+        // (큰 글씨 기준 3:1 도 못 넘긴다). --orange700 은 정확히 그 결함 때문에 도입된
+        // 토큰이고 흰 배경 5.94:1 · 틴트 배경 5.42:1 을 보장하며, 다크모드에서는
+        // 밝은 값으로 재정의돼 양쪽이 함께 해결된다(globals.css 주석 참조).
+        color: 'var(--orange700)',
+      }}
+    >
+      {matchOutcomeReasonLabel(reason)}
+    </p>
   );
 }
 
@@ -465,6 +499,10 @@ function ScheduleRow({
       {/* 스코어 아래 보조 표기 — 스코어 칸(가운데 64px)이 행 정중앙이라 행 전체를
           가운데 정렬하면 그대로 스코어 밑에 놓인다. 승부차기가 없으면 렌더 없음. */}
       <PenaltyScoreline score={entry.score} scoreStatus={entry.scoreStatus} />
+      {/* 몰수·중단 배지. 스코어 바로 아래 — 목록만 훑는 관전자에게 이 점수가 정상 경기
+          결과가 아니라는 것을 알리는 유일한 자리다. 사유 본문은 길어서 카드에 넣지 않고
+          경기 상세에 둔다(카드는 한 줄 요약이 계약이다). */}
+      <ScheduleOutcomeBadge outcome={entry.outcome} />
       <MatchEventSummary entry={entry} />
     </Link>
   );

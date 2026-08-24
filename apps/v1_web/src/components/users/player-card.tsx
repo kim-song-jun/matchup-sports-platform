@@ -42,23 +42,33 @@ const POSITION_LABEL: Record<string, string> = {
   GK: '골키퍼',
 };
 
-/** 뒷면 산식 -- 서버 산식(`player-card.ts`)의 요약. 계수가 바뀌면 여기도 같이 바뀌어야 한다. */
+/**
+ * 뒷면 능력치 설명 -- 산식 원문("30 + 골÷경기 × 55")을 그대로 적으면 카드가 영수증이
+ * 된다. 무엇이 이 숫자를 올리는지만 사람 말로 말한다(정확한 산식은 서버 `player-card.ts`).
+ */
 const STAT_BACK: Record<
   V1PlayerCardStat['code'],
-  { icon: typeof Target; formula: string; tag: string }
+  { icon: typeof Target; source: string; tag: string }
 > = {
-  SHO: { icon: Target, formula: '30 + 골÷경기 × 55', tag: '골 결정력' },
-  PAS: { icon: Zap, formula: '30 + 도움÷경기 × 60', tag: '찬스 메이킹' },
-  APP: { icon: CalendarCheck, formula: '35 + 경기 × 2.2 + 선발 × 15', tag: '성실 출석' },
-  SKI: { icon: Sparkles, formula: '후기 평균 → 39~99', tag: '탄탄한 기본기' },
-  MAN: { icon: HeartHandshake, formula: '후기 평균 → 39~99', tag: '매너 플레이' },
-  PUN: { icon: Clock, formula: '후기 평균 → 39~99', tag: '시간 약속' },
+  SHO: { icon: Target, source: '골 · 경기당 골이 많을수록 올라가요', tag: '골 결정력' },
+  PAS: { icon: Zap, source: '도움 · 경기당 도움이 많을수록 올라가요', tag: '찬스 메이킹' },
+  APP: { icon: CalendarCheck, source: '출전 · 나온 경기가 쌓일수록 올라가요', tag: '성실 출석' },
+  SKI: { icon: Sparkles, source: '실력 · 함께 뛴 동료들의 후기 평균이에요', tag: '탄탄한 기본기' },
+  MAN: { icon: HeartHandshake, source: '매너 · 함께 뛴 동료들의 후기 평균이에요', tag: '매너 플레이' },
+  PUN: { icon: Clock, source: '시간약속 · 함께 뛴 동료들의 후기 평균이에요', tag: '시간 약속' },
 };
 
-function lockReasonText(reason: NonNullable<V1PlayerCardStat['lockedBy']>): string {
-  if (reason.type === 'consent') return '기록 공개 필요';
-  if (reason.type === 'appearances') return `${reason.remaining}경기 더`;
-  return `후기 ${reason.remaining}개 더`;
+function lockReasonText(
+  reason: NonNullable<V1PlayerCardStat['lockedBy']>,
+  appearances: number,
+): string {
+  if (reason.type === 'consent') return '기록 공개를 켜면 열려요';
+  if (reason.type === 'appearances') {
+    // 0경기 사용자에게 "더 뛰면"은 틀린 말이다 -- 더 뛸 앞선 경기가 없다(앞면 힌트와 같은 규칙).
+    if (appearances === 0) return '첫 경기를 뛰면 열려요';
+    return `${reason.remaining}경기를 더 뛰면 열려요`;
+  }
+  return `후기 ${reason.remaining}개를 받으면 열려요`;
 }
 
 function unlockHint(card: V1PlayerCard): string | null {
@@ -178,7 +188,7 @@ function personaTags(card: V1PlayerCard): { text: string; accent: boolean }[] {
     { text: `${TIER_LABEL[card.tier]} 카드`, accent: true },
     { text: `${card.appearances}경기`, accent: false },
   ];
-  if (top.length === 0) return [...base, { text: '기록 모으는 중', accent: false }];
+  if (top.length === 0) return [...base, { text: '기록 쌓는 중', accent: false }];
   return [...base, ...top];
 }
 
@@ -365,7 +375,7 @@ export function PlayerCard({
         ))}
       </div>
 
-      <div className="tm-pcard-back-sec">이 숫자가 나온 곳</div>
+      <div className="tm-pcard-back-sec">능력치</div>
       <div className="tm-pcard-back-rows">
         {card.stats.map((stat) => {
           const meta = STAT_BACK[stat.code];
@@ -376,8 +386,9 @@ export function PlayerCard({
               <Icon aria-hidden="true" />
               <b data-locked={locked ? 'true' : undefined}>{locked ? '—' : stat.value}</b>
               <span>
-                {stat.label} ·{' '}
-                {locked && stat.lockedBy ? `잠김 (${lockReasonText(stat.lockedBy)})` : meta.formula}
+                {locked && stat.lockedBy
+                  ? `${stat.label} · ${lockReasonText(stat.lockedBy, card.appearances)}`
+                  : meta.source}
               </span>
             </div>
           );
@@ -385,7 +396,7 @@ export function PlayerCard({
       </div>
 
       <div className="tm-pcard-back-eq">
-        총점은 <b>포지션 가중 평균</b>이에요. 잠긴 능력치는 0 이 아니라 <b>평균에서 빠져요</b>.
+        총점은 <b>포지션에 맞게 가중치</b>를 두고 계산해요. 잠긴 능력치는 <b>총점에 넣지 않아요</b>.
       </div>
     </div>
   );
@@ -438,7 +449,7 @@ export function PlayerCard({
           className="tm-pcard-flipbtn"
           onClick={() => setFlipped((v) => !v)}
         >
-          {flipped ? '앞면 보기 ↺' : '카드 뒤집기 — 숫자의 근거 보기 ↻'}
+          {flipped ? '앞면 보기 ↺' : '카드 뒤집기 ↻'}
         </button>
 
         <div className="tm-player-card-sub">

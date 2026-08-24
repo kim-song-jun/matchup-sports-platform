@@ -8,6 +8,7 @@ import { PublicTournamentRecordsService } from './public-tournament-records.serv
  * 틀린 수상 추천이 된다), 계정 미연결 참가자는 정규화 이름으로 경기 간 합산된다.
  */
 function buildPrisma(options: {
+  tournamentExists?: boolean;
   games?: Array<{ currentOfficialRevisionId: string | null }>;
   participantRows?: Array<{
     participantId: string;
@@ -21,6 +22,7 @@ function buildPrisma(options: {
 }) {
   const consentFindMany = jest.fn().mockResolvedValue([]);
   const prisma = {
+    v1Tournament: { findUnique: jest.fn().mockResolvedValue(options.tournamentExists === false ? null : { id: 'tour-1' }) },
     v1Game: { findMany: jest.fn().mockResolvedValue(options.games ?? []) },
     v1GameResultParticipant: { findMany: jest.fn().mockResolvedValue(options.participantRows ?? []) },
     v1GameParticipant: { findMany: jest.fn().mockResolvedValue(options.participants ?? []) },
@@ -37,6 +39,13 @@ const access = {} as TournamentStaffAccessService;
 const OFFICIAL = { officialAt: new Date('2026-08-02T00:00:00Z') };
 
 describe('PublicTournamentRecordsService.getPlayerRecordsForAdmin', () => {
+  it('404s for a nonexistent tournament instead of returning an empty 200', async () => {
+    const { prisma } = buildPrisma({ tournamentExists: false });
+    await expect(
+      new PublicTournamentRecordsService(prisma, access).getPlayerRecordsForAdmin('nope'),
+    ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_NOT_FOUND' } });
+  });
+
   it('aggregates without consent gating and never touches the consent tables', async () => {
     const { prisma, consentFindMany } = buildPrisma({
       games: [{ currentOfficialRevisionId: 'rev-1' }],

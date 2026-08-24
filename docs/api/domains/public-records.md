@@ -347,7 +347,8 @@ identity/side itself:
   to recommend award candidates (retro STATS-3), and a gated ranking would
   silently drop an unconsented top scorer and recommend the wrong person.
   Unlinked participants aggregate by normalised name snapshot within the
-  tournament; rows are `{ userId | null, name, teamName, goals, assists }`.
+  tournament; each row is `{ userId: string | null, name: string, teamName:
+  string | null, goals: number, assists: number }`.
 - **The schedule (`GET /tournaments/:id/schedule`) deliberately does not carry
   `profileHref`.** Its `consentMap` stays behind the name-gating flag because that endpoint
   *is* polled while any fixture is live (`LIVE_POLL_INTERVAL_MS`). Loading consent

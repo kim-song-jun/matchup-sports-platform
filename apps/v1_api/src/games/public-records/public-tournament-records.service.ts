@@ -327,6 +327,15 @@ export class PublicTournamentRecordsService {
    * 마지막으로 본 스냅샷을 쓴다.
    */
   async getPlayerRecordsForAdmin(tournamentId: string) {
+    // 없는 대회 id에 빈 200을 주면 클라이언트 오배선이 "데이터 없음"으로 위장된다
+    // (리뷰 지적) — 공개 라우트와 달리 어드민 표면이라 명시적 코드를 쓴다.
+    const tournament = await this.prisma.v1Tournament.findUnique({
+      where: { id: tournamentId },
+      select: { id: true },
+    });
+    if (tournament === null) {
+      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
+    }
     const empty = { tournamentId, goals: [], assists: [] };
     const games = await this.prisma.v1Game.findMany({
       where: { tournamentFixture: { tournamentId }, currentOfficialRevisionId: { not: null } },

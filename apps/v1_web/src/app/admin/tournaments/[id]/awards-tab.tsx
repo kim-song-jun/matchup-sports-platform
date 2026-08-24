@@ -57,7 +57,9 @@ export function AwardsTab({
   };
 
   const addRow = () => {
-    setRows((prev) => [...prev, { awardType: `custom_${Date.now()}`, awardLabel: '', iconKey: 'trophy', recipientName: '', recipientUserId: '', teamName: '', note: '' }]);
+    // Date.now()만으로는 같은 ms의 연속 추가가 같은 awardType이 돼 DB unique
+    // (@@unique([tournamentId, awardType])) 위반으로 저장이 실패한다(리뷰 지적).
+    setRows((prev) => [...prev, { awardType: `custom_${crypto.randomUUID()}`, awardLabel: '', iconKey: 'trophy', recipientName: '', recipientUserId: '', teamName: '', note: '' }]);
   };
 
   // 회고 STATS-3 — 추천 근거 chip. 비게이팅 어드민 랭킹이라 미동의 1위도 그대로
@@ -69,7 +71,7 @@ export function AwardsTab({
     setRows((prev) => [
       ...prev,
       {
-        awardType: `custom_${Date.now()}`,
+        awardType: `custom_${crypto.randomUUID()}`,
         awardLabel: kind === 'goals' ? '득점왕' : '도움왕',
         iconKey: kind === 'goals' ? 'goal' : 'handshake',
         recipientName: row.name,

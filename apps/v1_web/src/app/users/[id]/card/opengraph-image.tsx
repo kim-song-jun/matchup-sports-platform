@@ -24,8 +24,20 @@ export const alt = '선수 카드';
 
 // satori 렌더와 폰트 에셋 로딩 모두 Node 런타임에서 돌린다.
 export const runtime = 'nodejs';
-// 카드는 경기가 끝나야 바뀐다 -- 매 요청마다 API 를 때릴 이유가 없다.
-export const revalidate = 300;
+
+/**
+ * **요청마다 실행해야 한다.** `revalidate` 만 두면 이 라우트가 빌드 타임에 한 장으로
+ * 생성되어 **모든 사용자에게 같은 이미지가 나간다.**
+ *
+ * alpha 실측(2026-08-24, 서빙 커밋 888041a8)에서 실제로 그랬다 -- 서로 다른 두 사용자와
+ * **존재하지 않는 사용자**까지 응답 바이트가 완전히 동일(42,163 bytes)했다. 빌드 시점에는
+ * `v1_api` 에 닿을 수 없어 프로필이 null 이었고, 그때 만들어진 폴백 이미지가 그대로
+ * 구워져 나가고 있었다.
+ *
+ * 데이터 캐시는 `fetchPublicProfileForOg` 의 `next: { revalidate: 300 }` 이 담당한다 --
+ * 그건 URL 단위라 사용자별로 따로 캐시된다. 라우트 자체를 정적으로 만들면 안 된다.
+ */
+export const dynamic = 'force-dynamic';
 
 export default async function Image({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

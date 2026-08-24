@@ -11,6 +11,7 @@ import { GameResultStandingsProjectionService } from './game-result-standings-pr
 import { officialRevisionRowSelect } from './official-revision-row.query';
 import { parseOfficialScore } from './parse-official-score';
 import { TeamMatchCompletionNotificationService } from './team-match-completion-notification.service';
+import { TournamentFixtureCompletionNotificationService } from './tournament-fixture-completion-notification.service';
 // 리그 도메인 소유(apps/v1_api/src/league-matches/) -- R6: 리그 대진(team-match)이
 // 공식 결과를 얻을 때마다 그 리그가 자동으로 completed 전이할 수 있는지 확인한다.
 // team-match가 아닌 게임(토너먼트 픽스처)에는 no-op이라 여기 추가해도 기존 흐름에
@@ -35,9 +36,13 @@ export class GameResultOfficialProjectionService {
   // 그대로 넘겨주지만, 이 클래스를 인자 없이 직접 `new`하는 기존 테스트 호출부(플레인 클래스,
   // DI 없음)는 하위호환으로 계속 동작한다(push는 그냥 no-op).
   private readonly teamMatchCompletion: TeamMatchCompletionNotificationService;
+  // 회고 REACH-4: 위 팀매치 sibling이 헤더에 문서화해 둔 "TOURNAMENT_FIXTURE에는
+  // no-op" 갭의 대칭 — 대회 픽스처가 공식 결과를 얻는 순간 참가팀 운영진에게 알린다.
+  private readonly tournamentFixtureCompletion: TournamentFixtureCompletionNotificationService;
 
   constructor(webPush?: WebPushService) {
     this.teamMatchCompletion = new TeamMatchCompletionNotificationService(webPush);
+    this.tournamentFixtureCompletion = new TournamentFixtureCompletionNotificationService(webPush);
   }
 
   readonly handler: GameOperationHandler = async (claim, tx) => {
@@ -61,6 +66,7 @@ export class GameResultOfficialProjectionService {
     await this.standings.project(tx, revision);
     await this.leagueCompletion.project(tx, revision);
     await this.teamMatchCompletion.project(tx, revision);
+    await this.tournamentFixtureCompletion.project(tx, revision);
     await this.terminal.close(tx, revision);
     await this.writeAggregateWatermarks(tx, revision, teamIds);
     await this.watermarks.write(tx, {

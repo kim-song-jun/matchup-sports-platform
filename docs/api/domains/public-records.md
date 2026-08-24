@@ -284,12 +284,23 @@ identity/side itself:
 - `GET /tournaments/:id/schedule` `items[]`/`unscheduled[]` and
   `GET /tournaments/:id/matches/:fixtureId` both carry
   `outcome: { reason: 'FORFEIT' | 'ABANDONED', note: string | null } | null` --
-  the abnormal-end marker. **Both views use the same condition**: it is non-null
-  only once the official result is public (`showOfficialResult`) *and* the
-  official revision's `outcomeReason` is not `NORMAL`. Keeping one condition is
-  deliberate -- if the list and the detail diverged, a fixture could read as a
-  forfeit in one place and a plain draw in the other. A normally-ended game is
-  `null`, so the pre-existing contract is unchanged for the common case.
+  the abnormal-end marker. In each view it is non-null only when **that view's
+  own score gate** (`showOfficialResult`) is open *and* the official revision's
+  `outcomeReason` is not `NORMAL`. Tying it to the score gate rather than a
+  bespoke condition is deliberate: a view that shows `0:0` while hiding the fact
+  that the `0:0` is a forfeit is exactly the screen this field exists to remove,
+  so the score and the reason are published together or not at all. A
+  normally-ended game is `null`, so the pre-existing contract is unchanged for
+  the common case.
+
+  **Known gate difference (predates this field).** `getMatch`'s
+  `showOfficialResult` also requires `officialAt !== null`; the schedule's does
+  not. So an OFFICIAL revision with a null `officialAt` (schema-nullable --
+  legacy/backfill rows) shows its score *and* its outcome on the schedule while
+  the match view shows neither. That asymmetry already applied to the score
+  before `outcome` existed; narrowing it would change score visibility and is a
+  separate change. `public-tournament-records.schedule-scorers.spec.ts` pins the
+  current behaviour so a future edit has to be deliberate.
   `note` is the operator's mandatory reason (the server rejects a forfeit
   without one, 422 `GAME_OUTCOME_NOTE_REQUIRED`), but it stays nullable in the
   schema for games ended before that rule existed. The schedule card renders

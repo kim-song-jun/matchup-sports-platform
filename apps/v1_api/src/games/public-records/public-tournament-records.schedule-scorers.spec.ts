@@ -741,6 +741,8 @@ describe('getSchedule — 몰수·중단 표기(outcome)', () => {
     outcomeReason: 'NORMAL' | 'FORFEIT' | 'ABANDONED';
     outcomeNote: string | null;
     revisionState?: string;
+    /** 레거시/백필 리비전은 OFFICIAL 인데도 `officialAt` 이 비어 있을 수 있다(스키마상 nullable). */
+    officialAt?: Date | null;
   }) {
     return makeFixture({
       status: 'completed',
@@ -751,7 +753,7 @@ describe('getSchedule — 몰수·중단 표기(outcome)', () => {
         currentOfficialRevision: {
           state: input.revisionState ?? 'OFFICIAL',
           supersedesId: null,
-          officialAt: new Date('2026-08-01T00:00:00.000Z'),
+          officialAt: (input.officialAt === undefined ? new Date('2026-08-01T00:00:00.000Z') : input.officialAt) as Date,
           score: { home: 0, away: 0 },
           outcomeReason: input.outcomeReason,
           outcomeNote: input.outcomeNote,
@@ -804,4 +806,29 @@ describe('getSchedule — 몰수·중단 표기(outcome)', () => {
     expect(result.items[0].scoreStatus).not.toBe('official');
     expect(result.items[0].outcome).toBeNull();
   });
+  /**
+   * `officialAt` 이 비어 있는 OFFICIAL 리비전(스키마상 nullable — 레거시/백필 경로)에서
+   * 목록과 상세의 공개 게이트가 갈린다: 상세(`getMatch`)의 `showOfficialResult` 는
+   * `officialAt !== null` 까지 요구하지만 목록은 요구하지 않는다. **이 차이는 점수에
+   * 대해 이 PR 이전부터 존재하던 것**이고, `outcome` 은 각 뷰의 점수 게이트를 그대로
+   * 따라간다.
+   *
+   * outcome 에만 `officialAt` 조건을 더하지 않는 이유(Copilot 리뷰 제안을 그대로 받지
+   * 않은 이유): 그렇게 하면 목록이 **`0:0` 은 보여주면서 그게 몰수라는 사실만 감추는**
+   * 상태가 된다 — 이 PR 이 없애려던 바로 그 화면이 그 데이터에서 재현된다. 목록 안에서
+   * 점수와 사유는 함께 나가거나 함께 빠져야 한다.
+   */
+  it('officialAt 이 비어도 목록은 점수와 사유를 함께 내보낸다 (한쪽만 감추지 않는다)', async () => {
+    const prisma = buildFakePrisma({
+      fixtures: [fixtureWithOutcome({ outcomeReason: 'FORFEIT', outcomeNote: '원정팀 미출석', officialAt: null })],
+      ...emptyConsent,
+    });
+
+    const result = await new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE).getSchedule(TOURNAMENT_ID, {});
+
+    // 점수를 내보내는 한 사유도 함께 내보낸다 — 둘의 노출 여부가 갈리면 안 된다.
+    expect(result.items[0].scoreStatus).toBe('official');
+    expect(result.items[0].outcome).toEqual({ reason: 'FORFEIT', note: '원정팀 미출석' });
+  });
+
 });

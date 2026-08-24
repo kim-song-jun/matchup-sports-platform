@@ -1133,9 +1133,16 @@ function presentScheduleEntry(
     periodBreak,
     scorers,
     cards,
-    // 경기 상세(getMatch)와 **같은 규칙**을 쓴다 — 공식 결과가 공개된 뒤에만, 정상 종료가
-    // 아닐 때만 내보낸다. 두 화면이 갈리면 목록에서 몰수인데 상세에서 아니거나 그 반대가
-    // 된다. 여기서 새 조건을 만들지 않는 이유다.
+    // **이 뷰의 점수 공개 게이트(`showOfficialResult`)를 그대로 따른다.** 여기서 outcome
+    // 전용 조건을 따로 만들지 않는 이유: 목록이 `0:0` 은 보여주면서 그게 몰수라는 사실만
+    // 감추면, 이 필드를 추가한 목적 자체가 무너진다 — 점수와 사유는 함께 나가거나 함께
+    // 빠져야 한다.
+    //
+    // 알려진 차이: 상세(`getMatch`)의 `showOfficialResult` 는 `officialAt !== null` 까지
+    // 요구하지만 이 목록은 요구하지 않는다(이 PR 이전부터 **점수**에 대해 그랬다). 따라서
+    // `officialAt` 이 빈 레거시 OFFICIAL 리비전은 목록에만 점수와 사유가 함께 뜬다. 그
+    // 게이트 차이를 좁히는 것은 기존 점수 노출 동작을 바꾸는 별개 변경이라 여기서 하지
+    // 않는다(`schedule-scorers.spec.ts` 가 현재 동작을 고정한다).
     outcome:
       showOfficialResult &&
       fixture.game?.currentOfficialRevision != null &&

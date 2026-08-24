@@ -1918,7 +1918,7 @@ export type V1PlayerCard = {
   /** 열린 능력치가 하나도 없으면 null. 0 이 아니다. */
   overall: number | null;
   /** 실력이 아니라 **출전 수**로 정해진다. */
-  tier: 'bronze' | 'silver' | 'gold' | 'special';
+  tier: 'bronze' | 'silver' | 'gold' | 'legend' | 'special';
   /** 카드 모양(코스메틱). 후기 10건 업적으로 방패가 열린다. */
   shape: 'rect' | 'shield';
   appearances: number;

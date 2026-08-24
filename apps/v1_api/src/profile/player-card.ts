@@ -20,7 +20,7 @@ export const MIN_REVIEWS_FOR_METRIC_STATS = 3;
 
 export type PlayerCardStatCode = 'SHO' | 'PAS' | 'APP' | 'SKI' | 'MAN' | 'PUN';
 export type PlayerCardPosition = 'FW' | 'MF' | 'DF' | 'GK' | null;
-export type PlayerCardTier = 'bronze' | 'silver' | 'gold' | 'special';
+export type PlayerCardTier = 'bronze' | 'silver' | 'gold' | 'legend' | 'special';
 
 export interface PlayerCardInput {
   /** 공개 게이트를 통과한 출전 경기 수(gameId 중복 제거 후). */
@@ -152,8 +152,17 @@ export function resolveCardShape(saved: string | null | undefined, reviewCount: 
   return unlocked.includes(saved as PlayerCardShape) ? (saved as PlayerCardShape) : 'rect';
 }
 
+/**
+ * 등급은 **뛴 경기 수만** 본다 -- 실력이 아니라 꾸준함에 주는 보상이다.
+ *
+ * 2026-08-24: 30경기에서 끝나던 사다리를 두 칸으로 나눴다. 30경기는 주말 풋살로 반 년이면
+ * 닿는 수치라, 거기서 최상위가 되면 그 뒤로 몇 년을 더 뛰어도 카드가 그대로였다 --
+ * 오래 뛴 사람에게 남는 목표가 없었다. `legend`(30~99)와 `special`(100+)로 나눠
+ * 장기 사용자에게 다음 칸을 만든다.
+ */
 export function resolveTier(appearances: number): PlayerCardTier {
-  if (appearances >= 30) return 'special';
+  if (appearances >= 100) return 'special';
+  if (appearances >= 30) return 'legend';
   if (appearances >= 15) return 'gold';
   if (appearances >= 5) return 'silver';
   return 'bronze';

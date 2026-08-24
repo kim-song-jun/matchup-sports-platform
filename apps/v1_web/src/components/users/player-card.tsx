@@ -25,6 +25,9 @@ const TIER_STYLE: Record<V1PlayerCard['tier'], { label: string; ring: string; gl
   bronze: { label: '브론즈', ring: 'rgba(197, 132, 74, 0.55)', glow: 'rgba(197, 132, 74, 0.34)' },
   silver: { label: '실버', ring: 'rgba(176, 184, 193, 0.6)', glow: 'rgba(176, 184, 193, 0.34)' },
   gold: { label: '골드', ring: 'rgba(255, 195, 66, 0.62)', glow: 'rgba(255, 195, 66, 0.36)' },
+  // 레전드는 금빛 계열이되 더 밝고 차분하게, 스페셜은 그 위에서 푸른빛으로 갈라진다 --
+  // 둘 다 금색이면 30경기와 100경기가 화면에서 구분되지 않는다.
+  legend: { label: '레전드', ring: 'rgba(246, 231, 174, 0.72)', glow: 'rgba(201, 162, 39, 0.4)' },
   special: { label: '스페셜', ring: 'rgba(49, 130, 246, 0.7)', glow: 'rgba(49, 130, 246, 0.42)' },
 };
 

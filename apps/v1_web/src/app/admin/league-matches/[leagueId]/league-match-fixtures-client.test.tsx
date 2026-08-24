@@ -133,6 +133,13 @@ describe('LeagueMatchFixturesClient', () => {
     // 상태 열이 사라지지 않았는지도 함께 고정한다 — 합치는 회귀를 잡는 게 이 테스트의 목적이다.
     expect(screen.getByRole('columnheader', { name: '상태' })).toBeInTheDocument();
 
+    // 열 **순서**까지 고정한다. 처음엔 결과를 맨 끝(관리 앞)에 뒀는데, alpha 1440 실측에서
+    // 표 스크롤러가 clientWidth 898 / scrollWidth 1201 이라 결과 열이 보이는 영역 밖으로
+    // 밀려 가로 스크롤을 해야만 보였다 — 운영자가 한눈에 막힌 경기를 짚게 하려고 만든
+    // 열이 기본 상태에서 안 보이면 기능이 성립하지 않는다. 그래서 '경기' 바로 뒤에 둔다.
+    const headers = screen.getAllByRole('columnheader').map((cell) => cell.textContent?.trim());
+    expect(headers.indexOf('결과')).toBe(headers.indexOf('경기') + 1);
+
     // AdminDataTable 은 같은 행을 데스크톱 표와 모바일 카드로 각각 렌더한다 —
     // 그래서 개수가 아니라 "존재"만 본다(getAllByText).
     expect(screen.getAllByText('확정').length).toBeGreaterThan(0);

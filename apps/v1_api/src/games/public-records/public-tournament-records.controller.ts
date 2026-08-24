@@ -7,7 +7,8 @@ import { PublicTournamentRecordsService } from './public-tournament-records.serv
 
 /**
  * Task 24 -- `GET /tournaments/:id/schedule` and
- * `GET /tournaments/:id/matches/:fixtureId` (public, no auth required).
+ * `GET /tournaments/:id/matches/:fixtureId` (public, no auth required),
+ * plus retro STATS-1's `GET /tournaments/:id/player-records`.
  * Registered as a sibling `@Controller('tournaments')` alongside
  * `TournamentsModule`'s own controllers (different route suffixes, so
  * there is no path collision) rather than folded into that module's file,

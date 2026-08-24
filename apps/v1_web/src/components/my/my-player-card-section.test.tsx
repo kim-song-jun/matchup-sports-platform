@@ -42,6 +42,19 @@ function renderSection() {
   );
 }
 
+/** 신원 통합 스테이지(A안) 렌더 -- 실제 my-page 가 넘기는 것과 같은 형태의 슬롯. */
+function renderStage() {
+  return render(
+    <MyPlayerCardSection
+      userId="u-1"
+      displayName="김선준"
+      profileImageUrl={null}
+      stageIdentity={<div>@sinaro · 서울 · 남</div>}
+      fallback={<section aria-label="신원 박스">김선준 신원 박스</section>}
+    />,
+  );
+}
+
 describe('마이페이지 내 선수 카드', () => {
   it('카드가 있으면 공유 화면으로 가는 입구를 만든다', () => {
     publicProfileMock.mockReturnValue({ data: { playerCard: card, teams: [{ id: 't-1', name: '주말 풋살' }] } });
@@ -108,5 +121,29 @@ describe('마이페이지 내 선수 카드', () => {
 
       expect(container).toBeEmptyDOMElement();
     });
+  });
+});
+
+describe('신원 통합 스테이지 (사용자 선택 A안)', () => {
+  it('카드가 있으면 다크 스테이지 안에 카드 + 신원 블록을 그리고, 흰 신원 박스는 그리지 않는다', () => {
+    // 신원 박스와 카드가 같은 말을 두 번 하는 중복이 이 통합의 제거 대상이다 --
+    // 둘 다 그려지면 A안은 실패한 것이다.
+    publicProfileMock.mockReturnValue({ data: { playerCard: card, teams: [] } });
+
+    const { container } = renderStage();
+
+    expect(container.querySelector('.tm-my-profile-stage')).not.toBeNull();
+    expect(screen.getByText('@sinaro · 서울 · 남')).toBeInTheDocument();
+    expect(screen.queryByLabelText('신원 박스')).not.toBeInTheDocument();
+  });
+
+  it('카드가 없으면(숨김·로딩·실패) 기존 신원 박스가 그대로 선다', () => {
+    // 마이페이지는 카드가 없어도 온전해야 한다 -- 빈 다크 무대가 뜨면 실패가 눈에 띈다.
+    publicProfileMock.mockReturnValue({ data: { playerCard: null } });
+
+    const { container } = renderStage();
+
+    expect(screen.getByLabelText('신원 박스')).toBeInTheDocument();
+    expect(container.querySelector('.tm-my-profile-stage')).toBeNull();
   });
 });

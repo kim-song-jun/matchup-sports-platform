@@ -779,9 +779,9 @@ function SidebarTournamentsWidget({ items, loading }: { items: V1TournamentListI
 
 // 대회 위젯(SidebarTournamentsWidget)과 같은 카드 관례 — 컴포넌트 파일 상단 주석 참조:
 // V1League엔 promoHomeEnabled 같은 관리자 토글이 없어 "진행 중(active)" 상태를 그대로
-// 홍보 신호로 쓴다. 아이콘도 같은 TrophyIcon을 재사용한다 — CompetitionTypeSegment가
-// 이미 대회/리그를 같은 "대회 유형" 축으로 묶고 있어(competition-type-segment.tsx)
-// 리그 전용 아이콘을 새로 만드는 대신 그 관례를 그대로 따른다.
+// 홍보 신호로 쓴다. 아이콘도 같은 TrophyIcon을 재사용한다 — 대회와 리그는 같은 "대회
+// 유형" 축이라(둘 다 경쟁 컨테이너) 리그 전용 아이콘을 새로 만드는 대신 그 관례를
+// 그대로 따른다.
 function SidebarLeaguesWidget({ items, loading }: { items: V1PublicLeagueListItem[]; loading: boolean }) {
   const visibleItems = items.slice(0, 4);
 

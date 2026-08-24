@@ -37,7 +37,8 @@ describe('PublicTeamRecordsService', () => {
       .mockResolvedValueOnce([{ id: 'fact-1', playedAt }])
       .mockResolvedValueOnce([
         { category: 'tournament', played: 1, won: 1, drawn: 0, lost: 0, goalsFor: 2, goalsAgainst: 1 },
-      ]);
+      ])
+      .mockResolvedValueOnce([{ season: '2026' }]);
     const prisma = {
       v1Team: {
         findUnique: jest.fn().mockResolvedValue({
@@ -80,6 +81,9 @@ describe('PublicTeamRecordsService', () => {
       }),
     );
     expect(result.items[0]).not.toHaveProperty('officialAt');
+    // 시즌 드롭다운 선택지는 하드코딩된 연도 목록이 아니라 이 팀 전용 3번째 $queryRaw
+    // 결과를 그대로 반영해야 한다.
+    expect(result.availableSeasons).toEqual(['2026']);
     // 전체 요약 + 종류별 구간 집계가 한 그룹 쿼리 결과에서 함께 나온다 -- tournament
     // 카테고리 1건만 있었으니 league/friendly 는 0으로 채워져야 한다(값을 지어내지 않는다).
     expect(result.summary).toEqual({
@@ -130,7 +134,8 @@ describe('PublicTeamRecordsService', () => {
       .mockResolvedValueOnce([{ id: 'fact-league-1', playedAt }])
       .mockResolvedValueOnce([
         { category: 'league', played: 1, won: 0, drawn: 0, lost: 1, goalsFor: 0, goalsAgainst: 3 },
-      ]);
+      ])
+      .mockResolvedValueOnce([{ season: '2026' }]);
     const teamMatchFindMany = jest.fn().mockResolvedValue([{ id: 'team-match-9', leagueId: 'league-1' }]);
     const leagueFindMany = jest.fn().mockResolvedValue([{ id: 'league-1', title: '2026 여름 정규 리그' }]);
     const prisma = {
@@ -196,7 +201,8 @@ describe('PublicTeamRecordsService', () => {
       .mockResolvedValueOnce([{ id: 'fact-friendly-1', playedAt }])
       .mockResolvedValueOnce([
         { category: 'friendly', played: 1, won: 0, drawn: 1, lost: 0, goalsFor: 1, goalsAgainst: 1 },
-      ]);
+      ])
+      .mockResolvedValueOnce([{ season: '2026' }]);
     const teamMatchFindMany = jest.fn().mockResolvedValue([{ id: 'team-match-3', leagueId: null }]);
     const leagueFindMany = jest.fn();
     const prisma = {
@@ -290,7 +296,8 @@ describe('PublicTeamRecordsService', () => {
         .mockResolvedValueOnce([{ id: 'fact-1', playedAt }])
         .mockResolvedValueOnce([
           { category: 'tournament', played: 1, won: 1, drawn: 0, lost: 0, goalsFor: 1, goalsAgainst: 0 },
-        ]),
+        ])
+        .mockResolvedValueOnce([{ season: '2026' }]),
     } as unknown as PrismaService;
 
     const result = await new PublicTeamRecordsService(prisma).getRecords('team-1', {});

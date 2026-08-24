@@ -272,6 +272,8 @@ export function TeamRecordsContent({
   onLoadMore,
   activeType,
   onChangeType,
+  activeSeason,
+  onChangeSeason,
 }: {
   data: PublicTeamRecordsResponse;
   hasNextPage?: boolean;
@@ -280,6 +282,9 @@ export function TeamRecordsContent({
   /** U2 -- 미전달 시 '전체' 고정(다른 화면이 아직 탭 없이 이 컴포넌트를 쓸 수 있어 optional). */
   activeType?: TeamRecordTypeFilter;
   onChangeType?: (type: TeamRecordTypeFilter) => void;
+  /** 미전달(`undefined`) = '전체 시즌'. 드롭다운 자체는 미전달 시 렌더하지 않는다(optional). */
+  activeSeason?: string;
+  onChangeSeason?: (season: string | undefined) => void;
 }) {
   // 여러 행을 동시에 펼칠 수 있게 Set으로 관리한다 -- 아코디언끼리 서로 배타적이어야
   // 할 이유가 없고(다른 경기 두 개를 나란히 비교해 보고 싶을 수 있다), gameId는
@@ -325,6 +330,34 @@ export function TeamRecordsContent({
               {tab.label}
             </button>
           ))}
+        </div>
+      ) : null}
+
+      {onChangeSeason ? (
+        // 시즌 데이터가 1개뿐이어도 숨기지 않는다 -- 자기 위치를 학습하게 그대로
+        // 보여준다(과제 지시). 선택지는 서버 `availableSeasons`(하드코딩 연도 없음).
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <label
+            htmlFor="team-records-season"
+            className="tm-text-caption"
+            style={{ color: 'var(--text-muted)', flexShrink: 0 }}
+          >
+            시즌
+          </label>
+          <select
+            id="team-records-season"
+            className="tm-input tm-input-select"
+            style={{ flex: 1, minHeight: 44 }}
+            value={activeSeason ?? 'all'}
+            onChange={(event) => onChangeSeason(event.target.value === 'all' ? undefined : event.target.value)}
+          >
+            <option value="all">전체 시즌</option>
+            {data.availableSeasons.map((season) => (
+              <option key={season} value={season}>
+                {season}시즌
+              </option>
+            ))}
+          </select>
         </div>
       ) : null}
 

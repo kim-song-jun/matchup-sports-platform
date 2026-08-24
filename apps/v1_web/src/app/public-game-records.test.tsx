@@ -203,6 +203,7 @@ function makeTeamRecords(overrides: Partial<PublicTeamRecordsResponse> = {}): Pu
     teamId: 'team-1',
     teamName: '서울 유나이티드',
     teamLogoUrl: '/uploads/teams/seoul.png',
+    availableSeasons: ['2026'],
     summary: {
       played: 1,
       won: 1,
@@ -338,6 +339,61 @@ describe('TeamRecordsContent — 종류 탭 (U2)', () => {
     // EmptyState 로 대체되지 않고 KPI 카드는 여전히 0을 보여준다.
     expect(screen.getAllByText('0').length).toBeGreaterThan(0);
     expect(screen.getByText('0·0·0')).toBeInTheDocument();
+  });
+});
+
+/**
+ * 시즌 드롭다운 -- 선택지는 하드코딩 연도 목록이 아니라 응답의 `availableSeasons`
+ * 그대로 렌더돼야 한다(과제 지시: "선택지 소스: ... 하드코딩 연도 목록 금지").
+ */
+describe('TeamRecordsContent — 시즌 드롭다운', () => {
+  it('onChangeSeason 미전달 시 드롭다운을 렌더하지 않는다', () => {
+    render(<TeamRecordsContent data={makeTeamRecords()} />);
+
+    expect(screen.queryByLabelText('시즌')).not.toBeInTheDocument();
+  });
+
+  it('선택지가 하드코딩이 아니라 응답의 availableSeasons 그대로 렌더된다', () => {
+    const data = makeTeamRecords({ availableSeasons: ['2026', '2025', '2024'] });
+    render(<TeamRecordsContent data={data} onChangeSeason={vi.fn()} />);
+
+    const select = screen.getByLabelText('시즌') as HTMLSelectElement;
+    const optionLabels = Array.from(select.options).map((option) => option.textContent);
+    expect(optionLabels).toEqual(['전체 시즌', '2026시즌', '2025시즌', '2024시즌']);
+  });
+
+  it('시즌이 1개뿐이어도 드롭다운을 숨기지 않는다', () => {
+    const data = makeTeamRecords({ availableSeasons: ['2026'] });
+    render(<TeamRecordsContent data={data} onChangeSeason={vi.fn()} />);
+
+    expect(screen.getByLabelText('시즌')).toBeInTheDocument();
+  });
+
+  it('기본값은 "전체 시즌"(activeSeason 미전달)이다', () => {
+    const data = makeTeamRecords({ availableSeasons: ['2026'] });
+    render(<TeamRecordsContent data={data} onChangeSeason={vi.fn()} />);
+
+    expect((screen.getByLabelText('시즌') as HTMLSelectElement).value).toBe('all');
+  });
+
+  it('시즌 선택이 onChangeSeason으로 선택된 연도를 그대로 전달한다', () => {
+    const onChangeSeason = vi.fn();
+    const data = makeTeamRecords({ availableSeasons: ['2026', '2025'] });
+    render(<TeamRecordsContent data={data} activeSeason="2026" onChangeSeason={onChangeSeason} />);
+
+    fireEvent.change(screen.getByLabelText('시즌'), { target: { value: '2025' } });
+
+    expect(onChangeSeason).toHaveBeenCalledWith('2025');
+  });
+
+  it('"전체 시즌" 재선택 시 onChangeSeason이 undefined로 호출된다', () => {
+    const onChangeSeason = vi.fn();
+    const data = makeTeamRecords({ availableSeasons: ['2026'] });
+    render(<TeamRecordsContent data={data} activeSeason="2026" onChangeSeason={onChangeSeason} />);
+
+    fireEvent.change(screen.getByLabelText('시즌'), { target: { value: 'all' } });
+
+    expect(onChangeSeason).toHaveBeenCalledWith(undefined);
   });
 });
 

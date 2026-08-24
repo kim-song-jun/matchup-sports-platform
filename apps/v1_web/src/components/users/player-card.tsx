@@ -219,6 +219,7 @@ export function PlayerCard({
   teamName,
   isOwner,
   shareHref,
+  belowCardSlot,
 }: {
   readonly card: V1PlayerCard;
   readonly displayName: string;
@@ -231,6 +232,12 @@ export function PlayerCard({
    * 공유 화면 자신은 이 값을 주지 않는다 -- 자기 자신으로 가는 버튼은 의미가 없다.
    */
   readonly shareHref?: string;
+  /**
+   * 카드 바로 아래(뒤집기 버튼 위)에 끼워 넣는 블록. 마이페이지 신원 통합 스테이지가
+   * 이름·뱃지·프로필 버튼을 여기에 넣는다 -- 카드가 신원을 대신하므로 흰 신원 박스를
+   * 따로 두면 같은 말을 두 번 하게 된다(사용자 선택 A안).
+   */
+  readonly belowCardSlot?: ReactNode;
 }) {
   const hint = unlockHint(card);
   const initial = displayName.trim().charAt(0) || '?';
@@ -443,6 +450,7 @@ export function PlayerCard({
       </div>
 
       <div className="tm-pcard-below">
+        {belowCardSlot ?? null}
         {/* 뒤집기는 버튼으로만 -- 카드 자체를 누르게 하면 기울기·공유 링크와 충돌한다. */}
         <button
           type="button"

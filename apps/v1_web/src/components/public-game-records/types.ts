@@ -378,6 +378,12 @@ export interface PublicTeamRecordsResponse {
   readonly teamName: string;
   readonly teamLogoUrl: string | null;
   readonly summary: PublicTeamRecordsSummary;
+  /**
+   * 시즌 드롭다운 선택지 -- `season`/`type` 쿼리와 무관하게 항상 이 팀에 공식 경기가
+   * 있었던 연도 전체(내림차순, 4자리 문자열). 하드코딩 연도 목록을 프론트에 두지
+   * 않기 위한 단일 소스(`public-team-records.service.ts`의 `fetchAvailableSeasons`).
+   */
+  readonly availableSeasons: readonly string[];
   readonly items: readonly PublicTeamRecordItem[];
   readonly nextCursor: string | null;
 }

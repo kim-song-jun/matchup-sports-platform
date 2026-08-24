@@ -1918,7 +1918,7 @@ export type V1PlayerCard = {
   /** 열린 능력치가 하나도 없으면 null. 0 이 아니다. */
   overall: number | null;
   /** 실력이 아니라 **출전 수**로 정해진다. */
-  tier: 'bronze' | 'silver' | 'gold' | 'special';
+  tier: 'bronze' | 'silver' | 'gold' | 'legend' | 'special';
   appearances: number;
   stats: V1PlayerCardStat[];
   unlockedCount: number;

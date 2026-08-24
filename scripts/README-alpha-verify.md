@@ -40,6 +40,7 @@ export ALPHA_SESSION_TOKEN='v1.<payload>.<signature>'
 | `capture-public-profile.mjs` | 공개 프로필 + 공개 활동 기록 3폭 캡처. `TARGET_USER_ID` 로 대상 지정 | 선수(타인 프로필도 가능) |
 | `capture-my-player-card.mjs` | 마이페이지의 **내 선수 카드** 3폭 캡처. `.tm-player-card` 존재 여부를 함께 판정한다 — 카드가 숨김·로딩·실패로 사라져도 화면은 200 이라 스크린샷만으로는 구분되지 않는다 | 본인 |
 | `verify-alpha-league-result-flow.mjs` | 리그 결과가 **순위표까지 닿는지** 릴레이 전체(홈팀 작성·제출 → 원정팀 승인 → 공개 순위표 반영)를 밟는다. 각 칸의 유닛 테스트가 전부 통과하는 동안 릴레이가 통째로 끊겨 있던 적이 있어서(2026-08-24 원정팀이 승인 화면에 진입 불가) 이어짐 자체를 본다. `--dry` 는 게이트 값과 순위표만 읽는다 | 홈팀장+원정팀장 |
+| `verify-alpha-result-official-notify.mjs` | 대회 결과 확정 알림(회고 REACH-4)이 **팀장에게 실제로 도착하는지** 전 구간을 밟는다: 예정 픽스처의 라인업 저장·제출 → start → end → SUBMITTED 리비전 officialize(previewHash 클라이언트 재구성) → 팀장 계정 알림 폴링. LINEUP-2 이후 라인업 save/submit 의 expectedVersion 은 **사이드별 라인업 버전**이다(게임 버전 아님 — 409 의 details.currentVersion 으로 1회 재시도해 흡수) | 관리자+팀장 |
 | `verify-alpha-og-card.mjs` | 선수 카드 OG 이미지가 **사용자별로 다른 그림**인지 판정. 여러 id 의 응답 바이트를 sha 로 비교해 전원이 같은 폴백을 받는 상태를 잡는다 — HTTP 200·PNG 까지는 통과하므로 상태코드만 보면 못 잡는다 | 불필요 |
 
 ```bash

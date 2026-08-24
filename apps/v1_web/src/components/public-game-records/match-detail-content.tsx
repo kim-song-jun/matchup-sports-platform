@@ -67,7 +67,9 @@ function MatchOutcomeNotice({ outcome }: { outcome: PublicMatchDetail['outcome']
         textAlign: 'center',
       }}
     >
-      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--orange500)' }}>
+      {/* --orange500 텍스트는 이 틴트 배경 위에서 1.97:1 로 WCAG AA 미달이다 —
+          --orange700(5.42:1)이 그 결함을 막으려 도입된 토큰이다. */}
+      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--orange700)' }}>
         {matchOutcomeReasonLabel(reason)}으로 종료된 경기예요
       </span>
       {/* 사유가 비어 있으면 빈 줄을 남기지 않는다. 서버가 사유 없는 몰수를 422 로 막지만

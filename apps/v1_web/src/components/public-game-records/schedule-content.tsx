@@ -88,7 +88,11 @@ function ScheduleOutcomeBadge({ outcome }: { outcome: PublicScheduleEntry['outco
         textAlign: 'center',
         fontSize: 11,
         fontWeight: 700,
-        color: 'var(--orange500)',
+        // --orange500 은 텍스트로 쓰면 흰 카드 위 2.16:1 로 WCAG AA 에 한참 못 미친다
+        // (큰 글씨 기준 3:1 도 못 넘긴다). --orange700 은 정확히 그 결함 때문에 도입된
+        // 토큰이고 흰 배경 5.94:1 · 틴트 배경 5.42:1 을 보장하며, 다크모드에서는
+        // 밝은 값으로 재정의돼 양쪽이 함께 해결된다(globals.css 주석 참조).
+        color: 'var(--orange700)',
       }}
     >
       {matchOutcomeReasonLabel(reason)}

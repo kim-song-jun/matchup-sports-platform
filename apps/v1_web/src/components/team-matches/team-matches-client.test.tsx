@@ -163,7 +163,11 @@ describe('TeamMatchDetailPageClient — GA events', () => {
 // rendered CTA so a regression in buildResultAction's role/viewerState
 // branching trips a real assertion.
 describe('TeamMatchDetailPageClient — result action routing gate (Task 17)', () => {
-  function mockMatchedTeamMatch(viewer: { state: V1TeamMatchViewerState; manageableHostTeam?: boolean }) {
+  function mockMatchedTeamMatch(viewer: {
+    state: V1TeamMatchViewerState;
+    manageableHostTeam?: boolean;
+    manageableOpponentTeam?: boolean;
+  }) {
     useV1TeamMatchMock.mockReturnValue({
       data: {
         id: 'team-match-1',
@@ -176,7 +180,11 @@ describe('TeamMatchDetailPageClient — result action routing gate (Task 17)', (
         capacityText: '2/2',
         displayState: 'matched',
         status: 'matched',
-        viewer: { state: viewer.state, manageableHostTeam: viewer.manageableHostTeam ?? false },
+        viewer: {
+          state: viewer.state,
+          manageableHostTeam: viewer.manageableHostTeam ?? false,
+          manageableOpponentTeam: viewer.manageableOpponentTeam ?? false,
+        },
         hostTeam: { teamId: 'team-host', name: '호스트 팀' },
       },
       isError: false,
@@ -201,7 +209,20 @@ describe('TeamMatchDetailPageClient — result action routing gate (Task 17)', (
   });
 
   it('shows the approved opponent the approval CTA routed to /result/approval, never the entry CTA', () => {
-    mockMatchedTeamMatch({ state: 'approved', manageableHostTeam: false });
+    mockMatchedTeamMatch({ state: 'approved', manageableHostTeam: false, manageableOpponentTeam: true });
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    const link = screen.getByRole('link', { name: '경기 결과 대기' });
+    expect(link).toHaveAttribute('href', '/team-matches/team-match-1/result/approval');
+    expect(screen.queryByRole('link', { name: '경기 결과 입력' })).not.toBeInTheDocument();
+  });
+
+  // 리그 대진 회귀: 신청서를 운영자가 대신 만들기 때문에 상대팀 매니저의 viewer.state 는
+  // 영영 'none' 이다(alpha 실측). 게이트가 다시 state 기반으로 돌아가면 이 단언이 깨진다 —
+  // 그때 실제로 벌어지는 일은 "리그 결과가 확정되지 않아 순위표가 멈추는 것"이다.
+  it('상대팀 매니저는 신청서를 직접 내지 않았어도(리그 대진) 승인 CTA를 본다', () => {
+    mockMatchedTeamMatch({ state: 'none', manageableHostTeam: false, manageableOpponentTeam: true });
 
     render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
 

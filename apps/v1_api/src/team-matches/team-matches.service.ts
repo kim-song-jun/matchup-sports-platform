@@ -1322,10 +1322,27 @@ export class TeamMatchesService {
 
   private async getViewer(teamMatch: TeamMatchWithRelations, user: V1AuthUser | null) {
     if (!user) {
-      return { state: 'guest', manageableHostTeam: false, participantMember: false, eligibleTeams: [], manageRoute: null };
+      return {
+        state: 'guest',
+        manageableHostTeam: false,
+        manageableOpponentTeam: false,
+        participantMember: false,
+        eligibleTeams: [],
+        manageRoute: null,
+      };
     }
     const hostMembership = teamMatch.hostTeam.memberships[0];
     const manageableHostTeam = hostMembership?.role === 'owner' || hostMembership?.role === 'manager';
+    // 결과 승인 게이트용 — "상대팀(승인된 신청팀)의 owner/manager 인가".
+    // `state === 'approved'` 로는 이 판정을 할 수 없다: 그건 **신청서를 낸 사람 한 명**만
+    // 통과하는데, 리그 대진의 신청서는 운영자가 자동 생성하면서 appliedByUserId 가
+    // 운영자로 남는다(league-match-admin.service.ts) -- 그래서 리그에서는 상대팀의
+    // 누구도 결과를 승인할 수 없었다(alpha 실측: 원정팀 owner 의 state 가 'none').
+    // 서버의 실제 권한 판정(games.service.ts resolveActor 의 opponent_result_decide)은
+    // 이미 팀 멤버십 기준이므로, 화면도 같은 기준을 쓰게 맞춘다.
+    const opponentMembership = teamMatch.approvedApplicantTeam?.memberships?.[0];
+    const manageableOpponentTeam =
+      opponentMembership?.role === 'owner' || opponentMembership?.role === 'manager';
     // 후기 자격 판정용 — 역할을 가리지 않는 "참가팀 소속" 여부.
     // `state` 는 이 목적에 못 쓴다: 'host_team' 은 host 팀 owner/manager 만, 'approved' 는
     // 신청서를 낸 사람 한 명만 받는다. 그 둘로 화면을 게이팅하면 양 팀 일반 팀원은 물론
@@ -1339,6 +1356,7 @@ export class TeamMatchesService {
     return {
       state: this.getViewerState(teamMatch, user),
       manageableHostTeam,
+      manageableOpponentTeam,
       participantMember,
       eligibleTeams: eligibleTeams.map((team) => {
         const application = teamMatch.applications.find((item) => item.applicantTeamId === team.id);

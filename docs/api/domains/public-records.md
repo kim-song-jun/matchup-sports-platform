@@ -49,7 +49,7 @@ existing file changed.
 | `GET /tournaments/:id/schedule` | `cursor?`, `limit? (1-100, default 20)`, `round?`, `groupId?` | `{ tournamentId, tournamentTitle, bracketPublished, items[], unscheduled[], standings[], nextCursor }` |
 | `GET /tournaments/:id/matches/:fixtureId` | -- | one match projection (see below) |
 | `GET /tournaments/:id/player-records` | -- | `{ tournamentId, goals[], assists[] }` -- per-user `{ userId, nickname, profileHref, goals, assists }`, desc-sorted, top 30 each |
-| `GET /teams/:id/records` | `cursor?`, `limit?`, `season? (YYYY)` | `{ teamId, teamName, teamLogoUrl, summary, items[] (including opponentTeamLogoUrl), nextCursor }` |
+| `GET /teams/:id/records` | `cursor?`, `limit?`, `season? (YYYY)` | `{ teamId, teamName, teamLogoUrl, summary, availableSeasons[], items[] (including opponentTeamLogoUrl), nextCursor }` |
 | `GET /users/:id/records` | `cursor?`, `limit?`, `season? (YYYY)` | `{ userId, nickname, summary, tournamentAwards[], items[], nextCursor }` |
 
 `cursor` is opaque (base64url JSON `{key,id}`); never construct it
@@ -61,6 +61,11 @@ or `V1TournamentFixture.scheduledAt` for tournament fixtures when the
 official fact is projected. The list order, cursor key, `season` filter, and
 summary all use this same match instant. A later result correction therefore
 updates the score without moving the match to the correction date.
+
+`availableSeasons` (4-digit years, descending) is the source for the team
+records page's season dropdown -- always computed from every year the team
+has a *current* official fact, independent of the request's own `season`/
+`type` filters (so picking one season never shrinks the option list itself).
 
 ### Server-enforced visibility (matches the frozen output matrix exactly)
 

@@ -73,16 +73,10 @@ const MENU_ICON_MAP: Record<string, React.ComponentType<LucideProps>> = {
 export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
   const avatarStyle = model.user.profileImageUrl ? { backgroundImage: cssUrl(model.user.profileImageUrl) } : undefined;
 
-  return (
-    <AppChrome title="마이페이지" activeTab="my" hasNewNotification={model.hasNewNotification} centerTitle>
-      <h1 className="sr-only">마이페이지</h1>
-      <div className="tm-my-shell">
-        {/* Mobile layout: flat stack (unchanged) */}
-        {/* Desktop layout: 2-column via tm-my-desktop-layout */}
-        <div className="tm-my-desktop-layout">
-          {/* LEFT sticky: profile identity */}
-          <div className="tm-my-desktop-sidebar">
-            <section className="tm-my-profile-head tm-my-home-profile-head">
+  // 신원 섹션. 카드가 있으면 다크 스테이지 안(카드 아래)으로 들어가고, 없으면
+  // 이 흰 박스가 그대로 선다(사용자 선택 A안 -- 카드와 신원 박스의 중복 제거).
+  const identitySection = (
+    <section className="tm-my-profile-head tm-my-home-profile-head">
               <div className="tm-my-avatar" style={avatarStyle}>{model.user.profileImageUrl ? null : model.user.initials}</div>
               <div className="tm-my-profile-copy">
                 <div className="tm-text-heading tm-my-profile-name">{model.user.name}</div>
@@ -136,17 +130,67 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
                 ) : null}
                 <Link className="tm-btn tm-btn-sm tm-btn-neutral tm-my-profile-edit-link" href="/my/profile/edit">프로필 수정</Link>
               </div>
-            </section>
-            {/* 내 선수 카드 (Task 155). 프로필 헤더 바로 아래 -- 마이페이지에 들어오면
-                바로 보이는 자리다. 카드를 숨겼거나 아직 못 불러왔으면 섹션이 통째로
-                사라지므로 이 자리가 비는 것 외의 부작용은 없다. */}
+    </section>
+  );
+
+  return (
+    <AppChrome title="마이페이지" activeTab="my" hasNewNotification={model.hasNewNotification} centerTitle>
+      <h1 className="sr-only">마이페이지</h1>
+      <div className="tm-my-shell">
+        {/* Mobile layout: flat stack (unchanged) */}
+        {/* Desktop layout: 2-column via tm-my-desktop-layout */}
+        <div className="tm-my-desktop-layout">
+          {/* LEFT sticky: profile identity */}
+          <div className="tm-my-desktop-sidebar">
+            {/* 내 선수 카드 + 신원 (Task 155, 신원 통합 스테이지 -- 사용자 선택 A안).
+                카드가 있으면 카드가 곧 프로필이다: 다크 스테이지 하나에 카드 → 신원
+                (이름·뱃지·버튼) → 뒤집기·진행도·공유가 정리되고 흰 신원 박스는 사라진다.
+                카드가 없으면(숨김·로딩·실패) 기존 신원 박스가 그대로 선다. */}
             {model.user.userId !== null ? (
               <MyPlayerCardSection
                 userId={model.user.userId}
                 displayName={model.user.name}
                 profileImageUrl={model.user.profileImageUrl ?? null}
+                fallback={identitySection}
+                stageIdentity={
+                  <div className="tm-pcard-identity">
+                    <div className="tm-pcard-identity-name">{model.user.name}</div>
+                    <div className="tm-pcard-identity-meta">
+                      {model.user.handle} · {model.user.region} · {model.user.genderLabel}
+                    </div>
+                    {model.user.loginMethod || model.phoneVerified ? (
+                      <div className="tm-pcard-identity-badges">
+                        {model.user.loginMethod ? (
+                          <span
+                            className="tm-badge tm-badge-grey"
+                            style={model.user.loginMethodProvider === 'kakao'
+                              ? { background: 'var(--kakao-yellow)', color: 'var(--static-black)' }
+                              : undefined}
+                          >
+                            {model.user.loginMethod}
+                          </span>
+                        ) : null}
+                        {model.phoneVerified ? (
+                          <span className="tm-badge tm-badge-grey" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            <ShieldCheck size={12} strokeWidth={2.5} aria-hidden="true" />
+                            본인인증 완료
+                          </span>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    <div className="tm-pcard-identity-actions">
+                      <Link
+                        className="tm-btn tm-btn-sm tm-btn-neutral"
+                        href={`/users/${encodeURIComponent(model.user.userId)}`}
+                      >
+                        내 프로필
+                      </Link>
+                      <Link className="tm-btn tm-btn-sm tm-btn-neutral" href="/my/profile/edit">프로필 수정</Link>
+                    </div>
+                  </div>
+                }
               />
-            ) : null}
+            ) : identitySection}
             {model.phoneVerified === false ? <PhoneVerificationCallout /> : null}
             {/* 활동 요약: stats strip을 Card로 감싸 섹션 라벨과 border/radius/padding 정합 */}
             <Card pad={16}>

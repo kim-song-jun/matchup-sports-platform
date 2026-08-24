@@ -167,6 +167,16 @@ async function main() {
   const revs = expectData(await api('GET', `/games/${gameId}/result-revisions`), '리비전 목록 조회');
   const submitted = (revs?.items ?? revs ?? []).find((r) => r.state === 'SUBMITTED');
   if (!submitted) throw new Error(`SUBMITTED 리비전 없음: ${JSON.stringify(revs).slice(0,300)}`);
+  // 판정 신뢰성(리뷰 지적): officialize 전에 팀장 알림 목록을 스냅샷 떠서
+  // '이번 실행이 새로 만든 알림'만 인정한다 — 시각 창 기반 판정은 경계가 자의적이다.
+  const capCookie = await login(process.env.CAPTAIN_EMAIL, process.env.CAPTAIN_PASSWORD);
+  const capApi = apiWith(capCookie);
+  const baseline = new Set(
+    (expectData(await capApi('GET', '/notifications?limit=50'), '알림 베이스라인 조회').items ?? [])
+      .map((n) => n.notificationId),
+  );
+  console.log(`팀장 로그인 OK — 베이스라인 알림 ${baseline.size}건`);
+
   g = expectData(await api('GET', `/games/${gameId}`), '게임 재조회');
   const offId = randomUUID();
   const off = await api('POST', `/games/${gameId}/result-revisions/${submitted.id}/officialize`, {
@@ -175,22 +185,17 @@ async function main() {
   console.log(`officialize: HTTP ${off.status}${off.status >= 400 ? ' ' + off.text.slice(0,300) : ''}`);
   if (off.status >= 400) throw new Error('officialize 실패');
 
-  // 팀장 계정으로 알림 폴링 (outbox 워커 비동기)
-  const capCookie = await login(process.env.CAPTAIN_EMAIL, process.env.CAPTAIN_PASSWORD);
-  const capApi = apiWith(capCookie);
-  // 판정 신뢰성(리뷰 지적): 제목만 보면 과거 실행이 남긴 같은 제목의 알림으로도
-  // PASS 한다 — 이번 픽스처를 가리키는 route + 스크립트 시작 이후 생성으로 좁힌다.
-  const startedAt = Date.now();
+  // 알림 폴링 (outbox 워커 비동기) — 베이스라인에 없던 신규 알림만 인정
   const expectedRoute = `/tournaments/${TOURNAMENT}/matches/${FIXTURE}`;
-  console.log('팀장 로그인 OK — 알림 폴링(최대 90s)');
+  console.log('알림 폴링(최대 90s)');
   for (let i = 0; i < 18; i += 1) {
     await new Promise((r) => setTimeout(r, 5000));
     const notis = expectData(await capApi('GET', '/notifications?limit=10'), '알림 목록 조회');
     const hit = (notis?.items ?? []).find(
       (n) =>
+        !baseline.has(n.notificationId) &&
         n.title === '대회 경기 결과가 확정됐어요' &&
-        n.target?.route === expectedRoute &&
-        new Date(n.createdAt).getTime() >= startedAt - 60_000,
+        n.target?.route === expectedRoute,
     );
     if (hit) {
       // 알림 목록 API 는 deepLink 를 target.route 로 직렬화한다.

@@ -48,6 +48,24 @@ function nullableText(value: string | null | undefined): string | null | undefin
   return trimmed.length > 0 ? trimmed : null;
 }
 
+/**
+ * 출전 인원·교체 설정 잠금 메시지에 쓸 라벨. 두 필드군은 같은 competition config 버전에
+ * 함께 pin 되어 하나의 게이트를 공유하지만, **거부 메시지는 운영자가 실제로 바꾸려던 것**을
+ * 말해야 한다. 늘 "출전 인원"이라고 하면 교체 방식만 건드린 운영자는 자기가 손대지도 않은
+ * 필드를 고치려 들고, 반대로 늘 둘 다 나열하면 무엇이 막혔는지가 흐려진다.
+ */
+export function lineupLockedFieldLabel(dto: {
+  lineupMaxPlayers?: unknown;
+  substitutionMode?: unknown;
+  maxSubstitutions?: unknown;
+}): string {
+  const sizeRequested = dto.lineupMaxPlayers !== undefined;
+  const substitutionRequested = dto.substitutionMode !== undefined || dto.maxSubstitutions !== undefined;
+  if (sizeRequested && substitutionRequested) return '출전 인원·교체 설정';
+  if (substitutionRequested) return '교체 설정';
+  return '출전 인원';
+}
+
 @Injectable()
 export class TournamentsAdminService {
   private readonly logger = new Logger(TournamentsAdminService.name);
@@ -342,6 +360,11 @@ export class TournamentsAdminService {
       dto.lineupMaxPlayers !== undefined ||
       dto.substitutionMode !== undefined ||
       dto.maxSubstitutions !== undefined;
+    // 잠금 메시지는 **운영자가 실제로 바꾸려던 것**을 말해야 한다. 출전 인원과 교체 설정은
+    // 같은 config 버전에 함께 pin 되어 한 게이트를 공유하는데, 메시지가 늘 "출전 인원"이라고
+    // 하면 교체 방식만 건드린 운영자는 자기가 손대지도 않은 필드 얘기를 듣는다
+    // (alpha 실측: 교체 방식만 보낸 PATCH 가 "출전 인원을 변경할 수 없어요"로 거부됐다).
+    const lockedFieldLabel = lineupLockedFieldLabel(dto);
     this.assertSubstitutionPolicyPair(dto.substitutionMode, dto.maxSubstitutions);
     if (lineupConfigChangeRequested) {
       // 종목과 출전 인원/교체 정책을 한 번에 바꾸면 어느 종목 기준으로 후보를 검증해야
@@ -361,7 +384,7 @@ export class TournamentsAdminService {
       if (existing.status === 'in_progress' || existing.status === 'completed') {
         throw new ConflictException({
           code: 'TOURNAMENT_LINEUP_SIZE_LOCKED',
-          message: '대회가 시작된 이후에는 출전 인원·교체 설정을 변경할 수 없어요.',
+          message: `대회가 시작된 이후에는 ${lockedFieldLabel}을 변경할 수 없어요.`,
         });
       }
     }
@@ -547,7 +570,11 @@ export class TournamentsAdminService {
         if (changeResult.confirmationRequired) {
           throw new ConflictException({
             code: 'TOURNAMENT_LINEUP_SIZE_LOCKED',
-            message: '이미 기록된 경기 결과가 있어 출전 인원을 변경할 수 없어요.',
+            // 사유도 사실에 맞춘다 — 이 게이트는 완료된 픽스처뿐 아니라 **기록된 순위**나
+            // **이미 시작된 경기**만 있어도 걸린다(TournamentCompetitionConfig.change 의
+            // requiresRecalculation). "기록된 경기 결과가 있어"로만 안내하면, 결과가 하나도
+            // 없는데 거부당한 운영자는 무엇을 지워야 풀리는지 알 수 없다.
+            message: `이미 진행된 경기나 기록된 결과가 있어 ${lockedFieldLabel}을 변경할 수 없어요.`,
           });
         }
       }

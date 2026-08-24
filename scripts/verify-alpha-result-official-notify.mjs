@@ -157,6 +157,7 @@ async function main() {
     if (g.state === 'SCHEDULED') {
       const r = await command('start');
       console.log(`start: HTTP ${r.status}${r.status >= 400 ? ' ' + r.text.slice(0,200) : ''}`);
+      if (r.status >= 400) throw new Error('start 실패');
     }
     const end = await command('end');
     console.log(`end: HTTP ${end.status}${end.status >= 400 ? ' ' + end.text.slice(0,300) : ''}`);
@@ -190,7 +191,7 @@ async function main() {
   console.log('알림 폴링(최대 90s)');
   for (let i = 0; i < 18; i += 1) {
     await new Promise((r) => setTimeout(r, 5000));
-    const notis = expectData(await capApi('GET', '/notifications?limit=10'), '알림 목록 조회');
+    const notis = expectData(await capApi('GET', '/notifications?limit=50'), '알림 목록 조회');
     const hit = (notis?.items ?? []).find(
       (n) =>
         !baseline.has(n.notificationId) &&

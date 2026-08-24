@@ -72,6 +72,13 @@ const config: Config = {
         // 내 변경과 무관한 선재 결함이다). 그래서 team-matches 선례를 따라 이 레인이
         // 새로 추가한 파일 하나만 명시 경로로 등록한다.
         '<rootDir>/test/league-matches/league-promotion.integration-spec.ts',
+        // D1-a: 위 league-promotion 줄과 같은 이유로 명시 경로 등록이 필요하다 --
+        // test/league-matches/ 디렉터리 자체가 와일드카드로 등록돼 있지 않아서
+        // (league-match-forfeit/-admin/-completion-projection 세 스펙이 이미
+        // 디스크에만 존재하고 CI 에서 한 번도 선택된 적이 없다), 새 스펙 하나만
+        // 명시 경로로 추가한다. 그 세 스펙까지 와일드카드로 되살리면 이 PR 과 무관한
+        // 이유로 CI 가 깨질 수 있다(team-matches/team-match-series 선례와 동일).
+        '<rootDir>/test/league-matches/league-match-result-entry.integration-spec.ts',
         // team-contacts (Task 8): 이 글롭이 없으면 `jest --selectProjects integration`
         // (= CI 의 migration replay + drift gate) 가 이 디렉터리를 절대 선택하지 않는다.
         // 이 레포에서 같은 실수가 이미 4회 반복 지적됐다 — 위 team-schedules/team-match-series/

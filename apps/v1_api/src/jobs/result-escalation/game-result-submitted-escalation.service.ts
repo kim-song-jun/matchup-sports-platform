@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import type { GameOperationHandler } from '../v1-game-operations-worker.service';
+import { LEAGUE_RESULT_AUTO_APPROVE_DELAY_MS } from '../../league-matches/league-result-dispute.constants';
 
 const REMINDER_DELAY_MS = 24 * 60 * 60 * 1_000;
 const ESCALATION_DELAY_MS = 48 * 60 * 60 * 1_000;
@@ -211,6 +212,19 @@ export class GameResultSubmittedEscalationService {
       await tx.$executeRaw`
         INSERT INTO v1_outbox_events (id, business_key, aggregate_type, aggregate_id, revision_id, type, payload, available_at, status, attempts, retry_generation, version, created_at, updated_at)
         VALUES (${randomUUID()}, ${`result-review:${revision.revisionId}:escalation`}, 'GAME', ${revision.gameId}, ${revision.revisionId}, 'GAME_RESULT_REVIEW_ESCALATION', ${payload}::jsonb, ${escalationDueAt}, 'PENDING'::"V1OutboxStatus", 0, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ON CONFLICT (business_key) DO NOTHING
+      `;
+      // D2 (E2, 2026-08-24 사용자 확정): 12시간 알림(위)과 별개로, 상대팀이 24시간
+      // 동안 승인/정정요청 어느 쪽도 하지 않으면 시스템이 자동 승인한다. 알림
+      // 큐(v1_result_escalations)는 건드리지 않는다 -- 이 항목은 실제 상태 전이를
+      // 일으키는 아웃박스 잡이지 SLA 대시보드용 알림이 아니다.
+      // `GameResultLeagueAutoApproveService.handler`가 처리하며, 그 안에서
+      // `revision.state !== 'SUBMITTED'`(사람이 이미 결정했거나 ASSIST_SYNC 로
+      // superseded 된 경우) 가드로 멱등을 보장한다.
+      const autoApproveDueAt = new Date(revision.submittedAt!.getTime() + LEAGUE_RESULT_AUTO_APPROVE_DELAY_MS);
+      await tx.$executeRaw`
+        INSERT INTO v1_outbox_events (id, business_key, aggregate_type, aggregate_id, revision_id, type, payload, available_at, status, attempts, retry_generation, version, created_at, updated_at)
+        VALUES (${randomUUID()}, ${`result-review:${revision.revisionId}:auto-approve`}, 'GAME', ${revision.gameId}, ${revision.revisionId}, 'GAME_RESULT_LEAGUE_AUTO_APPROVE', ${payload}::jsonb, ${autoApproveDueAt}, 'PENDING'::"V1OutboxStatus", 0, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         ON CONFLICT (business_key) DO NOTHING
       `;
       return;

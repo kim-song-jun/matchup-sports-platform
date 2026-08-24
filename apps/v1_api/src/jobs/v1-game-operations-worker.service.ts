@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 import { GameResultOfficialProjectionService } from '../game-operations/game-result-official-projection.service';
 import { GameResultVoidProjectionService } from '../game-operations/game-result-void-projection.service';
 import { GameResultSubmittedEscalationService } from './result-escalation/game-result-submitted-escalation.service';
+import { GameResultLeagueAutoApproveService } from './result-escalation/game-result-league-auto-approve.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { WebPushService } from '../notifications/web-push.service';
 
@@ -81,6 +82,10 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
     this.registerHandler('GAME_RESULT_SUBMITTED', submittedEscalation.handler);
     this.registerHandler('GAME_RESULT_REVIEW_REMINDER', submittedEscalation.reminderHandler);
     this.registerHandler('GAME_RESULT_REVIEW_ESCALATION', submittedEscalation.escalationHandler);
+    // D2 (E2): 리그 팀매치 결과가 24시간 무응답이면 자동 승인. 위 12시간 알림과는
+    // 별개 잡이다 -- 이쪽은 실제 OFFICIAL 전이를 일으킨다.
+    const leagueAutoApprove = new GameResultLeagueAutoApproveService();
+    this.registerHandler('GAME_RESULT_LEAGUE_AUTO_APPROVE', leagueAutoApprove.handler);
     // reject/request_supplement close their own review SLA synchronously in
     // the API command (TournamentResultReviewService.closeReviewSla, Task
     // 22); the durable audit handler here only needs to make the outbox's

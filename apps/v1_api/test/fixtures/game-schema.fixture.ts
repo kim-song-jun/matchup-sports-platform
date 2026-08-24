@@ -371,7 +371,21 @@ export const gameSchemaSourceManifest = {
   // game operations 계약 변화가 아니다. 전용 마이그레이션
   // 20260824120000_v1_player_card_hidden 이 뒷받침하며, 바인딩된
   // 20260729000100_v1_game_operations 는 건드리지 않았다(migration 해시 불변).
-  schema: '7cbdebdb092aa78fda6dd7d9f63a3772d68a1804a707213b016903a34a3b6ebe',
+  // 2026-08-24 재핀 (D2: 리그 결과 자동 승인 + 이의 제기): `V1LeagueMatchDispute` 모델
+  // (enum V1LeagueMatchDisputeStatus/V1LeagueMatchDisputeResolution 포함)을 신규
+  // 추가했다. 순수 CREATE TABLE + CREATE TYPE + CREATE INDEX(전부 새 테이블 위)라
+  // additive이며, 참조 컬럼(league_id/team_match_id/result_revision_id/
+  // raised_by_user_id/raised_by_team_id/resolved_by_admin_user_id)은 FK 관계를
+  // 걸지 않은 평문 문자열이라 **다른 기존 모델은 한 줄도 건드리지 않았다** — 5개
+  // 모델(V1League/V1TeamMatch/V1GameResultRevision/V1User/V1AdminUser)에 역참조
+  // 배열을 추가하지 않아도 되는 이유다. game domain(V1Game*) 모델·enum도 건드리지
+  // 않았다 -- 이 guard가 schema.prisma 전체 바이트를 결속하기 때문에 걸리는 것이지
+  // game operations 계약이 바뀐 게 아니다. 뒷받침 마이그레이션:
+  // 20260824130000_v1_league_match_disputes — 빈 DB replay + drift 검증(0) 통과.
+  // 바인딩된 20260729000100_v1_game_operations는 건드리지 않았으므로 migration
+  // 해시는 변하지 않는다. 아래 값은 이 브랜치의 schema.prisma에 `shasum -a 256`을
+  // 돌려 계산한 것이다.
+  schema: '712cc1aebccceef13074be2f2e8dd89378c95b71bacf2889fa32af918434c073',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

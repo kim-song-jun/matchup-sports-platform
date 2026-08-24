@@ -1860,6 +1860,49 @@ model V1LeagueTeam {
   @@map("v1_league_teams")
 }
 
+enum V1LeagueMatchDisputeStatus {
+  open
+  accepted
+  rejected
+}
+
+enum V1LeagueMatchDisputeResolution {
+  correction
+  void
+}
+
+// D2: 리그 경기 결과 확정 후 7일 이내 이의 제기(E2/E4). 신뢰 무결성보다 최소
+// 풋프린트를 택해 아래 참조 컬럼은 전부 FK 관계를 걸지 않은 평문 문자열이다 --
+// `V1OperationAudit`/`V1StatusChangeLog`가 actor 참조에 이미 쓰는 것과 같은
+// 감사원장 스타일이며(스키마 전체를 결속하는 게임 소스 스냅샷 가드 아래에서
+// 다른 5개 모델의 역참조 배열을 건드리지 않는 순수 CREATE TABLE로 남는다),
+// 조회는 인덱스 컬럼으로 충분하고(운영 알림도 이미 이 파일 옆
+// `game-result-submitted-escalation.service.ts`가 raw SQL join으로 하는 방식이다).
+model V1LeagueMatchDispute {
+  id                     String                          @id @default(uuid())
+  leagueId               String                          @map("league_id")
+  teamMatchId            String                          @map("team_match_id")
+  // 이의를 제기한 시점에 걸려 있던 공식 리비전의 스냅샷 — 해결 시점에 다른 정정이
+  // 먼저 그 자리를 대체했는지 판별하는 근거로 쓴다(대체됐다면 이 이의는 더 이상
+  // "현재" 공식 결과에 대한 것이 아니므로 해결 전에 재확인이 필요하다).
+  resultRevisionId       String                          @map("result_revision_id")
+  raisedByUserId         String                          @map("raised_by_user_id")
+  raisedByTeamId         String                          @map("raised_by_team_id")
+  reason                 String
+  status                 V1LeagueMatchDisputeStatus       @default(open)
+  resolution             V1LeagueMatchDisputeResolution?
+  resolutionNote         String?                         @map("resolution_note")
+  resolvedByAdminUserId  String?                         @map("resolved_by_admin_user_id")
+  resolvedAt             DateTime?                       @map("resolved_at")
+  createdAt              DateTime                        @default(now()) @map("created_at")
+  updatedAt              DateTime                        @updatedAt @map("updated_at")
+
+  @@index([leagueId, status])
+  @@index([teamMatchId, status])
+  @@index([status, createdAt])
+  @@map("v1_league_match_disputes")
+}
+
 model V1ChatRoom {
   id            String           @id @default(uuid())
   matchId       String?          @unique @map("match_id")

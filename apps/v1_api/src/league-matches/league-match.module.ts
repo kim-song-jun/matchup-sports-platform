@@ -6,6 +6,10 @@ import { OptionalV1AuthGuard } from '../auth/optional-v1-auth.guard';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { LeagueMatchAdminController } from './league-match-admin.controller';
 import { LeagueMatchAdminService } from './league-match-admin.service';
+// D2: 리그 결과 이의 제기(팀) + 수락/거부(운영자). LeagueMatchForfeitController/-Service와
+// 같은 이유로 별도 파일로 추가해 여기서만 등록한다.
+import { LeagueMatchDisputeController, LeagueMatchDisputeAdminController } from './league-match-dispute.controller';
+import { LeagueMatchDisputeService } from './league-match-dispute.service';
 import { LeagueMatchForfeitController } from './league-match-forfeit.controller';
 import { LeagueMatchForfeitService } from './league-match-forfeit.service';
 import { LeagueMatchPublicController } from './league-match-public.controller';
@@ -27,6 +31,8 @@ import { LeagueSeriesAdminService } from './league-series-admin.service';
   imports: [AdminContextModule, GamesModule, NotificationsModule],
   controllers: [
     LeagueMatchAdminController,
+    LeagueMatchDisputeController,
+    LeagueMatchDisputeAdminController,
     LeagueMatchForfeitController,
     LeagueMatchPublicController,
     LeagueMatchResultEntryController,
@@ -34,6 +40,7 @@ import { LeagueSeriesAdminService } from './league-series-admin.service';
   ],
   providers: [
     LeagueMatchAdminService,
+    LeagueMatchDisputeService,
     LeagueMatchForfeitService,
     LeagueMatchPublicService,
     LeagueMatchResultEntryService,

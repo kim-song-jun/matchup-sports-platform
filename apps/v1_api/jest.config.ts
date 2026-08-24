@@ -79,6 +79,10 @@ const config: Config = {
         // 명시 경로로 추가한다. 그 세 스펙까지 와일드카드로 되살리면 이 PR 과 무관한
         // 이유로 CI 가 깨질 수 있다(team-matches/team-match-series 선례와 동일).
         '<rootDir>/test/league-matches/league-match-result-entry.integration-spec.ts',
+        // D2: 위 두 줄과 같은 이유로 명시 경로 등록이 필요하다 -- test/league-matches/
+        // 디렉터리 자체가 와일드카드로 등록돼 있지 않다(이 디렉터리에서 벌써 3번째
+        // 반복되는 silent-omission 함정).
+        '<rootDir>/test/league-matches/league-match-dispute.integration-spec.ts',
         // team-contacts (Task 8): 이 글롭이 없으면 `jest --selectProjects integration`
         // (= CI 의 migration replay + drift gate) 가 이 디렉터리를 절대 선택하지 않는다.
         // 이 레포에서 같은 실수가 이미 4회 반복 지적됐다 — 위 team-schedules/team-match-series/

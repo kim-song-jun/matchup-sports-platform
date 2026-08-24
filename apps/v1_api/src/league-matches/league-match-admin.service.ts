@@ -1,6 +1,6 @@
 import { ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { Prisma, V1GameSideKey, V1GameSourceType } from '@prisma/client';
-import { AdminContextService } from '../common/admin-context.service';
+import { AdminContextService, type V1ActiveAdmin } from '../common/admin-context.service';
 import { canonicalGameCommandPayloadHash, GamesService } from '../games/games.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
@@ -702,31 +702,53 @@ export class LeagueMatchAdminService {
       });
     }
 
-    const alreadyProcessed = await this.prisma.$transaction(async (tx) => {
-      // 동시 요청 대비 조건부 UPDATE — 이미 다른 요청이 되돌렸다면(또는 자동 전이 로직이
-      // 마침 다시 completed로 돌려놨다면) 0행 매치로 조용히 no-op한다.
-      const reverted = await tx.v1League.updateMany({
-        where: { id: leagueId, state: 'completed' },
-        data: { state: 'active' },
-      });
-      if (reverted.count === 0) return true;
-
-      await this.adminContext.logAdminAction(
-        admin,
-        {
-          action: 'league_match.revert_completion',
-          targetType: 'league_match',
-          targetId: leagueId,
-          reason: dto.reason ?? null,
-          fromStatus: 'completed',
-          toStatus: 'active',
-        },
-        tx,
-      );
-      return false;
-    });
+    const alreadyProcessed = await this.prisma.$transaction((tx) =>
+      this.revertCompletionInTx(tx, admin, leagueId, dto.reason ?? null),
+    );
 
     return { leagueId, state: 'active' as const, alreadyProcessed };
+  }
+
+  /**
+   * `revertCompletion`의 tx-aware 핵심 로직(completed -> active 조건부 updateMany +
+   * 감사로그) — 호출자가 이미 시작한 트랜잭션 안에서 다른 작업과 원자적으로 묶기
+   * 위해 공개한다. D2(리그 결과 이의 수락, `league-match-dispute.service.ts`)가
+   * "정정/무효 처리 후 completed 였던 리그를 active 로 되돌린다"는 요구사항을 위해
+   * 새 함수를 만들지 않고 이 메서드를 그대로 재사용한다.
+   *
+   * `revertCompletion`(공개 엔드포인트)과 달리 `league.state`가 active/draft 인 경우를
+   * 미리 구분해 던지지 않는다 — completed 가 아니면 updateMany 가 그냥 0행 매치로
+   * no-op 하고 `true`(alreadyProcessed)를 돌려준다. 호출자가 "완료된 리그일 수도,
+   * 아닐 수도 있는" 상황에서 실패 없이 안전하게 부를 수 있어야 하기 때문이다
+   * (이의 수락 시점의 리그가 completed 인지는 그 흐름의 관심사가 아니라 부수 조건이다).
+   */
+  async revertCompletionInTx(
+    tx: Prisma.TransactionClient,
+    admin: V1ActiveAdmin,
+    leagueId: string,
+    reason: string | null,
+  ): Promise<boolean> {
+    // 동시 요청 대비 조건부 UPDATE — 이미 다른 요청이 되돌렸다면(또는 자동 전이 로직이
+    // 마침 다시 completed로 돌려놨다면) 0행 매치로 조용히 no-op한다.
+    const reverted = await tx.v1League.updateMany({
+      where: { id: leagueId, state: 'completed' },
+      data: { state: 'active' },
+    });
+    if (reverted.count === 0) return true;
+
+    await this.adminContext.logAdminAction(
+      admin,
+      {
+        action: 'league_match.revert_completion',
+        targetType: 'league_match',
+        targetId: leagueId,
+        reason,
+        fromStatus: 'completed',
+        toStatus: 'active',
+      },
+      tx,
+    );
+    return false;
   }
 
   private async loadLeague(leagueId: string) {

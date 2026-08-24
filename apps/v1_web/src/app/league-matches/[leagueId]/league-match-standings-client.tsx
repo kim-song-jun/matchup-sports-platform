@@ -167,10 +167,46 @@ function FixtureTeamLabel({
   const entry = teamId !== null ? lookup.get(teamId) : undefined;
   const name = entry?.name ?? fallback;
   return (
+    // 여기서는 **팀 상세로 링크하지 않는다**(D3 적용 대상 아님). 이 라벨은 경기 목록 행
+    // 안에서 쓰이는데 그 행 전체가 이미 팀매치 상세로 가는 <a> 라, 안에 또 <a> 를 두면
+    // HTML 이 무효가 되고 브라우저가 바깥 <a> 를 조기에 닫는다(같은 이유로 리그 배지도
+    // button + router.push 를 쓴다). 경기 행에서 기대되는 목적지도 팀이 아니라 그 경기다.
     <span className="inline-flex items-center gap-1.5">
       <TeamAvatar seed={teamId ?? fallback} name={name} logoUrl={entry?.logoUrl ?? null} size="sm" />
       <span className="text-[var(--text-strong)]">{name}</span>
     </span>
+  );
+}
+
+/**
+ * 리그 화면의 팀 이름을 팀 상세로 잇는다 (D3, 2026-08-24 사용자 확정).
+ *
+ * 그전까지 순위표·참가팀 목록·시상 화면의 팀 이름은 전부 **누를 수 없는 글자**였다.
+ * "이 팀 뭐 하는 팀이지?"에서 길이 끊겼고, 리그 안에서 팀으로 나가는 통로가 아예 없었다.
+ *
+ * 목적지는 팀 전적이 아니라 **팀 상세**다 — 앱의 다른 모든 화면에서 팀 이름은 팀 상세로
+ * 가므로 같은 단어가 화면마다 다른 곳으로 가지 않게 한다. 성적은 팀 상세에서 한 번 더
+ * 들어가면 된다(그 대가는 결정 시점에 인지된 것이다).
+ *
+ * teamId 가 없을 수 있는 자리(부전 등)에서는 링크로 감싸지 않고 원래 내용을 그대로 둔다 —
+ * 빈 링크는 키보드 포커스만 먹고 아무 데도 가지 않는다.
+ */
+function TeamNameLink({
+  teamId,
+  className,
+  children,
+}: {
+  teamId: string | null;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  if (teamId === null) {
+    return <span className={className}>{children}</span>;
+  }
+  return (
+    <Link href={`/teams/${teamId}`} className={`tm-pressable ${className ?? ''}`.trim()}>
+      {children}
+    </Link>
   );
 }
 
@@ -184,9 +220,14 @@ function ParticipantTeamList({ teams }: { teams: Array<{ teamId: string; teamNam
   return (
     <ul className="divide-y divide-[var(--border)] overflow-hidden rounded-xl border border-[var(--border)]">
       {sorted.map((team) => (
-        <li key={team.teamId} className="flex min-h-[44px] items-center gap-2 px-3 py-2 text-sm">
-          <TeamAvatar seed={team.teamId} name={team.teamName} logoUrl={team.teamLogoUrl} size="sm" />
-          <span className="text-[var(--text-strong)]">{team.teamName}</span>
+        <li key={team.teamId} className="text-sm">
+          <TeamNameLink
+            teamId={team.teamId}
+            className="tm-list-row-interactive flex min-h-[44px] items-center gap-2 px-3 py-2"
+          >
+            <TeamAvatar seed={team.teamId} name={team.teamName} logoUrl={team.teamLogoUrl} size="sm" />
+            <span className="text-[var(--text-strong)]">{team.teamName}</span>
+          </TeamNameLink>
         </li>
       ))}
     </ul>
@@ -514,7 +555,7 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
                   <tr key={row.teamId} className="border-t border-[var(--border)]">
                     <td className="py-2 text-[var(--text-strong)]">{row.position}</td>
                     <th scope="row" className="text-left font-normal text-[var(--text-strong)]">
-                      <span className="flex items-center gap-2">
+                      <TeamNameLink teamId={row.teamId} className="flex items-center gap-2">
                         <TeamAvatar seed={row.teamId} name={row.teamName} logoUrl={row.teamLogoUrl} size="sm" />
                         <span className="flex flex-col">
                           <span>{row.teamName}</span>
@@ -541,7 +582,7 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
                                 )
                           )}
                         </span>
-                      </span>
+                      </TeamNameLink>
                     </th>
                     {/* 1-0-0 압축 표기 — tournament-standings-table.tsx와 동일 정책.
                         스크린리더에는 aria-label로 풀어서 읽힌다. */}

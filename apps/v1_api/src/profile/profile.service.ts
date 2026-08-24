@@ -388,6 +388,9 @@ export class ProfileService {
       punctualityScore: toNumber(reputation?.metricPunctualityScore),
       reviewCount: reputation?.metricReviewCount ?? 0,
       recordsConsented: consent?.state === V1ConsentState.GRANTED,
+      // 연결된 기록이 하나도 없으면 동의를 켜도 열릴 것이 없다 -- 그 사실을 산식에
+      // 넘겨야 "공개를 켜면 열려요" 라는 거짓 약속을 하지 않는다.
+      hasRecordLinks: records.hasAnyLink,
     });
   }
 

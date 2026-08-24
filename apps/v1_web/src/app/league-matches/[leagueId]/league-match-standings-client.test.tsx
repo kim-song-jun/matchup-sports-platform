@@ -24,6 +24,53 @@ const useV1LeagueMatchStandingsMock = vi.mocked(useV1LeagueMatchStandings, { par
 const useV1LeagueMatchPlayerRecordsMock = vi.mocked(useV1LeagueMatchPlayerRecords, { partial: true });
 
 describe('LeagueMatchStandingsClient', () => {
+  // D3(2026-08-24 사용자 확정): 리그 안에서 팀으로 나가는 통로. 그전까지 순위표의 팀
+  // 이름은 누를 수 없는 글자였다. 목적지는 팀 전적이 아니라 **팀 상세**로 못 박는다 —
+  // 앱의 다른 화면과 같은 곳으로 가야 같은 단어가 화면마다 다른 데로 가지 않는다.
+  it('순위표의 팀 이름은 팀 상세로 가는 링크다', async () => {
+    useV1LeagueMatchMock.mockReturnValue({
+      data: { leagueId: 'league-1', title: '가을 리그', state: 'active', startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1'], fixtures: [] },
+    } as never);
+    useV1LeagueMatchStandingsMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1',
+        tieBreakOrder: ['points'],
+        standings: [{ teamId: 't1', teamName: '성수 FC', teamLogoUrl: null, position: 1, played: 1, wins: 1, draws: 0, losses: 0, goalsFor: 2, goalsAgainst: 0, points: 3 }],
+        pendingFixtures: [],
+      },
+    } as never);
+    useV1LeagueMatchPlayerRecordsMock.mockReturnValue({ data: { leagueId: 'league-1', goals: [], assists: [] } } as never);
+
+    render(<LeagueMatchStandingsClient leagueId="league-1" />);
+
+    const link = await screen.findByRole('link', { name: /성수 FC/ });
+    expect(link).toHaveAttribute('href', '/teams/t1');
+  });
+
+  // 한 경기도 안 치른 리그는 순위표 대신 참가팀 목록을 보여준다 — 거기서도 팀으로 갈 수
+  // 있어야 한다. 시즌 시작 전이 오히려 "어떤 팀이 나오지?"를 가장 많이 누르는 시점이다.
+  it('참가팀 목록의 팀 이름도 팀 상세로 간다', async () => {
+    useV1LeagueMatchMock.mockReturnValue({
+      data: { leagueId: 'league-1', title: '가을 리그', state: 'active', startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1', 't2'], fixtures: [] },
+    } as never);
+    useV1LeagueMatchStandingsMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1',
+        tieBreakOrder: ['points'],
+        standings: [
+          { teamId: 't1', teamName: '성수 FC', teamLogoUrl: null, position: 1, played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, points: 0 },
+          { teamId: 't2', teamName: '망원 FC', teamLogoUrl: null, position: 2, played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, points: 0 },
+        ],
+        pendingFixtures: [],
+      },
+    } as never);
+    useV1LeagueMatchPlayerRecordsMock.mockReturnValue({ data: { leagueId: 'league-1', goals: [], assists: [] } } as never);
+
+    render(<LeagueMatchStandingsClient leagueId="league-1" />);
+
+    expect(await screen.findByRole('link', { name: /망원 FC/ })).toHaveAttribute('href', '/teams/t2');
+  });
+
   it('순위표에서 저장된 팀 로고를 표시한다', async () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1LeagueMatchMock.mockReturnValue({

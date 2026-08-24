@@ -629,6 +629,39 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                   );
                 },
               },
+              // 열 순서: '경기' 바로 뒤. 처음엔 '상태' 뒤(맨 끝)에 뒀는데 alpha 1440 실측에서
+              // 표 스크롤러가 clientWidth 898 / scrollWidth 1201 이라 결과 열의 오른쪽 끝이
+              // x=1394 — 보이는 영역(1171) 밖이었다. **가로로 스크롤해야 보이는 결과 열**은
+              // 이 기능의 목적(운영자가 막힌 경기를 한눈에)을 달성하지 못한다.
+              //
+              // D6(2026-08-24 확정): '상태' 열은 그대로 두고 '결과' 열을 따로 둔다.
+              // 두 값은 다른 축이다 — status 는 "대진이 성사됐는가", resultStage 는
+              // "결과가 어디까지 왔는가". 합치면 취소·매칭 같은 대진 자체의 상태가
+              // 결과 단계에 가려진다. 이 열이 없던 동안 운영자는 어느 경기가 미입력인지,
+              // 어느 경기가 상대팀 승인을 기다리는지 화면에서 알 방법이 없었다.
+              {
+                key: 'result',
+                header: '결과',
+                render: (row) => {
+                  // 취소된 대진에 결과 단계를 붙이면 "미입력"이 영원히 처리해야 할 일처럼
+                  // 보인다 — 취소는 결과를 기다리지 않으므로 단계 자체를 그리지 않는다.
+                  if (row.status === 'cancelled') {
+                    return <span className="text-xs text-[var(--text-muted)]">—</span>;
+                  }
+                  const stage = row.resultStage ?? 'not_entered';
+                  const hasScore = row.homeScore !== null && row.homeScore !== undefined;
+                  return (
+                    <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                      <AdminStatusPill status={`result_${stage}`} />
+                      {hasScore ? (
+                        <span className="text-sm font-medium tabular-nums text-[var(--text-strong)]">
+                          {row.homeScore} : {row.awayScore}
+                        </span>
+                      ) : null}
+                    </span>
+                  );
+                },
+              },
               {
                 key: 'startAt',
                 header: '일시',

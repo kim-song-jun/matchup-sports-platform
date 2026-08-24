@@ -88,6 +88,98 @@ describe('LeagueMatchFixturesClient', () => {
     useV1RevertLeagueCompletionMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
   });
 
+  // D6(2026-08-24 확정): '상태' 열과 별개로 '결과' 열을 둔다. 이 열이 없던 동안 운영자는
+  // 어느 경기가 미입력이고 어느 경기가 상대팀 승인을 기다리는지 화면에서 알 수 없었다.
+  // 두 열이 다시 하나로 합쳐지면(= 결과 단계가 대진 상태를 가리면) 이 단언이 깨진다.
+  it('대진 표는 대진 상태와 결과 진행 단계를 각각의 열로 보여주고, 확정된 경기에는 스코어를 함께 싣는다', () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1AdminLeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1',
+        title: '가을 풋살 리그',
+        state: 'active',
+        teamIds: ['t1', 't2'],
+        recentVenues: [],
+        fixtures: [
+          {
+            teamMatchId: 'tm-official', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2',
+            startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched',
+            resultStage: 'official', homeScore: 3, awayScore: 1,
+          },
+          {
+            teamMatchId: 'tm-waiting', title: '가을 풋살 리그 2주차', homeTeamId: 't2', awayTeamId: 't1',
+            startAt: '2026-09-08T20:00:00.000Z', placeName: '장소 미정', status: 'matched',
+            resultStage: 'awaiting_approval', homeScore: null, awayScore: null,
+          },
+          {
+            teamMatchId: 'tm-empty', title: '가을 풋살 리그 3주차', homeTeamId: 't1', awayTeamId: 't2',
+            startAt: '2026-09-15T20:00:00.000Z', placeName: '장소 미정', status: 'matched',
+            resultStage: 'not_entered', homeScore: null, awayScore: null,
+          },
+        ],
+      },
+      isPending: false,
+    } as never);
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    expect(screen.getByRole('columnheader', { name: '결과' })).toBeInTheDocument();
+    // 상태 열이 사라지지 않았는지도 함께 고정한다 — 합치는 회귀를 잡는 게 이 테스트의 목적이다.
+    expect(screen.getByRole('columnheader', { name: '상태' })).toBeInTheDocument();
+
+    // 열 **순서**까지 고정한다. 처음엔 결과를 맨 끝(관리 앞)에 뒀는데, alpha 1440 실측에서
+    // 표 스크롤러가 clientWidth 898 / scrollWidth 1201 이라 결과 열이 보이는 영역 밖으로
+    // 밀려 가로 스크롤을 해야만 보였다 — 운영자가 한눈에 막힌 경기를 짚게 하려고 만든
+    // 열이 기본 상태에서 안 보이면 기능이 성립하지 않는다. 그래서 '경기' 바로 뒤에 둔다.
+    const headers = screen.getAllByRole('columnheader').map((cell) => cell.textContent?.trim());
+    expect(headers.indexOf('결과')).toBe(headers.indexOf('경기') + 1);
+
+    // AdminDataTable 은 같은 행을 데스크톱 표와 모바일 카드로 각각 렌더한다 —
+    // 그래서 개수가 아니라 "존재"만 본다(getAllByText).
+    expect(screen.getAllByText('확정').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('3 : 1').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('승인 대기').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('결과 미입력').length).toBeGreaterThan(0);
+  });
+
+  // 취소된 대진은 결과를 기다리지 않는다 — '미입력'으로 그리면 영원히 처리해야 할 일처럼 보인다.
+  it('취소된 대진에는 결과 단계를 그리지 않는다', () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1AdminLeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1',
+        title: '가을 풋살 리그',
+        state: 'active',
+        teamIds: ['t1', 't2'],
+        recentVenues: [],
+        fixtures: [
+          {
+            teamMatchId: 'tm-cancelled', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2',
+            startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'cancelled',
+            resultStage: 'not_entered', homeScore: null, awayScore: null,
+          },
+        ],
+      },
+      isPending: false,
+    } as never);
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    expect(screen.queryByText('결과 미입력')).not.toBeInTheDocument();
+  });
+
   it('일시 입력 칸에 표시되는 값이 서버가 내려준 UTC 시각과 동일한 순간(instant)을 나타낸다 (로컬시간 미변환 시 9시간 어긋남 회귀 방지)', () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1AdminLeagueMatchMock.mockReturnValue({

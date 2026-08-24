@@ -147,6 +147,34 @@ describe('팀매치 만들기 진행 표시줄 — 클릭 이동', () => {
 // 오탐한다 -- 실제로 매치 유형 세그먼트에 '리그' 탭이 생기자 바로 옆 '전체' 칩과 이어
 // 붙어 '리그전체' 가 되면서 이 단언이 깨졌다(배지는 없는데도). 배지는 접근 가능한
 // 이름을 가진 버튼이므로 그 역할로 정확히 겨냥한다.
+describe('경기 조건 — 값이 없는 항목', () => {
+  // D7(2026-08-24 사용자 확정): 값이 비면 행을 숨기지 않고 '미정'을 적는다.
+  // 리그 대진은 운영자가 만들기 때문에 경기방식·스타일·유니폼이 애초에 비어 있는데,
+  // 그동안 값 칸이 통째로 공백이라 화면이 "정보 없음"이 아니라 "깨짐"처럼 보였다.
+  it('경기방식·경기 스타일·유니폼 색상이 비어 있으면 값 자리에 미정을 적는다', () => {
+    const model = getTeamMatchDetailViewModel();
+    model.match = { ...model.match, format: '', style: '', uniform: '' };
+
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    // 세 항목이 비었으므로 '미정'이 최소 3개 — 행 자체는 사라지지 않아야 한다.
+    expect(screen.getAllByText('미정').length).toBeGreaterThanOrEqual(3);
+    expect(screen.getByText('경기방식')).toBeInTheDocument();
+    expect(screen.getByText('경기 스타일')).toBeInTheDocument();
+    expect(screen.getByText('유니폼 색상')).toBeInTheDocument();
+  });
+
+  it('값이 있으면 그대로 보여주고 미정으로 덮어쓰지 않는다', () => {
+    const model = getTeamMatchDetailViewModel();
+    model.match = { ...model.match, format: '5:5', style: '친선', uniform: '빨강' };
+
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    expect(screen.getByText('5:5')).toBeInTheDocument();
+    expect(screen.getByText('빨강')).toBeInTheDocument();
+  });
+});
+
 describe('리그전 배지', () => {
   const leagueBadge = () => screen.queryByRole('button', { name: /리그 상세로 이동/ });
 

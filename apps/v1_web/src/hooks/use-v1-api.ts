@@ -2305,6 +2305,32 @@ export function useV1UpdateRecordConsent() {
  */
 export type V1TournamentRealNameVisibility = { visible: boolean };
 
+/**
+ * 선수 카드 숨김 (Task 155). 컬럼과 같은 방향(`hidden`)으로 둔다 -- 화면·API·DB 사이에서
+ * 의미가 뒤집히면 반전이 빠지거나 두 번 되는 실수가 난다.
+ */
+export type V1PlayerCardHidden = { hidden: boolean };
+
+export function useV1PlayerCardHidden() {
+  return useQuery({
+    queryKey: v1Keys.playerCardHidden(),
+    queryFn: () => v1Get<V1PlayerCardHidden>('/me/player-card-hidden'),
+  });
+}
+
+export function useV1UpdatePlayerCardHidden() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { hidden: boolean }) => v1Patch<V1PlayerCardHidden>('/me/player-card-hidden', body),
+    onSuccess: (result) => {
+      queryClient.setQueryData<V1PlayerCardHidden>(v1Keys.playerCardHidden(), result);
+      // 카드 자체가 숨김에 따라 나타나고 사라지므로 공개 프로필 캐시를 비운다 --
+      // 안 비우면 껐는데 마이페이지에 카드가 남아 있는다.
+      void queryClient.invalidateQueries({ queryKey: v1Keys.all });
+    },
+  });
+}
+
 export function useV1TournamentRealNameVisibility() {
   return useQuery({
     queryKey: v1Keys.tournamentRealNameVisibility(),

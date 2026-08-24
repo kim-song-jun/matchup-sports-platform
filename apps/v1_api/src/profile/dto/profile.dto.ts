@@ -169,3 +169,15 @@ export class UpdateTournamentRealNameVisibilityDto {
   @IsBoolean()
   visible!: boolean;
 }
+
+/**
+ * 선수 카드 숨김 토글 (Task 155).
+ *
+ * `hidden` 으로 두는 이유: 컬럼(`playerCardHidden`)과 같은 방향이라 화면·API·DB 사이에서
+ * 의미가 뒤집히지 않는다. `visible` 로 받으면 어딘가에서 한 번 반전해야 하고, 그 반전이
+ * 빠지거나 두 번 되는 실수가 실제로 잘 난다.
+ */
+export class UpdatePlayerCardHiddenDto {
+  @IsBoolean()
+  hidden!: boolean;
+}

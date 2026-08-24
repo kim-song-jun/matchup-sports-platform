@@ -44,6 +44,7 @@ import {
   useV1TeamJoinApplications,
   useV1TeamMembers,
   useV1Tournament,
+  useV1PlayerCardHidden,
   useV1TournamentRealNameVisibility,
   useV1UploadImages,
   useV1UpdateMyPreferences,
@@ -51,6 +52,7 @@ import {
   useV1UpdateProfile,
   useV1UpdateRecordConsent,
   useV1UpdateSettings,
+  useV1UpdatePlayerCardHidden,
   useV1UpdateTournamentRealNameVisibility,
   useV1WithdrawalRequest,
   useV1WithdrawMyJoinApplication,
@@ -1761,6 +1763,96 @@ export function TournamentRealNameVisibilitySettingsPageClient() {
                 {visible ? 'ON' : 'OFF'}
               </span>
               <span className={`tm-toggle ${visible ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </AppChrome>
+  );
+}
+
+/**
+ * 선수 카드 숨김 설정 (Task 155).
+ *
+ * 카드는 게임화된 물건이라 거부감을 느끼는 사용자가 있다. 컬럼(`playerCardHidden`)은
+ * 그 탈출구로 만들었는데 **쓰는 경로가 없어 켤 수가 없었다** -- 이 화면이 그것을 연다.
+ *
+ * 켜면 마이페이지·공개 프로필·공유 화면에서 카드가 모두 사라진다(서버가 `playerCard: null`).
+ * 활동 기록과 프로필 자체는 그대로 남는다 -- 카드만 끄는 것이지 프로필을 숨기는 게 아니다.
+ */
+export function PlayerCardHiddenSettingsPageClient() {
+  const state = useV1PlayerCardHidden();
+  const update = useV1UpdatePlayerCardHidden();
+  const [toggleError, setToggleError] = useState(false);
+
+  if (state.isError) {
+    return (
+      <AppChrome title="선수 카드" activeTab="my" bottomNav={false} backHref="/my/settings" desktopHead>
+        <div className="tm-my-shell">
+          <ErrorState message="설정을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void state.refetch()} />
+        </div>
+      </AppChrome>
+    );
+  }
+
+  const hidden = Boolean(state.data?.hidden);
+  const toggle = () => {
+    setToggleError(false);
+    update.mutate({ hidden: !hidden }, { onError: () => setToggleError(true) });
+  };
+
+  return (
+    <AppChrome title="선수 카드" activeTab="my" bottomNav={false} backHref="/my/settings" desktopHead>
+      <div className="tm-my-shell">
+        <div className="tm-my-settings-desktop">
+          <div className="tm-desktop-page-head tm-show-desktop">
+            <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
+              <ChevronLeftIcon size={22} strokeWidth={2.5} />
+            </Link>
+            <h1 className="tm-text-heading">선수 카드</h1>
+          </div>
+          <Card pad={14} style={{ marginBottom: 8 }}>
+            <div className="tm-text-label">선수 카드 숨기기</div>
+            <div className="tm-text-caption" style={{ marginTop: 4 }}>
+              경기 기록으로 만든 카드예요. 숨기면 마이페이지·공개 프로필·공유 화면에서
+              카드가 보이지 않아요. 활동 기록과 프로필은 그대로 남아요 — 카드만 끄는 거예요.
+            </div>
+          </Card>
+          {toggleError ? (
+            <Card pad={14} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
+              <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
+              <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요.</div>
+            </Card>
+          ) : null}
+          <div className="tm-card" style={{ padding: 0 }}>
+            <button
+              className="tm-my-menu-row tm-pressable tm-noti-toggle-row"
+              onClick={toggle}
+              type="button"
+              disabled={state.isLoading || update.isPending}
+              role="switch"
+              aria-checked={hidden}
+              aria-label="선수 카드 숨기기"
+              style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+            >
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="tm-text-body">선수 카드 숨기기</div>
+                <div className="tm-text-caption" style={{ marginTop: 3 }}>
+                  {update.isPending
+                    ? '저장하는 중이에요…'
+                    : hidden
+                      ? '지금은 카드가 보이지 않아요. 끄면 다시 보여요.'
+                      : '지금은 카드가 보여요. 켜면 어디에도 표시되지 않아요.'}
+                </div>
+              </div>
+              <span
+                className="tm-text-caption"
+                style={{ minWidth: 24, textAlign: 'right', color: hidden ? 'var(--blue500)' : 'var(--text-caption)' }}
+                aria-hidden="true"
+              >
+                {hidden ? 'ON' : 'OFF'}
+              </span>
+              <span className={`tm-toggle ${hidden ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
             </button>
           </div>
         </div>

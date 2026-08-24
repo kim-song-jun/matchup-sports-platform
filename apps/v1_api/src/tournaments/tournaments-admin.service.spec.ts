@@ -1148,6 +1148,53 @@ describe('TournamentsAdminService', () => {
     expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
   });
 
+  /**
+   * alpha 실측: 교체 방식만 담은 PATCH 가 "이미 기록된 경기 결과가 있어 **출전 인원**을
+   * 변경할 수 없어요"로 거부됐다. 운영자는 출전 인원을 건드리지도 않았으므로 무엇이
+   * 막혔는지 알 수 없고, 손대지도 않은 필드를 고치려 들게 된다. 두 필드군이 한 게이트를
+   * 공유하는 것은 맞지만 **메시지는 시도한 것**을 말해야 한다.
+   */
+  it('update: 교체 설정만 바꿨다면 잠금 메시지도 교체 설정이라고 말한다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'in_progress' }));
+
+    // 포함 검사만으로는 '출전 인원·교체 설정' 과 구분되지 않는다 — 손대지 않은 필드가
+    // **빠져 있는지**가 이 테스트의 핵심이므로 메시지를 직접 꺼내 본다.
+    const message = await service
+      .update(ownerAuthUser, 'tournament-1', { substitutionMode: 'rolling' })
+      .then(
+        () => { throw new Error('거부되지 않았다'); },
+        (err: { response?: { code?: string; message?: string } }) => {
+          expect(err.response?.code).toBe('TOURNAMENT_LINEUP_SIZE_LOCKED');
+          return err.response?.message ?? '';
+        },
+      );
+    expect(message).toContain('교체 설정');
+    expect(message).not.toContain('출전 인원');
+  });
+
+  it('update: 출전 인원만 바꿨다면 잠금 메시지도 출전 인원이라고 말한다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'in_progress' }));
+
+    await expect(
+      service.update(ownerAuthUser, 'tournament-1', { lineupMaxPlayers: 5 }),
+    ).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_LINEUP_SIZE_LOCKED', message: expect.stringContaining('출전 인원을') },
+    });
+  });
+
+  it('update: 둘 다 바꿨다면 둘 다 말한다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'in_progress' }));
+
+    await expect(
+      service.update(ownerAuthUser, 'tournament-1', { lineupMaxPlayers: 5, substitutionMode: 'rolling' }),
+    ).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_LINEUP_SIZE_LOCKED', message: expect.stringContaining('출전 인원·교체 설정') },
+    });
+  });
+
   it('update: changing only substitutionMode preserves the currently pinned lineup size instead of resetting it to canonical', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     const existing = tournamentRow({

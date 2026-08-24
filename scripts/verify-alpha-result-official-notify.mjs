@@ -97,15 +97,15 @@ async function main() {
         displayNameSnapshot: n, jerseyNumber: i + 1,
         position: i === 0 ? 'GOLEIRO' : i === 1 ? 'FIXO' : 'PIVO', started: true,
       }));
-      // 버전 필드가 payload 마다 달라 어긋날 수 있다 — 409 의 details.currentVersion
-      // 으로 정확히 1회 재시도한다(레이스가 아니라 표기 차이를 흡수하는 용도).
+      // expectedVersion 은 사이드별 라인업의 `revision`(LINEUP-2 versionScope:'lineup').
+      // 409 의 details.currentVersion 1회 재시도는 순수 안전망으로만 남긴다.
       const trySave = async (v) => {
         const saveId = randomUUID();
         return api('PUT', `/games/${gameId}/lineups/${lineup.sideId}`, {
           expectedVersion: v, clientCommandId: saveId, formation: '1-2-1', participants,
         }, { 'idempotency-key': saveId });
       };
-      let saved = await trySave(lineup.version ?? lineup.revision ?? 1);
+      let saved = await trySave(lineup.revision ?? 1);
       if (saved.status === 409 && saved.json?.details?.currentVersion !== undefined) {
         saved = await trySave(saved.json.details.currentVersion);
       }
@@ -122,7 +122,7 @@ async function main() {
         return api('POST', `/games/${gameId}/lineups/${fresh.id}/submit`,
           { expectedVersion: v, clientCommandId: submitId }, { 'idempotency-key': submitId });
       };
-      let sub = await trySubmit(fresh.version ?? fresh.revision);
+      let sub = await trySubmit(fresh.revision ?? 1);
       if (sub.status === 409 && sub.json?.details?.currentVersion !== undefined) {
         sub = await trySubmit(sub.json.details.currentVersion);
       }

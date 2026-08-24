@@ -41,7 +41,16 @@ type FakeFixture = {
     id: string;
     state: string;
     visibilityPolicy: { mode: string; lineupAt: null };
-    currentOfficialRevision: { state: string; supersedesId: null; officialAt: Date; score: unknown } | null;
+    currentOfficialRevision: {
+      state: string;
+      supersedesId: null;
+      officialAt: Date;
+      score: unknown;
+      /** 프로덕션 select 가 항상 돌려주는 필드라 fake 도 필수로 둔다 — 생략을 허용하면
+       *  `undefined !== 'NORMAL'` 이 참이 되어 정상 경기가 몰수로 오판된다. */
+      outcomeReason: 'NORMAL' | 'FORFEIT' | 'ABANDONED';
+      outcomeNote: string | null;
+    } | null;
     sides: { id: string; sideKey: 'HOME' | 'AWAY' }[];
     periods: never[];
     participants: { id: string; sideId: string; userId: string | null; displayNameSnapshot: string; jerseyNumber: number | null }[];
@@ -474,6 +483,8 @@ describe('PublicTournamentRecordsService.getSchedule -- 리비전 score JSON 두
           supersedesId: null,
           officialAt: new Date('2026-08-01T00:00:00.000Z'),
           score,
+          outcomeReason: 'NORMAL',
+          outcomeNote: null,
         },
         sides: [
           { id: 'side-home', sideKey: 'HOME' },
@@ -712,5 +723,85 @@ describe('PublicTournamentRecordsService.getSchedule -- 일정 카드 카드(경
     const result = await service.getSchedule(TOURNAMENT_ID, {});
 
     expect(result.items[0].cards).toEqual([]);
+  });
+});
+
+/**
+ * 일정 목록의 몰수·중단 표기. 경기 상세(getMatch)에만 있던 동안, 목록만 훑는 관전자에게는
+ * 몰수 0:0 과 실제 0:0 무승부가 완전히 같아 보였다(alpha 실측: 순위표에 세 팀이 나란히
+ * 2점인데 그중 두 경기가 몰수라는 사실이 일정 어디에도 없었다).
+ *
+ * 이 스펙이 지키는 계약은 **노출 조건이 경기 상세와 같다**는 것이다 — 둘이 갈리면 같은
+ * 경기가 목록에서는 몰수인데 상세에서는 아닌(또는 그 반대) 상태가 된다.
+ */
+describe('getSchedule — 몰수·중단 표기(outcome)', () => {
+  const emptyConsent = { consentLinks: [], consentSnapshots: [], goalEvents: [] };
+
+  function fixtureWithOutcome(input: {
+    outcomeReason: 'NORMAL' | 'FORFEIT' | 'ABANDONED';
+    outcomeNote: string | null;
+    revisionState?: string;
+  }) {
+    return makeFixture({
+      status: 'completed',
+      game: {
+        id: 'game-1',
+        state: 'ENDED',
+        visibilityPolicy: { mode: 'LIVE', lineupAt: null },
+        currentOfficialRevision: {
+          state: input.revisionState ?? 'OFFICIAL',
+          supersedesId: null,
+          officialAt: new Date('2026-08-01T00:00:00.000Z'),
+          score: { home: 0, away: 0 },
+          outcomeReason: input.outcomeReason,
+          outcomeNote: input.outcomeNote,
+        },
+        sides: [
+          { id: 'side-home', sideKey: 'HOME' },
+          { id: 'side-away', sideKey: 'AWAY' },
+        ],
+        periods: [],
+        participants: [],
+      },
+    });
+  }
+
+  it('몰수로 끝난 경기는 사유와 함께 outcome 을 싣는다', async () => {
+    const prisma = buildFakePrisma({
+      fixtures: [fixtureWithOutcome({ outcomeReason: 'FORFEIT', outcomeNote: '원정팀 미출석' })],
+      ...emptyConsent,
+    });
+
+    const result = await new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE).getSchedule(TOURNAMENT_ID, {});
+
+    expect(result.items[0].outcome).toEqual({ reason: 'FORFEIT', note: '원정팀 미출석' });
+    // 점수 계약은 그대로여야 한다 — 몰수여도 기록된 점수는 그대로 확정된다.
+    expect(result.items[0].score).toEqual({ home: 0, away: 0, penalties: null });
+  });
+
+  it('정상 종료 경기는 outcome 이 null 이다 (기존 계약 불변)', async () => {
+    const prisma = buildFakePrisma({
+      fixtures: [fixtureWithOutcome({ outcomeReason: 'NORMAL', outcomeNote: null })],
+      ...emptyConsent,
+    });
+
+    const result = await new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE).getSchedule(TOURNAMENT_ID, {});
+
+    expect(result.items[0].outcome).toBeNull();
+  });
+
+  it('공식 결과가 아직 공개되지 않았으면 사유를 미리 흘리지 않는다', async () => {
+    // 확정 전(SUBMITTED) 리비전 — showOfficialResult 가 false 라 점수도 outcome 도 안 나간다.
+    const prisma = buildFakePrisma({
+      fixtures: [
+        fixtureWithOutcome({ outcomeReason: 'FORFEIT', outcomeNote: '원정팀 미출석', revisionState: 'SUBMITTED' }),
+      ],
+      ...emptyConsent,
+    });
+
+    const result = await new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE).getSchedule(TOURNAMENT_ID, {});
+
+    expect(result.items[0].scoreStatus).not.toBe('official');
+    expect(result.items[0].outcome).toBeNull();
   });
 });

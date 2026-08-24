@@ -908,6 +908,36 @@ describe('TeamMatchesService', () => {
     expect(result.viewer.participantMember).toBe(true);
   });
 
+  // 결과 승인 게이트(2026-08-24). 화면은 예전에 `state === 'approved'` 로 "상대팀 담당자"를
+  // 판정했는데, 그 값은 **신청서를 낸 사람 한 명**에게만 붙는다. 리그 대진은 운영자가 신청서를
+  // 대신 만들기 때문에 상대팀의 owner 도 manager 도 승인 화면에 닿지 못했고, 결과가
+  // SUBMITTED 에서 멈춰 순위표가 갱신되지 않았다(alpha 실측: 원정팀 owner 의 state 가 'none').
+  // 그래서 아래 두 테스트는 **state 와 무관하게** 멤버십 역할만으로 갈리는 것을 고정한다 —
+  // applications 를 비워 둔 채(= 신청서를 낸 적 없는 사용자) 판정이 나오는 것이 핵심이다.
+  it('detail: 신청팀 owner/manager 는 신청서를 직접 내지 않았어도 결과 승인 권한이 있다', async () => {
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(
+      detailRowWithOpponent([], [{ userId: manager.id, role: 'manager', status: 'active' }], true),
+    );
+    prisma.v1Team.findMany.mockResolvedValue([]);
+
+    const result = await service.detail(manager, 'tm-1');
+
+    expect(result.viewer.state).toBe('none');
+    expect(result.viewer.manageableOpponentTeam).toBe(true);
+    expect(result.viewer.manageableHostTeam).toBe(false);
+  });
+
+  it('detail: 신청팀 일반 멤버는 결과 승인 권한이 없다', async () => {
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(
+      detailRowWithOpponent([], [{ userId: manager.id, role: 'member', status: 'active' }], true),
+    );
+    prisma.v1Team.findMany.mockResolvedValue([]);
+
+    const result = await service.detail(manager, 'tm-1');
+
+    expect(result.viewer.manageableOpponentTeam).toBe(false);
+  });
+
   it('detail: 어느 팀에도 속하지 않으면 참가팀 소속이 아니다', async () => {
     prisma.v1TeamMatch.findFirst.mockResolvedValue(detailRowWithOpponent([], [], true));
     prisma.v1Team.findMany.mockResolvedValue([]);

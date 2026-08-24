@@ -981,7 +981,10 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
   const [showApproveConfirm, setShowApproveConfirm] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const isOpponent = teamMatch.data?.viewer?.state === 'approved';
+  // 홈팀 게이트(isHost)와 대칭으로 팀 멤버십을 본다. `state === 'approved'` 는 신청서를 낸
+  // 사람 한 명만 통과해서, 운영자가 대진을 만드는 리그전에서는 상대팀 전원이 이 화면에서
+  // "상대팀만 결과를 승인할 수 있어요" 로 튕겨 나갔다.
+  const isOpponent = teamMatch.data?.viewer?.manageableOpponentTeam === true;
 
   if (isError) {
     return (

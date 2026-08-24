@@ -27,6 +27,7 @@ import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, KPIStat, ListItem } from '@/components/v1-ui/primitives';
+import { MyPlayerCardSection } from './my-player-card-section';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { cssUrl } from '@/lib/assets';
 import { PendingReviewsCard } from '@/components/tournaments/pending-review-card';
@@ -136,6 +137,16 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
                 <Link className="tm-btn tm-btn-sm tm-btn-neutral tm-my-profile-edit-link" href="/my/profile/edit">프로필 수정</Link>
               </div>
             </section>
+            {/* 내 선수 카드 (Task 155). 프로필 헤더 바로 아래 -- 마이페이지에 들어오면
+                바로 보이는 자리다. 카드를 숨겼거나 아직 못 불러왔으면 섹션이 통째로
+                사라지므로 이 자리가 비는 것 외의 부작용은 없다. */}
+            {model.user.userId !== null ? (
+              <MyPlayerCardSection
+                userId={model.user.userId}
+                displayName={model.user.name}
+                profileImageUrl={model.user.profileImageUrl ?? null}
+              />
+            ) : null}
             {model.phoneVerified === false ? <PhoneVerificationCallout /> : null}
             {/* 활동 요약: stats strip을 Card로 감싸 섹션 라벨과 border/radius/padding 정합 */}
             <Card pad={16}>

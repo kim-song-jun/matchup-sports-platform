@@ -12,19 +12,25 @@ export const UPLOAD_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 
 /**
  * 이 크기 이하 원본은 재인코딩하지 않는다. 이미 한도 안이라 다시 인코딩해봐야
- * 화질만 잃고 얻는 게 없다.
+ * 화질만 잃고 얻는 게 없다. 2MB 는 사용자 확정 정책이다(2026-08-25) --
+ * "용량 제한을 빼고, 2MB 넘어가면 자동으로 WebP 변환해서 올린다".
  */
-const SKIP_RECOMPRESS_BELOW_BYTES = 1.5 * 1024 * 1024;
+const SKIP_RECOMPRESS_BELOW_BYTES = 2 * 1024 * 1024;
 
 /**
- * 캔버스로 다시 그릴 수 있는 MIME 만 처리한다. 그 외 형식은 손대지 않고 그대로
- * 보내 서버의 형식 검증(UPLOAD_FILE_TYPE_INVALID)이 판정하게 둔다.
+ * 서버가 원본 그대로 받아 주는 MIME. 이 목록의 형식은 2MB 이하면 재인코딩을 생략한다.
+ * 목록 밖 `image/*`(HEIC·GIF 등)는 크기와 무관하게 WebP 변환을 **시도**한다 --
+ * 서버가 jpeg/png/webp 만 받아서 원본 그대로는 어차피 거부되기 때문이다. 브라우저가
+ * 디코드하지 못하면 원본을 그대로 보내 서버의 형식 검증(UPLOAD_FILE_TYPE_INVALID)이
+ * 무엇이 문제인지 말하게 둔다.
  */
-const RECOMPRESSIBLE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const SERVER_ACCEPTED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
-/** 긴 변 상한 → 품질 순으로 낮춰가며 한도 안에 들어올 때까지 시도한다. */
-const MAX_EDGE_STEPS = [1920, 1440, 1080];
-const QUALITY_STEPS = [0.85, 0.7, 0.55];
+/** 긴 변 상한 → 품질 순으로 낮춰가며 한도 안에 들어올 때까지 시도한다.
+ * 마지막 단(800px · 0.4)은 "용량 때문에 업로드가 실패하는 일"을 사실상 없애기 위한
+ * 최후 단이다 -- 프로필 사진 표시 폭에는 800px 로도 충분하다. */
+const MAX_EDGE_STEPS = [1920, 1440, 1080, 800];
+const QUALITY_STEPS = [0.85, 0.7, 0.55, 0.4];
 
 export const IMAGE_TOO_LARGE_MESSAGE =
   '이미지 용량을 5MB 아래로 줄이지 못했어요. 더 작은 이미지를 선택해주세요.';
@@ -77,22 +83,25 @@ export async function compressImageForUpload(
   encode: ImageEncoder = encodeWithCanvas,
 ): Promise<File> {
   const withinLimit = file.size <= UPLOAD_IMAGE_MAX_BYTES;
+  const serverAccepted = SERVER_ACCEPTED_MIME_TYPES.includes(file.type);
 
-  if (!RECOMPRESSIBLE_MIME_TYPES.includes(file.type)) return file;
-  if (file.size <= SKIP_RECOMPRESS_BELOW_BYTES) return file;
+  if (!file.type.startsWith('image/')) return file;
+  if (serverAccepted && file.size <= SKIP_RECOMPRESS_BELOW_BYTES) return file;
 
   for (const maxEdge of MAX_EDGE_STEPS) {
     for (const quality of QUALITY_STEPS) {
       const encoded = await encode(file, maxEdge, quality);
       // 인코딩 자체가 불가능한 환경(캔버스 없음·디코드 실패)이면 더 시도해도 같다.
       if (!encoded) {
-        if (withinLimit) return file;
-        throw new Error(IMAGE_TOO_LARGE_MESSAGE);
+        if (serverAccepted && !withinLimit) throw new Error(IMAGE_TOO_LARGE_MESSAGE);
+        return file;
       }
-      // 재인코딩이 원본보다 커지는 경우(작은 PNG 등)가 있어 크기가 줄었을 때만 채택한다.
-      if (encoded.size <= UPLOAD_IMAGE_MAX_BYTES && encoded.size < file.size) {
-        return toEncodedFile(file, encoded);
-      }
+      // 서버가 받는 형식은 크기가 줄었을 때만 채택한다(작은 PNG 를 재인코딩하면 커질 수 있다).
+      // 서버가 안 받는 형식(HEIC 등)은 원본이 어차피 거부되므로 한도 안이기만 하면 채택한다.
+      const adopt = serverAccepted
+        ? encoded.size <= UPLOAD_IMAGE_MAX_BYTES && encoded.size < file.size
+        : encoded.size <= UPLOAD_IMAGE_MAX_BYTES;
+      if (adopt) return toEncodedFile(file, encoded);
     }
   }
 

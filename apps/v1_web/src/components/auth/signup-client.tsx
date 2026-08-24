@@ -201,12 +201,8 @@ export function SignupClient() {
       return;
     }
 
-    if (file.size > 2 * 1024 * 1024) {
-      setProfileError('프로필 사진은 2MB 이하 이미지로 선택해 주세요.');
-      event.target.value = '';
-      return;
-    }
-
+    // 용량으로 거부하지 않는다 -- 제출 시 업로드 훅이 2MB 초과 사진을 자동으로 줄여
+    // WebP 로 변환한다(프로필 수정 화면과 같은 정책, 2026-08-25 사용자 확정).
     const reader = new FileReader();
     setUploadingProfileImage(true);
     reader.onload = () => {
@@ -656,7 +652,7 @@ export function SignupClient() {
                       </button>
                     ) : null}
                   </div>
-                  <div className="tm-text-caption" style={{ marginTop: 6 }}>{profileImageName || '이미지 1장, 2MB 이하'}</div>
+                  <div className="tm-text-caption" style={{ marginTop: 6 }}>{profileImageName || '이미지 1장 — 큰 사진은 자동으로 줄여 올려요'}</div>
                 </div>
               </section>
 

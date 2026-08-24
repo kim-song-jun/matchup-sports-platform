@@ -69,11 +69,25 @@ describe('compressImageForUpload', () => {
   });
 
   it('재인코딩 결과가 원본보다 커지면 원본을 그대로 쓴다', async () => {
-    const original = makeFile(2 * MB, 'image/png', 'logo.png');
+    const original = makeFile(3 * MB, 'image/png', 'logo.png');
     const encode: ImageEncoder = vi.fn(async () => makeBlob(4 * MB));
     const result = await compressImageForUpload(original, encode);
 
     expect(result).toBe(original);
+  });
+
+  it('2MB 이하는 손대지 않고, 2MB 를 넘으면 WebP 로 변환한다 -- 사용자 확정 경계', async () => {
+    // "용량 제한을 빼고 2MB 넘어가면 자동으로 WebP 변환"(2026-08-25). 경계가 밀리면
+    // 멀쩡한 사진을 다시 인코딩해 화질만 잃거나, 큰 사진이 변환 없이 서버 한도로 간다.
+    const encode: ImageEncoder = vi.fn(async () => makeBlob(500 * 1024));
+
+    const atLimit = makeFile(2 * MB, 'image/jpeg', 'at.jpg');
+    await expect(compressImageForUpload(atLimit, encode)).resolves.toBe(atLimit);
+    expect(encode).not.toHaveBeenCalled();
+
+    const overLimit = await compressImageForUpload(makeFile(2 * MB + 1, 'image/jpeg', 'over.jpg'), encode);
+    expect(overLimit.type).toBe('image/webp');
+    expect(overLimit.name).toBe('over.webp');
   });
 
   it('한도 이하로 작은 원본은 재인코딩하지 않는다', async () => {
@@ -100,13 +114,23 @@ describe('compressImageForUpload', () => {
     );
   });
 
-  it('캔버스로 다룰 수 없는 형식은 손대지 않고 서버 검증에 맡긴다', async () => {
-    const original = makeFile(12 * MB, 'image/gif', 'anim.gif');
-    const encode: ImageEncoder = vi.fn(async () => makeBlob(100 * 1024));
+  it('서버가 안 받는 형식(HEIC·GIF)은 크기와 무관하게 WebP 로 변환해 살린다', async () => {
+    // 서버는 jpeg/png/webp 만 받는다 -- 원본 그대로 보내면 어차피 거부되므로,
+    // 브라우저가 디코드할 수 있으면 변환해서 업로드가 성공하게 만든다(아이폰 HEIC 실사례).
+    const original = makeFile(1 * MB, 'image/heic', 'photo.heic');
+    const encode: ImageEncoder = vi.fn(async () => makeBlob(800 * 1024));
     const result = await compressImageForUpload(original, encode);
 
-    expect(result).toBe(original);
-    expect(encode).not.toHaveBeenCalled();
+    expect(result.type).toBe('image/webp');
+    expect(result.name).toBe('photo.webp');
+  });
+
+  it('서버가 안 받는 형식인데 디코드도 안 되면 원본을 그대로 보내 서버 검증이 말하게 한다', async () => {
+    // 여기서 용량 에러를 던지면 진짜 문제(형식)를 가린다 -- 서버의 형식 에러가 정답이다.
+    const original = makeFile(12 * MB, 'image/gif', 'anim.gif');
+    const encode: ImageEncoder = vi.fn(async () => null);
+
+    await expect(compressImageForUpload(original, encode)).resolves.toBe(original);
   });
 });
 

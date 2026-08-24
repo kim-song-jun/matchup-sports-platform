@@ -231,6 +231,7 @@ function makeTeamRecordEvent(overrides: Partial<PublicTeamRecordEvent> = {}): Pu
     id: 'event-1',
     type: 'GOAL',
     side: 'own',
+    profileHref: null,
     participantName: '홍길동',
     jerseyNumber: 9,
     period: 1,
@@ -264,6 +265,34 @@ describe('TeamRecordsContent — 승부차기 보조 표기', () => {
   it('penalties가 null이면 승부차기 보조 텍스트를 렌더하지 않는다', () => {
     render(<TeamRecordsContent data={makeTeamRecords()} />);
     expect(screen.queryByText(/승부차기/)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * 팀 전적의 골/카드 이름도 공개 프로필로 잇는다(#707 의 경기 상세와 같은 규칙).
+ * 열어도 되는지는 서버가 `profileHref` 로 판단해 내려주므로 화면은 있으면 링크, 없으면
+ * 그냥 글자다 — 화면이 동의·계정 유무를 다시 따지기 시작하면 서버와 갈린다.
+ */
+describe('TeamRecordsContent — 선수 이름 프로필 링크', () => {
+  function withEvents(events: PublicTeamRecordEvent[]) {
+    return makeTeamRecords({ items: [{ ...makeTeamRecords().items[0], events }] });
+  }
+
+  it('profileHref 가 있으면 이름을 링크로 만든다', () => {
+    render(<TeamRecordsContent data={withEvents([makeTeamRecordEvent({ participantName: '홍길동', profileHref: '/users/u-1' })])} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /전 경기 기록 펼치기/ }));
+
+    expect(screen.getByRole('link', { name: '홍길동' })).toHaveAttribute('href', '/users/u-1');
+  });
+
+  it('profileHref 가 없으면 링크를 만들지 않는다 (이름은 그대로 보인다)', () => {
+    render(<TeamRecordsContent data={withEvents([makeTeamRecordEvent({ participantName: '홍길동', profileHref: null })])} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /전 경기 기록 펼치기/ }));
+
+    expect(screen.getByText('홍길동')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '홍길동' })).not.toBeInTheDocument();
   });
 });
 

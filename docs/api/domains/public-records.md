@@ -329,6 +329,19 @@ identity/side itself:
   are shown, while a profile exposes the person's whole activity history. With the switch
   off, an unconsented participant's name may appear but their profile still will not open.
 
+- `GET /teams/:teamId/records` carries the same `profileHref` on `items[].events[]`, with the
+  identical rule and the same server-side resolver. Its `consentMap` is loaded
+  unconditionally for the same reason as the match view; unlike the schedule, this endpoint
+  is not polled (`usePublicTeamRecords` sets no `refetchInterval`), so the extra lookup is
+  paid once per view.
+
+- **The schedule (`GET /tournaments/:id/schedule`) deliberately does not carry
+  `profileHref`.** Its `consentMap` stays behind the name-gating flag because that endpoint
+  *is* polled while any fixture is live (`LIVE_POLL_INTERVAL_MS`), and loading consent
+  unconditionally there would add two queries to every poll for every fixture on the page.
+  The scorer line on a schedule card is a one-line summary; a reader who wants the player
+  opens the match, where the link exists. Revisit only with a cheaper consent source.
+
 ### Known scope trims (documented, not silently dropped)
 
 - The schedule list only cursor-paginates fixtures that already have a

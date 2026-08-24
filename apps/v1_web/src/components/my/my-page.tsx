@@ -120,7 +120,22 @@ export function MyHomePageView({ model, userId }: { model: MyHomeViewModel; user
                   {model.user.intro}
                 </div>
               </div>
-              <Link className="tm-btn tm-btn-sm tm-btn-neutral tm-my-profile-edit-link" href="/my/profile/edit">프로필 수정</Link>
+              {/* 공개 프로필 진입. 지금까지 `/users/:id`(선수 카드·활동 기록이 있는 화면)로 가는
+                  길이 앱 어디에도 없어서, URL 을 직접 아는 사람만 볼 수 있었다 — 만들어 두고
+                  도달할 수 없는 상태였다. 내 것부터 여기서 연다.
+                  `userId` 가 아직 없으면(로딩·에러) 렌더하지 않는다: 링크를 먼저 그려 두고
+                  눌렀을 때 깨지는 것보다 안 보이는 편이 낫다. */}
+              <div className="tm-my-profile-actions">
+                {model.user.userId !== null ? (
+                  <Link
+                    className="tm-btn tm-btn-sm tm-btn-neutral"
+                    href={`/users/${encodeURIComponent(model.user.userId)}`}
+                  >
+                    내 프로필
+                  </Link>
+                ) : null}
+                <Link className="tm-btn tm-btn-sm tm-btn-neutral tm-my-profile-edit-link" href="/my/profile/edit">프로필 수정</Link>
+              </div>
             </section>
             {/* 내 선수 카드 (Task 155). 프로필 헤더 바로 아래 -- 마이페이지에 들어오면
                 바로 보이는 자리다. 카드를 숨겼거나 아직 못 불러왔으면 섹션이 통째로

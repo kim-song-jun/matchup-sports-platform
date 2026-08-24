@@ -1,5 +1,6 @@
 'use client';
 
+import { competitionRanks } from '@/lib/competition-ranks';
 import Link from 'next/link';
 import { Trophy } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -89,26 +90,9 @@ function ExpectedPromotionBadge({ kind, toTierLabel }: { kind: 'promoted' | 'rel
   );
 }
 
-/**
- * 득점·도움 순위는 배열 인덱스+1을 등수로 쓰면 공동 순위가 사라진다 — 5골인 두 선수가
- * "1위 / 2위"로 갈려 공동 1위가 뒤처진 것처럼 읽힌다. 순위표(standings)는 서버가 이미
- * `position`을 계산해 주는 것과 대비된다(서버가 이 값은 계산해 주지 않으므로 클라에서
- * 표준 경쟁 순위(1,1,3 — 동점은 같은 등수, 다음 등수는 동점자 수만큼 건너뜀)를 계산한다).
- * 응답 배열은 값 내림차순 정렬로 온다는 전제(기존 index+1 표기도 같은 전제를 썼다).
- */
-export function competitionRanks(values: number[]): number[] {
-  const ranks: number[] = [];
-  let previousValue: number | null = null;
-  let previousRank = 0;
-  values.forEach((value, index) => {
-    if (previousValue === null || value !== previousValue) {
-      previousRank = index + 1;
-      previousValue = value;
-    }
-    ranks.push(previousRank);
-  });
-  return ranks;
-}
+// competitionRanks 는 lib/competition-ranks.ts 로 이동 — 대회 개인 랭킹(STATS-1)과
+// 공유하기 위해서다. 기존 소비처(수상 페이지·테스트)를 위해 re-export 로 유지한다.
+export { competitionRanks } from '@/lib/competition-ranks';
 
 /**
  * 점수 필드(homeScore/awayScore)는 값이 없을 수 있다(미확정 대진) — 그때는 0:0으로

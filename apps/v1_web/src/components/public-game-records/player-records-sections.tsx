@@ -3,9 +3,7 @@
 import Link from 'next/link';
 import { useMemo } from 'react';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
-// 리그 수상 페이지(league-awards-page-client.tsx)가 이미 쓰는 cross-import 선례를
-// 그대로 따른다 — 공동 순위(표준 경쟁 순위 1,1,3)는 이 함수 하나가 단일 소스다.
-import { competitionRanks } from '@/app/league-matches/[leagueId]/league-match-standings-client';
+import { competitionRanks } from '@/lib/competition-ranks';
 import type { PublicTournamentPlayerRecordRow } from './types';
 
 /**
@@ -30,8 +28,8 @@ export function TournamentPlayerRecordsSections({
   onRetry,
   emptyBehavior,
 }: {
-  goals: PublicTournamentPlayerRecordRow[] | undefined;
-  assists: PublicTournamentPlayerRecordRow[] | undefined;
+  goals: readonly PublicTournamentPlayerRecordRow[] | undefined;
+  assists: readonly PublicTournamentPlayerRecordRow[] | undefined;
   isLoading: boolean;
   isError: boolean;
   errorMessage: string;
@@ -83,7 +81,7 @@ function RecordList({
   value,
 }: {
   title: string;
-  rows: PublicTournamentPlayerRecordRow[];
+  rows: readonly PublicTournamentPlayerRecordRow[];
   ranks: number[];
   unit: string;
   value: (row: PublicTournamentPlayerRecordRow) => number;
@@ -101,8 +99,11 @@ function RecordList({
               {ranks[index]}.{' '}
               {/* 랭킹 행은 정의상 전원 동의+계정 연결 — 서버가 내려준 profileHref로
                   공개 프로필에 연결한다(#707/#714 관례: 밑줄 = 링크, 색만으로 구분 금지). */}
+              {/* 닉네임 null 행은 링크 텍스트가 전부 '선수'가 된다 — 스크린리더가
+                  같은 이름의 링크를 구분할 수 있게 순위·기록을 aria-label에 싣는다. */}
               <Link
                 href={row.profileHref}
+                aria-label={`${title} ${ranks[index]}위 ${row.nickname ?? '선수'} ${value(row)}${unit} — 공개 프로필 보기`}
                 style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 2 }}
               >
                 {row.nickname ?? '선수'}

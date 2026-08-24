@@ -26,6 +26,9 @@ const argv = process.argv.slice(2);
 const DRY = argv.includes('--dry');
 const leagueArgIndex = argv.indexOf('--league');
 const LEAGUE_ID = leagueArgIndex >= 0 ? argv[leagueArgIndex + 1] : process.env.LEAGUE_ID;
+/** 공식 결과 투영(아웃박스 워커)이 공개 응답에 나타날 때까지 기다리는 상한. */
+const PROJECTION_TIMEOUT_MS = Number(process.env.PROJECTION_TIMEOUT_MS ?? 90_000);
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 if (!HOME_TOKEN || !AWAY_TOKEN) {
   console.error('HOME_TOKEN 과 AWAY_TOKEN 환경변수가 필요해요 (teameet_v1_session 쿠키 값).');
@@ -105,12 +108,38 @@ async function main() {
   const league = detailBefore.json.data;
   console.log(`리그: ${league.title} (${leagueId})`);
 
-  // 아직 스코어가 없는 matched 대진 = 이 릴레이를 처음부터 밟아 볼 수 있는 대진.
-  const target = (league.fixtures ?? []).find(
+  // 아직 스코어가 없는 matched 대진 중에서, **주어진 두 토큰이 각각 홈·원정 담당자인**
+  // 대진을 고른다. 리그에는 이 계정들과 무관한 팀들의 대진도 섞여 있어서(4팀 리그면
+  // 6대진 중 우리 둘이 맞붙는 건 일부뿐) 앞에서부터 아무거나 집으면 두 토큰 다 권한이
+  // 없는 대진을 골라 "게이트 실패"로 오판한다 — 실제로 그렇게 한 번 오판했다.
+  // 판정은 추측하지 않고 서버가 내려주는 권한 플래그로 한다.
+  const candidates = (league.fixtures ?? []).filter(
     (fixture) => fixture.status === 'matched' && fixture.homeScore === null && fixture.awayTeamId !== null,
   );
+  let target = null;
+  let awayView = null;
+  let homeView = null;
+  for (const fixture of candidates) {
+    const [away, home] = await Promise.all([
+      call('GET', `/team-matches/${fixture.teamMatchId}`, { token: AWAY_TOKEN }),
+      call('GET', `/team-matches/${fixture.teamMatchId}`, { token: HOME_TOKEN }),
+    ]);
+    // 반드시 **둘 다** 만족해야 한다. 홈만 보고 고르면 원정팀이 제3의 팀인 대진을 집어
+    // 승인 단계에서 403 이 나고, 그 403 을 결함으로 오해하게 된다(실제로 한 번 그랬다).
+    if (
+      home.json?.data?.viewer?.manageableHostTeam === true &&
+      away.json?.data?.viewer?.manageableOpponentTeam === true
+    ) {
+      target = fixture;
+      awayView = away;
+      homeView = home;
+      break;
+    }
+  }
   if (!target) {
-    console.error('결과가 비어 있는 matched 대진이 없어요. 다른 리그를 지정해 주세요.');
+    console.error(
+      `두 토큰이 각각 홈·원정 담당자인 빈 matched 대진이 없어요(후보 ${candidates.length}개). 다른 리그를 지정해 주세요.`,
+    );
     process.exit(2);
   }
   console.log(`대진: ${target.title} — ${target.teamMatchId}`);
@@ -123,14 +152,12 @@ async function main() {
 
   // ── 2. 게이트: 원정팀 담당자가 승인 권한을 인정받는가 ──────────────────────
   console.log('\n[1] 승인 게이트');
-  const awayView = await call('GET', `/team-matches/${target.teamMatchId}`, { token: AWAY_TOKEN });
   const awayViewer = awayView.json?.data?.viewer ?? {};
   check(
     '원정팀 담당자에게 manageableOpponentTeam=true 가 내려온다',
     awayViewer.manageableOpponentTeam === true,
     `viewer.state=${awayViewer.state} manageableOpponentTeam=${awayViewer.manageableOpponentTeam}`,
   );
-  const homeView = await call('GET', `/team-matches/${target.teamMatchId}`, { token: HOME_TOKEN });
   const homeViewer = homeView.json?.data?.viewer ?? {};
   check(
     '홈팀 담당자에게 manageableHostTeam=true 가 내려온다',
@@ -200,10 +227,35 @@ async function main() {
 
   // ── 5. 순위표가 실제로 움직였는가 ────────────────────────────────────────
   // 공개 응답이 ground truth 다 — 커맨드 응답이 아니라 관전자가 받는 값을 본다.
-  console.log('\n[4] 순위표 반영');
-  const detailAfter = await call('GET', `/league-matches/${leagueId}`);
-  const standingsAfter = await call('GET', `/league-matches/${leagueId}/standings`);
-  const afterStandings = standingsAfter.json?.data?.standings ?? standingsAfter.json?.data?.rows ?? [];
+  // 승인 응답이 200 이어도 순위표는 **그 순간 바뀌지 않는다** — 공식 결과는 아웃박스
+  // 워커가 비동기로 투영한다(v1-game-operations-worker → GAME_RESULT_OFFICIAL). 처음에
+  // 승인 직후 한 번만 읽었더니 0점/스코어 null 이 나와서 결함으로 오판할 뻔했다(실제로는
+  // 십수 초 뒤 정상 반영). 그래서 여기서는 반영될 때까지 짧게 재조회하고, **걸린 시간을
+  // 함께 출력**해 지연 자체를 눈에 보이게 한다.
+  console.log('\n[4] 순위표 반영 (비동기 투영 — 반영까지 대기)');
+  const startedAt = Date.now();
+  const deadline = startedAt + PROJECTION_TIMEOUT_MS;
+  let detailAfter;
+  let standingsAfter;
+  let afterStandings = [];
+  let projectedMs = null;
+  for (;;) {
+    detailAfter = await call('GET', `/league-matches/${leagueId}`);
+    standingsAfter = await call('GET', `/league-matches/${leagueId}/standings`);
+    afterStandings = standingsAfter.json?.data?.standings ?? standingsAfter.json?.data?.rows ?? [];
+    const row = (detailAfter.json?.data?.fixtures ?? []).find((f) => f.teamMatchId === target.teamMatchId);
+    if (row?.homeScore !== null && row?.homeScore !== undefined) {
+      projectedMs = Date.now() - startedAt;
+      break;
+    }
+    if (Date.now() >= deadline) break;
+    await sleep(3_000);
+  }
+  check(
+    `공식 결과가 ${Math.round(PROJECTION_TIMEOUT_MS / 1000)}초 안에 공개 응답에 투영된다`,
+    projectedMs !== null,
+    projectedMs === null ? '시간 안에 반영되지 않았다' : `${(projectedMs / 1000).toFixed(1)}초 걸림`,
+  );
   const homeBefore = beforeStandings.find((entry) => entry.teamId === target.homeTeamId);
   const homeAfter = afterStandings.find((entry) => entry.teamId === target.homeTeamId);
   console.log(`  홈팀 순위(후): ${standingsLine(afterStandings, target.homeTeamId)}`);

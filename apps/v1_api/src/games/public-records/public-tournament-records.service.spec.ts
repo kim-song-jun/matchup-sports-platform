@@ -202,13 +202,17 @@ function buildFakePrisma(options: {
         return options.consentSnapshots;
       },
     },
-    // 사용자 단위 공개 동의(Task 24 규칙 재정의, 2026-08-13). 이 스펙의 롤백 스위치
-    // 테스트는 전부 consentLinks가 빈 배열이라 loadParticipantConsentEligibility가
-    // 이 테이블까지 조회하지는 않지만(링크가 없으면 조회 자체를 skip), 방어적으로
-    // 빈 배열을 반환하도록 둔다.
+    // 사용자 단위 공개 동의(Task 24 규칙 재정의, 2026-08-13).
+    //
+    // **`where.userId.in` 을 실제로 적용한다.** 넘겨준 행을 전부 돌려주면, 이 경기와
+    // 무관한 사용자의 동의 행이 섞였을 때도 테스트가 통과해 버린다 — 실제 코드는
+    // `loadParticipantConsentEligibility` 가 링크에서 뽑은 userId 로만 조회하므로
+    // 그 경로를 타지 않은 채 초록불이 켜지는 거짓 양성이 된다(Copilot 리뷰 지적).
     v1UserRecordConsent: {
-      async findMany() {
-        return options.userConsents ?? [];
+      async findMany(args: { where?: { userId?: { in?: readonly string[] } } }) {
+        const wanted = args?.where?.userId?.in;
+        const rows = options.userConsents ?? [];
+        return wanted === undefined ? rows : rows.filter((row) => wanted.includes(row.userId));
       },
     },
     // 2026-08-18 대회 실명 표시 정책 -- 위 consent 조회와 달리 게이팅 없이 매 getMatch
@@ -1024,6 +1028,25 @@ describe('PublicTournamentRecordsService.getMatch -- 선수 프로필 링크(pro
       consentLinks: [{ participantId: LINKED.id, linkId: 'link-1', userId: 'user-1' }],
       consentSnapshots: [],
       userConsents: [],
+    });
+    const service = new PublicTournamentRecordsService(prisma, NO_ASSIGNMENTS_ACCESS);
+
+    const result = await service.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined);
+
+    expect(result.lineup?.home[0]).toEqual(expect.objectContaining({ profileHref: null }));
+  });
+
+  it('다른 사용자의 동의 행이 섞여 있어도 링크가 생기지 않는다', async () => {
+    // 남의 동의로 링크가 열려선 안 된다. 이 계약은 **두 겹**으로 지켜진다 —
+    // 쿼리가 `where.userId.in` 으로 걸러내고, 그걸 통과해도 코드가 링크의 userId 로
+    // 맵을 조회한다. 그래서 한쪽만 깨뜨려서는 이 테스트가 실패하지 않고, **둘 다**
+    // 무너뜨려야 실패한다(실측 확인). 약한 단언이지만 두 방어가 함께 사라지는
+    // 회귀는 잡는다.
+    const prisma = buildFakePrisma({
+      ...base,
+      consentLinks: [{ participantId: LINKED.id, linkId: 'link-1', userId: 'user-1' }],
+      consentSnapshots: [],
+      userConsents: [{ userId: 'someone-else', state: 'GRANTED' }],
     });
     const service = new PublicTournamentRecordsService(prisma, NO_ASSIGNMENTS_ACCESS);
 

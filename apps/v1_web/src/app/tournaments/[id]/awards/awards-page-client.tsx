@@ -12,9 +12,11 @@ import {
   useV1SubmitTournamentReview,
   useV1UploadImages,
 } from '@/hooks/use-v1-api';
+import { usePublicTournamentPlayerRecords } from '@/components/public-game-records/use-public-game-records';
+import { TournamentPlayerRecordsSections } from '@/components/public-game-records/player-records-sections';
+import { extractErrorMessage } from '@/lib/error-message';
 import { hasStoredV1Session } from '@/lib/session-storage';
 import { trackEvent } from '@/lib/analytics';
-import { extractErrorMessage } from '@/lib/error-message';
 import { V1ApiError } from '@/lib/api-client';
 import { TournamentFlowNav } from '@/components/tournaments/tournament-flow-nav';
 import { formatEntryFee } from '@/lib/date-utils';
@@ -223,6 +225,26 @@ function PrizeSection({
     </section>
   );
 }
+/**
+ * 회고 STATS-1 — 수상 페이지의 개인 득점·도움 랭킹. 리그 수상 페이지가 순위
+ * 데이터를 함께 보여주는 패턴의 대회판이며, 어워드(수상자)가 "왜 그 사람인지"를
+ * 옆에서 뒷받침한다. 기록이 없으면 EmptyState(emptyBehavior=empty-state).
+ */
+function PlayerRecordsSection({ tournamentId }: { tournamentId: string }) {
+  const records = usePublicTournamentPlayerRecords(tournamentId);
+  return (
+    <TournamentPlayerRecordsSections
+      goals={records.data?.goals}
+      assists={records.data?.assists}
+      isLoading={records.isLoading}
+      isError={records.isError}
+      errorMessage={extractErrorMessage(records.error, '기록을 불러오지 못했어요.')}
+      onRetry={() => void records.refetch()}
+      emptyBehavior="empty-state"
+    />
+  );
+}
+
 function IndividualAwardsSection({ tournament }: { tournament: V1TournamentDetail }) {
   const awards = tournament.awards ?? [];
 
@@ -803,6 +825,9 @@ function AwardsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
             {/* 개인 어워드 */}
             <IndividualAwardsSection tournament={tournament} />
 
+            {/* 개인 기록 랭킹 (STATS-1) */}
+            <PlayerRecordsSection tournamentId={tournament.id} />
+
             {/* 참가팀 후기 */}
             <ReviewsSection tournament={tournament} />
           </div>
@@ -813,6 +838,7 @@ function AwardsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
         /* 상금 정보가 없는 대회는 2열 그리드 대신 전체 폭 단일 컬럼으로 — 빈 좌측 트랙이 생기지 않도록 */
         <div className="tm-tourn-hero-full" style={{ padding: '0 20px' }}>
           <IndividualAwardsSection tournament={tournament} />
+          <PlayerRecordsSection tournamentId={tournament.id} />
             <ReviewsSection tournament={tournament} />
         </div>
       )}

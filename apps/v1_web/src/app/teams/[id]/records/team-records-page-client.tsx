@@ -1,10 +1,12 @@
 'use client';
 
+import { useState } from 'react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { ErrorState } from '@/components/v1-ui/primitives';
 import { extractErrorMessage } from '@/lib/error-message';
 import { usePublicTeamRecords } from '@/components/public-game-records/use-public-game-records';
 import { TeamRecordsContent } from '@/components/public-game-records/team-records-content';
+import type { TeamRecordTypeFilter } from '@/components/public-game-records/types';
 
 function RecordsSkeleton() {
   return (
@@ -16,8 +18,9 @@ function RecordsSkeleton() {
 }
 
 export function TeamRecordsPageClient({ teamId }: { teamId: string }) {
+  const [activeType, setActiveType] = useState<TeamRecordTypeFilter>('all');
   const { data, isLoading, isError, error, refetch, hasNextPage, isFetchingNextPage, fetchNextPage } =
-    usePublicTeamRecords(teamId);
+    usePublicTeamRecords(teamId, undefined, activeType === 'all' ? undefined : activeType);
 
   if (isLoading) {
     return (
@@ -58,6 +61,8 @@ export function TeamRecordsPageClient({ teamId }: { teamId: string }) {
         hasNextPage={hasNextPage}
         isFetchingNextPage={isFetchingNextPage}
         onLoadMore={() => void fetchNextPage()}
+        activeType={activeType}
+        onChangeType={setActiveType}
       />
     </AppChrome>
   );

@@ -203,13 +203,28 @@ function makeTeamRecords(overrides: Partial<PublicTeamRecordsResponse> = {}): Pu
     teamId: 'team-1',
     teamName: '서울 유나이티드',
     teamLogoUrl: '/uploads/teams/seoul.png',
-    summary: { played: 1, won: 1, drawn: 0, lost: 0, goalsFor: 2, goalsAgainst: 1 },
+    summary: {
+      played: 1,
+      won: 1,
+      drawn: 0,
+      lost: 0,
+      goalsFor: 2,
+      goalsAgainst: 1,
+      byType: {
+        league: { played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0 },
+        tournament: { played: 1, won: 1, drawn: 0, lost: 0, goalsFor: 2, goalsAgainst: 1 },
+        friendly: { played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0 },
+      },
+    },
     items: [
       {
         gameId: 'game-1',
         teamMatchId: null,
         tournamentId: 'tournament-1',
         tournamentTitle: '테스트 대회',
+        leagueId: null,
+        leagueTitle: null,
+        type: 'tournament',
         opponentTeamId: 'team-away',
         opponentTeamName: '부산 FC',
         opponentTeamLogoUrl: '/uploads/teams/busan.png',
@@ -247,6 +262,82 @@ describe('TeamRecordsContent — 팀 로고', () => {
 
     expect(container.querySelector('img[src="/uploads/teams/seoul.png"]')).toBeInTheDocument();
     expect(container.querySelector('img[src="/uploads/teams/busan.png"]')).toBeInTheDocument();
+  });
+});
+
+/**
+ * U2 -- 탭이 요약(KPI)과 목록을 함께 전환한다(B안). 서버는 `summary.byType`를
+ * `type` 필터와 무관하게 항상 전체 기준으로 내려주므로(백엔드 계약), 탭 전환은
+ * 새 계산 없이 이 맵에서 값을 그대로 꺼내는 것으로 끝나야 한다 -- 계산이 섞이면
+ * 서버가 낸 숫자와 화면이 보여주는 숫자가 갈릴 수 있다.
+ */
+describe('TeamRecordsContent — 종류 탭 (U2)', () => {
+  // 득실차(played - X 아님, goalsFor-goalsAgainst)가 played 와 우연히 같은 값이
+  // 되지 않도록 의도적으로 서로 다른 숫자를 골랐다 -- KPIStat 은 값만 렌더하고
+  // 단위가 없는 카드(득실차)도 있어서, 두 카드가 같은 숫자면 `getByText` 가
+  // "여러 요소 매치"로 실패한다.
+  function withByType(overrides: Partial<PublicTeamRecordsResponse['summary']['byType']> = {}) {
+    return makeTeamRecords({
+      summary: {
+        played: 12,
+        won: 6,
+        drawn: 3,
+        lost: 3,
+        goalsFor: 25,
+        goalsAgainst: 11, // diff = 14
+        byType: {
+          league: { played: 4, won: 2, drawn: 1, lost: 1, goalsFor: 9, goalsAgainst: 4 }, // diff = 5
+          tournament: { played: 5, won: 3, drawn: 1, lost: 1, goalsFor: 12, goalsAgainst: 5 }, // diff = 7
+          friendly: { played: 3, won: 1, drawn: 1, lost: 1, goalsFor: 4, goalsAgainst: 2 }, // diff = 2
+          ...overrides,
+        },
+      },
+    });
+  }
+
+  it('정규 리그 탭을 고르면 KPI가 summary.byType.league 값으로 바뀐다 (전체 기준으로 새로 계산하지 않는다)', () => {
+    render(<TeamRecordsContent data={withByType()} activeType="league" onChangeType={vi.fn()} />);
+
+    // 전체 기준(12경기)이 아니라 리그 기준(4경기) 값이어야 한다.
+    expect(screen.getByText('4')).toBeInTheDocument();
+    expect(screen.getByText('2·1·1')).toBeInTheDocument();
+    expect(screen.getByText('5')).toBeInTheDocument(); // 득실차 9-4
+    expect(screen.queryByText('12')).not.toBeInTheDocument();
+    expect(screen.queryByText('6·3·3')).not.toBeInTheDocument();
+  });
+
+  it('전체 탭이면 KPI가 summary(전체 기준) 그대로다', () => {
+    render(<TeamRecordsContent data={withByType()} activeType="all" onChangeType={vi.fn()} />);
+
+    expect(screen.getByText('12')).toBeInTheDocument();
+    expect(screen.getByText('6·3·3')).toBeInTheDocument();
+    expect(screen.getByText('14')).toBeInTheDocument(); // 득실차 25-11
+  });
+
+  it('탭 클릭이 onChangeType으로 선택된 종류를 그대로 전달한다', () => {
+    const onChangeType = vi.fn();
+    render(<TeamRecordsContent data={withByType()} activeType="all" onChangeType={onChangeType} />);
+
+    fireEvent.click(screen.getByRole('tab', { name: '대회' }));
+
+    expect(onChangeType).toHaveBeenCalledWith('tournament');
+  });
+
+  it('활성 탭은 색만이 아니라 aria-selected로도 표시된다', () => {
+    render(<TeamRecordsContent data={withByType()} activeType="friendly" onChangeType={vi.fn()} />);
+
+    expect(screen.getByRole('tab', { name: '친선' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: '전체' })).toHaveAttribute('aria-selected', 'false');
+  });
+
+  it('선택한 종류에 경기가 0건이면 안내 문구를 보여주되 KPI는 0을 그대로 보여준다', () => {
+    const data = withByType({ tournament: { played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0 } });
+    render(<TeamRecordsContent data={{ ...data, items: [] }} activeType="tournament" onChangeType={vi.fn()} />);
+
+    expect(screen.getByText('아직 대회 경기가 없어요')).toBeInTheDocument();
+    // EmptyState 로 대체되지 않고 KPI 카드는 여전히 0을 보여준다.
+    expect(screen.getAllByText('0').length).toBeGreaterThan(0);
+    expect(screen.getByText('0·0·0')).toBeInTheDocument();
   });
 });
 

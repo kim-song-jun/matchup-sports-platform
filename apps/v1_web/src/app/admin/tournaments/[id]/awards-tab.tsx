@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import { useV1AdminTournamentRegistrations, useV1AdminTournamentPlayers, useV1AdminTournamentAwards, useV1SetTournamentAwards } from '@/hooks/use-v1-api';
-import { useV1AdminTournamentPlayerRecords } from '@/hooks/use-v1-api';
+import { useV1AdminTournamentRegistrations, useV1AdminTournamentPlayers, useV1AdminTournamentAwards, useV1SetTournamentAwards, useV1AdminTournamentPlayerRecords } from '@/hooks/use-v1-api';
 import { AwardRecommendationChips, type AwardRecommendation } from '@/components/admin/award-recommendation-chips';
 import type { V1TournamentAwardIconKey } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';

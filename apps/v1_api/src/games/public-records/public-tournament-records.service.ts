@@ -356,9 +356,16 @@ export class PublicTournamentRecordsService {
       },
     });
     // 0골·0도움 행은 응답에서 전부 걸러진다 — 공개 랭킹과 같은 사전 필터(비용 패리티).
-    const officialRows = participantRows.filter(
-      (row) => row.resultRevision.officialAt !== null && (row.goals > 0 || row.assists > 0),
-    );
+    // "마지막 스냅샷" 갱신이 결정적이 되도록 officialAt(동률이면 participantId)로
+    // 정렬한다 — findMany 순서는 무보장이라 그대로 두면 name/team이 실행마다
+    // 흔들릴 수 있다(리뷰 지적).
+    const officialRows = participantRows
+      .filter((row) => row.resultRevision.officialAt !== null && (row.goals > 0 || row.assists > 0))
+      .sort(
+        (a, b) =>
+          a.resultRevision.officialAt!.getTime() - b.resultRevision.officialAt!.getTime() ||
+          a.participantId.localeCompare(b.participantId),
+      );
     if (officialRows.length === 0) return empty;
 
     const participants = await this.prisma.v1GameParticipant.findMany({
@@ -406,8 +413,10 @@ export class PublicTournamentRecordsService {
       current.goals += row.goals;
       current.assists += row.assists;
       // 마지막으로 본 스냅샷으로 갱신 — 개명·이적 시 최신 표기를 따른다.
+      // teamName도 이름과 똑같이 무조건 대입한다: null 가드를 두면 "마지막
+      // 스냅샷이 무팀"인 사실이 이전 팀명으로 가려진다(리뷰 지적).
       current.name = participant.displayNameSnapshot;
-      if (teamName !== null) current.teamName = teamName;
+      current.teamName = teamName;
       totalsByKey.set(key, current);
     }
 

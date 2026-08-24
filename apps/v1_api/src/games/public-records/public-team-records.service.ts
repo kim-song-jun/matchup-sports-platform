@@ -346,10 +346,25 @@ export class PublicTeamRecordsService {
       eventsByGame.set(event.gameId, list);
     }
 
-    const scorerParticipantIds = Array.from(eventsByGame.values())
-      .flat()
-      .map((event) => event.participantId)
-      .filter((id): id is string => id !== null);
+    // 공식 리비전의 goalEvents(JSON) 는 `V1GameEvent` 행이 아니다 -- 백필된 골은 그쪽에만
+    // 있다. 아래 렌더 루프가 그 participantId 로도 `consentMap` 을 조회하므로, 여기서 함께
+    // 모으지 않으면 그런 골에는 `profileHref` 가 영영 붙지 않는다(Copilot 리뷰 지적).
+    // 이름 게이팅에서는 이 구멍이 드러나지 않았다 -- 정책 공개 기본값에서
+    // `resolveParticipantNameEligible` 이 consent 를 보지 않고 항상 true 를 돌려주기 때문에,
+    // 프로필 링크가 처음으로 이 경로를 실제로 사용하게 됐다.
+    //
+    // 파싱 결과를 Map 에 담아 아래 루프가 재사용한다 -- 같은 JSON 을 두 번 파싱하지 않는다.
+    const revisionGoalsByGameId = new Map(
+      currentRows.map((row) => [row.gameId, parseTournamentFixtureRevisionGoals(row.resultRevision.goalEvents)] as const),
+    );
+    const scorerParticipantIds = [
+      ...Array.from(eventsByGame.values())
+        .flat()
+        .map((event) => event.participantId),
+      ...Array.from(revisionGoalsByGameId.values()).flatMap((goals) =>
+        (goals ?? []).map((goal) => goal.participantId),
+      ),
+    ].filter((id): id is string => id !== null);
     // **항상 조회한다.** 이름 게이팅(되돌린 상태에서만 동작)에는 쓰이지 않지만, 프로필
     // 링크(`resolveParticipantProfileHref`)는 정책 공개 기본값에서도 동의를 확인해야 하기
     // 때문이다 -- 게이팅 플래그로 감싸 두면 기본 운영 설정에서 이 맵이 비어 `profileHref`
@@ -375,7 +390,7 @@ export class PublicTeamRecordsService {
         row.resultRevision.game.participants.map((participant) => [participant.id, participant.sideId] as const),
       );
 
-      const revisionGoals = parseTournamentFixtureRevisionGoals(row.resultRevision.goalEvents);
+      const revisionGoals = revisionGoalsByGameId.get(row.gameId) ?? null;
       const rows = (eventsByGame.get(row.gameId) ?? [])
         .filter((event) => revisionGoals === null || event.type === 'CARD')
         .map((event) => {

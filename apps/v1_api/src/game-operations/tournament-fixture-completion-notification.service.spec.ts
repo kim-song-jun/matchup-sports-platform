@@ -62,9 +62,11 @@ describe('TournamentFixtureCompletionNotificationService', () => {
       preferences: [],
       alreadyDelivered: [],
     });
+    // sourceType만 바꾼다 — tournamentId/fixtureId를 함께 null로 만들면 소스타입
+    // 가드가 제거돼도 다음 가드가 대신 통과시켜 테스트가 무력화된다(Copilot 지적).
     await new TournamentFixtureCompletionNotificationService().project(
       tx,
-      revisionFixture({ sourceType: 'TEAM_MATCH', tournamentId: null, tournamentFixtureId: null }),
+      revisionFixture({ sourceType: 'TEAM_MATCH' }),
     );
     expect(createMany).not.toHaveBeenCalled();
   });
@@ -83,7 +85,12 @@ describe('TournamentFixtureCompletionNotificationService', () => {
       'captain-away',
       'captain-home',
     ]);
-    expect(rows[0]).toMatchObject({
+    // 배열 순서(멤버십 findMany 결과 순서)에 의존하지 않고 해당 수신자 row를 찾아
+    // 검증한다(Copilot 지적 — DB findMany는 정렬을 보장하지 않는다).
+    const homeRow = rows.find(
+      (row: { recipientUserId: string }) => row.recipientUserId === 'captain-home',
+    );
+    expect(homeRow).toMatchObject({
       targetType: 'tournament',
       targetId: 'tour-1',
       body: '테스트 대회 — 홈팀FC 2:1 원정팀FC 결과가 공식 확정됐어요.',

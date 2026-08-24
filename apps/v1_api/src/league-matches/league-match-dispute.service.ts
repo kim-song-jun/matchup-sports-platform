@@ -209,10 +209,108 @@ export class LeagueMatchDisputeService {
     // 읽기 전용이라 getActiveAdmin(변경 권한까지는 요구하지 않음) — 같은 모듈의
     // LeagueMatchAdminService.list() 와 동일한 게이트다.
     await this.adminContext.getActiveAdmin(user.id);
-    return this.prisma.v1LeagueMatchDispute.findMany({
+    const disputes = await this.prisma.v1LeagueMatchDispute.findMany({
       where: status === undefined ? {} : { status },
       orderBy: { createdAt: 'desc' },
       take: 100,
+    });
+    return { items: await this.enrichDisputeRows(disputes) };
+  }
+
+  /**
+   * 어드민 이의 목록 화면은 리그 제목 · 대진 팀 이름 매치업 · 제기 팀 이름을 사람이 읽을
+   * 수 있는 형태로 보여줘야 하는데, `V1LeagueMatchDispute`는 leagueId/teamMatchId/
+   * raisedByTeamId 셋 다 FK 관계가 없는 평문 문자열이다(스키마 주석 참고 — 신뢰
+   * 무결성보다 최소 풋프린트를 택함). 이의 건수만큼 반복 조회하면 N+1이 되므로,
+   * `league-match-admin.service.ts`의 listTeams()/detail()과 같은 패턴으로 리그·
+   * 대진·팀을 각각 단일 IN 조회로 모아 온다.
+   */
+  private async enrichDisputeRows(
+    disputes: Array<{
+      id: string;
+      leagueId: string;
+      teamMatchId: string;
+      raisedByTeamId: string;
+      reason: string;
+      status: 'open' | 'accepted' | 'rejected';
+      resolution: 'correction' | 'void' | null;
+      resolutionNote: string | null;
+      resolvedAt: Date | null;
+      createdAt: Date;
+    }>,
+  ) {
+    if (disputes.length === 0) return [];
+
+    const leagueIds = [...new Set(disputes.map((dispute) => dispute.leagueId))];
+    const teamMatchIds = [...new Set(disputes.map((dispute) => dispute.teamMatchId))];
+    const [leagues, teamMatches] = await Promise.all([
+      this.prisma.v1League.findMany({ where: { id: { in: leagueIds } }, select: { id: true, title: true } }),
+      this.prisma.v1TeamMatch.findMany({
+        where: { id: { in: teamMatchIds } },
+        select: {
+          id: true,
+          hostTeamId: true,
+          approvedApplicantTeamId: true,
+          // 처리 모달의 정정 경로가 "전(현재 공식 스코어) → 후(입력값)" 비교를 보여주려면
+          // 여기서 currentOfficialRevisionId 를 미리 가져와야 한다 — 이의별로 다시 조회하면
+          // N+1이라 아래에서 리비전 id 를 모아 v1GameOfficialFact 를 단일 IN 조회한다
+          // (league-match-admin.service.ts detail() 과 같은 패턴).
+          game: { select: { id: true, currentOfficialRevisionId: true } },
+        },
+      }),
+    ]);
+    const leagueById = new Map(leagues.map((league) => [league.id, league]));
+    const teamMatchById = new Map(teamMatches.map((teamMatch) => [teamMatch.id, teamMatch]));
+
+    const teamIds = [
+      ...new Set([
+        ...disputes.map((dispute) => dispute.raisedByTeamId),
+        ...teamMatches.flatMap((teamMatch) =>
+          [teamMatch.hostTeamId, teamMatch.approvedApplicantTeamId].filter((id): id is string => id !== null),
+        ),
+      ]),
+    ];
+    const officialRevisionIds = teamMatches
+      .map((teamMatch) => teamMatch.game?.currentOfficialRevisionId ?? null)
+      .filter((id): id is string => id !== null);
+    const [teams, facts] = await Promise.all([
+      teamIds.length === 0
+        ? Promise.resolve([])
+        : this.prisma.v1Team.findMany({ where: { id: { in: teamIds } }, select: { id: true, name: true } }),
+      officialRevisionIds.length === 0
+        ? Promise.resolve([])
+        : this.prisma.v1GameOfficialFact.findMany({
+            where: { revisionId: { in: officialRevisionIds } },
+            select: { gameId: true, homeScore: true, awayScore: true },
+          }),
+    ]);
+    const teamNameById = new Map(teams.map((team) => [team.id, team.name]));
+    const factByGameId = new Map(facts.map((fact) => [fact.gameId, fact]));
+
+    return disputes.map((dispute) => {
+      const teamMatch = teamMatchById.get(dispute.teamMatchId);
+      const fact = teamMatch?.game ? factByGameId.get(teamMatch.game.id) : undefined;
+      return {
+        id: dispute.id,
+        leagueId: dispute.leagueId,
+        leagueTitle: leagueById.get(dispute.leagueId)?.title ?? '(삭제된 리그)',
+        teamMatchId: dispute.teamMatchId,
+        homeTeamName: teamMatch ? teamNameById.get(teamMatch.hostTeamId) ?? '(삭제된 팀)' : '(삭제된 대진)',
+        awayTeamName:
+          teamMatch?.approvedApplicantTeamId != null
+            ? teamNameById.get(teamMatch.approvedApplicantTeamId) ?? '(삭제된 팀)'
+            : '(삭제된 대진)',
+        reason: dispute.reason,
+        raisedByTeamId: dispute.raisedByTeamId,
+        raisedByTeamName: teamNameById.get(dispute.raisedByTeamId) ?? '(삭제된 팀)',
+        status: dispute.status,
+        resolution: dispute.resolution,
+        resolutionNote: dispute.resolutionNote,
+        resolvedAt: dispute.resolvedAt,
+        createdAt: dispute.createdAt,
+        currentHomeScore: fact?.homeScore ?? null,
+        currentAwayScore: fact?.awayScore ?? null,
+      };
     });
   }
 

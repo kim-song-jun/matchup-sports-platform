@@ -4816,6 +4816,7 @@ import type {
   V1AddLeagueTeamResult,
   V1AdminLeagueDetail,
   V1AdminLeagueListItem,
+  V1AdminLeagueMatchDisputeListResponse,
   V1AdminLeagueTeamsResponse,
   V1CancelLeagueFixturePayload,
   V1CancelLeagueFixtureResult,
@@ -4836,7 +4837,11 @@ import type {
   V1RecordLeagueResultResult,
   V1RegenerateLeagueFixturesPayload,
   V1RegenerateLeagueFixturesResult,
+  V1RejectLeagueMatchDisputePayload,
+  V1RejectLeagueMatchDisputeResult,
   V1RemoveLeagueTeamResult,
+  V1ResolveLeagueMatchDisputePayload,
+  V1ResolveLeagueMatchDisputeResult,
   V1RevertLeagueCompletionPayload,
   V1RevertLeagueCompletionResult,
   V1UpdateLeagueFixturePayload,
@@ -5057,6 +5062,45 @@ export function useV1CorrectLeagueResult(leagueId: string) {
       ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
+    },
+  });
+}
+
+// D2 (E4): 어드민 이의 목록 — GET /admin/league-match-disputes?status=. status가
+// 빈 문자열/undefined 면 쿼리 파라미터 자체를 생략해 전체를 받는다(다른 어드민 목록
+// 훅들과 동일 관례).
+export function useV1AdminLeagueDisputes(status?: string) {
+  return useQuery({
+    queryKey: v1Keys.adminLeagueMatchDisputes(status),
+    queryFn: () =>
+      v1Get<V1AdminLeagueMatchDisputeListResponse>('/admin/league-match-disputes', status ? { status } : undefined),
+  });
+}
+
+// D2 (E4): 이의 수락(정정/무효) — POST /admin/league-match-disputes/:disputeId/resolve.
+// 정정은 대진 상세(adminLeagueMatch)의 결과 열도 바뀌므로 함께 무효화하고 싶지만, 이
+// 화면은 leagueId를 모르는 채로 목록만 다루므로 리그 상세 캐시는 다음 방문 시 자연 재조회에
+// 맡긴다(다른 화면에서 열려 있다면 그쪽에서 별도로 invalidate).
+export function useV1ResolveLeagueDispute() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ disputeId, body }: { disputeId: string; body: V1ResolveLeagueMatchDisputePayload }) =>
+      v1Post<V1ResolveLeagueMatchDisputeResult>(`/admin/league-match-disputes/${disputeId}/resolve`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'league-match-disputes'] });
+    },
+  });
+}
+
+// D2 (E4): 이의 거부 — POST /admin/league-match-disputes/:disputeId/reject. 결과에는
+// 영향이 없으므로 이의 목록 캐시만 무효화한다.
+export function useV1RejectLeagueDispute() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ disputeId, body }: { disputeId: string; body: V1RejectLeagueMatchDisputePayload }) =>
+      v1Post<V1RejectLeagueMatchDisputeResult>(`/admin/league-match-disputes/${disputeId}/reject`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'league-match-disputes'] });
     },
   });
 }

@@ -33,6 +33,7 @@ import {
   X,
   Radio,
   Bug,
+  Gavel,
 } from 'lucide-react';
 
 // ── Nav items (reviews/notifications removed per task-97 IA) ───────────────
@@ -88,6 +89,7 @@ const BASE_NAV_GROUPS: NavGroup[] = [
       { label: '팀', href: '/admin/teams', icon: <UsersRound size={18} /> },
       { label: '팀매치', href: '/admin/team-matches', icon: <Trophy size={18} /> },
       { label: '정규 리그', href: '/admin/league-matches', icon: <ListOrdered size={18} /> },
+      { label: '결과 이의', href: '/admin/league-match-disputes', icon: <Gavel size={18} /> },
       { label: '리그 체계', href: '/admin/league-series', icon: <Layers size={18} /> },
       { label: '대회', href: '/admin/tournaments', icon: <Medal size={18} /> },
     ],

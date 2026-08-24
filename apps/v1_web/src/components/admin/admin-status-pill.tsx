@@ -206,6 +206,26 @@ export const STATUS_META: Record<string, StatusMeta> = {
     tone: 'gray',
     icon: <XCircle size={12} aria-hidden="true" />,
   },
+
+  // ── 리그 결과 이의(D2/E4) ────────────────────────────────────────────
+  // result_* 와 다른 축이다 — 이건 "결과가 확정된 뒤 팀이 그 결과에 이의를 걸었는지"의
+  // 상태고, result_* 는 결과 자체가 어느 단계인지다. dispute_ 접두를 붙여 다른 도메인의
+  // open/accepted/rejected(신청·주문 등)와 라벨이 뒤섞이지 않게 한다.
+  dispute_open: {
+    label: '처리 대기',
+    tone: 'amber',
+    icon: <Clock size={12} aria-hidden="true" />,
+  },
+  dispute_accepted: {
+    label: '수락됨',
+    tone: 'green',
+    icon: <CheckCircle2 size={12} aria-hidden="true" />,
+  },
+  dispute_rejected: {
+    label: '거부됨',
+    tone: 'red',
+    icon: <XCircle size={12} aria-hidden="true" />,
+  },
 };
 
 // ── Component ─────────────────────────────────────────────────────────────

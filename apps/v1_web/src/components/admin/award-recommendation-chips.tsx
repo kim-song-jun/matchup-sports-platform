@@ -49,7 +49,7 @@ export function AwardRecommendationChips({
                 type="button"
                 onClick={() => onPick({ kind: group.kind, row })}
                 className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg border border-[var(--tint-blue-border)] bg-[var(--card-surface)] text-xs text-[var(--text-strong)] hover:bg-[var(--blue50)]"
-                aria-label={`${group.label} ${index + 1}위 ${row.name} ${group.kind === 'goals' ? row.goals : row.assists}${group.unit} — 수상 항목으로 추가`}
+                aria-label={`${group.label} ${index + 1}위 ${row.name} ${group.kind === 'goals' ? row.goals : row.assists}${group.unit}${row.teamName ? ` (${row.teamName})` : ''} — 수상 항목으로 추가`}
               >
                 <span className="font-bold text-[var(--blue700)]">{index + 1}위</span>
                 <span>{row.name}</span>

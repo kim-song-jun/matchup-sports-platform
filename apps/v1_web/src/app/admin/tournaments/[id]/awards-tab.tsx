@@ -9,6 +9,7 @@ import type { V1TournamentAwardIconKey } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { legacyAwardIconKey, TOURNAMENT_AWARD_ICON_OPTIONS, TournamentAwardIcon } from '@/components/tournaments/tournament-award-icon';
 import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-picker';
+import { randomUuid } from '@/lib/uuid';
 
 
 // ── Tab: Individual Awards ────────────────────────────────────────────────
@@ -59,7 +60,8 @@ export function AwardsTab({
   const addRow = () => {
     // Date.now()만으로는 같은 ms의 연속 추가가 같은 awardType이 돼 DB unique
     // (@@unique([tournamentId, awardType])) 위반으로 저장이 실패한다(리뷰 지적).
-    setRows((prev) => [...prev, { awardType: `custom_${crypto.randomUUID()}`, awardLabel: '', iconKey: 'trophy', recipientName: '', recipientUserId: '', teamName: '', note: '' }]);
+    // randomUuid()는 crypto.randomUUID 부재 WebView(Capacitor 구형)까지 흡수하는 헬퍼다.
+    setRows((prev) => [...prev, { awardType: `custom_${randomUuid()}`, awardLabel: '', iconKey: 'trophy', recipientName: '', recipientUserId: '', teamName: '', note: '' }]);
   };
 
   // 회고 STATS-3 — 추천 근거 chip. 비게이팅 어드민 랭킹이라 미동의 1위도 그대로
@@ -71,7 +73,7 @@ export function AwardsTab({
     setRows((prev) => [
       ...prev,
       {
-        awardType: `custom_${crypto.randomUUID()}`,
+        awardType: `custom_${randomUuid()}`,
         awardLabel: kind === 'goals' ? '득점왕' : '도움왕',
         iconKey: kind === 'goals' ? 'goal' : 'handshake',
         recipientName: row.name,

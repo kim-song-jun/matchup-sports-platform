@@ -6,6 +6,7 @@ import {
   MatchIcon,
   MyIcon,
   SearchIcon,
+  TeamMatchIcon,
   TeamsIcon,
   TrophyIcon,
 } from './icons';
@@ -14,8 +15,12 @@ import { BrandMark } from './brand-logo';
 import { AppBackLink } from './app-back-link';
 import { NotificationBellLink } from './notification-bell';
 
-export type V1NavTab = 'home' | 'matches' | 'tournaments' | 'teams' | 'my';
+export type V1NavTab = 'home' | 'matches' | 'tournaments' | 'league' | 'teams' | 'my';
 
+// D5 — 하단 탭 6개(홈/매치/대회/리그/팀/마이). 리그 아이콘은 새로 만들지 않고
+// TeamMatchIcon을 재사용한다: 리그 대진은 도메인상 TEAM_MATCH 레코드이고(팀 대 팀
+// 고정 일정), TeamMatchIcon은 이미 이 저장소에서 랜딩/홈/알림의 "팀매치" 시각 언어로
+// 쓰이고 있다 — TrophyIcon(대회)·TeamsIcon(팀)·MatchIcon(매치)은 이미 다른 탭이 쓴다.
 const tabs: Array<{
   id: V1NavTab;
   label: string;
@@ -25,6 +30,7 @@ const tabs: Array<{
   { id: 'home', label: '홈', href: '/home', Icon: HomeIcon },
   { id: 'matches', label: '매치', href: '/matches', Icon: MatchIcon },
   { id: 'tournaments', label: '대회', href: '/tournaments', Icon: TrophyIcon },
+  { id: 'league', label: '리그', href: '/league-matches', Icon: TeamMatchIcon },
   { id: 'teams', label: '팀', href: '/teams', Icon: TeamsIcon },
   { id: 'my', label: '마이', href: '/my', Icon: MyIcon },
 ];
@@ -169,7 +175,14 @@ function DesktopFooter() {
 
 function BottomNav({ activeTab }: { activeTab?: V1NavTab }) {
   return (
-    <nav className="tm-bottom-nav" aria-label="주요 메뉴">
+    <nav
+      className="tm-bottom-nav"
+      aria-label="주요 메뉴"
+      // 탭 개수가 CSS의 하드코딩된 5열에 묶이지 않도록 tabs.length로 열 수를 계산한다.
+      // 390px 폭 계산 근거는 shell.tsx 주변 PR 설명 참조 — 6열 기준 탭당 65px,
+      // 아이콘 23px + 라벨(최대 2글자, 12px)이 전부 여유 있게 들어간다.
+      style={{ gridTemplateColumns: `repeat(${tabs.length}, 1fr)` }}
+    >
       {tabs.map(({ id, label, href, Icon }) => {
         const active = id === activeTab;
         return (

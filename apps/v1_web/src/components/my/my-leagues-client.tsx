@@ -28,7 +28,7 @@ export function MyLeaguesPageClient() {
   const items = query.data?.items ?? [];
 
   return (
-    <AppChrome title="내 리그" activeTab="my" backHref="/my">
+    <AppChrome title="내 리그" activeTab="league" backHref="/my">
       <div className="mx-auto max-w-4xl px-4 py-6">
         <div className="tm-my-desktop-head tm-show-desktop">
           <Link className="tm-desktop-back" href="/my" aria-label="마이페이지로 돌아가기">

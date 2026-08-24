@@ -80,6 +80,30 @@ describe('선수 카드', () => {
     expect(screen.getByText('3 / 6 열림')).toBeInTheDocument();
   });
 
+  it('아직 한 경기도 안 뛴 사람에게 "더 뛰면" 이라고 말하지 않는다', () => {
+    // alpha 실측(2026-08-24)에서 잡았다. 0경기 사용자가 "1경기 더 뛰면 열려요" 를
+    // 받고 있었는데, 더 뛸 앞선 경기가 없는 사람에게는 틀린 말이다.
+    renderCard(
+      card({
+        appearances: 0,
+        overall: null,
+        unlockedCount: 0,
+        stats: [
+          stat('SHO', '골', null, { type: 'appearances', remaining: 3 }),
+          stat('PAS', '도움', null, { type: 'appearances', remaining: 3 }),
+          stat('APP', '출전', null, { type: 'appearances', remaining: 1 }),
+          stat('SKI', '실력', null, { type: 'reviews', remaining: 3 }),
+          stat('MAN', '매너', null, { type: 'reviews', remaining: 3 }),
+          stat('PUN', '시간약속', null, { type: 'reviews', remaining: 3 }),
+        ],
+        nextUnlock: { code: 'APP', reason: { type: 'appearances', remaining: 1 } },
+      }),
+    );
+
+    expect(screen.getByText('첫 경기를 뛰면 기록이 쌓이기 시작해요')).toBeInTheDocument();
+    expect(screen.queryByText(/더 뛰면/)).not.toBeInTheDocument();
+  });
+
   describe('기록 공개 유도', () => {
     const needsConsent = card({
       stats: [

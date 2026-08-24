@@ -1,6 +1,5 @@
 import { Suspense } from 'react';
 import { AppChrome } from '@/components/v1-ui/shell';
-import { CompetitionTypeSegment } from '@/components/v1-ui/competition-type-segment';
 import { buildPublicMetadata } from '@/lib/seo';
 import LeagueMatchesListClient from './league-matches-list-client';
 
@@ -21,12 +20,10 @@ export const metadata = buildPublicMetadata({
 // 알림 벨까지 끌어와 use-v1-api 모킹 표면이 화면과 무관하게 넓어진다.
 //
 // activeTab은 'league' — D5(하단 탭 6개 분리)로 리그가 대회에서 독립된 탭이 됐다.
-// CompetitionTypeSegment는 그대로 남아 대회 목록과도 오갈 수 있다(탭·세그먼트 중복은
-// 정책 미확정이라 유지 — CLAUDE.md D5 참조).
+// 대회/리그 이동은 하단 탭이 전담하므로 상단 세그먼트(E5)는 제거했다.
 export default function LeagueMatchesPage() {
   return (
     <AppChrome title="정규 리그" activeTab="league" showNotifications>
-      <CompetitionTypeSegment active="league" />
       <Suspense fallback={null}>
         <LeagueMatchesListClient />
       </Suspense>

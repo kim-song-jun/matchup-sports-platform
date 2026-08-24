@@ -150,7 +150,8 @@ export function MyHomePageClient() {
     return <ErrorState message="프로필 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void profile.refetch()} />;
   }
 
-  return <MyHomePageView model={model} />;
+  // 카드 섹션이 스스로 공개 프로필을 조회하므로 userId 만 넘긴다.
+  return <MyHomePageView model={model} userId={profile.data?.userId} />;
 }
 
 export function MyTeamsPageClient() {

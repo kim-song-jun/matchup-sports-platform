@@ -36,7 +36,7 @@ describe('PublicTeamRecordsService', () => {
       .fn()
       .mockResolvedValueOnce([{ id: 'fact-1', playedAt }])
       .mockResolvedValueOnce([
-        { played: 1, won: 1, drawn: 0, lost: 0, goalsFor: 2, goalsAgainst: 1 },
+        { category: 'tournament', played: 1, won: 1, drawn: 0, lost: 0, goalsFor: 2, goalsAgainst: 1 },
       ]);
     const prisma = {
       v1Team: {
@@ -53,6 +53,8 @@ describe('PublicTeamRecordsService', () => {
       v1Tournament: {
         findMany: jest.fn().mockResolvedValue([{ id: 'tournament-1', title: '주말 리그' }]),
       },
+      v1TeamMatch: { findMany: jest.fn().mockResolvedValue([]) },
+      v1League: { findMany: jest.fn().mockResolvedValue([]) },
       v1GameEvent: { findMany: jest.fn().mockResolvedValue([]) },
       $queryRaw: queryRaw,
     } as unknown as PrismaService;
@@ -70,8 +72,153 @@ describe('PublicTeamRecordsService', () => {
     expect(pageQuery.strings?.join(' ')).toContain('ORDER BY trf.played_at DESC, trf.id DESC');
     expect(pageQuery.strings?.join(' ')).toContain('trf.played_at >=');
     expect(result.items[0]).toEqual(
-      expect.objectContaining({ playedAt: playedAt.toISOString() }),
+      expect.objectContaining({
+        playedAt: playedAt.toISOString(),
+        type: 'tournament',
+        leagueId: null,
+        leagueTitle: null,
+      }),
     );
     expect(result.items[0]).not.toHaveProperty('officialAt');
+    // 전체 요약 + 종류별 구간 집계가 한 그룹 쿼리 결과에서 함께 나온다 -- tournament
+    // 카테고리 1건만 있었으니 league/friendly 는 0으로 채워져야 한다(값을 지어내지 않는다).
+    expect(result.summary).toEqual({
+      played: 1,
+      won: 1,
+      drawn: 0,
+      lost: 0,
+      goalsFor: 2,
+      goalsAgainst: 1,
+      byType: {
+        tournament: { played: 1, won: 1, drawn: 0, lost: 0, goalsFor: 2, goalsAgainst: 1 },
+        league: { played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0 },
+        friendly: { played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0 },
+      },
+    });
+  });
+
+  it('classifies a league team-match fact and resolves its leagueId/leagueTitle through the team match', async () => {
+    const playedAt = new Date('2026-08-09T02:00:00.000Z');
+    const factFindMany = jest.fn().mockResolvedValue([
+      {
+        id: 'fact-league-1',
+        revisionId: 'revision-9',
+        gameId: 'game-9',
+        opponentTeamId: 'team-2',
+        tournamentId: null,
+        result: 'LOST',
+        goalsFor: 0,
+        goalsAgainst: 3,
+        playedAt,
+        resultRevision: {
+          score: { home: 0, away: 3 },
+          goalEvents: null,
+          game: {
+            currentOfficialRevisionId: 'revision-9',
+            teamMatchId: 'team-match-9',
+            sides: [
+              { id: 'side-home', sideKey: 'HOME', teamId: 'team-1' },
+              { id: 'side-away', sideKey: 'AWAY', teamId: 'team-2' },
+            ],
+            participants: [],
+          },
+        },
+      },
+    ]);
+    const queryRaw = jest
+      .fn()
+      .mockResolvedValueOnce([{ id: 'fact-league-1', playedAt }])
+      .mockResolvedValueOnce([
+        { category: 'league', played: 1, won: 0, drawn: 0, lost: 1, goalsFor: 0, goalsAgainst: 3 },
+      ]);
+    const teamMatchFindMany = jest.fn().mockResolvedValue([{ id: 'team-match-9', leagueId: 'league-1' }]);
+    const leagueFindMany = jest.fn().mockResolvedValue([{ id: 'league-1', title: '2026 여름 정규 리그' }]);
+    const prisma = {
+      v1Team: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'team-1', name: '서울 유나이티드', profile: null }),
+        findMany: jest.fn().mockResolvedValue([{ id: 'team-2', name: '부산 FC', profile: null }]),
+      },
+      v1TeamRecordFact: { findMany: factFindMany },
+      v1Tournament: { findMany: jest.fn().mockResolvedValue([]) },
+      v1TeamMatch: { findMany: teamMatchFindMany },
+      v1League: { findMany: leagueFindMany },
+      v1GameEvent: { findMany: jest.fn().mockResolvedValue([]) },
+      $queryRaw: queryRaw,
+    } as unknown as PrismaService;
+
+    const result = await new PublicTeamRecordsService(prisma).getRecords('team-1', {});
+
+    expect(teamMatchFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: { in: ['team-match-9'] } } }),
+    );
+    expect(leagueFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: { id: { in: ['league-1'] } } }));
+    expect(result.items[0]).toEqual(
+      expect.objectContaining({
+        type: 'league',
+        leagueId: 'league-1',
+        leagueTitle: '2026 여름 정규 리그',
+        tournamentId: null,
+        tournamentTitle: null,
+      }),
+    );
+  });
+
+  it('sends the type filter to the raw page query and skips league/tournament lookups when nothing needs them', async () => {
+    const playedAt = new Date('2026-08-09T02:00:00.000Z');
+    const factFindMany = jest.fn().mockResolvedValue([
+      {
+        id: 'fact-friendly-1',
+        revisionId: 'revision-3',
+        gameId: 'game-3',
+        opponentTeamId: null,
+        tournamentId: null,
+        result: 'DRAWN',
+        goalsFor: 1,
+        goalsAgainst: 1,
+        playedAt,
+        resultRevision: {
+          score: { home: 1, away: 1 },
+          goalEvents: null,
+          game: {
+            currentOfficialRevisionId: 'revision-3',
+            teamMatchId: 'team-match-3',
+            sides: [
+              { id: 'side-home', sideKey: 'HOME', teamId: 'team-1' },
+              { id: 'side-away', sideKey: 'AWAY', teamId: null },
+            ],
+            participants: [],
+          },
+        },
+      },
+    ]);
+    const queryRaw = jest
+      .fn()
+      .mockResolvedValueOnce([{ id: 'fact-friendly-1', playedAt }])
+      .mockResolvedValueOnce([
+        { category: 'friendly', played: 1, won: 0, drawn: 1, lost: 0, goalsFor: 1, goalsAgainst: 1 },
+      ]);
+    const teamMatchFindMany = jest.fn().mockResolvedValue([{ id: 'team-match-3', leagueId: null }]);
+    const leagueFindMany = jest.fn();
+    const prisma = {
+      v1Team: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'team-1', name: '서울 유나이티드', profile: null }),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      v1TeamRecordFact: { findMany: factFindMany },
+      v1Tournament: { findMany: jest.fn() },
+      v1TeamMatch: { findMany: teamMatchFindMany },
+      v1League: { findMany: leagueFindMany },
+      v1GameEvent: { findMany: jest.fn().mockResolvedValue([]) },
+      $queryRaw: queryRaw,
+    } as unknown as PrismaService;
+
+    const result = await new PublicTeamRecordsService(prisma).getRecords('team-1', { type: 'friendly' });
+
+    const pageQuery = queryRaw.mock.calls[0]?.[0] as { strings?: readonly string[] };
+    expect(pageQuery.strings?.join(' ')).toContain('trf.tournament_id IS NULL AND tm.league_id IS NULL');
+    // leagueIds 는 전부 null 이었으니 v1League.findMany 는 아예 호출되지 않아야 한다
+    // (N+1 방지 배치 조회가 빈 배열일 때 여전히 왕복을 만들지 않는지 확인).
+    expect(leagueFindMany).not.toHaveBeenCalled();
+    expect(result.items[0]).toEqual(expect.objectContaining({ type: 'friendly', leagueId: null }));
   });
 });

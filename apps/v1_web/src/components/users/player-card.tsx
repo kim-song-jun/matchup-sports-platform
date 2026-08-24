@@ -39,7 +39,11 @@ function unlockHint(card: V1PlayerCard): string | null {
   if (card.nextUnlock === null) return null;
   const { reason } = card.nextUnlock;
   if (reason.type === 'consent') return '기록 공개를 켜면 골·도움·출전이 한 번에 열려요';
-  if (reason.type === 'appearances') return `${reason.remaining}경기 더 뛰면 열려요`;
+  if (reason.type === 'appearances') {
+    // 아직 한 경기도 안 뛴 사람에게 "1경기 더" 는 틀린 말이다 -- 더 뛸 앞선 경기가 없다.
+    if (card.appearances === 0) return '첫 경기를 뛰면 기록이 쌓이기 시작해요';
+    return `${reason.remaining}경기 더 뛰면 열려요`;
+  }
   return `후기 ${reason.remaining}개를 더 받으면 열려요`;
 }
 

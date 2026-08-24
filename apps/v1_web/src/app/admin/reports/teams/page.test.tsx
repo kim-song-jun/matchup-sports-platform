@@ -140,4 +140,17 @@ describe('AdminReportedTeamsPage', () => {
     // topReason·lastReportedAt null 은 대시로 표시된다.
     expect(screen.getAllByText('—').length).toBeGreaterThan(0);
   });
+
+  // flex-col 의 기본 align-items: stretch 가 상태 pill 을 열 폭 전체로 늘렸다
+  // (alpha 캡처에서 파란 배지가 팀 칸을 가득 채웠다). items-start 로 고정한다.
+  it('상태 배지가 열 폭 전체로 늘어나지 않는다', () => {
+    reportedTeamsMock.mockReturnValue({ data: { items: [rowA()], windowDays: 30 }, isPending: false });
+
+    const { container } = render(<AdminReportedTeamsPage />);
+
+    const cell = container.querySelector('.flex.flex-col');
+    expect(cell).not.toBeNull();
+    expect(cell?.className).toContain('items-start');
+  });
+
 });

@@ -38,8 +38,10 @@ export default function AdminReportedTeamsPage() {
     {
       key: 'team',
       header: '팀',
+      // items-start 가 없으면 flex-col 의 기본 align-items: stretch 가 상태 pill 을 열 폭
+      // 전체로 늘린다 — alpha 캡처에서 파란 배지가 팀 칸을 가득 채운 것이 이것이다.
       render: (row) => (
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col items-start gap-1">
           {/* #657 딥링크 재사용 — 그 팀의 신고만 필터된 문의 목록으로 이동한다. */}
           <Link
             href={`/admin/inquiries?category=report&reportedTeamId=${encodeURIComponent(row.teamId)}`}

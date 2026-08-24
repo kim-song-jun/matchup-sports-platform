@@ -2099,7 +2099,13 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     const reporterTeamId =
       contact.fromTeamId === inquiry.reportedTeamId ? contact.toTeamId : contact.fromTeamId;
 
-    const reason = `운영자 조치 (신고 ${inquiry.id})`;
+    // 두 문자열을 나눈다 — **읽는 사람이 다르다.**
+    // blockReason 은 차단당한 팀의 운영진이 자기 설정 화면에서 본다. 여기에 문의 UUID 를
+    // 넣으면 아무 의미도 전달하지 못하면서 390 폭에서 두 줄로 접혀 해제 버튼까지 밀어낸다
+    // (alpha 캡처에서 실제로 그랬다). auditReason 은 운영자가 보는 감사 로그용이라
+    // 어떤 신고에서 비롯됐는지 추적할 수 있어야 한다.
+    const blockReason = '운영자가 접수된 신고를 확인해 차단했어요.';
+    const auditReason = `운영자 조치 (신고 ${inquiry.id})`;
     let alreadyBlocked = false;
     try {
       await this.prisma.v1TeamContactBlock.create({
@@ -2107,7 +2113,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
           teamId: reporterTeamId,
           blockedTeamId: inquiry.reportedTeamId,
           createdByUserId: user.id,
-          reason,
+          reason: blockReason,
         },
       });
     } catch (error) {
@@ -2126,7 +2132,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       targetId: inquiry.id,
       previousStatus: alreadyBlocked ? 'blocked' : 'not_blocked',
       status: 'blocked',
-      reason,
+      reason: auditReason,
       beforeState: { blocked: alreadyBlocked ? 'true' : 'false' },
       afterState: { blocked: 'true' },
       responseIdKey: 'inquiryId',

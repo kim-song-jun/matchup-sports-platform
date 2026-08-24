@@ -67,7 +67,8 @@ export function AwardsTab({
   // 보인다(공개 랭킹을 쓰면 틀린 추천이 된다). chip을 탭하면 아는 값(이름·계정·
   // 소속팀)이 미리 채워진 항목이 추가된다 — 계정 미연결 후보는 recipientUserId가
   // 비어 저장 전 명단 picker로 채워야 하고, 그 필수 검증은 기존 handleSave가 한다.
-  const playerRecords = useV1AdminTournamentPlayerRecords(tournamentId);
+  // 읽기 전용 접속(canWrite=false)은 chip을 렌더하지 않으므로 조회도 걸지 않는다.
+  const playerRecords = useV1AdminTournamentPlayerRecords(canWrite ? tournamentId : '');
   const addRecommendedRow = ({ kind, row }: AwardRecommendation) => {
     setRows((prev) => [
       ...prev,

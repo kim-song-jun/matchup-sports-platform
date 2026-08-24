@@ -59,11 +59,11 @@ export const OG_CARD_SIZE = { width: 1200, height: 630 } as const;
 
 /** 등급색. 화면 카드(`globals.css`)와 같은 값을 쓴다 -- 링크 미리보기와 실제 화면이 달라 보이면 안 된다. */
 export const OG_TIER: Record<V1PlayerCard['tier'], { label: string; ring: string; glow: string }> = {
-  bronze: { label: '브론즈', ring: 'rgba(197, 132, 74, 0.55)', glow: 'rgba(197, 132, 74, 0.34)' },
-  silver: { label: '실버', ring: 'rgba(176, 184, 193, 0.6)', glow: 'rgba(176, 184, 193, 0.34)' },
-  gold: { label: '골드', ring: 'rgba(255, 195, 66, 0.62)', glow: 'rgba(255, 195, 66, 0.36)' },
-  legend: { label: '레전드', ring: 'rgba(246, 231, 174, 0.72)', glow: 'rgba(201, 162, 39, 0.4)' },
-  special: { label: '스페셜', ring: 'rgba(49, 130, 246, 0.7)', glow: 'rgba(49, 130, 246, 0.42)' },
+  bronze: { label: '브론즈', ring: 'rgba(224, 171, 114, 0.6)', glow: 'rgba(224, 171, 114, 0.35)' },
+  silver: { label: '실버', ring: 'rgba(242, 246, 251, 0.62)', glow: 'rgba(205, 220, 240, 0.35)' },
+  gold: { label: '골드', ring: 'rgba(217, 168, 50, 0.66)', glow: 'rgba(255, 205, 90, 0.4)' },
+  legend: { label: '레전드', ring: 'rgba(201, 162, 39, 0.7)', glow: 'rgba(226, 196, 110, 0.45)' },
+  special: { label: '스페셜', ring: 'rgba(77, 157, 255, 0.72)', glow: 'rgba(95, 165, 255, 0.5)' },
 };
 
 export const OG_POSITION_LABEL: Record<string, string> = {

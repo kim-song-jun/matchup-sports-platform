@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { PlayerCard } from './player-card';
 import type { V1PlayerCard, V1PlayerCardStat } from '@/types/api';
 
@@ -83,7 +83,8 @@ describe('선수 카드', () => {
     renderCard(card({ tier: 'bronze', appearances: 2 }));
 
     expect(screen.getByText('등급은 실력이 아니라 뛴 경기 수로 올라가요')).toBeInTheDocument();
-    expect(screen.getByText(/브론즈/)).toBeInTheDocument();
+    // 티어 한글 이름은 카드 아래 요약 줄과 뒷면 성향 태그 양쪽에 나온다.
+    expect(screen.getAllByText(/브론즈/).length).toBeGreaterThan(0);
   });
 
   it('다음에 무엇을 하면 열리는지 한 가지만 안내한다', () => {
@@ -115,6 +116,32 @@ describe('선수 카드', () => {
 
     expect(screen.getByText('첫 경기를 뛰면 기록이 쌓이기 시작해요')).toBeInTheDocument();
     expect(screen.queryByText(/더 뛰면/)).not.toBeInTheDocument();
+  });
+
+  it('티어와 형태를 data 속성으로 내보내 CSS 가 형태·재질을 그리게 한다', () => {
+    // 실루엣·재질·엠블럼은 전부 globals.css 의 [data-tier][data-shape] 규칙이 그린다.
+    // 이 속성이 빠지면 다섯 티어가 전부 같은 카드로 보인다 -- 화면에서만 드러나는 종류라 여기서 잡는다.
+    const { container } = renderCard(card({ tier: 'gold', shape: 'shield' }));
+    const root = container.querySelector('.tm-player-card');
+
+    expect(root?.getAttribute('data-tier')).toBe('gold');
+    expect(root?.getAttribute('data-shape')).toBe('shield');
+  });
+
+  it('카드를 뒤집으면 숫자의 근거(산식·잠금 사유)가 보인다', () => {
+    renderCard(card());
+
+    // 처음엔 앞면 -- 뒷면은 보조기기에서 숨겨져 있다.
+    const back = document.querySelector('.tm-pcard-side[data-side="back"]');
+    expect(back?.getAttribute('aria-hidden')).toBe('true');
+
+    fireEvent.click(screen.getByRole('button', { name: /카드 뒤집기/ }));
+
+    expect(back?.getAttribute('aria-hidden')).toBe('false');
+    // 뒷면이 산식을 실제로 말하는지 -- 헤더와 총점 규칙 문장으로 확인한다.
+    expect(screen.getByText(/어떤 선수인가/)).toBeInTheDocument();
+    expect(screen.getByText(/평균에서 빠져요/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /앞면 보기/ })).toBeInTheDocument();
   });
 
   describe('기록 공개 유도', () => {

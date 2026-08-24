@@ -6762,114 +6762,547 @@ button:disabled {
   .tm-review-player-summary::after { transition: none; }
 }
 
+/* ── 선수 카드 (Task 155 — 티어별 형태·재질·엠블럼·뒷면) ─────────────────
+   사용자 확정 목업(카드 티어 스타일 아티팩트)을 그대로 옮긴 것이다. 구조 요약:
 
-/* ── 선수 카드 (Task 155) ────────────────────────────────────────────────
-   FIFA 카드 형태. 등급색은 테두리와 상단 글로우로만 쓴다 — 배경 전체를 등급색으로
-   칠하면 브론즈 카드가 초라해져 "안 쓰고 싶은 카드"가 된다.
-   카드 자체는 라이트/다크 양쪽에서 항상 어두운 배경이다(등급색 대비 확보). */
-/* 카드 모양(코스메틱, Task 155). 기본은 네모이고 방패는 후기 10건 업적으로 열린다.
-   컴포넌트는 data-shape 만 내보내고 실제 형태는 여기서 그린다 -- 새 모양을 더할 때
-   CSS 한 곳만 고치면 된다.
+   .tm-player-card                → 레이아웃 래퍼(클립 없음). data-tier / data-shape /
+                                    data-flipped 를 여기서만 내보내고 형태는 전부 CSS 가 그린다.
+   .tm-pcard-scene > .tm-pcard-flip → 원근 + 뒤집기(앞/뒷면 preserve-3d).
+   .tm-pcard-frame                → 기울기·발광의 대상. **테두리는 border 가 아니라
+                                    ::before(바깥으로 3px 키운 같은 도형)** 이다 --
+                                    clip-path 는 border 를 잘라내고, 안쪽 상자를 4px 줄이는
+                                    방식은 % 폴리곤에서 가로/세로가 다른 비율로 줄어
+                                    대각선·곡선 모서리의 테두리가 사라진다(실측).
+   .tm-pcard-face                 → 실루엣으로 잘린 카드 면. 재질(::before) + 광택
+                                    스윕(::after) + 티어 장식(.tm-pcard-fx)이 겹친다.
 
-   모서리를 %가 아니라 px 로 자르는 이유: 카드가 정사각형이 아니라 가로 7%와 세로 7%의
-   실제 길이가 다르다. %로 두면 테두리(바깥으로 키운 같은 도형)와 안쪽 면의 대각선이
-   겹쳐 **잘린 모서리에만 테두리가 사라진다**. */
-.tm-player-card[data-shape='rect'] {
-  clip-path: polygon(
-    0 22px, 22px 0, calc(100% - 22px) 0, 100% 22px,
-    100% calc(100% - 10px), calc(100% - 10px) 100%, 10px 100%, 0 calc(100% - 10px)
-  );
+   티어 토큰(--tm-rim/--tm-facefill/--tm-ink…)은 루트 data-tier 에서 한 번만 정해지고
+   앞면·뒷면·글레어가 전부 그 토큰을 읽는다. 글자색 대비는 목업에서 픽셀 실측으로
+   보정된 값이다(밝은 금속은 어두운 글자 -- 흰 글자로는 4.5:1 을 못 넘겼다). */
+
+/* 숫자 전용 서체. FIFA 카드의 인상은 콘덴스드 숫자에서 나온다 -- latin 서브셋만
+   동봉했으므로 한글·기호는 Pretendard 로 자연 폴백된다. */
+@font-face {
+  font-family: 'Saira Condensed';
+  src: url('/fonts/SairaCondensed-Bold.woff2') format('woff2');
+  font-style: normal; font-weight: 700; font-display: swap;
+  unicode-range: U+0000-00FF;
 }
-.tm-player-card[data-shape='shield'] {
-  clip-path: polygon(
-    50% 0, 78% 2%, 92% 7%, 100% 15%,
-    100% 85%, 50% 100%, 0 85%,
-    0 15%, 8% 7%, 22% 2%
-  );
+@font-face {
+  font-family: 'Saira Condensed';
+  src: url('/fonts/SairaCondensed-ExtraBold.woff2') format('woff2');
+  font-style: normal; font-weight: 800; font-display: swap;
+  unicode-range: U+0000-00FF;
 }
 
 .tm-player-card {
-  position: relative;
-  border-radius: 18px;
-  padding: 18px 18px 16px;
-  overflow: hidden;
-  color: var(--static-white);
-  border: 1px solid var(--tm-card-ring, rgba(255, 255, 255, 0.12));
-  background:
-    radial-gradient(120% 90% at 78% 4%, var(--tm-card-glow, rgba(49, 130, 246, 0.36)) 0%, rgba(0, 0, 0, 0) 58%),
-    linear-gradient(168deg, #20252e 0%, #141821 62%, #0f1319 100%);
-}
-.tm-player-card-top { display: flex; gap: 16px; align-items: flex-start; }
-.tm-player-card-ovr { text-align: center; min-width: 72px; }
-.tm-player-card-ovr-value {
-  font-size: 52px; font-weight: 800; line-height: 0.92;
-  letter-spacing: -0.02em; font-variant-numeric: tabular-nums;
-}
-/* 아직 총점이 없는 카드. 52px 숫자 자리에 "NEW" 를 그대로 넣으면 글자가 카드를 넘친다 --
-   크기를 줄이고 톤을 낮춰 "값이 없다"는 사실이 조용히 읽히게 한다. */
-.tm-player-card-ovr-value[data-empty='true'] {
-  font-size: 24px;
-  letter-spacing: 0.06em;
-  color: rgba(255, 255, 255, 0.62);
+  --tm-num: 'Saira Condensed', 'Pretendard Variable', Pretendard, sans-serif;
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
 }
 
-.tm-player-card-ovr-rule { height: 1px; background: rgba(255, 255, 255, 0.22); margin: 8px 4px; }
-.tm-player-card-ovr-pos { font-size: 14px; font-weight: 800; letter-spacing: 0.1em; color: var(--yellow500); }
-.tm-player-card-photo { margin-left: auto; }
-.tm-player-card-photo-img,
-.tm-player-card-photo-fallback {
-  width: 92px; height: 92px; border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+/* ── 형태 두 벌 × 티어 5단계 실루엣 ──
+   방패(shield)는 실제 FUT 카드 알파 채널에서 추출한 윤곽(등급마다 돔이 높아진다),
+   네모(rect)는 FO4 풍 각진 모서리(등급이 오를수록 더 크게 깎는다).
+   네모의 모서리를 %가 아니라 px 로 자르는 이유: 카드가 정사각형이 아니라 %로 두면
+   테두리(바깥으로 키운 같은 도형)와 안쪽 면의 대각선이 겹쳐 모서리 테두리가 사라진다. */
+.tm-player-card[data-shape='shield'][data-tier='bronze'] { --tm-silhouette: polygon(33.5% 3%, 26.9% 4%, 21.7% 5%, 17.8% 6%, 15.2% 7%, 14.3% 10%, 13.3% 11%, 12.0% 12%, 10.2% 13%, 7.0% 14%, 3.9% 15%, 4.8% 85%, 5.9% 86%, 8.0% 87%, 11.3% 88%, 16.1% 89%, 21.3% 90%, 25.9% 91%, 30.4% 92%, 34.3% 93%, 38.0% 94%, 41.7% 95%, 44.4% 96%, 46.9% 97%, 48.7% 98%, 50.0% 99.5%, 50.9% 98%, 52.8% 97%, 55.2% 96%, 58.0% 95%, 61.7% 94%, 65.4% 93%, 69.3% 92%, 73.5% 91%, 78.0% 90%, 83.1% 89%, 88.0% 88%, 91.7% 87%, 93.7% 86%, 94.8% 85%, 95.6% 15%, 92.6% 14%, 89.4% 13%, 87.6% 12%, 86.3% 11%, 85.4% 10%, 84.3% 7%, 81.7% 6%, 77.8% 5%, 72.6% 4%, 65.9% 3%); }
+.tm-player-card[data-shape='shield'][data-tier='silver'] { --tm-silhouette: polygon(33.5% 3%, 26.9% 4%, 21.7% 5%, 17.8% 6%, 15.4% 7%, 14.3% 10%, 13.3% 11%, 12.0% 12%, 10.2% 13%, 7.0% 14%, 3.9% 15%, 4.8% 85%, 5.9% 86%, 8.0% 87%, 11.1% 88%, 16.1% 89%, 21.3% 90%, 25.9% 91%, 30.2% 92%, 34.3% 93%, 37.8% 94%, 41.7% 95%, 44.4% 96%, 46.9% 97%, 48.7% 98%, 50.0% 99.5%, 50.9% 98%, 52.8% 97%, 55.2% 96%, 58.0% 95%, 61.7% 94%, 65.4% 93%, 69.3% 92%, 73.5% 91%, 78.0% 90%, 83.1% 89%, 88.0% 88%, 91.7% 87%, 93.7% 86%, 94.8% 85%, 95.6% 15%, 92.4% 14%, 89.3% 13%, 87.4% 12%, 86.3% 11%, 85.4% 10%, 84.3% 7%, 81.7% 6%, 77.8% 5%, 72.6% 4%, 65.9% 3%); }
+.tm-player-card[data-shape='shield'][data-tier='gold'] { --tm-silhouette: polygon(42.0% 2%, 30.7% 3%, 25.4% 4%, 21.1% 5%, 17.8% 6%, 15.2% 7%, 14.1% 10%, 13.1% 11%, 11.9% 12%, 10.2% 13%, 7.0% 14%, 3.7% 15%, 4.8% 85%, 5.9% 86%, 8.0% 87%, 11.1% 88%, 16.1% 89%, 21.3% 90%, 25.7% 91%, 30.2% 92%, 34.3% 93%, 37.8% 94%, 41.7% 95%, 44.4% 96%, 46.9% 97%, 48.7% 98%, 50.0% 99.5%, 50.9% 98%, 52.8% 97%, 55.2% 96%, 58.0% 95%, 61.7% 94%, 65.4% 93%, 69.3% 92%, 73.7% 91%, 78.0% 90%, 83.1% 89%, 88.1% 88%, 91.7% 87%, 93.9% 86%, 95.0% 85%, 95.7% 15%, 92.6% 14%, 89.4% 13%, 87.6% 12%, 86.3% 11%, 85.4% 10%, 84.3% 7%, 81.9% 6%, 78.0% 5%, 72.6% 4%, 66.1% 3%, 51.7% 2%); }
+.tm-player-card[data-shape='shield'][data-tier='legend'] { --tm-silhouette: polygon(49.6% 1%, 48.5% 2%, 32.8% 3%, 29.6% 4%, 26.7% 5%, 24.4% 6%, 22.4% 7%, 20.6% 8%, 18.5% 9%, 16.3% 10%, 14.4% 11%, 12.2% 12%, 9.6% 13%, 5.4% 14%, 3.7% 15%, 4.8% 85%, 5.9% 86%, 8.1% 87%, 11.9% 88%, 16.7% 89%, 21.9% 90%, 26.3% 91%, 30.6% 92%, 34.6% 93%, 38.1% 94%, 41.9% 95%, 44.6% 96%, 47.0% 97%, 48.9% 98%, 50.0% 99.5%, 50.7% 98%, 52.6% 97%, 54.8% 96%, 57.4% 95%, 61.1% 94%, 64.6% 93%, 68.5% 92%, 72.8% 91%, 77.0% 90%, 82.2% 89%, 87.0% 88%, 91.1% 87%, 93.3% 86%, 94.6% 85%, 95.7% 15%, 94.1% 14%, 89.8% 13%, 87.2% 12%, 85.2% 11%, 83.1% 10%, 80.9% 9%, 78.9% 8%, 77.0% 7%, 75.0% 6%, 72.6% 5%, 69.8% 4%, 66.5% 3%, 51.1% 2%, 50.0% 1%); }
+.tm-player-card[data-shape='shield'][data-tier='special'] { --tm-silhouette: polygon(49.6% 1%, 48.5% 2%, 32.8% 3%, 29.6% 4%, 26.7% 5%, 24.4% 6%, 22.4% 7%, 20.6% 8%, 18.5% 9%, 16.3% 10%, 14.4% 11%, 12.2% 12%, 9.6% 13%, 5.4% 14%, 3.7% 15%, 4.8% 85%, 5.9% 86%, 8.1% 87%, 11.9% 88%, 16.7% 89%, 21.9% 90%, 26.3% 91%, 30.6% 92%, 34.6% 93%, 38.1% 94%, 41.9% 95%, 44.6% 96%, 47.0% 97%, 48.9% 98%, 50.0% 99.5%, 50.7% 98%, 52.6% 97%, 54.8% 96%, 57.4% 95%, 61.1% 94%, 64.6% 93%, 68.5% 92%, 72.8% 91%, 77.0% 90%, 82.2% 89%, 87.0% 88%, 91.1% 87%, 93.3% 86%, 94.6% 85%, 95.7% 15%, 94.1% 14%, 89.8% 13%, 87.2% 12%, 85.2% 11%, 83.1% 10%, 80.9% 9%, 78.9% 8%, 77.0% 7%, 75.0% 6%, 72.6% 5%, 69.8% 4%, 66.5% 3%, 51.1% 2%, 50.0% 1%); }
+.tm-player-card[data-shape='rect'][data-tier='bronze'] { --tm-silhouette: polygon(0px 14px, 14px 0px, calc(100% - 14px) 0px, 100% 14px, 100% calc(100% - 8px), calc(100% - 8px) 100%, 8px 100%, 0px calc(100% - 8px)); }
+.tm-player-card[data-shape='rect'][data-tier='silver'] { --tm-silhouette: polygon(0px 18px, 18px 0px, calc(100% - 18px) 0px, 100% 18px, 100% calc(100% - 9px), calc(100% - 9px) 100%, 9px 100%, 0px calc(100% - 9px)); }
+.tm-player-card[data-shape='rect'][data-tier='gold'] { --tm-silhouette: polygon(0px 22px, 22px 0px, calc(100% - 22px) 0px, 100% 22px, 100% calc(100% - 10px), calc(100% - 10px) 100%, 10px 100%, 0px calc(100% - 10px)); }
+.tm-player-card[data-shape='rect'][data-tier='legend'] { --tm-silhouette: polygon(0px 27px, 27px 0px, calc(100% - 27px) 0px, 100% 27px, 100% calc(100% - 11px), calc(100% - 11px) 100%, 11px 100%, 0px calc(100% - 11px)); }
+.tm-player-card[data-shape='rect'][data-tier='special'] { --tm-silhouette: polygon(0px 33px, 33px 0px, calc(100% - 33px) 0px, 100% 33px, 100% calc(100% - 12px), calc(100% - 12px) 100%, 12px 100%, 0px calc(100% - 12px)); }
+
+/* ── 씬·뒤집기 ── */
+.tm-pcard-scene { perspective: 1100px; width: 280px; }
+.tm-pcard-flip {
+  position: relative; width: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.72s cubic-bezier(0.3, 0.85, 0.25, 1);
+}
+.tm-player-card[data-flipped='true'] .tm-pcard-flip { transform: rotateY(180deg); }
+.tm-pcard-side { backface-visibility: hidden; }
+.tm-pcard-side[data-side='back'] { position: absolute; inset: 0; transform: rotateY(180deg); }
+
+/* ── 프레임 = 기울기 + 림 ── */
+.tm-pcard-frame {
+  width: 280px; position: relative;
+  /* 기울기 변수는 .tm-pcard-scene 이 소유한다(포인터 핸들러가 거기 붙는다) --
+     frame 이 직접 선언하면 상속이 막혀 기울기가 전달되지 않는다. */
+  transform: translateY(var(--lift, 0px)) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1), filter 0.45s ease;
+  animation: tmCardRise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  filter: drop-shadow(0 16px 30px rgba(0, 0, 0, 0.55));
+}
+/* 형태마다 위·아래로 먹는 양이 다르다 -- 돔은 크게, 네모는 조금. 여백·높이도 형태를 따른다.
+   퍼센트 패딩은 위아래도 가로 기준으로 계산돼 실루엣과 어긋나므로 px 로 못 박는다. */
+.tm-player-card[data-shape='shield'] .tm-pcard-frame { height: 488px; --tm-pad: 48px 16px 64px; }
+.tm-player-card[data-shape='rect'] .tm-pcard-frame { height: 424px; --tm-pad: 26px 16px 24px; }
+.tm-pcard-frame::before {
+  content: ''; position: absolute; inset: -3px; z-index: 0;
+  clip-path: var(--tm-silhouette);
+  background: var(--tm-rim);
+  pointer-events: none;
+}
+.tm-pcard-scene[data-active='true'] .tm-pcard-frame { transition-duration: 0.08s; }
+.tm-pcard-scene[data-press='true'] .tm-pcard-frame { --lift: -2px; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.5)); }
+@keyframes tmCardRise { from { opacity: 0; transform: translateY(22px) scale(0.97); } to { opacity: 1; } }
+
+/* 글레어 -- 포인터를 따라 움직이는 반사광. 부드러운 원 하나로는 "빛이 닿았다" 수준에
+   그친다. 실물은 날카로운 대각 줄무늬가 함께 지나가고 screen 으로 합성돼 유리처럼 읽힌다. */
+.tm-pcard-glare {
+  position: absolute; inset: 0; z-index: 3; pointer-events: none;
+  clip-path: var(--tm-silhouette);
+  background:
+    linear-gradient(115deg,
+      transparent calc(var(--gx, 50%) - 22%),
+      rgba(255, 255, 255, 0.06) calc(var(--gx, 50%) - 9%),
+      rgba(255, 255, 255, 0.26) var(--gx, 50%),
+      rgba(255, 255, 255, 0.07) calc(var(--gx, 50%) + 9%),
+      transparent calc(var(--gx, 50%) + 20%)),
+    radial-gradient(120% 90% at var(--gx, 50%) var(--gy, 50%), rgba(255, 255, 255, 0.12), transparent 60%);
+  mix-blend-mode: screen;
+  opacity: 0; transition: opacity 0.3s ease;
+}
+.tm-pcard-scene[data-active='true'] .tm-pcard-glare { opacity: 1; }
+/* 손가락 조작 기기에서는 기울기가 오히려 방해다 -- 누름 반응만 남긴다. */
+@media (hover: none) {
+  .tm-pcard-scene { --rx: 0deg !important; --ry: 0deg !important; }
+  .tm-pcard-glare { display: none; }
+}
+
+/* ── 카드 면 ── */
+.tm-pcard-face {
+  width: 100%; height: 100%; position: relative; z-index: 1;
+  clip-path: var(--tm-silhouette);
+  background: var(--tm-facefill);
+  color: var(--tm-ink);
+  overflow: hidden;
+  display: flex; flex-direction: column;
+  padding: var(--tm-pad);
+}
+/* 재질 = 한 겹으로 안 된다. 넓은 반사 + 미세 빗살을 겹쳐야 금속으로 읽힌다. */
+.tm-pcard-face::before {
+  content: ''; position: absolute; inset: -20%;
+  background:
+    linear-gradient(158deg,
+      rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.05) 26%,
+      rgba(0, 0, 0, 0.02) 58%, rgba(0, 0, 0, 0.1) 100%),
+    repeating-linear-gradient(104deg,
+      rgba(255, 255, 255, 0.1) 0 1px, rgba(255, 255, 255, 0) 1px 6px);
+  mix-blend-mode: overlay; pointer-events: none;
+}
+/* 광택 스윕 -- 넓은 반사 옆에 가는 하이라이트를 붙여 두 줄이 함께 지나가야 포일로 보인다. */
+.tm-pcard-face::after {
+  content: ''; position: absolute; top: -60%; left: -85%;
+  width: 62%; height: 240%;
+  background: linear-gradient(90deg,
+    rgba(255, 255, 255, 0) 0%, var(--tm-sheen) 38%,
+    rgba(255, 255, 255, 0.55) 50%, var(--tm-sheen) 62%, rgba(255, 255, 255, 0) 100%);
+  transform: rotate(18deg);
+  animation: tmCardSweep 5.6s ease-in-out infinite;
+  animation-delay: var(--tm-sweep-delay, 0s);
+  pointer-events: none; z-index: 2;
+}
+@keyframes tmCardSweep { 0%, 62% { left: -80%; } 88%, 100% { left: 160%; } }
+/* 각인된 브랜드 마크 -- 색을 칠하지 않고 마스크로 뚫어 티어 잉크색을 그대로 쓴다. */
+.tm-pcard-crest-bg {
+  position: absolute; right: -26px; top: -16px;
+  width: 150px; height: 150px;
+  background: var(--tm-ink);
+  -webkit-mask: url('/brand/teameet-mark.png') center / contain no-repeat;
+  mask: url('/brand/teameet-mark.png') center / contain no-repeat;
+  opacity: 0.1; pointer-events: none; z-index: 0;
+}
+.tm-pcard-fx { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
+
+/* ── 앞면 콘텐츠 ── */
+.tm-player-card-top { display: flex; gap: 10px; align-items: flex-start; position: relative; z-index: 1; }
+.tm-player-card-ovr { text-align: center; min-width: 52px; margin-left: 4px; }
+.tm-player-card[data-shape='shield'] .tm-player-card-ovr { margin-left: 26px; }
+/* 레전드·스페셜 돔은 가장 가팔라 같은 높이에서 폭이 가장 좁다 -- 총점만 더 안쪽으로. */
+.tm-player-card[data-shape='shield'][data-tier='legend'] .tm-player-card-ovr,
+.tm-player-card[data-shape='shield'][data-tier='special'] .tm-player-card-ovr { margin-left: 42px; }
+.tm-player-card-ovr-value {
+  font-family: var(--tm-num);
+  font-size: 40px; font-weight: 800; line-height: 0.86;
+  letter-spacing: -0.01em; font-variant-numeric: tabular-nums;
+}
+/* 아직 총점이 없는 카드. 40px 숫자 자리에 "NEW" 를 그대로 넣으면 글자가 넘친다 --
+   크기를 줄이고 톤을 낮춰 "값이 없다"는 사실이 조용히 읽히게 한다. */
+.tm-player-card-ovr-value[data-empty='true'] {
+  font-size: 20px; letter-spacing: 0.06em; color: var(--tm-dim);
+}
+.tm-player-card-ovr-rule { height: 1px; background: var(--tm-rule); margin: 6px 4px 5px; }
+.tm-player-card-ovr-pos {
+  font-family: var(--tm-num);
+  font-size: 13px; font-weight: 800; letter-spacing: 0.18em; color: var(--tm-ink);
+}
+.tm-pcard-tier-tag {
+  margin-top: 3px; font-family: var(--tm-num);
+  font-size: 9.5px; font-weight: 800; letter-spacing: 0.16em; color: var(--tm-dim);
+}
+/* 배지 열 -- 실제 FUT 카드에서 등급·희귀도 표식이 앉는 자리. 엠블럼(티어 배지)이
+   머리, 그 아래 브랜드 마크. 이 스택이 없으면 아무리 색을 맞춰도 피파로 안 읽힌다. */
+.tm-pcard-badges { display: flex; flex-direction: column; align-items: center; gap: 2px; margin-top: 4px; }
+.tm-pcard-crest {
+  width: 38px; height: 38px;
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.45));
+  animation: tmCrestBreathe 3.8s ease-in-out infinite;
+}
+.tm-pcard-crest svg { display: block; width: 100%; height: 100%; }
+@keyframes tmCrestBreathe { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.5px); } }
+.tm-pcard-badge {
+  width: 19px; height: 19px; border-radius: 4px;
+  display: grid; place-items: center;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--tm-rim-line);
+}
+.tm-pcard-badge-mark {
+  width: 13px; height: 13px; background: var(--tm-ink);
+  -webkit-mask: url('/brand/teameet-mark.png') center / contain no-repeat;
+  mask: url('/brand/teameet-mark.png') center / contain no-repeat;
+}
+
+/* 선수 렌더 -- 원형 아바타가 아니라 아래가 잘려 사라지는 큰 컷아웃. 프레임 위로 걸친다. */
+.tm-pcard-render {
+  position: absolute; right: 8px; top: 26px; width: 138px; height: 140px;
+  display: flex; align-items: flex-end; justify-content: center; z-index: 1;
+}
+.tm-player-card[data-shape='shield'] .tm-pcard-render { top: 48px; }
+.tm-pcard-render-img {
+  width: 100%; height: 100%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.03));
+  -webkit-mask: linear-gradient(180deg, #000 74%, rgba(0, 0, 0, 0) 100%);
+  mask: linear-gradient(180deg, #000 74%, rgba(0, 0, 0, 0) 100%);
+  display: grid; place-items: end center;
+  font-size: 54px; font-weight: 800; color: var(--tm-ink);
+  opacity: 0.95; padding-bottom: 8px;
+}
+.tm-pcard-render-photo {
+  width: 100%; height: 100%;
   background-size: cover; background-position: center top;
+  -webkit-mask: linear-gradient(180deg, #000 74%, rgba(0, 0, 0, 0) 100%);
+  mask: linear-gradient(180deg, #000 74%, rgba(0, 0, 0, 0) 100%);
 }
-.tm-player-card-photo-fallback {
-  display: flex; align-items: center; justify-content: center;
-  font-size: 34px; font-weight: 800; color: rgba(255, 255, 255, 0.5);
-  background: rgba(255, 255, 255, 0.08);
+
+/* 이름 줄 -- 실물은 이름 아래에만 헤어라인이 있다. 위아래를 다 그으면 표처럼 보인다. */
+.tm-player-card-name {
+  margin-top: 2px; position: relative; z-index: 2;
+  display: flex; align-items: baseline; justify-content: center; gap: 7px;
+  padding-bottom: 6px; border-bottom: 1px solid var(--tm-rule);
+  font-size: 19px; font-weight: 800; letter-spacing: -0.01em; line-height: 1.1;
 }
-.tm-player-card-id { margin-top: 12px; }
-.tm-player-card-name { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.25; }
-.tm-player-card-sub { font-size: 13px; color: rgba(255, 255, 255, 0.68); margin-top: 3px; }
-.tm-player-card-club {
-  display: inline-block; margin-top: 9px; padding: 4px 10px; border-radius: 999px;
-  font-size: 12px; font-weight: 700;
-  background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.14);
+/* 등번호는 이름과 같은 줄에. 왼쪽 큰 숫자가 총점이라 no. 를 붙여야 둘이 안 헷갈린다. */
+.tm-player-card-jersey { display: inline-flex; align-items: baseline; gap: 2px; }
+.tm-pcard-no-lbl {
+  font-family: var(--tm-num); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.06em; color: var(--tm-dim);
 }
+.tm-pcard-no-num {
+  font-family: var(--tm-num); font-size: 21px; font-weight: 800;
+  letter-spacing: -0.01em; color: var(--tm-dim);
+}
+
+/* 능력치 -- gitfut/FUT 실물은 값 + 3글자 코드뿐이다. 한글 뜻은 뒷면에서 푼다. */
 .tm-player-card-stats {
-  margin-top: 15px; padding-top: 14px;
-  border-top: 1px solid rgba(255, 255, 255, 0.14);
-  display: grid; grid-template-columns: 1fr 1fr; gap: 10px 18px;
+  margin-top: 11px; position: relative; z-index: 1;
+  display: grid; grid-template-columns: 1fr 1px 1fr;
+  column-gap: 11px; row-gap: 4px; align-items: center;
 }
-.tm-player-card-stat { display: flex; align-items: center; gap: 9px; }
+.tm-pcard-stats-div { grid-row: span 3; width: 1px; height: 100%; background: var(--tm-rule); }
+.tm-player-card-stat { display: flex; align-items: baseline; gap: 8px; }
 .tm-player-card-stat-value {
-  display: inline-flex; align-items: center; justify-content: center;
-  min-width: 30px; font-size: 20px; font-weight: 800;
-  font-variant-numeric: tabular-nums; color: var(--static-white);
+  font-family: var(--tm-num); font-size: 19px; font-weight: 800;
+  min-width: 25px; letter-spacing: -0.01em; text-align: right;
+  display: inline-flex; align-items: center; justify-content: flex-end;
+  font-variant-numeric: tabular-nums;
 }
-.tm-player-card-stat[data-locked='true'] .tm-player-card-stat-value { color: rgba(255, 255, 255, 0.38); }
-.tm-player-card-stat-meta { display: flex; flex-direction: column; line-height: 1.3; }
 .tm-player-card-stat-code {
-  font-size: 11px; font-weight: 800; letter-spacing: 0.07em; color: rgba(255, 255, 255, 0.52);
+  font-family: var(--tm-num); font-size: 14px; font-weight: 600;
+  letter-spacing: 0.04em; color: var(--tm-dim);
 }
-.tm-player-card-stat-label { font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.82); }
-.tm-player-card-stat[data-locked='true'] .tm-player-card-stat-label { color: rgba(255, 255, 255, 0.44); }
-.tm-player-card-tier-note {
-  margin-top: 12px; font-size: 11px; color: rgba(255, 255, 255, 0.5);
+.tm-player-card-stat[data-locked='true'] .tm-player-card-stat-value,
+.tm-player-card-stat[data-locked='true'] .tm-player-card-stat-code { color: var(--tm-lock); }
+
+/* 발치 -- 팀 · 경기수 한 줄, 브랜드는 그 아래 눕힌다(알약 배지로 두면 카드의 주인이
+   팀밋인 것처럼 보인다). */
+.tm-pcard-meta {
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  margin-top: auto; padding-top: 6px; position: relative; z-index: 1;
+  border-top: 1px solid var(--tm-rule);
+  width: 72%; margin-left: auto; margin-right: auto;
+  font-size: 10.5px; font-weight: 700; color: var(--tm-ink);
 }
+.tm-pcard-meta-line { display: flex; align-items: center; gap: 7px; min-width: 0; letter-spacing: 0.01em; }
+.tm-pcard-meta-line b { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tm-pcard-meta-line i { width: 3px; height: 3px; border-radius: 999px; background: currentColor; flex: none; }
+.tm-pcard-meta-line span { font-family: var(--tm-num); letter-spacing: 0.04em; flex: none; }
+.tm-pcard-brand {
+  display: inline-flex; align-items: center; gap: 4px; opacity: 0.62;
+  font-family: var(--tm-num); font-size: 9px; font-weight: 800; letter-spacing: 0.18em;
+}
+.tm-pcard-brand em {
+  width: 11px; height: 11px; font-style: normal; display: block;
+  background: currentColor;
+  -webkit-mask: url('/brand/teameet-mark.png') center / contain no-repeat;
+  mask: url('/brand/teameet-mark.png') center / contain no-repeat;
+}
+
+/* ── 티어 토큰 ── 실루엣 + 재질 + 엠블럼이 한 세트로 움직인다.
+   명도 폭을 좁게 유지한다 -- 넓히면 같은 글자색이 위에서는 읽히고 아래에서는 안 읽힌다.
+   밝은 금속(실버·골드·레전드)은 글자를 어둡게 뒤집는다(흰 글자로는 4.5:1 을 못 넘겼다). */
+.tm-player-card[data-tier='bronze'] {
+  --tm-rim: linear-gradient(160deg, #e0ab72, #8a5a30 46%, #4a2c15);
+  --tm-rim-line: rgba(240, 200, 160, 0.45);
+  --tm-facefill: linear-gradient(163deg, #6e4423 0%, #5a3619 34%, #3c2210 74%, #2a170a 100%);
+  --tm-rule: rgba(255, 224, 196, 0.34);
+  --tm-ink: #fff5ec;
+  --tm-dim: rgba(255, 240, 226, 0.88);
+  --tm-lock: rgba(255, 240, 226, 0.62);
+  --tm-sheen: rgba(255, 214, 170, 0.16);
+  --tm-back-accent: #e0ab72;
+  --tm-sweep-delay: 0s;
+}
+.tm-player-card[data-tier='silver'] {
+  --tm-rim: linear-gradient(160deg, #f2f6fb, #93a0b1 48%, #4c5563);
+  --tm-rim-line: rgba(60, 70, 84, 0.4);
+  --tm-facefill: linear-gradient(163deg, #eef2f7 0%, #d5dbe3 32%, #bcc5d0 70%, #a9b4c2 100%);
+  --tm-rule: rgba(40, 46, 55, 0.34);
+  --tm-ink: #1f242b;
+  --tm-dim: rgba(31, 36, 43, 0.9);
+  --tm-lock: rgba(31, 36, 43, 0.78);
+  --tm-sheen: rgba(255, 255, 255, 0.4);
+  --tm-back-accent: #c9d4e2;
+  --tm-sweep-delay: 0.5s;
+}
+.tm-player-card[data-tier='gold'] {
+  --tm-rim: linear-gradient(160deg, #fff0bd, #d9a832 46%, #7a5510);
+  --tm-rim-line: rgba(122, 85, 16, 0.5);
+  --tm-facefill: linear-gradient(163deg, #ffe9a6 0%, #f0cd6a 32%, #dcae3f 70%, #c99a2f 100%);
+  --tm-rule: rgba(74, 51, 7, 0.42);
+  --tm-ink: #2a1d04;
+  --tm-dim: rgba(48, 33, 4, 0.88);
+  --tm-lock: rgba(48, 33, 4, 0.62);
+  --tm-sheen: rgba(255, 255, 255, 0.34);
+  --tm-back-accent: #f0cd6a;
+  --tm-sweep-delay: 1s;
+}
+/* 레전드 = 실제 Icon 카드 컨셉: 크림색 바탕 + 얇은 금색 이중 테두리 + 상단 메달.
+   최상위 두 등급이 둘 다 금색이면 30경기와 100경기가 구분되지 않는다 -- 레전드는
+   정갈함(크림+금), 스페셜은 화려함(남색+청색 광휘)으로 갈라진다. */
+.tm-player-card[data-tier='legend'] {
+  --tm-rim: linear-gradient(160deg, #f6e7ae, #c9a227 46%, #7a5f14);
+  --tm-rim-line: rgba(122, 95, 20, 0.45);
+  --tm-facefill: linear-gradient(168deg, #fbf8ee 0%, #f2ecdb 38%, #e2d8bd 72%, #d3c7a4 100%);
+  --tm-rule: rgba(96, 76, 22, 0.38);
+  --tm-ink: #3f3517;
+  --tm-dim: rgba(70, 58, 22, 0.88);
+  --tm-lock: rgba(70, 58, 22, 0.6);
+  --tm-sheen: rgba(255, 255, 255, 0.42);
+  --tm-back-accent: #e8d9a8;
+  --tm-sweep-delay: 1.6s;
+}
+.tm-player-card[data-tier='special'] {
+  --tm-rim: linear-gradient(160deg, #f6e7ae 0%, #cfe8ff 26%, #4d9dff 58%, #10305e 100%);
+  --tm-rim-line: rgba(150, 205, 255, 0.55);
+  --tm-facefill:
+    radial-gradient(120% 62% at 50% 0%, rgba(96, 170, 255, 0.42), rgba(0, 0, 0, 0) 62%),
+    linear-gradient(180deg, rgba(10, 18, 34, 0) 0 34%, #0a1222 44% 100%),
+    linear-gradient(90deg, rgba(120, 190, 255, 0) 30%, rgba(120, 190, 255, 0.3) 50%, rgba(120, 190, 255, 0) 70%),
+    linear-gradient(163deg, #16294a 0%, #0c1730 46%, #04070e 100%);
+  --tm-rule: rgba(160, 205, 255, 0.4);
+  --tm-ink: #f2f8ff;
+  --tm-dim: rgba(206, 228, 255, 0.9);
+  --tm-lock: rgba(206, 228, 255, 0.62);
+  --tm-sheen: rgba(170, 215, 255, 0.36);
+  --tm-back-accent: #8fc2ff;
+  --tm-sweep-delay: 2.2s;
+}
+
+/* ── 티어별 장식 -- 브론즈는 아무것도 없다. 위로 갈수록 하나씩 얹혀 "올라간 게 보이게". ── */
+.tm-player-card[data-tier='bronze'] .tm-pcard-fx {
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.05) 0 55%, rgba(255, 255, 255, 0.04) 55% 100%);
+}
+.tm-player-card[data-tier='bronze'] .tm-pcard-frame { filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.5)); }
+.tm-player-card[data-tier='bronze'] .tm-pcard-face::after { animation: none; opacity: 0; }
+.tm-player-card[data-tier='bronze'] .tm-pcard-crest { animation: none; }
+
+.tm-player-card[data-tier='silver'] .tm-pcard-fx {
+  background:
+    radial-gradient(66% 42% at 50% 24%, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0) 72%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.06) 0 55%, rgba(255, 255, 255, 0.07) 55% 100%);
+}
+.tm-player-card[data-tier='silver'] .tm-pcard-frame {
+  filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 12px rgba(205, 220, 240, 0.28));
+}
+.tm-player-card[data-tier='silver'] .tm-pcard-face::after { animation-duration: 7s; opacity: 0.8; }
+
+.tm-player-card[data-tier='gold'] .tm-pcard-fx {
+  background:
+    radial-gradient(20% 13% at 12% 12%, rgba(255, 244, 200, 0.7), rgba(255, 255, 255, 0) 72%),
+    radial-gradient(20% 13% at 88% 12%, rgba(255, 244, 200, 0.7), rgba(255, 255, 255, 0) 72%),
+    radial-gradient(60% 34% at 50% 2%, rgba(255, 248, 220, 0.5), rgba(255, 255, 255, 0) 76%),
+    linear-gradient(180deg, rgba(120, 82, 10, 0.1) 0 55%, rgba(255, 252, 230, 0.12) 55% 100%);
+}
+.tm-player-card[data-tier='gold'] .tm-pcard-face {
+  box-shadow: inset 0 0 0 1px rgba(255, 245, 205, 0.34), inset 0 2px 10px rgba(255, 240, 190, 0.22);
+}
+.tm-player-card[data-tier='gold'] .tm-pcard-frame {
+  animation: tmCardRise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both, tmGoldBreathe 5s ease-in-out infinite 1s;
+}
+@keyframes tmGoldBreathe {
+  0%, 100% { filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 14px rgba(255, 205, 90, 0.38)); }
+  50% { filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 22px rgba(255, 205, 90, 0.58)); }
+}
+.tm-player-card[data-tier='gold'] .tm-pcard-face::after { animation-duration: 5.5s; }
+
+/* 레전드: 이중 테두리 안쪽 선 + 상단 중앙 메달 -- 실물 Icon 카드의 서명 요소. */
+.tm-player-card[data-tier='legend'] .tm-pcard-fx {
+  background:
+    radial-gradient(circle at 50% 4.2%, rgba(201, 162, 39, 0.95) 0 5px,
+      rgba(255, 255, 255, 0.9) 5px 7px, rgba(201, 162, 39, 0.9) 7px 9px, rgba(0, 0, 0, 0) 9px),
+    radial-gradient(70% 32% at 50% 8%, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0) 72%);
+}
+.tm-player-card[data-tier='legend'] .tm-pcard-face {
+  box-shadow: inset 0 0 0 1px rgba(201, 162, 39, 0.55),
+    inset 0 0 0 6px rgba(251, 248, 238, 0.9),
+    inset 0 0 0 7px rgba(201, 162, 39, 0.45);
+}
+.tm-player-card[data-tier='legend'] .tm-pcard-frame {
+  animation: tmCardRise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both, tmLegendPulse 3.6s ease-in-out infinite 1s;
+}
+@keyframes tmLegendPulse {
+  0%, 100% { filter: drop-shadow(0 14px 28px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 20px rgba(226, 196, 110, 0.5)); }
+  50% { filter: drop-shadow(0 14px 28px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 36px rgba(226, 196, 110, 0.82)); }
+}
+.tm-player-card[data-tier='legend'] .tm-pcard-face::after { animation-duration: 4.2s; }
+.tm-player-card[data-tier='legend'] .tm-pcard-crest,
+.tm-player-card[data-tier='special'] .tm-pcard-crest {
+  animation: tmCrestBreathe 3.8s ease-in-out infinite, tmCrestGlint 6s ease-in-out infinite;
+}
+@keyframes tmCrestGlint {
+  0%, 82%, 100% { filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.45)); }
+  90% { filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.45)) drop-shadow(0 0 10px rgba(150, 210, 255, 0.9)); }
+}
+
+/* 스페셜: 조용한 오로라 + 이중 테두리. 오로라를 회전시키면 바람개비로 보인다 --
+   실제 오로라처럼 여러 빛덩이가 서로 다른 속도로 흐르게 한다(표류). */
+.tm-player-card[data-tier='special'] .tm-pcard-fx {
+  background:
+    radial-gradient(52% 30% at 22% 24%, rgba(120, 190, 255, 0.34), rgba(255, 255, 255, 0) 70%),
+    radial-gradient(48% 28% at 78% 32%, rgba(226, 196, 110, 0.26), rgba(255, 255, 255, 0) 72%);
+  background-size: 170% 170%, 150% 150%;
+  -webkit-mask: linear-gradient(180deg, #000 0 34%, rgba(0, 0, 0, 0) 46%);
+  mask: linear-gradient(180deg, #000 0 34%, rgba(0, 0, 0, 0) 46%);
+  animation: tmAuroraDrift 17s ease-in-out infinite alternate;
+}
+@keyframes tmAuroraDrift {
+  0% { background-position: 8% 22%, 88% 44%; }
+  50% { background-position: 34% 34%, 58% 24%; }
+  100% { background-position: 16% 10%, 80% 52%; }
+}
+.tm-player-card[data-tier='special'] .tm-pcard-face {
+  box-shadow: inset 0 0 0 1px rgba(246, 231, 174, 0.6), inset 0 0 0 5px rgba(8, 16, 32, 0.7),
+    inset 0 0 0 6px rgba(150, 205, 255, 0.45), inset 0 0 30px rgba(80, 160, 255, 0.34);
+}
+.tm-player-card[data-tier='special'] .tm-pcard-frame {
+  animation: tmCardRise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both, tmSpecialPulse 3.4s ease-in-out infinite 1s;
+}
+@keyframes tmSpecialPulse {
+  0%, 100% { filter: drop-shadow(0 14px 28px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 24px rgba(95, 165, 255, 0.55)); }
+  50% { filter: drop-shadow(0 14px 28px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 44px rgba(95, 165, 255, 0.9)); }
+}
+.tm-player-card[data-tier='special'] .tm-pcard-face::after { animation-duration: 4s; }
+
+/* ── 뒷면 -- 같은 카드다. 같은 실루엣·같은 림을 쓰고, 글이 많으므로 바탕만 어둡게. ── */
+.tm-pcard-backface {
+  width: 100%; height: 100%; position: relative; z-index: 1;
+  clip-path: var(--tm-silhouette);
+  background: linear-gradient(168deg, #1a1f2a 0%, #12161e 58%, #0b0e14 100%);
+  color: #a9b3c2;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.tm-player-card[data-shape='shield'] .tm-pcard-backface { padding: 46px 22px 64px; }
+.tm-player-card[data-shape='rect'] .tm-pcard-backface { padding: 30px 20px 24px; }
+.tm-pcard-back-h {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  font-family: var(--tm-num); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.18em; color: var(--tm-back-accent); text-transform: uppercase;
+  padding-bottom: 7px; border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  width: 78%; margin: 0 auto;
+}
+.tm-pcard-back-h em {
+  width: 12px; height: 12px; font-style: normal; background: currentColor;
+  -webkit-mask: url('/brand/teameet-mark.png') center / contain no-repeat;
+  mask: url('/brand/teameet-mark.png') center / contain no-repeat;
+}
+/* 숫자 나열 전에 "어떤 선수인가"를 사람 말로 먼저. */
+.tm-pcard-back-sum { font-size: 11.5px; line-height: 1.55; color: #a9b3c2; text-align: center; }
+.tm-pcard-back-sum b { color: var(--tm-back-accent); font-weight: 700; }
+.tm-pcard-back-sec {
+  display: flex; align-items: center; gap: 7px; margin-top: 3px;
+  font-family: var(--tm-num); font-size: 9px; font-weight: 800; letter-spacing: 0.16em;
+  color: #6f7a8a;
+}
+.tm-pcard-back-sec::before, .tm-pcard-back-sec::after {
+  content: ''; flex: 1; height: 1px; background: rgba(255, 255, 255, 0.1);
+}
+/* 성향 태그 -- 2열 고정. 흘려 넣으면 줄바꿈이 들쭉날쭉해진다. */
+.tm-pcard-back-tags { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.tm-pcard-tag {
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 0;
+  padding: 4px 7px; border-radius: 7px;
+  background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 10.5px; font-weight: 700; color: #a9b3c2;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tm-pcard-tag[data-tone='accent'] { border-color: var(--tm-back-accent); color: var(--tm-back-accent); }
+/* 산식 -- 아이콘 / 값 / 설명이 세로로 맞아야 표처럼 읽힌다. */
+.tm-pcard-back-rows { display: grid; gap: 2px; }
+.tm-pcard-brow {
+  display: grid; grid-template-columns: 14px 26px 1fr; gap: 8px; align-items: center;
+  font-size: 10px; color: #8b95a5; padding: 1px 0;
+}
+.tm-pcard-brow svg { width: 13px; height: 13px; color: var(--tm-back-accent); opacity: 0.8; }
+.tm-pcard-brow b {
+  font-family: var(--tm-num); font-size: 14px; color: #eef2f8; text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.tm-pcard-brow b[data-locked='true'] { color: #6f7a8a; }
+.tm-pcard-back-eq {
+  margin: 4px auto 0; padding-top: 8px; border-top: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 10px; color: #a9b3c2; line-height: 1.5; text-align: center; width: 72%;
+}
+.tm-pcard-back-eq b { color: var(--tm-back-accent); }
+
+/* ── 카드 아래 동반 UI -- 카드는 소장품이라 앞면을 깨끗하게 두고, 안내·행동은 밖에 둔다. ── */
+.tm-pcard-below { width: 100%; max-width: 320px; display: flex; flex-direction: column; }
+.tm-pcard-flipbtn {
+  margin-top: 4px; width: 100%; min-height: 44px; border-radius: 11px;
+  background: var(--surface-soft); border: 1px solid var(--border);
+  color: var(--text-strong); font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
+}
+.tm-pcard-flipbtn:focus-visible { outline: 2px solid var(--blue500); outline-offset: 2px; }
+.tm-player-card-sub { margin-top: 10px; font-size: 13px; color: var(--text-muted); text-align: center; }
+.tm-player-card-tier-note { margin-top: 4px; font-size: 11px; color: var(--text-caption); text-align: center; }
 .tm-player-card-progress {
   margin-top: 10px; padding: 10px 12px; border-radius: 10px;
-  background: rgba(255, 255, 255, 0.09);
+  background: var(--surface-soft); border: 1px solid var(--border);
 }
-.tm-player-card-progress-text { font-size: 12px; color: rgba(255, 255, 255, 0.82); }
+.tm-player-card-progress-text { font-size: 12px; color: var(--text-body); }
 .tm-player-card-progress-bar {
   height: 5px; border-radius: 3px; margin-top: 7px; overflow: hidden;
-  background: rgba(255, 255, 255, 0.16);
+  background: var(--border);
 }
 .tm-player-card-progress-bar i {
   display: block; height: 100%; border-radius: 3px; background: var(--blue500);
 }
 .tm-player-card-progress-count {
-  margin-top: 6px; font-size: 11px; color: rgba(255, 255, 255, 0.55);
+  margin-top: 6px; font-size: 11px; color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
 .tm-player-card-cta {
@@ -6878,20 +7311,19 @@ button:disabled {
   background: var(--blue500); color: var(--static-white);
   font-size: 15px; font-weight: 700; text-decoration: none;
 }
-.tm-player-card-cta:focus-visible { outline: 2px solid var(--static-white); outline-offset: 2px; }
+.tm-player-card-cta:focus-visible { outline: 2px solid var(--blue500); outline-offset: 2px; }
 
-/* 선수 카드 공유 입구 (Task 155). 카드 안의 보조 액션이라 CTA(파란 채움)보다 약하게 —
-   카드에서 가장 강한 것은 기록 공개 유도여야 한다. */
+/* 선수 카드 공유 입구 (Task 155). 카드 밖의 보조 액션이라 CTA(파란 채움)보다 약하게 --
+   가장 강한 것은 기록 공개 유도여야 한다. */
 .tm-player-card-share-link {
   display: flex; align-items: center; justify-content: center;
   min-height: 44px; margin-top: 10px; border-radius: 12px;
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  color: var(--static-white); font-size: 15px; font-weight: 700; text-decoration: none;
+  background: var(--surface-soft); border: 1px solid var(--border);
+  color: var(--text-strong); font-size: 15px; font-weight: 700; text-decoration: none;
 }
-.tm-player-card-share-link:focus-visible { outline: 2px solid var(--static-white); outline-offset: 2px; }
+.tm-player-card-share-link:focus-visible { outline: 2px solid var(--blue500); outline-offset: 2px; }
 
-/* 공유 전용 화면의 주 버튼 — 여기서는 공유가 유일한 목적이라 강한 CTA 로 둔다. */
+/* 공유 전용 화면의 주 버튼 -- 여기서는 공유가 유일한 목적이라 강한 CTA 로 둔다. */
 .tm-player-card-share-btn {
   min-height: 48px; border-radius: 12px; border: none;
   background: var(--blue500); color: var(--static-white);
@@ -6902,14 +7334,8 @@ button:disabled {
   min-height: 44px; color: var(--text-muted); font-size: 14px; text-decoration: none;
 }
 
-/* 등번호 배지 (Task 155). 왼쪽 큰 숫자는 총점이라, 등번호는 이름 앞에 작게 붙여
-   둘을 시각적으로 갈라 놓는다 — 안 그러면 총점이 등번호로 읽힌다. */
-.tm-player-card-jersey {
-  display: inline-flex; align-items: center; justify-content: center;
-  min-width: 30px; margin-right: 9px; padding: 1px 7px;
-  border: 1.5px solid rgba(255, 255, 255, 0.26);
-  border-radius: 8px;
-  font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums;
-  color: rgba(255, 255, 255, 0.62);
-  vertical-align: middle;
+@media (prefers-reduced-motion: reduce) {
+  .tm-pcard-frame, .tm-pcard-face::after, .tm-pcard-fx, .tm-pcard-crest, .tm-pcard-flip {
+    animation: none !important; transition: none !important;
+  }
 }

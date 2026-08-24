@@ -3437,7 +3437,19 @@ export class GamesService {
           throw this.notFound('GAME_PARTICIPANT_NOT_FOUND');
         }
         const side = await tx.v1GameSide.findUnique({ where: { id: participant.sideId } });
-        await this.assertAttestorAuthority(tx, side?.teamId ?? null, actor);
+        // sourceType 은 자격 판정을 가르므로 여기서 직접 읽는다 -- withParticipantCommand 가
+        // 넘겨주는 game 은 id/version 만 담고 있다.
+        const commandGame = await tx.v1Game.findUniqueOrThrow({
+          where: { id: gameId },
+          select: { sourceType: true },
+        });
+        await this.assertAttestorAuthority(
+          tx,
+          gameId,
+          commandGame.sourceType,
+          side?.teamId ?? null,
+          actor,
+        );
 
         const action =
           dto.decision === 'approve' ? V1IdentityLinkAction.ATTESTED : V1IdentityLinkAction.REJECTED;
@@ -4066,12 +4078,71 @@ export class GamesService {
     return error;
   }
 
+  /**
+   * 신원 연결의 **확인자** 자격. 이 게이트를 지나는 커맨드는 attest 하나뿐이다.
+   *
+   * 경기 종류에 따라 자격이 다르다 -- 같은 규칙을 쓰면 한쪽이 반드시 틀린다.
+   *
+   * ## TEAM_MATCH: 참가자 본인 팀의 owner/manager (기존 계약 유지)
+   * 두 팀이 서로 아는 소규모 경기라 팀장이 곁에 있고, 팀장 승인이 실제로 작동한다.
+   * `game-participant-identity.integration-spec.ts` 가 "평멤버는 거부"를 명시적으로
+   * 못박고 있다(Track A 회귀 방지) -- 여기를 건드리면 그 계약이 깨진다.
+   *
+   * ## TOURNAMENT_FIXTURE: 두 등록팀의 **활성 멤버 누구나** (2026-08-24 사용자 확정)
+   * 대회는 다르다. alpha 실측에서 **신청은 201, 확인은 403** 이 나왔다 -- 양쪽 다 등록팀
+   * 활성 멤버였지만 둘 다 평멤버였다. 신청만 열리고 확인이 막히면 선수가 자기 기록을
+   * 되찾겠다고 신청해도 팀장이 손대기 전까지 영영 pending 이라, "문의 없이 복구한다"는
+   * 이 기능(P0-5)의 목적이 절반만 달성된다. 대회 등록팀의 팀장은 대개 현장에 없다.
+   *
+   * 판정은 **신청(request)이 쓰는 것과 같은 술어**를 쓴다 -- `resolveActor` 의
+   * participant_identity 분기가 두 등록팀 멤버십으로 신청을 허용했으므로(그래서 201),
+   * 확인도 같은 기준이어야 둘이 어긋나지 않는다. 참가자 본인 팀(`sideTeamId`)이 아니라
+   * 등록팀 기준인 이유이기도 하다 -- 상대팀 사람이 "이 사람 맞다"고 말하는 편이 오히려
+   * 담합이 어렵다.
+   *
+   * ## 대가 (실재한다)
+   * 팀장 승인보다 담합이 쉬워진다 -- 한 대회에 공모자가 둘 있으면 서로의 기록을 확인해 줄
+   * 수 있다. 감수하는 근거는 셋이다: ① 신청자 ≠ 확인자가 위에서 강제되고(서비스 + DB
+   * 트리거 이중), ② 모든 결정이 `V1ParticipantIdentityLinkEvent` 원장에 누가 언제 했는지로
+   * 남아 사후 추적·취소가 가능하며, ③ 잘못 붙은 기록은 되돌릴 수 있는 반면 영영 pending 인
+   * 기록은 사용자가 앱 안에서 복구할 방법이 아예 없다.
+   */
   private async assertAttestorAuthority(
     tx: Transaction,
+    gameId: string,
+    sourceType: V1GameSourceType,
     sideTeamId: string | null,
     actor: Extract<GameActorScope, { actorType: 'USER' }>,
   ) {
     if (actor.role === 'platform_ops') {
+      return;
+    }
+    if (sourceType === V1GameSourceType.TOURNAMENT_FIXTURE) {
+      const game = await tx.v1Game.findUnique({
+        where: { id: gameId },
+        select: {
+          tournamentFixture: {
+            select: {
+              homeRegistration: { select: { teamId: true } },
+              awayRegistration: { select: { teamId: true } },
+            },
+          },
+        },
+      });
+      const registrationTeamIds = [
+        game?.tournamentFixture?.homeRegistration?.teamId,
+        game?.tournamentFixture?.awayRegistration?.teamId,
+      ].filter((teamId): teamId is string => typeof teamId === 'string');
+      if (registrationTeamIds.length === 0) {
+        throw this.forbidden();
+      }
+      const membership = await tx.v1TeamMembership.findFirst({
+        // 역할은 보지 않는다 -- 활성 멤버이기만 하면 된다. 탈퇴·정지 멤버는 status 로 걸린다.
+        where: { userId: actor.actorUserId, teamId: { in: registrationTeamIds }, status: 'active' },
+      });
+      if (membership === null) {
+        throw this.forbidden();
+      }
       return;
     }
     if (sideTeamId === null) {

@@ -222,4 +222,60 @@ describe('Task 154 대회 경기 신원 연결 자가신청 (참가팀 멤버)',
     expect(error).toBeInstanceOf(HttpException);
     expect((error as HttpException).getStatus()).not.toBe(200);
   });
+
+  /**
+   * P0-5 왕복의 마지막 칸. alpha 실측(2026-08-24)에서 **신청은 201, 제3자 확인은 403**
+   * 이었다 -- 두 계정 모두 양 등록팀의 활성 멤버였고 방향을 바꿔도 같았다. 신청만 열리고
+   * 확인이 막히면 선수가 신청해도 운영자가 개입하기 전까지 영영 pending 이라, "문의 없이
+   * 복구한다"는 이 기능의 목적이 절반만 달성된다.
+   *
+   * 이 스펙은 그 왕복이 실제로 완성되는지를 건다 -- 신청자와 **다른** 등록팀 멤버가
+   * 확인하면 `V1ParticipantIdentityLinkCurrent` 가 생겨야 한다.
+   */
+  it('신청자와 다른 등록팀 멤버가 확인하면 연결이 완성된다 (P0-5 왕복)', async () => {
+    const request = await prisma.v1ParticipantIdentityLinkEvent.findFirstOrThrow({
+      where: { participantId, actorUserId: ids.teamMember, action: 'REQUESTED' },
+    });
+    const game = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId }, select: { version: true } });
+
+    await service.attestIdentityLink(
+      // attestor 는 반대편 등록팀의 활성 멤버다 -- 신청자와 다른 사람이어야 이 경로가 열린다.
+      authUser(ids.attestor),
+      gameId,
+      participantId,
+      request.requestId,
+      'task154-third-party-attest',
+      { expectedVersion: game.version, clientCommandId: 'task154-third-party-attest', decision: 'approve' },
+    );
+
+    // 연결이 실제로 생겼는지를 원장이 아니라 **현재 상태 테이블**로 확인한다.
+    const current = await prisma.v1ParticipantIdentityLinkCurrent.findUnique({ where: { participantId } });
+    expect(current).not.toBeNull();
+    expect(current?.userId).toBe(ids.teamMember);
+  });
+
+  /**
+   * 게이트를 넓혔으면 반대 방향도 걸어야 한다 -- 넓힌 것이 "역할 제한"이지 "팀 제한"이
+   * 아니라는 것을 여기서 증명한다. 이게 없으면 다음 사람이 술어를 더 풀어도 아무도 모른다.
+   */
+  it('두 등록팀 어디에도 없는 사람은 여전히 확인할 수 없다', async () => {
+    const request = await prisma.v1ParticipantIdentityLinkEvent.findFirstOrThrow({
+      where: { participantId, actorUserId: ids.teamMember, action: 'REQUESTED' },
+    });
+    const game = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId }, select: { version: true } });
+
+    const error = await captureFailure(() =>
+      service.attestIdentityLink(
+        authUser(ids.outsider),
+        gameId,
+        participantId,
+        request.requestId,
+        'task154-outsider-attest',
+        { expectedVersion: game.version, clientCommandId: 'task154-outsider-attest', decision: 'approve' },
+      ),
+    );
+
+    expect(error).toBeInstanceOf(HttpException);
+    expect((error as HttpException).getStatus()).toBe(403);
+  });
 });

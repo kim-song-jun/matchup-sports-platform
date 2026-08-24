@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import { Logger } from '@nestjs/common';
 import type { WebPushService } from '../notifications/web-push.service';
 import type { OfficialRevisionRow } from './game-result-official-projection.types';
 import { parseOfficialScore } from './parse-official-score';
@@ -25,6 +26,8 @@ import { parseOfficialScore } from './parse-official-score';
  *   리비전으로 이미 성공한 뒤라 여기서 다시 던질 수 없다.
  */
 export class TournamentFixtureCompletionNotificationService {
+  private readonly logger = new Logger(TournamentFixtureCompletionNotificationService.name);
+
   constructor(private readonly webPush?: WebPushService) {}
 
   async project(tx: Prisma.TransactionClient, revision: OfficialRevisionRow): Promise<void> {
@@ -102,8 +105,13 @@ export class TournamentFixtureCompletionNotificationService {
     for (const userId of newlyDelivered) {
       void this.webPush
         ?.sendToUser(userId, { title, body, url: deepLink })
-        .catch(() => {
-          // Best-effort — 실패해도 이미 커밋된 알림 row는 그대로 유지된다.
+        .catch((error: unknown) => {
+          // Best-effort — 실패해도 이미 커밋된 알림 row는 그대로 유지되지만,
+          // 조용히 삼키면 sendToUser 내부 실패(조회·전송)를 추적할 수 없다
+          // (이 저장소의 silent-catch 안티패턴 규칙). warn 한 줄은 남긴다.
+          this.logger.warn(
+            `web push failed for tournament fixture completion (fixture=${revision.tournamentFixtureId}): ${String(error)}`,
+          );
         });
     }
   }

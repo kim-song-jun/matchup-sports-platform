@@ -120,8 +120,8 @@ function makeMatch(overrides: Partial<PublicMatchDetail> = {}): PublicMatchDetai
     clock: null,
     periodBreak: null,
     lineup: {
-      home: [{ participantId: 'p-1', displayName: null, jerseyNumber: 7, position: 'FW' }],
-      away: [{ participantId: 'p-2', displayName: '이몽룡', jerseyNumber: 10, position: 'MF' }],
+      home: [{ participantId: 'p-1', displayName: null, jerseyNumber: 7, position: 'FW', profileHref: null }],
+      away: [{ participantId: 'p-2', displayName: '이몽룡', jerseyNumber: 10, position: 'MF', profileHref: null }],
     },
     events: [],
     mvp: null,
@@ -148,7 +148,7 @@ describe('MatchDetailContent — 동의 게이트된 신원 표시', () => {
   it('MVP도 동일한 규칙을 따른다 -- displayName null이면 익명 라벨', () => {
     render(
       <MatchDetailContent
-        data={makeMatch({ mvp: { participantId: 'p-1', displayName: null } })}
+        data={makeMatch({ mvp: { participantId: 'p-1', displayName: null, profileHref: null } })}
       />,
     );
     // 라인업(p-1)과 MVP 카드 두 곳 모두 익명 라벨이 노출된다
@@ -622,8 +622,8 @@ describe('MatchDetailContent — 골/카드 타임라인의 이름·팀 귀속',
         data={makeMatch({
           lineup: null, // 라인업 슬롯의 익명 라벨과 섞이지 않도록 이 테스트는 라인업을 비운다.
           events: [
-            { type: 'GOAL', cardColor: null, sideId: 'side-home', side: 'home', participantId: 'p-1', participantName: '김철수', jerseyNumber: 7, period: 1, clockMs: 600_000 },
-            { type: 'GOAL', cardColor: null, sideId: 'side-away', side: 'away', participantId: null, participantName: null, jerseyNumber: null, period: 1, clockMs: 900_000 },
+            { type: 'GOAL', cardColor: null, sideId: 'side-home', side: 'home', participantId: 'p-1', participantName: '김철수', jerseyNumber: 7, profileHref: null, period: 1, clockMs: 600_000 },
+            { type: 'GOAL', cardColor: null, sideId: 'side-away', side: 'away', participantId: null, participantName: null, jerseyNumber: null, profileHref: null, period: 1, clockMs: 900_000 },
           ],
         })}
       />,
@@ -638,7 +638,7 @@ describe('MatchDetailContent — 골/카드 타임라인의 이름·팀 귀속',
         data={makeMatch({
           lineup: null,
           events: [
-            { type: 'GOAL', cardColor: null, sideId: 'side-home', side: 'home', participantId: 'p-1', participantName: '김철수', jerseyNumber: 7, period: 1, clockMs: 600_000 },
+            { type: 'GOAL', cardColor: null, sideId: 'side-home', side: 'home', participantId: 'p-1', participantName: '김철수', jerseyNumber: 7, profileHref: null, period: 1, clockMs: 600_000 },
           ],
         })}
       />,

@@ -178,6 +178,12 @@ export interface PublicLineupSlot {
   readonly displayName: string | null;
   readonly jerseyNumber: number | null;
   readonly position: string | null;
+  /**
+   * 공개 프로필 경로. **열어도 되는지 판단까지 서버가 끝낸 값**이라 화면은 있으면 링크,
+   * 없으면 그냥 글자로 두면 된다 — 화면이 동의·계정 유무를 다시 따지지 않는다.
+   * 계정이 없는 참가자, 동의하지 않은 사람, 이름이 가려진 사람은 모두 `null`.
+   */
+  readonly profileHref: string | null;
 }
 
 export interface PublicLineup {
@@ -207,6 +213,8 @@ export interface PublicMatchEvent {
   readonly participantId: string | null;
   readonly participantName: string | null;
   readonly jerseyNumber: number | null;
+  /** 공개 프로필 경로 — 서버가 열어도 되는지까지 판단한 값. `PublicLineupSlot` 과 동일 규칙. */
+  readonly profileHref: string | null;
   readonly period: number | null;
   readonly clockMs: number | null;
 }
@@ -214,6 +222,8 @@ export interface PublicMatchEvent {
 export interface PublicMatchMvp {
   readonly participantId: string;
   readonly displayName: string | null;
+  /** 공개 프로필 경로 — 서버가 열어도 되는지까지 판단한 값. `PublicLineupSlot` 과 동일 규칙. */
+  readonly profileHref: string | null;
 }
 
 export interface PublicMatchHistoryEntry {

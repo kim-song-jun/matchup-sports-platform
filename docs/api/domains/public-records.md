@@ -307,6 +307,28 @@ identity/side itself:
   only the reason label; the full note is read on the match view, because a
   schedule row is a one-line summary and the note has no length bound.
 
+- `GET /tournaments/:id/matches/:fixtureId` carries `profileHref: string | null` on every
+  place a participant is named -- `lineup.home[]`/`lineup.away[]`, `events[]`, and `mvp`.
+  It is the **public profile path** (`/users/:userId`) when the viewer may open it, and
+  `null` otherwise. Deliberately **not** a raw `userId`: shipping the account id would let a
+  caller re-identify the same person across fixtures whose names are withheld, and a link
+  does not need that surface. The server decides once
+  (`resolveParticipantProfileHref`) so the three consuming views never re-derive the
+  policy and drift apart.
+
+  It is non-null only when **all** of these hold:
+  1. the participant has a linked account -- a lineup can be built from names alone, and a
+     guest has no profile to open;
+  2. user-level record consent is `GRANTED` with no per-participant `REVOKED` override --
+     `/users/:id` gates on the same condition, so linking without it lands on an empty page;
+  3. the name itself is visible in that payload. A slot rendered as `비공개 선수` never
+     carries a link.
+
+  Note that (2) is checked **directly**, not through
+  `resolveParticipantNameEligible`'s rollback switch: that switch controls whether *names*
+  are shown, while a profile exposes the person's whole activity history. With the switch
+  off, an unconsented participant's name may appear but their profile still will not open.
+
 ### Known scope trims (documented, not silently dropped)
 
 - The schedule list only cursor-paginates fixtures that already have a

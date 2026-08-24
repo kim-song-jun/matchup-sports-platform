@@ -30,6 +30,7 @@ import {
   parseCardColor,
   resolveParticipantDisplayName,
   resolveParticipantNameEligible,
+  resolveParticipantProfileHref,
   type ParticipantNameProfileRow,
 } from './participant-name-gating';
 
@@ -487,11 +488,12 @@ export class PublicTournamentRecordsService {
         : null;
 
     const participantIds = (fixture.game?.participants ?? []).map((participant) => participant.id);
-    // 정책 공개(기본값)에서는 이 맵이 쓰이지 않는다 -- 위 getSchedule과 동일한 이유로
-    // 되돌린 상태(V1_TOURNAMENT_PARTICIPANT_NAMES_CONSENT_GATE=true)일 때만 조회한다.
-    const consentMap = isTournamentParticipantNameGatingReverted()
-      ? await loadParticipantConsentEligibility(this.prisma, participantIds)
-      : new Map<string, ParticipantConsentEligibility>();
+    // **항상 조회한다.** 이름 게이팅(되돌린 상태에서만 동작)에는 안 쓰이지만, 프로필 링크
+    // (`resolveParticipantProfileHref`)는 정책 공개 기본값에서도 동의를 확인해야 하기
+    // 때문이다 -- 예전처럼 게이팅 플래그로 감싸 두면 기본 운영 설정에서 이 맵이 비어
+    // `profileHref` 가 **항상 null** 이 되어 링크가 하나도 생기지 않는다(Copilot 리뷰가
+    // 잡은 결함). 배치 조회 1회라 N+1 이 아니고, getMatch 는 단일 경기라 대상도 적다.
+    const consentMap = await loadParticipantConsentEligibility(this.prisma, participantIds);
     // 위 consentMap과 달리 이건 게이팅하지 않는다 -- getSchedule과 동일한 이유
     // (resolveParticipantDisplayName 위 doc comment 참고).
     const nameProfileByUserId = await loadParticipantNameProfiles(
@@ -803,6 +805,7 @@ export class PublicTournamentRecordsService {
           participantId: eligible ? event.participantId : null,
           participantName: eligible ? resolveParticipantDisplayName(participant, nameProfileByUserId) : null,
           jerseyNumber: eligible ? (participant?.jerseyNumber ?? null) : null,
+          profileHref: eligible ? resolveParticipantProfileHref(participant?.userId ?? null, consent) : null,
           // 백필로 복원된 골은 `period: 1`로 저장돼 있지만 그건 컬럼이 non-null이라
           // 어쩔 수 없이 넣은 값이고 레거시 원본엔 전/후반 자체가 없었다 -- 그대로
           // 내보내면 이 타임라인이 `periodLabel(1)`="전반" 헤딩을 붙여 없던 사실을
@@ -838,6 +841,7 @@ export class PublicTournamentRecordsService {
           ? resolveParticipantDisplayName(participant, nameProfileByUserId)
           : null,
         jerseyNumber: eligible ? (participant?.jerseyNumber ?? null) : null,
+        profileHref: eligible ? resolveParticipantProfileHref(participant?.userId ?? null, consent) : null,
         period: event.period,
         clockMs: event.minute === null ? null : event.minute * 60000,
       };
@@ -1207,6 +1211,11 @@ function buildLineup(
         displayName: eligible ? resolveParticipantDisplayName(participant, nameProfileByUserId) : null,
         jerseyNumber: participant.jerseyNumber,
         position: participant.position,
+        // 두 조건을 **모두** 만족할 때만 링크가 걸린다.
+        //   eligible          — 이름이 가려진 사람("비공개 선수")에게 링크를 걸면 안 된다
+        //   profileHref !== null — 프로필은 이름보다 강한 노출이라 동의를 직접 본다
+        // 이름 게이팅 롤백 스위치가 켜져도 동의 없는 사람의 프로필은 열리지 않는다.
+        profileHref: eligible ? resolveParticipantProfileHref(participant.userId, consent) : null,
       };
     });
 
@@ -1233,7 +1242,11 @@ function buildMvp(
   // 않는다(undefined 참가자일 때만 null) -- displayNameSnapshot 폴백은 그 계약을
   // 타입에도 그대로 반영하기 위한 방어일 뿐, 실질적으로는 항상 함수 반환값을 쓴다.
   const displayName = resolveParticipantDisplayName(participant, nameProfileByUserId) ?? participant.displayNameSnapshot;
-  return { participantId: participant.id, displayName };
+  return {
+    participantId: participant.id,
+    displayName,
+    profileHref: resolveParticipantProfileHref(participant.userId, consent),
+  };
 }
 
 /**

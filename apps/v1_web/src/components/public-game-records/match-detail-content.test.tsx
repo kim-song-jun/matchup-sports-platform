@@ -54,7 +54,7 @@ describe('MatchDetailContent — 이상 클럭 경고 표식(alpha 452′ 사고
           side: 'home',
           participantId: 'p-1',
           participantName: '김선수',
-          jerseyNumber: 9,
+          jerseyNumber: 9, profileHref: null,
           period: 1,
           clockMs: 27_166_083,
         },
@@ -77,7 +77,7 @@ describe('MatchDetailContent — 이상 클럭 경고 표식(alpha 452′ 사고
           side: 'home',
           participantId: 'p-1',
           participantName: '김선수',
-          jerseyNumber: 9,
+          jerseyNumber: 9, profileHref: null,
           period: 1,
           clockMs: 649_891,
         },
@@ -95,8 +95,8 @@ describe('MatchDetailContent — 전반/후반 섹션 분리', () => {
   it('전반과 후반 이벤트가 각각 자기 구간에만 들어간다 (시간 역전 버그 회귀)', () => {
     const data = makeDetail({
       events: [
-        { type: 'GOAL', cardColor: null, sideId: 'side-home', side: 'home', participantId: 'p-1', participantName: '김선수', jerseyNumber: 9, period: 1, clockMs: 600_000 },
-        { type: 'GOAL', cardColor: null, sideId: 'side-away', side: 'away', participantId: 'p-2', participantName: '이선수', jerseyNumber: 10, period: 2, clockMs: 300_000 },
+        { type: 'GOAL', cardColor: null, sideId: 'side-home', side: 'home', participantId: 'p-1', participantName: '김선수', profileHref: null, jerseyNumber: 9, period: 1, clockMs: 600_000 },
+        { type: 'GOAL', cardColor: null, sideId: 'side-away', side: 'away', participantId: 'p-2', participantName: '이선수', profileHref: null, jerseyNumber: 10, period: 2, clockMs: 300_000 },
       ],
     });
 
@@ -113,7 +113,7 @@ describe('MatchDetailContent — 전반/후반 섹션 분리', () => {
   it('period가 null인 이벤트는 "기타" 구간에 담겨 유실되지 않는다', () => {
     const data = makeDetail({
       events: [
-        { type: 'CARD', cardColor: 'YELLOW', sideId: 'side-home', side: 'home', participantId: 'p-3', participantName: '박선수', jerseyNumber: 5, period: null, clockMs: null },
+        { type: 'CARD', cardColor: 'YELLOW', sideId: 'side-home', side: 'home', participantId: 'p-3', participantName: '박선수', profileHref: null, jerseyNumber: 5, period: null, clockMs: null },
       ],
     });
 
@@ -127,8 +127,8 @@ describe('MatchDetailContent — 카드 색상', () => {
   it('익명 골은 "익명", 익명 자책골은 "OG"로 표시한다', () => {
     const data = makeDetail({
       events: [
-        { type: 'GOAL', cardColor: null, sideId: 'side-home', side: 'home', participantId: null, participantName: null, jerseyNumber: null, period: 1, clockMs: 60_000 },
-        { type: 'OWN_GOAL', cardColor: null, sideId: 'side-away', side: 'away', participantId: null, participantName: null, jerseyNumber: null, period: 1, clockMs: 120_000 },
+        { type: 'GOAL', cardColor: null, sideId: 'side-home', side: 'home', participantId: null, participantName: null, profileHref: null, jerseyNumber: null, period: 1, clockMs: 60_000 },
+        { type: 'OWN_GOAL', cardColor: null, sideId: 'side-away', side: 'away', participantId: null, participantName: null, profileHref: null, jerseyNumber: null, period: 1, clockMs: 120_000 },
       ],
     });
 
@@ -141,8 +141,8 @@ describe('MatchDetailContent — 카드 색상', () => {
   it('옐로카드와 레드카드를 서로 다른 아이콘과 접근 가능한 이름으로 표시한다', () => {
     const data = makeDetail({
       events: [
-        { type: 'CARD', cardColor: 'YELLOW', sideId: 'side-home', side: 'home', participantId: 'p-yellow', participantName: '옐로 선수', jerseyNumber: 5, period: 1, clockMs: 300_000 },
-        { type: 'CARD', cardColor: 'RED', sideId: 'side-away', side: 'away', participantId: 'p-red', participantName: '레드 선수', jerseyNumber: 6, period: 1, clockMs: 600_000 },
+        { type: 'CARD', cardColor: 'YELLOW', sideId: 'side-home', side: 'home', participantId: 'p-yellow', participantName: '옐로 선수', profileHref: null, jerseyNumber: 5, period: 1, clockMs: 300_000 },
+        { type: 'CARD', cardColor: 'RED', sideId: 'side-away', side: 'away', participantId: 'p-red', participantName: '레드 선수', profileHref: null, jerseyNumber: 6, period: 1, clockMs: 600_000 },
       ],
     });
 
@@ -197,5 +197,77 @@ describe('MatchDetailContent — 카드 색상', () => {
       expect(notice).not.toBeNull();
       expect(within(notice as HTMLElement).getAllByText(/./)).toHaveLength(1);
     });
+  });
+});
+
+/**
+ * 선수 이름 → 공개 프로필 링크(B-2).
+ *
+ * 열어도 되는지는 **서버가 판단해서** `profileHref` 로 내려준다. 화면은 있으면 링크,
+ * 없으면 그냥 글자다. 이 테스트가 지키는 것은 그 계약 하나 — 화면이 동의·계정 유무를
+ * 다시 따지기 시작하면 서버와 갈린다.
+ */
+describe('MatchDetailContent — 선수 이름 프로필 링크', () => {
+  it('profileHref 가 있으면 라인업 이름을 링크로 만든다', () => {
+    const data = makeDetail({
+      lineup: {
+        home: [{ participantId: 'p-1', displayName: '김도윤', jerseyNumber: 7, position: 'GK', profileHref: '/users/u-1' }],
+        away: [],
+      },
+    });
+
+    render(<MatchDetailContent data={data} />);
+
+    expect(screen.getByRole('link', { name: '김도윤' })).toHaveAttribute('href', '/users/u-1');
+  });
+
+  it('profileHref 가 없으면 링크를 만들지 않는다 (이름은 그대로 보인다)', () => {
+    const data = makeDetail({
+      lineup: {
+        home: [{ participantId: 'p-2', displayName: '박서준', jerseyNumber: 9, position: null, profileHref: null }],
+        away: [],
+      },
+    });
+
+    render(<MatchDetailContent data={data} />);
+
+    expect(screen.getByText('박서준')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '박서준' })).not.toBeInTheDocument();
+  });
+
+  it('이름이 가려진 참가자는 링크도 없다', () => {
+    // 서버가 이 조합(displayName=null 인데 profileHref 있음)을 내리지 않는 것이 계약이지만,
+    // 화면이 "비공개 선수"에 링크를 거는 일이 없다는 것 자체를 고정한다.
+    const data = makeDetail({
+      lineup: {
+        home: [{ participantId: 'p-3', displayName: null, jerseyNumber: null, position: null, profileHref: null }],
+        away: [],
+      },
+    });
+
+    render(<MatchDetailContent data={data} />);
+
+    expect(screen.getByText('비공개 선수')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '비공개 선수' })).not.toBeInTheDocument();
+  });
+
+  it('이벤트 타임라인의 득점자도 링크가 된다', () => {
+    const data = makeDetail({
+      events: [
+        { type: 'GOAL', cardColor: null, sideId: 'side-home', side: 'home', participantId: 'p-1', participantName: '김도윤', jerseyNumber: 7, profileHref: '/users/u-1', period: 1, clockMs: 600_000 },
+      ],
+    });
+
+    render(<MatchDetailContent data={data} />);
+
+    expect(screen.getByRole('link', { name: '김도윤' })).toHaveAttribute('href', '/users/u-1');
+  });
+
+  it('MVP 도 링크가 된다', () => {
+    const data = makeDetail({ mvp: { participantId: 'p-1', displayName: '김도윤', profileHref: '/users/u-1' } });
+
+    render(<MatchDetailContent data={data} />);
+
+    expect(screen.getByRole('link', { name: '김도윤' })).toHaveAttribute('href', '/users/u-1');
   });
 });

@@ -9,6 +9,7 @@ import type {
   PublicTournamentScheduleResponse,
   PublicUserRecordsResponse,
   TeamRecordCategory,
+  PublicTournamentPlayerRecordsResponse,
 } from './types';
 
 /**
@@ -27,6 +28,8 @@ export const publicGameRecordsKeys = {
     [...publicGameRecordsKeys.all, 'team-records', teamId, season ?? null, type] as const,
   userRecords: (userId: string, season: string | undefined) =>
     [...publicGameRecordsKeys.all, 'user-records', userId, season ?? null] as const,
+  playerRecords: (tournamentId: string) =>
+    [...publicGameRecordsKeys.all, 'player-records', tournamentId] as const,
 };
 
 export interface ScheduleFilters {
@@ -133,5 +136,20 @@ export function usePublicUserRecords(userId: string, season?: string) {
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled: Boolean(userId),
     retry: false,
+  });
+}
+
+/**
+ * 회고 STATS-1 — 대회 단위 개인 득점·도움 랭킹(공개, 동의 게이팅은 서버가 판정).
+ * 일정 화면은 10초 폴링을 돌지만 이 쿼리는 그 폴링과 무관한 별도 키다 — 랭킹은
+ * 공식 확정 때만 바뀌므로 staleTime을 넉넉히 둬 폴링 화면에 편승 재조회하지 않는다.
+ */
+export function usePublicTournamentPlayerRecords(tournamentId: string) {
+  return useQuery({
+    queryKey: publicGameRecordsKeys.playerRecords(tournamentId),
+    queryFn: () =>
+      v1Get<PublicTournamentPlayerRecordsResponse>(`/tournaments/${tournamentId}/player-records`),
+    enabled: Boolean(tournamentId),
+    staleTime: 60_000,
   });
 }

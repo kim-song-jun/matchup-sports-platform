@@ -18,7 +18,7 @@ import {
   type TournamentStaffResource,
 } from '../../tournaments/staff/tournament-staff-access.service';
 import { decodeRecordCursor, encodeRecordCursor } from './public-cursor';
-import { loadParticipantConsentEligibility, type ParticipantConsentEligibility } from './public-consent';
+import { isParticipantPubliclyEligible, loadParticipantConsentEligibility, type ParticipantConsentEligibility } from './public-consent';
 import { resolveLiveClock, resolvePeriodBreak, type PublicGameClock, type PublicPeriodBreak } from './public-clock';
 import { tallyLiveScore } from './public-live-score';
 import { effectivePublicVisibilityMode, isLineupPublished, publicFixtureStatus, resolveResultState } from './public-visibility';
@@ -42,6 +42,8 @@ import {
  * from "exists but hidden" -- the fail-closed default the todo requires.
  */
 const NOT_FOUND = { code: 'TOURNAMENT_MATCH_NOT_FOUND', message: '경기 정보를 찾을 수 없어요.' } as const;
+// 리그 도메인(league-match-public.service.ts)과 같은 상한 — 회고 STATS-1은 그 패턴의 복제다.
+const PLAYER_RECORDS_LIMIT = 30;
 
 const FIXTURE_SCHEDULE_SELECT = {
   id: true,
@@ -191,6 +193,90 @@ export class PublicTournamentRecordsService {
     private readonly prisma: PrismaService,
     private readonly access: TournamentStaffAccessService,
   ) {}
+
+  /**
+   * 회고 STATS-1: 대회 단위 개인 득점·도움 랭킹. 리그의
+   * `league-match-public.service.ts#playerRecords`를 대회 도메인으로 복제한 것 —
+   * 공식 리비전의 `V1GameResultParticipant` 집계, 공개동의 게이팅
+   * (`isParticipantPubliclyEligible`), 0 기록 제외, 내림차순 LIMIT까지 같은 규칙이다.
+   * 다른 점 두 가지만 기록한다:
+   * - 대진 미공개(`isBracketPublished` false)면 목록을 비워 내린다 — 이 컨트롤러의
+   *   다른 라우트들이 미공개 대진을 숨기는 정책과 같은 축.
+   * - 랭킹 행은 정의상 전원이 동의+계정 연결이므로 `profileHref`를 함께 내린다
+   *   (#707/#714에서 확립한 "열어도 되는지는 서버가 판단해 내린다" 관례).
+   * 몰수·중단 경기는 별도 제외하지 않는다: 운영자가 스코어만 입력한 경기는
+   * 참가자 스탯 행 자체가 없어 자연히 집계되지 않는다.
+   */
+  async getPlayerRecords(tournamentId: string) {
+    const tournament = await this.prisma.v1Tournament.findUnique({
+      where: { id: tournamentId },
+      select: { id: true, bracketPublishedAt: true, bracketPublishScheduledAt: true },
+    });
+    if (tournament === null) {
+      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
+    }
+    const empty = { tournamentId: tournament.id, goals: [], assists: [] };
+    if (!isBracketPublished(tournament.bracketPublishedAt, tournament.bracketPublishScheduledAt)) {
+      return empty;
+    }
+
+    const games = await this.prisma.v1Game.findMany({
+      where: { tournamentFixture: { tournamentId }, currentOfficialRevisionId: { not: null } },
+      select: { currentOfficialRevisionId: true },
+    });
+    const revisionIds = games
+      .map((game) => game.currentOfficialRevisionId)
+      .filter((id): id is string => id !== null);
+    if (revisionIds.length === 0) return empty;
+
+    const participantRows = await this.prisma.v1GameResultParticipant.findMany({
+      where: { resultRevisionId: { in: revisionIds } },
+      select: {
+        participantId: true,
+        goals: true,
+        assists: true,
+        resultRevision: { select: { officialAt: true } },
+      },
+    });
+
+    const eligibility = await loadParticipantConsentEligibility(
+      this.prisma,
+      participantRows.map((row) => row.participantId),
+    );
+    const totalsByUserId = new Map<string, { goals: number; assists: number }>();
+    for (const row of participantRows) {
+      const eligibilityRow = eligibility.get(row.participantId);
+      if (eligibilityRow === undefined) continue;
+      // officialAt null(공식 확정 안 됨)은 동의 판정과 무관한 별개 게이트 — 리그와 동일.
+      if (row.resultRevision.officialAt === null || !isParticipantPubliclyEligible(eligibilityRow)) continue;
+      const userId = eligibilityRow.linkedUserId!;
+      const current = totalsByUserId.get(userId) ?? { goals: 0, assists: 0 };
+      current.goals += row.goals;
+      current.assists += row.assists;
+      totalsByUserId.set(userId, current);
+    }
+
+    const userIds = [...totalsByUserId.keys()];
+    const users = userIds.length === 0
+      ? []
+      : await this.prisma.v1User.findMany({
+          where: { id: { in: userIds } },
+          select: { id: true, profile: { select: { nickname: true } } },
+        });
+    const nicknameByUserId = new Map(users.map((user) => [user.id, user.profile?.nickname ?? null]));
+
+    const rows = userIds.map((userId) => ({
+      userId,
+      nickname: nicknameByUserId.get(userId) ?? null,
+      profileHref: `/users/${encodeURIComponent(userId)}`,
+      ...totalsByUserId.get(userId)!,
+    }));
+    return {
+      tournamentId: tournament.id,
+      goals: rows.filter((row) => row.goals > 0).sort((a, b) => b.goals - a.goals).slice(0, PLAYER_RECORDS_LIMIT),
+      assists: rows.filter((row) => row.assists > 0).sort((a, b) => b.assists - a.assists).slice(0, PLAYER_RECORDS_LIMIT),
+    };
+  }
 
   async getSchedule(tournamentId: string, query: PublicTournamentScheduleQueryDto, user?: V1AuthUser) {
     const tournament = await this.prisma.v1Tournament.findUnique({

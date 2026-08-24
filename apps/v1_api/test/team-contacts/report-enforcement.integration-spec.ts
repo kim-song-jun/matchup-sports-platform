@@ -163,7 +163,19 @@ describe('팀 컨택 신고 운영 조치 — 롤업 · 대리 차단 · 권한'
       where: { teamId: ids.teamB, blockedTeamId: ids.teamA },
     });
     expect(blockRow.createdByUserId).toBe(ids.adminOwnerUser);
-    expect(blockRow.reason).toContain(inquiryId);
+    // 이 사유는 **차단당한 팀의 운영진** 이 자기 설정 화면에서 본다. 문의 UUID 를 넣으면
+    // 아무 의미도 전달하지 못하면서 좁은 화면에서 줄이 밀린다(alpha 캡처에서 실제로 그랬다).
+    expect(blockRow.reason).not.toContain(inquiryId);
+    expect(blockRow.reason).toContain('신고');
+
+    // 추적용 id 는 운영자가 보는 감사 로그가 들고 있어야 한다 — 읽는 사람이 다르다.
+    const actionLog = await prisma.v1AdminActionLog.findFirstOrThrow({
+      where: { action: 'inquiry.block_reported_team', targetId: inquiryId },
+      orderBy: { createdAt: 'desc' },
+    });
+    // reason 을 직접 본다 — actionLog 전체를 문자열로 훑으면 targetId 만으로도 통과해
+    // '추적용 id 가 reason 에 남는다' 를 증명하지 못한다.
+    expect(actionLog.reason).toContain(inquiryId);
   });
 
   it('4) 같은 차단 요청을 다시 보내면 500 이 아니라 200 + alreadyBlocked:true', async () => {

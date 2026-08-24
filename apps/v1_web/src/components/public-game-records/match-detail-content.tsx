@@ -21,6 +21,24 @@ import {
 import { PenaltyScoreline } from './penalty-scoreline';
 import type { PublicLineupSlot, PublicMatchDetail, PublicMatchEvent } from './types';
 
+/**
+ * 선수 이름을 프로필로 잇는다. **열어도 되는지는 서버가 이미 판단해서** `profileHref` 로
+ * 내려주므로(없으면 `null`) 여기서 동의·계정 유무를 다시 따지지 않는다 — 화면 세 곳이
+ * 각자 판단하면 언젠가 갈린다.
+ *
+ * 링크가 없을 때 굳이 span 으로 감싸지 않고 이름을 그대로 돌려주는 이유: 대부분의
+ * 참가자가 그 경우이고, 의미 없는 래퍼가 한 겹 늘면 기존 레이아웃(폭·정렬)이 미묘하게
+ * 달라진다.
+ */
+function ProfileLink({ href, children }: { href: string | null; children: React.ReactNode }) {
+  if (href === null) return <>{children}</>;
+  return (
+    <Link href={href} style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 2 }}>
+      {children}
+    </Link>
+  );
+}
+
 function sideLabel(side: PublicMatchDetail['home']): string {
   return side?.teamName ?? '미정';
 }
@@ -94,7 +112,9 @@ function LineupColumn({ title, slots }: { title: string; slots: readonly PublicL
               {slot.jerseyNumber !== null ? (
                 <span className="tab-num" style={{ color: 'var(--text-caption)', width: 20 }}>{slot.jerseyNumber}</span>
               ) : null}
-              <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{presentParticipantName(slot.displayName)}</span>
+              <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>
+                <ProfileLink href={slot.profileHref}>{presentParticipantName(slot.displayName)}</ProfileLink>
+              </span>
               {/* [R-T2] 고정폭 없는 인라인 텍스트 — 12로 상향. */}
               {slot.position ? <span style={{ color: 'var(--text-caption)', fontSize: 12 }}>{slot.position}</span> : null}
             </li>
@@ -122,7 +142,9 @@ function EventRow({ event }: { event: PublicMatchEvent }) {
         <span className="tab-num" style={{ color: 'var(--text-caption)', fontSize: 12 }}>{event.jerseyNumber}</span>
       ) : null}
       <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-strong)' }}>
-        {presentGameEventParticipantName(event.type, event.participantName)}
+        <ProfileLink href={event.profileHref}>
+          {presentGameEventParticipantName(event.type, event.participantName)}
+        </ProfileLink>
       </span>
     </span>
   );
@@ -350,7 +372,7 @@ export function MatchDetailContent({ data }: { data: PublicMatchDetail }) {
         <Card pad={16}>
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', marginBottom: 4 }}>MVP</div>
           <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-strong)' }}>
-            {presentParticipantName(data.mvp.displayName)}
+            <ProfileLink href={data.mvp.profileHref}>{presentParticipantName(data.mvp.displayName)}</ProfileLink>
           </div>
         </Card>
       ) : null}

@@ -30,6 +30,7 @@ import {
   parseCardColor,
   resolveParticipantDisplayName,
   resolveParticipantNameEligible,
+  resolveParticipantProfileHref,
   type ParticipantNameProfileRow,
 } from './participant-name-gating';
 
@@ -803,6 +804,7 @@ export class PublicTournamentRecordsService {
           participantId: eligible ? event.participantId : null,
           participantName: eligible ? resolveParticipantDisplayName(participant, nameProfileByUserId) : null,
           jerseyNumber: eligible ? (participant?.jerseyNumber ?? null) : null,
+          profileHref: eligible ? resolveParticipantProfileHref(participant?.userId ?? null, consent) : null,
           // 백필로 복원된 골은 `period: 1`로 저장돼 있지만 그건 컬럼이 non-null이라
           // 어쩔 수 없이 넣은 값이고 레거시 원본엔 전/후반 자체가 없었다 -- 그대로
           // 내보내면 이 타임라인이 `periodLabel(1)`="전반" 헤딩을 붙여 없던 사실을
@@ -838,6 +840,7 @@ export class PublicTournamentRecordsService {
           ? resolveParticipantDisplayName(participant, nameProfileByUserId)
           : null,
         jerseyNumber: eligible ? (participant?.jerseyNumber ?? null) : null,
+        profileHref: eligible ? resolveParticipantProfileHref(participant?.userId ?? null, consent) : null,
         period: event.period,
         clockMs: event.minute === null ? null : event.minute * 60000,
       };
@@ -1207,6 +1210,11 @@ function buildLineup(
         displayName: eligible ? resolveParticipantDisplayName(participant, nameProfileByUserId) : null,
         jerseyNumber: participant.jerseyNumber,
         position: participant.position,
+        // 두 조건을 **모두** 만족할 때만 링크가 걸린다.
+        //   eligible          — 이름이 가려진 사람("비공개 선수")에게 링크를 걸면 안 된다
+        //   profileHref !== null — 프로필은 이름보다 강한 노출이라 동의를 직접 본다
+        // 이름 게이팅 롤백 스위치가 켜져도 동의 없는 사람의 프로필은 열리지 않는다.
+        profileHref: eligible ? resolveParticipantProfileHref(participant.userId, consent) : null,
       };
     });
 
@@ -1233,7 +1241,11 @@ function buildMvp(
   // 않는다(undefined 참가자일 때만 null) -- displayNameSnapshot 폴백은 그 계약을
   // 타입에도 그대로 반영하기 위한 방어일 뿐, 실질적으로는 항상 함수 반환값을 쓴다.
   const displayName = resolveParticipantDisplayName(participant, nameProfileByUserId) ?? participant.displayNameSnapshot;
-  return { participantId: participant.id, displayName };
+  return {
+    participantId: participant.id,
+    displayName,
+    profileHref: resolveParticipantProfileHref(participant.userId, consent),
+  };
 }
 
 /**

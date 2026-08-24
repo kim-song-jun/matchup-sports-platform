@@ -1,5 +1,8 @@
 import { Module } from '@nestjs/common';
 import { OptionalV1AuthGuard } from '../../auth/optional-v1-auth.guard';
+import { V1AuthGuard } from '../../auth/v1-auth.guard';
+import { AdminContextModule } from '../../common/admin-context.module';
+import { AdminTournamentPlayerRecordsController } from './admin-tournament-player-records.controller';
 import { TournamentStaffAccessService } from '../../tournaments/staff/tournament-staff-access.service';
 import { PublicTeamRecordsController } from './public-team-records.controller';
 import { PublicTeamRecordsService } from './public-team-records.service';
@@ -27,12 +30,24 @@ import { PublicUserRecordsService } from './public-user-records.service';
  * already follow.
  */
 @Module({
-  controllers: [PublicTournamentRecordsController, PublicTeamRecordsController, PublicUserRecordsController],
+  // AdminContextService 는 로컬 재공급하지 않는다 — 전용 모듈(AdminContextModule)이
+  // exports 하는 단일 인스턴스를 써야 한다. 재공급하면 인스턴스가 갈라져,
+  // app.get() 으로 얻은 인스턴스에 spy 를 거는 통합 스펙(tournament-campaign 감사
+  // 롤백)이 조용히 무력화된다 — 실제로 #727 CI 에서 두 번 재현된 사고다.
+  imports: [AdminContextModule],
+  controllers: [
+    PublicTournamentRecordsController,
+    PublicTeamRecordsController,
+    PublicUserRecordsController,
+    // 회고 STATS-3 — 수상 추천 근거용 어드민 랭킹(비게이팅). 같은 서비스의 다른 게이트.
+    AdminTournamentPlayerRecordsController,
+  ],
   providers: [
     PublicTournamentRecordsService,
     PublicTeamRecordsService,
     PublicUserRecordsService,
     OptionalV1AuthGuard,
+    V1AuthGuard,
     TournamentStaffAccessService,
   ],
 })

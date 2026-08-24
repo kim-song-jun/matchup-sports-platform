@@ -9,6 +9,7 @@ import { v1Keys } from '@/lib/query-keys';
 import { randomUuid } from '@/lib/uuid';
 import type { GameLineup, GameLineupState } from '@/types/game-operations';
 import type {
+  V1AdminTournamentPlayerRecordsResponse,
   V1AdminRosterEligibleMembersResponse,
   AdminListFilters,
   AdminCursorPage,
@@ -3639,6 +3640,19 @@ export function useV1TournamentPlayers(tournamentId: string, registrationId: str
         `/tournaments/${tournamentId}/registrations/${registrationId}/players`,
       ),
     enabled: !!tournamentId && !!registrationId,
+  });
+}
+
+/**
+ * 회고 STATS-3 — 수상 탭 추천 근거용 어드민 랭킹(비게이팅).
+ * 공개 랭킹과 달리 동의 게이팅이 없어 진짜 순위를 보장한다.
+ */
+export function useV1AdminTournamentPlayerRecords(tournamentId: string) {
+  return useQuery({
+    queryKey: v1Keys.adminTournamentPlayerRecords(tournamentId),
+    queryFn: () =>
+      v1Get<V1AdminTournamentPlayerRecordsResponse>(`/admin/tournaments/${tournamentId}/player-records`),
+    enabled: !!tournamentId,
   });
 }
 

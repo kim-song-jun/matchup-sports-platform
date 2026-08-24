@@ -18,6 +18,7 @@ import {
   parseCardColor,
   resolveParticipantDisplayName,
   resolveParticipantNameEligible,
+  resolveParticipantProfileHref,
 } from './participant-name-gating';
 import { classifyTeamRecordCategory, type TeamRecordCategory } from './team-record-category';
 
@@ -62,6 +63,8 @@ type TeamRecordEventRow = {
   readonly side: 'own' | 'opponent';
   readonly participantName: string | null;
   readonly jerseyNumber: number | null;
+  /** 공개 프로필 경로 -- 열어도 되는지까지 서버가 판단한 값(`resolveParticipantProfileHref`). */
+  readonly profileHref: string | null;
   readonly period: number | null;
   readonly clockMs: number | null;
   readonly cardColor: 'YELLOW' | 'RED' | null;
@@ -343,15 +346,33 @@ export class PublicTeamRecordsService {
       eventsByGame.set(event.gameId, list);
     }
 
-    const scorerParticipantIds = Array.from(eventsByGame.values())
-      .flat()
-      .map((event) => event.participantId)
-      .filter((id): id is string => id !== null);
-    // 정책 공개(기본값)에서는 이름이 동의와 무관하게 항상 보이므로 이 맵을 채울 필요가
-    // 없다 -- 대회 기록의 동일한 게이팅과 이유가 같다(participant-name-gating.ts).
-    const consentMap = isTournamentParticipantNameGatingReverted()
-      ? await loadParticipantConsentEligibility(this.prisma, scorerParticipantIds)
-      : new Map<string, ParticipantConsentEligibility>();
+    // 공식 리비전의 goalEvents(JSON) 는 `V1GameEvent` 행이 아니다 -- 백필된 골은 그쪽에만
+    // 있다. 아래 렌더 루프가 그 participantId 로도 `consentMap` 을 조회하므로, 여기서 함께
+    // 모으지 않으면 그런 골에는 `profileHref` 가 영영 붙지 않는다(Copilot 리뷰 지적).
+    // 이름 게이팅에서는 이 구멍이 드러나지 않았다 -- 정책 공개 기본값에서
+    // `resolveParticipantNameEligible` 이 consent 를 보지 않고 항상 true 를 돌려주기 때문에,
+    // 프로필 링크가 처음으로 이 경로를 실제로 사용하게 됐다.
+    //
+    // 파싱 결과를 Map 에 담아 아래 루프가 재사용한다 -- 같은 JSON 을 두 번 파싱하지 않는다.
+    const revisionGoalsByGameId = new Map(
+      currentRows.map((row) => [row.gameId, parseTournamentFixtureRevisionGoals(row.resultRevision.goalEvents)] as const),
+    );
+    const scorerParticipantIds = [
+      ...Array.from(eventsByGame.values())
+        .flat()
+        .map((event) => event.participantId),
+      ...Array.from(revisionGoalsByGameId.values()).flatMap((goals) =>
+        (goals ?? []).map((goal) => goal.participantId),
+      ),
+    ].filter((id): id is string => id !== null);
+    // **항상 조회한다.** 이름 게이팅(되돌린 상태에서만 동작)에는 쓰이지 않지만, 프로필
+    // 링크(`resolveParticipantProfileHref`)는 정책 공개 기본값에서도 동의를 확인해야 하기
+    // 때문이다 -- 게이팅 플래그로 감싸 두면 기본 운영 설정에서 이 맵이 비어 `profileHref`
+    // 가 항상 null 이 된다(#707 에서 getMatch 가 바로 그 결함으로 리뷰에 걸렸다).
+    // 이 화면은 관전자 폴링 경로가 아니라(`usePublicTeamRecords` 에 refetchInterval 없음)
+    // 매 요청 조회 비용도 문제되지 않는다 -- 폴링되는 일정 카드가 이 맵을 여전히 게이팅
+    // 뒤에 두는 이유와 대비된다.
+    const consentMap = await loadParticipantConsentEligibility(this.prisma, scorerParticipantIds);
     const nameProfileByUserId = await loadParticipantNameProfiles(
       this.prisma,
       currentRows.flatMap((row) => row.resultRevision.game.participants.map((participant) => participant.userId)),
@@ -369,7 +390,7 @@ export class PublicTeamRecordsService {
         row.resultRevision.game.participants.map((participant) => [participant.id, participant.sideId] as const),
       );
 
-      const revisionGoals = parseTournamentFixtureRevisionGoals(row.resultRevision.goalEvents);
+      const revisionGoals = revisionGoalsByGameId.get(row.gameId) ?? null;
       const rows = (eventsByGame.get(row.gameId) ?? [])
         .filter((event) => revisionGoals === null || event.type === 'CARD')
         .map((event) => {
@@ -397,6 +418,8 @@ export class PublicTeamRecordsService {
             side: (eventSideKey !== null && eventSideKey === ownSideKey ? 'own' : 'opponent') as 'own' | 'opponent',
             participantName: eligible ? resolveParticipantDisplayName(participant, nameProfileByUserId) : null,
             jerseyNumber: eligible ? (participant?.jerseyNumber ?? null) : null,
+            // 이름이 보일 때만 링크를 건다 -- '비공개 선수'에 링크를 걸면 안 된다.
+            profileHref: eligible ? resolveParticipantProfileHref(participant?.userId ?? null, consent) : null,
             period: isPeriodUnknown(event.payload) ? null : event.period,
             clockMs: isMinuteUnknown(event.payload) ? null : event.clockMs,
             cardColor: event.type === 'CARD' ? parseCardColor(event.payload) : null,
@@ -428,6 +451,7 @@ export class PublicTeamRecordsService {
                 ? resolveParticipantDisplayName(participant, nameProfileByUserId)
                 : null,
               jerseyNumber: eligible ? (participant?.jerseyNumber ?? null) : null,
+              profileHref: eligible ? resolveParticipantProfileHref(participant?.userId ?? null, consent) : null,
               period: event.period,
               clockMs: event.minute === null ? null : event.minute * 60000,
               cardColor: null,

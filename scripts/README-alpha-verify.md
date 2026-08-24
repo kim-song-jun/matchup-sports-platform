@@ -38,6 +38,7 @@ export ALPHA_SESSION_TOKEN='v1.<payload>.<signature>'
 | `capture-record-consent-screens.mjs` | 기록 공개 설정 화면 — 알림 착지(`?from=tournament`, 맥락 배너 있음) / 파라미터 없는 기본 화면 / 홈 넛지 배너를 3폭 캡처. 캡처 전에 `GET /me/record-consent` 를 찍어 **배너가 안 뜬 이유를 서버 응답으로 남긴다**(스크린샷만 보고 추측하지 않기 위해) | 선수 |
 | `capture-claim-my-record.mjs` | 자가 신원 연결 — 경기 상세의 배너와 **모달을 실제로 열어** 3폭 캡처. 후보 0명/N명 두 상태를 각각 찍으라고 만든 것이다(`FIXTURE_ID` 를 바꿔 가며) | 참가팀 멤버 |
 | `capture-public-profile.mjs` | 공개 프로필 + 공개 활동 기록 3폭 캡처. `TARGET_USER_ID` 로 대상 지정 | 선수(타인 프로필도 가능) |
+| `capture-my-player-card.mjs` | 마이페이지의 **내 선수 카드** 3폭 캡처. `.tm-player-card` 존재 여부를 함께 판정한다 — 카드가 숨김·로딩·실패로 사라져도 화면은 200 이라 스크린샷만으로는 구분되지 않는다 | 본인 |
 | `verify-alpha-league-result-flow.mjs` | 리그 결과가 **순위표까지 닿는지** 릴레이 전체(홈팀 작성·제출 → 원정팀 승인 → 공개 순위표 반영)를 밟는다. 각 칸의 유닛 테스트가 전부 통과하는 동안 릴레이가 통째로 끊겨 있던 적이 있어서(2026-08-24 원정팀이 승인 화면에 진입 불가) 이어짐 자체를 본다. `--dry` 는 게이트 값과 순위표만 읽는다 | 홈팀장+원정팀장 |
 | `verify-alpha-og-card.mjs` | 선수 카드 OG 이미지가 **사용자별로 다른 그림**인지 판정. 여러 id 의 응답 바이트를 sha 로 비교해 전원이 같은 폴백을 받는 상태를 잡는다 — HTTP 200·PNG 까지는 통과하므로 상태코드만 보면 못 잡는다 | 불필요 |
 

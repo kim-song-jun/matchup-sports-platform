@@ -46,7 +46,15 @@ function TeamRecordEventRow({ event }: { event: PublicTeamRecordEvent }) {
         <span className="tab-num" style={{ color: 'var(--text-caption)', fontSize: 12 }}>{event.jerseyNumber}</span>
       ) : null}
       <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-strong)' }}>
-        {presentGameEventParticipantName(event.type, event.participantName)}
+        {/* 열어도 되는지는 서버가 `profileHref` 로 판단해 내려준다 — 여기서 동의·계정
+            유무를 다시 따지지 않는다(경기 상세의 ProfileLink 와 같은 규칙). */}
+        {event.profileHref !== null ? (
+          <Link href={event.profileHref} style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 2 }}>
+            {presentGameEventParticipantName(event.type, event.participantName)}
+          </Link>
+        ) : (
+          presentGameEventParticipantName(event.type, event.participantName)
+        )}
       </span>
     </span>
   );

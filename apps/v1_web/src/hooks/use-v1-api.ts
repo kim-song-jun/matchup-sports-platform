@@ -2311,10 +2311,38 @@ export type V1TournamentRealNameVisibility = { visible: boolean };
  */
 export type V1PlayerCardHidden = { hidden: boolean };
 
+/** 선수 카드 모양 설정. 잠금 판정은 서버가 하고 화면은 결과만 그린다 -- 규칙을 두 곳에 두면 어긋난다. */
+export type V1PlayerCardShapeSettings = {
+  shape: 'rect' | 'shield';
+  unlocked: ('rect' | 'shield')[];
+  reviewCount: number;
+  requiredForShield: number;
+};
+
 export function useV1PlayerCardHidden() {
   return useQuery({
     queryKey: v1Keys.playerCardHidden(),
     queryFn: () => v1Get<V1PlayerCardHidden>('/me/player-card-hidden'),
+  });
+}
+
+export function useV1PlayerCardShape() {
+  return useQuery({
+    queryKey: v1Keys.playerCardShape(),
+    queryFn: () => v1Get<V1PlayerCardShapeSettings>('/me/player-card-shape'),
+  });
+}
+
+export function useV1UpdatePlayerCardShape() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { shape: 'rect' | 'shield' }) =>
+      v1Patch<V1PlayerCardShapeSettings>('/me/player-card-shape', body),
+    onSuccess: (result) => {
+      queryClient.setQueryData<V1PlayerCardShapeSettings>(v1Keys.playerCardShape(), result);
+      // 모양이 바뀌면 마이페이지·공개 프로필에 그려진 카드도 같이 바뀌어야 한다.
+      void queryClient.invalidateQueries({ queryKey: v1Keys.all });
+    },
   });
 }
 

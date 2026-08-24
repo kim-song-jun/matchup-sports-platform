@@ -25,6 +25,9 @@ const TIER_STYLE: Record<V1PlayerCard['tier'], { label: string; ring: string; gl
   bronze: { label: '브론즈', ring: 'rgba(197, 132, 74, 0.55)', glow: 'rgba(197, 132, 74, 0.34)' },
   silver: { label: '실버', ring: 'rgba(176, 184, 193, 0.6)', glow: 'rgba(176, 184, 193, 0.34)' },
   gold: { label: '골드', ring: 'rgba(255, 195, 66, 0.62)', glow: 'rgba(255, 195, 66, 0.36)' },
+  // 레전드는 금빛 계열이되 더 밝고 차분하게, 스페셜은 그 위에서 푸른빛으로 갈라진다 --
+  // 둘 다 금색이면 30경기와 100경기가 화면에서 구분되지 않는다.
+  legend: { label: '레전드', ring: 'rgba(246, 231, 174, 0.72)', glow: 'rgba(201, 162, 39, 0.4)' },
   special: { label: '스페셜', ring: 'rgba(49, 130, 246, 0.7)', glow: 'rgba(49, 130, 246, 0.42)' },
 };
 
@@ -95,14 +98,26 @@ export function PlayerCard({
   return (
     <section
       className="tm-player-card"
+      // 모양은 코스메틱이라 data 속성으로만 내보내고 CSS 가 그린다 -- 컴포넌트 로직에
+      // 모양별 분기를 넣으면 새 모양을 더할 때마다 이 파일을 고쳐야 한다.
+      data-shape={card.shape ?? 'rect'}
       style={{ '--tm-card-ring': tier.ring, '--tm-card-glow': tier.glow } as React.CSSProperties}
       aria-label={`${displayName} 선수 카드`}
     >
       <div className="tm-player-card-top">
+        {/* 총점이 없을 때 대시를 쓰면 52px 짜리 **흰 막대**가 떠 카드가 깨져 보인다
+            (alpha 실측 2026-08-24, 0경기 사용자). 0 을 쓸 수 없다는 계약은 그대로 두고
+            "아직 없음"을 글자로 말한다. 포지션 대시도 같은 이유로 지운다 -- 포지션이
+            없다는 사실은 아래 한 줄(포지션 미정)이 이미 말하고 있다. */}
         <div className="tm-player-card-ovr">
-          <div className="tm-player-card-ovr-value">{card.overall ?? '–'}</div>
+          <div
+            className="tm-player-card-ovr-value"
+            data-empty={card.overall === null ? 'true' : undefined}
+          >
+            {card.overall ?? 'NEW'}
+          </div>
           <div className="tm-player-card-ovr-rule" aria-hidden="true" />
-          <div className="tm-player-card-ovr-pos">{card.position ?? '–'}</div>
+          {card.position ? <div className="tm-player-card-ovr-pos">{card.position}</div> : null}
         </div>
 
         {/* 사진이 카드의 주인공이다. 없으면 이니셜로 대체하되, 본인에게는 올리라고 권한다 --

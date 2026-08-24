@@ -181,3 +181,15 @@ export class UpdatePlayerCardHiddenDto {
   @IsBoolean()
   hidden!: boolean;
 }
+
+/**
+ * 선수 카드 모양 선택.
+ *
+ * 문자열을 자유롭게 받지 않고 목록으로 막는 이유: 저장은 되는데 화면이 못 그리는 값이
+ * 들어오면 카드가 통째로 안 보인다. 잠금 여부는 서비스가 따로 판정한다 -- 여기서는
+ * "존재하는 모양인가"만 본다.
+ */
+export class UpdatePlayerCardShapeDto {
+  @IsIn(['rect', 'shield'])
+  shape!: 'rect' | 'shield';
+}

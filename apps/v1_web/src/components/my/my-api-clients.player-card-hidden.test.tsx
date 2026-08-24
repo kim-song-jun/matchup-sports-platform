@@ -22,6 +22,9 @@ vi.mock('next/navigation', () => ({
 const stateMock = vi.fn();
 const mutateMock = vi.fn();
 const updateMock = vi.fn();
+const shapeStateMock = vi.fn();
+const shapeUpdateMock = vi.fn();
+const shapeMutate = vi.fn();
 
 vi.mock('@/hooks/use-v1-api', async () => {
   const actual = await vi.importActual<Record<string, unknown>>('@/hooks/use-v1-api');
@@ -29,6 +32,8 @@ vi.mock('@/hooks/use-v1-api', async () => {
     ...actual,
     useV1PlayerCardHidden: () => stateMock(),
     useV1UpdatePlayerCardHidden: () => updateMock(),
+    useV1PlayerCardShape: () => shapeStateMock(),
+    useV1UpdatePlayerCardShape: () => shapeUpdateMock(),
   };
 });
 
@@ -42,7 +47,13 @@ function renderWithClient(ui: ReactElement) {
 
 beforeEach(() => {
   mutateMock.mockReset();
+  shapeMutate.mockReset();
   updateMock.mockReturnValue({ mutate: mutateMock, isPending: false });
+  shapeUpdateMock.mockReturnValue({ mutate: shapeMutate, isPending: false });
+  shapeStateMock.mockReturnValue({
+    data: { shape: 'rect', unlocked: ['rect'], reviewCount: 3, requiredForShield: 10 },
+    isLoading: false, isError: false,
+  });
 });
 
 describe('선수 카드 숨김 설정', () => {
@@ -101,5 +112,39 @@ describe('선수 카드 숨김 설정', () => {
     renderWithClient(<PlayerCardHiddenSettingsPageClient />);
 
     expect(screen.getByText(/설정을 불러오지 못했어요/)).toBeInTheDocument();
+  });
+
+  describe('카드 모양 (업적 코스메틱)', () => {
+    it('잠긴 모양은 지우지 않고 자물쇠와 남은 개수를 보여준다', () => {
+      stateMock.mockReturnValue({ data: { hidden: false }, isLoading: false, isError: false });
+
+      renderWithClient(<PlayerCardHiddenSettingsPageClient />);
+
+      // 목록에서 지워버리면 존재를 모른다 -- 다음 목표가 되는 게 이 기능의 목적이다.
+      const shield = screen.getByRole('button', { name: '카드 모양 방패 (잠김)' });
+      expect(shield).toBeDisabled();
+      expect(screen.getByText(/후기 10개를 받으면 열려요 \(지금 3개\)/)).toBeInTheDocument();
+    });
+
+    it('열려 있으면 눌러서 바꿀 수 있다', async () => {
+      stateMock.mockReturnValue({ data: { hidden: false }, isLoading: false, isError: false });
+      shapeStateMock.mockReturnValue({
+        data: { shape: 'rect', unlocked: ['rect', 'shield'], reviewCount: 12, requiredForShield: 10 },
+        isLoading: false, isError: false,
+      });
+
+      renderWithClient(<PlayerCardHiddenSettingsPageClient />);
+      fireEvent.click(screen.getByRole('button', { name: '카드 모양 방패' }));
+
+      await waitFor(() => expect(shapeMutate).toHaveBeenCalledWith({ shape: 'shield' }, expect.anything()));
+    });
+
+    it('모양은 꾸미기일 뿐이라는 것을 화면에 적는다', () => {
+      stateMock.mockReturnValue({ data: { hidden: false }, isLoading: false, isError: false });
+
+      renderWithClient(<PlayerCardHiddenSettingsPageClient />);
+
+      expect(screen.getByText(/능력치나 등급은 바뀌지 않아요/)).toBeInTheDocument();
+    });
   });
 });

@@ -305,6 +305,8 @@ export interface PublicTeamRecordEvent {
   readonly side: 'own' | 'opponent';
   readonly participantName: string | null;
   readonly jerseyNumber: number | null;
+  /** 공개 프로필 경로 — 서버가 열어도 되는지까지 판단한 값. `PublicMatchEvent` 와 동일 규칙. */
+  readonly profileHref: string | null;
   readonly period: number | null;
   readonly clockMs: number | null;
   readonly cardColor: 'YELLOW' | 'RED' | null;

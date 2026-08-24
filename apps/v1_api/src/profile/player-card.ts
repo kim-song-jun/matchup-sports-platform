@@ -20,7 +20,7 @@ export const MIN_REVIEWS_FOR_METRIC_STATS = 3;
 
 export type PlayerCardStatCode = 'SHO' | 'PAS' | 'APP' | 'SKI' | 'MAN' | 'PUN';
 export type PlayerCardPosition = 'FW' | 'MF' | 'DF' | 'GK' | null;
-export type PlayerCardTier = 'bronze' | 'silver' | 'gold' | 'special';
+export type PlayerCardTier = 'bronze' | 'silver' | 'gold' | 'legend' | 'special';
 
 export interface PlayerCardInput {
   /** 공개 게이트를 통과한 출전 경기 수(gameId 중복 제거 후). */
@@ -50,6 +50,8 @@ export interface PlayerCardInput {
    * alpha 실측(2026-08-24)에서 0경기 사용자가 정확히 그 안내를 받고 있었다.
    */
   readonly hasRecordLinks: boolean;
+  /** 저장된 모양 선택. 잠금은 buildPlayerCard 가 다시 판정한다. */
+  readonly savedShape?: string | null;
 }
 
 export type PlayerCardLockReason =
@@ -74,6 +76,8 @@ export interface PlayerCard {
   /** 열린 능력치가 하나도 없으면 null. 숫자를 짜내지 않는다. */
   readonly overall: number | null;
   readonly tier: PlayerCardTier;
+  /** 카드 모양(코스메틱). 업적으로 열리며 능력치·등급과 무관하다. */
+  readonly shape: PlayerCardShape;
   readonly appearances: number;
   readonly stats: readonly PlayerCardStat[];
   /** 열린 능력치 / 전체. 카드 완성도 표시에 쓴다. */
@@ -121,8 +125,44 @@ function fromReviewScore(average: number): number {
   return clamp99(((average - 1) / 4) * 60 + 39);
 }
 
+/** 카드 모양(코스메틱). 능력치·등급 계산에 관여하지 않는다. */
+export type PlayerCardShape = 'rect' | 'shield';
+
+/** 방패 모양이 열리는 최소 후기 수. */
+export const MIN_REVIEWS_FOR_SHIELD_SHAPE = 10;
+
+/**
+ * 열려 있는 카드 모양.
+ *
+ * 기준을 **4항목 후기 건수**로 잡은 이유: 이미 SKI/MAN/PUN 잠금을 푸는 값이라
+ * 카드에 보이는 숫자와 업적 조건이 같아진다. 별도 카운터를 만들면 "후기 12개인데
+ * 왜 안 열리지" 같은 어긋남이 생긴다.
+ */
+export function unlockedCardShapes(reviewCount: number): readonly PlayerCardShape[] {
+  return reviewCount >= MIN_REVIEWS_FOR_SHIELD_SHAPE ? ['rect', 'shield'] : ['rect'];
+}
+
+/**
+ * 저장된 선택을 **매번 재판정**해서 실제 적용할 모양을 낸다.
+ * 저장값을 그대로 믿지 않는 이유: 후기가 지워져 조건이 깨질 수 있고, 그때 화면만
+ * 방패로 남아 있으면 "왜 나는 되는데 남은 안 되지"가 된다.
+ */
+export function resolveCardShape(saved: string | null | undefined, reviewCount: number): PlayerCardShape {
+  const unlocked = unlockedCardShapes(reviewCount);
+  return unlocked.includes(saved as PlayerCardShape) ? (saved as PlayerCardShape) : 'rect';
+}
+
+/**
+ * 등급은 **뛴 경기 수만** 본다 -- 실력이 아니라 꾸준함에 주는 보상이다.
+ *
+ * 2026-08-24: 30경기에서 끝나던 사다리를 두 칸으로 나눴다. 30경기는 주말 풋살로 반 년이면
+ * 닿는 수치라, 거기서 최상위가 되면 그 뒤로 몇 년을 더 뛰어도 카드가 그대로였다 --
+ * 오래 뛴 사람에게 남는 목표가 없었다. `legend`(30~99)와 `special`(100+)로 나눠
+ * 장기 사용자에게 다음 칸을 만든다.
+ */
 export function resolveTier(appearances: number): PlayerCardTier {
-  if (appearances >= 30) return 'special';
+  if (appearances >= 100) return 'special';
+  if (appearances >= 30) return 'legend';
   if (appearances >= 15) return 'gold';
   if (appearances >= 5) return 'silver';
   return 'bronze';
@@ -225,6 +265,7 @@ export function buildPlayerCard(input: PlayerCardInput): PlayerCard {
     jerseyNumber: input.jerseyNumber,
     overall,
     tier: resolveTier(appearances),
+    shape: resolveCardShape(input.savedShape, input.reviewCount),
     appearances,
     stats,
     unlockedCount: unlocked.length,

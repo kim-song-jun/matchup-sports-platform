@@ -329,6 +329,23 @@ identity/side itself:
   are shown, while a profile exposes the person's whole activity history. With the switch
   off, an unconsented participant's name may appear but their profile still will not open.
 
+- `GET /teams/:teamId/records` carries the same `profileHref` on `items[].events[]`, with the
+  identical rule and the same server-side resolver. Its `consentMap` is loaded
+  unconditionally for the same reason as the match view; unlike the schedule, this endpoint
+  is not polled (`usePublicTeamRecords` sets no `refetchInterval`), so the extra lookup is
+  paid once per view.
+
+- **The schedule (`GET /tournaments/:id/schedule`) deliberately does not carry
+  `profileHref`.** Its `consentMap` stays behind the name-gating flag because that endpoint
+  *is* polled while any fixture is live (`LIVE_POLL_INTERVAL_MS`). Loading consent
+  unconditionally there would add up to **three batched queries per poll** — links, user
+  consents, snapshots (`loadParticipantConsentEligibility`). They are batched across the
+  whole page, *not* per fixture, so the cost grows with `IN`-list size rather than with the
+  number of fixtures. That is a real but modest cost, weighed against a scorer line that is
+  a one-line summary: a reader who wants the player opens the match, where the link exists.
+  Revisit if the schedule ever needs consent for another reason, since the marginal cost
+  would then be zero.
+
 ### Known scope trims (documented, not silently dropped)
 
 - The schedule list only cursor-paginates fixtures that already have a

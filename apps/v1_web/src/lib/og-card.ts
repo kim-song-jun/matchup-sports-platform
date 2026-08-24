@@ -62,6 +62,7 @@ export const OG_TIER: Record<V1PlayerCard['tier'], { label: string; ring: string
   bronze: { label: '브론즈', ring: 'rgba(197, 132, 74, 0.55)', glow: 'rgba(197, 132, 74, 0.34)' },
   silver: { label: '실버', ring: 'rgba(176, 184, 193, 0.6)', glow: 'rgba(176, 184, 193, 0.34)' },
   gold: { label: '골드', ring: 'rgba(255, 195, 66, 0.62)', glow: 'rgba(255, 195, 66, 0.36)' },
+  legend: { label: '레전드', ring: 'rgba(246, 231, 174, 0.72)', glow: 'rgba(201, 162, 39, 0.4)' },
   special: { label: '스페셜', ring: 'rgba(49, 130, 246, 0.7)', glow: 'rgba(49, 130, 246, 0.42)' },
 };
 

@@ -4,7 +4,7 @@ import { GamesService } from '../games/games.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { NotificationsService } from '../notifications/notifications.service';
-import { LEAGUE_RESULT_DISPUTE_WINDOW_MS } from './league-result-dispute.constants';
+import { judgeLeagueDisputeEligibility } from './league-result-dispute-eligibility';
 import { LeagueMatchAdminService } from './league-match-admin.service';
 import { LeagueMatchResultEntryService } from './league-match-result-entry.service';
 import {
@@ -79,20 +79,27 @@ export class LeagueMatchDisputeService {
         message: '아직 확정된 결과가 없어 이의를 제기할 수 없어요.',
       });
     }
-    const disputeDeadline = new Date(revision.officialAt.getTime() + LEAGUE_RESULT_DISPUTE_WINDOW_MS);
-    if (new Date() > disputeDeadline) {
+    // E3: 승강이 확정된 리그는 이의 제기 자체를 막는다. commitPromotions가 만드는
+    // V1LeaguePromotion 행 존재 여부가 그 판정 근거다(league-series-admin.service.ts).
+    // U3: 이 판정(기간 만료·승강 확정)은 team-matches.service.ts의 상세 응답이 미리
+    // 보여주는 disputeBlockedReason과 **같은 순수 함수**(league-result-dispute-eligibility.ts)를
+    // 공유한다 -- 여기서 새로 로직을 만들면 화면과 서버가 다른 답을 낼 수 있다.
+    const promotionCommitted = await this.prisma.v1LeaguePromotion.findFirst({
+      where: { fromLeagueId: leagueId },
+      select: { id: true },
+    });
+    const { blockedReason } = judgeLeagueDisputeEligibility({
+      officialAt: revision.officialAt,
+      now: new Date(),
+      promotionCommitted: promotionCommitted !== null,
+    });
+    if (blockedReason === 'window_expired') {
       throw new ConflictException({
         code: 'LEAGUE_RESULT_DISPUTE_WINDOW_EXPIRED',
         message: '결과 확정 후 7일이 지나 이의를 제기할 수 없어요.',
       });
     }
-    // E3: 승강이 확정된 리그는 이의 제기 자체를 막는다. commitPromotions가 만드는
-    // V1LeaguePromotion 행 존재 여부가 그 판정 근거다(league-series-admin.service.ts).
-    const promotionCommitted = await this.prisma.v1LeaguePromotion.findFirst({
-      where: { fromLeagueId: leagueId },
-      select: { id: true },
-    });
-    if (promotionCommitted !== null) {
+    if (blockedReason === 'promotion_committed') {
       throw new ConflictException({
         code: 'LEAGUE_PROMOTION_ALREADY_COMMITTED',
         message: '승강이 이미 확정된 리그는 이의를 제기할 수 없어요.',

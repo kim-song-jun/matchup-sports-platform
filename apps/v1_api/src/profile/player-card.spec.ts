@@ -3,6 +3,9 @@ import {
   MIN_APPEARANCES_FOR_RATE_STATS,
   PLAYER_CARD_FORMULA_VERSION,
   resolveTier,
+  resolveCardShape,
+  unlockedCardShapes,
+  MIN_REVIEWS_FOR_SHIELD_SHAPE,
   type PlayerCardInput,
   type PlayerCardStatCode,
 } from './player-card';
@@ -250,5 +253,33 @@ describe('선수 카드 산식', () => {
 
   it('응답에 산식 버전이 실린다 -- 나중에 계수를 바꿔도 조용히 바뀌지 않게', () => {
     expect(buildPlayerCard(base).formulaVersion).toBe(PLAYER_CARD_FORMULA_VERSION);
+  });
+
+  describe('카드 모양 (코스메틱 업적)', () => {
+    it('처음에는 네모만 열려 있다 -- 첫 카드는 가장 단순해야 한다', () => {
+      expect(unlockedCardShapes(0)).toEqual(['rect']);
+      expect(unlockedCardShapes(MIN_REVIEWS_FOR_SHIELD_SHAPE - 1)).toEqual(['rect']);
+    });
+
+    it('후기 10건에서 방패가 열린다', () => {
+      expect(unlockedCardShapes(MIN_REVIEWS_FOR_SHIELD_SHAPE)).toEqual(['rect', 'shield']);
+      expect(unlockedCardShapes(42)).toEqual(['rect', 'shield']);
+    });
+
+    it('잠긴 모양을 저장해 뒀어도 적용되지 않는다 -- 저장값을 그대로 믿지 않는다', () => {
+      // 후기가 지워져 조건이 깨지는 경우가 실제로 있다. 그때 화면만 방패로 남으면
+      // "나는 되는데 남은 안 되네"가 된다.
+      expect(resolveCardShape('shield', 3)).toBe('rect');
+    });
+
+    it('열려 있으면 저장한 선택을 그대로 쓴다', () => {
+      expect(resolveCardShape('shield', 10)).toBe('shield');
+      expect(resolveCardShape('rect', 10)).toBe('rect');
+    });
+
+    it('값이 없거나 이상하면 네모로 떨어진다', () => {
+      expect(resolveCardShape(null, 99)).toBe('rect');
+      expect(resolveCardShape('diamond', 99)).toBe('rect');
+    });
   });
 });

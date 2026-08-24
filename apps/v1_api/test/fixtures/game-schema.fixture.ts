@@ -371,7 +371,12 @@ export const gameSchemaSourceManifest = {
   // game operations 계약 변화가 아니다. 전용 마이그레이션
   // 20260824120000_v1_player_card_hidden 이 뒷받침하며, 바인딩된
   // 20260729000100_v1_game_operations 는 건드리지 않았다(migration 해시 불변).
-  schema: '7cbdebdb092aa78fda6dd7d9f63a3772d68a1804a707213b016903a34a3b6ebe',
+  // 선수 카드 모양(v1_user_profiles.player_card_shape) 컬럼 하나가 늘었다. game domain 밖의
+  // nullable 아닌 기본값 컬럼이지만 이 guard 는 schema.prisma **전체 바이트**를 결속하므로
+  // 여기서 걸린다 -- 파일 해시 노이즈이지 game operations 계약 변화가 아니다. 전용 마이그레이션
+  // 20260824170000_v1_player_card_shape 의 빈 DB replay + drift 검증을 통과한 스키마로
+  // 재고정하며, 바인딩된 20260729000100_v1_game_operations 는 건드리지 않았다(migration 해시 불변).
+  schema: '262b672d8717a0ca058334e4e27e58c0c8a5ad4341a8c25840498883f3760c75',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

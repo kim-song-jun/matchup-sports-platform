@@ -22,6 +22,7 @@ const card: V1PlayerCard = {
   jerseyNumber: 1,
   overall: 48,
   tier: 'bronze',
+  shape: 'rect',
   appearances: 4,
   stats: [
     { code: 'SHO', label: '골', value: 44, unlocked: true, lockedBy: null },

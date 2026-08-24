@@ -1919,6 +1919,8 @@ export type V1PlayerCard = {
   overall: number | null;
   /** 실력이 아니라 **출전 수**로 정해진다. */
   tier: 'bronze' | 'silver' | 'gold' | 'special';
+  /** 카드 모양(코스메틱). 후기 10건 업적으로 방패가 열린다. */
+  shape: 'rect' | 'shield';
   appearances: number;
   stats: V1PlayerCardStat[];
   unlockedCount: number;

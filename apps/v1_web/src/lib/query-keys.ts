@@ -70,6 +70,7 @@ export const v1Keys = {
   recordConsent: () => [...v1Keys.all, 'me', 'record-consent'] as const,
   tournamentRealNameVisibility: () => [...v1Keys.all, 'me', 'tournament-real-name-visibility'] as const,
   playerCardHidden: () => [...v1Keys.all, 'me', 'player-card-hidden'] as const,
+  playerCardShape: () => [...v1Keys.all, 'me', 'player-card-shape'] as const,
   inquiries: (filters?: Record<string, unknown>) => [...v1Keys.all, 'inquiries', filters ?? {}] as const,
   inquiry: (inquiryId: string) => [...v1Keys.all, 'inquiries', inquiryId] as const,
   profile: () => [...v1Keys.all, 'me', 'profile'] as const,

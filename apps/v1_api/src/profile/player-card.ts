@@ -50,6 +50,8 @@ export interface PlayerCardInput {
    * alpha 실측(2026-08-24)에서 0경기 사용자가 정확히 그 안내를 받고 있었다.
    */
   readonly hasRecordLinks: boolean;
+  /** 저장된 모양 선택. 잠금은 buildPlayerCard 가 다시 판정한다. */
+  readonly savedShape?: string | null;
 }
 
 export type PlayerCardLockReason =
@@ -74,6 +76,8 @@ export interface PlayerCard {
   /** 열린 능력치가 하나도 없으면 null. 숫자를 짜내지 않는다. */
   readonly overall: number | null;
   readonly tier: PlayerCardTier;
+  /** 카드 모양(코스메틱). 업적으로 열리며 능력치·등급과 무관하다. */
+  readonly shape: PlayerCardShape;
   readonly appearances: number;
   readonly stats: readonly PlayerCardStat[];
   /** 열린 능력치 / 전체. 카드 완성도 표시에 쓴다. */
@@ -119,6 +123,33 @@ function clamp99(raw: number): number {
  */
 function fromReviewScore(average: number): number {
   return clamp99(((average - 1) / 4) * 60 + 39);
+}
+
+/** 카드 모양(코스메틱). 능력치·등급 계산에 관여하지 않는다. */
+export type PlayerCardShape = 'rect' | 'shield';
+
+/** 방패 모양이 열리는 최소 후기 수. */
+export const MIN_REVIEWS_FOR_SHIELD_SHAPE = 10;
+
+/**
+ * 열려 있는 카드 모양.
+ *
+ * 기준을 **4항목 후기 건수**로 잡은 이유: 이미 SKI/MAN/PUN 잠금을 푸는 값이라
+ * 카드에 보이는 숫자와 업적 조건이 같아진다. 별도 카운터를 만들면 "후기 12개인데
+ * 왜 안 열리지" 같은 어긋남이 생긴다.
+ */
+export function unlockedCardShapes(reviewCount: number): readonly PlayerCardShape[] {
+  return reviewCount >= MIN_REVIEWS_FOR_SHIELD_SHAPE ? ['rect', 'shield'] : ['rect'];
+}
+
+/**
+ * 저장된 선택을 **매번 재판정**해서 실제 적용할 모양을 낸다.
+ * 저장값을 그대로 믿지 않는 이유: 후기가 지워져 조건이 깨질 수 있고, 그때 화면만
+ * 방패로 남아 있으면 "왜 나는 되는데 남은 안 되지"가 된다.
+ */
+export function resolveCardShape(saved: string | null | undefined, reviewCount: number): PlayerCardShape {
+  const unlocked = unlockedCardShapes(reviewCount);
+  return unlocked.includes(saved as PlayerCardShape) ? (saved as PlayerCardShape) : 'rect';
 }
 
 export function resolveTier(appearances: number): PlayerCardTier {
@@ -225,6 +256,7 @@ export function buildPlayerCard(input: PlayerCardInput): PlayerCard {
     jerseyNumber: input.jerseyNumber,
     overall,
     tier: resolveTier(appearances),
+    shape: resolveCardShape(input.savedShape, input.reviewCount),
     appearances,
     stats,
     unlockedCount: unlocked.length,

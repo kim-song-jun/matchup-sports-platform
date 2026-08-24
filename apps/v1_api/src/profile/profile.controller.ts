@@ -21,6 +21,7 @@ import {
   UpdateProfileDto,
   UpdateSettingsDto,
   UpdatePlayerCardHiddenDto,
+  UpdatePlayerCardShapeDto,
   UpdateTournamentRealNameVisibilityDto,
   WithdrawalRequestDto,
 } from './dto/profile.dto';
@@ -101,6 +102,19 @@ export class ProfileController {
   @UseGuards(V1AuthGuard)
   updateMyPlayerCardHidden(@CurrentUser() user: V1AuthUser, @Body() dto: UpdatePlayerCardHiddenDto) {
     return this.profileService.updateMyPlayerCardHidden(user, dto);
+  }
+
+  /** 선수 카드 모양 (코스메틱 업적). 잠금 판정은 서버가 하고, 화면은 결과만 그린다. */
+  @Get('me/player-card-shape')
+  @UseGuards(V1AuthGuard)
+  myPlayerCardShape(@CurrentUser() user: V1AuthUser) {
+    return this.profileService.myPlayerCardShape(user);
+  }
+
+  @Patch('me/player-card-shape')
+  @UseGuards(V1AuthGuard)
+  updateMyPlayerCardShape(@CurrentUser() user: V1AuthUser, @Body() dto: UpdatePlayerCardShapeDto) {
+    return this.profileService.updateMyPlayerCardShape(user, dto);
   }
 
   @Get('me/tournament-real-name-visibility')

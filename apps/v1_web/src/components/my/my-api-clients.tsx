@@ -53,6 +53,8 @@ import {
   useV1UpdateRecordConsent,
   useV1UpdateSettings,
   useV1UpdatePlayerCardHidden,
+  useV1PlayerCardShape,
+  useV1UpdatePlayerCardShape,
   useV1UpdateTournamentRealNameVisibility,
   useV1WithdrawalRequest,
   useV1WithdrawMyJoinApplication,
@@ -1855,9 +1857,94 @@ export function PlayerCardHiddenSettingsPageClient() {
               <span className={`tm-toggle ${hidden ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
             </button>
           </div>
+
+          <PlayerCardShapePicker />
         </div>
       </div>
     </AppChrome>
+  );
+}
+
+/**
+ * 카드 모양 선택 (코스메틱 업적).
+ *
+ * 별도 화면을 만들지 않고 카드 설정 안에 둔다 -- 카드에 관한 설정이 두 곳으로 갈리면
+ * 사용자가 "카드 숨기기"와 "카드 모양"을 다른 기능으로 오해한다.
+ *
+ * 잠긴 모양도 **목록에서 지우지 않고 자물쇠로 보여준다.** 안 보이면 존재를 모르고,
+ * 존재를 몰라야 할 이유가 없다 -- 오히려 다음 목표가 되는 게 이 기능의 목적이다.
+ */
+function PlayerCardShapePicker() {
+  const state = useV1PlayerCardShape();
+  const update = useV1UpdatePlayerCardShape();
+  const [saveError, setSaveError] = useState(false);
+
+  const shape = state.data?.shape ?? 'rect';
+  const unlocked = state.data?.unlocked ?? ['rect'];
+  const reviewCount = state.data?.reviewCount ?? 0;
+  const required = state.data?.requiredForShield ?? 10;
+
+  const options: { key: 'rect' | 'shield'; label: string; sub: string }[] = [
+    { key: 'rect', label: '네모', sub: '기본 카드예요' },
+    {
+      key: 'shield',
+      label: '방패',
+      sub: unlocked.includes('shield')
+        ? '업적으로 열린 모양이에요'
+        : `후기 ${required}개를 받으면 열려요 (지금 ${reviewCount}개)`,
+    },
+  ];
+
+  return (
+    <>
+      <Card pad={14} style={{ marginTop: 14, marginBottom: 8 }}>
+        <div className="tm-text-label">카드 모양</div>
+        <div className="tm-text-caption" style={{ marginTop: 4 }}>
+          모양은 꾸미기예요 — 능력치나 등급은 바뀌지 않아요.
+        </div>
+      </Card>
+      {saveError ? (
+        <Card pad={14} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
+          <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
+          <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요.</div>
+        </Card>
+      ) : null}
+      <div className="tm-card" style={{ padding: 0 }}>
+        {options.map((opt) => {
+          const locked = !unlocked.includes(opt.key);
+          const selected = shape === opt.key;
+          return (
+            <button
+              key={opt.key}
+              className="tm-my-menu-row tm-pressable"
+              type="button"
+              disabled={locked || state.isLoading || update.isPending}
+              aria-pressed={selected}
+              aria-label={`카드 모양 ${opt.label}${locked ? ' (잠김)' : ''}`}
+              onClick={() => {
+                setSaveError(false);
+                update.mutate({ shape: opt.key }, { onError: () => setSaveError(true) });
+              }}
+              style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: locked ? 'default' : 'pointer' }}
+            >
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="tm-text-body">
+                  {locked ? '🔒 ' : ''}{opt.label}
+                </div>
+                <div className="tm-text-caption" style={{ marginTop: 3 }}>{opt.sub}</div>
+              </div>
+              <span
+                className="tm-text-caption"
+                style={{ minWidth: 24, textAlign: 'right', color: selected ? 'var(--blue500)' : 'var(--text-caption)' }}
+                aria-hidden="true"
+              >
+                {selected ? '선택됨' : ''}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </>
   );
 }
 

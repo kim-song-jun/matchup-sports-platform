@@ -21,6 +21,7 @@ const base: PlayerCardInput = {
   assists: 0,
   startedCount: 0,
   position: 'MF',
+  jerseyNumber: 7,
   skillScore: null,
   mannerScore: null,
   punctualityScore: null,
@@ -235,6 +236,16 @@ describe('선수 카드 산식', () => {
         expect(s.value).toBeLessThanOrEqual(99);
       }
     });
+  });
+
+  it('등번호는 계산에 쓰이지 않고 그대로 통과한다', () => {
+    // 등번호가 총점이나 능력치에 영향을 주면 안 된다 -- 표시 전용 값이다.
+    const withJersey = buildPlayerCard({ ...base, appearances: 10, goals: 5, startedCount: 10, jerseyNumber: 99 });
+    const withoutJersey = buildPlayerCard({ ...base, appearances: 10, goals: 5, startedCount: 10, jerseyNumber: null });
+
+    expect(withJersey.jerseyNumber).toBe(99);
+    expect(withoutJersey.jerseyNumber).toBeNull();
+    expect(withJersey.overall).toBe(withoutJersey.overall);
   });
 
   it('응답에 산식 버전이 실린다 -- 나중에 계수를 바꿔도 조용히 바뀌지 않게', () => {

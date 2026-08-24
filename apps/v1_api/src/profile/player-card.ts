@@ -30,6 +30,11 @@ export interface PlayerCardInput {
   /** 선발 출전 수. `appearances` 이하여야 한다. */
   readonly startedCount: number;
   readonly position: PlayerCardPosition;
+  /**
+   * 등번호. **어떤 계산에도 쓰이지 않는다** -- 표시 전용으로 통과시킨다.
+   * 카드 응답을 한 곳에서 만들기 위해 여기 두었고, 능력치·총점·등급과 무관하다.
+   */
+  readonly jerseyNumber: number | null;
   /** 4항목 후기 평균(1~5). 값이 없으면 null. */
   readonly skillScore: number | null;
   readonly mannerScore: number | null;
@@ -64,6 +69,8 @@ export interface PlayerCardStat {
 export interface PlayerCard {
   readonly formulaVersion: number;
   readonly position: PlayerCardPosition;
+  /** 등번호(표시 전용). 라인업 기록이 없으면 null. */
+  readonly jerseyNumber: number | null;
   /** 열린 능력치가 하나도 없으면 null. 숫자를 짜내지 않는다. */
   readonly overall: number | null;
   readonly tier: PlayerCardTier;
@@ -215,6 +222,7 @@ export function buildPlayerCard(input: PlayerCardInput): PlayerCard {
   return {
     formulaVersion: PLAYER_CARD_FORMULA_VERSION,
     position: input.position,
+    jerseyNumber: input.jerseyNumber,
     overall,
     tier: resolveTier(appearances),
     appearances,

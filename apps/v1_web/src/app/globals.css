@@ -6812,3 +6812,37 @@ button:disabled {
   font-size: 15px; font-weight: 700; text-decoration: none;
 }
 .tm-player-card-cta:focus-visible { outline: 2px solid var(--static-white); outline-offset: 2px; }
+
+/* 선수 카드 공유 입구 (Task 155). 카드 안의 보조 액션이라 CTA(파란 채움)보다 약하게 —
+   카드에서 가장 강한 것은 기록 공개 유도여야 한다. */
+.tm-player-card-share-link {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 44px; margin-top: 10px; border-radius: 12px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: var(--static-white); font-size: 15px; font-weight: 700; text-decoration: none;
+}
+.tm-player-card-share-link:focus-visible { outline: 2px solid var(--static-white); outline-offset: 2px; }
+
+/* 공유 전용 화면의 주 버튼 — 여기서는 공유가 유일한 목적이라 강한 CTA 로 둔다. */
+.tm-player-card-share-btn {
+  min-height: 48px; border-radius: 12px; border: none;
+  background: var(--blue500); color: var(--static-white);
+  font-family: inherit; font-size: 16px; font-weight: 700; width: 100%; cursor: pointer;
+}
+.tm-player-card-share-secondary {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 44px; color: var(--text-muted); font-size: 14px; text-decoration: none;
+}
+
+/* 등번호 배지 (Task 155). 왼쪽 큰 숫자는 총점이라, 등번호는 이름 앞에 작게 붙여
+   둘을 시각적으로 갈라 놓는다 — 안 그러면 총점이 등번호로 읽힌다. */
+.tm-player-card-jersey {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 30px; margin-right: 9px; padding: 1px 7px;
+  border: 1.5px solid rgba(255, 255, 255, 0.26);
+  border-radius: 8px;
+  font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.62);
+  vertical-align: middle;
+}

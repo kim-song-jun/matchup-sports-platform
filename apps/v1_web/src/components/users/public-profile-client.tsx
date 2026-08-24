@@ -102,6 +102,7 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
             profileImageUrl={data.profileImageUrl}
             teamName={data.teams?.[0]?.name ?? null}
             isOwner={false}
+            shareHref={`/users/${userId}/card`}
           />
         ) : null}
 

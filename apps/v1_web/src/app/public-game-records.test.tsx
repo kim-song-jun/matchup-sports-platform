@@ -156,20 +156,27 @@ describe('MatchDetailContent — 동의 게이트된 신원 표시', () => {
   });
 });
 
+/**
+ * 배지를 `role="status"` 로 찾지 않는다 — 이 배지들은 렌더 후 변하지 않는 정적 텍스트라
+ * live region 을 떼어냈다(스크린리더가 상태 변경으로 오인해 공지하는 문제). role 로 찾던
+ * 단언을 그대로 두면 세 번째 테스트("배지를 렌더하지 않는다")가 **role 이 없다는 이유만으로
+ * 항상 통과**해 버려, 배지가 잘못 뜨는 회귀를 못 잡는다. 표시 텍스트로 고정한다.
+ */
 describe('MatchDetailContent — 정정/무효 상태 표시', () => {
   it('void 상태는 무효 처리 배지를 보여준다', () => {
     render(<MatchDetailContent data={makeMatch({ resultState: 'void' })} />);
-    expect(screen.getByRole('status')).toHaveTextContent('무효 처리');
+    expect(screen.getByText('무효 처리')).toBeInTheDocument();
   });
 
   it('corrected 상태는 정정된 결과 배지를 보여준다', () => {
     render(<MatchDetailContent data={makeMatch({ resultState: 'corrected' })} />);
-    expect(screen.getByRole('status')).toHaveTextContent('정정된 결과');
+    expect(screen.getByText('정정된 결과')).toBeInTheDocument();
   });
 
   it('official/pending 상태는 배지를 렌더하지 않는다', () => {
     render(<MatchDetailContent data={makeMatch({ resultState: 'official' })} />);
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.queryByText('무효 처리')).not.toBeInTheDocument();
+    expect(screen.queryByText('정정된 결과')).not.toBeInTheDocument();
   });
 
   it('정정 이력(history)의 정정 여부(isCorrection)에 따라 라벨이 갈린다', () => {

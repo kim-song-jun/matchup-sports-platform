@@ -28,6 +28,17 @@ import {
 
 // ── Main detail client ────────────────────────────────────────────────────
 
+/**
+ * 잠금 안내 끝에 붙는 해결 경로. 이 잠금은 영구 불가가 아니라 **이 폼에서만** 막히는
+ * 것이다 — 소급 영향을 확인하는 전용 경로(대회 설정 변경)로는 바꿀 수 있다. 서버가 409
+ * 로 돌려주는 문구(`tournaments-admin.service.ts` 의 LINEUP_LOCK_ESCAPE_HINT)와 같은
+ * 말을 써서, 폼에서 미리 읽든 저장하다 막히든 같은 안내를 보게 한다.
+ *
+ * 이 안내가 없으면 운영자는 영구 불가로 읽고 엉뚱한 우회를 시도한다 — alpha 실측에서
+ * 경기 결과를 void 해도 잠금이 풀리지 않는 것을 확인했다.
+ */
+const LINEUP_LOCK_ESCAPE_HINT = '꼭 바꿔야 하면 대회 설정 변경에서 소급 영향을 확인한 뒤 진행할 수 있어요.';
+
 export function TournamentInfoSection() {
   const { tournamentId: id, canWrite, showToast } = useTournamentAdmin();
   const { data: tournament } = useV1AdminTournament(id);
@@ -775,6 +786,8 @@ export function TournamentInfoSection() {
               <p className="text-[12px] text-[var(--orange700)]">
                 대회가 시작된 이후에는 출전 인원을 바꿀 수 없어요.
                 {tournament.lineupMaxPlayers !== null ? ` 현재 ${tournament.lineupMaxPlayers}명이에요.` : ''}
+                {' '}
+                {LINEUP_LOCK_ESCAPE_HINT}
               </p>
             ) : editSportId && editSportId !== tournament.sportId ? (
               <p className="text-[12px] text-[var(--text-muted)]">
@@ -829,6 +842,8 @@ export function TournamentInfoSection() {
                 {tournament.substitutionMode !== null
                   ? ` 현재 ${substitutionPolicyLabel(tournament.substitutionMode, tournament.maxSubstitutions)}이에요.`
                   : ''}
+                {' '}
+                {LINEUP_LOCK_ESCAPE_HINT}
               </p>
             ) : editSportId && editSportId !== tournament.sportId ? (
               <p className="text-[12px] text-[var(--text-muted)]">

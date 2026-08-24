@@ -124,6 +124,8 @@ export interface PublicScheduleEntry {
   readonly periodBreak: PublicPeriodBreak | null;
   readonly scorers: readonly PublicScheduleScorer[];
   readonly cards: readonly PublicScheduleCard[];
+  /** 몰수·중단 종결 표기. 경기 상세와 같은 규칙으로 서버가 채운다(정상 종료·공개 전이면 null). */
+  readonly outcome: PublicMatchOutcome | null;
   readonly hasVideo: boolean;
 }
 

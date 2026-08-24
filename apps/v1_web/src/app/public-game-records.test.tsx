@@ -464,6 +464,7 @@ function makeSchedule(overrides: Partial<PublicTournamentScheduleResponse> = {})
         periodBreak: null,
         scorers: [],
         cards: [],
+        outcome: null,
         hasVideo: false,
       },
     ],
@@ -522,6 +523,7 @@ describe('ScheduleContent — 경기 일정에 시각과 구장을 함께 보여
           periodBreak: null,
           scorers: [],
           cards: [],
+          outcome: null,
           hasVideo: false,
         },
       ],
@@ -564,6 +566,7 @@ describe('ScheduleContent — 진행 중 경기의 라이브 스코어/경과 �
     periodBreak: null,
     scorers: [],
     cards: [],
+    outcome: null,
     hasVideo: false,
   };
 

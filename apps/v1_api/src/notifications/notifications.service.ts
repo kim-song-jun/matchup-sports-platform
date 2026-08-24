@@ -271,6 +271,26 @@ function deepLinkForTarget(
   return `${base}/${targetId}`;
 }
 
+/**
+ * 알림 문구·딥링크의 단일 소스 조회 — NotificationsService 를 거치지 않고 자체
+ * 트랜잭션 안에서 v1_notifications 에 직접 쓰는 발송 경로(아웃박스 핸들러 등)가
+ * 문구를 **복사하지 않고 여기서 읽게** 하기 위해 둔다. 적대 리뷰(2026-08-25)가
+ * league_team_match_completed 의 문구가 테이블과 발송 경로에 두 벌로 존재해
+ * 조용히 갈라질 수 있음을 지적했다 — 이 헬퍼가 그 두 번째 사본을 없앤다.
+ * body 는 호출부가 동적 본문(경기 제목 인용 등)으로 덮는 관례라 기본값만 준다.
+ */
+export function notificationCopyFor(
+  type: NotificationEventType,
+  targetType: V1NotificationTargetType,
+  targetId: string | null,
+): { title: string; defaultBody: string; deepLink: string | null } {
+  return {
+    title: EVENT_TITLES[type],
+    defaultBody: EVENT_BODIES[type],
+    deepLink: deepLinkForEvent(type, targetType, targetId),
+  };
+}
+
 function deepLinkForEvent(
   type: NotificationEventType,
   targetType: V1NotificationTargetType,

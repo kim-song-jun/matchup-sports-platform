@@ -133,6 +133,8 @@ import type {
   V1TeamJoinEligibility,
   V1TeamMembersPage,
   V1TeamMembershipMutationResult,
+  V1FileLeagueDisputeDto,
+  V1FileLeagueDisputeResult,
   V1TeamMatch,
   V1TeamMatchApplicationResult,
   V1TeamMatchApplicationsPage,
@@ -1436,6 +1438,21 @@ export function useV1TeamMatchEligibility(teamMatchId: string, filters?: ListFil
     queryFn: () => v1Get<V1TeamMatchEligibility>(`/team-matches/${teamMatchId}/application-eligibility`, filters),
     enabled: Boolean(teamMatchId) && (options?.enabled ?? true),
     retry: false,
+  });
+}
+
+// U3: 리그 대진 결과 이의 제기 (POST /league-matches/:leagueId/fixtures/:teamMatchId/dispute).
+// 팀매치 상세(league.disputeDeadline/disputeBlockedReason/openDisputeExists)가 서버와
+// 같은 판정을 이미 내려주므로, 이 mutation은 성공 시 그 상세만 다시 읽으면
+// openDisputeExists가 true로 바뀐 최신 상태를 그대로 반영한다.
+export function useV1FileLeagueDispute(leagueId: string, teamMatchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1FileLeagueDisputeDto) =>
+      v1Post<V1FileLeagueDisputeResult>(`/league-matches/${leagueId}/fixtures/${teamMatchId}/dispute`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatch(teamMatchId) });
+    },
   });
 }
 

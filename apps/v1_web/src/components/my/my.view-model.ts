@@ -4,6 +4,7 @@ import type {
 } from './my.types';
 
 export const myUser = {
+  userId: null,
   name: '—',
   handle: '—',
   region: '지역 미정',

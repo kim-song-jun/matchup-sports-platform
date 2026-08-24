@@ -71,18 +71,18 @@ export function SchedulePageClient({ tournamentId }: { tournamentId: string }) {
         myFixtures={myFixtures.data}
       />
       {/* 회고 STATS-1 — 대회 개인 득점·도움 랭킹. ScheduleContent 컨테이너와 같은
-          좌우 20px 리듬. 기록이 없으면 아무것도 그리지 않는다(emptyBehavior=hide). */}
-      <div style={{ padding: '0 20px 40px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-        <TournamentPlayerRecordsSections
-          goals={playerRecords.data?.goals}
-          assists={playerRecords.data?.assists}
-          isLoading={playerRecords.isLoading}
-          isError={playerRecords.isError}
-          errorMessage={extractErrorMessage(playerRecords.error, '기록을 불러오지 못했어요.')}
-          onRetry={() => void playerRecords.refetch()}
-          emptyBehavior="hide"
-        />
-      </div>
+          좌우 20px 리듬. 기록이 없으면 아무것도(래퍼 여백 포함) 그리지 않는다 —
+          래퍼는 containerStyle로 컴포넌트 안에서 내용과 함께만 렌더된다. */}
+      <TournamentPlayerRecordsSections
+        goals={playerRecords.data?.goals}
+        assists={playerRecords.data?.assists}
+        isLoading={playerRecords.isLoading}
+        isError={playerRecords.isError}
+        errorMessage={extractErrorMessage(playerRecords.error, '기록을 불러오지 못했어요.')}
+        onRetry={() => void playerRecords.refetch()}
+        emptyBehavior="hide"
+        containerStyle={{ padding: '0 20px 40px', display: 'flex', flexDirection: 'column', gap: 20 }}
+      />
     </AppChrome>
   );
 }

@@ -117,6 +117,7 @@ function fixtureEntry(overrides: Partial<import('./types').PublicScheduleEntry> 
     periodBreak: null,
     scorers: [],
     cards: [],
+    outcome: null,
     hasVideo: false,
     ...overrides,
   };
@@ -576,5 +577,48 @@ describe('ScheduleContent — 시간 미정 경기', () => {
     expect(screen.getByText('홈팀')).toBeInTheDocument();
     expect(screen.getByText('미정')).toBeInTheDocument();
     expect(screen.queryByText('대진 확정 전')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * 일정 목록에서 몰수 0:0 과 실제 0:0 무승부가 같아 보이면, 순위표에 무승부로 집계된
+ * 이유를 관전자가 목록에서 추적할 수 없다(alpha 실측: 세 팀이 나란히 2점인데 그중 두
+ * 경기가 몰수라는 사실이 목록 어디에도 없었다).
+ */
+describe('ScheduleContent — 몰수·중단 배지', () => {
+  it('몰수로 끝난 경기 카드에 사유 라벨을 붙인다', () => {
+    const data = makeData({
+      items: [fixtureEntry({ score: { home: 0, away: 0, penalties: null }, outcome: { reason: 'FORFEIT', note: '원정팀 미출석' } })],
+    });
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    expect(screen.getByText('몰수·기권')).toBeInTheDocument();
+  });
+
+  it('경기 중단은 몰수와 다른 라벨로 구분한다', () => {
+    const data = makeData({ items: [fixtureEntry({ outcome: { reason: 'ABANDONED', note: null } })] });
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    expect(screen.getByText('경기 중단')).toBeInTheDocument();
+    expect(screen.queryByText('몰수·기권')).not.toBeInTheDocument();
+  });
+
+  it('정상 종료 경기에는 배지를 붙이지 않는다', () => {
+    const data = makeData({ items: [fixtureEntry({ outcome: null })] });
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    expect(screen.queryByText('몰수·기권')).not.toBeInTheDocument();
+    expect(screen.queryByText('경기 중단')).not.toBeInTheDocument();
+  });
+
+  it('사유 본문은 카드에 넣지 않는다 — 카드는 한 줄 요약이 계약이다', () => {
+    const data = makeData({ items: [fixtureEntry({ outcome: { reason: 'FORFEIT', note: '원정팀이 킥오프 15분 경과까지 미출석' } })] });
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    expect(screen.queryByText(/킥오프 15분 경과까지 미출석/)).not.toBeInTheDocument();
   });
 });

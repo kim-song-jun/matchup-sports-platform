@@ -9,6 +9,7 @@ import {
   type TournamentStandingsRow,
 } from '@/components/tournaments/tournament-standings-table';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
+import { matchOutcomeReasonLabel, toDisplayableOutcomeReason } from '@/lib/match-outcome';
 import type { V1MyTournamentFixtures } from '@/hooks/use-v1-api';
 import type { GameLineupState } from '@/types/game-operations';
 import { AbnormalClockBadge } from './abnormal-clock-badge';
@@ -65,6 +66,33 @@ function ScheduleResultBadge({ entry }: { entry: PublicScheduleEntry }) {
     >
       {resultStateLabel(entry.resultState)}
     </span>
+  );
+}
+
+/**
+ * 몰수·중단 배지. 이게 없으면 목록에서 몰수 0:0 과 실제 0:0 무승부가 같아 보이고,
+ * 순위표에 무승부로 집계된 이유를 관전자가 목록에서 추적할 수 없다(alpha 실측).
+ *
+ * 사유 본문은 넣지 않는다 — 일정 카드는 한 줄 요약이 계약이고, 사유는 길이 제한이 없어
+ * 카드 높이를 예측할 수 없게 만든다. 사유는 경기 상세에서 읽는다.
+ * 컬러만으로 구분하지 않는다(WCAG) — 라벨 텍스트가 항상 함께 나온다.
+ */
+function ScheduleOutcomeBadge({ outcome }: { outcome: PublicScheduleEntry['outcome'] }) {
+  const reason = toDisplayableOutcomeReason(outcome?.reason);
+  if (reason === null) return null;
+  return (
+    <p
+      role="status"
+      style={{
+        margin: '4px 0 0',
+        textAlign: 'center',
+        fontSize: 11,
+        fontWeight: 700,
+        color: 'var(--orange500)',
+      }}
+    >
+      {matchOutcomeReasonLabel(reason)}
+    </p>
   );
 }
 
@@ -465,6 +493,10 @@ function ScheduleRow({
       {/* 스코어 아래 보조 표기 — 스코어 칸(가운데 64px)이 행 정중앙이라 행 전체를
           가운데 정렬하면 그대로 스코어 밑에 놓인다. 승부차기가 없으면 렌더 없음. */}
       <PenaltyScoreline score={entry.score} scoreStatus={entry.scoreStatus} />
+      {/* 몰수·중단 배지. 스코어 바로 아래 — 목록만 훑는 관전자에게 이 점수가 정상 경기
+          결과가 아니라는 것을 알리는 유일한 자리다. 사유 본문은 길어서 카드에 넣지 않고
+          경기 상세에 둔다(카드는 한 줄 요약이 계약이다). */}
+      <ScheduleOutcomeBadge outcome={entry.outcome} />
       <MatchEventSummary entry={entry} />
     </Link>
   );

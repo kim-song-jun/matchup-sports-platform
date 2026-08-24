@@ -63,7 +63,21 @@ const FIXTURE_SCHEDULE_SELECT = {
       id: true,
       state: true,
       visibilityPolicy: { select: { mode: true, lineupAt: true } },
-      currentOfficialRevision: { select: { state: true, supersedesId: true, officialAt: true, score: true, goalEvents: true } },
+      // outcomeReason/outcomeNote — 일정 목록에서도 몰수·중단을 정상 종료와 구분하기 위한 것.
+      // 경기 상세(FIXTURE_MATCH_SELECT)에만 있던 동안, 목록만 훑는 관전자에게는 몰수 0:0 과
+      // 실제 0:0 무승부가 같아 보였다(alpha 실측: 순위표에 세 팀이 나란히 2점인데 그중
+      // 두 경기가 몰수라는 사실을 목록 어디에서도 알 수 없었다).
+      currentOfficialRevision: {
+        select: {
+          state: true,
+          supersedesId: true,
+          officialAt: true,
+          score: true,
+          goalEvents: true,
+          outcomeReason: true,
+          outcomeNote: true,
+        },
+      },
       // Lane 1 addition -- `sides`/`periods` back the live-score tally and the
       // elapsed-clock projection for a fixture that is genuinely LIVE and has
       // no official revision yet (see `public-live-score.ts`/`public-clock.ts`).
@@ -1119,6 +1133,18 @@ function presentScheduleEntry(
     periodBreak,
     scorers,
     cards,
+    // 경기 상세(getMatch)와 **같은 규칙**을 쓴다 — 공식 결과가 공개된 뒤에만, 정상 종료가
+    // 아닐 때만 내보낸다. 두 화면이 갈리면 목록에서 몰수인데 상세에서 아니거나 그 반대가
+    // 된다. 여기서 새 조건을 만들지 않는 이유다.
+    outcome:
+      showOfficialResult &&
+      fixture.game?.currentOfficialRevision != null &&
+      fixture.game.currentOfficialRevision.outcomeReason !== 'NORMAL'
+        ? {
+            reason: fixture.game.currentOfficialRevision.outcomeReason,
+            note: fixture.game.currentOfficialRevision.outcomeNote,
+          }
+        : null,
     hasVideo: fixture.videos.length > 0,
   };
 }

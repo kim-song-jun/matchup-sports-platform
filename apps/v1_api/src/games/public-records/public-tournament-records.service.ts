@@ -213,7 +213,7 @@ export class PublicTournamentRecordsService {
       select: { id: true, bracketPublishedAt: true, bracketPublishScheduledAt: true },
     });
     if (tournament === null) {
-      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
+      throw new NotFoundException(NOT_FOUND);
     }
     const empty = { tournamentId: tournament.id, goals: [], assists: [] };
     if (!isBracketPublished(tournament.bracketPublishedAt, tournament.bracketPublishScheduledAt)) {

@@ -503,12 +503,9 @@ export function ProfileEditPageClient() {
       return;
     }
 
-    if (file.size > 2 * 1024 * 1024) {
-      setFieldErrors((current) => ({ ...current, profileImage: '프로필 사진은 2MB 이하 이미지만 선택해 주세요.' }));
-      event.target.value = '';
-      return;
-    }
-
+    // 용량으로 거부하지 않는다(2026-08-25 사용자 확정). 2MB 를 넘는 사진은 업로드 훅이
+    // 자동으로 줄여 WebP 로 변환한다(`compressImagesForUpload`) -- 폰 사진(3~8MB)을
+    // 여기서 막으면 "사진을 올려도 안 된다"가 된다(실사용 보고).
     setUploadingProfileImage(true);
     try {
       const result = await uploadImages.mutateAsync([file]);
@@ -637,7 +634,7 @@ export function ProfileEditPageClient() {
                   제거
                 </button>
               ) : null}
-              <span className="tm-text-caption">{profileImageName || '이미지 1장, 2MB 이하'}</span>
+              <span className="tm-text-caption">{profileImageName || '이미지 1장 — 큰 사진은 자동으로 줄여 올려요'}</span>
             </div>
             {fieldErrors.profileImage ? <div className="tm-text-caption tm-auth-field-helper-error" style={{ marginTop: 6 }}>{fieldErrors.profileImage}</div> : null}
           </div>

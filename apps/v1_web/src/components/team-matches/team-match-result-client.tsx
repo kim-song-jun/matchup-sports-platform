@@ -32,6 +32,7 @@ import {
   hashResultPayload,
   hydrateResultFormFromRevision,
   toResultRosterRows,
+  displayRevisionReason,
 } from './team-match-result.types';
 import type { CardDraft, GoalDraft, ResultRosterRow } from './team-match-result.types';
 
@@ -325,7 +326,7 @@ function ResultDraftSummary({
       {reason.trim() ? (
         <div>
           <div className="tm-text-label">메모</div>
-          <div className="tm-text-caption" style={{ marginTop: 6, color: 'var(--text-muted)' }}>{reason.trim()}</div>
+          <div className="tm-text-caption" style={{ marginTop: 6, color: 'var(--text-muted)' }}>{displayRevisionReason(reason)}</div>
         </div>
       ) : null}
     </div>
@@ -522,14 +523,14 @@ function LeagueTeamMatchResultPage({
                   mvpParticipantId={latest.mvpParticipantId}
                 />
                 {latest.reason ? (
-                  <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>{latest.reason}</div>
+                  <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>{displayRevisionReason(latest.reason)}</div>
                 ) : null}
               </Card>
             ) : latest?.state === 'VOID' ? (
               <Card pad={16} style={{ background: 'var(--red50)' }}>
                 <div className="tm-text-body-lg">이 결과는 무효 처리됐어요</div>
                 {latest.reason ? (
-                  <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>{latest.reason}</div>
+                  <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>{displayRevisionReason(latest.reason)}</div>
                 ) : null}
               </Card>
             ) : (
@@ -889,7 +890,7 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
           <Card pad={16} style={{ background: 'var(--red50)' }}>
             <div className="tm-text-body-lg">이 결과는 무효 처리됐어요</div>
             {latest.reason ? (
-              <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>{latest.reason}</div>
+              <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>{displayRevisionReason(latest.reason)}</div>
             ) : null}
           </Card>
         ) : null}
@@ -934,7 +935,7 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
               </div>
             ) : null}
             {latest.reason ? (
-              <div className="tm-text-caption" style={{ marginTop: 6, color: 'var(--text-muted)' }}>{latest.reason}</div>
+              <div className="tm-text-caption" style={{ marginTop: 6, color: 'var(--text-muted)' }}>{displayRevisionReason(latest.reason)}</div>
             ) : null}
             <div className="tm-text-caption" style={{ marginTop: 10, color: 'var(--text-caption)' }}>
               제출하면 되돌릴 수 없어요. {opponentName}이(가) 확인 후 승인하거나 정정을 요청할 수 있어요.
@@ -996,7 +997,7 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
         {canDraft && stage === 'editing' ? (
           <Card pad={16}>
             {latest?.state === 'CHANGE_REQUESTED' && latest.reason ? (
-              <AlertBanner tone="warning" message={`상대팀 정정 요청: ${latest.reason}`} />
+              <AlertBanner tone="warning" message={`상대팀 정정 요청: ${displayRevisionReason(latest.reason)}`} />
             ) : null}
             <div className="tm-text-body-lg" style={{ marginTop: latest?.state === 'CHANGE_REQUESTED' ? 12 : 0 }}>
               1. 스코어
@@ -1447,7 +1448,7 @@ function ResultRevisionHistory({ history }: { history: V1GameResultRevision[] })
               </span>
             </div>
             {revision.reason ? (
-              <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>{revision.reason}</div>
+              <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>{displayRevisionReason(revision.reason)}</div>
             ) : null}
             <div className="tm-text-micro" style={{ marginTop: 4, color: 'var(--text-caption)' }}>
               제출 {formatDateTime(revision.submittedAt)}

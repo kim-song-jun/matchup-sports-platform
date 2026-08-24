@@ -61,13 +61,6 @@ official fact is projected. The list order, cursor key, `season` filter, and
 summary all use this same match instant. A later result correction therefore
 updates the score without moving the match to the correction date.
 
-For `GET /teams/:id/records`, every item exposes `playedAt`, not
-`officialAt`. `playedAt` is copied from `V1TeamMatch.startAt` for team matches
-or `V1TournamentFixture.scheduledAt` for tournament fixtures when the
-official fact is projected. The list order, cursor key, `season` filter, and
-summary all use this same match instant. A later result correction therefore
-updates the score without moving the match to the correction date.
-
 ### Server-enforced visibility (matches the frozen output matrix exactly)
 
 Each fixture/game independently resolves `hidden | status_only | live |
@@ -343,8 +336,12 @@ identity/side itself:
   whole page, *not* per fixture, so the cost grows with `IN`-list size rather than with the
   number of fixtures. That is a real but modest cost, weighed against a scorer line that is
   a one-line summary: a reader who wants the player opens the match, where the link exists.
-  Revisit if the schedule ever needs consent for another reason, since the marginal cost
-  would then be zero.
+  The stronger reason is structural: the whole schedule card is already one `<Link>` to the
+  match view (`schedule-content.tsx`), and scorer names render inside it -- a profile link
+  there would nest an anchor inside an anchor, which is invalid HTML and would require
+  redesigning the card's tap target. Keeping the card link-free was confirmed as the
+  product decision on 2026-08-24. Revisit only if the card layout is restructured or the
+  schedule needs consent for another reason (the marginal query cost would then be zero).
 
 ### Known scope trims (documented, not silently dropped)
 

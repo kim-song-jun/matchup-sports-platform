@@ -36,7 +36,7 @@ export class LeagueCompletionProjectionService {
    * "취소되지 않은 모든 대진이 공식 결과를 확보했는가"를 판정해 `active -> completed`로
    * 전이한다. 조건을 만족하지 않으면 아무것도 하지 않는다(멱등).
    *
-   * `project()` 말고 **대진 취소 경로에서도** 불러야 한다. 결과 확정만 훅으로 잡으면
+   * `project()` 말고 **대진 취소·무효 경로에서도** 불러야 한다. 결과 확정만 훅으로 잡으면
    * 마지막 미확정 대진을 "취소"로 끝낸 리그가 D-3의 완료 조건을 충족하면서도 영원히
    * `active`로 남는다(alpha 실측으로 재현됨). 취소는 남은 대진 집합을 줄이는 조작이라
    * 결과 확정과 정확히 같은 판정을 다시 돌려야 한다.
@@ -44,7 +44,7 @@ export class LeagueCompletionProjectionService {
   async settle(
     tx: Prisma.TransactionClient,
     leagueId: string,
-    reason: 'all_fixtures_confirmed' | 'remaining_fixture_cancelled',
+    reason: 'all_fixtures_confirmed' | 'remaining_fixture_cancelled' | 'remaining_fixture_voided',
   ): Promise<boolean> {
     const league = await tx.v1League.findUnique({ where: { id: leagueId }, select: { state: true } });
     // active 가 아니면 여기서 끝낸다. shouldCompleteLeague 도 같은 판정을 하지만, 그건
@@ -59,13 +59,27 @@ export class LeagueCompletionProjectionService {
     // 없다(이 파일은 @prisma/client를 import 한다). league-lifecycle-rules.ts 참고.
     const fixtures = await tx.v1TeamMatch.findMany({
       where: { leagueId },
-      select: { status: true, game: { select: { currentOfficialRevisionId: true } } },
+      select: {
+        status: true,
+        game: {
+          select: {
+            currentOfficialRevisionId: true,
+            // 무효(VOID) 리비전이 하나라도 있고 지금 공식 결과가 없으면 "무효로 끝난 대진"이다.
+            // 무효 뒤 운영자가 다시 입력했다면 currentOfficialRevisionId 가 채워져 있으므로
+            // 아래 isVoided 가 false 가 되고 정상 대진으로 되돌아온다.
+            resultRevisions: { where: { state: 'VOID' }, select: { id: true }, take: 1 },
+          },
+        },
+      },
     });
     const ready = shouldCompleteLeague({
       state: league.state,
       fixtures: fixtures.map((fixture) => ({
         status: fixture.status,
         hasOfficialResult: fixture.game?.currentOfficialRevisionId != null,
+        isVoided:
+          fixture.game?.currentOfficialRevisionId == null &&
+          (fixture.game?.resultRevisions.length ?? 0) > 0,
       })),
     });
     if (!ready) return false;

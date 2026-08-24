@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import type { GameOperationHandler } from '../jobs/v1-game-operations-worker.service';
 import { GameResultProjectionWatermarkService } from './game-result-projection-watermark.service';
+import { LeagueCompletionProjectionService } from '../league-matches/league-completion-projection.service';
 
 type LockedVoidRevisionRow = {
   revisionId: string;
@@ -61,6 +62,13 @@ type FixtureSlotsRow = {
 export class GameResultVoidProjectionService {
   private readonly watermarks = new GameResultProjectionWatermarkService();
 
+  // GAME_RESULT_OFFICIAL 쪽이 LeagueCompletionProjectionService.project() 를 부르는 것과
+  // 대칭. 무효도 "남은 대진 집합을 줄이는 조작"이라 완료 판정을 다시 돌려야 한다 --
+  // 안 돌리면 이의 수락으로 무효 처리된 대진 하나가 그 리그를 영원히 active 로 묶고
+  // 승강까지 영구히 막는다(적대 리뷰 지적). 이 클래스는 의존 없는 순수 클래스라
+  // official 쪽과 같은 방식으로 필드에서 직접 만든다.
+  private readonly leagueCompletion = new LeagueCompletionProjectionService();
+
   readonly handler: GameOperationHandler = async (claim, tx) => {
     const revision = await this.lockVoidRevision(tx, this.revisionId(claim.payload));
     await this.hidePublicCache(tx, revision);
@@ -71,7 +79,30 @@ export class GameResultVoidProjectionService {
       (teamId): teamId is string => teamId !== null,
     );
     await this.writeWatermarks(tx, revision, teamIds);
+    await this.settleLeagueIfNeeded(tx, revision);
   };
+
+  /**
+   * 무효 처리된 대진이 리그 소속이면 그 리그의 완료 판정을 다시 돌린다.
+   * 리그가 아니거나(일반 팀매치·대회 픽스처) 아직 미확정 대진이 남았으면 no-op 이다
+   * (settle 자체가 멱등하고 state='active' 조건부 UPDATE 로 보호된다).
+   */
+  private async settleLeagueIfNeeded(
+    tx: Prisma.TransactionClient,
+    revision: LockedVoidRevisionRow,
+  ): Promise<void> {
+    if (revision.sourceType !== 'TEAM_MATCH') return;
+    const rows = await tx.$queryRaw<Array<{ leagueId: string | null }>>`
+      SELECT team_match.league_id AS "leagueId"
+      FROM v1_games game
+      INNER JOIN v1_team_matches team_match ON team_match.id = game.team_match_id
+      WHERE game.id = ${revision.gameId}
+      LIMIT 1
+    `;
+    const leagueId = rows[0]?.leagueId ?? null;
+    if (leagueId === null) return;
+    await this.leagueCompletion.settle(tx, leagueId, 'remaining_fixture_voided');
+  }
 
   private revisionId(payload: unknown): string {
     if (

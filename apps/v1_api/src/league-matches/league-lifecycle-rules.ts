@@ -12,6 +12,16 @@
 export interface LeagueFixtureCompletionRow {
   status: string;
   hasOfficialResult: boolean;
+  /**
+   * 이 대진의 결과가 **무효(VOID)** 처리됐는가. 무효는 취소와 마찬가지로 "이 대진은 더
+   * 이상 결과를 기다리지 않는다"를 뜻하므로 완료 판정에서 제외된다.
+   * 무효 뒤 운영자가 결과를 다시 입력하면 hasOfficialResult 가 true 로 돌아오고 이 값은
+   * false 가 되어 정상 대진으로 복귀한다.
+   *
+   * optional 인 이유: 무효를 모르는 기존 호출부(그리고 무효가 존재하지 않던 시기의
+   * 데이터)는 "무효 아님"이 옳은 기본값이다. 생략은 false 와 같은 뜻이다.
+   */
+  isVoided?: boolean;
 }
 
 /**
@@ -29,7 +39,14 @@ export function shouldCompleteLeague(input: {
   fixtures: readonly LeagueFixtureCompletionRow[];
 }): boolean {
   if (input.state !== 'active') return false;
-  const live = input.fixtures.filter((fixture) => fixture.status !== 'cancelled');
+  // 취소와 **무효(void)** 는 둘 다 "이 대진은 더 이상 결과를 기다리지 않는다"를 뜻한다.
+  // 무효를 빼지 않으면, 이의 수락으로 무효 처리된 대진이 hasOfficialResult=false 로 남아
+  // 그 리그가 영원히 completed 로 못 가고 승강도 영구히 막힌다(적대 리뷰 지적).
+  // 이 파일 위쪽 주석이 기록한 취소 경로의 사고와 정확히 같은 종류다 — 남은 대진 집합을
+  // 줄이는 조작은 전부 같은 판정을 다시 통과해야 한다.
+  const live = input.fixtures.filter(
+    (fixture) => fixture.status !== 'cancelled' && !fixture.isVoided,
+  );
   if (live.length === 0) return false;
   return live.every((fixture) => fixture.hasOfficialResult);
 }

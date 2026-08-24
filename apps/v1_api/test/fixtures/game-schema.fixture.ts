@@ -371,12 +371,17 @@ export const gameSchemaSourceManifest = {
   // game operations 계약 변화가 아니다. 전용 마이그레이션
   // 20260824120000_v1_player_card_hidden 이 뒷받침하며, 바인딩된
   // 20260729000100_v1_game_operations 는 건드리지 않았다(migration 해시 불변).
-  // 선수 카드 모양(v1_user_profiles.player_card_shape) 컬럼 하나가 늘었다. game domain 밖의
-  // nullable 아닌 기본값 컬럼이지만 이 guard 는 schema.prisma **전체 바이트**를 결속하므로
-  // 여기서 걸린다 -- 파일 해시 노이즈이지 game operations 계약 변화가 아니다. 전용 마이그레이션
-  // 20260824170000_v1_player_card_shape 의 빈 DB replay + drift 검증을 통과한 스키마로
-  // 재고정하며, 바인딩된 20260729000100_v1_game_operations 는 건드리지 않았다(migration 해시 불변).
-  schema: '262b672d8717a0ca058334e4e27e58c0c8a5ad4341a8c25840498883f3760c75',
+  // 2026-08-24 재핀 (병합): 이 머지에는 두 갈래의 additive 변경이 함께 들어 있다.
+  // ① dev 쪽 — 선수 카드 모양(v1_user_profiles.player_card_shape) 컬럼 1개
+  //   (마이그레이션 20260824170000_v1_player_card_shape).
+  // ② 이 브랜치(D2) — `V1LeagueMatchDispute` 모델 신규(enum 2종 포함, 순수
+  //   CREATE TABLE/TYPE/INDEX, 참조 컬럼은 FK 없는 평문이라 기존 모델은 한 줄도
+  //   변경 없음. 마이그레이션 20260824130000_v1_league_match_disputes).
+  // 둘 다 game domain(V1Game*) 모델·enum 을 건드리지 않는다 — 이 guard 가
+  // schema.prisma 전체 바이트를 결속하기 때문에 걸리는 것이지 game operations 계약이
+  // 바뀐 게 아니다. 바인딩된 20260729000100_v1_game_operations 는 그대로다(migration
+  // 해시 불변). 아래 값은 병합된 schema.prisma 에 shasum -a 256 을 돌려 계산했다.
+  schema: '9741e53f856743f9e50bc13f0f0d8923ea45dc52326fc031069bd1f81733d07a',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

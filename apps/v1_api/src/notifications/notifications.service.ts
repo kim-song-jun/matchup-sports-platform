@@ -68,7 +68,11 @@ export type NotificationEventType =
   | 'league_promotion_promoted'
   | 'league_promotion_relegated'
   | 'league_promotion_stayed'
-  | 'league_promotion_withdrawn';
+  | 'league_promotion_withdrawn'
+  // D2 (E2/E4, 2026-08-24 사용자 확정): 리그 경기 결과 확정 후 7일 이내 이의 제기가
+  // 접수되면 운영자(admin)에게 보낸다. 팀 신청자/상대팀에게 보내는 알림은 이 태스크
+  // 범위가 아니다(운영자 알림만 명시적으로 요구됨) — 필요해지면 별도 타입을 추가한다.
+  | 'league_result_dispute_filed';
 
 /** V1NotificationPreference 컬럼 중 이벤트 발송을 게이트하는 필드들. */
 type NotificationPrefField = keyof Pick<
@@ -123,7 +127,8 @@ function preferenceFieldForEvent(type: NotificationEventType): NotificationPrefF
     type === 'team_match_closed' ||
     type === 'team_match_cancelled' ||
     type === 'team_match_completed' ||
-    type === 'league_fixture_scheduled'
+    type === 'league_fixture_scheduled' ||
+    type === 'league_result_dispute_filed'
   ) {
     return 'teamMatchEnabled';
   }
@@ -213,6 +218,8 @@ function targetTypeForEvent(type: NotificationEventType): V1NotificationTargetTy
   // 이벤트라 'team_match'가 맞다. targetId는 리그당 배치 발송이라 leagueId를 쓴다
   // (특정 team_match id가 아니라 리그 전체를 가리킴 — deepLinkForEvent에서 명시적으로
   // 처리한다).
+  // league_result_dispute_filed(D2)도 여기로 떨어진다 — 이의는 특정 팀매치(경기)에
+  // 대한 것이라 targetId로 teamMatchId를 그대로 쓴다.
   return 'team_match';
 }
 
@@ -350,6 +357,7 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   league_promotion_relegated: '다음 시즌 하위 리그로 강등됐어요',
   league_promotion_stayed: '다음 시즌에도 같은 리그예요',
   league_promotion_withdrawn: '리그 참가가 종료됐어요',
+  league_result_dispute_filed: '리그 경기 결과에 이의가 접수됐어요',
 };
 
 /**
@@ -397,6 +405,7 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   league_promotion_relegated: '아쉽지만 다음 시즌은 하위 리그에서 시작해요.',
   league_promotion_stayed: '현재 리그에서 다음 시즌을 계속해요.',
   league_promotion_withdrawn: '이번 시즌을 끝으로 리그 참가가 종료됐어요.',
+  league_result_dispute_filed: '이의 내용을 확인하고 정정 또는 무효 처리해 주세요.',
 };
 
 @Injectable()

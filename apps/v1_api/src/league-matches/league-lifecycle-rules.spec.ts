@@ -37,6 +37,48 @@ describe('shouldCompleteLeague — 자동 종료 판정 (D-3)', () => {
     ).toBe(true);
   });
 
+  // 이의 수락으로 무효(VOID) 처리된 대진은 결과가 영원히 생기지 않는다 — 취소와 같다.
+  // 이걸 빼지 않으면 무효 대진 하나가 그 리그를 영원히 active 로 묶고 승강까지 막는다.
+  // (적대 리뷰가 잡은 결함. 같은 종류의 사고가 취소 경로에서 이미 한 번 있었다.)
+  it('무효 처리된 대진은 취소와 마찬가지로 완료 판정에서 제외한다', () => {
+    expect(
+      shouldCompleteLeague({
+        state: 'active',
+        fixtures: [
+          { status: 'completed', hasOfficialResult: true },
+          // 무효: 공식 결과가 없지만 더 이상 기다리지 않는다
+          { status: 'completed', hasOfficialResult: false, isVoided: true },
+        ],
+      }),
+    ).toBe(true);
+  });
+
+  // 무효 뒤 운영자가 결과를 다시 입력한 경우 — 다시 정상 대진으로 세어야 한다.
+  it('무효 뒤 결과가 다시 입력된 대진은 정상 대진으로 센다', () => {
+    expect(
+      shouldCompleteLeague({
+        state: 'active',
+        fixtures: [
+          { status: 'completed', hasOfficialResult: true, isVoided: false },
+          { status: 'matched', hasOfficialResult: false, isVoided: false },
+        ],
+      }),
+    ).toBe(false);
+  });
+
+  // 전부 무효면 "모두 확정"의 의미가 없다 — 취소만 있는 리그와 같은 취급.
+  it('남은 대진이 전부 무효면 종료하지 않는다', () => {
+    expect(
+      shouldCompleteLeague({
+        state: 'active',
+        fixtures: [
+          { status: 'cancelled', hasOfficialResult: false },
+          { status: 'completed', hasOfficialResult: false, isVoided: true },
+        ],
+      }),
+    ).toBe(false);
+  });
+
   it('미확정 대진이 하나라도 남으면 종료하지 않는다', () => {
     expect(
       shouldCompleteLeague({

@@ -104,6 +104,7 @@ import type {
   DecideGameResultRevisionDto,
   GameResultRecoveryDto,
   SubmitGameResultRevisionDto,
+  VoidTeamMatchResultDto,
 } from './dto/game-result.dto';
 import type {
   AttestIdentityLinkDto,
@@ -120,7 +121,15 @@ type CommandResult = object;
 // must have a registered handler in v1-game-operations-worker.service.ts's
 // constructor (or the worker main.ts bootstrap) or it will retry 6 times
 // and end up POISONED forever.
-type GamesOutboxEventType = 'GAME_RESULT_SUBMITTED' | 'GAME_RESULT_OFFICIAL' | 'GAME_RESULT_CHANGE_REQUESTED';
+type GamesOutboxEventType =
+  | 'GAME_RESULT_SUBMITTED'
+  | 'GAME_RESULT_OFFICIAL'
+  | 'GAME_RESULT_CHANGE_REQUESTED'
+  // D2: TEAM_MATCH 결과 무효화(voidTeamMatchResult) 가 쓴다. 이미
+  // GameResultVoidProjectionService 가 이 타입으로 워커에 등록돼 있다(대회 레인의
+  // voidResultRevision 이 먼저 썼다) -- 핸들러가 sourceType 을 가리지 않는 범용
+  // 투영이라 새 핸들러 등록 없이 그대로 재사용한다.
+  | 'GAME_RESULT_VOIDED';
 type GameAuthorizationAction =
   | 'read'
   | 'tournament_command'
@@ -135,6 +144,16 @@ type GameAuthorizationAction =
   // TEAM_MATCH 분기가 명시적으로 forbidden 을 던진다. 오직 admin 패스스루(이 함수보다
   // 먼저 검사된다)만 통과할 수 있다.
   | 'team_result_correction'
+  // D2: 이의(dispute) 제기 -- 참가 두 팀(host/opponent) 중 어느 쪽이든 owner/manager면
+  // 낼 수 있다. team_result_correction 과 달리 이 액션은 **명시적으로 특수 취급하지
+  // 않는다** -- resolveActor TEAM_MATCH 분기 맨 아래 공용 fallback
+  // (`managerRole(hostMembership) ?? managerRole(opponentMembership)`)이 정확히
+  // "두 팀 중 하나의 owner/manager" 규칙과 일치하므로 그대로 통과시킨다.
+  | 'team_result_dispute_file'
+  // D2: 이의 수락 시 운영자가 고르는 무효(void) 처리 -- team_result_correction 과
+  // 완전히 같은 이유로 팀 소속 fallback 을 명시적으로 차단해야 한다(그러지 않으면
+  // 상대팀 매니저가 자기에게 불리한 결과를 스스로 무효화할 수 있는 구멍이 생긴다).
+  | 'team_result_void'
   | 'cancel'
   | 'participant_identity';
 
@@ -288,6 +307,11 @@ export function gameAuthorizationAction(action: string): GameAuthorizationAction
     case 'team_result_correction_create':
     case 'team_result_correction_officialize':
       return 'team_result_correction';
+    // D2: voidTeamMatchResult가 withCommand에 넘기는 명령 이름이 곧 이 액션
+    // 버킷과 같은 이름이다(team_result_correction_create/_officialize처럼 별도
+    // create/officialize 단계가 없는 단일 커맨드라서 나눌 이유가 없다).
+    case 'team_result_void':
+      return 'team_result_void';
     default:
       throw new TypeError(`Unsupported game command action: ${action}`);
   }
@@ -3491,6 +3515,143 @@ export class GamesService {
     );
   }
 
+  // ─── D2: TEAM_MATCH 전용 결과 무효화(void) ─────────────────────────────────
+  //
+  // 이의(dispute) 수락 시 운영자가 정정(createTeamMatchResultCorrection) 대신 고를
+  // 수 있는 두 번째 경로(E4). 대회 픽스처의
+  // `TournamentResultReviewService.voidResultRevision`과 완전히 같은 패턴을
+  // 재사용한다 -- DRAFT/SUBMITTED 를 거치지 않고 새 리비전을 곧바로 VOID 상태로
+  // 만들어 현재 공식 리비전을 슈퍼시드한다(assertRevisionTransition 은 VOID 로 가는
+  // STANDARD/CORRECTION 전이를 정의하지 않으므로 그 함수를 거치지 않는다 -- 대회
+  // 레인의 원본도 마찬가지다).
+  //
+  // 인가는 'team_result_void' 액션으로 resolveActor 를 부른다 -- admin 패스스루만
+  // 통과하고 호스트/상대팀 owner·manager 는 예외 없이 403 이다(위 resolveActor 의
+  // "if (action === 'team_result_void') throw this.forbidden();" 참고).
+  //
+  // 순위표 제외는 이 메서드가 직접 하지 않는다 -- `game.currentOfficialRevisionId`
+  // 를 VOID 리비전으로 옮기기만 하면, `GameResultOfficialFactsService`가 VOID
+  // 리비전에는 fact 행을 절대 만들지 않으므로(오직 GAME_RESULT_OFFICIAL 투영에서만
+  // fact 를 쓴다) `league-match-public.service.ts`의 `standings()`가 그 팀매치를
+  // 자동으로 확정 집계에서 빠뜨린다(구조적으로 보장됨 -- league-standings.ts 자체를
+  // 고칠 필요가 없다).
+  async voidTeamMatchResult(
+    user: V1AuthUser,
+    gameId: string,
+    headerIdempotencyKey: string | undefined,
+    dto: VoidTeamMatchResultDto,
+  ): Promise<GameRevisionMutationResult> {
+    const source = await this.prisma.v1Game.findUnique({
+      where: { id: gameId },
+      select: { sourceType: true },
+    });
+    if (source === null) {
+      throw this.notFound();
+    }
+    if (source.sourceType !== V1GameSourceType.TEAM_MATCH) {
+      // createTeamMatchResultCorrection 과 같은 패턴: read 로 감사 로그는 남기되
+      // mutate 는 허용하지 않는다.
+      await this.resolveActor(this.prisma, gameId, user.id, 'read');
+      throw new ConflictException({
+        code: 'RESULT_VOID_TEAM_MATCH_ONLY',
+        message: '이 무효 처리 경로는 리그 팀매치 전용이에요.',
+      });
+    }
+    return this.withCommand(
+      {
+        gameId,
+        action: 'team_result_void',
+        actor: await this.resolveActor(this.prisma, gameId, user.id, 'team_result_void'),
+        expectedVersion: dto.expectedVersion,
+        headerIdempotencyKey,
+        bodyCommandId: dto.clientCommandId,
+        payload: dto,
+      },
+      async (tx, game, context) => {
+        await this.assertTeamMatchMatched(tx, game.teamMatchId);
+        const gameRow = await tx.v1Game.findUniqueOrThrow({
+          where: { id: gameId },
+          select: { currentOfficialRevisionId: true },
+        });
+        const revision =
+          gameRow.currentOfficialRevisionId === null
+            ? null
+            : await tx.v1GameResultRevision.findFirst({
+                where: { id: gameRow.currentOfficialRevisionId, gameId },
+              });
+        if (revision === null || revision.state !== V1GameResultRevisionState.OFFICIAL) {
+          throw new ConflictException({
+            code: 'RESULT_VOID_NO_OFFICIAL_REVISION',
+            message: '무효 처리할 공식 결과가 아직 없어요.',
+          });
+        }
+        const voidRevision = await tx.v1GameResultRevision.create({
+          data: {
+            gameId,
+            revision: revision.revision + 1,
+            state: V1GameResultRevisionState.VOID,
+            score: jsonInput(revision.score),
+            eventsHash: revision.eventsHash,
+            missingScorer: revision.missingScorer,
+            mvpParticipantId: revision.mvpParticipantId,
+            reason: dto.reason,
+            createdByActorType: 'USER',
+            createdByUserId: user.id,
+            supersedesId: revision.id,
+            submittedAt: new Date(),
+            officialAt: new Date(),
+          },
+        });
+        const updated = await tx.v1Game.update({
+          where: { id: gameId },
+          data: { version: { increment: 1 }, currentOfficialRevisionId: voidRevision.id },
+        });
+        await this.writeOutbox(
+          tx,
+          `game:${gameId}:revision:${voidRevision.revision}:voided`,
+          gameId,
+          'GAME_RESULT_VOIDED',
+          { revisionId: voidRevision.id, supersedesId: revision.id },
+          voidRevision.id,
+        );
+        return {
+          gameId,
+          state: updated.state,
+          version: updated.version,
+          durableCommandId: context.durableCommandId,
+          replayed: false,
+          revisionId: voidRevision.id,
+          revision: voidRevision.revision,
+          revisionState: voidRevision.state,
+        };
+      },
+    );
+  }
+
+  /**
+   * D2: 이의(dispute) 제기 인가 게이트. `resolveActor`는 private 이라 외부 모듈
+   * (`league-matches/league-match-dispute.service.ts`)이 직접 부를 수 없으므로,
+   * 'team_result_dispute_file' 액션 하나만 노출하는 얇은 공개 래퍼를 둔다 --
+   * 인가 판정 자체는 여전히 `resolveActor` 단일 지점에서만 일어난다(이 래퍼는
+   * 그 결과를 그대로 돌려줄 뿐 스스로 아무것도 판단하지 않는다).
+   *
+   * admin(platform_ops)도 이 액션을 통과한다(위쪽 admin 패스스루가 TEAM_MATCH
+   * 분기 어떤 액션보다도 먼저 적용되기 때문 -- team_result_correction/
+   * team_result_void 의 명시적 deny 도 admin 을 막지 않는 것과 동일한 이유)만,
+   * 이의는 "팀이 내는 것"이라는 도메인 의미상 `teamId`가 없는 admin 액터는
+   * 여기서 별도로 거부한다.
+   */
+  async assertTeamResultDisputeFileAuthority(
+    user: V1AuthUser,
+    gameId: string,
+  ): Promise<{ actorUserId: string; teamId: string }> {
+    const actor = await this.resolveActor(this.prisma, gameId, user.id, 'team_result_dispute_file');
+    if (actor.teamId === undefined) {
+      throw this.forbidden();
+    }
+    return { actorUserId: actor.actorUserId, teamId: actor.teamId };
+  }
+
   // ─── Task 14: participant identity link + consent (append-only, ≤5s purge) ───
   //
   // Design notes (see games.module.ts callers / task-14 tests for the literal
@@ -5111,6 +5272,14 @@ export class GamesService {
       // 라도 예외 없음.
       throw this.forbidden();
     }
+    if (action === 'team_result_void') {
+      // D2 (#712 의 team_result_correction 과 동일한 방식의 명시적 deny): 여기까지
+      // 내려왔다는 것 자체가(위 admin 패스스루를 통과하지 못했다는 뜻이므로) 호출자가
+      // admin 이 아니라는 뜻이다 — 아래 공용 폴백으로 새면 이의를 낸 팀의 상대편
+      // owner/manager 가 자기에게 유리하게 결과를 스스로 무효화할 수 있는 구멍이
+      // 생긴다. 팀 owner/manager 라도 예외 없이 거부한다.
+      throw this.forbidden();
+    }
     const role = managerRole(hostMembership) ?? managerRole(opponentMembership);
     // `participant_identity` (Task 14 identity-link/consent mutations) is
     // deliberately as permissive as `read` here: the actor only needs to be
@@ -5151,6 +5320,8 @@ export class GamesService {
       case 'team_result_submit':
       case 'opponent_result_decide':
       case 'team_result_correction':
+      case 'team_result_dispute_file':
+      case 'team_result_void':
       case 'participant_identity':
         // Unreachable in practice: resolveActor special-cases
         // 'participant_identity' before calling this mapper (see Task 14
@@ -5161,6 +5332,10 @@ export class GamesService {
         // both reject a TOURNAMENT_FIXTURE game's sourceType before ever
         // resolving an actor for this action — so this arm denies-by-default
         // for the same "should never actually run" reason.
+        // 'team_result_dispute_file'/'team_result_void' (D2) are the same:
+        // the dispute service and the new void method both reject a
+        // TOURNAMENT_FIXTURE game's sourceType before ever resolving an
+        // actor for either action.
         return null;
     }
   }

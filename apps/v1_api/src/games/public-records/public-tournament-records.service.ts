@@ -229,7 +229,7 @@ export class PublicTournamentRecordsService {
       .filter((id): id is string => id !== null);
     if (revisionIds.length === 0) return empty;
 
-    const participantRows = await this.prisma.v1GameResultParticipant.findMany({
+    const allParticipantRows = await this.prisma.v1GameResultParticipant.findMany({
       where: { resultRevisionId: { in: revisionIds } },
       select: {
         participantId: true,
@@ -238,6 +238,9 @@ export class PublicTournamentRecordsService {
         resultRevision: { select: { officialAt: true } },
       },
     });
+    // 0골·0도움 행은 최종 응답에서 전부 걸러진다 — 동의 3쿼리·프로필 조회 대상에
+    // 넣을 이유가 없다(리뷰 지적). 합산에 0을 더하는 행이라 결과도 동일하다.
+    const participantRows = allParticipantRows.filter((row) => row.goals > 0 || row.assists > 0);
 
     const eligibility = await loadParticipantConsentEligibility(
       this.prisma,
@@ -266,9 +269,21 @@ export class PublicTournamentRecordsService {
       ? []
       : await this.prisma.v1User.findMany({
           where: { id: { in: userIds } },
-          select: { id: true, profile: { select: { nickname: true } } },
+          select: { id: true, profile: { select: { nickname: true, displayName: true, deletedAt: true } } },
         });
-    const nicknameByUserId = new Map(users.map((user) => [user.id, user.profile?.nickname ?? null]));
+    // 탈퇴 처리(admin.service.ts)는 nickname을 `deleted_<8자>` 내부 식별자로 덮고
+    // displayName에만 '탈퇴 회원'을 남긴다 — nickname만 쓰면 공개 응답에 식별자가
+    // 그대로 노출된다. resolveParticipantDisplayName(participant-name-gating.ts)의
+    // 탈퇴 방어와 같은 규칙이다(실명 공개 규칙은 랭킹 표면에 적용하지 않는다 —
+    // 리그 랭킹도 nickname 표면이다).
+    const nicknameByUserId = new Map(users.map((user) => [
+      user.id,
+      user.profile === null
+        ? null
+        : user.profile.deletedAt !== null
+          ? user.profile.displayName ?? user.profile.nickname ?? null
+          : user.profile.nickname ?? null,
+    ]));
 
     const rows = userIds.map((userId) => ({
       userId,

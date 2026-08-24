@@ -21,7 +21,7 @@ function buildPrisma(options: {
   identityLinks?: Array<{ participantId: string; userId: string }>;
   userConsents?: Array<{ userId: string; state: string }>;
   participantSnapshots?: Array<{ participantId: string; state: string }>;
-  users?: Array<{ id: string; profile: { nickname: string | null } | null }>;
+  users?: Array<{ id: string; profile: { nickname: string | null; displayName?: string | null; deletedAt?: Date | null } | null }>;
 }) {
   return {
     v1Tournament: {
@@ -117,6 +117,39 @@ describe('PublicTournamentRecordsService.getPlayerRecords', () => {
     const result = await new PublicTournamentRecordsService(prisma, access).getPlayerRecords('tour-1');
     expect(result).toEqual({ tournamentId: 'tour-1', goals: [], assists: [] });
     expect((prisma as unknown as { v1Game: { findMany: jest.Mock } }).v1Game.findMany).not.toHaveBeenCalled();
+  });
+
+  it('shows a withdrawn user as their displayName instead of the deleted_* internal nickname', async () => {
+    const prisma = buildPrisma({
+      games: [{ currentOfficialRevisionId: 'rev-1' }],
+      participantRows: [
+        { participantId: 'p-a1', goals: 2, assists: 0, resultRevision: OFFICIAL },
+      ],
+      identityLinks: [{ participantId: 'p-a1', userId: 'user-a' }],
+      userConsents: [{ userId: 'user-a', state: 'GRANTED' }],
+      users: [
+        { id: 'user-a', profile: { nickname: 'deleted_a1b2c3d4', displayName: '탈퇴 회원', deletedAt: new Date('2026-08-20T00:00:00Z') } },
+      ],
+    });
+    const result = await new PublicTournamentRecordsService(prisma, access).getPlayerRecords('tour-1');
+    expect(result.goals[0].nickname).toBe('탈퇴 회원');
+  });
+
+  it('drops zero-contribution rows before the consent lookup', async () => {
+    const prisma = buildPrisma({
+      games: [{ currentOfficialRevisionId: 'rev-1' }],
+      participantRows: [
+        { participantId: 'p-zero', goals: 0, assists: 0, resultRevision: OFFICIAL },
+        { participantId: 'p-scorer', goals: 1, assists: 0, resultRevision: OFFICIAL },
+      ],
+      identityLinks: [{ participantId: 'p-scorer', userId: 'user-a' }],
+      userConsents: [{ userId: 'user-a', state: 'GRANTED' }],
+      users: [{ id: 'user-a', profile: { nickname: 'a' } }],
+    });
+    await new PublicTournamentRecordsService(prisma, access).getPlayerRecords('tour-1');
+    const linkQuery = (prisma as unknown as { v1ParticipantIdentityLinkCurrent: { findMany: jest.Mock } })
+      .v1ParticipantIdentityLinkCurrent.findMany.mock.calls[0][0];
+    expect(linkQuery.where.participantId.in).toEqual(['p-scorer']);
   });
 
   it('skips rows whose revision has no officialAt', async () => {

@@ -114,6 +114,7 @@ export function MyHomePageClient() {
         ...myHomeModel,
         user: {
           ...myHomeModel.user,
+          userId: null,
           name: '—',
           handle: '—',
           region: '—',
@@ -2015,6 +2016,7 @@ function toMyHomeModel(
     sections,
     user: {
       ...myHomeModel.user,
+      userId: profile.userId,
       name: nickname,
       handle: `@${nickname}`,
       region: profile.regionName ?? '지역 미정',

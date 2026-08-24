@@ -4251,6 +4251,16 @@ button:disabled {
   flex-shrink: 0;
 }
 
+/* 프로필 헤더 우측 액션 묶음("내 프로필" + "프로필 수정").
+   세로로 쌓는 이유: 390 폭에서는 아바타와 이름이 남기는 자리에 두 버튼을 가로로 넣을 수
+   없어 이름이 먼저 줄어든다. 데스크톱 사이드바에서도 폭이 좁아 같은 문제가 생긴다. */
+.tm-my-profile-actions {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .tm-profile-level-panel {
   /* 흰 카드(--card-surface) 내부에 렌더되므로 grey50/grey100은 카드와 명도가 거의
      동일해(대비 ~1.04~1.10:1) 패널 경계가 사실상 안 보였다. .tm-create-input과 동일

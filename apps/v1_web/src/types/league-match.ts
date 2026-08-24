@@ -472,3 +472,23 @@ export interface V1RecordLeagueForfeitResult {
    */
   requestMatchesStored?: boolean;
 }
+
+// U1: 운영자 결과 입력·정정 — POST .../result 와 .../result/correct 가 완전히 같은 요청
+// 모양을 쓴다(league-match-result-entry.dto.ts RecordLeagueResultDto). 신규 입력·정정
+// 두 화면이 이 하나의 payload 타입을 공유한다.
+export interface V1RecordLeagueResultPayload {
+  homeScore: number;
+  awayScore: number;
+  /** 감사 로그·결과 리비전에 남기는 처리 사유. 필수. */
+  reason: string;
+}
+
+export interface V1RecordLeagueResultResult {
+  teamMatchId: string;
+  leagueId: string;
+  homeScore: number;
+  awayScore: number;
+  resultRevisionId: string;
+  /** true면 이미 같은 내용으로 확정돼 있어 이번 호출이 아무것도 바꾸지 않았다는 뜻. */
+  alreadyProcessed: boolean;
+}

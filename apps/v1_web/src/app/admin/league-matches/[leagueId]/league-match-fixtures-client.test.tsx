@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Providers } from '@/app/providers';
 import {
@@ -8,9 +8,11 @@ import {
   useV1AdminLeagueTeams,
   useV1AdminTeam,
   useV1CancelLeagueFixture,
+  useV1CorrectLeagueResult,
   useV1GenerateLeagueFixtures,
   useV1PreviewLeagueFixtures,
   useV1RecordLeagueForfeit,
+  useV1RecordLeagueResult,
   useV1RegenerateLeagueFixtures,
   useV1RemoveLeagueTeam,
   useV1RevertLeagueCompletion,
@@ -34,6 +36,9 @@ vi.mock('@/hooks/use-v1-api', () => ({
   // 열지 않으므로 data: undefined인 기본값으로 충분하다.
   useV1AdminTeam: vi.fn(() => ({ data: undefined })),
   useV1CancelLeagueFixture: vi.fn(),
+  // U1: 결과 입력·정정. 대부분의 테스트는 결과 처리를 다루지 않으므로 무해한 기본값.
+  useV1CorrectLeagueResult: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  useV1RecordLeagueResult: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useV1GenerateLeagueFixtures: vi.fn(),
   // 그룹 B 감사 결함 3: 최초 생성·재생성 공용 미리보기. 미리보기 자체를 다루는 테스트가
   // 없으므로 무해한 기본값.
@@ -58,6 +63,8 @@ const useV1AdminLeagueMatchMock = vi.mocked(useV1AdminLeagueMatch, { partial: tr
 const useV1AdminLeagueTeamsMock = vi.mocked(useV1AdminLeagueTeams, { partial: true });
 const useV1AdminTeamMock = vi.mocked(useV1AdminTeam, { partial: true });
 const useV1CancelLeagueFixtureMock = vi.mocked(useV1CancelLeagueFixture, { partial: true });
+const useV1CorrectLeagueResultMock = vi.mocked(useV1CorrectLeagueResult, { partial: true });
+const useV1RecordLeagueResultMock = vi.mocked(useV1RecordLeagueResult, { partial: true });
 const useV1PreviewLeagueFixturesMock = vi.mocked(useV1PreviewLeagueFixtures, { partial: true });
 const useV1RecordLeagueForfeitMock = vi.mocked(useV1RecordLeagueForfeit, { partial: true });
 const useV1GenerateLeagueFixturesMock = vi.mocked(useV1GenerateLeagueFixtures, { partial: true });
@@ -86,6 +93,8 @@ describe('LeagueMatchFixturesClient', () => {
     useV1CancelLeagueFixtureMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
     useV1RegenerateLeagueFixturesMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
     useV1RevertLeagueCompletionMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
+    useV1CorrectLeagueResultMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
+    useV1RecordLeagueResultMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
   });
 
   // D6(2026-08-24 확정): '상태' 열과 별개로 '결과' 열을 둔다. 이 열이 없던 동안 운영자는
@@ -795,5 +804,166 @@ describe('LeagueMatchFixturesClient', () => {
     fireEvent.click(screen.getByRole('button', { name: '되돌리기' }));
 
     await waitFor(() => expect(revertMutate).toHaveBeenCalledWith({ reason: '오심 정정' }, expect.anything()));
+  });
+
+  // U1(A안 "확정 다이얼로그") — '관리' 열 버튼은 결과 진행 단계에 따라 갈린다.
+  it('결과 진행 단계에 따라 관리 버튼 레이블이 바뀐다 — 미확정 3단계는 결과 입력, 확정이면 결과 정정, 승인대기 단계는 버튼이 없다', () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1AdminLeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1',
+        title: '가을 풋살 리그',
+        state: 'active',
+        teamIds: ['t1', 't2'],
+        fixtures: [
+          { teamMatchId: 'tm-not-entered', title: '1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched', resultStage: 'not_entered', homeScore: null, awayScore: null },
+          { teamMatchId: 'tm-draft', title: '2주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-08T20:00:00.000Z', placeName: '장소 미정', status: 'matched', resultStage: 'draft', homeScore: null, awayScore: null },
+          { teamMatchId: 'tm-change-requested', title: '3주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-15T20:00:00.000Z', placeName: '장소 미정', status: 'matched', resultStage: 'change_requested', homeScore: null, awayScore: null },
+          { teamMatchId: 'tm-official', title: '4주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-22T20:00:00.000Z', placeName: '장소 미정', status: 'completed', resultStage: 'official', homeScore: 3, awayScore: 1 },
+          { teamMatchId: 'tm-awaiting', title: '5주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-29T20:00:00.000Z', placeName: '장소 미정', status: 'matched', resultStage: 'awaiting_approval', homeScore: null, awayScore: null },
+        ],
+      },
+      isPending: false,
+    } as never);
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    expect(screen.getAllByRole('button', { name: '1주차 결과 입력' }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: '2주차 결과 입력' }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: '3주차 결과 입력' }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: '4주차 결과 정정' }).length).toBeGreaterThan(0);
+    expect(screen.queryAllByRole('button', { name: '5주차 결과 입력' })).toHaveLength(0);
+    expect(screen.queryAllByRole('button', { name: '5주차 결과 정정' })).toHaveLength(0);
+  });
+
+  // U1: 요구사항 3 — 정정 모드는 확정 전 "전 → 후" 비교를 보여준다. 이게 이 안의 존재 이유라
+  // 빼먹으면 안 된다.
+  it('결과 정정 버튼을 누르면 모달에 현재 공식 스코어("전")가 렌더된다', async () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1AdminLeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1',
+        title: '가을 풋살 리그',
+        state: 'active',
+        teamIds: ['t1', 't2'],
+        fixtures: [
+          { teamMatchId: 'tm-1', title: '1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'completed', resultStage: 'official', homeScore: 3, awayScore: 1 },
+        ],
+      },
+      isPending: false,
+    } as never);
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    fireEvent.click(screen.getAllByRole('button', { name: '1주차 결과 정정' })[0]);
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('현재 공식 스코어와 비교')).toBeInTheDocument();
+    expect(within(dialog).getByText('전')).toBeInTheDocument();
+    // 정정 전 현재 확정 스코어(3:1)가 "전" 칸에 그대로 보여야 한다.
+    expect(within(dialog).getByText('3 : 1')).toBeInTheDocument();
+  });
+
+  // U1: 요구사항 5 — mutation 훅은 다른 어드민 리그 훅들과 같은 패턴을 따른다. 여기서는
+  // 엔드포인트·body가 서버 계약(RecordLeagueResultDto: homeScore/awayScore/reason)과
+  // 정확히 맞는지 배선을 검증한다.
+  it('결과 입력 모달에서 스코어·사유를 입력해 제출하면 신규 입력 mutation을 올바른 body로 호출한다', async () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1AdminLeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1',
+        title: '가을 풋살 리그',
+        state: 'active',
+        teamIds: ['t1', 't2'],
+        fixtures: [
+          { teamMatchId: 'tm-1', title: '1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched', resultStage: 'not_entered', homeScore: null, awayScore: null },
+        ],
+      },
+      isPending: false,
+    } as never);
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+    const recordMutate = vi.fn();
+    useV1RecordLeagueResultMock.mockReturnValue({ mutate: recordMutate, isPending: false } as never);
+    const correctMutate = vi.fn();
+    useV1CorrectLeagueResultMock.mockReturnValue({ mutate: correctMutate, isPending: false } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    fireEvent.click(screen.getAllByRole('button', { name: '1주차 결과 입력' })[0]);
+
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText('홈팀'), { target: { value: '2' } });
+    fireEvent.change(within(dialog).getByLabelText('원정팀'), { target: { value: '0' } });
+    fireEvent.change(within(dialog).getByLabelText(/^사유/), { target: { value: '경기 종료 후 결과를 입력해요.' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '확인' }));
+
+    await waitFor(() =>
+      expect(recordMutate).toHaveBeenCalledWith(
+        { teamMatchId: 'tm-1', body: { homeScore: 2, awayScore: 0, reason: '경기 종료 후 결과를 입력해요.' } },
+        expect.anything(),
+      ),
+    );
+    expect(correctMutate).not.toHaveBeenCalled();
+  });
+
+  it('결과 정정 모달에서 새 스코어·사유를 입력해 제출하면 정정 mutation을 올바른 엔드포인트(body)로 호출한다', async () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1AdminLeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1',
+        title: '가을 풋살 리그',
+        state: 'active',
+        teamIds: ['t1', 't2'],
+        fixtures: [
+          { teamMatchId: 'tm-1', title: '1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'completed', resultStage: 'official', homeScore: 3, awayScore: 1 },
+        ],
+      },
+      isPending: false,
+    } as never);
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+    const recordMutate = vi.fn();
+    useV1RecordLeagueResultMock.mockReturnValue({ mutate: recordMutate, isPending: false } as never);
+    const correctMutate = vi.fn();
+    useV1CorrectLeagueResultMock.mockReturnValue({ mutate: correctMutate, isPending: false } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    fireEvent.click(screen.getAllByRole('button', { name: '1주차 결과 정정' })[0]);
+
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText('홈팀'), { target: { value: '2' } });
+    fireEvent.change(within(dialog).getByLabelText('원정팀'), { target: { value: '2' } });
+    fireEvent.change(within(dialog).getByLabelText(/^사유/), { target: { value: '오심으로 스코어를 정정해요.' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '확인' }));
+
+    await waitFor(() =>
+      expect(correctMutate).toHaveBeenCalledWith(
+        { teamMatchId: 'tm-1', body: { homeScore: 2, awayScore: 2, reason: '오심으로 스코어를 정정해요.' } },
+        expect.anything(),
+      ),
+    );
+    expect(recordMutate).not.toHaveBeenCalled();
   });
 });

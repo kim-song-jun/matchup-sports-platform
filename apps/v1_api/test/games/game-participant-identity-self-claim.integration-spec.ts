@@ -253,4 +253,29 @@ describe('Task 154 대회 경기 신원 연결 자가신청 (참가팀 멤버)',
     expect(current).not.toBeNull();
     expect(current?.userId).toBe(ids.teamMember);
   });
+
+  /**
+   * 게이트를 넓혔으면 반대 방향도 걸어야 한다 -- 넓힌 것이 "역할 제한"이지 "팀 제한"이
+   * 아니라는 것을 여기서 증명한다. 이게 없으면 다음 사람이 술어를 더 풀어도 아무도 모른다.
+   */
+  it('두 등록팀 어디에도 없는 사람은 여전히 확인할 수 없다', async () => {
+    const request = await prisma.v1ParticipantIdentityLinkEvent.findFirstOrThrow({
+      where: { participantId, actorUserId: ids.teamMember, action: 'REQUESTED' },
+    });
+    const game = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId }, select: { version: true } });
+
+    const error = await captureFailure(() =>
+      service.attestIdentityLink(
+        authUser(ids.outsider),
+        gameId,
+        participantId,
+        request.requestId,
+        'task154-outsider-attest',
+        { expectedVersion: game.version, clientCommandId: 'task154-outsider-attest', decision: 'approve' },
+      ),
+    );
+
+    expect(error).toBeInstanceOf(HttpException);
+    expect((error as HttpException).getStatus()).toBe(403);
+  });
 });

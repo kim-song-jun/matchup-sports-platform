@@ -317,6 +317,10 @@ export class PublicTournamentRecordsService {
    * 빠져 **틀린 추천**이 되기 때문이다(2026-08-25 A안 확정). 컨트롤러
    * (`AdminTournamentPlayerRecordsController`)가 활성 어드민만 통과시킨다.
    *
+   * 공개 랭킹과 달리 **가시성 정책(hidden·status_only) 필터도 걸지 않는다** —
+   * 숨김은 관중에 대한 정책이지 운영자에 대한 정책이 아니고, 수상 판단은 실제로
+   * 치러진 모든 공식 결과를 근거로 해야 한다.
+   *
    * 집계 키: 참가자의 `userId`가 있으면 사용자 단위(경기 간 합산), 없으면
    * 대회 안 정규화 이름 단위 — 계정 미연결 참가자는 이름 스냅샷 외에 게임 간
    * 동일인 판단 근거가 없다(어드민 통계 탭이 이미 같은 폴백을 쓴다). 이름·팀은
@@ -342,7 +346,10 @@ export class PublicTournamentRecordsService {
         resultRevision: { select: { officialAt: true } },
       },
     });
-    const officialRows = participantRows.filter((row) => row.resultRevision.officialAt !== null);
+    // 0골·0도움 행은 응답에서 전부 걸러진다 — 공개 랭킹과 같은 사전 필터(비용 패리티).
+    const officialRows = participantRows.filter(
+      (row) => row.resultRevision.officialAt !== null && (row.goals > 0 || row.assists > 0),
+    );
     if (officialRows.length === 0) return empty;
 
     const participants = await this.prisma.v1GameParticipant.findMany({

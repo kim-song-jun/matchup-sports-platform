@@ -342,7 +342,8 @@ identity/side itself:
   operator-entered score has no participant stat rows.
   The **admin variant** `GET /admin/tournaments/:id/player-records`
   (`AdminTournamentPlayerRecordsController`, active-admin only) shares the
-  fixture/revision walk but is deliberately **not** consent-gated -- it exists
+  fixture/revision walk minus the visibility filter (hiding is a spectator
+  policy, not an operator one) and is deliberately **not** consent-gated -- it exists
   to recommend award candidates (retro STATS-3), and a gated ranking would
   silently drop an unconsented top scorer and recommend the wrong person.
   Unlinked participants aggregate by normalised name snapshot within the

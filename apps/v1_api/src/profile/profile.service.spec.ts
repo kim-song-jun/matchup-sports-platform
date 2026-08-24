@@ -332,6 +332,11 @@ describe('ProfileService activitySummary', () => {
         .mockResolvedValueOnce([reverseReview]);
 
       const prisma = {
+        // Task 155: publicProfile() 이 선수 카드를 함께 만든다 -- 카드 입력을 목에 두지
+        // 않으면 이 스펙이 검증하는 것과 무관한 이유로 죽는다. null 은 '카드는 만들어지되
+        // 아무 능력치도 열리지 않는' 최소 상태다.
+        v1UserReputationSummary: { findUnique: jest.fn().mockResolvedValue(null) },
+        v1UserRecordConsent: { findUnique: jest.fn().mockResolvedValue(null) },
         v1TeamMembership: { findMany: jest.fn().mockResolvedValue([{ teamId: 'team-1' }]) },
         v1PostEventReview: { findMany },
         v1MatchParticipant: {
@@ -374,6 +379,11 @@ describe('ProfileService activitySummary', () => {
       };
       const findMany = jest.fn().mockResolvedValueOnce([hiddenReview]).mockResolvedValueOnce([]);
       const prisma = {
+        // Task 155: publicProfile() 이 선수 카드를 함께 만든다 -- 카드 입력을 목에 두지
+        // 않으면 이 스펙이 검증하는 것과 무관한 이유로 죽는다. null 은 '카드는 만들어지되
+        // 아무 능력치도 열리지 않는' 최소 상태다.
+        v1UserReputationSummary: { findUnique: jest.fn().mockResolvedValue(null) },
+        v1UserRecordConsent: { findUnique: jest.fn().mockResolvedValue(null) },
         v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
         v1PostEventReview: { findMany },
         v1MatchParticipant: { count: jest.fn().mockResolvedValue(0) },
@@ -409,6 +419,11 @@ describe('ProfileService activitySummary', () => {
       // reverse 조회 결과는 비어있음 — 상대가 끝까지 반대 방향 리뷰를 제출하지 않았지만, 시간 경과만으로 공개됨
       const findMany = jest.fn().mockResolvedValueOnce([staleRevealedReview]).mockResolvedValueOnce([]);
       const prisma = {
+        // Task 155: publicProfile() 이 선수 카드를 함께 만든다 -- 카드 입력을 목에 두지
+        // 않으면 이 스펙이 검증하는 것과 무관한 이유로 죽는다. null 은 '카드는 만들어지되
+        // 아무 능력치도 열리지 않는' 최소 상태다.
+        v1UserReputationSummary: { findUnique: jest.fn().mockResolvedValue(null) },
+        v1UserRecordConsent: { findUnique: jest.fn().mockResolvedValue(null) },
         v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
         v1PostEventReview: { findMany },
         v1MatchParticipant: { count: jest.fn().mockResolvedValue(0) },
@@ -460,6 +475,11 @@ describe('ProfileService tournament appearance aggregation', () => {
     try {
       const gameResultParticipantFindMany = jest.fn();
       const prisma = {
+        // Task 155: publicProfile() 이 선수 카드를 함께 만든다 -- 카드 입력을 목에 두지
+        // 않으면 이 스펙이 검증하는 것과 무관한 이유로 죽는다. null 은 '카드는 만들어지되
+        // 아무 능력치도 열리지 않는' 최소 상태다.
+        v1UserReputationSummary: { findUnique: jest.fn().mockResolvedValue(null) },
+        v1UserRecordConsent: { findUnique: jest.fn().mockResolvedValue(null) },
         v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
         v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
         v1MatchParticipant: { count: jest.fn().mockResolvedValueOnce(3).mockResolvedValueOnce(1) },
@@ -512,6 +532,11 @@ describe('ProfileService tournament appearance aggregation', () => {
         }),
       ];
       const prisma = {
+        // Task 155: publicProfile() 이 선수 카드를 함께 만든다 -- 카드 입력을 목에 두지
+        // 않으면 이 스펙이 검증하는 것과 무관한 이유로 죽는다. null 은 '카드는 만들어지되
+        // 아무 능력치도 열리지 않는' 최소 상태다.
+        v1UserReputationSummary: { findUnique: jest.fn().mockResolvedValue(null) },
+        v1UserRecordConsent: { findUnique: jest.fn().mockResolvedValue(null) },
         v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
         v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
         v1MatchParticipant: { count: jest.fn().mockResolvedValueOnce(0).mockResolvedValueOnce(0) },
@@ -574,6 +599,11 @@ describe('ProfileService tournament appearance aggregation', () => {
         }),
       ];
       const prisma = {
+        // Task 155: publicProfile() 이 선수 카드를 함께 만든다 -- 카드 입력을 목에 두지
+        // 않으면 이 스펙이 검증하는 것과 무관한 이유로 죽는다. null 은 '카드는 만들어지되
+        // 아무 능력치도 열리지 않는' 최소 상태다.
+        v1UserReputationSummary: { findUnique: jest.fn().mockResolvedValue(null) },
+        v1UserRecordConsent: { findUnique: jest.fn().mockResolvedValue(null) },
         v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
         v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
         v1MatchParticipant: { count: jest.fn().mockResolvedValueOnce(0).mockResolvedValueOnce(0) },
@@ -619,6 +649,11 @@ describe('ProfileService tournament appearance aggregation', () => {
         }),
       ];
       const prisma = {
+        // Task 155: publicProfile() 이 선수 카드를 함께 만든다 -- 카드 입력을 목에 두지
+        // 않으면 이 스펙이 검증하는 것과 무관한 이유로 죽는다. null 은 '카드는 만들어지되
+        // 아무 능력치도 열리지 않는' 최소 상태다.
+        v1UserReputationSummary: { findUnique: jest.fn().mockResolvedValue(null) },
+        v1UserRecordConsent: { findUnique: jest.fn().mockResolvedValue(null) },
         v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
         v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
         v1MatchParticipant: { count: jest.fn().mockResolvedValue(0) },
@@ -661,6 +696,10 @@ describe('ProfileService tournament appearance aggregation', () => {
         }),
       ];
       const prisma = {
+        // Task 155: publicProfile() 이 선수 카드를 함께 만든다 -- 카드 입력을 목에 두지
+        // 않으면 이 스펙이 검증하는 것과 무관한 이유로 죽는다. null 은 '카드는 만들어지되
+        // 아무 능력치도 열리지 않는' 최소 상태다.
+        v1UserReputationSummary: { findUnique: jest.fn().mockResolvedValue(null) },
         v1User: { findFirst: jest.fn().mockResolvedValue(baseUser) },
         v1MatchParticipant: { count: jest.fn().mockResolvedValue(0) },
         v1TeamMembership: { count: jest.fn().mockResolvedValue(0), findMany: jest.fn().mockResolvedValue([]) },
@@ -677,6 +716,8 @@ describe('ProfileService tournament appearance aggregation', () => {
         // 대신 결과(outcome)로 검증한다: 동의를 REVOKED 로 두고도 matchCount 가 그대로인지 본다.
         // 이 편이 예전 단언보다 강하다 -- 구현이 동의를 조회하든 말든 집계가 흔들리면 잡힌다.
         v1UserRecordConsent: {
+          // Task 155: 선수 카드가 동의 상태를 findUnique 로 읽는다(이 스펙의 findMany 와 별개 경로).
+          findUnique: jest.fn().mockResolvedValue(null),
           findMany: jest.fn().mockResolvedValue([{ userId: targetUserId, state: 'REVOKED' }]),
         },
         v1ParticipantConsentSnapshot: { findMany: jest.fn().mockResolvedValue([]) },
@@ -823,6 +864,11 @@ describe('ProfileService public profile activity summary (reveal filtering)', ()
       v1ParticipantIdentityLinkCurrent: { findMany: jest.fn().mockResolvedValue([]) },
       // Task 154 P2: 연결이 0개면 최근 활동 조회는 즉시 null 로 끝나지만, 방어적으로 둔다.
       v1GameResultParticipant: { findMany: jest.fn().mockResolvedValue([]) },
+      // Task 155: publicProfile() 이 선수 카드도 함께 만든다. 이 describe 가 검증하는 것은
+      // 후기 reveal 필터라 카드는 무관하지만, 입력이 없으면 카드 계산에서 죽는다.
+      // null 은 '카드는 만들어지되 아무 능력치도 열리지 않는' 최소 상태다.
+      v1UserReputationSummary: { findUnique: jest.fn().mockResolvedValue(null) },
+      v1UserRecordConsent: { findUnique: jest.fn().mockResolvedValue(null) },
     };
   }
 
@@ -975,6 +1021,7 @@ describe('ProfileService public profile activity summary (reveal filtering)', ()
         };
       }
       const prisma = {
+        // 카드 입력(v1UserReputationSummary/v1UserRecordConsent)은 buildPrisma() 가 이미 준다.
         ...buildPrisma(),
         v1ParticipantIdentityLinkCurrent: {
           // linkId/userId 는 최근 활동 조회(loadParticipantConsentEligibility)가 select 한다.
@@ -984,7 +1031,11 @@ describe('ProfileService public profile activity summary (reveal filtering)', ()
         },
         // Task 154 P2: 최근 활동은 동의 게이트를 탄다. 이 스펙의 관심사는 출전 수 집계이므로
         // 동의 없음(=최근 활동 null)으로 두고 집계만 본다.
-        v1UserRecordConsent: { findMany: jest.fn().mockResolvedValue([]) },
+        // Task 155: 선수 카드는 동의 상태를 findUnique 로 읽는다(참가자 스냅샷용 findMany 와 별개 경로).
+        v1UserRecordConsent: {
+          findMany: jest.fn().mockResolvedValue([]),
+          findUnique: jest.fn().mockResolvedValue(null),
+        },
         v1ParticipantConsentSnapshot: { findMany: jest.fn().mockResolvedValue([]) },
         v1GameResultParticipant: {
           findMany: jest.fn().mockResolvedValue([

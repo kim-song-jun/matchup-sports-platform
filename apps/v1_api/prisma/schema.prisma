@@ -737,6 +737,10 @@ model V1UserProfile {
   /// 표시 시점에 `V1GameParticipant.userId`로 이 프로필을 조인해 즉시 반영한다(자세한
   /// 배경은 그 파일의 `resolveParticipantDisplayName` 주석 참고).
   tournamentRealNameVisible Boolean @default(false) @map("tournament_real_name_visible")
+  /// 선수 카드(Task 155)를 끄는 스위치. 기본값 false = 카드를 보여준다.
+  /// 켜면 본인에게도 남에게도 카드가 안 보이고 기존 프로필만 남는다 -- 게임화에
+  /// 거부감이 있는 사용자를 위한 탈출구다. 카드를 강제하지 않기 위해 존재한다.
+  playerCardHidden Boolean @default(false) @map("player_card_hidden")
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
   deletedAt       DateTime? @map("deleted_at")

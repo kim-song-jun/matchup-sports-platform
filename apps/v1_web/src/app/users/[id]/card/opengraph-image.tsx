@@ -39,6 +39,20 @@ export const runtime = 'nodejs';
  */
 export const dynamic = 'force-dynamic';
 
+/**
+ * ## satori 는 숫자 자식을 렌더하지 못한다
+ *
+ * `<div>{42}</div>` 처럼 **숫자를 그대로 자식으로 주면** satori 가
+ * `Expected <div> to have explicit "display: flex" ...` 로 던진다. 숫자를 자식 노드로
+ * 세면서 컨테이너로 오인하는 것으로 보인다 -- 같은 자리에 문자열을 주면 통과한다.
+ *
+ * 이 카드는 총점·등번호·능력치가 전부 숫자라 **정상 카드 경로가 항상 실패**했고,
+ * 문자열만 쓰는 폴백 이미지만 성공했다. 그래서 모든 사용자가 같은 폴백을 받았다
+ * (alpha 실측: 서로 다른 사용자와 없는 사용자까지 응답 바이트가 동일).
+ *
+ * 그러므로 **이 파일에서 숫자를 자식으로 쓸 때는 반드시 `String()` 으로 감싼다.**
+ */
+
 export default async function Image({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   // 이 라우트는 force-dynamic 이므로 fetch 도 no-store 여야 한다 -- revalidate 와 함께
@@ -101,7 +115,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
         {/* 왼쪽 — 총점·포지션·이름 */}
         <div style={{ display: 'flex', flexDirection: 'column', flex: 1, justifyContent: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 24 }}>
-            <div style={{ fontSize: 148, fontWeight: 700, lineHeight: 1 }}>{card.overall ?? '–'}</div>
+            <div style={{ fontSize: 148, fontWeight: 700, lineHeight: 1 }}>{String(card.overall ?? '–')}</div>
             <div style={{ display: 'flex', flexDirection: 'column', paddingBottom: 16 }}>
               <div style={{ fontSize: 40, fontWeight: 700, color: '#ffc342', letterSpacing: 4 }}>
                 {card.position ?? '–'}
@@ -125,13 +139,16 @@ export default async function Image({ params }: { params: Promise<{ id: string }
                   padding: '2px 12px',
                 }}
               >
-                {card.jerseyNumber}
+                {String(card.jerseyNumber)}
               </div>
             ) : null}
             <div style={{ fontSize: 60, fontWeight: 700 }}>{profile.displayName}</div>
           </div>
+          {/* satori 는 자식이 둘 이상인 div 에 명시적 display 를 요구한다. 여기서는
+              레이아웃이 필요한 게 아니라 한 줄 텍스트이므로, 조각을 나누지 말고
+              **하나의 문자열로 합친다** -- flex 를 붙이면 텍스트가 조각별로 배치된다. */}
           <div style={{ fontSize: 26, color: 'rgba(255,255,255,0.66)', marginTop: 8 }}>
-            {tier.label} · {card.appearances}경기{teamName ? ` · ${teamName}` : ''}
+            {`${tier.label} · ${card.appearances}경기${teamName ? ` · ${teamName}` : ''}`}
           </div>
           <div style={{ fontSize: 20, color: 'rgba(255,255,255,0.44)', marginTop: 26 }}>
             등급은 실력이 아니라 뛴 경기 수로 올라가요
@@ -151,6 +168,9 @@ export default async function Image({ params }: { params: Promise<{ id: string }
         >
           {card.stats.map((s) => (
             <div key={s.code} style={{ display: 'flex', alignItems: 'center', marginBottom: 22 }}>
+              {/* 자물쇠 이모지는 satori 가 못 그리므로 텍스트 `잠김` 으로 말한다.
+                  주석은 **엘리먼트 밖에** 둔다 -- satori 는 텍스트 전용 div 안의 주석까지
+                  자식으로 세어 "display: flex 를 붙여라" 에러를 낸다. */}
               <div
                 style={{
                   width: 116,
@@ -159,8 +179,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
                   color: s.value === null ? 'rgba(255,255,255,0.34)' : '#ffffff',
                 }}
               >
-                {/* 자물쇠 이모지는 satori 가 못 그린다 -- 텍스트로 말한다. */}
-                {s.value ?? '잠김'}
+                {String(s.value ?? '잠김')}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <div style={{ fontSize: 18, fontWeight: 700, color: 'rgba(255,255,255,0.52)', letterSpacing: 2 }}>

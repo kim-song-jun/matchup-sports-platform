@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import type { V1PlayerCard } from '@/types/api';
 
 /**
@@ -15,31 +16,41 @@ import type { V1PlayerCard } from '@/types/api';
  * 서브셋 범위를 넓히는 것이 대응이다(원본 woff2 는 그대로 있으므로 재생성 가능).
  */
 
-let cached: { regular: ArrayBuffer; bold: ArrayBuffer } | null = null;
+let cached: { regular: Buffer; bold: Buffer } | null = null;
 
 /**
- * 폰트를 `new URL(..., import.meta.url)` 로 읽는다 -- **`process.cwd()` 기반 경로를
- * 쓰면 배포에서 깨진다.**
+ * 폰트를 `readFile(new URL(..., import.meta.url))` 로 읽는다.
  *
- * 런타임 이미지(`deploy/Dockerfile.v1-web`)는 `.next/standalone`, `.next/static`,
- * `public` 세 가지만 복사한다. `src/` 는 컨테이너에 아예 없으므로 `process.cwd()` 로
- * `src/...` 를 읽으면 로컬에서는 되고 alpha 에서는 500 이 난다. 이 형태로 쓰면
- * 번들러가 에셋을 추적해 standalone 출력에 함께 넣어 준다.
+ * ## 두 가지를 동시에 지켜야 한다
+ * 1. **경로를 번들러가 추적해야 한다.** 런타임 이미지(`deploy/Dockerfile.v1-web`)는
+ *    `.next/standalone`·`.next/static`·`public` 만 복사하고 `src/` 는 컨테이너에 없다.
+ *    `process.cwd()` 로 `src/...` 를 읽으면 로컬만 되고 배포에서 깨진다.
+ *    `new URL(..., import.meta.url)` 형태여야 에셋이 standalone 출력에 함께 들어간다.
+ * 2. **`fetch` 로 읽으면 안 된다.** 그 URL 은 `file:` 스킴인데 Node 의 `fetch`(undici)는
+ *    `file:` 을 지원하지 않는다 -- 항상 예외가 난다. `fs.readFile` 은 file URL 을 직접
+ *    받으므로 이쪽을 쓴다.
+ *
+ * 처음엔 `fetch(new URL(...))` 로 썼다가 alpha 에서 **모든 사용자가 같은 폴백 이미지**를
+ * 받는 증상으로 나타났다. 폰트 로딩이 조용히 실패하고 있었는데, 이 catch 가 로그를
+ * 남기지 않아 세 라운드 동안 원인을 못 봤다.
  */
-export async function loadOgFonts(): Promise<{ regular: ArrayBuffer; bold: ArrayBuffer } | null> {
+export async function loadOgFonts(): Promise<{ regular: Buffer; bold: Buffer } | null> {
   // 이미지 요청마다 900KB 를 두 번 읽지 않도록 프로세스 수명 동안 캐시한다.
   if (cached !== null) return cached;
   try {
     const [regular, bold] = await Promise.all([
-      fetch(new URL('./og-fonts/Pretendard-Regular.ttf', import.meta.url)).then((r) => r.arrayBuffer()),
-      fetch(new URL('./og-fonts/Pretendard-Bold.ttf', import.meta.url)).then((r) => r.arrayBuffer()),
+      readFile(new URL('./og-fonts/Pretendard-Regular.ttf', import.meta.url)),
+      readFile(new URL('./og-fonts/Pretendard-Bold.ttf', import.meta.url)),
     ]);
     cached = { regular, bold };
     return cached;
-  } catch {
+  } catch (error) {
     // 에셋 추적이 어떤 이유로든 어긋나면(번들러 설정 변경, 배포 이미지 구성 변경)
     // **500 대신 라틴 전용 이미지**로 떨어진다. 카카오톡에 깨진 썸네일이 뜨는 것보다
     // 한글 없는 브랜드 이미지가 낫다 -- 링크 자체는 살아 있어야 한다.
+    //
+    // 다만 **조용히 삼키지 않는다.** 여기가 세 라운드 동안 원인을 가린 자리다.
+    console.error('[og-card] 폰트 로딩 실패 -- 라틴 전용 이미지로 떨어진다', error);
     return null;
   }
 }

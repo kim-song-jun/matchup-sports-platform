@@ -29,7 +29,8 @@ async function login(email, password) {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password }),
   });
-  const set = res.headers.getSetCookie?.() ?? [];
+  // getSetCookie 가 없는 Node 런타임 폴백(다른 하네스와 동일한 이유).
+  const set = res.headers.getSetCookie?.() ?? (res.headers.get('set-cookie') ? [res.headers.get('set-cookie')] : []);
   const found = set.map((c) => c.split(';')[0]).find((c) => c.startsWith('teameet_v1_session='));
   if (!found) throw new Error(`login 실패 (${res.status})`);
   return found;
@@ -63,10 +64,18 @@ async function main() {
   const api = apiWith(adminCookie);
   console.log('관리자 로그인 OK');
 
-  const pub = (await api('GET', `/tournaments/${TOURNAMENT}/matches/${FIXTURE}`)).json?.data;
+  const pubRes = await api('GET', `/tournaments/${TOURNAMENT}/matches/${FIXTURE}`);
+  const pub = pubRes.json?.data;
   const gameId = pub?.gameId;
+  if (pubRes.status !== 200 || !gameId) {
+    throw new Error(`fixture 조회 실패 HTTP ${pubRes.status}: ${pubRes.text.slice(0, 200)}`);
+  }
   console.log(`fixture status=${pub?.status} game=${gameId}`);
-  let g = (await api('GET', `/games/${gameId}`)).json?.data;
+  const gRes = await api('GET', `/games/${gameId}`);
+  let g = gRes.json?.data;
+  if (gRes.status !== 200 || !g) {
+    throw new Error(`게임 조회 실패 HTTP ${gRes.status}: ${gRes.text.slice(0, 200)}`);
+  }
   console.log(`game state=${g.state} v${g.version}`);
 
   // 라인업 (SCHEDULED 에서만) — LINEUP-2 이후 expectedVersion 은 **사이드별
@@ -97,6 +106,9 @@ async function main() {
       // submit 의 expectedVersion 은 저장 직후 **다시 읽은** 라인업 버전 (저장소 관례)
       g = (await api('GET', `/games/${gameId}`)).json?.data;
       const fresh = (g.lineups ?? []).find((l) => l.sideId === lineup.sideId);
+      if (!fresh) {
+        throw new Error(`재조회에서 라인업(sideId=${lineup.sideId})을 찾지 못했어요 — 응답: ${JSON.stringify(g.lineups ?? []).slice(0, 200)}`);
+      }
       const trySubmit = async (v) => {
         const submitId = randomUUID();
         return api('POST', `/games/${gameId}/lineups/${fresh.id}/submit`,

@@ -156,7 +156,7 @@ describe('TeamContactSettingsPageClient', () => {
             teamId: 'A',
             blockedTeamId: 'B',
             createdByUserId: 'u1',
-            reason: '운영자 조치 (신고 inq-1)',
+            reason: '운영자가 접수된 신고를 확인해 차단했어요.',
             createdAt: '2026-08-24T00:00:00.000Z',
             blockedTeam: { id: 'B', name: '상대팀' },
           },
@@ -168,7 +168,7 @@ describe('TeamContactSettingsPageClient', () => {
 
     render(<TeamContactSettingsPageClient teamId="team-1" />);
 
-    expect(screen.getByText('운영자 조치 (신고 inq-1)')).toBeInTheDocument();
+    expect(screen.getByText('운영자가 접수된 신고를 확인해 차단했어요.')).toBeInTheDocument();
   });
 
   it('사유가 없으면 아무것도 덧붙이지 않는다', () => {
@@ -193,6 +193,6 @@ describe('TeamContactSettingsPageClient', () => {
     render(<TeamContactSettingsPageClient teamId="team-1" />);
 
     expect(screen.getByText('상대팀')).toBeInTheDocument();
-    expect(screen.queryByText(/운영자 조치/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/운영자가 접수된 신고/)).not.toBeInTheDocument();
   });
 });

@@ -973,29 +973,29 @@ describe('AdminService — list/detail endpoints', () => {
     }
 
     // 차단당한 팀의 운영진이 자기 설정 화면에서 이 사유를 본다. 문의 UUID 를 넣으면 아무
-  // 의미도 전달하지 못하면서 좁은 화면에서 두 줄로 접혀 해제 버튼까지 밀어낸다.
-  // 추적용 id 는 감사 로그가 따로 들고 있어야 한다 — 읽는 사람이 다르다.
-  it('팀에 보이는 차단 사유에는 문의 id 가 들어가지 않는다', async () => {
-    prisma.v1AdminUser.findUnique.mockResolvedValue(activeAdminRecord);
-    prisma.v1Inquiry.findUnique.mockResolvedValue({
-      id: 'inq-1', userId: 'reporter', category: 'report',
-      relatedType: 'team_contact', relatedId: 'c1', reportedTeamId: 'B',
+    // 의미도 전달하지 못하면서 좁은 화면에서 두 줄로 접혀 해제 버튼까지 밀어낸다.
+    // 추적용 id 는 감사 로그가 따로 들고 있어야 한다 — 읽는 사람이 다르다.
+    it('팀에 보이는 차단 사유에는 문의 id 가 들어가지 않는다', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(activeAdminRecord);
+      prisma.v1Inquiry.findUnique.mockResolvedValue({
+        id: 'inq-1', userId: 'reporter', category: 'report',
+        relatedType: 'team_contact', relatedId: 'c1', reportedTeamId: 'B',
+      });
+      prisma.v1TeamContact.findUnique.mockResolvedValue({ fromTeamId: 'A', toTeamId: 'B' });
+      prisma.v1TeamContactBlock.create.mockResolvedValue({ id: 'b1' });
+
+      await service.blockReportedTeam(adminAuthUser, 'inq-1');
+
+      const blockReason = prisma.v1TeamContactBlock.create.mock.calls[0][0].data.reason;
+      expect(blockReason).not.toContain('inq-1');
+      expect(blockReason).toContain('신고');
+
+      // 감사 로그 쪽에는 추적용 id 가 남아야 한다.
+      const logArgs = prisma.v1AdminActionLog.create.mock.calls[0][0].data;
+      expect(JSON.stringify(logArgs)).toContain('inq-1');
     });
-    prisma.v1TeamContact.findUnique.mockResolvedValue({ fromTeamId: 'A', toTeamId: 'B' });
-    prisma.v1TeamContactBlock.create.mockResolvedValue({ id: 'b1' });
 
-    await service.blockReportedTeam(adminAuthUser, 'inq-1');
-
-    const blockReason = prisma.v1TeamContactBlock.create.mock.calls[0][0].data.reason;
-    expect(blockReason).not.toContain('inq-1');
-    expect(blockReason).toContain('신고');
-
-    // 감사 로그 쪽에는 추적용 id 가 남아야 한다.
-    const logArgs = prisma.v1AdminActionLog.create.mock.calls[0][0].data;
-    expect(JSON.stringify(logArgs)).toContain('inq-1');
-  });
-
-  it('신고자 팀 명의로 대상 팀을 차단하고 사유를 남긴다', async () => {
+    it('신고자 팀 명의로 대상 팀을 차단하고 사유를 남긴다', async () => {
       prisma.v1AdminUser.findUnique.mockResolvedValue(activeAdminRecord);
       prisma.v1Inquiry.findUnique.mockResolvedValue(reportRow());
       prisma.v1TeamContact.findUnique.mockResolvedValue({ fromTeamId: 'A', toTeamId: 'B' });

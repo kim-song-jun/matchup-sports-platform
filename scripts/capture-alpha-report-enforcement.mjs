@@ -36,6 +36,19 @@ function requireEnv(...names) {
 }
 requireEnv('ALPHA_ADMIN_EMAIL', 'ALPHA_EMAIL_A', 'ALPHA_TEAM_A_ID', 'ALPHA_INQUIRY_ID');
 
+// 비밀번호도 여기서 검증한다. 안 그러면 login() 의 타입 가드가 "둘 다 문자열이어야 합니다"
+// 로만 죽어 **무엇이 빠졌는지** 가 안 보인다 — 원인이 env 누락인지 alpha 장애인지 구분이 안 된다.
+//
+// alpha E2E 계정은 공통 비밀번호를 쓰므로 ALPHA_PASSWORD 하나로 두 계정을 모두 연다.
+// 어드민만 다른 비밀번호를 쓰는 환경이면 ALPHA_ADMIN_PASSWORD 로 덮어쓸 수 있다 —
+// 그 경우에도 멤버 계정은 ALPHA_PASSWORD 를 쓰므로 둘 다 있어야 한다.
+if (!process.env.ALPHA_PASSWORD && !process.env.ALPHA_ADMIN_PASSWORD) {
+  throw new Error('필수 환경변수가 없습니다: ALPHA_PASSWORD (또는 어드민 전용 ALPHA_ADMIN_PASSWORD)');
+}
+if (process.env.ALPHA_ADMIN_PASSWORD && !process.env.ALPHA_PASSWORD) {
+  throw new Error('ALPHA_ADMIN_PASSWORD 만으로는 멤버 계정을 열 수 없습니다 — ALPHA_PASSWORD 도 설정해 주세요');
+}
+
 async function login(email, password) {
   if (typeof email !== 'string' || typeof password !== 'string') {
     throw new Error('login(email, password) 는 둘 다 문자열이어야 합니다');
@@ -54,7 +67,7 @@ async function login(email, password) {
 
 const password = process.env.ALPHA_ADMIN_PASSWORD ?? process.env.ALPHA_PASSWORD;
 const adminToken = await login(process.env.ALPHA_ADMIN_EMAIL, password);
-const memberToken = await login(process.env.ALPHA_EMAIL_A, process.env.ALPHA_PASSWORD ?? password);
+const memberToken = await login(process.env.ALPHA_EMAIL_A, process.env.ALPHA_PASSWORD);
 
 const PAGES = [
   { key: 'admin-report-detail', url: `/admin/inquiries/${process.env.ALPHA_INQUIRY_ID}`, token: adminToken },

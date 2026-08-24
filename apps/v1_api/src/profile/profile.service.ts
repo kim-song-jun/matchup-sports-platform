@@ -25,6 +25,7 @@ import {
   UpdateMyRegionsDto,
   UpdateProfileDto,
   UpdateSettingsDto,
+  UpdatePlayerCardHiddenDto,
   UpdateTournamentRealNameVisibilityDto,
   WithdrawalRequestDto,
 } from './dto/profile.dto';
@@ -920,6 +921,46 @@ export class ProfileService {
       select: { tournamentRealNameVisible: true },
     });
     return { visible: profile.tournamentRealNameVisible };
+  }
+
+  /**
+   * 선수 카드 숨김 토글 조회 (Task 155). 프로필 row 가 없으면 컬럼 기본값과 같은
+   * false(= 카드를 보여준다)를 반환한다 -- 대회 실명 토글과 같은 패턴.
+   */
+  async myPlayerCardHidden(user: V1AuthUser) {
+    const profile = await this.prisma.v1UserProfile.findUnique({
+      where: { userId: user.id },
+      select: { playerCardHidden: true },
+    });
+    return { hidden: profile?.playerCardHidden ?? false };
+  }
+
+  /**
+   * 선수 카드 숨김 토글 저장.
+   *
+   * 이 컬럼은 Task 155 에서 카드와 함께 넣었지만 **쓰는 경로가 없어 사용자가 켤 수
+   * 없는 상태**였다 -- 읽기만 하고 있었다. 게임화에 거부감이 있는 사용자를 위한
+   * 탈출구가 목적인데 잠글 방법이 없으면 탈출구가 아니다.
+   *
+   * `updateMe`(PATCH /me/profile)와 달리 nickname/gender 같은 다른 필수 필드를 함께
+   * 요구하지 않는다 -- 이 화면은 스위치 하나만 다룬다. 프로필 row 가 아직 없으면
+   * upsert 의 create 분기가 nickname 없이 만들 수 없으므로 404 로 막는다.
+   */
+  async updateMyPlayerCardHidden(user: V1AuthUser, dto: UpdatePlayerCardHiddenDto) {
+    this.assertMutableAccount(user);
+    const existing = await this.prisma.v1UserProfile.findUnique({ where: { userId: user.id }, select: { id: true } });
+    if (!existing) {
+      throw new NotFoundException({
+        code: 'PROFILE_NOT_FOUND',
+        message: '프로필을 먼저 등록해주세요.',
+      });
+    }
+    const profile = await this.prisma.v1UserProfile.update({
+      where: { userId: user.id },
+      data: { playerCardHidden: dto.hidden },
+      select: { playerCardHidden: true },
+    });
+    return { hidden: profile.playerCardHidden };
   }
 
   logout() {

@@ -383,6 +383,7 @@ export class ProfileService {
       assists: records.assists,
       startedCount: records.startedCount,
       position: records.position,
+      jerseyNumber: records.jerseyNumber,
       skillScore: toNumber(reputation?.metricSkillScore),
       mannerScore: toNumber(reputation?.metricMannerScore),
       punctualityScore: toNumber(reputation?.metricPunctualityScore),

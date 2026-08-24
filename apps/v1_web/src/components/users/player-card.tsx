@@ -69,6 +69,7 @@ export function PlayerCard({
   profileImageUrl,
   teamName,
   isOwner,
+  shareHref,
 }: {
   readonly card: V1PlayerCard;
   readonly displayName: string;
@@ -76,6 +77,11 @@ export function PlayerCard({
   readonly teamName: string | null;
   /** 본인이 보는 경우에만 "공개하기" 같은 행동을 권한다 -- 남의 카드에서 권하면 이상하다. */
   readonly isOwner: boolean;
+  /**
+   * 공유 화면 경로. 주면 카드 아래에 공유 입구가 붙는다.
+   * 공유 화면 자신은 이 값을 주지 않는다 -- 자기 자신으로 가는 버튼은 의미가 없다.
+   */
+  readonly shareHref?: string;
 }) {
   const tier = TIER_STYLE[card.tier];
   const hint = unlockHint(card);
@@ -107,7 +113,16 @@ export function PlayerCard({
       </div>
 
       <div className="tm-player-card-id">
-        <div className="tm-player-card-name">{displayName}</div>
+        {/* 등번호를 이름 앞에 둔다. 왼쪽 큰 숫자는 총점이라, 그것만 있으면 등번호로
+            오해된다 -- 실제 유니폼 번호는 따로 보여야 "내 카드"로 읽힌다. */}
+        <div className="tm-player-card-name">
+          {card.jerseyNumber !== null ? (
+            <span className="tm-player-card-jersey" aria-label={`등번호 ${card.jerseyNumber}번`}>
+              {card.jerseyNumber}
+            </span>
+          ) : null}
+          {displayName}
+        </div>
         <div className="tm-player-card-sub">
           {card.position ? POSITION_LABEL[card.position] : '포지션 미정'}
           {' · '}
@@ -142,6 +157,13 @@ export function PlayerCard({
       {isOwner && needsConsent ? (
         <Link href="/my/settings/record-consent" className="tm-player-card-cta">
           기록 공개하고 3개 열기
+        </Link>
+      ) : null}
+
+      {/* 공유 입구. 잠긴 게 많아도 막지 않는다 -- 자랑할지 말지는 본인이 정한다. */}
+      {shareHref ? (
+        <Link href={shareHref} className="tm-player-card-share-link">
+          카드 공유하기
         </Link>
       ) : null}
     </section>

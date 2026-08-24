@@ -20,6 +20,7 @@ const stat = (
 const card = (overrides: Partial<V1PlayerCard> = {}): V1PlayerCard => ({
   formulaVersion: 1,
   position: 'MF',
+  jerseyNumber: 7,
   overall: 72,
   tier: 'silver',
   appearances: 8,

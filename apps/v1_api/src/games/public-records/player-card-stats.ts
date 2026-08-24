@@ -21,6 +21,14 @@ export interface PlayerCardRecordStats {
   readonly assists: number;
   readonly startedCount: number;
   readonly position: PlayerCardPosition;
+  /**
+   * 등번호. 라인업 스냅샷에서 **가장 자주 단 번호**를 쓴다.
+   *
+   * 팀 고정 등번호(`V1TeamMembership.jerseyNumber`)가 아니라 실제 출전 기록에서 뽑는
+   * 이유: 카드의 다른 값이 전부 "실제로 뛴 것"에서 나오는데 등번호만 팀 설정에서
+   * 오면, 그 팀을 떠난 뒤에도 옛 번호가 카드에 남는다.
+   */
+  readonly jerseyNumber: number | null;
   /** 연결된 participant 가 하나라도 있는가 -- 동의만 없는 상태와 애초에 기록이 없는 상태를 가른다. */
   readonly hasAnyLink: boolean;
 }
@@ -31,6 +39,7 @@ const EMPTY: PlayerCardRecordStats = {
   assists: 0,
   startedCount: 0,
   position: null,
+  jerseyNumber: null,
   hasAnyLink: false,
 };
 
@@ -130,13 +139,16 @@ export async function loadPlayerCardRecordStats(
   // 종목 프리셋에 따라 그 값이 'GK'(축구) 또는 'GOLEIRO'(풋살)로 들어온다.
   const lineup = await prisma.v1GameParticipant.findMany({
     where: { id: { in: visible } },
-    select: { position: true },
+    select: { position: true, jerseyNumber: true },
   });
   const tally = new Map<string, number>();
+  const jerseyTally = new Map<number, number>();
   for (const entry of lineup) {
     const code = normalizePosition(entry.position, false);
-    if (code === null) continue;
-    tally.set(code, (tally.get(code) ?? 0) + 1);
+    if (code !== null) tally.set(code, (tally.get(code) ?? 0) + 1);
+    if (entry.jerseyNumber !== null) {
+      jerseyTally.set(entry.jerseyNumber, (jerseyTally.get(entry.jerseyNumber) ?? 0) + 1);
+    }
   }
   let position: PlayerCardPosition = null;
   let best = 0;
@@ -151,12 +163,24 @@ export async function loadPlayerCardRecordStats(
     position = 'GK';
   }
 
+  // 등번호도 포지션과 같은 규칙 -- 가장 자주 단 번호. 한 경기 빌린 번호가 카드에
+  // 박히면 안 된다. 동률이면 작은 번호를 쓴다(Map 순회 순서에 결과가 좌우되지 않게).
+  let jerseyNumber: number | null = null;
+  let jerseyBest = 0;
+  for (const [number, count] of [...jerseyTally.entries()].sort((a, b) => a[0] - b[0])) {
+    if (count > jerseyBest) {
+      jerseyBest = count;
+      jerseyNumber = number;
+    }
+  }
+
   return {
     appearances: byGame.size,
     goals,
     assists,
     startedCount,
     position,
+    jerseyNumber,
     hasAnyLink: true,
   };
 }

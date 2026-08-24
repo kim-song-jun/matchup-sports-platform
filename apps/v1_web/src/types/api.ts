@@ -1911,6 +1911,8 @@ export type V1PlayerCard = {
   /** 산식 버전. 계수가 바뀌면 올라간다 -- 조용히 바뀌지 않게. */
   formulaVersion: number;
   position: 'FW' | 'MF' | 'DF' | 'GK' | null;
+  /** 등번호(표시 전용). 라인업 기록에서 가장 자주 단 번호이며 계산에는 쓰이지 않는다. */
+  jerseyNumber: number | null;
   /** 열린 능력치가 하나도 없으면 null. 0 이 아니다. */
   overall: number | null;
   /** 실력이 아니라 **출전 수**로 정해진다. */

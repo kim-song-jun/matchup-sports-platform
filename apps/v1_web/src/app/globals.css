@@ -563,6 +563,10 @@ button:disabled {
   backdrop-filter: blur(18px);
   padding: 6px 0 calc(16px + var(--v1-shell-safe-bottom));
   display: grid;
+  /* D5 — shell.tsx의 BottomNav가 tabs.length로 인라인 style을 얹어 실제 열 수를
+     결정한다(탭 6개 = repeat(6, 1fr)). 여기 5는 JS가 실패했을 때만 쓰이는 fallback값이라
+     탭이 늘어도 이 파일을 다시 고칠 필요가 없다 — 하드코딩된 열 수에 다시 묶이지 않도록
+     일부러 인라인 스타일을 우선시키는 구조다. */
   grid-template-columns: repeat(5, 1fr);
   position: absolute;
   bottom: 0;
@@ -578,14 +582,25 @@ button:disabled {
   justify-content: center;
   gap: 4px;
   min-width: 0;
+  /* 탭이 6개로 늘면서(D5) 폭이 가장 좁은 뷰포트(iPhone SE 320px 기준)에서
+     320/6 ≈ 53px/tab까지 좁아진다. 아이콘 23px는 그대로 두되(53px의 ≈43%, 여전히
+     여유), 좌우 압박을 줄이려 최소 패딩을 준다 — 라벨(최대 2글자)이 탭 경계에
+     바짝 붙는 것을 막는다. 아래 .tm-bottom-tab span 주석에 열 수·라벨 폭 계산 근거. */
+  padding: 0 2px;
   color: var(--grey400);
 }
 
 .tm-bottom-tab span {
   color: var(--grey500);
-  /* [알파 감사 B] 11px는 R-T2 최소 하한(12px) 미달 — 하단 탭바 5개
-     라벨(홈/매치/대회/팀/마이) 전부 해당. 토큰(--font-size-caption)으로
-     교체. 탭바는 min-height라 1px 증가가 레이아웃을 깨지 않는다. */
+  /* [알파 감사 B] 11px는 R-T2 최소 하한(12px) 미달 — 하단 탭바 6개
+     라벨(홈/매치/대회/리그/팀/마이) 전부 해당. 토큰(--font-size-caption)으로
+     교체. 탭바는 min-height라 1px 증가가 레이아웃을 깨지 않는다.
+     [D5] 6열 계산: 390px viewport → .tm-app-frame width = min(100%, 480px) = 390px →
+     탭당 390/6 = 65px. 라벨은 전부 한글 1~2글자(홈/매치/대회/리그/팀/마이) — 12px
+     캡션 폰트 기준 한글 1글자 ≈ 13~14px 폭이라 2글자 라벨도 ≈26~28px로 65px 탭 폭에
+     여유 있게 들어간다(아이콘 23px도 동일). 최소 지원 폭 320px(iPhone SE) 기준으로도
+     320/6 ≈ 53px로 2글자 라벨(≈28px)이 아이콘과 겹치지 않는다 — 라벨이 줄바꿈되는
+     시점은 탭 폭이 라벨 폭보다 좁아질 때인데, 6글자 이상 라벨이 아니면 도달하지 않는다. */
   font-size: var(--font-size-caption);
   line-height: 16px;
   font-weight: 500;

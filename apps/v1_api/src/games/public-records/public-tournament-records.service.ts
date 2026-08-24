@@ -44,6 +44,8 @@ import {
 const NOT_FOUND = { code: 'TOURNAMENT_MATCH_NOT_FOUND', message: '경기 정보를 찾을 수 없어요.' } as const;
 // 리그 도메인(league-match-public.service.ts)과 같은 상한 — 회고 STATS-1은 그 패턴의 복제다.
 const PLAYER_RECORDS_LIMIT = 30;
+// 어드민 추천 근거는 상위 후보만 필요하다 — chip 3개 + 여유분.
+const ADMIN_PLAYER_RECORDS_LIMIT = 10;
 
 const FIXTURE_SCHEDULE_SELECT = {
   id: true,
@@ -275,6 +277,99 @@ export class PublicTournamentRecordsService {
       tournamentId: tournament.id,
       goals: rows.filter((row) => row.goals > 0).sort((a, b) => b.goals - a.goals).slice(0, PLAYER_RECORDS_LIMIT),
       assists: rows.filter((row) => row.assists > 0).sort((a, b) => b.assists - a.assists).slice(0, PLAYER_RECORDS_LIMIT),
+    };
+  }
+
+  /**
+   * 회고 STATS-3: 수상 추천 근거용 **어드민 비게이팅** 랭킹. 위 공개 랭킹과 같은
+   * 집계(공식 리비전의 V1GameResultParticipant)를 쓰되 공개동의 게이팅을 걸지
+   * 않는다 — 동의 게이팅된 공개 랭킹으로 수상자를 고르면 미동의 1위가 조용히
+   * 빠져 **틀린 추천**이 되기 때문이다(2026-08-25 A안 확정). 컨트롤러
+   * (`AdminTournamentPlayerRecordsController`)가 활성 어드민만 통과시킨다.
+   *
+   * 집계 키: 참가자의 `userId`가 있으면 사용자 단위(경기 간 합산), 없으면
+   * 대회 안 정규화 이름 단위 — 계정 미연결 참가자는 이름 스냅샷 외에 게임 간
+   * 동일인 판단 근거가 없다(어드민 통계 탭이 이미 같은 폴백을 쓴다). 이름·팀은
+   * 마지막으로 본 스냅샷을 쓴다.
+   */
+  async getPlayerRecordsForAdmin(tournamentId: string) {
+    const empty = { tournamentId, goals: [], assists: [] };
+    const games = await this.prisma.v1Game.findMany({
+      where: { tournamentFixture: { tournamentId }, currentOfficialRevisionId: { not: null } },
+      select: { currentOfficialRevisionId: true },
+    });
+    const revisionIds = games
+      .map((game) => game.currentOfficialRevisionId)
+      .filter((id): id is string => id !== null);
+    if (revisionIds.length === 0) return empty;
+
+    const participantRows = await this.prisma.v1GameResultParticipant.findMany({
+      where: { resultRevisionId: { in: revisionIds } },
+      select: {
+        participantId: true,
+        goals: true,
+        assists: true,
+        resultRevision: { select: { officialAt: true } },
+      },
+    });
+    const officialRows = participantRows.filter((row) => row.resultRevision.officialAt !== null);
+    if (officialRows.length === 0) return empty;
+
+    const participants = await this.prisma.v1GameParticipant.findMany({
+      where: { id: { in: officialRows.map((row) => row.participantId) } },
+      select: { id: true, userId: true, displayNameSnapshot: true, sideId: true },
+    });
+    const participantById = new Map(participants.map((participant) => [participant.id, participant]));
+    const sideIds = [...new Set(participants.map((participant) => participant.sideId))];
+    const sides = sideIds.length === 0
+      ? []
+      : await this.prisma.v1GameSide.findMany({
+          where: { id: { in: sideIds } },
+          select: { id: true, teamId: true },
+        });
+    const teamIdBySideId = new Map(sides.map((side) => [side.id, side.teamId]));
+    const teamIds = [...new Set(sides.map((side) => side.teamId).filter((id): id is string => id !== null))];
+    const teams = teamIds.length === 0
+      ? []
+      : await this.prisma.v1Team.findMany({ where: { id: { in: teamIds } }, select: { id: true, name: true } });
+    const teamNameById = new Map(teams.map((team) => [team.id, team.name]));
+
+    type AdminRecordRow = {
+      userId: string | null;
+      name: string;
+      teamName: string | null;
+      goals: number;
+      assists: number;
+    };
+    const totalsByKey = new Map<string, AdminRecordRow>();
+    for (const row of officialRows) {
+      const participant = participantById.get(row.participantId);
+      if (participant === undefined) continue;
+      const key = participant.userId !== null
+        ? `user:${participant.userId}`
+        : `named:${participant.displayNameSnapshot.trim().normalize('NFKC').toLocaleLowerCase('ko-KR')}`;
+      const teamId = teamIdBySideId.get(participant.sideId) ?? null;
+      const teamName = teamId !== null ? teamNameById.get(teamId) ?? null : null;
+      const current = totalsByKey.get(key) ?? {
+        userId: participant.userId,
+        name: participant.displayNameSnapshot,
+        teamName,
+        goals: 0,
+        assists: 0,
+      };
+      current.goals += row.goals;
+      current.assists += row.assists;
+      // 마지막으로 본 스냅샷으로 갱신 — 개명·이적 시 최신 표기를 따른다.
+      current.name = participant.displayNameSnapshot;
+      if (teamName !== null) current.teamName = teamName;
+      totalsByKey.set(key, current);
+    }
+
+    const rows = [...totalsByKey.values()];
+    return {
+      tournamentId,
+      goals: rows.filter((row) => row.goals > 0).sort((a, b) => b.goals - a.goals).slice(0, ADMIN_PLAYER_RECORDS_LIMIT),
+      assists: rows.filter((row) => row.assists > 0).sort((a, b) => b.assists - a.assists).slice(0, ADMIN_PLAYER_RECORDS_LIMIT),
     };
   }
 

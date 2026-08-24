@@ -3401,6 +3401,21 @@ export type V1AdminTournamentPlayer = V1TournamentPlayer & {
 };
 
 /** 어드민 전용 로스터 조회 응답 — 팀 비멤버 어드민도 조회 가능 (Task 110) */
+/** GET /admin/tournaments/:id/player-records — 회고 STATS-3 수상 추천 근거(비게이팅) */
+export type V1AdminTournamentPlayerRecordRow = {
+  userId: string | null;
+  name: string;
+  teamName: string | null;
+  goals: number;
+  assists: number;
+};
+
+export type V1AdminTournamentPlayerRecordsResponse = {
+  tournamentId: string;
+  goals: V1AdminTournamentPlayerRecordRow[];
+  assists: V1AdminTournamentPlayerRecordRow[];
+};
+
 export type V1AdminTournamentRosterResponse = Omit<V1TournamentRosterResponse, 'players'> & {
   players: V1AdminTournamentPlayer[];
   registrationId: string;

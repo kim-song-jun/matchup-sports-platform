@@ -1,5 +1,8 @@
 import { Module } from '@nestjs/common';
 import { OptionalV1AuthGuard } from '../../auth/optional-v1-auth.guard';
+import { V1AuthGuard } from '../../auth/v1-auth.guard';
+import { AdminContextService } from '../../common/admin-context.service';
+import { AdminTournamentPlayerRecordsController } from './admin-tournament-player-records.controller';
 import { TournamentStaffAccessService } from '../../tournaments/staff/tournament-staff-access.service';
 import { PublicTeamRecordsController } from './public-team-records.controller';
 import { PublicTeamRecordsService } from './public-team-records.service';
@@ -27,12 +30,20 @@ import { PublicUserRecordsService } from './public-user-records.service';
  * already follow.
  */
 @Module({
-  controllers: [PublicTournamentRecordsController, PublicTeamRecordsController, PublicUserRecordsController],
+  controllers: [
+    PublicTournamentRecordsController,
+    PublicTeamRecordsController,
+    PublicUserRecordsController,
+    // 회고 STATS-3 — 수상 추천 근거용 어드민 랭킹(비게이팅). 같은 서비스의 다른 게이트.
+    AdminTournamentPlayerRecordsController,
+  ],
   providers: [
     PublicTournamentRecordsService,
     PublicTeamRecordsService,
     PublicUserRecordsService,
     OptionalV1AuthGuard,
+    V1AuthGuard,
+    AdminContextService,
     TournamentStaffAccessService,
   ],
 })

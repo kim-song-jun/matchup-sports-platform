@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { useV1AdminTournamentRegistrations, useV1AdminTournamentPlayers, useV1AdminTournamentAwards, useV1SetTournamentAwards } from '@/hooks/use-v1-api';
+import { useV1AdminTournamentPlayerRecords } from '@/hooks/use-v1-api';
+import { AwardRecommendationChips, type AwardRecommendation } from '@/components/admin/award-recommendation-chips';
 import type { V1TournamentAwardIconKey } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { legacyAwardIconKey, TOURNAMENT_AWARD_ICON_OPTIONS, TournamentAwardIcon } from '@/components/tournaments/tournament-award-icon';
@@ -58,6 +60,26 @@ export function AwardsTab({
     setRows((prev) => [...prev, { awardType: `custom_${Date.now()}`, awardLabel: '', iconKey: 'trophy', recipientName: '', recipientUserId: '', teamName: '', note: '' }]);
   };
 
+  // 회고 STATS-3 — 추천 근거 chip. 비게이팅 어드민 랭킹이라 미동의 1위도 그대로
+  // 보인다(공개 랭킹을 쓰면 틀린 추천이 된다). chip을 탭하면 아는 값(이름·계정·
+  // 소속팀)이 미리 채워진 항목이 추가된다 — 계정 미연결 후보는 recipientUserId가
+  // 비어 저장 전 명단 picker로 채워야 하고, 그 필수 검증은 기존 handleSave가 한다.
+  const playerRecords = useV1AdminTournamentPlayerRecords(tournamentId);
+  const addRecommendedRow = ({ kind, row }: AwardRecommendation) => {
+    setRows((prev) => [
+      ...prev,
+      {
+        awardType: `custom_${Date.now()}`,
+        awardLabel: kind === 'goals' ? '득점왕' : '도움왕',
+        iconKey: kind === 'goals' ? 'goal' : 'handshake',
+        recipientName: row.name,
+        recipientUserId: row.userId ?? '',
+        teamName: row.teamName ?? '',
+        note: '',
+      },
+    ]);
+  };
+
   const removeRow = (idx: number) => {
     setRows((prev) => prev.filter((_, i) => i !== idx));
   };
@@ -87,6 +109,14 @@ export function AwardsTab({
           <button type="button" onClick={addRow} className="inline-flex items-center text-xs text-[var(--blue700)] font-semibold px-3 min-h-[36px] rounded-lg border border-[var(--tint-blue-border)] hover:bg-[var(--blue50)]">+ 항목 추가</button>
         )}
       </div>
+
+      {canWrite && (
+        <AwardRecommendationChips
+          goals={playerRecords.data?.goals}
+          assists={playerRecords.data?.assists}
+          onPick={addRecommendedRow}
+        />
+      )}
 
       <div className="flex flex-col gap-3">
         {loaded && rows.length === 0 && (

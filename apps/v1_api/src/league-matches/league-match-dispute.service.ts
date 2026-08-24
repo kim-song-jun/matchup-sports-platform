@@ -3,7 +3,7 @@ import { AdminContextService } from '../common/admin-context.service';
 import { GamesService } from '../games/games.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
-import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationEventType, NotificationsService } from '../notifications/notifications.service';
 import { judgeLeagueDisputeEligibility } from './league-result-dispute-eligibility';
 import { LeagueMatchAdminService } from './league-match-admin.service';
 import { LeagueMatchResultEntryService } from './league-match-result-entry.service';
@@ -127,6 +127,11 @@ export class LeagueMatchDisputeService {
       },
     });
     this.notifyAdmins(teamMatchId);
+    // 리그 알림 문구 전용화(2026-08-25) 문제 2: 이의를 낸 팀이 아닌 상대 팀에도 알린다.
+    // hostTeamId/approvedApplicantTeamId 는 이 함수 앞부분에서 이미 조회해 뒀으니
+    // 재조회하지 않는다 -- teamId(필자 팀)와 다른 쪽이 상대 팀이다.
+    const opposingTeamId = teamId === teamMatch.hostTeamId ? teamMatch.approvedApplicantTeamId : teamMatch.hostTeamId;
+    this.notifyOpposingTeam(opposingTeamId, teamMatchId, `"${dto.reason}" 사유로 이의가 접수됐어요.`);
     return {
       id: dispute.id,
       leagueId,
@@ -176,6 +181,15 @@ export class LeagueMatchDisputeService {
       return false;
     });
 
+    if (!alreadyClosed) {
+      const isCorrection = dto.resolution === 'correction';
+      this.notifyBothTeams(
+        dispute.teamMatchId,
+        isCorrection ? 'league_match_dispute_corrected' : 'league_match_dispute_voided',
+        `"${dto.note}" 사유로 결과가 ${isCorrection ? '정정' : '무효 처리'}됐어요.`,
+      );
+    }
+
     return {
       id: disputeId,
       status: 'accepted' as const,
@@ -202,6 +216,15 @@ export class LeagueMatchDisputeService {
       }
       return { id: disputeId, status: existing.status, alreadyProcessed: true };
     }
+    // updateMany는 갱신된 행의 필드를 돌려주지 않으므로(count만) 알림에 필요한
+    // teamMatchId를 별도로 읽는다 -- resolveDispute가 이미 dispute 행을 findUnique로
+    // 읽어 두는 것과 같은 이유(updateMany의 원자적 status='open' 가드는 유지하면서
+    // 부가 정보만 추가로 조회).
+    const dispute = await this.prisma.v1LeagueMatchDispute.findUniqueOrThrow({
+      where: { id: disputeId },
+      select: { teamMatchId: true },
+    });
+    this.notifyBothTeams(dispute.teamMatchId, 'league_match_dispute_rejected', `"${dto.note}" 사유로 이의가 받아들여지지 않았어요.`);
     return { id: disputeId, status: 'rejected' as const, alreadyProcessed: false };
   }
 
@@ -273,6 +296,64 @@ export class LeagueMatchDisputeService {
         ).map((admin) => admin.userId),
       'league_result_dispute_filed',
       teamMatchId,
+    );
+  }
+
+  /**
+   * 리그 알림 문구 전용화(2026-08-25) 문제 2, 접수 시점: 이의를 낸 팀이 아닌 상대 팀의
+   * owner/manager(active)에게 알린다. 호출부가 이미 hostTeamId/approvedApplicantTeamId를
+   * 조회해 뒀으므로 어느 쪽이 "상대"인지는 여기서 다시 묻지 않고 그대로 받는다 --
+   * opposingTeamId가 null이면(상대팀이 확정되지 않은 대진) 아무 것도 하지 않는다
+   * (실제로는 이의 제기 자체가 공식 결과를 전제하므로 도달하지 않는 방어적 분기다).
+   */
+  private notifyOpposingTeam(opposingTeamId: string | null, teamMatchId: string, body: string): void {
+    if (opposingTeamId === null) return;
+    this.notifyTeamMembers([opposingTeamId], teamMatchId, 'league_match_dispute_received', body);
+  }
+
+  /**
+   * 리그 알림 문구 전용화(2026-08-25) 문제 2, 처리 시점: 정정/무효/거부 결과를 양 팀
+   * (host + approvedApplicant) owner/manager(active) 전원에게 알린다. resolveDispute/
+   * rejectDispute 호출 시점에는 팀 id가 아직 없으므로(dispute 행에는 teamMatchId만
+   * 있다), 팀 조회 자체도 emitToManyDeferred의 fire-and-forget 클로저 안에서
+   * 수행한다 -- notifyOpposingTeam처럼 호출부가 이미 알고 있는 값이 아니라서
+   * notifyTeamMembers처럼 미리 팀 id를 받을 수 없다.
+   */
+  private notifyBothTeams(teamMatchId: string, type: NotificationEventType, body: string): void {
+    this.notifications.emitToManyDeferred(
+      async () => {
+        const teamMatch = await this.prisma.v1TeamMatch.findUnique({
+          where: { id: teamMatchId },
+          select: { hostTeamId: true, approvedApplicantTeamId: true },
+        });
+        const teamIds = [teamMatch?.hostTeamId, teamMatch?.approvedApplicantTeamId].filter(
+          (id): id is string => id !== undefined && id !== null,
+        );
+        return this.resolveTeamMemberUserIds(teamIds);
+      },
+      type,
+      teamMatchId,
+      body,
+    );
+  }
+
+  /** teamIds 전원(host/opponent 여러 팀 가능)의 active owner/manager userId 목록. */
+  private async resolveTeamMemberUserIds(teamIds: string[]): Promise<string[]> {
+    if (teamIds.length === 0) return [];
+    const memberships = await this.prisma.v1TeamMembership.findMany({
+      where: { teamId: { in: teamIds }, status: 'active', role: { in: ['owner', 'manager'] } },
+      select: { userId: true },
+    });
+    return [...new Set(memberships.map((m) => m.userId))];
+  }
+
+  private notifyTeamMembers(teamIds: string[], teamMatchId: string, type: NotificationEventType, body: string): void {
+    if (teamIds.length === 0) return;
+    this.notifications.emitToManyDeferred(
+      () => this.resolveTeamMemberUserIds(teamIds),
+      type,
+      teamMatchId,
+      body,
     );
   }
 }

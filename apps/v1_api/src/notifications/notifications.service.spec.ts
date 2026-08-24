@@ -300,6 +300,48 @@ describe('NotificationsService', () => {
     );
   });
 
+  // 리그 알림 문구 전용화(2026-08-25): 결과 확정/이의 접수/이의 처리 4종은 전부 결과
+  // 영수증 화면(경기 상세가 아니라 확정 결과 + 이의 제기 CTA가 있는 화면)으로 딥링크한다.
+  it.each([
+    ['league_team_match_completed' as const, 'tm-1', '/team-matches/tm-1/result'],
+    ['league_match_dispute_received' as const, 'tm-1', '/team-matches/tm-1/result'],
+    ['league_match_dispute_corrected' as const, 'tm-1', '/team-matches/tm-1/result'],
+    ['league_match_dispute_voided' as const, 'tm-1', '/team-matches/tm-1/result'],
+    ['league_match_dispute_rejected' as const, 'tm-1', '/team-matches/tm-1/result'],
+  ])('%s 알림은 결과 영수증 화면으로 딥링크한다', async (type, targetId, expectedDeepLink) => {
+    prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
+    prisma.v1Notification.create.mockResolvedValue(makeNotification());
+
+    await service.emitNotification('user-1', type, targetId);
+    await new Promise(setImmediate);
+
+    expect(prisma.v1Notification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ deepLink: expectedDeepLink, targetType: 'team_match' }),
+      }),
+    );
+  });
+
+  // team_match_completed(일반 팀매치) 문구·링크는 이 태스크로 인해 한 글자도 바뀌면 안 된다
+  // -- 리그 전용 형제 타입을 새로 추가했을 뿐 기존 타입은 그대로다(회귀 고정).
+  it('team_match_completed(일반) 문구·링크는 리그 전용 타입 추가 이후에도 그대로다', async () => {
+    prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
+    prisma.v1Notification.create.mockResolvedValue(makeNotification());
+
+    await service.emitNotification('user-1', 'team_match_completed', 'tm-1');
+    await new Promise(setImmediate);
+
+    expect(prisma.v1Notification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          title: '팀매치가 완료됐어요. 리뷰를 남겨보세요!',
+          body: '팀매치 리뷰를 남겨보세요.',
+          deepLink: '/my/reviews/team_match/tm-1',
+        }),
+      }),
+    );
+  });
+
   // ─── tournament_record_consent_invite 딥링크 (Task 154 P0-4·P0-6) ──────────
   //
   // 이 알림은 "동의를 켜 달라"고 요청한다. 그러니 눌렀을 때 **켤 수 있는 화면**에

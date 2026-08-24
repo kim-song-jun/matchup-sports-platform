@@ -1,6 +1,9 @@
 import { Prisma } from '@prisma/client';
+import { LEAGUE_RESULT_DISPUTE_WINDOW_MS } from '../league-matches/league-result-dispute.constants';
 import type { WebPushService } from '../notifications/web-push.service';
 import type { OfficialRevisionRow } from './game-result-official-projection.types';
+
+const LEAGUE_RESULT_DISPUTE_WINDOW_DAYS = LEAGUE_RESULT_DISPUTE_WINDOW_MS / (24 * 60 * 60 * 1_000);
 
 /**
  * 리그 감사 그룹 A / R1: `team_match_completed` 알림 타입은
@@ -25,6 +28,18 @@ import type { OfficialRevisionRow } from './game-result-official-projection.type
  * 오심 정정) 재알림하지 않는다. "완료됐어요" 알림은 팀매치 생애주기에서 한 번만
  * 의미가 있다. Web Push는 그 이후 best-effort로 붙는다(실패해도 이미 커밋된
  * 알림 row는 그대로 유지된다).
+ *
+ * **리그 알림 문구 전용화(2026-08-25)**: 리그 대진(`teamMatch.leagueId !== null`)은
+ * 일반 팀매치와 문구·딥링크가 다르다 — 일반 팀매치는 "완료됐어요, 리뷰를 남겨보세요"로
+ * 후기 작성 화면으로 보내지만, 리그는 이의 제기 기간이 있는 "확정" 이벤트라 결과
+ * 영수증 화면(`/team-matches/:id/result`)으로 보내고 이의 제기 기간을 안내한다. 이
+ * 갈림은 `notifications.service.ts`의 `NotificationEventType`
+ * `team_match_completed` vs `league_team_match_completed` 두 항목의 title/body/
+ * deepLink와 정확히 같은 문구를 쓴다(그 파일이 단일 소스) — 여기서 문구를 고치면
+ * 그 파일도 같은 커밋에서 고친다. 일반 팀매치 쪽 문구·링크는 이 갈림으로 인해
+ * 한 글자도 바뀌지 않는다(기존 리비전 정정 재알림 회피 등 나머지 로직은 두 경로가
+ * 공유한다 — businessKey 형식도 그대로: 팀매치 하나는 생애주기 내내 리그 아니면
+ * 일반 중 하나로 고정이라 리그 여부로 businessKey 네임스페이스를 나눌 이유가 없다).
  */
 export class TeamMatchCompletionNotificationService {
   constructor(private readonly webPush?: WebPushService) {}
@@ -36,7 +51,9 @@ export class TeamMatchCompletionNotificationService {
       where: { id: revision.gameId },
       select: {
         teamMatchId: true,
-        teamMatch: { select: { title: true, hostTeamId: true, approvedApplicantTeamId: true } },
+        teamMatch: {
+          select: { title: true, hostTeamId: true, approvedApplicantTeamId: true, leagueId: true },
+        },
       },
     });
     const teamMatchId = game?.teamMatchId ?? null;
@@ -65,11 +82,21 @@ export class TeamMatchCompletionNotificationService {
     const enabledRecipients = recipients.filter((userId) => teamMatchEnabledByUser.get(userId) !== false);
     if (enabledRecipients.length === 0) return;
 
-    const title = '팀매치가 완료됐어요. 리뷰를 남겨보세요!';
-    const body = `"${teamMatch.title}" 팀매치 리뷰를 남겨보세요.`;
-    // notifications.service.ts의 deepLinkForEvent가 'team_match_completed' 이벤트에
-    // 이미 라우팅해 둔 것과 동일한 목적지 — 매치 상세가 아니라 리뷰 작성 화면으로 바로 보낸다.
-    const deepLink = `/my/reviews/team_match/${teamMatchId}`;
+    const isLeagueFixture = teamMatch.leagueId !== null;
+    // notifications.service.ts의 EVENT_TITLES/EVENT_BODIES/deepLinkForEvent가
+    // 'team_match_completed'(일반)와 'league_team_match_completed'(리그) 두 이벤트에
+    // 이미 정의해 둔 것과 정확히 같은 문구·목적지다 — 그 파일이 단일 소스다.
+    const title = isLeagueFixture
+      ? '리그 경기 결과가 확정됐어요'
+      : '팀매치가 완료됐어요. 리뷰를 남겨보세요!';
+    const body = isLeagueFixture
+      ? `"${teamMatch.title}" 경기 결과가 확정됐어요. ${LEAGUE_RESULT_DISPUTE_WINDOW_DAYS}일 안에 이의를 제기할 수 있어요.`
+      : `"${teamMatch.title}" 팀매치 리뷰를 남겨보세요.`;
+    // 일반 팀매치는 리뷰 작성 화면으로, 리그 대진은 확정 결과 + 이의 제기 CTA가 있는
+    // 결과 영수증 화면으로 보낸다.
+    const deepLink = isLeagueFixture
+      ? `/team-matches/${teamMatchId}/result`
+      : `/my/reviews/team_match/${teamMatchId}`;
     const businessKeyFor = (userId: string) => `team-match-completed:${teamMatchId}:${userId}`;
 
     const alreadyDelivered = await tx.v1Notification.findMany({

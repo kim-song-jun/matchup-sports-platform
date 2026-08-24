@@ -72,7 +72,26 @@ export type NotificationEventType =
   // D2 (E2/E4, 2026-08-24 사용자 확정): 리그 경기 결과 확정 후 7일 이내 이의 제기가
   // 접수되면 운영자(admin)에게 보낸다. 팀 신청자/상대팀에게 보내는 알림은 이 태스크
   // 범위가 아니다(운영자 알림만 명시적으로 요구됨) — 필요해지면 별도 타입을 추가한다.
-  | 'league_result_dispute_filed';
+  | 'league_result_dispute_filed'
+  // 리그 알림 문구 전용화(2026-08-25): 위 team_match_completed는 일반 팀매치 문구
+  // ("팀매치가 완료됐어요. 리뷰를 남겨보세요!")로 고정돼 있어 리그 대진에는 맞지 않는다
+  // (리그는 이의 제기 기간이 있는 확정 결과지, 리뷰를 남기는 흐름이 아니다).
+  // team-match-completion-notification.service.ts가 leagueId 유무로 갈라 이 타입과
+  // team_match_completed 중 하나를 골라 쓴다 — 실제 발송은 그 파일이 outbox tx 안에서
+  // 직접 V1Notification을 쓰므로(top of team-match-completion-notification.service.ts
+  // 참조) 여기 title/body/deepLink는 그 문구의 단일 소스(참고용 겸 emitNotification을
+  // 통해 직접 호출될 경우의 실제 경로)다 — 두 파일의 문구가 갈리지 않도록 여기를 고치면
+  // 그 파일도 같은 커밋에서 고친다.
+  | 'league_team_match_completed'
+  // 리그 알림 문구 전용화(2026-08-25) 문제 2: 이의 접수 시 운영자뿐 아니라 상대 팀
+  // (이의를 낸 팀이 아닌 쪽)의 owner/manager에게도 알린다 — league-match-dispute.service.ts
+  // fileDispute.
+  | 'league_match_dispute_received'
+  // 이의 처리 결과를 양 팀(owner/manager)에게 알린다 — 처리 종류(정정/무효/거부)별로
+  // 문구가 갈린다. league-match-dispute.service.ts resolveDispute/rejectDispute.
+  | 'league_match_dispute_corrected'
+  | 'league_match_dispute_voided'
+  | 'league_match_dispute_rejected';
 
 /** V1NotificationPreference 컬럼 중 이벤트 발송을 게이트하는 필드들. */
 type NotificationPrefField = keyof Pick<
@@ -128,7 +147,12 @@ function preferenceFieldForEvent(type: NotificationEventType): NotificationPrefF
     type === 'team_match_cancelled' ||
     type === 'team_match_completed' ||
     type === 'league_fixture_scheduled' ||
-    type === 'league_result_dispute_filed'
+    type === 'league_result_dispute_filed' ||
+    type === 'league_team_match_completed' ||
+    type === 'league_match_dispute_received' ||
+    type === 'league_match_dispute_corrected' ||
+    type === 'league_match_dispute_voided' ||
+    type === 'league_match_dispute_rejected'
   ) {
     return 'teamMatchEnabled';
   }
@@ -220,6 +244,8 @@ function targetTypeForEvent(type: NotificationEventType): V1NotificationTargetTy
   // 처리한다).
   // league_result_dispute_filed(D2)도 여기로 떨어진다 — 이의는 특정 팀매치(경기)에
   // 대한 것이라 targetId로 teamMatchId를 그대로 쓴다.
+  // league_team_match_completed/league_match_dispute_*(리그 알림 문구 전용화)도 전부
+  // 특정 팀매치(경기)에 대한 것이라 같은 이유로 'team_match'다.
   return 'team_match';
 }
 
@@ -316,6 +342,20 @@ function deepLinkForEvent(
   ) {
     return `/league-matches/${targetId}`;
   }
+  // 리그 알림 문구 전용화(2026-08-25): 결과 확정/이의 접수/이의 처리 4종은 전부 결과
+  // 영수증 화면(경기 상세가 아니라 확정된 결과 + 이의 제기 CTA가 있는 화면)으로 보낸다 —
+  // team-match-completion-notification.service.ts와 league-match-dispute.service.ts가
+  // 이 문자열을 직접 구성할 때도 같은 목적지를 쓴다(단일 소스 동기화 대상).
+  if (
+    (type === 'league_team_match_completed' ||
+      type === 'league_match_dispute_received' ||
+      type === 'league_match_dispute_corrected' ||
+      type === 'league_match_dispute_voided' ||
+      type === 'league_match_dispute_rejected') &&
+    targetId
+  ) {
+    return `/team-matches/${targetId}/result`;
+  }
   return deepLinkForTarget(targetType, targetId);
 }
 
@@ -358,6 +398,11 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   league_promotion_stayed: '다음 시즌에도 같은 리그예요',
   league_promotion_withdrawn: '리그 참가가 종료됐어요',
   league_result_dispute_filed: '리그 경기 결과에 이의가 접수됐어요',
+  league_team_match_completed: '리그 경기 결과가 확정됐어요',
+  league_match_dispute_received: '상대 팀이 경기 결과에 이의를 제기했어요',
+  league_match_dispute_corrected: '리그 경기 결과가 정정됐어요',
+  league_match_dispute_voided: '리그 경기 결과가 무효 처리됐어요',
+  league_match_dispute_rejected: '이의 제기가 받아들여지지 않았어요',
 };
 
 /**
@@ -406,6 +451,11 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   league_promotion_stayed: '현재 리그에서 다음 시즌을 계속해요.',
   league_promotion_withdrawn: '이번 시즌을 끝으로 리그 참가가 종료됐어요.',
   league_result_dispute_filed: '이의 내용을 확인하고 정정 또는 무효 처리해 주세요.',
+  league_team_match_completed: '경기 결과가 확정됐어요. 이의가 있다면 확인해 주세요.',
+  league_match_dispute_received: '이의 내용을 확인해 주세요.',
+  league_match_dispute_corrected: '정정된 결과를 확인해 주세요.',
+  league_match_dispute_voided: '결과가 무효 처리됐어요.',
+  league_match_dispute_rejected: '기존 결과가 그대로 유지돼요.',
 };
 
 @Injectable()

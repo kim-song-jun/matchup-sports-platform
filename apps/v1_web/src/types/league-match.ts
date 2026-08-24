@@ -114,6 +114,12 @@ export interface V1LeagueFixture {
   placeAddress?: string | null;
   status: string;
   /**
+   * 결과 진행 단계 — 어드민 상세에서만 채워진다. 팀매치 `status`(matched/cancelled)와는
+   * **다른 축**이다: status 는 "대진이 성사됐는가", 이 값은 "결과가 어디까지 왔는가"다.
+   * 그래서 어드민 표에서 두 값을 각각의 열로 보여준다(2026-08-24 D6 확정).
+   */
+  resultStage?: 'not_entered' | 'draft' | 'awaiting_approval' | 'change_requested' | 'official' | 'voided';
+  /**
    * 경기 결과 점수 — 공식 결과가 확정된 대진에만 채워진다. 미확정이면 null 이고,
    * 0:0 으로 오인되지 않게 서버가 명시적으로 구분해 내려준다. 소비 측은 값이 없으면
    * 스코어 대신 상태 기반 문구("예정"/"결과 대기")로 대체한다.

@@ -7,6 +7,7 @@ import { V1AuthUser } from '../auth/v1-auth-user';
 import { NotificationsService } from '../notifications/notifications.service';
 import { resolveTeamMatchCompetitionConfig } from '../team-matches/resolve-team-match-competition-config';
 import { cascadeCancelTeamMatchSchedulesInTx } from '../team-schedules/team-schedules.service';
+import { scheduleLeagueResultEntryReminder } from '../jobs/league-reminders/league-result-entry-reminder.service';
 import { LeagueCompletionProjectionService } from './league-completion-projection.service';
 import { buildOddTeamCountWarning, checkLeagueTeamAddAllowed, checkLeagueTeamRemovalAllowed } from './league-lifecycle-rules';
 import { resolveResultStage } from './league-result-stage';
@@ -667,6 +668,12 @@ export class LeagueMatchAdminService {
           ...(dto.placeAddress === undefined ? {} : { placeAddress: dto.placeAddress }),
         },
       });
+      // 사용자 확정: 시작 시각이 바뀌면 결과 미입력 리마인더도 새 시각을 따라간다 —
+      // 새 세대(startAt)로 다시 스케줄할 뿐 옛 행은 건드리지 않는다(발화 시점에
+      // expectedStartAt 불일치로 스스로 no-op — league-result-entry-reminder.service.ts 참고).
+      if (dto.startsAt !== undefined) {
+        await scheduleLeagueResultEntryReminder(tx, { teamMatchId, startAt: result.startAt });
+      }
       await this.adminContext.logAdminAction(
         admin,
         {
@@ -901,6 +908,10 @@ export class LeagueMatchAdminService {
           message: '리그 대진 자동 생성',
         },
       });
+      // 사용자 확정: 경기 시작 +24시간에도 결과 미입력이면 운영자 리마인더 1회.
+      // league-result-entry-reminder.service.ts 참고 — updateFixture()가 시작 시각을
+      // 바꾸면 새 세대로 다시 스케줄한다.
+      await scheduleLeagueResultEntryReminder(tx, { teamMatchId: teamMatch.id, startAt });
       ids.push(teamMatch.id);
     }
     return { ids, placeName };

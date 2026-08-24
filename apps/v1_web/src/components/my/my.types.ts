@@ -1,4 +1,10 @@
 export type MyUser = {
+  /**
+   * 공개 프로필(`/users/:id`) 진입에 쓴다. 로딩·에러 중에는 아직 모르므로 `null` 이고,
+   * 그때는 진입점을 렌더하지 않는다 — 링크를 먼저 그려 두고 눌렀을 때 깨지는 것보다
+   * 안 보이는 편이 낫다.
+   */
+  userId: string | null;
   name: string;
   handle: string;
   region: string;

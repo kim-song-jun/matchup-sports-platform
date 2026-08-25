@@ -80,7 +80,21 @@ describe('LeagueResultEntryModal 득점·도움 기록', () => {
     await user.selectOptions(screen.getByLabelText('성수 FC 선수 추가'), 'p-h1');
     await user.type(screen.getByLabelText('김성수 득점'), '3');
 
-    expect(screen.getByRole('alert')).toHaveTextContent('선수 득점·도움 합이 팀 스코어보다 많아요');
+    expect(screen.getByRole('alert')).toHaveTextContent('기록 합이 맞지 않아요');
+    await user.click(screen.getByRole('button', { name: '확인' }));
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('도움 합이 기록된 득점 합을 넘으면 제출을 잠근다 (스코어 기준이 아니라 득점 기준)', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderModal();
+    await fillBaseForm(user);
+
+    // 홈 스코어 2인데 기록된 득점 0 + 도움 1 — 스코어 기준이면 통과했을 조합.
+    await user.selectOptions(screen.getByLabelText('성수 FC 선수 추가'), 'p-h1');
+    await user.type(screen.getByLabelText('김성수 도움'), '1');
+
+    expect(screen.getByRole('alert')).toHaveTextContent('도움 합은 기록된 득점 합을 넘을 수 없어요');
     await user.click(screen.getByRole('button', { name: '확인' }));
     expect(onSubmit).not.toHaveBeenCalled();
   });

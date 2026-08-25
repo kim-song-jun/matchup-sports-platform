@@ -103,12 +103,14 @@ export function assembleLeagueResultParticipants(input: {
         message: `${label} 팀 선수 득점 합(${goalSum[sideKey]})이 팀 스코어(${scoreBySideKey[sideKey]})보다 많아요.`,
       };
     }
-    // 도움은 골 하나에 최대 하나 — 사이드 스코어를 넘을 수 없다.
-    if (assistSum[sideKey] > scoreBySideKey[sideKey]) {
+    // 도움은 골 하나에 최대 하나 — 팀 스코어가 아니라 **기록된 득점 합**을 기준으로
+    // 막는다(Copilot 리뷰 반영). 스코어 기준으로 두면 자책골·미기록 득점이 있는 경기에서
+    // "기록된 골 0개인데 도움 2개" 같은 물리적으로 불가능한 기록이 저장될 수 있다.
+    if (assistSum[sideKey] > goalSum[sideKey]) {
       return {
         ok: false,
-        code: 'LEAGUE_RESULT_ASSISTS_EXCEED_SCORE',
-        message: `${label} 팀 도움 합(${assistSum[sideKey]})이 팀 스코어(${scoreBySideKey[sideKey]})보다 많아요.`,
+        code: 'LEAGUE_RESULT_ASSISTS_EXCEED_GOALS',
+        message: `${label} 팀 도움 합(${assistSum[sideKey]})이 기록된 득점 합(${goalSum[sideKey]})보다 많아요.`,
       };
     }
   }

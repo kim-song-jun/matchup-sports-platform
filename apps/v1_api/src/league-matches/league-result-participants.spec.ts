@@ -95,7 +95,7 @@ describe('assembleLeagueResultParticipants', () => {
     expect(under).toMatchObject({ ok: true });
   });
 
-  it('사이드별 도움 합이 그 팀 스코어를 넘으면 거부한다', () => {
+  it('사이드별 도움 합이 기록된 득점 합을 넘으면 거부한다 (스코어가 아니라 득점 기준)', () => {
     const result = assembleLeagueResultParticipants({
       participants: [
         { participantId: 'p-h1', goals: 0, assists: 2 },
@@ -103,9 +103,21 @@ describe('assembleLeagueResultParticipants', () => {
       ],
       gameParticipants,
       sides,
+      homeScore: 3,
+      awayScore: 0,
+    });
+    // 스코어(3) 기준이면 통과했겠지만, 기록된 득점 합은 1 — 도움 2는 불가능한 기록이다.
+    expect(result).toMatchObject({ ok: false, code: 'LEAGUE_RESULT_ASSISTS_EXCEED_GOALS' });
+  });
+
+  it('기록된 득점이 0인 사이드의 도움은 거부한다 (자책골로 스코어만 있는 경우)', () => {
+    const result = assembleLeagueResultParticipants({
+      participants: [{ participantId: 'p-h1', goals: 0, assists: 1 }],
+      gameParticipants,
+      sides,
       homeScore: 1,
       awayScore: 0,
     });
-    expect(result).toMatchObject({ ok: false, code: 'LEAGUE_RESULT_ASSISTS_EXCEED_SCORE' });
+    expect(result).toMatchObject({ ok: false, code: 'LEAGUE_RESULT_ASSISTS_EXCEED_GOALS' });
   });
 });

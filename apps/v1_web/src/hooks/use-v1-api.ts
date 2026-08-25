@@ -5055,10 +5055,14 @@ export function useV1RecordLeagueResult(leagueId: string) {
 export function useV1LeagueFixtureParticipants(leagueId: string, teamMatchId: string | null) {
   return useQuery({
     queryKey: [...v1Keys.adminLeagueMatch(leagueId), 'fixture-participants', teamMatchId],
-    queryFn: () =>
-      v1Get<V1LeagueFixtureParticipantsResponse>(
+    queryFn: () => {
+      // enabled 가드와 별개로 한 번 더 단언 — refactor 로 queryFn 이 직접 불리면
+      // '.../fixtures/null/participants' 같은 잘못된 요청이 나갈 수 있다(Copilot 리뷰).
+      if (teamMatchId === null) throw new Error('teamMatchId 없이 참가자 목록을 요청할 수 없어요.');
+      return v1Get<V1LeagueFixtureParticipantsResponse>(
         `/admin/league-matches/${leagueId}/fixtures/${teamMatchId}/participants`,
-      ),
+      );
+    },
     enabled: teamMatchId !== null,
     staleTime: 5 * 60 * 1000,
   });

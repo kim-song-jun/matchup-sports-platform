@@ -196,14 +196,14 @@ export function LeagueResultEntryModal({
     sums[row.side].goals += goals;
     sums[row.side].assists += assists;
   }
-  // 자책골 여지가 있어 미만은 허용하고 초과만 막는다(서버 검증과 동일 규칙 —
-  // league-result-participants.ts).
+  // 서버 검증과 동일 규칙(league-result-participants.ts): 득점 합은 팀 스코어를,
+  // 도움 합은 **기록된 득점 합**을 넘을 수 없다(자책골·미기록 득점 여지로 미만은 허용).
   const scorerSumExceeds =
     scoresValid &&
     (sums.home.goals > parsedHome ||
       sums.away.goals > parsedAway ||
-      sums.home.assists > parsedHome ||
-      sums.away.assists > parsedAway);
+      sums.home.assists > sums.home.goals ||
+      sums.away.assists > sums.away.goals);
 
   const canSubmit =
     scoresValid && trimmedReason.length > 0 && !pending && !scorerRowsInvalid && !scorerSumExceeds;
@@ -460,7 +460,7 @@ export function LeagueResultEntryModal({
                 })}
                 {scorerSumExceeds && (
                   <p className="text-[12px] text-[var(--red700)]" role="alert">
-                    선수 득점·도움 합이 팀 스코어보다 많아요. 스코어와 맞춰 주세요.
+                    기록 합이 맞지 않아요 — 득점 합은 팀 스코어를, 도움 합은 기록된 득점 합을 넘을 수 없어요.
                   </p>
                 )}
               </fieldset>

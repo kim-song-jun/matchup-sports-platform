@@ -60,6 +60,8 @@ export function MyPlayerCardSection({
         // 내 카드이므로 기록 공개 유도를 띄운다 -- 남의 카드에서는 권하지 않는다.
         isOwner
         shareHref={`/users/${userId}/card`}
+        // 카드 설정(숨김·모양)은 내 카드에서 바로 -- 메뉴 2클릭 뒤에 숨기지 않는다.
+        settingsHref="/my/settings/player-card"
         belowCardSlot={stageIdentity}
       />
     </section>

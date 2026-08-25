@@ -63,6 +63,8 @@ describe('마이페이지 내 선수 카드', () => {
 
     expect(screen.getByRole('link', { name: '카드 공유하기' })).toHaveAttribute('href', '/users/u-1/card');
     expect(screen.getByLabelText('등번호 1번')).toBeInTheDocument();
+    // 카드 설정(숨김·모양) 입구도 카드 곁에 -- 메뉴 2클릭 뒤에만 있으면 발견 불가능하다.
+    expect(screen.getByRole('link', { name: '카드 설정' })).toHaveAttribute('href', '/my/settings/player-card');
   });
 
   it('소속팀을 밖에서 받지 않고 조회한 프로필에서 쓴다', () => {

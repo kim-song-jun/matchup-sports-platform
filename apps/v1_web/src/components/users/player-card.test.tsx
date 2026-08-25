@@ -129,6 +129,27 @@ describe('선수 카드', () => {
     expect(screen.getByText(/다음 목표 · 후기 3개 받기/)).toBeInTheDocument();
   });
 
+  it('settingsHref 를 주면 카드 설정 입구가, 없으면(남의 카드) 안 보인다', () => {
+    // 적대 검증(2026-08-25) 확정 결함: 숨김·모양 설정이 카드에서 2클릭 떨어진 메뉴에만
+    // 있어 발견 불가능했다. 입구는 본인 카드에서만 -- 남의 카드에 설정 아이콘이 뜨면 오해다.
+    const { rerender } = render(
+      <PlayerCard
+        card={card()}
+        displayName="김선준"
+        profileImageUrl={null}
+        teamName={null}
+        isOwner
+        settingsHref="/my/settings/player-card"
+      />,
+    );
+    expect(screen.getByRole('link', { name: '카드 설정' })).toHaveAttribute('href', '/my/settings/player-card');
+
+    rerender(
+      <PlayerCard card={card()} displayName="김선준" profileImageUrl={null} teamName={null} isOwner={false} />,
+    );
+    expect(screen.queryByRole('link', { name: '카드 설정' })).not.toBeInTheDocument();
+  });
+
   it('아직 한 경기도 안 뛴 사람에게 "더 뛰면" 이라고 말하지 않는다', () => {
     // alpha 실측(2026-08-24)에서 잡았다. 0경기 사용자가 "1경기 더 뛰면 열려요" 를
     // 받고 있었는데, 더 뛸 앞선 경기가 없는 사람에게는 틀린 말이다.

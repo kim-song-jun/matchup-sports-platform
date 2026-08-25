@@ -4,6 +4,7 @@ import { V1AuthGuard } from '../../auth/v1-auth.guard';
 import { AdminContextModule } from '../../common/admin-context.module';
 import { AdminTournamentPlayerRecordsController } from './admin-tournament-player-records.controller';
 import { TournamentStaffAccessService } from '../../tournaments/staff/tournament-staff-access.service';
+import { PublicLeagueFixtureRecordsController } from './public-league-fixture-records.controller';
 import { PublicTeamRecordsController } from './public-team-records.controller';
 import { PublicTeamRecordsService } from './public-team-records.service';
 import { PublicTournamentRecordsController } from './public-tournament-records.controller';
@@ -37,6 +38,8 @@ import { PublicUserRecordsService } from './public-user-records.service';
   imports: [AdminContextModule],
   controllers: [
     PublicTournamentRecordsController,
+    // 리그 대진의 게임 프로젝션 — 같은 서비스의 리그 게이트(getLeagueFixtureRecord).
+    PublicLeagueFixtureRecordsController,
     PublicTeamRecordsController,
     PublicUserRecordsController,
     // 회고 STATS-3 — 수상 추천 근거용 어드민 랭킹(비게이팅). 같은 서비스의 다른 게이트.

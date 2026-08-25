@@ -511,14 +511,14 @@ export class LeagueMatchPublicService {
         select: { id: true },
       })
     ).map((tm) => tm.id);
-    if (teamMatchIds.length === 0) return { leagueId: league.id, goals: [], assists: [] };
+    if (teamMatchIds.length === 0) return { leagueId: league.id, goals: [], assists: [], hiddenByConsent: false };
 
     const games = await this.prisma.v1Game.findMany({
       where: { teamMatchId: { in: teamMatchIds }, currentOfficialRevisionId: { not: null } },
       select: { currentOfficialRevisionId: true },
     });
     const revisionIds = games.map((g) => g.currentOfficialRevisionId!).filter(Boolean);
-    if (revisionIds.length === 0) return { leagueId: league.id, goals: [], assists: [] };
+    if (revisionIds.length === 0) return { leagueId: league.id, goals: [], assists: [], hiddenByConsent: false };
 
     const participantRows = await this.prisma.v1GameResultParticipant.findMany({
       where: { resultRevisionId: { in: revisionIds } },
@@ -527,13 +527,20 @@ export class LeagueMatchPublicService {
 
     const eligibility = await loadParticipantConsentEligibility(this.prisma, participantRows.map((row) => row.participantId));
     const totalsByUserId = new Map<string, { goals: number; assists: number }>();
+    // "기록은 있는데 신원 연동·동의가 없어 집계에서 빠진 행"이 하나라도 있었는가 —
+    // 화면이 이 값으로 빈 상태 문구를 가른다("결과가 쌓이면 나타나요"는 이 경우 거짓
+    // 안내가 된다). officialAt null 로 빠진 행은 동의와 무관하므로 세지 않는다.
+    let hiddenByConsent = false;
     for (const row of participantRows) {
-      const eligibilityRow = eligibility.get(row.participantId);
-      if (eligibilityRow === undefined) continue;
       // officialAt이 null이면(공식 확정 안 됨) 이 행은 애초에 집계 대상이 아니다 --
       // 동의 판정(isParticipantPubliclyEligible)은 시간 비교를 하지 않으므로
       // 이 null 체크는 그 판정과 무관한 별개의 "공식 결과인가" 게이트다.
-      if (row.resultRevision.officialAt === null || !isParticipantPubliclyEligible(eligibilityRow)) continue;
+      if (row.resultRevision.officialAt === null) continue;
+      const eligibilityRow = eligibility.get(row.participantId);
+      if (eligibilityRow === undefined || !isParticipantPubliclyEligible(eligibilityRow)) {
+        if (row.goals > 0 || row.assists > 0) hiddenByConsent = true;
+        continue;
+      }
       const userId = eligibilityRow.linkedUserId!;
       const current = totalsByUserId.get(userId) ?? { goals: 0, assists: 0 };
       current.goals += row.goals;
@@ -551,6 +558,7 @@ export class LeagueMatchPublicService {
       leagueId: league.id,
       goals: rows.filter((row) => row.goals > 0).sort((a, b) => b.goals - a.goals).slice(0, PLAYER_RECORDS_LIMIT),
       assists: rows.filter((row) => row.assists > 0).sort((a, b) => b.assists - a.assists).slice(0, PLAYER_RECORDS_LIMIT),
+      hiddenByConsent,
     };
   }
 

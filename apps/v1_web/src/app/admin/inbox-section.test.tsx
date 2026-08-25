@@ -1,11 +1,16 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+// 구 /admin/hub 페이지 테스트 — B안 통합(2026-08-25)으로 할 일 섹션이 대시보드(/admin)에
+// 이식되면서 이 테스트도 대시보드를 렌더한다. 인박스 계약(카운트·행·딥링크·빈/에러 상태)은 불변.
 import AdminHubPage from './page';
 
 const inboxMock = vi.fn();
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminHubInbox: () => inboxMock(),
+  // 대시보드가 함께 렌더하는 개요·운영 지표 — 이 테스트의 관심사가 아니라 로딩 상태로 고정.
+  useV1AdminOverview: () => ({ data: undefined, isPending: true, isError: false, refetch: vi.fn() }),
+  useV1AdminOpsSummary: () => ({ data: undefined, isPending: true, isError: false, refetch: vi.fn() }),
 }));
 
 describe('AdminHubPage — 할 일 인박스', () => {

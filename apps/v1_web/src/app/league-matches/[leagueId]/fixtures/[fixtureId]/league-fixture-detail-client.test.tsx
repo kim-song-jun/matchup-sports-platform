@@ -28,6 +28,14 @@ vi.mock('@/components/public-game-records/claim-my-record', () => ({
   ),
 }));
 
+// 승인함 내부는 attest-requests.test.tsx 가 검증한다 — 여기서는 기록의 gameId 로
+// 배치되는지만 본다.
+vi.mock('@/components/public-game-records/attest-requests', () => ({
+  AttestRequestsSection: ({ gameId }: { gameId: string | null }) => (
+    <div data-testid="attest-section">{gameId}</div>
+  ),
+}));
+
 const useV1LeagueMatchMock = vi.mocked(useV1LeagueMatch, { partial: true });
 const useV1LeagueMatchStandingsMock = vi.mocked(useV1LeagueMatchStandings, { partial: true });
 const useV1TeamMatchMock = vi.mocked(useV1TeamMatch, { partial: true });
@@ -217,6 +225,8 @@ describe('LeagueFixtureDetailClient', () => {
     expect(screen.queryByText('매칭됨')).not.toBeInTheDocument();
     // "내 기록 연결" 배너(claim 의 리그 판)가 리그 인자 그대로 기록 본문 아래에 실린다.
     expect(screen.getByTestId('league-claim-section')).toHaveTextContent('lg-1/fx-1');
+    // 기록 연결 승인함도 기록의 gameId 로 함께 실린다.
+    expect(screen.getByTestId('attest-section')).toHaveTextContent('game-1');
   });
 
   it('기록에 경기 영상이 있으면 대회와 동일한 경기 영상 섹션이 뜬다', () => {

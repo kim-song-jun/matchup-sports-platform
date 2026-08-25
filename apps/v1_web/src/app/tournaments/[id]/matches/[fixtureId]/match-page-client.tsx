@@ -7,6 +7,7 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { usePublicMatch } from '@/components/public-game-records/use-public-game-records';
 import { MatchDetailContent } from '@/components/public-game-records/match-detail-content';
 import { useV1FixtureLineupAccess } from '@/hooks/use-v1-api';
+import { AttestRequestsSection } from '@/components/public-game-records/attest-requests';
 import { ClaimMyRecordSection } from '@/components/public-game-records/claim-my-record';
 
 function MatchSkeleton() {
@@ -83,6 +84,9 @@ export function MatchPageClient({ tournamentId, fixtureId }: { tournamentId: str
       <MatchDetailContent data={data} />
       <div style={{ padding: '0 16px' }}>
         <LineupManagementCta tournamentId={tournamentId} fixtureId={fixtureId} />
+        {/* 기록 연결 승인함 (attest UI C안): 다른 참가자의 연결 신청을 확인·승인하는
+            반대쪽 절반. 신청 알림의 착지 화면이기도 하다 — 요청이 있을 때만 보인다. */}
+        <AttestRequestsSection gameId={data.gameId} />
         {/* Task 154 P0-5: 라인업에 이름만 있고 계정 연결이 안 된 선수가 자기 기록을
             가져오는 입구. 라인업 CTA 아래에 둔다 -- 명단을 보고 "내가 없네" 를
             깨달은 직후가 가장 자연스러운 자리다. */}

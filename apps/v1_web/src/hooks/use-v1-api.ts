@@ -1757,6 +1757,74 @@ export function useV1LeagueClaimableParticipants(
   });
 }
 
+/**
+ * 승인함 목록 (attest UI C안) — 이 경기에서 내가 승인할 수 있는 대기 중 신원 연결 요청.
+ * game 경로라 대회·리그(팀매치) 어느 소스든 같은 훅을 쓴다.
+ */
+export type V1PendingIdentityLinkRequests = {
+  gameId: string;
+  version: number;
+  requests: {
+    requestId: string;
+    participantId: string;
+    participantDisplayName: string;
+    jerseyNumber: number | null;
+    sideId: string | null;
+    requesterNickname: string | null;
+    requestedAt: string;
+    expiresAt: string;
+  }[];
+};
+
+export function useV1PendingIdentityLinkRequests(
+  gameId: string | null | undefined,
+  options?: { enabled?: boolean },
+) {
+  return useQuery({
+    queryKey: ['v1', 'pending-identity-link-requests', gameId ?? ''] as const,
+    queryFn: () =>
+      v1Get<V1PendingIdentityLinkRequests>(`/games/${gameId}/identity-link-requests/pending`),
+    enabled: Boolean(gameId) && (options?.enabled ?? true),
+    // 비참가자는 403 이 정상 응답이다 -- 재시도해도 달라지지 않는다.
+    retry: false,
+  });
+}
+
+/** 승인·거절 — attest 커맨드. expectedVersion 은 승인함 목록과 같은 시점의 값을 쓴다. */
+export function useV1AttestIdentityLink(gameId: string | null | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: {
+      participantId: string;
+      requestId: string;
+      decision: 'approve' | 'reject';
+      expectedVersion: number;
+    }) => {
+      // gameId 는 승인함 목록 응답에서 오지만 훅 시그니처상 비어 있을 수 있다 —
+      // 비어 있는 채로 URL 을 만들면 `/games/undefined/...` 로 조용히 나간다.
+      // 여기서 즉시 실패시켜 잘못된 요청 자체를 만들지 않는다 (Copilot 리뷰).
+      if (!gameId) {
+        return Promise.reject(new Error('경기 정보를 찾지 못해 요청을 보낼 수 없어요.'));
+      }
+      // 서버가 헤더 Idempotency-Key 와 body.clientCommandId 의 일치를 요구한다
+      // (requestIdentityLink 와 같은 계약).
+      const clientCommandId = `attest-${body.requestId}-${Date.now()}`;
+      return v1Post(
+        `/games/${gameId}/participants/${body.participantId}/identity-link-requests/${body.requestId}/attest`,
+        { expectedVersion: body.expectedVersion, clientCommandId, decision: body.decision },
+        { headers: { 'idempotency-key': clientCommandId } },
+      );
+    },
+    // onSuccess 가 아니라 onSettled 다 — stale expectedVersion 으로 409 가 나는 경우가
+    // 정확히 "목록이 낡았다"는 뜻이라 그때야말로 다시 불러와야 한다 (Copilot 리뷰).
+    onSettled: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ['v1', 'pending-identity-link-requests', gameId ?? ''],
+      });
+    },
+  });
+}
+
 /** 리그 판 신청 — 본문은 대회와 같고, 무효화하는 목록 쿼리 키만 리그 것으로 바뀐다. */
 export function useV1LeagueRequestIdentityLink(leagueId: string, teamMatchId: string) {
   const queryClient = useQueryClient();

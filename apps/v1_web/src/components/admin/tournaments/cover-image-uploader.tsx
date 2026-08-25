@@ -52,17 +52,25 @@ export function CoverImageUploader({
             이전 16:9 미리보기는 관리자가 가로로 프레이밍한 사진을 업로드하게 유도했지만 실제
             화면에선 좌우가 크게 잘려 나가는 미리보기-실사용 불일치가 있었다. */}
         <div className="relative aspect-square overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--grey50)]">
-          <Image
-            src={publicAssetPath(value ?? COVER_EXAMPLE)}
-            alt={previewAlt ?? (value ? '선택한 대회 커버 미리보기' : '대회 커버 이미지 예시')}
-            fill
-            sizes="(max-width: 640px) 100vw, 240px"
-            className={`${previewFit === 'contain' ? 'object-contain p-3' : 'object-cover'} ${value ? '' : 'opacity-55'}`}
-            loading={eager ? 'eager' : 'lazy'}
-            fetchPriority={eager ? 'high' : 'auto'}
-            unoptimized
-          />
-          {!value ? (
+          {/* 커버 예시 사진과 "정사각형으로 표시" 오버레이는 커버(cover) 전용 안내다 —
+              contain(로고) 모드의 빈 상태에서 그대로 노출되면 엉뚱한 예시·설명이 된다. */}
+          {value || previewFit === 'cover' ? (
+            <Image
+              src={publicAssetPath(value ?? COVER_EXAMPLE)}
+              alt={value ? (previewAlt ?? '선택한 대회 커버 미리보기') : '대회 커버 이미지 예시'}
+              fill
+              sizes="(max-width: 640px) 100vw, 240px"
+              className={`${previewFit === 'contain' ? 'object-contain p-3' : 'object-cover'} ${value ? '' : 'opacity-55'}`}
+              loading={eager ? 'eager' : 'lazy'}
+              fetchPriority={eager ? 'high' : 'auto'}
+              unoptimized
+            />
+          ) : (
+            <div className="absolute inset-0 grid place-items-center" aria-hidden="true">
+              <ImagePlus size={28} className="text-[var(--text-muted)]" />
+            </div>
+          )}
+          {!value && previewFit === 'cover' ? (
             <div className="absolute inset-0 grid place-items-center bg-black/20 px-4 text-center text-xs font-semibold text-white">
               업로드 전 예시 · 목록·상세에 정사각형으로 표시돼요
             </div>

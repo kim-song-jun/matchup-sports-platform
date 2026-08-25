@@ -222,6 +222,13 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
       showToast('경기 시간(분)을 입력해야 휴식·팀당 하루 경기 수를 쓸 수 있어요.', 'error');
       return false;
     }
+    // 서버 DTO 범위(@Min/@Max)와 동일한 상한을 제출 전에 안내한다 — number input의
+    // min/max 속성은 직접 타이핑을 막지 못한다.
+    const inRange = (value: number | null, min: number, max: number) => value === null || (value >= min && value <= max);
+    if (!inRange(durationValue, 5, 240) || !inRange(breakValue, 0, 120) || !inRange(gamesPerDayValue, 1, 10)) {
+      showToast('경기 시간은 5~240분, 휴식은 0~120분, 팀당 하루 경기는 1~10 사이로 입력해주세요.', 'error');
+      return false;
+    }
     return true;
   };
 

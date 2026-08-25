@@ -146,4 +146,14 @@ describe('groupPreviewByMatchday (미리보기 매치데이 그룹핑)', () => {
     const groups = groupPreviewByMatchday(fixtures);
     expect(groups.map((g) => g.matchday)).toEqual([1, 2]);
   });
+
+  it('입력 순서가 섞여 있어도 그룹 안에서는 경기 순번(orderInDay)순으로 정렬한다', () => {
+    const fixtures = [
+      { round: 3, matchday: 1, orderInDay: 3, homeTeamId: 'a', awayTeamId: 'd', startAt: '2026-09-02T13:40:00.000Z', endAt: 'e3' },
+      { round: 1, matchday: 1, orderInDay: 1, homeTeamId: 'a', awayTeamId: 'b', startAt: '2026-09-02T13:00:00.000Z', endAt: 'e1' },
+      { round: 2, matchday: 1, orderInDay: 2, homeTeamId: 'c', awayTeamId: 'd', startAt: '2026-09-02T13:20:00.000Z', endAt: 'e2' },
+    ];
+    const groups = groupPreviewByMatchday(fixtures);
+    expect(groups[0].items.map((item) => item.orderInDay)).toEqual([1, 2, 3]);
+  });
 });

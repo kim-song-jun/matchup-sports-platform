@@ -123,5 +123,12 @@ export function groupPreviewByMatchday(fixtures: V1PreviewLeagueFixture[]): Matc
   }
   return [...groups.entries()]
     .sort(([a], [b]) => a - b)
-    .map(([matchday, items]) => ({ matchday, items }));
+    .map(([matchday, items]) => ({
+      matchday,
+      // 서버는 생성 순서(=시간순)로 내려주지만, 표시 순서가 응답 배열 순서에 묵시적으로
+      // 기대는 대신 그룹 안에서 경기 순번으로 명시 정렬한다(레거시 응답은 startAt 폴백).
+      items: [...items].sort(
+        (a, b) => (a.orderInDay ?? 0) - (b.orderInDay ?? 0) || a.startAt.localeCompare(b.startAt),
+      ),
+    }));
 }

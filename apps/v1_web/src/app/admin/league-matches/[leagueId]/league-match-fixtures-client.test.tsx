@@ -1067,6 +1067,23 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
     expect(mutateAsync).not.toHaveBeenCalled();
   });
 
+  it('경기 시간이 서버 허용 범위(5~240분)를 벗어나면 범위 안내 토스트를 띄우고 제출하지 않는다', async () => {
+    const mutateAsync = vi.fn();
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync, isPending: false } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    fireEvent.change(screen.getByLabelText('경기 시간(분)'), { target: { value: '300' } });
+    fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+
+    expect(await screen.findByText(/5~240분/)).toBeInTheDocument();
+    expect(mutateAsync).not.toHaveBeenCalled();
+  });
+
   it('경기 시간에 소수를 입력하면 정수 안내 토스트를 띄우고 제출하지 않는다', async () => {
     const mutateAsync = vi.fn();
     useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync, isPending: false } as never);

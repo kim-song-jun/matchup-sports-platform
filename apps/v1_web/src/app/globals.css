@@ -6831,8 +6831,9 @@ button:disabled {
 .tm-pcard-frame {
   width: 280px; position: relative;
   /* 기울기 변수는 .tm-pcard-scene 이 소유한다(포인터 핸들러가 거기 붙는다) --
-     frame 이 직접 선언하면 상속이 막혀 기울기가 전달되지 않는다. */
-  transform: translateY(var(--lift, 0px)) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+     frame 이 직접 선언하면 상속이 막혀 기울기가 전달되지 않는다.
+     호버 리프트는 없다(2026-08-25 사용자 결정) -- 기울기·글레어만으로 충분하다. */
+  transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
   transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1), filter 0.45s ease;
   animation: tmCardRise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   filter: drop-shadow(0 16px 30px rgba(0, 0, 0, 0.55));
@@ -6848,7 +6849,10 @@ button:disabled {
   pointer-events: none;
 }
 .tm-pcard-scene[data-active='true'] .tm-pcard-frame { transition-duration: 0.08s; }
-.tm-pcard-scene[data-press='true'] .tm-pcard-frame { --lift: -2px; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.5)); }
+/* 누르면 뜨는 대신 살짝 눌린다 -- 물건은 누르면 들어간다. */
+.tm-pcard-scene[data-press='true'] .tm-pcard-frame {
+  transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) scale(0.985);
+}
 @keyframes tmCardRise { from { opacity: 0; transform: translateY(22px) scale(0.97); } to { opacity: 1; } }
 
 /* 글레어 -- 포인터를 따라 움직이는 반사광. 부드러운 원 하나로는 "빛이 닿았다" 수준에

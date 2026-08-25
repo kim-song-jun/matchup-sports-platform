@@ -32,17 +32,21 @@ import { LeagueSeriesAdminService } from './league-series-admin.service';
 // 동일하게 전체 NotificationsModule을 가져온다(HTTP 앱 그래프 안에서는 여러 feature 모듈이 같은
 // 선언 모듈을 import해도 Nest가 하나의 공유 인스턴스로 묶는다 — 이미 TeamMatchesModule에서 쓰는 패턴).
 @Module({
-  imports: [AdminContextModule, GamesModule, NotificationsModule],
+  // UploadsModule: 리그 경기 영상 업로드(LeagueFixtureVideosService)가 UploadsService 를 쓴다.
+  imports: [AdminContextModule, GamesModule, NotificationsModule, UploadsModule],
   controllers: [
     LeagueMatchAdminController,
     LeagueMatchDisputeController,
     LeagueMatchDisputeAdminController,
+    // #750 후속 등록 — import 구문만 있고 이 배열에 빠져 있어 라우트가 404 였다(alpha 실측).
+    LeagueFixtureVideosController,
     LeagueMatchForfeitController,
     LeagueMatchPublicController,
     LeagueMatchResultEntryController,
     LeagueSeriesAdminController,
   ],
   providers: [
+    LeagueFixtureVideosService,
     LeagueMatchAdminService,
     LeagueMatchDisputeService,
     LeagueMatchForfeitService,

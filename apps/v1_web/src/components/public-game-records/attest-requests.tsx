@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card } from '@/components/v1-ui/primitives';
 import { extractErrorMessage } from '@/lib/error-message';
+import { hasStoredV1Session } from '@/lib/session-storage';
 import {
   useV1AttestIdentityLink,
   useV1AuthMe,
@@ -28,10 +29,18 @@ import {
  * 결정(승인/거절)을 전달하는 입구일 뿐이다.
  */
 export function AttestRequestsSection({ gameId }: { gameId: string | null | undefined }) {
-  // 비로그인 관전자가 페이지를 열 때마다 401 을 만들 이유가 없다 — 세션이 확인된
-  // 뒤에만 승인함을 조회한다.
-  const me = useV1AuthMe({ retry: false });
-  const pending = useV1PendingIdentityLinkRequests(gameId, { enabled: me.data !== undefined });
+  // 비로그인 관전자가 페이지를 열 때마다 401 을 만들 이유가 없다 — 로컬 세션 힌트가
+  // 있을 때만 /auth/me probe 를 보내고(힌트 없이 probe 부터 나가면 그 자체가 401 소음
+  // — Copilot 리뷰), 세션이 확인된 뒤에만 승인함을 조회한다. 힌트는 SSR 하이드레이션
+  // 불일치를 피하려고 effect 에서 읽는다(tournament-detail-client 와 같은 패턴).
+  const [hasSessionHint, setHasSessionHint] = useState(false);
+  useEffect(() => {
+    setHasSessionHint(hasStoredV1Session());
+  }, []);
+  const me = useV1AuthMe({ enabled: hasSessionHint, retry: false });
+  const pending = useV1PendingIdentityLinkRequests(gameId, {
+    enabled: hasSessionHint && me.data !== undefined,
+  });
   const attest = useV1AttestIdentityLink(gameId);
   const [error, setError] = useState<string | null>(null);
   const [lastDecision, setLastDecision] = useState<string | null>(null);

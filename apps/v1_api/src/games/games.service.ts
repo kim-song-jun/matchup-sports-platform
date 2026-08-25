@@ -2773,10 +2773,14 @@ export class GamesService {
       try {
         await this.assertAttestorAuthority(this.prisma, gameId, game.sourceType, side.teamId, actor);
         canAttestBySideId.set(side.id, true);
-      } catch {
-        // forbidden 을 "이 사이드는 내 승인 자격 밖" 판정값으로 쓴다 — 요청별 필터이지
-        // 오류가 아니므로 삼키는 것이 맞다(참가팀 멤버 게이트는 위 resolveActor 가 이미
-        // 통과시켰다).
+      } catch (error) {
+        // ForbiddenException 만 "이 사이드는 내 승인 자격 밖" 판정값으로 쓴다 — 요청별
+        // 필터이지 오류가 아니므로 삼키는 것이 맞다(참가팀 멤버 게이트는 위 resolveActor
+        // 가 이미 통과시켰다). 그 외(DB 오류 등)를 함께 삼키면 실제 장애가 빈 승인함으로
+        // 위장된다(Copilot 리뷰) — 그대로 던진다.
+        if (!(error instanceof ForbiddenException)) {
+          throw error;
+        }
         canAttestBySideId.set(side.id, false);
       }
     }

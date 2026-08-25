@@ -99,6 +99,15 @@ describe('identity attest (승인함)', () => {
         },
       ]);
     });
+
+    it('승인 자격 판정 중 발생한 진짜 오류(DB 등)는 빈 목록으로 숨기지 않고 그대로 던진다', async () => {
+      const { service, prisma } = makeService();
+      // 자격 판정용 조회가 터진다 — forbidden(자격 밖)과 구분되어야 한다. 함께 삼키면
+      // 실제 장애가 "승인할 요청이 없음"으로 위장돼 화면에서 사라진다(Copilot 리뷰).
+      prisma.v1TeamMembership.findFirst.mockRejectedValue(new Error('DB down'));
+
+      await expect(service.listPendingIdentityLinkRequests(user, 'game-1')).rejects.toThrow('DB down');
+    });
   });
 
   describe('writeIdentityAttestRequestNotifications', () => {

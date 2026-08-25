@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { useV1LeagueMatch, useV1LeagueMatchStandings, useV1ResolveChatRoom, useV1TeamMatch } from '@/hooks/use-v1-api';
+import { usePublicLeagueFixtureRecord } from '@/components/public-game-records/use-public-game-records';
+import { MatchDetailContent } from '@/components/public-game-records/match-detail-content';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -87,6 +89,10 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
   const standingsQuery = useV1LeagueMatchStandings(leagueId);
   // 참가팀 여부(채팅·라인업 통로)만을 위해 쓴다 — 실패해도 관전 화면은 그대로 뜬다.
   const teamMatchQuery = useV1TeamMatch(fixtureId);
+  // 대회 경기 상세와 동일한 게임 프로젝션(스코어·득점/카드 타임라인·라인업·승부차기·
+  // 몰수 사유·MVP·정정 이력·라이브 폴링). 404(게임 미공개/숨김)면 아래 자체 요약
+  // 카드로 폴백하므로 이 실패는 화면 오류가 아니다.
+  const recordQuery = usePublicLeagueFixtureRecord(leagueId, fixtureId);
   const resolveChatRoom = useV1ResolveChatRoom();
   const [chatError, setChatError] = useState('');
 
@@ -199,29 +205,73 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
         <Link href={`/league-matches/${leagueId}`} className="tm-pressable text-sm font-semibold text-[var(--text-strong)] underline underline-offset-2">
           {series.title}
         </Link>
-        {round ? <span className="text-sm text-[var(--text-muted)]">{round}</span> : null}
+        {/* 기록 본문(MatchDetailContent)이 뜨면 그 헤더가 주차를 이미 보여준다 — 중복 표기 방지. */}
+        {round && !recordQuery.data ? <span className="text-sm text-[var(--text-muted)]">{round}</span> : null}
       </div>
 
-      {/* 경기 카드 — 양팀 실명 + 스코어/상태 */}
-      <Card pad={20}>
-        <div className="flex items-start justify-between gap-3">
-          <TeamSide teamId={fixture.homeTeamId} name={homeName} logoUrl={homeRow?.teamLogoUrl ?? null} record={recordLine(homeRow)} align="left" />
-          <div className="flex min-w-[96px] flex-col items-center gap-1 pt-1">
-            {result.hasScore ? (
-              <span className="text-2xl font-bold text-[var(--text-strong)]">{result.text}</span>
-            ) : (
-              <span className="text-sm font-semibold text-[var(--text-muted)]">{result.text}</span>
-            )}
-            {result.isForfeit ? <span className="tm-badge tm-badge-sm tm-badge-orange">몰수</span> : null}
-            <span className={`tm-badge tm-badge-sm ${statusMeta.badgeClass}`}>{statusMeta.label}</span>
+      {recordQuery.data ? (
+        <>
+          {/* 대회 경기 상세(/tournaments/:id/matches/:fixtureId)와 완전히 같은 본문 —
+              스코어·승부차기·몰수 사유·MVP·라인업·득점/카드 타임라인·경기 영상·정정 이력.
+              (2026-08-25 사용자 지시: 대회에 만든 경기 UI/UX 가 리그에도 모두 있어야 한다.)
+              MatchDetailContent 는 자체 좌우 패딩(20px)을 가진다 — 이 컨테이너의 px-4 와
+              겹쳐 본문만 안으로 밀리지 않게 음수 마진으로 상쇄한다. */}
+          <div className="-mx-4">
+            <MatchDetailContent data={recordQuery.data} />
           </div>
-          <TeamSide teamId={fixture.awayTeamId} name={awayName} logoUrl={awayRow?.teamLogoUrl ?? null} record={recordLine(awayRow)} align="right" />
-        </div>
-        <div className="mt-4 space-y-1 border-t border-[var(--border)] pt-3 text-sm text-[var(--text-muted)]">
-          <p>{formatTournamentDateTimeLong(fixture.startAt) ?? '일정 미정'}</p>
-          <p>{fixture.placeName || '장소 미정'}</p>
-        </div>
-      </Card>
+          {/* 리그 고유 문맥 — 대회 본문에는 없는 순위·전적. 팀 상세로 가는 통로이기도 하다. */}
+          {(recordLine(homeRow) || recordLine(awayRow)) && (
+            <Card pad={16}>
+              <h2 className="text-sm font-bold text-[var(--text-strong)]">리그 순위·전적</h2>
+              <ul className="mt-2 space-y-1">
+                {[
+                  { teamId: fixture.homeTeamId, name: homeName, row: homeRow },
+                  { teamId: fixture.awayTeamId, name: awayName, row: awayRow },
+                ].map((side) =>
+                  side.teamId === null || !recordLine(side.row) ? null : (
+                    <li key={side.teamId}>
+                      <Link
+                        href={`/teams/${side.teamId}`}
+                        className="tm-pressable tm-list-row-interactive flex min-h-[44px] items-center justify-between gap-2 rounded-lg px-2 text-sm"
+                      >
+                        <span className="inline-flex items-center gap-1.5">
+                          <TeamAvatar seed={side.teamId} name={side.name} logoUrl={side.row?.teamLogoUrl ?? null} size="sm" />
+                          <span className="text-[var(--text-strong)]">{side.name}</span>
+                        </span>
+                        <span className="text-[var(--text-muted)]">{recordLine(side.row)}</span>
+                      </Link>
+                    </li>
+                  ),
+                )}
+              </ul>
+            </Card>
+          )}
+        </>
+      ) : recordQuery.isPending ? (
+        <div className="tm-skeleton" style={{ height: 180, borderRadius: 16 }} />
+      ) : (
+        /* 기록 API 404(게임 미공개·숨김 정책) 폴백 — 리그 대진 요약 카드.
+           양팀 실명·스코어/상태·일시·장소는 리그 공개 상세만으로도 보여줄 수 있다. */
+        <Card pad={20}>
+          <div className="flex items-start justify-between gap-3">
+            <TeamSide teamId={fixture.homeTeamId} name={homeName} logoUrl={homeRow?.teamLogoUrl ?? null} record={recordLine(homeRow)} align="left" />
+            <div className="flex min-w-[96px] flex-col items-center gap-1 pt-1">
+              {result.hasScore ? (
+                <span className="text-2xl font-bold text-[var(--text-strong)]">{result.text}</span>
+              ) : (
+                <span className="text-sm font-semibold text-[var(--text-muted)]">{result.text}</span>
+              )}
+              {result.isForfeit ? <span className="tm-badge tm-badge-sm tm-badge-orange">몰수</span> : null}
+              <span className={`tm-badge tm-badge-sm ${statusMeta.badgeClass}`}>{statusMeta.label}</span>
+            </div>
+            <TeamSide teamId={fixture.awayTeamId} name={awayName} logoUrl={awayRow?.teamLogoUrl ?? null} record={recordLine(awayRow)} align="right" />
+          </div>
+          <div className="mt-4 space-y-1 border-t border-[var(--border)] pt-3 text-sm text-[var(--text-muted)]">
+            <p>{formatTournamentDateTimeLong(fixture.startAt) ?? '일정 미정'}</p>
+            <p>{fixture.placeName || '장소 미정'}</p>
+          </div>
+        </Card>
+      )}
 
       {/* 맞대결 기록 — 이 리그에서 같은 두 팀이 이미 치른 경기. 없으면 섹션 자체를 숨긴다. */}
       {headToHead.length > 0 && (

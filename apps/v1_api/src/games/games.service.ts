@@ -2632,7 +2632,32 @@ export class GamesService {
     if (fixture === null || fixture.game === null) {
       throw this.notFound('TOURNAMENT_FIXTURE_GAME_NOT_FOUND');
     }
-    const gameId = fixture.game.id;
+    return this.listClaimableParticipantsForGame(user, fixture.game);
+  }
+
+  /**
+   * 리그 판 (2026-08-25 대회 패리티 후속). 리그 대진의 게임은 TEAM_MATCH 소스라
+   * resolveActor 의 team-match 분기가 `participant_identity` 를 "두 팀 중 한쪽의 활성
+   * 멤버"에게 이미 허용한다 — 여기서 새 인가 규칙을 만들지 않고, **teamMatchId 가 정말
+   * 이 리그의 대진인지**(리그 스코프)만 추가로 검증한다. 신청·승인 API 는 game 경로
+   * (`/games/:gameId/...`)라 소스 불문 그대로 쓴다.
+   */
+  async listLeagueClaimableParticipants(user: V1AuthUser, leagueId: string, teamMatchId: string) {
+    const teamMatch = await this.prisma.v1TeamMatch.findFirst({
+      where: { id: teamMatchId, leagueId, deletedAt: null },
+      select: { game: { select: { id: true, version: true } } },
+    });
+    if (teamMatch === null || teamMatch.game === null) {
+      throw this.notFound('LEAGUE_FIXTURE_GAME_NOT_FOUND');
+    }
+    return this.listClaimableParticipantsForGame(user, teamMatch.game);
+  }
+
+  private async listClaimableParticipantsForGame(
+    user: V1AuthUser,
+    game: { id: string; version: number },
+  ) {
+    const gameId = game.id;
     // 신청 자격과 동일한 스코프. 비참가자는 여기서 403 으로 끊긴다.
     await this.resolveActor(this.prisma, gameId, user.id, 'participant_identity');
 
@@ -2642,7 +2667,7 @@ export class GamesService {
       orderBy: [{ sideId: 'asc' }, { jerseyNumber: 'asc' }],
     });
     if (participants.length === 0) {
-      return { gameId, version: fixture.game.version, participants: [] };
+      return { gameId, version: game.version, participants: [] };
     }
     // 이미 연결된 참가자는 뺀다 -- 남의 연결을 빼앗는 경로를 애초에 안 만든다.
     // (설령 목록에 넣어도 requestIdentityLink 가 409 로 막지만, 고를 수 있게 보여주는
@@ -2654,7 +2679,7 @@ export class GamesService {
     const linkedIds = new Set(linked.map((row) => row.participantId));
     return {
       gameId,
-      version: fixture.game.version,
+      version: game.version,
       participants: participants
         .filter((participant) => !linkedIds.has(participant.id))
         .map((participant) => ({

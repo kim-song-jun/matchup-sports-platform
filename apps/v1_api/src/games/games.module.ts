@@ -3,6 +3,7 @@ import { OptionalV1AuthGuard } from '../auth/optional-v1-auth.guard';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { OperationAuditModule } from '../common/audit/operation-audit.module';
 import { GamesController } from './games.controller';
+import { LeagueFixtureClaimAccessController } from './league-fixture-claim-access.controller';
 import {
   MyTournamentFixturesController,
   TournamentFixtureLineupAccessController,
@@ -17,6 +18,7 @@ import { GamesService } from './games.service';
     GamesController,
     TournamentFixtureLineupAccessController,
     MyTournamentFixturesController,
+    LeagueFixtureClaimAccessController,
   ],
   providers: [
     GamesService,

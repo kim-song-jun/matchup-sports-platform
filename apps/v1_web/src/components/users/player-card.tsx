@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { CalendarCheck, Clock, HeartHandshake, Lock, Sparkles, Target, Zap } from 'lucide-react';
+import { CalendarCheck, Clock, HeartHandshake, Lock, Settings, Sparkles, Target, Zap } from 'lucide-react';
 import { cssUrl } from '@/lib/assets';
 import type { V1PlayerCard, V1PlayerCardStat } from '@/types/api';
 
@@ -234,6 +234,7 @@ export function PlayerCard({
   teamName,
   isOwner,
   shareHref,
+  settingsHref,
   belowCardSlot,
 }: {
   readonly card: V1PlayerCard;
@@ -247,6 +248,12 @@ export function PlayerCard({
    * 공유 화면 자신은 이 값을 주지 않는다 -- 자기 자신으로 가는 버튼은 의미가 없다.
    */
   readonly shareHref?: string;
+  /**
+   * 카드 설정(숨김·모양) 화면 경로. 본인 카드에서만 넘긴다 -- 적대 검증(2026-08-25)에서
+   * 이 설정이 카드에서 2클릭 떨어진 메뉴에만 있어 사실상 발견 불가능하다고 확정됐다.
+   * 기록 공개 설정은 이미 카드 안에 입구가 있으므로, 카드 자체 설정도 같은 원칙을 따른다.
+   */
+  readonly settingsHref?: string;
   /**
    * 카드 바로 아래(뒤집기 버튼 위)에 끼워 넣는 블록. 마이페이지 신원 통합 스테이지가
    * 이름·뱃지·프로필 버튼을 여기에 넣는다 -- 카드가 신원을 대신하므로 흰 신원 박스를
@@ -494,13 +501,20 @@ export function PlayerCard({
       <div className="tm-pcard-below">
         {belowCardSlot ?? null}
         {/* 뒤집기는 버튼으로만 -- 카드 자체를 누르게 하면 기울기·공유 링크와 충돌한다. */}
-        <button
-          type="button"
-          className="tm-pcard-flipbtn"
-          onClick={() => setFlipped((v) => !v)}
-        >
-          {flipped ? '앞면 보기 ↺' : '카드 뒤집기 ↻'}
-        </button>
+        <div className="tm-pcard-actions">
+          <button
+            type="button"
+            className="tm-pcard-flipbtn"
+            onClick={() => setFlipped((v) => !v)}
+          >
+            {flipped ? '앞면 보기 ↺' : '카드 뒤집기 ↻'}
+          </button>
+          {settingsHref ? (
+            <Link href={settingsHref} className="tm-pcard-settings-link" aria-label="카드 설정">
+              <Settings size={19} strokeWidth={2.2} aria-hidden="true" />
+            </Link>
+          ) : null}
+        </div>
 
         <div className="tm-player-card-sub">
           {card.position ? POSITION_LABEL[card.position] : '포지션 미정'}

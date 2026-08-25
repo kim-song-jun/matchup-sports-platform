@@ -71,7 +71,7 @@ export default function AdminHubPage() {
   return (
     <>
       <AdminPageHeader
-        eyebrow="개요"
+        eyebrow="할 일"
         title="할 일"
         description="운영자 처리가 필요한 항목을 한곳에서 확인해요."
       />

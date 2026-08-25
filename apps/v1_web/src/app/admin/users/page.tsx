@@ -10,6 +10,8 @@ import {
   useV1ChangeUserStatus,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { formatAuthProviders, formatGender, formatUserTitle } from '@/lib/format-user';
+import { formatAdminDate } from '@/lib/date-utils';
 import { useAdminListQuery } from '@/hooks/use-admin-list-query';
 import {
   AdminPageHeader,
@@ -25,38 +27,8 @@ import {
 } from '@/components/admin';
 import type { V1AdminUserRow } from '@/types/api';
 
-// ── Date formatter ────────────────────────────────────────────────────────────
-function formatDateCompact(dateStr: string | null | undefined): string {
-  if (!dateStr) return '—';
-  try {
-    const d = new Date(dateStr);
-    const y = d.getFullYear();
-    const mo = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}.${mo}.${day}`;
-  } catch {
-    return dateStr ?? '—';
-  }
-}
-
-function formatUserTitle(row: V1AdminUserRow): string {
-  if (row.nickname || row.displayName) return row.nickname ?? row.displayName ?? '';
-  if (row.onboardingStatus === 'social_terms_required') return '가입 진행 중 · 약관 미동의';
-  if (row.onboardingStatus === 'social_profile_required') return '가입 진행 중 · 프로필 미완료';
-  return '프로필 없음';
-}
-
-function formatGender(gender: V1AdminUserRow['gender']) {
-  if (gender === 'male') return '남';
-  if (gender === 'female') return '여';
-  return '성별 미등록';
-}
-
-function formatAuthProviders(providers: V1AdminUserRow['authProviders']) {
-  const labels = { kakao: '카카오', naver: '네이버', email: '이메일' } as const;
-  const values = providers ?? [];
-  return values.length > 0 ? values.map((provider) => labels[provider]).join(' · ') : '로그인 수단 없음';
-}
+// 회원 표기(제목·성별·로그인 수단)는 상세 페이지와 공유하는 lib/format-user.ts 단일 소스 —
+// 두 화면이 각자 복제한 로직이 갈라져 같은 회원이 다른 이름으로 보이던 결함이 있었다.
 
 function getTeamRoleCounts(row: V1AdminUserRow) {
   return {
@@ -281,7 +253,7 @@ function AdminUsersPageContent() {
               header: '가입',
               width: 'w-[104px]',
               render: (row) => (
-                <span className="whitespace-nowrap text-[var(--text-muted)]">{formatDateCompact(row.createdAt)}</span>
+                <span className="whitespace-nowrap text-[var(--text-muted)]">{formatAdminDate(row.createdAt)}</span>
               ),
             },
             {
@@ -289,7 +261,7 @@ function AdminUsersPageContent() {
               header: '최근 로그인',
               width: 'w-[112px]',
               render: (row) => (
-                <span className="whitespace-nowrap text-[var(--text-muted)]">{formatDateCompact(row.lastLoginAt)}</span>
+                <span className="whitespace-nowrap text-[var(--text-muted)]">{formatAdminDate(row.lastLoginAt)}</span>
               ),
             },
           ]}

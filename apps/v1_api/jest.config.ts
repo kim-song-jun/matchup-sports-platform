@@ -86,6 +86,9 @@ const config: Config = {
         // U3: 같은 이유로 명시 경로 등록이 필요하다(이 디렉터리에서 벌써 4번째
         // 반복되는 silent-omission 함정).
         '<rootDir>/test/league-matches/league-match-detail-dispute-eligibility.integration-spec.ts',
+        // 대진 timing(경기 시간·휴식·팀당 하루 경기 수): 같은 이유로 명시 경로 등록
+        // (이 디렉터리 5번째 — 와일드카드 복원은 여전히 기존 4개 스펙의 무관한 실패를 되살린다).
+        '<rootDir>/test/league-matches/league-fixture-timing.integration-spec.ts',
         // team-contacts (Task 8): 이 글롭이 없으면 `jest --selectProjects integration`
         // (= CI 의 migration replay + drift gate) 가 이 디렉터리를 절대 선택하지 않는다.
         // 이 레포에서 같은 실수가 이미 4회 반복 지적됐다 — 위 team-schedules/team-match-series/

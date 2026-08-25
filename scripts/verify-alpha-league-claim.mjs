@@ -11,6 +11,9 @@ import { mkdirSync } from 'node:fs';
 
 const BASE = 'https://alpha.teameet.co.kr';
 const OUT = process.env.OUT_DIR ?? '.screenshots/league-claim-0825';
+// alpha 는 과한 요청에 403 을 건다 — 스캔 범위를 힌트/상한으로 제한한다 (Copilot 리뷰).
+const HINT = process.env.LEAGUE_HINT ?? '';
+const MAX_LEAGUES = Number(process.env.MAX_LEAGUES ?? 5);
 const EMAIL = process.env.ALPHA_EMAIL;
 const PASSWORD = process.env.ALPHA_PASSWORD;
 if (!EMAIL || !PASSWORD) throw new Error('ALPHA_EMAIL/ALPHA_PASSWORD 환경변수가 필요합니다');
@@ -30,17 +33,25 @@ const loginRes = await fetch(`${BASE}/api/v1/auth/login`, {
   headers: { 'content-type': 'application/json' },
   body: JSON.stringify({ email: EMAIL, password: PASSWORD }),
 });
-const setCookie = loginRes.headers.get('set-cookie') ?? '';
-const session = /teameet_v1_session=([^;]+)/.exec(setCookie)?.[1];
+// getSetCookie() 를 먼저 쓴다 — get() 은 Set-Cookie 가 여러 개일 때 하나로 합쳐 돌려줘
+// 세션 쿠키를 놓칠 수 있다 (capture-admin-report-filter.mjs 등과 같은 관행).
+const cookies = loginRes.headers.getSetCookie?.() ?? [loginRes.headers.get('set-cookie') ?? ''];
+const session = cookies
+  .map((cookie) => /teameet_v1_session=([^;]+)/.exec(cookie ?? '')?.[1])
+  .find(Boolean);
 if (!session) throw new Error(`로그인 실패: ${loginRes.status}`);
 const authHeaders = { cookie: `teameet_v1_session=${session}` };
 console.log('login: ok');
 
 // --- 대상 대진 탐색: 기록(record)이 공개(200)이고 이 계정이 참가팀 멤버(200)인 대진 ---
 const list = await api('/league-matches?limit=50');
-const leagues = list.data?.items ?? [];
+const allLeagues = list.data?.items ?? [];
+const leagues = (HINT ? allLeagues.filter((l) => l.title.includes(HINT)) : allLeagues).slice(
+  0,
+  MAX_LEAGUES,
+);
 let target = null;
-const leagueIds = leagues.map((l) => l.leagueId);
+const leagueIds = allLeagues.map((l) => l.leagueId);
 outer: for (const league of leagues) {
   const detail = await api(`/league-matches/${league.leagueId}`);
   const fixtures = (detail.data?.fixtures ?? []).slice(0, 4);

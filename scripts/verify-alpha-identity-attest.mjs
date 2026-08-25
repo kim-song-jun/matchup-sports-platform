@@ -1,6 +1,14 @@
 // alpha 실측 — 기록 연결 승인(attest) 동선(PR #774) 전 구간 릴레이.
-// 사용: ALPHA_REQUESTER_EMAIL=<팀원> ALPHA_ATTESTOR_EMAIL=<그 팀 리더> ALPHA_PASSWORD=<공통 비밀번호> \
+// 사용: ALPHA_REQUESTER_EMAIL=<팀원> ALPHA_ATTESTOR_EMAIL=<홈팀 리더> \
+//       ALPHA_ATTESTOR_ALT_EMAIL=<원정팀 리더> ALPHA_PASSWORD=<공통 비밀번호> \
 //       node scripts/verify-alpha-identity-attest.mjs
+//
+// 확인자를 **양 팀 리더 2명** 받는 이유: 승인 자격은 참가자가 속한 사이드 팀의
+// owner/manager 에게만 있는데, 사이드↔팀 매핑을 공개 API 로 알 방법이 없다(공개 기록의
+// lineup 은 경기 시작 전 null). 한 명만 받아 "안 보이면 다른 사이드로 재신청"하면
+// **자격 밖 사이드에 만든 요청이 취소 불가**(revoke 는 활성 링크 전용)라 24h 잔여물이
+// 남는다. 그래서 요청은 **정확히 1건만** 만들고, 두 리더 중 그 요청이 보이는 쪽을
+// 확인자로 삼아 반드시 종결시킨다.
 // 릴레이: 팀원이 신청 → 리더의 인앱 알림 도착 → 리더의 승인함 목록에 노출 →
 //         화면(승인 카드) 캡처 → 리더가 거절(reject)로 종결 → 승인함에서 사라짐.
 // 거절로 끝내는 이유: approve 는 실제 신원 연결을 만든다 — 실측 잔여물을 남기지 않기
@@ -15,9 +23,12 @@ const HINT = process.env.LEAGUE_HINT ?? '';
 const MAX_LEAGUES = Number(process.env.MAX_LEAGUES ?? 5);
 const REQUESTER_EMAIL = process.env.ALPHA_REQUESTER_EMAIL;
 const ATTESTOR_EMAIL = process.env.ALPHA_ATTESTOR_EMAIL;
+const ATTESTOR_ALT_EMAIL = process.env.ALPHA_ATTESTOR_ALT_EMAIL;
 const PASSWORD = process.env.ALPHA_PASSWORD;
-if (!REQUESTER_EMAIL || !ATTESTOR_EMAIL || !PASSWORD) {
-  throw new Error('ALPHA_REQUESTER_EMAIL/ALPHA_ATTESTOR_EMAIL/ALPHA_PASSWORD 환경변수가 필요합니다');
+if (!REQUESTER_EMAIL || !ATTESTOR_EMAIL || !ATTESTOR_ALT_EMAIL || !PASSWORD) {
+  throw new Error(
+    'ALPHA_REQUESTER_EMAIL/ALPHA_ATTESTOR_EMAIL/ALPHA_ATTESTOR_ALT_EMAIL/ALPHA_PASSWORD 환경변수가 필요합니다',
+  );
 }
 
 function assert(condition, message) {
@@ -55,8 +66,8 @@ async function api(path, { session, method = 'GET', body, idempotencyKey } = {})
 }
 
 const requesterSession = await login(REQUESTER_EMAIL);
-const attestorSession = await login(ATTESTOR_EMAIL);
-console.log('login: requester + attestor ok');
+const attestorSessions = [await login(ATTESTOR_EMAIL), await login(ATTESTOR_ALT_EMAIL)];
+console.log('login: requester + attestor x2 ok');
 
 // --- 대상 대진 탐색: 신청자가 참가팀 멤버로 미연결 후보를 가진 리그 대진 ---
 const list = await api('/league-matches?limit=50');
@@ -82,49 +93,53 @@ const { league, fx } = target;
 const gameId = target.claim.gameId;
 console.log('target:', league.title, '/', fx.teamMatchId, 'gameId:', gameId, 'candidates:', target.claim.participants.length);
 
-// --- 1) 팀원이 신청 → 2) 리더의 승인함에 노출 ---
-// 승인 자격은 **참가자가 속한 사이드 팀의 owner/manager** 에게만 있다 — 신청자는 양 팀
-// 소속일 수 있으므로 후보의 사이드가 확인자 팀과 다르면 승인함에 뜨지 않는 것이 정상이다.
-// 사이드별로 한 명씩 시도해 확인자 자격이 닿는 사이드를 찾는다.
-const sideIds = [...new Set(target.claim.participants.map((p) => p.sideId))];
-let candidate = null;
+// --- 1) 팀원이 신청 (요청은 정확히 1건만 만든다 — 취소 수단이 없다) ---
+const candidate = target.claim.participants[0];
+const clientCommandId = `attest-verify-${Date.now()}`;
+const requested = await api(`/games/${gameId}/participants/${candidate.participantId}/identity-link-requests`, {
+  session: requesterSession,
+  method: 'POST',
+  body: { expectedVersion: target.claim.version, clientCommandId },
+  idempotencyKey: clientCommandId,
+});
+console.log(`request: ${requested.status} ${requested.code ?? ''} participant=${candidate.displayName}`);
+assert(
+  requested.status === 201 || requested.status === 200 || requested.code === 'IDENTITY_LINK_REQUEST_PENDING',
+  `신청이 예상 밖 응답 — ${requested.status} ${requested.code}`,
+);
+
+// --- 2) 두 리더 중 이 요청이 보이는 쪽이 승인 자격자다 ---
+// (자격 밖 리더에게 안 보이는 것이 정상 — 사이드 스코프 필터가 동작한다는 증거이기도 하다.)
+let attestorSession = null;
 let pending = null;
 let row = null;
-for (const sideId of sideIds) {
-  const pick = target.claim.participants.find((p) => p.sideId === sideId);
-  const clientCommandId = `attest-verify-${sideId}-${Date.now()}`;
-  const requested = await api(`/games/${gameId}/participants/${pick.participantId}/identity-link-requests`, {
-    session: requesterSession,
-    method: 'POST',
-    body: { expectedVersion: target.claim.version, clientCommandId },
-    idempotencyKey: clientCommandId,
-  });
-  console.log(`request(side=${sideId}): ${requested.status} ${requested.code ?? ''}`);
-  assert(
-    requested.status === 201 || requested.status === 200 || requested.code === 'IDENTITY_LINK_REQUEST_PENDING',
-    `신청이 예상 밖 응답 — ${requested.status} ${requested.code}`,
-  );
-
-  const listed = await api(`/games/${gameId}/identity-link-requests/pending`, { session: attestorSession });
+for (const [index, session] of attestorSessions.entries()) {
+  const listed = await api(`/games/${gameId}/identity-link-requests/pending`, { session });
   assert(listed.status === 200, `승인함 목록이 200 이 아님 — ${listed.status} ${listed.code}`);
-  const found = (listed.data?.requests ?? []).find((r) => r.participantId === pick.participantId);
+  const found = (listed.data?.requests ?? []).find((r) => r.participantId === candidate.participantId);
+  console.log(`pending(attestor#${index + 1}): ${found ? 'visible' : '자격 밖(정상)'}`);
   if (found) {
-    candidate = pick;
+    attestorSession = session;
     pending = listed;
     row = found;
     break;
   }
-  console.log(`  → 확인자 자격 밖 사이드(정상) — 다음 사이드 시도. 이 요청은 24h 뒤 만료됩니다.`);
 }
-assert(row, '어느 사이드에서도 승인함에 요청이 뜨지 않음 — 확인자 자격 판정을 확인하세요');
+assert(row, '두 팀 리더 모두에게 요청이 보이지 않음 — 사이드 자격 판정을 확인하세요');
 console.log(`pending: ok — requestId=${row.requestId} participant="${row.participantDisplayName}" requester=${row.requesterNickname}`);
 
 // --- 3) 리더의 인앱 알림 도착 ---
-const notifications = await api('/notifications?limit=20', { session: attestorSession });
+// 알림은 신청 트랜잭션 안에서 쓰이므로 신청 성공 = 알림 존재다(지연 없음). 다만 확인자의
+// 알림함이 활발하면 최근 20건 밖으로 밀릴 수 있어 창을 넓히고 **참가자 이름까지** 맞춘다
+// — 제목만 맞추면 이전 실행의 다른 참가자 알림을 잡아 통과할 수도 있다(Copilot 리뷰).
+const notifications = await api('/notifications?limit=50', { session: attestorSession });
 const arrived = (notifications.data?.items ?? []).find(
-  (n) => n.title === '기록 연결 승인 요청이 도착했어요',
+  (n) =>
+    n.title === '기록 연결 승인 요청이 도착했어요' &&
+    typeof n.body === 'string' &&
+    n.body.includes(candidate.displayName),
 );
-assert(arrived, '리더의 알림함에 승인 요청 알림이 없음');
+assert(arrived, `리더의 알림함에 "${candidate.displayName}" 승인 요청 알림이 없음`);
 // 목록 응답은 deepLink 를 `target.route` 안에 담아 내려준다(notifications.service.ts list()).
 // 최상위 `deepLink`/`route` 로 읽으면 undefined 라 "딥링크 없음"으로 오판한다.
 const route = arrived.target?.route ?? null;

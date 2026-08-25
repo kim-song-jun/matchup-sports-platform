@@ -2,7 +2,7 @@
 
 import { Suspense, useState } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Eye } from 'lucide-react';
 import {
   useV1AdminMe,
@@ -96,6 +96,7 @@ export default function AdminUsersPage() {
 }
 
 function AdminUsersPageContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const initialStatus = searchParams.get('status') ?? '';
 
@@ -190,6 +191,10 @@ function AdminUsersPageContent() {
         <AdminDataTable<V1AdminUserRow>
           rows={rows}
           keyExtractor={(row) => row.userId}
+          // 자매 목록(matches·team-matches)과 같은 행 진입 계약 — "상세" 버튼으로만
+          // 진입 가능하던 유일한 목록 2개(users·teams) 중 하나였다.
+          onRowClick={(row) => router.push(`/admin/users/${encodeURIComponent(row.userId)}`)}
+          rowClickLabel={(row) => `${formatUserTitle(row)} 상세 보기`}
           tableMaxWidth="max-w-none"
           rowTone={(row) =>
             row.accountStatus === 'blocked' || row.accountStatus === 'deleted'

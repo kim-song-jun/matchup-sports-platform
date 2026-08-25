@@ -4,7 +4,7 @@
  */
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { AdminDetailRow } from './admin-detail-row';
+import { AdminDetailRow, AdminSummaryItem } from './admin-detail-row';
 
 describe('AdminDetailRow', () => {
   it('값이 없으면 대시로 보여준다', () => {
@@ -28,5 +28,27 @@ describe('AdminDetailRow', () => {
   it('보통 값은 그대로 보여준다', () => {
     render(<AdminDetailRow label="지역" value="서울 성동구" />);
     expect(screen.getByText('서울 성동구')).toBeInTheDocument();
+  });
+});
+
+describe('AdminSummaryItem', () => {
+  // AdminDetailRow 와 같은 빈 값 계약. 이 컴포넌트만 non-nullable 로 남아
+  // 상세 3화면(teams·matches·team-matches)이 각자 `?? '-'` 를 재구현했었다 —
+  // `?? '-'` 는 빈 문자열을 빈 칸으로 남기는 바로 그 결함을 다시 들여온다.
+  it('null·undefined·빈 문자열은 대시로 보여준다', () => {
+    render(
+      <>
+        <AdminSummaryItem icon={null} label="지역" value={null} />
+        <AdminSummaryItem icon={null} label="호스트" value={undefined} />
+        <AdminSummaryItem icon={null} label="주소" value="" />
+      </>,
+    );
+    expect(screen.getAllByText('-')).toHaveLength(3);
+  });
+
+  it('0 은 0 그대로 보여준다', () => {
+    render(<AdminSummaryItem icon={null} label="취소 매치" value={0} />);
+    expect(screen.getByText('0')).toBeInTheDocument();
+    expect(screen.queryByText('-')).not.toBeInTheDocument();
   });
 });

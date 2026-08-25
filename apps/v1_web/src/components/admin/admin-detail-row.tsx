@@ -26,7 +26,11 @@ export function AdminDetailRow({
   );
 }
 
-/** 상세 화면 우측 요약(aside)의 한 줄. 아이콘 + 라벨 + 값. */
+/**
+ * 상세 화면 우측 요약(aside)의 한 줄. 아이콘 + 라벨 + 값.
+ * 빈 값 판정은 `AdminDetailRow`와 같은 계약이다 — 이 컴포넌트만 non-nullable로 남아
+ * 호출부 3곳(teams·matches·team-matches 상세)이 각자 `?? '-'`를 재구현했었다.
+ */
 export function AdminSummaryItem({
   icon,
   label,
@@ -34,15 +38,18 @@ export function AdminSummaryItem({
 }: {
   icon: ReactNode;
   label: string;
-  value: string | number;
+  value: string | number | null | undefined;
 }) {
+  const isEmpty = value === null || value === undefined || value === '';
   return (
     <div className="flex items-center justify-between gap-3 rounded-xl bg-[var(--surface-soft)] px-4 py-3">
       <dt className="flex min-w-0 items-center gap-2 text-sm font-semibold text-[var(--text-muted)]">
         <span className="shrink-0 text-gray-400" aria-hidden="true">{icon}</span>
         <span className="truncate">{label}</span>
       </dt>
-      <dd className="shrink-0 text-sm font-bold tabular-nums text-[var(--text-strong)]">{value}</dd>
+      <dd className="shrink-0 text-sm font-bold tabular-nums text-[var(--text-strong)]">
+        {isEmpty ? '-' : value}
+      </dd>
     </div>
   );
 }

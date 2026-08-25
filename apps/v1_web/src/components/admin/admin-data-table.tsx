@@ -255,7 +255,12 @@ export function AdminDataTable<T>({
                       stickyActions ? 'sticky right-0 z-[5] bg-[var(--card-surface)] border-l border-[var(--border)]' : '',
                     ].filter(Boolean).join(' ')}
                   >
-                    <div className="flex items-center justify-end gap-2">
+                    {/* 액션 클릭이 행 클릭(onRowClick)으로 전파되면 버튼을 눌렀는데 상세로
+                        이동한다 — 소비자마다 stopPropagation 을 복제하는 대신 여기서 끊는다. */}
+                    <div
+                      className="flex items-center justify-end gap-2"
+                      onClick={onRowClick ? (event) => event.stopPropagation() : undefined}
+                    >
                       {renderActions!(row)}
                     </div>
                   </td>
@@ -298,7 +303,31 @@ export function AdminDataTable<T>({
             return (
             <li
               key={keyExtractor(row)}
-              className={['bg-[var(--card-surface)] rounded-xl border border-[var(--border)] px-4 py-3', tone ? ROW_TONE_TR[tone] : '', tone ? ROW_TONE_ACCENT[tone] : ''].filter(Boolean).join(' ')}
+              // 데스크톱 <tr>과 같은 행 진입 계약 — 모바일이 본무대인데 카드 스택에만
+              // 클릭 배선이 없어 목록→상세 진입이 데스크톱 전용이었다.
+              {...(onRowClick
+                ? {
+                    onClick: () => onRowClick(row),
+                    onKeyDown: (event: KeyboardEvent<HTMLLIElement>) => {
+                      if (event.key !== 'Enter' && event.key !== ' ') return;
+                      // 카드 안의 버튼·링크에서 올라온 키 입력까지 행 클릭으로 삼키지 않는다.
+                      if (event.target !== event.currentTarget) return;
+                      event.preventDefault();
+                      onRowClick(row);
+                    },
+                    tabIndex: 0,
+                    role: 'button' as const,
+                    'aria-label': rowClickLabel?.(row),
+                  }
+                : {})}
+              className={[
+                'bg-[var(--card-surface)] rounded-xl border border-[var(--border)] px-4 py-3',
+                onRowClick
+                  ? 'cursor-pointer transition-colors hover:bg-[var(--surface-soft)]/60 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:-outline-offset-2'
+                  : '',
+                tone ? ROW_TONE_TR[tone] : '',
+                tone ? ROW_TONE_ACCENT[tone] : '',
+              ].filter(Boolean).join(' ')}
             >
               <dl className="flex flex-col gap-1.5">
                 {columns.map((col) => (
@@ -313,7 +342,10 @@ export function AdminDataTable<T>({
                 ))}
               </dl>
               {hasActions && (
-                <div className="mt-3 flex items-center gap-2 justify-end border-t border-[var(--border)] pt-2.5">
+                <div
+                  className="mt-3 flex items-center gap-2 justify-end border-t border-[var(--border)] pt-2.5"
+                  onClick={onRowClick ? (event) => event.stopPropagation() : undefined}
+                >
                   {renderActions!(row)}
                 </div>
               )}

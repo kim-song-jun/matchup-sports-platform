@@ -11,7 +11,6 @@ import {
 import type { V1AdminTeamMatchRow } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { useAdminListQuery } from '@/hooks/use-admin-list-query';
-import { Activity, Clock, Calendar } from 'lucide-react';
 import {
   AdminPageHeader,
   AdminFilterBar,

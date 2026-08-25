@@ -24,8 +24,16 @@ import {
   useV1UpdateLeagueFixture,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
 import { fromDatetimeLocalValue, toDatetimeLocalValue } from '@/components/team-schedules/team-schedules.view-model';
 import { RecentVenueChips } from '@/components/v1-ui/create-form-fields';
+import {
+  computeDailyPlan,
+  dayOffsetLabel,
+  groupPreviewByMatchday,
+  suggestGamesPerTeamPerDay,
+  type DailyPlan,
+} from './league-fixture-timing.view-model';
 import type { V1GenerateLeagueFixturesPayload, V1LeagueFixture, V1PreviewLeagueFixturesResult } from '@/types/league-match';
 
 const inputClass =
@@ -97,6 +105,14 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
   const [dayOfWeek, setDayOfWeek] = useState<number | ''>('');
   const [time, setTime] = useState('18:00');
   const [placeName, setPlaceName] = useState('');
+  // 대진 timing(2026-08-25 사용자 확정: C안 시간창 역산 + B안 계산기·타임라인). 기존 필드처럼
+  // 생성·재생성 두 폼이 같은 상태를 공유한다. ''=미입력 — 경기 시간이 비어 있으면 timing을
+  // 아예 안 보내 기존 동작(같은 주차 동시 시각)을 유지한다. 종료 시각은 서버로 가지 않고
+  // 팀당 하루 경기 수 역산 제안에만 쓴다.
+  const [endTime, setEndTime] = useState('');
+  const [gameDurationMinutes, setGameDurationMinutes] = useState('');
+  const [breakMinutes, setBreakMinutes] = useState('');
+  const [gamesPerTeamPerDay, setGamesPerTeamPerDay] = useState('');
   // R12: 취소 확인 대상 대진. null이면 모달을 닫는다.
   const [cancelTarget, setCancelTarget] = useState<V1LeagueFixture | null>(null);
   // R13: 대진 재생성 확인 모달 열림 상태.
@@ -142,11 +158,86 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
   // generate/regenerate/preview 세 호출이 전부 같은 폼 상태(weeksCount/dayOfWeek/time/
   // placeName)에서 같은 모양의 body를 만든다 — 세 곳에서 조립 규칙이 갈리면(예: 트림 여부)
   // "미리보기는 통과했는데 실제 생성은 다르게 실패"가 생긴다.
+  // 서버 DTO가 @IsInt라 '15.5'·'1e2' 같은 값은 400으로 튕긴다 — 정수 문자열만 값으로
+  // 인정하고, "비어 있지 않은데 정수가 아님"은 제출 전에 별도로 걸러 안내한다.
+  const parseOptionalInt = (value: string): number | null => {
+    const trimmed = value.trim();
+    return /^\d+$/.test(trimmed) ? Number(trimmed) : null;
+  };
+  const isInvalidIntInput = (value: string) => value.trim() !== '' && !/^\d+$/.test(value.trim());
+  const hasInvalidTimingInput = [gameDurationMinutes, breakMinutes, gamesPerTeamPerDay].some(isInvalidIntInput);
+  const durationValue = parseOptionalInt(gameDurationMinutes);
+  const breakValue = parseOptionalInt(breakMinutes);
+  const gamesPerDayValue = parseOptionalInt(gamesPerTeamPerDay);
+  const teamCount = series.teamIds.length;
+
+  // C안: 시간창(시작~종료)과 경기 시간이 다 있으면 팀당 하루 경기 수를 역산해 제안한다.
+  // 정수가 아닌 입력이 하나라도 있으면 제안·계산 카드를 아예 숨긴다 — ?? 폴백(휴식 0·팀당 1)으로
+  // 계산하면 사용자가 입력한 값과 다른 결과를 "정상 계산"처럼 보여주게 된다.
+  const timingSuggestion =
+    !hasInvalidTimingInput && dayOfWeek !== '' && time.trim() !== '' && endTime.trim() !== '' && durationValue !== null
+      ? suggestGamesPerTeamPerDay({
+          startTime: time,
+          endTime,
+          gameDurationMinutes: durationValue,
+          breakMinutes: breakValue ?? 0,
+          teamCount,
+        })
+      : null;
+  // teamCount < 2면 제안이 null인 원인이 시간창이 아니라 참가팀 부족이다 — 그때 이 경고를
+  // 띄우면 운영자가 엉뚱한 원인(시간창)을 고치게 된다. 팀 부족은 생성 시도 시 서버 422
+  // 메시지('리그에 등록된 팀이 2개 미만이에요')가 정확한 원인을 알려준다.
+  const showTimingNoFit =
+    !hasInvalidTimingInput && teamCount >= 2 &&
+    dayOfWeek !== '' && time.trim() !== '' && endTime.trim() !== '' && durationValue !== null && timingSuggestion === null;
+  // B안: 현재 폼 값 그대로의 "하루 운영 계산" — 팀당 경기 수를 안 채웠으면 서버 기본값 1로 보여준다.
+  const dailyPlan =
+    !hasInvalidTimingInput && durationValue !== null
+      ? computeDailyPlan({
+          gameDurationMinutes: durationValue,
+          breakMinutes: breakValue ?? 0,
+          gamesPerTeamPerDay: gamesPerDayValue ?? 1,
+          teamCount,
+          startTime: dayOfWeek !== '' && time.trim() !== '' ? time : undefined,
+        })
+      : null;
+
   const buildFixtureFormPayload = (): V1GenerateLeagueFixturesPayload => ({
     weeksCount,
     ...(dayOfWeek === '' ? {} : { schedule: { dayOfWeek, time } }),
     ...(placeName.trim() === '' ? {} : { placeName: placeName.trim() }),
+    ...(durationValue === null
+      ? {}
+      : {
+          timing: {
+            gameDurationMinutes: durationValue,
+            ...(breakValue === null ? {} : { breakMinutes: breakValue }),
+            ...(gamesPerDayValue === null ? {} : { gamesPerTeamPerDay: gamesPerDayValue }),
+          },
+        }),
   });
+
+  // 경기 시간 없이 휴식/팀당 경기 수만 채우면 서버가 400을 낸다(timing.gameDurationMinutes 필수) —
+  // 요일-시각 짝 검증과 같은 방식으로 제출 전에 먼저 알려준다. 정수가 아닌 입력도 여기서 차단한다
+  // (parseOptionalInt가 null로 만들면 timing이 조용히 누락돼 더 나쁘다).
+  const validateTimingInputs = (): boolean => {
+    if (hasInvalidTimingInput) {
+      showToast('경기 시간·휴식·팀당 하루 경기 수는 정수로만 입력할 수 있어요.', 'error');
+      return false;
+    }
+    if (durationValue === null && (breakValue !== null || gamesPerDayValue !== null)) {
+      showToast('경기 시간(분)을 입력해야 휴식·팀당 하루 경기 수를 쓸 수 있어요.', 'error');
+      return false;
+    }
+    // 서버 DTO 범위(@Min/@Max)와 동일한 상한을 제출 전에 안내한다 — number input의
+    // min/max 속성은 직접 타이핑을 막지 못한다.
+    const inRange = (value: number | null, min: number, max: number) => value === null || (value >= min && value <= max);
+    if (!inRange(durationValue, 5, 240) || !inRange(breakValue, 0, 120) || !inRange(gamesPerDayValue, 1, 10)) {
+      showToast('경기 시간은 5~240분, 휴식은 0~120분, 팀당 하루 경기는 1~10 사이로 입력해주세요.', 'error');
+      return false;
+    }
+    return true;
+  };
 
   // 감사 결함 2: 서버가 응답에 실어 준 경고(현재는 ODD_TEAM_COUNT_BYE 하나)를 성공 메시지에
   // 이어 붙인다 — AdminToast는 success/error 두 톤뿐이라 별도 토스트를 추가로 띄우지 않고,
@@ -161,6 +252,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
       showToast('요일을 골랐으면 시각도 입력해 주세요.', 'error');
       return;
     }
+    if (!validateTimingInputs()) return;
     try {
       const result = await generateFixtures.mutateAsync(buildFixtureFormPayload());
       showToast(appendFixtureWarnings(`대진 ${result.createdCount}경기를 만들었어요.`, result.warnings), 'success');
@@ -178,6 +270,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
       showToast('요일을 골랐으면 시각도 입력해 주세요.', 'error');
       return;
     }
+    if (!validateTimingInputs()) return;
     try {
       const result = await previewFixtures.mutateAsync(buildFixtureFormPayload());
       setPreviewResult(result);
@@ -368,6 +461,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
       showToast('요일을 골랐으면 시각도 입력해 주세요.', 'error');
       return;
     }
+    if (!validateTimingInputs()) return;
     regenerateFixtures.mutate(
       { ...buildFixtureFormPayload(), reason },
       {
@@ -487,7 +581,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
               </select>
             </div>
             <div>
-              <label htmlFor="fixture-time" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">시각</label>
+              <label htmlFor="fixture-time" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">시작 시각</label>
               <input
                 id="fixture-time"
                 type="time"
@@ -497,6 +591,18 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                 className={`${inputClass} w-36 disabled:opacity-50`}
               />
             </div>
+            <FixtureTimingFields
+              idPrefix="fixture"
+              dayOfWeekUnset={dayOfWeek === ''}
+              endTime={endTime}
+              onEndTimeChange={setEndTime}
+              gameDurationMinutes={gameDurationMinutes}
+              onGameDurationChange={setGameDurationMinutes}
+              breakMinutes={breakMinutes}
+              onBreakMinutesChange={setBreakMinutes}
+              gamesPerTeamPerDay={gamesPerTeamPerDay}
+              onGamesPerTeamPerDayChange={setGamesPerTeamPerDay}
+            />
             <div>
               <label htmlFor="fixture-place-name" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">기본 장소</label>
               <input
@@ -528,6 +634,12 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
               라운드로빈 대진 생성
             </button>
           </div>
+          <TimingSuggestionRow
+            suggestion={timingSuggestion}
+            showNoFit={showTimingNoFit}
+            onApply={(games) => setGamesPerTeamPerDay(String(games))}
+          />
+          {dailyPlan !== null && <DailyPlanCard plan={dailyPlan} />}
           <RecentVenueChips
             items={(series.recentVenues ?? []).map((venue) => ({ placeName: venue }))}
             selectedValue={placeName}
@@ -536,7 +648,8 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
           <FixturePreviewPanel result={previewResult} teamNameById={teamNameById} />
           <p className="text-xs text-[var(--text-muted)]">
             요일·시각을 정하면 매주 그 요일 그 시각으로 채워요. 비워두면 시작일 그대로 매주 반복돼요.
-            생성 후 특정 주만 다르면 아래 표에서 개별 수정하면 돼요.
+            경기 시간(분)을 넣으면 그날 경기들이 휴식 간격으로 연달아 배치되고, 종료 시각까지 넣으면
+            팀당 하루 경기 수를 계산해 제안해요. 생성 후 특정 주만 다르면 아래 표에서 개별 수정하면 돼요.
           </p>
         </div>
       ) : (
@@ -577,7 +690,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                 </select>
               </div>
               <div>
-                <label htmlFor="regen-time" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">시각</label>
+                <label htmlFor="regen-time" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">시작 시각</label>
                 <input
                   id="regen-time"
                   type="time"
@@ -587,6 +700,18 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                   className={`${inputClass} w-36 disabled:opacity-50`}
                 />
               </div>
+              <FixtureTimingFields
+                idPrefix="regen"
+                dayOfWeekUnset={dayOfWeek === ''}
+                endTime={endTime}
+                onEndTimeChange={setEndTime}
+                gameDurationMinutes={gameDurationMinutes}
+                onGameDurationChange={setGameDurationMinutes}
+                breakMinutes={breakMinutes}
+                onBreakMinutesChange={setBreakMinutes}
+                gamesPerTeamPerDay={gamesPerTeamPerDay}
+                onGamesPerTeamPerDayChange={setGamesPerTeamPerDay}
+              />
               <div>
                 <label htmlFor="regen-place-name" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">기본 장소</label>
                 <input
@@ -616,6 +741,14 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
               >
                 대진 재생성
               </button>
+            </div>
+            <div className="mt-3 flex flex-col gap-3">
+              <TimingSuggestionRow
+                suggestion={timingSuggestion}
+                showNoFit={showTimingNoFit}
+                onApply={(games) => setGamesPerTeamPerDay(String(games))}
+              />
+              {dailyPlan !== null && <DailyPlanCard plan={dailyPlan} />}
             </div>
             <FixturePreviewPanel result={previewResult} teamNameById={teamNameById} />
           </div>
@@ -935,10 +1068,13 @@ function FixturePreviewPanel({
   teamNameById: Map<string, string>;
 }) {
   if (result === null) return null;
+  // timing을 보내면 서버가 경기별 matchday/endAt을 채워준다 — 그때는 flat 테이블 대신
+  // 매치데이별 타임라인(B안)로 렌더한다. 레거시 응답(필드 없음)은 기존 테이블 유지.
+  const isTimingPreview = result.fixtures.some((fixture) => fixture.matchday !== undefined && fixture.endAt != null);
   return (
     <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
       <p className="mb-1 text-sm font-semibold text-[var(--text-strong)]">
-        미리보기 — {result.rounds}주 · {result.fixtureCount}경기 · 기본 장소 &quot;{result.placeName}&quot;
+        미리보기 — {result.matchdayCount ?? result.rounds}주 · {result.fixtureCount}경기 · 기본 장소 &quot;{result.placeName}&quot;
       </p>
       {result.warnings.length > 0 && (
         <div className="mb-3 flex items-start gap-2 rounded-lg bg-[var(--tint-orange)] px-3 py-2 text-xs text-[var(--orange700)]">
@@ -946,28 +1082,212 @@ function FixturePreviewPanel({
           <span>{result.warnings.map((w) => w.message).join(' ')}</span>
         </div>
       )}
-      <div className="max-h-64 overflow-y-auto rounded-lg border border-[var(--border)]">
-        <table className="w-full text-left text-xs">
-          <thead className="sticky top-0 bg-[var(--card-surface)] text-[var(--text-muted)]">
-            <tr>
-              <th className="px-3 py-2 font-medium">주차</th>
-              <th className="px-3 py-2 font-medium">대진</th>
-              <th className="px-3 py-2 font-medium">일시</th>
-            </tr>
-          </thead>
-          <tbody>
-            {result.fixtures.map((fixture, index) => (
-              <tr key={`${fixture.round}-${fixture.homeTeamId}-${fixture.awayTeamId}-${index}`} className="border-t border-[var(--border)]">
-                <td className="px-3 py-2 text-[var(--text-muted)]">{fixture.round}주차</td>
-                <td className="px-3 py-2 text-[var(--text-strong)]">
-                  {teamNameById.get(fixture.homeTeamId) ?? '홈팀'} vs {teamNameById.get(fixture.awayTeamId) ?? '원정팀'}
-                </td>
-                <td className="px-3 py-2 text-[var(--text-muted)]">{formatPreviewDateTime(fixture.startAt)}</td>
+      {isTimingPreview ? (
+        <div className="max-h-80 overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--card-surface)]">
+          {groupPreviewByMatchday(result.fixtures).map((group) => (
+            <div key={group.matchday}>
+              <p className="border-t border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-xs font-semibold text-[var(--text-strong)] first:border-t-0">
+                {group.matchday}주차 — {formatKstDateShort(group.items[0].startAt)} · {group.items.length}경기
+              </p>
+              {group.items.map((fixture, index) => (
+                <div
+                  key={`${fixture.round}-${fixture.homeTeamId}-${fixture.awayTeamId}-${index}`}
+                  className="flex items-center gap-3 border-t border-[var(--border)] px-3 py-1.5 text-xs"
+                >
+                  <span className="w-[96px] shrink-0 tabular-nums text-[var(--text-muted)]">
+                    {formatKstTime(fixture.startAt)}~{fixture.endAt != null ? formatKstTime(fixture.endAt) : ''}
+                  </span>
+                  <span aria-hidden="true" className="h-5 w-[3px] shrink-0 rounded bg-blue-500/60" />
+                  <span className="text-[var(--text-strong)]">
+                    {teamNameById.get(fixture.homeTeamId) ?? '홈팀'} vs {teamNameById.get(fixture.awayTeamId) ?? '원정팀'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="max-h-64 overflow-y-auto rounded-lg border border-[var(--border)]">
+          <table className="w-full text-left text-xs">
+            <thead className="sticky top-0 bg-[var(--card-surface)] text-[var(--text-muted)]">
+              <tr>
+                <th className="px-3 py-2 font-medium">주차</th>
+                <th className="px-3 py-2 font-medium">대진</th>
+                <th className="px-3 py-2 font-medium">일시</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {result.fixtures.map((fixture, index) => (
+                <tr key={`${fixture.round}-${fixture.homeTeamId}-${fixture.awayTeamId}-${index}`} className="border-t border-[var(--border)]">
+                  <td className="px-3 py-2 text-[var(--text-muted)]">{fixture.round}주차</td>
+                  <td className="px-3 py-2 text-[var(--text-strong)]">
+                    {teamNameById.get(fixture.homeTeamId) ?? '홈팀'} vs {teamNameById.get(fixture.awayTeamId) ?? '원정팀'}
+                  </td>
+                  <td className="px-3 py-2 text-[var(--text-muted)]">{formatPreviewDateTime(fixture.startAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// 대진 timing 입력 4종(종료 시각 + 경기 시간·휴식·팀당 하루 경기). 생성·재생성 두 폼이 같은
+// 마크업을 공유한다 — 부모의 flex-wrap 행 안에서 fragment 자식들이 그대로 flex 아이템이 된다.
+function FixtureTimingFields({
+  idPrefix,
+  dayOfWeekUnset,
+  endTime,
+  onEndTimeChange,
+  gameDurationMinutes,
+  onGameDurationChange,
+  breakMinutes,
+  onBreakMinutesChange,
+  gamesPerTeamPerDay,
+  onGamesPerTeamPerDayChange,
+}: {
+  idPrefix: string;
+  dayOfWeekUnset: boolean;
+  endTime: string;
+  onEndTimeChange: (value: string) => void;
+  gameDurationMinutes: string;
+  onGameDurationChange: (value: string) => void;
+  breakMinutes: string;
+  onBreakMinutesChange: (value: string) => void;
+  gamesPerTeamPerDay: string;
+  onGamesPerTeamPerDayChange: (value: string) => void;
+}) {
+  return (
+    <>
+      <div>
+        <label htmlFor={`${idPrefix}-end-time`} className="mb-1 block text-sm font-medium text-[var(--text-strong)]">종료 시각</label>
+        <input
+          id={`${idPrefix}-end-time`}
+          type="time"
+          value={endTime}
+          onChange={(e) => onEndTimeChange(e.target.value)}
+          disabled={dayOfWeekUnset}
+          className={`${inputClass} w-28 disabled:opacity-50`}
+        />
       </div>
+      <div>
+        <label htmlFor={`${idPrefix}-game-duration`} className="mb-1 block text-sm font-medium text-[var(--text-strong)]">경기 시간(분)</label>
+        <input
+          id={`${idPrefix}-game-duration`}
+          type="number"
+          min={5}
+          max={240}
+          placeholder="예: 15"
+          value={gameDurationMinutes}
+          onChange={(e) => onGameDurationChange(e.target.value)}
+          className={`${inputClass} w-28`}
+        />
+      </div>
+      <div>
+        <label htmlFor={`${idPrefix}-break-minutes`} className="mb-1 block text-sm font-medium text-[var(--text-strong)]">휴식(분)</label>
+        <input
+          id={`${idPrefix}-break-minutes`}
+          type="number"
+          min={0}
+          max={120}
+          placeholder="0"
+          value={breakMinutes}
+          onChange={(e) => onBreakMinutesChange(e.target.value)}
+          className={`${inputClass} w-24`}
+        />
+      </div>
+      <div>
+        <label htmlFor={`${idPrefix}-games-per-day`} className="mb-1 block text-sm font-medium text-[var(--text-strong)]">팀당 하루 경기</label>
+        <input
+          id={`${idPrefix}-games-per-day`}
+          type="number"
+          min={1}
+          max={10}
+          placeholder="1"
+          value={gamesPerTeamPerDay}
+          onChange={(e) => onGamesPerTeamPerDayChange(e.target.value)}
+          className={`${inputClass} w-28`}
+        />
+      </div>
+    </>
+  );
+}
+
+// C안: 시간창 역산 제안. 제안이 없더라도 "한 라운드도 못 치르는 창"이면 그 사실을 알려준다 —
+// 조용히 사라지면 운영자는 왜 제안이 안 뜨는지 알 수 없다.
+function TimingSuggestionRow({
+  suggestion,
+  showNoFit,
+  onApply,
+}: {
+  suggestion: { gamesPerTeamPerDay: number; plan: DailyPlan } | null;
+  showNoFit: boolean;
+  onApply: (games: number) => void;
+}) {
+  if (suggestion === null) {
+    if (!showNoFit) return null;
+    return (
+      <div className="flex items-start gap-2 rounded-lg bg-[var(--tint-orange)] px-3 py-2 text-xs text-[var(--orange700)]">
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+        <span>이 시간창엔 한 라운드도 못 치러요. 종료 시각을 늦추거나 경기 시간·휴식을 줄여주세요.</span>
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-[var(--tint-blue-border)] px-3 py-2 text-xs text-[var(--text-strong)]">
+      <span>
+        이 시간창이면 <b>팀당 {suggestion.gamesPerTeamPerDay}경기 · 하루 {suggestion.plan.totalGamesPerDay}경기</b> 가능해요
+        {suggestion.plan.lastGameEndTime !== null && (
+          <> — {dayOffsetLabel(suggestion.plan.daysLater)}{suggestion.plan.lastGameEndTime} 종료</>
+        )}
+      </span>
+      <button
+        type="button"
+        onClick={() => onApply(suggestion.gamesPerTeamPerDay)}
+        className="min-h-[36px] rounded-lg border border-[var(--border-strong)] px-3 text-xs font-semibold text-[var(--text-strong)] hover:border-blue-500 hover:text-[var(--blue700)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+      >
+        이대로 적용
+      </button>
+    </div>
+  );
+}
+
+function formatMinutesLabel(totalMinutes: number) {
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours === 0) return `${minutes}분`;
+  return minutes === 0 ? `${hours}시간` : `${hours}시간 ${minutes}분`;
+}
+
+// B안: 하루 운영 계산 카드 — 현재 폼 값이 만들 하루치 스케줄을 입력 즉시 요약한다.
+function DailyPlanCard({ plan }: { plan: DailyPlan }) {
+  return (
+    <div className="rounded-2xl border border-[var(--tint-blue-border)] bg-[var(--tint-blue)] p-4">
+      <p className="mb-2 text-sm font-semibold text-[var(--text-strong)]">하루 운영 계산</p>
+      <dl className="flex flex-wrap gap-x-6 gap-y-2">
+        <div>
+          <dt className="text-xs text-[var(--text-muted)]">하루 총 경기</dt>
+          <dd className="m-0 text-lg font-bold tabular-nums text-[var(--blue700)]">{plan.totalGamesPerDay}경기</dd>
+        </div>
+        {plan.lastGameEndTime !== null && (
+          <div>
+            <dt className="text-xs text-[var(--text-muted)]">마지막 경기 종료</dt>
+            <dd className="m-0 text-lg font-bold tabular-nums text-[var(--blue700)]">
+              {dayOffsetLabel(plan.daysLater)}{plan.lastGameEndTime}
+            </dd>
+          </div>
+        )}
+        <div>
+          <dt className="text-xs text-[var(--text-muted)]">총 소요</dt>
+          <dd className="m-0 text-lg font-bold tabular-nums text-[var(--blue700)]">{formatMinutesLabel(plan.totalMinutes)}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-[var(--text-muted)]">팀당</dt>
+          <dd className="m-0 text-lg font-bold tabular-nums text-[var(--blue700)]">{plan.gamesPerTeamPerDay}경기</dd>
+        </div>
+      </dl>
     </div>
   );
 }

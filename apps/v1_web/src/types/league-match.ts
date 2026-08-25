@@ -211,12 +211,24 @@ export interface V1LeagueFixtureScheduleTemplate {
   time: string;
 }
 
+/** "한 구장 순차 진행" 설정 — 서버 LeagueFixtureTimingDto와 동일 계약. */
+export interface V1LeagueFixtureTimingPayload {
+  /** 경기당 소요 시간(분), 5~240. */
+  gameDurationMinutes: number;
+  /** 경기 간 휴식(분), 0~120. 생략 시 서버 기본 0. */
+  breakMinutes?: number;
+  /** 팀당 매치데이(하루) 경기 수, 1~10. 생략 시 서버 기본 1. */
+  gamesPerTeamPerDay?: number;
+}
+
 export interface V1GenerateLeagueFixturesPayload {
   weeksCount: number;
   /** 지정하지 않으면 시작일 그대로(자정) 매주 반복하는 기존 동작을 유지한다. */
   schedule?: V1LeagueFixtureScheduleTemplate;
   /** 지정하지 않으면 서버 기본값('장소 미정')을 사용한다. */
   placeName?: string;
+  /** 지정하지 않으면 기존 동작(같은 주차 전 경기 동일 시각·endAt 없음)을 유지한다. */
+  timing?: V1LeagueFixtureTimingPayload;
 }
 
 /** 그룹 B 감사 결함 2 — 서버가 명시적으로 알려주는 대진 생성 부수효과 경고. 지금은
@@ -242,11 +254,19 @@ export interface V1PreviewLeagueFixture {
   homeTeamId: string;
   awayTeamId: string;
   startAt: string;
+  /** timing 지정 시 라운드 G개가 묶인 매치데이(주차). 구버전 서버 응답엔 없다. */
+  matchday?: number;
+  /** timing 지정 시 그 매치데이 안의 경기 순번. timing 미지정이면 null, 구버전 서버 응답엔 필드 자체가 없다. */
+  orderInDay?: number | null;
+  /** timing 지정 시 경기 종료 시각. timing 미지정이면 null, 구버전 서버 응답엔 필드 자체가 없다. */
+  endAt?: string | null;
 }
 
 export interface V1PreviewLeagueFixturesResult {
   leagueId: string;
   rounds: number;
+  /** timing 지정 시 실제 주차(매치데이) 수 — rounds(라운드 수)와 달라진다. 구버전 서버 응답엔 없다. */
+  matchdayCount?: number;
   fixtureCount: number;
   placeName: string;
   fixtures: V1PreviewLeagueFixture[];

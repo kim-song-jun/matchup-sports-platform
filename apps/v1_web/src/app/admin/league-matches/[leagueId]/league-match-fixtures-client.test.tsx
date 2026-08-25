@@ -336,7 +336,7 @@ describe('LeagueMatchFixturesClient', () => {
     );
 
     fireEvent.change(screen.getByLabelText('요일'), { target: { value: '6' } });
-    fireEvent.change(screen.getByLabelText('시각'), { target: { value: '19:30' } });
+    fireEvent.change(screen.getByLabelText('시작 시각'), { target: { value: '19:30' } });
     fireEvent.change(screen.getByLabelText('기본 장소'), { target: { value: '상암 풋살파크' } });
     fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
 
@@ -364,7 +364,7 @@ describe('LeagueMatchFixturesClient', () => {
     );
 
     fireEvent.change(screen.getByLabelText('요일'), { target: { value: '6' } });
-    fireEvent.change(screen.getByLabelText('시각'), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText('시작 시각'), { target: { value: '' } });
     fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
 
     await waitFor(() => expect(screen.getByText('요일을 골랐으면 시각도 입력해 주세요.')).toBeInTheDocument());
@@ -965,5 +965,244 @@ describe('LeagueMatchFixturesClient', () => {
       ),
     );
     expect(recordMutate).not.toHaveBeenCalled();
+  });
+});
+
+// 대진 timing(경기 시간·휴식·팀당 하루 경기 수) — C안(시간창 역산) + B안(계산기 카드·타임라인) 결합.
+describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
+  beforeEach(() => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1CancelLeagueFixtureMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
+    useV1RegenerateLeagueFixturesMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
+    useV1RevertLeagueCompletionMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
+    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+    useV1AdminLeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1',
+        title: '심야 풋살 리그',
+        state: 'draft',
+        teamIds: ['t1', 't2', 't3', 't4'],
+        fixtures: [],
+      },
+      isPending: false,
+    } as never);
+    useV1AdminLeagueTeamsMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1',
+        teams: [
+          { teamId: 't1', name: '독수리FC', status: 'active', memberCount: 5, logoUrl: null },
+          { teamId: 't2', name: '호랑이FC', status: 'active', memberCount: 5, logoUrl: null },
+          { teamId: 't3', name: '사자FC', status: 'active', memberCount: 5, logoUrl: null },
+          { teamId: 't4', name: '표범FC', status: 'active', memberCount: 5, logoUrl: null },
+        ],
+      },
+    } as never);
+  });
+
+  it('경기 시간·휴식·팀당 하루 경기를 채우고 생성하면 timing을 함께 전달한다', async () => {
+    const mutateAsync = vi.fn().mockResolvedValue({ leagueId: 'league-1', createdCount: 6, teamMatchIds: [], warnings: [] });
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync, isPending: false } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    fireEvent.change(screen.getByLabelText('요일'), { target: { value: '3' } });
+    fireEvent.change(screen.getByLabelText('시작 시각'), { target: { value: '22:00' } });
+    fireEvent.change(screen.getByLabelText('경기 시간(분)'), { target: { value: '15' } });
+    fireEvent.change(screen.getByLabelText('휴식(분)'), { target: { value: '5' } });
+    fireEvent.change(screen.getByLabelText('팀당 하루 경기'), { target: { value: '3' } });
+    fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+
+    await waitFor(() =>
+      expect(mutateAsync).toHaveBeenCalledWith({
+        weeksCount: 7,
+        schedule: { dayOfWeek: 3, time: '22:00' },
+        timing: { gameDurationMinutes: 15, breakMinutes: 5, gamesPerTeamPerDay: 3 },
+      }),
+    );
+  });
+
+  it('이용 종료 시각까지 넣으면 팀당 경기 수를 역산 제안하고 "이대로 적용"이 값을 채운다', () => {
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    fireEvent.change(screen.getByLabelText('요일'), { target: { value: '3' } });
+    fireEvent.change(screen.getByLabelText('시작 시각'), { target: { value: '22:00' } });
+    fireEvent.change(screen.getByLabelText('종료 시각'), { target: { value: '00:00' } });
+    fireEvent.change(screen.getByLabelText('경기 시간(분)'), { target: { value: '15' } });
+    fireEvent.change(screen.getByLabelText('휴식(분)'), { target: { value: '5' } });
+
+    expect(screen.getByText(/팀당 3경기 · 하루 6경기/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '이대로 적용' }));
+    expect((screen.getByLabelText('팀당 하루 경기') as HTMLInputElement).value).toBe('3');
+
+    // B안 결합: 하루 운영 계산 카드가 종료 시각까지 보여준다.
+    expect(screen.getByText('하루 운영 계산')).toBeInTheDocument();
+    expect(screen.getAllByText(/23:55/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/1시간 55분/).length).toBeGreaterThan(0);
+  });
+
+  it('경기 시간 없이 팀당 하루 경기만 넣고 생성하면 안내 토스트를 띄우고 제출하지 않는다', async () => {
+    const mutateAsync = vi.fn();
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync, isPending: false } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    fireEvent.change(screen.getByLabelText('팀당 하루 경기'), { target: { value: '3' } });
+    fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+
+    expect(await screen.findByText(/경기 시간\(분\)을 입력/)).toBeInTheDocument();
+    expect(mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('경기 시간이 서버 허용 범위(5~240분)를 벗어나면 범위 안내 토스트를 띄우고 제출하지 않는다', async () => {
+    const mutateAsync = vi.fn();
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync, isPending: false } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    fireEvent.change(screen.getByLabelText('경기 시간(분)'), { target: { value: '300' } });
+    fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+
+    expect(await screen.findByText(/5~240분/)).toBeInTheDocument();
+    expect(mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('참가팀이 2개 미만이면 "시간창" 경고를 띄우지 않는다(원인은 팀 부족이지 시간창이 아님)', () => {
+    useV1AdminLeagueMatchMock.mockReturnValue({
+      data: { leagueId: 'league-1', title: '외로운 리그', state: 'draft', teamIds: ['t1'], fixtures: [] },
+      isPending: false,
+    } as never);
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    fireEvent.change(screen.getByLabelText('요일'), { target: { value: '3' } });
+    fireEvent.change(screen.getByLabelText('시작 시각'), { target: { value: '22:00' } });
+    fireEvent.change(screen.getByLabelText('종료 시각'), { target: { value: '00:00' } });
+    fireEvent.change(screen.getByLabelText('경기 시간(분)'), { target: { value: '15' } });
+
+    expect(screen.queryByText(/한 라운드도 못 치러요/)).not.toBeInTheDocument();
+  });
+
+  it('휴식에 정수가 아닌 값이 있으면 계산 카드·역산 제안을 숨긴다(폴백 값으로 잘못 계산해 보여주지 않음)', () => {
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    fireEvent.change(screen.getByLabelText('경기 시간(분)'), { target: { value: '15' } });
+    expect(screen.getByText('하루 운영 계산')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('휴식(분)'), { target: { value: '5.5' } });
+    expect(screen.queryByText('하루 운영 계산')).not.toBeInTheDocument();
+  });
+
+  it('경기 시간에 소수를 입력하면 정수 안내 토스트를 띄우고 제출하지 않는다', async () => {
+    const mutateAsync = vi.fn();
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync, isPending: false } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    fireEvent.change(screen.getByLabelText('경기 시간(분)'), { target: { value: '15.5' } });
+    fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+
+    expect(await screen.findByText(/정수로만 입력/)).toBeInTheDocument();
+    expect(mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('재생성 확인 모달에서도 timing 선제 검증이 동작한다(경기 시간 없이 팀당만 입력하면 미호출)', async () => {
+    useV1AdminLeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1',
+        title: '심야 풋살 리그',
+        state: 'active',
+        teamIds: ['t1', 't2'],
+        fixtures: [
+          { teamMatchId: 'tm-1', title: '심야 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched' },
+        ],
+      },
+      isPending: false,
+    } as never);
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    const regenMutate = vi.fn();
+    useV1RegenerateLeagueFixturesMock.mockReturnValue({ mutate: regenMutate, isPending: false } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    fireEvent.change(screen.getByLabelText('팀당 하루 경기'), { target: { value: '3' } });
+    fireEvent.click(screen.getAllByRole('button', { name: '대진 재생성' })[0]);
+    fireEvent.change(
+      screen.getByPlaceholderText('이 작업이 왜 필요한지 남겨 주세요. 감사 로그에 그대로 기록돼요.'),
+      { target: { value: '테스트 재생성' } },
+    );
+    fireEvent.change(screen.getByPlaceholderText('재생성'), { target: { value: '재생성' } });
+    fireEvent.click(screen.getAllByRole('button', { name: '대진 재생성' })[screen.getAllByRole('button', { name: '대진 재생성' }).length - 1]);
+
+    expect(await screen.findByText(/경기 시간\(분\)을 입력/)).toBeInTheDocument();
+    expect(regenMutate).not.toHaveBeenCalled();
+  });
+
+  it('timing 미리보기 응답은 매치데이 타임라인으로 렌더된다', async () => {
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    const previewMutateAsync = vi.fn().mockResolvedValue({
+      leagueId: 'league-1',
+      rounds: 3,
+      matchdayCount: 1,
+      fixtureCount: 6,
+      placeName: '베이컨 풋살장',
+      fixtures: [
+        { round: 1, matchday: 1, orderInDay: 1, homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-02T13:00:00.000Z', endAt: '2026-09-02T13:15:00.000Z' },
+        { round: 1, matchday: 1, orderInDay: 2, homeTeamId: 't3', awayTeamId: 't4', startAt: '2026-09-02T13:20:00.000Z', endAt: '2026-09-02T13:35:00.000Z' },
+      ],
+      warnings: [],
+    });
+    useV1PreviewLeagueFixturesMock.mockReturnValue({ mutateAsync: previewMutateAsync, isPending: false } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '미리보기' }));
+
+    // KST(TZ 고정): 13:00Z = 22:00, 매치데이 헤더 + 경기별 시간 범위.
+    expect(await screen.findByText(/1주 · 6경기/)).toBeInTheDocument();
+    expect(screen.getByText(/1주차/)).toBeInTheDocument();
+    expect(screen.getByText('22:00~22:15')).toBeInTheDocument();
+    expect(screen.getByText('22:20~22:35')).toBeInTheDocument();
+    expect(screen.getByText('독수리FC vs 호랑이FC')).toBeInTheDocument();
   });
 });

@@ -87,11 +87,46 @@ describe('선수 카드', () => {
     expect(screen.getAllByText(/브론즈/).length).toBeGreaterThan(0);
   });
 
-  it('다음에 무엇을 하면 열리는지 한 가지만 안내한다', () => {
-    renderCard(card());
+  it('다음에 무엇을 하면 열리는지 한 가지만 안내한다 (본인)', () => {
+    renderCard(card(), true);
 
     expect(screen.getByText('후기 3개를 더 받으면 열려요')).toBeInTheDocument();
     expect(screen.getByText('3 / 6 열림')).toBeInTheDocument();
+  });
+
+  it('남이 보는 카드에는 진행도·해금 안내를 그리지 않는다', () => {
+    // 진행도는 카드 주인에게 하는 말이다 -- 남의 프로필에서 보이면 소음이다.
+    // 잠긴 이유가 궁금한 사람에게는 뒷면(산식·잠금 사유)이 말한다.
+    renderCard(card(), false);
+
+    expect(screen.queryByText('후기 3개를 더 받으면 열려요')).not.toBeInTheDocument();
+    expect(screen.queryByText('3 / 6 열림')).not.toBeInTheDocument();
+    // 뒤집기·공유 같은 중립 요소는 남에게도 남는다.
+    expect(screen.getByRole('button', { name: /카드 뒤집기/ })).toBeInTheDocument();
+  });
+
+  it('0경기 카드는 자물쇠 벽 대신 여정 면을 그린다 (A안)', () => {
+    const { container } = renderCard(
+      card({
+        appearances: 0,
+        overall: null,
+        unlockedCount: 0,
+        stats: card().stats.map((s) => ({ ...s, value: null, unlocked: false, lockedBy: { type: 'appearances' as const, remaining: 3 } })),
+        nextUnlock: { code: 'APP', reason: { type: 'appearances', remaining: 1 } },
+      }),
+    );
+
+    // 앞면에 자물쇠 그리드가 없다 -- "잠긴 것 목록"이 첫 카드가 되면 안 된다.
+    expect(container.querySelector('.tm-player-card-stats')).toBeNull();
+    expect(screen.getByText('첫 경기를 기다리는 선수')).toBeInTheDocument();
+    expect(screen.getByText(/다음 목표 · 첫 경기 뛰기/)).toBeInTheDocument();
+    expect(container.querySelector('.tm-player-card')?.getAttribute('data-face')).toBe('journey');
+  });
+
+  it('기록이 있으면 다음 목표 한 줄이 카드 안에 보인다', () => {
+    renderCard(card());
+
+    expect(screen.getByText(/다음 목표 · 후기 3개 받기/)).toBeInTheDocument();
   });
 
   it('아직 한 경기도 안 뛴 사람에게 "더 뛰면" 이라고 말하지 않는다', () => {
@@ -112,6 +147,7 @@ describe('선수 카드', () => {
         ],
         nextUnlock: { code: 'APP', reason: { type: 'appearances', remaining: 1 } },
       }),
+      true,
     );
 
     expect(screen.getByText('첫 경기를 뛰면 기록이 쌓이기 시작해요')).toBeInTheDocument();
@@ -168,12 +204,13 @@ describe('선수 카드', () => {
       );
     });
 
-    it('남의 카드에서는 공개하라고 권하지 않는다', () => {
+    it('남의 카드에서는 공개 유도도 진행 안내도 하지 않는다', () => {
       renderCard(needsConsent, false);
 
       expect(screen.queryByRole('link', { name: '기록 공개하고 3개 열기' })).not.toBeInTheDocument();
-      // 다만 왜 잠겼는지는 남에게도 보인다 -- 카드가 왜 비었는지 알 수 없으면 오해가 생긴다.
-      expect(screen.getByText('기록 공개를 켜면 골·도움·출전이 한 번에 열려요')).toBeInTheDocument();
+      expect(screen.queryByText('기록 공개를 켜면 골·도움·출전이 한 번에 열려요')).not.toBeInTheDocument();
+      // 왜 잠겼는지는 뒷면이 남에게도 말한다 -- 카드가 왜 비었는지 오해하지 않게.
+      expect(screen.getByText(/골 · 기록 공개를 켜면 열려요/)).toBeInTheDocument();
     });
   });
 });

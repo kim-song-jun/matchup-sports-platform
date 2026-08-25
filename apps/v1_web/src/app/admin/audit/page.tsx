@@ -12,9 +12,11 @@ import { adminActionLabel, adminTargetTypeLabel } from '@/lib/admin-labels';
 import {
   AdminDataTable,
   AdminEmpty,
+  AdminFilterBar,
   AdminPageHeader,
   AdminStatusPill,
 } from '@/components/admin';
+import { useAdminListQuery } from '@/hooks/use-admin-list-query';
 
 // ── Types ─────────────────────────────────────────────────────────────────
 /** 필터 칩으로 고를 수 있는 값. 서버가 기록하는 targetType 전체가 아니라 자주 쓰는 것만이다. */
@@ -250,12 +252,13 @@ function StatusLogDetailModal({
 function ActionLogPanel({ targetType }: { targetType: TargetTypeFilter }) {
   // 커서 누적("더 보기") 대신 페이지 단위 교체다. 로그는 "어디쯤 보고 있는지"와 총량을
   // 알아야 조사가 되는데, 누적 목록은 그 감각을 주지 못한다.
-  const [page, setPage] = useState(1);
+  // 페이지 상태·리셋·pagination 조립은 공용 훅 소관 — 두 패널이 각자 재구현하던 로직.
+  const { page, resetToFirstPage, buildPagination } = useAdminListQuery({ pageSize: PAGE_SIZE });
   const [selected, setSelected] = useState<V1AdminLog | null>(null);
 
   useEffect(() => {
-    setPage(1);
-  }, [targetType]);
+    resetToFirstPage();
+  }, [targetType, resetToFirstPage]);
 
   const filters: AdminListFilters = {
     ...(targetType ? { targetType } : {}),
@@ -333,18 +336,7 @@ function ActionLogPanel({ targetType }: { targetType: TargetTypeFilter }) {
         skeletonRows={8}
         onRowClick={setSelected}
         rowClickLabel={(row) => `${adminActionLabel(row.actionType)} 로그 상세 보기`}
-        pagination={
-          pageInfo?.totalPages
-            ? {
-                page: pageInfo.page ?? page,
-                totalPages: pageInfo.totalPages,
-                total: pageInfo.total ?? 0,
-                limit: pageInfo.limit ?? PAGE_SIZE,
-                onPageChange: setPage,
-                loading: isFetching,
-              }
-            : undefined
-        }
+        pagination={buildPagination(pageInfo, isFetching)}
       />
 
       <ActionLogDetailModal log={selected} onClose={() => setSelected(null)} />
@@ -354,12 +346,12 @@ function ActionLogPanel({ targetType }: { targetType: TargetTypeFilter }) {
 
 // ── Status change log panel ───────────────────────────────────────────────
 function StatusLogPanel({ targetType }: { targetType: TargetTypeFilter }) {
-  const [page, setPage] = useState(1);
+  const { page, resetToFirstPage, buildPagination } = useAdminListQuery({ pageSize: PAGE_SIZE });
   const [selected, setSelected] = useState<V1AdminStatusChangeLog | null>(null);
 
   useEffect(() => {
-    setPage(1);
-  }, [targetType]);
+    resetToFirstPage();
+  }, [targetType, resetToFirstPage]);
 
   const filters: AdminListFilters = {
     ...(targetType ? { targetType } : {}),
@@ -450,18 +442,7 @@ function StatusLogPanel({ targetType }: { targetType: TargetTypeFilter }) {
         skeletonRows={8}
         onRowClick={setSelected}
         rowClickLabel={(row) => `${adminTargetTypeLabel(row.targetType)} 상태 변경 상세 보기`}
-        pagination={
-          pageInfo?.totalPages
-            ? {
-                page: pageInfo.page ?? page,
-                totalPages: pageInfo.totalPages,
-                total: pageInfo.total ?? 0,
-                limit: pageInfo.limit ?? PAGE_SIZE,
-                onPageChange: setPage,
-                loading: isFetching,
-              }
-            : undefined
-        }
+        pagination={buildPagination(pageInfo, isFetching)}
       />
 
       <StatusLogDetailModal log={selected} onClose={() => setSelected(null)} />
@@ -518,32 +499,17 @@ export default function AdminAuditPage() {
         })}
       </div>
 
-      {/* ── Target type filter chips ──────────────────────────────── */}
-      <div
-        role="group"
-        aria-label="대상 유형 필터"
-        className="flex items-center gap-1.5 flex-wrap mb-5"
-      >
-        {TARGET_TYPE_OPTIONS.map((opt) => {
-          const isActive = targetType === opt.value;
-          return (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => setTargetType(opt.value)}
-              aria-pressed={isActive}
-              className={[
-                'inline-flex items-center px-3 min-h-[44px] rounded-full text-[length:var(--font-size-label)] font-medium transition-colors',
-                'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
-                isActive
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-[var(--card-surface)] border border-[var(--border)] text-[var(--text-muted)] hover:border-blue-300 hover:text-[var(--blue700)]',
-              ].join(' ')}
-            >
-              {opt.label}
-            </button>
-          );
-        })}
+      {/* ── Target type filter chips — 수제 칩을 공용 AdminFilterBar 로 교체.
+          마크업이 AdminFilterBar 의 statusOptions 렌더와 구조적으로 동일했다. ── */}
+      <div className="mb-5">
+        <AdminFilterBar
+          hideSearch
+          searchValue=""
+          onSearchChange={() => undefined}
+          statusOptions={TARGET_TYPE_OPTIONS}
+          activeStatus={targetType}
+          onStatusChange={(value) => setTargetType(value as TargetTypeFilter)}
+        />
       </div>
 
       {/* ── Tab panels ───────────────────────────────────────────── */}

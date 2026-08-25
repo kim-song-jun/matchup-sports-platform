@@ -1425,7 +1425,11 @@ export class PublicTournamentRecordsService {
         revision: revision.revision,
         state: revision.state,
         officialAt: revision.officialAt?.toISOString() ?? null,
-        reason: revision.reason,
+        // 리그 결과 입력·정정 경로는 감사용 코드 마커("[LEAGUE_RESULT_ENTRY] ...",
+        // league-match-result-entry.service.ts)를 reason 앞에 붙여 저장한다 — 관전자
+        // 화면(결과 변경 이력)에 그대로 나가면 기술 문구다(alpha 실측 2026-08-25).
+        // 표시에서만 마커를 벗긴다 — DB 의 감사 기록 원문은 그대로다.
+        reason: revision.reason === null ? null : revision.reason.replace(/^\[[A-Z0-9_]+\]\s*/, ''),
         isCorrection: revision.supersedesId !== null,
       })),
       videos: teamMatch.videos.map((video) => ({ id: video.id, title: video.title, url: video.url })),

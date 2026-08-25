@@ -21,6 +21,7 @@ import {
   useV1UpdateAdminNotice,
 } from '@/hooks/use-v1-api';
 import { useTemporaryContentAssets } from '@/hooks/use-temporary-content-assets';
+import { useAdminListQuery } from '@/hooks/use-admin-list-query';
 import { extractErrorMessage } from '@/lib/error-message';
 import { EMPTY_RICH_CONTENT, isRichContentEmpty, resolveRichContent, richContentPlainText } from '@/lib/rich-content';
 import type {
@@ -84,12 +85,24 @@ function formatDateTime(value: string | null | undefined) {
 const PAGE_SIZE = 20;
 
 export default function AdminNoticesPage() {
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [activeStatus, setActiveStatus] = useState('');
+  // 검색 debounce·상태 필터·page 리셋은 공용 훅이 담당 (M1 표준) — 이 페이지가
+  // 손으로 재구현하던 바로 그 로직이다(훅 자체 주석이 경고하는 5벌 복제).
+  const {
+    search,
+    setSearch,
+    activeStatus,
+    setActiveStatus,
+    page,
+    setPage,
+    resetToFirstPage,
+    filters: listFilters,
+    buildPagination,
+  } = useAdminListQuery({ pageSize: PAGE_SIZE });
+  // audience 는 훅 범위 밖의 추가 필터 — 훅과 같은 이유로 바뀌면 첫 페이지로.
   const [activeAudience, setActiveAudience] = useState('');
-  // 커서 누적 대신 페이지 단위 교체다 — 목록 어디쯤인지와 총량이 보여야 한다.
-  const [page, setPage] = useState(1);
+  useEffect(() => {
+    resetToFirstPage();
+  }, [activeAudience, resetToFirstPage]);
 
   const [title, setTitle] = useState('');
   const [content, setContent] = useState(EMPTY_RICH_CONTENT);
@@ -102,21 +115,9 @@ export default function AdminNoticesPage() {
   const { data: adminMe } = useV1AdminMe();
   const canWrite = adminMe?.capabilities.includes('status:write') ?? false;
 
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
-    return () => clearTimeout(timer);
-  }, [search]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [debouncedSearch, activeStatus, activeAudience]);
-
   const filters: AdminListFilters = {
-    ...(debouncedSearch ? { q: debouncedSearch } : {}),
-    ...(activeStatus ? { status: activeStatus } : {}),
+    ...listFilters,
     ...(activeAudience ? { audience: activeAudience } : {}),
-    page,
-    limit: PAGE_SIZE,
   };
 
   const { data: firstPage, isPending, isFetching, isError, error, refetch } =
@@ -263,18 +264,7 @@ export default function AdminNoticesPage() {
             onRetry={() => void refetch()}
             empty={<AdminEmpty title="공지사항이 없어요" description="조건에 맞는 공지가 없어요." />}
             skeletonRows={8}
-            pagination={
-              pageInfo?.totalPages
-                ? {
-                    page: pageInfo.page ?? page,
-                    totalPages: pageInfo.totalPages,
-                    total: pageInfo.total ?? 0,
-                    limit: pageInfo.limit ?? PAGE_SIZE,
-                    onPageChange: setPage,
-                    loading: isFetching,
-                  }
-                : undefined
-            }
+            pagination={buildPagination(pageInfo, isFetching)}
             renderActions={(row) => (
               <button
                 type="button"

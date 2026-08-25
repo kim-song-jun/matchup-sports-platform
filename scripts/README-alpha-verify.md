@@ -44,6 +44,7 @@ export ALPHA_SESSION_TOKEN='v1.<payload>.<signature>'
 | `verify-alpha-og-card.mjs` | 선수 카드 OG 이미지가 **사용자별로 다른 그림**인지 판정. 여러 id 의 응답 바이트를 sha 로 비교해 전원이 같은 폴백을 받는 상태를 잡는다 — HTTP 200·PNG 까지는 통과하므로 상태코드만 보면 못 잡는다 | 불필요 |
 | `capture-league-fixture-record.mjs` | 리그 경기 상세의 **대회 패리티 본문**(스코어·정정 배지·경기 기록·정정 이력) — 기록 API(`.../fixtures/:id/record`)의 round/scoreStatus/videos 를 먼저 찍고 예정·완료 경기를 3폭 캡처. `LEAGUE_HINT` 로 대상 리그 지정 | 불필요 |
 | `verify-alpha-league-video.mjs` | 리그 경기 영상 **전 구간 릴레이**: 어드민 목록(주차 라벨) → 링크 등록(재실행 시 중복 건너뜀) → 공개 기록 `videos` 반영 → 경기 상세·어드민 화면 캡처. 라우트가 모듈에 등록 안 된 채 배포돼 전부 404 였던 실사고(#755)를 잡으라고 있다 | 플랫폼 관리자 |
+| `verify-alpha-league-claim.mjs` | "내 기록 연결(claim)" 리그 확장(#770) 실측: 비인증 401 → 참가팀 멤버 목록 200(`gameId/version/participants` 계약) → **다른 리그 id 교차 조회 404**(스코프 게이트) → 경기 상세 배너 3폭 + 모달 캡처. 계정이 참가팀 멤버인 기록 공개 대진을 자동 탐색한다 | 참가팀 멤버 |
 | `wait-alpha-serves-commit.mjs` | alpha 의 `x-teameet-commit` 이 지정 커밋을 **조상으로 포함**할 때까지 대기 — 배포 창(502·구 에셋)에서 측정해 멀쩡한 화면을 결함으로 오진하는 것을 막는 실측 전 게이트. `node scripts/wait-alpha-serves-commit.mjs <commit> [maxPolls] [intervalMs]` | 불필요 |
 
 ```bash

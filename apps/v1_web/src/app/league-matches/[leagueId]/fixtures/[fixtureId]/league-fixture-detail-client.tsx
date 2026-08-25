@@ -164,7 +164,20 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
   const awayName = fixture.awayTeamId === null ? '상대팀 미정' : awayRow?.teamName ?? '상대팀 정보 없음';
 
   const viewerState = getViewerState(teamMatchQuery.data);
-  const isParticipant = viewerState === 'host_team' || viewerState === 'approved';
+  // 리그 대진의 신청서는 운영자가 일괄 생성한다 — away 팀 팀장은 '신청서를 낸 사람'이
+  // 아니라서 viewerState 가 'approved' 가 되지 않는다(alpha 실측: A팀 팀장인데 카드
+  // 미노출). 결과 승인 게이트가 쓰는 manageableHostTeam/manageableOpponentTeam 과
+  // 참가팀 멤버 판정(participantMember)을 함께 본다.
+  const viewer = teamMatchQuery.data?.viewer;
+  const isParticipant =
+    viewerState === 'host_team' ||
+    viewerState === 'approved' ||
+    viewer?.manageableHostTeam === true ||
+    viewer?.manageableOpponentTeam === true ||
+    viewer?.participantMember === true;
+  // 채팅 개설 권한은 기존 팀매치 상세와 같은 기준(host_team/approved)을 유지한다 —
+  // 서버 resolve 가 그 밖의 뷰어를 허용하는지 검증된 바 없어 403 버튼을 만들지 않는다.
+  const canChat = viewerState === 'host_team' || viewerState === 'approved';
 
   const openChat = () => {
     setChatError('');
@@ -243,9 +256,11 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
         <Card pad={16}>
           <h2 className="text-sm font-bold text-[var(--text-strong)]">우리 팀 경기</h2>
           <div className="mt-3 flex flex-col gap-2">
-            <button type="button" className="tm-btn tm-btn-lg tm-btn-neutral" disabled={resolveChatRoom.isPending} onClick={openChat}>
-              {resolveChatRoom.isPending ? '연결 중' : '상대팀과 채팅'}
-            </button>
+            {canChat ? (
+              <button type="button" className="tm-btn tm-btn-lg tm-btn-neutral" disabled={resolveChatRoom.isPending} onClick={openChat}>
+                {resolveChatRoom.isPending ? '연결 중' : '상대팀과 채팅'}
+              </button>
+            ) : null}
             {chatError ? <p role="alert" className="text-sm text-red-700 dark:text-red-300">{chatError}</p> : null}
             <Link href={`/team-matches/${fixtureId}/lineup`} className="tm-btn tm-btn-lg tm-btn-neutral">
               라인업 관리

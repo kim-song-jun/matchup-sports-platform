@@ -90,7 +90,7 @@ describe('MyLeaguesPageClient — 팀별 순위·다음 경기 노출', () => {
     expect(screen.queryByText(/0점/)).not.toBeInTheDocument();
   });
 
-  it('nextFixture 가 있으면 해당 팀매치 상세로 가는 링크를 보여준다', () => {
+  it('nextFixture 가 있으면 리그 경기 상세로 가는 링크를 보여준다', () => {
     apiMocks.useV1MyLeagues.mockReturnValue({
       data: {
         items: [
@@ -119,7 +119,7 @@ describe('MyLeaguesPageClient — 팀별 순위·다음 경기 노출', () => {
     render(<MyLeaguesPageClient />);
 
     const link = screen.getByRole('link', { name: '성수 러너스 FC 다음 경기 상세로 이동' });
-    expect(link).toHaveAttribute('href', '/team-matches/tm-42');
+    expect(link).toHaveAttribute('href', '/league-matches/league-1/fixtures/tm-42');
     expect(link).toHaveTextContent('마포 유나이티드');
   });
 

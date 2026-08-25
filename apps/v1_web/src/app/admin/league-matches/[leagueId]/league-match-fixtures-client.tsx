@@ -558,7 +558,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                 id="fixture-day-of-week"
                 value={dayOfWeek}
                 onChange={(e) => setDayOfWeek(e.target.value === '' ? '' : Number(e.target.value))}
-                className={`${inputClass} w-32`}
+                className={`${inputClass} w-40`}
               >
                 <option value="">시작일 그대로</option>
                 {WEEKDAY_OPTIONS.map((option) => (
@@ -574,7 +574,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                 value={time}
                 onChange={(e) => setTime(e.target.value)}
                 disabled={dayOfWeek === ''}
-                className={`${inputClass} w-28 disabled:opacity-50`}
+                className={`${inputClass} w-36 disabled:opacity-50`}
               />
             </div>
             <FixtureTimingFields
@@ -667,7 +667,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                   id="regen-day-of-week"
                   value={dayOfWeek}
                   onChange={(e) => setDayOfWeek(e.target.value === '' ? '' : Number(e.target.value))}
-                  className={`${inputClass} w-32`}
+                  className={`${inputClass} w-40`}
                 >
                   <option value="">시작일 그대로</option>
                   {WEEKDAY_OPTIONS.map((option) => (
@@ -683,7 +683,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                   value={time}
                   onChange={(e) => setTime(e.target.value)}
                   disabled={dayOfWeek === ''}
-                  className={`${inputClass} w-28 disabled:opacity-50`}
+                  className={`${inputClass} w-36 disabled:opacity-50`}
                 />
               </div>
               <FixtureTimingFields

@@ -209,17 +209,17 @@ describe('LeagueMatchStandingsClient', () => {
     await waitFor(() => expect(screen.getByText('진행 중')).toBeInTheDocument());
 
     // R1: 경기 일정 행 — 팀 이름은 standings 매핑으로 채워지고, 행 전체가 team-matches 링크다.
-    const scheduled = container.querySelector('a[href="/team-matches/tm-10"]');
+    const scheduled = container.querySelector('a[href="/league-matches/league-1/fixtures/tm-10"]');
     expect(scheduled).toBeInTheDocument();
     expect(scheduled?.textContent).toContain('성수 FC');
     expect(scheduled?.textContent).toContain('망원 FC');
     expect(scheduled?.textContent).toContain('예정');
 
-    const scored = container.querySelector('a[href="/team-matches/tm-11"]');
+    const scored = container.querySelector('a[href="/league-matches/league-1/fixtures/tm-11"]');
     expect(scored?.textContent).toContain('3 : 1');
 
     // 스코어 필드가 undefined(레인 C 병행 작업 중)여도 깨지지 않고 안전한 폴백을 보여준다.
-    const pendingResult = container.querySelector('a[href="/team-matches/tm-12"]');
+    const pendingResult = container.querySelector('a[href="/league-matches/league-1/fixtures/tm-12"]');
     expect(pendingResult?.textContent).toContain('결과 대기');
     expect(pendingResult?.textContent).toContain('상대팀 미정');
     expect(pendingResult?.textContent).toContain('장소 미정');
@@ -257,7 +257,7 @@ describe('LeagueMatchStandingsClient', () => {
     expect(screen.getByText('최종 순위')).toBeInTheDocument();
   });
 
-  it('미확정 경기 목록의 각 항목이 team-matches 상세 링크로 연결된다', async () => {
+  it('미확정 경기 목록의 각 항목이 리그 경기 상세 링크로 연결된다', async () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1LeagueMatchMock.mockReturnValue({
       data: { leagueId: 'league-1', title: '가을 리그', state: 'active', startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1', 't2'], fixtures: [] },
@@ -282,7 +282,7 @@ describe('LeagueMatchStandingsClient', () => {
     );
 
     await waitFor(() => expect(screen.getByText('확인 중')).toBeInTheDocument());
-    const pendingLink = container.querySelector('a[href="/team-matches/tm-1"]');
+    const pendingLink = container.querySelector('a[href="/league-matches/league-1/fixtures/tm-1"]');
     expect(pendingLink).toBeInTheDocument();
     expect(pendingLink?.textContent).toContain('성수 FC');
     expect(pendingLink?.textContent).toContain('망원 FC');
@@ -373,7 +373,7 @@ describe('LeagueMatchStandingsClient', () => {
     const rowByHref = (teamMatchId: string) => {
       const row = screen
         .getAllByRole('link')
-        .find((link) => link.getAttribute('href') === `/team-matches/${teamMatchId}`);
+        .find((link) => link.getAttribute('href') === `/league-matches/league-1/fixtures/${teamMatchId}`);
       if (!row) throw new Error(`fixture row not found: ${teamMatchId}`);
       return row;
     };
@@ -730,16 +730,16 @@ describe('LeagueMatchStandingsClient', () => {
     );
 
     // 필터를 켜지 않아도 다음 경기 행에는 뱃지가 붙는다.
-    await waitFor(() => expect(container.querySelector('a[href="/team-matches/tm-next"]')).toBeInTheDocument());
-    const nextLink = container.querySelector('a[href="/team-matches/tm-next"]');
+    await waitFor(() => expect(container.querySelector('a[href="/league-matches/league-1/fixtures/tm-next"]')).toBeInTheDocument());
+    const nextLink = container.querySelector('a[href="/league-matches/league-1/fixtures/tm-next"]');
     expect(nextLink?.textContent).toContain('다음 경기');
-    const pastLinkBefore = container.querySelector('a[href="/team-matches/tm-past"]');
+    const pastLinkBefore = container.querySelector('a[href="/league-matches/league-1/fixtures/tm-past"]');
     expect(pastLinkBefore).toBeInTheDocument();
 
     // "예정만" 필터를 누르면 이미 끝난 경기가 화면에서 사라진다.
     fireEvent.click(screen.getByRole('button', { name: '예정만' }));
-    await waitFor(() => expect(container.querySelector('a[href="/team-matches/tm-past"]')).not.toBeInTheDocument());
-    expect(container.querySelector('a[href="/team-matches/tm-next"]')).toBeInTheDocument();
+    await waitFor(() => expect(container.querySelector('a[href="/league-matches/league-1/fixtures/tm-past"]')).not.toBeInTheDocument());
+    expect(container.querySelector('a[href="/league-matches/league-1/fixtures/tm-next"]')).toBeInTheDocument();
   });
   /**
    * 재검토에서 잡힌 판정 불일치 — isUpcomingFixture 가 "취소 아님 + 스코어 없음"만 보던 시절엔
@@ -781,14 +781,14 @@ describe('LeagueMatchStandingsClient', () => {
     );
 
     // "다음 경기" 뱃지는 결과 대기 행이 아니라 진짜 예정 경기에 붙어야 한다.
-    await waitFor(() => expect(container.querySelector('a[href="/team-matches/tm-upcoming"]')).toBeInTheDocument());
-    expect(container.querySelector('a[href="/team-matches/tm-upcoming"]')?.textContent).toContain('다음 경기');
-    expect(container.querySelector('a[href="/team-matches/tm-awaiting"]')?.textContent).not.toContain('다음 경기');
+    await waitFor(() => expect(container.querySelector('a[href="/league-matches/league-1/fixtures/tm-upcoming"]')).toBeInTheDocument());
+    expect(container.querySelector('a[href="/league-matches/league-1/fixtures/tm-upcoming"]')?.textContent).toContain('다음 경기');
+    expect(container.querySelector('a[href="/league-matches/league-1/fixtures/tm-awaiting"]')?.textContent).not.toContain('다음 경기');
 
     // "예정만"을 켜면 결과 대기 행도 함께 걷힌다 — 화면에 찍힌 문구와 필터 기준이 일치해야 한다.
     fireEvent.click(screen.getByRole('button', { name: '예정만' }));
-    await waitFor(() => expect(container.querySelector('a[href="/team-matches/tm-awaiting"]')).not.toBeInTheDocument());
-    expect(container.querySelector('a[href="/team-matches/tm-upcoming"]')).toBeInTheDocument();
+    await waitFor(() => expect(container.querySelector('a[href="/league-matches/league-1/fixtures/tm-awaiting"]')).not.toBeInTheDocument());
+    expect(container.querySelector('a[href="/league-matches/league-1/fixtures/tm-upcoming"]')).toBeInTheDocument();
   });
 
   it('이슈 1: 같은 시리즈의 다른 시즌·티어로 가는 링크를 보여준다', async () => {
@@ -895,8 +895,8 @@ describe('LeagueMatchStandingsClient', () => {
     await waitFor(() => expect(screen.getAllByText('1 : 0')).toHaveLength(2));
     expect(screen.getByText('(관례 스코어)')).toBeInTheDocument();
 
-    const forfeitRow = container.querySelector('a[href="/team-matches/tm-1"]');
-    const realRow = container.querySelector('a[href="/team-matches/tm-2"]');
+    const forfeitRow = container.querySelector('a[href="/league-matches/league-1/fixtures/tm-1"]');
+    const realRow = container.querySelector('a[href="/league-matches/league-1/fixtures/tm-2"]');
     expect(forfeitRow?.textContent).toContain('관례 스코어');
     expect(realRow?.textContent).not.toContain('관례 스코어');
   });

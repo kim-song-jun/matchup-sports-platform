@@ -107,7 +107,14 @@ function TeamMatchCreateFloatingButton() {
  */
 function teamMatchOpponentLabel(mode: TeamMatchDetailViewModel['mode'], match: TeamMatchDetailViewModel['match']) {
   if (mode === 'pending') return '검토 중';
-  if (mode === 'approved') return '승인 완료';
+  if (mode === 'approved') {
+    // 승인된 시점부터 상대는 확정이다 — 팀 이름 자리에 신청 상태("승인 완료")를 넣으면
+    // 정작 누구와 붙는지가 화면에서 사라진다(2026-08-25 사용자 보고). applicantTeams에는
+    // 승인된 팀(=이 뷰어의 팀) 하나가 '승인 완료' 상태로 담겨 온다 — 아래 closed 분기와
+    // 같은 소스다. 이름을 못 찾는 예외 상황에서만 기존 상태 문구로 물러난다.
+    const approvedOpponent = match.applicantTeams.find((team) => team.status === '승인 완료');
+    return approvedOpponent?.name ?? '승인 완료';
+  }
   if (mode === 'mine') return '신청팀';
   if (match.status === 'closed') {
     // approvedOpponentTeam이 있으면 applicantTeams에 그 팀 하나만 '승인 완료' 상태로 담겨
@@ -195,8 +202,9 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
         <div className="tm-text-body-lg" style={{ marginTop: 2 }}>{match.hostTeam}</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 5 }}>
           <span className="tm-badge tm-badge-blue">{match.sport}</span>
-          <span className="tm-badge tm-badge-grey">{match.grade}등급</span>
-          {match.hostTeamTrustState && match.hostTeamTrustState !== 'none' ? (
+          {/* 등급 미입력(리그 대진 등 levelLabel 없음)이면 값 없는 "등급" 배지가 뜬다 — 숨긴다. */}
+          {match.grade ? <span className="tm-badge tm-badge-grey">{match.grade}등급</span> : null}
+          {match.hostTeamTrustState && trustStateLabel(match.hostTeamTrustState) ? (
             <span className="tm-badge tm-badge-blue">{trustStateLabel(match.hostTeamTrustState)}</span>
           ) : null}
           {/* 리그 상세 페이지는 앱 안에 진입점이 전혀 없었다(직접 URL 만) -- 이 링크가
@@ -316,7 +324,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
               <div className="tm-info-group">
                 <div className="tm-info-group-label">경기 조건</div>
                 <InfoRow label="종목" value={match.sport} />
-                <InfoRow label="실력등급" value={`${match.grade}등급`} />
+                <InfoRow label="실력등급" value={match.grade ? `${match.grade}등급` : '미정'} />
                 <InfoRow label="경기방식" value={match.format} />
                 <InfoRow label="경기 스타일" value={match.style} />
                 <InfoRow label="유니폼 색상" value={match.uniform} />
@@ -722,9 +730,10 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
       <div style={{ padding: 16 }}>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           <span className="tm-badge tm-badge-blue">{match.sport}</span>
-          <span className="tm-badge tm-badge-grey">{match.grade}등급</span>
-          <span className="tm-badge tm-badge-grey">{match.format}</span>
-          <span className="tm-badge tm-badge-grey">{match.gender}</span>
+          {/* 값이 비면 내용 없는 회색 알약만 남는다(리그 대진은 등급·경기방식 미입력이 기본) — 숨긴다. */}
+          {match.grade ? <span className="tm-badge tm-badge-grey">{match.grade}등급</span> : null}
+          {match.format ? <span className="tm-badge tm-badge-grey">{match.format}</span> : null}
+          {match.gender ? <span className="tm-badge tm-badge-grey">{match.gender}</span> : null}
           {/* 리그전 배지: 상태(모집중/마감)가 아니라 카테고리라 중립 grey 를 쓴다.
               컬러만으로 뜻을 전달하지 않도록 "리그전" 텍스트를 함께 싣는다(DESIGN.md 규칙).
               카드 전체가 이미 상세로 가는 Link라 <a>를 중첩하면 브라우저 파서가 바깥
@@ -1285,10 +1294,16 @@ function prevHref(step: TeamMatchCreateViewModel['step']) {
   return '/team-matches';
 }
 
-function trustStateLabel(trustState: string) {
+/**
+ * API TrustState('verified' | 'estimated' | 'sample' | 'none', types/api.ts)의 배지 라벨.
+ * 원래 gold/silver/bronze를 매핑하고 나머지를 원문 그대로 돌려줬는데, 그 등급은 API에
+ * 존재한 적이 없는 값이라 실제 화면엔 "estimated" 영문 원문이 그대로 떴다(2026-08-25
+ * 사용자 보고). 라벨은 공개 프로필(public-profile-client.tsx)·홈(home-client-model.ts)과
+ * 같은 낱말을 쓰고, 모르는 값은 null 로 돌려 배지 자체를 숨긴다 — 원문 노출 재발 방지.
+ */
+function trustStateLabel(trustState: string): string | null {
   if (trustState === 'verified') return '인증팀';
-  if (trustState === 'gold') return '골드';
-  if (trustState === 'silver') return '실버';
-  if (trustState === 'bronze') return '브론즈';
-  return trustState;
+  if (trustState === 'estimated') return '누적 중';
+  if (trustState === 'sample') return '샘플';
+  return null;
 }

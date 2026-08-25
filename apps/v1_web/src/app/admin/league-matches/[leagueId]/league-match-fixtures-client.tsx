@@ -183,8 +183,11 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
           teamCount,
         })
       : null;
+  // teamCount < 2면 제안이 null인 원인이 시간창이 아니라 참가팀 부족이다 — 그때 이 경고를
+  // 띄우면 운영자가 엉뚱한 원인(시간창)을 고치게 된다. 팀 부족은 생성 시도 시 서버 422
+  // 메시지('리그에 등록된 팀이 2개 미만이에요')가 정확한 원인을 알려준다.
   const showTimingNoFit =
-    !hasInvalidTimingInput &&
+    !hasInvalidTimingInput && teamCount >= 2 &&
     dayOfWeek !== '' && time.trim() !== '' && endTime.trim() !== '' && durationValue !== null && timingSuggestion === null;
   // B안: 현재 폼 값 그대로의 "하루 운영 계산" — 팀당 경기 수를 안 채웠으면 서버 기본값 1로 보여준다.
   const dailyPlan =

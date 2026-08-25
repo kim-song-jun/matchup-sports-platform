@@ -1084,6 +1084,27 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
     expect(mutateAsync).not.toHaveBeenCalled();
   });
 
+  it('참가팀이 2개 미만이면 "시간창" 경고를 띄우지 않는다(원인은 팀 부족이지 시간창이 아님)', () => {
+    useV1AdminLeagueMatchMock.mockReturnValue({
+      data: { leagueId: 'league-1', title: '외로운 리그', state: 'draft', teamIds: ['t1'], fixtures: [] },
+      isPending: false,
+    } as never);
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    fireEvent.change(screen.getByLabelText('요일'), { target: { value: '3' } });
+    fireEvent.change(screen.getByLabelText('시작 시각'), { target: { value: '22:00' } });
+    fireEvent.change(screen.getByLabelText('종료 시각'), { target: { value: '00:00' } });
+    fireEvent.change(screen.getByLabelText('경기 시간(분)'), { target: { value: '15' } });
+
+    expect(screen.queryByText(/한 라운드도 못 치러요/)).not.toBeInTheDocument();
+  });
+
   it('휴식에 정수가 아닌 값이 있으면 계산 카드·역산 제안을 숨긴다(폴백 값으로 잘못 계산해 보여주지 않음)', () => {
     useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
 

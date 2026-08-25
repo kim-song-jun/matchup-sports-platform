@@ -232,12 +232,22 @@ export class LeagueMatchDisputeService {
     // 읽기 전용이라 getActiveAdmin(변경 권한까지는 요구하지 않음) — 같은 모듈의
     // LeagueMatchAdminService.list() 와 동일한 게이트다.
     await this.adminContext.getActiveAdmin(user.id);
-    const disputes = await this.prisma.v1LeagueMatchDispute.findMany({
-      where: status === undefined ? {} : { status },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-    });
-    return { items: await this.enrichDisputeRows(disputes) };
+    const [disputes, grouped] = await Promise.all([
+      this.prisma.v1LeagueMatchDispute.findMany({
+        where: status === undefined ? {} : { status },
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+      }),
+      // 상태 탭 카운트는 현재 status 필터와 무관하게 전체 분포여야 한다 — 필터된
+      // where 를 재사용하면 활성 탭 외 두 탭이 항상 0으로 보인다.
+      this.prisma.v1LeagueMatchDispute.groupBy({
+        by: ['status'],
+        _count: { _all: true },
+      }),
+    ]);
+    const counts: Record<'open' | 'accepted' | 'rejected', number> = { open: 0, accepted: 0, rejected: 0 };
+    for (const g of grouped) counts[g.status] = g._count._all;
+    return { items: await this.enrichDisputeRows(disputes), counts };
   }
 
   /**

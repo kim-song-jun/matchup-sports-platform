@@ -13,7 +13,11 @@ import type { V1AdminLeagueMatchDisputeRow } from '@/types/league-match';
 import AdminLeagueMatchDisputesPage from './page';
 
 const { hooks, resolveMutate, rejectMutate } = vi.hoisted(() => ({
-  hooks: { rows: [] as V1AdminLeagueMatchDisputeRow[], lastStatusArg: undefined as string | undefined },
+  hooks: {
+    rows: [] as V1AdminLeagueMatchDisputeRow[],
+    counts: { open: 0, accepted: 0, rejected: 0 } as Record<'open' | 'accepted' | 'rejected', number>,
+    lastStatusArg: undefined as string | undefined,
+  },
   resolveMutate: vi.fn(),
   rejectMutate: vi.fn(),
 }));
@@ -22,7 +26,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminLeagueDisputes: (status?: string) => {
     hooks.lastStatusArg = status;
     return {
-      data: { items: hooks.rows },
+      data: { items: hooks.rows, counts: hooks.counts },
       isPending: false,
       isFetching: false,
       isError: false,
@@ -60,8 +64,12 @@ const ACCEPTED_ROW: V1AdminLeagueMatchDisputeRow = {
   resolution: 'correction',
 };
 
-function renderWith(rows: V1AdminLeagueMatchDisputeRow[]) {
+function renderWith(
+  rows: V1AdminLeagueMatchDisputeRow[],
+  counts: Record<'open' | 'accepted' | 'rejected', number> = { open: 0, accepted: 0, rejected: 0 },
+) {
   hooks.rows = rows;
+  hooks.counts = counts;
   return render(<AdminLeagueMatchDisputesPage />);
 }
 
@@ -75,8 +83,16 @@ describe('AdminLeagueMatchDisputesPage', () => {
     const user = userEvent.setup();
     renderWith([OPEN_ROW]);
 
-    await user.click(screen.getByRole('button', { name: '수락됨' }));
+    await user.click(screen.getByRole('button', { name: /수락됨/ }));
     expect(hooks.lastStatusArg).toBe('accepted');
+  });
+
+  it('상태 탭에 서버가 내려준 전체 분포 counts 를 표시한다', () => {
+    renderWith([OPEN_ROW], { open: 2, accepted: 1, rejected: 0 });
+
+    expect(screen.getByRole('button', { name: '처리 대기 2' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '수락됨 1' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '거부됨 0' })).toBeInTheDocument();
   });
 
   it('open 행에만 처리·거부 버튼이 보인다', () => {

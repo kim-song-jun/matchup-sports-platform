@@ -223,6 +223,17 @@ function AdminInquiriesPageContent() {
         eyebrow="콘텐츠"
         title="문의 관리"
         description="사용자 문의를 확인하고 답변 상태를 관리해요."
+        action={
+          // /admin/reports/teams 는 이 링크가 유일한 진입점이다 — 사이드바·허브 어디에도
+          // 없어 URL 직접 입력으로만 도달 가능한 고아 화면이었다(전수 감사 확인). 신고
+          // 문의를 다루는 이 화면이 신고 랭킹의 자연스러운 부모다.
+          <Link
+            href="/admin/reports/teams"
+            className="inline-flex h-[44px] items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-4 text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+          >
+            신고 누적 팀 랭킹
+          </Link>
+        }
       />
 
       <div className="flex flex-col gap-4">

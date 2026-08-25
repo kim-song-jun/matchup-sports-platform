@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import {
   AdminPageHeader,
   AdminFilterBar,
@@ -133,9 +134,15 @@ export default function AdminLeagueMatchDisputesPage() {
                 <div className="truncate font-medium text-[var(--text-strong)]">
                   {row.homeTeamName} vs {row.awayTeamName}
                 </div>
-                <div className="truncate text-[length:var(--font-size-micro)] text-[var(--text-muted)]">
+                {/* 이의를 처리하려면 대진 맥락(다른 경기 결과)을 봐야 할 때가 있는데,
+                    이 화면에서 리그 상세로 가는 길이 없어 목록에서 다시 찾아야 했다. */}
+                <Link
+                  href={`/admin/league-matches/${encodeURIComponent(row.leagueId)}`}
+                  className="inline-flex min-h-[44px] max-w-full items-center truncate text-[length:var(--font-size-micro)] text-[var(--blue700)] underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                  aria-label={`${row.leagueTitle} 리그 상세 보기`}
+                >
                   {row.leagueTitle}
-                </div>
+                </Link>
               </div>
             ),
           },

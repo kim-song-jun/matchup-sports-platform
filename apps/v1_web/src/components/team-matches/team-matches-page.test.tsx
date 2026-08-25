@@ -375,3 +375,43 @@ describe('상세 히어로 — 상대가 정해졌거나 끝난 매치는 "모�
     expect(screen.getByText('모집 중')).toBeInTheDocument();
   });
 });
+
+/**
+ * 2026-08-25 사용자 보고 — 상세 우측 홈팀 카드의 "이상한 글씨들":
+ * ① trustState 영문 원문("estimated")이 배지에 그대로 떴다 — API에 존재하지 않는
+ *    gold/silver/bronze만 매핑하고 나머지를 원문 fall-through 하던 죽은 테이블이 원인.
+ * ② 등급 미입력 매치(리그 대진 등 levelLabel 없음)는 값 없는 "등급" 배지가 떴다.
+ * ③ 승인된 뷰어의 히어로 상대팀 자리에 팀 이름 대신 신청 상태("승인 완료")가 떴다.
+ */
+describe('상세 홈팀 카드·히어로 — 표기 결함 회귀(2026-08-25)', () => {
+  it('trustState=estimated 는 영문 원문이 아니라 "누적 중"으로 표기한다', () => {
+    const model = getTeamMatchDetailViewModel('default');
+    model.match.hostTeamTrustState = 'estimated';
+
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    // hostTeamCard 는 모바일용·데스크톱용 두 위치에 렌더된다 — 개수는 세지 않는다.
+    expect(screen.getAllByText('누적 중').length).toBeGreaterThan(0);
+    expect(screen.queryByText('estimated')).not.toBeInTheDocument();
+  });
+
+  it('등급이 비어 있으면 값 없는 "등급" 배지를 만들지 않고 정보 행은 미정으로 채운다', () => {
+    const model = getTeamMatchDetailViewModel('default');
+    model.match.grade = '';
+
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    // 빈 grade 는 배지 텍스트가 접미사만 남은 "등급"이 된다 — 그 노드가 없어야 한다.
+    expect(screen.queryByText('등급')).not.toBeInTheDocument();
+    expect(screen.getByText('실력등급')).toBeInTheDocument();
+  });
+
+  it('승인 완료(approved) 뷰어의 히어로에는 상태 문구 대신 승인된 팀 이름이 뜬다', () => {
+    const model = getTeamMatchDetailViewModel('approved');
+    model.match.applicantTeams = [{ name: '브라보FC', meta: '승인된 상대팀', status: '승인 완료' }];
+
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    expect(screen.getByText('브라보FC')).toBeInTheDocument();
+  });
+});

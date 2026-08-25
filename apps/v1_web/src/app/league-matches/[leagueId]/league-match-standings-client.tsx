@@ -10,6 +10,7 @@ import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { extractErrorMessage } from '@/lib/error-message';
 import { LEAGUE_STATE_META } from '@/lib/league-state-meta';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
+import { fixtureResultLabel, fixtureStatusMeta, isUpcomingFixture, type TeamLookupEntry } from './league-fixture-meta';
 import type { V1LeagueChampionTeam, V1LeagueFixture } from '@/types/league-match';
 
 /**
@@ -33,25 +34,9 @@ const TIE_BREAK_LABELS: Record<string, string> = {
 };
 
 
-/**
- * 리그 대진(fixture)은 팀 매칭(team-match) 레코드 그대로다 — status는
- * V1TeamMatchApiStatus(모집 중/마감/매칭됨/취소됨/완료/기한 만료)와 같은 값을 쓴다.
- * 이 화면은 public 페이지라 관리자 전용 AdminStatusPill(components/admin — /admin
- * 라우트 밖에서 쓰인 전례가 없다)을 끌어오지 않고, team-matches-page.tsx 등 다른
- * public 화면이 이미 쓰는 "tm-badge 로컬 라벨 매핑" 관례를 그대로 따른다.
- */
-const FIXTURE_STATUS_META: Record<string, { label: string; badgeClass: string }> = {
-  recruiting: { label: '모집 중', badgeClass: 'tm-badge-blue' },
-  closed: { label: '마감', badgeClass: 'tm-badge-orange' },
-  matched: { label: '매칭됨', badgeClass: 'tm-badge-green' },
-  cancelled: { label: '취소됨', badgeClass: 'tm-badge-red' },
-  completed: { label: '완료', badgeClass: 'tm-badge-grey' },
-  expired: { label: '기한 만료', badgeClass: 'tm-badge-grey' },
-};
-
-function fixtureStatusMeta(status: string): { label: string; badgeClass: string } {
-  return FIXTURE_STATUS_META[status] ?? { label: status, badgeClass: 'tm-badge-grey' };
-}
+// FIXTURE_STATUS_META/fixtureStatusMeta/fixtureResultLabel/isUpcomingFixture 는
+// ./league-fixture-meta.ts 로 이동 — 리그 경기 상세(fixtures/[fixtureId])와 같은
+// 판정을 공유하기 위해서다.
 
 /**
  * 승격/강등/잔류/불참 뱃지 — 열(390px 이상)과 팀명 아래 인라인(390px 미만) 양쪽에서 재사용한다.
@@ -94,50 +79,6 @@ function ExpectedPromotionBadge({ kind, toTierLabel }: { kind: 'promoted' | 'rel
 // 공유하기 위해서다. 상단에서 import 한 바인딩을 그대로 re-export 해 기존
 // 소비처(수상 페이지·테스트)를 유지한다(같은 모듈 이중 import 방지 — 리뷰 지적).
 export { competitionRanks };
-
-/**
- * 점수 필드(homeScore/awayScore)는 값이 없을 수 있다(미확정 대진) — 그때는 0:0으로
- * 오인되지 않게 상태 기반 문구로 대체한다.
- *
- * **취소된 대진은 점수가 있어도 점수를 보여주지 않는다.** 순위표는 취소 대진을 완전히
- * 제외하는데(R8) 일정 목록에만 "취소됨 1 : 0"이 굵게 남으면, 존재하는 점수가 왜 순위에
- * 반영되지 않는지 알 수 없다 — 같은 화면 안에서 두 집계가 서로 다른 말을 하게 된다.
- * 대신 "집계 제외"라고 명시해 그 경기가 기록에서 빠졌음을 그대로 읽히게 한다.
- * (취소 대진에 '예정'이 붙던 문제도 여기서 함께 사라진다.)
- *
- * **몰수 결과는 점수 옆에 뱃지로 구분한다.** 몰수는 1:0 으로 기록되는데, 그대로 두면
- * 실제로 치러진 1:0 승리와 화면에서 완전히 같아 보인다 — 관전자가 "이 팀이 이겼다"와
- * "상대가 안 나왔다"를 구분할 수 없다.
- */
-function fixtureResultLabel(fixture: V1LeagueFixture): { text: string; hasScore: boolean; isForfeit: boolean } {
-  if (fixture.status === 'cancelled') {
-    return { text: '집계 제외', hasScore: false, isForfeit: false };
-  }
-  if (typeof fixture.homeScore === 'number' && typeof fixture.awayScore === 'number') {
-    // 몰수는 스코어만 보면 실제 1:0 승리와 똑같이 읽힌다 — 점수는 그대로 두고 별도
-    // 뱃지로 구분한다. 색만으로 알리지 않도록 "몰수" 텍스트를 함께 싣는다.
-    return { text: `${fixture.homeScore} : ${fixture.awayScore}`, hasScore: true, isForfeit: fixture.isForfeit === true };
-  }
-  return { text: fixture.status === 'completed' ? '결과 대기' : '예정', hasScore: false, isForfeit: false };
-}
-
-/**
- * 이슈 3(감사 보통) — "예정"으로 봐야 할 대진 = 각 행에 실제로 **'예정'이라고 찍히는** 대진.
- *
- * 판정을 fixtureResultLabel 과 **같은 기준으로 맞춘다.** 스코어가 없다고 다 '예정'인 게 아니다 —
- * 이미 치렀지만 공식 결과가 아직 안 붙은 대진(status === 'completed' + 스코어 null)에는
- * 그 함수가 '결과 대기'를 찍는다. 그런데도 필터가 그걸 '예정'으로 세면, "예정만 보기"를 켰을 때
- * 화면엔 '결과 대기'라고 적힌 행이 섞여 나오고 "다음 경기" 강조도 지난 경기에 붙는다
- * (실제로 이 함수가 취소 여부와 스코어 유무만 보고 있어서 그런 상태였다).
- */
-function isUpcomingFixture(fixture: V1LeagueFixture): boolean {
-  return fixtureResultLabel(fixture).text === '예정';
-}
-
-interface TeamLookupEntry {
-  name: string;
-  logoUrl: string | null;
-}
 
 /** fixtures/pendingFixtures는 teamId만 준다 — standings 응답에서 만든 lookup으로 이름·로고를 매핑한다. */
 function FixtureTeamLabel({
@@ -627,7 +568,7 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
               {standings.pendingFixtures.map((fixture) => (
                 <li key={fixture.teamMatchId}>
                   <Link
-                    href={`/team-matches/${fixture.teamMatchId}`}
+                    href={`/league-matches/${leagueId}/fixtures/${fixture.teamMatchId}`}
                     className="tm-pressable flex min-h-[44px] flex-wrap items-center justify-between gap-2 rounded-lg px-2 text-sm text-[var(--text-strong)] hover:bg-[var(--grey100)]"
                   >
                     <span className="inline-flex flex-wrap items-center gap-1.5">
@@ -687,7 +628,7 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
               return (
                 <li key={fixture.teamMatchId}>
                   <Link
-                    href={`/team-matches/${fixture.teamMatchId}`}
+                    href={`/league-matches/${leagueId}/fixtures/${fixture.teamMatchId}`}
                     className={`tm-pressable tm-list-row-interactive flex min-h-[44px] flex-col gap-2 rounded-xl border bg-[var(--card-surface)] p-3 text-sm sm:flex-row sm:items-center sm:justify-between ${isNextUpcoming ? 'border-[var(--blue500)]' : 'border-[var(--border)]'}`}
                   >
                     <span className="inline-flex flex-wrap items-center gap-1.5">

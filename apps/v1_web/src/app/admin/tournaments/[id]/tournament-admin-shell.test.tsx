@@ -41,7 +41,7 @@ describe('TournamentAdminShell 섹션 내비', () => {
     const popupLink = screen.getByRole('link', { name: /팝업/ });
     expect(popupLink).toHaveAttribute(
       'href',
-      `/admin/popups?targetPath=${encodeURIComponent('/tournaments/tournament-1')}`,
+      `/admin/content?tab=popups&targetPath=${encodeURIComponent('/tournaments/tournament-1')}`,
     );
     // 대회 하위 팝업 라우트는 더 이상 존재하지 않는다.
     expect(popupLink.getAttribute('href')).not.toContain('/admin/tournaments/tournament-1/popups');

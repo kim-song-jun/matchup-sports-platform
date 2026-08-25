@@ -70,7 +70,9 @@ function SettingsHub() {
               id={`settings-tab-${tab.key}`}
               role="tab"
               aria-selected={isActive}
-              aria-controls={`settings-panel-${tab.key}`}
+              // 활성 패널만 마운트하므로(각 본문이 자기 조회를 가진 완결 화면) 비활성 탭이
+              // 존재하지 않는 id 를 가리키지 않도록 aria-controls 는 활성 탭에만 단다.
+              aria-controls={isActive ? `settings-panel-${tab.key}` : undefined}
               type="button"
               onClick={() => handleTabChange(tab.key)}
               className={[

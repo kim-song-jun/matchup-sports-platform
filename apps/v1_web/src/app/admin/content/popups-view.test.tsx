@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import AdminPopupsPage from './page';
+import { PopupsView as AdminPopupsPage } from './popups-view';
 import type { V1AdminPopupRow } from '@/types/api';
 
 const createMutate = vi.fn();
@@ -77,7 +77,7 @@ describe('AdminPopupsPage', () => {
     const user = userEvent.setup();
     render(<AdminPopupsPage />);
 
-    expect(screen.getByRole('heading', { name: '팝업 관리' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /새 팝업/ })).toBeInTheDocument(); // 헤더는 허브 소유 — 뷰 자체 렌더 확인은 툴바 버튼으로
     expect(screen.getAllByText('서비스 점검 안내')[0]).toBeInTheDocument();
 
     await user.click(screen.getAllByRole('button', { name: '조회' })[0]);

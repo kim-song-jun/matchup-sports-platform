@@ -2676,6 +2676,18 @@ export type V1AdminOpsSummary = {
   smsFailures5m: number;
 };
 
+/** 모니터링 허브 상단 신호 스트립 — "지금 사람이 봐야 할 것"의 개수 4종. */
+export type V1AdminMonitoringSummary = {
+  /** 최근 24시간에 활동한 에러 그룹 수(lastSeenAt 기준, 발생 총량 아님). */
+  errorsLast24h: number;
+  /** 미확인(acknowledgedAt null) 웹 푸시 실패 누적. */
+  pushUnacked: number;
+  /** 미확인 SMS·인증 실패 누적. */
+  smsUnacked: number;
+  /** 오늘(KST 자정 이후) 기록된 관리자 액션 수. */
+  auditToday: number;
+};
+
 // ---------------------------------------------------------------------------
 // Admin — 에러 로그 뷰어
 // ---------------------------------------------------------------------------

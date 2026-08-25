@@ -8,6 +8,8 @@ interface AdminKpiCardProps {
   tone?: 'neutral' | 'positive' | 'warning' | 'danger';
   icon?: ReactNode;
   href?: string;
+  /** 페이지 이동(href) 대신 화면 안 동작(탭 전환 등)을 걸 때. href 가 있으면 href 가 우선. */
+  onClick?: () => void;
   /** Accessible label for screen readers (falls back to label + value) */
   ariaLabel?: string;
 }
@@ -66,9 +68,23 @@ export function AdminKpiCard({
   tone = 'neutral',
   icon,
   href,
+  onClick,
   ariaLabel,
 }: AdminKpiCardProps) {
   const derivedAriaLabel = ariaLabel ?? `${label}: ${value}`;
+
+  if (!href && onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={derivedAriaLabel}
+        className="block w-full min-h-[44px] rounded-2xl text-left active:opacity-70 transition-opacity focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+      >
+        <KpiCardInner label={label} value={value} sub={sub} tone={tone} icon={icon} />
+      </button>
+    );
+  }
 
   if (href) {
     return (

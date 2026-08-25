@@ -15,7 +15,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
 }));
 
 describe('AdminShell nav', () => {
-  it('renders a reachable sidebar link to the Web Push failure log page', () => {
+  it('renders a reachable sidebar link to the monitoring hub (감시 4화면 통합, 2026-08-25)', () => {
     render(
       <AdminShell>
         <div>content</div>
@@ -24,10 +24,10 @@ describe('AdminShell nav', () => {
 
     // Desktop sidebar renders inside `nav[aria-label="주 메뉴"]`; there are two
     // (desktop sidebar + mobile drawer), so assert at least one reachable link exists.
-    const links = screen.getAllByRole('link', { name: /웹 푸시 실패/ });
+    const links = screen.getAllByRole('link', { name: /^모니터링$/ });
     expect(links.length).toBeGreaterThan(0);
     for (const link of links) {
-      expect(link).toHaveAttribute('href', '/admin/ops/push-failures');
+      expect(link).toHaveAttribute('href', '/admin/monitoring');
     }
   });
 
@@ -42,16 +42,17 @@ describe('AdminShell nav', () => {
     for (const link of links) expect(link).toHaveAttribute('href', '/admin/ops/tournaments');
   });
 
-  it('renders a reachable sidebar link to the error log page', () => {
-    // /admin/ops/errors 는 정식 페이지인데 nav 에 없어 URL 을 아는 사람만 들어갈 수 있었다.
+  it('keeps the retired standalone monitoring links out of the nav (모니터링 허브로 통합)', () => {
+    // 에러 로그·웹 푸시 실패·SMS·감사 로그는 /admin/monitoring 탭이 됐다 — 사이드바에
+    // 남아 있으면 같은 화면으로 가는 입구가 두 벌이 된다.
     render(
       <AdminShell>
         <div>content</div>
       </AdminShell>,
     );
-    const links = screen.getAllByRole('link', { name: /에러 로그/ });
-    expect(links.length).toBeGreaterThan(0);
-    for (const link of links) expect(link).toHaveAttribute('href', '/admin/ops/errors');
+    for (const name of [/에러 로그/, /웹 푸시 실패/, /SMS · 인증 실패/, /감사 로그/]) {
+      expect(screen.queryByRole('link', { name })).toBeNull();
+    }
   });
 
   it('groups nav items under 플랫폼 / 콘텐츠 / 운영 / 설정 headings', () => {

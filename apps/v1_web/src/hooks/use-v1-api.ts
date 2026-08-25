@@ -48,6 +48,7 @@ import type {
   V1PushFailureSummary,
   V1FoundAccount,
   V1SmsFailureSummary,
+  V1AdminMonitoringSummary,
   V1AdminOpsSummary,
   V1AdminErrorLogsPage,
   V1AdminErrorLogDetail,
@@ -3124,6 +3125,8 @@ export function useV1AckPushFailures() {
     onSuccess: () => {
       // 빈 filters는 partial match로 모든 limit 변형을 함께 무효화한다.
       queryClient.invalidateQueries({ queryKey: v1Keys.adminPushFailures() });
+      // 모니터링 신호 스트립의 "미확인 누적"은 ack 로 즉시 줄어야 한다.
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminMonitoringSummary() });
     },
   });
 }
@@ -3218,6 +3221,8 @@ export function useV1AckSmsFailures() {
     onSuccess: () => {
       // 빈 filters는 partial match로 모든 limit 변형을 함께 무효화한다.
       queryClient.invalidateQueries({ queryKey: v1Keys.adminSmsFailures() });
+      // 모니터링 신호 스트립의 "미확인 누적"은 ack 로 즉시 줄어야 한다.
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminMonitoringSummary() });
     },
   });
 }
@@ -3232,6 +3237,15 @@ export function useV1AdminOpsSummary() {
     queryFn: () => v1Get<V1AdminOpsSummary>('/admin/ops/summary'),
     // 열어 둔 채 방치하면 숫자가 멈춘다 — 전역 staleTime 은 탭 재포커스에서만 다시 받는다.
     // 같은 파일의 인박스·에러로그 훅이 쓰는 것과 같은 주기다.
+    refetchInterval: 30_000,
+  });
+}
+
+/** 모니터링 허브 신호 스트립(에러 24h·푸시/SMS 미확인·감사 오늘). 30초 주기는 ops summary 와 동일. */
+export function useV1AdminMonitoringSummary() {
+  return useQuery({
+    queryKey: v1Keys.adminMonitoringSummary(),
+    queryFn: () => v1Get<V1AdminMonitoringSummary>('/admin/monitoring/summary'),
     refetchInterval: 30_000,
   });
 }

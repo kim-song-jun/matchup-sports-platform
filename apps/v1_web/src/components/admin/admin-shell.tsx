@@ -20,19 +20,16 @@ import {
   Megaphone,
   PanelsTopLeft,
   MessageSquareText,
-  MessageSquareWarning,
-  ClipboardList,
   ShieldCheck,
   Settings,
   Star,
   Send,
-  BellRing,
   ScrollText,
   ChevronLeft,
   Menu,
   X,
   Radio,
-  Bug,
+  Gauge,
   Gavel,
 } from 'lucide-react';
 
@@ -106,14 +103,11 @@ const BASE_NAV_GROUPS: NavGroup[] = [
   {
     label: '운영',
     items: [
-      // 살펴보는 화면과 누르면 사용자에게 즉시 영향이 가는 화면이 같은 무게로 붙어 있었다.
-      // 순서를 바꿔 읽기 → 쓰기로 모으고 그 경계에 소구획 캡션을 둔다.
-      { label: '대회 현장 운영', href: '/admin/ops/tournaments', icon: <Activity size={18} />, subgroup: '모니터링' },
-      // 정식 페이지인데 nav 에 없어 URL 을 아는 사람만 들어갈 수 있었다(2026-08-16 IA 감사).
-      { label: '에러 로그', href: '/admin/ops/errors', icon: <Bug size={18} />, subgroup: '모니터링' },
-      { label: '웹 푸시 실패', href: '/admin/ops/push-failures', icon: <BellRing size={18} />, subgroup: '모니터링' },
-      { label: 'SMS · 인증 실패', href: '/admin/ops/sms-failures', icon: <MessageSquareWarning size={18} />, subgroup: '모니터링' },
-      { label: '감사 로그', href: '/admin/audit', icon: <ClipboardList size={18} />, subgroup: '모니터링' },
+      // 살펴보는 화면(위)과 누르면 사용자에게 즉시 영향이 가는 화면(아래 '제어 · 발송')을
+      // 분리한다. 감시 4화면(에러·푸시 실패·SMS 실패·감사)은 2026-08-25 모니터링 허브
+      // (/admin/monitoring 탭)로 통합됐고 구 URL 은 리다이렉트로 보존된다.
+      { label: '대회 현장 운영', href: '/admin/ops/tournaments', icon: <Activity size={18} /> },
+      { label: '모니터링', href: '/admin/monitoring', icon: <Gauge size={18} /> },
       { label: '웹 푸시 발송', href: '/admin/ops/push-send', icon: <Send size={18} />, subgroup: '제어 · 발송', tone: 'control' },
       { label: '경기 운영 플래그', href: '/admin/ops/operation-flags', icon: <Radio size={18} />, subgroup: '제어 · 발송', tone: 'control' },
     ],

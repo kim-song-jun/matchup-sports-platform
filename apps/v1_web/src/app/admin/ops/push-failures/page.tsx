@@ -1,17 +1,9 @@
-'use client';
+import { redirect } from 'next/navigation';
 
-import { AdminPageHeader } from '@/components/admin';
-import { PushFailureTable } from '@/components/admin/push-failure-table';
-
-export default function AdminPushFailuresPage() {
-  return (
-    <>
-      <AdminPageHeader
-        eyebrow="운영"
-        title="Web Push 실패 로그"
-        description="최근 웹 푸시 발송 실패 기록을 확인하고 확인 처리해요."
-      />
-      <PushFailureTable />
-    </>
-  );
+/**
+ * 모니터링 허브 통합(2026-08-25)으로 본문이 /admin/monitoring 의 탭으로 이동했다.
+ * 북마크·감사 로그·공유된 딥링크가 죽지 않도록 구 URL 은 리다이렉트로 보존한다.
+ */
+export default function AdminPushFailuresRedirect() {
+  redirect('/admin/monitoring?tab=push');
 }

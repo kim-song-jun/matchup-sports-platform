@@ -203,14 +203,14 @@ export default function AdminOverviewPage() {
                     label="웹 푸시 실패"
                     value={warningPushFailures}
                     tone="warning"
-                    href="/admin/ops/push-failures"
+                    href="/admin/monitoring?tab=push"
                     sub="최근 5분"
                   />
                   <WarningCard
                     label="SMS · 인증 실패"
                     value={warningSmsFailures}
                     tone="warning"
-                    href="/admin/ops/sms-failures"
+                    href="/admin/monitoring?tab=sms"
                     sub="최근 5분"
                   />
                 </>
@@ -226,7 +226,7 @@ export default function AdminOverviewPage() {
           <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
             <h2 className="text-[length:var(--font-size-body)] font-bold text-[var(--text-strong)]">최근 운영 활동</h2>
             <Link
-              href="/admin/audit"
+              href="/admin/monitoring?tab=audit"
               className="flex items-center gap-0.5 text-[length:var(--font-size-label)] text-blue-500 font-medium hover:text-[var(--blue700)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded min-h-[44px] px-1"
             >
               전체 보기

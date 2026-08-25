@@ -1737,6 +1737,8 @@ export type V1ReviewSubmitPayload = {
   targetTeamId?: string | null;
   rating: number;
   tagCodes: string[];
+  /** 4항목 채점(실력·매너·시간약속·안전). 사람 대상 후기에만 싣는다 -- 팀 대상은 400. */
+  metricScores?: { skill: number; manner: number; punctuality: number; safety: number };
 };
 
 export type V1ReviewSubmitResponse = {

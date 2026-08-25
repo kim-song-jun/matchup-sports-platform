@@ -163,6 +163,10 @@ describe('ReviewsService', () => {
           create: createMock,
           findMany: jest.fn().mockResolvedValue([]),
         },
+        // 4항목 채점 집계(Task 155 후속)가 tx 에서 함께 읽는다 -- 스키마-mock 드리프트 방지.
+        v1PostEventReviewMetricScore: {
+          findMany: jest.fn().mockResolvedValue([]),
+        },
         v1UserReputationSummary: {
           upsert: jest.fn().mockResolvedValue({}),
         },
@@ -231,6 +235,10 @@ describe('ReviewsService', () => {
       $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback({
         v1PostEventReview: {
           create: createMock,
+          findMany: jest.fn().mockResolvedValue([]),
+        },
+        // 4항목 채점 집계(Task 155 후속)가 tx 에서 함께 읽는다 -- 스키마-mock 드리프트 방지.
+        v1PostEventReviewMetricScore: {
           findMany: jest.fn().mockResolvedValue([]),
         },
         v1UserReputationSummary: {
@@ -487,6 +495,7 @@ describe('ReviewsService', () => {
         const upsertMock = jest.fn().mockResolvedValue({});
         const prisma = {
           v1PostEventReview: { findMany: findManyMock },
+          v1PostEventReviewMetricScore: { findMany: jest.fn().mockResolvedValue([]) },
           v1UserReputationSummary: { upsert: upsertMock },
         };
         const tournamentFixtureReviews = { pending: jest.fn(), source: jest.fn(), submit: jest.fn(), sourceSummaries: jest.fn() };
@@ -1195,12 +1204,14 @@ describe('ReviewsService — 어드민 후기 숨김', () => {
         findMany: jest.fn().mockResolvedValue([]),
         update,
       },
+      v1PostEventReviewMetricScore: { findMany: jest.fn().mockResolvedValue([]) },
       v1UserReputationSummary: { upsert },
       v1TeamTrustScore: { upsert },
       v1TeamMatch: { count: jest.fn().mockResolvedValue(0) },
       $transaction: jest.fn(async (cb: (tx: unknown) => Promise<unknown>) => cb({
         v1PostEventReview: { update, findMany: jest.fn().mockResolvedValue([]) },
-        v1UserReputationSummary: { upsert },
+        v1PostEventReviewMetricScore: { findMany: jest.fn().mockResolvedValue([]) },
+      v1UserReputationSummary: { upsert },
         v1TeamTrustScore: { upsert },
         v1TeamMatch: { count: jest.fn().mockResolvedValue(0) },
       })),
@@ -1429,6 +1440,7 @@ function teamMatchWorld(
       v1TeamMatch: { count: jest.fn().mockResolvedValue(1) },
       v1TeamTrustScore: { upsert: teamTrustUpsert },
       // 선수 후기 경로는 팀 신뢰점수가 아니라 개인 평판을 갱신한다.
+      v1PostEventReviewMetricScore: { findMany: jest.fn().mockResolvedValue([]) },
       v1UserReputationSummary: { upsert: userReputationUpsert },
     })),
   };

@@ -29,10 +29,21 @@ export type ReviewsPageModel = {
   emptySub: string;
 };
 
+export type ReviewMetricDraft = { skill: number; manner: number; punctuality: number; safety: number };
+
 export type ReviewTargetDraft = {
   rating: number;
   tagCodes: string[];
+  /** 사람 대상에만 존재. 기본값은 종합 별점과 같게 시작해 제출 마찰을 늘리지 않는다. */
+  metricScores?: ReviewMetricDraft;
 };
+
+export const REVIEW_METRIC_FIELDS = [
+  { key: 'skill', label: '실력' },
+  { key: 'manner', label: '매너' },
+  { key: 'punctuality', label: '시간약속' },
+  { key: 'safety', label: '안전' },
+] as const;
 
 export type ReviewSourcePageModel = V1ReviewSourceResponse & {
   sourceMeta: string;

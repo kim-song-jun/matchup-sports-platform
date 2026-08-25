@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
+import { useModalA11y } from '../v1-ui/use-modal-a11y';
 
 // ── Types ─────────────────────────────────────────────────────────────────
 export interface ReasonStatusOption {
@@ -37,10 +38,13 @@ export function AdminReasonModal({
   );
   const [reason, setReason] = useState('');
 
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const firstFocusableRef = useRef<HTMLSelectElement>(null);
-  /** Saved reference to the element that was focused before the modal opened (for focus restore on close) */
-  const previousFocusRef = useRef<Element | null>(null);
+  // focus 저장·복원 / 첫 컨트롤 포커스 / ESC / focus trap / 스크롤 잠금 — 공용 훅.
+  // 이 파일의 구현을 리그 모달 3종이 "그대로 본떠" 네 벌이 됐던 것을 한 벌로 모았다.
+  const { dialogRef, initialFocusRef, onBackdropClick } = useModalA11y<HTMLSelectElement>({
+    open,
+    onClose,
+    pending,
+  });
 
   // Reset form whenever the modal opens
   useEffect(() => {
@@ -49,80 +53,6 @@ export function AdminReasonModal({
       setReason('');
     }
   }, [open, currentStatus, statusOptions]);
-
-  // Save focus on open; restore it on close via every path (ESC / backdrop / Cancel / submit) (WCAG 2.4.3)
-  useEffect(() => {
-    if (open) {
-      previousFocusRef.current = document.activeElement;
-    } else {
-      const el = previousFocusRef.current;
-      if (el && typeof (el as HTMLElement).focus === 'function') {
-        (el as HTMLElement).focus();
-      }
-      previousFocusRef.current = null;
-    }
-  }, [open]);
-
-  // Focus the first control on open
-  useEffect(() => {
-    if (open) {
-      const id = setTimeout(() => firstFocusableRef.current?.focus(), 60);
-      return () => clearTimeout(id);
-    }
-  }, [open]);
-
-  // ESC to close (unless pending)
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !pending) onClose();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [open, onClose, pending]);
-
-  // Focus trap
-  useEffect(() => {
-    if (!open) return;
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    const focusableSelectors =
-      'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
-
-    const trap = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab') return;
-      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(focusableSelectors));
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (e.shiftKey) {
-        if (document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        }
-      } else {
-        if (document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    };
-
-    document.addEventListener('keydown', trap);
-    return () => document.removeEventListener('keydown', trap);
-  }, [open]);
-
-  // Prevent body scroll while open
-  useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [open]);
 
   if (!open) return null;
 
@@ -140,10 +70,7 @@ export function AdminReasonModal({
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-[2px]"
       aria-hidden={!open}
-      onClick={(e) => {
-        // Close on backdrop click (not on panel click)
-        if (e.target === e.currentTarget && !pending) onClose();
-      }}
+      onClick={onBackdropClick}
     >
       {/* Panel */}
       <div
@@ -185,7 +112,7 @@ export function AdminReasonModal({
               </label>
               <select
                 id="admin-reason-status"
-                ref={firstFocusableRef}
+                ref={initialFocusRef}
                 value={selectedStatus}
                 onChange={(e) => setSelectedStatus(e.target.value)}
                 disabled={pending}

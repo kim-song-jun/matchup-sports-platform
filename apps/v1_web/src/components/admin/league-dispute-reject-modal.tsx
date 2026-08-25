@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
+import { useModalA11y } from '../v1-ui/use-modal-a11y';
 
 // D2 (E4): 어드민 이의 거부 모달 — 사유만 받는다(결과에는 영향이 없으므로 스코어 입력이
-// 필요 없다). admin-reason-modal.tsx 와 같은 dialog/focus-trap/ESC/backdrop 마크업이지만
-// 상태 select 를 빼서 "이건 결과를 바꾸지 않는다"는 것을 화면에서도 드러낸다.
+// 필요 없다). 상태 select 를 빼서 "이건 결과를 바꾸지 않는다"는 것을 화면에서도 드러낸다.
+// dialog/focus-trap/ESC/backdrop 동작은 useModalA11y 공용 훅.
 
 interface LeagueDisputeRejectModalProps {
   open: boolean;
@@ -33,81 +34,14 @@ export function LeagueDisputeRejectModal({
 }: LeagueDisputeRejectModalProps) {
   const [note, setNote] = useState('');
 
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const firstFocusableRef = useRef<HTMLTextAreaElement>(null);
-  const previousFocusRef = useRef<Element | null>(null);
+  const { dialogRef, initialFocusRef, onBackdropClick } = useModalA11y<HTMLTextAreaElement>({
+    open,
+    onClose,
+    pending,
+  });
 
   useEffect(() => {
     if (open) setNote('');
-  }, [open]);
-
-  useEffect(() => {
-    if (open) {
-      previousFocusRef.current = document.activeElement;
-    } else {
-      const el = previousFocusRef.current;
-      if (el && typeof (el as HTMLElement).focus === 'function') {
-        (el as HTMLElement).focus();
-      }
-      previousFocusRef.current = null;
-    }
-  }, [open]);
-
-  useEffect(() => {
-    if (open) {
-      const id = setTimeout(() => firstFocusableRef.current?.focus(), 60);
-      return () => clearTimeout(id);
-    }
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !pending) onClose();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [open, onClose, pending]);
-
-  useEffect(() => {
-    if (!open) return;
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    const focusableSelectors =
-      'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
-
-    const trap = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab') return;
-      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(focusableSelectors));
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (e.shiftKey) {
-        if (document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        }
-      } else {
-        if (document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    };
-
-    document.addEventListener('keydown', trap);
-    return () => document.removeEventListener('keydown', trap);
-  }, [open]);
-
-  useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
   }, [open]);
 
   if (!open) return null;
@@ -125,9 +59,7 @@ export function LeagueDisputeRejectModal({
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-[2px]"
       aria-hidden={!open}
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !pending) onClose();
-      }}
+      onClick={onBackdropClick}
     >
       <div
         ref={dialogRef}
@@ -172,7 +104,7 @@ export function LeagueDisputeRejectModal({
               </label>
               <textarea
                 id="league-dispute-reject-note"
-                ref={firstFocusableRef}
+                ref={initialFocusRef}
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 maxLength={NOTE_MAX}

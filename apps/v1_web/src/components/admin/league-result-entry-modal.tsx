@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
+import { useModalA11y } from '../v1-ui/use-modal-a11y';
 import type {
   V1LeagueFixtureParticipantsResponse,
   V1LeagueResultParticipantStat,
@@ -74,10 +75,13 @@ export function LeagueResultEntryModal({
   const [reason, setReason] = useState('');
   const [scorerRows, setScorerRows] = useState<ScorerRowState[]>([]);
 
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const firstFocusableRef = useRef<HTMLInputElement>(null);
-  /** Saved reference to the element that was focused before the modal opened (for focus restore on close) */
-  const previousFocusRef = useRef<Element | null>(null);
+  // dialog/focus-trap/ESC/backdrop/스크롤 잠금 — useModalA11y 공용 훅 (한때 이 파일이
+  // admin-reason-modal 을 본뜬 원본이었고 이의 모달 2종이 다시 이걸 본떠 네 벌이 됐었다)
+  const { dialogRef, initialFocusRef, onBackdropClick } = useModalA11y<HTMLInputElement>({
+    open,
+    onClose,
+    pending,
+  });
   /** 정정 모드 프리필을 열림당 1회로 제한한다 — 아래 프리필 effect 참고. */
   const prefillDoneRef = useRef(false);
 
@@ -118,80 +122,6 @@ export function LeagueResultEntryModal({
     );
     prefillDoneRef.current = true;
   }, [open, mode, participants]);
-
-  // Save focus on open; restore it on close via every path (ESC / backdrop / Cancel / submit) (WCAG 2.4.3)
-  useEffect(() => {
-    if (open) {
-      previousFocusRef.current = document.activeElement;
-    } else {
-      const el = previousFocusRef.current;
-      if (el && typeof (el as HTMLElement).focus === 'function') {
-        (el as HTMLElement).focus();
-      }
-      previousFocusRef.current = null;
-    }
-  }, [open]);
-
-  // Focus the first control on open
-  useEffect(() => {
-    if (open) {
-      const id = setTimeout(() => firstFocusableRef.current?.focus(), 60);
-      return () => clearTimeout(id);
-    }
-  }, [open]);
-
-  // ESC to close (unless pending)
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !pending) onClose();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [open, onClose, pending]);
-
-  // Focus trap
-  useEffect(() => {
-    if (!open) return;
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    const focusableSelectors =
-      'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
-
-    const trap = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab') return;
-      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(focusableSelectors));
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (e.shiftKey) {
-        if (document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        }
-      } else {
-        if (document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    };
-
-    document.addEventListener('keydown', trap);
-    return () => document.removeEventListener('keydown', trap);
-  }, [open]);
-
-  // Prevent body scroll while open
-  useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [open]);
 
   if (!open) return null;
 
@@ -280,10 +210,7 @@ export function LeagueResultEntryModal({
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-[2px]"
       aria-hidden={!open}
-      onClick={(e) => {
-        // Close on backdrop click (not on panel click)
-        if (e.target === e.currentTarget && !pending) onClose();
-      }}
+      onClick={onBackdropClick}
     >
       {/* Panel */}
       <div
@@ -355,7 +282,7 @@ export function LeagueResultEntryModal({
                 </label>
                 <input
                   id="league-result-home-score"
-                  ref={firstFocusableRef}
+                  ref={initialFocusRef}
                   type="number"
                   min={0}
                   step={1}

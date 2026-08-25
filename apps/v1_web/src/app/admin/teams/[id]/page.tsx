@@ -29,11 +29,6 @@ function formatDateTime(value: string | null | undefined) {
   });
 }
 
-function formatScore(value: string | number | null | undefined) {
-  if (value === null || value === undefined || value === '') return '-';
-  return String(value);
-}
-
 function BackLink() {
   return (
     <Link
@@ -208,7 +203,7 @@ export default function AdminTeamDetailPage() {
             {trust ? (
               <dl className="mt-4 grid gap-3">
                 <AdminSummaryItem icon={<Shield size={16} />} label="상태" value={trust.trustState} />
-                <AdminSummaryItem icon={<Shield size={16} />} label="매너 점수" value={formatScore(trust.mannerScore)} />
+                <AdminSummaryItem icon={<Shield size={16} />} label="매너 점수" value={trust.mannerScore} />
                 <AdminSummaryItem icon={<Trophy size={16} />} label="반영 경기" value={trust.matchCount} />
                 <AdminSummaryItem icon={<Calendar size={16} />} label="계산일" value={formatDateTime(trust.calculatedAt)} />
               </dl>

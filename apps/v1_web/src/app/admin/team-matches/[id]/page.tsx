@@ -211,7 +211,7 @@ export default function AdminTeamMatchDetailPage() {
               <AdminSummaryItem icon={<Users size={16} />} label="상대팀 신청" value={`${teamMatch.applicationCount}건`} />
               <AdminSummaryItem icon={<Trophy size={16} />} label="확정 상대팀" value={teamMatch.approvedApplicantTeamName ?? '미확정'} />
               <AdminSummaryItem icon={<ListOrdered size={16} />} label="정규 리그" value={teamMatch.league?.title ?? '단발 경기'} />
-              <AdminSummaryItem icon={<MapPin size={16} />} label="지역" value={teamMatch.regionName ?? '-'} />
+              <AdminSummaryItem icon={<MapPin size={16} />} label="지역" value={teamMatch.regionName} />
               <AdminSummaryItem icon={<CalendarClock size={16} />} label="시작" value={formatDateTime(teamMatch.startAt)} />
               <AdminSummaryItem icon={<CalendarClock size={16} />} label="경기 기록" value={teamMatch.hasGame ? '연결됨' : '없음'} />
             </dl>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   useV1AdminTeams,
   useV1AdminMe,
@@ -56,6 +57,7 @@ const PAGE_SIZE = 20;
 // ── Page ──────────────────────────────────────────────────────────────────
 
 export default function AdminTeamsPage() {
+  const router = useRouter();
   // ── Admin capabilities ─────────────────────────────────────────────
   const { data: adminMe } = useV1AdminMe();
   const canWrite = adminMe?.capabilities.includes('status:write') ?? false;
@@ -142,6 +144,10 @@ export default function AdminTeamsPage() {
         <AdminDataTable<V1AdminTeamRow>
           rows={rows}
           keyExtractor={(r) => r.teamId}
+          // 자매 목록(matches·team-matches)과 같은 행 진입 계약 — "상세 보기" 버튼으로만
+          // 진입 가능하던 유일한 목록 2개(users·teams) 중 하나였다.
+          onRowClick={(row) => router.push(`/admin/teams/${encodeURIComponent(row.teamId)}`)}
+          rowClickLabel={(row) => `${row.name} 상세 보기`}
           tableMaxWidth="max-w-none"
           rowTone={(row) =>
             row.status === 'suspended' || row.status === 'archived' ? 'warning' : undefined

@@ -6,6 +6,7 @@ const usersQueryMock = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams('status=active'),
+  useRouter: () => ({ push: vi.fn() }),
 }));
 
 vi.mock('@/hooks/use-v1-api', () => ({

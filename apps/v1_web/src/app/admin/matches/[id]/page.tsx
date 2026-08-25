@@ -133,7 +133,7 @@ export default function AdminMatchDetailPage() {
             <dl className="mt-4 grid gap-3">
               <AdminSummaryItem icon={<Users size={16} />} label="참가 인원" value={`${match.participantCount}/${match.maxParticipants}명`} />
               <AdminSummaryItem icon={<UserRound size={16} />} label="신청" value={`${match.applicationCount}건`} />
-              <AdminSummaryItem icon={<MapPin size={16} />} label="지역" value={match.regionName ?? '-'} />
+              <AdminSummaryItem icon={<MapPin size={16} />} label="지역" value={match.regionName} />
               <AdminSummaryItem icon={<CalendarClock size={16} />} label="시작" value={formatDateTime(match.startAt)} />
               <AdminSummaryItem icon={<CalendarClock size={16} />} label="신청 마감" value={formatDateTime(match.deadlineAt)} />
             </dl>
@@ -142,7 +142,7 @@ export default function AdminMatchDetailPage() {
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
             <h2 className="text-[17px] font-bold text-[var(--text-strong)]">호스트</h2>
             <dl className="mt-4 grid gap-3">
-              <AdminSummaryItem icon={<UserRound size={16} />} label="이름" value={match.hostName ?? '-'} />
+              <AdminSummaryItem icon={<UserRound size={16} />} label="이름" value={match.hostName} />
             </dl>
             <Link
               href={`/admin/users/${encodeURIComponent(match.hostUserId)}`}

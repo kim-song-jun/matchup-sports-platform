@@ -171,8 +171,10 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
   const teamCount = series.teamIds.length;
 
   // C안: 시간창(시작~종료)과 경기 시간이 다 있으면 팀당 하루 경기 수를 역산해 제안한다.
+  // 정수가 아닌 입력이 하나라도 있으면 제안·계산 카드를 아예 숨긴다 — ?? 폴백(휴식 0·팀당 1)으로
+  // 계산하면 사용자가 입력한 값과 다른 결과를 "정상 계산"처럼 보여주게 된다.
   const timingSuggestion =
-    dayOfWeek !== '' && time.trim() !== '' && endTime.trim() !== '' && durationValue !== null
+    !hasInvalidTimingInput && dayOfWeek !== '' && time.trim() !== '' && endTime.trim() !== '' && durationValue !== null
       ? suggestGamesPerTeamPerDay({
           startTime: time,
           endTime,
@@ -182,10 +184,11 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
         })
       : null;
   const showTimingNoFit =
+    !hasInvalidTimingInput &&
     dayOfWeek !== '' && time.trim() !== '' && endTime.trim() !== '' && durationValue !== null && timingSuggestion === null;
   // B안: 현재 폼 값 그대로의 "하루 운영 계산" — 팀당 경기 수를 안 채웠으면 서버 기본값 1로 보여준다.
   const dailyPlan =
-    durationValue !== null
+    !hasInvalidTimingInput && durationValue !== null
       ? computeDailyPlan({
           gameDurationMinutes: durationValue,
           breakMinutes: breakValue ?? 0,

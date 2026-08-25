@@ -1084,6 +1084,22 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
     expect(mutateAsync).not.toHaveBeenCalled();
   });
 
+  it('휴식에 정수가 아닌 값이 있으면 계산 카드·역산 제안을 숨긴다(폴백 값으로 잘못 계산해 보여주지 않음)', () => {
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    fireEvent.change(screen.getByLabelText('경기 시간(분)'), { target: { value: '15' } });
+    expect(screen.getByText('하루 운영 계산')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('휴식(분)'), { target: { value: '5.5' } });
+    expect(screen.queryByText('하루 운영 계산')).not.toBeInTheDocument();
+  });
+
   it('경기 시간에 소수를 입력하면 정수 안내 토스트를 띄우고 제출하지 않는다', async () => {
     const mutateAsync = vi.fn();
     useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync, isPending: false } as never);

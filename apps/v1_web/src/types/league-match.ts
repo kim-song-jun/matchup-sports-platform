@@ -256,9 +256,9 @@ export interface V1PreviewLeagueFixture {
   startAt: string;
   /** timing 지정 시 라운드 G개가 묶인 매치데이(주차). 구버전 서버 응답엔 없다. */
   matchday?: number;
-  /** timing 지정 시 그 매치데이 안의 경기 순번. timing 미지정이면 null. */
+  /** timing 지정 시 그 매치데이 안의 경기 순번. timing 미지정이면 null, 구버전 서버 응답엔 필드 자체가 없다. */
   orderInDay?: number | null;
-  /** timing 지정 시 경기 종료 시각. timing 미지정이면 null. */
+  /** timing 지정 시 경기 종료 시각. timing 미지정이면 null, 구버전 서버 응답엔 필드 자체가 없다. */
   endAt?: string | null;
 }
 

@@ -14,10 +14,12 @@ function makePrisma() {
     v1LeaguePromotion: { findFirst: jest.fn().mockResolvedValue(null) },
     v1LeagueMatchDispute: {
       findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
       findUnique: jest.fn(),
       findUniqueOrThrow: jest.fn(),
       create: jest.fn(),
       updateMany: jest.fn(),
+      groupBy: jest.fn().mockResolvedValue([]),
     },
     v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
     v1AdminUser: { findMany: jest.fn().mockResolvedValue([]) },
@@ -218,5 +220,23 @@ describe('LeagueMatchDisputeService 알림 수신자', () => {
       prisma.v1TeamMembership.findMany.mockResolvedValue([{ userId: 'host-owner' }]);
       await expect(resolveUserIds()).resolves.toEqual(['host-owner']);
     });
+  });
+});
+
+describe('LeagueMatchDisputeService.listDisputes 상태 탭 카운트', () => {
+  it('counts 는 status 필터와 무관한 전체 분포이고, 없는 상태는 0 으로 채운다', async () => {
+    const prisma = makePrisma();
+    const service = makeService(prisma, makeNotifications());
+    prisma.v1LeagueMatchDispute.findMany.mockResolvedValue([]);
+    prisma.v1LeagueMatchDispute.groupBy.mockResolvedValue([
+      { status: 'open', _count: { _all: 2 } },
+      { status: 'rejected', _count: { _all: 1 } },
+    ]);
+
+    const result = await service.listDisputes(adminActor, 'open');
+
+    expect(result.counts).toEqual({ open: 2, accepted: 0, rejected: 1 });
+    // 필터된 where 를 groupBy 에 재사용하면 비활성 탭이 항상 0 이 된다 — 무필터 계약 고정.
+    expect(prisma.v1LeagueMatchDispute.groupBy).toHaveBeenCalledWith({ by: ['status'], _count: { _all: true } });
   });
 });

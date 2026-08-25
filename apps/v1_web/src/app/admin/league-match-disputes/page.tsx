@@ -94,6 +94,13 @@ export default function AdminLeagueMatchDisputesPage() {
 
   const isInitialLoad = isPending && rows.length === 0;
 
+  // 탭 카운트는 서버가 필터와 무관한 전체 분포로 내려준다 — 로딩 중에는 undefined 그대로
+  // 두어 AdminFilterBar 의 "—" 플레이스홀더가 뜨게 한다.
+  const statusOptions = STATUS_OPTIONS.map((option) => ({
+    ...option,
+    count: data?.counts?.[option.value],
+  }));
+
   return (
     <>
       <AdminPageHeader
@@ -107,7 +114,7 @@ export default function AdminLeagueMatchDisputesPage() {
           hideSearch
           searchValue=""
           onSearchChange={() => {}}
-          statusOptions={STATUS_OPTIONS}
+          statusOptions={statusOptions}
           activeStatus={activeStatus}
           onStatusChange={(value) => setActiveStatus(value as V1LeagueMatchDisputeStatus)}
         />

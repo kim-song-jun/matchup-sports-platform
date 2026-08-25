@@ -542,6 +542,8 @@ export interface V1AdminLeagueMatchDisputeRow {
 
 export interface V1AdminLeagueMatchDisputeListResponse {
   items: V1AdminLeagueMatchDisputeRow[];
+  /** 상태 탭 카운트 — 현재 status 필터와 무관한 전체 분포. */
+  counts: Record<V1LeagueMatchDisputeStatus, number>;
 }
 
 /** 수락(정정/무효) 요청 — 정정은 스코어가 필수, 무효는 스코어를 보내지 않는다. */

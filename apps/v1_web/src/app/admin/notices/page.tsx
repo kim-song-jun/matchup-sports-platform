@@ -15,11 +15,11 @@ import {
 import { AdminContentPreview } from '@/components/admin/admin-content-preview';
 import { RichTextEditor } from '@/components/content/rich-text-editor';
 import {
-  useV1AdminMe,
   useV1AdminNotices,
   useV1CreateAdminNotice,
   useV1UpdateAdminNotice,
 } from '@/hooks/use-v1-api';
+import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import { useTemporaryContentAssets } from '@/hooks/use-temporary-content-assets';
 import { useAdminListQuery } from '@/hooks/use-admin-list-query';
 import { formatAdminDateTimeShort } from '@/lib/date-utils';
@@ -104,8 +104,7 @@ export default function AdminNoticesPage() {
   const [editingNotice, setEditingNotice] = useState<V1AdminNoticeRow | null>(null);
 
   const { toasts, showToast } = useAdminToast();
-  const { data: adminMe } = useV1AdminMe();
-  const canWrite = adminMe?.capabilities.includes('status:write') ?? false;
+  const canWrite = useAdminCanWrite();
 
   const filters: AdminListFilters = {
     ...listFilters,

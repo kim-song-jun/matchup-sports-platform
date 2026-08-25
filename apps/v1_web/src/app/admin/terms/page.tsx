@@ -10,8 +10,8 @@ import {
   AdminToasts,
   useAdminToast,
 } from '@/components/admin';
+import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import {
-  useV1AdminMe,
   useV1AdminTerms,
   useV1ChangeAdminTermsStatus,
   useV1CreateAdminTermsPolicy,
@@ -122,8 +122,7 @@ export default function AdminTermsPage() {
     [search, context],
   );
   const { data, isPending, isError, error, refetch } = useV1AdminTerms(filters);
-  const { data: adminMe } = useV1AdminMe();
-  const canWrite = adminMe?.capabilities.includes('status:write') ?? false;
+  const canWrite = useAdminCanWrite();
   const { toasts, showToast } = useAdminToast();
 
   const updatePolicy = useV1UpdateAdminTermsPolicy();

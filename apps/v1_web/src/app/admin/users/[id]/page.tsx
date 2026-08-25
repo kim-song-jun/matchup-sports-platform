@@ -22,10 +22,10 @@ import {
   useAdminToast,
 } from '@/components/admin';
 import {
-  useV1AdminMe,
   useV1AdminUser,
   useV1DeleteAdminUser,
 } from '@/hooks/use-v1-api';
+import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import { formatAdminDateTime } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
@@ -62,7 +62,6 @@ export default function AdminUserDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const userId = params.id;
-  const { data: adminMe } = useV1AdminMe();
   const { data: user, isPending, isError, error, refetch } = useV1AdminUser(userId);
   const deleteMutation = useV1DeleteAdminUser(userId);
   const { toasts, showToast } = useAdminToast();
@@ -79,7 +78,7 @@ export default function AdminUserDetailPage() {
     pending: deleteMutation.isPending,
   });
 
-  const canWrite = adminMe?.capabilities.includes('status:write') ?? false;
+  const canWrite = useAdminCanWrite();
   const canDelete = canWrite && user?.accountStatus !== 'deleted';
 
   function handleDeleteSubmit(event: FormEvent<HTMLFormElement>) {

@@ -3,8 +3,8 @@
 import type { FormEvent } from 'react';
 import { useEffect, useState } from 'react';
 import { AdminPageHeader, AdminToasts, useAdminToast } from '@/components/admin';
+import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import {
-  useV1AdminMe,
   useV1AdminReviewPolicySettings,
   useV1UpdateReviewPolicySettings,
 } from '@/hooks/use-v1-api';
@@ -29,8 +29,7 @@ export default function AdminReviewPolicySettingsPage() {
   const [hoursInput, setHoursInput] = useState('');
 
   const { toasts, showToast } = useAdminToast();
-  const { data: adminMe } = useV1AdminMe();
-  const canWrite = adminMe?.capabilities.includes('status:write') ?? false;
+  const canWrite = useAdminCanWrite();
 
   const { data: settings, isPending, isError, error, refetch } = useV1AdminReviewPolicySettings();
   const updateSettings = useV1UpdateReviewPolicySettings();

@@ -4,7 +4,8 @@ import type { FormEvent } from 'react';
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { AdminPageHeader, AdminToasts, useAdminToast } from '@/components/admin';
-import { useV1AdminIntegrationSettings, useV1AdminMe, useV1UpdateIntegrationSettings } from '@/hooks/use-v1-api';
+import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
+import { useV1AdminIntegrationSettings, useV1UpdateIntegrationSettings } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import type { V1IntegrationKeySource } from '@/types/api';
 
@@ -24,8 +25,7 @@ export default function AdminIntegrationSettingsPage() {
   const [kakaoMapsJsKey, setKakaoMapsJsKey] = useState<KeyFieldValue>(undefined);
 
   const { toasts, showToast } = useAdminToast();
-  const { data: adminMe } = useV1AdminMe();
-  const canWrite = adminMe?.capabilities.includes('status:write') ?? false;
+  const canWrite = useAdminCanWrite();
 
   const { data: settings, isPending, isError, error, refetch } = useV1AdminIntegrationSettings();
   const updateSettings = useV1UpdateIntegrationSettings();

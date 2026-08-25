@@ -3,12 +3,12 @@
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  useV1AdminMe,
   useV1AdminMatches,
   useV1ChangeMatchStatus,
 } from '@/hooks/use-v1-api';
 import { formatAdminDateTimeShort } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
+import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import { useAdminListQuery } from '@/hooks/use-admin-list-query';
 import {
   AdminPageHeader,
@@ -76,8 +76,7 @@ function AdminMatchesPageContent() {
   const { toasts, showToast } = useAdminToast();
 
   // Capability check
-  const { data: adminMe } = useV1AdminMe();
-  const canWrite = adminMe?.capabilities.includes('status:write') ?? false;
+  const canWrite = useAdminCanWrite();
 
 
   const {

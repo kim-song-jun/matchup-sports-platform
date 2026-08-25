@@ -3,13 +3,11 @@
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { Plus, Calendar, Clock, Users, Coins } from 'lucide-react';
-import {
-  useV1AdminTournaments,
-  useV1AdminMe,
-} from '@/hooks/use-v1-api';
+import { useV1AdminTournaments } from '@/hooks/use-v1-api';
 import type { V1Tournament } from '@/types/api';
 import { formatAdminDateTimeShort, formatEntryFee } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
+import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import { useAdminListQuery } from '@/hooks/use-admin-list-query';
 import {
   AdminPageHeader,
@@ -50,8 +48,7 @@ const PAGE_SIZE = 20;
 // ── Page ──────────────────────────────────────────────────────────────────
 
 export default function AdminTournamentsPage() {
-  const { data: adminMe } = useV1AdminMe();
-  const canWrite = adminMe?.capabilities.includes('status:write') ?? false;
+  const canWrite = useAdminCanWrite();
 
   // 검색 debounce·상태 필터·page 리셋은 공용 훅이 담당 (M1 표준 — users/teams와 동일)
   const { search, setSearch, activeStatus, setActiveStatus, filters, buildPagination } =

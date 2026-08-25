@@ -13,9 +13,9 @@ import {
   useAdminToast,
 } from '@/components/admin';
 import type { AdminToastVariant } from '@/components/admin';
+import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import {
   useV1AdminInquiry,
-  useV1AdminMe,
   useV1BlockReportedTeam,
   useV1ChangeAdminInquiryStatus,
   useV1ChangeTeamStatus,
@@ -296,7 +296,6 @@ function ReportedTeamSection({
 export default function AdminInquiryDetailPage() {
   const params = useParams<{ id: string }>();
   const inquiryId = params.id;
-  const { data: adminMe } = useV1AdminMe();
   const { data: inquiry, isPending, isError, error, refetch } = useV1AdminInquiry(inquiryId);
   const replyMutation = useV1ReplyAdminInquiry(inquiryId);
   const updateReplyMutation = useV1UpdateAdminInquiryReply(inquiryId);
@@ -306,7 +305,7 @@ export default function AdminInquiryDetailPage() {
   const [status, setStatus] = useState<V1InquiryStatus>('reviewing');
   const [editingReplyId, setEditingReplyId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState('');
-  const canWrite = adminMe?.capabilities.includes('status:write') ?? false;
+  const canWrite = useAdminCanWrite();
 
   function startEditReply(replyId: string, currentBody: string) {
     setEditingReplyId(replyId);

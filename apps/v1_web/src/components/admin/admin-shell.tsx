@@ -22,7 +22,6 @@ import {
   MessageSquareText,
   ShieldCheck,
   Settings,
-  Star,
   Send,
   ScrollText,
   ChevronLeft,
@@ -115,8 +114,8 @@ const BASE_NAV_GROUPS: NavGroup[] = [
   {
     label: '설정',
     items: [
-      { label: '연동 설정', href: '/admin/settings/integrations', icon: <Settings size={18} /> },
-      { label: '후기 정책', href: '/admin/settings/reviews', icon: <Star size={18} /> },
+      // 연동 설정·후기 정책은 2026-08-25 설정 허브(A안)로 흡수 — /admin/settings 탭.
+      { label: '설정', href: '/admin/settings', icon: <Settings size={18} /> },
     ],
   },
 ];

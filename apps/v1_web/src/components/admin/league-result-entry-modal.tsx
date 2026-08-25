@@ -78,6 +78,8 @@ export function LeagueResultEntryModal({
   const firstFocusableRef = useRef<HTMLInputElement>(null);
   /** Saved reference to the element that was focused before the modal opened (for focus restore on close) */
   const previousFocusRef = useRef<Element | null>(null);
+  /** 정정 모드 프리필을 열림당 1회로 제한한다 — 아래 프리필 effect 참고. */
+  const prefillDoneRef = useRef(false);
 
   // Reset form whenever the modal opens (또는 모드가 바뀌면 — 같은 대진이라도 신규↔정정
   // 전환 시 이전 입력값이 새 모드에 새어 들어가면 안 된다).
@@ -87,8 +89,35 @@ export function LeagueResultEntryModal({
       setAwayScore('');
       setReason('');
       setScorerRows([]);
+      prefillDoneRef.current = false;
     }
   }, [open, mode]);
+
+  // 정정 모드 프리필: 현재 공식 기록을 행으로 미리 채운다 — 빈 화면이 "기록 없음"으로
+  // 오독돼 정정 한 번에 기존 기록이 지워지는 사고를 막는다. participants 는 비동기로
+  // 늦게 도착할 수 있어 열림당 1회만 채운다(그 뒤의 사용자 편집을 덮어쓰지 않는다).
+  useEffect(() => {
+    if (!open || mode !== 'correction' || prefillDoneRef.current || participants == null) return;
+    const bySide = new Map<string, { side: 'home' | 'away'; name: string }>();
+    for (const player of participants.home.players) bySide.set(player.participantId, { side: 'home', name: player.name });
+    for (const player of participants.away.players) bySide.set(player.participantId, { side: 'away', name: player.name });
+    setScorerRows(
+      participants.currentStats.flatMap((stat) => {
+        const found = bySide.get(stat.participantId);
+        if (found === undefined) return [];
+        return [
+          {
+            participantId: stat.participantId,
+            side: found.side,
+            name: found.name,
+            goals: stat.goals === 0 ? '' : String(stat.goals),
+            assists: stat.assists === 0 ? '' : String(stat.assists),
+          },
+        ];
+      }),
+    );
+    prefillDoneRef.current = true;
+  }, [open, mode, participants]);
 
   // Save focus on open; restore it on close via every path (ESC / backdrop / Cancel / submit) (WCAG 2.4.3)
   useEffect(() => {

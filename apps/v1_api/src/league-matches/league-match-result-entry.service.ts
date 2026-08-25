@@ -7,6 +7,7 @@ import { RecordLeagueResultDto } from './dto/league-match-result-entry.dto';
 import { parseStoredScore } from './league-lifecycle-rules';
 import {
   assembleLeagueResultParticipants,
+  carryForwardResultParticipants,
   type AssembledResultParticipant,
 } from './league-result-participants';
 
@@ -160,7 +161,7 @@ export class LeagueMatchResultEntryService {
   async listFixtureParticipants(user: V1AuthUser, leagueId: string, teamMatchId: string) {
     await this.adminContext.getActiveAdmin(user.id);
     const fixture = await this.loadMatchedFixture(leagueId, teamMatchId);
-    const [sides, participants] = await Promise.all([
+    const [sides, participants, game] = await Promise.all([
       this.prisma.v1GameSide.findMany({
         where: { gameId: fixture.gameId },
         select: { id: true, sideKey: true, displayNameSnapshot: true },
@@ -170,7 +171,23 @@ export class LeagueMatchResultEntryService {
         select: { id: true, sideId: true, displayNameSnapshot: true },
         orderBy: { displayNameSnapshot: 'asc' },
       }),
+      this.prisma.v1Game.findUnique({
+        where: { id: fixture.gameId },
+        select: { currentOfficialRevisionId: true },
+      }),
     ]);
+    // 정정 모달이 기존 기록을 미리 채우는 데 쓴다 — 빈 화면이 "기록 없음"으로 오독돼
+    // 정정 한 번에 개인 기록이 지워지는 사고를 막는다. 기록이 있는 행만 싣는다.
+    const currentStats =
+      game?.currentOfficialRevisionId == null
+        ? []
+        : await this.prisma.v1GameResultParticipant.findMany({
+            where: {
+              resultRevisionId: game.currentOfficialRevisionId,
+              OR: [{ goals: { gt: 0 } }, { assists: { gt: 0 } }],
+            },
+            select: { participantId: true, goals: true, assists: true },
+          });
     const bySide = (sideKey: 'HOME' | 'AWAY') => {
       const side = sides.find((row) => row.sideKey === sideKey);
       return {
@@ -183,7 +200,45 @@ export class LeagueMatchResultEntryService {
                 .map((row) => ({ participantId: row.id, name: row.displayNameSnapshot })),
       };
     };
-    return { leagueId, teamMatchId, home: bySide('HOME'), away: bySide('AWAY') };
+    return { leagueId, teamMatchId, home: bySide('HOME'), away: bySide('AWAY'), currentStats };
+  }
+
+  /**
+   * 정정에서 participants 미전송 시: 직전 공식 리비전의 개인 기록을 그대로 승계한다.
+   * 규칙(스코어 하향 정정과의 충돌 검증 포함)은 순수 모듈이 수행한다.
+   */
+  private async carryForwardFromRevision(
+    gameId: string,
+    revisionId: string,
+    dto: RecordLeagueResultDto,
+  ): Promise<AssembledResultParticipant[]> {
+    const [rows, sides] = await Promise.all([
+      this.prisma.v1GameResultParticipant.findMany({
+        where: { resultRevisionId: revisionId },
+        select: {
+          participantId: true,
+          sideId: true,
+          started: true,
+          minutesPlayed: true,
+          goals: true,
+          assists: true,
+          fouls: true,
+          cards: true,
+          goalkeeper: true,
+        },
+      }),
+      this.prisma.v1GameSide.findMany({ where: { gameId }, select: { id: true, sideKey: true } }),
+    ]);
+    const result = carryForwardResultParticipants({
+      rows,
+      sides: sides.map((side) => ({ id: side.id, sideKey: side.sideKey as 'HOME' | 'AWAY' })),
+      homeScore: dto.homeScore,
+      awayScore: dto.awayScore,
+    });
+    if (!result.ok) {
+      throw new BadRequestException({ code: result.code, message: result.message });
+    }
+    return result.actualParticipants;
   }
 
   /**
@@ -412,16 +467,21 @@ export class LeagueMatchResultEntryService {
     const attempt = latestRevision.revision + 1;
     const commandPrefix = `league-result-correction:${gameId}:${attempt}`;
 
+    // 정정의 participants 계약(Copilot 리뷰 반영 — 미전송 정정이 기존 개인 기록을
+    // 소실시키던 구멍): **미전송(null/undefined) = 직전 공식 기록 승계, 명시적 [] = 삭제,
+    // 전송 = 교체.** 멱등 판정은 스코어·사유만 비교하므로, 참가자만 고치려면 사유를
+    // 바꿔 보내야 한다(정정 사유가 달라지는 것이 감사 로그 관점에서도 맞다).
+    const actualParticipants =
+      dto.participants == null
+        ? await this.carryForwardFromRevision(gameId, latestRevision.id, dto)
+        : await this.resolveActualParticipants(gameId, dto);
+
     const createCommandId = `${commandPrefix}:create`;
     const created = await this.games.createTeamMatchResultCorrection(user, gameId, createCommandId, {
       expectedVersion: teamMatch.gameVersion,
       clientCommandId: createCommandId,
       score: { home: dto.homeScore, away: dto.awayScore },
-      // 정정도 신규 입력과 같은 계약으로 선수별 득점·도움(선택)을 받는다. 멱등 판정은
-      // 스코어·사유만 비교하므로, 같은 스코어·사유에 참가자만 바꾼 재요청은 no-op 이
-      // 된다 — 참가자만 고치려면 사유를 바꿔 보내야 한다(정정 사유가 달라지는 것이
-      // 감사 로그 관점에서도 맞다).
-      actualParticipants: await this.resolveActualParticipants(gameId, dto),
+      actualParticipants,
       eventsHash: canonicalGameCommandPayloadHash([]),
       reason: persistedReason,
     });

@@ -525,6 +525,11 @@ export interface V1LeagueFixtureParticipantsResponse {
   teamMatchId: string;
   home: { teamName: string; players: V1LeagueFixturePlayerOption[] };
   away: { teamName: string; players: V1LeagueFixturePlayerOption[] };
+  /**
+   * 현재 공식 리비전의 개인 기록(기록이 있는 행만). 정정 모달이 미리 채우는 데 쓴다 —
+   * 빈 화면이 "기록 없음"으로 오독돼 정정 한 번에 기록이 지워지는 사고를 막는다.
+   */
+  currentStats: Array<{ participantId: string; goals: number; assists: number }>;
 }
 
 export interface V1RecordLeagueResultResult {

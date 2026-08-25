@@ -403,7 +403,15 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
           homeScore,
           awayScore,
           reason,
-          ...(participantStats.length > 0 ? { participants: participantStats } : {}),
+          // 정정 + 로스터 로딩 성공 시엔 빈 배열도 그대로 보낸다 — 모달이 현재 기록을
+          // 프리필한 상태라 화면이 곧 전체 진실이다(빈 배열 = 명시적 삭제). 그 외(신규
+          // 입력, 로스터 로딩 실패로 섹션 숨김)에는 미전송 — 서버 승계 규칙이 기존
+          // 기록을 보존한다.
+          ...(resultEntryMode === 'correction' && fixtureParticipants.data != null
+            ? { participants: participantStats }
+            : participantStats.length > 0
+              ? { participants: participantStats }
+              : {}),
         },
       },
       {

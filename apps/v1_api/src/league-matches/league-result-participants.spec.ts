@@ -1,4 +1,7 @@
-import { assembleLeagueResultParticipants } from './league-result-participants';
+import {
+  assembleLeagueResultParticipants,
+  carryForwardResultParticipants,
+} from './league-result-participants';
 
 const sides = [
   { id: 'side-home', sideKey: 'HOME' as const },
@@ -119,5 +122,65 @@ describe('assembleLeagueResultParticipants', () => {
       awayScore: 0,
     });
     expect(result).toMatchObject({ ok: false, code: 'LEAGUE_RESULT_ASSISTS_EXCEED_GOALS' });
+  });
+});
+
+describe('carryForwardResultParticipants', () => {
+  const storedRow = {
+    participantId: 'p-h1',
+    sideId: 'side-home',
+    started: true,
+    minutesPlayed: 40,
+    goals: 2,
+    assists: 1,
+    fouls: 3,
+    cards: { yellow: 1, red: 0 },
+    goalkeeper: false,
+  };
+
+  it('직전 공식 기록을 필드 손실 없이 승계한다 (0/null 필드는 생략 매핑)', () => {
+    const result = carryForwardResultParticipants({
+      rows: [
+        storedRow,
+        { participantId: 'p-a1', sideId: 'side-away', started: false, minutesPlayed: null, goals: 1, assists: 0, fouls: 0, cards: null, goalkeeper: true },
+      ],
+      sides,
+      homeScore: 2,
+      awayScore: 1,
+    });
+    expect(result).toEqual({
+      ok: true,
+      actualParticipants: [
+        {
+          participantId: 'p-h1',
+          sideId: 'side-home',
+          started: true,
+          goals: 2,
+          assists: 1,
+          fouls: 3,
+          minutesPlayed: 40,
+          cards: { yellow: 1, red: 0 },
+          goalkeeper: false,
+        },
+        {
+          participantId: 'p-a1',
+          sideId: 'side-away',
+          started: false,
+          goals: 1,
+          cards: { yellow: 0, red: 0 },
+          goalkeeper: true,
+        },
+      ],
+    });
+  });
+
+  it('스코어를 낮추는 정정으로 승계 득점 합이 새 스코어를 넘으면 거부한다', () => {
+    const result = carryForwardResultParticipants({
+      rows: [storedRow],
+      sides,
+      homeScore: 1,
+      awayScore: 0,
+    });
+    expect(result).toMatchObject({ ok: false, code: 'LEAGUE_RESULT_CARRIED_PARTICIPANTS_CONFLICT' });
   });
 });

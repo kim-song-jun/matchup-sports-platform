@@ -23,6 +23,7 @@ const PARTICIPANTS: V1LeagueFixtureParticipantsResponse = {
     ],
   },
   away: { teamName: '왕십리 유나이티드', players: [{ participantId: 'p-a1', name: '이유나' }] },
+  currentStats: [],
 };
 
 function renderModal(overrides: Partial<Parameters<typeof LeagueResultEntryModal>[0]> = {}) {
@@ -97,6 +98,18 @@ describe('LeagueResultEntryModal 득점·도움 기록', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('도움 합은 기록된 득점 합을 넘을 수 없어요');
     await user.click(screen.getByRole('button', { name: '확인' }));
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('정정 모드에서는 현재 공식 기록을 미리 채운다', () => {
+    renderModal({
+      mode: 'correction',
+      currentHomeScore: 2,
+      currentAwayScore: 1,
+      participants: { ...PARTICIPANTS, currentStats: [{ participantId: 'p-h1', goals: 2, assists: 1 }] },
+    });
+
+    expect(screen.getByLabelText('김성수 득점')).toHaveValue(2);
+    expect(screen.getByLabelText('김성수 도움')).toHaveValue(1);
   });
 
   it('participants 미제공이면 섹션이 없고 빈 배열로 제출된다', async () => {

@@ -31,7 +31,22 @@ export interface AssembledResultParticipant {
   started: boolean;
   goals: number;
   assists?: number;
+  fouls?: number;
+  minutesPlayed?: number;
   cards: { yellow: number; red: number };
+  goalkeeper: boolean;
+}
+
+/** 직전 공식 리비전에 저장돼 있던 개인 기록 한 행 (V1GameResultParticipant 부분집합). */
+export interface StoredResultParticipantRow {
+  participantId: string;
+  sideId: string;
+  started: boolean;
+  minutesPlayed: number | null;
+  goals: number;
+  assists: number;
+  fouls: number;
+  cards: unknown;
   goalkeeper: boolean;
 }
 
@@ -116,4 +131,64 @@ export function assembleLeagueResultParticipants(input: {
   }
 
   return { ok: true, actualParticipants: assembled };
+}
+
+/**
+ * 정정에서 participants 를 **보내지 않았을 때**, 직전 공식 리비전의 개인 기록을 새
+ * 리비전으로 그대로 승계한다 — 스코어·사유만 고치는 정정이 득점·도움 기록을
+ * 소실시키면 안 된다(BRACKET-6 outcome_note 승계와 같은 원칙, Copilot 리뷰 반영).
+ * 명시적 빈 배열(`participants: []`)은 승계가 아니라 "기록 삭제"로, 이 함수를 타지 않는다.
+ *
+ * 스코어를 낮추는 정정으로 승계 기록의 사이드별 득점 합이 새 스코어를 넘게 되면,
+ * 조용히 불일치 기록을 저장하는 대신 거부한다 — 운영자가 기록을 함께 다시 입력해야 한다.
+ */
+export function carryForwardResultParticipants(input: {
+  rows: StoredResultParticipantRow[];
+  sides: LeagueGameSideRow[];
+  homeScore: number;
+  awayScore: number;
+}): AssembleResult {
+  const { rows, sides, homeScore, awayScore } = input;
+  const sideKeyById = new Map(sides.map((side) => [side.id, side.sideKey]));
+  const scoreBySideKey: Record<'HOME' | 'AWAY', number> = { HOME: homeScore, AWAY: awayScore };
+  const goalSum: Record<'HOME' | 'AWAY', number> = { HOME: 0, AWAY: 0 };
+
+  const carried: AssembledResultParticipant[] = [];
+  for (const row of rows) {
+    const sideKey = sideKeyById.get(row.sideId);
+    // 승계 원본이 이 게임의 사이드가 아닐 수는 없지만(같은 게임의 리비전), 방어적으로 건너뛴다.
+    if (sideKey === undefined) continue;
+    goalSum[sideKey] += row.goals;
+    const cards =
+      typeof row.cards === 'object' && row.cards !== null
+        ? {
+            yellow: Number((row.cards as { yellow?: unknown }).yellow) || 0,
+            red: Number((row.cards as { red?: unknown }).red) || 0,
+          }
+        : { yellow: 0, red: 0 };
+    carried.push({
+      participantId: row.participantId,
+      sideId: row.sideId,
+      started: row.started,
+      goals: row.goals,
+      ...(row.assists === 0 ? {} : { assists: row.assists }),
+      ...(row.fouls === 0 ? {} : { fouls: row.fouls }),
+      ...(row.minutesPlayed === null ? {} : { minutesPlayed: row.minutesPlayed }),
+      cards,
+      goalkeeper: row.goalkeeper,
+    });
+  }
+
+  for (const sideKey of ['HOME', 'AWAY'] as const) {
+    const label = sideKey === 'HOME' ? '홈' : '원정';
+    if (goalSum[sideKey] > scoreBySideKey[sideKey]) {
+      return {
+        ok: false,
+        code: 'LEAGUE_RESULT_CARRIED_PARTICIPANTS_CONFLICT',
+        message: `${label} 팀의 기존 선수 득점 합(${goalSum[sideKey]})이 정정 스코어(${scoreBySideKey[sideKey]})보다 많아요. 득점·도움 기록을 함께 다시 입력해 주세요.`,
+      };
+    }
+  }
+
+  return { ok: true, actualParticipants: carried };
 }

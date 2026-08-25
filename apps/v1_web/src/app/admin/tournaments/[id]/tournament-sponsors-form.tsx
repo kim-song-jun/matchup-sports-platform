@@ -108,6 +108,8 @@ export function TournamentSponsorForm({
             label="협찬사 로고"
             helperText="JPG, PNG, WebP · 최대 10MB. 정사각형 또는 가로형 로고를 권장해요."
             previewAlt="선택한 협찬사 로고 미리보기"
+            // 로고는 잘리면 안 된다 — 실제 노출(협찬 섹션 object-contain)과 동일하게 맞춘다.
+            previewFit="contain"
           />
           {logoUploadError ? (
             <p role="alert" className="text-xs text-[var(--red700)]">{logoUploadError}</p>

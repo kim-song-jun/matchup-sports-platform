@@ -17,6 +17,11 @@ type CoverImageUploaderProps = {
   helperText?: string;
   previewAlt?: string;
   eager?: boolean;
+  /**
+   * 미리보기 맞춤 방식. 사진형 커버는 실제 노출(정사각 썸네일 크롭)과 같은 'cover',
+   * 로고처럼 잘리면 안 되는 이미지는 'contain' — 미리보기는 항상 실제 노출을 따라간다.
+   */
+  previewFit?: 'cover' | 'contain';
 };
 
 export function CoverImageUploader({
@@ -29,6 +34,7 @@ export function CoverImageUploader({
   helperText = 'JPG, PNG, WebP · 큰 사진은 올릴 때 자동으로 줄여요. 목록·상세는 물론 홍보 카드의 기본 이미지로도 함께 쓰여요.',
   previewAlt,
   eager = false,
+  previewFit = 'cover',
 }: CoverImageUploaderProps) {
   const generatedId = useId();
   const inputId = `tournament-cover-${generatedId.replaceAll(':', '')}`;
@@ -51,7 +57,7 @@ export function CoverImageUploader({
             alt={previewAlt ?? (value ? '선택한 대회 커버 미리보기' : '대회 커버 이미지 예시')}
             fill
             sizes="(max-width: 640px) 100vw, 240px"
-            className={`object-cover ${value ? '' : 'opacity-55'}`}
+            className={`${previewFit === 'contain' ? 'object-contain p-3' : 'object-cover'} ${value ? '' : 'opacity-55'}`}
             loading={eager ? 'eager' : 'lazy'}
             fetchPriority={eager ? 'high' : 'auto'}
             unoptimized

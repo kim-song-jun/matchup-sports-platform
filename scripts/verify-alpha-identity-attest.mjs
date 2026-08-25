@@ -132,14 +132,25 @@ console.log(`pending: ok — requestId=${row.requestId} participant="${row.parti
 // 알림은 신청 트랜잭션 안에서 쓰이므로 신청 성공 = 알림 존재다(지연 없음). 다만 확인자의
 // 알림함이 활발하면 최근 20건 밖으로 밀릴 수 있어 창을 넓히고 **참가자 이름까지** 맞춘다
 // — 제목만 맞추면 이전 실행의 다른 참가자 알림을 잡아 통과할 수도 있다(Copilot 리뷰).
-const notifications = await api('/notifications?limit=50', { session: attestorSession });
-const arrived = (notifications.data?.items ?? []).find(
-  (n) =>
-    n.title === '기록 연결 승인 요청이 도착했어요' &&
-    typeof n.body === 'string' &&
-    n.body.includes(candidate.displayName),
-);
-assert(arrived, `리더의 알림함에 "${candidate.displayName}" 승인 요청 알림이 없음`);
+// 조회 자체의 실패(401/5xx)를 "알림 없음"으로 읽으면 원인을 엉뚱한 데서 찾게 된다 —
+// 매 회 status 를 먼저 검증하고, 반영 지연에 대비해 짧게만 재시도한다(Copilot 리뷰).
+let arrived = null;
+for (let attempt = 1; attempt <= 5; attempt += 1) {
+  const notifications = await api('/notifications?limit=50', { session: attestorSession });
+  assert(
+    notifications.status === 200,
+    `알림 목록 조회가 200 이 아님 — ${notifications.status} ${notifications.code} (알림 없음이 아니라 조회 실패다)`,
+  );
+  arrived = (notifications.data?.items ?? []).find(
+    (n) =>
+      n.title === '기록 연결 승인 요청이 도착했어요' &&
+      typeof n.body === 'string' &&
+      n.body.includes(candidate.displayName),
+  );
+  if (arrived) break;
+  await new Promise((r) => setTimeout(r, 1000));
+}
+assert(arrived, `리더의 알림함에 "${candidate.displayName}" 승인 요청 알림이 없음(5회 조회)`);
 // 목록 응답은 deepLink 를 `target.route` 안에 담아 내려준다(notifications.service.ts list()).
 // 최상위 `deepLink`/`route` 로 읽으면 undefined 라 "딥링크 없음"으로 오판한다.
 const route = arrived.target?.route ?? null;

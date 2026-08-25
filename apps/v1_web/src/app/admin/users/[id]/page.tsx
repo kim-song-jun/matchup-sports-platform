@@ -27,6 +27,7 @@ import {
   useV1DeleteAdminUser,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { formatAuthProviders, formatGender, formatOnboardingStatus, formatUserTitle } from '@/lib/format-user';
 import type { V1AdminUserDetail } from '@/types/api';
 
 function formatDateTime(value: string | null | undefined) {
@@ -42,25 +43,14 @@ function formatDateTime(value: string | null | undefined) {
     hour12: false,
   });
 }
-function formatGender(gender: V1AdminUserDetail['gender']) {
-  if (gender === 'male') return '남';
-  if (gender === 'female') return '여';
-  return '성별 미등록';
-}
-
 function formatVerification(value: string | null) {
   return value ? `인증 · ${formatDateTime(value)}` : '미인증';
 }
 
-
-function formatAuthProviders(providers: V1AdminUserDetail['authProviders']) {
-  const labels = { kakao: '카카오', naver: '네이버', email: '이메일' } as const;
-  const values = providers ?? [];
-  return values.length > 0 ? values.map((provider) => labels[provider]).join(' · ') : '로그인 수단 없음';
-}
-
+// 목록(formatUserTitle)과 다른 로직을 복제해 같은 회원이 화면마다 다른 이름으로
+// 보이던 결함 — 표기는 lib/format-user.ts 단일 소스를 쓴다.
 function userTitle(user: V1AdminUserDetail) {
-  return user.nickname ?? user.displayName ?? user.email ?? user.userId.slice(0, 8);
+  return formatUserTitle(user);
 }
 
 type TeamMembershipRole = NonNullable<V1AdminUserDetail['teamMemberships']>[number]['role'];
@@ -185,7 +175,7 @@ export default function AdminUserDetailPage() {
               <AdminDetailRow label="생년월일" value={user.birthDate} />
               <AdminDetailRow label="활동 지역" value={user.displayRegion} />
               <AdminDetailRow label="로그인 방식" value={formatAuthProviders(user.authProviders)} />
-              <AdminDetailRow label="온보딩" value={user.onboardingStatus} />
+              <AdminDetailRow label="온보딩" value={formatOnboardingStatus(user.onboardingStatus)} />
               <AdminDetailRow label="가입일" value={formatDateTime(user.createdAt)} />
               <AdminDetailRow label="최근 로그인" value={formatDateTime(user.lastLoginAt)} />
               <AdminDetailRow label="삭제일" value={formatDateTime(user.deletedAt)} />

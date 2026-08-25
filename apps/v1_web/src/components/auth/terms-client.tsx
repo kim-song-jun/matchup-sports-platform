@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronRightIcon } from '@/components/v1-ui/icons';
+import { TermsDocumentSubtitleAndCard } from '@/components/auth/terms-document-body';
 import { Button } from '@/components/v1-ui/button';
 import {
   useV1AcceptSignupTerms,
@@ -205,16 +206,10 @@ export function TermsClient() {
             </div>
           ) : null}
           {managedDocument ? (
-            <>
-              {managedDocument.subtitle ? (
-                <p className="tm-text-body tm-auth-sub">{managedDocument.subtitle}</p>
-              ) : null}
-              <div className="tm-auth-soft-card" style={{ display: 'grid', gap: 14, marginTop: 18 }}>
-                <p className="tm-text-caption" style={{ margin: 0, lineHeight: 1.65, whiteSpace: 'pre-line' }}>
-                  {managedDocument.content}
-                </p>
-              </div>
-            </>
+            <TermsDocumentSubtitleAndCard
+              subtitle={managedDocument.subtitle}
+              content={managedDocument.content}
+            />
           ) : null}
         </div>
       </AuthFrame>

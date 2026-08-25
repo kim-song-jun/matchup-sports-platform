@@ -20,6 +20,7 @@ import {
   useV1UpdateAdminTermsPolicy,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { TermsDocumentBody } from '@/components/auth/terms-document-body';
 import type {
   V1AdminTermsDocument,
   V1AdminTermsPlacementPayload,
@@ -572,20 +573,25 @@ export default function AdminTermsPage() {
                   화면 높이가 4,851px(모바일 8.7화면)까지 늘어났고, 정작 편집 폼이 위쪽 20%로
                   밀려 스크롤을 되감아야 했다(2026-08-17 로컬 실측). */}
               <div className="rounded-2xl bg-[var(--surface-soft)] p-4">
-                <p className="mb-3 text-xs font-bold text-[var(--text-muted)]">실제 본문 미리보기</p>
-                <article className="mx-auto max-w-[680px] rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5 md:p-7">
-                  <h3 className="text-xl font-bold text-[var(--text-strong)]">{form.title || '약관 제목'}</h3>
-                  {form.subtitle ? <p className="mt-2 text-sm text-[var(--text-muted)]">{form.subtitle}</p> : null}
-                  <p className="mt-1 text-xs text-gray-400">{form.version || '버전 미입력'}</p>
-                  <div
-                    tabIndex={0}
-                    role="region"
-                    aria-label="약관 본문 미리보기"
-                    className="mt-6 max-h-[420px] overflow-y-auto whitespace-pre-wrap break-words text-sm leading-7 text-[var(--text-body)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-                  >
-                    {form.content || '약관 본문이 여기에 표시돼요.'}
-                  </div>
-                </article>
+                <p className="mb-3 text-xs font-bold text-[var(--text-muted)]">
+                  실제 본문 미리보기
+                  <span className="ml-2 font-medium text-gray-400">{form.version || '버전 미입력'}</span>
+                </p>
+                {/* "실제"라는 라벨에 걸맞게 사용자 화면(terms-client)과 같은 컴포넌트를 그대로
+                    그린다 — 예전엔 여기만의 타이포그래피(text-sm leading-7)로 근사치를 그려
+                    운영자가 실화면과 다른 모습을 보고 확신하는 결함이 있었다. */}
+                <div
+                  tabIndex={0}
+                  role="region"
+                  aria-label="약관 본문 미리보기"
+                  className="mx-auto max-h-[420px] max-w-[680px] overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 md:p-7"
+                >
+                  <TermsDocumentBody
+                    title={form.title || '약관 제목'}
+                    subtitle={form.subtitle || null}
+                    content={form.content || '약관 본문이 여기에 표시돼요.'}
+                  />
+                </div>
               </div>
             </div>
           )}

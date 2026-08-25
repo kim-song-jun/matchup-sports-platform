@@ -1815,7 +1815,9 @@ export function useV1AttestIdentityLink(gameId: string | null | undefined) {
         { headers: { 'idempotency-key': clientCommandId } },
       );
     },
-    onSuccess: () => {
+    // onSuccess 가 아니라 onSettled 다 — stale expectedVersion 으로 409 가 나는 경우가
+    // 정확히 "목록이 낡았다"는 뜻이라 그때야말로 다시 불러와야 한다 (Copilot 리뷰).
+    onSettled: () => {
       void queryClient.invalidateQueries({
         queryKey: ['v1', 'pending-identity-link-requests', gameId ?? ''],
       });

@@ -2784,13 +2784,20 @@ export class GamesService {
         canAttestBySideId.set(side.id, false);
       }
     }
-    const visible = pending.filter((event) => {
+    // 이벤트와 참가자를 여기서 한 쌍으로 확정한다 — 아래 응답 생성에서 다시 조회하며
+    // 빈 문자열로 폴백하면 데이터 불일치가 "이름 없는 요청"으로 조용히 나간다(Copilot 리뷰).
+    const visible = pending.flatMap((event) => {
       const participant = participantById.get(event.participantId);
-      return participant !== undefined && canAttestBySideId.get(participant.sideId) === true;
+      if (participant === undefined || canAttestBySideId.get(participant.sideId) !== true) {
+        return [];
+      }
+      return [{ event, participant }];
     });
 
     const requesterIds = [
-      ...new Set(visible.map((event) => event.userId).filter((id): id is string => typeof id === 'string')),
+      ...new Set(
+        visible.map(({ event }) => event.userId).filter((id): id is string => typeof id === 'string'),
+      ),
     ];
     const requesters =
       requesterIds.length === 0
@@ -2806,20 +2813,17 @@ export class GamesService {
       // attest 의 expectedVersion 으로 그대로 되돌아가는 값 — claim 목록과 같은 이유로
       // 목록과 같은 시점의 버전을 함께 내린다.
       version: game.version,
-      requests: visible.map((event) => {
-        const participant = participantById.get(event.participantId);
-        return {
-          requestId: event.requestId,
-          participantId: event.participantId,
-          participantDisplayName: participant?.displayNameSnapshot ?? '',
-          jerseyNumber: participant?.jerseyNumber ?? null,
-          sideId: participant?.sideId ?? null,
-          requesterNickname:
-            typeof event.userId === 'string' ? (nicknameById.get(event.userId) ?? null) : null,
-          requestedAt: event.effectiveAt.toISOString(),
-          expiresAt: new Date(event.effectiveAt.getTime() + 24 * 60 * 60 * 1000).toISOString(),
-        };
-      }),
+      requests: visible.map(({ event, participant }) => ({
+        requestId: event.requestId,
+        participantId: event.participantId,
+        participantDisplayName: participant.displayNameSnapshot,
+        jerseyNumber: participant.jerseyNumber,
+        sideId: participant.sideId,
+        requesterNickname:
+          typeof event.userId === 'string' ? (nicknameById.get(event.userId) ?? null) : null,
+        requestedAt: event.effectiveAt.toISOString(),
+        expiresAt: new Date(event.effectiveAt.getTime() + 24 * 60 * 60 * 1000).toISOString(),
+      })),
     };
   }
 

@@ -55,8 +55,8 @@ function mockLeague(overrides?: { fixtures?: unknown[] }) {
   } as never);
 }
 
-function mockViewer(state: 'none' | 'approved' | 'host_team') {
-  useV1TeamMatchMock.mockReturnValue({ data: { id: 'fx-1', viewer: { state } } } as never);
+function mockViewer(state: 'none' | 'approved' | 'host_team', extra: Record<string, boolean> = {}) {
+  useV1TeamMatchMock.mockReturnValue({ data: { id: 'fx-1', viewer: { state, ...extra } } } as never);
   useV1ResolveChatRoomMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
 }
 
@@ -111,6 +111,19 @@ describe('LeagueFixtureDetailClient', () => {
     expect(screen.getByRole('link', { name: '라인업 관리' })).toHaveAttribute('href', '/team-matches/fx-1/lineup');
     // 아직 스코어 없는 예정 경기라 결과 링크는 뜨지 않는다.
     expect(screen.queryByText('결과 상세·이의 제기')).not.toBeInTheDocument();
+  });
+
+  // alpha 실측(2026-08-25) — 리그 대진 신청서는 운영자가 만들어서 away 팀 팀장의
+  // viewerState 는 'approved' 가 아니라 'none' 이다. 결과 승인 게이트 필드로 판정해야
+  // 카드가 뜬다. 채팅 개설 권한은 없으므로 채팅 버튼은 숨는다.
+  it('away 팀 팀장(manageableOpponentTeam)은 채팅 없이 라인업 통로가 뜬다', () => {
+    mockLeague();
+    mockViewer('none', { manageableOpponentTeam: true });
+    render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
+
+    expect(screen.getByText('우리 팀 경기')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '라인업 관리' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '상대팀과 채팅' })).not.toBeInTheDocument();
   });
 
   it('리그에 없는 경기 id 는 오류 안내와 리그로 돌아가는 링크를 보여준다', () => {

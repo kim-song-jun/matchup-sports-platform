@@ -143,7 +143,8 @@ function LeaguesPanel({
     seriesFilter || undefined,
   );
   const items = data?.items ?? [];
-  // 칩 목록용 — 리그 체계 탭 본문과 쿼리 키가 같아 요청은 한 번만 나간다.
+  // 칩 목록용 — 리그 체계 탭 본문과 쿼리 키·캐시를 공유한다(전역 staleTime 30초 안의
+  // 탭 전환은 재요청 없이 캐시를 읽고, 그 뒤 리마운트는 백그라운드 갱신이 될 수 있다).
   const { data: seriesData } = useV1AdminLeagueSeriesList();
   const seriesOptions = seriesData?.items ?? [];
 

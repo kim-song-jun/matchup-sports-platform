@@ -42,7 +42,8 @@ export function AdminFilterBar({
 
   return (
     <div className="flex flex-col gap-2.5">
-      {/* Search row — hideSearch=true인 경우(백엔드 q 미지원) 렌더 생략 */}
+      {/* Search row — hideSearch=true인 경우 렌더 생략. "백엔드 q 미지원"이라 적혀
+          있었으나 사실이 아니었다(대회 목록도 q 지원) — 숨김 여부는 화면이 결정한다. */}
       {!hideSearch && (
         <div className="relative">
           {/* Visually-hidden label (linked via htmlFor) */}

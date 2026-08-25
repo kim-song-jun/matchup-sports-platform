@@ -1,14 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { Plus, Calendar, Clock, Users, Coins } from 'lucide-react';
 import {
   useV1AdminTournaments,
   useV1AdminMe,
 } from '@/hooks/use-v1-api';
-import type { V1Tournament, V1TournamentStatus } from '@/types/api';
+import type { V1Tournament } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { useAdminListQuery } from '@/hooks/use-admin-list-query';
 import {
   AdminPageHeader,
   AdminDataTable,
@@ -70,32 +71,19 @@ export default function AdminTournamentsPage() {
   const { data: adminMe } = useV1AdminMe();
   const canWrite = adminMe?.capabilities.includes('status:write') ?? false;
 
-  const [activeStatus, setActiveStatus] = useState<string>('');
+  // 검색 debounce·상태 필터·page 리셋은 공용 훅이 담당 (M1 표준 — users/teams와 동일)
+  const { search, setSearch, activeStatus, setActiveStatus, filters, buildPagination } =
+    useAdminListQuery({ pageSize: PAGE_SIZE });
 
-  // URL pre-selection on mount
+  // URL pre-selection on mount (?status= 딥링크 — 기존 동작 유지)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const s = params.get('status') ?? '';
     if (s) setActiveStatus(s);
-  }, []);
-
-  // 커서 누적 대신 페이지 단위 교체다 — 목록 어디쯤인지와 총량이 보여야 한다.
-  const [page, setPage] = useState(1);
+  }, [setActiveStatus]);
 
   const { toasts, showToast: _showToast } = useAdminToast();
   // showToast is available for future use (e.g. after bulk actions)
-
-  const handleStatusChange = (value: string) => {
-    setActiveStatus(value);
-    // 필터를 좁히면 보던 페이지에 결과가 없을 수 있어 첫 페이지로 되돌린다.
-    setPage(1);
-  };
-
-  const filters = {
-    ...(activeStatus ? { status: activeStatus as V1TournamentStatus } : {}),
-    page,
-    limit: PAGE_SIZE,
-  };
 
   const { data, isPending, isFetching, isError, error, refetch } =
     useV1AdminTournaments(filters);
@@ -135,14 +123,16 @@ export default function AdminTournamentsPage() {
       />
 
       <div className="flex flex-col gap-4">
-        {/* Filter bar — no text search (backend has no q for tournaments) */}
+        {/* "backend has no q" 주석 때문에 검색이 죽어 있었다 — 백엔드는 처음부터
+            q(제목 contains, insensitive)를 지원한다. tournaments-admin.service.ts list 참조 */}
         <AdminFilterBar
-          hideSearch
-          searchValue=""
-          onSearchChange={() => undefined}
+          searchLabel="대회명 검색"
+          searchPlaceholder="대회명 검색"
+          searchValue={search}
+          onSearchChange={setSearch}
           statusOptions={statusOptions}
           activeStatus={activeStatus}
-          onStatusChange={handleStatusChange}
+          onStatusChange={setActiveStatus}
         />
 
         {/* Card list */}
@@ -152,18 +142,7 @@ export default function AdminTournamentsPage() {
           <AdminDataTable<V1Tournament>
             rows={rows}
             keyExtractor={(r) => r.id}
-            pagination={
-              pageInfo?.totalPages
-                ? {
-                    page: pageInfo.page ?? page,
-                    totalPages: pageInfo.totalPages,
-                    total: pageInfo.total ?? 0,
-                    limit: pageInfo.limit ?? PAGE_SIZE,
-                    onPageChange: setPage,
-                    loading: isFetching,
-                  }
-                : undefined
-            }
+            pagination={buildPagination(pageInfo, isFetching)}
             tableMaxWidth="max-w-none"
             rowTone={(row) =>
               row.status === 'cancelled' ? 'danger' : row.status === 'closed' ? 'warning' : undefined

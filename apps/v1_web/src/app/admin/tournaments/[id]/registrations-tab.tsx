@@ -551,6 +551,12 @@ export function RegistrationsTab({
 
   return (
     <>
+      {/* 전량 로더의 안전 상한(1,000건)에 걸린 경우 — 조용한 잘림 금지, 정직하게 알린다 */}
+      {data?.truncated && (
+        <p className="mb-3 rounded-xl bg-[var(--tint-orange)] px-4 py-3 text-[13px] font-medium text-[var(--orange700)]">
+          신청이 1,000건을 넘어 일부만 불러왔어요. 아래 목록과 카운트가 전체보다 적을 수 있어요.
+        </p>
+      )}
       {/* P1-2: 상태 필터 칩 */}
       <div className="flex items-center gap-1.5 flex-wrap mb-3" role="group" aria-label="신청 상태 필터">
         {REGISTRATION_STATUS_FILTERS.map((opt) => {

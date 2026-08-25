@@ -3803,10 +3803,14 @@ export function useV1RemovePlayer(tournamentId: string, registrationId: string) 
 // ---------------------------------------------------------------------------
 
 type AdminTournamentListFilters = {
-  status?: V1Tournament['status'];
+  /** 서버 DTO가 검증한다 — useAdminListQuery.filters(string)를 그대로 받기 위한 완화 */
+  status?: string;
   sportId?: string;
+  /** 제목 검색 (백엔드 title contains, insensitive — tournaments-admin.service.ts list) */
   q?: string;
   cursor?: string;
+  /** 페이지 모드 — 보내면 응답 pageInfo에 total/totalPages가 채워진다(어드민 목록 표) */
+  page?: number;
   limit?: number;
 };
 
@@ -3972,23 +3976,38 @@ export function useV1UnpublishTournamentBracket(id: string) {
   });
 }
 
-type AdminRegistrationListFilters = {
-  status?: string;
-  cursor?: string;
-  limit?: number;
+export type V1AdminRegistrationsAll = {
+  items: V1AdminTournamentRegistration[];
+  /** 안전 상한(1,000건)에 걸려 일부만 모았을 때 true — 소비 UI는 반드시 알린다(조용한 잘림 금지). */
+  truncated: boolean;
 };
 
-export function useV1AdminTournamentRegistrations(
-  tournamentId: string,
-  params?: AdminRegistrationListFilters,
-) {
+/**
+ * 신청 목록 — 커서를 서버 상한(limit=50)씩 자동 순회해 전량을 모은다.
+ * 소비처 3곳(신청 관리 탭·어워드 탭·대진 스테이징)이 전부 클라이언트에서 집계·필터하므로
+ * 부분 페이지는 곧 과소 집계다 — 커서 미처리 + 기본 limit 20으로 21번째 이후 신청이
+ * 화면에서 통째로 누락되고 상태 칩 카운트·대기 배너도 실제보다 적게 잡혔었다.
+ */
+export function useV1AdminTournamentRegistrations(tournamentId: string) {
   return useQuery({
-    queryKey: v1Keys.adminTournamentRegistrations(tournamentId, params as Record<string, unknown>),
-    queryFn: () =>
-      v1Get<V1AdminRegistrationListPage>(
-        `/admin/tournaments/${tournamentId}/registrations`,
-        params,
-      ),
+    queryKey: v1Keys.adminTournamentRegistrations(tournamentId),
+    queryFn: async (): Promise<V1AdminRegistrationsAll> => {
+      const items: V1AdminTournamentRegistration[] = [];
+      let cursor: string | undefined;
+      const MAX_PAGES = 20; // 20 × 50 = 1,000건 — 대회 신청 규모(정원 기반)를 크게 웃도는 안전 상한
+      for (let page = 0; page < MAX_PAGES; page += 1) {
+        const res = await v1Get<V1AdminRegistrationListPage>(
+          `/admin/tournaments/${tournamentId}/registrations`,
+          cursor ? { limit: 50, cursor } : { limit: 50 },
+        );
+        items.push(...res.items);
+        if (!res.pageInfo.hasNext || !res.pageInfo.nextCursor) {
+          return { items, truncated: false };
+        }
+        cursor = res.pageInfo.nextCursor;
+      }
+      return { items, truncated: true };
+    },
     enabled: !!tournamentId,
   });
 }

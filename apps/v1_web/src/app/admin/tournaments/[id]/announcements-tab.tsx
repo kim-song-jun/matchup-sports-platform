@@ -7,7 +7,7 @@ import type { V1AdminTournamentAnnouncement, V1AnnouncementAudience, V1Announcem
 import { extractErrorMessage } from '@/lib/error-message';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { getTournamentAnnouncementCategoryLabel } from '@/components/tournaments/tournament-announcement-category';
-import { AdminDataTable, AdminEmpty } from '@/components/admin';
+import { AdminCardList, AdminEmpty } from '@/components/admin';
 import { formatDate } from './tournament-admin-shared';
 import {
   inputCls,
@@ -267,85 +267,73 @@ export function AnnouncementsTab({
       </div>
       )}
 
-      {/* ── 공지 목록 ─────────────────────────────────────────────────── */}
-      {(annPending || annError) && (
-        <AdminDataTable
-          columns={[]}
-          rows={[]}
-          keyExtractor={() => ''}
-          loading={annPending}
-          error={annError ? extractErrorMessage(annErr, '공지 목록을 불러오지 못했어요.') : undefined}
-          onRetry={() => void annRefetch()}
-        />
-      )}
-      {!annPending && !annError && announcements.length === 0 && (
-        <AdminEmpty title="공지가 없어요" description="아직 작성된 공지가 없어요." />
-      )}
-      {!annPending && !annError && announcements.length > 0 && (
-        <div className="flex flex-col gap-3">
-          {announcements.map((ann) => (
-            <div key={ann.id} className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] px-5 py-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-bold text-[var(--text-strong)] mb-0.5 truncate">{ann.title}</p>
-                  <p className="text-xs text-[var(--text-muted)]">
-                    {getTournamentAnnouncementCategoryLabel(ann.category)}
-                    {' '}·{' '}
-                    {ann.publishedAt ? `발행됨 · ${formatDate(ann.publishedAt)}` : '미발행'}
-                    {' '}·{' '}
-                    {ann.audience === 'public'
-                      ? '전체 공개'
-                      : ann.audience === 'all_registered'
-                      ? '모든 신청팀'
-                      : ann.audience === 'confirmed_only'
-                      ? '확정팀만'
-                      : '대기팀만'}
-                  </p>
-                </div>
-                {canWrite && !ann.publishedAt && (
+      {/* ── 공지 목록 — 로딩/에러만 표를 빌려 쓰고 카드를 손으로 그리던 것을
+          AdminCardList 하나로(로딩·에러·빈 상태·카드 전부 표준). ── */}
+      <AdminCardList<V1AdminTournamentAnnouncement>
+        rows={announcements}
+        keyExtractor={(ann) => ann.id}
+        loading={annPending}
+        error={annError ? extractErrorMessage(annErr, '공지 목록을 불러오지 못했어요.') : undefined}
+        onRetry={() => void annRefetch()}
+        empty={<AdminEmpty title="공지가 없어요" description="아직 작성된 공지가 없어요." />}
+        minCardWidth="100%"
+        actionLayout="compact"
+        card={(ann) => ({
+          title: ann.title,
+          subtitle: [
+            getTournamentAnnouncementCategoryLabel(ann.category),
+            ann.publishedAt ? `발행됨 · ${formatDate(ann.publishedAt)}` : '미발행',
+            ann.audience === 'public'
+              ? '전체 공개'
+              : ann.audience === 'all_registered'
+                ? '모든 신청팀'
+                : ann.audience === 'confirmed_only'
+                  ? '확정팀만'
+                  : '대기팀만',
+          ].join(' · '),
+          description: <span className="whitespace-pre-wrap">{ann.body}</span>,
+        })}
+        renderActions={
+          canWrite
+            ? (ann) => (
+                <>
+                  {!ann.publishedAt && (
+                    <button
+                      type="button"
+                      onClick={() => handlePublish(ann.id)}
+                      disabled={publishAnnouncement.isPending}
+                      aria-label={`"${ann.title}" 발행`}
+                      className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium text-[var(--blue700)] bg-[var(--blue50)] hover:bg-blue-100 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                    >
+                      <Send size={12} aria-hidden="true" />
+                      발행
+                    </button>
+                  )}
                   <button
                     type="button"
-                    onClick={() => handlePublish(ann.id)}
-                    disabled={publishAnnouncement.isPending}
-                    aria-label={`"${ann.title}" 발행`}
-                    className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium text-[var(--blue700)] bg-[var(--blue50)] hover:bg-blue-100 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 shrink-0"
+                    onClick={() => startEditAnnouncement(ann)}
+                    disabled={isSavingAnnouncement || deleteAnnouncement.isPending}
+                    aria-label={`"${ann.title}" 수정`}
+                    className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium text-[var(--text-body)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                   >
-                    <Send size={12} aria-hidden="true" />
-                    발행
+                    <Pencil size={12} aria-hidden="true" />
+                    수정
                   </button>
-                )}
-              </div>
-              {canWrite && (
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => startEditAnnouncement(ann)}
-                  disabled={isSavingAnnouncement || deleteAnnouncement.isPending}
-                  aria-label={`"${ann.title}" 수정`}
-                  className="inline-flex items-center gap-1 min-h-[40px] px-3 rounded-lg text-xs font-medium text-[var(--text-body)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-                >
-                  <Pencil size={12} aria-hidden="true" />
-                  수정
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleDelete(ann)}
-                  disabled={deleteAnnouncement.isPending}
-                  aria-label={`"${ann.title}" 삭제`}
-                  className="inline-flex items-center gap-1 min-h-[40px] px-3 rounded-lg text-xs font-medium text-[var(--red700)] bg-[var(--red50)] hover:bg-red-100 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-red-500 focus-visible:outline-offset-2"
-                >
-                  <Trash2 size={12} aria-hidden="true" />
-                  삭제
-                </button>
-              </div>
-              )}
-              <p className="mt-2 text-[13px] text-[var(--text-muted)] whitespace-pre-wrap leading-relaxed">
-                {ann.body}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
+                  <button
+                    type="button"
+                    onClick={() => void handleDelete(ann)}
+                    disabled={deleteAnnouncement.isPending}
+                    aria-label={`"${ann.title}" 삭제`}
+                    className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium text-[var(--red700)] bg-[var(--red50)] hover:bg-red-100 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-red-500 focus-visible:outline-offset-2"
+                  >
+                    <Trash2 size={12} aria-hidden="true" />
+                    삭제
+                  </button>
+                </>
+              )
+            : undefined
+        }
+      />
       {ConfirmModal}
     </div>
   );

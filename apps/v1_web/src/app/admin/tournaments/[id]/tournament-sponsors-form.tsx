@@ -1,9 +1,8 @@
 'use client';
 
-import Image from 'next/image';
 import type { FormEvent, ReactNode } from 'react';
-import { ImagePlus, Plus, Save, Trash2, X } from 'lucide-react';
-import { publicAssetPath } from '@/lib/assets';
+import { Plus, Save, X } from 'lucide-react';
+import { CoverImageUploader } from '@/components/admin/tournaments/cover-image-uploader';
 import type { SponsorForm } from './tournament-sponsors-admin-model';
 
 const inputCls = [
@@ -97,14 +96,23 @@ export function TournamentSponsorForm({
           />
         </Field>
 
-        <SponsorLogoUploader
-          value={form.logoUrl}
-          disabled={pending}
-          uploading={uploadingLogo}
-          error={logoUploadError}
-          onSelectFile={onSelectLogo}
-          onClear={() => setField('logoUrl', '')}
-        />
+        {/* 커버 업로더와 거의 동일한 로고 업로더를 재구현하고 있던 것을 공용
+            CoverImageUploader 재사용으로 교체 — 에러 표기만 호출부에 남긴다. */}
+        <div className="flex flex-col gap-2">
+          <CoverImageUploader
+            value={form.logoUrl || null}
+            onSelectFile={onSelectLogo}
+            onClear={() => setField('logoUrl', '')}
+            uploading={uploadingLogo}
+            disabled={pending}
+            label="협찬사 로고"
+            helperText="JPG, PNG, WebP · 최대 10MB. 정사각형 또는 가로형 로고를 권장해요."
+            previewAlt="선택한 협찬사 로고 미리보기"
+          />
+          {logoUploadError ? (
+            <p role="alert" className="text-xs text-[var(--red700)]">{logoUploadError}</p>
+          ) : null}
+        </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="홈페이지">
@@ -219,72 +227,6 @@ export function TournamentSponsorForm({
           ) : null}
         </div>
       </form>
-    </div>
-  );
-}
-
-function SponsorLogoUploader({
-  value,
-  disabled,
-  uploading,
-  error,
-  onSelectFile,
-  onClear,
-}: {
-  readonly value: string;
-  readonly disabled: boolean;
-  readonly uploading: boolean;
-  readonly error?: string;
-  readonly onSelectFile: (file: File) => void;
-  readonly onClear: () => void;
-}) {
-  const locked = disabled || uploading;
-
-  return (
-    <div className="flex flex-col gap-2">
-      <span className="text-[13px] text-[var(--text-strong)]">협찬사 로고</span>
-      <div className="grid gap-3 sm:grid-cols-[112px_1fr] sm:items-center">
-        <div className="relative grid aspect-square place-items-center overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface-soft)]">
-          {value ? (
-            <Image
-              src={publicAssetPath(value)}
-              alt="선택한 협찬사 로고 미리보기"
-              fill
-              sizes="112px"
-              className="object-contain p-3"
-              unoptimized
-            />
-          ) : (
-            <ImagePlus size={28} className="text-[var(--text-muted)]" aria-hidden="true" />
-          )}
-        </div>
-        <div className="flex flex-col items-start gap-2">
-          <label className="inline-flex min-h-[44px] cursor-pointer items-center justify-center gap-2 rounded-xl border border-[var(--tint-blue-border)] bg-[var(--card-surface)] px-4 text-sm font-semibold text-[var(--blue700)] transition-colors hover:bg-[var(--blue50)] has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50">
-            <ImagePlus size={16} aria-hidden="true" />
-            {uploading ? '업로드 중…' : value ? '로고 변경' : '로고 선택'}
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              aria-label="협찬사 로고 파일 선택"
-              className="sr-only"
-              disabled={locked}
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) onSelectFile(file);
-                event.target.value = '';
-              }}
-            />
-          </label>
-          {value ? (
-            <button type="button" onClick={onClear} disabled={locked} className="inline-flex min-h-[44px] items-center gap-2 rounded-xl px-4 text-sm font-semibold text-[var(--text-muted)] hover:bg-[var(--red50)] hover:text-[var(--red700)] disabled:opacity-50">
-              <Trash2 size={16} aria-hidden="true" />
-              로고 제거
-            </button>
-          ) : null}
-          <p className="text-xs leading-5 text-[var(--text-muted)]">JPG, PNG, WebP · 최대 10MB. 정사각형 또는 가로형 로고를 권장해요.</p>
-          {error ? <p role="alert" className="text-xs text-[var(--red700)]">{error}</p> : null}
-        </div>
-      </div>
     </div>
   );
 }

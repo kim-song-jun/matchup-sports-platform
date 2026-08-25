@@ -1,12 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Search, Star } from 'lucide-react';
+import { Search, Star } from 'lucide-react';
 import { publicAssetPath } from '@/lib/assets';
 import { useV1AdminTournamentReviews, useV1HideReview, useV1UnhideReview } from '@/hooks/use-v1-api';
 import type { V1AdminTournamentReview } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
-import { AdminEmpty } from '@/components/admin';
+import { AdminEmpty, AdminListSkeleton } from '@/components/admin';
+import { PaginationBar } from '@/components/v1-ui/pagination-bar';
 import { formatDate } from './tournament-admin-shared';
 import {
   SimpleModal,
@@ -127,28 +128,28 @@ export function ReviewsTab({
         </button>
       </form>
 
+      {/* 수제 스켈레톤·에러 블록이 공용 컴포넌트의 분기를 마크업까지 복제하고 있었다 —
+          표준(AdminListSkeleton / AdminEmpty+재시도)으로 교체. 리뷰 카드 자체는 아바타·
+          별점·사진이 있는 도메인 카드라 AdminCardList 로 뭉개지 않고 유지한다. */}
       {isPending ? (
-        <div className="flex flex-col gap-3" aria-busy="true" aria-live="polite">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="bg-[var(--card-surface)] rounded-xl border border-[var(--border)] p-3.5 animate-pulse">
-              <div className="h-3.5 w-1/3 rounded bg-[var(--surface-soft)]" />
-              <div className="mt-2 h-2.5 w-2/3 rounded bg-[var(--surface-soft)]" />
-              <div className="mt-3 h-10 rounded-lg bg-[var(--surface-soft)]" />
-            </div>
-          ))}
+        <div className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] overflow-hidden">
+          <AdminListSkeleton rows={4} />
         </div>
       ) : isError ? (
-        <div className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] py-10 px-4 flex flex-col items-center gap-3 text-center">
-          <p className="text-sm text-[var(--red700)] font-medium">
-            {extractErrorMessage(error, '리뷰를 불러오지 못했어요.')}
-          </p>
-          <button
-            type="button"
-            onClick={() => void refetch()}
-            className="text-sm text-[var(--blue700)] hover:bg-[var(--blue50)] underline underline-offset-2 min-h-[44px] px-3 rounded transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-          >
-            다시 시도하기
-          </button>
+        <div className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] overflow-hidden">
+          <AdminEmpty
+            title="리뷰를 불러오지 못했어요"
+            description={extractErrorMessage(error, '잠시 후 다시 시도해 주세요.')}
+            action={
+              <button
+                type="button"
+                onClick={() => void refetch()}
+                className="min-h-[44px] px-4 rounded-lg border border-[var(--border)] font-semibold focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              >
+                다시 시도
+              </button>
+            }
+          />
         </div>
       ) : reviews.length === 0 ? (
         <div className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] overflow-hidden">
@@ -177,28 +178,18 @@ export function ReviewsTab({
             ))}
           </div>
 
+          {/* 수제 Prev/Next 페이저는 공용 PaginationBar 가 막으려던 접근성 회귀(범위
+              텍스트·aria-current·생략구간)를 그대로 재현하고 있었다 — 공용 바로 교체. */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-2 mt-4">
-              <button
-                type="button"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1}
-                aria-label="이전 페이지"
-                className="w-[44px] h-[44px] inline-flex items-center justify-center rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-soft)] disabled:opacity-40 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-              >
-                <ChevronLeft size={16} aria-hidden="true" />
-              </button>
-              <span className="text-[13px] text-[var(--text-muted)] tabular-nums">{page} / {totalPages}</span>
-              <button
-                type="button"
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages}
-                aria-label="다음 페이지"
-                className="w-[44px] h-[44px] inline-flex items-center justify-center rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-soft)] disabled:opacity-40 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-              >
-                <ChevronRight size={16} aria-hidden="true" />
-              </button>
-            </div>
+            <PaginationBar
+              page={page}
+              totalPages={totalPages}
+              total={total}
+              limit={REVIEWS_PAGE_SIZE}
+              onPageChange={setPage}
+              loading={isFetching}
+              label="리뷰 목록 페이지"
+            />
           )}
         </>
       )}

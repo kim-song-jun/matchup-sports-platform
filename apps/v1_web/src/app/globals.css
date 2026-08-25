@@ -7419,3 +7419,21 @@ button:disabled {
 .tm-pcard-next i { width: 5px; height: 5px; border-radius: 999px; background: var(--tm-ink); opacity: 0.75; }
 /* 공개 프로필 스테이지의 이름은 h1 -- 헤딩 기본 마진·크기를 카드 신원 스타일로 되돌린다. */
 h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
+
+/* ── 카드 설정 입구 (적대 검증 2026-08-25 확정 결함 수정) ──
+   숨김·모양 설정이 카드에서 2클릭 떨어진 메뉴에만 있어 발견 불가능했다 --
+   뒤집기 버튼 옆에 아이콘 입구를 둔다(본인 카드에서만 렌더). */
+.tm-pcard-actions { display: flex; gap: 8px; margin-top: 4px; }
+.tm-pcard-actions .tm-pcard-flipbtn { flex: 1; margin-top: 0; }
+.tm-pcard-settings-link {
+  flex: none; width: 44px; min-height: 44px; border-radius: 11px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface-soft); border: 1px solid var(--border);
+  color: var(--text-strong);
+}
+.tm-pcard-settings-link:focus-visible { outline: 2px solid var(--blue500); outline-offset: 2px; }
+.tm-my-profile-stage .tm-pcard-settings-link {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #eef2f8;
+}

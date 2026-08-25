@@ -29,6 +29,7 @@ import { fromDatetimeLocalValue, toDatetimeLocalValue } from '@/components/team-
 import { RecentVenueChips } from '@/components/v1-ui/create-form-fields';
 import {
   computeDailyPlan,
+  dayOffsetLabel,
   groupPreviewByMatchday,
   suggestGamesPerTeamPerDay,
   type DailyPlan,
@@ -1239,7 +1240,7 @@ function TimingSuggestionRow({
       <span>
         이 시간창이면 <b>팀당 {suggestion.gamesPerTeamPerDay}경기 · 하루 {suggestion.plan.totalGamesPerDay}경기</b> 가능해요
         {suggestion.plan.lastGameEndTime !== null && (
-          <> — {suggestion.plan.spansNextDay ? '다음날 ' : ''}{suggestion.plan.lastGameEndTime} 종료</>
+          <> — {dayOffsetLabel(suggestion.plan.daysLater)}{suggestion.plan.lastGameEndTime} 종료</>
         )}
       </span>
       <button
@@ -1274,7 +1275,7 @@ function DailyPlanCard({ plan }: { plan: DailyPlan }) {
           <div>
             <dt className="text-xs text-[var(--text-muted)]">마지막 경기 종료</dt>
             <dd className="m-0 text-lg font-bold tabular-nums text-[var(--blue700)]">
-              {plan.spansNextDay ? '다음날 ' : ''}{plan.lastGameEndTime}
+              {dayOffsetLabel(plan.daysLater)}{plan.lastGameEndTime}
             </dd>
           </div>
         )}

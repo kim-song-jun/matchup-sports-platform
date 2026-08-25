@@ -13,8 +13,17 @@ export interface DailyPlan {
   gamesPerTeamPerDay: number;
   /** 'HH:mm'. startTime이 없으면(시작일 그대로 모드) null. */
   lastGameEndTime: string | null;
-  /** 마지막 경기가 시작일 자정을 넘겨 끝나는지 — 화면에서 "다음날" 표기용. */
+  /** 마지막 경기가 시작일 자정을 넘겨 끝나는지 — daysLater >= 1 과 동치. */
   spansNextDay: boolean;
+  /** 시작일 기준 며칠 뒤에 끝나는지(0=당일). 극단 설정은 하루를 여러 번 넘길 수 있어
+   * "다음날" 불리언만으로는 오표기가 된다 — 화면 표기는 dayOffsetLabel()을 쓴다. */
+  daysLater: number;
+}
+
+/** DailyPlan.daysLater의 화면 표기: 0 → '', 1 → '다음날 ', n → 'n일 뒤 '. */
+export function dayOffsetLabel(daysLater: number): string {
+  if (daysLater <= 0) return '';
+  return daysLater === 1 ? '다음날 ' : `${daysLater}일 뒤 `;
 }
 
 export interface DailyPlanInput {
@@ -58,13 +67,13 @@ export function computeDailyPlan(input: DailyPlanInput): DailyPlan | null {
   const totalMinutes = totalGamesPerDay * interval - input.breakMinutes;
 
   let lastGameEndTime: string | null = null;
-  let spansNextDay = false;
+  let daysLater = 0;
   if (input.startTime !== undefined) {
     const startMinutes = parseTimeToMinutes(input.startTime);
     if (startMinutes !== null) {
       const endMinutes = startMinutes + totalMinutes;
       lastGameEndTime = formatClock(endMinutes);
-      spansNextDay = endMinutes >= DAY_MINUTES;
+      daysLater = Math.floor(endMinutes / DAY_MINUTES);
     }
   }
   return {
@@ -72,7 +81,8 @@ export function computeDailyPlan(input: DailyPlanInput): DailyPlan | null {
     totalMinutes,
     gamesPerTeamPerDay: input.gamesPerTeamPerDay,
     lastGameEndTime,
-    spansNextDay,
+    spansNextDay: daysLater >= 1,
+    daysLater,
   };
 }
 
@@ -126,9 +136,12 @@ export function groupPreviewByMatchday(fixtures: V1PreviewLeagueFixture[]): Matc
     .map(([matchday, items]) => ({
       matchday,
       // 서버는 생성 순서(=시간순)로 내려주지만, 표시 순서가 응답 배열 순서에 묵시적으로
-      // 기대는 대신 그룹 안에서 경기 순번으로 명시 정렬한다(레거시 응답은 startAt 폴백).
+      // 기대는 대신 그룹 안에서 경기 순번으로 명시 정렬한다. 순번이 없는 항목(레거시)은
+      // 0이 아니라 뒤로 보낸다 — 혹시 섞여 오더라도 순번 있는 경기가 항상 먼저다.
       items: [...items].sort(
-        (a, b) => (a.orderInDay ?? 0) - (b.orderInDay ?? 0) || a.startAt.localeCompare(b.startAt),
+        (a, b) =>
+          (a.orderInDay ?? Number.MAX_SAFE_INTEGER) - (b.orderInDay ?? Number.MAX_SAFE_INTEGER) ||
+          a.startAt.localeCompare(b.startAt),
       ),
     }));
 }

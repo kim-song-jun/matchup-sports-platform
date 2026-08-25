@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   computeDailyPlan,
+  dayOffsetLabel,
   groupPreviewByMatchday,
   suggestGamesPerTeamPerDay,
 } from './league-fixture-timing.view-model';
@@ -122,6 +123,28 @@ describe('computeDailyPlan (하루 운영 계산)', () => {
 
   it('팀 2개 미만이면 null을 반환한다', () => {
     expect(computeDailyPlan({ gameDurationMinutes: 15, breakMinutes: 5, gamesPerTeamPerDay: 3, teamCount: 1 })).toBeNull();
+  });
+
+  it('하루를 여러 번 넘기는 극단 설정은 daysLater로 며칠 뒤 종료인지 정확히 표현한다', () => {
+    // 00:00 시작 · 240분 경기 × 팀당 10경기 × 라운드당 2경기 = 20경기 = 4,800분 = 3일 8시간.
+    const plan = computeDailyPlan({
+      startTime: '00:00',
+      gameDurationMinutes: 240,
+      breakMinutes: 0,
+      gamesPerTeamPerDay: 10,
+      teamCount: 4,
+    });
+    expect(plan!.lastGameEndTime).toBe('08:00');
+    expect(plan!.daysLater).toBe(3);
+    expect(plan!.spansNextDay).toBe(true);
+  });
+});
+
+describe('dayOffsetLabel', () => {
+  it('당일은 빈 문자열, 1일 뒤는 "다음날", 그 이상은 "N일 뒤"로 표기한다', () => {
+    expect(dayOffsetLabel(0)).toBe('');
+    expect(dayOffsetLabel(1)).toBe('다음날 ');
+    expect(dayOffsetLabel(3)).toBe('3일 뒤 ');
   });
 });
 

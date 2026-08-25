@@ -1,10 +1,14 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { AdminContextService, type V1ActiveAdmin } from '../common/admin-context.service';
 import { canonicalGameCommandPayloadHash, GamesService } from '../games/games.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { RecordLeagueResultDto } from './dto/league-match-result-entry.dto';
 import { parseStoredScore } from './league-lifecycle-rules';
+import {
+  assembleLeagueResultParticipants,
+  type AssembledResultParticipant,
+} from './league-result-participants';
 
 /**
  * D1-a: 운영자가 리그 대진 결과를 직접 입력·정정하는 경로 -- 사용자 확정 결정
@@ -147,6 +151,71 @@ export class LeagueMatchResultEntryService {
     };
   }
 
+  /**
+   * U1 모달의 득점자 선택 목록. 대진 생성이 이미 만들어 둔 게임 로스터
+   * (양 팀 전체 active 멤버 — league-match-admin.service.ts 생성 루프)를
+   * 사이드별로 돌려준다. 읽기 전용이라 getActiveAdmin 게이트를 쓴다
+   * (league-match-dispute.service.listDisputes 와 동일).
+   */
+  async listFixtureParticipants(user: V1AuthUser, leagueId: string, teamMatchId: string) {
+    await this.adminContext.getActiveAdmin(user.id);
+    const fixture = await this.loadMatchedFixture(leagueId, teamMatchId);
+    const [sides, participants] = await Promise.all([
+      this.prisma.v1GameSide.findMany({
+        where: { gameId: fixture.gameId },
+        select: { id: true, sideKey: true, displayNameSnapshot: true },
+      }),
+      this.prisma.v1GameParticipant.findMany({
+        where: { gameId: fixture.gameId },
+        select: { id: true, sideId: true, displayNameSnapshot: true },
+        orderBy: { displayNameSnapshot: 'asc' },
+      }),
+    ]);
+    const bySide = (sideKey: 'HOME' | 'AWAY') => {
+      const side = sides.find((row) => row.sideKey === sideKey);
+      return {
+        teamName: side?.displayNameSnapshot ?? (sideKey === 'HOME' ? '홈 팀' : '원정 팀'),
+        players:
+          side === undefined
+            ? []
+            : participants
+                .filter((row) => row.sideId === side.id)
+                .map((row) => ({ participantId: row.id, name: row.displayNameSnapshot })),
+      };
+    };
+    return { leagueId, teamMatchId, home: bySide('HOME'), away: bySide('AWAY') };
+  }
+
+  /**
+   * dto.participants(선택)를 GamesService 가 받는 actualParticipants 로 변환한다.
+   * 검증(이 게임 소속·중복·사이드별 합 ≤ 스코어)은 순수 모듈
+   * league-result-participants.ts 가 수행하고, 여기서는 조회와 예외 변환만 한다.
+   */
+  private async resolveActualParticipants(
+    gameId: string,
+    dto: RecordLeagueResultDto,
+  ): Promise<AssembledResultParticipant[]> {
+    if (dto.participants === undefined || dto.participants.length === 0) return [];
+    const [gameParticipants, sides] = await Promise.all([
+      this.prisma.v1GameParticipant.findMany({
+        where: { gameId, id: { in: dto.participants.map((stat) => stat.participantId) } },
+        select: { id: true, sideId: true },
+      }),
+      this.prisma.v1GameSide.findMany({ where: { gameId }, select: { id: true, sideKey: true } }),
+    ]);
+    const result = assembleLeagueResultParticipants({
+      participants: dto.participants,
+      gameParticipants,
+      sides: sides.map((side) => ({ id: side.id, sideKey: side.sideKey as 'HOME' | 'AWAY' })),
+      homeScore: dto.homeScore,
+      awayScore: dto.awayScore,
+    });
+    if (!result.ok) {
+      throw new BadRequestException({ code: result.code, message: result.message });
+    }
+    return result.actualParticipants;
+  }
+
   // ─── 신규 입력 ──────────────────────────────────────────────────────────────
 
   private async recordResultOnce(
@@ -222,7 +291,9 @@ export class LeagueMatchResultEntryService {
         expectedVersion: initialGameVersion,
         clientCommandId: createCommandId,
         score: { home: dto.homeScore, away: dto.awayScore },
-        actualParticipants: [],
+        // 선수별 득점·도움(선택). 이벤트는 계속 싣지 않는다 — TEAM_MATCH 무이벤트
+        // 면제(game-invariants.ts Task 17 Option A)가 참가자 합계를 권위로 받아 준다.
+        actualParticipants: await this.resolveActualParticipants(gameId, dto),
         eventsHash: canonicalGameCommandPayloadHash([]),
         reason: persistedReason,
       });
@@ -344,7 +415,11 @@ export class LeagueMatchResultEntryService {
       expectedVersion: teamMatch.gameVersion,
       clientCommandId: createCommandId,
       score: { home: dto.homeScore, away: dto.awayScore },
-      actualParticipants: [],
+      // 정정도 신규 입력과 같은 계약으로 선수별 득점·도움(선택)을 받는다. 멱등 판정은
+      // 스코어·사유만 비교하므로, 같은 스코어·사유에 참가자만 바꾼 재요청은 no-op 이
+      // 된다 — 참가자만 고치려면 사유를 바꿔 보내야 한다(정정 사유가 달라지는 것이
+      // 감사 로그 관점에서도 맞다).
+      actualParticipants: await this.resolveActualParticipants(gameId, dto),
       eventsHash: canonicalGameCommandPayloadHash([]),
       reason: persistedReason,
     });

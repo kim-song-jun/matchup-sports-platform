@@ -31,6 +31,8 @@ vi.mock('@/hooks/use-v1-api', () => ({
   // 무해한 기본값이면 충분하다.
   useV1AddLeagueTeam: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useV1AdminLeagueMatch: vi.fn(),
+  // U1 확장: 득점자 선택 목록 — 기본은 빈 데이터(섹션 숨김). 필요한 테스트만 값을 채운다.
+  useV1LeagueFixtureParticipants: vi.fn(() => ({ data: null, isPending: false })),
   useV1AdminLeagueTeams: vi.fn(),
   // R11(C-6): 몰수 모달이 열릴 때만 의미 있는 데이터를 쓴다 — 다른 테스트들은 모달을
   // 열지 않으므로 data: undefined인 기본값으로 충분하다.

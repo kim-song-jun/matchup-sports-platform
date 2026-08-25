@@ -14,6 +14,7 @@ import {
   useV1AdminTeam,
   useV1CancelLeagueFixture,
   useV1CorrectLeagueResult,
+  useV1LeagueFixtureParticipants,
   useV1GenerateLeagueFixtures,
   useV1PreviewLeagueFixtures,
   useV1RecordLeagueForfeit,
@@ -34,7 +35,12 @@ import {
   suggestGamesPerTeamPerDay,
   type DailyPlan,
 } from './league-fixture-timing.view-model';
-import type { V1GenerateLeagueFixturesPayload, V1LeagueFixture, V1PreviewLeagueFixturesResult } from '@/types/league-match';
+import type {
+  V1GenerateLeagueFixturesPayload,
+  V1LeagueFixture,
+  V1LeagueResultParticipantStat,
+  V1PreviewLeagueFixturesResult,
+} from '@/types/league-match';
 
 const inputClass =
   'h-[44px] rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20';
@@ -101,6 +107,8 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
     resultEntryFixture?.resultStage === 'official' ? 'correction' : 'entry';
   const recordResult = useV1RecordLeagueResult(leagueId);
   const correctResult = useV1CorrectLeagueResult(leagueId);
+  // U1 확장: 모달이 열린 대진의 득점자 선택 목록 — 대상이 없으면(enabled=false) 요청하지 않는다.
+  const fixtureParticipants = useV1LeagueFixtureParticipants(leagueId, resultEntryFixture?.teamMatchId ?? null);
   const [weeksCount, setWeeksCount] = useState(7);
   const [dayOfWeek, setDayOfWeek] = useState<number | ''>('');
   const [time, setTime] = useState('18:00');
@@ -380,11 +388,24 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
   // U1: 결과 입력·정정 제출. 신규 입력(POST .../result)과 정정(POST .../result/correct)은
   // 서버 계약이 완전히 같은 body(RecordLeagueResultDto)를 쓰지만 엔드포인트·멱등 의미가
   // 달라 두 훅을 그대로 유지하고 여기서 모드로만 갈라 호출한다.
-  const onResultEntrySubmit = (homeScore: number, awayScore: number, reason: string) => {
+  const onResultEntrySubmit = (
+    homeScore: number,
+    awayScore: number,
+    reason: string,
+    participantStats: V1LeagueResultParticipantStat[],
+  ) => {
     if (!resultEntryFixture) return;
     const mutation = resultEntryMode === 'correction' ? correctResult : recordResult;
     mutation.mutate(
-      { teamMatchId: resultEntryFixture.teamMatchId, body: { homeScore, awayScore, reason } },
+      {
+        teamMatchId: resultEntryFixture.teamMatchId,
+        body: {
+          homeScore,
+          awayScore,
+          reason,
+          ...(participantStats.length > 0 ? { participants: participantStats } : {}),
+        },
+      },
       {
         onSuccess: (result) => {
           setResultEntryFixture(null);
@@ -991,6 +1012,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
         weekLabel={resultEntryFixture?.title ?? ''}
         currentHomeScore={resultEntryFixture?.homeScore ?? null}
         currentAwayScore={resultEntryFixture?.awayScore ?? null}
+        participants={fixtureParticipants.data ?? null}
         onSubmit={onResultEntrySubmit}
         onClose={() => setResultEntryFixture(null)}
         pending={resultEntryMode === 'correction' ? correctResult.isPending : recordResult.isPending}

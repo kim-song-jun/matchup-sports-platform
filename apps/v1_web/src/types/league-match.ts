@@ -501,6 +501,30 @@ export interface V1RecordLeagueResultPayload {
   awayScore: number;
   /** 감사 로그·결과 리비전에 남기는 처리 사유. 필수. */
   reason: string;
+  /**
+   * 선수별 득점·도움 (선택) — 리그 득점왕·도움왕 공급 경로(2026-08-25 사용자 확정).
+   * participantId는 참가자 조회(V1LeagueFixtureParticipantsResponse)에서 온 값만 유효하다.
+   */
+  participants?: V1LeagueResultParticipantStat[];
+}
+
+export interface V1LeagueResultParticipantStat {
+  participantId: string;
+  goals: number;
+  assists?: number;
+}
+
+/** U1 모달 득점자 선택 목록 — GET /admin/league-matches/:leagueId/fixtures/:teamMatchId/participants */
+export interface V1LeagueFixturePlayerOption {
+  participantId: string;
+  name: string;
+}
+
+export interface V1LeagueFixtureParticipantsResponse {
+  leagueId: string;
+  teamMatchId: string;
+  home: { teamName: string; players: V1LeagueFixturePlayerOption[] };
+  away: { teamName: string; players: V1LeagueFixturePlayerOption[] };
 }
 
 export interface V1RecordLeagueResultResult {

@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
@@ -27,6 +27,16 @@ const teamMatchIdPipe = new ParseUUIDPipe({
 @UseGuards(V1AuthGuard)
 export class LeagueMatchResultEntryController {
   constructor(private readonly service: LeagueMatchResultEntryService) {}
+
+  /** U1 모달의 득점자 선택 목록 — 대진의 게임 로스터를 사이드별로 돌려준다. */
+  @Get(':leagueId/fixtures/:teamMatchId/participants')
+  listParticipants(
+    @CurrentUser() user: V1AuthUser,
+    @Param('leagueId', leagueIdPipe) leagueId: string,
+    @Param('teamMatchId', teamMatchIdPipe) teamMatchId: string,
+  ) {
+    return this.service.listFixtureParticipants(user, leagueId, teamMatchId);
+  }
 
   @Post(':leagueId/fixtures/:teamMatchId/result')
   recordResult(

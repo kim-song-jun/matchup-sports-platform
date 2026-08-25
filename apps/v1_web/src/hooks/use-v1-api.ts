@@ -4835,6 +4835,7 @@ import type {
   V1RecordLeagueForfeitResult,
   V1RecordLeagueResultPayload,
   V1RecordLeagueResultResult,
+  V1LeagueFixtureParticipantsResponse,
   V1RegenerateLeagueFixturesPayload,
   V1RegenerateLeagueFixturesResult,
   V1RejectLeagueMatchDisputePayload,
@@ -5046,6 +5047,20 @@ export function useV1RecordLeagueResult(leagueId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
     },
+  });
+}
+
+// U1 확장(2026-08-25): 득점자 선택 목록 — GET .../fixtures/:teamMatchId/participants.
+// 모달이 열릴 때만 가져온다(enabled). 로스터는 대진 생성 시 고정되므로 staleTime을 넉넉히 둔다.
+export function useV1LeagueFixtureParticipants(leagueId: string, teamMatchId: string | null) {
+  return useQuery({
+    queryKey: [...v1Keys.adminLeagueMatch(leagueId), 'fixture-participants', teamMatchId],
+    queryFn: () =>
+      v1Get<V1LeagueFixtureParticipantsResponse>(
+        `/admin/league-matches/${leagueId}/fixtures/${teamMatchId}/participants`,
+      ),
+    enabled: teamMatchId !== null,
+    staleTime: 5 * 60 * 1000,
   });
 }
 

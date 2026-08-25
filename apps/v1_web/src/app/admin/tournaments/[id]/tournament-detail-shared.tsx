@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useId } from 'react';
 import { X } from 'lucide-react';
+import { formatEntryFee } from '@/lib/date-utils';
 import type { V1AdminTournamentRegistration } from '@/types/api';
 
 // ── Constants ─────────────────────────────────────────────────────────────
@@ -89,10 +90,8 @@ export const REGISTRATION_STATUS_FILTERS: { value: string; label: string }[] = [
 /** Returns next allowed statuses from the current one */
 // ── Helpers ───────────────────────────────────────────────────────────────
 
-export function formatCurrency(n: number): string {
-  if (n === 0) return '무료';
-  return `${n.toLocaleString('ko-KR')}원`;
-}
+// 로직이 date-utils formatEntryFee 와 동일해 위임 — 소비 탭들의 import 는 그대로 유지됨.
+export const formatCurrency = formatEntryFee;
 
 export function formatRegistrationPaymentSubtitle(
   payment: V1AdminTournamentRegistration['payment'],

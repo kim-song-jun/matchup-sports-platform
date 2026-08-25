@@ -12,6 +12,7 @@ import {
   AdminTableSkeleton,
 } from '@/components/admin';
 import { useV1AdminMatch } from '@/hooks/use-v1-api';
+import { formatAdminDateTime } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 
 /**
@@ -21,19 +22,6 @@ import { extractErrorMessage } from '@/lib/error-message';
  * 상태 변경은 목록 화면이 계속 담당한다: 사유 입력 모달과 뮤테이션이 거기 있고, 같은 액션을
  * 두 곳에 두면 M4 에서 정리한 '이중 편집 진입점'을 다시 만드는 셈이다.
  */
-function formatDateTime(value: string | null | undefined) {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString('ko-KR', {
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
-}
 
 function BackLink() {
   return (
@@ -106,10 +94,10 @@ export default function AdminMatchDetailPage() {
               <AdminDetailRow label="종목" value={match.sportName} />
               <AdminDetailRow label="장소" value={match.placeName} />
               <AdminDetailRow label="지역" value={match.regionName} />
-              <AdminDetailRow label="시작" value={formatDateTime(match.startAt)} />
-              <AdminDetailRow label="신청 마감" value={formatDateTime(match.deadlineAt)} />
+              <AdminDetailRow label="시작" value={formatAdminDateTime(match.startAt)} />
+              <AdminDetailRow label="신청 마감" value={formatAdminDateTime(match.deadlineAt)} />
               <AdminDetailRow label="호스트" value={match.hostName} />
-              <AdminDetailRow label="생성일" value={formatDateTime(match.createdAt)} />
+              <AdminDetailRow label="생성일" value={formatAdminDateTime(match.createdAt)} />
             </dl>
           </article>
 
@@ -134,8 +122,8 @@ export default function AdminMatchDetailPage() {
               <AdminSummaryItem icon={<Users size={16} />} label="참가 인원" value={`${match.participantCount}/${match.maxParticipants}명`} />
               <AdminSummaryItem icon={<UserRound size={16} />} label="신청" value={`${match.applicationCount}건`} />
               <AdminSummaryItem icon={<MapPin size={16} />} label="지역" value={match.regionName} />
-              <AdminSummaryItem icon={<CalendarClock size={16} />} label="시작" value={formatDateTime(match.startAt)} />
-              <AdminSummaryItem icon={<CalendarClock size={16} />} label="신청 마감" value={formatDateTime(match.deadlineAt)} />
+              <AdminSummaryItem icon={<CalendarClock size={16} />} label="시작" value={formatAdminDateTime(match.startAt)} />
+              <AdminSummaryItem icon={<CalendarClock size={16} />} label="신청 마감" value={formatAdminDateTime(match.deadlineAt)} />
             </dl>
           </section>
 

@@ -12,6 +12,7 @@ import {
   AdminTableSkeleton,
 } from '@/components/admin';
 import { useV1AdminTeamMatch } from '@/hooks/use-v1-api';
+import { formatAdminDateTime } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import type { V1AdminTeamMatchDetail } from '@/types/api';
 
@@ -22,14 +23,6 @@ import type { V1AdminTeamMatchDetail } from '@/types/api';
  * 같은 정보를 두 화면이 각자 그리면 어느 쪽이 최신인지 알 수 없게 된다. 대신 연결된 게임이
  * 있는지만 알린다. 상태 변경도 목록이 계속 담당한다(이중 편집 진입점을 만들지 않는다).
  */
-function formatDateTime(value: string | null | undefined) {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString('ko-KR', {
-    year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
-  });
-}
 
 const APPLICATION_STATUS_LABEL: Record<string, string> = {
   requested: '신청',
@@ -76,7 +69,7 @@ function Applications({ teamMatch }: { teamMatch: V1AdminTeamMatchDetail }) {
                   >
                     {application.applicantTeamName}
                   </Link>
-                  <p className="mt-1 text-xs font-medium text-[var(--text-muted)]">{formatDateTime(application.createdAt)}</p>
+                  <p className="mt-1 text-xs font-medium text-[var(--text-muted)]">{formatAdminDateTime(application.createdAt)}</p>
                   {application.message && (
                     <p className="mt-1.5 whitespace-pre-wrap break-words text-xs text-[var(--text-body)]">{application.message}</p>
                   )}
@@ -168,11 +161,11 @@ export default function AdminTeamMatchDetailPage() {
               <AdminDetailRow label="장소" value={teamMatch.placeName} />
               <AdminDetailRow label="주소" value={teamMatch.placeAddress} />
               <AdminDetailRow label="지역" value={teamMatch.regionName} />
-              <AdminDetailRow label="시작" value={formatDateTime(teamMatch.startAt)} />
-              <AdminDetailRow label="종료" value={formatDateTime(teamMatch.endAt)} />
-              <AdminDetailRow label="신청 마감" value={formatDateTime(teamMatch.deadlineAt)} />
+              <AdminDetailRow label="시작" value={formatAdminDateTime(teamMatch.startAt)} />
+              <AdminDetailRow label="종료" value={formatAdminDateTime(teamMatch.endAt)} />
+              <AdminDetailRow label="신청 마감" value={formatAdminDateTime(teamMatch.deadlineAt)} />
               <AdminDetailRow label="개설자" value={teamMatch.createdByName} />
-              <AdminDetailRow label="생성일" value={formatDateTime(teamMatch.createdAt)} />
+              <AdminDetailRow label="생성일" value={formatAdminDateTime(teamMatch.createdAt)} />
             </dl>
           </article>
 
@@ -212,7 +205,7 @@ export default function AdminTeamMatchDetailPage() {
               <AdminSummaryItem icon={<Trophy size={16} />} label="확정 상대팀" value={teamMatch.approvedApplicantTeamName ?? '미확정'} />
               <AdminSummaryItem icon={<ListOrdered size={16} />} label="정규 리그" value={teamMatch.league?.title ?? '단발 경기'} />
               <AdminSummaryItem icon={<MapPin size={16} />} label="지역" value={teamMatch.regionName} />
-              <AdminSummaryItem icon={<CalendarClock size={16} />} label="시작" value={formatDateTime(teamMatch.startAt)} />
+              <AdminSummaryItem icon={<CalendarClock size={16} />} label="시작" value={formatAdminDateTime(teamMatch.startAt)} />
               <AdminSummaryItem icon={<CalendarClock size={16} />} label="경기 기록" value={teamMatch.hasGame ? '연결됨' : '없음'} />
             </dl>
           </section>

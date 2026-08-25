@@ -182,15 +182,32 @@ export function formatEntryFee(fee: number): string {
 
 /**
  * 관리자 운영 화면 공용 일시 포맷터: 'YYYY.M.D HH:MM'
- * 대회 도메인 밖의 관리자 로그/운영 테이블(예: 웹 푸시 실패 로그)에서 사용해요.
- * dateStr 이 없거나 invalid 이면 원본 문자열을 그대로 반환.
+ * 대회 도메인 밖의 관리자 로그/운영 테이블·상세 화면에서 사용해요.
+ * 빈 값은 '—'(어드민 공통 폴백), invalid 는 원본 문자열을 그대로 반환.
+ *
+ * 한때 어드민 화면 11곳이 각자 로컬 포맷터를 재구현해 같은 페이지 쌍(목록/상세)
+ * 안에서도 포맷·폴백 문자('-' vs '—')가 갈렸다 — 이 3형제(일시/일시 짧은/날짜)로 수렴.
  */
-export function formatAdminDateTime(dateStr: string): string {
+export function formatAdminDateTime(dateStr: string | null | undefined): string {
+  if (!dateStr) return '—';
   const d = new Date(dateStr);
   if (Number.isNaN(d.getTime())) return dateStr;
   const hour = String(d.getHours()).padStart(2, '0');
   const minute = String(d.getMinutes()).padStart(2, '0');
   return `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()} ${hour}:${minute}`;
+}
+
+/**
+ * 연도 없는 목록용 일시: 'M.D HH:MM' — 목록 열은 폭이 좁아 연도를 의도적으로 뺀다
+ * (로그·최근 활동처럼 대부분 올해 데이터인 열). 상세 화면은 연도 포함 본판을 쓴다.
+ */
+export function formatAdminDateTimeShort(dateStr: string | null | undefined): string {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  const hour = String(d.getHours()).padStart(2, '0');
+  const minute = String(d.getMinutes()).padStart(2, '0');
+  return `${d.getMonth() + 1}.${d.getDate()} ${hour}:${minute}`;
 }
 
 /** formatAdminDateTime 의 날짜 전용 자매 — 어드민 목록의 가입일·생성일 열처럼 시각이 불필요한 곳 */

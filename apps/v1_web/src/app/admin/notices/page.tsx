@@ -22,6 +22,7 @@ import {
 } from '@/hooks/use-v1-api';
 import { useTemporaryContentAssets } from '@/hooks/use-temporary-content-assets';
 import { useAdminListQuery } from '@/hooks/use-admin-list-query';
+import { formatAdminDateTimeShort } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import { EMPTY_RICH_CONTENT, isRichContentEmpty, resolveRichContent, richContentPlainText } from '@/lib/rich-content';
 import type {
@@ -69,18 +70,9 @@ const audienceLabel: Record<V1AdminNoticeAudience, string> = {
   admins: '관리자',
 };
 
-function formatDateTime(value: string | null | undefined) {
-  if (!value) return '미발행';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString('ko-KR', {
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
-}
+// '미발행' 은 이 화면 전용 폴백 문구라(공용 함수의 '—' 와 다름) 한 줄 래퍼로 보존한다.
+const formatPublishedAt = (value: string | null | undefined) =>
+  value ? formatAdminDateTimeShort(value) : '미발행';
 
 const PAGE_SIZE = 20;
 
@@ -285,7 +277,7 @@ export default function AdminNoticesPage() {
                 width: 'w-[132px]',
                 render: (row) => (
                   <span className="whitespace-nowrap text-[var(--text-muted)]">
-                    {formatDateTime(row.publishedAt)}
+                    {formatPublishedAt(row.publishedAt)}
                   </span>
                 ),
               },

@@ -8,6 +8,7 @@ import {
   useV1AdminMe,
 } from '@/hooks/use-v1-api';
 import type { V1Tournament } from '@/types/api';
+import { formatAdminDateTimeShort, formatEntryFee } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import { useAdminListQuery } from '@/hooks/use-admin-list-query';
 import {
@@ -24,31 +25,12 @@ import { MockSeedPanel } from '@/components/admin/tournaments/mock-seed-panel';
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return '—';
-  try {
-    return new Intl.DateTimeFormat('ko-KR', {
-      month: 'numeric',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(new Date(dateStr));
-  } catch {
-    return dateStr;
-  }
-}
-
 function formatDateRange(startStr: string | null, endStr: string | null): string {
-  const start = formatDate(startStr);
+  const start = formatAdminDateTimeShort(startStr);
   if (start === '—') return start;
-  const end = formatDate(endStr);
+  const end = formatAdminDateTimeShort(endStr);
   if (end === '—' || end === start) return start;
   return `${start} ~ ${end}`;
-}
-
-function formatCurrency(n: number): string {
-  if (n === 0) return '무료';
-  return `${n.toLocaleString('ko-KR')}원`;
 }
 
 // ── Status filter options ─────────────────────────────────────────────────
@@ -186,7 +168,7 @@ export default function AdminTournamentsPage() {
                 width: 'w-[124px]',
                 render: (row) => (
                   <span className="whitespace-nowrap text-[var(--text-muted)]">
-                    {formatDate(row.registrationDeadlineAt)}
+                    {formatAdminDateTimeShort(row.registrationDeadlineAt)}
                   </span>
                 ),
               },
@@ -206,7 +188,7 @@ export default function AdminTournamentsPage() {
                 width: 'w-[112px]',
                 render: (row) => (
                   <span className="tabular-nums whitespace-nowrap text-[var(--text-muted)]">
-                    {formatCurrency(row.entryFee)}
+                    {formatEntryFee(row.entryFee)}
                   </span>
                 ),
               },

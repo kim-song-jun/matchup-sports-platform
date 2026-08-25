@@ -7,6 +7,7 @@ import {
   useV1AdminMatches,
   useV1ChangeMatchStatus,
 } from '@/hooks/use-v1-api';
+import { formatAdminDateTimeShort } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import { useAdminListQuery } from '@/hooks/use-admin-list-query';
 import {
@@ -21,21 +22,6 @@ import {
   AdminToasts,
 } from '@/components/admin';
 import type { V1AdminMatchRow } from '@/types/api';
-
-// ── Date formatter ────────────────────────────────────────────────────────────
-function formatDateTime(dateStr: string | null | undefined): string {
-  if (!dateStr) return '—';
-  try {
-    const d = new Date(dateStr);
-    const mo = d.getMonth() + 1;
-    const day = d.getDate();
-    const hh = String(d.getHours()).padStart(2, '0');
-    const mm = String(d.getMinutes()).padStart(2, '0');
-    return `${mo}/${day} ${hh}:${mm}`;
-  } catch {
-    return dateStr ?? '—';
-  }
-}
 
 // ── Status options for moderation modal ──────────────────────────────────────
 const MATCH_STATUS_OPTIONS = (
@@ -174,7 +160,7 @@ function AdminMatchesPageContent() {
               header: '시작',
               width: 'w-[132px]',
               render: (row) => (
-                <span className="whitespace-nowrap text-[var(--text-muted)]">{formatDateTime(row.startAt)}</span>
+                <span className="whitespace-nowrap text-[var(--text-muted)]">{formatAdminDateTimeShort(row.startAt)}</span>
               ),
             },
             {

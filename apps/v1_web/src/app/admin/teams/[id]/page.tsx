@@ -12,22 +12,9 @@ import {
   AdminTableSkeleton,
 } from '@/components/admin';
 import { useV1AdminTeam } from '@/hooks/use-v1-api';
+import { formatAdminDateTime } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import type { V1AdminTeamDetail } from '@/types/api';
-
-function formatDateTime(value: string | null | undefined) {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString('ko-KR', {
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
-}
 
 function BackLink() {
   return (
@@ -54,7 +41,7 @@ function RecentTeamMatches({ team }: { team: V1AdminTeamDetail }) {
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="break-words text-sm font-semibold text-[var(--text-strong)]">{match.title}</p>
-                  <p className="mt-1 text-xs font-medium text-[var(--text-muted)]">{formatDateTime(match.startAt)}</p>
+                  <p className="mt-1 text-xs font-medium text-[var(--text-muted)]">{formatAdminDateTime(match.startAt)}</p>
                 </div>
                 <AdminStatusPill status={match.status} />
               </div>
@@ -101,7 +88,7 @@ function TeamMembers({ team }: { team: V1AdminTeamDetail }) {
               <dl className="mt-3 grid gap-1.5 text-xs">
                 <div className="flex gap-2"><dt className="w-14 shrink-0 text-gray-400">이메일</dt><dd className="min-w-0 break-all text-[var(--text-body)]">{member.email ?? '미등록'}</dd></div>
                 <div className="flex gap-2"><dt className="w-14 shrink-0 text-gray-400">전화번호</dt><dd className="min-w-0 break-all text-[var(--text-body)]">{member.phone ?? '미등록'}</dd></div>
-                <div className="flex gap-2"><dt className="w-14 shrink-0 text-gray-400">가입일</dt><dd className="min-w-0 text-[var(--text-body)]">{formatDateTime(member.joinedAt)}</dd></div>
+                <div className="flex gap-2"><dt className="w-14 shrink-0 text-gray-400">가입일</dt><dd className="min-w-0 text-[var(--text-body)]">{formatAdminDateTime(member.joinedAt)}</dd></div>
               </dl>
             </li>
           ))}
@@ -178,7 +165,7 @@ export default function AdminTeamDetailPage() {
               <AdminDetailRow label="팀장 ID" value={team.ownerUserId} />
               <AdminDetailRow label="멤버 수" value={team.memberCount} />
               <AdminDetailRow label="매니저 수" value={team.managerCount} />
-              <AdminDetailRow label="생성일" value={formatDateTime(team.createdAt)} />
+              <AdminDetailRow label="생성일" value={formatAdminDateTime(team.createdAt)} />
             </dl>
           </article>
 
@@ -194,7 +181,7 @@ export default function AdminTeamDetailPage() {
               <AdminSummaryItem icon={<Shield size={16} />} label="매니저" value={team.managerCount} />
               <AdminSummaryItem icon={<Trophy size={16} />} label="최근 주최 팀매치" value={team.recentHostedTeamMatches.length} />
               <AdminSummaryItem icon={<MapPin size={16} />} label="지역" value={team.regionName} />
-              <AdminSummaryItem icon={<Calendar size={16} />} label="생성일" value={formatDateTime(team.createdAt)} />
+              <AdminSummaryItem icon={<Calendar size={16} />} label="생성일" value={formatAdminDateTime(team.createdAt)} />
             </dl>
           </section>
 
@@ -205,7 +192,7 @@ export default function AdminTeamDetailPage() {
                 <AdminSummaryItem icon={<Shield size={16} />} label="상태" value={trust.trustState} />
                 <AdminSummaryItem icon={<Shield size={16} />} label="매너 점수" value={trust.mannerScore} />
                 <AdminSummaryItem icon={<Trophy size={16} />} label="반영 경기" value={trust.matchCount} />
-                <AdminSummaryItem icon={<Calendar size={16} />} label="계산일" value={formatDateTime(trust.calculatedAt)} />
+                <AdminSummaryItem icon={<Calendar size={16} />} label="계산일" value={formatAdminDateTime(trust.calculatedAt)} />
               </dl>
             ) : (
               <div className="mt-4 rounded-xl bg-[var(--surface-soft)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">

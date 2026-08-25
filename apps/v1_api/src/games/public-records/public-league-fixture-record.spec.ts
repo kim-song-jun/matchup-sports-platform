@@ -25,6 +25,7 @@ type FakeTeamMatchRow = {
   status: string;
   hostTeam: { id: string; name: string };
   approvedApplicantTeam: { id: string; name: string } | null;
+  videos: Array<{ id: string; title: string | null; url: string }>;
   game: Record<string, unknown> | null;
 };
 
@@ -64,6 +65,7 @@ function makeFixtureRow(overrides: Partial<FakeTeamMatchRow> = {}): FakeTeamMatc
     status: 'matched',
     hostTeam: { id: 'team-home', name: '성수 FC' },
     approvedApplicantTeam: { id: 'team-away', name: '왕십리 유나이티드' },
+    videos: [],
     game: makeGame(),
     ...overrides,
   };
@@ -114,6 +116,16 @@ describe('PublicTournamentRecordsService.getLeagueFixtureRecord', () => {
     await expect(service.getLeagueFixtureRecord(LEAGUE_ID, TEAM_MATCH_ID)).rejects.toThrow(NotFoundException);
   });
 
+  it('결과 이력의 감사용 코드 마커([LEAGUE_RESULT_ENTRY] 등)는 관전자 화면에서 벗긴다', async () => {
+    const service = buildService({
+      revisions: [
+        { revision: 1, state: 'OFFICIAL', officialAt: new Date('2026-09-05T11:00:00.000Z'), reason: '[LEAGUE_RESULT_ENTRY] 운영자 직접 입력', supersedesId: null },
+      ],
+    });
+    const result = await service.getLeagueFixtureRecord(LEAGUE_ID, TEAM_MATCH_ID);
+    expect(result.history[0].reason).toBe('운영자 직접 입력');
+  });
+
   it('공식 결과: 스코어·팀 실명·주차가 실리고 대회 전용 필드는 리그 값으로 고정된다', async () => {
     const service = buildService({
       revisions: [{ revision: 1, state: 'OFFICIAL', officialAt: new Date('2026-09-05T11:00:00.000Z'), reason: null, supersedesId: null }],
@@ -138,6 +150,16 @@ describe('PublicTournamentRecordsService.getLeagueFixtureRecord', () => {
     expect(result.history).toEqual([
       { revision: 1, state: 'OFFICIAL', officialAt: '2026-09-05T11:00:00.000Z', reason: null, isCorrection: false },
     ]);
+  });
+
+  it('등록된 리그 영상(V1TeamMatchVideo)이 기록 응답에 실린다', async () => {
+    const service = buildService({
+      fixture: makeFixtureRow({
+        videos: [{ id: 'video-1', title: '전반 하이라이트', url: 'https://youtu.be/x' }],
+      }),
+    });
+    const result = await service.getLeagueFixtureRecord(LEAGUE_ID, TEAM_MATCH_ID);
+    expect(result.videos).toEqual([{ id: 'video-1', title: '전반 하이라이트', url: 'https://youtu.be/x' }]);
   });
 
   it('몰수로 확정된 결과는 outcome 사유가 실린다 — 실제 1:0 승리와 구분', async () => {

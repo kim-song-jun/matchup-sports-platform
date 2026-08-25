@@ -1679,6 +1679,7 @@ model V1TeamMatch {
   applications          V1TeamMatchApplication[]
   chatRoom              V1ChatRoom?
   game                  V1Game?                     @relation("V1GameTeamMatch")
+  videos                V1TeamMatchVideo[]
   competitionConfig     V1CompetitionConfigVersion? @relation("V1TeamMatchCompetitionConfig", fields: [competitionConfigVersionId], references: [id], onDelete: Restrict, map: "v1_team_matches_competition_config_fk")
   league                V1League?                   @relation("V1TeamMatchLeague", fields: [leagueId], references: [id], onDelete: SetNull, map: "v1_team_matches_league_fk")
 
@@ -1694,6 +1695,24 @@ model V1TeamMatch {
   @@index([competitionConfigVersionId], map: "v1_team_matches_competition_config_idx")
   @@index([leagueId, startAt], map: "v1_team_matches_league_start_at_idx")
   @@map("v1_team_matches")
+}
+
+/// 리그 대진(팀매치) 하이라이트/중계 영상 — 경기당 여러 개 (유튜브 링크 또는 업로드 파일 URL).
+/// V1TournamentFixtureVideo 의 팀매치 판 — 같은 URL 검증·업로드 원장 규칙을 공유한다
+/// (apps/v1_api/src/tournaments/videos/fixture-video-url.ts).
+model V1TeamMatchVideo {
+  id          String   @id @default(uuid())
+  teamMatchId String   @map("team_match_id")
+  /// 표시 제목 (예: "전반 하이라이트") — 없으면 "경기 영상 N"으로 표시
+  title       String?
+  url         String
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  teamMatch V1TeamMatch @relation(fields: [teamMatchId], references: [id], onDelete: Cascade)
+
+  @@index([teamMatchId, sortOrder])
+  @@map("v1_team_match_videos")
 }
 
 model V1TeamMatchApplication {

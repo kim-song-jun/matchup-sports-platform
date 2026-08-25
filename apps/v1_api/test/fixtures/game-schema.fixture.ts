@@ -381,7 +381,13 @@ export const gameSchemaSourceManifest = {
   // schema.prisma 전체 바이트를 결속하기 때문에 걸리는 것이지 game operations 계약이
   // 바뀐 게 아니다. 바인딩된 20260729000100_v1_game_operations 는 그대로다(migration
   // 해시 불변). 아래 값은 병합된 schema.prisma 에 shasum -a 256 을 돌려 계산했다.
-  schema: '9741e53f856743f9e50bc13f0f0d8923ea45dc52326fc031069bd1f81733d07a',
+  // 재핀(2026-08-25): `V1TeamMatchVideo` 모델 신규 — 리그 대진(팀매치) 경기 영상 저장.
+  // 순수 additive CREATE TABLE/INDEX/FK(v1_team_matches 로의 CASCADE FK 하나), 기존
+  // 모델은 V1TeamMatch 에 역참조 relation 필드 `videos` 한 줄 추가뿐이라 컬럼 변화 없음.
+  // game domain(V1Game*) 모델·enum 은 건드리지 않는다. 마이그레이션
+  // 20260825070000_v1_team_match_videos. 바인딩된 20260729000100_v1_game_operations 는
+  // 그대로다(migration 해시 불변). 아래 값은 shasum -a 256 으로 계산했다.
+  schema: 'f9bc07bdce405f8ef624a692d9eb491e9f6e176b757d311904a47ab6e97559aa',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
 import { AdminPageHeader, AdminDataTable, AdminReasonModal, AdminStatusPill, AdminTableSkeleton, AdminToasts, useAdminToast } from '@/components/admin';
@@ -490,6 +491,14 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
         action={
           <div className="flex flex-wrap items-center gap-2">
             <AdminStatusPill status={series.state} />
+            {/* 경기 영상 관리 — 대회 운영 콘솔의 영상 화면과 같은 역할의 리그 판.
+                대진이 없으면 그 화면이 빈 상태 안내를 대신한다. */}
+            <Link
+              href={`/admin/league-matches/${leagueId}/videos`}
+              className="inline-flex min-h-[44px] items-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--text-strong)]"
+            >
+              경기 영상 관리
+            </Link>
             {/* 되돌리기는 completed 일 때만 의미가 있다 — draft/active 에서는 서버가
                 409 LEAGUE_NOT_COMPLETED 로 막으므로 버튼 자체를 내지 않는다. */}
             {series.state === 'completed' && (

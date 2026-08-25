@@ -96,17 +96,23 @@ if (c.participants.length > 0) {
   console.log(`  first: sideId=${typeof p.sideId} displayName=${typeof p.displayName} jersey=${p.jerseyNumber}`);
 }
 
-// --- 3) 리그 스코프 게이트: 다른 리그 id + 같은 teamMatchId -> 404 ---
-const otherLeagueId = leagueIds.find((id) => id !== league.leagueId) ?? '00000000-0000-4000-8000-000000000000';
-const crossed = await api(
-  `/league-matches/${otherLeagueId}/fixtures/${fx.teamMatchId}/claimable-participants`,
-  { headers: authHeaders },
-);
-console.log(`cross-league: ${crossed.status} code=${crossed.code} (expect 404 LEAGUE_FIXTURE_GAME_NOT_FOUND)`);
-assert(
-  crossed.status === 404 && crossed.code === 'LEAGUE_FIXTURE_GAME_NOT_FOUND',
-  `스코프 게이트 회귀 — ${crossed.status} ${crossed.code}`,
-);
+// --- 3) 리그 스코프 게이트: **실재하는** 다른 리그 id + 같은 teamMatchId -> 404 ---
+// 더미 UUID 폴백은 "리그 없음 404"라 스코프 게이트 검증이 아니다 — 다른 리그가
+// 없으면 조용히 약한 검증으로 대체하지 말고 skip 을 명시한다 (Copilot 리뷰).
+const otherLeagueId = leagueIds.find((id) => id !== league.leagueId);
+if (otherLeagueId === undefined) {
+  console.log('cross-league: SKIP — alpha 에 다른 리그가 없어 교차 검증 불가');
+} else {
+  const crossed = await api(
+    `/league-matches/${otherLeagueId}/fixtures/${fx.teamMatchId}/claimable-participants`,
+    { headers: authHeaders },
+  );
+  console.log(`cross-league: ${crossed.status} code=${crossed.code} (expect 404 LEAGUE_FIXTURE_GAME_NOT_FOUND)`);
+  assert(
+    crossed.status === 404 && crossed.code === 'LEAGUE_FIXTURE_GAME_NOT_FOUND',
+    `스코프 게이트 회귀 — ${crossed.status} ${crossed.code}`,
+  );
+}
 
 // --- 4) 화면 캡처: 배너 3폭 + 모달(390) ---
 mkdirSync(OUT, { recursive: true });

@@ -4,10 +4,16 @@
 //   1) 비인증 GET claimable-participants -> 401 (V1AuthGuard)
 //   2) 참가팀 멤버 GET -> 200 + { gameId, version, participants[] } 계약
 //   3) 리그 스코프 게이트 -> 다른 leagueId 로 같은 teamMatchId 를 조회하면 404
-//   4) 화면: 리그 경기 상세 배너 + 모달(390/768/1440) 캡처
+//   4) 화면: 리그 경기 상세 배너(390/768/1440) + 모달(390만) 캡처
+// 기대값이 하나라도 어긋나면 즉시 throw 로 실패한다(exit != 0) — 로그만 남기고
+// 지나가면 회귀가 성공처럼 보인다 (Copilot 리뷰).
 // 주의: alpha 는 과한 캡처에 403 을 건다 — 페이지 수를 늘리지 말 것.
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
+
+function assert(condition, message) {
+  if (!condition) throw new Error(`검증 실패: ${message}`);
+}
 
 const BASE = 'https://alpha.teameet.co.kr';
 const OUT = process.env.OUT_DIR ?? '.screenshots/league-claim-0825';
@@ -76,14 +82,17 @@ console.log('target:', league.leagueId, league.title, '/', fx.teamMatchId);
 // --- 1) 비인증 -> 401 ---
 const anon = await api(`/league-matches/${league.leagueId}/fixtures/${fx.teamMatchId}/claimable-participants`);
 console.log(`anon: ${anon.status} (expect 401)`);
+assert(anon.status === 401, `비인증 조회가 401 이 아니라 ${anon.status}`);
 
 // --- 2) 계약 필드 ---
 const c = target.claim;
-console.log(
-  `claim: gameId=${typeof c.gameId} version=${typeof c.version} participants=${Array.isArray(c.participants) ? c.participants.length : 'N/A'}`,
-);
+assert(typeof c?.gameId === 'string', `gameId 가 string 이 아님: ${typeof c?.gameId}`);
+assert(typeof c?.version === 'number', `version 이 number 가 아님: ${typeof c?.version}`);
+assert(Array.isArray(c?.participants), 'participants 가 배열이 아님');
+console.log(`claim: gameId=string version=number participants=${c.participants.length}`);
 if (c.participants.length > 0) {
   const p = c.participants[0];
+  assert(typeof p.sideId === 'string' && typeof p.displayName === 'string', '참가자 필드 계약 위반');
   console.log(`  first: sideId=${typeof p.sideId} displayName=${typeof p.displayName} jersey=${p.jerseyNumber}`);
 }
 
@@ -94,6 +103,10 @@ const crossed = await api(
   { headers: authHeaders },
 );
 console.log(`cross-league: ${crossed.status} code=${crossed.code} (expect 404 LEAGUE_FIXTURE_GAME_NOT_FOUND)`);
+assert(
+  crossed.status === 404 && crossed.code === 'LEAGUE_FIXTURE_GAME_NOT_FOUND',
+  `스코프 게이트 회귀 — ${crossed.status} ${crossed.code}`,
+);
 
 // --- 4) 화면 캡처: 배너 3폭 + 모달(390) ---
 mkdirSync(OUT, { recursive: true });
@@ -116,11 +129,17 @@ for (const [label, width, height] of [
   const bannerVisible = await page.getByText('이 경기에 뛰었는데 내 기록이 없나요?').count();
   console.log(`page ${label}: banner=${bannerVisible > 0 ? 'visible' : 'MISSING'}`);
   await page.screenshot({ path: `${OUT}/claim-banner-${label}.png`, fullPage: true });
+  assert(bannerVisible > 0, `${label} 에서 claim 배너가 렌더되지 않음`);
   if (label === 'mobile-390') {
     await page.getByRole('button', { name: '명단에서 나 찾기' }).click();
     await page.waitForTimeout(1500);
     const title = await page.locator('#claim-my-record-title').textContent().catch(() => null);
     console.log(`modal title: ${title}`);
+    // 후보 유무에 따라 제목이 갈린다 — 어느 쪽이든 모달은 열려야 한다.
+    assert(
+      title === '명단에서 본인을 골라 주세요' || title === '연결할 참가자가 없어요',
+      `모달이 열리지 않았거나 제목이 다름: ${title}`,
+    );
     await page.screenshot({ path: `${OUT}/claim-modal-mobile-390.png`, fullPage: false });
   }
   await page.close();

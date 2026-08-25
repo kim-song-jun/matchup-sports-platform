@@ -31,7 +31,11 @@ export function TermsDocumentSubtitleAndCard({
   );
 }
 
-/** 제목 포함 전체 — 어드민 미리보기용 */
+/**
+ * 제목 포함 전체 — 어드민 미리보기용.
+ * 사용자 화면에선 이 제목이 문서의 h1이지만, 어드민 페이지는 AdminPageHeader가 이미
+ * h1을 그리므로 여기선 h2로 내린다(시각은 동일 클래스) — h1 중복 접근성 회귀 방지.
+ */
 export function TermsDocumentBody({
   title,
   subtitle,
@@ -43,7 +47,7 @@ export function TermsDocumentBody({
 }) {
   return (
     <>
-      <h1 className="tm-text-heading tm-auth-heading">{title}</h1>
+      <h2 className="tm-text-heading tm-auth-heading">{title}</h2>
       <TermsDocumentSubtitleAndCard subtitle={subtitle} content={content} />
     </>
   );

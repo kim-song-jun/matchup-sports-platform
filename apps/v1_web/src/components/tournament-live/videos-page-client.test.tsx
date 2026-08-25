@@ -27,8 +27,10 @@ vi.mock('@/hooks/use-v1-fixture-videos', async (importOriginal) => {
   return {
     ...actual,
     useTournamentFixtureVideos: () => mocks.videosResult(),
-    useCreateFixtureVideoLink: () => ({ mutate: mocks.createLinkMutate, isPending: false }),
-    useUploadFixtureVideo: () => ({ mutate: mocks.uploadMutate, isPending: false }),
+    // 등록 폼(FixtureVideoAddForm 공용화)은 Promise 계약(mutateAsync)을 쓴다 — 삭제는
+    // 화면(handleDelete)이 여전히 mutate 콜백 계약이라 그대로 둔다.
+    useCreateFixtureVideoLink: () => ({ mutateAsync: mocks.createLinkMutate, isPending: false }),
+    useUploadFixtureVideo: () => ({ mutateAsync: mocks.uploadMutate, isPending: false }),
     useDeleteFixtureVideo: () => ({ mutate: mocks.deleteMutate, isPending: false }),
   };
 });
@@ -76,6 +78,9 @@ describe('VideosPageClient', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.useTournamentOpsRole.mockReturnValue('TOURNAMENT_DIRECTOR');
+    // mutateAsync 계약 — resolve 하지 않으면 폼의 .then() 성공 경로가 영영 안 탄다.
+    mocks.createLinkMutate.mockResolvedValue({});
+    mocks.uploadMutate.mockResolvedValue({});
     setVideos([FIXTURE]);
   });
 
@@ -107,10 +112,11 @@ describe('VideosPageClient', () => {
     await user.type(screen.getByLabelText('제목 (선택)'), '  후반 하이라이트  ');
     await user.click(screen.getByRole('button', { name: '영상 등록' }));
 
-    expect(mocks.createLinkMutate).toHaveBeenCalledWith(
-      { fixtureId: 'fixture-1', url: 'https://youtu.be/zzzzzzzzzzz', title: '후반 하이라이트' },
-      expect.anything(),
-    );
+    expect(mocks.createLinkMutate).toHaveBeenCalledWith({
+      fixtureId: 'fixture-1',
+      url: 'https://youtu.be/zzzzzzzzzzz',
+      title: '후반 하이라이트',
+    });
   });
 
   it('한도를 넘는 파일은 업로드를 보내지 않고 이유를 알려준다', async () => {

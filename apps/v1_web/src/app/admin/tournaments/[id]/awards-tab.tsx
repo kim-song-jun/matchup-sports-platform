@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { useV1AdminTournamentRegistrations, useV1AdminTournamentPlayers, useV1AdminTournamentAwards, useV1SetTournamentAwards, useV1AdminTournamentPlayerRecords } from '@/hooks/use-v1-api';
+import { AdminEmpty, AdminTableSkeleton } from '@/components/admin';
 import { AwardRecommendationChips, type AwardRecommendation } from '@/components/admin/award-recommendation-chips';
 import type { V1TournamentAwardIconKey } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -25,7 +26,12 @@ export function AwardsTab({
   readonly showToast: (msg: string, v?: 'success' | 'error') => void;
 }) {
   const setAwards = useV1SetTournamentAwards(tournamentId);
-  const { data: savedAwards } = useV1AdminTournamentAwards(tournamentId);
+  const {
+    data: savedAwards,
+    isPending: awardsPending,
+    isError: awardsError,
+    refetch: refetchAwards,
+  } = useV1AdminTournamentAwards(tournamentId);
   const { data: awardRegData } = useV1AdminTournamentRegistrations(tournamentId);
   // EntityPicker 어댑터 — 소속 팀 선택지(제출은 계속 teamName 문자열)
   const awardTeamItems: EntityPickerItem[] = (awardRegData?.items ?? [])
@@ -101,6 +107,34 @@ export function AwardsTab({
       onError: (err) => showToast(extractErrorMessage(err, '개인 어워드를 저장하지 못했어요.'), 'error'),
     });
   };
+
+  // 형제 탭(통계)과 같은 로딩·에러 가드 — 이 가드가 없어 조회 실패 시
+  // 스켈레톤도 에러도 없는 무설명 빈 화면이 영구히 남았다.
+  if (awardsPending) {
+    return (
+      <div className="p-4">
+        <AdminTableSkeleton rows={4} cols={3} />
+      </div>
+    );
+  }
+  if (awardsError) {
+    return (
+      <div className="p-4">
+        <AdminEmpty
+          title="개인 어워드를 불러오지 못했어요."
+          action={
+            <button
+              type="button"
+              onClick={() => void refetchAwards()}
+              className="min-h-[44px] px-4 rounded-lg border border-[var(--border)] font-semibold"
+            >
+              다시 시도
+            </button>
+          }
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="p-4">

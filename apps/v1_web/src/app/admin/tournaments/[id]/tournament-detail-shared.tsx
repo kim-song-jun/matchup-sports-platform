@@ -76,6 +76,8 @@ export const REGISTRATION_STATUS_FILTERS: { value: string; label: string }[] = [
   { value: 'all', label: '전체' },
   { value: 'awaiting_payment', label: '입금 대기' },
   { value: 'payment_checking', label: '입금 확인 중' },
+  // 'paid'는 실사용 상태(입금 확인 완료, 확정 전)인데 칩이 없어 '전체'로만 볼 수 있었다.
+  { value: 'paid', label: '결제 완료' },
   { value: 'confirmed', label: '확정' },
   { value: 'waitlisted', label: '대기' },
   { value: 'cancel_requested', label: '취소 요청' },

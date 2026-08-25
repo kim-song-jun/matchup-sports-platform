@@ -27,6 +27,13 @@ vi.mock('@/components/public-game-records/use-public-game-records', () => ({
   usePublicMatch: (...args: unknown[]) => matchMock(...args),
 }));
 
+// 승인함 내부(훅·버튼)는 attest-requests.test.tsx 가 검증한다 — 이 스펙의 관심사(라인업
+// CTA 노출 규칙)와 무관하고, 실컴포넌트를 두면 use-v1-api mock factory 에 훅 3개를
+// 계속 따라 붙여야 한다.
+vi.mock('@/components/public-game-records/attest-requests', () => ({
+  AttestRequestsSection: () => null,
+}));
+
 vi.mock('@/components/public-game-records/match-detail-content', () => ({
   MatchDetailContent: () => <div>경기 상세</div>,
 }));

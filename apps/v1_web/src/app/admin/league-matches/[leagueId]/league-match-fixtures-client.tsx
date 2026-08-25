@@ -758,6 +758,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
             keyExtractor={(row) => row.teamMatchId}
             rowTone={(row) => (row.status === 'cancelled' ? 'danger' : undefined)}
             actionsHeader="관리"
+            stickyActions
             renderActions={(row) =>
               row.status === 'cancelled' ? (
                 <span className="text-xs text-[var(--text-muted)]">취소됨</span>

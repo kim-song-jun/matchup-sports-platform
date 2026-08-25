@@ -467,10 +467,11 @@ export interface V1LeaguePlayerRecordsResponse {
   goals: V1LeaguePlayerRecordRow[];
   assists: V1LeaguePlayerRecordRow[];
   /**
-   * 기록은 입력됐지만 신원 연동·기록 공개 동의가 없어 집계에서 빠진 행이 있는가.
+   * 기록은 입력됐지만 **공개 자격**(신원 연동 + 기록 공개 동의)을 못 갖춰 집계에서 빠진
+   * 행이 있는가. 둘 중 어느 쪽이 빠졌든 true 라서 이름이 consent 가 아니라 eligibility 다.
    * 빈 상태 문구를 가르는 데 쓴다 — "결과가 쌓이면 나타나요"는 이 경우 거짓 안내가 된다.
    */
-  hiddenByConsent: boolean;
+  hiddenByEligibility: boolean;
 }
 
 // R11(C-6): 몰수패·부전승 결과 입력. 스코어는 서버가 고정 컨벤션(승 1 : 몰수팀 0)으로

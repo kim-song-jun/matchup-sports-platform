@@ -679,7 +679,7 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
           <EmptyState
             title="아직 기록이 없어요"
             sub={
-              records.hiddenByConsent
+              records.hiddenByEligibility
                 ? '득점 기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 순위가 공개돼요.'
                 : '확정된 경기 결과가 쌓이면 득점 순위가 나타나요.'
             }
@@ -709,7 +709,7 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
           <EmptyState
             title="아직 기록이 없어요"
             sub={
-              records.hiddenByConsent
+              records.hiddenByEligibility
                 ? '도움 기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 순위가 공개돼요.'
                 : '확정된 경기 결과가 쌓이면 도움 순위가 나타나요.'
             }

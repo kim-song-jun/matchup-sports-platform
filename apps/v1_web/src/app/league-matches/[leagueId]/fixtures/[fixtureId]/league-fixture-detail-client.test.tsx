@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { useV1LeagueMatch, useV1LeagueMatchStandings, useV1ResolveChatRoom, useV1TeamMatch } from '@/hooks/use-v1-api';
 import { usePublicLeagueFixtureRecord } from '@/components/public-game-records/use-public-game-records';
+import { V1ApiError } from '@/lib/api-client';
 import LeagueFixtureDetailClient from './league-fixture-detail-client';
 
 vi.mock('next/navigation', () => ({
@@ -32,11 +33,12 @@ function makeRecord(overrides: Record<string, unknown> = {}) {
     tournamentTitle: '가을 리그',
     fixtureId: 'fx-1',
     gameId: 'game-1',
-    round: 2,
+    // round 는 PublicMatchDetail 계약대로 string — 서버가 'N주차' 라벨을 내린다.
+    round: '2주차',
     fixtureNumber: 1,
     legNumber: 1,
     groupId: null,
-    groupName: '2주차',
+    groupName: null,
     scheduledAt: '2026-09-12T10:00:00.000Z',
     venue: '검증장',
     fieldName: null,
@@ -61,12 +63,23 @@ function makeRecord(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function mockRecord(state: 'absent' | 'present', overrides: Record<string, unknown> = {}) {
-  usePublicLeagueFixtureRecordMock.mockReturnValue(
-    state === 'present'
-      ? ({ data: makeRecord(overrides), isPending: false, isError: false } as never)
-      : ({ data: undefined, isPending: false, isError: true } as never),
-  );
+function mockRecord(state: 'absent' | 'present' | 'server-error', overrides: Record<string, unknown> = {}) {
+  if (state === 'present') {
+    usePublicLeagueFixtureRecordMock.mockReturnValue({ data: makeRecord(overrides), isPending: false, isError: false } as never);
+    return;
+  }
+  // 'absent' = 404(게임 미공개·숨김) — 정상 폴백 경로. 그 외 에러는 ErrorState 로 노출된다.
+  const error =
+    state === 'absent'
+      ? new V1ApiError({ status: 'error', timestamp: '', statusCode: 404, code: 'LEAGUE_FIXTURE_NOT_FOUND', message: '경기 정보를 찾을 수 없어요.', details: null })
+      : new V1ApiError({ status: 'error', timestamp: '', statusCode: 500, code: 'INTERNAL_ERROR', message: '서버 오류', details: null });
+  usePublicLeagueFixtureRecordMock.mockReturnValue({
+    data: undefined,
+    isPending: false,
+    isError: true,
+    error,
+    refetch: vi.fn(),
+  } as never);
 }
 
 // 1주차(완료 2:1) → 2주차(이 화면의 대상, 예정) 두 대진을 가진 리그.
@@ -214,6 +227,18 @@ describe('LeagueFixtureDetailClient', () => {
     // 폴백 카드의 상태 배지 + 일시·장소가 그대로 살아 있다.
     expect(screen.getByText('매칭됨')).toBeInTheDocument();
     expect(screen.getByText('예정')).toBeInTheDocument();
+  });
+
+  it('기록 API 의 404 외 오류(5xx 등)는 폴백으로 숨기지 않고 오류 상태를 보여준다', () => {
+    mockLeague();
+    mockViewer('none');
+    mockRecord('server-error');
+    render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
+
+    // extractErrorMessage 는 서버가 준 메시지를 그대로 노출한다.
+    expect(screen.getByText('서버 오류')).toBeInTheDocument();
+    // 폴백 요약 카드는 함께 뜨지 않는다 — 장애를 정상 화면처럼 보이게 하지 않는다.
+    expect(screen.queryByText('매칭됨')).not.toBeInTheDocument();
   });
 
   it('리그에 없는 경기 id 는 오류 안내와 리그로 돌아가는 링크를 보여준다', () => {

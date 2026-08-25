@@ -53,6 +53,13 @@ interface AdminDataTableProps<T> {
    */
   tableMaxWidth?: string;
   /**
+   * 폭이 넓어 가로 스크롤이 생기는 표에서 관리(actions) 열을 오른쪽에 고정한다.
+   * 핵심 액션 버튼이 스크롤해야만 보이는 것을 막는다(2026-08-25 사용자 확정 — 리그 대진 표).
+   * 고정 셀은 스크롤 콘텐츠가 비쳐 보이지 않도록 카드 배경을 불투명하게 깐다 —
+   * rowTone 틴트·hover 배경은 고정 셀 아래에서는 보이지 않는 것이 의도된 트레이드오프다.
+   */
+  stickyActions?: boolean;
+  /**
    * #9: Per-row visual tone for dangerous/warning states (suspended, blocked, cancelled…).
    * danger → var(--red50)/40 + left red accent bar.
    * warning → var(--tint-orange) + left amber accent bar.
@@ -103,6 +110,7 @@ export function AdminDataTable<T>({
   skeletonRows = 5,
   scrollOnMobile = false,
   tableMaxWidth,
+  stickyActions = false,
   rowTone,
   onRowClick,
   rowClickLabel,
@@ -181,7 +189,11 @@ export function AdminDataTable<T>({
             {hasActions && (
               <th
                 scope="col"
-                className={[cellPad, 'font-semibold text-[var(--text-muted)] text-[12px] tracking-wide text-right whitespace-nowrap'].join(' ')}
+                className={[
+                  cellPad,
+                  'font-semibold text-[var(--text-muted)] text-[12px] tracking-wide text-right whitespace-nowrap',
+                  stickyActions ? 'sticky right-0 z-20 bg-[var(--card-surface)] border-l border-[var(--border)]' : '',
+                ].filter(Boolean).join(' ')}
               >
                 {actionsHeader ?? '작업'}
               </th>
@@ -236,7 +248,13 @@ export function AdminDataTable<T>({
                   </td>
                 ))}
                 {hasActions && (
-                  <td className={[cellPad, 'text-right align-middle'].join(' ')}>
+                  <td
+                    className={[
+                      cellPad,
+                      'text-right align-middle',
+                      stickyActions ? 'sticky right-0 z-[5] bg-[var(--card-surface)] border-l border-[var(--border)]' : '',
+                    ].filter(Boolean).join(' ')}
+                  >
                     <div className="flex items-center justify-end gap-2">
                       {renderActions!(row)}
                     </div>

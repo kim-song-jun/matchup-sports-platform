@@ -9,6 +9,7 @@ import { MatchDetailContent } from '@/components/public-game-records/match-detai
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { extractErrorMessage } from '@/lib/error-message';
+import { V1ApiError } from '@/lib/api-client';
 import { LEAGUE_STATE_META } from '@/lib/league-state-meta';
 import { formatTournamentDateTimeLong, formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { fixtureResultLabel, fixtureStatusMeta } from '../../league-fixture-meta';
@@ -249,6 +250,14 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
         </>
       ) : recordQuery.isPending ? (
         <div className="tm-skeleton" style={{ height: 180, borderRadius: 16 }} />
+      ) : recordQuery.isError &&
+        !(recordQuery.error instanceof V1ApiError && recordQuery.error.statusCode === 404) ? (
+        /* 404(게임 미공개·숨김)만 정상 폴백이다 — 네트워크/5xx 를 요약 카드로 숨기면
+           실제 장애가 화면에서 사라진다(Copilot 리뷰 #747). */
+        <ErrorState
+          message={extractErrorMessage(recordQuery.error, '경기 기록을 불러오지 못했어요.')}
+          onRetry={() => void recordQuery.refetch()}
+        />
       ) : (
         /* 기록 API 404(게임 미공개·숨김 정책) 폴백 — 리그 대진 요약 카드.
            양팀 실명·스코어/상태·일시·장소는 리그 공개 상세만으로도 보여줄 수 있다. */

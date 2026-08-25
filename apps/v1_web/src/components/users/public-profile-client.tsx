@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { formatTournamentDateShort } from '@/lib/date-utils';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
-import { useV1PublicProfile } from '@/hooks/use-v1-api';
+import { useV1AuthMe, useV1PublicProfile } from '@/hooks/use-v1-api';
 import { cssUrl } from '@/lib/assets';
 import { PlayerCard } from './player-card';
 import { ShieldCheck, TrendingUp, Activity, Star, AlertCircle, ChevronRight } from 'lucide-react';
@@ -44,6 +44,12 @@ function trustConfig(trustState: TrustState) {
 
 export function PublicProfilePageClient({ userId }: { userId: string }) {
   const profile = useV1PublicProfile(userId);
+  /**
+   * 본인 여부. 적대 검증(2026-08-25)에서 isOwner=false 하드코딩이 확정됐다 -- 주인이
+   * '내 프로필'로 자기 공개 프로필에 와도 남의 시점으로 렌더돼 진행도·해금 안내가
+   * 사라졌다. 세션 확인 실패(비로그인 4xx)는 곧 '본인 아님'이므로 재시도하지 않는다.
+   */
+  const authMe = useV1AuthMe({ retry: false });
 
   if (profile.isLoading) {
     return (
@@ -92,7 +98,7 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
               displayName={data.displayName}
               profileImageUrl={data.profileImageUrl}
               teamName={data.teams?.[0]?.name ?? null}
-              isOwner={false}
+              isOwner={authMe.data?.user?.id === userId}
               shareHref={`/users/${userId}/card`}
               belowCardSlot={
                 <div className="tm-pcard-identity">

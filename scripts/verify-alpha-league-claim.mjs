@@ -126,10 +126,14 @@ for (const [label, width, height] of [
   // 라이브 폴링 페이지는 networkidle 이 끝나지 않는다 — domcontentloaded + 대기.
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await page.waitForTimeout(2500);
-  const bannerVisible = await page.getByText('이 경기에 뛰었는데 내 기록이 없나요?').count();
-  console.log(`page ${label}: banner=${bannerVisible > 0 ? 'visible' : 'MISSING'}`);
+  // count() 는 DOM 존재만 세서 CSS 로 숨겨져도 통과한다 — 가시성으로 판정 (Copilot 리뷰).
+  const bannerVisible = await page
+    .getByText('이 경기에 뛰었는데 내 기록이 없나요?')
+    .isVisible()
+    .catch(() => false);
+  console.log(`page ${label}: banner=${bannerVisible ? 'visible' : 'MISSING'}`);
   await page.screenshot({ path: `${OUT}/claim-banner-${label}.png`, fullPage: true });
-  assert(bannerVisible > 0, `${label} 에서 claim 배너가 렌더되지 않음`);
+  assert(bannerVisible, `${label} 에서 claim 배너가 화면에 보이지 않음`);
   if (label === 'mobile-390') {
     await page.getByRole('button', { name: '명단에서 나 찾기' }).click();
     await page.waitForTimeout(1500);

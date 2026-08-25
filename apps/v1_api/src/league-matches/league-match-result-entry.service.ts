@@ -195,7 +195,9 @@ export class LeagueMatchResultEntryService {
     gameId: string,
     dto: RecordLeagueResultDto,
   ): Promise<AssembledResultParticipant[]> {
-    if (dto.participants === undefined || dto.participants.length === 0) return [];
+    // == null: 명시적 null 도 커버 — @IsOptional() 은 null 을 검증 없이 통과시키므로
+    // undefined 만 걸러서는 `null.length` 500 이 난다(Copilot 리뷰).
+    if (dto.participants == null || dto.participants.length === 0) return [];
     const [gameParticipants, sides] = await Promise.all([
       this.prisma.v1GameParticipant.findMany({
         where: { gameId, id: { in: dto.participants.map((stat) => stat.participantId) } },

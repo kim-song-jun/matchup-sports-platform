@@ -71,6 +71,21 @@ function lockReasonText(
   return `후기 ${reason.remaining}개를 받으면 열려요`;
 }
 
+/**
+ * 카드 안에 놓는 "다음 목표" 한 줄 (사용자 선택 A안 -- 상태 적응형 카드).
+ * 잠긴 것 여섯 개를 나열하는 대신 지금 할 일 하나만 말한다 -- 카드가 행동을 만든다.
+ * 주인이 아니어도 보인다: 이 선수가 어느 단계인지를 말하는 중립 정보다.
+ */
+function nextGoalText(card: V1PlayerCard): string | null {
+  if (card.nextUnlock === null) return null;
+  const { reason } = card.nextUnlock;
+  if (reason.type === 'consent') return '기록 공개하기';
+  if (reason.type === 'appearances') {
+    return card.appearances === 0 ? '첫 경기 뛰기' : `${reason.remaining}경기 더 뛰기`;
+  }
+  return `후기 ${reason.remaining}개 받기`;
+}
+
 function unlockHint(card: V1PlayerCard): string | null {
   if (card.nextUnlock === null) return null;
   const { reason } = card.nextUnlock;
@@ -244,6 +259,13 @@ export function PlayerCard({
   const needsConsent = card.nextUnlock?.reason.type === 'consent';
   const { left, right } = splitStats(card.stats);
   const [flipped, setFlipped] = useState(false);
+  /**
+   * 여정 면 (A안): 아직 한 경기도 안 뛰었고 열린 능력치도 없으면, 자물쇠 여섯 개의
+   * 벽 대신 "시작하는 카드"를 그린다. 후기는 경기를 뛴 사람에게만 달리므로
+   * 0경기 + 열림 0 조합이 곧 "완전 신규"다.
+   */
+  const isJourney = card.appearances === 0 && card.unlockedCount === 0;
+  const nextGoal = nextGoalText(card);
 
   /**
    * 포인터 추종 기울기 + 글레어 (목업 확정 인터랙션).
@@ -336,25 +358,44 @@ export function PlayerCard({
         {displayName}
       </div>
 
-      <div className="tm-player-card-stats">
-        <StatCell stat={left[0]} />
-        <div className="tm-pcard-stats-div" aria-hidden="true" />
-        <StatCell stat={right[0]} />
-        <StatCell stat={left[1]} />
-        <StatCell stat={right[1]} />
-        <StatCell stat={left[2]} />
-        <StatCell stat={right[2]} />
-      </div>
+      {isJourney ? (
+        <div className="tm-pcard-journey">
+          <div className="tm-pcard-journey-title">첫 경기를 기다리는 선수</div>
+          <div className="tm-pcard-journey-sub">
+            경기를 뛰는 순간부터
+            <br />
+            이 카드에 기록이 새겨져요
+          </div>
+        </div>
+      ) : (
+        <div className="tm-player-card-stats">
+          <StatCell stat={left[0]} />
+          <div className="tm-pcard-stats-div" aria-hidden="true" />
+          <StatCell stat={right[0]} />
+          <StatCell stat={left[1]} />
+          <StatCell stat={right[1]} />
+          <StatCell stat={left[2]} />
+          <StatCell stat={right[2]} />
+        </div>
+      )}
+
+      {nextGoal ? (
+        <div className="tm-pcard-next">
+          <i aria-hidden="true" />
+          다음 목표 · {nextGoal}
+        </div>
+      ) : null}
 
       <div className="tm-pcard-meta">
         <span className="tm-pcard-meta-line">
           {teamName ? (
             <>
               <b>{teamName}</b>
-              <i aria-hidden="true" />
+              {isJourney ? null : <i aria-hidden="true" />}
             </>
           ) : null}
-          <span>{card.appearances}경기</span>
+          {/* 여정 면에서 "0경기"는 빈 사실의 반복이다 -- 위 문장이 이미 말했다. */}
+          {isJourney ? null : <span>{card.appearances}경기</span>}
         </span>
         <span className="tm-pcard-brand" aria-hidden="true">
           <em />
@@ -415,6 +456,7 @@ export function PlayerCard({
       // 새 티어·모양을 더할 때마다 이 파일을 고쳐야 한다.
       data-tier={card.tier}
       data-shape={card.shape ?? 'rect'}
+      data-face={isJourney ? 'journey' : 'record'}
       data-flipped={flipped ? 'true' : undefined}
       aria-label={`${displayName} 선수 카드`}
     >
@@ -471,7 +513,9 @@ export function PlayerCard({
         {/* 등급의 의미를 못 박는다. 이 문장이 없으면 브론즈가 "실력 하위"로 읽힌다. */}
         <div className="tm-player-card-tier-note">등급은 실력이 아니라 뛴 경기 수로 올라가요</div>
 
-        {hint ? (
+        {/* 진행도·해금 안내는 카드 주인에게 하는 말이다 -- 남의 프로필에서 보이면
+            소음이고, 잠긴 이유가 궁금한 사람은 뒷면이 말해 준다. */}
+        {isOwner && hint ? (
           <div className="tm-player-card-progress">
             <div className="tm-player-card-progress-text">{hint}</div>
             <div className="tm-player-card-progress-bar" aria-hidden="true">

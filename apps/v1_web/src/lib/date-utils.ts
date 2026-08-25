@@ -192,3 +192,21 @@ export function formatAdminDateTime(dateStr: string): string {
   const minute = String(d.getMinutes()).padStart(2, '0');
   return `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()} ${hour}:${minute}`;
 }
+
+/**
+ * 리그 대진 timing 타임라인 공용: 경기별 시각 'HH:mm'. 경기 시각은 KST 벽시계 계약이라
+ * (서버가 KST 기준으로 배치한다) 실행 환경 타임존과 무관하게 Asia/Seoul로 고정한다.
+ * dateStr 이 invalid 이면 원본 문자열을 그대로 반환.
+ */
+export function formatKstTime(dateStr: string): string {
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  return d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Seoul' });
+}
+
+/** 리그 대진 timing 타임라인 공용: 매치데이 헤더 날짜 'M. D. (요일)' — 위와 같은 이유로 KST 고정. */
+export function formatKstDateShort(dateStr: string): string {
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric', weekday: 'short', timeZone: 'Asia/Seoul' });
+}

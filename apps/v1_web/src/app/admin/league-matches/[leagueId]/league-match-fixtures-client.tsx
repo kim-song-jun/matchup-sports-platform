@@ -24,6 +24,7 @@ import {
   useV1UpdateLeagueFixture,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
 import { fromDatetimeLocalValue, toDatetimeLocalValue } from '@/components/team-schedules/team-schedules.view-model';
 import { RecentVenueChips } from '@/components/v1-ui/create-form-fields';
 import {
@@ -156,12 +157,14 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
   // generate/regenerate/preview 세 호출이 전부 같은 폼 상태(weeksCount/dayOfWeek/time/
   // placeName)에서 같은 모양의 body를 만든다 — 세 곳에서 조립 규칙이 갈리면(예: 트림 여부)
   // "미리보기는 통과했는데 실제 생성은 다르게 실패"가 생긴다.
+  // 서버 DTO가 @IsInt라 '15.5'·'1e2' 같은 값은 400으로 튕긴다 — 정수 문자열만 값으로
+  // 인정하고, "비어 있지 않은데 정수가 아님"은 제출 전에 별도로 걸러 안내한다.
   const parseOptionalInt = (value: string): number | null => {
     const trimmed = value.trim();
-    if (trimmed === '') return null;
-    const parsed = Number(trimmed);
-    return Number.isFinite(parsed) ? parsed : null;
+    return /^\d+$/.test(trimmed) ? Number(trimmed) : null;
   };
+  const isInvalidIntInput = (value: string) => value.trim() !== '' && !/^\d+$/.test(value.trim());
+  const hasInvalidTimingInput = [gameDurationMinutes, breakMinutes, gamesPerTeamPerDay].some(isInvalidIntInput);
   const durationValue = parseOptionalInt(gameDurationMinutes);
   const breakValue = parseOptionalInt(breakMinutes);
   const gamesPerDayValue = parseOptionalInt(gamesPerTeamPerDay);
@@ -208,8 +211,13 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
   });
 
   // 경기 시간 없이 휴식/팀당 경기 수만 채우면 서버가 400을 낸다(timing.gameDurationMinutes 필수) —
-  // 요일-시각 짝 검증과 같은 방식으로 제출 전에 먼저 알려준다.
+  // 요일-시각 짝 검증과 같은 방식으로 제출 전에 먼저 알려준다. 정수가 아닌 입력도 여기서 차단한다
+  // (parseOptionalInt가 null로 만들면 timing이 조용히 누락돼 더 나쁘다).
   const validateTimingInputs = (): boolean => {
+    if (hasInvalidTimingInput) {
+      showToast('경기 시간·휴식·팀당 하루 경기 수는 정수로만 입력할 수 있어요.', 'error');
+      return false;
+    }
     if (durationValue === null && (breakValue !== null || gamesPerDayValue !== null)) {
       showToast('경기 시간(분)을 입력해야 휴식·팀당 하루 경기 수를 쓸 수 있어요.', 'error');
       return false;
@@ -439,6 +447,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
       showToast('요일을 골랐으면 시각도 입력해 주세요.', 'error');
       return;
     }
+    if (!validateTimingInputs()) return;
     regenerateFixtures.mutate(
       { ...buildFixtureFormPayload(), reason },
       {
@@ -1037,26 +1046,6 @@ function formatPreviewDateTime(value: string) {
  * 상태에서 "이 설정으로 만들면 이렇게 된다"를 그대로 보여준다. result가 null이면(아직
  * 안 눌렀거나 직전 생성/재생성이 성공해 초기화됐을 때) 아무것도 렌더하지 않는다.
  */
-// timing 미리보기 전용 시각 포맷 — 경기별 시간 범위(22:00~22:15)는 KST 벽시계를 그대로
-// 보여줘야 하므로 실행 환경 타임존과 무관하게 Asia/Seoul로 고정한다.
-function formatKstTime(value: string) {
-  return new Date(value).toLocaleTimeString('ko-KR', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    timeZone: 'Asia/Seoul',
-  });
-}
-
-function formatKstDateShort(value: string) {
-  return new Date(value).toLocaleDateString('ko-KR', {
-    month: 'numeric',
-    day: 'numeric',
-    weekday: 'short',
-    timeZone: 'Asia/Seoul',
-  });
-}
-
 function FixturePreviewPanel({
   result,
   teamNameById,

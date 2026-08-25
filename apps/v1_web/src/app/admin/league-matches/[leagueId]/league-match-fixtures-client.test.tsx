@@ -1067,6 +1067,59 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
     expect(mutateAsync).not.toHaveBeenCalled();
   });
 
+  it('경기 시간에 소수를 입력하면 정수 안내 토스트를 띄우고 제출하지 않는다', async () => {
+    const mutateAsync = vi.fn();
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync, isPending: false } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    fireEvent.change(screen.getByLabelText('경기 시간(분)'), { target: { value: '15.5' } });
+    fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+
+    expect(await screen.findByText(/정수로만 입력/)).toBeInTheDocument();
+    expect(mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('재생성 확인 모달에서도 timing 선제 검증이 동작한다(경기 시간 없이 팀당만 입력하면 미호출)', async () => {
+    useV1AdminLeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1',
+        title: '심야 풋살 리그',
+        state: 'active',
+        teamIds: ['t1', 't2'],
+        fixtures: [
+          { teamMatchId: 'tm-1', title: '심야 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched' },
+        ],
+      },
+      isPending: false,
+    } as never);
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    const regenMutate = vi.fn();
+    useV1RegenerateLeagueFixturesMock.mockReturnValue({ mutate: regenMutate, isPending: false } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    fireEvent.change(screen.getByLabelText('팀당 하루 경기'), { target: { value: '3' } });
+    fireEvent.click(screen.getAllByRole('button', { name: '대진 재생성' })[0]);
+    fireEvent.change(
+      screen.getByPlaceholderText('이 작업이 왜 필요한지 남겨 주세요. 감사 로그에 그대로 기록돼요.'),
+      { target: { value: '테스트 재생성' } },
+    );
+    fireEvent.change(screen.getByPlaceholderText('재생성'), { target: { value: '재생성' } });
+    fireEvent.click(screen.getAllByRole('button', { name: '대진 재생성' })[screen.getAllByRole('button', { name: '대진 재생성' }).length - 1]);
+
+    expect(await screen.findByText(/경기 시간\(분\)을 입력/)).toBeInTheDocument();
+    expect(regenMutate).not.toHaveBeenCalled();
+  });
+
   it('timing 미리보기 응답은 매치데이 타임라인으로 렌더된다', async () => {
     useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
     const previewMutateAsync = vi.fn().mockResolvedValue({

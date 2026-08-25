@@ -2,8 +2,12 @@ import { Module } from '@nestjs/common';
 import { AdminContextModule } from '../common/admin-context.module';
 import { GamesModule } from '../games/games.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { UploadsModule } from '../uploads/uploads.module';
 import { OptionalV1AuthGuard } from '../auth/optional-v1-auth.guard';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
+// 리그 경기 영상(대회 영상의 팀매치 판) — 다른 컨트롤러들과 같은 이유로 별도 파일 등록.
+import { LeagueFixtureVideosController } from './league-fixture-videos.controller';
+import { LeagueFixtureVideosService } from './league-fixture-videos.service';
 import { LeagueMatchAdminController } from './league-match-admin.controller';
 import { LeagueMatchAdminService } from './league-match-admin.service';
 // D2: 리그 결과 이의 제기(팀) + 수락/거부(운영자). LeagueMatchForfeitController/-Service와

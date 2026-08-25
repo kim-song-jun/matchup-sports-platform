@@ -132,7 +132,9 @@ export function MyLeaguesPageClient() {
                           )}
                           {team.nextFixture != null && (
                             <Link
-                              href={`/team-matches/${team.nextFixture.teamMatchId}`}
+                              // 리그 대진 클릭의 착지는 리그 경기 상세다 — /team-matches/:id 로 보내도
+                              // 서버가 같은 곳으로 리다이렉트하지만, 한 번의 왕복을 아끼려 직접 잇는다.
+                              href={`/league-matches/${item.leagueId}/fixtures/${team.nextFixture.teamMatchId}`}
                               className="tm-pressable tm-list-row-interactive inline-flex min-h-[44px] items-center gap-1 rounded-lg px-2 font-medium text-[var(--blue500)]"
                               aria-label={`${team.name} 다음 경기 상세로 이동`}
                             >

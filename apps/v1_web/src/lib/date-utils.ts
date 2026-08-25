@@ -193,6 +193,14 @@ export function formatAdminDateTime(dateStr: string): string {
   return `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()} ${hour}:${minute}`;
 }
 
+/** formatAdminDateTime 의 날짜 전용 자매 — 어드민 목록의 가입일·생성일 열처럼 시각이 불필요한 곳 */
+export function formatAdminDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  return `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}`;
+}
+
 /**
  * 리그 대진 timing 타임라인 공용: 경기별 시각 'HH:mm'. 경기 시각은 KST 벽시계 계약이라
  * (서버가 KST 기준으로 배치한다) 실행 환경 타임존과 무관하게 Asia/Seoul로 고정한다.

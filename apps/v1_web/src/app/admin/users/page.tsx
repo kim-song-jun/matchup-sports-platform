@@ -11,6 +11,7 @@ import {
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { formatAuthProviders, formatGender, formatUserTitle } from '@/lib/format-user';
+import { formatAdminDate } from '@/lib/date-utils';
 import { useAdminListQuery } from '@/hooks/use-admin-list-query';
 import {
   AdminPageHeader,
@@ -25,20 +26,6 @@ import {
   AdminToasts,
 } from '@/components/admin';
 import type { V1AdminUserRow } from '@/types/api';
-
-// ── Date formatter ────────────────────────────────────────────────────────────
-function formatDateCompact(dateStr: string | null | undefined): string {
-  if (!dateStr) return '—';
-  try {
-    const d = new Date(dateStr);
-    const y = d.getFullYear();
-    const mo = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}.${mo}.${day}`;
-  } catch {
-    return dateStr ?? '—';
-  }
-}
 
 // 회원 표기(제목·성별·로그인 수단)는 상세 페이지와 공유하는 lib/format-user.ts 단일 소스 —
 // 두 화면이 각자 복제한 로직이 갈라져 같은 회원이 다른 이름으로 보이던 결함이 있었다.
@@ -266,7 +253,7 @@ function AdminUsersPageContent() {
               header: '가입',
               width: 'w-[104px]',
               render: (row) => (
-                <span className="whitespace-nowrap text-[var(--text-muted)]">{formatDateCompact(row.createdAt)}</span>
+                <span className="whitespace-nowrap text-[var(--text-muted)]">{formatAdminDate(row.createdAt)}</span>
               ),
             },
             {
@@ -274,7 +261,7 @@ function AdminUsersPageContent() {
               header: '최근 로그인',
               width: 'w-[112px]',
               render: (row) => (
-                <span className="whitespace-nowrap text-[var(--text-muted)]">{formatDateCompact(row.lastLoginAt)}</span>
+                <span className="whitespace-nowrap text-[var(--text-muted)]">{formatAdminDate(row.lastLoginAt)}</span>
               ),
             },
           ]}

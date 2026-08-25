@@ -74,6 +74,16 @@ function renderWith(
 }
 
 describe('AdminLeagueMatchDisputesPage', () => {
+  it('리그명은 해당 리그 상세로 가는 링크다 — 이의 처리 시 대진 맥락 확인 동선', () => {
+    renderWith([OPEN_ROW], { open: 1, accepted: 0, rejected: 0 });
+    const links = screen.getAllByRole('link', { name: '가을 풋살 리그 리그 상세 보기' });
+    for (const link of links) {
+      expect(link).toHaveAttribute('href', '/admin/league-matches/league-1');
+    }
+    expect(links.length).toBeGreaterThan(0);
+  });
+
+
   it('기본 상태 필터는 open 이고, 훅에 그대로 전달된다', () => {
     renderWith([OPEN_ROW]);
     expect(hooks.lastStatusArg).toBe('open');

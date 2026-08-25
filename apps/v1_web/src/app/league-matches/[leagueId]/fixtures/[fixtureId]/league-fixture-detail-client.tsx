@@ -6,6 +6,7 @@ import { useMemo, useState } from 'react';
 import { useV1LeagueMatch, useV1LeagueMatchStandings, useV1ResolveChatRoom, useV1TeamMatch } from '@/hooks/use-v1-api';
 import { usePublicLeagueFixtureRecord } from '@/components/public-game-records/use-public-game-records';
 import { MatchDetailContent } from '@/components/public-game-records/match-detail-content';
+import { AttestRequestsSection } from '@/components/public-game-records/attest-requests';
 import { LeagueClaimMyRecordSection } from '@/components/public-game-records/claim-my-record';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
@@ -221,6 +222,9 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
           <div className="-mx-4">
             <MatchDetailContent data={recordQuery.data} />
           </div>
+          {/* 기록 연결 승인함 (attest UI C안): 다른 참가자의 연결 신청을 확인·승인하는
+              반대쪽 절반. 신청 알림의 착지 화면이기도 하다 — 요청이 있을 때만 보인다. */}
+          <AttestRequestsSection gameId={recordQuery.data.gameId} />
           {/* 대회 경기 상세와 같은 "내 기록 연결" 배너 (claim 의 리그 판). 기록 본문이
               뜨는 경우에만 싣는다 — 게임 미공개(404 폴백) 대진은 연결할 기록 자체가
               화면에 없어 배너가 맥락을 잃는다. 조회는 모달을 연 뒤에만 나간다. */}

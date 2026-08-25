@@ -91,7 +91,16 @@ export type NotificationEventType =
   // 문구가 갈린다. league-match-dispute.service.ts resolveDispute/rejectDispute.
   | 'league_match_dispute_corrected'
   | 'league_match_dispute_voided'
-  | 'league_match_dispute_rejected';
+  | 'league_match_dispute_rejected'
+  // 내 기록 연결(claim) 승인 요청 (2026-08-26, attest UI C안): 신청이 들어오면 확인자
+  // 후보에게 알린다 — 요청이 24시간 뒤 만료되는데 알림 없이는 확인자가 신청 사실
+  // 자체를 알 수 없었다. 소스별로 딥링크·게이트가 달라 두 타입으로 나눈다.
+  // 발송은 games/identity-attest-notification.ts 가 tx 안에서 V1Notification 을 직접
+  // 쓴다(team-match-completion-notification.service.ts 선례 — GamesModule 이
+  // NotificationsServiceModule 을 import 하면 RealtimeModule 경유 순환이 생겨서다).
+  // 여기 title/body/deepLink 는 그 문구의 단일 소스다.
+  | 'team_match_identity_attest_requested'
+  | 'tournament_identity_attest_requested';
 
 /** V1NotificationPreference 컬럼 중 이벤트 발송을 게이트하는 필드들. */
 type NotificationPrefField = keyof Pick<
@@ -152,7 +161,8 @@ function preferenceFieldForEvent(type: NotificationEventType): NotificationPrefF
     type === 'league_match_dispute_received' ||
     type === 'league_match_dispute_corrected' ||
     type === 'league_match_dispute_voided' ||
-    type === 'league_match_dispute_rejected'
+    type === 'league_match_dispute_rejected' ||
+    type === 'team_match_identity_attest_requested'
   ) {
     return 'teamMatchEnabled';
   }
@@ -168,7 +178,9 @@ function preferenceFieldForEvent(type: NotificationEventType): NotificationPrefF
     // 수상 알림도 대회 활동이다 — 나머지 대회 알림 7종과 같은 축으로 게이트한다.
     // importantEnabled 는 "놓치면 안 되는 1:1 문의 답변" 전용이라 성격이 다르고,
     // 새 preference 컬럼을 만들면 마이그레이션이 붙는데 그럴 이유가 없다.
-    type === 'tournament_award_received'
+    type === 'tournament_award_received' ||
+    // 신원 연결 승인 요청(대회 판)도 대회 활동 축이다.
+    type === 'tournament_identity_attest_requested'
   ) {
     return 'activityEnabled';
   }
@@ -221,7 +233,11 @@ function targetTypeForEvent(type: NotificationEventType): V1NotificationTargetTy
     type === 'tournament_payment_confirmed' ||
     type === 'tournament_announcement_published' ||
     type === 'tournament_completed_review_request' ||
-    type === 'tournament_award_received'
+    type === 'tournament_award_received' ||
+    // targetId 는 "${tournamentId}:${fixtureId}" 복합 문자열 — 경기 상세가 2계층 경로라서다.
+    // schedule_rsvp_deadline_reminder 의 기존 복합 targetId 선례를 따르고, 딥링크는
+    // deepLinkForEvent 에서 명시적으로 파싱한다.
+    type === 'tournament_identity_attest_requested'
   ) {
     return 'tournament';
   }
@@ -348,6 +364,16 @@ function deepLinkForEvent(
       return `/teams/${teamId}/schedules/${scheduleId}`;
     }
   }
+  // 신원 연결 승인 요청(대회 판): targetId 는 "${tournamentId}:${fixtureId}" 복합 —
+  // 승인 카드가 실리는 경기 상세로 보낸다(위 schedule 복합 targetId 와 같은 패턴).
+  // 팀매치·리그 판(team_match_identity_attest_requested)은 기본 /team-matches/:id 로
+  // 충분하다 — 리그 대진이면 그 라우트의 서버 redirect 가 리그 경기 상세로 보낸다.
+  if (type === 'tournament_identity_attest_requested' && targetId) {
+    const [tournamentId, fixtureId] = targetId.split(':');
+    if (tournamentId && fixtureId) {
+      return `/tournaments/${tournamentId}/matches/${fixtureId}`;
+    }
+  }
   // league_fixture_scheduled/league_promotion_* 는 targetType이 'team_match'/'team'이라
   // ROUTE_BASE_BY_TARGET_TYPE 기본값을 쓰면 각각 /team-matches/{leagueId}, /teams/{leagueId}
   // 로 잘못 라우팅된다(targetId가 team_match/team의 id가 아니라 leagueId이기 때문 —
@@ -423,6 +449,8 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   league_match_dispute_corrected: '리그 경기 결과가 정정됐어요',
   league_match_dispute_voided: '리그 경기 결과가 무효 처리됐어요',
   league_match_dispute_rejected: '이의 제기가 받아들여지지 않았어요',
+  team_match_identity_attest_requested: '기록 연결 승인 요청이 도착했어요',
+  tournament_identity_attest_requested: '기록 연결 승인 요청이 도착했어요',
 };
 
 /**
@@ -476,6 +504,8 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   league_match_dispute_corrected: '정정된 결과를 확인해 주세요.',
   league_match_dispute_voided: '결과가 무효 처리됐어요.',
   league_match_dispute_rejected: '기존 결과가 그대로 유지돼요.',
+  team_match_identity_attest_requested: '경기 명단의 기록 연결 요청을 24시간 안에 확인해 주세요.',
+  tournament_identity_attest_requested: '경기 명단의 기록 연결 요청을 24시간 안에 확인해 주세요.',
 };
 
 @Injectable()

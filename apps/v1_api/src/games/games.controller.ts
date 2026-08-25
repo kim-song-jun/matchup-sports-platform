@@ -283,6 +283,16 @@ export class GamesController {
     );
   }
 
+  /**
+   * 승인함 목록 (attest UI C안) — 내가 승인할 수 있는 대기 중 신원 연결 요청.
+   * attest 에 필요한 requestId·expectedVersion 을 알아낼 유일한 조회 경로다.
+   */
+  @Get(':gameId/identity-link-requests/pending')
+  @UseGuards(V1AuthGuard)
+  pendingIdentityLinkRequests(@CurrentUser() user: V1AuthUser, @Param('gameId') gameId: string) {
+    return this.gamesService.listPendingIdentityLinkRequests(user, gameId);
+  }
+
   @Post(':gameId/participants/:participantId/identity-link-requests')
   @UseGuards(V1AuthGuard)
   requestIdentityLink(

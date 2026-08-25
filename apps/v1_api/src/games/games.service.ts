@@ -55,6 +55,7 @@ import {
   type StoredPenalties,
 } from './core/knockout-penalties';
 import { GameTakeoverService } from './game-takeover.service';
+import { writeIdentityAttestRequestNotifications } from './identity-attest-notification';
 import {
   decideTournamentStaffAccess,
   type TournamentStaffAction,
@@ -2691,6 +2692,133 @@ export class GamesService {
     };
   }
 
+  /**
+   * 승인함 목록 (2026-08-26, attest UI C안) — 이 경기에서 **내가 승인(attest)할 수 있는**
+   * 대기 중 신원 연결 요청을 돌려준다. attest API 는 requestId 를 요구하는데 그것을
+   * 알아낼 조회 경로가 없어 승인 UI 를 만들 수 없었다(신청·승인 API 만 존재).
+   *
+   * ## 노출 범위 = 승인 자격
+   * 진입 게이트는 신청과 같은 `participant_identity` 스코프(참가팀 멤버)이고, 그 위에
+   * **요청별 승인 자격**(assertAttestorAuthority — TEAM_MATCH 는 그 사이드 팀의
+   * owner/manager, TOURNAMENT 는 등록팀 활성 멤버)을 사이드 단위로 판정해 통과하는
+   * 요청만 싣는다. 볼 수 있는데 승인은 못 하는 행을 만들지 않는다(claim 목록과 같은
+   * 원칙). 본인이 낸 요청도 뺀다 — 스스로 승인할 수 없다(서비스 + DB 트리거).
+   *
+   * ## pending 판정
+   * REQUESTED 이벤트가 있고 종결 이벤트(ATTESTED/REJECTED/EXPIRED)가 없으며 24시간이
+   * 지나지 않은 것. 24시간이 지난 요청은 EXPIRED 이벤트를 여기서 쓰지 않고 목록에서만
+   * 뺀다 — 만료 이벤트 기록은 attest 시점의 lazy expiry (attestIdentityLink) 소관이다.
+   */
+  async listPendingIdentityLinkRequests(user: V1AuthUser, gameId: string) {
+    const game = await this.prisma.v1Game.findUnique({
+      where: { id: gameId },
+      select: { version: true, sourceType: true },
+    });
+    if (game === null) {
+      throw this.notFound();
+    }
+    const actor = await this.resolveActor(this.prisma, gameId, user.id, 'participant_identity');
+
+    const participants = await this.prisma.v1GameParticipant.findMany({
+      where: { gameId },
+      select: { id: true, sideId: true, displayNameSnapshot: true, jerseyNumber: true },
+    });
+    if (participants.length === 0) {
+      return { gameId, version: game.version, requests: [] };
+    }
+    const participantById = new Map(participants.map((participant) => [participant.id, participant]));
+
+    const events = await this.prisma.v1ParticipantIdentityLinkEvent.findMany({
+      where: { participantId: { in: participants.map((participant) => participant.id) } },
+      orderBy: { eventVersion: 'asc' },
+    });
+    const requestedByRequestId = new Map<string, (typeof events)[number]>();
+    const terminalRequestIds = new Set<string>();
+    for (const event of events) {
+      if (event.action === V1IdentityLinkAction.REQUESTED) {
+        requestedByRequestId.set(event.requestId, event);
+      } else if (
+        event.action === V1IdentityLinkAction.ATTESTED ||
+        event.action === V1IdentityLinkAction.REJECTED ||
+        event.action === V1IdentityLinkAction.EXPIRED
+      ) {
+        terminalRequestIds.add(event.requestId);
+      }
+    }
+    const now = Date.now();
+    const pending = [...requestedByRequestId.values()].filter(
+      (event) =>
+        !terminalRequestIds.has(event.requestId) &&
+        now - event.effectiveAt.getTime() < 24 * 60 * 60 * 1000 &&
+        event.userId !== user.id,
+    );
+    if (pending.length === 0) {
+      return { gameId, version: game.version, requests: [] };
+    }
+
+    // 승인 자격은 사이드(팀) 단위로 갈리므로 사이드마다 1회만 판정한다.
+    const sideIds = [
+      ...new Set(
+        pending
+          .map((event) => participantById.get(event.participantId)?.sideId)
+          .filter((sideId): sideId is string => typeof sideId === 'string'),
+      ),
+    ];
+    const sides = await this.prisma.v1GameSide.findMany({
+      where: { id: { in: sideIds } },
+      select: { id: true, teamId: true },
+    });
+    const canAttestBySideId = new Map<string, boolean>();
+    for (const side of sides) {
+      try {
+        await this.assertAttestorAuthority(this.prisma, gameId, game.sourceType, side.teamId, actor);
+        canAttestBySideId.set(side.id, true);
+      } catch {
+        // forbidden 을 "이 사이드는 내 승인 자격 밖" 판정값으로 쓴다 — 요청별 필터이지
+        // 오류가 아니므로 삼키는 것이 맞다(참가팀 멤버 게이트는 위 resolveActor 가 이미
+        // 통과시켰다).
+        canAttestBySideId.set(side.id, false);
+      }
+    }
+    const visible = pending.filter((event) => {
+      const participant = participantById.get(event.participantId);
+      return participant !== undefined && canAttestBySideId.get(participant.sideId) === true;
+    });
+
+    const requesterIds = [
+      ...new Set(visible.map((event) => event.userId).filter((id): id is string => typeof id === 'string')),
+    ];
+    const requesters =
+      requesterIds.length === 0
+        ? []
+        : await this.prisma.v1UserProfile.findMany({
+            where: { userId: { in: requesterIds } },
+            select: { userId: true, nickname: true },
+          });
+    const nicknameById = new Map(requesters.map((requester) => [requester.userId, requester.nickname]));
+
+    return {
+      gameId,
+      // attest 의 expectedVersion 으로 그대로 되돌아가는 값 — claim 목록과 같은 이유로
+      // 목록과 같은 시점의 버전을 함께 내린다.
+      version: game.version,
+      requests: visible.map((event) => {
+        const participant = participantById.get(event.participantId);
+        return {
+          requestId: event.requestId,
+          participantId: event.participantId,
+          participantDisplayName: participant?.displayNameSnapshot ?? '',
+          jerseyNumber: participant?.jerseyNumber ?? null,
+          sideId: participant?.sideId ?? null,
+          requesterNickname:
+            typeof event.userId === 'string' ? (nicknameById.get(event.userId) ?? null) : null,
+          requestedAt: event.effectiveAt.toISOString(),
+          expiresAt: new Date(event.effectiveAt.getTime() + 24 * 60 * 60 * 1000).toISOString(),
+        };
+      }),
+    };
+  }
+
   async resolveFixtureLineupAccess(user: V1AuthUser, tournamentId: string, fixtureId: string) {
     const fixture = await this.prisma.v1TournamentFixture.findUnique({
       where: { tournamentId_id: { tournamentId, id: fixtureId } },
@@ -3768,6 +3896,15 @@ export class GamesService {
           actorType: V1IdentityActorType.USER,
           actorUserId: user.id,
         });
+        // 승인 자격자에게 인앱 알림 (attest UI C안) — 같은 tx 라 신청 커밋 = 알림 존재.
+        // businessKey 멱등이라 커맨드 재시도에도 재알림하지 않는다. 발송 정책·순환
+        // 회피 이유는 identity-attest-notification.ts 헤더 참조.
+        await writeIdentityAttestRequestNotifications(tx, {
+          gameId,
+          participantId,
+          requestId,
+          requesterUserId: user.id,
+        });
         const updated = await tx.v1Game.update({
           where: { id: gameId },
           data: { version: { increment: 1 } },
@@ -4563,7 +4700,7 @@ export class GamesService {
    * 기록은 사용자가 앱 안에서 복구할 방법이 아예 없다.
    */
   private async assertAttestorAuthority(
-    tx: Transaction,
+    tx: Transaction | PrismaService,
     gameId: string,
     sourceType: V1GameSourceType,
     sideTeamId: string | null,

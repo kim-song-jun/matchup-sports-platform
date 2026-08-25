@@ -44,6 +44,10 @@ function renderModal(overrides: Partial<Parameters<typeof LeagueResultEntryModal
 }
 
 async function fillBaseForm(user: ReturnType<typeof userEvent.setup>) {
+  // 모달 오픈 60ms 뒤 첫 입력으로 오토포커스가 한 번 더 이동한다 — 그 전에 타이핑하면
+  // 포커스를 빼앗겨 입력이 중간에 끊긴다(league-match-disputes/page.test.tsx 와 같은 함정,
+  // CI 저속 환경에서 실제 재현됨). 오토포커스가 끝난 뒤부터 입력한다.
+  await new Promise((resolve) => setTimeout(resolve, 100));
   await user.type(screen.getByLabelText('성수 FC'), '2');
   await user.type(screen.getByLabelText('왕십리 유나이티드'), '1');
   await user.type(screen.getByLabelText(/사유/), '실측 결과 입력');

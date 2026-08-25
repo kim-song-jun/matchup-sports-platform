@@ -178,10 +178,11 @@ export function LeagueResultEntryModal({
     parsedAway >= 0;
 
   // 득점·도움 행 파싱 — 빈 문자열은 0으로 본다(행을 추가만 하고 안 채운 상태).
+  // 상한 99는 서버 DTO(@Max(99))와 같은 값 — 클라이언트에서 미리 막아 400 왕복을 줄인다.
   const parseStat = (value: string) => {
     if (value.trim() === '') return 0;
     const parsed = Number(value);
-    return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
+    return Number.isInteger(parsed) && parsed >= 0 && parsed <= 99 ? parsed : null;
   };
   let scorerRowsInvalid = false;
   const sums = { home: { goals: 0, assists: 0 }, away: { goals: 0, assists: 0 } };
@@ -401,6 +402,7 @@ export function LeagueResultEntryModal({
                             id={`scorer-goals-${row.participantId}`}
                             type="number"
                             min={0}
+                            max={99}
                             step={1}
                             inputMode="numeric"
                             placeholder="골"
@@ -416,6 +418,7 @@ export function LeagueResultEntryModal({
                             id={`scorer-assists-${row.participantId}`}
                             type="number"
                             min={0}
+                            max={99}
                             step={1}
                             inputMode="numeric"
                             placeholder="도움"

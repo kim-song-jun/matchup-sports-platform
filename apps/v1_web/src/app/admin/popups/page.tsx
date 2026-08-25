@@ -27,6 +27,7 @@ import {
   useV1UpdateAdminPopup,
 } from '@/hooks/use-v1-api';
 import { useTemporaryContentAssets } from '@/hooks/use-temporary-content-assets';
+import { useAdminListQuery } from '@/hooks/use-admin-list-query';
 import { extractErrorMessage } from '@/lib/error-message';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { isSafePopupLink, isSafePopupTargetPath, POPUP_TARGET_LABELS, POPUP_TARGET_OPTIONS } from '@/lib/popup-targets';
@@ -123,11 +124,18 @@ function AdminPopupsPageContent() {
   const requestedTargetPath = searchParams.get('targetPath') ?? '';
   const initialTargetPath = isSafePopupTargetPath(requestedTargetPath) ? requestedTargetPath : '';
 
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [activeStatus, setActiveStatus] = useState('');
-  // 커서 누적 대신 페이지 단위 교체다 — 목록 어디쯤인지와 총량이 보여야 한다.
-  const [page, setPage] = useState(1);
+  // 검색 debounce·상태 필터·page 리셋은 공용 훅이 담당 (M1 표준 — notices 와 함께
+  // 수동 재구현으로 남아 있던 마지막 콘텐츠 목록 2곳을 수렴).
+  const {
+    search,
+    setSearch,
+    activeStatus,
+    setActiveStatus,
+    page,
+    setPage,
+    filters: listFilters,
+    buildPagination,
+  } = useAdminListQuery({ pageSize: PAGE_SIZE });
   const [selectedId, setSelectedId] = useState('');
   const [mode, setMode] = useState<EditorMode>(initialTargetPath ? 'create' : 'view');
   const [title, setTitle] = useState('');
@@ -144,22 +152,7 @@ function AdminPopupsPageContent() {
   const { data: adminMe } = useV1AdminMe();
   const canWrite = adminMe?.capabilities.includes('status:write') ?? false;
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
-    return () => window.clearTimeout(timer);
-  }, [search]);
-
-  // 필터를 좁히면 보던 페이지에 결과가 없을 수 있어 첫 페이지로 되돌린다.
-  useEffect(() => {
-    setPage(1);
-  }, [activeStatus, debouncedSearch]);
-
-  const filters: AdminListFilters = {
-    ...(activeStatus ? { status: activeStatus } : {}),
-    ...(debouncedSearch ? { q: debouncedSearch } : {}),
-    page,
-    limit: PAGE_SIZE,
-  };
+  const filters: AdminListFilters = { ...listFilters };
   const listQuery = useV1AdminPopups(filters);
   const statusOptions = STATUS_OPTIONS.map((option) => ({
     ...option,
@@ -364,18 +357,7 @@ function AdminPopupsPageContent() {
             empty={<AdminEmpty title="팝업이 없어요" description="새 팝업을 만들어 필요한 화면에 안내해 보세요." />}
             skeletonCards={6}
             actionLayout="compact"
-            pagination={
-              pageInfo?.totalPages
-                ? {
-                    page: pageInfo.page ?? page,
-                    totalPages: pageInfo.totalPages,
-                    total: pageInfo.total ?? 0,
-                    limit: pageInfo.limit ?? PAGE_SIZE,
-                    onPageChange: setPage,
-                    loading: listQuery.isFetching,
-                  }
-                : undefined
-            }
+            pagination={buildPagination(pageInfo, listQuery.isFetching)}
             minCardWidth="100%"
             renderActions={(row) => (
               <>

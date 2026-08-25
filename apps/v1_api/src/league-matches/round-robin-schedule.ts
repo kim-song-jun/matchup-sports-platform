@@ -30,6 +30,53 @@ export function generateRoundRobinFixtures(
   );
 }
 
+export interface FixtureTimingOptions {
+  /** 경기당 소요 시간(분). */
+  gameDurationMinutes: number;
+  /** 경기 간 휴식(분). */
+  breakMinutes: number;
+  /** 팀당 매치데이(하루) 경기 수 = 하루에 소화하는 라운드 수. */
+  gamesPerTeamPerDay: number;
+}
+
+export interface FixtureTimeSlot {
+  /** 1부터 시작하는 매치데이(주차) 번호. */
+  matchday: number;
+  /** 그 매치데이 안에서 1부터 시작하는 경기 순번. */
+  orderInDay: number;
+  startAt: Date;
+  endAt: Date;
+}
+
+/**
+ * "한 구장 순차 진행" 모델의 경기 시각 배정. `gamesPerTeamPerDay`개 라운드를 한 매치데이로
+ * 묶고(라운드 r → 매치데이 ceil(r/G)), 매치데이 시작 시각은 기존 주간 리듬 계산
+ * (`resolveFixtureStartAt`)을 매치데이 번호로 재사용한다. 매치데이 안에서는 경기들이
+ * `경기 시간 + 휴식` 간격으로 연달아 배치된다 — 예: 4팀·팀당 3경기·15분+5분이면
+ * 22:00/22:20/22:40/23:00/23:20/23:40 (하루 6경기).
+ *
+ * 입력 `fixtures`는 round 오름차순이어야 한다(라운드로빈 생성기의 계약). 반환 배열은
+ * 입력과 같은 순서·같은 길이로, i번째 슬롯이 i번째 대진의 시각이다.
+ */
+export function resolveFixtureTimeSlots(
+  fixtures: readonly RoundRobinFixture[],
+  leagueStartsOn: Date,
+  timing: FixtureTimingOptions,
+  template?: FixtureScheduleTemplate,
+): FixtureTimeSlot[] {
+  const intervalMs = (timing.gameDurationMinutes + timing.breakMinutes) * 60_000;
+  const durationMs = timing.gameDurationMinutes * 60_000;
+  const lastOrderByMatchday = new Map<number, number>();
+  return fixtures.map((fixture) => {
+    const matchday = Math.ceil(fixture.round / timing.gamesPerTeamPerDay);
+    const orderInDay = (lastOrderByMatchday.get(matchday) ?? 0) + 1;
+    lastOrderByMatchday.set(matchday, orderInDay);
+    const dayStartMs = resolveFixtureStartAt(leagueStartsOn, matchday, template).getTime();
+    const startAt = new Date(dayStartMs + (orderInDay - 1) * intervalMs);
+    return { matchday, orderInDay, startAt, endAt: new Date(startAt.getTime() + durationMs) };
+  });
+}
+
 /**
  * 리그 시작일 기준으로 round(주차)의 경기 시작 시각을 계산한다.
  *

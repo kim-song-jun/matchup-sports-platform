@@ -48,6 +48,31 @@ export class LeagueFixtureScheduleDto {
   time!: string;
 }
 
+// 운영자 요구(2026-08-25): "한 구장 순차 진행" — 22시 리그에 한 경기장을 쓰면 4팀이
+// 15분 경기·5분 휴식으로 22:00~00:00 사이 하루 6경기(팀당 3경기)를 치르는 식으로,
+// 경기 시간·휴식·팀당 하루 경기 수를 설정하면 매치데이 안에서 경기별 시각이 계산된다.
+export class LeagueFixtureTimingDto {
+  /** 경기당 소요 시간(분). */
+  @IsInt()
+  @Min(5)
+  @Max(240)
+  gameDurationMinutes!: number;
+
+  /** 경기 간 휴식(분). 생략 시 0. */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(120)
+  breakMinutes?: number;
+
+  /** 팀당 매치데이(하루) 경기 수 = 하루에 소화하는 라운드 수. 생략 시 1. */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(10)
+  gamesPerTeamPerDay?: number;
+}
+
 export class GenerateLeagueFixturesDto {
   @IsInt()
   @Min(1)
@@ -65,6 +90,14 @@ export class GenerateLeagueFixturesDto {
   @IsString()
   @MaxLength(120)
   placeName?: string;
+
+  // 지정하지 않으면 기존 동작(같은 주차 전 경기 동일 시각·endAt 없음)을 유지한다 — 하위 호환.
+  // "주차 수 × 팀당 하루 경기 수" 상한 같은 도메인 규칙은 서비스가 소유한다(위
+  // CreateLeagueMatchDto의 카디널리티 주석과 같은 이유).
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => LeagueFixtureTimingDto)
+  timing?: LeagueFixtureTimingDto;
 }
 
 export class UpdateLeagueFixtureDto {

@@ -122,12 +122,15 @@ export class LeagueMatchAdminService {
    */
   async list(user: V1AuthUser, seriesId?: string) {
     await this.adminContext.getActiveAdmin(user.id);
+    // DTO 검증이 /i 라 'INDEPENDENT'·대문자 uuid 도 통과한다 — 소문자로 정규화해야
+    // 리터럴 비교와 (소문자로 저장되는) uuid 매칭이 어긋나지 않는다.
+    const normalized = seriesId?.toLowerCase();
     const rows = await this.prisma.v1League.findMany({
       where:
-        seriesId === 'independent'
+        normalized === 'independent'
           ? { seriesId: null }
-          : seriesId
-            ? { seriesId }
+          : normalized
+            ? { seriesId: normalized }
             : undefined,
       orderBy: { createdAt: 'desc' },
       include: {

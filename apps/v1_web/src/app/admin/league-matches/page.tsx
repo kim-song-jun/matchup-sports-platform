@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { Plus } from 'lucide-react';
 import {
   AdminDataTable,
@@ -46,6 +46,11 @@ function LeagueHub() {
   const [activeTab, setActiveTab] = useState<TabKey>(() =>
     searchParams.get('tab') === 'series' ? 'series' : 'leagues',
   );
+  // 뒤로가기/앞으로가기·외부 내비게이션으로 URL 만 바뀐 경우에도 탭을 따라가게 한다 —
+  // 클릭은 setActiveTab 이 즉시 처리하므로(RSC 왕복 대기 없음) 이 effect 는 재동기화 전용이다.
+  useEffect(() => {
+    setActiveTab(searchParams.get('tab') === 'series' ? 'series' : 'leagues');
+  }, [searchParams]);
   // '' = 전체, 'independent' = 무소속만, 그 외 = 체계 id.
   const [seriesFilter, setSeriesFilter] = useState('');
 
@@ -129,6 +134,7 @@ function LeagueHub() {
                 hideSearch
                 searchValue=""
                 onSearchChange={() => undefined}
+                statusGroupLabel="체계 필터"
                 statusOptions={[
                   { value: '', label: '전체' },
                   ...seriesOptions.map((series) => ({ value: series.id, label: series.title })),

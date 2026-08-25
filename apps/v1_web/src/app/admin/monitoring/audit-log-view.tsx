@@ -492,6 +492,7 @@ export function AuditLogView() {
           hideSearch
           searchValue=""
           onSearchChange={() => undefined}
+          statusGroupLabel="대상 유형 필터"
           statusOptions={TARGET_TYPE_OPTIONS}
           activeStatus={targetType}
           onStatusChange={(value) => setTargetType(value as TargetTypeFilter)}

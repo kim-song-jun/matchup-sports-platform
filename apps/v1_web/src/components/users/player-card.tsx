@@ -277,6 +277,7 @@ export function PlayerCard({
   /**
    * 포인터 추종 기울기 + 글레어 (목업 확정 인터랙션).
    * - 마우스: 커서 위치를 각도로 바꿔 카드가 손을 따라 돈다(±5/±6도 -- 더 크면 안 읽힌다).
+   *   위로 들어 올리는 리프트는 없다 -- 기울기와 글레어만으로 실물감을 만든다.
    * - 터치: 기울기는 CSS 가 끈다(손가락에 가려 안 보인다). 누름 반응만 남는다.
    * - prefers-reduced-motion: 아예 걸지 않는다.
    * 상태를 리액트 state 로 두면 pointermove 마다 리렌더가 나므로 CSS 변수를 직접 만진다.
@@ -296,7 +297,6 @@ export function PlayerCard({
     el.dataset.active = 'false';
     el.style.setProperty('--rx', '0deg');
     el.style.setProperty('--ry', '0deg');
-    el.style.setProperty('--lift', '0px');
   }
 
   function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
@@ -308,7 +308,8 @@ export function PlayerCard({
     el.dataset.active = 'true';
     el.style.setProperty('--ry', `${((px - 0.5) * 12).toFixed(2)}deg`);
     el.style.setProperty('--rx', `${((0.5 - py) * 10).toFixed(2)}deg`);
-    el.style.setProperty('--lift', '-10px');
+    // 리프트(-10px)는 쓰지 않는다(2026-08-25 사용자 결정) -- 카드가 위로 점프하면
+    // 레이아웃이 들썩이는 느낌만 남는다. 프리미엄감은 기울기 + 글레어가 만든다.
     el.style.setProperty('--gx', `${(px * 100).toFixed(1)}%`);
     el.style.setProperty('--gy', `${(py * 100).toFixed(1)}%`);
   }

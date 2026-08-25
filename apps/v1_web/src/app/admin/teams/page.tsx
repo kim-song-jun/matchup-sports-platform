@@ -5,12 +5,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   useV1AdminTeams,
-  useV1AdminMe,
   useV1ChangeTeamStatus,
 } from '@/hooks/use-v1-api';
 import type { V1AdminTeamRow } from '@/types/api';
 import { formatAdminDate } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
+import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import { useAdminListQuery } from '@/hooks/use-admin-list-query';
 import {
   AdminPageHeader,
@@ -46,8 +46,7 @@ const PAGE_SIZE = 20;
 export default function AdminTeamsPage() {
   const router = useRouter();
   // ── Admin capabilities ─────────────────────────────────────────────
-  const { data: adminMe } = useV1AdminMe();
-  const canWrite = adminMe?.capabilities.includes('status:write') ?? false;
+  const canWrite = useAdminCanWrite();
 
   // ── Filter state — 검색 debounce·상태 필터·page 리셋은 공용 훅이 담당 ─────
   const {

@@ -18,7 +18,6 @@ import { AdminContentPreview } from '@/components/admin/admin-content-preview';
 import { RichTextEditor } from '@/components/content/rich-text-editor';
 import { RichContentRenderer } from '@/components/content/rich-content-renderer';
 import {
-  useV1AdminMe,
   useV1AdminTournaments,
   useV1AdminPopupDetail,
   useV1AdminPopups,
@@ -26,6 +25,7 @@ import {
   useV1DeleteAdminPopup,
   useV1UpdateAdminPopup,
 } from '@/hooks/use-v1-api';
+import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import { useTemporaryContentAssets } from '@/hooks/use-temporary-content-assets';
 import { useAdminListQuery } from '@/hooks/use-admin-list-query';
 import { formatAdminDateTime } from '@/lib/date-utils';
@@ -139,8 +139,7 @@ function AdminPopupsPageContent() {
   const [displayEndAt, setDisplayEndAt] = useState('');
 
   const { toasts, showToast } = useAdminToast();
-  const { data: adminMe } = useV1AdminMe();
-  const canWrite = adminMe?.capabilities.includes('status:write') ?? false;
+  const canWrite = useAdminCanWrite();
 
   const filters: AdminListFilters = { ...listFilters };
   const listQuery = useV1AdminPopups(filters);

@@ -9,6 +9,7 @@ import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { useV1AdminActionLogs, useV1AdminStatusChangeLogs } from '@/hooks/use-v1-api';
 import type { AdminListFilters, V1AdminLog, V1AdminStatusChangeLog } from '@/types/api';
 import { adminActionLabel, adminTargetTypeLabel } from '@/lib/admin-labels';
+import { formatAdminDateTimeShort } from '@/lib/date-utils';
 import {
   AdminDataTable,
   AdminEmpty,
@@ -69,19 +70,6 @@ const TABS: Tab[] = [
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────
-function formatDateTime(dateStr: string): string {
-  try {
-    return new Intl.DateTimeFormat('ko-KR', {
-      month: 'numeric',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(new Date(dateStr));
-  } catch {
-    return dateStr;
-  }
-}
-
 function shortId(id: string | null | undefined): string {
   if (!id) return '—';
   return `${id.slice(0, 8)}…`;
@@ -198,7 +186,7 @@ function ActionLogDetailModal({ log, onClose }: { log: V1AdminLog | null; onClos
   return (
     <LogDetailModal title={adminActionLabel(log.actionType)} onClose={onClose}>
       <dl>
-        <DetailRow label="시각" value={formatDateTime(log.createdAt)} />
+        <DetailRow label="시각" value={formatAdminDateTimeShort(log.createdAt)} />
         <DetailRow label="대상" value={adminTargetTypeLabel(log.targetType)} />
         <DetailRow label="대상 ID" value={<span className="font-mono">{log.targetId ?? '—'}</span>} />
         <DetailRow label="실행자" value={<span className="font-mono">{log.adminUserId ?? '—'}</span>} />
@@ -225,7 +213,7 @@ function StatusLogDetailModal({
       onClose={onClose}
     >
       <dl>
-        <DetailRow label="시각" value={formatDateTime(log.createdAt)} />
+        <DetailRow label="시각" value={formatAdminDateTimeShort(log.createdAt)} />
         <DetailRow label="대상" value={adminTargetTypeLabel(log.targetType)} />
         <DetailRow label="대상 ID" value={<span className="font-mono">{log.targetId}</span>} />
         <DetailRow
@@ -288,7 +276,7 @@ function ActionLogPanel({ targetType }: { targetType: TargetTypeFilter }) {
             header: '시각',
             width: 'w-[140px]',
             render: (row) => (
-              <span className="whitespace-nowrap text-[var(--text-muted)]">{formatDateTime(row.createdAt)}</span>
+              <span className="whitespace-nowrap text-[var(--text-muted)]">{formatAdminDateTimeShort(row.createdAt)}</span>
             ),
           },
           {
@@ -385,7 +373,7 @@ function StatusLogPanel({ targetType }: { targetType: TargetTypeFilter }) {
             header: '시각',
             width: 'w-[140px]',
             render: (row) => (
-              <span className="whitespace-nowrap text-[var(--text-muted)]">{formatDateTime(row.createdAt)}</span>
+              <span className="whitespace-nowrap text-[var(--text-muted)]">{formatAdminDateTimeShort(row.createdAt)}</span>
             ),
           },
           {

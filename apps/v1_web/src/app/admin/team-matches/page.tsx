@@ -5,12 +5,12 @@ import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   useV1AdminTeamMatches,
-  useV1AdminMe,
   useV1ChangeTeamMatchStatus,
 } from '@/hooks/use-v1-api';
 import type { V1AdminTeamMatchRow } from '@/types/api';
 import { formatAdminDateTimeShort } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
+import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import { useAdminListQuery } from '@/hooks/use-admin-list-query';
 import {
   AdminPageHeader,
@@ -63,8 +63,7 @@ function AdminTeamMatchesPageContent() {
   const router = useRouter();
   const initialStatus = searchParams.get('status') ?? '';
   // ── Admin capabilities ─────────────────────────────────────────────
-  const { data: adminMe } = useV1AdminMe();
-  const canWrite = adminMe?.capabilities.includes('status:write') ?? false;
+  const canWrite = useAdminCanWrite();
 
   // ── Filter state — 검색 debounce·상태 필터·page 리셋은 공용 훅이 담당 ─────
   // (백엔드 q 지원이 이번에 추가되어 hideSearch도 함께 해제한다 — 제목·호스트 팀명 검색)

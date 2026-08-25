@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { AdminPageHeader, AdminStatusPill, AdminToasts, useAdminToast } from '@/components/admin';
+import { AdminEmpty, AdminPageHeader, AdminPageSkeleton, AdminStatusPill, AdminToasts, useAdminToast } from '@/components/admin';
 import { PromotionCommitPanel } from '@/components/admin/promotion-commit-panel';
 import { SeasonSeedPanel } from '@/components/admin/season-seed-panel';
 import {
@@ -73,20 +73,23 @@ export default function LeagueSeriesDetailClient({ seriesId }: { seriesId: strin
   };
 
   if (isPending) {
-    return <p className="p-4 text-sm text-[var(--text-muted)]">불러오는 중…</p>;
+    return <AdminPageSkeleton />;
   }
   if (isError || series === undefined) {
     return (
-      <div className="p-4">
-        <p className="text-sm text-[var(--text-muted)]">리그 체계를 불러오지 못했어요.</p>
-        <button
-          type="button"
-          onClick={() => refetch()}
-          className="mt-2 inline-flex min-h-[44px] items-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold"
-        >
-          다시 시도
-        </button>
-      </div>
+      <AdminEmpty
+        title="리그 체계를 불러오지 못했어요"
+        description="네트워크 상태를 확인하고 다시 시도해 주세요."
+        action={
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="inline-flex min-h-[44px] items-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--text-strong)]"
+          >
+            다시 시도
+          </button>
+        }
+      />
     );
   }
 

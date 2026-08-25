@@ -5,13 +5,13 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Eye } from 'lucide-react';
 import {
-  useV1AdminMe,
   useV1AdminUsers,
   useV1ChangeUserStatus,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { formatAuthProviders, formatGender, formatUserTitle } from '@/lib/format-user';
 import { formatAdminDate } from '@/lib/date-utils';
+import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import { useAdminListQuery } from '@/hooks/use-admin-list-query';
 import {
   AdminPageHeader,
@@ -91,8 +91,7 @@ function AdminUsersPageContent() {
   const { toasts, showToast } = useAdminToast();
 
   // Capability check
-  const { data: adminMe } = useV1AdminMe();
-  const canWrite = adminMe?.capabilities.includes('status:write') ?? false;
+  const canWrite = useAdminCanWrite();
 
   const {
     data: firstPage,

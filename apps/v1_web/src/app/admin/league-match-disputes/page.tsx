@@ -15,25 +15,12 @@ import { LeagueDisputeResolveModal } from '@/components/admin/league-dispute-res
 import { LeagueDisputeRejectModal } from '@/components/admin/league-dispute-reject-modal';
 import { useV1AdminLeagueDisputes, useV1ResolveLeagueDispute, useV1RejectLeagueDispute } from '@/hooks/use-v1-api';
 import type { V1AdminLeagueMatchDisputeRow, V1LeagueMatchDisputeStatus } from '@/types/league-match';
+import { formatAdminDateTime } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 
 // D2 (E4, B안 확정): 어드민 이의 목록·처리 독립 페이지. 대진 표(league-match-fixtures-client)
 // 안에 끼워 넣지 않고 별도 라우트로 둔 이유는 사용자 확정 사항 — 이의는 리그 하나에 갇히지
 // 않고 운영자가 "지금 처리 대기 중인 게 몇 건인지"를 리그 전체에서 한눈에 봐야 한다.
-
-function formatDateTime(dateStr: string): string {
-  try {
-    return new Intl.DateTimeFormat('ko-KR', {
-      year: 'numeric',
-      month: 'numeric',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(new Date(dateStr));
-  } catch {
-    return dateStr;
-  }
-}
 
 const STATUS_OPTIONS: { value: V1LeagueMatchDisputeStatus; label: string }[] = [
   { value: 'open', label: '처리 대기' },
@@ -166,7 +153,7 @@ export default function AdminLeagueMatchDisputesPage() {
             header: '제기 시각',
             width: 'w-[148px]',
             render: (row) => (
-              <span className="whitespace-nowrap text-[var(--text-muted)]">{formatDateTime(row.createdAt)}</span>
+              <span className="whitespace-nowrap text-[var(--text-muted)]">{formatAdminDateTime(row.createdAt)}</span>
             ),
           },
           {

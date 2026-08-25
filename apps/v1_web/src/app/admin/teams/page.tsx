@@ -9,6 +9,7 @@ import {
   useV1ChangeTeamStatus,
 } from '@/hooks/use-v1-api';
 import type { V1AdminTeamRow } from '@/types/api';
+import { formatAdminDate } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import { useAdminListQuery } from '@/hooks/use-admin-list-query';
 import {
@@ -22,20 +23,6 @@ import {
   useAdminToast,
   AdminToasts,
 } from '@/components/admin';
-
-// ── Helpers ───────────────────────────────────────────────────────────────
-
-function formatDate(dateStr: string): string {
-  try {
-    return new Intl.DateTimeFormat('ko-KR', {
-      year: 'numeric',
-      month: 'numeric',
-      day: 'numeric',
-    }).format(new Date(dateStr));
-  } catch {
-    return dateStr;
-  }
-}
 
 // ── Status filter options ─────────────────────────────────────────────────
 
@@ -198,7 +185,7 @@ export default function AdminTeamsPage() {
               header: '생성',
               width: 'w-[112px]',
               render: (row) => (
-                <span className="whitespace-nowrap text-[var(--text-muted)]">{formatDate(row.createdAt)}</span>
+                <span className="whitespace-nowrap text-[var(--text-muted)]">{formatAdminDate(row.createdAt)}</span>
               ),
             },
           ]}

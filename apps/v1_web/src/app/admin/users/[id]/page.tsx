@@ -26,26 +26,14 @@ import {
   useV1AdminUser,
   useV1DeleteAdminUser,
 } from '@/hooks/use-v1-api';
+import { formatAdminDateTime } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { formatAuthProviders, formatGender, formatOnboardingStatus, formatUserTitle } from '@/lib/format-user';
 import type { V1AdminUserDetail } from '@/types/api';
 
-function formatDateTime(value: string | null | undefined) {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString('ko-KR', {
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
-}
 function formatVerification(value: string | null) {
-  return value ? `인증 · ${formatDateTime(value)}` : '미인증';
+  return value ? `인증 · ${formatAdminDateTime(value)}` : '미인증';
 }
 
 // 목록(formatUserTitle)과 다른 로직을 복제해 같은 회원이 화면마다 다른 이름으로
@@ -187,9 +175,9 @@ export default function AdminUserDetailPage() {
               <AdminDetailRow label="활동 지역" value={user.displayRegion} />
               <AdminDetailRow label="로그인 방식" value={formatAuthProviders(user.authProviders)} />
               <AdminDetailRow label="온보딩" value={formatOnboardingStatus(user.onboardingStatus)} />
-              <AdminDetailRow label="가입일" value={formatDateTime(user.createdAt)} />
-              <AdminDetailRow label="최근 로그인" value={formatDateTime(user.lastLoginAt)} />
-              <AdminDetailRow label="삭제일" value={formatDateTime(user.deletedAt)} />
+              <AdminDetailRow label="가입일" value={formatAdminDateTime(user.createdAt)} />
+              <AdminDetailRow label="최근 로그인" value={formatAdminDateTime(user.lastLoginAt)} />
+              <AdminDetailRow label="삭제일" value={formatAdminDateTime(user.deletedAt)} />
               <AdminDetailRow label="관리자 권한" value={user.adminRole ?? '없음'} />
             </dl>
             {user.bio ? (
@@ -205,7 +193,7 @@ export default function AdminUserDetailPage() {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-[17px] font-bold text-[var(--text-strong)]">탈퇴 요청 메시지</h2>
                 <time className="text-xs font-semibold text-[var(--orange700)]">
-                  {formatDateTime(user.withdrawalRequest.requestedAt)}
+                  {formatAdminDateTime(user.withdrawalRequest.requestedAt)}
                 </time>
               </div>
               <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-relaxed text-[var(--text-strong)]">
@@ -221,7 +209,7 @@ export default function AdminUserDetailPage() {
               items={user.hostedMatches.map((match) => ({
                 id: match.matchId,
                 title: match.title,
-                meta: `${match.status} · ${formatDateTime(match.startAt)}`,
+                meta: `${match.status} · ${formatAdminDateTime(match.startAt)}`,
               }))}
             />
             <RelatedList

@@ -22,6 +22,7 @@ import {
   useV1ReplyAdminInquiry,
   useV1UpdateAdminInquiryReply,
 } from '@/hooks/use-v1-api';
+import { formatAdminDateTime } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import { INQUIRY_REPORT_REASON_OPTIONS, inquiryReportReasonLabel } from '@/lib/v1-status-labels';
 import type { V1AdminReportedTeamSummary, V1InquiryCategory, V1InquiryStatus } from '@/types/api';
@@ -49,20 +50,6 @@ const STATUS_OPTIONS: Array<{ value: V1InquiryStatus; label: string }> = [
   { value: 'answered', label: '답변완료' },
   { value: 'closed', label: '종결' },
 ];
-
-function formatDateTime(value: string | null | undefined) {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString('ko-KR', {
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
-}
 
 /**
  * Prisma @updatedAt은 생성 시점에도 createdAt과 수 밀리초 차이가 날 수 있어(같은 요청
@@ -475,7 +462,7 @@ export default function AdminInquiryDetailPage() {
                   </span>
                   <span className="inline-flex items-center gap-1.5">
                     <Clock size={14} aria-hidden="true" />
-                    {formatDateTime(inquiry.createdAt)}
+                    {formatAdminDateTime(inquiry.createdAt)}
                   </span>
                 </div>
               </div>
@@ -511,7 +498,7 @@ export default function AdminInquiryDetailPage() {
                         </p>
                         <div className="flex items-center gap-2">
                           <time className="text-xs text-gray-400">
-                            {formatDateTime(reply.createdAt)}
+                            {formatAdminDateTime(reply.createdAt)}
                             {wasReplyEdited(reply) ? ' (수정됨)' : ''}
                           </time>
                           {canWrite && !isEditing ? (

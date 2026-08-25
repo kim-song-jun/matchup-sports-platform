@@ -10,6 +10,7 @@ import {
   useV1UpdateAdminRole,
 } from '@/hooks/use-v1-api';
 import { v1Get } from '@/lib/api-client';
+import { formatAdminDate } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import { useAdminListQuery } from '@/hooks/use-admin-list-query';
 import {
@@ -31,20 +32,6 @@ const ADMIN_STATUS_FILTER_OPTIONS = [
   { value: 'suspended', label: '정지' },
   { value: 'revoked', label: '회수' },
 ];
-
-// ── Date formatter ─────────────────────────────────────────────────────────
-function formatDateCompact(dateStr: string | null | undefined): string {
-  if (!dateStr) return '—';
-  try {
-    const d = new Date(dateStr);
-    const y = d.getFullYear();
-    const mo = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}.${mo}.${day}`;
-  } catch {
-    return '—';
-  }
-}
 
 function formatUserTitle(row: {
   nickname: string | null;
@@ -544,7 +531,7 @@ export default function AdminAdminsPage() {
               width: 'w-[112px]',
               render: (row) => (
                 <span className="whitespace-nowrap text-[var(--text-muted)]">
-                  {formatDateCompact(row.grantedAt)}
+                  {formatAdminDate(row.grantedAt)}
                 </span>
               ),
             },
@@ -554,7 +541,7 @@ export default function AdminAdminsPage() {
               width: 'w-[112px]',
               render: (row) => (
                 <span className="whitespace-nowrap text-[var(--text-muted)]">
-                  {row.revokedAt ? formatDateCompact(row.revokedAt) : '—'}
+                  {row.revokedAt ? formatAdminDate(row.revokedAt) : '—'}
                 </span>
               ),
             },

@@ -9,6 +9,7 @@ import {
   useV1ChangeTeamMatchStatus,
 } from '@/hooks/use-v1-api';
 import type { V1AdminTeamMatchRow } from '@/types/api';
+import { formatAdminDateTimeShort } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import { useAdminListQuery } from '@/hooks/use-admin-list-query';
 import {
@@ -22,21 +23,6 @@ import {
   useAdminToast,
   AdminToasts,
 } from '@/components/admin';
-
-// ── Helpers ───────────────────────────────────────────────────────────────
-
-function formatDateTime(dateStr: string): string {
-  try {
-    return new Intl.DateTimeFormat('ko-KR', {
-      month: 'numeric',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(new Date(dateStr));
-  } catch {
-    return dateStr;
-  }
-}
 
 // ── Status filter options ─────────────────────────────────────────────────
 
@@ -166,7 +152,7 @@ function AdminTeamMatchesPageContent() {
             header: '시작',
             width: 'w-[132px]',
             render: (row) => (
-              <span className="whitespace-nowrap text-[var(--text-muted)]">{formatDateTime(row.startAt)}</span>
+              <span className="whitespace-nowrap text-[var(--text-muted)]">{formatAdminDateTimeShort(row.startAt)}</span>
             ),
           },
           {
@@ -216,7 +202,7 @@ function AdminTeamMatchesPageContent() {
             header: '생성',
             width: 'w-[132px]',
             render: (row) => (
-              <span className="whitespace-nowrap text-[var(--text-muted)]">{formatDateTime(row.createdAt)}</span>
+              <span className="whitespace-nowrap text-[var(--text-muted)]">{formatAdminDateTimeShort(row.createdAt)}</span>
             ),
           },
         ]}

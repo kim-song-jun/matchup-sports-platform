@@ -14,6 +14,7 @@ import {
   useAdminToast,
 } from '@/components/admin';
 import { useV1AdminInquiries } from '@/hooks/use-v1-api';
+import { formatAdminDateTimeShort } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import { INQUIRY_REPORT_REASON_OPTIONS, inquiryReportReasonLabel } from '@/lib/v1-status-labels';
 import type {
@@ -65,19 +66,6 @@ const REPORT_REASON_OPTIONS: Array<{ value: '' | V1InquiryReportReason; label: s
   { value: '', label: '전체 사유' },
   ...INQUIRY_REPORT_REASON_OPTIONS,
 ];
-
-function formatDateTime(value: string | null | undefined) {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString('ko-KR', {
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
-}
 
 function requesterLabel(row: V1AdminInquiryRow) {
   if (row.isGuest) return '비회원';
@@ -327,7 +315,7 @@ function AdminInquiriesPageContent() {
               header: '접수',
               width: 'w-[132px]',
               render: (row) => (
-                <span className="whitespace-nowrap text-[var(--text-muted)]">{formatDateTime(row.createdAt)}</span>
+                <span className="whitespace-nowrap text-[var(--text-muted)]">{formatAdminDateTimeShort(row.createdAt)}</span>
               ),
             },
             {

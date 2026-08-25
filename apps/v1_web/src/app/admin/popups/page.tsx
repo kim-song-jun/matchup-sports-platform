@@ -28,6 +28,7 @@ import {
 } from '@/hooks/use-v1-api';
 import { useTemporaryContentAssets } from '@/hooks/use-temporary-content-assets';
 import { useAdminListQuery } from '@/hooks/use-admin-list-query';
+import { formatAdminDateTime } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { isSafePopupLink, isSafePopupTargetPath, POPUP_TARGET_LABELS, POPUP_TARGET_OPTIONS } from '@/lib/popup-targets';
@@ -66,19 +67,8 @@ const STATUS_LABEL: Record<V1AdminPopupStatus, string> = {
   archived: '비공개',
 };
 
-function formatDateTime(value: string | null | undefined) {
-  if (!value) return '미게시';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString('ko-KR', {
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
-}
+// '미게시' 는 이 화면 전용 폴백 문구라(공용 함수의 '—' 와 다름) 한 줄 래퍼로 보존한다.
+const formatDateTime = (value: string | null | undefined) => (value ? formatAdminDateTime(value) : '미게시');
 
 function toDateTimeLocal(value: string | null | undefined) {
   if (!value) return '';

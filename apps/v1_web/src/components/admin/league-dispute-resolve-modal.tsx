@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
+import { useModalA11y } from '../v1-ui/use-modal-a11y';
 import type { V1LeagueMatchDisputeResolution } from '@/types/league-match';
 
 // D2 (E4): 어드민 이의 수락 처리 모달 — 정정(홈/원정 스코어 입력 + 전→후 비교) / 무효
@@ -47,9 +48,11 @@ export function LeagueDisputeResolveModal({
   const [awayScore, setAwayScore] = useState('');
   const [note, setNote] = useState('');
 
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const firstFocusableRef = useRef<HTMLButtonElement>(null);
-  const previousFocusRef = useRef<Element | null>(null);
+  const { dialogRef, initialFocusRef, onBackdropClick } = useModalA11y<HTMLButtonElement>({
+    open,
+    onClose,
+    pending,
+  });
 
   // Reset form whenever the modal opens
   useEffect(() => {
@@ -59,76 +62,6 @@ export function LeagueDisputeResolveModal({
       setAwayScore('');
       setNote('');
     }
-  }, [open]);
-
-  // Save focus on open; restore on close via every path (WCAG 2.4.3)
-  useEffect(() => {
-    if (open) {
-      previousFocusRef.current = document.activeElement;
-    } else {
-      const el = previousFocusRef.current;
-      if (el && typeof (el as HTMLElement).focus === 'function') {
-        (el as HTMLElement).focus();
-      }
-      previousFocusRef.current = null;
-    }
-  }, [open]);
-
-  useEffect(() => {
-    if (open) {
-      const id = setTimeout(() => firstFocusableRef.current?.focus(), 60);
-      return () => clearTimeout(id);
-    }
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !pending) onClose();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [open, onClose, pending]);
-
-  useEffect(() => {
-    if (!open) return;
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    const focusableSelectors =
-      'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
-
-    const trap = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab') return;
-      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(focusableSelectors));
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (e.shiftKey) {
-        if (document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        }
-      } else {
-        if (document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    };
-
-    document.addEventListener('keydown', trap);
-    return () => document.removeEventListener('keydown', trap);
-  }, [open]);
-
-  useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
   }, [open]);
 
   if (!open) return null;
@@ -162,9 +95,7 @@ export function LeagueDisputeResolveModal({
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-[2px]"
       aria-hidden={!open}
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !pending) onClose();
-      }}
+      onClick={onBackdropClick}
     >
       <div
         ref={dialogRef}
@@ -207,7 +138,7 @@ export function LeagueDisputeResolveModal({
               <span className="text-[13px] font-semibold text-[var(--text-body)]">처리 방식</span>
               <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="처리 방식">
                 <button
-                  ref={firstFocusableRef}
+                  ref={initialFocusRef}
                   type="button"
                   role="radio"
                   aria-checked={resolution === 'correction'}

@@ -6,7 +6,6 @@ import { Fragment, useEffect, useRef, useState, useCallback, type ReactNode } fr
 import { useV1AdminInquiriesPendingCount } from '@/hooks/use-v1-api';
 import { CommandPalette } from './command-palette';
 import {
-  Inbox,
   LayoutDashboard,
   Search,
   Users,
@@ -70,8 +69,8 @@ interface NavGroup {
 const BASE_NAV_GROUPS: NavGroup[] = [
   {
     items: [
-      { label: '개요', href: '/admin', icon: <LayoutDashboard size={18} />, exact: true },
-      { label: '할 일', href: '/admin/hub', icon: <Inbox size={18} /> },
+      // '할 일'은 2026-08-25 대시보드(B안)로 흡수 — /admin 최상단 섹션. /admin/hub 는 리다이렉트.
+      { label: '대시보드', href: '/admin', icon: <LayoutDashboard size={18} />, exact: true },
     ],
   },
   {

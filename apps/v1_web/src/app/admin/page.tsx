@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { AlertTriangle, ArrowRight, CheckCircle2 } from 'lucide-react';
-import { useV1AdminOpsSummary, useV1AdminOverview } from '@/hooks/use-v1-api';
+import { useV1AdminHubInbox, useV1AdminOpsSummary, useV1AdminOverview } from '@/hooks/use-v1-api';
 import {
   AdminKpiCard,
   AdminKpiGridSkeleton,
@@ -10,6 +10,8 @@ import {
   AdminStatusPill,
 } from '@/components/admin';
 import { adminActionLabel, adminTargetTypeLabel } from '@/lib/admin-labels';
+import { extractErrorMessage } from '@/lib/error-message';
+import type { V1AdminHubTournamentCount } from '@/types/api';
 
 // ── Date helpers ──────────────────────────────────────────────────────────
 function formatRelativeTime(dateStr: string): string {
@@ -54,6 +56,145 @@ function WarningCard({ label, value, tone, href, sub }: WarningCardProps) {
   );
 }
 
+// ── 할 일 breakdown card (구 /admin/hub 에서 이식) ─────────────────────────
+function TournamentBreakdownCard({
+  title,
+  rows,
+  hrefFor,
+  linkLabel,
+}: {
+  title: string;
+  rows: V1AdminHubTournamentCount[];
+  hrefFor: (tournamentId: string) => string;
+  linkLabel: string;
+}) {
+  if (rows.length === 0) return null;
+  return (
+    <section
+      aria-label={title}
+      className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)]"
+    >
+      <h3 className="px-5 py-4 border-b border-[var(--border)] text-[length:var(--font-size-body)] font-bold text-[var(--text-strong)]">
+        {title}
+      </h3>
+      <ul>
+        {rows.map((row) => (
+          <li
+            key={row.tournamentId}
+            className="flex items-center gap-3 px-5 py-3 border-b border-[var(--border)] last:border-b-0"
+          >
+            <span className="flex-1 min-w-0 truncate text-[13.5px] text-[var(--text-strong)]">
+              {row.title || '(제목 없음)'}
+            </span>
+            <span className="shrink-0 rounded-full bg-[var(--tint-red)] px-2 py-0.5 text-[length:var(--font-size-caption)] font-bold tabular-nums text-[var(--red700)]">
+              {row.count}건
+            </span>
+            <Link
+              href={hrefFor(row.tournamentId)}
+              aria-label={`${row.title || '(제목 없음)'} ${linkLabel}`}
+              className="shrink-0 inline-flex items-center gap-0.5 min-h-[44px] px-2 text-[length:var(--font-size-label)] font-medium text-blue-500 hover:text-[var(--blue700)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+            >
+              {linkLabel}
+              <ArrowRight size={13} aria-hidden="true" />
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/**
+ * 할 일 섹션 (구 /admin/hub 본문 이식 — B안 단일 대시보드, 2026-08-25 사용자 확정).
+ * 처리 대기 신호는 숨기면 가치가 사라지므로 대시보드 최상단에 둔다. 조회 실패는
+ * 조용히 숨기지 않고 명시적으로 알린다('실패 시 무신호 금지' 계약 — 주의 필요와 동일).
+ */
+function InboxSection() {
+  const { data, isPending, isError, error, refetch } = useV1AdminHubInbox();
+
+  const totalTodo =
+    (data?.pendingRegistrations.total ?? 0) +
+    (data?.resultReviewPending.total ?? 0) +
+    (data?.pendingInquiries ?? 0);
+
+  return (
+    <section aria-label="할 일" className="mb-6">
+      <h2 className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-body)] mb-3">할 일</h2>
+      {isPending ? (
+        <AdminKpiGridSkeleton count={4} />
+      ) : isError ? (
+        <div className="p-4 bg-[var(--red50)] border border-[var(--tint-red-border)] rounded-xl flex items-center gap-3">
+          <p className="text-sm text-[var(--red700)] flex-1">
+            {extractErrorMessage(error, '할 일 목록을 불러오지 못했어요.')}
+          </p>
+          <button
+            type="button"
+            onClick={() => void refetch()}
+            className="text-sm text-[var(--red700)] font-semibold underline underline-offset-2 min-h-[44px] px-2 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+          >
+            다시 시도
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <AdminKpiCard
+              label="미승인 대회 신청"
+              value={data.pendingRegistrations.total}
+              tone={data.pendingRegistrations.total > 0 ? 'warning' : 'neutral'}
+              href="/admin/tournaments"
+              ariaLabel={`미승인 대회 신청: ${data.pendingRegistrations.total}건`}
+            />
+            <AdminKpiCard
+              label="결과 검토 대기"
+              value={data.resultReviewPending.total}
+              tone={data.resultReviewPending.total > 0 ? 'warning' : 'neutral'}
+              href="/admin/ops/tournaments"
+              ariaLabel={`결과 검토 대기: ${data.resultReviewPending.total}건`}
+            />
+            <AdminKpiCard
+              label="미답변 문의"
+              value={data.pendingInquiries}
+              tone={data.pendingInquiries > 0 ? 'warning' : 'neutral'}
+              href="/admin/inquiries"
+              ariaLabel={`미답변 문의: ${data.pendingInquiries}건`}
+            />
+            <AdminKpiCard
+              label="진행중 대회"
+              value={data.tournamentsInProgress}
+              tone="neutral"
+              href="/admin/tournaments?status=in_progress"
+              ariaLabel={`진행중 대회: ${data.tournamentsInProgress}개`}
+            />
+          </div>
+
+          {totalTodo === 0 && (
+            <div className="flex items-center gap-2.5 p-4 bg-[var(--green50)] border border-green-100 rounded-xl">
+              <CheckCircle2 size={18} className="text-green-500 shrink-0" aria-hidden="true" />
+              <p className="text-[length:var(--font-size-body-sm)] text-[var(--text-strong)]">
+                지금은 처리할 일이 없어요.
+              </p>
+            </div>
+          )}
+
+          <TournamentBreakdownCard
+            title="대회별 미승인 신청"
+            rows={data.pendingRegistrations.tournaments}
+            hrefFor={(id) => `/admin/tournaments/${id}/registrations`}
+            linkLabel="신청 관리"
+          />
+          <TournamentBreakdownCard
+            title="대회별 결과 검토 대기"
+            rows={data.resultReviewPending.tournaments}
+            hrefFor={(id) => `/admin/live/${id}/result-review`}
+            linkLabel="검토하기"
+          />
+        </div>
+      )}
+    </section>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────
 export default function AdminOverviewPage() {
   const { data: overview, isPending, isError, refetch } = useV1AdminOverview();
@@ -84,57 +225,12 @@ export default function AdminOverviewPage() {
   return (
     <>
       <AdminPageHeader
-        title="운영 개요"
-        description="플랫폼 현황을 한눈에 확인해요."
+        title="대시보드"
+        description="처리할 일과 플랫폼 현황을 한 화면에서 확인해요."
       />
 
-      {/* ── Primary KPIs ─────────────────────────────────────────────── */}
-      {isPending ? (
-        <AdminKpiGridSkeleton count={4} />
-      ) : isError ? (
-        <div className="mb-6 p-4 bg-[var(--red50)] border border-[var(--tint-red-border)] rounded-xl flex items-center gap-3">
-          <p className="text-sm text-[var(--red700)] flex-1">현황 데이터를 불러오지 못했어요.</p>
-          <button
-            type="button"
-            onClick={() => refetch()}
-            className="text-sm text-[var(--red700)] font-semibold underline underline-offset-2 min-h-[44px] px-2 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
-          >
-            다시 시도
-          </button>
-        </div>
-      ) : (
-        /* lg:grid-cols-4: 어드민 사이드바가 1024+에서만 나타나므로 4열은 lg부터 (fix #16) */
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-          <AdminKpiCard
-            label="활성 회원"
-            value={overview?.users.active ?? 0}
-            tone="neutral"
-            href="/admin/users?status=active"
-            ariaLabel={`활성 회원: ${overview?.users.active ?? 0}명`}
-          />
-          <AdminKpiCard
-            label="활성 매치"
-            value={overview?.matches.recruiting ?? 0}
-            tone="neutral"
-            href="/admin/matches?status=recruiting"
-            ariaLabel={`활성 매치: ${overview?.matches.recruiting ?? 0}건`}
-          />
-          <AdminKpiCard
-            label="활성 팀"
-            value={overview?.teams.active ?? 0}
-            tone="neutral"
-            href="/admin/teams?status=active"
-            ariaLabel={`활성 팀: ${overview?.teams.active ?? 0}개`}
-          />
-          <AdminKpiCard
-            label="모집 중 팀매치"
-            value={overview?.teamMatches.recruiting ?? 0}
-            tone="neutral"
-            href="/admin/team-matches?status=recruiting"
-            ariaLabel={`모집 중 팀매치: ${overview?.teamMatches.recruiting ?? 0}건`}
-          />
-        </div>
-      )}
+      {/* ── 할 일 (최상단 — 처리 대기 신호가 항상 첫눈에) ─────────────── */}
+      <InboxSection />
 
       {/* ── Warning section ───────────────────────────────────────────── */}
       {!isPending && !isError && (
@@ -218,6 +314,57 @@ export default function AdminOverviewPage() {
             </div>
           )}
         </section>
+      )}
+
+      {/* ── Primary KPIs (현황) ──────────────────────────────────────── */}
+      {!isPending && !isError && (
+        <h2 className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-body)] mb-3">현황</h2>
+      )}
+      {isPending ? (
+        <AdminKpiGridSkeleton count={4} />
+      ) : isError ? (
+        <div className="mb-6 p-4 bg-[var(--red50)] border border-[var(--tint-red-border)] rounded-xl flex items-center gap-3">
+          <p className="text-sm text-[var(--red700)] flex-1">현황 데이터를 불러오지 못했어요.</p>
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="text-sm text-[var(--red700)] font-semibold underline underline-offset-2 min-h-[44px] px-2 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+          >
+            다시 시도
+          </button>
+        </div>
+      ) : (
+        /* lg:grid-cols-4: 어드민 사이드바가 1024+에서만 나타나므로 4열은 lg부터 (fix #16) */
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+          <AdminKpiCard
+            label="활성 회원"
+            value={overview?.users.active ?? 0}
+            tone="neutral"
+            href="/admin/users?status=active"
+            ariaLabel={`활성 회원: ${overview?.users.active ?? 0}명`}
+          />
+          <AdminKpiCard
+            label="활성 매치"
+            value={overview?.matches.recruiting ?? 0}
+            tone="neutral"
+            href="/admin/matches?status=recruiting"
+            ariaLabel={`활성 매치: ${overview?.matches.recruiting ?? 0}건`}
+          />
+          <AdminKpiCard
+            label="활성 팀"
+            value={overview?.teams.active ?? 0}
+            tone="neutral"
+            href="/admin/teams?status=active"
+            ariaLabel={`활성 팀: ${overview?.teams.active ?? 0}개`}
+          />
+          <AdminKpiCard
+            label="모집 중 팀매치"
+            value={overview?.teamMatches.recruiting ?? 0}
+            tone="neutral"
+            href="/admin/team-matches?status=recruiting"
+            ariaLabel={`모집 중 팀매치: ${overview?.teamMatches.recruiting ?? 0}건`}
+          />
+        </div>
       )}
 
       {/* ── Recent actions panel ──────────────────────────────────────── */}

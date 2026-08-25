@@ -23,6 +23,9 @@ const opsSummaryMock = vi.fn();
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminOverview: () => overviewHook,
   useV1AdminOpsSummary: () => opsSummaryMock(),
+  // B안 통합으로 대시보드가 할 일 인박스도 렌더한다 — 이 파일의 관심사(무신호 금지)가
+  // 아니므로 로딩 상태로 고정한다(인박스 계약은 inbox-section.test.tsx 가 커버).
+  useV1AdminHubInbox: () => ({ data: undefined, isPending: true, isError: false, refetch: vi.fn() }),
 }));
 
 describe('AdminOverviewPage — ops summary 실패 무신호 금지', () => {

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Card } from '@/components/v1-ui/primitives';
+import { V1ApiError } from '@/lib/api-client';
 import { extractErrorMessage } from '@/lib/error-message';
 import { hasStoredV1Session } from '@/lib/session-storage';
 import {
@@ -47,6 +48,22 @@ export function AttestRequestsSection({ gameId }: { gameId: string | null | unde
   const [decidingRequestId, setDecidingRequestId] = useState<string | null>(null);
 
   const requests = pending.data?.requests ?? [];
+  // 403(관전자·자격 없음)은 정상 상태라 조용히 숨긴다. 그 외 오류(5xx·네트워크)를 함께
+  // 숨기면 장애가 "승인할 요청 없음"으로 위장되므로 최소한의 오류 문구는 드러낸다
+  // (Copilot 리뷰 — 리그 경기 상세의 404 vs 그 외 처리와 같은 원칙).
+  const isSpectatorDenied =
+    pending.error instanceof V1ApiError &&
+    (pending.error.statusCode === 403 || pending.error.statusCode === 401);
+  if (pending.isError && !isSpectatorDenied) {
+    return (
+      <Card pad={16} style={{ marginTop: 10 }}>
+        <div className="tm-text-body-lg">기록 연결 승인 요청</div>
+        <div role="alert" className="tm-text-caption" style={{ marginTop: 4, color: 'var(--red700)' }}>
+          {extractErrorMessage(pending.error, '승인 요청을 불러오지 못했어요.')}
+        </div>
+      </Card>
+    );
+  }
   if (pending.data === undefined || (requests.length === 0 && lastDecision === null)) {
     return null;
   }

@@ -10,8 +10,9 @@ import { notificationCopyFor } from '../notifications/notifications.service';
  * GamesModule → NotificationsServiceModule → RealtimeModule → GamesModule 이 순환이라
  * games 쪽에서 NotificationsService 를 주입할 수 없다. 그래서
  * team-match-completion-notification.service.ts 선례를 그대로 따른다: V1Notification
- * row 를 호출자의 tx 로 직접 쓰고(신청 커밋 = 알림 존재), 문구·딥링크는
- * `notificationCopyFor()`(notifications.service.ts 단일 소스)에서 읽으며,
+ * row 를 호출자의 tx 로 직접 쓰고(신청 커밋 = 알림 존재), **제목·딥링크**는
+ * `notificationCopyFor()`(notifications.service.ts 단일 소스)에서 읽고 body 만 여기서
+ * 동적으로 만들며(참가자 이름 인용 — 호출부 body 오버라이드는 그 파일이 문서화한 관례),
  * `businessKey` 로 (요청, 수신자) 쌍마다 정확히 한 번만 배달한다 — 커맨드 재시도
  * (idempotency REPLAY)에도 재알림하지 않는다. 웹 푸시 즉시 발송은 이 경로에 없다
  * (인앱 알림함·미읽음 뱃지로 도달) — 필요해지면 outbox 핸들러로 옮겨 워커의

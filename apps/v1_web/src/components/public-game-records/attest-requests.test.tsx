@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { V1ApiError } from '@/lib/api-client';
 import { AttestRequestsSection } from './attest-requests';
 
 /**
@@ -68,7 +69,8 @@ describe('AttestRequestsSection', () => {
   it('비로그인(세션 힌트 없음)이면 세션 확인도 승인함 조회도 하지 않고 아무것도 렌더하지 않는다', () => {
     hasSessionMock.mockReturnValue(false);
     meMock.mockReturnValue({ data: undefined });
-    pendingMock.mockReturnValue({ data: undefined, isError: true });
+    // 비활성 쿼리는 에러가 아니라 대기 상태다.
+    pendingMock.mockReturnValue({ data: undefined, isError: false, error: null });
 
     const { container } = render(<AttestRequestsSection gameId="g-1" />);
 
@@ -76,6 +78,32 @@ describe('AttestRequestsSection', () => {
     // 힌트 없이 /auth/me probe 부터 나가면 그 자체가 401 소음이다.
     expect(meMock).toHaveBeenLastCalledWith({ enabled: false, retry: false });
     expect(pendingMock).toHaveBeenLastCalledWith('g-1', { enabled: false });
+  });
+
+  it('관전자 403 은 조용히 숨기고, 그 외 오류(5xx)는 장애를 드러낸다', () => {
+    hasSessionMock.mockReturnValue(true);
+    meMock.mockReturnValue({ data: { userId: 'me' } });
+
+    const apiError = (statusCode: number, message: string) =>
+      new V1ApiError({ status: 'error', timestamp: '', statusCode, code: 'X', message, details: null });
+
+    pendingMock.mockReturnValue({
+      data: undefined,
+      isError: true,
+      error: apiError(403, '권한이 없어요.'),
+    });
+    const spectator = render(<AttestRequestsSection gameId="g-1" />);
+    expect(spectator.container).toBeEmptyDOMElement();
+    spectator.unmount();
+
+    pendingMock.mockReturnValue({
+      data: undefined,
+      isError: true,
+      error: apiError(500, '서버 오류'),
+    });
+    render(<AttestRequestsSection gameId="g-1" />);
+    // 장애를 "승인할 요청 없음"으로 위장하지 않는다.
+    expect(screen.getByRole('alert')).toHaveTextContent('서버 오류');
   });
 
   it('대기 요청 0건이면 렌더하지 않는다', () => {

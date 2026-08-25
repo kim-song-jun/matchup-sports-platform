@@ -1800,6 +1800,12 @@ export function useV1AttestIdentityLink(gameId: string | null | undefined) {
       decision: 'approve' | 'reject';
       expectedVersion: number;
     }) => {
+      // gameId 는 승인함 목록 응답에서 오지만 훅 시그니처상 비어 있을 수 있다 —
+      // 비어 있는 채로 URL 을 만들면 `/games/undefined/...` 로 조용히 나간다.
+      // 여기서 즉시 실패시켜 잘못된 요청 자체를 만들지 않는다 (Copilot 리뷰).
+      if (!gameId) {
+        return Promise.reject(new Error('경기 정보를 찾지 못해 요청을 보낼 수 없어요.'));
+      }
       // 서버가 헤더 Idempotency-Key 와 body.clientCommandId 의 일치를 요구한다
       // (requestIdentityLink 와 같은 계약).
       const clientCommandId = `attest-${body.requestId}-${Date.now()}`;

@@ -28,6 +28,8 @@ import {
   type TournamentFixtureReviewTagCode,
 } from './tournament-fixture-review-mappers';
 import { recalculateTournamentUserReputation } from './tournament-fixture-review-reputation';
+import { REVIEW_METRICS } from './review-metric-aggregation';
+import type { ReviewMetricScoresDto } from './dto/submit-review.dto';
 import { recalculateTournamentFixtureTeamTrust } from './tournament-fixture-review-trust';
 
 @Injectable()
@@ -262,6 +264,7 @@ export class TournamentFixtureReviewsService {
           rating: dto.rating,
           sportId: context.fixture.tournament.sportId,
           tags: { create: tagCodes.map((tagCode) => ({ tagCode, labelSnapshot: REVIEW_TAGS[tagCode] })) },
+          ...tournamentMetricScoreCreate(dto),
         },
         include: reviewInclude(),
       });
@@ -476,6 +479,7 @@ export type TournamentFixtureReviewSubmitInput = {
   readonly targetUserId?: string | null;
   readonly targetTeamId?: string | null;
   readonly rating: number;
+  metricScores?: ReviewMetricScoresDto;
 };
 
 type ReviewContext = {
@@ -555,4 +559,15 @@ function notFound(code: string, message: string) {
 
 function conflict(code: string, message: string) {
   return new ConflictException({ code, message });
+}
+
+/** 4항목 채점을 대회 개인 후기 행에 싣는다 -- 개인 경로(reviews.service)와 같은 규칙. */
+function tournamentMetricScoreCreate(dto: { metricScores?: ReviewMetricScoresDto }) {
+  if (!dto.metricScores) return {};
+  const { skill, manner, punctuality, safety } = dto.metricScores;
+  const byMetric = { SKILL: skill, MANNER: manner, PUNCTUALITY: punctuality, SAFETY: safety } as const;
+  return {
+    scoringVersion: 'four_metric' as const,
+    metricScores: { create: REVIEW_METRICS.map((metric) => ({ metric, score: byMetric[metric] })) },
+  };
 }

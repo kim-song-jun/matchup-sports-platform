@@ -57,6 +57,7 @@ function renderCompose(m: ReviewSourcePageModel) {
       onRetry={vi.fn()}
       onSubmit={vi.fn()}
       onToggleTag={vi.fn()}
+      onUpdateMetricScore={vi.fn()}
       onUpdateRating={vi.fn()}
       submitting={false}
     />,

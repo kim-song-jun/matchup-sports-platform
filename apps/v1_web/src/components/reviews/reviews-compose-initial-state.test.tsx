@@ -70,6 +70,7 @@ describe('리뷰 작성 화면 — 아직 손대지 않은 대상의 별점 초�
         onRetry={() => {}}
         onSubmit={() => {}}
         onToggleTag={() => {}}
+        onUpdateMetricScore={() => {}}
         onUpdateRating={() => {}}
         submitting={false}
       />,
@@ -101,6 +102,7 @@ describe('리뷰 작성 화면 — 보내기 버튼이 잠긴 이유 안내', ()
         onRetry={() => {}}
         onSubmit={() => {}}
         onToggleTag={() => {}}
+        onUpdateMetricScore={() => {}}
         onUpdateRating={() => {}}
         submitting={false}
       />,
@@ -132,6 +134,7 @@ describe('리뷰 작성 화면 — 보내기 버튼이 잠긴 이유 안내', ()
         onRetry={() => {}}
         onSubmit={() => {}}
         onToggleTag={() => {}}
+        onUpdateMetricScore={() => {}}
         onUpdateRating={() => {}}
         submitting={false}
       />,

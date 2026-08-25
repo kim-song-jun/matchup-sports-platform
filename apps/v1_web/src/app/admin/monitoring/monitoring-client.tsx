@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AdminInlineError, AdminKpiCard } from '@/components/admin';
 import { PushFailureTable } from '@/components/admin/push-failure-table';
 import { SmsFailureTable } from '@/components/admin/sms-failure-table';
@@ -62,6 +62,11 @@ export function MonitoringClient() {
 
   // URL → 초기 상태. 구 URL 리다이렉트와 사이드바·개요 딥링크가 그대로 해당 탭에 도착한다.
   const [activeTab, setActiveTab] = useState<TabKey>(() => pickTab(searchParams.get('tab')));
+  // 뒤로가기/앞으로가기·외부 내비게이션으로 URL 만 바뀐 경우에도 탭을 따라가게 한다 —
+  // 클릭은 setActiveTab 이 즉시 처리하므로 이 effect 는 재동기화 전용이다 (리그 허브와 동일).
+  useEffect(() => {
+    setActiveTab(pickTab(searchParams.get('tab')));
+  }, [searchParams]);
 
   const { data: summary, isPending, isError, refetch } = useV1AdminMonitoringSummary();
 
@@ -115,7 +120,9 @@ export function MonitoringClient() {
               id={`monitoring-tab-${tab.key}`}
               role="tab"
               aria-selected={isActive}
-              aria-controls={`monitoring-panel-${tab.key}`}
+              // 활성 패널만 마운트하므로 비활성 탭이 존재하지 않는 id 를 가리키지 않도록
+              // aria-controls 는 활성 탭에만 단다 (#771 Copilot 지적의 허브 공통 반영).
+              aria-controls={isActive ? `monitoring-panel-${tab.key}` : undefined}
               type="button"
               onClick={() => handleTabChange(tab.key)}
               className={[

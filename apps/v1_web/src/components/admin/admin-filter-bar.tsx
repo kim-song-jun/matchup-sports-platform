@@ -20,6 +20,11 @@ interface AdminFilterBarProps {
   /** 검색 입력란을 숨긴다. 백엔드가 q 파라미터를 지원하지 않는 페이지에서 사용 */
   hideSearch?: boolean;
   statusOptions?: StatusOption[];
+  /**
+   * 칩 그룹의 스크린리더 라벨. 칩이 상태가 아닌 다른 축(체계·대상 유형 등)을 거를 때
+   * 기본값 "상태 필터"가 잘못된 의미로 읽히므로 화면이 실제 의미를 지정한다.
+   */
+  statusGroupLabel?: string;
   activeStatus?: string;
   onStatusChange?: (value: string) => void;
   /** Optional content injected to the right of the chips row */
@@ -34,6 +39,7 @@ export function AdminFilterBar({
   onSearchChange,
   hideSearch = false,
   statusOptions,
+  statusGroupLabel = '상태 필터',
   activeStatus,
   onStatusChange,
   rightSlot,
@@ -75,7 +81,7 @@ export function AdminFilterBar({
       {(statusOptions && statusOptions.length > 0) || rightSlot ? (
         <div className="flex items-center gap-2 flex-wrap">
           {statusOptions && statusOptions.length > 0 && onStatusChange && (
-            <div className="flex items-center gap-1.5 flex-wrap" role="group" aria-label="상태 필터">
+            <div className="flex items-center gap-1.5 flex-wrap" role="group" aria-label={statusGroupLabel}>
               {statusOptions.map((opt) => {
                 const active = activeStatus === opt.value;
                 return (

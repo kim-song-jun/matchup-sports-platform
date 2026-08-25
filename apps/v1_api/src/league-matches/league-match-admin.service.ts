@@ -10,6 +10,7 @@ import { cascadeCancelTeamMatchSchedulesInTx } from '../team-schedules/team-sche
 import { scheduleLeagueResultEntryReminder } from '../jobs/league-reminders/league-result-entry-reminder.service';
 import { LeagueCompletionProjectionService } from './league-completion-projection.service';
 import { buildOddTeamCountWarning, checkLeagueTeamAddAllowed, checkLeagueTeamRemovalAllowed } from './league-lifecycle-rules';
+import { tierLabel } from './league-series-admin.service';
 import { resolveResultStage } from './league-result-stage';
 import { FixtureScheduleTemplate, FixtureTimingOptions, generateRoundRobinFixtures, resolveFixtureStartAt, resolveFixtureTimeSlots, RoundRobinFixture } from './round-robin-schedule';
 import {
@@ -115,11 +116,27 @@ export class LeagueMatchAdminService {
     return { leagueId: league.id, title: league.title, state: league.state };
   }
 
-  async list(user: V1AuthUser) {
+  /**
+   * seriesId: 체계 id 로 소속 리그만, 'independent' 로 무소속(단발) 리그만 필터한다.
+   * 리그 허브(B안, 2026-08-25)의 체계 칩 필터가 쓰는 파라미터 — 없으면 전체.
+   */
+  async list(user: V1AuthUser, seriesId?: string) {
     await this.adminContext.getActiveAdmin(user.id);
+    // DTO 검증이 /i 라 'INDEPENDENT'·대문자 uuid 도 통과한다 — 소문자로 정규화해야
+    // 리터럴 비교와 (소문자로 저장되는) uuid 매칭이 어긋나지 않는다.
+    const normalized = seriesId?.toLowerCase();
     const rows = await this.prisma.v1League.findMany({
+      where:
+        normalized === 'independent'
+          ? { seriesId: null }
+          : normalized
+            ? { seriesId: normalized }
+            : undefined,
       orderBy: { createdAt: 'desc' },
-      include: { _count: { select: { teams: true, teamMatches: true } } },
+      include: {
+        _count: { select: { teams: true, teamMatches: true } },
+        series: { select: { title: true } },
+      },
     });
     return {
       items: rows.map((row) => ({
@@ -130,6 +147,11 @@ export class LeagueMatchAdminService {
         fixtureCount: row._count.teamMatches,
         startsOn: row.startsOn,
         endsOn: row.endsOn,
+        seriesId: row.seriesId,
+        seriesTitle: row.series?.title ?? null,
+        // 단발 리그는 tier 가 null — "1부" 뱃지가 잘못 붙지 않도록 라벨도 null 로 내린다.
+        tierLabel: row.tier === null ? null : tierLabel(row.tier),
+        seasonNo: row.seasonNo,
       })),
     };
   }

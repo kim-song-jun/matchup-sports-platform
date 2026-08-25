@@ -1072,4 +1072,27 @@ describe('LeagueMatchStandingsClient', () => {
     expect(await screen.findByText('이번 시즌 요약')).toBeInTheDocument();
     expect(await screen.findByText('시즌 요약을 불러오지 못했어요.')).toBeInTheDocument();
   });
+
+  // 기록이 입력됐지만 신원 연동·동의가 없어 집계에서 빠진 경우, "결과가 쌓이면
+  // 나타나요"는 거짓 안내가 된다 — hiddenByEligibility 가 문구를 갈라야 한다.
+  it('hiddenByEligibility 면 빈 상태 문구가 동의 안내로 바뀐다', async () => {
+    useV1LeagueMatchMock.mockReturnValue({
+      data: { leagueId: 'league-1', title: '가을 리그', state: 'active', startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1'], fixtures: [] },
+    } as never);
+    useV1LeagueMatchStandingsMock.mockReturnValue({
+      data: { leagueId: 'league-1', tieBreakOrder: ['points'], standings: [], pendingFixtures: [] },
+    } as never);
+    useV1LeagueMatchPlayerRecordsMock.mockReturnValue({
+      data: { leagueId: 'league-1', goals: [], assists: [], hiddenByEligibility: true },
+    } as never);
+
+    render(<LeagueMatchStandingsClient leagueId="league-1" />);
+
+    expect(
+      await screen.findByText('득점 기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 순위가 공개돼요.'),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText('도움 기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 순위가 공개돼요.'),
+    ).toBeInTheDocument();
+  });
 });

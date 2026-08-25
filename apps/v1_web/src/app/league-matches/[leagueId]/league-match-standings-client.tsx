@@ -676,7 +676,14 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
         ) : records === undefined ? (
           <div className="tm-skeleton" style={{ height: 80, borderRadius: 12 }} />
         ) : records.goals.length === 0 ? (
-          <EmptyState title="아직 기록이 없어요" sub="확정된 경기 결과가 쌓이면 득점 순위가 나타나요." />
+          <EmptyState
+            title="아직 기록이 없어요"
+            sub={
+              records.hiddenByEligibility
+                ? '득점 기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 순위가 공개돼요.'
+                : '확정된 경기 결과가 쌓이면 득점 순위가 나타나요.'
+            }
+          />
         ) : (
           <ol className="space-y-1">
             {records.goals.map((row, index) => (
@@ -699,7 +706,14 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
         ) : records === undefined ? (
           <div className="tm-skeleton" style={{ height: 80, borderRadius: 12 }} />
         ) : records.assists.length === 0 ? (
-          <EmptyState title="아직 기록이 없어요" sub="확정된 경기 결과가 쌓이면 도움 순위가 나타나요." />
+          <EmptyState
+            title="아직 기록이 없어요"
+            sub={
+              records.hiddenByEligibility
+                ? '도움 기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 순위가 공개돼요.'
+                : '확정된 경기 결과가 쌓이면 도움 순위가 나타나요.'
+            }
+          />
         ) : (
           <ol className="space-y-1">
             {records.assists.map((row, index) => (

@@ -42,6 +42,9 @@ export ALPHA_SESSION_TOKEN='v1.<payload>.<signature>'
 | `verify-alpha-league-result-flow.mjs` | 리그 결과가 **순위표까지 닿는지** 릴레이 전체(홈팀 작성·제출 → 원정팀 승인 → 공개 순위표 반영)를 밟는다. 각 칸의 유닛 테스트가 전부 통과하는 동안 릴레이가 통째로 끊겨 있던 적이 있어서(2026-08-24 원정팀이 승인 화면에 진입 불가) 이어짐 자체를 본다. `--dry` 는 게이트 값과 순위표만 읽는다 | 홈팀장+원정팀장 |
 | `verify-alpha-result-official-notify.mjs` | 대회 결과 확정 알림(회고 REACH-4)이 **팀장에게 실제로 도착하는지** 전 구간을 밟는다: 예정 픽스처의 라인업 저장·제출 → start → end → SUBMITTED 리비전 officialize(previewHash 클라이언트 재구성) → 팀장 계정 알림 폴링. LINEUP-2 이후 라인업 save/submit 의 expectedVersion 은 **사이드별 라인업 버전**이다(게임 버전 아님 — 409 의 details.currentVersion 으로 1회 재시도해 흡수) | 관리자+팀장 |
 | `verify-alpha-og-card.mjs` | 선수 카드 OG 이미지가 **사용자별로 다른 그림**인지 판정. 여러 id 의 응답 바이트를 sha 로 비교해 전원이 같은 폴백을 받는 상태를 잡는다 — HTTP 200·PNG 까지는 통과하므로 상태코드만 보면 못 잡는다 | 불필요 |
+| `capture-league-fixture-record.mjs` | 리그 경기 상세의 **대회 패리티 본문**(스코어·정정 배지·경기 기록·정정 이력) — 기록 API(`.../fixtures/:id/record`)의 round/scoreStatus/videos 를 먼저 찍고 예정·완료 경기를 3폭 캡처. `LEAGUE_HINT` 로 대상 리그 지정 | 불필요 |
+| `verify-alpha-league-video.mjs` | 리그 경기 영상 **전 구간 릴레이**: 어드민 목록(주차 라벨) → 링크 등록(재실행 시 중복 건너뜀) → 공개 기록 `videos` 반영 → 경기 상세·어드민 화면 캡처. 라우트가 모듈에 등록 안 된 채 배포돼 전부 404 였던 실사고(#755)를 잡으라고 있다 | 플랫폼 관리자 |
+| `wait-alpha-serves-commit.mjs` | alpha 의 `x-teameet-commit` 이 지정 커밋을 **조상으로 포함**할 때까지 대기 — 배포 창(502·구 에셋)에서 측정해 멀쩡한 화면을 결함으로 오진하는 것을 막는 실측 전 게이트. `node scripts/wait-alpha-serves-commit.mjs <commit> [maxPolls] [intervalMs]` | 불필요 |
 
 ```bash
 # 공개 화면 (기본 대상 대회는 스크립트 상단 TID 상수, 환경변수로 교체 가능)

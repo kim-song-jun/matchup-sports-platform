@@ -68,7 +68,7 @@ const SECTION_GROUPS: { label: string; items: SectionItem[] }[] = [
         slug: 'popups',
         label: '팝업',
         externalHref: (tournamentId) =>
-          `/admin/popups?targetPath=${encodeURIComponent(`/tournaments/${tournamentId}`)}`,
+          `/admin/content?tab=popups&targetPath=${encodeURIComponent(`/tournaments/${tournamentId}`)}`,
       },
       { slug: 'campaign', label: '캠페인' },
     ],

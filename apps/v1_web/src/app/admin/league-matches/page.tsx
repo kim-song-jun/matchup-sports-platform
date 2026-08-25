@@ -51,16 +51,11 @@ function LeagueHub() {
   useEffect(() => {
     setActiveTab(searchParams.get('tab') === 'series' ? 'series' : 'leagues');
   }, [searchParams]);
-  // '' = 전체, 'independent' = 무소속만, 그 외 = 체계 id.
+  // '' = 전체, 'independent' = 무소속만, 그 외 = 체계 id. 필터 선택은 탭을 오가도
+  // 남아야 하므로 허브가 들고, 목록 쿼리는 정규 리그 패널만 마운트될 때 실행되도록
+  // 패널 컴포넌트(LeaguesPanel) 안에 둔다 — 리그 체계 탭에서 리그 목록 API 가
+  // 불필요하게 호출되지 않게 한다.
   const [seriesFilter, setSeriesFilter] = useState('');
-
-  const { data, isPending, isError, refetch } = useV1AdminLeagueMatchList(
-    seriesFilter || undefined,
-  );
-  const items = data?.items ?? [];
-  // 칩 목록용 — 리그 체계 탭 본문과 쿼리 키가 같아 요청은 한 번만 나간다.
-  const { data: seriesData } = useV1AdminLeagueSeriesList();
-  const seriesOptions = seriesData?.items ?? [];
 
   function handleTabChange(tab: TabKey) {
     setActiveTab(tab);
@@ -129,34 +124,55 @@ function LeagueHub() {
         {activeTab === 'series' ? (
           <LeagueSeriesView />
         ) : (
-          <>
-            {/* 체계 칩 필터 — 공용 AdminFilterBar 의 status 칩 재사용 (audit 선례). */}
-            <div className="mb-4">
-              <AdminFilterBar
-                hideSearch
-                searchValue=""
-                onSearchChange={() => undefined}
-                statusGroupLabel="체계 필터"
-                statusOptions={[
-                  { value: '', label: '전체' },
-                  ...seriesOptions.map((series) => ({ value: series.id, label: series.title })),
-                  { value: 'independent', label: '독립 리그' },
-                ]}
-                activeStatus={seriesFilter}
-                onStatusChange={setSeriesFilter}
-              />
-            </div>
-            <LeagueListTable
-              items={items}
-              isPending={isPending}
-              isError={isError}
-              onRetry={() => void refetch()}
-              filtered={seriesFilter !== ''}
-            />
-          </>
+          <LeaguesPanel seriesFilter={seriesFilter} onSeriesFilterChange={setSeriesFilter} />
         )}
       </div>
     </div>
+  );
+}
+
+/** 정규 리그 탭 본문 — 목록 쿼리를 여기 두어 이 패널이 마운트된 동안에만 호출한다. */
+function LeaguesPanel({
+  seriesFilter,
+  onSeriesFilterChange,
+}: {
+  seriesFilter: string;
+  onSeriesFilterChange: (value: string) => void;
+}) {
+  const { data, isPending, isError, refetch } = useV1AdminLeagueMatchList(
+    seriesFilter || undefined,
+  );
+  const items = data?.items ?? [];
+  // 칩 목록용 — 리그 체계 탭 본문과 쿼리 키가 같아 요청은 한 번만 나간다.
+  const { data: seriesData } = useV1AdminLeagueSeriesList();
+  const seriesOptions = seriesData?.items ?? [];
+
+  return (
+    <>
+      {/* 체계 칩 필터 — 공용 AdminFilterBar 의 status 칩 재사용 (audit 선례). */}
+      <div className="mb-4">
+        <AdminFilterBar
+          hideSearch
+          searchValue=""
+          onSearchChange={() => undefined}
+          statusGroupLabel="체계 필터"
+          statusOptions={[
+            { value: '', label: '전체' },
+            ...seriesOptions.map((series) => ({ value: series.id, label: series.title })),
+            { value: 'independent', label: '독립 리그' },
+          ]}
+          activeStatus={seriesFilter}
+          onStatusChange={onSeriesFilterChange}
+        />
+      </div>
+      <LeagueListTable
+        items={items}
+        isPending={isPending}
+        isError={isError}
+        onRetry={() => void refetch()}
+        filtered={seriesFilter !== ''}
+      />
+    </>
   );
 }
 

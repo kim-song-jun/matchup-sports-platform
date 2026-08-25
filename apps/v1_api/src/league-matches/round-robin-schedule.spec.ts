@@ -1,4 +1,4 @@
-import { generateRoundRobinFixtures, resolveFixtureStartAt, WEEK_MS } from './round-robin-schedule';
+import { generateRoundRobinFixtures, resolveFixtureStartAt, resolveFixtureTimeSlots, WEEK_MS } from './round-robin-schedule';
 
 describe('generateRoundRobinFixtures', () => {
   it('4팀·3주에 모든 페어가 정확히 한 번씩 만나고, 라운드마다 팀이 중복 출전하지 않는다', () => {
@@ -87,5 +87,81 @@ describe('resolveFixtureStartAt', () => {
     const result = resolveFixtureStartAt(leagueStartsOn, 1, { dayOfWeek: 1, time: '08:00' }); // 09:00보다 이른 08:00 KST
     expect(result.toISOString()).toBe('2026-08-16T23:00:00.000Z'); // 8/17(월) 08:00 KST = 8/16 23:00 UTC
     expect(result.getTime()).toBeGreaterThan(leagueStartsOn.getTime());
+  });
+});
+
+describe('resolveFixtureTimeSlots', () => {
+  // 2026-08-31T00:00:00Z = KST 8/31(월) 09:00. 수요일(3) 지정 시 첫 매치데이는 9/2(수).
+  const leagueStartsOn = new Date('2026-08-31T00:00:00.000Z');
+  const wednesday22 = { dayOfWeek: 3, time: '22:00' };
+
+  it('4팀·팀당 하루 3경기·15분 경기·5분 휴식이면 하루 6경기가 20분 간격으로 연달아 배치된다', () => {
+    // 한 구장 운영 시나리오: 22:00~00:00 사이 6경기(팀당 3경기).
+    const fixtures = generateRoundRobinFixtures(['A', 'B', 'C', 'D'], 3); // 1매치데이 × 3라운드
+    const slots = resolveFixtureTimeSlots(fixtures, leagueStartsOn, { gameDurationMinutes: 15, breakMinutes: 5, gamesPerTeamPerDay: 3 }, wednesday22);
+    expect(slots).toHaveLength(6);
+    expect(slots.map((s) => s.startAt.toISOString())).toEqual([
+      '2026-09-02T13:00:00.000Z', // 22:00 KST
+      '2026-09-02T13:20:00.000Z', // 22:20
+      '2026-09-02T13:40:00.000Z', // 22:40
+      '2026-09-02T14:00:00.000Z', // 23:00
+      '2026-09-02T14:20:00.000Z', // 23:20
+      '2026-09-02T14:40:00.000Z', // 23:40
+    ]);
+    expect(slots[5].endAt.toISOString()).toBe('2026-09-02T14:55:00.000Z'); // 마지막 경기 23:55 KST 종료
+    expect(slots.every((s) => s.matchday === 1)).toBe(true);
+    expect(slots.map((s) => s.orderInDay)).toEqual([1, 2, 3, 4, 5, 6]);
+  });
+
+  it('endAt은 startAt + 경기 시간이다(휴식은 다음 경기 시작 간격에만 반영)', () => {
+    const fixtures = generateRoundRobinFixtures(['A', 'B'], 1);
+    const slots = resolveFixtureTimeSlots(fixtures, leagueStartsOn, { gameDurationMinutes: 40, breakMinutes: 10, gamesPerTeamPerDay: 1 }, wednesday22);
+    expect(slots[0].endAt.getTime() - slots[0].startAt.getTime()).toBe(40 * 60_000);
+  });
+
+  it('각 팀은 매치데이마다 정확히 팀당 하루 경기 수만큼 출전한다', () => {
+    const fixtures = generateRoundRobinFixtures(['A', 'B', 'C', 'D'], 6); // 2매치데이 × 3라운드
+    const slots = resolveFixtureTimeSlots(fixtures, leagueStartsOn, { gameDurationMinutes: 15, breakMinutes: 5, gamesPerTeamPerDay: 3 }, wednesday22);
+    const perDay = new Map<string, number>();
+    fixtures.forEach((fixture, i) => {
+      for (const teamId of [fixture.homeTeamId, fixture.awayTeamId]) {
+        const key = `${slots[i].matchday}:${teamId}`;
+        perDay.set(key, (perDay.get(key) ?? 0) + 1);
+      }
+    });
+    expect(perDay.size).toBe(8); // 2매치데이 × 4팀
+    for (const count of perDay.values()) expect(count).toBe(3);
+  });
+
+  it('다음 매치데이는 정확히 7일 뒤 같은 시각부터 다시 시작한다', () => {
+    const fixtures = generateRoundRobinFixtures(['A', 'B', 'C', 'D'], 6);
+    const slots = resolveFixtureTimeSlots(fixtures, leagueStartsOn, { gameDurationMinutes: 15, breakMinutes: 5, gamesPerTeamPerDay: 3 }, wednesday22);
+    expect(slots[6].matchday).toBe(2);
+    expect(slots[6].orderInDay).toBe(1);
+    expect(slots[6].startAt.getTime()).toBe(slots[0].startAt.getTime() + WEEK_MS);
+  });
+
+  it('팀당 하루 1경기여도 같은 매치데이 경기들은 순차 배치된다(동시 시작 없음)', () => {
+    const fixtures = generateRoundRobinFixtures(['A', 'B', 'C', 'D', 'E', 'F'], 1); // 1라운드 3경기
+    const slots = resolveFixtureTimeSlots(fixtures, leagueStartsOn, { gameDurationMinutes: 15, breakMinutes: 5, gamesPerTeamPerDay: 1 }, wednesday22);
+    expect(slots.map((s) => s.startAt.toISOString())).toEqual([
+      '2026-09-02T13:00:00.000Z',
+      '2026-09-02T13:20:00.000Z',
+      '2026-09-02T13:40:00.000Z',
+    ]);
+  });
+
+  it('휴식 0분이면 경기 시간 간격으로 바로 이어 붙인다', () => {
+    const fixtures = generateRoundRobinFixtures(['A', 'B', 'C', 'D'], 1);
+    const slots = resolveFixtureTimeSlots(fixtures, leagueStartsOn, { gameDurationMinutes: 30, breakMinutes: 0, gamesPerTeamPerDay: 1 }, wednesday22);
+    expect(slots[1].startAt.getTime() - slots[0].startAt.getTime()).toBe(30 * 60_000);
+  });
+
+  it('template 없이도 시작일 시각부터 순차 배치하고 매치데이는 주 단위로 반복한다', () => {
+    const fixtures = generateRoundRobinFixtures(['A', 'B', 'C', 'D'], 2); // 2매치데이 × 1라운드
+    const slots = resolveFixtureTimeSlots(fixtures, leagueStartsOn, { gameDurationMinutes: 15, breakMinutes: 5, gamesPerTeamPerDay: 1 });
+    expect(slots[0].startAt).toEqual(leagueStartsOn);
+    expect(slots[1].startAt.getTime()).toBe(leagueStartsOn.getTime() + 20 * 60_000);
+    expect(slots[2].startAt.getTime()).toBe(leagueStartsOn.getTime() + WEEK_MS);
   });
 });

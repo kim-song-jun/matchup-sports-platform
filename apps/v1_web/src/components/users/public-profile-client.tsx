@@ -81,30 +81,38 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
   return (
     <AppChrome title="프로필" activeTab="teams" bottomNav={false} backHref="/teams" desktopHead>
       <div className="tm-my-shell">
-        {/* 헤더 — 아바타 + 이름 */}
-        <section className="tm-my-profile-head" aria-label="사용자 정보">
-          <div className="tm-my-avatar" style={avatarStyle}>{data.profileImageUrl ? null : initials}</div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <h1 className="tm-text-heading" style={{ margin: 0 }}>{data.displayName}</h1>
-            {data.nickname ? (
-              <div className="tm-text-caption" style={{ marginTop: 4 }}>@{data.nickname}</div>
-            ) : null}
-          </div>
-        </section>
-
-        {/* 선수 카드 (Task 155). 프로필의 첫 화면이다 -- 자랑할 수 있는 것이 맨 위에
-            와야 공유할 이유가 생긴다. 숨김을 켠 사용자에게는 서버가 null 을 주므로
-            섹션 자체가 사라진다(빈 자리를 남기지 않는다). */}
+        {/* 선수 카드 + 신원 (Task 155, 신원 통합 스테이지 -- 마이페이지와 같은 규칙).
+            카드가 있으면 카드가 곧 프로필이다: 흰 헤더(아바타+이름)와 카드가 같은 말을
+            두 번 하지 않도록 이름·핸들은 스테이지 안 카드 아래로 들어간다.
+            숨김을 켠 사용자에게는 서버가 null 을 주므로 기존 헤더가 그대로 선다. */}
         {data.playerCard ? (
-          <PlayerCard
-            card={data.playerCard}
-            displayName={data.displayName}
-            profileImageUrl={data.profileImageUrl}
-            teamName={data.teams?.[0]?.name ?? null}
-            isOwner={false}
-            shareHref={`/users/${userId}/card`}
-          />
-        ) : null}
+          <section className="tm-my-profile-stage" aria-label="선수 카드와 사용자 정보">
+            <PlayerCard
+              card={data.playerCard}
+              displayName={data.displayName}
+              profileImageUrl={data.profileImageUrl}
+              teamName={data.teams?.[0]?.name ?? null}
+              isOwner={false}
+              shareHref={`/users/${userId}/card`}
+              belowCardSlot={
+                <div className="tm-pcard-identity">
+                  <h1 className="tm-pcard-identity-name">{data.displayName}</h1>
+                  {data.nickname ? <div className="tm-pcard-identity-meta">@{data.nickname}</div> : null}
+                </div>
+              }
+            />
+          </section>
+        ) : (
+          <section className="tm-my-profile-head" aria-label="사용자 정보">
+            <div className="tm-my-avatar" style={avatarStyle}>{data.profileImageUrl ? null : initials}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <h1 className="tm-text-heading" style={{ margin: 0 }}>{data.displayName}</h1>
+              {data.nickname ? (
+                <div className="tm-text-caption" style={{ marginTop: 4 }}>@{data.nickname}</div>
+              ) : null}
+            </div>
+          </section>
+        )}
 
         {/* 한 줄 소개 · 소속팀 (Task 154 P1)
             기록이 0건인 프로필이 통계 카드 하나만 남아 완전히 비어 보이던 문제를 메운다.

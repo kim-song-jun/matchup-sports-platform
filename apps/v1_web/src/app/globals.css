@@ -7390,3 +7390,32 @@ button:disabled {
 .tm-my-profile-stage .tm-player-card-progress-text { color: #cdd5e0; }
 .tm-my-profile-stage .tm-player-card-progress-bar { background: rgba(255, 255, 255, 0.16); }
 .tm-my-profile-stage .tm-player-card-progress-count { color: #8b95a5; }
+
+/* ── 상태 적응형 카드 앞면 (Task 155, 사용자 선택 A안) ──────────────────
+   0경기 + 열림 0 = 여정 면: 자물쇠 여섯 개의 벽 대신 큰 렌더와 "시작"을 그린다.
+   기록 면에는 다음 목표 한 줄이 중앙 공백을 채운다 -- 카드가 행동을 만든다. */
+.tm-player-card[data-face='journey'] .tm-pcard-render {
+  right: 50%; transform: translateX(50%);
+  /* alpha 실측(2026-08-25): 렌더를 이름 줄까지 내리면 큰 이니셜이 이름·여정 문구를
+     관통한다. 이름 줄 위에서 끝나도록 높이를 줄이고 글리프를 가운데 정렬한다. */
+  top: 40px; width: 176px; height: 118px;
+}
+.tm-player-card[data-face='journey'][data-shape='shield'] .tm-pcard-render { top: 64px; }
+.tm-player-card[data-face='journey'] .tm-pcard-render-img {
+  font-size: 80px; padding-bottom: 0; place-items: center;
+}
+.tm-player-card[data-face='journey'] .tm-player-card-name { margin-top: 14px; }
+.tm-pcard-journey { margin-top: 14px; text-align: center; position: relative; z-index: 2; }
+.tm-pcard-journey-title { font-size: 15px; font-weight: 800; color: var(--tm-ink); }
+.tm-pcard-journey-sub { margin-top: 5px; font-size: 11px; line-height: 1.55; color: var(--tm-dim); }
+.tm-pcard-next {
+  margin: 12px auto 0; width: fit-content; padding: 5px 12px; border-radius: 999px;
+  border: 1px solid var(--tm-rule);
+  font-family: var(--tm-num); font-size: 11px; font-weight: 800; letter-spacing: 0.02em;
+  color: var(--tm-ink);
+  display: flex; align-items: center; gap: 6px;
+  position: relative; z-index: 2;
+}
+.tm-pcard-next i { width: 5px; height: 5px; border-radius: 999px; background: var(--tm-ink); opacity: 0.75; }
+/* 공개 프로필 스테이지의 이름은 h1 -- 헤딩 기본 마진·크기를 카드 신원 스타일로 되돌린다. */
+h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }

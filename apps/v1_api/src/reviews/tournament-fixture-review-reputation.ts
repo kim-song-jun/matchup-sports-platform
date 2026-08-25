@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { isReviewRevealed, reviewRevealScope } from './review-visibility';
+import { aggregateTournamentMetricScores, type MetricScoreRow } from './review-metric-aggregation';
 import { average, trustStateForReviewCount } from './team-trust-aggregation';
 import { decimalScore, TOURNAMENT_FIXTURE_SOURCE_TYPE } from './tournament-fixture-review-mappers';
 
@@ -34,6 +35,7 @@ export async function recalculateTournamentUserReputation(
       sourceGroupId: { not: null },
     },
     select: {
+      id: true,
       sourceType: true,
       sourceId: true,
       sourceGroupId: true,
@@ -68,6 +70,9 @@ export async function recalculateTournamentUserReputation(
   // 사람을 평가했으면 그 사람이 나에게 쓴 것도 공개"라는 상호성이 그대로 성립한다. 다만 짝을 맞추는
   // 단위만 대회(reviewRevealScope)로 접는다: 서로 다른 경기에서 평가했어도 같은 대회면 짝이다.
   const ratingsByGroup = new Map<string, number[]>();
+  // 4항목 채점도 rating 과 같은 "대회 × 평가한 팀" 접기를 따른다 -- reveal 된 후기의
+  // id → 접기 키 맵을 함께 만들어 항목 집계에 넘긴다.
+  const revealedGroupKeyByReviewId = new Map<string, string>();
   for (const review of candidates) {
     const revealed = isReviewRevealed(
       {
@@ -81,10 +86,19 @@ export async function recalculateTournamentUserReputation(
     );
     if (!revealed) continue;
     const key = `${review.sourceGroupId ?? ''}:${review.reviewerTeamId ?? ''}`;
+    revealedGroupKeyByReviewId.set(review.id, key);
     const ratings = ratingsByGroup.get(key) ?? [];
     ratings.push(review.rating);
     ratingsByGroup.set(key, ratings);
   }
+
+  const metricRows = revealedGroupKeyByReviewId.size
+    ? await tx.v1PostEventReviewMetricScore.findMany({
+        where: { reviewId: { in: [...revealedGroupKeyByReviewId.keys()] } },
+        select: { reviewId: true, metric: true, score: true },
+      })
+    : [];
+  const metricAggregate = aggregateTournamentMetricScores(revealedGroupKeyByReviewId, metricRows as MetricScoreRow[]);
 
   const groupAverages = [...ratingsByGroup.values()].map(average);
   const reviewCount = groupAverages.length;
@@ -94,6 +108,11 @@ export async function recalculateTournamentUserReputation(
     tournamentMannerScore: decimalScore(avgRating),
     tournamentReviewCount: reviewCount,
     tournamentSourceLabel: '완료 대회 경기 개인 리뷰 기반',
+    tournamentMetricReviewCount: metricAggregate.metricReviewCount,
+    tournamentMetricSkillScore: decimalScore(metricAggregate.skill),
+    tournamentMetricMannerScore: decimalScore(metricAggregate.manner),
+    tournamentMetricPunctualityScore: decimalScore(metricAggregate.punctuality),
+    tournamentMetricSafetyScore: decimalScore(metricAggregate.safety),
     calculatedAt: new Date(),
   };
 

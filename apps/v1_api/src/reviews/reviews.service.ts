@@ -21,6 +21,7 @@ import { SubmitReviewDto } from './dto/submit-review.dto';
 import { formatReviewWindow, reviewWindowClosed } from './review-deadline';
 import { ReviewPolicySettingsService } from './review-policy-settings.service';
 import { isReviewRevealed, reviewRevealScope } from './review-visibility';
+import { aggregatePersonalMetricScores, REVIEW_METRICS, type MetricScoreRow } from './review-metric-aggregation';
 import { average, revealGroupKey, trustStateForReviewCount } from './team-trust-aggregation';
 import { TournamentFixtureReviewsService } from './tournament-fixture-reviews.service';
 import { AdminContextService } from '../common/admin-context.service';
@@ -789,6 +790,7 @@ export class ReviewsService {
           rating: dto.rating,
           sportId: source.sportId,
           tags: { create: tagCodes.map((tagCode) => ({ tagCode, labelSnapshot: REVIEW_TAGS[tagCode] })) },
+          ...metricScoreCreate(dto),
         },
         include: reviewInclude(),
       });
@@ -823,6 +825,7 @@ export class ReviewsService {
           rating: dto.rating,
           sportId: source.sportId,
           tags: { create: tagCodes.map((tagCode) => ({ tagCode, labelSnapshot: REVIEW_TAGS[tagCode] })) },
+          ...metricScoreCreate(dto),
         },
         include: reviewInclude(),
       });
@@ -1066,7 +1069,7 @@ export class ReviewsService {
       // 모순이 있었다. 대회 개인 후기(tournament_fixture)는 여전히 제외한다 — 한 대회에서
       // 상대 로스터 전원에게 수십 건이 들어와 점수가 급변하므로 tournament_* 컬럼에 따로 쌓는다.
       where: { targetUserId, targetType: 'user', status: 'submitted', sourceType: { in: PERSONAL_REPUTATION_SOURCES } },
-      select: { sourceId: true, reviewerUserId: true, targetUserId: true, rating: true, submittedAt: true },
+      select: { id: true, sourceId: true, reviewerUserId: true, targetUserId: true, rating: true, submittedAt: true },
     });
     const reverseReviews = candidates.length
       ? await tx.v1PostEventReview.findMany({
@@ -1078,10 +1081,28 @@ export class ReviewsService {
     const reviewCount = revealed.length;
     const avgRating = reviewCount ? revealed.reduce((sum, review) => sum + review.rating, 0) / reviewCount : null;
 
+    // 4항목 채점 집계 -- rating 과 같은 reveal 규칙, 표본은 "4항목이 달린 후기"만.
+    // 이 집계가 선수 카드의 SKI/MAN/PUN 값과 해금 카운트(후기 3 / 방패 10)의 원천이다.
+    const revealedIds = new Set(revealed.map((review) => review.id));
+    const metricRows = revealedIds.size
+      ? await tx.v1PostEventReviewMetricScore.findMany({
+          where: { reviewId: { in: [...revealedIds] } },
+          select: { reviewId: true, metric: true, score: true },
+        })
+      : [];
+    const metricAggregate = aggregatePersonalMetricScores(revealedIds, metricRows as MetricScoreRow[]);
+    const metricData = {
+      metricReviewCount: metricAggregate.metricReviewCount,
+      metricSkillScore: decimalScore(metricAggregate.skill),
+      metricMannerScore: decimalScore(metricAggregate.manner),
+      metricPunctualityScore: decimalScore(metricAggregate.punctuality),
+      metricSafetyScore: decimalScore(metricAggregate.safety),
+    };
+
     await tx.v1UserReputationSummary.upsert({
       where: { userId: targetUserId },
-      update: reputationData(reviewCount, avgRating, '완료 경기 리뷰 기반'),
-      create: { userId: targetUserId, ...reputationData(reviewCount, avgRating, '완료 경기 리뷰 기반') },
+      update: { ...reputationData(reviewCount, avgRating, '완료 경기 리뷰 기반'), ...metricData },
+      create: { userId: targetUserId, ...reputationData(reviewCount, avgRating, '완료 경기 리뷰 기반'), ...metricData },
     });
   }
 
@@ -1188,6 +1209,11 @@ export class ReviewsService {
   private assertSubmitShape(dto: SubmitReviewDto) {
     if (dto.sourceType === 'match' && (dto.targetType !== 'user' || !dto.targetUserId || dto.targetTeamId)) {
       throw badRequest('INVALID_MATCH_REVIEW_TARGET', 'Match reviews require targetType=user and targetUserId only');
+    }
+    // 4항목 채점은 사람에게만 -- 팀에 "시간약속" 점수를 주는 것은 의미가 없고,
+    // 조용히 버리면 클라이언트는 저장된 줄 안다(무시 대신 명시적 거부).
+    if (dto.metricScores && dto.targetType !== 'user') {
+      throw badRequest('METRIC_SCORES_USER_ONLY', 'metricScores is only allowed for user targets');
     }
     // team_match도 대회 경기와 같은 두 대상을 받는다. 개인 대상 명단의 근거는 그 경기에 제출된
     // 라인업(V1GameParticipant.userId)이다 — 팀 매치 라인업은 연동 팀원의 userId를 그대로 저장하고
@@ -1323,6 +1349,17 @@ function isCompleted(source: { status: string; completedAt: Date | null }) {
 
 function uniqueTagCodes(tagCodes: string[]): ReviewTagCode[] {
   return [...new Set(tagCodes)].filter((tagCode): tagCode is ReviewTagCode => tagCode in REVIEW_TAGS);
+}
+
+/** 4항목 채점을 후기 행에 nested create 로 싣는다. 없으면 legacy 후기 그대로. */
+function metricScoreCreate(dto: SubmitReviewDto) {
+  if (!dto.metricScores) return {};
+  const { skill, manner, punctuality, safety } = dto.metricScores;
+  const byMetric = { SKILL: skill, MANNER: manner, PUNCTUALITY: punctuality, SAFETY: safety } as const;
+  return {
+    scoringVersion: 'four_metric' as const,
+    metricScores: { create: REVIEW_METRICS.map((metric) => ({ metric, score: byMetric[metric] })) },
+  };
 }
 
 function reputationData(reviewCount: number, avgRating: number | null, sourceLabel: string) {

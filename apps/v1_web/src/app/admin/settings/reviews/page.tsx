@@ -2,7 +2,7 @@
 
 import type { FormEvent } from 'react';
 import { useEffect, useState } from 'react';
-import { AdminPageHeader, AdminToasts, useAdminToast } from '@/components/admin';
+import { AdminInlineError, AdminPageHeader, AdminToasts, useAdminToast } from '@/components/admin';
 import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import {
   useV1AdminReviewPolicySettings,
@@ -94,13 +94,8 @@ export default function AdminReviewPolicySettingsPage() {
             갱신되면서 기간도 함께 밀려요.
           </p>
 
-          {isError ? (
-            <div className="mt-4 rounded-xl bg-[var(--red50)] px-3 py-2 text-[length:var(--font-size-caption)] text-[var(--red700)]">
-              {errorMessage}
-              <button type="button" onClick={() => void refetch()} className="ml-2 font-semibold underline">
-                다시 시도
-              </button>
-            </div>
+          {isError && errorMessage ? (
+            <AdminInlineError message={errorMessage} onRetry={() => void refetch()} />
           ) : null}
 
           {settings ? (

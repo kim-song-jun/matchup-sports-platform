@@ -363,12 +363,20 @@ export default function AdminTermsPage() {
           </div>
           {isPending ? <AdminTableSkeleton rows={6} /> : null}
           {errorMessage ? (
-            <div className="space-y-3">
-              <AdminEmpty title="약관을 불러오지 못했어요" description={errorMessage} />
-              <button type="button" onClick={() => void refetch()} className="min-h-[44px] w-full rounded-xl border border-[var(--border)] bg-[var(--card-surface)] text-sm font-semibold text-[var(--text-body)] hover:border-blue-300">
-                다시 시도
-              </button>
-            </div>
+            <AdminEmpty
+              title="약관을 불러오지 못했어요"
+              description={errorMessage}
+              // 재시도 버튼이 빈 상태 바깥에 따로 떠 있던 것을 표준 action 슬롯으로.
+              action={
+                <button
+                  type="button"
+                  onClick={() => void refetch()}
+                  className="min-h-[44px] rounded-lg border border-[var(--border)] px-4 font-semibold focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                >
+                  다시 시도
+                </button>
+              }
+            />
           ) : null}
           {!isPending && !errorMessage && data?.items.length === 0 ? (
             <AdminEmpty title="등록된 약관이 없어요" description="새 약관을 만들어 주세요." />

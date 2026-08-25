@@ -3,7 +3,7 @@
 import type { FormEvent } from 'react';
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
-import { AdminPageHeader, AdminToasts, useAdminToast } from '@/components/admin';
+import { AdminInlineError, AdminPageHeader, AdminToasts, useAdminToast } from '@/components/admin';
 import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import { useV1AdminIntegrationSettings, useV1UpdateIntegrationSettings } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -91,13 +91,8 @@ export default function AdminIntegrationSettingsPage() {
             에서 앱을 등록하고 발급받아요.
           </p>
 
-          {isError ? (
-            <div className="mt-4 rounded-xl bg-[var(--red50)] px-3 py-2 text-[length:var(--font-size-caption)] text-[var(--red700)]">
-              {errorMessage}
-              <button type="button" onClick={() => void refetch()} className="ml-2 font-semibold underline">
-                다시 시도
-              </button>
-            </div>
+          {isError && errorMessage ? (
+            <AdminInlineError message={errorMessage} onRetry={() => void refetch()} />
           ) : null}
 
           <form className="mt-4 flex flex-col gap-4" onSubmit={handleSubmit}>

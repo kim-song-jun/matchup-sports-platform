@@ -28,6 +28,7 @@ export { OperationFlagTogglePanel } from './operation-flag-toggle-panel';
 
 // ── Empty / error / loading ───────────────────────────────────────────────
 export { AdminEmpty } from './admin-empty';
+export { AdminInlineError } from './admin-inline-error';
 export {
   AdminKpiGridSkeleton,
   AdminListSkeleton,

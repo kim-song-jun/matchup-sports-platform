@@ -13,7 +13,9 @@ export function AdminInlineError({
   onRetry: () => void;
 }) {
   return (
-    <div className="mt-4 rounded-xl bg-[var(--red50)] px-3 py-2 text-[length:var(--font-size-caption)] text-[var(--red700)]">
+    // 조회 실패 시 동적으로 나타나는 배너라 role=alert 로 스크린리더에 즉시 공지한다
+    // (이 저장소 admin 폼들의 에러 관례와 동일).
+    <div role="alert" className="mt-4 rounded-xl bg-[var(--red50)] px-3 py-2 text-[length:var(--font-size-caption)] text-[var(--red700)]">
       {message}
       <button
         type="button"

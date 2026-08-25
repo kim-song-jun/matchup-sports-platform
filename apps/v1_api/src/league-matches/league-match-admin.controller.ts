@@ -1,4 +1,5 @@
-import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { IsOptional, Matches } from 'class-validator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
@@ -28,14 +29,23 @@ const teamIdPipe = new ParseUUIDPipe({
     new BadRequestException({ code: 'LEAGUE_TEAM_ID_INVALID', message: '올바르지 않은 팀 ID예요.' }),
 });
 
+/** 리그 목록 필터 — 체계 id(uuid) 또는 'independent'(무소속만). 없으면 전체. */
+class AdminLeagueListQueryDto {
+  @IsOptional()
+  @Matches(/^(independent|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i, {
+    message: '올바르지 않은 체계 필터예요.',
+  })
+  seriesId?: string;
+}
+
 @Controller('admin/league-matches')
 @UseGuards(V1AuthGuard)
 export class LeagueMatchAdminController {
   constructor(private readonly service: LeagueMatchAdminService) {}
 
   @Get()
-  list(@CurrentUser() user: V1AuthUser) {
-    return this.service.list(user);
+  list(@CurrentUser() user: V1AuthUser, @Query() query: AdminLeagueListQueryDto) {
+    return this.service.list(user, query.seriesId);
   }
 
   @Get(':leagueId')

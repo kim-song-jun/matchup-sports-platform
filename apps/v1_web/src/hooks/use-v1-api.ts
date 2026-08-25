@@ -4918,10 +4918,15 @@ export function useV1MyLeagues(options?: { enabled?: boolean }) {
   });
 }
 
-export function useV1AdminLeagueMatchList() {
+/** seriesId: 체계 id 로 소속 리그만, 'independent' 로 무소속만. 없으면 전체 (리그 허브 칩 필터). */
+export function useV1AdminLeagueMatchList(seriesId?: string) {
   return useQuery({
-    queryKey: v1Keys.adminLeagueMatchList(),
-    queryFn: () => v1Get<{ items: V1AdminLeagueListItem[] }>('/admin/league-matches'),
+    queryKey: v1Keys.adminLeagueMatchList(seriesId),
+    queryFn: () =>
+      v1Get<{ items: V1AdminLeagueListItem[] }>(
+        '/admin/league-matches',
+        seriesId ? { seriesId } : undefined,
+      ),
   });
 }
 

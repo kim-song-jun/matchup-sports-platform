@@ -140,7 +140,10 @@ export const v1Keys = {
     [...v1Keys.all, 'admin', 'tournaments', tournamentId, 'announcements'] as const,
   adminTournamentSponsors: (tournamentId: string) =>
     [...v1Keys.all, 'admin', 'tournaments', tournamentId, 'sponsors'] as const,
-  adminLeagueMatchList: () => [...v1Keys.all, 'admin', 'league-matches'] as const,
+  adminLeagueMatchList: (seriesId?: string) =>
+    seriesId
+      ? ([...v1Keys.all, 'admin', 'league-matches', seriesId] as const)
+      : ([...v1Keys.all, 'admin', 'league-matches'] as const),
   adminLeagueSeriesList: () => [...v1Keys.all, 'admin', 'league-series'] as const,
   adminLeagueSeries: (seriesId: string) => [...v1Keys.all, 'admin', 'league-series', seriesId] as const,
   adminLeagueSeriesPromotionPreview: (seriesId: string, seasonNo: number) =>

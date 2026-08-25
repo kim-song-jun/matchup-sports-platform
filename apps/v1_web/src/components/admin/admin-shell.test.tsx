@@ -55,6 +55,17 @@ describe('AdminShell nav', () => {
     }
   });
 
+  it('keeps the retired 리그 체계 link out of the nav (리그 허브로 흡수, 2026-08-25)', () => {
+    render(
+      <AdminShell>
+        <div>content</div>
+      </AdminShell>,
+    );
+    expect(screen.queryByRole('link', { name: /리그 체계/ })).toBeNull();
+    // 정규 리그 입구는 그대로 산다 — 허브가 두 목록을 다 품는다.
+    expect(screen.getAllByRole('link', { name: /정규 리그/ }).length).toBeGreaterThan(0);
+  });
+
   it('groups nav items under 플랫폼 / 콘텐츠 / 운영 / 설정 headings', () => {
     render(
       <AdminShell>

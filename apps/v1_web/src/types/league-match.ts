@@ -6,6 +6,12 @@ export interface V1AdminLeagueListItem {
   fixtureCount: number;
   startsOn: string;
   endsOn: string;
+  /** 소속 리그 체계 — 단발(독립) 리그는 셋 다 null (리그 허브 B안, 2026-08-25). */
+  seriesId: string | null;
+  seriesTitle: string | null;
+  /** "1부"류 표기. tier 가 null 인 독립 리그에 "1부"가 붙지 않도록 서버가 null 로 내린다. */
+  tierLabel: string | null;
+  seasonNo: number | null;
 }
 
 /**

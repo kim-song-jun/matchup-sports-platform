@@ -66,6 +66,21 @@ describe('AdminShell nav', () => {
     expect(screen.getAllByRole('link', { name: /정규 리그/ }).length).toBeGreaterThan(0);
   });
 
+  it('keeps the retired settings/content links out of the nav (허브로 흡수, 2026-08-25)', () => {
+    render(
+      <AdminShell>
+        <div>content</div>
+      </AdminShell>,
+    );
+    for (const name of [/연동 설정/, /후기 정책/, /공지사항/, /^팝업$/, /^약관$/]) {
+      expect(screen.queryByRole('link', { name })).toBeNull();
+    }
+    // 새 입구와, 인박스 성격이라 독립 유지한 문의는 산다.
+    expect(screen.getAllByRole('link', { name: /^설정$/ }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('link', { name: /^콘텐츠$/ }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('link', { name: /문의/ }).length).toBeGreaterThan(0);
+  });
+
   it('groups nav items under 플랫폼 / 콘텐츠 / 운영 / 설정 headings', () => {
     render(
       <AdminShell>

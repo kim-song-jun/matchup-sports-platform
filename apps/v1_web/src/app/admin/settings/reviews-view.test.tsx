@@ -13,7 +13,7 @@ import {
   useV1AdminReviewPolicySettings,
   useV1UpdateReviewPolicySettings,
 } from '@/hooks/use-v1-api';
-import AdminReviewPolicySettingsPage from './page';
+import { ReviewPolicyView as AdminReviewPolicySettingsPage } from './reviews-view';
 
 vi.mock('@/components/auth/pending-social-signup-gate', () => ({
   PendingSocialSignupGate: ({ children }: { children: React.ReactNode }) => children,

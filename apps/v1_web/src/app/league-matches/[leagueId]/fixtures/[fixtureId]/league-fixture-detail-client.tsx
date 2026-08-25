@@ -6,6 +6,7 @@ import { useMemo, useState } from 'react';
 import { useV1LeagueMatch, useV1LeagueMatchStandings, useV1ResolveChatRoom, useV1TeamMatch } from '@/hooks/use-v1-api';
 import { usePublicLeagueFixtureRecord } from '@/components/public-game-records/use-public-game-records';
 import { MatchDetailContent } from '@/components/public-game-records/match-detail-content';
+import { LeagueClaimMyRecordSection } from '@/components/public-game-records/claim-my-record';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -220,6 +221,10 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
           <div className="-mx-4">
             <MatchDetailContent data={recordQuery.data} />
           </div>
+          {/* 대회 경기 상세와 같은 "내 기록 연결" 배너 (claim 의 리그 판). 기록 본문이
+              뜨는 경우에만 싣는다 — 게임 미공개(404 폴백) 대진은 연결할 기록 자체가
+              화면에 없어 배너가 맥락을 잃는다. 조회는 모달을 연 뒤에만 나간다. */}
+          <LeagueClaimMyRecordSection leagueId={leagueId} teamMatchId={fixtureId} />
           {/* 리그 고유 문맥 — 대회 본문에는 없는 순위·전적. 팀 상세로 가는 통로이기도 하다. */}
           {(recordLine(homeRow) || recordLine(awayRow)) && (
             <Card pad={16}>

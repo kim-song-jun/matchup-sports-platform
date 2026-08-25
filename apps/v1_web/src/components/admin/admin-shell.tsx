@@ -17,13 +17,10 @@ import {
   Medal,
   Activity,
   Megaphone,
-  PanelsTopLeft,
   MessageSquareText,
   ShieldCheck,
   Settings,
-  Star,
   Send,
-  ScrollText,
   ChevronLeft,
   Menu,
   X,
@@ -94,9 +91,9 @@ const BASE_NAV_GROUPS: NavGroup[] = [
   {
     label: '콘텐츠',
     items: [
-      { label: '공지사항', href: '/admin/notices', icon: <Megaphone size={18} /> },
-      { label: '팝업', href: '/admin/popups', icon: <PanelsTopLeft size={18} /> },
-      { label: '약관', href: '/admin/terms', icon: <ScrollText size={18} /> },
+      // 공지·팝업·약관은 2026-08-25 콘텐츠 허브(A안)로 흡수 — /admin/content 탭.
+      // 문의는 인박스 성격(미확인 뱃지·딥링크 필터)이라 독립 유지.
+      { label: '콘텐츠', href: '/admin/content', icon: <Megaphone size={18} /> },
       { label: '문의', href: '/admin/inquiries', icon: <MessageSquareText size={18} /> },
     ],
   },
@@ -115,8 +112,8 @@ const BASE_NAV_GROUPS: NavGroup[] = [
   {
     label: '설정',
     items: [
-      { label: '연동 설정', href: '/admin/settings/integrations', icon: <Settings size={18} /> },
-      { label: '후기 정책', href: '/admin/settings/reviews', icon: <Star size={18} /> },
+      // 연동 설정·후기 정책은 2026-08-25 설정 허브(A안)로 흡수 — /admin/settings 탭.
+      { label: '설정', href: '/admin/settings', icon: <Settings size={18} /> },
     ],
   },
 ];

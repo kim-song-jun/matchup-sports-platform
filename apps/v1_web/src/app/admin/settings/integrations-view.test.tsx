@@ -15,7 +15,7 @@ import {
   useV1AdminMe,
   useV1UpdateIntegrationSettings,
 } from '@/hooks/use-v1-api';
-import AdminIntegrationSettingsPage from './page';
+import { IntegrationsView as AdminIntegrationSettingsPage } from './integrations-view';
 
 vi.mock('@/components/auth/pending-social-signup-gate', () => ({
   PendingSocialSignupGate: ({ children }: { children: React.ReactNode }) => children,

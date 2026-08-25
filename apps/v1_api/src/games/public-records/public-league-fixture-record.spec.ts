@@ -25,6 +25,7 @@ type FakeTeamMatchRow = {
   status: string;
   hostTeam: { id: string; name: string };
   approvedApplicantTeam: { id: string; name: string } | null;
+  videos: Array<{ id: string; title: string | null; url: string }>;
   game: Record<string, unknown> | null;
 };
 
@@ -64,6 +65,7 @@ function makeFixtureRow(overrides: Partial<FakeTeamMatchRow> = {}): FakeTeamMatc
     status: 'matched',
     hostTeam: { id: 'team-home', name: '성수 FC' },
     approvedApplicantTeam: { id: 'team-away', name: '왕십리 유나이티드' },
+    videos: [],
     game: makeGame(),
     ...overrides,
   };
@@ -138,6 +140,16 @@ describe('PublicTournamentRecordsService.getLeagueFixtureRecord', () => {
     expect(result.history).toEqual([
       { revision: 1, state: 'OFFICIAL', officialAt: '2026-09-05T11:00:00.000Z', reason: null, isCorrection: false },
     ]);
+  });
+
+  it('등록된 리그 영상(V1TeamMatchVideo)이 기록 응답에 실린다', async () => {
+    const service = buildService({
+      fixture: makeFixtureRow({
+        videos: [{ id: 'video-1', title: '전반 하이라이트', url: 'https://youtu.be/x' }],
+      }),
+    });
+    const result = await service.getLeagueFixtureRecord(LEAGUE_ID, TEAM_MATCH_ID);
+    expect(result.videos).toEqual([{ id: 'video-1', title: '전반 하이라이트', url: 'https://youtu.be/x' }]);
   });
 
   it('몰수로 확정된 결과는 outcome 사유가 실린다 — 실제 1:0 승리와 구분', async () => {

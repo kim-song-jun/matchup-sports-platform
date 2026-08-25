@@ -1267,8 +1267,9 @@ export class PublicTournamentRecordsService {
    *     `groupName` ← null (헤더가 `groupName ?? round` 를 찍으므로 round 가 그대로 보인다)
    * 대회 전용 개념은 리그에 없는 값으로 고정한다: 스태프 실명 우회 없음(리그 운영자는
    * 어드민 화면에서 본다 — 여기 공개 화면은 동의 게이팅 그대로), 참가팀 가리기 없음
-   * (리그 참가팀은 순위표에 항상 공개), `videos` 는 저장소가 아직 대회 픽스처 전용이라
-   * 빈 배열(리그 영상 저장은 후속 작업), `nextMatch`/`fieldName` 은 null.
+   * (리그 참가팀은 순위표에 항상 공개), `nextMatch`/`fieldName` 은 null.
+   * `videos` 는 리그 대진 영상 저장소(V1TeamMatchVideo — 어드민이
+   * /admin/league-matches/:leagueId/videos 에서 등록)에서 내린다.
    */
   async getLeagueFixtureRecord(leagueId: string, teamMatchId: string) {
     const league = await this.prisma.v1League.findUnique({
@@ -1288,6 +1289,7 @@ export class PublicTournamentRecordsService {
         status: true,
         hostTeam: { select: { id: true, name: true } },
         approvedApplicantTeam: { select: { id: true, name: true } },
+        videos: { select: { id: true, title: true, url: true }, orderBy: { sortOrder: 'asc' } },
         game: { select: GAME_MATCH_SELECT },
       },
     });
@@ -1426,7 +1428,7 @@ export class PublicTournamentRecordsService {
         reason: revision.reason,
         isCorrection: revision.supersedesId !== null,
       })),
-      videos: [],
+      videos: teamMatch.videos.map((video) => ({ id: video.id, title: video.title, url: video.url })),
       nextMatch: null,
     };
   }

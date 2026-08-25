@@ -18,9 +18,12 @@ export interface ModalA11yOptions {
   pending?: boolean;
 }
 
-export interface ModalA11yHandles<TInitial extends HTMLElement = HTMLElement> {
-  /** 모달 패널(role=dialog)에 붙인다 — focus trap 의 경계 */
-  dialogRef: RefObject<HTMLDivElement | null>;
+export interface ModalA11yHandles<
+  TInitial extends HTMLElement = HTMLElement,
+  TDialog extends HTMLElement = HTMLDivElement,
+> {
+  /** 모달 패널(role=dialog)에 붙인다 — focus trap 의 경계. 패널이 form 인 모달도 있어 제네릭 */
+  dialogRef: RefObject<TDialog | null>;
   /** 열릴 때 포커스할 첫 컨트롤에 붙인다. 안 붙이면 패널 안 첫 focusable 로 폴백 */
   initialFocusRef: RefObject<TInitial | null>;
   /** backdrop div 의 onClick 에 그대로 넘긴다(패널 클릭은 닫지 않음) */
@@ -30,32 +33,34 @@ export interface ModalA11yHandles<TInitial extends HTMLElement = HTMLElement> {
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
 
-export function useModalA11y<TInitial extends HTMLElement = HTMLElement>({
-  open,
-  onClose,
-  pending = false,
-}: ModalA11yOptions): ModalA11yHandles<TInitial> {
-  const dialogRef = useRef<HTMLDivElement | null>(null);
+export function useModalA11y<
+  TInitial extends HTMLElement = HTMLElement,
+  TDialog extends HTMLElement = HTMLDivElement,
+>({ open, onClose, pending = false }: ModalA11yOptions): ModalA11yHandles<TInitial, TDialog> {
+  const dialogRef = useRef<TDialog | null>(null);
   const initialFocusRef = useRef<TInitial | null>(null);
-  const previousFocusRef = useRef<Element | null>(null);
 
-  // 열릴 때 이전 포커스를 저장하고, 닫힐 때(ESC/backdrop/취소/제출 전 경로) 복원한다
+  // 열릴 때 이전 포커스를 저장하고, 닫힐 때(ESC/backdrop/취소/제출 전 경로) 복원한다.
+  // cleanup 기반이라 open 토글형 모달뿐 아니라 조건부 마운트형(열려 있는 채 언마운트)
+  // 모달에서도 복원된다 — LogDetailModal 류가 후자다.
   useEffect(() => {
-    if (open) {
-      previousFocusRef.current = document.activeElement;
-    } else {
-      const el = previousFocusRef.current;
-      if (el && typeof (el as HTMLElement).focus === 'function') {
-        (el as HTMLElement).focus();
+    if (!open) return;
+    const previous = document.activeElement;
+    return () => {
+      if (previous && typeof (previous as HTMLElement).focus === 'function') {
+        (previous as HTMLElement).focus();
       }
-      previousFocusRef.current = null;
-    }
+    };
   }, [open]);
 
-  // 열리면 첫 컨트롤로 포커스 이동 (미지정 시 패널 안 첫 focusable)
+  // 열리면 첫 컨트롤로 포커스 이동 (미지정 시 패널 안 첫 focusable).
+  // 60ms 는 마운트 트랜지션 뒤로 미루기 위한 것 — 그 사이 사용자가 패널 안 다른 필드를
+  // 먼저 클릭해 타이핑을 시작했다면 되채가지 않는다(GateConfirmModal 에서 온 가드 —
+  // 안 그러면 입력이 중간에 엉뚱한 필드로 튄다).
   useEffect(() => {
     if (!open) return;
     const id = setTimeout(() => {
+      if (dialogRef.current?.contains(document.activeElement)) return;
       const target =
         initialFocusRef.current ??
         dialogRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR) ??

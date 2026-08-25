@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Send, User as UserIcon, Users, AlertTriangle, X } from 'lucide-react';
+import { useModalA11y } from '../v1-ui/use-modal-a11y';
 import { useV1AdminSendPush, useV1AdminUsers } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { EntityPicker, type EntityPickerItem } from './entity-picker';
@@ -36,81 +37,18 @@ interface BroadcastConfirmModalProps {
 }
 
 function BroadcastConfirmModal({ open, pending, title, onConfirm, onClose }: BroadcastConfirmModalProps) {
-  const panelRef = useRef<HTMLDivElement>(null);
-  const confirmButtonRef = useRef<HTMLButtonElement>(null);
-  /** Saved reference to the element that was focused before the modal opened (for focus restore on close) */
-  const previousFocusRef = useRef<Element | null>(null);
-
-  // Save focus on open; restore it on close via every path (ESC / backdrop / 취소 / 발송) (WCAG 2.4.3)
-  useEffect(() => {
-    if (open) {
-      previousFocusRef.current = document.activeElement;
-    } else {
-      const el = previousFocusRef.current;
-      if (el && typeof (el as HTMLElement).focus === 'function') {
-        (el as HTMLElement).focus();
-      }
-      previousFocusRef.current = null;
-    }
-  }, [open]);
-
-  useEffect(() => {
-    if (open) {
-      const t = setTimeout(() => confirmButtonRef.current?.focus(), 60);
-      return () => clearTimeout(t);
-    }
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !pending) onClose();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [open, onClose, pending]);
-
-  useEffect(() => {
-    if (!open) return;
-    const panel = panelRef.current;
-    if (!panel) return;
-    const sel = 'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
-    const trap = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab') return;
-      const items = Array.from(panel.querySelectorAll<HTMLElement>(sel));
-      if (items.length === 0) return;
-      const first = items[0];
-      const last = items[items.length - 1];
-      if (e.shiftKey) {
-        if (document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        }
-      } else if (document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener('keydown', trap);
-    return () => document.removeEventListener('keydown', trap);
-  }, [open]);
-
-  useEffect(() => {
-    if (open) document.body.style.overflow = 'hidden';
-    else document.body.style.overflow = '';
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [open]);
+  const {
+    dialogRef: panelRef,
+    initialFocusRef: confirmButtonRef,
+    onBackdropClick,
+  } = useModalA11y<HTMLButtonElement>({ open, onClose, pending });
 
   if (!open) return null;
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-[2px]"
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !pending) onClose();
-      }}
+      onClick={onBackdropClick}
     >
       <div
         ref={panelRef}

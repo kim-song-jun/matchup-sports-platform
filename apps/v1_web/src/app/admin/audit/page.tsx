@@ -3,8 +3,9 @@
 import Link from 'next/link';
 import { adminAuditActorHref, adminAuditTargetHref } from '@/lib/admin-audit-links';
 import type { ReactNode } from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
+import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { useV1AdminActionLogs, useV1AdminStatusChangeLogs } from '@/hooks/use-v1-api';
 import type { AdminListFilters, V1AdminLog, V1AdminStatusChangeLog } from '@/types/api';
 import { adminActionLabel, adminTargetTypeLabel } from '@/lib/admin-labels';
@@ -130,36 +131,20 @@ function LogDetailModal({
   onClose: () => void;
   children: ReactNode;
 }) {
-  const closeRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    const timer = setTimeout(() => closeRef.current?.focus(), 60);
-    return () => clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
-    const handler = (event: globalThis.KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [onClose]);
-
-  useEffect(() => {
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, []);
+  // 조건부 마운트형이라 open은 항상 true — 공용 훅으로 옮기며 이 모달에 없던
+  // focus trap과 닫을 때 포커스 복원(WCAG 2.4.3)도 함께 얻는다.
+  const { dialogRef, initialFocusRef: closeRef, onBackdropClick } = useModalA11y<HTMLButtonElement>({
+    open: true,
+    onClose,
+  });
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-[2px]"
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
+      onClick={onBackdropClick}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="audit-log-detail-title"

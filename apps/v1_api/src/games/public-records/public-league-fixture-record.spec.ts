@@ -128,8 +128,9 @@ describe('PublicTournamentRecordsService.getLeagueFixtureRecord', () => {
     expect(result.scoreStatus).toBe('official');
     expect(result.score).toEqual({ home: 2, away: 1, penalties: null });
     // 대진 킥오프가 9/5·9/12 두 날(KST)이고 이 경기는 9/12 — 2주차.
-    expect(result.round).toBe(2);
-    expect(result.groupName).toBe('2주차');
+    // round 는 PublicMatchDetail 계약(string)이라 라벨 문자열로 내린다.
+    expect(result.round).toBe('2주차');
+    expect(result.groupName).toBeNull();
     // 리그에 없는 대회 전용 개념은 고정값 — 프론트 MatchDetailContent 계약 유지용.
     expect(result.videos).toEqual([]);
     expect(result.nextMatch).toBeNull();

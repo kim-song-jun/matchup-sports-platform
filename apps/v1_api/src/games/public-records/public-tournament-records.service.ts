@@ -1379,11 +1379,13 @@ export class PublicTournamentRecordsService {
       tournamentTitle: league.title,
       fixtureId: teamMatch.id,
       gameId: teamMatch.game?.id ?? null,
-      round: weekNumber,
+      // PublicMatchDetail.round 는 string 계약(대회는 'group'/'semi' 같은 라벨) —
+      // 숫자를 그대로 내리면 소비처의 문자열 처리에서 깨진다(Copilot 리뷰 #747).
+      round: `${weekNumber}주차`,
       fixtureNumber: 1,
       legNumber: 1,
       groupId: null,
-      groupName: `${weekNumber}주차`,
+      groupName: null,
       scheduledAt: teamMatch.startAt.toISOString(),
       venue: teamMatch.placeName,
       fieldName: null,
@@ -1436,7 +1438,11 @@ export class PublicTournamentRecordsService {
    */
   private async resolveLeagueWeekNumber(leagueId: string, startAt: Date): Promise<number> {
     const fixtures = await this.prisma.v1TeamMatch.findMany({
-      where: { leagueId, deletedAt: null },
+      // 이후 주차의 대진은 이 경기의 순번에 영향을 주지 않는다 — 더 이른 KST 날짜의
+      // 대진은 전부 startAt 이 더 작고, 같은 날짜의 늦은 대진은 잘려도 그 날짜 자체가
+      // 이 경기로 이미 세어진다. 라이브 폴링(10초)마다 리그 전체를 훑지 않기 위한
+      // 범위 축소다(Copilot 리뷰 #747).
+      where: { leagueId, deletedAt: null, startAt: { lte: startAt } },
       select: { startAt: true },
     });
     const days = Array.from(new Set(fixtures.map((fixture) => KST_DAY.format(fixture.startAt)))).sort();

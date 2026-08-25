@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
+import { useModalA11y } from '../v1-ui/use-modal-a11y';
 
 // ── Types ─────────────────────────────────────────────────────────────────
 export interface GateConfirmModalProps {
@@ -62,82 +63,18 @@ export function GateConfirmModal({
 }: GateConfirmModalProps) {
   const [reason, setReason] = useState('');
   const [typedInput, setTypedInput] = useState('');
-  const panelRef = useRef<HTMLDivElement>(null);
-  const firstFocusableRef = useRef<HTMLTextAreaElement>(null);
-  const previousFocusRef = useRef<Element | null>(null);
+  // "포커스 되채감 방지" 가드까지 포함해 공용 훅으로 — 이 모달의 가드가 훅에 흡수됐다.
+  const {
+    dialogRef: panelRef,
+    initialFocusRef,
+    onBackdropClick,
+  } = useModalA11y<HTMLTextAreaElement>({ open, onClose, pending });
 
   useEffect(() => {
     if (open) {
       setReason('');
       setTypedInput('');
     }
-  }, [open]);
-
-  useEffect(() => {
-    if (open) {
-      previousFocusRef.current = document.activeElement;
-    } else {
-      const el = previousFocusRef.current;
-      if (el && typeof (el as HTMLElement).focus === 'function') (el as HTMLElement).focus();
-      previousFocusRef.current = null;
-    }
-  }, [open]);
-
-  useEffect(() => {
-    if (open) {
-      // 60ms 지연은 모달 마운트 트랜지션이 끝난 뒤 포커스를 옮기기 위한 것. panelRef 안에
-      // 이미 포커스가 있으면(사용자가 그 사이 다른 필드를 먼저 클릭/입력하기 시작했으면)
-      // 강제로 되채가지 않는다 — 안 그러면 빠르게 타이핑을 시작한 사용자의 입력이 중간에
-      // 엉뚱한 필드(사유 textarea)로 튀는 버그가 생긴다.
-      const t = setTimeout(() => {
-        if (!panelRef.current?.contains(document.activeElement)) {
-          firstFocusableRef.current?.focus();
-        }
-      }, 60);
-      return () => clearTimeout(t);
-    }
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !pending) onClose();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [open, onClose, pending]);
-
-  useEffect(() => {
-    if (!open) return;
-    const panel = panelRef.current;
-    if (!panel) return;
-    const sel = 'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
-    const trap = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab') return;
-      const items = Array.from(panel.querySelectorAll<HTMLElement>(sel));
-      if (items.length === 0) return;
-      const first = items[0];
-      const last = items[items.length - 1];
-      if (e.shiftKey) {
-        if (document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        }
-      } else if (document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener('keydown', trap);
-    return () => document.removeEventListener('keydown', trap);
-  }, [open]);
-
-  useEffect(() => {
-    if (open) document.body.style.overflow = 'hidden';
-    else document.body.style.overflow = '';
-    return () => {
-      document.body.style.overflow = '';
-    };
   }, [open]);
 
   if (!open) return null;
@@ -149,9 +86,7 @@ export function GateConfirmModal({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-[2px]"
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !pending) onClose();
-      }}
+      onClick={onBackdropClick}
     >
       <div
         ref={panelRef}
@@ -202,7 +137,7 @@ export function GateConfirmModal({
               </label>
               <textarea
                 id="gate-confirm-reason"
-                ref={firstFocusableRef}
+                ref={initialFocusRef}
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 maxLength={REASON_MAX}

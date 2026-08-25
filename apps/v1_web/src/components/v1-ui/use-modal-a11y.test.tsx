@@ -73,6 +73,17 @@ describe('useModalA11y', () => {
     outside.remove();
   });
 
+  it('열린 채 언마운트돼도 이전 포커스를 복원한다 — 조건부 마운트형(LogDetailModal 류) 경로', () => {
+    const outside = document.createElement('button');
+    document.body.appendChild(outside);
+    outside.focus();
+
+    const { unmount } = render(<TestModal open onClose={() => {}} />);
+    unmount();
+    expect(document.activeElement).toBe(outside);
+    outside.remove();
+  });
+
   it('열리면 지정한 첫 컨트롤로 포커스가 이동한다', async () => {
     vi.useFakeTimers();
     try {

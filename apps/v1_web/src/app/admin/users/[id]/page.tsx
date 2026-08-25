@@ -27,6 +27,7 @@ import {
   useV1DeleteAdminUser,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { formatAuthProviders, formatGender, formatOnboardingStatus, formatUserTitle } from '@/lib/format-user';
 import type { V1AdminUserDetail } from '@/types/api';
 
@@ -79,6 +80,16 @@ export default function AdminUserDetailPage() {
   const { toasts, showToast } = useAdminToast();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteReason, setDeleteReason] = useState('');
+  // 어드민 모달 중 유일하게 ESC·focus trap·포커스 복원이 없던 인라인 모달 — 공용 훅으로 표준화.
+  const {
+    dialogRef: deleteDialogRef,
+    initialFocusRef: deleteReasonRef,
+    onBackdropClick: onDeleteBackdropClick,
+  } = useModalA11y<HTMLTextAreaElement, HTMLFormElement>({
+    open: deleteOpen,
+    onClose: () => setDeleteOpen(false),
+    pending: deleteMutation.isPending,
+  });
 
   const canWrite = adminMe?.capabilities.includes('status:write') ?? false;
   const canDelete = canWrite && user?.accountStatus !== 'deleted';
@@ -278,11 +289,10 @@ export default function AdminUserDetailPage() {
       {deleteOpen ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 p-4"
-          onClick={(event) => {
-            if (event.target === event.currentTarget && !deleteMutation.isPending) setDeleteOpen(false);
-          }}
+          onClick={onDeleteBackdropClick}
         >
           <form
+            ref={deleteDialogRef}
             onSubmit={handleDeleteSubmit}
             // 전수검수: bg-white가 다크에서 안 뒤집혀 안의 text-[var(--text-strong)] 등이
             // 근접색이 되던 회귀 — 다른 어드민 모달들과 동일하게 --card-surface로 교체.
@@ -299,6 +309,7 @@ export default function AdminUserDetailPage() {
               삭제 사유
             </label>
             <textarea
+              ref={deleteReasonRef}
               id="delete-user-reason"
               value={deleteReason}
               onChange={(event) => setDeleteReason(event.target.value)}

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { ClaimMyRecordSection } from './claim-my-record';
+import { ClaimMyRecordSection, LeagueClaimMyRecordSection } from './claim-my-record';
 
 /**
  * alpha 실화면(2026-08-24)에서 잡은 결함을 고정한다.
@@ -13,9 +13,12 @@ import { ClaimMyRecordSection } from './claim-my-record';
  * 잘못 읽혔다.
  */
 const claimableMock = vi.fn();
+const leagueClaimableMock = vi.fn();
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1ClaimableParticipants: (...args: unknown[]) => claimableMock(...args),
   useV1RequestIdentityLink: () => ({ mutate: vi.fn(), isPending: false }),
+  useV1LeagueClaimableParticipants: (...args: unknown[]) => leagueClaimableMock(...args),
+  useV1LeagueRequestIdentityLink: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 vi.mock('@/components/v1-ui/primitives', () => ({
   Card: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -71,5 +74,37 @@ describe('ClaimMyRecordSection 빈 상태', () => {
     expect(screen.queryByText('연결할 참가자가 없어요')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '이 선수가 저예요' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '취소' })).toBeInTheDocument();
+  });
+});
+
+// 2026-08-25 대회 패리티 후속 — 리그 래퍼는 같은 본문(View)을 쓰되 목록만 리그 스코프
+// 훅을 태워야 한다. 여기가 어긋나면(예: 대회 훅을 그대로 부르면) 리그 화면이 대회
+// fixture id 로 목록을 조회해 조용히 403/404 가 된다.
+describe('LeagueClaimMyRecordSection', () => {
+  it('리그 스코프 훅을 리그 인자로 부르고, 모달을 연 뒤에만 목록을 조회한다', () => {
+    // 앞 describe 가 대회 훅을 호출했어도 이 테스트의 "대회 훅으로 새지 않는다" 단언이
+    // 오염되지 않게 이력만 비운다(구현은 유지).
+    claimableMock.mockClear();
+    leagueClaimableMock.mockReturnValue({
+      data: {
+        gameId: 'g-1',
+        version: 3,
+        participants: [{ participantId: 'p-1', sideId: 's-1', displayName: '홍길동', jerseyNumber: 7 }],
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    render(<LeagueClaimMyRecordSection leagueId="lg-1" teamMatchId="tm-1" />);
+    expect(leagueClaimableMock).toHaveBeenLastCalledWith('lg-1', 'tm-1', { enabled: false });
+
+    fireEvent.click(screen.getByRole('button', { name: '명단에서 나 찾기' }));
+
+    expect(leagueClaimableMock).toHaveBeenLastCalledWith('lg-1', 'tm-1', { enabled: true });
+    expect(screen.getByText('명단에서 본인을 골라 주세요')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /홍길동/ })).toBeInTheDocument();
+    // 대회 훅으로 새지 않는다.
+    expect(claimableMock).not.toHaveBeenCalled();
   });
 });

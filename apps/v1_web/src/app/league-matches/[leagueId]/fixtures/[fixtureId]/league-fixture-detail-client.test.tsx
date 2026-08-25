@@ -20,6 +20,14 @@ vi.mock('@/components/public-game-records/use-public-game-records', () => ({
   usePublicLeagueFixtureRecord: vi.fn(),
 }));
 
+// claim 배너 내부(훅·모달)는 claim-my-record.test.tsx 가 검증한다 — 여기서는
+// "기록 본문이 뜰 때만 리그 인자로 배치되는지"만 본다.
+vi.mock('@/components/public-game-records/claim-my-record', () => ({
+  LeagueClaimMyRecordSection: ({ leagueId, teamMatchId }: { leagueId: string; teamMatchId: string }) => (
+    <div data-testid="league-claim-section">{`${leagueId}/${teamMatchId}`}</div>
+  ),
+}));
+
 const useV1LeagueMatchMock = vi.mocked(useV1LeagueMatch, { partial: true });
 const useV1LeagueMatchStandingsMock = vi.mocked(useV1LeagueMatchStandings, { partial: true });
 const useV1TeamMatchMock = vi.mocked(useV1TeamMatch, { partial: true });
@@ -207,6 +215,8 @@ describe('LeagueFixtureDetailClient', () => {
     expect(screen.getByText('리그 순위·전적')).toBeInTheDocument();
     // 폴백 요약 카드는 렌더되지 않는다(같은 정보 중복 방지) — 폴백에만 있는 상태 배지로 판정.
     expect(screen.queryByText('매칭됨')).not.toBeInTheDocument();
+    // "내 기록 연결" 배너(claim 의 리그 판)가 리그 인자 그대로 기록 본문 아래에 실린다.
+    expect(screen.getByTestId('league-claim-section')).toHaveTextContent('lg-1/fx-1');
   });
 
   it('기록에 경기 영상이 있으면 대회와 동일한 경기 영상 섹션이 뜬다', () => {
@@ -227,6 +237,8 @@ describe('LeagueFixtureDetailClient', () => {
     // 폴백 카드의 상태 배지 + 일시·장소가 그대로 살아 있다.
     expect(screen.getByText('매칭됨')).toBeInTheDocument();
     expect(screen.getByText('예정')).toBeInTheDocument();
+    // 게임 미공개 대진에는 연결할 기록이 화면에 없다 — claim 배너도 싣지 않는다.
+    expect(screen.queryByTestId('league-claim-section')).not.toBeInTheDocument();
   });
 
   it('기록 API 의 404 외 오류(5xx 등)는 폴백으로 숨기지 않고 오류 상태를 보여준다', () => {

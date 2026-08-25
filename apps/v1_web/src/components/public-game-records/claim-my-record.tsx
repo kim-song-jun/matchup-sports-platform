@@ -4,7 +4,12 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { Card } from '@/components/v1-ui/primitives';
 import { extractErrorMessage } from '@/lib/error-message';
-import { useV1ClaimableParticipants, useV1RequestIdentityLink } from '@/hooks/use-v1-api';
+import {
+  useV1ClaimableParticipants,
+  useV1LeagueClaimableParticipants,
+  useV1LeagueRequestIdentityLink,
+  useV1RequestIdentityLink,
+} from '@/hooks/use-v1-api';
 
 /**
  * "이 경기에 뛰었는데 내 기록이 없나요?" (Task 154 P0-5, 사용자 선택 B안).
@@ -22,6 +27,11 @@ import { useV1ClaimableParticipants, useV1RequestIdentityLink } from '@/hooks/us
  * 신청은 확정이 아니다. `requestIdentityLink` 는 append-only 원장에 요청만 남기고,
  * "신청자 ≠ 확인자" 규칙(서비스 + DB 트리거)이 혼자서 연결을 완성하는 것을 막는다.
  * 이 화면은 그 요청을 만드는 입구일 뿐이다.
+ *
+ * ## 대회·리그 공용 (2026-08-25 대회 패리티 후속)
+ * 화면·문구·신청 API 는 소스 불문 동일하고 **목록 훅만** 도메인이 다르다 — 그래서
+ * 훅 호출부만 얇은 래퍼(`ClaimMyRecordSection`/`LeagueClaimMyRecordSection`)로 갈라
+ * 두고 본문은 `ClaimMyRecordView` 하나를 공유한다(영상 등록 폼 공용화와 같은 구조).
  */
 export function ClaimMyRecordSection({
   tournamentId,
@@ -35,6 +45,34 @@ export function ClaimMyRecordSection({
   // 관전자가 이 페이지를 열 때마다 403 을 만들 이유가 없다.
   const claimable = useV1ClaimableParticipants(tournamentId, fixtureId, { enabled: open });
   const request = useV1RequestIdentityLink(tournamentId, fixtureId);
+  return <ClaimMyRecordView open={open} onOpenChange={setOpen} claimable={claimable} request={request} />;
+}
+
+/** 리그 경기 상세용 — 목록만 리그 스코프 API 를 쓰고 나머지는 대회와 동일하다. */
+export function LeagueClaimMyRecordSection({
+  leagueId,
+  teamMatchId,
+}: {
+  leagueId: string;
+  teamMatchId: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const claimable = useV1LeagueClaimableParticipants(leagueId, teamMatchId, { enabled: open });
+  const request = useV1LeagueRequestIdentityLink(leagueId, teamMatchId);
+  return <ClaimMyRecordView open={open} onOpenChange={setOpen} claimable={claimable} request={request} />;
+}
+
+function ClaimMyRecordView({
+  open,
+  onOpenChange,
+  claimable,
+  request,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  claimable: ReturnType<typeof useV1ClaimableParticipants>;
+  request: ReturnType<typeof useV1RequestIdentityLink>;
+}) {
   const [selected, setSelected] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -49,12 +87,12 @@ export function ClaimMyRecordSection({
   useEffect(() => {
     if (!open) return undefined;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false);
+      if (event.key === 'Escape') onOpenChange(false);
     };
     window.addEventListener('keydown', onKey);
     dialogRef.current?.focus();
     return () => window.removeEventListener('keydown', onKey);
-  }, [open]);
+  }, [open, onOpenChange]);
 
   // 신청이 끝나면 배너를 접는다. 같은 경기에 두 번 신청할 이유가 없고, 남겨 두면
   // "아직 안 됐나?" 하고 다시 누르게 된다.
@@ -82,7 +120,7 @@ export function ClaimMyRecordSection({
           style={{ marginTop: 12, minHeight: 44 }}
           onClick={() => {
             setError(null);
-            setOpen(true);
+            onOpenChange(true);
           }}
         >
           명단에서 나 찾기
@@ -94,7 +132,7 @@ export function ClaimMyRecordSection({
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: 'rgba(25, 31, 40, 0.48)' }}
           onClick={(event) => {
-            if (event.target === event.currentTarget) setOpen(false);
+            if (event.target === event.currentTarget) onOpenChange(false);
           }}
         >
           <div
@@ -180,7 +218,7 @@ export function ClaimMyRecordSection({
                 type="button"
                 className={`tm-btn tm-btn-md ${loaded && !hasCandidates ? 'tm-btn-primary' : 'tm-btn-neutral'}`}
                 style={{ flex: 1, minHeight: 44 }}
-                onClick={() => setOpen(false)}
+                onClick={() => onOpenChange(false)}
               >
                 {loaded && !hasCandidates ? '닫기' : '취소'}
               </button>
@@ -203,7 +241,7 @@ export function ClaimMyRecordSection({
                     },
                     {
                       onSuccess: () => {
-                        setOpen(false);
+                        onOpenChange(false);
                         setDone(true);
                       },
                       onError: (mutationError) =>

@@ -1706,25 +1706,65 @@ export function useV1ClaimableParticipants(
   });
 }
 
+/**
+ * 신청 본문은 대회·리그가 완전히 같다 — 신청 API 가 game 경로(`/games/:gameId/...`)라
+ * 소스(TOURNAMENT_FIXTURE/TEAM_MATCH)를 가리지 않는다. gameId 는 목록 응답이 이미
+ * 주므로 호출부가 넘긴다 -- 여기서 또 조회하면 목록과 다른 시점의 값을 쓰게 될 수 있다.
+ */
+function postIdentityLinkRequest(body: {
+  gameId: string;
+  participantId: string;
+  expectedVersion: number;
+}) {
+  // 서버가 헤더 Idempotency-Key 와 body.clientCommandId 의 **일치**를 요구한다
+  // (다르면 422 COMMAND_IDEMPOTENCY_KEY_MISMATCH). 한 번의 신청에 하나의 id 를
+  // 만들어 양쪽에 같은 값을 쓴다.
+  const clientCommandId = `claim-${body.participantId}-${Date.now()}`;
+  return v1Post(
+    `/games/${body.gameId}/participants/${body.participantId}/identity-link-requests`,
+    { expectedVersion: body.expectedVersion, clientCommandId },
+    { headers: { 'idempotency-key': clientCommandId } },
+  );
+}
+
 export function useV1RequestIdentityLink(tournamentId: string, fixtureId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    // gameId 는 목록 응답이 이미 주므로 호출부가 넘긴다 -- 여기서 또 조회하면
-    // 목록과 다른 시점의 값을 쓰게 될 수 있다.
-    mutationFn: (body: { gameId: string; participantId: string; expectedVersion: number }) => {
-      // 서버가 헤더 Idempotency-Key 와 body.clientCommandId 의 **일치**를 요구한다
-      // (다르면 422 COMMAND_IDEMPOTENCY_KEY_MISMATCH). 한 번의 신청에 하나의 id 를
-      // 만들어 양쪽에 같은 값을 쓴다.
-      const clientCommandId = `claim-${body.participantId}-${Date.now()}`;
-      return v1Post(
-        `/games/${body.gameId}/participants/${body.participantId}/identity-link-requests`,
-        { expectedVersion: body.expectedVersion, clientCommandId },
-        { headers: { 'idempotency-key': clientCommandId } },
-      );
-    },
+    mutationFn: postIdentityLinkRequest,
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: ['v1', 'claimable-participants', tournamentId, fixtureId],
+      });
+    },
+  });
+}
+
+/** 리그 판 목록 (2026-08-25 대회 패리티 후속) — 응답 계약은 대회와 동일하다. */
+export function useV1LeagueClaimableParticipants(
+  leagueId: string,
+  teamMatchId: string,
+  options?: { enabled?: boolean },
+) {
+  return useQuery({
+    queryKey: ['v1', 'league-claimable-participants', leagueId, teamMatchId] as const,
+    queryFn: () =>
+      v1Get<V1ClaimableParticipants>(
+        `/league-matches/${leagueId}/fixtures/${teamMatchId}/claimable-participants`,
+      ),
+    enabled: Boolean(leagueId) && Boolean(teamMatchId) && (options?.enabled ?? true),
+    // 비참가자는 403 이 정상 응답이다 -- 재시도해도 달라지지 않는다.
+    retry: false,
+  });
+}
+
+/** 리그 판 신청 — 본문은 대회와 같고, 무효화하는 목록 쿼리 키만 리그 것으로 바뀐다. */
+export function useV1LeagueRequestIdentityLink(leagueId: string, teamMatchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: postIdentityLinkRequest,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ['v1', 'league-claimable-participants', leagueId, teamMatchId],
       });
     },
   });

@@ -102,9 +102,10 @@ export function usePublicMatch(tournamentId: string, fixtureId: string) {
 /**
  * `GET /league-matches/:leagueId/fixtures/:teamMatchId/record` -- 리그 대진의
  * 경기 기록 프로젝션. 서버가 `usePublicMatch`와 **같은 PublicMatchDetail 필드명**으로
- * 내려준다(tournamentId/tournamentTitle 자리에 리그 id/제목, groupName에 "N주차" —
- * `getLeagueFixtureRecord` 주석 참고). 게임이 아직 없거나 숨김 정책인 대진은 404 로
- * 접힌다 -- 소비처(리그 경기 상세)는 그때 자체 요약 카드로 폴백하므로 retry 하지 않는다.
+ * 내려준다(tournamentId/tournamentTitle 자리에 리그 id/제목, round 에 'N주차' 라벨,
+ * groupName 은 null — `getLeagueFixtureRecord` 주석 참고). 게임이 아직 없거나 숨김
+ * 정책인 대진은 404 로 접힌다 -- 소비처(리그 경기 상세)는 그때 자체 요약 카드로
+ * 폴백하므로 retry 하지 않는다.
  */
 export function usePublicLeagueFixtureRecord(leagueId: string, teamMatchId: string) {
   return useQuery({

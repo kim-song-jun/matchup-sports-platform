@@ -1263,8 +1263,8 @@ export class PublicTournamentRecordsService {
    * 대회 이름의 자리에 실린다:
    *   - `tournamentId`/`tournamentTitle` ← 리그 id/제목 (컴포넌트는 tournamentId 를
    *     nextMatch 링크에만 쓰는데 리그는 nextMatch=null 이라 잘못된 링크가 생길 수 없다)
-   *   - `groupName` ← "N주차" (헤더가 `groupName ?? round` 를 그대로 찍는 계약),
-   *     `round` ← 주차 번호
+   *   - `round` ← 'N주차' 라벨(string 계약 — 대회의 'group'/'semi' 자리),
+   *     `groupName` ← null (헤더가 `groupName ?? round` 를 찍으므로 round 가 그대로 보인다)
    * 대회 전용 개념은 리그에 없는 값으로 고정한다: 스태프 실명 우회 없음(리그 운영자는
    * 어드민 화면에서 본다 — 여기 공개 화면은 동의 게이팅 그대로), 참가팀 가리기 없음
    * (리그 참가팀은 순위표에 항상 공개), `videos` 는 저장소가 아직 대회 픽스처 전용이라

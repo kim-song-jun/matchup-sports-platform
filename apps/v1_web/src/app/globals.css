@@ -7340,56 +7340,32 @@ button:disabled {
   }
 }
 
-/* ── 신원 통합 스테이지 (Task 155, 사용자 선택 A안) ─────────────────────
-   마이페이지 사이드바에서 흰 신원 박스와 선수 카드를 **하나의 다크 무대**로 합친다.
-   카드는 어두운 바탕을 전제로 만든 금속 카드라 흰 배경에서는 재질이 죽고, 신원
-   박스(아바타+이름)와 카드(이니셜+이름)가 같은 말을 두 번 하던 중복도 여기서 없앤다.
-   카드가 없을 때는 이 스테이지 자체가 렌더되지 않으므로(기존 신원 박스 fallback)
-   아래 다크 팔레트가 라이트 화면에 새어 나갈 일은 없다. */
+/* ── 신원 통합 스테이지 (Task 155, 사용자 선택 A안 → 2026-08-25 화이트 무대로 전환) ──
+   마이페이지 사이드바에서 흰 신원 박스와 선수 카드를 하나의 무대로 합친다(신원 중복 제거).
+   처음엔 다크 무대였지만 라이트 앱 한가운데 검은 블록이 서는 이질감이 커서(사용자 결정)
+   **테마 토큰 무대**로 바꿨다 -- 카드는 자기 재질·림·그림자를 갖고 있어 밝은 배경 위에서도
+   실물처럼 도드라진다(alpha 실렌더 3안 비교로 확정). 다크 모드에서는 토큰이 알아서
+   어두워지므로 별도 분기가 없다. companion(버튼·진행도)은 원래 테마 토큰이라 그대로 산다. */
 .tm-my-profile-stage {
-  background:
-    radial-gradient(90% 70% at 50% 0%, rgba(49, 130, 246, 0.14) 0%, rgba(0, 0, 0, 0) 60%),
-    linear-gradient(180deg, #10141c 0%, #0b0e14 100%);
-  border: 1px solid #262d3a;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 16px;
   padding: 20px 16px 16px;
 }
 /* 카드 아래 신원 블록 -- 카드가 이름을 이미 크게 말하므로 여기서는 보조 정보만. */
 .tm-pcard-identity {
   padding: 2px 0 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--border);
   margin-bottom: 12px;
   text-align: center;
 }
-.tm-pcard-identity-name { font-size: 16px; font-weight: 800; color: #eef2f8; letter-spacing: -0.01em; }
-.tm-pcard-identity-meta { margin-top: 3px; font-size: 12px; color: #8b95a5; }
+.tm-pcard-identity-name { font-size: 16px; font-weight: 800; color: var(--text-strong); letter-spacing: -0.01em; }
+.tm-pcard-identity-meta { margin-top: 3px; font-size: 12px; color: var(--text-muted); }
 .tm-pcard-identity-badges {
   margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;
 }
-.tm-my-profile-stage .tm-pcard-identity .tm-badge-grey {
-  background: rgba(255, 255, 255, 0.09);
-  color: #cdd5e0;
-}
 .tm-pcard-identity-actions { margin-top: 10px; display: flex; gap: 8px; }
 .tm-pcard-identity-actions .tm-btn { flex: 1; }
-/* 스테이지 안의 라이트 테마 토큰(중립 버튼·진행도)은 다크 무대 위에서 뒤집는다 --
-   토큰을 그대로 두면 라이트 모드에서 밝은 회색 덩어리가 무대 위에 뜬다. */
-.tm-my-profile-stage .tm-pcard-identity-actions .tm-btn-neutral,
-.tm-my-profile-stage .tm-pcard-flipbtn,
-.tm-my-profile-stage .tm-player-card-share-link {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  color: #eef2f8;
-}
-.tm-my-profile-stage .tm-player-card-sub { color: #a9b3c2; }
-.tm-my-profile-stage .tm-player-card-tier-note { color: #8b95a5; }
-.tm-my-profile-stage .tm-player-card-progress {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.12);
-}
-.tm-my-profile-stage .tm-player-card-progress-text { color: #cdd5e0; }
-.tm-my-profile-stage .tm-player-card-progress-bar { background: rgba(255, 255, 255, 0.16); }
-.tm-my-profile-stage .tm-player-card-progress-count { color: #8b95a5; }
 
 /* ── 상태 적응형 카드 앞면 (Task 155, 사용자 선택 A안) ──────────────────
    0경기 + 열림 0 = 여정 면: 자물쇠 여섯 개의 벽 대신 큰 렌더와 "시작"을 그린다.
@@ -7432,8 +7408,3 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
   color: var(--text-strong);
 }
 .tm-pcard-settings-link:focus-visible { outline: 2px solid var(--blue500); outline-offset: 2px; }
-.tm-my-profile-stage .tm-pcard-settings-link {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  color: #eef2f8;
-}

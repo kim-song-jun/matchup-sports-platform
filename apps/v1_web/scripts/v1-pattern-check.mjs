@@ -181,14 +181,17 @@ function checkRadiusLiteral() {
   eachCssFile((f, txt) => {
     for (const m of txt.matchAll(/border-radius\s*:\s*([^;{}]+)/g)) {
       const value = m[1].trim();
-      for (const part of value.split(/\s+/)) {
-        if (part === '0' || part === '100%' || part.startsWith('var(')) continue;
-        if (/^[\d.]+(px|%)$/.test(part)) {
-          violations.push(
-            `[radius 리터럴] ${f}: border-radius: ${value} — tokens.css 의 ` +
-              `var(--radius-*) 를 쓸 것 (tight/chip/control/field/container/hero/pill/circle)`,
-          );
-        }
+      // 간격 검사와 같은 방식으로 값 전체를 훑는다. 공백으로 쪼개면
+      //   var(--x, 12px) 의 fallback · calc(... + 2px) 의 인자
+      // 가 빠져나가 게이트가 우회된다.
+      for (const lit of value.matchAll(/(-?[\d.]+)(px|%)/g)) {
+        const n = parseFloat(lit[1]);
+        if (n === 0) continue; // 0 / 0px / 0% — 모서리 없음
+        if (lit[2] === '%' && n === 100) continue; // 100% — 컨테이너 전체를 덮는 곡률
+        violations.push(
+          `[radius 리터럴] ${f}: border-radius: ${value} — ${lit[0]} 대신 tokens.css 의 ` +
+            `var(--radius-*) 를 쓸 것 (tight/chip/control/field/container/hero/pill/circle)`,
+        );
       }
     }
   });

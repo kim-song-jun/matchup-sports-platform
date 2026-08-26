@@ -1,6 +1,5 @@
 'use client';
 
-import type { ReactNode } from 'react';
 import { useV1PublicProfile } from '@/hooks/use-v1-api';
 import { PlayerCard } from '@/components/users/player-card';
 
@@ -27,43 +26,32 @@ export function MyPlayerCardSection({
   userId,
   displayName,
   profileImageUrl,
-  stageIdentity,
-  fallback,
 }: {
   readonly userId: string;
   readonly displayName: string;
   readonly profileImageUrl: string | null;
-  /**
-   * 신원 통합 스테이지(사용자 선택 A안)에서 카드 바로 아래 들어가는 신원 블록
-   * (이름·뱃지·내 프로필/프로필 수정). 카드가 있을 때 흰 신원 박스 대신 이것만 그린다 --
-   * 카드와 신원 박스가 같은 말을 두 번 하는 중복이 이 통합의 제거 대상이다.
-   */
-  readonly stageIdentity?: ReactNode;
-  /** 카드가 없을 때(숨김·로딩·실패) 대신 그릴 것 -- 기존 흰 신원 박스. */
-  readonly fallback?: ReactNode;
 }) {
   const profile = useV1PublicProfile(userId, { enabled: Boolean(userId) });
   const card = profile.data?.playerCard;
 
-  // 카드 숨김·로딩·실패에서는 신원 박스가 원래 모습으로 남는다 -- 마이페이지는
-  // 카드가 없어도 온전해야 하고, 어두운 스테이지가 빈 채로 뜨면 실패가 눈에 띈다.
-  if (!card) return <>{fallback ?? null}</>;
+  // 카드 숨김·로딩·실패에서는 아무것도 그리지 않는다 -- 신원은 아래 프로필 카드가
+  // 항상 말하므로 여기서 대체물을 세울 필요가 없다(빈 자리도 남기지 않는다).
+  if (!card) return null;
 
+  // 카드는 상자에 담지 않는다(사용자 선택 A안, 2026-08-26) -- 무대 상자가 페이지 배경과
+  // 거의 같은 톤이라 경계에 이유가 없었고, 모바일에서는 좌우 여백이 이중으로 들었다.
   return (
-    <section className="tm-my-profile-stage" aria-label="내 선수 카드와 프로필">
-      <PlayerCard
-        card={card}
-        displayName={displayName}
-        profileImageUrl={profileImageUrl}
-        // 소속팀은 방금 가져온 공개 프로필에 이미 있다 -- 밖에서 또 넘기지 않는다.
-        teamName={profile.data?.teams?.[0]?.name ?? null}
-        // 내 카드이므로 기록 공개 유도를 띄운다 -- 남의 카드에서는 권하지 않는다.
-        isOwner
-        shareHref={`/users/${userId}/card`}
-        // 카드 설정(숨김·모양)은 내 카드에서 바로 -- 메뉴 2클릭 뒤에 숨기지 않는다.
-        settingsHref="/my/settings/player-card"
-        belowCardSlot={stageIdentity}
-      />
-    </section>
+    <PlayerCard
+      card={card}
+      displayName={displayName}
+      profileImageUrl={profileImageUrl}
+      // 소속팀은 방금 가져온 공개 프로필에 이미 있다 -- 밖에서 또 넘기지 않는다.
+      teamName={profile.data?.teams?.[0]?.name ?? null}
+      // 내 카드이므로 기록 공개 유도를 띄운다 -- 남의 카드에서는 권하지 않는다.
+      isOwner
+      shareHref={`/users/${userId}/card`}
+      // 카드 설정(숨김·모양)은 내 카드에서 바로 -- 메뉴 2클릭 뒤에 숨기지 않는다.
+      settingsHref="/my/settings/player-card"
+    />
   );
 }

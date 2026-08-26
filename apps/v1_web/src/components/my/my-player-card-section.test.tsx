@@ -42,17 +42,9 @@ function renderSection() {
   );
 }
 
-/** 신원 통합 스테이지(A안) 렌더 -- 실제 my-page 가 넘기는 것과 같은 형태의 슬롯. */
+/** 카드 독립 배치(A안) 렌더 -- 실제 my-page 가 넘기는 것과 같은 형태. */
 function renderStage() {
-  return render(
-    <MyPlayerCardSection
-      userId="u-1"
-      displayName="김선준"
-      profileImageUrl={null}
-      stageIdentity={<div>@sinaro · 서울 · 남</div>}
-      fallback={<section aria-label="신원 박스">김선준 신원 박스</section>}
-    />,
-  );
+  return render(<MyPlayerCardSection userId="u-1" displayName="김선준" profileImageUrl={null} />);
 }
 
 describe('마이페이지 내 선수 카드', () => {
@@ -126,26 +118,39 @@ describe('마이페이지 내 선수 카드', () => {
   });
 });
 
-describe('신원 통합 스테이지 (사용자 선택 A안)', () => {
-  it('카드가 있으면 다크 스테이지 안에 카드 + 신원 블록을 그리고, 흰 신원 박스는 그리지 않는다', () => {
-    // 신원 박스와 카드가 같은 말을 두 번 하는 중복이 이 통합의 제거 대상이다 --
-    // 둘 다 그려지면 A안은 실패한 것이다.
+describe('카드 독립 배치 (사용자 선택 A안)', () => {
+  it('카드를 상자에 담지 않고 그대로 놓는다 -- 상자 속 상자를 만들지 않는다', () => {
+    // 무대 상자가 페이지 배경과 같은 톤이라 경계에 이유가 없었고, 모바일에서는 좌우
+    // 여백이 이중으로 들었다. 상자가 되살아나면 그 문제가 그대로 돌아온다.
     publicProfileMock.mockReturnValue({ data: { playerCard: card, teams: [] } });
 
     const { container } = renderStage();
 
-    expect(container.querySelector('.tm-my-profile-stage')).not.toBeNull();
-    expect(screen.getByText('@sinaro · 서울 · 남')).toBeInTheDocument();
-    expect(screen.queryByLabelText('신원 박스')).not.toBeInTheDocument();
+    expect(container.querySelector('.tm-my-profile-stage')).toBeNull();
+    expect(container.querySelector('.tm-player-card')).not.toBeNull();
   });
 
-  it('카드가 없으면(숨김·로딩·실패) 기존 신원 박스가 그대로 선다', () => {
-    // 마이페이지는 카드가 없어도 온전해야 한다 -- 빈 다크 무대가 뜨면 실패가 눈에 띈다.
+  it('카드 아래에는 카드 조작만 둔다 -- 계정 버튼은 여기 없다', () => {
+    // 계정 조작(내 프로필·프로필 수정)은 아래 프로필 카드로 내려갔다. 카드 곁에 남으면
+    // "카드 이야기"와 "계정 이야기"가 다시 한 덩어리가 된다.
+    publicProfileMock.mockReturnValue({ data: { playerCard: card, teams: [] } });
+
+    renderStage();
+
+    expect(screen.getByRole('button', { name: /카드 뒤집기/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '카드 공유하기' })).toHaveAttribute('href', '/users/u-1/card');
+    expect(screen.getByRole('link', { name: '카드 설정' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '프로필 수정' })).not.toBeInTheDocument();
+  });
+
+  it('카드가 없으면(숨김·로딩·실패) 아무것도 그리지 않는다 -- 신원은 프로필 카드가 말한다', () => {
+    // 예전에는 여기서 신원 박스를 대신 세웠는데, 그러면 아래 프로필 카드와 같은 버튼이
+    // 두 번 나온다(실제로 '내 프로필'·'프로필 수정'이 중복 렌더돼 테스트가 잡았다).
     publicProfileMock.mockReturnValue({ data: { playerCard: null } });
 
     const { container } = renderStage();
 
-    expect(screen.getByLabelText('신원 박스')).toBeInTheDocument();
-    expect(container.querySelector('.tm-my-profile-stage')).toBeNull();
+    expect(container.querySelector('.tm-player-card')).toBeNull();
+    expect(container.textContent).toBe('');
   });
 });

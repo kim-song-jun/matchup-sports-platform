@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { CalendarCheck, Camera, Clock, HeartHandshake, Lock, Settings, Sparkles, Target, Zap } from 'lucide-react';
+import { CalendarCheck, Camera, Clock, HeartHandshake, Lock, Settings, Share2, Sparkles, Target, Zap } from 'lucide-react';
 import { cssUrl } from '@/lib/assets';
 import type { V1PlayerCard, V1PlayerCardStat } from '@/types/api';
 
@@ -521,7 +521,10 @@ export function PlayerCard({
 
       <div className="tm-pcard-below">
         {belowCardSlot ?? null}
-        {/* 뒤집기는 버튼으로만 -- 카드 자체를 누르게 하면 기울기·공유 링크와 충돌한다. */}
+        {/* 카드 조작을 한 줄로 모은다(사용자 선택 A안 + 조정, 2026-08-26).
+            공유도 아이콘 하나로 -- 뒤집기만 글자로 남기고 보조 조작(공유·설정)은
+            아이콘으로 두는 편이 줄이 끊기지 않는다. 뒤집기는 버튼으로만 둔다:
+            카드 자체를 누르게 하면 기울기·공유 링크와 충돌한다. */}
         <div className="tm-pcard-actions">
           <button
             type="button"
@@ -530,8 +533,13 @@ export function PlayerCard({
           >
             {flipped ? '앞면 보기 ↺' : '카드 뒤집기 ↻'}
           </button>
+          {shareHref ? (
+            <Link href={shareHref} className="tm-pcard-icon-link" aria-label="카드 공유하기">
+              <Share2 size={18} strokeWidth={2.2} aria-hidden="true" />
+            </Link>
+          ) : null}
           {settingsHref ? (
-            <Link href={settingsHref} className="tm-pcard-settings-link" aria-label="카드 설정">
+            <Link href={settingsHref} className="tm-pcard-icon-link" aria-label="카드 설정">
               <Settings size={19} strokeWidth={2.2} aria-hidden="true" />
             </Link>
           ) : null}
@@ -568,12 +576,6 @@ export function PlayerCard({
           </Link>
         ) : null}
 
-        {/* 공유 입구. 잠긴 게 많아도 막지 않는다 -- 자랑할지 말지는 본인이 정한다. */}
-        {shareHref ? (
-          <Link href={shareHref} className="tm-player-card-share-link">
-            카드 공유하기
-          </Link>
-        ) : null}
       </div>
     </section>
   );

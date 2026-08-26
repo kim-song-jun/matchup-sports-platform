@@ -63,16 +63,13 @@ export function PlayerCardShareClient({
   return (
     <AppChrome title="선수 카드" activeTab="my" bottomNav={false} backHref={`/users/${userId}`} desktopHead>
       <div className="tm-my-shell">
-        {/* 공유 받은 사람이 처음 보는 화면 -- 카드가 설계 전제인 어두운 무대에 앉힌다. */}
-        <section className="tm-my-profile-stage" aria-label="선수 카드">
-          <PlayerCard
-            card={card}
-            displayName={displayName}
-            profileImageUrl={profileImageUrl}
-            teamName={teamName}
-            isOwner={false}
-          />
-        </section>
+        <PlayerCard
+          card={card}
+          displayName={displayName}
+          profileImageUrl={profileImageUrl}
+          teamName={teamName}
+          isOwner={false}
+        />
 
         <button type="button" className="tm-player-card-share-btn" onClick={onShare}>
           카드 공유하기

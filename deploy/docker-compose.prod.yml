@@ -119,6 +119,8 @@ services:
       DATABASE_URL: postgresql://${V1_DB_USER:-teameet_v1}:${V1_DB_APP_PASSWORD:-${V1_DB_PASSWORD:-${DB_PASSWORD}}}@${V1_DB_HOST:-v1_postgres}:5432/${V1_DB_NAME:-teameet_v1}
       NODE_ENV: production
       WORKER_PORT: ${WORKER_PORT:-8122}
+      FRONTEND_URL: ${FRONTEND_URL:-https://teameet.co.kr}
+      SLACK_INQUIRY_WEBHOOK_URL: ${SLACK_INQUIRY_WEBHOOK_URL:-}
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-}

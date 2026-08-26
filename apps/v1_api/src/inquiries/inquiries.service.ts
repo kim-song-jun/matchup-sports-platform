@@ -3,6 +3,10 @@ import type { V1Inquiry as V1InquiryRecord } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateInquiryDto, InquiriesQueryDto } from './dto/inquiries.dto';
+import {
+  INQUIRY_SLACK_NOTIFICATION_TYPE,
+  type InquirySlackNotificationPayload,
+} from './inquiry-slack-notifier';
 
 @Injectable()
 export class InquiriesService {
@@ -42,18 +46,38 @@ export class InquiriesService {
     if (!dto.relatedType && relatedId) {
       throw new BadRequestException({ code: 'INVALID_INQUIRY_RELATED_TARGET', message: 'relatedType is required when relatedId is provided' });
     }
-    const inquiry = await this.prisma.v1Inquiry.create({
-      data: {
-        userId: user.id,
-        guestEmail: null,
-        guestPhone: null,
-        category: dto.category,
-        title,
-        body,
-        contact: contact || null,
-        relatedType: dto.relatedType ?? null,
-        relatedId: relatedId || null,
-      },
+    const inquiry = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.v1Inquiry.create({
+        data: {
+          userId: user.id,
+          guestEmail: null,
+          guestPhone: null,
+          category: dto.category,
+          title,
+          body,
+          contact: contact || null,
+          relatedType: dto.relatedType ?? null,
+          relatedId: relatedId || null,
+        },
+      });
+      const slackPayload: InquirySlackNotificationPayload = {
+        inquiryId: created.id,
+        category: created.category,
+        title: created.title,
+        relatedType: created.relatedType,
+        relatedId: created.relatedId,
+        createdAt: created.createdAt.toISOString(),
+      };
+      await tx.v1OutboxEvent.create({
+        data: {
+          businessKey: `inquiry:${created.id}:slack-created`,
+          aggregateType: 'INQUIRY',
+          aggregateId: created.id,
+          type: INQUIRY_SLACK_NOTIFICATION_TYPE,
+          payload: slackPayload,
+        },
+      });
+      return created;
     });
 
     return serializeInquiry(inquiry);

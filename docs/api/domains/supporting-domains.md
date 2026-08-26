@@ -109,7 +109,7 @@
   - `title`: string, max 80
   - `body`: string, max 2000
   - `contact?`: string, max 120
-  - `relatedType?`: `match | team | team_match | tournament | registration | payment | user`
+  - `relatedType?`: `match | team | team_match | tournament | registration | payment | user | team_contact`
   - `relatedId?`: string, max 80
 - If `relatedType` is provided, `relatedId` is required. If `relatedId` is provided, `relatedType` is required.
 
@@ -132,6 +132,14 @@
 - Cross-user detail access returns `403 PERMISSION_DENIED`; missing inquiry returns `404 NOT_FOUND`.
 - Admin `support` can read only; reply and status mutation require `ops` or `owner`.
 - Creating a reply automatically sets the inquiry status to `answered` and records admin action/status logs.
+
+### Slack Operations Notification
+
+- Inquiry creation writes an `INQUIRY_SLACK_NOTIFICATION` outbox event in the same database transaction as the inquiry.
+- The worker posts category, title, inquiry ID, related target metadata, created time, and an environment-specific `/admin/inquiries/:id` link to Slack.
+- Inquiry `body`, `contact`, requester email, and other direct contact data are not copied into the outbox payload or Slack message.
+- Slack delivery is at-least-once. Non-2xx responses, timeouts, and invalid runtime configuration fail the outbox handler and use the existing retry/poison visibility.
+- Slack is not the inquiry source of truth. Replies, status changes, permissions, and audit logs remain in the Teameet admin API and UI.
 
 ## 4) Badges (`/badges`)
 

@@ -7307,7 +7307,7 @@ button:disabled {
 /* ── 카드 아래 동반 UI -- 카드는 소장품이라 앞면을 깨끗하게 두고, 안내·행동은 밖에 둔다. ── */
 /* 카드 아래 영역. 카드가 drop-shadow 를 깔고 있어 버튼이 바짝 붙으면 그림자 위에
    올라탄 것처럼 보인다 -- 그림자가 앉을 자리를 여백으로 비운다(사용자 지적 2026-08-26). */
-.tm-pcard-below { width: 100%; max-width: 320px; display: flex; flex-direction: column; margin-top: 14px; }
+.tm-pcard-below { width: 100%; max-width: 320px; display: flex; flex-direction: column; margin-top: 16px; }
 .tm-pcard-flipbtn {
   margin-top: 4px; width: 100%; min-height: 44px; border-radius: var(--radius-control);
   background: var(--surface-soft); border: 1px solid var(--border);
@@ -7473,17 +7473,17 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
 
 /* ── 프로필(계정) 블록 · 활동 병합 (사용자 선택 A안, 2026-08-26) ──
    카드 조작과 계정 조작이 한 상자에 섞여 있던 것을 갈랐다. 여기는 계정 쪽이다. */
-.tm-my-account-block { margin-top: 10px; text-align: center; }
+.tm-my-account-block { margin-top: 12px; text-align: center; }
 /* 계정 아바타 -- 카드를 숨긴 사용자에게는 이것이 유일한 얼굴이다. */
 .tm-my-account-avatar {
-  width: 52px; height: 52px; border-radius: 18px; margin: 0 auto 10px;
+  width: 52px; height: 52px; border-radius: var(--radius-container); margin: 0 auto 12px;
   display: flex; align-items: center; justify-content: center;
   font-size: 20px; font-weight: 800;
 }
 .tm-my-account-name { font-size: 16px; font-weight: 800; color: var(--text-strong); letter-spacing: -0.01em; }
 .tm-my-account-meta { margin-top: 3px; font-size: 12px; color: var(--text-muted); }
 .tm-my-account-badges {
-  margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;
+  margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
 }
 .tm-my-account-actions { margin-top: 12px; display: flex; gap: 8px; }
 .tm-my-account-actions .tm-btn { flex: 1; }

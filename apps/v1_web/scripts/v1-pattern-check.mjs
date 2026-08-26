@@ -129,9 +129,72 @@ function checkInertFontSizeClasses() {
   }
 }
 
+/* ── CSS 파일 목록 + 주석 제거 (아래 두 검사 공용) ─────────────────── */
+function eachCssFile(fn) {
+  let list = ' ';
+  try { list = execSync('find src -name "*.css"', { encoding: 'utf8' }); } catch { return; }
+  for (const f of list.split('\n').filter(Boolean)) {
+    // 주석 안의 예시 값(문서용)을 위반으로 세지 않도록 공백으로 치환한다
+    fn(f, readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, ' '));
+  }
+}
+
+/* ── 4) 간격 4px 격자 검사 ─────────────────────────────────────────
+ * gap / padding / margin 은 4의 배수만 쓴다. 예외는 1~3px 광학 보정 하나뿐이다
+ * (아이콘 baseline 정렬 등 — tokens.css 의 SPACING 절 참조).
+ * 이 게이트가 없으면 격자는 조용히 무너진다: 2026-08-26 에 전 CSS 를 격자로
+ * 맞춘 그 날, 병행 작업이 10px·14px·6px 을 4건 다시 들여왔다.
+ * ────────────────────────────────────────────────────────────────── */
+function checkSpacingGrid() {
+  const PROP = /(?:^|[;{}\s])((?:row-|column-)?gap|padding|margin)(-(?:top|right|bottom|left))?\s*:\s*([^;{}]+)/g;
+  eachCssFile((f, txt) => {
+    for (const m of txt.matchAll(PROP)) {
+      const prop = m[1] + (m[2] || '');
+      const value = m[3].trim();
+      if (value.includes('var(') || value.includes('calc(')) continue;
+      for (const part of value.split(/\s+/)) {
+        const px = part.match(/^([\d.]+)px$/);
+        if (!px) continue;
+        const n = parseFloat(px[1]);
+        if (!n || n <= 3) continue; // 0 과 광학 보정(1~3px)은 허용
+        if (n % 4 !== 0) {
+          violations.push(
+            `[간격 격자 이탈] ${f}: ${prop}: ${value} — ${n}px 는 4의 배수가 아니다. ` +
+              `${Math.round(n / 4) * 4}px 로 맞추거나, 정렬 보정이면 3px 이하로 줄일 것`,
+          );
+        }
+      }
+    }
+  });
+}
+
+/* ── 5) radius 리터럴 금지 ─────────────────────────────────────────
+ * border-radius 는 tokens.css 의 역할 토큰만 쓴다(chip/control/field/
+ * container/hero/pill/circle/tight). px 를 직접 적으면 21종으로 분화됐던
+ * 그 상태로 되돌아간다.
+ * ────────────────────────────────────────────────────────────────── */
+function checkRadiusLiteral() {
+  eachCssFile((f, txt) => {
+    for (const m of txt.matchAll(/border-radius\s*:\s*([^;{}]+)/g)) {
+      const value = m[1].trim();
+      for (const part of value.split(/\s+/)) {
+        if (part === '0' || part === '100%' || part.startsWith('var(')) continue;
+        if (/^[\d.]+(px|%)$/.test(part)) {
+          violations.push(
+            `[radius 리터럴] ${f}: border-radius: ${value} — tokens.css 의 ` +
+              `var(--radius-*) 를 쓸 것 (tight/chip/control/field/container/hero/pill/circle)`,
+          );
+        }
+      }
+    }
+  });
+}
+
 checkHapnida();
 checkUndefinedTokens();
 checkInertFontSizeClasses();
+checkSpacingGrid();
+checkRadiusLiteral();
 
 if (violations.length) {
   console.error(`\n✗ v1 패턴 검사 실패 — ${violations.length}건:\n`);
@@ -139,4 +202,6 @@ if (violations.length) {
   console.error('\n참고: docs/v1-coding-patterns.md\n');
   process.exit(1);
 }
-console.log('✓ v1 패턴 검사 통과 (합니다체 0, 미정의 CSS 토큰 0, 무효 폰트 크기 클래스 0)');
+console.log(
+  '✓ v1 패턴 검사 통과 (합니다체 0, 미정의 CSS 토큰 0, 무효 폰트 크기 클래스 0, 간격 격자 이탈 0, radius 리터럴 0)',
+);

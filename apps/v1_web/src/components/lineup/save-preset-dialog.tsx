@@ -128,7 +128,7 @@ export function SavePresetDialog({ open, onClose, existingNames, saving, error, 
             </p>
           ) : null}
           {error !== null ? (
-            <p className="tm-text-caption" role="alert" style={{ color: 'var(--red600, #d63636)', margin: 0 }}>
+            <p className="tm-text-caption" role="alert" style={{ color: 'var(--red700)', margin: 0 }}>
               {error}
             </p>
           ) : null}

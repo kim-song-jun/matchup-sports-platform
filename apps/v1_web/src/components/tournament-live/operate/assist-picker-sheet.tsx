@@ -152,7 +152,7 @@ export function AssistPickerSheet({ open, event, scorerName, teamName, whenLabel
               disabled={pending !== null}
               onClick={() => pick(teammate)}
             >
-              <span className="inline-block min-w-[1.25rem] text-right tabular-nums text-gray-400">
+              <span className="inline-block min-w-[1.25rem] text-right tabular-nums text-[var(--text-muted)]">
                 {jerseyText(teammate.jerseyNumber)}
               </span>
               {teammate.displayNameSnapshot}

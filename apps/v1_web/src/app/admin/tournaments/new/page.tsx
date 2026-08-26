@@ -350,7 +350,7 @@ export default function AdminTournamentsNewPage() {
           </div>
         </div>
 
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--border)] bg-white/95 px-4 py-3 backdrop-blur lg:pl-[var(--admin-sidebar-width,0px)]">
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--border)] bg-[var(--card-surface)]/95 px-4 py-3 backdrop-blur lg:pl-[var(--admin-sidebar-width,0px)]">
           <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3">
             {state.step === 0 ? (
               <Link
@@ -499,7 +499,7 @@ function WizardStepper({
                       active
                         ? 'bg-blue-500 text-white'
                         : done
-                          ? 'bg-blue-100 text-[var(--blue700)]'
+                          ? 'bg-[var(--blue50)] text-[var(--blue700)]'
                           : 'bg-[var(--grey150)] text-[var(--text-caption)]',
                     ].join(' ')}
                   >

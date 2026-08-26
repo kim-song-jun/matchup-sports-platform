@@ -57,7 +57,7 @@ export function AdminFilterBar({
             {searchLabel}
           </label>
           <span
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none"
             aria-hidden="true"
           >
             <Search size={16} />
@@ -70,7 +70,7 @@ export function AdminFilterBar({
             placeholder={searchPlaceholder}
             className={[
               'w-full h-[44px] pl-9 pr-4 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl',
-              'placeholder:text-gray-400 text-[var(--text-strong)]',
+              'placeholder:text-[var(--text-muted)] text-[var(--text-strong)]',
               'transition-colors focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
             ].join(' ')}
           />
@@ -103,7 +103,7 @@ export function AdminFilterBar({
                     <span
                       className={[
                         'ml-1.5 min-w-[1.25rem] text-center font-semibold tabular-nums',
-                        active ? 'text-white/90' : 'text-gray-400',
+                        active ? 'text-white/90' : 'text-[var(--text-muted)]',
                       ].join(' ')}
                       aria-hidden="true"
                     >

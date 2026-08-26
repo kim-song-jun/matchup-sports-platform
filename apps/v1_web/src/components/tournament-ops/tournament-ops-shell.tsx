@@ -168,7 +168,7 @@ function NavItemDisabledRow({ item, dense }: { item: NavItem; dense?: boolean })
       <span className="flex flex-col items-start">
         <span>{item.label}</span>
         {item.disabledReason ? (
-          <span className="text-[length:var(--font-size-micro)] font-normal text-gray-400 dark:text-gray-500">{item.disabledReason}</span>
+          <span className="text-[length:var(--font-size-micro)] font-normal text-[var(--text-muted)] dark:text-gray-500">{item.disabledReason}</span>
         ) : null}
       </span>
     </button>
@@ -346,7 +346,7 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverI
                     : 'border-transparent text-[var(--text-muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--text-strong)]',
                 ].join(' ')}
               >
-                <span className={active ? 'text-blue-500 dark:text-blue-300' : 'text-gray-400'} aria-hidden="true">
+                <span className={active ? 'text-blue-500 dark:text-blue-300' : 'text-[var(--text-muted)]'} aria-hidden="true">
                   {item.icon}
                 </span>
                 <span>{item.label}</span>
@@ -359,7 +359,7 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverI
           <Link
             href={returnHref}
             onClick={onClose}
-            className="flex items-center gap-1.5 text-[length:var(--font-size-label)] text-gray-400 hover:text-[var(--text-muted)] transition-colors min-h-[44px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+            className="flex items-center gap-1.5 text-[length:var(--font-size-label)] text-[var(--text-muted)] hover:text-[var(--text-muted)] transition-colors min-h-[44px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
           >
             <ChevronLeft size={14} aria-hidden="true" />
             {returnLabel}
@@ -435,7 +435,7 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
                     : 'border-transparent text-[var(--text-muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--text-strong)]',
                 ].join(' ')}
               >
-                <span className={active ? 'text-blue-500 dark:text-blue-300' : 'text-gray-400'} aria-hidden="true">
+                <span className={active ? 'text-blue-500 dark:text-blue-300' : 'text-[var(--text-muted)]'} aria-hidden="true">
                   {item.icon}
                 </span>
                 <span>{item.label}</span>
@@ -447,7 +447,7 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
         <div className="px-4 py-4 border-t border-[var(--border)] shrink-0">
           <Link
             href={returnTarget.href}
-            className="flex items-center gap-1.5 text-[length:var(--font-size-label)] text-gray-400 hover:text-[var(--text-muted)] transition-colors min-h-[44px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+            className="flex items-center gap-1.5 text-[length:var(--font-size-label)] text-[var(--text-muted)] hover:text-[var(--text-muted)] transition-colors min-h-[44px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
           >
             <ChevronLeft size={14} aria-hidden="true" />
             {returnTarget.label}

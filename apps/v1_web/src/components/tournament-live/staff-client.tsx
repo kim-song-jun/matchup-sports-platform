@@ -173,7 +173,7 @@ function TournamentFieldsSection({
             maxLength={120}
             disabled={create.isPending}
             placeholder="예: A구장, 1번 코트"
-            className="flex-1 h-[44px] px-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] placeholder:text-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors disabled:opacity-50"
+            className="flex-1 h-[44px] px-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors disabled:opacity-50"
           />
           <button
             type="submit"
@@ -183,7 +183,7 @@ function TournamentFieldsSection({
               'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
               canSubmit
                 ? 'bg-blue-500 text-white hover:bg-blue-600'
-                : 'bg-blue-200 dark:bg-blue-500/30 text-white cursor-not-allowed',
+                : 'bg-[var(--grey100)] text-[var(--text-caption)] cursor-not-allowed',
             ].join(' ')}
           >
             {create.isPending ? '등록 중…' : '경기장 추가'}
@@ -457,7 +457,7 @@ export function StaffClient({ tournamentId }: Props) {
                       {status.label}
                     </span>
                   </div>
-                  <p className="text-[length:var(--font-size-caption)] text-gray-400 mt-1">
+                  <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] mt-1">
                     {assignment.fieldId
                       ? fieldNameById.get(assignment.fieldId) ?? '필드'
                       : assignment.fixtureIds.length > 0

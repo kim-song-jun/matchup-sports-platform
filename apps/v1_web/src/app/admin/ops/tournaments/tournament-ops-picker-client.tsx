@@ -80,7 +80,7 @@ export function TournamentOpsPickerClient() {
             <Link
               href={`/admin/live/${encodeURIComponent(row.id)}/operations`}
               aria-label={`${row.title} 운영 콘솔 열기`}
-              // 전수검수: hover:bg-blue-100(raw, dark: 짝 없음)이 다크에서 밝은
+              // 전수검수: hover:bg-[var(--blue100)](raw, dark: 짝 없음)이 다크에서 밝은
               // blue700 텍스트와 겹쳐 대비 1.99:1까지 붕괴 — 다크 대응된 --blue100
               // 토큰(rgba 틴트)으로 교체.
               className="inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[length:var(--font-size-label)] font-medium text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--blue100)] transition-colors whitespace-nowrap focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"

@@ -492,11 +492,11 @@ export default function AdminInquiryDetailPage() {
                         <p className="text-sm font-semibold text-[var(--text-strong)]">
                           {reply.adminName ?? '운영팀'}
                           {reply.adminRole ? (
-                            <span className="ml-2 text-xs font-medium text-gray-400">{reply.adminRole}</span>
+                            <span className="ml-2 text-xs font-medium text-[var(--text-muted)]">{reply.adminRole}</span>
                           ) : null}
                         </p>
                         <div className="flex items-center gap-2">
-                          <time className="text-xs text-gray-400">
+                          <time className="text-xs text-[var(--text-muted)]">
                             {formatAdminDateTime(reply.createdAt)}
                             {wasReplyEdited(reply) ? ' (수정됨)' : ''}
                           </time>
@@ -505,7 +505,7 @@ export default function AdminInquiryDetailPage() {
                               type="button"
                               onClick={() => startEditReply(reply.replyId, reply.body)}
                               aria-label="답변 수정"
-                              className="inline-flex h-[44px] w-[44px] items-center justify-center rounded-lg text-gray-400 hover:bg-[var(--border)] hover:text-[var(--text-muted)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                              className="inline-flex h-[44px] w-[44px] items-center justify-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--border)] hover:text-[var(--text-muted)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                             >
                               <Pencil size={15} aria-hidden="true" />
                             </button>

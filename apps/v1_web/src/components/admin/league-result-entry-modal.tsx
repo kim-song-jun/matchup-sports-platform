@@ -55,7 +55,7 @@ const scoreInputClass =
   'h-[44px] w-20 rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-2 text-center text-lg font-semibold tabular-nums text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
 
 const statInputClass =
-  'h-[44px] w-16 shrink-0 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-2 text-center text-sm font-semibold tabular-nums text-[var(--text-strong)] placeholder:font-normal placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
+  'h-[44px] w-16 shrink-0 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-2 text-center text-sm font-semibold tabular-nums text-[var(--text-strong)] placeholder:font-normal placeholder:text-[var(--text-muted)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
 
 export function LeagueResultEntryModal({
   open,
@@ -236,7 +236,7 @@ export function LeagueResultEntryModal({
             onClick={() => !pending && onClose()}
             disabled={pending}
             aria-label="모달 닫기"
-            className="flex shrink-0 items-center justify-center w-[44px] h-[44px] rounded-lg text-gray-400 hover:text-[var(--text-muted)] hover:bg-[var(--surface-soft)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-40"
+            className="flex shrink-0 items-center justify-center w-[44px] h-[44px] rounded-lg text-[var(--text-muted)] hover:text-[var(--text-muted)] hover:bg-[var(--surface-soft)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-40"
           >
             <X size={18} aria-hidden="true" />
           </button>
@@ -388,7 +388,7 @@ export function LeagueResultEntryModal({
                             onClick={() => removeScorerRow(row.participantId)}
                             disabled={pending}
                             aria-label={`${row.name} 기록 제거`}
-                            className="flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-lg text-gray-400 hover:bg-[var(--surface-soft)] hover:text-[var(--text-muted)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-40"
+                            className="flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--text-muted)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-40"
                           >
                             <X size={16} aria-hidden="true" />
                           </button>
@@ -438,7 +438,7 @@ export function LeagueResultEntryModal({
                 placeholder={mode === 'correction' ? '정정 사유를 입력해 주세요.' : '결과 입력 사유를 입력해 주세요.'}
                 className={[
                   'px-3 py-2.5 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] resize-none',
-                  'placeholder:text-gray-400',
+                  'placeholder:text-[var(--text-muted)]',
                   'focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
                   'transition-colors disabled:opacity-50',
                   trimmedReason.length === 0 ? 'border-[var(--border)]' : 'border-[var(--border-strong)]',
@@ -450,7 +450,7 @@ export function LeagueResultEntryModal({
                 id="league-result-reason-char-count"
                 className={[
                   'text-[length:var(--font-size-caption)] text-right tabular-nums',
-                  reason.length >= REASON_MAX ? 'text-[var(--red700)]' : 'text-gray-400',
+                  reason.length >= REASON_MAX ? 'text-[var(--red700)]' : 'text-[var(--text-muted)]',
                 ].join(' ')}
                 aria-live="polite"
               >
@@ -484,7 +484,7 @@ export function LeagueResultEntryModal({
                 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                 canSubmit
                   ? 'bg-blue-500 text-white hover:bg-blue-600'
-                  : 'bg-blue-200 text-white cursor-not-allowed',
+                  : 'bg-[var(--grey100)] text-[var(--text-caption)] cursor-not-allowed',
               ].join(' ')}
               aria-disabled={!canSubmit}
             >

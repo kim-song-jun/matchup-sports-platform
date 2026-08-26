@@ -447,7 +447,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                       <td className="px-4 py-3 align-middle">
                         <p className="font-medium text-[var(--text-strong)]">{rowLabel(item)}</p>
                         {/* 모바일 카드와 같은 표기 — "4강 4경기"는 "4강의 4번째 경기"로 오독된다. */}
-                        <p className="text-[length:var(--font-size-caption)] text-gray-400">{item.round} · {item.fixtureNumber}번 경기</p>
+                        <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{item.round} · {item.fixtureNumber}번 경기</p>
                       </td>
                       <td className="px-4 py-3 align-middle tabular-nums">
                         {item.scheduledAt ? formatAdminDateTime(item.scheduledAt) : '미정'}
@@ -478,7 +478,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                       <td className="px-4 py-3 align-middle">
                         <Link
                           href={`${liveBase}/fixtures/${encodeURIComponent(item.fixtureId)}/operate`}
-                          className="inline-flex items-center min-h-11 px-3 rounded-lg text-[length:var(--font-size-caption)] font-medium whitespace-nowrap text-[var(--blue700)] bg-[var(--blue50)] hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                          className="inline-flex items-center min-h-11 px-3 rounded-lg text-[length:var(--font-size-caption)] font-medium whitespace-nowrap text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--blue100)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                         >
                           운영 콘솔
                         </Link>
@@ -500,7 +500,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="font-medium text-[var(--text-strong)] truncate">{rowLabel(item)}</p>
-                    <p className="text-[length:var(--font-size-caption)] text-gray-400">
+                    <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
                       {/* "4강 4경기"는 "4강의 4번째 경기"로 오독된다 — fixtureNumber 는
                           대회 전체 연번이므로 '번 경기'로 번호임을 드러낸다. */}
                       {item.round} · {item.fixtureNumber}번 경기 ·{' '}
@@ -518,7 +518,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                         />
                       </div>
                     ) : item.fieldName ? (
-                      <p className="text-[length:var(--font-size-caption)] text-gray-400 mt-0.5">필드 {item.fieldName}</p>
+                      <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] mt-0.5">필드 {item.fieldName}</p>
                     ) : null}
                   </div>
                   <div className="flex flex-col items-end gap-1 shrink-0">
@@ -535,7 +535,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                 )}
                 <Link
                   href={`${liveBase}/fixtures/${encodeURIComponent(item.fixtureId)}/operate`}
-                  className="mt-2 inline-flex items-center min-h-11 px-3 rounded-lg text-[length:var(--font-size-caption)] font-medium whitespace-nowrap text-[var(--blue700)] bg-[var(--blue50)] hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                  className="mt-2 inline-flex items-center min-h-11 px-3 rounded-lg text-[length:var(--font-size-caption)] font-medium whitespace-nowrap text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--blue100)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                 >
                   운영 콘솔로 이동
                 </Link>

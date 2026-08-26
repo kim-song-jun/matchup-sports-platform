@@ -798,7 +798,7 @@ function PlayerRow({
                   <label
                     key={val}
                     htmlFor={`player-${player.id}-eligibility-${val}`}
-                    style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', minHeight: 36 }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', minHeight: 44 }}
                   >
                     <input
                       id={`player-${player.id}-eligibility-${val}`}
@@ -851,7 +851,7 @@ function PlayerRow({
             <button
               type="button"
               className="tm-btn tm-btn-sm tm-btn-neutral"
-              style={{ flex: 1, minHeight: 40 }}
+              style={{ flex: 1 }}
               onClick={() => {
                 setDraftEligibility(player.eligibilityStatus);
                 setEditError(null);
@@ -864,7 +864,7 @@ function PlayerRow({
             <button
               type="button"
               className="tm-btn tm-btn-sm tm-btn-primary"
-              style={{ flex: 1, minHeight: 40 }}
+              style={{ flex: 1 }}
               onClick={() => void handleSave()}
               disabled={isUpdating || draftEligibility === player.eligibilityStatus}
             >

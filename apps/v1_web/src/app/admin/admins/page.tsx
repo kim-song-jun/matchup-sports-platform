@@ -48,7 +48,7 @@ function formatUserTitle(row: {
 function AdminRoleBadge({ role }: { role: 'owner' | 'ops' | 'support' }) {
   if (role === 'owner') {
     return (
-      <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 text-[length:var(--font-size-micro)] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap">
+      <span className="inline-flex items-center gap-1 bg-[var(--blue50)] text-[var(--blue700)] text-[length:var(--font-size-micro)] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap">
         <ShieldCheck size={11} aria-hidden="true" />
         최고운영자
       </span>
@@ -214,7 +214,7 @@ function GrantModal({ open, onClose, onGrantSuccess }: GrantModalProps) {
             onClick={() => !grantMutation.isPending && onClose()}
             disabled={grantMutation.isPending}
             aria-label="모달 닫기"
-            className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-gray-400 hover:text-[var(--text-muted)] hover:bg-[var(--surface-soft)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-40"
+            className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-[var(--text-muted)] hover:text-[var(--text-muted)] hover:bg-[var(--surface-soft)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-40"
           >
             <X size={18} aria-hidden="true" />
           </button>
@@ -278,13 +278,13 @@ function GrantModal({ open, onClose, onGrantSuccess }: GrantModalProps) {
                 placeholder="부여 사유를 입력해 주세요."
                 className={[
                   'px-3 py-2.5 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] resize-none',
-                  'placeholder:text-gray-400',
+                  'placeholder:text-[var(--text-muted)]',
                   'focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
                   'transition-colors disabled:opacity-50',
                 ].join(' ')}
                 aria-required="true"
               />
-              <p className="text-[length:var(--font-size-micro)] text-right text-gray-400 tabular-nums">
+              <p className="text-[length:var(--font-size-micro)] text-right text-[var(--text-muted)] tabular-nums">
                 {reason.length} / 500
               </p>
             </div>
@@ -308,7 +308,7 @@ function GrantModal({ open, onClose, onGrantSuccess }: GrantModalProps) {
                 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                 canSubmit
                   ? 'bg-blue-500 text-white hover:bg-blue-600'
-                  : 'bg-blue-200 text-white cursor-not-allowed',
+                  : 'bg-[var(--grey100)] text-[var(--text-caption)] cursor-not-allowed',
               ].join(' ')}
               aria-disabled={!canSubmit}
             >
@@ -573,7 +573,7 @@ export default function AdminAdminsPage() {
                       onClick={() => setActionModal({ row, action: 'revoke' })}
                       className={[
                         'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[length:var(--font-size-label)] font-medium',
-                        'text-[var(--red700)] bg-[var(--red50)] hover:bg-red-100 transition-colors whitespace-nowrap',
+                        'text-[var(--red700)] bg-[var(--red50)] hover:bg-[var(--red100)] transition-colors whitespace-nowrap',
                         'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                       ].join(' ')}
                       aria-label={`${row.nickname ?? '운영자'} 권한 회수`}
@@ -588,7 +588,7 @@ export default function AdminAdminsPage() {
                     onClick={() => setActionModal({ row, action: 'reactivate' })}
                     className={[
                       'inline-flex items-center justify-center gap-1 min-h-[44px] px-3 rounded-lg text-[length:var(--font-size-label)] font-medium',
-                      'text-[var(--blue700)] bg-[var(--blue50)] hover:bg-blue-100 transition-colors whitespace-nowrap',
+                      'text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--blue100)] transition-colors whitespace-nowrap',
                       'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                     ].join(' ')}
                     aria-label={`${row.nickname ?? '운영자'} 권한 재부여`}

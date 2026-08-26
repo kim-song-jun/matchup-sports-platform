@@ -181,7 +181,7 @@ export default function AdminUserDetailPage() {
             </dl>
             {user.bio ? (
               <div className="mt-3 rounded-xl bg-[var(--surface-soft)] px-4 py-3">
-                <p className="text-xs font-semibold text-gray-400">소개</p>
+                <p className="text-xs font-semibold text-[var(--text-muted)]">소개</p>
                 <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-[var(--text-strong)]">{user.bio}</p>
               </div>
             ) : null}

@@ -471,12 +471,12 @@ function PopupDetail({
         <AdminStatusPill status={popup.status} label={STATUS_LABEL[popup.status]} />
       </div>
       <dl className="mt-4 grid grid-cols-2 gap-3 rounded-xl bg-[var(--surface-soft)] p-3 text-sm">
-        <div><dt className="text-xs text-gray-400">게시일</dt><dd className="mt-1 text-[var(--text-body)]">{formatDateTime(popup.publishedAt)}</dd></div>
-        <div><dt className="text-xs text-gray-400">수정일</dt><dd className="mt-1 text-[var(--text-body)]">{formatDateTime(popup.updatedAt)}</dd></div>
-        <div className="col-span-2"><dt className="text-xs text-gray-400">노출 기간</dt><dd className="mt-1 text-[var(--text-body)]">{formatDisplayWindow(popup.displayStartAt, popup.displayEndAt)}</dd></div>
-        <div className="col-span-2"><dt className="text-xs text-gray-400">노출 화면</dt><dd className="mt-1 text-[var(--text-body)]">{formatTargetScreens(popup.targetScreens)}</dd></div>
-        <div className="col-span-2"><dt className="text-xs text-gray-400">정확한 경로</dt><dd className="mt-1 break-all text-[var(--text-body)]">{popup.targetPaths?.length ? popup.targetPaths.join(', ') : '없음'}</dd></div>
-        <div className="col-span-2"><dt className="text-xs text-gray-400">이동 링크</dt><dd className="mt-1 break-all text-[var(--text-body)]">{popup.linkUrl ? `${popup.linkLabel ?? '자세히 보기'} · ${popup.linkUrl}` : '없음'}</dd></div>
+        <div><dt className="text-xs text-[var(--text-muted)]">게시일</dt><dd className="mt-1 text-[var(--text-body)]">{formatDateTime(popup.publishedAt)}</dd></div>
+        <div><dt className="text-xs text-[var(--text-muted)]">수정일</dt><dd className="mt-1 text-[var(--text-body)]">{formatDateTime(popup.updatedAt)}</dd></div>
+        <div className="col-span-2"><dt className="text-xs text-[var(--text-muted)]">노출 기간</dt><dd className="mt-1 text-[var(--text-body)]">{formatDisplayWindow(popup.displayStartAt, popup.displayEndAt)}</dd></div>
+        <div className="col-span-2"><dt className="text-xs text-[var(--text-muted)]">노출 화면</dt><dd className="mt-1 text-[var(--text-body)]">{formatTargetScreens(popup.targetScreens)}</dd></div>
+        <div className="col-span-2"><dt className="text-xs text-[var(--text-muted)]">정확한 경로</dt><dd className="mt-1 break-all text-[var(--text-body)]">{popup.targetPaths?.length ? popup.targetPaths.join(', ') : '없음'}</dd></div>
+        <div className="col-span-2"><dt className="text-xs text-[var(--text-muted)]">이동 링크</dt><dd className="mt-1 break-all text-[var(--text-body)]">{popup.linkUrl ? `${popup.linkLabel ?? '자세히 보기'} · ${popup.linkUrl}` : '없음'}</dd></div>
       </dl>
       <div className="mt-4 max-h-[440px] overflow-y-auto rounded-xl border border-[var(--border)] p-4 text-sm leading-7 text-[var(--text-body)]">
         <RichContentRenderer content={popup.content} legacyBody={popup.body} />
@@ -574,14 +574,14 @@ function PopupForm({
                     )}
                     className="mt-1 h-4 w-4 rounded border-[var(--border-strong)] text-blue-500 focus:ring-blue-500"
                   />
-                  <span><span className="block text-sm font-medium text-[var(--text-body)]">{option.label}</span><span className="block text-xs text-gray-400">{option.description}</span></span>
+                  <span><span className="block text-sm font-medium text-[var(--text-body)]">{option.label}</span><span className="block text-xs text-[var(--text-muted)]">{option.description}</span></span>
                 </label>
               );
             })}
           </div>
         </fieldset>
         <fieldset className="rounded-xl border border-[var(--border)] p-3">
-          <legend className="px-1 text-sm font-semibold text-[var(--text-body)]">정확한 화면 <span className="font-normal text-gray-400">(선택)</span></legend>
+          <legend className="px-1 text-sm font-semibold text-[var(--text-body)]">정확한 화면 <span className="font-normal text-[var(--text-muted)]">(선택)</span></legend>
           <p className="mb-3 text-xs leading-5 text-[var(--text-muted)]">설정하면 해당 경로에서 화면 그룹 팝업보다 먼저 노출돼요. 대회를 선택하면 상세 경로가 자동으로 입력돼요.</p>
           <label className="flex flex-col gap-1.5">
             <span className="text-sm font-semibold text-[var(--text-body)]">특정 대회 상세</span>
@@ -608,8 +608,8 @@ function PopupForm({
           </label>
         </fieldset>
         <div className="grid gap-3 sm:grid-cols-2">
-          <label className="flex flex-col gap-1.5"><span className="text-sm font-semibold text-[var(--text-body)]">이동 링크 <span className="font-normal text-gray-400">(선택)</span></span><input value={linkUrl} onChange={(event) => onLinkUrlChange(event.target.value)} maxLength={500} disabled={!canWrite || saving} className="h-[44px] min-w-0 rounded-xl border border-[var(--border)] px-3 text-sm text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-[var(--surface-soft)]" placeholder="/matches 또는 https://..." /></label>
-          <label className="flex flex-col gap-1.5"><span className="text-sm font-semibold text-[var(--text-body)]">버튼 문구 <span className="font-normal text-gray-400">(선택)</span></span><input value={linkLabel} onChange={(event) => onLinkLabelChange(event.target.value)} maxLength={40} disabled={!canWrite || saving} className="h-[44px] min-w-0 rounded-xl border border-[var(--border)] px-3 text-sm text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-[var(--surface-soft)]" placeholder="자세히 보기" /></label>
+          <label className="flex flex-col gap-1.5"><span className="text-sm font-semibold text-[var(--text-body)]">이동 링크 <span className="font-normal text-[var(--text-muted)]">(선택)</span></span><input value={linkUrl} onChange={(event) => onLinkUrlChange(event.target.value)} maxLength={500} disabled={!canWrite || saving} className="h-[44px] min-w-0 rounded-xl border border-[var(--border)] px-3 text-sm text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-[var(--surface-soft)]" placeholder="/matches 또는 https://..." /></label>
+          <label className="flex flex-col gap-1.5"><span className="text-sm font-semibold text-[var(--text-body)]">버튼 문구 <span className="font-normal text-[var(--text-muted)]">(선택)</span></span><input value={linkLabel} onChange={(event) => onLinkLabelChange(event.target.value)} maxLength={40} disabled={!canWrite || saving} className="h-[44px] min-w-0 rounded-xl border border-[var(--border)] px-3 text-sm text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-[var(--surface-soft)]" placeholder="자세히 보기" /></label>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="flex flex-col gap-1.5"><span className="text-sm font-semibold text-[var(--text-body)]">노출 시작</span><input type="datetime-local" value={displayStartAt} onChange={(event) => onDisplayStartAtChange(event.target.value)} disabled={!canWrite || saving} className="h-[44px] min-w-0 rounded-xl border border-[var(--border)] px-3 text-sm text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-[var(--surface-soft)]" /></label>

@@ -54,7 +54,7 @@ export function GateModeCard({ gateStatus, isPending, isError, showToast }: Gate
               <span
                 className={[
                   'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[length:var(--font-size-caption)] font-semibold',
-                  enabled ? 'bg-blue-100 text-blue-700' : 'bg-[var(--surface-soft)] text-[var(--text-muted)]',
+                  enabled ? 'bg-[var(--blue50)] text-[var(--blue700)]' : 'bg-[var(--surface-soft)] text-[var(--text-muted)]',
                 ].join(' ')}
               >
                 {enabled ? <ToggleRight size={12} aria-hidden="true" /> : <ToggleLeft size={12} aria-hidden="true" />}
@@ -99,15 +99,15 @@ export function GateModeCard({ gateStatus, isPending, isError, showToast }: Gate
       {gateStatus && (
         <dl className="grid grid-cols-3 gap-2 pt-3 border-t border-[var(--border)] text-[12px]">
           <div>
-            <dt className="text-gray-400">버전</dt>
+            <dt className="text-[var(--text-muted)]">버전</dt>
             <dd className="text-[var(--text-body)] font-medium tabular-nums">v{gateStatus.version}</dd>
           </div>
           <div>
-            <dt className="text-gray-400">마지막 변경자</dt>
+            <dt className="text-[var(--text-muted)]">마지막 변경자</dt>
             <dd className="text-[var(--text-body)] font-medium truncate">{gateStatus.updatedByUserId ?? '—'}</dd>
           </div>
           <div>
-            <dt className="text-gray-400">마지막 변경 시각</dt>
+            <dt className="text-[var(--text-muted)]">마지막 변경 시각</dt>
             <dd className="text-[var(--text-body)] font-medium">
               {new Date(gateStatus.updatedAt).toLocaleString('ko-KR', {
                 month: 'numeric',

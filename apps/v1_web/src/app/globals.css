@@ -28,6 +28,11 @@
   --static-black: #000000;
   --blue50: #e8f3ff;
   --blue100: #d6e7ff;
+  /* red/green 의 100 단계 — blue100 과 같은 비율로 만들었다(500 색을 흰 배경에 20%).
+   * hover 배경 용도다: raw Tailwind 의 bg-red-100/green-100 은 테마가 고정이라
+   * 다크에서 밝은 배경 위에 밝아진 700 텍스트가 얹혀 대비가 무너진다. */
+  --red100: #fcdadc;
+  --green100: #cdf0e2;
   --blue500: #3182f6;
   --blue600: #2272eb;
   --blue700: #1b64da; /* blue600보다 진한 강조색 — active 상태(.tm-review-tag-chip 등) */
@@ -333,6 +338,10 @@
    * 토큰(--text-strong 등, 이미 위에서 뒤집힘)이라 대비가 무너지지 않는다. */
   --blue50: rgba(49, 130, 246, 0.14);
   --blue100: rgba(49, 130, 246, 0.24);
+  /* 다크에서는 --blue100 과 같은 방식(500 색의 알파 24%)으로 얹는다 —
+   * 배경이 다크 표면 위에서 은은하게 깔리고 그 위 700 텍스트가 밝아져도 대비가 산다. */
+  --red100: rgba(240, 68, 82, 0.24);
+  --green100: rgba(3, 178, 108, 0.24);
   --green50: rgba(3, 178, 108, 0.14);
   --orange50: rgba(254, 152, 0, 0.16);
   --red50: rgba(240, 68, 82, 0.16);
@@ -350,6 +359,11 @@
    * 확보한 값으로 재계산해 선택. orange는 이미 다크에서 잘 보이는 --orange500을
    * 재사용, red는 이 파일에 이미 쓰이던 #ff6b76(.tm-bk2-badge-live 등)과 통일. */
   --blue700: #6ba8ff;
+  /* --blue600 은 다크 오버라이드가 아예 없어서 라이트값 #2272eb 가 그대로 남았다.
+   * 다크 카드 배경(#1c1e24) 위에서 3.71:1 로 AA 미달인데 26곳이 이 토큰을 쓴다.
+   * blue500(#3182f6, 4.49:1) 과 blue700(#6ba8ff, 6.88:1) 사이를 유지하면서
+   * AA 를 넘는 값으로 잡았다 — #5a9cf8 은 5.99:1. */
+  --blue600: #5a9cf8;
   --orange700: var(--orange500);
   /* --yellow700(light #a66c00)도 동일 이유로 다크에서 --yellow500 재사용 — 다크
      yellow50 틴트(rgba(255,195,66,0.16)) 위 yellow500은 이미 7.2:1로 충분히 통과. */
@@ -1156,13 +1170,17 @@ button:disabled {
   background: var(--grey50);
 }
 
+/* 미체크 상태가 보여야 한다 — 여기는 가입을 통과하려면 반드시 눌러야 하는 관문이다.
+ * grey200 테두리는 흰 배경에서 1.23:1(비텍스트 3:1 기준 미달), grey400 글리프는
+ * 2.01:1 이라 "체크 안 된 동그라미가 거기 있다" 는 것 자체가 보이지 않았다.
+ * grey600 으로 올리면 라이트 4.62:1 · 다크(#8b95a1 on #1c1e24) 5.48:1 로 둘 다 통과한다. */
 .tm-auth-check {
   width: 24px;
   height: 24px;
   border-radius: var(--radius-pill);
-  border: 1px solid var(--grey200);
+  border: 1px solid var(--grey600);
   background: var(--bg);
-  color: var(--grey400);
+  color: var(--grey600);
   display: grid;
   place-items: center;
   font-size: 13px;
@@ -1419,6 +1437,25 @@ button:disabled {
   height: 44px;
   padding: 0;
   position: relative;
+}
+
+/* 시각 크기는 그대로 두고 **터치 영역만** 44px 로 넓힌다.
+ * .tm-btn-icon 은 요소 자체를 44x44 로 만들기 때문에 좁은 줄(검색바 안쪽 등)에
+ * 쓰면 옆 요소를 밀어낸다. 그런 자리에는 이 유틸을 쓴다 — 아이콘은 작게 두고
+ * 손가락이 닿는 영역만 넓히는 방식으로, Apple HIG 와 Material 이 둘 다 권장한다.
+ * ::after 는 버튼의 자식이라 클릭이 버튼으로 전달된다.
+ * 주의: 부모에 overflow:hidden 이 있으면 확장된 영역이 잘리므로 그런 곳에는 쓰지 않는다. */
+.tm-tap-44 {
+  position: relative;
+}
+.tm-tap-44::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100%, 44px);
+  height: max(100%, 44px);
+  transform: translate(-50%, -50%);
 }
 
 .tm-btn-sm {
@@ -2768,7 +2805,12 @@ button:disabled {
   color: var(--static-white);
 }
 
-@media (min-width: 720px) {
+/* 앱 셸의 프레임이 실제로 넓어지는 지점은 768px 이다
+ * (desktop/_shell.css 의 @media(min-width:768px) 에서 --v1-app-chrome-frame-width 가 600px 로).
+ * 이 분기가 720px 에 있으면 720~767px 구간에서는 프레임이 아직 좁은데 2열 그리드로
+ * 바뀌어 오른쪽 열이 잘린다 — 로고 프리셋 버튼이 화면 밖으로 나가 누를 수 없다.
+ * 셸과 같은 지점으로 맞춘다. */
+@media (min-width: 768px) {
   .tm-team-logo-picker {
     grid-template-columns: minmax(210px, 1fr) auto;
     align-items: center;
@@ -2988,6 +3030,15 @@ button:disabled {
   background: var(--grey900);
   display: grid;
   place-items: center;
+}
+
+/* grey900 은 다크에서 #f2f4f6 으로 뒤집힌다. 이 미리보기 안의 아이콘은 흰색
+ * 고정이라 다크에서 "밝은 배경 + 흰 아이콘"(1.10:1)이 되어 사라진다 —
+ * 이미지를 아직 안 올린 사용자에게는 이게 유일한 시각 단서다.
+ * 같은 결함을 먼저 고친 .tm-team-detail-hero-card · .tm-chat-avatar ·
+ * .tm-my-avatar 와 동일하게 다크에서 배경을 고정 어두운 값으로 되돌린다. */
+:root.dark .tm-team-create-preview {
+  background: #191f28;
 }
 
 .tm-list-searchbar {
@@ -4255,6 +4306,14 @@ button:disabled {
   font-weight: 800;
 }
 
+/* grey900 은 다크에서 #f2f4f6 으로 뒤집힌다(회색 스케일 반전). 전경은 --static-white
+ * 고정이라 다크에서 "밝은 배경 + 흰 글자" 가 되어 이니셜이 1.10:1 로 사라졌다.
+ * 다크에서는 배경만 어두운 쪽으로 바꿔 대비를 되살린다 — grey300(#333a45) 위
+ * 흰 글자는 11.46:1. 사진이 있으면 background-image 가 덮으므로 영향 없다. */
+:root.dark .tm-my-avatar {
+  background: var(--grey300);
+}
+
 .tm-my-profile-copy {
   flex: 1;
   min-width: 0;
@@ -5284,7 +5343,7 @@ button:disabled {
 /* 진행중: 파란 외곽 + 안쪽 점 + 펄스 */
 .tm-hub-stage-dot-active {
   border: 2.5px solid var(--blue500);
-  background: #fff;
+  background: var(--static-white);
   box-shadow: 0 0 0 4px var(--blue50);
   animation: tmStepperPulse 1.8s ease-in-out infinite;
 }
@@ -5881,7 +5940,7 @@ button:disabled {
   border: 1px solid var(--grey150);
   border-radius: var(--radius-control);
   padding: 16px 16px;
-  background: #fff;
+  background: var(--card-surface);
   display: flex;
   flex-direction: column;
   gap: 8px;

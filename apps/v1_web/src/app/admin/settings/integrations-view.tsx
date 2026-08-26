@@ -134,7 +134,7 @@ export function IntegrationsView() {
                 onDelete={() => setKakaoMapsJsKey('')}
                 onCancelDelete={() => setKakaoMapsJsKey(undefined)}
               />
-              <span className="text-[length:var(--font-size-micro)] text-gray-400">
+              <span className="text-[length:var(--font-size-micro)] text-[var(--text-muted)]">
                 JS 키는 지도 스크립트에 포함되어 브라우저에 그대로 노출돼요 — 카카오 개발자 콘솔에서 이 앱의
                 사용 도메인을 등록해두면 다른 도메인에서의 무단 사용을 막을 수 있어요.
               </span>

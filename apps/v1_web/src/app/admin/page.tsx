@@ -383,7 +383,7 @@ export default function AdminOverviewPage() {
 
           {!overview?.recentActions?.length ? (
             <div className="py-10 text-center">
-              <p className="text-[length:var(--font-size-body-sm)] text-gray-400">최근 운영 활동이 없어요.</p>
+              <p className="text-[length:var(--font-size-body-sm)] text-[var(--text-muted)]">최근 운영 활동이 없어요.</p>
             </div>
           ) : (
             <ul role="list">
@@ -403,7 +403,7 @@ export default function AdminOverviewPage() {
                   {/* Relative time */}
                   <time
                     dateTime={action.createdAt}
-                    className="text-[length:var(--font-size-caption)] text-gray-400 shrink-0 tabular-nums"
+                    className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] shrink-0 tabular-nums"
                   >
                     {formatRelativeTime(action.createdAt)}
                   </time>

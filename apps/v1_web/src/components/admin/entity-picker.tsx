@@ -194,7 +194,7 @@ export function EntityPicker({
           onClick={() => onChange(null)}
           disabled={disabled}
           aria-label="선택 해제"
-          className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-[var(--blue700)] hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50 shrink-0"
+          className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-[var(--blue700)] hover:bg-[var(--blue100)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50 shrink-0"
         >
           <X size={14} aria-hidden="true" />
         </button>
@@ -205,7 +205,7 @@ export function EntityPicker({
   // ── Search state — input + dropdown menu ───────────────────────────────────
   return (
     <div className="relative">
-      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none">
         <Search size={16} aria-hidden="true" />
       </div>
       <input
@@ -242,7 +242,7 @@ export function EntityPicker({
         aria-activedescendant={safeHighlightIdx >= 0 ? `${menuId}-opt-${safeHighlightIdx}` : undefined}
         className={[
           'w-full h-[44px] pl-9 pr-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)]',
-          'placeholder:text-gray-400',
+          'placeholder:text-[var(--text-muted)]',
           'focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
           'transition-colors disabled:opacity-50',
         ].join(' ')}
@@ -258,9 +258,9 @@ export function EntityPicker({
           className="absolute left-0 right-0 top-[48px] bg-[var(--card-surface)] border border-[var(--border)] rounded-xl shadow-md z-20 overflow-hidden max-h-[240px] overflow-y-auto"
         >
           {loading ? (
-            <p className="px-4 py-3 text-[length:var(--font-size-label)] text-gray-400">검색 중…</p>
+            <p className="px-4 py-3 text-[length:var(--font-size-label)] text-[var(--text-muted)]">검색 중…</p>
           ) : menuEntries.length === 0 ? (
-            <p className="px-4 py-3 text-[length:var(--font-size-label)] text-gray-400">{emptyText}</p>
+            <p className="px-4 py-3 text-[length:var(--font-size-label)] text-[var(--text-muted)]">{emptyText}</p>
           ) : (
             <div role="listbox" id={`${menuId}-list`} aria-label={`${placeholder} 결과`}>
               {menuEntries.map((entry, idx) => {
@@ -315,15 +315,15 @@ export function EntityPicker({
                     ].join(' ')}
                   >
                     <span
-                      className={`text-[length:var(--font-size-label)] font-semibold ${item.disabled ? 'text-gray-400' : 'text-[var(--text-strong)]'}`}
+                      className={`text-[length:var(--font-size-label)] font-semibold ${item.disabled ? 'text-[var(--text-muted)]' : 'text-[var(--text-strong)]'}`}
                     >
                       {item.label}
                     </span>
                     {item.description && (
-                      <span className="text-[length:var(--font-size-caption)] text-gray-400">{item.description}</span>
+                      <span className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{item.description}</span>
                     )}
                     {item.disabled && item.disabledReason && (
-                      <span className="text-[length:var(--font-size-caption)] text-gray-400">{item.disabledReason}</span>
+                      <span className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{item.disabledReason}</span>
                     )}
                   </button>
                 );

@@ -61,7 +61,7 @@ function TeamStagingPicker({
                   type="button"
                   onClick={() => addStaged(t.id)}
                   disabled={isSubmitting}
-                  className="inline-flex items-center gap-1 h-[44px] px-3 rounded-full text-[13px] font-medium text-[var(--blue700)] bg-[var(--blue50)] border border-[var(--tint-blue-border)] hover:bg-blue-100 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                  className="inline-flex items-center gap-1 h-[44px] px-3 rounded-full text-[13px] font-medium text-[var(--blue700)] bg-[var(--blue50)] border border-[var(--tint-blue-border)] hover:bg-[var(--blue100)] transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                 >
                   <Plus size={12} aria-hidden="true" />
                   {t.label}
@@ -113,7 +113,7 @@ function TeamStagingPicker({
                 type="button"
                 onClick={() => removeStaged(id)}
                 aria-label={`${labelById.get(id) ?? '팀'} 담기 취소`}
-                className="inline-flex items-center justify-center w-[20px] h-[20px] rounded-full text-gray-400 hover:text-red-500 hover:bg-[var(--red50)] transition-colors"
+                className="inline-flex items-center justify-center w-[20px] h-[20px] rounded-full text-[var(--text-muted)] hover:text-red-500 hover:bg-[var(--red50)] transition-colors"
               >
                 <X size={11} aria-hidden="true" />
               </button>
@@ -304,7 +304,7 @@ export function BracketGroupCard({
           <ChevronRight
             size={18}
             aria-hidden="true"
-            className={`shrink-0 mt-0.5 text-gray-400 transition-transform ${expanded ? 'rotate-90' : ''}`}
+            className={`shrink-0 mt-0.5 text-[var(--text-muted)] transition-transform ${expanded ? 'rotate-90' : ''}`}
           />
           <span className="flex-1 min-w-0">
             <span className="flex items-center gap-1.5 flex-wrap">
@@ -327,7 +327,7 @@ export function BracketGroupCard({
             type="button"
             onClick={() => onEditGroup(group)}
             aria-label={`${group.name} 수정`}
-            className="inline-flex items-center justify-center w-[44px] h-[44px] rounded-lg text-gray-400 hover:text-[var(--blue700)] hover:bg-[var(--blue50)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            className="inline-flex items-center justify-center w-[44px] h-[44px] rounded-lg text-[var(--text-muted)] hover:text-[var(--blue700)] hover:bg-[var(--blue50)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
             <Pencil size={14} aria-hidden="true" />
           </button>
@@ -335,7 +335,7 @@ export function BracketGroupCard({
             type="button"
             onClick={() => onDeleteGroup(group)}
             aria-label={`${group.name} 삭제`}
-            className="inline-flex items-center justify-center w-[44px] h-[44px] rounded-lg text-gray-400 hover:text-red-500 hover:bg-[var(--red50)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            className="inline-flex items-center justify-center w-[44px] h-[44px] rounded-lg text-[var(--text-muted)] hover:text-red-500 hover:bg-[var(--red50)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
             <Trash2 size={14} aria-hidden="true" />
           </button>
@@ -358,7 +358,7 @@ export function BracketGroupCard({
                       type="button"
                       onClick={() => onRemoveGroupTeam(gt.id, gt.teamName ?? '이 팀')}
                       aria-label={`${gt.teamName ?? '팀'} 배정 해제`}
-                      className="inline-flex items-center justify-center w-[20px] h-[20px] rounded-full text-gray-400 hover:text-red-500 hover:bg-[var(--red50)] transition-colors"
+                      className="inline-flex items-center justify-center w-[20px] h-[20px] rounded-full text-[var(--text-muted)] hover:text-red-500 hover:bg-[var(--red50)] transition-colors"
                     >
                       <X size={11} aria-hidden="true" />
                     </button>

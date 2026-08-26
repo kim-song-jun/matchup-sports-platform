@@ -239,7 +239,7 @@ function AdminUsersPageContent() {
                 return (
                   <span className="tabular-nums whitespace-nowrap text-[var(--text-muted)]">
                     {row.membershipCount}
-                    <span className="text-gray-400">
+                    <span className="text-[var(--text-muted)]">
                       {' '}
                       ({teamRoles.owner}/{teamRoles.manager}/{teamRoles.member})
                     </span>

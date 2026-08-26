@@ -645,7 +645,7 @@ export function BracketTab({
                     <Link
                       href={operateHref}
                       aria-label={`${f.round} ${f.fixtureNumber}번 경기 운영 콘솔 열기`}
-                      className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium whitespace-nowrap text-[var(--green700)] bg-[var(--green50)] hover:bg-green-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                      className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium whitespace-nowrap text-[var(--green700)] bg-[var(--green50)] hover:bg-[var(--green100)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                     >
                       운영 콘솔 열기
                       <ChevronRight size={12} aria-hidden="true" />
@@ -659,7 +659,7 @@ export function BracketTab({
                   <Link
                     href={resultConsoleHref}
                     aria-label={`${f.round} ${f.fixtureNumber}번 경기 ${resultConsoleLabel}`}
-                    className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium whitespace-nowrap text-[var(--blue700)] bg-[var(--blue50)] hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                    className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium whitespace-nowrap text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--blue100)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                   >
                     {resultConsoleLabel}
                     <ChevronRight size={12} aria-hidden="true" />

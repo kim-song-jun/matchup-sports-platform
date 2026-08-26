@@ -79,17 +79,37 @@ for (const [pname, path] of PAGES) {
     const page = await ctx.newPage();
     const resp = await page.goto(BASE + path, { waitUntil: 'domcontentloaded' });
     const status = resp?.status() ?? 0;
-    // 라이브 경기가 있는 화면은 폴링이라 networkidle 이 끝나지 않는다 — 명시 대기
-    await page.waitForTimeout(2600);
+    // 라이브 경기가 있는 화면은 10초 폴링이라 networkidle 이 끝나지 않는다.
+    // 그렇다고 고정 대기로 재면 **아직 스켈레톤인 화면의 여백을 재게 된다** —
+    // 데이터가 늦게 오는 목록에서 이탈을 통째로 놓친다. DOM 이 멎을 때까지 기다린다.
+    const settle = await page.evaluate(async () => {
+      const count = () => document.querySelectorAll('body *').length;
+      const skeleton = () =>
+        document.querySelectorAll('[class*="skeleton"], [class*="Skeleton"], .animate-pulse').length;
+      let prev = -1, stable = 0, waited = 0;
+      while (waited < 12000) {
+        await new Promise((r) => setTimeout(r, 400));
+        waited += 400;
+        const n = count();
+        // 연속 3회(1.2초) 같은 수면 렌더가 멎은 것으로 본다
+        stable = n === prev ? stable + 1 : 0;
+        prev = n;
+        if (stable >= 3 && skeleton() === 0) return { waited, nodes: n, skeleton: 0 };
+      }
+      return { waited, nodes: count(), skeleton: skeleton() };
+    });
     const audit = await page.evaluate(AUDIT);
     const file = `${pname}-${wname}-${width}.png`;
     await page.screenshot({ path: `${OUT}/${file}`, fullPage: true });
     // 캡처가 403/500 을 찍고 통과로 읽히는 사고를 막는다
     const ok = status === 200;
-    results.push({ pname, wname, width, status, ...audit, file, ok });
+    const settled = settle.skeleton === 0;
+    results.push({ pname, wname, width, status, ...audit, ...settle, settled, file, ok });
     console.log(
       `${ok ? '  ' : '★ '}${pname.padEnd(15)} ${String(width).padStart(4)}px  HTTP ${status}  ` +
       `여백 ${String(audit.checked).padStart(4)}개 중 격자 이탈 ${audit.offCount}` +
+      `  (렌더 ${settle.waited}ms·노드 ${settle.nodes}` +
+      (settled ? ')' : `·스켈레톤 ${settle.skeleton} 남음 ⚠️)`) +
       (audit.offCount ? `  ${JSON.stringify(audit.byValue)}` : ''),
     );
     if (audit.offCount && audit.sample.length) {
@@ -101,10 +121,15 @@ for (const [pname, path] of PAGES) {
 
 await browser.close();
 
+// 스켈레톤이 남은 채 잰 측정은 신뢰할 수 없다 — 통과로 읽히면 안 된다
+const unsettled = results.filter((r) => !r.settled);
 const bad = results.filter((r) => !r.ok);
 const totalOff = results.reduce((a, r) => a + r.offCount, 0);
 const totalChecked = results.reduce((a, r) => a + r.checked, 0);
-console.log(`\n합계: 여백 ${totalChecked}개 검사 · 격자 이탈 ${totalOff}개 · HTTP 비200 ${bad.length}건`);
+console.log(
+  `\n합계: 여백 ${totalChecked}개 검사 · 격자 이탈 ${totalOff}개 · HTTP 비200 ${bad.length}건` +
+  (unsettled.length ? ` · ⚠️ 렌더 미완 ${unsettled.length}건` : ''),
+);
 console.log(`저장: ${OUT}`);
 // 하네스로 쓰려면 이탈도 실패여야 한다 — 숫자만 찍고 exit 0 이면 자동화에서 놓친다.
-if (bad.length || totalOff) process.exit(1);
+if (bad.length || totalOff || unsettled.length) process.exit(1);

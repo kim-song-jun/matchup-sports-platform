@@ -142,14 +142,13 @@ function FilterChipGroup<T extends string>({
   return (
     <div>
       <div className="tm-text-caption" style={{ marginBottom: 6 }}>{label}</div>
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         {options.map((option) => (
           <button
             key={option.value}
             type="button"
             aria-pressed={value === option.value}
-            className={`tm-badge ${value === option.value ? 'tm-badge-blue' : 'tm-badge-grey'}`}
-            style={{ border: 'none', cursor: 'pointer' }}
+            className={`tm-chip ${value === option.value ? 'tm-chip-active' : ''}`}
             onClick={() => onChange(option.value)}
           >
             {option.label}
@@ -683,14 +682,13 @@ export function ScheduleFormPageView({ model }: { model: ScheduleFormViewModel }
             <div>
               <div className="tm-text-label" style={{ marginBottom: 6 }}>종류</div>
               {model.typeEditable ? (
-                <div style={{ display: 'flex', gap: 6 }}>
+                <div style={{ display: 'flex', gap: 8 }}>
                   {model.typeOptions.map((option) => (
                     <button
                       key={option.value}
                       type="button"
                       aria-pressed={draft.type === option.value}
-                      className={`tm-badge ${draft.type === option.value ? 'tm-badge-blue' : 'tm-badge-grey'}`}
-                      style={{ border: 'none', cursor: 'pointer' }}
+                      className={`tm-chip ${draft.type === option.value ? 'tm-chip-active' : ''}`}
                       onClick={() => model.onFieldChange('type', option.value)}
                     >
                       {option.label}
@@ -745,14 +743,13 @@ export function ScheduleFormPageView({ model }: { model: ScheduleFormViewModel }
 
         <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
           <div className="tm-text-label" style={{ marginBottom: 14, color: 'var(--text-muted)' }}>공개 설정</div>
-          <div style={{ display: 'flex', gap: 6 }}>
+          <div style={{ display: 'flex', gap: 8 }}>
             {model.visibilityOptions.map((option) => (
               <button
                 key={option.value}
                 type="button"
                 aria-pressed={draft.visibility === option.value}
-                className={`tm-badge ${draft.visibility === option.value ? 'tm-badge-blue' : 'tm-badge-grey'}`}
-                style={{ border: 'none', cursor: 'pointer' }}
+                className={`tm-chip ${draft.visibility === option.value ? 'tm-chip-active' : ''}`}
                 onClick={() => model.onFieldChange('visibility', option.value)}
               >
                 {option.label}

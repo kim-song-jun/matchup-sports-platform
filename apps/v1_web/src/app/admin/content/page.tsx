@@ -100,9 +100,11 @@ function ContentHub() {
       </div>
 
       <div
+        key={activeTab}
         id={`content-panel-${activeTab}`}
         role="tabpanel"
         aria-labelledby={`content-tab-${activeTab}`}
+        className="tm-tabpanel-enter"
       >
         {activeTab === 'notices' && <NoticesView />}
         {activeTab === 'popups' && <PopupsView />}

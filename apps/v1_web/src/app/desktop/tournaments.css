@@ -187,7 +187,7 @@
     border: 1px solid var(--border);
     border-radius: 16px;
     padding: 20px;
-    box-shadow: var(--shadow-1);
+    box-shadow: var(--shadow-card);
   }
 }
 
@@ -275,7 +275,7 @@
     border: 1px solid var(--border);
     border-radius: 16px;
     padding: 20px;
-    box-shadow: var(--shadow-1);
+    box-shadow: var(--shadow-card);
   }
 
   /* Hide the fixed bottom CTA on desktop — the rail takes over.

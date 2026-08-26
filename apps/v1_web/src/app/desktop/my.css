@@ -246,7 +246,7 @@
   }
 
   .tm-review-schedule-card:hover {
-    box-shadow: var(--shadow-2);
+    box-shadow: var(--shadow-dropdown);
   }
 
   /* Review compose shell: same max-width. */
@@ -290,7 +290,7 @@
   }
 
   .tm-my-matches-desktop .tm-my-list-stack .tm-card:hover {
-    box-shadow: var(--shadow-2);
+    box-shadow: var(--shadow-dropdown);
   }
 
   /* Segment row (joined/created toggle): constrain to ~360px, don't stretch */
@@ -324,7 +324,7 @@
   }
 
   .tm-my-teams-desktop .tm-my-team-card:hover {
-    box-shadow: var(--shadow-2);
+    box-shadow: var(--shadow-dropdown);
   }
 
   /* Stat grid: already 3-col on mobile — fine on desktop, no override needed. */
@@ -380,7 +380,7 @@
     border: 1px solid var(--border);
     border-radius: 16px;
     padding: 16px;
-    box-shadow: var(--shadow-1);
+    box-shadow: var(--shadow-card);
   }
 }
 

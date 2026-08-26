@@ -236,7 +236,7 @@
     border: 1px solid var(--border);
     border-radius: 16px;
     padding: 20px;
-    box-shadow: var(--shadow-1);
+    box-shadow: var(--shadow-card);
   }
 
   .tm-match-detail-desktop-cta-label {

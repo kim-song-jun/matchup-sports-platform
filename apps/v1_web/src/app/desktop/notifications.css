@@ -88,7 +88,7 @@
     width: min(400px, calc(100vw - 48px));
     border-radius: 14px;
     z-index: 60;
-    box-shadow: var(--shadow-2);
+    box-shadow: var(--shadow-dropdown);
   }
 
   /* Page head: rendered via .tm-desktop-page-head primitive in the JSX.

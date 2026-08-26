@@ -82,24 +82,17 @@
   --orange-soft: var(--orange50);
   --red: var(--red500);
   --red-soft: var(--red50);
-  --grey-900: var(--grey900);
-  --grey-700: var(--grey700);
-  --grey-500: var(--grey500);
-  --grey-300: var(--grey300);
-  --grey-100: var(--grey100);
   --accent: var(--blue);
-  /* ── [P2 Elevation] named shadow — 역할 매핑 (값 변경 없음, 의미 명문화) ──────
+  /* ── [P2 Elevation] named shadow — 역할 매핑 ────────────────────────────────
+   * 정의는 tokens.css 의 @theme 로 옮겼다(치수 계열 SSOT). 값은 그대로다.
    * elevation-0: flat surface (배경과 동일, shadow 없음)
-   * elevation-1: card — 콘텐츠 카드, 인라인 칩, 세그먼트 탭 활성
-   * elevation-2: dropdown / overlay — 검색 드롭다운, 툴팁, 하단 스크림
+   * elevation-1: card — 콘텐츠 카드, 인라인 칩, 세그먼트 탭 활성 (--shadow-card)
+   * elevation-2: dropdown / overlay — 검색 드롭다운, 툴팁, 하단 스크림 (--shadow-dropdown)
    * elevation-3: dialog — 모달·alert dialog (--shadow-modal)
-   * elevation-4: sidebar / drawer — 사이드 네비 (--shadow-sidebar)
+   * elevation-4: sidebar / drawer — 사이드 네비 (--shadow-drawer)
    * elevation-5: toast / FAB — 화면 최상단 플로팅 (별도 box-shadow 인라인)
    * ──────────────────────────────────────────────────────────────────────────── */
-  --shadow-1: 0 1px 2px rgba(15, 23, 42, 0.05);       /* elevation-1: card */
-  --shadow-2: 0 8px 24px rgba(20, 28, 45, 0.08);      /* elevation-2: dropdown/overlay */
   /* ── 시맨틱 별칭 — 컴포넌트 CSS가 참조하지만 정의가 누락됐던 토큰(WS1 복구) ── */
-  --sh-1: var(--shadow-1); /* box-shadow: .tm-auth-segment-active, .tm-chat-bubble 등 */
   --line: var(--border); /* hairline border: .tm-auth-profile-upload 등 */
   --red-alpha-08: rgba(240, 68, 82, 0.08); /* --red500(#f04452) 8% — 에러 카드 border */
   /* ── WS6 토큰화 — 소비자 하드코딩 hex/rgba → 의미 토큰 ── */
@@ -141,8 +134,6 @@
   --overlay-white-92: rgba(255, 255, 255, 0.92);  /* 프로모 eyebrow 텍스트, CTA hover */
   --glass-white-96: rgba(255, 255, 255, 0.96);   /* 네비/헤더 유리 배경 */
   /* 모달·사이드바 그림자 */
-  --shadow-modal: 0 8px 32px rgba(20, 28, 45, 0.14);  /* elevation-3: dialog */
-  --shadow-sidebar: 4px 0 24px rgba(20, 28, 45, 0.12); /* elevation-4: sidebar/drawer */
   /* 검색 포커스 링 */
   --blue-focus-ring: rgba(49, 130, 246, 0.12);
   /* 대회 상금 / 보조 색 */
@@ -900,7 +891,7 @@ button:disabled {
 .tm-auth-segment-active {
   background: var(--bg);
   color: var(--blue500);
-  box-shadow: var(--sh-1);
+  box-shadow: var(--shadow-card);
 }
 
 /* 모드 탭 아래 한 단계 낮은 선택지(계정 찾기의 '본인 확인 방법')에 쓰는 축소 변형.
@@ -1519,7 +1510,11 @@ button:disabled {
  * - active scale은 :not(:disabled) 가드로 비활성 버튼 눌림 피드백 차단
  * ─────────────────────────────────────────────────────────────────────────── */
 .tm-btn {
-  transition: background-color 0.12s ease, transform 0.08s ease;
+  /* 0.12s / 0.08s 를 같은 값의 토큰으로 표기 통일 (120ms / 80ms — 값 변화 없음).
+   * easing 은 여기서 건드리지 않는다: ease 는 cubic-bezier(.25,.1,.25,1) 이고
+   * --ease-standard 는 (.4,0,.2,1) 이라 서로 다른 곡선이다. 통일하려면 의도적
+   * 결정과 시각 검증이 따라야 한다. */
+  transition: background-color var(--duration-fast) ease, transform var(--duration-instant) ease;
 }
 
 @media (hover: hover) {
@@ -1598,7 +1593,7 @@ button:disabled {
  * ─────────────────────────────────────────────────────────────────────────── */
 @media (hover: hover) {
   .tm-card-interactive:hover {
-    box-shadow: var(--shadow-1); /* elevation-1 lift */
+    box-shadow: var(--shadow-card); /* elevation-1 lift */
     cursor: pointer;
   }
 
@@ -1959,7 +1954,7 @@ button:disabled {
      shadow-2 를 히어로 카드에도 적용해, 이미지 비중이 커진 만큼 media+content 를 한
      덩어리로 묶어 '붕 떠' 보이지 않게 한다. border만 있던 이전보다 카드가 배경 위에
      자연스럽게 자리 잡은 느낌을 준다(과한 확산 없는 절제된 값 그대로 재사용). */
-  box-shadow: var(--shadow-2);
+  box-shadow: var(--shadow-dropdown);
 }
 
 .tm-featured-content {
@@ -2189,7 +2184,7 @@ button:disabled {
   text-align: left;
   color: inherit;
   /* hairline shadow 로 이미지+내용을 한 카드로 묶어 '붕 떠' 보이지 않게 */
-  box-shadow: var(--shadow-2);
+  box-shadow: var(--shadow-dropdown);
 }
 
 .tm-match-card-media {
@@ -3695,7 +3690,7 @@ button:disabled {
   border-radius: 14px;
   background: var(--bg);
   color: var(--text-strong);
-  box-shadow: var(--sh-1);
+  box-shadow: var(--shadow-card);
 }
 
 .tm-chat-bubble-me {
@@ -4169,7 +4164,7 @@ button:disabled {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface);
-  box-shadow: var(--shadow-1);
+  box-shadow: var(--shadow-card);
 }
 
 .v1-card-pad {
@@ -4853,7 +4848,7 @@ button:disabled {
     border: 1px solid var(--border);
     border-radius: 18px;
     overflow: hidden;
-    box-shadow: var(--shadow-2);
+    box-shadow: var(--shadow-dropdown);
   }
 
   .v1-main {

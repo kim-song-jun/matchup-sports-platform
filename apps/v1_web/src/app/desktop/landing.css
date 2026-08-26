@@ -151,7 +151,7 @@
   background: var(--bg);
   border: 1px solid var(--grey150);
   border-radius: 14px;
-  box-shadow: var(--shadow-1);
+  box-shadow: var(--shadow-card);
 }
 
 .tm-landing-stat {
@@ -201,7 +201,7 @@
   background: var(--bg);
   border: 1px solid var(--grey150);
   border-radius: 14px;
-  box-shadow: var(--shadow-1);
+  box-shadow: var(--shadow-card);
 }
 
 .tm-landing-feature-icon {
@@ -248,7 +248,7 @@
   font-size: 14px;
   font-weight: 500;
   color: var(--text-strong);
-  box-shadow: var(--shadow-1);
+  box-shadow: var(--shadow-card);
 }
 
 /* ── Steps ── */
@@ -270,7 +270,7 @@
   background: var(--bg);
   border: 1px solid var(--grey150);
   border-radius: 14px;
-  box-shadow: var(--shadow-1);
+  box-shadow: var(--shadow-card);
 }
 
 .tm-landing-step-num {

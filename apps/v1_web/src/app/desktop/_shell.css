@@ -130,7 +130,7 @@
     width: min(100%, 440px);
     border-radius: 16px;
     border-top: none;
-    box-shadow: var(--shadow-2);
+    box-shadow: var(--shadow-dropdown);
     animation: tm-filter-sheet-scale-in 0.2s ease-out;
   }
 
@@ -474,7 +474,7 @@
     background: var(--bg);
     color: var(--grey700);
     border: 1px solid var(--grey200);
-    box-shadow: var(--shadow-2);
+    box-shadow: var(--shadow-dropdown);
     cursor: pointer;
     opacity: 0;
     transform: translateY(8px) rotate(90deg);
@@ -529,7 +529,7 @@
     position: static;
     margin: 0 auto;
     border-radius: 16px;
-    box-shadow: var(--shadow-2);
+    box-shadow: var(--shadow-dropdown);
     background: var(--bg);
     align-self: center;
   }

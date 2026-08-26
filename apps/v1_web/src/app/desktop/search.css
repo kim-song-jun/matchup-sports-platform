@@ -63,7 +63,7 @@
     width: 100% !important;
     min-height: 52px !important;
     border-radius: 18px !important;
-    box-shadow: var(--shadow-1);
+    box-shadow: var(--shadow-card);
     background: var(--bg) !important;
     border: 1.5px solid var(--grey200) !important;
     padding: 0 10px 0 18px !important;

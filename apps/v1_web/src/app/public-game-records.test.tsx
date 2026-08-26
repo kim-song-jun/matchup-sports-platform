@@ -517,9 +517,12 @@ function makeUserRecords(overrides: Partial<PublicUserRecordsResponse> = {}): Pu
       {
         id: 'result-1',
         gameId: 'game-1',
+        type: 'tournament',
         matchType: 'tournament',
         tournamentId: 'tournament-1',
         tournamentTitle: '테스트 대회',
+        leagueId: null,
+        leagueTitle: null,
         round: '결승',
         teamId: 'team-1',
         teamName: '서울 유나이티드',
@@ -577,6 +580,55 @@ describe('UserRecordsContent — 기록 행', () => {
     // KPI 요약 카드에도 "MVP" 라벨이 있어 텍스트만으로는 모호하다 -- 기록 행(목록) 안의
     // 배지(<span>)만 특정해서 확인한다.
     expect(screen.getByText('MVP', { selector: 'section span' })).toBeInTheDocument();
+  });
+
+  // F6 -- 리그 경기가 친선 팀매치와 구분 없이 이름 없는 행으로 남던 결함.
+  it('정규 리그 대진 행은 대회 경기와 같은 표기로 리그명을 보여준다', () => {
+    const base = makeUserRecords().items[0];
+    render(
+      <UserRecordsContent
+        data={makeUserRecords({
+          items: [
+            {
+              ...base,
+              type: 'league',
+              matchType: 'team_match',
+              tournamentId: null,
+              tournamentTitle: null,
+              leagueId: 'league-1',
+              leagueTitle: '2026 가을 정규 리그',
+            },
+          ],
+        })}
+      />,
+    );
+
+    expect(screen.getByText(/· 2026 가을 정규 리그/)).toBeInTheDocument();
+  });
+
+  it('리그가 아닌 친선 팀매치 행에는 대회·리그 이름이 붙지 않는다', () => {
+    const base = makeUserRecords().items[0];
+    render(
+      <UserRecordsContent
+        data={makeUserRecords({
+          items: [
+            {
+              ...base,
+              type: 'friendly',
+              matchType: 'team_match',
+              tournamentId: null,
+              tournamentTitle: null,
+              leagueId: null,
+              leagueTitle: null,
+            },
+          ],
+        })}
+      />,
+    );
+
+    // 캡션은 날짜 하나로만 끝난다 -- ` · 이름` 꼬리가 붙지 않는다(회귀 금지).
+    expect(screen.getByText(/^\d{1,2}\/\d{1,2} \(.\)$/)).toBeInTheDocument();
+    expect(screen.queryByText(/· 테스트 대회/)).toBeNull();
   });
 });
 

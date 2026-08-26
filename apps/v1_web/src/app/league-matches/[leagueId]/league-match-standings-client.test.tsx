@@ -1,7 +1,18 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Providers } from '@/app/providers';
-import { useV1ActivePopup, useV1LeagueMatch, useV1LeagueMatchPlayerRecords, useV1LeagueMatchStandings } from '@/hooks/use-v1-api';
+import {
+  useV1ActivePopup,
+  useV1AuthMe,
+  useV1LeagueClaimableFixtures,
+  useV1LeagueMatch,
+  useV1LeagueMatchPlayerRecords,
+  useV1LeagueMatchStandings,
+  useV1MyLeagues,
+  useV1MyTeams,
+  useV1RecordConsent,
+} from '@/hooks/use-v1-api';
+import { clearStoredV1Session, saveStoredV1Session } from '@/lib/session-storage';
 import LeagueMatchStandingsClient from './league-match-standings-client';
 
 vi.mock('@/components/auth/pending-social-signup-gate', () => ({
@@ -13,6 +24,18 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1LeagueMatch: vi.fn(),
   useV1LeagueMatchStandings: vi.fn(),
   useV1LeagueMatchPlayerRecords: vi.fn(),
+  // F8 배너 경로. 기본값은 "로그인 안 됨 + 연결할 대진 없음" — 기존 테스트가 배너를
+  // 만나지 않고 그대로 돌아간다.
+  useV1AuthMe: vi.fn(() => ({ data: undefined })),
+  useV1LeagueClaimableFixtures: vi.fn(() => ({ data: undefined })),
+  // R5 동의 안내 경로. 기본값은 "이 리그 참가자가 아님 + 동의 응답 없음" — 기존 테스트는
+  // 두 카드 어느 쪽도 만나지 않는다.
+  useV1MyTeams: vi.fn(() => ({ data: undefined })),
+  useV1RecordConsent: vi.fn(() => ({ data: undefined })),
+  // 이 화면은 **비로그인도 열리는 공개 순위표**라 여기서 호출하면 안 되는 무거운 조회.
+  // 아래 "공개 화면에서 무거운 조회를 붙이지 않는다" 테스트가 이 mock 이 한 번도 불리지
+  // 않는지 검사한다.
+  useV1MyLeagues: vi.fn(() => ({ data: undefined })),
   // Providers 안의 ThemeProvider가 전역으로 호출한다 — 이 테스트가 <Providers>로 렌더하는 한 필요.
   useV1Settings: vi.fn(() => ({ data: undefined, isError: false, refetch: vi.fn() })),
   useV1UpdateSettings: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
@@ -22,6 +45,11 @@ const useV1ActivePopupMock = vi.mocked(useV1ActivePopup, { partial: true });
 const useV1LeagueMatchMock = vi.mocked(useV1LeagueMatch, { partial: true });
 const useV1LeagueMatchStandingsMock = vi.mocked(useV1LeagueMatchStandings, { partial: true });
 const useV1LeagueMatchPlayerRecordsMock = vi.mocked(useV1LeagueMatchPlayerRecords, { partial: true });
+const useV1AuthMeMock = vi.mocked(useV1AuthMe, { partial: true });
+const useV1LeagueClaimableFixturesMock = vi.mocked(useV1LeagueClaimableFixtures, { partial: true });
+const useV1MyLeaguesMock = vi.mocked(useV1MyLeagues, { partial: true });
+const useV1MyTeamsMock = vi.mocked(useV1MyTeams, { partial: true });
+const useV1RecordConsentMock = vi.mocked(useV1RecordConsent, { partial: true });
 
 describe('LeagueMatchStandingsClient', () => {
   // D3(2026-08-24 사용자 확정): 리그 안에서 팀으로 나가는 통로. 그전까지 순위표의 팀
@@ -1094,5 +1122,396 @@ describe('LeagueMatchStandingsClient', () => {
     expect(
       await screen.findByText('도움 기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 순위가 공개돼요.'),
     ).toBeInTheDocument();
+  });
+
+  /* ── F8: 빈 상태에서 신원 연동으로 가는 길 ────────────────────────────────
+   * 빈 상태는 "신원 연동과 기록 공개에 동의하면 순위가 공개돼요"라고 이유를 말하는데
+   * 정작 이 화면에는 연동을 시작할 수단이 없었다(alpha 실측). 아래 테스트들은 그 길이
+   * **필요한 사람에게만** 열리는지를 본다 — 아무에게나 쓸모없는 버튼을 남기면 그건
+   * 고친 게 아니라 옮긴 것이다.
+   * ────────────────────────────────────────────────────────────────────── */
+  afterEach(() => {
+    clearStoredV1Session();
+    useV1AuthMeMock.mockReturnValue({ data: undefined } as never);
+    useV1LeagueClaimableFixturesMock.mockReturnValue({ data: undefined } as never);
+    useV1MyLeaguesMock.mockClear();
+    useV1MyTeamsMock.mockReturnValue({ data: undefined } as never);
+    useV1RecordConsentMock.mockReturnValue({ data: undefined } as never);
+  });
+
+  /**
+   * 이 리그의 참가팀. 순위표 응답이 곧 참가팀 목록이라(서버가 `league.teams` 로 행을 만든다)
+   * 참가자 판정이 이 값을 그대로 쓴다 — 그래서 배너 테스트도 여기서 참가팀을 정한다.
+   */
+  const LEAGUE_TEAM_ID = 't1';
+
+  function mockLeague(
+    records: {
+      goals: { userId: string; nickname: string | null; goals: number }[];
+      assists: { userId: string; nickname: string | null; assists: number }[];
+      hiddenByEligibility: boolean;
+    },
+    leagueTeamIds: string[] = [LEAGUE_TEAM_ID],
+  ) {
+    useV1LeagueMatchMock.mockReturnValue({
+      data: { leagueId: 'league-1', title: '가을 리그', state: 'active', startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1'], fixtures: [] },
+    } as never);
+    useV1LeagueMatchStandingsMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1',
+        tieBreakOrder: ['points'],
+        standings: leagueTeamIds.map((teamId, index) => ({
+          teamId,
+          teamName: `${teamId} 팀`,
+          teamLogoUrl: null,
+          position: index + 1,
+          played: 0,
+          wins: 0,
+          draws: 0,
+          losses: 0,
+          goalsFor: 0,
+          goalsAgainst: 0,
+          points: 0,
+        })),
+        pendingFixtures: [],
+      },
+    } as never);
+    useV1LeagueMatchPlayerRecordsMock.mockReturnValue({ data: { leagueId: 'league-1', ...records } } as never);
+  }
+
+  /**
+   * 훅 mock 이 `enabled` 를 실제로 지킨다 — 그래야 "조회를 보내지 않는다"는 게이트가
+   * 호출 인자 대조가 아니라 **화면에 배너가 없다**로 검증된다.
+   */
+  function mockClaimableFixtures(
+    fixtures: { teamMatchId: string; title: string; startAt: string; claimableCount: number }[],
+  ) {
+    useV1LeagueClaimableFixturesMock.mockImplementation(
+      ((_leagueId: string, options?: { enabled?: boolean }) =>
+        (options?.enabled ?? true)
+          ? { data: { leagueId: 'league-1', fixtures } }
+          : { data: undefined }) as never,
+    );
+  }
+
+  const oneFixture = [
+    { teamMatchId: 'tm-1', title: '가을 리그 1주차 1경기', startAt: '2026-08-01T10:00:00.000Z', claimableCount: 2 },
+  ];
+
+  /**
+   * "내 팀" 도 `enabled` 를 지킨다 — 비로그인 관전자에게 조회가 나가지 않는다는 것을
+   * 호출 인자가 아니라 **화면에 안내가 없다**로 검증하기 위해서다.
+   */
+  function mockMyTeams(teamIds: string[]) {
+    useV1MyTeamsMock.mockImplementation(
+      ((_filters?: unknown, options?: { enabled?: boolean }) =>
+        (options?.enabled ?? true)
+          ? { data: { items: teamIds.map((teamId) => ({ teamId })) } }
+          : { data: undefined }) as never,
+    );
+  }
+
+  /**
+   * React Query 는 `enabled: false` 여도 **캐시에 남아 있는 데이터는 그대로 돌려준다.**
+   * "내 팀"은 앱 전역이 공유하는 쿼리 키라, 사용자가 팀·대회 화면을 먼저 다녀왔다면 이
+   * 리그 화면에서 조회가 꺼져 있어도 data 가 채워진 채로 들어온다 — `enabled` 만 믿고
+   * 게이트를 세우면 그 경로로 샌다.
+   */
+  function mockMyTeamsFromWarmCache(teamIds: string[]) {
+    useV1MyTeamsMock.mockReturnValue({
+      data: { items: teamIds.map((teamId) => ({ teamId })) },
+    } as never);
+  }
+
+  function mockRecordConsent(
+    consent: { granted: boolean; hasResponded: boolean; pendingRecordCount: number } | undefined,
+  ) {
+    useV1RecordConsentMock.mockReturnValue({ data: consent } as never);
+  }
+
+  /** 아직 동의를 한 번도 묻지 않은 사람 — 안내 대상. */
+  const NEVER_ASKED = { granted: false, hasResponded: false, pendingRecordCount: 3 };
+
+  const CONSENT_CARD_TITLE = '내 경기 기록이 아직 비공개예요';
+
+  it('공개 자격 때문에 순위가 비면, 연결할 대진이 있는 사람에게 연동 배너를 보여준다', async () => {
+    saveStoredV1Session({ userId: 'me' });
+    useV1AuthMeMock.mockReturnValue({ data: { id: 'me' } } as never);
+    mockLeague({ goals: [], assists: [], hiddenByEligibility: true });
+    mockClaimableFixtures(oneFixture);
+
+    render(<LeagueMatchStandingsClient leagueId="league-1" />);
+
+    expect(await screen.findByText('이 리그에서 뛰었는데 내 기록이 없나요?')).toBeInTheDocument();
+    const link = screen.getByRole('link', { name: /가을 리그 1주차 1경기 경기 상세로 이동/ });
+    expect(link).toHaveAttribute('href', '/league-matches/league-1/fixtures/tm-1');
+    expect(link).toHaveTextContent('연결 안 된 참가자 2명');
+  });
+
+  it('연결할 대진이 0건이면 배너를 아예 띄우지 않는다', async () => {
+    saveStoredV1Session({ userId: 'me' });
+    useV1AuthMeMock.mockReturnValue({ data: { id: 'me' } } as never);
+    mockLeague({ goals: [], assists: [], hiddenByEligibility: true });
+    mockClaimableFixtures([]);
+
+    render(<LeagueMatchStandingsClient leagueId="league-1" />);
+
+    // 화면 자체는 그려졌다(빈 상태 문구 존재) — 배너만 없다.
+    expect(
+      await screen.findByText('득점 기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 순위가 공개돼요.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('이 리그에서 뛰었는데 내 기록이 없나요?')).not.toBeInTheDocument();
+  });
+
+  it('비로그인 관전자에게는 배너를 띄우지도, 목록을 조회하지도 않는다', async () => {
+    // 세션 힌트 없음. 서버가 대진을 준다 해도 조회 자체가 꺼져 있어야 한다.
+    mockLeague({ goals: [], assists: [], hiddenByEligibility: true });
+    mockClaimableFixtures(oneFixture);
+
+    render(<LeagueMatchStandingsClient leagueId="league-1" />);
+
+    expect(
+      await screen.findByText('득점 기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 순위가 공개돼요.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('이 리그에서 뛰었는데 내 기록이 없나요?')).not.toBeInTheDocument();
+  });
+
+  it('공개 자격과 무관하게 비어 있는 순위에는 배너를 붙이지 않는다', async () => {
+    saveStoredV1Session({ userId: 'me' });
+    useV1AuthMeMock.mockReturnValue({ data: { id: 'me' } } as never);
+    // 아직 확정된 결과가 없어서 빈 것 — 연동도 동의도 이 상태의 처방이 아니다.
+    mockLeague({ goals: [], assists: [], hiddenByEligibility: false });
+    mockClaimableFixtures(oneFixture);
+    mockMyTeams([LEAGUE_TEAM_ID]);
+    mockRecordConsent(NEVER_ASKED);
+
+    render(<LeagueMatchStandingsClient leagueId="league-1" />);
+
+    expect(await screen.findByText('확정된 경기 결과가 쌓이면 득점 순위가 나타나요.')).toBeInTheDocument();
+    expect(screen.queryByText('이 리그에서 뛰었는데 내 기록이 없나요?')).not.toBeInTheDocument();
+    expect(screen.queryByText(CONSENT_CARD_TITLE)).not.toBeInTheDocument();
+  });
+
+  it('연결할 대진이 많으면 앞 3건만 펼치고 나머지는 건수로 알린다', async () => {
+    saveStoredV1Session({ userId: 'me' });
+    useV1AuthMeMock.mockReturnValue({ data: { id: 'me' } } as never);
+    mockLeague({ goals: [], assists: [], hiddenByEligibility: true });
+    mockClaimableFixtures(
+      [1, 2, 3, 4, 5].map((week) => ({
+        teamMatchId: `tm-${week}`,
+        title: `가을 리그 ${week}주차 1경기`,
+        startAt: `2026-08-0${week}T10:00:00.000Z`,
+        claimableCount: 1,
+      })),
+    );
+
+    render(<LeagueMatchStandingsClient leagueId="league-1" />);
+
+    expect(await screen.findByText('이 리그에서 뛰었는데 내 기록이 없나요?')).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: /경기 상세로 이동/ })).toHaveLength(3);
+    expect(screen.getByText(/그 밖에 2경기가 더 있어요/)).toBeInTheDocument();
+  });
+
+  /* ── R5: 빈 상태가 요구하는 두 번째 조건 — 기록 공개 동의 ────────────────────
+   * 빈 상태는 신원 연동 **과** 기록 공개 동의를 함께 요구하는데 위 배너는 앞쪽만
+   * 안내했다. 게다가 서버 목록이 이미 연결된 대진을 빼므로, 리그에서 가장 흔한 조합인
+   * "연동은 끝났고 동의만 안 켠 사람"에게는 배너 자체가 뜨지 않아 **순위를 막고 있는
+   * 당사자가 아무 안내도 못 받았다.** 아래 테스트들은 그 길이 열리되, 열려선 안 되는
+   * 사람(구경꾼·이미 동의한 사람·켜도 바뀔 게 없는 사람)에게는 닫혀 있는지를 본다.
+   * ────────────────────────────────────────────────────────────────────────── */
+  it('연동을 마치고 동의만 남은 참가자에게 기록 공개 설정으로 가는 길을 준다', async () => {
+    saveStoredV1Session({ userId: 'me' });
+    useV1AuthMeMock.mockReturnValue({ data: { id: 'me' } } as never);
+    mockLeague({ goals: [], assists: [], hiddenByEligibility: true });
+    // 연결할 대진 0건 — 팀장이 라인업을 저장하며 내 자리는 이미 전부 연결됐다.
+    mockClaimableFixtures([]);
+    mockMyTeams([LEAGUE_TEAM_ID]);
+    mockRecordConsent(NEVER_ASKED);
+
+    render(<LeagueMatchStandingsClient leagueId="league-1" />);
+
+    expect(await screen.findByText(CONSENT_CARD_TITLE)).toBeInTheDocument();
+    // 연동 카드는 뜨지 않는다 — 이 사람에게 남은 일은 동의뿐이다.
+    expect(screen.queryByText('이 리그에서 뛰었는데 내 기록이 없나요?')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /기록 공개 설정 열기/ })).toHaveAttribute(
+      'href',
+      '/my/settings/record-consent',
+    );
+    // 켜면 무엇이 달라지는지를 숫자로 말한다 — "설정에 가 보세요"로 끝내지 않는다.
+    expect(screen.getByText(/경기 3건의 기록이 공개돼요/)).toBeInTheDocument();
+  });
+
+  it('연결할 대진과 동의가 모두 남았으면 두 안내를 함께 보여준다', async () => {
+    saveStoredV1Session({ userId: 'me' });
+    useV1AuthMeMock.mockReturnValue({ data: { id: 'me' } } as never);
+    mockLeague({ goals: [], assists: [], hiddenByEligibility: true });
+    mockClaimableFixtures(oneFixture);
+    mockMyTeams([LEAGUE_TEAM_ID]);
+    mockRecordConsent({ ...NEVER_ASKED, pendingRecordCount: 2 });
+
+    render(<LeagueMatchStandingsClient leagueId="league-1" />);
+
+    expect(await screen.findByText('이 리그에서 뛰었는데 내 기록이 없나요?')).toBeInTheDocument();
+    expect(screen.getByText(CONSENT_CARD_TITLE)).toBeInTheDocument();
+  });
+
+  it('이미 동의한 사람에게는 동의 안내를 띄우지 않는다', async () => {
+    saveStoredV1Session({ userId: 'me' });
+    useV1AuthMeMock.mockReturnValue({ data: { id: 'me' } } as never);
+    mockLeague({ goals: [], assists: [], hiddenByEligibility: true });
+    mockClaimableFixtures([]);
+    mockMyTeams([LEAGUE_TEAM_ID]);
+    mockRecordConsent({ granted: true, hasResponded: true, pendingRecordCount: 0 });
+
+    render(<LeagueMatchStandingsClient leagueId="league-1" />);
+
+    expect(
+      await screen.findByText('득점 기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 순위가 공개돼요.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(CONSENT_CARD_TITLE)).not.toBeInTheDocument();
+  });
+
+  // 켜도 공개될 게 없는 사람에게 권하면, 켜고 나서 화면이 그대로라 신뢰만 잃는다.
+  it('동의를 켜도 공개될 기록이 없으면 동의 안내를 띄우지 않는다', async () => {
+    saveStoredV1Session({ userId: 'me' });
+    useV1AuthMeMock.mockReturnValue({ data: { id: 'me' } } as never);
+    mockLeague({ goals: [], assists: [], hiddenByEligibility: true });
+    mockClaimableFixtures([]);
+    mockMyTeams([LEAGUE_TEAM_ID]);
+    mockRecordConsent({ ...NEVER_ASKED, pendingRecordCount: 0 });
+
+    render(<LeagueMatchStandingsClient leagueId="league-1" />);
+
+    expect(
+      await screen.findByText('득점 기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 순위가 공개돼요.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(CONSENT_CARD_TITLE)).not.toBeInTheDocument();
+  });
+
+  // 다른 데(대회·다른 리그)에 가려진 기록이 있다고 해서, 구경만 하는 리그에서 동의를
+  // 권할 이유는 없다 — 이 화면의 빈 순위는 그 사람 탓이 아니다.
+  it('이 리그 참가자가 아니면 동의 안내를 띄우지 않는다', async () => {
+    saveStoredV1Session({ userId: 'me' });
+    useV1AuthMeMock.mockReturnValue({ data: { id: 'me' } } as never);
+    mockLeague({ goals: [], assists: [], hiddenByEligibility: true });
+    mockClaimableFixtures([]);
+    mockMyTeams(['t9']);
+    mockRecordConsent({ ...NEVER_ASKED, pendingRecordCount: 5 });
+
+    render(<LeagueMatchStandingsClient leagueId="league-1" />);
+
+    expect(
+      await screen.findByText('득점 기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 순위가 공개돼요.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(CONSENT_CARD_TITLE)).not.toBeInTheDocument();
+  });
+
+  it('순위가 공개 자격과 무관하게 비어 있으면, "내 팀" 캐시가 이미 있어도 동의 안내를 띄우지 않는다', async () => {
+    saveStoredV1Session({ userId: 'me' });
+    useV1AuthMeMock.mockReturnValue({ data: { id: 'me' } } as never);
+    // 아직 확정된 결과가 없어서 빈 순위 — 동의는 이 상태의 처방이 아니다.
+    mockLeague({ goals: [], assists: [], hiddenByEligibility: false });
+    mockClaimableFixtures([]);
+    mockMyTeamsFromWarmCache([LEAGUE_TEAM_ID]);
+    mockRecordConsent(NEVER_ASKED);
+
+    render(<LeagueMatchStandingsClient leagueId="league-1" />);
+
+    expect(await screen.findByText('확정된 경기 결과가 쌓이면 득점 순위가 나타나요.')).toBeInTheDocument();
+    expect(screen.queryByText(CONSENT_CARD_TITLE)).not.toBeInTheDocument();
+  });
+
+  // 연동 목록도 같은 함정이 있다 — `enabled` 는 요청을 막을 뿐 렌더를 막지 않으므로,
+  // 로그아웃 직후 캐시가 남아 있으면 관전자 화면에 남의 대진 목록이 그대로 뜬다.
+  it('비로그인 관전자는 연동 목록 캐시가 남아 있어도 배너를 보지 않는다', async () => {
+    mockLeague({ goals: [], assists: [], hiddenByEligibility: true });
+    // enabled 를 무시하는 mock = 로그아웃 직전 세션이 남긴 캐시.
+    useV1LeagueClaimableFixturesMock.mockReturnValue({
+      data: { leagueId: 'league-1', fixtures: oneFixture },
+    } as never);
+    mockMyTeams([]);
+    mockRecordConsent(undefined);
+
+    render(<LeagueMatchStandingsClient leagueId="league-1" />);
+
+    expect(
+      await screen.findByText('득점 기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 순위가 공개돼요.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('이 리그에서 뛰었는데 내 기록이 없나요?')).not.toBeInTheDocument();
+  });
+
+  it('비로그인 관전자는 "내 팀" 캐시가 남아 있어도 동의 안내를 보지 않는다', async () => {
+    // 세션 힌트 없음(로그아웃 직후) + 이전 세션이 남긴 캐시.
+    mockLeague({ goals: [], assists: [], hiddenByEligibility: true });
+    mockClaimableFixtures([]);
+    mockMyTeamsFromWarmCache([LEAGUE_TEAM_ID]);
+    mockRecordConsent(NEVER_ASKED);
+
+    render(<LeagueMatchStandingsClient leagueId="league-1" />);
+
+    expect(
+      await screen.findByText('득점 기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 순위가 공개돼요.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(CONSENT_CARD_TITLE)).not.toBeInTheDocument();
+  });
+
+  it('비로그인 관전자에게는 동의 안내도, 참가 여부 조회도 하지 않는다', async () => {
+    // 세션 힌트 없음. 서버가 무엇을 준다 해도 두 카드 모두 뜨지 않아야 한다 —
+    // mockMyTeams 가 enabled 를 지키므로 카드 부재가 곧 조회 부재다.
+    mockLeague({ goals: [], assists: [], hiddenByEligibility: true });
+    mockClaimableFixtures(oneFixture);
+    mockMyTeams([LEAGUE_TEAM_ID]);
+    mockRecordConsent(NEVER_ASKED);
+
+    render(<LeagueMatchStandingsClient leagueId="league-1" />);
+
+    expect(
+      await screen.findByText('득점 기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 순위가 공개돼요.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('이 리그에서 뛰었는데 내 기록이 없나요?')).not.toBeInTheDocument();
+    expect(screen.queryByText(CONSENT_CARD_TITLE)).not.toBeInTheDocument();
+  });
+
+  /* ── R6: 한 번 거부한 사람 · 공개 화면의 조회 비용 ─────────────────────────
+   * 위 안내들이 "필요한 사람에게만" 열리는지에 더해, 두 가지를 더 못박는다.
+   * ① 기록 공개를 **의식적으로 끈** 사람에게 같은 권유를 다시 하지 않는다 — 홈 넛지가
+   *    이미 세운 규칙이고, 리그는 참가 리그 수만큼 이 화면이 있어 반복이 더 심하다.
+   * ② 이 화면은 비로그인도 열리는 **공개 순위표**라, 안내 하나를 위해 무거운 조회를
+   *    붙이면 안 된다.
+   * ────────────────────────────────────────────────────────────────────── */
+  it('기록 공개를 스스로 껐던 사람에게는 동의 안내를 다시 띄우지 않는다', async () => {
+    saveStoredV1Session({ userId: 'me' });
+    useV1AuthMeMock.mockReturnValue({ data: { id: 'me' } } as never);
+    mockLeague({ goals: [], assists: [], hiddenByEligibility: true });
+    mockClaimableFixtures([]);
+    mockMyTeams([LEAGUE_TEAM_ID]);
+    // 설정에서 직접 껐다(REVOKED). 서버는 껐어도 "지금 켜면 공개될 경기 수"를 계속
+    // 내려주므로, 그 숫자만 보고 띄우면 이 사람은 리그를 열 때마다 같은 권유를 받는다.
+    mockRecordConsent({ granted: false, hasResponded: true, pendingRecordCount: 3 });
+
+    render(<LeagueMatchStandingsClient leagueId="league-1" />);
+
+    expect(
+      await screen.findByText('득점 기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 순위가 공개돼요.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(CONSENT_CARD_TITLE)).not.toBeInTheDocument();
+  });
+
+  it('참가자 판정에 순위표의 참가팀을 쓴다 — 공개 화면에서 "내 리그"를 조회하지 않는다', async () => {
+    saveStoredV1Session({ userId: 'me' });
+    useV1AuthMeMock.mockReturnValue({ data: { id: 'me' } } as never);
+    mockLeague({ goals: [], assists: [], hiddenByEligibility: true });
+    mockClaimableFixtures([]);
+    mockMyTeams([LEAGUE_TEAM_ID]);
+    mockRecordConsent(NEVER_ASKED);
+
+    render(<LeagueMatchStandingsClient leagueId="league-1" />);
+
+    // 참가자로 인정돼 안내는 그대로 뜬다.
+    expect(await screen.findByText(CONSENT_CARD_TITLE)).toBeInTheDocument();
+    // 그러면서도 `/league-matches/me` 는 건드리지 않는다. 이 조회는 내가 속한 리그마다
+    // 순위표를 통째로 계산해서 돌려주는데(listMine → 리그별 standings), 여기서 필요한 건
+    // "내 팀이 이 리그에 있나" 하나뿐이다.
+    expect(useV1MyLeaguesMock).not.toHaveBeenCalled();
   });
 });

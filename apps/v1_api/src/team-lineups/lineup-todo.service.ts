@@ -6,14 +6,39 @@ import { PrismaService } from '../prisma/prisma.service';
 /** 라인업이 아직 끝나지 않은 상태. 완료(SUBMITTED/LOCKED)는 아예 목록에 오르지 않는다. */
 export type LineupTodoState = 'MISSING' | 'DRAFT';
 
+/** 리그 주차의 기준 날짜 — 리그 일정은 KST 기준이다(`resolveLeagueWeekNumber`와 같은 포맷터). */
+const KST_DAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' });
+
 export type LineupTodo = {
   source: 'TOURNAMENT_FIXTURE' | 'TEAM_MATCH';
   teamId: string;
   teamName: string;
   gameId: string;
-  /** 대회 경기일 때만 채워진다 — 알림을 대회 단위로 묶는 열쇠이기도 하다. */
+  /**
+   * 이 경기가 속한 **대회 또는 리그**. 대회 경기면 대회 id/제목, 리그 대진이면 리그
+   * id/제목이 들어간다 — 어느 쪽인지는 `source` 로 갈린다.
+   *
+   * 리그 값을 대회 이름의 자리에 싣는 것은 이 레포의 기존 관례다
+   * (public-tournament-records.service.ts `getLeagueFixtureRecord` — 같은 화면·같은 소비자가
+   * 분기 없이 하나의 필드를 읽게 하려는 것). 리그 전용 필드를 새로 만들면 소비자(알림
+   * 워커·홈 카드)마다 "둘 중 채워진 쪽"을 고르는 분기가 늘어난다.
+   *
+   * 주의: 알림 워커는 이 값을 **대회 단위 묶음의 열쇠**로도 쓴다
+   * (lineup-reminder.service.ts `buildDailyMessages`). 그쪽은 `source === 'TOURNAMENT_FIXTURE'`
+   * 를 함께 보고 있으므로 리그 대진은 지금도 경기 단위로 묶인다 — 그 가드를 지우면
+   * 리그 대진이 리그 단위로 묶여버리니 함께 고쳐야 한다.
+   */
   tournamentId: string | null;
   tournamentTitle: string | null;
+  /**
+   * 화면·알림에 그대로 나가는 한 줄 라벨. 대회 경기는 "대회명 · 라운드", 리그 대진은
+   * "리그명 N주차", 리그가 아닌 친선 팀매치는 '팀 매치' 고정이다.
+   *
+   * 리그의 주차는 `V1TeamMatch.title`에 박제된 값을 쓰지 않는다 — 그 제목은 대진 생성
+   * 시점에 굳고 재일정(`updateFixture`)에서 갱신되지 않아서, 그대로 쓰면 같은 경기를
+   * 공개 경기기록·어드민 영상 화면과 **다른 주차로 부르게 된다**. 저 두 화면과 같은
+   * 규칙(KST 경기일 순번)으로 `startAt`에서 매번 파생한다.
+   */
   title: string;
   opponentName: string | null;
   scheduledAt: Date | null;
@@ -157,16 +182,24 @@ export class LineupTodoService {
       },
       select: {
         id: true,
+        // `title`은 읽지 않는다 — 리그 대진의 라벨은 아래에서 리그명 + 파생 주차로 조립하고,
+        // 친선 팀매치의 제목은 모집 문구라 라벨로 쓰지 않는다.
         startAt: true,
         hostTeamId: true,
         hostTeam: { select: { name: true } },
         approvedApplicantTeamId: true,
         approvedApplicantTeam: { select: { name: true } },
+        leagueId: true,
+        // 리그 제목은 관계로 가져온다 — Prisma 가 대진 목록에 딸린 리그를 id IN (...) 한 번으로
+        // 모아 오므로 대진 수(최대 500)만큼 쿼리가 늘지 않는다.
+        league: { select: { title: true } },
         game: { select: { id: true } },
       },
       orderBy: { startAt: 'asc' },
       take: 500,
     });
+
+    const weekNumberByTeamMatchId = await this.resolveLeagueWeekNumbers(matches);
 
     const rows: Array<Omit<LineupTodo, 'state'>> = [];
     for (const match of matches) {
@@ -179,6 +212,22 @@ export class LineupTodoService {
           opponentName: match.hostTeam.name,
         },
       ];
+      // 리그 대진의 라벨은 "<리그명> N주차"로 **여기서 조립한다**. 저장된
+      // `V1TeamMatch.title`("<리그명> N주차 M경기")을 쓰지 않는 이유는 그 값이 대진 생성
+      // 시점에 굳고 재일정에서 갱신되지 않기 때문이다 — 운영자가 경기를 앞당기면 제목만
+      // 옛 주차로 남아, 같은 경기를 공개 경기기록·어드민 영상 화면과 다른 주차로 부르게 된다.
+      // 그래서 주차는 저 화면들과 같은 규칙(KST 경기일 순번)으로 startAt에서 파생한다.
+      // 그날의 경기 순번("M경기")도 붙이지 않는다. timing 을 지정한 리그는 한 팀이 하루에
+      // 여러 경기를 뛰므로(팀당 하루 N경기) 순번이 행을 구분해 주긴 했지만, 그 값 역시
+      // 제목과 함께 굳어 재일정 뒤에는 실제 킥오프 순서와 어긋난다 — 틀린 순번을 말하느니
+      // 말하지 않는 편이 낫고, 주차를 파생하는 다른 화면들도 순번은 말하지 않는다. 같은 날
+      // 여러 행이 서면 카드 아래줄의 "vs 상대"가 그대로 구분자 역할을 한다.
+      // 친선 팀매치(leagueId 없음)는 사용자가 붙인 제목이 리그 맥락이 아니라 모집 문구라
+      // 예전처럼 '팀 매치'로 둔다.
+      const leagueTitle = match.league?.title ?? null;
+      const weekNumber = weekNumberByTeamMatchId.get(match.id);
+      const title =
+        leagueTitle === null || weekNumber === undefined ? '팀 매치' : `${leagueTitle} ${weekNumber}주차`;
       for (const side of sides) {
         if (side.teamId === null || side.teamName === null) continue;
         if (teamIds !== null && !teamIds.includes(side.teamId)) continue;
@@ -187,9 +236,9 @@ export class LineupTodoService {
           teamId: side.teamId,
           teamName: side.teamName,
           gameId: match.game.id,
-          tournamentId: null,
-          tournamentTitle: null,
-          title: '팀 매치',
+          tournamentId: match.leagueId,
+          tournamentTitle: leagueTitle,
+          title,
           opponentName: side.opponentName,
           scheduledAt: match.startAt,
           deepLink: `/team-matches/${match.id}/lineup`,
@@ -197,6 +246,54 @@ export class LineupTodoService {
       }
     }
     return rows;
+  }
+
+  /**
+   * 리그 대진의 "N주차" — 대진 제목에 박제된 주차 대신 `startAt`에서 매번 파생한다.
+   *
+   * 규칙은 공개 경기기록(`public-tournament-records.service.ts`의 `resolveLeagueWeekNumber`)·
+   * 어드민 영상 화면(`league-fixture-videos.service.ts`)과 **완전히 같다**: 그 리그의 서로 다른
+   * KST 경기일을 오름차순으로 세어 몇 번째 날인지가 곧 주차다. 같은 경기가 화면마다 다른
+   * 주차로 불리면 안 되므로 규칙을 여기서 새로 만들지 않는다.
+   *
+   * 저쪽이 `startAt <= 대상`으로 범위를 좁히는 것은 비용 최적화일 뿐이다(뒤 날짜는 앞
+   * 날짜의 순번을 바꾸지 못한다). 여기서는 여러 대진의 주차를 한 번에 구해야 하므로
+   * 리그별 경기일 전체를 **리그 단위 한 번의 조회로** 모아 두고 각자 순번을 찾는다.
+   */
+  private async resolveLeagueWeekNumbers(
+    matches: ReadonlyArray<{ id: string; leagueId: string | null; startAt: Date }>,
+  ): Promise<Map<string, number>> {
+    const leagueIds = [
+      ...new Set(matches.map((match) => match.leagueId).filter((id): id is string => id !== null)),
+    ];
+    // 리그 대진이 하나도 없으면(친선만 있는 흔한 경우) 추가 왕복을 만들지 않는다.
+    if (leagueIds.length === 0) return new Map();
+
+    const siblings = await this.prisma.v1TeamMatch.findMany({
+      // 취소된 대진도 경기일에 포함한다 — 위 두 화면이 쓰는 조건과 같아야 주차가 어긋나지 않는다.
+      where: { leagueId: { in: leagueIds }, deletedAt: null },
+      select: { leagueId: true, startAt: true },
+    });
+
+    const daysByLeagueId = new Map<string, Set<string>>();
+    for (const sibling of siblings) {
+      if (sibling.leagueId === null) continue;
+      const days = daysByLeagueId.get(sibling.leagueId);
+      if (days === undefined) daysByLeagueId.set(sibling.leagueId, new Set([KST_DAY.format(sibling.startAt)]));
+      else days.add(KST_DAY.format(sibling.startAt));
+    }
+    const sortedDaysByLeagueId = new Map<string, string[]>();
+    for (const [id, days] of daysByLeagueId) sortedDaysByLeagueId.set(id, [...days].sort());
+
+    const weekNumbers = new Map<string, number>();
+    for (const match of matches) {
+      if (match.leagueId === null) continue;
+      const index = sortedDaysByLeagueId.get(match.leagueId)?.indexOf(KST_DAY.format(match.startAt)) ?? -1;
+      // 자기 자신이 목록에 없는 경우(소프트삭제된 대진)는 순번을 셀 근거가 없다 — 위 두 화면과
+      // 같은 폴백(1주차)을 쓴다.
+      weekNumbers.set(match.id, index >= 0 ? index + 1 : 1);
+    }
+    return weekNumbers;
   }
 
   /**

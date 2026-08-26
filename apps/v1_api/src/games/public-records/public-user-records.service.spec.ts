@@ -17,7 +17,23 @@ function createFakePrisma(config: {
   resultRows: unknown[];
   tournamentAwards?: unknown[];
   viewerConsentState?: 'GRANTED' | 'REVOKED' | null;
+  sides?: ReadonlyArray<{
+    id: string;
+    gameId: string;
+    sideKey: 'HOME' | 'AWAY';
+    teamId: string | null;
+    displayNameSnapshot: string | null;
+  }>;
+  teamMatches?: ReadonlyArray<{ id: string; leagueId: string | null }>;
+  leagues?: ReadonlyArray<{ id: string; title: string }>;
+  fixtures?: ReadonlyArray<{ id: string; tournamentId: string; round: string }>;
+  tournaments?: ReadonlyArray<{ id: string; title: string }>;
 }) {
+  /** 서비스가 `where: { id: { in: [...] } }` 로만 조회하므로(N+1 금지 계약) 그 형태를 그대로 흉내낸다. */
+  const findManyByIds = <T extends { id: string }>(rows: ReadonlyArray<T>) =>
+    jest.fn().mockImplementation((args: { where: { id: { in: readonly string[] } } }) =>
+      Promise.resolve(rows.filter((row) => args.where.id.in.includes(row.id))),
+    );
   const linkFindMany = jest.fn().mockImplementation((args: { where: Record<string, unknown> }) => {
     if ('userId' in args.where) {
       return Promise.resolve(
@@ -46,13 +62,17 @@ function createFakePrisma(config: {
     v1GameResultParticipant: { findMany: jest.fn().mockResolvedValue(config.resultRows) },
     v1TournamentAward: { findMany: jest.fn().mockResolvedValue(config.tournamentAwards ?? []) },
     v1GameSide: {
-      findMany: jest.fn().mockResolvedValue([
-        { id: 'side-1', gameId: 'game-1', sideKey: 'HOME', teamId: null, displayNameSnapshot: '우리팀' },
-      ]),
+      findMany: jest.fn().mockResolvedValue(
+        config.sides ?? [
+          { id: 'side-1', gameId: 'game-1', sideKey: 'HOME', teamId: null, displayNameSnapshot: '우리팀' },
+        ],
+      ),
     },
-    v1TournamentFixture: { findMany: jest.fn().mockResolvedValue([]) },
+    v1TournamentFixture: { findMany: findManyByIds(config.fixtures ?? []) },
     v1Team: { findMany: jest.fn().mockResolvedValue([]) },
-    v1Tournament: { findMany: jest.fn().mockResolvedValue([]) },
+    v1Tournament: { findMany: findManyByIds(config.tournaments ?? []) },
+    v1TeamMatch: { findMany: findManyByIds(config.teamMatches ?? []) },
+    v1League: { findMany: findManyByIds(config.leagues ?? []) },
   } as unknown as PrismaService;
 }
 
@@ -74,7 +94,50 @@ function gameResultRow(mvpParticipantId: string | null = null) {
       officialAt: new Date('2026-08-10T00:00:00Z'),
       mvpParticipantId,
       score: { home: 1, away: 0 },
-      game: { sourceType: 'TEAM_MATCH', tournamentFixtureId: null, currentOfficialRevisionId: 'revision-1' },
+      game: {
+        sourceType: 'TEAM_MATCH',
+        tournamentFixtureId: null,
+        teamMatchId: null,
+        currentOfficialRevisionId: 'revision-1',
+      },
+    },
+  };
+}
+
+/**
+ * F6 -- 리그/친선/대회를 한 응답에 섞어 넣기 위한 팩토리. `gameResultRow`가 단일 행
+ * 고정 id를 쓰고 있어 여러 행을 만들 수 없어서 별도로 둔다.
+ */
+function sourcedResultRow(input: {
+  suffix: string;
+  participantId: string;
+  teamMatchId?: string | null;
+  tournamentFixtureId?: string | null;
+}) {
+  const isTournament = (input.tournamentFixtureId ?? null) !== null;
+  return {
+    id: `result-${input.suffix}`,
+    resultRevisionId: `revision-${input.suffix}`,
+    participantId: input.participantId,
+    sideId: `side-${input.suffix}`,
+    started: true,
+    minutesPlayed: 90,
+    goals: 0,
+    assists: 0,
+    cards: { yellow: 0, red: 0 },
+    goalkeeper: false,
+    resultRevision: {
+      id: `revision-${input.suffix}`,
+      gameId: `game-${input.suffix}`,
+      officialAt: new Date('2026-08-10T00:00:00Z'),
+      mvpParticipantId: null,
+      score: { home: 1, away: 0 },
+      game: {
+        sourceType: isTournament ? 'TOURNAMENT_FIXTURE' : 'TEAM_MATCH',
+        tournamentFixtureId: input.tournamentFixtureId ?? null,
+        teamMatchId: input.teamMatchId ?? null,
+        currentOfficialRevisionId: `revision-${input.suffix}`,
+      },
     },
   };
 }
@@ -224,5 +287,71 @@ describe('PublicUserRecordsService', () => {
     expect(result.tournamentAwards).toHaveLength(1);
     expect(result.summary.tournamentAwardCount).toBe(1);
     expect('consentGranted' in result).toBe(false);
+  });
+
+  it('리그 대진 행에는 리그 제목이 붙고, 리그가 아닌 친선 팀매치 행에는 붙지 않는다', async () => {
+    const prisma = createFakePrisma({
+      links: [
+        { participantId: 'participant-league', linkId: 'link-league', userId: OWNER_ID },
+        { participantId: 'participant-friendly', linkId: 'link-friendly', userId: OWNER_ID },
+        { participantId: 'participant-tournament', linkId: 'link-tournament', userId: OWNER_ID },
+      ],
+      userConsents: [{ userId: OWNER_ID, state: 'GRANTED' }],
+      snapshots: [],
+      resultRows: [
+        sourcedResultRow({ suffix: 'league', participantId: 'participant-league', teamMatchId: 'team-match-league' }),
+        sourcedResultRow({
+          suffix: 'friendly',
+          participantId: 'participant-friendly',
+          teamMatchId: 'team-match-friendly',
+        }),
+        sourcedResultRow({
+          suffix: 'tournament',
+          participantId: 'participant-tournament',
+          tournamentFixtureId: 'fixture-1',
+        }),
+      ],
+      // 친선 팀매치도 팀매치 행 자체는 존재한다 -- 다른 점은 `leagueId`가 null이라는 것뿐이다.
+      teamMatches: [
+        { id: 'team-match-league', leagueId: 'league-1' },
+        { id: 'team-match-friendly', leagueId: null },
+      ],
+      leagues: [{ id: 'league-1', title: '2026 가을 정규 리그' }],
+      fixtures: [{ id: 'fixture-1', tournamentId: 'tournament-1', round: '결승' }],
+      tournaments: [{ id: 'tournament-1', title: '2026 여름 챔피언십' }],
+      viewerConsentState: 'GRANTED',
+    });
+    const service = new PublicUserRecordsService(prisma);
+
+    const result = await service.getRecords(OWNER_ID, {}, 'someone-else');
+
+    const byGameId = new Map(result.items.map((item) => [item.gameId, item]));
+    expect(byGameId.get('game-league')).toMatchObject({
+      type: 'league',
+      leagueId: 'league-1',
+      leagueTitle: '2026 가을 정규 리그',
+      tournamentId: null,
+      tournamentTitle: null,
+    });
+    // 회귀 금지: 리그가 아닌 팀매치는 예전과 똑같이 아무 맥락도 붙지 않는다.
+    expect(byGameId.get('game-friendly')).toMatchObject({
+      type: 'friendly',
+      leagueId: null,
+      leagueTitle: null,
+      tournamentId: null,
+      tournamentTitle: null,
+    });
+    // 회귀 금지: 대회 경기는 그대로 대회명을 유지한다.
+    expect(byGameId.get('game-tournament')).toMatchObject({
+      type: 'tournament',
+      leagueId: null,
+      leagueTitle: null,
+      tournamentId: 'tournament-1',
+      tournamentTitle: '2026 여름 챔피언십',
+    });
+
+    // N+1 금지: 팀매치·리그 모두 행 수와 무관하게 단일 IN 조회 1회씩이다.
+    expect((prisma.v1TeamMatch.findMany as jest.Mock).mock.calls).toHaveLength(1);
+    expect((prisma.v1League.findMany as jest.Mock).mock.calls).toHaveLength(1);
   });
 });

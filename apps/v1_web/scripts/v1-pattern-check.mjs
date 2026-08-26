@@ -196,8 +196,12 @@ function checkSpacingGrid() {
  * ────────────────────────────────────────────────────────────────── */
 function checkRadiusLiteral() {
   eachCssFile((f, txt) => {
-    for (const m of txt.matchAll(/border-radius\s*:\s*([^;{}]+)/g)) {
-      const value = m[1].trim();
+    // shorthand 만 보면 코너별 longhand(border-top-left-radius,
+    // border-start-start-radius …)로 그대로 우회된다. 실제로 6건이 그렇게 남아
+    // 있었다. 속성 이름을 넓게 잡고 위반 메시지에 실제 속성명을 싣는다.
+    for (const m of txt.matchAll(/(border-(?:[a-z]+-)*radius)\s*:\s*([^;{}]+)/g)) {
+      const prop = m[1];
+      const value = m[2].trim();
       // 단위를 열거하지 않는다. 열거하면 목록에 없는 단위(vmin/vmax, 신규
       // viewport 단위 dvh·svw·lvh, lh/cap/ic …)로 바꾸는 것만으로 우회되고,
       // CSS 에 단위가 추가될 때마다 게이트가 뒤처진다.
@@ -212,7 +216,7 @@ function checkRadiusLiteral() {
       const stripped = value.replace(/var\(\s*--radius-[\w-]+/g, ' ');
       for (const other of stripped.matchAll(/var\(\s*(--[\w-]+)/g)) {
         violations.push(
-          `[radius 리터럴] ${f}: border-radius: ${value} — ${other[1]} 는 radius 토큰이 아니다. ` +
+          `[radius 리터럴] ${f}: ${prop}: ${value} — ${other[1]} 는 radius 토큰이 아니다. ` +
             `var(--radius-*) 를 쓸 것 (tight/chip/control/field/container/hero/pill/circle)`,
         );
       }
@@ -221,7 +225,7 @@ function checkRadiusLiteral() {
         if (n === 0) continue; // 0 / 0px / 0% — 모서리 없음
         if (lit[2] === '%' && n === 100) continue; // 100% — 컨테이너 전체를 덮는 곡률
         violations.push(
-          `[radius 리터럴] ${f}: border-radius: ${value} — ${lit[1]}${lit[2]} 대신 tokens.css 의 ` +
+          `[radius 리터럴] ${f}: ${prop}: ${value} — ${lit[1]}${lit[2]} 대신 tokens.css 의 ` +
             `var(--radius-*) 를 쓸 것 (tight/chip/control/field/container/hero/pill/circle)`,
         );
       }

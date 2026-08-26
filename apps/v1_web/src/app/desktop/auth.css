@@ -53,8 +53,8 @@
     left: auto;
     right: auto;
     /* Round the bottom corners to match the card */
-    border-bottom-left-radius: 16px;
-    border-bottom-right-radius: 16px;
+    border-bottom-left-radius: var(--radius-container);
+    border-bottom-right-radius: var(--radius-container);
     /* Slightly increase padding for more breathing room */
     padding: 16px 24px 24px;
   }

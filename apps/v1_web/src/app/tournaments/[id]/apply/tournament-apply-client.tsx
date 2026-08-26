@@ -536,7 +536,7 @@ function ExpandableCheckRow({
                     padding: '2px 6px',
                     borderRadius: 999,
                     background: consentType === 'required' ? 'var(--red50)' : 'var(--grey100)',
-                    color: consentType === 'required' ? 'var(--red600)' : 'var(--text-muted)',
+                    color: consentType === 'required' ? 'var(--red700)' : 'var(--text-muted)',
                     fontWeight: 700,
                     lineHeight: 1.2,
                   }}

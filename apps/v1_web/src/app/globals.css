@@ -350,6 +350,11 @@
    * 확보한 값으로 재계산해 선택. orange는 이미 다크에서 잘 보이는 --orange500을
    * 재사용, red는 이 파일에 이미 쓰이던 #ff6b76(.tm-bk2-badge-live 등)과 통일. */
   --blue700: #6ba8ff;
+  /* --blue600 은 다크 오버라이드가 아예 없어서 라이트값 #2272eb 가 그대로 남았다.
+   * 다크 카드 배경(#1c1e24) 위에서 3.71:1 로 AA 미달인데 26곳이 이 토큰을 쓴다.
+   * blue500(#3182f6, 4.49:1) 과 blue700(#6ba8ff, 6.88:1) 사이를 유지하면서
+   * AA 를 넘는 값으로 잡았다 — #5a9cf8 은 5.99:1. */
+  --blue600: #5a9cf8;
   --orange700: var(--orange500);
   /* --yellow700(light #a66c00)도 동일 이유로 다크에서 --yellow500 재사용 — 다크
      yellow50 틴트(rgba(255,195,66,0.16)) 위 yellow500은 이미 7.2:1로 충분히 통과. */
@@ -4255,6 +4260,14 @@ button:disabled {
   font-weight: 800;
 }
 
+/* grey900 은 다크에서 #f2f4f6 으로 뒤집힌다(회색 스케일 반전). 전경은 --static-white
+ * 고정이라 다크에서 "밝은 배경 + 흰 글자" 가 되어 이니셜이 1.10:1 로 사라졌다.
+ * 다크에서는 배경만 어두운 쪽으로 바꿔 대비를 되살린다 — grey300(#333a45) 위
+ * 흰 글자는 11.46:1. 사진이 있으면 background-image 가 덮으므로 영향 없다. */
+:root.dark .tm-my-avatar {
+  background: var(--grey300);
+}
+
 .tm-my-profile-copy {
   flex: 1;
   min-width: 0;
@@ -5284,7 +5297,7 @@ button:disabled {
 /* 진행중: 파란 외곽 + 안쪽 점 + 펄스 */
 .tm-hub-stage-dot-active {
   border: 2.5px solid var(--blue500);
-  background: #fff;
+  background: var(--static-white);
   box-shadow: 0 0 0 4px var(--blue50);
   animation: tmStepperPulse 1.8s ease-in-out infinite;
 }
@@ -5881,7 +5894,7 @@ button:disabled {
   border: 1px solid var(--grey150);
   border-radius: var(--radius-control);
   padding: 16px 16px;
-  background: #fff;
+  background: var(--card-surface);
   display: flex;
   flex-direction: column;
   gap: 8px;

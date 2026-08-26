@@ -891,7 +891,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                   등번호")로 이미 문맥을 얻으므로 헤더 자체는 장식으로 숨긴다. */}
               <div
                 aria-hidden="true"
-                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 12px', marginTop: 8 }}
+                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0 12px', marginTop: 8 }}
               >
                 <span className="tm-text-micro" style={{ color: 'var(--text-muted)', fontWeight: 600, minWidth: 44 }}>
                   GK
@@ -915,7 +915,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                     ...(index > 0 ? { borderTop: '1px solid var(--border)' } : {}),
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     {/* 예전엔 네이티브 라디오 + "선택됐을 때만 보이는 GK 텍스트"였는데, 브라우저
                         기본 라디오가 작고(터치 타겟 미달) 밋밋해서 "이게 뭘 누르는 버튼인지"
                         한눈에 안 읽힌다는 지적(QA)을 받았다. 항상 "GK" 글자가 보이는 토글 칩으로
@@ -956,7 +956,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                       {entry.position ? (
                         <span
                           className="tm-text-micro"
-                          style={{ marginLeft: 6, color: 'var(--text-muted)', fontWeight: 400 }}
+                          style={{ marginLeft: 8, color: 'var(--text-muted)', fontWeight: 400 }}
                         >
                           {entry.position}
                         </span>
@@ -1020,7 +1020,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
             <>
               <div
                 aria-hidden="true"
-                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 12px', marginTop: 8 }}
+                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0 12px', marginTop: 8 }}
               >
                 <span className="tm-text-micro" style={{ flex: 1, color: 'var(--text-muted)', fontWeight: 600 }}>
                   이름
@@ -1041,7 +1041,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                     ...(index > 0 ? { borderTop: '1px solid var(--border)' } : {}),
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <span className="tm-text-label" style={{ flex: 1, fontWeight: 600 }}>{entry.displayName}</span>
                     <input
                       type="number"
@@ -1120,7 +1120,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
                 {waitingMembers.map((member) => (
                   <Card key={member.userId} pad={12}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                       <span className="tm-text-label" style={{ flex: 1, fontWeight: 600 }}>{member.displayName}</span>
                       <button
                         type="button"
@@ -1196,7 +1196,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
         <section aria-labelledby="lineup-change-request-heading" style={{ marginBottom: 16 }}>
           <SectionTitle id="lineup-change-request-heading" title="상대팀 라인업 정정 요청" />
           <Card pad={14} style={{ marginTop: 8 }}>
-            <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: 10 }}>
+            <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: 12 }}>
               상대팀이 제출한 라인업에 문제가 있다면 재작성을 요청할 수 있어요. 상대팀 라인업 내용은 직접 볼 수 없고, 사유만 남겨 다시 작성해 달라고 요청하는 기능이에요.
             </p>
             <button type="button" className="tm-btn tm-btn-sm tm-btn-outline" onClick={() => setChangeRequestOpen(true)}>
@@ -1267,7 +1267,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
             aria-modal="true"
             aria-labelledby="lineup-change-request-dialog-title"
             onClick={(event) => event.stopPropagation()}
-            style={{ width: 'min(100%, 420px)', borderRadius: 18, background: 'var(--bg)', boxShadow: 'var(--shadow-modal)', padding: 18 }}
+            style={{ width: 'min(100%, 420px)', borderRadius: 18, background: 'var(--bg)', boxShadow: 'var(--shadow-modal)', padding: 20 }}
           >
             <h2 id="lineup-change-request-dialog-title" className="tm-text-subhead" style={{ margin: 0 }}>
               상대팀에 정정을 요청할까요?
@@ -1285,7 +1285,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
               placeholder="예: 등번호가 중복된 것 같아요"
             />
             {changeRequestError ? (
-              <p role="alert" className="tm-text-caption" style={{ color: 'var(--red700)', marginTop: 6 }}>
+              <p role="alert" className="tm-text-caption" style={{ color: 'var(--red700)', marginTop: 8 }}>
                 {changeRequestError}
               </p>
             ) : null}

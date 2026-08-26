@@ -197,7 +197,7 @@ export function OtpVerificationCard({
     <div
       ref={rootRef}
       className={surfaceClass}
-      style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}
+      style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}
     >
       <p className="tm-text-label" style={{ margin: 0 }}>
         {title}

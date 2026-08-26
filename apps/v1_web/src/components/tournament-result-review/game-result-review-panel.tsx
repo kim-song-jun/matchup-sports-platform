@@ -234,7 +234,7 @@ export function GameResultReviewPanel({
       </div>
 
       {latest && latest.state === 'SUBMITTED' && !readOnly ? (
-        <div className="tm-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className="tm-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
           <p className="tm-text-label" style={{ fontWeight: 600 }}>이 결과를 검토해 주세요</p>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {showOfficializeCta ? (
@@ -280,7 +280,7 @@ export function GameResultReviewPanel({
       ) : null}
 
       {latest && (latest.state === 'REJECTED' || latest.state === 'SUPPLEMENT_REQUESTED') && !readOnly ? (
-        <div className="tm-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className="tm-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
           <p className="tm-text-label" style={{ fontWeight: 600 }}>
             {latest.state === 'REJECTED' ? '반려된 결과예요' : '보완이 필요한 결과예요'}
           </p>

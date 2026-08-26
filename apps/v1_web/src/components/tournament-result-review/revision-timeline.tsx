@@ -33,13 +33,13 @@ export function RevisionTimeline({ revisions }: { revisions: readonly GameResult
   }
 
   return (
-    <ol style={{ display: 'flex', flexDirection: 'column', gap: 10, listStyle: 'none', padding: 0, margin: 0 }}>
+    <ol style={{ display: 'flex', flexDirection: 'column', gap: 12, listStyle: 'none', padding: 0, margin: 0 }}>
       {revisions.map((revision) => {
         const previous = revision.supersedesId ? byId.get(revision.supersedesId) : undefined;
         const scoreChanged = previous && scoreText(previous.score) !== scoreText(revision.score);
         const tone = REVISION_STATE_BADGE_TONE[revision.state];
         return (
-          <li key={revision.id} className="tm-card" style={{ padding: 14 }}>
+          <li key={revision.id} className="tm-card" style={{ padding: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
               <span className={`tm-badge tm-badge-${tone}`}>{REVISION_STATE_LABELS[revision.state]}</span>
               {/* [알파 감사 C] tm-text-micro(11px)는 R-T2 하한(12px) 미달 — 처리
@@ -70,7 +70,7 @@ export function RevisionTimeline({ revisions }: { revisions: readonly GameResult
               </p>
             ) : null}
             {/* [알파 감사 C] "담당자 처리 · 리비전 #N" — 알파 실측 지적 항목. 11px → 12px. */}
-            <p className="tm-text-caption" style={{ color: 'var(--text-caption)', marginTop: 6 }}>
+            <p className="tm-text-caption" style={{ color: 'var(--text-caption)', marginTop: 8 }}>
               {revision.createdByActorType === 'SYSTEM'
                 ? `자동 처리(${revision.createdBySystemActor ?? '시스템'})`
                 : '담당자 처리'}

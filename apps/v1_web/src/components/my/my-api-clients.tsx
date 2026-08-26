@@ -624,7 +624,7 @@ export function ProfileEditPageClient() {
           <div>
             <div className="tm-text-body-lg">프로필 사진</div>
             <div className="tm-text-caption" style={{ marginTop: 4 }}>매치 목록과 신청서에 함께 보여요.</div>
-            <div className="tm-auth-profile-upload-body" style={{ marginTop: 10 }}>
+            <div className="tm-auth-profile-upload-body" style={{ marginTop: 12 }}>
               <label className="tm-btn tm-btn-md tm-btn-neutral">
                 {uploadingProfileImage ? '올리는 중' : profileImageUrl ? '사진 변경' : '사진 선택'}
                 <input className="sr-only" type="file" accept="image/*" onChange={selectProfileImage} disabled={uploadingProfileImage} />
@@ -636,7 +636,7 @@ export function ProfileEditPageClient() {
               ) : null}
               <span className="tm-text-caption">{profileImageName || '이미지 1장 — 큰 사진은 자동으로 줄여 올려요'}</span>
             </div>
-            {fieldErrors.profileImage ? <div className="tm-text-caption tm-auth-field-helper-error" style={{ marginTop: 6 }}>{fieldErrors.profileImage}</div> : null}
+            {fieldErrors.profileImage ? <div className="tm-text-caption tm-auth-field-helper-error" style={{ marginTop: 8 }}>{fieldErrors.profileImage}</div> : null}
           </div>
         </section>
         <label className="tm-create-field">
@@ -831,9 +831,9 @@ export function ProfileEditPageClient() {
           ) : null}
         </div>
 
-        <Card pad={14} style={{ marginTop: 14, background: fieldErrors.form ? 'var(--red50)' : 'var(--blue50)' }}>
+        <Card pad={14} style={{ marginTop: 16, background: fieldErrors.form ? 'var(--red50)' : 'var(--blue50)' }}>
           <div className="tm-text-label">{fieldErrors.form ?? '프로필 정보만 저장돼요.'}</div>
-          <div className="tm-text-caption" style={{ marginTop: 5 }}>종목·난이도·활동 지역은 '운동 정보'에서 따로 관리할 수 있어요.</div>
+          <div className="tm-text-caption" style={{ marginTop: 4 }}>종목·난이도·활동 지역은 '운동 정보'에서 따로 관리할 수 있어요.</div>
         </Card>
       </form>
       {/*
@@ -957,7 +957,7 @@ export function SportsSettingsPageClient() {
         <Card pad={16}>
           <div className="tm-text-body-lg">운동 종목</div>
           <div className="tm-text-caption" style={{ marginTop: 4 }}>매치 추천과 모집 조건에 쓸 종목을 선택해 주세요.</div>
-          <div className="tm-auth-sport-grid" style={{ marginTop: 14 }}>
+          <div className="tm-auth-sport-grid" style={{ marginTop: 16 }}>
             {sports.map((sport) => {
               const selected = selectedSports.some((item) => item.sportId === sport.id);
               return (
@@ -980,7 +980,7 @@ export function SportsSettingsPageClient() {
           <Card pad={16}>
             <div className="tm-text-body-lg">난이도</div>
             <div className="tm-text-caption" style={{ marginTop: 4 }}>선택한 종목마다 현재 실력에 가까운 난이도를 선택해 주세요.</div>
-            <div className="tm-auth-stack" style={{ marginTop: 14 }}>
+            <div className="tm-auth-stack" style={{ marginTop: 16 }}>
               {selectedSports.map(({ sportId, levelId }) => {
                 const sport = sports.find((candidate) => candidate.id === sportId);
                 if (!sport) return null;
@@ -1013,9 +1013,9 @@ export function SportsSettingsPageClient() {
           />
         </Card>
 
-        <Card pad={14} style={{ marginTop: 14, background: message?.includes('실패') || message?.includes('선택해') ? 'var(--red50)' : 'var(--blue50)' }}>
+        <Card pad={14} style={{ marginTop: 16, background: message?.includes('실패') || message?.includes('선택해') ? 'var(--red50)' : 'var(--blue50)' }}>
           <div className="tm-text-label">{message ?? '운동 정보만 별도로 저장돼요.'}</div>
-          <div className="tm-text-caption" style={{ marginTop: 5 }}>저장하면 종목 태그와 추천 기준에 바로 반영돼요.</div>
+          <div className="tm-text-caption" style={{ marginTop: 4 }}>저장하면 종목 태그와 추천 기준에 바로 반영돼요.</div>
         </Card>
       </form>
       <div className="tm-fixed-cta tm-my-sports-cta">
@@ -1039,7 +1039,7 @@ function SportLevelPicker({
   return (
     <div className="tm-profile-level-panel">
       <div className="tm-text-label">{sport.name}</div>
-      <div className="tm-auth-chip-wrap" style={{ marginTop: 10 }}>
+      <div className="tm-auth-chip-wrap" style={{ marginTop: 12 }}>
         {sport.levels.map((level) => (
           <button className={`tm-chip ${levelId === level.id ? 'tm-chip-active' : ''}`} key={level.id} onClick={() => onSelect(level.id)} type="button" aria-pressed={levelId === level.id}>
             {level.name}
@@ -1070,7 +1070,7 @@ function SettingsRegionSlot({
   const selectedGroup = groups.find((group) => group.id === groupId) ?? null;
 
   return (
-    <div className="tm-create-field" style={{ marginTop: 14 }}>
+    <div className="tm-create-field" style={{ marginTop: 16 }}>
       <div className="tm-text-label">{label}</div>
       <div className="tm-create-two-col" style={{ marginTop: 8 }}>
         <label>
@@ -1280,15 +1280,15 @@ export function LocationSettingsPageClient() {
           </div>
           <Card pad={16}>
             <div className="tm-text-label">현재 활동 지역</div>
-            <div className="tm-text-heading" style={{ marginTop: 6 }}>{profile.data?.regionName ?? '지역 미설정'}</div>
-            <div className="tm-text-caption" style={{ marginTop: 6 }}>
+            <div className="tm-text-heading" style={{ marginTop: 8 }}>{profile.data?.regionName ?? '지역 미설정'}</div>
+            <div className="tm-text-caption" style={{ marginTop: 8 }}>
               매치·팀매치·팀 추천의 기준 지역으로 사용돼요.
             </div>
           </Card>
 
           <Card pad={16}>
             <div className="tm-text-body-lg">현재 위치로 찾기</div>
-            <div className="tm-text-caption" style={{ marginTop: 5 }}>
+            <div className="tm-text-caption" style={{ marginTop: 4 }}>
               버튼을 누르면 현재 좌표를 지역 확인 목적으로 팀밋 서버와 카카오에 1회 전송해요.
               좌표 자체는 저장하지 않아요.
             </div>
@@ -1314,7 +1314,7 @@ export function LocationSettingsPageClient() {
 
           <Card pad={14} style={{ background: status === 'denied' || status === 'unsupported' || status === 'unmatched' ? 'var(--red50)' : 'var(--blue50)' }}>
             <div className="tm-text-label">{matchedLabel ?? '지역을 선택해 주세요'}</div>
-            <div className="tm-text-caption" style={{ marginTop: 5 }}>{message}</div>
+            <div className="tm-text-caption" style={{ marginTop: 4 }}>{message}</div>
           </Card>
         </div>
       </div>
@@ -1894,7 +1894,7 @@ function PlayerCardShapePicker() {
 
   return (
     <>
-      <Card pad={14} style={{ marginTop: 14, marginBottom: 8 }}>
+      <Card pad={14} style={{ marginTop: 16, marginBottom: 8 }}>
         <div className="tm-text-label">카드 모양</div>
         <div className="tm-text-caption" style={{ marginTop: 4 }}>
           모양은 꾸미기예요 — 능력치나 등급은 바뀌지 않아요.

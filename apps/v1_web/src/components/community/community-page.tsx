@@ -439,7 +439,7 @@ function ChatRoomRow({ room, selected = false }: { room: ChatRoomModel; selected
         <Link className="tm-chat-row-main" href={`/chat/${room.id}`} onClick={handleClick} aria-current={selected ? 'page' : undefined}>
           <div className="tm-chat-avatar" style={room.avatarUrl ? { backgroundImage: cssUrl(room.avatarUrl) } : undefined}>{room.avatarUrl ? null : room.initials}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}><div className="tm-text-body-lg tm-chat-row-title">{room.title}</div>{room.pinned ? <span className="tm-badge tm-badge-blue tm-chat-pinned-badge">고정</span> : null}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}><div className="tm-text-body-lg tm-chat-row-title">{room.title}</div>{room.pinned ? <span className="tm-badge tm-badge-blue tm-chat-pinned-badge">고정</span> : null}</div>
             <div className="tm-chat-last-line" style={{ marginTop: 3 }}>
               <span className="tm-chat-room-type">{room.type}</span>
               <span className={`tm-chat-last-message ${room.unread > 0 ? 'tm-chat-last-message-unread' : ''}`}>{room.last}</span>

@@ -211,7 +211,7 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
         <div className="tm-search-panel">
           <div className="tm-search-panel-col">
             <div className="tm-text-label">최근 검색</div>
-            <div className="tm-search-recent-chips" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+            <div className="tm-search-recent-chips" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
               {(recentSearches.data?.items ?? []).map((item, index) => (
                 <button key={item.id} type="button" onClick={() => useChip(item.query)} className={`tm-chip ${index === 0 ? 'tm-chip-active' : ''}`}>
                   {item.query}
@@ -226,11 +226,11 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
             </div>
 
             <div className="tm-text-label" style={{ marginTop: 20 }}>빠른 조건</div>
-            <div className="tm-search-quick-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
+            <div className="tm-search-quick-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
               {quickFilters.map(([title, sub]) => {
                 const selected = selectedQuickFilter === title;
                 return (
-                  <button key={title} type="button" onClick={() => toggleQuickFilter(title)} className="tm-card tm-card-interactive" aria-pressed={selected} style={{ textAlign: 'left', padding: 14, border: 0, background: selected ? 'var(--blue50)' : 'var(--bg)' }}>
+                  <button key={title} type="button" onClick={() => toggleQuickFilter(title)} className="tm-card tm-card-interactive" aria-pressed={selected} style={{ textAlign: 'left', padding: 16, border: 0, background: selected ? 'var(--blue50)' : 'var(--bg)' }}>
                     <div className="tm-text-label" style={{ color: selected ? 'var(--blue700)' : 'var(--text-strong)' }}>{title}</div>
                     <div className="tm-text-micro" style={{ marginTop: 4, color: 'var(--text-caption)' }}>{sub}</div>
                   </button>
@@ -251,36 +251,36 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
             </div>
 
             {effectiveViewState === 'results' ? (
-              <div className="tm-search-results-list" style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
+              <div className="tm-search-results-list" style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12 }}>
                 {results.map((item) => (
-                  <button key={item.title} type="button" onClick={() => router.push(item.href)} className="tm-card tm-card-interactive tm-search-result-card" style={{ width: '100%', textAlign: 'left', border: 0, background: 'var(--bg)', padding: 14 }}>
+                  <button key={item.title} type="button" onClick={() => router.push(item.href)} className="tm-card tm-card-interactive tm-search-result-card" style={{ width: '100%', textAlign: 'left', border: 0, background: 'var(--bg)', padding: 16 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span className="tm-badge tm-badge-blue tm-badge-sm">{item.type}</span>
                       <div className="tm-text-body-lg">{item.title}</div>
                     </div>
-                    <div className="tm-text-caption" style={{ marginTop: 6 }}>{item.meta}</div>
+                    <div className="tm-text-caption" style={{ marginTop: 8 }}>{item.meta}</div>
                   </button>
                 ))}
               </div>
             ) : null}
 
             {effectiveViewState === 'new' ? (
-              <div className="tm-search-state-msg" style={{ marginTop: 42, textAlign: 'center', color: 'var(--text-muted)' }}>
+              <div className="tm-search-state-msg" style={{ marginTop: 44, textAlign: 'center', color: 'var(--text-muted)' }}>
                 <div style={{ width: 48, height: 48, borderRadius: 16, background: 'var(--grey50)', display: 'grid', placeItems: 'center', margin: '0 auto 14px', color: 'var(--grey500)' }}>
                   <Search size={22} />
                 </div>
                 <div className="tm-text-body-lg">검색어를 입력하거나 조건을 선택해 주세요</div>
-                <div className="tm-text-caption" style={{ marginTop: 6 }}>최근 검색과 빠른 조건은 검색 전에도 그대로 있어요.</div>
+                <div className="tm-text-caption" style={{ marginTop: 8 }}>최근 검색과 빠른 조건은 검색 전에도 그대로 있어요.</div>
               </div>
             ) : null}
 
             {effectiveShowStateMessage ? (
-              <div className="tm-search-state-msg" style={{ marginTop: 42, textAlign: 'center', color: 'var(--text-muted)' }}>
+              <div className="tm-search-state-msg" style={{ marginTop: 44, textAlign: 'center', color: 'var(--text-muted)' }}>
                 <div style={{ width: 48, height: 48, borderRadius: 16, background: 'var(--grey50)', display: 'grid', placeItems: 'center', margin: '0 auto 14px', color: effectiveViewState === 'error' ? 'var(--red500)' : 'var(--grey500)' }}>
                   {effectiveViewState === 'stale' ? <Clock size={22} /> : effectiveViewState === 'error' ? <AlertCircle size={22} /> : <Search size={22} />}
                 </div>
                 <div className="tm-text-body-lg">{effectiveViewState === 'stale' ? '최신 결과를 불러오는 중이에요.' : effectiveViewState === 'error' ? '검색 결과를 불러오지 못했어요.' : '검색 결과가 없어요.'}</div>
-                <div className="tm-text-caption" style={{ marginTop: 6 }}>검색어와 조건은 그대로 남아 있어요.</div>
+                <div className="tm-text-caption" style={{ marginTop: 8 }}>검색어와 조건은 그대로 남아 있어요.</div>
               </div>
             ) : null}
           </div>

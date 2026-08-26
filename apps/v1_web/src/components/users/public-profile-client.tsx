@@ -132,7 +132,7 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
             이미 있는 값을 앞으로 당긴 것이다 -- 같은 게이트를 통과한 것만 서버가 준다. */}
         {data.recentActivity ? (
           <Card pad={16}>
-            <div className="tm-text-label" style={{ marginBottom: 6 }}>최근 활동</div>
+            <div className="tm-text-label" style={{ marginBottom: 8 }}>최근 활동</div>
             <div className="tm-text-body">
               {data.recentActivity.teamName}
               {data.recentActivity.jerseyNumber !== null ? ` · ${data.recentActivity.jerseyNumber}번` : ''}
@@ -145,7 +145,7 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
         ) : null}
         {data.teams && data.teams.length > 0 ? (
           <Card pad={16}>
-            <div className="tm-text-label" style={{ marginBottom: 10 }}>소속팀</div>
+            <div className="tm-text-label" style={{ marginBottom: 12 }}>소속팀</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {data.teams.map((team) => (
                 <Link
@@ -165,7 +165,7 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
         <Card pad={16}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <span style={{ color: 'var(--text-muted)', display: 'flex' }} aria-hidden="true">
                   <ShieldCheck size={16} />
                 </span>
@@ -195,11 +195,11 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
             }}
             aria-label={mannerDisplay ? `매너 점수 ${mannerDisplay}점 (${trust.label})` : '매너 점수 없음'}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <Star size={14} style={{ color: mannerDisplay ? 'var(--orange500)' : 'var(--grey300)' }} aria-hidden="true" />
               <span className="tm-text-body" style={{ fontWeight: 600 }}>매너 점수</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
               {mannerDisplay ? (
                 <>
                   <span
@@ -219,7 +219,7 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
           </div>
 
           {/* 안내 문구 */}
-          <p className="tm-text-caption" style={{ marginTop: 10, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+          <p className="tm-text-caption" style={{ marginTop: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
             매너 점수는 실제 활동 후기를 기반으로 계산돼요. 이메일·전화·생년월일은 공개되지 않아요.
           </p>
         </Card>
@@ -228,7 +228,7 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
         {activitySummary ? (
           <>
             <Card pad={16}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
                 <span style={{ color: 'var(--text-muted)', display: 'flex' }} aria-hidden="true">
                   <Activity size={16} />
                 </span>
@@ -253,7 +253,7 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
             </Card>
 
             <Card pad={16}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
                 <span style={{ color: 'var(--text-muted)', display: 'flex' }} aria-hidden="true">
                   <TrendingUp size={16} />
                 </span>
@@ -271,7 +271,7 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
           </>
         ) : (
           <Card pad={16}>
-            <p className="tm-text-body-lg" style={{ marginBottom: 6 }}>활동 요약 없음</p>
+            <p className="tm-text-body-lg" style={{ marginBottom: 8 }}>활동 요약 없음</p>
             <p className="tm-text-caption" style={{ lineHeight: 1.5 }}>
               아직 공개할 활동 요약이 없어요.
             </p>
@@ -285,7 +285,7 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            gap: 10,
+            gap: 12,
             border: '1px solid var(--border)',
             borderRadius: 14,
             padding: '14px 16px',

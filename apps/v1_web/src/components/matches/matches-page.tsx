@@ -154,16 +154,16 @@ export function MatchStatePageView({ model }: { model: MatchStateViewModel }) {
       <div className="tm-match-list">
         <EmptyState title={model.title} sub={model.description} />
         {model.state === 'error' ? (
-          <Card pad={16} style={{ marginTop: 18, background: 'var(--grey50)' }}>
+          <Card pad={16} style={{ marginTop: 20, background: 'var(--grey50)' }}>
             <div className="tm-text-label">목록으로 돌아가 다시 확인해 주세요</div>
-            <div className="tm-text-caption" style={{ marginTop: 6, lineHeight: 1.55 }}>
+            <div className="tm-text-caption" style={{ marginTop: 8, lineHeight: 1.55 }}>
               새로고침 후에도 같은 문제가 반복되면 잠시 뒤 다시 시도해 주세요.
             </div>
-            <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href="/matches" style={{ marginTop: 14 }}>목록으로 돌아가기</Link>
+            <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href="/matches" style={{ marginTop: 16 }}>목록으로 돌아가기</Link>
           </Card>
         ) : null}
         {model.state === 'joined' ? (
-          <div className="tm-match-card-stack" style={{ marginTop: 18 }}>
+          <div className="tm-match-card-stack" style={{ marginTop: 20 }}>
             {model.matches.map((match) => <MatchCardItem key={match.id} match={match} />)}
           </div>
         ) : null}
@@ -209,8 +209,8 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
   // 경기가 끝난 뒤 후기로 가는 유일한 상세 화면 진입점. 완료 알림도 후기 화면으로 보내지만,
   // 매치 상세에서 직접 들어갈 길이 없으면 알림을 지운 사용자는 후기를 쓸 방법이 사라진다.
   const reviewCard = model.reviewAction ? (
-    <Card pad={16} style={{ marginTop: 10 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+    <Card pad={16} style={{ marginTop: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
         <div style={{ minWidth: 0 }}>
           <div className="tm-text-body-lg">후기</div>
           <div className="tm-text-caption" style={{ marginTop: 2, color: 'var(--text-muted)' }}>
@@ -281,7 +281,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
               </div>
             </div>
             <div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
                 {/* 종목 배지: blue solid → sport dot + 텍스트(중립 배지).
                     R-C1 준수: 단일 블루 액센트는 상태 배지에만 예약. */}
                 <span className="tm-badge tm-match-detail-sport-badge">
@@ -297,7 +297,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
                 <span className={`tm-badge ${matchStatusBadgeClass(mode, match.status)}`}>{matchStatusBadgeLabel(mode, match.status)}</span>
               </div>
               <h2 className="tm-match-detail-title">{match.title}</h2>
-              <div className="tm-text-caption" style={{ color: 'var(--overlay-white-76)', marginTop: 6 }}>{match.host} 호스트 · {match.deadline}</div>
+              <div className="tm-text-caption" style={{ color: 'var(--overlay-white-76)', marginTop: 8 }}>{match.host} 호스트 · {match.deadline}</div>
               {heroMessage ? <div className="tm-text-caption" role="status" style={{ color: 'var(--overlay-white-86)', marginTop: 8 }}>{heroMessage}</div> : null}
             </div>
           </div>
@@ -319,15 +319,15 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
               <>
                 <StateCard tone="orange" title="승인 대기" body="호스트가 신청을 확인하고 있어요." />
                 {/* 신청 후 현황 확인 CTA — '내 신청 현황 보기' (#13) */}
-                <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href="/my/matches/joined" style={{ marginTop: 10 }}>
+                <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href="/my/matches/joined" style={{ marginTop: 12 }}>
                   내 신청 현황 보기
                 </Link>
               </>
             ) : null}
             {mode === 'approved' ? <StateCard tone="green" title="승인 완료" body="참가를 확정했어요. 경기 당일 늦지 않게 도착해 주세요." /> : null}
             {mode === 'closed' ? <StateCard tone="grey" title="모집 완료" body="이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요." /> : null}
-            {match.rules.length ? <Card pad={16} style={{ marginTop: 10 }}><div className="tm-text-body-lg">규칙</div><div style={{ display: 'grid', gap: 6, marginTop: 10 }}>{match.rules.map((rule) => <div key={rule} className="tm-text-body" style={{ color: 'var(--text-muted)' }}>{rule}</div>)}</div></Card> : null}
-            <Card pad={16} style={{ marginTop: 10 }}>
+            {match.rules.length ? <Card pad={16} style={{ marginTop: 12 }}><div className="tm-text-body-lg">규칙</div><div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{match.rules.map((rule) => <div key={rule} className="tm-text-body" style={{ color: 'var(--text-muted)' }}>{rule}</div>)}</div></Card> : null}
+            <Card pad={16} style={{ marginTop: 12 }}>
               <div className="tm-text-body-lg">참가자</div>
               <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
                 {match.participants.map((person) => (
@@ -393,15 +393,15 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
             <>
               <StateCard tone="orange" title="승인 대기" body="호스트가 신청을 확인하고 있어요." />
               {/* 신청 후 현황 확인 CTA — '내 신청 현황 보기' (#13) */}
-              <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href="/my/matches/joined" style={{ marginTop: 10 }}>
+              <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href="/my/matches/joined" style={{ marginTop: 12 }}>
                 내 신청 현황 보기
               </Link>
             </>
           ) : null}
           {mode === 'approved' ? <StateCard tone="green" title="승인 완료" body="참가를 확정했어요. 경기 당일 늦지 않게 도착해 주세요." /> : null}
           {mode === 'closed' ? <StateCard tone="grey" title="모집 완료" body="이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요." /> : null}
-          {match.rules.length ? <Card pad={16} style={{ marginTop: 10 }}><div className="tm-text-body-lg">규칙</div><div style={{ display: 'grid', gap: 6, marginTop: 10 }}>{match.rules.map((rule) => <div key={rule} className="tm-text-body" style={{ color: 'var(--text-muted)' }}>{rule}</div>)}</div></Card> : null}
-          <Card pad={16} style={{ marginTop: 10 }}>
+          {match.rules.length ? <Card pad={16} style={{ marginTop: 12 }}><div className="tm-text-body-lg">규칙</div><div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{match.rules.map((rule) => <div key={rule} className="tm-text-body" style={{ color: 'var(--text-muted)' }}>{rule}</div>)}</div></Card> : null}
+          <Card pad={16} style={{ marginTop: 12 }}>
             <div className="tm-text-body-lg">참가자</div>
             <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
               {match.participants.map((person) => (
@@ -423,7 +423,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
 
       {/* Mobile-only fixed CTA — hidden on desktop (CSS: .tm-match-detail + .tm-fixed-cta) */}
       <div className="tm-fixed-cta tm-hide-desktop">
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
           <span className="tm-text-caption">{mode === 'mine' ? '내가 만든 매치' : '신청 상태'}</span>
           <span className="tm-text-label">{model.statusLabel ?? match.actionLabel}</span>
         </div>
@@ -652,7 +652,7 @@ function MatchCardItem({ match }: { match: MatchCardModel }) {
         <div className="tm-text-caption" style={{ color: 'var(--text-caption)', marginTop: 2 }}>{match.level} · {match.gender}</div>
         <div className="tm-text-body-lg" style={{ marginTop: 8 }}>{match.title}</div>
         {/* [격상3] 시간만 weight 600으로 강조 — 행동 결정 핵심 정보 분리. 날짜·장소는 caption 유지. */}
-        <div className="tm-text-caption" style={{ marginTop: 5 }}>
+        <div className="tm-text-caption" style={{ marginTop: 4 }}>
           <strong style={{ fontWeight: 600 }}>{match.date} {match.time}</strong>
           {' · '}{match.venue}
         </div>
@@ -707,13 +707,13 @@ function StateCard({ tone, title, body }: { tone: 'orange' | 'green' | 'grey'; t
   const tint = tone === 'green' ? 'var(--tint-green)' : tone === 'grey' ? 'var(--tint-grey)' : 'var(--tint-orange)';
   const accent = tone === 'green' ? 'var(--green700)' : tone === 'grey' ? 'var(--text-muted)' : 'var(--orange700)';
   return (
-    <Card pad={14} style={{ marginTop: 14, background: tint }}>
+    <Card pad={14} style={{ marginTop: 16, background: tint }}>
       {/* [P0/P1 아이콘+컬러] 아이콘을 타이틀과 함께 표시해 색상만으로 상태를 구분하지 않음 (WCAG 1.4.1) */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <StatusIcon tone={tone} />
         <div className="tm-text-label" style={{ color: accent }}>{title}</div>
       </div>
-      <div className="tm-text-caption" style={{ marginTop: 5 }}>{body}</div>
+      <div className="tm-text-caption" style={{ marginTop: 4 }}>{body}</div>
     </Card>
   );
 }
@@ -721,7 +721,7 @@ function StateCard({ tone, title, body }: { tone: 'orange' | 'green' | 'grey'; t
 function CreateProgress({ step, edit, completeSteps = [] }: { step: number; edit: boolean; completeSteps?: number[] }) {
   return (
     <div className="tm-create-progress">
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
         <span
           className={`tm-badge ${edit ? 'tm-badge-orange' : 'tm-badge-blue'}`}
           {...(!edit && {
@@ -758,7 +758,7 @@ function SportStep({ model }: { model: MatchCreateViewModel }) {
             onClick={() => model.form?.onSelectSport(sport)}
           >
             <div className="tm-text-body-lg">{sport}</div>
-            {sport === model.selectedSport ? <div className="tm-text-caption" style={{ marginTop: 5 }}>선택됨</div> : null}
+            {sport === model.selectedSport ? <div className="tm-text-caption" style={{ marginTop: 4 }}>선택됨</div> : null}
           </button>
         ))}
       </div>
@@ -820,18 +820,18 @@ function ImageUploadField({ image, onChange, onUpload }: { image: string; onChan
   };
 
   return (
-    <Card pad={0} style={{ marginTop: 14, overflow: 'hidden' }}>
+    <Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}>
       <div className="tm-create-image-preview" style={{ backgroundImage: cssUrl(image) }}>
         <span className="tm-badge tm-badge-grey">대표 이미지</span>
       </div>
-      <div style={{ padding: 14 }}>
+      <div style={{ padding: 16 }}>
         <label className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" style={{ opacity: uploading ? 0.6 : 1 }}>
           {uploading ? '업로드 중…' : fileName ? '이미지 변경' : '대표 이미지 선택'}
           <input className="sr-only" type="file" accept="image/*" disabled={uploading} onChange={handleChange} />
         </label>
         {uploadError ? <div className="tm-text-caption" role="alert" style={{ marginTop: 8, color: 'var(--orange700)' }}>{uploadError}</div> : null}
         {image && !uploading ? (
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 10 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginTop: 12 }}>
             <span className="tm-text-caption" style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fileName || '현재 대표 이미지'}</span>
             <button className="tm-btn tm-btn-sm tm-btn-ghost" type="button" onClick={() => { setFileName(''); onChange?.(''); }}>제거</button>
           </div>
@@ -961,7 +961,7 @@ function PlaceTimeFields({ model }: { model: MatchCreateViewModel }) {
         <CreateField label="신청 마감일" value={draft.deadlineDate} type="date" onChange={(value) => model.form?.onFieldChange('deadlineDate', value)} />
         <CreateField id="field-deadlineTime" error={errors?.deadlineTime} label="신청 마감시간" value={draft.deadlineTime} type="time" onChange={(value) => model.form?.onFieldChange('deadlineTime', value)} />
       </div>
-      <div className="tm-text-caption" style={{ marginTop: 6 }}>둘 다 비워두면 경기 시작 전까지 신청을 받아요.</div>
+      <div className="tm-text-caption" style={{ marginTop: 8 }}>둘 다 비워두면 경기 시작 전까지 신청을 받아요.</div>
     </>
   );
 }
@@ -974,7 +974,7 @@ function RegionSelect({ value, regions, onChange, error }: { value: string; regi
         <option value="">시/군/구 선택</option>
         {regions.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}
       </select>
-      <div className="tm-text-caption" style={{ marginTop: 6 }}>지역은 검색·추천에 쓰이고, 장소와 주소는 아래에 직접 입력해 주세요.</div>
+      <div className="tm-text-caption" style={{ marginTop: 8 }}>지역은 검색·추천에 쓰이고, 장소와 주소는 아래에 직접 입력해 주세요.</div>
       <FieldErrorText message={error} />
     </label>
   );
@@ -984,7 +984,7 @@ function ConfirmStep({ model }: { model: MatchCreateViewModel }) {
   const draft = model.draft;
   const regionName = model.form?.regions.find((region) => region.id === model.form?.regionId)?.name ?? '지역 선택 필요';
   const deadlineText = draft.deadlineDate && draft.deadlineTime ? `${draft.deadlineDate} ${draft.deadlineTime}` : '경기 시작 전까지';
-  return <div><h1 className="tm-text-heading">입력한 내용을 확인해 주세요</h1><Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}><div className="tm-create-image-preview" style={{ backgroundImage: cssUrl(draft.image) }} /><div style={{ padding: 16 }}><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{model.selectedSport}</span><span className="tm-badge tm-badge-grey">{draft.minLevel}-{draft.maxLevel}</span><span className="tm-badge tm-badge-grey">{draft.gender}</span></div><div className="tm-text-subhead" style={{ marginTop: 10 }}>{draft.title}</div><div className="tm-text-caption" style={{ marginTop: 6 }}>{draft.description}</div></div></Card><Card pad={16} style={{ marginTop: 12 }}><InfoRow label="지역" value={regionName} sub="검색·추천에 사용돼요" /><InfoRow label="일시" value={`${draft.date} ${draft.startTime}-${draft.endTime}`} /><InfoRow label="신청 마감" value={deadlineText} /><InfoRow label="장소" value={draft.venue} sub={draft.address} /><InfoRow label="인원" value={`최대 ${draft.capacity}명`} /><InfoRow label="이미지" value="대표 이미지" sub="목록과 상세 화면에 표시돼요" /></Card></div>;
+  return <div><h1 className="tm-text-heading">입력한 내용을 확인해 주세요</h1><Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}><div className="tm-create-image-preview" style={{ backgroundImage: cssUrl(draft.image) }} /><div style={{ padding: 16 }}><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{model.selectedSport}</span><span className="tm-badge tm-badge-grey">{draft.minLevel}-{draft.maxLevel}</span><span className="tm-badge tm-badge-grey">{draft.gender}</span></div><div className="tm-text-subhead" style={{ marginTop: 12 }}>{draft.title}</div><div className="tm-text-caption" style={{ marginTop: 8 }}>{draft.description}</div></div></Card><Card pad={16} style={{ marginTop: 12 }}><InfoRow label="지역" value={regionName} sub="검색·추천에 사용돼요" /><InfoRow label="일시" value={`${draft.date} ${draft.startTime}-${draft.endTime}`} /><InfoRow label="신청 마감" value={deadlineText} /><InfoRow label="장소" value={draft.venue} sub={draft.address} /><InfoRow label="인원" value={`최대 ${draft.capacity}명`} /><InfoRow label="이미지" value="대표 이미지" sub="목록과 상세 화면에 표시돼요" /></Card></div>;
 }
 
 function MatchComplete({ model }: { model: MatchCreateViewModel }) {
@@ -1028,7 +1028,7 @@ function MatchComplete({ model }: { model: MatchCreateViewModel }) {
         {/* [P2 마이크로인터랙션] 완료 체크 애니메이션 — globals.css .tm-complete-check (reduced-motion 자동 처리) */}
         <CompletionCheckIcon />
         <EmptyState title="매치를 만들었어요" sub="팀원들에게 링크를 공유해 참여 의사를 확인해 보세요." />
-        <Card pad={16} style={{ marginTop: 22, background: 'var(--tint-blue)', borderColor: 'var(--tint-blue-border)' }}>
+        <Card pad={16} style={{ marginTop: 24, background: 'var(--tint-blue)', borderColor: 'var(--tint-blue-border)' }}>
           <div className="tm-text-body-lg">매치 공유</div>
           <div className="tm-text-caption" style={{ marginTop: 4 }}>팀원들에게 링크와 일정을 알려보세요</div>
         </Card>

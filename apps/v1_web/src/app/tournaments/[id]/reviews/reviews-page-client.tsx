@@ -33,7 +33,7 @@ function getPageWindow(current: number, total: number): number[] {
 
 function ReviewsListSkeleton() {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div className="tm-skeleton" style={{ height: 96, borderRadius: 12 }} />
       <div className="tm-skeleton" style={{ height: 96, borderRadius: 12 }} />
       <div className="tm-skeleton" style={{ height: 96, borderRadius: 12 }} />
@@ -159,7 +159,7 @@ export function TournamentReviewsPageClient({ tournamentId }: { tournamentId: st
       {showForm && <ReviewFormModal tournamentId={tournamentId} onClose={() => setShowForm(false)} />}
       <div className="tm-tourn-sub-page">
         <div className="tm-reviews-body" style={{ padding: '20px 20px 40px' }}>
-          <header style={{ marginBottom: 14 }}>
+          <header style={{ marginBottom: 16 }}>
             <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: 'var(--text-strong)' }}>
               {tournament ? `${tournament.title} 참가팀 후기` : '참가팀 후기'}
             </h1>

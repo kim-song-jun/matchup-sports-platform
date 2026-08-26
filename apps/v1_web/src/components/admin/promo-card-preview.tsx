@@ -129,13 +129,13 @@ export function PromoListPreview({ fields, fallback }: { fields: PromoPreviewFie
       {imageUrl ? <span aria-hidden="true" style={{ position: 'absolute', inset: 0, background: 'var(--scrim-dark-32)' }} /> : null}
       <div style={{ position: 'relative', zIndex: 1 }}>
         <div>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 999, background: 'var(--overlay-white-18)', fontSize: 'var(--font-size-caption)', fontWeight: 700 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 9px', borderRadius: 999, background: 'var(--overlay-white-18)', fontSize: 'var(--font-size-caption)', fontWeight: 700 }}>
             <Trophy size={12} strokeWidth={2} aria-hidden="true" />
             {featuredBadge}
           </span>
           <div className="tm-text-heading" style={{ color: 'var(--static-white)', marginTop: 12 }}>{featuredTitle}</div>
           {featuredSubtitle ? (
-            <div className="tm-text-caption" style={{ color: 'var(--overlay-white-85)', marginTop: 6 }}>
+            <div className="tm-text-caption" style={{ color: 'var(--overlay-white-85)', marginTop: 8 }}>
               {featuredSubtitle}
             </div>
           ) : null}

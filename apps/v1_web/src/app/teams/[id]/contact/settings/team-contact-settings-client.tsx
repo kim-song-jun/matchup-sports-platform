@@ -92,7 +92,7 @@ export function TeamContactSettingsPageClient({ teamId }: { teamId: string }) {
                     minHeight: 44,
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 10,
+                    gap: 12,
                     padding: '10px 12px',
                     borderRadius: 10,
                     cursor: updatePolicy.isPending ? 'default' : 'pointer',

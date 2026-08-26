@@ -86,7 +86,7 @@ export function MyInquiriesListClient() {
     <AppChrome title={t.inquiry} activeTab="my" bottomNav={false} backHref="/my" desktopHead>
       <div className="tm-my-shell">
         <div className="tm-my-settings-desktop">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 16 }}>
             <div>
               <div className="tm-text-heading">{t.myInquiries}</div>
               <div className="tm-text-caption" style={{ marginTop: 4 }}>{t.listSub}</div>
@@ -162,7 +162,7 @@ export function MyInquiryCreateClient() {
       <div className="tm-my-shell">
         <div className="tm-my-settings-desktop">
           <Card pad={16}>
-            <form onSubmit={submit} style={{ display: 'grid', gap: 14 }}>
+            <form onSubmit={submit} style={{ display: 'grid', gap: 16 }}>
               <label className="tm-create-field">
                 <span className="tm-text-label">{t.category}</span>
                 <select className="tm-input" value={category} onChange={(event) => setCategory(event.target.value as V1InquiryCategory)}>
@@ -227,7 +227,7 @@ function InquiryDetail({ inquiry }: { inquiry: V1Inquiry }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
           <div style={{ minWidth: 0 }}>
             <div className="tm-text-heading">{inquiry.title}</div>
-            <div className="tm-text-caption" style={{ marginTop: 6 }}>{meta}</div>
+            <div className="tm-text-caption" style={{ marginTop: 8 }}>{meta}</div>
           </div>
           <span className="tm-badge tm-badge-blue">{statusLabel[inquiry.status]}</span>
         </div>
@@ -239,12 +239,12 @@ function InquiryDetail({ inquiry }: { inquiry: V1Inquiry }) {
         </p>
       </Card>
       <Card pad={16}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
           <div className="tm-text-body-lg">{t.answer}</div>
           <span className="tm-badge tm-badge-grey">{inquiry.replies?.length ?? 0}</span>
         </div>
         {inquiry.replies && inquiry.replies.length > 0 ? (
-          <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
+          <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
             {inquiry.replies.map((reply) => (
               <div key={reply.replyId} style={{ borderRadius: 14, background: 'var(--surface-soft)', padding: 12 }}>
                 <div className="tm-text-label" style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>

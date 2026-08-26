@@ -355,7 +355,7 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
             {selectedSports.map(({ sportId, levelId, sport }) => (
               <Card key={sportId} pad={15}>
                 <div className="tm-text-body-lg">{sport?.name}</div>
-                <div className="tm-auth-chip-wrap" style={{ marginTop: 10 }}>
+                <div className="tm-auth-chip-wrap" style={{ marginTop: 12 }}>
                   {(sport?.levels ?? []).map((level) => (
                     <button
                       className={`tm-chip ${levelId === level.id ? 'tm-chip-active' : ''}`}
@@ -385,7 +385,7 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
             <div className="tm-auth-stack">
               <Card pad={15}>
                 <div className="tm-text-label">시/도</div>
-                <div className="tm-auth-chip-wrap" style={{ marginTop: 10 }}>
+                <div className="tm-auth-chip-wrap" style={{ marginTop: 12 }}>
                   {regionGroups.map((group) => (
                     <button
                       className={`tm-chip ${selectedRegionGroup?.id === group.id ? 'tm-chip-active' : ''}`}
@@ -401,7 +401,7 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
               </Card>
               <Card pad={15}>
                 <div className="tm-text-label">{selectedRegionGroup ? `${selectedRegionGroup.name} 상세 지역` : '상세 지역'}</div>
-                <div className="tm-auth-chip-wrap" style={{ marginTop: 10 }}>
+                <div className="tm-auth-chip-wrap" style={{ marginTop: 12 }}>
                   {(selectedRegionGroup?.options ?? []).map((region) => (
                     <button
                       className={`tm-chip ${selectedRegionIds.has(region.id) ? 'tm-chip-active' : ''}`}

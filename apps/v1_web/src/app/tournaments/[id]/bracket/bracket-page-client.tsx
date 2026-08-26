@@ -124,7 +124,7 @@ function TeamFixturesDetail({ teamId, fixtures }: { teamId: string | null; fixtu
   }
 
   return (
-    <ul style={{ display: 'flex', flexDirection: 'column', gap: 6, listStyle: 'none', margin: 0, padding: 0 }}>
+    <ul style={{ display: 'flex', flexDirection: 'column', gap: 8, listStyle: 'none', margin: 0, padding: 0 }}>
       {mine.map((f) => {
         const isHome = f.homeTeamId === teamId;
         const opponent = (isHome ? f.awayTeamName : f.homeTeamName) ?? '비공개';

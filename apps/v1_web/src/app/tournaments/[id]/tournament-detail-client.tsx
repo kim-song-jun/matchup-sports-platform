@@ -257,7 +257,7 @@ function CollapsiblePolicyText({
         <FormattedText text={text} className={className} style={{ color, lineHeight }} />
       </div>
       {shouldCollapse ? (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
           <button
             type="button"
             className="tm-btn tm-btn-sm tm-btn-ghost"
@@ -399,7 +399,7 @@ function BracketEntryCtaButton({ tournament }: { tournament: V1TournamentDetail 
       {isLive ? (
         <span
           style={{
-            display: 'flex', alignItems: 'center', gap: 5,
+            display: 'flex', alignItems: 'center', gap: 4,
             background: 'rgba(255,255,255,0.18)', borderRadius: 20,
             padding: '3px 9px', flexShrink: 0,
           }}
@@ -584,7 +584,7 @@ export function TournamentDetailView({
           </div>
         </div>
         {prizeChips.length > 0 ? (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 14 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 16 }}>
             {prizeChips.map((seg, i) => {
               const m = seg.match(/^(우승|준우승|공동 ?[1-9]위|[1-9]위|MVP|득점왕|도움왕|(?:참가(?:팀|자) )?전원)\s+(.+)$/);
               return (
@@ -622,7 +622,7 @@ export function TournamentDetailView({
   /* ── Header identity block (icon + title + badges) — shared by open/scheduled/in_progress
      layout and the completed layout, which relocates it above the result hero (TARGET §1). ── */
   const headerIdentitySection = (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
       <div
         aria-hidden="true"
         style={{
@@ -642,7 +642,7 @@ export function TournamentDetailView({
         <h1 className="tm-text-heading" style={{ color: 'var(--text-strong)', margin: 0, lineHeight: 1.3 }}>
           {tournament.title}
         </h1>
-        <div style={{ marginTop: 5, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+        <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span className={`tm-badge ${status.badgeClass}`}>
             {status.label}
           </span>
@@ -696,7 +696,7 @@ export function TournamentDetailView({
         <Card pad={0}>
           {/* 정원 진행 + 잔여 (모바일 전용) */}
           <div className="tm-hide-desktop" style={{ padding: '14px 16px', borderBottom: '1px solid var(--grey100)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
               <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>정원</span>
               {/* P1 숫자:단위 2:1 + tabular-nums */}
               <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 1 }}>
@@ -712,7 +712,7 @@ export function TournamentDetailView({
               teamCount={tournament.teamCount}
             />
             {pendingPaymentCount > 0 ? (
-              <div className="tm-text-caption" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', color: 'var(--text-muted)', marginTop: 6 }}>
+              <div className="tm-text-caption" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', color: 'var(--text-muted)', marginTop: 8 }}>
                 <span><b style={{ color: 'var(--blue700)', fontWeight: 600 }}>{tournament.confirmedCount}팀</b> 확정</span>
                 <span><b style={{ color: 'var(--orange700)', fontWeight: 600 }}>{pendingPaymentCount}팀</b> 입금 대기</span>
               </div>
@@ -720,12 +720,12 @@ export function TournamentDetailView({
             {(() => {
               const remaining = tournament.teamCount - reservedTeamCount;
               if (remaining <= 0) {
-                return <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 6 }}>정원이 가득 찼어요</div>;
+                return <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 8 }}>정원이 가득 찼어요</div>;
               }
               const pct = Math.round((reservedTeamCount / Math.max(tournament.teamCount, 1)) * 100);
               const almostFull = pct >= 80;
               return (
-                <div className="tm-text-caption" style={{ color: almostFull ? 'var(--orange700)' : 'var(--text-muted)', marginTop: 6 }}>
+                <div className="tm-text-caption" style={{ color: almostFull ? 'var(--orange700)' : 'var(--text-muted)', marginTop: 8 }}>
                   {almostFull ? '마감 임박! ' : '아직 '}
                   <b style={{ color: almostFull ? 'var(--orange700)' : 'var(--blue700)', fontWeight: 500 }}>{remaining}자리</b> 남았어요
                 </div>
@@ -989,7 +989,7 @@ export function TournamentDetailView({
                 key={item.label}
                 style={{
                   display: 'flex',
-                  gap: 10,
+                  gap: 12,
                   padding: '9px 14px',
                   borderBottom: idx < arr.length - 1 ? '1px solid var(--grey100)' : 'none',
                   alignItems: 'flex-start',
@@ -1031,7 +1031,7 @@ export function TournamentDetailView({
           teamCount={tournament.teamCount}
           height={6}
         />
-        <div style={{ marginTop: 18 }}>
+        <div style={{ marginTop: 20 }}>
           <ApplyCTAButtons tournament={tournament} isFull={isFull} myRegistration={myRegistration} />
         </div>
       </div>
@@ -1040,8 +1040,8 @@ export function TournamentDetailView({
           the mobile metric strip is hidden on desktop to avoid duplication). */}
       <div
         style={{
-          marginTop: 14,
-          paddingTop: 14,
+          marginTop: 16,
+          paddingTop: 16,
           borderTop: '1px solid var(--border)',
           display: 'flex',
           flexDirection: 'column',
@@ -1075,7 +1075,7 @@ export function TournamentDetailView({
       <Link
         href={`/tournaments/${tournament.id}/bracket`}
         style={{
-          display: 'flex', alignItems: 'center', gap: 10,
+          display: 'flex', alignItems: 'center', gap: 12,
           padding: '14px 16px',
           background: 'var(--blue500)', borderRadius: 14,
           textDecoration: 'none',
@@ -1083,7 +1083,7 @@ export function TournamentDetailView({
           marginBottom: 16,
         }}
       >
-        <span style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,0.18)', borderRadius: 20, padding: '3px 9px', flexShrink: 0 }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.18)', borderRadius: 20, padding: '3px 9px', flexShrink: 0 }}>
           <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#4ADE80', flexShrink: 0, boxShadow: '0 0 0 2px rgba(74,222,128,0.35)' }} aria-hidden="true" />
           <span style={{ fontSize: 'var(--font-size-caption)', fontWeight: 800, color: '#fff', letterSpacing: '0.02em' }}>LIVE</span>
         </span>
@@ -1116,7 +1116,7 @@ export function TournamentDetailView({
       <Link
         href={`/tournaments/${tournament.id}/bracket`}
         style={{
-          display: 'flex', alignItems: 'center', gap: 10,
+          display: 'flex', alignItems: 'center', gap: 12,
           padding: '14px 16px',
           background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14,
           textDecoration: 'none',
@@ -1151,7 +1151,7 @@ export function TournamentDetailView({
       <Link
         href={`/tournaments/${tournament.id}/results`}
         style={{
-          display: 'flex', alignItems: 'center', gap: 10,
+          display: 'flex', alignItems: 'center', gap: 12,
           padding: '14px 16px',
           background: 'linear-gradient(135deg, #1A1A2E 0%, #111827 100%)', borderRadius: 14,
           textDecoration: 'none',
@@ -1159,7 +1159,7 @@ export function TournamentDetailView({
           marginBottom: 16,
         }}
       >
-        <span style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,0.12)', borderRadius: 20, padding: '3px 9px', flexShrink: 0 }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.12)', borderRadius: 20, padding: '3px 9px', flexShrink: 0 }}>
           <Trophy size={12} className="tm-medal-gold" strokeWidth={2.4} aria-hidden="true" />
           <span style={{ fontSize: 'var(--font-size-caption)', fontWeight: 800, color: '#fff', letterSpacing: '0.02em' }}>종료</span>
         </span>
@@ -1275,7 +1275,7 @@ function CompletedResultHero({ tournament }: { tournament: V1TournamentDetail })
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 14,
+          gap: 16,
           padding: '16px 18px',
           background: 'linear-gradient(135deg, #1A1A2E 0%, #111827 100%)',
           borderRadius: 16,
@@ -1354,7 +1354,7 @@ function AccordionSection({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: 10,
+          gap: 12,
           background: 'transparent',
           border: 'none',
           textAlign: 'left',
@@ -1920,10 +1920,10 @@ export function FixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: 10,
+          marginBottom: 12,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span className="tm-text-label" style={{ color: 'var(--text-muted)' }}>
             {roundLabel}
           </span>
@@ -2025,7 +2025,7 @@ function AnnouncementCard({ announcement }: { announcement: V1TournamentAnnounce
         <FormattedText
           text={announcement.body}
           className="tm-text-caption"
-          style={{ marginTop: 6, color: 'var(--text-body)', lineHeight: 1.65 }}
+          style={{ marginTop: 8, color: 'var(--text-body)', lineHeight: 1.65 }}
         />
       </Card>
     </div>
@@ -2038,7 +2038,7 @@ function TournamentDetailSkeleton() {
   return (
     <div aria-busy="true" aria-label="대회 정보 불러오는 중" style={{ padding: '0 20px 48px', marginTop: 20 }}>
       {/* Header skeleton */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
         <div
           aria-hidden="true"
           style={{ width: 52, height: 52, borderRadius: 16, background: 'var(--grey100)', flexShrink: 0 }}

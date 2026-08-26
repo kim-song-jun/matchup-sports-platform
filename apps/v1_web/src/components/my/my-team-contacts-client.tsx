@@ -104,7 +104,7 @@ export function MyTeamContactsListClient() {
     <AppChrome title="팀 컨택함" activeTab="my" bottomNav={false} backHref="/my" desktopHead>
       <div className="tm-my-shell">
         <div className="tm-my-settings-desktop">
-          <div style={{ marginBottom: 14 }}>
+          <div style={{ marginBottom: 16 }}>
             <div className="tm-text-heading">팀 컨택함</div>
             <div className="tm-text-caption" style={{ marginTop: 4 }}>
               다른 팀과 주고받은 컨택 메시지를 확인해요.
@@ -112,14 +112,14 @@ export function MyTeamContactsListClient() {
           </div>
 
           {operatorTeams.length >= 2 ? (
-            <div style={{ marginBottom: 14 }}>
+            <div style={{ marginBottom: 16 }}>
               <label htmlFor="team-contacts-team" className="tm-text-label">
                 팀 선택
               </label>
               <select
                 id="team-contacts-team"
                 className="tm-input tm-input-select"
-                style={{ marginTop: 6 }}
+                style={{ marginTop: 8 }}
                 value={selectedTeamId}
                 onChange={(event) => setSelectedTeamId(event.target.value)}
               >
@@ -150,7 +150,7 @@ export function MyTeamContactsListClient() {
                 aria-label="컨택 방향"
                 /* tm-review-tabs 는 3컬럼 고정이라 2탭에서는 오른쪽 1/3 이 빈다.
                    컬럼 수를 소비처가 정하는 tm-seg-tabs 를 쓴다(bracket-page-client 선례). */
-                style={{ marginBottom: 14, gridTemplateColumns: '1fr 1fr' }}
+                style={{ marginBottom: 16, gridTemplateColumns: '1fr 1fr' }}
               >
                 <button
                   type="button"
@@ -580,7 +580,7 @@ export function MyTeamContactDetailClient({ contactId }: { contactId: string }) 
                 <div className="tm-text-heading">
                   {fromTeamName} → {toTeamName}
                 </div>
-                <div className="tm-text-caption" style={{ marginTop: 6 }}>
+                <div className="tm-text-caption" style={{ marginTop: 8 }}>
                   {formatTournamentDateTimeLong(contact.createdAt)}
                 </div>
               </div>
@@ -589,7 +589,7 @@ export function MyTeamContactDetailClient({ contactId }: { contactId: string }) 
               </span>
             </div>
             {contact.status === 'requested' ? (
-              <div className="tm-text-caption" style={{ marginTop: 10, color: 'var(--text-muted)' }}>
+              <div className="tm-text-caption" style={{ marginTop: 12, color: 'var(--text-muted)' }}>
                 {formatExpiresIn(contact.expiresAt)}
               </div>
             ) : null}
@@ -625,7 +625,7 @@ export function MyTeamContactDetailClient({ contactId }: { contactId: string }) 
               <textarea
                 id="team-contact-decline-reason"
                 className="tm-input"
-                style={{ marginTop: 6, resize: 'none', lineHeight: 1.5 }}
+                style={{ marginTop: 8, resize: 'none', lineHeight: 1.5 }}
                 rows={3}
                 maxLength={200}
                 value={declineReason}

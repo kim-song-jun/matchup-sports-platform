@@ -34,8 +34,8 @@ function LineupManagementCta({ tournamentId, fixtureId }: { tournamentId: string
   const hasOwnSide = typeof access.data?.mySideId === 'string';
   if (!hasOwnSide && !isStaff) return null;
   return (
-    <Card pad={16} style={{ marginTop: 10 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+    <Card pad={16} style={{ marginTop: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
         <div style={{ minWidth: 0 }}>
           <div className="tm-text-body-lg">라인업</div>
           <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>

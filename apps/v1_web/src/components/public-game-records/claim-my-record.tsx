@@ -98,7 +98,7 @@ function ClaimMyRecordView({
   // "아직 안 됐나?" 하고 다시 누르게 된다.
   if (done) {
     return (
-      <Card pad={16} style={{ marginTop: 10 }}>
+      <Card pad={16} style={{ marginTop: 12 }}>
         <div className="tm-text-body-lg">연결을 신청했어요</div>
         <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>
           다른 참가자의 확인을 거쳐 연결돼요. 확인되면 내 활동 기록에 이 경기가 표시돼요.
@@ -109,7 +109,7 @@ function ClaimMyRecordView({
 
   return (
     <>
-      <Card pad={16} style={{ marginTop: 10, borderStyle: 'dashed' }}>
+      <Card pad={16} style={{ marginTop: 12, borderStyle: 'dashed' }}>
         <div className="tm-text-body-lg">이 경기에 뛰었는데 내 기록이 없나요?</div>
         <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>
           명단에서 본인을 찾아 연결하면 내 활동 기록으로 가져올 수 있어요.
@@ -155,7 +155,7 @@ function ClaimMyRecordView({
                 <div id="claim-my-record-title" className="tm-text-heading">
                   연결할 참가자가 없어요
                 </div>
-                <div className="tm-text-caption" style={{ marginTop: 6, color: 'var(--text-muted)' }}>
+                <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>
                   이 경기 명단은 모두 계정에 연결돼 있어요. 그런데도 내 기록이 안 보인다면{' '}
                   {/* 인라인 텍스트 링크 관례는 auth-page 와 같은 --blue700. 밑줄은
                       "컬러만으로 정보 전달 금지" 규칙 때문에 함께 둔다. */}
@@ -173,13 +173,13 @@ function ClaimMyRecordView({
                 <div id="claim-my-record-title" className="tm-text-heading">
                   명단에서 본인을 골라 주세요
                 </div>
-                <div className="tm-text-caption" style={{ marginTop: 6, color: 'var(--text-muted)' }}>
+                <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>
                   이미 계정이 연결된 참가자는 목록에 없어요. 신청 후 다른 참가자의 확인을 거쳐 연결돼요.
                 </div>
               </>
             )}
 
-            <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 320, overflowY: 'auto' }}>
+            <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 320, overflowY: 'auto' }}>
               {claimable.isLoading ? (
                 <div className="tm-text-caption">불러오는 중이에요…</div>
               ) : claimable.isError ? (
@@ -208,7 +208,7 @@ function ClaimMyRecordView({
             </div>
 
             {error ? (
-              <div role="alert" className="tm-text-caption" style={{ marginTop: 10, color: 'var(--red700)' }}>
+              <div role="alert" className="tm-text-caption" style={{ marginTop: 12, color: 'var(--red700)' }}>
                 {error}
               </div>
             ) : null}

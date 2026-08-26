@@ -24,7 +24,7 @@ export function PageSkeleton({ variant = 'list' }: { variant?: 'list' | 'detail'
         padding: '16px',
         display: 'flex',
         flexDirection: 'column',
-        gap: 14,
+        gap: 16,
       }}
     >
       {variant === 'detail' ? (
@@ -32,7 +32,7 @@ export function PageSkeleton({ variant = 'list' }: { variant?: 'list' | 'detail'
           <SkeletonBlock height={172} radius={16} />
           <SkeletonBlock height={22} width="62%" />
           <SkeletonBlock height={14} width="42%" />
-          <SkeletonBlock height={120} radius={16} style={{ marginTop: 6 }} />
+          <SkeletonBlock height={120} radius={16} style={{ marginTop: 8 }} />
           <SkeletonBlock height={120} radius={16} />
         </>
       ) : (

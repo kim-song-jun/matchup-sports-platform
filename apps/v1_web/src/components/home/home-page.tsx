@@ -131,7 +131,7 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
           {/* Featured recommendation hero — 가로 캐러셀(스와이프) */}
           {hasFeaturedContent ? (
           <div className="tm-home-featured-block">
-            <div style={{ marginBottom: 10 }}>
+            <div style={{ marginBottom: 12 }}>
               <div className="tm-text-label">오늘의 추천</div>
               <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 2 }}>지금 눈여겨볼 매치·대회</div>
             </div>
@@ -413,7 +413,7 @@ function RecordConsentNudgeBanner({
           type="button"
           aria-label="경기 기록 공개 안내 닫기"
           className="tm-pressable"
-          style={{ flexShrink: 0, padding: 6, minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          style={{ flexShrink: 0, padding: 8, minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           onClick={recordConsentNudge.onDismiss}
         >
           <X size={18} aria-hidden="true" />
@@ -474,7 +474,7 @@ function PushNudgeBanner({ pushNudge }: { pushNudge: NonNullable<HomeViewModel['
           type="button"
           aria-label="알림 받기 안내 닫기"
           className="tm-pressable"
-          style={{ flexShrink: 0, padding: 6, minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          style={{ flexShrink: 0, padding: 8, minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           onClick={pushNudge.onDismiss}
         >
           <X size={18} aria-hidden="true" />
@@ -629,7 +629,7 @@ function FeaturedMatchCard({
               <div className="tm-text-body-lg">{match.venue}</div>
               <div
                 className="tm-text-caption tm-featured-meta"
-                style={{ marginTop: 6, display: 'flex', alignItems: 'center', columnGap: 8, rowGap: 4, flexWrap: 'wrap' }}
+                style={{ marginTop: 8, display: 'flex', alignItems: 'center', columnGap: 8, rowGap: 4, flexWrap: 'wrap' }}
               >
                 <span style={{ color: 'var(--text-strong)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
                   {match.date} {match.time}
@@ -713,7 +713,7 @@ function SidebarTournamentsWidget({ items, loading }: { items: V1TournamentListI
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 10,
+                  gap: 12,
                   padding: '10px 12px',
                   borderRadius: 10,
                   background: 'var(--surface)',
@@ -828,7 +828,7 @@ function SidebarLeaguesWidget({ items, loading }: { items: V1PublicLeagueListIte
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 10,
+                  gap: 12,
                   padding: '10px 12px',
                   borderRadius: 10,
                   background: 'var(--surface)',

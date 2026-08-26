@@ -724,7 +724,7 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
 
   return (
     <AppChrome title="라인업" activeTab="tournaments" backHref={`/tournaments/${tournamentId}`} bottomNav={false} desktopHead>
-      <div className="tm-fixture-lineup-page" style={{ display: 'grid', gap: 14 }}>
+      <div className="tm-fixture-lineup-page" style={{ display: 'grid', gap: 16 }}>
         <Card pad={16}>
           <div className="tm-text-body-lg">{homeName} vs {awayName}</div>
           <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>
@@ -754,7 +754,7 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
             <button
               type="button"
               className="tm-btn tm-btn-outline"
-              style={{ marginTop: 10, width: '100%' }}
+              style={{ marginTop: 12, width: '100%' }}
               onClick={handleLoadLatestLineup}
             >
               최신 명단 불러오기

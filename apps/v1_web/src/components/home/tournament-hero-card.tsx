@@ -97,7 +97,7 @@ export function TournamentHeroCard({ items, loading = false }: { items: V1Tourna
                   {facts.length > 0 ? (
                     <div
                       className="tm-text-caption tm-featured-meta"
-                      style={{ marginTop: 6, display: 'flex', alignItems: 'center', columnGap: 8, rowGap: 4, flexWrap: 'wrap' }}
+                      style={{ marginTop: 8, display: 'flex', alignItems: 'center', columnGap: 8, rowGap: 4, flexWrap: 'wrap' }}
                     >
                       {facts.map((fact) => (
                         <span

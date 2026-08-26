@@ -23,7 +23,7 @@ export function LineupTodoCard({ enabled = true }: { enabled?: boolean }) {
   return (
     <section aria-labelledby="lineup-todo-heading">
       <Card pad={16}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 12 }}>
           <h2 id="lineup-todo-heading" className="tm-text-body-lg" style={{ fontWeight: 700, margin: 0 }}>
             라인업을 기다리는 경기
           </h2>

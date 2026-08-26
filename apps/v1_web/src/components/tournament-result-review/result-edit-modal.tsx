@@ -555,7 +555,7 @@ export function ResultEditModal({
         <div style={{ padding: '16px 24px', overflowY: 'auto', flex: 1 }}>
           <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', marginBottom: 20 }}>
             <div style={{ flex: 1 }}>
-              <label htmlFor={`${idPrefix}-home`} className="tm-text-label" style={{ display: 'block', marginBottom: 6 }}>
+              <label htmlFor={`${idPrefix}-home`} className="tm-text-label" style={{ display: 'block', marginBottom: 8 }}>
                 홈 점수
               </label>
               <input
@@ -572,7 +572,7 @@ export function ResultEditModal({
               />
             </div>
             <div style={{ flex: 1 }}>
-              <label htmlFor={`${idPrefix}-away`} className="tm-text-label" style={{ display: 'block', marginBottom: 6 }}>
+              <label htmlFor={`${idPrefix}-away`} className="tm-text-label" style={{ display: 'block', marginBottom: 8 }}>
                 원정 점수
               </label>
               <input
@@ -621,18 +621,18 @@ export function ResultEditModal({
 
           {penaltiesAllowed ? (
             <section className="tm-card" style={{ padding: 12, marginBottom: 20 }}>
-              <p className="tm-text-label" style={{ fontWeight: 600, marginBottom: 10 }}>
+              <p className="tm-text-label" style={{ fontWeight: 600, marginBottom: 12 }}>
                 승부차기 결과
               </p>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
                 <StatNumberField id={`${idPrefix}-penalty-home`} label="홈 성공" value={penaltyHome} onValueChange={setPenaltyHome} />
                 <StatNumberField id={`${idPrefix}-penalty-away`} label="원정 성공" value={penaltyAway} onValueChange={setPenaltyAway} />
               </div>
               <fieldset style={{ marginTop: 12 }}>
-                <legend className="tm-text-caption" style={{ marginBottom: 6 }}>먼저 차는 팀</legend>
+                <legend className="tm-text-caption" style={{ marginBottom: 8 }}>먼저 차는 팀</legend>
                 <div style={{ display: 'flex', gap: 16 }}>
                   {(['HOME', 'AWAY'] as const).map((sideKey) => (
-                    <label key={sideKey} className="tm-text-caption" style={{ display: 'flex', gap: 6, alignItems: 'center', minHeight: 44 }}>
+                    <label key={sideKey} className="tm-text-caption" style={{ display: 'flex', gap: 8, alignItems: 'center', minHeight: 44 }}>
                       <input type="radio" name={`${idPrefix}-first-kick`} checked={firstKickSideKey === sideKey} onChange={() => setFirstKickSideKey(sideKey)} />
                       {sideKey === 'HOME' ? '홈' : '원정'}
                     </label>
@@ -669,7 +669,7 @@ export function ResultEditModal({
                 득점 추가
               </button>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {goalEvents.map((goal, index) => (
                 <div key={goal.id} className="tm-card" style={{ padding: 12 }}>
                   <div style={{ display: 'grid', gridTemplateColumns: 'minmax(88px, 0.8fr) minmax(120px, 1.4fr) 76px 86px', gap: 8 }}>
@@ -748,7 +748,7 @@ export function ResultEditModal({
                       }
                     />
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, marginTop: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
                     <button type="button" className="tm-btn tm-btn-sm tm-btn-ghost" disabled={index === 0} onClick={() => {
                       const next = [...goalEvents];
                       [next[index - 1], next[index]] = [next[index], next[index - 1]];
@@ -774,13 +774,13 @@ export function ResultEditModal({
           <p className="tm-text-label" style={{ fontWeight: 600, color: 'var(--text-strong)', marginBottom: 8 }}>
             참가자별 기록
           </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
             {participants.map((participant, index) => (
               <div key={participant.participantId} className="tm-card" style={{ padding: 12 }}>
                 <p className="tm-text-caption" style={{ fontWeight: 600, marginBottom: 8 }}>
                   {participantLabel(sides, participantNameMap, participant.participantId, participant.sideId)}
                 </p>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
                   <StatNumberField
                     id={`${idPrefix}-p${index}-goals`}
                     label="득점"
@@ -844,7 +844,7 @@ export function ResultEditModal({
           ) : null}
 
           <div style={{ marginBottom: 20 }}>
-            <label htmlFor={`${idPrefix}-mvp`} className="tm-text-label" style={{ display: 'block', marginBottom: 6 }}>
+            <label htmlFor={`${idPrefix}-mvp`} className="tm-text-label" style={{ display: 'block', marginBottom: 8 }}>
               MVP (선택)
             </label>
             <select
@@ -864,7 +864,7 @@ export function ResultEditModal({
           </div>
 
           <div>
-            <label htmlFor={`${idPrefix}-reason`} className="tm-text-label" style={{ display: 'block', marginBottom: 6 }}>
+            <label htmlFor={`${idPrefix}-reason`} className="tm-text-label" style={{ display: 'block', marginBottom: 8 }}>
               {reasonLabel}
             </label>
             <textarea

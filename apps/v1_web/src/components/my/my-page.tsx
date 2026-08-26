@@ -293,7 +293,7 @@ export function MyInvitationsPageView({ model }: { model: MyInvitationsViewModel
                   </button>
                 </div>
                 {invitation.actionPending ? (
-                  <div className="tm-text-caption" role="status" aria-live="polite" style={{ marginTop: 6 }}>
+                  <div className="tm-text-caption" role="status" aria-live="polite" style={{ marginTop: 8 }}>
                     처리 중…
                   </div>
                 ) : null}
@@ -397,7 +397,7 @@ export function MyTeamMembersPageView({ model, backHref = '/my/teams/team-1' }: 
         <div className="tm-my-stat-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
           {model.summary.map((stat) => <Card key={stat.label} pad={16}><KPIStat {...stat} /></Card>)}
         </div>
-        <div className="tm-team-form-chip-row" role="group" aria-label="멤버 목록 탭" style={{ marginTop: 14 }}>
+        <div className="tm-team-form-chip-row" role="group" aria-label="멤버 목록 탭" style={{ marginTop: 16 }}>
           {model.tabs.map((tab) => (
             <button key={tab.key} className={`tm-chip ${model.activeTab === tab.key ? 'tm-chip-active' : ''}`} type="button" onClick={tab.onSelect} aria-pressed={model.activeTab === tab.key}>
               {tab.label} <span className="tab-num">{tab.count}</span>

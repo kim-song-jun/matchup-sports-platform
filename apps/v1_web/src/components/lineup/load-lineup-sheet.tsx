@@ -208,7 +208,7 @@ export function LoadLineupSheet({
                         width: '100%',
                         minHeight: 44,
                         textAlign: 'left',
-                        padding: 14,
+                        padding: 16,
                         borderRadius: 12,
                         border: '1px solid var(--border)',
                         background: 'var(--card-surface)',
@@ -223,7 +223,7 @@ export function LoadLineupSheet({
                       <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
                         {item.subtitle}
                       </span>
-                      <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
+                      <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 2 }}>
                         <Badge>선발 {item.starterCount}명</Badge>
                         {item.formation !== null ? <Badge>{item.formation}</Badge> : null}
                         {sportMismatch ? <Badge tone="warn">{item.sportName} 라인업</Badge> : null}

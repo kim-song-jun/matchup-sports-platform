@@ -101,7 +101,7 @@ export function TeamContactNewPageClient({ teamId }: { teamId: string }) {
               <select
                 id="contact-from-team"
                 className="tm-input tm-input-select"
-                style={{ marginTop: 6 }}
+                style={{ marginTop: 8 }}
                 value={fromTeamId}
                 onChange={(event) => setFromTeamId(event.target.value)}
                 disabled={createContact.isPending}
@@ -123,7 +123,7 @@ export function TeamContactNewPageClient({ teamId }: { teamId: string }) {
             <textarea
               id="contact-message"
               className="tm-input"
-              style={{ marginTop: 6, resize: 'none', lineHeight: 1.5 }}
+              style={{ marginTop: 8, resize: 'none', lineHeight: 1.5 }}
               rows={5}
               maxLength={MESSAGE_MAX_LENGTH}
               value={message}

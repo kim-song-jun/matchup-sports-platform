@@ -1045,7 +1045,7 @@ function LegalDocumentDialog({ title, sections, onClose }: { title: string; sect
             닫기
           </button>
         </header>
-        <div style={{ overflowY: 'auto', padding: '18px', display: 'grid', gap: 18 }}>
+        <div style={{ overflowY: 'auto', padding: '18px', display: 'grid', gap: 20 }}>
           {sections.map((section) => (
             <section key={section.title}>
               <h3 className="tm-text-body-lg" style={{ margin: 0 }}>{section.title}</h3>

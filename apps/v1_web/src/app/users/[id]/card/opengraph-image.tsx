@@ -140,7 +140,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
           </div>
 
           {/* 등번호는 이름 앞. 왼쪽 큰 숫자(총점)와 헷갈리지 않게 크기·색을 낮춘다. */}
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, marginTop: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 16, marginTop: 20 }}>
             {card.jerseyNumber !== null ? (
               <div
                 style={{
@@ -163,7 +163,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
           <div style={{ fontSize: 26, color: 'rgba(255,255,255,0.66)', marginTop: 8 }}>
             {`${tier.label} · ${card.appearances}경기${teamName ? ` · ${teamName}` : ''}`}
           </div>
-          <div style={{ fontSize: 20, color: 'rgba(255,255,255,0.44)', marginTop: 26 }}>
+          <div style={{ fontSize: 20, color: 'rgba(255,255,255,0.44)', marginTop: 28 }}>
             등급은 실력이 아니라 뛴 경기 수로 올라가요
           </div>
         </div>
@@ -180,7 +180,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
           }}
         >
           {card.stats.map((s) => (
-            <div key={s.code} style={{ display: 'flex', alignItems: 'center', marginBottom: 22 }}>
+            <div key={s.code} style={{ display: 'flex', alignItems: 'center', marginBottom: 24 }}>
               {/* 자물쇠 이모지는 satori 가 못 그리므로 텍스트 `잠김` 으로 말한다.
                   주석은 **엘리먼트 밖에** 둔다 -- satori 는 텍스트 전용 div 안의 주석까지
                   자식으로 세어 "display: flex 를 붙여라" 에러를 낸다. */}

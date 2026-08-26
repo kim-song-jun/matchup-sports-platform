@@ -148,7 +148,8 @@ for (let attempt = 1; attempt <= 5; attempt += 1) {
       n.body.includes(candidate.displayName),
   );
   if (arrived) break;
-  await new Promise((r) => setTimeout(r, 1000));
+  // 마지막 시도 뒤에는 기다리지 않는다 — 실패 시점만 1초 늦어진다(Copilot 리뷰).
+  if (attempt < 5) await new Promise((r) => setTimeout(r, 1000));
 }
 assert(arrived, `리더의 알림함에 "${candidate.displayName}" 승인 요청 알림이 없음(5회 조회)`);
 // 목록 응답은 deepLink 를 `target.route` 안에 담아 내려준다(notifications.service.ts list()).

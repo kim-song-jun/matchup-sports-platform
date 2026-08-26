@@ -44,7 +44,22 @@ function OwnerVisibilityBanner() {
   );
 }
 
+/**
+ * F6 -- 행 상단 캡션에 붙일 대회/리그 이름. 대회 경기는 예전처럼 대회명을, 정규 리그
+ * 대진은 리그명을 같은 자리에 같은 표기(` · 이름`)로 보여준다 -- 리그 경기가 친선
+ * 팀매치와 구분 없이 이름 없는 행으로 남던 것이 이 결함(F6)이었다. 리그가 아닌 친선
+ * 팀매치는 예전 그대로 아무것도 붙지 않는다(회귀 금지).
+ *
+ * 서버 계약상 `tournamentId`가 있는 경기는 `leagueId`가 항상 null이라(대회의 "리그 방식"
+ * 포맷도 분류상 `tournament`) 둘이 동시에 채워지는 행은 없지만, 우선순위는 백엔드
+ * 판정 함수(`classifyTeamRecordCategory`)와 같은 순서로 고정해 둔다.
+ */
+function competitionLabel(item: PublicUserRecordItem): string | null {
+  return item.tournamentTitle ?? item.leagueTitle ?? null;
+}
+
 function UserRecordRow({ item }: { item: PublicUserRecordItem }) {
+  const competition = competitionLabel(item);
   return (
     <div
       style={{
@@ -71,7 +86,7 @@ function UserRecordRow({ item }: { item: PublicUserRecordItem }) {
           }}
         >
           {formatTournamentDateShort(item.officialAt) ?? ''}
-          {item.tournamentTitle ? ` · ${item.tournamentTitle}` : ''}
+          {competition ? ` · ${competition}` : ''}
         </span>
         {item.mvp ? (
           <span

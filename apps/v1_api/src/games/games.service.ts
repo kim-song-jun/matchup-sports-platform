@@ -740,6 +740,194 @@ export function gameCommandAuditAction(
   }
 }
 
+/**
+ * 신원 연결(identity link) 3종 헬퍼는 `GamesService`의 private 메서드였다가 모듈 레벨
+ * 함수로 올라왔다 — 팀매치 전용 라인업 서비스(`team-match-lineup.service.ts`)가
+ * `GamesService.saveLineup`을 지나지 않고 자기 참가자 행을 직접 쓰는데, 그쪽에서도
+ * **똑같은** ROSTER_ASSERTED 연결을 만들어야 하기 때문이다. 계약(중복 연결 조기 반환,
+ * eventVersion 채번, 트리거 오류 매핑)을 복제하면 반드시 갈라지므로 구현은 하나로 둔다.
+ * `this`를 쓰지 않는 순수 tx 함수라 클래스 밖으로 옮기는 데 다른 제약은 없다.
+ */
+async function appendIdentityEvent(
+  tx: Transaction,
+  input: {
+    participantId: string;
+    linkId: string;
+    requestId: string;
+    userId: string;
+    reason?: string;
+  } & (
+    | {
+        action:
+          | typeof V1IdentityLinkAction.REQUESTED
+          | typeof V1IdentityLinkAction.ATTESTED
+          // 라인업 저장 시 매니저가 로스터에 지정한 계정으로 자동 생성되는 연결.
+          // v1_guard_identity_event 트리거는 ATTESTED/EXPIRED만 승인자≠본인을
+          // 검증하므로 ROSTER_ASSERTED는 그 검증을 우회하지 않고 애초에 대상이
+          // 아니다(자기 자신을 로스터에 넣는 선수 겸 매니저도 막히지 않는다).
+          | typeof V1IdentityLinkAction.ROSTER_ASSERTED
+          | typeof V1IdentityLinkAction.REJECTED
+          | typeof V1IdentityLinkAction.REVOKED;
+        actorType: typeof V1IdentityActorType.USER;
+        actorUserId: string;
+      }
+    | {
+        action:
+          | typeof V1IdentityLinkAction.EXPIRED
+          | typeof V1IdentityLinkAction.ROSTER_ASSERTED;
+        actorType: typeof V1IdentityActorType.SYSTEM;
+        systemActor:
+          | 'IDENTITY_LINK_EXPIRY'
+          | 'GAME_END_DERIVER'
+          | 'GAME_BACKFILL'
+          | 'PROJECTION_REPAIR'
+          // 라인업 리비전 복사(정정 요청)가 원본의 연결을 새 참가자 행으로 옮길 때.
+          // 사람이 새로 주장한 것이 아니라 시스템이 기존 주장을 이어 붙인 것이므로
+          // 복사를 실행한 상대팀 팀장의 이름을 빌리지 않는다.
+          // `system_actor` 는 TEXT 컬럼이고 트리거가 값을 검사하는 것은 EXPIRED 뿐이라
+          // (20260729000100 migration 의 v1_guard_identity_event) 스키마 변경이 필요 없다.
+          | 'LINEUP_REVISION_COPY';
+      }
+  ),
+) {
+  const last = await tx.v1ParticipantIdentityLinkEvent.findFirst({
+    where: { participantId: input.participantId },
+    orderBy: { eventVersion: 'desc' },
+    select: { eventVersion: true },
+  });
+  try {
+    return await tx.v1ParticipantIdentityLinkEvent.create({
+      data: {
+        participantId: input.participantId,
+        linkId: input.linkId,
+        eventVersion: (last?.eventVersion ?? 0) + 1,
+        requestId: input.requestId,
+        action: input.action,
+        userId: input.userId,
+        actorType: input.actorType,
+        actorUserId: input.actorType === V1IdentityActorType.USER ? input.actorUserId : null,
+        systemActor: input.actorType === V1IdentityActorType.SYSTEM ? input.systemActor : null,
+        reason: input.reason ?? null,
+      },
+    });
+  } catch (error) {
+    throw mapIdentityEventError(error);
+  }
+}
+
+/**
+ * Roster-backed participants become readable personal records in the same
+ * transaction that creates them. `V1GameParticipant.userId` alone is not a
+ * public identity assertion; the records reader intentionally follows the
+ * append-only identity event plus current-link pair.
+ *
+ * **멱등**: 이미 연결이 있는 participant 면 아무것도 하지 않고 조기 반환한다. 그래서
+ * 같은 라인업을 여러 번 저장하거나(각 저장은 새 participant 행을 만든다) 재시도로 이
+ * 함수가 두 번 불려도 유니크 제약(`v1_participant_identity_link_current` PK =
+ * participantId) 위반으로 500 이 나지 않는다. 한 사용자가 같은 경기에서 **여러**
+ * participant 행(라인업 리비전별 행, 자동 로스터 행)에 연결되는 것은 정상이다 —
+ * 연결 테이블의 유일성은 participant 기준이지 사용자 기준이 아니고, 기록은 결과
+ * 리비전이 지목한 participant 행 하나에만 붙기 때문에 이중 집계가 되지 않는다.
+ */
+export async function createRosterAssertedIdentityLink(
+  tx: Transaction,
+  participantId: string,
+  userId: string,
+  actor:
+    | { actorType: 'USER'; actorUserId: string }
+    | {
+        actorType: 'SYSTEM';
+        systemActor:
+          | 'GAME_END_DERIVER'
+          | 'GAME_BACKFILL'
+          | 'PROJECTION_REPAIR'
+          | 'LINEUP_REVISION_COPY';
+      },
+  reason: string,
+): Promise<void> {
+  const existingLink = await tx.v1ParticipantIdentityLinkCurrent.findUnique({
+    where: { participantId },
+  });
+  if (existingLink !== null) return;
+
+  const linkId = randomUUID();
+  const identityEvent =
+    actor.actorType === 'USER'
+      ? await appendIdentityEvent(tx, {
+          participantId,
+          linkId,
+          requestId: linkId,
+          action: V1IdentityLinkAction.ROSTER_ASSERTED,
+          userId,
+          actorType: V1IdentityActorType.USER,
+          actorUserId: actor.actorUserId,
+          reason,
+        })
+      : await appendIdentityEvent(tx, {
+          participantId,
+          linkId,
+          requestId: linkId,
+          action: V1IdentityLinkAction.ROSTER_ASSERTED,
+          userId,
+          actorType: V1IdentityActorType.SYSTEM,
+          systemActor: actor.systemActor,
+          reason,
+        });
+
+  await tx.v1ParticipantIdentityLinkCurrent.create({
+    data: {
+      participantId,
+      linkId,
+      userId,
+      version: 1,
+      effectiveFrom: identityEvent.effectiveAt,
+    },
+  });
+}
+
+function mapIdentityEventError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  if (message.includes('attestation requires a distinct pending requestor')) {
+    return new ConflictException({
+      code: 'IDENTITY_LINK_REQUEST_EXPIRED',
+      message: '연결 요청이 만료됐거나 유효하지 않아요.',
+    });
+  }
+  if (message.includes('identity terminal action already committed')) {
+    return new ConflictException({
+      code: 'IDENTITY_LINK_ALREADY_DECIDED',
+      message: '이미 처리된 요청이에요.',
+    });
+  }
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    // P2034(직렬화 충돌·데드락)는 신원 도메인의 사실이 아니라 **트랜잭션 레벨** 사건이다.
+    // 이 헬퍼는 라인업 저장(team-match-lineup.service.ts saveLineup)처럼 신원과 무관한
+    // 커맨드 한복판에서도 불리는데, 같은 저장의 다른 statement 가 졌을 때는 감싸는
+    // 트랜잭션이 COMMAND_CONCURRENCY_CONFLICT 를 던진다 — 어느 statement 가 졌느냐로
+    // 클라이언트가 보는 코드가 갈리면 같은 상황이 다른 실패로 보인다. 그래서 이쪽도
+    // 같은 코드로 맞춘다(프론트가 실제로 분기하는 코드도 이쪽이다 —
+    // apps/v1_web/src/hooks/use-v1-game-operations-console.ts).
+    // 신원 커맨드(requestIdentityLink/attest/revoke)에서도 이 통일이 맞다: 그쪽을 감싸는
+    // withParticipantCommand 의 P2034 처리가 원래 같은 코드를 내려는 것이었는데, 여기서
+    // 먼저 ConflictException 으로 바꿔 던지는 바람에 도달하지 못하고 있었다.
+    if (error.code === 'P2034') {
+      return new ConflictException({
+        code: 'COMMAND_CONCURRENCY_CONFLICT',
+        message: '동시에 처리된 요청이 있어요. 최신 상태를 다시 불러와 주세요.',
+      });
+    }
+    // P2002 는 반대로 신원 테이블의 유일성이 실제로 깨진 것(같은 요청의 중복 이벤트 등)이라
+    // 도메인 코드를 유지한다.
+    if (error.code === 'P2002') {
+      return new ConflictException({
+        code: 'IDENTITY_LINK_CONFLICT',
+        message: '동시 요청이 충돌했어요. 다시 시도해 주세요.',
+      });
+    }
+  }
+  return error;
+}
+
 @Injectable()
 export class GamesService {
   constructor(
@@ -882,7 +1070,7 @@ export class GamesService {
           },
         });
         if (participant.userId !== undefined) {
-          await this.createRosterAssertedIdentityLink(
+          await createRosterAssertedIdentityLink(
             tx,
             createdParticipant.id,
             participant.userId,
@@ -2471,7 +2659,7 @@ export class GamesService {
           // 로스터 귀속을 신원 연결(identity link)로 자동 승격한다 -- 방금 만든
           // participant라 정상적으로는 기존 링크가 있을 수 없지만, 방어적으로 한
           // 번 더 확인한다(재시도 등으로 이 루프가 두 번 돌 가능성에 대비).
-          await this.createRosterAssertedIdentityLink(
+          await createRosterAssertedIdentityLink(
             tx,
             createdParticipant.id,
             participant.userId,
@@ -3907,7 +4095,7 @@ export class GamesService {
               message: '이미 대기 중인 연결 요청이 있어요.',
             });
           }
-          await this.appendIdentityEvent(tx, {
+          await appendIdentityEvent(tx, {
             participantId,
             linkId: last.linkId,
             requestId: last.requestId,
@@ -3918,7 +4106,7 @@ export class GamesService {
           });
         }
         const requestId = randomUUID();
-        const created = await this.appendIdentityEvent(tx, {
+        const created = await appendIdentityEvent(tx, {
           participantId,
           linkId: requestId,
           requestId,
@@ -4043,7 +4231,7 @@ export class GamesService {
         }
         const expired = Date.now() - requested.effectiveAt.getTime() >= IDENTITY_LINK_REQUEST_TTL_MS;
         if (expired) {
-          const expiredEvent = await this.appendIdentityEvent(tx, {
+          const expiredEvent = await appendIdentityEvent(tx, {
             participantId,
             linkId: requested.linkId,
             requestId,
@@ -4106,7 +4294,7 @@ export class GamesService {
 
         const action =
           dto.decision === 'approve' ? V1IdentityLinkAction.ATTESTED : V1IdentityLinkAction.REJECTED;
-        const decided = await this.appendIdentityEvent(tx, {
+        const decided = await appendIdentityEvent(tx, {
           participantId,
           linkId: requested.linkId,
           requestId,
@@ -4200,7 +4388,7 @@ export class GamesService {
         if (actor.role !== 'platform_ops' && current.userId !== actor.actorUserId) {
           throw this.forbidden();
         }
-        const revoked = await this.appendIdentityEvent(tx, {
+        const revoked = await appendIdentityEvent(tx, {
           participantId,
           linkId,
           requestId: linkId,
@@ -4584,151 +4772,6 @@ export class GamesService {
       }
       throw error;
     }
-  }
-
-  private async appendIdentityEvent(
-    tx: Transaction,
-    input: {
-      participantId: string;
-      linkId: string;
-      requestId: string;
-      userId: string;
-      reason?: string;
-    } & (
-      | {
-          action:
-            | typeof V1IdentityLinkAction.REQUESTED
-            | typeof V1IdentityLinkAction.ATTESTED
-            // 라인업 저장 시 매니저가 로스터에 지정한 계정으로 자동 생성되는 연결.
-            // v1_guard_identity_event 트리거는 ATTESTED/EXPIRED만 승인자≠본인을
-            // 검증하므로 ROSTER_ASSERTED는 그 검증을 우회하지 않고 애초에 대상이
-            // 아니다(자기 자신을 로스터에 넣는 선수 겸 매니저도 막히지 않는다).
-            | typeof V1IdentityLinkAction.ROSTER_ASSERTED
-            | typeof V1IdentityLinkAction.REJECTED
-            | typeof V1IdentityLinkAction.REVOKED;
-          actorType: typeof V1IdentityActorType.USER;
-          actorUserId: string;
-        }
-      | {
-          action:
-            | typeof V1IdentityLinkAction.EXPIRED
-            | typeof V1IdentityLinkAction.ROSTER_ASSERTED;
-          actorType: typeof V1IdentityActorType.SYSTEM;
-          systemActor:
-            | 'IDENTITY_LINK_EXPIRY'
-            | 'GAME_END_DERIVER'
-            | 'GAME_BACKFILL'
-            | 'PROJECTION_REPAIR';
-        }
-    ),
-  ) {
-    const last = await tx.v1ParticipantIdentityLinkEvent.findFirst({
-      where: { participantId: input.participantId },
-      orderBy: { eventVersion: 'desc' },
-      select: { eventVersion: true },
-    });
-    try {
-      return await tx.v1ParticipantIdentityLinkEvent.create({
-        data: {
-          participantId: input.participantId,
-          linkId: input.linkId,
-          eventVersion: (last?.eventVersion ?? 0) + 1,
-          requestId: input.requestId,
-          action: input.action,
-          userId: input.userId,
-          actorType: input.actorType,
-          actorUserId: input.actorType === V1IdentityActorType.USER ? input.actorUserId : null,
-          systemActor: input.actorType === V1IdentityActorType.SYSTEM ? input.systemActor : null,
-          reason: input.reason ?? null,
-        },
-      });
-    } catch (error) {
-      throw this.mapIdentityEventError(error);
-    }
-  }
-
-  /**
-   * Roster-backed participants become readable personal records in the same
-   * transaction that creates them. `V1GameParticipant.userId` alone is not a
-   * public identity assertion; the records reader intentionally follows the
-   * append-only identity event plus current-link pair.
-   */
-  private async createRosterAssertedIdentityLink(
-    tx: Transaction,
-    participantId: string,
-    userId: string,
-    actor:
-      | { actorType: 'USER'; actorUserId: string }
-      | {
-          actorType: 'SYSTEM';
-          systemActor: 'GAME_END_DERIVER' | 'GAME_BACKFILL' | 'PROJECTION_REPAIR';
-        },
-    reason: string,
-  ): Promise<void> {
-    const existingLink = await tx.v1ParticipantIdentityLinkCurrent.findUnique({
-      where: { participantId },
-    });
-    if (existingLink !== null) return;
-
-    const linkId = randomUUID();
-    const identityEvent =
-      actor.actorType === 'USER'
-        ? await this.appendIdentityEvent(tx, {
-            participantId,
-            linkId,
-            requestId: linkId,
-            action: V1IdentityLinkAction.ROSTER_ASSERTED,
-            userId,
-            actorType: V1IdentityActorType.USER,
-            actorUserId: actor.actorUserId,
-            reason,
-          })
-        : await this.appendIdentityEvent(tx, {
-            participantId,
-            linkId,
-            requestId: linkId,
-            action: V1IdentityLinkAction.ROSTER_ASSERTED,
-            userId,
-            actorType: V1IdentityActorType.SYSTEM,
-            systemActor: actor.systemActor,
-            reason,
-          });
-
-    await tx.v1ParticipantIdentityLinkCurrent.create({
-      data: {
-        participantId,
-        linkId,
-        userId,
-        version: 1,
-        effectiveFrom: identityEvent.effectiveAt,
-      },
-    });
-  }
-
-  private mapIdentityEventError(error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (message.includes('attestation requires a distinct pending requestor')) {
-      return new ConflictException({
-        code: 'IDENTITY_LINK_REQUEST_EXPIRED',
-        message: '연결 요청이 만료됐거나 유효하지 않아요.',
-      });
-    }
-    if (message.includes('identity terminal action already committed')) {
-      return new ConflictException({
-        code: 'IDENTITY_LINK_ALREADY_DECIDED',
-        message: '이미 처리된 요청이에요.',
-      });
-    }
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      (error.code === 'P2002' || error.code === 'P2034')
-    ) {
-      return new ConflictException({
-        code: 'IDENTITY_LINK_CONFLICT',
-        message: '동시 요청이 충돌했어요. 다시 시도해 주세요.',
-      });
-    }
-    return error;
   }
 
   /**

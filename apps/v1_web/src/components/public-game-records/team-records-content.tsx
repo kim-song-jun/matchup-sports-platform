@@ -43,6 +43,21 @@ const TEAM_RECORD_TYPE_LABEL: Readonly<Record<TeamRecordCategory, string>> = {
   friendly: '친선',
 };
 
+/**
+ * F6 -- 행 상단 캡션에 붙일 대회/리그 이름. 대회 경기는 대회명을, 정규 리그 대진은 리그명을
+ * 같은 자리에 같은 표기(` · 이름`)로 보여준다. 개인 전적 화면(`user-records-content.tsx`의
+ * `competitionLabel`)과 **같은 규칙**이다 -- 같은 경기를 두 화면이 다르게 부르면 안 된다.
+ * 전에는 대회명만 붙어서 '전체' 탭의 리그 경기와 친선 팀매치가 둘 다 날짜 한 줄로 끝나
+ * 서로 구분되지 않았다. 리그가 아닌 친선 팀매치는 예전 그대로 아무것도 붙지 않는다(회귀 금지).
+ *
+ * 서버 계약상 `tournamentId`가 있는 경기는 `leagueId`가 항상 null이지만(V1Game의
+ * exactly-one-source CHECK), 우선순위는 백엔드 판정 함수(`classifyTeamRecordCategory`)와
+ * 같은 순서로 고정해 둔다.
+ */
+function competitionLabel(item: PublicTeamRecordItem): string | null {
+  return item.tournamentTitle ?? item.leagueTitle ?? null;
+}
+
 /** 대회 소스면 대회 상세로, 팀매치 소스면 팀매치 상세로 — exactly-one-source라 항상 둘 중
  * 하나만 있다(V1Game의 CHECK 제약, public-team-records.service.ts 주석 참고). */
 function recordHref(item: PublicTeamRecordItem): string | null {
@@ -191,6 +206,7 @@ function TeamRecordRow({
   reserveToggleSpace: boolean;
 }) {
   const penaltyLabel = formatTeamRecordPenaltyScoreline(item.penalties);
+  const competition = competitionLabel(item);
   return (
     <div
       style={{
@@ -226,7 +242,7 @@ function TeamRecordRow({
           }}
         >
           {formatTournamentDateShort(item.playedAt) ?? ''}
-          {item.tournamentTitle ? ` · ${item.tournamentTitle}` : ''}
+          {competition ? ` · ${competition}` : ''}
         </span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>

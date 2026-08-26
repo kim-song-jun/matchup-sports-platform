@@ -1,30 +1,98 @@
 import {
   assembleLeagueResultParticipants,
   carryForwardResultParticipants,
+  type LeagueSideRoster,
+  type StoredResultParticipantRow,
 } from './league-result-participants';
 
 const sides = [
   { id: 'side-home', sideKey: 'HOME' as const },
   { id: 'side-away', sideKey: 'AWAY' as const },
 ];
+
+/**
+ * 이 대진의 `V1GameParticipant` 전체 — 라인업 리비전마다 행이 **쌓이므로** 최신 리비전
+ * 밖의 행(p-h0)도 여전히 존재한다. 조립 함수는 "이 게임 소속인가" 검증에만 이 목록을 쓰고,
+ * 출전 기록 여부는 아래 로스터(최신 리비전)로 판단한다.
+ */
 const gameParticipants = [
+  { id: 'p-h0', sideId: 'side-home' },
   { id: 'p-h1', sideId: 'side-home' },
+  // p-h1 과 **같은 사람**(u-1)의 옛 라인업 리비전 행. 알파에는 이 행에 득점이 달린 채
+  // 확정된 경기가 실제로 있다(득점자 드롭다운이 같은 이름을 2~3번 보여주던 시절).
+  { id: 'p-h1-old', sideId: 'side-home' },
   { id: 'p-h2', sideId: 'side-home' },
+  { id: 'p-h3', sideId: 'side-home' },
   { id: 'p-a1', sideId: 'side-away' },
+  { id: 'p-a2', sideId: 'side-away' },
 ];
 
+/**
+ * 참가자 행 → 실제 사용자. 같은 사람의 행이 결과에 두 번 실리지 않게 접는 근거다.
+ * p-h0 은 최신 명단에서 아예 빠진 **다른 사람**(u-0)이라 접히지 않고 그대로 남는다.
+ */
+const userIdByParticipantId = new Map<string, string | null>([
+  ['p-h0', 'u-0'],
+  ['p-h1', 'u-1'],
+  ['p-h1-old', 'u-1'],
+  ['p-h2', 'u-2'],
+  ['p-h3', 'u-3'],
+  ['p-a1', 'u-a1'],
+  ['p-a2', 'u-a2'],
+]);
+
+/** 홈: 팀이 직접 작성한 라인업(골키퍼 1 + 필드 1 + 후보 1). team-match 관례대로 GK/BENCH 센티널. */
+const authoredHomeRoster: LeagueSideRoster = {
+  sideId: 'side-home',
+  teamAuthored: true,
+  participants: [
+    { id: 'p-h1', sideId: 'side-home', position: 'GK' },
+    { id: 'p-h2', sideId: 'side-home', position: 'PIVO' },
+    { id: 'p-h3', sideId: 'side-home', position: 'BENCH' },
+  ],
+};
+
+/** 원정: 팀이 라인업을 한 번도 저장하지 않아 대진 생성이 만든 자동 로스터(position 없음)뿐이다. */
+const autoAwayRoster: LeagueSideRoster = {
+  sideId: 'side-away',
+  teamAuthored: false,
+  participants: [
+    { id: 'p-a1', sideId: 'side-away', position: null },
+    { id: 'p-a2', sideId: 'side-away', position: null },
+  ],
+};
+
+const rosters = [authoredHomeRoster, autoAwayRoster];
+
+function assemble(overrides: {
+  participants: Array<{ participantId: string; goals: number; assists?: number }>;
+  rosters?: LeagueSideRoster[];
+  goalkeeperPositionCode?: string;
+  userIdByParticipantId?: ReadonlyMap<string, string | null>;
+  hasGameEvents?: boolean;
+  homeScore: number;
+  awayScore: number;
+}) {
+  return assembleLeagueResultParticipants({
+    participants: overrides.participants,
+    gameParticipants,
+    sides,
+    rosters: overrides.rosters ?? rosters,
+    goalkeeperPositionCode: overrides.goalkeeperPositionCode ?? 'GOLEIRO',
+    userIdByParticipantId: overrides.userIdByParticipantId ?? userIdByParticipantId,
+    hasGameEvents: overrides.hasGameEvents ?? false,
+    homeScore: overrides.homeScore,
+    awayScore: overrides.awayScore,
+  });
+}
+
 describe('assembleLeagueResultParticipants', () => {
-  it('사이드를 participant 행에서 도출하고, 0-0 기록은 제외하며, 기본 필드를 채운다', () => {
-    const result = assembleLeagueResultParticipants({
-      participants: [
-        { participantId: 'p-h1', goals: 2, assists: 1 },
-        { participantId: 'p-h2', goals: 0 },
-        { participantId: 'p-a1', goals: 1 },
-      ],
-      gameParticipants,
-      sides,
-      homeScore: 3,
-      awayScore: 1,
+  it('팀이 작성한 라인업이 있는 사이드는 무득점 선수까지 출전 기록으로 남기고, BENCH는 started=false로 간다', () => {
+    const result = assemble({
+      // p-h2·p-h3 는 아무 기록도 없다 — 그래도 뛴 사람이므로 행이 남아야 한다.
+      participants: [{ participantId: 'p-h1', goals: 1 }],
+      homeScore: 1,
+      awayScore: 0,
     });
     expect(result).toEqual({
       ok: true,
@@ -32,15 +100,220 @@ describe('assembleLeagueResultParticipants', () => {
         {
           participantId: 'p-h1',
           sideId: 'side-home',
-          started: false,
-          goals: 2,
-          assists: 1,
+          started: true,
+          goals: 1,
+          cards: { yellow: 0, red: 0 },
+          // team-match 라인업은 골키퍼를 리터럴 'GK'로 저장한다 — 종목 코드가 'GOLEIRO'인
+          // 풋살에서도 이 사람은 골키퍼다. config 코드만 비교하면 여기가 false로 무너진다.
+          goalkeeper: true,
+        },
+        {
+          participantId: 'p-h2',
+          sideId: 'side-home',
+          started: true,
+          goals: 0,
           cards: { yellow: 0, red: 0 },
           goalkeeper: false,
         },
         {
+          participantId: 'p-h3',
+          sideId: 'side-home',
+          started: false,
+          goals: 0,
+          cards: { yellow: 0, red: 0 },
+          goalkeeper: false,
+        },
+      ],
+    });
+  });
+
+  it('종목 사전의 골키퍼 코드(풋살 GOLEIRO)로 저장된 라인업도 골키퍼로 인정한다', () => {
+    const result = assemble({
+      participants: [],
+      rosters: [
+        {
+          sideId: 'side-home',
+          teamAuthored: true,
+          participants: [{ id: 'p-h1', sideId: 'side-home', position: 'GOLEIRO' }],
+        },
+      ],
+      homeScore: 0,
+      awayScore: 0,
+    });
+    expect(result).toMatchObject({ ok: true, actualParticipants: [{ participantId: 'p-h1', goalkeeper: true }] });
+  });
+
+  it('자동 로스터뿐인 사이드는 기록이 있는 선수만 저장한다 (뛰지 않은 팀원의 허위 출전을 만들지 않는다)', () => {
+    const result = assemble({
+      participants: [{ participantId: 'p-a1', goals: 1 }],
+      // 홈도 자동 로스터로 바꿔 양쪽 모두 증거가 없는 상태로 만든다.
+      rosters: [
+        { ...authoredHomeRoster, teamAuthored: false },
+        autoAwayRoster,
+      ],
+      homeScore: 0,
+      awayScore: 1,
+    });
+    expect(result).toEqual({
+      ok: true,
+      actualParticipants: [
+        {
           participantId: 'p-a1',
           sideId: 'side-away',
+          // 라인업 증거가 없으므로 선발이라고 적지 않는다.
+          started: false,
+          goals: 1,
+          cards: { yellow: 0, red: 0 },
+          goalkeeper: false,
+        },
+      ],
+    });
+    // 자동 로스터의 나머지 팀원(p-a2, 홈 3명)은 한 명도 실리지 않아야 한다.
+    expect(result.ok && result.actualParticipants).toHaveLength(1);
+  });
+
+  it('최신 라인업에서 빠졌지만 기록이 실린 선수(승계 대상)는 그대로 저장한다', () => {
+    // p-h0 은 옛 라인업 리비전의 행이라 최신 로스터에 없다. 정정 모달이 기존 공식 기록을
+    // 그 id 로 프리필해 다시 보내는 경우 — 여기서 떨어뜨리면 그 사람의 기록이 사라진다.
+    const result = assemble({
+      participants: [{ participantId: 'p-h0', goals: 2, assists: 1 }],
+      homeScore: 2,
+      awayScore: 0,
+    });
+    expect(result.ok && result.actualParticipants).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ participantId: 'p-h0', goals: 2, assists: 1, started: false }),
+      ]),
+    );
+    // 로스터 전원(3명) + 승계 1명.
+    expect(result.ok && result.actualParticipants).toHaveLength(4);
+  });
+
+  it('옛 라인업 행에 달린 기록은 같은 사람의 최신 행으로 접힌다 (한 경기·한 사람 = 결과 행 하나)', () => {
+    // 정정 모달이 현재 공식 기록(p-h1-old = u-1)을 프리필해 그대로 되보내는 상황.
+    // 접지 않으면 u-1 이 이 경기에서 결과 행을 두 개 갖게 되고, 개인 기록의 출전 수가
+    // 1 부풀며 전적 목록에 같은 경기가 두 번 뜬다(PublicUserRecordsService 는 행 수를 센다).
+    const result = assemble({
+      participants: [{ participantId: 'p-h1-old', goals: 1, assists: 1 }],
+      homeScore: 1,
+      awayScore: 0,
+    });
+    const rows = result.ok ? result.actualParticipants : [];
+    expect(rows.map((row) => row.participantId)).toEqual(['p-h1', 'p-h2', 'p-h3']);
+    // 기록은 최신 행으로 이관된다 — 옛 행의 득점·도움이 사라지면 안 된다.
+    expect(rows[0]).toEqual({
+      participantId: 'p-h1',
+      sideId: 'side-home',
+      started: true,
+      goals: 1,
+      assists: 1,
+      cards: { yellow: 0, red: 0 },
+      goalkeeper: true,
+    });
+  });
+
+  it('같은 사람의 옛 행과 최신 행에 각각 기록이 있으면 합산한다', () => {
+    const result = assemble({
+      participants: [
+        { participantId: 'p-h1', goals: 1 },
+        { participantId: 'p-h1-old', goals: 1, assists: 1 },
+      ],
+      homeScore: 2,
+      awayScore: 0,
+    });
+    const rows = result.ok ? result.actualParticipants : [];
+    expect(rows.filter((row) => row.participantId === 'p-h1')).toEqual([
+      {
+        participantId: 'p-h1',
+        sideId: 'side-home',
+        started: true,
+        goals: 2,
+        assists: 1,
+        cards: { yellow: 0, red: 0 },
+        goalkeeper: true,
+      },
+    ]);
+    expect(rows.map((row) => row.participantId)).not.toContain('p-h1-old');
+  });
+
+  it('userId 가 없는 게스트는 접지 않는다 (이름이 같아도 동일인이라는 근거가 없다)', () => {
+    // 동명이인·게스트를 이름으로 묶으면 남의 득점이 다른 사람에게 붙는다 — 이 저장소가
+    // 라인업 저장에서 id 를 직접 받는 이유와 같은 위험이라 게스트는 각자 남긴다.
+    const result = assemble({
+      participants: [
+        { participantId: 'p-a1', goals: 1 },
+        { participantId: 'p-a2', goals: 1 },
+      ],
+      userIdByParticipantId: new Map<string, string | null>([
+        ['p-a1', null],
+        ['p-a2', null],
+      ]),
+      // 원정(자동 로스터)만 남겨 게스트 두 행이 그대로 실리는지 본다.
+      rosters: [{ ...authoredHomeRoster, teamAuthored: false }, autoAwayRoster],
+      homeScore: 0,
+      awayScore: 2,
+    });
+    expect(result.ok && result.actualParticipants.map((row) => row.participantId)).toEqual(['p-a1', 'p-a2']);
+  });
+
+  it('사이드가 다르면 같은 userId 라도 접지 않는다 (득점이 상대 팀으로 넘어가면 안 된다)', () => {
+    // 양 팀에 동시에 소속된 사람이 각 팀 명단에 실린 경우. 접으면 원정 득점이 홈으로
+    // 옮겨 가 사이드별 스코어 검증이 통째로 무의미해진다.
+    const result = assemble({
+      participants: [
+        { participantId: 'p-h1', goals: 1 },
+        { participantId: 'p-a1', goals: 1 },
+      ],
+      userIdByParticipantId: new Map<string, string | null>([
+        ['p-h1', 'u-same'],
+        ['p-a1', 'u-same'],
+      ]),
+      rosters: [{ ...authoredHomeRoster, teamAuthored: false }, autoAwayRoster],
+      homeScore: 1,
+      awayScore: 1,
+    });
+    const rows = result.ok ? result.actualParticipants : [];
+    expect(rows.map((row) => ({ id: row.participantId, sideId: row.sideId, goals: row.goals }))).toEqual([
+      { id: 'p-h1', sideId: 'side-home', goals: 1 },
+      { id: 'p-a1', sideId: 'side-away', goals: 1 },
+    ]);
+  });
+
+  it('명시적 빈 배열은 득점·도움만 비우고 출전 기록은 라인업대로 남긴다', () => {
+    // `[]` 를 "이 경기 기록 전체 삭제"로 읽으면 정상적인 0-0 입력 한 번에 그 경기의
+    // 출전 기록이 통째로 사라진다. 출전은 이 배열이 주장하는 값이 아니라 라인업 파생값이다.
+    const result = assemble({ participants: [], homeScore: 0, awayScore: 0 });
+    const rows = result.ok ? result.actualParticipants : [];
+    expect(rows.map((row) => row.participantId)).toEqual(['p-h1', 'p-h2', 'p-h3']);
+    expect(rows.every((row) => row.goals === 0 && row.assists === undefined)).toBe(true);
+  });
+
+  it('빈 배열이어도 자동 로스터뿐인 사이드에는 아무 행도 만들지 않는다', () => {
+    const result = assemble({
+      participants: [],
+      rosters: [{ ...authoredHomeRoster, teamAuthored: false }, autoAwayRoster],
+      homeScore: 0,
+      awayScore: 0,
+    });
+    expect(result).toEqual({ ok: true, actualParticipants: [] });
+  });
+
+  it('이 게임에 이벤트 행이 있으면 로스터 전원 기록을 끄고 기록이 있는 행만 저장한다', () => {
+    // 이벤트가 있으면 validateGameResultInvariants 의 TEAM_MATCH 면제가 풀려서 실린 행
+    // 전부의 득점·카드가 이벤트와 일치해야 한다. 로스터 전원을 cards:{0,0} 으로 실으면
+    // 운영자가 손댈 수 없는 값 때문에 SCORE_EVENT_MISMATCH 로 결과 입력 자체가 막힌다.
+    const result = assemble({
+      participants: [{ participantId: 'p-h1', goals: 1 }],
+      hasGameEvents: true,
+      homeScore: 1,
+      awayScore: 0,
+    });
+    expect(result).toEqual({
+      ok: true,
+      actualParticipants: [
+        {
+          participantId: 'p-h1',
+          sideId: 'side-home',
           started: false,
           goals: 1,
           cards: { yellow: 0, red: 0 },
@@ -50,11 +323,19 @@ describe('assembleLeagueResultParticipants', () => {
     });
   });
 
+  it('같은 participantId 가 결과에 두 번 실리지 않는다', () => {
+    const result = assemble({
+      participants: [{ participantId: 'p-h1', goals: 1 }],
+      homeScore: 1,
+      awayScore: 0,
+    });
+    const ids = result.ok ? result.actualParticipants.map((row) => row.participantId) : [];
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
   it('이 게임 소속이 아닌 participantId 는 거부한다', () => {
-    const result = assembleLeagueResultParticipants({
+    const result = assemble({
       participants: [{ participantId: 'p-외부', goals: 1 }],
-      gameParticipants,
-      sides,
       homeScore: 1,
       awayScore: 0,
     });
@@ -62,13 +343,11 @@ describe('assembleLeagueResultParticipants', () => {
   });
 
   it('같은 선수가 두 번 실리면 거부한다', () => {
-    const result = assembleLeagueResultParticipants({
+    const result = assemble({
       participants: [
         { participantId: 'p-h1', goals: 1 },
         { participantId: 'p-h1', goals: 1 },
       ],
-      gameParticipants,
-      sides,
       homeScore: 2,
       awayScore: 0,
     });
@@ -76,22 +355,18 @@ describe('assembleLeagueResultParticipants', () => {
   });
 
   it('사이드별 득점 합이 그 팀 스코어를 넘으면 거부한다 (자책골 여지로 미만은 허용)', () => {
-    const over = assembleLeagueResultParticipants({
+    const over = assemble({
       participants: [
         { participantId: 'p-h1', goals: 2 },
         { participantId: 'p-h2', goals: 2 },
       ],
-      gameParticipants,
-      sides,
       homeScore: 3,
       awayScore: 0,
     });
     expect(over).toMatchObject({ ok: false, code: 'LEAGUE_RESULT_GOALS_EXCEED_SCORE' });
 
-    const under = assembleLeagueResultParticipants({
+    const under = assemble({
       participants: [{ participantId: 'p-h1', goals: 1 }],
-      gameParticipants,
-      sides,
       homeScore: 3,
       awayScore: 0,
     });
@@ -99,13 +374,11 @@ describe('assembleLeagueResultParticipants', () => {
   });
 
   it('사이드별 도움 합이 기록된 득점 합을 넘으면 거부한다 (스코어가 아니라 득점 기준)', () => {
-    const result = assembleLeagueResultParticipants({
+    const result = assemble({
       participants: [
         { participantId: 'p-h1', goals: 0, assists: 2 },
         { participantId: 'p-h2', goals: 1 },
       ],
-      gameParticipants,
-      sides,
       homeScore: 3,
       awayScore: 0,
     });
@@ -114,10 +387,8 @@ describe('assembleLeagueResultParticipants', () => {
   });
 
   it('기록된 득점이 0인 사이드의 도움은 거부한다 (자책골로 스코어만 있는 경우)', () => {
-    const result = assembleLeagueResultParticipants({
+    const result = assemble({
       participants: [{ participantId: 'p-h1', goals: 0, assists: 1 }],
-      gameParticipants,
-      sides,
       homeScore: 1,
       awayScore: 0,
     });
@@ -126,10 +397,10 @@ describe('assembleLeagueResultParticipants', () => {
 });
 
 describe('carryForwardResultParticipants', () => {
-  const storedRow = {
+  const storedHome = {
     participantId: 'p-h1',
     sideId: 'side-home',
-    started: true,
+    started: false,
     minutesPlayed: 40,
     goals: 2,
     assists: 1,
@@ -137,32 +408,74 @@ describe('carryForwardResultParticipants', () => {
     cards: { yellow: 1, red: 0 },
     goalkeeper: false,
   };
+  const storedAway = {
+    participantId: 'p-a1',
+    sideId: 'side-away',
+    started: false,
+    minutesPlayed: null,
+    goals: 1,
+    assists: 0,
+    fouls: 0,
+    cards: null,
+    goalkeeper: true,
+  };
 
-  it('직전 공식 기록을 필드 손실 없이 승계한다 (0/null 필드는 생략 매핑)', () => {
-    const result = carryForwardResultParticipants({
-      rows: [
-        storedRow,
-        { participantId: 'p-a1', sideId: 'side-away', started: false, minutesPlayed: null, goals: 1, assists: 0, fouls: 0, cards: null, goalkeeper: true },
-      ],
+  function carry(overrides: {
+    rows: StoredResultParticipantRow[];
+    rosters?: LeagueSideRoster[];
+    userIdByParticipantId?: ReadonlyMap<string, string | null>;
+    hasGameEvents?: boolean;
+    homeScore: number;
+    awayScore: number;
+  }) {
+    return carryForwardResultParticipants({
+      rows: overrides.rows,
       sides,
-      homeScore: 2,
-      awayScore: 1,
+      rosters: overrides.rosters ?? rosters,
+      goalkeeperPositionCode: 'GOLEIRO',
+      userIdByParticipantId: overrides.userIdByParticipantId ?? userIdByParticipantId,
+      hasGameEvents: overrides.hasGameEvents ?? false,
+      homeScore: overrides.homeScore,
+      awayScore: overrides.awayScore,
     });
+  }
+
+  it('직전 공식 기록을 필드 손실 없이 승계하고, 라인업에만 있는 무득점 선수를 출전 기록으로 채운다', () => {
+    const result = carry({ rows: [storedHome, storedAway], homeScore: 2, awayScore: 1 });
     expect(result).toEqual({
       ok: true,
       actualParticipants: [
         {
           participantId: 'p-h1',
           sideId: 'side-home',
+          // 저장값은 started:false 였지만 라인업이 선발 골키퍼로 적어 둔 사람이다 —
+          // started/goalkeeper 는 운영자 입력이 아니라 라인업 파생값이라 다시 읽는다.
           started: true,
           goals: 2,
           assists: 1,
           fouls: 3,
           minutesPlayed: 40,
           cards: { yellow: 1, red: 0 },
+          goalkeeper: true,
+        },
+        {
+          participantId: 'p-h2',
+          sideId: 'side-home',
+          started: true,
+          goals: 0,
+          cards: { yellow: 0, red: 0 },
           goalkeeper: false,
         },
         {
+          participantId: 'p-h3',
+          sideId: 'side-home',
+          started: false,
+          goals: 0,
+          cards: { yellow: 0, red: 0 },
+          goalkeeper: false,
+        },
+        {
+          // 원정은 자동 로스터뿐이라 저장된 행만 그대로 승계된다(허위 출전 없음).
           participantId: 'p-a1',
           sideId: 'side-away',
           started: false,
@@ -174,13 +487,78 @@ describe('carryForwardResultParticipants', () => {
     });
   });
 
-  it('스코어를 낮추는 정정으로 승계 득점 합이 새 스코어를 넘으면 거부한다', () => {
-    const result = carryForwardResultParticipants({
-      rows: [storedRow],
-      sides,
-      homeScore: 1,
-      awayScore: 0,
+  it('자동 로스터뿐인 사이드는 저장된 기록만 승계한다 (팀원 전원을 출전으로 만들지 않는다)', () => {
+    const result = carry({
+      rows: [storedAway],
+      rosters: [{ ...authoredHomeRoster, teamAuthored: false }, autoAwayRoster],
+      homeScore: 0,
+      awayScore: 1,
     });
+    expect(result.ok && result.actualParticipants.map((row) => row.participantId)).toEqual(['p-a1']);
+  });
+
+  it('스코어를 낮추는 정정으로 승계 득점 합이 새 스코어를 넘으면 거부한다', () => {
+    const result = carry({ rows: [storedHome], homeScore: 1, awayScore: 0 });
     expect(result).toMatchObject({ ok: false, code: 'LEAGUE_RESULT_CARRIED_PARTICIPANTS_CONFLICT' });
+  });
+
+  it('옛 라인업 행에 저장된 기록을 같은 사람의 최신 행으로 접어 승계한다', () => {
+    // participants 미전송 정정에서도 같은 결함이 난다: ①이 최신 로스터(p-h1 포함)를 싣고
+    // ②가 저장된 옛 행(p-h1-old)을 추가로 실어 u-1 에게 결과 행이 두 개 생긴다.
+    const staleHome: StoredResultParticipantRow = {
+      participantId: 'p-h1-old',
+      sideId: 'side-home',
+      started: false,
+      minutesPlayed: null,
+      goals: 2,
+      assists: 1,
+      fouls: 0,
+      cards: { yellow: 1, red: 0 },
+      goalkeeper: false,
+    };
+    const result = carry({ rows: [staleHome], homeScore: 2, awayScore: 0 });
+    const rows = result.ok ? result.actualParticipants : [];
+    expect(rows.map((row) => row.participantId)).toEqual(['p-h1', 'p-h2', 'p-h3']);
+    expect(rows[0]).toEqual({
+      participantId: 'p-h1',
+      sideId: 'side-home',
+      // 출전 판정은 최신 라인업에서 다시 읽고(선발 골키퍼), 기록은 옛 행에서 이관한다.
+      started: true,
+      goals: 2,
+      assists: 1,
+      cards: { yellow: 1, red: 0 },
+      goalkeeper: true,
+    });
+  });
+
+  it('접어도 사이드별 득점 합은 그대로라 스코어 하향 정정 거부 임계가 흔들리지 않는다', () => {
+    const staleHome: StoredResultParticipantRow = {
+      participantId: 'p-h1-old',
+      sideId: 'side-home',
+      started: false,
+      minutesPlayed: null,
+      goals: 1,
+      assists: 0,
+      fouls: 0,
+      cards: null,
+      goalkeeper: false,
+    };
+    // 옛 행 1골 + 최신 행 1골 = 홈 2골. 정정 스코어 1은 거부, 2는 통과여야 한다.
+    const rows = [staleHome, { ...storedHome, goals: 1, assists: 0 }];
+    expect(carry({ rows, homeScore: 1, awayScore: 0 })).toMatchObject({
+      ok: false,
+      code: 'LEAGUE_RESULT_CARRIED_PARTICIPANTS_CONFLICT',
+    });
+    const merged = carry({ rows, homeScore: 2, awayScore: 0 });
+    expect(merged.ok && merged.actualParticipants.filter((row) => row.participantId === 'p-h1')).toEqual([
+      expect.objectContaining({ participantId: 'p-h1', goals: 2 }),
+    ]);
+  });
+
+  it('이 게임에 이벤트 행이 있으면 저장된 기록만 승계하고 로스터는 채우지 않는다', () => {
+    const result = carry({ rows: [storedHome], hasGameEvents: true, homeScore: 2, awayScore: 0 });
+    expect(result.ok && result.actualParticipants.map((row) => row.participantId)).toEqual(['p-h1']);
+    // 저장값을 그대로 승계한다(라인업 파생값으로 덮어쓰지 않는다) — 이벤트가 권위인 경기다.
+    expect(result.ok && result.actualParticipants[0]).toMatchObject({ started: false, goalkeeper: false });
   });
 });

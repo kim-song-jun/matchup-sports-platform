@@ -50,6 +50,13 @@ export function LineupTodoCard({ enabled = true }: { enabled?: boolean }) {
                 }}
               >
                 <span style={{ flex: 1, display: 'grid', gap: 2 }}>
+                  {/* title 에는 이미 "어느 대회·리그의 몇 번째 경기인지"가 들어 있다 —
+                      대회는 "대회명 · 8강", 리그 대진은 "리그명 N주차", 리그가 없는 친선
+                      팀매치만 '팀 매치'다(서버 lineup-todo.service.ts). 여러 리그를 동시에
+                      뛰는 팀장이 목록만 보고 경기를 고를 수 있어야 하므로, 여기서 제목을
+                      잘라내거나 고정 라벨로 바꾸지 않는다. 주차는 서버가 킥오프 시각에서
+                      매번 파생하므로(재일정돼도 다른 리그 화면과 어긋나지 않는다) 여기서
+                      다시 계산하지도 않는다. */}
                   <span className="tm-text-label" style={{ fontWeight: 700 }}>
                     {todo.title}
                   </span>

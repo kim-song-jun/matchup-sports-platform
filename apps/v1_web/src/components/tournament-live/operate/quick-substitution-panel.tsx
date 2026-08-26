@@ -148,7 +148,7 @@ export function QuickSubstitutionPanel({
                           'flex min-h-[44px] items-center gap-1 rounded-full border px-2.5 text-xs font-medium transition-colors',
                           'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500',
                           disabled ? 'cursor-not-allowed opacity-50' : '',
-                          // 전수검수: hover:bg-green-100(raw, dark: 짝 없음)이 다크에서
+                          // 전수검수: hover:bg-[var(--green100)](raw, dark: 짝 없음)이 다크에서
                           // text-strong(거의 흰색) 텍스트와 겹쳐 대비 1.0:1까지 붕괴 —
                           // 같은 요소의 dark:border-green-500/30과 동일 계열로 짝을 맞춘다.
                           armed !== null

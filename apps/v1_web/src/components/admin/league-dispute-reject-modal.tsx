@@ -155,7 +155,7 @@ export function LeagueDisputeRejectModal({
               className={[
                 'flex-1 h-[48px] rounded-xl text-[15px] font-semibold transition-colors',
                 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
-                canSubmit ? 'bg-blue-500 text-white hover:bg-blue-600' : 'bg-blue-200 text-white cursor-not-allowed',
+                canSubmit ? 'bg-blue-500 text-white hover:bg-blue-600' : 'bg-[var(--grey100)] text-[var(--text-caption)] cursor-not-allowed',
               ].join(' ')}
               aria-disabled={!canSubmit}
             >

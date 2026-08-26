@@ -308,7 +308,7 @@ function GrantModal({ open, onClose, onGrantSuccess }: GrantModalProps) {
                 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                 canSubmit
                   ? 'bg-blue-500 text-white hover:bg-blue-600'
-                  : 'bg-blue-200 text-white cursor-not-allowed',
+                  : 'bg-[var(--grey100)] text-[var(--text-caption)] cursor-not-allowed',
               ].join(' ')}
               aria-disabled={!canSubmit}
             >
@@ -573,7 +573,7 @@ export default function AdminAdminsPage() {
                       onClick={() => setActionModal({ row, action: 'revoke' })}
                       className={[
                         'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[length:var(--font-size-label)] font-medium',
-                        'text-[var(--red700)] bg-[var(--red50)] hover:bg-red-100 transition-colors whitespace-nowrap',
+                        'text-[var(--red700)] bg-[var(--red50)] hover:bg-[var(--red100)] transition-colors whitespace-nowrap',
                         'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                       ].join(' ')}
                       aria-label={`${row.nickname ?? '운영자'} 권한 회수`}

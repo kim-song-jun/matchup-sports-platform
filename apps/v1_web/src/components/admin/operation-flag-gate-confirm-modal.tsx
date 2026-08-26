@@ -206,7 +206,7 @@ export function GateConfirmModal({
                   ? tone === 'amber'
                     ? 'bg-[var(--button-fill-warning)] text-white hover:bg-[var(--button-fill-warning-hover)]'
                     : 'bg-blue-500 text-white hover:bg-blue-600'
-                  : 'bg-gray-200 text-white cursor-not-allowed',
+                  : 'bg-[var(--grey100)] text-[var(--text-caption)] cursor-not-allowed',
               ].join(' ')}
               aria-disabled={!canSubmit}
             >

@@ -176,7 +176,7 @@ export function RevokeStaffModal({
               className={[
                 'flex-1 h-[48px] rounded-xl text-[length:var(--font-size-body)] font-semibold transition-colors',
                 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
-                canSubmit ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-red-200 dark:bg-red-500/30 text-white cursor-not-allowed',
+                canSubmit ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-[var(--grey100)] text-[var(--text-caption)] cursor-not-allowed',
               ].join(' ')}
             >
               {pending ? '해제 중…' : '배정 해제'}

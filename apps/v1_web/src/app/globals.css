@@ -28,6 +28,11 @@
   --static-black: #000000;
   --blue50: #e8f3ff;
   --blue100: #d6e7ff;
+  /* red/green 의 100 단계 — blue100 과 같은 비율로 만들었다(500 색을 흰 배경에 20%).
+   * hover 배경 용도다: raw Tailwind 의 bg-red-100/green-100 은 테마가 고정이라
+   * 다크에서 밝은 배경 위에 밝아진 700 텍스트가 얹혀 대비가 무너진다. */
+  --red100: #fcdadc;
+  --green100: #cdf0e2;
   --blue500: #3182f6;
   --blue600: #2272eb;
   --blue700: #1b64da; /* blue600보다 진한 강조색 — active 상태(.tm-review-tag-chip 등) */
@@ -333,6 +338,10 @@
    * 토큰(--text-strong 등, 이미 위에서 뒤집힘)이라 대비가 무너지지 않는다. */
   --blue50: rgba(49, 130, 246, 0.14);
   --blue100: rgba(49, 130, 246, 0.24);
+  /* 다크에서는 --blue100 과 같은 방식(500 색의 알파 24%)으로 얹는다 —
+   * 배경이 다크 표면 위에서 은은하게 깔리고 그 위 700 텍스트가 밝아져도 대비가 산다. */
+  --red100: rgba(240, 68, 82, 0.24);
+  --green100: rgba(3, 178, 108, 0.24);
   --green50: rgba(3, 178, 108, 0.14);
   --orange50: rgba(254, 152, 0, 0.16);
   --red50: rgba(240, 68, 82, 0.16);
@@ -1161,13 +1170,17 @@ button:disabled {
   background: var(--grey50);
 }
 
+/* 미체크 상태가 보여야 한다 — 여기는 가입을 통과하려면 반드시 눌러야 하는 관문이다.
+ * grey200 테두리는 흰 배경에서 1.23:1(비텍스트 3:1 기준 미달), grey400 글리프는
+ * 2.01:1 이라 "체크 안 된 동그라미가 거기 있다" 는 것 자체가 보이지 않았다.
+ * grey600 으로 올리면 라이트 4.62:1 · 다크(#8b95a1 on #1c1e24) 5.48:1 로 둘 다 통과한다. */
 .tm-auth-check {
   width: 24px;
   height: 24px;
   border-radius: var(--radius-pill);
-  border: 1px solid var(--grey200);
+  border: 1px solid var(--grey600);
   background: var(--bg);
-  color: var(--grey400);
+  color: var(--grey600);
   display: grid;
   place-items: center;
   font-size: 13px;
@@ -3017,6 +3030,15 @@ button:disabled {
   background: var(--grey900);
   display: grid;
   place-items: center;
+}
+
+/* grey900 은 다크에서 #f2f4f6 으로 뒤집힌다. 이 미리보기 안의 아이콘은 흰색
+ * 고정이라 다크에서 "밝은 배경 + 흰 아이콘"(1.10:1)이 되어 사라진다 —
+ * 이미지를 아직 안 올린 사용자에게는 이게 유일한 시각 단서다.
+ * 같은 결함을 먼저 고친 .tm-team-detail-hero-card · .tm-chat-avatar ·
+ * .tm-my-avatar 와 동일하게 다크에서 배경을 고정 어두운 값으로 되돌린다. */
+:root.dark .tm-team-create-preview {
+  background: #191f28;
 }
 
 .tm-list-searchbar {

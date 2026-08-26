@@ -356,7 +356,7 @@ function ReviewModerationCard({
             <button
               type="button"
               onClick={onHide}
-              className="w-full h-[44px] rounded-xl text-[13px] font-semibold text-[var(--red700)] bg-[var(--red50)] hover:bg-red-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              className="w-full h-[44px] rounded-xl text-[13px] font-semibold text-[var(--red700)] bg-[var(--red50)] hover:bg-[var(--red100)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
             >
               숨기기
             </button>

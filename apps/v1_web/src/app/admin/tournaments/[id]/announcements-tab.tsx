@@ -324,7 +324,7 @@ export function AnnouncementsTab({
                     onClick={() => void handleDelete(ann)}
                     disabled={deleteAnnouncement.isPending}
                     aria-label={`"${ann.title}" 삭제`}
-                    className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium text-[var(--red700)] bg-[var(--red50)] hover:bg-red-100 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-red-500 focus-visible:outline-offset-2"
+                    className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium text-[var(--red700)] bg-[var(--red50)] hover:bg-[var(--red100)] transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-red-500 focus-visible:outline-offset-2"
                   >
                     <Trash2 size={12} aria-hidden="true" />
                     삭제

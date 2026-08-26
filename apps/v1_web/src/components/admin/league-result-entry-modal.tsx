@@ -484,7 +484,7 @@ export function LeagueResultEntryModal({
                 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                 canSubmit
                   ? 'bg-blue-500 text-white hover:bg-blue-600'
-                  : 'bg-blue-200 text-white cursor-not-allowed',
+                  : 'bg-[var(--grey100)] text-[var(--text-caption)] cursor-not-allowed',
               ].join(' ')}
               aria-disabled={!canSubmit}
             >

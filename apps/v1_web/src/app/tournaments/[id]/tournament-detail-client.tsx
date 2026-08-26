@@ -568,7 +568,7 @@ export function TournamentDetailView({
   const prizeChips = getPrizeBreakdownChips(tournament.prizeBreakdown);
   const prizeCard = hasPrize ? (
     <section aria-label="상품 및 상금 안내" style={{ marginTop: 16 }}>
-      <Card pad={18} style={{ background: 'var(--orange50)' }}>
+      <Card pad={20} style={{ background: 'var(--orange50)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div
             aria-hidden="true"
@@ -1913,7 +1913,7 @@ export function FixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
   const awayLabel = fixture.awayTeamName === null ? '비공개' : fixture.awayTeamName || '미정';
 
   return (
-    <Card pad={14}>
+    <Card pad={16}>
       {/* Round + date row */}
       <div
         style={{

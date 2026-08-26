@@ -686,7 +686,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
 
         {conflict ? (
           <div style={{ marginBottom: 12 }}>
-            <Card pad={14} style={{ background: 'var(--red50)' }}>
+            <Card pad={16} style={{ background: 'var(--red50)' }}>
               <p className="tm-text-label" style={{ color: 'var(--red700)', fontWeight: 700, marginBottom: 8 }}>
                 라인업이 그새 변경됐어요.
               </p>
@@ -702,7 +702,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
 
         {pendingRemoval ? (
           <div style={{ marginBottom: 12 }}>
-            <Card pad={14} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <Card pad={16} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <p role="status" aria-live="polite" className="tm-text-caption" style={{ color: 'var(--text-muted)', flex: 1, margin: 0 }}>
                 {pendingRemoval.entry.displayName} 선수를 명단에서 제거했어요.
               </p>
@@ -1195,7 +1195,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
 
         <section aria-labelledby="lineup-change-request-heading" style={{ marginBottom: 16 }}>
           <SectionTitle id="lineup-change-request-heading" title="상대팀 라인업 정정 요청" />
-          <Card pad={14} style={{ marginTop: 8 }}>
+          <Card pad={16} style={{ marginTop: 8 }}>
             <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: 12 }}>
               상대팀이 제출한 라인업에 문제가 있다면 재작성을 요청할 수 있어요. 상대팀 라인업 내용은 직접 볼 수 없고, 사유만 남겨 다시 작성해 달라고 요청하는 기능이에요.
             </p>

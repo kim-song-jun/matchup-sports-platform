@@ -514,7 +514,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
       <div className="tm-team-detail-desktop-layout tm-show-desktop">
         {/* LEFT: hero + info */}
         <div className="tm-team-detail-desktop-main">
-          <Card pad={18} className="tm-team-detail-hero-card" style={teamHeroStyle(team)}>
+          <Card pad={20} className="tm-team-detail-hero-card" style={teamHeroStyle(team)}>
             <button
               className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button"
               type="button"
@@ -698,7 +698,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
 
       {/* Mobile layout (unchanged) */}
       <article className="tm-team-detail-body tm-hide-desktop">
-        <Card pad={18} className="tm-team-detail-hero-card" style={teamHeroStyle(team)}>
+        <Card pad={20} className="tm-team-detail-hero-card" style={teamHeroStyle(team)}>
           <button
             className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button"
             type="button"

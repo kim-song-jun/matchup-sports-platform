@@ -383,7 +383,7 @@ function RecordConsentNudgeBanner({
   recordConsentNudge: NonNullable<HomeViewModel['recordConsentNudge']>;
 }) {
   return (
-    <Card pad={14} style={{ marginBottom: 16 }}>
+    <Card pad={16} style={{ marginBottom: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <span
           aria-hidden="true"
@@ -448,7 +448,7 @@ function PushNudgeBanner({ pushNudge }: { pushNudge: NonNullable<HomeViewModel['
     // 390px 에서 아이콘(36) + 문구 + CTA + 닫기(44) 를 한 줄에 넣으면 gap·패딩까지 합쳐
     // 220px 넘게 먹어 문구가 들어갈 자리가 거의 남지 않는다. 정보 줄과 CTA 를 분리해
     // 같은 자리에 뜨는 "남은 후기" 배너와 같은 리듬으로 맞춘다.
-    <Card pad={14} style={{ marginBottom: 16 }}>
+    <Card pad={16} style={{ marginBottom: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
       <span
         aria-hidden="true"
@@ -495,7 +495,7 @@ function PushNudgeBanner({ pushNudge }: { pushNudge: NonNullable<HomeViewModel['
 
 function PhoneVerifyBanner({ phoneVerifyNudge }: { phoneVerifyNudge: NonNullable<HomeViewModel['phoneVerifyNudge']> }) {
   return (
-    <Card pad={14} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+    <Card pad={16} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
       <span
         aria-hidden="true"
         style={{

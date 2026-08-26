@@ -365,7 +365,7 @@ function TeamSelectStep({
                   }}
                 >
                   <Card
-                    pad={14}
+                    pad={16}
                     className={isSelected ? 'tm-create-selected' : undefined}
                     style={{
                       opacity: isManager ? 1 : 0.55,
@@ -967,7 +967,7 @@ function AgreementsStep({
         <div style={{ marginLeft: -20, marginRight: -20 }}>
           <SectionTitle id="payment-method-heading" title="결제 수단" />
         </div>
-        <Card pad={14} style={{ marginTop: 8 }}>
+        <Card pad={16} style={{ marginTop: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 44 }}>
             <div
               aria-hidden="true"
@@ -1014,7 +1014,7 @@ function AgreementsStep({
           카드 결제는 준비 중이에요. 계좌이체를 이용해 주세요.
         </p>
 
-        <Card pad={14} style={{ marginTop: 12 }}>
+        <Card pad={16} style={{ marginTop: 12 }}>
           <label htmlFor="depositor-name" className="tm-text-caption" style={{ display: 'block', marginBottom: 8 }}>
             입금자명 <span style={{ color: 'var(--red700)' }}>*</span>
           </label>
@@ -1400,14 +1400,14 @@ function PaymentGuideStep({
           )}
         </Card>
 
-        <Card pad={14} style={{ marginTop: 12, background: 'var(--grey50)' }}>
+        <Card pad={16} style={{ marginTop: 12, background: 'var(--grey50)' }}>
           <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.65 }}>
             입금이 확인되면 신청이 최종 확정돼요. 입금자명이 다르면 확인이 늦어질 수 있어요.
           </p>
         </Card>
 
         <section aria-labelledby="roster-next-step-heading" style={{ marginTop: 12, scrollMarginBottom: 144 }}>
-          <Card pad={14}>
+          <Card pad={16}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
               <div style={{ minWidth: 0 }}>
                 <div id="roster-next-step-heading" className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 700 }}>

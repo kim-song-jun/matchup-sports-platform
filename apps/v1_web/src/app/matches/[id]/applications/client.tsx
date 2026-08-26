@@ -222,7 +222,7 @@ function ApplicationRow({
     application.mannerScore !== null ? application.mannerScore.toFixed(1) : null;
 
   return (
-    <Card pad={14}>
+    <Card pad={16}>
       {/* 신청자 정보 행 */}
       <div
         style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 44 }}

@@ -191,7 +191,7 @@ export function MyMatchesPageView({ model }: { model: MyMatchesViewModel }) {
           <Link className={`tm-btn tm-btn-md ${!joined ? 'tm-btn-primary' : 'tm-btn-neutral'}`} href="/my/matches/created" aria-current={!joined ? 'page' : undefined}>생성한 매치</Link>
         </div>
         {model.apiNotice ? (
-          <Card pad={14} className={model.apiNotice.tone === 'warning' ? 'tm-auth-soft-card-warning' : undefined}>
+          <Card pad={16} className={model.apiNotice.tone === 'warning' ? 'tm-auth-soft-card-warning' : undefined}>
             <div className="tm-text-body-lg">{model.apiNotice.title}</div>
             <div className="tm-text-caption" style={{ marginTop: 4 }}>{model.apiNotice.body}</div>
           </Card>
@@ -584,7 +584,7 @@ function MemberGroup({ title, members }: { title: string; members: MyMember[] })
  */
 function PhoneVerificationCallout() {
   return (
-    <Card pad={14} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+    <Card pad={16} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
       <span
         aria-hidden="true"
         style={{

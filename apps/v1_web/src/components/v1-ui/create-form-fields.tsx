@@ -255,7 +255,7 @@ export function MissingFieldsBanner<Step extends string>({
 }) {
   if (missingFields.length === 0) return null;
   return (
-    <Card pad={14} style={{ marginTop: 16, background: 'var(--tint-orange)' }}>
+    <Card pad={16} style={{ marginTop: 16, background: 'var(--tint-orange)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <AlertTriangleIcon size={16} aria-hidden="true" />
         <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장할 수 없어요</div>

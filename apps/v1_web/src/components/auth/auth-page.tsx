@@ -94,7 +94,7 @@ export function SignupCompletePageView({ model }: { model: SignupCompleteViewMod
         <p className="tm-text-body tm-auth-sub">{model.sub}</p>
         <div className="tm-auth-stack">
           {model.steps.map((step) => (
-            <Card key={step.title} pad={15} className="tm-auth-step-card">
+            <Card key={step.title} pad={16} className="tm-auth-step-card">
               <CheckMark checked={step.done} />
               <div>
                 <div className="tm-text-body-lg">{step.title}</div>

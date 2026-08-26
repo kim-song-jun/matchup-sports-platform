@@ -80,7 +80,7 @@ export function TeamContactNewPageClient({ teamId }: { teamId: string }) {
 
   return (
     <AppChrome title="컨택 보내기" activeTab="teams" bottomNav={false} backHref={`/teams/${teamId}`}>
-      <Card pad={18} style={{ marginTop: 12 }}>
+      <Card pad={20} style={{ marginTop: 12 }}>
         <div className="tm-text-heading">{targetTeamName}에 컨택 보내기</div>
         <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 4 }}>
           팀 간 매치·교류를 제안하는 메시지를 보내요.

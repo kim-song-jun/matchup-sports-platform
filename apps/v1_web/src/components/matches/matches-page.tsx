@@ -707,7 +707,7 @@ function StateCard({ tone, title, body }: { tone: 'orange' | 'green' | 'grey'; t
   const tint = tone === 'green' ? 'var(--tint-green)' : tone === 'grey' ? 'var(--tint-grey)' : 'var(--tint-orange)';
   const accent = tone === 'green' ? 'var(--green700)' : tone === 'grey' ? 'var(--text-muted)' : 'var(--orange700)';
   return (
-    <Card pad={14} style={{ marginTop: 16, background: tint }}>
+    <Card pad={16} style={{ marginTop: 16, background: tint }}>
       {/* [P0/P1 아이콘+컬러] 아이콘을 타이틀과 함께 표시해 색상만으로 상태를 구분하지 않음 (WCAG 1.4.1) */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <StatusIcon tone={tone} />

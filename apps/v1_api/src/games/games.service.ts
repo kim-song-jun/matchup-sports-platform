@@ -4,7 +4,9 @@ import {
   ForbiddenException,
   HttpException,
   Injectable,
+  Logger,
   NotFoundException,
+  Optional,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import {
@@ -55,7 +57,15 @@ import {
   type StoredPenalties,
 } from './core/knockout-penalties';
 import { GameTakeoverService } from './game-takeover.service';
-import { writeIdentityAttestRequestNotifications } from './identity-attest-notification';
+import {
+  writeIdentityAttestRequestNotifications,
+  type IdentityAttestPushPlan,
+} from './identity-attest-notification';
+import {
+  IDENTITY_LINK_REQUEST_TTL_MS,
+  scheduleIdentityLinkExpiry,
+} from '../jobs/identity-link/identity-link-expiry.service';
+import { WebPushService } from '../notifications/web-push.service';
 import {
   decideTournamentStaffAccess,
   type TournamentStaffAction,
@@ -736,7 +746,14 @@ export class GamesService {
     private readonly prisma: PrismaService,
     private readonly operationAuditWriter: OperationAuditWriterService,
     private readonly takeover: GameTakeoverService,
+    // 신원 연결 승인 요청 푸시(2026-08-26). optional 인 이유는 워커 서비스의 webPush 와 같다 —
+    // `new GamesService(prisma, audit, takeover)` 로 직접 만드는 스펙이 다수 있고 그쪽은
+    // 푸시가 no-op 이면 된다. 실제 앱에서는 GamesModule 이 import 한 WebPushModule 에서 주입된다.
+    @Optional() private readonly webPush?: WebPushService,
   ) {}
+
+  /** 푸시 발송 실패 기록용. 이 클래스에는 주입 로거가 없어 지역 인스턴스를 쓴다. */
+  private readonly pushLogger = new Logger(`${GamesService.name}:push`);
 
   async createFromSourceInTransaction(
     tx: Prisma.TransactionClient,
@@ -2749,7 +2766,7 @@ export class GamesService {
     const pending = [...requestedByRequestId.values()].filter(
       (event) =>
         !terminalRequestIds.has(event.requestId) &&
-        now - event.effectiveAt.getTime() < 24 * 60 * 60 * 1000 &&
+        now - event.effectiveAt.getTime() < IDENTITY_LINK_REQUEST_TTL_MS &&
         event.userId !== user.id,
     );
     if (pending.length === 0) {
@@ -2822,7 +2839,7 @@ export class GamesService {
         requesterNickname:
           typeof event.userId === 'string' ? (nicknameById.get(event.userId) ?? null) : null,
         requestedAt: event.effectiveAt.toISOString(),
-        expiresAt: new Date(event.effectiveAt.getTime() + 24 * 60 * 60 * 1000).toISOString(),
+        expiresAt: new Date(event.effectiveAt.getTime() + IDENTITY_LINK_REQUEST_TTL_MS).toISOString(),
       })),
     };
   }
@@ -3844,7 +3861,13 @@ export class GamesService {
     headerIdempotencyKey: string | undefined,
     dto: RequestIdentityLinkDto,
   ) {
-    return this.withParticipantCommand(
+    // 푸시는 롤백할 수 없으므로 트랜잭션 밖에서 보낸다 — 커맨드가 커밋된 뒤에만 발송한다.
+    // 재시도(idempotency REPLAY)로 mutate 가 아예 실행되지 않으면 이 값이 null 로 남아
+    // 중복 푸시도 생기지 않는다.
+    // 지역 변수 대신 박스에 담는다 — 클로저 안에서만 대입하면 TS 가 바깥 읽기 지점을
+    // `null` 로 좁혀 버려(제어흐름 분석은 콜백 실행을 모른다) 사용이 불가능해진다.
+    const push: { plan: IdentityAttestPushPlan | null } = { plan: null };
+    const result = await this.withParticipantCommand(
       {
         gameId,
         action: 'identity_link_request',
@@ -3877,7 +3900,7 @@ export class GamesService {
           orderBy: { eventVersion: 'desc' },
         });
         if (last !== null && last.action === V1IdentityLinkAction.REQUESTED) {
-          const stillPending = Date.now() - last.effectiveAt.getTime() < 24 * 60 * 60 * 1000;
+          const stillPending = Date.now() - last.effectiveAt.getTime() < IDENTITY_LINK_REQUEST_TTL_MS;
           if (stillPending) {
             throw new ConflictException({
               code: 'IDENTITY_LINK_REQUEST_PENDING',
@@ -3907,11 +3930,19 @@ export class GamesService {
         // 승인 자격자에게 인앱 알림 (attest UI C안) — 같은 tx 라 신청 커밋 = 알림 존재.
         // businessKey 멱등이라 커맨드 재시도에도 재알림하지 않는다. 발송 정책·순환
         // 회피 이유는 identity-attest-notification.ts 헤더 참조.
-        await writeIdentityAttestRequestNotifications(tx, {
+        push.plan = await writeIdentityAttestRequestNotifications(tx, {
           gameId,
           participantId,
           requestId,
           requesterUserId: user.id,
+        });
+        // 24시간 뒤 만료를 확정하는 예약 잡 — 아무도 확인하지 않아도 요청이 원장에서
+        // 종결되고 신청자가 통보를 받는다(identity-link-expiry.service.ts).
+        await scheduleIdentityLinkExpiry(tx, {
+          gameId,
+          participantId,
+          requestId,
+          requestedAt: created.effectiveAt,
         });
         const updated = await tx.v1Game.update({
           where: { id: gameId },
@@ -3924,7 +3955,7 @@ export class GamesService {
           state: 'pending_attestation' as const,
           version: updated.version,
           effectiveAt: created.effectiveAt.toISOString(),
-          expiresAt: new Date(created.effectiveAt.getTime() + 24 * 60 * 60 * 1000).toISOString(),
+          expiresAt: new Date(created.effectiveAt.getTime() + IDENTITY_LINK_REQUEST_TTL_MS).toISOString(),
           replayed: false,
         };
         await this.writeAudit(
@@ -3939,6 +3970,28 @@ export class GamesService {
         return response;
       },
     );
+
+    // 커밋 뒤 best-effort 푸시. 실패해도 이미 커밋된 인앱 알림은 그대로 남고, 신청
+    // 응답에도 영향을 주지 않는다.
+    const plan = push.plan;
+    if (plan !== null && this.webPush !== undefined) {
+      for (const recipientUserId of plan.recipients) {
+        void this.webPush
+          .sendToUser(recipientUserId, {
+            title: plan.title,
+            body: plan.body,
+            url: plan.url ?? undefined,
+          })
+          .catch((error: unknown) => {
+            // best-effort 이지만 조용히 삼키지는 않는다 — 구독 조회·발송이 계속 실패해도
+            // 아무 흔적이 없으면 운영에서 알아챌 방법이 없다(Copilot 리뷰).
+            this.pushLogger.warn(
+              `web push failed for identity attest request (game=${gameId}, recipient=${recipientUserId}): ${String(error)}`,
+            );
+          });
+      }
+    }
+    return result;
   }
 
   async attestIdentityLink(
@@ -3988,7 +4041,7 @@ export class GamesService {
             message: '이미 처리된 요청이에요.',
           });
         }
-        const expired = Date.now() - requested.effectiveAt.getTime() >= 24 * 60 * 60 * 1000;
+        const expired = Date.now() - requested.effectiveAt.getTime() >= IDENTITY_LINK_REQUEST_TTL_MS;
         if (expired) {
           const expiredEvent = await this.appendIdentityEvent(tx, {
             participantId,

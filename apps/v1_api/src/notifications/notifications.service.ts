@@ -100,7 +100,13 @@ export type NotificationEventType =
   // NotificationsServiceModule 을 import 하면 RealtimeModule 경유 순환이 생겨서다).
   // 여기 title/body/deepLink 는 그 문구의 단일 소스다.
   | 'team_match_identity_attest_requested'
-  | 'tournament_identity_attest_requested';
+  | 'tournament_identity_attest_requested'
+  // 만료 통보(2026-08-26): 24시간 안에 아무도 확인하지 않으면 **신청자에게** 알린다.
+  // 예전에는 만료가 다음 attest 시도 때에야 기록되는 lazy 처리라, 신청자는 자기 요청이
+  // 끝났는지 알 방법이 없었다(화면에서도 조용히 사라진다). 예약 잡
+  // (jobs/identity-link/identity-link-expiry.service.ts)이 발송한다.
+  | 'team_match_identity_attest_expired'
+  | 'tournament_identity_attest_expired';
 
 /** V1NotificationPreference 컬럼 중 이벤트 발송을 게이트하는 필드들. */
 type NotificationPrefField = keyof Pick<
@@ -162,7 +168,8 @@ function preferenceFieldForEvent(type: NotificationEventType): NotificationPrefF
     type === 'league_match_dispute_corrected' ||
     type === 'league_match_dispute_voided' ||
     type === 'league_match_dispute_rejected' ||
-    type === 'team_match_identity_attest_requested'
+    type === 'team_match_identity_attest_requested' ||
+    type === 'team_match_identity_attest_expired'
   ) {
     return 'teamMatchEnabled';
   }
@@ -179,8 +186,9 @@ function preferenceFieldForEvent(type: NotificationEventType): NotificationPrefF
     // importantEnabled 는 "놓치면 안 되는 1:1 문의 답변" 전용이라 성격이 다르고,
     // 새 preference 컬럼을 만들면 마이그레이션이 붙는데 그럴 이유가 없다.
     type === 'tournament_award_received' ||
-    // 신원 연결 승인 요청(대회 판)도 대회 활동 축이다.
-    type === 'tournament_identity_attest_requested'
+    // 신원 연결 승인 요청·만료(대회 판)도 대회 활동 축이다.
+    type === 'tournament_identity_attest_requested' ||
+    type === 'tournament_identity_attest_expired'
   ) {
     return 'activityEnabled';
   }
@@ -237,7 +245,8 @@ function targetTypeForEvent(type: NotificationEventType): V1NotificationTargetTy
     // targetId 는 "${tournamentId}:${fixtureId}" 복합 문자열 — 경기 상세가 2계층 경로라서다.
     // schedule_rsvp_deadline_reminder 의 기존 복합 targetId 선례를 따르고, 딥링크는
     // deepLinkForEvent 에서 명시적으로 파싱한다.
-    type === 'tournament_identity_attest_requested'
+    type === 'tournament_identity_attest_requested' ||
+    type === 'tournament_identity_attest_expired'
   ) {
     return 'tournament';
   }
@@ -368,7 +377,10 @@ function deepLinkForEvent(
   // 승인 카드가 실리는 경기 상세로 보낸다(위 schedule 복합 targetId 와 같은 패턴).
   // 팀매치·리그 판(team_match_identity_attest_requested)은 기본 /team-matches/:id 로
   // 충분하다 — 리그 대진이면 그 라우트의 서버 redirect 가 리그 경기 상세로 보낸다.
-  if (type === 'tournament_identity_attest_requested' && targetId) {
+  if (
+    (type === 'tournament_identity_attest_requested' || type === 'tournament_identity_attest_expired') &&
+    targetId
+  ) {
     const [tournamentId, fixtureId] = targetId.split(':');
     if (tournamentId && fixtureId) {
       return `/tournaments/${tournamentId}/matches/${fixtureId}`;
@@ -451,6 +463,8 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   league_match_dispute_rejected: '이의 제기가 받아들여지지 않았어요',
   team_match_identity_attest_requested: '기록 연결 승인 요청이 도착했어요',
   tournament_identity_attest_requested: '기록 연결 승인 요청이 도착했어요',
+  team_match_identity_attest_expired: '기록 연결 요청이 만료됐어요',
+  tournament_identity_attest_expired: '기록 연결 요청이 만료됐어요',
 };
 
 /**
@@ -506,6 +520,8 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   league_match_dispute_rejected: '기존 결과가 그대로 유지돼요.',
   team_match_identity_attest_requested: '경기 명단의 기록 연결 요청을 24시간 안에 확인해 주세요.',
   tournament_identity_attest_requested: '경기 명단의 기록 연결 요청을 24시간 안에 확인해 주세요.',
+  team_match_identity_attest_expired: '24시간 안에 확인되지 않아 만료됐어요. 다시 신청할 수 있어요.',
+  tournament_identity_attest_expired: '24시간 안에 확인되지 않아 만료됐어요. 다시 신청할 수 있어요.',
 };
 
 @Injectable()

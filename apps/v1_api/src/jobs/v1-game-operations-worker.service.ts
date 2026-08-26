@@ -9,6 +9,10 @@ import {
   LEAGUE_RESULT_ENTRY_REMINDER_TYPE,
   LeagueResultEntryReminderService,
 } from './league-reminders/league-result-entry-reminder.service';
+import {
+  IDENTITY_LINK_EXPIRY_TYPE,
+  IdentityLinkExpiryService,
+} from './identity-link/identity-link-expiry.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { WebPushService } from '../notifications/web-push.service';
 
@@ -32,6 +36,15 @@ export type GameOperationClaim = {
   version: number;
   leaseOwner: string;
   leaseUntil: Date;
+  /**
+   * 커밋 뒤에 실행할 부수효과를 담는 자리 (2026-08-26). 핸들러는 트랜잭션 **안에서**
+   * 돌기 때문에, 롤백할 수 없는 외부 발송(웹 푸시 등)을 거기서 바로 하면 트랜잭션이
+   * 뒤집혔을 때 "일어나지 않은 일"의 알림이 나간다. 여기 담아 두면 워커가 커밋 성공
+   * 직후에만 실행한다. 워커가 매 클레임마다 빈 배열로 채우므로 핸들러는 그냥 push 하면
+   * 된다(직접 클레임을 만들어 핸들러를 부르는 유닛 스펙에서는 없을 수 있다 —
+   * 그 경우 호출부가 즉시 실행으로 폴백한다).
+   */
+  afterCommit?: Array<() => void | Promise<void>>;
 };
 
 export type GameOperationHandler = (
@@ -96,6 +109,11 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
     // updateFixture(시작 시각 변경)가 건다 — league-result-entry-reminder.service.ts 참고.
     const leagueResultEntryReminder = new LeagueResultEntryReminderService();
     this.registerHandler(LEAGUE_RESULT_ENTRY_REMINDER_TYPE, leagueResultEntryReminder.handler);
+    // 신원 연결 요청은 24시간 뒤 만료된다 — 예전에는 다음 attest 시도 때에야 기록되는
+    // lazy 처리라 아무도 손대지 않으면 신청자가 결말을 알 수 없었다. 신청 시각 +24h 에
+    // 만료를 확정하고 신청자에게 통보한다(identity-link-expiry.service.ts).
+    const identityLinkExpiry = new IdentityLinkExpiryService(this.webPush);
+    this.registerHandler(IDENTITY_LINK_EXPIRY_TYPE, identityLinkExpiry.handler);
     // reject/request_supplement close their own review SLA synchronously in
     // the API command (TournamentResultReviewService.closeReviewSla, Task
     // 22); the durable audit handler here only needs to make the outbox's
@@ -397,6 +415,8 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
     heartbeatTimer.unref();
 
     const work = async () => {
+      // 커밋 뒤 부수효과 수집함 — 핸들러가 여기에 담고, 아래에서 커밋이 확정된 뒤에만 실행한다.
+      claim.afterCommit = [];
       try {
         await this.prisma.$transaction(async (tx) => {
           const locked = await this.lockClaim(tx, claim);
@@ -414,6 +434,23 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
         });
         claim.version += 1;
         this.completionCount += 1;
+        // 커밋이 확정된 뒤에만 외부 발송을 한다. 롤백된 트랜잭션의 알림이 나가는 것을
+        // 막는 유일한 지점이라, 실패해도 잡 결과에는 영향을 주지 않는다.
+        for (const effect of claim.afterCommit ?? []) {
+          const warn = (effectError: unknown) =>
+            this.logger.warn(
+              `after-commit effect failed for outbox job ${claim.id}: ${this.boundedError(effectError)}`,
+            );
+          try {
+            // 비동기 부수효과도 허용한다 — 잡을 붙잡지 않도록 await 하지 않지만,
+            // rejection 을 그냥 두면 unhandled rejection 이 되므로 catch 를 붙인다
+            // (Copilot 리뷰).
+            const outcome = effect();
+            if (outcome instanceof Promise) void outcome.catch(warn);
+          } catch (effectError: unknown) {
+            warn(effectError);
+          }
+        }
       } catch (error: unknown) {
         await this.fail(claim, error);
       } finally {

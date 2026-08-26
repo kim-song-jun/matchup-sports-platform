@@ -128,7 +128,11 @@ describe('identity attest (승인함)', () => {
         v1NotificationPreference: {
           findMany: jest.fn().mockResolvedValue(overrides.preferences ?? []),
         },
-        v1Notification: { createMany: jest.fn().mockResolvedValue({ count: 1 }) },
+        v1Notification: {
+          // 기본은 "아직 아무에게도 배달 안 됨" — 재시도 케이스만 이 값을 덮는다.
+          findMany: jest.fn().mockResolvedValue([]),
+          createMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
       };
     }
 
@@ -160,6 +164,31 @@ describe('identity attest (승인함)', () => {
       });
       const [{ data }] = tx.v1Notification.createMany.mock.calls[0] as [{ data: { body: string }[] }];
       expect(data[0].body).toContain('김민준');
+    });
+
+    it('새로 배달된 수신자만 커밋 뒤 푸시 대상으로 돌려준다(재시도 시 중복 푸시 없음)', async () => {
+      const tx = makeTx({
+        game: { sourceType: 'TEAM_MATCH', teamMatchId: 'tm-1', tournamentFixture: null },
+        memberships: [{ userId: 'leader-1' }, { userId: 'leader-2' }],
+      });
+      // leader-1 은 이미 같은 요청으로 알림을 받은 상태(커맨드 재시도).
+      tx.v1Notification.findMany = jest
+        .fn()
+        .mockResolvedValue([{ businessKey: 'identity-attest:req-1:leader-1' }]);
+
+      const plan = await writeIdentityAttestRequestNotifications(tx as never, {
+        gameId: 'game-1',
+        participantId: 'p-1',
+        requestId: 'req-1',
+        requesterUserId: 'requester',
+      });
+
+      expect(plan).toEqual({
+        recipients: ['leader-2'],
+        title: '기록 연결 승인 요청이 도착했어요',
+        body: expect.stringContaining('김민준'),
+        url: '/team-matches/tm-1',
+      });
     });
 
     it('선호도(teamMatchEnabled=false)로 꺼진 수신자에게는 남기지 않는다', async () => {

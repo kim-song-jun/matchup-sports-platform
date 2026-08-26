@@ -333,7 +333,7 @@ function TournamentSkeletonCard({ opacity }: { opacity: number }) {
     <div
       className="tm-card"
       aria-hidden="true"
-      style={{ opacity, padding: '16px 16px 14px', pointerEvents: 'none' }}
+      style={{ opacity, padding: '16px 16px 16px', pointerEvents: 'none' }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
         <div style={{ height: 14, borderRadius: 6, background: 'var(--grey100)', width: '60%' }} />

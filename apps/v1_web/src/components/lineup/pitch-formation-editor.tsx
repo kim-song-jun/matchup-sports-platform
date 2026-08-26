@@ -414,7 +414,7 @@ export function PitchFormationEditor({
             display: 'flex',
             alignItems: 'center',
             gap: 12,
-            padding: '10px 14px',
+            padding: '12px 16px',
             borderRadius: 12,
             border: '1px solid var(--border)',
             background: 'var(--card-surface)',
@@ -649,7 +649,7 @@ function FormationControls({
                   display: 'flex',
                   alignItems: 'center',
                   gap: 8,
-                  padding: '6px 10px',
+                  padding: '8px 12px',
                   borderRadius: 999,
                   border: selectedWaitingKey === entry.key ? '2px solid var(--blue500)' : '1px solid var(--border)',
                   background: selectedWaitingKey === entry.key ? 'var(--tint-blue)' : 'var(--card-surface)',
@@ -724,7 +724,7 @@ function FormationChip({
         flexDirection: 'column',
         alignItems: 'center',
         gap: 8,
-        padding: '10px 8px',
+        padding: '12px 8px',
         minHeight: TOUCH_TARGET_PX,
         borderRadius: 10,
         border: `1px solid ${selected ? 'var(--blue500)' : 'var(--border)'}`,
@@ -837,7 +837,7 @@ function FormationSheet({
       >
         <div
           aria-hidden="true"
-          style={{ width: 36, height: 4, borderRadius: 999, background: 'var(--grey100)', margin: '0 auto 14px' }}
+          style={{ width: 36, height: 4, borderRadius: 999, background: 'var(--grey100)', margin: '0 auto 16px' }}
         />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <h3 id={titleId} className="tm-text-body-lg" style={{ fontWeight: 700 }}>
@@ -980,7 +980,7 @@ function SlotPlayerPickerSheet({
           padding: '16px 20px calc(20px + env(safe-area-inset-bottom))', boxShadow: '0 -8px 24px rgba(0,0,0,0.18)',
         }}
       >
-        <div aria-hidden="true" style={{ width: 36, height: 4, borderRadius: 999, background: 'var(--grey100)', margin: '0 auto 14px' }} />
+        <div aria-hidden="true" style={{ width: 36, height: 4, borderRadius: 999, background: 'var(--grey100)', margin: '0 auto 16px' }} />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <h3 id={titleId} className="tm-text-body-lg" style={{ fontWeight: 700 }}>{slot.label} 자리에 채울 선수</h3>
           <button type="button" onClick={onClose} aria-label="닫기" className="tm-btn tm-btn-icon tm-btn-ghost">×</button>
@@ -995,7 +995,7 @@ function SlotPlayerPickerSheet({
               <button
                 key={entry.key} type="button" onClick={() => onSelect(entry.key)}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', minHeight: TOUCH_TARGET_PX,
+                  display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', minHeight: TOUCH_TARGET_PX,
                   borderRadius: 10, border: '1px solid var(--border)', background: 'var(--card-surface)', textAlign: 'left',
                 }}
               >
@@ -1144,7 +1144,7 @@ function PlayerToken({
           fontWeight: 600,
           color: '#fff',
           background: 'rgba(0,0,0,0.6)',
-          padding: '1px 6px',
+          padding: '1px 8px',
           borderRadius: 6,
         }}
       >

@@ -245,7 +245,7 @@ function RegistrationPass({
           marginBottom: 16,
         }}
       >
-        <div style={{ padding: '16px 18px 14px' }}>
+        <div style={{ padding: '16px 20px 16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 8 }}>
             <span className="tm-badge tm-badge-orange">입금 대기</span>
           </div>
@@ -261,7 +261,7 @@ function RegistrationPass({
         <div
           style={{
             borderTop: '1px dashed var(--border)',
-            padding: '13px 18px',
+            padding: '12px 20px',
             display: 'flex', flexDirection: 'column', gap: 8,
           }}
         >
@@ -269,7 +269,7 @@ function RegistrationPass({
           <PassFact icon={<MapPinIcon />} label="장소" value={venue || '장소 미정'} />
           {paymentSummary ? <PassFact icon={<ReceiptIcon />} label="참가비" value={paymentSummary} /> : null}
         </div>
-        <div style={{ borderTop: '1px solid var(--border)', padding: '12px 18px' }}>
+        <div style={{ borderTop: '1px solid var(--border)', padding: '12px 20px' }}>
           <p className="tm-text-caption" style={{ color: 'var(--orange700)', lineHeight: 1.6, margin: 0, fontWeight: 600 }}>
             신청 내역에서 계좌 정보를 확인하고 참가비를 입금해 주세요.
           </p>
@@ -299,14 +299,14 @@ function RegistrationPass({
       }}
     >
       {/* Header: sport chip + status pill, title, team */}
-      <div style={{ padding: '16px 18px 14px' }}>
+      <div style={{ padding: '16px 20px 16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 8 }}>
           <span
             className="tm-text-micro"
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 4,
               background: accent.badgeBg, color: accent.badgeText,
-              fontWeight: 600, padding: '3px 9px', borderRadius: 999, flexShrink: 0,
+              fontWeight: 600, padding: '3px 8px', borderRadius: 999, flexShrink: 0,
             }}
           >
             <span aria-hidden="true" style={{ width: 5, height: 5, borderRadius: '50%', background: accent.dot }} />
@@ -328,7 +328,7 @@ function RegistrationPass({
       <div
         style={{
           borderTop: '1px dashed var(--border)',
-          padding: '13px 18px',
+          padding: '12px 20px',
           display: 'flex', flexDirection: 'column', gap: 8,
         }}
       >
@@ -342,7 +342,7 @@ function RegistrationPass({
         <div
           style={{
             borderTop: '1px solid var(--border)',
-            padding: '13px 18px',
+            padding: '12px 20px',
             display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
           }}
         >
@@ -375,7 +375,7 @@ function RegistrationPass({
           ) : null}
         </div>
       ) : (
-        <div style={{ borderTop: '1px solid var(--border)', padding: '12px 18px' }}>
+        <div style={{ borderTop: '1px solid var(--border)', padding: '12px 20px' }}>
           <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, margin: 0 }}>
             앞 순위 팀이 취소하면 자동으로 확정 알림을 드려요.
           </p>
@@ -1227,7 +1227,7 @@ function TeamRegistrationHub({
         <div
           style={{
             marginTop: 12,
-            padding: '10px 12px',
+            padding: '12px 12px',
             borderRadius: 10,
             background: blockMessage ? 'var(--orange50)' : 'var(--grey50)',
             display: 'flex',

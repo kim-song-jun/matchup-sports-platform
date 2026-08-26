@@ -42,7 +42,7 @@ export function LineupTodoCard({ enabled = true }: { enabled?: boolean }) {
                   alignItems: 'center',
                   gap: 12,
                   minHeight: 44,
-                  padding: '10px 12px',
+                  padding: '12px 12px',
                   borderRadius: 12,
                   border: '1px solid var(--border)',
                   textDecoration: 'none',

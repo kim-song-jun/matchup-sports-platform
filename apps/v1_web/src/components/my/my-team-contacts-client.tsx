@@ -597,7 +597,7 @@ export function MyTeamContactDetailClient({ contactId }: { contactId: string }) 
 
           <Card pad={16}>
             <div className="tm-text-body-lg">전달 메시지</div>
-            <p className="tm-text-body" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, margin: '10px 0 0' }}>
+            <p className="tm-text-body" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, margin: '12px 0 0' }}>
               {contact.message}
             </p>
           </Card>
@@ -605,7 +605,7 @@ export function MyTeamContactDetailClient({ contactId }: { contactId: string }) 
           {contact.status === 'declined' && contact.declineReason ? (
             <Card pad={16}>
               <div className="tm-text-body-lg">거절 사유</div>
-              <p className="tm-text-body" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, margin: '10px 0 0' }}>
+              <p className="tm-text-body" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, margin: '12px 0 0' }}>
                 {contact.declineReason}
               </p>
             </Card>

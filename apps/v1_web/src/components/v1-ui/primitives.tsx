@@ -210,7 +210,7 @@ export function AlertBanner({
       role={isError ? 'alert' : 'status'}
       aria-live={isError ? 'assertive' : 'polite'}
       style={{
-        padding: '10px 14px',
+        padding: '12px 16px',
         borderRadius: 12,
         background: s.bg,
         color: s.color,

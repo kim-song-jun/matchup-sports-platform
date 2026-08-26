@@ -136,7 +136,7 @@ export function LoadLineupSheet({
       >
         <div
           style={{
-            padding: '18px 20px 12px',
+            padding: '20px 20px 12px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',

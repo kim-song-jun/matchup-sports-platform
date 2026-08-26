@@ -61,7 +61,7 @@ function ScheduleResultBadge({ entry }: { entry: PublicScheduleEntry }) {
         color: tone,
         background: bg,
         borderRadius: 6,
-        padding: '2px 6px',
+        padding: '2px 8px',
       }}
     >
       {resultStateLabel(entry.resultState)}
@@ -313,7 +313,7 @@ function LineupStatusBadge({ lineupState }: { lineupState: GameLineupState | nul
         ? { label: '라인업 작성 중', color: 'var(--orange700)', background: 'var(--orange50)' }
         : { label: '라인업 제출 완료', color: 'var(--blue700)', background: 'var(--blue50)' };
   return (
-    <span style={{ fontSize: 12, fontWeight: 700, color, background, borderRadius: 6, padding: '2px 6px' }}>
+    <span style={{ fontSize: 12, fontWeight: 700, color, background, borderRadius: 6, padding: '2px 8px' }}>
       {label}
     </span>
   );
@@ -409,7 +409,7 @@ function ScheduleRow({
               // 예전처럼 카드 표면색(흰색)으로 두면 중립 배경 위에서 배지 윤곽이 사라진다.
               background: 'var(--blue50)',
               borderRadius: 6,
-              padding: '2px 6px',
+              padding: '2px 8px',
             }}
           >
             우리 팀
@@ -802,7 +802,7 @@ export function ScheduleContent({
       {hasHiddenIdentity ? (
         <div
           style={{
-            padding: '10px 14px',
+            padding: '12px 16px',
             borderRadius: 10,
             background: 'var(--grey50)',
             fontSize: 12,

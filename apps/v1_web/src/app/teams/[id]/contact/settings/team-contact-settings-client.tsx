@@ -93,7 +93,7 @@ export function TeamContactSettingsPageClient({ teamId }: { teamId: string }) {
                     display: 'flex',
                     alignItems: 'center',
                     gap: 12,
-                    padding: '10px 12px',
+                    padding: '12px 12px',
                     borderRadius: 10,
                     cursor: updatePolicy.isPending ? 'default' : 'pointer',
                     border: `1px solid ${selected ? 'var(--blue500)' : 'var(--border)'}`,

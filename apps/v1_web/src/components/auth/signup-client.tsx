@@ -418,7 +418,7 @@ export function SignupClient() {
             {primary.label}
           </button>
           {disabledHint ? (
-            <p className="tm-text-caption" role="status" style={{ margin: '6px 0 0', textAlign: 'center' }}>
+            <p className="tm-text-caption" role="status" style={{ margin: '8px 0 0', textAlign: 'center' }}>
               {disabledHint}
             </p>
           ) : null}

@@ -139,7 +139,7 @@ function TeamFixturesDetail({ teamId, fixtures }: { teamId: string | null; fixtu
               display: 'flex',
               alignItems: 'center',
               gap: 8,
-              padding: '8px 10px',
+              padding: '8px 12px',
               borderRadius: 10,
               background: 'var(--surface-soft)',
               fontSize: 12,
@@ -281,7 +281,7 @@ function BracketEmpty({
       <div
         style={{
           marginTop: 16,
-          padding: '10px 14px',
+          padding: '12px 16px',
           borderRadius: 10,
           background: 'var(--surface-soft)',
           fontSize: 12,

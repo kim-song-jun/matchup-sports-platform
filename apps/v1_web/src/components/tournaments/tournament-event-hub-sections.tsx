@@ -58,7 +58,7 @@ export function TournamentApplicationGuideSection() {
         <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, marginTop: 4 }}>
           팀장 또는 운영진이 팀을 선택해 신청하고, 입금 확인 후 참가가 확정돼요. 선수단은 마감일 전까지 등록·수정할 수 있어요.
         </div>
-        <ol style={{ display: 'grid', gap: 12, listStyle: 'none', margin: '14px 0 0', padding: 0 }}>
+        <ol style={{ display: 'grid', gap: 12, listStyle: 'none', margin: '16px 0 0', padding: 0 }}>
           {steps.map((step, index) => (
             <li key={step.title} style={{ display: 'grid', gridTemplateColumns: '28px 1fr', gap: 12 }}>
               <span

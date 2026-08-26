@@ -97,7 +97,7 @@ function UserRecordRow({ item }: { item: PublicUserRecordItem }) {
               color: 'var(--orange700, #a36100)',
               background: 'var(--orange50)',
               borderRadius: 6,
-              padding: '2px 6px',
+              padding: '2px 8px',
             }}
           >
             MVP
@@ -160,7 +160,7 @@ export function UserRecordsContent({
                   display: 'flex',
                   alignItems: 'center',
                   gap: 12,
-                  padding: '14px 16px',
+                  padding: '16px 16px',
                   borderTop: '1px solid var(--grey100)',
                   color: 'inherit',
                   textDecoration: 'none',

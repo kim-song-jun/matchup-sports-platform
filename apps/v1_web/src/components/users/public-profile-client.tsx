@@ -191,7 +191,7 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
               background: 'var(--surface-soft)',
               border: '1px solid var(--border)',
               borderRadius: 12,
-              padding: '10px 14px',
+              padding: '12px 16px',
             }}
             aria-label={mannerDisplay ? `매너 점수 ${mannerDisplay}점 (${trust.label})` : '매너 점수 없음'}
           >
@@ -288,7 +288,7 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
             gap: 12,
             border: '1px solid var(--border)',
             borderRadius: 14,
-            padding: '14px 16px',
+            padding: '16px 16px',
             background: 'var(--bg)',
             textDecoration: 'none',
             color: 'inherit',

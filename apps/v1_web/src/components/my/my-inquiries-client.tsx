@@ -234,7 +234,7 @@ function InquiryDetail({ inquiry }: { inquiry: V1Inquiry }) {
       </Card>
       <Card pad={16}>
         <div className="tm-text-body-lg">{t.myQuestion}</div>
-        <p className="tm-text-body" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, margin: '10px 0 0' }}>
+        <p className="tm-text-body" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, margin: '12px 0 0' }}>
           {inquiry.body}
         </p>
       </Card>
@@ -259,8 +259,8 @@ function InquiryDetail({ inquiry }: { inquiry: V1Inquiry }) {
           </div>
         ) : (
           <>
-            <p className="tm-text-body" style={{ lineHeight: 1.6, margin: '10px 0 0' }}>{t.waitingAnswer}</p>
-            <p className="tm-text-caption" style={{ lineHeight: 1.55, margin: '6px 0 0' }}>{t.waitingAnswerSub}</p>
+            <p className="tm-text-body" style={{ lineHeight: 1.6, margin: '12px 0 0' }}>{t.waitingAnswer}</p>
+            <p className="tm-text-caption" style={{ lineHeight: 1.55, margin: '8px 0 0' }}>{t.waitingAnswerSub}</p>
           </>
         )}
       </Card>

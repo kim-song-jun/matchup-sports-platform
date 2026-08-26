@@ -65,7 +65,7 @@ function CardShell({
     display: 'flex',
     flexDirection: 'column',
     height: '100%',
-    padding: '16px 16px 14px',
+    padding: '16px 16px 16px',
     textDecoration: 'none',
   };
   if (interactive) {
@@ -194,7 +194,7 @@ export function TournamentCard({
             </div>
 
             {/* Sport identity chip + meta row */}
-            <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 10px' }}>
+            <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 12px' }}>
               {/* Sport chip: colored dot + Korean label */}
               <span
                 style={{

@@ -488,7 +488,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
                   ) : null}
                   <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
                     {match.applicantTeams.map((team) => (
-                      <div key={team.applicationId ?? team.name} style={{ border: '1px solid var(--grey100)', borderRadius: 12, padding: '10px 12px' }}>
+                      <div key={team.applicationId ?? team.name} style={{ border: '1px solid var(--grey100)', borderRadius: 12, padding: '12px 12px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                           <div style={{ minWidth: 0, flex: 1 }}>
                             <div className="tm-text-label">{team.name}</div>

@@ -98,7 +98,7 @@ function StepIndicator({ current }: { current: ApplyStep }) {
   const currentLabel = STEPS[currentIndex]?.label ?? '';
   const nextStep = STEPS[currentIndex + 1];
   return (
-    <div className="tm-create-progress" style={{ padding: '14px 20px 0' }} aria-label="신청 단계">
+    <div className="tm-create-progress" style={{ padding: '16px 20px 0' }} aria-label="신청 단계">
       {/* a11y: 단계 전환 시 스크린리더에 현재 단계 공지 (aria-live polite) */}
       <span
         role="status"
@@ -511,7 +511,7 @@ function ExpandableCheckRow({
           display: 'flex',
           alignItems: 'center',
           gap: 12,
-          padding: '12px 14px',
+          padding: '12px 16px',
           minHeight: 44,
         }}
       >
@@ -545,7 +545,7 @@ function ExpandableCheckRow({
                   className="tm-text-micro"
                   style={{
                     flexShrink: 0,
-                    padding: '2px 6px',
+                    padding: '2px 8px',
                     borderRadius: 999,
                     background: consentType === 'required' ? 'var(--red50)' : 'var(--grey100)',
                     color: consentType === 'required' ? 'var(--red700)' : 'var(--text-muted)',
@@ -574,7 +574,7 @@ function ExpandableCheckRow({
               flexShrink: 0,
               background: 'none',
               border: 'none',
-              padding: '4px 6px',
+              padding: '4px 8px',
               cursor: 'pointer',
               color: 'var(--text-caption)',
               minWidth: 44,
@@ -1154,7 +1154,7 @@ function TournamentConsentDialog({
             alignItems: 'center',
             justifyContent: 'space-between',
             gap: 12,
-            padding: '18px 18px 12px',
+            padding: '20px 20px 12px',
             borderBottom: '1px solid var(--grey100)',
           }}
         >
@@ -1165,7 +1165,7 @@ function TournamentConsentDialog({
             닫기
           </button>
         </header>
-        <div style={{ overflowY: 'auto', padding: '18px' }}>
+        <div style={{ overflowY: 'auto', padding: '20px' }}>
           <p
             className="tm-text-caption"
             style={{ margin: 0, color: 'var(--text-muted)', lineHeight: 1.75, whiteSpace: 'pre-line' }}
@@ -1384,7 +1384,7 @@ function PaymentGuideStep({
               />
             </div>
           ) : (
-            <div style={{ padding: '0 16px 14px' }}>
+            <div style={{ padding: '0 16px 16px' }}>
               <AlertBanner
                 tone="error"
                 message="입금 계좌가 준비되지 않았어요. 운영팀에 문의해 주세요."

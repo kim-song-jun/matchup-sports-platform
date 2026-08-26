@@ -1272,7 +1272,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
             <h2 id="lineup-change-request-dialog-title" className="tm-text-subhead" style={{ margin: 0 }}>
               상대팀에 정정을 요청할까요?
             </h2>
-            <label htmlFor="lineup-change-request-reason" className="tm-text-caption" style={{ display: 'block', margin: '12px 0 6px', color: 'var(--text-muted)' }}>
+            <label htmlFor="lineup-change-request-reason" className="tm-text-caption" style={{ display: 'block', margin: '12px 0 8px', color: 'var(--text-muted)' }}>
               사유
             </label>
             <textarea

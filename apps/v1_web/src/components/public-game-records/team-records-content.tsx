@@ -152,7 +152,7 @@ function TeamRecordEventsPanel({
       id={id}
       role="list"
       aria-label={`${teamName} 대 ${item.opponentTeamName ?? '상대 미상'} 경기 기록`}
-      style={{ padding: '0 16px 14px', borderTop: '1px solid var(--grey100)' }}
+      style={{ padding: '0 16px 16px', borderTop: '1px solid var(--grey100)' }}
     >
       {/* 이벤트 행(`TeamRecordEventRow`)과 **같은 grid·gap·가운데 폭**을 쓴다 — 머리글만
        * gap 없이 두면 두 팀명이 `…01팀(테스트) QA 스쿼드 02팀` 처럼 맞붙어 한 덩어리로
@@ -164,7 +164,7 @@ function TeamRecordEventsPanel({
           gap: 8,
           fontSize: 'var(--font-size-micro)',
           color: 'var(--text-caption)',
-          margin: '10px 0 8px',
+          margin: '12px 0 8px',
         }}
       >
         <span style={{ textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -210,7 +210,7 @@ function TeamRecordRow({
   return (
     <div
       style={{
-        padding: '14px 16px 14px 12px',
+        padding: '16px 16px 16px 12px',
         borderTop: '1px solid var(--grey100)',
         ...resultStripeStyle(item.result),
       }}

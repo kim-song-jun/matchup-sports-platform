@@ -233,7 +233,7 @@ function TeamOpenMatchesSection({
                 gap: 12,
                 border: '1px solid var(--border)',
                 borderRadius: 14,
-                padding: '14px 16px',
+                padding: '16px 16px',
                 background: 'var(--bg)',
                 textDecoration: 'none',
                 color: 'inherit',
@@ -316,7 +316,7 @@ function TeamMyLeaguesSection({
                 gap: 12,
                 border: '1px solid var(--border)',
                 borderRadius: 14,
-                padding: '14px 16px',
+                padding: '16px 16px',
                 background: 'var(--bg)',
                 textDecoration: 'none',
                 color: 'inherit',
@@ -431,7 +431,7 @@ function TeamRecordLinkCard({
     gap: 12,
     border: '1px solid var(--border)',
     borderRadius: 14,
-    padding: '14px 16px',
+    padding: '16px 16px',
     background: 'var(--bg)',
     textDecoration: 'none',
     color: 'inherit',
@@ -564,7 +564,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
                 gap: 12,
                 border: '1px solid var(--border)',
                 borderRadius: 14,
-                padding: '14px 16px',
+                padding: '16px 16px',
                 background: 'var(--bg)',
                 textDecoration: 'none',
                 color: 'inherit',
@@ -709,7 +709,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             <ShareIcon size={20} />
           </button>
           <TeamAvatar seed={team.id} name={team.name} logoUrl={team.logoUrl} size="xl" />
-          <div className="tm-text-heading" style={{ color: 'var(--static-white)', margin: '14px 0 0' }} aria-hidden="true">{team.name}</div>
+          <div className="tm-text-heading" style={{ color: 'var(--static-white)', margin: '16px 0 0' }} aria-hidden="true">{team.name}</div>
           <div className="tm-text-caption" style={{ color: 'var(--overlay-white-72)', marginTop: 4 }}>{team.sport} · {team.region}</div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
             <span className={`tm-badge ${teamDetailStatusBadgeClass(mode)}`}>{team.statusLabel}</span>

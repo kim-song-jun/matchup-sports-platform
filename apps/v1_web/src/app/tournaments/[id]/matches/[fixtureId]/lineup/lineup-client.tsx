@@ -748,7 +748,7 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
               message="이 라인업이 다른 곳에서 먼저 바뀌었어요. 지금 화면의 편집 내용은 그대로 두었어요."
               tone="warning"
             />
-            <p className="tm-text-caption" style={{ margin: '10px 0 0', color: 'var(--text-muted)' }}>
+            <p className="tm-text-caption" style={{ margin: '12px 0 0', color: 'var(--text-muted)' }}>
               최신 명단을 불러오면 지금 화면에서 고친 내용은 사라져요. 남겨야 할 변경이 있다면 먼저 메모해 두세요.
             </p>
             <button
@@ -877,7 +877,7 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
             {/* 지난 경기와 같은 명단을 매번 처음부터 고르지 않도록 — 고른 라인업은 지금
                 등록 명단 위에 "누가 선발이었나"로만 얹힌다(명단 자체는 바뀌지 않는다). */}
             {editable && editingTeamId !== null ? (
-              <div style={{ display: 'flex', gap: 8, margin: '0 0 10px' }}>
+              <div style={{ display: 'flex', gap: 8, margin: '0 0 12px' }}>
                 <button
                   type="button"
                   className="tm-btn tm-btn-sm tm-btn-outline"

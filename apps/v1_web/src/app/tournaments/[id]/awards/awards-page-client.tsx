@@ -177,7 +177,7 @@ function PrizeSection({
       <div className="tm-prize-card" style={{ background: 'var(--card-surface)', borderRadius: 14, border: '1px solid var(--grey150)', overflow: 'hidden' }}>
         {/* 총 상금 헤더 */}
         {tournament.prizePool !== null && tournament.prizePool > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', padding: '14px 16px', background: 'var(--blue50)', borderBottom: '1px solid var(--grey100)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', padding: '16px 16px', background: 'var(--blue50)', borderBottom: '1px solid var(--grey100)' }}>
             <span style={{ display: 'inline-flex', marginRight: 12 }} aria-hidden="true">
               <Trophy size={20} className="tm-medal-gold" strokeWidth={2} />
             </span>
@@ -192,7 +192,7 @@ function PrizeSection({
           const teamName = posNum ? teamByPos[Number(posNum)] : undefined;
           const isAmount = isPrizeAmountValue(row.amount);
           return (
-            <div key={idx} style={{ display: 'flex', alignItems: 'center', padding: '13px 16px', borderTop: idx > 0 || tournament.prizePool ? '1px solid var(--grey100)' : 'none' }}>
+            <div key={idx} style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', borderTop: idx > 0 || tournament.prizePool ? '1px solid var(--grey100)' : 'none' }}>
               <span style={{ display: 'inline-flex', marginRight: 12, flexShrink: 0 }} aria-hidden="true">
                 <PrizeRankIcon label={row.label} />
               </span>
@@ -431,7 +431,7 @@ export function ReviewFormModal({
         </div>
 
         <div style={{ marginBottom: 16, textAlign: 'center' }}>
-          <p style={{ margin: '0 0 10px', fontSize: 13, color: 'var(--text-caption)' }}>대회는 어떠셨나요?</p>
+          <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--text-caption)' }}>대회는 어떠셨나요?</p>
           <StarRating value={rating} onChange={setRating} />
         </div>
 
@@ -460,7 +460,7 @@ export function ReviewFormModal({
                     htmlFor={`review-team-${team.teamId}`}
                     style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      width: '100%', minHeight: 44, padding: '10px 14px', borderRadius: 10,
+                      width: '100%', minHeight: 44, padding: '12px 16px', borderRadius: 10,
                       border: isSelected ? '1.5px solid var(--blue500)' : '1px solid var(--grey200)',
                       background: isSelected ? 'var(--blue50)' : 'var(--surface)',
                       color: 'var(--text-strong)', fontSize: 13, fontWeight: isSelected ? 700 : 500,
@@ -558,7 +558,7 @@ export function ReviewFormModal({
           type="button" onClick={handleSubmit}
           disabled={isPending || rating === 0 || (!!teamOptions && !selectedTeamId)}
           className="tm-btn tm-btn-primary"
-          style={{ width: '100%', justifyContent: 'center', padding: '14px', fontSize: 14, fontWeight: 700 }}
+          style={{ width: '100%', justifyContent: 'center', padding: '16px', fontSize: 14, fontWeight: 700 }}
         >
           {isPending ? '저장 중...' : teamOptions ? '선택한 팀으로 등록' : '후기 등록'}
         </button>
@@ -661,7 +661,7 @@ function ReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
               <button
                 type="button"
                 className="tm-btn tm-btn-sm tm-btn-secondary"
-                style={{ padding: '5px 12px', fontSize: 12 }}
+                style={{ padding: '4px 12px', fontSize: 12 }}
                 onClick={() => setShowForm(true)}
               >
                 + 후기 쓰기

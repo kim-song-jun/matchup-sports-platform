@@ -364,7 +364,7 @@ function ReviewTargetSections({
           <summary className="tm-review-player-summary">
             선수 개별 평가 <span className="tab-num">{playerTargets.length}</span>명
           </summary>
-          <div className="tm-text-caption" style={{ margin: '6px 0 10px' }}>
+          <div className="tm-text-caption" style={{ margin: '8px 0 12px' }}>
             남기고 싶은 선수만 골라 주세요. 비워 두면 팀 후기만 전송돼요.
           </div>
           <div className="tm-review-target-stack">{playerTargets.map(renderCard)}</div>

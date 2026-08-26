@@ -78,7 +78,7 @@ export function LeagueStandingsTable({ data }: { data: LeagueStandingsTableData 
               alignItems: 'center',
               gap: 8,
               marginTop: 12,
-              padding: '4px 10px',
+              padding: '4px 12px',
               minHeight: 28,
               borderRadius: 999,
               fontSize: 12,

@@ -388,7 +388,7 @@ function BracketEntryCtaButton({ tournament }: { tournament: V1TournamentDetail 
         alignItems: 'center',
         gap: 12,
         width: '100%',
-        padding: '14px 16px',
+        padding: '16px 16px',
         borderRadius: 14,
         textDecoration: 'none',
         background: isLive ? 'var(--blue500)' : 'var(--surface)',
@@ -401,7 +401,7 @@ function BracketEntryCtaButton({ tournament }: { tournament: V1TournamentDetail 
           style={{
             display: 'flex', alignItems: 'center', gap: 4,
             background: 'rgba(255,255,255,0.18)', borderRadius: 20,
-            padding: '3px 9px', flexShrink: 0,
+            padding: '3px 8px', flexShrink: 0,
           }}
         >
           <span
@@ -596,7 +596,7 @@ export function TournamentDetailView({
                   // 특히 다크모드에서 카드는 따뜻한 주황조인데 칩만 차가운 무채색 검정으로
                   // 떠 보이는 결함이 실측 확인됐다(라이브 alpha 스크린샷). 카드 톤에 맞춘
                   // 반투명 --tint-orange(주황 10%, 라이트/다크 공용)로 교체.
-                  style={{ background: 'var(--tint-orange)', border: '1px solid var(--tint-orange-border)', color: 'var(--text-body)', fontWeight: 600, padding: '4px 10px', borderRadius: 999 }}
+                  style={{ background: 'var(--tint-orange)', border: '1px solid var(--tint-orange-border)', color: 'var(--text-body)', fontWeight: 600, padding: '4px 12px', borderRadius: 999 }}
                 >
                   {m ? (
                     <>
@@ -695,7 +695,7 @@ export function TournamentDetailView({
             일정·정원·참가비는 데스크탑 우측 sticky 레일과 중복되어 모바일 전용(tm-hide-desktop). */}
         <Card pad={0}>
           {/* 정원 진행 + 잔여 (모바일 전용) */}
-          <div className="tm-hide-desktop" style={{ padding: '14px 16px', borderBottom: '1px solid var(--grey100)' }}>
+          <div className="tm-hide-desktop" style={{ padding: '16px 16px', borderBottom: '1px solid var(--grey100)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
               <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>정원</span>
               {/* P1 숫자:단위 2:1 + tabular-nums */}
@@ -735,7 +735,7 @@ export function TournamentDetailView({
           {/* 일정·참가비 (모바일 전용 — 데스크탑은 우측 레일) */}
           <div className="tm-hide-desktop">
             <InfoRow label="일정" value={formatTournamentDateRangeWithTime(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'} />
-            <ScheduleNoticeCaption style={{ padding: '10px 16px 14px', marginTop: 0, borderBottom: '1px solid var(--grey100)' }} />
+            <ScheduleNoticeCaption style={{ padding: '12px 16px 16px', marginTop: 0, borderBottom: '1px solid var(--grey100)' }} />
             <InfoRow label="참가비" value={formatEntryFee(tournament.entryFee)} />
           </div>
           {/* 항상 표시 */}
@@ -858,7 +858,7 @@ export function TournamentDetailView({
         </div>
         <Card pad={0}>
           <InfoRow label="일정" value={formatTournamentDateRangeWithTime(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'} />
-          <ScheduleNoticeCaption style={{ padding: '10px 16px 14px', marginTop: 0, borderBottom: '1px solid var(--grey100)' }} />
+          <ScheduleNoticeCaption style={{ padding: '12px 16px 16px', marginTop: 0, borderBottom: '1px solid var(--grey100)' }} />
           <InfoRow label="참가팀" value={`${tournament.confirmedCount}/${tournament.teamCount}팀 확정`} />
           <InfoRow label="참가비" value={formatEntryFee(tournament.entryFee)} />
           {tournament.venue ? (
@@ -990,7 +990,7 @@ export function TournamentDetailView({
                 style={{
                   display: 'flex',
                   gap: 12,
-                  padding: '9px 14px',
+                  padding: '8px 16px',
                   borderBottom: idx < arr.length - 1 ? '1px solid var(--grey100)' : 'none',
                   alignItems: 'flex-start',
                 }}
@@ -1076,14 +1076,14 @@ export function TournamentDetailView({
         href={`/tournaments/${tournament.id}/bracket`}
         style={{
           display: 'flex', alignItems: 'center', gap: 12,
-          padding: '14px 16px',
+          padding: '16px 16px',
           background: 'var(--blue500)', borderRadius: 14,
           textDecoration: 'none',
           boxShadow: '0 2px 14px rgba(49,130,246,0.28)',
           marginBottom: 16,
         }}
       >
-        <span style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.18)', borderRadius: 20, padding: '3px 9px', flexShrink: 0 }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.18)', borderRadius: 20, padding: '3px 8px', flexShrink: 0 }}>
           <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#4ADE80', flexShrink: 0, boxShadow: '0 0 0 2px rgba(74,222,128,0.35)' }} aria-hidden="true" />
           <span style={{ fontSize: 'var(--font-size-caption)', fontWeight: 800, color: '#fff', letterSpacing: '0.02em' }}>LIVE</span>
         </span>
@@ -1117,7 +1117,7 @@ export function TournamentDetailView({
         href={`/tournaments/${tournament.id}/bracket`}
         style={{
           display: 'flex', alignItems: 'center', gap: 12,
-          padding: '14px 16px',
+          padding: '16px 16px',
           background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14,
           textDecoration: 'none',
           marginBottom: 16,
@@ -1152,14 +1152,14 @@ export function TournamentDetailView({
         href={`/tournaments/${tournament.id}/results`}
         style={{
           display: 'flex', alignItems: 'center', gap: 12,
-          padding: '14px 16px',
+          padding: '16px 16px',
           background: 'linear-gradient(135deg, #1A1A2E 0%, #111827 100%)', borderRadius: 14,
           textDecoration: 'none',
           boxShadow: '0 2px 12px rgba(0,0,0,0.2)',
           marginBottom: 16,
         }}
       >
-        <span style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.12)', borderRadius: 20, padding: '3px 9px', flexShrink: 0 }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.12)', borderRadius: 20, padding: '3px 8px', flexShrink: 0 }}>
           <Trophy size={12} className="tm-medal-gold" strokeWidth={2.4} aria-hidden="true" />
           <span style={{ fontSize: 'var(--font-size-caption)', fontWeight: 800, color: '#fff', letterSpacing: '0.02em' }}>종료</span>
         </span>
@@ -1276,7 +1276,7 @@ function CompletedResultHero({ tournament }: { tournament: V1TournamentDetail })
           display: 'flex',
           alignItems: 'center',
           gap: 16,
-          padding: '16px 18px',
+          padding: '16px 20px',
           background: 'linear-gradient(135deg, #1A1A2E 0%, #111827 100%)',
           borderRadius: 16,
           textDecoration: 'none',
@@ -1350,7 +1350,7 @@ function AccordionSection({
         style={{
           width: '100%',
           minHeight: 52,
-          padding: '14px 16px',
+          padding: '16px 16px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -1375,7 +1375,7 @@ function AccordionSection({
         />
       </button>
       {open ? (
-        <div id={id} style={{ padding: '14px 16px 16px', borderTop: '1px solid var(--grey100)' }}>
+        <div id={id} style={{ padding: '16px 16px 16px', borderTop: '1px solid var(--grey100)' }}>
           {children}
         </div>
       ) : null}
@@ -1415,7 +1415,7 @@ function TournamentPreParticipationNotice() {
                 style={{
                   display: 'flex',
                   gap: 12,
-                  padding: '10px 16px',
+                  padding: '12px 16px',
                   borderBottom: idx < arr.length - 1 ? '1px solid var(--grey100)' : 'none',
                   alignItems: 'flex-start',
                 }}
@@ -1511,7 +1511,7 @@ function StandingsMovedNotice({ tournamentId }: { tournamentId: string }) {
           display: 'flex',
           alignItems: 'center',
           gap: 12,
-          padding: '14px 16px',
+          padding: '16px 16px',
           background: 'var(--grey50)',
           borderRadius: 14,
           textDecoration: 'none',

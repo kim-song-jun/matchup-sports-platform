@@ -375,7 +375,7 @@ function KnockoutResultsTable({
     date?: string; isAccent?: boolean; isAgg?: boolean;
   }) => (
     <div style={{
-      padding: '10px 16px',
+      padding: '12px 16px',
       background: 'transparent',
     }}>
       {/* 상단: 라벨 + 날짜 */}
@@ -527,7 +527,7 @@ function FinalStandingsTable({ rows, fixtures }: { rows: FinalRankRow[]; fixture
     <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid var(--grey150)' }}>
       <div style={{
         display: 'grid', gridTemplateColumns: '40px 1fr 64px 36px 36px 40px',
-        padding: '7px 14px', background: 'var(--grey50)', borderBottom: '1px solid var(--grey150)',
+        padding: '8px 16px', background: 'var(--grey50)', borderBottom: '1px solid var(--grey150)',
       }}>
         {/* [R-T2] 그리드 컬럼(40px/1fr/64px/36px/36px/40px) 헤더 — 가장 좁은 36px도
             'W'/'GF' 한두 글자라 12px 여유. */}
@@ -543,7 +543,7 @@ function FinalStandingsTable({ rows, fixtures }: { rows: FinalRankRow[]; fixture
         return (
           <div key={row.pos} style={{
             display: 'grid', gridTemplateColumns: '40px 1fr 64px 36px 36px 40px',
-            padding: '11px 14px', background: cfg.bg,
+            padding: '12px 16px', background: cfg.bg,
             borderTop: idx > 0 ? '1px solid var(--grey100)' : 'none',
             alignItems: 'center',
           }}>

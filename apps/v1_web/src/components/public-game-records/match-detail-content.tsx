@@ -76,7 +76,7 @@ function MatchOutcomeNotice({ outcome }: { outcome: PublicMatchDetail['outcome']
     <div
       style={{
         marginTop: 12,
-        padding: '8px 10px',
+        padding: '8px 12px',
         borderRadius: 10,
         background: 'var(--orange50)',
         display: 'flex',
@@ -273,7 +273,7 @@ function HistorySection({ history }: { history: PublicMatchDetail['history'] }) 
         {history.map((revision, index) => (
           <div
             key={revision.revision}
-            style={{ padding: '10px 16px', borderTop: index > 0 ? '1px solid var(--grey100)' : 'none' }}
+            style={{ padding: '12px 16px', borderTop: index > 0 ? '1px solid var(--grey100)' : 'none' }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-strong)' }}>

@@ -187,7 +187,7 @@ export function TournamentReviewsPageClient({ tournamentId }: { tournamentId: st
                 display: 'inline-block',
                 color: 'var(--text-caption)',
                 background: 'var(--grey100)',
-                padding: '6px 10px',
+                padding: '8px 12px',
                 borderRadius: 8,
                 margin: '12px 0 4px',
               }}
@@ -208,7 +208,7 @@ export function TournamentReviewsPageClient({ tournamentId }: { tournamentId: st
           {/* 소제목은 위의 "리뷰할 수 있는 경기"와 이 목록을 가르는 역할이라 필요하다. 다만
               문구는 "참가팀 후기"가 아니어야 한다 — alpha 실측에서 같은 말이 한 화면에 세 번
               (상단 바 + h1 + 소제목) 나왔다. "전체 후기"는 검색·페이징 대상이 무엇인지도 함께 알린다. */}
-          <h2 className="tm-hub-section-title" style={{ margin: '24px 0 10px' }}>
+          <h2 className="tm-hub-section-title" style={{ margin: '24px 0 12px' }}>
             전체 후기
           </h2>
 

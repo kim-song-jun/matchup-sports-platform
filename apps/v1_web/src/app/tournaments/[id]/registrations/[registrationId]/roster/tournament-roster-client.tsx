@@ -371,7 +371,7 @@ function AddPlayerForm({
         <button
           type="button"
           className="tm-btn tm-btn-sm tm-btn-neutral"
-          style={{ minWidth: 44, padding: '0 10px' }}
+          style={{ minWidth: 44, padding: '0 12px' }}
           onClick={() => onRemove(formId)}
           disabled={isSubmitting}
           aria-label="선수 추가 칸 삭제"
@@ -453,12 +453,12 @@ function AddPlayerForm({
                 })}
               </select>
               {selectedMemberMissing ? (
-                <p className="tm-text-micro" role="alert" style={{ color: 'var(--red700)', margin: '6px 0 0' }}>
+                <p className="tm-text-micro" role="alert" style={{ color: 'var(--red700)', margin: '8px 0 0' }}>
                   실명, 생년월일, 휴대폰 번호가 모두 등록된 팀원만 선수로 등록할 수 있어요.
                 </p>
               ) : null}
               {selectedAlreadyRegistered || selectedAlreadyPending ? (
-                <p className="tm-text-micro" role="alert" style={{ color: 'var(--red700)', margin: '6px 0 0' }}>
+                <p className="tm-text-micro" role="alert" style={{ color: 'var(--red700)', margin: '8px 0 0' }}>
                   {selectedAlreadyRegistered ? '이미 명단에 등록된 선수예요.' : '다른 추가 칸에서 선택한 선수예요.'}
                 </p>
               ) : null}
@@ -715,7 +715,7 @@ function PlayerRow({
   return (
     <div
       style={{
-        padding: '12px 14px',
+        padding: '12px 16px',
         borderTop: '1px solid var(--grey100)',
       }}
     >
@@ -758,7 +758,7 @@ function PlayerRow({
             <button
               type="button"
               className="tm-btn tm-btn-sm tm-btn-neutral"
-              style={{ minWidth: 44, padding: '0 10px' }}
+              style={{ minWidth: 44, padding: '0 12px' }}
               onClick={() => {
                 setDraftEligibility(player.eligibilityStatus);
                 setEditError(null);
@@ -773,7 +773,7 @@ function PlayerRow({
             <button
               type="button"
               className="tm-btn tm-btn-sm tm-btn-danger"
-              style={{ minWidth: 44, padding: '0 10px' }}
+              style={{ minWidth: 44, padding: '0 12px' }}
               onClick={() => onRemove(player.id)}
               disabled={isRemoving || isUpdating}
               aria-label={`${player.realName} 삭제`}
@@ -1141,7 +1141,7 @@ export function TournamentRosterPageClient({
               aria-live="polite"
               className="tm-text-label"
               style={{
-                padding: '10px 14px',
+                padding: '12px 16px',
                 borderRadius: 12,
                 background: 'var(--orange50)',
                 color: 'var(--orange700)',
@@ -1253,7 +1253,7 @@ export function TournamentRosterPageClient({
           </Card>
         ) : (
           <Card pad={0}>
-            <div style={{ padding: '8px 14px' }}>
+            <div style={{ padding: '8px 16px' }}>
               <div className="tm-text-micro tab-num" style={{ color: 'var(--text-caption)', fontWeight: 600 }}>
                 총 {players.length}명 · {canEditRoster ? '수정 가능' : '수정 불가'}
               </div>

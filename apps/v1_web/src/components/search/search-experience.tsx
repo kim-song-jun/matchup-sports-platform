@@ -180,11 +180,11 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
       bottomNav={true}
     >
     <div className="tm-search-frame" style={{ width: 'min(100%, var(--v1-app-chrome-frame-width))', height: '100%', minHeight: 0, margin: '0 auto', background: 'var(--bg)', fontFamily: 'var(--font)', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
-      <form className="tm-search-form-bar" onSubmit={submit} style={{ minHeight: 'var(--v1-shell-topbar-height)', padding: '8px 10px 8px 8px', borderBottom: '1px solid var(--grey100)', display: 'flex', alignItems: 'center', gap: 1, background: 'var(--bg)', flexShrink: 0 }}>
+      <form className="tm-search-form-bar" onSubmit={submit} style={{ minHeight: 'var(--v1-shell-topbar-height)', padding: '8px 12px 8px 8px', borderBottom: '1px solid var(--grey100)', display: 'flex', alignItems: 'center', gap: 1, background: 'var(--bg)', flexShrink: 0 }}>
         <button type="button" aria-label="뒤로가기" onClick={goBack} className="tm-search-back-btn tm-hide-desktop tm-tap-44" style={{ width: 30, minWidth: 30, height: 40, border: 0, background: 'transparent', borderRadius: 12, display: 'grid', placeItems: 'center', color: 'var(--text-strong)', padding: 0 }}>
           <ChevronLeft size={20} />
         </button>
-        <div className="tm-search-input-wrap" style={{ flex: 1, minHeight: 44, borderRadius: 14, background: 'var(--grey100)', border: viewState === 'error' ? '1px solid var(--red500)' : query ? '1px solid var(--blue500)' : '1px solid transparent', display: 'flex', alignItems: 'center', gap: 4, padding: '0 8px 0 14px', minWidth: 0 }}>
+        <div className="tm-search-input-wrap" style={{ flex: 1, minHeight: 44, borderRadius: 14, background: 'var(--grey100)', border: viewState === 'error' ? '1px solid var(--red500)' : query ? '1px solid var(--blue500)' : '1px solid transparent', display: 'flex', alignItems: 'center', gap: 4, padding: '0 8px 0 16px', minWidth: 0 }}>
           <input
             aria-label="검색어"
             value={query}
@@ -207,7 +207,7 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
         </div>
       </form>
 
-      <div className="tm-search-body" style={{ flex: 1, overflow: 'auto', padding: '18px var(--v1-shell-page-x) calc(22px + var(--v1-shell-safe-bottom))' }}>
+      <div className="tm-search-body" style={{ flex: 1, overflow: 'auto', padding: '20px var(--v1-shell-page-x) calc(24px + var(--v1-shell-safe-bottom))' }}>
         <div className="tm-search-panel">
           <div className="tm-search-panel-col">
             <div className="tm-text-label">최근 검색</div>
@@ -240,7 +240,7 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
           </div>
 
           <div className="tm-search-results-col">
-            <div style={{ height: 1, background: 'var(--grey100)', margin: '20px 0 18px' }} className="tm-hide-desktop" />
+            <div style={{ height: 1, background: 'var(--grey100)', margin: '20px 0 20px' }} className="tm-hide-desktop" />
             <div className="tm-search-results-header">
               <div className="tm-text-label">검색 결과</div>
               {submittedQuery ? (
@@ -266,7 +266,7 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
 
             {effectiveViewState === 'new' ? (
               <div className="tm-search-state-msg" style={{ marginTop: 44, textAlign: 'center', color: 'var(--text-muted)' }}>
-                <div style={{ width: 48, height: 48, borderRadius: 16, background: 'var(--grey50)', display: 'grid', placeItems: 'center', margin: '0 auto 14px', color: 'var(--grey500)' }}>
+                <div style={{ width: 48, height: 48, borderRadius: 16, background: 'var(--grey50)', display: 'grid', placeItems: 'center', margin: '0 auto 16px', color: 'var(--grey500)' }}>
                   <Search size={22} />
                 </div>
                 <div className="tm-text-body-lg">검색어를 입력하거나 조건을 선택해 주세요</div>
@@ -276,7 +276,7 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
 
             {effectiveShowStateMessage ? (
               <div className="tm-search-state-msg" style={{ marginTop: 44, textAlign: 'center', color: 'var(--text-muted)' }}>
-                <div style={{ width: 48, height: 48, borderRadius: 16, background: 'var(--grey50)', display: 'grid', placeItems: 'center', margin: '0 auto 14px', color: effectiveViewState === 'error' ? 'var(--red500)' : 'var(--grey500)' }}>
+                <div style={{ width: 48, height: 48, borderRadius: 16, background: 'var(--grey50)', display: 'grid', placeItems: 'center', margin: '0 auto 16px', color: effectiveViewState === 'error' ? 'var(--red500)' : 'var(--grey500)' }}>
                   {effectiveViewState === 'stale' ? <Clock size={22} /> : effectiveViewState === 'error' ? <AlertCircle size={22} /> : <Search size={22} />}
                 </div>
                 <div className="tm-text-body-lg">{effectiveViewState === 'stale' ? '최신 결과를 불러오는 중이에요.' : effectiveViewState === 'error' ? '검색 결과를 불러오지 못했어요.' : '검색 결과가 없어요.'}</div>
@@ -288,7 +288,7 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
       </div>
 
       {effectiveViewState === 'error' ? (
-        <div className="tm-search-error-toast" style={{ position: 'absolute', left: 'var(--v1-shell-page-x)', right: 'var(--v1-shell-page-x)', bottom: 'calc(22px + var(--v1-shell-safe-bottom))', minHeight: 48, borderRadius: 14, background: 'var(--scrim-dark-94)', color: 'var(--static-white)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 14px', fontSize: 13, fontWeight: 700 }}>
+        <div className="tm-search-error-toast" style={{ position: 'absolute', left: 'var(--v1-shell-page-x)', right: 'var(--v1-shell-page-x)', bottom: 'calc(22px + var(--v1-shell-safe-bottom))', minHeight: 48, borderRadius: 14, background: 'var(--scrim-dark-94)', color: 'var(--static-white)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 16px', fontSize: 13, fontWeight: 700 }}>
           검색 중 문제가 생겼어요. 잠시 후 다시 시도해 주세요.
         </div>
       ) : null}

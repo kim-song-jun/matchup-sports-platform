@@ -1128,8 +1128,8 @@ function PlayerToken({
         aria-hidden="true"
         style={{
           position: 'absolute',
-          // 위로 올릴 때 6px을 띄우는 건 GK 배지가 토큰 위로 4px 삐져나오기 때문이다 —
-          // 3px만 두면 긴 이름에서 배지와 겹친다.
+          // 위로 올릴 때 8px을 띄우는 건 GK 배지가 토큰 위로 4px 삐져나오기 때문이다 —
+          // 3px만 두면 긴 이름에서 배지와 겹친다. (격자 정리 전에는 6px 이었다)
           ...(labelAbove ? { bottom: '100%', marginBottom: 8 } : { top: '100%', marginTop: 3 }),
           left: '50%',
           transform: 'translateX(-50%)',

@@ -9,6 +9,10 @@ import {
   LEAGUE_RESULT_ENTRY_REMINDER_TYPE,
   LeagueResultEntryReminderService,
 } from './league-reminders/league-result-entry-reminder.service';
+import {
+  IDENTITY_LINK_EXPIRY_TYPE,
+  IdentityLinkExpiryService,
+} from './identity-link/identity-link-expiry.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { WebPushService } from '../notifications/web-push.service';
 
@@ -96,6 +100,11 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
     // updateFixture(시작 시각 변경)가 건다 — league-result-entry-reminder.service.ts 참고.
     const leagueResultEntryReminder = new LeagueResultEntryReminderService();
     this.registerHandler(LEAGUE_RESULT_ENTRY_REMINDER_TYPE, leagueResultEntryReminder.handler);
+    // 신원 연결 요청은 24시간 뒤 만료된다 — 예전에는 다음 attest 시도 때에야 기록되는
+    // lazy 처리라 아무도 손대지 않으면 신청자가 결말을 알 수 없었다. 신청 시각 +24h 에
+    // 만료를 확정하고 신청자에게 통보한다(identity-link-expiry.service.ts).
+    const identityLinkExpiry = new IdentityLinkExpiryService(this.webPush);
+    this.registerHandler(IDENTITY_LINK_EXPIRY_TYPE, identityLinkExpiry.handler);
     // reject/request_supplement close their own review SLA synchronously in
     // the API command (TournamentResultReviewService.closeReviewSla, Task
     // 22); the durable audit handler here only needs to make the outbox's

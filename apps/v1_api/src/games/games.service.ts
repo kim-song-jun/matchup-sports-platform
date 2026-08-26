@@ -5,6 +5,7 @@ import {
   HttpException,
   Injectable,
   NotFoundException,
+  Optional,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import {
@@ -55,7 +56,12 @@ import {
   type StoredPenalties,
 } from './core/knockout-penalties';
 import { GameTakeoverService } from './game-takeover.service';
-import { writeIdentityAttestRequestNotifications } from './identity-attest-notification';
+import {
+  writeIdentityAttestRequestNotifications,
+  type IdentityAttestPushPlan,
+} from './identity-attest-notification';
+import { scheduleIdentityLinkExpiry } from '../jobs/identity-link/identity-link-expiry.service';
+import { WebPushService } from '../notifications/web-push.service';
 import {
   decideTournamentStaffAccess,
   type TournamentStaffAction,
@@ -736,6 +742,10 @@ export class GamesService {
     private readonly prisma: PrismaService,
     private readonly operationAuditWriter: OperationAuditWriterService,
     private readonly takeover: GameTakeoverService,
+    // 신원 연결 승인 요청 푸시(2026-08-26). optional 인 이유는 워커 서비스의 webPush 와 같다 —
+    // `new GamesService(prisma, audit, takeover)` 로 직접 만드는 스펙이 다수 있고 그쪽은
+    // 푸시가 no-op 이면 된다. 실제 앱에서는 GamesModule 이 import 한 WebPushModule 에서 주입된다.
+    @Optional() private readonly webPush?: WebPushService,
   ) {}
 
   async createFromSourceInTransaction(
@@ -3844,7 +3854,13 @@ export class GamesService {
     headerIdempotencyKey: string | undefined,
     dto: RequestIdentityLinkDto,
   ) {
-    return this.withParticipantCommand(
+    // 푸시는 롤백할 수 없으므로 트랜잭션 밖에서 보낸다 — 커맨드가 커밋된 뒤에만 발송한다.
+    // 재시도(idempotency REPLAY)로 mutate 가 아예 실행되지 않으면 이 값이 null 로 남아
+    // 중복 푸시도 생기지 않는다.
+    // 지역 변수 대신 박스에 담는다 — 클로저 안에서만 대입하면 TS 가 바깥 읽기 지점을
+    // `null` 로 좁혀 버려(제어흐름 분석은 콜백 실행을 모른다) 사용이 불가능해진다.
+    const push: { plan: IdentityAttestPushPlan | null } = { plan: null };
+    const result = await this.withParticipantCommand(
       {
         gameId,
         action: 'identity_link_request',
@@ -3907,11 +3923,19 @@ export class GamesService {
         // 승인 자격자에게 인앱 알림 (attest UI C안) — 같은 tx 라 신청 커밋 = 알림 존재.
         // businessKey 멱등이라 커맨드 재시도에도 재알림하지 않는다. 발송 정책·순환
         // 회피 이유는 identity-attest-notification.ts 헤더 참조.
-        await writeIdentityAttestRequestNotifications(tx, {
+        push.plan = await writeIdentityAttestRequestNotifications(tx, {
           gameId,
           participantId,
           requestId,
           requesterUserId: user.id,
+        });
+        // 24시간 뒤 만료를 확정하는 예약 잡 — 아무도 확인하지 않아도 요청이 원장에서
+        // 종결되고 신청자가 통보를 받는다(identity-link-expiry.service.ts).
+        await scheduleIdentityLinkExpiry(tx, {
+          gameId,
+          participantId,
+          requestId,
+          requestedAt: created.effectiveAt,
         });
         const updated = await tx.v1Game.update({
           where: { id: gameId },
@@ -3939,6 +3963,24 @@ export class GamesService {
         return response;
       },
     );
+
+    // 커밋 뒤 best-effort 푸시. 실패해도 이미 커밋된 인앱 알림은 그대로 남고, 신청
+    // 응답에도 영향을 주지 않는다.
+    const plan = push.plan;
+    if (plan !== null && this.webPush !== undefined) {
+      for (const recipientUserId of plan.recipients) {
+        void this.webPush
+          .sendToUser(recipientUserId, {
+            title: plan.title,
+            body: plan.body,
+            url: plan.url ?? undefined,
+          })
+          .catch(() => {
+            // best-effort
+          });
+      }
+    }
+    return result;
   }
 
   async attestIdentityLink(

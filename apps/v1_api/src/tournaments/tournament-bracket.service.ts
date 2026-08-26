@@ -48,6 +48,10 @@ import {
   type TournamentFixtureLegacyResult,
 } from './tournament-fixture-official-result';
 import {
+  describeFixtureDeleteBlockers,
+  restrictedFixtureDeleteBlockers,
+} from './league-fixture-generator.service';
+import {
   fairPlayByRegistrationFromGroups,
   recalculateAndUpsertGroupStandings,
 } from './tournament-group-standings';
@@ -650,15 +654,28 @@ export class TournamentBracketService {
     return this.serializeFixture(updated);
   }
 
-  /** 경기 삭제. 결과가 있으면 먼저 결과 삭제를 요구한다(409). 영상은 경기와 함께 삭제(cascade). */
+  /**
+   * 경기 삭제. 결과가 있으면 먼저 결과 삭제를 요구한다(409). 영상은 경기와 함께 삭제(cascade).
+   *
+   * **경기(`V1Game`)·운영 감사 기록·스태프 배정이 붙은 대진은 지울 수 없다.** 셋 다
+   * `onDelete: Restrict` 이고, 그중 감사 기록은 append-only 트리거까지 걸려 있어 어떤 순서로도
+   * 떼어낼 수 없다(근거는 `league-fixture-generator.service.ts` 상단 주석). 예전에는 이 경우
+   * `delete()` 가 그대로 FK 위반을 던져 운영자가 원인 없는 500 을 봤다 — 대회 경기는 이제
+   * 만들어질 때 항상 게임과 `GAME_CREATED` 감사를 동반하므로 흔한 경로다. 무엇이 막고 있는지
+   * 이름을 붙여 409 로 돌려준다.
+   */
   async deleteFixture(user: V1AuthUser, fixtureId: string) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const fixture = await this.prisma.v1TournamentFixture.findUnique({
       where: { id: fixtureId },
-      include: {
-        game: { select: { currentOfficialRevision: { select: { state: true } } } },
+      select: {
+        round: true,
+        fixtureNumber: true,
+        legNumber: true,
+        game: { select: { id: true, currentOfficialRevision: { select: { state: true } } } },
         // R3 §4-3단계 한시적 레거시 폴백 입력 — updateFixture()와 동일한 이유. §4-4단계에서 제거.
         result: { select: { id: true } },
+        _count: { select: { operationAudits: true, staffScopes: true } },
       },
     });
     if (!fixture) {
@@ -672,8 +689,34 @@ export class TournamentBracketService {
         message: '결과가 기록된 경기예요. 결과를 먼저 삭제해 주세요.',
       });
     }
+    const blockers = restrictedFixtureDeleteBlockers(fixture);
+    if (blockers.length > 0) {
+      throw new ConflictException({
+        code: 'FIXTURE_NOT_DELETABLE',
+        message:
+          `${describeFixtureDeleteBlockers(blockers)}이 남아 있어 이 경기를 지울 수 없어요. ` +
+          '팀이나 일시를 바꾸려면 "수정" 을 이용해주세요.',
+        details: { reasons: blockers },
+      });
+    }
     await this.prisma.$transaction(async (tx) => {
-      await tx.v1TournamentFixture.delete({ where: { id: fixtureId } });
+      // 위 판정과 이 삭제 사이에 다른 요청이 경기를 붙일 수 있다. where 에 전제를 다시 적어
+      // (CAS) 그런 경우 0건이 지워지게 하고, 0건이면 롤백한다 — 그대로 delete() 를 부르면
+      // 같은 상황이 매핑 없는 FK 위반 500 이 된다.
+      const deleted = await tx.v1TournamentFixture.deleteMany({
+        where: {
+          id: fixtureId,
+          game: { is: null },
+          operationAudits: { none: {} },
+          staffScopes: { none: {} },
+        },
+      });
+      if (deleted.count !== 1) {
+        throw new ConflictException({
+          code: 'FIXTURE_NOT_DELETABLE',
+          message: '다른 요청이 방금 이 경기를 바꿨어요. 새로고침한 뒤 다시 시도해주세요.',
+        });
+      }
       await this.adminContext.logAdminAction(
         admin,
         {

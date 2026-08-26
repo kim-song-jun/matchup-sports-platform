@@ -32,6 +32,73 @@ import {
 } from './tournament-detail-shared';
 
 
+/**
+ * 서버가 `LEAGUE_FIXTURES_ALREADY_EXIST`(409) 와 함께 주는 사전 영향 요약. 이 숫자들을 보고
+ * 운영자가 "교체" 를 누를지 결정한다 — API 계약은
+ * `apps/v1_api/src/tournaments/league-fixture-generator.service.ts` 의
+ * `LeagueFixtureReplaceImpact`.
+ */
+interface LeagueReplaceImpact {
+  existingFixtureCount: number;
+  fixturesWithResultCount: number;
+  blockedFixtureCount: number;
+  replaceable: boolean;
+}
+
+function readCount(source: Record<string, unknown>, key: string): number {
+  const value = source[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+
+/**
+ * 교체 확인 문구를 만든다. **무엇이 사라지는지 숫자로** 말해야 한다 — 자동 생성 한 번이
+ * 8팀 조 2회전이면 대진 56개를 만들고, 교체는 그걸 전부 지운다.
+ *
+ * 막힌 이유는 개수까지만 말한다. 어느 대진이 왜 막혔는지는 서버가 실제 교체 요청에 대한
+ * 응답 message 로 이름까지 붙여 주므로(`LEAGUE_FIXTURES_NOT_DELETABLE`), 같은 문구를 여기서
+ * 다시 조립하지 않는다.
+ *
+ * `details` 가 없거나 모양이 다르면(구버전 서버·프록시가 본문을 잘라낸 경우) 숫자를 지어내지
+ * 않는다. 대신 숫자 없는 문구로 확인만 받는다 — 0개라고 잘못 말하면 운영자가 안심하고 누른다.
+ */
+export function describeLeagueReplace(details: unknown): { replaceable: boolean; message: string } {
+  if (details === null || typeof details !== 'object' || Array.isArray(details)) {
+    return {
+      replaceable: true,
+      message: '이미 대진이 있어요. 교체하면 기존 대진이 모두 삭제돼요. 계속할까요?',
+    };
+  }
+  const source = details as Record<string, unknown>;
+  const impact: LeagueReplaceImpact = {
+    existingFixtureCount: readCount(source, 'existingFixtureCount'),
+    fixturesWithResultCount: readCount(source, 'fixturesWithResultCount'),
+    blockedFixtureCount: readCount(source, 'blockedFixtureCount'),
+    replaceable: source.replaceable !== false,
+  };
+
+  if (!impact.replaceable) {
+    const reasons: string[] = [];
+    if (impact.fixturesWithResultCount > 0) {
+      reasons.push(`결과가 확정된 경기 ${impact.fixturesWithResultCount}개`);
+    }
+    if (impact.blockedFixtureCount > 0) {
+      reasons.push(`기록이 남아 지울 수 없는 대진 ${impact.blockedFixtureCount}개`);
+    }
+    const reason = reasons.length > 0 ? reasons.join('와 ') : '지울 수 없는 대진';
+    return {
+      replaceable: false,
+      message: `${reason}가 있어 대진을 다시 만들 수 없어요. 각 경기의 "수정" 으로 팀과 일시를 바꿔주세요.`,
+    };
+  }
+
+  return {
+    replaceable: true,
+    message:
+      `기존 대진 ${impact.existingFixtureCount}개가 모두 삭제되고 새 대진이 만들어져요. ` +
+      '삭제한 대진은 되돌릴 수 없어요. 계속할까요?',
+  };
+}
+
 // ── Tab: Bracket ──────────────────────────────────────────────────────────
 
 export function BracketTab({
@@ -299,17 +366,26 @@ export function BracketTab({
       }
     } catch (err) {
       if (err instanceof V1ApiError && err.code === 'LEAGUE_FIXTURES_ALREADY_EXIST') {
+        const prompt = describeLeagueReplace(err.details);
+        // 교체할 수 없는 조에는 확인 모달을 띄우지 않는다. 예전에는 "교체할까요?" 에 예라고
+        // 답한 운영자를 곧바로 409 토스트로 떨어뜨렸다 — 물어보고 나서 거절하는 흐름이었다.
+        if (!prompt.replaceable) {
+          showToast(prompt.message, 'error');
+          return;
+        }
         const ok = await confirmModal({
           title: '대진 교체',
-          message: '이미 대진이 있어요. 교체할까요?',
+          message: prompt.message,
           confirmLabel: '교체',
           tone: 'danger',
         });
         if (ok) await handleGenerateLeagueFixtures(true);
         return;
       }
-      // LEAGUE_MIN_MATCHES_NOT_MET 등 그 외 코드는 서버 message 를 그대로 노출한다
-      // (message 에 이미 필요한 회전 수 안내가 포함돼 있다).
+      // LEAGUE_MIN_MATCHES_NOT_MET·LEAGUE_FIXTURES_NOT_DELETABLE·
+      // LEAGUE_FIXTURES_GENERATION_TIMEOUT·LEAGUE_REGISTRATION_NOT_CONFIRMED 등 그 외 코드는
+      // 서버 message 를 그대로 노출한다 — 필요한 회전 수·막힌 대진 번호·문제 팀 이름이 이미
+      // message 에 들어 있고, 여기서 다시 조립하면 두 문구가 갈라진다.
       showToast(extractErrorMessage(err, '자동 생성에 실패했어요.'), 'error');
     } finally {
       setIsGeneratingLeague(false);
@@ -577,19 +653,23 @@ export function BracketTab({
               {
                 key: 'fixtureNumber',
                 header: '번호',
-                width: 'w-[64px]',
+                width: 'w-[80px]',
                 align: 'center',
                 render: (f) => <span className="tabular-nums text-[var(--text-muted)]">{f.fixtureNumber}</span>,
               },
               {
                 key: 'homeTeamName',
                 header: '홈',
-                render: (f) => <span className="font-medium text-[var(--text-strong)] break-keep">{f.homeTeamName ?? '—'}</span>,
+                render: (f) => (
+                  <span className="font-medium text-[var(--text-strong)] break-keep">{f.homeTeamName ?? '—'}</span>
+                ),
               },
               {
                 key: 'awayTeamName',
                 header: '어웨이',
-                render: (f) => <span className="font-medium text-[var(--text-strong)] break-keep">{f.awayTeamName ?? '—'}</span>,
+                render: (f) => (
+                  <span className="font-medium text-[var(--text-strong)] break-keep">{f.awayTeamName ?? '—'}</span>
+                ),
               },
               {
                 key: 'result',
@@ -664,6 +744,11 @@ export function BracketTab({
                     {resultConsoleLabel}
                     <ChevronRight size={12} aria-hidden="true" />
                   </Link>
+                  {/* 경기 기록·운영 감사 기록이 붙은 대진은 스키마상 지울 수 없다. 여기서는
+                      그 사실을 미리 알 수 없으므로(대진 목록 응답에 게임 유무가 없다) 버튼은
+                      그대로 두고, 서버가 409 FIXTURE_NOT_DELETABLE 로 **무엇이 막는지** 알려
+                      주면 그 문구를 아래 onError 가 토스트로 그대로 보여 준다. 예전에는 같은
+                      클릭이 매핑 없는 500("서버 오류")으로 끝났다. */}
                   {!f.result && (
                     <button
                       type="button"

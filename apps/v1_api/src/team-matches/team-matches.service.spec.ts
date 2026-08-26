@@ -1176,6 +1176,209 @@ describe('TeamMatchesService', () => {
     expect(prisma.v1TeamMatchApplication.create).not.toHaveBeenCalled();
   });
 
+  // ─── C2 후속 — 서버 중복 신청 가드 ──────────────────────────────────────────
+  //
+  // 화면(team-matches-client.tsx)의 '신청 취소' 버튼이 다른 팀으로 **새 신청**을 보내던 결함은
+  // 프론트에서 막았지만, 서버에는 그 결과물("한 사용자가 같은 팀매치에 살아 있는 신청서 2건")을
+  // 막는 가드가 없어 옛 번들·직접 호출·경합으로 그대로 다시 생길 수 있었다. 유령 신청서가 생기면
+  // 호스트가 그쪽을 승인하는 순간 approveApplication 이 진짜 신청을 자동 거절해, 사용자가 신청한
+  // 적 없는 팀이 상대팀으로 확정된다.
+  //
+  // 판정 단위는 **팀**이다 — unique 제약도 신청·철회 권한도 팀 단위다. 그래서 같은 팀 중복은
+  // 기존 어휘(ALREADY_REQUESTED)로 수렴시키고, DB 가 못 막는 "같은 사용자 × 다른 팀"만 새 코드로
+  // 막는다. 아래 전 케이스에서 화면용 include(applications)는 비워 둔다 — 중복 판정이 그 목록에
+  // 기대면(사용자 필터가 걸려 있다) 같은 팀의 다른 매니저가 낸 신청서를 놓치기 때문이다.
+  describe('createApplication: 중복 신청 가드', () => {
+    beforeEach(() => {
+      prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-applicant' });
+      prisma.v1TeamMatch.findFirst.mockResolvedValue({
+        ...teamMatchRow({ status: 'recruiting', startAt: FUTURE, hostTeamId: 'team-host' }),
+        sport: { id: 'sport-1', name: '풋살' },
+        region: { id: 'region-1', name: '서울' },
+        minSportLevel: null,
+        maxSportLevel: null,
+        hostTeam: { id: 'team-host', memberships: [], trustScore: null },
+        approvedApplicantTeam: null,
+        applications: [],
+      });
+      prisma.v1StatusChangeLog.create.mockResolvedValue({});
+      prisma.v1TeamMatchApplication.updateMany.mockResolvedValue({ count: 1 });
+      prisma.v1TeamMatchApplication.create.mockImplementation(
+        ({ data }: { data: Record<string, unknown> }) => Promise.resolve({ id: 'app-new', ...data }),
+      );
+    });
+
+    it('같은 사용자가 다른 팀으로 신청 중이면 두 번째 신청을 만들지 않는다', async () => {
+      prisma.v1TeamMatchApplication.findMany.mockResolvedValue([
+        applicationRow({ id: 'app-alpha', applicantTeamId: 'team-alpha', appliedByUserId: manager.id, status: 'requested' }),
+      ]);
+
+      await expect(
+        service.createApplication(manager, 'tm-1', { applicantTeamId: 'team-bravo' }),
+      ).rejects.toMatchObject({ response: { code: 'ALREADY_REQUESTED_WITH_ANOTHER_TEAM' } });
+      expect(prisma.v1TeamMatchApplication.create).not.toHaveBeenCalled();
+    });
+
+    it('같은 팀의 다른 매니저가 이미 신청했으면 unique 위반이 아니라 409 ALREADY_REQUESTED 로 수렴한다', async () => {
+      // 이 행은 화면용 include 에는 안 보인다(appliedByUserId 가 내가 아니다). 종전 코드는 못 보고
+      // create() 로 직행해 @@unique([teamMatchId, applicantTeamId]) 를 때렸고, 이 저장소엔 전역
+      // P2002 필터가 없어 raw 500 이 됐다.
+      prisma.v1TeamMatchApplication.findMany.mockResolvedValue([
+        applicationRow({ id: 'app-peer', applicantTeamId: 'team-applicant', appliedByUserId: 'peer-manager', status: 'requested' }),
+      ]);
+
+      await expect(
+        service.createApplication(manager, 'tm-1', { applicantTeamId: 'team-applicant' }),
+      ).rejects.toMatchObject({ response: { code: 'ALREADY_REQUESTED' } });
+      expect(prisma.v1TeamMatchApplication.create).not.toHaveBeenCalled();
+    });
+
+    it('철회한 신청서는 자리를 차지하지 않는다 — 다른 팀으로 다시 신청할 수 있다', async () => {
+      prisma.v1TeamMatchApplication.findMany.mockResolvedValue([
+        applicationRow({ id: 'app-alpha', applicantTeamId: 'team-alpha', appliedByUserId: manager.id, status: 'withdrawn' }),
+      ]);
+
+      const result = await service.createApplication(manager, 'tm-1', { applicantTeamId: 'team-bravo' });
+
+      expect(result.status).toBe('requested');
+      expect(prisma.v1TeamMatchApplication.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ applicantTeamId: 'team-bravo', appliedByUserId: manager.id }),
+        }),
+      );
+    });
+
+    it('같은 팀의 철회된 신청서는 새로 만들지 않고 그 행을 되살린다(다른 매니저가 철회했어도)', async () => {
+      prisma.v1TeamMatchApplication.findMany.mockResolvedValue([
+        applicationRow({ id: 'app-peer', applicantTeamId: 'team-applicant', appliedByUserId: 'peer-manager', status: 'withdrawn' }),
+      ]);
+
+      const result = await service.createApplication(manager, 'tm-1', { applicantTeamId: 'team-applicant' });
+
+      expect(result).toMatchObject({ applicationId: 'app-peer', status: 'requested' });
+      expect(prisma.v1TeamMatchApplication.create).not.toHaveBeenCalled();
+      expect(prisma.v1TeamMatchApplication.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'app-peer', status: 'withdrawn' } }),
+      );
+    });
+
+    it('선행 판정 이후 경합 상대가 신청서를 만들면 잠금 뒤 재판정에서 걸러낸다', async () => {
+      // 1회차(트랜잭션 진입 전) 원장은 비어 있고, 2회차(팀매치 행 잠금 이후)에 경합 상대의
+      // 신청서가 보인다 — 종전 코드는 진입 전 판정만 믿고 그대로 create() 했다.
+      prisma.v1TeamMatchApplication.findMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          applicationRow({ id: 'app-race', applicantTeamId: 'team-applicant', appliedByUserId: 'peer-manager', status: 'requested' }),
+        ]);
+
+      await expect(
+        service.createApplication(manager, 'tm-1', { applicantTeamId: 'team-applicant' }),
+      ).rejects.toMatchObject({ response: { code: 'ALREADY_REQUESTED' } });
+      expect(prisma.v1TeamMatchApplication.create).not.toHaveBeenCalled();
+      // 재판정이 의미를 가지려면 그 사이 다른 요청이 끼어들지 못해야 한다 — 같은 팀매치 행을
+      // FOR UPDATE 로 잠근 뒤 다시 읽는 것이 그 보장이다(approveApplication 과 같은 행·같은 순서라
+      // 두 경로가 교차 교착에 빠지지 않는다). 사용자 단위 중복은 unique 제약이 팀 단위라 DB 가
+      // 막아주지 못하므로, 이 직렬화가 유일한 방어다.
+      const lockedStatements = prisma.$queryRaw.mock.calls.map((call) => (call[0] as string[]).join(' ')).join('\n');
+      expect(lockedStatements).toContain('v1_team_matches');
+      expect(lockedStatements).toContain('FOR UPDATE');
+    });
+  });
+
+  // ─── 자격 판정과 생성 가드는 같은 사실을 본다 ───────────────────────────────────
+  //
+  // 위 가드가 409 로 막는 조합을 applicationEligibility 가 eligible:true 로 내려주면, 화면에는
+  // 누를 수 있는데 **반드시 실패하는** 버튼이 남는다(막다른 길). 종전에 정확히 그랬다 — 자격
+  // 판정은 화면용 include(applications: `OR:[{status:'approved'},{appliedByUserId: 나}]`)를 쓰고
+  // 가드는 신청 원장을 써서 근거가 갈렸다. 아래 테스트는 문구가 아니라 **두 경로의 결론이
+  // 같은가**를 잡는다 — 한쪽만 되돌리면 그 자리에서 깨진다.
+  describe('applicationEligibility: 생성 가드와 같은 결론을 낸다', () => {
+    beforeEach(() => {
+      prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-applicant' });
+      prisma.v1TeamMatch.findFirst.mockResolvedValue({
+        ...teamMatchRow({ status: 'recruiting', startAt: FUTURE, hostTeamId: 'team-host' }),
+        sport: { id: 'sport-1', name: '풋살' },
+        region: { id: 'region-1', name: '서울' },
+        minSportLevel: null,
+        maxSportLevel: null,
+        hostTeam: { id: 'team-host', memberships: [], trustScore: null },
+        approvedApplicantTeam: null,
+        // 화면용 include 는 비워 둔다 — 자격 판정이 여기에 기대고 있으면(사용자 필터가 걸려
+        // 있어 동료의 신청서가 안 보인다) 아래 단언이 옛 결론(eligible:true)으로 깨진다.
+        applications: [],
+      });
+      prisma.v1StatusChangeLog.create.mockResolvedValue({});
+      prisma.v1TeamMatchApplication.updateMany.mockResolvedValue({ count: 1 });
+      prisma.v1TeamMatchApplication.create.mockImplementation(
+        ({ data }: { data: Record<string, unknown> }) => Promise.resolve({ id: 'app-new', ...data }),
+      );
+    });
+
+    it('같은 팀의 다른 매니저가 신청 중이면 신청 불가로 내려주고, 그 신청서 id 도 함께 준다', async () => {
+      prisma.v1Team.findMany.mockResolvedValue([
+        { id: 'team-applicant', name: '신청팀', memberships: [{ role: 'manager' }] },
+      ]);
+      prisma.v1TeamMatchApplication.findMany.mockResolvedValue([
+        applicationRow({ id: 'app-peer', applicantTeamId: 'team-applicant', appliedByUserId: 'peer-manager', status: 'requested' }),
+      ]);
+
+      const eligibility = await service.applicationEligibility(manager, 'tm-1', {});
+
+      expect(eligibility.teams[0]).toMatchObject({
+        teamId: 'team-applicant',
+        eligible: false,
+        reasonCode: 'ALREADY_REQUESTED',
+        // 같은 팀 신청서는 이 팀 매니저 누구나 철회할 수 있다 — id 를 줘야 화면이
+        // '신청 취소' 로 빠져나갈 길을 만든다. null 이면 다시 막다른 길이다.
+        applicationId: 'app-peer',
+      });
+
+      // 그리고 실제로 눌렀을 때의 결론과 같아야 한다.
+      await expect(
+        service.createApplication(manager, 'tm-1', { applicantTeamId: 'team-applicant' }),
+      ).rejects.toMatchObject({ response: { code: 'ALREADY_REQUESTED' } });
+    });
+
+    it('내가 다른 팀으로 신청 중이면 나머지 관리 팀도 신청 불가로 내려준다', async () => {
+      prisma.v1Team.findMany.mockResolvedValue([
+        { id: 'team-alpha', name: '알파', memberships: [{ role: 'owner' }] },
+        { id: 'team-bravo', name: '브라보', memberships: [{ role: 'manager' }] },
+      ]);
+      prisma.v1TeamMatchApplication.findMany.mockResolvedValue([
+        applicationRow({ id: 'app-alpha', applicantTeamId: 'team-alpha', appliedByUserId: manager.id, status: 'requested' }),
+      ]);
+
+      const eligibility = await service.applicationEligibility(manager, 'tm-1', {});
+
+      expect(eligibility.teams).toMatchObject([
+        { teamId: 'team-alpha', eligible: false, reasonCode: 'ALREADY_REQUESTED', applicationId: 'app-alpha' },
+        { teamId: 'team-bravo', eligible: false, reasonCode: 'ALREADY_REQUESTED_WITH_ANOTHER_TEAM' },
+      ]);
+
+      await expect(
+        service.createApplication(manager, 'tm-1', { applicantTeamId: 'team-bravo' }),
+      ).rejects.toMatchObject({ response: { code: 'ALREADY_REQUESTED_WITH_ANOTHER_TEAM' } });
+    });
+
+    it('철회된 신청서는 자격을 막지 않는다 — 가드도 통과시키므로 자격도 통과시켜야 한다', async () => {
+      // 반대 방향 회귀 가드. 원장을 보게 됐다고 죽은 신청서(withdrawn/rejected)까지 막으면
+      // 정당한 재신청이 화면에서 사라진다 — 가드는 통과시키는데 화면만 잠기는 반대편 갈림이다.
+      prisma.v1Team.findMany.mockResolvedValue([
+        { id: 'team-applicant', name: '신청팀', memberships: [{ role: 'manager' }] },
+      ]);
+      prisma.v1TeamMatchApplication.findMany.mockResolvedValue([
+        applicationRow({ id: 'app-peer', applicantTeamId: 'team-applicant', appliedByUserId: 'peer-manager', status: 'withdrawn' }),
+      ]);
+
+      const eligibility = await service.applicationEligibility(manager, 'tm-1', {});
+
+      expect(eligibility.teams[0]).toMatchObject({ teamId: 'team-applicant', eligible: true, reasonCode: 'OK' });
+
+      const created = await service.createApplication(manager, 'tm-1', { applicantTeamId: 'team-applicant' });
+      expect(created.status).toBe('requested');
+    });
+  });
+
   it('withdrawApplication: 승인과 경쟁해 requested 전이가 실패하면 취소 성공으로 보고하지 않는다', async () => {
     prisma.v1TeamMatchApplication.findFirst.mockResolvedValue(applicationWithTeamMatch());
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });

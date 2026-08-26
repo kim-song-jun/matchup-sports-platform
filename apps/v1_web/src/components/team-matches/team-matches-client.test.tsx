@@ -9,15 +9,27 @@ vi.mock('@/lib/analytics', () => ({ trackEvent: vi.fn() }));
 
 const {
   applyTeamMatchMutateAsync,
+  withdrawTeamMatchMutateAsync,
+  useV1WithdrawTeamMatchApplicationMock,
   routerPush,
   useV1TeamMatchMock,
   useV1TeamMatchEligibilityMock,
-} = vi.hoisted(() => ({
-  applyTeamMatchMutateAsync: vi.fn(),
-  routerPush: vi.fn(),
-  useV1TeamMatchMock: vi.fn(),
-  useV1TeamMatchEligibilityMock: vi.fn(),
-}));
+} = vi.hoisted(() => {
+  const withdrawTeamMatchMutateAsync = vi.fn();
+  return {
+    applyTeamMatchMutateAsync: vi.fn(),
+    withdrawTeamMatchMutateAsync,
+    // 철회 훅은 applicationId를 **훅 생성 시점 인자**로 받는다(use-v1-api.ts) — 그래서 "어떤
+    // 신청서를 철회하는지"는 mutateAsync 인자가 아니라 이 호출 인자로만 확인할 수 있다.
+    useV1WithdrawTeamMatchApplicationMock: vi.fn(() => ({
+      mutateAsync: withdrawTeamMatchMutateAsync,
+      isPending: false,
+    })),
+    routerPush: vi.fn(),
+    useV1TeamMatchMock: vi.fn(),
+    useV1TeamMatchEligibilityMock: vi.fn(),
+  };
+});
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: routerPush }),
@@ -37,7 +49,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1ReopenTeamMatch: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useV1CancelTeamMatch: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useV1ResolveChatRoom: () => ({ mutate: vi.fn(), isPending: false }),
-  useV1WithdrawTeamMatchApplication: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useV1WithdrawTeamMatchApplication: useV1WithdrawTeamMatchApplicationMock,
 }));
 
 vi.mock('./team-matches-page', () => ({
@@ -609,5 +621,93 @@ describe('TeamMatchDetailPageClient — 리그 대진은 "팀매치 취소"를 �
 
     const actions = (screen.getByTestId('team-match-host-actions').textContent ?? '').split(',').filter(Boolean);
     expect(actions).toContain('팀매치 취소');
+  });
+});
+
+// C2 회귀 — 히어로 CTA의 **라벨과 액션이 서로 다른 값을 근거로 삼던** 결함.
+// 라벨은 viewerState(='requested')를 보고 '신청 취소'라고 적었는데, 액션은
+// `teams.find(t => t.eligible)`로 고른 팀을 봤다. 내가 신청한 팀은 ALREADY_REQUESTED라
+// eligible=false이므로 **절대 선택되지 않고**, 팀을 2개 이상 관리하는 사용자에게는 그 자리에
+// 다른 팀이 들어왔다. 그 결과 '신청 취소'를 누르면 철회 대신 **다른 팀으로 새 신청**이 나가고
+// (호스트가 그걸 승인하면 내 진짜 신청은 자동 거절되고 신청한 적 없는 팀이 상대팀이 된다),
+// 화면은 '신청을 취소했어요.'라고 알렸다.
+describe('TeamMatchDetailPageClient — 신청 중인 뷰어의 히어로 CTA는 새 신청을 보내지 않는다', () => {
+  function mockRequestedViewer(teams: Array<{
+    teamId: string;
+    name: string;
+    role: string;
+    eligible: boolean;
+    reasonCode: string;
+    applicationId: string | null;
+  }>) {
+    useV1TeamMatchMock.mockReturnValue({
+      data: {
+        id: 'team-match-1',
+        teamMatchId: 'team-match-1',
+        title: '풋살 팀매치',
+        sportName: '풋살',
+        sport: { sportId: 'sport-futsal', name: '풋살' },
+        placeName: '서울 풋살장',
+        startsAt: '2026-09-01T10:00:00.000Z',
+        capacityText: '1/2',
+        status: 'recruiting',
+        displayState: 'recruiting',
+        // 서버는 "신청서를 낸 사람"에게만 'requested'를 준다(team-matches.service.ts
+        // getViewerState) — 즉 이 뷰어에게는 살아 있는 신청서가 정확히 하나 있다.
+        viewer: { state: 'requested', manageableHostTeam: false },
+        hostTeam: { teamId: 'team-host', name: '호스트 팀' },
+      },
+      isError: false,
+    });
+    useV1TeamMatchEligibilityMock.mockReturnValue({
+      data: { teamMatchId: 'team-match-1', requiresApproval: true, requiresPayment: false, teams },
+      isSuccess: true,
+    });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    applyTeamMatchMutateAsync.mockResolvedValue({ applicationId: 'app-new' });
+    withdrawTeamMatchMutateAsync.mockResolvedValue({ applicationId: 'app-alpha' });
+  });
+
+  it('A팀으로 신청한 뒤 B팀도 관리 중이면, CTA는 B팀 신규 신청이 아니라 A팀 신청 철회를 실행한다', () => {
+    // eligibility는 createdAt desc라 최근에 만든 B팀이 앞에 온다 — 결함 당시 `find(t => t.eligible)`가
+    // 정확히 이 B를 골랐다.
+    mockRequestedViewer([
+      { teamId: 'team-bravo', name: '브라보FC', role: 'owner', eligible: true, reasonCode: 'OK', applicationId: null },
+      { teamId: 'team-alpha', name: '알파FC', role: 'owner', eligible: false, reasonCode: 'ALREADY_REQUESTED', applicationId: 'app-alpha' },
+    ]);
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '상대팀 신청' }));
+
+    // 결함의 핵심: 여기서 B팀(브라보FC) 신규 신청이 나갔다.
+    expect(applyTeamMatchMutateAsync).not.toHaveBeenCalled();
+    expect(withdrawTeamMatchMutateAsync).toHaveBeenCalledTimes(1);
+    // 철회 대상은 A팀의 신청서다 — 훅 생성 인자로만 확인할 수 있다.
+    expect(useV1WithdrawTeamMatchApplicationMock).toHaveBeenCalledWith('team-match-1', 'app-alpha');
+    // 라벨과 액션이 같은 팀을 가리켜야 한다 — 취소 CTA는 철회할 팀(알파FC)을 이름으로 밝힌다.
+    expect(screen.getByTestId('team-match-apply-label')).toHaveTextContent('알파FC');
+  });
+
+  it('철회할 신청서를 찾을 수 없으면 CTA를 비활성화하고, 다른 팀으로 신청하지 않는다', () => {
+    // 신청 당시 팀에서 운영진 자격을 잃으면 그 팀은 eligibility 목록에서 통째로 빠진다
+    // (getUserManageableTeams는 owner/manager 멤버십만 본다) — 그래도 내 신청서는 살아 있어
+    // viewerState는 'requested'다. 이때 남은 B팀으로 신청이 나가면 안 된다.
+    mockRequestedViewer([
+      { teamId: 'team-bravo', name: '브라보FC', role: 'owner', eligible: true, reasonCode: 'OK', applicationId: null },
+    ]);
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    expect(screen.queryByRole('button', { name: '상대팀 신청' })).not.toBeInTheDocument();
+    // 라벨도 남은 팀(브라보FC)을 가리키면 안 되고, 아무 일도 못 하는 버튼에 '신청 취소'라고
+    // 적어두면 "여기서 취소된다"는 거짓 안내가 된다 — 왜 못 하는지를 알려야 한다.
+    const label = screen.getByTestId('team-match-apply-label');
+    expect(label).not.toHaveTextContent('브라보FC');
+    expect(label).not.toHaveTextContent('신청 취소');
+    expect(label.textContent?.trim()).toBeTruthy();
   });
 });

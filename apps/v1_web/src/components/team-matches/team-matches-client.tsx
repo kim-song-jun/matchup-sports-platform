@@ -202,7 +202,18 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
   const [actionError, setActionError] = useState<string | null>(null);
   const resolveChatRoom = useV1ResolveChatRoom();
   const autoResolvedChatRef = useRef<string | null>(null);
-  const selectedEligibility = eligibility.data?.teams.find((team) => team.eligible) ?? eligibility.data?.teams[0] ?? null;
+  // 히어로 CTA의 라벨·철회 대상·액션이 함께 나오는 **단일 근거**. 우선순위 자체가 규칙이다.
+  // ① 내 신청서가 살아 있는 팀 — 이 팀은 ALREADY_REQUESTED라 항상 eligible=false다.
+  //    종전엔 `find(t => t.eligible)`만 봐서 이 팀이 절대 선택될 수 없었고, 그래서 팀을 2개 이상
+  //    관리하는 사용자에게는 라벨(viewerState='requested' → '신청 취소')과 액션(다른 팀)이 서로
+  //    다른 팀을 가리켰다 — '신청 취소'를 누르면 고른 적 없는 팀으로 **새 신청**이 나갔다.
+  // ② 신청 가능한 팀 — 신청 CTA의 대상.
+  // ③ 둘 다 없으면 첫 팀 — 신청할 수 없는 사유(reasonLabel)를 보여주기 위한 자리다.
+  const selectedEligibility =
+    eligibility.data?.teams.find((team) => team.applicationId && team.reasonCode === 'ALREADY_REQUESTED')
+    ?? eligibility.data?.teams.find((team) => team.eligible)
+    ?? eligibility.data?.teams[0]
+    ?? null;
   // 팀이 없는 경우: eligibility 로드 완료 후 teams 배열이 비어 있으면 소속 팀 없음 (#13)
   const hasNoTeam = !isGuest && eligibility.isSuccess && eligibility.data.teams.length === 0;
   const withdrawTeamMatch = useV1WithdrawTeamMatchApplication(teamMatchId, selectedEligibility?.applicationId);
@@ -263,7 +274,7 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
           ),
         },
         mode: toDetailMode(viewerState, getStatus(query.data)),
-        applyLabel: applyLabel(viewerState, getStatus(query.data), selectedEligibility, isGuest, hasNoTeam),
+        applyLabel: applyLabel(viewerState, getStatus(query.data), selectedEligibility, isGuest, hasNoTeam, eligibility.isSuccess),
         applyPending: applyTeamMatch.isPending || withdrawTeamMatch.isPending,
         hostActions: canManageHostTeam
           ? buildHostActions({
@@ -540,9 +551,20 @@ function applyLabel(
   team?: { eligible: boolean; reasonCode: string; applicationId: string | null; name: string } | null,
   isGuest?: boolean,
   hasNoTeam?: boolean,
+  /** eligibility 응답 도착 여부. 도착 전에는 "철회 대상을 못 찾았다"고 단정할 수 없다. */
+  eligibilityLoaded?: boolean,
 ) {
   if (viewerState === 'host_team') return '매치 관리';
-  if (viewerState === 'requested' || team?.reasonCode === 'ALREADY_REQUESTED') return '신청 취소';
+  if (viewerState === 'requested' || team?.reasonCode === 'ALREADY_REQUESTED') {
+    // 라벨과 액션은 같은 `team`에서 나와야 한다(getApplyAction도 이 팀의 applicationId를 쓴다).
+    // 여러 팀을 관리하는 사용자에게 "어느 팀 신청을 취소하는지"를 밝혀야 신청 CTA
+    // (`${팀명}으로 신청`)와 대칭이 맞고, 라벨·액션이 갈렸는지도 화면에서 바로 드러난다.
+    if (team?.applicationId) return `${team.name} 신청 취소`;
+    // 철회 대상을 못 찾은 경우(예: 신청 당시 팀에서 운영진 자격을 잃어 eligibility 목록에서
+    // 빠짐) 이 CTA는 아무것도 못 한다 — 비활성 버튼에 '신청 취소'라고 적어두면 "여기서
+    // 취소된다"는 거짓 안내가 된다. 응답이 아직 안 왔으면 기존 문구를 유지해 깜빡임을 막는다.
+    return eligibilityLoaded ? '팀 운영진만 취소할 수 있어요' : '신청 취소';
+  }
   if (viewerState === 'approved') return '승인 완료';
   if (status !== 'recruiting') return '신청 불가';
   // 비인증 사용자: 로그인 유도 (#13)
@@ -724,7 +746,13 @@ function getApplyAction({
   reasonCode?: string;
   redirectTo: (href: string) => void;
 }): (() => Promise<unknown>) | undefined {
-  if ((viewerState === 'requested' || reasonCode === 'ALREADY_REQUESTED') && applicationId) return withdraw;
+  // 내 신청서가 이미 살아 있으면 이 CTA가 할 수 있는 일은 '철회' 하나뿐이다. 철회 대상을 못
+  // 찾았다고 해서 아래 신청 분기로 흘려보내면 안 된다 — 종전 코드가 `&& applicationId`로 이
+  // 분기를 탈락시켰고, 그 순간 사용자가 고른 적 없는 다른 팀으로 새 신청이 나갔다(그리고
+  // 화면은 '신청을 취소했어요.'라고 알렸다). 아무것도 안 하는 쪽이 잘못된 신청보다 낫다.
+  if (viewerState === 'requested' || reasonCode === 'ALREADY_REQUESTED') {
+    return applicationId ? withdraw : undefined;
+  }
   // 이미 마감/확정/종료/취소된 매치는 신청할 게 없다 — 여기서 끊지 않으면 guest/무팀 사용자가
   // applyLabel()엔 '신청 불가'로 뜨는데 onApply는 여전히 로그인·팀만들기 리다이렉트를 반환해서
   // 파란 primary 버튼이 "신청 불가"라고 적힌 채 클릭되면 로그인 페이지로 튀는 상태였다

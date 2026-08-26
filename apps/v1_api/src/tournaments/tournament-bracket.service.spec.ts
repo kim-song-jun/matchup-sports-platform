@@ -132,6 +132,23 @@ function fixtureRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/**
+ * `deleteFixture()` 가 실제로 select 하는 모양. 기본값은 "아무것도 매달려 있지 않은 대진"이라
+ * 지울 수 있고, 테스트마다 막는 요소만 덮어쓴다. `_count` 를 빼면 삭제 가드가 스펙에서만
+ * 통하는 거짓이 된다.
+ */
+function deletableFixtureRow(overrides: Record<string, unknown> = {}) {
+  return {
+    round: 'group_a',
+    fixtureNumber: 1,
+    legNumber: 1,
+    game: null,
+    result: null,
+    _count: { operationAudits: 0, staffScopes: 0 },
+    ...overrides,
+  };
+}
+
 // R3 §4-3단계: 레거시 V1TournamentFixtureResult 대신 신규 경로
 // (V1Game.currentOfficialRevision)에서 결과를 읽는다 -- fixture.game 모양을 흉내낸다.
 function gameOfficialResultRow(overrides: Record<string, unknown> = {}) {
@@ -171,6 +188,7 @@ describe('TournamentBracketService', () => {
       findMany: jest.Mock;
       update: jest.Mock;
       delete: jest.Mock;
+      deleteMany: jest.Mock;
     };
     v1TournamentFixtureResult: { upsert: jest.Mock };
     v1TournamentFixtureVideo: { findMany: jest.Mock; deleteMany: jest.Mock; createMany: jest.Mock };
@@ -199,6 +217,7 @@ describe('TournamentBracketService', () => {
         findMany: jest.fn(),
         update: jest.fn(),
         delete: jest.fn().mockResolvedValue({}),
+        deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       v1TournamentFixtureResult: { upsert: jest.fn() },
       v1TournamentFixtureVideo: {
@@ -1044,11 +1063,9 @@ describe('TournamentBracketService', () => {
 
   it('deleteFixture: 신규 경로에 OFFICIAL 결과가 있으면 삭제가 409로 막힌다', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
-    prisma.v1TournamentFixture.findUnique.mockResolvedValue({
-      ...fixtureRow(),
-      // 실제 쿼리는 game.sides 도 함께 include 한다(팀 배정 시 사이드를 옮기기 위해) — mock 도 같은 모양을 준다.
-      game: { id: 'game-1', currentOfficialRevision: { state: 'OFFICIAL' }, sides: [] },
-    });
+    prisma.v1TournamentFixture.findUnique.mockResolvedValue(
+      deletableFixtureRow({ game: { id: 'game-1', currentOfficialRevision: { state: 'OFFICIAL' } } }),
+    );
 
     await expect(service.deleteFixture(ownerUser, 'fixture-1')).rejects.toMatchObject({
       response: { code: 'FIXTURE_HAS_RESULT' },
@@ -1070,22 +1087,55 @@ describe('TournamentBracketService', () => {
 
   it('deleteFixture: game이 없고(백필 전) 레거시 result만 있으면 삭제가 409로 막힌다', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
-    prisma.v1TournamentFixture.findUnique.mockResolvedValue({
-      ...fixtureRow(),
-      game: null,
-      result: { id: 'legacy-result-1' },
-    });
+    prisma.v1TournamentFixture.findUnique.mockResolvedValue(
+      deletableFixtureRow({ result: { id: 'legacy-result-1' } }),
+    );
 
     await expect(service.deleteFixture(ownerUser, 'fixture-1')).rejects.toMatchObject({
       response: { code: 'FIXTURE_HAS_RESULT' },
     });
   });
 
-  it('deleteFixture: 결과가 없으면(game null) 삭제된다', async () => {
+  it('deleteFixture: 아무것도 매달려 있지 않으면 삭제된다', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
-    prisma.v1TournamentFixture.findUnique.mockResolvedValue({ ...fixtureRow(), game: null });
+    prisma.v1TournamentFixture.findUnique.mockResolvedValue(deletableFixtureRow());
 
     const result = await service.deleteFixture(ownerUser, 'fixture-1');
     expect(result).toEqual({ deleted: true });
+  });
+
+  // 대회 경기는 만들어질 때 항상 게임과 GAME_CREATED 감사를 동반한다. 그 대진에 delete() 를
+  // 그대로 부르면 FK 위반(P2003)이 매핑 없이 500 으로 나가서, 운영자는 휴지통을 눌러 놓고
+  // "서버 오류" 만 본다. 무엇이 막고 있는지 이름을 붙여 409 로 돌려준다.
+  it.each([
+    ['게임이 붙은', { game: { id: 'game-1', currentOfficialRevision: null }, _count: { operationAudits: 1, staffScopes: 0 } }, '경기 기록'],
+    ['감사 기록만 남은', { _count: { operationAudits: 1, staffScopes: 0 } }, '운영 감사 기록'],
+    ['스태프가 배정된', { _count: { operationAudits: 0, staffScopes: 1 } }, '스태프 배정'],
+  ])('deleteFixture: %s 대진은 500 대신 이유를 말하는 409 로 거절한다', async (_label, overrides, reason) => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    prisma.v1TournamentFixture.findUnique.mockResolvedValue(deletableFixtureRow(overrides));
+
+    const error = await service
+      .deleteFixture(ownerUser, 'fixture-1')
+      .then(() => null)
+      .catch((err: ConflictException) => err);
+    const response = error!.getResponse() as { code: string; message: string };
+
+    expect(response.code).toBe('FIXTURE_NOT_DELETABLE');
+    expect(response.message).toContain(reason);
+    expect(prisma.v1TournamentFixture.deleteMany).not.toHaveBeenCalled();
+  });
+
+  // 판정과 DELETE 사이에 다른 요청이 경기를 붙일 수 있다. where 에 전제를 다시 적어(CAS)
+  // 0건이 지워지게 하고, 0건이면 롤백한다 — 그대로 delete() 를 부르면 같은 상황이 500 이다.
+  it('deleteFixture: 판정 직후 경기가 붙어 0건이 지워지면 감사 로그도 남기지 않고 거절한다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    prisma.v1TournamentFixture.findUnique.mockResolvedValue(deletableFixtureRow());
+    prisma.v1TournamentFixture.deleteMany.mockResolvedValue({ count: 0 });
+
+    await expect(service.deleteFixture(ownerUser, 'fixture-1')).rejects.toMatchObject({
+      response: { code: 'FIXTURE_NOT_DELETABLE' },
+    });
+    expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
   });
 });

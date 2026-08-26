@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -413,5 +413,136 @@ describe('상세 홈팀 카드·히어로 — 표기 결함 회귀(2026-08-25)',
     renderPage(<TeamMatchDetailPageView model={model} />);
 
     expect(screen.getByText('브라보FC')).toBeInTheDocument();
+  });
+});
+
+// C2 — 상세 히어로 CTA가 '신청 취소'라고 적어두고 실제로는 다른 팀으로 **새 신청**을 보내던
+// 결함의 화면 쪽 계약. 근거를 하나로 모으는 수정은 team-matches-client.tsx에서 했고, 여기서는
+// ① 실행할 액션이 없으면 버튼이 눌리지 않는다 ② 눌렀을 때의 안내가 실제로 한 일과 일치한다
+// 두 가지를 고정한다 — 둘 중 하나라도 깨지면 다시 "말과 행동이 다른 버튼"이 된다.
+describe('팀매치 상세 히어로 CTA — 안내와 실제 동작', () => {
+  it('신청 중인데 실행할 액션이 없으면 CTA가 눌리지 않는다', () => {
+    const model = getTeamMatchDetailViewModel('pending');
+    const label = '팀 운영진만 취소할 수 있어요';
+    model.applyLabel = label;
+    model.onApply = undefined;
+
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    // 모바일 고정 바 + 데스크톱 스티키 카드 두 곳에 렌더된다 — 양쪽 다 비활성이어야 한다.
+    const buttons = screen.getAllByRole('button', { name: label });
+    expect(buttons.length).toBeGreaterThan(0);
+    for (const button of buttons) expect(button).toBeDisabled();
+  });
+
+  it('신청 중인 뷰어가 CTA를 누르면 모델이 준 액션을 실행하고 "취소했다"고 알린다', async () => {
+    // 철회 mutation이 돌려주는 실제 응답 모양(V1TeamMatchApplicationResult) — 안내 문구는
+    // 이 status에서 나온다.
+    const onApply = vi.fn().mockResolvedValue({ applicationId: 'app-a', status: 'withdrawn' });
+    const model = getTeamMatchDetailViewModel('pending');
+    const label = '알파FC 신청 취소';
+    model.applyLabel = label;
+    model.onApply = onApply;
+
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    fireEvent.click(screen.getAllByRole('button', { name: label })[0]);
+
+    // runHeroAction은 액션을 마이크로태스크로 미룬다(동기 throw까지 rejection으로 잡기 위해) —
+    // 안내 문구가 뜰 때까지 기다린 뒤 실제 실행 여부를 확인한다.
+    expect(await screen.findByText('신청을 취소했어요.')).toBeInTheDocument();
+    expect(onApply).toHaveBeenCalledTimes(1);
+  });
+
+  // 유령 신청서가 남은 계정에서 실제로 도달하는 조합이다: 최신 신청서를 먼저 철회하면
+  // viewerState는 'withdrawn'(→ mode 'default')인데 더 오래된 신청서가 아직 requested라
+  // eligibility는 ALREADY_REQUESTED를 준다 → CTA는 '철회'를 실행한다. 문구를 mode에서 뽑던
+  // 종전 코드는 이 상태에서 "신청을 완료했어요."라고 알렸다(신청한 적이 없는데).
+  it('mode가 default여도 실제로 철회했으면 "취소했다"고 알린다', async () => {
+    const onApply = vi.fn().mockResolvedValue({ applicationId: 'app-a', status: 'withdrawn' });
+    const model = getTeamMatchDetailViewModel('default');
+    const label = '알파FC 신청 취소';
+    model.applyLabel = label;
+    model.onApply = onApply;
+
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    fireEvent.click(screen.getAllByRole('button', { name: label })[0]);
+
+    expect(await screen.findByText('신청을 취소했어요.')).toBeInTheDocument();
+    expect(screen.queryByText('신청을 완료했어요.')).not.toBeInTheDocument();
+  });
+
+  // D2(2026-08-27) — 위 세 테스트는 결과 객체를 **손으로** 써 넣는다. 그래서 "안내 문구는
+  // 서버가 준 status 에서 나온다"는 계약 중 절반(화면이 status 를 읽는다)만 잡히고, 나머지
+  // 절반(**훅이 실제로 그 status 를 돌려준다**)은 어디서도 안 잡혔다 — 상세 클라이언트 스위트는
+  // './team-matches-page' 를 통째로 stub 하므로 실제 배선을 지나지 않는다. 그 상태에서
+  // useV1WithdrawTeamMatchApplication 의 반환을 void 로 바꾸거나 서버가 status 필드명을 바꾸면,
+  // 모든 철회에서 안내가 조용히 사라지는데 어떤 테스트도 깨지지 않는다.
+  //
+  // 아래는 그 나머지 절반을 **컴파일 타임**에 못 박는다: 결과 객체를 리터럴이 아니라 훅이
+  // resolve 하는 타입(mutateAsync 의 Awaited 반환)으로 선언한다. 훅 반환이 void 가 되거나
+  // status 가 사라지면 이 파일이 **타입체크에서** 깨진다. 런타임 쪽은 그 값을 실제 화면
+  // (TeamMatchDetailPageView → runHeroAction → applyResultMessage)에 통과시켜 확인한다.
+  //
+  // 훅 모듈은 타입 위치에서만 참조한다(`typeof import(...)`) — 런타임 import 가 없으므로
+  // react-query/Provider 를 이 테스트에 끌고 오지 않는다.
+  type V1Hooks = typeof import('@/hooks/use-v1-api');
+  type ApplyResolved = Awaited<ReturnType<ReturnType<V1Hooks['useV1ApplyTeamMatch']>['mutateAsync']>>;
+  type WithdrawResolved = Awaited<
+    ReturnType<ReturnType<V1Hooks['useV1WithdrawTeamMatchApplication']>['mutateAsync']>
+  >;
+
+  it('훅이 resolve 하는 응답을 그대로 흘리면 신청·철회 문구가 각각 나온다', async () => {
+    // 서버가 실제로 주는 값: createApplication → 'requested', withdrawApplication → 'withdrawn'
+    // (team-matches.service.ts). 이 두 리터럴이 문구의 유일한 근거다.
+    const applied: ApplyResolved = {
+      applicationId: 'app-a',
+      teamMatchId: 'team-match-1',
+      applicantTeamId: 'team-alpha',
+      status: 'requested',
+      requiresApproval: true,
+      requiresPayment: false,
+    };
+    const withdrawn: WithdrawResolved = {
+      applicationId: 'app-a',
+      teamMatchId: 'team-match-1',
+      applicantTeamId: 'team-alpha',
+      status: 'withdrawn',
+    };
+
+    const applyModel = getTeamMatchDetailViewModel('default');
+    applyModel.applyLabel = '알파FC으로 신청';
+    applyModel.onApply = vi.fn().mockResolvedValue(applied);
+    const applyView = renderPage(<TeamMatchDetailPageView model={applyModel} />);
+    fireEvent.click(screen.getAllByRole('button', { name: '알파FC으로 신청' })[0]);
+    expect(await screen.findByText('신청을 완료했어요.')).toBeInTheDocument();
+    applyView.unmount();
+
+    const withdrawModel = getTeamMatchDetailViewModel('pending');
+    withdrawModel.applyLabel = '알파FC 신청 취소';
+    withdrawModel.onApply = vi.fn().mockResolvedValue(withdrawn);
+    renderPage(<TeamMatchDetailPageView model={withdrawModel} />);
+    fireEvent.click(screen.getAllByRole('button', { name: '알파FC 신청 취소' })[0]);
+    expect(await screen.findByText('신청을 취소했어요.')).toBeInTheDocument();
+    expect(screen.queryByText('신청을 완료했어요.')).not.toBeInTheDocument();
+  });
+
+  it('로그인·팀 만들기 리다이렉트처럼 신청도 철회도 아닌 액션은 성공 안내를 띄우지 않는다', async () => {
+    // getApplyAction의 리다이렉트 분기는 아무것도 resolve하지 않는다 — 종전에는 mode가
+    // 'default'라는 이유만으로 "신청을 완료했어요."가 떴다.
+    const onApply = vi.fn().mockResolvedValue(undefined);
+    const model = getTeamMatchDetailViewModel('default');
+    const label = '로그인하고 신청하기';
+    model.applyLabel = label;
+    model.onApply = onApply;
+
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    fireEvent.click(screen.getAllByRole('button', { name: label })[0]);
+    await waitFor(() => expect(onApply).toHaveBeenCalledTimes(1));
+
+    expect(screen.queryByText('신청을 완료했어요.')).not.toBeInTheDocument();
+    expect(screen.queryByText('신청을 취소했어요.')).not.toBeInTheDocument();
   });
 });

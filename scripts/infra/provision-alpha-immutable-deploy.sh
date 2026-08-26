@@ -11,7 +11,29 @@ readonly ALPHA_GITHUB_REPOSITORY=kim-song-jun/matchup-sports-platform
 
 readonly API_REPOSITORY=teameet-alpha-v1-api
 readonly WEB_REPOSITORY=teameet-alpha-v1-web
-readonly runtime_parameter='/teameet/alpha/env/SLACK_INQUIRY_WEBHOOK_URL'
+readonly policy_renderer='scripts/infra/render-alpha-immutable-deploy-policies.mjs'
+
+render_github_policy() {
+  local account_id="$1"
+  node "${policy_renderer}" --policy github \
+    --region "${ALPHA_AWS_REGION}" --account "${account_id}" \
+    --bucket "${ALPHA_DEPLOY_BUCKET}" --instance "${ALPHA_EC2_INSTANCE_ID}"
+}
+
+render_instance_policy() {
+  local account_id="$1"
+  node "${policy_renderer}" --policy instance \
+    --region "${ALPHA_AWS_REGION}" --account "${account_id}" \
+    --bucket "${ALPHA_DEPLOY_BUCKET}" --instance "${ALPHA_EC2_INSTANCE_ID}"
+}
+
+if [[ "${ALPHA_POLICY_RENDER_ONLY:-false}" == true ]]; then
+  : "${ALPHA_RENDER_ACCOUNT_ID:?ALPHA_RENDER_ACCOUNT_ID is required}"
+  node "${policy_renderer}" --policy all \
+    --region "${ALPHA_AWS_REGION}" --account "${ALPHA_RENDER_ACCOUNT_ID}" \
+    --bucket "${ALPHA_DEPLOY_BUCKET}" --instance "${ALPHA_EC2_INSTANCE_ID}"
+  exit 0
+fi
 
 account_id="$(aws sts get-caller-identity --query Account --output text)"
 if [[ "${account_id}" != "${ALPHA_EXPECTED_ACCOUNT_ID}" ]]; then
@@ -106,21 +128,7 @@ aws s3api put-public-access-block --bucket "${ALPHA_DEPLOY_BUCKET}" \
   --public-access-block-configuration \
   BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
 
-github_policy="$(jq -nc \
-  --arg region "${ALPHA_AWS_REGION}" --arg account "${account_id}" \
-  --arg bucket "${ALPHA_DEPLOY_BUCKET}" --arg instance "${ALPHA_EC2_INSTANCE_ID}" \
-  --arg api "${API_REPOSITORY}" --arg web "${WEB_REPOSITORY}" \
-  --arg runtimeParameter "${runtime_parameter}" \
-  '{Version:"2012-10-17",Statement:[
-    {Sid:"EcrLogin",Effect:"Allow",Action:"ecr:GetAuthorizationToken",Resource:"*"},
-    {Sid:"ImmutableImagePush",Effect:"Allow",Action:["ecr:BatchCheckLayerAvailability","ecr:BatchGetImage","ecr:CompleteLayerUpload","ecr:DescribeImages","ecr:DescribeImageScanFindings","ecr:DescribeRepositories","ecr:GetDownloadUrlForLayer","ecr:InitiateLayerUpload","ecr:PutImage","ecr:UploadLayerPart"],Resource:[("arn:aws:ecr:"+$region+":"+$account+":repository/"+$api),("arn:aws:ecr:"+$region+":"+$account+":repository/"+$web)]},
-    {Sid:"ReleaseBucketMetadata",Effect:"Allow",Action:["s3:GetBucketVersioning","s3:ListBucket"],Resource:("arn:aws:s3:::"+$bucket)},
-    {Sid:"ImmutableReleaseObjects",Effect:"Allow",Action:["s3:GetObject","s3:GetObjectVersion","s3:PutObject"],Resource:[("arn:aws:s3:::"+$bucket+"/releases/*"),("arn:aws:s3:::"+$bucket+"/manifests/*")]},
-    {Sid:"DescribeAlphaTarget",Effect:"Allow",Action:"ec2:DescribeInstances",Resource:"*"},
-    {Sid:"InvokeAlphaInstance",Effect:"Allow",Action:"ssm:SendCommand",Resource:[("arn:aws:ssm:"+$region+"::document/AWS-RunShellScript"),("arn:aws:ec2:"+$region+":"+$account+":instance/"+$instance)]},
-    {Sid:"ReadAlphaCommand",Effect:"Allow",Action:"ssm:GetCommandInvocation",Resource:"*"},
-    {Sid:"WriteAlphaRuntimeParameter",Effect:"Allow",Action:"ssm:PutParameter",Resource:("arn:aws:ssm:"+$region+":"+$account+":parameter"+$runtimeParameter)}
-  ]}')"
+github_policy="$(render_github_policy "${account_id}")"
 aws iam put-role-policy --role-name "${ALPHA_GITHUB_ROLE_NAME}" \
   --policy-name TeameetAlphaImmutableReleasePush \
   --policy-document "${github_policy}"
@@ -130,17 +138,7 @@ while IFS= read -r policy_name; do
 done < <(aws iam list-role-policies --role-name "${ALPHA_GITHUB_ROLE_NAME}" \
   --query 'PolicyNames[]' --output text | tr '\t' '\n')
 
-pull_policy="$(jq -nc \
-  --arg region "${ALPHA_AWS_REGION}" --arg account "${account_id}" \
-  --arg bucket "${ALPHA_DEPLOY_BUCKET}" \
-  --arg api "${API_REPOSITORY}" --arg web "${WEB_REPOSITORY}" \
-  --arg runtimeParameter "${runtime_parameter}" \
-  '{Version:"2012-10-17",Statement:[
-    {Sid:"EcrLogin",Effect:"Allow",Action:"ecr:GetAuthorizationToken",Resource:"*"},
-    {Sid:"ImmutableImagePull",Effect:"Allow",Action:["ecr:BatchGetImage","ecr:GetDownloadUrlForLayer"],Resource:[("arn:aws:ecr:"+$region+":"+$account+":repository/"+$api),("arn:aws:ecr:"+$region+":"+$account+":repository/"+$web)]},
-    {Sid:"PinnedReleaseRead",Effect:"Allow",Action:["s3:GetObject","s3:GetObjectVersion"],Resource:[("arn:aws:s3:::"+$bucket+"/releases/*"),("arn:aws:s3:::"+$bucket+"/manifests/*")]},
-    {Sid:"ReadAlphaRuntimeParameter",Effect:"Allow",Action:"ssm:GetParameter",Resource:("arn:aws:ssm:"+$region+":"+$account+":parameter"+$runtimeParameter)}
-  ]}')"
+pull_policy="$(render_instance_policy "${account_id}")"
 aws iam put-role-policy --role-name "${instance_role}" \
   --policy-name TeameetAlphaImmutableImagePull \
   --policy-document "${pull_policy}"

@@ -62,9 +62,13 @@ const AUDIT = () => {
       checked++;
       // computed 는 11.999999 처럼 나올 수 있다 — 0.05px 허용오차로 반올림해 잰다.
       const v = Math.round(raw * 20) / 20;
-      const rem = Math.abs(v % 4);
+      // 음수 마진(-10px 로 겹치기)도 격자 대상이다. 부호가 아니라 크기로 재야
+      // v > 3 이 음수를 통째로 빠뜨리지 않는다 — CSS 게이트(checkSpacingGrid)도
+      // Math.abs 로 재고 있어 기준이 갈리면 안 된다.
+      const mag = Math.abs(v);
+      const rem = mag % 4;
       // 1~3px 은 광학 보정으로 허용 (tokens.css SPACING 절)
-      if (v > 3 && rem > 0.05 && Math.abs(rem - 4) > 0.05) {
+      if (mag > 3 && rem > 0.05 && Math.abs(rem - 4) > 0.05) {
         off.push({ v, p, tag: el.tagName.toLowerCase(), cls: (el.className || '').toString().slice(0, 40) });
       }
     }

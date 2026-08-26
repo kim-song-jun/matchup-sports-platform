@@ -12,7 +12,9 @@ import { chromium } from 'playwright';
 import { mkdir } from 'node:fs/promises';
 
 const BASE = process.env.ALPHA_BASE ?? 'https://alpha.teameet.co.kr';
-const OUT = process.env.OUT_DIR ?? '.screenshots/spacing-grid-0827';
+// 날짜를 하드코딩하면 다음에 돌릴 때 옛 캡처를 덮어써서 비교가 불가능해진다.
+const STAMP = new Date().toISOString().slice(0, 10).replace(/-/g, '').slice(2);
+const OUT = process.env.OUT_DIR ?? `.screenshots/spacing-grid-${STAMP}`;
 const WIDTHS = [
   ['mobile', 390, 950],
   ['tablet', 768, 1024],
@@ -86,27 +88,39 @@ for (const [pname, path] of PAGES) {
       const count = () => document.querySelectorAll('body *').length;
       const skeleton = () =>
         document.querySelectorAll('[class*="skeleton"], [class*="Skeleton"], .animate-pulse').length;
-      let prev = -1, stable = 0, waited = 0;
+      // 노드 수만 보면 **개수가 그대로인 레이아웃 변화**를 놓친다 — 이미지·폰트가
+      // 늦게 실려 높이만 바뀌거나, hydration 이 클래스만 갈아끼우는 경우다.
+      // 그래서 문서 높이도 함께 안정 조건에 넣는다.
+      const sig = () => count() + ':' + Math.round(document.body.scrollHeight);
+      let prev = '', stable = 0, waited = 0;
       while (waited < 12000) {
         await new Promise((r) => setTimeout(r, 400));
         waited += 400;
-        const n = count();
-        // 연속 3회(1.2초) 같은 수면 렌더가 멎은 것으로 본다
-        stable = n === prev ? stable + 1 : 0;
-        prev = n;
-        if (stable >= 3 && skeleton() === 0) return { waited, nodes: n, skeleton: 0 };
+        const cur = sig();
+        // 연속 3회(1.2초) 같으면 렌더가 멎은 것으로 본다
+        stable = cur === prev ? stable + 1 : 0;
+        prev = cur;
+        if (stable >= 3 && skeleton() === 0) {
+          return { waited, nodes: count(), height: document.body.scrollHeight, skeleton: 0 };
+        }
       }
-      return { waited, nodes: count(), skeleton: skeleton() };
+      return { waited, nodes: count(), height: document.body.scrollHeight, skeleton: skeleton() };
     });
     const audit = await page.evaluate(AUDIT);
     const file = `${pname}-${wname}-${width}.png`;
     await page.screenshot({ path: `${OUT}/${file}`, fullPage: true });
-    // 캡처가 403/500 을 찍고 통과로 읽히는 사고를 막는다
-    const ok = status === 200;
+    // HTTP 200 만으로는 로그인 벽이나 에러 라우트로 **리다이렉트된 화면**을 못 가린다.
+    // 그런 화면을 재고 "이탈 0" 이라 보고하면 아무것도 검증하지 않은 것이다.
+    const landedOn = new URL(page.url()).pathname.replace(/\/$/, '') || '/';
+    const expected = path.replace(/\/$/, '') || '/';
+    const sameRoute = landedOn === expected;
+    // 캡처가 403/500 이나 엉뚱한 라우트를 찍고 통과로 읽히는 사고를 막는다
+    const ok = status === 200 && sameRoute;
     const settled = settle.skeleton === 0;
-    results.push({ pname, wname, width, status, ...audit, ...settle, settled, file, ok });
+    results.push({ pname, wname, width, status, landedOn, sameRoute, ...audit, ...settle, settled, file, ok });
     console.log(
-      `${ok ? '  ' : '★ '}${pname.padEnd(15)} ${String(width).padStart(4)}px  HTTP ${status}  ` +
+      `${ok ? '  ' : '★ '}${pname.padEnd(15)} ${String(width).padStart(4)}px  HTTP ${status}` +
+      (sameRoute ? '  ' : ` → ${landedOn} ⚠️  `) +
       `여백 ${String(audit.checked).padStart(4)}개 중 격자 이탈 ${audit.offCount}` +
       `  (렌더 ${settle.waited}ms·노드 ${settle.nodes}` +
       (settled ? ')' : `·스켈레톤 ${settle.skeleton} 남음 ⚠️)`) +

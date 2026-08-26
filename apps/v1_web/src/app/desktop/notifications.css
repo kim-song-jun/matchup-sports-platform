@@ -66,14 +66,14 @@
   .tm-notification-card:focus-visible {
     outline: 2px solid var(--blue500);
     outline-offset: 2px;
-    border-radius: 16px;
+    border-radius: var(--radius-container);
   }
 
   /* Icon: slightly larger touch-zone comfort on desktop. */
   .tm-notification-icon {
     width: 44px;
     height: 44px;
-    border-radius: 15px;
+    border-radius: var(--radius-field);
   }
 
   /* Toast: re-scope to the notification column, not the 480px mobile frame.
@@ -86,7 +86,7 @@
     bottom: 32px;
     transform: translateX(-50%);
     width: min(400px, calc(100vw - 48px));
-    border-radius: 14px;
+    border-radius: var(--radius-field);
     z-index: 60;
     box-shadow: var(--shadow-dropdown);
   }

@@ -45,7 +45,7 @@
 .highlightCard {
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius-container);
   background: var(--bg);
 }
 

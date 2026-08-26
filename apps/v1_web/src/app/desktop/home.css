@@ -53,7 +53,7 @@
   min-height: 72px;
   padding: 12px 14px;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   background: var(--surface);
 }
 
@@ -68,7 +68,7 @@
   width: 38px;
   height: 38px;
   place-items: center;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--grey50);
   color: var(--blue500);
 }
@@ -106,7 +106,7 @@
 .tm-home-chat-row-count {
   min-width: 20px;
   height: 20px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 0 6px;
   background: var(--red500);
   color: var(--static-white);
@@ -312,7 +312,7 @@
   /* Quick-grid keeps its 4-column layout but shrinks icon size to fit 360px */
   .tm-home-sidebar .tm-quick-grid {
     padding: 16px 12px;
-    border-radius: 14px;
+    border-radius: var(--radius-field);
     /* Override the 480px responsive override that makes it 2-col */
     grid-template-columns: repeat(4, 1fr) !important;
   }
@@ -320,7 +320,7 @@
   .tm-home-sidebar .tm-quick-icon {
     width: 40px;
     height: 40px;
-    border-radius: 12px;
+    border-radius: var(--radius-control);
   }
 }
 
@@ -336,7 +336,7 @@
 
 @media (min-width: 1024px) {
   .tm-home-sidebar .tm-weather-strip {
-    border-radius: 14px;
+    border-radius: var(--radius-field);
   }
 
   /* 데스크톱: margin-bottom은 그대로 유지 */
@@ -355,7 +355,7 @@
   .tm-home-sidebar-notices {
     background: var(--bg);
     border: 1px solid var(--border);
-    border-radius: 16px;
+    border-radius: var(--radius-container);
     padding: 16px;
   }
 
@@ -392,7 +392,7 @@
     min-height: 176px;
     padding: 28px 24px;
     border: 1px solid var(--border);
-    border-radius: 14px;
+    border-radius: var(--radius-field);
     display: flex;
     align-items: center;
     justify-content: center;

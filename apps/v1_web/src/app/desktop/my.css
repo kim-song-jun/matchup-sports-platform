@@ -104,7 +104,7 @@
      effect — on desktop the section sits inside a card, not edge-to-edge. */
   .tm-my-desktop-sidebar .tm-my-profile-head {
     margin: 0;
-    border-radius: 16px;
+    border-radius: var(--radius-container);
     /* 페이지 배경(--bg) 위 --grey50 한 단계 — main과 동일
        (globals.css .tm-my-profile-head와 동일 근거). 경계는 모바일 변형과 같은
        --border(grey200) — main의 grey100은 grey50 배경 위에서 ~1.03:1로 보이지 않는다. */
@@ -125,7 +125,7 @@
     width: 72px;
     height: 72px;
     font-size: var(--font-size-heading); /* 24px — R-T2 토큰, 구 28px */
-    border-radius: 24px;
+    border-radius: var(--radius-hero);
   }
 
   /* Stats strip: 이제 Card(border/radius/padding 내장) 안에 있으므로 독립 스타일 불필요.
@@ -187,7 +187,7 @@
   .tm-my-profile-edit-desktop .tm-my-profile-head {
     margin: 0;
     border: 1px solid var(--border);
-    border-radius: 16px;
+    border-radius: var(--radius-container);
   }
 
   /*
@@ -378,7 +378,7 @@
   .tm-my-team-detail-cta {
     background: var(--bg);
     border: 1px solid var(--border);
-    border-radius: 16px;
+    border-radius: var(--radius-container);
     padding: 16px;
     box-shadow: var(--shadow-card);
   }

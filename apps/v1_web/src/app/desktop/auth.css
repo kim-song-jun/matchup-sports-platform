@@ -104,7 +104,7 @@
   .tm-auth-logo {
     width: 64px;
     height: 64px;
-    border-radius: 18px;
+    border-radius: var(--radius-container);
     font-size: 28px;
     margin-bottom: 16px;
   }
@@ -184,7 +184,7 @@
   .tm-auth-complete-icon {
     width: 64px;
     height: 64px;
-    border-radius: 20px;
+    border-radius: var(--radius-hero);
     margin-bottom: 20px;
   }
 }

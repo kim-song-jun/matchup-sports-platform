@@ -32,7 +32,7 @@
     gap: 6px;
     height: 44px;
     padding: 0 18px;
-    border-radius: 10px;
+    border-radius: var(--radius-control);
     background: var(--blue500);
     color: var(--static-white);
     font-size: 15px;
@@ -50,7 +50,7 @@
   .tm-team-match-desktop-create-btn:focus-visible {
     outline: 2px solid var(--blue500);
     outline-offset: 2px;
-    border-radius: 10px;
+    border-radius: var(--radius-control);
   }
 
   /* Search bar: un-stick from mobile top, widen padding to match content column */
@@ -101,7 +101,7 @@
 /* 의미 그룹 카드 — 11개 flat InfoRow를 3개 시맨틱 섹션으로 분할(T4) */
 .tm-info-group {
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius-container);
   overflow: hidden;
   margin-top: 12px;
 }
@@ -165,7 +165,7 @@
 
   /* VS hero: round the corners since it's now inside the content column */
   .tm-team-vs-hero {
-    border-radius: 16px;
+    border-radius: var(--radius-container);
     min-height: 200px;
     padding: 16px 20px 20px;
   }
@@ -203,7 +203,7 @@
   .tm-team-match-cta-card {
     background: var(--bg);
     border: 1px solid var(--grey150, var(--grey100));
-    border-radius: 16px;
+    border-radius: var(--radius-container);
     padding: 20px;
     box-shadow: var(--shadow-card);
     display: flex;

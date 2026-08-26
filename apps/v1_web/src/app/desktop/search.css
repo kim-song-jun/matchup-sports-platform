@@ -62,7 +62,7 @@
     max-width: 640px !important;
     width: 100% !important;
     min-height: 52px !important;
-    border-radius: 18px !important;
+    border-radius: var(--radius-container) !important;
     box-shadow: var(--shadow-card);
     background: var(--bg) !important;
     border: 1.5px solid var(--grey200) !important;
@@ -127,7 +127,7 @@
     scrollbar-width: none;
     background: var(--grey50);
     border: 1px solid var(--grey150);
-    border-radius: 16px;
+    border-radius: var(--radius-container);
     padding: 20px;
   }
 
@@ -207,7 +207,7 @@
     align-items: center;
     justify-content: center;
     border: 1px solid var(--grey100);
-    border-radius: 16px;
+    border-radius: var(--radius-container);
     padding: 40px 24px;
     background: var(--grey50);
     text-align: center !important;
@@ -227,7 +227,7 @@
     bottom: 32px !important;
     transform: translateX(-50%);
     width: min(calc(100vw - 48px), 560px) !important;
-    border-radius: 14px !important;
+    border-radius: var(--radius-field) !important;
   }
 }
 

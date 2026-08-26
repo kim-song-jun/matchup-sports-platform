@@ -5,7 +5,7 @@
   gap: 32px;
   margin-top: 24px;
   padding: 28px;
-  border-radius: 20px;
+  border-radius: var(--radius-hero);
   background: var(--blue50);
 }
 

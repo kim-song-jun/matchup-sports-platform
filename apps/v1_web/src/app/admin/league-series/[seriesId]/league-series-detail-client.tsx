@@ -184,7 +184,7 @@ export default function LeagueSeriesDetailClient({ seriesId }: { seriesId: strin
                     className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-3"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="rounded-md bg-blue-100 px-1.5 py-0.5 text-2xs font-bold text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
+                      <span className="rounded-md bg-blue-100 px-2 py-0.5 text-2xs font-bold text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
                         {tier.tierLabel ?? '단일'}
                       </span>
                       <AdminStatusPill status={tier.state} />

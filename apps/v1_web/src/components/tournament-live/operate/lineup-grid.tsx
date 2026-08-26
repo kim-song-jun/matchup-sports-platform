@@ -174,7 +174,7 @@ export function LineupGrid({
                 className="mb-2 text-sm font-semibold text-[var(--text-strong)]"
               >
                 {side.displayNameSnapshot}
-                <span className="ml-1.5 text-xs font-normal text-[var(--text-muted)]">
+                <span className="ml-2 text-xs font-normal text-[var(--text-muted)]">
                   {side.sideKey === 'HOME' ? '홈' : '원정'}
                 </span>
               </h3>
@@ -198,7 +198,7 @@ export function LineupGrid({
                   ) : null}
                 </div>
               ) : (
-                <ul className="flex flex-col gap-1.5" role="list">
+                <ul className="flex flex-col gap-2" role="list">
                   {participants.map((participant) => (
                     <li key={participant.id}>
                       <button
@@ -207,7 +207,7 @@ export function LineupGrid({
                         onClick={() => onSelectPlayer({ sideId: side.id, participant })}
                         aria-label={`${participant.displayNameSnapshot} 선수 이벤트 기록`}
                         className={[
-                          'flex min-h-[44px] w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-colors',
+                          'flex min-h-[44px] w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors',
                           'hover:bg-[var(--blue50)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500',
                           disabled ? 'cursor-not-allowed opacity-50' : '',
                         ].join(' ')}

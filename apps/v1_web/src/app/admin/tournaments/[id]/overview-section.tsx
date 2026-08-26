@@ -70,7 +70,7 @@ export function TournamentOverviewSection() {
         <p className="text-[length:var(--font-size-body)] font-bold text-[var(--text-strong)]">
           {milestone.headline}
         </p>
-        <dl className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-1.5 mt-1">
+        <dl className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-2 mt-1">
           <OverviewFact label="경기 일정" value={formatDateRange(tournament.scheduledAt, tournament.scheduledEndAt)} />
           <OverviewFact label="접수 마감" value={formatDate(tournament.registrationDeadlineAt)} />
           <OverviewFact label="명단 마감" value={formatDate(tournament.rosterDeadlineAt)} />
@@ -104,7 +104,7 @@ export function TournamentOverviewSection() {
 
       <Link
         href={`/tournaments/${tournamentId}`}
-        className="inline-flex items-center gap-1.5 self-start min-h-[44px] px-3 rounded-xl text-[length:var(--font-size-label)] font-medium text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--tint-blue)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+        className="inline-flex items-center gap-2 self-start min-h-[44px] px-3 rounded-xl text-[length:var(--font-size-label)] font-medium text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--tint-blue)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
       >
         참가자에게 보이는 화면 열기
         <ExternalLink size={13} aria-hidden="true" />
@@ -125,7 +125,7 @@ function OverviewFact({ label, value }: { label: string; value: string }) {
 function ChecklistCard({ checks, basePath }: { checks: TournamentOverviewCheck[]; basePath: string }) {
   if (checks.length === 0) {
     return (
-      <div className="flex items-center gap-2.5 p-4 bg-[var(--green50)] border border-green-100 rounded-xl">
+      <div className="flex items-center gap-3 p-4 bg-[var(--green50)] border border-green-100 rounded-xl">
         <CheckCircle2 size={18} className="text-green-500 shrink-0" aria-hidden="true" />
         <p className="text-[length:var(--font-size-body-sm)] text-[var(--text-strong)]">
           비어 있는 설정이 없어요.

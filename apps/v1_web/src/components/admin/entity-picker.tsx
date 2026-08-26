@@ -277,7 +277,7 @@ export function EntityPicker({
                       tabIndex={-1}
                       onClick={() => commitEntry(entry)}
                       className={[
-                        'w-full flex items-center px-4 py-2.5 min-h-[44px] text-left border-b border-[var(--border)]',
+                        'w-full flex items-center px-4 py-3 min-h-[44px] text-left border-b border-[var(--border)]',
                         'hover:bg-[var(--surface-soft)] transition-colors',
                         'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-[-2px]',
                         highlighted ? 'bg-[var(--surface-soft)]' : '',
@@ -306,7 +306,7 @@ export function EntityPicker({
                     tabIndex={-1}
                     onClick={() => commitEntry(entry)}
                     className={[
-                      'w-full flex flex-col items-start px-4 py-2.5 min-h-[44px] text-left transition-colors',
+                      'w-full flex flex-col items-start px-4 py-3 min-h-[44px] text-left transition-colors',
                       item.disabled ? 'cursor-not-allowed opacity-60' : 'hover:bg-[var(--blue50)]',
                       // disabled 항목도 화살표 키로 하이라이트될 수 있다 — 선택은 막되(no-op),
                       // 지금 어디에 있는지는 키보드 사용자에게도 보여야 한다.

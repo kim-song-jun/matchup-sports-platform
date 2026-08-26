@@ -75,7 +75,7 @@ function LeagueHub() {
         action={
           <Link
             href={activeTab === 'series' ? '/admin/league-series/new' : '/admin/league-matches/new'}
-            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl bg-blue-500 px-4 text-sm font-semibold text-white"
+            className="inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-blue-500 px-4 text-sm font-semibold text-white"
           >
             <Plus size={16} aria-hidden="true" />
             {activeTab === 'series' ? '리그 체계 만들기' : '리그 만들기'}
@@ -224,11 +224,11 @@ function LeagueListTable({
           header: '소속 · 티어',
           render: (row) =>
             row.seriesTitle ? (
-              <span className="inline-flex rounded-md bg-[var(--tint-blue)] px-1.5 py-0.5 text-2xs font-semibold text-[var(--blue700)]">
+              <span className="inline-flex rounded-md bg-[var(--tint-blue)] px-2 py-0.5 text-2xs font-semibold text-[var(--blue700)]">
                 {row.tierLabel ? `${row.seriesTitle} · ${row.tierLabel}` : row.seriesTitle}
               </span>
             ) : (
-              <span className="inline-flex rounded-md bg-[var(--surface-muted)] px-1.5 py-0.5 text-2xs font-semibold text-[var(--text-muted)]">
+              <span className="inline-flex rounded-md bg-[var(--surface-muted)] px-2 py-0.5 text-2xs font-semibold text-[var(--text-muted)]">
                 독립 리그
               </span>
             ),

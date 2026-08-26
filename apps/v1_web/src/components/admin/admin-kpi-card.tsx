@@ -53,7 +53,7 @@ function KpiCardInner({
           </span>
         )}
       </div>
-      <p className={`text-2xl md:text-3xl font-bold tabular-nums mt-1.5 ${TONE_VALUE[tone]}`}>
+      <p className={`text-2xl md:text-3xl font-bold tabular-nums mt-2 ${TONE_VALUE[tone]}`}>
         {value}
       </p>
       {sub && <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] mt-0.5">{sub}</p>}

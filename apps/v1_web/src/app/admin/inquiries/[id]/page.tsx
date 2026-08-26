@@ -441,25 +441,25 @@ export default function AdminInquiryDetailPage() {
               <div className="min-w-0">
                 <h2 className="break-words text-[20px] font-bold text-[var(--text-strong)]">{inquiry.title}</h2>
                 <div className="mt-3 flex flex-wrap gap-2 text-[13px] text-[var(--text-muted)]">
-                  <span className="inline-flex items-center gap-1.5">
+                  <span className="inline-flex items-center gap-2">
                     <Tag size={14} aria-hidden="true" />
                     {CATEGORY_LABEL[inquiry.category]}
                   </span>
                   {inquiry.reportReason ? (
-                    <span className="inline-flex items-center gap-1.5">
+                    <span className="inline-flex items-center gap-2">
                       <Flag size={14} aria-hidden="true" />
                       {inquiryReportReasonLabel(inquiry.reportReason)}
                     </span>
                   ) : null}
-                  <span className="inline-flex items-center gap-1.5">
+                  <span className="inline-flex items-center gap-2">
                     <UserRound size={14} aria-hidden="true" />
                     {requesterName(inquiry)}
                   </span>
-                  <span className="inline-flex items-center gap-1.5">
+                  <span className="inline-flex items-center gap-2">
                     <Mail size={14} aria-hidden="true" />
                     {requesterContact(inquiry)}
                   </span>
-                  <span className="inline-flex items-center gap-1.5">
+                  <span className="inline-flex items-center gap-2">
                     <Clock size={14} aria-hidden="true" />
                     {formatAdminDateTime(inquiry.createdAt)}
                   </span>
@@ -476,7 +476,7 @@ export default function AdminInquiryDetailPage() {
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5" aria-label="답변 내역">
             <div className="mb-4 flex items-center justify-between gap-3">
               <h2 className="text-[17px] font-bold text-[var(--text-strong)]">답변</h2>
-              <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--text-muted)]">
+              <span className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--text-muted)]">
                 <MessageSquareText size={15} aria-hidden="true" />
                 {inquiry.replies.length}
               </span>
@@ -521,7 +521,7 @@ export default function AdminInquiryDetailPage() {
                             maxLength={2000}
                             disabled={updateReplyMutation.isPending}
                             aria-label="답변 내용 수정"
-                            className="resize-y rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 py-2.5 text-sm leading-relaxed text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50 disabled:text-gray-400"
+                            className="resize-y rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 py-3 text-sm leading-relaxed text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50 disabled:text-gray-400"
                           />
                           <div className="flex gap-2">
                             <button
@@ -577,7 +577,7 @@ export default function AdminInquiryDetailPage() {
                 rows={8}
                 maxLength={2000}
                 disabled={!canWrite || replyMutation.isPending}
-                className="resize-y rounded-xl border border-[var(--border)] px-3 py-2.5 text-sm leading-relaxed text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50 disabled:text-gray-400"
+                className="resize-y rounded-xl border border-[var(--border)] px-3 py-3 text-sm leading-relaxed text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50 disabled:text-gray-400"
                 placeholder="답변 내용"
               />
               {!canWrite ? (

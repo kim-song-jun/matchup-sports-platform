@@ -135,7 +135,7 @@ export function RevokeStaffModal({
               <strong className="text-[var(--text-strong)]">{targetLabel}</strong>의 배정을 해제할까요? 즉시
               해당 실시간 세션에서도 방출돼요.
             </p>
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               <label htmlFor="revoke-staff-reason" className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">
                 사유 <span className="text-[var(--red700)]" aria-hidden="true">*</span>
                 <span className="sr-only">(필수)</span>
@@ -149,7 +149,7 @@ export function RevokeStaffModal({
                 rows={3}
                 disabled={pending}
                 placeholder="해제 사유를 입력해 주세요."
-                className="px-3 py-2.5 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] placeholder:text-[var(--text-muted)] resize-none focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors disabled:opacity-50"
+                className="px-3 py-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] placeholder:text-[var(--text-muted)] resize-none focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors disabled:opacity-50"
                 aria-required="true"
               />
             </div>

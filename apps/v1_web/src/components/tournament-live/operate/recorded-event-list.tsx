@@ -132,7 +132,7 @@ export function RecordedEventList({
   );
 
   return (
-    <ul className="flex flex-col gap-1.5" aria-label="기록된 이벤트 목록">
+    <ul className="flex flex-col gap-2" aria-label="기록된 이벤트 목록">
       {events.map((event) => {
         const canAttachAssist =
           onAttachAssist !== undefined &&
@@ -163,7 +163,7 @@ export function RecordedEventList({
                 }[teamAccent(event.sideId)]
               }`}
             />
-            <div className="@container flex min-w-0 flex-1 flex-col gap-1.5">
+            <div className="@container flex min-w-0 flex-1 flex-col gap-2">
             {/* 좁은 폭에서는 위아래로 쌓는다. 한 줄로 두면 액션 묶음(어시스트·
                 되돌리기·팀명)이 shrink-0 이라 폭을 먼저 가져가고, 남은 자리에서
                 이벤트 문구가 잘려 "골 · 1 김..." 처럼 선수 이름이 사라졌다(알파
@@ -185,7 +185,7 @@ export function RecordedEventList({
                     645886/649891/652602/655603ms 가 전부 "10'"로 보였다). 초까지 보여
                     구분 가능하게 한다 — ms 는 여기서는 산만하기만 하다(초 단위로 이미
                     충분히 구분되고, 커맨드 왕복 지연처럼 액션 가능한 값이 아니다). */}
-                <span className="shrink-0 rounded bg-[var(--surface-soft)] px-1.5 py-0.5 text-xs font-medium tabular-nums text-[var(--text-muted)]">
+                <span className="shrink-0 rounded bg-[var(--surface-soft)] px-2 py-0.5 text-xs font-medium tabular-nums text-[var(--text-muted)]">
                   {eventTimeLabel(event)}
                 </span>
                 <span

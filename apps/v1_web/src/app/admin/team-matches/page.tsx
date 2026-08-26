@@ -165,7 +165,7 @@ function AdminTeamMatchesPageContent() {
             header: '팀매칭',
             render: (row) => (
               <div className="min-w-0">
-                <div className="flex min-w-0 items-center gap-1.5">
+                <div className="flex min-w-0 items-center gap-2">
                   {/* 리그는 팀매치를 묶는 컨테이너다 — 어느 리그 소속인지 목록에서 바로 보이지
                       않으면 운영자는 단발 경기와 리그전을 구분하지 못한다. 색만으로 알리지
                       않도록 '리그' 글자를 함께 둔다. */}
@@ -242,7 +242,7 @@ function AdminTeamMatchesPageContent() {
 
       {/* 페이지 이동 실패는 목록이 비어 보이지 않으므로 따로 알린다. */}
       {isError && rows.length > 0 && (
-        <div className="mt-4 flex flex-col items-center gap-1.5">
+        <div className="mt-4 flex flex-col items-center gap-2">
           <p className="text-[length:var(--font-size-label)] text-red-500" role="alert">
             {extractErrorMessage(error, '목록을 불러오지 못했어요.')}
           </p>

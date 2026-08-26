@@ -71,7 +71,7 @@ function ChampionsHero({ champions }: { champions: V1LeagueChampionTeam[] }) {
             <Link
               key={team.teamId}
               href={`/teams/${team.teamId}`}
-              className="tm-pressable flex flex-col items-center gap-1.5"
+              className="tm-pressable flex flex-col items-center gap-2"
             >
               <TeamAvatar seed={team.teamId} name={team.teamName} logoUrl={team.teamLogoUrl} size="lg" />
               <span className="inline-flex items-center gap-1 text-sm font-bold text-[var(--text-strong)]">
@@ -123,7 +123,7 @@ function FinalStandingsSection({
               >
               <span className="w-5 shrink-0 text-[var(--text-muted)]">{row.position}</span>
               <TeamAvatar seed={row.teamId} name={row.teamName} logoUrl={row.teamLogoUrl} size="sm" />
-              <span className="flex min-w-0 flex-1 items-center gap-1.5">
+              <span className="flex min-w-0 flex-1 items-center gap-2">
                 <span className="truncate text-[var(--text-strong)]">{row.teamName}</span>
                 {championTeamIds.has(row.teamId) && (
                   <Trophy size={13} className="tm-medal-gold shrink-0" aria-hidden="true" />
@@ -173,12 +173,12 @@ function LeaderboardSection({
     <section className="mb-5">
       <h2 className="tm-hub-section-title mb-2">{title}</h2>
       <Card pad={12}>
-        <ol className="space-y-1.5">
+        <ol className="space-y-2">
           {rows.map((row, index) => {
             const isTop = ranks[index] === 1;
             return (
               <li key={row.userId} className="flex items-center justify-between gap-2 text-sm">
-                <span className="inline-flex min-w-0 items-center gap-1.5">
+                <span className="inline-flex min-w-0 items-center gap-2">
                   {isTop && <Medal size={14} className="tm-medal-gold shrink-0" aria-hidden="true" />}
                   <span className={`truncate ${isTop ? 'font-bold text-[var(--text-strong)]' : 'text-[var(--text-strong)]'}`}>
                     {ranks[index]}. {row.nickname ?? '선수'}
@@ -238,7 +238,7 @@ export function LeagueAwardsPageClient({ leagueId }: { leagueId: string }) {
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
       <h1 className="sr-only">{series.title} 시즌 결산</h1>
-      <p className="mb-4 flex flex-wrap items-center gap-1.5 text-xs text-[var(--text-muted)]">
+      <p className="mb-4 flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
         {series.tierLabel != null && <span className="tm-badge tm-badge-sm tm-badge-blue">{series.tierLabel}</span>}
         <span>{series.title}</span>
         <span className={`tm-badge tm-badge-sm ${LEAGUE_STATE_META[series.state].badgeClass}`}>

@@ -45,7 +45,7 @@ export function FieldOperatorConsoleFrame({
           <span className="text-[length:var(--font-size-body-sm)] font-bold text-[var(--text-strong)] truncate">
             {tournamentTitle ?? '대회 운영'}
           </span>
-          <span className="text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-1.5 py-0.5 w-fit">
+          <span className="text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-2 py-0.5 w-fit">
             {staffRoleLabel('FIELD_OPERATOR')}
           </span>
         </div>

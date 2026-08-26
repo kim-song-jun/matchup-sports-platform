@@ -173,7 +173,7 @@ export default function LeagueMatchesListClient() {
                           </div>
                         )}
                         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--text-muted)] sm:text-sm">
-                          <span className="inline-flex items-center gap-1.5">
+                          <span className="inline-flex items-center gap-2">
                             <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: '50%', background: accent.dot }} />
                             {accent.label}
                           </span>

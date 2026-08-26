@@ -128,13 +128,13 @@ export function LeagueDisputeResolveModal({
         <form onSubmit={handleSubmit} noValidate>
           <div className="px-5 py-5 flex flex-col gap-4">
             {/* 제기 사유 — 운영자가 무엇에 이의를 걸었는지 처리 전에 다시 확인한다. */}
-            <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3.5 py-3">
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3">
               <p className="text-[11px] font-semibold text-[var(--text-muted)]">제기 사유</p>
               <p className="mt-1 text-[13px] text-[var(--text-strong)] whitespace-pre-wrap break-words">{reason}</p>
             </div>
 
             {/* Resolution toggle */}
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               <span className="text-[13px] font-semibold text-[var(--text-body)]">처리 방식</span>
               <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="처리 방식">
                 <button
@@ -203,7 +203,7 @@ export function LeagueDisputeResolveModal({
 
                 {/* Score inputs */}
                 <div className="flex items-end justify-center gap-3">
-                  <div className="flex flex-col items-center gap-1.5">
+                  <div className="flex flex-col items-center gap-2">
                     <label
                       htmlFor="league-dispute-home-score"
                       className="max-w-[96px] truncate text-[13px] font-semibold text-[var(--text-body)]"
@@ -226,7 +226,7 @@ export function LeagueDisputeResolveModal({
                   <span className="pb-3 text-lg font-semibold text-[var(--text-muted)]" aria-hidden="true">
                     :
                   </span>
-                  <div className="flex flex-col items-center gap-1.5">
+                  <div className="flex flex-col items-center gap-2">
                     <label
                       htmlFor="league-dispute-away-score"
                       className="max-w-[96px] truncate text-[13px] font-semibold text-[var(--text-body)]"
@@ -257,7 +257,7 @@ export function LeagueDisputeResolveModal({
             )}
 
             {/* Note textarea */}
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               <label htmlFor="league-dispute-resolve-note" className="text-[13px] font-semibold text-[var(--text-body)]">
                 처리 사유 <span className="text-[var(--red700)]" aria-hidden="true">*</span>
                 <span className="sr-only">(필수)</span>
@@ -271,7 +271,7 @@ export function LeagueDisputeResolveModal({
                 disabled={pending}
                 placeholder="처리 사유를 입력해 주세요."
                 className={[
-                  'px-3 py-2.5 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] resize-none',
+                  'px-3 py-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] resize-none',
                   'placeholder:text-[var(--text-muted)]',
                   'focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
                   'transition-colors disabled:opacity-50',

@@ -337,7 +337,7 @@ function AwardRow({
             value={row.note}
             onChange={(e) => update(idx, 'note', e.target.value)}
             placeholder="비고 (선택, 예: 3골 1어시스트)"
-            className="w-full text-xs border border-[var(--border)] rounded-xl px-3 py-1.5 bg-[var(--surface-soft)] focus:outline-none focus:ring-2 focus:ring-blue-300"
+            className="w-full text-xs border border-[var(--border)] rounded-xl px-3 py-2 bg-[var(--surface-soft)] focus:outline-none focus:ring-2 focus:ring-blue-300"
           />
         </div>
       )}

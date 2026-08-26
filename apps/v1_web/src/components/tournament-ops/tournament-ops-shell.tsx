@@ -161,7 +161,7 @@ function NavItemDisabledRow({ item, dense }: { item: NavItem; dense?: boolean })
       className={[
         'flex w-full items-center gap-3 px-4 min-h-[44px] text-sm text-left border-l-2 border-transparent',
         'text-gray-300 dark:text-gray-600 cursor-not-allowed',
-        dense ? 'py-3' : 'py-2.5',
+        dense ? 'py-3' : 'py-3',
       ].join(' ')}
     >
       <span className="text-gray-300 dark:text-gray-600" aria-hidden="true">{item.icon}</span>
@@ -300,7 +300,7 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverI
         ].join(' ')}
       >
         <div className="flex items-center justify-between px-4 h-[52px] border-b border-[var(--border)] shrink-0">
-          <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex items-center gap-3 min-w-0">
             <TournamentEmblem tournamentId={tournamentId} coverImageUrl={tournamentCoverImageUrl} title={tournamentTitle} size={28} />
             <div className="flex flex-col min-w-0">
               {/* 목업처럼 접두어가 긴 이름은 뒤쪽 식별자가 통째로 잘려 어느 대회인지
@@ -313,7 +313,7 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverI
                 {tournamentTitle ?? '대회 운영'}
               </span>
               {/* [알파 감사 C] ops shell 역할 배지 "플랫폼 운영자" — 알파 실측 지적(10px → 12px). */}
-              <span className="text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-1.5 py-0.5 w-fit mt-0.5">
+              <span className="text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-2 py-0.5 w-fit mt-0.5">
                 {staffRoleLabel(role)}
               </span>
             </div>
@@ -328,7 +328,7 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverI
           </button>
         </div>
 
-        <nav className="flex-1 py-1.5 overflow-y-auto" aria-label="주 메뉴">
+        <nav className="flex-1 py-2 overflow-y-auto" aria-label="주 메뉴">
           {navItems.map((item) => {
             const active = isActive(item);
             if (item.disabled) return <NavItemDisabledRow key={item.href} item={item} dense />;
@@ -359,7 +359,7 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverI
           <Link
             href={returnHref}
             onClick={onClose}
-            className="flex items-center gap-1.5 text-[length:var(--font-size-label)] text-[var(--text-muted)] hover:text-[var(--text-muted)] transition-colors min-h-[44px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+            className="flex items-center gap-2 text-[length:var(--font-size-label)] text-[var(--text-muted)] hover:text-[var(--text-muted)] transition-colors min-h-[44px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
           >
             <ChevronLeft size={14} aria-hidden="true" />
             {returnLabel}
@@ -402,7 +402,7 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
         className="hidden lg:flex w-[240px] min-h-screen bg-[var(--card-surface)] border-r border-[var(--border)] flex-col fixed top-0 left-0 h-screen overflow-y-auto z-30 shrink-0"
         aria-label="대회 운영 사이드바"
       >
-        <div className="px-5 py-4 border-b border-[var(--border)] flex items-center gap-2.5 min-h-[64px]">
+        <div className="px-5 py-4 border-b border-[var(--border)] flex items-center gap-3 min-h-[64px]">
           <TournamentEmblem tournamentId={tournamentId} coverImageUrl={tournamentCoverImageUrl} title={tournamentTitle} size={34} />
           <div className="flex flex-col min-w-0">
             <span
@@ -412,13 +412,13 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
               {tournamentTitle ?? '대회 운영'}
             </span>
             {/* [알파 감사 C] ops shell 역할 배지 "플랫폼 운영자" — 알파 실측 지적(10px → 12px). */}
-            <span className="text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-1.5 py-0.5 w-fit mt-0.5">
+            <span className="text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-2 py-0.5 w-fit mt-0.5">
               {staffRoleLabel(role)}
             </span>
           </div>
         </div>
 
-        <nav className="flex-1 py-1.5" aria-label="주 메뉴">
+        <nav className="flex-1 py-2" aria-label="주 메뉴">
           {navItems.map((item) => {
             const active = isActive(item);
             if (item.disabled) return <NavItemDisabledRow key={item.href} item={item} />;
@@ -428,7 +428,7 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
                 href={item.href}
                 aria-current={active ? 'page' : undefined}
                 className={[
-                  'flex items-center gap-3 px-4 py-2.5 min-h-[44px] text-sm transition-colors border-l-2',
+                  'flex items-center gap-3 px-4 py-3 min-h-[44px] text-sm transition-colors border-l-2',
                   'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-[-2px]',
                   active
                     ? 'border-blue-500 bg-blue-50/60 dark:bg-blue-500/10 text-[var(--blue700)] font-semibold'
@@ -447,7 +447,7 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
         <div className="px-4 py-4 border-t border-[var(--border)] shrink-0">
           <Link
             href={returnTarget.href}
-            className="flex items-center gap-1.5 text-[length:var(--font-size-label)] text-[var(--text-muted)] hover:text-[var(--text-muted)] transition-colors min-h-[44px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+            className="flex items-center gap-2 text-[length:var(--font-size-label)] text-[var(--text-muted)] hover:text-[var(--text-muted)] transition-colors min-h-[44px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
           >
             <ChevronLeft size={14} aria-hidden="true" />
             {returnTarget.label}

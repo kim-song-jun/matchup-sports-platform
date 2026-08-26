@@ -62,7 +62,7 @@ export function GateModeCard({ gateStatus, isPending, isError, showToast }: Gate
               </span>
             )}
           </div>
-          <p className="text-[13px] text-[var(--text-muted)] mt-1.5 leading-relaxed">
+          <p className="text-[13px] text-[var(--text-muted)] mt-2 leading-relaxed">
             게이트 번들(R1/R2 서명, 최소 14일) 절차 없이 아래 운영 토글 2개를 바로 실행할 수
             있게 하는 스위치예요. 켜져 있는 동안에도 CAS·감사 로그 같은 안전장치는 그대로
             적용돼요 — 생략되는 건 서류 절차뿐이에요.

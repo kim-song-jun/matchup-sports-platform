@@ -252,7 +252,7 @@ export function ErrorLogsClient() {
 
       {/* source / level chip filters */}
       <div className="flex flex-col gap-2">
-        <div role="group" aria-label="source 필터" className="flex items-center gap-1.5 flex-wrap">
+        <div role="group" aria-label="source 필터" className="flex items-center gap-2 flex-wrap">
           {SOURCE_OPTIONS.map((opt) => {
             const active = source === opt.value;
             return (
@@ -274,7 +274,7 @@ export function ErrorLogsClient() {
             );
           })}
         </div>
-        <div role="group" aria-label="level 필터" className="flex items-center gap-1.5 flex-wrap">
+        <div role="group" aria-label="level 필터" className="flex items-center gap-2 flex-wrap">
           {LEVEL_OPTIONS.map((opt) => {
             const active = level === opt.value;
             return (
@@ -297,7 +297,7 @@ export function ErrorLogsClient() {
           })}
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <label className="flex items-center gap-1.5 text-[length:var(--font-size-label)] text-[var(--text-muted)]">
+          <label className="flex items-center gap-2 text-[length:var(--font-size-label)] text-[var(--text-muted)]">
             상태코드
             <input
               type="number"
@@ -305,25 +305,25 @@ export function ErrorLogsClient() {
               value={statusCode}
               onChange={(e) => setStatusCode(e.target.value)}
               placeholder="예: 500"
-              className="w-[88px] h-[44px] px-2.5 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors"
+              className="w-[88px] h-[44px] px-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors"
             />
           </label>
-          <label className="flex items-center gap-1.5 text-[length:var(--font-size-label)] text-[var(--text-muted)]">
+          <label className="flex items-center gap-2 text-[length:var(--font-size-label)] text-[var(--text-muted)]">
             시작일
             <input
               type="date"
               value={from}
               onChange={(e) => setFrom(e.target.value)}
-              className="h-[44px] px-2.5 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors"
+              className="h-[44px] px-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors"
             />
           </label>
-          <label className="flex items-center gap-1.5 text-[length:var(--font-size-label)] text-[var(--text-muted)]">
+          <label className="flex items-center gap-2 text-[length:var(--font-size-label)] text-[var(--text-muted)]">
             종료일
             <input
               type="date"
               value={to}
               onChange={(e) => setTo(e.target.value)}
-              className="h-[44px] px-2.5 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors"
+              className="h-[44px] px-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors"
             />
           </label>
         </div>

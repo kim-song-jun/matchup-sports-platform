@@ -43,7 +43,7 @@ export function PrizeBreakdownEditor({
 
   return (
     <div className="grid gap-4">
-      <div className="grid gap-1.5">
+      <div className="grid gap-2">
         <label htmlFor="tournament-prize-pool" className="text-sm font-semibold text-[var(--text-body)]">
           총상금
         </label>
@@ -114,7 +114,7 @@ export function PrizeBreakdownEditor({
               onChange([...rows, { id: createPrizeRowId(), label, value: '' }]);
             }}
             disabled={disabled || rows.length >= 12}
-            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl bg-[var(--blue50)] px-4 text-sm font-semibold text-[var(--blue700)] transition-colors hover:bg-[var(--blue100)] disabled:opacity-50"
+            className="inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-[var(--blue50)] px-4 text-sm font-semibold text-[var(--blue700)] transition-colors hover:bg-[var(--blue100)] disabled:opacity-50"
           >
             <Plus size={16} aria-hidden="true" />
             항목 추가

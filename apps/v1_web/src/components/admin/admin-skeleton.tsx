@@ -43,7 +43,7 @@ export function AdminTableSkeleton({ rows = 5, cols = 4 }: { rows?: number; cols
       {Array.from({ length: rows }).map((_, i) => (
         <div
           key={i}
-          className="flex gap-4 px-4 py-3.5 border-b border-[var(--border)] last:border-0"
+          className="flex gap-4 px-4 py-4 border-b border-[var(--border)] last:border-0"
         >
           {Array.from({ length: cols }).map((_, j) => (
             <div key={j} className="h-4 bg-[var(--surface-soft)] rounded-lg flex-1" />

@@ -12,7 +12,7 @@ const inputClass =
   'h-[44px] w-full rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)] placeholder:text-[var(--text-muted)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
 const readOnlyInputClass =
   'h-[44px] w-full rounded-xl border border-[var(--border-strong)] bg-[var(--surface-muted)] px-3 text-sm text-[var(--text-muted)]';
-const labelClass = 'mb-1.5 block text-sm font-semibold text-[var(--text-strong)]';
+const labelClass = 'mb-2 block text-sm font-semibold text-[var(--text-strong)]';
 
 export default function LeagueSeriesEditClient({ seriesId }: { seriesId: string }) {
   const router = useRouter();

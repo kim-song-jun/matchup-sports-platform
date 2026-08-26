@@ -130,7 +130,7 @@ export function ReviewPolicyView() {
               })}
             </div>
 
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               <label
                 htmlFor="review-window-hours"
                 className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]"

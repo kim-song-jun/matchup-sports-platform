@@ -5,7 +5,7 @@ import type { V1PromotionRule } from '@/types/league-series';
 
 const inputClass =
   'h-[44px] w-full rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)] placeholder:text-[var(--text-muted)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
-const labelClass = 'mb-1.5 block text-sm font-semibold text-[var(--text-strong)]';
+const labelClass = 'mb-2 block text-sm font-semibold text-[var(--text-strong)]';
 
 /** 미리보기에 쓰는 팀 수 표본. 실제 리그 팀 수가 아니라 규칙 감각을 잡기 위한 예시다. */
 const PREVIEW_TEAM_COUNTS = [5, 8, 12] as const;
@@ -226,7 +226,7 @@ export function PromotionRuleForm({ value, tierCount, onChange, disabled = false
                     <span className="font-semibold text-[var(--text-strong)]">{tier.tier}부</span>
                     <span aria-hidden="true">→</span>
                     {tier.skippedByMajorityGuard ? (
-                      <span className="rounded-md bg-amber-100 px-1.5 py-0.5 font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+                      <span className="rounded-md bg-amber-100 px-2 py-0.5 font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
                         ! 잔류 팀이 과반에 못 미쳐 승강을 건너뛰어요
                       </span>
                     ) : tier.promoteCount === 0 && tier.relegateCount === 0 ? (

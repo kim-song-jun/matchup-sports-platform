@@ -75,7 +75,7 @@ export function QuickSubstitutionPanel({
       className="rounded-xl border border-[var(--tint-blue-border)] bg-[var(--blue50)] p-3"
       aria-label="빠른 교체 모드"
     >
-      <div className="mb-2 flex items-center gap-1.5 text-xs font-bold text-[var(--blue700)]">
+      <div className="mb-2 flex items-center gap-2 text-xs font-bold text-[var(--blue700)]">
         <ArrowLeftRight size={13} aria-hidden="true" />
         빠른 교체 모드
       </div>
@@ -125,7 +125,7 @@ export function QuickSubstitutionPanel({
                 // `role="listitem"`을 직접 얹으면 버튼의 암묵적 button 역할이
                 // 덮어써져 스크린리더/접근성 트리에서 더 이상 버튼으로 노출되지
                 // 않는다(`LineupGrid`가 이미 쓰는 것과 같은 패턴).
-                <ul className="flex flex-wrap gap-1.5" role="list">
+                <ul className="flex flex-wrap gap-2" role="list">
                   {targets.map((participant) => (
                     <li key={participant.id}>
                       <button
@@ -145,7 +145,7 @@ export function QuickSubstitutionPanel({
                           // 36px로 두면 경기장에서 급하게 조작하다 옆 선수를
                           // 잘못 눌러 엉뚱한 교체가 그대로 기록되는 사고로
                           // 이어진다(Copilot 리뷰 지적).
-                          'flex min-h-[44px] items-center gap-1 rounded-full border px-2.5 text-xs font-medium transition-colors',
+                          'flex min-h-[44px] items-center gap-1 rounded-full border px-3 text-xs font-medium transition-colors',
                           'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500',
                           disabled ? 'cursor-not-allowed opacity-50' : '',
                           // 전수검수: hover:bg-[var(--green100)](raw, dark: 짝 없음)이 다크에서

@@ -97,7 +97,7 @@ export function GateConfirmModal({
         className="bg-[var(--card-surface)] rounded-2xl shadow-[var(--shadow-modal)] w-full max-w-[440px] overflow-hidden"
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
-          <h2 id="gate-confirm-title" className="text-[16px] font-bold text-[var(--text-strong)] flex items-center gap-1.5">
+          <h2 id="gate-confirm-title" className="text-[16px] font-bold text-[var(--text-strong)] flex items-center gap-2">
             {tone === 'amber' && <AlertTriangle size={17} className="text-[var(--orange700)]" aria-hidden="true" />}
             {title}
           </h2>
@@ -119,18 +119,18 @@ export function GateConfirmModal({
           }}
           noValidate
         >
-          <div className="px-5 py-5 flex flex-col gap-3.5">
+          <div className="px-5 py-5 flex flex-col gap-4">
             <p
               id="gate-confirm-desc"
               className={[
-                'text-[13px] leading-relaxed rounded-xl border px-3.5 py-3',
+                'text-[13px] leading-relaxed rounded-xl border px-4 py-3',
                 tone === 'amber' ? 'text-[var(--orange700)] bg-[var(--tint-orange)] border-[var(--tint-orange-border)]' : 'text-[var(--blue700)] bg-[var(--blue50)] border-[var(--tint-blue-border)]',
               ].join(' ')}
             >
               {description}
             </p>
 
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               <label htmlFor="gate-confirm-reason" className="text-[13px] font-semibold text-[var(--text-body)]">
                 사유 <span className="text-[var(--red700)]" aria-hidden="true">*</span>
                 <span className="sr-only">(필수)</span>
@@ -145,7 +145,7 @@ export function GateConfirmModal({
                 disabled={pending}
                 placeholder="이 작업이 왜 필요한지 남겨 주세요. 감사 로그에 그대로 기록돼요."
                 className={[
-                  'px-3 py-2.5 text-[13px] bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] resize-none',
+                  'px-3 py-3 text-[13px] bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] resize-none',
                   'placeholder:text-[var(--text-muted)]',
                   'focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
                   'transition-colors disabled:opacity-50',
@@ -158,7 +158,7 @@ export function GateConfirmModal({
             </div>
 
             {typedChallenge && (
-              <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-2">
                 <label htmlFor="gate-confirm-typed" className="text-[13px] font-semibold text-[var(--text-body)]">
                   확인을 위해 <span className="text-[var(--orange700)]">&ldquo;{typedChallenge}&rdquo;</span>
                   {objectParticle(typedChallenge)} 그대로 입력해 주세요{' '}

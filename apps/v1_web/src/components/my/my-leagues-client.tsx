@@ -84,7 +84,7 @@ export function MyLeaguesPageClient() {
                           </div>
                         )}
                         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--text-muted)] sm:text-sm">
-                          <span className="inline-flex items-center gap-1.5">
+                          <span className="inline-flex items-center gap-2">
                             <span
                               aria-hidden="true"
                               style={{ width: 6, height: 6, borderRadius: '50%', background: accent.dot }}
@@ -109,7 +109,7 @@ export function MyLeaguesPageClient() {
                         팀별로 행을 나누고 이름에 truncate 를 쓰지 않는다 — 접기(collapse)
                         UI 는 실측상 팀 수가 보통 1~2개뿐이라 과설계라 넣지 않았고, 이름은
                         항상 노출해 "어느 팀이 뛰는지"가 줄바꿈되더라도 잘리지 않게 한다. */}
-                    <div className="flex flex-col gap-1.5 border-t border-[var(--border)] px-3 py-2">
+                    <div className="flex flex-col gap-2 border-t border-[var(--border)] px-3 py-2">
                       {item.myTeams.map((team) => (
                         <div
                           key={team.teamId}

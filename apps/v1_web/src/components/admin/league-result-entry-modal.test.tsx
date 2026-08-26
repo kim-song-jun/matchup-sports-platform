@@ -25,6 +25,26 @@
  *  "높이 임계"라 jsdom 으로 원리적으로 못 잡는다(레이아웃이 없어 clientHeight 가 0).
  *  클래스 문자열을 되읊는 단언은 회귀를 하나도 못 잡으므로 쓰지 않는다 — 확인은
  *  브라우저 실측(844x390 / 390x844 / 1440x1000)이고 절차는 보고서 residualRisk 에 있다.
+ *
+ * C3(2026-08-27) — 390x844 에서 액션 바가 사유 입력의 아래 모서리를 23px 덮던 것을
+ *  본문과 패널 양쪽의 scroll-padding-bottom(액션 바 높이 84px)으로 고쳤다. 겹침 좌표는
+ *  위와 같은 이유로 여기서 못 잡는다(브라우저 실측 몫 — 실컴포넌트를 띄워 좌표로 쟀고
+ *  수치는 보고서에 있다). 여기서 잠그는 것은 그 처방이 기대는 구조뿐 —
+ *  8. 사유 입력의 설명(글자수)은 실제 글자수를 따라가고, 입력칸과 같은 스크롤 영역의
+ *     **뒤쪽**에 있다. 그래서 굴림이 모자라면 이 설명이 가장 먼저 접힌다.
+ *  9. 액션 바는 스크롤 본문 **뒤**의 형제다. 낮은 뷰포트에서 액션 바를 화면에 들이는 것은
+ *     패널의 굴림이라, 액션 바가 본문 앞으로 올라가면 패널 쪽 처방의 전제가 사라진다.
+ *
+ * D3(2026-08-27) — 위 패널 scroll-padding-bottom 이 가로 모드 좁은 띠에서 패널을 열자마자
+ *  끝까지 굴려 **모달 제목과 닫기(X)가 화면 밖으로** 나갔다(실측 844x410: 24→0px, 44→0px).
+ *  헤더를 패널 스크롤포트에 sticky 로 붙여 고정했다. 고정 자체는 jsdom 이 못 잡으므로
+ *  (레이아웃·Tailwind 스타일시트가 없어 computed position 이 늘 static) —
+ *  10. 제목과 닫기 버튼은 **패널의 직속 자식** 상자에 함께 있고 스크롤 본문 바깥이다.
+ *      sticky 는 가장 가까운 스크롤 조상에 붙으므로, 이 부모 관계가 곧 처방의 전제다.
+ *
+ *  로케이터 주의: 스크롤 본문은 클래스가 아니라 id(`league-result-modal-body`)로 잡는다.
+ *  closest('div.overflow-y-auto') 는 본문에서 그 클래스가 빠지는 순간 패널을 잡아 단언이
+ *  조용히 통과했다 — getScrollBody() 주석 참고.
  */
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -66,6 +86,21 @@ function renderModal(overrides: Partial<ModalProps> = {}) {
   const rerenderWith = (next: Partial<ModalProps>) =>
     view.rerender(<LeagueResultEntryModal {...props} {...next} />);
   return { onSubmit, rerenderWith };
+}
+
+/**
+ * 스크롤 본문을 가리키는 유일한 로케이터 — 스타일 클래스가 아니라 컴포넌트가 붙인 id 로 잡는다.
+ *
+ * 예전에는 `closest('div.overflow-y-auto')` 를 썼는데, 본문에서 그 클래스가 빠지면 closest 가
+ * 한 칸 더 올라가 **패널**(role=dialog, 역시 overflow-y-auto)을 잡았다 — 아래 단언들이 "같은
+ * 스크롤 영역 안"을 패널 기준으로 다시 계산해 전부 통과했다. 계약이 깨진 바로 그 순간에
+ * 침묵하는 로케이터라 바꿨다. id 는 패널과 절대 겹치지 않으므로 그 미끄러짐이 원천 봉쇄된다.
+ * "본문이 실제로 굴리는 상자인가" 는 아래 '스크롤 영역은 하나뿐' 테스트가 따로 잠근다.
+ */
+function getScrollBody(): HTMLElement {
+  const el = document.getElementById('league-result-modal-body');
+  expect(el).not.toBeNull();
+  return el as HTMLElement;
 }
 
 async function fillBaseForm(user: ReturnType<typeof userEvent.setup>) {
@@ -235,7 +270,10 @@ describe('LeagueResultEntryModal 정정 프리필·본문 높이 (F5)', () => {
     // 그때도 비교 박스는 본문의 굴림에는 여전히 닿지 않는다 — 이 단언이 잠그는 것이 그것이다.
     const scrollers = dialog.querySelectorAll('div.overflow-y-auto');
     expect(scrollers).toHaveLength(1);
-    const scrollBody = scrollers[0];
+    // 그 하나가 곧 본문이다 — 다른 테스트들이 id 로 잡는 상자와 같은 것임을 여기서 한 번만
+    // 묶어 둔다. 본문에서 굴림이 빠지면 여기가 0 개로 떨어져 크게 깨진다(조용한 통과 없음).
+    const scrollBody = getScrollBody();
+    expect(scrollers[0]).toBe(scrollBody);
 
     // 첫 포커스 대상은 본문 안 — 그래서 브라우저가 본문을 굴린다(전제).
     expect(scrollBody.contains(screen.getByLabelText(/사유/))).toBe(true);
@@ -273,17 +311,94 @@ describe('LeagueResultEntryModal 정정 프리필·본문 높이 (F5)', () => {
     // false-fail 만 내고 정작 겹침은 하나도 못 잡아서 걷어 냈다.
     renderModal({ mode: 'correction', currentHomeScore: 2, currentAwayScore: 1 });
 
-    const scrollBody = screen.getByLabelText(/사유/).closest('div.overflow-y-auto');
-    expect(scrollBody).not.toBeNull();
+    const dialog = screen.getByRole('dialog');
+    const scrollBody = getScrollBody();
+    expect(scrollBody.contains(screen.getByLabelText(/사유/))).toBe(true);
 
     // ① 되돌아오면 안 되는 것: 헤더·액션 바 높이를 모르는 본문 고정 비율(옛 max-h-[60vh]).
     //    본문이 뷰포트 비율로 묶이면 패널이 뷰포트보다 작아지고 필수 입력이 다시 잘린다.
-    expect(scrollBody?.className).not.toMatch(/max-h-\[\d+d?v[hw]\]/);
+    expect(scrollBody.className).not.toMatch(/max-h-\[\d+d?v[hw]\]/);
 
     // ② 액션 바는 스크롤 본문 바깥 — 본문이 길어져도 '확인'·'취소' 가 함께 스크롤돼
     //    사라지지 않는다.
-    expect((scrollBody as HTMLElement).contains(screen.getByRole('button', { name: '확인' }))).toBe(
-      false,
+    const confirm = screen.getByRole('button', { name: '확인' });
+    expect(scrollBody.contains(confirm)).toBe(false);
+
+    // ③ 그리고 본문 **뒤**다(2026-08-27 C3 2라운드). 낮은 뷰포트에서는 패널까지 굴러야
+    //    액션 바가 화면에 들어오는데, 그 굴림을 끝까지 끌고 가는 것이 패널의
+    //    scroll-padding-bottom 이다 — 액션 바가 본문 앞으로 올라가면 그 처방의 전제가
+    //    사라진다. 굴림의 양은 jsdom 이 못 재도 위아래 관계는 잰다.
+    expect(scrollBody.compareDocumentPosition(confirm) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(
+      0,
     );
+    // 액션 바는 여전히 패널(= 낮은 뷰포트에서 굴러 주는 상자) 안에 있어야 한다.
+    expect(dialog.contains(confirm)).toBe(true);
+  });
+
+  it('모달 제목과 닫기 버튼은 패널의 직속 자식 상자에 함께 있다', () => {
+    // D3(2026-08-27) 수정이 기대는 구조. 위 패널 scroll-padding-bottom 은 가로 모드 좁은 띠
+    // (844x390~450 · 932x430 · 740x360 · 915x412)에서 패널을 열자마자 끝까지 굴리는데, 헤더가
+    // 그냥 흘러가면 제목과 닫기(X)가 화면 밖으로 나갔다 — 실측(844x410): 제목 24 → 0px,
+    // X 44 → 0px, X 중앙 hit-test null. 그래서 헤더를 패널 스크롤포트에 sticky 로 붙였다.
+    //
+    // **고정 자체(position:sticky)는 여기서 못 잡는다** — jsdom 에는 레이아웃도 Tailwind
+    // 스타일시트도 없어 computed position 이 언제나 static 이다. 클래스 문자열을 되읊는
+    // 단언은 회귀를 하나도 못 잡으므로 이 파일의 다른 계약들과 같은 규칙으로 쓰지 않는다
+    // (수치 확인은 브라우저 실측 — 보고서 residualRisk 의 뷰포트 목록).
+    //
+    // 여기서 잠그는 것은 그 처방이 성립하는 **유일한 구조**다: sticky top-0 은 "가장 가까운
+    // 스크롤 조상"에 붙는다. 헤더가 패널의 직속 자식이라 그 조상이 곧 굴러가는 패널이다 —
+    // 헤더를 form 안이나 스크롤 본문 안으로 옮기면 붙는 상자가 바뀌어(또는 사라져) 제목·X 가
+    // 다시 흘러가는데, 그때 이 단언이 그 자리에서 깨진다.
+    renderModal({ mode: 'correction', currentHomeScore: 2, currentAwayScore: 1 });
+
+    const dialog = screen.getByRole('dialog');
+    const header = document.getElementById('league-result-modal-header');
+    expect(header).not.toBeNull();
+
+    // ① 굴러가는 상자(패널)의 직속 자식 — sticky 가 붙을 스크롤포트가 곧 이 패널이다.
+    expect(header?.parentElement).toBe(dialog);
+
+    // ② 제목과 닫기 버튼이 그 상자 **안**에 함께 있다. 둘 중 하나만 남으면
+    //    "지금 무슨 모달인지" 나 "닫는 법" 중 하나가 다시 굴림에 실려 나간다.
+    expect(header?.contains(screen.getByRole('heading', { name: '결과 정정' }))).toBe(true);
+    expect(header?.contains(screen.getByRole('button', { name: '모달 닫기' }))).toBe(true);
+
+    // ③ 안쪽 스크롤 본문 바깥 — 본문이 굴러도 헤더는 함께 밀리지 않는다.
+    expect(getScrollBody().contains(header as Node)).toBe(false);
+  });
+
+  it('사유 입력의 설명(글자수)은 실제 글자수를 따라가고 같은 스크롤 영역의 뒤쪽에 있다', async () => {
+    // C3(2026-08-27) 수정이 기대는 구조. 390x844 실측에서 액션 바가 사유 입력의 아래
+    // 모서리를 23px 덮고 있었고, 그때 이 설명(글자수)은 100% 잘려 있었다 — 본문
+    // scroll-padding-bottom 이 살려 내야 하는 것이 바로 이 노드다. 크기는 여기서 정하지
+    // 않는다(액션 바 실측 높이 84px, 근거는 컴포넌트 주석과 브라우저 실측 표에 있다).
+    // 글자수는 이 칸의 aria-describedby 대상이라, 포커스된 필수 입력의 설명이 화면에
+    // 남아야 한다는 것이 지켜야 할 접근성 계약이기도 하다.
+    //
+    // 겹침 좌표 자체는 jsdom 이 못 잰다(레이아웃이 없다). 여기서 잠그는 것은 그 여백이
+    // 기대는 두 가지뿐이다 — 설명이 실제로 이 칸의 글자수이고(이름만 같은 다른 노드가
+    // 아니고), 입력칸과 같은 스크롤 영역의 뒤쪽에 있다는 것. 글자수를 고정 영역이나 라벨
+    // 옆으로 옮기거나 aria-describedby 를 떼면 여기서 깨져 컴포넌트 주석을 다시 읽게 된다.
+    const user = userEvent.setup();
+    renderModal({ mode: 'correction', currentHomeScore: 2, currentAwayScore: 1 });
+
+    const reason = screen.getByLabelText(/사유/);
+    const describedBy = reason.getAttribute('aria-describedby');
+    expect(describedBy).not.toBeNull();
+    const description = document.getElementById(describedBy as string);
+    expect(description).not.toBeNull();
+
+    // 설명이 정말 이 칸의 글자수인가 — 두 글자를 치면 그 수를 따라와야 한다.
+    await user.type(reason, '오심');
+    expect(description?.textContent).toContain('2');
+
+    const scrollBody = getScrollBody();
+    expect(scrollBody.contains(reason)).toBe(true);
+    expect(scrollBody.contains(description as Node)).toBe(true);
+    // 문서 순서상 입력칸 **뒤** — 굴림이 모자랄 때 가장 먼저 접히는 것이 이 설명이다.
+    expect(
+      reason.compareDocumentPosition(description as Node) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0);
   });
 });

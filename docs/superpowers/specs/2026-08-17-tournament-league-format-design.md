@@ -248,26 +248,63 @@ export function generateRoundRobinFixtures(teamIds, weeksCount): RoundRobinFixtu
 조 배정 팀이 홀수라 라운드마다 부전승이 생기는 `ODD_TEAM_COUNT_BYE`).
 생성을 막아야 하는 조건은 전부 아래 422 목록에 있다.
 
-#### 6.1.1 `replaceExisting` 의미
+#### 6.1.1 `replaceExisting` 의미 (2026-08-27 개정)
 
 | 값 | 동작 |
 |---|---|
-| `false` (기본) | 대상 조에 fixture가 이미 하나라도 있으면 `LEAGUE_FIXTURES_ALREADY_EXIST`로 거부한다 |
-| `true` | 대상 조의 fixture를 **전부 삭제하고 재생성**한다. 단 결과가 확정된 fixture가 하나라도 있으면 `LEAGUE_FIXTURES_HAVE_RESULTS`로 **거부한다** — 확정 결과가 걸린 대진은 재생성 대상이 아니다 |
+| `false` (기본) | 대상 조에 fixture가 이미 하나라도 있으면 `LEAGUE_FIXTURES_ALREADY_EXIST`로 거부한다. `details`에 사전 영향 요약(`existingFixtureCount` / `fixturesWithResultCount` / `blockedFixtureCount` / `deletableFixtureCount` / `blockedFixtures` / `replaceable`)을 실어, 어드민이 "교체"를 누르기 **전에** 몇 개가 삭제되고 애초에 교체가 가능한지 볼 수 있게 한다 |
+| `true` | 대상 조의 fixture를 **실제로 DELETE 하고** 재생성한다. 단 **지울 수 있는 것만** 지운다 — 아래 참조 |
 
-즉 재생성은 "아직 아무 경기도 치르지 않은 조"에서만 허용한다. 일부 경기가 끝난 뒤의 대진 수정은
-단건 API(`POST admin/tournaments/:id/fixtures`, `PATCH admin/fixtures/:id`)로 처리한다.
+**"지울 수 있다"의 정의 (스키마가 정한다).** `V1TournamentFixture`를 참조하는 관계를 두 부류로 나눈다.
 
-검증 (실패 시 422):
+- **DB가 삭제를 거부하는 관계(`onDelete: Restrict`)**: `V1Game.tournamentFixtureId`,
+  `V1TournamentStaffFixtureScope.fixtureId`, `V1OperationAudit(tournamentId, fixtureId)`.
+  이 중 **감사 로그는 우회로가 없다** — `20260801040000_v1_task7_staff_audit_scope/migration.sql`이
+  `v1_operation_audits`에 append-only 트리거(BEFORE UPDATE OR DELETE, ERRCODE 55000)를 걸어
+  감사 행을 지우는 것도 `fixture_id`를 NULL로 떼는 것도 막는다. 그리고
+  `GamesService.createFromSourceInTransaction`은 게임 생성 시 항상 `GAME_CREATED` 감사를
+  `fixtureId`와 함께 남긴다. ⇒ **게임이 한 번이라도 붙은 대진은 영구히 삭제 불가**다
+  (수동 폼 `createFixture` 산출물도 동일).
+- **삭제 시 함께 사라지는 관계(`Cascade`/`SetNull`)**: `result`, `videos`,
+  `advancementSources`/`advancementTargets`, `childFixtures`. 조 단위 일괄 교체는 한 번의 클릭으로
+  수십 개를 지우는데 운영자는 어느 대진에 영상·진출 연결이 걸렸는지 화면에서 볼 수 없으므로
+  **일괄 경로에서는 이쪽도 막는다**(단건 삭제 `DELETE admin/fixtures/:id`는 대진 하나를 지목해
+  확인까지 받는 조작이라 기존 cascade 계약 유지).
 
-| code | 조건 |
-|---|---|
-| `TOURNAMENT_NOT_LEAGUE` | `format !== 'league'` |
-| `LEAGUE_GROUP_PHASE_INVALID` | 대상 그룹의 `phase !== 'group'` |
-| `LEAGUE_MIN_MATCHES_NOT_MET` | `perTeamMatches < minMatchesPerTeam`. 응답에 필요한 최소 `legs`를 함께 반환 |
-| `LEAGUE_TEAMS_INSUFFICIENT` | 조 배정 팀 2팀 미만 |
-| `LEAGUE_FIXTURES_ALREADY_EXIST` | `replaceExisting=false`인데 대상 조에 fixture가 이미 존재 |
-| `LEAGUE_FIXTURES_HAVE_RESULTS` | `replaceExisting=true`인데 결과가 확정된 fixture가 존재 |
+즉 이 생성기가 지우는 것은 **아무것도 매달려 있지 않은 대진 행**뿐이고, 그 DELETE는 다른 테이블을
+한 줄도 건드리지 않는다. 하나라도 매달려 있으면 `LEAGUE_FIXTURES_NOT_DELETABLE`로 **어느 대진이
+무엇 때문에** 막혔는지 이름을 붙여 거절한다. 이 경우 조의 대진 수를 바꿀 방법은 없다 — 팀·일시는
+단건 API(`PATCH admin/fixtures/:id`)로 수정한다.
+
+> **취소 표식(tombstone)은 쓰지 않는다.** 되돌리기를 `V1TournamentFixture.status = 'cancelled'`
+> 로 구현했던 중간 시도는 폐기했다. 그 값은 이 저장소가 한 번도 쓴 적이 없어 fixture를 읽는
+> 소비처가 아무도 거르지 않았고, 남은 행이 공개 리그 진행률(`leagueProgressOf`는 fixture 행 수를
+> total로 센다)·매직넘버·**카드 출전정지 판정**(경기 순서 인덱스가 `V1TournamentFixture` 전체
+> 정렬로 만들어진다)을 오염시켰다. 표식은 지울 수도 없어 그 오염은 되돌릴 수 없었다.
+
+**트랜잭션 상한은 앞단 프록시보다 낮다.** `timeout: 45s` + `maxWait: 5s` = 최악 50초로, 앞단 ALB
+`idle_timeout` 60초 안에서 끝난다. 예전 값(120초)은 운영자가 60초에 504를 받고 "실패했다"고 믿는
+동안 백엔드가 계속 돌아 **그대로 커밋**되게 만들었고, 그 조는 방금 만들어진 게임 때문에 교체도 안 돼
+영구히 잠겼다. 만료되면 트랜잭션 전체가 롤백되고 `LEAGUE_FIXTURES_GENERATION_TIMEOUT`으로
+"저장된 대진은 하나도 없다 + 조를 더 작게 나누거나 회전 수를 줄여라"를 알려준다. 대진 수 상한
+상수는 두지 않았다 — 대진당 비용이 조 명단 크기에 따라 크게 달라져 실측 없이 정한 값은 지금 잘 도는
+생성까지 막는다.
+
+검증 (실패 시 4xx):
+
+| code | HTTP | 조건 |
+|---|---|---|
+| `TOURNAMENT_NOT_LEAGUE` | 422 | `format`이 `league`·`group_knockout` 둘 다 아님 |
+| `LEAGUE_GROUP_PHASE_INVALID` | 422 | 대상 그룹의 `phase !== 'group'` |
+| `LEAGUE_MIN_MATCHES_NOT_MET` | 422 | `perTeamMatches < minMatchesPerTeam`. 응답에 필요한 최소 `legs`를 함께 반환 |
+| `LEAGUE_TEAMS_INSUFFICIENT` | 422 | 조 배정 팀 2팀 미만 |
+| `LEAGUE_REGISTRATION_NOT_CONFIRMED` | 422 | 조에 배정된 신청 중 `confirmed`가 아닌 것이 있음. `details.registrations`와 message 양쪽에 팀명·상태를 싣는다 |
+| `LEAGUE_FIXTURES_GENERATION_TIMEOUT` | 422 | 트랜잭션이 상한 안에 끝나지 못함. **아무것도 저장되지 않는다** |
+| `LEAGUE_FIXTURES_ALREADY_EXIST` | 409 | `replaceExisting=false`인데 대상 조에 fixture가 이미 존재 |
+| `LEAGUE_FIXTURES_HAVE_RESULTS` | 409 | `replaceExisting=true`인데 결과가 확정된 fixture가 존재 |
+| `LEAGUE_FIXTURES_NOT_DELETABLE` | 409 | `replaceExisting=true`인데 지울 수 없는 대진이 존재. `details.blockedFixtures`에 최대 5건을 사유와 함께 지목 |
+| `LEAGUE_FIXTURES_CHANGED` | 409 | 재점검 직후 다른 요청이 대진을 바꿔 DELETE가 CAS에서 어긋남. 새로고침 후 재시도 |
+| `COMPETITION_CONFIG_REQUIRED` | 409 | 대회에 활성 경기 규칙 버전이 없음 — 기존 대진을 지우기 **전에** 던진다 |
 
 이 엔드포인트는 멱등하지 않다 — 재호출은 §6.1.1에 따라 거부되거나 전체 재생성이다.
 중복 클릭 방어는 프론트에서 처리하고, 서버는 "이미 있으면 거부"로 보수적으로 막는다.

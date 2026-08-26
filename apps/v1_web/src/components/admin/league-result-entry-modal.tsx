@@ -303,11 +303,36 @@ export function LeagueResultEntryModal({
            굴리고 있던 그 축을 사용자도 굴릴 수 있다 — 낮은 뷰포트에서는 모달 전체가
            한 덩어리로 스크롤된다. 넘치지 않는 뷰포트(약 571px 이상, 아래 본문 min-h 주석
            참고)에서는 scrollHeight === clientHeight 라 스크롤바도 굴림도 생기지 않아
-           기존 동작과 동일하다. x 는 계속 잘라 둥근 모서리를 지킨다. */
-        className="bg-[var(--card-surface)] rounded-2xl shadow-[0_8px_32px_rgba(20,28,45,0.14)] w-full max-w-[440px] max-h-[calc(100dvh-32px)] flex flex-col overflow-x-hidden overflow-y-auto"
+           기존 동작과 동일하다. x 는 계속 잘라 둥근 모서리를 지킨다.
+
+           scroll-pb-21(84px) 은 그 패널 굴림의 착지 지점을 액션 바 높이만큼 위로 올린다
+           (2026-08-27 C3 2라운드). 아래 본문에만 scroll-padding 을 주고 실측했더니 844x390
+           에서 패널이 9/188 만 굴러 '취소·확인' 두 버튼이 화면 밖에 남았다 — 본문이 먼저
+           굴려 사유 칸을 끌어올리면 패널은 더 굴릴 이유가 없어지는데, 그 지점의 화면 바닥은
+           아직 본문이라 액션 바가 들어올 자리가 없다. 패널 스크롤포트를 액션 바 높이만큼
+           줄이면 패널이 끝까지 굴러 액션 바가 함께 들어온다(실측 844x390: 패널 188/188 ·
+           확인·취소 각 48/48 · 사유 94/94 · 글자수 18/18 — 수정 전 0/48 · 33/94 · 0/18).
+           패널이 넘치지 않는 뷰포트(약 571px 이상)에서는 굴릴 것이 없어 무해하다. */
+        className="bg-[var(--card-surface)] rounded-2xl shadow-[0_8px_32px_rgba(20,28,45,0.14)] w-full max-w-[440px] max-h-[calc(100dvh-32px)] flex flex-col overflow-x-hidden overflow-y-auto scroll-pb-21"
       >
-        {/* Header */}
-        <div className="shrink-0 flex items-start justify-between px-5 py-4 border-b border-[var(--border)]">
+        {/* Header — 패널 스크롤포트에 고정(sticky)한다.
+            위 scroll-pb-21 이 가로 모드 좁은 띠(실측 844x390·410·430·450 · 915x412 · 932x430 ·
+            740x360)에서 패널을 열자마자 끝까지 굴리는데(첫 포커스가 본문 맨 아래 '사유'), 헤더가
+            그냥 흘러가면 모달 제목과 닫기(X)가 화면 밖으로 나간다 — 실측(2026-08-27 D3, 844x410):
+            제목 24 → 0px, X 44 → 0px, X 중앙 hit-test 도 null. "지금 무슨 모달인지"와 "닫는 법"은
+            굴림 위치와 무관하게 항상 보여야 한다.
+            sticky 는 흐름에서 빠지지 않으므로 레이아웃은 1px 도 안 바뀐다 — 패널이 넘치지 않는
+            뷰포트에서는 굴릴 것이 없어 동작도 좌표도 그대로다(390x844 · 1440x1000 스크린샷 해시
+            수정 전후 동일).
+            bg 는 패널과 같은 토큰이라 겹쳐도 색이 달라 보이지 않는다(투명이면 본문이 비쳐 겹쳐 보인다).
+            **대가**: 그 좁은 띠에서 열자마자 보이던 '현재 공식 스코어와 비교' 박스의 꼬리 77px 이
+            헤더 뒤로 들어간다(844x390 실측 112.7 → 35.7px, 스코어 입력칸 44 → 18.7px, 740x360 은
+            44 → 0px). 위로 굴리면 그대로 닿고, 뷰포트 높이 ≥700 인 계약 밴드에서는 무변화다
+            (스코어 비교 223.7/223.7 · 입력칸 44/44). 사유·글자수·확인·취소는 전 구간에서 무변화. */}
+        <div
+          id="league-result-modal-header"
+          className="sticky top-0 z-10 shrink-0 flex items-start justify-between px-5 py-4 bg-[var(--card-surface)] border-b border-[var(--border)]"
+        >
           <div>
             <h2 id="league-result-entry-modal-title" className="text-[16px] font-bold text-[var(--text-strong)]">
               {title}
@@ -434,10 +459,39 @@ export function LeagueResultEntryModal({
               그만큼 넘치게 되는데, 그 넘침은 위 패널의 overflow-y-auto 가 받아 모달 전체
               스크롤로 바꾼다. 전환 경계는 뷰포트 높이 약 571px(= 32 + 77 + 218 + 160 + 84)
               이고 그 위에서는 이 값이 한 번도 안 걸린다 — 사유 덩어리의 실제 높이가
-              약 165px 라 신규 입력·정정 어느 모드에서도 본문이 이미 더 크다. */}
+              약 165px 라 신규 입력·정정 어느 모드에서도 본문이 이미 더 크다.
+
+              scroll-pb-21(84px) 는 그 본문 안에서 focus() 가 착지하는 지점을 84px 위로
+              올린다(2026-08-27 C3). 390x844 실측에서 액션 바가 사유 입력의 아래 모서리를
+              23px 덮고 있었다 — 정정 모드의 첫 포커스는 본문 맨 아래 사유인데, 브라우저의
+              focus() 스크롤은 대상이 일부만 잘린 상태를 "보인다"로 판정해 굴리지 않는다
+              (실컴포넌트 실측: 본문에 70px 굴릴 여유가 있는데도 scrollTop 이 0 그대로였다).
+              그래서 잘린 아래 모서리와 글자수(이 칸의 aria-describedby 대상)가 액션 바에
+              딱 붙은 채 남는다. scroll-padding-bottom 은 그 "가려졌나" 판정에 쓰는
+              스크롤포트를 84px 줄여, 그 상태를 굴려야 할 상태로 바꾼다 — 레이아웃은 1px 도
+              안 바뀌므로 본문이 넘치지 않는 뷰포트에서는 굴림도 스크롤바도 안 생기고
+              (실측 1440x1000: 수정 전후 좌표 동일), 스코어 고정 영역도 그대로라 위 R3
+              계약을 건드리지 않는다.
+
+              84 는 액션 바 실측 높이(85px = pt-4 16 + 버튼 48 + pb-5 20 + 경계선 1)를 4px
+              격자 유틸로 내린 값이다. 처음 넣었던 48px 은 "글자수 18 + gap 6 + 여백 24" 라는
+              사후 계산이었고 실측에서 겹침을 25.7 → 12.7 로 절반만 줄였다 — 390 폭에서
+              뷰포트 높이를 훑으면 48·56·64 는 각각 840·850·870 부근에서 글자수를 못 살리고
+              84 만 700~932 전 구간을 닫는다. 패널에도 같은 값을 줘야 가로 모드에서 액션 바가
+              함께 들어온다(위 패널 주석).
+
+              흔한 처방인 "액션 바 높이만큼 본문에 padding-bottom" 은 여기서 듣지 않는다 —
+              패딩은 내용이 접히는 지점을 옮기지 못하고 focus() 의 판정도 바꾸지 못한다.
+              대상 쪽 scroll-margin-bottom 도 안 듣는다(실측: 84px 을 줘도 겹침 25.7 그대로). */}
           <div
             ref={scrollBodyRef}
-            className="px-5 pt-4 pb-5 flex flex-col gap-4 min-h-[160px] overflow-y-auto overscroll-contain"
+            /* id 는 이 상자를 스타일과 무관하게 가리키기 위한 것이다. 위 계약들(액션 바가
+               본문 밖에 있을 것 · 글자수가 입력칸과 같은 굴림 안에 있을 것)을 테스트에서
+               잡을 때 예전에는 closest('div.overflow-y-auto') 를 썼는데, 본문에서 그
+               클래스가 빠지면 closest 가 한 칸 더 올라가 **패널**(역시 overflow-y-auto)을
+               잡아 단언이 조용히 통과했다 — 계약이 깨진 바로 그 순간에 침묵하는 로케이터였다. */
+            id="league-result-modal-body"
+            className="px-5 pt-4 pb-5 flex flex-col gap-4 min-h-[160px] overflow-y-auto overscroll-contain scroll-pb-21"
           >
             {/* 득점·도움 기록 (선택) — 리그 득점왕·도움왕의 유일한 공급 경로(2026-08-25
                 사용자 확정). participants 미제공(로딩·실패)이면 섹션을 숨겨 기존

@@ -136,6 +136,25 @@ function teamMatchOpponentSub(mode: TeamMatchDetailViewModel['mode'], match: Tea
   return '신청 후 승인';
 }
 
+/**
+ * 히어로 CTA 성공 안내는 `mode`가 아니라 **서버가 확정한 결과 상태**에서 뽑는다.
+ *
+ * `mode`는 viewerState 파생값이라 실제로 실행된 액션과 어긋날 수 있다 — 유령 신청서가 남아
+ * viewerState는 'withdrawn'인데 eligibility는 ALREADY_REQUESTED인 조합에서, CTA는 철회를
+ * 실행하는데 mode가 'default'라 "신청을 완료했어요."라고 알렸다(C2 후속 지적). 신청·철회 두
+ * mutation 모두 `V1TeamMatchApplicationResult`(status 포함)를 resolve 하므로, 그 status가
+ * "방금 무엇을 했는가"의 유일한 근거다.
+ *
+ * 로그인·팀 만들기 리다이렉트는 신청도 철회도 아니라 status가 없다 → null(안내 없음).
+ */
+function applyResultMessage(result: unknown): string | null {
+  if (typeof result !== 'object' || result === null) return null;
+  const status = (result as Record<string, unknown>).status;
+  if (status === 'withdrawn') return '신청을 취소했어요.';
+  if (status === 'requested') return '신청을 완료했어요.';
+  return null;
+}
+
 export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewModel }) {
   const router = useRouter();
   const { match, mode } = model;
@@ -154,7 +173,11 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
   const [heroMessage, setHeroMessage] = useState('');
 
   const heroActionBusyRef = useRef(false);
-  const runHeroAction = (action: (() => void | Promise<unknown>) | undefined, successMessage: string) => {
+  const runHeroAction = (
+    action: (() => void | Promise<unknown>) | undefined,
+    /** 고정 문구이거나, 액션이 돌려준 결과에서 문구를 뽑는 함수(null이면 아무 안내도 띄우지 않음). */
+    successMessage: string | ((result: unknown) => string | null),
+  ) => {
     // 로딩 중 재클릭 시 중복 제출 방지 — disabled/loading prop은 리렌더 이후에나 반영되므로
     // 동기적인 ref 락으로 한 번 더 막는다.
     if (!action || heroActionBusyRef.current) return;
@@ -164,8 +187,10 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
     // Promise.resolve 호출보다 먼저라 동기 throw 시 .finally를 건너뛰어 락이 영구 고정됨).
     void Promise.resolve()
       .then(() => action())
-      .then(() => {
-        setHeroMessage(successMessage);
+      .then((result) => {
+        const message = typeof successMessage === 'function' ? successMessage(result) : successMessage;
+        if (!message) return;
+        setHeroMessage(message);
         window.setTimeout(() => setHeroMessage(''), 2000);
       })
       .catch(() => {
@@ -249,8 +274,12 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
       {mode === 'mine' ? (
         <Link className="tm-btn tm-btn-lg tm-btn-primary" href={match.manageHref ?? `/team-matches/${match.id}/edit`}>{cta}</Link>
       ) : (
-        /* P2: 완료 메시지 능동형 전환 ("신청이 취소되었어요" → "신청을 취소했어요") */
-        <button className={`tm-btn tm-btn-lg ${ctaTone}`} disabled={!canRunAction || model.applyPending} type="button" onClick={() => runHeroAction(model.onApply, mode === 'pending' ? '신청을 취소했어요.' : '신청을 완료했어요.')}>
+        /* P2: 완료 메시지 능동형 전환 ("신청이 취소되었어요" → "신청을 취소했어요")
+         *
+         * 안내 문구와 실제 동작은 **같은 근거**에서 나와야 한다 — 둘이 갈리면 화면이 거짓말을
+         * 한다(C2 실사고: 라벨은 '신청 취소'인데 액션은 다른 팀 신규 신청이었다). 그래서 문구는
+         * mode가 아니라 액션이 돌려준 결과 status에서 뽑는다(applyResultMessage 주석 참고). */
+        <button className={`tm-btn tm-btn-lg ${ctaTone}`} disabled={!canRunAction || model.applyPending} type="button" onClick={() => runHeroAction(model.onApply, applyResultMessage)}>
           {model.applyPending ? '처리 중' : cta}
         </button>
       )}

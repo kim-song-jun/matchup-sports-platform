@@ -241,21 +241,33 @@ export class TeamMatchesService {
   ) {
     const teamMatch = await this.getPublicTeamMatch(teamMatchId, user);
     const manageableTeams = await this.getUserManageableTeams(user.id, query.teamId);
+    // 자격 판정은 createApplication 의 가드와 **같은 사실**(신청 원장)을 봐야 한다.
+    // 종전엔 화면용 include(teamMatchInclude)의 applications 로 판정했는데 그 목록은
+    // `OR:[{status:'approved'},{appliedByUserId: 나}]` 로 걸러져 있어, 같은 팀의 **다른
+    // 매니저**가 낸 requested 신청서가 아예 안 보였다 → 그 팀이 eligible:true 로 내려가
+    // 화면에 '{팀}으로 신청' 버튼이 떴고, 누르면 createApplication 의 가드가 409
+    // ALREADY_REQUESTED 를 던졌다(그 전에는 unique 제약에 걸려 raw 500). 눌러야만 알 수
+    // 있고 몇 번을 눌러도 결과가 같은 막다른 길이었다.
+    // 같은 원장 + 같은 판정 함수(judgeApplicationAttempt)를 쓰면 두 곳이 갈릴 수 없다.
+    // 대가는 이 엔드포인트의 쿼리 1개(teamMatchId 인덱스 조회) 추가다.
+    const ledger = await readTeamMatchApplicationLedger(this.prisma, teamMatch.id);
 
     return {
       teamMatchId: teamMatch.id,
       requiresApproval: true,
       requiresPayment: false,
       teams: manageableTeams.map((team) => {
-        const application = teamMatch.applications.find((item) => item.applicantTeamId === team.id);
-        const reasonCode = getEligibilityReason(teamMatch, team.id, application);
+        const { reasonCode, teamApplication } = judgeApplicationAttempt(teamMatch, ledger, user.id, team.id);
         return {
           teamId: team.id,
           name: team.name,
           role: team.memberships[0]?.role ?? 'member',
           eligible: reasonCode === 'OK',
           reasonCode,
-          applicationId: application?.id ?? null,
+          // 같은 팀의 신청서는 이 팀 매니저 누구나 철회할 수 있다(withdrawApplication 도
+          // applicantTeamId 로 권한을 본다) — 그래서 동료가 낸 신청서의 id 를 그대로
+          // 내려주는 것이 막다른 길의 출구다. 화면은 이 id 로 '신청 취소' CTA 를 만든다.
+          applicationId: teamApplication?.id ?? null,
         };
       }),
     };
@@ -751,13 +763,46 @@ export class TeamMatchesService {
     this.assertActiveAccount(user);
     await this.assertCanManageTeam(user.id, dto.applicantTeamId);
     const teamMatch = await this.getPublicTeamMatch(teamMatchId, user);
-    const application = teamMatch.applications.find((item) => item.applicantTeamId === dto.applicantTeamId);
-    const reasonCode = getEligibilityReason(teamMatch, dto.applicantTeamId, application);
-    if (reasonCode !== 'OK') {
-      throw stateConflict(getEligibilityReasonMessage(reasonCode), reasonCode);
+    // 중복 판정은 화면용 include(teamMatchInclude)가 아니라 신청 원장을 직접 읽는다 — 그
+    // include 의 applications 는 `appliedByUserId = 나`로 걸러져 있어 같은 팀의 다른 매니저가
+    // 낸 신청서가 아예 안 보인다. 그 필터된 목록으로 판정하면 아래 create()가
+    // @@unique([teamMatchId, applicantTeamId])에 걸려 raw 500 이 된다(이 저장소엔 전역
+    // P2002 필터가 없다 — 12곳 전부 서비스 로컬 처리).
+    const reason = judgeApplicationAttempt(
+      teamMatch,
+      await readTeamMatchApplicationLedger(this.prisma, teamMatch.id),
+      user.id,
+      dto.applicantTeamId,
+    ).reasonCode;
+    if (reason !== 'OK') {
+      throw stateConflict(getEligibilityReasonMessage(reason), reason);
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
+      // 조회 → 생성 사이의 경합 창을 닫는다. **사용자 단위 중복(한 사람이 두 팀으로 2건)은
+      // DB 가 막아주지 못한다** — unique 제약이 팀 단위라서다. 그래서 같은 팀매치에 대한
+      // 신청을 직렬화하는 것이 유일한 방어다. approveApplication 이 이미 잡는 것과 **같은
+      // 행(v1_team_matches)을 같은 순서로** 잠그므로 두 경로가 교차 교착에 빠지지 않는다.
+      await tx.$queryRaw`SELECT id FROM "v1_team_matches" WHERE id = ${teamMatch.id} FOR UPDATE`;
+      const currentTeamMatch = await tx.v1TeamMatch.findFirst({
+        where: { id: teamMatch.id, deletedAt: null },
+        select: { hostTeamId: true, status: true, startAt: true, deadlineAt: true },
+      });
+      if (!currentTeamMatch) {
+        throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Team match was not found' });
+      }
+      // 잠금을 잡은 뒤 원장을 다시 읽어 같은 규칙으로 재판정한다 — 잠금 대기 중에 다른
+      // 요청이 신청서를 만들거나 호스트가 승인을 끝냈을 수 있다.
+      const judged = judgeApplicationAttempt(
+        currentTeamMatch,
+        await readTeamMatchApplicationLedger(tx, teamMatch.id),
+        user.id,
+        dto.applicantTeamId,
+      );
+      if (judged.reasonCode !== 'OK') {
+        throw stateConflict(getEligibilityReasonMessage(judged.reasonCode), judged.reasonCode);
+      }
+      const application = judged.teamApplication;
       const nextApplication = application
         ? await (async () => {
             const transition = await tx.v1TeamMatchApplication.updateMany({
@@ -804,6 +849,21 @@ export class TeamMatchesService {
       });
 
       return nextApplication;
+    },
+    {
+      // 이 트랜잭션은 위 FOR UPDATE 에서 **다른 요청이 끝날 때까지 기다릴 수 있다** — 종전엔
+      // 없던 대기다(그 대신 유령 신청서가 생겼다). Prisma 의 기본 timeout 5초는 그 대기까지
+      // 포함해 재는데, 이 행을 잡는 다른 경로(approveApplication: 쿼리 12개)도 같은 5초를
+      // 쓰므로 최악의 정당한 점유가 5초다 → 기본값이면 정상적인 순서 대기가 그대로 실패로
+      // 뒤집힌다. 최악 점유의 3배로 잡아 "기다리면 되는 것"이 실패하지 않게 한다.
+      // 잠금 자체는 줄이지 않는다: 사용자 단위 중복(한 사람이 두 팀으로 2건)은 unique 제약이
+      // 팀 단위라 DB 가 못 막고, 이 직렬화가 유일한 방어다. 잠금 구간은 이미 최소다
+      // (조회 2 + 쓰기 2). 알림 발송은 이미 트랜잭션 밖이다.
+      timeout: 15_000,
+      // maxWait 는 일부러 기본값(2초)을 둔다 — 이건 **커넥션 풀에서 커넥션을 받는** 시간이지
+      // 위 행 잠금 대기가 아니다. 풀이 포화된 상태에서 이 값을 늘리면 줄만 길어진다. 그때 나는
+      // P2028 은 전역 필터(common/filters/http-exception.filter.ts)가 이미 503
+      // SERVICE_TEMPORARILY_BUSY + 해요체 안내로 번역하므로 여기서 또 의미를 붙이지 않는다.
     });
 
     // 알림: 호스트팀 manager+에게 신청 접수 안내 (fire-and-forget — 수신자 조회 실패도 본 요청을 깨지 않음)
@@ -1411,14 +1471,17 @@ export class TeamMatchesService {
       teamMatch.approvedApplicantTeamId !== null &&
       (teamMatch.hostTeam.memberships.length > 0 || (teamMatch.approvedApplicantTeam?.memberships.length ?? 0) > 0);
     const eligibleTeams = await this.getUserManageableTeams(user.id);
+    // 상세 응답에도 같은 자격 목록이 실린다 — applicationEligibility 와 **같은 근거**로
+    // 판정해야 한다. 한쪽만 원장을 보게 두면 같은 팀이 두 응답에서 다른 자격으로 내려가고,
+    // 그 갈림이 다시 "누를 수 있는데 반드시 실패하는 버튼"이 된다.
+    const ledger = await readTeamMatchApplicationLedger(this.prisma, teamMatch.id);
     return {
       state: this.getViewerState(teamMatch, user),
       manageableHostTeam,
       manageableOpponentTeam,
       participantMember,
       eligibleTeams: eligibleTeams.map((team) => {
-        const application = teamMatch.applications.find((item) => item.applicantTeamId === team.id);
-        const reasonCode = getEligibilityReason(teamMatch, team.id, application);
+        const { reasonCode } = judgeApplicationAttempt(teamMatch, ledger, user.id, team.id);
         return { teamId: team.id, name: team.name, role: team.memberships[0]?.role ?? 'member', eligible: reasonCode === 'OK', reasonCode };
       }),
       manageRoute: manageableHostTeam ? `/team-matches/${teamMatch.id}/manage` : null,
@@ -1813,10 +1876,68 @@ function getGenderRuleWhere(genderRule: NonNullable<TeamMatchesQueryDto['genderR
     : genderRule;
 }
 
-function getEligibilityReason(
-  teamMatch: V1TeamMatch,
+type TeamMatchApplicationLedgerRow = Pick<
+  V1TeamMatchApplication,
+  'id' | 'teamMatchId' | 'applicantTeamId' | 'appliedByUserId' | 'status'
+>;
+
+/** 이 팀매치의 신청서를 사용자 필터 없이 전부 읽는다 — 중복 판정의 유일한 근거다. */
+function readTeamMatchApplicationLedger(
+  client: PrismaService | Prisma.TransactionClient,
+  teamMatchId: string,
+): Promise<TeamMatchApplicationLedgerRow[]> {
+  return client.v1TeamMatchApplication.findMany({
+    where: { teamMatchId },
+    select: { id: true, teamMatchId: true, applicantTeamId: true, appliedByUserId: true, status: true },
+  });
+}
+
+/** "살아 있는" 신청서 — 철회·거절·만료는 아무 자리도 차지하지 않으므로 재신청을 막지 않는다. */
+function isLiveApplication(status: V1TeamMatchApplication['status']) {
+  return status === 'requested' || status === 'approved';
+}
+
+/**
+ * 팀매치 신청 중복 판정.
+ *
+ * **신청 주체는 팀이다.** DB 제약(@@unique([teamMatchId, applicantTeamId]))도, 신청·철회
+ * 권한(assertCanManageTeam)도 팀 단위이고, 승인은 나머지 requested 를 전부 자동 거절해
+ * 상대팀을 정확히 하나로 만든다. 그래서 판정도 두 층이다:
+ *
+ *  ① **같은 팀**에 살아 있는 신청서가 있으면 그건 새 신청이 아니라 "그 팀의 신청서"다.
+ *     같은 팀의 다른 매니저가 눌렀어도 마찬가지다 — 그 매니저는 이미 같은 신청서를 철회할
+ *     수 있다(withdrawApplication 도 applicantTeamId 로 권한을 본다). 그래서 기존 어휘인
+ *     ALREADY_REQUESTED / ALREADY_APPROVED 로 수렴시킨다(화면이 이미 처리하는 코드다).
+ *     종전엔 이 조합이 사용자 필터 때문에 안 보여 create() 가 unique 제약에 걸렸다.
+ *  ② **같은 사용자**가 다른 팀으로 살아 있는 신청서를 갖고 있으면 새 신청을 막는다. unique
+ *     가 팀 단위라 DB 로는 못 막는 조합이고, C2 결함이 만들던 유령 신청서(한 사람이 한
+ *     팀매치에 2건)가 정확히 이 모양이다 — 호스트가 유령 쪽을 승인하면 approveApplication
+ *     이 나머지 requested 를 자동 거절해 **신청한 적 없는 팀이 상대팀으로 확정**된다.
+ *     다른 사람이 자기 팀으로 내는 신청은 정상 경쟁이므로 막지 않는다.
+ */
+function judgeApplicationAttempt(
+  teamMatch: Pick<V1TeamMatch, 'hostTeamId' | 'status' | 'startAt' | 'deadlineAt'>,
+  ledger: TeamMatchApplicationLedgerRow[],
+  userId: string,
   applicantTeamId: string,
-  application?: V1TeamMatchApplication,
+): { reasonCode: string; teamApplication?: TeamMatchApplicationLedgerRow } {
+  const teamApplication = ledger.find((row) => row.applicantTeamId === applicantTeamId);
+  const reasonCode = getEligibilityReason(teamMatch, applicantTeamId, teamApplication);
+  if (reasonCode !== 'OK') return { reasonCode, teamApplication };
+  const liveOnAnotherTeam = ledger.some(
+    (row) =>
+      row.appliedByUserId === userId &&
+      row.applicantTeamId !== applicantTeamId &&
+      isLiveApplication(row.status),
+  );
+  if (liveOnAnotherTeam) return { reasonCode: 'ALREADY_REQUESTED_WITH_ANOTHER_TEAM', teamApplication };
+  return { reasonCode: 'OK', teamApplication };
+}
+
+function getEligibilityReason(
+  teamMatch: Pick<V1TeamMatch, 'hostTeamId' | 'status' | 'startAt' | 'deadlineAt'>,
+  applicantTeamId: string,
+  application?: Pick<V1TeamMatchApplication, 'status'>,
 ) {
   if (teamMatch.hostTeamId === applicantTeamId) return 'HOST_TEAM_CANNOT_APPLY';
   if (application?.status === 'requested') return 'ALREADY_REQUESTED';
@@ -1835,6 +1956,7 @@ function getEligibilityReasonMessage(reasonCode: string) {
     OK: '신청할 수 있어요.',
     HOST_TEAM_CANNOT_APPLY: '호스트 팀은 자기 팀매치에 신청할 수 없어요.',
     ALREADY_REQUESTED: '이미 신청해서 승인을 기다리고 있어요.',
+    ALREADY_REQUESTED_WITH_ANOTHER_TEAM: '이미 다른 팀으로 신청 중이에요. 그 신청을 먼저 취소해주세요.',
     ALREADY_APPROVED: '이미 승인된 신청이에요.',
     MATCHED_ALREADY: '이미 매칭이 완료됐어요.',
     NOT_RECRUITING: '지금은 모집 중인 팀매치가 아니에요.',

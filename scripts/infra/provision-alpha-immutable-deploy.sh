@@ -11,6 +11,7 @@ readonly ALPHA_GITHUB_REPOSITORY=kim-song-jun/matchup-sports-platform
 
 readonly API_REPOSITORY=teameet-alpha-v1-api
 readonly WEB_REPOSITORY=teameet-alpha-v1-web
+readonly runtime_parameter='/teameet/alpha/env/SLACK_INQUIRY_WEBHOOK_URL'
 
 account_id="$(aws sts get-caller-identity --query Account --output text)"
 if [[ "${account_id}" != "${ALPHA_EXPECTED_ACCOUNT_ID}" ]]; then
@@ -109,6 +110,7 @@ github_policy="$(jq -nc \
   --arg region "${ALPHA_AWS_REGION}" --arg account "${account_id}" \
   --arg bucket "${ALPHA_DEPLOY_BUCKET}" --arg instance "${ALPHA_EC2_INSTANCE_ID}" \
   --arg api "${API_REPOSITORY}" --arg web "${WEB_REPOSITORY}" \
+  --arg runtimeParameter "${runtime_parameter}" \
   '{Version:"2012-10-17",Statement:[
     {Sid:"EcrLogin",Effect:"Allow",Action:"ecr:GetAuthorizationToken",Resource:"*"},
     {Sid:"ImmutableImagePush",Effect:"Allow",Action:["ecr:BatchCheckLayerAvailability","ecr:BatchGetImage","ecr:CompleteLayerUpload","ecr:DescribeImages","ecr:DescribeImageScanFindings","ecr:DescribeRepositories","ecr:GetDownloadUrlForLayer","ecr:InitiateLayerUpload","ecr:PutImage","ecr:UploadLayerPart"],Resource:[("arn:aws:ecr:"+$region+":"+$account+":repository/"+$api),("arn:aws:ecr:"+$region+":"+$account+":repository/"+$web)]},
@@ -116,7 +118,8 @@ github_policy="$(jq -nc \
     {Sid:"ImmutableReleaseObjects",Effect:"Allow",Action:["s3:GetObject","s3:GetObjectVersion","s3:PutObject"],Resource:[("arn:aws:s3:::"+$bucket+"/releases/*"),("arn:aws:s3:::"+$bucket+"/manifests/*")]},
     {Sid:"DescribeAlphaTarget",Effect:"Allow",Action:"ec2:DescribeInstances",Resource:"*"},
     {Sid:"InvokeAlphaInstance",Effect:"Allow",Action:"ssm:SendCommand",Resource:[("arn:aws:ssm:"+$region+"::document/AWS-RunShellScript"),("arn:aws:ec2:"+$region+":"+$account+":instance/"+$instance)]},
-    {Sid:"ReadAlphaCommand",Effect:"Allow",Action:"ssm:GetCommandInvocation",Resource:"*"}
+    {Sid:"ReadAlphaCommand",Effect:"Allow",Action:"ssm:GetCommandInvocation",Resource:"*"},
+    {Sid:"WriteAlphaRuntimeParameter",Effect:"Allow",Action:"ssm:PutParameter",Resource:("arn:aws:ssm:"+$region+":"+$account+":parameter"+$runtimeParameter)}
   ]}')"
 aws iam put-role-policy --role-name "${ALPHA_GITHUB_ROLE_NAME}" \
   --policy-name TeameetAlphaImmutableReleasePush \
@@ -131,10 +134,12 @@ pull_policy="$(jq -nc \
   --arg region "${ALPHA_AWS_REGION}" --arg account "${account_id}" \
   --arg bucket "${ALPHA_DEPLOY_BUCKET}" \
   --arg api "${API_REPOSITORY}" --arg web "${WEB_REPOSITORY}" \
+  --arg runtimeParameter "${runtime_parameter}" \
   '{Version:"2012-10-17",Statement:[
     {Sid:"EcrLogin",Effect:"Allow",Action:"ecr:GetAuthorizationToken",Resource:"*"},
     {Sid:"ImmutableImagePull",Effect:"Allow",Action:["ecr:BatchGetImage","ecr:GetDownloadUrlForLayer"],Resource:[("arn:aws:ecr:"+$region+":"+$account+":repository/"+$api),("arn:aws:ecr:"+$region+":"+$account+":repository/"+$web)]},
-    {Sid:"PinnedReleaseRead",Effect:"Allow",Action:["s3:GetObject","s3:GetObjectVersion"],Resource:[("arn:aws:s3:::"+$bucket+"/releases/*"),("arn:aws:s3:::"+$bucket+"/manifests/*")]}
+    {Sid:"PinnedReleaseRead",Effect:"Allow",Action:["s3:GetObject","s3:GetObjectVersion"],Resource:[("arn:aws:s3:::"+$bucket+"/releases/*"),("arn:aws:s3:::"+$bucket+"/manifests/*")]},
+    {Sid:"ReadAlphaRuntimeParameter",Effect:"Allow",Action:"ssm:GetParameter",Resource:("arn:aws:ssm:"+$region+":"+$account+":parameter"+$runtimeParameter)}
   ]}')"
 aws iam put-role-policy --role-name "${instance_role}" \
   --policy-name TeameetAlphaImmutableImagePull \

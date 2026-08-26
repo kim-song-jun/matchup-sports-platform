@@ -597,10 +597,18 @@ button:disabled {
      바짝 붙는 것을 막는다. 아래 .tm-bottom-tab span 주석에 열 수·라벨 폭 계산 근거. */
   padding: 0 2px;
   color: var(--grey400);
+  /* [모션] 탭 전환에 색 애니메이션이 없어 활성 탭이 즉시 스냅했다. 하단 내비는
+   * 세션당 가장 많이 눌리는 곳이라 여기의 즉시 전환이 앱 전체를 뻣뻣하게 만든다.
+   * 아이콘(color)과 라벨(span의 color)이 따로 상속되므로 두 곳 모두에 건다.
+   * font-weight(500→700)는 전환 불가 속성이라 그대로 둔다 — 볼드는 순간 전환이
+   * 오히려 자연스럽다. easing 은 .tm-btn 선례를 따라 ease 유지(--ease-standard 와
+   * 다른 곡선이라 통일에는 별도 시각 검증이 필요). */
+  transition: color var(--duration-fast) ease;
 }
 
 .tm-bottom-tab span {
   color: var(--grey500);
+  transition: color var(--duration-fast) ease;
   /* [알파 감사 B] 11px는 R-T2 최소 하한(12px) 미달 — 하단 탭바 6개
      라벨(홈/매치/대회/리그/팀/마이) 전부 해당. 토큰(--font-size-caption)으로
      교체. 탭바는 min-height라 1px 증가가 레이아웃을 깨지 않는다.
@@ -623,6 +631,13 @@ button:disabled {
 .tm-bottom-tab[data-active="true"] span {
   color: var(--blue500);
   font-weight: 700;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tm-bottom-tab,
+  .tm-bottom-tab span {
+    transition: none;
+  }
 }
 
 .tm-auth-frame {
@@ -1414,7 +1429,7 @@ button:disabled {
 }
 
 .tm-pressable {
-  transition: transform 120ms ease, opacity 120ms ease;
+  transition: transform var(--duration-fast) ease, opacity var(--duration-fast) ease;
 }
 
 .tm-pressable:active {
@@ -4985,7 +5000,7 @@ button:disabled {
 }
 
 .tm-complete-check {
-  animation: tm-complete-check 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation: tm-complete-check 0.32s var(--ease-spring) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -5008,7 +5023,7 @@ button:disabled {
   height: 5px;
   border-radius: var(--radius-pill);
   background: var(--grey150);
-  transition: background 240ms ease;
+  transition: background var(--duration-slow) ease;
 }
 
 .tm-signup-progress span[data-on='true'] {
@@ -5082,7 +5097,7 @@ button:disabled {
   color: var(--text-caption);
   cursor: pointer;
   border-radius: var(--radius-control);
-  transition: color 120ms ease;
+  transition: color var(--duration-fast) ease;
 }
 
 .tm-auth-password-toggle:hover {
@@ -5715,7 +5730,7 @@ button:disabled {
   text-align: center;
   opacity: 0;
   transform: scale(0.88) translateY(12px);
-  transition: opacity 0.4s ease, transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: opacity 0.4s ease, transform 0.45s var(--ease-spring);
 }
 .tm-res-hero-in {
   opacity: 1;
@@ -5746,7 +5761,7 @@ button:disabled {
   to   { opacity: 1; transform: translateY(0); }
 }
 .tm-resd-hero   { animation: tmResdFade 0.5s ease both; }
-.tm-resd-trophy { animation: tmResdTrophy 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s both; }
+.tm-resd-trophy { animation: tmResdTrophy 0.7s var(--ease-spring) 0.1s both; }
 .tm-resd-name   { animation: tmResdRise 0.55s ease 0.25s both; }
 .tm-resd-meta   { animation: tmResdRise 0.55s ease 0.38s both; }
 .tm-resd-stat   { animation: tmResdRise 0.5s ease both; }

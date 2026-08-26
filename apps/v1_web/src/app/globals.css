@@ -6989,8 +6989,19 @@ button:disabled {
 .tm-pcard-render-photo {
   width: 100%; height: 100%;
   background-size: cover; background-position: center top;
-  -webkit-mask: linear-gradient(180deg, #000 74%, rgba(0, 0, 0, 0) 100%);
-  mask: linear-gradient(180deg, #000 74%, rgba(0, 0, 0, 0) 100%);
+  /* 사진을 카드에 **녹인다**. 아래로만 페이드하면(예전: 180deg 74%) 좌우·위가 직각으로
+     남아 카드 위에 사각 사진을 붙여 놓은 것처럼 보인다(alpha 실측 2026-08-26, 실제
+     사진 업로드로 확인). 세로·가로 두 그라디언트의 **교집합**을 마스크로 써서 네 변이
+     모두 사라지게 한다 -- 실물 FUT 카드의 배경 제거된 선수 컷아웃에 가장 가까운 근사다.
+     mask-composite 는 표준(intersect)과 WebKit(source-in) 문법이 달라 둘 다 적는다. */
+  -webkit-mask-image:
+    linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, #000 8%, #000 58%, rgba(0, 0, 0, 0) 100%),
+    linear-gradient(90deg, rgba(0, 0, 0, 0) 0%, #000 16%, #000 84%, rgba(0, 0, 0, 0) 100%);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, #000 8%, #000 58%, rgba(0, 0, 0, 0) 100%),
+    linear-gradient(90deg, rgba(0, 0, 0, 0) 0%, #000 16%, #000 84%, rgba(0, 0, 0, 0) 100%);
+  mask-composite: intersect;
 }
 
 /* 이름 줄 -- 실물은 이름 아래에만 헤어라인이 있다. 위아래를 다 그으면 표처럼 보인다. */

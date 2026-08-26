@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+/* 치수 계열 디자인 토큰(간격·라운드·그림자·모션·레이어·컨트롤 크기)의 SSOT.
+ * @theme 블록이 있어 Tailwind 유틸리티와 이 파일의 CSS 클래스가 같은 값을 본다.
+ * 색상 토큰은 아래 :root 가 계속 담당한다. 근거·흡수 규칙은 tokens.css 주석 참조. */
+@import "./tokens.css";
+
 /* 다크모드 전략을 OS 자동(prefers-color-scheme, Tailwind v4 기본값)에서 수동 토글
  * (class 기반)로 전환한다. `<html>`에 .dark 클래스가 있을 때만 dark: 유틸리티가
  * 적용된다 — 적용 여부는 ThemeProvider(src/components/providers/theme-provider.tsx)가

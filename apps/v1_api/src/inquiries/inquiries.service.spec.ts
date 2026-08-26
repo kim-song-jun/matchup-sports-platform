@@ -11,7 +11,8 @@ const user = {
 const now = new Date('2026-07-08T00:00:00.000Z');
 
 describe('InquiriesService', () => {
-  const prisma = {
+  const prisma: any = {
+    $transaction: jest.fn((callback: (tx: any) => unknown) => callback(prisma)),
     v1Inquiry: {
       findMany: jest.fn(),
       create: jest.fn(),
@@ -22,6 +23,9 @@ describe('InquiriesService', () => {
     },
     v1TeamMembership: {
       findFirst: jest.fn(),
+    },
+    v1OutboxEvent: {
+      create: jest.fn(),
     },
   };
   let service: InquiriesService;
@@ -65,6 +69,25 @@ describe('InquiriesService', () => {
         contact: null,
       }),
     });
+    expect(prisma.v1OutboxEvent.create).toHaveBeenCalledWith({
+      data: {
+        businessKey: 'inquiry:inquiry-1:slack-created',
+        aggregateType: 'INQUIRY',
+        aggregateId: 'inquiry-1',
+        type: 'INQUIRY_SLACK_NOTIFICATION',
+        payload: {
+          inquiryId: 'inquiry-1',
+          category: 'account',
+          title: 'Login issue',
+          relatedType: null,
+          relatedId: null,
+          createdAt: now.toISOString(),
+        },
+      },
+    });
+    const outboxPayload = prisma.v1OutboxEvent.create.mock.calls[0][0].data.payload;
+    expect(outboxPayload).not.toHaveProperty('body');
+    expect(outboxPayload).not.toHaveProperty('contact');
   });
 
   it('rejects incomplete related target payloads', async () => {

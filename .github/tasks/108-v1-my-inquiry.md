@@ -142,7 +142,39 @@ Phase 4 - Admin follow-up:
 
 1차 범위에 포함할지 별도 task로 분리할지 결정한다. 운영자가 앱 안에서 답변해야 한다면 admin inquiry queue와 reply/status update API가 필요하다. 단순 접수만이면 1차에서는 admin UI를 제외하고 DB 조회 및 후속 운영 도구로 넘긴다.
 
-## Open Questions
+## Slack Operations Extension (2026-08-26)
+
+### Scope
+
+- Backend: enqueue a durable `INQUIRY_SLACK_NOTIFICATION` outbox event in the same transaction as inquiry creation.
+- Worker: deliver the event to Slack Incoming Webhooks with bounded timeout and existing outbox retry/poison visibility.
+- Infra: inject `SLACK_INQUIRY_WEBHOOK_URL` into the worker only, with repository secret for Alpha and the `production` Environment secret for production.
+- Docs: document the runtime variable and the non-PII Slack message contract.
+
+### Acceptance Criteria
+
+- [x] A successful inquiry creation atomically persists both the inquiry and one uniquely keyed Slack outbox event.
+- [x] The Slack payload contains category, title, inquiry ID, related target metadata, created time, and an environment-correct admin link.
+- [x] Inquiry body and contact are not copied into the outbox payload or Slack message.
+- [x] Slack non-2xx, timeout, or malformed configuration fails the outbox handler so the existing worker retry/poison policy remains observable.
+- [x] Slack delivery failure never rolls back or falsely reports failure for an already-created user inquiry.
+- [x] Alpha and production use separate webhook values under the same runtime variable name.
+
+### Delivery Semantics
+
+- Slack delivery is at-least-once. A webhook request accepted by Slack whose response is lost may be retried and create a duplicate message.
+- The inquiry ID is included in every message so operators can recognize and collapse duplicates.
+- The Teameet database and admin inquiry screen remain the source of truth; Slack is an operational notification and deep-link surface only.
+
+### Progress Snapshot
+
+- [x] Slack app and separate Alpha/production Incoming Webhooks created and manually smoke-tested (`HTTP 200`, `ok`).
+- [x] GitHub repository Alpha secret and `production` Environment secret registered as `SLACK_INQUIRY_WEBHOOK_URL` without exposing values.
+- [x] Backend outbox producer and worker handler implemented.
+- [x] Deployment runtime injection implemented.
+- [x] Narrow tests and diff hygiene complete.
+
+## Historical Open Questions
 
 - 1차 문의는 앱 내 DB 접수까지 할지, 이메일 안내형 MVP로 먼저 둘지 결정이 필요하다. 저장소 규칙상 “문의 완료”를 보여주려면 실제 API 접수가 필요하다.
 - 문의 유형 범위는 `계정`, `매치`, `팀`, `대회`, `결제/환불`, `신고`, `기타` 중 어디까지 열지 정해야 한다.

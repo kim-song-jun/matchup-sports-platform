@@ -663,6 +663,7 @@ jobs:
           SECRET_GABIA_SENDER_NUMBER: ${{ secrets.GABIA_SENDER_NUMBER }}
           SECRET_SES_REGION: ${{ vars.SES_REGION }}
           SECRET_EMAIL_FROM: ${{ vars.EMAIL_FROM }}
+          SECRET_SLACK_INQUIRY_WEBHOOK_URL: ${{ secrets.SLACK_INQUIRY_WEBHOOK_URL }}
         run: bash scripts/release/sync-prod-runtime-env.sh
 
       - name: Run deploy-prod.sh

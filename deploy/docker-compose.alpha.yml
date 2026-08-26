@@ -24,6 +24,7 @@ services:
       DATABASE_URL: postgresql://${V1_DB_USER:-teameet_v1}:${V1_DB_PASSWORD:-${DB_PASSWORD}}@v1_postgres:5432/${V1_DB_NAME:-teameet_v1}
       NODE_ENV: production
       WORKER_PORT: ${WORKER_PORT:-8122}
+      FRONTEND_URL: https://alpha.teameet.co.kr
     healthcheck:
       test:
         [

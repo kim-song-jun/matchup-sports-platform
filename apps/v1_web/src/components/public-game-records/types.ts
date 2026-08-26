@@ -391,9 +391,27 @@ export interface PublicTeamRecordsResponse {
 export interface PublicUserRecordItem {
   readonly id: string;
   readonly gameId: string;
+  /**
+   * F6 -- 개인 전적 한 건의 정본 분류. 팀 전적(`PublicTeamRecordItem.type`)과 **같은
+   * 값 집합·같은 판정 함수**(`team-record-category.ts`)를 쓴다 -- 같은 경기를 두 화면이
+   * 다르게 부르지 않게 하기 위함이다.
+   */
+  readonly type: TeamRecordCategory;
+  /**
+   * 구 클라이언트 호환용 별칭(`summary.mvpCount`와 같은 성격). 게임의 *소스 타입*
+   * 이분법일 뿐이라 리그 경기를 친선 팀매치와 구분하지 못한다 -- 신규 화면은 반드시
+   * 위 `type`을 읽는다.
+   */
   readonly matchType: 'tournament' | 'team_match';
   readonly tournamentId: string | null;
   readonly tournamentTitle: string | null;
+  /**
+   * 정규 리그 대진에서만 채워진다 (`tournamentId`가 있는 대회 경기와 리그가 아닌
+   * 친선 팀매치는 둘 다 null). `PublicTeamRecordItem`과 동일한 사슬
+   * (game.teamMatchId -> V1TeamMatch.leagueId -> V1League.title)로 서버가 해석한다.
+   */
+  readonly leagueId: string | null;
+  readonly leagueTitle: string | null;
   readonly round: string | null;
   readonly teamId: string | null;
   readonly teamName: string | null;

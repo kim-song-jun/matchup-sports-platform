@@ -43,13 +43,16 @@ export interface PlayerCardInput {
   /** 기록 공개 동의 여부. false 면 기록 3항목이 잠긴다. */
   readonly recordsConsented: boolean;
   /**
-   * 이 사용자에게 연결된 경기 참가 기록이 하나라도 있는가.
+   * 동의를 켜면 **실제로 공개될 공식 결과가 하나라도 있는가**
+   * (`games/public-records/player-card-stats.ts` 의 `hasUnlockableRecords`).
    *
-   * 동의를 켜면 열리는 것이 **실제로 있는지**를 가른다. 연결이 하나도 없는 사람에게
-   * "기록 공개를 켜면 열려요" 라고 말하면 켜도 아무것도 안 열리는 거짓 약속이 된다 --
-   * alpha 실측(2026-08-24)에서 0경기 사용자가 정확히 그 안내를 받고 있었다.
+   * 옛 이름은 `hasRecordLinks`("연결이 있는가")였는데, 그 질문은 답이 달라서 거짓 약속을
+   * 낳았다 -- 연결은 라인업 저장·대회 명단 등록 시점에 생기고 공식 결과는 그보다 한참
+   * 뒤에(또는 끝내) 생기지 않는다. 연결만 보고 "기록 공개를 켜면 열려요"라고 말하면 켜도
+   * 0건인 사람이 나온다(2026-08-24 alpha 실측, 2026-08-26 라인업 경로 재발).
+   * 이름을 바꾼 이유가 그것이다 -- 이 자리에 들어올 값의 조건을 이름이 직접 말하게 했다.
    */
-  readonly hasRecordLinks: boolean;
+  readonly hasUnlockableRecords: boolean;
   /** 저장된 모양 선택. 잠금은 buildPlayerCard 가 다시 판정한다. */
   readonly savedShape?: string | null;
 }
@@ -176,9 +179,9 @@ export function buildPlayerCard(input: PlayerCardInput): PlayerCard {
   // 기록 3항목은 2층(동의 필요) 데이터다. 동의가 없으면 출전 수와 무관하게 잠근다 --
   // 이 잠금이 곧 "기록 공개를 켜면 3개가 열려요" 라는 이 기능의 목적이다.
   const recordLock = (): PlayerCardLockReason | null => {
-    // 연결된 기록이 없으면 동의는 해결책이 아니다. 그 사람에게 필요한 건 경기다.
+    // 동의를 켜도 열릴 것이 없으면 동의는 해결책이 아니다. 그 사람에게 필요한 건 경기다.
     // 순서가 중요하다 -- 동의를 먼저 보면 0경기 사용자에게 거짓 약속을 하게 된다.
-    if (!input.hasRecordLinks) return { type: 'appearances', remaining: Math.max(1, MIN_APPEARANCES_FOR_RATE_STATS - appearances) };
+    if (!input.hasUnlockableRecords) return { type: 'appearances', remaining: Math.max(1, MIN_APPEARANCES_FOR_RATE_STATS - appearances) };
     if (!input.recordsConsented) return { type: 'consent' };
     return null;
   };
@@ -198,8 +201,8 @@ export function buildPlayerCard(input: PlayerCardInput): PlayerCard {
   };
 
   const appLock = (): PlayerCardLockReason | null => {
-    // APP 은 1경기부터 열리므로, 연결이 없을 때의 안내도 "3경기"가 아니라 "1경기"다.
-    if (!input.hasRecordLinks) return { type: 'appearances', remaining: 1 };
+    // APP 은 1경기부터 열리므로, 열릴 기록이 없을 때의 안내도 "3경기"가 아니라 "1경기"다.
+    if (!input.hasUnlockableRecords) return { type: 'appearances', remaining: 1 };
     if (!input.recordsConsented) return { type: 'consent' };
     if (appearances < 1) return { type: 'appearances', remaining: 1 };
     return null;

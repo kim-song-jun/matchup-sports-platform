@@ -1758,6 +1758,34 @@ export function useV1LeagueClaimableParticipants(
 }
 
 /**
+ * 리그 상세(순위·득점·도움)의 "내 기록 연결" 배너용 목록 (F8, 2026-08-26).
+ *
+ * 리그 상세의 득점·도움 빈 상태는 "신원 연동과 기록 공개에 동의하면 순위가 공개돼요"라고
+ * 이유를 말하면서 **연동을 시작할 수단은 주지 않았다**. 이 목록이 그 길이다 — 내 팀이
+ * 참가했고 아직 연결되지 않은 참가자가 남은 대진만 돌려준다(서버 필터).
+ */
+export type V1LeagueClaimableFixtures = {
+  leagueId: string;
+  fixtures: {
+    teamMatchId: string;
+    title: string;
+    startAt: string;
+    claimableCount: number;
+  }[];
+};
+
+export function useV1LeagueClaimableFixtures(leagueId: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: ['v1', 'league-claimable-fixtures', leagueId] as const,
+    queryFn: () =>
+      v1Get<V1LeagueClaimableFixtures>(`/league-matches/${leagueId}/claimable-fixtures`),
+    enabled: Boolean(leagueId) && (options?.enabled ?? true),
+    // 비로그인(401)·세션 만료는 정상 응답이다 -- 재시도해도 달라지지 않는다.
+    retry: false,
+  });
+}
+
+/**
  * 승인함 목록 (attest UI C안) — 이 경기에서 내가 승인할 수 있는 대기 중 신원 연결 요청.
  * game 경로라 대회·리그(팀매치) 어느 소스든 같은 훅을 쓴다.
  */

@@ -3,11 +3,20 @@
 import { competitionRanks } from '@/lib/competition-ranks';
 import Link from 'next/link';
 import { Trophy } from 'lucide-react';
-import { useMemo, useState } from 'react';
-import { useV1LeagueMatch, useV1LeagueMatchPlayerRecords, useV1LeagueMatchStandings } from '@/hooks/use-v1-api';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  useV1AuthMe,
+  useV1LeagueClaimableFixtures,
+  useV1LeagueMatch,
+  useV1LeagueMatchPlayerRecords,
+  useV1LeagueMatchStandings,
+  useV1MyTeams,
+  useV1RecordConsent,
+} from '@/hooks/use-v1-api';
 import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { extractErrorMessage } from '@/lib/error-message';
+import { hasStoredV1Session } from '@/lib/session-storage';
 import { LEAGUE_STATE_META } from '@/lib/league-state-meta';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { fixtureResultLabel, fixtureStatusMeta, isUpcomingFixture, type TeamLookupEntry } from './league-fixture-meta';
@@ -240,6 +249,231 @@ function SeasonSummaryCard({
   );
 }
 
+/**
+ * 배너에 한 번에 펼칠 대진 수. 한 시즌이면 미연결 대진이 수십 개가 될 수 있어, 그대로
+ * 늘어놓으면 배너가 순위표를 화면 밖으로 밀어낸다. 나머지는 건수만 알리고 바로 위
+ * "경기 일정" 목록으로 보낸다.
+ */
+const CLAIM_FIXTURE_PREVIEW_LIMIT = 3;
+
+/** 기록 공개 동의 토글이 이미 살고 있는 화면. 여기서 새로 만들지 않고 그리로 보낸다. */
+const RECORD_CONSENT_SETTINGS_PATH = '/my/settings/record-consent';
+
+/**
+ * "연동할 대진이 있어요" 카드 — F8 의 원래 처방.
+ *
+ * 문구는 경기 상세 배너("이 경기에 뛰었는데 내 기록이 없나요?")를 리그 맥락으로만 바꾼
+ * 것이다 — 같은 일을 하는 두 화면이 서로 다른 말을 쓰지 않게 한다.
+ */
+function ClaimFixturesCard({
+  leagueId,
+  fixtures,
+}: {
+  leagueId: string;
+  fixtures: { teamMatchId: string; title: string; startAt: string; claimableCount: number }[];
+}) {
+  const shown = fixtures.slice(0, CLAIM_FIXTURE_PREVIEW_LIMIT);
+  const restCount = fixtures.length - shown.length;
+
+  return (
+    <Card pad={16} className="mt-4" style={{ borderStyle: 'dashed' }}>
+      <div className="tm-text-body-lg">이 리그에서 뛰었는데 내 기록이 없나요?</div>
+      <div className="mt-1 text-sm text-[var(--text-muted)]">
+        경기를 열어 명단에서 본인을 찾아 연결하면 내 활동 기록으로 가져올 수 있어요.
+      </div>
+      <ul className="mt-2 space-y-1">
+        {shown.map((fixture) => (
+          <li key={fixture.teamMatchId}>
+            <Link
+              href={`/league-matches/${leagueId}/fixtures/${fixture.teamMatchId}`}
+              className="tm-pressable tm-list-row-interactive flex min-h-[44px] flex-wrap items-center justify-between gap-x-2 gap-y-1 rounded-lg px-2 text-sm"
+              // 링크 텍스트만으로는 "연결 안 된 참가자 N명"이 무슨 뜻인지 화면 낭독에서
+              // 끊겨 읽힌다 — 목적지를 한 문장으로 붙여 준다.
+              aria-label={`${fixture.title} 경기 상세로 이동, 아직 연결되지 않은 참가자 ${fixture.claimableCount}명`}
+            >
+              <span className="flex flex-wrap items-baseline gap-x-1.5">
+                <span className="font-medium text-[var(--text-strong)]">{fixture.title}</span>
+                {/* 주차 라벨만으로는 어느 경기인지 확신하기 어렵다 — 같은 주차에 여러 경기가
+                    설 수 있고, 재일정도 흔하다. 경기일을 함께 보여 라벨을 대조 가능하게 한다. */}
+                <span className="text-xs text-[var(--text-muted)]">
+                  {formatTournamentDateTimeShort(fixture.startAt) ?? '일정 미정'}
+                </span>
+              </span>
+              <span className="text-[var(--text-muted)]">
+                연결 안 된 참가자 {fixture.claimableCount}명
+                <span aria-hidden="true"> →</span>
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+      {restCount > 0 ? (
+        <div className="mt-2 text-sm text-[var(--text-muted)]">
+          그 밖에 {restCount}경기가 더 있어요. 위 경기 일정에서 해당 경기를 열어 연결할 수 있어요.
+        </div>
+      ) : null}
+    </Card>
+  );
+}
+
+/**
+ * "동의만 남았어요" 카드 — 빈 상태가 요구하는 **두 번째** 조건으로 가는 길 (R5, 2026-08-26).
+ *
+ * ## 왜 필요한가
+ * 빈 상태가 요구하는 것은 신원 연동 **과** 기록 공개 동의 두 가지인데, 위 연동 카드는
+ * 앞쪽만 안내했다. 게다가 서버 목록은 이미 연결을 마친 대진을 빼므로, **연동을 다 끝내고
+ * 동의만 남은 사람에게는 위 카드가 아예 뜨지 않는다** — 순위를 막고 있는 당사자가 정확히
+ * 그 사람인데 아무 안내도 못 받는 상태였다. 리그는 팀장이 라인업을 저장하는 순간 출전
+ * 선수를 자동 연결하므로 이 조합이 예외가 아니라 기본형이다.
+ *
+ * ## 새 화면을 만들지 않는다
+ * 동의 토글은 `/my/settings/record-consent` 에 이미 있다. 여기서 토글을 한 번 더 구현하면
+ * 같은 동의를 켜는 자리가 셋(설정·홈 넛지·리그)이 되고, 정책 해시와 "과거 경기까지 소급
+ * 공개된다"는 고지 문구가 화면마다 어긋날 여지가 생긴다. 그래서 이 카드는 **그 화면으로
+ * 보내기만** 한다.
+ *
+ * ## 노출 규칙 — 홈 넛지와 **같은 조건**을 쓴다
+ * `home-client.tsx` 의 `showRecordConsentNudge` 와 같은 두 항이다.
+ * - `hasResponded === false`: 한 번이라도 답한 적 있으면 띄우지 않는다. `granted:false` 는
+ *   "거부"와 "아직 안 물어봄"을 구분하지 못하는데, **명시적으로 끈 사람을 다시 조르는 것은
+ *   같은 요청을 반복하는 것**이다. 리그는 참가 중인 리그 수만큼 이 화면이 있어서 닫기 버튼도
+ *   노출 상한도 없는 이 카드가 그만큼 반복된다 — 홈보다 오히려 더 끈질기다. 옛 서버 응답에는
+ *   이 필드가 없는데, 그때는 판단 근거가 없으므로 띄우지 않는다(홈과 동일).
+ *   `hasResponded === false` 면 동의 row 자체가 없다는 뜻이라 `granted` 는 반드시 false 다
+ *   (profile.service.ts `withPendingRecordSignal`: `hasResponded = consent !== null`) — 그래서
+ *   `granted` 를 따로 보지 않아도 "이미 동의한 사람"은 자동으로 걸러진다.
+ * - `pendingRecordCount > 0`: 켜도 아무것도 안 바뀌는 사람에게 권하면 켜고 나서 화면이
+ *   그대로라 신뢰만 잃는다.
+ *
+ * 두 화면이 다른 규칙을 쓰면 "홈에서는 안 조르는데 리그에서는 조른다"가 되어, 사용자가
+ * 어디서 끄면 끝나는지를 알 수 없게 된다.
+ */
+function RecordConsentPointerCard({ tightTop }: { tightTop: boolean }) {
+  const consent = useV1RecordConsent();
+  const pendingCount = consent.data?.pendingRecordCount ?? 0;
+  if (consent.data?.hasResponded !== false || pendingCount === 0) return null;
+
+  return (
+    // 위 연동 카드와 함께 뜰 때는 간격을 좁혀 **한 덩어리의 두 단계**로 읽히게 한다.
+    // 같은 무게의 dashed 카드 둘이 같은 간격으로 떨어져 있으면 순위표 밑에 서로 무관한
+    // 안내가 두 개 쌓인 것처럼 보인다(둘 다 필요한 사용자가 실제로 있다 — 연결도 동의도
+    // 남은 사람).
+    <Card pad={16} className={tightTop ? 'mt-2' : 'mt-4'} style={{ borderStyle: 'dashed' }}>
+      <div className="tm-text-body-lg">내 경기 기록이 아직 비공개예요</div>
+      <div className="mt-1 text-sm text-[var(--text-muted)]">
+        공개를 켜면 내 계정에 연결된 경기 {pendingCount}건의 기록이 공개돼요. 득점·도움이 있으면
+        이 리그 순위에도 이름이 나타나요.
+      </div>
+      <Link href={RECORD_CONSENT_SETTINGS_PATH} className="tm-btn tm-btn-sm tm-btn-outline mt-3">
+        기록 공개 설정 열기
+        <span aria-hidden="true"> →</span>
+      </Link>
+    </Card>
+  );
+}
+
+/**
+ * "내 기록 연결" 배너 — 리그 판 (F8, 2026-08-26 / R5 후속 2026-08-26).
+ *
+ * 득점·도움 순위의 빈 상태는 "선수가 신원 연동과 경기 기록 공개에 동의하면 순위가
+ * 공개돼요"라고 이유를 정직하게 말하는데, **정작 이 화면에는 그 둘 중 어느 것도 시작할
+ * 길이 없었다.** 이 컴포넌트가 두 길을 모두 놓는다 — 연동은 경기 상세의
+ * `LeagueClaimMyRecordSection`("명단에서 나 찾기")으로, 동의는 기존 설정 화면으로
+ * 보낸다(사용자 확정 C안 — 기존 패턴 재사용: 두 화면 모두 새로 만들지 않는다).
+ *
+ * ## 노출 규칙
+ * 둘 다 로그인 전제다. 그 위에서 두 카드가 각자 자기 조건을 본다.
+ * - 연동 카드: 연결할 대진이 1건 이상일 때. 서버가 "내 팀이 참가했고 이미 치러졌으며 아직
+ *   연결 안 된 참가자가 남은 대진"으로 좁혀 주므로, 뜬 행은 전부 실제로 연결을 시작할 수 있다.
+ * - 동의 카드: **이 리그 참가자**이고 아직 동의를 묻지 않았고 켜면 공개될 기록이 있을 때.
+ *
+ * ## 참가자 판정을 "내 팀 ∩ 이 리그 참가팀"으로 하는 이유 (공개 화면의 비용)
+ * 연동 목록은 "연결할 게 남았는가"만 답하므로 **이미 다 연결한 사람과 구경꾼을 구분하지
+ * 못한다** — 바로 그 사람이 동의 안내의 대상이라 다른 신호가 필요하다. 그런데 이 화면은
+ * **로그인하지 않아도 열리는 공개 순위표**라, boolean 하나를 위해 무거운 조회를 붙이면
+ * 안 된다.
+ *
+ * `/league-matches/me`(내 리그)는 그 용도로 너무 비싸다 — 서버가 내가 속한 non-draft 리그
+ * **하나하나마다 순위표를 통째로 계산해서**(`listMine` → 리그마다 `standings()` = 리그
+ * 조회 + 대진 + 공식기록 + 승강 4쿼리) 돌려주는데, 여기서 읽는 건 리그 id 뿐이라 나머지는
+ * 전부 버려진다. 참가 리그가 3개면 한 번 열 때마다 14쿼리다.
+ *
+ * 대신 **이 화면이 이미 받아 둔 순위표의 참가팀 목록**(`leagueTeamIds`)과 `/me/teams`(내
+ * 활성 팀)를 교차한다. 순위표는 서버가 `league.teams` 로 행을 만들므로 **경기를 한 번도
+ * 치르지 않은 팀까지 전부** 담겨 시즌 초에도 정확하고, `/me/teams` 는 참가 리그 수와 무관하게
+ * 고정 비용이며 앱의 다른 화면들과 캐시 키를 공유한다(이미 채워져 있을 확률이 높다).
+ * 판정 기준(활성 팀 멤버십)은 두 경로가 같다 — `/me/teams` 쪽이 "해체·삭제된 팀"을 한 겹 더
+ * 걸러 내는 차이뿐이고, 그건 안내를 덜 띄우는 방향이라 거짓 안내를 만들지 않는다.
+ *
+ * 비로그인 관전자에게는 세 조회(연동 목록·내 팀·동의) 모두 꺼진다.
+ */
+function LeagueClaimRecordBanner({
+  leagueId,
+  enabled,
+  leagueTeamIds,
+}: {
+  leagueId: string;
+  enabled: boolean;
+  /**
+   * 이 리그 참가팀 id. 순위표 응답에서 그대로 온다 — 이 판정 때문에 새로 조회하지 않는다.
+   * 순위표를 아직 못 받았거나 조회가 실패했으면 빈 배열이라 안내가 뜨지 않는다(참가자를
+   * 잘못 단정해 남의 화면에 띄우는 것보다, 한 박자 늦게 뜨는 쪽이 안전하다).
+   */
+  leagueTeamIds: string[];
+}) {
+  // 비로그인 관전자가 리그 상세를 열 때마다 401 을 만들 이유가 없다 — 로컬 세션 힌트가
+  // 있을 때만 /auth/me probe 를 보내고, 세션이 확인된 뒤에만 목록을 조회한다
+  // (attest-requests.tsx 와 같은 패턴). 힌트는 SSR 하이드레이션 불일치를 피하려고
+  // effect 에서 읽는다.
+  const [hasSessionHint, setHasSessionHint] = useState(false);
+  useEffect(() => {
+    setHasSessionHint(hasStoredV1Session());
+  }, []);
+  const me = useV1AuthMe({ enabled: hasSessionHint, retry: false });
+  const signedIn = enabled && hasSessionHint && me.data !== undefined;
+  const claimable = useV1LeagueClaimableFixtures(leagueId, { enabled: signedIn });
+  const myTeams = useV1MyTeams(undefined, { enabled: signedIn });
+
+  // 두 파생값 모두 `signedIn` 을 **다시** 건다. React Query 는 `enabled: false` 여도
+  // **캐시에 남아 있는 데이터는 그대로 돌려주기** 때문이다 — 로그아웃 직후(세션 힌트가
+  // 사라졌지만 캐시는 그대로)나, 같은 화면에서 결과가 확정돼 `enabled` 가 false 로 뒤집힌
+  // 뒤에도 옛 데이터로 카드가 계속 뜬다. "내 팀"은 앱 전역이 공유하는 쿼리 키라 팀·대회
+  // 화면을 먼저 다녀오기만 해도 채워지므로 특히 새기 쉽다. `enabled` 는 **요청을** 막을
+  // 뿐 **렌더를** 막지 않는다.
+  //
+  // 조회 실패(401·403·5xx)도 여기서는 조용히 접는다. 이 배너는 부가 안내라, 오류 문구를
+  // 순위 빈 상태 아래에 띄우면 정작 "왜 순위가 비었는가"라는 본문을 가린다.
+  const fixtures = signedIn ? claimable.data?.fixtures ?? [] : [];
+  const myTeamIds = signedIn ? myTeamIdsOf(myTeams.data) : [];
+  const isLeagueParticipant = leagueTeamIds.some((teamId) => myTeamIds.includes(teamId));
+
+  const showClaimCard = fixtures.length > 0;
+  return (
+    <>
+      {showClaimCard ? <ClaimFixturesCard leagueId={leagueId} fixtures={fixtures} /> : null}
+      {/* 동의 조회는 참가자로 확인된 뒤에만 보낸다 — 훅이 마운트될 때 바로 요청하므로
+          조건부 렌더가 곧 조건부 조회다. */}
+      {isLeagueParticipant ? <RecordConsentPointerCard tightTop={showClaimCard} /> : null}
+    </>
+  );
+}
+
+/**
+ * `/me/teams` 응답에서 내 팀 id 만 뽑는다. 이 엔드포인트는 `{ items: [...] }` 로 감싸 주는데
+ * 타입은 배열과의 교차라 두 모양이 다 가능해서, 다른 소비처(`normalizeMyTeams`)와 같은 방식으로
+ * 런타임 모양을 그대로 확인한다.
+ *
+ * 마지막 `Array.isArray` 는 형식적인 방어가 아니다 — 이 배너는 **비로그인도 열리는 공개
+ * 순위표** 위에 얹혀 있어서, 예상 밖 응답 모양에 `.map` 이 터지면 부가 안내 하나 때문에
+ * 순위표 전체가 함께 사라진다. 위쪽 조회 실패를 조용히 접는 것과 같은 이유다.
+ */
+function myTeamIdsOf(data: ReturnType<typeof useV1MyTeams>['data']): string[] {
+  if (!data) return [];
+  const items = 'items' in data ? data.items : data;
+  if (!Array.isArray(items)) return [];
+  return items.map((team) => team.teamId);
+}
+
 export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: string }) {
   const seriesQuery = useV1LeagueMatch(leagueId);
   const standingsQuery = useV1LeagueMatchStandings(leagueId);
@@ -258,8 +492,21 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
     return map;
   }, [standings]);
 
+  // 배너의 참가자 판정("내 팀이 이 리그에 있나")에 쓰는 참가팀 목록. 순위표 응답을 그대로
+  // 재사용하므로 이 판정 때문에 늘어나는 조회가 없다 — 근거는 LeagueClaimRecordBanner 헤더.
+  const leagueTeamIds = useMemo(() => [...teamLookup.keys()], [teamLookup]);
+
   const goalRanks = useMemo(() => competitionRanks((records?.goals ?? []).map((row) => row.goals)), [records]);
   const assistRanks = useMemo(() => competitionRanks((records?.assists ?? []).map((row) => row.assists)), [records]);
+
+  // "내 기록 연결" 배너를 띄울 조건(F8). 득점·도움 중 한쪽이라도 **공개 자격 때문에**
+  // 비어 있을 때만 켠다 — 그 빈 상태가 연동을 요구하는 유일한 화면이고, 그 밖의 빈 상태
+  // ("결과가 쌓이면 나타나요")는 연동과 무관해서 배너가 엉뚱한 처방이 된다.
+  // 이 값이 false 면 목록 조회 자체를 보내지 않는다.
+  const rankingsHiddenByEligibility =
+    records !== undefined &&
+    records.hiddenByEligibility &&
+    (records.goals.length === 0 || records.assists.length === 0);
 
   // 시즌 결산 카드(SeasonSummaryCard) 전용 파생값 — 승격/강등 집계와 공동 득점왕(1위
   // 동점자 전원) 이름. promotionKind가 아직 없는(단발 리그·확정 전) 시즌은 두 카운트
@@ -725,6 +972,15 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
           </ol>
         )}
       </section>
+
+      {/* 득점·도움 두 빈 상태가 같은 이유(공개 자격)를 말하고 hiddenByEligibility 플래그도
+          하나뿐이라, 배너는 절마다 반복하지 않고 두 순위 바로 아래에 한 번만 놓는다.
+          같은 카드가 한 화면에 두 번 뜨면 안내가 아니라 소음이 된다. */}
+      <LeagueClaimRecordBanner
+        leagueId={leagueId}
+        enabled={rankingsHiddenByEligibility}
+        leagueTeamIds={leagueTeamIds}
+      />
     </div>
   );
 }

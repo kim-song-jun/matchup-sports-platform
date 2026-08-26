@@ -873,9 +873,19 @@ describe('LeagueMatchFixturesClient', () => {
 
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('현재 공식 스코어와 비교')).toBeInTheDocument();
-    expect(within(dialog).getByText('전')).toBeInTheDocument();
-    // 정정 전 현재 확정 스코어(3:1)가 "전" 칸에 그대로 보여야 한다.
-    expect(within(dialog).getByText('3 : 1')).toBeInTheDocument();
+
+    // 정정 전 현재 확정 스코어(3:1)가 "전" 칸에 그대로 보여야 한다. 칸을 지정해서 읽는다 —
+    // F5 프리필(2026-08-26) 이후 "후" 칸도 같은 3 : 1 을 렌더하므로 dialog 전체에서
+    // 텍스트만 찾으면 두 요소가 잡혀 어느 칸을 본 건지 알 수 없다.
+    const beforeCell = within(dialog).getByText('전').parentElement;
+    expect(beforeCell).not.toBeNull();
+    expect(within(beforeCell as HTMLElement).getByText('3 : 1')).toBeInTheDocument();
+
+    // "후" 칸은 열자마자 같은 스코어를 보여준다(프리필). '— : —' 로 남으면 득점자만
+    // 고치려는 정정에서도 스코어를 다시 타이핑해야만 제출되는 옛 동작이다.
+    const afterCell = within(dialog).getByText('후').parentElement;
+    expect(afterCell).not.toBeNull();
+    expect(within(afterCell as HTMLElement).getByText('3 : 1')).toBeInTheDocument();
   });
 
   // U1: 요구사항 5 — mutation 훅은 다른 어드민 리그 훅들과 같은 패턴을 따른다. 여기서는

@@ -398,9 +398,10 @@ export class ProfileService {
       reviewCount: reputation?.metricReviewCount ?? 0,
       savedShape: profileShape,
       recordsConsented: consent?.state === V1ConsentState.GRANTED,
-      // 연결된 기록이 하나도 없으면 동의를 켜도 열릴 것이 없다 -- 그 사실을 산식에
-      // 넘겨야 "공개를 켜면 열려요" 라는 거짓 약속을 하지 않는다.
-      hasRecordLinks: records.hasAnyLink,
+      // 동의를 켰을 때 실제로 공개될 공식 결과가 있는지 -- 연결이 있는지가 아니다.
+      // 연결은 라인업 저장·대회 명단 등록 시점에 결과보다 먼저 생기므로, 그것만 보고
+      // 넘기면 "공개를 켜면 열려요" 라는 거짓 약속을 하게 된다.
+      hasUnlockableRecords: records.hasUnlockableRecords,
     });
   }
 

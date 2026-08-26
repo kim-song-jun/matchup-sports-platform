@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { resolveTeamRecordResult } from '../../game-operations/team-record-result';
 import { parseTournamentFixtureOfficialScore } from '../../tournaments/tournament-fixture-official-result';
 import { PublicRecordsQueryDto } from './dto/public-records-query.dto';
+import { classifyTeamRecordCategory } from './team-record-category';
 import { decodeRecordCursor, encodeRecordCursor, isAfterCursor, type RecordCursor } from './public-cursor';
 import {
   isParticipantOwnerVisible,
@@ -18,6 +19,7 @@ interface EligibleResultRow {
   readonly gameId: string;
   readonly sourceType: string;
   readonly tournamentFixtureId: string | null;
+  readonly teamMatchId: string | null;
   readonly sideId: string;
   readonly goals: number;
   readonly assists: number;
@@ -210,7 +212,15 @@ export class PublicUserRecordsService {
             mvpParticipantId: true,
             score: true,
             game: {
-              select: { sourceType: true, tournamentFixtureId: true, currentOfficialRevisionId: true },
+              select: {
+                sourceType: true,
+                tournamentFixtureId: true,
+                // 리그 맥락은 게임에 직접 실려 있지 않다 -- 팀매치를 거쳐야만 얻어진다
+                // (game.teamMatchId -> V1TeamMatch.leagueId -> V1League.title). 팀 전적
+                // (`public-team-records.service.ts`)이 쓰는 것과 같은 사슬이다.
+                teamMatchId: true,
+                currentOfficialRevisionId: true,
+              },
             },
           },
         },
@@ -252,6 +262,7 @@ export class PublicUserRecordsService {
         gameId: revision.gameId,
         sourceType: revision.game.sourceType,
         tournamentFixtureId: revision.game.tournamentFixtureId,
+        teamMatchId: revision.game.teamMatchId,
         sideId: row.sideId,
         goals: row.goals,
         assists: row.assists,
@@ -275,8 +286,11 @@ export class PublicUserRecordsService {
     const fixtureIds = Array.from(
       new Set(rows.map((row) => row.tournamentFixtureId).filter((id): id is string => id !== null)),
     );
+    const teamMatchIds = Array.from(
+      new Set(rows.map((row) => row.teamMatchId).filter((id): id is string => id !== null)),
+    );
 
-    const [sides, fixtures] = await Promise.all([
+    const [sides, fixtures, teamMatches] = await Promise.all([
       this.prisma.v1GameSide.findMany({
         where: { gameId: { in: gameIds } },
         select: { id: true, gameId: true, sideKey: true, teamId: true, displayNameSnapshot: true },
@@ -287,6 +301,14 @@ export class PublicUserRecordsService {
             where: { id: { in: fixtureIds } },
             select: { id: true, tournamentId: true, round: true },
           }),
+      // 팀 전적과 같은 "단일 IN 조회로 맥락을 붙이는" 2단계 패턴 -- 행마다 조회하면
+      // N+1 이 된다. 1단계: 팀매치 -> leagueId, 2단계(아래): 리그 -> title.
+      teamMatchIds.length === 0
+        ? []
+        : this.prisma.v1TeamMatch.findMany({
+            where: { id: { in: teamMatchIds } },
+            select: { id: true, leagueId: true },
+          }),
     ]);
 
     const sidesByGame = new Map<string, typeof sides>();
@@ -296,6 +318,7 @@ export class PublicUserRecordsService {
       sidesByGame.set(side.gameId, list);
     }
     const fixtureById = new Map(fixtures.map((fixture) => [fixture.id, fixture]));
+    const leagueIdByTeamMatchId = new Map(teamMatches.map((teamMatch) => [teamMatch.id, teamMatch.leagueId]));
 
     const teamIds = Array.from(
       new Set(sides.map((side) => side.teamId).filter((id): id is string => id !== null)),
@@ -303,22 +326,31 @@ export class PublicUserRecordsService {
     const tournamentIds = Array.from(
       new Set(fixtures.map((fixture) => fixture.tournamentId)),
     );
-    const [teams, tournaments] = await Promise.all([
+    const leagueIds = Array.from(
+      new Set(Array.from(leagueIdByTeamMatchId.values()).filter((id): id is string => id !== null)),
+    );
+    const [teams, tournaments, leagues] = await Promise.all([
       teamIds.length === 0
         ? []
         : this.prisma.v1Team.findMany({ where: { id: { in: teamIds } }, select: { id: true, name: true } }),
       tournamentIds.length === 0
         ? []
         : this.prisma.v1Tournament.findMany({ where: { id: { in: tournamentIds } }, select: { id: true, title: true } }),
+      leagueIds.length === 0
+        ? []
+        : this.prisma.v1League.findMany({ where: { id: { in: leagueIds } }, select: { id: true, title: true } }),
     ]);
     const teamNameById = new Map(teams.map((team) => [team.id, team.name]));
     const tournamentTitleById = new Map(tournaments.map((tournament) => [tournament.id, tournament.title]));
+    const leagueTitleById = new Map(leagues.map((league) => [league.id, league.title]));
 
     return rows.map((row) => {
       const gameSides = sidesByGame.get(row.gameId) ?? [];
       const ownSide = gameSides.find((side) => side.id === row.sideId) ?? null;
       const opponentSide = gameSides.find((side) => side.id !== row.sideId) ?? null;
       const fixture = row.tournamentFixtureId === null ? null : (fixtureById.get(row.tournamentFixtureId) ?? null);
+      const tournamentId = fixture?.tournamentId ?? null;
+      const leagueId = row.teamMatchId === null ? null : (leagueIdByTeamMatchId.get(row.teamMatchId) ?? null);
 
       let result: 'WON' | 'LOST' | 'DRAWN' | null = null;
       if (row.score !== null && ownSide !== null) {
@@ -339,9 +371,18 @@ export class PublicUserRecordsService {
       return {
         id: row.participantResultId,
         gameId: row.gameId,
+        // `type` 이 화면이 읽는 정본 분류다 -- 팀 전적(`public-team-records.service.ts`)과
+        // **같은 함수**(`classifyTeamRecordCategory`)를 그대로 호출해 두 화면이 같은
+        // 경기를 다르게 부르지 않게 한다(리그 경기가 친선과 뭉뚱그려지던 F6 결함).
+        type: classifyTeamRecordCategory({ tournamentId, leagueId }),
+        // 구 클라이언트 호환용 별칭 -- 게임의 *소스 타입* 이분법(대회 픽스처/팀매치)일
+        // 뿐이라 리그를 구분하지 못한다. 신규 화면은 위 `type` 을 쓴다(같은 파일의
+        // `mvpCount` -> `matchMvpCount` 별칭과 같은 이유·같은 방식).
         matchType: row.sourceType === 'TOURNAMENT_FIXTURE' ? ('tournament' as const) : ('team_match' as const),
-        tournamentId: fixture?.tournamentId ?? null,
-        tournamentTitle: fixture ? (tournamentTitleById.get(fixture.tournamentId) ?? null) : null,
+        tournamentId,
+        tournamentTitle: tournamentId === null ? null : (tournamentTitleById.get(tournamentId) ?? null),
+        leagueId,
+        leagueTitle: leagueId === null ? null : (leagueTitleById.get(leagueId) ?? null),
         round: fixture?.round ?? null,
         teamId: ownSide?.teamId ?? null,
         teamName: ownSide ? (ownSide.teamId ? (teamNameById.get(ownSide.teamId) ?? null) : ownSide.displayNameSnapshot) : null,

@@ -374,7 +374,7 @@ function Drawer({
         aria-hidden={!open}
         className={[
           'fixed inset-y-0 left-0 z-50 w-[280px] bg-[var(--card-surface)] flex flex-col',
-          'shadow-[var(--shadow-sidebar)]',
+          'shadow-[var(--shadow-drawer)]',
           'transition-transform motion-reduce:transition-none',
           open ? 'translate-x-0 visible' : '-translate-x-full invisible',
         ].join(' ')}

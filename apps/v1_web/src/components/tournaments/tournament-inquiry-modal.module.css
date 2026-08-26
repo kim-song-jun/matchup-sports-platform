@@ -13,7 +13,7 @@
   width: 100%;
   max-height: calc(100dvh - 12px);
   overflow: hidden;
-  border-radius: 16px 16px 0 0;
+  border-radius: var(--radius-container) var(--radius-container) 0 0;
   background: var(--surface);
   box-shadow: 0 -8px 30px rgb(20 28 45 / 14%);
   animation: inquiry-slide-up 180ms ease-out;
@@ -47,7 +47,7 @@
   width: 42px;
   height: 42px;
   place-items: center;
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   background: var(--blue50);
   color: var(--blue500);
 }
@@ -74,7 +74,7 @@
   height: 44px;
   place-items: center;
   border: 0;
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
@@ -98,7 +98,7 @@
   display: grid;
   gap: 10px;
   padding: 14px 16px;
-  border-radius: 16px;
+  border-radius: var(--radius-container);
   background: var(--grey50);
 }
 
@@ -172,7 +172,7 @@
 
 .errorBanner {
   padding: 12px 14px;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--red50);
 }
 
@@ -182,7 +182,7 @@
   justify-content: space-between;
   gap: 12px;
   padding: 14px;
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   background: var(--red50);
   color: var(--red700);
   font-size: 13px;
@@ -225,7 +225,7 @@
   .dialog {
     max-width: 580px;
     max-height: calc(100dvh - 48px);
-    border-radius: 16px;
+    border-radius: var(--radius-container);
     box-shadow: 0 16px 48px rgb(20 28 45 / 18%);
     animation: inquiry-scale-in 160ms ease-out;
   }

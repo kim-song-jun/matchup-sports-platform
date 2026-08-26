@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
 
 const argumentsList = process.argv.slice(2);
@@ -16,6 +17,8 @@ const sourceLibraryPath = 'deploy/alpha-source-common.sh';
 const manifestLibraryPath = 'deploy/alpha-manifest-common.sh';
 const rollbackWorkflowPath = '.github/workflows/rollback-alpha.yml';
 const provisioningPath = 'scripts/infra/provision-alpha-immutable-deploy.sh';
+const policyRendererPath = 'scripts/infra/render-alpha-immutable-deploy-policies.mjs';
+const runtimeSyncPath = 'scripts/release/sync-alpha-inquiry-slack-env.sh';
 const manifestBuilderPath = 'scripts/release/create-alpha-release-manifest.sh';
 const ssmDeployPath = 'scripts/release/deploy-alpha-via-ssm.sh';
 const rollbackBasePath = 'scripts/release/resolve-alpha-rollback-base.sh';
@@ -30,12 +33,17 @@ const sources = new Map([
   [manifestLibraryPath, readRequiredFile(manifestLibraryPath)],
   [rollbackWorkflowPath, readRequiredFile(rollbackWorkflowPath)],
   [provisioningPath, readRequiredFile(provisioningPath)],
+  [policyRendererPath, readRequiredFile(policyRendererPath)],
+  [runtimeSyncPath, readRequiredFile(runtimeSyncPath)],
   [manifestBuilderPath, readRequiredFile(manifestBuilderPath)],
   [ssmDeployPath, readRequiredFile(ssmDeployPath)],
   [rollbackBasePath, readRequiredFile(rollbackBasePath)],
 ]);
 
 const errors = [];
+const runtimePolicies = renderRuntimePolicies();
+if (runtimePolicies !== undefined) validateRuntimePolicies(runtimePolicies, errors);
+validateRuntimeSecretTransport(sources.get(runtimeSyncPath), errors);
 
 requirePatterns(workflowPath, [
   [/amazon-ecr-login/, 'must authenticate to ECR'],
@@ -143,9 +151,15 @@ requirePatterns(rollbackWorkflowPath, [
 
 requirePatterns(provisioningPath, [
   [/sts:AssumeRoleWithWebIdentity/, 'provisioning must pin the GitHub OIDC trust policy'],
+  [/render-alpha-immutable-deploy-policies\.mjs/, 'provisioning must use the canonical IAM policy renderer'],
+  [/Environment[\s\S]*alpha/, 'provisioning must validate the alpha target identity'],
+]);
+
+requirePatterns(policyRendererPath, [
   [/ssm:SendCommand/, 'GitHub role must be able to invoke the exact alpha instance'],
   [/s3:GetObjectVersion/, 'EC2 role must read pinned source and manifest versions'],
-  [/Environment[\s\S]*alpha/, 'provisioning must validate the alpha target identity'],
+  [/ssm:PutParameter/, 'GitHub role must write the scoped alpha runtime parameter'],
+  [/ssm:GetParameter/, 'EC2 role must read the scoped alpha runtime parameter'],
 ]);
 
 forbidPatterns(provisioningPath, [
@@ -159,7 +173,112 @@ if (errors.length > 0) {
 }
 
 console.log('[alpha-immutable-deploy] passed');
-if (runSelfTest) verifyNegativeControls();
+if (runSelfTest) verifyNegativeControls(runtimePolicies);
+
+function renderRuntimePolicies() {
+  const accountId = '123456789012';
+  const result = spawnSync(process.execPath, [
+    policyRendererPath,
+    '--policy', 'all',
+    '--region', 'ap-northeast-2',
+    '--account', accountId,
+    '--bucket', `teameet-alpha-deploy-${accountId}-ap-northeast-2`,
+    '--instance', 'i-00000000000000000',
+  ], {
+    cwd: resolve(sourceRoot),
+    encoding: 'utf8',
+  });
+  if (result.status !== 0) {
+    errors.push(`${provisioningPath}: failed to render IAM policies: ${result.stderr.trim()}`);
+    return undefined;
+  }
+  try {
+    return JSON.parse(result.stdout);
+  } catch (error) {
+    errors.push(`${provisioningPath}: rendered IAM policies are not valid JSON: ${error.message}`);
+    return undefined;
+  }
+}
+
+function validateRuntimePolicies(policies, targetErrors) {
+  const parameterArn = 'arn:aws:ssm:ap-northeast-2:123456789012:parameter/teameet/alpha/env/SLACK_INQUIRY_WEBHOOK_URL';
+  validateRuntimePolicy(
+    policies?.github,
+    {
+      label: 'GitHub deploy role',
+      sid: 'WriteAlphaRuntimeParameter',
+      action: 'ssm:PutParameter',
+      resource: parameterArn,
+    },
+    targetErrors,
+  );
+  validateRuntimePolicy(
+    policies?.instance,
+    {
+      label: 'Alpha EC2 role',
+      sid: 'ReadAlphaRuntimeParameter',
+      action: 'ssm:GetParameter',
+      resource: parameterArn,
+    },
+    targetErrors,
+  );
+}
+
+function validateRuntimePolicy(policy, expected, targetErrors) {
+  const statements = Array.isArray(policy?.Statement) ? policy.Statement : [];
+  const runtimeStatements = statements.filter((statement) => {
+    const actions = Array.isArray(statement?.Action) ? statement.Action : [statement?.Action];
+    return actions.some((action) => action === 'ssm:PutParameter' || action === 'ssm:GetParameter');
+  });
+  if (runtimeStatements.length !== 1) {
+    targetErrors.push(`${provisioningPath}: ${expected.label} must have exactly one runtime Parameter statement`);
+    return;
+  }
+  const [statement] = runtimeStatements;
+  if (
+    statement.Sid !== expected.sid ||
+    statement.Effect !== 'Allow' ||
+    statement.Action !== expected.action ||
+    statement.Resource !== expected.resource
+  ) {
+    targetErrors.push(
+      `${provisioningPath}: ${expected.label} runtime Parameter statement must be exactly ${expected.action} on ${expected.resource}`,
+    );
+  }
+}
+
+function validateRuntimeSecretTransport(source, targetErrors) {
+  if (typeof source !== 'string') {
+    targetErrors.push(`${runtimeSyncPath}: source is unavailable`);
+    return;
+  }
+  if (!/aws ssm put-parameter[\s\S]*?--name "\$\{parameter_name\}"[\s\S]*?--value "\$\{SECRET_SLACK_INQUIRY_WEBHOOK_URL\}"[\s\S]*?--type SecureString/.test(source)) {
+    targetErrors.push(`${runtimeSyncPath}: webhook must enter SSM only through the scoped SecureString`);
+  }
+  const remoteScript = source.match(/remote_script=\$\(cat <<REMOTE\r?\n([\s\S]*?)\r?\nREMOTE\r?\n\)/)?.[1];
+  if (!remoteScript) {
+    targetErrors.push(`${runtimeSyncPath}: remote script boundary is missing`);
+    return;
+  }
+  if (/SECRET_SLACK_INQUIRY_WEBHOOK_URL|hooks\.slack\.com/.test(remoteScript)) {
+    targetErrors.push(`${runtimeSyncPath}: remote script must not contain the webhook secret or its variable`);
+  }
+  if (!/aws ssm get-parameter[\s\S]*?--name \$\{parameter_name\}[\s\S]*?--with-decryption/.test(remoteScript)) {
+    targetErrors.push(`${runtimeSyncPath}: remote script must retrieve the scoped Parameter with decryption`);
+  }
+  const parametersBlock = source.match(/parameters="[\s\S]*?"\r?\ncommand_id=/)?.[0] ?? '';
+  if (!parametersBlock || /SECRET_SLACK_INQUIRY_WEBHOOK_URL|hooks\.slack\.com/.test(parametersBlock)) {
+    targetErrors.push(`${runtimeSyncPath}: SSM parameters must contain only the remote script, never the webhook secret`);
+  }
+  const sendCommand = source.match(/command_id="\$\(aws ssm send-command[\s\S]*?--output text\)"/)?.[0] ?? '';
+  if (
+    !sendCommand ||
+    !/--parameters "\$\{parameters\}"/.test(sendCommand) ||
+    /SECRET_SLACK_INQUIRY_WEBHOOK_URL|hooks\.slack\.com/.test(sendCommand)
+  ) {
+    targetErrors.push(`${runtimeSyncPath}: send-command must receive only the sanitized parameters document`);
+  }
+}
 
 function readRequiredFile(filePath) {
   try {
@@ -189,10 +308,18 @@ function forbidPatterns(filePath, forbidden) {
   }
 }
 
-function verifyNegativeControls() {
+function verifyNegativeControls(renderedPolicies) {
   const originalDeploy = sources.get(deployPath);
   const originalCompose = sources.get(composePath);
-  if (originalDeploy === undefined || originalCompose === undefined) process.exit(1);
+  const originalProvisioning = sources.get(provisioningPath);
+  const originalRuntimeSync = sources.get(runtimeSyncPath);
+  if (
+    originalDeploy === undefined ||
+    originalCompose === undefined ||
+    originalProvisioning === undefined ||
+    originalRuntimeSync === undefined ||
+    renderedPolicies === undefined
+  ) process.exit(1);
 
   sources.set(deployPath, `${originalDeploy}\ndocker build .\n`);
   errors.length = 0;
@@ -215,9 +342,69 @@ function verifyNegativeControls() {
   requirePatterns(deployPath, [[/validate_alpha_release_manifest/, 'deploy must validate the release manifest']]);
   assertRejected('missing manifest validation');
 
+  assertPolicyRejected('swapped runtime Parameter role actions', renderedPolicies, (policies) => {
+    runtimeStatement(policies.github).Action = 'ssm:GetParameter';
+    runtimeStatement(policies.instance).Action = 'ssm:PutParameter';
+  });
+  assertPolicyRejected('extra runtime Parameter action', renderedPolicies, (policies) => {
+    runtimeStatement(policies.github).Action = ['ssm:PutParameter', 'ssm:GetParameter'];
+  });
+  assertPolicyRejected('broad runtime Parameter resource', renderedPolicies, (policies) => {
+    runtimeStatement(policies.github).Resource = 'arn:aws:ssm:ap-northeast-2:123456789012:parameter/teameet/alpha/env/*';
+  });
+
+  errors.length = 0;
+  validateRuntimeSecretTransport(
+    originalRuntimeSync.replace(
+      'remote_script=$(cat <<REMOTE\nset -Eeuo pipefail',
+      'remote_script=$(cat <<REMOTE\nset -Eeuo pipefail\nvalue="${SECRET_SLACK_INQUIRY_WEBHOOK_URL}"',
+    ),
+    errors,
+  );
+  assertRejected('webhook variable in remote script');
+
+  errors.length = 0;
+  validateRuntimeSecretTransport(
+    originalRuntimeSync.replace(
+      'parameters="$(jq -nc --arg script "${remote_script}" \'{commands:[$script]}\')"',
+      'parameters="${SECRET_SLACK_INQUIRY_WEBHOOK_URL}"',
+    ),
+    errors,
+  );
+  assertRejected('webhook variable in SSM parameters');
+
+  errors.length = 0;
+  validateRuntimeSecretTransport(
+    originalRuntimeSync.replace(
+      '--parameters "${parameters}"',
+      '--parameters "${SECRET_SLACK_INQUIRY_WEBHOOK_URL}"',
+    ),
+    errors,
+  );
+  assertRejected('webhook variable in send-command');
+
   sources.set(deployPath, originalDeploy);
+  sources.set(provisioningPath, originalProvisioning);
   errors.length = 0;
   console.log('[alpha-immutable-deploy] negative controls passed');
+}
+
+function assertPolicyRejected(label, renderedPolicies, mutate) {
+  const policies = JSON.parse(JSON.stringify(renderedPolicies));
+  mutate(policies);
+  const policyErrors = [];
+  validateRuntimePolicies(policies, policyErrors);
+  if (policyErrors.length === 0) {
+    console.error(`[alpha-immutable-deploy] negative control was not rejected: ${label}`);
+    process.exit(1);
+  }
+}
+
+function runtimeStatement(policy) {
+  return policy.Statement.find((statement) => {
+    const actions = Array.isArray(statement.Action) ? statement.Action : [statement.Action];
+    return actions.some((action) => action === 'ssm:PutParameter' || action === 'ssm:GetParameter');
+  });
 }
 
 function assertRejected(label) {

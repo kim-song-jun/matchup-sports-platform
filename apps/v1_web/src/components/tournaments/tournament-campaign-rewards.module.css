@@ -1,7 +1,7 @@
 .rewards {
   margin-top: 72px;
   padding: 32px;
-  border-radius: 24px;
+  border-radius: var(--radius-hero);
   background: var(--grey50);
 }
 
@@ -40,13 +40,13 @@
   height: 48px;
   place-items: center;
   flex: 0 0 auto;
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   background: var(--blue50);
   color: var(--blue600);
 }
 
 .prize p { margin: 8px 0 0; color: var(--text-muted); line-height: 1.6; }
-.prizeBreakdown { margin: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 16px; background: var(--bg); }
+.prizeBreakdown { margin: 0; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-container); background: var(--bg); }
 .prizeBreakdown > div {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(96px, auto);

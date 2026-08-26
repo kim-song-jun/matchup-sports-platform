@@ -56,7 +56,7 @@ export function AttestRequestsSection({ gameId }: { gameId: string | null | unde
     (pending.error.statusCode === 403 || pending.error.statusCode === 401);
   if (pending.isError && !isSpectatorDenied) {
     return (
-      <Card pad={16} style={{ marginTop: 10 }}>
+      <Card pad={16} style={{ marginTop: 12 }}>
         <div className="tm-text-body-lg">기록 연결 승인 요청</div>
         <div role="alert" className="tm-text-caption" style={{ marginTop: 4, color: 'var(--red700)' }}>
           {extractErrorMessage(pending.error, '승인 요청을 불러오지 못했어요.')}
@@ -100,34 +100,34 @@ export function AttestRequestsSection({ gameId }: { gameId: string | null | unde
   };
 
   return (
-    <Card pad={16} style={{ marginTop: 10 }}>
+    <Card pad={16} style={{ marginTop: 12 }}>
       <div className="tm-text-body-lg">기록 연결 승인 요청</div>
       <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>
         명단의 이름과 신청한 사람이 같은 선수인지 확인해 주세요. 요청은 24시간 뒤 만료돼요.
       </div>
 
       {lastDecision ? (
-        <div role="status" className="tm-text-caption" style={{ marginTop: 10, color: 'var(--text-strong)' }}>
+        <div role="status" className="tm-text-caption" style={{ marginTop: 12, color: 'var(--text-strong)' }}>
           {lastDecision}
         </div>
       ) : null}
 
       {error ? (
-        <div role="alert" className="tm-text-caption" style={{ marginTop: 10, color: 'var(--red700)' }}>
+        <div role="alert" className="tm-text-caption" style={{ marginTop: 12, color: 'var(--red700)' }}>
           {error}
         </div>
       ) : null}
 
-      <ul style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10, listStyle: 'none', padding: 0 }}>
+      <ul style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 12, listStyle: 'none', padding: 0 }}>
         {requests.map((request) => (
           <li
             key={request.requestId}
-            style={{ display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid var(--border)', paddingTop: 10 }}
+            style={{ display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid var(--border)', paddingTop: 12 }}
           >
             <div className="tm-text-body">
               {request.jerseyNumber !== null ? `${request.jerseyNumber}. ` : ''}
               {request.participantDisplayName}
-              <span className="tm-text-caption" style={{ marginLeft: 6, color: 'var(--text-muted)' }}>
+              <span className="tm-text-caption" style={{ marginLeft: 8, color: 'var(--text-muted)' }}>
                 신청: {request.requesterNickname ?? '알 수 없음'}
               </span>
             </div>

@@ -127,7 +127,7 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
         {/* 매치 요약 카드 */}
         <Card pad={16} style={{ background: 'var(--tint-blue)', borderColor: 'var(--tint-blue-border)' }}>
           <div className="tm-text-body-lg">{matchTitle}</div>
-          <div className="tm-text-caption" style={{ marginTop: 5 }}>
+          <div className="tm-text-caption" style={{ marginTop: 4 }}>
             {/* eligibility 미도착 시 기본값 '자동 승인'을 보여주면 호스트가 승인 방식을
                 오인할 수 있어, 데이터가 준비될 때까지 중립 문구를 표시한다. */}
             {!eligibilityData
@@ -143,22 +143,22 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
 
         {/* 로딩 중 */}
         {applicationsQuery.isLoading ? (
-          <div style={{ marginTop: 14 }}>
+          <div style={{ marginTop: 16 }}>
             <ApplicationsSkeletonList />
           </div>
         ) : applicationsQuery.isError ? (
-          <div style={{ marginTop: 14 }}>
+          <div style={{ marginTop: 16 }}>
             <ErrorCard message="신청 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." />
           </div>
         ) : items.length === 0 ? (
-          <div style={{ marginTop: 14 }}>
+          <div style={{ marginTop: 16 }}>
             <EmptyState
               title="신청자가 없어요"
               sub="신청자가 생기면 여기서 바로 승인하거나 거절할 수 있어요."
             />
           </div>
         ) : (
-          <div className="tm-my-list-stack" style={{ marginTop: 14 }}>
+          <div className="tm-my-list-stack" style={{ marginTop: 16 }}>
             {items.map((application) => (
               <ApplicationRow
                 key={application.applicationId}
@@ -222,7 +222,7 @@ function ApplicationRow({
     application.mannerScore !== null ? application.mannerScore.toFixed(1) : null;
 
   return (
-    <Card pad={14}>
+    <Card pad={16}>
       {/* 신청자 정보 행 */}
       <div
         style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 44 }}
@@ -267,7 +267,7 @@ function ApplicationRow({
           </div>
           <div
             className="tm-text-caption"
-            style={{ marginTop: 2, display: 'flex', gap: 6, flexWrap: 'wrap' }}
+            style={{ marginTop: 2, display: 'flex', gap: 8, flexWrap: 'wrap' }}
           >
             {mannerScore !== null ? (
               /* [P1 숫자:단위 2:1 + tabular-nums] 매너점수 숫자(body-sm weight600) : 단위(caption) */
@@ -310,7 +310,7 @@ function ApplicationRow({
           <button
             className="tm-btn tm-btn-sm tm-btn-neutral tm-btn-block"
             type="button"
-            style={{ marginTop: 10 }}
+            style={{ marginTop: 12 }}
             disabled={actionPending}
             aria-expanded={actionsOpen}
             aria-label={`${application.displayName} 신청 관리`}
@@ -321,7 +321,7 @@ function ApplicationRow({
           {actionsOpen ? (
             <div
               className="tm-member-actions"
-              style={{ marginTop: 10, display: 'flex', gap: 8 }}
+              style={{ marginTop: 12, display: 'flex', gap: 8 }}
             >
               <button
                 className="tm-btn tm-btn-sm tm-btn-primary"
@@ -376,7 +376,7 @@ function ErrorCard({ message }: { message: string }) {
   return (
     <Card pad={16} style={{ background: 'var(--grey50)' }}>
       <div className="tm-text-label">{message}</div>
-      <div className="tm-text-caption" style={{ marginTop: 6, lineHeight: 1.55 }}>
+      <div className="tm-text-caption" style={{ marginTop: 8, lineHeight: 1.55 }}>
         새로고침 후에도 같은 문제가 반복되면 잠시 뒤 다시 시도해 주세요.
       </div>
     </Card>

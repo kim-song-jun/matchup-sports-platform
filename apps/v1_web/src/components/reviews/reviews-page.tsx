@@ -92,7 +92,7 @@ export function ReviewsPageView({
         ) : (
           <>
             <ReviewStats stats={model.stats} />
-            <div style={{ display: 'grid', gap: 10 }}>
+            <div style={{ display: 'grid', gap: 12 }}>
               {loading ? <ReviewSkeleton count={2} /> : null}
               {!loading && errorMessage ? <ReviewNotice title="리뷰를 불러오지 못했어요" sub={errorMessage} onRetry={onRetry} /> : null}
               {!loading && !errorMessage && model.cards.length === 0 ? <ReviewEmpty title={model.emptyTitle} sub={model.emptySub} /> : null}
@@ -128,7 +128,7 @@ function AnonymousReceivedContent({ model }: { model: ReviewsReceivedPageModel }
     <div style={{ marginTop: 24 }}>
       {/* 제도 전/후를 나누지 않는다 — "이전 리뷰" 섹션은 제거했다. 작성자도 공개한다. */}
       <div className="tm-my-section-label">경기에서 받은 리뷰</div>
-      <div className="tm-text-caption" style={{ marginBottom: 10 }}>상호 작성이 끝나거나 72시간이 지나면 보여요.</div>
+      <div className="tm-text-caption" style={{ marginBottom: 12 }}>상호 작성이 끝나거나 72시간이 지나면 보여요.</div>
       {model.userGroups.length > 0 ? <ReceivedGroupSection groups={model.userGroups} title="내가 받은 리뷰" /> : null}
       {model.teamGroups.length > 0 ? (
         <div style={{ marginTop: 16 }}><ReceivedGroupSection groups={model.teamGroups} title="내 팀이 받은 리뷰" /></div>
@@ -191,9 +191,9 @@ export function ReviewSourcePageView({
               onUpdateMetricScore={onUpdateMetricScore}
               onUpdateRating={onUpdateRating}
             />
-            <Card className={message ? 'tm-review-notice-error' : ''} pad={14} style={message ? undefined : { background: 'var(--grey50)' }}>
+            <Card className={message ? 'tm-review-notice-error' : ''} pad={16} style={message ? undefined : { background: 'var(--grey50)' }}>
               <div className="tm-text-label">{message ?? '작성 현황'}</div>
-              <div className="tm-text-caption" style={{ marginTop: 5 }}>{message ? '선택 상태를 확인한 뒤 다시 시도해 주세요.' : model.progressLabel}</div>
+              <div className="tm-text-caption" style={{ marginTop: 4 }}>{message ? '선택 상태를 확인한 뒤 다시 시도해 주세요.' : model.progressLabel}</div>
             </Card>
           </>
         ) : null}
@@ -293,7 +293,7 @@ export function ReviewSubmitCompleteView({ model, onConfirm }: { model: ReviewSo
     <AppChrome title="" activeTab="my" bottomNav={false} backHref="/my/reviews" desktopHead>
       <div className="tm-review-complete">
         <div className="tm-review-complete-icon">✓</div>
-        <div className="tm-text-heading" style={{ marginTop: 22 }}>리뷰를 보냈어요</div>
+        <div className="tm-text-heading" style={{ marginTop: 24 }}>리뷰를 보냈어요</div>
         <Card pad={16} style={{ marginTop: 24, textAlign: 'left' }}>
           <div className="tm-text-label">{model.source.title}</div>
           {/* "별점 선택됨"·"태그 선택됨"은 무엇을 보냈든 항상 같은 문구라 아무것도 알려주지
@@ -364,7 +364,7 @@ function ReviewTargetSections({
           <summary className="tm-review-player-summary">
             선수 개별 평가 <span className="tab-num">{playerTargets.length}</span>명
           </summary>
-          <div className="tm-text-caption" style={{ margin: '6px 0 10px' }}>
+          <div className="tm-text-caption" style={{ margin: '8px 0 12px' }}>
             남기고 싶은 선수만 골라 주세요. 비워 두면 팀 후기만 전송돼요.
           </div>
           <div className="tm-review-target-stack">{playerTargets.map(renderCard)}</div>
@@ -398,7 +398,7 @@ function ReviewStats({ stats }: { stats: Array<{ label: string; value: string }>
   return (
     <div className="tm-review-stat-grid">
       {stats.map((stat) => (
-        <Card key={stat.label} pad={10}>
+        <Card key={stat.label} pad={12}>
           <KPIStat label={stat.label} value={stat.value} />
         </Card>
       ))}
@@ -423,7 +423,7 @@ function ReviewTargetCard({
   const active = !locked && draft.tagCodes.length > 0;
 
   return (
-    <Card className={active ? 'tm-review-target-card tm-review-target-active' : 'tm-review-target-card'} pad={14}>
+    <Card className={active ? 'tm-review-target-card tm-review-target-active' : 'tm-review-target-card'} pad={16}>
       <div className="tm-review-target-head">
         <Avatar imageUrl={target.imageUrl} initials={target.initials} />
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -557,7 +557,7 @@ function ReviewNotice({ onRetry, sub, title }: { onRetry: () => void; sub: strin
   return (
     <Card className="tm-review-notice-error" pad={16}>
       <div className="tm-text-body-lg">{title}</div>
-      <div className="tm-text-caption" style={{ marginTop: 5 }}>{sub}</div>
+      <div className="tm-text-caption" style={{ marginTop: 4 }}>{sub}</div>
       <button className="tm-btn tm-btn-sm tm-btn-neutral" onClick={onRetry} style={{ marginTop: 12 }} type="button">다시 시도</button>
     </Card>
   );
@@ -565,9 +565,9 @@ function ReviewNotice({ onRetry, sub, title }: { onRetry: () => void; sub: strin
 
 function ReviewEmpty({ sub, title }: { sub: string; title: string }) {
   return (
-    <Card pad={18} style={{ textAlign: 'center' }}>
+    <Card pad={20} style={{ textAlign: 'center' }}>
       <div className="tm-text-body-lg">{title}</div>
-      <div className="tm-text-caption" style={{ marginTop: 6 }}>{sub}</div>
+      <div className="tm-text-caption" style={{ marginTop: 8 }}>{sub}</div>
     </Card>
   );
 }

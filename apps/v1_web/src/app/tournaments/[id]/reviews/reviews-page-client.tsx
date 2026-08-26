@@ -33,7 +33,7 @@ function getPageWindow(current: number, total: number): number[] {
 
 function ReviewsListSkeleton() {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div className="tm-skeleton" style={{ height: 96, borderRadius: 12 }} />
       <div className="tm-skeleton" style={{ height: 96, borderRadius: 12 }} />
       <div className="tm-skeleton" style={{ height: 96, borderRadius: 12 }} />
@@ -159,7 +159,7 @@ export function TournamentReviewsPageClient({ tournamentId }: { tournamentId: st
       {showForm && <ReviewFormModal tournamentId={tournamentId} onClose={() => setShowForm(false)} />}
       <div className="tm-tourn-sub-page">
         <div className="tm-reviews-body" style={{ padding: '20px 20px 40px' }}>
-          <header style={{ marginBottom: 14 }}>
+          <header style={{ marginBottom: 16 }}>
             <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: 'var(--text-strong)' }}>
               {tournament ? `${tournament.title} 참가팀 후기` : '참가팀 후기'}
             </h1>
@@ -187,7 +187,7 @@ export function TournamentReviewsPageClient({ tournamentId }: { tournamentId: st
                 display: 'inline-block',
                 color: 'var(--text-caption)',
                 background: 'var(--grey100)',
-                padding: '6px 10px',
+                padding: '8px 12px',
                 borderRadius: 8,
                 margin: '12px 0 4px',
               }}
@@ -208,7 +208,7 @@ export function TournamentReviewsPageClient({ tournamentId }: { tournamentId: st
           {/* 소제목은 위의 "리뷰할 수 있는 경기"와 이 목록을 가르는 역할이라 필요하다. 다만
               문구는 "참가팀 후기"가 아니어야 한다 — alpha 실측에서 같은 말이 한 화면에 세 번
               (상단 바 + h1 + 소제목) 나왔다. "전체 후기"는 검색·페이징 대상이 무엇인지도 함께 알린다. */}
-          <h2 className="tm-hub-section-title" style={{ margin: '24px 0 10px' }}>
+          <h2 className="tm-hub-section-title" style={{ margin: '24px 0 12px' }}>
             전체 후기
           </h2>
 

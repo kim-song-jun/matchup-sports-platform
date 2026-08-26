@@ -65,7 +65,7 @@ export function LeagueStandingsTable({ data }: { data: LeagueStandingsTableData 
           </div>
           <div
             className="tm-text-caption tab-num"
-            style={{ color: 'var(--text-caption)', marginTop: 6 }}
+            style={{ color: 'var(--text-caption)', marginTop: 8 }}
           >
             {progress.played} / {progress.total} · {progress.percent}%
           </div>
@@ -76,9 +76,9 @@ export function LeagueStandingsTable({ data }: { data: LeagueStandingsTableData 
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 6,
-              marginTop: 10,
-              padding: '4px 10px',
+              gap: 8,
+              marginTop: 12,
+              padding: '4px 12px',
               minHeight: 28,
               borderRadius: 999,
               fontSize: 12,
@@ -130,7 +130,7 @@ export function LeagueStandingsTable({ data }: { data: LeagueStandingsTableData 
                       {row.fairPlayPoints > 0 ? (
                         <span
                           className="tm-text-caption"
-                          style={{ marginLeft: 6, color: 'var(--text-caption)' }}
+                          style={{ marginLeft: 8, color: 'var(--text-caption)' }}
                           aria-label={`페어플레이 벌점 ${row.fairPlayPoints}`}
                         >
                           FP {row.fairPlayPoints}

@@ -210,7 +210,7 @@ export function AlertBanner({
       role={isError ? 'alert' : 'status'}
       aria-live={isError ? 'assertive' : 'polite'}
       style={{
-        padding: '10px 14px',
+        padding: '12px 16px',
         borderRadius: 12,
         background: s.bg,
         color: s.color,
@@ -491,7 +491,7 @@ export function InfoRow({ label, value, valueColor, isLast, sub, badge }: InfoRo
       <div style={{ textAlign: 'right', minWidth: 0 }}>
         <div
           className="tm-text-body"
-          style={{ fontWeight: 600, color: valueColor ?? 'var(--text-strong)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}
+          style={{ fontWeight: 600, color: valueColor ?? 'var(--text-strong)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}
         >
           {value}
           {/* #2: 희소성/마감 인라인 배지 */}

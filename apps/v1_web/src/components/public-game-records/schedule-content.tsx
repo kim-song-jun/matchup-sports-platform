@@ -61,7 +61,7 @@ function ScheduleResultBadge({ entry }: { entry: PublicScheduleEntry }) {
         color: tone,
         background: bg,
         borderRadius: 6,
-        padding: '2px 6px',
+        padding: '2px 8px',
       }}
     >
       {resultStateLabel(entry.resultState)}
@@ -313,7 +313,7 @@ function LineupStatusBadge({ lineupState }: { lineupState: GameLineupState | nul
         ? { label: '라인업 작성 중', color: 'var(--orange700)', background: 'var(--orange50)' }
         : { label: '라인업 제출 완료', color: 'var(--blue700)', background: 'var(--blue50)' };
   return (
-    <span style={{ fontSize: 12, fontWeight: 700, color, background, borderRadius: 6, padding: '2px 6px' }}>
+    <span style={{ fontSize: 12, fontWeight: 700, color, background, borderRadius: 6, padding: '2px 8px' }}>
       {label}
     </span>
   );
@@ -346,7 +346,7 @@ function MyTeamLineupSummary({
         <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-strong)' }}>{team.teamName}</span>
         <span style={{ fontSize: 12, color: 'var(--text-caption)' }}>우리 팀 경기 {team.fixtures.length}</span>
       </div>
-      <div style={{ marginTop: 6, fontSize: 13, color: 'var(--text-strong)' }}>
+      <div style={{ marginTop: 8, fontSize: 13, color: 'var(--text-strong)' }}>
         {team.fixtures.length === 0
           ? '아직 배정된 경기가 없어요.'
           : pending.length === 0
@@ -354,7 +354,7 @@ function MyTeamLineupSummary({
             : `라인업이 아직 정해지지 않은 경기가 ${pending.length}경기 있어요.`}
       </div>
       {next !== undefined ? (
-        <div style={{ marginTop: 10 }}>
+        <div style={{ marginTop: 12 }}>
           <Link
             href={`/tournaments/${tournamentId}/matches/${next.fixtureId}/lineup`}
             className="tm-btn tm-btn-sm tm-btn-primary"
@@ -398,7 +398,7 @@ function ScheduleRow({
       }}
     >
       {myFixture ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
           <span
             style={{
               fontSize: 12,
@@ -409,7 +409,7 @@ function ScheduleRow({
               // 예전처럼 카드 표면색(흰색)으로 두면 중립 배경 위에서 배지 윤곽이 사라진다.
               background: 'var(--blue50)',
               borderRadius: 6,
-              padding: '2px 6px',
+              padding: '2px 8px',
             }}
           >
             우리 팀
@@ -423,8 +423,8 @@ function ScheduleRow({
           좌상단으로 올려도 될것같아 카드에서"). 빈 자리를 채우면서 스코어 아래 줄도
           한 줄 짧아진다. 긴 구장명은 말줄임으로 접고 날짜 쪽은 줄이지 않는다 —
           경기 시각은 목록에서 가장 자주 찾는 값이라 잘리면 안 된다. */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', display: 'flex', gap: 6, alignItems: 'center', minWidth: 0 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', display: 'flex', gap: 8, alignItems: 'center', minWidth: 0 }}>
           {showGroupLabel ? entry.groupName ?? entry.round : ''}
           {entry.legNumber > 1 ? ` ${entry.legNumber}차` : ''}
           <VideoBadge hasVideo={entry.hasVideo} />
@@ -438,7 +438,7 @@ function ScheduleRow({
           ) : null}
         </span>
         {/* [R-T2] 고정폭 없는 flex 텍스트 — 12로 상향. */}
-        <span style={{ fontSize: 12, color: 'var(--text-caption)', display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+        <span style={{ fontSize: 12, color: 'var(--text-caption)', display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
           {dateLabel ?? '일정 미정'}
           {entry.status === 'live' ? (
             <LiveBadge clock={entry.clock} periodBreak={entry.periodBreak} />
@@ -625,7 +625,7 @@ function ScheduleGroupBlock({
   myFixtureById: Map<string, MyFixtureRowInfo>;
 }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {showGroupHeading ? (
         <div className="tm-text-caption" style={{ color: 'var(--text-caption)', fontWeight: 700 }}>
           {group.label}
@@ -691,7 +691,7 @@ function ScheduleSections({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {filters.length > 1 ? (
-        <div role="tablist" aria-label="경기 일정 보기" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <div role="tablist" aria-label="경기 일정 보기" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {filters.map((option) => (
             <button
               key={option.key}
@@ -711,7 +711,7 @@ function ScheduleSections({
         <EmptyState title="해당하는 경기가 없어요" sub="다른 보기를 선택해 주세요." />
       ) : (
         visiblePhases.map((phase) => (
-          <section key={phase.key} aria-label={phase.label} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <section key={phase.key} aria-label={phase.label} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {/* 단계가 하나뿐이면(순수 토너먼트 등) 제목이 목록 전체를 되풀이할 뿐이라 숨긴다. */}
             {phases.length > 1 ? (
               <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>{phase.label}</div>
@@ -793,7 +793,7 @@ export function ScheduleContent({
   return (
     <div style={{ padding: '16px 20px 40px', display: 'flex', flexDirection: 'column', gap: 20 }}>
       {myTeams.length > 0 ? (
-        <section aria-label="우리 팀 라인업" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <section aria-label="우리 팀 라인업" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {myTeams.map((team) => (
             <MyTeamLineupSummary key={team.registrationId} tournamentId={tournamentId} team={team} />
           ))}
@@ -802,7 +802,7 @@ export function ScheduleContent({
       {hasHiddenIdentity ? (
         <div
           style={{
-            padding: '10px 14px',
+            padding: '12px 16px',
             borderRadius: 10,
             background: 'var(--grey50)',
             fontSize: 12,
@@ -815,7 +815,7 @@ export function ScheduleContent({
       ) : null}
       {showStandings && data.standings.length > 0 ? (
         <section>
-          <h3 className="tm-hub-section-title" style={{ marginBottom: 10 }}>
+          <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>
             조별 순위
           </h3>
           <StandingsTable rows={data.standings} />
@@ -823,7 +823,7 @@ export function ScheduleContent({
       ) : null}
 
       <section>
-        <h3 className="tm-hub-section-title" style={{ marginBottom: 10 }}>
+        <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>
           경기 일정
         </h3>
         {data.items.length === 0 ? (
@@ -850,7 +850,7 @@ export function ScheduleContent({
 
       {data.unscheduled.length > 0 ? (
         <section>
-          <h3 className="tm-hub-section-title" style={{ marginBottom: 10 }}>
+          <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>
             시간 미정 경기
           </h3>
           {/* 일정이 잡힌 목록과 같은 모양으로 묶는다 — 예전엔 한 줄로 흘려보내서 같은 조의
@@ -858,7 +858,7 @@ export function ScheduleContent({
               컨테이너도 `Card` 가 아니라 그룹 목록과 같은 `tm-schedule-list` 다: 행 자체가
               이미 `tm-schedule-card` 라 바깥 카드는 이중 크롬이고, 경기가 1건일 때는 테두리
               안 우측이 "액자 속 빈 공간"으로 남았다. */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {groupUnscheduledEntries(data.unscheduled).map((group) => (
               <ScheduleGroupBlock
                 key={group.key}

@@ -107,7 +107,7 @@ export function JerseyNumberDialog({
         style={{ background: 'var(--card-surface, #fff)', boxShadow: '0 8px 32px rgba(20,28,45,0.14)' }}
         onClick={(event) => event.stopPropagation()}
       >
-        <div style={{ padding: '24px 20px 16px', display: 'grid', gap: 10 }}>
+        <div style={{ padding: '24px 20px 16px', display: 'grid', gap: 12 }}>
           <p id={titleId} className="tm-text-body-lg" style={{ fontWeight: 700, margin: 0 }}>
             {memberName}님 등번호
           </p>

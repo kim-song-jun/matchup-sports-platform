@@ -353,9 +353,9 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
           <div className="tm-auth-stack">
             {selectedSports.length === 0 ? <Notice title="종목 선택 필요" body="먼저 관심 종목을 선택해야 실력을 입력할 수 있어요." tone="orange" /> : null}
             {selectedSports.map(({ sportId, levelId, sport }) => (
-              <Card key={sportId} pad={15}>
+              <Card key={sportId} pad={16}>
                 <div className="tm-text-body-lg">{sport?.name}</div>
-                <div className="tm-auth-chip-wrap" style={{ marginTop: 10 }}>
+                <div className="tm-auth-chip-wrap" style={{ marginTop: 12 }}>
                   {(sport?.levels ?? []).map((level) => (
                     <button
                       className={`tm-chip ${levelId === level.id ? 'tm-chip-active' : ''}`}
@@ -383,9 +383,9 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
             </p>
             <LocationNotice detectedRegion={draft.detectedRegion ?? null} status={locationStatus} />
             <div className="tm-auth-stack">
-              <Card pad={15}>
+              <Card pad={16}>
                 <div className="tm-text-label">시/도</div>
-                <div className="tm-auth-chip-wrap" style={{ marginTop: 10 }}>
+                <div className="tm-auth-chip-wrap" style={{ marginTop: 12 }}>
                   {regionGroups.map((group) => (
                     <button
                       className={`tm-chip ${selectedRegionGroup?.id === group.id ? 'tm-chip-active' : ''}`}
@@ -399,9 +399,9 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
                   ))}
                 </div>
               </Card>
-              <Card pad={15}>
+              <Card pad={16}>
                 <div className="tm-text-label">{selectedRegionGroup ? `${selectedRegionGroup.name} 상세 지역` : '상세 지역'}</div>
-                <div className="tm-auth-chip-wrap" style={{ marginTop: 10 }}>
+                <div className="tm-auth-chip-wrap" style={{ marginTop: 12 }}>
                   {(selectedRegionGroup?.options ?? []).map((region) => (
                     <button
                       className={`tm-chip ${selectedRegionIds.has(region.id) ? 'tm-chip-active' : ''}`}

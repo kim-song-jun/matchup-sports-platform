@@ -145,7 +145,7 @@ export function TournamentRosterDeadlineCard({
         : '대회 신청 마감과 별개로, 운영진이 명단을 잠그기 전까지 수정할 수 있어요.';
 
   return (
-    <Card pad={16} style={{ marginBottom: 14 }}>
+    <Card pad={16} style={{ marginBottom: 16 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
         <div style={{ minWidth: 0 }}>
           <div className={'tm-text-micro'} style={{ color: 'var(--text-caption)', fontWeight: 600 }}>
@@ -160,7 +160,7 @@ export function TournamentRosterDeadlineCard({
         </span>
       </div>
 
-      <div style={{ borderTop: '1px solid var(--border)', marginTop: 14, paddingTop: 14 }}>
+      <div style={{ borderTop: '1px solid var(--border)', marginTop: 16, paddingTop: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <span className={'tm-text-caption'} style={{ color: 'var(--text-muted)', fontWeight: 600 }}>
             선수 명단
@@ -169,7 +169,7 @@ export function TournamentRosterDeadlineCard({
             {rosterEditBadge}
           </span>
         </div>
-        <div className={'tm-text-micro'} style={{ color: 'var(--text-caption)', lineHeight: 1.5, marginTop: 6 }}>
+        <div className={'tm-text-micro'} style={{ color: 'var(--text-caption)', lineHeight: 1.5, marginTop: 8 }}>
           {rosterEditMessage}
         </div>
       </div>
@@ -364,14 +364,14 @@ function AddPlayerForm({
   /* #7a: Neutral solid card — no blue tint. Blue reserved for focus/active states only. */
   return (
     <Card pad={16} style={{ border: '1px solid var(--grey200)', background: 'var(--surface)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
         <div className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 700 }}>
           선수 추가
         </div>
         <button
           type="button"
           className="tm-btn tm-btn-sm tm-btn-neutral"
-          style={{ minWidth: 44, padding: '0 10px' }}
+          style={{ minWidth: 44, padding: '0 12px' }}
           onClick={() => onRemove(formId)}
           disabled={isSubmitting}
           aria-label="선수 추가 칸 삭제"
@@ -453,17 +453,17 @@ function AddPlayerForm({
                 })}
               </select>
               {selectedMemberMissing ? (
-                <p className="tm-text-micro" role="alert" style={{ color: 'var(--red700)', margin: '6px 0 0' }}>
+                <p className="tm-text-micro" role="alert" style={{ color: 'var(--red700)', margin: '8px 0 0' }}>
                   실명, 생년월일, 휴대폰 번호가 모두 등록된 팀원만 선수로 등록할 수 있어요.
                 </p>
               ) : null}
               {selectedAlreadyRegistered || selectedAlreadyPending ? (
-                <p className="tm-text-micro" role="alert" style={{ color: 'var(--red700)', margin: '6px 0 0' }}>
+                <p className="tm-text-micro" role="alert" style={{ color: 'var(--red700)', margin: '8px 0 0' }}>
                   {selectedAlreadyRegistered ? '이미 명단에 등록된 선수예요.' : '다른 추가 칸에서 선택한 선수예요.'}
                 </p>
               ) : null}
               {unavailableMembers.length > 0 ? (
-                <div style={{ display: 'grid', gap: 6, marginTop: 8 }}>
+                <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>
                   {unavailableMembers.map((m) => (
                     <div key={m.userId} className="tm-text-micro" style={{ color: 'var(--text-muted)' }}>
                       {josa(m.displayName, ['은', '는'])} {josa(memberMissingReason(m), ['으로', '로'])} 표시돼요. 제출하면 서버가 최신 프로필 기준으로 다시 확인해요.
@@ -475,7 +475,7 @@ function AddPlayerForm({
                 <button
                   type="button"
                   className="tm-btn tm-btn-sm tm-btn-neutral"
-                  style={{ marginTop: 6, width: '100%', minHeight: 44 }}
+                  style={{ marginTop: 8, width: '100%', minHeight: 44 }}
                   onClick={() => void fetchNextPage()}
                   disabled={isFetchingNextPage}
                 >
@@ -536,14 +536,14 @@ function AddPlayerForm({
         </FormField>
 
         <FormField id={eligibilityFieldId} label="선출 여부" labelId={`${eligibilityFieldId}-label`}>
-          <div role="radiogroup" aria-labelledby={`${eligibilityFieldId}-label`} style={{ display: 'flex', gap: 10 }}>
+          <div role="radiogroup" aria-labelledby={`${eligibilityFieldId}-label`} style={{ display: 'flex', gap: 12 }}>
             {(['non_pro', 'pro'] as const).map((val) => {
               const selected = form.eligibilityStatus === val;
               return (
                 <label
                   key={val}
                   htmlFor={`${eligibilityFieldId}-${val}`}
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', minHeight: 44 }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', minHeight: 44 }}
                 >
                   {/* sr-only native radio — keyboard + screen reader accessible */}
                   <input
@@ -604,7 +604,7 @@ function AddPlayerForm({
           position: 'sticky',
           bottom: 0,
           marginTop: 16,
-          paddingTop: 10,
+          paddingTop: 12,
           paddingBottom: 8,
           background: 'var(--surface)',
           borderTop: '1px solid var(--grey100)',
@@ -651,7 +651,7 @@ function FormField({
         id={labelId}
         htmlFor={id}
         className="tm-text-caption"
-        style={{ color: 'var(--text-muted)', display: 'block', marginBottom: 5 }}
+        style={{ color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}
       >
         {label}
         {required ? (
@@ -715,11 +715,11 @@ function PlayerRow({
   return (
     <div
       style={{
-        padding: '12px 14px',
+        padding: '12px 16px',
         borderTop: '1px solid var(--grey100)',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <div
           aria-hidden="true"
           // 2026-08-12: [인라인 style 우선순위 fix] 배경을 인라인으로 두면 다크모드 전용
@@ -741,7 +741,7 @@ function PlayerRow({
           {player.realName.charAt(0)}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 600 }}>
               {player.realName}
             </span>
@@ -754,11 +754,11 @@ function PlayerRow({
           </div>
         </div>
         {!isLocked ? (
-          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
             <button
               type="button"
               className="tm-btn tm-btn-sm tm-btn-neutral"
-              style={{ minWidth: 44, padding: '0 10px' }}
+              style={{ minWidth: 44, padding: '0 12px' }}
               onClick={() => {
                 setDraftEligibility(player.eligibilityStatus);
                 setEditError(null);
@@ -773,7 +773,7 @@ function PlayerRow({
             <button
               type="button"
               className="tm-btn tm-btn-sm tm-btn-danger"
-              style={{ minWidth: 44, padding: '0 10px' }}
+              style={{ minWidth: 44, padding: '0 12px' }}
               onClick={() => onRemove(player.id)}
               disabled={isRemoving || isUpdating}
               aria-label={`${player.realName} 삭제`}
@@ -790,7 +790,7 @@ function PlayerRow({
             <div
               role="radiogroup"
               aria-labelledby={`player-${player.id}-eligibility-label`}
-              style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}
+              style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}
             >
               {(['non_pro', 'pro', 'needs_review'] as const).map((val) => {
                 const selected = draftEligibility === val;
@@ -798,7 +798,7 @@ function PlayerRow({
                   <label
                     key={val}
                     htmlFor={`player-${player.id}-eligibility-${val}`}
-                    style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', minHeight: 44 }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', minHeight: 44 }}
                   >
                     <input
                       id={`player-${player.id}-eligibility-${val}`}
@@ -1087,7 +1087,7 @@ export function TournamentRosterPageClient({
         {rosterDeadlineFormatted ? (
           <p
             className="tm-text-caption"
-            style={{ color: 'var(--text-muted)', marginBottom: 10 }}
+            style={{ color: 'var(--text-muted)', marginBottom: 12 }}
           >
             {`명단 제출 마감: ${rosterDeadlineFormatted}까지`}
           </p>
@@ -1095,7 +1095,7 @@ export function TournamentRosterPageClient({
 
         {/* Roster deadline passed banner (blocks edit unless admin granted an override) */}
         {rosterDeadlineState.blocked ? (
-          <div style={{ marginBottom: 14 }}>
+          <div style={{ marginBottom: 16 }}>
             <AlertBanner
               message="명단 제출 기간이 종료됐어요. 수정이 필요하면 운영진에게 문의해 주세요."
               tone="info"
@@ -1105,7 +1105,7 @@ export function TournamentRosterPageClient({
 
         {/* Deadline passed but admin granted an override — editing stays open */}
         {rosterDeadlineState.overridden ? (
-          <div style={{ marginBottom: 14 }}>
+          <div style={{ marginBottom: 16 }}>
             <AlertBanner
               message="운영진이 명단 제출 마감 예외를 허용했어요. 계속 명단을 수정할 수 있어요."
               tone="info"
@@ -1115,7 +1115,7 @@ export function TournamentRosterPageClient({
 
         {/* Locked banner */}
         {isRosterLocked ? (
-          <div style={{ marginBottom: 14 }}>
+          <div style={{ marginBottom: 16 }}>
             <AlertBanner
               message="선수 명단이 마감됐어요. 변경이 필요하면 운영진에게 문의해 주세요."
               tone="info"
@@ -1124,7 +1124,7 @@ export function TournamentRosterPageClient({
         ) : null}
 
         {isRosterEditBlockedByStatus ? (
-          <div style={{ marginBottom: 14 }}>
+          <div style={{ marginBottom: 16 }}>
             <AlertBanner
               message="취소 요청 또는 취소 완료된 신청은 선수 명단을 수정할 수 없어요."
               tone="info"
@@ -1134,14 +1134,14 @@ export function TournamentRosterPageClient({
 
         {/* Below minimum warning — 잠금/상태와 무관하게 미달 사실은 계속 노출 (P0: 조건 버그 수정) */}
         {belowMinimum ? (
-          <div style={{ marginBottom: 14 }}>
+          <div style={{ marginBottom: 16 }}>
             {/* P1-3a: 델타(K명 더 필요해요)를 굵게 병기 — AlertBanner는 string만 받으므로 동일 스타일을 직접 구성 */}
             <div
               role="status"
               aria-live="polite"
               className="tm-text-label"
               style={{
-                padding: '10px 14px',
+                padding: '12px 16px',
                 borderRadius: 12,
                 background: 'var(--orange50)',
                 color: 'var(--orange700)',
@@ -1159,20 +1159,20 @@ export function TournamentRosterPageClient({
 
         {/* Remove error */}
         {removeError ? (
-          <div style={{ marginBottom: 14 }}>
+          <div style={{ marginBottom: 16 }}>
             <AlertBanner message={removeError} />
           </div>
         ) : null}
 
         {/* Add success feedback */}
         {addSuccess ? (
-          <div style={{ marginBottom: 14 }}>
+          <div style={{ marginBottom: 16 }}>
             <AlertBanner tone="info" message={addSuccess} />
           </div>
         ) : null}
 
         {/* Roster header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <div>
             {/* P1 숫자:단위 2:1 — 선수 수 숫자(subhead)+단위(body) */}
             <div style={{ display: 'inline-flex', alignItems: 'baseline', gap: 2 }}>
@@ -1217,7 +1217,7 @@ export function TournamentRosterPageClient({
         </div>
 
         {draftForms.length > 0 && canEditRoster ? (
-          <div style={{ display: 'grid', gap: 12, marginBottom: 14 }}>
+          <div style={{ display: 'grid', gap: 12, marginBottom: 16 }}>
             {draftForms.map((draftForm) => {
               const pendingUserIds = new Set(
                 draftForms
@@ -1253,7 +1253,7 @@ export function TournamentRosterPageClient({
           </Card>
         ) : (
           <Card pad={0}>
-            <div style={{ padding: '8px 14px' }}>
+            <div style={{ padding: '8px 16px' }}>
               <div className="tm-text-micro tab-num" style={{ color: 'var(--text-caption)', fontWeight: 600 }}>
                 총 {players.length}명 · {canEditRoster ? '수정 가능' : '수정 불가'}
               </div>

@@ -174,7 +174,7 @@ function DesktopChampionHero({
         pointerEvents: 'none',
       }} />
       {/* 트로피 */}
-      <div className="tm-resd-trophy" style={{ display: 'flex', justifyContent: 'center', lineHeight: 1, marginBottom: 18, filter: 'drop-shadow(0 6px 20px rgba(246,185,59,0.45))' }} aria-hidden="true">
+      <div className="tm-resd-trophy" style={{ display: 'flex', justifyContent: 'center', lineHeight: 1, marginBottom: 20, filter: 'drop-shadow(0 6px 20px rgba(246,185,59,0.45))' }} aria-hidden="true">
         <TrophyMark size={60} />
       </div>
       {/* 팀명 — 배지 제거 후에도 스크린리더에는 '우승팀' 맥락 유지 */}
@@ -375,11 +375,11 @@ function KnockoutResultsTable({
     date?: string; isAccent?: boolean; isAgg?: boolean;
   }) => (
     <div style={{
-      padding: '10px 16px',
+      padding: '12px 16px',
       background: 'transparent',
     }}>
       {/* 상단: 라벨 + 날짜 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         {/* [R-T2] accent 라운드(10→12로 통일)와 일반 라운드가 같은 12px가 됐다 —
             accent 구분은 옆 스코어 폰트(16 vs 14)가 계속 담당해 위계 손실 없음. */}
         <span style={{ fontSize: 12, fontWeight: 700, color: labelColor, letterSpacing: '0.02em' }}>
@@ -388,7 +388,7 @@ function KnockoutResultsTable({
         {date && <span style={{ fontSize: 12, color: 'var(--text-caption)' }}>{date}</span>}
       </div>
       {/* 팀 – 스코어 – 팀 (전체 팀명 노출, 잘리지 않음) */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <span style={{
           flex: 1, textAlign: 'right',
           fontSize: isAccent ? 15 : 13, fontWeight: winner === 'home' ? 700 : 400,
@@ -527,7 +527,7 @@ function FinalStandingsTable({ rows, fixtures }: { rows: FinalRankRow[]; fixture
     <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid var(--grey150)' }}>
       <div style={{
         display: 'grid', gridTemplateColumns: '40px 1fr 64px 36px 36px 40px',
-        padding: '7px 14px', background: 'var(--grey50)', borderBottom: '1px solid var(--grey150)',
+        padding: '8px 16px', background: 'var(--grey50)', borderBottom: '1px solid var(--grey150)',
       }}>
         {/* [R-T2] 그리드 컬럼(40px/1fr/64px/36px/36px/40px) 헤더 — 가장 좁은 36px도
             'W'/'GF' 한두 글자라 12px 여유. */}
@@ -543,7 +543,7 @@ function FinalStandingsTable({ rows, fixtures }: { rows: FinalRankRow[]; fixture
         return (
           <div key={row.pos} style={{
             display: 'grid', gridTemplateColumns: '40px 1fr 64px 36px 36px 40px',
-            padding: '11px 14px', background: cfg.bg,
+            padding: '12px 16px', background: cfg.bg,
             borderTop: idx > 0 ? '1px solid var(--grey100)' : 'none',
             alignItems: 'center',
           }}>
@@ -627,7 +627,7 @@ function VideoGallerySection({ fixtures }: { fixtures: V1TournamentFixture[] }) 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {withVideos.map((f) => (
             <div key={f.id}>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 2 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 2 }}>
                 <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-strong)' }}>{fixtureVideoLabel(f)}</span>
                 <span style={{ fontSize: 12, color: 'var(--text-caption)' }}>{f.homeTeamName} vs {f.awayTeamName}</span>
               </div>
@@ -852,7 +852,7 @@ export function GroupStageFixtures({ tournament }: { tournament: V1TournamentDet
         <span>
           조별리그 경기 {fixtures.length}경기
           {recorded < fixtures.length && (
-            <span style={{ marginLeft: 6, fontWeight: 500, color: 'var(--text-caption)' }}>
+            <span style={{ marginLeft: 8, fontWeight: 500, color: 'var(--text-caption)' }}>
               결과 등록 {recorded}경기
             </span>
           )}
@@ -972,7 +972,7 @@ export function ResultsPageContent({ tournament }: { tournament: V1TournamentDet
       {isCompleted && activeTab === 'results' && (
         <div className="tm-tourn-sub-grid tm-tourn-sub-grid-6040 tm-results-grid">
           <div className="tm-tourn-sub-col" style={{ padding: '16px 20px 0' }}>
-            <h3 className="tm-hub-section-title" style={{ marginBottom: 10 }}>최종 순위</h3>
+            <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>최종 순위</h3>
             {knockoutRows.length > 0 ? (
               <FinalStandingsTable rows={knockoutRows} fixtures={tournament.fixtures} />
             ) : (
@@ -989,7 +989,7 @@ export function ResultsPageContent({ tournament }: { tournament: V1TournamentDet
           <div className="tm-tourn-sub-col" style={{ padding: '16px 20px 0' }}>
             {knockoutFixtures.length > 0 && (
               <>
-                <h3 className="tm-hub-section-title" style={{ marginBottom: 10 }}>결선 경기</h3>
+                <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>결선 경기</h3>
                 <KnockoutResultsTable fixtures={knockoutFixtures} kindOf={knockoutKind} />
               </>
             )}

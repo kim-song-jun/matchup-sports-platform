@@ -84,7 +84,7 @@ export function FixturePickerList({
                   {item.round} · {item.fixtureNumber}번 경기
                 </p>
                 {item.warnings.length > 0 ? (
-                  <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
                     {item.warnings.map((warning) => (
                       <span key={warning} className="tm-badge tm-badge-orange">
                         {WARNING_LABELS[warning] ?? warning}

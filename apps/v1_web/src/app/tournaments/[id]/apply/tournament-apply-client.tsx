@@ -98,7 +98,7 @@ function StepIndicator({ current }: { current: ApplyStep }) {
   const currentLabel = STEPS[currentIndex]?.label ?? '';
   const nextStep = STEPS[currentIndex + 1];
   return (
-    <div className="tm-create-progress" style={{ padding: '14px 20px 0' }} aria-label="신청 단계">
+    <div className="tm-create-progress" style={{ padding: '16px 20px 0' }} aria-label="신청 단계">
       {/* a11y: 단계 전환 시 스크린리더에 현재 단계 공지 (aria-live polite) */}
       <span
         role="status"
@@ -365,7 +365,7 @@ function TeamSelectStep({
                   }}
                 >
                   <Card
-                    pad={14}
+                    pad={16}
                     className={isSelected ? 'tm-create-selected' : undefined}
                     style={{
                       opacity: isManager ? 1 : 0.55,
@@ -373,10 +373,10 @@ function TeamSelectStep({
                       transition: 'border-color 0.15s, background 0.15s',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                       <TeamAvatar seed={team.teamId} name={team.name} logoUrl={team.logoUrl} size="md" />
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                           <span
                             className="tm-text-label"
                             style={{
@@ -510,8 +510,8 @@ function ExpandableCheckRow({
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 10,
-          padding: '12px 14px',
+          gap: 12,
+          padding: '12px 16px',
           minHeight: 44,
         }}
       >
@@ -536,7 +536,7 @@ function ExpandableCheckRow({
             ✓
           </span>
           <span style={{ display: 'grid', gap: 3, flex: 1, minWidth: 0 }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', minWidth: 0 }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minWidth: 0 }}>
               <span className="tm-text-body" style={{ color: 'var(--text-strong)', lineHeight: 1.35 }}>
                 {label}
               </span>
@@ -545,7 +545,7 @@ function ExpandableCheckRow({
                   className="tm-text-micro"
                   style={{
                     flexShrink: 0,
-                    padding: '2px 6px',
+                    padding: '2px 8px',
                     borderRadius: 999,
                     background: consentType === 'required' ? 'var(--red50)' : 'var(--grey100)',
                     color: consentType === 'required' ? 'var(--red700)' : 'var(--text-muted)',
@@ -574,7 +574,7 @@ function ExpandableCheckRow({
               flexShrink: 0,
               background: 'none',
               border: 'none',
-              padding: '4px 6px',
+              padding: '4px 8px',
               cursor: 'pointer',
               color: 'var(--text-caption)',
               minWidth: 44,
@@ -967,7 +967,7 @@ function AgreementsStep({
         <div style={{ marginLeft: -20, marginRight: -20 }}>
           <SectionTitle id="payment-method-heading" title="결제 수단" />
         </div>
-        <Card pad={14} style={{ marginTop: 8 }}>
+        <Card pad={16} style={{ marginTop: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 44 }}>
             <div
               aria-hidden="true"
@@ -1014,8 +1014,8 @@ function AgreementsStep({
           카드 결제는 준비 중이에요. 계좌이체를 이용해 주세요.
         </p>
 
-        <Card pad={14} style={{ marginTop: 10 }}>
-          <label htmlFor="depositor-name" className="tm-text-caption" style={{ display: 'block', marginBottom: 6 }}>
+        <Card pad={16} style={{ marginTop: 12 }}>
+          <label htmlFor="depositor-name" className="tm-text-caption" style={{ display: 'block', marginBottom: 8 }}>
             입금자명 <span style={{ color: 'var(--red700)' }}>*</span>
           </label>
           <input
@@ -1154,7 +1154,7 @@ function TournamentConsentDialog({
             alignItems: 'center',
             justifyContent: 'space-between',
             gap: 12,
-            padding: '18px 18px 12px',
+            padding: '20px 20px 12px',
             borderBottom: '1px solid var(--grey100)',
           }}
         >
@@ -1165,7 +1165,7 @@ function TournamentConsentDialog({
             닫기
           </button>
         </header>
-        <div style={{ overflowY: 'auto', padding: '18px' }}>
+        <div style={{ overflowY: 'auto', padding: '20px' }}>
           <p
             className="tm-text-caption"
             style={{ margin: 0, color: 'var(--text-muted)', lineHeight: 1.75, whiteSpace: 'pre-line' }}
@@ -1223,7 +1223,7 @@ function TournamentSubmitConfirmDialog({
           borderRadius: 18,
           background: 'var(--bg)',
           boxShadow: 'var(--shadow-modal)',
-          padding: 18,
+          padding: 20,
         }}
       >
         <h2 id="tournament-submit-confirm-title" className="tm-text-subhead" style={{ margin: 0 }}>
@@ -1235,7 +1235,7 @@ function TournamentSubmitConfirmDialog({
         >
           참가비 입금 후 단순 변심 또는 팀 사정으로 인한 신청 취소는 불가합니다.
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.6fr', gap: 8, marginTop: 18 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.6fr', gap: 8, marginTop: 20 }}>
           <button
             type="button"
             className="tm-btn tm-btn-lg tm-btn-neutral"
@@ -1318,7 +1318,7 @@ function PaymentGuideStep({
       <div
         role="status"
         aria-label="신청했어요"
-        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '24px 0 8px' }}
+        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '24px 0 8px' }}
       >
         <div
           className="tm-complete-check"
@@ -1384,12 +1384,12 @@ function PaymentGuideStep({
               />
             </div>
           ) : (
-            <div style={{ padding: '0 16px 14px' }}>
+            <div style={{ padding: '0 16px 16px' }}>
               <AlertBanner
                 tone="error"
                 message="입금 계좌가 준비되지 않았어요. 운영팀에 문의해 주세요."
               />
-              <div style={{ marginTop: 10 }}>
+              <div style={{ marginTop: 12 }}>
                 <InfoRow
                   label="입금액"
                   value={formatEntryFee(tournament.entryFee)}
@@ -1400,14 +1400,14 @@ function PaymentGuideStep({
           )}
         </Card>
 
-        <Card pad={14} style={{ marginTop: 12, background: 'var(--grey50)' }}>
+        <Card pad={16} style={{ marginTop: 12, background: 'var(--grey50)' }}>
           <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.65 }}>
             입금이 확인되면 신청이 최종 확정돼요. 입금자명이 다르면 확인이 늦어질 수 있어요.
           </p>
         </Card>
 
         <section aria-labelledby="roster-next-step-heading" style={{ marginTop: 12, scrollMarginBottom: 144 }}>
-          <Card pad={14}>
+          <Card pad={16}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
               <div style={{ minWidth: 0 }}>
                 <div id="roster-next-step-heading" className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 700 }}>
@@ -1454,7 +1454,7 @@ function LoadingSkeleton() {
         <div
           key={i}
           aria-hidden="true"
-          style={{ height: 64, borderRadius: 14, background: 'var(--grey100)', marginBottom: 10 }}
+          style={{ height: 64, borderRadius: 14, background: 'var(--grey100)', marginBottom: 12 }}
         />
       ))}
     </div>
@@ -1698,7 +1698,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
           <Link
             href={`/tournaments/${tournamentId}`}
             className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
-            style={{ marginTop: 14 }}
+            style={{ marginTop: 16 }}
           >
             대회 상세로 돌아가기
           </Link>
@@ -1721,14 +1721,14 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
           <Link
             href={buildPhoneVerifyHref(`/tournaments/${tournamentId}/apply`)}
             className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
-            style={{ marginTop: 14 }}
+            style={{ marginTop: 16 }}
           >
             본인인증 하러 가기
           </Link>
           <Link
             href={`/tournaments/${tournamentId}`}
             className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
-            style={{ marginTop: 10 }}
+            style={{ marginTop: 12 }}
           >
             대회 상세로 돌아가기
           </Link>
@@ -1749,7 +1749,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
           <Link
             href={`/tournaments/${tournamentId}`}
             className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
-            style={{ marginTop: 14 }}
+            style={{ marginTop: 16 }}
           >
             대회 상세로 돌아가기
           </Link>

@@ -413,8 +413,8 @@ export function PitchFormationEditor({
             minHeight: 56,
             display: 'flex',
             alignItems: 'center',
-            gap: 10,
-            padding: '10px 14px',
+            gap: 12,
+            padding: '12px 16px',
             borderRadius: 12,
             border: '1px solid var(--border)',
             background: 'var(--card-surface)',
@@ -585,7 +585,7 @@ function FormationControls({
         <span
           id={selectId}
           className="tm-text-caption"
-          style={{ display: 'block', color: 'var(--text-muted)', marginBottom: 6 }}
+          style={{ display: 'block', color: 'var(--text-muted)', marginBottom: 8 }}
         >
           포메이션
         </span>
@@ -634,7 +634,7 @@ function FormationControls({
         </p>
       ) : waiting.length > 0 ? (
         <div>
-          <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginBottom: 6 }}>
+          <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginBottom: 8 }}>
             대기 중 — 선수를 고른 뒤 피치를 탭해 배치하세요
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -648,8 +648,8 @@ function FormationControls({
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 6,
-                  padding: '6px 10px',
+                  gap: 8,
+                  padding: '8px 12px',
                   borderRadius: 999,
                   border: selectedWaitingKey === entry.key ? '2px solid var(--blue500)' : '1px solid var(--border)',
                   background: selectedWaitingKey === entry.key ? 'var(--tint-blue)' : 'var(--card-surface)',
@@ -723,8 +723,8 @@ function FormationChip({
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: 6,
-        padding: '10px 8px',
+        gap: 8,
+        padding: '12px 8px',
         minHeight: TOUCH_TARGET_PX,
         borderRadius: 10,
         border: `1px solid ${selected ? 'var(--blue500)' : 'var(--border)'}`,
@@ -837,7 +837,7 @@ function FormationSheet({
       >
         <div
           aria-hidden="true"
-          style={{ width: 36, height: 4, borderRadius: 999, background: 'var(--grey100)', margin: '0 auto 14px' }}
+          style={{ width: 36, height: 4, borderRadius: 999, background: 'var(--grey100)', margin: '0 auto 16px' }}
         />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <h3 id={titleId} className="tm-text-body-lg" style={{ fontWeight: 700 }}>
@@ -980,7 +980,7 @@ function SlotPlayerPickerSheet({
           padding: '16px 20px calc(20px + env(safe-area-inset-bottom))', boxShadow: '0 -8px 24px rgba(0,0,0,0.18)',
         }}
       >
-        <div aria-hidden="true" style={{ width: 36, height: 4, borderRadius: 999, background: 'var(--grey100)', margin: '0 auto 14px' }} />
+        <div aria-hidden="true" style={{ width: 36, height: 4, borderRadius: 999, background: 'var(--grey100)', margin: '0 auto 16px' }} />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <h3 id={titleId} className="tm-text-body-lg" style={{ fontWeight: 700 }}>{slot.label} 자리에 채울 선수</h3>
           <button type="button" onClick={onClose} aria-label="닫기" className="tm-btn tm-btn-icon tm-btn-ghost">×</button>
@@ -995,7 +995,7 @@ function SlotPlayerPickerSheet({
               <button
                 key={entry.key} type="button" onClick={() => onSelect(entry.key)}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', minHeight: TOUCH_TARGET_PX,
+                  display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', minHeight: TOUCH_TARGET_PX,
                   borderRadius: 10, border: '1px solid var(--border)', background: 'var(--card-surface)', textAlign: 'left',
                 }}
               >
@@ -1128,9 +1128,9 @@ function PlayerToken({
         aria-hidden="true"
         style={{
           position: 'absolute',
-          // 위로 올릴 때 6px을 띄우는 건 GK 배지가 토큰 위로 4px 삐져나오기 때문이다 —
-          // 3px만 두면 긴 이름에서 배지와 겹친다.
-          ...(labelAbove ? { bottom: '100%', marginBottom: 6 } : { top: '100%', marginTop: 3 }),
+          // 위로 올릴 때 8px을 띄우는 건 GK 배지가 토큰 위로 4px 삐져나오기 때문이다 —
+          // 3px만 두면 긴 이름에서 배지와 겹친다. (격자 정리 전에는 6px 이었다)
+          ...(labelAbove ? { bottom: '100%', marginBottom: 8 } : { top: '100%', marginTop: 3 }),
           left: '50%',
           transform: 'translateX(-50%)',
           maxWidth: 84,
@@ -1144,7 +1144,7 @@ function PlayerToken({
           fontWeight: 600,
           color: '#fff',
           background: 'rgba(0,0,0,0.6)',
-          padding: '1px 6px',
+          padding: '1px 8px',
           borderRadius: 6,
         }}
       >

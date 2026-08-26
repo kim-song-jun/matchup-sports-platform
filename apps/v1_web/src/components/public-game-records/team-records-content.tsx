@@ -152,7 +152,7 @@ function TeamRecordEventsPanel({
       id={id}
       role="list"
       aria-label={`${teamName} 대 ${item.opponentTeamName ?? '상대 미상'} 경기 기록`}
-      style={{ padding: '0 16px 14px', borderTop: '1px solid var(--grey100)' }}
+      style={{ padding: '0 16px 16px', borderTop: '1px solid var(--grey100)' }}
     >
       {/* 이벤트 행(`TeamRecordEventRow`)과 **같은 grid·gap·가운데 폭**을 쓴다 — 머리글만
        * gap 없이 두면 두 팀명이 `…01팀(테스트) QA 스쿼드 02팀` 처럼 맞붙어 한 덩어리로
@@ -164,7 +164,7 @@ function TeamRecordEventsPanel({
           gap: 8,
           fontSize: 'var(--font-size-micro)',
           color: 'var(--text-caption)',
-          margin: '10px 0 8px',
+          margin: '12px 0 8px',
         }}
       >
         <span style={{ textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -175,7 +175,7 @@ function TeamRecordEventsPanel({
           {item.opponentTeamName ?? '상대 미상'}
         </span>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {item.events.map((event) => (
           <TeamRecordEventRow key={event.id} event={event} />
         ))}
@@ -210,7 +210,7 @@ function TeamRecordRow({
   return (
     <div
       style={{
-        padding: '14px 16px 14px 12px',
+        padding: '16px 16px 16px 12px',
         borderTop: '1px solid var(--grey100)',
         ...resultStripeStyle(item.result),
       }}
@@ -219,8 +219,8 @@ function TeamRecordRow({
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 6,
-          marginBottom: 10,
+          gap: 8,
+          marginBottom: 12,
           // '정정됨' 배지가 빠진 자리 재균형: 배지가 있던 시절엔 우측 여백이 배지
           // 폭만큼만 확보됐는데, 배지를 완전히 없앤 지금은 (1) 아코디언 토글 버튼이
           // 있는 행엔 그 버튼(44px)과 안 겹치도록 동일한 폭을 계속 남기고, (2) 토글이
@@ -246,7 +246,7 @@ function TeamRecordRow({
         </span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, minWidth: 0 }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, minWidth: 0 }}>
           <TeamAvatar seed={teamId} name={teamName} logoUrl={teamLogoUrl} size="sm" />
           <span
             className="tm-text-caption"
@@ -267,7 +267,7 @@ function TeamRecordRow({
             </span>
           ) : null}
         </div>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, minWidth: 0 }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, minWidth: 0 }}>
           <TeamAvatar seed={item.opponentTeamId ?? item.gameId} name={item.opponentTeamName ?? '상대 미상'} logoUrl={item.opponentTeamLogoUrl} size="sm" />
           <span
             className="tm-text-caption"
@@ -352,7 +352,7 @@ export function TeamRecordsContent({
       {onChangeSeason ? (
         // 시즌 데이터가 1개뿐이어도 숨기지 않는다 -- 자기 위치를 학습하게 그대로
         // 보여준다(과제 지시). 선택지는 서버 `availableSeasons`(하드코딩 연도 없음).
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <label
             htmlFor="team-records-season"
             className="tm-text-caption"
@@ -386,7 +386,7 @@ export function TeamRecordsContent({
       </Card>
 
       <section>
-        <h3 className="tm-hub-section-title" style={{ marginBottom: 10 }}>경기 기록</h3>
+        <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>경기 기록</h3>
         {data.items.length === 0 ? (
           <EmptyState title={emptyStateCopy.title} sub={emptyStateCopy.sub} />
         ) : (

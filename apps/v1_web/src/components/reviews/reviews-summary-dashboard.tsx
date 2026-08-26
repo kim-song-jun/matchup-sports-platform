@@ -71,13 +71,13 @@ export function ReviewsSummaryDashboard({
         ) : null}
       </div>
 
-      <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
+      <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
         {bySport.map((sport) => {
           // sportId 는 UUID 다 — 배지 매핑 키는 v1Sport.code(sportCode).
           const accent = getSportAccent(sport.sportCode ?? '');
           const topTags = sport.tagRates.slice(0, 3);
           return (
-            <div key={sport.sportId} style={{ borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+            <div key={sport.sportId} style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
                 <span className="tm-badge" style={{ background: accent.badgeBg, color: accent.badgeText }}>{accent.label}</span>
                 <div className="tm-text-caption">
@@ -86,7 +86,7 @@ export function ReviewsSummaryDashboard({
                 </div>
               </div>
               {topTags.length > 0 ? (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
                   {topTags.map((tag) => (
                     <span key={tag.tagCode} className="tm-badge" style={{ background: 'var(--grey100)', color: 'var(--text-caption)' }}>
                       {tag.label}{' '}

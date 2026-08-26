@@ -200,7 +200,7 @@ export function GameResultCorrectionPanel({
       ) : null}
 
       {draftBase && !readOnly ? (
-        <div className="tm-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className="tm-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
           {pendingCorrection ? (
             <>
               <p className="tm-text-label" style={{ fontWeight: 600 }}>
@@ -240,7 +240,7 @@ export function GameResultCorrectionPanel({
       ) : null}
 
       {currentOfficial && !readOnly ? (
-        <div className="tm-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className="tm-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
           <p className="tm-text-label" style={{ fontWeight: 600, color: 'var(--red700)' }}>
             공식 결과 무효화
           </p>

@@ -191,7 +191,7 @@ export function MyMatchesPageView({ model }: { model: MyMatchesViewModel }) {
           <Link className={`tm-btn tm-btn-md ${!joined ? 'tm-btn-primary' : 'tm-btn-neutral'}`} href="/my/matches/created" aria-current={!joined ? 'page' : undefined}>생성한 매치</Link>
         </div>
         {model.apiNotice ? (
-          <Card pad={14} className={model.apiNotice.tone === 'warning' ? 'tm-auth-soft-card-warning' : undefined}>
+          <Card pad={16} className={model.apiNotice.tone === 'warning' ? 'tm-auth-soft-card-warning' : undefined}>
             <div className="tm-text-body-lg">{model.apiNotice.title}</div>
             <div className="tm-text-caption" style={{ marginTop: 4 }}>{model.apiNotice.body}</div>
           </Card>
@@ -293,7 +293,7 @@ export function MyInvitationsPageView({ model }: { model: MyInvitationsViewModel
                   </button>
                 </div>
                 {invitation.actionPending ? (
-                  <div className="tm-text-caption" role="status" aria-live="polite" style={{ marginTop: 6 }}>
+                  <div className="tm-text-caption" role="status" aria-live="polite" style={{ marginTop: 8 }}>
                     처리 중…
                   </div>
                 ) : null}
@@ -397,7 +397,7 @@ export function MyTeamMembersPageView({ model, backHref = '/my/teams/team-1' }: 
         <div className="tm-my-stat-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
           {model.summary.map((stat) => <Card key={stat.label} pad={16}><KPIStat {...stat} /></Card>)}
         </div>
-        <div className="tm-team-form-chip-row" role="group" aria-label="멤버 목록 탭" style={{ marginTop: 14 }}>
+        <div className="tm-team-form-chip-row" role="group" aria-label="멤버 목록 탭" style={{ marginTop: 16 }}>
           {model.tabs.map((tab) => (
             <button key={tab.key} className={`tm-chip ${model.activeTab === tab.key ? 'tm-chip-active' : ''}`} type="button" onClick={tab.onSelect} aria-pressed={model.activeTab === tab.key}>
               {tab.label} <span className="tab-num">{tab.count}</span>
@@ -525,7 +525,7 @@ function MyMatchCard({ match, manage }: { match: MyMatch; manage?: boolean }) {
         </div>
         <span className={`tm-badge ${match.status === 'pending' ? 'tm-badge-orange' : match.status === 'ended' ? 'tm-badge-grey' : 'tm-badge-blue'}`}>{match.statusLabel}</span>
       </div>
-      <p className="tm-text-caption" style={{ margin: '10px 0 0', lineHeight: 1.5 }}>{match.note}</p>
+      <p className="tm-text-caption" style={{ margin: '12px 0 0', lineHeight: 1.5 }}>{match.note}</p>
       <div className="tm-my-card-actions">
         <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={match.href}>상세</Link>
         {manage ? <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={`${match.href}/applications`}>참가 관리</Link> : canReview ? <Link className="tm-btn tm-btn-sm tm-btn-primary" href={match.reviewHref ?? '/my/reviews'}>리뷰</Link> : <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled>{match.status === 'ended' ? '리뷰 불가' : '리뷰 대기'}</button>}
@@ -584,7 +584,7 @@ function MemberGroup({ title, members }: { title: string; members: MyMember[] })
  */
 function PhoneVerificationCallout() {
   return (
-    <Card pad={14} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+    <Card pad={16} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
       <span
         aria-hidden="true"
         style={{

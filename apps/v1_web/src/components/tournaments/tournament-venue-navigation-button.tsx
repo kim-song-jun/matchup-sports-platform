@@ -67,7 +67,7 @@ export function TournamentVenueNavigationButton({
         ref={triggerRef}
         type="button"
         className="tm-btn tm-btn-sm tm-btn-neutral"
-        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 44 }}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 8, minHeight: 44 }}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={menuId}
@@ -87,13 +87,13 @@ export function TournamentVenueNavigationButton({
             position: 'absolute',
             top: '100%',
             left: 0,
-            marginTop: 6,
+            marginTop: 8,
             minWidth: 260,
             background: 'var(--surface, #fff)',
             border: '1px solid var(--border)',
             borderRadius: 12,
             boxShadow: '0 8px 24px rgba(20,28,45,0.14)',
-            padding: 6,
+            padding: 8,
             zIndex: 20,
           }}
         >

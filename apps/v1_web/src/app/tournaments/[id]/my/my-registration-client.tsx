@@ -245,7 +245,7 @@ function RegistrationPass({
           marginBottom: 16,
         }}
       >
-        <div style={{ padding: '16px 18px 14px' }}>
+        <div style={{ padding: '16px 20px 16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 8 }}>
             <span className="tm-badge tm-badge-orange">입금 대기</span>
           </div>
@@ -261,15 +261,15 @@ function RegistrationPass({
         <div
           style={{
             borderTop: '1px dashed var(--border)',
-            padding: '13px 18px',
-            display: 'flex', flexDirection: 'column', gap: 9,
+            padding: '12px 20px',
+            display: 'flex', flexDirection: 'column', gap: 8,
           }}
         >
           <PassFact icon={<CalendarIcon />} label="일정" value={formatMonthDayRange(scheduledAt, scheduledEndAt) || '일정 미정'} />
           <PassFact icon={<MapPinIcon />} label="장소" value={venue || '장소 미정'} />
           {paymentSummary ? <PassFact icon={<ReceiptIcon />} label="참가비" value={paymentSummary} /> : null}
         </div>
-        <div style={{ borderTop: '1px solid var(--border)', padding: '12px 18px' }}>
+        <div style={{ borderTop: '1px solid var(--border)', padding: '12px 20px' }}>
           <p className="tm-text-caption" style={{ color: 'var(--orange700)', lineHeight: 1.6, margin: 0, fontWeight: 600 }}>
             신청 내역에서 계좌 정보를 확인하고 참가비를 입금해 주세요.
           </p>
@@ -299,14 +299,14 @@ function RegistrationPass({
       }}
     >
       {/* Header: sport chip + status pill, title, team */}
-      <div style={{ padding: '16px 18px 14px' }}>
+      <div style={{ padding: '16px 20px 16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 8 }}>
           <span
             className="tm-text-micro"
             style={{
-              display: 'inline-flex', alignItems: 'center', gap: 5,
+              display: 'inline-flex', alignItems: 'center', gap: 4,
               background: accent.badgeBg, color: accent.badgeText,
-              fontWeight: 600, padding: '3px 9px', borderRadius: 999, flexShrink: 0,
+              fontWeight: 600, padding: '3px 8px', borderRadius: 999, flexShrink: 0,
             }}
           >
             <span aria-hidden="true" style={{ width: 5, height: 5, borderRadius: '50%', background: accent.dot }} />
@@ -328,8 +328,8 @@ function RegistrationPass({
       <div
         style={{
           borderTop: '1px dashed var(--border)',
-          padding: '13px 18px',
-          display: 'flex', flexDirection: 'column', gap: 9,
+          padding: '12px 20px',
+          display: 'flex', flexDirection: 'column', gap: 8,
         }}
       >
         <PassFact icon={<CalendarIcon />} label="일정" value={dateStr || '일정 미정'} />
@@ -342,7 +342,7 @@ function RegistrationPass({
         <div
           style={{
             borderTop: '1px solid var(--border)',
-            padding: '13px 18px',
+            padding: '12px 20px',
             display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
           }}
         >
@@ -375,7 +375,7 @@ function RegistrationPass({
           ) : null}
         </div>
       ) : (
-        <div style={{ borderTop: '1px solid var(--border)', padding: '12px 18px' }}>
+        <div style={{ borderTop: '1px solid var(--border)', padding: '12px 20px' }}>
           <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, margin: 0 }}>
             앞 순위 팀이 취소하면 자동으로 확정 알림을 드려요.
           </p>
@@ -502,7 +502,7 @@ function CancelModal({
             취소 요청을 보내면 운영진이 검토 후 처리해요. 환불 정책에 따라 환불 금액이 달라질 수 있어요.
           </p>
 
-          <label htmlFor="cancel-reason" className="tm-text-caption" style={{ color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>
+          <label htmlFor="cancel-reason" className="tm-text-caption" style={{ color: 'var(--text-muted)', display: 'block', marginBottom: 8 }}>
             취소 사유 (선택)
           </label>
           <textarea
@@ -517,7 +517,7 @@ function CancelModal({
           />
 
           {error ? (
-            <div style={{ marginTop: 10 }}>
+            <div style={{ marginTop: 12 }}>
               <AlertBanner message={error} />
             </div>
           ) : null}
@@ -735,7 +735,7 @@ function RegistrationDetailView({
       <div
         style={{
           borderTop: '1px solid var(--border)',
-          paddingTop: 14,
+          paddingTop: 16,
           marginBottom: 16,
         }}
       >
@@ -908,11 +908,11 @@ function RegistrationDetailView({
                 {belowMinimum && !isRosterEditBlockedByStatus ? (
                   /* P0: copy branches on whether confirmation is still blocked */
                   registration.status === 'confirmed' || registration.status === 'paid' ? (
-                    <p className="tm-text-caption" style={{ marginTop: 10, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                    <p className="tm-text-caption" style={{ marginTop: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
                       대회 전까지 선수를 더 등록할 수 있어요.
                     </p>
                   ) : (
-                    <p className="tm-text-caption" style={{ marginTop: 10, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                    <p className="tm-text-caption" style={{ marginTop: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
                       최소 인원을 채워야 참가 확정이 가능해요.
                     </p>
                   )
@@ -956,7 +956,7 @@ function RegistrationDetailView({
 
                 {/* 결제 group */}
                 <div style={{ borderTop: '1px solid var(--border)', marginTop: 12, paddingTop: 12 }}>
-                  <div className="tm-text-micro" style={{ color: 'var(--text-caption)', fontWeight: 600, marginBottom: 6 }}>
+                  <div className="tm-text-micro" style={{ color: 'var(--text-caption)', fontWeight: 600, marginBottom: 8 }}>
                     결제
                   </div>
                   {registration.payment ? (
@@ -1019,7 +1019,7 @@ function RegistrationDetailView({
             </section>
 
             {showAwaitingPaymentNotice ? (
-              <Card pad={14} style={{ marginTop: 12, background: 'var(--grey50)' }}>
+              <Card pad={16} style={{ marginTop: 12, background: 'var(--grey50)' }}>
                 <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.65 }}>
                   <p style={{ margin: 0 }}>아직 참가가 확정된 상태는 아닙니다.</p>
                   <p style={{ margin: '8px 0 0' }}>
@@ -1032,7 +1032,7 @@ function RegistrationDetailView({
             ) : null}
 
             {/* Mobile-only: Cancel / Reapply actions (hidden on desktop — rail handles them) */}
-            <div className="tm-hide-desktop" style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div className="tm-hide-desktop" style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
               {canManageRegistration && (registration.status === 'cancelled' || registration.status === 'draft') ? (
                 <Link
                   href={`/tournaments/${tournamentId}/apply`}
@@ -1141,7 +1141,7 @@ function MyRegistrationsList({
       <div style={{ marginLeft: -20, marginRight: -20 }}>
         <SectionTitle title="팀별 신청 내역" />
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 8 }}>
         {registrations.map((registration) => {
           const status = registrationStatusConfig(registration.status);
           const href = appRoute(`/tournaments/${tournamentId}/my?reg=${registration.id}`);
@@ -1167,12 +1167,12 @@ function MyRegistrationsList({
                       </span>
                       <span className={`tm-badge ${status.badgeClass}`}>{status.label}</span>
                     </div>
-                    <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 6 }}>
+                    <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 8 }}>
                       선수 {registration.playerCount}명
                       {registration.payment ? ` · ${paymentMethodLabel(registration.payment.method)} · ${paymentStatusLabel(registration.payment.status)}` : ''}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-muted)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-muted)' }}>
                     <span className="tm-text-caption">{primaryAction}</span>
                     <ChevronRight size={16} />
                   </div>
@@ -1226,8 +1226,8 @@ function TeamRegistrationHub({
       {capacity ? (
         <div
           style={{
-            marginTop: 10,
-            padding: '10px 12px',
+            marginTop: 12,
+            padding: '12px 12px',
             borderRadius: 10,
             background: blockMessage ? 'var(--orange50)' : 'var(--grey50)',
             display: 'flex',
@@ -1263,7 +1263,7 @@ function TeamRegistrationHub({
           />
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12 }}>
           {teams.map((team) => {
             const registration = registrationByTeamId.get(team.teamId);
             const canManageTeam = team.role === 'owner' || team.role === 'manager';
@@ -1337,13 +1337,13 @@ function TeamRegistrationHub({
                         <span className="tm-badge tm-badge-grey">멤버</span>
                       )}
                     </div>
-                    <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.5 }}>
+                    <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.5 }}>
                       {team.sport.name}
                       {team.region ? ` · ${team.region.name}` : ''}
                       {` · ${meta}`}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: displayActionDisabled ? 'var(--text-caption)' : 'var(--blue700)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: displayActionDisabled ? 'var(--text-caption)' : 'var(--blue700)' }}>
                     <span className="tm-text-caption" style={{ fontWeight: 700 }}>{displayActionLabel}</span>
                     {!displayActionDisabled ? <ChevronRight size={16} /> : null}
                   </div>
@@ -1394,7 +1394,7 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
             <div
               key={i}
               aria-hidden="true"
-              style={{ height: 80, borderRadius: 12, background: 'var(--grey100)', marginBottom: 10 }}
+              style={{ height: 80, borderRadius: 12, background: 'var(--grey100)', marginBottom: 12 }}
             />
           ))}
         </div>
@@ -1411,7 +1411,7 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
           <Link
             href={`/tournaments/${tournamentId}`}
             className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
-            style={{ marginTop: 14 }}
+            style={{ marginTop: 16 }}
           >
             대회 상세로 돌아가기
           </Link>

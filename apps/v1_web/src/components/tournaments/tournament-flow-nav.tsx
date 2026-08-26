@@ -44,7 +44,7 @@ export function TournamentFlowNav({ prev, next }: TournamentFlowNavProps) {
       <Link
         href={prev.href}
         className="tm-btn tm-btn-md tm-btn-ghost"
-        style={{ flexShrink: 0, gap: 6 }}
+        style={{ flexShrink: 0, gap: 8 }}
         aria-label={`${withDirectionalParticle(prev.label)} 이동`}
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

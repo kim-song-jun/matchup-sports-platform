@@ -77,12 +77,12 @@ export function TeamMatchStatePageView({ model }: { model: TeamMatchStateViewMod
       <div className="tm-match-list">
         <EmptyState title={model.title} sub={model.description} />
         {model.state === 'error' ? (
-          <Card pad={16} style={{ marginTop: 18, background: 'var(--grey50)' }}>
+          <Card pad={16} style={{ marginTop: 20, background: 'var(--grey50)' }}>
             <div className="tm-text-label">목록에서 다시 확인해 주세요</div>
-            <div className="tm-text-caption" style={{ marginTop: 6, lineHeight: 1.55 }}>
+            <div className="tm-text-caption" style={{ marginTop: 8, lineHeight: 1.55 }}>
               새로고침 후에도 같은 문제가 반복되면 잠시 뒤 다시 시도해 보세요.
             </div>
-            <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href="/team-matches" style={{ marginTop: 14 }}>목록으로 돌아가기</Link>
+            <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href="/team-matches" style={{ marginTop: 16 }}>목록으로 돌아가기</Link>
           </Card>
         ) : null}
       </div>
@@ -218,14 +218,14 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
   /* Host-team card — rendered in left column (mobile) and right column (desktop).
    * Desktop 우측 컬럼에 이동해 40% 보이드를 채움(T1). 모바일은 기존 위치 유지. */
   const hostTeamCard = (
-    <Link className="tm-card tm-pressable tm-host-team-card" href={match.hostTeamHref ?? '/teams'} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 16 }}>
+    <Link className="tm-card tm-pressable tm-host-team-card" href={match.hostTeamHref ?? '/teams'} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: 16 }}>
       {/* 팀 로고 아바타 — 원본은 48px였으나 TeamAvatar 표준 사이즈 중 가장 근접한 md(40px)로 통일 */}
       <TeamAvatar seed={match.hostTeamId ?? match.hostTeam} name={match.hostTeam} logoUrl={match.hostTeamLogoUrl} size="md" />
       {/* 팀 정보 */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>홈팀 정보</div>
         <div className="tm-text-body-lg" style={{ marginTop: 2 }}>{match.hostTeam}</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 5 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
           <span className="tm-badge tm-badge-blue">{match.sport}</span>
           {/* 등급 미입력(리그 대진 등 levelLabel 없음)이면 값 없는 "등급" 배지가 뜬다 — 숨긴다. */}
           {match.grade ? <span className="tm-badge tm-badge-grey">{match.grade}등급</span> : null}
@@ -409,7 +409,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
               {mode === 'pending' ? <StateCard tone="orange" title="신청을 접수했어요" body="홈팀이 검토를 마치면 알림으로 알려드릴게요." /> : null}
               {mode === 'approved' ? <StateCard tone="green" title="승인 완료" body="팀매치 참가가 확정됐어요. 경기 전 안내는 채팅에서 확인할 수 있어요." /> : null}
               {match.description ? (
-                <Card pad={16} style={{ marginTop: 10 }}>
+                <Card pad={16} style={{ marginTop: 12 }}>
                   <div className="tm-text-body-lg">설명</div>
                   <div className="tm-text-body" style={{ marginTop: 8, lineHeight: 1.55, color: 'var(--text-muted)' }}>{match.description}</div>
                 </Card>
@@ -419,11 +419,11 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
                   분리돼 보였다(QA 지적). model.lineupHref/resultAction은
                   team-matches-client.tsx가 권한 조건일 때만 설정한다. */}
               {model.lineupHref || model.resultAction || model.reviewAction ? (
-                <Card pad={16} style={{ marginTop: 10 }}>
+                <Card pad={16} style={{ marginTop: 12 }}>
                   <div className="tm-text-body-lg">매치 관리</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12 }}>
                     {model.lineupHref ? (
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                         <div style={{ minWidth: 0 }}>
                           <div className="tm-text-label" style={{ fontWeight: 600 }}>라인업</div>
                           <div className="tm-text-caption" style={{ marginTop: 2, color: 'var(--text-muted)' }}>
@@ -441,7 +441,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
-                          gap: 10,
+                          gap: 12,
                           ...(model.lineupHref ? { borderTop: '1px solid var(--border)', paddingTop: 12 } : {}),
                         }}
                       >
@@ -468,7 +468,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
-                          gap: 10,
+                          gap: 12,
                           ...(model.lineupHref || model.resultAction
                             ? { borderTop: '1px solid var(--border)', paddingTop: 12 }
                             : {}),
@@ -493,12 +493,12 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
                 </Card>
               ) : null}
               {/* 홈팀 카드: 모바일은 왼쪽 컬럼 하단, 데스크톱은 우측 컬럼(tm-hide-desktop)으로 이동 */}
-              <div className="tm-hide-desktop" style={{ marginTop: 14 }}>{hostTeamCard}</div>
+              <div className="tm-hide-desktop" style={{ marginTop: 16 }}>{hostTeamCard}</div>
               {mode === 'mine' ? (
-                <Card pad={16} style={{ marginTop: 10 }}>
+                <Card pad={16} style={{ marginTop: 12 }}>
                   <div className="tm-text-body-lg">신청팀</div>
                   {match.applicantActionError ? (
-                    <div className="tm-text-micro" role="alert" style={{ color: 'var(--red700)', marginTop: 6 }}>{match.applicantActionError}</div>
+                    <div className="tm-text-micro" role="alert" style={{ color: 'var(--red700)', marginTop: 8 }}>{match.applicantActionError}</div>
                   ) : null}
                   {model.hostActions?.length ? (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
@@ -515,9 +515,9 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
                       ))}
                     </div>
                   ) : null}
-                  <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
+                  <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
                     {match.applicantTeams.map((team) => (
-                      <div key={team.applicationId ?? team.name} style={{ border: '1px solid var(--grey100)', borderRadius: 12, padding: '10px 12px' }}>
+                      <div key={team.applicationId ?? team.name} style={{ border: '1px solid var(--grey100)', borderRadius: 12, padding: '12px 12px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                           <div style={{ minWidth: 0, flex: 1 }}>
                             <div className="tm-text-label">{team.name}</div>
@@ -537,7 +537,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
                         </div>
                         {(team.onApprove ?? team.onReject) ? (
                           // #4: 순서 [거절(좌/danger)] [승인(우/primary)] — 위험 행동을 왼쪽 ghost red, 확정 행동을 오른쪽 primary로
-                          <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+                          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                             {team.onReject ? (
                               <button
                                 className="tm-btn tm-btn-sm tm-btn-danger"
@@ -590,7 +590,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
 
       {/* Mobile fixed CTA — hidden on desktop (desktop card above replaces it) */}
       <div className="tm-fixed-cta tm-team-match-mobile-cta">
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
           <span className="tm-text-caption">{mode === 'mine' ? '내가 만든 팀매치' : '신청 상태'}</span>
           {/* 비용을 모르면(costNote 미기재) 금액 대신 '비용 미정' — 0원으로 단정하지 않는다. */}
           <span className="tm-text-label">{model.statusLabel ?? (match.opponentCost !== null ? `${match.opponentCost.toLocaleString('ko-KR')}원` : '비용 미정')}</span>
@@ -757,7 +757,7 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
         </div>
       </div>
       <div style={{ padding: 16 }}>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <span className="tm-badge tm-badge-blue">{match.sport}</span>
           {/* 값이 비면 내용 없는 회색 알약만 남는다(리그 대진은 등급·경기방식 미입력이 기본) — 숨긴다. */}
           {match.grade ? <span className="tm-badge tm-badge-grey">{match.grade}등급</span> : null}
@@ -789,8 +789,8 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
               costNote 를 안 적은 매치가 전부 '무료초청'으로 둔갑한다. */}
           {match.opponentCost === 0 ? <span className="tm-badge tm-badge-blue">무료초청</span> : null}
         </div>
-        <div className="tm-text-body-lg" style={{ marginTop: 10 }}>{match.title}</div>
-        <div className="tm-text-caption" style={{ marginTop: 5 }}>{match.date} {match.time} · {match.venue}</div>
+        <div className="tm-text-body-lg" style={{ marginTop: 12 }}>{match.title}</div>
+        <div className="tm-text-caption" style={{ marginTop: 4 }}>{match.date} {match.time} · {match.venue}</div>
         <div className="tm-match-list-footer">
           {/* 매너·승수를 모르면(API 미제공) 줄을 비운다 — 0 으로 채우면 잘하는 팀이 최악으로 보인다.
               푸터의 좌우 배치를 유지하려고 빈 span 을 자리표시자로 남긴다. */}
@@ -840,7 +840,7 @@ function TeamStep({ model }: { model: TeamMatchCreateViewModel }) {
       <h1 className="tm-text-heading">어떤 팀의 매치인가요?</h1>
       <p className="tm-text-body" style={{ marginTop: 8 }}>선택한 팀의 종목·등급·권한 정보를 기반으로 팀매치를 만들어요.</p>
       {model.isLoadingTeams ? (
-        <div style={{ display: 'grid', gap: 10, marginTop: 20 }}>
+        <div style={{ display: 'grid', gap: 12, marginTop: 20 }}>
           {[0, 1, 2].map((i) => (
             <div key={i} className="tm-review-skeleton" style={{ height: 72 }} aria-hidden="true" />
           ))}
@@ -848,7 +848,7 @@ function TeamStep({ model }: { model: TeamMatchCreateViewModel }) {
       ) : !hasTeams ? (
         <EmptyState title="팀매치를 만들 수 있는 팀이 없어요" sub="소속된 팀이 없거나 팀 정보를 불러오지 못했어요." />
       ) : (
-        <div style={{ display: 'grid', gap: 10, marginTop: 20 }}>
+        <div style={{ display: 'grid', gap: 12, marginTop: 20 }}>
           {model.teams.map((team) => (
             <button
               key={team.name}
@@ -876,9 +876,9 @@ function TeamStep({ model }: { model: TeamMatchCreateViewModel }) {
       {!model.isLoadingTeams && hasTeams ? (() => {
         const blocked = !hasCreatableTeams;
         return (
-          <Card pad={14} style={{ marginTop: 14, background: blocked ? 'var(--orange50)' : 'var(--grey50)' }}>
+          <Card pad={16} style={{ marginTop: 16, background: blocked ? 'var(--orange50)' : 'var(--grey50)' }}>
             <div className="tm-text-label" style={blocked ? { color: 'var(--orange700)' } : undefined}>권한 기준</div>
-            <div className="tm-text-caption" style={{ marginTop: 6 }}>
+            <div className="tm-text-caption" style={{ marginTop: 8 }}>
               {blocked
                 ? '팀장이거나 매치 생성 권한이 있어야 다음으로 진행할 수 있어요. 해당 권한이 있는 팀으로 다시 시도해 주세요.'
                 : '팀장이거나 매치 생성 권한이 있는 관리자만 다음으로 진행할 수 있어요.'}
@@ -891,7 +891,7 @@ function TeamStep({ model }: { model: TeamMatchCreateViewModel }) {
 }
 
 function SportStep({ model }: { model: TeamMatchCreateViewModel }) {
-  return <div><h1 className="tm-text-heading">어떤 종목인가요?</h1><p className="tm-text-body" style={{ marginTop: 8 }}>상대 팀과 함께 진행할 종목을 선택해 주세요.</p><div className="tm-create-sport-grid">{model.sports.map((sport) => <button key={sport} className={`tm-card tm-pressable ${sport === model.selectedSport ? 'tm-create-selected' : ''}`} style={{ padding: 16, textAlign: 'left' }} type="button" aria-pressed={sport === model.selectedSport} onClick={() => model.form?.onSelectSport(sport)}><div className="tm-text-body-lg">{sport}</div><div className="tm-text-caption" style={{ marginTop: 5 }}>{sport === model.selectedSport ? '선택됨' : '탭해서 선택'}</div></button>)}</div><FieldErrorText id="field-sportId" message={model.form?.fieldErrors?.sportId} /></div>;
+  return <div><h1 className="tm-text-heading">어떤 종목인가요?</h1><p className="tm-text-body" style={{ marginTop: 8 }}>상대 팀과 함께 진행할 종목을 선택해 주세요.</p><div className="tm-create-sport-grid">{model.sports.map((sport) => <button key={sport} className={`tm-card tm-pressable ${sport === model.selectedSport ? 'tm-create-selected' : ''}`} style={{ padding: 16, textAlign: 'left' }} type="button" aria-pressed={sport === model.selectedSport} onClick={() => model.form?.onSelectSport(sport)}><div className="tm-text-body-lg">{sport}</div><div className="tm-text-caption" style={{ marginTop: 4 }}>{sport === model.selectedSport ? '선택됨' : '탭해서 선택'}</div></button>)}</div><FieldErrorText id="field-sportId" message={model.form?.fieldErrors?.sportId} /></div>;
 }
 
 function InfoStep({ model, edit }: { model: TeamMatchCreateViewModel; edit: boolean }) {
@@ -919,7 +919,7 @@ function InfoStep({ model, edit }: { model: TeamMatchCreateViewModel; edit: bool
 
 function ImmutableMatchContext({ team, sport }: { team: string; sport: string }) {
   return (
-    <Card pad={14} style={{ marginTop: 14, background: 'var(--grey50)' }}>
+    <Card pad={16} style={{ marginTop: 16, background: 'var(--grey50)' }}>
       <div className="tm-create-two-col">
         <div><div className="tm-text-caption">호스트 팀</div><div className="tm-text-body-lg" style={{ marginTop: 4 }}>{team}</div></div>
         <div><div className="tm-text-caption">종목</div><div className="tm-text-body-lg" style={{ marginTop: 4 }}>{sport}</div></div>
@@ -952,7 +952,7 @@ function matchFormatOptionsForSport(sportNameOrId: string): readonly string[] {
 }
 
 function ConditionStep({ model }: { model: TeamMatchCreateViewModel }) {
-  return <div><h1 className="tm-text-heading">경기조건</h1><p className="tm-text-body" style={{ marginTop: 8 }}>상대팀이 신청 전에 확인할 등급, 방식, 비용 조건을 입력해 주세요.</p><ConditionFields model={model} /><Card pad={14} style={{ marginTop: 14, background: 'var(--grey50)' }}><div className="tm-text-label">무료초청 표시</div><div className="tm-text-caption" style={{ marginTop: 5 }}>상대팀 부담금이 0원이면 목록과 상세에 '무료초청' 배지가 표시돼요.</div></Card></div>;
+  return <div><h1 className="tm-text-heading">경기조건</h1><p className="tm-text-body" style={{ marginTop: 8 }}>상대팀이 신청 전에 확인할 등급, 방식, 비용 조건을 입력해 주세요.</p><ConditionFields model={model} /><Card pad={16} style={{ marginTop: 16, background: 'var(--grey50)' }}><div className="tm-text-label">무료초청 표시</div><div className="tm-text-caption" style={{ marginTop: 4 }}>상대팀 부담금이 0원이면 목록과 상세에 '무료초청' 배지가 표시돼요.</div></Card></div>;
 }
 
 function ConditionFields({ model }: { model: TeamMatchCreateViewModel }) {
@@ -1012,7 +1012,7 @@ function PlaceTimeFields({ model }: { model: TeamMatchCreateViewModel }) {
         <CreateField label="신청 마감일" value={d.deadlineDate} type="date" onChange={(value) => model.form?.onFieldChange('deadlineDate', value)} />
         <CreateField id="field-deadlineTime" error={errors?.deadlineTime} label="신청 마감시간" value={d.deadlineTime} type="time" onChange={(value) => model.form?.onFieldChange('deadlineTime', value)} />
       </div>
-      <div className="tm-text-caption" style={{ marginTop: 6 }}>둘 다 비워두면 경기 시작 전까지 신청을 받아요.</div>
+      <div className="tm-text-caption" style={{ marginTop: 8 }}>둘 다 비워두면 경기 시작 전까지 신청을 받아요.</div>
     </>
   );
 }
@@ -1028,7 +1028,7 @@ function RegionSelect({ value, regions, onChange, error }: { value: string; regi
   }, [selectedRegion?.parentName]);
 
   if (parentNames.length === 0) {
-    return <label className="tm-create-field"><div className="tm-text-label">지역</div><select id="field-regionId" className="tm-create-input tm-create-select-control" value={value} onChange={(event) => onChange?.(event.target.value)}><option value="">시/군/구 선택</option>{regions.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}</select><div className="tm-text-caption" style={{ marginTop: 6 }}>지역은 검색·추천 기준으로 사용돼요. 상세주소는 아래에 직접 입력해 주세요.</div><FieldErrorText message={error} /><RequiredHint shown={!error && !value} /></label>;
+    return <label className="tm-create-field"><div className="tm-text-label">지역</div><select id="field-regionId" className="tm-create-input tm-create-select-control" value={value} onChange={(event) => onChange?.(event.target.value)}><option value="">시/군/구 선택</option>{regions.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}</select><div className="tm-text-caption" style={{ marginTop: 8 }}>지역은 검색·추천 기준으로 사용돼요. 상세주소는 아래에 직접 입력해 주세요.</div><FieldErrorText message={error} /><RequiredHint shown={!error && !value} /></label>;
   }
 
   return (
@@ -1059,7 +1059,7 @@ function RegionSelect({ value, regions, onChange, error }: { value: string; regi
           {districts.map((region) => <option key={region.id} value={region.id}>{region.shortName ?? region.name}</option>)}
         </select>
       </div>
-      <div className="tm-text-caption" style={{ marginTop: 6 }}>지역은 검색·추천 기준으로 사용돼요. 상세주소는 아래에 직접 입력해 주세요.</div>
+      <div className="tm-text-caption" style={{ marginTop: 8 }}>지역은 검색·추천 기준으로 사용돼요. 상세주소는 아래에 직접 입력해 주세요.</div>
       <FieldErrorText message={error} />
       <RequiredHint shown={!error && !value} />
     </div>
@@ -1073,7 +1073,7 @@ function ConfirmStep({ model }: { model: TeamMatchCreateViewModel }) {
   // 상대팀 부담금 0원일 때만 '무료초청' 뱃지 표시 (목록·상세와 동일 조건 #20)
   const isFreeInvite = d.opponentCost === 0;
   const styleText = d.style.join(' · ');
-  return <div><h1 className="tm-text-heading">입력한 내용을 확인해 주세요</h1><Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}><div className="tm-team-create-preview" style={{ backgroundImage: cssUrl(d.imageUrl) }}><div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{model.selectedTeam} vs 상대팀</div></div><div style={{ padding: 16 }}><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{model.selectedSport}</span><span className="tm-badge tm-badge-grey">{d.grade}</span><span className="tm-badge tm-badge-grey">{d.format}</span><span className="tm-badge tm-badge-grey">{d.gender}</span>{isFreeInvite ? <span className="tm-badge tm-badge-blue">무료초청</span> : null}</div><div className="tm-text-subhead" style={{ marginTop: 10 }}>{d.title}</div><div className="tm-text-caption" style={{ marginTop: 6 }}>{d.description}</div></div></Card><Card pad={16} style={{ marginTop: 12 }}><InfoRow label="지역" value={regionName} sub="검색과 추천에 사용돼요" /><InfoRow label="경기조건" value={`${d.grade} · ${d.format}${styleText ? ` · ${styleText}` : ''}`} sub={`${d.uniform} · ${d.gender}`} /><InfoRow label="비용" value={`총 ${d.cost.toLocaleString('ko-KR')}원 · 상대팀 ${d.opponentCost.toLocaleString('ko-KR')}원`} /><InfoRow label="일시" value={`${d.date} ${d.startTime}-${d.endTime}`} /><InfoRow label="신청 마감" value={deadlineText} /><InfoRow label="상세 주소" value={d.venue} /></Card></div>;
+  return <div><h1 className="tm-text-heading">입력한 내용을 확인해 주세요</h1><Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}><div className="tm-team-create-preview" style={{ backgroundImage: cssUrl(d.imageUrl) }}><div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{model.selectedTeam} vs 상대팀</div></div><div style={{ padding: 16 }}><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{model.selectedSport}</span><span className="tm-badge tm-badge-grey">{d.grade}</span><span className="tm-badge tm-badge-grey">{d.format}</span><span className="tm-badge tm-badge-grey">{d.gender}</span>{isFreeInvite ? <span className="tm-badge tm-badge-blue">무료초청</span> : null}</div><div className="tm-text-subhead" style={{ marginTop: 12 }}>{d.title}</div><div className="tm-text-caption" style={{ marginTop: 8 }}>{d.description}</div></div></Card><Card pad={16} style={{ marginTop: 12 }}><InfoRow label="지역" value={regionName} sub="검색과 추천에 사용돼요" /><InfoRow label="경기조건" value={`${d.grade} · ${d.format}${styleText ? ` · ${styleText}` : ''}`} sub={`${d.uniform} · ${d.gender}`} /><InfoRow label="비용" value={`총 ${d.cost.toLocaleString('ko-KR')}원 · 상대팀 ${d.opponentCost.toLocaleString('ko-KR')}원`} /><InfoRow label="일시" value={`${d.date} ${d.startTime}-${d.endTime}`} /><InfoRow label="신청 마감" value={deadlineText} /><InfoRow label="상세 주소" value={d.venue} /></Card></div>;
 }
 
 function TeamMatchComplete({ model }: { model: TeamMatchCreateViewModel }) {
@@ -1107,7 +1107,7 @@ function TeamMatchComplete({ model }: { model: TeamMatchCreateViewModel }) {
         <div className="tm-complete-check">
           <EmptyState title="팀매치를 만들었어요" sub="팀원들에게 먼저 공유해서 참가 가능 여부와 경기 준비를 함께 확인해 보세요." />
         </div>
-        <Card pad={16} style={{ marginTop: 22, background: 'var(--blue50)' }}>
+        <Card pad={16} style={{ marginTop: 24, background: 'var(--blue50)' }}>
           <div className="tm-text-body-lg">{model.selectedTeam} 팀매치 공유</div>
           <div className="tm-text-caption" style={{ marginTop: 4 }}>팀원들에게 팀매치 링크와 경기조건을 공유해요</div>
         </Card>
@@ -1144,7 +1144,7 @@ function InfoRow({ label, value, sub }: { label: string; value: string; sub?: st
 
 function StateCard({ tone, title, body }: { tone: 'orange' | 'green'; title: string; body: string }) {
   /* 배경색은 디자인 토큰 사용 — raw rgba 금지(v1-coding-patterns §2) */
-  return <Card pad={14} style={{ marginTop: 14, background: tone === 'green' ? 'var(--tint-green)' : 'var(--tint-orange)' }}><div className="tm-text-label" style={{ color: tone === 'green' ? 'var(--green700)' : 'var(--orange700)' }}>{title}</div><div className="tm-text-caption" style={{ marginTop: 5 }}>{body}</div></Card>;
+  return <Card pad={16} style={{ marginTop: 16, background: tone === 'green' ? 'var(--tint-green)' : 'var(--tint-orange)' }}><div className="tm-text-label" style={{ color: tone === 'green' ? 'var(--green700)' : 'var(--orange700)' }}>{title}</div><div className="tm-text-caption" style={{ marginTop: 4 }}>{body}</div></Card>;
 }
 
 function ImageUploadField({ image, onChange, onUpload }: { image: string; onChange?: (value: string) => void; onUpload?: (file: File) => Promise<string> }) {
@@ -1175,11 +1175,11 @@ function ImageUploadField({ image, onChange, onUpload }: { image: string; onChan
   };
 
   return (
-    <Card pad={0} style={{ marginTop: 14, overflow: 'hidden' }}>
+    <Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}>
       <div className="tm-create-image-preview" style={{ backgroundImage: cssUrl(image) }}>
         <span className="tm-badge tm-badge-grey">배경 이미지</span>
       </div>
-      <div style={{ padding: 14 }}>
+      <div style={{ padding: 16 }}>
         <label className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" style={{ opacity: uploading ? 0.6 : 1 }}>
           {uploading ? '업로드 중...' : fileName || image ? '이미지 변경' : '배경 이미지 선택'}
           <input className="sr-only" type="file" accept="image/*" disabled={uploading} onChange={handleChange} />
@@ -1187,7 +1187,7 @@ function ImageUploadField({ image, onChange, onUpload }: { image: string; onChan
         <div className="tm-text-caption" style={{ marginTop: 8 }}>목록과 상세 화면의 상단 배경으로 보여요.</div>
         {uploadError ? <div className="tm-text-caption" role="alert" style={{ marginTop: 8, color: 'var(--orange700)' }}>{uploadError}</div> : null}
         {(fileName || image) && !uploading ? (
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 10 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginTop: 12 }}>
             <span className="tm-text-caption" style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fileName || '선택한 이미지'}</span>
             <button className="tm-btn tm-btn-sm tm-btn-ghost" type="button" onClick={() => { setFileName(''); onChange?.(''); }}>제거</button>
           </div>
@@ -1261,7 +1261,7 @@ function CreateProgress({
     <div className="tm-create-progress">
       {/* edit 모드: 배지 + 안내 텍스트를 space-between으로 양쪽 정렬.
           일반 단계: 배지 + 단계명을 flex-start gap으로 나란히 정렬 — 레이아웃 패턴 §3 */}
-      <div style={{ display: 'flex', justifyContent: edit ? 'space-between' : 'flex-start', alignItems: 'center', gap: 10 }}>
+      <div style={{ display: 'flex', justifyContent: edit ? 'space-between' : 'flex-start', alignItems: 'center', gap: 12 }}>
         <span className={`tm-badge ${edit ? 'tm-badge-orange' : 'tm-badge-blue'}`}>{edit ? '수정' : `${step}/6단계`}</span>
         <span className="tm-text-caption">{edit ? '변경한 항목만 저장돼요' : stepLabel}</span>
       </div>

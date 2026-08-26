@@ -65,7 +65,7 @@ export function TournamentPlayerRecordsSections({
   if (goalRows.length === 0 && assistRows.length === 0) {
     return emptyBehavior === 'hide' ? null : wrap(
       <section>
-        <h3 className="tm-hub-section-title" style={{ marginBottom: 10 }}>개인 기록</h3>
+        <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>개인 기록</h3>
         <EmptyState title="아직 기록이 없어요" sub="확정된 경기 결과가 쌓이면 득점·도움 순위가 나타나요." />
       </section>,
     );
@@ -98,8 +98,8 @@ function RecordList({
 }) {
   return (
     <section>
-      <h3 className="tm-hub-section-title" style={{ marginBottom: 10 }}>{title}</h3>
-      <ol style={{ display: 'flex', flexDirection: 'column', gap: 6, listStyle: 'none', margin: 0, padding: 0 }}>
+      <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>{title}</h3>
+      <ol style={{ display: 'flex', flexDirection: 'column', gap: 8, listStyle: 'none', margin: 0, padding: 0 }}>
         {rows.map((row, index) => (
           <li
             key={row.userId}

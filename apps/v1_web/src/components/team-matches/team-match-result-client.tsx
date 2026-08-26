@@ -105,7 +105,7 @@ function GoalTimeline({ revision, homeName, awayName }: {
   const goals = score && 'goals' in score ? score.goals ?? [] : [];
   if (goals.length === 0) return null;
   return (
-    <div style={{ display: 'grid', gap: 6, marginTop: 12 }}>
+    <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
       <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>득점 기록</div>
       {goals
         .slice()
@@ -217,7 +217,7 @@ function ApprovalParticipantSummary({
   const label = (participantId: string) => `선수 #${participantId.slice(0, 8)}`;
 
   return (
-    <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
+    <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
       {scorers.length > 0 ? (
         <div>
           <div className="tm-text-label">득점자</div>
@@ -286,7 +286,7 @@ function ResultDraftSummary({
   }
 
   return (
-    <div style={{ display: 'grid', gap: 14, marginTop: 12 }}>
+    <div style={{ display: 'grid', gap: 16, marginTop: 12 }}>
       <div>
         <div className="tm-text-label">스코어</div>
         <div className="tm-text-subhead" style={{ marginTop: 4, fontWeight: 700 }}>
@@ -296,7 +296,7 @@ function ResultDraftSummary({
       {homeGoals.length > 0 ? (
         <div>
           <div className="tm-text-label">득점자</div>
-          <div style={{ display: 'grid', gap: 4, marginTop: 6 }}>
+          <div style={{ display: 'grid', gap: 4, marginTop: 8 }}>
             {homeGoals.map((goal, index) => (
               <div key={goal.key} className="tm-text-caption">
                 {index + 1}번 골 · {nameFor(goal.participantId)}
@@ -308,7 +308,7 @@ function ResultDraftSummary({
       {cardDrafts.length > 0 ? (
         <div>
           <div className="tm-text-label">옐로카드·레드카드</div>
-          <div style={{ display: 'grid', gap: 4, marginTop: 6 }}>
+          <div style={{ display: 'grid', gap: 4, marginTop: 8 }}>
             {cardDrafts.map((card) => (
               <div key={card.key} className="tm-text-caption">
                 {nameFor(card.participantId)} · {CARD_TYPE_LABEL[card.type]}
@@ -319,14 +319,14 @@ function ResultDraftSummary({
       ) : null}
       <div>
         <div className="tm-text-label">MVP</div>
-        <div className="tm-text-caption" style={{ marginTop: 6 }}>
+        <div className="tm-text-caption" style={{ marginTop: 8 }}>
           {mvpParticipantId ? nameFor(mvpParticipantId) : '선택 안 함'}
         </div>
       </div>
       {reason.trim() ? (
         <div>
           <div className="tm-text-label">메모</div>
-          <div className="tm-text-caption" style={{ marginTop: 6, color: 'var(--text-muted)' }}>{displayRevisionReason(reason)}</div>
+          <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>{displayRevisionReason(reason)}</div>
         </div>
       ) : null}
     </div>
@@ -434,13 +434,13 @@ function LeagueDisputeCard({
         </span>
       </div>
       {formError ? (
-        <div style={{ marginTop: 10 }}>
+        <div style={{ marginTop: 12 }}>
           <AlertBanner tone="error" message={formError} />
         </div>
       ) : null}
       {canFileDispute ? (
         showForm ? (
-          <div style={{ marginTop: 14 }}>
+          <div style={{ marginTop: 16 }}>
             <TextField
               label="이의 사유"
               multiline
@@ -450,7 +450,7 @@ function LeagueDisputeCard({
               fieldId="league-dispute-reason"
               placeholder="어떤 부분에 이의가 있는지 알려주세요"
             />
-            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
               <Button
                 variant="primary"
                 disabled={!reason.trim()}
@@ -465,7 +465,7 @@ function LeagueDisputeCard({
             </div>
           </div>
         ) : (
-          <Button variant="outline" size="lg" style={{ marginTop: 14 }} onClick={() => setShowForm(true)}>
+          <Button variant="outline" size="lg" style={{ marginTop: 16 }} onClick={() => setShowForm(true)}>
             이의 제기
           </Button>
         )
@@ -500,7 +500,7 @@ function LeagueTeamMatchResultPage({
 
   return (
     <AppChrome title="경기 결과" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`} desktopHead>
-      <div style={{ display: 'grid', gap: 14, padding: '16px 20px 24px' }}>
+      <div style={{ display: 'grid', gap: 16, padding: '16px 20px 24px' }}>
         <Card pad={16}>
           <div className="tm-text-body-lg">
             {hostName} <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>(홈)</span>
@@ -516,7 +516,7 @@ function LeagueTeamMatchResultPage({
             {latest?.state === 'OFFICIAL' ? (
               <Card pad={16}>
                 <div className="tm-text-body-lg">공식 결과로 확정됐어요</div>
-                <div className="tm-text-subhead" style={{ marginTop: 10, fontWeight: 700 }}>{scoreLabel(latest)}</div>
+                <div className="tm-text-subhead" style={{ marginTop: 12, fontWeight: 700 }}>{scoreLabel(latest)}</div>
                 <GoalTimeline revision={latest} homeName={hostName} awayName={opponentName} />
                 <ApprovalParticipantSummary
                   resultParticipants={latest.resultParticipants}
@@ -835,7 +835,7 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
     <AppChrome title="경기 결과 입력" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`} desktopHead>
       {/* 상단 여백이 0이라 헤더 바로 아래 카드가 붙어 답답해 보인다는 지적(QA) — 다른
           화면(예: 라인업 페이지)의 16px 20px 관례를 그대로 맞춘다. */}
-      <div style={{ display: 'grid', gap: 14, padding: '16px 20px 24px' }}>
+      <div style={{ display: 'grid', gap: 16, padding: '16px 20px 24px' }}>
         <Card pad={16}>
           <div className="tm-text-body-lg">
             {hostName} <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>(홈)</span>
@@ -867,7 +867,7 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
         {latest?.state === 'OFFICIAL' ? (
           <Card pad={16}>
             <div className="tm-text-body-lg">공식 결과로 확정됐어요</div>
-            <div className="tm-text-subhead" style={{ marginTop: 10, fontWeight: 700 }}>{scoreLabel(latest)}</div>
+            <div className="tm-text-subhead" style={{ marginTop: 12, fontWeight: 700 }}>{scoreLabel(latest)}</div>
             <GoalTimeline revision={latest} homeName={hostName} awayName={opponentName} />
             {latest.missingScorer ? (
               <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-caption)' }}>
@@ -898,9 +898,9 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
         {canSubmit && latest ? (
           <Card pad={16}>
             <div className="tm-text-body-lg">작성한 결과를 확인해 주세요</div>
-            <div className="tm-text-label" style={{ marginTop: 10 }}>스코어 {scoreLabel(latest)}</div>
+            <div className="tm-text-label" style={{ marginTop: 12 }}>스코어 {scoreLabel(latest)}</div>
             {latest.resultParticipants.length > 0 ? (
-              <div style={{ display: 'grid', gap: 10, marginTop: 10 }}>
+              <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
                 {latest.resultParticipants.some((row) => row.goals > 0) ? (
                   <div>
                     <div className="tm-text-label">득점자</div>
@@ -935,16 +935,16 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
               </div>
             ) : null}
             {latest.reason ? (
-              <div className="tm-text-caption" style={{ marginTop: 6, color: 'var(--text-muted)' }}>{displayRevisionReason(latest.reason)}</div>
+              <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>{displayRevisionReason(latest.reason)}</div>
             ) : null}
-            <div className="tm-text-caption" style={{ marginTop: 10, color: 'var(--text-caption)' }}>
+            <div className="tm-text-caption" style={{ marginTop: 12, color: 'var(--text-caption)' }}>
               제출하면 되돌릴 수 없어요. {opponentName}이(가) 확인 후 승인하거나 정정을 요청할 수 있어요.
             </div>
             <Button
               variant="primary"
               size="lg"
               block
-              style={{ marginTop: 14 }}
+              style={{ marginTop: 16 }}
               loading={submitRevision.isPending}
               onClick={handleSubmit}
             >
@@ -1040,16 +1040,16 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
                   선수만 체크해 주세요 — 체크하지 않은 선수는 이 경기에 출전한 것으로 기록되지 않아요.
                 </div>
                 {benchRoster.length === 0 ? (
-                  <div className="tm-text-caption" style={{ marginTop: 10, color: 'var(--text-muted)' }}>
+                  <div className="tm-text-caption" style={{ marginTop: 12, color: 'var(--text-muted)' }}>
                     교체 명단이 비어 있어요.
                   </div>
                 ) : (
-                  <div style={{ display: 'grid', gap: 4, marginTop: 10 }}>
+                  <div style={{ display: 'grid', gap: 4, marginTop: 12 }}>
                     {benchRoster.map((row) => (
                       <label
                         key={row.participantId}
                         className="tm-text-body"
-                        style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 44, cursor: 'pointer' }}
+                        style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 44, cursor: 'pointer' }}
                       >
                         <input
                           type="checkbox"
@@ -1074,9 +1074,9 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
                     위에서 홈 득점 수를 입력하면 골마다 득점자를 고를 수 있어요.
                   </div>
                 ) : (
-                  <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
+                  <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
                     {homeGoals.map((goal, index) => (
-                      <div key={goal.key} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div key={goal.key} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         {/* 프로젝트 컨벤션(label htmlFor + input id)에 맞춘다 — 예전엔 시각 라벨(span)과
                             select가 접근성 이름만 aria-label로 따로 갖고 있어 스크린리더용 이름과
                             눈에 보이는 텍스트가 서로 다른 엘리먼트였다(QA 지적). */}
@@ -1104,7 +1104,7 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
                 )}
 
                 <div className="tm-text-body-lg" style={{ marginTop: 20 }}>4. 옐로카드·레드카드</div>
-                <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
+                <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
                   {cardDrafts.map((card) => (
                     <div key={card.key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <label htmlFor={`card-player-${card.key}`} className="sr-only">
@@ -1164,7 +1164,7 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
                 <select
                   id="result-mvp-select"
                   className="tm-input"
-                  style={{ marginTop: 10, width: '100%' }}
+                  style={{ marginTop: 12, width: '100%' }}
                   value={mvpParticipantId}
                   onChange={(event) => setMvpParticipantId(event.target.value)}
                 >
@@ -1306,7 +1306,7 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
     <AppChrome title="경기 결과 승인" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`} desktopHead>
       {/* 상단 여백이 0이라 헤더 바로 아래 카드가 붙어 답답해 보인다는 지적(QA) — 다른
           화면(예: 라인업 페이지)의 16px 20px 관례를 그대로 맞춘다. */}
-      <div style={{ display: 'grid', gap: 14, padding: '16px 20px 24px' }}>
+      <div style={{ display: 'grid', gap: 16, padding: '16px 20px 24px' }}>
         <Card pad={16}>
           <div className="tm-text-body-lg">
             {hostName} <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>(홈)</span>
@@ -1322,7 +1322,7 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
         ) : latest.state === 'SUBMITTED' ? (
           <Card pad={16}>
             <div className="tm-text-body-lg">제출된 결과예요. 확인 후 승인해 주세요</div>
-            <div className="tm-text-subhead" style={{ marginTop: 10, fontWeight: 700 }}>{scoreLabel(latest)}</div>
+            <div className="tm-text-subhead" style={{ marginTop: 12, fontWeight: 700 }}>{scoreLabel(latest)}</div>
             <GoalTimeline revision={latest} homeName={hostName} awayName={opponentName} />
             <ApprovalParticipantSummary resultParticipants={latest.resultParticipants} mvpParticipantId={latest.mvpParticipantId} />
             {latest.missingScorer ? (
@@ -1347,7 +1347,7 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
                   fieldId="result-change-reason"
                   placeholder="어떤 부분이 다른지 알려주세요"
                 />
-                <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                   <Button
                     variant="danger"
                     disabled={!changeReason.trim()}
@@ -1367,7 +1367,7 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
                   tone="warning"
                   message={`${scoreLabel(latest)} 결과와 선수 기록을 공식 기록으로 승인할까요? 승인 후에는 직접 수정할 수 없어요.`}
                 />
-                <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                   <Button variant="primary" size="lg" loading={decideRevision.isPending} onClick={handleApprove}>
                     승인 확정
                   </Button>
@@ -1395,7 +1395,7 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
         ) : latest.state === 'OFFICIAL' ? (
           <Card pad={16}>
             <div className="tm-text-body-lg">공식 결과로 확정됐어요</div>
-            <div className="tm-text-subhead" style={{ marginTop: 10, fontWeight: 700 }}>{scoreLabel(latest)}</div>
+            <div className="tm-text-subhead" style={{ marginTop: 12, fontWeight: 700 }}>{scoreLabel(latest)}</div>
             <GoalTimeline revision={latest} homeName={hostName} awayName={opponentName} />
             {latest.missingScorer ? (
               <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-caption)' }}>
@@ -1435,13 +1435,13 @@ function ResultRevisionHistory({ history }: { history: V1GameResultRevision[] })
   return (
     <Card pad={16}>
       <div className="tm-text-body-lg">변경 이력</div>
-      <div style={{ display: 'grid', gap: 10, marginTop: 10 }}>
+      <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
         {history.map((revision) => (
-          <div key={revision.id} style={{ borderTop: '1px solid var(--grey100)', paddingTop: 10 }}>
+          <div key={revision.id} style={{ borderTop: '1px solid var(--grey100)', paddingTop: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span className="tm-text-label">
                 {revision.revision}차 · {scoreLabel(revision)}
-                {revision.supersedesId ? <span className="tm-badge tm-badge-grey" style={{ marginLeft: 6 }}>정정</span> : null}
+                {revision.supersedesId ? <span className="tm-badge tm-badge-grey" style={{ marginLeft: 8 }}>정정</span> : null}
               </span>
               <span className={`tm-badge ${revisionBadgeTone(revision.state)}`}>
                 {RESULT_REVISION_STATE_LABEL[revision.state]}

@@ -418,7 +418,7 @@ export function SignupClient() {
             {primary.label}
           </button>
           {disabledHint ? (
-            <p className="tm-text-caption" role="status" style={{ margin: '6px 0 0', textAlign: 'center' }}>
+            <p className="tm-text-caption" role="status" style={{ margin: '8px 0 0', textAlign: 'center' }}>
               {disabledHint}
             </p>
           ) : null}
@@ -641,7 +641,7 @@ export function SignupClient() {
                 </label>
                 <div>
                   <div className="tm-text-label">프로필 사진 <em className="tm-auth-optional">선택</em></div>
-                  <div className="tm-auth-profile-upload-body" style={{ marginTop: 10 }}>
+                  <div className="tm-auth-profile-upload-body" style={{ marginTop: 12 }}>
                     <label className="tm-btn tm-btn-md tm-btn-neutral">
                       {uploadingProfileImage ? '올리는 중' : profileImageUrl ? '사진 변경' : '사진 선택'}
                       <input className="sr-only" type="file" accept="image/*" onChange={selectProfileImage} disabled={uploadingProfileImage} />
@@ -652,7 +652,7 @@ export function SignupClient() {
                       </button>
                     ) : null}
                   </div>
-                  <div className="tm-text-caption" style={{ marginTop: 6 }}>{profileImageName || '이미지 1장 — 큰 사진은 자동으로 줄여 올려요'}</div>
+                  <div className="tm-text-caption" style={{ marginTop: 8 }}>{profileImageName || '이미지 1장 — 큰 사진은 자동으로 줄여 올려요'}</div>
                 </div>
               </section>
 

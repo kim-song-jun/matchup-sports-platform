@@ -270,7 +270,7 @@ export function TournamentStandingsTable({
       {unranked ? (
         <div
           style={{
-            padding: '10px 12px',
+            padding: '12px 12px',
             borderTop: '1px solid var(--grey100)',
             fontSize: 12,
             color: 'var(--text-caption)',

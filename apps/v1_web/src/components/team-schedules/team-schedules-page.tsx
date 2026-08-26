@@ -141,7 +141,7 @@ function FilterChipGroup<T extends string>({
 }) {
   return (
     <div>
-      <div className="tm-text-caption" style={{ marginBottom: 6 }}>{label}</div>
+      <div className="tm-text-caption" style={{ marginBottom: 8 }}>{label}</div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         {options.map((option) => (
           <button
@@ -163,7 +163,7 @@ function ScheduleCalendarGrid({ model }: { model: ScheduleListViewModel }) {
   const { calendar } = model;
   return (
     <Card pad={12}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <button type="button" className="tm-btn tm-btn-sm tm-btn-ghost" aria-label="이전 달" onClick={model.onPrevMonth}>
           이전
         </button>
@@ -271,7 +271,7 @@ export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewMod
           </div>
           <div className="tm-text-body-lg" style={{ marginBottom: 4 }}>{model.title}</div>
           <div className="tm-text-body" style={{ color: 'var(--text-muted)' }}>{model.dateTimeLabel}</div>
-          {model.capacityLabel ? <div className="tm-text-caption" style={{ marginTop: 6 }}>{model.capacityLabel}</div> : null}
+          {model.capacityLabel ? <div className="tm-text-caption" style={{ marginTop: 8 }}>{model.capacityLabel}</div> : null}
         </Card>
 
         {/* 변경 이력·내 참석·용병 모집·운영 관리를 카드마다 따로 감싸면 화면이 상자
@@ -456,7 +456,7 @@ function ScheduleAttendeeSection({ model }: { model: ScheduleDetailViewModel['at
   return (
     <div>
       <div className="tm-text-label" style={{ marginBottom: 8 }}>참석 현황</div>
-      <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
         <button type="button" className={`tm-btn tm-btn-sm ${tab === 'all' ? 'tm-btn-primary' : 'tm-btn-neutral'}`} onClick={() => setTab('all')}>
           전체 {model.counts.all}
         </button>
@@ -472,7 +472,7 @@ function ScheduleAttendeeSection({ model }: { model: ScheduleDetailViewModel['at
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {filtered.map((item) => (
-            <div key={item.userId} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0' }}>
+            <div key={item.userId} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0' }}>
               <div
                 aria-hidden="true"
                 style={{
@@ -570,7 +570,7 @@ function GuestRecruitmentSection({ model }: { model: ScheduleDetailViewModel['gu
             onChange={(e) => model.manage?.editPanel?.onNoteChange(e.target.value)}
             disabled={model.manage.editPanel.pending}
           />
-          {model.manage.editPanel.error ? <div style={{ marginTop: 6 }}><AlertBanner tone="error" message={model.manage.editPanel.error} /></div> : null}
+          {model.manage.editPanel.error ? <div style={{ marginTop: 8 }}><AlertBanner tone="error" message={model.manage.editPanel.error} /></div> : null}
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
             <button type="button" className="tm-btn tm-btn-sm tm-btn-neutral" onClick={model.manage.editPanel.onDismiss} disabled={model.manage.editPanel.pending}>
               닫기
@@ -593,7 +593,7 @@ function GuestRecruitmentSection({ model }: { model: ScheduleDetailViewModel['gu
           ) : null}
           {model.applicationForm.visible ? (
             <>
-              <div className="tm-text-caption" style={{ marginBottom: 6 }}>용병으로 신청하기</div>
+              <div className="tm-text-caption" style={{ marginBottom: 8 }}>용병으로 신청하기</div>
               <TextField
                 label="표시 이름"
                 value={model.applicationForm.displayName}
@@ -610,7 +610,7 @@ function GuestRecruitmentSection({ model }: { model: ScheduleDetailViewModel['gu
                 disabled={model.applicationForm.submitting}
               />
               {model.applicationForm.error ? (
-                <div style={{ marginTop: 6 }}><AlertBanner tone="error" message={model.applicationForm.error} /></div>
+                <div style={{ marginTop: 8 }}><AlertBanner tone="error" message={model.applicationForm.error} /></div>
               ) : null}
               <button
                 type="button"
@@ -669,8 +669,8 @@ export function ScheduleFormPageView({ model }: { model: ScheduleFormViewModel }
       <div style={{ padding: '16px 20px 40px' }}>
       <Card>
         <div>
-          <div className="tm-text-label" style={{ marginBottom: 14, color: 'var(--text-muted)' }}>기본 정보</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className="tm-text-label" style={{ marginBottom: 16, color: 'var(--text-muted)' }}>기본 정보</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <TextField
               label="제목"
               value={draft.title}
@@ -680,7 +680,7 @@ export function ScheduleFormPageView({ model }: { model: ScheduleFormViewModel }
             />
 
             <div>
-              <div className="tm-text-label" style={{ marginBottom: 6 }}>종류</div>
+              <div className="tm-text-label" style={{ marginBottom: 8 }}>종류</div>
               {model.typeEditable ? (
                 <div style={{ display: 'flex', gap: 8 }}>
                   {model.typeOptions.map((option) => (
@@ -698,7 +698,7 @@ export function ScheduleFormPageView({ model }: { model: ScheduleFormViewModel }
               ) : (
                 <div className="tm-text-body">
                   {scheduleTypeLabel(draft.type)}
-                  <span className="tm-text-caption" style={{ marginLeft: 6 }}>(종류는 만든 뒤 바꿀 수 없어요)</span>
+                  <span className="tm-text-caption" style={{ marginLeft: 8 }}>(종류는 만든 뒤 바꿀 수 없어요)</span>
                 </div>
               )}
             </div>
@@ -706,8 +706,8 @@ export function ScheduleFormPageView({ model }: { model: ScheduleFormViewModel }
         </div>
 
         <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
-          <div className="tm-text-label" style={{ marginBottom: 14, color: 'var(--text-muted)' }}>일정</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className="tm-text-label" style={{ marginBottom: 16, color: 'var(--text-muted)' }}>일정</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <TextField
               label="시작 시각"
               type="datetime-local"
@@ -742,7 +742,7 @@ export function ScheduleFormPageView({ model }: { model: ScheduleFormViewModel }
         </div>
 
         <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
-          <div className="tm-text-label" style={{ marginBottom: 14, color: 'var(--text-muted)' }}>공개 설정</div>
+          <div className="tm-text-label" style={{ marginBottom: 16, color: 'var(--text-muted)' }}>공개 설정</div>
           <div style={{ display: 'flex', gap: 8 }}>
             {model.visibilityOptions.map((option) => (
               <button

@@ -160,7 +160,7 @@ export function TournamentsListContent() {
           }}
           aria-label="이벤트 허브 — 팀밋 주관 대회 캠페인 모아보기"
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <Sparkles size={18} style={{ color: 'var(--blue700)', flexShrink: 0 }} aria-hidden="true" />
             <div>
               <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--blue700)' }}>이벤트 허브</div>
@@ -319,7 +319,7 @@ function TournamentSkeletonList() {
     <div
       aria-busy="true"
       aria-label="대회 목록 불러오는 중"
-      style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}
+      style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}
     >
       <TournamentSkeletonCard opacity={1} />
       <TournamentSkeletonCard opacity={0.65} />
@@ -333,9 +333,9 @@ function TournamentSkeletonCard({ opacity }: { opacity: number }) {
     <div
       className="tm-card"
       aria-hidden="true"
-      style={{ opacity, padding: '16px 16px 14px', pointerEvents: 'none' }}
+      style={{ opacity, padding: '16px 16px 16px', pointerEvents: 'none' }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
         <div style={{ height: 14, borderRadius: 6, background: 'var(--grey100)', width: '60%' }} />
         <div className="tm-badge tm-badge-grey" style={{ opacity: 0.5, width: 48 }}>&nbsp;</div>
       </div>
@@ -344,8 +344,8 @@ function TournamentSkeletonCard({ opacity }: { opacity: number }) {
         style={{
           display: 'flex',
           justifyContent: 'space-between',
-          marginTop: 10,
-          paddingTop: 10,
+          marginTop: 12,
+          paddingTop: 12,
           borderTop: '1px solid var(--grey100)',
         }}
       >

@@ -98,7 +98,7 @@ export function TournamentInquirySection({
             zIndex: 10000,
             background: 'var(--text-strong)',
             color: 'var(--static-white)',
-            padding: '13px 20px',
+            padding: '12px 20px',
             borderRadius: 999,
             fontSize: 13,
             fontWeight: 600,

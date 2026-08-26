@@ -281,7 +281,7 @@ export default function LandingPage() {
                 <BrandMark size={24} />
                 <span className="tm-landing-brand">teameet</span>
               </span>
-              <p className="tm-text-caption" style={{ marginTop: 6, color: 'var(--text-caption)' }}>
+              <p className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-caption)' }}>
                 AI 스포츠 매칭 플랫폼
               </p>
             </div>

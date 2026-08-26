@@ -177,8 +177,8 @@ function PrizeSection({
       <div className="tm-prize-card" style={{ background: 'var(--card-surface)', borderRadius: 14, border: '1px solid var(--grey150)', overflow: 'hidden' }}>
         {/* 총 상금 헤더 */}
         {tournament.prizePool !== null && tournament.prizePool > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', padding: '14px 16px', background: 'var(--blue50)', borderBottom: '1px solid var(--grey100)' }}>
-            <span style={{ display: 'inline-flex', marginRight: 10 }} aria-hidden="true">
+          <div style={{ display: 'flex', alignItems: 'center', padding: '16px 16px', background: 'var(--blue50)', borderBottom: '1px solid var(--grey100)' }}>
+            <span style={{ display: 'inline-flex', marginRight: 12 }} aria-hidden="true">
               <Trophy size={20} className="tm-medal-gold" strokeWidth={2} />
             </span>
             <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: 'var(--text-strong)' }}>총 상금</span>
@@ -192,8 +192,8 @@ function PrizeSection({
           const teamName = posNum ? teamByPos[Number(posNum)] : undefined;
           const isAmount = isPrizeAmountValue(row.amount);
           return (
-            <div key={idx} style={{ display: 'flex', alignItems: 'center', padding: '13px 16px', borderTop: idx > 0 || tournament.prizePool ? '1px solid var(--grey100)' : 'none' }}>
-              <span style={{ display: 'inline-flex', marginRight: 10, flexShrink: 0 }} aria-hidden="true">
+            <div key={idx} style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', borderTop: idx > 0 || tournament.prizePool ? '1px solid var(--grey100)' : 'none' }}>
+              <span style={{ display: 'inline-flex', marginRight: 12, flexShrink: 0 }} aria-hidden="true">
                 <PrizeRankIcon label={row.label} />
               </span>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -206,7 +206,7 @@ function PrizeSection({
                 isAmount ? (
                   <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-strong)', letterSpacing: '-0.01em', flexShrink: 0 }}>{formatPrizeRowValue(row.amount)}</span>
                 ) : (
-                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-caption)', flexShrink: 0, marginLeft: 10, textAlign: 'right', maxWidth: '55%' }}>{row.amount}</span>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-caption)', flexShrink: 0, marginLeft: 12, textAlign: 'right', maxWidth: '55%' }}>{row.amount}</span>
                 )
               )}
             </div>
@@ -431,7 +431,7 @@ export function ReviewFormModal({
         </div>
 
         <div style={{ marginBottom: 16, textAlign: 'center' }}>
-          <p style={{ margin: '0 0 10px', fontSize: 13, color: 'var(--text-caption)' }}>대회는 어떠셨나요?</p>
+          <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--text-caption)' }}>대회는 어떠셨나요?</p>
           <StarRating value={rating} onChange={setRating} />
         </div>
 
@@ -460,7 +460,7 @@ export function ReviewFormModal({
                     htmlFor={`review-team-${team.teamId}`}
                     style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      width: '100%', minHeight: 44, padding: '10px 14px', borderRadius: 10,
+                      width: '100%', minHeight: 44, padding: '12px 16px', borderRadius: 10,
                       border: isSelected ? '1.5px solid var(--blue500)' : '1px solid var(--grey200)',
                       background: isSelected ? 'var(--blue50)' : 'var(--surface)',
                       color: 'var(--text-strong)', fontSize: 13, fontWeight: isSelected ? 700 : 500,
@@ -549,7 +549,7 @@ export function ReviewFormModal({
             style={{ display: 'none' }}
           />
           {/* [R-T2] 고정폭 없는 에러 문구 — 12로 상향. */}
-          {photoError && <p style={{ color: 'var(--red700)', fontSize: 12, marginTop: 6 }}>{photoError}</p>}
+          {photoError && <p style={{ color: 'var(--red700)', fontSize: 12, marginTop: 8 }}>{photoError}</p>}
         </div>
 
         {genericError && <p style={{ color: 'var(--red700)', fontSize: 12, marginBottom: 12 }}>리뷰 작성 중 오류가 발생했어요. 다시 시도해주세요.</p>}
@@ -558,7 +558,7 @@ export function ReviewFormModal({
           type="button" onClick={handleSubmit}
           disabled={isPending || rating === 0 || (!!teamOptions && !selectedTeamId)}
           className="tm-btn tm-btn-primary"
-          style={{ width: '100%', justifyContent: 'center', padding: '14px', fontSize: 14, fontWeight: 700 }}
+          style={{ width: '100%', justifyContent: 'center', padding: '16px', fontSize: 14, fontWeight: 700 }}
         >
           {isPending ? '저장 중...' : teamOptions ? '선택한 팀으로 등록' : '후기 등록'}
         </button>
@@ -589,7 +589,7 @@ export function ReviewCard({ review }: { review: V1TournamentReview }) {
       </div>
       {review.comment && <p className="tm-review-card-body">{review.comment}</p>}
       {photoUrls.length > 0 && (
-        <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
           {photoUrls.map((url) => (
             <a key={url} href={publicAssetPath(url)} target="_blank" rel="noreferrer" style={{ display: 'block', width: 72, height: 72, borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}>
               <img src={publicAssetPath(url)} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -653,7 +653,7 @@ function ReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
       <section style={{ marginBottom: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <h3 className="tm-hub-section-title" style={{ margin: 0 }}>참가팀 후기</h3>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             {reviews.length > 0 && (
               <span style={{ fontSize: 12, color: 'var(--text-caption)' }}>{reviews.length}개</span>
             )}
@@ -661,7 +661,7 @@ function ReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
               <button
                 type="button"
                 className="tm-btn tm-btn-sm tm-btn-secondary"
-                style={{ padding: '5px 12px', fontSize: 12 }}
+                style={{ padding: '4px 12px', fontSize: 12 }}
                 onClick={() => setShowForm(true)}
               >
                 + 후기 쓰기
@@ -697,7 +697,7 @@ function ReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
             </p>
           </Card>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {reviews.slice(0, REVIEW_EMBED_CAP).map((review) => (
               <ReviewCard key={review.id} review={review} />
             ))}

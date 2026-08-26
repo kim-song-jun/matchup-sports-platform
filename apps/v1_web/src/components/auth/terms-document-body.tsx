@@ -22,7 +22,7 @@ export function TermsDocumentSubtitleAndCard({
   return (
     <>
       {subtitle ? <p className="tm-text-body tm-auth-sub">{subtitle}</p> : null}
-      <div className="tm-auth-soft-card" style={{ display: 'grid', gap: 14, marginTop: 18 }}>
+      <div className="tm-auth-soft-card" style={{ display: 'grid', gap: 16, marginTop: 20 }}>
         <p className="tm-text-caption" style={{ margin: 0, lineHeight: 1.65, whiteSpace: 'pre-line' }}>
           {content}
         </p>

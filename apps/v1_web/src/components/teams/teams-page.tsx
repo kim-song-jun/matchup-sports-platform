@@ -144,12 +144,12 @@ export function TeamStatePageView({ model }: { model: TeamStateViewModel }) {
       <div className="tm-team-list">
         <EmptyState title={model.title} sub={model.description} />
         {model.state === 'error' ? (
-          <Card pad={16} className="tm-team-state-error-card" style={{ marginTop: 18, background: 'var(--grey50)' }}>
+          <Card pad={16} className="tm-team-state-error-card" style={{ marginTop: 20, background: 'var(--grey50)' }}>
             <div className="tm-text-label">목록에서 다시 확인해 주세요</div>
-            <div className="tm-text-caption" style={{ marginTop: 6, lineHeight: 1.55 }}>
+            <div className="tm-text-caption" style={{ marginTop: 8, lineHeight: 1.55 }}>
               새로고침 후에도 같은 문제가 반복되면 잠시 뒤 다시 시도해 보세요.
             </div>
-            <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href="/teams" style={{ marginTop: 14 }}>목록으로 돌아가기</Link>
+            <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href="/teams" style={{ marginTop: 16 }}>목록으로 돌아가기</Link>
           </Card>
         ) : null}
       </div>
@@ -230,10 +230,10 @@ function TeamOpenMatchesSection({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                gap: 10,
+                gap: 12,
                 border: '1px solid var(--border)',
                 borderRadius: 14,
-                padding: '14px 16px',
+                padding: '16px 16px',
                 background: 'var(--bg)',
                 textDecoration: 'none',
                 color: 'inherit',
@@ -313,10 +313,10 @@ function TeamMyLeaguesSection({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                gap: 10,
+                gap: 12,
                 border: '1px solid var(--border)',
                 borderRadius: 14,
-                padding: '14px 16px',
+                padding: '16px 16px',
                 background: 'var(--bg)',
                 textDecoration: 'none',
                 color: 'inherit',
@@ -344,7 +344,7 @@ function TeamOperationsSection({
 }) {
   if (!operations?.length) return null;
   return (
-    <section style={{ display: 'grid', gap: 10, marginTop: compact ? 0 : 14, marginBottom: compact ? 14 : 0 }}>
+    <section style={{ display: 'grid', gap: 12, marginTop: compact ? 0 : 14, marginBottom: compact ? 14 : 0 }}>
       <div>
         <div className="tm-text-body-lg">운영 메뉴</div>
         <div className="tm-text-caption" style={{ marginTop: 3 }}>팀 정보와 멤버 운영을 이 화면에서 이어서 관리해요.</div>
@@ -428,10 +428,10 @@ function TeamRecordLinkCard({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 10,
+    gap: 12,
     border: '1px solid var(--border)',
     borderRadius: 14,
-    padding: '14px 16px',
+    padding: '16px 16px',
     background: 'var(--bg)',
     textDecoration: 'none',
     color: 'inherit',
@@ -514,7 +514,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
       <div className="tm-team-detail-desktop-layout tm-show-desktop">
         {/* LEFT: hero + info */}
         <div className="tm-team-detail-desktop-main">
-          <Card pad={18} className="tm-team-detail-hero-card" style={teamHeroStyle(team)}>
+          <Card pad={20} className="tm-team-detail-hero-card" style={teamHeroStyle(team)}>
             <button
               className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button"
               type="button"
@@ -525,9 +525,9 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
               <ShareIcon size={20} />
             </button>
             <TeamAvatar seed={team.id} name={team.name} logoUrl={team.logoUrl} size="xl" />
-            <h2 className="tm-text-heading" style={{ color: 'var(--static-white)', marginTop: 14 }}>{team.name}</h2>
+            <h2 className="tm-text-heading" style={{ color: 'var(--static-white)', marginTop: 16 }}>{team.name}</h2>
             <div className="tm-text-caption" style={{ color: 'var(--overlay-white-72)', marginTop: 4 }}>{team.sport} · {team.region}</div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12 }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
               <span className={`tm-badge ${teamDetailStatusBadgeClass(mode)}`}>{team.statusLabel}</span>
               <span className="tm-badge tm-badge-grey">{memberCapacity}</span>
             </div>
@@ -561,10 +561,10 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                gap: 10,
+                gap: 12,
                 border: '1px solid var(--border)',
                 borderRadius: 14,
-                padding: '14px 16px',
+                padding: '16px 16px',
                 background: 'var(--bg)',
                 textDecoration: 'none',
                 color: 'inherit',
@@ -593,11 +593,11 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
           </Card>
           <TeamOperationsSection operations={model.operations} />
           {/* (3) 비공개 카드: opacity dim 제거(텍스트 대비 정상화). disabled 회색 pill → Lock 아이콘 + tm-badge-grey 정적 라벨. */}
-          <Card pad={16} style={{ marginTop: 14 }}>
+          <Card pad={16} style={{ marginTop: 16 }}>
             <div className="tm-section-row" style={{ alignItems: 'flex-start', gap: 12, marginTop: 0 }}>
               <div style={{ minWidth: 0, flex: '1 1 auto' }}>
                 <div className="tm-text-body-lg">주요 멤버</div>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, flexWrap: 'wrap', marginTop: 4, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap', marginTop: 4, minWidth: 0 }}>
                   {team.memberAccess.message ? (
                     <span className="tm-text-caption" style={{ minWidth: 0, flex: '1 1 180px', lineHeight: 1.45 }}>{team.memberAccess.message}</span>
                   ) : null}
@@ -666,7 +666,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             </div>
           )}
           {/* P2: 완료 메시지에 .tm-complete-check 마이크로인터랙션 적용 (globals.css 키프레임) */}
-          {heroMessage ? <div className="tm-text-caption tm-complete-check" role="status" style={{ color: 'var(--text-caption)', marginTop: 6 }}>{heroMessage}</div> : null}
+          {heroMessage ? <div className="tm-text-caption tm-complete-check" role="status" style={{ color: 'var(--text-caption)', marginTop: 8 }}>{heroMessage}</div> : null}
           <div className="tm-team-detail-sidebar-cta">
             {model.contactHref ? (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
@@ -698,7 +698,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
 
       {/* Mobile layout (unchanged) */}
       <article className="tm-team-detail-body tm-hide-desktop">
-        <Card pad={18} className="tm-team-detail-hero-card" style={teamHeroStyle(team)}>
+        <Card pad={20} className="tm-team-detail-hero-card" style={teamHeroStyle(team)}>
           <button
             className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button"
             type="button"
@@ -709,9 +709,9 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             <ShareIcon size={20} />
           </button>
           <TeamAvatar seed={team.id} name={team.name} logoUrl={team.logoUrl} size="xl" />
-          <div className="tm-text-heading" style={{ color: 'var(--static-white)', margin: '14px 0 0' }} aria-hidden="true">{team.name}</div>
+          <div className="tm-text-heading" style={{ color: 'var(--static-white)', margin: '16px 0 0' }} aria-hidden="true">{team.name}</div>
           <div className="tm-text-caption" style={{ color: 'var(--overlay-white-72)', marginTop: 4 }}>{team.sport} · {team.region}</div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
             <span className={`tm-badge ${teamDetailStatusBadgeClass(mode)}`}>{team.statusLabel}</span>
             <span className="tm-badge tm-badge-grey">{memberCapacity}</span>
           </div>
@@ -726,7 +726,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             로 맞붙어**(alpha 390 실측) 그 섹션의 일부처럼 보였다 — 별개 항목이므로 자기
             제목과 여백을 가진 섹션으로 세운다. */}
         <SectionTitle title="팀 기록" sub="이 팀의 성적과 평가를 확인해요." />
-        <div style={{ display: 'grid', gap: 10 }}>
+        <div style={{ display: 'grid', gap: 12 }}>
           {/* 데스크톱 레이아웃에만 있던 링크 — 모바일에서 팀 전적으로 갈 방법이 아예 없었다. */}
           <TeamRecordLinkCard
             href={`/teams/${team.id}/records`}
@@ -767,11 +767,11 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
         </Card>
         <TeamOperationsSection operations={model.operations} />
         {/* (3) 비공개 카드: opacity dim 제거(텍스트 대비 정상화). disabled 회색 pill → Lock 아이콘 + tm-badge-grey 정적 라벨. */}
-        <Card pad={16} style={{ marginTop: 14 }}>
+        <Card pad={16} style={{ marginTop: 16 }}>
           <div className="tm-section-row" style={{ alignItems: 'flex-start', gap: 12, marginTop: 0 }}>
             <div style={{ minWidth: 0, flex: '1 1 auto' }}>
               <div className="tm-text-body-lg">주요 멤버</div>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, flexWrap: 'wrap', marginTop: 4, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap', marginTop: 4, minWidth: 0 }}>
                 {team.memberAccess.message ? (
                   <span className="tm-text-caption" style={{ minWidth: 0, flex: '1 1 180px', lineHeight: 1.45 }}>{team.memberAccess.message}</span>
                 ) : null}
@@ -820,7 +820,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
           </div>
         )}
         {/* P2: 완료 메시지 .tm-complete-check 마이크로인터랙션 */}
-        {heroMessage ? <div className="tm-text-caption tm-complete-check" role="status" style={{ color: 'var(--text-caption)', marginBottom: 6 }}>{heroMessage}</div> : null}
+        {heroMessage ? <div className="tm-text-caption tm-complete-check" role="status" style={{ color: 'var(--text-caption)', marginBottom: 8 }}>{heroMessage}</div> : null}
         {model.contactHref ? (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
             <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={model.contactHref}>
@@ -923,7 +923,7 @@ export function TeamFormPageView({
             </Card>
           ) : null}
           {!edit ? <h2 className="tm-text-heading">새 팀을 만들어요</h2> : null}
-          {form?.error ? <Card pad={16} style={{ marginTop: 14, background: 'var(--red50)' }}><div className="tm-text-label">저장할 수 없어요</div><div className="tm-text-caption" style={{ marginTop: 5 }}>{form.error}</div></Card> : null}
+          {form?.error ? <Card pad={16} style={{ marginTop: 16, background: 'var(--red50)' }}><div className="tm-text-label">저장할 수 없어요</div><div className="tm-text-caption" style={{ marginTop: 4 }}>{form.error}</div></Card> : null}
           <CreateField label="팀 이름" value={team.name} placeholder="예: 성수 풋살 크루" onChange={(value) => form?.onFieldChange('name', value)} />
           <TeamLogoField logoUrl={team.logoUrl} teamName={team.name} uploadImage={form?.uploadImage} onChange={(url) => form?.onFieldChange('logoUrl', url)} />
           <TeamCoverImageField coverImageUrl={team.coverImageUrl} uploadImage={form?.uploadImage} onChange={(url) => form?.onFieldChange('coverImageUrl', url)} />
@@ -1015,7 +1015,7 @@ function TeamJoinPolicyField({ form }: { form?: TeamFormViewModel['form'] }) {
           );
         })}
       </div>
-      <div className="tm-text-caption" style={{ marginTop: 6 }}>
+      <div className="tm-text-caption" style={{ marginTop: 8 }}>
         {form?.joinPolicy === 'closed' ? options[1].description : options[0].description}
       </div>
     </div>
@@ -1216,7 +1216,7 @@ function TeamLogoField({
         <div className="tm-team-logo-current">
           {/* 팀 id가 아직 없는 create/edit draft이므로 팀명을 seed로 사용(TeamAvatar 자체 fallback과 동일 규칙). */}
           <TeamAvatar seed={teamName} name={teamName} logoUrl={logoUrl} size="xl" />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
             <button
               type="button"
               className="tm-btn tm-btn-sm tm-btn-neutral"
@@ -1258,7 +1258,7 @@ function TeamLogoField({
         />
       </div>
       {error ? (
-        <div className="tm-text-caption" style={{ color: 'var(--red700)', marginTop: 6 }}>{error}</div>
+        <div className="tm-text-caption" style={{ color: 'var(--red700)', marginTop: 8 }}>{error}</div>
       ) : null}
     </div>
   );
@@ -1310,7 +1310,7 @@ function TeamCoverImageField({
           약 60% 낮아 사진 상하가 실제보다 덜 잘려 보이는 미리보기-실사용 불일치가 있었다. */}
       <div
         style={{
-          marginTop: 10,
+          marginTop: 12,
           minHeight: 210,
           borderRadius: 14,
           border: '1px solid var(--border-strong)',
@@ -1324,7 +1324,7 @@ function TeamCoverImageField({
       >
         {coverImageUrl ? null : <span className="tm-text-caption">상단 이미지를 선택해 주세요</span>}
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
         <button
           type="button"
           className="tm-btn tm-btn-sm tm-btn-neutral"
@@ -1347,7 +1347,7 @@ function TeamCoverImageField({
           onChange={(event) => handleFile(event.target.files?.[0])}
         />
       </div>
-      {error ? <div className="tm-text-caption" style={{ color: 'var(--red700)', marginTop: 6 }}>{error}</div> : null}
+      {error ? <div className="tm-text-caption" style={{ color: 'var(--red700)', marginTop: 8 }}>{error}</div> : null}
     </div>
   );
 }
@@ -1384,7 +1384,7 @@ function TeamFormPreview({
               {hasName ? trimmedName : '팀 이름'}
             </div>
             <div className="tm-text-caption" style={{ marginTop: 4 }}>{sport} · {region}</div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
               <span className="tm-badge tm-badge-grey">{level}</span>
               <span className="tm-badge tm-badge-grey">{capacity}</span>
               <span className="tm-badge tm-badge-grey">{gender}</span>
@@ -1394,7 +1394,7 @@ function TeamFormPreview({
         </div>
         <div className="tm-team-intro-box">
           <div className="tm-text-label">팀 소개</div>
-          <div className="tm-text-body" style={{ marginTop: 6, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+          <div className="tm-text-body" style={{ marginTop: 8, color: 'var(--text-muted)', lineHeight: 1.5 }}>
             {intro || '팀 소개를 입력하면 여기에 보여요.'}
           </div>
         </div>
@@ -1420,11 +1420,11 @@ export function TeamMembersPageView({ model, backHref = '/teams' }: { model: Tea
           <Card pad={12}><KPIStat label="관리자" value={model.summary.managers} unit="명" /></Card>
           <Card pad={12}><KPIStat label="검토" value={model.summary.pending} unit="명" /></Card>
         </div>
-        <Card pad={16} style={{ background: 'var(--grey50)', marginTop: 14 }}>
+        <Card pad={16} style={{ background: 'var(--grey50)', marginTop: 16 }}>
           <div className="tm-text-label">권한 규칙</div>
-          <div className="tm-text-caption" style={{ marginTop: 5 }}>멤버를 운영진으로 지정할 수 있고, 팀장 위임은 운영진에게만 할 수 있어요. 모든 변경은 확인 창을 거쳐 적용돼요.</div>
+          <div className="tm-text-caption" style={{ marginTop: 4 }}>멤버를 운영진으로 지정할 수 있고, 팀장 위임은 운영진에게만 할 수 있어요. 모든 변경은 확인 창을 거쳐 적용돼요.</div>
         </Card>
-        <div className="tm-team-form-chip-row" role="group" aria-label="멤버 탭 선택" style={{ marginTop: 14 }}>
+        <div className="tm-team-form-chip-row" role="group" aria-label="멤버 탭 선택" style={{ marginTop: 16 }}>
           {model.tabs.map((tab) => (
             <button key={tab.key} className={`tm-chip ${model.activeTab === tab.key ? 'tm-chip-active' : ''}`} type="button" aria-pressed={model.activeTab === tab.key} onClick={tab.onSelect}>
               {tab.label} <span className="tab-num">{tab.count}</span>
@@ -1465,7 +1465,7 @@ function InvitationSection({ invitations }: { invitations: NonNullable<TeamMembe
           }}
         >
           <div className="tm-invitation-form-row">
-            <label htmlFor="invite-email" className="tm-text-label" style={{ flexShrink: 0, paddingTop: 10 }}>
+            <label htmlFor="invite-email" className="tm-text-label" style={{ flexShrink: 0, paddingTop: 12 }}>
               이메일
             </label>
             <input
@@ -1483,7 +1483,7 @@ function InvitationSection({ invitations }: { invitations: NonNullable<TeamMembe
             />
           </div>
           <div className="tm-invitation-form-row">
-            <label htmlFor="invite-message" className="tm-text-label" style={{ flexShrink: 0, paddingTop: 10 }}>
+            <label htmlFor="invite-message" className="tm-text-label" style={{ flexShrink: 0, paddingTop: 12 }}>
               메시지
               <span className="tm-text-caption" style={{ fontWeight: 400, marginLeft: 4 }}>(선택)</span>
             </label>
@@ -1523,9 +1523,9 @@ function InvitationSection({ invitations }: { invitations: NonNullable<TeamMembe
 
       {/* 보낸 초대 목록 */}
       <div className="tm-text-label" style={{ marginTop: 20 }}>보낸 초대</div>
-      <div className="tm-text-caption" style={{ marginTop: 3, marginBottom: 10 }}>아직 수락되지 않은 초대예요.</div>
+      <div className="tm-text-caption" style={{ marginTop: 3, marginBottom: 12 }}>아직 수락되지 않은 초대예요.</div>
       {listLoading ? (
-        <div style={{ display: 'grid', gap: 10 }} aria-busy="true" aria-label="초대 목록 불러오는 중">
+        <div style={{ display: 'grid', gap: 12 }} aria-busy="true" aria-label="초대 목록 불러오는 중">
           {[0, 1].map((i) => (
             <div key={i} className="tm-review-skeleton" style={{ height: 64, borderRadius: 14 }} aria-hidden="true" />
           ))}
@@ -1540,7 +1540,7 @@ function InvitationSection({ invitations }: { invitations: NonNullable<TeamMembe
       ) : items.length === 0 ? (
         <EmptyState title="보낸 초대가 없어요" sub="이메일로 팀원을 초대하면 여기에 표시돼요." />
       ) : (
-        <div style={{ display: 'grid', gap: 10 }}>
+        <div style={{ display: 'grid', gap: 12 }}>
           {items.map((item) => (
             <div key={item.invitationId} className="tm-invitation-card">
               <div className="tm-invitation-card-head">
@@ -1782,7 +1782,7 @@ function TeamCard({ team }: { team: TeamModel }) {
           {leaderLine ? (
             <div className="tm-text-caption line-clamp-1" style={{ marginTop: 4, color: 'var(--text-muted)' }}>{leaderLine}</div>
           ) : null}
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>{dedupeTags([...team.tags, team.genderRule]).map((tag) => <span key={tag} className="tm-badge tm-badge-grey">{tag}</span>)}</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>{dedupeTags([...team.tags, team.genderRule]).map((tag) => <span key={tag} className="tm-badge tm-badge-grey">{tag}</span>)}</div>
         </div>
       </div>
       {/* 실제 팀 소개가 있을 때만 intro-box를 렌더한다. */}
@@ -1864,7 +1864,7 @@ function InfoChips({ label, items }: { label: string; items: string[] }) {
           단일 종목 → sport dot + 텍스트로 충분히 식별 가능.
           복수 종목 → tm-badge tm-badge-grey 로 중립 처리. */}
       {items.length === 1 ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span
             style={{
               display: 'inline-block',
@@ -1879,7 +1879,7 @@ function InfoChips({ label, items }: { label: string; items: string[] }) {
           <span className="tm-text-body">{items[0]}</span>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {items.map((item) => (
             <span key={item} className="tm-badge tm-badge-grey">{item}</span>
           ))}
@@ -1941,7 +1941,7 @@ function MemberSection({ title, sub, desktopGrid, children }: { title: string; s
     <section className="tm-member-section">
       <div className="tm-text-label">{title}</div>
       <div className="tm-text-caption" style={{ marginTop: 3 }}>{sub}</div>
-      <div className={desktopGrid ? 'tm-team-members-desktop-layout' : ''} style={desktopGrid ? undefined : { display: 'grid', gap: 10, marginTop: 10 }}>
+      <div className={desktopGrid ? 'tm-team-members-desktop-layout' : ''} style={desktopGrid ? undefined : { display: 'grid', gap: 12, marginTop: 12 }}>
         {children}
       </div>
     </section>
@@ -1971,11 +1971,11 @@ function MemberCard({
   return (
     <Card pad={16}>
       <ListItem title={title} sub={sub} trailing={role} href={profileHref} chev={Boolean(profileHref)} />
-      <button className="tm-btn tm-btn-sm tm-btn-neutral tm-btn-block" style={{ marginTop: 10 }} type="button" disabled={disabled} onClick={() => setOpen((current) => !current)}>
+      <button className="tm-btn tm-btn-sm tm-btn-neutral tm-btn-block" style={{ marginTop: 12 }} type="button" disabled={disabled} onClick={() => setOpen((current) => !current)}>
         관리
       </button>
       {open && !disabled ? (
-        <div className="tm-member-actions" style={{ gridTemplateColumns: '1fr', marginTop: 10 }}>
+        <div className="tm-member-actions" style={{ gridTemplateColumns: '1fr', marginTop: 12 }}>
           {actions.map((action) => (
             <button
               key={action.label}
@@ -1994,7 +1994,7 @@ function MemberCard({
       {selfLeave ? (
         <button
           className="tm-btn tm-btn-sm tm-btn-danger tm-btn-block"
-          style={{ marginTop: 10, minHeight: 44 }}
+          style={{ marginTop: 12, minHeight: 44 }}
           type="button"
           disabled={selfLeave.disabled || selfLeave.pending}
           title={selfLeave.disabled ? selfLeave.disabledReason : undefined}
@@ -2005,7 +2005,7 @@ function MemberCard({
         </button>
       ) : null}
       {selfLeave?.error ? (
-        <p role="alert" className="tm-text-caption" style={{ marginTop: 6, color: 'var(--red700)' }}>
+        <p role="alert" className="tm-text-caption" style={{ marginTop: 8, color: 'var(--red700)' }}>
           {selfLeave.error}
         </p>
       ) : null}
@@ -2078,7 +2078,7 @@ function RegionSelect({
           ))}
         </select>
       </div>
-      <div className="tm-text-caption" style={{ marginTop: 6 }}>팀 추천과 지역 검색에 쓰여요. 세부 장소나 예외 일정은 아래 활동 메모에 적어 주세요.</div>
+      <div className="tm-text-caption" style={{ marginTop: 8 }}>팀 추천과 지역 검색에 쓰여요. 세부 장소나 예외 일정은 아래 활동 메모에 적어 주세요.</div>
     </label>
   );
 }

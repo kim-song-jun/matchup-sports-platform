@@ -624,7 +624,7 @@ export function ProfileEditPageClient() {
           <div>
             <div className="tm-text-body-lg">프로필 사진</div>
             <div className="tm-text-caption" style={{ marginTop: 4 }}>매치 목록과 신청서에 함께 보여요.</div>
-            <div className="tm-auth-profile-upload-body" style={{ marginTop: 10 }}>
+            <div className="tm-auth-profile-upload-body" style={{ marginTop: 12 }}>
               <label className="tm-btn tm-btn-md tm-btn-neutral">
                 {uploadingProfileImage ? '올리는 중' : profileImageUrl ? '사진 변경' : '사진 선택'}
                 <input className="sr-only" type="file" accept="image/*" onChange={selectProfileImage} disabled={uploadingProfileImage} />
@@ -636,7 +636,7 @@ export function ProfileEditPageClient() {
               ) : null}
               <span className="tm-text-caption">{profileImageName || '이미지 1장 — 큰 사진은 자동으로 줄여 올려요'}</span>
             </div>
-            {fieldErrors.profileImage ? <div className="tm-text-caption tm-auth-field-helper-error" style={{ marginTop: 6 }}>{fieldErrors.profileImage}</div> : null}
+            {fieldErrors.profileImage ? <div className="tm-text-caption tm-auth-field-helper-error" style={{ marginTop: 8 }}>{fieldErrors.profileImage}</div> : null}
           </div>
         </section>
         <label className="tm-create-field">
@@ -831,9 +831,9 @@ export function ProfileEditPageClient() {
           ) : null}
         </div>
 
-        <Card pad={14} style={{ marginTop: 14, background: fieldErrors.form ? 'var(--red50)' : 'var(--blue50)' }}>
+        <Card pad={16} style={{ marginTop: 16, background: fieldErrors.form ? 'var(--red50)' : 'var(--blue50)' }}>
           <div className="tm-text-label">{fieldErrors.form ?? '프로필 정보만 저장돼요.'}</div>
-          <div className="tm-text-caption" style={{ marginTop: 5 }}>종목·난이도·활동 지역은 '운동 정보'에서 따로 관리할 수 있어요.</div>
+          <div className="tm-text-caption" style={{ marginTop: 4 }}>종목·난이도·활동 지역은 '운동 정보'에서 따로 관리할 수 있어요.</div>
         </Card>
       </form>
       {/*
@@ -957,7 +957,7 @@ export function SportsSettingsPageClient() {
         <Card pad={16}>
           <div className="tm-text-body-lg">운동 종목</div>
           <div className="tm-text-caption" style={{ marginTop: 4 }}>매치 추천과 모집 조건에 쓸 종목을 선택해 주세요.</div>
-          <div className="tm-auth-sport-grid" style={{ marginTop: 14 }}>
+          <div className="tm-auth-sport-grid" style={{ marginTop: 16 }}>
             {sports.map((sport) => {
               const selected = selectedSports.some((item) => item.sportId === sport.id);
               return (
@@ -980,7 +980,7 @@ export function SportsSettingsPageClient() {
           <Card pad={16}>
             <div className="tm-text-body-lg">난이도</div>
             <div className="tm-text-caption" style={{ marginTop: 4 }}>선택한 종목마다 현재 실력에 가까운 난이도를 선택해 주세요.</div>
-            <div className="tm-auth-stack" style={{ marginTop: 14 }}>
+            <div className="tm-auth-stack" style={{ marginTop: 16 }}>
               {selectedSports.map(({ sportId, levelId }) => {
                 const sport = sports.find((candidate) => candidate.id === sportId);
                 if (!sport) return null;
@@ -1013,9 +1013,9 @@ export function SportsSettingsPageClient() {
           />
         </Card>
 
-        <Card pad={14} style={{ marginTop: 14, background: message?.includes('실패') || message?.includes('선택해') ? 'var(--red50)' : 'var(--blue50)' }}>
+        <Card pad={16} style={{ marginTop: 16, background: message?.includes('실패') || message?.includes('선택해') ? 'var(--red50)' : 'var(--blue50)' }}>
           <div className="tm-text-label">{message ?? '운동 정보만 별도로 저장돼요.'}</div>
-          <div className="tm-text-caption" style={{ marginTop: 5 }}>저장하면 종목 태그와 추천 기준에 바로 반영돼요.</div>
+          <div className="tm-text-caption" style={{ marginTop: 4 }}>저장하면 종목 태그와 추천 기준에 바로 반영돼요.</div>
         </Card>
       </form>
       <div className="tm-fixed-cta tm-my-sports-cta">
@@ -1039,7 +1039,7 @@ function SportLevelPicker({
   return (
     <div className="tm-profile-level-panel">
       <div className="tm-text-label">{sport.name}</div>
-      <div className="tm-auth-chip-wrap" style={{ marginTop: 10 }}>
+      <div className="tm-auth-chip-wrap" style={{ marginTop: 12 }}>
         {sport.levels.map((level) => (
           <button className={`tm-chip ${levelId === level.id ? 'tm-chip-active' : ''}`} key={level.id} onClick={() => onSelect(level.id)} type="button" aria-pressed={levelId === level.id}>
             {level.name}
@@ -1070,7 +1070,7 @@ function SettingsRegionSlot({
   const selectedGroup = groups.find((group) => group.id === groupId) ?? null;
 
   return (
-    <div className="tm-create-field" style={{ marginTop: 14 }}>
+    <div className="tm-create-field" style={{ marginTop: 16 }}>
       <div className="tm-text-label">{label}</div>
       <div className="tm-create-two-col" style={{ marginTop: 8 }}>
         <label>
@@ -1280,15 +1280,15 @@ export function LocationSettingsPageClient() {
           </div>
           <Card pad={16}>
             <div className="tm-text-label">현재 활동 지역</div>
-            <div className="tm-text-heading" style={{ marginTop: 6 }}>{profile.data?.regionName ?? '지역 미설정'}</div>
-            <div className="tm-text-caption" style={{ marginTop: 6 }}>
+            <div className="tm-text-heading" style={{ marginTop: 8 }}>{profile.data?.regionName ?? '지역 미설정'}</div>
+            <div className="tm-text-caption" style={{ marginTop: 8 }}>
               매치·팀매치·팀 추천의 기준 지역으로 사용돼요.
             </div>
           </Card>
 
           <Card pad={16}>
             <div className="tm-text-body-lg">현재 위치로 찾기</div>
-            <div className="tm-text-caption" style={{ marginTop: 5 }}>
+            <div className="tm-text-caption" style={{ marginTop: 4 }}>
               버튼을 누르면 현재 좌표를 지역 확인 목적으로 팀밋 서버와 카카오에 1회 전송해요.
               좌표 자체는 저장하지 않아요.
             </div>
@@ -1312,9 +1312,9 @@ export function LocationSettingsPageClient() {
             </select>
           </label>
 
-          <Card pad={14} style={{ background: status === 'denied' || status === 'unsupported' || status === 'unmatched' ? 'var(--red50)' : 'var(--blue50)' }}>
+          <Card pad={16} style={{ background: status === 'denied' || status === 'unsupported' || status === 'unmatched' ? 'var(--red50)' : 'var(--blue50)' }}>
             <div className="tm-text-label">{matchedLabel ?? '지역을 선택해 주세요'}</div>
-            <div className="tm-text-caption" style={{ marginTop: 5 }}>{message}</div>
+            <div className="tm-text-caption" style={{ marginTop: 4 }}>{message}</div>
           </Card>
         </div>
       </div>
@@ -1458,12 +1458,12 @@ export function NotificationSettingsPageClient() {
             </div>
           ) : null}
           {pushError ? (
-            <Card pad={14} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
+            <Card pad={16} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
               <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>브라우저 알림을 켜지 못했어요</div>
               <div className="tm-text-caption" style={{ marginTop: 4 }} role="status">{pushError}</div>
             </Card>
           ) : null}
-          <Card pad={14} style={{ marginBottom: 8 }}>
+          <Card pad={16} style={{ marginBottom: 8 }}>
             <div className="tm-text-label">받을 알림 고르기</div>
             <div className="tm-text-caption" style={{ marginTop: 4 }}>
               {/* 위 푸시 토글과의 관계를 명시한다 — 예전에는 두 영역이 무관해 보여서,
@@ -1474,7 +1474,7 @@ export function NotificationSettingsPageClient() {
             </div>
           </Card>
           {toggleError ? (
-            <Card pad={14} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
+            <Card pad={16} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
               <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
               <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요.</div>
             </Card>
@@ -1543,7 +1543,7 @@ function RecordConsentTournamentContext() {
   if (!fromTournament) return null;
   const title = tournament.data?.title;
   return (
-    <Card pad={14} style={{ marginBottom: 8, background: 'var(--blue-soft)' }}>
+    <Card pad={16} style={{ marginBottom: 8, background: 'var(--blue-soft)' }}>
       <div className="tm-text-label" style={{ color: 'var(--blue700)' }}>
         {title ? `"${title}" 명단에 올랐어요` : '대회 명단에 올랐어요'}
       </div>
@@ -1590,7 +1590,7 @@ export function RecordConsentSettingsPageClient() {
             <h1 className="tm-text-heading">경기 기록 공개</h1>
           </div>
           <RecordConsentTournamentContext />
-          <Card pad={14} style={{ marginBottom: 8 }}>
+          <Card pad={16} style={{ marginBottom: 8 }}>
             {/* 이 카드는 **무엇이** 공개되는지만 답한다. "왜 지금 이 화면인지"는 위 대회
                 맥락 배너가, "지금 켜져 있는지 / 켜면 어떻게 되는지"는 아래 토글의
                 서브텍스트가 각각 맡는다 -- 셋이 같은 말을 반복하면(실측: 알림에서 들어온
@@ -1609,7 +1609,7 @@ export function RecordConsentSettingsPageClient() {
             </div>
           </Card>
           {toggleError ? (
-            <Card pad={14} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
+            <Card pad={16} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
               <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
               <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요.</div>
             </Card>
@@ -1719,7 +1719,7 @@ export function TournamentRealNameVisibilitySettingsPageClient() {
             </Link>
             <h1 className="tm-text-heading">대회 기록 실명 표시</h1>
           </div>
-          <Card pad={14} style={{ marginBottom: 8 }}>
+          <Card pad={16} style={{ marginBottom: 8 }}>
             <div className="tm-text-label">대회 경기 기록에 실명 표시</div>
             <div className="tm-text-caption" style={{ marginTop: 4 }}>
               대회 라인업·득점자·MVP에 붙는 이름이에요. 끄면 닉네임으로 표시되고, 대회
@@ -1728,7 +1728,7 @@ export function TournamentRealNameVisibilitySettingsPageClient() {
             </div>
           </Card>
           {toggleError ? (
-            <Card pad={14} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
+            <Card pad={16} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
               <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
               <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요.</div>
             </Card>
@@ -1810,7 +1810,7 @@ export function PlayerCardHiddenSettingsPageClient() {
             </Link>
             <h1 className="tm-text-heading">선수 카드</h1>
           </div>
-          <Card pad={14} style={{ marginBottom: 8 }}>
+          <Card pad={16} style={{ marginBottom: 8 }}>
             <div className="tm-text-label">선수 카드 숨기기</div>
             <div className="tm-text-caption" style={{ marginTop: 4 }}>
               경기 기록으로 만든 카드예요. 숨기면 마이페이지·공개 프로필·공유 화면에서
@@ -1818,7 +1818,7 @@ export function PlayerCardHiddenSettingsPageClient() {
             </div>
           </Card>
           {toggleError ? (
-            <Card pad={14} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
+            <Card pad={16} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
               <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
               <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요.</div>
             </Card>
@@ -1894,14 +1894,14 @@ function PlayerCardShapePicker() {
 
   return (
     <>
-      <Card pad={14} style={{ marginTop: 14, marginBottom: 8 }}>
+      <Card pad={16} style={{ marginTop: 16, marginBottom: 8 }}>
         <div className="tm-text-label">카드 모양</div>
         <div className="tm-text-caption" style={{ marginTop: 4 }}>
           모양은 꾸미기예요 — 능력치나 등급은 바뀌지 않아요.
         </div>
       </Card>
       {saveError ? (
-        <Card pad={14} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
+        <Card pad={16} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
           <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
           <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요.</div>
         </Card>
@@ -1964,14 +1964,14 @@ export function ThemeSettingsPageClient() {
             </Link>
             <h1 className="tm-text-heading">화면 테마</h1>
           </div>
-          <Card pad={14} style={{ marginBottom: 8 }}>
+          <Card pad={16} style={{ marginBottom: 8 }}>
             <div className="tm-text-label">화면 밝기 고르기</div>
             <div className="tm-text-caption" style={{ marginTop: 4 }}>
               기본값은 라이트예요. 로그인하면 이 기기뿐 아니라 다른 기기에서도 같은 설정으로 보여요.
             </div>
           </Card>
           {saveError ? (
-            <Card pad={14} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
+            <Card pad={16} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
               <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
               <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요. 이 화면에서는 그대로 적용돼요.</div>
             </Card>
@@ -2063,7 +2063,7 @@ export function WithdrawalPageClient() {
               </span>
               <div className="tm-text-heading">탈퇴 전 확인해 주세요</div>
             </div>
-            <p className="tm-text-body" style={{ margin: '10px 0 0', lineHeight: 1.6 }}>진행 중인 매치가 있거나 팀 운영 권한(팀장·운영진)을 갖고 있으면 탈퇴가 제한돼요.</p>
+            <p className="tm-text-body" style={{ margin: '12px 0 0', lineHeight: 1.6 }}>진행 중인 매치가 있거나 팀 운영 권한(팀장·운영진)을 갖고 있으면 탈퇴가 제한돼요.</p>
           </section>
           <Card pad={16}>
             <button
@@ -2099,7 +2099,7 @@ export function WithdrawalPageClient() {
             <textarea className="tm-input tm-create-input-multiline" value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} placeholder="선택 입력" />
           </label>
           {withdrawal.isError ? (
-            <Card pad={14} className="tm-auth-soft-card-error">
+            <Card pad={16} className="tm-auth-soft-card-error">
               <div className="tm-text-label">
                 {extractErrorMessage(withdrawal.error, '탈퇴 요청에 실패했어요')}
               </div>

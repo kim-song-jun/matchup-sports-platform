@@ -468,7 +468,7 @@ function HubFactRow({ item }: { item: TournamentVenuePrepItem }) {
       style={{
         display: 'grid',
         gridTemplateColumns: hasBadge ? '72px 1fr auto' : '72px 1fr',
-        gap: 10,
+        gap: 12,
         alignItems: 'start',
       }}
     >
@@ -505,7 +505,7 @@ function HubFactRow({ item }: { item: TournamentVenuePrepItem }) {
           )
         ) : null}
         {item.notice ? (
-          <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
             <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.5 }}>
               {item.notice.summary}
             </div>

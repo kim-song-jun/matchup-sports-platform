@@ -16,15 +16,15 @@ export function MyMemberCard({ member }: { member: MyMember }) {
   const pending = member.actionPending;
 
   return (
-    <Card pad={14}>
+    <Card pad={16}>
       <ListItem title={member.name} sub={member.meta} trailing={member.role || member.status} />
       {hasActions ? (
-        <button className="tm-btn tm-btn-sm tm-btn-neutral tm-btn-block" style={{ marginTop: 10 }} type="button" disabled={pending} onClick={() => setOpen((current) => !current)}>
+        <button className="tm-btn tm-btn-sm tm-btn-neutral tm-btn-block" style={{ marginTop: 12 }} type="button" disabled={pending} onClick={() => setOpen((current) => !current)}>
           관리
         </button>
       ) : null}
       {open && hasActions ? (
-        <div className="tm-member-actions" style={{ gridTemplateColumns: '1fr', marginTop: 10 }}>
+        <div className="tm-member-actions" style={{ gridTemplateColumns: '1fr', marginTop: 12 }}>
           {actions.map((action) => (
             <button
               key={action.label}

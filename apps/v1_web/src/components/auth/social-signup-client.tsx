@@ -298,7 +298,7 @@ export function SocialSignupClient() {
             <div
               className="tm-text-caption"
               role="status"
-              style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--blue700)' }}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--blue700)' }}
             >
               <span
                 aria-hidden="true"

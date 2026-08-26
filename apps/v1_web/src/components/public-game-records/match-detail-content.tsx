@@ -75,8 +75,8 @@ function MatchOutcomeNotice({ outcome }: { outcome: PublicMatchDetail['outcome']
     // live region 을 쓰지 않는 이유는 일정 카드의 같은 배지와 동일하다 — 정적 텍스트다.
     <div
       style={{
-        marginTop: 10,
-        padding: '8px 10px',
+        marginTop: 12,
+        padding: '8px 12px',
         borderRadius: 10,
         background: 'var(--orange50)',
         display: 'flex',
@@ -102,13 +102,13 @@ function MatchOutcomeNotice({ outcome }: { outcome: PublicMatchDetail['outcome']
 function LineupColumn({ title, slots }: { title: string; slots: readonly PublicLineupSlot[] }) {
   return (
     <div style={{ flex: 1 }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', marginBottom: 6 }}>{title}</div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', marginBottom: 8 }}>{title}</div>
       {slots.length === 0 ? (
         <div style={{ fontSize: 12, color: 'var(--text-caption)' }}>명단이 아직 없어요</div>
       ) : (
-        <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
           {slots.map((slot) => (
-            <li key={slot.participantId} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+            <li key={slot.participantId} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
               {slot.jerseyNumber !== null ? (
                 <span className="tab-num" style={{ color: 'var(--text-caption)', width: 20 }}>{slot.jerseyNumber}</span>
               ) : null}
@@ -237,7 +237,7 @@ function EventsSection({
             >
               {periodLabel(period)}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {byPeriod.get(period)!.map((event, index) => (
                 <EventRow key={`${event.type}-${event.sideId}-${period}-${index}`} event={event} />
               ))}
@@ -253,7 +253,7 @@ function EventsSection({
           >
             기타
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {unknownPeriodEvents.map((event, index) => (
               <EventRow key={`${event.type}-${event.sideId}-unknown-${index}`} event={event} />
             ))}
@@ -268,12 +268,12 @@ function HistorySection({ history }: { history: PublicMatchDetail['history'] }) 
   if (history.length === 0) return null;
   return (
     <section>
-      <h3 className="tm-hub-section-title" style={{ marginBottom: 10 }}>결과 변경 이력</h3>
+      <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>결과 변경 이력</h3>
       <Card pad={0}>
         {history.map((revision, index) => (
           <div
             key={revision.revision}
-            style={{ padding: '10px 16px', borderTop: index > 0 ? '1px solid var(--grey100)' : 'none' }}
+            style={{ padding: '12px 16px', borderTop: index > 0 ? '1px solid var(--grey100)' : 'none' }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-strong)' }}>
@@ -341,8 +341,8 @@ export function MatchDetailContent({ data }: { data: PublicMatchDetail }) {
               justifyContent: 'center',
               alignItems: 'center',
               flexWrap: 'wrap',
-              gap: 6,
-              marginTop: 10,
+              gap: 8,
+              marginTop: 12,
               fontSize: 12,
               color: 'var(--text-caption)',
             }}
@@ -384,7 +384,7 @@ export function MatchDetailContent({ data }: { data: PublicMatchDetail }) {
           자체를 통째로 생략한다. */}
       {data.lineup ? (
         <section>
-          <h3 className="tm-hub-section-title" style={{ marginBottom: 10 }}>라인업</h3>
+          <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>라인업</h3>
           <Card pad={16}>
             <div style={{ display: 'flex', gap: 20 }}>
               <LineupColumn title={sideLabel(data.home)} slots={data.lineup.home} />
@@ -395,7 +395,7 @@ export function MatchDetailContent({ data }: { data: PublicMatchDetail }) {
       ) : null}
 
       <section>
-        <h3 className="tm-hub-section-title" style={{ marginBottom: 10 }}>경기 기록</h3>
+        <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>경기 기록</h3>
         <Card pad={16}>
           <EventsSection events={data.events} isStatusOnly={isStatusOnly} />
         </Card>
@@ -403,7 +403,7 @@ export function MatchDetailContent({ data }: { data: PublicMatchDetail }) {
 
       {data.videos.length > 0 ? (
         <section>
-          <h3 className="tm-hub-section-title" style={{ marginBottom: 10 }}>경기 영상</h3>
+          <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>경기 영상</h3>
           <Card pad={16}>
             <MatchVideos videos={[...data.videos]} matchLabel={`${sideLabel(data.home)} vs ${sideLabel(data.away)}`} />
           </Card>

@@ -1036,7 +1036,7 @@ function LegalDocumentDialog({ title, sections, onClose }: { title: string; sect
             alignItems: 'center',
             justifyContent: 'space-between',
             gap: 12,
-            padding: '18px 18px 12px',
+            padding: '20px 20px 12px',
             borderBottom: '1px solid var(--grey100)',
           }}
         >
@@ -1045,7 +1045,7 @@ function LegalDocumentDialog({ title, sections, onClose }: { title: string; sect
             닫기
           </button>
         </header>
-        <div style={{ overflowY: 'auto', padding: '18px', display: 'grid', gap: 18 }}>
+        <div style={{ overflowY: 'auto', padding: '20px', display: 'grid', gap: 20 }}>
           {sections.map((section) => (
             <section key={section.title}>
               <h3 className="tm-text-body-lg" style={{ margin: 0 }}>{section.title}</h3>

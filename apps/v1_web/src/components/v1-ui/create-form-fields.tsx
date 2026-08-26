@@ -216,7 +216,7 @@ export function RecentVenueChips({
   if (items.length === 0) return null;
   return (
     <div role="group" aria-label="최근 사용한 장소" style={{ marginTop: 8 }}>
-      <div className="tm-text-caption" style={{ marginBottom: 6 }}>최근 사용한 장소</div>
+      <div className="tm-text-caption" style={{ marginBottom: 8 }}>최근 사용한 장소</div>
       <div className="tm-team-form-chip-row">
         {items.map((item, index) => {
           const isSelected = selectedValue !== undefined && selectedValue === item.placeName;
@@ -255,13 +255,13 @@ export function MissingFieldsBanner<Step extends string>({
 }) {
   if (missingFields.length === 0) return null;
   return (
-    <Card pad={14} style={{ marginTop: 14, background: 'var(--tint-orange)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+    <Card pad={16} style={{ marginTop: 16, background: 'var(--tint-orange)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <AlertTriangleIcon size={16} aria-hidden="true" />
         <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장할 수 없어요</div>
       </div>
-      <div className="tm-text-caption" style={{ marginTop: 5 }}>다음 항목을 채워야 만들 수 있어요.</div>
-      <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
+      <div className="tm-text-caption" style={{ marginTop: 4 }}>다음 항목을 채워야 만들 수 있어요.</div>
+      <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
         {missingFields.map((item) => (
           <Link
             key={`${item.step}:${item.field}`}

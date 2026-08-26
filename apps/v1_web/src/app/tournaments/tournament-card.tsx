@@ -65,7 +65,7 @@ function CardShell({
     display: 'flex',
     flexDirection: 'column',
     height: '100%',
-    padding: '16px 16px 14px',
+    padding: '16px 16px 16px',
     textDecoration: 'none',
   };
   if (interactive) {
@@ -174,7 +174,7 @@ export function TournamentCard({
               제목과 같은 x축에 메타 행이 정렬되도록 한다(이전엔 형제 div라 아이콘 밑에
               깔려 제목과 어긋나 보였다 — 사용자 피드백: "align도 안맞네"). */}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, justifyContent: 'space-between' }}>
               <div
                 className="tm-text-body-lg"
                 style={{
@@ -194,13 +194,13 @@ export function TournamentCard({
             </div>
 
             {/* Sport identity chip + meta row */}
-            <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 10px' }}>
+            <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 12px' }}>
               {/* Sport chip: colored dot + Korean label */}
               <span
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: 5,
+                  gap: 4,
                   padding: '2px 8px',
                   borderRadius: 999,
                   background: sportAccent.badgeBg,
@@ -283,7 +283,7 @@ export function TournamentCard({
           </div>
         ) : null}
 
-        <div style={{ marginTop: 10 }}>
+        <div style={{ marginTop: 12 }}>
           <CapacityMiniBar item={item} />
         </div>
 
@@ -296,8 +296,8 @@ export function TournamentCard({
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginTop: 10,
-            paddingTop: 10,
+            marginTop: 12,
+            paddingTop: 12,
             borderTop: '1px solid var(--grey100)',
           }}
         >
@@ -305,7 +305,7 @@ export function TournamentCard({
           <span className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 700 }}>
             참가비 {formatEntryFee(item.entryFee)}
           </span>
-          <span className="tm-text-caption" style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span className="tm-text-caption" style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 8 }}>
             {/* #7: 확정 팀 ≥80% 이상이면 '거의 마감' orange 배지 */}
             {item.teamCount > 0 && reservedTeamCount / item.teamCount >= 0.8
               ? <span className="tm-badge tm-badge-orange">{reservedTeamCount >= item.teamCount ? '마감' : '거의 마감'}</span>

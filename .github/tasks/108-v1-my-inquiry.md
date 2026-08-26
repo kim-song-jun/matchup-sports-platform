@@ -173,6 +173,7 @@ Phase 4 - Admin follow-up:
 - [x] Backend outbox producer and worker handler implemented.
 - [x] Deployment runtime injection implemented.
 - [x] Narrow tests and diff hygiene complete.
+- [ ] Alpha deployment verified after converging the scoped SSM Parameter IAM permissions discovered by run `32944182955`.
 
 ## Historical Open Questions
 

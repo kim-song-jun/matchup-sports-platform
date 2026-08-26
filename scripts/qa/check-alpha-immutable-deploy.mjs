@@ -144,6 +144,9 @@ requirePatterns(rollbackWorkflowPath, [
 requirePatterns(provisioningPath, [
   [/sts:AssumeRoleWithWebIdentity/, 'provisioning must pin the GitHub OIDC trust policy'],
   [/ssm:SendCommand/, 'GitHub role must be able to invoke the exact alpha instance'],
+  [/ssm:PutParameter/, 'GitHub role must write the scoped alpha runtime parameter'],
+  [/ssm:GetParameter/, 'EC2 role must read the scoped alpha runtime parameter'],
+  [/\/teameet\/alpha\/env\/SLACK_INQUIRY_WEBHOOK_URL/, 'runtime parameter access must be scoped to the inquiry Slack webhook'],
   [/s3:GetObjectVersion/, 'EC2 role must read pinned source and manifest versions'],
   [/Environment[\s\S]*alpha/, 'provisioning must validate the alpha target identity'],
 ]);
@@ -192,7 +195,12 @@ function forbidPatterns(filePath, forbidden) {
 function verifyNegativeControls() {
   const originalDeploy = sources.get(deployPath);
   const originalCompose = sources.get(composePath);
-  if (originalDeploy === undefined || originalCompose === undefined) process.exit(1);
+  const originalProvisioning = sources.get(provisioningPath);
+  if (
+    originalDeploy === undefined ||
+    originalCompose === undefined ||
+    originalProvisioning === undefined
+  ) process.exit(1);
 
   sources.set(deployPath, `${originalDeploy}\ndocker build .\n`);
   errors.length = 0;
@@ -215,7 +223,41 @@ function verifyNegativeControls() {
   requirePatterns(deployPath, [[/validate_alpha_release_manifest/, 'deploy must validate the release manifest']]);
   assertRejected('missing manifest validation');
 
+  sources.set(
+    provisioningPath,
+    originalProvisioning.replace('ssm:PutParameter', 'ssm:DescribeParameters'),
+  );
+  errors.length = 0;
+  requirePatterns(provisioningPath, [
+    [/ssm:PutParameter/, 'GitHub role must write the scoped alpha runtime parameter'],
+  ]);
+  assertRejected('missing runtime parameter write permission');
+
+  sources.set(
+    provisioningPath,
+    originalProvisioning.replace('ssm:GetParameter', 'ssm:DescribeParameters'),
+  );
+  errors.length = 0;
+  requirePatterns(provisioningPath, [
+    [/ssm:GetParameter/, 'EC2 role must read the scoped alpha runtime parameter'],
+  ]);
+  assertRejected('missing runtime parameter read permission');
+
+  sources.set(
+    provisioningPath,
+    originalProvisioning.replace(
+      '/teameet/alpha/env/SLACK_INQUIRY_WEBHOOK_URL',
+      '/teameet/alpha/env/*',
+    ),
+  );
+  errors.length = 0;
+  requirePatterns(provisioningPath, [
+    [/\/teameet\/alpha\/env\/SLACK_INQUIRY_WEBHOOK_URL/, 'runtime parameter access must be scoped to the inquiry Slack webhook'],
+  ]);
+  assertRejected('broad runtime parameter path');
+
   sources.set(deployPath, originalDeploy);
+  sources.set(provisioningPath, originalProvisioning);
   errors.length = 0;
   console.log('[alpha-immutable-deploy] negative controls passed');
 }

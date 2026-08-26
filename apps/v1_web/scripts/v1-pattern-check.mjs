@@ -233,11 +233,57 @@ function checkRadiusLiteral() {
   });
 }
 
+/* ── 6) TSX 임의값 간격 검사 ───────────────────────────────────────
+ * 4번 검사는 CSS 파일만 본다. 그런데 이 저장소는 Tailwind 유틸도 쓰기 때문에
+ * 마크업 쪽으로 격자 밖 값이 그대로 들어올 수 있다 — CSS 를 아무리 격자로
+ * 맞춰도 `py-[14px]` 한 줄이면 우회된다.
+ *
+ * 여기서는 **임의값 대괄호 표기**(`py-[14px]`)만 본다. 스케일 유틸(`gap-1.5`
+ * = 6px)까지 한꺼번에 막지 않는 것은 의도다: 그쪽은 800곳 규모라 일괄 스냅이
+ * 화면 전반을 바꾸는 결정이고, 게이트는 그 결정을 대신할 수 없다. 임의값은
+ * 반대로 "스케일을 벗어나려고 일부러 쓴 표기"라 지금 막는 게 맞다.
+ *
+ * radius(`rounded-[2px]`)는 포함하지 않는다. 현재 1건뿐이고 그건 축구 카드
+ * 아이콘의 모서리라 도메인 형태에 가깝다 — 토큰(4px)으로 올리면 카드 모양이
+ * 바뀐다. 늘어나면 그때 별도 판단한다.
+ * ────────────────────────────────────────────────────────────────── */
+function checkTsxArbitrarySpacing() {
+  const SPACING_UTIL = /\b(gap|gap-x|gap-y|p|px|py|pt|pb|pl|pr|m|mx|my|mt|mb|ml|mr|space-x|space-y)-\[(-?[\d.]+)px\]/g;
+  let list;
+  try {
+    list = execSync('find src \\( -name "*.tsx" -o -name "*.ts" \\)', { encoding: 'utf8' });
+  } catch (e) {
+    violations.push(`[게이트 실행 실패] TSX 목록을 만들 수 없다 (${e.message}). 검사를 건너뛰지 않는다`);
+    return;
+  }
+  const files = list.split('\n').filter(Boolean);
+  if (!files.length) {
+    violations.push('[게이트 실행 실패] src 아래 TSX/TS 파일이 0개다 — 실행 위치나 경로가 바뀐 것으로 본다');
+    return;
+  }
+  for (const f of files) {
+    const txt = readFileSync(f, 'utf8');
+    for (const [index, line] of txt.split('\n').entries()) {
+      for (const m of line.matchAll(SPACING_UTIL)) {
+        const n = Math.abs(parseFloat(m[2]));
+        if (!n || n <= 3) continue; // 1~3px 광학 보정 — CSS 검사와 같은 예외
+        if (n % 4 !== 0) {
+          violations.push(
+            `[간격 격자 이탈] ${f}:${index + 1}: ${m[0]} — 4의 배수만 쓴다 ` +
+              `(1~3px 광학 보정은 예외). 스케일 유틸이나 4의 배수 임의값으로 바꿀 것`,
+          );
+        }
+      }
+    }
+  }
+}
+
 checkHapnida();
 checkUndefinedTokens();
 checkInertFontSizeClasses();
 checkSpacingGrid();
 checkRadiusLiteral();
+checkTsxArbitrarySpacing();
 
 if (violations.length) {
   console.error(`\n✗ v1 패턴 검사 실패 — ${violations.length}건:\n`);
@@ -246,5 +292,5 @@ if (violations.length) {
   process.exit(1);
 }
 console.log(
-  '✓ v1 패턴 검사 통과 (합니다체 0, 미정의 CSS 토큰 0, 무효 폰트 크기 클래스 0, 간격 격자 이탈 0, radius 리터럴 0)',
+  '✓ v1 패턴 검사 통과 (합니다체 0, 미정의 CSS 토큰 0, 무효 폰트 크기 클래스 0, 간격 격자 이탈 0(CSS+TSX 임의값), radius 리터럴 0)',
 );

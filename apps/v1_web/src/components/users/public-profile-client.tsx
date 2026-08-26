@@ -92,8 +92,7 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
             두 번 하지 않도록 이름·핸들은 스테이지 안 카드 아래로 들어간다.
             숨김을 켠 사용자에게는 서버가 null 을 주므로 기존 헤더가 그대로 선다. */}
         {data.playerCard ? (
-          <section className="tm-my-profile-stage" aria-label="선수 카드와 사용자 정보">
-            <PlayerCard
+          <PlayerCard
               card={data.playerCard}
               displayName={data.displayName}
               profileImageUrl={data.profileImageUrl}
@@ -107,7 +106,6 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
                 </div>
               }
             />
-          </section>
         ) : (
           <section className="tm-my-profile-head" aria-label="사용자 정보">
             <div className="tm-my-avatar" style={avatarStyle}>{data.profileImageUrl ? null : initials}</div>

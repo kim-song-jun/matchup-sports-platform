@@ -7295,7 +7295,9 @@ button:disabled {
 .tm-pcard-back-eq b { color: var(--tm-back-accent); }
 
 /* ── 카드 아래 동반 UI -- 카드는 소장품이라 앞면을 깨끗하게 두고, 안내·행동은 밖에 둔다. ── */
-.tm-pcard-below { width: 100%; max-width: 320px; display: flex; flex-direction: column; }
+/* 카드 아래 영역. 카드가 drop-shadow 를 깔고 있어 버튼이 바짝 붙으면 그림자 위에
+   올라탄 것처럼 보인다 -- 그림자가 앉을 자리를 여백으로 비운다(사용자 지적 2026-08-26). */
+.tm-pcard-below { width: 100%; max-width: 320px; display: flex; flex-direction: column; margin-top: 14px; }
 .tm-pcard-flipbtn {
   margin-top: 4px; width: 100%; min-height: 44px; border-radius: 11px;
   background: var(--surface-soft); border: 1px solid var(--border);
@@ -7355,19 +7357,15 @@ button:disabled {
   }
 }
 
-/* ── 신원 통합 스테이지 (Task 155, 사용자 선택 A안 → 2026-08-25 화이트 무대로 전환) ──
-   마이페이지 사이드바에서 흰 신원 박스와 선수 카드를 하나의 무대로 합친다(신원 중복 제거).
-   처음엔 다크 무대였지만 라이트 앱 한가운데 검은 블록이 서는 이질감이 커서(사용자 결정)
-   **테마 토큰 무대**로 바꿨다 -- 카드는 자기 재질·림·그림자를 갖고 있어 밝은 배경 위에서도
-   실물처럼 도드라진다(alpha 실렌더 3안 비교로 확정). 다크 모드에서는 토큰이 알아서
-   어두워지므로 별도 분기가 없다. companion(버튼·진행도)은 원래 테마 토큰이라 그대로 산다. */
-.tm-my-profile-stage {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 20px 16px 16px;
-}
-/* 카드 아래 신원 블록 -- 카드가 이름을 이미 크게 말하므로 여기서는 보조 정보만. */
+/* ── 카드는 상자에 담지 않는다 (사용자 선택 A안, 2026-08-26) ──
+   무대 상자를 거쳐(다크 → 화이트) 결국 **상자 자체를 없앴다**. 상자가 페이지 배경과
+   거의 같은 톤이라 경계에 이유가 없었고, 모바일에서는 좌우 여백이 이중으로 들었으며,
+   무엇보다 그 안에 계정 버튼까지 들어 있어 "카드 조작"과 "계정 조작"이 한 덩어리로
+   섞였다. 카드는 자기 림·그림자를 갖고 있어 배경 위에 그냥 놓아도 소장품으로 선다.
+   계정은 아래 별도 프로필 카드로 내려갔다(my-page.tsx).
+
+   카드 아래 신원 블록 -- 공개 프로필에서만 쓴다(이름·핸들). 마이페이지는 프로필 카드가
+   같은 정보를 더 자세히 말하므로 여기에 넣지 않는다. */
 .tm-pcard-identity {
   padding: 2px 0 12px;
   border-bottom: 1px solid var(--border);
@@ -7414,15 +7412,17 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
 /* ── 카드 설정 입구 (적대 검증 2026-08-25 확정 결함 수정) ──
    숨김·모양 설정이 카드에서 2클릭 떨어진 메뉴에만 있어 발견 불가능했다 --
    뒤집기 버튼 옆에 아이콘 입구를 둔다(본인 카드에서만 렌더). */
-.tm-pcard-actions { display: flex; gap: 8px; margin-top: 4px; }
+/* 카드 조작 한 줄: 뒤집기(글자) + 공유·설정(아이콘). 보조 조작까지 글자로 두면
+   줄이 길어져 아래로 흐르고, 그 사이에 등급 설명이 끼어 버튼 흐름이 끊겼다. */
+.tm-pcard-actions { display: flex; gap: 8px; margin-top: 0; }
 .tm-pcard-actions .tm-pcard-flipbtn { flex: 1; margin-top: 0; }
-.tm-pcard-settings-link {
+.tm-pcard-icon-link {
   flex: none; width: 44px; min-height: 44px; border-radius: 11px;
   display: flex; align-items: center; justify-content: center;
   background: var(--surface-soft); border: 1px solid var(--border);
   color: var(--text-strong);
 }
-.tm-pcard-settings-link:focus-visible { outline: 2px solid var(--blue500); outline-offset: 2px; }
+.tm-pcard-icon-link:focus-visible { outline: 2px solid var(--blue500); outline-offset: 2px; }
 
 /* ── 후기 4항목 채점 (Task 155 후속 -- 해금 카운트의 원천) ──
    종합 별점 아래 실력·매너·시간약속·안전 네 줄. 종합 별점과 같은 별 패턴을
@@ -7459,3 +7459,23 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
 }
 .tm-pcard-photo-slot:hover { background: rgba(255, 255, 255, 0.13); border-color: var(--tm-ink); }
 .tm-pcard-photo-slot:focus-visible { outline: 2px solid var(--tm-ink); outline-offset: 2px; }
+
+
+/* ── 프로필(계정) 블록 · 활동 병합 (사용자 선택 A안, 2026-08-26) ──
+   카드 조작과 계정 조작이 한 상자에 섞여 있던 것을 갈랐다. 여기는 계정 쪽이다. */
+.tm-my-account-block { margin-top: 10px; text-align: center; }
+/* 계정 아바타 -- 카드를 숨긴 사용자에게는 이것이 유일한 얼굴이다. */
+.tm-my-account-avatar {
+  width: 52px; height: 52px; border-radius: 18px; margin: 0 auto 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; font-weight: 800;
+}
+.tm-my-account-name { font-size: 16px; font-weight: 800; color: var(--text-strong); letter-spacing: -0.01em; }
+.tm-my-account-meta { margin-top: 3px; font-size: 12px; color: var(--text-muted); }
+.tm-my-account-badges {
+  margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;
+}
+.tm-my-account-actions { margin-top: 12px; display: flex; gap: 8px; }
+.tm-my-account-actions .tm-btn { flex: 1; }
+/* 활동 요약과 이번 달 활동을 한 카드로 합칠 때 두 묶음을 가르는 선. */
+.tm-my-activity-divider { height: 1px; background: var(--border); margin: 12px 0; }

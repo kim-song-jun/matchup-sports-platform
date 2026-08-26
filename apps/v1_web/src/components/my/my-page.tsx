@@ -73,66 +73,6 @@ const MENU_ICON_MAP: Record<string, React.ComponentType<LucideProps>> = {
 export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
   const avatarStyle = model.user.profileImageUrl ? { backgroundImage: cssUrl(model.user.profileImageUrl) } : undefined;
 
-  // 신원 섹션. 카드가 있으면 다크 스테이지 안(카드 아래)으로 들어가고, 없으면
-  // 이 흰 박스가 그대로 선다(사용자 선택 A안 -- 카드와 신원 박스의 중복 제거).
-  const identitySection = (
-    <section className="tm-my-profile-head tm-my-home-profile-head">
-              <div className="tm-my-avatar" style={avatarStyle}>{model.user.profileImageUrl ? null : model.user.initials}</div>
-              <div className="tm-my-profile-copy">
-                <div className="tm-text-heading tm-my-profile-name">{model.user.name}</div>
-                <div className="tm-text-caption tm-my-profile-meta">{model.user.handle} · {model.user.region} · {model.user.genderLabel}</div>
-                {model.user.loginMethod || model.phoneVerified ? (
-                  <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {model.user.loginMethod ? (
-                      <span
-                        className="tm-badge tm-badge-grey"
-                        style={model.user.loginMethodProvider === 'kakao'
-                          ? { background: 'var(--kakao-yellow)', color: 'var(--static-black)' }
-                          : undefined}
-                      >
-                        {model.user.loginMethod}
-                      </span>
-                    ) : null}
-                    {/* 컬러만으로 상태를 전달하지 않도록 아이콘 + 텍스트를 함께 쓴다. */}
-                    {model.phoneVerified ? (
-                      <span className="tm-badge tm-badge-grey" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                        <ShieldCheck size={12} strokeWidth={2.5} aria-hidden="true" />
-                        본인인증 완료
-                      </span>
-                    ) : null}
-                  </div>
-                ) : null}
-                <div
-                  className="tm-text-caption"
-                  style={{
-                    marginTop: 6,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {model.user.intro}
-                </div>
-              </div>
-              {/* 공개 프로필 진입. 지금까지 `/users/:id`(선수 카드·활동 기록이 있는 화면)로 가는
-                  길이 앱 어디에도 없어서, URL 을 직접 아는 사람만 볼 수 있었다 — 만들어 두고
-                  도달할 수 없는 상태였다. 내 것부터 여기서 연다.
-                  `userId` 가 아직 없으면(로딩·에러) 렌더하지 않는다: 링크를 먼저 그려 두고
-                  눌렀을 때 깨지는 것보다 안 보이는 편이 낫다. */}
-              <div className="tm-my-profile-actions">
-                {model.user.userId !== null ? (
-                  <Link
-                    className="tm-btn tm-btn-sm tm-btn-neutral"
-                    href={`/users/${encodeURIComponent(model.user.userId)}`}
-                  >
-                    내 프로필
-                  </Link>
-                ) : null}
-                <Link className="tm-btn tm-btn-sm tm-btn-neutral tm-my-profile-edit-link" href="/my/profile/edit">프로필 수정</Link>
-              </div>
-    </section>
-  );
-
   return (
     <AppChrome title="마이페이지" activeTab="my" hasNewNotification={model.hasNewNotification} centerTitle>
       <h1 className="sr-only">마이페이지</h1>
@@ -142,63 +82,72 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
         <div className="tm-my-desktop-layout">
           {/* LEFT sticky: profile identity */}
           <div className="tm-my-desktop-sidebar">
-            {/* 내 선수 카드 + 신원 (Task 155, 신원 통합 스테이지 -- 사용자 선택 A안).
-                카드가 있으면 카드가 곧 프로필이다: 다크 스테이지 하나에 카드 → 신원
-                (이름·뱃지·버튼) → 뒤집기·진행도·공유가 정리되고 흰 신원 박스는 사라진다.
-                카드가 없으면(숨김·로딩·실패) 기존 신원 박스가 그대로 선다. */}
+            {/* 내 선수 카드 (Task 155, 사용자 선택 A안 -- 카드 독립, 2026-08-26).
+                카드를 상자에서 꺼내 페이지 위에 직접 놓는다. 이전에는 카드가 무대 상자
+                안에 있고 그 안에 계정 버튼(내 프로필·프로필 수정)까지 함께 있어,
+                모바일에서 상자 속 상자 + 카드 조작과 계정 조작이 한 덩어리로 섞였다.
+                카드 아래에는 **카드 조작만** 남고(뒤집기·공유·설정), 계정은 아래 프로필
+                카드로 내려간다. 카드가 없으면(숨김·로딩·실패) 기존 신원 박스가 그 자리에 선다. */}
             {model.user.userId !== null ? (
               <MyPlayerCardSection
                 userId={model.user.userId}
                 displayName={model.user.name}
                 profileImageUrl={model.user.profileImageUrl ?? null}
-                fallback={identitySection}
-                stageIdentity={
-                  <div className="tm-pcard-identity">
-                    <div className="tm-pcard-identity-name">{model.user.name}</div>
-                    <div className="tm-pcard-identity-meta">
-                      {model.user.handle} · {model.user.region} · {model.user.genderLabel}
-                    </div>
-                    {model.user.loginMethod || model.phoneVerified ? (
-                      <div className="tm-pcard-identity-badges">
-                        {model.user.loginMethod ? (
-                          <span
-                            className="tm-badge tm-badge-grey"
-                            style={model.user.loginMethodProvider === 'kakao'
-                              ? { background: 'var(--kakao-yellow)', color: 'var(--static-black)' }
-                              : undefined}
-                          >
-                            {model.user.loginMethod}
-                          </span>
-                        ) : null}
-                        {model.phoneVerified ? (
-                          <span className="tm-badge tm-badge-grey" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                            <ShieldCheck size={12} strokeWidth={2.5} aria-hidden="true" />
-                            본인인증 완료
-                          </span>
-                        ) : null}
-                      </div>
-                    ) : null}
-                    <div className="tm-pcard-identity-actions">
-                      <Link
-                        className="tm-btn tm-btn-sm tm-btn-neutral"
-                        href={`/users/${encodeURIComponent(model.user.userId)}`}
-                      >
-                        내 프로필
-                      </Link>
-                      <Link className="tm-btn tm-btn-sm tm-btn-neutral" href="/my/profile/edit">프로필 수정</Link>
-                    </div>
-                  </div>
-                }
               />
-            ) : identitySection}
+            ) : null}
+            {/* 프로필(계정) -- 카드와 **다른 블록**이다. 카드 유무와 무관하게 항상 선다:
+                카드를 숨긴 사용자에게는 이것이 유일한 신원 표시이고, 카드가 있는
+                사용자에게는 계정 조작이 카드 조작과 섞이지 않는 자리다. */}
+            {model.user.userId !== null ? (
+              <Card pad={16}>
+                <div className="tm-text-body-lg">프로필</div>
+                <div className="tm-my-account-block">
+                  <div className="tm-my-avatar tm-my-account-avatar" style={avatarStyle}>
+                    {model.user.profileImageUrl ? null : model.user.initials}
+                  </div>
+                  <div className="tm-my-account-name">{model.user.name}</div>
+                  <div className="tm-my-account-meta">
+                    {model.user.handle} · {model.user.region} · {model.user.genderLabel}
+                  </div>
+                  {model.user.loginMethod || model.phoneVerified ? (
+                    <div className="tm-my-account-badges">
+                      {model.user.loginMethod ? (
+                        <span
+                          className="tm-badge tm-badge-grey"
+                          style={model.user.loginMethodProvider === 'kakao'
+                            ? { background: 'var(--kakao-yellow)', color: 'var(--static-black)' }
+                            : undefined}
+                        >
+                          {model.user.loginMethod}
+                        </span>
+                      ) : null}
+                      {model.phoneVerified ? (
+                        <span className="tm-badge tm-badge-grey" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <ShieldCheck size={12} strokeWidth={2.5} aria-hidden="true" />
+                          본인인증 완료
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  <div className="tm-my-account-actions">
+                    <Link
+                      className="tm-btn tm-btn-sm tm-btn-neutral"
+                      href={`/users/${encodeURIComponent(model.user.userId)}`}
+                    >
+                      내 프로필
+                    </Link>
+                    <Link className="tm-btn tm-btn-sm tm-btn-neutral" href="/my/profile/edit">프로필 수정</Link>
+                  </div>
+                </div>
+              </Card>
+            ) : null}
             {model.phoneVerified === false ? <PhoneVerificationCallout /> : null}
-            {/* 활동 요약: stats strip을 Card로 감싸 섹션 라벨과 border/radius/padding 정합 */}
+            {/* 활동 -- 전체 활동과 이번 달을 한 카드로 합친다(사용자 확정 2026-08-26).
+                성격이 같은 숫자 묶음이 상자 두 개로 나뉘어 모바일 스크롤만 길었다. */}
             <Card pad={16}>
-              <div className="tm-text-body-lg">활동 요약</div>
+              <div className="tm-text-body-lg">활동</div>
               <div className="tm-my-profile-stats">{model.user.stats.map((stat) => <KPIStat key={stat.label} {...stat} />)}</div>
-            </Card>
-            <Card pad={16}>
-              <div className="tm-text-body-lg">이번 달 활동</div>
+              <div className="tm-my-activity-divider" />
               <div className="tm-my-monthly">{model.user.monthly.map((stat) => <KPIStat key={stat.label} {...stat} />)}</div>
             </Card>
           </div>

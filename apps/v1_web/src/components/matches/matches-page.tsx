@@ -91,8 +91,8 @@ function StatusIcon({ tone }: { tone: 'orange' | 'green' | 'grey' }) {
   return (
     <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true" style={{ flexShrink: 0 }}>
       <circle cx="7.5" cy="7.5" r="7.5" fill="var(--tint-orange)" />
-      <path d="M7.5 4.5V8" stroke="var(--orange600)" strokeWidth="1.5" strokeLinecap="round" />
-      <circle cx="7.5" cy="10.5" r="0.75" fill="var(--orange600)" />
+      <path d="M7.5 4.5V8" stroke="var(--orange700)" strokeWidth="1.5" strokeLinecap="round" />
+      <circle cx="7.5" cy="10.5" r="0.75" fill="var(--orange700)" />
     </svg>
   );
 }
@@ -705,7 +705,7 @@ function CapacityRow({ current, capacity }: { current: number; capacity: number 
 
 function StateCard({ tone, title, body }: { tone: 'orange' | 'green' | 'grey'; title: string; body: string }) {
   const tint = tone === 'green' ? 'var(--tint-green)' : tone === 'grey' ? 'var(--tint-grey)' : 'var(--tint-orange)';
-  const accent = tone === 'green' ? 'var(--green700)' : tone === 'grey' ? 'var(--text-muted)' : 'var(--orange600)';
+  const accent = tone === 'green' ? 'var(--green700)' : tone === 'grey' ? 'var(--text-muted)' : 'var(--orange700)';
   return (
     <Card pad={14} style={{ marginTop: 14, background: tint }}>
       {/* [P0/P1 아이콘+컬러] 아이콘을 타이틀과 함께 표시해 색상만으로 상태를 구분하지 않음 (WCAG 1.4.1) */}

@@ -46,7 +46,7 @@ function sideLabel(side: PublicMatchDetail['home']): string {
 /** `void`/`corrected` states need a visible badge so a stale-looking score is never mistaken for the live truth. */
 function ResultStateBadge({ state }: { state: PublicMatchDetail['resultState'] }) {
   if (state === 'pending' || state === 'official') return null;
-  const tone = state === 'void' ? 'var(--red500)' : 'var(--blue500)';
+  const tone = state === 'void' ? 'var(--red700)' : 'var(--blue700)';
   const bg = state === 'void' ? 'var(--red50)' : 'var(--blue50)';
   return (
     // live region 을 쓰지 않는다 — 이 배지는 렌더 후 변하지 않는 정적 텍스트라, role="status"

@@ -900,10 +900,10 @@ function RecommendedMatchRail({ matches }: { matches: HomeMatchCard[] }) {
                   ambient tm-text-micro(12px, globals.css)와 맞춰 12로 올림. */}
               {Math.max(match.maxParticipants - match.currentParticipants, 0) <= 3 && match.currentParticipants < match.maxParticipants ? (
                 <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 2, fontVariantNumeric: 'tabular-nums' }}>
-                  <span className="tm-text-micro" style={{ color: 'var(--orange600)', fontWeight: 700 }}>
+                  <span className="tm-text-micro" style={{ color: 'var(--orange700)', fontWeight: 700 }}>
                     {match.currentParticipants}/{match.maxParticipants}
                   </span>
-                  <span style={{ fontSize: 12, color: 'var(--orange600)', fontWeight: 600 }}>명</span>
+                  <span style={{ fontSize: 12, color: 'var(--orange700)', fontWeight: 600 }}>명</span>
                   <span className="tm-badge tm-badge-orange" style={{ marginLeft: 2 }}>마감 임박</span>
                 </span>
               ) : (

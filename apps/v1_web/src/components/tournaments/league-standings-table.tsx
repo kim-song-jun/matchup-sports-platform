@@ -84,7 +84,7 @@ export function LeagueStandingsTable({ data }: { data: LeagueStandingsTableData 
               fontSize: 12,
               fontWeight: 700,
               background: magicNumber.clinched ? 'var(--blue50)' : 'var(--grey100)',
-              color: magicNumber.clinched ? 'var(--blue500)' : 'var(--text)',
+              color: magicNumber.clinched ? 'var(--blue700)' : 'var(--text)',
             }}
           >
             <span>{magicNumber.clinched ? '우승 확정' : `매직넘버 ${magicNumber.value}`}</span>

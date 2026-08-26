@@ -195,7 +195,14 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .section {
+  /* 셀렉터를 애니메이션 쪽과 같게 맞춘다. `.section` 만 쓰면 specificity 가
+   * (0,1,0) 이라 위 `.section:not([data-variant='embedded'])`(0,2,0)에 져서
+   * **가드가 아무것도 하지 못한다** — 모션을 줄이도록 설정한 사용자에게 스크롤
+   * 연동 애니메이션이 그대로 재생된다. 순서로는 해결되지 않는다(specificity 우선).
+   * embedded 변형은 애초에 애니메이션 대상이 아니지만, 둘 다 적어 두면 나중에
+   * 애니메이션 셀렉터가 바뀌어도 가드가 먼저 무너지지 않는다. */
+  .section,
+  .section:not([data-variant='embedded']) {
     animation: none;
     opacity: 1;
     transform: none;

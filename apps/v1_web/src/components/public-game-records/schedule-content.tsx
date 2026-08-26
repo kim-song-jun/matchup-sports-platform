@@ -88,7 +88,7 @@ function ScheduleOutcomeBadge({ outcome }: { outcome: PublicScheduleEntry['outco
       style={{
         margin: '4px 0 0',
         textAlign: 'center',
-        fontSize: 11,
+        fontSize: 'var(--font-size-micro)',
         fontWeight: 700,
         // --orange500 은 텍스트로 쓰면 흰 카드 위 2.16:1 로 WCAG AA 에 한참 못 미친다
         // (큰 글씨 기준 3:1 도 못 넘긴다). --orange700 은 정확히 그 결함 때문에 도입된
@@ -266,7 +266,7 @@ function ScheduleEventRow({ item }: { item: ScheduleEventItem }) {
              관전자에게는 원정 열에 홈 선수 이름이 뜬 일반 골로만 보였다). */
           <span
             style={{
-              fontSize: 10,
+              fontSize: 'var(--font-size-micro)',
               lineHeight: 1.4,
               padding: '0 4px',
               borderRadius: 4,

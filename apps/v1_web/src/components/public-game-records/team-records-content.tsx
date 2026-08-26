@@ -109,7 +109,7 @@ function TeamRecordEventRow({ event }: { event: PublicTeamRecordEvent }) {
              관전자에게는 원정 열에 홈 선수 이름이 뜬 일반 골로만 보였다). */
           <span
             style={{
-              fontSize: 10,
+              fontSize: 'var(--font-size-micro)',
               lineHeight: 1.4,
               padding: '0 4px',
               borderRadius: 4,
@@ -162,7 +162,7 @@ function TeamRecordEventsPanel({
           display: 'grid',
           gridTemplateColumns: '1fr auto 1fr',
           gap: 8,
-          fontSize: 11,
+          fontSize: 'var(--font-size-micro)',
           color: 'var(--text-caption)',
           margin: '10px 0 8px',
         }}
@@ -262,7 +262,7 @@ function TeamRecordRow({
           {/* 정규시간 스코어 그대로 두고, 승부차기는 아래 보조 표기로만 덧붙인다 --
               대회 화면(PenaltyScoreline)과 동일한 "승부차기 N-M" 문구. */}
           {penaltyLabel ? (
-            <span className="tab-num" style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-caption)' }}>
+            <span className="tab-num" style={{ fontSize: 'var(--font-size-micro)', fontWeight: 600, color: 'var(--text-caption)' }}>
               {penaltyLabel}
             </span>
           ) : null}

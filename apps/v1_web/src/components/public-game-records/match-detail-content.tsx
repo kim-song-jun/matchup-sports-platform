@@ -163,7 +163,7 @@ function EventRow({ event }: { event: PublicMatchEvent }) {
              관전자에게는 원정 열에 홈 선수 이름이 뜬 일반 골로만 보였다). */
           <span
             style={{
-              fontSize: 10,
+              fontSize: 'var(--font-size-micro)',
               lineHeight: 1.4,
               padding: '0 4px',
               borderRadius: 4,
@@ -331,7 +331,7 @@ export function MatchDetailContent({ data }: { data: PublicMatchDetail }) {
             </span>
           </div>
           {/* 스코어 아래 보조 표기 — 승부차기가 없으면 렌더 없음. */}
-          <PenaltyScoreline score={data.score} scoreStatus={data.scoreStatus} fontSize={12} />
+          <PenaltyScoreline score={data.score} scoreStatus={data.scoreStatus} fontSize="var(--font-size-caption)" />
           {/* 몰수·중단 표기는 스코어 바로 아래에 둔다 — 점수를 읽은 다음 눈이 가는 자리이자,
               "이 점수가 정상 경기 결과가 아니다"를 점수와 떼어놓지 않는 유일한 위치다. */}
           <MatchOutcomeNotice outcome={data.outcome} />

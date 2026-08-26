@@ -1,8 +1,12 @@
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { NotificationsService } from '../notifications/notifications.service';
 import { WebPushService } from '../notifications/web-push.service';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  INQUIRY_SLACK_NOTIFICATION_TYPE,
+  InquirySlackNotifier,
+} from '../inquiries/inquiry-slack-notifier';
 import { LineupTodoService } from '../team-lineups/lineup-todo.service';
 import {
   LINEUP_REMINDER_SCAN_TYPE,
@@ -16,6 +20,17 @@ import { V1GameOperationsWorkerService } from './v1-game-operations-worker.servi
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(V1GameOperationsWorkerModule);
   const worker = app.get(V1GameOperationsWorkerService);
+  if (process.env.SLACK_INQUIRY_WEBHOOK_URL?.trim()) {
+    const inquirySlack = new InquirySlackNotifier({
+      webhookUrl: process.env.SLACK_INQUIRY_WEBHOOK_URL,
+      frontendUrl: process.env.FRONTEND_URL,
+    });
+    worker.registerHandler(INQUIRY_SLACK_NOTIFICATION_TYPE, inquirySlack.handler);
+  } else {
+    new Logger('InquirySlackNotifier').warn(
+      'SLACK_INQUIRY_WEBHOOK_URL is not configured; inquiry Slack outbox events remain pending',
+    );
+  }
   worker.registerDurableAuditHandler('GAME_OPERATION_FLAG_CHANGED');
   worker.registerDurableAuditHandler('GAME_OPERATION_JOB_REQUEUED');
   // GAME_OPERATION_GATE_MODE_CHANGED (simplified-gate on/off toggle) is

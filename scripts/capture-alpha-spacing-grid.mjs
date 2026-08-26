@@ -43,6 +43,7 @@ const AUDIT = () => {
   // 전부 재귀로 새어 나갔다. 길이를 봐야 하고, 자기 자신 검사가 재귀보다 먼저다.
   const autoSel = { marginTop: [], marginBottom: [], marginLeft: [], marginRight: [] };
   const KEBAB = (k) => k.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase());
+  let importsFollowed = 0;
   const collect = (rules) => {
     for (const r of rules) {
       if (r.selectorText && r.style) {
@@ -50,6 +51,13 @@ const AUDIT = () => {
           const v = r.style.getPropertyValue(KEBAB(k)) || r.style.getPropertyValue('margin');
           if (v && /(^|\s)auto(\s|$)/.test(v)) autoSel[k].push(r.selectorText);
         }
+      }
+      // @import 는 규칙이 아니라 **다른 시트**를 가리킨다 — cssRules 를 갖지 않으므로
+      // 따라가지 않으면 그 시트의 margin:auto 를 통째로 놓친다. 이 앱은 번들러가
+      // @import 를 인라인해서 런타임에 0건이지만(실측), 방어는 두 줄이라 넣어 둔다.
+      if (r.styleSheet) {
+        importsFollowed++;
+        try { collect(r.styleSheet.cssRules); } catch { /* cross-origin import */ }
       }
       if (r.cssRules && r.cssRules.length) collect(r.cssRules);
     }
@@ -92,7 +100,7 @@ const AUDIT = () => {
   }
   const byValue = {};
   for (const o of off) byValue[o.v] = (byValue[o.v] || 0) + 1;
-  return { checked, autoSkipped, autoRuleCount, sheetsRead, sheetsBlocked,
+  return { checked, autoSkipped, autoRuleCount, sheetsRead, sheetsBlocked, importsFollowed,
            offCount: off.length, byValue, sample: off.slice(0, 6) };
 };
 

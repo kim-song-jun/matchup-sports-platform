@@ -61,7 +61,10 @@ import {
   writeIdentityAttestRequestNotifications,
   type IdentityAttestPushPlan,
 } from './identity-attest-notification';
-import { scheduleIdentityLinkExpiry } from '../jobs/identity-link/identity-link-expiry.service';
+import {
+  IDENTITY_LINK_REQUEST_TTL_MS,
+  scheduleIdentityLinkExpiry,
+} from '../jobs/identity-link/identity-link-expiry.service';
 import { WebPushService } from '../notifications/web-push.service';
 import {
   decideTournamentStaffAccess,
@@ -2763,7 +2766,7 @@ export class GamesService {
     const pending = [...requestedByRequestId.values()].filter(
       (event) =>
         !terminalRequestIds.has(event.requestId) &&
-        now - event.effectiveAt.getTime() < 24 * 60 * 60 * 1000 &&
+        now - event.effectiveAt.getTime() < IDENTITY_LINK_REQUEST_TTL_MS &&
         event.userId !== user.id,
     );
     if (pending.length === 0) {
@@ -2836,7 +2839,7 @@ export class GamesService {
         requesterNickname:
           typeof event.userId === 'string' ? (nicknameById.get(event.userId) ?? null) : null,
         requestedAt: event.effectiveAt.toISOString(),
-        expiresAt: new Date(event.effectiveAt.getTime() + 24 * 60 * 60 * 1000).toISOString(),
+        expiresAt: new Date(event.effectiveAt.getTime() + IDENTITY_LINK_REQUEST_TTL_MS).toISOString(),
       })),
     };
   }
@@ -3897,7 +3900,7 @@ export class GamesService {
           orderBy: { eventVersion: 'desc' },
         });
         if (last !== null && last.action === V1IdentityLinkAction.REQUESTED) {
-          const stillPending = Date.now() - last.effectiveAt.getTime() < 24 * 60 * 60 * 1000;
+          const stillPending = Date.now() - last.effectiveAt.getTime() < IDENTITY_LINK_REQUEST_TTL_MS;
           if (stillPending) {
             throw new ConflictException({
               code: 'IDENTITY_LINK_REQUEST_PENDING',
@@ -3952,7 +3955,7 @@ export class GamesService {
           state: 'pending_attestation' as const,
           version: updated.version,
           effectiveAt: created.effectiveAt.toISOString(),
-          expiresAt: new Date(created.effectiveAt.getTime() + 24 * 60 * 60 * 1000).toISOString(),
+          expiresAt: new Date(created.effectiveAt.getTime() + IDENTITY_LINK_REQUEST_TTL_MS).toISOString(),
           replayed: false,
         };
         await this.writeAudit(
@@ -4038,7 +4041,7 @@ export class GamesService {
             message: '이미 처리된 요청이에요.',
           });
         }
-        const expired = Date.now() - requested.effectiveAt.getTime() >= 24 * 60 * 60 * 1000;
+        const expired = Date.now() - requested.effectiveAt.getTime() >= IDENTITY_LINK_REQUEST_TTL_MS;
         if (expired) {
           const expiredEvent = await this.appendIdentityEvent(tx, {
             participantId,

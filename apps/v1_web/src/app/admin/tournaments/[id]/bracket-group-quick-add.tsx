@@ -69,7 +69,7 @@ export function BracketGroupQuickAdd({ existingGroups, createGroup, showToast, o
             type="button"
             onClick={() => submitTemplate(phase)}
             disabled={createGroup.isPending}
-            className="inline-flex items-center justify-center h-[44px] px-4 rounded-xl text-[13px] font-semibold text-[var(--blue700)] bg-[var(--blue50)] border border-[var(--tint-blue-border)] hover:bg-blue-100 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            className="inline-flex items-center justify-center h-[44px] px-4 rounded-xl text-[13px] font-semibold text-[var(--blue700)] bg-[var(--blue50)] border border-[var(--tint-blue-border)] hover:bg-[var(--blue100)] transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
             <Plus size={14} aria-hidden="true" />
             {label}

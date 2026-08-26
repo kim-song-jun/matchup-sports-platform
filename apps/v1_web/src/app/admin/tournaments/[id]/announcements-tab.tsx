@@ -160,7 +160,7 @@ export function AnnouncementsTab({
               type="button"
               onClick={resetAnnouncementForm}
               disabled={isSavingAnnouncement}
-              className="inline-flex items-center min-h-[36px] rounded-lg bg-[var(--card-surface)] px-3 font-medium text-[var(--blue700)] hover:bg-blue-100 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              className="inline-flex items-center min-h-[36px] rounded-lg bg-[var(--card-surface)] px-3 font-medium text-[var(--blue700)] hover:bg-[var(--blue100)] disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
             >
               취소
             </button>
@@ -303,7 +303,7 @@ export function AnnouncementsTab({
                       onClick={() => handlePublish(ann.id)}
                       disabled={publishAnnouncement.isPending}
                       aria-label={`"${ann.title}" 발행`}
-                      className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium text-[var(--blue700)] bg-[var(--blue50)] hover:bg-blue-100 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                      className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--blue100)] transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                     >
                       <Send size={12} aria-hidden="true" />
                       발행

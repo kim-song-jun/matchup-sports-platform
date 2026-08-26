@@ -61,7 +61,7 @@ function TeamStagingPicker({
                   type="button"
                   onClick={() => addStaged(t.id)}
                   disabled={isSubmitting}
-                  className="inline-flex items-center gap-1 h-[44px] px-3 rounded-full text-[13px] font-medium text-[var(--blue700)] bg-[var(--blue50)] border border-[var(--tint-blue-border)] hover:bg-blue-100 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                  className="inline-flex items-center gap-1 h-[44px] px-3 rounded-full text-[13px] font-medium text-[var(--blue700)] bg-[var(--blue50)] border border-[var(--tint-blue-border)] hover:bg-[var(--blue100)] transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                 >
                   <Plus size={12} aria-hidden="true" />
                   {t.label}

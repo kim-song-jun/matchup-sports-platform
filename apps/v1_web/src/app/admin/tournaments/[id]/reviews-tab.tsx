@@ -348,7 +348,7 @@ function ReviewModerationCard({
               type="button"
               onClick={onUnhide}
               disabled={unhidePending}
-              className="w-full h-[44px] rounded-xl text-[13px] font-semibold text-[var(--blue700)] bg-[var(--blue50)] hover:bg-blue-100 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              className="w-full h-[44px] rounded-xl text-[13px] font-semibold text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--blue100)] transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
             >
               {unhidePending ? '처리 중...' : '공개로 전환'}
             </button>

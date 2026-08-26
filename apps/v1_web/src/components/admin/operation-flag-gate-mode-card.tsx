@@ -54,7 +54,7 @@ export function GateModeCard({ gateStatus, isPending, isError, showToast }: Gate
               <span
                 className={[
                   'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[length:var(--font-size-caption)] font-semibold',
-                  enabled ? 'bg-blue-100 text-blue-700' : 'bg-[var(--surface-soft)] text-[var(--text-muted)]',
+                  enabled ? 'bg-[var(--blue50)] text-[var(--blue700)]' : 'bg-[var(--surface-soft)] text-[var(--text-muted)]',
                 ].join(' ')}
               >
                 {enabled ? <ToggleRight size={12} aria-hidden="true" /> : <ToggleLeft size={12} aria-hidden="true" />}

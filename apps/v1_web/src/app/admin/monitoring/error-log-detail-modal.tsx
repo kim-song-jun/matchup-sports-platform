@@ -223,7 +223,7 @@ export function ErrorLogDetailModal({ id, open, onClose }: ErrorLogDetailModalPr
                 <button
                   type="button"
                   onClick={() => void copyToClipboard(fullMarkdown(detail), '전체 내용을')}
-                  className="inline-flex items-center gap-1.5 min-h-[44px] px-3 rounded-lg text-[length:var(--font-size-label)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] hover:bg-blue-100 dark:hover:bg-blue-950/60 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                  className="inline-flex items-center gap-1.5 min-h-[44px] px-3 rounded-lg text-[length:var(--font-size-label)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--blue100)] dark:hover:bg-blue-950/60 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                 >
                   <Copy size={14} aria-hidden="true" />
                   전체 복사

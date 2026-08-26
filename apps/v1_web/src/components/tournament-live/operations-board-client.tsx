@@ -478,7 +478,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                       <td className="px-4 py-3 align-middle">
                         <Link
                           href={`${liveBase}/fixtures/${encodeURIComponent(item.fixtureId)}/operate`}
-                          className="inline-flex items-center min-h-11 px-3 rounded-lg text-[length:var(--font-size-caption)] font-medium whitespace-nowrap text-[var(--blue700)] bg-[var(--blue50)] hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                          className="inline-flex items-center min-h-11 px-3 rounded-lg text-[length:var(--font-size-caption)] font-medium whitespace-nowrap text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--blue100)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                         >
                           운영 콘솔
                         </Link>
@@ -535,7 +535,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                 )}
                 <Link
                   href={`${liveBase}/fixtures/${encodeURIComponent(item.fixtureId)}/operate`}
-                  className="mt-2 inline-flex items-center min-h-11 px-3 rounded-lg text-[length:var(--font-size-caption)] font-medium whitespace-nowrap text-[var(--blue700)] bg-[var(--blue50)] hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                  className="mt-2 inline-flex items-center min-h-11 px-3 rounded-lg text-[length:var(--font-size-caption)] font-medium whitespace-nowrap text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--blue100)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                 >
                   운영 콘솔로 이동
                 </Link>

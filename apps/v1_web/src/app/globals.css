@@ -1426,6 +1426,25 @@ button:disabled {
   position: relative;
 }
 
+/* 시각 크기는 그대로 두고 **터치 영역만** 44px 로 넓힌다.
+ * .tm-btn-icon 은 요소 자체를 44x44 로 만들기 때문에 좁은 줄(검색바 안쪽 등)에
+ * 쓰면 옆 요소를 밀어낸다. 그런 자리에는 이 유틸을 쓴다 — 아이콘은 작게 두고
+ * 손가락이 닿는 영역만 넓히는 방식으로, Apple HIG 와 Material 이 둘 다 권장한다.
+ * ::after 는 버튼의 자식이라 클릭이 버튼으로 전달된다.
+ * 주의: 부모에 overflow:hidden 이 있으면 확장된 영역이 잘리므로 그런 곳에는 쓰지 않는다. */
+.tm-tap-44 {
+  position: relative;
+}
+.tm-tap-44::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100%, 44px);
+  height: max(100%, 44px);
+  transform: translate(-50%, -50%);
+}
+
 .tm-btn-sm {
   min-height: 44px; /* WS11 a11y 터치 타깃 (40→44) */
   padding: 0 16px;
@@ -2773,7 +2792,12 @@ button:disabled {
   color: var(--static-white);
 }
 
-@media (min-width: 720px) {
+/* 앱 셸의 프레임이 실제로 넓어지는 지점은 768px 이다
+ * (desktop/_shell.css 의 @media(min-width:768px) 에서 --v1-app-chrome-frame-width 가 600px 로).
+ * 이 분기가 720px 에 있으면 720~767px 구간에서는 프레임이 아직 좁은데 2열 그리드로
+ * 바뀌어 오른쪽 열이 잘린다 — 로고 프리셋 버튼이 화면 밖으로 나가 누를 수 없다.
+ * 셸과 같은 지점으로 맞춘다. */
+@media (min-width: 768px) {
   .tm-team-logo-picker {
     grid-template-columns: minmax(210px, 1fr) auto;
     align-items: center;

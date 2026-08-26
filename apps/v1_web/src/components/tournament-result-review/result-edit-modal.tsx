@@ -632,7 +632,7 @@ export function ResultEditModal({
                 <legend className="tm-text-caption" style={{ marginBottom: 6 }}>먼저 차는 팀</legend>
                 <div style={{ display: 'flex', gap: 16 }}>
                   {(['HOME', 'AWAY'] as const).map((sideKey) => (
-                    <label key={sideKey} className="tm-text-caption" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <label key={sideKey} className="tm-text-caption" style={{ display: 'flex', gap: 6, alignItems: 'center', minHeight: 44 }}>
                       <input type="radio" name={`${idPrefix}-first-kick`} checked={firstKickSideKey === sideKey} onChange={() => setFirstKickSideKey(sideKey)} />
                       {sideKey === 'HOME' ? '홈' : '원정'}
                     </label>
@@ -816,7 +816,7 @@ export function ResultEditModal({
                     value={participant.cards.red}
                     onValueChange={(red) => updateParticipant(index, { cards: { ...participant.cards, red } })}
                   />
-                  <label className="tm-text-caption" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <label className="tm-text-caption" style={{ display: 'flex', alignItems: 'center', gap: 4, minHeight: 44 }}>
                     <input
                       type="checkbox"
                       checked={participant.started}
@@ -824,7 +824,7 @@ export function ResultEditModal({
                     />
                     선발
                   </label>
-                  <label className="tm-text-caption" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <label className="tm-text-caption" style={{ display: 'flex', alignItems: 'center', gap: 4, minHeight: 44 }}>
                     <input
                       type="checkbox"
                       checked={participant.goalkeeper}

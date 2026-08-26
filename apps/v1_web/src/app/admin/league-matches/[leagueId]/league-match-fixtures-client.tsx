@@ -816,7 +816,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                       type="button"
                       onClick={() => setResultEntryFixture(row)}
                       aria-label={`${row.title} ${row.resultStage === 'official' ? '결과 정정' : '결과 입력'}`}
-                      className="inline-flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-lg bg-[var(--blue50)] px-3 text-sm font-medium text-[var(--blue700)] transition-colors hover:bg-blue-100 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                      className="inline-flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-lg bg-[var(--blue50)] px-3 text-sm font-medium text-[var(--blue700)] transition-colors hover:bg-[var(--blue100)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                     >
                       {row.resultStage === 'official' ? '결과 정정' : '결과 입력'}
                     </button>

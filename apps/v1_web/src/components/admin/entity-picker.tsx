@@ -194,7 +194,7 @@ export function EntityPicker({
           onClick={() => onChange(null)}
           disabled={disabled}
           aria-label="선택 해제"
-          className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-[var(--blue700)] hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50 shrink-0"
+          className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-[var(--blue700)] hover:bg-[var(--blue100)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50 shrink-0"
         >
           <X size={14} aria-hidden="true" />
         </button>

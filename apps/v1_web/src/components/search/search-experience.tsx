@@ -181,7 +181,7 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
     >
     <div className="tm-search-frame" style={{ width: 'min(100%, var(--v1-app-chrome-frame-width))', height: '100%', minHeight: 0, margin: '0 auto', background: 'var(--bg)', fontFamily: 'var(--font)', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
       <form className="tm-search-form-bar" onSubmit={submit} style={{ minHeight: 'var(--v1-shell-topbar-height)', padding: '8px 10px 8px 8px', borderBottom: '1px solid var(--grey100)', display: 'flex', alignItems: 'center', gap: 1, background: 'var(--bg)', flexShrink: 0 }}>
-        <button type="button" aria-label="뒤로가기" onClick={goBack} className="tm-search-back-btn tm-hide-desktop" style={{ width: 30, minWidth: 30, height: 40, border: 0, background: 'transparent', borderRadius: 12, display: 'grid', placeItems: 'center', color: 'var(--text-strong)', padding: 0 }}>
+        <button type="button" aria-label="뒤로가기" onClick={goBack} className="tm-search-back-btn tm-hide-desktop tm-tap-44" style={{ width: 30, minWidth: 30, height: 40, border: 0, background: 'transparent', borderRadius: 12, display: 'grid', placeItems: 'center', color: 'var(--text-strong)', padding: 0 }}>
           <ChevronLeft size={20} />
         </button>
         <div className="tm-search-input-wrap" style={{ flex: 1, minHeight: 44, borderRadius: 14, background: 'var(--grey100)', border: viewState === 'error' ? '1px solid var(--red500)' : query ? '1px solid var(--blue500)' : '1px solid transparent', display: 'flex', alignItems: 'center', gap: 4, padding: '0 8px 0 14px', minWidth: 0 }}>
@@ -195,13 +195,13 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
             autoFocus
           />
           {query ? (
-            <button type="button" aria-label="검색어 지우기" onClick={clear} style={{ width: 30, minWidth: 30, height: 30, border: 0, background: 'transparent', display: 'grid', placeItems: 'center', padding: 0 }}>
+            <button type="button" aria-label="검색어 지우기" onClick={clear} className="tm-tap-44" style={{ width: 30, minWidth: 30, height: 30, border: 0, background: 'transparent', display: 'grid', placeItems: 'center', padding: 0 }}>
               <span style={{ width: 20, height: 20, borderRadius: 999, background: 'var(--grey400)', color: 'var(--static-white)', display: 'grid', placeItems: 'center' }}>
                 <X size={13} />
               </span>
             </button>
           ) : null}
-          <button type="submit" aria-label="검색" style={{ width: 34, minWidth: 34, height: 34, border: 0, background: 'transparent', borderRadius: 11, display: 'grid', placeItems: 'center', color: viewState === 'error' ? 'var(--red500)' : 'var(--blue500)', padding: 0 }}>
+          <button type="submit" aria-label="검색" className="tm-tap-44" style={{ width: 34, minWidth: 34, height: 34, border: 0, background: 'transparent', borderRadius: 11, display: 'grid', placeItems: 'center', color: viewState === 'error' ? 'var(--red500)' : 'var(--blue500)', padding: 0 }}>
             <Search size={19} />
           </button>
         </div>

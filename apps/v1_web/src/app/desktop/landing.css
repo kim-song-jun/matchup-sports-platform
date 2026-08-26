@@ -89,7 +89,7 @@
 }
 
 .tm-landing-section-header .tm-text-heading {
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 /* ── Hero ── */
@@ -117,7 +117,7 @@
   color: var(--grey900);
   line-height: 1.3;
   letter-spacing: -0.5px;
-  margin: 0 0 14px;
+  margin: 0 0 16px;
 }
 
 .tm-landing-hero-sub {
@@ -131,8 +131,8 @@
 .tm-landing-hero-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 14px;
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
 .tm-landing-hero-disclaimer {
@@ -147,7 +147,7 @@
   align-items: center;
   gap: 0;
   margin-top: 36px;
-  padding: 18px 20px;
+  padding: 20px 20px;
   background: var(--bg);
   border: 1px solid var(--grey150);
   border-radius: var(--radius-field);
@@ -196,8 +196,8 @@
 .tm-landing-feature-card {
   display: flex;
   align-items: flex-start;
-  gap: 14px;
-  padding: 18px;
+  gap: 16px;
+  padding: 20px;
   background: var(--bg);
   border: 1px solid var(--grey150);
   border-radius: var(--radius-field);
@@ -216,7 +216,7 @@
 }
 
 .tm-landing-feature-title {
-  margin: 0 0 6px;
+  margin: 0 0 8px;
   color: var(--text-strong);
 }
 
@@ -233,14 +233,14 @@
   padding: 0;
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 12px;
   justify-content: center;
 }
 
 .tm-landing-sport-chip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   padding: 8px 16px;
   background: var(--bg);
   border: 1px solid var(--grey200);
@@ -287,7 +287,7 @@
 }
 
 .tm-landing-step-title {
-  margin: 0 0 6px;
+  margin: 0 0 8px;
   color: var(--text-strong);
 }
 
@@ -312,7 +312,7 @@
   font-weight: 800;
   color: var(--static-white);
   letter-spacing: -0.4px;
-  margin: 0 0 10px;
+  margin: 0 0 12px;
 }
 
 .tm-landing-cta-sub {
@@ -379,12 +379,12 @@
 @media (min-width: 768px) and (max-width: 1023px) {
   .tm-landing-features {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
+    gap: 16px;
   }
 
   .tm-landing-steps {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
+    gap: 16px;
   }
 }
 
@@ -411,7 +411,7 @@
     display: inline-flex;
     align-items: center;
     height: 40px;
-    padding: 0 14px;
+    padding: 0 16px;
     border-radius: var(--radius-chip);
     font-size: 15px;
     font-weight: 500;
@@ -459,7 +459,7 @@
     font-size: 44px;
     letter-spacing: -1px;
     line-height: 1.2;
-    margin-bottom: 18px;
+    margin-bottom: 20px;
   }
 
   .tm-landing-hero-sub {
@@ -510,7 +510,7 @@
   }
 
   .tm-landing-feature-card {
-    padding: 22px;
+    padding: 24px;
   }
 
   /* Steps: 3 col */

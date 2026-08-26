@@ -13,7 +13,7 @@
      상태 배지(모집중/내 매치)는 tm-badge-blue로 별도 적용 — 블루는 상태 전용. */
   background: var(--overlay-white-18);
   color: var(--overlay-white-92);
-  gap: 5px;
+  gap: 4px;
 }
 
 /* dot: 8×8 원형 인디케이터 */
@@ -92,9 +92,9 @@
   .tm-match-desktop-create-btn {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     height: 44px;
-    padding: 0 18px;
+    padding: 0 20px;
     border-radius: var(--radius-control);
     background: var(--blue500);
     color: var(--static-white);
@@ -118,7 +118,7 @@
 
   /* Search bar: full width on desktop with max-width to prevent over-stretch. */
   .tm-list-searchbar {
-    gap: 10px;
+    gap: 12px;
     padding: 0;
     margin-bottom: 16px;
   }
@@ -159,7 +159,7 @@
   .tm-match-card-stack {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
+    gap: 16px;
     margin-top: 16px;
   }
 }
@@ -244,7 +244,7 @@
     justify-content: space-between;
     align-items: center;
     gap: 8px;
-    margin-bottom: 14px;
+    margin-bottom: 16px;
     padding-bottom: 12px;
     border-bottom: 1px solid var(--grey100);
   }
@@ -319,7 +319,7 @@
 
   /* Two-col layout inside match forms. */
   .tm-match-create-shell .tm-create-two-col {
-    gap: 14px;
+    gap: 16px;
   }
 
   /* Progress bars look better with a bit more top padding. */

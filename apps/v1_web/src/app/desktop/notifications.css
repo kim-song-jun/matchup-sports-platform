@@ -39,13 +39,13 @@
 
   /* Section label: more top whitespace before each day group. */
   .tm-notification-section .tm-text-label {
-    margin-bottom: 10px;
+    margin-bottom: 12px;
     margin-top: 4px;
   }
 
   /* Stack: slightly wider gap between cards on desktop. */
   .tm-notification-stack {
-    gap: 10px;
+    gap: 12px;
   }
 
   /* Notification card: hover tint (그림자·lift 대신 content-first solid 규약) */
@@ -99,7 +99,7 @@
   .tm-notifications-desktop-head {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     padding: 28px 0 16px;
     max-width: 720px;
     margin-left: auto;

@@ -50,7 +50,7 @@
   .tm-team-list ~ .tm-list-searchbar,
   .tm-team-list .tm-list-searchbar,
   .tm-list-searchbar {
-    gap: 10px;
+    gap: 12px;
     padding: 0;
     margin-bottom: 4px;
     position: static;
@@ -67,7 +67,7 @@
   .tm-team-summary-bar {
     flex-direction: row;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     padding: 0 12px;
     margin-top: 4px;
   }
@@ -93,9 +93,9 @@
   .tm-team-desktop-create-btn {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     height: 44px;
-    padding: 0 18px;
+    padding: 0 20px;
     border-radius: var(--radius-control);
     background: var(--blue500);
     color: var(--static-white);
@@ -147,7 +147,7 @@
   .tm-team-card-stack {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
+    gap: 16px;
     margin-top: 16px;
   }
 }
@@ -311,14 +311,14 @@
   .tm-team-members-desktop-layout {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
+    gap: 16px;
     margin-top: 12px;
   }
 }
 
 @media (min-width: 1440px) {
   .tm-team-members-desktop-layout {
-    gap: 18px;
+    gap: 20px;
   }
 }
 
@@ -362,7 +362,7 @@
   display: grid;
   grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
   gap: 8px;
-  margin-top: 10px;
+  margin-top: 12px;
 }
 
 .tm-region-select-grid .tm-create-input {
@@ -400,7 +400,7 @@
     overflow-x: visible;
   }
   .tm-team-form-main .tm-create-two-col {
-    gap: 14px;
+    gap: 16px;
   }
 
   /* Right rail: sticky live team-card preview + CTA. */

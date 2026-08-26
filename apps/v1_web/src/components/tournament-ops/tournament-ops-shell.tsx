@@ -151,7 +151,7 @@ function buildNavItems(basePath: string, role: V1TournamentStaffRole): NavItem[]
 }
 
 // 공용 비활성 행 — Drawer/데스크톱 사이드바 둘 다에서 쓴다.
-function NavItemDisabledRow({ item, dense }: { item: NavItem; dense?: boolean }) {
+function NavItemDisabledRow({ item }: { item: NavItem }) {
   return (
     <button
       type="button"
@@ -161,7 +161,7 @@ function NavItemDisabledRow({ item, dense }: { item: NavItem; dense?: boolean })
       className={[
         'flex w-full items-center gap-3 px-4 min-h-[44px] text-sm text-left border-l-2 border-transparent',
         'text-gray-300 dark:text-gray-600 cursor-not-allowed',
-        dense ? 'py-3' : 'py-3',
+        'py-3',
       ].join(' ')}
     >
       <span className="text-gray-300 dark:text-gray-600" aria-hidden="true">{item.icon}</span>
@@ -331,7 +331,7 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverI
         <nav className="flex-1 py-2 overflow-y-auto" aria-label="주 메뉴">
           {navItems.map((item) => {
             const active = isActive(item);
-            if (item.disabled) return <NavItemDisabledRow key={item.href} item={item} dense />;
+            if (item.disabled) return <NavItemDisabledRow key={item.href} item={item} />;
             return (
               <Link
                 key={item.href}

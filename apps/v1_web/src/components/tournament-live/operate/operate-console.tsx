@@ -995,7 +995,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           </div>
           <div className="flex flex-col items-end gap-1 sm:shrink-0">
             {/* UX 감사 item 3 — "경기 종료"는 되돌릴 수 없는데 나머지 명령과
-                6px(gap-2)로 붙어 있어 오탭 위험이 컸다. 되돌릴 수 있는
+                6px 간격으로 붙어 있어 오탭 위험이 컸다. 되돌릴 수 있는
                 명령들과 별도 그룹으로 묶고 구분선을 둬 시각적·물리적으로
                 떼어낸다.
                 R-K5 CTA 위계 재설계 — LIVE + 다음 피리어드가 있는 상태에서는

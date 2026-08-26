@@ -64,7 +64,7 @@ export function RestTimer() {
         aria-live="assertive"
         className="mx-4 flex flex-col items-center gap-2 rounded-xl border-2 border-[var(--tint-orange-border)] bg-[var(--tint-orange)] px-4 py-4 text-center motion-safe:animate-pulse"
       >
-        <p className="flex items-center gap-1.5 text-base font-extrabold text-[var(--orange700)]">
+        <p className="flex items-center gap-2 text-base font-extrabold text-[var(--orange700)]">
           <Timer size={18} aria-hidden="true" />
           휴식 시간이 끝났어요
         </p>
@@ -82,7 +82,7 @@ export function RestTimer() {
     return (
       <section className="mx-4 flex flex-col gap-2 rounded-xl border border-[var(--tint-orange-border)] bg-[var(--tint-orange)] px-4 py-3">
         <div className="flex items-center justify-between">
-          <p className="flex items-center gap-1.5 text-xs font-semibold text-[var(--orange700)]">
+          <p className="flex items-center gap-2 text-xs font-semibold text-[var(--orange700)]">
             <Timer size={14} aria-hidden="true" />
             쉬는 시간
           </p>
@@ -116,8 +116,8 @@ export function RestTimer() {
   }
 
   return (
-    <section className="mx-4 flex flex-col gap-1.5">
-      <p className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text-muted)]">
+    <section className="mx-4 flex flex-col gap-2">
+      <p className="flex items-center gap-2 text-xs font-semibold text-[var(--text-muted)]">
         <Timer size={14} aria-hidden="true" />
         쉬는 시간
       </p>
@@ -130,7 +130,7 @@ export function RestTimer() {
           남겨둔다. sm 이상에서 max-w 로 폭을 막는 건, 안 막으면 6열이 컨테이너를
           그대로 나눠 가져 넓은 화면에서 칩 하나가 200px 가까이 늘어나기 때문이다
           — 내용은 "10분" 세 글자뿐이라 헐거워 보인다. */}
-      <div className="grid grid-cols-6 gap-1.5 sm:max-w-md">
+      <div className="grid grid-cols-6 gap-2 sm:max-w-md">
         {REST_PRESET_MINUTES.map((minutes) => (
           <button
             key={minutes}

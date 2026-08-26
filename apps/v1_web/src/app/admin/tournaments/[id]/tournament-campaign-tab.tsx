@@ -136,7 +136,7 @@ export function TournamentCampaignTab({
 
           {canWrite ? (
             <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={() => setEditorOpen((open) => !open)} className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl bg-[var(--surface-soft)] px-3 text-xs font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--border)]">
+              <button type="button" onClick={() => setEditorOpen((open) => !open)} className="inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-[var(--surface-soft)] px-3 text-xs font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--border)]">
                 <FilePenLine size={15} aria-hidden="true" />
                 캠페인 편집
               </button>
@@ -154,7 +154,7 @@ export function TournamentCampaignTab({
               ))}
             </div>
           ) : (
-            <span className="rounded-full bg-[var(--surface-soft)] px-2.5 py-1 text-xs font-medium text-[var(--text-muted)]">읽기 전용</span>
+            <span className="rounded-full bg-[var(--surface-soft)] px-3 py-1 text-xs font-medium text-[var(--text-muted)]">읽기 전용</span>
           )}
         </div>
       </section>

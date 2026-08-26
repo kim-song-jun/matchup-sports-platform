@@ -47,7 +47,7 @@ export function AdminFilterBar({
   const inputId = useId();
 
   return (
-    <div className="flex flex-col gap-2.5">
+    <div className="flex flex-col gap-3">
       {/* Search row — hideSearch=true인 경우 렌더 생략. "백엔드 q 미지원"이라 적혀
           있었으나 사실이 아니었다(대회 목록도 q 지원) — 숨김 여부는 화면이 결정한다. */}
       {!hideSearch && (
@@ -81,7 +81,7 @@ export function AdminFilterBar({
       {(statusOptions && statusOptions.length > 0) || rightSlot ? (
         <div className="flex items-center gap-2 flex-wrap">
           {statusOptions && statusOptions.length > 0 && onStatusChange && (
-            <div className="flex items-center gap-1.5 flex-wrap" role="group" aria-label={statusGroupLabel}>
+            <div className="flex items-center gap-2 flex-wrap" role="group" aria-label={statusGroupLabel}>
               {statusOptions.map((opt) => {
                 const active = activeStatus === opt.value;
                 return (
@@ -102,7 +102,7 @@ export function AdminFilterBar({
                     <span>{opt.label}</span>
                     <span
                       className={[
-                        'ml-1.5 min-w-[1.25rem] text-center font-semibold tabular-nums',
+                        'ml-2 min-w-[1.25rem] text-center font-semibold tabular-nums',
                         active ? 'text-white/90' : 'text-[var(--text-muted)]',
                       ].join(' ')}
                       aria-hidden="true"

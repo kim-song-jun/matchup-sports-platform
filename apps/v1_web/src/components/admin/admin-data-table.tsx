@@ -159,7 +159,7 @@ export function AdminDataTable<T>({
   // smaller text, no forced tableMaxWidth (the table sizes to its content
   // inside a horizontally scrollable wrapper instead).
   function renderTable(compact: boolean) {
-    const cellPad = compact ? 'px-3 py-2.5' : 'px-4 py-3';
+    const cellPad = compact ? 'px-3 py-3' : 'px-4 py-3';
     // tableMaxWidth는 데스크톱 래퍼(아래 hidden lg:block div)에만 적용한다 —
     // 여기 <table> 자체에 같이 걸면 w-max로 콘텐츠 폭까지 자라야 할 테이블이
     // 그 cap에 눌려 overflow-x-auto 스크롤 대신 다시 컬럼 압축이 재발한다.
@@ -329,7 +329,7 @@ export function AdminDataTable<T>({
                 tone ? ROW_TONE_ACCENT[tone] : '',
               ].filter(Boolean).join(' ')}
             >
-              <dl className="flex flex-col gap-1.5">
+              <dl className="flex flex-col gap-2">
                 {columns.map((col) => (
                   <div key={col.key} className="flex items-start gap-2 text-[13px]">
                     <dt className="shrink-0 text-[var(--text-muted)] w-[90px] font-medium">{col.header}</dt>
@@ -343,7 +343,7 @@ export function AdminDataTable<T>({
               </dl>
               {hasActions && (
                 <div
-                  className="mt-3 flex items-center gap-2 justify-end border-t border-[var(--border)] pt-2.5"
+                  className="mt-3 flex items-center gap-2 justify-end border-t border-[var(--border)] pt-3"
                   onClick={onRowClick ? (event) => event.stopPropagation() : undefined}
                 >
                   {renderActions!(row)}

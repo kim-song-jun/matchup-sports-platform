@@ -71,7 +71,7 @@ function Applications({ teamMatch }: { teamMatch: V1AdminTeamMatchDetail }) {
                   </Link>
                   <p className="mt-1 text-xs font-medium text-[var(--text-muted)]">{formatAdminDateTime(application.createdAt)}</p>
                   {application.message && (
-                    <p className="mt-1.5 whitespace-pre-wrap break-words text-xs text-[var(--text-body)]">{application.message}</p>
+                    <p className="mt-2 whitespace-pre-wrap break-words text-xs text-[var(--text-body)]">{application.message}</p>
                   )}
                 </div>
                 <span className="shrink-0 rounded-full border border-[var(--border)] bg-[var(--card-surface)] px-2 py-1 text-xs font-semibold text-[var(--text-muted)]">

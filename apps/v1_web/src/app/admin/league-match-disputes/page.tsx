@@ -196,7 +196,7 @@ export default function AdminLeagueMatchDisputesPage() {
       />
 
       {isError && rows.length > 0 && (
-        <div className="mt-4 flex flex-col items-center gap-1.5">
+        <div className="mt-4 flex flex-col items-center gap-2">
           <p className="text-[length:var(--font-size-label)] text-red-500" role="alert">
             {extractErrorMessage(error, '목록을 불러오지 못했어요.')}
           </p>

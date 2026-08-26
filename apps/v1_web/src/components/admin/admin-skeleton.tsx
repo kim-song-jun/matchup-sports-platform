@@ -17,7 +17,7 @@ export function AdminListSkeleton({ rows = 5 }: { rows?: number }) {
       {Array.from({ length: rows }).map((_, i) => (
         <div
           key={i}
-          className="flex items-center gap-3 px-5 py-[14px] border-b border-[var(--border)] last:border-0 animate-pulse"
+          className="flex items-center gap-3 px-5 py-3 min-h-[64px] border-b border-[var(--border)] last:border-0 animate-pulse"
         >
           <div className="flex-1 space-y-2">
             <div className="h-4 bg-[var(--surface-soft)] rounded-lg w-3/5" />
@@ -43,7 +43,7 @@ export function AdminTableSkeleton({ rows = 5, cols = 4 }: { rows?: number; cols
       {Array.from({ length: rows }).map((_, i) => (
         <div
           key={i}
-          className="flex gap-4 px-4 py-3.5 border-b border-[var(--border)] last:border-0"
+          className="flex gap-4 px-4 py-4 border-b border-[var(--border)] last:border-0"
         >
           {Array.from({ length: cols }).map((_, j) => (
             <div key={j} className="h-4 bg-[var(--surface-soft)] rounded-lg flex-1" />

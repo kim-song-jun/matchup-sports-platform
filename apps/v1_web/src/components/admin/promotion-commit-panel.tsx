@@ -112,7 +112,7 @@ export function PromotionCommitPanel({ preview, submitting, onCommit }: Promotio
     <div className="space-y-4">
       {preview.warnings.length > 0 && (
         <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-950/30">
-          <p className="flex items-center gap-1.5 text-sm font-bold text-amber-900 dark:text-amber-200">
+          <p className="flex items-center gap-2 text-sm font-bold text-amber-900 dark:text-amber-200">
             <AlertTriangle size={16} aria-hidden="true" />
             확인이 필요해요
           </p>
@@ -186,7 +186,7 @@ export function PromotionCommitPanel({ preview, submitting, onCommit }: Promotio
                       {meta.label}
                     </span>
                     {changed && (
-                      <span className="rounded-md bg-blue-100 px-1.5 py-0.5 text-xs font-semibold text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
+                      <span className="rounded-md bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
                         규칙은 {KIND_META[entry.computedKind].label}
                       </span>
                     )}

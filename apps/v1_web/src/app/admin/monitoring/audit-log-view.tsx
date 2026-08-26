@@ -161,7 +161,7 @@ function LogDetailModal({
 
 function DetailRow({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="flex gap-3 py-1.5">
+    <div className="flex gap-3 py-2">
       <dt className="w-[92px] shrink-0 text-[length:var(--font-size-label)] text-[var(--text-muted)]">{label}</dt>
       <dd className="min-w-0 flex-1 break-all text-[length:var(--font-size-body-sm)] text-[var(--text-strong)]">{value}</dd>
     </div>
@@ -172,7 +172,7 @@ function StateBlock({ label, value }: { label: string; value: unknown }) {
   if (value === null || value === undefined) return null;
   return (
     <section className="mt-4">
-      <h3 className="mb-1.5 text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">{label}</h3>
+      <h3 className="mb-2 text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">{label}</h3>
       <pre className="max-h-[220px] overflow-auto rounded-xl bg-[var(--surface-soft)] p-3 font-mono text-[length:var(--font-size-micro)] leading-relaxed text-[var(--text-body)]">
         {JSON.stringify(value, null, 2)}
       </pre>
@@ -218,7 +218,7 @@ function StatusLogDetailModal({
         <DetailRow
           label="변경"
           value={
-            <span className="flex items-center gap-1.5">
+            <span className="flex items-center gap-2">
               <AdminStatusPill status={log.fromStatus} />
               <span className="text-[var(--text-muted)]" aria-hidden="true">→</span>
               <AdminStatusPill status={log.toStatus} />

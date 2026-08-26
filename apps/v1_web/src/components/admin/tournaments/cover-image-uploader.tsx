@@ -105,7 +105,7 @@ export function CoverImageUploader({
               type="button"
               onClick={onClear}
               disabled={locked}
-              className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold text-[var(--text-caption)] transition-colors hover:bg-[var(--red50)] hover:text-[var(--red500)] disabled:opacity-50"
+              className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold text-[var(--text-caption)] transition-colors hover:bg-[var(--red50)] hover:text-[var(--red700)] disabled:opacity-50"
             >
               <Trash2 size={16} aria-hidden="true" />
               이미지 제거

@@ -111,7 +111,7 @@ export function PromoCardFields({
               title={canResetFacts ? '날짜·장소·상금 문구를 대회 정보로 다시 채워요.' : undefined}
               aria-label="날짜·장소·상금 문구를 대회 정보로 다시 채우기"
               aria-describedby={showResetHint ? resetHintId : undefined}
-              className="inline-flex min-h-[44px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-xs font-semibold text-[var(--text-body)] disabled:opacity-50"
+              className="inline-flex min-h-[44px] shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-xs font-semibold text-[var(--text-body)] disabled:opacity-50"
             >
               <RotateCcw size={14} aria-hidden="true" />
               {/* 좁은 화면에서 라벨 전체를 쓰면 두 줄로 접혀 카드 헤더가 무너진다. */}
@@ -309,7 +309,7 @@ export function PromoCardFields({
                 </button>
               ) : null}
             </div>
-            <p className="mt-1.5 text-xs text-[var(--text-caption)]">
+            <p className="mt-2 text-xs text-[var(--text-caption)]">
               {trimmedDefaultImageUrl
                 ? usingDefaultImage
                   ? '기본 이미지를 쓰고 있어요. 이 카드만 다르게 하려면 업로드해 주세요.'
@@ -340,7 +340,7 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <div className="grid gap-1.5">
+    <div className="grid gap-2">
       <label htmlFor={id} className="text-xs font-semibold text-[var(--text-body)]">
         {label}
       </label>

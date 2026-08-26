@@ -169,7 +169,7 @@ function InboxSection() {
           </div>
 
           {totalTodo === 0 && (
-            <div className="flex items-center gap-2.5 p-4 bg-[var(--green50)] border border-green-100 rounded-xl">
+            <div className="flex items-center gap-3 p-4 bg-[var(--green50)] border border-green-100 rounded-xl">
               <CheckCircle2 size={18} className="text-green-500 shrink-0" aria-hidden="true" />
               <p className="text-[length:var(--font-size-body-sm)] text-[var(--text-strong)]">
                 지금은 처리할 일이 없어요.
@@ -242,7 +242,7 @@ export default function AdminOverviewPage() {
           {opsError && (
             <div
               role="alert"
-              className="mb-3 flex flex-wrap items-center gap-2.5 p-4 bg-[var(--red50)] border border-[var(--tint-red-border)] rounded-xl"
+              className="mb-3 flex flex-wrap items-center gap-3 p-4 bg-[var(--red50)] border border-[var(--tint-red-border)] rounded-xl"
             >
               <AlertTriangle size={18} className="text-[var(--red700)] shrink-0" aria-hidden="true" />
               <p className="flex-1 min-w-[200px] text-[length:var(--font-size-body-sm)] text-[var(--red700)]">
@@ -258,7 +258,7 @@ export default function AdminOverviewPage() {
             </div>
           )}
           {totalWarnings === 0 ? (
-            <div className="flex items-center gap-2.5 p-4 bg-[var(--green50)] border border-green-100 rounded-xl">
+            <div className="flex items-center gap-3 p-4 bg-[var(--green50)] border border-green-100 rounded-xl">
               <CheckCircle2 size={18} className="text-green-500 shrink-0" aria-hidden="true" />
               {/* text-green-700은 dark: 변형이 없는 고정값이라 --green50(dark) 배경 위에서 2.70~3.07:1로 AA 미달.
                   admin-status-pill.tsx와 동일하게 --green700 토큰 부재 시 중립 강조 토큰(--text-strong)으로 대체. */}
@@ -390,7 +390,7 @@ export default function AdminOverviewPage() {
               {overview.recentActions.map((action) => (
                 <li
                   key={action.actionLogId}
-                  className="flex items-center gap-3 px-5 py-3.5 border-b border-[var(--border)] last:border-0"
+                  className="flex items-center gap-3 px-5 py-4 border-b border-[var(--border)] last:border-0"
                 >
                   {/* Status pill for targetType */}
                   <AdminStatusPill status={action.targetType} label={adminTargetTypeLabel(action.targetType)} />

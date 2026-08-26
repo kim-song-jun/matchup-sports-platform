@@ -509,7 +509,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                     {/* 배정 권한이 있으면 여기서 바로 바꾼다 — 권한이 없으면 배정된 필드만 읽기로
                         보여주고, 미배정은 아래 경고 배지가 이미 알려주므로 반복하지 않는다. */}
                     {canAssignField ? (
-                      <div className="mt-1.5">
+                      <div className="mt-2">
                         <FixtureFieldCell
                           tournamentId={tournamentId}
                           item={item}

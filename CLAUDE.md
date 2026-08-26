@@ -578,6 +578,13 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 ### 프론트엔드 품질 기준
 - **Open Redirect 방지**: `/login?redirect=...` 파라미터는 반드시 `sanitizeRedirect()` (`apps/web/src/app/(auth)/login/page.tsx`)를 통과시켜 **상대 경로만** 허용한다. 절대 URL, `javascript:`, `//host/` 형태는 모두 차단하고 `/home`으로 fallback.
 - **접근성 기준**: **WCAG 2.1 AA** 준수 (토스·당근마켓 동급). 컬러 대비 4.5:1, 키보드 접근성, 스크린리더 대응, `prefers-reduced-motion` 필수.
+  - **의도적 예외는 `docs/design/a11y-decisions.md` 에 모아 둔다.** 감사·리뷰·정적 분석이
+    접근성 위반을 지적하면 **먼저 그 문서를 확인**한다 — 거기 근거와 함께 적혀 있으면 그 지적은
+    닫고, 없으면 고칠 대상이다. 현재 등재된 것: solid-fill 버튼 흰 글씨(4색 전부 AA 미달이나
+    2026-08-27 KST 현행 유지 결정) · `disabled:` 저대비(WCAG 1.4.3 자체 예외) · 선수 카드
+    9~11.5px(전용 디자인 언어) · 간격 1~3px 광학 보정.
+  - **새로 "안 고치기로" 결정하면 그 문서에 추가한다.** 커밋 메시지에만 적으면 다음 사람이
+    같은 지적을 다시 하고 같은 논의를 반복한다.
 - **컬러만으로 정보 전달 금지**: 종목·상태·알림 등 의미 있는 구분은 반드시 **컬러 + 아이콘/텍스트/패턴**을 병행. 예: recruiting = 파란 점 + "모집중" 텍스트. 색맹 시뮬레이션 대응.
 - **다크모드**: 모든 `bg-white` → `dark:bg-gray-800`, `text-gray-900` → `dark:text-white`. 라이트/다크 전환 시 4.5:1 대비 유지. 누락은 Critical.
 - **터치 타겟**: 인터랙티브 요소 최소 44x44px (`min-h-[44px]`)

@@ -223,7 +223,7 @@ function GrantModal({ open, onClose, onGrantSuccess }: GrantModalProps) {
         <form onSubmit={handleSubmit} noValidate>
           <div className="px-5 py-5 flex flex-col gap-4">
             {/* User search */}
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               <label htmlFor="grant-user-search" className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">
                 회원 검색
               </label>
@@ -241,7 +241,7 @@ function GrantModal({ open, onClose, onGrantSuccess }: GrantModalProps) {
             </div>
 
             {/* Role selection */}
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               <label htmlFor="grant-role" className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">
                 부여할 역할
               </label>
@@ -262,7 +262,7 @@ function GrantModal({ open, onClose, onGrantSuccess }: GrantModalProps) {
             </div>
 
             {/* Reason */}
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               <label htmlFor="grant-reason" className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">
                 부여 사유{' '}
                 <span className="text-red-500" aria-hidden="true">*</span>
@@ -277,7 +277,7 @@ function GrantModal({ open, onClose, onGrantSuccess }: GrantModalProps) {
                 disabled={grantMutation.isPending}
                 placeholder="부여 사유를 입력해 주세요."
                 className={[
-                  'px-3 py-2.5 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] resize-none',
+                  'px-3 py-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] resize-none',
                   'placeholder:text-[var(--text-muted)]',
                   'focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
                   'transition-colors disabled:opacity-50',
@@ -470,7 +470,7 @@ export default function AdminAdminsPage() {
             type="button"
             onClick={() => setGrantModalOpen(true)}
             className={[
-              'inline-flex items-center justify-center gap-1.5 min-h-[44px] px-5 rounded-xl',
+              'inline-flex items-center justify-center gap-2 min-h-[44px] px-5 rounded-xl',
               'bg-blue-500 hover:bg-blue-600 text-white text-[length:var(--font-size-body-sm)] font-semibold',
               'transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
             ].join(' ')}
@@ -553,7 +553,7 @@ export default function AdminAdminsPage() {
             if (row.adminUserId === myAdminUserId) return null;
 
             return (
-              <div className="flex items-center gap-1.5 w-full">
+              <div className="flex items-center gap-2 w-full">
                 {row.status === 'active' && (
                   <>
                     <button

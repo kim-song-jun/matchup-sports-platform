@@ -169,7 +169,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
         onKeyDown={handleKeyDown}
       >
         {/* 입력 */}
-        <div className="flex items-center gap-2.5 px-4 border-b border-[var(--border)]">
+        <div className="flex items-center gap-3 px-4 border-b border-[var(--border)]">
           <Search size={16} className="text-[var(--text-muted)] shrink-0" aria-hidden="true" />
           <input
             ref={inputRef}
@@ -184,7 +184,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
             aria-controls="command-palette-results"
             aria-activedescendant={items[activeIndex] ? `palette-item-${activeIndex}` : undefined}
           />
-          <kbd className="hidden sm:inline-flex items-center rounded border border-[var(--border)] bg-[var(--surface-soft)] px-1.5 py-0.5 text-[length:var(--font-size-micro)] text-[var(--text-muted)]">
+          <kbd className="hidden sm:inline-flex items-center rounded border border-[var(--border)] bg-[var(--surface-soft)] px-2 py-0.5 text-[length:var(--font-size-micro)] text-[var(--text-muted)]">
             ESC
           </kbd>
         </div>
@@ -207,7 +207,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
             </p>
           )}
           {!isFetching && items.length > 0 && (
-            <ul ref={listRef} id="command-palette-results" role="listbox" aria-label="검색 결과" className="py-1.5">
+            <ul ref={listRef} id="command-palette-results" role="listbox" aria-label="검색 결과" className="py-2">
               {items.map((item, index) => {
                 const showGroupHeader = item.group !== lastGroup;
                 lastGroup = item.group;
@@ -215,7 +215,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
                 return (
                   <li key={item.key}>
                     {showGroupHeader && (
-                      <p className="flex items-center gap-1.5 px-4 pt-2.5 pb-1 text-[length:var(--font-size-micro)] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                      <p className="flex items-center gap-2 px-4 pt-3 pb-1 text-[length:var(--font-size-micro)] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
                         <GroupIcon size={11} aria-hidden="true" />
                         {item.group}
                         {item.group === '매치' && (

@@ -213,7 +213,7 @@ export function PenaltyShootoutPanel({
               승부차기
             </h2>
             {regulationScoreBySideId && sides.length === 2 ? (
-              <p className="mt-0.5 flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+              <p className="mt-0.5 flex items-center gap-2 text-xs text-[var(--text-muted)]">
                 <span>정규 시간</span>
                 <span className="font-bold tabular-nums text-[var(--text-strong)]">
                   {regulationScoreBySideId.get(sides[0].id) ?? 0} : {regulationScoreBySideId.get(sides[1].id) ?? 0}
@@ -298,11 +298,11 @@ export function PenaltyShootoutPanel({
                   <div className="flex items-center justify-between gap-2">
                     <p className="truncate text-sm font-semibold text-[var(--text-strong)]">
                       {side.displayNameSnapshot}
-                      {isTurn ? <span className="ml-1.5 text-xs font-semibold text-[var(--blue700)]">다음 순서</span> : null}
+                      {isTurn ? <span className="ml-2 text-xs font-semibold text-[var(--blue700)]">다음 순서</span> : null}
                     </p>
                     <p className="text-xl font-bold tabular-nums text-[var(--text-strong)]">{score.get(side.id) ?? 0}</p>
                   </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-1.5" aria-label={`${side.displayNameSnapshot} 킥 기록`}>
+                  <div className="mt-2 flex flex-wrap items-center gap-2" aria-label={`${side.displayNameSnapshot} 킥 기록`}>
                     {sideKicks.length === 0 ? (
                       <span className="tm-text-caption text-[var(--text-muted)]">아직 기록된 킥이 없어요</span>
                     ) : (

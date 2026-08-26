@@ -80,12 +80,12 @@ export function ArrivalCheckinPanel({
       </div>
 
       {sections.map(({ side, participants }) => (
-        <div key={side.id} className="flex flex-col gap-1.5">
+        <div key={side.id} className="flex flex-col gap-2">
           <p className="text-xs font-medium text-[var(--text-muted)]">{side.displayNameSnapshot}</p>
           {participants.length === 0 ? (
             <p className="text-xs text-[var(--text-muted)]">제출된 명단이 없어요.</p>
           ) : (
-            <ul className="flex flex-col gap-1.5">
+            <ul className="flex flex-col gap-2">
               {participants.map((participant) => (
                 <ArrivalRow
                   key={participant.id}

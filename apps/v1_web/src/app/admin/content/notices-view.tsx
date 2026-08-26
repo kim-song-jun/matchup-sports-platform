@@ -258,7 +258,7 @@ export function NoticesView() {
                 type="button"
                 onClick={() => startEdit(row)}
                 disabled={!canWrite || isSaving}
-                className="inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--card-surface)] px-3 text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)] hover:border-blue-300 hover:text-[var(--blue700)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                className="inline-flex min-h-[38px] items-center justify-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--card-surface)] px-3 text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)] hover:border-blue-300 hover:text-[var(--blue700)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
               >
                 <Pencil size={14} aria-hidden="true" />
                 수정
@@ -341,7 +341,7 @@ export function NoticesView() {
           </div>
 
           <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
-            <label className="flex flex-col gap-1.5">
+            <label className="flex flex-col gap-2">
               <span className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">제목</span>
               <input
                 value={title}
@@ -354,7 +354,7 @@ export function NoticesView() {
             </label>
 
             <div className="grid grid-cols-2 gap-2">
-              <label className="flex flex-col gap-1.5">
+              <label className="flex flex-col gap-2">
                 <span className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">대상</span>
                 <select
                   value={audience}
@@ -368,7 +368,7 @@ export function NoticesView() {
                 </select>
               </label>
 
-              <label className="flex flex-col gap-1.5">
+              <label className="flex flex-col gap-2">
                 <span className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">상태</span>
                 <select
                   value={createStatus}
@@ -383,7 +383,7 @@ export function NoticesView() {
               </label>
             </div>
 
-            <label className="flex flex-col gap-1.5">
+            <label className="flex flex-col gap-2">
               <span className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">분류</span>
               <select
                 value={category}

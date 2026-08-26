@@ -395,7 +395,7 @@ export function LeagueResultEntryModal({
 
             {/* Score inputs */}
             <div className="flex items-end justify-center gap-3">
-              <div className="flex flex-col items-center gap-1.5">
+              <div className="flex flex-col items-center gap-2">
                 <label
                   htmlFor="league-result-home-score"
                   className="max-w-[96px] truncate text-[13px] font-semibold text-[var(--text-body)]"
@@ -420,7 +420,7 @@ export function LeagueResultEntryModal({
               <span className="pb-3 text-lg font-semibold text-[var(--text-muted)]" aria-hidden="true">
                 :
               </span>
-              <div className="flex flex-col items-center gap-1.5">
+              <div className="flex flex-col items-center gap-2">
                 <label
                   htmlFor="league-result-away-score"
                   className="max-w-[96px] truncate text-[13px] font-semibold text-[var(--text-body)]"
@@ -598,7 +598,7 @@ export function LeagueResultEntryModal({
             )}
 
             {/* Reason textarea */}
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               <label htmlFor="league-result-reason" className="text-[13px] font-semibold text-[var(--text-body)]">
                 사유 <span className="text-[var(--red700)]" aria-hidden="true">*</span>
                 <span className="sr-only">(필수)</span>
@@ -613,7 +613,7 @@ export function LeagueResultEntryModal({
                 disabled={pending}
                 placeholder={mode === 'correction' ? '정정 사유를 입력해 주세요.' : '결과 입력 사유를 입력해 주세요.'}
                 className={[
-                  'px-3 py-2.5 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] resize-none',
+                  'px-3 py-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] resize-none',
                   'placeholder:text-[var(--text-muted)]',
                   'focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
                   'transition-colors disabled:opacity-50',

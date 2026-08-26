@@ -90,14 +90,14 @@ export function LeagueDisputeRejectModal({
 
         <form onSubmit={handleSubmit} noValidate>
           <div className="px-5 py-5 flex flex-col gap-4">
-            <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3.5 py-3">
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3">
               <p className="text-[11px] font-semibold text-[var(--text-muted)]">제기 사유</p>
               <p className="mt-1 text-[13px] text-[var(--text-strong)] whitespace-pre-wrap break-words">{reason}</p>
             </div>
 
             <p className="text-[13px] text-[var(--text-muted)]">이의를 거부해요. 결과는 그대로 유지돼요.</p>
 
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               <label htmlFor="league-dispute-reject-note" className="text-[13px] font-semibold text-[var(--text-body)]">
                 거부 사유 <span className="text-[var(--red700)]" aria-hidden="true">*</span>
                 <span className="sr-only">(필수)</span>
@@ -112,7 +112,7 @@ export function LeagueDisputeRejectModal({
                 disabled={pending}
                 placeholder="거부 사유를 입력해 주세요."
                 className={[
-                  'px-3 py-2.5 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] resize-none',
+                  'px-3 py-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] resize-none',
                   'placeholder:text-[var(--text-muted)]',
                   'focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
                   'transition-colors disabled:opacity-50',

@@ -706,7 +706,7 @@ export function BracketTab({
               const canOperate = f.status === 'scheduled' || f.status === 'in_progress';
               const operateHref = `/admin/live/${encodeURIComponent(tournamentId)}/fixtures/${encodeURIComponent(f.id)}/operate`;
               return (
-                <span className="inline-flex items-center gap-1.5">
+                <span className="inline-flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => {
@@ -900,7 +900,7 @@ export function BracketTab({
         pending={isGeneratingLeague}
       >
         <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             <label htmlFor="league-fixtures-legs" className="text-[13px] text-[var(--text-strong)]">회전 수</label>
             <select
               id="league-fixtures-legs"

@@ -51,7 +51,7 @@ export function LeagueSeriesView() {
                 {row.tierLabels.map((label) => (
                   <span
                     key={label}
-                    className="rounded-md bg-[var(--surface-muted)] px-1.5 py-0.5 text-2xs font-semibold text-[var(--text-strong)]"
+                    className="rounded-md bg-[var(--surface-muted)] px-2 py-0.5 text-2xs font-semibold text-[var(--text-strong)]"
                   >
                     {label}
                   </span>

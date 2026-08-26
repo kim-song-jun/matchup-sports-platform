@@ -223,7 +223,7 @@ export function ErrorLogDetailModal({ id, open, onClose }: ErrorLogDetailModalPr
                 <button
                   type="button"
                   onClick={() => void copyToClipboard(fullMarkdown(detail), '전체 내용을')}
-                  className="inline-flex items-center gap-1.5 min-h-[44px] px-3 rounded-lg text-[length:var(--font-size-label)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--blue100)] dark:hover:bg-blue-950/60 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                  className="inline-flex items-center gap-2 min-h-[44px] px-3 rounded-lg text-[length:var(--font-size-label)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--blue100)] dark:hover:bg-blue-950/60 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                 >
                   <Copy size={14} aria-hidden="true" />
                   전체 복사
@@ -339,7 +339,7 @@ function Section({
           type="button"
           onClick={onCopy}
           aria-label={`${title} 복사`}
-          className="inline-flex items-center gap-1 min-h-[36px] px-2.5 rounded-md text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--blue700)] hover:bg-[var(--blue50)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+          className="inline-flex items-center gap-1 min-h-[36px] px-3 rounded-md text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--blue700)] hover:bg-[var(--blue50)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
         >
           <Copy size={12} aria-hidden="true" />
           복사

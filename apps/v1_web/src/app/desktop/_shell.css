@@ -354,6 +354,20 @@
     color: var(--grey700);
     text-decoration: none;
     transition: background-color 0.12s, color 0.12s;
+    /* [a11y] 36x36 은 44px 기준 미달. 원 크기를 키우면 데스크탑 헤더의 시각
+     * 균형이 바뀌므로 히트 영역만 넓힌다. 왼쪽 이웃과는 margin-left 8px 중
+     * 4px 이 남아 겹치지 않는다. */
+    position: relative;
+  }
+
+  .tm-desktop-nav-avatar::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    transform: translate(-50%, -50%);
   }
 
   .tm-desktop-nav-avatar:hover {
@@ -603,6 +617,19 @@
     color: var(--grey700);
     flex-shrink: 0;
     text-decoration: none;
+    /* [a11y] 40x40 → 히트 영역만 44px. 부모 gap 이 12px 이라 확장분 2px 씩은
+     * 이웃과 겹치지 않는다(8px 여유). */
+    position: relative;
+  }
+
+  .tm-desktop-page-head .tm-desktop-back::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    transform: translate(-50%, -50%);
   }
   .tm-desktop-page-head .tm-desktop-back:hover {
     background: var(--grey100);

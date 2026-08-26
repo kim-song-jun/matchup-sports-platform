@@ -87,7 +87,7 @@ export function FixtureVideoAddForm({
 
   return (
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-2 pt-1">
-      <div className="flex gap-1.5" role="group" aria-label="영상 등록 방식">
+      <div className="flex gap-2" role="group" aria-label="영상 등록 방식">
         {(['link', 'file'] as const).map((value) => {
           const active = mode === value;
           return (
@@ -100,7 +100,7 @@ export function FixtureVideoAddForm({
                 setLocalError(null);
               }}
               className={[
-                'inline-flex items-center gap-1.5 h-[44px] px-3 rounded-xl text-sm font-semibold transition-colors',
+                'inline-flex items-center gap-2 h-[44px] px-3 rounded-xl text-sm font-semibold transition-colors',
                 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                 active
                   ? 'bg-blue-500 text-white'

@@ -121,7 +121,7 @@ export function AbnormalEndDialog({ open, onCancel, onConfirm, submitting = fals
         <h2 id={titleId} className="text-base font-bold">
           몰수·중단으로 종료
         </h2>
-        <p className="mt-1.5 text-sm text-[var(--text-muted)]">
+        <p className="mt-2 text-sm text-[var(--text-muted)]">
           점수는 지금 기록된 값 그대로 확정돼요. 사유는 공개 경기 기록에 함께 남아, 나중에 이 결과가 왜
           이런지 설명하는 유일한 근거가 돼요.
         </p>
@@ -167,7 +167,7 @@ export function AbnormalEndDialog({ open, onCancel, onConfirm, submitting = fals
             onChange={(event) => setNote(event.target.value)}
             rows={3}
             placeholder="예) 원정팀이 킥오프 15분 경과까지 미출석"
-            className="mt-1.5 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] p-2.5 text-sm"
+            className="mt-2 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 text-sm"
           />
           {/* 왜 못 누르는지 말해 준다 — 비활성 버튼만 두면 운영자가 현장에서 이유를 못 찾는다. */}
           {trimmed.length === 0 ? (

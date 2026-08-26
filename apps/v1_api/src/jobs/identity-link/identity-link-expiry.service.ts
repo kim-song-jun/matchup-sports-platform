@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { Logger } from '@nestjs/common';
 import { Prisma, V1IdentityActorType, V1IdentityLinkAction } from '@prisma/client';
 import { notificationCopyFor } from '../../notifications/notifications.service';
 import type { WebPushService } from '../../notifications/web-push.service';
@@ -42,6 +43,8 @@ export async function scheduleIdentityLinkExpiry(
 type ExpiryPayload = { gameId: string; participantId: string; requestId: string };
 
 export class IdentityLinkExpiryService {
+  private readonly logger = new Logger(IdentityLinkExpiryService.name);
+
   constructor(private readonly webPush?: WebPushService) {}
 
   readonly handler: GameOperationHandler = async (claim, tx) => {
@@ -160,8 +163,12 @@ export class IdentityLinkExpiryService {
     if (existing !== null) return;
     void this.webPush
       ?.sendToUser(input.requesterUserId, { title: copy.title, body, url: copy.deepLink ?? undefined })
-      .catch(() => {
-        // best-effort — 이미 커밋된 인앱 알림은 그대로 남는다.
+      .catch((error: unknown) => {
+        // best-effort — 이미 커밋된 인앱 알림은 그대로 남는다. 다만 조용히 삼키면
+        // 이 잡이 계속 푸시를 못 보내도 운영에서 알 수 없어 로그는 남긴다(Copilot 리뷰).
+        this.logger.warn(
+          `web push failed for identity link expiry (request=${input.requestId}): ${String(error)}`,
+        );
       });
   }
 

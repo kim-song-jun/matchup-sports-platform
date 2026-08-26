@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   HttpException,
   Injectable,
+  Logger,
   NotFoundException,
   Optional,
   UnprocessableEntityException,
@@ -747,6 +748,9 @@ export class GamesService {
     // 푸시가 no-op 이면 된다. 실제 앱에서는 GamesModule 이 import 한 WebPushModule 에서 주입된다.
     @Optional() private readonly webPush?: WebPushService,
   ) {}
+
+  /** 푸시 발송 실패 기록용. 이 클래스에는 주입 로거가 없어 지역 인스턴스를 쓴다. */
+  private readonly pushLogger = new Logger(`${GamesService.name}:push`);
 
   async createFromSourceInTransaction(
     tx: Prisma.TransactionClient,
@@ -3975,8 +3979,12 @@ export class GamesService {
             body: plan.body,
             url: plan.url ?? undefined,
           })
-          .catch(() => {
-            // best-effort
+          .catch((error: unknown) => {
+            // best-effort 이지만 조용히 삼키지는 않는다 — 구독 조회·발송이 계속 실패해도
+            // 아무 흔적이 없으면 운영에서 알아챌 방법이 없다(Copilot 리뷰).
+            this.pushLogger.warn(
+              `web push failed for identity attest request (game=${gameId}, recipient=${recipientUserId}): ${String(error)}`,
+            );
           });
       }
     }

@@ -198,16 +198,21 @@ function checkRadiusLiteral() {
   eachCssFile((f, txt) => {
     for (const m of txt.matchAll(/border-radius\s*:\s*([^;{}]+)/g)) {
       const value = m[1].trim();
-      // 간격 검사와 같은 방식으로 값 전체를 훑는다. 공백으로 쪼개면
-      //   var(--x, 12px) 의 fallback · calc(... + 2px) 의 인자
-      // 가 빠져나가 게이트가 우회된다.
-      // 단위는 px/% 로 좁히지 않는다 — 좁히면 1rem 으로 바꾸는 것만으로 우회된다.
-      for (const lit of value.matchAll(/(-?[\d.]+)(px|%|r?em|v[hwbi]|min|max|pt|pc|cm|mm|in|q|ch|ex)\b/gi)) {
+      // 단위를 열거하지 않는다. 열거하면 목록에 없는 단위(vmin/vmax, 신규
+      // viewport 단위 dvh·svw·lvh, lh/cap/ic …)로 바꾸는 것만으로 우회되고,
+      // CSS 에 단위가 추가될 때마다 게이트가 뒤처진다.
+      //
+      // 대신 반대로 본다: 이 속성에 허용된 것은 토큰 참조와 0 / 100% 뿐이므로,
+      // **토큰 참조를 걷어낸 뒤 숫자가 남아 있으면 리터럴**이다.
+      // var( 와 토큰 이름만 지우고 닫는 괄호 안쪽은 남기는 게 핵심 — 그래야
+      // var(--x, 12px) 의 fallback 이 계속 검사 대상으로 남는다.
+      const stripped = value.replace(/var\(\s*--[\w-]+/g, ' ');
+      for (const lit of stripped.matchAll(/(-?[\d.]+)\s*([a-z%]*)/gi)) {
         const n = parseFloat(lit[1]);
         if (n === 0) continue; // 0 / 0px / 0% — 모서리 없음
         if (lit[2] === '%' && n === 100) continue; // 100% — 컨테이너 전체를 덮는 곡률
         violations.push(
-          `[radius 리터럴] ${f}: border-radius: ${value} — ${lit[0]} 대신 tokens.css 의 ` +
+          `[radius 리터럴] ${f}: border-radius: ${value} — ${lit[1]}${lit[2]} 대신 tokens.css 의 ` +
             `var(--radius-*) 를 쓸 것 (tight/chip/control/field/container/hero/pill/circle)`,
         );
       }

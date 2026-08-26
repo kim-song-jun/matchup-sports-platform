@@ -34,21 +34,38 @@ const AUDIT = () => {
   const PROPS = ['paddingTop', 'paddingBottom', 'paddingLeft', 'paddingRight',
     'marginTop', 'marginBottom', 'marginLeft', 'marginRight', 'rowGap', 'columnGap'];
   // margin:auto 가 남긴 여백은 저자가 고른 값이 아니라 **브라우저가 남은 공간을
-  // 나눈 결과**라 격자로 잴 대상이 아니다. 그런데 그걸 자동으로 알아낼 방법이 없다:
-  //   · computed 는 auto 를 이미 픽셀로 바꿔 준다(getPropertyValue 도 '9px' 를 준다)
-  //   · CSSOM 으로 선언값을 읽으려 했지만 이 앱에서는 규칙이 0개로 나온다
-  //     (실측: styleSheets 2개 모두 접근 가능한데 순회 결과 CSSStyleRule 0개 —
-  //      Tailwind v4 의 @layer 구조 때문으로 보인다)
-  // 그래서 auto 를 쓰는 셀렉터를 여기 적는다. 늘어나면 추가하되, **추가 전에
-  // 반드시 소스에서 auto 인지 확인한다** — 격자 이탈을 예외로 덮는 통로가 되면 안 된다.
-  const AUTO_MARGIN = [
-    ['.tm-tournament-promo-card-footer', 'marginTop'],   // desktop/tournaments.css:1325 margin-top: auto
-    ['.tm-desktop-footer-links', 'marginLeft'],          // desktop/_shell.css:447   margin-left: auto
-  ];
-  const isAuto = (el, p) => AUTO_MARGIN.some(([sel, prop]) => {
-    if (prop !== p) return false;
-    try { return el.matches(sel); } catch { return false; }
-  });
+  // 나눈 결과**라 격자로 잴 대상이 아니다. computed 는 auto 를 이미 픽셀로 바꿔
+  // 주므로(getPropertyValue 도 '9px' 를 준다) 선언값은 CSSOM 에서 읽어야 한다.
+  //
+  // 처음에 CSSOM 순회가 규칙 0개를 돌려줘 allowlist 로 우회했었는데, 원인은
+  // **CSSStyleRule 도 cssRules(빈 리스트)를 갖는다**는 것이었다 — CSS Nesting 이
+  // 표준화되면서 생긴 성질이라 `if (r.cssRules)` 가 truthy 로 잡혀 971개 규칙이
+  // 전부 재귀로 새어 나갔다. 길이를 봐야 하고, 자기 자신 검사가 재귀보다 먼저다.
+  const autoSel = { marginTop: [], marginBottom: [], marginLeft: [], marginRight: [] };
+  const KEBAB = (k) => k.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase());
+  const collect = (rules) => {
+    for (const r of rules) {
+      if (r.selectorText && r.style) {
+        for (const k of Object.keys(autoSel)) {
+          const v = r.style.getPropertyValue(KEBAB(k)) || r.style.getPropertyValue('margin');
+          if (v && /(^|\s)auto(\s|$)/.test(v)) autoSel[k].push(r.selectorText);
+        }
+      }
+      if (r.cssRules && r.cssRules.length) collect(r.cssRules);
+    }
+  };
+  let sheetsRead = 0, sheetsBlocked = 0;
+  for (const sheet of document.styleSheets) {
+    try { collect(sheet.cssRules); sheetsRead++; }
+    catch { sheetsBlocked++; }   // cross-origin 시트는 읽을 수 없다
+  }
+  const autoRuleCount = Object.values(autoSel).reduce((a, l) => a + l.length, 0);
+  const isAuto = (el, p) => {
+    const list = autoSel[p];
+    if (!list) return false;
+    for (const sel of list) { try { if (el.matches(sel)) return true; } catch { /* 미지원 셀렉터 */ } }
+    return /(^|\s)auto(\s|$)/.test(el.style[p] || el.style.margin || '');
+  };
   let checked = 0, autoSkipped = 0;
   const off = [];
   for (const el of document.querySelectorAll('body *')) {
@@ -75,7 +92,8 @@ const AUDIT = () => {
   }
   const byValue = {};
   for (const o of off) byValue[o.v] = (byValue[o.v] || 0) + 1;
-  return { checked, autoSkipped, offCount: off.length, byValue, sample: off.slice(0, 6) };
+  return { checked, autoSkipped, autoRuleCount, sheetsRead, sheetsBlocked,
+           offCount: off.length, byValue, sample: off.slice(0, 6) };
 };
 
 const results = [];
@@ -121,12 +139,15 @@ for (const [pname, path] of PAGES) {
     // 캡처가 403/500 이나 엉뚱한 라우트를 찍고 통과로 읽히는 사고를 막는다
     const ok = status === 200 && sameRoute;
     const settled = settle.skeleton === 0;
-    results.push({ pname, wname, width, status, landedOn, sameRoute, ...audit, ...settle, settled, file, ok });
+    // 시트를 하나도 못 읽었으면 auto 판별이 무력화된 상태다 — 그 측정은 못 믿는다.
+    const cssomOk = audit.sheetsRead > 0;
+    results.push({ pname, wname, width, status, landedOn, sameRoute, ...audit, ...settle, settled, cssomOk, file, ok });
     console.log(
       `${ok ? '  ' : '★ '}${pname.padEnd(15)} ${String(width).padStart(4)}px  HTTP ${status}` +
       (sameRoute ? '  ' : ` → ${landedOn} ⚠️  `) +
       `여백 ${String(audit.checked).padStart(4)}개 중 격자 이탈 ${audit.offCount}` +
-      `  (렌더 ${settle.waited}ms·노드 ${settle.nodes}` +
+      `  (렌더 ${settle.waited}ms·노드 ${settle.nodes}·auto규칙 ${audit.autoRuleCount}` +
+      (cssomOk ? '' : '·CSSOM 차단 ⚠️') +
       (settled ? ')' : `·스켈레톤 ${settle.skeleton} 남음 ⚠️)`) +
       (audit.offCount ? `  ${JSON.stringify(audit.byValue)}` : ''),
     );
@@ -140,7 +161,7 @@ for (const [pname, path] of PAGES) {
 await browser.close();
 
 // 스켈레톤이 남은 채 잰 측정은 신뢰할 수 없다 — 통과로 읽히면 안 된다
-const unsettled = results.filter((r) => !r.settled);
+const unsettled = results.filter((r) => !r.settled || !r.cssomOk);
 const bad = results.filter((r) => !r.ok);
 const totalOff = results.reduce((a, r) => a + r.offCount, 0);
 const totalChecked = results.reduce((a, r) => a + r.checked, 0);

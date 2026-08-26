@@ -3,7 +3,7 @@ import { Logger } from '@nestjs/common';
 import { Prisma, V1IdentityActorType, V1IdentityLinkAction } from '@prisma/client';
 import { notificationCopyFor } from '../../notifications/notifications.service';
 import type { WebPushService } from '../../notifications/web-push.service';
-import type { GameOperationHandler } from '../v1-game-operations-worker.service';
+import type { GameOperationClaim, GameOperationHandler } from '../v1-game-operations-worker.service';
 
 export const IDENTITY_LINK_EXPIRY_TYPE = 'IDENTITY_LINK_EXPIRY';
 
@@ -94,12 +94,18 @@ export class IdentityLinkExpiryService {
     // (lazy expiry 경로와 동일).
     await tx.v1Game.update({ where: { id: gameId }, data: { version: { increment: 1 } } });
 
-    await this.notifyRequester(tx, { gameId, participantId, requestId, requesterUserId: requested.userId });
+    await this.notifyRequester(tx, claim, {
+      gameId,
+      participantId,
+      requestId,
+      requesterUserId: requested.userId,
+    });
   };
 
   /** 신청자에게 "만료됐어요"를 1회 통보한다. 수신 거부(선호도)는 존중한다. */
   private async notifyRequester(
     tx: Prisma.TransactionClient,
+    claim: GameOperationClaim,
     input: { gameId: string; participantId: string; requestId: string; requesterUserId: string },
   ): Promise<void> {
     const game = await tx.v1Game.findUnique({
@@ -161,6 +167,23 @@ export class IdentityLinkExpiryService {
     });
     // 잡이 재시도돼도 푸시는 한 번만 — 이미 알림 row 가 있었으면 보내지 않는다.
     if (existing !== null) return;
+    // 이 핸들러는 트랜잭션 **안에서** 돈다 — 여기서 바로 보내면 트랜잭션이 뒤집혔을 때
+    // "만료되지 않은 요청"의 만료 알림이 나간다(Copilot 리뷰). 커밋 확정 뒤 실행되도록
+    // 워커의 afterCommit 에 담는다. 훅이 없는 경로(핸들러를 직접 부르는 유닛 스펙)에서는
+    // 즉시 실행으로 폴백한다.
+    const send = () => this.sendExpiryPush(input, copy, body);
+    if (claim.afterCommit === undefined) {
+      send();
+      return;
+    }
+    claim.afterCommit.push(send);
+  }
+
+  private sendExpiryPush(
+    input: { requesterUserId: string; requestId: string },
+    copy: { title: string; deepLink: string | null },
+    body: string,
+  ): void {
     void this.webPush
       ?.sendToUser(input.requesterUserId, { title: copy.title, body, url: copy.deepLink ?? undefined })
       .catch((error: unknown) => {

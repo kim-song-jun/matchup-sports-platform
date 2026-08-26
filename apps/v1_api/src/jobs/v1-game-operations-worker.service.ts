@@ -36,6 +36,15 @@ export type GameOperationClaim = {
   version: number;
   leaseOwner: string;
   leaseUntil: Date;
+  /**
+   * 커밋 뒤에 실행할 부수효과를 담는 자리 (2026-08-26). 핸들러는 트랜잭션 **안에서**
+   * 돌기 때문에, 롤백할 수 없는 외부 발송(웹 푸시 등)을 거기서 바로 하면 트랜잭션이
+   * 뒤집혔을 때 "일어나지 않은 일"의 알림이 나간다. 여기 담아 두면 워커가 커밋 성공
+   * 직후에만 실행한다. 워커가 매 클레임마다 빈 배열로 채우므로 핸들러는 그냥 push 하면
+   * 된다(직접 클레임을 만들어 핸들러를 부르는 유닛 스펙에서는 없을 수 있다 —
+   * 그 경우 호출부가 즉시 실행으로 폴백한다).
+   */
+  afterCommit?: Array<() => void>;
 };
 
 export type GameOperationHandler = (
@@ -406,6 +415,8 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
     heartbeatTimer.unref();
 
     const work = async () => {
+      // 커밋 뒤 부수효과 수집함 — 핸들러가 여기에 담고, 아래에서 커밋이 확정된 뒤에만 실행한다.
+      claim.afterCommit = [];
       try {
         await this.prisma.$transaction(async (tx) => {
           const locked = await this.lockClaim(tx, claim);
@@ -423,6 +434,17 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
         });
         claim.version += 1;
         this.completionCount += 1;
+        // 커밋이 확정된 뒤에만 외부 발송을 한다. 롤백된 트랜잭션의 알림이 나가는 것을
+        // 막는 유일한 지점이라, 실패해도 잡 결과에는 영향을 주지 않는다.
+        for (const effect of claim.afterCommit ?? []) {
+          try {
+            effect();
+          } catch (effectError: unknown) {
+            this.logger.warn(
+              `after-commit effect failed for outbox job ${claim.id}: ${this.boundedError(effectError)}`,
+            );
+          }
+        }
       } catch (error: unknown) {
         await this.fail(claim, error);
       } finally {

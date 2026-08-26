@@ -115,6 +115,25 @@ describe('IdentityLinkExpiryService', () => {
     expect(tx.v1ParticipantIdentityLinkEvent.create).not.toHaveBeenCalled();
   });
 
+  it('워커가 afterCommit 훅을 주면 푸시를 트랜잭션 안에서 보내지 않고 커밋 뒤로 미룬다', async () => {
+    const tx = makeTx({ events: [requestedEvent] });
+    const push = { sendToUser: jest.fn().mockResolvedValue({}) };
+    const claimWithHook = {
+      payload: { gameId: 'game-1', participantId: 'p-1', requestId: 'req-1' },
+      afterCommit: [] as Array<() => void>,
+    };
+
+    await new IdentityLinkExpiryService(push as never).handler(claimWithHook as never, tx as never);
+
+    // 핸들러가 끝난 시점(=아직 커밋 전)에는 발송되지 않아야 한다 — 트랜잭션이 뒤집히면
+    // "만료되지 않은 요청"의 만료 알림이 나가기 때문이다.
+    expect(push.sendToUser).not.toHaveBeenCalled();
+    expect(claimWithHook.afterCommit).toHaveLength(1);
+
+    claimWithHook.afterCommit[0]();
+    expect(push.sendToUser).toHaveBeenCalledWith('requester', expect.objectContaining({ title: '기록 연결 요청이 만료됐어요' }));
+  });
+
   it('재시도로 알림이 이미 있으면 푸시를 다시 보내지 않는다', async () => {
     const tx = makeTx({ events: [requestedEvent], existingNotification: { id: 'n-1' } });
     const push = { sendToUser: jest.fn().mockResolvedValue({}) };

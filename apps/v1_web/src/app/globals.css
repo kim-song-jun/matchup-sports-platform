@@ -221,6 +221,28 @@
    * 버튼 hover 전용 component 토큰으로 별도 관리한다. */
   --button-fill-warning:        var(--orange500);
   --button-fill-warning-hover:  var(--orange600);
+  /* [결정 · 2026-08-27 사용자 확정] solid-fill 버튼의 흰 글씨는 **현행 유지**한다.
+   * 접근성 감사에서 네 색 모두 WCAG AA(4.5:1) 미달로 나왔다:
+   *   primary(--blue500) 3.71:1 · danger(--red500) 3.71:1
+   *   success(--green500) 2.77:1 · warning(--orange500) 2.16:1
+   * 그런데도 바꾸지 않기로 한 이유: 3.71:1 은 정상 시력·실내 조명에서 문제없이
+   * 읽히고, 파란 버튼에 흰 글씨는 보편적 CTA 관습이다. 지금 고치면 175곳이
+   * 영향을 받는데 급하지 않다는 판단이다.
+   *
+   * **다시 꺼내야 하는 때**: 웹 접근성 품질인증(WA) 을 추진하면 4.5:1 은 심사
+   * 항목이라 그때는 선택이 아니다. 그리고 warning(2.16:1) 은 다른 셋과 급이
+   * 다르다 — 정상 시력에서도 흰 글씨가 주황 배경에 녹아 윤곽이 뭉개진다.
+   * 부분적으로라도 손댄다면 warning·success 부터다.
+   *
+   * **그때의 선택지**(검토 완료, 수치는 실측):
+   *   A 글씨만 --grey900 으로  → warning 7.65 · success 5.98 은 통과하지만
+   *     primary/danger 가 4.46:1 로 **기준을 못 넘는다**. 단독으로는 답이 아니다.
+   *   B 배경을 진하게(흰 글씨 유지) → 넷 다 4.79~5.46:1 통과. 대신 주황이
+   *     원색의 65%(#a56300)가 되어 거의 갈색이다.
+   *   C 색 성질대로 나눠서 → 밝은 색(warning/success)은 --grey900 글씨로 원색을
+   *     지키고, 진한 색(primary/danger)만 배경을 20% 어둡게. 넷 다 5.42~7.65:1
+   *     로 여유가 가장 크다. 검토 시점의 추천안이었다.
+   * 근거 문서: docs/design/a11y-decisions.md */
   --button-text-primary:        var(--static-white);
   --button-text-neutral:        var(--text-strong);
   /* Card

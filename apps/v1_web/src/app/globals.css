@@ -526,7 +526,7 @@ button:disabled {
 }
 
 .tm-topbar-title .tm-btn-icon {
-  margin-left: -10px;
+  margin-left: -12px;
   margin-right: 2px;
 }
 
@@ -556,7 +556,7 @@ button:disabled {
   border-top: 1px solid var(--grey100);
   background: rgba(255, 255, 255, 0.94);
   backdrop-filter: blur(18px);
-  padding: 6px 0 calc(16px + var(--v1-shell-safe-bottom));
+  padding: 8px 0 calc(16px + var(--v1-shell-safe-bottom));
   display: grid;
   /* D5 — shell.tsx의 BottomNav가 tabs.length로 인라인 style을 얹어 실제 열 수를
      결정한다(탭 6개 = repeat(6, 1fr)). 여기 5는 JS가 실패했을 때만 쓰이는 fallback값이라
@@ -2328,7 +2328,7 @@ button:disabled {
 }
 
 .tm-match-list {
-  padding: 14px var(--v1-shell-page-x) 108px;
+  padding: 16px var(--v1-shell-page-x) 108px;
 }
 
 .tm-sport-chip-row {
@@ -2534,7 +2534,7 @@ button:disabled {
   width: min(100%, var(--v1-app-chrome-frame-width));
   transform: translateX(-50%);
   z-index: var(--z-cta);
-  padding: 14px var(--v1-shell-page-x) calc(var(--v1-shell-cta-bottom-pad) + var(--v1-shell-safe-bottom));
+  padding: 16px var(--v1-shell-page-x) calc(var(--v1-shell-cta-bottom-pad) + var(--v1-shell-safe-bottom));
   border-top: 1px solid var(--grey100);
   background: var(--bg);
 }
@@ -2570,7 +2570,7 @@ button:disabled {
   right: 0;
   bottom: 0;
   width: 100%;
-  padding: 10px var(--v1-shell-page-x) calc(20px + var(--v1-shell-safe-bottom));
+  padding: 12px var(--v1-shell-page-x) calc(20px + var(--v1-shell-safe-bottom));
   border-top: 1px solid var(--grey100);
   border-radius: var(--radius-hero) var(--radius-hero) 0 0;
   background: var(--bg);
@@ -3004,7 +3004,7 @@ button:disabled {
 }
 
 .tm-team-list {
-  padding: 14px var(--v1-shell-page-x) 104px;
+  padding: 16px var(--v1-shell-page-x) 104px;
 }
 
 .tm-team-searchbar {
@@ -3762,7 +3762,7 @@ button:disabled {
   flex: 0 0 auto;
   z-index: var(--z-inputbar);
   width: 100%;
-  padding: 12px var(--v1-shell-page-x) calc(22px + var(--v1-shell-safe-bottom));
+  padding: 12px var(--v1-shell-page-x) calc(24px + var(--v1-shell-safe-bottom));
   border-top: 1px solid var(--grey100);
   background: var(--bg);
   display: flex;
@@ -3908,7 +3908,7 @@ button:disabled {
 
 .tm-notification-sheet {
   width: min(100%, var(--v1-app-chrome-frame-width));
-  padding: 10px var(--v1-shell-page-x) calc(20px + var(--v1-shell-safe-bottom));
+  padding: 12px var(--v1-shell-page-x) calc(20px + var(--v1-shell-safe-bottom));
   border-radius: var(--radius-hero) var(--radius-hero) 0 0;
   background: var(--bg);
   box-shadow: 0 -16px 32px rgba(25, 31, 40, 0.14);
@@ -4152,7 +4152,7 @@ button:disabled {
 
 .v1-main {
   min-height: 100vh;
-  padding: calc(var(--v1-shell-wide-topbar-height) + 6px) var(--v1-shell-page-x) calc(20px + var(--v1-shell-wide-bottom-nav-height) + var(--v1-shell-safe-bottom));
+  padding: calc(var(--v1-shell-wide-topbar-height) + 8px) var(--v1-shell-page-x) calc(20px + var(--v1-shell-wide-bottom-nav-height) + var(--v1-shell-safe-bottom));
 }
 
 .v1-button:active {
@@ -4203,7 +4203,7 @@ button:disabled {
 .tm-my-shell {
   display: grid;
   gap: 16px;
-  padding: 18px var(--v1-shell-page-x) 124px;
+  padding: 20px var(--v1-shell-page-x) 124px;
 }
 
 /* 프로필 헤더는 페이지 배경(--bg) 위에 --grey50 한 단계로 얹힌다 — main과 동일.
@@ -4213,7 +4213,7 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 16px;
-  margin: -18px -20px 0;
+  margin: -20px -20px 0;
   padding: 20px 20px 20px;
   border-bottom: 1px solid var(--border);
   background: var(--grey50);
@@ -4221,7 +4221,7 @@ button:disabled {
 
 .tm-my-home-profile-head {
   position: relative;
-  margin: -18px 0 0;
+  margin: -20px 0 0;
   padding: 20px 0 20px;
   border-bottom: 0;
   background: transparent;
@@ -4308,7 +4308,7 @@ button:disabled {
    * tm-create-shell의 하드코딩 124px보다 이 값이 적용 순서상 뒤에 오므로
    * specificity로 덮어씌우기 위해 별도 속성으로 선언합니다.
    */
-  padding-bottom: calc(86px + env(safe-area-inset-bottom, 0px) + 16px);
+  padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px) + 16px);
 }
 
 .tm-profile-edit-shell .tm-my-profile-head {
@@ -4449,7 +4449,7 @@ button:disabled {
 .tm-review-shell {
   display: grid;
   gap: 16px;
-  padding: 18px var(--v1-shell-page-x) 124px;
+  padding: 20px var(--v1-shell-page-x) 124px;
 }
 
 .tm-review-compose-shell {
@@ -6708,7 +6708,7 @@ button:disabled {
 .tm-fixture-lineup-player-controls .tm-input {
   width: 54px;
   min-width: 0;
-  padding-inline: 6px;
+  padding-inline: 8px;
 }
 
 @media (max-width: 420px) {

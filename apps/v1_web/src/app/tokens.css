@@ -14,7 +14,7 @@
    @theme 에 정의하므로 Tailwind 유틸리티가 자동 생성된다:
      --radius-field   -> rounded-field
      --shadow-card    -> shadow-card
-     --spacing-3h     -> p-3h / gap-3h / m-3h
+     --spacing-3      -> p-3 / gap-3 / m-3
    즉 CSS 클래스와 Tailwind 유틸이 같은 값을 보게 된다.
 
    Tailwind 기본 스케일(rounded-xl 등)은 일부러 지우지 않았다.

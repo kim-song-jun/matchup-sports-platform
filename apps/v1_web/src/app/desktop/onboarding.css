@@ -43,7 +43,7 @@
 }
 
 .tm-onboarding-frame .tm-auth-fixed-cta {
-  padding-bottom: calc(22px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────

@@ -146,21 +146,25 @@ function eachCssFile(fn) {
  * 맞춘 그 날, 병행 작업이 10px·14px·6px 을 4건 다시 들여왔다.
  * ────────────────────────────────────────────────────────────────── */
 function checkSpacingGrid() {
-  const PROP = /(?:^|[;{}\s])((?:row-|column-)?gap|padding|margin)(-(?:top|right|bottom|left))?\s*:\s*([^;{}]+)/g;
+  // logical property(padding-inline / margin-block-start 등)까지 포함한다.
+  const PROP =
+    /(?:^|[;{}\s])((?:row-|column-)?gap|padding|margin)(-(?:top|right|bottom|left|inline|block)(?:-(?:start|end))?)?\s*:\s*([^;{}]+)/g;
   eachCssFile((f, txt) => {
     for (const m of txt.matchAll(PROP)) {
       const prop = m[1] + (m[2] || '');
       const value = m[3].trim();
-      if (value.includes('var(') || value.includes('calc(')) continue;
-      for (const part of value.split(/\s+/)) {
-        const px = part.match(/^([\d.]+)px$/);
-        if (!px) continue;
-        const n = parseFloat(px[1]);
-        if (!n || n <= 3) continue; // 0 과 광학 보정(1~3px)은 허용
+      // 값을 공백으로 쪼개지 않고 px 토큰을 통째로 훑는다. 그래야
+      //   음수(-10px) · 함수 인자(max(10px, 2vw)) · var() fallback(var(--x, 10px))
+      // 이 전부 걸린다. var(--spacing-3) 처럼 px 가 없는 값은 자연히 통과한다.
+      for (const px of value.matchAll(/(-?[\d.]+)px/g)) {
+        const signed = parseFloat(px[1]);
+        const n = Math.abs(signed); // 음수 마진도 격자를 지켜야 한다
+        if (!n || n <= 3) continue; // 0 과 광학 보정(±1~3px)은 허용
         if (n % 4 !== 0) {
+          const snapped = (signed < 0 ? -1 : 1) * (Math.round(n / 4) * 4);
           violations.push(
-            `[간격 격자 이탈] ${f}: ${prop}: ${value} — ${n}px 는 4의 배수가 아니다. ` +
-              `${Math.round(n / 4) * 4}px 로 맞추거나, 정렬 보정이면 3px 이하로 줄일 것`,
+            `[간격 격자 이탈] ${f}: ${prop}: ${value} — ${signed}px 는 4의 배수가 아니다. ` +
+              `${snapped}px 로 맞추거나, 정렬 보정이면 3px 이하로 줄일 것`,
           );
         }
       }

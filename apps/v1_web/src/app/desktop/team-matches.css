@@ -29,9 +29,9 @@
   .tm-team-match-desktop-create-btn {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     height: 44px;
-    padding: 0 18px;
+    padding: 0 20px;
     border-radius: var(--radius-control);
     background: var(--blue500);
     color: var(--static-white);
@@ -126,7 +126,7 @@
 
 /* 비용 그룹 — 상대팀 부담금 수치 승격 영역(R-D1 primary) */
 .tm-info-cost-hero {
-  padding: 12px 16px 10px;
+  padding: 12px 16px 12px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -215,7 +215,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
+    gap: 12px;
   }
 
   .tm-team-match-cta-actions {
@@ -233,7 +233,7 @@
   .tm-team-match-detail-left .tm-info-row {
     flex-direction: row;
     align-items: center;
-    gap: 14px;
+    gap: 16px;
     padding: 0;
   }
 

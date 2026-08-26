@@ -129,9 +129,115 @@ function checkInertFontSizeClasses() {
   }
 }
 
+/* ── CSS 파일 목록 + 주석 제거 (아래 두 검사 공용) ─────────────────── */
+function eachCssFile(fn) {
+  // 게이트는 fail-closed 여야 한다. 목록을 못 만들거나 파일이 0개면 조용히
+  // 통과시키지 않고 위반으로 올린다 — 검사를 못 돌린 것과 위반이 없는 것은 다르다.
+  let list;
+  try {
+    list = execSync('find src -name "*.css"', { encoding: 'utf8' });
+  } catch (e) {
+    violations.push(`[게이트 실행 실패] CSS 목록을 만들 수 없다 (${e.message}). 검사를 건너뛰지 않는다`);
+    return;
+  }
+  const files = list.split('\n').filter(Boolean);
+  if (!files.length) {
+    violations.push('[게이트 실행 실패] src 아래 CSS 파일이 0개다 — 실행 위치나 경로가 바뀐 것으로 본다');
+    return;
+  }
+  for (const f of files) {
+    // 주석 안의 예시 값(문서용)을 위반으로 세지 않도록 공백으로 치환한다
+    fn(f, readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, ' '));
+  }
+}
+
+/* ── 4) 간격 4px 격자 검사 ─────────────────────────────────────────
+ * gap / padding / margin 은 4의 배수만 쓴다. 예외는 1~3px 광학 보정 하나뿐이다
+ * (아이콘 baseline 정렬 등 — tokens.css 의 SPACING 절 참조).
+ * 이 게이트가 없으면 격자는 조용히 무너진다: 2026-08-26 에 전 CSS 를 격자로
+ * 맞춘 그 날, 병행 작업이 10px·14px·6px 을 4건 다시 들여왔다.
+ * ────────────────────────────────────────────────────────────────── */
+function checkSpacingGrid() {
+  // logical property(padding-inline / margin-block-start 등)까지 포함한다.
+  const PROP =
+    /(?:^|[;{}\s])((?:row-|column-)?gap|padding|margin)(-(?:top|right|bottom|left|inline|block)(?:-(?:start|end))?)?\s*:\s*([^;{}]+)/g;
+  eachCssFile((f, txt) => {
+    for (const m of txt.matchAll(PROP)) {
+      const prop = m[1] + (m[2] || '');
+      const value = m[3].trim();
+      // 값을 공백으로 쪼개지 않고 px 토큰을 통째로 훑는다. 그래야
+      //   음수(-10px) · 함수 인자(max(10px, 2vw)) · var() fallback(var(--x, 10px))
+      // 이 전부 걸린다. var(--spacing-3) 처럼 px 가 없는 값은 자연히 통과한다.
+      //
+      // 단위를 px 로 한정한 것은 의도다. em/rem 간격(리치텍스트의
+      // `margin: 0.75em 0` 등)은 글자 크기에 비례하는 흐름 여백이라 4px 격자와
+      // 개념이 다르다 — 격자로 강제하면 본문 리듬이 깨진다. radius 쪽은 반대로
+      // 단위를 넓게 잡는다(그쪽은 "토큰만 쓴다" 가 규칙이라 단위 교체가 곧 우회다).
+      for (const px of value.matchAll(/(-?[\d.]+)px/g)) {
+        const signed = parseFloat(px[1]);
+        const n = Math.abs(signed); // 음수 마진도 격자를 지켜야 한다
+        if (!n || n <= 3) continue; // 0 과 광학 보정(±1~3px)은 허용
+        if (n % 4 !== 0) {
+          const snapped = (signed < 0 ? -1 : 1) * (Math.round(n / 4) * 4);
+          violations.push(
+            `[간격 격자 이탈] ${f}: ${prop}: ${value} — ${signed}px 는 4의 배수가 아니다. ` +
+              `${snapped}px 로 맞추거나, 정렬 보정이면 3px 이하로 줄일 것`,
+          );
+        }
+      }
+    }
+  });
+}
+
+/* ── 5) radius 리터럴 금지 ─────────────────────────────────────────
+ * border-radius 는 tokens.css 의 역할 토큰만 쓴다(chip/control/field/
+ * container/hero/pill/circle/tight). px 를 직접 적으면 21종으로 분화됐던
+ * 그 상태로 되돌아간다.
+ * ────────────────────────────────────────────────────────────────── */
+function checkRadiusLiteral() {
+  eachCssFile((f, txt) => {
+    // shorthand 만 보면 코너별 longhand(border-top-left-radius,
+    // border-start-start-radius …)로 그대로 우회된다. 실제로 6건이 그렇게 남아
+    // 있었다. 속성 이름을 넓게 잡고 위반 메시지에 실제 속성명을 싣는다.
+    for (const m of txt.matchAll(/(border-(?:[a-z]+-)*radius)\s*:\s*([^;{}]+)/g)) {
+      const prop = m[1];
+      const value = m[2].trim();
+      // 단위를 열거하지 않는다. 열거하면 목록에 없는 단위(vmin/vmax, 신규
+      // viewport 단위 dvh·svw·lvh, lh/cap/ic …)로 바꾸는 것만으로 우회되고,
+      // CSS 에 단위가 추가될 때마다 게이트가 뒤처진다.
+      //
+      // 대신 반대로 본다: 이 속성에 허용된 것은 토큰 참조와 0 / 100% 뿐이므로,
+      // **토큰 참조를 걷어낸 뒤 숫자가 남아 있으면 리터럴**이다.
+      // var( 와 토큰 이름만 지우고 닫는 괄호 안쪽은 남기는 게 핵심 — 그래야
+      // var(--x, 12px) 의 fallback 이 계속 검사 대상으로 남는다.
+      // 정당한 참조는 --radius-* 하나뿐이다. 아무 변수나 통과시키면
+      // `border-radius: var(--font-size-body)` 같은 것으로 우회할 수 있고,
+      // 되살아난 --card-radius 처럼 폐기한 토큰도 조용히 다시 들어온다.
+      const stripped = value.replace(/var\(\s*--radius-[\w-]+/g, ' ');
+      for (const other of stripped.matchAll(/var\(\s*(--[\w-]+)/g)) {
+        violations.push(
+          `[radius 리터럴] ${f}: ${prop}: ${value} — ${other[1]} 는 radius 토큰이 아니다. ` +
+            `var(--radius-*) 를 쓸 것 (tight/chip/control/field/container/hero/pill/circle)`,
+        );
+      }
+      for (const lit of stripped.matchAll(/(-?[\d.]+)\s*([a-z%]*)/gi)) {
+        const n = parseFloat(lit[1]);
+        if (n === 0) continue; // 0 / 0px / 0% — 모서리 없음
+        if (lit[2] === '%' && n === 100) continue; // 100% — 컨테이너 전체를 덮는 곡률
+        violations.push(
+          `[radius 리터럴] ${f}: ${prop}: ${value} — ${lit[1]}${lit[2]} 대신 tokens.css 의 ` +
+            `var(--radius-*) 를 쓸 것 (tight/chip/control/field/container/hero/pill/circle)`,
+        );
+      }
+    }
+  });
+}
+
 checkHapnida();
 checkUndefinedTokens();
 checkInertFontSizeClasses();
+checkSpacingGrid();
+checkRadiusLiteral();
 
 if (violations.length) {
   console.error(`\n✗ v1 패턴 검사 실패 — ${violations.length}건:\n`);
@@ -139,4 +245,6 @@ if (violations.length) {
   console.error('\n참고: docs/v1-coding-patterns.md\n');
   process.exit(1);
 }
-console.log('✓ v1 패턴 검사 통과 (합니다체 0, 미정의 CSS 토큰 0, 무효 폰트 크기 클래스 0)');
+console.log(
+  '✓ v1 패턴 검사 통과 (합니다체 0, 미정의 CSS 토큰 0, 무효 폰트 크기 클래스 0, 간격 격자 이탈 0, radius 리터럴 0)',
+);

@@ -16,18 +16,18 @@
 
   /* Filter row: top margin tightened on desktop */
   .tm-notice-filter-row {
-    margin-top: 14px;
+    margin-top: 16px;
   }
 
   /* Notice stack: 1-col constrained column on desktop (list is already narrow) */
   .tm-notice-stack {
     gap: 8px;
-    margin-top: 14px;
+    margin-top: 16px;
   }
 
   /* Rows: slightly more padding on desktop */
   .tm-notice-row {
-    padding: 16px 18px;
+    padding: 16px 20px;
     border-radius: var(--radius-control);
     transition: background-color 0.1s;
   }
@@ -52,7 +52,7 @@
 
   /* Title: comfortable top breathing room */
   .tm-notice-title {
-    margin-top: 14px;
+    margin-top: 16px;
     font-size: 22px;
     line-height: 1.4;
   }
@@ -64,8 +64,8 @@
 
   /* Body paragraphs: generous line-height for reading */
   .tm-notice-body {
-    margin-top: 26px;
-    gap: 18px;
+    margin-top: 28px;
+    gap: 20px;
   }
 
   .tm-notice-body p {
@@ -75,7 +75,7 @@
   /* Related link card */
   .tm-notice-related {
     margin-top: 28px;
-    padding: 18px 20px;
+    padding: 20px 20px;
     border-radius: var(--radius-control);
   }
 }

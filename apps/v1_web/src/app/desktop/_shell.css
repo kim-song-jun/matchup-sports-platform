@@ -348,7 +348,7 @@
     justify-content: center;
     width: 36px;
     height: 36px;
-    margin-left: 6px;
+    margin-left: 8px;
     border-radius: var(--radius-circle);
     background: var(--grey100);
     color: var(--grey700);
@@ -407,7 +407,7 @@
      * flex-baseline mismatch. Center avoids the whole computation and reads
      * correctly for an icon+wordmark+tagline row. */
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     min-width: 0;
   }
 
@@ -590,8 +590,8 @@
   .tm-desktop-page-head {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 28px 0 18px;
+    gap: 12px;
+    padding: 28px 0 20px;
   }
   .tm-desktop-page-head .tm-desktop-back {
     display: inline-flex;

@@ -73,7 +73,7 @@
 }
 
 .emptyState p {
-  margin: 5px 0 0;
+  margin: 4px 0 0;
   color: var(--text-muted);
   font-size: var(--font-size-label);
   line-height: 1.55;
@@ -125,13 +125,13 @@
 .factList {
   display: grid;
   gap: 8px;
-  margin: 14px 0 0;
+  margin: 16px 0 0;
 }
 
 .fact {
   display: grid;
   grid-template-columns: 76px minmax(0, 1fr);
-  gap: 10px;
+  gap: 12px;
 }
 
 .factLabel {
@@ -148,7 +148,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 14px;
+  margin-top: 16px;
 }
 
 @media (max-width: 767px) {

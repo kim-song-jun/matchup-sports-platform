@@ -53,8 +53,8 @@
     left: auto;
     right: auto;
     /* Round the bottom corners to match the card */
-    border-bottom-left-radius: 16px;
-    border-bottom-right-radius: 16px;
+    border-bottom-left-radius: var(--radius-container);
+    border-bottom-right-radius: var(--radius-container);
     /* Slightly increase padding for more breathing room */
     padding: 16px 24px 24px;
   }
@@ -152,7 +152,7 @@
   }
 
   .tm-auth-signup-form {
-    gap: 18px;
+    gap: 20px;
   }
 }
 
@@ -195,16 +195,16 @@
 @media (min-width: 1024px) {
   /* "Agree all" banner: slightly more padding */
   .tm-auth-agree-all {
-    padding: 18px;
+    padding: 20px;
     margin-top: 24px;
   }
 
   .tm-auth-agreement {
-    padding: 16px 18px;
+    padding: 16px 20px;
   }
 
   .tm-auth-agreement-detail {
-    margin: 0 18px 16px 54px;
+    margin: 0 20px 16px 56px;
   }
 }
 
@@ -214,7 +214,7 @@
 @media (min-width: 1024px) {
   .tm-auth-segmented {
     gap: 8px;
-    padding: 5px;
+    padding: 4px;
   }
 
   .tm-auth-segment {
@@ -224,7 +224,7 @@
   /* 축소 변형은 데스크톱에서도 상위 탭보다 가볍게 유지한다 — 다만 높이(클릭 타겟)는
      기본값 그대로 두고 간격만 좁힌다. */
   .tm-auth-segmented-sm {
-    gap: 5px;
+    gap: 4px;
     padding: 4px;
   }
 }

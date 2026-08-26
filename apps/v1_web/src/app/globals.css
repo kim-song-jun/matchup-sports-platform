@@ -221,7 +221,7 @@
    * 버튼 hover 전용 component 토큰으로 별도 관리한다. */
   --button-fill-warning:        var(--orange500);
   --button-fill-warning-hover:  var(--orange600);
-  /* [결정 · 2026-08-27 사용자 확정] solid-fill 버튼의 흰 글씨는 **현행 유지**한다.
+  /* [결정 · 2026-08-27 KST 사용자 확정] solid-fill 버튼의 흰 글씨는 **현행 유지**한다.
    * 접근성 감사에서 네 색 모두 WCAG AA(4.5:1) 미달로 나왔다:
    *   primary(--blue500) 3.71:1 · danger(--red500) 3.71:1
    *   success(--green500) 2.77:1 · warning(--orange500) 2.16:1

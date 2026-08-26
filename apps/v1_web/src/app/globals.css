@@ -1931,8 +1931,10 @@ button:disabled {
   font-size: var(--font-size-label); /* 13px — R-T2 토큰 */
   font-weight: 700;
   white-space: nowrap;
-  /* 이 클래스는 <button> 선택 칩에 붙는다. 지금까지 소비처가 인라인으로 pointer 를
-   * 주고 있었는데, 커서는 컴포넌트의 성질이라 여기서 책임진다. */
+  /* 이 클래스는 선택 칩(<button>)과 필터 링크(<Link> → <a>) 양쪽에 붙는다.
+   * <a> 는 커서가 이미 pointer 라 이 선언이 실제로 필요한 건 <button> 쪽이지만,
+   * 커서는 소비처가 매번 인라인으로 붙일 게 아니라 컴포넌트의 성질이므로 여기서
+   * 한 번에 책임진다. */
   cursor: pointer;
 }
 

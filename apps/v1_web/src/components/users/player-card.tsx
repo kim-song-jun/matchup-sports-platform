@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { CalendarCheck, Clock, HeartHandshake, Lock, Settings, Sparkles, Target, Zap } from 'lucide-react';
+import { CalendarCheck, Camera, Clock, HeartHandshake, Lock, Settings, Sparkles, Target, Zap } from 'lucide-react';
 import { cssUrl } from '@/lib/assets';
 import type { V1PlayerCard, V1PlayerCardStat } from '@/types/api';
 
@@ -273,6 +273,11 @@ export function PlayerCard({
    */
   const isJourney = card.appearances === 0 && card.unlockedCount === 0;
   const nextGoal = nextGoalText(card);
+  /**
+   * 사진 추가 슬롯을 띄울지. 본인 + 사진 없음일 때만이다 -- 남의 카드에서 "사진 올리세요"는
+   * 소음이고, 공유 화면(isOwner=false)에서도 뜨면 받은 사람이 조작할 수 없는 버튼을 본다.
+   */
+  const photoSlotHref = isOwner && !profileImageUrl ? '/my/profile/edit' : null;
 
   /**
    * 포인터 추종 기울기 + 글레어 (목업 확정 인터랙션).
@@ -319,14 +324,29 @@ export function PlayerCard({
       <div className="tm-pcard-fx" aria-hidden="true" />
       <div className="tm-pcard-crest-bg" aria-hidden="true" />
 
-      {/* 선수 렌더 -- 원형 아바타가 아니라 아래로 잘려 사라지는 큰 컷아웃. */}
-      <div className="tm-pcard-render" aria-hidden="true">
-        {profileImageUrl ? (
-          <div className="tm-pcard-render-photo" style={{ backgroundImage: cssUrl(profileImageUrl) }} />
-        ) : (
-          <div className="tm-pcard-render-img">{initial}</div>
-        )}
-      </div>
+      {/* 선수 렌더 -- 원형 아바타가 아니라 아래로 잘려 사라지는 큰 컷아웃.
+          사진이 없고 **본인**이면 이 자리를 사진 추가 슬롯으로 바꾼다(사용자 선택 A안,
+          2026-08-26). 업로드 경로는 이미 동작하는데 올리라고 권하는 화면이 없어 카드가
+          전부 이니셜로 남아 있었다 -- 카드에서 가장 큰 자리가 비어 있으면서 아무 말도
+          하지 않던 것이 문제였다. 남이 보는 카드와 공유 이미지는 그대로 이니셜이다. */}
+      {photoSlotHref ? (
+        <Link
+          href={photoSlotHref}
+          className="tm-pcard-photo-slot"
+          aria-label="사진 추가하기 -- 프로필 사진을 올리면 카드에 들어가요"
+        >
+          <Camera size={22} strokeWidth={2.1} aria-hidden="true" />
+          <span aria-hidden="true">사진 추가</span>
+        </Link>
+      ) : (
+        <div className="tm-pcard-render" aria-hidden="true">
+          {profileImageUrl ? (
+            <div className="tm-pcard-render-photo" style={{ backgroundImage: cssUrl(profileImageUrl) }} />
+          ) : (
+            <div className="tm-pcard-render-img">{initial}</div>
+          )}
+        </div>
+      )}
 
       <div className="tm-player-card-top">
         {/* 왼쪽 세로 열: 총점 → 구분선 → 포지션 → 등급 → 배지 스택.

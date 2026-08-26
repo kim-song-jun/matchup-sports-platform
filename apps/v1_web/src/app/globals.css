@@ -7426,3 +7426,25 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
   width: 56px; flex: none; font-size: 12px; font-weight: 600; color: var(--text-muted);
 }
 .tm-review-stars[data-compact='true'] button { font-size: 15px; min-width: 28px; min-height: 32px; }
+
+/* ── 카드 안 사진 추가 슬롯 (사용자 선택 A안, 2026-08-26) ──
+   사진이 없는 본인 카드에서 렌더 자리를 그대로 버튼으로 바꾼다. 업로드는 이미
+   동작하는데 권하는 화면이 없어 카드가 전부 이니셜로 남아 있었다 -- 결핍이 있는
+   자리에서 해결한다. 사진이 생기면 이 슬롯은 사라지고 렌더가 그 자리를 채운다. */
+.tm-pcard-photo-slot {
+  position: absolute; right: 8px; top: 26px; width: 138px; height: 140px;
+  z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+  border: 1.5px dashed var(--tm-rule);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--tm-ink);
+  text-decoration: none;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+.tm-player-card[data-shape='shield'] .tm-pcard-photo-slot { top: 48px; }
+.tm-pcard-photo-slot span {
+  font-family: var(--tm-num);
+  font-size: 12px; font-weight: 800; letter-spacing: 0.04em;
+}
+.tm-pcard-photo-slot:hover { background: rgba(255, 255, 255, 0.13); border-color: var(--tm-ink); }
+.tm-pcard-photo-slot:focus-visible { outline: 2px solid var(--tm-ink); outline-offset: 2px; }

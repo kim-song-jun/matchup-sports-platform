@@ -131,9 +131,21 @@ function checkInertFontSizeClasses() {
 
 /* ── CSS 파일 목록 + 주석 제거 (아래 두 검사 공용) ─────────────────── */
 function eachCssFile(fn) {
-  let list = ' ';
-  try { list = execSync('find src -name "*.css"', { encoding: 'utf8' }); } catch { return; }
-  for (const f of list.split('\n').filter(Boolean)) {
+  // 게이트는 fail-closed 여야 한다. 목록을 못 만들거나 파일이 0개면 조용히
+  // 통과시키지 않고 위반으로 올린다 — 검사를 못 돌린 것과 위반이 없는 것은 다르다.
+  let list;
+  try {
+    list = execSync('find src -name "*.css"', { encoding: 'utf8' });
+  } catch (e) {
+    violations.push(`[게이트 실행 실패] CSS 목록을 만들 수 없다 (${e.message}). 검사를 건너뛰지 않는다`);
+    return;
+  }
+  const files = list.split('\n').filter(Boolean);
+  if (!files.length) {
+    violations.push('[게이트 실행 실패] src 아래 CSS 파일이 0개다 — 실행 위치나 경로가 바뀐 것으로 본다');
+    return;
+  }
+  for (const f of files) {
     // 주석 안의 예시 값(문서용)을 위반으로 세지 않도록 공백으로 치환한다
     fn(f, readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, ' '));
   }
@@ -156,6 +168,11 @@ function checkSpacingGrid() {
       // 값을 공백으로 쪼개지 않고 px 토큰을 통째로 훑는다. 그래야
       //   음수(-10px) · 함수 인자(max(10px, 2vw)) · var() fallback(var(--x, 10px))
       // 이 전부 걸린다. var(--spacing-3) 처럼 px 가 없는 값은 자연히 통과한다.
+      //
+      // 단위를 px 로 한정한 것은 의도다. em/rem 간격(리치텍스트의
+      // `margin: 0.75em 0` 등)은 글자 크기에 비례하는 흐름 여백이라 4px 격자와
+      // 개념이 다르다 — 격자로 강제하면 본문 리듬이 깨진다. radius 쪽은 반대로
+      // 단위를 넓게 잡는다(그쪽은 "토큰만 쓴다" 가 규칙이라 단위 교체가 곧 우회다).
       for (const px of value.matchAll(/(-?[\d.]+)px/g)) {
         const signed = parseFloat(px[1]);
         const n = Math.abs(signed); // 음수 마진도 격자를 지켜야 한다
@@ -184,7 +201,8 @@ function checkRadiusLiteral() {
       // 간격 검사와 같은 방식으로 값 전체를 훑는다. 공백으로 쪼개면
       //   var(--x, 12px) 의 fallback · calc(... + 2px) 의 인자
       // 가 빠져나가 게이트가 우회된다.
-      for (const lit of value.matchAll(/(-?[\d.]+)(px|%)/g)) {
+      // 단위는 px/% 로 좁히지 않는다 — 좁히면 1rem 으로 바꾸는 것만으로 우회된다.
+      for (const lit of value.matchAll(/(-?[\d.]+)(px|%|r?em|v[hwbi]|min|max|pt|pc|cm|mm|in|q|ch|ex)\b/gi)) {
         const n = parseFloat(lit[1]);
         if (n === 0) continue; // 0 / 0px / 0% — 모서리 없음
         if (lit[2] === '%' && n === 100) continue; // 100% — 컨테이너 전체를 덮는 곡률

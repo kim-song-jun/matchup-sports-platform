@@ -7,12 +7,12 @@ import type { SponsorForm } from './tournament-sponsors-admin-model';
 
 const inputCls = [
   'h-[44px] rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-[13px] text-[var(--text-strong)]',
-  'outline-none transition-colors placeholder:text-gray-400 focus:border-blue-500 focus:ring-2',
+  'outline-none transition-colors placeholder:text-[var(--text-muted)] focus:border-blue-500 focus:ring-2',
   'focus:ring-blue-100 disabled:bg-[var(--surface-soft)] disabled:text-gray-400',
 ].join(' ');
 const textareaCls = [
   'min-h-[88px] rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 py-2.5 text-[13px] text-[var(--text-strong)]',
-  'outline-none transition-colors placeholder:text-gray-400 focus:border-blue-500 focus:ring-2',
+  'outline-none transition-colors placeholder:text-[var(--text-muted)] focus:border-blue-500 focus:ring-2',
   'focus:ring-blue-100 disabled:bg-[var(--surface-soft)] disabled:text-gray-400',
 ].join(' ');
 const primaryBtnCls = [
@@ -62,7 +62,7 @@ export function TournamentSponsorForm({
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-full p-2 text-gray-400 transition-colors hover:bg-[var(--surface-soft)] hover:text-[var(--text-body)]"
+            className="rounded-full p-2 text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-soft)] hover:text-[var(--text-body)]"
             aria-label="수정 취소"
           >
             <X size={16} aria-hidden="true" />

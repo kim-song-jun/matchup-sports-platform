@@ -229,7 +229,7 @@ export function ErrorLogsClient() {
       width: 'w-[96px]',
       render: (row) => (
         <span
-          className="font-mono text-[length:var(--font-size-micro)] text-gray-400 whitespace-nowrap"
+          className="font-mono text-[length:var(--font-size-micro)] text-[var(--text-muted)] whitespace-nowrap"
           title={row.releaseSha ?? undefined}
         >
           {shortRelease(row.releaseSha)}

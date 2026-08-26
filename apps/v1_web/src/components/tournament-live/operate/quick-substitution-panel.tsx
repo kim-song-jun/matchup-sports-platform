@@ -156,7 +156,7 @@ export function QuickSubstitutionPanel({
                             : 'border-[var(--border)] bg-[var(--card-surface)] text-[var(--text-body)] hover:bg-[var(--surface-soft)]',
                         ].join(' ')}
                       >
-                        <span className="inline-block min-w-[1.25rem] text-right tabular-nums text-gray-400">
+                        <span className="inline-block min-w-[1.25rem] text-right tabular-nums text-[var(--text-muted)]">
                           {jerseyText(participant.jerseyNumber)}
                         </span>
                         {participant.displayNameSnapshot}

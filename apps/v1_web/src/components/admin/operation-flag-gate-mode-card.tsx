@@ -99,15 +99,15 @@ export function GateModeCard({ gateStatus, isPending, isError, showToast }: Gate
       {gateStatus && (
         <dl className="grid grid-cols-3 gap-2 pt-3 border-t border-[var(--border)] text-[12px]">
           <div>
-            <dt className="text-gray-400">버전</dt>
+            <dt className="text-[var(--text-muted)]">버전</dt>
             <dd className="text-[var(--text-body)] font-medium tabular-nums">v{gateStatus.version}</dd>
           </div>
           <div>
-            <dt className="text-gray-400">마지막 변경자</dt>
+            <dt className="text-[var(--text-muted)]">마지막 변경자</dt>
             <dd className="text-[var(--text-body)] font-medium truncate">{gateStatus.updatedByUserId ?? '—'}</dd>
           </div>
           <div>
-            <dt className="text-gray-400">마지막 변경 시각</dt>
+            <dt className="text-[var(--text-muted)]">마지막 변경 시각</dt>
             <dd className="text-[var(--text-body)] font-medium">
               {new Date(gateStatus.updatedAt).toLocaleString('ko-KR', {
                 month: 'numeric',

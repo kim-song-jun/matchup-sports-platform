@@ -234,7 +234,7 @@ export function ErrorLogDetailModal({ id, open, onClose }: ErrorLogDetailModalPr
                 type="button"
                 onClick={onClose}
                 aria-label="모달 닫기"
-                className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-gray-400 hover:text-[var(--text-muted)] hover:bg-[var(--surface-soft)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-[var(--text-muted)] hover:text-[var(--text-muted)] hover:bg-[var(--surface-soft)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
               >
                 <X size={18} aria-hidden="true" />
               </button>
@@ -353,7 +353,7 @@ function Section({
 function MetaRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div className="flex items-baseline gap-2 min-w-0">
-      <dt className="shrink-0 w-[92px] text-gray-400 dark:text-gray-400">{label}</dt>
+      <dt className="shrink-0 w-[92px] text-[var(--text-muted)] dark:text-[var(--text-muted)]">{label}</dt>
       <dd
         className={[
           'text-[var(--text-body)] break-all min-w-0',

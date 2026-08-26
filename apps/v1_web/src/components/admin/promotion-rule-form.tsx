@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import type { V1PromotionRule } from '@/types/league-series';
 
 const inputClass =
-  'h-[44px] w-full rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)] placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
+  'h-[44px] w-full rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)] placeholder:text-[var(--text-muted)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
 const labelClass = 'mb-1.5 block text-sm font-semibold text-[var(--text-strong)]';
 
 /** 미리보기에 쓰는 팀 수 표본. 실제 리그 팀 수가 아니라 규칙 감각을 잡기 위한 예시다. */

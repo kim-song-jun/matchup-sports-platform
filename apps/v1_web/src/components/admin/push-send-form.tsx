@@ -324,12 +324,12 @@ export function PushSendForm() {
             aria-required="true"
             className={[
               'h-[44px] px-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)]',
-              'placeholder:text-gray-400',
+              'placeholder:text-[var(--text-muted)]',
               'focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
               'transition-colors disabled:opacity-50',
             ].join(' ')}
           />
-          <p className="text-[length:var(--font-size-micro)] text-right text-gray-400 tabular-nums">
+          <p className="text-[length:var(--font-size-micro)] text-right text-[var(--text-muted)] tabular-nums">
             {title.length} / {TITLE_MAX}
           </p>
         </div>
@@ -349,12 +349,12 @@ export function PushSendForm() {
             placeholder="알림 내용을 입력해 주세요. (선택)"
             className={[
               'px-3 py-2.5 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] resize-none',
-              'placeholder:text-gray-400',
+              'placeholder:text-[var(--text-muted)]',
               'focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
               'transition-colors disabled:opacity-50',
             ].join(' ')}
           />
-          <p className="text-[length:var(--font-size-micro)] text-right text-gray-400 tabular-nums">
+          <p className="text-[length:var(--font-size-micro)] text-right text-[var(--text-muted)] tabular-nums">
             {body.length} / {BODY_MAX}
           </p>
         </div>
@@ -362,7 +362,7 @@ export function PushSendForm() {
         {/* URL */}
         <div className="flex flex-col gap-1.5">
           <label htmlFor="push-send-url" className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">
-            이동 링크 <span className="text-gray-400 font-normal">(선택)</span>
+            이동 링크 <span className="text-[var(--text-muted)] font-normal">(선택)</span>
           </label>
           <input
             id="push-send-url"
@@ -373,7 +373,7 @@ export function PushSendForm() {
             placeholder="/notices/123"
             className={[
               'h-[44px] px-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)]',
-              'placeholder:text-gray-400',
+              'placeholder:text-[var(--text-muted)]',
               'focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
               'transition-colors disabled:opacity-50',
             ].join(' ')}

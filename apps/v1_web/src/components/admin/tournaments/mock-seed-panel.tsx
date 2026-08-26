@@ -76,12 +76,12 @@ export function MockSeedPanel() {
           목업 대회 생성 (alpha 전용)
         </h2>
       </div>
-      <p className="mt-1 text-[length:var(--font-size-caption)] text-gray-600 dark:text-gray-400">
+      <p className="mt-1 text-[length:var(--font-size-caption)] text-gray-600 dark:text-[var(--text-muted)]">
         조건에 맞는 테스트 대회를 하나 만들어요. 팀 등록·명단·경기(운영 콘솔)까지 준비해요.
         라인업은 기본적으로 비워 두니 직접 제출해 보시고, 그 다음 단계를 테스트하려면{' '}
         <strong>라인업까지 제출</strong>을 켜세요.
       </p>
-      <p className="mt-1 text-[length:var(--font-size-caption)] text-gray-600 dark:text-gray-400">
+      <p className="mt-1 text-[length:var(--font-size-caption)] text-gray-600 dark:text-[var(--text-muted)]">
         지금 쓸 수 있는 테스트 팀 <strong>{usableTeamCount}팀</strong> (최대 {maxTeamCount}팀까지 만들 수 있어요).
         실제 사용자가 섞인 팀은 쓰지 않아요.
         {minPlayersPerTeam > 0 ? (
@@ -94,14 +94,14 @@ export function MockSeedPanel() {
 
       <div className="mt-3 flex flex-wrap items-end gap-3">
         <label className="flex flex-col gap-1">
-          <span className="text-[length:var(--font-size-caption)] text-gray-600 dark:text-gray-400">형식</span>
+          <span className="text-[length:var(--font-size-caption)] text-gray-600 dark:text-[var(--text-muted)]">형식</span>
           <select className={FIELD_CLASS} value={format} onChange={(e) => setFormat(e.target.value as typeof format)}>
             {FORMATS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="text-[length:var(--font-size-caption)] text-gray-600 dark:text-gray-400">팀 수</span>
+          <span className="text-[length:var(--font-size-caption)] text-gray-600 dark:text-[var(--text-muted)]">팀 수</span>
           <input
             className={`${FIELD_CLASS} w-[88px] ${teamCountTooHigh ? 'border-red-400 dark:border-red-600' : ''}`}
             type="number"
@@ -120,7 +120,7 @@ export function MockSeedPanel() {
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="text-[length:var(--font-size-caption)] text-gray-600 dark:text-gray-400">상태</span>
+          <span className="text-[length:var(--font-size-caption)] text-gray-600 dark:text-[var(--text-muted)]">상태</span>
           <select className={FIELD_CLASS} value={status} onChange={(e) => setStatus(e.target.value as typeof status)}>
             {STATUSES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
@@ -169,7 +169,7 @@ export function MockSeedPanel() {
               <summary className="cursor-pointer font-semibold text-gray-900 dark:text-white">
                 이 대회에 들어간 테스트 계정 ({created.teams.reduce((sum, team) => sum + team.accounts.length, 0)}명)
               </summary>
-              <p className="mt-2 text-gray-600 dark:text-gray-400">
+              <p className="mt-2 text-gray-600 dark:text-[var(--text-muted)]">
                 아래 계정으로 로그인하면 팀장·팀원 각 시점의 화면을 확인할 수 있어요.
                 비밀번호는 <strong>모든 테스트 계정이 같은 값</strong>을 쓰며, 이 저장소는 공개돼 있어 화면에 싣지 않아요 — 운영자에게 전달받은 공통 비밀번호를 사용하세요.
               </p>
@@ -181,7 +181,7 @@ export function MockSeedPanel() {
                       {team.accounts.map((account) => (
                         <li key={account.email} className="flex flex-wrap items-center gap-1.5">
                           <span className="font-mono text-gray-800 dark:text-gray-200">{account.email}</span>
-                          <span className="text-gray-500 dark:text-gray-400">
+                          <span className="text-gray-500 dark:text-[var(--text-muted)]">
                             {account.nickname}
                             {account.role === 'owner' ? ' · 팀장' : account.role === 'manager' ? ' · 운영진' : ''}
                           </span>

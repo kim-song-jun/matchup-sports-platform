@@ -155,7 +155,7 @@ export function AdminCardList<T>({
                   {model.title}
                 </p>
                 {model.subtitle != null && (
-                  <p className="text-[length:var(--font-size-caption)] text-gray-400 mt-0.5 truncate">
+                  <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] mt-0.5 truncate">
                     {model.subtitle}
                   </p>
                 )}
@@ -178,7 +178,7 @@ export function AdminCardList<T>({
                     className="flex items-center gap-1.5 text-[length:var(--font-size-label)] text-[var(--text-muted)] tabular-nums min-w-0"
                   >
                     {m.icon && (
-                      <span className="shrink-0 text-gray-400 inline-flex" aria-hidden="true">
+                      <span className="shrink-0 text-[var(--text-muted)] inline-flex" aria-hidden="true">
                         {m.icon}
                       </span>
                     )}

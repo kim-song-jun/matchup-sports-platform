@@ -398,7 +398,7 @@ export function TermsView() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-bold text-[var(--text-strong)]">{policy.name}</p>
-                      <p className="mt-1 truncate text-xs text-gray-400">{policy.code}</p>
+                      <p className="mt-1 truncate text-xs text-[var(--text-muted)]">{policy.code}</p>
                     </div>
                     <AdminStatusPill
                       status={current?.status ?? 'draft'}
@@ -582,7 +582,7 @@ export function TermsView() {
               <div className="rounded-2xl bg-[var(--surface-soft)] p-4">
                 <p className="mb-3 text-xs font-bold text-[var(--text-muted)]">
                   실제 본문 미리보기
-                  <span className="ml-2 font-medium text-gray-400">{form.version || '버전 미입력'}</span>
+                  <span className="ml-2 font-medium text-[var(--text-muted)]">{form.version || '버전 미입력'}</span>
                 </p>
                 {/* "실제"라는 라벨에 걸맞게 사용자 화면(terms-client)과 같은 컴포넌트를 그대로
                     그린다 — 예전엔 여기만의 타이포그래피(text-sm leading-7)로 근사치를 그려

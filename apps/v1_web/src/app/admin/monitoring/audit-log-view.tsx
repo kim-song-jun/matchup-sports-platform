@@ -76,7 +76,7 @@ function shortId(id: string | null | undefined): string {
 
 /** ID 는 축약해 보여주되 전문을 title 로 달아 둔다 — 축약본만으로는 대상을 특정할 수 없다. */
 function IdCell({ id, href }: { id: string | null | undefined; href?: string | null }) {
-  if (!id) return <span className="text-gray-400">—</span>;
+  if (!id) return <span className="text-[var(--text-muted)]">—</span>;
   const cls = 'font-mono text-[length:var(--font-size-micro)]';
   // 링크를 걸 수 있는 대상만 링크가 된다 — 상세 화면이 없거나 targetId 가 그 라우트의
   // id 가 아닌 타입은 그대로 텍스트다(잘못된 링크는 없는 링크보다 나쁘다).
@@ -97,7 +97,7 @@ function IdCell({ id, href }: { id: string | null | undefined; href?: string | n
 
 /** 사유는 길면 잘리되 전문을 title 로 보존한다(카드에서는 한 글자만 남아 의미가 사라졌다). */
 function ReasonCell({ reason }: { reason: string | null | undefined }) {
-  if (!reason) return <span className="text-gray-400">—</span>;
+  if (!reason) return <span className="text-[var(--text-muted)]">—</span>;
   return (
     <span className="block max-w-[220px] truncate text-[var(--text-muted)]" title={reason}>
       {reason}
@@ -220,7 +220,7 @@ function StatusLogDetailModal({
           value={
             <span className="flex items-center gap-1.5">
               <AdminStatusPill status={log.fromStatus} />
-              <span className="text-gray-400" aria-hidden="true">→</span>
+              <span className="text-[var(--text-muted)]" aria-hidden="true">→</span>
               <AdminStatusPill status={log.toStatus} />
             </span>
           }
@@ -389,7 +389,7 @@ function StatusLogPanel({ targetType }: { targetType: TargetTypeFilter }) {
             render: (row) => (
               <span className="flex items-center gap-1 flex-wrap">
                 <AdminStatusPill status={row.fromStatus} />
-                <span className="text-gray-400 text-[length:var(--font-size-micro)]" aria-hidden="true">→</span>
+                <span className="text-[var(--text-muted)] text-[length:var(--font-size-micro)]" aria-hidden="true">→</span>
                 <AdminStatusPill status={row.toStatus} />
               </span>
             ),

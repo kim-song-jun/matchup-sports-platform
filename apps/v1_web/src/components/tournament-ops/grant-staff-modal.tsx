@@ -237,7 +237,7 @@ export function GrantStaffModal({
             onClick={() => !pending && onClose()}
             disabled={pending}
             aria-label="모달 닫기"
-            className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-gray-400 hover:text-[var(--text-muted)] hover:bg-[var(--surface-soft)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-40"
+            className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-[var(--text-muted)] hover:text-[var(--text-muted)] hover:bg-[var(--surface-soft)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-40"
           >
             <X size={18} aria-hidden="true" />
           </button>
@@ -288,7 +288,7 @@ export function GrantStaffModal({
                     <Search
                       size={16}
                       aria-hidden="true"
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none"
                     />
                     <input
                       id="grant-staff-user-search"
@@ -301,7 +301,7 @@ export function GrantStaffModal({
                       autoComplete="off"
                       aria-describedby="grant-staff-user-search-help"
                       aria-invalid={submitAttempted && selected === null ? true : undefined}
-                      className="w-full h-[44px] pl-9 pr-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] placeholder:text-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors disabled:opacity-50"
+                      className="w-full h-[44px] pl-9 pr-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors disabled:opacity-50"
                     />
                   </div>
 

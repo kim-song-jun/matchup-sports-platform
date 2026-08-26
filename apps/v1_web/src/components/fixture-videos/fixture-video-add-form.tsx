@@ -128,7 +128,7 @@ export function FixtureVideoAddForm({
             maxLength={1000}
             disabled={isPending}
             placeholder="https://youtu.be/..."
-            className="h-[44px] px-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] placeholder:text-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors disabled:opacity-50"
+            className="h-[44px] px-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors disabled:opacity-50"
           />
           <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
             유튜브 등 http·https 로 시작하는 주소만 등록할 수 있어요.
@@ -169,7 +169,7 @@ export function FixtureVideoAddForm({
           maxLength={80}
           disabled={isPending}
           placeholder="예: 전반 하이라이트"
-          className="h-[44px] px-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] placeholder:text-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors disabled:opacity-50"
+          className="h-[44px] px-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors disabled:opacity-50"
         />
       </div>
 

@@ -106,7 +106,7 @@ export function GateConfirmModal({
             onClick={() => !pending && onClose()}
             disabled={pending}
             aria-label="모달 닫기"
-            className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-gray-400 hover:text-[var(--text-muted)] hover:bg-[var(--surface-soft)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-40"
+            className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-[var(--text-muted)] hover:text-[var(--text-muted)] hover:bg-[var(--surface-soft)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-40"
           >
             <X size={18} aria-hidden="true" />
           </button>
@@ -146,13 +146,13 @@ export function GateConfirmModal({
                 placeholder="이 작업이 왜 필요한지 남겨 주세요. 감사 로그에 그대로 기록돼요."
                 className={[
                   'px-3 py-2.5 text-[13px] bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] resize-none',
-                  'placeholder:text-gray-400',
+                  'placeholder:text-[var(--text-muted)]',
                   'focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
                   'transition-colors disabled:opacity-50',
                 ].join(' ')}
                 aria-required="true"
               />
-              <p className="text-[length:var(--font-size-caption)] text-right text-gray-400 tabular-nums">
+              <p className="text-[length:var(--font-size-caption)] text-right text-[var(--text-muted)] tabular-nums">
                 {reason.length} / {REASON_MAX}
               </p>
             </div>

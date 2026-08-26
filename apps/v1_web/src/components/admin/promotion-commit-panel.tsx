@@ -221,7 +221,7 @@ export function PromotionCommitPanel({ preview, submitting, onCommit }: Promotio
                           value={notes[entry.teamId] ?? ''}
                           onChange={(e) => setNotes((prev) => ({ ...prev, [entry.teamId]: e.target.value }))}
                           placeholder="수정 사유 (예: 다음 시즌 불참 통보)"
-                          className="h-[44px] w-full rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)] placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50"
+                          className="h-[44px] w-full rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)] placeholder:text-[var(--text-muted)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50"
                         />
                       </span>
                     )}

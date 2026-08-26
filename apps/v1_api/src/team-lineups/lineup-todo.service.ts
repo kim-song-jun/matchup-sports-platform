@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { V1GameLineupState } from '@prisma/client';
 import type { V1AuthUser } from '../auth/v1-auth-user';
+// 주차 규칙은 공용 모듈이 소유한다. 아래 private 메서드는 "DB 에서 형제 경기일을 모으는" 부분만
+// 담당하므로 이름이 겹친다 — 별칭으로 구분한다.
+import { resolveLeagueWeekNumbers as resolveWeekNumbersFromStartAts } from '../league-matches/league-week-number';
 import { PrismaService } from '../prisma/prisma.service';
 
 /** 라인업이 아직 끝나지 않은 상태. 완료(SUBMITTED/LOCKED)는 아예 목록에 오르지 않는다. */
 export type LineupTodoState = 'MISSING' | 'DRAFT';
-
-/** 리그 주차의 기준 날짜 — 리그 일정은 KST 기준이다(`resolveLeagueWeekNumber`와 같은 포맷터). */
-const KST_DAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' });
 
 export type LineupTodo = {
   source: 'TOURNAMENT_FIXTURE' | 'TEAM_MATCH';
@@ -275,25 +275,16 @@ export class LineupTodoService {
       select: { leagueId: true, startAt: true },
     });
 
-    const daysByLeagueId = new Map<string, Set<string>>();
+    const startAtsByLeagueId = new Map<string, Date[]>();
     for (const sibling of siblings) {
       if (sibling.leagueId === null) continue;
-      const days = daysByLeagueId.get(sibling.leagueId);
-      if (days === undefined) daysByLeagueId.set(sibling.leagueId, new Set([KST_DAY.format(sibling.startAt)]));
-      else days.add(KST_DAY.format(sibling.startAt));
+      const bucket = startAtsByLeagueId.get(sibling.leagueId);
+      if (bucket === undefined) startAtsByLeagueId.set(sibling.leagueId, [sibling.startAt]);
+      else bucket.push(sibling.startAt);
     }
-    const sortedDaysByLeagueId = new Map<string, string[]>();
-    for (const [id, days] of daysByLeagueId) sortedDaysByLeagueId.set(id, [...days].sort());
-
-    const weekNumbers = new Map<string, number>();
-    for (const match of matches) {
-      if (match.leagueId === null) continue;
-      const index = sortedDaysByLeagueId.get(match.leagueId)?.indexOf(KST_DAY.format(match.startAt)) ?? -1;
-      // 자기 자신이 목록에 없는 경우(소프트삭제된 대진)는 순번을 셀 근거가 없다 — 위 두 화면과
-      // 같은 폴백(1주차)을 쓴다.
-      weekNumbers.set(match.id, index >= 0 ? index + 1 : 1);
-    }
-    return weekNumbers;
+    // 순번 규칙 자체는 공용 모듈이 소유한다 — 같은 규칙이 화면마다 복제되면서 새 소비처가
+    // 저장된 제목을 쓰는 함정을 다시 밟은 전례가 있다(league-week-number.ts 헤더 참고).
+    return resolveWeekNumbersFromStartAts(startAtsByLeagueId, matches);
   }
 
   /**

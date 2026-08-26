@@ -291,7 +291,14 @@ function ClaimFixturesCard({
               // 끊겨 읽힌다 — 목적지를 한 문장으로 붙여 준다.
               aria-label={`${fixture.title} 경기 상세로 이동, 아직 연결되지 않은 참가자 ${fixture.claimableCount}명`}
             >
-              <span className="font-medium text-[var(--text-strong)]">{fixture.title}</span>
+              <span className="flex flex-wrap items-baseline gap-x-1.5">
+                <span className="font-medium text-[var(--text-strong)]">{fixture.title}</span>
+                {/* 주차 라벨만으로는 어느 경기인지 확신하기 어렵다 — 같은 주차에 여러 경기가
+                    설 수 있고, 재일정도 흔하다. 경기일을 함께 보여 라벨을 대조 가능하게 한다. */}
+                <span className="text-xs text-[var(--text-muted)]">
+                  {formatTournamentDateTimeShort(fixture.startAt) ?? '일정 미정'}
+                </span>
+              </span>
               <span className="text-[var(--text-muted)]">
                 연결 안 된 참가자 {fixture.claimableCount}명
                 <span aria-hidden="true"> →</span>

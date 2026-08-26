@@ -80,6 +80,7 @@ function makeService(seed: {
   fixtures?: FixtureSeed[];
   participants?: { id: string; gameId: string }[];
   links?: { participantId: string; userId: string }[];
+  leagueTitle?: string;
 }) {
   const fixtures = seed.fixtures ?? [];
   const prisma = {
@@ -93,8 +94,9 @@ function makeService(seed: {
         fixtures
           .filter((row) => matchesFixtureWhere(row, where))
           .map((row) => ({
+            // `title` 은 일부러 돌려주지 않는다 — 서비스가 더 이상 select 하지 않는다.
+            // 가짜가 실제보다 많이 주면 "저장된 제목을 쓰지 않는다"는 계약이 스펙에서 새어 나간다.
             id: row.id,
-            title: row.title,
             startAt: row.startAt,
             game: row.gameId === null ? null : { id: row.gameId },
           })),
@@ -105,6 +107,20 @@ function makeService(seed: {
     },
     v1ParticipantIdentityLinkCurrent: {
       findMany: jest.fn().mockResolvedValue(seed.links ?? []),
+    },
+    // 라벨용 리그명 + 주차 파생에 쓰는 형제 경기일. 실제 쿼리와 같은 조건(`deletedAt: null`)만
+    // 건다 — 취소된 대진도 경기일로 세야 다른 화면과 주차가 어긋나지 않는다.
+    v1League: {
+      findUnique: jest.fn(async ({ where }: { where: { id: string } }) => {
+        const siblings = fixtures.filter(
+          (row) => row.leagueId === where.id && row.deletedAt === null,
+        );
+        if (siblings.length === 0 && where.id !== 'league-1') return null;
+        return {
+          title: seed.leagueTitle ?? '가을 리그',
+          teamMatches: siblings.map((row) => ({ startAt: row.startAt })),
+        };
+      }),
     },
   };
   const service = new LeagueClaimableFixturesService(prisma as unknown as PrismaService);
@@ -262,7 +278,8 @@ describe('LeagueClaimableFixturesService.listClaimableFixtures', () => {
     expect(result.fixtures).toEqual([
       {
         teamMatchId: 'tm-partial',
-        title: '가을 리그 tm-partial',
+        // 저장된 제목("가을 리그 tm-partial")이 아니라 startAt 에서 파생한 라벨이다.
+        title: '가을 리그 1주차',
         startAt: '2026-08-01T10:00:00.000Z',
         claimableCount: 1,
       },
@@ -317,5 +334,58 @@ describe('LeagueClaimableFixturesService.listClaimableFixtures', () => {
     expect(result.fixtures).toHaveLength(3);
     expect(prisma.v1GameParticipant.findMany).toHaveBeenCalledTimes(1);
     expect(prisma.v1ParticipantIdentityLinkCurrent.findMany).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * 라벨은 저장된 `V1TeamMatch.title` 이 아니라 `startAt` 에서 파생한다.
+   * 재일정(`updateFixture`)이 `startAt` 만 갱신하고 `title` 은 그대로 두기 때문에, 저장값을
+   * 쓰면 일정을 옮긴 대진이 옛 주차를 계속 말한다(Copilot 리뷰 지적, PR #787).
+   */
+  it('주차는 KST 경기일 순번에서 파생한다 — 대진 제목에 박제된 주차를 쓰지 않는다', async () => {
+    const { service } = makeService({
+      myTeamIds: ['team-mine'],
+      leagueTitle: '가을 리그',
+      fixtures: [
+        // 제목에는 "3주차"가 박제돼 있지만 경기일은 이 리그에서 가장 이르다 → 1주차여야 한다.
+        fixture({
+          id: 'tm-moved',
+          gameId: 'game-moved',
+          title: '가을 리그 3주차 1경기',
+          startAt: new Date('2026-08-01T10:00:00.000Z'),
+        }),
+        fixture({
+          id: 'tm-later',
+          gameId: 'game-later',
+          title: '가을 리그 1주차 1경기',
+          startAt: new Date('2026-08-08T10:00:00.000Z'),
+        }),
+      ],
+      participants: [
+        { id: 'p-moved', gameId: 'game-moved' },
+        { id: 'p-later', gameId: 'game-later' },
+      ],
+    });
+
+    const result = await service.listClaimableFixtures(user, 'league-1');
+
+    expect(result.fixtures.map((row) => row.title)).toEqual(['가을 리그 1주차', '가을 리그 2주차']);
+  });
+
+  it('같은 날 두 경기는 같은 주차로 부른다 — 하루에 여러 경기를 치르는 리그가 실재한다', async () => {
+    const { service } = makeService({
+      myTeamIds: ['team-mine'],
+      fixtures: [
+        fixture({ id: 'tm-a', gameId: 'game-a', startAt: new Date('2026-08-01T10:00:00.000Z') }),
+        fixture({ id: 'tm-b', gameId: 'game-b', startAt: new Date('2026-08-01T11:00:00.000Z') }),
+      ],
+      participants: [
+        { id: 'p-a', gameId: 'game-a' },
+        { id: 'p-b', gameId: 'game-b' },
+      ],
+    });
+
+    const result = await service.listClaimableFixtures(user, 'league-1');
+
+    expect(result.fixtures.map((row) => row.title)).toEqual(['가을 리그 1주차', '가을 리그 1주차']);
   });
 });

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { V1AuthUser } from '../auth/v1-auth-user';
+import { resolveLeagueWeekNumbers } from '../league-matches/league-week-number';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
@@ -41,13 +42,20 @@ import { PrismaService } from '../prisma/prisma.service';
  * 대가를 치를 이유가 없다.
  *
  * ## 성능
- * 대진 수와 무관하게 **조회 4번**으로 끝난다(멤버십 → 대진 → 참가자 IN → 연결 IN).
+ * 대진 수와 무관하게 **조회 5번**으로 끝난다(멤버십 → 대진 → 참가자 IN → 연결 IN → 리그+형제 경기일).
  * 대진마다 조회를 도는 N+1 은 금지 — `GamesService.listMyTournamentFixtures` 가 세운
  * 같은 관례를 따른다.
  */
 export type LeagueClaimableFixtureRow = {
   teamMatchId: string;
-  /** 사람이 읽는 제목. 리그 대진은 "가을 리그 3주차 1경기" 형태로 생성된다. */
+  /**
+   * 사람이 읽는 라벨 — "<리그명> N주차".
+   *
+   * `V1TeamMatch.title` 을 그대로 쓰지 않는다. 그 값에는 대진 **생성 시점**의 주차가 박제돼
+   * 있는데 재일정(`updateFixture`)은 `startAt` 만 갱신하므로, 일정을 옮긴 대진은 옛 주차를
+   * 계속 말한다. 주차는 `startAt` 에서 매번 파생한다 — 규칙은 공개 경기기록·어드민 영상
+   * 화면과 같은 단일 소스(`league-week-number.ts`)를 쓴다.
+   */
   title: string;
   startAt: string;
   /** 그 대진에서 아직 아무 계정에도 연결되지 않은 참가자 수. */
@@ -107,7 +115,7 @@ export class LeagueClaimableFixturesService {
         game: { is: { currentOfficialRevisionId: { not: null } } },
         OR: [{ hostTeamId: { in: myTeamIds } }, { approvedApplicantTeamId: { in: myTeamIds } }],
       },
-      select: { id: true, title: true, startAt: true, game: { select: { id: true } } },
+      select: { id: true, startAt: true, game: { select: { id: true } } },
       orderBy: { startAt: 'asc' },
     });
 
@@ -157,6 +165,18 @@ export class LeagueClaimableFixturesService {
       }
     }
 
+    // 라벨용 리그명 + 주차 파생에 필요한 형제 경기일. 한 번의 조회로 둘 다 얻는다.
+    // 형제 조건은 `deletedAt: null` 뿐이다 — 취소된 대진도 경기일로 세야 공개 경기기록·
+    // 어드민 영상 화면과 주차가 어긋나지 않는다(league-week-number.ts 참고).
+    const league = await this.prisma.v1League.findUnique({
+      where: { id: leagueId },
+      select: { title: true, teamMatches: { where: { deletedAt: null }, select: { startAt: true } } },
+    });
+    const weekNumbers = resolveLeagueWeekNumbers(
+      new Map([[leagueId, (league?.teamMatches ?? []).map((sibling) => sibling.startAt)]]),
+      fixtures.map((fixture) => ({ id: fixture.id, leagueId, startAt: fixture.startAt })),
+    );
+
     return {
       leagueId,
       fixtures: fixtures.flatMap((fixture) => {
@@ -169,7 +189,9 @@ export class LeagueClaimableFixturesService {
         return [
           {
             teamMatchId: fixture.id,
-            title: fixture.title,
+            // 리그명이 비어 있을 리는 없지만(대진이 있으면 리그가 있다), 라벨이 "undefined
+            // N주차"가 되는 것보다는 주차만 말하는 편이 낫다.
+            title: [league?.title, `${weekNumbers.get(fixture.id) ?? 1}주차`].filter(Boolean).join(' '),
             startAt: fixture.startAt.toISOString(),
             claimableCount,
           },

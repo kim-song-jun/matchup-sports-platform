@@ -1931,6 +1931,11 @@ button:disabled {
   font-size: var(--font-size-label); /* 13px — R-T2 토큰 */
   font-weight: 700;
   white-space: nowrap;
+  /* 이 클래스는 선택 칩(<button>)과 필터 링크(<Link> → <a>) 양쪽에 붙는다.
+   * <a> 는 커서가 이미 pointer 라 이 선언이 실제로 필요한 건 <button> 쪽이지만,
+   * 커서는 소비처가 매번 인라인으로 붙일 게 아니라 컴포넌트의 성질이므로 여기서
+   * 한 번에 책임진다. */
+  cursor: pointer;
 }
 
 /* a11y R-A2: 키보드 포커스 링 — .tm-btn/:focus-visible 패턴과 통일 */

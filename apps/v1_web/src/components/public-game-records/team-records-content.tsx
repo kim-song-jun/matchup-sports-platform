@@ -17,7 +17,31 @@ import {
   teamRecordResultLabel,
 } from './format';
 import { resultChipStyle, resultStripeStyle } from './result-emphasis';
-import type { PublicTeamRecordEvent, PublicTeamRecordItem, PublicTeamRecordsResponse } from './types';
+import type {
+  PublicTeamRecordEvent,
+  PublicTeamRecordItem,
+  PublicTeamRecordsResponse,
+  TeamRecordCategory,
+  TeamRecordSummaryTotals,
+  TeamRecordTypeFilter,
+} from './types';
+
+/**
+ * U2 -- 탭 4개, 순서 고정. '전체'만 로컬 전용 값(`'all'`)이고 나머지 세 값은
+ * 서버가 그대로 받는 `type` 쿼리 값(`TeamRecordCategory`)과 동일하다.
+ */
+const TEAM_RECORD_TYPE_TABS: readonly { readonly key: TeamRecordTypeFilter; readonly label: string }[] = [
+  { key: 'all', label: '전체' },
+  { key: 'league', label: '정규 리그' },
+  { key: 'tournament', label: '대회' },
+  { key: 'friendly', label: '친선' },
+];
+
+const TEAM_RECORD_TYPE_LABEL: Readonly<Record<TeamRecordCategory, string>> = {
+  league: '정규 리그',
+  tournament: '대회',
+  friendly: '친선',
+};
 
 /** 대회 소스면 대회 상세로, 팀매치 소스면 팀매치 상세로 — exactly-one-source라 항상 둘 중
  * 하나만 있다(V1Game의 CHECK 제약, public-team-records.service.ts 주석 참고). */
@@ -46,7 +70,15 @@ function TeamRecordEventRow({ event }: { event: PublicTeamRecordEvent }) {
         <span className="tab-num" style={{ color: 'var(--text-caption)', fontSize: 12 }}>{event.jerseyNumber}</span>
       ) : null}
       <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-strong)' }}>
-        {presentGameEventParticipantName(event.type, event.participantName)}
+        {/* 열어도 되는지는 서버가 `profileHref` 로 판단해 내려준다 — 여기서 동의·계정
+            유무를 다시 따지지 않는다(경기 상세의 ProfileLink 와 같은 규칙). */}
+        {event.profileHref !== null ? (
+          <Link href={event.profileHref} style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 2 }}>
+            {presentGameEventParticipantName(event.type, event.participantName)}
+          </Link>
+        ) : (
+          presentGameEventParticipantName(event.type, event.participantName)
+        )}
       </span>
     </span>
   );
@@ -238,11 +270,21 @@ export function TeamRecordsContent({
   hasNextPage,
   isFetchingNextPage,
   onLoadMore,
+  activeType,
+  onChangeType,
+  activeSeason,
+  onChangeSeason,
 }: {
   data: PublicTeamRecordsResponse;
   hasNextPage?: boolean;
   isFetchingNextPage?: boolean;
   onLoadMore?: () => void;
+  /** U2 -- 미전달 시 '전체' 고정(다른 화면이 아직 탭 없이 이 컴포넌트를 쓸 수 있어 optional). */
+  activeType?: TeamRecordTypeFilter;
+  onChangeType?: (type: TeamRecordTypeFilter) => void;
+  /** 미전달(`undefined`) = '전체 시즌'. 드롭다운 자체는 미전달 시 렌더하지 않는다(optional). */
+  activeSeason?: string;
+  onChangeSeason?: (season: string | undefined) => void;
 }) {
   // 여러 행을 동시에 펼칠 수 있게 Set으로 관리한다 -- 아코디언끼리 서로 배타적이어야
   // 할 이유가 없고(다른 경기 두 개를 나란히 비교해 보고 싶을 수 있다), gameId는
@@ -258,26 +300,84 @@ export function TeamRecordsContent({
     });
   }
 
+  const resolvedActiveType: TeamRecordTypeFilter = activeType ?? 'all';
+  // U2 -- '전체'가 아닌 탭이면 KPI를 서버가 이미 계산해 보낸 `summary.byType[종류]`로
+  // 교체한다. 새 계산 없이 그대로 꺼내 쓴다(과제 지시: "새 계산 없이 이미 온 값 그대로").
+  const activeSummary: TeamRecordSummaryTotals =
+    resolvedActiveType === 'all' ? data.summary : data.summary.byType[resolvedActiveType];
+  const emptyStateCopy =
+    resolvedActiveType === 'all'
+      ? { title: '아직 공식 경기 기록이 없어요', sub: '대회·팀매치 결과가 확정되면 이곳에 표시돼요.' }
+      : {
+          title: `아직 ${TEAM_RECORD_TYPE_LABEL[resolvedActiveType]} 경기가 없어요`,
+          sub: `${TEAM_RECORD_TYPE_LABEL[resolvedActiveType]} 결과가 확정되면 이곳에 표시돼요.`,
+        };
+
   return (
     <div style={{ padding: '16px 20px 40px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {onChangeType ? (
+        <div role="tablist" aria-label="경기 종류" className="tm-seg-tabs" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+          {TEAM_RECORD_TYPE_TABS.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              role="tab"
+              aria-selected={resolvedActiveType === tab.key}
+              data-active={resolvedActiveType === tab.key}
+              className="tm-seg-tab"
+              onClick={() => onChangeType(tab.key)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {onChangeSeason ? (
+        // 시즌 데이터가 1개뿐이어도 숨기지 않는다 -- 자기 위치를 학습하게 그대로
+        // 보여준다(과제 지시). 선택지는 서버 `availableSeasons`(하드코딩 연도 없음).
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <label
+            htmlFor="team-records-season"
+            className="tm-text-caption"
+            style={{ color: 'var(--text-muted)', flexShrink: 0 }}
+          >
+            시즌
+          </label>
+          <select
+            id="team-records-season"
+            className="tm-input tm-input-select"
+            style={{ flex: 1, minHeight: 44 }}
+            value={activeSeason ?? 'all'}
+            onChange={(event) => onChangeSeason(event.target.value === 'all' ? undefined : event.target.value)}
+          >
+            <option value="all">전체 시즌</option>
+            {data.availableSeasons.map((season) => (
+              <option key={season} value={season}>
+                {season}시즌
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : null}
+
       <Card>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-          <KPIStat label="경기" value={data.summary.played} unit="경기" />
-          <KPIStat label="승·무·패" value={`${data.summary.won}·${data.summary.drawn}·${data.summary.lost}`} />
-          <KPIStat label="득실차" value={data.summary.goalsFor - data.summary.goalsAgainst} />
+          <KPIStat label="경기" value={activeSummary.played} unit="경기" />
+          <KPIStat label="승·무·패" value={`${activeSummary.won}·${activeSummary.drawn}·${activeSummary.lost}`} />
+          <KPIStat label="득실차" value={activeSummary.goalsFor - activeSummary.goalsAgainst} />
         </div>
       </Card>
 
       <section>
         <h3 className="tm-hub-section-title" style={{ marginBottom: 10 }}>경기 기록</h3>
         {data.items.length === 0 ? (
-          <EmptyState title="아직 공식 경기 기록이 없어요" sub="대회·팀매치 결과가 확정되면 이곳에 표시돼요." />
+          <EmptyState title={emptyStateCopy.title} sub={emptyStateCopy.sub} />
         ) : (
           <Card pad={0}>
             {data.items.map((item) => {
               const href = recordHref(item);
-              // Rolling deploy 중 구 API 응답에는 events 필드가 없을 수 있다.
-              const hasEvents = (item.events?.length ?? 0) > 0;
+              const hasEvents = item.events.length > 0;
               const isExpanded = hasEvents && expandedGameIds.has(item.gameId);
               const panelId = `team-record-events-${item.gameId}`;
               const row = (

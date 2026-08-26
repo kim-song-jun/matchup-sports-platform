@@ -199,6 +199,22 @@ const FEATURED_QA_DEFAULT_MARKETING: TournamentMarketingCopy = {
 export type PersonaSeed = { readonly id: string; readonly email: string; readonly phone: string; readonly nickname: string; readonly realName: string; readonly gender: string };
 export type TeamSeed = { readonly id: string; readonly name: string };
 
+export async function ensureAlphaQaRecordConsent(
+  tx: Pick<Prisma.TransactionClient, 'v1UserRecordConsent'>,
+  userId: string,
+) {
+  return tx.v1UserRecordConsent.upsert({
+    where: { userId },
+    // QA 페르소나가 화면에서 철회한 선택은 다음 배포가 다시 켜지 않게 보존한다.
+    update: {},
+    create: {
+      userId,
+      state: 'GRANTED',
+      policyHash: 'alpha-qa-fixture-v1',
+    },
+  });
+}
+
 export const PERSONAS: readonly PersonaSeed[] = [
   { id: 'aa200000-0000-4000-8000-000000000001', email: 'alpha.qa.red@teameet.test', phone: '01001000001', nickname: '알파레드', realName: '김알파', gender: 'male' },
   { id: 'aa200000-0000-4000-8000-000000000002', email: 'alpha.qa.blue@teameet.test', phone: '01001000002', nickname: '알파블루', realName: '이테스트', gender: 'female' },
@@ -230,7 +246,10 @@ const FEATURED_TEAMS: readonly TeamSeed[] = [
   { id: 'ab300000-0000-4000-8000-000000000004', name: '팀밋 선라이즈' },
 ] as const;
 
-function assertAlphaSeedAllowed(env: NodeJS.ProcessEnv) {
+// export: seed-alpha-league-qa.ts 가 같은 4중 가드(NODE_ENV·확인 플래그·alpha DB
+// 호스트/이름)를 그대로 재사용한다 — 리그 QA 시드도 alpha 전용이라 게이트가 갈라지면
+// 위험하므로 단일 소스를 공유한다.
+export function assertAlphaSeedAllowed(env: NodeJS.ProcessEnv) {
   if (env.NODE_ENV !== 'production') {
     throw new Error('Alpha tournament QA seed requires the production-mode alpha image.');
   }
@@ -367,6 +386,9 @@ export async function ensureTeamRoster(
         bio: userBio,
       },
     });
+    // 완료 대회의 개인 수상/경기 기록을 공개 프로필에서 실제 API로 검증할 수 있는
+    // alpha 전용 가상 사용자다. 최초 행만 GRANTED로 만들고 이후 철회는 덮지 않는다.
+    await ensureAlphaQaRecordConsent(tx, user.id);
     const team = await tx.v1Team.upsert({
       where: { id: teamSeed.id },
       update: {

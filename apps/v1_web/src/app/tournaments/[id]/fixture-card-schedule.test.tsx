@@ -13,6 +13,7 @@ function makeGroupFixture(scheduledAt: string | null): V1TournamentFixture {
     scheduledAt,
     venue: null,
     status: 'scheduled',
+    liveStatus: 'scheduled',
     homeRegistrationId: 'reg-home',
     homeTeamId: 'team-home',
     homeTeamName: '서울 유나이티드',

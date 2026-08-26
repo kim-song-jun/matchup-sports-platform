@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import type { CSSProperties, InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react';
+import type { CSSProperties, InputHTMLAttributes, PointerEvent, ReactNode, TextareaHTMLAttributes } from 'react';
 import { useRef } from 'react';
 import { ChevronRightIcon } from './icons';
 import {
@@ -230,11 +230,31 @@ type CardProps = {
   pad?: number;
   className?: string;
   style?: CSSProperties;
+  /** 카드를 드래그 손잡이로 쓰는 화면(라인업 명단 → 피치)에서만 넘긴다. 카드는 기본적으로
+   * 표시용 컨테이너라 클릭 핸들러를 두지 않는다 — 누를 수 있는 것은 카드 안 버튼·링크가
+   * 맡는다. 포인터 제스처는 그 규칙을 깨지 않으면서 필요한 최소 확장이다. */
+  onPointerDown?: (event: PointerEvent<HTMLDivElement>) => void;
+  onPointerUp?: (event: PointerEvent<HTMLDivElement>) => void;
+  onPointerCancel?: (event: PointerEvent<HTMLDivElement>) => void;
 };
 
-export function Card({ children, pad = 20, className = '', style }: CardProps) {
+export function Card({
+  children,
+  pad = 20,
+  className = '',
+  style,
+  onPointerDown,
+  onPointerUp,
+  onPointerCancel,
+}: CardProps) {
   return (
-    <div className={`tm-card ${className}`.trim()} style={{ padding: pad, ...style }}>
+    <div
+      className={`tm-card ${className}`.trim()}
+      style={{ padding: pad, ...style }}
+      onPointerDown={onPointerDown}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
+    >
       {children}
     </div>
   );

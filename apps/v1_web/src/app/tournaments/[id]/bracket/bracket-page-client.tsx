@@ -398,6 +398,19 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
     .filter((row, index, arr) => arr.findIndex((x) => x.key === row.key) === index)
     .sort((a, b) => a.position - b.position);
 
+  // 좌(순위표) 칼럼에 **실제로 그릴 게 있는지**. 예전엔 이걸 따지지 않고 항상 2열 그리드를
+  // 폈다 — 그래서 순위표가 없는 상태(대회 초반이라 성적이 아직 없거나, 애초에 조별 순위가
+  // 없는 knockout 포맷)에서는 왼쪽 절반이 빈 채로 넓게 잡히고 오른쪽에 대진표만 치우쳐
+  // 붙었다(오너 지적: 대진표 빈 상태 화면). 반대로 league 포맷은 우측(대진표)이 없는데
+  // 2열이라 오른쪽이 비었다. 칼럼이 하나뿐이면 그리드를 1열로 접어 그 칼럼이 가운데 폭을
+  // 온전히 쓰게 한다.
+  const hasStandingsColumn =
+    format === 'league'
+      ? allLeagueRows.length > 0 || fixtures.length === 0
+      : format === 'group_knockout' && hasGroupStandings;
+  const hasBracketColumn = format === 'knockout' || format === 'group_knockout';
+  const isTwoColumn = hasStandingsColumn && hasBracketColumn;
+
   return (
     // §빈 상태 재균형(fix/v1-publish) — 조별리그 미종료 등으로 대진표 우 컬럼이
     // BracketEmpty 하나뿐일 만큼 콘텐츠가 짧으면, .tm-scroll-area(뷰포트 - 상단바 -
@@ -422,7 +435,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
           <p>경기 일정과 조별 순위, 결선 진행 상황을 확인하세요.</p>
         </div>
         <span className="tm-bracket-page-format">
-          {format === 'league' ? '리그' : format === 'knockout' ? '토너먼트' : '조별리그 + 토너먼트'}
+          {format === 'league' ? '리그 방식' : format === 'knockout' ? '토너먼트' : '조별리그 + 토너먼트'}
         </span>
       </header>
       {/* 진행 단계 */}
@@ -480,8 +493,21 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
           {/* 2열 그리드: 좌=순위표 / 우=대진표 (데스크탑) — 탭 전환용 조건 안이지만
               활성 탭일 때만 그리드를 그린다. 아래 흐름 네비게이터(§FlowNav)는 탭과
               무관한 페이지 레벨 이동이라 이 분기 밖(항상)으로 옮겼다. */}
-          <div className={`tm-tourn-sub-grid tm-bracket-page-grid ${format === 'group_knockout' ? 'tm-tourn-sub-grid-6040' : 'tm-tourn-sub-grid-2col'} ${format === 'group_knockout' && !showBracket ? 'tm-bracket-page-grid-empty' : ''} ${showBracket && knockoutRoundCount <= 1 ? 'tm-bracket-page-grid-slim-bracket' : ''}`}>
-            {/* 좌: 순위표 */}
+          <div
+            className={[
+              'tm-tourn-sub-grid',
+              'tm-bracket-page-grid',
+              // 폭 배분 규칙은 **두 칼럼이 다 있을 때만** 의미가 있다. 한쪽이 없으면
+              // 붙이지 않아 `.tm-tourn-sub-grid` 기본값(1열)으로 떨어진다.
+              isTwoColumn ? (format === 'group_knockout' ? 'tm-tourn-sub-grid-6040' : 'tm-tourn-sub-grid-2col') : '',
+              isTwoColumn && format === 'group_knockout' && !showBracket ? 'tm-bracket-page-grid-empty' : '',
+              isTwoColumn && showBracket && knockoutRoundCount <= 1 ? 'tm-bracket-page-grid-slim-bracket' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+          >
+            {/* 좌: 순위표 — 그릴 게 없으면 빈 칼럼을 남기지 않고 아예 렌더하지 않는다. */}
+            {hasStandingsColumn ? (
             <div className="tm-tourn-sub-col" style={{ padding: '20px 20px 0' }}>
               {format === 'league' && (
                 <section>
@@ -507,9 +533,10 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
                 <div className="tm-hub-empty">경기 일정이 아직 없어요.</div>
               )}
             </div>
+            ) : null}
 
             {/* 우: 대진표 */}
-            {(format === 'knockout' || format === 'group_knockout') && (
+            {hasBracketColumn && (
               <div className="tm-tourn-sub-col" style={{ padding: '20px 20px 0' }}>
                 <section>
                   <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>

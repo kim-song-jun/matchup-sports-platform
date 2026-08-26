@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 
 import { execFileSync } from 'node:child_process';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 // Declared here rather than beside parseStatements because selfTest() runs
 // during module evaluation, before a class declaration further down the file
@@ -191,6 +194,27 @@ const REVIEWED_NON_ADDITIVE = [
       "ALTER TABLE v1_game_result_participants ENABLE TRIGGER v1_guard_result_participant_mutation",
     reason:
       "PR #563 재수행(#600 이후 alpha 차단 복구). Restores the guard disabled above, in the same transaction. If the migration fails at any point the transaction rolls back and the trigger is never left off — the disabled state cannot outlive this file. Reviewed 2026-08-20.",
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260818090000_v1_tournament_record_disclosure_consent/migration.sql',
+    statement:
+      "INSERT INTO \"v1_managed_terms_placements\" (\"id\", \"policy_id\", \"context\", \"requirement\", \"display_order\", \"is_active\", \"created_at\", \"updated_at\") VALUES ( '7ef702a4-6289-4913-a31a-319de15bebd8', 'f772fb99-2671-4066-8874-54867ce0ecf4', 'tournament_application'::\"V1ManagedTermsContext\", 'optional'::\"V1ManagedTermsRequirement\", 4, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP ) ON CONFLICT (\"id\") DO NOTHING",
+    reason:
+      "Seeds the tournament_application PLACEMENT that binds the policy above, explicitly as requirement='optional' (PR #516). This is the row that makes the other two safe: optional placements are excluded from assertTournamentAcceptances()'s missingRequiredDocumentIds, so neither a new nor an old instance can require it. One new row, ON CONFLICT DO NOTHING, no existing row touched. Reviewed 2026-08-18.",
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260818090000_v1_tournament_record_disclosure_consent/migration.sql',
+    statement:
+      "INSERT INTO \"v1_managed_terms_documents\" (\"id\", \"policy_id\", \"version\", \"title\", \"content\", \"content_hash\", \"change_summary\", \"requires_reconsent\", \"status\", \"effective_at\", \"published_at\", \"created_at\", \"updated_at\") VALUES ( '86b39028-bd47-4a4e-9c09-6a4c71c34df6', 'f772fb99-2671-4066-8874-54867ce0ecf4', 'v1.1', '\ub300\ud68c \uacbd\uae30 \uae30\ub85d \uacf5\uac1c \ub3d9\uc758', $terms$\ubcf8\uc778\uc740 \ud300\ubc0b \ub300\ud68c \uacbd\uae30 \uae30\ub85d(\ub77c\uc778\uc5c5, \ub4dd\uc810\u00b7\uc5b4\uc2dc\uc2a4\ud2b8 \ub4f1 \uc774\ubca4\ud2b8 \uae30\ub85d, MVP \ub4f1)\uc5d0 \ub2c9\ub124\uc784 \ub300\uc2e0 \uc2e4\uba85\uc774 \ud45c\uc2dc\ub418\ub294 \uac83\uc5d0 \ub3d9\uc758\ud560 \uc218 \uc788\uc2b5\ub2c8\ub2e4. \uc774 \ub3d9\uc758\ub294 \uc120\ud0dd \uc0ac\ud56d\uc774\uba70, \ub3d9\uc758\ud558\uc9c0 \uc54a\uc544\ub3c4 \ub300\ud68c \uc2e0\uccad \ubc0f \ucc38\uac00\uc5d0\ub294 \uc5b4\ub5a0\ud55c \uc81c\ud55c\ub3c4 \uc5c6\uc2b5\ub2c8\ub2e4. 1. \uacf5\uac1c \ud56d\ubaa9 \uc774\ub984, \ub4f1\ubc88\ud638, \ud3ec\uc9c0\uc158, \uc18c\uc18d \ud300\uba85, \uacbd\uae30\ubcc4 \uae30\ub85d(\ucd9c\uc804\u00b7\ub4dd\uc810\u00b7\uc5b4\uc2dc\uc2a4\ud2b8\u00b7\uacbd\uace0\u00b7\ud1f4\uc7a5\u00b7MVP \ub4f1) 2. \uacf5\uac1c \ubaa9\uc801 \ub300\ud68c \uacbd\uae30 \uae30\ub85d \ubc0f \ucc38\uac00 \uba85\ub2e8\uc744 \ud300\ubc0b \uc11c\ube44\uc2a4 \ub0b4\uc5d0\uc11c \uacf5\uac1c \uac8c\uc2dc\ud558\uae30 \uc704\ud55c \ubaa9\uc801\uc73c\ub85c \uc774\uc6a9\ud569\ub2c8\ub2e4. 3. \uacf5\uac1c \uc704\uce58 \ud300\ubc0b \uc11c\ube44\uc2a4 \ub0b4 \ub300\ud68c \uae30\ub85d, \uc21c\uc704\ud45c, \uc120\uc218 \uae30\ub85d \ud654\uba74 4. \uacf5\uac1c \uae30\uac04 \ub3d9\uc758 \uc2dc\uc810\ubd80\ud130 \ubcf8\uc778\uc774 \ucca0\ud68c\ud558\uae30 \uc804\uae4c\uc9c0 \uacc4\uc18d \uacf5\uac1c\ub429\ub2c8\ub2e4. \ucca0\ud68c \ud6c4\uc5d0\ub294 \ubcc4\ub3c4 \uc694\uccad \uc5c6\uc774 \uc989\uc2dc \ub2c9\ub124\uc784 \ud45c\uc2dc\ub85c \uc804\ud658\ub429\ub2c8\ub2e4. 5. \ub3d9\uc758 \uac70\ubd80 \ubc0f \ucca0\ud68c \uc548\ub0b4 \ubcf8 \ub3d9\uc758\ub294 \uc120\ud0dd \uc0ac\ud56d\uc785\ub2c8\ub2e4. \ub3d9\uc758\ud558\uc9c0 \uc54a\uc544\ub3c4 \ub300\ud68c \uc2e0\uccad \ubc0f \ucc38\uac00\uc5d0\ub294 \uc81c\ud55c\uc774 \uc5c6\uc73c\uba70, \uc774 \uacbd\uc6b0 \uacbd\uae30 \uae30\ub85d\uc5d0\ub294 \ub2c9\ub124\uc784\uc774 \ud45c\uc2dc\ub429\ub2c8\ub2e4. \uc774\ubbf8 \ub3d9\uc758\ud55c \uacbd\uc6b0\uc5d0\ub3c4 \ub9c8\uc774\ud398\uc774\uc9c0 > \uc124\uc815 > \ub300\ud68c \uae30\ub85d \uc2e4\uba85 \ud45c\uc2dc\uc5d0\uc11c \uc5b8\uc81c\ub4e0\uc9c0 \ucca0\ud68c\ud560 \uc218 \uc788\uc2b5\ub2c8\ub2e4. 6. \uc720\uc758\uc0ac\ud56d \ud68c\uc0ac\ub294 \uacf5\uac1c\ub41c \uacbd\uae30 \uae30\ub85d\uc744 \ub300\ud68c \uc6b4\uc601, \uae30\ub85d \uac8c\uc2dc, \uc11c\ube44\uc2a4 \uc81c\uacf5 \ubaa9\uc801 \ubc94\uc704 \ub0b4\uc5d0\uc11c\ub9cc \uc0ac\uc6a9\ud569\ub2c8\ub2e4. \ubcf8\uc778\uc740 \uc704 \ub0b4\uc6a9\uc744 \ud655\uc778\ud558\uc600\uc73c\uba70 \ub300\ud68c \uacbd\uae30 \uae30\ub85d \uacf5\uac1c(\uc2e4\uba85 \ud45c\uc2dc)\uc5d0 \ub3d9\uc758\ud569\ub2c8\ub2e4. \ud68c\uc0ac\uba85: \uc544\uc774\uc704(IWI) \ub300\ud45c\uc790: \uae40\ubd09\ubaa9 \uc774\uba54\uc77c: teameetsports@naver.com \uc2dc\ud589\uc77c: 2026\ub144 8\uc6d4 18\uc77c$terms$, 'b0527fa26264263b1ed78388472df50499c9e2cb0730ff0a3d28e090f278e65a', '\ub300\ud68c \uacbd\uae30 \uae30\ub85d(\ub77c\uc778\uc5c5/\ub4dd\uc810/MVP \ub4f1)\uc5d0 \uc2e4\uba85 \ud45c\uc2dc\ub97c \uc120\ud0dd\uc801\uc73c\ub85c \ub3d9\uc758\ubc1b\uae30 \uc704\ud55c \uc2e0\uaddc \uc815\ucc45 \ucd5c\ucd08 \ubc1c\ud589', true, 'published'::\"V1TermsDocumentStatus\", '2026-08-18T00:00:00.000Z'::timestamptz, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP ) ON CONFLICT (\"id\") DO NOTHING",
+    reason:
+      "Seeds the v1.1 consent DOCUMENT for that same optional policy (PR #516). Same reasoning as the policy row: one new row, ON CONFLICT DO NOTHING, nothing existing modified. Because its policy's placement is optional it never enters the required-terms set an older instance computes, so it cannot trigger forced re-consent, and tournament_privacy stays at v1.1 untouched. Reviewed 2026-08-18.",
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260818090000_v1_tournament_record_disclosure_consent/migration.sql',
+    statement:
+      "INSERT INTO \"v1_managed_terms_policies\" (\"id\", \"code\", \"name\", \"is_active\", \"created_at\", \"updated_at\") VALUES ('f772fb99-2671-4066-8874-54867ce0ecf4', 'tournament_record_disclosure', '\ub300\ud68c \uacbd\uae30 \uae30\ub85d \uacf5\uac1c \ub3d9\uc758', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT (\"id\") DO NOTHING",
+    reason:
+      "Seeds the new OPTIONAL 'tournament_record_disclosure' consent POLICY row (PR #516). Rolling-deploy safe both ways: it only INSERTs a brand-new row with ON CONFLICT DO NOTHING and touches no existing row, and its placement is requirement='optional', so ManagedTermsRuntimeService.currentTournamentTerms() leaves it out of missingRequiredDocumentIds. An older instance therefore sees no new required term and blocks no registration; on rollback the row is simply ignored. The gate rejects INSERT as a category because it cannot PROVE additivity, not because this row is unsafe. Reviewed 2026-08-18.",
   },
   {
     file: 'apps/v1_api/prisma/migrations/20260817120000_v1_tournament_review_drop_team_unique/migration.sql',
@@ -600,6 +624,45 @@ END $$`,
       "Reviewed 2026-08-18.",
   },
   {
+    file: 'apps/v1_api/prisma/migrations/20260818120000_v1_league_expand/migration.sql',
+    statement: `INSERT INTO "v1_leagues" ( "id", "title", "sport_id", "region_id", "created_by_admin_user_id", "starts_on", "ends_on", "tie_break_json", "state", "created_at", "updated_at" ) SELECT s."id", s."title", s."sport_id", s."region_id", s."created_by_admin_user_id", s."starts_on", s."ends_on", s."tie_break_json", s."state"::text::"V1LeagueState", s."created_at", s."updated_at" FROM "v1_team_match_series" s ON CONFLICT ("id") DO NOTHING`,
+    reason:
+      "Copies existing rows from v1_team_match_series into the newly created v1_leagues table -- the expand " +
+      "half of a two-release rename (2026-08-18 user decision: expand-contract, zero downtime). It writes " +
+      "only to a table this same migration creates three statements earlier, so no deployed revision -- old " +
+      "or new -- can observe it as a change: the old app has never heard of v1_leagues, and the new app " +
+      "finds it already populated. The source table is left completely untouched and keeps serving old " +
+      "containers through the rolling window. Row ids are carried over verbatim rather than regenerated, so " +
+      "v1_team_matches.series_id and .league_id always point at the same league and no id-mapping table is " +
+      "needed. INSERT ... SELECT with ON CONFLICT (\"id\") DO NOTHING, so a re-run is a no-op. Why a straight " +
+      "RENAME was rejected instead: deploy-alpha.sh runs prisma migrate deploy (line 246) BEFORE it " +
+      "recreates the containers (line 288), with seeds and standings recalculation in between -- renaming " +
+      "in place would leave old containers querying a table that no longer exists for that whole span. " +
+      "Reviewed 2026-08-18.",
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260818120000_v1_league_expand/migration.sql',
+    statement: `INSERT INTO "v1_league_teams" ("id", "league_id", "team_id", "created_at") SELECT t."id", t."series_id", t."team_id", t."created_at" FROM "v1_team_match_series_teams" t ON CONFLICT ("id") DO NOTHING`,
+    reason:
+      "Same expand-half copy for the join table: v1_team_match_series_teams -> v1_league_teams, into a " +
+      "table created by this same migration. Carries ids over verbatim for the same reason as the parent " +
+      "copy, and maps the old series_id column onto the new league_id column. The source table is " +
+      "untouched. ON CONFLICT (\"id\") DO NOTHING makes a re-run a no-op. Reviewed 2026-08-18.",
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260818120000_v1_league_expand/migration.sql',
+    statement: `UPDATE "v1_team_matches" SET "league_id" = "series_id" WHERE "series_id" IS NOT NULL AND "league_id" IS NULL`,
+    reason:
+      "Backfills the new v1_team_matches.league_id column that this same migration adds, from the existing " +
+      "series_id. This is the one statement that touches a pre-existing table, and it is safe in the " +
+      "rolling window for two reasons: it only writes the brand-new column (WHERE league_id IS NULL), so no " +
+      "column any deployed revision reads is modified, and series_id -- which old containers do read -- is " +
+      "left exactly as it was. Since ids were carried over by the two copies above, league_id ends up " +
+      "holding the identical value as series_id, so the two columns can never disagree about which league a " +
+      "match belongs to during the window. Re-running is a no-op because of the IS NULL guard. The " +
+      "contract-phase release drops series_id once no old container remains. Reviewed 2026-08-18.",
+  },
+  {
     file: 'apps/v1_api/prisma/migrations/20260818160000_v1_team_record_facts_penalty_result/migration.sql',
     statement: 'ALTER TABLE v1_team_record_facts DISABLE TRIGGER v1_block_team_record_fact_mutation',
     reason:
@@ -638,6 +701,154 @@ END $$`,
       "no-op: the WHERE clause only selects result = 'DRAWN', which an already-corrected row no longer is. " +
       'The gate rejects UPDATE as a category because it cannot prove additivity. Reviewed 2026-08-19.',
   },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260819100000_v1_league_contract/migration.sql',
+    statement: `ALTER TABLE "v1_team_matches" DROP CONSTRAINT IF EXISTS "v1_team_matches_series_fk"`,
+    reason:
+      "This is the contract half of the two-release league rename whose expand half shipped in " +
+      "20260818120000_v1_league_expand (2026-08-18 user decision: expand-contract, zero downtime). The gate " +
+      "rejects it because dropping is never provably additive, which is exactly right for a rename done in " +
+      "ONE release -- deploy-alpha.sh runs prisma migrate deploy (line 246) BEFORE it recreates containers " +
+      "(line 289), so a same-release drop would leave old containers reading a column that no longer exists " +
+      "for that whole span. That is not the situation here: the expand release is already deployed and " +
+      "every running container reads only the new names. Verified by exhaustive grep on dev before writing " +
+      "this migration -- raw SQL referencing v1_team_match_series or team_match.series_id: 0; Prisma code " +
+      "READING the legacy models: 0; tests using them: 0. The only remaining references were the " +
+      "expand-phase dual writes, removed in this same release. Drops the FK first because the column it " +
+      "constrains cannot be dropped while it exists. Removing a constraint only RELAXES the schema, so no " +
+      "running instance can be tripped by it. Reviewed 2026-08-19.",
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260819100000_v1_league_contract/migration.sql',
+    statement: `DROP INDEX IF EXISTS "v1_team_matches_series_start_at_idx"`,
+    reason:
+      "This is the contract half of the two-release league rename whose expand half shipped in " +
+      "20260818120000_v1_league_expand (2026-08-18 user decision: expand-contract, zero downtime). The gate " +
+      "rejects it because dropping is never provably additive, which is exactly right for a rename done in " +
+      "ONE release -- deploy-alpha.sh runs prisma migrate deploy (line 246) BEFORE it recreates containers " +
+      "(line 289), so a same-release drop would leave old containers reading a column that no longer exists " +
+      "for that whole span. That is not the situation here: the expand release is already deployed and " +
+      "every running container reads only the new names. Verified by exhaustive grep on dev before writing " +
+      "this migration -- raw SQL referencing v1_team_match_series or team_match.series_id: 0; Prisma code " +
+      "READING the legacy models: 0; tests using them: 0. The only remaining references were the " +
+      "expand-phase dual writes, removed in this same release. Drops the index on (series_id, start_at). An " +
+      "index is pure read acceleration -- no query depends on it for correctness, and nothing reads " +
+      "series_id any more. Reviewed 2026-08-19.",
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260819100000_v1_league_contract/migration.sql',
+    statement: `ALTER TABLE "v1_team_matches" DROP COLUMN IF EXISTS "series_id"`,
+    reason:
+      "This is the contract half of the two-release league rename whose expand half shipped in " +
+      "20260818120000_v1_league_expand (2026-08-18 user decision: expand-contract, zero downtime). The gate " +
+      "rejects it because dropping is never provably additive, which is exactly right for a rename done in " +
+      "ONE release -- deploy-alpha.sh runs prisma migrate deploy (line 246) BEFORE it recreates containers " +
+      "(line 289), so a same-release drop would leave old containers reading a column that no longer exists " +
+      "for that whole span. That is not the situation here: the expand release is already deployed and " +
+      "every running container reads only the new names. Verified by exhaustive grep on dev before writing " +
+      "this migration -- raw SQL referencing v1_team_match_series or team_match.series_id: 0; Prisma code " +
+      "READING the legacy models: 0; tests using them: 0. The only remaining references were the " +
+      "expand-phase dual writes, removed in this same release. Drops v1_team_matches.series_id. Its data is " +
+      "not lost: the expand migration copied it into league_id carrying the SAME ids, and every write since " +
+      "then set both columns to the same value (the dual write removed in this release), so league_id is a " +
+      "complete and identical replacement. Reviewed 2026-08-19.",
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260819100000_v1_league_contract/migration.sql',
+    statement: `DROP TABLE IF EXISTS "v1_team_match_series_teams"`,
+    reason:
+      "This is the contract half of the two-release league rename whose expand half shipped in " +
+      "20260818120000_v1_league_expand (2026-08-18 user decision: expand-contract, zero downtime). The gate " +
+      "rejects it because dropping is never provably additive, which is exactly right for a rename done in " +
+      "ONE release -- deploy-alpha.sh runs prisma migrate deploy (line 246) BEFORE it recreates containers " +
+      "(line 289), so a same-release drop would leave old containers reading a column that no longer exists " +
+      "for that whole span. That is not the situation here: the expand release is already deployed and " +
+      "every running container reads only the new names. Verified by exhaustive grep on dev before writing " +
+      "this migration -- raw SQL referencing v1_team_match_series or team_match.series_id: 0; Prisma code " +
+      "READING the legacy models: 0; tests using them: 0. The only remaining references were the " +
+      "expand-phase dual writes, removed in this same release. Drops the join table. Dropped before its " +
+      "parent because it holds the FK pointing at it. Its rows were copied id-for-id into v1_league_teams " +
+      "by the expand migration. Reviewed 2026-08-19.",
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260819100000_v1_league_contract/migration.sql',
+    statement: `DROP TABLE IF EXISTS "v1_team_match_series"`,
+    reason:
+      "This is the contract half of the two-release league rename whose expand half shipped in " +
+      "20260818120000_v1_league_expand (2026-08-18 user decision: expand-contract, zero downtime). The gate " +
+      "rejects it because dropping is never provably additive, which is exactly right for a rename done in " +
+      "ONE release -- deploy-alpha.sh runs prisma migrate deploy (line 246) BEFORE it recreates containers " +
+      "(line 289), so a same-release drop would leave old containers reading a column that no longer exists " +
+      "for that whole span. That is not the situation here: the expand release is already deployed and " +
+      "every running container reads only the new names. Verified by exhaustive grep on dev before writing " +
+      "this migration -- raw SQL referencing v1_team_match_series or team_match.series_id: 0; Prisma code " +
+      "READING the legacy models: 0; tests using them: 0. The only remaining references were the " +
+      "expand-phase dual writes, removed in this same release. Drops the legacy league table. Its rows were " +
+      "copied id-for-id into v1_leagues by the expand migration and kept in sync afterwards by " +
+      "mirrorLeagueToLegacy, so what is dropped here is a mirror, not an original. Reviewed 2026-08-19.",
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260819100000_v1_league_contract/migration.sql',
+    statement: `DROP TYPE IF EXISTS "V1TeamMatchSeriesState"`,
+    reason:
+      "This is the contract half of the two-release league rename whose expand half shipped in " +
+      "20260818120000_v1_league_expand (2026-08-18 user decision: expand-contract, zero downtime). The gate " +
+      "rejects it because dropping is never provably additive, which is exactly right for a rename done in " +
+      "ONE release -- deploy-alpha.sh runs prisma migrate deploy (line 246) BEFORE it recreates containers " +
+      "(line 289), so a same-release drop would leave old containers reading a column that no longer exists " +
+      "for that whole span. That is not the situation here: the expand release is already deployed and " +
+      "every running container reads only the new names. Verified by exhaustive grep on dev before writing " +
+      "this migration -- raw SQL referencing v1_team_match_series or team_match.series_id: 0; Prisma code " +
+      "READING the legacy models: 0; tests using them: 0. The only remaining references were the " +
+      "expand-phase dual writes, removed in this same release. Drops the now-unreferenced enum type. Its " +
+      "only users were the two tables dropped just above, so this cannot affect anything still in the " +
+      "schema. Reviewed 2026-08-19.",
+  },
+  // ── PR #627 v1_team_contacts (2026-08-21) ───────────────────────────────
+  // 링크 대상 CHECK 제약에 새 컬럼을 편입하는 DROP+재생성 쌍의 앞 절반.
+  {
+    file: 'apps/v1_api/prisma/migrations/20260821000000_v1_team_contacts/migration.sql',
+    statement: `ALTER TABLE "v1_chat_rooms" DROP CONSTRAINT IF EXISTS "v1_chat_rooms_exactly_one_target_check"`,
+    reason:
+      'v1_chat_rooms 의 "링크 대상은 정확히 하나" CHECK 를 team_contact_id 까지 포함하도록 넓히는 ' +
+      'DROP + 즉시 재생성 쌍의 앞 절반이다. 게이트가 막는 이유는 DROP 이 결코 provably additive 하지 ' +
+      '않기 때문인데, 실제로 일어나는 일은 제약의 **완화**다: 새 술어는 ' +
+      '(match_id) + (team_id) + (team_match_id) + (team_contact_id) = 1 로, 기존 3개 술어를 만족하는 ' +
+      '모든 행이 새 술어도 그대로 만족한다(네 번째 항이 0 이라 합이 변하지 않는다). ' +
+      '롤링 배포 양방향 검증: (1) 구 인스턴스는 team_contact_id 를 아는 코드가 없어 match/team/team_match ' +
+      '방만 쓰는데 그 write 는 새 제약에서도 합=1 이라 거부되지 않는다. (2) 신 인스턴스가 만드는 ' +
+      'team_contact 방은 구 제약에서 합=0 으로 거부되므로, 이 마이그레이션이 신 코드보다 먼저 도는 ' +
+      '기존 배포 순서(deploy-alpha.sh 가 migrate deploy 를 컨테이너 재생성보다 먼저 실행)를 그대로 전제한다. ' +
+      '(3) 롤백 시 구 앱은 team_contact 행을 읽지도 쓰지도 않으므로 영향이 없다. ' +
+      'DROP 과 ADD 가 같은 migration.sql 안에 있어 제약 없는 창이 커밋 밖으로 노출되지 않는다. ' +
+      '같은 테이블에 team_id 를 추가했을 때도 동일한 DROP+재생성을 했다 ' +
+      '(20260630000000_v1_chat_room_team_target_constraint). Reviewed 2026-08-21.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260821000000_v1_team_contacts/migration.sql',
+    statement:
+      `ALTER TABLE "v1_chat_rooms" ADD CONSTRAINT "v1_chat_rooms_exactly_one_target_check" ` +
+      `CHECK ( ( ("match_id" IS NOT NULL)::int + ("team_id" IS NOT NULL)::int ` +
+      `+ ("team_match_id" IS NOT NULL)::int + ("team_contact_id" IS NOT NULL)::int ) = 1 )`,
+    reason:
+      '위 DROP 의 짝 — 같은 이름의 제약을 team_contact_id 를 포함한 형태로 되돌려 놓는다. ' +
+      '게이트가 ADD CONSTRAINT 를 막는 이유는 새 제약이 기존 행을 거부할 수 있어 provably additive 가 ' +
+      '아니기 때문인데, 여기서는 그 위험이 구조적으로 없다: 새 술어는 직전 술어에 ' +
+      '`+ ("team_contact_id" IS NOT NULL)::int` 항 하나만 더한 것이고, 이 마이그레이션 이전에는 ' +
+      '그 컬럼 자체가 존재하지 않았으므로 모든 기존 행에서 그 항은 0 이다. 따라서 합이 변하지 않아 ' +
+      '**기존 제약을 만족하던 모든 행이 새 제약도 만족한다** — ADD 시점의 검증이 실패할 수 없다. ' +
+      '같은 이유로 구 인스턴스의 write(match/team/team_match 중 하나만 채움)도 새 제약을 통과한다. ' +
+      '즉 이 ADD 는 스키마를 조이는 것이 아니라 직전 DROP 이 만든 공백을 **더 느슨한 형태로** 메우는 ' +
+      '것이고, 둘이 같은 migration.sql 에 있어 제약 없는 창이 커밋 밖으로 노출되지 않는다. ' +
+      'Reviewed 2026-08-21.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260824100100_v1_inquiry_reported_team_backfill/migration.sql',
+    statement:
+      'UPDATE "v1_inquiries" i SET "reported_team_id" = sub.reported_team_id FROM ( SELECT i2."id" AS id, CASE WHEN EXISTS (SELECT 1 FROM "v1_team_memberships" m WHERE m."team_id" = c."from_team_id" AND m."user_id" = i2."user_id" AND m."status" = \'active\') THEN c."to_team_id" WHEN EXISTS (SELECT 1 FROM "v1_team_memberships" m WHERE m."team_id" = c."to_team_id" AND m."user_id" = i2."user_id" AND m."status" = \'active\') THEN c."from_team_id" ELSE NULL END AS reported_team_id FROM "v1_inquiries" i2 JOIN "v1_team_contacts" c ON c."id" = i2."related_id" WHERE i2."related_type" = \'team_contact\' AND i2."category" = \'report\' AND i2."user_id" IS NOT NULL ) sub WHERE i."id" = sub.id AND sub.reported_team_id IS NOT NULL',
+    reason:
+      'Backfills only the newly introduced nullable reported_team_id. It reads existing rows but writes no pre-existing column, so a rolling deploy running the old code sees an unchanged schema surface. Rollback is DROP COLUMN, which the preceding additive migration owns. Rows whose reporter has no active membership on either side are intentionally left NULL rather than guessed.',
+  },
 ];
 
 const normalizeStatementText = (statement) => statement.replace(/\s+/g, ' ').trim();
@@ -657,9 +868,21 @@ for (const [label, sha] of [['base', baseSha], ['head', headSha]]) {
   if (!/^[0-9a-f]{40}$/.test(sha ?? '')) fail(`${label} SHA must be a full lowercase commit`);
 }
 
-runGit(['merge-base', '--is-ancestor', baseSha, headSha]);
+// PR 이벤트가 넘기는 base 는 **대상 브랜치의 현재 tip** 이다(github.event.pull_request.base.sha).
+// 브랜치를 딴 뒤 dev 가 전진하면 그 tip 은 head 의 조상이 아니게 되고, 아래 diff 가 "dev 에는
+// 있고 내 브랜치엔 없는" 남의 마이그레이션까지 D 로 뱉어 `existing migration changed (D)` 로
+// 엉뚱하게 죽는다 — 이 PR 이 마이그레이션을 전혀 건드리지 않아도 그렇다(2026-08-21 리그전
+// 작업에서 5개 PR 이 이 사유로 red 였다). 그래서 조상이 아니면 **실제 분기점** 을 diff base 로
+// 쓴다. 그래야 이 PR 이 정말로 **추가한** 마이그레이션만 A 로 잡힌다.
+//
+// 게이트를 느슨하게 만들지 않는다는 점이 중요하다: 바꾸는 것은 "무엇을 이 PR 의 변경으로 볼
+// 것인가" 뿐이고, 아래 collectBaseFunctionNames 는 계속 **대상 브랜치 tip**(baseSha)을 본다 —
+// 함수 존재 여부는 머지된 뒤의 현실로 판정해야 CREATE OR REPLACE 가 새 함수로 오인되지 않는다.
+const diffBase = isAncestorOf(baseSha, headSha)
+  ? baseSha
+  : runGit(['merge-base', baseSha, headSha]).trim();
 const changes = runGit([
-  'diff', '--name-status', '--find-renames', baseSha, headSha, '--',
+  'diff', '--name-status', '--find-renames', diffBase, headSha, '--',
   'apps/v1_api/prisma/migrations/*/migration.sql',
 ]).trim();
 const addedFiles = [];
@@ -984,6 +1207,17 @@ function isAdditiveStatement(statement, { newTables, nullableNewColumnsByTable, 
   return false;
 }
 
+// runGit 과 달리 실패를 예외로 흘리지 않고 boolean 으로 돌려준다 — 조상이 아닌 것은
+// 오류가 아니라 판정해야 할 상태다(runGit 은 git 이 non-zero 면 곧바로 fail() 로 종료한다).
+function isAncestorOf(ancestor, descendant) {
+  try {
+    execFileSync('git', ['merge-base', '--is-ancestor', ancestor, descendant], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function runGit(args) {
   try {
     return execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 1024 * 1024 * 64 });
@@ -1152,6 +1386,67 @@ function selfTest() {
   }
 
   console.log('[expand-contract-sql-v1] negative controls passed');
+
+  baseResolutionSelfTest();
+}
+
+/**
+ * base 해석(조상 여부에 따른 diff base 선택)을 임시 저장소로 검증한다.
+ *
+ * 이 케이스가 없으면 조상이 아닐 때의 동작을 CI 가 전혀 보지 못한다 — 실제로 그 구간이
+ * 비어 있어서, 대상 브랜치가 전진할 때마다 무관한 PR 이 죽는 결함이 오래 남아 있었다.
+ * 특히 C 케이스(조상이 아니면서 위험한 마이그레이션)가 중요하다: base 를 느슨하게 고르면
+ * 게이트가 조용히 fail-open 되는데, 그건 원래 결함보다 훨씬 나쁘다.
+ */
+function baseResolutionSelfTest() {
+  const repo = mkdtempSync(join(tmpdir(), 'ec-gate-'));
+  const git = (...args) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  const commit = (dir, sql, message) => {
+    mkdirSync(join(repo, 'apps/v1_api/prisma/migrations', dir), { recursive: true });
+    writeFileSync(join(repo, 'apps/v1_api/prisma/migrations', dir, 'migration.sql'), `${sql}\n`);
+    git('add', '-A');
+    git('-c', 'user.email=selftest@local', '-c', 'user.name=selftest', 'commit', '-qm', message);
+    return git('rev-parse', 'HEAD');
+  };
+  const gateExits = (base, head) => {
+    try {
+      execFileSync(process.execPath, [new URL(import.meta.url).pathname, base, head], { cwd: repo, stdio: 'ignore' });
+      return 0;
+    } catch {
+      return 1;
+    }
+  };
+
+  try {
+    git('init', '-q', '.');
+    const fork = commit('20260101000000_base', 'CREATE TABLE "Thing" ("id" UUID NOT NULL);', 'base');
+
+    git('checkout', '-q', '-b', 'safe');
+    const safeHead = commit('20260102000000_safe', 'ALTER TABLE "Thing" ADD COLUMN "note" TEXT;', 'safe');
+
+    git('checkout', '-q', fork);
+    git('checkout', '-q', '-b', 'risky');
+    const riskyHead = commit('20260102000000_risky', 'ALTER TABLE "Thing" DROP COLUMN "id";', 'risky');
+
+    // 대상 브랜치가 그사이 전진해 fork 이후로 벌어진다 — 여기서 조상 관계가 깨진다.
+    git('checkout', '-q', fork);
+    git('checkout', '-q', '-b', 'mainline');
+    const movedTip = commit('20260103000000_other', 'ALTER TABLE "Thing" ADD COLUMN "other" TEXT;', 'other');
+
+    const cases = [
+      ['ancestor base, additive migration', fork, safeHead, 0],
+      ['moved base, additive migration', movedTip, safeHead, 0],
+      ['moved base, destructive migration', movedTip, riskyHead, 1],
+      ['ancestor base, destructive migration', fork, riskyHead, 1],
+    ];
+    for (const [label, base, head, expected] of cases) {
+      const actual = gateExits(base, head);
+      if (actual !== expected) fail(`base resolution self-test: ${label} expected exit ${expected}, got ${actual}`);
+    }
+    console.log('[expand-contract-sql-v1] base resolution controls passed');
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
 }
 
 function fail(message) {

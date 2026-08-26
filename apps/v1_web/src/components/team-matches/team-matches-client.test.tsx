@@ -47,6 +47,14 @@ vi.mock('./team-matches-page', () => ({
       <span data-testid="team-match-mode">{model.mode}</span>
       <span data-testid="team-match-status-label">{model.statusLabel}</span>
       <span data-testid="team-match-apply-label">{model.applyLabel}</span>
+      <span data-testid="team-match-description">{model.match.description}</span>
+      <span data-testid="team-match-address">{model.match.address}</span>
+      <span data-testid="team-match-cost">{model.match.cost}</span>
+      <span data-testid="team-match-opponent-cost">{model.match.opponentCost}</span>
+      <span data-testid="team-match-manner">{model.match.manner}</span>
+      <span data-testid="team-match-wins">{model.match.wins}</span>
+      <span data-testid="team-match-applicant-count">{model.match.applicantTeams.length}</span>
+      <span data-testid="team-match-host-actions">{model.hostActions?.map((action) => action.label).join(',')}</span>
       {model.onApply && <button onClick={model.onApply}>상대팀 신청</button>}
       {model.resultAction && <a href={model.resultAction.href}>{model.resultAction.label}</a>}
       {model.reviewAction && <a href={model.reviewAction.href}>{model.reviewAction.label}</a>}
@@ -70,7 +78,10 @@ describe('TeamMatchDetailPageClient — GA events', () => {
         placeName: '서울 풋살장',
         startsAt: '2026-08-01T10:00:00.000Z',
         capacityText: '1/2',
-        status: 'open',
+        // 'open'은 V1TeamMatchApiStatus에 없는 값이다(recruiting|closed|matched|cancelled|
+        // completed|expired) — 신청 가능한 매치를 뜻하려면 'recruiting'이어야 getApplyAction의
+        // status 게이트(그룹 A 수정)를 실제로 통과한다.
+        status: 'recruiting',
         viewerState: 'none',
         hostTeam: { teamId: 'team-host', name: '호스트 팀' },
       },
@@ -152,7 +163,11 @@ describe('TeamMatchDetailPageClient — GA events', () => {
 // rendered CTA so a regression in buildResultAction's role/viewerState
 // branching trips a real assertion.
 describe('TeamMatchDetailPageClient — result action routing gate (Task 17)', () => {
-  function mockMatchedTeamMatch(viewer: { state: V1TeamMatchViewerState; manageableHostTeam?: boolean }) {
+  function mockMatchedTeamMatch(viewer: {
+    state: V1TeamMatchViewerState;
+    manageableHostTeam?: boolean;
+    manageableOpponentTeam?: boolean;
+  }) {
     useV1TeamMatchMock.mockReturnValue({
       data: {
         id: 'team-match-1',
@@ -165,7 +180,11 @@ describe('TeamMatchDetailPageClient — result action routing gate (Task 17)', (
         capacityText: '2/2',
         displayState: 'matched',
         status: 'matched',
-        viewer: { state: viewer.state, manageableHostTeam: viewer.manageableHostTeam ?? false },
+        viewer: {
+          state: viewer.state,
+          manageableHostTeam: viewer.manageableHostTeam ?? false,
+          manageableOpponentTeam: viewer.manageableOpponentTeam ?? false,
+        },
         hostTeam: { teamId: 'team-host', name: '호스트 팀' },
       },
       isError: false,
@@ -190,7 +209,20 @@ describe('TeamMatchDetailPageClient — result action routing gate (Task 17)', (
   });
 
   it('shows the approved opponent the approval CTA routed to /result/approval, never the entry CTA', () => {
-    mockMatchedTeamMatch({ state: 'approved', manageableHostTeam: false });
+    mockMatchedTeamMatch({ state: 'approved', manageableHostTeam: false, manageableOpponentTeam: true });
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    const link = screen.getByRole('link', { name: '경기 결과 대기' });
+    expect(link).toHaveAttribute('href', '/team-matches/team-match-1/result/approval');
+    expect(screen.queryByRole('link', { name: '경기 결과 입력' })).not.toBeInTheDocument();
+  });
+
+  // 리그 대진 회귀: 신청서를 운영자가 대신 만들기 때문에 상대팀 매니저의 viewer.state 는
+  // 영영 'none' 이다(alpha 실측). 게이트가 다시 state 기반으로 돌아가면 이 단언이 깨진다 —
+  // 그때 실제로 벌어지는 일은 "리그 결과가 확정되지 않아 순위표가 멈추는 것"이다.
+  it('상대팀 매니저는 신청서를 직접 내지 않았어도(리그 대진) 승인 CTA를 본다', () => {
+    mockMatchedTeamMatch({ state: 'none', manageableHostTeam: false, manageableOpponentTeam: true });
 
     render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
 
@@ -371,5 +403,211 @@ describe('TeamMatchDetailPageClient — 후기 진입점', () => {
     render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
 
     expect(screen.queryByRole('link', { name: '후기 남기기' })).not.toBeInTheDocument();
+  });
+});
+
+// alpha 실측 결함(그룹 B): API가 costNote/description을 안 주고(costNote: null, description: null,
+// paymentRequired: false — 실제 응답 그대로), 신청팀도 아직 없는 실제 매치를 열었더니
+// team-matches.view-model.ts의 하드코딩 목업("상대팀 부담금 140,000원", "친선 팀매치를 진행해요...",
+// "매너 4.8 · 승 23", 가짜 신청팀 이름)이 그대로 새어 나왔다 — 서로 다른 매치를 열어도 항상
+// 똑같은 값이 보이는 게 이 버그의 증거였다. 이 스위트는 화면(모델)에 그 목업 값이 더 이상
+// 나타나지 않고, 실제 API 값이 있을 때는 여전히 정상적으로 반영됨을 함께 고정한다.
+describe('TeamMatchDetailPageClient — API가 비용/설명/신청팀을 안 주면 목업으로 채우지 않는다', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    applyTeamMatchMutateAsync.mockResolvedValue({ applicationId: 'app-1' });
+    useV1TeamMatchEligibilityMock.mockReturnValue({ data: undefined, isSuccess: false });
+  });
+
+  it('costNote/description이 null이고 신청팀이 없으면 목업(140,000원·친선 문구·매너 4.8·가짜 신청팀)이 하나도 나타나지 않는다', () => {
+    useV1TeamMatchMock.mockReturnValue({
+      data: {
+        id: 'real-league-match-1',
+        teamMatchId: 'real-league-match-1',
+        title: '(테스트) 8월 리그 3라운드',
+        sportName: '풋살',
+        sport: { sportId: 'sport-futsal', name: '풋살' },
+        placeName: '진짜 경기장',
+        startsAt: '2026-08-01T10:00:00.000Z',
+        capacityText: '1/2',
+        status: 'open',
+        viewer: { state: 'none', manageableHostTeam: false },
+        hostTeam: { teamId: 'team-host', name: '호스트 팀', trustState: 'none' },
+        costNote: null,
+        description: null,
+        paymentRequired: false,
+        approvedOpponentTeam: null,
+      },
+      isError: false,
+    });
+
+    render(<TeamMatchDetailPageClient teamMatchId="real-league-match-1" />);
+
+    // 결함으로 보고된 정확한 목업 값들 — 하나도 렌더되면 안 된다.
+    expect(screen.getByTestId('team-match-opponent-cost')).not.toHaveTextContent('140000');
+    expect(screen.getByTestId('team-match-cost')).not.toHaveTextContent('280000');
+    expect(screen.getByTestId('team-match-manner')).not.toHaveTextContent('4.8');
+    expect(screen.getByTestId('team-match-wins')).not.toHaveTextContent('23');
+    expect(screen.queryByText(/친선 팀매치를 진행해요/)).not.toBeInTheDocument();
+    expect(screen.queryByText('성수 러너스 FC')).not.toBeInTheDocument();
+    expect(screen.queryByText('마포 애슬레틱')).not.toBeInTheDocument();
+
+    // 값 없음은 0 이 아니라 **null** 로 넘긴다 — 0 으로 채우면 화면이 '무료초청 · 실제 청구
+    // 없어요'(비용)나 '매너 0 · 승 0'(팀 통계)이라는 또 다른 거짓 정보를 만들어낸다.
+    // 렌더러(team-matches-page.tsx)는 null 을 받으면 그 줄·그룹을 감춘다.
+    expect(screen.getByTestId('team-match-description')).toHaveTextContent('');
+    expect(screen.getByTestId('team-match-cost')).toHaveTextContent('');
+    expect(screen.getByTestId('team-match-opponent-cost')).toHaveTextContent('');
+    expect(screen.getByTestId('team-match-manner')).toHaveTextContent('');
+    expect(screen.getByTestId('team-match-wins')).toHaveTextContent('');
+    expect(screen.getByTestId('team-match-applicant-count')).toHaveTextContent('0');
+  });
+
+  it('costNote/description이 실제로 있으면 그 값을 그대로 반영한다(목업으로 안 덮는다)', () => {
+    useV1TeamMatchMock.mockReturnValue({
+      data: {
+        id: 'real-league-match-2',
+        teamMatchId: 'real-league-match-2',
+        title: '(테스트) 8월 리그 4라운드',
+        sportName: '풋살',
+        sport: { sportId: 'sport-futsal', name: '풋살' },
+        placeName: '진짜 경기장',
+        startsAt: '2026-08-02T10:00:00.000Z',
+        capacityText: '1/2',
+        status: 'open',
+        viewer: { state: 'none', manageableHostTeam: false },
+        hostTeam: { teamId: 'team-host', name: '호스트 팀', trustState: 'none' },
+        costNote: '총 90,000원 · 상대팀 30,000원',
+        description: '실제로 입력된 설명이에요.',
+        paymentRequired: true,
+        approvedOpponentTeam: null,
+      },
+      isError: false,
+    });
+
+    render(<TeamMatchDetailPageClient teamMatchId="real-league-match-2" />);
+
+    expect(screen.getByTestId('team-match-description')).toHaveTextContent('실제로 입력된 설명이에요.');
+    expect(screen.getByTestId('team-match-cost')).toHaveTextContent('90000');
+    expect(screen.getByTestId('team-match-opponent-cost')).toHaveTextContent('30000');
+  });
+});
+
+// alpha 실측 결함(그룹 A, C-1) — 이미 대진이 확정/종료된 리그 경기를 비로그인 관전자로
+// 열면 applyLabel은 '신청 불가'인데 onApply는 여전히 로그인 리다이렉트를 반환해서,
+// "신청 불가"라고 적힌 파란 primary 버튼이 클릭되면 로그인 페이지로 튀는 상태였다.
+// 신청할 게 없는(recruiting이 아닌) 매치에서는 로그인/팀만들기 유도 자체를 하지 않는다.
+describe('TeamMatchDetailPageClient — 신청 마감된 매치는 로그인/팀만들기 리다이렉트를 제공하지 않는다', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useV1TeamMatchEligibilityMock.mockReturnValue({ data: undefined, isSuccess: false });
+  });
+
+  it('완료된 리그 경기를 비로그인 뷰어로 열면 신청 CTA(onApply)가 아예 없다', () => {
+    useV1TeamMatchMock.mockReturnValue({
+      data: {
+        id: 'league-fixture-1',
+        teamMatchId: 'league-fixture-1',
+        title: '(테스트) 8월 리그 3라운드',
+        sportName: '풋살',
+        placeName: '진짜 경기장',
+        startsAt: '2026-08-01T10:00:00.000Z',
+        status: 'completed',
+        displayState: 'completed',
+        viewer: { state: 'guest', manageableHostTeam: false },
+        hostTeam: { teamId: 'team-host', name: '알파팀' },
+        league: { leagueId: 'league-1', title: '8월 리그' },
+        approvedOpponentTeam: { teamId: 'team-away', name: '브라보FC', applicationId: 'app-away' },
+      },
+      isError: false,
+    });
+
+    render(<TeamMatchDetailPageClient teamMatchId="league-fixture-1" />);
+
+    expect(screen.getByTestId('team-match-apply-label')).toHaveTextContent('신청 불가');
+    // 회귀 지점: 예전엔 onApply가 로그인 리다이렉트라 이 버튼이 여전히 렌더됐다.
+    expect(screen.queryByRole('button', { name: '상대팀 신청' })).not.toBeInTheDocument();
+  });
+
+  it('신청 마감(closed)에서 소속 팀이 없는 뷰어도 팀만들기 리다이렉트를 받지 않는다', () => {
+    useV1TeamMatchMock.mockReturnValue({
+      data: {
+        id: 'team-match-closed-1',
+        teamMatchId: 'team-match-closed-1',
+        title: '모집 마감된 팀매치',
+        sportName: '풋살',
+        placeName: '경기장',
+        startsAt: '2026-08-01T10:00:00.000Z',
+        status: 'closed',
+        displayState: 'closed',
+        viewer: { state: 'none', manageableHostTeam: false },
+        hostTeam: { teamId: 'team-host', name: '알파팀' },
+        approvedOpponentTeam: null,
+      },
+      isError: false,
+    });
+    // hasNoTeam 게이트: teams 배열이 비어 있으면 '팀 없음'으로 잡힌다.
+    useV1TeamMatchEligibilityMock.mockReturnValue({ data: { teamMatchId: 'team-match-closed-1', requiresApproval: true, requiresPayment: false, teams: [] }, isSuccess: true });
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-closed-1" />);
+
+    expect(screen.getByTestId('team-match-apply-label')).toHaveTextContent('신청 불가');
+    expect(screen.queryByRole('button', { name: '상대팀 신청' })).not.toBeInTheDocument();
+  });
+});
+
+// 그룹 A(alpha 실측) — 서버는 리그 대진(leagueId 有)의 팀 단독 취소를 항상 409
+// LEAGUE_FIXTURE_HOST_CANCEL_FORBIDDEN으로 거부한다(team-matches.service.ts cancel()).
+// 눌러서 실패 문구를 봐야만 알 수 있게 두지 않고, 애초에 버튼을 노출하지 않는다.
+describe('TeamMatchDetailPageClient — 리그 대진은 "팀매치 취소"를 노출하지 않는다', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useV1TeamMatchEligibilityMock.mockReturnValue({ data: undefined, isSuccess: false });
+  });
+
+  function mockHostView(status: string, league: { leagueId: string; title: string } | null) {
+    useV1TeamMatchMock.mockReturnValue({
+      data: {
+        id: 'team-match-host-1',
+        teamMatchId: 'team-match-host-1',
+        title: '팀매치',
+        sportName: '풋살',
+        placeName: '경기장',
+        startsAt: '2026-08-01T10:00:00.000Z',
+        status,
+        displayState: status,
+        viewer: { state: 'host_team', manageableHostTeam: true },
+        hostTeam: { teamId: 'team-host', name: '알파팀' },
+        league,
+      },
+      isError: false,
+    });
+  }
+
+  it('리그 대진(모집 중)은 "모집 마감"만 보이고 "팀매치 취소"는 없다', () => {
+    mockHostView('recruiting', { leagueId: 'league-1', title: '8월 리그' });
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-host-1" />);
+
+    const actions = (screen.getByTestId('team-match-host-actions').textContent ?? '').split(',').filter(Boolean);
+    expect(actions).toEqual(['모집 마감']);
+  });
+
+  it('리그 대진(상대팀 확정)은 호스트 액션이 아예 없다', () => {
+    mockHostView('matched', { leagueId: 'league-1', title: '8월 리그' });
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-host-1" />);
+
+    const actions = (screen.getByTestId('team-match-host-actions').textContent ?? '').split(',').filter(Boolean);
+    expect(actions).toEqual([]);
+  });
+
+  it('일반 팀매치(리그 아님, 같은 상태)는 여전히 "팀매치 취소"가 보인다(회귀 방지)', () => {
+    mockHostView('recruiting', null);
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-host-1" />);
+
+    const actions = (screen.getByTestId('team-match-host-actions').textContent ?? '').split(',').filter(Boolean);
+    expect(actions).toContain('팀매치 취소');
   });
 });

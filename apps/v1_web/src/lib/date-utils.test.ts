@@ -1,5 +1,29 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { formatTournamentDateTimeLong, formatTournamentDateTimeShort } from './date-utils';
+import { formatAdminDate, formatKstDateShort, formatKstTime, formatTournamentDateTimeLong, formatTournamentDateTimeShort } from './date-utils';
+
+describe('formatAdminDate', () => {
+  it('유효한 날짜는 Y.M.D (formatAdminDateTime의 날짜 전용 자매 스타일)', () => {
+    expect(formatAdminDate('2026-08-05T10:00:00.000Z')).toMatch(/^2026\.8\.\d+$/);
+  });
+
+  it('빈 값은 대시, invalid는 원문 그대로', () => {
+    expect(formatAdminDate(null)).toBe('—');
+    expect(formatAdminDate(undefined)).toBe('—');
+    expect(formatAdminDate('not-a-date')).toBe('not-a-date');
+  });
+});
+
+describe('formatKstTime / formatKstDateShort (리그 대진 timing 타임라인)', () => {
+  it('실행 타임존과 무관하게 KST 벽시계로 표기한다', () => {
+    expect(formatKstTime('2026-09-02T13:00:00.000Z')).toBe('22:00'); // 13:00Z = 22:00 KST
+    expect(formatKstDateShort('2026-09-02T13:00:00.000Z')).toBe('9. 2. (수)');
+  });
+
+  it('invalid 문자열은 원본을 그대로 반환한다', () => {
+    expect(formatKstTime('nope')).toBe('nope');
+    expect(formatKstDateShort('nope')).toBe('nope');
+  });
+});
 
 describe('formatTournamentDateTimeLong', () => {
   it('includes the exact date, weekday, and time for a registration deadline', () => {

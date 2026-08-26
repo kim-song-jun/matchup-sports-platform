@@ -34,8 +34,6 @@ export function toReviewsPageModel(data: V1ReviewListResponse | undefined, tab: 
       href: `/my/reviews/${item.sourceType}/${item.sourceId}`,
       badgeLabel: item.state === 'done' ? '완료' : isTeamReviewSource(item.sourceType) ? '상대팀' : '작성 전',
       kindLabel: sourceTypeLabel(item.sourceType),
-      // 작성된 리뷰는 한 경기에서 여러 명에게 쓸 수 있어 대상자 없이는 행이 서로 구분되지 않는다.
-      targetLabel: item.targetTeam?.name ?? item.targetUser?.nickname ?? null,
       meta: buildListMeta(item.completedAt, item.reviewedCount, item.targetCount, item.remainingCount),
       ctaLabel: item.state === 'done' ? '보기' : item.reviewedCount > 0 ? '이어서 작성' : '리뷰',
     })),

@@ -8,6 +8,18 @@ import {
 } from '@nestjs/common';
 import { Prisma, V1AuthProvider, V1ConsentState } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
+import {
+  countOwnerVisibleParticipations,
+  findLatestPublicParticipation,
+} from '../games/public-records/public-consent';
+import { loadPlayerCardRecordStats } from '../games/public-records/player-card-stats';
+import {
+  buildPlayerCard,
+  resolveCardShape,
+  unlockedCardShapes,
+  MIN_REVIEWS_FOR_SHIELD_SHAPE,
+  type PlayerCard,
+} from './player-card';
 import { PrismaService } from '../prisma/prisma.service';
 import { isReviewRevealed } from '../reviews/review-visibility';
 import { removeUserFromActiveRosters } from '../tournaments/roster-cleanup';
@@ -19,8 +31,10 @@ import {
   UpdateMyRegionsDto,
   UpdateProfileDto,
   UpdateSettingsDto,
+  UpdatePlayerCardHiddenDto,
   UpdateTournamentRealNameVisibilityDto,
   WithdrawalRequestDto,
+  UpdatePlayerCardShapeDto,
 } from './dto/profile.dto';
 
 // v1_notification_preferences row가 아직 없는 사용자에게 읽기 전용으로 보여줄 기본값 —
@@ -133,6 +147,7 @@ export class ProfileService {
             profileImageUrl: true,
             birthDate: true,
             gender: true,
+            bio: true,
           },
         },
       },
@@ -247,6 +262,9 @@ export class ProfileService {
           profileImageUrl,
           birthDate,
           gender,
+          // 필드를 아예 안 보낸 클라이언트(옛 버전)의 저장이 기존 소개를 지우면 안 되므로
+          // `undefined` 는 "건드리지 않음", `null`/빈 문자열은 "지움" 으로 갈린다.
+          ...(dto.bio === undefined ? {} : { bio: dto.bio?.trim() || null }),
         },
         create: {
           userId: user.id,
@@ -307,11 +325,39 @@ export class ProfileService {
     const liveReputation = await this.computeRevealedUserReputation(user.id);
     const activitySummary = await this.getPublicActivitySummary(user.id, liveReputation);
 
+    // Task 154 P1: 기록이 0건인 프로필이 완전히 비어 보이던 문제를 소속팀으로 메운다.
+    //
+    // `membersVisible` 을 반드시 존중한다. 이 컬럼은 스키마 기본값이 true 라 "아무도
+    // 신경 안 쓰는 값"으로 보기 쉬운데, 프로덕션 실측(2026-08-24)에서 44개 팀 중 12개가
+    // 명시적으로 false 였다 -- 팀장들이 실제로 쓰는 통제 수단이다. 팀 페이지에서 명단을
+    // 가려둔 팀이 개인 프로필 경로로 새어 나가면 그 설정을 우회하는 셈이 된다.
+    const teamMemberships = await this.prisma.v1TeamMembership.findMany({
+      where: {
+        userId: user.id,
+        status: 'active',
+        team: { membersVisible: true, status: 'active', deletedAt: null },
+      },
+      // V1Team 에 로고 컬럼이 없다 -- 팀 이름만 내린다(프론트는 이니셜 배지로 대체).
+      select: { team: { select: { id: true, name: true } } },
+      orderBy: { createdAt: 'asc' },
+      take: 6,
+    });
+
     return {
       userId: user.id,
       displayName: user.profile?.nickname ?? '사용자',
       nickname: user.profile?.nickname ?? null,
       profileImageUrl: user.profile?.profileImageUrl ?? null,
+      // 값이 없으면 null 로 내려 프론트가 섹션 자체를 렌더하지 않게 한다 --
+      // 빈 문자열을 내리면 제목만 있는 빈 카드가 남는다.
+      bio: user.profile?.bio?.trim() || null,
+      teams: teamMemberships.map((membership) => membership.team),
+      // Task 154 P2: 가장 최근 공개 가능 출전 한 줄. 기록 목록과 **같은 게이트**를 통과한
+      // 것만 쓴다 -- 다르면 같은 프로필에서 "최근 경기"와 "목록 맨 위"가 어긋난다.
+      recentActivity: await findLatestPublicParticipation(this.prisma, user.id),
+      // Task 155 선수 카드. 숨김을 켠 사용자에게는 null 을 내려 프론트가 섹션 자체를
+      // 렌더하지 않게 한다 -- 빈 카드를 남기면 "숨겼는데 자리가 남는" 상태가 된다.
+      playerCard: user.profile?.playerCardHidden === true ? null : await this.buildPlayerCardFor(user.id, user.profile?.playerCardShape),
       reputation: {
         ...toReputationPayload(user.reputationSummary),
         mannerScore: liveReputation.mannerScore,
@@ -320,6 +366,42 @@ export class ProfileService {
       },
       activitySummary,
     };
+  }
+
+  /**
+   * 선수 카드를 만든다 (Task 155). 산식은 `profile/player-card.ts` 의 순수 함수에 있고,
+   * 여기서는 **입력을 모으는 일만** 한다 -- 그래야 산식을 DB 없이 테스트할 수 있다.
+   *
+   * 기록 쪽은 공개 기록 목록과 같은 게이트를 통과한 것만 쓴다. 후기 쪽(4항목 평균)은
+   * 1층 데이터라 동의와 무관하게 읽는다 -- 두 층의 경계가 카드 안에서도 그대로다.
+   */
+  private async buildPlayerCardFor(userId: string, profileShape?: string | null): Promise<PlayerCard> {
+    const [records, reputation, consent] = await Promise.all([
+      loadPlayerCardRecordStats(this.prisma, userId),
+      this.prisma.v1UserReputationSummary.findUnique({ where: { userId } }),
+      this.prisma.v1UserRecordConsent.findUnique({ where: { userId } }),
+    ]);
+
+    const toNumber = (value: Prisma.Decimal | null | undefined): number | null =>
+      value === null || value === undefined ? null : Number(value);
+
+    return buildPlayerCard({
+      appearances: records.appearances,
+      goals: records.goals,
+      assists: records.assists,
+      startedCount: records.startedCount,
+      position: records.position,
+      jerseyNumber: records.jerseyNumber,
+      skillScore: toNumber(reputation?.metricSkillScore),
+      mannerScore: toNumber(reputation?.metricMannerScore),
+      punctualityScore: toNumber(reputation?.metricPunctualityScore),
+      reviewCount: reputation?.metricReviewCount ?? 0,
+      savedShape: profileShape,
+      recordsConsented: consent?.state === V1ConsentState.GRANTED,
+      // 연결된 기록이 하나도 없으면 동의를 켜도 열릴 것이 없다 -- 그 사실을 산식에
+      // 넘겨야 "공개를 켜면 열려요" 라는 거짓 약속을 하지 않는다.
+      hasRecordLinks: records.hasAnyLink,
+    });
   }
 
   private async getPublicActivitySummary(userId: string, precomputedReputation?: { reviewCount: number; mannerScore: number | null }) {
@@ -771,7 +853,27 @@ export class ProfileService {
    */
   async myRecordConsent(user: V1AuthUser) {
     const consent = await this.prisma.v1UserRecordConsent.findUnique({ where: { userId: user.id } });
-    return toRecordConsentResponse(consent);
+    return this.withPendingRecordSignal(user.id, consent);
+  }
+
+  /**
+   * 동의 응답에 유도 UI 용 신호 두 개를 얹는다.
+   *
+   * - `hasResponded`: GRANTED/REVOKED 와 무관하게 **한 번이라도 답한 적 있는지**.
+   *   `granted:false` 는 "거부"와 "아직 안 물어봄"을 구분하지 못하는데, 유도 배너는
+   *   그 둘을 반드시 다르게 취급해야 한다(명시적 거부는 다시 조르지 않는다).
+   * - `pendingRecordCount`: 지금 켜면 즉시 공개될 경기 수. 이미 GRANTED 면 유도할
+   *   이유가 없으므로 세지 않고 0 으로 둔다(불필요한 3쿼리 절약).
+   *
+   * 이 두 필드는 기존 필드에 **추가만** 한다 — 옛 클라이언트는 그대로 동작한다.
+   */
+  private async withPendingRecordSignal(
+    userId: string,
+    consent: { state: V1ConsentState; effectiveAt: Date } | null,
+  ) {
+    const base = toRecordConsentResponse(consent);
+    const pendingRecordCount = base.granted ? 0 : await countOwnerVisibleParticipations(this.prisma, userId);
+    return { ...base, hasResponded: consent !== null, pendingRecordCount };
   }
 
   /**
@@ -787,7 +889,7 @@ export class ProfileService {
       update: { state, policyHash: dto.policyHash, effectiveAt: new Date() },
       create: { userId: user.id, state, policyHash: dto.policyHash },
     });
-    return toRecordConsentResponse(consent);
+    return this.withPendingRecordSignal(user.id, consent);
   }
 
   /**
@@ -827,6 +929,92 @@ export class ProfileService {
       select: { tournamentRealNameVisible: true },
     });
     return { visible: profile.tournamentRealNameVisible };
+  }
+
+  /**
+   * 선수 카드 숨김 토글 조회 (Task 155). 프로필 row 가 없으면 컬럼 기본값과 같은
+   * false(= 카드를 보여준다)를 반환한다 -- 대회 실명 토글과 같은 패턴.
+   */
+  /**
+   * 카드 모양 설정 화면이 필요한 것 전부.
+   *
+   * `unlocked` 를 서버가 내려주는 이유: 잠금 조건을 화면에도 복사해 두면 규칙이 두 곳이 되고,
+   * 나중에 조건을 바꿀 때 한쪽만 고쳐 "열렸다고 나오는데 저장은 거부되는" 상태가 된다.
+   */
+  async myPlayerCardShape(user: V1AuthUser) {
+    const [profile, reputation] = await Promise.all([
+      this.prisma.v1UserProfile.findUnique({ where: { userId: user.id }, select: { playerCardShape: true } }),
+      this.prisma.v1UserReputationSummary.findUnique({ where: { userId: user.id }, select: { metricReviewCount: true } }),
+    ]);
+    const reviewCount = reputation?.metricReviewCount ?? 0;
+    return {
+      shape: resolveCardShape(profile?.playerCardShape, reviewCount),
+      unlocked: unlockedCardShapes(reviewCount),
+      reviewCount,
+      requiredForShield: MIN_REVIEWS_FOR_SHIELD_SHAPE,
+    };
+  }
+
+  /** 잠긴 모양은 저장 자체를 거부한다 -- 화면이 막는 것과 별개로 서버가 마지막 문이다. */
+  async updateMyPlayerCardShape(user: V1AuthUser, dto: UpdatePlayerCardShapeDto) {
+    this.assertMutableAccount(user);
+    const existing = await this.prisma.v1UserProfile.findUnique({ where: { userId: user.id }, select: { id: true } });
+    if (!existing) {
+      throw new NotFoundException({ code: 'PROFILE_NOT_FOUND', message: '프로필을 먼저 등록해주세요.' });
+    }
+    const reputation = await this.prisma.v1UserReputationSummary.findUnique({
+      where: { userId: user.id },
+      select: { metricReviewCount: true },
+    });
+    const reviewCount = reputation?.metricReviewCount ?? 0;
+    if (!unlockedCardShapes(reviewCount).includes(dto.shape)) {
+      throw new ForbiddenException({
+        code: 'CARD_SHAPE_LOCKED',
+        message: `후기 ${MIN_REVIEWS_FOR_SHIELD_SHAPE}개를 받으면 열려요.`,
+      });
+    }
+    await this.prisma.v1UserProfile.update({
+      where: { userId: user.id },
+      data: { playerCardShape: dto.shape },
+      select: { id: true },
+    });
+    return { shape: dto.shape, unlocked: unlockedCardShapes(reviewCount), reviewCount, requiredForShield: MIN_REVIEWS_FOR_SHIELD_SHAPE };
+  }
+
+  async myPlayerCardHidden(user: V1AuthUser) {
+    const profile = await this.prisma.v1UserProfile.findUnique({
+      where: { userId: user.id },
+      select: { playerCardHidden: true },
+    });
+    return { hidden: profile?.playerCardHidden ?? false };
+  }
+
+  /**
+   * 선수 카드 숨김 토글 저장.
+   *
+   * 이 컬럼은 Task 155 에서 카드와 함께 넣었지만 **쓰는 경로가 없어 사용자가 켤 수
+   * 없는 상태**였다 -- 읽기만 하고 있었다. 게임화에 거부감이 있는 사용자를 위한
+   * 탈출구가 목적인데 잠글 방법이 없으면 탈출구가 아니다.
+   *
+   * `updateMe`(PATCH /me/profile)와 달리 nickname/gender 같은 다른 필수 필드를 함께
+   * 요구하지 않는다 -- 이 화면은 스위치 하나만 다룬다. 프로필 row 가 아직 없으면
+   * upsert 의 create 분기가 nickname 없이 만들 수 없으므로 404 로 막는다.
+   */
+  async updateMyPlayerCardHidden(user: V1AuthUser, dto: UpdatePlayerCardHiddenDto) {
+    this.assertMutableAccount(user);
+    const existing = await this.prisma.v1UserProfile.findUnique({ where: { userId: user.id }, select: { id: true } });
+    if (!existing) {
+      throw new NotFoundException({
+        code: 'PROFILE_NOT_FOUND',
+        message: '프로필을 먼저 등록해주세요.',
+      });
+    }
+    const profile = await this.prisma.v1UserProfile.update({
+      where: { userId: user.id },
+      data: { playerCardHidden: dto.hidden },
+      select: { playerCardHidden: true },
+    });
+    return { hidden: profile.playerCardHidden };
   }
 
   logout() {
@@ -1123,6 +1311,7 @@ function toProfilePayload(profile: {
   profileImageUrl: string | null;
   birthDate: string | null;
   gender: string | null;
+  bio?: string | null;
 } | null) {
   return {
     displayName: profile?.nickname ?? '사용자',
@@ -1131,6 +1320,11 @@ function toProfilePayload(profile: {
     profileImageUrl: profile?.profileImageUrl ?? null,
     birthDate: profile?.birthDate ?? null,
     gender: normalizeProfileGender(profile?.gender),
+    // alpha 실측(2026-08-24)에서 잡은 결함: 저장은 되는데 이 payload 에 bio 가 빠져
+    // `GET /me/profile` 과 `PATCH` 응답 모두 값을 안 돌려줬다. 프론트는 그 응답으로
+    // 캐시를 갱신하고 편집 폼 초깃값을 채우므로, 저장 직후 편집 화면에 다시 들어가면
+    // 방금 쓴 소개가 비어 보였다(DB 엔 남아 있는데).
+    bio: profile?.bio ?? null,
   };
 }
 

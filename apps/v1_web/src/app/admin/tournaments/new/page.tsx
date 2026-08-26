@@ -39,6 +39,7 @@ import {
   buildTournamentCreatePayload,
   buildTournamentPreviewItem,
   canSubmitTournamentCreate,
+  hasPromoFactEdits,
   tournamentCreateReducer,
   validateTournamentCreateStep,
   type TournamentCreateAction,
@@ -271,7 +272,7 @@ export default function AdminTournamentsNewPage() {
       </div>
 
       <AdminPageHeader
-        eyebrow="대회 관리"
+        eyebrow="플랫폼 · 대회"
         title="새 대회 만들기"
         description="기본 정보부터 참가 조건까지 입력하면 대회가 초안으로 만들어져요. 마지막 확인 화면에서 참가자에게 보일 모습을 확인한 뒤 접수를 시작하세요."
       />
@@ -506,7 +507,7 @@ function WizardStepper({
                   </span>
                   <span className="hidden min-w-0 sm:block" aria-hidden="true">
                     <span className="block truncate text-xs font-bold">{step.title}</span>
-                    <span className="mt-0.5 block truncate text-[var(--font-size-caption)]">{step.description}</span>
+                    <span className="mt-0.5 block truncate text-[length:var(--font-size-caption)]">{step.description}</span>
                   </span>
                 </button>
               </li>
@@ -586,7 +587,7 @@ function BasicStep({
           {([
             ['group_knockout', '조별리그 + 토너먼트', '예선 순위 후 결선'],
             ['knockout', '토너먼트', '패하면 탈락'],
-            ['league', '리그', '모든 팀이 순위 경쟁'],
+            ['league', '리그 방식', '모든 팀이 순위 경쟁'],
           ] as const).map(([value, label, description]) => (
             <label
               key={value}
@@ -938,6 +939,28 @@ function ParticipationStep({
         )}
       </Field>
 
+      {state.format === 'league' ? (
+        <Field
+          id="minMatchesPerTeam"
+          label="최소 경기 수"
+          hint="각 팀이 최소 몇 경기를 보장받을지 정해요. 비워두면 검증하지 않아요."
+          error={errors.minMatchesPerTeam}
+        >
+          <input
+            id="minMatchesPerTeam"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={50}
+            value={state.minMatchesPerTeam}
+            onChange={(event) => setField('minMatchesPerTeam', event.target.value)}
+            disabled={pending}
+            aria-invalid={Boolean(errors.minMatchesPerTeam)}
+            className={inputClass}
+          />
+        </Field>
+      ) : null}
+
       {state.genderCategory === 'mixed' ? (
         <section className="rounded-2xl border border-[var(--border)] bg-[var(--grey50)] p-4">
           <h3 className="text-sm font-bold text-[var(--text-strong)]">혼성 명단 쿼터</h3>
@@ -1139,6 +1162,46 @@ function PresentationStep({
         </Field>
       </section>
 
+      {/* 카드 정지 규정 — 비워 두면 이 대회에는 적용되지 않는다. 기본값을 채워 두지
+          않는 것이 의도다: 운영자가 의식하지 못한 채 정지 규정이 켜진 대회가 만들어지면,
+          이미 카드를 받은 선수가 갑자기 못 뛰게 된다. */}
+      <section className="grid gap-4 sm:grid-cols-2">
+        <Field id="yellow-accumulation-limit" label="경고 누적 출전정지 (장)">
+          <input
+            id="yellow-accumulation-limit"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={20}
+            value={state.yellowAccumulationLimit}
+            onChange={(event) => setField('yellowAccumulationLimit', event.target.value)}
+            disabled={pending}
+            placeholder="비우면 적용 안 함"
+            className={inputClass}
+          />
+          <p className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>
+            옐로카드가 이 장수만큼 쌓일 때마다 다음 1경기 출전이 막혀요. 비워 두면 적용하지 않아요.
+          </p>
+        </Field>
+        <Field id="red-card-suspension-matches" label="퇴장 시 출전정지 (경기)">
+          <input
+            id="red-card-suspension-matches"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={20}
+            value={state.redCardSuspensionMatches}
+            onChange={(event) => setField('redCardSuspensionMatches', event.target.value)}
+            disabled={pending}
+            placeholder="비우면 적용 안 함"
+            className={inputClass}
+          />
+          <p className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>
+            레드카드 1장당 막히는 경기 수예요. 비워 두면 적용하지 않아요.
+          </p>
+        </Field>
+      </section>
+
       <section className="grid gap-4 sm:grid-cols-2">
         <Field id="rules-text" label="대회 규정">
           <textarea
@@ -1169,7 +1232,8 @@ function PresentationStep({
           <h3 className="text-sm font-bold text-[var(--text-strong)]">홍보 카드</h3>
           <p className="mt-1 text-xs text-[var(--text-caption)]">
             생성과 동시에 홈·대회 목록 홍보를 준비할 수 있어요. 노출은 각 카드에서 켜세요.
-            홍보 이미지를 비워두면 위에서 올린 대표 이미지를 함께 사용해요.
+            날짜·장소·상금 문구는 앞 단계에 입력한 대회 정보로 미리 채워 두었고, 직접 고치면
+            그 문구는 그대로 유지돼요. 홍보 이미지를 비워두면 위에서 올린 대표 이미지를 함께 사용해요.
           </p>
         </div>
         <PromoCardFields
@@ -1183,6 +1247,8 @@ function PresentationStep({
           uploading={promoUploadingSlot === 'promoHome'}
           disabled={pending}
           priorityError={errors.promoHomePriority}
+          onResetFacts={() => dispatch({ type: 'reset-promo-facts', slot: 'promoHome' })}
+          canResetFacts={hasPromoFactEdits(state, 'promoHome')}
           // 이 자리를 비웠을 때 실제로 노출될 이미지 — 자기 자리를 뺀 폴백 결과를 그대로 넘겨
           // 미리보기가 공개 화면과 어긋나지 않게 한다.
           defaultImageUrl={resolveTournamentImage(
@@ -1205,6 +1271,8 @@ function PresentationStep({
           uploading={promoUploadingSlot === 'promoList'}
           disabled={pending}
           priorityError={errors.promoListPriority}
+          onResetFacts={() => dispatch({ type: 'reset-promo-facts', slot: 'promoList' })}
+          canResetFacts={hasPromoFactEdits(state, 'promoList')}
           defaultImageUrl={resolveTournamentImage(
             {
               coverImageUrl: state.coverImageUrl,

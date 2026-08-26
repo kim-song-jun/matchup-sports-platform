@@ -26,6 +26,15 @@ type RoomWithRelations = Prisma.V1ChatRoomGetPayload<{
     match: { select: { id: true; title: true } };
     team: { select: { id: true; name: true } };
     teamMatch: { select: { id: true; title: true; hostTeamId: true; approvedApplicantTeamId: true } };
+    teamContact: {
+      select: {
+        id: true;
+        fromTeamId: true;
+        toTeamId: true;
+        fromTeam: { select: { id: true; name: true } };
+        toTeam: { select: { id: true; name: true } };
+      };
+    };
     participants: {
       include: {
         user: { select: { id: true; profile: { select: { nickname: true; displayName: true; profileImageUrl: true } } } };
@@ -52,6 +61,7 @@ export class ChatService {
         ...(query.roomType === 'match' ? { matchId: { not: null } } : {}),
         ...(query.roomType === 'team' ? { teamId: { not: null } } : {}),
         ...(query.roomType === 'team_match' ? { teamMatchId: { not: null } } : {}),
+        ...(query.roomType === 'team_contact' ? { teamContactId: { not: null } } : {}),
         participants: { some: { userId: user.id, status: 'active' } },
         AND: [currentChatEntitlementWhere(user.id)],
       },
@@ -78,8 +88,18 @@ export class ChatService {
       await this.assertCanUseTeamChat(user.id, dto.targetId);
       return this.resolveTeamRoom(user.id, dto.targetId);
     }
-    await this.assertCanUseTeamMatchChat(user.id, dto.targetId);
-    return this.resolveTeamMatchRoom(user.id, dto.targetId);
+    if (dto.targetType === 'team_match') {
+      await this.assertCanUseTeamMatchChat(user.id, dto.targetId);
+      return this.resolveTeamMatchRoom(user.id, dto.targetId);
+    }
+    if (dto.targetType === 'team_contact') {
+      await this.assertCanUseTeamContactChat(user.id, dto.targetId);
+      return this.resolveTeamContactRoom(user.id, dto.targetId);
+    }
+    // DTO 의 @IsIn 이 targetType 을 네 값으로 제한하므로 여기 도달할 일은 없다.
+    // 도달했다면 새 방 종류가 이 분기 없이 추가된 것이다 — 조용히 마지막 분기로
+    // 새느니 크게 실패한다. assertCurrentRoomEntitlement 와 같은 규약이다.
+    throw validationError('Unsupported chat target type', 'targetType');
   }
 
   async detail(user: V1AuthUser, roomId: string) {
@@ -334,6 +354,13 @@ export class ChatService {
     return { roomId: room.id, roomType: 'team_match', created: !existing, route: chatRoomRoute(room.id) };
   }
 
+  private async resolveTeamContactRoom(userId: string, teamContactId: string) {
+    const existing = await this.prisma.v1ChatRoom.findUnique({ where: { teamContactId } });
+    const room = existing ?? (await this.prisma.v1ChatRoom.create({ data: { teamContactId, status: 'active' } }));
+    await this.ensureResolvedParticipant(room.id, userId);
+    return { roomId: room.id, roomType: 'team_contact', created: !existing, route: chatRoomRoute(room.id) };
+  }
+
   private async assertCanUseMatchChat(userId: string, matchId: string) {
     const participant = await this.prisma.v1MatchParticipant.findFirst({
       where: { matchId, userId, status: 'active', match: { deletedAt: null } },
@@ -373,6 +400,28 @@ export class ChatService {
     if (!membership) throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Team match chat requires team owner or manager role' });
   }
 
+  private async assertCanUseTeamContactChat(userId: string, teamContactId: string) {
+    const contact = await this.prisma.v1TeamContact.findFirst({
+      where: { id: teamContactId, status: 'accepted' },
+      select: { fromTeamId: true, toTeamId: true },
+    });
+    if (!contact) throw stateConflict('컨택이 수락된 뒤에 대화할 수 있어요.');
+    const membership = await this.prisma.v1TeamMembership.findFirst({
+      where: {
+        userId, status: 'active',
+        role: { in: ['owner', 'manager'] },
+        teamId: { in: [contact.fromTeamId, contact.toTeamId] },
+      },
+      select: { id: true },
+    });
+    if (!membership) {
+      throw new ForbiddenException({
+        code: 'PERMISSION_DENIED',
+        message: '팀장 또는 운영진만 컨택 대화에 참여할 수 있어요.',
+      });
+    }
+  }
+
   private async getActiveParticipantRoom(userId: string, roomId: string) {
     const room = await this.getRoomParticipant(userId, roomId);
     if (room.participants[0].status !== 'active') {
@@ -384,11 +433,17 @@ export class ChatService {
 
   private async assertCurrentRoomEntitlement(
     userId: string,
-    room: { matchId: string | null; teamId: string | null; teamMatchId: string | null },
+    room: {
+      matchId: string | null;
+      teamId: string | null;
+      teamMatchId: string | null;
+      teamContactId: string | null;
+    },
   ) {
     if (room.matchId) return this.assertCanUseMatchChat(userId, room.matchId);
     if (room.teamId) return this.assertCanUseTeamChat(userId, room.teamId);
     if (room.teamMatchId) return this.assertCanUseTeamMatchChat(userId, room.teamMatchId);
+    if (room.teamContactId) return this.assertCanUseTeamContactChat(userId, room.teamContactId);
     throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Chat room is not linked to an active target' });
   }
 
@@ -492,6 +547,15 @@ export class ChatService {
       match: { select: { id: true, title: true } },
       team: { select: { id: true, name: true } },
       teamMatch: { select: { id: true, title: true, hostTeamId: true, approvedApplicantTeamId: true } },
+      teamContact: {
+        select: {
+          id: true,
+          fromTeamId: true,
+          toTeamId: true,
+          fromTeam: { select: { id: true, name: true } },
+          toTeam: { select: { id: true, name: true } },
+        },
+      },
       participants: {
         include: {
           user: { select: { id: true, profile: { select: { nickname: true, displayName: true, profileImageUrl: true } } } },
@@ -547,27 +611,51 @@ export class ChatService {
   }
 }
 
-function getRoomType(room: { matchId: string | null; teamId: string | null; teamMatchId: string | null }) {
-  if (room.matchId) return 'match';
-  if (room.teamId) return 'team';
-  return 'team_match';
-}
-
-function getRoomTitle(room: { match: { title: string } | null; team: { name: string } | null; teamMatch: { title: string } | null }) {
-  return room.match?.title ?? room.team?.name ?? room.teamMatch?.title ?? '채팅';
-}
-
-function getLinkedTarget(room: {
+export function getRoomType(room: {
   matchId: string | null;
   teamId: string | null;
   teamMatchId: string | null;
+  teamContactId: string | null;
+}) {
+  if (room.matchId) return 'match';
+  if (room.teamId) return 'team';
+  if (room.teamContactId) return 'team_contact';
+  return 'team_match';
+}
+
+export function getRoomTitle(room: {
+  match: { title: string } | null;
+  team: { name: string } | null;
+  teamMatch: { title: string } | null;
+  teamContact: { fromTeam: { name: string }; toTeam: { name: string } } | null;
+}) {
+  const contactTitle = room.teamContact
+    ? `${room.teamContact.fromTeam.name} ↔ ${room.teamContact.toTeam.name}`
+    : null;
+  return room.match?.title ?? room.team?.name ?? room.teamMatch?.title ?? contactTitle ?? '채팅';
+}
+
+export function getLinkedTarget(room: {
+  matchId: string | null;
+  teamId: string | null;
+  teamMatchId: string | null;
+  teamContactId: string | null;
   match: { id: string; title: string } | null;
   team: { id: string; name: string } | null;
   teamMatch: { id: string; title: string } | null;
+  teamContact: { id: string; fromTeam: { name: string }; toTeam: { name: string } } | null;
 }) {
   if (room.match) return { type: 'match', id: room.match.id, title: room.match.title, route: `/matches/${room.match.id}` };
   if (room.team) return { type: 'team', id: room.team.id, title: room.team.name, route: `/teams/${room.team.id}` };
   if (room.teamMatch) return { type: 'team_match', id: room.teamMatch.id, title: room.teamMatch.title, route: `/team-matches/${room.teamMatch.id}` };
+  if (room.teamContact) {
+    return {
+      type: 'team_contact',
+      id: room.teamContact.id,
+      title: `${room.teamContact.fromTeam.name} ↔ ${room.teamContact.toTeam.name}`,
+      route: `/my/team-contacts/${room.teamContact.id}`,
+    };
+  }
   return { type: null, id: null, title: '채팅', route: null };
 }
 

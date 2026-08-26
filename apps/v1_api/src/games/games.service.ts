@@ -1,9 +1,12 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   HttpException,
   Injectable,
+  Logger,
   NotFoundException,
+  Optional,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import {
@@ -31,6 +34,11 @@ import type {
 } from '../common/audit/operation-audit.contract';
 import { OperationAuditWriterService } from '../common/audit/operation-audit-writer.service';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  evaluateSuspension,
+  suspensionRulesEnabled,
+  type PlayedGameCards,
+} from '../tournaments/discipline/card-suspension';
 import { cascadeCompleteTeamMatchSchedulesInTx } from '../team-schedules/team-schedules.service';
 import {
   parseLineupCatalog,
@@ -41,6 +49,7 @@ import {
 } from '../tournaments/competition-config/competition-config.parse';
 import { readIsKnockoutFixture, readKnockoutFixtureFacts } from '../tournaments/knockout-fixture';
 import { assertPenaltyShootoutPersistable } from './core/penalty-shootout-outcome';
+import { isCommandConcurrencyConflict } from './command-concurrency-error';
 import {
   assertBracketResolvable,
   assertPenaltiesNotAllowed,
@@ -48,6 +57,15 @@ import {
   type StoredPenalties,
 } from './core/knockout-penalties';
 import { GameTakeoverService } from './game-takeover.service';
+import {
+  writeIdentityAttestRequestNotifications,
+  type IdentityAttestPushPlan,
+} from './identity-attest-notification';
+import {
+  IDENTITY_LINK_REQUEST_TTL_MS,
+  scheduleIdentityLinkExpiry,
+} from '../jobs/identity-link/identity-link-expiry.service';
+import { WebPushService } from '../notifications/web-push.service';
 import {
   decideTournamentStaffAccess,
   type TournamentStaffAction,
@@ -97,6 +115,7 @@ import type {
   DecideGameResultRevisionDto,
   GameResultRecoveryDto,
   SubmitGameResultRevisionDto,
+  VoidTeamMatchResultDto,
 } from './dto/game-result.dto';
 import type {
   AttestIdentityLinkDto,
@@ -113,7 +132,15 @@ type CommandResult = object;
 // must have a registered handler in v1-game-operations-worker.service.ts's
 // constructor (or the worker main.ts bootstrap) or it will retry 6 times
 // and end up POISONED forever.
-type GamesOutboxEventType = 'GAME_RESULT_SUBMITTED' | 'GAME_RESULT_OFFICIAL' | 'GAME_RESULT_CHANGE_REQUESTED';
+type GamesOutboxEventType =
+  | 'GAME_RESULT_SUBMITTED'
+  | 'GAME_RESULT_OFFICIAL'
+  | 'GAME_RESULT_CHANGE_REQUESTED'
+  // D2: TEAM_MATCH 결과 무효화(voidTeamMatchResult) 가 쓴다. 이미
+  // GameResultVoidProjectionService 가 이 타입으로 워커에 등록돼 있다(대회 레인의
+  // voidResultRevision 이 먼저 썼다) -- 핸들러가 sourceType 을 가리지 않는 범용
+  // 투영이라 새 핸들러 등록 없이 그대로 재사용한다.
+  | 'GAME_RESULT_VOIDED';
 type GameAuthorizationAction =
   | 'read'
   | 'tournament_command'
@@ -122,6 +149,22 @@ type GameAuthorizationAction =
   | 'lineup_mutate'
   | 'team_result_submit'
   | 'opponent_result_decide'
+  // D1-a: TEAM_MATCH 전용 결과 정정(이미 OFFICIAL 인 결과를 새 DRAFT 로 슈퍼시드했다가
+  // 다시 OFFICIAL 로 승격). team_result_submit/opponent_result_decide 와 달리 이
+  // 액션은 팀 소속(host/opponent)만으로는 절대 통과시키지 않는다 — resolveActor 의
+  // TEAM_MATCH 분기가 명시적으로 forbidden 을 던진다. 오직 admin 패스스루(이 함수보다
+  // 먼저 검사된다)만 통과할 수 있다.
+  | 'team_result_correction'
+  // D2: 이의(dispute) 제기 -- 참가 두 팀(host/opponent) 중 어느 쪽이든 owner/manager면
+  // 낼 수 있다. team_result_correction 과 달리 이 액션은 **명시적으로 특수 취급하지
+  // 않는다** -- resolveActor TEAM_MATCH 분기 맨 아래 공용 fallback
+  // (`managerRole(hostMembership) ?? managerRole(opponentMembership)`)이 정확히
+  // "두 팀 중 하나의 owner/manager" 규칙과 일치하므로 그대로 통과시킨다.
+  | 'team_result_dispute_file'
+  // D2: 이의 수락 시 운영자가 고르는 무효(void) 처리 -- team_result_correction 과
+  // 완전히 같은 이유로 팀 소속 fallback 을 명시적으로 차단해야 한다(그러지 않으면
+  // 상대팀 매니저가 자기에게 불리한 결과를 스스로 무효화할 수 있는 구멍이 생긴다).
+  | 'team_result_void'
   | 'cancel'
   | 'participant_identity';
 
@@ -272,6 +315,14 @@ export function gameAuthorizationAction(action: string): GameAuthorizationAction
     case 'result_revision_approve':
     case 'result_revision_change_request':
       return 'opponent_result_decide';
+    case 'team_result_correction_create':
+    case 'team_result_correction_officialize':
+      return 'team_result_correction';
+    // D2: voidTeamMatchResult가 withCommand에 넘기는 명령 이름이 곧 이 액션
+    // 버킷과 같은 이름이다(team_result_correction_create/_officialize처럼 별도
+    // create/officialize 단계가 없는 단일 커맨드라서 나눌 이유가 없다).
+    case 'team_result_void':
+      return 'team_result_void';
     default:
       throw new TypeError(`Unsupported game command action: ${action}`);
   }
@@ -499,6 +550,45 @@ function assertClockNotDrifted(occurredAt: string): void {
  * elsewhere in this file) so this pure parsing rule is unit-testable without
  * a database.
  */
+/**
+ * `end` 커맨드 payload 에서 몰수·중단 종결 사유를 뽑는다.
+ *
+ * 1차 대회 회고 "몰수·중단 등 특수 상황 처리". 지금까지 운영자는 몰수를 임의 점수로
+ * 수기 입력하는 수밖에 없었고, 정상 종료와 구분되지 않아 **왜 그 점수인지 근거가
+ * 남지 않았다**.
+ *
+ * 2026-08-23 사용자 결정(Q3): 종목별 표준 스코어를 자동 부여하지 않는다. 대신
+ * **사유를 필수로** 걸어 임의성이 사람 판단에 남더라도 그 판단이 기록에 남게 한다 —
+ * 이 함수의 존재 이유가 그 "필수"다. 사유 없는 몰수는 여기서 422 로 막힌다.
+ *
+ * `extractEndPenalties` 와 같은 이유로 순수 함수다(payload 가 느슨한 레코드라 DTO
+ * 검증을 못 거치고, DB 없이 단위 테스트할 수 있어야 한다).
+ */
+export function extractEndOutcome(payload: Record<string, unknown>): {
+  outcomeReason: 'NORMAL' | 'FORFEIT' | 'ABANDONED';
+  note: string | null;
+} {
+  const raw = payload.outcomeReason;
+  if (raw === undefined || raw === null || raw === 'NORMAL') {
+    return { outcomeReason: 'NORMAL', note: null };
+  }
+  if (raw !== 'FORFEIT' && raw !== 'ABANDONED') {
+    throw new UnprocessableEntityException({
+      code: 'GAME_OUTCOME_REASON_INVALID',
+      message: "outcomeReason must be one of 'NORMAL', 'FORFEIT', 'ABANDONED'",
+    });
+  }
+  const note = typeof payload.outcomeNote === 'string' ? payload.outcomeNote.trim() : '';
+  if (note.length === 0) {
+    throw new UnprocessableEntityException({
+      code: 'GAME_OUTCOME_NOTE_REQUIRED',
+      message:
+        '몰수·중단으로 종료할 때는 사유를 반드시 남겨야 해요 — 나중에 왜 그 점수인지 설명할 수 있는 유일한 기록이에요.',
+    });
+  }
+  return { outcomeReason: raw, note };
+}
+
 export function extractEndPenalties(payload: Record<string, unknown>): StoredPenalties | undefined {
   const raw = payload.penalties;
   if (raw === undefined) return undefined;
@@ -656,7 +746,14 @@ export class GamesService {
     private readonly prisma: PrismaService,
     private readonly operationAuditWriter: OperationAuditWriterService,
     private readonly takeover: GameTakeoverService,
+    // 신원 연결 승인 요청 푸시(2026-08-26). optional 인 이유는 워커 서비스의 webPush 와 같다 —
+    // `new GamesService(prisma, audit, takeover)` 로 직접 만드는 스펙이 다수 있고 그쪽은
+    // 푸시가 no-op 이면 된다. 실제 앱에서는 GamesModule 이 import 한 WebPushModule 에서 주입된다.
+    @Optional() private readonly webPush?: WebPushService,
   ) {}
+
+  /** 푸시 발송 실패 기록용. 이 클래스에는 주입 로거가 없어 지역 인스턴스를 쓴다. */
+  private readonly pushLogger = new Logger(`${GamesService.name}:push`);
 
   async createFromSourceInTransaction(
     tx: Prisma.TransactionClient,
@@ -1122,6 +1219,9 @@ export class GamesService {
             context,
             'END_COMMAND',
             extractEndPenalties(dto.payload),
+            // 몰수·중단 종결 사유. 정상 종료면 NORMAL/null 이라 기존 동작과 같다.
+            // 사유가 비어 있는 몰수는 extractEndOutcome 이 422 로 먼저 막는다.
+            extractEndOutcome(dto.payload),
           );
         }
         return {
@@ -1784,7 +1884,7 @@ export class GamesService {
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
-        (error.code === 'P2034' || error.code === 'P2002')
+        isCommandConcurrencyConflict(error.code, error.meta, error.message)
       ) {
         throw new ConflictException({
           code: 'COMMAND_CONCURRENCY_CONFLICT',
@@ -2127,6 +2227,56 @@ export class GamesService {
     }));
   }
 
+  /**
+   * 명단 검인(체크인) — 참가자가 실제로 도착했음을 현장에서 확정한다.
+   * 1차 대회 회고: "명단 검인 과정에서 오지 않거나, 하지 않은 사람들에 대한 확인이 어려움".
+   *
+   * **`withCommand` 를 쓰지 않는다.** 체크인은 라인업 내용을 바꾸지 않고 킥오프 직전 여러
+   * 명을 연달아 누르는 조작이라, 버전 커맨드로 만들면 한 명 누를 때마다 revision 이 올라
+   * 다음 사람에서 곧바로 409 VERSION_CONFLICT 가 난다. 그래서 게임/라인업 버전과 완전히
+   * 분리된 단순 토글로 둔다 — 되돌리기(arrived=false → NULL)도 같은 이유로 값싸야 한다.
+   *
+   * **경기 상태로 막지 않는다.** 사람은 킥오프 직전은 물론 경기가 시작된 뒤에도 도착하고,
+   * 늦게 온 사람을 기록하는 것이 이 기능의 목적이다. 라인업 저장의 deadline 게이트
+   * (SCHEDULED 전용)를 여기에 그대로 옮기면 정작 필요한 순간에 잠긴다.
+   */
+  async setParticipantArrival(
+    user: V1AuthUser,
+    gameId: string,
+    participantId: string,
+    arrived: boolean,
+  ) {
+    // lineup_mutate 는 platform_ops · 라인업 권한을 가진 대회 스태프 · 이 fixture 참가팀의
+    // 매니저/오너를 통과시킨다 — 명단 검인을 할 수 있어야 하는 사람과 정확히 같은 집합이다.
+    const actor = await this.resolveActor(this.prisma, gameId, user.id, 'lineup_mutate');
+    const participant = await this.prisma.v1GameParticipant.findFirst({
+      where: { id: participantId, gameId },
+      select: { id: true, sideId: true, arrivedAt: true },
+    });
+    if (participant === null) {
+      throw this.notFound('GAME_PARTICIPANT_NOT_FOUND');
+    }
+    // 팀 액터는 자기 팀 사이드만 검인할 수 있다 — saveLineup 과 같은 규칙이다.
+    // 스태프/platform_ops 는 어느 쪽이든 검인해야 하므로 팀 액터일 때만 검사한다.
+    if (actor.role === 'team_manager' || actor.role === 'team_owner') {
+      const side = await this.prisma.v1GameSide.findFirst({
+        where: { id: participant.sideId, gameId },
+        select: { teamId: true },
+      });
+      if (side === null || actor.teamId !== side.teamId) {
+        throw this.forbidden();
+      }
+    }
+    const arrivedAt = arrived ? (participant.arrivedAt ?? new Date()) : null;
+    // 이미 같은 상태면 시각을 다시 쓰지 않는다 — 같은 사람을 두 번 눌러도 최초 확인 시각이
+    // 유지돼야 분쟁 시 근거가 된다(위 `?? new Date()` 가 그 역할).
+    return this.prisma.v1GameParticipant.update({
+      where: { id: participant.id },
+      data: { arrivedAt },
+      select: { id: true, sideId: true, arrivedAt: true },
+    });
+  }
+
   async saveLineup(
     user: V1AuthUser,
     gameId: string,
@@ -2428,6 +2578,13 @@ export class GamesService {
             throw this.forbidden();
           }
         }
+        // 경고 누적·퇴장 출전정지 가드. 1차 대회 회고 "옐로카드 누적, 레드카드 퇴장등
+        // 필요해보임" — 지금까지 이 경로는 정지 여부를 **전혀 검사하지 않아** 퇴장당한
+        // 선수가 다음 경기에 그대로 뛸 수 있었다.
+        //
+        // **저장(saveLineup)이 아니라 제출에 건다.** 초안을 짜는 동안 막으면 팀장이
+        // 명단을 구성조차 못 한다 — 제출이 "이 명단으로 뛰겠다"고 확정하는 지점이다.
+        await this.assertNoSuspendedStarters(tx, game, lineup.id);
         if (lineup.state !== V1GameLineupState.DRAFT) {
           throw new ConflictException({
             code: 'INVALID_LINEUP_STATE',
@@ -2468,6 +2625,225 @@ export class GamesService {
    * 인가는 resolveActor('read')를 그대로 재사용해 team-match/tournament-fixture
    * 분기 로직을 여기서 다시 만들지 않는다.
    */
+  /**
+   * "이 기록은 제 것입니다" 화면이 쓰는 목록 (Task 154 P0-5, 사용자 선택 B안).
+   *
+   * 라인업에 **이름만 올라가고 계정이 연결되지 않은** 참가자를 돌려준다. 선수가 자기
+   * 이름을 골라 신원 연결을 신청하는 것이 이 목록의 유일한 용도다.
+   *
+   * ## 노출 범위를 왜 이렇게 잡았나
+   * 인가를 `participant_identity` 스코프로 건다 -- **신청할 수 있는 사람에게만 목록을
+   * 보여준다**는 뜻이다. 볼 수만 있고 신청할 수 없는 사람을 만들지 않으므로, 이 API 가
+   * 새로운 노출 판단을 만들지 않는다(#673 에서 이미 정한 범위를 그대로 따른다).
+   * `read` 스코프로 걸면 관전자 전원에게 미연결 명단이 보이게 되어 훨씬 넓어진다.
+   *
+   * ## version 을 함께 내리는 이유
+   * `requestIdentityLink` 는 `expectedVersion` 을 요구하는데(낙관적 동시성), 공개 경기
+   * 응답에는 그 값이 없어 클라이언트가 알 길이 없었다. 목록과 같은 시점의 값을 함께
+   * 내려 클라이언트가 별도 조회 없이 바로 신청할 수 있게 한다.
+   */
+  async listClaimableParticipants(user: V1AuthUser, tournamentId: string, fixtureId: string) {
+    const fixture = await this.prisma.v1TournamentFixture.findUnique({
+      where: { tournamentId_id: { tournamentId, id: fixtureId } },
+      select: { game: { select: { id: true, version: true } } },
+    });
+    if (fixture === null || fixture.game === null) {
+      throw this.notFound('TOURNAMENT_FIXTURE_GAME_NOT_FOUND');
+    }
+    return this.listClaimableParticipantsForGame(user, fixture.game);
+  }
+
+  /**
+   * 리그 판 (2026-08-25 대회 패리티 후속). 리그 대진의 게임은 TEAM_MATCH 소스라
+   * resolveActor 의 team-match 분기가 `participant_identity` 를 "두 팀 중 한쪽의 활성
+   * 멤버"에게 이미 허용한다 — 여기서 새 인가 규칙을 만들지 않고, **teamMatchId 가 정말
+   * 이 리그의 대진인지**(리그 스코프)만 추가로 검증한다. 신청·승인 API 는 game 경로
+   * (`/games/:gameId/...`)라 소스 불문 그대로 쓴다.
+   */
+  async listLeagueClaimableParticipants(user: V1AuthUser, leagueId: string, teamMatchId: string) {
+    const teamMatch = await this.prisma.v1TeamMatch.findFirst({
+      where: { id: teamMatchId, leagueId, deletedAt: null },
+      select: { game: { select: { id: true, version: true } } },
+    });
+    if (teamMatch === null || teamMatch.game === null) {
+      throw this.notFound('LEAGUE_FIXTURE_GAME_NOT_FOUND');
+    }
+    return this.listClaimableParticipantsForGame(user, teamMatch.game);
+  }
+
+  private async listClaimableParticipantsForGame(
+    user: V1AuthUser,
+    game: { id: string; version: number },
+  ) {
+    const gameId = game.id;
+    // 신청 자격과 동일한 스코프. 비참가자는 여기서 403 으로 끊긴다.
+    await this.resolveActor(this.prisma, gameId, user.id, 'participant_identity');
+
+    const participants = await this.prisma.v1GameParticipant.findMany({
+      where: { gameId },
+      select: { id: true, sideId: true, displayNameSnapshot: true, jerseyNumber: true },
+      orderBy: [{ sideId: 'asc' }, { jerseyNumber: 'asc' }],
+    });
+    if (participants.length === 0) {
+      return { gameId, version: game.version, participants: [] };
+    }
+    // 이미 연결된 참가자는 뺀다 -- 남의 연결을 빼앗는 경로를 애초에 안 만든다.
+    // (설령 목록에 넣어도 requestIdentityLink 가 409 로 막지만, 고를 수 있게 보여주는
+    //  것 자체가 "가능하다"는 신호가 된다.)
+    const linked = await this.prisma.v1ParticipantIdentityLinkCurrent.findMany({
+      where: { participantId: { in: participants.map((participant) => participant.id) } },
+      select: { participantId: true },
+    });
+    const linkedIds = new Set(linked.map((row) => row.participantId));
+    return {
+      gameId,
+      version: game.version,
+      participants: participants
+        .filter((participant) => !linkedIds.has(participant.id))
+        .map((participant) => ({
+          participantId: participant.id,
+          sideId: participant.sideId,
+          displayName: participant.displayNameSnapshot,
+          jerseyNumber: participant.jerseyNumber,
+        })),
+    };
+  }
+
+  /**
+   * 승인함 목록 (2026-08-26, attest UI C안) — 이 경기에서 **내가 승인(attest)할 수 있는**
+   * 대기 중 신원 연결 요청을 돌려준다. attest API 는 requestId 를 요구하는데 그것을
+   * 알아낼 조회 경로가 없어 승인 UI 를 만들 수 없었다(신청·승인 API 만 존재).
+   *
+   * ## 노출 범위 = 승인 자격
+   * 진입 게이트는 신청과 같은 `participant_identity` 스코프(참가팀 멤버)이고, 그 위에
+   * **요청별 승인 자격**(assertAttestorAuthority — TEAM_MATCH 는 그 사이드 팀의
+   * owner/manager, TOURNAMENT 는 등록팀 활성 멤버)을 사이드 단위로 판정해 통과하는
+   * 요청만 싣는다. 볼 수 있는데 승인은 못 하는 행을 만들지 않는다(claim 목록과 같은
+   * 원칙). 본인이 낸 요청도 뺀다 — 스스로 승인할 수 없다(서비스 + DB 트리거).
+   *
+   * ## pending 판정
+   * REQUESTED 이벤트가 있고 종결 이벤트(ATTESTED/REJECTED/EXPIRED)가 없으며 24시간이
+   * 지나지 않은 것. 24시간이 지난 요청은 EXPIRED 이벤트를 여기서 쓰지 않고 목록에서만
+   * 뺀다 — 만료 이벤트 기록은 attest 시점의 lazy expiry (attestIdentityLink) 소관이다.
+   */
+  async listPendingIdentityLinkRequests(user: V1AuthUser, gameId: string) {
+    const game = await this.prisma.v1Game.findUnique({
+      where: { id: gameId },
+      select: { version: true, sourceType: true },
+    });
+    if (game === null) {
+      throw this.notFound();
+    }
+    const actor = await this.resolveActor(this.prisma, gameId, user.id, 'participant_identity');
+
+    const participants = await this.prisma.v1GameParticipant.findMany({
+      where: { gameId },
+      select: { id: true, sideId: true, displayNameSnapshot: true, jerseyNumber: true },
+    });
+    if (participants.length === 0) {
+      return { gameId, version: game.version, requests: [] };
+    }
+    const participantById = new Map(participants.map((participant) => [participant.id, participant]));
+
+    const events = await this.prisma.v1ParticipantIdentityLinkEvent.findMany({
+      where: { participantId: { in: participants.map((participant) => participant.id) } },
+      orderBy: { eventVersion: 'asc' },
+    });
+    const requestedByRequestId = new Map<string, (typeof events)[number]>();
+    const terminalRequestIds = new Set<string>();
+    for (const event of events) {
+      if (event.action === V1IdentityLinkAction.REQUESTED) {
+        requestedByRequestId.set(event.requestId, event);
+      } else if (
+        event.action === V1IdentityLinkAction.ATTESTED ||
+        event.action === V1IdentityLinkAction.REJECTED ||
+        event.action === V1IdentityLinkAction.EXPIRED
+      ) {
+        terminalRequestIds.add(event.requestId);
+      }
+    }
+    const now = Date.now();
+    const pending = [...requestedByRequestId.values()].filter(
+      (event) =>
+        !terminalRequestIds.has(event.requestId) &&
+        now - event.effectiveAt.getTime() < IDENTITY_LINK_REQUEST_TTL_MS &&
+        event.userId !== user.id,
+    );
+    if (pending.length === 0) {
+      return { gameId, version: game.version, requests: [] };
+    }
+
+    // 승인 자격은 사이드(팀) 단위로 갈리므로 사이드마다 1회만 판정한다.
+    const sideIds = [
+      ...new Set(
+        pending
+          .map((event) => participantById.get(event.participantId)?.sideId)
+          .filter((sideId): sideId is string => typeof sideId === 'string'),
+      ),
+    ];
+    const sides = await this.prisma.v1GameSide.findMany({
+      where: { id: { in: sideIds } },
+      select: { id: true, teamId: true },
+    });
+    const canAttestBySideId = new Map<string, boolean>();
+    for (const side of sides) {
+      try {
+        await this.assertAttestorAuthority(this.prisma, gameId, game.sourceType, side.teamId, actor);
+        canAttestBySideId.set(side.id, true);
+      } catch (error) {
+        // ForbiddenException 만 "이 사이드는 내 승인 자격 밖" 판정값으로 쓴다 — 요청별
+        // 필터이지 오류가 아니므로 삼키는 것이 맞다(참가팀 멤버 게이트는 위 resolveActor
+        // 가 이미 통과시켰다). 그 외(DB 오류 등)를 함께 삼키면 실제 장애가 빈 승인함으로
+        // 위장된다(Copilot 리뷰) — 그대로 던진다.
+        if (!(error instanceof ForbiddenException)) {
+          throw error;
+        }
+        canAttestBySideId.set(side.id, false);
+      }
+    }
+    // 이벤트와 참가자를 여기서 한 쌍으로 확정한다 — 아래 응답 생성에서 다시 조회하며
+    // 빈 문자열로 폴백하면 데이터 불일치가 "이름 없는 요청"으로 조용히 나간다(Copilot 리뷰).
+    const visible = pending.flatMap((event) => {
+      const participant = participantById.get(event.participantId);
+      if (participant === undefined || canAttestBySideId.get(participant.sideId) !== true) {
+        return [];
+      }
+      return [{ event, participant }];
+    });
+
+    const requesterIds = [
+      ...new Set(
+        visible.map(({ event }) => event.userId).filter((id): id is string => typeof id === 'string'),
+      ),
+    ];
+    const requesters =
+      requesterIds.length === 0
+        ? []
+        : await this.prisma.v1UserProfile.findMany({
+            where: { userId: { in: requesterIds } },
+            select: { userId: true, nickname: true },
+          });
+    const nicknameById = new Map(requesters.map((requester) => [requester.userId, requester.nickname]));
+
+    return {
+      gameId,
+      // attest 의 expectedVersion 으로 그대로 되돌아가는 값 — claim 목록과 같은 이유로
+      // 목록과 같은 시점의 버전을 함께 내린다.
+      version: game.version,
+      requests: visible.map(({ event, participant }) => ({
+        requestId: event.requestId,
+        participantId: event.participantId,
+        participantDisplayName: participant.displayNameSnapshot,
+        jerseyNumber: participant.jerseyNumber,
+        sideId: participant.sideId,
+        requesterNickname:
+          typeof event.userId === 'string' ? (nicknameById.get(event.userId) ?? null) : null,
+        requestedAt: event.effectiveAt.toISOString(),
+        expiresAt: new Date(event.effectiveAt.getTime() + IDENTITY_LINK_REQUEST_TTL_MS).toISOString(),
+      })),
+    };
+  }
+
   async resolveFixtureLineupAccess(user: V1AuthUser, tournamentId: string, fixtureId: string) {
     const fixture = await this.prisma.v1TournamentFixture.findUnique({
       where: { tournamentId_id: { tournamentId, id: fixtureId } },
@@ -2568,6 +2944,33 @@ export class GamesService {
       orderBy: { addedAt: 'asc' },
       select: { id: true, userId: true, realName: true },
     });
+    /**
+     * 팀이 지정한 고정 등번호(`V1TeamMembership.jerseyNumber`)를 함께 내려준다.
+     *
+     * 1차 대회(2026-08-15~16) 회고: "라인업에서 선수 번호 등록을 처음에만 하고 추후에는
+     * 안하는 문제". 프론트의 등번호 결정 로직은 `loaded ?? teamFixed ?? recent` 3단계로
+     * 이미 설계돼 있었는데, **2순위 teamFixed 가 死문이었다** — 이 응답에 번호 자체가
+     * 없어서 프론트가 넘길 값을 갖지 못했다. 그래서 팀장이 매 경기 번호를 다시 타이핑해야
+     * 했고, 그 반복 입력이 곧 오탈자 발생원이다.
+     *
+     * 이 사이드 팀의 **active 멤버십만** 본다 — 팀을 떠난 사람의 옛 번호를 되살리면
+     * 이미 그 번호를 물려받은 현재 멤버와 충돌한다(스키마에도 (teamId, jerseyNumber)
+     * 유니크가 걸려 있다).
+     */
+    const memberships =
+      side.teamId === null
+        ? []
+        : await this.prisma.v1TeamMembership.findMany({
+            where: {
+              teamId: side.teamId,
+              status: 'active',
+              userId: { in: players.map((player) => player.userId) },
+            },
+            select: { userId: true, jerseyNumber: true },
+          });
+    const teamJerseyByUserId = new Map(
+      memberships.map((membership) => [membership.userId, membership.jerseyNumber]),
+    );
     return {
       sideId,
       registrationId: resolved.registrationId,
@@ -2575,6 +2978,8 @@ export class GamesService {
         tournamentPlayerId: player.id,
         userId: player.userId,
         name: player.realName,
+        /** 팀 고정 등번호. 팀이 지정하지 않았거나 멤버십이 없으면 null. */
+        teamJerseyNumber: teamJerseyByUserId.get(player.userId) ?? null,
       })),
     };
   }
@@ -3028,6 +3433,403 @@ export class GamesService {
     );
   }
 
+  // ─── D1-a: TEAM_MATCH 전용 결과 정정 ───────────────────────────────────────
+  //
+  // 이미 OFFICIAL 인 팀매치 결과를 운영자가 새 스코어로 덮어쓰는 경로. 대회 픽스처는
+  // tournament-result-review.service.ts 의 CORRECTION flow(createResultCorrection /
+  // officializeResultRevision)로 이미 지원되지만, 그 소비자는 TEAM_MATCH 를 명시적으로
+  // 거부한다 -- games/core/revision-state-machine.ts 의 CORRECTION flow 자체(DRAFT가
+  // OFFICIAL 이었던 리비전을 슈퍼시드하고, 승격 시 SUBMITTED 를 건너뛰어 DRAFT 에서
+  // 곧바로 OFFICIAL 로 전이)는 소스타입을 가리지 않는 공용 계약이라 여기서도 그대로
+  // 재사용한다.
+  //
+  // 두 메서드로 나눈 이유는 tournament 레인과 동일하다: 생성(create)과 승격
+  // (officialize)을 분리해 두면 운영자가 화면에서 "정정 내용을 먼저 확인 -> 확정"
+  // 흐름을 만들 수 있고, league-matches 레인의 admin 서비스가 이 둘을 이어 붙여
+  // "즉시 확정"으로 쓸 수도 있다(league-match-result-entry.service.ts 참고).
+  //
+  // 인가: 두 메서드 모두 resolveActor 를 'team_result_correction' 액션으로 부른다 --
+  // 그 액션은 admin 패스스루만 통과하고(games.service.ts 위쪽 TEAM_MATCH 분기의
+  // "if (action === 'team_result_correction') throw this.forbidden();" 참고) 호스트/
+  // 상대팀 owner·manager 는 예외 없이 403 이다. 승인 없는 결과 정정을 팀이 스스로
+  // 만들어낼 수 없게 하는 것이 이 분리의 핵심이다.
+
+  /**
+   * 현재 게임의 currentOfficialRevisionId 를 base 로 삼아 새 DRAFT 정정을 만든다.
+   * 생성만으로는 공식 포인터가 바뀌지 않는다 -- officializeTeamMatchResultCorrection
+   * 을 별도로 호출해야 실제로 반영된다.
+   *
+   * `dto` 는 CreateGameResultRevisionDto 를 그대로 재사용한다(팀매치 신규 결과 제출과
+   * 같은 모양 -- score/actualParticipants/eventsHash). `actualParticipants` 를 빈
+   * 배열로 보내는 것도 허용된다: TEAM_MATCH 소스는 이벤트 스트림 교차검증이 면제되므로
+   * (resultInvariantInput 이 매 요청 이벤트 0건을 그대로 통과시킨다) 참가자별 스탯 없이
+   * 최종 스코어만 정정하는 운영 조작도 유효한 입력이다.
+   */
+  async createTeamMatchResultCorrection(
+    user: V1AuthUser,
+    gameId: string,
+    headerIdempotencyKey: string | undefined,
+    dto: CreateGameResultRevisionDto,
+  ): Promise<GameRevisionMutationResult> {
+    const source = await this.prisma.v1Game.findUnique({
+      where: { id: gameId },
+      select: { sourceType: true },
+    });
+    if (source === null) {
+      throw this.notFound();
+    }
+    if (source.sourceType !== V1GameSourceType.TEAM_MATCH) {
+      // 이 정정 경로는 리그 팀매치 전용이다 -- 대회 픽스처 정정은
+      // tournament-result-review.service.ts 의 별도 경로를 쓴다. createResultRevision
+      // 이 TOURNAMENT_FIXTURE 를 거부하는 것과 같은 이유·같은 패턴(위쪽 read 로
+      // 감사 로그는 남기되 mutate 는 허용하지 않는다).
+      await this.resolveActor(this.prisma, gameId, user.id, 'read');
+      throw new ConflictException({
+        code: 'RESULT_CORRECTION_TEAM_MATCH_ONLY',
+        message: '이 정정 경로는 리그 팀매치 전용이에요.',
+      });
+    }
+    return this.withCommand(
+      {
+        gameId,
+        action: 'team_result_correction_create',
+        actor: await this.resolveActor(this.prisma, gameId, user.id, 'team_result_correction'),
+        expectedVersion: dto.expectedVersion,
+        headerIdempotencyKey,
+        bodyCommandId: dto.clientCommandId,
+        payload: dto,
+      },
+      async (tx, game, context) => {
+        await this.assertTeamMatchMatched(tx, game.teamMatchId);
+        const gameRow = await tx.v1Game.findUniqueOrThrow({
+          where: { id: gameId },
+          select: { currentOfficialRevisionId: true },
+        });
+        const latest = await tx.v1GameResultRevision.findFirst({
+          where: { gameId },
+          orderBy: { revision: 'desc' },
+        });
+        if (latest === null || latest.state !== V1GameResultRevisionState.OFFICIAL) {
+          throw new ConflictException({
+            code: 'RESULT_CORRECTION_NO_OFFICIAL_REVISION',
+            message: '정정할 공식 결과가 아직 없어요.',
+          });
+        }
+        // base 는 반드시 게임의 **현재** 공식 포인터여야 한다(단순히 자기 state 컬럼이
+        // OFFICIAL 인 것으로는 부족하다) -- tournament 레인의 createResultCorrection
+        // docblock 이 설명하는 것과 같은 함정: 한 번 슈퍼시드된 리비전은 자기 state
+        // 컬럼이 영원히 OFFICIAL 로 남는다.
+        if (gameRow.currentOfficialRevisionId !== latest.id) {
+          throw new ConflictException({
+            code: 'REVISION_MUST_BE_SUPERSEDED',
+            message: '가장 최근 리비전이 더 이상 현재 공식 결과가 아니에요.',
+          });
+        }
+        try {
+          assertRevisionSupersession({
+            baseGameId: latest.gameId,
+            successorGameId: gameId,
+            baseRevisionId: latest.id,
+            supersedesRevisionId: latest.id,
+            baseState: latest.state,
+            successorState: V1GameResultRevisionState.DRAFT,
+            purpose: 'CORRECTION',
+          });
+        } catch (error) {
+          if (error instanceof GameContractError) {
+            throw toGameHttpException(error);
+          }
+          throw error;
+        }
+        const invariant = await this.resultInvariantInput(tx, game, dto);
+        try {
+          validateGameResultInvariants(invariant);
+        } catch (error) {
+          if (error instanceof GameContractError) {
+            throw toGameHttpException(error);
+          }
+          throw error;
+        }
+        const revision = await tx.v1GameResultRevision.create({
+          data: {
+            gameId,
+            revision: latest.revision + 1,
+            score: jsonInput(dto.score),
+            eventsHash: dto.eventsHash,
+            missingScorer: invariant.missingScorer,
+            mvpParticipantId: dto.mvpParticipantId,
+            reason: dto.reason,
+            createdByActorType: 'USER',
+            createdByUserId: user.id,
+            supersedesId: latest.id,
+          },
+        });
+        await tx.v1GameResultParticipant.createMany({
+          data: dto.actualParticipants.map((participant) => ({
+            resultRevisionId: revision.id,
+            participantId: participant.participantId,
+            sideId: participant.sideId,
+            started: participant.started,
+            minutesPlayed: participant.minutesPlayed,
+            goals: participant.goals,
+            assists: participant.assists ?? 0,
+            fouls: participant.fouls ?? 0,
+            cards: jsonInput(participant.cards),
+            goalkeeper: participant.goalkeeper,
+          })),
+        });
+        const updated = await tx.v1Game.update({
+          where: { id: gameId },
+          data: { version: { increment: 1 } },
+        });
+        return {
+          gameId,
+          state: updated.state,
+          version: updated.version,
+          durableCommandId: context.durableCommandId,
+          replayed: false,
+          revisionId: revision.id,
+          revision: revision.revision,
+          revisionState: revision.state,
+        };
+      },
+    );
+  }
+
+  /**
+   * createTeamMatchResultCorrection 이 만든 DRAFT 를 OFFICIAL 로 승격한다. CORRECTION
+   * flow(assertRevisionTransition)는 DRAFT -> OFFICIAL 직접 전이를 허용한다 -- 표준
+   * 결과 제출(create -> submit -> decide)과 달리 SUBMITTED 를 거치지 않는다. 이 정정은
+   * 운영자 단독 조작(상대팀 재승인 없음)이라 SUBMITTED 상태가 표현할 "상대팀 검토 대기"
+   * 의미 자체가 없기 때문이다.
+   */
+  async officializeTeamMatchResultCorrection(
+    user: V1AuthUser,
+    gameId: string,
+    revisionId: string,
+    headerIdempotencyKey: string | undefined,
+    dto: SubmitGameResultRevisionDto,
+  ): Promise<GameRevisionMutationResult> {
+    return this.withCommand(
+      {
+        gameId,
+        action: 'team_result_correction_officialize',
+        actor: await this.resolveActor(this.prisma, gameId, user.id, 'team_result_correction'),
+        expectedVersion: dto.expectedVersion,
+        headerIdempotencyKey,
+        bodyCommandId: dto.clientCommandId,
+        payload: { revisionId, ...dto },
+      },
+      async (tx, game, context) => {
+        if (game.sourceType !== V1GameSourceType.TEAM_MATCH) {
+          // resolveActor 의 'team_result_correction' 액션이 TOURNAMENT_FIXTURE 에서는
+          // tournamentAuthorizationAction 매핑(null)으로 이미 거부하므로 여기 도달하는
+          // 것은 실제로 불가능하다 -- decideResultRevision 의 같은 자리 체크와 동일하게
+          // 방어적으로만 남긴다.
+          throw new ForbiddenException({
+            code: 'PERMISSION_DENIED',
+            message: 'Tournament correction uses the tournament review decision surface',
+          });
+        }
+        await tx.$queryRaw`SELECT id FROM v1_game_result_revisions WHERE id = ${revisionId} FOR UPDATE`;
+        const revision = await tx.v1GameResultRevision.findFirst({ where: { id: revisionId, gameId } });
+        if (revision === null) {
+          throw this.notFound('RESULT_REVISION_NOT_FOUND');
+        }
+        const gameRow = await tx.v1Game.findUniqueOrThrow({
+          where: { id: gameId },
+          select: { currentOfficialRevisionId: true },
+        });
+        // 이 정정이 여전히 게임의 **현재** 공식 결과를 슈퍼시드하고 있는지 재확인한다.
+        // 생성과 승격 사이에 다른 정정이 먼저 승격됐다면 이 DRAFT 는 stale 이다.
+        if (revision.supersedesId === null || revision.supersedesId !== gameRow.currentOfficialRevisionId) {
+          throw new ConflictException({
+            code: 'REVISION_MUST_BE_SUPERSEDED',
+            message: '이 정정은 더 이상 현재 공식 결과를 슈퍼시드하지 않아요.',
+          });
+        }
+        try {
+          assertRevisionTransition({
+            from: revision.state,
+            to: V1GameResultRevisionState.OFFICIAL,
+            flow: 'CORRECTION',
+          });
+        } catch (error) {
+          if (error instanceof GameContractError) {
+            throw toGameHttpException(error);
+          }
+          throw error;
+        }
+        const officialized = await tx.v1GameResultRevision.update({
+          where: { id: revision.id },
+          data: { state: V1GameResultRevisionState.OFFICIAL, officialAt: new Date() },
+        });
+        const updated = await tx.v1Game.update({
+          where: { id: gameId },
+          data: { version: { increment: 1 }, currentOfficialRevisionId: revision.id },
+        });
+        // 같은 outbox 이벤트 타입을 재사용한다 -- game-result-official-projection.service.ts
+        // 의 핸들러가 currentOfficialRevisionId 를 다시 읽어 순위표·공개 캐시·팀 전적을
+        // 재투영하므로, 정정도 표준 승인과 완전히 같은 다운스트림 경로를 그대로 탄다.
+        await this.writeOutbox(
+          tx,
+          `game:${gameId}:revision:${officialized.revision}:correction_officialize`,
+          gameId,
+          'GAME_RESULT_OFFICIAL',
+          { revisionId: officialized.id },
+          officialized.id,
+        );
+        return {
+          gameId,
+          state: updated.state,
+          version: updated.version,
+          durableCommandId: context.durableCommandId,
+          replayed: false,
+          revisionId: officialized.id,
+          revision: officialized.revision,
+          revisionState: officialized.state,
+        };
+      },
+    );
+  }
+
+  // ─── D2: TEAM_MATCH 전용 결과 무효화(void) ─────────────────────────────────
+  //
+  // 이의(dispute) 수락 시 운영자가 정정(createTeamMatchResultCorrection) 대신 고를
+  // 수 있는 두 번째 경로(E4). 대회 픽스처의
+  // `TournamentResultReviewService.voidResultRevision`과 완전히 같은 패턴을
+  // 재사용한다 -- DRAFT/SUBMITTED 를 거치지 않고 새 리비전을 곧바로 VOID 상태로
+  // 만들어 현재 공식 리비전을 슈퍼시드한다(assertRevisionTransition 은 VOID 로 가는
+  // STANDARD/CORRECTION 전이를 정의하지 않으므로 그 함수를 거치지 않는다 -- 대회
+  // 레인의 원본도 마찬가지다).
+  //
+  // 인가는 'team_result_void' 액션으로 resolveActor 를 부른다 -- admin 패스스루만
+  // 통과하고 호스트/상대팀 owner·manager 는 예외 없이 403 이다(위 resolveActor 의
+  // "if (action === 'team_result_void') throw this.forbidden();" 참고).
+  //
+  // 순위표 제외는 이 메서드가 직접 하지 않는다 -- `game.currentOfficialRevisionId`
+  // 를 VOID 리비전으로 옮기기만 하면, `GameResultOfficialFactsService`가 VOID
+  // 리비전에는 fact 행을 절대 만들지 않으므로(오직 GAME_RESULT_OFFICIAL 투영에서만
+  // fact 를 쓴다) `league-match-public.service.ts`의 `standings()`가 그 팀매치를
+  // 자동으로 확정 집계에서 빠뜨린다(구조적으로 보장됨 -- league-standings.ts 자체를
+  // 고칠 필요가 없다).
+  async voidTeamMatchResult(
+    user: V1AuthUser,
+    gameId: string,
+    headerIdempotencyKey: string | undefined,
+    dto: VoidTeamMatchResultDto,
+  ): Promise<GameRevisionMutationResult> {
+    const source = await this.prisma.v1Game.findUnique({
+      where: { id: gameId },
+      select: { sourceType: true },
+    });
+    if (source === null) {
+      throw this.notFound();
+    }
+    if (source.sourceType !== V1GameSourceType.TEAM_MATCH) {
+      // createTeamMatchResultCorrection 과 같은 패턴: read 로 감사 로그는 남기되
+      // mutate 는 허용하지 않는다.
+      await this.resolveActor(this.prisma, gameId, user.id, 'read');
+      throw new ConflictException({
+        code: 'RESULT_VOID_TEAM_MATCH_ONLY',
+        message: '이 무효 처리 경로는 리그 팀매치 전용이에요.',
+      });
+    }
+    return this.withCommand(
+      {
+        gameId,
+        action: 'team_result_void',
+        actor: await this.resolveActor(this.prisma, gameId, user.id, 'team_result_void'),
+        expectedVersion: dto.expectedVersion,
+        headerIdempotencyKey,
+        bodyCommandId: dto.clientCommandId,
+        payload: dto,
+      },
+      async (tx, game, context) => {
+        await this.assertTeamMatchMatched(tx, game.teamMatchId);
+        const gameRow = await tx.v1Game.findUniqueOrThrow({
+          where: { id: gameId },
+          select: { currentOfficialRevisionId: true },
+        });
+        const revision =
+          gameRow.currentOfficialRevisionId === null
+            ? null
+            : await tx.v1GameResultRevision.findFirst({
+                where: { id: gameRow.currentOfficialRevisionId, gameId },
+              });
+        if (revision === null || revision.state !== V1GameResultRevisionState.OFFICIAL) {
+          throw new ConflictException({
+            code: 'RESULT_VOID_NO_OFFICIAL_REVISION',
+            message: '무효 처리할 공식 결과가 아직 없어요.',
+          });
+        }
+        const voidRevision = await tx.v1GameResultRevision.create({
+          data: {
+            gameId,
+            revision: revision.revision + 1,
+            state: V1GameResultRevisionState.VOID,
+            score: jsonInput(revision.score),
+            eventsHash: revision.eventsHash,
+            missingScorer: revision.missingScorer,
+            mvpParticipantId: revision.mvpParticipantId,
+            reason: dto.reason,
+            createdByActorType: 'USER',
+            createdByUserId: user.id,
+            supersedesId: revision.id,
+            submittedAt: new Date(),
+            officialAt: new Date(),
+          },
+        });
+        const updated = await tx.v1Game.update({
+          where: { id: gameId },
+          data: { version: { increment: 1 }, currentOfficialRevisionId: voidRevision.id },
+        });
+        await this.writeOutbox(
+          tx,
+          `game:${gameId}:revision:${voidRevision.revision}:voided`,
+          gameId,
+          'GAME_RESULT_VOIDED',
+          { revisionId: voidRevision.id, supersedesId: revision.id },
+          voidRevision.id,
+        );
+        return {
+          gameId,
+          state: updated.state,
+          version: updated.version,
+          durableCommandId: context.durableCommandId,
+          replayed: false,
+          revisionId: voidRevision.id,
+          revision: voidRevision.revision,
+          revisionState: voidRevision.state,
+        };
+      },
+    );
+  }
+
+  /**
+   * D2: 이의(dispute) 제기 인가 게이트. `resolveActor`는 private 이라 외부 모듈
+   * (`league-matches/league-match-dispute.service.ts`)이 직접 부를 수 없으므로,
+   * 'team_result_dispute_file' 액션 하나만 노출하는 얇은 공개 래퍼를 둔다 --
+   * 인가 판정 자체는 여전히 `resolveActor` 단일 지점에서만 일어난다(이 래퍼는
+   * 그 결과를 그대로 돌려줄 뿐 스스로 아무것도 판단하지 않는다).
+   *
+   * admin(platform_ops)도 이 액션을 통과한다(위쪽 admin 패스스루가 TEAM_MATCH
+   * 분기 어떤 액션보다도 먼저 적용되기 때문 -- team_result_correction/
+   * team_result_void 의 명시적 deny 도 admin 을 막지 않는 것과 동일한 이유)만,
+   * 이의는 "팀이 내는 것"이라는 도메인 의미상 `teamId`가 없는 admin 액터는
+   * 여기서 별도로 거부한다.
+   */
+  async assertTeamResultDisputeFileAuthority(
+    user: V1AuthUser,
+    gameId: string,
+  ): Promise<{ actorUserId: string; teamId: string }> {
+    const actor = await this.resolveActor(this.prisma, gameId, user.id, 'team_result_dispute_file');
+    if (actor.teamId === undefined) {
+      throw this.forbidden();
+    }
+    return { actorUserId: actor.actorUserId, teamId: actor.teamId };
+  }
+
   // ─── Task 14: participant identity link + consent (append-only, ≤5s purge) ───
   //
   // Design notes (see games.module.ts callers / task-14 tests for the literal
@@ -3059,7 +3861,13 @@ export class GamesService {
     headerIdempotencyKey: string | undefined,
     dto: RequestIdentityLinkDto,
   ) {
-    return this.withParticipantCommand(
+    // 푸시는 롤백할 수 없으므로 트랜잭션 밖에서 보낸다 — 커맨드가 커밋된 뒤에만 발송한다.
+    // 재시도(idempotency REPLAY)로 mutate 가 아예 실행되지 않으면 이 값이 null 로 남아
+    // 중복 푸시도 생기지 않는다.
+    // 지역 변수 대신 박스에 담는다 — 클로저 안에서만 대입하면 TS 가 바깥 읽기 지점을
+    // `null` 로 좁혀 버려(제어흐름 분석은 콜백 실행을 모른다) 사용이 불가능해진다.
+    const push: { plan: IdentityAttestPushPlan | null } = { plan: null };
+    const result = await this.withParticipantCommand(
       {
         gameId,
         action: 'identity_link_request',
@@ -3092,7 +3900,7 @@ export class GamesService {
           orderBy: { eventVersion: 'desc' },
         });
         if (last !== null && last.action === V1IdentityLinkAction.REQUESTED) {
-          const stillPending = Date.now() - last.effectiveAt.getTime() < 24 * 60 * 60 * 1000;
+          const stillPending = Date.now() - last.effectiveAt.getTime() < IDENTITY_LINK_REQUEST_TTL_MS;
           if (stillPending) {
             throw new ConflictException({
               code: 'IDENTITY_LINK_REQUEST_PENDING',
@@ -3119,6 +3927,23 @@ export class GamesService {
           actorType: V1IdentityActorType.USER,
           actorUserId: user.id,
         });
+        // 승인 자격자에게 인앱 알림 (attest UI C안) — 같은 tx 라 신청 커밋 = 알림 존재.
+        // businessKey 멱등이라 커맨드 재시도에도 재알림하지 않는다. 발송 정책·순환
+        // 회피 이유는 identity-attest-notification.ts 헤더 참조.
+        push.plan = await writeIdentityAttestRequestNotifications(tx, {
+          gameId,
+          participantId,
+          requestId,
+          requesterUserId: user.id,
+        });
+        // 24시간 뒤 만료를 확정하는 예약 잡 — 아무도 확인하지 않아도 요청이 원장에서
+        // 종결되고 신청자가 통보를 받는다(identity-link-expiry.service.ts).
+        await scheduleIdentityLinkExpiry(tx, {
+          gameId,
+          participantId,
+          requestId,
+          requestedAt: created.effectiveAt,
+        });
         const updated = await tx.v1Game.update({
           where: { id: gameId },
           data: { version: { increment: 1 } },
@@ -3130,7 +3955,7 @@ export class GamesService {
           state: 'pending_attestation' as const,
           version: updated.version,
           effectiveAt: created.effectiveAt.toISOString(),
-          expiresAt: new Date(created.effectiveAt.getTime() + 24 * 60 * 60 * 1000).toISOString(),
+          expiresAt: new Date(created.effectiveAt.getTime() + IDENTITY_LINK_REQUEST_TTL_MS).toISOString(),
           replayed: false,
         };
         await this.writeAudit(
@@ -3145,6 +3970,28 @@ export class GamesService {
         return response;
       },
     );
+
+    // 커밋 뒤 best-effort 푸시. 실패해도 이미 커밋된 인앱 알림은 그대로 남고, 신청
+    // 응답에도 영향을 주지 않는다.
+    const plan = push.plan;
+    if (plan !== null && this.webPush !== undefined) {
+      for (const recipientUserId of plan.recipients) {
+        void this.webPush
+          .sendToUser(recipientUserId, {
+            title: plan.title,
+            body: plan.body,
+            url: plan.url ?? undefined,
+          })
+          .catch((error: unknown) => {
+            // best-effort 이지만 조용히 삼키지는 않는다 — 구독 조회·발송이 계속 실패해도
+            // 아무 흔적이 없으면 운영에서 알아챌 방법이 없다(Copilot 리뷰).
+            this.pushLogger.warn(
+              `web push failed for identity attest request (game=${gameId}, recipient=${recipientUserId}): ${String(error)}`,
+            );
+          });
+      }
+    }
+    return result;
   }
 
   async attestIdentityLink(
@@ -3194,7 +4041,7 @@ export class GamesService {
             message: '이미 처리된 요청이에요.',
           });
         }
-        const expired = Date.now() - requested.effectiveAt.getTime() >= 24 * 60 * 60 * 1000;
+        const expired = Date.now() - requested.effectiveAt.getTime() >= IDENTITY_LINK_REQUEST_TTL_MS;
         if (expired) {
           const expiredEvent = await this.appendIdentityEvent(tx, {
             participantId,
@@ -3243,7 +4090,19 @@ export class GamesService {
           throw this.notFound('GAME_PARTICIPANT_NOT_FOUND');
         }
         const side = await tx.v1GameSide.findUnique({ where: { id: participant.sideId } });
-        await this.assertAttestorAuthority(tx, side?.teamId ?? null, actor);
+        // sourceType 은 자격 판정을 가르므로 여기서 직접 읽는다 -- withParticipantCommand 가
+        // 넘겨주는 game 은 id/version 만 담고 있다.
+        const commandGame = await tx.v1Game.findUniqueOrThrow({
+          where: { id: gameId },
+          select: { sourceType: true },
+        });
+        await this.assertAttestorAuthority(
+          tx,
+          gameId,
+          commandGame.sourceType,
+          side?.teamId ?? null,
+          actor,
+        );
 
         const action =
           dto.decision === 'approve' ? V1IdentityLinkAction.ATTESTED : V1IdentityLinkAction.REJECTED;
@@ -3716,7 +4575,7 @@ export class GamesService {
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
-        (error.code === 'P2034' || error.code === 'P2002')
+        isCommandConcurrencyConflict(error.code, error.meta, error.message)
       ) {
         throw new ConflictException({
           code: 'COMMAND_CONCURRENCY_CONFLICT',
@@ -3872,12 +4731,71 @@ export class GamesService {
     return error;
   }
 
+  /**
+   * 신원 연결의 **확인자** 자격. 이 게이트를 지나는 커맨드는 attest 하나뿐이다.
+   *
+   * 경기 종류에 따라 자격이 다르다 -- 같은 규칙을 쓰면 한쪽이 반드시 틀린다.
+   *
+   * ## TEAM_MATCH: 참가자 본인 팀의 owner/manager (기존 계약 유지)
+   * 두 팀이 서로 아는 소규모 경기라 팀장이 곁에 있고, 팀장 승인이 실제로 작동한다.
+   * `game-participant-identity.integration-spec.ts` 가 "평멤버는 거부"를 명시적으로
+   * 못박고 있다(Track A 회귀 방지) -- 여기를 건드리면 그 계약이 깨진다.
+   *
+   * ## TOURNAMENT_FIXTURE: 두 등록팀의 **활성 멤버 누구나** (2026-08-24 사용자 확정)
+   * 대회는 다르다. alpha 실측에서 **신청은 201, 확인은 403** 이 나왔다 -- 양쪽 다 등록팀
+   * 활성 멤버였지만 둘 다 평멤버였다. 신청만 열리고 확인이 막히면 선수가 자기 기록을
+   * 되찾겠다고 신청해도 팀장이 손대기 전까지 영영 pending 이라, "문의 없이 복구한다"는
+   * 이 기능(P0-5)의 목적이 절반만 달성된다. 대회 등록팀의 팀장은 대개 현장에 없다.
+   *
+   * 판정은 **신청(request)이 쓰는 것과 같은 술어**를 쓴다 -- `resolveActor` 의
+   * participant_identity 분기가 두 등록팀 멤버십으로 신청을 허용했으므로(그래서 201),
+   * 확인도 같은 기준이어야 둘이 어긋나지 않는다. 참가자 본인 팀(`sideTeamId`)이 아니라
+   * 등록팀 기준인 이유이기도 하다 -- 상대팀 사람이 "이 사람 맞다"고 말하는 편이 오히려
+   * 담합이 어렵다.
+   *
+   * ## 대가 (실재한다)
+   * 팀장 승인보다 담합이 쉬워진다 -- 한 대회에 공모자가 둘 있으면 서로의 기록을 확인해 줄
+   * 수 있다. 감수하는 근거는 셋이다: ① 신청자 ≠ 확인자가 위에서 강제되고(서비스 + DB
+   * 트리거 이중), ② 모든 결정이 `V1ParticipantIdentityLinkEvent` 원장에 누가 언제 했는지로
+   * 남아 사후 추적·취소가 가능하며, ③ 잘못 붙은 기록은 되돌릴 수 있는 반면 영영 pending 인
+   * 기록은 사용자가 앱 안에서 복구할 방법이 아예 없다.
+   */
   private async assertAttestorAuthority(
-    tx: Transaction,
+    tx: Transaction | PrismaService,
+    gameId: string,
+    sourceType: V1GameSourceType,
     sideTeamId: string | null,
     actor: Extract<GameActorScope, { actorType: 'USER' }>,
   ) {
     if (actor.role === 'platform_ops') {
+      return;
+    }
+    if (sourceType === V1GameSourceType.TOURNAMENT_FIXTURE) {
+      const game = await tx.v1Game.findUnique({
+        where: { id: gameId },
+        select: {
+          tournamentFixture: {
+            select: {
+              homeRegistration: { select: { teamId: true } },
+              awayRegistration: { select: { teamId: true } },
+            },
+          },
+        },
+      });
+      const registrationTeamIds = [
+        game?.tournamentFixture?.homeRegistration?.teamId,
+        game?.tournamentFixture?.awayRegistration?.teamId,
+      ].filter((teamId): teamId is string => typeof teamId === 'string');
+      if (registrationTeamIds.length === 0) {
+        throw this.forbidden();
+      }
+      const membership = await tx.v1TeamMembership.findFirst({
+        // 역할은 보지 않는다 -- 활성 멤버이기만 하면 된다. 탈퇴·정지 멤버는 status 로 걸린다.
+        where: { userId: actor.actorUserId, teamId: { in: registrationTeamIds }, status: 'active' },
+      });
+      if (membership === null) {
+        throw this.forbidden();
+      }
       return;
     }
     if (sideTeamId === null) {
@@ -3896,6 +4814,21 @@ export class GamesService {
     }
   }
 
+  /**
+   * 모든 게임 커맨드가 지나는 단일 경계.
+   *
+   * 트랜잭션은 Serializable 이고, 맨 처음 `SELECT id FROM v1_games ... FOR UPDATE` 로
+   * 게임 행을 잠근다. 그래서 같은 게임에 대한 커맨드는 서로 직렬화되고, 뒤늦은 쪽은
+   * 앞선 쪽이 커밋한 idempotency 레코드를 보게 돼 REPLAY 로 수렴한다.
+   *
+   * 다만 그 잠금 자체가 경합에 걸리면 Postgres 가 40001 을 던지는데, 그것이
+   * **raw query 안에서** 난 것이라 Prisma 는 P2034 가 아니라 P2010 으로 감싼다 — 아래 catch 가
+   * `isCommandConcurrencyConflict` 를 쓰는 이유다(P2034/P2002 만 보던 시절엔 이 경로가
+   * 통째로 새어 500 이 됐다. alpha 실측 2026-08-23).
+   *
+   * 같은 catch 가 이 파일에 세 벌 있는데, 셋 다 같은 `FOR UPDATE` 경계를 감싸므로
+   * 하나를 고칠 때는 나머지 둘도 같이 봐야 한다.
+   */
   private async withCommand<T extends CommandResult>(
     input: CommandBoundaryInput,
     mutate: (
@@ -4027,7 +4960,7 @@ export class GamesService {
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
-        (error.code === 'P2034' || error.code === 'P2002')
+        isCommandConcurrencyConflict(error.code, error.meta, error.message)
       ) {
         throw new ConflictException({
           code: 'COMMAND_CONCURRENCY_CONFLICT',
@@ -4063,6 +4996,170 @@ export class GamesService {
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       },
     });
+  }
+
+  /**
+   * 이 라인업의 **선발** 중 출전정지 선수가 있으면 400 `DISCIPLINE_SUSPENDED` 로 막는다.
+   *
+   * 후보(started=false)는 막지 않는다 — 정지 선수를 벤치에 앉히는 것 자체는 규정
+   * 위반이 아니고, 실제로 뛰는 순간은 교체 이벤트라 그때 별도로 다룰 문제다.
+   * (지금은 교체까지 막지 않는다 — 그건 이 변경의 범위를 넘고, 라인업 제출을 막는
+   * 것만으로 회고가 지적한 "퇴장 선수가 다음 경기에 그대로 선발 출전"은 닫힌다.)
+   *
+   * 대회 픽스처가 아니거나 규정이 꺼진 대회면 조회 없이 즉시 통과한다.
+   */
+  private async assertNoSuspendedStarters(
+    tx: Transaction,
+    game: LockedGame,
+    lineupId: string,
+  ): Promise<void> {
+    if (game.sourceType !== V1GameSourceType.TOURNAMENT_FIXTURE) return;
+    // `LockedGame` 이 이미 `tournamentFixtureId` 를 들고 있으므로 게임을 다시 조회하지
+    // 않는다 — 앞선 버전은 관계를 따라가느라 쿼리를 한 번 더 썼다(Copilot 리뷰 지적).
+    if (game.tournamentFixtureId === null) return;
+    const fixture = await tx.v1TournamentFixture.findUnique({
+      where: { id: game.tournamentFixtureId },
+      select: { id: true, tournamentId: true },
+    });
+    if (fixture === null) return;
+
+    const verdicts = await this.suspensionVerdicts(tx, fixture.tournamentId, fixture.id);
+    if (verdicts.size === 0) return; // 규정 미적용이거나 누적 카드가 아직 없다.
+
+    const starters = await tx.v1GameParticipant.findMany({
+      where: { lineupId, started: true },
+      select: { userId: true, displayNameSnapshot: true },
+    });
+    const blocked = starters
+      .map((starter) => {
+        const verdict = starter.userId === null ? undefined : verdicts.get(starter.userId);
+        return verdict?.suspended === true
+          ? { name: starter.displayNameSnapshot, reason: verdict.reason }
+          : null;
+      })
+      .filter((entry): entry is { name: string; reason: string | null } => entry !== null);
+    if (blocked.length === 0) return;
+
+    throw new BadRequestException({
+      code: 'DISCIPLINE_SUSPENDED',
+      message: `${blocked.map((entry) => entry.name).join(', ')} 선수는 출전정지 상태예요. 선발에서 빼고 다시 제출해 주세요.`,
+      details: { blocked },
+    });
+  }
+
+  /**
+   * 이 대회에서 카드가 누적된 선수들의 `fixtureId` 경기 정지 여부. 규칙 자체는
+   * `card-suspension.ts`(순수 함수, DB 없이 전수 테스트)에 있고 여기서는 조회만 한다.
+   *
+   * **별도 주입 서비스로 빼지 않은 이유**: `GamesService` 생성자에 인자를 하나 더하면
+   * 이 클래스를 직접 `new` 하는 통합 스펙 41곳이 전부 깨진다(CI 실측 — 그 스펙들의
+   * 타입은 로컬 `tsc -p tsconfig.json` 대상 밖이라 로컬에서는 보이지도 않는다).
+   * 게다가 여기서 `tx` 를 쓰면 제출과 **같은 트랜잭션**에서 읽어 더 정확하다.
+   *
+   * **판정 단위는 사용자(userId)다.** 참가자 행은 경기마다 새로 생기므로 그것으로는
+   * 대회 전체 누적을 셀 수 없고, 이름 문자열로 묶으면 동명이인이 서로의 카드를
+   * 뒤집어쓴다. 계정 미연결 참가자는 대상에서 빠진다.
+   */
+  private async suspensionVerdicts(tx: Transaction, tournamentId: string, fixtureId: string) {
+    const tournament = await tx.v1Tournament.findUnique({
+      where: { id: tournamentId },
+      select: { yellowAccumulationLimit: true, redCardSuspensionMatches: true },
+    });
+    const rules = {
+      yellowAccumulationLimit: tournament?.yellowAccumulationLimit ?? null,
+      redCardSuspensionMatches: tournament?.redCardSuspensionMatches ?? null,
+    };
+    // 규정이 꺼져 있으면 **조회조차 하지 않는다** — 대다수 대회가 그렇다.
+    if (!suspensionRulesEnabled(rules)) return new Map<string, ReturnType<typeof evaluateSuspension>>();
+
+    // 일정 순서 = "정지는 다음 경기부터"라는 규칙의 기준틀. scheduledAt 이 없는 픽스처는
+    // 라운드·번호로 이어 정렬한다 — 순서를 못 정하면 판정 자체가 불가능하다.
+    const fixtures = await tx.v1TournamentFixture.findMany({
+      where: { tournamentId },
+      // `nulls: 'last'` 를 **명시한다.** Postgres 의 ASC 기본값이 이미 NULLS LAST 라
+      // 동작은 같지만(Copilot 은 "기본이 nulls first"라고 봤는데 그건 DESC 얘기다),
+      // 이 순서가 정지 판정의 기준축이라 기본값에 기대지 않고 의도를 코드에 박는다 —
+      // 일정 미정 픽스처가 앞으로 오면 gameOrder 가 통째로 어긋난다.
+      orderBy: [
+        { scheduledAt: { sort: 'asc', nulls: 'last' } },
+        { round: 'asc' },
+        { fixtureNumber: 'asc' },
+      ],
+      select: {
+        id: true,
+        game: {
+          select: {
+            currentOfficialRevisionId: true,
+            // 공식 확정 전 결과도 봐야 한다 — 아래 폴백 주석 참고.
+            resultRevisions: {
+              where: { state: 'SUBMITTED' },
+              orderBy: { revision: 'desc' },
+              take: 1,
+              select: { id: true },
+            },
+          },
+        },
+      },
+    });
+    const orderByFixtureId = new Map(fixtures.map((fixture, index) => [fixture.id, index + 1]));
+    const upcomingGameOrder = orderByFixtureId.get(fixtureId);
+    if (upcomingGameOrder === undefined) return new Map<string, ReturnType<typeof evaluateSuspension>>();
+
+    /**
+     * 픽스처마다 **딱 한 개**의 리비전만 센다 — 여러 개를 세면 정정 이력이 카드로 중복
+     * 집계돼 멀쩡한 선수가 정지된다.
+     *
+     * 고르는 순서: **공식 확정본 우선, 없으면 최신 제출본(SUBMITTED)**.
+     *
+     * 공식본만 보면 안 되는 이유(2026-08-24 alpha 실측으로 발견): 경기를 `end` 하면
+     * 결과 리비전은 `SUBMITTED` 로 남고 `currentOfficialRevisionId` 는 **null 이다** —
+     * 공식 확정은 운영진이 결과 검토를 거쳐 따로 눌러야 하는 별도 단계다. 당일 대회는
+     * 다음 경기가 그 검토보다 먼저 시작되는 게 보통이라, 공식본만 세면 **정작 필요한
+     * 순간에 가드가 조용히 안 걸린다**(실측: 레드카드 받은 선수가 다음 경기 라인업에
+     * 그대로 제출돼 201 로 통과했다).
+     *
+     * DRAFT·VOID 는 세지 않는다 — 초안은 아직 아무도 제출하지 않은 값이고 VOID 는
+     * 무효화된 값이다. 제출된 결과는 "심판이 기록을 확정해 올린 것"이라 정지 판정의
+     * 근거로 충분하다. 나중에 정정되면 공식본이 그 자리를 대신한다.
+     */
+    const revisionToOrder = new Map<string, number>();
+    for (const fixture of fixtures) {
+      const order = orderByFixtureId.get(fixture.id);
+      if (order === undefined) continue;
+      const revisionId =
+        fixture.game?.currentOfficialRevisionId ?? fixture.game?.resultRevisions?.[0]?.id ?? null;
+      if (revisionId !== null) revisionToOrder.set(revisionId, order);
+    }
+    if (revisionToOrder.size === 0) return new Map<string, ReturnType<typeof evaluateSuspension>>();
+
+    const resultParticipants = await tx.v1GameResultParticipant.findMany({
+      where: { resultRevisionId: { in: [...revisionToOrder.keys()] } },
+      select: { resultRevisionId: true, participantId: true, cards: true },
+    });
+    if (resultParticipants.length === 0) return new Map<string, ReturnType<typeof evaluateSuspension>>();
+
+    const participants = await tx.v1GameParticipant.findMany({
+      where: { id: { in: resultParticipants.map((row) => row.participantId) } },
+      select: { id: true, userId: true },
+    });
+    const userByParticipantId = new Map(participants.map((row) => [row.id, row.userId]));
+
+    const playedByUserId = new Map<string, PlayedGameCards[]>();
+    for (const row of resultParticipants) {
+      const userId = userByParticipantId.get(row.participantId) ?? null;
+      if (userId === null) continue;
+      const gameOrder = revisionToOrder.get(row.resultRevisionId);
+      if (gameOrder === undefined) continue;
+      const bucket = playedByUserId.get(userId) ?? [];
+      bucket.push({ gameOrder, cards: readResultCards(row.cards) });
+      playedByUserId.set(userId, bucket);
+    }
+
+    const verdicts = new Map<string, ReturnType<typeof evaluateSuspension>>();
+    for (const [userId, played] of playedByUserId) {
+      verdicts.set(userId, evaluateSuspension({ rules, played, upcomingGameOrder }));
+    }
+    return verdicts;
   }
 
   private async resolveActor(
@@ -4123,8 +5220,45 @@ export class GamesService {
         // never reach this action — only platform_ops may act, exactly like
         // the admin branch below but without falling through to the staff
         // assignment loop.
+        //
+        // Task 154 P0-5 (2026-08-24, 사용자 결정 A안): 위 규칙 때문에 **대회 경기에서는
+        // 선수 본인도 자기 신원 연결을 신청할 수 없었다**(403). 그런데 TEAM_MATCH 쪽은
+        // 같은 action 에 대해 "두 팀 중 한쪽의 활성 멤버면 자기 것을 신청/철회하거나
+        // 별개 확인자로 행동할 수 있다"를 이미 허용하고 있다. 대회라고 다를 이유가 없다 --
+        // 라인업이 마감된 뒤 연결이 누락된 선수에게 남는 경로가 platform_ops 문의뿐이면
+        // 사실상 복구 수단이 없다.
+        //
+        // 그래서 **두 등록팀의 활성 멤버**에게 같은 권한을 준다. 안전장치는 새로 만들지
+        // 않는다 -- Task 14 가 세운 "신청자 ≠ 확인자" 규칙이 서비스와 DB 트리거 양쪽에
+        // 그대로 살아 있어(attestation requires a distinct pending requestor) 혼자서는
+        // 연결을 완성할 수 없다. 여기서 여는 것은 *신청할 자격*이지 *확정할 권한*이 아니다.
+        // platform_ops 는 아래 경로로 계속 통과한다(운영 개입 경로 유지).
         if (eligibleAdmin === null) {
-          throw this.forbidden();
+          const registrationTeamIds = [
+            fixture.homeRegistration?.teamId,
+            fixture.awayRegistration?.teamId,
+          ].filter((teamId): teamId is string => typeof teamId === 'string');
+          const membership =
+            registrationTeamIds.length === 0
+              ? null
+              : await tx.v1TeamMembership.findFirst({
+                  where: { userId, teamId: { in: registrationTeamIds }, status: 'active' },
+                  select: { teamId: true },
+                });
+          if (membership === null) {
+            throw this.forbidden();
+          }
+          return {
+            actorType: 'USER',
+            actorUserId: userId,
+            // 스태프 등급이 아니라 "참가팀 소속" 자격이다. 이 액션에서 role 은 감사
+            // 기록용이고 추가 권한을 열지 않는다(위 tournamentAuthorizationAction 이
+            // participant_identity 를 null 로 막아 스태프 경로로 새지 않는다).
+            role: 'support_readonly',
+            tournamentId: fixture.tournamentId,
+            fixtureId: fixture.id,
+            teamId: membership.teamId,
+          };
         }
         const authorizationSubject = `platform_ops:${userId}@${eligibleAdmin.updatedAt.getTime()}`;
         if (
@@ -4346,6 +5480,29 @@ export class GamesService {
         teamId: match.hostTeamId,
       };
     }
+    if (action === 'team_result_correction') {
+      // D1-a 적대 검증: resolveActor 의 나머지 TEAM_MATCH 액션들은 여기 도달하기 전에
+      // 이미 명시적으로 처리됐고(opponent_result_decide/team_result_submit/
+      // tournament_command/event_append/event_reverse), 이 지점까지 내려온
+      // 'team_result_correction' 을 그대로 두면 몇 줄 아래의 공용 폴백
+      // (`managerRole(hostMembership) ?? managerRole(opponentMembership)`)이
+      // 팀 소속만으로 통과시켜 버린다 — 상대팀 매니저가 자기에게 유리한 '정정'을
+      // 승인 단계 없이 즉시 OFFICIAL 로 만들 수 있게 되는 구멍이다.
+      //
+      // 이 함수 위쪽의 admin 패스스루(라인 ~4747, "if (admin !== null && ... )")가
+      // 이미 자격 있는 admin 을 먼저 반환하므로, 이 줄까지 도달했다는 것 자체가
+      // 호출자가 admin 이 아니라는 뜻이다 — 그러면 무조건 거부한다. 팀 owner/manager
+      // 라도 예외 없음.
+      throw this.forbidden();
+    }
+    if (action === 'team_result_void') {
+      // D2 (#712 의 team_result_correction 과 동일한 방식의 명시적 deny): 여기까지
+      // 내려왔다는 것 자체가(위 admin 패스스루를 통과하지 못했다는 뜻이므로) 호출자가
+      // admin 이 아니라는 뜻이다 — 아래 공용 폴백으로 새면 이의를 낸 팀의 상대편
+      // owner/manager 가 자기에게 유리하게 결과를 스스로 무효화할 수 있는 구멍이
+      // 생긴다. 팀 owner/manager 라도 예외 없이 거부한다.
+      throw this.forbidden();
+    }
     const role = managerRole(hostMembership) ?? managerRole(opponentMembership);
     // `participant_identity` (Task 14 identity-link/consent mutations) is
     // deliberately as permissive as `read` here: the actor only needs to be
@@ -4385,11 +5542,23 @@ export class GamesService {
         return action;
       case 'team_result_submit':
       case 'opponent_result_decide':
+      case 'team_result_correction':
+      case 'team_result_dispute_file':
+      case 'team_result_void':
       case 'participant_identity':
         // Unreachable in practice: resolveActor special-cases
         // 'participant_identity' before calling this mapper (see Task 14
         // note there), but the switch stays exhaustive over
         // GameAuthorizationAction and denies-by-default if that ever changes.
+        // 'team_result_correction' (D1-a) is TEAM_MATCH-only by construction —
+        // createTeamMatchResultCorrection/officializeTeamMatchResultCorrection
+        // both reject a TOURNAMENT_FIXTURE game's sourceType before ever
+        // resolving an actor for this action — so this arm denies-by-default
+        // for the same "should never actually run" reason.
+        // 'team_result_dispute_file'/'team_result_void' (D2) are the same:
+        // the dispute service and the new void method both reject a
+        // TOURNAMENT_FIXTURE game's sourceType before ever resolving an
+        // actor for either action.
         return null;
     }
   }
@@ -4721,6 +5890,14 @@ export class GamesService {
      */
     penaltyOrigin: 'END_COMMAND' | 'RECOVERY',
     penalties?: StoredPenalties,
+    /**
+     * 몰수·중단 종결 사유. 생략하면 정상 종료(NORMAL)다 — 복구 레인(RECOVERY)은
+     * 이미 저장된 결과를 승계하는 경로라 사유를 새로 만들지 않는다.
+     */
+    outcome: { outcomeReason: 'NORMAL' | 'FORFEIT' | 'ABANDONED'; note: string | null } = {
+      outcomeReason: 'NORMAL',
+      note: null,
+    },
   ): Promise<GameRevisionMutationResult> {
     const [events, participantCandidates, lineups, sides, config] = await Promise.all([
       tx.v1GameEvent.findMany({ where: { gameId: game.id }, orderBy: { sequence: 'asc' } }),
@@ -4767,6 +5944,10 @@ export class GamesService {
       data: {
         gameId: game.id,
         revision: 1,
+        // 몰수·중단이면 그 사실과 사유가 결과 리비전에 함께 박힌다 — 점수만 남기면
+        // 정상 종료와 구분되지 않아 "왜 그 점수인지"를 나중에 설명할 수 없다.
+        outcomeReason: outcome.outcomeReason,
+        outcomeNote: outcome.note,
         score: jsonInput(score),
         goalEvents: jsonInput(
           events
@@ -5225,6 +6406,10 @@ export class GamesService {
         eventsHash: predecessor.eventsHash,
         missingScorer: predecessor.missingScorer,
         mvpParticipantId: predecessor.mvpParticipantId,
+        // 몰수·중단 표식과 사유를 승계한다. 빠뜨리면 기본값 NORMAL 로 떨어져 몰수로
+        // 끝난 경기가 어시스트 동기화 한 번에 정상 종료로 둔갑한다(Copilot 리뷰 지적).
+        outcomeReason: predecessor.outcomeReason,
+        outcomeNote: predecessor.outcomeNote,
         reason: '시스템: 어시스트 변경을 반영해 새 리비전을 제출했어요',
         createdByActorType: context.actor.actorType,
         createdByUserId:
@@ -5814,4 +6999,24 @@ export class GamesService {
   private forbidden() {
     return new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Actor scope is not permitted' });
   }
+}
+
+/**
+ * `V1GameResultParticipant.cards`(Json)에서 카드 수를 읽는다. 저장 모양은
+ * `{ yellow: number, red: number }` 뿐이다(`parseFairPlayCards` 주석 참고 — 경고 누적
+ * 퇴장과 직접 퇴장을 구분하는 필드가 데이터 모델에 없다). 모양이 다르면 0으로 본다 —
+ * 판정을 못 하는 것이 잘못 막는 것보다 낫다.
+ */
+function readResultCards(value: unknown): { yellow: number; red: number } {
+  if (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    typeof (value as { yellow?: unknown }).yellow === 'number' &&
+    typeof (value as { red?: unknown }).red === 'number'
+  ) {
+    const record = value as { yellow: number; red: number };
+    return { yellow: record.yellow, red: record.red };
+  }
+  return { yellow: 0, red: 0 };
 }

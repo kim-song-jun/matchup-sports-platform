@@ -78,7 +78,7 @@ export function TournamentCampaignStatusDialog({
               className="rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 py-2.5 text-sm text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50"
               aria-required="true"
             />
-            <p className="text-right text-[var(--font-size-caption)] text-gray-400 tabular-nums">{reason.length} / 500</p>
+            <p className="text-right text-[length:var(--font-size-caption)] text-gray-400 tabular-nums">{reason.length} / 500</p>
           </div>
           <div className="flex gap-2 px-5 pb-5">
             <button type="button" onClick={onClose} disabled={pending} className="h-[48px] flex-1 rounded-xl bg-[var(--surface-soft)] text-sm font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--border)] disabled:opacity-50">취소</button>

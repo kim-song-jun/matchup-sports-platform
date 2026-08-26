@@ -36,6 +36,18 @@ export interface AdminOpsSummary {
   smsFailures5m: number;
 }
 
+/**
+ * 모니터링 허브 상단 신호 스트립 — "지금 사람이 봐야 할 것"의 개수 4종.
+ * 에러는 ack 개념이 없어 최근 24시간 활동(lastSeenAt 기준, 접힌 그룹 행 수)을,
+ * 푸시·SMS 는 미확인(acknowledgedAt null) 누적을, 감사는 오늘 발생량을 센다.
+ */
+export interface AdminMonitoringSummary {
+  errorsLast24h: number;
+  pushUnacked: number;
+  smsUnacked: number;
+  auditToday: number;
+}
+
 export interface ManualPushSendResult {
   /** 인앱 알림(V1Notification)을 만든 수신자 수. 웹 푸시 도달과는 별개다. */
   sent: number;
@@ -158,6 +170,31 @@ export class AdminOpsService {
       this.smsFailuresLast5Minutes(),
     ]);
     return { pushFailures5m, smsFailures5m };
+  }
+
+  /** 모니터링 허브 신호 스트립 4종을 한 번의 왕복으로 모아 준다. */
+  async monitoringSummary(): Promise<AdminMonitoringSummary> {
+    // "오늘"은 운영자가 실제로 쓰는 한국 시간(KST) 자정부터다 — 서버 TZ(UTC) 자정을
+    // 쓰면 KST 오전 9시까지 어제 활동이 "오늘"로 집계된다. KST 는 DST 가 없어
+    // 고정 오프셋 계산이 안전하다.
+    const KST_OFFSET_MS = 9 * 60 * 60_000;
+    const now = Date.now();
+    const kstMidnight = new Date(
+      Math.floor((now + KST_OFFSET_MS) / 86_400_000) * 86_400_000 - KST_OFFSET_MS,
+    );
+
+    const [errorsLast24h, pushUnacked, smsUnacked, auditToday] = await Promise.all([
+      // 에러 로그는 (fingerprint, windowBucket) 으로 접힌 행이므로 이 수는
+      // "최근 24시간에 활동한 에러 그룹 수"다 — 발생 총량(occurrenceCount 합)이 아니다.
+      this.prisma.v1ErrorLog.count({
+        where: { lastSeenAt: { gte: new Date(now - 24 * 60 * 60_000) } },
+      }),
+      this.prisma.v1WebPushFailureLog.count({ where: { acknowledgedAt: null } }),
+      this.prisma.v1SmsEventLog.count({ where: { acknowledgedAt: null } }),
+      this.prisma.v1AdminActionLog.count({ where: { createdAt: { gte: kstMidnight } } }),
+    ]);
+
+    return { errorsLast24h, pushUnacked, smsUnacked, auditToday };
   }
 
   /** acknowledgeFailures(웹 푸시)와 동일 계약 — 실제로 미확인인 id만 갱신하고 건별 감사 로그를 남긴다. */

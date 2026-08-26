@@ -1,17 +1,9 @@
-'use client';
+import { redirect } from 'next/navigation';
 
-import { AdminPageHeader } from '@/components/admin';
-import { SmsFailureTable } from '@/components/admin/sms-failure-table';
-
-export default function AdminSmsFailuresPage() {
-  return (
-    <>
-      <AdminPageHeader
-        eyebrow="운영 도구"
-        title="SMS · 인증 실패 로그"
-        description="SMS 발송 실패와 휴대폰·이메일 인증 실패 기록을 확인하고 확인 처리해요."
-      />
-      <SmsFailureTable />
-    </>
-  );
+/**
+ * 모니터링 허브 통합(2026-08-25)으로 본문이 /admin/monitoring 의 탭으로 이동했다.
+ * 북마크·감사 로그·공유된 딥링크가 죽지 않도록 구 URL 은 리다이렉트로 보존한다.
+ */
+export default function AdminSmsFailuresRedirect() {
+  redirect('/admin/monitoring?tab=sms');
 }

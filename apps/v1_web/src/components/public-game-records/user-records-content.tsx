@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { EyeOff } from 'lucide-react';
 import { Card, EmptyState, KPIStat } from '@/components/v1-ui/primitives';
 import { formatTournamentDateShort } from '@/lib/date-utils';
+import { TournamentAwardIcon } from '@/components/tournaments/tournament-award-icon';
 import { userRecordResultLabel } from './format';
 import { resultChipStyle, resultStripeStyle } from './result-emphasis';
 import type { PublicUserRecordItem, PublicUserRecordsResponse } from './types';
@@ -52,17 +53,38 @@ function UserRecordRow({ item }: { item: PublicUserRecordItem }) {
         ...resultStripeStyle(item.result),
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-        {/* [R-T2] 고정폭 없는 텍스트/배지 — 아래 2개 span 모두 12로 상향. */}
-        {/* isCorrected 배지 제거 후 이 행에 남는 건 MVP 배지 하나뿐이라, 별도 flex
-         * wrapper 없이 날짜/대회명 span과 나란히 두는 것만으로 공간이 자연스럽게
-         * 재배분된다(빈 wrapper를 남겨두지 않음). */}
-        <span style={{ fontSize: 12, color: 'var(--text-caption)' }}>
+      {/* [R-T2] 고정폭 없는 텍스트/배지 — 아래 span 모두 12로 상향.
+          '정정됨' 배지 제거 후 재균형: 우측에 남는 배지는 MVP 하나뿐이라 고정폭
+          `justify-content: space-between` 대신 날짜/대회명 span이 `flex:1`로 남은
+          폭을 모두 차지하게 하고(대회명이 길어도 줄임표 전까지 더 길게 보임),
+          MVP가 없는 행은 우측 슬롯 자체를 렌더하지 않는다. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+        <span
+          style={{
+            fontSize: 12,
+            color: 'var(--text-caption)',
+            flex: 1,
+            minWidth: 0,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
           {formatTournamentDateShort(item.officialAt) ?? ''}
           {item.tournamentTitle ? ` · ${item.tournamentTitle}` : ''}
         </span>
         {item.mvp ? (
-          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--orange700, #a36100)', background: 'var(--orange50)', borderRadius: 6, padding: '2px 6px' }}>
+          <span
+            style={{
+              flexShrink: 0,
+              fontSize: 12,
+              fontWeight: 700,
+              color: 'var(--orange700, #a36100)',
+              background: 'var(--orange50)',
+              borderRadius: 6,
+              padding: '2px 6px',
+            }}
+          >
             MVP
           </span>
         ) : null}
@@ -103,12 +125,67 @@ export function UserRecordsContent({
       {showOwnerVisibilityBanner ? <OwnerVisibilityBanner /> : null}
 
       <Card>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 12 }}>
           <KPIStat label="출전" value={data.summary.appearances} unit="경기" />
           <KPIStat label="골" value={data.summary.goals} unit="골" />
-          <KPIStat label="MVP" value={data.summary.mvpCount} unit="회" />
+          <KPIStat label="매치 MVP" value={data.summary.matchMvpCount} unit="회" />
+          <KPIStat label="대회 수상" value={data.summary.tournamentAwardCount} unit="회" />
         </div>
       </Card>
+
+      {data.tournamentAwards.length > 0 ? (
+        <section aria-labelledby="tournament-awards-title">
+          <h3 id="tournament-awards-title" className="tm-hub-section-title" style={{ marginBottom: 10 }}>대회 수상</h3>
+          <Card pad={0}>
+            {data.tournamentAwards.map((award) => (
+              <Link
+                key={award.id}
+                href={`/tournaments/${award.tournamentId}`}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '14px 16px',
+                  borderTop: '1px solid var(--grey100)',
+                  color: 'inherit',
+                  textDecoration: 'none',
+                }}
+              >
+                <span
+                  aria-hidden="true"
+                  style={{
+                    display: 'inline-flex',
+                    width: 40,
+                    height: 40,
+                    flexShrink: 0,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: 12,
+                    background: 'var(--surface-soft)',
+                  }}
+                >
+                  <TournamentAwardIcon iconKey={award.iconKey} awardType={award.awardType} size={20} />
+                </span>
+                <span style={{ minWidth: 0, flex: 1 }}>
+                  <span style={{ display: 'block', fontSize: 14, fontWeight: 700, color: 'var(--text-strong)' }}>
+                    {award.awardLabel}
+                  </span>
+                  <span style={{ display: 'block', marginTop: 2, fontSize: 12, color: 'var(--text-caption)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {award.tournamentTitle}
+                    {award.teamName ? ` · ${award.teamName}` : ''}
+                    {formatTournamentDateShort(award.awardedAt) ? ` · ${formatTournamentDateShort(award.awardedAt)}` : ''}
+                  </span>
+                  {award.note ? (
+                    <span style={{ display: 'block', marginTop: 4, fontSize: 12, color: 'var(--text-muted)' }}>
+                      {award.note}
+                    </span>
+                  ) : null}
+                </span>
+              </Link>
+            ))}
+          </Card>
+        </section>
+      ) : null}
 
       <section>
         <h3 className="tm-hub-section-title" style={{ marginBottom: 10 }}>활동 기록</h3>
@@ -119,15 +196,23 @@ export function UserRecordsContent({
             // "대회 라인업에 아직 팀원으로 연결되지 않음" 하나뿐이다.
             <EmptyState
               title="아직 등록된 경기 기록이 없어요"
-              sub="팀 매니저가 대회 라인업에 회원님을 팀원으로 연결하면 이곳에 표시돼요."
+              sub="팀 매니저가 대회 라인업에 회원님을 팀원으로 연결하고, 대회 결과가 확정되면 이곳에 표시돼요."
             />
           ) : (
-            // 타인이 보는 페이지에서 0건이면 원인이 신원 연결 미완료·공개 동의 미완료
-            // 둘 다일 수 있어(서버가 어느 쪽인지 구분해 내려주지 않음) 두 조건을 모두
-            // 3인칭으로 안내한다 — "나를"이라고 쓰면 조회자 본인 얘기처럼 보인다.
+            // 타인이 보는 페이지에서 0건이면 원인이 신원 연결 미완료·결과 미확정·공개 동의
+            // 미완료 중 무엇이든 될 수 있고, 서버는 어느 쪽인지 구분해 내려주지 않는다.
+            //
+            // 2026-08-24 프로덕션 실측으로 문구 순서를 바꿨다. 이전 문구는 "팀 매니저가
+            // 연결해야 하고" 를 **먼저** 말했는데, 실제로는 신원 연결이 1,384건 이미 쌓여
+            // 있고 공개 동의를 켠 사람이 0명이었다 -- 즉 압도적 다수의 원인은 동의 쪽이다.
+            // 이미 끝난 조건을 먼저 안내하니 사용자가 엉뚱한 곳을 확인하다 "오류인가?" 로
+            // 되물었다(이 태스크의 출발점이 그 문의였다).
+            //
+            // 그렇다고 "동의를 안 켰다"고 단정하지는 않는다 -- 서버가 원인을 구분해 주지
+            // 않으므로 단정은 틀릴 수 있다. 가장 흔한 원인을 앞에 두되 나머지도 함께 적는다.
             <EmptyState
               title="공개된 경기 기록이 없어요"
-              sub="팀 매니저가 대회 라인업에 이 선수를 팀원으로 연결해야 하고, 선수 본인이 마이페이지 > 설정 > 경기 기록 공개에서 공개 동의를 켜야 이곳에 표시돼요."
+              sub="이 선수가 경기 기록 공개를 켜면 이곳에 표시돼요. 대회 결과가 확정되기 전이거나 팀 라인업에 연결되지 않은 경기는 표시되지 않아요."
             />
           )
         ) : (

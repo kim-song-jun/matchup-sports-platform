@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, EmptyState, ErrorState, SectionTitle } from '@/components/v1-ui/primitives';
@@ -9,7 +9,7 @@ import {
   buildFormationPresets, describeSquadSize, goalkeeperPositionCode, slotsWithGoalkeeper,
   type FormationPreset,
 } from '@/components/lineup/formation-slots';
-import { PitchFormationEditor } from '@/components/lineup/pitch-formation-editor';
+import { PitchFormationEditor, type PitchDropResolver } from '@/components/lineup/pitch-formation-editor';
 import { LoadLineupSheet, type LoadableLineup } from '@/components/lineup/load-lineup-sheet';
 import { SavePresetDialog } from '@/components/lineup/save-preset-dialog';
 import { buildRecentJerseyMap, describeSkipped, resolveJerseyNumber, resolveLoadableEntries } from '@/components/lineup/lineup-source';
@@ -41,11 +41,21 @@ import {
   selectFormation,
   setGoalkeeper,
   setJerseyNumber,
+  dropPlayerOnPitch,
   setPlayerPosition,
   toggleStarter,
   unplaceFromSlot,
   type FixtureLineupState,
 } from './fixture-lineup.view-model';
+
+/**
+ * 라인업 저장·제출이 "그새 남이 바꿨다"로 거부된 경우인지. 서버는 사이드별 revision 이
+ * 어긋나면 409 VERSION_CONFLICT 를 낸다(games.service.ts 의 라인업 커맨드 경계).
+ * 코드로 판별한다 — 메시지 문자열 비교는 문구가 바뀌는 순간 조용히 깨진다.
+ */
+function isVersionConflict(err: unknown): boolean {
+  return err instanceof V1ApiError && err.code === 'VERSION_CONFLICT';
+}
 
 /**
  * 대회 경기(tournament fixture) 참가팀 자기 서비스 라인업 화면 — team-match
@@ -83,6 +93,42 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
   // tournamentId로 대회 상세를 별도 조회해 sport.name을 가져온다 — 그 결과, 이 가드가
   // 아예 없던 이전 버전은 배드민턴·농구 등 비축구 대회 경기에서도 축구 피치 도형을
   // 조건 없이 그렸다(2026-08 QA 지적, 실제 버그).
+  /**
+   * 명단 카드를 피치로 끌어다 놓는 경로. 예전에는 ①명단에서 선발 체크 → ②피치에서 다시
+   * 배치, 두 단계를 거쳐야 했다(오너 지적: "드래그앤드롭으로 데스크탑에서 넣는다던가").
+   * 이제 카드를 피치 위로 끌면 그 자리에 바로 놓이고 선발 처리까지 함께 일어난다.
+   *
+   * 기존 경로(체크박스 · 대기 목록에서 고른 뒤 피치 탭)는 **그대로 남는다** — 드래그는
+   * 포인터를 정밀하게 쓸 수 있을 때만 편한 보조 수단이라, 키보드·보조기기 사용자에게서
+   * 유일한 길을 빼앗으면 안 된다.
+   *
+   * 착지점 판정(피치 안인지, 슬롯 모드면 어느 빈 자리인지)은 좌표계를 아는 피치 에디터가
+   * `dropResolverRef` 로 대신 해 준다.
+   */
+  const dropResolverRef = useRef<PitchDropResolver | null>(null);
+  const [draggingRosterKey, setDraggingRosterKey] = useState<string | null>(null);
+
+  function handleRosterPointerDown(key: string) {
+    return (event: React.PointerEvent<HTMLDivElement>) => {
+      // 마우스는 주 버튼만. 체크박스·등번호 입력 같은 카드 안 컨트롤을 누른 것은 드래그로
+      // 삼지 않는다 — 그랬다간 체크 한 번이 매번 드래그로 해석된다.
+      if (event.button !== 0) return;
+      if ((event.target as HTMLElement).closest('input, button, a, label, select')) return;
+      event.currentTarget.setPointerCapture(event.pointerId);
+      setDraggingRosterKey(key);
+    };
+  }
+
+  function handleRosterPointerUp(key: string) {
+    return (event: React.PointerEvent<HTMLDivElement>) => {
+      if (draggingRosterKey !== key) return;
+      setDraggingRosterKey(null);
+      const target = dropResolverRef.current?.resolve(event.clientX, event.clientY) ?? null;
+      if (target === null) return;
+      setState((prev) => (prev === null ? prev : dropPlayerOnPitch(prev, key, target)));
+    };
+  }
+
   const tournamentQuery = useV1Tournament(tournamentId);
   const formationSupportedSportName = tournamentQuery.data?.sport?.name ?? null;
   const formationSupported =
@@ -95,6 +141,18 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
   const [activeView, setActiveView] = useState<'roster' | 'pitch'>('pitch');
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  /**
+   * 저장·제출이 409 VERSION_CONFLICT 로 막혔다는 표시. 1차 대회 회고의 실제 사고가
+   * 여기다 — 팀 사용자가 브라우저를 새로고침하지 못해 결국 운영진이 어드민에서 대신
+   * 라인업을 입력해 줬다. 서버 메시지("새로고침 후 다시 시도해 주세요")는 사용자에게
+   * 브라우저 조작을 요구하는데, 그걸 못 하는 사람이 바로 이 화면의 주 사용자다.
+   *
+   * 그렇다고 자동으로 다시 불러오면 안 된다 — 충돌 시점의 화면에는 **반드시 미저장
+   * 편집이 남아 있다**(dirty 는 저장 성공에서만 풀린다). 자동 재로드는 그 편집을 통째로
+   * 덮어쓴다. 그래서 편집은 그대로 두고, 최신본을 미리 받아 둔 뒤 **버리고 새로 시작할지
+   * 사용자가 고르게** 한다.
+   */
+  const [staleConflict, setStaleConflict] = useState(false);
   /**
    * 이슈 #378: SUBMITTED가 되면 editable이 영구히 false로 고정돼 재편집 진입점 자체가
    * 없었다. 서버 상태(lineupState)와는 분리된 순수 로컬 UI 플래그로 재편집 세션을 연다 —
@@ -138,6 +196,14 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
       : editingSideId === access.data?.homeSideId
         ? access.data?.homeTeamId ?? null
         : access.data?.awayTeamId ?? null;
+  /** 피치 토큰 라벨에서 팀명 접두사를 떼는 데만 쓴다 — 등록 명단의 표시 이름이
+   *  "<팀명> 선수1" 처럼 팀명으로 시작하면 84px 라벨이 이름 쪽에서 잘려 누구인지 못 읽는다. */
+  const editingTeamName =
+    editingSideId === null
+      ? null
+      : editingSideId === access.data?.homeSideId
+        ? access.data?.homeTeamName ?? null
+        : access.data?.awayTeamName ?? null;
   const [loadSheetOpen, setLoadSheetOpen] = useState(false);
   const [loadNotice, setLoadNotice] = useState<string | null>(null);
   const [savePresetOpen, setSavePresetOpen] = useState(false);
@@ -444,6 +510,13 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
     if (state === null) return;
     const roster = rosterQuery.data?.players ?? [];
     const recentJersey = buildRecentJerseyMap(historyQuery.data?.items ?? []);
+    // 3단계 우선순위(loaded ?? teamFixed ?? recent)의 **2순위가 여기까지 오지 못하고
+    // 있었다** — 로스터 응답에 팀 고정 번호가 없어 넘길 값 자체가 없었다(死문).
+    const teamFixedJersey = new Map(
+      roster
+        .filter((player) => player.teamJerseyNumber !== null && player.teamJerseyNumber !== undefined)
+        .map((player) => [player.userId, player.teamJerseyNumber as number]),
+    );
     const resolved = resolveLoadableEntries({
       entries: lineup.entries,
       eligible: roster.map((player) => ({ userId: player.userId, displayName: player.name })),
@@ -463,6 +536,7 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
               // 불러온 라인업에 등번호가 없으면 직전에 달았던 번호로 채운다.
               jerseyNumber: resolveJerseyNumber({
                 loaded: entry.jerseyNumber,
+                teamFixed: entry.userId !== null ? teamFixedJersey.get(entry.userId) ?? null : null,
                 recent: entry.userId !== null ? recentJersey.get(entry.userId) ?? null : null,
               }),
             })),
@@ -560,10 +634,20 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
           ? prev
           : { ...prev, lineupRevision: result.lineupRevision, lineupId: result.lineupId, lineupState: 'DRAFT', dirty: false },
       );
+      setStaleConflict(false);
       setSaveStatus('saved');
     } catch (err) {
       setSaveStatus('idle');
-      setSaveError(extractErrorMessage(err, '저장하지 못했어요.'));
+      // 충돌이면 서버 메시지를 그대로 쓰지 않는다. 서버 문구는 "새로고침 후 다시
+      // 시도해 주세요"인데, 바로 아래 배너는 "버튼 한 번으로 복구하라"고 말한다 —
+      // 두 안내가 동시에 뜨면 사용자가 무엇을 해야 하는지 갈린다(Copilot 리뷰 지적).
+      // 행동 지시는 아래 복구 카드 하나로 몰고, 여기서는 사실만 알린다.
+      if (isVersionConflict(err)) {
+        markStaleConflict();
+        setSaveError('저장하지 못했어요 — 이 라인업이 다른 곳에서 먼저 바뀌었어요.');
+      } else {
+        setSaveError(extractErrorMessage(err, '저장하지 못했어요.'));
+      }
     }
   }
 
@@ -578,9 +662,45 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
       // 새로 제출됐으니 재편집 세션은 닫는다 — 다시 바꾸려면 "다시 편집하기"를 또 눌러야
       // 한다(제출 완료를 매번 인지한 뒤 편집하게 하려는 의도, 실수로 이어지는 편집 방지).
       setReopened(false);
+      setStaleConflict(false);
     } catch (err) {
-      setSaveError(extractErrorMessage(err, '제출하지 못했어요.'));
+      if (isVersionConflict(err)) {
+        markStaleConflict();
+        setSaveError('제출하지 못했어요 — 이 라인업이 다른 곳에서 먼저 바뀌었어요.');
+      } else {
+        setSaveError(extractErrorMessage(err, '제출하지 못했어요.'));
+      }
     }
+  }
+
+  function markStaleConflict() {
+    setStaleConflict(true);
+    // 사용자가 "최신 명단 불러오기"를 누르는 순간 기다리지 않도록 미리 받아 둔다.
+    // 지금 화면의 state 는 건드리지 않는다 — 재하이드레이션은 hydrated 를 풀 때만 일어난다.
+    void lineupsQuery.refetch();
+  }
+
+  /**
+   * 충돌에서 빠져나오는 유일한 경로. 지금 편집 내용을 버리고 서버 최신본으로 다시 시작한다.
+   * refetch 를 **먼저 await** 한다 — hydrated 를 먼저 풀면 아직 낡은 lineupsQuery.data 로
+   * 재하이드레이션돼 저장을 눌러도 같은 충돌이 반복된다.
+   *
+   * **refetch 성공까지 확인한 뒤에만 hydrated 를 푼다**(Copilot 리뷰 지적, real).
+   * React Query 는 refetch 가 실패해도 기존 `data` 를 그대로 들고 있다 — 성공 여부를
+   * 안 보면 최신본을 못 받은 채 낡은 데이터로 재하이드레이션해서, **최신본도 못 주고
+   * 사용자 편집만 날리는** 정확히 반대 결과가 된다. 실패하면 충돌 상태와 편집을 모두
+   * 그대로 두고 사유만 알린다 — 버튼이 남아 있으니 다시 시도할 수 있다.
+   */
+  async function handleLoadLatestLineup() {
+    setSaveError(null);
+    setSaveStatus('idle');
+    const refetched = await lineupsQuery.refetch();
+    if (refetched.isError || refetched.data === undefined) {
+      setSaveError('최신 명단을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
+      return;
+    }
+    setStaleConflict(false);
+    setHydrated(false);
   }
 
   const homeName = access.data.homeTeamName ?? '홈팀';
@@ -622,6 +742,26 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
 
         {saveError ? <AlertBanner message={saveError} tone="error" /> : null}
 
+        {staleConflict ? (
+          <Card pad={16}>
+            <AlertBanner
+              message="이 라인업이 다른 곳에서 먼저 바뀌었어요. 지금 화면의 편집 내용은 그대로 두었어요."
+              tone="warning"
+            />
+            <p className="tm-text-caption" style={{ margin: '10px 0 0', color: 'var(--text-muted)' }}>
+              최신 명단을 불러오면 지금 화면에서 고친 내용은 사라져요. 남겨야 할 변경이 있다면 먼저 메모해 두세요.
+            </p>
+            <button
+              type="button"
+              className="tm-btn tm-btn-outline"
+              style={{ marginTop: 10, width: '100%' }}
+              onClick={handleLoadLatestLineup}
+            >
+              최신 명단 불러오기
+            </button>
+          </Card>
+        ) : null}
+
         {/* 탭은 좁은 폭(모바일·태블릿) 전용 — 데스크톱(≥1024px)에서는 두 영역이
             .tm-fixture-lineup-grid로 동시에 보이므로 탭 자체가 필요 없다(tm-hide-desktop).
             순서·기본 선택 모두 피치 배치가 먼저다(2026-08 사용자 지적: "항상 피치 배치가
@@ -662,12 +802,22 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
                 title="이 종목은 피치 배치를 아직 지원하지 않아요"
                 sub={`${josa(formationSupportedSportName ?? '이 종목', ['은', '는'])} 축구·풋살과 코트 모양·포지션 개념이 달라 준비 중이에요. 명단 탭에서 선발·후보는 그대로 관리할 수 있어요.`}
               />
-            ) : state.starters.length === 0 ? (
+            ) : state.starters.length === 0 && !editable ? (
+              // 읽기 전용인데 선발도 없으면 그릴 것도 놓을 곳도 없다 — 빈 피치를 세워 둘 이유가 없다.
               <p className="tm-text-caption" style={{ color: 'var(--text-muted)', padding: '8px 0' }}>
-                먼저 명단에서 선발을 등록해야 피치에 배치할 수 있어요.
+                아직 선발로 등록된 선수가 없어요.
               </p>
             ) : (
               <div style={{ marginTop: 8 }}>
+                {/* 선발이 0명이어도 **피치는 그린다.** 예전엔 이 자리에 안내 문구만 두고 피치를
+                    통째로 숨겼는데, 그러면 명단 카드를 끌어다 놓을 대상이 화면에 없어 정작
+                    라인업을 처음 짜는 순간에 드래그를 쓸 수 없다(오너 요청으로 추가한 경로가
+                    가장 필요한 시점에 막히는 셈이다). */}
+                {state.starters.length === 0 ? (
+                  <p className="tm-text-caption" style={{ color: 'var(--text-muted)', margin: '0 0 8px' }}>
+                    명단에서 선수를 체크하거나, 카드를 아래 피치로 끌어다 놓으면 선발로 들어가요.
+                  </p>
+                ) : null}
                 <PitchFormationEditor
                   starters={state.starters}
                   formation={state.formation}
@@ -695,6 +845,8 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
                   onUnplacePlayer={(key) => setState((prev) => (prev ? clearPlayerPosition(prev, key) : prev))}
                   onPlaceInSlot={(key, slot) => setState((prev) => (prev ? placeInSlot(prev, key, slot) : prev))}
                   onUnplaceFromSlot={(key) => setState((prev) => (prev ? unplaceFromSlot(prev, key) : prev))}
+                  dropResolverRef={dropResolverRef}
+                  teamName={editingTeamName}
                 />
               </div>
             )}
@@ -707,7 +859,7 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
             />
             <p className="tm-text-caption" style={{ color: 'var(--text-muted)', margin: '4px 0 8px' }}>
               {editable
-                ? '체크한 선수가 선발이에요. 체크하지 않은 선수는 후보로 들어가요.'
+                ? '체크한 선수가 선발이에요. 카드를 피치로 끌어다 놓으면 그 자리에 바로 배치돼요.'
                 : '이 경기의 선발·후보 명단이에요.'}
             </p>
             {/* 등록 명단이 유일한 출처라 이 화면에는 선수를 추가하는 입력이 없다 —
@@ -780,10 +932,15 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
                       <Card
                         key={entry.key}
                         pad={12}
+                        onPointerDown={editable ? handleRosterPointerDown(entry.key) : undefined}
+                        onPointerUp={editable ? handleRosterPointerUp(entry.key) : undefined}
+                        onPointerCancel={editable ? () => setDraggingRosterKey(null) : undefined}
                         style={{
                           // 선발은 배경 틴트로도 구분한다 — 체크 표시 하나에만 기대면
                           // 목록이 길어질수록 "지금 몇 명이 선발인지"가 눈으로 안 잡힌다.
                           ...(isStarter ? { background: 'var(--blue50)' } : {}),
+                          ...(editable ? { touchAction: 'none' } : {}),
+                          ...(draggingRosterKey === entry.key ? { opacity: 0.55 } : {}),
                         }}
                       >
                         {/* 1줄: 선발 체크 · 이름 · 상태. 골키퍼와 등번호는 아래 줄에

@@ -1,14 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { Plus, Calendar, Clock, Users, Coins } from 'lucide-react';
-import {
-  useV1AdminTournaments,
-  useV1AdminMe,
-} from '@/hooks/use-v1-api';
-import type { V1Tournament, V1TournamentStatus } from '@/types/api';
+import { useV1AdminTournaments } from '@/hooks/use-v1-api';
+import type { V1Tournament } from '@/types/api';
+import { formatAdminDateTimeShort, formatEntryFee } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
+import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
+import { useAdminListQuery } from '@/hooks/use-admin-list-query';
 import {
   AdminPageHeader,
   AdminDataTable,
@@ -19,34 +19,16 @@ import {
   AdminToasts,
   useAdminToast,
 } from '@/components/admin';
+import { MockSeedPanel } from '@/components/admin/tournaments/mock-seed-panel';
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return '—';
-  try {
-    return new Intl.DateTimeFormat('ko-KR', {
-      month: 'numeric',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(new Date(dateStr));
-  } catch {
-    return dateStr;
-  }
-}
-
 function formatDateRange(startStr: string | null, endStr: string | null): string {
-  const start = formatDate(startStr);
+  const start = formatAdminDateTimeShort(startStr);
   if (start === '—') return start;
-  const end = formatDate(endStr);
+  const end = formatAdminDateTimeShort(endStr);
   if (end === '—' || end === start) return start;
   return `${start} ~ ${end}`;
-}
-
-function formatCurrency(n: number): string {
-  if (n === 0) return '무료';
-  return `${n.toLocaleString('ko-KR')}원`;
 }
 
 // ── Status filter options ─────────────────────────────────────────────────
@@ -66,35 +48,21 @@ const PAGE_SIZE = 20;
 // ── Page ──────────────────────────────────────────────────────────────────
 
 export default function AdminTournamentsPage() {
-  const { data: adminMe } = useV1AdminMe();
-  const canWrite = adminMe?.capabilities.includes('status:write') ?? false;
+  const canWrite = useAdminCanWrite();
 
-  const [activeStatus, setActiveStatus] = useState<string>('');
+  // 검색 debounce·상태 필터·page 리셋은 공용 훅이 담당 (M1 표준 — users/teams와 동일)
+  const { search, setSearch, activeStatus, setActiveStatus, filters, buildPagination } =
+    useAdminListQuery({ pageSize: PAGE_SIZE });
 
-  // URL pre-selection on mount
+  // URL pre-selection on mount (?status= 딥링크 — 기존 동작 유지)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const s = params.get('status') ?? '';
     if (s) setActiveStatus(s);
-  }, []);
-
-  // 커서 누적 대신 페이지 단위 교체다 — 목록 어디쯤인지와 총량이 보여야 한다.
-  const [page, setPage] = useState(1);
+  }, [setActiveStatus]);
 
   const { toasts, showToast: _showToast } = useAdminToast();
   // showToast is available for future use (e.g. after bulk actions)
-
-  const handleStatusChange = (value: string) => {
-    setActiveStatus(value);
-    // 필터를 좁히면 보던 페이지에 결과가 없을 수 있어 첫 페이지로 되돌린다.
-    setPage(1);
-  };
-
-  const filters = {
-    ...(activeStatus ? { status: activeStatus as V1TournamentStatus } : {}),
-    page,
-    limit: PAGE_SIZE,
-  };
 
   const { data, isPending, isFetching, isError, error, refetch } =
     useV1AdminTournaments(filters);
@@ -114,15 +82,16 @@ export default function AdminTournamentsPage() {
 
   return (
     <>
+      <MockSeedPanel />
       <AdminPageHeader
-        eyebrow="플랫폼 관리"
+        eyebrow="플랫폼"
         title="대회 관리"
         description="플랫폼 내 모든 대회의 상태를 필터링하고 관리해요."
         action={
           canWrite ? (
             <Link
               href="/admin/tournaments/new"
-              className="inline-flex items-center gap-1.5 h-[44px] px-4 rounded-xl text-[var(--font-size-label)] font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              className="inline-flex items-center gap-1.5 h-[44px] px-4 rounded-xl text-[length:var(--font-size-label)] font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
               aria-label="새 대회 만들기"
             >
               <Plus size={16} aria-hidden="true" />
@@ -133,14 +102,16 @@ export default function AdminTournamentsPage() {
       />
 
       <div className="flex flex-col gap-4">
-        {/* Filter bar — no text search (backend has no q for tournaments) */}
+        {/* "backend has no q" 주석 때문에 검색이 죽어 있었다 — 백엔드는 처음부터
+            q(제목 contains, insensitive)를 지원한다. tournaments-admin.service.ts list 참조 */}
         <AdminFilterBar
-          hideSearch
-          searchValue=""
-          onSearchChange={() => undefined}
+          searchLabel="대회명 검색"
+          searchPlaceholder="대회명 검색"
+          searchValue={search}
+          onSearchChange={setSearch}
           statusOptions={statusOptions}
           activeStatus={activeStatus}
-          onStatusChange={handleStatusChange}
+          onStatusChange={setActiveStatus}
         />
 
         {/* Card list */}
@@ -150,18 +121,7 @@ export default function AdminTournamentsPage() {
           <AdminDataTable<V1Tournament>
             rows={rows}
             keyExtractor={(r) => r.id}
-            pagination={
-              pageInfo?.totalPages
-                ? {
-                    page: pageInfo.page ?? page,
-                    totalPages: pageInfo.totalPages,
-                    total: pageInfo.total ?? 0,
-                    limit: pageInfo.limit ?? PAGE_SIZE,
-                    onPageChange: setPage,
-                    loading: isFetching,
-                  }
-                : undefined
-            }
+            pagination={buildPagination(pageInfo, isFetching)}
             tableMaxWidth="max-w-none"
             rowTone={(row) =>
               row.status === 'cancelled' ? 'danger' : row.status === 'closed' ? 'warning' : undefined
@@ -192,7 +152,7 @@ export default function AdminTournamentsPage() {
                       {row.title}
                     </span>
                     {row.venue ? (
-                      <span className="block truncate text-[var(--font-size-micro)] text-[var(--text-muted)]">
+                      <span className="block truncate text-[length:var(--font-size-micro)] text-[var(--text-muted)]">
                         {row.venue}
                       </span>
                     ) : null}
@@ -205,7 +165,7 @@ export default function AdminTournamentsPage() {
                 width: 'w-[124px]',
                 render: (row) => (
                   <span className="whitespace-nowrap text-[var(--text-muted)]">
-                    {formatDate(row.registrationDeadlineAt)}
+                    {formatAdminDateTimeShort(row.registrationDeadlineAt)}
                   </span>
                 ),
               },
@@ -225,7 +185,7 @@ export default function AdminTournamentsPage() {
                 width: 'w-[112px]',
                 render: (row) => (
                   <span className="tabular-nums whitespace-nowrap text-[var(--text-muted)]">
-                    {formatCurrency(row.entryFee)}
+                    {formatEntryFee(row.entryFee)}
                   </span>
                 ),
               },
@@ -236,7 +196,7 @@ export default function AdminTournamentsPage() {
                 aria-label={`${row.title} 상세 보기`}
                 className={[
                   'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg',
-                  'text-[var(--font-size-label)] font-medium text-[var(--text-muted)] bg-[var(--surface-soft)]',
+                  'text-[length:var(--font-size-label)] font-medium text-[var(--text-muted)] bg-[var(--surface-soft)]',
                   'hover:bg-[var(--grey300)] transition-colors whitespace-nowrap',
                   'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                 ].join(' ')}
@@ -261,7 +221,7 @@ export default function AdminTournamentsPage() {
         {/* 페이지 이동 실패는 목록이 비어 보이지 않으므로 따로 알린다. */}
         {isError && rows.length > 0 && (
           <div className="flex flex-col items-center gap-1.5">
-            <p className="text-[var(--font-size-label)] text-[var(--red700)]" role="alert">
+            <p className="text-[length:var(--font-size-label)] text-[var(--red700)]" role="alert">
               {extractErrorMessage(error, '목록을 불러오지 못했어요.')}
             </p>
             <button
@@ -269,7 +229,7 @@ export default function AdminTournamentsPage() {
               onClick={() => void refetch()}
               disabled={isFetching}
               className={[
-                'h-[44px] px-6 rounded-xl text-[var(--font-size-label)] font-semibold transition-colors',
+                'h-[44px] px-6 rounded-xl text-[length:var(--font-size-label)] font-semibold transition-colors',
                 'border border-[var(--border)] text-[var(--text-body)] bg-[var(--card-surface)] hover:bg-[var(--surface-soft)]',
                 'disabled:opacity-50',
                 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',

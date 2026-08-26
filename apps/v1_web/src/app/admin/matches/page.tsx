@@ -1,15 +1,15 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { Suspense, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  useV1AdminMe,
   useV1AdminMatches,
   useV1ChangeMatchStatus,
 } from '@/hooks/use-v1-api';
-import { v1Get } from '@/lib/api-client';
+import { formatAdminDateTimeShort } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
-import { Activity, User, Clock, Users } from 'lucide-react';
+import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
+import { useAdminListQuery } from '@/hooks/use-admin-list-query';
 import {
   AdminPageHeader,
   AdminFilterBar,
@@ -21,22 +21,7 @@ import {
   useAdminToast,
   AdminToasts,
 } from '@/components/admin';
-import type { V1AdminMatchRow, CursorPage } from '@/types/api';
-
-// ── Date formatter ────────────────────────────────────────────────────────────
-function formatDateTime(dateStr: string | null | undefined): string {
-  if (!dateStr) return '—';
-  try {
-    const d = new Date(dateStr);
-    const mo = d.getMonth() + 1;
-    const day = d.getDate();
-    const hh = String(d.getHours()).padStart(2, '0');
-    const mm = String(d.getMinutes()).padStart(2, '0');
-    return `${mo}/${day} ${hh}:${mm}`;
-  } catch {
-    return dateStr ?? '—';
-  }
-}
+import type { V1AdminMatchRow } from '@/types/api';
 
 // ── Status options for moderation modal ──────────────────────────────────────
 const MATCH_STATUS_OPTIONS = (
@@ -69,14 +54,20 @@ export default function AdminMatchesPage() {
 
 function AdminMatchesPageContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const initialStatus = searchParams.get('status') ?? '';
 
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [activeStatus, setActiveStatus] = useState(initialStatus);
-
-  // 커서 누적 대신 페이지 단위 교체다 — 목록 어디쯤인지와 총량이 보여야 한다.
-  const [page, setPage] = useState(1);
+  // 검색 debounce·상태 필터·page 리셋·페이지네이션 조립은 공용 훅이 담당한다.
+  // (커서 누적 대신 페이지 단위 교체 — 목록 어디쯤인지와 총량이 보여야 한다.)
+  const {
+    search,
+    setSearch,
+    activeStatus,
+    setActiveStatus,
+    filters,
+    resetToFirstPage,
+    buildPagination,
+  } = useAdminListQuery({ initialStatus, pageSize: PAGE_SIZE });
 
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
@@ -84,30 +75,9 @@ function AdminMatchesPageContent() {
 
   const { toasts, showToast } = useAdminToast();
 
-  // Debounce search ~300ms
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(search.trim());
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [search]);
-
-  // Reset extra pages when filters change
-  useEffect(() => {
-    setPage(1);
-  }, [debouncedSearch, activeStatus]);
-
   // Capability check
-  const { data: adminMe } = useV1AdminMe();
-  const canWrite = adminMe?.capabilities.includes('status:write') ?? false;
+  const canWrite = useAdminCanWrite();
 
-  // Build filters
-  const filters = {
-    ...(debouncedSearch ? { q: debouncedSearch } : {}),
-    ...(activeStatus ? { status: activeStatus } : {}),
-    page,
-    limit: PAGE_SIZE,
-  };
 
   const {
     data: firstPage,
@@ -138,7 +108,7 @@ function AdminMatchesPageContent() {
           setModalOpen(false);
           setSelectedRow(null);
           // Reset to first page so the updated row (incl. page2+ extras) is
-          setPage(1);
+          resetToFirstPage();
           showToast('매치 상태를 변경했어요.', 'success');
         },
         onError: (err) => {
@@ -155,6 +125,7 @@ function AdminMatchesPageContent() {
   return (
     <>
       <AdminPageHeader
+        eyebrow="플랫폼"
         title="매치 관리"
         description="플랫폼 전체 매치의 상태를 검색하고 관리해요."
       />
@@ -175,6 +146,9 @@ function AdminMatchesPageContent() {
         <AdminDataTable<V1AdminMatchRow>
           rows={rows}
           keyExtractor={(row) => row.matchId}
+          // 상세 라우트는 있었는데 목록에서 갈 길이 없어 ⌘K 팔레트로만 도달 가능했다.
+          onRowClick={(row) => router.push(`/admin/matches/${encodeURIComponent(row.matchId)}`)}
+          rowClickLabel={(row) => `${row.title} 상세 보기`}
           tableMaxWidth="max-w-none"
           rowTone={(row) =>
             row.status === 'cancelled' ? 'danger' : row.status === 'closed' ? 'warning' : undefined
@@ -185,7 +159,7 @@ function AdminMatchesPageContent() {
               header: '시작',
               width: 'w-[132px]',
               render: (row) => (
-                <span className="whitespace-nowrap text-[var(--text-muted)]">{formatDateTime(row.startAt)}</span>
+                <span className="whitespace-nowrap text-[var(--text-muted)]">{formatAdminDateTimeShort(row.startAt)}</span>
               ),
             },
             {
@@ -202,7 +176,7 @@ function AdminMatchesPageContent() {
                   <span className="block truncate font-medium text-[var(--text-strong)]" title={row.title}>
                     {row.title}
                   </span>
-                  <span className="block truncate text-[var(--font-size-micro)] text-[var(--text-muted)]">
+                  <span className="block truncate text-[length:var(--font-size-micro)] text-[var(--text-muted)]">
                     {row.placeName}
                   </span>
                 </div>
@@ -244,7 +218,7 @@ function AdminMatchesPageContent() {
                       setModalOpen(true);
                     }}
                     className={[
-                      'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[var(--font-size-label)] font-medium',
+                      'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[length:var(--font-size-label)] font-medium',
                       'text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--border)] transition-colors whitespace-nowrap',
                       'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                     ].join(' ')}
@@ -265,18 +239,7 @@ function AdminMatchesPageContent() {
           error={errorMessage}
           onRetry={() => void refetch()}
           skeletonRows={8}
-          pagination={
-            pageInfo?.totalPages
-              ? {
-                  page: pageInfo.page ?? page,
-                  totalPages: pageInfo.totalPages,
-                  total: pageInfo.total ?? 0,
-                  limit: pageInfo.limit ?? PAGE_SIZE,
-                  onPageChange: setPage,
-                  loading: isFetching,
-                }
-              : undefined
-          }
+          pagination={buildPagination(pageInfo, isFetching)}
         />
       </div>
 

@@ -1,15 +1,18 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Eye } from 'lucide-react';
 import {
-  useV1AdminMe,
   useV1AdminUsers,
   useV1ChangeUserStatus,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { formatAuthProviders, formatGender, formatUserTitle } from '@/lib/format-user';
+import { formatAdminDate } from '@/lib/date-utils';
+import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
+import { useAdminListQuery } from '@/hooks/use-admin-list-query';
 import {
   AdminPageHeader,
   AdminFilterBar,
@@ -24,38 +27,8 @@ import {
 } from '@/components/admin';
 import type { V1AdminUserRow } from '@/types/api';
 
-// ── Date formatter ────────────────────────────────────────────────────────────
-function formatDateCompact(dateStr: string | null | undefined): string {
-  if (!dateStr) return '—';
-  try {
-    const d = new Date(dateStr);
-    const y = d.getFullYear();
-    const mo = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}.${mo}.${day}`;
-  } catch {
-    return dateStr ?? '—';
-  }
-}
-
-function formatUserTitle(row: V1AdminUserRow): string {
-  if (row.nickname || row.displayName) return row.nickname ?? row.displayName ?? '';
-  if (row.onboardingStatus === 'social_terms_required') return '가입 진행 중 · 약관 미동의';
-  if (row.onboardingStatus === 'social_profile_required') return '가입 진행 중 · 프로필 미완료';
-  return '프로필 없음';
-}
-
-function formatGender(gender: V1AdminUserRow['gender']) {
-  if (gender === 'male') return '남';
-  if (gender === 'female') return '여';
-  return '성별 미등록';
-}
-
-function formatAuthProviders(providers: V1AdminUserRow['authProviders']) {
-  const labels = { kakao: '카카오', naver: '네이버', email: '이메일' } as const;
-  const values = providers ?? [];
-  return values.length > 0 ? values.map((provider) => labels[provider]).join(' · ') : '로그인 수단 없음';
-}
+// 회원 표기(제목·성별·로그인 수단)는 상세 페이지와 공유하는 lib/format-user.ts 단일 소스 —
+// 두 화면이 각자 복제한 로직이 갈라져 같은 회원이 다른 이름으로 보이던 결함이 있었다.
 
 function getTeamRoleCounts(row: V1AdminUserRow) {
   return {
@@ -95,16 +68,21 @@ export default function AdminUsersPage() {
 }
 
 function AdminUsersPageContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const initialStatus = searchParams.get('status') ?? '';
 
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [activeStatus, setActiveStatus] = useState(initialStatus);
-
-  // 커서 누적 대신 페이지 단위 교체다. 회원 목록은 "몇 명 중 어디쯤"이 보여야 하는데
-  // 누적 목록으로는 그 감각이 생기지 않는다.
-  const [page, setPage] = useState(1);
+  // 검색 debounce·상태 필터·page=1 리셋·페이지네이션 조립은 공용 훅이 담당한다.
+  // (커서 누적 대신 페이지 단위 교체 — 회원 목록은 "몇 명 중 어디쯤"이 보여야 한다.)
+  const {
+    search,
+    setSearch,
+    activeStatus,
+    setActiveStatus,
+    filters,
+    resetToFirstPage,
+    buildPagination,
+  } = useAdminListQuery({ initialStatus, pageSize: PAGE_SIZE });
 
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
@@ -112,30 +90,8 @@ function AdminUsersPageContent() {
 
   const { toasts, showToast } = useAdminToast();
 
-  // Debounce search ~300ms
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(search.trim());
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [search]);
-
-  // 필터가 바뀌면 첫 페이지로 돌아간다 — 3페이지를 보던 중 조건을 좁히면 결과가 없을 수 있다.
-  useEffect(() => {
-    setPage(1);
-  }, [debouncedSearch, activeStatus]);
-
   // Capability check
-  const { data: adminMe } = useV1AdminMe();
-  const canWrite = adminMe?.capabilities.includes('status:write') ?? false;
-
-  // Build filters
-  const filters = {
-    ...(debouncedSearch ? { q: debouncedSearch } : {}),
-    ...(activeStatus ? { status: activeStatus } : {}),
-    page,
-    limit: PAGE_SIZE,
-  };
+  const canWrite = useAdminCanWrite();
 
   const {
     data: firstPage,
@@ -166,7 +122,7 @@ function AdminUsersPageContent() {
           setModalOpen(false);
           setSelectedRow(null);
           // 방금 바꾼 행이 최신 상태로 다시 그려지도록 첫 페이지부터 받아온다.
-          setPage(1);
+          resetToFirstPage();
           showToast('회원 상태를 변경했어요.', 'success');
         },
         onError: (err) => {
@@ -183,6 +139,7 @@ function AdminUsersPageContent() {
   return (
     <>
       <AdminPageHeader
+        eyebrow="플랫폼"
         title="회원 관리"
         description="플랫폼 전체 회원의 상태를 검색하고 관리해요."
       />
@@ -205,6 +162,10 @@ function AdminUsersPageContent() {
         <AdminDataTable<V1AdminUserRow>
           rows={rows}
           keyExtractor={(row) => row.userId}
+          // 자매 목록(matches·team-matches)과 같은 행 진입 계약 — "상세" 버튼으로만
+          // 진입 가능하던 유일한 목록 2개(users·teams) 중 하나였다.
+          onRowClick={(row) => router.push(`/admin/users/${encodeURIComponent(row.userId)}`)}
+          rowClickLabel={(row) => `${formatUserTitle(row)} 상세 보기`}
           tableMaxWidth="max-w-none"
           rowTone={(row) =>
             row.accountStatus === 'blocked' || row.accountStatus === 'deleted'
@@ -222,13 +183,13 @@ function AdminUsersPageContent() {
                   <span className="flex items-center gap-1.5">
                     <span className="truncate font-medium text-[var(--text-strong)]">{formatUserTitle(row)}</span>
                     {row.adminRole ? (
-                      <span className="shrink-0 rounded bg-[var(--blue50)] px-1.5 py-0.5 text-[var(--font-size-micro)] font-semibold text-[var(--blue700)]">
+                      <span className="shrink-0 rounded bg-[var(--blue50)] px-1.5 py-0.5 text-[length:var(--font-size-micro)] font-semibold text-[var(--blue700)]">
                         운영자
                       </span>
                     ) : null}
                   </span>
                   {row.email ? (
-                    <span className="block truncate text-[var(--font-size-micro)] text-[var(--text-muted)]" title={row.email}>
+                    <span className="block truncate text-[length:var(--font-size-micro)] text-[var(--text-muted)]" title={row.email}>
                       {row.email}
                     </span>
                   ) : null}
@@ -291,7 +252,7 @@ function AdminUsersPageContent() {
               header: '가입',
               width: 'w-[104px]',
               render: (row) => (
-                <span className="whitespace-nowrap text-[var(--text-muted)]">{formatDateCompact(row.createdAt)}</span>
+                <span className="whitespace-nowrap text-[var(--text-muted)]">{formatAdminDate(row.createdAt)}</span>
               ),
             },
             {
@@ -299,7 +260,7 @@ function AdminUsersPageContent() {
               header: '최근 로그인',
               width: 'w-[112px]',
               render: (row) => (
-                <span className="whitespace-nowrap text-[var(--text-muted)]">{formatDateCompact(row.lastLoginAt)}</span>
+                <span className="whitespace-nowrap text-[var(--text-muted)]">{formatAdminDate(row.lastLoginAt)}</span>
               ),
             },
           ]}
@@ -308,7 +269,7 @@ function AdminUsersPageContent() {
               <Link
                 href={`/admin/users/${row.userId}`}
                 className={[
-                  'inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3 rounded-lg text-[var(--font-size-label)] font-medium',
+                  'inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3 rounded-lg text-[length:var(--font-size-label)] font-medium',
                   'text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--blue100)] transition-colors whitespace-nowrap',
                   'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                 ].join(' ')}
@@ -325,7 +286,7 @@ function AdminUsersPageContent() {
                       setModalOpen(true);
                     }}
                     className={[
-                      'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[var(--font-size-label)] font-medium',
+                      'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[length:var(--font-size-label)] font-medium',
                       'text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--border)] transition-colors whitespace-nowrap',
                       'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                     ].join(' ')}
@@ -346,18 +307,7 @@ function AdminUsersPageContent() {
           error={errorMessage}
           onRetry={() => void refetch()}
           skeletonRows={8}
-          pagination={
-            pageInfo?.totalPages
-              ? {
-                  page: pageInfo.page ?? page,
-                  totalPages: pageInfo.totalPages,
-                  total: pageInfo.total ?? 0,
-                  limit: pageInfo.limit ?? PAGE_SIZE,
-                  onPageChange: setPage,
-                  loading: isFetching,
-                }
-              : undefined
-          }
+          pagination={buildPagination(pageInfo, isFetching)}
         />
       </div>
 

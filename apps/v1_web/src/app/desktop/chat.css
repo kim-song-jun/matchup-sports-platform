@@ -38,14 +38,14 @@
 
   /* Section label: tighten vertical rhythm. */
   .tm-chat-section-label {
-    padding-top: 18px;
+    padding-top: 20px;
     padding-bottom: 8px;
   }
 
   /* Chat rows: more vertical breathing room on desktop; a resting card style. */
   .tm-chat-row {
     border-bottom: none;
-    border-radius: 14px;
+    border-radius: var(--radius-field);
     margin-bottom: 4px;
   }
 
@@ -76,7 +76,7 @@
     min-width: 0;
     min-height: 72px;
     overflow: hidden;
-    border-radius: 14px;
+    border-radius: var(--radius-field);
     transition: background-color 0.12s;
     grid-column: 1;
   }
@@ -92,14 +92,14 @@
   .tm-chat-row-main:focus-visible {
     outline: 2px solid var(--blue500);
     outline-offset: 2px;
-    border-radius: 14px;
+    border-radius: var(--radius-field);
   }
 
   /* Slightly larger avatar on desktop. */
   .tm-chat-avatar {
     width: 50px;
     height: 50px;
-    border-radius: 18px;
+    border-radius: var(--radius-container);
   }
 
   /* Desktop keeps pinning available as an explicit trailing action. */
@@ -163,8 +163,8 @@
   .tm-chat-room-desktop-head {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 20px 0 14px;
+    gap: 12px;
+    padding: 20px 0 16px;
     max-width: 760px;
     margin-left: auto;
     margin-right: auto;
@@ -176,7 +176,7 @@
     justify-content: center;
     width: 40px;
     height: 40px;
-    border-radius: 10px;
+    border-radius: var(--radius-control);
     color: var(--grey700);
     flex-shrink: 0;
     text-decoration: none;
@@ -191,7 +191,7 @@
   .tm-chat-room-desktop-head .tm-desktop-back:focus-visible {
     outline: 2px solid var(--blue500);
     outline-offset: 2px;
-    border-radius: 10px;
+    border-radius: var(--radius-control);
   }
 
   /* Room content: a full-height conversation card. The card fills the viewport
@@ -204,7 +204,7 @@
     padding-bottom: 0;
     background: var(--bg);
     border: 1px solid var(--grey100);
-    border-radius: 16px;
+    border-radius: var(--radius-container);
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -244,9 +244,9 @@
     left: auto;
     bottom: auto;
     width: 100%;
-    padding: 12px 16px 14px;
+    padding: 12px 16px 16px;
     border-top: 1px solid var(--grey100);
-    border-radius: 0 0 16px 16px;
+    border-radius: 0 0 var(--radius-container) var(--radius-container);
   }
 }
 
@@ -290,7 +290,7 @@
     grid-template-columns: minmax(320px, 360px) minmax(0, 1fr);
     overflow: hidden;
     border: 1px solid var(--grey150);
-    border-radius: 16px;
+    border-radius: var(--radius-container);
     background: var(--bg);
   }
 
@@ -346,12 +346,12 @@
   }
 
   .tm-chat-desktop-list-pane .tm-chat-list .tm-sport-chip-row {
-    padding: 12px 14px 10px;
+    padding: 12px 16px 12px;
     flex-wrap: wrap;
   }
 
   .tm-chat-desktop-list-pane .tm-chat-section-label {
-    padding: 12px 16px 6px;
+    padding: 12px 16px 8px;
   }
 
   .tm-chat-desktop-list-pane .tm-chat-row {
@@ -412,7 +412,7 @@
     margin-bottom: 4px;
     display: grid;
     place-items: center;
-    border-radius: 16px;
+    border-radius: var(--radius-container);
     background: var(--grey150); /* [토큰 충돌 fix] grey100 → grey150 — thread-pane 배경(grey50)과 인접해 거의 안 보이던 것 한 단계 진하게 */
     color: var(--grey500);
   }

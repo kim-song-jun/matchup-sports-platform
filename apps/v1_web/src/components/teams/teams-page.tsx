@@ -10,7 +10,7 @@ import { Card, EmptyState, ErrorState, KPIStat, ListItem } from '@/components/v1
 import { ChevronLeftIcon, ChevronRightIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { cssUrl } from '@/lib/assets';
-import { useV1ReceivedReviewSummary } from '@/hooks/use-v1-api';
+import { useV1PublicTeamReviewSummary } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { isTeamLogoPreset, TEAM_LOGO_PRESETS } from '@/lib/team-logo-presets';
 import type {
@@ -261,6 +261,80 @@ function TeamOpenMatchesSection({
   );
 }
 
+/**
+ * "내 리그" (R4) — 이 팀이 host 또는 신청자로 속한 팀매치 목록(GET /team-matches?teamId=)
+ * 에서 distinct 로 추린 리그. 전용 리그 API가 없어 팀 상세 진입점을 만드는 유일한
+ * 방법이었다 -- 리그 상세로 가는 인앱 링크가 team-matches 상세 화면 배지 하나뿐이라
+ * (team-matches-page.tsx 참고) 팀장·선수가 리그를 발견할 방법이 사실상 없었다.
+ * 리그가 하나도 없으면 제목까지 포함해 섹션 전체를 렌더하지 않는다 -- 빈 섹션 노출 금지.
+ * 단, 이는 "진짜 0개"에만 적용된다 -- myLeaguesQuery 가 실패한 경우도 items가 빈 배열이
+ * 되어 이 조건과 100% 겹쳐 버리므로(그룹 F 재감사), error 를 loading/empty 와 분리된
+ * 3번째 상태로 먼저 분기한다. 에러일 때는 섹션을 감추지 않고 재시도 CTA를 보여준다 —
+ * "보낸 초대" 섹션(InvitationSection, 이 파일 listError 분기)과 동일하게 EmptyState를
+ * 에러 표시에도 재사용해 이 페이지 안에서 시각적으로 통일한다.
+ */
+function TeamMyLeaguesSection({
+  leagues,
+  loading,
+  error,
+  onRetry,
+}: {
+  leagues?: TeamDetailViewModel['myLeagues'];
+  loading?: boolean;
+  error?: boolean;
+  onRetry?: () => void;
+}) {
+  const items = leagues ?? [];
+  if (!loading && !error && items.length === 0) return null;
+  return (
+    <>
+      <SectionTitle title="내 리그" sub="이 팀이 참가 중인 리그예요." />
+      {loading ? (
+        <div style={{ display: 'grid', gap: 8 }} aria-busy="true" aria-label="내 리그 불러오는 중">
+          {[0, 1].map((i) => (
+            <div key={i} className="tm-review-skeleton" style={{ height: 56, borderRadius: 14 }} aria-hidden="true" />
+          ))}
+        </div>
+      ) : error ? (
+        <EmptyState
+          title="리그 정보를 불러오지 못했어요"
+          sub="잠시 후 다시 시도해 주세요."
+          cta="다시 시도"
+          onCta={onRetry}
+        />
+      ) : (
+        <div style={{ display: 'grid', gap: 8 }}>
+          {items.map((league) => (
+            <Link
+              key={league.leagueId}
+              className="tm-pressable"
+              href={`/league-matches/${league.leagueId}`}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 10,
+                border: '1px solid var(--border)',
+                borderRadius: 14,
+                padding: '14px 16px',
+                background: 'var(--bg)',
+                textDecoration: 'none',
+                color: 'inherit',
+              }}
+            >
+              <div style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="tm-badge tm-badge-grey" style={{ flexShrink: 0 }}>정규 리그</span>
+                <div className="tm-text-label" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{league.title}</div>
+              </div>
+              <ChevronRightIcon size={18} strokeWidth={2} aria-hidden="true" style={{ flexShrink: 0, color: 'var(--text-caption)' }} />
+            </Link>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
 function TeamOperationsSection({
   operations,
   compact = false,
@@ -330,28 +404,14 @@ function TeamRecordLinkCard({
   description,
   badge,
 }: {
-  href: string;
+  /** 없으면 링크가 아니라 표시 전용 카드로 그린다 — 갈 곳이 없는데 눌리는 것처럼 보이면 안 된다. */
+  href?: string;
   title: string;
   description: string;
   badge?: string | null;
 }) {
-  return (
-    <Link
-      className="tm-pressable"
-      href={href}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: 10,
-        border: '1px solid var(--border)',
-        borderRadius: 14,
-        padding: '14px 16px',
-        background: 'var(--bg)',
-        textDecoration: 'none',
-        color: 'inherit',
-      }}
-    >
+  const body = (
+    <>
       <div>
         <div className="tm-text-label">{title}</div>
         <div className="tm-text-caption" style={{ marginTop: 4 }}>{description}</div>
@@ -360,8 +420,26 @@ function TeamRecordLinkCard({
         {badge ? (
           <span className="tm-badge tm-badge-blue" style={{ whiteSpace: 'nowrap' }}>{badge}</span>
         ) : null}
-        <ChevronRightIcon size={18} aria-hidden="true" />
+        {href ? <ChevronRightIcon size={18} aria-hidden="true" /> : null}
       </div>
+    </>
+  );
+  const style: CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    border: '1px solid var(--border)',
+    borderRadius: 14,
+    padding: '14px 16px',
+    background: 'var(--bg)',
+    textDecoration: 'none',
+    color: 'inherit',
+  };
+  if (href === undefined) return <div style={style}>{body}</div>;
+  return (
+    <Link className="tm-pressable" href={href} style={style}>
+      {body}
     </Link>
   );
 }
@@ -378,12 +456,15 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
   const [heroMessage, setHeroMessage] = useState('');
 
   /**
-   * 내 팀일 때만 "받은 후기" 요약을 부른다. 이 응답은 **로그인 사용자가 받은 팀 후기**라
-   * 남의 팀 상세에서 부르면 그 팀 것이 아니라 내 것이 나온다 — 남의 팀 후기를 공개로
-   * 읽는 경로는 아직 API 자체가 없다.
+   * 팀 후기 요약. **공개 엔드포인트**(`GET /teams/:id/reviews`)라 내 팀이든 남의 팀이든
+   * 그 팀이 받은 평가를 그대로 읽는다 — 예전에는 "로그인한 나"가 받은 후기를 주는
+   * `/reviews/received` 밖에 없어서 내 팀에서만 보여줄 수 있었다.
+   *
+   * 공개라고 규칙이 느슨한 건 아니다: 서버가 같은 상호평가 공개 게이트를 지나므로,
+   * 상대가 아직 안 썼고 유예 시간도 안 지난 후기는 여기에도 안 잡힌다.
    */
   const isMyTeam = mode === 'mine';
-  const reviewSummary = useV1ReceivedReviewSummary('team', undefined, { enabled: isMyTeam });
+  const reviewSummary = useV1PublicTeamReviewSummary(team.id);
   const teamReviewCount = (reviewSummary.data?.bySport ?? []).reduce((sum, row) => sum + row.ratingCount, 0);
   // 종목별로 쪼개져 오므로 개수로 가중 평균을 낸다 — 종목이 하나면 그 값 그대로다.
   const teamReviewAvg =
@@ -452,19 +533,22 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             </div>
           </Card>
           <TeamOpenMatchesSection matches={model.openMatches} loading={model.openMatchesLoading} />
+          <TeamMyLeaguesSection leagues={model.myLeagues} loading={model.myLeaguesLoading} error={model.myLeaguesError} onRetry={model.onRetryMyLeagues} />
           <TeamRecordLinkCard
             href={`/teams/${team.id}/records`}
             title="팀 전적"
             description="승·무·패와 경기별 기록을 확인해요."
           />
-          {isMyTeam ? (
+          {isMyTeam || teamReviewCount > 0 ? (
             <TeamRecordLinkCard
-              href="/my/reviews?tab=received"
+              href={isMyTeam ? '/my/reviews?tab=received' : undefined}
               title="받은 후기"
               description={
-                teamReviewCount > 0
-                  ? '함께 뛴 팀들이 남긴 평가를 확인해요.'
-                  : '아직 받은 후기가 없어요. 경기를 마치면 쌓여요.'
+                teamReviewCount === 0
+                  ? '아직 받은 후기가 없어요. 경기를 마치면 쌓여요.'
+                  : isMyTeam
+                    ? '함께 뛴 팀들이 남긴 평가를 확인해요.'
+                    : '이 팀과 뛴 팀들이 남긴 평가예요.'
               }
               badge={teamReviewCount > 0 && teamReviewAvg !== null ? `${teamReviewAvg.toFixed(1)} · ${teamReviewCount}개` : null}
             />
@@ -584,14 +668,30 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
           {/* P2: 완료 메시지에 .tm-complete-check 마이크로인터랙션 적용 (globals.css 키프레임) */}
           {heroMessage ? <div className="tm-text-caption tm-complete-check" role="status" style={{ color: 'var(--text-caption)', marginTop: 6 }}>{heroMessage}</div> : null}
           <div className="tm-team-detail-sidebar-cta">
-            <button
-              className={`tm-btn tm-btn-lg ${ctaTone} tm-btn-block`}
-              type="button"
-              disabled={!model.onCta || model.ctaPending}
-              onClick={() => runHeroAction(model.onCta, model.ctaSuccessMessage ?? (mode === 'pending' ? '신청을 취소했어요.' : '신청을 완료했어요.'), model.ctaFailureMessage)}
-            >
-              {model.ctaPending ? '처리 중' : cta}
-            </button>
+            {model.contactHref ? (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
+                <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={model.contactHref}>
+                  컨택 보내기
+                </Link>
+                <button
+                  className={`tm-btn tm-btn-lg ${ctaTone} tm-btn-block`}
+                  type="button"
+                  disabled={!model.onCta || model.ctaPending}
+                  onClick={() => runHeroAction(model.onCta, model.ctaSuccessMessage ?? (mode === 'pending' ? '신청을 취소했어요.' : '신청을 완료했어요.'), model.ctaFailureMessage)}
+                >
+                  {model.ctaPending ? '처리 중' : cta}
+                </button>
+              </div>
+            ) : (
+              <button
+                className={`tm-btn tm-btn-lg ${ctaTone} tm-btn-block`}
+                type="button"
+                disabled={!model.onCta || model.ctaPending}
+                onClick={() => runHeroAction(model.onCta, model.ctaSuccessMessage ?? (mode === 'pending' ? '신청을 취소했어요.' : '신청을 완료했어요.'), model.ctaFailureMessage)}
+              >
+                {model.ctaPending ? '처리 중' : cta}
+              </button>
+            )}
           </div>
         </aside>
       </div>
@@ -620,6 +720,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
           <TeamJoinPendingNotice requestedAtLabel={model.joinRequest?.requestedAtLabel} />
         ) : null}
         <TeamOpenMatchesSection matches={model.openMatches} loading={model.openMatchesLoading} />
+        <TeamMyLeaguesSection leagues={model.myLeagues} loading={model.myLeaguesLoading} error={model.myLeaguesError} onRetry={model.onRetryMyLeagues} />
 
         {/* 기록으로 가는 링크 묶음. 예전에는 "팀 전적" 링크 하나가 위 매치 섹션과 **간격 0px
             로 맞붙어**(alpha 390 실측) 그 섹션의 일부처럼 보였다 — 별개 항목이므로 자기
@@ -632,16 +733,18 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             title="팀 전적"
             description="승·무·패와 경기별 기록을 확인해요."
           />
-          {/* 받은 후기는 내 팀에서만 — 이 요약 API 는 "로그인 사용자가 받은 팀 후기"라
-              남의 팀 상세에 두면 그 팀이 아니라 내 후기가 실린다. */}
-          {isMyTeam ? (
+          {/* 내 팀은 후기가 0건이어도 "아직 없다"는 사실이 정보다(쌓아야 할 것). 남의 팀은
+              받은 후기가 있을 때만 보여준다 — 빈 카드는 방문자에게 알려줄 게 없다. */}
+          {isMyTeam || teamReviewCount > 0 ? (
             <TeamRecordLinkCard
-              href="/my/reviews?tab=received"
+              href={isMyTeam ? '/my/reviews?tab=received' : undefined}
               title="받은 후기"
               description={
-                teamReviewCount > 0
-                  ? '함께 뛴 팀들이 남긴 평가를 확인해요.'
-                  : '아직 받은 후기가 없어요. 경기를 마치면 쌓여요.'
+                teamReviewCount === 0
+                  ? '아직 받은 후기가 없어요. 경기를 마치면 쌓여요.'
+                  : isMyTeam
+                    ? '함께 뛴 팀들이 남긴 평가를 확인해요.'
+                    : '이 팀과 뛴 팀들이 남긴 평가예요.'
               }
               // 별점만 두면 몇 명이 준 점수인지 알 수 없다 — 개수를 함께 적는다.
               badge={teamReviewCount > 0 && teamReviewAvg !== null ? `${teamReviewAvg.toFixed(1)} · ${teamReviewCount}개` : null}
@@ -718,9 +821,20 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
         )}
         {/* P2: 완료 메시지 .tm-complete-check 마이크로인터랙션 */}
         {heroMessage ? <div className="tm-text-caption tm-complete-check" role="status" style={{ color: 'var(--text-caption)', marginBottom: 6 }}>{heroMessage}</div> : null}
-        <button className={`tm-btn tm-btn-lg ${ctaTone} tm-btn-block`} type="button" disabled={!model.onCta || model.ctaPending} onClick={() => runHeroAction(model.onCta, model.ctaSuccessMessage ?? (mode === 'pending' ? '신청을 취소했어요.' : '신청을 완료했어요.'), model.ctaFailureMessage)}>
-          {model.ctaPending ? '처리 중' : cta}
-        </button>
+        {model.contactHref ? (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
+            <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={model.contactHref}>
+              컨택 보내기
+            </Link>
+            <button className={`tm-btn tm-btn-lg ${ctaTone} tm-btn-block`} type="button" disabled={!model.onCta || model.ctaPending} onClick={() => runHeroAction(model.onCta, model.ctaSuccessMessage ?? (mode === 'pending' ? '신청을 취소했어요.' : '신청을 완료했어요.'), model.ctaFailureMessage)}>
+              {model.ctaPending ? '처리 중' : cta}
+            </button>
+          </div>
+        ) : (
+          <button className={`tm-btn tm-btn-lg ${ctaTone} tm-btn-block`} type="button" disabled={!model.onCta || model.ctaPending} onClick={() => runHeroAction(model.onCta, model.ctaSuccessMessage ?? (mode === 'pending' ? '신청을 취소했어요.' : '신청을 완료했어요.'), model.ctaFailureMessage)}>
+            {model.ctaPending ? '처리 중' : cta}
+          </button>
+        )}
       </div>
     </AppChrome>
   );

@@ -1,0 +1,372 @@
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
+import { RecordedEventList } from './recorded-event-list';
+import type { GameEventRecord, GameLineup, GameSide } from '@/types/game-operations';
+import { GOAL_BACKFILL_EVENT_SOURCE } from '@/lib/backfilled-goal-event';
+
+/**
+ * 이 목록이 존재하는 이유는 "기록한 이벤트" 자리에 **서버에 확정된 이벤트 로그**를 보여주기
+ * 위해서다. 예전에는 그 자리에 로컬 전송 큐를 그려서, 골이 4개 기록된 경기도 새로고침하면
+ * "기록된 이벤트가 아직 없어요" 로 보였다 — 화면이 실제 기록을 부정하는 상태였다.
+ * 아래 테스트는 그 계약(서버 이벤트를 시각·득점자·팀과 함께 렌더)이 되돌려지면 깨진다.
+ */
+
+const HOME_SIDE_ID = 'side-home';
+const AWAY_SIDE_ID = 'side-away';
+
+function side(id: string, name: string): GameSide {
+  return {
+    id,
+    gameId: 'game-1',
+    sideKey: id === HOME_SIDE_ID ? 'HOME' : 'AWAY',
+    teamId: null,
+    displayNameSnapshot: name,
+    createdAt: '2026-08-04T00:00:00.000Z',
+    updatedAt: '2026-08-04T00:00:00.000Z',
+  };
+}
+
+function lineup(sideId: string, participants: Array<{ id: string; name: string; jersey: number | null }>): GameLineup {
+  return {
+    id: `lineup-${sideId}`,
+    gameId: 'game-1',
+    sideId,
+    revision: 1,
+    state: 'SUBMITTED',
+    version: 1,
+    submittedAt: '2026-08-04T00:00:00.000Z',
+    supersedesId: null,
+    formation: null,
+    createdAt: '2026-08-04T00:00:00.000Z',
+    updatedAt: '2026-08-04T00:00:00.000Z',
+    participants: participants.map((p) => ({
+      id: p.id,
+      gameId: 'game-1',
+      sideId,
+      lineupId: `lineup-${sideId}`,
+      userId: null,
+      displayNameSnapshot: p.name,
+      jerseyNumber: p.jersey,
+      position: null,
+      positionX: null,
+      positionY: null,
+      started: true,
+      arrivedAt: null,
+      createdAt: '2026-08-04T00:00:00.000Z',
+      updatedAt: '2026-08-04T00:00:00.000Z',
+    })),
+  };
+}
+
+function goal(sequence: number, sideId: string, participantId: string | null, clockMs: number): GameEventRecord {
+  return {
+    id: `event-${sequence}`,
+    gameId: 'game-1',
+    sequence,
+    clientEventId: `client-${sequence}`,
+    payloadHash: 'hash',
+    type: 'GOAL',
+    sideId,
+    participantId,
+    assistParticipantId: null,
+    period: 2,
+    clockMs,
+    occurredAt: '2026-08-04T00:00:00.000Z',
+    receivedAt: '2026-08-04T00:00:00.000Z',
+    actorUserId: 'actor-1',
+    reversesEventId: null,
+    payload: {},
+  };
+}
+
+const SIDES = [side(HOME_SIDE_ID, '강남 풋살 클럽'), side(AWAY_SIDE_ID, '성수 풋살 클럽')];
+const LINEUPS = [
+  lineup(HOME_SIDE_ID, [{ id: 'p-jung', name: '정우진', jersey: 10 }]),
+  lineup(AWAY_SIDE_ID, [{ id: 'p-cho', name: '조현우', jersey: 9 }]),
+];
+
+describe('RecordedEventList', () => {
+  it('renders each server-confirmed event with its clock, scorer and side', () => {
+    render(
+      <RecordedEventList
+        events={[goal(1, HOME_SIDE_ID, 'p-jung', 6 * 60000), goal(2, AWAY_SIDE_ID, 'p-cho', 11 * 60000)]}
+        sides={SIDES}
+        lineups={LINEUPS}
+      />,
+    );
+
+    const rows = within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getAllByRole('listitem');
+    expect(rows).toHaveLength(2);
+    // UX 감사 item 4 — "N피리어드/전반/후반/P" 세 가지 표기가 섞여 있던 걸
+    // "전반/후반"으로 통일했다(`period-label.ts`). 이 헬퍼는 period: 2로
+    // 고정돼 있으므로 "후반"으로 보여야 한다.
+    expect(rows[0]).toHaveTextContent('후반 6');
+    expect(rows[0]).toHaveTextContent('골 · 10 정우진');
+    expect(rows[0]).toHaveTextContent('강남 풋살 클럽');
+    expect(rows[1]).toHaveTextContent('골 · 9 조현우');
+    expect(rows[1]).toHaveTextContent('성수 풋살 클럽');
+  });
+
+  // 라인업 스냅샷에 없는 참가자를 이름으로 지어내면 운영자가 잘못된 득점자를 보게 된다.
+  /** 행의 두 색 신호를 각각 집어 온다 — 레일은 행 왼쪽 세로 막대(w-1),
+   *  팀 점은 팀 이름 앞 원(h-2 w-2). innerHTML 문자열 매칭으로 뭉뚱그리면
+   *  "unknown 이면 점을 아예 그리지 않는다"는 계약이 고정되지 않는다. */
+  function teamSignals(row: Element) {
+    return {
+      rail: row.querySelector('span.w-1'),
+      dot: row.querySelector('span.h-2.w-2'),
+    };
+  }
+
+  it('홈/원정을 색으로 구분한다 — 왼쪽 레일과 팀명 앞 점이 같은 팀 색을 쓴다', () => {
+    const { container } = render(
+      <RecordedEventList
+        events={[goal(1, HOME_SIDE_ID, 'p-jung', 6 * 60000), goal(2, AWAY_SIDE_ID, 'p-cho', 11 * 60000)]}
+        sides={SIDES}
+        lineups={LINEUPS}
+      />,
+    );
+    const rows = container.querySelectorAll('li');
+    const home = teamSignals(rows[0]);
+    const away = teamSignals(rows[1]);
+    expect(home.rail?.className).toContain('bg-[var(--blue500)]');
+    expect(home.dot?.className).toContain('bg-[var(--blue500)]');
+    expect(away.rail?.className).toContain('bg-[var(--orange500)]');
+    expect(away.dot?.className).toContain('bg-[var(--orange500)]');
+  });
+
+  /* 팀 색은 "이 이벤트가 어느 팀 것인가"를 말하는 신호다. sides 가 아직 로드되지
+     않은 첫 렌더에서 홈을 알 수 없는데도 한쪽 색을 칠하면 없는 정보를 지어내는
+     셈이고, 그때는 옆의 팀 이름조차 비어 있어 잘못된 색만 남는다. */
+  it('sides 를 아직 모르면 팀 색을 지어내지 않는다 — 레일은 중립, 팀 점은 아예 없다', () => {
+    const { container } = render(
+      <RecordedEventList events={[goal(1, HOME_SIDE_ID, 'p-jung', 6 * 60000)]} sides={[]} lineups={[]} />,
+    );
+    const row = container.querySelector('li');
+    expect(row).not.toBeNull();
+    const { rail, dot } = teamSignals(row as Element);
+    expect(rail?.className).toContain('bg-[var(--border)]');
+    expect(rail?.className).not.toContain('bg-[var(--blue500)]');
+    expect(rail?.className).not.toContain('bg-[var(--orange500)]');
+    expect(dot).toBeNull();
+  });
+
+  // 알 수 없는 participantId는 지어내지 않고, 명시적으로 참가자가 없는 골만 익명으로 표시한다.
+  it('does not invent an unknown scorer and labels a participant-less goal as anonymous', () => {
+    render(
+      <RecordedEventList
+        events={[goal(1, HOME_SIDE_ID, 'p-unknown', 3 * 60000), goal(2, AWAY_SIDE_ID, null, 5 * 60000)]}
+        sides={SIDES}
+        lineups={LINEUPS}
+      />,
+    );
+
+    const rows = within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getAllByRole('listitem');
+    expect(rows[0]).toHaveTextContent('강남 풋살 클럽');
+    expect(rows[0]).not.toHaveTextContent('정우진');
+    expect(rows[0]).not.toHaveTextContent('·');
+    expect(rows[1]).toHaveTextContent('성수 풋살 클럽');
+    expect(rows[1]).toHaveTextContent('골 · 익명');
+    expect(rows[1]).not.toHaveTextContent('조현우');
+  });
+
+  it('선수 없는 자책골은 OG로 표시한다', () => {
+    const ownGoal = { ...goal(1, HOME_SIDE_ID, null, 60000), type: 'OWN_GOAL' as const, payload: { anonymous: true } };
+    render(<RecordedEventList events={[ownGoal]} sides={SIDES} lineups={LINEUPS} />);
+    expect(screen.getByRole('list', { name: '기록된 이벤트 목록' })).toHaveTextContent('자책골 · OG');
+  });
+
+  it('shows an empty state instead of an empty list when nothing is recorded yet', () => {
+    render(<RecordedEventList events={[]} sides={SIDES} lineups={LINEUPS} />);
+
+    expect(screen.queryByRole('list', { name: '기록된 이벤트 목록' })).toBeNull();
+    expect(screen.getByText('아직 기록된 이벤트가 없어요.')).toBeInTheDocument();
+  });
+
+  /**
+   * 레거시 대회 결과에서 복원된 골(`goal-event-backfill.ts`)은 전/후반이 원본에 없었고
+   * 분도 없을 수 있는데, `period`·`clockMs` 가 non-null 컬럼이라 `1`·`0` 으로 저장된다.
+   * 공개 화면은 서버가 그 값을 null 로 내려 억제하는데, 이 콘솔만 원시 행을 받아
+   * "전반 0:00" 이라고 단정하고 있었다 — 결과 정정을 판단하는 화면이라 더 위험하다.
+   */
+  it('복원된 골(분 미상)은 "전반 0:00" 이 아니라 시각 미상으로 표시한다', () => {
+    const backfilled = {
+      ...goal(1, HOME_SIDE_ID, 'p-jung', 0),
+      payload: { source: GOAL_BACKFILL_EVENT_SOURCE, legacyPlayerName: '정우진', minuteKnown: false },
+    };
+    render(<RecordedEventList events={[backfilled]} sides={SIDES} lineups={LINEUPS} />);
+
+    const row = within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getAllByRole('listitem')[0];
+    expect(row).toHaveTextContent('시각 미상');
+    expect(row).not.toHaveTextContent('후반');
+    expect(row).not.toHaveTextContent('0:00');
+  });
+
+  it('복원된 골이라도 레거시에 분이 남아 있으면 그 시각은 보여주되 전/후반은 단정하지 않는다', () => {
+    const backfilled = {
+      ...goal(1, HOME_SIDE_ID, 'p-jung', 71 * 60000),
+      payload: { source: GOAL_BACKFILL_EVENT_SOURCE, legacyPlayerName: '정우진' },
+    };
+    render(<RecordedEventList events={[backfilled]} sides={SIDES} lineups={LINEUPS} />);
+
+    const row = within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getAllByRole('listitem')[0];
+    expect(row).toHaveTextContent('71:00');
+    expect(row).not.toHaveTextContent('후반');
+  });
+
+  it('백필 표식이 없는 라이브 이벤트는 payload 에 minuteKnown 이 있어도 시각을 그대로 보여준다', () => {
+    // payload 는 기록 클라이언트가 자유롭게 채우는 객체다 — `source` 를 확인하지 않으면
+    // 라이브 71분 골의 시각이 이 화면에서 사라진다.
+    const live = {
+      ...goal(1, HOME_SIDE_ID, 'p-jung', 71 * 60000),
+      payload: { note: '현장 메모', minuteKnown: false },
+    };
+    render(<RecordedEventList events={[live]} sides={SIDES} lineups={LINEUPS} />);
+
+    expect(within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getAllByRole('listitem')[0])
+      .toHaveTextContent('후반 71:00');
+  });
+
+  it('CARD 이벤트는 payload.card 색으로 옐로/레드를 구분해 렌더한다 — 죽은 스위치 분기 회귀 방지', () => {
+    const yellowCard = {
+      ...goal(1, HOME_SIDE_ID, 'p-jung', 60000),
+      type: 'CARD' as const,
+      payload: { card: 'YELLOW' },
+    };
+    render(<RecordedEventList events={[yellowCard]} sides={SIDES} lineups={LINEUPS} />);
+    expect(screen.getByRole('list', { name: '기록된 이벤트 목록' })).toHaveTextContent('옐로카드');
+  });
+
+  it('assistParticipantId가 없는 GOAL 이벤트에는 "+ 어시스트" 버튼이 뜬다', () => {
+    const onAttachAssist = vi.fn();
+    const bareGoal = { ...goal(1, HOME_SIDE_ID, 'p-jung', 60000), assistParticipantId: null };
+    render(<RecordedEventList events={[bareGoal]} sides={SIDES} lineups={LINEUPS} onAttachAssist={onAttachAssist} />);
+    expect(screen.getByRole('button', { name: /어시스트/ })).toBeInTheDocument();
+  });
+
+  it('이미 assistParticipantId가 있는 GOAL 이벤트에는 "+ 어시스트" 버튼이 없다', () => {
+    const onAttachAssist = vi.fn();
+    const assistedGoal = { ...goal(1, HOME_SIDE_ID, 'p-jung', 60000), assistParticipantId: 'p-cho' };
+    render(<RecordedEventList events={[assistedGoal]} sides={SIDES} lineups={LINEUPS} onAttachAssist={onAttachAssist} />);
+    expect(screen.queryByRole('button', { name: /어시스트/ })).toBeNull();
+  });
+
+  it('SUBSTITUTION 이벤트는 나가는 선수 → 들어오는 선수를 함께 보여준다', () => {
+    const substitution = {
+      ...goal(1, HOME_SIDE_ID, 'p-jung', 300000),
+      type: 'SUBSTITUTION' as const,
+      payload: { outParticipantId: 'p-cho' },
+    };
+    render(
+      <RecordedEventList
+        events={[substitution]}
+        sides={SIDES}
+        lineups={[
+          ...LINEUPS,
+          // p-cho도 홈팀 벤치였다고 가정 — 이름 조회만 검증하면 되므로 sideId는 표시에 영향 없다.
+        ]}
+      />,
+    );
+    const row = screen.getByRole('list', { name: '기록된 이벤트 목록' });
+    expect(row).toHaveTextContent('교체');
+    expect(row).toHaveTextContent('9 조현우 → 10 정우진');
+  });
+
+  it('되돌리지 않은 SUBSTITUTION 이벤트에는 "되돌리기" 버튼이 뜨고, 누르면 콜백을 부른다', async () => {
+    const onReverseSubstitution = vi.fn();
+    const substitution = {
+      ...goal(1, HOME_SIDE_ID, 'p-jung', 300000),
+      type: 'SUBSTITUTION' as const,
+      payload: { outParticipantId: 'p-cho' },
+    };
+    render(
+      <RecordedEventList
+        events={[substitution]}
+        sides={SIDES}
+        lineups={LINEUPS}
+        onReverseSubstitution={onReverseSubstitution}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: /되돌리기/ }));
+    expect(onReverseSubstitution).toHaveBeenCalledWith(substitution);
+  });
+
+  it('이미 되돌려진 SUBSTITUTION 이벤트에는 "되돌리기" 버튼이 없다', () => {
+    const onReverseSubstitution = vi.fn();
+    const substitution = {
+      ...goal(1, HOME_SIDE_ID, 'p-jung', 300000),
+      type: 'SUBSTITUTION' as const,
+      payload: { outParticipantId: 'p-cho' },
+    };
+    const correction = {
+      ...goal(2, HOME_SIDE_ID, null, 300000),
+      type: 'CORRECTION' as const,
+      reversesEventId: 'event-1',
+      payload: { reason: '오조작' },
+    };
+    render(
+      <RecordedEventList
+        events={[substitution, correction]}
+        sides={SIDES}
+        lineups={LINEUPS}
+        onReverseSubstitution={onReverseSubstitution}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: /되돌리기/ })).toBeNull();
+  });
+
+  it('골·카드 이벤트는 수정·취소 버튼으로 공용 되돌리기 콜백을 호출한다', async () => {
+    const onReverseEvent = vi.fn();
+    const recordedGoal = goal(1, HOME_SIDE_ID, 'p-jung', 124_000);
+    render(
+      <RecordedEventList
+        events={[recordedGoal]}
+        sides={SIDES}
+        lineups={LINEUPS}
+        onReverseEvent={onReverseEvent}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: '수정·취소' }));
+    expect(onReverseEvent).toHaveBeenCalledWith(recordedGoal);
+  });
+});
+
+/**
+ * 현장 가독성 회귀 가드.
+ *
+ * 이 콘솔은 경기장에서 휴대폰으로 쓰는 화면이다. 2026-08-11 알파 실측(390px)에서
+ * 이 화면의 11px 텍스트가 28개였고, 그 안에 팀명·이벤트 시각·상태 뱃지 같은 **핵심
+ * 식별 정보가 전부** 들어 있었다(`text-2xs` = 11px 유틸리티). 햇빛 아래 한 손으로
+ * 조작하는 맥락에서 읽히지 않는 크기다.
+ *
+ * `--text-2xs` 자체는 앱 전역에서 쓰이므로 값을 바꾸지 않고, **이 화면에서만** 하한을
+ * 12px 로 올렸다. 타입 종류는 12/14/15/24 = 4종으로 유지돼 루브릭 R-T1 을 지킨다.
+ * 소스 텍스트로 고정하는 이유는 렌더 결과의 computed font-size 가 jsdom 에서
+ * Tailwind 유틸리티를 해석하지 못해 단언할 수 없기 때문이다.
+ */
+describe('현장 운영 콘솔 가독성 하한', () => {
+  it('이 화면의 소스에는 11px(text-2xs) 이 남아 있지 않다', async () => {
+    const { existsSync, readdirSync, readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    // jsdom 환경이라 import.meta.url 이 file: 스킴이 아니고 __dirname 도 없다.
+    // vitest 는 패키지 루트(apps/v1_web)에서 돌므로 거기서 상대 경로로 잡는다.
+    // 화면 디렉터리만 훑으면 부족하다 — 이 콘솔이 쓰는 전용 공유 컴포넌트에도 11px 이
+    // 남아 있었다(TeamFoulCounterBar 의 팀명, 알파 배포 후 실측에서 2개 잔존). 소비처가
+    // 이 콘솔뿐인 컴포넌트는 함께 본다.
+    const dirs = [
+      'src/app/tournament-ops/tournaments/[id]/fixtures/[fixtureId]/operate',
+      'src/components/game-operations',
+    ].map((rel) => join(process.cwd(), rel));
+    const offenders: string[] = [];
+    for (const dir of dirs) {
+      // 경로가 틀리면 offenders 가 빈 배열이 되어 조용히 통과한다 — 그건 가드가 아니다.
+      expect(existsSync(dir)).toBe(true);
+      for (const name of readdirSync(dir)) {
+        if (!name.endsWith('.tsx') || name.endsWith('.test.tsx')) continue;
+        if (readFileSync(join(dir, name), 'utf8').includes('text-2xs')) offenders.push(name);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+});

@@ -3,6 +3,7 @@ import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, KPIStat } from '@/components/v1-ui/primitives';
 import { ChevronRightIcon } from '@/components/v1-ui/icons';
 import { cssUrl } from '@/lib/assets';
+import { DEFAULT_REVIEW_RATING, REVIEW_METRIC_FIELDS } from './reviews.types';
 import type { ReviewSourcePageModel, ReviewsPageModel, ReviewsReceivedPageModel, ReviewsTab, ReviewTargetDraft, ReviewTargetViewModel } from './reviews.types';
 import { REVIEW_TAG_OPTIONS, toTargetViewModel } from './reviews.view-model';
 import { ReviewsSummaryDashboard } from './reviews-summary-dashboard';
@@ -107,11 +108,6 @@ export function ReviewsPageView({
                   {/* #17: CTA 영역에 ChevronRight 추가 — 탭 가능한 카드임을 명시적으로 전달 */}
                   <div className="tm-review-card-foot">
                     <span className="tm-badge tm-badge-grey">{card.kindLabel}</span>
-                    {card.targetLabel ? (
-                      <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
-                        {card.targetLabel}
-                      </span>
-                    ) : null}
                     <span className="tm-text-label" style={{ display: 'inline-flex', alignItems: 'center', gap: 2, color: 'var(--blue700)' }}>
                       {card.ctaLabel}
                       <ChevronRightIcon size={14} strokeWidth={2.2} aria-hidden="true" />
@@ -141,6 +137,8 @@ function AnonymousReceivedContent({ model }: { model: ReviewsReceivedPageModel }
   );
 }
 
+const SUBMIT_HINT_ID = 'review-submit-hint';
+
 export function ReviewSourcePageView({
   drafts,
   errorMessage,
@@ -150,6 +148,7 @@ export function ReviewSourcePageView({
   onRetry,
   onSubmit,
   onToggleTag,
+  onUpdateMetricScore,
   onUpdateRating,
   submitting,
 }: QueryStateProps & {
@@ -158,11 +157,15 @@ export function ReviewSourcePageView({
   model: ReviewSourcePageModel | null;
   onSubmit: () => void;
   onToggleTag: (key: string, tagCode: string) => void;
+  onUpdateMetricScore: (key: string, metric: 'skill' | 'manner' | 'punctuality' | 'safety', score: number) => void;
   onUpdateRating: (key: string, rating: number) => void;
   submitting: boolean;
 }) {
   const pendingTargets = model?.targets.filter((target) => !target.locked && !target.alreadySubmitted && !target.review) ?? [];
   const canSubmit = pendingTargets.some((target) => drafts[targetKey(target.targetType, target.targetUserId, target.targetTeamId)]?.tagCodes.length > 0);
+  // 아직 쓸 대상이 남아 있는데 태그를 하나도 안 골라 버튼이 잠긴 상태에서만 안내한다 —
+  // 로딩·에러·전송 중이거나 남은 대상이 없으면 버튼이 회색인 이유가 다르므로 띄우지 않는다.
+  const showSubmitHint = !loading && !errorMessage && !submitting && pendingTargets.length > 0 && !canSubmit;
 
   return (
     <AppChrome title="리뷰 남기기" activeTab="my" bottomNav={false} backHref="/my/reviews" desktopHead>
@@ -185,6 +188,7 @@ export function ReviewSourcePageView({
               drafts={drafts}
               model={model}
               onToggleTag={onToggleTag}
+              onUpdateMetricScore={onUpdateMetricScore}
               onUpdateRating={onUpdateRating}
             />
             <Card className={message ? 'tm-review-notice-error' : ''} pad={14} style={message ? undefined : { background: 'var(--grey50)' }}>
@@ -195,7 +199,26 @@ export function ReviewSourcePageView({
         ) : null}
       </div>
       <div className="tm-fixed-cta">
-        <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" disabled={!canSubmit || submitting || loading || Boolean(errorMessage)} onClick={onSubmit} type="button">
+        {/* 별점은 기본값(5)으로 이미 채워져 있어서, 태그를 안 고른 사용자 눈에는 "다 했는데
+            버튼만 회색"으로 보인다 — 태그 1개 이상은 서버 계약(SubmitReviewDto 의
+            `@ArrayMinSize(1)`)이라 버튼을 풀어줄 수는 없으니, 왜 못 보내는지를 말해준다.
+            `aria-describedby` 로 버튼에 묶어 스크린리더도 비활성 이유를 읽게 한다. */}
+        {showSubmitHint ? (
+          <p
+            id={SUBMIT_HINT_ID}
+            className="tm-text-caption"
+            style={{ margin: '0 0 8px', textAlign: 'center', color: 'var(--text-caption)' }}
+          >
+            태그를 하나 이상 골라야 리뷰를 보낼 수 있어요
+          </p>
+        ) : null}
+        <button
+          aria-describedby={showSubmitHint ? SUBMIT_HINT_ID : undefined}
+          className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
+          disabled={!canSubmit || submitting || loading || Boolean(errorMessage)}
+          onClick={onSubmit}
+          type="button"
+        >
           {submitting ? '전송 중' : '리뷰 보내기'}
         </button>
       </div>
@@ -299,11 +322,13 @@ function ReviewTargetSections({
   drafts,
   model,
   onToggleTag,
+  onUpdateMetricScore,
   onUpdateRating,
 }: {
   drafts: Record<string, ReviewTargetDraft>;
   model: ReviewSourcePageModel;
   onToggleTag: (key: string, tagCode: string) => void;
+  onUpdateMetricScore: (key: string, metric: 'skill' | 'manner' | 'punctuality' | 'safety', score: number) => void;
   onUpdateRating: (key: string, rating: number) => void;
 }) {
   const teamTargets = model.targets.filter((target) => target.targetType === 'team');
@@ -321,8 +346,9 @@ function ReviewTargetSections({
     return (
       <ReviewTargetCard
         key={key}
-        draft={drafts[key] ?? { rating: target.review?.rating ?? 4, tagCodes: target.review?.tags.map((tag) => tag.tagCode) ?? [] }}
+        draft={drafts[key] ?? { rating: target.review?.rating ?? DEFAULT_REVIEW_RATING, tagCodes: target.review?.tags.map((tag) => tag.tagCode) ?? [] }}
         onToggleTag={(tagCode) => onToggleTag(key, tagCode)}
+        onUpdateMetricScore={(metric, score) => onUpdateMetricScore(key, metric, score)}
         onUpdateRating={(rating) => onUpdateRating(key, rating)}
         target={targetModel}
       />
@@ -383,11 +409,13 @@ function ReviewStats({ stats }: { stats: Array<{ label: string; value: string }>
 function ReviewTargetCard({
   draft,
   onToggleTag,
+  onUpdateMetricScore,
   onUpdateRating,
   target,
 }: {
   draft: ReviewTargetDraft;
   onToggleTag: (tagCode: string) => void;
+  onUpdateMetricScore: (metric: 'skill' | 'manner' | 'punctuality' | 'safety', score: number) => void;
   onUpdateRating: (rating: number) => void;
   target: ReviewTargetViewModel;
 }) {
@@ -413,6 +441,24 @@ function ReviewTargetCard({
           </div>
           {target.lockReasonLabel ? <div className="tm-text-caption" style={{ marginTop: 8 }}>{target.lockReasonLabel}</div> : null}
           <StarRating disabled={locked} rating={draft.rating} onChange={onUpdateRating} />
+          {/* 4항목 채점 -- 사람 대상에만. 이 값이 상대 선수 카드의 실력·매너·시간약속을
+              만들고, 후기 3개로 능력치가·10개로 카드 모양이 열린다(Task 155 해금의 원천).
+              기본값은 종합 별점과 같아 세부를 안 만져도 제출 마찰이 늘지 않는다. */}
+          {target.targetType === 'user' && draft.metricScores ? (
+            <div className="tm-review-metric-rows">
+              {REVIEW_METRIC_FIELDS.map((field) => (
+                <div key={field.key} className="tm-review-metric-row">
+                  <span className="tm-review-metric-label">{field.label}</span>
+                  <StarRating
+                    compact
+                    disabled={locked}
+                    rating={draft.metricScores?.[field.key] ?? draft.rating}
+                    onChange={(score) => onUpdateMetricScore(field.key, score)}
+                  />
+                </div>
+              ))}
+            </div>
+          ) : null}
           <div className="tm-review-chip-row">
             {REVIEW_TAG_OPTIONS.map((tag) => {
               const selected = draft.tagCodes.includes(tag.code);
@@ -437,9 +483,9 @@ function ReviewTargetCard({
   );
 }
 
-function StarRating({ disabled, onChange, rating }: { disabled?: boolean; onChange: (rating: number) => void; rating: number }) {
+function StarRating({ compact, disabled, onChange, rating }: { compact?: boolean; disabled?: boolean; onChange: (rating: number) => void; rating: number }) {
   return (
-    <div className="tm-review-stars" aria-label={`${rating}점`}>
+    <div className="tm-review-stars" data-compact={compact ? 'true' : undefined} aria-label={`${rating}점`}>
       {[1, 2, 3, 4, 5].map((value) => (
         <button
           key={value}

@@ -182,11 +182,11 @@ export function EntityPicker({
     return (
       <div className="flex items-center justify-between h-[44px] px-3 bg-[var(--blue50)] border border-[var(--tint-blue-border)] rounded-xl">
         <div className="flex flex-col min-w-0">
-          <span className="text-[var(--font-size-label)] font-semibold text-[var(--blue700)] truncate">
+          <span className="text-[length:var(--font-size-label)] font-semibold text-[var(--blue700)] truncate">
             {value.label}
           </span>
           {value.description && (
-            <span className="text-[var(--font-size-micro)] text-[var(--blue700)] truncate">{value.description}</span>
+            <span className="text-[length:var(--font-size-micro)] text-[var(--blue700)] truncate">{value.description}</span>
           )}
         </div>
         <button
@@ -213,8 +213,20 @@ export function EntityPicker({
         ref={inputRef}
         type="search"
         value={inputValue}
-        onChange={(e) => setInputValue(e.target.value)}
+        onChange={(e) => {
+          // 타이핑은 항상 "다시 찾고 싶다"는 의도다 — 목록을 연다.
+          // commitEntry/외부 clear가 setInputValue('')로 값을 비우는 경로는 이 DOM 이벤트를
+          // 거치지 않는 프로그램적 상태 갱신이라 여기서 재오픈되지 않는다(의도한 분리).
+          setInputValue(e.target.value);
+          setOpen(true);
+        }}
         onFocus={() => setOpen(true)}
+        onClick={() => {
+          // 선택 직후엔 blur 없이 입력창에 포커스가 남아(메뉴 mousedown preventDefault 때문),
+          // 이미 포커스된 입력을 재클릭해도 onFocus는 새로 안 뜬다. 클릭 자체도 재검색 의도로
+          // 보고 열어준다 — onFocus는 그대로 두고 이 경로를 추가로 연다.
+          setOpen(true);
+        }}
         onBlur={() => {
           commitFreeTextIfNeeded();
           closeMenu();
@@ -246,9 +258,9 @@ export function EntityPicker({
           className="absolute left-0 right-0 top-[48px] bg-[var(--card-surface)] border border-[var(--border)] rounded-xl shadow-md z-20 overflow-hidden max-h-[240px] overflow-y-auto"
         >
           {loading ? (
-            <p className="px-4 py-3 text-[var(--font-size-label)] text-gray-400">검색 중…</p>
+            <p className="px-4 py-3 text-[length:var(--font-size-label)] text-gray-400">검색 중…</p>
           ) : menuEntries.length === 0 ? (
-            <p className="px-4 py-3 text-[var(--font-size-label)] text-gray-400">{emptyText}</p>
+            <p className="px-4 py-3 text-[length:var(--font-size-label)] text-gray-400">{emptyText}</p>
           ) : (
             <div role="listbox" id={`${menuId}-list`} aria-label={`${placeholder} 결과`}>
               {menuEntries.map((entry, idx) => {
@@ -271,7 +283,7 @@ export function EntityPicker({
                         highlighted ? 'bg-[var(--surface-soft)]' : '',
                       ].join(' ')}
                     >
-                      <span className="text-[var(--font-size-label)] font-medium text-[var(--text-muted)]">
+                      <span className="text-[length:var(--font-size-label)] font-medium text-[var(--text-muted)]">
                         {clearLabel}
                       </span>
                     </button>
@@ -303,15 +315,15 @@ export function EntityPicker({
                     ].join(' ')}
                   >
                     <span
-                      className={`text-[var(--font-size-label)] font-semibold ${item.disabled ? 'text-gray-400' : 'text-[var(--text-strong)]'}`}
+                      className={`text-[length:var(--font-size-label)] font-semibold ${item.disabled ? 'text-gray-400' : 'text-[var(--text-strong)]'}`}
                     >
                       {item.label}
                     </span>
                     {item.description && (
-                      <span className="text-[var(--font-size-caption)] text-gray-400">{item.description}</span>
+                      <span className="text-[length:var(--font-size-caption)] text-gray-400">{item.description}</span>
                     )}
                     {item.disabled && item.disabledReason && (
-                      <span className="text-[var(--font-size-caption)] text-gray-400">{item.disabledReason}</span>
+                      <span className="text-[length:var(--font-size-caption)] text-gray-400">{item.disabledReason}</span>
                     )}
                   </button>
                 );

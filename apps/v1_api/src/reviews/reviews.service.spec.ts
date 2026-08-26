@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { ForbiddenException, GoneException } from '@nestjs/common';
 import { ReviewsService } from './reviews.service';
 
 const user = {
@@ -11,10 +11,10 @@ const user = {
 const sourceId = '00000000-0000-4000-8000-000000000010';
 const targetUserId = '00000000-0000-4000-8000-000000000002';
 const submittedAt = new Date('2026-06-02T12:00:00.000Z');
-
-// 후기 작성 기간(기본 7일)이 도입되면서, 고정 과거 날짜를 team_match 앵커로 쓰면 마감을 넘겨버린다
-// — 마감 판정과 무관한 시나리오(멤버십/역할/대상 로직)의 completedAt 픽스처는 "방금 완료"를 뜻하는
-// 이 상대값을 쓴다. 마감 자체를 테스트하는 케이스만 옛 날짜를 그대로 쓴다.
+// team_match 는 completedAt 기준 마감(review-deadline.ts, 기간은 어드민 설정)이 실제 시각(Date.now())으로
+// 판정된다(Task 4). submittedAt 은 하드코딩된 과거 날짜라 이 게이트가 생기면서 저절로 마감을
+// 넘겨버린다 — 마감 판정과 무관한 시나리오(멤버십/역할/대상 로직)의 팀매치 completedAt 픽스처는
+// 별도로 "방금 완료"를 뜻하는 이 상대값을 쓴다. 마감 자체를 테스트하는 케이스만 옛 날짜를 그대로 쓴다.
 const teamMatchCompletedAt = new Date(Date.now() - 60 * 60 * 1000);
 
 const teamSourceId = '00000000-0000-4000-8000-000000000030';
@@ -57,42 +57,6 @@ describe('ReviewsService', () => {
     expect(tournamentFixtureReviews.pending).toHaveBeenCalledWith(user, 20, tournamentId);
   });
 
-  // 한 경기에서 여러 명에게 쓴 리뷰는 sourceId 가 같다. 대상자를 안 실으면 "작성된 리뷰" 목록에서
-  // 행이 서로 구분되지 않아 누구에게 쓴 건지 알 수 없다(targetUser 는 이미 조인돼 있었는데 버려졌다).
-  it('작성된 리뷰 목록에 대상자를 함께 싣는다', async () => {
-    const prisma = {
-      v1PostEventReview: {
-        findMany: jest.fn().mockResolvedValue([
-          {
-            id: 'review-1',
-            sourceType: 'team_match',
-            sourceId,
-            targetType: 'user',
-            submittedAt,
-            reviewerTeam: null,
-            targetTeam: null,
-            targetUser: { id: targetUserId, profile: { nickname: '상대선수' } },
-          },
-        ]),
-      },
-      v1TeamMatch: { findMany: jest.fn().mockResolvedValue([]) },
-      v1Match: { findMany: jest.fn().mockResolvedValue([]) },
-    };
-    const tournamentFixtureReviews = {
-      pending: jest.fn(),
-      source: jest.fn(),
-      submit: jest.fn(),
-      sourceSummaries: jest.fn().mockResolvedValue([]),
-    };
-    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub(), reviewPolicyStub());
-
-    const result = await service.list(user, { tab: 'written', limit: 20 });
-
-    // list() 반환 타입이 경로별 union 이라 written 항목만 좁혀서 본다.
-    const [item] = result.items as Array<{ targetUser?: { userId: string; nickname: string } | null }>;
-    expect(item.targetUser).toEqual({ userId: targetUserId, nickname: '상대선수' });
-  });
-
   it('returns an idempotent duplicate response when personal review create hits the unique constraint', async () => {
     const existingReview = {
       id: 'review-1',
@@ -114,7 +78,7 @@ describe('ReviewsService', () => {
           id: sourceId,
           title: '성수 풋살파크 개인 매치',
           status: 'completed',
-          completedAt: teamMatchCompletedAt,
+          completedAt: submittedAt,
           startAt: submittedAt,
           participants: [
             { userId: user.id, user: { id: user.id, profile: { nickname: '송준', profileImageUrl: null } } },
@@ -182,7 +146,7 @@ describe('ReviewsService', () => {
           id: sourceId,
           title: '성수 풋살파크 개인 매치',
           status: 'completed',
-          completedAt: teamMatchCompletedAt,
+          completedAt: submittedAt,
           startAt: submittedAt,
           sportId: 'sport-futsal',
           participants: [
@@ -197,6 +161,10 @@ describe('ReviewsService', () => {
       $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback({
         v1PostEventReview: {
           create: createMock,
+          findMany: jest.fn().mockResolvedValue([]),
+        },
+        // 4항목 채점 집계(Task 155 후속)가 tx 에서 함께 읽는다 -- 스키마-mock 드리프트 방지.
+        v1PostEventReviewMetricScore: {
           findMany: jest.fn().mockResolvedValue([]),
         },
         v1UserReputationSummary: {
@@ -226,6 +194,118 @@ describe('ReviewsService', () => {
     );
   });
 
+  it('match 소스는 마감 없이 무기한 제출 가능하다(D-12, 완료 플로우 부재)', async () => {
+    // V1Match.completedAt 을 채우는 write 경로가 이 저장소에 없다(스펙 §1.2.2) — 앵커가 항상
+    // 비어 있으므로 match 소스에는 review-deadline.ts 를 아예 호출하지 않는다. 100일 전 완료로
+    // 세팅해도(=team_match 였다면 진작 마감) 제출이 막히지 않는지를 회귀로 고정한다.
+    const veryOldCompletedAt = new Date('2020-01-01T00:00:00.000Z');
+    const createMock = jest.fn().mockResolvedValue({
+      id: 'review-unlimited',
+      sourceType: 'match',
+      sourceId,
+      targetType: 'user',
+      targetUser: { id: targetUserId, profile: { nickname: '민준', profileImageUrl: null } },
+      targetTeam: null,
+      reviewerUser: { id: user.id, profile: { nickname: '송준', profileImageUrl: null } },
+      reviewerTeam: null,
+      rating: 5,
+      sportId: 'sport-futsal',
+      tags: [],
+      status: 'submitted',
+      submittedAt,
+    });
+    const prisma = {
+      v1Match: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: sourceId,
+          title: '성수 풋살파크 개인 매치',
+          status: 'completed',
+          completedAt: veryOldCompletedAt,
+          startAt: veryOldCompletedAt,
+          sportId: 'sport-futsal',
+          participants: [
+            { userId: user.id, user: { id: user.id, profile: { nickname: '송준', profileImageUrl: null } } },
+            { userId: targetUserId, user: { id: targetUserId, profile: { nickname: '민준', profileImageUrl: null } } },
+          ],
+        }),
+      },
+      v1PostEventReview: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback({
+        v1PostEventReview: {
+          create: createMock,
+          findMany: jest.fn().mockResolvedValue([]),
+        },
+        // 4항목 채점 집계(Task 155 후속)가 tx 에서 함께 읽는다 -- 스키마-mock 드리프트 방지.
+        v1PostEventReviewMetricScore: {
+          findMany: jest.fn().mockResolvedValue([]),
+        },
+        v1UserReputationSummary: {
+          upsert: jest.fn().mockResolvedValue({}),
+        },
+      })),
+    };
+    const tournamentFixtureReviews = {
+      pending: jest.fn(),
+      source: jest.fn(),
+      submit: jest.fn(),
+      sourceSummaries: jest.fn(),
+    };
+    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub(), reviewPolicyStub());
+
+    await expect(service.submit(user, {
+      sourceType: 'match',
+      sourceId,
+      targetType: 'user',
+      targetUserId,
+      rating: 5,
+      tagCodes: ['manner'],
+    })).resolves.toMatchObject({ alreadySubmitted: false });
+    expect(createMock).toHaveBeenCalled();
+  });
+
+  it('team_match: completedAt(앵커) 기준 설정된 기간을 넘기면 REVIEW_WINDOW_CLOSED(410)로 막는다', async () => {
+    // completedAt 은 games.service.ts 결과 확정 시 채워진다(스펙 §6.1) — team_match 는 이 값이
+    // 앵커라 기간이 지나면 teamMatchSourceContext() 진입 즉시(다른 조회 전에) 막혀야 한다.
+    const closedCompletedAt = new Date('2020-01-01T00:00:00.000Z');
+    const prisma = {
+      v1TeamMatch: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: teamSourceId,
+          title: '성수 풋살파크 팀 매치',
+          status: 'completed',
+          completedAt: closedCompletedAt,
+          startAt: closedCompletedAt,
+          sportId: 'sport-futsal',
+          hostTeamId,
+          approvedApplicantTeamId: awayTeamId,
+          hostTeam: { id: hostTeamId, name: '홈팀', profile: { logoUrl: null } },
+          approvedApplicantTeam: { id: awayTeamId, name: '원정팀', profile: { logoUrl: null } },
+        }),
+      },
+    };
+    const tournamentFixtureReviews = {
+      pending: jest.fn(),
+      source: jest.fn(),
+      submit: jest.fn(),
+      sourceSummaries: jest.fn(),
+    };
+    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub(), reviewPolicyStub());
+
+    // catch 결과는 성공 반환형과의 유니온이라 getStatus() 를 직접 부르면 컴파일되지 않는다
+    // (CI 타입체크 실패로 확인). GoneException 자체가 410 을 뜻하므로 인스턴스 검사로
+    // 상태코드까지 함께 고정한다 -- tournament-fixture-reviews.service.spec.ts 와 같은 방식.
+    const error = await service
+      .source(user, { sourceType: 'team_match', sourceId: teamSourceId })
+      .catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(GoneException);
+    expect(error).toMatchObject({ response: { code: 'REVIEW_WINDOW_CLOSED' } });
+    // 마감 판정이 다른 조회보다 먼저 걸려야 한다 — 멤버십·라인업까지 안 갔다는 뜻.
+    expect(prisma.v1TeamMatch.findUnique).toHaveBeenCalledTimes(1);
+  });
+
   it('submitTeamReview: 리뷰 생성 시 팀 매치의 sportId를 스냅샷으로 저장한다', async () => {
     const createMock = jest.fn().mockResolvedValue({
       id: 'review-3',
@@ -249,7 +329,7 @@ describe('ReviewsService', () => {
           title: '성수 풋살파크 팀 매치',
           status: 'completed',
           completedAt: teamMatchCompletedAt,
-          startAt: submittedAt,
+          startAt: teamMatchCompletedAt,
           sportId: 'sport-futsal',
           hostTeamId,
           approvedApplicantTeamId: awayTeamId,
@@ -415,6 +495,7 @@ describe('ReviewsService', () => {
         const upsertMock = jest.fn().mockResolvedValue({});
         const prisma = {
           v1PostEventReview: { findMany: findManyMock },
+          v1PostEventReviewMetricScore: { findMany: jest.fn().mockResolvedValue([]) },
           v1UserReputationSummary: { upsert: upsertMock },
         };
         const tournamentFixtureReviews = { pending: jest.fn(), source: jest.fn(), submit: jest.fn(), sourceSummaries: jest.fn() };
@@ -1123,12 +1204,14 @@ describe('ReviewsService — 어드민 후기 숨김', () => {
         findMany: jest.fn().mockResolvedValue([]),
         update,
       },
+      v1PostEventReviewMetricScore: { findMany: jest.fn().mockResolvedValue([]) },
       v1UserReputationSummary: { upsert },
       v1TeamTrustScore: { upsert },
       v1TeamMatch: { count: jest.fn().mockResolvedValue(0) },
       $transaction: jest.fn(async (cb: (tx: unknown) => Promise<unknown>) => cb({
         v1PostEventReview: { update, findMany: jest.fn().mockResolvedValue([]) },
-        v1UserReputationSummary: { upsert },
+        v1PostEventReviewMetricScore: { findMany: jest.fn().mockResolvedValue([]) },
+      v1UserReputationSummary: { upsert },
         v1TeamTrustScore: { upsert },
         v1TeamMatch: { count: jest.fn().mockResolvedValue(0) },
       })),
@@ -1267,7 +1350,7 @@ function teamMatchWorld(
     title: '성수 풋살파크 팀 매치',
     status: 'completed',
     completedAt: teamMatchCompletedAt,
-    startAt: submittedAt,
+    startAt: teamMatchCompletedAt,
     sportId: 'sport-futsal',
     hostTeamId,
     approvedApplicantTeamId: awayTeamId,
@@ -1357,6 +1440,7 @@ function teamMatchWorld(
       v1TeamMatch: { count: jest.fn().mockResolvedValue(1) },
       v1TeamTrustScore: { upsert: teamTrustUpsert },
       // 선수 후기 경로는 팀 신뢰점수가 아니라 개인 평판을 갱신한다.
+      v1PostEventReviewMetricScore: { findMany: jest.fn().mockResolvedValue([]) },
       v1UserReputationSummary: { upsert: userReputationUpsert },
     })),
   };
@@ -1414,7 +1498,7 @@ describe('ReviewsService — 양 팀 겸직 후기', () => {
           title: '홈팀 vs 원정팀',
           status: 'completed',
           completedAt: teamMatchCompletedAt,
-          startAt: submittedAt,
+          startAt: teamMatchCompletedAt,
           sportId: 'sport-futsal',
           hostTeamId,
           approvedApplicantTeamId: awayTeamId,
@@ -1521,5 +1605,87 @@ describe('ReviewsService — 양 팀 겸직 후기', () => {
         expect.objectContaining({ targetTeamId: hostTeamId, reviewerTeam: expect.objectContaining({ teamId: awayTeamId }) }),
       ]),
     );
+  });
+});
+
+/**
+ * 오너 요청(2026-08-18) — 팀 상세에서 **그 팀이 받은 후기**를 누구나 보게 한다. 기존
+ * `receivedSummary` 는 "로그인한 나"가 받은 것이라 남의 팀 상세에 쓰면 내 후기를 그 팀
+ * 평가인 양 보여준다. 공개 경로는 팀 id 로 직접 집계하되, **공개 게이트는 동일**해야 한다 —
+ * 이 경로만 느슨하면 아직 공개되면 안 되는 상호평가가 새어 나가는 구멍이 된다.
+ */
+describe('publicTeamSummary — 공개 팀 후기 요약', () => {
+  function stubs() {
+    return {
+      tournamentFixtureReviews: { pending: jest.fn(), source: jest.fn(), submit: jest.fn(), sourceSummaries: jest.fn() },
+    };
+  }
+
+  it('그 팀이 받은 후기만 집계하고, 로그인 사용자의 팀 목록을 조회하지 않는다', async () => {
+    const submittedAt = new Date('2026-08-01T00:00:00Z');
+    jest.useFakeTimers().setSystemTime(new Date('2026-08-01T01:00:00Z'));
+    try {
+      const findMany = jest
+        .fn()
+        .mockResolvedValueOnce([
+          { sourceId: 'tm1', reviewerUserId: 'user-p', reviewerTeamId: 'team-a', targetUserId: null, targetTeamId: 'team-x', rating: 4, sportId: 'futsal', submittedAt, tags: [] },
+        ])
+        .mockResolvedValueOnce([{ sourceId: 'tm1', reviewerTeamId: 'team-x', targetTeamId: 'team-a' }]);
+      const membershipFindMany = jest.fn();
+      const prisma = {
+        v1PostEventReview: { findMany },
+        // 공개 경로는 "내가 속한 팀"을 물을 필요가 없다 — 물었다면 로그인 의존이 남아 있다는 뜻이다.
+        v1TeamMembership: { findMany: membershipFindMany },
+        v1Sport: { findMany: jest.fn().mockResolvedValue([{ id: 'futsal', code: 'futsal' }]) },
+      };
+      const service = new ReviewsService(
+        prisma as never,
+        stubs().tournamentFixtureReviews as never,
+        adminContextStub(),
+        reviewPolicyStub(),
+      );
+
+      const result = await service.publicTeamSummary('team-x');
+
+      expect(membershipFindMany).not.toHaveBeenCalled();
+      // 대상 필터가 팀 id 로 직접 걸려야 한다.
+      expect(findMany.mock.calls[0][0].where).toMatchObject({ targetTeamId: 'team-x', targetType: 'team' });
+      expect(result.bySport).toEqual([
+        { sportId: 'futsal', sportCode: 'futsal', ratingAvg: 4, ratingCount: 1, tagRates: [] },
+      ]);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('상대가 아직 안 썼고 유예 시간도 안 지난 후기는 공개 경로에서도 빠진다', async () => {
+    const submittedAt = new Date('2026-08-01T00:00:00Z');
+    jest.useFakeTimers().setSystemTime(new Date('2026-08-01T01:00:00Z')); // 유예 시간 미경과
+    try {
+      const findMany = jest
+        .fn()
+        .mockResolvedValueOnce([
+          { sourceId: 'tm1', reviewerUserId: 'user-p', reviewerTeamId: 'team-a', targetUserId: null, targetTeamId: 'team-x', rating: 5, sportId: 'futsal', submittedAt, tags: [] },
+        ])
+        // 반대 방향 후기 없음 → 아직 공개 시점이 아니다
+        .mockResolvedValueOnce([]);
+      const prisma = {
+        v1PostEventReview: { findMany },
+        v1TeamMembership: { findMany: jest.fn() },
+        v1Sport: { findMany: jest.fn().mockResolvedValue([]) },
+      };
+      const service = new ReviewsService(
+        prisma as never,
+        stubs().tournamentFixtureReviews as never,
+        adminContextStub(),
+        reviewPolicyStub(),
+      );
+
+      const result = await service.publicTeamSummary('team-x');
+
+      expect(result.bySport).toEqual([]);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

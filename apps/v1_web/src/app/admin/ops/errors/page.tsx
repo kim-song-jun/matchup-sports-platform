@@ -1,17 +1,9 @@
-'use client';
+import { redirect } from 'next/navigation';
 
-import { AdminPageHeader } from '@/components/admin';
-import { ErrorLogsClient } from './error-logs-client';
-
-export default function AdminErrorLogsPage() {
-  return (
-    <>
-      <AdminPageHeader
-        eyebrow="운영 도구"
-        title="에러 로그"
-        description="서버·클라이언트 에러를 모아 원인 파악에 필요한 정보를 한 화면에서 확인해요."
-      />
-      <ErrorLogsClient />
-    </>
-  );
+/**
+ * 모니터링 허브 통합(2026-08-25)으로 본문이 /admin/monitoring 의 탭으로 이동했다.
+ * 북마크·감사 로그·공유된 딥링크가 죽지 않도록 구 URL 은 리다이렉트로 보존한다.
+ */
+export default function AdminErrorLogsRedirect() {
+  redirect('/admin/monitoring');
 }

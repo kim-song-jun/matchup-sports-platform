@@ -128,9 +128,9 @@
     right: auto;
     bottom: auto;
     width: min(100%, 440px);
-    border-radius: 16px;
+    border-radius: var(--radius-container);
     border-top: none;
-    box-shadow: var(--shadow-2);
+    box-shadow: var(--shadow-dropdown);
     animation: tm-filter-sheet-scale-in 0.2s ease-out;
   }
 
@@ -212,7 +212,7 @@
   .tm-desktop-nav-brand:focus-visible {
     outline: 2px solid var(--blue500);
     outline-offset: 2px;
-    border-radius: 4px;
+    border-radius: var(--radius-tight);
   }
 
   /* Primary tab group — text-only desktop nav (no per-tab icons) */
@@ -264,13 +264,13 @@
     bottom: 0;
     height: 2.5px;
     background: var(--blue500);
-    border-radius: 2px 2px 0 0;
+    border-radius: var(--radius-pill) var(--radius-pill) 0 0;
   }
 
   .tm-desktop-nav-tab:focus-visible {
     outline: 2px solid var(--blue500);
     outline-offset: -2px;
-    border-radius: 6px;
+    border-radius: var(--radius-chip);
   }
 
   /* Right-side actions */
@@ -288,7 +288,7 @@
     justify-content: center;
     width: 44px;
     height: 44px;
-    border-radius: 8px;
+    border-radius: var(--radius-chip);
     color: var(--grey700);
     text-decoration: none;
     position: relative;
@@ -303,7 +303,7 @@
   .tm-desktop-nav-action:focus-visible {
     outline: 2px solid var(--blue500);
     outline-offset: 2px;
-    border-radius: 8px;
+    border-radius: var(--radius-chip);
   }
 
   /* Unread notification count badge on the bell icon (numeric pill) */
@@ -318,7 +318,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     background: var(--red500);
     color: var(--static-white);
     border: 2px solid var(--bg);
@@ -336,7 +336,7 @@
     right: 3px;
     width: 7px;
     height: 7px;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     background: var(--red500);
     border: 2px solid var(--bg);
   }
@@ -348,8 +348,8 @@
     justify-content: center;
     width: 36px;
     height: 36px;
-    margin-left: 6px;
-    border-radius: 50%;
+    margin-left: 8px;
+    border-radius: var(--radius-circle);
     background: var(--grey100);
     color: var(--grey700);
     text-decoration: none;
@@ -407,7 +407,7 @@
      * flex-baseline mismatch. Center avoids the whole computation and reads
      * correctly for an icon+wordmark+tagline row. */
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     min-width: 0;
   }
 
@@ -450,7 +450,7 @@
   .tm-desktop-footer-links a:focus-visible {
     outline: 2px solid var(--blue500);
     outline-offset: 2px;
-    border-radius: 4px;
+    border-radius: var(--radius-tight);
   }
 
   .tm-desktop-footer-copy {
@@ -470,11 +470,11 @@
     bottom: 28px;
     width: 44px;
     height: 44px;
-    border-radius: 50%;
+    border-radius: var(--radius-circle);
     background: var(--bg);
     color: var(--grey700);
     border: 1px solid var(--grey200);
-    box-shadow: var(--shadow-2);
+    box-shadow: var(--shadow-dropdown);
     cursor: pointer;
     opacity: 0;
     transform: translateY(8px) rotate(90deg);
@@ -528,8 +528,8 @@
     overflow: visible;
     position: static;
     margin: 0 auto;
-    border-radius: 16px;
-    box-shadow: var(--shadow-2);
+    border-radius: var(--radius-container);
+    box-shadow: var(--shadow-dropdown);
     background: var(--bg);
     align-self: center;
   }
@@ -590,8 +590,8 @@
   .tm-desktop-page-head {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 28px 0 18px;
+    gap: 12px;
+    padding: 28px 0 20px;
   }
   .tm-desktop-page-head .tm-desktop-back {
     display: inline-flex;
@@ -599,7 +599,7 @@
     justify-content: center;
     width: 40px;
     height: 40px;
-    border-radius: 10px;
+    border-radius: var(--radius-control);
     color: var(--grey700);
     flex-shrink: 0;
     text-decoration: none;

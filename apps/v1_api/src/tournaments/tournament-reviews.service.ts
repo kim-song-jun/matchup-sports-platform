@@ -7,6 +7,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService } from '../common/admin-context.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { ArrayMaxSize, IsArray, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -75,6 +76,9 @@ export class TournamentAwardItemDto {
   @IsString()
   recipientName!: string;
 
+  @IsUUID()
+  recipientUserId!: string;
+
   @IsOptional()
   @IsString()
   teamName?: string;
@@ -112,6 +116,7 @@ export class TournamentReviewsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly adminContext: AdminContextService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   private buildReviewWhere(
@@ -493,6 +498,7 @@ export class TournamentReviewsService {
       awardLabel: a.awardLabel,
       iconKey: a.iconKey ?? null,
       recipientName: a.recipientName,
+      recipientUserId: a.recipientUserId,
       teamName: a.teamName ?? null,
       note: a.note ?? null,
     }));
@@ -519,58 +525,63 @@ export class TournamentReviewsService {
     }
 
     // 검증과 저장이 같은 값을 쓰도록 선(先)정규화 — 공백 섞인 입력이 그대로 저장되는 것을 방지.
-    const awards = dto.awards.map((a) => ({
+    const submittedAwards = dto.awards.map((a) => ({
       ...a,
       recipientName: a.recipientName.trim(),
       teamName: a.teamName?.trim() || null,
     }));
 
-    // 로스터 전용 강제 — 수상자는 해당 대회 확정(confirmed) 등록 팀 명단의 선수여야 하고,
-    // 팀명이 지정된 경우 확정 등록 팀명과 일치해야 한다 (자유 입력 차단).
-    if (awards.length > 0) {
+    // 로스터 전용 강제 — 이름만 비교하면 동명이인을 잘못 연결할 수 있으므로 계정 ID,
+    // 이름 스냅샷, 팀을 같은 confirmed 등록 행에서 교차 검증한다.
+    let awards: Array<TournamentAwardItemDto & { teamName: string }> = [];
+    if (submittedAwards.length > 0) {
       const registrations = await this.prisma.v1TournamentRegistration.findMany({
         where: { tournamentId, status: 'confirmed' },
         select: {
           team: { select: { name: true } },
-          players: { where: { removedAt: null }, select: { realName: true } },
+          players: { where: { removedAt: null }, select: { userId: true, realName: true } },
         },
       });
-      const rosterNames = new Set(
-        registrations.flatMap((r) => r.players.map((p) => p.realName.trim())),
-      );
-      // 팀명 → 그 팀의 선수 집합 (팀명 지정 시 수상자-팀 소속 교차 검증용)
-      const teamRosters = new Map<string, Set<string>>();
-      for (const r of registrations) {
-        const teamName = r.team.name.trim();
-        const roster = teamRosters.get(teamName) ?? new Set<string>();
-        for (const p of r.players) roster.add(p.realName.trim());
-        teamRosters.set(teamName, roster);
-      }
+      const roster = registrations.flatMap((registration) => {
+        const teamName = registration.team.name.trim();
+        return registration.players.map((player) => ({
+          userId: player.userId,
+          realName: player.realName.trim(),
+          teamName,
+        }));
+      });
 
-      for (const a of awards) {
-        if (!rosterNames.has(a.recipientName)) {
+      awards = submittedAwards.map((award) => {
+        const candidates = roster.filter(
+          (player) =>
+            player.userId === award.recipientUserId &&
+            (award.teamName === null || player.teamName === award.teamName),
+        );
+        const recipient = candidates.length === 1 ? candidates[0] : null;
+        if (recipient === null || recipient.realName !== award.recipientName) {
           throw new BadRequestException({
             code: 'AWARD_RECIPIENT_NOT_IN_ROSTER',
-            message: `'${a.recipientName}'은(는) 대회 참가 명단에 없어요. 명단에서 수상자를 선택해 주세요.`,
+            message: `'${award.recipientName}' 수상자를 해당 대회 확정 명단에서 확인할 수 없어요. 명단에서 다시 선택해 주세요.`,
           });
         }
-        if (a.teamName) {
-          const teamRoster = teamRosters.get(a.teamName);
-          if (!teamRoster) {
-            throw new BadRequestException({
-              code: 'AWARD_RECIPIENT_NOT_IN_ROSTER',
-              message: `'${a.teamName}'은(는) 대회에 참가 확정된 팀이 아니에요. 참가 팀에서 선택해 주세요.`,
-            });
-          }
-          if (!teamRoster.has(a.recipientName)) {
-            throw new BadRequestException({
-              code: 'AWARD_RECIPIENT_NOT_IN_ROSTER',
-              message: `'${a.recipientName}'은(는) '${a.teamName}' 팀 명단에 없어요. 수상자와 팀을 다시 확인해 주세요.`,
-            });
-          }
-        }
-      }
+        return {
+          ...award,
+          recipientName: recipient.realName,
+          recipientUserId: recipient.userId,
+          teamName: recipient.teamName,
+        };
+      });
     }
+
+    /**
+     * 이번 저장으로 **새로 수상한 사람**만 담는다. 알림 발송 대상이다.
+     *
+     * `setAwards` 는 전체 교체(deleteMany + 재생성)라, 저장할 때마다 전원에게 보내면
+     * 어드민이 오타 하나 고칠 때도 같은 사람에게 축하 알림이 다시 간다. 감사 로그용으로
+     * 이미 뜨는 `before` 스냅샷을 그대로 재사용해 (수상항목, 수상자) 쌍이 새로 생긴
+     * 경우만 고른다 — 같은 사람이 다른 상을 새로 받은 것도 새 수상으로 친다.
+     */
+    const newlyAwarded: Array<{ userId: string; awardLabel: string }> = [];
 
     // 스냅샷 → 전체 교체 → 감사 기록을 한 트랜잭션에서 원자적으로 수행
     // (감사 로그 실패 시 데이터 변경도 함께 롤백, before/after drift 방지 — 타 admin mutation과 동일 패턴)
@@ -579,6 +590,20 @@ export class TournamentReviewsService {
         where: { tournamentId },
         orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
       });
+
+      // 키는 JSON 배열로 만든다 — awardType 이 자유 문자열이라 구분자를 문자로 고르면
+      // 그 문자가 값에 섞였을 때 서로 다른 쌍이 같은 키로 뭉개진다.
+      const pairKey = (awardType: string, userId: string) => JSON.stringify([awardType, userId]);
+      const previousPairs = new Set(
+        before
+          .filter((a) => a.recipientUserId !== null)
+          .map((a) => pairKey(a.awardType, a.recipientUserId as string)),
+      );
+      for (const a of awards) {
+        if (a.recipientUserId === null || a.recipientUserId === undefined) continue;
+        if (previousPairs.has(pairKey(a.awardType, a.recipientUserId))) continue;
+        newlyAwarded.push({ userId: a.recipientUserId, awardLabel: a.awardLabel });
+      }
 
       await tx.v1TournamentAward.deleteMany({ where: { tournamentId } });
       for (const [idx, a] of awards.entries()) {
@@ -589,6 +614,7 @@ export class TournamentReviewsService {
             awardLabel: a.awardLabel,
             iconKey: a.iconKey ?? null,
             recipientName: a.recipientName,
+            recipientUserId: a.recipientUserId,
             teamName: a.teamName,
             note: a.note ?? null,
             sortOrder: a.sortOrder ?? idx,
@@ -607,6 +633,7 @@ export class TournamentReviewsService {
               awardLabel: a.awardLabel,
               iconKey: a.iconKey ?? null,
               recipientName: a.recipientName,
+              recipientUserId: a.recipientUserId,
               teamName: a.teamName ?? null,
             })),
           },
@@ -615,6 +642,7 @@ export class TournamentReviewsService {
               awardLabel: a.awardLabel,
               iconKey: a.iconKey ?? null,
               recipientName: a.recipientName,
+              recipientUserId: a.recipientUserId,
               teamName: a.teamName,
             })),
           },
@@ -622,6 +650,23 @@ export class TournamentReviewsService {
         tx,
       );
     });
+
+    /**
+     * 알림은 **트랜잭션 밖**에서 보낸다. 발송은 fire-and-forget 이고 외부(web-push)로
+     * 나가므로, 트랜잭션 안에 두면 알림 실패가 수상 저장을 롤백시킬 수 있다 —
+     * 이 저장소의 다른 알림 호출부(tournaments-admin.service.ts)도 같은 위치다.
+     *
+     * 사람마다 받은 상이 다르므로 emitNotificationToMany 로 뭉뚱그리지 않고 개별
+     * 발송한다 — 본문에 상 이름을 담아야 "무엇을 받았는지"가 알림만 보고 전해진다.
+     */
+    for (const recipient of newlyAwarded) {
+      await this.notifications.emitNotification(
+        recipient.userId,
+        'tournament_award_received',
+        tournamentId,
+        `${tournament.title} — '${recipient.awardLabel}' 수상자로 선정됐어요.`,
+      );
+    }
 
     return this.listAwardsInternal(tournamentId);
   }

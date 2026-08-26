@@ -229,7 +229,7 @@ export function GrantStaffModal({
         className="bg-[var(--card-surface)] rounded-2xl shadow-[0_8px_32px_rgba(20,28,45,0.14)] w-full max-w-[440px] max-h-[calc(100dvh-32px)] flex flex-col overflow-hidden"
       >
         <div className="shrink-0 flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
-          <h2 id="grant-staff-modal-title" className="text-[16px] font-bold text-[var(--text-strong)]">
+          <h2 id="grant-staff-modal-title" className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">
             스태프 배정
           </h2>
           <button
@@ -250,7 +250,7 @@ export function GrantStaffModal({
                 들어갈 수 없으므로 사실상 배정할 방법이 없었다(2026-08-13 사용자 제보).
                 닉네임으로 찾아 고르는 방식으로 바꾼다. */}
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="grant-staff-user-search" className="text-[13px] font-semibold text-[var(--text-body)]">
+              <label htmlFor="grant-staff-user-search" className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">
                 배정할 사람 <span className="text-[var(--red700)]" aria-hidden="true">*</span>
                 <span className="sr-only">(필수)</span>
               </label>
@@ -262,7 +262,7 @@ export function GrantStaffModal({
                       {candidateLabel(selected)}
                     </span>
                     {selected.maskedEmail !== null && (
-                      <span className="text-[12px] text-[var(--text-muted)] truncate">{selected.maskedEmail}</span>
+                      <span className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] truncate">{selected.maskedEmail}</span>
                     )}
                   </div>
                   <button
@@ -277,7 +277,7 @@ export function GrantStaffModal({
                       setDebouncedQuery('');
                     }}
                     disabled={pending}
-                    className="shrink-0 h-[44px] px-3 text-[13px] font-semibold text-[var(--text-muted)] rounded-lg hover:bg-gray-200 dark:hover:bg-white/20 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+                    className="shrink-0 h-[44px] px-3 text-[length:var(--font-size-label)] font-semibold text-[var(--text-muted)] rounded-lg hover:bg-gray-200 dark:hover:bg-white/20 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
                   >
                     다시 고르기
                   </button>
@@ -318,13 +318,13 @@ export function GrantStaffModal({
                   {trimmedQuery.length >= MIN_QUERY_LENGTH && (
                     <div className="border border-[var(--border)] rounded-xl overflow-hidden">
                       {search.isError ? (
-                        <p className="px-3 py-3 text-[13px] text-[var(--red700)]">
+                        <p className="px-3 py-3 text-[length:var(--font-size-label)] text-[var(--red700)]">
                           검색하지 못했어요. 잠시 후 다시 시도해 주세요.
                         </p>
                       ) : !searchSettled ? (
-                        <p className="px-3 py-3 text-[13px] text-[var(--text-muted)]">검색 중이에요…</p>
+                        <p className="px-3 py-3 text-[length:var(--font-size-label)] text-[var(--text-muted)]">검색 중이에요…</p>
                       ) : candidates.length === 0 ? (
-                        <p className="px-3 py-3 text-[13px] text-[var(--text-muted)]">
+                        <p className="px-3 py-3 text-[length:var(--font-size-label)] text-[var(--text-muted)]">
                           검색 결과가 없어요. 닉네임을 정확히 입력했는지 확인해 주세요.
                         </p>
                       ) : (
@@ -344,7 +344,7 @@ export function GrantStaffModal({
                                   {candidateLabel(candidate)}
                                 </span>
                                 {candidate.maskedEmail !== null && (
-                                  <span className="text-[12px] text-[var(--text-muted)] truncate max-w-full">
+                                  <span className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] truncate max-w-full">
                                     {candidate.maskedEmail}
                                   </span>
                                 )}
@@ -356,7 +356,7 @@ export function GrantStaffModal({
                     </div>
                   )}
 
-                  <p id="grant-staff-user-search-help" className="text-[12px] text-[var(--text-muted)]">
+                  <p id="grant-staff-user-search-help" className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
                     닉네임 {MIN_QUERY_LENGTH}글자 이상으로 찾을 수 있어요. 이메일은 전체를 정확히 입력해야 찾아져요.
                   </p>
                 </>
@@ -364,7 +364,7 @@ export function GrantStaffModal({
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="grant-staff-role" className="text-[13px] font-semibold text-[var(--text-body)]">
+              <label htmlFor="grant-staff-role" className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">
                 역할
               </label>
               <select
@@ -384,7 +384,7 @@ export function GrantStaffModal({
 
             {requiresField && (
               <div className="flex flex-col gap-1.5">
-                <label htmlFor="grant-staff-field" className="text-[13px] font-semibold text-[var(--text-body)]">
+                <label htmlFor="grant-staff-field" className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">
                   담당 필드 <span className="text-[var(--red700)]" aria-hidden="true">*</span>
                   <span className="sr-only">(필수)</span>
                 </label>
@@ -406,7 +406,7 @@ export function GrantStaffModal({
                 </select>
                 {/* 등록된 필드가 하나도 없으면 이 select 는 영영 비어 있고 제출 버튼도 계속 잠긴다.
                     잠긴 이유와 다음 행동을 적지 않으면 운영자는 "필드"가 뭔지도 모른 채 막힌다(#373). */}
-                <p id="grant-staff-field-help" className="text-[12px] text-[var(--text-muted)]">
+                <p id="grant-staff-field-help" className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
                   {fields.length === 0
                     ? '필드는 경기가 열리는 코트·구장이에요. 스태프 화면 위쪽 “경기장(필드)”에서 먼저 등록해 주세요.'
                     : '이 담당자가 맡을 코트·구장이에요. 배정하면 그 경기장의 경기만 담당해요.'}
@@ -415,7 +415,7 @@ export function GrantStaffModal({
             )}
 
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="grant-staff-expires" className="text-[13px] font-semibold text-[var(--text-body)]">
+              <label htmlFor="grant-staff-expires" className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">
                 만료 시각 (선택)
               </label>
               <input
@@ -430,20 +430,20 @@ export function GrantStaffModal({
 
             {/* 배정 후 그 사람이 어디로 들어가는지 — 배정만 하고 "이제 뭘 하라고 전해야
                 하는지"를 모르면 배정이 끝나도 현장은 그대로 막힌다. */}
-            <p className="text-[12px] text-[var(--text-muted)] leading-relaxed bg-[var(--surface-soft)] rounded-xl px-3 py-2">
+            <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] leading-relaxed bg-[var(--surface-soft)] rounded-xl px-3 py-2">
               {requiresField
                 ? '배정하면 그분은 마이페이지 → “대회 운영을 맡고 있어요”에서 담당 경기 기록 화면으로 바로 들어갈 수 있어요.'
                 : '배정하면 그분은 마이페이지 → “대회 운영을 맡고 있어요”에서 이 대회 운영 보드로 들어갈 수 있어요.'}
             </p>
 
             {submitAttempted && validationError !== null && (
-              <p className="text-[13px] text-[var(--red700)]" role="alert">
+              <p className="text-[length:var(--font-size-label)] text-[var(--red700)]" role="alert">
                 {validationError}
               </p>
             )}
 
             {errorMessage && (
-              <p className="text-[13px] text-[var(--red700)]" role="alert">
+              <p className="text-[length:var(--font-size-label)] text-[var(--red700)]" role="alert">
                 {errorMessage}
               </p>
             )}
@@ -454,7 +454,7 @@ export function GrantStaffModal({
               type="button"
               onClick={() => !pending && onClose()}
               disabled={pending}
-              className="flex-1 h-[48px] rounded-xl text-[15px] font-semibold text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-gray-200 dark:hover:bg-white/20 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+              className="flex-1 h-[48px] rounded-xl text-[length:var(--font-size-body)] font-semibold text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-gray-200 dark:hover:bg-white/20 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
             >
               취소
             </button>
@@ -462,7 +462,7 @@ export function GrantStaffModal({
               type="submit"
               disabled={!canSubmit}
               className={[
-                'flex-1 h-[48px] rounded-xl text-[15px] font-semibold transition-colors',
+                'flex-1 h-[48px] rounded-xl text-[length:var(--font-size-body)] font-semibold transition-colors',
                 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                 canSubmit
                   ? 'bg-blue-500 text-white hover:bg-blue-600'

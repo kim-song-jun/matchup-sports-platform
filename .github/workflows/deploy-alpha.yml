@@ -186,6 +186,13 @@ jobs:
           MIGRATION_BASE_SHA: ${{ steps.rollback-base.outputs.migrationBaseSha }}
         run: bash scripts/release/create-alpha-release-manifest.sh
 
+      - name: Sync inquiry Slack runtime env
+        env:
+          INSTANCE_ID: ${{ vars.ALPHA_EC2_INSTANCE_ID }}
+          AWS_REGION: ${{ vars.ALPHA_AWS_REGION }}
+          SECRET_SLACK_INQUIRY_WEBHOOK_URL: ${{ secrets.SLACK_INQUIRY_WEBHOOK_URL }}
+        run: bash scripts/release/sync-alpha-inquiry-slack-env.sh
+
       - name: Deploy through AWS Systems Manager
         timeout-minutes: 25
         env:

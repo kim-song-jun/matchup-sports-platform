@@ -22,7 +22,7 @@ const teamApiMocks = vi.hoisted(() => ({
   useV1LeaveTeam: vi.fn(),
   // 기본 반환값이 없으면 이 훅을 신경 쓰지 않는 기존 테스트들이 전부 undefined.data 로 깨진다.
   // 반환 타입을 명시하지 않으면 `{ data: undefined }` 로 좁혀져 mockReturnValue 가 막힌다.
-  useV1ReceivedReviewSummary: vi.fn((): { data: unknown } => ({ data: undefined })),
+  useV1PublicTeamReviewSummary: vi.fn((): { data: unknown } => ({ data: undefined })),
 }));
 
 vi.mock('@/hooks/use-v1-api', async (importOriginal) => ({
@@ -579,7 +579,7 @@ describe('TeamDetailPageView — 팀 기록 섹션', () => {
   }
 
   it('내 팀이면 전적과 받은 후기 링크를 함께 보여주고, 요약을 배지로 적는다', () => {
-    teamApiMocks.useV1ReceivedReviewSummary.mockReturnValue({
+    teamApiMocks.useV1PublicTeamReviewSummary.mockReturnValue({
       data: {
         bySport: [
           { sportId: 's1', sportCode: 'futsal', ratingAvg: 5, ratingCount: 3, tagRates: [] },
@@ -603,20 +603,104 @@ describe('TeamDetailPageView — 팀 기록 섹션', () => {
     expect(reviewLink).toHaveTextContent('4개');
   });
 
-  it('남의 팀에는 받은 후기 링크를 두지 않는다 (내 후기를 그 팀 평가로 보이게 하면 안 된다)', () => {
-    teamApiMocks.useV1ReceivedReviewSummary.mockReturnValue({ data: undefined });
+  it('남의 팀도 그 팀이 받은 후기를 보여주되, 내 후기 화면으로 보내지는 않는다', () => {
+    teamApiMocks.useV1PublicTeamReviewSummary.mockReturnValue({
+      data: { bySport: [{ sportId: 's1', sportCode: 'futsal', ratingAvg: 4.5, ratingCount: 2, tagRates: [] }], availableMonths: [] },
+    });
 
     render(<TeamDetailPageView model={modelWithMode('default')} />);
 
-    expect(screen.getAllByRole('link', { name: /팀 전적/ })).toHaveLength(2);
+    // 요약은 보인다 — 공개 엔드포인트라 그 팀이 받은 평가가 맞다.
+    expect(screen.getAllByText('받은 후기').length).toBeGreaterThan(0);
+    // 하지만 링크는 아니다: /my/reviews 는 "내" 후기 화면이라 남의 팀에서 그리로 보내면 거짓말이 된다.
     expect(screen.queryAllByRole('link', { name: /받은 후기/ })).toHaveLength(0);
   });
 
+  it('남의 팀이고 받은 후기가 0건이면 카드 자체를 두지 않는다', () => {
+    teamApiMocks.useV1PublicTeamReviewSummary.mockReturnValue({ data: { bySport: [], availableMonths: [] } });
+
+    render(<TeamDetailPageView model={modelWithMode('default')} />);
+
+    expect(screen.queryAllByText('받은 후기')).toHaveLength(0);
+  });
+
   it('받은 후기가 아직 없으면 배지 없이 안내만 보여준다', () => {
-    teamApiMocks.useV1ReceivedReviewSummary.mockReturnValue({ data: { bySport: [], availableMonths: [] } });
+    teamApiMocks.useV1PublicTeamReviewSummary.mockReturnValue({ data: { bySport: [], availableMonths: [] } });
 
     render(<TeamDetailPageView model={modelWithMode('mine')} />);
 
     expect(screen.getAllByRole('link', { name: /받은 후기/ })[0]).toHaveTextContent('아직 받은 후기가 없어요');
+  });
+});
+
+/**
+ * "내 리그" (R4, 2026-08-20) — 리그 상세로 가는 인앱 진입점이 team-matches 상세 화면의
+ * 배지 하나뿐이었어서(team-matches-page.tsx 참고) 팀장·선수가 자기 팀의 리그를 발견할
+ * 방법이 사실상 없었다. 팀 상세에 이 팀이 속한 리그 목록을 보여준다.
+ */
+describe('TeamDetailPageView — 내 리그 섹션', () => {
+  function modelWithLeagues(
+    myLeagues: TeamDetailViewModel['myLeagues'],
+    myLeaguesLoading = false,
+    myLeaguesError = false,
+    onRetryMyLeagues?: () => void,
+  ): TeamDetailViewModel {
+    return { ...getTeamDetailViewModel('default'), myLeagues, myLeaguesLoading, myLeaguesError, onRetryMyLeagues };
+  }
+
+  it('소속 리그가 있으면 리그별로 리그 상세 링크를 보여준다', () => {
+    render(
+      <TeamDetailPageView
+        model={modelWithLeagues([
+          { leagueId: 'lg-1', title: '가을 리그' },
+          { leagueId: 'lg-2', title: '겨울 리그' },
+        ])}
+      />,
+    );
+
+    expect(screen.getAllByText('내 리그').length).toBeGreaterThan(0);
+    // 모바일·데스크톱 두 레이아웃이 동시에 마운트되므로 리그당 2개씩 나온다.
+    const autumnLinks = screen.getAllByRole('link', { name: /가을 리그/ });
+    expect(autumnLinks).toHaveLength(2);
+    autumnLinks.forEach((link) => expect(link).toHaveAttribute('href', '/league-matches/lg-1'));
+    const winterLinks = screen.getAllByRole('link', { name: /겨울 리그/ });
+    expect(winterLinks).toHaveLength(2);
+    winterLinks.forEach((link) => expect(link).toHaveAttribute('href', '/league-matches/lg-2'));
+  });
+
+  it('소속 리그가 없으면 "내 리그" 섹션 자체를 렌더하지 않는다 — 빈 섹션 노출 금지', () => {
+    render(<TeamDetailPageView model={modelWithLeagues([])} />);
+
+    expect(screen.queryByText('내 리그')).not.toBeInTheDocument();
+  });
+
+  it('아직 로딩 중이면(빈 배열이어도) 섹션 제목과 스켈레톤을 보여준다', () => {
+    render(<TeamDetailPageView model={modelWithLeagues([], true)} />);
+
+    expect(screen.getAllByText('내 리그').length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText('내 리그 불러오는 중').length).toBeGreaterThan(0);
+  });
+
+  /**
+   * 그룹 F 재감사 — myLeaguesQuery 가 실패하면 items도 빈 배열이 되어 위 "소속 리그가
+   * 없으면 섹션을 감춘다" 케이스와 화면이 100% 같아지던 결함. 에러 플래그가 있으면
+   * items가 비어 있어도 섹션이 감춰지지 않고 재시도 UI가 떠야 한다.
+   */
+  it('통신 오류면(items가 비어 있어도) 섹션을 감추지 않고 재시도 안내를 보여준다', () => {
+    render(<TeamDetailPageView model={modelWithLeagues([], false, true)} />);
+
+    expect(screen.queryByLabelText('내 리그 불러오는 중')).not.toBeInTheDocument();
+    expect(screen.getAllByText('내 리그').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('리그 정보를 불러오지 못했어요').length).toBeGreaterThan(0);
+  });
+
+  it('재시도 버튼을 누르면 onRetryMyLeagues가 호출된다', () => {
+    const onRetryMyLeagues = vi.fn();
+    render(<TeamDetailPageView model={modelWithLeagues([], false, true, onRetryMyLeagues)} />);
+
+    const retryButtons = screen.getAllByRole('button', { name: '다시 시도' });
+    fireEvent.click(retryButtons[0]);
+
+    expect(onRetryMyLeagues).toHaveBeenCalledTimes(1);
   });
 });

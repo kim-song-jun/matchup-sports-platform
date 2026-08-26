@@ -17,8 +17,6 @@ export type ReviewListCardModel = V1ReviewListItem & {
   href: string;
   badgeLabel: string;
   kindLabel: string;
-  /** 누구에게 쓴 리뷰인지(팀명 또는 닉네임). 대상이 없으면 null. */
-  targetLabel: string | null;
   meta: string;
   ctaLabel: string;
 };
@@ -31,10 +29,21 @@ export type ReviewsPageModel = {
   emptySub: string;
 };
 
+export type ReviewMetricDraft = { skill: number; manner: number; punctuality: number; safety: number };
+
 export type ReviewTargetDraft = {
   rating: number;
   tagCodes: string[];
+  /** 사람 대상에만 존재. 기본값은 종합 별점과 같게 시작해 제출 마찰을 늘리지 않는다. */
+  metricScores?: ReviewMetricDraft;
 };
+
+export const REVIEW_METRIC_FIELDS = [
+  { key: 'skill', label: '실력' },
+  { key: 'manner', label: '매너' },
+  { key: 'punctuality', label: '시간약속' },
+  { key: 'safety', label: '안전' },
+] as const;
 
 export type ReviewSourcePageModel = V1ReviewSourceResponse & {
   sourceMeta: string;
@@ -66,3 +75,10 @@ export type ReviewsReceivedPageModel = {
   userGroups: ReceivedReviewGroup[];
   teamGroups: ReceivedReviewGroup[];
 };
+
+/**
+ * 아직 손대지 않은 리뷰 대상의 별점 초기값. 한때 이 값이 4로 **네 군데에 각각** 적혀
+ * 있었다(초기 draft 생성 · 태그 토글 · 제출 · 렌더 fallback) — 한 곳만 고치면 화면에
+ * 보이는 별과 실제로 전송되는 별이 갈린다. 값을 바꿀 일이 생기면 여기 한 곳만 고친다.
+ */
+export const DEFAULT_REVIEW_RATING = 5;

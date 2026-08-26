@@ -5618,9 +5618,18 @@ Response data:
     "name": "string",
     "applicationId": "uuid"
   } | null,
+  "league": {
+    "leagueId": "uuid",
+    "title": "string",
+    "disputeDeadline": "datetime | null",
+    "disputeBlockedReason": "window_expired | promotion_committed | null",
+    "openDisputeExists": true
+  } | null,
   "viewer": {
     "state": "guest | none | host_team | requested | approved | matched_team",
     "manageableHostTeam": true,
+    "manageableOpponentTeam": true,
+    "participantMember": true,
     "eligibleTeams": [
       { "teamId": "uuid", "name": "string", "role": "owner | manager", "eligible": true, "reasonCode": "OK" }
     ],
@@ -5635,6 +5644,24 @@ requested = 승인 대기 상태
 matched = 모집 완료 상태
 host_team = 신청팀 관리 CTA
 cancelled/completed/expired = 신청 CTA disabled
+
+`state` 로 판정하면 안 되는 것 3가지 — 각각 전용 boolean 을 쓴다:
+- **결과 입력**(`/team-matches/:id/result`) → `manageableHostTeam`. `state === 'host_team'` 은
+  같은 뜻이지만, 화면은 항상 권한 boolean 을 본다.
+- **결과 승인**(`/team-matches/:id/result/approval`) → `manageableOpponentTeam`.
+  `state === 'approved'` 는 **신청서를 낸 사람 한 명**에게만 붙는다. 리그 대진은 운영자가
+  신청서를 대신 만들기 때문에 상대팀의 owner·manager 전원이 `'none'` 으로 떨어져,
+  결과가 SUBMITTED 에서 멈추고 순위표가 갱신되지 않았다(2026-08-24 alpha 실측).
+  서버 권한 판정(`games.service.ts` resolveActor 의 `opponent_result_decide`)이 팀 멤버십
+  기준이므로 이 필드가 그것과 짝을 이룬다.
+- **후기 작성** → `participantMember`. 두 팀의 active 멤버 전원이 대상이라 역할을 가리지 않는다
+  (`reviews.service.ts` resolveReviewerTeams).
+
+`league`(U3, 2026-08-24 추가): 리그 대진일 때만 non-null. `disputeDeadline`/`disputeBlockedReason`/
+`openDisputeExists`는 화면이 "지금 이의를 제기할 수 있는지"를 재요청 없이 판정할 수 있게 싣는
+필드다 — `POST /league-matches/:leagueId/fixtures/:teamMatchId/dispute`(`fileDispute`)가 실제로
+거부하는 것과 **같은 순수 함수**(`league-result-dispute-eligibility.ts`)를 공유하므로 두 값이
+어긋나지 않는다. `disputeDeadline`은 공식 결과(`OFFICIAL` revision)가 아직 없으면 null.
 
 State transition:
 없음. read-only 상세 API.

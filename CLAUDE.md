@@ -43,6 +43,26 @@
   수습 가능하다 — 사전 확인이 유일한 값싼 방어다.
 - **worktree는 항상 최신 `dev`를 fetch한 직후에 만든다.** 새 작업(기능/수정)을 시작할 때 `git worktree add <path> -b <branch> origin/dev` 직전에 반드시 `git fetch origin dev`를 먼저 실행해서 base를 최신으로 맞춘다 — 캐시된(오래된) ref에서 분기하면 나중에 `dev`와의 diff가 불필요하게 커지고, changeset 정책 체크 등 CI 게이트가 실제로는 이미 해결된 옛 상태를 기준으로 오판할 수 있다. dev push = 자동 실배포이므로, 오래된 base에서 분기해 뒤늦게 머지하면 검증 시점과 실제 배포 시점의 코드가 어긋날 위험도 커진다.
   - **로컬 `dev` 브랜치를 직접 체크아웃해서 base로 쓰지 않는다.** git은 같은 브랜치를 두 worktree에 동시 체크아웃할 수 없다 — 이 저장소는 여러 세션이 각자 `.claude/worktrees/*`를 쓰는 공유 환경이라, 로컬 `dev`가 이미 다른 worktree(예: `dev-verify`류)에 uncommitted 상태로 체크아웃돼 있을 수 있다. 그 worktree를 임의로 건드리거나(pull/checkout/reset) 새 작업의 base로 재사용하지 말 것 — 대신 매번 `git fetch origin dev` 후 **원격 ref `origin/dev`**를 base로 분기한다(로컬 `dev` 브랜치 자체는 만들지 않는다). 이렇게 하면 항상 최신이면서도 다른 세션과 절대 충돌하지 않는다.
+- **착수 전에는 `fetch`, 머지 후에는 로컬 `dev` 동기화 — 양쪽 다 예외 없다** (2026-08-23 사용자 지시).
+  - **착수 전 (pull first)**: worktree를 만들기 전이든 메인 트리에서 코드를 읽기 전이든, 어떤 작업이라도
+    시작 전에 먼저 `git fetch origin dev`로 원격을 당겨온다. 캐시된 ref나 뒤처진 로컬 브랜치를 현행으로
+    착각하면 이미 고쳐진 것을 다시 고치거나 살아 있는 기능을 dead code로 오진한다(실사례 2건).
+  - **머지 후 (sync back)**: PR이 `origin/dev`에 머지되면 **그 즉시** 메인 작업트리
+    (`/Users/sungjun/Dev/projects/matchup-sports-platform`)의 로컬 `dev`를 따라잡힌다. 머지 하나당 한 번,
+    나중에 몰아서 하지 않는다:
+    ```bash
+    cd /Users/sungjun/Dev/projects/matchup-sports-platform
+    git fetch origin dev -q && git merge --ff-only origin/dev
+    ```
+    미루면 조용히 벌어진다(실측: 131커밋 → 263커밋 뒤처진 상태로 발견). 사용자는 이 트리에서 직접
+    코드를 보므로, 뒤처진 트리는 곧 사용자가 옛 코드를 보는 것이다.
+  - **반드시 `--ff-only`.** `git pull`(머지 커밋 생성)·rebase·`reset`은 쓰지 않는다 — 공유 트리라 다른
+    세션 작업을 건드린다. `--ff-only`는 위험하면 실패하고 멈추므로 미커밋 변경을 보존한다.
+  - **FF가 거부되면 지우지 말고 백업 후 진행한다.** 원인은 대개 미커밋/untracked 파일이 upstream
+    커밋본과 겹치는 경우다. `git status --porcelain`과 `git diff --name-only HEAD origin/dev`의
+    **교집합**으로 충돌 파일만 특정하고(나머지 미커밋 변경은 손대지 않는다), 스크래치패드에 디렉터리
+    구조를 유지해 복사한 뒤 원복·FF 하고 **백업 경로를 사용자에게 알린다.** 타 세션의 미커밋 변경을
+    되돌려야 하면 그 전에 사용자 승인을 받는다(위 "공유 작업트리 git 안전" 규칙).
 
 ## DB 마이그레이션 규율 (Critical — 2026-07-12 프로덕션 장애 재발 방지)
 
@@ -500,6 +520,27 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 
 상세 디자인 가이드: `DESIGN.md` (`.impeccable.md`는 compatibility summary)
 
+### UI 착수 규칙 — A·B·C 3안 브레인스토밍 필수 (2026-08-23 사용자 지시)
+
+> **화면·컴포넌트·레이아웃을 새로 만들거나 바꾸는 작업은, 코드를 쓰기 전에 반드시
+> A·B·C 3안 + 추천안을 먼저 제시하고 사용자 선택을 받는다.** 바로 구현하지 않는다.
+
+- **적용 대상**: 신규 페이지·모달·배너·카드·폼, 기존 화면의 레이아웃/정보구조 변경,
+  빈 상태(EmptyState)·에러 상태 설계, 알림 착지 화면 등 **사용자가 보는 것 전부**.
+  - 대상 아님: 오타·색 토큰 치환 같은 1줄 기계적 수정, 백엔드/로직 전용 변경.
+- **3안은 서로 다른 원칙을 가져야 한다.** 같은 안의 미세 변형 3개는 3안이 아니다 —
+  예: "정보 밀도 최우선 / 행동 유도 최우선 / 기존 패턴 재사용 최우선"처럼 축이 갈려야 한다.
+  2안만 내거나 추천 없이 나열만 하는 것 금지.
+- **각 안에 장점·단점을 모두 적는다.** "단점 없음"은 금지 — 트레이드오프가 실재하는지
+  먼저 검토하고, 있으면 정직하게 쓴다.
+- **목업은 production fidelity.** low-fi 와이어프레임 금지 — 이 저장소의 실제 디자인
+  시스템(아래 토큰·컴포넌트, 다크모드, 44px 터치, WCAG AA)을 그대로 적용해 만든다.
+  기존 컴포넌트(`EmptyState`·`Modal`·`Toast` 등) 재사용 여부를 각 안에 명시한다.
+- **제시 순서**: ① 3안 비교표(축·장단점·작업규모) → ② `AskUserQuestion` 으로 선택받기.
+  선택 전에 구현을 시작하지 않는다.
+- **태스크 문서에 반영**: `.github/tasks/{N}-*.md` 의 UI 항목은 "구현" 앞에
+  "3안 제시 → 선택" 단계가 선행한다는 것을 Acceptance Criteria 에 남긴다.
+
 ### 디자인 시스템
 - **컬러**: 블루(#3182F6) 단일 액센트, Pretendard 폰트, 라이트+다크 모드
 - **타입 스케일**: `globals.css` @theme 블록에 `--font-size-2xs`(10px) ~ `--font-size-6xl`(56px) 12단계. `text-[Npx]` 대신 토큰 사용
@@ -570,6 +611,88 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 5. **전체 검수/피드백**은 built-in `Workflow`(ultracode) 8차원 적대 검증으로(= evidence-producing; `/agent-all`은 본 레포 Phase 0 전제 미충족). 모델 배정은 글로벌 규칙 11(결정=opus/fable, 실행=sonnet).
 6. **CI flake**(Postgres `40P01 deadlock` 등)는 내 변경과 무관함 확인 후 `gh run rerun <id> --failed`. 머지 준비 = `MERGEABLE/CLEAN` + 미해결 스레드 0 + CI pass.
 7. **런타임·환경 의존 동작은 로컬 포렌식에 매몰되지 말고 alpha 배포로 검증한다(Critical — 2026-08-09 실사고).** SSR 상태코드·스트리밍·프로덕션 렌더처럼 **환경에 따라 달라지는 동작**을 진단할 때, 로컬 `next start`/`next build` 반복 실험에 세션을 통째로 태우지 말 것. dev 머지 = 즉시 alpha 실배포이므로 **fix 후보를 dev에 머지해 alpha에서 직접 재측정**하는 것이 이 레포의 검증 루프이자 ground truth다. 실사고: schedule 라우트의 not-found HTTP 200 결함을 로컬에서 파다가 (a) `next start` 좀비 서버가 옛 빌드를 서빙해 거짓 결론을 냈고(`kill $SRV`가 래퍼만 죽이고 next-server 자식이 포트 점유 → 이후 측정이 stale 빌드를 때림), (b) 병렬 세션의 `next dev` 와 겹쳐 결과가 뒤엉켰다 — 몇 시간·수십 빌드를 태우고도 못 고쳤다. **불가피하게 로컬 prod 렌더로 검증해야 하면**: `next start` 대신 `node .next/standalone/apps/v1_web/server.js`(alpha 실런타임)를 쓰고, 매 측정마다 fresh 포트 + `lsof -tnP -iTCP:<port>` 로 실제 리스너 PID 를 확인해 그 PID 로 종료하며, 측정 전 좀비 next-server 를 전수 확인한다. 그래도 **1순위는 alpha 배포-측정**이다.
+
+## Alpha 실측 검증 (E2E 테스트 절차)
+
+> 위 7번의 "alpha 가 ground truth"를 실제로 실행하는 절차. 상세 스크립트 목록: `scripts/README-alpha-verify.md`
+
+### 1. 자격증명 — 저장소에 절대 적지 않는다
+
+**이 저장소는 PUBLIC이다.** 계정·비밀번호·세션 토큰을 `CLAUDE.md`·`AGENTS.md`·`scripts/`·PR
+코멘트 어디에도 적지 말 것. alpha E2E 계정 목록과 공통 비밀번호는 **저장소 밖의 비공개
+프로젝트 메모리**(`~/.claude/projects/<이 저장소>/memory/alpha-e2e-test-accounts.md`)에 있다.
+계정 종류: 플랫폼 관리자(`adminRole=ops`) / 대회 스태프 / A·B팀 팀장 / 선수 10명(양 팀 소속) /
+초대 대상 3명. 전 계정 약관 동의·휴대폰·이메일 인증 완료.
+
+세션은 `teameet_v1_session` **쿠키 하나**이고 `v1.<payload>.<HMAC>` 형태로 **서명만 해서**
+발급된다 — 저장 테이블이 없으므로 **DB에서 뽑을 수 없다.** alpha는 프로덕션 모드라
+**헤더 dev 인증(`x-v1-user-*`)이 401**이다(로컬 검증과 다른 점). `login` API가 유일한 발급 경로다.
+
+```bash
+curl -sS -D- -o/dev/null https://alpha.teameet.co.kr/api/v1/auth/login \
+  -H 'content-type: application/json' \
+  -d '{"email":"<계정>","password":"<비밀번호>"}' \
+  | grep -i '^set-cookie: teameet_v1_session'
+export ALPHA_SESSION_TOKEN='v1.<payload>.<HMAC>'   # 스크립트엔 이 환경변수로만 넘긴다
+```
+
+### 2. 배포 창을 피한다 (Critical — 2026-08-13 실사고)
+
+배포 중에는 502가 뜬다. 그 창에서 측정하면 **멀쩡한 화면을 결함으로 오진한다.** 측정 전에
+① 배포 완료 ② 배포된 SHA가 내 머지를 포함하는지를 반드시 확인한다.
+
+```bash
+gh run list --workflow deploy-alpha.yml --branch dev --limit 1 \
+  --json headSha,status,conclusion --jq '.[0]'
+curl -fsSI https://alpha.teameet.co.kr/landing | grep -i 'x-teameet-\(release\|commit\)'
+curl -fsS  https://alpha.teameet.co.kr/api/v1/health   # .data.checks.db === true
+git merge-base --is-ancestor <내 머지 커밋> <배포 SHA> && echo "포함됨"
+```
+
+`x-teameet-commit` 이 **내 머지 커밋 이후**여야 내 변경을 보고 있는 것이다. 직전 배포 run이
+`cancelled` 로 남아 있을 수 있다(뒤 머지가 앞 배포를 대체) — 그때 alpha가 서빙하는 SHA는
+마지막 **성공** 배포의 것이다.
+
+### 3. 라이브 경기 상태는 운영 API로 직접 만든다
+
+alpha에는 `status === 'live'` 경기가 보통 없다(전부 `ended`). 라이브 전용 UI(경기 시계,
+하프타임 배지, 라이브 스코어, 콘솔 재연결)는 "재현 불가"로 접지 말고 운영자 경로를 그대로
+밟는다. 재사용 하네스: `scripts/verify-alpha-period-break.mjs`.
+
+```
+라인업 저장·제출 → start → end-period(하프타임) → start-period(후반) → end-period → end
+```
+
+실측으로 확인된 계약 4개(하나라도 어기면 400/409/422):
+1. **takeover 토큰은 REST로 못 받는다.** `TOURNAMENT_FIXTURE` 게임의 모든 커맨드에 필수인데
+   발급 경로는 Socket.IO `/game-operations` 의 `game.takeover.request` 하나뿐이다
+   (`socket.io-client` + `extraHeaders: { cookie }` + `auth: { clientInstanceId,
+   authorizationSubjectVersion: 0 }`).
+2. **`Idempotency-Key` 헤더 = body의 `clientCommandId`.** 다르면 422 `COMMAND_IDEMPOTENCY_KEY_MISMATCH`.
+3. **라인업 참가자에 `started: boolean` 필수.** 빼면 400인데 `details.messages`가 빈 배열로 와서
+   원인이 안 보인다. `participantId`는 optional이라 `displayNameSnapshot`만으로 구성 가능(풋살 `minPlayers: 3`).
+4. **라인업 수정은 `state === 'SCHEDULED'` 동안만.** 이후 409 `LINEUP_DEADLINE_PASSED` — 이미 시작된
+   경기를 재사용할 땐 라인업 단계를 건너뛴다.
+
+### 4. 판정은 공개 API를 ground truth로
+
+커맨드 응답이 아니라 `GET /tournaments/:id/matches/:fixtureId`(비인증)를 매 전이마다 찍어
+**관전자가 실제로 받는 값**을 본다. 육안 스크린샷 대조로 "차이 없음"을 결론내지 말고
+computed 값(색·폰트크기·정렬)을 직접 읽는다.
+
+### 5. 캡처 시 주의
+
+- 라이브 경기가 있는 페이지는 10초 주기 폴링이라 Playwright `waitUntil: 'networkidle'`이
+  **절대 끝나지 않는다**(60초 타임아웃) → `domcontentloaded` + 명시적 `waitForTimeout`.
+- 캡처 스크립트는 **`scripts/` 내부**에 둔다(`/tmp`는 모듈 해석 실패).
+- 갤러리는 페이지별 📱390 / 📲768 / 🖥1440 3열 + raw URL 200 확인 후 PR 코멘트 게시.
+
+### 6. 배포와 QA 시드의 관계
+
+alpha는 배포마다 QA 시드가 다시 돈다. 시드의 `deleteMany`는 **자기 대회 범위로만** 한정되고
+사용자·팀은 `upsert`만 하므로 **E2E 계정·팀은 배포로 지워지지 않는다.** 다만 시드가 자기
+대회(`(테스트)` 로 시작하는 것들)의 **조 배정을 초기화**하므로, E2E는 **새 대회를 직접 만들어**
+진행하는 편이 안전하다.
 
 ## Agent Team 운영
 

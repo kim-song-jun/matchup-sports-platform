@@ -4,10 +4,12 @@ import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/v1-ui/button';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, EmptyState, ErrorState, TextField } from '@/components/v1-ui/primitives';
+import { ClockIcon } from '@/components/v1-ui/icons';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import {
   useV1CreateGameResultRevision,
   useV1DecideGameResultRevision,
+  useV1FileLeagueDispute,
   useV1Game,
   useV1GameResultRevisions,
   useV1SubmitGameResultRevision,
@@ -17,6 +19,7 @@ import {
 import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
 import { randomUuid } from '@/lib/uuid';
 import { countMissingAssists } from '@/lib/result-review-warnings';
+import { formatTournamentDateLong } from '@/lib/date-utils';
 import type {
   V1GameResultParticipantInput,
   V1GameResultRevision,
@@ -29,6 +32,7 @@ import {
   hashResultPayload,
   hydrateResultFormFromRevision,
   toResultRosterRows,
+  displayRevisionReason,
 } from './team-match-result.types';
 import type { CardDraft, GoalDraft, ResultRosterRow } from './team-match-result.types';
 
@@ -61,6 +65,14 @@ const RESULT_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   // 안 나는데도 사용자에게 거짓 제약을 안내하고 있었음). 이 에러가 실제로 뜬다면
   // 진짜 다른 결함(예: 관리자가 별도로 기록한 이벤트와 불일치)이라 일반 메시지로 안내한다.
   SCORE_EVENT_MISMATCH: '결과 내용에 문제가 있어 저장하지 못했어요. 입력한 득점·카드를 다시 확인해 주세요.',
+  // U3: 리그 이의 제기(POST /league-matches/:leagueId/fixtures/:teamMatchId/dispute) 전용 코드.
+  // 화면은 league.disputeBlockedReason/openDisputeExists 로 버튼 자체를 미리 숨기지만, 그 사이
+  // 다른 참가자가 먼저 이의를 접수하는 등 경쟁 상황에서는 서버가 최종 방어선이다.
+  LEAGUE_RESULT_DISPUTE_WINDOW_EXPIRED: '결과 확정 후 7일이 지나 이의를 제기할 수 없어요.',
+  LEAGUE_PROMOTION_ALREADY_COMMITTED: '승강이 이미 확정되어 이의를 제기할 수 없어요.',
+  LEAGUE_RESULT_DISPUTE_ALREADY_OPEN: '이미 처리 대기 중인 이의가 있어요.',
+  LEAGUE_RESULT_NOT_OFFICIAL: '아직 확정된 결과가 없어 이의를 제기할 수 없어요.',
+  LEAGUE_NOT_FOUND: '이 리그의 대진이 아니에요.',
 };
 
 function resultErrorMessage(err: unknown): string {
@@ -147,21 +159,32 @@ function revisionBadgeTone(state: V1GameResultRevision['state']) {
   return 'tm-badge-grey';
 }
 
-/** Shared loading/error/not-ready gate for both the entry and approval screens. */
+/**
+ * Shared loading/error/not-ready gate for both the entry and approval screens.
+ *
+ * U3: 리그 대진에서는 라인업 조회를 아예 건너뛴다. 리그전은 참가팀의 **모든 active
+ * 멤버**가 결과 영수증을 볼 수 있는데(participantMember), `GET /team-matches/:id/lineup`은
+ * owner/manager가 아니면 403을 던진다(team-match-lineup.service.ts loadContext) — 일반
+ * 멤버가 리그 결과 화면에 들어오면 needsOwnLineup=true 그대로는 이 403이 `isError`를
+ * 덮어써서 정상적인 영수증 대신 에러 화면을 보게 된다. 리그 결과는 애초에 라인업을
+ * 쓰지 않는다(LeagueMatchResultEntryService는 항상 actualParticipants=[]).
+ */
 function useResultScreenBase(teamMatchId: string, options: { needsOwnLineup: boolean }) {
   const teamMatch = useV1TeamMatch(teamMatchId);
   const gameId = teamMatch.data?.gameId ?? null;
+  const isLeague = teamMatch.data?.league != null;
+  const shouldFetchLineup = options.needsOwnLineup && !isLeague;
   const game = useV1Game(gameId, { enabled: Boolean(teamMatch.data) });
   const revisions = useV1GameResultRevisions(gameId, { enabled: Boolean(teamMatch.data) });
   const lineup = useV1TeamMatchLineup(teamMatchId, {
-    enabled: options.needsOwnLineup && Boolean(teamMatch.data),
+    enabled: shouldFetchLineup && Boolean(teamMatch.data),
   });
 
-  const isError = teamMatch.isError || game.isError || revisions.isError || (options.needsOwnLineup && lineup.isError);
+  const isError = teamMatch.isError || game.isError || revisions.isError || (shouldFetchLineup && lineup.isError);
   const isLoading =
     teamMatch.isLoading ||
     (Boolean(gameId) && (game.isLoading || revisions.isLoading)) ||
-    (options.needsOwnLineup && Boolean(teamMatch.data) && lineup.isLoading);
+    (shouldFetchLineup && Boolean(teamMatch.data) && lineup.isLoading);
 
   return { teamMatch, game, revisions, lineup, isError, isLoading, gameId };
 }
@@ -303,10 +326,231 @@ function ResultDraftSummary({
       {reason.trim() ? (
         <div>
           <div className="tm-text-label">메모</div>
-          <div className="tm-text-caption" style={{ marginTop: 6, color: 'var(--text-muted)' }}>{reason.trim()}</div>
+          <div className="tm-text-caption" style={{ marginTop: 6, color: 'var(--text-muted)' }}>{displayRevisionReason(reason)}</div>
         </div>
       ) : null}
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// League fixtures: "확정 영수증 + 이의 D-day 카드" (U3, 2026-08-24 사용자 확정 A안)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function daysUntil(deadlineIso: string): number {
+  return Math.ceil((new Date(deadlineIso).getTime() - Date.now()) / (24 * 60 * 60 * 1000));
+}
+
+type LeagueDisputeInfo = NonNullable<V1TeamMatch['league']>;
+
+/**
+ * U3: 이의 제기 D-day 카드. 리그 상세(`teamMatch.data.league`)가 이미 서버와 같은
+ * 판정(`disputeBlockedReason`)을 내려주므로, 여기는 그 값을 그대로 문구로 옮기기만
+ * 한다 — 새 판정을 만들지 않는다(글로벌 규칙 5 "조용한 fallback 금지"와 같은 이유로,
+ * 판정이 두 곳에 있으면 드리프트가 생긴다).
+ *
+ * 상태 우선순위: 열린 이의가 이미 있으면(openDisputeExists) 그것부터 보여준다 —
+ * 이미 뭔가 접수돼 있는데 "이의 제기" 버튼을 다시 보여주면 혼란스럽다. 그다음
+ * disputeBlockedReason, 마지막이 기본(제기 가능) 상태다.
+ */
+function LeagueDisputeCard({
+  leagueId,
+  teamMatchId,
+  league,
+  canFileDispute,
+}: {
+  leagueId: string;
+  teamMatchId: string;
+  league: LeagueDisputeInfo;
+  canFileDispute: boolean;
+}) {
+  const fileDispute = useV1FileLeagueDispute(leagueId, teamMatchId);
+  const [showForm, setShowForm] = useState(false);
+  const [reason, setReason] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  if (!league.disputeDeadline) return null;
+
+  async function handleSubmit() {
+    if (!reason.trim()) return;
+    setFormError(null);
+    try {
+      await fileDispute.mutateAsync({ reason: reason.trim() });
+      setSubmitted(true);
+      setShowForm(false);
+    } catch (err) {
+      setFormError(resultErrorMessage(err));
+    }
+  }
+
+  if (league.openDisputeExists || submitted) {
+    return (
+      <Card pad={16}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <ClockIcon size={18} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+          <div className="tm-text-body">접수된 이의를 운영자가 확인하고 있어요</div>
+        </div>
+      </Card>
+    );
+  }
+
+  if (league.disputeBlockedReason === 'window_expired') {
+    return (
+      <Card pad={16}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <ClockIcon size={18} style={{ color: 'var(--text-caption)', flexShrink: 0 }} />
+          <div className="tm-text-body" style={{ color: 'var(--text-muted)' }}>이의 제기 기간이 지났어요</div>
+        </div>
+      </Card>
+    );
+  }
+
+  if (league.disputeBlockedReason === 'promotion_committed') {
+    return (
+      <Card pad={16}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <ClockIcon size={18} style={{ color: 'var(--text-caption)', flexShrink: 0 }} />
+          <div className="tm-text-body" style={{ color: 'var(--text-muted)' }}>
+            승강이 확정되어 이의를 제기할 수 없어요
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
+  const days = daysUntil(league.disputeDeadline);
+  // 색만으로 D-day 급박함을 전달하지 않는다 — 배지 텍스트 자체가 'D-N'이고 옆에
+  // 마감 날짜 문장을 병기한다(강한 규칙: 색만으로 정보 전달 금지).
+  const ddayLabel = days > 0 ? `D-${days}` : 'D-DAY';
+
+  return (
+    <Card pad={16}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <ClockIcon size={18} style={{ color: 'var(--orange700)', flexShrink: 0 }} />
+        <span className="tm-badge tm-badge-orange">{ddayLabel}</span>
+        <span className="tm-text-body">
+          {formatTournamentDateLong(league.disputeDeadline)}까지 이의를 제기할 수 있어요
+        </span>
+      </div>
+      {formError ? (
+        <div style={{ marginTop: 10 }}>
+          <AlertBanner tone="error" message={formError} />
+        </div>
+      ) : null}
+      {canFileDispute ? (
+        showForm ? (
+          <div style={{ marginTop: 14 }}>
+            <TextField
+              label="이의 사유"
+              multiline
+              rows={3}
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              fieldId="league-dispute-reason"
+              placeholder="어떤 부분에 이의가 있는지 알려주세요"
+            />
+            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+              <Button
+                variant="primary"
+                disabled={!reason.trim()}
+                loading={fileDispute.isPending}
+                onClick={handleSubmit}
+              >
+                이의 제기 보내기
+              </Button>
+              <Button variant="neutral" onClick={() => setShowForm(false)} disabled={fileDispute.isPending}>
+                취소
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <Button variant="outline" size="lg" style={{ marginTop: 14 }} onClick={() => setShowForm(true)}>
+            이의 제기
+          </Button>
+        )
+      ) : null}
+    </Card>
+  );
+}
+
+/**
+ * U3-A안(2026-08-24 사용자 확정): 리그 대진의 결과 화면은 "확정 영수증"이 최상단이고
+ * 이의는 그 아래 D-day 카드다 — "승인" 프레이밍이 없다. 호스트 진입점
+ * (`TeamMatchResultPageClient`)과 상대팀 진입점(`TeamMatchResultApprovalPageClient`)
+ * 양쪽 다 이 컴포넌트로 합류한다: 리그 결과는 운영자가 입력·즉시 확정하므로(E1) 두
+ * 팀이 서로 승인할 대상 자체가 없다.
+ */
+function LeagueTeamMatchResultPage({
+  teamMatchId,
+  teamMatch,
+  revisions,
+}: {
+  teamMatchId: string;
+  teamMatch: V1TeamMatch;
+  revisions: V1GameResultRevision[];
+}) {
+  const league = teamMatch.league;
+  const hostName = teamMatch.hostTeam?.name ?? '홈팀';
+  const opponentName = teamMatch.approvedOpponentTeam?.name ?? '상대팀';
+  const latest = revisions[0] ?? null;
+  const participantMember = teamMatch.viewer?.participantMember === true;
+  const canFileDispute =
+    teamMatch.viewer?.manageableHostTeam === true || teamMatch.viewer?.manageableOpponentTeam === true;
+
+  return (
+    <AppChrome title="경기 결과" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`} desktopHead>
+      <div style={{ display: 'grid', gap: 14, padding: '16px 20px 24px' }}>
+        <Card pad={16}>
+          <div className="tm-text-body-lg">
+            {hostName} <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>(홈)</span>
+            {' vs '}
+            {opponentName} <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>(원정)</span>
+          </div>
+        </Card>
+
+        {!participantMember ? (
+          <EmptyState title="참가팀만 볼 수 있어요" sub="이 리그 대진에 참가한 팀의 멤버만 결과를 확인할 수 있어요." />
+        ) : (
+          <>
+            {latest?.state === 'OFFICIAL' ? (
+              <Card pad={16}>
+                <div className="tm-text-body-lg">공식 결과로 확정됐어요</div>
+                <div className="tm-text-subhead" style={{ marginTop: 10, fontWeight: 700 }}>{scoreLabel(latest)}</div>
+                <GoalTimeline revision={latest} homeName={hostName} awayName={opponentName} />
+                <ApprovalParticipantSummary
+                  resultParticipants={latest.resultParticipants}
+                  mvpParticipantId={latest.mvpParticipantId}
+                />
+                {latest.reason ? (
+                  <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>{displayRevisionReason(latest.reason)}</div>
+                ) : null}
+              </Card>
+            ) : latest?.state === 'VOID' ? (
+              <Card pad={16} style={{ background: 'var(--red50)' }}>
+                <div className="tm-text-body-lg">이 결과는 무효 처리됐어요</div>
+                {latest.reason ? (
+                  <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>{displayRevisionReason(latest.reason)}</div>
+                ) : null}
+              </Card>
+            ) : (
+              <EmptyState title="아직 결과가 없어요" sub="운영자가 결과를 입력하면 여기에 표시돼요." />
+            )}
+
+            {league?.disputeDeadline ? (
+              <LeagueDisputeCard
+                leagueId={league.leagueId}
+                teamMatchId={teamMatchId}
+                league={league}
+                canFileDispute={canFileDispute}
+              />
+            ) : null}
+          </>
+        )}
+
+        <ResultRevisionHistory history={revisions} />
+      </div>
+    </AppChrome>
   );
 }
 
@@ -464,6 +708,14 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
       <AppChrome title="경기 결과 입력" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`} desktopHead>
         <PageSkeleton variant="detail" />
       </AppChrome>
+    );
+  }
+
+  // U3-A안: 리그 대진은 "호스트만 입력" 프레이밍이 아예 없다 — 운영자가 결과를
+  // 입력·즉시 확정하므로(E1) 양 팀 참가자 전원이 같은 확정 영수증 뷰로 합류한다.
+  if (teamMatch.data.league) {
+    return (
+      <LeagueTeamMatchResultPage teamMatchId={teamMatchId} teamMatch={teamMatch.data} revisions={revisions.data ?? []} />
     );
   }
 
@@ -638,7 +890,7 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
           <Card pad={16} style={{ background: 'var(--red50)' }}>
             <div className="tm-text-body-lg">이 결과는 무효 처리됐어요</div>
             {latest.reason ? (
-              <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>{latest.reason}</div>
+              <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>{displayRevisionReason(latest.reason)}</div>
             ) : null}
           </Card>
         ) : null}
@@ -683,7 +935,7 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
               </div>
             ) : null}
             {latest.reason ? (
-              <div className="tm-text-caption" style={{ marginTop: 6, color: 'var(--text-muted)' }}>{latest.reason}</div>
+              <div className="tm-text-caption" style={{ marginTop: 6, color: 'var(--text-muted)' }}>{displayRevisionReason(latest.reason)}</div>
             ) : null}
             <div className="tm-text-caption" style={{ marginTop: 10, color: 'var(--text-caption)' }}>
               제출하면 되돌릴 수 없어요. {opponentName}이(가) 확인 후 승인하거나 정정을 요청할 수 있어요.
@@ -745,7 +997,7 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
         {canDraft && stage === 'editing' ? (
           <Card pad={16}>
             {latest?.state === 'CHANGE_REQUESTED' && latest.reason ? (
-              <AlertBanner tone="warning" message={`상대팀 정정 요청: ${latest.reason}`} />
+              <AlertBanner tone="warning" message={`상대팀 정정 요청: ${displayRevisionReason(latest.reason)}`} />
             ) : null}
             <div className="tm-text-body-lg" style={{ marginTop: latest?.state === 'CHANGE_REQUESTED' ? 12 : 0 }}>
               1. 스코어
@@ -981,7 +1233,10 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
   const [showApproveConfirm, setShowApproveConfirm] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const isOpponent = teamMatch.data?.viewer?.state === 'approved';
+  // 홈팀 게이트(isHost)와 대칭으로 팀 멤버십을 본다. `state === 'approved'` 는 신청서를 낸
+  // 사람 한 명만 통과해서, 운영자가 대진을 만드는 리그전에서는 상대팀 전원이 이 화면에서
+  // "상대팀만 결과를 승인할 수 있어요" 로 튕겨 나갔다.
+  const isOpponent = teamMatch.data?.viewer?.manageableOpponentTeam === true;
 
   if (isError) {
     return (
@@ -996,6 +1251,15 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
       <AppChrome title="경기 결과 승인" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`} desktopHead>
         <PageSkeleton variant="detail" />
       </AppChrome>
+    );
+  }
+
+  // U3-A안: 리그 대진은 "상대팀만 승인" 프레이밍이 아예 없다 — 위 주석이 설명하는
+  // alpha 실측 결함(상대팀 전원이 튕겨 나감)도 애초에 이 분기로 우회된다. 운영자가
+  // 결과를 입력·즉시 확정하므로(E1) 양 팀 참가자 전원이 같은 확정 영수증 뷰로 합류한다.
+  if (teamMatch.data.league) {
+    return (
+      <LeagueTeamMatchResultPage teamMatchId={teamMatchId} teamMatch={teamMatch.data} revisions={revisions.data ?? []} />
     );
   }
 
@@ -1184,7 +1448,7 @@ function ResultRevisionHistory({ history }: { history: V1GameResultRevision[] })
               </span>
             </div>
             {revision.reason ? (
-              <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>{revision.reason}</div>
+              <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>{displayRevisionReason(revision.reason)}</div>
             ) : null}
             <div className="tm-text-micro" style={{ marginTop: 4, color: 'var(--text-caption)' }}>
               제출 {formatDateTime(revision.submittedAt)}

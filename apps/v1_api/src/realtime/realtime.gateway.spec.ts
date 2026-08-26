@@ -1,6 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { ForbiddenException } from '@nestjs/common';
 import { getLoggerToken } from 'nestjs-pino';
+import { GameBroadcastRegistry } from '../games/game-broadcast.registry';
 import { GamesService } from '../games/games.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { TournamentStaffAccessService } from '../tournaments/staff/tournament-staff-access.service';
@@ -120,6 +121,10 @@ describe('RealtimeGateway', () => {
         { provide: TournamentStaffAccessService, useValue: staffAccess },
         { provide: GamesService, useValue: gamesService },
         { provide: getLoggerToken(RealtimeGateway.name), useValue: logger },
+        // 게이트웨이가 afterInit 에서 자신을 등록하는 룸 브로드캐스터. 이 스펙들은
+        // 소켓 경로만 검증하므로 주입만 만족하면 된다(REST 경로 브로드캐스트는
+        // games.controller.broadcast.spec.ts 가 따로 검증한다).
+        { provide: GameBroadcastRegistry, useValue: { register: jest.fn(), emitToGame: jest.fn() } },
       ],
     }).compile();
     gateway = moduleRef.get(RealtimeGateway);

@@ -139,6 +139,10 @@ describe('HomePage', () => {
       const onDismiss = vi.fn();
       const model = {
         ...getHomeViewModel(),
+        // Task 154 P2-1: 배너는 조건이 맞아도 정책이 이번 방문에 뽑아야 렌더된다.
+        // 이 테스트의 관심사는 "뽑혔을 때 제대로 그려지고 동작이 연결되는가" 이므로
+        // 푸시가 뽑힌 상태를 명시한다.
+        bannerDecision: { showPhoneVerify: false, nudge: 'push' as const, deferred: [] },
         pushNudge: { subscribing: false, onSubscribe, onDismiss },
       };
 
@@ -159,6 +163,7 @@ describe('HomePage', () => {
     it('disables the subscribe button and shows a pending label while subscribing', () => {
       const model = {
         ...getHomeViewModel(),
+        bannerDecision: { showPhoneVerify: false, nudge: 'push' as const, deferred: [] },
         pushNudge: { subscribing: true, onSubscribe: vi.fn(), onDismiss: vi.fn() },
       };
 

@@ -29,10 +29,10 @@
   .tm-team-match-desktop-create-btn {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     height: 44px;
-    padding: 0 18px;
-    border-radius: 10px;
+    padding: 0 20px;
+    border-radius: var(--radius-control);
     background: var(--blue500);
     color: var(--static-white);
     font-size: 15px;
@@ -50,7 +50,7 @@
   .tm-team-match-desktop-create-btn:focus-visible {
     outline: 2px solid var(--blue500);
     outline-offset: 2px;
-    border-radius: 10px;
+    border-radius: var(--radius-control);
   }
 
   /* Search bar: un-stick from mobile top, widen padding to match content column */
@@ -101,7 +101,7 @@
 /* 의미 그룹 카드 — 11개 flat InfoRow를 3개 시맨틱 섹션으로 분할(T4) */
 .tm-info-group {
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius-container);
   overflow: hidden;
   margin-top: 12px;
 }
@@ -126,7 +126,7 @@
 
 /* 비용 그룹 — 상대팀 부담금 수치 승격 영역(R-D1 primary) */
 .tm-info-cost-hero {
-  padding: 12px 16px 10px;
+  padding: 12px 16px 12px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -165,7 +165,7 @@
 
   /* VS hero: round the corners since it's now inside the content column */
   .tm-team-vs-hero {
-    border-radius: 16px;
+    border-radius: var(--radius-container);
     min-height: 200px;
     padding: 16px 20px 20px;
   }
@@ -203,9 +203,9 @@
   .tm-team-match-cta-card {
     background: var(--bg);
     border: 1px solid var(--grey150, var(--grey100));
-    border-radius: 16px;
+    border-radius: var(--radius-container);
     padding: 20px;
-    box-shadow: var(--shadow-1);
+    box-shadow: var(--shadow-card);
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -215,7 +215,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
+    gap: 12px;
   }
 
   .tm-team-match-cta-actions {
@@ -233,7 +233,7 @@
   .tm-team-match-detail-left .tm-info-row {
     flex-direction: row;
     align-items: center;
-    gap: 14px;
+    gap: 16px;
     padding: 0;
   }
 

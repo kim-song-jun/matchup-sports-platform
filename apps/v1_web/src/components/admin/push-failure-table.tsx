@@ -1,87 +1,68 @@
 'use client';
 
-import { CheckCircle2 } from 'lucide-react';
 import { useV1AckPushFailures, useV1RecentPushFailures } from '@/hooks/use-v1-api';
-import { extractErrorMessage } from '@/lib/error-message';
 import { formatAdminDateTime } from '@/lib/date-utils';
-import { AdminDataTable, AdminEmpty } from '@/components/admin';
+import { FailureLogTable } from './failure-log-table';
 import type { AdminTableColumn } from '@/components/admin';
 import type { V1PushFailureSummary } from '@/types/api';
+
+// 도메인 컬럼만 정의한다 — ack 열·로딩·에러·빈 상태는 FailureLogTable 골격 소관
+// (sms-failure-table 과 98% 동일 복제였던 것을 골격으로 수렴).
+const COLUMNS: AdminTableColumn<V1PushFailureSummary>[] = [
+  {
+    key: 'userIdHash',
+    header: '사용자',
+    render: (failure) => (
+      <span className="font-mono text-[length:var(--font-size-label)] text-[var(--text-body)]">
+        {failure.userIdHash}
+      </span>
+    ),
+  },
+  {
+    key: 'endpointSuffix',
+    header: '구독',
+    render: (failure) => (
+      <span className="font-mono text-[length:var(--font-size-label)] text-[var(--text-muted)]">
+        …{failure.endpointSuffix}
+      </span>
+    ),
+  },
+  {
+    key: 'statusCode',
+    header: '상태 코드',
+    align: 'center',
+    width: 'w-[88px]',
+    render: (failure) => (
+      <span className="tabular-nums text-[var(--text-body)]">{failure.statusCode ?? '—'}</span>
+    ),
+  },
+  {
+    key: 'occurredAt',
+    header: '발생 시각',
+    render: (failure) => (
+      <span className="text-[var(--text-muted)] whitespace-nowrap">{formatAdminDateTime(failure.occurredAt)}</span>
+    ),
+  },
+];
 
 // ── Component ─────────────────────────────────────────────────────────────
 export function PushFailureTable() {
   const { data: failures, isLoading, isError, error, refetch } = useV1RecentPushFailures();
   const ackMutation = useV1AckPushFailures();
 
-  const columns: AdminTableColumn<V1PushFailureSummary>[] = [
-    {
-      key: 'userIdHash',
-      header: '사용자',
-      render: (failure) => (
-        <span className="font-mono text-[var(--font-size-label)] text-[var(--text-body)]">
-          {failure.userIdHash}
-        </span>
-      ),
-    },
-    {
-      key: 'endpointSuffix',
-      header: '구독',
-      render: (failure) => (
-        <span className="font-mono text-[var(--font-size-label)] text-[var(--text-muted)]">
-          …{failure.endpointSuffix}
-        </span>
-      ),
-    },
-    {
-      key: 'statusCode',
-      header: '상태 코드',
-      align: 'center',
-      width: 'w-[88px]',
-      render: (failure) => (
-        <span className="tabular-nums text-[var(--text-body)]">{failure.statusCode ?? '—'}</span>
-      ),
-    },
-    {
-      key: 'occurredAt',
-      header: '발생 시각',
-      render: (failure) => (
-        <span className="text-[var(--text-muted)] whitespace-nowrap">{formatAdminDateTime(failure.occurredAt)}</span>
-      ),
-    },
-    {
-      key: 'ack',
-      header: '확인',
-      align: 'center',
-      width: 'w-[88px]',
-      render: (failure) =>
-        failure.acknowledgedAt ? (
-          <span className="inline-flex items-center gap-1 text-[var(--font-size-micro)] font-semibold text-[var(--text-muted)]">
-            <CheckCircle2 size={13} aria-hidden="true" />
-            확인됨
-          </span>
-        ) : (
-          <button
-            type="button"
-            onClick={() => ackMutation.mutate([failure.id])}
-            disabled={ackMutation.isPending}
-            className="inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[var(--font-size-label)] font-medium text-[var(--blue700)] bg-[var(--blue50)] hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
-            aria-label={`${failure.userIdHash} 실패 알림 확인`}
-          >
-            확인
-          </button>
-        ),
-    },
-  ];
-
   return (
-    <AdminDataTable<V1PushFailureSummary>
-      columns={columns}
+    <FailureLogTable<V1PushFailureSummary>
+      columns={COLUMNS}
       rows={failures ?? []}
-      keyExtractor={(failure) => failure.id}
-      loading={isLoading}
-      error={isError ? extractErrorMessage(error, '실패 기록을 불러오지 못했어요.') : undefined}
+      isLoading={isLoading}
+      isError={isError}
+      error={error}
       onRetry={() => void refetch()}
-      empty={<AdminEmpty title="최근 실패 기록이 없어요" description="웹 푸시 발송 실패가 발생하면 여기에 표시돼요." />}
+      onAck={(ids) => ackMutation.mutate(ids)}
+      ackPending={ackMutation.isPending}
+      ackAriaLabel={(failure) => `${failure.userIdHash} 실패 알림 확인`}
+      emptyTitle="최근 실패 기록이 없어요"
+      emptyDescription="웹 푸시 발송 실패가 발생하면 여기에 표시돼요."
     />
   );
 }

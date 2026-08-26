@@ -18,7 +18,7 @@
 
 /* Hero body: mobile single-column */
 .tm-tournament-hero-body {
-  padding: 16px 18px 18px;
+  padding: 16px 20px 20px;
 }
 
 .tm-tournament-hero-copy {
@@ -31,7 +31,7 @@
 }
 
 .tm-tournament-hero-stat-item {
-  padding: 10px 0;
+  padding: 12px 0;
   border-bottom: 1px solid var(--grey100);
 }
 
@@ -185,9 +185,9 @@
   .tm-tournament-rail {
     background: var(--bg);
     border: 1px solid var(--border);
-    border-radius: 16px;
+    border-radius: var(--radius-container);
     padding: 20px;
-    box-shadow: var(--shadow-1);
+    box-shadow: var(--shadow-card);
   }
 }
 
@@ -273,9 +273,9 @@
     top: 88px;
     background: var(--bg);
     border: 1px solid var(--border);
-    border-radius: 16px;
+    border-radius: var(--radius-container);
     padding: 20px;
-    box-shadow: var(--shadow-1);
+    box-shadow: var(--shadow-card);
   }
 
   /* Hide the fixed bottom CTA on desktop — the rail takes over.
@@ -344,9 +344,9 @@
 .tm-tournament-promo-eyebrow {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 4px 10px;
-  border-radius: 999px;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.18);
   color: rgba(255, 255, 255, 0.92);
   font-size: var(--font-size-caption);
@@ -365,7 +365,7 @@
 .tm-tournament-promo-prize-row {
   display: flex;
   align-items: baseline;
-  gap: 6px;
+  gap: 8px;
   margin-bottom: 8px;
 }
 
@@ -494,14 +494,14 @@
 .tm-tournament-promo-prize-cards {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+  gap: 12px;
   margin-bottom: 20px;
 }
 
 .tm-tournament-promo-prize-card {
   background: var(--orange50);
-  border-radius: 14px;
-  padding: 16px 12px 14px;
+  border-radius: var(--radius-field);
+  padding: 16px 12px 16px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -527,10 +527,10 @@
 .tm-tournament-promo-prize-single {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
   background: var(--orange50);
-  border-radius: 14px;
-  padding: 18px 16px;
+  border-radius: var(--radius-field);
+  padding: 20px 16px;
   margin-bottom: 20px;
 }
 
@@ -563,7 +563,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   position: relative;
 }
 
@@ -572,7 +572,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .tm-tournament-promo-step-icon {
@@ -583,7 +583,7 @@
   /* 2026-08-11: 6단계 전부 순수 안내(경고 아님)인데 파란 틴트라 "왜 파란색인지" 의미
      없이 튀어 보인다는 지적 — 무채색으로 통일(≥1024px 오버라이드는 이미 --bg라 무채색). */
   background: var(--grey100);
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   position: relative;
   box-shadow: 0 0 0 1px var(--border), 0 1px 3px rgba(0, 0, 0, 0.06);
 }
@@ -617,8 +617,8 @@
 /* Mini bracket preview */
 .tm-tournament-promo-bracket-preview {
   background: var(--grey50);
-  border-radius: 14px;
-  padding: 14px 16px 16px;
+  border-radius: var(--radius-field);
+  padding: 16px 16px 16px;
   margin-bottom: 20px;
 }
 
@@ -641,7 +641,7 @@
   font-weight: 700;
   color: var(--text-muted);
   text-align: center;
-  margin: 0 0 6px;
+  margin: 0 0 8px;
 }
 
 .tm-tournament-promo-bracket-matches {
@@ -653,8 +653,8 @@
 .tm-tournament-promo-bracket-match {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 10px;
+  border-radius: var(--radius-chip);
+  padding: 8px 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -707,14 +707,14 @@
 .tm-tournament-promo-how-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+  gap: 12px;
   margin-bottom: 20px;
 }
 
 .tm-tournament-promo-how-card {
   background: var(--grey50);
-  border-radius: 14px;
-  padding: 16px 12px 14px;
+  border-radius: var(--radius-field);
+  padding: 16px 12px 16px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -750,7 +750,7 @@
 .tm-tournament-promo-final-cta {
   margin: 8px 20px 16px;
   background: var(--grey50);
-  border-radius: 16px;
+  border-radius: var(--radius-container);
   padding: 20px 16px;
   display: flex;
   flex-direction: column;
@@ -762,7 +762,7 @@
 .tm-tournament-promo-final-cta .tm-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   min-height: 44px;
 }
 
@@ -840,7 +840,7 @@
     align-items: flex-start;
     gap: 16px;
     background: var(--grey50);
-    border-radius: 20px;
+    border-radius: var(--radius-hero);
     padding: 24px;
   }
 
@@ -848,14 +848,14 @@
     flex-shrink: 0;
     width: 52px;
     height: 52px;
-    border-radius: 50%;
+    border-radius: var(--radius-circle);
     background: var(--bg);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
   }
 
   .tm-tournament-promo-step-text {
     align-items: flex-start;
-    gap: 6px;
+    gap: 8px;
     min-width: 0;
   }
 
@@ -879,11 +879,11 @@
   }
 
   .tm-tournament-promo-how-grid {
-    gap: 14px;
+    gap: 16px;
   }
 
   .tm-tournament-promo-how-card {
-    padding: 20px 16px 18px;
+    padding: 20px 16px 20px;
   }
 
   .tm-tournament-promo-final-cta {
@@ -948,7 +948,7 @@
 .tm-bracket-col-body {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 /* Mobile downward connector between rounds. */
@@ -957,13 +957,13 @@
   display: block;
   width: 2px;
   height: 18px;
-  margin: 6px 0 6px 22px;
+  margin: 8px 0 8px 24px;
   background: var(--grey200);
 }
 
 .tm-bk-match {
   border: 1px solid var(--grey200);
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--bg);
   overflow: hidden;
 }
@@ -976,8 +976,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding: 11px 14px;
+  gap: 12px;
+  padding: 12px 16px;
 }
 
 .tm-bk-row-win {
@@ -1019,7 +1019,7 @@
   font-size: var(--font-size-micro);
   color: var(--text-caption);
   text-align: center;
-  padding: 5px 0;
+  padding: 4px 0;
   border-top: 1px solid var(--grey100);
   background: var(--grey50);
 }
@@ -1028,10 +1028,10 @@
 .tm-bk-champ {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 13px 16px;
+  gap: 12px;
+  padding: 12px 16px;
   border: 1px solid var(--grey200);
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--grey50);
 }
 
@@ -1043,7 +1043,7 @@
 .tm-bk-champ-icon {
   width: 36px;
   height: 36px;
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   display: grid;
   place-items: center;
   flex-shrink: 0;
@@ -1076,15 +1076,15 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 .tm-bracket-third-pill {
   font-size: var(--font-size-caption);
   font-weight: 700;
   color: var(--text-muted);
-  padding: 3px 10px;
-  border-radius: 99px;
+  padding: 3px 12px;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--grey200);
   background: var(--grey50);
 }
@@ -1092,7 +1092,7 @@
 .tm-bracket-third-body {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   max-width: 360px;
 }
 
@@ -1120,8 +1120,8 @@
   .tm-bracket-col-body {
     flex: 1;
     justify-content: center;
-    gap: 18px;
-    padding: 0 26px;
+    gap: 20px;
+    padding: 0 28px;
   }
 
   /* drop the mobile vertical connector on desktop */
@@ -1192,7 +1192,7 @@
 .tm-tourn-flow-num {
   width: 28px;
   height: 28px;
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   background: var(--blue50);
   color: var(--blue500);
   font-size: var(--font-size-label);
@@ -1209,9 +1209,13 @@
   min-width: 0;
 }
 
-/* Public tournament promo card-news carousel. */
+/* Public tournament promo card-news carousel.
+   top margin 20px(기존 12px) — E5에서 목록 상단의 CompetitionTypeSegment를 제거하면서
+   이 캐러셀이 topbar 바로 아래 첫 콘텐츠가 됐다. 세그먼트가 차지하던 시각적 여백을
+   완전히 복원하진 않되(세그먼트 높이+마진 ≈ 56~60px), topbar에 바로 붙어 답답해
+   보이지 않을 만큼만 보정한다. */
 .tm-tournament-promo-carousel {
-  margin: 12px 20px 0;
+  margin: 20px 20px 0;
 }
 
 .tm-tournament-promo-carousel-body {
@@ -1225,7 +1229,7 @@
   scroll-snap-type: x mandatory;
   scroll-behavior: smooth;
   scrollbar-width: none;
-  border-radius: 16px;
+  border-radius: var(--radius-container);
 }
 
 .tm-tournament-promo-carousel-rail::-webkit-scrollbar {
@@ -1244,7 +1248,7 @@
   display: block;
   position: relative;
   overflow: hidden;
-  border-radius: 16px;
+  border-radius: var(--radius-container);
   color: var(--static-white);
   text-decoration: none;
 }
@@ -1269,16 +1273,16 @@
   z-index: 1;
   display: flex;
   flex-direction: column;
-  padding: 16px 18px 38px;
+  padding: 16px 20px 40px;
 }
 
 .tm-tournament-promo-card-badge {
   width: fit-content;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 4px 9px;
-  border-radius: 999px;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: var(--radius-pill);
   background: var(--overlay-white-18);
   font-size: var(--font-size-caption);
   font-weight: 700;
@@ -1286,7 +1290,7 @@
 
 .tm-tournament-promo-card-title {
   color: var(--static-white);
-  margin-top: 10px;
+  margin-top: 12px;
 }
 
 .tm-tournament-promo-card-meta,
@@ -1304,7 +1308,7 @@
   justify-content: space-between;
   gap: 12px;
   margin-top: auto;
-  padding-top: 14px;
+  padding-top: 16px;
 }
 
 .tm-tournament-promo-dots {
@@ -1316,8 +1320,8 @@
   align-items: center;
   gap: 1px;
   transform: translateX(-50%);
-  padding: 1px 5px;
-  border-radius: 999px;
+  padding: 1px 4px;
+  border-radius: var(--radius-pill);
   background: var(--scrim-dark-32);
 }
 
@@ -1335,7 +1339,7 @@
 .tm-tournament-promo-dot {
   width: 5px;
   height: 5px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--overlay-white-55);
   transition: width 160ms ease, background 160ms ease;
 }
@@ -1347,8 +1351,8 @@
 
 .tm-tournament-promo-card-cta {
   flex-shrink: 0;
-  padding: 7px 13px;
-  border-radius: 999px;
+  padding: 8px 12px;
+  border-radius: var(--radius-pill);
   background: var(--static-white);
   color: var(--blue700);
   font-size: var(--font-size-label);
@@ -1359,7 +1363,7 @@
 .tm-tournament-promo-carousel-skeleton,
 .tm-tournament-promo-carousel-error {
   min-height: 180px;
-  border-radius: 16px;
+  border-radius: var(--radius-container);
 }
 
 .tm-tournament-promo-carousel-skeleton {
@@ -1381,7 +1385,7 @@
 .tm-tournament-registration-empty {
   width: 100%;
   max-width: 520px;
-  margin: 14px auto 0;
+  margin: 16px auto 0;
 }
 
 @media (min-width: 1024px) {
@@ -1415,7 +1419,7 @@
 
 .tm-fixture-lineup-pane.is-active {
   display: grid;
-  gap: 14px;
+  gap: 16px;
 }
 
 @media (min-width: 1024px) {
@@ -1429,7 +1433,7 @@
   /* is-active 여부와 무관하게 두 pane 모두 강제 노출 — 탭 상태는 모바일/태블릿에서만 의미가 있다. */
   .tm-fixture-lineup-pane {
     display: grid !important;
-    gap: 14px;
+    gap: 16px;
   }
 
   /* 2026-08 QA 지적: 피치는 maxWidth 420px 기준 세로 ~648px — 데스크톱 페이지 헤더·

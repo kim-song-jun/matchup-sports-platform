@@ -25,6 +25,19 @@ export class UpdateProfileDto {
   email?: string | null;
 
   /**
+   * 한 줄 소개. 컬럼(`V1UserProfile.bio`)은 오래전부터 있었지만 저장 경로가 없어
+   * admin 조회로만 존재했다(프로덕션 실측 2026-08-24: 245개 프로필 중 비어 있지 않은
+   * 값 1건). Task 154 P1 에서 사용자가 직접 쓰고 공개 프로필에 보이게 한다.
+   *
+   * 300자 상한은 카드 한 장에 접힘 없이 들어가는 분량 기준이다 -- 더 길면 프로필의
+   * 다른 정보를 밀어낸다. null 로 보내면 지운다.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  bio?: string | null;
+
+  /**
    * 휴대폰 번호를 바꿀 때만 필요한 본인인증 증명. 가입과 같은 발급 경로
    * (POST /auth/phone/issue → verify)에서 받은 토큰을 그대로 전달한다.
    * 번호를 바꾸지 않는 저장에는 없어도 된다.
@@ -155,4 +168,28 @@ export class UpdateMyRecordConsentDto {
 export class UpdateTournamentRealNameVisibilityDto {
   @IsBoolean()
   visible!: boolean;
+}
+
+/**
+ * 선수 카드 숨김 토글 (Task 155).
+ *
+ * `hidden` 으로 두는 이유: 컬럼(`playerCardHidden`)과 같은 방향이라 화면·API·DB 사이에서
+ * 의미가 뒤집히지 않는다. `visible` 로 받으면 어딘가에서 한 번 반전해야 하고, 그 반전이
+ * 빠지거나 두 번 되는 실수가 실제로 잘 난다.
+ */
+export class UpdatePlayerCardHiddenDto {
+  @IsBoolean()
+  hidden!: boolean;
+}
+
+/**
+ * 선수 카드 모양 선택.
+ *
+ * 문자열을 자유롭게 받지 않고 목록으로 막는 이유: 저장은 되는데 화면이 못 그리는 값이
+ * 들어오면 카드가 통째로 안 보인다. 잠금 여부는 서비스가 따로 판정한다 -- 여기서는
+ * "존재하는 모양인가"만 본다.
+ */
+export class UpdatePlayerCardShapeDto {
+  @IsIn(['rect', 'shield'])
+  shape!: 'rect' | 'shield';
 }

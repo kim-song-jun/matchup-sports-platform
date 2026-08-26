@@ -1,4 +1,4 @@
-import { CorrectionsPageClient } from './corrections-page-client';
+import { CorrectionsPageClient } from '@/components/tournament-live/corrections-page-client';
 
 export default async function TournamentRecordsCorrectionsPage({
   params,

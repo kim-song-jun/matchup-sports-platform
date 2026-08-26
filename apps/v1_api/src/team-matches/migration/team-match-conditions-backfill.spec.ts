@@ -5,7 +5,7 @@
  * candidate-selection query shape — this is deliberately NOT a
  * test/team-matches/*.integration-spec.ts (that glob is not even wired into
  * jest.config.ts's `integration` project — see jest.config.ts's comment
- * trail about test/team-schedules and test/team-match-series needing an
+ * trail about test/team-schedules and test/league-matches needing an
  * explicit glob addition; test/team-matches/ never got one, so any spec
  * placed there today would silently never run under `--selectProjects
  * integration`, exactly the trap those comments warn about. Flagged

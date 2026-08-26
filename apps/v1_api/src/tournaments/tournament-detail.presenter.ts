@@ -1,3 +1,4 @@
+import { publicFixtureStatus } from '../games/public-records/public-visibility';
 import type { TournamentDetailRow } from './tournaments-read.query';
 import { resolveTournamentFixtureOfficialResult } from './tournament-fixture-official-result';
 
@@ -215,6 +216,23 @@ export function presentTournamentDetail(
       scheduledAt: fixture.scheduledAt?.toISOString() ?? null,
       venue: fixture.venue,
       status: fixture.status,
+      /**
+       * 라이브 여부를 말할 수 있는 유일한 필드. `status`는 아래 이유로 그 답을 낼 수
+       * 없어서 남겨두되 손대지 않는다(어드민 화면이 원본 컬럼 어휘에 의존한다).
+       *
+       * `V1TournamentFixture.status`는 `scheduled`로 생성돼(tournament-bracket.service.ts)
+       * 결과 확정 시 `completed`로 한 번 움직이는 것이 전부다 — 어디에서도
+       * `in_progress`로 전이시키지 않는다(tournament-result-review.service.ts의
+       * "no other writer ever advances it once the Game model became authoritative").
+       * 그래서 이 컬럼만 보는 소비자는 경기가 진행 중인 순간에도 영영 `scheduled`를 본다.
+       * 실제 진행 상태는 `V1Game.state`가 authoritative하며, 공개 일정·경기 상세 API가
+       * 이미 `publicFixtureStatus()`로 같은 판정을 하고 있다 — 여기서 같은 함수를 써서
+       * 대회 상세 응답도 그 어휘(`scheduled|live|ended|cancelled`)를 함께 내려준다.
+       */
+      liveStatus: publicFixtureStatus({
+        gameState: fixture.game?.state ?? null,
+        fixtureStatus: fixture.status,
+      }),
       homeRegistrationId: fixture.homeRegistrationId,
       // homeTeamName은 세 갈래: 슬롯에 팀이 아직 배정 안 됐으면 'TBD'(기존 동작 유지),
       // 배정은 됐지만 모집 중이라 가려야 하면 null(진짜 미배정과 구분되는 값 —

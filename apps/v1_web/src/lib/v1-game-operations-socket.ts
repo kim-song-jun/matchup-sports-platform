@@ -6,10 +6,14 @@ import { randomUuid } from './uuid';
 /**
  * Task 21 — dedicated Socket.IO client for the `/game-operations` namespace
  * (frozen realtime contract). Deliberately separate from `getV1Socket()`
- * (`./v1-socket.ts`, the default `/` namespace used by chat/notifications):
- * this namespace's handshake `auth` payload additionally carries
- * `clientInstanceId`/`authorizationSubjectVersion`, which the gateway's
- * `parseConnectionMetadata()` requires and the default namespace does not.
+ * (`./v1-socket.ts`, chat/notifications): that socket must not present this
+ * one's `clientInstanceId`, because a takeover token is bound to
+ * `(gameId, authorizationSubject, clientInstanceId)`.
+ *
+ * 2026-08-21 정정: 예전 주석은 알림 소켓이 "기본 `/` 네임스페이스"를 쓰고 그쪽은
+ * `clientInstanceId`/`authorizationSubjectVersion` 을 요구하지 않는다고 적고 있었다.
+ * **루트에는 게이트웨이가 없다** — 그래서 그 소켓은 이벤트를 한 건도 받지 못했다.
+ * 지금은 두 소켓 다 이 네임스페이스에 붙고, 각자 다른 clientInstanceId 를 제시한다.
  */
 
 const CLIENT_INSTANCE_ID_KEY = 'teameet.v1.gameOps.clientInstanceId';
@@ -70,8 +74,13 @@ export function getV1GameOperationsSocket(): Socket {
     });
   });
 
+  // `v1-socket.ts`의 같은 핸들러에는 `reason === 'io client disconnect'`를 걸러내는
+  // 가드가 있는데 여기에는 일부러 두지 않는다: 그 reason은 클라이언트가 스스로
+  // `socket.disconnect()`를 부른 경우에만 발생하고, 이 네임스페이스에는 그런 호출이
+  // 한 곳도 없다(유일했던 `disconnectV1GameOperationsSocket`은 호출처가 0건이라 이번에
+  // 삭제했다). 도달 불가능한 분기를 남겨 두면 다음 사람이 "양쪽 다 필요한 패턴"으로
+  // 오독한다 — 이 네임스페이스에 자발적 disconnect를 다시 도입한다면 그때 함께 넣는다.
   socket.on('disconnect', (reason: string) => {
-    if (reason === 'io client disconnect') return;
     reportClientError({
       message: '경기 운영 실시간 연결이 끊겼어요.',
       level: 'warn',
@@ -80,9 +89,4 @@ export function getV1GameOperationsSocket(): Socket {
   });
 
   return socket;
-}
-
-export function disconnectV1GameOperationsSocket(): void {
-  socket?.disconnect();
-  socket = null;
 }

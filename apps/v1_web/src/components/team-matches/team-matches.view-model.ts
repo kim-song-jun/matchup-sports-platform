@@ -6,6 +6,14 @@ import type {
   TeamMatchStateViewModel,
 } from './team-matches.types';
 
+// 이 배열은 (a) 목록/상세 API 응답이 도착하기 전 로딩 스켈레톤 값, (b) team-matches-page.test.tsx의
+// 순수 프레젠테이션 렌더 픽스처, 이 두 용도로만 쓴다. 실제 매치가 로드된 뒤에는
+// team-matches-client.tsx가 이 목업으로 빈 필드를 채우면 안 된다 — cost/opponentCost/manner/wins/
+// description/applicantTeams를 여기 값으로 폴백시켰다가 서로 다른 매치가 전부 동일한
+// "상대팀 부담금 140,000원 · 매너 4.8"을 보여주는 실사고가 있었다(alpha 실측). API가 해당 값을
+// 안 주면 그 정보를 감추거나(설명/주소/신청팀) 안전한 중립값(비용 0원, 매너/승수 0)을 쓰고,
+// 이 배열의 숫자를 다시 끌어오지 않는다 — team-matches-client.tsx의 toTeamMatch()/parseCosts()/
+// toApplicantTeamsWithActions() 참고.
 const teamMatches = [
   { id: 'team-match-1', title: 'FC 발빠른놈들 vs 상대팀 구합니다', imageUrl: '/mock/generated/team-huddle.webp', sport: '축구', hostTeam: 'FC 발빠른놈들', venue: '상암 월드컵 A구장', region: '서울 마포', date: '5월 11일 일', time: '09:00', endTime: '11:00', format: '11:11', grade: 'A', style: '친선', cost: 280000, opponentCost: 140000, uniform: '빨강', gender: '성별 무관', manner: 4.8, wins: 23, status: 'open' as const },
   { id: 'team-match-2', title: '주말 친선 풋살 상대 구해요', imageUrl: '/mock/generated/futsal-rooftop.webp', sport: '풋살', hostTeam: '다이나믹 FS', venue: '신도림 풋살파크', region: '서울 구로', date: '5월 12일 월', time: '20:00', endTime: '22:00', format: '5:5', grade: 'B', style: '매너 중시', cost: 80000, opponentCost: 0, uniform: '파랑', gender: '남', manner: 4.6, wins: 15, status: 'pending' as const },

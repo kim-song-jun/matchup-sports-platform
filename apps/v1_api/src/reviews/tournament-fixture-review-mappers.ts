@@ -37,7 +37,15 @@ export function tournamentFixtureSelect() {
     // R3 §4-3단계: 신규 경로(V1Game.currentOfficialRevision.officialAt)를 우선 읽는다 --
     // officialResultTimestamp() 참고. state까지 함께 골라서 VOID로 넘어간 리비전을
     // "결과 있음"으로 오판하지 않는다.
-    game: { select: { currentOfficialRevision: { select: { state: true, officialAt: true } } } },
+    // 실출전 게이트(스펙 §5.1)가 V1GameResultParticipant 를 조회하려면 game.id 와
+    // currentOfficialRevision.id 가 필요하다 -- 확장 전에는 두 필드가 골라지지 않아
+    // appearedUserIdsBySide() 가 항상 null 폴백으로 떨어졌다.
+    game: {
+      select: {
+        id: true,
+        currentOfficialRevision: { select: { id: true, state: true, officialAt: true } },
+      },
+    },
     // R3 §4-3단계 한시적 레거시 폴백 입력 — officialResultTimestamp()가 새 경로에 OFFICIAL
     // 리비전이 없을 때만(game 백필 전) 레거시 recordedAt으로 대체한다. §4-4단계에서 제거.
     result: { select: { recordedAt: true } },

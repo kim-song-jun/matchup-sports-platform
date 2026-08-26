@@ -39,6 +39,8 @@ export type AdminListSummary = {
   byStatus: Record<string, number>;
   byCategory?: Record<string, number>;
   byAudience?: Record<string, number>;
+  /** 문의 목록 전용 — 신고(`category: 'report'`) 사유별 건수. 5개 키 전부 존재, 없으면 0. */
+  byReportReason?: Record<string, number>;
 };
 
 export type AdminCursorPage<T> = CursorPage<T> & {
@@ -312,7 +314,10 @@ export type V1InquiryRelatedType =
   | 'tournament'
   | 'registration'
   | 'payment'
-  | 'user';
+  | 'user'
+  | 'team_contact';
+
+export type V1InquiryReportReason = 'spam' | 'harassment' | 'impersonation' | 'inappropriate' | 'other';
 
 export type V1Inquiry = {
   inquiryId: string;
@@ -322,6 +327,8 @@ export type V1Inquiry = {
   contact: string | null;
   relatedType: V1InquiryRelatedType | null;
   relatedId: string | null;
+  /** 신고(`category: 'report'`)에만 실린다 — 그 외 문의에는 서버가 null 을 넣는다. */
+  reportReason: V1InquiryReportReason | null;
   status: V1InquiryStatus;
   createdAt: string;
   updatedAt: string;
@@ -353,6 +360,7 @@ export type V1CreateInquiryPayload = {
   contact?: string;
   relatedType?: V1InquiryRelatedType;
   relatedId?: string;
+  reportReason?: V1InquiryReportReason;
 };
 
 export type V1Match = {
@@ -603,6 +611,12 @@ export type V1TeamDetail = {
   regionName?: string | null;
   region: { regionId: string; name: string; parentName?: string | null } | null;
   joinPolicy?: 'approval_required' | 'closed';
+  /**
+   * 팀 컨택 수신 정책(Phase 2/3 Task 5). `/teams/:teamId/contact-policy` PATCH 응답은
+   * `{ id, contactPolicy }` 두 필드만 반환하므로(team-contacts.service.ts:394-398), 화면이
+   * "현재 선택된 정책"을 렌더하려면 이 GET 응답에서 읽어야 한다.
+   */
+  contactPolicy?: 'open' | 'recruiting_only' | 'closed';
   trustState?: TrustState | 'none';
   version?: string;
   membersVisibilityEnabled: boolean;
@@ -1031,6 +1045,25 @@ export type V1TeamMatch = V1Match & {
   place?: { name: string; addressText?: string | null };
   displayState?: V1TeamMatchApiStatus;
   costNote?: string | null;
+  /**
+   * 리그전 경기면 소속 리그, 일반 팀 매치면 null. 백엔드
+   * team-matches.service.ts 의 toListItem()/detail()/myTeamMatches() 와
+   * admin listTeamMatches() 가 같은 모양으로 내려준다.
+   *
+   * U3(2026-08-24): disputeDeadline/disputeBlockedReason/openDisputeExists 는
+   * detail() 응답에만 실린다(목록 계열은 여전히 leagueId/title 만) -- 화면이
+   * "지금 이의를 제기할 수 있는지"를 재요청 없이 판정할 수 있게 한다. 서버의
+   * POST /league-matches/:leagueId/fixtures/:teamMatchId/dispute 가 실제로
+   * 거부하는 것과 같은 판정이다.
+   */
+  league?: {
+    leagueId: string;
+    title: string;
+    /** 공식(OFFICIAL) 결과가 아직 없으면 null. officialAt + 7일. */
+    disputeDeadline?: string | null;
+    disputeBlockedReason?: 'window_expired' | 'promotion_committed' | null;
+    openDisputeExists?: boolean;
+  } | null;
   rulesText?: string | null;
   minLevelCode?: string | null;
   maxLevelCode?: string | null;
@@ -1057,6 +1090,8 @@ export type V1TeamMatch = V1Match & {
   viewer?: {
     state: V1TeamMatchViewerState;
     manageableHostTeam?: boolean;
+    /** 승인된 신청팀(상대팀)의 owner/manager 인가 — 결과 승인 진입 게이트. */
+    manageableOpponentTeam?: boolean;
     /**
      * 역할을 가리지 않는 "참가팀(host·승인 신청팀) active 멤버" 여부 — 후기 진입점 판정용.
      * `state` 로 대신할 수 없다: 'host_team' 은 host 팀 owner/manager, 'approved' 는 신청서를
@@ -1073,6 +1108,20 @@ export type V1TeamMatch = V1Match & {
     manageRoute?: string | null;
   };
   applicantTeamState?: string;
+};
+
+/** POST /league-matches/:leagueId/fixtures/:teamMatchId/dispute 요청 (U3). */
+export type V1FileLeagueDisputeDto = {
+  reason: string;
+};
+
+/** POST /league-matches/:leagueId/fixtures/:teamMatchId/dispute 응답 (U3). */
+export type V1FileLeagueDisputeResult = {
+  id: string;
+  leagueId: string;
+  teamMatchId: string;
+  status: 'open';
+  createdAt: string;
 };
 
 export type V1TeamMatchMutationPayload = {
@@ -1195,20 +1244,6 @@ export type V1TeamMatchApplicationsPage = {
     nextCursor: string | null;
     hasNext: boolean;
   };
-};
-
-export type V1MyTeamMatch = {
-  teamMatchId: string;
-  title: string;
-  sportName: string;
-  startsAt: string;
-  status: V1TeamMatchApiStatus;
-  relation: 'host_team' | 'requested' | 'approved' | 'rejected' | 'withdrawn';
-  teamId?: string | null;
-  teamName?: string | null;
-  applicationId: string | null;
-  manageRoute: string | null;
-  detailRoute: string;
 };
 
 // ─── Task 17: Game aggregate + team result revisions (docs/api/domains/games.md) ───
@@ -1334,6 +1369,13 @@ export type V1GameResultRevision = {
   missingScorer: boolean;
   mvpParticipantId: string | null;
   reason: string | null;
+  /**
+   * 몰수·중단 종결 표기. `reason` 과 별개인 이유: `reason` 은 어시스트 동기화 같은
+   * 시스템 정정이 승계 리비전에 자기 메시지로 덮어쓰는 필드라, 여기에 몰수 사유를
+   * 실으면 그 정정 한 번에 "왜 몰수인지"가 사라진다(설계 초안의 실제 결함).
+   */
+  outcomeReason: 'NORMAL' | 'FORFEIT' | 'ABANDONED';
+  outcomeNote: string | null;
   createdByActorType: 'USER' | 'SYSTEM';
   createdByUserId: string | null;
   createdBySystemActor: string | null;
@@ -1619,8 +1661,6 @@ export type V1ReviewListItem = {
   state: 'ready' | 'done';
   reviewerTeam?: { teamId: string; name: string } | null;
   targetTeam?: { teamId: string; name: string } | null;
-  /** 작성된 리뷰에서 "누구에게 쓴 것인지" — 한 경기에 여러 명을 평가하면 이게 없으면 구분되지 않는다. */
-  targetUser?: { userId: string; nickname: string } | null;
 };
 
 export type V1ReviewListResponse = {
@@ -1697,6 +1737,8 @@ export type V1ReviewSubmitPayload = {
   targetTeamId?: string | null;
   rating: number;
   tagCodes: string[];
+  /** 4항목 채점(실력·매너·시간약속·안전). 사람 대상 후기에만 싣는다 -- 팀 대상은 400. */
+  metricScores?: { skill: number; manner: number; punctuality: number; safety: number };
 };
 
 export type V1ReviewSubmitResponse = {
@@ -1866,6 +1908,8 @@ export type V1Profile = {
     profileImageUrl: string | null;
     birthDate?: string | null;
     gender: 'male' | 'female' | null;
+    /** 한 줄 소개 (Task 154 P1). 옛 서버 응답엔 없으므로 optional. */
+    bio?: string | null;
   };
   reputation: {
     trustState: TrustState;
@@ -1877,17 +1921,71 @@ export type V1Profile = {
   trustState?: TrustState;
 };
 
+/**
+ * 선수 카드 (Task 155). 산식과 잠금 규칙은 서버가 정하고, 프론트는 **그린다**.
+ * 잠긴 능력치는 `value: null` 로 오며, 프론트가 임의로 0 이나 추정값을 채우면 안 된다.
+ */
+export type V1PlayerCardStat = {
+  code: 'SHO' | 'PAS' | 'APP' | 'SKI' | 'MAN' | 'PUN';
+  label: string;
+  /** 잠겨 있으면 null. */
+  value: number | null;
+  unlocked: boolean;
+  lockedBy:
+    | { type: 'appearances'; remaining: number }
+    | { type: 'reviews'; remaining: number }
+    | { type: 'consent' }
+    | null;
+};
+
+export type V1PlayerCard = {
+  /** 산식 버전. 계수가 바뀌면 올라간다 -- 조용히 바뀌지 않게. */
+  formulaVersion: number;
+  position: 'FW' | 'MF' | 'DF' | 'GK' | null;
+  /** 등번호(표시 전용). 라인업 기록에서 가장 자주 단 번호이며 계산에는 쓰이지 않는다. */
+  jerseyNumber: number | null;
+  /** 열린 능력치가 하나도 없으면 null. 0 이 아니다. */
+  overall: number | null;
+  /** 실력이 아니라 **출전 수**로 정해진다. */
+  tier: 'bronze' | 'silver' | 'gold' | 'legend' | 'special';
+  /** 카드 모양(코스메틱). 후기 10건 업적으로 방패가 열린다. */
+  shape: 'rect' | 'shield';
+  appearances: number;
+  stats: V1PlayerCardStat[];
+  unlockedCount: number;
+  nextUnlock: { code: V1PlayerCardStat['code']; reason: NonNullable<V1PlayerCardStat['lockedBy']> } | null;
+};
+
 export type V1PublicProfile = {
   userId: string;
   displayName: string;
   nickname: string | null;
   profileImageUrl: string | null;
+  /** 한 줄 소개. 비어 있으면 null 이 오고, 프론트는 섹션 자체를 렌더하지 않는다. */
+  bio?: string | null;
+  /**
+   * 소속팀. **명단 공개(`membersVisible`)를 켠 팀만** 내려온다 -- 팀 페이지에서 명단을
+   * 가려둔 팀이 개인 프로필로 새어 나가지 않게 서버가 걸러 준다.
+   */
+  teams?: { id: string; name: string }[];
+  /**
+   * 가장 최근 공개 가능 출전 한 줄. 기록 목록과 **같은 게이트**를 통과한 것만 온다 --
+   * 동의 전이거나 확정 전이면 null.
+   */
+  recentActivity?: {
+    position: string | null;
+    jerseyNumber: number | null;
+    teamName: string;
+    playedAt: string;
+  } | null;
   reputation: {
     trustState: TrustState;
     mannerScore: number | null;
     activityCount: number;
     reviewCount: number;
   };
+  /** 선수 카드. 사용자가 카드를 숨겼으면 null 이 오고, 프론트는 섹션을 렌더하지 않는다. */
+  playerCard?: V1PlayerCard | null;
   activitySummary: {
     totals: {
       matchCount: number;
@@ -1983,6 +2081,47 @@ export type V1Home = {
   recommendedMatches?: V1Match[];
   recommendedTeamMatches?: V1TeamMatch[];
   recommendedTeams?: V1Team[];
+};
+
+/** GET /admin/search — 커맨드 팔레트 전역 검색 결과 (도메인당 최대 5건) */
+export type V1AdminGlobalSearchUserHit = {
+  userId: string;
+  label: string;
+  sublabel: string | null;
+  status: string;
+};
+
+export type V1AdminGlobalSearchTeamHit = {
+  teamId: string;
+  label: string;
+  status: string;
+};
+
+export type V1AdminGlobalSearchMatchHit = {
+  matchId: string;
+  label: string;
+  sublabel: string | null;
+  status: string;
+};
+
+export type V1AdminGlobalSearchResult = {
+  users: V1AdminGlobalSearchUserHit[];
+  teams: V1AdminGlobalSearchTeamHit[];
+  matches: V1AdminGlobalSearchMatchHit[];
+};
+
+/** GET /admin/hub/inbox — 할 일 인박스 (운영자 액션 대기 요약, M3) */
+export type V1AdminHubTournamentCount = {
+  tournamentId: string;
+  title: string;
+  count: number;
+};
+
+export type V1AdminHubInbox = {
+  pendingRegistrations: { total: number; tournaments: V1AdminHubTournamentCount[] };
+  resultReviewPending: { total: number; tournaments: V1AdminHubTournamentCount[] };
+  pendingInquiries: number;
+  tournamentsInProgress: number;
 };
 
 export type V1AdminOverview = {
@@ -2247,6 +2386,8 @@ export type V1AdminInquiryRow = {
   status: V1InquiryStatus;
   relatedType: V1InquiryRelatedType | null;
   relatedId: string | null;
+  /** 신고(`category: 'report'`)에만 실린다 — 그 외 문의에는 서버가 null 을 넣는다. */
+  reportReason: V1InquiryReportReason | null;
   replyCount: number;
   createdAt: string;
   updatedAt: string;
@@ -2257,10 +2398,34 @@ export type V1AdminInquiryReply = V1InquiryReply & {
   adminUserId: string | null;
 };
 
+/** 신고 대상 팀의 최근 누적 요약 — 문의 상세(`GET /admin/inquiries/:id`)에서 조치 판단 맥락으로 실린다. */
+export type V1AdminReportedTeamSummary = {
+  teamId: string;
+  name: string;
+  status: string;
+  windowDays: number;
+  recentReportCount: number;
+  /** 사유별 건수 맵. 건수가 0인 사유는 키 자체가 없다(0으로 채워지지 않음). */
+  reasonBreakdown: Partial<Record<V1InquiryReportReason, number>>;
+};
+
+/** 신고 누적 팀 랭킹 한 행 (`GET /admin/reports/teams`). 팀이 삭제됐거나 사유가 없을 수 있어 널값을 그대로 노출한다. */
+export type V1AdminReportedTeamRow = {
+  teamId: string;
+  name: string | null;
+  status: string | null;
+  totalCount: number;
+  recentCount: number;
+  topReason: V1InquiryReportReason | null;
+  lastReportedAt: string | null;
+};
+
 export type V1AdminInquiryDetail = V1AdminInquiryRow & {
   body: string;
   contact: string | null;
   replies: V1AdminInquiryReply[];
+  /** 신고(`category: 'report'`) 문의만 채워진다 — 그 외 문의·대상 팀 조회 실패 시 null. */
+  reportedTeam: V1AdminReportedTeamSummary | null;
 };
 
 export type V1AdminInquiryReplyPayload = {
@@ -2394,10 +2559,51 @@ export type V1AdminTeamMatchRow = {
   title: string;
   hostTeamId: string;
   hostTeamName: string;
+  /**
+   * 이 팀매치를 담고 있는 리그. 단발 팀매치면 null.
+   *
+   * 리그는 팀매치와 별개 엔티티가 아니라 **팀매치를 묶는 컨테이너**다
+   * (`V1TeamMatch.leagueId`). 서버(`listTeamMatches`)는 이미 이 값을 내려주는데
+   * 이 타입에 선언이 없어 화면이 통째로 버리고 있었다.
+   */
+  league: { leagueId: string; title: string } | null;
   sportName: string;
   startAt: string;
   status: 'recruiting' | 'closed' | 'matched' | 'cancelled' | 'completed' | 'archived';
   createdAt: string;
+};
+
+export type V1AdminTeamMatchApplicationRow = {
+  applicationId: string;
+  status: string;
+  message: string | null;
+  applicantTeamId: string;
+  applicantTeamName: string;
+  createdAt: string;
+};
+
+export type V1AdminTeamMatchDetail = V1AdminTeamMatchRow & {
+  description: string | null;
+  sportCode: string;
+  regionName: string | null;
+  placeName: string;
+  placeAddress: string | null;
+  endAt: string | null;
+  deadlineAt: string | null;
+  approvedApplicantTeamId: string | null;
+  approvedApplicantTeamName: string | null;
+  createdByUserId: string;
+  createdByName: string | null;
+  /** 연결된 게임이 있으면 현장 콘솔에서 다룰 수 있는 경기다. 라이브 상태 자체는 여기서 안 준다. */
+  hasGame: boolean;
+  matchFormat: string | null;
+  formatNote: string | null;
+  matchStyle: string[];
+  genderRule: string | null;
+  uniformColor: string | null;
+  costNote: string | null;
+  applicationCount: number;
+  applications: V1AdminTeamMatchApplicationRow[];
 };
 
 export type V1AdminStatusChangeResult = {
@@ -2413,6 +2619,10 @@ export type AdminListFilters = {
   sportId?: string;
   audience?: string;
   category?: string;
+  /** 문의 목록 전용 — `category: 'report'` 일 때만 의미가 있다. */
+  reportReason?: string;
+  /** 문의 목록 전용 — 신고 누적 팀 랭킹에서 "이 팀 신고만" 딥링크할 때 쓴다. 칩이 없는 필터라 자기 facet은 없다. */
+  reportedTeamId?: string;
   targetType?: string;
   cursor?: string;
   /** 페이지 번호(1부터). cursor 와 함께 보내면 서버가 page 를 우선한다. */
@@ -2466,6 +2676,18 @@ export type V1SmsFailureSummary = {
 export type V1AdminOpsSummary = {
   pushFailures5m: number;
   smsFailures5m: number;
+};
+
+/** 모니터링 허브 상단 신호 스트립 — "지금 사람이 봐야 할 것"의 개수 4종. */
+export type V1AdminMonitoringSummary = {
+  /** 최근 24시간에 활동한 에러 그룹 수(lastSeenAt 기준, 발생 총량 아님). */
+  errorsLast24h: number;
+  /** 미확인(acknowledgedAt null) 웹 푸시 실패 누적. */
+  pushUnacked: number;
+  /** 미확인 SMS·인증 실패 누적. */
+  smsUnacked: number;
+  /** 오늘(KST 자정 이후) 기록된 관리자 액션 수. */
+  auditToday: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -2776,6 +2998,8 @@ export type V1Tournament = {
   genderMaxMale: number | null;
   genderMinFemale: number | null;
   genderMaxFemale: number | null;
+  /** 리그(format==='league') 대회에서 각 팀이 보장받아야 할 최소 경기 수. null이면 검증하지 않는다. */
+  minMatchesPerTeam: number | null;
   entryFee: number;
   prizePool: number | null;
   prizeSummary: string | null;
@@ -2803,6 +3027,10 @@ export type V1Tournament = {
   bankName: string | null;
   bankAccount: string | null;
   bankHolder: string | null;
+  /** 경고 누적 출전정지 기준(장). null = 이 대회에는 카드 정지 규정 미적용. */
+  yellowAccumulationLimit: number | null;
+  /** 퇴장 1장당 출전정지 경기 수. null = 미적용. */
+  redCardSuspensionMatches: number | null;
   rulesText: string | null;
   refundPolicyText: string | null;
   registrationCount: number;
@@ -2900,7 +3128,22 @@ export type V1TournamentFixture = {
   legNumber: number;
   scheduledAt: string | null;
   venue: string | null;
+  /**
+   * 원본 `V1TournamentFixture.status` 컬럼. DB enum 은
+   * `scheduled | in_progress | completed | cancelled` 네 값이지만, **실제로 기록되는
+   * 값은 `scheduled`(생성 시)와 `completed`(결과 확정 시) 둘뿐이다** — 서버 어디에서도
+   * `in_progress`/`cancelled` 를 이 컬럼에 쓰지 않는다. 따라서 **라이브 판정에 쓰면
+   * 안 된다**(경기가 뛰는 중에도 `scheduled` 로 남는다). 그 용도는 아래 `liveStatus` 다.
+   * 어드민 화면이 이 원본 어휘에 의존하므로 타입은 넓게 유지한다.
+   */
   status: string;
+  /**
+   * `V1Game.state` 우선으로 파생한 공개 진행 상태. 서버의
+   * `publicFixtureStatus()`(`PublicFixtureStatus`) 반환 타입과 1:1 대응하며, 공개 일정
+   * API(`/tournaments/:id/schedule`)가 쓰는 것과 같은 어휘·같은 판정 함수다. 값이
+   * 고정 집합이라 유니온으로 좁혀 게이트 오타를 타입에서 잡는다.
+   */
+  liveStatus: 'scheduled' | 'live' | 'ended' | 'cancelled';
   homeRegistrationId: string | null;
   homeTeamId: string | null;
   homeTeamName: string | null;
@@ -3010,6 +3253,10 @@ export type V1TournamentDetail = {
   promoListPrizeText: string | null;
   promoListPriority: number;
   campaignSlug: string | null;
+  /** 경고 누적 출전정지 기준(장). null = 이 대회에는 카드 정지 규정 미적용. */
+  yellowAccumulationLimit: number | null;
+  /** 퇴장 1장당 출전정지 경기 수. null = 미적용. */
+  redCardSuspensionMatches: number | null;
   rulesText: string | null;
   refundPolicyText: string | null;
   confirmedCount: number;
@@ -3023,8 +3270,6 @@ export type V1TournamentDetail = {
   reviews: V1TournamentReview[];
   /** 어드민이 입력한 개인 어워드 (MVP, 득점왕 등) */
   awards: V1TournamentAward[];
-  /** 대회 상세 진입 시 노출할 활성 팝업(published + 노출 기간 내) 1건. 없으면 null. */
-  popup: V1TournamentDetailPopup | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -3073,6 +3318,8 @@ export type V1TournamentAward = {
   awardLabel: string;  // 'MVP' | '득점왕' | ...
   iconKey?: V1TournamentAwardIconKey | null;
   recipientName: string;
+  /** Admin award reads include this; public tournament detail omits account linkage. */
+  recipientUserId?: string | null;
   teamName: string | null;
   note: string | null;
 };
@@ -3176,6 +3423,21 @@ export type V1AdminTournamentRosterResponse = Omit<V1TournamentRosterResponse, '
   rosterLockedAt: string | null;
 };
 
+/** GET /admin/tournaments/:id/player-records — 회고 STATS-3 수상 추천 근거(비게이팅) */
+export type V1AdminTournamentPlayerRecordRow = {
+  userId: string | null;
+  name: string;
+  teamName: string | null;
+  goals: number;
+  assists: number;
+};
+
+export type V1AdminTournamentPlayerRecordsResponse = {
+  tournamentId: string;
+  goals: V1AdminTournamentPlayerRecordRow[];
+  assists: V1AdminTournamentPlayerRecordRow[];
+};
+
 /** Admin bracket bracket view: TournamentBracketService.getBracket groups item */
 export type V1AdminBracketGroup = {
   id: string;
@@ -3256,6 +3518,37 @@ export type V1AdminTournamentBracket = {
   standings: V1AdminBracketStanding[];
 };
 
+/** POST /admin/tournaments/:tournamentId/league/fixtures/generate 응답 — 리그 대진 일괄 생성 결과 */
+export interface V1GenerateLeagueFixturesResponse {
+  created: number;
+  deleted: number;
+  perTeamMatches: number;
+  rounds: number;
+  warnings: Array<{ code: string; message: string }>;
+}
+
+/** GET /tournaments/:id/standings/overall 통합 순위 행 — 리그 대회 전체 조를 합친 순위표 한 줄 */
+export interface V1LeagueOverallStandingRow {
+  registrationId: string;
+  teamName: string;
+  position: number | null;
+  points: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  fairPlayPoints: number;
+}
+
+/** GET /tournaments/:id/standings/overall 응답 — 통합 순위 + 진행률 + 매직넘버 */
+export interface V1LeagueOverallStandingsResponse {
+  standings: V1LeagueOverallStandingRow[];
+  progress: { total: number; played: number; remaining: number; percent: number };
+  magicNumber: { registrationId: string; value: number; clinched: boolean } | null;
+  recalculatedAt: string | null;
+}
+
 /** Admin tournament announcement (includes tournamentId, body, updatedAt — full admin serialize) */
 export type V1AdminTournamentAnnouncement = {
   id: string;
@@ -3318,10 +3611,9 @@ export type V1ExportRosterCsvResult = {
 
 export type V1TournamentListPage = {
   items: V1TournamentListItem[];
-  pageInfo: {
-    nextCursor: string | null;
-    hasNext: boolean;
-  };
+  // 커서(모바일 무한 스크롤)와 페이지 번호(데스크톱) 두 방식을 같은 응답으로 지원한다 —
+  // `page` 를 보낸 요청에만 total/totalPages 가 채워진다(COUNT 를 그때만 돌린다).
+  pageInfo: PageInfo;
 };
 
 export type V1AdminTournamentListPage = {
@@ -3391,6 +3683,8 @@ export type V1CreateTournamentPayload = {
   genderMaxMale?: number;
   genderMinFemale?: number;
   genderMaxFemale?: number;
+  /** 리그(format==='league') 대회에서 각 팀이 보장받아야 할 최소 경기 수. 생략하면 검증하지 않는다. */
+  minMatchesPerTeam?: number;
   entryFee?: number;
   prizePool?: number;
   prizeSummary?: string;
@@ -3418,6 +3712,10 @@ export type V1CreateTournamentPayload = {
   bankName?: string;
   bankAccount?: string;
   bankHolder?: string;
+  /** 경고 누적 출전정지 기준(장). 생략·null = 미적용. */
+  yellowAccumulationLimit?: number | null;
+  /** 퇴장 1장당 출전정지 경기 수. 생략·null = 미적용. */
+  redCardSuspensionMatches?: number | null;
   rulesText?: string;
   refundPolicyText?: string;
 };
@@ -3563,50 +3861,6 @@ export type V1CreateTournamentSponsorPayload = {
 
 export type V1UpdateTournamentSponsorPayload = Partial<V1CreateTournamentSponsorPayload>;
 
-/** 대회 상세 공개 응답에 포함되는 활성 팝업 1건(published + 노출 기간 내) */
-export type V1TournamentDetailPopup = {
-  popupId: string;
-  title: string;
-  body: string;
-  imageUrl: string | null;
-};
-
-export type V1AdminTournamentPopup = {
-  id: string;
-  tournamentId: string;
-  title: string;
-  body: string;
-  imageUrl: string | null;
-  status: V1TournamentPopupStatus;
-  displayStartAt: string | null;
-  displayEndAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
-
-/** V1TournamentPopup 상태 — 기존 V1AdminPopupStatus(홈 팝업)와 동일 값, 별도 타입으로 유지 */
-export type V1TournamentPopupStatus = 'draft' | 'published' | 'archived';
-
-export type V1CreateTournamentPopupPayload = {
-  title: string;
-  body: string;
-  imageUrl?: string;
-  status: V1TournamentPopupStatus;
-  displayStartAt?: string | null;
-  displayEndAt?: string | null;
-};
-
-export type V1UpdateTournamentPopupPayload = V1CreateTournamentPopupPayload;
-
-export type V1AdminTournamentPopupListResult = {
-  items: V1AdminTournamentPopup[];
-};
-
-export type V1DeleteTournamentPopupResult = {
-  popupId: string;
-  deleted: boolean;
-};
-
 export type V1UpdateAnnouncementPayload = V1CreateAnnouncementPayload;
 
 export type V1DeleteAnnouncementResult = {
@@ -3721,7 +3975,7 @@ export type V1ReviewPolicySettings = {
   minHours: number;
   maxHours: number;
   defaultHours: number;
-  /** 아직 어드민이 저장한 적 없어 기본값으로 동작 중인지 */
+  /** 설정 행이 아직 없어 기본값으로 동작 중인지 */
   isDefault: boolean;
   updatedAt: string | null;
 };

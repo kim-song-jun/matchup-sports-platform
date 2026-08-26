@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ShieldAlert, X } from 'lucide-react';
+import { Eye, ShieldAlert, X } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { PendingReviewsCard } from '@/components/tournaments/pending-review-card';
 import { LineupTodoCard } from '@/components/lineup/lineup-todo-card';
@@ -17,8 +17,9 @@ import {
 import { Card, ErrorState, KPIStat, ListItem, NumberDisplay, SectionTitle, WeatherStrip } from '@/components/v1-ui/primitives';
 import { cssUrl } from '@/lib/assets';
 import { formatTournamentDateRangeShort } from '@/lib/date-utils';
-import { useV1AllTournaments } from '@/hooks/use-v1-api';
+import { useV1AllTournaments, useV1LeagueMatches } from '@/hooks/use-v1-api';
 import type { V1TournamentListItem } from '@/types/api';
+import type { V1PublicLeagueListItem } from '@/types/league-match';
 import { TournamentHeroCard } from './tournament-hero-card';
 import type { HomeChatRoom, HomeMatchCard, HomeQuickAction, HomeViewModel } from './home.types';
 
@@ -26,6 +27,16 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
   const dash = model.signedOut || model.network;
   const tournaments = useV1AllTournaments({ status: 'open' });
   const tournamentItems = tournaments.data ?? [];
+  // 그룹 C 리그 발견성 감사(Task 153 Wave 3): 홈에는 관리자가 홍보를 켠 대회만 노출되고
+  // 리그는 동급 프로모션이 전혀 없었다. 대회의 "오늘의 추천"은 V1Tournament의
+  // promoHomeEnabled/promoHomeTitle 등 관리자 토글 필드(V1Tournament 모델)를 그대로
+  // 따르는데, V1League 모델에는 그런 홍보 필드가 없다(schema.prisma 확인) — 새로 추가하려면
+  // 백엔드 스키마 + 마이그레이션 + 어드민 편집 UI까지 필요해 이 프론트엔드 전용 감사
+  // 수정의 범위를 벗어난다. 그래서 관리자 토글 대신 "진행 중(active)" 상태를 자동 홍보
+  // 신호로 쓴다 — 어차피 진행 중 리그는 시즌 중 발견될수록 가치가 있고, 사이드바 위젯
+  // 하나만 추가해 대회 히어로 카드처럼 메인 컬럼 밀도(오늘의 추천)는 건드리지 않는다.
+  const leagues = useV1LeagueMatches({ state: 'active', limit: 4 });
+  const leagueItems = leagues.data?.items ?? [];
   // TournamentHeroCard owns the promoHomeEnabled filter + sort — this only needs
   // to know whether *any* eligible item exists, to decide the section's visibility.
   const hasHomePromo = tournamentItems.some((item) => item.status === 'open' && item.promoHomeEnabled);
@@ -60,12 +71,21 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
               카드가 화면 끝에서 끝까지 늘어나 아래 콘텐츠의 여백선과 어긋났다(390 실측: 배너
               0~390 vs 다른 카드 20~370). 배너 슬롯이 그 여백을 책임진다. */}
           <div className="tm-home-banner-slot">
-            {model.pushNudge ? <PushNudgeBanner pushNudge={model.pushNudge} /> : null}
+            {/* Task 154 P2-1: 조건이 맞아도 이번 방문에 선택된 유도 배너 하나만 렌더한다.
+                차단성인 휴대폰 인증은 이 예산 밖이라 조건만 맞으면 항상 보인다 --
+                밀려서 안 보이면 사용자는 신청이 왜 거부되는지 알 길이 없다.
+                판정은 model.bannerDecision(lib/home-banner-policy.ts) 하나로 모았다. */}
             {model.phoneVerifyNudge ? <PhoneVerifyBanner phoneVerifyNudge={model.phoneVerifyNudge} /> : null}
+            {model.bannerDecision.nudge === 'recordConsent' && model.recordConsentNudge ? (
+              <RecordConsentNudgeBanner recordConsentNudge={model.recordConsentNudge} />
+            ) : null}
+            {model.bannerDecision.nudge === 'push' && model.pushNudge ? (
+              <PushNudgeBanner pushNudge={model.pushNudge} />
+            ) : null}
           {/* 남은 후기 유도 — 홈에는 대회 후기 전용 바텀시트 모달만 있어서 경기 후기는
               마이 메뉴 서브텍스트 한 줄 말고 알릴 길이 없었다. 마이페이지와 같은 컴포넌트를
               써서 두 화면의 숫자가 갈리지 않게 한다(남은 게 없으면 스스로 null). */}
-            <PendingReviewsCard />
+            {model.bannerDecision.nudge === 'pendingReviews' ? <PendingReviewsCard /> : null}
           </div>
 
           {/* Greeting + activity stats */}
@@ -224,6 +244,12 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
           {/* Upcoming tournaments — fills remaining sidebar height, avoids ~830px gap */}
           <SidebarTournamentsWidget items={tournamentItems} loading={tournaments.isLoading} />
 
+          {/* 진행 중인 정규 리그 — 대회 위젯 바로 아래에 붙는다. 두 위젯이 인접해 보이는 이
+              자리가 감사 C-3("리그"가 두 제품을 가리킴)의 핵심 지점이라, 여기서는 반드시
+              "정규 리그"로 불러 대회(리그 방식 대회)와 구분한다. 위 주석 참조: promoHomeEnabled 같은
+              관리자 토글이 리그엔 없어 자동으로 active 리그를 보여준다. */}
+          <SidebarLeaguesWidget items={leagueItems} loading={leagues.isLoading} />
+
         </div>{/* /tm-home-sidebar */}
 
       </div>{/* /tm-home-desktop */}
@@ -339,12 +365,90 @@ function HomeChatFloatingButton({ model }: { model: HomeViewModel }) {
   );
 }
 
+/**
+ * 경기 기록 공개 동의 유도 배너 (Task 154 P0-3).
+ *
+ * 형태는 `PushNudgeBanner` 를 그대로 따른다 -- 아이콘 + 문구 2줄 + 닫기, 그리고 CTA 는
+ * 아래 줄로 분리. 390px 에서 한 줄에 다 넣으면 문구 자리가 남지 않는다는 그쪽 주석의
+ * 판단이 여기서도 그대로 적용된다.
+ *
+ * 다른 점은 **문구가 아니라 숫자로 이유를 준다**는 것이다. "공개할까요?" 만으로는 왜 지금
+ * 나에게 뜨는지 알 수 없고, 켜고 나서 뭐가 달라지는지도 모른다. 서버가 계산한
+ * `pendingCount`(지금 켜면 즉시 공개될 경기 수)를 앞세워 그 둘을 한 번에 답한다 --
+ * 이 숫자가 0 인 사용자에겐 배너 자체가 뜨지 않으므로 "0경기" 는 렌더되지 않는다.
+ */
+function RecordConsentNudgeBanner({
+  recordConsentNudge,
+}: {
+  recordConsentNudge: NonNullable<HomeViewModel['recordConsentNudge']>;
+}) {
+  return (
+    <Card pad={14} style={{ marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <span
+          aria-hidden="true"
+          style={{
+            flexShrink: 0,
+            width: 36,
+            height: 36,
+            borderRadius: 10,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'var(--blue-soft)',
+            color: 'var(--blue700)',
+          }}
+        >
+          <Eye size={18} strokeWidth={2} />
+        </span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="tm-text-label">
+            {recordConsentNudge.pendingCount}경기가 공개를 기다려요
+          </div>
+          <div className="tm-text-caption" style={{ marginTop: 2 }}>
+            공개하면 내 출전·득점이 프로필에 표시돼요.
+          </div>
+        </div>
+        <button
+          type="button"
+          aria-label="경기 기록 공개 안내 닫기"
+          className="tm-pressable"
+          style={{ flexShrink: 0, padding: 6, minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={recordConsentNudge.onDismiss}
+        >
+          <X size={18} aria-hidden="true" />
+        </button>
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+        {/* 무엇이 공개되는지 확인할 경로를 항상 함께 둔다 -- 개인정보 공개를 "보지 않고
+            버튼 한 번"으로 켜게 만들지 않기 위한 것이다. */}
+        <Link
+          href="/my/settings/record-consent"
+          className="tm-btn tm-btn-sm tm-btn-neutral"
+          style={{ flex: 1, minHeight: 44 }}
+        >
+          어떤 기록인지 보기
+        </Link>
+        <button
+          type="button"
+          className="tm-btn tm-btn-sm tm-btn-primary"
+          style={{ flex: 1, minHeight: 44 }}
+          disabled={recordConsentNudge.saving}
+          onClick={recordConsentNudge.onGrant}
+        >
+          {recordConsentNudge.saving ? '적용 중' : '공개하기'}
+        </button>
+      </div>
+    </Card>
+  );
+}
+
 function PushNudgeBanner({ pushNudge }: { pushNudge: NonNullable<HomeViewModel['pushNudge']> }) {
   return (
     // 390px 에서 아이콘(36) + 문구 + CTA + 닫기(44) 를 한 줄에 넣으면 gap·패딩까지 합쳐
     // 220px 넘게 먹어 문구가 들어갈 자리가 거의 남지 않는다. 정보 줄과 CTA 를 분리해
     // 같은 자리에 뜨는 "남은 후기" 배너와 같은 리듬으로 맞춘다.
-    <Card pad={14}>
+    <Card pad={14} style={{ marginBottom: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
       <span
         aria-hidden="true"
@@ -660,6 +764,111 @@ function SidebarTournamentsWidget({ items, loading }: { items: V1TournamentListI
                     <span style={{ fontVariantNumeric: 'tabular-nums', display: 'inline-flex', alignItems: 'baseline', gap: 1 }}>
                       <span style={{ fontWeight: 600 }}>{t.confirmedCount}/{t.teamCount}</span>
                       <span style={{ fontSize: 12 }}>팀</span>
+                    </span>
+                  </div>
+                </div>
+                <ChevronRightIcon size={14} strokeWidth={2} style={{ flexShrink: 0, color: 'var(--text-muted)' }} aria-hidden="true" />
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// 대회 위젯(SidebarTournamentsWidget)과 같은 카드 관례 — 컴포넌트 파일 상단 주석 참조:
+// V1League엔 promoHomeEnabled 같은 관리자 토글이 없어 "진행 중(active)" 상태를 그대로
+// 홍보 신호로 쓴다. 아이콘도 같은 TrophyIcon을 재사용한다 — 대회와 리그는 같은 "대회
+// 유형" 축이라(둘 다 경쟁 컨테이너) 리그 전용 아이콘을 새로 만드는 대신 그 관례를
+// 그대로 따른다.
+function SidebarLeaguesWidget({ items, loading }: { items: V1PublicLeagueListItem[]; loading: boolean }) {
+  const visibleItems = items.slice(0, 4);
+
+  return (
+    <div className="tm-home-sidebar-notices">
+      <div className="tm-notice-head">
+        <div className="tm-text-body-lg">진행 중인 정규 리그</div>
+        <Link
+          className="tm-btn tm-btn-sm tm-btn-ghost"
+          href="/league-matches"
+          style={{ alignSelf: 'flex-end', padding: '0 4px' }}
+        >
+          전체보기
+        </Link>
+      </div>
+
+      {loading ? (
+        /* [P2 UX 라이팅] 능동형 로딩 안내 */
+        <div
+          className="tm-text-caption"
+          style={{ color: 'var(--text-muted)', paddingTop: 8 }}
+          aria-busy="true"
+          role="status"
+        >
+          정규 리그 목록을 가져오고 있어요…
+        </div>
+      ) : visibleItems.length === 0 ? (
+        <div
+          className="tm-text-caption"
+          style={{ color: 'var(--text-muted)', paddingTop: 8 }}
+        >
+          현재 진행 중인 정규 리그가 없어요.
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gap: 8 }}>
+          {visibleItems.map((l) => {
+            const dateLabel = formatTournamentDateRangeShort(l.startsOn, l.endsOn);
+            return (
+              <Link
+                key={l.leagueId}
+                href={`/league-matches/${l.leagueId}`}
+                className="tm-pressable"
+                aria-label={`정규 리그 상세 보기 — ${l.title}`}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '10px 12px',
+                  borderRadius: 10,
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  minHeight: 44,
+                }}
+              >
+                <span
+                  className="tm-tournament-widget-icon"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    width: 32,
+                    height: 32,
+                    borderRadius: 8,
+                    color: 'var(--text-strong)',
+                  }}
+                  aria-hidden="true"
+                >
+                  <TrophyIcon size={16} strokeWidth={2} />
+                </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    className="tm-text-label line-clamp-1"
+                    style={{ color: 'var(--text-strong)' }}
+                  >
+                    {l.title}
+                  </div>
+                  <div
+                    className="tm-text-micro"
+                    style={{ color: 'var(--text-muted)', marginTop: 2, display: 'flex', alignItems: 'baseline', gap: 2, flexWrap: 'wrap' }}
+                  >
+                    {l.sport.name}
+                    {dateLabel ? ` · ${dateLabel}` : ''}
+                    {' · '}
+                    <span style={{ fontVariantNumeric: 'tabular-nums', display: 'inline-flex', alignItems: 'baseline', gap: 1 }}>
+                      <span style={{ fontWeight: 600 }}>{l.teamCount}</span>
+                      <span style={{ fontSize: 12 }}>팀 참가</span>
                     </span>
                   </div>
                 </div>

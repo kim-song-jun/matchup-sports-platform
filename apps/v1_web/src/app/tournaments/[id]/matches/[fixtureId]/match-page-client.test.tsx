@@ -16,10 +16,22 @@ const chromeMock = vi.fn(({ children }: { children: React.ReactNode }) => <div>{
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1FixtureLineupAccess: (...args: unknown[]) => accessMock(...args),
+  // Task 154 P0-5: 같은 화면에 "이 기록은 제 것입니다" 섹션이 붙으면서 이 훅들도 탄다.
+  // 이 스펙의 관심사는 라인업 CTA 노출 규칙이므로, 목록 조회는 비활성(모달 닫힘) 상태로
+  // 고정한다 -- 섹션 자체의 계약은 별도 스펙이 맡는다.
+  useV1ClaimableParticipants: () => ({ data: undefined, isLoading: false, isError: false, error: null }),
+  useV1RequestIdentityLink: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 vi.mock('@/components/public-game-records/use-public-game-records', () => ({
   usePublicMatch: (...args: unknown[]) => matchMock(...args),
+}));
+
+// 승인함 내부(훅·버튼)는 attest-requests.test.tsx 가 검증한다 — 이 스펙의 관심사(라인업
+// CTA 노출 규칙)와 무관하고, 실컴포넌트를 두면 use-v1-api mock factory 에 훅 3개를
+// 계속 따라 붙여야 한다.
+vi.mock('@/components/public-game-records/attest-requests', () => ({
+  AttestRequestsSection: () => null,
 }));
 
 vi.mock('@/components/public-game-records/match-detail-content', () => ({

@@ -1,3 +1,4 @@
+import { publicFixtureStatus } from '../games/public-records/public-visibility';
 import { isBracketPublished, presentTournamentDetail } from './tournament-detail.presenter';
 import type { TournamentDetailRow } from './tournaments-read.query';
 
@@ -112,6 +113,7 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
 
   function fixtureRow(
     game: TournamentDetailRow['fixtures'][number]['game'],
+    status: TournamentDetailRow['fixtures'][number]['status'] = 'completed',
   ): TournamentDetailRow['fixtures'][number] {
     return {
       id: 'fixture-1',
@@ -121,7 +123,7 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
       legNumber: 1,
       scheduledAt: null,
       venue: null,
-      status: 'completed',
+      status,
       homeRegistrationId: 'reg-1',
       homeRegistration: { team: { id: 'team-1', name: '서울 FC', profile: null } },
       awayRegistrationId: 'reg-2',
@@ -136,6 +138,10 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
     const row = baseRow({
       fixtures: [
         fixtureRow({
+          // `state`는 공개 상세가 픽스처의 라이브 여부를 판정하는 유일한 authoritative
+          // 신호다(`V1TournamentFixture.status`는 in_progress로 전이하지 않는다).
+          // OFFICIAL 리비전이 존재하는 이 시나리오의 경기는 이미 끝난 상태다.
+          state: 'ENDED',
           sides: [
             { id: 'side-home', sideKey: 'HOME' },
             { id: 'side-away', sideKey: 'AWAY' },
@@ -148,6 +154,7 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
               sideId: 'side-home',
               participantId: 'participant-1',
               clockMs: 300_000,
+              // 라이브 기록 골 -- 백필의 `minuteKnown` 표식이 없는 평범한 payload.
               payload: null,
               reversesEventId: null,
             },
@@ -188,6 +195,7 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
     const row = baseRow({
       fixtures: [
         fixtureRow({
+          state: 'ENDED',
           sides: [
             { id: 'side-home', sideKey: 'HOME' },
             { id: 'side-away', sideKey: 'AWAY' },
@@ -241,6 +249,7 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
     const row = baseRow({
       fixtures: [
         fixtureRow({
+          state: 'ENDED',
           sides: [],
           participants: [],
           events: [],
@@ -259,5 +268,142 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
 
     const presented = presentTournamentDetail(row);
     expect(presented.fixtures[0].result).toBeNull();
+  });
+
+  /**
+   * 이 두 케이스가 프로덕션에서 실제로 깨져 있던 조합이다. `V1TournamentFixture.status`는
+   * 생성 시 `scheduled`로 박히고 결과 확정 때 곧장 `completed`로 가며, `in_progress`로
+   * 전이시키는 writer가 코드베이스에 존재하지 않는다. 그래서 "경기가 뛰고 있는 중"을
+   * `status`만으로 판별하려던 소비자(`/tournaments/:id/bracket`의 라이브 폴링 게이트)는
+   * 조건이 영원히 false여서 대진표·순위표를 한 번도 갱신하지 않았다.
+   *
+   * 아래 첫 케이스는 그 정확한 상태(경기는 LIVE인데 fixture.status는 아직 scheduled)를
+   * 재현한다 — `liveStatus`가 없거나 `status`에서 파생되면 실패한다.
+   */
+  it('경기가 LIVE면 fixture.status가 scheduled여도 liveStatus는 live다', () => {
+    const row = baseRow({
+      fixtures: [
+        fixtureRow(
+          {
+            state: 'LIVE',
+            sides: [],
+            participants: [],
+            events: [],
+            currentOfficialRevision: null,
+          } as never,
+          'scheduled',
+        ),
+      ],
+    } as never);
+
+    const presented = presentTournamentDetail(row);
+    // 원본 컬럼은 손대지 않는다 — 어드민 화면이 이 어휘에 의존한다.
+    expect(presented.fixtures[0].status).toBe('scheduled');
+    expect(presented.fixtures[0].liveStatus).toBe('live');
+  });
+
+  it('game이 아직 없으면 liveStatus는 fixture.status에서 파생된다', () => {
+    const row = baseRow({ fixtures: [fixtureRow(null as never, 'scheduled')] } as never);
+
+    const presented = presentTournamentDetail(row);
+    expect(presented.fixtures[0].liveStatus).toBe('scheduled');
+  });
+
+  /**
+   * 두 공개 레인의 진행 상태 일치 계약.
+   *
+   * 같은 픽스처를 두 API 가 읽는다 — `GET /tournaments/:id`(대진표·순위가 쓰는 상세)와
+   * `GET /tournaments/:id/schedule`(일정이 쓰는 공개 기록). 원래 이 둘은 서로 다른
+   * 소스를 봤다: 일정 레인은 `publicFixtureStatus()`로 `V1Game.state` 를 파생했고,
+   * 상세 레인은 원본 `status` 컬럼을 그대로 노출했다. 그 컬럼은 경기가 진행 중이어도
+   * `scheduled` 에 머무르므로, 진행 중인 경기를 두 API 가 `live` 와 `scheduled` 로
+   * 서로 다르게 말하는 상태가 프로덕션에서 실제로 관측됐다.
+   *
+   * 그래서 여기서는 두 레인을 서로 비교하지 않는다 — 지금은 둘 다 같은 헬퍼를 타므로
+   * 서로 대조하면 순환 논리가 되고, 둘이 함께 틀려도 통과한다. 대신 **기대값을 표에
+   * 직접 적어두고 두 레인을 각각 그 표에 대조**한다. 어느 한쪽이 파생 방식을 바꾸면
+   * 그쪽 단언이 깨진다.
+   */
+  const PROGRESS_MATRIX: ReadonlyArray<{
+    readonly gameState: 'SCHEDULED' | 'LIVE' | 'PAUSED' | 'ENDED' | 'CANCELLED' | null;
+    readonly expected: string;
+  }> = [
+    { gameState: null, expected: 'scheduled' },
+    { gameState: 'SCHEDULED', expected: 'scheduled' },
+    { gameState: 'LIVE', expected: 'live' },
+    { gameState: 'PAUSED', expected: 'live' },
+    { gameState: 'ENDED', expected: 'ended' },
+    { gameState: 'CANCELLED', expected: 'cancelled' },
+  ];
+
+  it.each(PROGRESS_MATRIX)(
+    '게임 상태 $gameState 는 두 공개 레인 모두에서 $expected 로 보인다',
+    ({ gameState, expected }) => {
+      // 일정 레인(`public-tournament-records.service.ts` 의 두 호출 지점이 쓰는 헬퍼).
+      expect(publicFixtureStatus({ gameState, fixtureStatus: 'scheduled' })).toBe(expected);
+
+      // 상세 레인(대진표·순위가 읽는 응답).
+      const row = baseRow({
+        fixtures: [
+          fixtureRow(
+            gameState === null
+              ? null
+              : ({
+                  state: gameState,
+                  sides: [],
+                  participants: [],
+                  events: [],
+                  currentOfficialRevision: null,
+                } as never),
+            'scheduled',
+          ),
+        ],
+      } as never);
+      expect(presentTournamentDetail(row).fixtures[0].liveStatus).toBe(expected);
+    },
+  );
+
+  it('원본 status 컬럼이 무엇이든 두 레인의 진행 상태는 게임에서만 나온다', () => {
+    // 컬럼이 completed 인데 경기가 다시 LIVE 인 조합(결과 정정 중 재개 등)에서도
+    // 두 레인이 갈리면 안 된다 — 상세 레인이 컬럼으로 되돌아가면 여기서 깨진다.
+    expect(publicFixtureStatus({ gameState: 'LIVE', fixtureStatus: 'completed' })).toBe('live');
+
+    const row = baseRow({
+      fixtures: [
+        fixtureRow(
+          {
+            state: 'LIVE',
+            sides: [],
+            participants: [],
+            events: [],
+            currentOfficialRevision: null,
+          } as never,
+          'completed',
+        ),
+      ],
+    } as never);
+    expect(presentTournamentDetail(row).fixtures[0].liveStatus).toBe('live');
+  });
+
+  it('공개 대회 수상에는 관리자용 recipientUserId 계정 연결을 노출하지 않는다', () => {
+    const row = baseRow({
+      awards: [
+        {
+          id: 'award-1',
+          awardType: 'mvp',
+          awardLabel: 'MVP',
+          iconKey: 'crown',
+          recipientName: '김선수',
+          recipientUserId: 'user-private-link',
+          teamName: '서울 FC',
+          note: null,
+        },
+      ],
+    } as never);
+
+    const presented = presentTournamentDetail(row);
+
+    expect(presented.awards[0]).toMatchObject({ awardLabel: 'MVP', recipientName: '김선수' });
+    expect(presented.awards[0]).not.toHaveProperty('recipientUserId');
   });
 });

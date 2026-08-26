@@ -14,6 +14,8 @@ describe('AdminOpsService', () => {
   const prisma = {
     v1WebPushFailureLog: { findMany: jest.fn(), updateMany: jest.fn(), count: jest.fn() },
     v1SmsEventLog: { findMany: jest.fn(), updateMany: jest.fn(), count: jest.fn() },
+    v1ErrorLog: { count: jest.fn() },
+    v1AdminActionLog: { count: jest.fn() },
     v1User: { findUnique: jest.fn(), findMany: jest.fn() },
     v1PushSubscription: { findMany: jest.fn() },
     v1NotificationPreference: { findUnique: jest.fn() },
@@ -105,6 +107,35 @@ describe('AdminOpsService', () => {
     const cutoff = smsWhere.createdAt.gte as Date;
     expect(Date.now() - cutoff.getTime()).toBeGreaterThanOrEqual(5 * 60_000 - 1_000);
     expect(Date.now() - cutoff.getTime()).toBeLessThanOrEqual(5 * 60_000 + 1_000);
+  });
+
+  it('monitoringSummary counts 24h error groups, unacked push/sms, and audit entries since KST midnight', async () => {
+    prisma.v1ErrorLog.count.mockResolvedValue(4);
+    prisma.v1WebPushFailureLog.count.mockResolvedValue(2);
+    prisma.v1SmsEventLog.count.mockResolvedValue(5);
+    prisma.v1AdminActionLog.count.mockResolvedValue(11);
+
+    const result = await service.monitoringSummary();
+
+    expect(result).toEqual({ errorsLast24h: 4, pushUnacked: 2, smsUnacked: 5, auditToday: 11 });
+
+    // 에러는 lastSeenAt 24시간 창 — occurredAt/createdAt 이 아니라 "마지막 활동" 기준이다.
+    const errorWhere = prisma.v1ErrorLog.count.mock.calls[0][0].where;
+    const errorCutoff = errorWhere.lastSeenAt.gte as Date;
+    expect(Date.now() - errorCutoff.getTime()).toBeGreaterThanOrEqual(24 * 60 * 60_000 - 1_000);
+    expect(Date.now() - errorCutoff.getTime()).toBeLessThanOrEqual(24 * 60 * 60_000 + 1_000);
+
+    // 푸시·SMS 는 시간 창이 아니라 미확인 누적이다.
+    expect(prisma.v1WebPushFailureLog.count).toHaveBeenCalledWith({ where: { acknowledgedAt: null } });
+    expect(prisma.v1SmsEventLog.count).toHaveBeenCalledWith({ where: { acknowledgedAt: null } });
+
+    // 감사 "오늘"은 KST 자정 — UTC 자정도, 최근 24시간도 아니다.
+    const auditWhere = prisma.v1AdminActionLog.count.mock.calls[0][0].where;
+    const auditCutoff = auditWhere.createdAt.gte as Date;
+    const KST_OFFSET_MS = 9 * 60 * 60_000;
+    expect((auditCutoff.getTime() + KST_OFFSET_MS) % 86_400_000).toBe(0);
+    expect(auditCutoff.getTime()).toBeLessThanOrEqual(Date.now());
+    expect(Date.now() - auditCutoff.getTime()).toBeLessThan(86_400_000);
   });
 
   it('ackSmsFailures updates only the still-unacknowledged ids and logs one audit entry each, in one transaction', async () => {

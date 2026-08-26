@@ -12,12 +12,21 @@ export type TeamMatchModel = {
   format: string;
   grade: string;
   style: string;
-  cost: number;
-  opponentCost: number;
+  /**
+   * 비용·매너·전적은 **모를 수 있다**(null). 호스트가 costNote 를 안 적은 매치가 있고,
+   * 팀 매너 점수·승수는 애초에 API 응답에 없는 값이다(V1TeamMatch.hostTeam 은
+   * trustState 카테고리만 준다). 예전에는 이 자리를 화면 골격용 목업(140,000원 · 매너 4.8 ·
+   * 승 23)으로 채워 **어느 매치를 열어도 같은 가짜 숫자가 보였다**(2026-08-23 alpha 실측).
+   * 숫자로 강제하지 않고 null 을 허용해, 모르는 값은 화면에서 감춘다.
+   */
+  cost: number | null;
+  opponentCost: number | null;
+  /** 값이 있으면 리그전 경기다. */
+  league?: { leagueId: string; title: string } | null;
   uniform: string;
   gender: string;
-  manner: number;
-  wins: number;
+  manner: number | null;
+  wins: number | null;
   status: 'open' | 'pending' | 'approved' | 'closed' | 'mine';
 };
 
@@ -72,6 +81,8 @@ export type TeamMatchDetailViewModel = {
     hostTeamId?: string | null;
     hostTeamLogoUrl?: string | null;
     hostTeamTrustState?: string | null;
+    /** 값이 있으면 리그전 경기다(리그 홈으로 딥링크). null 이면 일반 팀 매치. */
+    league?: { leagueId: string; title: string } | null;
     applicantActionError?: string | null;
     manageHref?: string;
     applicantTeams: Array<{

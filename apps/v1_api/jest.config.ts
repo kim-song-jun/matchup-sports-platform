@@ -59,6 +59,41 @@ const config: Config = {
         // test/team-matches/ noted above) so it can be registered without
         // reviving the other 6 pre-existing, unrelated failures.
         '<rootDir>/test/team-matches/team-match-lineup-size.integration-spec.ts',
+        // Task 153 승강 확정 경로. test/league-matches/ 는 이 줄이 생기기 전까지
+        // integration testMatch 에 **한 번도 등록된 적이 없다** — 그 디렉터리의 기존 4개
+        // 스펙(admin·public·forfeit·completion-projection)은 디스크에만 있고
+        // `jest --selectProjects integration`(CI 의 migration replay + drift gate 가 그대로
+        // 호출)으로 선택된 적이 없다. 위 team-schedules·team-match-series·team-lineups
+        // 주석이 경고하는 그 silent-omission 함정이 여기서도 반복됐다.
+        //
+        // 그 4개를 와일드카드로 한꺼번에 되살리면 이 PR 과 무관한 이유로 CI 가 깨진다
+        // (로컬 실측: 45건 중 44건 통과, 1건은 league-match-public 의 "state 필터" 케이스가
+        // 종목을 새로 만들어 경기 설정이 없는 탓에 409 COMPETITION_CONFIG_REQUIRED —
+        // 내 변경과 무관한 선재 결함이다). 그래서 team-matches 선례를 따라 이 레인이
+        // 새로 추가한 파일 하나만 명시 경로로 등록한다.
+        '<rootDir>/test/league-matches/league-promotion.integration-spec.ts',
+        // D1-a: 위 league-promotion 줄과 같은 이유로 명시 경로 등록이 필요하다 --
+        // test/league-matches/ 디렉터리 자체가 와일드카드로 등록돼 있지 않아서
+        // (league-match-forfeit/-admin/-completion-projection 세 스펙이 이미
+        // 디스크에만 존재하고 CI 에서 한 번도 선택된 적이 없다), 새 스펙 하나만
+        // 명시 경로로 추가한다. 그 세 스펙까지 와일드카드로 되살리면 이 PR 과 무관한
+        // 이유로 CI 가 깨질 수 있다(team-matches/team-match-series 선례와 동일).
+        '<rootDir>/test/league-matches/league-match-result-entry.integration-spec.ts',
+        // D2: 위 두 줄과 같은 이유로 명시 경로 등록이 필요하다 -- test/league-matches/
+        // 디렉터리 자체가 와일드카드로 등록돼 있지 않다(이 디렉터리에서 벌써 3번째
+        // 반복되는 silent-omission 함정).
+        '<rootDir>/test/league-matches/league-match-dispute.integration-spec.ts',
+        // U3: 같은 이유로 명시 경로 등록이 필요하다(이 디렉터리에서 벌써 4번째
+        // 반복되는 silent-omission 함정).
+        '<rootDir>/test/league-matches/league-match-detail-dispute-eligibility.integration-spec.ts',
+        // 대진 timing(경기 시간·휴식·팀당 하루 경기 수): 같은 이유로 명시 경로 등록
+        // (이 디렉터리 5번째 — 와일드카드 복원은 여전히 기존 4개 스펙의 무관한 실패를 되살린다).
+        '<rootDir>/test/league-matches/league-fixture-timing.integration-spec.ts',
+        // team-contacts (Task 8): 이 글롭이 없으면 `jest --selectProjects integration`
+        // (= CI 의 migration replay + drift gate) 가 이 디렉터리를 절대 선택하지 않는다.
+        // 이 레포에서 같은 실수가 이미 4회 반복 지적됐다 — 위 team-schedules/team-match-series/
+        // team-lineups/team-matches 주석 참고.
+        '<rootDir>/test/team-contacts/**/*.integration-spec.ts',
       ],
     },
     {

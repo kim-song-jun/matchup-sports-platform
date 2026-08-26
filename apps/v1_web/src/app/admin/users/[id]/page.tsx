@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useState, type FormEvent } from 'react';
 import {
   ArrowLeft,
   Calendar,
@@ -12,53 +12,34 @@ import {
   Users,
 } from 'lucide-react';
 import {
+  AdminDetailRow,
   AdminEmpty,
   AdminPageHeader,
   AdminStatusPill,
+  AdminSummaryItem,
   AdminTableSkeleton,
   AdminToasts,
   useAdminToast,
 } from '@/components/admin';
 import {
-  useV1AdminMe,
   useV1AdminUser,
   useV1DeleteAdminUser,
 } from '@/hooks/use-v1-api';
+import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
+import { formatAdminDateTime } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
+import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
+import { formatAuthProviders, formatGender, formatOnboardingStatus, formatUserTitle } from '@/lib/format-user';
 import type { V1AdminUserDetail } from '@/types/api';
 
-function formatDateTime(value: string | null | undefined) {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString('ko-KR', {
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
-}
-function formatGender(gender: V1AdminUserDetail['gender']) {
-  if (gender === 'male') return '남';
-  if (gender === 'female') return '여';
-  return '성별 미등록';
-}
-
 function formatVerification(value: string | null) {
-  return value ? `인증 · ${formatDateTime(value)}` : '미인증';
+  return value ? `인증 · ${formatAdminDateTime(value)}` : '미인증';
 }
 
-
-function formatAuthProviders(providers: V1AdminUserDetail['authProviders']) {
-  const labels = { kakao: '카카오', naver: '네이버', email: '이메일' } as const;
-  const values = providers ?? [];
-  return values.length > 0 ? values.map((provider) => labels[provider]).join(' · ') : '로그인 수단 없음';
-}
-
+// 목록(formatUserTitle)과 다른 로직을 복제해 같은 회원이 화면마다 다른 이름으로
+// 보이던 결함 — 표기는 lib/format-user.ts 단일 소스를 쓴다.
 function userTitle(user: V1AdminUserDetail) {
-  return user.nickname ?? user.displayName ?? user.email ?? user.userId.slice(0, 8);
+  return formatUserTitle(user);
 }
 
 type TeamMembershipRole = NonNullable<V1AdminUserDetail['teamMemberships']>[number]['role'];
@@ -77,27 +58,27 @@ const TEAM_ROLE_LABEL: Record<TeamMembershipRole, string> = {
   member: '멤버',
 };
 
-function DetailRow({ label, value }: { label: string; value: string | number | null | undefined }) {
-  return (
-    <div className="min-w-0 rounded-xl bg-[var(--surface-soft)] px-4 py-3">
-      <dt className="text-xs font-semibold text-gray-400">{label}</dt>
-      <dd className="mt-1 break-words text-sm font-semibold text-[var(--text-strong)]">{value ?? '-'}</dd>
-    </div>
-  );
-}
-
 export default function AdminUserDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const userId = params.id;
-  const { data: adminMe } = useV1AdminMe();
   const { data: user, isPending, isError, error, refetch } = useV1AdminUser(userId);
   const deleteMutation = useV1DeleteAdminUser(userId);
   const { toasts, showToast } = useAdminToast();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteReason, setDeleteReason] = useState('');
+  // 어드민 모달 중 유일하게 ESC·focus trap·포커스 복원이 없던 인라인 모달 — 공용 훅으로 표준화.
+  const {
+    dialogRef: deleteDialogRef,
+    initialFocusRef: deleteReasonRef,
+    onBackdropClick: onDeleteBackdropClick,
+  } = useModalA11y<HTMLTextAreaElement, HTMLFormElement>({
+    open: deleteOpen,
+    onClose: () => setDeleteOpen(false),
+    pending: deleteMutation.isPending,
+  });
 
-  const canWrite = adminMe?.capabilities.includes('status:write') ?? false;
+  const canWrite = useAdminCanWrite();
   const canDelete = canWrite && user?.accountStatus !== 'deleted';
 
   function handleDeleteSubmit(event: FormEvent<HTMLFormElement>) {
@@ -131,6 +112,7 @@ export default function AdminUserDetailPage() {
     return (
       <>
         <AdminPageHeader
+          eyebrow="플랫폼 · 회원"
           title="회원 상세"
           action={<BackLink />}
         />
@@ -158,6 +140,7 @@ export default function AdminUserDetailPage() {
   return (
     <>
       <AdminPageHeader
+        eyebrow="플랫폼 · 회원"
         title="회원 상세"
         description={userTitle(user)}
         action={<BackLink />}
@@ -179,22 +162,22 @@ export default function AdminUserDetailPage() {
             </div>
 
             <dl className="mt-5 grid gap-3 sm:grid-cols-2">
-              <DetailRow label="회원 ID" value={user.userId} />
-              <DetailRow label="이름" value={user.displayName} />
-              <DetailRow label="닉네임" value={user.nickname} />
-              <DetailRow label="이메일" value={user.email} />
-              <DetailRow label="이메일 인증" value={formatVerification(user.emailVerifiedAt)} />
-              <DetailRow label="전화번호" value={user.phone} />
-              <DetailRow label="전화번호 인증" value={formatVerification(user.phoneVerifiedAt)} />
-              <DetailRow label="성별" value={formatGender(user.gender)} />
-              <DetailRow label="생년월일" value={user.birthDate} />
-              <DetailRow label="활동 지역" value={user.displayRegion} />
-              <DetailRow label="로그인 방식" value={formatAuthProviders(user.authProviders)} />
-              <DetailRow label="온보딩" value={user.onboardingStatus} />
-              <DetailRow label="가입일" value={formatDateTime(user.createdAt)} />
-              <DetailRow label="최근 로그인" value={formatDateTime(user.lastLoginAt)} />
-              <DetailRow label="삭제일" value={formatDateTime(user.deletedAt)} />
-              <DetailRow label="관리자 권한" value={user.adminRole ?? '없음'} />
+              <AdminDetailRow label="회원 ID" value={user.userId} />
+              <AdminDetailRow label="이름" value={user.displayName} />
+              <AdminDetailRow label="닉네임" value={user.nickname} />
+              <AdminDetailRow label="이메일" value={user.email} />
+              <AdminDetailRow label="이메일 인증" value={formatVerification(user.emailVerifiedAt)} />
+              <AdminDetailRow label="전화번호" value={user.phone} />
+              <AdminDetailRow label="전화번호 인증" value={formatVerification(user.phoneVerifiedAt)} />
+              <AdminDetailRow label="성별" value={formatGender(user.gender)} />
+              <AdminDetailRow label="생년월일" value={user.birthDate} />
+              <AdminDetailRow label="활동 지역" value={user.displayRegion} />
+              <AdminDetailRow label="로그인 방식" value={formatAuthProviders(user.authProviders)} />
+              <AdminDetailRow label="온보딩" value={formatOnboardingStatus(user.onboardingStatus)} />
+              <AdminDetailRow label="가입일" value={formatAdminDateTime(user.createdAt)} />
+              <AdminDetailRow label="최근 로그인" value={formatAdminDateTime(user.lastLoginAt)} />
+              <AdminDetailRow label="삭제일" value={formatAdminDateTime(user.deletedAt)} />
+              <AdminDetailRow label="관리자 권한" value={user.adminRole ?? '없음'} />
             </dl>
             {user.bio ? (
               <div className="mt-3 rounded-xl bg-[var(--surface-soft)] px-4 py-3">
@@ -209,7 +192,7 @@ export default function AdminUserDetailPage() {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-[17px] font-bold text-[var(--text-strong)]">탈퇴 요청 메시지</h2>
                 <time className="text-xs font-semibold text-[var(--orange700)]">
-                  {formatDateTime(user.withdrawalRequest.requestedAt)}
+                  {formatAdminDateTime(user.withdrawalRequest.requestedAt)}
                 </time>
               </div>
               <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-relaxed text-[var(--text-strong)]">
@@ -225,7 +208,7 @@ export default function AdminUserDetailPage() {
               items={user.hostedMatches.map((match) => ({
                 id: match.matchId,
                 title: match.title,
-                meta: `${match.status} · ${formatDateTime(match.startAt)}`,
+                meta: `${match.status} · ${formatAdminDateTime(match.startAt)}`,
               }))}
             />
             <RelatedList
@@ -262,13 +245,13 @@ export default function AdminUserDetailPage() {
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
             <h2 className="text-[17px] font-bold text-[var(--text-strong)]">활동 요약</h2>
             <dl className="mt-4 grid gap-3">
-              <SummaryItem icon={<Calendar size={16} />} label="개설 매치" value={user.hostedMatchCount} />
-              <SummaryItem icon={<Users size={16} />} label="생성/소유 팀" value={user.ownedTeamCount} />
-              <SummaryItem icon={<Shield size={16} />} label="팀장 팀" value={teamRoles.owner} />
-              <SummaryItem icon={<Shield size={16} />} label="운영진 팀" value={teamRoles.manager} />
-              <SummaryItem icon={<Users size={16} />} label="소속팀 전체" value={teamMemberships.length} />
-              <SummaryItem icon={<Users size={16} />} label="일반 멤버 팀" value={teamRoles.member} />
-              <SummaryItem icon={<Clock size={16} />} label="리뷰 수" value={user.reputationSummary?.reviewCount ?? 0} />
+              <AdminSummaryItem icon={<Calendar size={16} />} label="개설 매치" value={user.hostedMatchCount} />
+              <AdminSummaryItem icon={<Users size={16} />} label="생성/소유 팀" value={user.ownedTeamCount} />
+              <AdminSummaryItem icon={<Shield size={16} />} label="팀장 팀" value={teamRoles.owner} />
+              <AdminSummaryItem icon={<Shield size={16} />} label="운영진 팀" value={teamRoles.manager} />
+              <AdminSummaryItem icon={<Users size={16} />} label="소속팀 전체" value={teamMemberships.length} />
+              <AdminSummaryItem icon={<Users size={16} />} label="일반 멤버 팀" value={teamRoles.member} />
+              <AdminSummaryItem icon={<Clock size={16} />} label="리뷰 수" value={user.reputationSummary?.reviewCount ?? 0} />
             </dl>
           </section>
 
@@ -293,11 +276,10 @@ export default function AdminUserDetailPage() {
       {deleteOpen ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 p-4"
-          onClick={(event) => {
-            if (event.target === event.currentTarget && !deleteMutation.isPending) setDeleteOpen(false);
-          }}
+          onClick={onDeleteBackdropClick}
         >
           <form
+            ref={deleteDialogRef}
             onSubmit={handleDeleteSubmit}
             // 전수검수: bg-white가 다크에서 안 뒤집혀 안의 text-[var(--text-strong)] 등이
             // 근접색이 되던 회귀 — 다른 어드민 모달들과 동일하게 --card-surface로 교체.
@@ -314,6 +296,7 @@ export default function AdminUserDetailPage() {
               삭제 사유
             </label>
             <textarea
+              ref={deleteReasonRef}
               id="delete-user-reason"
               value={deleteReason}
               onChange={(event) => setDeleteReason(event.target.value)}
@@ -359,18 +342,6 @@ export default function AdminUserDetailPage() {
       </button>
     );
   }
-}
-
-function SummaryItem({ icon, label, value }: { icon: ReactNode; label: string; value: number }) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-xl bg-[var(--surface-soft)] px-4 py-3">
-      <dt className="flex items-center gap-2 text-sm font-semibold text-[var(--text-muted)]">
-        <span className="text-gray-400" aria-hidden="true">{icon}</span>
-        {label}
-      </dt>
-      <dd className="text-sm font-bold tabular-nums text-[var(--text-strong)]">{value}</dd>
-    </div>
-  );
 }
 
 function RelatedList({

@@ -55,17 +55,24 @@ import {
   v1ReviewsReceivedFixture,
   v1ReviewsWrittenFixture,
   v1ReviewSubmitFixture,
+  v1ReportedTeamsFixture,
+  v1ReportedTeamsWindowDays,
   v1ReviewTeamMatchSourceFixture,
   v1SettingsFixture,
   v1SportsFixture,
   v1TeamMatchesFixture,
   v1TeamsFixture,
   v1UserFixture,
+  getReportedTeamIdForInquiry,
   toAdminInquiryDetail,
   toAdminInquiryRow,
 } from './fixtures';
 
 const api = '*/api/v1';
+
+// `/admin/inquiries/:inquiryId/block-reported-team` 멱등 상태 — 같은 문의를 두 번 차단해도
+// 두 번째부터는 alreadyBlocked: true 로 200 이 온다(에러 아님, admin.service.ts 실측).
+const blockedInquiryIds = new Set<string>();
 
 type RegisterField = SignupProfileField | 'nickname' | 'email' | 'password' | 'requiredTermsAccepted';
 
@@ -467,6 +474,7 @@ export const v1MswHandlers = [
     const inquiry: V1Inquiry = {
       inquiryId: `inquiry-${v1InquiriesFixture.items.length + 1}`,
       category: body.category as V1Inquiry['category'],
+      reportReason: null,
       title: body.title,
       body: body.body,
       contact: body.contact ?? null,
@@ -770,16 +778,34 @@ export const v1MswHandlers = [
     const params = new URL(request.url).searchParams;
     const status = params.get('status');
     const category = params.get('category');
+    const reportReason = params.get('reportReason');
+    const reportedTeamId = params.get('reportedTeamId');
     const q = params.get('q')?.trim().toLowerCase();
+    // reportedTeamId 는 칩이 없는 딥링크 필터라 자기 facet이 없다 — searched 단계에서 걸러
+    // 아래 세 facet(status/category/reportReason) 모두가 이미 걸러진 집합을 이어받게 한다
+    // (admin.service.ts의 statusFacetWhere/categoryFacetWhere/reportReasonFacetWhere 미러).
     const searched = v1InquiriesFixture.items.map(toAdminInquiryRow).filter((inquiry) => {
       if (q && !`${inquiry.title} ${inquiry.requesterName ?? ''} ${inquiry.requesterEmail ?? ''}`.toLowerCase().includes(q)) return false;
+      if (reportedTeamId && getReportedTeamIdForInquiry(inquiry.inquiryId) !== reportedTeamId) return false;
       return true;
     });
+    // 각 facet 은 "자기 자신을 뺀 나머지 필터" 로 집계한다 — admin.service.ts의 실제 규칙을
+    // 그대로 미러링한다(사유 하나를 골라도 다른 사유 칩 건수는 그대로 보여야 한다).
     const statusSource = searched.filter((inquiry) => {
+      if (category && inquiry.category !== category) return false;
+      if (reportReason && inquiry.reportReason !== reportReason) return false;
+      return true;
+    });
+    const categorySource = searched.filter((inquiry) => {
+      if (status && inquiry.status !== status) return false;
+      if (reportReason && inquiry.reportReason !== reportReason) return false;
+      return true;
+    });
+    const reportReasonSource = searched.filter((inquiry) => {
+      if (status && inquiry.status !== status) return false;
       if (category && inquiry.category !== category) return false;
       return true;
     });
-    const categorySource = searched.filter((inquiry) => !status || inquiry.status === status);
     const rows = statusSource.filter((inquiry) => !status || inquiry.status === status);
     return ok({
       ...page(rows),
@@ -787,12 +813,38 @@ export const v1MswHandlers = [
         total: statusSource.length,
         byStatus: countFacet(statusSource, ['received', 'reviewing', 'answered', 'closed'], (inquiry) => inquiry.status),
         byCategory: countFacet(categorySource, ['account', 'match', 'team', 'tournament', 'payment_refund', 'report', 'other'], (inquiry) => inquiry.category),
+        byReportReason: countFacet(reportReasonSource, ['spam', 'harassment', 'impersonation', 'inappropriate', 'other'], (inquiry) => inquiry.reportReason ?? ''),
       },
     });
   }),
   http.get(`${api}/admin/inquiries/:inquiryId`, ({ params }) => {
     const inquiry = v1InquiriesFixture.items.find((item) => item.inquiryId === params.inquiryId) ?? v1InquiriesFixture.items[0];
     return ok(toAdminInquiryDetail(inquiry));
+  }),
+  http.get(`${api}/admin/reports/teams`, ({ request }) => {
+    const limitParam = new URL(request.url).searchParams.get('limit');
+    const limit = limitParam ? Math.min(Math.max(Number(limitParam), 1), 50) : 20;
+    return ok({ items: v1ReportedTeamsFixture.slice(0, limit), windowDays: v1ReportedTeamsWindowDays });
+  }),
+  http.post(`${api}/admin/inquiries/:inquiryId/block-reported-team`, ({ params }) => {
+    const inquiryId = params.inquiryId as string;
+    const reportedTeamId = getReportedTeamIdForInquiry(inquiryId);
+    if (!reportedTeamId) {
+      return HttpResponse.json(
+        {
+          status: 'error',
+          statusCode: 409,
+          code: 'REPORT_TARGET_UNKNOWN',
+          message: '신고 대상 팀을 알 수 없어 차단할 수 없어요.',
+          timestamp: '2026-05-18T00:00:00.000Z',
+        },
+        { status: 409 },
+      );
+    }
+    // 멱등 — 두 번째 클릭도 에러가 아니라 200 + alreadyBlocked: true 여야 한다(admin.service.ts 실측, P2002 흡수).
+    const alreadyBlocked = blockedInquiryIds.has(inquiryId);
+    blockedInquiryIds.add(inquiryId);
+    return ok({ blocked: true, alreadyBlocked, teamId: 'team-1', blockedTeamId: reportedTeamId });
   }),
   http.post(`${api}/admin/inquiries/:inquiryId/replies`, async ({ params, request }) => {
     const body = await request.json() as { body: string };
@@ -1072,6 +1124,8 @@ export const v1MswHandlers = [
       missingScorer: false,
       mvpParticipantId: body.mvpParticipantId ?? null,
       reason: body.reason ?? null,
+      outcomeReason: 'NORMAL',
+      outcomeNote: null,
       createdByActorType: 'USER',
       createdByUserId: 'user-1',
       createdBySystemActor: null,

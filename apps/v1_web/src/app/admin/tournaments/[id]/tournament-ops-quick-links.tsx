@@ -32,8 +32,8 @@ export function TournamentOpsQuickLinks({ tournamentId }: { tournamentId: string
   }
 
   const links = [
-    { href: `/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/staff?from=admin`, label: '스태프 배정 콘솔' },
-    { href: `/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/operations?from=admin`, label: '운영 보드' },
+    { href: `/admin/live/${encodeURIComponent(tournamentId)}/staff`, label: '스태프 배정 콘솔' },
+    { href: `/admin/live/${encodeURIComponent(tournamentId)}/operations`, label: '운영 보드' },
   ];
 
   return (
@@ -48,7 +48,7 @@ export function TournamentOpsQuickLinks({ tournamentId }: { tournamentId: string
             className="inline-flex flex-col items-start min-h-[44px] px-3 py-1 rounded-lg text-xs font-medium whitespace-nowrap text-gray-400 bg-[var(--surface-soft)] cursor-not-allowed text-left"
           >
             <span>{link.label}</span>
-            <span className="text-[var(--font-size-micro)] font-normal text-gray-400">{reasonLabel}</span>
+            <span className="text-[length:var(--font-size-micro)] font-normal text-gray-400">{reasonLabel}</span>
           </button>
         ) : (
           <Link

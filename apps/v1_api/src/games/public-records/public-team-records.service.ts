@@ -8,7 +8,7 @@ import {
   parseTournamentFixtureOfficialScore,
   resolveGoalDisplaySideId,
 } from '../../tournaments/tournament-fixture-official-result';
-import { PublicRecordsQueryDto } from './dto/public-records-query.dto';
+import { TeamRecordsQueryDto } from './dto/public-records-query.dto';
 import { decodeRecordCursor, encodeRecordCursor, type RecordCursor } from './public-cursor';
 import { loadParticipantConsentEligibility, type ParticipantConsentEligibility } from './public-consent';
 import {
@@ -18,7 +18,9 @@ import {
   parseCardColor,
   resolveParticipantDisplayName,
   resolveParticipantNameEligible,
+  resolveParticipantProfileHref,
 } from './participant-name-gating';
+import { classifyTeamRecordCategory, type TeamRecordCategory } from './team-record-category';
 
 type GameSideRow = { readonly id: string; readonly sideKey: 'HOME' | 'AWAY'; readonly teamId: string | null };
 type GameParticipantRow = {
@@ -61,6 +63,8 @@ type TeamRecordEventRow = {
   readonly side: 'own' | 'opponent';
   readonly participantName: string | null;
   readonly jerseyNumber: number | null;
+  /** 공개 프로필 경로 -- 열어도 되는지까지 서버가 판단한 값(`resolveParticipantProfileHref`). */
+  readonly profileHref: string | null;
   readonly period: number | null;
   readonly clockMs: number | null;
   readonly cardColor: 'YELLOW' | 'RED' | null;
@@ -86,7 +90,7 @@ type TeamRecordEventRow = {
 export class PublicTeamRecordsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getRecords(teamId: string, query: PublicRecordsQueryDto) {
+  async getRecords(teamId: string, query: TeamRecordsQueryDto) {
     const team = await this.prisma.v1Team.findUnique({
       where: { id: teamId },
       select: { id: true, name: true, profile: { select: { logoUrl: true } } },
@@ -99,9 +103,17 @@ export class PublicTeamRecordsService {
     const cursor = decodeRecordCursor(query.cursor);
     const seasonRange = seasonBounds(query.season);
 
-    const [rawFacts, summary] = await Promise.all([
-      this.fetchRawFacts(teamId, limit, cursor, seasonRange),
+    // 집계(summary/byType)는 `type` 필터와 무관하게 항상 전체 기준이다 -- 필터는
+    // items 목록에만 적용된다(과제 지시: "페이지네이션과 집계를 섞지 마라"). 종류별
+    // 뱃지·탭을 동시에 보여주려면 요약이 필터에 따라 흔들리면 안 된다.
+    //
+    // `availableSeasons`도 같은 이유로 `season`/`type` 둘 다와 무관하게 항상 팀
+    // 전체 기준이다 -- 한 시즌을 고른 상태에서 드롭다운을 다시 열어도 선택지 자체가
+    // 줄어들면 안 된다(그 시즌만 있는 것처럼 보이는 함정).
+    const [rawFacts, summary, availableSeasons] = await Promise.all([
+      this.fetchRawFacts(teamId, limit, cursor, seasonRange, query.type),
       this.fetchSummary(teamId, seasonRange),
+      this.fetchAvailableSeasons(teamId),
     ]);
 
     const hasMore = rawFacts.length > limit;
@@ -116,7 +128,14 @@ export class PublicTeamRecordsService {
     const tournamentIds = Array.from(
       new Set(currentRows.map((row) => row.tournamentId).filter((id): id is string => id !== null)),
     );
-    const [opponentTeams, tournaments, eventsByGameId] = await Promise.all([
+    const teamMatchIds = Array.from(
+      new Set(
+        currentRows
+          .map((row) => row.resultRevision.game.teamMatchId)
+          .filter((id): id is string => id !== null),
+      ),
+    );
+    const [opponentTeams, tournaments, teamMatches, eventsByGameId] = await Promise.all([
       opponentTeamIds.length === 0
         ? []
         : this.prisma.v1Team.findMany({
@@ -126,31 +145,57 @@ export class PublicTeamRecordsService {
       tournamentIds.length === 0
         ? []
         : this.prisma.v1Tournament.findMany({ where: { id: { in: tournamentIds } }, select: { id: true, title: true } }),
+      // 리그 맥락(leagueId/leagueTitle)은 tournamentId 처럼 fact 에 직접 실려 있지
+      // 않는다 -- 팀매치를 거쳐야만 얻어진다(game.teamMatchId -> V1TeamMatch.leagueId).
+      // tournamentId 조회와 같은 "단일 IN 조회로 제목을 붙이는" 패턴을 그대로
+      // 따르되, 이쪽은 leagueId 를 얻기 위한 조회가 한 단계 더 필요하다(아래 leagues).
+      teamMatchIds.length === 0
+        ? []
+        : this.prisma.v1TeamMatch.findMany({
+            where: { id: { in: teamMatchIds } },
+            select: { id: true, leagueId: true },
+          }),
       this.loadEvents(currentRows, teamId),
     ]);
     const opponentNameById = new Map(opponentTeams.map((row) => [row.id, row.name]));
     const opponentLogoById = new Map(opponentTeams.map((row) => [row.id, row.profile?.logoUrl ?? null]));
     const tournamentTitleById = new Map(tournaments.map((row) => [row.id, row.title]));
+    const leagueIdByTeamMatchId = new Map(teamMatches.map((row) => [row.id, row.leagueId]));
+    const leagueIds = Array.from(
+      new Set(Array.from(leagueIdByTeamMatchId.values()).filter((id): id is string => id !== null)),
+    );
+    const leagues =
+      leagueIds.length === 0
+        ? []
+        : await this.prisma.v1League.findMany({ where: { id: { in: leagueIds } }, select: { id: true, title: true } });
+    const leagueTitleById = new Map(leagues.map((row) => [row.id, row.title]));
 
-    const items = currentRows.map((row) => ({
-      gameId: row.gameId,
-      // exactly-one-source: a game is either tournament-sourced (tournamentId set) or
-      // team-match-sourced (teamMatchId set), never both -- see V1Game's CHECK constraint.
-      teamMatchId: row.resultRevision.game.teamMatchId,
-      tournamentId: row.tournamentId,
-      tournamentTitle: row.tournamentId === null ? null : (tournamentTitleById.get(row.tournamentId) ?? null),
-      opponentTeamId: row.opponentTeamId,
-      opponentTeamName: row.opponentTeamId === null ? null : (opponentNameById.get(row.opponentTeamId) ?? null),
-      opponentTeamLogoUrl: row.opponentTeamId === null ? null : (opponentLogoById.get(row.opponentTeamId) ?? null),
-      result: row.result,
-      // 정규시간 스코어 그대로 -- 승부차기로 덮어쓰지 않는다(계약). 승부차기는 아래
-      // penalties 필드에서 별도로 실린다.
-      goalsFor: row.goalsFor,
-      goalsAgainst: row.goalsAgainst,
-      penalties: resolveTeamPenalties(row.resultRevision.score, row.resultRevision.game.sides, teamId),
-      events: eventsByGameId.get(row.gameId) ?? [],
-      playedAt: row.playedAt.toISOString(),
-    }));
+    const items = currentRows.map((row) => {
+      const teamMatchId = row.resultRevision.game.teamMatchId;
+      const leagueId = teamMatchId === null ? null : (leagueIdByTeamMatchId.get(teamMatchId) ?? null);
+      return {
+        gameId: row.gameId,
+        // exactly-one-source: a game is either tournament-sourced (tournamentId set) or
+        // team-match-sourced (teamMatchId set), never both -- see V1Game's CHECK constraint.
+        teamMatchId,
+        tournamentId: row.tournamentId,
+        tournamentTitle: row.tournamentId === null ? null : (tournamentTitleById.get(row.tournamentId) ?? null),
+        leagueId,
+        leagueTitle: leagueId === null ? null : (leagueTitleById.get(leagueId) ?? null),
+        type: classifyTeamRecordCategory({ tournamentId: row.tournamentId, leagueId }),
+        opponentTeamId: row.opponentTeamId,
+        opponentTeamName: row.opponentTeamId === null ? null : (opponentNameById.get(row.opponentTeamId) ?? null),
+        opponentTeamLogoUrl: row.opponentTeamId === null ? null : (opponentLogoById.get(row.opponentTeamId) ?? null),
+        result: row.result,
+        // 정규시간 스코어 그대로 -- 승부차기로 덮어쓰지 않는다(계약). 승부차기는 아래
+        // penalties 필드에서 별도로 실린다.
+        goalsFor: row.goalsFor,
+        goalsAgainst: row.goalsAgainst,
+        penalties: resolveTeamPenalties(row.resultRevision.score, row.resultRevision.game.sides, teamId),
+        events: eventsByGameId.get(row.gameId) ?? [],
+        playedAt: row.playedAt.toISOString(),
+      };
+    });
 
     const lastPageRow = pageRows[pageRows.length - 1];
     const nextCursor =
@@ -163,9 +208,27 @@ export class PublicTeamRecordsService {
       teamName: team.name,
       teamLogoUrl: team.profile?.logoUrl ?? null,
       summary,
+      availableSeasons,
       items,
       nextCursor,
     };
+  }
+
+  /**
+   * 시즌 드롭다운의 선택지 소스 -- 팀에 공식 경기가 있었던 연도(`playedAt` 4자리 연도)만,
+   * 하드코딩 없이 실데이터 기준으로 내려준다. `fetchSummary`/`fetchRawFacts`와 동일하게
+   * "그 게임의 현재 공식 리비전"만 센다(취소·구버전 리비전은 시즌 목록에 유령 연도를
+   * 남기지 않는다). 내림차순(최신 시즌 먼저) -- 드롭다운 첫 항목이 최근 시즌이 되도록.
+   */
+  private async fetchAvailableSeasons(teamId: string): Promise<readonly string[]> {
+    const rows = await this.prisma.$queryRaw<{ readonly season: string }[]>(Prisma.sql`
+      SELECT DISTINCT to_char(trf.played_at, 'YYYY') AS season
+      FROM v1_team_record_facts trf
+      INNER JOIN v1_games g ON g.id = trf.game_id AND g.current_official_revision_id = trf.revision_id
+      WHERE trf.team_id = ${teamId}
+      ORDER BY season DESC
+    `);
+    return rows.map((row) => row.season);
   }
 
   private async fetchRawFacts(
@@ -173,23 +236,37 @@ export class PublicTeamRecordsService {
     limit: number,
     cursor: RecordCursor | null,
     seasonRange: { readonly gte: Date; readonly lt: Date } | null,
+    typeFilter: TeamRecordCategory | undefined,
   ): Promise<TeamRecordFactRow[]> {
     type PageKeyRow = { readonly id: string; readonly playedAt: Date };
-    const seasonFilter = seasonRange
+    const seasonSql = seasonRange
       ? Prisma.sql`AND trf.played_at >= ${seasonRange.gte} AND trf.played_at < ${seasonRange.lt}`
       : Prisma.empty;
-    const cursorFilter = cursor
+    const cursorSql = cursor
       ? Prisma.sql`AND (trf.played_at < ${new Date(cursor.key)} OR (trf.played_at = ${new Date(cursor.key)} AND trf.id < ${cursor.id}))`
       : Prisma.empty;
+    // `tm`(v1_team_matches) 은 leagueId 판정에만 쓴다 -- tournamentId 는 이미
+    // trf 자체 컬럼이라 조인이 필요 없다. `classifyTeamRecordCategory` 와 동일한
+    // 우선순위(tournamentId 우선)를 SQL에서도 그대로 지킨다.
+    const typeSql =
+      typeFilter === undefined
+        ? Prisma.empty
+        : typeFilter === 'tournament'
+          ? Prisma.sql`AND trf.tournament_id IS NOT NULL`
+          : typeFilter === 'league'
+            ? Prisma.sql`AND trf.tournament_id IS NULL AND tm.league_id IS NOT NULL`
+            : Prisma.sql`AND trf.tournament_id IS NULL AND tm.league_id IS NULL`;
     const pageKeys = await this.prisma.$queryRaw<PageKeyRow[]>(Prisma.sql`
       SELECT trf.id, trf.played_at AS "playedAt"
       FROM v1_team_record_facts trf
       INNER JOIN v1_games game
         ON game.id = trf.game_id
        AND game.current_official_revision_id = trf.revision_id
+      LEFT JOIN v1_team_matches tm ON tm.id = game.team_match_id
       WHERE trf.team_id = ${teamId}
-      ${seasonFilter}
-      ${cursorFilter}
+      ${seasonSql}
+      ${cursorSql}
+      ${typeSql}
       ORDER BY trf.played_at DESC, trf.id DESC
       LIMIT ${limit + 1}
     `);
@@ -292,15 +369,33 @@ export class PublicTeamRecordsService {
       eventsByGame.set(event.gameId, list);
     }
 
-    const scorerParticipantIds = Array.from(eventsByGame.values())
-      .flat()
-      .map((event) => event.participantId)
-      .filter((id): id is string => id !== null);
-    // 정책 공개(기본값)에서는 이름이 동의와 무관하게 항상 보이므로 이 맵을 채울 필요가
-    // 없다 -- 대회 기록의 동일한 게이팅과 이유가 같다(participant-name-gating.ts).
-    const consentMap = isTournamentParticipantNameGatingReverted()
-      ? await loadParticipantConsentEligibility(this.prisma, scorerParticipantIds)
-      : new Map<string, ParticipantConsentEligibility>();
+    // 공식 리비전의 goalEvents(JSON) 는 `V1GameEvent` 행이 아니다 -- 백필된 골은 그쪽에만
+    // 있다. 아래 렌더 루프가 그 participantId 로도 `consentMap` 을 조회하므로, 여기서 함께
+    // 모으지 않으면 그런 골에는 `profileHref` 가 영영 붙지 않는다(Copilot 리뷰 지적).
+    // 이름 게이팅에서는 이 구멍이 드러나지 않았다 -- 정책 공개 기본값에서
+    // `resolveParticipantNameEligible` 이 consent 를 보지 않고 항상 true 를 돌려주기 때문에,
+    // 프로필 링크가 처음으로 이 경로를 실제로 사용하게 됐다.
+    //
+    // 파싱 결과를 Map 에 담아 아래 루프가 재사용한다 -- 같은 JSON 을 두 번 파싱하지 않는다.
+    const revisionGoalsByGameId = new Map(
+      currentRows.map((row) => [row.gameId, parseTournamentFixtureRevisionGoals(row.resultRevision.goalEvents)] as const),
+    );
+    const scorerParticipantIds = [
+      ...Array.from(eventsByGame.values())
+        .flat()
+        .map((event) => event.participantId),
+      ...Array.from(revisionGoalsByGameId.values()).flatMap((goals) =>
+        (goals ?? []).map((goal) => goal.participantId),
+      ),
+    ].filter((id): id is string => id !== null);
+    // **항상 조회한다.** 이름 게이팅(되돌린 상태에서만 동작)에는 쓰이지 않지만, 프로필
+    // 링크(`resolveParticipantProfileHref`)는 정책 공개 기본값에서도 동의를 확인해야 하기
+    // 때문이다 -- 게이팅 플래그로 감싸 두면 기본 운영 설정에서 이 맵이 비어 `profileHref`
+    // 가 항상 null 이 된다(#707 에서 getMatch 가 바로 그 결함으로 리뷰에 걸렸다).
+    // 이 화면은 관전자 폴링 경로가 아니라(`usePublicTeamRecords` 에 refetchInterval 없음)
+    // 매 요청 조회 비용도 문제되지 않는다 -- 폴링되는 일정 카드가 이 맵을 여전히 게이팅
+    // 뒤에 두는 이유와 대비된다.
+    const consentMap = await loadParticipantConsentEligibility(this.prisma, scorerParticipantIds);
     const nameProfileByUserId = await loadParticipantNameProfiles(
       this.prisma,
       currentRows.flatMap((row) => row.resultRevision.game.participants.map((participant) => participant.userId)),
@@ -318,7 +413,7 @@ export class PublicTeamRecordsService {
         row.resultRevision.game.participants.map((participant) => [participant.id, participant.sideId] as const),
       );
 
-      const revisionGoals = parseTournamentFixtureRevisionGoals(row.resultRevision.goalEvents);
+      const revisionGoals = revisionGoalsByGameId.get(row.gameId) ?? null;
       const rows = (eventsByGame.get(row.gameId) ?? [])
         .filter((event) => revisionGoals === null || event.type === 'CARD')
         .map((event) => {
@@ -346,6 +441,8 @@ export class PublicTeamRecordsService {
             side: (eventSideKey !== null && eventSideKey === ownSideKey ? 'own' : 'opponent') as 'own' | 'opponent',
             participantName: eligible ? resolveParticipantDisplayName(participant, nameProfileByUserId) : null,
             jerseyNumber: eligible ? (participant?.jerseyNumber ?? null) : null,
+            // 이름이 보일 때만 링크를 건다 -- '비공개 선수'에 링크를 걸면 안 된다.
+            profileHref: eligible ? resolveParticipantProfileHref(participant?.userId ?? null, consent) : null,
             period: isPeriodUnknown(event.payload) ? null : event.period,
             clockMs: isMinuteUnknown(event.payload) ? null : event.clockMs,
             cardColor: event.type === 'CARD' ? parseCardColor(event.payload) : null,
@@ -377,6 +474,7 @@ export class PublicTeamRecordsService {
                 ? resolveParticipantDisplayName(participant, nameProfileByUserId)
                 : null,
               jerseyNumber: eligible ? (participant?.jerseyNumber ?? null) : null,
+              profileHref: eligible ? resolveParticipantProfileHref(participant?.userId ?? null, consent) : null,
               period: event.period,
               clockMs: event.minute === null ? null : event.minute * 60000,
               cardColor: null,
@@ -390,6 +488,13 @@ export class PublicTeamRecordsService {
     return result;
   }
 
+  /**
+   * 전체 요약 + 종류별(리그/대회/친선) 구간 집계를 **한 번의 GROUP BY 쿼리**로 얻는다.
+   * 페이지(limit/cursor)와는 완전히 무관하다 -- season 필터만 적용되고, 나머지는
+   * 팀의 전체 전적 기준이다(과제 지시: "집계는 페이지가 아니라 전체 기준이어야 한다").
+   * overall 은 별도 쿼리를 새로 만들지 않고 category 행들을 합산해서 얻는다 -- 두
+   * 쿼리가 서로 다른 값을 낼 여지 자체를 없앤다.
+   */
   private async fetchSummary(
     teamId: string,
     seasonRange: { readonly gte: Date; readonly lt: Date } | null,
@@ -400,53 +505,71 @@ export class PublicTeamRecordsService {
     lost: number;
     goalsFor: number;
     goalsAgainst: number;
+    byType: Record<TeamRecordCategory, TeamRecordSummaryTotals>;
   }> {
-    type SummaryRow = {
-      played: number;
-      won: number;
-      drawn: number;
-      lost: number;
-      goalsFor: number;
-      goalsAgainst: number;
+    type CategorySummaryRow = TeamRecordSummaryTotals & { category: TeamRecordCategory };
+    const seasonSql = seasonRange
+      ? Prisma.sql`AND trf.played_at >= ${seasonRange.gte} AND trf.played_at < ${seasonRange.lt}`
+      : Prisma.empty;
+    const rows = await this.prisma.$queryRaw<CategorySummaryRow[]>(Prisma.sql`
+      SELECT
+        CASE
+          WHEN trf.tournament_id IS NOT NULL THEN 'tournament'
+          WHEN tm.league_id IS NOT NULL THEN 'league'
+          ELSE 'friendly'
+        END AS category,
+        COUNT(*)::int AS played,
+        COUNT(*) FILTER (WHERE trf.result = 'WON')::int AS won,
+        COUNT(*) FILTER (WHERE trf.result = 'DRAWN')::int AS drawn,
+        COUNT(*) FILTER (WHERE trf.result = 'LOST')::int AS lost,
+        COALESCE(SUM(trf.goals_for), 0)::int AS "goalsFor",
+        COALESCE(SUM(trf.goals_against), 0)::int AS "goalsAgainst"
+      FROM v1_team_record_facts trf
+      INNER JOIN v1_games g ON g.id = trf.game_id AND g.current_official_revision_id = trf.revision_id
+      LEFT JOIN v1_team_matches tm ON tm.id = g.team_match_id
+      WHERE trf.team_id = ${teamId}
+      ${seasonSql}
+      GROUP BY category
+    `);
+
+    const zero: TeamRecordSummaryTotals = { played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0 };
+    const byType: Record<TeamRecordCategory, TeamRecordSummaryTotals> = {
+      league: { ...zero },
+      tournament: { ...zero },
+      friendly: { ...zero },
     };
-    const rows = seasonRange
-      ? await this.prisma.$queryRaw<SummaryRow[]>`
-          SELECT
-            COUNT(*)::int AS played,
-            COUNT(*) FILTER (WHERE trf.result = 'WON')::int AS won,
-            COUNT(*) FILTER (WHERE trf.result = 'DRAWN')::int AS drawn,
-            COUNT(*) FILTER (WHERE trf.result = 'LOST')::int AS lost,
-            COALESCE(SUM(trf.goals_for), 0)::int AS "goalsFor",
-            COALESCE(SUM(trf.goals_against), 0)::int AS "goalsAgainst"
-          FROM v1_team_record_facts trf
-          INNER JOIN v1_games g ON g.id = trf.game_id AND g.current_official_revision_id = trf.revision_id
-          WHERE trf.team_id = ${teamId}
-            AND trf.played_at >= ${seasonRange.gte}
-            AND trf.played_at < ${seasonRange.lt}
-        `
-      : await this.prisma.$queryRaw<SummaryRow[]>`
-          SELECT
-            COUNT(*)::int AS played,
-            COUNT(*) FILTER (WHERE trf.result = 'WON')::int AS won,
-            COUNT(*) FILTER (WHERE trf.result = 'DRAWN')::int AS drawn,
-            COUNT(*) FILTER (WHERE trf.result = 'LOST')::int AS lost,
-            COALESCE(SUM(trf.goals_for), 0)::int AS "goalsFor",
-            COALESCE(SUM(trf.goals_against), 0)::int AS "goalsAgainst"
-          FROM v1_team_record_facts trf
-          INNER JOIN v1_games g ON g.id = trf.game_id AND g.current_official_revision_id = trf.revision_id
-          WHERE trf.team_id = ${teamId}
-        `;
-    const row = rows[0];
-    return {
-      played: row?.played ?? 0,
-      won: row?.won ?? 0,
-      drawn: row?.drawn ?? 0,
-      lost: row?.lost ?? 0,
-      goalsFor: row?.goalsFor ?? 0,
-      goalsAgainst: row?.goalsAgainst ?? 0,
-    };
+    const overall: { -readonly [K in keyof TeamRecordSummaryTotals]: number } = { ...zero };
+    for (const row of rows) {
+      const totals: TeamRecordSummaryTotals = {
+        played: row.played,
+        won: row.won,
+        drawn: row.drawn,
+        lost: row.lost,
+        goalsFor: row.goalsFor,
+        goalsAgainst: row.goalsAgainst,
+      };
+      byType[row.category] = totals;
+      overall.played += totals.played;
+      overall.won += totals.won;
+      overall.drawn += totals.drawn;
+      overall.lost += totals.lost;
+      overall.goalsFor += totals.goalsFor;
+      overall.goalsAgainst += totals.goalsAgainst;
+    }
+
+    return { ...overall, byType };
   }
 }
+
+/** `fetchSummary`의 승-무-패-득실 한 구간. 전체 요약과 `byType`의 각 항목이 공유하는 모양. */
+type TeamRecordSummaryTotals = {
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  goalsFor: number;
+  goalsAgainst: number;
+};
 
 /**
  * `resultRevision.score`(정규시간 + 선택적 승부차기)를 이 팀 관점 for/against로

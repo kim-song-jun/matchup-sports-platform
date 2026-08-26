@@ -1,12 +1,13 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import type { ChangeEvent } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
-import { ChevronLeftIcon, FilterIcon, HomeIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
+import { ChevronLeftIcon, ChevronRightIcon, FilterIcon, HomeIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
 import { NotificationBellButton } from '@/components/v1-ui/notification-bell';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
@@ -97,22 +98,48 @@ function TeamMatchCreateFloatingButton() {
   );
 }
 
-function teamMatchOpponentLabel(mode: TeamMatchDetailViewModel['mode']) {
+/*
+ * mode('default'/'pending'/'approved'/'mine')만으로는 "상대가 이미 정해졌거나 경기가
+ * 끝난 매치를 guest/비참여자가 보는 경우"를 구분할 수 없다 — mode는 항상 'default'로
+ * 떨어진다(viewerState 기준일 뿐 경기 진행 상태를 안 본다). match.status(카드 레벨
+ * open/closed 판정, toTeamMatch의 statusToCardStatus)는 API status까지 반영하므로
+ * 여기서 함께 봐야 완료된 리그 경기를 열어도 "모집 중"이 뜨지 않는다(alpha 실측 C-1).
+ */
+function teamMatchOpponentLabel(mode: TeamMatchDetailViewModel['mode'], match: TeamMatchDetailViewModel['match']) {
   if (mode === 'pending') return '검토 중';
-  if (mode === 'approved') return '승인 완료';
+  if (mode === 'approved') {
+    // 승인된 시점부터 상대는 확정이다 — 팀 이름 자리에 신청 상태("승인 완료")를 넣으면
+    // 정작 누구와 붙는지가 화면에서 사라진다(2026-08-25 사용자 보고). applicantTeams에는
+    // 승인된 팀(=이 뷰어의 팀) 하나가 '승인 완료' 상태로 담겨 온다 — 아래 closed 분기와
+    // 같은 소스다. 이름을 못 찾는 예외 상황에서만 기존 상태 문구로 물러난다.
+    const approvedOpponent = match.applicantTeams.find((team) => team.status === '승인 완료');
+    return approvedOpponent?.name ?? '승인 완료';
+  }
   if (mode === 'mine') return '신청팀';
+  if (match.status === 'closed') {
+    // approvedOpponentTeam이 있으면 applicantTeams에 그 팀 하나만 '승인 완료' 상태로 담겨
+    // 온다(team-matches-client.tsx toApplicantTeamsWithActions) — guest에게도 이 필드는
+    // 그대로 내려오므로 실제 상대팀 이름을 보여줄 수 있다.
+    const approvedOpponent = match.applicantTeams.find((team) => team.status === '승인 완료');
+    return approvedOpponent?.name ?? '모집 마감';
+  }
   return '모집 중';
 }
 
-function teamMatchOpponentSub(mode: TeamMatchDetailViewModel['mode']) {
+function teamMatchOpponentSub(mode: TeamMatchDetailViewModel['mode'], match: TeamMatchDetailViewModel['match'], statusLabel?: string) {
   if (mode === 'pending') return '홈팀 검토 중';
   if (mode === 'approved') return '참가 확정';
   if (mode === 'mine') return '승인 후 확정';
+  // statusLabel(모델에서 이미 계산돼 온 문구)이 matched/completed/cancelled를
+  // 구분해 정확한 상태를 준다 — team-matches-client.tsx statusLabel() 참고.
+  if (match.status === 'closed') return statusLabel ?? '신청 마감';
   return '신청 후 승인';
 }
 
 export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewModel }) {
+  const router = useRouter();
   const { match, mode } = model;
+  const league = match.league;
   const locked = mode === 'pending' || mode === 'approved';
   const cta = model.applyLabel ?? (mode === 'mine' ? '매치 관리' : mode === 'approved' ? '승인 완료' : mode === 'pending' ? '신청 취소' : '신청하기');
   const canRunAction = Boolean(model.onApply);
@@ -175,9 +202,38 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
         <div className="tm-text-body-lg" style={{ marginTop: 2 }}>{match.hostTeam}</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 5 }}>
           <span className="tm-badge tm-badge-blue">{match.sport}</span>
-          <span className="tm-badge tm-badge-grey">{match.grade}등급</span>
-          {match.hostTeamTrustState && match.hostTeamTrustState !== 'none' ? (
+          {/* 등급 미입력(리그 대진 등 levelLabel 없음)이면 값 없는 "등급" 배지가 뜬다 — 숨긴다. */}
+          {match.grade ? <span className="tm-badge tm-badge-grey">{match.grade}등급</span> : null}
+          {match.hostTeamTrustState && trustStateLabel(match.hostTeamTrustState) ? (
             <span className="tm-badge tm-badge-blue">{trustStateLabel(match.hostTeamTrustState)}</span>
+          ) : null}
+          {/* 리그 상세 페이지는 앱 안에 진입점이 전혀 없었다(직접 URL 만) -- 이 링크가
+              사실상 첫 통로다. 배지 자체를 링크로 만들어 리그명을 함께 보여준다.
+              hostTeamCard 전체가 이미 팀 상세로 가는 Link라 배지를 또 <a>로 두면 <a>가
+              중첩돼 브라우저가 바깥 <a>를 조기에 닫아버린다(오케스트레이터 지적,
+              2026-08-20) -- TeamMatchCard(R3, 목록 카드 리그전 배지)와 동일하게
+              button + preventDefault/stopPropagation + router.push로 바꿨고,
+              같은 .tm-league-badge-link 클래스를 재사용해 화살표 아이콘+밑줄로
+              "클릭 가능함"을 컬러 외 신호로도 전달한다. */}
+          {league ? (
+            <button
+              type="button"
+              className="tm-badge tm-badge-grey tm-league-badge-link"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                router.push(`/league-matches/${league.leagueId}`);
+              }}
+              aria-label={`${league.title} 리그 상세로 이동`}
+            >
+              {/* F7: 리그명이 길면 배지가 카드 밖으로 밀려 나가 화면이 가로로 스크롤됐다
+                  (390px 실측: 카드 밖 152px, 뷰포트 밖 37px). 리그명만 말줄임하고
+                  화살표는 항상 보이게 텍스트를 별도 span 으로 감싼다 — 팀 상세의
+                  "내 리그" 목록이 이미 쓰는 처리와 같은 방식이다.
+                  목록 카드 쪽 배지(아래)는 리그명 없이 '정규 리그'만 실어서 넘치지 않는다. */}
+              <span className="tm-league-badge-text">정규 리그 · {league.title}</span>
+              <ChevronRightIcon size={12} strokeWidth={2.5} aria-hidden="true" />
+            </button>
           ) : null}
         </div>
       </div>
@@ -239,13 +295,18 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
                 <div>
                   <div className="tm-text-caption" style={{ color: 'var(--overlay-white-68)' }}>홈팀</div>
                   <div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{match.hostTeam}</div>
-                  <div className="tm-text-micro" style={{ color: 'var(--overlay-white-72)' }}>매너 {match.manner} · 승 {match.wins}</div>
+                  {/* 매너·승수는 API 가 안 주는 값이라 null 일 수 있다 — 모르면 이 줄을 통째로
+                      감춘다. 0 으로 채워 "매너 0 · 승 0"을 보여주면 실제로 잘하는 팀이 최악으로
+                      보이고, 목업으로 채우면 모든 매치가 같은 숫자를 보여준다(2026-08-23 실사고). */}
+                  {match.manner !== null && match.wins !== null ? (
+                    <div className="tm-text-micro" style={{ color: 'var(--overlay-white-72)' }}>매너 {match.manner} · 승 {match.wins}</div>
+                  ) : null}
                 </div>
                 <div className="tm-text-label" style={{ color: 'var(--overlay-white-76)' }}>vs</div>
                 <div style={{ textAlign: 'right' }}>
                   <div className="tm-text-caption" style={{ color: 'var(--overlay-white-68)' }}>상대팀</div>
-                  <div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{teamMatchOpponentLabel(mode)}</div>
-                  <div className="tm-text-micro" style={{ color: 'var(--overlay-white-72)' }}>{teamMatchOpponentSub(mode)}</div>
+                  <div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{teamMatchOpponentLabel(mode, match)}</div>
+                  <div className="tm-text-micro" style={{ color: 'var(--overlay-white-72)' }}>{teamMatchOpponentSub(mode, match, model.statusLabel)}</div>
                 </div>
               </div>
               {/* P2: 완료 피드백 .tm-complete-check 마이크로인터랙션 */}
@@ -263,49 +324,58 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
               <div className="tm-info-group">
                 <div className="tm-info-group-label">경기 조건</div>
                 <InfoRow label="종목" value={match.sport} />
-                <InfoRow label="실력등급" value={`${match.grade}등급`} />
+                <InfoRow label="실력등급" value={match.grade ? `${match.grade}등급` : '미정'} />
                 <InfoRow label="경기방식" value={match.format} />
                 <InfoRow label="경기 스타일" value={match.style} />
                 <InfoRow label="유니폼 색상" value={match.uniform} />
                 <InfoRow label="성별 조건" value={match.gender} />
               </div>
-              {/* ── 그룹 3: 비용 — 상대팀 부담금 수치 승격 ── */}
+              {/* ── 그룹 3: 비용 — 상대팀 부담금 수치 승격 ──
+                  호스트가 비용을 안 적은 매치(costNote 없음, 리그 대진이 대표적)는 이 그룹을
+                  통째로 감춘다. 예전에는 목업 금액(140,000원/280,000원)이 그대로 노출됐고,
+                  그걸 0 으로 바꾸면 이번엔 '무료초청 · 실제 청구 없어요'라는 다른 거짓말이 된다. */}
+              {(match.opponentCost !== null || match.cost !== null) && (
               <div className="tm-info-group">
                 <div className="tm-info-group-label">비용</div>
                 {/* 상대팀 부담금은 신청 결정의 핵심 — primary 위치로 승격(R-D1) */}
                 {/* P1: 숫자(subhead/20px/700) : 단위(body/15px) = 2:1 비율 + tabular-nums */}
-                <div className="tm-info-cost-hero">
-                  <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>상대팀 부담금</div>
-                  <div className="tm-info-cost-amount">
-                    {match.opponentCost === 0 ? (
-                      <>
-                        <span className="tm-info-cost-value">무료</span>
-                        <span className="tm-badge tm-badge-blue" style={{ marginLeft: 8 }}>무료초청</span>
-                      </>
-                    ) : (
-                      <span className="tab-num" style={{ display: 'inline-flex', alignItems: 'baseline', gap: 2 }}>
-                        <span style={{ fontSize: 'var(--font-size-subhead)', fontWeight: 700, color: 'var(--text-strong)', fontVariantNumeric: 'tabular-nums' }}>
-                          {match.opponentCost.toLocaleString('ko-KR')}
+                {match.opponentCost !== null && (
+                  <div className="tm-info-cost-hero">
+                    <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>상대팀 부담금</div>
+                    <div className="tm-info-cost-amount">
+                      {match.opponentCost === 0 ? (
+                        <>
+                          <span className="tm-info-cost-value">무료</span>
+                          <span className="tm-badge tm-badge-blue" style={{ marginLeft: 8 }}>무료초청</span>
+                        </>
+                      ) : (
+                        <span className="tab-num" style={{ display: 'inline-flex', alignItems: 'baseline', gap: 2 }}>
+                          <span style={{ fontSize: 'var(--font-size-subhead)', fontWeight: 700, color: 'var(--text-strong)', fontVariantNumeric: 'tabular-nums' }}>
+                            {match.opponentCost.toLocaleString('ko-KR')}
+                          </span>
+                          <span style={{ fontSize: 'var(--font-size-body)', fontWeight: 500, color: 'var(--text-muted)' }}>원</span>
                         </span>
-                        <span style={{ fontSize: 'var(--font-size-body)', fontWeight: 500, color: 'var(--text-muted)' }}>원</span>
-                      </span>
-                    )}
+                      )}
+                    </div>
+                    {match.opponentCost === 0 ? (
+                      <div className="tm-text-micro" style={{ marginTop: 2, color: 'var(--text-caption)' }}>실제 청구 없어요</div>
+                    ) : null}
                   </div>
-                  {match.opponentCost === 0 ? (
-                    <div className="tm-text-micro" style={{ marginTop: 2, color: 'var(--text-caption)' }}>실제 청구 없어요</div>
-                  ) : null}
-                </div>
+                )}
                 {/* P1: 총비용도 숫자:단위 2:1 */}
-                <div className="tm-info-row">
-                  <div className="tm-text-caption">총비용</div>
-                  <div style={{ flex: 1, minWidth: 0, textAlign: 'right' }}>
-                    <span className="tab-num" style={{ display: 'inline-flex', alignItems: 'baseline', gap: 1 }}>
-                      <span className="tm-text-label" style={{ fontVariantNumeric: 'tabular-nums' }}>{match.cost.toLocaleString('ko-KR')}</span>
-                      <span className="tm-text-caption" style={{ fontWeight: 500, color: 'var(--text-muted)' }}>원</span>
-                    </span>
+                {match.cost !== null && (
+                  <div className="tm-info-row">
+                    <div className="tm-text-caption">총비용</div>
+                    <div style={{ flex: 1, minWidth: 0, textAlign: 'right' }}>
+                      <span className="tab-num" style={{ display: 'inline-flex', alignItems: 'baseline', gap: 1 }}>
+                        <span className="tm-text-label" style={{ fontVariantNumeric: 'tabular-nums' }}>{match.cost.toLocaleString('ko-KR')}</span>
+                        <span className="tm-text-caption" style={{ fontWeight: 500, color: 'var(--text-muted)' }}>원</span>
+                      </span>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
+              )}
               {/* P2: 능동형 카피 적용 */}
               {mode === 'pending' ? <StateCard tone="orange" title="신청을 접수했어요" body="홈팀이 검토를 마치면 알림으로 알려드릴게요." /> : null}
               {mode === 'approved' ? <StateCard tone="green" title="승인 완료" body="팀매치 참가가 확정됐어요. 경기 전 안내는 채팅에서 확인할 수 있어요." /> : null}
@@ -479,7 +549,8 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
           <div className="tm-team-match-cta-card">
             <div className="tm-team-match-cta-meta">
               <span className="tm-text-caption">{mode === 'mine' ? '내가 만든 팀매치' : '신청 상태'}</span>
-              <span className="tm-text-label">{model.statusLabel ?? `${match.opponentCost.toLocaleString('ko-KR')}원`}</span>
+              {/* 비용을 모르면(costNote 미기재) 금액 대신 '비용 미정' — 0원으로 단정하지 않는다. */}
+              <span className="tm-text-label">{model.statusLabel ?? (match.opponentCost !== null ? `${match.opponentCost.toLocaleString('ko-KR')}원` : '비용 미정')}</span>
             </div>
             <div className="tm-team-match-cta-actions">
               {ctaButtons}
@@ -492,7 +563,8 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
       <div className="tm-fixed-cta tm-team-match-mobile-cta">
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
           <span className="tm-text-caption">{mode === 'mine' ? '내가 만든 팀매치' : '신청 상태'}</span>
-          <span className="tm-text-label">{model.statusLabel ?? `${match.opponentCost.toLocaleString('ko-KR')}원`}</span>
+          {/* 비용을 모르면(costNote 미기재) 금액 대신 '비용 미정' — 0원으로 단정하지 않는다. */}
+          <span className="tm-text-label">{model.statusLabel ?? (match.opponentCost !== null ? `${match.opponentCost.toLocaleString('ko-KR')}원` : '비용 미정')}</span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: showChat ? '120px 1fr' : '1fr', gap: 8 }}>
           {ctaButtons}
@@ -634,6 +706,8 @@ function TeamMatchFilterSheet({ model }: { model: TeamMatchListViewModel }) {
 function TeamMatchCard({ match }: { match: TeamMatchModel }) {
   /* #20: 상대팀 부담금은 핵심 결정요소 — tm-text-body-lg(17px/700)+blue로 격상.
    *      P1: 숫자:단위 2:1 비율 + tabular-nums. 매너·승 통계는 caption 유지. */
+  const router = useRouter();
+  const league = match.league;
   const statusLabel = match.status === 'mine' ? '내 매치' : match.status === 'pending' ? '승인 대기' : match.status === 'approved' ? '승인 완료' : match.status === 'closed' ? '마감' : '모집 중';
   const statusClass = match.status === 'mine' ? 'tm-badge-blue' : match.status === 'pending' ? 'tm-badge-orange' : match.status === 'approved' ? 'tm-badge-green' : match.status === 'closed' ? 'tm-badge-grey' : 'tm-badge-blue';
   return (
@@ -656,17 +730,52 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
       <div style={{ padding: 16 }}>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           <span className="tm-badge tm-badge-blue">{match.sport}</span>
-          <span className="tm-badge tm-badge-grey">{match.grade}등급</span>
-          <span className="tm-badge tm-badge-grey">{match.format}</span>
-          <span className="tm-badge tm-badge-grey">{match.gender}</span>
+          {/* 값이 비면 내용 없는 회색 알약만 남는다(리그 대진은 등급·경기방식 미입력이 기본) — 숨긴다. */}
+          {match.grade ? <span className="tm-badge tm-badge-grey">{match.grade}등급</span> : null}
+          {match.format ? <span className="tm-badge tm-badge-grey">{match.format}</span> : null}
+          {match.gender ? <span className="tm-badge tm-badge-grey">{match.gender}</span> : null}
+          {/* 리그전 배지: 상태(모집중/마감)가 아니라 카테고리라 중립 grey 를 쓴다.
+              컬러만으로 뜻을 전달하지 않도록 "리그전" 텍스트를 함께 싣는다(DESIGN.md 규칙).
+              카드 전체가 이미 상세로 가는 Link라 <a>를 중첩하면 브라우저 파서가 바깥
+              <a>를 조기에 닫아 하이드레이션 불일치·레이아웃 붕괴를 낸다(HTML5 어댑션
+              에이전시 규칙 — <a> 안에 새 <a>가 열리면 바깥 태그가 강제로 닫힌다).
+              대신 button + stopPropagation/preventDefault로 안전하게 리그 홈으로
+              이동시킨다. "클릭 가능함"은 컬러가 아니라 화살표 아이콘+밑줄로 전달한다. */}
+          {league ? (
+            <button
+              type="button"
+              className="tm-badge tm-badge-grey tm-league-badge-link"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                router.push(`/league-matches/${league.leagueId}`);
+              }}
+              aria-label={`${league.title} 리그 상세로 이동`}
+            >
+              정규 리그
+              <ChevronRightIcon size={12} strokeWidth={2.5} aria-hidden="true" />
+            </button>
+          ) : null}
+          {/* 비용을 모를 때(null)는 배지를 붙이지 않는다 — 0 과 null 을 같이 다루면
+              costNote 를 안 적은 매치가 전부 '무료초청'으로 둔갑한다. */}
           {match.opponentCost === 0 ? <span className="tm-badge tm-badge-blue">무료초청</span> : null}
         </div>
         <div className="tm-text-body-lg" style={{ marginTop: 10 }}>{match.title}</div>
         <div className="tm-text-caption" style={{ marginTop: 5 }}>{match.date} {match.time} · {match.venue}</div>
         <div className="tm-match-list-footer">
-          <span className="tm-text-caption">매너 <span style={{ fontVariantNumeric: 'tabular-nums' }}>{match.manner}</span> · 승 <span style={{ fontVariantNumeric: 'tabular-nums' }}>{match.wins}</span></span>
+          {/* 매너·승수를 모르면(API 미제공) 줄을 비운다 — 0 으로 채우면 잘하는 팀이 최악으로 보인다.
+              푸터의 좌우 배치를 유지하려고 빈 span 을 자리표시자로 남긴다. */}
+          {match.manner !== null && match.wins !== null ? (
+            <span className="tm-text-caption">매너 <span style={{ fontVariantNumeric: 'tabular-nums' }}>{match.manner}</span> · 승 <span style={{ fontVariantNumeric: 'tabular-nums' }}>{match.wins}</span></span>
+          ) : (
+            <span />
+          )}
           {/* P1: 숫자는 body-lg(17px/700), 단위 "원"은 caption(12px) — 2:1 비율 */}
-          {match.opponentCost === 0 ? (
+          {/* 비용을 모르면(costNote 미기재) 금액 자리를 '비용 미정'으로 둔다 — 0 으로 채워
+              '무료'라고 하면 없는 사실을 만들어낸다. */}
+          {match.opponentCost === null ? (
+            <span className="tm-text-caption">비용 미정</span>
+          ) : match.opponentCost === 0 ? (
             <span className="tm-text-body-lg tab-num" style={{ color: 'var(--blue700)' }}>무료</span>
           ) : (
             <span className="tab-num" style={{ display: 'inline-flex', alignItems: 'baseline', gap: 1 }}>
@@ -991,8 +1100,17 @@ function hostActionClass(tone: NonNullable<TeamMatchDetailViewModel['hostActions
   return 'tm-btn-neutral';
 }
 
+/**
+ * D7(2026-08-24 사용자 확정) — 값이 비어 있으면 **'미정'을 값 자리에 적는다**(행을 숨기지 않는다).
+ *
+ * 리그 대진은 운영자가 만들기 때문에 경기방식·경기 스타일·유니폼 색상을 애초에 입력하지
+ * 않는다. 그동안은 라벨만 있고 값 칸이 통째로 비어 있어서, 화면이 "정보가 없다"가 아니라
+ * "무언가 깨졌다"처럼 보였다. 행을 유지하는 쪽을 고른 것은 **"이 경기엔 그 규정이 없다"는
+ * 사실 자체도 정보**이기 때문이다 — 대신 값이 아니라는 것이 보이도록 흐린 색으로 적는다.
+ */
 function InfoRow({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return <div className="tm-info-row"><div className="tm-text-caption">{label}</div><div style={{ flex: 1, minWidth: 0, textAlign: 'right' }}><div className="tm-text-label">{value}</div>{sub ? <div className="tm-text-micro" style={{ marginTop: 3, color: 'var(--text-caption)' }}>{sub}</div> : null}</div></div>;
+  const filled = value.trim().length > 0;
+  return <div className="tm-info-row"><div className="tm-text-caption">{label}</div><div style={{ flex: 1, minWidth: 0, textAlign: 'right' }}><div className="tm-text-label" style={filled ? undefined : { color: 'var(--text-caption)', fontWeight: 400 }}>{filled ? value : '미정'}</div>{sub ? <div className="tm-text-micro" style={{ marginTop: 3, color: 'var(--text-caption)' }}>{sub}</div> : null}</div></div>;
 }
 
 function StateCard({ tone, title, body }: { tone: 'orange' | 'green'; title: string; body: string }) {
@@ -1176,10 +1294,16 @@ function prevHref(step: TeamMatchCreateViewModel['step']) {
   return '/team-matches';
 }
 
-function trustStateLabel(trustState: string) {
+/**
+ * API TrustState('verified' | 'estimated' | 'sample' | 'none', types/api.ts)의 배지 라벨.
+ * 원래 gold/silver/bronze를 매핑하고 나머지를 원문 그대로 돌려줬는데, 그 등급은 API에
+ * 존재한 적이 없는 값이라 실제 화면엔 "estimated" 영문 원문이 그대로 떴다(2026-08-25
+ * 사용자 보고). 라벨은 공개 프로필(public-profile-client.tsx)·홈(home-client-model.ts)과
+ * 같은 낱말을 쓰고, 모르는 값은 null 로 돌려 배지 자체를 숨긴다 — 원문 노출 재발 방지.
+ */
+function trustStateLabel(trustState: string): string | null {
   if (trustState === 'verified') return '인증팀';
-  if (trustState === 'gold') return '골드';
-  if (trustState === 'silver') return '실버';
-  if (trustState === 'bronze') return '브론즈';
-  return trustState;
+  if (trustState === 'estimated') return '누적 중';
+  if (trustState === 'sample') return '샘플';
+  return null;
 }

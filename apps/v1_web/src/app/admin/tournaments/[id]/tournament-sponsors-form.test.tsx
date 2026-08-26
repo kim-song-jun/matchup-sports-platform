@@ -42,7 +42,9 @@ describe('TournamentSponsorForm', () => {
       'src',
       publicAssetPath('/uploads/2026/08/partner.webp'),
     );
-    fireEvent.click(screen.getByRole('button', { name: '로고 제거' }));
+    // 공용 CoverImageUploader 재사용으로 제거 버튼 라벨이 공용 문구('이미지 제거')가 됐다 —
+    // 계약(누르면 logoUrl 을 비운다)은 동일.
+    fireEvent.click(screen.getByRole('button', { name: '이미지 제거' }));
     expect(setField).toHaveBeenCalledWith('logoUrl', '');
   });
 

@@ -367,6 +367,26 @@ recover_known_played_at_migration_failure
   -e V1_ALPHA_QA_ORIGIN=https://alpha.teameet.co.kr \
   v1_api sh -c \
   'cd /app/apps/v1_api && ./node_modules/.bin/ts-node prisma/seed-alpha-tournament-qa.ts'
+# 리그 QA 시드. 토너먼트 시드와 같은 alpha 4중 가드를 공유하고 같은 sport/region/admin/
+# futsal-v1 config 선행조건을 쓰므로 반드시 토너먼트 시드 뒤에 둔다.
+#
+# 의도적으로 비치명(non-fatal)이다. 이 스크립트는 set -Eeuo pipefail 이라 여기서 실패하면
+# alpha 배포 전체가 죽는데, 이 시드는 아직 한 번도 실행된 적이 없다 — 공유 작업트리에
+# Prisma 클라이언트가 생성돼 있지 않아 로컬에서 타입검사도 시험 실행도 못 했다. QA 데이터
+# 하나 때문에 모든 세션의 배포 경로를 막을 수는 없다(같은 판단으로 competition-config
+# 백필 CLI 도 이 파이프라인에서 빠져 있다 — 아래 주석 참고). alpha 에서 한 번 성공하는 것을
+# 확인한 뒤 다른 시드처럼 하드 실패로 조이는 것이 다음 단계다.
+if ! "${compose[@]}" run --rm --no-deps -T \
+  -e V1_ALPHA_QA_SEED=true \
+  -e V1_ALPHA_QA_ORIGIN=https://alpha.teameet.co.kr \
+  v1_api sh -c \
+  'cd /app/apps/v1_api && ./node_modules/.bin/ts-node prisma/seed-alpha-league-qa.ts'; then
+  echo "WARNING: league QA seed failed - deploy continues; league screens may have no QA data." >&2
+fi
+# QA 시드가 복원한 기존 이름-only 수상도 포함해 단일 로스터 후보만 계정에 연결한다.
+# 이미 연결됐거나 동명이인 후보가 여러 명인 행은 건드리지 않는 멱등 CLI다.
+"${compose[@]}" run --rm --no-deps -T v1_api sh -c \
+  'cd /app/apps/v1_api && node dist/src/tournaments/migration/tournament-award-recipient-backfill.cli.js'
 # QA 시드가 매 배포마다 대회를 리셋하므로, 공개 일정을 채우는 fixture-game 백필은 반드시
 # QA 시드 뒤에 돌아야 한다(앞에 두면 QA 시드가 만든 픽스처를 못 보고 무의미하다).
 #

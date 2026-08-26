@@ -1,7 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { X } from 'lucide-react';
 import {
   AdminDataTable,
   AdminEmpty,
@@ -12,13 +14,14 @@ import {
   useAdminToast,
 } from '@/components/admin';
 import { useV1AdminInquiries } from '@/hooks/use-v1-api';
-import { v1Get } from '@/lib/api-client';
+import { formatAdminDateTimeShort } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
+import { INQUIRY_REPORT_REASON_OPTIONS, inquiryReportReasonLabel } from '@/lib/v1-status-labels';
 import type {
   AdminListFilters,
-  CursorPage,
   V1AdminInquiryRow,
   V1InquiryCategory,
+  V1InquiryReportReason,
   V1InquiryStatus,
 } from '@/types/api';
 
@@ -58,18 +61,11 @@ const CATEGORY_LABEL: Record<V1InquiryCategory, string> = {
   other: '기타',
 };
 
-function formatDateTime(value: string | null | undefined) {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString('ko-KR', {
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
-}
+// 신고 사유는 분류가 'report'일 때만 의미가 있다 — 다른 분류에서는 항상 null이라 보여줄 게 없다.
+const REPORT_REASON_OPTIONS: Array<{ value: '' | V1InquiryReportReason; label: string }> = [
+  { value: '', label: '전체 사유' },
+  ...INQUIRY_REPORT_REASON_OPTIONS,
+];
 
 function requesterLabel(row: V1AdminInquiryRow) {
   if (row.isGuest) return '비회원';
@@ -85,11 +81,45 @@ function requesterContact(row: V1AdminInquiryRow) {
 
 const PAGE_SIZE = 20;
 
+/**
+ * URL 값은 사용자가 손으로 고칠 수 있으므로 허용 목록과 대조한다. 검증 없이 그대로 필터에
+ * 실으면 서버가 400 을 내고 화면은 원인 모를 에러가 된다.
+ */
+function pickAllowed(raw: string | null, allowed: ReadonlyArray<{ value: string }>): string {
+  if (!raw) return '';
+  return allowed.some((option) => option.value === raw && raw !== '') ? raw : '';
+}
+
+// useSearchParams 는 Suspense 경계를 요구한다(Next.js App Router).
 export default function AdminInquiriesPage() {
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [activeStatus, setActiveStatus] = useState('');
-  const [activeCategory, setActiveCategory] = useState('');
+  return (
+    <Suspense fallback={null}>
+      <AdminInquiriesPageContent />
+    </Suspense>
+  );
+}
+
+function AdminInquiriesPageContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  // URL → 초기 상태. 운영자가 "스팸 신고 목록" 같은 링크를 받아 그대로 그 화면에 도착한다.
+  const [search, setSearch] = useState(() => searchParams.get('q') ?? '');
+  const [debouncedSearch, setDebouncedSearch] = useState(() => searchParams.get('q') ?? '');
+  const [activeStatus, setActiveStatus] = useState(() => pickAllowed(searchParams.get('status'), STATUS_OPTIONS));
+  const [activeCategory, setActiveCategory] = useState(() => pickAllowed(searchParams.get('category'), CATEGORY_OPTIONS));
+  const [activeReportReason, setActiveReportReason] = useState(() =>
+    // 분류가 report 가 아닌데 사유만 들어온 링크는 무시한다 — 보이지 않는 필터가 목록을 좁힌다.
+    pickAllowed(searchParams.get('category'), CATEGORY_OPTIONS) === 'report'
+      ? pickAllowed(searchParams.get('reportReason'), REPORT_REASON_OPTIONS)
+      : '',
+  );
+  // 신고 누적 팀 목록(#7)에서 넘어오는 딥링크 전용 필터. teamId 는 자유 문자열이라
+  // pickAllowed(허용 목록 대조)를 쓸 수 없다 — 존재 여부만 본다.
+  const [activeReportedTeamId, setActiveReportedTeamId] = useState(
+    () => searchParams.get('reportedTeamId') ?? '',
+  );
   // 커서 누적 대신 페이지 단위 교체다 — 목록 어디쯤인지와 총량이 보여야 한다.
   const [page, setPage] = useState(1);
   const { toasts, showToast } = useAdminToast();
@@ -101,12 +131,49 @@ export default function AdminInquiriesPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, activeStatus, activeCategory]);
+  }, [debouncedSearch, activeStatus, activeCategory, activeReportReason, activeReportedTeamId]);
+
+  // 상태 → URL. 읽기만 지원하면 링크를 손으로 조립해야 해서 사실상 쓰이지 않는다 — 화면에서
+  // 필터를 건 뒤 주소창을 그대로 복사해 공유할 수 있어야 딥링크가 의미를 갖는다.
+  //
+  // push 가 아니라 **replace** 다. 필터를 만질 때마다 히스토리가 쌓이면 뒤로가기가 목록 안에서
+  // 맴돌아 운영자가 이전 화면으로 못 돌아간다. page 는 싣지 않는다 — 목록은 계속 변하므로
+  // "3페이지" 를 공유해봐야 받는 쪽에서 같은 내용이 아니다.
+  useEffect(() => {
+    const next = new URLSearchParams();
+    if (debouncedSearch) next.set('q', debouncedSearch);
+    if (activeStatus) next.set('status', activeStatus);
+    if (activeCategory) next.set('category', activeCategory);
+    if (activeCategory === 'report' && activeReportReason) {
+      next.set('reportReason', activeReportReason);
+    }
+    // 다른 필터를 만지는 순간 팀 필터가 주소에서 조용히 사라지지 않도록 항상 함께 싣는다.
+    if (activeReportedTeamId) next.set('reportedTeamId', activeReportedTeamId);
+    const query = next.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }, [
+    debouncedSearch,
+    activeStatus,
+    activeCategory,
+    activeReportReason,
+    activeReportedTeamId,
+    pathname,
+    router,
+  ]);
+
+  // 분류가 'report'를 벗어나면 사유 필터는 보이지 않는데, 선택값이 남아 있으면 안 보이는
+  // 필터가 목록을 계속 좁혀 "왜 결과가 없지?"를 만든다 — 분류를 바꿀 때 항상 함께 초기화한다.
+  function handleCategoryChange(value: string) {
+    setActiveCategory(value);
+    if (value !== 'report') setActiveReportReason('');
+  }
 
   const filters: AdminListFilters = {
     ...(debouncedSearch ? { q: debouncedSearch } : {}),
     ...(activeStatus ? { status: activeStatus } : {}),
     ...(activeCategory ? { category: activeCategory } : {}),
+    ...(activeCategory === 'report' && activeReportReason ? { reportReason: activeReportReason } : {}),
+    ...(activeReportedTeamId ? { reportedTeamId: activeReportedTeamId } : {}),
     page,
     limit: PAGE_SIZE,
   };
@@ -129,15 +196,55 @@ export default function AdminInquiriesPage() {
     ...option,
     count: option.value ? categoryCounts?.[option.value] : categoryTotal,
   }));
+  const reportReasonCounts = firstPage?.summary.byReportReason;
+  const reportReasonTotal = reportReasonCounts
+    ? Object.values(reportReasonCounts).reduce((sum, count) => sum + count, 0)
+    : undefined;
+  const reportReasonOptions = REPORT_REASON_OPTIONS.map((option) => ({
+    ...option,
+    count: option.value ? reportReasonCounts?.[option.value] : reportReasonTotal,
+  }));
 
   return (
     <>
       <AdminPageHeader
+        eyebrow="콘텐츠"
         title="문의 관리"
         description="사용자 문의를 확인하고 답변 상태를 관리해요."
+        action={
+          // /admin/reports/teams 는 이 링크가 유일한 진입점이다 — 사이드바·허브 어디에도
+          // 없어 URL 직접 입력으로만 도달 가능한 고아 화면이었다(전수 감사 확인). 신고
+          // 문의를 다루는 이 화면이 신고 랭킹의 자연스러운 부모다.
+          <Link
+            href="/admin/reports/teams"
+            className="inline-flex h-[44px] items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-4 text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+          >
+            신고 누적 팀 랭킹
+          </Link>
+        }
       />
 
       <div className="flex flex-col gap-4">
+        {/* 신고 누적 팀 목록(#657 딥링크)에서 넘어온 팀 필터 — 보이지 않는 필터가 목록을
+            좁히면 "왜 결과가 없지?"가 된다. 걸려 있는 동안은 항상 표시하고 해제 수단을 준다. */}
+        {activeReportedTeamId ? (
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--tint-blue-border)] bg-[var(--tint-blue)] px-4 py-2.5">
+            <p className="text-sm text-[var(--blue700)]">
+              이 팀의 신고만 보는 중이에요{' '}
+              <span className="font-mono text-2xs text-[var(--blue700)]">({activeReportedTeamId})</span>
+            </p>
+            <button
+              type="button"
+              onClick={() => setActiveReportedTeamId('')}
+              aria-label="팀 필터 해제"
+              className="inline-flex h-[44px] shrink-0 items-center gap-1 rounded-lg px-2.5 text-sm font-semibold text-[var(--blue700)] transition-colors hover:bg-white/60 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            >
+              <X size={16} aria-hidden="true" />
+              필터 해제
+            </button>
+          </div>
+        ) : null}
+
         <AdminFilterBar
           searchLabel="문의 검색"
           searchPlaceholder="제목, 내용, 사용자 검색"
@@ -147,18 +254,34 @@ export default function AdminInquiriesPage() {
           activeStatus={activeStatus}
           onStatusChange={setActiveStatus}
           rightSlot={
-            <select
-              value={activeCategory}
-              onChange={(event) => setActiveCategory(event.target.value)}
-              aria-label="문의 분류 필터"
-              className="h-[44px] rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-body)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-            >
-              {categoryOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label} {typeof option.count === 'number' ? option.count.toLocaleString('ko-KR') : '—'}
-                </option>
-              ))}
-            </select>
+            <>
+              <select
+                value={activeCategory}
+                onChange={(event) => handleCategoryChange(event.target.value)}
+                aria-label="문의 분류 필터"
+                className="h-[44px] rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-body)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+              >
+                {categoryOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label} {typeof option.count === 'number' ? option.count.toLocaleString('ko-KR') : '—'}
+                  </option>
+                ))}
+              </select>
+              {activeCategory === 'report' ? (
+                <select
+                  value={activeReportReason}
+                  onChange={(event) => setActiveReportReason(event.target.value)}
+                  aria-label="신고 사유 필터"
+                  className="h-[44px] rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-body)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                >
+                  {reportReasonOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label} {typeof option.count === 'number' ? option.count.toLocaleString('ko-KR') : '—'}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
+            </>
           }
         />
 
@@ -192,7 +315,7 @@ export default function AdminInquiriesPage() {
               header: '접수',
               width: 'w-[132px]',
               render: (row) => (
-                <span className="whitespace-nowrap text-[var(--text-muted)]">{formatDateTime(row.createdAt)}</span>
+                <span className="whitespace-nowrap text-[var(--text-muted)]">{formatAdminDateTimeShort(row.createdAt)}</span>
               ),
             },
             {
@@ -205,7 +328,16 @@ export default function AdminInquiriesPage() {
               key: 'category',
               header: '분류',
               width: 'w-[96px]',
-              render: (row) => <span className="text-[var(--text-muted)]">{CATEGORY_LABEL[row.category]}</span>,
+              render: (row) => (
+                <span className="text-[var(--text-muted)]">
+                  {CATEGORY_LABEL[row.category]}
+                  {row.reportReason ? (
+                    <span className="block text-2xs text-[var(--text-muted)]">
+                      {inquiryReportReasonLabel(row.reportReason)}
+                    </span>
+                  ) : null}
+                </span>
+              ),
             },
             {
               key: 'title',

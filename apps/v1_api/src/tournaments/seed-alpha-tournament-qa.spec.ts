@@ -6,11 +6,30 @@ import {
   ALPHA_TOURNAMENT_SCENARIOS,
   buildAlphaTournamentCampaignContent,
   createCompetitionData,
+  ensureAlphaQaRecordConsent,
 } from '../../prisma/seed-alpha-tournament-qa';
 import { parseCampaignContentJson } from './tournament-campaign-content';
 import { FUTSAL_COMPETITION_CONFIG_ID } from './competition-config/competition-config-backfill';
 
 describe('alpha tournament QA campaign content', () => {
+  it('creates public-record consent for a QA persona without overwriting a later revocation', async () => {
+    const upsert = jest.fn().mockResolvedValue({});
+    await ensureAlphaQaRecordConsent(
+      { v1UserRecordConsent: { upsert } } as never,
+      'qa-user-1',
+    );
+
+    expect(upsert).toHaveBeenCalledWith({
+      where: { userId: 'qa-user-1' },
+      update: {},
+      create: {
+        userId: 'qa-user-1',
+        state: 'GRANTED',
+        policyHash: 'alpha-qa-fixture-v1',
+      },
+    });
+  });
+
   it('satisfies the persisted campaign contract used by the public event hub', () => {
     const content = buildAlphaTournamentCampaignContent(
       {
@@ -140,14 +159,17 @@ describe('alpha tournament QA campaign content', () => {
     // 안에서 실행하는데, 그 이미지에는 `src/` 가 없다(dist/·prisma/·node_modules 만 COPY).
     // 실제로 `../src/...` import 하나 때문에 2026-08-09 배포가 MODULE_NOT_FOUND 로 죽었고,
     // CI 는 src/ 가 존재하는 레포에서 돌아 잡지 못했다. 그래서 소스 텍스트로 고정한다.
-    const seedSource = readFileSync(
-      resolve(__dirname, '../../prisma/seed-alpha-tournament-qa.ts'),
-      'utf8',
-    );
-    const srcImports = seedSource
-      .split('\n')
-      .filter((line) => /^\s*import[^;]*from\s+['"]\.\.\/src\//.test(line));
-    expect(srcImports).toEqual([]);
+    // 리그 QA 시드도 같은 자리에서 같은 방식으로 실행되므로 같은 가드를 받는다 --
+    // 시드가 늘어날 때마다 가드가 한 파일에만 남으면 다음 시드가 그대로 사고를 반복한다.
+    const seedScripts = ['seed-alpha-tournament-qa.ts', 'seed-alpha-league-qa.ts'];
+    const srcImportsByScript = seedScripts.map((script) => {
+      const seedSource = readFileSync(resolve(__dirname, '../../prisma/', script), 'utf8');
+      const srcImports = seedSource
+        .split('\n')
+        .filter((line) => /^\s*import[^;]*from\s+['"]\.\.\/src\//.test(line));
+      return [script, srcImports] as const;
+    });
+    expect(srcImportsByScript).toEqual(seedScripts.map((script) => [script, []]));
   });
 
   it('seeds one non-QA "featured" completed scenario with real-looking marketing copy', () => {

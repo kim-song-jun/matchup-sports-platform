@@ -514,6 +514,41 @@ describe('TournamentAnnouncementsService', () => {
     );
   });
 
+  it('update: category is persisted when provided', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1TournamentAnnouncement.findUnique.mockResolvedValue(announcementRow());
+    prisma.v1TournamentAnnouncement.update.mockResolvedValue(
+      announcementRow({ category: 'venue' }),
+    );
+
+    await service.update(ownerAuthUser, 'ann-1', {
+      title: '경기 일정 공지',
+      body: '수정된 본문',
+      category: 'venue',
+    });
+
+    const updateArgs = prisma.v1TournamentAnnouncement.update.mock.calls[0][0];
+    expect(updateArgs.data.category).toBe('venue');
+  });
+
+  it('update: category omitted keeps the existing category', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1TournamentAnnouncement.findUnique.mockResolvedValue(
+      announcementRow({ category: 'sponsor' }),
+    );
+    prisma.v1TournamentAnnouncement.update.mockResolvedValue(
+      announcementRow({ category: 'sponsor' }),
+    );
+
+    await service.update(ownerAuthUser, 'ann-1', {
+      title: '경기 일정 공지',
+      body: '수정된 본문',
+    });
+
+    const updateArgs = prisma.v1TournamentAnnouncement.update.mock.calls[0][0];
+    expect(updateArgs.data.category).toBe('sponsor');
+  });
+
   it('update: can move a published announcement back to draft', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     prisma.v1TournamentAnnouncement.findUnique.mockResolvedValue(

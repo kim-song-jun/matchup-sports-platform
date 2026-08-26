@@ -1,5 +1,6 @@
 import { Prisma, PrismaClient, V1GameEventType, V1GameSideKey, V1GameSourceType, V1GameState } from '@prisma/client';
 import { canonicalGameCommandPayloadHash } from '../games.service';
+import { GOAL_BACKFILL_EVENT_SOURCE } from '../../tournaments/tournament-fixture-official-result';
 
 /**
  * Operational backfill for the "public goal list is always empty for
@@ -18,22 +19,55 @@ import { canonicalGameCommandPayloadHash } from '../games.service';
  * never touches a game's score, sides, or lineup, and it never invents data
  * a goal doesn't actually carry (see "no fabrication" notes below).
  *
- * ## Idempotency
- * A game is a candidate for this backfill only while it currently has ZERO
- * `V1GameEvent` rows of type GOAL (`events: { none: { type: 'GOAL' } }` in
- * the candidate query below — the exact same "count the missing relation in
- * SQL" idiom `fixture-game-backfill.ts` already uses for its period/policy
- * backfill). The first successful `apply` run inserts GOAL events for a
- * game, which permanently removes that game from the candidate set for
- * every future run — so a second `apply` call finds zero candidates among
- * the games this run already touched and reports the same counts, and a
- * game that already has real, live-recorded GOAL events (never a backfill
- * candidate at all, since it already has >=1 GOAL event before this module
- * ever runs) is left untouched for the same reason. This single WHERE
- * condition is deliberately what decides BOTH "already backfilled" and
- * "has real live events" — there is no separate marker distinguishing the
- * two, because from this module's perspective they require the identical
- * response (do nothing).
+ * ## Idempotency — per goal, not per game
+ * Every event this module writes carries a deterministic `clientEventId`,
+ * `GOAL_BACKFILL:<gameId>:<goalIndex>`, where `goalIndex` is the goal's
+ * position in the frozen `score.goals[]` array. The candidate query reads
+ * back the ones already present for each game and `planGameGoalEvents()`
+ * skips exactly those goals, so a rerun fills only the holes and re-inserts
+ * nothing. `V1GameEvent`'s `@@unique([gameId, clientEventId])`
+ * (`v1_game_events_game_client_event_key`) is the database-level backstop
+ * for that same rule.
+ *
+ * This replaced an earlier GAME-level gate (`events: { none: { type: 'GOAL'
+ * } }` in the candidate WHERE clause), which dropped a game from the
+ * candidate set the instant it held any GOAL event at all. That made a
+ * partial backfill permanent: a single run can insert some of a game's goals
+ * and quarantine others (see below), and under the game-level gate those
+ * quarantined goals could never be retried afterwards — not even once the
+ * cause was resolved — because the game itself was gone from every future
+ * run. Skipping per goal has no such trapdoor, and it also keeps REPORTING
+ * the goals that still have no home on each run, instead of letting them
+ * vanish from the operational quarantine report just because a sibling goal
+ * in the same game succeeded.
+ *
+ * ### The live-game guards, after that change
+ * The game-level gate was also, incidentally, what kept this module away from
+ * genuinely live-officiated games (they already hold GOAL events). It was
+ * replaced deliberately rather than simply dropped, so three checks stand
+ * between this backfill and a live game's event stream:
+ *
+ * 1. `state: ENDED` — a game still being officiated is never a candidate at
+ *    all. (This is the one that makes "live" in the strict, in-progress sense
+ *    unreachable; the other two are about games that have since ended.)
+ * 2. `currentOfficialRevision.createdBySystemActor = 'GAME_BACKFILL'` — the
+ *    direct replacement for the removed gate, and the reason this query still
+ *    reads ~21 rows instead of every tournament game ever ended. The WHERE
+ *    clause carries the evidence that only Task 10's importer writes it.
+ * 3. `parseScoreForGoals()`'s `score.provenance !== 'TOURNAMENT_FIXTURE_RESULT'
+ *    -> { kind: 'skip' }`. A game ended through the live `end` command gets
+ *    its OFFICIAL revision from `GamesService.deriveTournamentRevision()`,
+ *    which writes the flat `{ home, away, penalties? }` score with no
+ *    `provenance` key at all — the nested, `provenance`-carrying shape was
+ *    only ever written by Task 10's one-time importer
+ *    (`game-result-backfill.ts`, since removed from the tree along with the
+ *    rest of that migration's implementation).
+ *
+ * 2 and 3 are independent, and the integration spec pins each on its own
+ * fixture (a live-ended game with the flat score; a game carrying the legacy
+ * provenance on an operator-authored revision). Do not drop either on the
+ * grounds that the other covers it — reasoning of exactly that shape is what
+ * left the original gate doing safety work nobody had written down.
  *
  * ## Participant matching — no fabrication
  * The 21 backfilled games have ZERO `V1GameParticipant` rows: `createImportedGame()`
@@ -61,10 +95,43 @@ import { canonicalGameCommandPayloadHash } from '../games.service';
  * (`validateGameResultInvariants()`'s `missingScorer`/`scorerPolicy`, see
  * `game-invariants.ts`). These are inserted.
  *
- * A goal missing its `minute` is quarantined too (`MINUTE_MISSING`):
- * `V1GameEvent.clockMs` is a required, non-null column, and writing `0`
- * for an unknown minute would assert "scored in the first minute", a false,
- * specific claim — not an honest placeholder.
+ * ## A goal with no recorded minute
+ * `V1GameEvent.clockMs` is a required, non-null column, so a goal whose
+ * legacy `minute` is null has to land on `clockMs: 0` — and `0` alone would
+ * assert "scored in the opening minute", a specific claim the source never
+ * made. It is written anyway, with the unknown-ness carried as data:
+ * `payload.minuteKnown: false`. Read paths key off that marker and surface
+ * the minute as `null` ("not recorded"), never as `0`
+ * (`deriveTournamentFixtureOfficialGoals()` in
+ * `tournaments/tournament-fixture-official-result.ts`, and `buildEvents()`/
+ * `loadScorers()` in `games/public-records/public-tournament-records.service.ts`).
+ * Because the marker is part of the hashed payload, a genuine minute-0 goal
+ * and an unknown-minute goal are also distinguishable to anything hashing
+ * the event, rather than collapsing onto one `clockMs: 0` row.
+ *
+ * Those read paths require `payload.source` to be this module's own
+ * `GOAL_BACKFILL_EVENT_SOURCE` before they honour `minuteKnown`, and that is
+ * not ceremony: `V1GameEvent.payload` is a free-form object that
+ * `AppendGameEventDto` only checks with `@IsObject()`, so a recording client
+ * can put any key it likes in there. Keyed on `minuteKnown` alone, a live
+ * 71-minute goal whose payload happened to carry that key would have its
+ * time erased from the public bracket, timeline and schedule card.
+ *
+ * These goals used to be quarantined (`MINUTE_MISSING`) on the same "don't
+ * fabricate a minute" reasoning, but quarantining is not neutral: combined
+ * with the old game-level gate it erased the goal from the event lineage
+ * permanently, so the reader saw a game whose goal list silently disagreed
+ * with its own score. Recording the goal while recording that its minute is
+ * unknown loses nothing the source had.
+ *
+ * `minuteKnown` is deliberately NOT stamped as `true` on goals whose minute
+ * IS known. Idempotency is keyed on `clientEventId`, so rows an earlier run
+ * wrote are never rewritten — and every goal an earlier run could have
+ * written had a known minute (minute-less ones were quarantined then). A
+ * redundant `minuteKnown: true` would therefore leave the same fact recorded
+ * two different ways depending on which run happened to write the row.
+ * Omitting it keeps the field strictly additive: absent means "known", and
+ * it appears only on rows that previously could not exist at all.
  *
  * ## period / clockMs
  * The legacy table only ever recorded a single match-minute per goal, never
@@ -72,16 +139,33 @@ import { canonicalGameCommandPayloadHash } from '../games.service';
  * codebase (confirmed by reading the whole `games/` and `migration/` trees),
  * and inventing a 45-minutes-per-half split would assume a fixed period
  * length that this platform's own `V1CompetitionConfigVersion.periods` does
- * not universally guarantee. Every backfilled GOAL event is therefore
- * written with `period: 1` — a placeholder, not a claim about which half the
- * goal happened in. This is safe specifically because no public read path
- * consumes `period` for a GOAL event's display: `match-detail-content.tsx`
- * only ever renders `formatClock(event.clockMs)`, and
- * `format.ts#formatGoalMinute()` computes the displayed minute as
- * `clockMs / 60_000` directly, with no period offset — so `clockMs` (set to
- * `goal.minute * 60_000`, the one number this migration DOES know precisely)
- * is the only field that reaches the screen, and it reproduces the legacy
- * minute exactly.
+ * not universally guarantee. `V1GameEvent.period` is a non-null column, so
+ * every backfilled GOAL event is written with `period: 1` — storage, not a
+ * claim about which half the goal happened in.
+ *
+ * That placeholder must NOT reach a screen, because `period` very much is
+ * consumed for a GOAL event's display, in two places:
+ *   - `match-detail-content.tsx` groups the timeline into `periodLabel()`
+ *     headings, so `period: 1` renders as a literal "전반" heading; and
+ *   - `schedule-content.tsx` splits the scorer summary into 전반/후반 rows on
+ *     `scorer.period === 1`.
+ * Left raw, a legacy 71' goal would be published as "전반 71:00" — a claim
+ * about the half that the source never made and that is, for a 71st-minute
+ * goal, almost certainly wrong. So the read paths suppress it exactly the way
+ * they suppress an unknown minute: `isPeriodUnknown()`
+ * (tournaments/tournament-fixture-official-result.ts) recognises this
+ * module's `payload.source` and maps `period` to `null`, which both surfaces
+ * already have an honest rendering for ("기타" / a separate row). Unlike the
+ * minute marker this needs no per-row flag — the source had no period for ANY
+ * of these goals — which also means it applies retroactively to rows an
+ * earlier run already wrote.
+ *
+ * `clockMs` is the field that carries real information: for every goal whose
+ * legacy minute was recorded it is `goal.minute * 60_000` and reproduces that
+ * minute exactly (`format.ts#formatGoalMinute()` divides straight back out,
+ * with no period offset). For the minute-less goals it is `0` and the read
+ * paths suppress it entirely, per the section above — the screen shows no
+ * minute rather than a wrong one.
  *
  * ## occurredAt
  * The legacy source never recorded a wall-clock instant for a goal, only a
@@ -93,17 +177,28 @@ import { canonicalGameCommandPayloadHash } from '../games.service';
  * timestamp already on the row, not a fabricated per-goal instant.
  *
  * ## sequence / V1Game.lastSequence
- * Inserted events consume `game.lastSequence + 1, +2, ...` in `score.goals[]`
- * order (skipping quarantined goals — they never reserve a sequence number),
- * and `V1Game.lastSequence` is bumped to the last sequence actually written,
- * inside the SAME transaction as the inserts — exactly the invariant the
- * live `appendEvent()` path maintains, so nothing downstream that reads
- * `lastSequence` (gap detection, polling) can observe skew.
+ * Within one run, inserted events consume `game.lastSequence + 1, +2, ...` in
+ * `score.goals[]` order (skipping quarantined goals — they never reserve a
+ * sequence number), and `V1Game.lastSequence` is bumped to the last sequence
+ * actually written, inside the SAME transaction as the inserts — exactly the
+ * invariant the live `appendEvent()` path maintains, so nothing downstream
+ * that reads `lastSequence` (gap detection, polling) can observe skew.
+ *
+ * Across runs it does NOT line up with `score.goals[]` order, and that is
+ * inherent to per-goal idempotency: if a first run filled goal 1 and a later
+ * one fills goals 0 and 2, the sequences read (goal 1, goal 0, goal 2). This
+ * is not a defect being tolerated — `sequence` is defined as the order the
+ * server RECEIVED events, never as match chronology, which is why every
+ * public read path orders by `(period, clockMs, sequence)` and treats
+ * `sequence` as a tiebreak only (see the ordering comment in
+ * `public-tournament-records.service.ts#buildEvents`, written after an alpha
+ * incident caused by sequence-ordering a timeline). The one reader that does
+ * order purely by `sequence`, `GamesService.getVisibility()`, is an operator
+ * audit view of receive order, and receive order is exactly what it shows.
  */
 
 export type GoalEventBackfillQuarantineReason =
   | 'CORRUPT_SCORE'
-  | 'MINUTE_MISSING'
   | 'PARTICIPANT_UNRESOLVED'
   | 'SIDE_MISSING';
 
@@ -145,6 +240,15 @@ export type GameGoalCandidate = {
   goals: readonly LegacyGoal[];
   sides: ReadonlyArray<{ id: string; sideKey: V1GameSideKey }>;
   participants: ReadonlyArray<{ id: string; sideId: string; displayNameSnapshot: string }>;
+  /**
+   * `clientEventId`s this game already holds for goals a previous run
+   * inserted (see the header doc's "Idempotency" section). A required field
+   * rather than an optional argument on purpose: a caller that forgot to
+   * supply it would silently plan duplicate inserts for every already
+   * backfilled goal, and the type system is the cheapest place to make that
+   * impossible.
+   */
+  alreadyInsertedClientEventIds: ReadonlySet<string>;
 };
 
 export type GoalEventInsert = {
@@ -158,7 +262,14 @@ export type GoalEventInsert = {
   clockMs: number;
   occurredAt: Date;
   actorUserId: string;
-  payload: { source: 'GOAL_BACKFILL_V1'; legacyPlayerName: string };
+  // `source` is what every read path keys its "this row came from the
+  // backfill" rules off (`isPeriodUnknown()`/`isMinuteUnknown()` in
+  // tournaments/tournament-fixture-official-result.ts) — hence the shared
+  // constant rather than a second copy of the literal. `minuteKnown` is
+  // present only (and always) when the legacy minute was missing; see the
+  // header doc's "A goal with no recorded minute" for why it is never
+  // written as `true`.
+  payload: { source: typeof GOAL_BACKFILL_EVENT_SOURCE; legacyPlayerName: string; minuteKnown?: false };
 };
 
 const ACTOR_SYSTEM_ID = 'SYSTEM:GOAL_EVENT_BACKFILL';
@@ -171,10 +282,15 @@ function sideKeyFor(team: 'home' | 'away'): V1GameSideKey {
   return team === 'home' ? V1GameSideKey.HOME : V1GameSideKey.AWAY;
 }
 
+function goalClientEventId(gameId: string, goalIndex: number): string {
+  return `${CLIENT_EVENT_ID_PREFIX}:${gameId}:${goalIndex}`;
+}
+
 /**
  * Pure decision layer: given one game's already-extracted goal list, sides,
- * and (usually empty, see header doc) participants, decides exactly which
- * `V1GameEvent` rows to insert and which goals to quarantine instead. No I/O.
+ * (usually empty, see header doc) participants, and the set of goals a
+ * previous run already inserted, decides exactly which `V1GameEvent` rows to
+ * insert and which goals to quarantine instead. No I/O.
  */
 export function planGameGoalEvents(candidate: GameGoalCandidate): {
   toInsert: GoalEventInsert[];
@@ -186,6 +302,19 @@ export function planGameGoalEvents(candidate: GameGoalCandidate): {
   let sequence = candidate.lastSequence;
 
   candidate.goals.forEach((goal, goalIndex) => {
+    // `goalIndex` stays anchored to the goal's position in the frozen
+    // `score.goals[]` array — that is what an earlier run built its
+    // `clientEventId` from, so filtering the list before enumerating it
+    // would shift every id and defeat the skip below.
+    const clientEventId = goalClientEventId(candidate.gameId, goalIndex);
+    if (candidate.alreadyInsertedClientEventIds.has(clientEventId)) {
+      // Settled by an earlier run: no insert, and deliberately no quarantine
+      // entry either. A goal that made it in needs no operator attention, and
+      // re-reporting it every run would grow the quarantine report without
+      // bound while misrepresenting stable data as unresolved.
+      return;
+    }
+
     const side = sideByKey.get(sideKeyFor(goal.team));
     if (side === undefined) {
       // Defensive: every backfilled fixture-sourced game is created with
@@ -197,10 +326,6 @@ export function planGameGoalEvents(candidate: GameGoalCandidate): {
       // fails loudly (as a quarantine entry, not a wrong-side event) instead
       // of writing a GOAL event on the wrong side of the scoreboard.
       quarantine.push({ gameId: candidate.gameId, goalIndex, reason: 'SIDE_MISSING' });
-      return;
-    }
-    if (goal.minute === null) {
-      quarantine.push({ gameId: candidate.gameId, goalIndex, reason: 'MINUTE_MISSING' });
       return;
     }
 
@@ -223,8 +348,16 @@ export function planGameGoalEvents(candidate: GameGoalCandidate): {
     }
 
     sequence += 1;
-    const clockMs = goal.minute * 60_000;
-    const payload = { source: 'GOAL_BACKFILL_V1' as const, legacyPlayerName: goal.playerName };
+    // A missing minute parks the event at 0 (the column is non-null) and says
+    // so in the payload; see the header doc for why the marker rides along
+    // instead of the goal being dropped, and why it is omitted when the
+    // minute IS known rather than written as `true`.
+    const clockMs = goal.minute === null ? 0 : goal.minute * 60_000;
+    const payload = {
+      source: GOAL_BACKFILL_EVENT_SOURCE,
+      legacyPlayerName: goal.playerName,
+      ...(goal.minute === null ? { minuteKnown: false as const } : {}),
+    };
     const payloadHash = canonicalGameCommandPayloadHash({
       type: V1GameEventType.GOAL,
       sideId: side.id,
@@ -237,7 +370,7 @@ export function planGameGoalEvents(candidate: GameGoalCandidate): {
     toInsert.push({
       gameId: candidate.gameId,
       sequence,
-      clientEventId: `${CLIENT_EVENT_ID_PREFIX}:${candidate.gameId}:${goalIndex}`,
+      clientEventId,
       payloadHash,
       sideId: side.id,
       participantId,
@@ -257,12 +390,16 @@ type ParsedScore = { kind: 'goals'; goals: LegacyGoal[] } | { kind: 'skip' } | {
 // Runtime guard over the persisted `V1GameResultRevision.score` JSONB
 // column, mirroring game-result-backfill.ts's own validatePersistedScore()/
 // isValidScoreShape() defensiveness (that column has no DB-level shape
-// constraint). `kind: 'skip'` is NOT an error: a `TEAM_MATCH_COMPLETION_ONLY`
-// provenance always carries `goals: []` by construction (this module never
-// sees that provenance in practice, since its candidate query is scoped to
-// `sourceType: TOURNAMENT_FIXTURE`, but the check stays so a corrupted
-// `sourceType`/`score.provenance` pairing degrades to "nothing to do"
-// instead of silently mis-parsing).
+// constraint). `kind: 'skip'` is NOT an error: it is the third of the three
+// live-game guards (header doc, "The live-game guards, after that change") —
+// a live-ended game's revision is the flat `{ home, away }` shape with no
+// `provenance` key, so it skips here and is never planned against, whether or
+// not it also slipped past the query's `createdBySystemActor` filter. A
+// `TEAM_MATCH_COMPLETION_ONLY` provenance (always `goals: []` by
+// construction, and never reachable while the candidate query is scoped to
+// `sourceType: TOURNAMENT_FIXTURE`) degrades through the same branch, so a
+// corrupted `sourceType`/`score.provenance` pairing means "nothing to do"
+// instead of a silent mis-parse.
 function parseScoreForGoals(value: Prisma.JsonValue): ParsedScore {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return { kind: 'corrupt' };
   const record = value as Record<string, unknown>;
@@ -315,9 +452,26 @@ async function collectCandidates(client: MigrationReadClient): Promise<Collected
       sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
       state: V1GameState.ENDED,
       currentOfficialRevisionId: { not: null },
-      // The idempotency + "don't touch live games" gate — see the header
-      // doc's "Idempotency" section for why one condition covers both.
-      events: { none: { type: V1GameEventType.GOAL } },
+      // Deliberately NO `events: { none: { type: 'GOAL' } }` here: that
+      // game-level gate made partial backfills permanent (header doc,
+      // "Idempotency"). Idempotency is now decided per goal, from the
+      // `clientEventId`s selected below.
+      //
+      // What the removed gate ALSO did, incidentally, was keep the query away
+      // from live-officiated games (they hold GOAL events). This filter is its
+      // deliberate replacement, and it is a far more direct statement of the
+      // same intent: Task 10's importer stamped every revision it wrote with
+      // `createdBySystemActor = 'GAME_BACKFILL'`
+      // (`IMPORTED_REVISION_SYSTEM_ACTOR` in the since-deleted
+      // `game-result-backfill.ts`, readable at `a6d41f68^`), and nothing else
+      // in this codebase writes that actor onto a tournament game's official
+      // revision — a live `end` command's revision is authored by the operator
+      // (`createdByActorType: 'USER'`). So this narrows the candidate set back
+      // to "games whose current official result IS one of Task 10's imports"
+      // at the database level, instead of loading every ended tournament game
+      // ever played (with its sides, participants and events) into memory —
+      // and, in apply mode, into a SERIALIZABLE transaction's read set.
+      currentOfficialRevision: { is: { createdBySystemActor: 'GAME_BACKFILL' } },
     },
     orderBy: { id: 'asc' },
     select: {
@@ -327,11 +481,31 @@ async function collectCandidates(client: MigrationReadClient): Promise<Collected
       currentOfficialRevision: { select: { score: true } },
       sides: { select: { id: true, sideKey: true } },
       participants: { select: { id: true, sideId: true, displayNameSnapshot: true } },
+      // Only this module's own rows: the deterministic prefix keeps the read
+      // narrow (a live game's hundreds of events never load) and makes the
+      // set exactly "goals a previous run of this backfill already wrote".
+      events: {
+        where: { clientEventId: { startsWith: `${CLIENT_EVENT_ID_PREFIX}:` } },
+        select: { clientEventId: true },
+      },
     },
   });
 
   const quarantine: GoalEventBackfillQuarantine[] = [];
   const plans = new Map<string, GoalEventInsert[]>();
+  // "Rows this backfill claims": games that passed BOTH gates — the query's
+  // `createdBySystemActor` filter and `parseScoreForGoals()`. Counted here
+  // rather than as `games.length` because a `skip` (a score shape this module
+  // has no business touching) is not a claim.
+  //
+  // A CORRUPT_SCORE game IS counted: it is one of Task 10's own rows, this
+  // module simply cannot read it, and it needs an operator. Note also what
+  // this number is NOT: it does not shrink as work gets done (a fully
+  // backfilled game stays claimed, since the goal-level skip happens further
+  // in). The "is there work left" signal is `eventsCreated` + `quarantined`
+  // both being 0 on a dry run — the CLI's own header points at this file for
+  // exactly this kind of question.
+  let gamesEligible = 0;
 
   for (const game of games) {
     const score = game.currentOfficialRevision?.score;
@@ -343,6 +517,7 @@ async function collectCandidates(client: MigrationReadClient): Promise<Collected
     if (score === undefined) continue;
     const parsed = parseScoreForGoals(score);
     if (parsed.kind === 'skip') continue;
+    gamesEligible += 1;
     if (parsed.kind === 'corrupt') {
       quarantine.push({ gameId: game.id, goalIndex: -1, reason: 'CORRUPT_SCORE' });
       continue;
@@ -356,6 +531,7 @@ async function collectCandidates(client: MigrationReadClient): Promise<Collected
       goals: parsed.goals,
       sides: game.sides,
       participants: game.participants,
+      alreadyInsertedClientEventIds: new Set(game.events.map((event) => event.clientEventId)),
     });
     quarantine.push(...goalQuarantine);
     if (toInsert.length > 0) {
@@ -363,7 +539,7 @@ async function collectCandidates(client: MigrationReadClient): Promise<Collected
     }
   }
 
-  return { gamesEligible: games.length, plans, quarantine };
+  return { gamesEligible, plans, quarantine };
 }
 
 function toResult(collected: CollectedCandidates): GoalEventBackfillResult {

@@ -38,6 +38,7 @@ function makeFixture(
     scheduledAt: null,
     venue: null,
     status: 'completed',
+    liveStatus: 'ended',
     homeRegistrationId: 'registration-home',
     homeTeamId: 'team-home',
     homeTeamName: '홈 팀',
@@ -117,6 +118,8 @@ function makeTournament(overrides: Partial<V1TournamentDetail> = {}): V1Tourname
     promoListPriority: 0,
     campaignSlug: null,
     rulesText: null,
+    yellowAccumulationLimit: null,
+    redCardSuspensionMatches: null,
     refundPolicyText: null,
     confirmedCount: 4,
     participantTeams: [],
@@ -127,7 +130,6 @@ function makeTournament(overrides: Partial<V1TournamentDetail> = {}): V1Tourname
     sponsors: [],
     reviews: [],
     awards: [],
-    popup: null,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
@@ -157,6 +159,9 @@ const twoGroupTournament = () =>
         homeTeamName: '연남 스포츠',
         awayTeamName: '망원 FC',
         status: 'scheduled',
+        // 상태 칩은 `liveStatus` 로 판정하므로 픽스처 두 필드를 함께 맞춰 둔다 —
+        // 한쪽만 바꾸면 서버가 만들지 않는 조합이 되어 테스트가 현실과 어긋난다.
+        liveStatus: 'scheduled',
       }),
     ],
   });
@@ -231,7 +236,12 @@ describe('최종결과 — 조별리그 경기 블록', () => {
       <ResultsPageContent
         tournament={makeTournament({
           groups: tournament.groups,
-          fixtures: tournament.fixtures.map((f) => ({ ...f, status: 'scheduled', result: null })),
+          fixtures: tournament.fixtures.map((f) => ({
+            ...f,
+            status: 'scheduled',
+            liveStatus: 'scheduled' as const,
+            result: null,
+          })),
         })}
       />,
     );

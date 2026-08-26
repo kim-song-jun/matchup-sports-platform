@@ -16,6 +16,7 @@
 
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminService } from './admin.service';
 
@@ -130,6 +131,32 @@ function makeInquiryRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
+// getInquiry()의 select 는 목록보다 필드가 많다(body/contact/replies + reportedTeam 관계).
+function makeInquiryDetailRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'inq-1',
+    userId: 'u-1',
+    guestEmail: null,
+    guestPhone: null,
+    category: 'account',
+    title: '로그인 문의',
+    body: '문의 본문입니다.',
+    contact: null,
+    relatedType: null,
+    relatedId: null,
+    reportReason: null,
+    reportedTeamId: null,
+    reportedTeam: null,
+    status: 'received',
+    closedAt: null,
+    createdAt: new Date('2026-07-18T00:00:00.000Z'),
+    updatedAt: new Date('2026-07-18T00:00:00.000Z'),
+    user: { email: 'user@teameet.v1', profile: { nickname: '문의자', displayName: '문의자' } },
+    replies: [],
+    ...overrides,
+  };
+}
+
 // ─── Test setup ───────────────────────────────────────────────────────────────
 
 describe('AdminService — list/detail endpoints', () => {
@@ -140,7 +167,14 @@ describe('AdminService — list/detail endpoints', () => {
     v1Match: { findMany: jest.Mock; findUnique: jest.Mock; groupBy: jest.Mock };
     v1Team: { findMany: jest.Mock; findUnique: jest.Mock; groupBy: jest.Mock };
     v1TeamMatch: { findMany: jest.Mock; findUnique: jest.Mock; groupBy: jest.Mock };
-    v1Inquiry: { findMany: jest.Mock; groupBy: jest.Mock };
+    v1Inquiry: { findMany: jest.Mock; findUnique: jest.Mock; groupBy: jest.Mock; count: jest.Mock };
+    v1TeamContact: { findUnique: jest.Mock };
+    v1TeamContactBlock: { create: jest.Mock };
+    v1AdminActionLog: { create: jest.Mock };
+    v1StatusChangeLog: { create: jest.Mock };
+    v1Tournament: { count: jest.Mock; findMany: jest.Mock };
+    v1TournamentRegistration: { groupBy: jest.Mock };
+    v1TournamentFixture: { groupBy: jest.Mock };
     v1PostEventReview: { findMany: jest.Mock };
   };
 
@@ -151,7 +185,19 @@ describe('AdminService — list/detail endpoints', () => {
       v1Match: { findMany: jest.fn(), findUnique: jest.fn(), groupBy: jest.fn().mockResolvedValue([]) },
       v1Team: { findMany: jest.fn(), findUnique: jest.fn(), groupBy: jest.fn().mockResolvedValue([]) },
       v1TeamMatch: { findMany: jest.fn(), findUnique: jest.fn(), groupBy: jest.fn().mockResolvedValue([]) },
-      v1Inquiry: { findMany: jest.fn(), groupBy: jest.fn().mockResolvedValue([]) },
+      v1Inquiry: {
+        findMany: jest.fn(),
+        findUnique: jest.fn(),
+        groupBy: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+      },
+      v1TeamContact: { findUnique: jest.fn() },
+      v1TeamContactBlock: { create: jest.fn() },
+      v1AdminActionLog: { create: jest.fn().mockResolvedValue({ id: 'action-log-1' }) },
+      v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },
+      v1Tournament: { count: jest.fn().mockResolvedValue(0), findMany: jest.fn().mockResolvedValue([]) },
+      v1TournamentRegistration: { groupBy: jest.fn().mockResolvedValue([]) },
+      v1TournamentFixture: { groupBy: jest.fn().mockResolvedValue([]) },
       // getTeam() live-recalculates trustScore via computeRevealedTeamTrustBatch(); default to
       // "no submitted reviews" so tests that don't care about trust reveal math still resolve.
       v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
@@ -731,6 +777,21 @@ describe('AdminService — list/detail endpoints', () => {
       expect(call.where).toMatchObject({ status: 'matched' });
     });
 
+    it('passes q as title/hostTeam.name OR to both findMany and the status facet groupBy', async () => {
+      prisma.v1TeamMatch.findMany.mockResolvedValue([]);
+      await service.listTeamMatches(adminAuthUser, { q: '풋살' });
+
+      const expectedOr = [
+        { title: { contains: '풋살', mode: 'insensitive' } },
+        { hostTeam: { name: { contains: '풋살', mode: 'insensitive' } } },
+      ];
+      const findCall = prisma.v1TeamMatch.findMany.mock.calls[0][0] as { where: { OR?: unknown[] } };
+      expect(findCall.where.OR).toEqual(expectedOr);
+      // 상태 칩 카운트도 검색어가 반영된 값이어야 한다 (listMatches와 동일 계약)
+      const groupCall = prisma.v1TeamMatch.groupBy.mock.calls[0][0] as { where: { OR?: unknown[] } };
+      expect(groupCall.where.OR).toEqual(expectedOr);
+    });
+
     it('returns hasNext=true and nextCursor when rows exceed limit', async () => {
       const rows = Array.from({ length: 6 }, (_, i) => makeTeamMatchRow({ id: `tm-${i + 1}` }));
       prisma.v1TeamMatch.findMany.mockResolvedValue(rows);
@@ -755,6 +816,11 @@ describe('AdminService — list/detail endpoints', () => {
         .mockResolvedValueOnce([
           { category: 'account', _count: { _all: 3 } },
           { category: 'report', _count: { _all: 2 } },
+        ])
+        .mockResolvedValueOnce([
+          // 신고가 아닌 문의는 reportReason 이 null 이라 groupBy 결과에 null 키로 섞여 들어온다.
+          { reportReason: null, _count: { _all: 11 } },
+          { reportReason: 'spam', _count: { _all: 2 } },
         ]);
 
       const result = await service.listInquiries(adminAuthUser, { q: '로그인' });
@@ -772,7 +838,375 @@ describe('AdminService — list/detail endpoints', () => {
           report: 2,
           other: 0,
         },
+        // null 그룹(신고 아닌 문의 11건)은 버려야 한다 — 사유 칩에 넣을 자리가 없고,
+        // 넣으면 "사유 미상 11건" 처럼 보여 실제 신고 건수를 오해하게 만든다.
+        byReportReason: {
+          spam: 2,
+          harassment: 0,
+          impersonation: 0,
+          inappropriate: 0,
+          other: 0,
+        },
+      });
+    });
+
+    // facet 규칙: 각 칩의 건수는 "자기 자신을 뺀 나머지 필터" 로 집계해야 "이걸 고르면 몇 건이
+    // 되는지" 를 뜻한다. reportReason 이 자기 facet 집계에 섞여 들어가면 고른 사유만 남아
+    // 다른 사유 칩이 전부 0 이 된다.
+    it('reportReason 필터는 목록에는 걸리지만 자기 facet 집계에는 걸리지 않는다', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(activeAdminRecord);
+      prisma.v1Inquiry.findMany.mockResolvedValue([makeInquiryRow()]);
+      prisma.v1Inquiry.groupBy
+        .mockResolvedValueOnce([{ status: 'received', _count: { _all: 2 } }])
+        .mockResolvedValueOnce([{ category: 'report', _count: { _all: 2 } }])
+        .mockResolvedValueOnce([
+          { reportReason: 'spam', _count: { _all: 2 } },
+          { reportReason: 'harassment', _count: { _all: 5 } },
+        ]);
+
+      const result = await service.listInquiries(adminAuthUser, {
+        category: 'report',
+        reportReason: 'spam',
+      });
+
+      // 목록 조회에는 사유가 걸린다.
+      expect(prisma.v1Inquiry.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ reportReason: 'spam' }),
+        }),
+      );
+      // 사유 facet 집계에는 사유가 빠진다 — 세 번째 groupBy 호출이 그것이다.
+      const reportReasonGroupByArgs = prisma.v1Inquiry.groupBy.mock.calls[2][0];
+      expect(reportReasonGroupByArgs.by).toEqual(['reportReason']);
+      expect(reportReasonGroupByArgs.where).not.toHaveProperty('reportReason');
+      // 그래서 고르지 않은 사유의 건수도 그대로 보인다.
+      expect(result.summary.byReportReason).toMatchObject({ spam: 2, harassment: 5 });
+    });
+  });
+
+  // ─── 신고 롤업 집계 ─────────────────────────────────────────────────────────
+
+  describe('신고 롤업', () => {
+    it('신고 상세에 대상 팀의 최근 30일 신고 요약이 붙는다', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(activeAdminRecord);
+      prisma.v1Inquiry.findUnique.mockResolvedValue({
+        ...makeInquiryDetailRow(),
+        category: 'report',
+        reportedTeamId: 'team-x',
+        reportedTeam: { id: 'team-x', name: '문제팀', status: 'active' },
+      });
+      prisma.v1Inquiry.count.mockResolvedValue(3);
+      prisma.v1Inquiry.groupBy.mockResolvedValue([
+        { reportReason: 'spam', _count: { _all: 2 } },
+        { reportReason: 'harassment', _count: { _all: 1 } },
+      ]);
+
+      const result = await service.getInquiry(adminAuthUser, 'inq-1');
+
+      expect(result.reportedTeam).toMatchObject({
+        teamId: 'team-x',
+        name: '문제팀',
+        status: 'active',
+        recentReportCount: 3,
+      });
+      expect(result.reportedTeam?.reasonBreakdown).toEqual({ spam: 2, harassment: 1 });
+    });
+
+    it('대상 팀이 없는 문의는 요약이 null 이다', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(activeAdminRecord);
+      prisma.v1Inquiry.findUnique.mockResolvedValue({
+        ...makeInquiryDetailRow(),
+        category: 'account',
+        reportedTeamId: null,
+        reportedTeam: null,
+      });
+
+      const result = await service.getInquiry(adminAuthUser, 'inq-1');
+
+      expect(result.reportedTeam).toBeNull();
+      // 대상이 없으면 집계 쿼리를 아예 돌리지 않는다 — 모든 문의 상세가 비용을 치르면 안 된다.
+      expect(prisma.v1Inquiry.count).not.toHaveBeenCalled();
+    });
+
+    it('reportedTeamId 필터가 목록 조회에 걸린다', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(activeAdminRecord);
+      prisma.v1Inquiry.findMany.mockResolvedValue([makeInquiryRow()]);
+      prisma.v1Inquiry.groupBy.mockResolvedValue([]);
+
+      await service.listInquiries(adminAuthUser, { reportedTeamId: 'team-x' } as any);
+
+      expect(prisma.v1Inquiry.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ reportedTeamId: 'team-x' }) }),
+      );
+    });
+
+    it('신고 누적 팀 목록은 건수 내림차순으로 돌려준다', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(activeAdminRecord);
+      prisma.v1Inquiry.groupBy.mockResolvedValue([
+        { reportedTeamId: 'team-a', _count: { _all: 5 }, _max: { createdAt: new Date('2026-08-20') } },
+        { reportedTeamId: 'team-b', _count: { _all: 2 }, _max: { createdAt: new Date('2026-08-22') } },
+      ]);
+      prisma.v1Team.findMany.mockResolvedValue([
+        { id: 'team-a', name: 'A팀', status: 'active' },
+        { id: 'team-b', name: 'B팀', status: 'suspended' },
+      ]);
+
+      const result = await service.listReportedTeams(adminAuthUser, {} as any);
+
+      expect(result.items.map((i: any) => i.teamId)).toEqual(['team-a', 'team-b']);
+      expect(result.items[0]).toMatchObject({ name: 'A팀', status: 'active', totalCount: 5 });
+    });
+  });
+
+  // ─── 대리 차단 ──────────────────────────────────────────────────────────────
+
+  describe('대리 차단', () => {
+    function reportRow() {
+      return {
+        id: 'inq-1',
+        userId: 'reporter',
+        category: 'report',
+        relatedType: 'team_contact',
+        relatedId: 'c1',
+        reportedTeamId: 'B',
+      };
+    }
+
+    // 차단당한 팀의 운영진이 자기 설정 화면에서 이 사유를 본다. 문의 UUID 를 넣으면 아무
+    // 의미도 전달하지 못하면서 좁은 화면에서 두 줄로 접혀 해제 버튼까지 밀어낸다.
+    // 추적용 id 는 감사 로그가 따로 들고 있어야 한다 — 읽는 사람이 다르다.
+    it('팀에 보이는 차단 사유에는 문의 id 가 들어가지 않는다', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(activeAdminRecord);
+      prisma.v1Inquiry.findUnique.mockResolvedValue({
+        id: 'inq-1', userId: 'reporter', category: 'report',
+        relatedType: 'team_contact', relatedId: 'c1', reportedTeamId: 'B',
+      });
+      prisma.v1TeamContact.findUnique.mockResolvedValue({ fromTeamId: 'A', toTeamId: 'B' });
+      prisma.v1TeamContactBlock.create.mockResolvedValue({ id: 'b1' });
+
+      await service.blockReportedTeam(adminAuthUser, 'inq-1');
+
+      const blockReason = prisma.v1TeamContactBlock.create.mock.calls[0][0].data.reason;
+      expect(blockReason).not.toContain('inq-1');
+      expect(blockReason).toContain('신고');
+
+      // 감사 로그의 **reason** 에 추적용 id 가 남아야 한다.
+      // JSON.stringify(logArgs) 로 훑으면 targetId 가 이미 'inq-1' 이라 reason 이 id 를
+      // 잃어도 통과한다 — 검증한다고 주장하는 것을 실제로는 검증하지 못한다.
+      const logArgs = prisma.v1AdminActionLog.create.mock.calls[0][0].data;
+      expect(logArgs.reason).toContain('inq-1');
+    });
+
+    it('신고자 팀 명의로 대상 팀을 차단하고 사유를 남긴다', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(activeAdminRecord);
+      prisma.v1Inquiry.findUnique.mockResolvedValue(reportRow());
+      prisma.v1TeamContact.findUnique.mockResolvedValue({ fromTeamId: 'A', toTeamId: 'B' });
+      prisma.v1TeamContactBlock.create.mockResolvedValue({ id: 'b1' });
+
+      const result = await service.blockReportedTeam(adminAuthUser, 'inq-1');
+
+      expect(prisma.v1TeamContactBlock.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            teamId: 'A',
+            blockedTeamId: 'B',
+            // 팀에 보이는 사유다 — 문의 id 가 아니라 사람이 읽는 문장이어야 한다.
+          // (추적용 id 는 감사 로그가 따로 들고 있고, 바로 아래 테스트가 그것을 단언한다.)
+          reason: expect.stringContaining('신고'),
+          }),
+        }),
+      );
+      expect(result).toMatchObject({ alreadyBlocked: false, teamId: 'A', blockedTeamId: 'B' });
+    });
+
+    // Phase 2·3 과 같은 함정: 이 저장소엔 전역 P2002 필터가 없다.
+    it('이미 차단돼 있으면 500 이 아니라 멱등하게 통과한다', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(activeAdminRecord);
+      prisma.v1Inquiry.findUnique.mockResolvedValue(reportRow());
+      prisma.v1TeamContact.findUnique.mockResolvedValue({ fromTeamId: 'A', toTeamId: 'B' });
+      prisma.v1TeamContactBlock.create.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('dup', { code: 'P2002', clientVersion: 'x' }),
+      );
+
+      const result = await service.blockReportedTeam(adminAuthUser, 'inq-1');
+
+      expect(result).toMatchObject({ alreadyBlocked: true });
+    });
+
+    it('대상 팀이 없는 신고는 409 로 거부한다', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(activeAdminRecord);
+      prisma.v1Inquiry.findUnique.mockResolvedValue({ ...reportRow(), reportedTeamId: null });
+
+      await expect(service.blockReportedTeam(adminAuthUser, 'inq-1')).rejects.toMatchObject({
+        response: { code: 'REPORT_TARGET_UNKNOWN' },
+      });
+    });
+
+    it('support 관리자는 403 이다', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue({ ...activeAdminRecord, adminRole: 'support' });
+
+      await expect(service.blockReportedTeam(adminAuthUser, 'inq-1')).rejects.toMatchObject({
+        response: { code: 'PERMISSION_DENIED' },
       });
     });
   });
+
+  // ─── globalSearch (커맨드 팔레트 전역 검색) ────────────────────────────────
+
+  describe('globalSearch', () => {
+    it('throws 403 for non-admin', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(null);
+      await expect(service.globalSearch(nonAdminAuthUser, { q: 'kim' })).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('returns empty domains for blank q without touching the DB', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(activeAdminRecord);
+      const result = await service.globalSearch(adminAuthUser, { q: '   ' });
+      expect(result).toEqual({ users: [], teams: [], matches: [] });
+      expect(prisma.v1User.findMany).not.toHaveBeenCalled();
+      expect(prisma.v1Team.findMany).not.toHaveBeenCalled();
+      expect(prisma.v1Match.findMany).not.toHaveBeenCalled();
+    });
+
+    it('queries the same q fields as the list endpoints and maps slim palette rows', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(activeAdminRecord);
+      prisma.v1User.findMany.mockResolvedValue([
+        {
+          id: 'u-1',
+          email: 'host@teameet.v1',
+          accountStatus: 'active',
+          profile: { nickname: '호스트민', displayName: '호스트민' },
+        },
+      ]);
+      prisma.v1Team.findMany.mockResolvedValue([
+        { id: 't-1', name: '민FC', status: 'active' },
+      ]);
+      prisma.v1Match.findMany.mockResolvedValue([
+        { id: 'm-1', title: '민 매치', placeName: '서울 풋살장', status: 'open' },
+      ]);
+
+      const result = await service.globalSearch(adminAuthUser, { q: ' 민 ' });
+
+      // 회원 검색은 목록 API와 동일한 4개 필드 OR (nickname/realName/displayName/email)
+      const userWhere = prisma.v1User.findMany.mock.calls[0][0].where;
+      expect(userWhere.OR).toHaveLength(4);
+      expect(userWhere.OR).toEqual(
+        expect.arrayContaining([
+          { profile: { nickname: { contains: '민', mode: 'insensitive' } } },
+          { email: { contains: '민', mode: 'insensitive' } },
+        ]),
+      );
+      // 도메인당 최대 5건
+      expect(prisma.v1User.findMany.mock.calls[0][0].take).toBe(5);
+      expect(prisma.v1Team.findMany.mock.calls[0][0].take).toBe(5);
+      expect(prisma.v1Match.findMany.mock.calls[0][0].take).toBe(5);
+
+      expect(result.users).toEqual([
+        { userId: 'u-1', label: '호스트민', sublabel: 'host@teameet.v1', status: 'active' },
+      ]);
+      expect(result.teams).toEqual([{ teamId: 't-1', label: '민FC', status: 'active' }]);
+      expect(result.matches).toEqual([
+        { matchId: 'm-1', label: '민 매치', sublabel: '서울 풋살장', status: 'open' },
+      ]);
+    });
+
+    it('falls back to displayName then email when nickname is missing', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(activeAdminRecord);
+      prisma.v1User.findMany.mockResolvedValue([
+        { id: 'u-2', email: 'no-nick@teameet.v1', accountStatus: 'active', profile: null },
+      ]);
+      prisma.v1Team.findMany.mockResolvedValue([]);
+      prisma.v1Match.findMany.mockResolvedValue([]);
+
+      const result = await service.globalSearch(adminAuthUser, { q: 'no-nick' });
+      expect(result.users[0].label).toBe('no-nick@teameet.v1');
+    });
+  });
+
+
+  // ─── hubInbox (할 일 인박스 집계) ──────────────────────────────────────────
+
+  describe('hubInbox', () => {
+    it('throws 403 for non-admin', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(null);
+      await expect(service.hubInbox(nonAdminAuthUser)).rejects.toThrow(ForbiddenException);
+    });
+
+    it('aggregates actionable registrations and review-pending fixtures per tournament with titles', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(activeAdminRecord);
+      prisma.v1TournamentRegistration.groupBy.mockResolvedValue([
+        { tournamentId: 'tour-1', _count: { _all: 3 } },
+        { tournamentId: 'tour-2', _count: { _all: 7 } },
+      ]);
+      prisma.v1TournamentFixture.groupBy.mockResolvedValue([
+        { tournamentId: 'tour-1', _count: { _all: 2 } },
+        { tournamentId: 'tour-3', _count: { _all: 1 } },
+      ]);
+      prisma.v1Inquiry.count.mockResolvedValue(4);
+      prisma.v1Tournament.count.mockResolvedValue(2);
+      prisma.v1Tournament.findMany.mockResolvedValue([
+        { id: 'tour-1', title: '가을 풋살컵' },
+        { id: 'tour-2', title: '주말 리그' },
+        { id: 'tour-3', title: '신년 대회' },
+      ]);
+
+      const result = await service.hubInbox(adminAuthUser);
+
+      // 처리 대기 신청 상태 4종만 센다 (입금확인/확정대기/취소요청)
+      const regWhere = prisma.v1TournamentRegistration.groupBy.mock.calls[0][0].where;
+      expect(regWhere.status.in).toEqual([
+        'awaiting_payment',
+        'payment_checking',
+        'paid',
+        'cancel_requested',
+      ]);
+      expect(regWhere.tournament).toEqual({ deletedAt: null });
+
+      // 검토 대기 = ENDED + (공식 리비전 없음 OR 열린 에스컬레이션) — result-review 화면과 동일 정의
+      const fixtureCall = prisma.v1TournamentFixture.groupBy.mock.calls[0][0];
+      // JS 재집계 대신 DB groupBy로 바로 센다 (Copilot 리뷰 반영)
+      expect(fixtureCall.by).toEqual(['tournamentId']);
+      const fixtureWhere = fixtureCall.where;
+      expect(fixtureWhere.game.is.state).toBe('ENDED');
+      expect(fixtureWhere.game.is.OR).toEqual([
+        { currentOfficialRevisionId: null },
+        {
+          resultRevisions: {
+            some: { resultEscalations: { some: { status: { in: ['PENDING', 'ACKNOWLEDGED'] } } } },
+          },
+        },
+      ]);
+
+      expect(result.pendingRegistrations.total).toBe(10);
+      // 건수 내림차순 정렬
+      expect(result.pendingRegistrations.tournaments).toEqual([
+        { tournamentId: 'tour-2', title: '주말 리그', count: 7 },
+        { tournamentId: 'tour-1', title: '가을 풋살컵', count: 3 },
+      ]);
+      expect(result.resultReviewPending.total).toBe(3);
+      expect(result.resultReviewPending.tournaments).toEqual([
+        { tournamentId: 'tour-1', title: '가을 풋살컵', count: 2 },
+        { tournamentId: 'tour-3', title: '신년 대회', count: 1 },
+      ]);
+      expect(result.pendingInquiries).toBe(4);
+      expect(result.tournamentsInProgress).toBe(2);
+    });
+
+    it('returns zeroed inbox without a title lookup when nothing is pending', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(activeAdminRecord);
+
+      const result = await service.hubInbox(adminAuthUser);
+
+      expect(result).toEqual({
+        pendingRegistrations: { total: 0, tournaments: [] },
+        resultReviewPending: { total: 0, tournaments: [] },
+        pendingInquiries: 0,
+        tournamentsInProgress: 0,
+      });
+      expect(prisma.v1Tournament.findMany).not.toHaveBeenCalled();
+    });
+  });
+
 });

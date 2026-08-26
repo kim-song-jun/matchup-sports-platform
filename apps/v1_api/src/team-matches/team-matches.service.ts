@@ -28,6 +28,10 @@ import {
   createTeamMatchScheduleInTx,
   syncTeamMatchScheduleInTx,
 } from '../team-schedules/team-schedules.service';
+import {
+  judgeLeagueDisputeEligibility,
+  type LeagueDisputeBlockedReason,
+} from '../league-matches/league-result-dispute-eligibility';
 import { resolveTeamMatchCompetitionConfig } from './resolve-team-match-competition-config';
 import { assertCreatorProfileComplete } from '../profile/creator-profile.guard';
 import { computeRevealedTeamTrustBatch } from '../reviews/team-trust-aggregation';
@@ -69,6 +73,9 @@ type TeamMatchWithRelations = V1TeamMatch & {
   } | null;
   applications: Array<V1TeamMatchApplication & { applicantTeam: { id: string; name: string } }>;
   game: { id: string } | null;
+  // teamMatchInclude() 와 짝을 이루는 **손으로 쓴** 타입이라, include 를 넓혀도 여기를
+  // 함께 고치지 않으면 컴파일이 깨진다(실제로 CI 가 TS2551 로 잡았다).
+  league: { id: string; title: string } | null;
 };
 
 @Injectable()
@@ -135,6 +142,9 @@ export class TeamMatchesService {
     const teamMatch = await this.getPublicTeamMatch(teamMatchId, user, { includeTrust: true });
     const viewer = await this.getViewer(teamMatch, user);
     const approvedApplication = teamMatch.applications.find((item) => item.status === 'approved');
+    // U3: 리그 대진일 때만 이의 제기 자격을 계산한다 -- 일반 팀 매치는 이 개념 자체가
+    // 없고, 추가 쿼리 3개(공식 리비전·승강 확정·열린 이의)를 매번 낼 이유도 없다.
+    const leagueDispute = teamMatch.league ? await this.getLeagueDisputeEligibility(teamMatch) : null;
 
     return {
       teamMatchId: teamMatch.id,
@@ -154,6 +164,13 @@ export class TeamMatchesService {
       status: this.getApiStatus(teamMatch),
       displayState: this.getDisplayState(teamMatch),
       costNote: teamMatch.costNote,
+      // null 이면 일반 팀 매치, 값이 있으면 리그전이다. 프론트는 이 값의 유무로 배지를 건다.
+      // U3: 리그전이면 이의 제기 자격(disputeDeadline/disputeBlockedReason/openDisputeExists)도
+      // 함께 싣는다 -- 기존 leagueId/title 필드는 그대로 두고 추가만 한다.
+      league:
+        teamMatch.league && leagueDispute
+          ? { leagueId: teamMatch.league.id, title: teamMatch.league.title, ...leagueDispute }
+          : null,
       levelLabel: formatLevelRange(teamMatch.minSportLevel, teamMatch.maxSportLevel, teamMatch.formatNote),
       minLevel: teamMatch.minSportLevel ? { code: teamMatch.minSportLevel.code, name: teamMatch.minSportLevel.name } : null,
       maxLevel: teamMatch.maxSportLevel ? { code: teamMatch.maxSportLevel.code, name: teamMatch.maxSportLevel.name } : null,
@@ -191,7 +208,7 @@ export class TeamMatchesService {
    * Prisma `distinct`는 Postgres `DISTINCT ON`으로 컴파일되는데, 이때
    * `orderBy`가 distinct 필드로 시작해야 한다 — `distinct: ['placeName']` +
    * `orderBy: { createdAt: 'desc' }` 조합은 "최근순 distinct 장소"라는 의도와
-   * 어긋난다(team-match-series-admin.service.ts의 loadRecentVenues와 동일한
+   * 어긋난다(league-match-admin.service.ts의 loadRecentVenues와 동일한
    * 이유로, 넉넉히 가져온 뒤 애플리케이션에서 dedup한다).
    */
   async recentVenues(user: V1AuthUser, teamId: string) {
@@ -202,7 +219,7 @@ export class TeamMatchesService {
       take: 30,
       select: { placeName: true, placeAddress: true },
     });
-    // 레거시 행에 앞뒤 공백이 섞여 있을 수 있어 trim 후 dedup한다(team-match-series-admin
+    // 레거시 행에 앞뒤 공백이 섞여 있을 수 있어 trim 후 dedup한다(league-match-admin
     // .service.ts의 loadRecentVenues와 동일한 방어) — 안 하면 공백만 다른 "중복" 장소가
     // 서로 다른 칩으로 뜨거나, 공백뿐인 값이 빈 칩으로 렌더될 수 있다.
     const seen = new Set<string>();
@@ -253,27 +270,67 @@ export class TeamMatchesService {
     const teamIds = memberships.map((membership) => membership.teamId);
     if (teamIds.length === 0) return { items: [], pageInfo: { nextCursor: null, hasNext: false } };
 
-    const includeHosted = !query.scope || query.scope === 'all' || query.scope === 'hosted';
+    // status 는 두 계열이 섞여 있다: 매치 상태(recruiting~expired)는 teamMatch.status 로,
+    // 신청 상태(requested~withdrawn)는 "내 신청"의 상태로 필터한다.
+    const applicationStatusFilter =
+      (['requested', 'approved', 'rejected', 'withdrawn'] as const).find((status) => status === query.status) ?? null;
+    // 신청 상태를 제외한 나머지도 리터럴 배열로 좁힌다 — query.status 를 그대로 쓰면 타입이
+    // 10개 값 union 이라 where.status(V1TeamMatchStatus)에 대입이 안 된다.
+    const matchStatusFilter =
+      (['recruiting', 'closed', 'matched', 'cancelled', 'completed', 'expired'] as const).find(
+        (status) => status === query.status,
+      ) ?? null;
+
+    // 신청 상태는 호스트로 참여한 매치에는 성립하지 않으므로 hosted 분기를 제외한다
+    // (scope=hosted + 신청 상태 조합은 OR: [] → 빈 결과).
+    const includeHosted = (!query.scope || query.scope === 'all' || query.scope === 'hosted') && !applicationStatusFilter;
     const includeApplied = !query.scope || query.scope === 'all' || query.scope === 'applied';
     const teamMatches = await this.prisma.v1TeamMatch.findMany({
       where: {
         deletedAt: null,
+        // 'expired'는 계산 상태(getApiStatus)라 DB status 로 존재하지 않는다 — list()와
+        // 동일하게 startAt 과거 조건으로 매핑한다.
+        ...(matchStatusFilter
+          ? matchStatusFilter === 'expired'
+            ? { startAt: { lt: new Date() } }
+            : { status: matchStatusFilter }
+          : {}),
         OR: [
           ...(includeHosted ? [{ hostTeamId: { in: teamIds } }] : []),
-          ...(includeApplied ? [{ applications: { some: { applicantTeamId: { in: teamIds } } } }] : []),
+          ...(includeApplied
+            ? [
+                {
+                  applications: {
+                    some: {
+                      applicantTeamId: { in: teamIds },
+                      ...(applicationStatusFilter ? { status: applicationStatusFilter } : {}),
+                    },
+                  },
+                },
+              ]
+            : []),
         ],
       },
       include: {
         sport: { select: { name: true } },
         hostTeam: { select: { id: true, name: true } },
+        // 내 경기 목록도 리그전 배지를 단다(사용자 결정 3). 이 목록은 공용 include 를
+        // 쓰지 않고 자체 select 라, 여기에 따로 실지 않으면 배지가 이 화면에서만 빠진다.
+        league: { select: { id: true, title: true } },
         applications: {
-          where: { applicantTeamId: { in: teamIds } },
+          // 신청 상태로 필터 중이면 노출하는 신청도 그 상태와 일치해야 한다 — 아니면
+          // 필터에 걸린 매치에 다른 상태의 최신 신청이 표시될 수 있다.
+          where: {
+            applicantTeamId: { in: teamIds },
+            ...(applicationStatusFilter ? { status: applicationStatusFilter } : {}),
+          },
           include: { applicantTeam: { select: { id: true, name: true } } },
           orderBy: { createdAt: 'desc' },
           take: 1,
         },
       },
-      orderBy: [{ startAt: 'asc' }, { createdAt: 'desc' }],
+      // { id } tie-breaker: getOrderBy 와 같은 이유(리그 일괄 생성 행의 동률 정렬 결정성).
+      orderBy: [{ startAt: 'asc' }, { createdAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
       ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
     });
@@ -300,6 +357,7 @@ export class TeamMatchesService {
           teamId,
           teamName: teamIds.includes(teamMatch.hostTeamId) ? teamMatch.hostTeam.name : application?.applicantTeam.name,
           applicationId: application?.id ?? null,
+          league: teamMatch.league ? { leagueId: teamMatch.league.id, title: teamMatch.league.title } : null,
           manageRoute: relation === 'host_team' ? `/team-matches/${teamMatch.id}/manage` : null,
           detailRoute: `/team-matches/${teamMatch.id}`,
         };
@@ -536,6 +594,14 @@ export class TeamMatchesService {
   async cancel(user: V1AuthUser, teamMatchId: string, dto: CancelTeamMatchDto) {
     this.assertActiveAccount(user);
     const teamMatch = await this.getManageableTeamMatch(user, teamMatchId);
+    // 리그 대진(leagueId 有)은 어드민이 일정을 관리한다 — 호스트 팀의 일방 취소를 허용하면
+    // 리그 순위표·잔여 라운드가 조용히 깨진다. 어드민 경로(POST /admin/team-matches/:id/status)만 유효.
+    if (teamMatch.leagueId !== null) {
+      throw stateConflict(
+        '리그 경기는 팀에서 직접 취소할 수 없어요. 리그 운영자에게 문의해주세요.',
+        'LEAGUE_FIXTURE_HOST_CANCEL_FORBIDDEN',
+      );
+    }
     if (teamMatch.status === 'cancelled') {
       throw new ConflictException({ code: 'ALREADY_PROCESSED', message: 'Team match is already cancelled' });
     }
@@ -1200,6 +1266,11 @@ export class TeamMatchesService {
       // only route the v1 web client already fetches for a team match, so we
       // surface the 1:1 Game relation here instead of adding a new endpoint.
       game: { select: { id: true } },
+      // 리그전 표시(2026-08-18). 이 관계가 없으면 응답에 리그 소속이 실리지 않아
+      // 화면에서 "이 경기가 리그전인지" 알 방법이 아예 없다 -- 배지의 유일한 근거다.
+      // 확장 단계라 league(신규)만 읽는다. 구 series 관계는 롤링 배포 창을 위해
+      // 스키마에 남아 있지만 새 코드는 읽지 않는다.
+      league: { select: { id: true, title: true } },
     } satisfies Prisma.V1TeamMatchInclude;
   }
 
@@ -1223,6 +1294,7 @@ export class TeamMatchesService {
         trustState: teamMatch.hostTeam.trustScore?.trustState ?? 'none',
       },
       costNote: teamMatch.costNote,
+      league: teamMatch.league ? { leagueId: teamMatch.league.id, title: teamMatch.league.title } : null,
       levelLabel: formatLevelRange(teamMatch.minSportLevel, teamMatch.maxSportLevel, teamMatch.formatNote),
       minLevel: teamMatch.minSportLevel ? { code: teamMatch.minSportLevel.code, name: teamMatch.minSportLevel.name } : null,
       maxLevel: teamMatch.maxSportLevel ? { code: teamMatch.maxSportLevel.code, name: teamMatch.maxSportLevel.name } : null,
@@ -1260,12 +1332,75 @@ export class TeamMatchesService {
     return teamMatch;
   }
 
+  /**
+   * U3: 리그 대진 상세에 이의 제기 자격을 실어 보낸다 -- 화면이 서버 재요청 없이
+   * "지금 이의를 제기할 수 있는지"를 바로 판정할 수 있게 한다.
+   *
+   * 판정(기간 만료·승강 확정)은 `LeagueMatchDisputeService.fileDispute`가 실제로
+   * 이의를 거부하는 것과 **같은 순수 함수**(`judgeLeagueDisputeEligibility`)를
+   * 그대로 재사용한다 -- 여기서 새로 로직을 만들면 화면이 "제기 가능"이라고
+   * 보여주는데 서버는 거부하는(또는 그 반대) 드리프트가 생길 수 있다.
+   */
+  private async getLeagueDisputeEligibility(
+    teamMatch: Pick<TeamMatchWithRelations, 'id' | 'game'> & { league: { id: string; title: string } | null },
+  ): Promise<{
+    disputeDeadline: string | null;
+    disputeBlockedReason: LeagueDisputeBlockedReason;
+    openDisputeExists: boolean;
+  }> {
+    const leagueId = teamMatch.league!.id;
+    const [officialRevision, promotionCommitted, openDispute] = await Promise.all([
+      teamMatch.game
+        ? this.prisma.v1Game.findUnique({
+            where: { id: teamMatch.game.id },
+            select: { currentOfficialRevision: { select: { officialAt: true } } },
+          })
+        : Promise.resolve(null),
+      // E3: commitPromotions가 만드는 V1LeaguePromotion 행 존재 여부가 승강 확정 판정 근거다
+      // (league-series-admin.service.ts, LeagueMatchDisputeService.fileDispute와 동일).
+      this.prisma.v1LeaguePromotion.findFirst({ where: { fromLeagueId: leagueId }, select: { id: true } }),
+      this.prisma.v1LeagueMatchDispute.findFirst({
+        where: { teamMatchId: teamMatch.id, status: 'open' },
+        select: { id: true },
+      }),
+    ]);
+
+    const { disputeDeadline, blockedReason } = judgeLeagueDisputeEligibility({
+      officialAt: officialRevision?.currentOfficialRevision?.officialAt ?? null,
+      now: new Date(),
+      promotionCommitted: promotionCommitted !== null,
+    });
+
+    return {
+      disputeDeadline: disputeDeadline ? disputeDeadline.toISOString() : null,
+      disputeBlockedReason: blockedReason,
+      openDisputeExists: openDispute !== null,
+    };
+  }
+
   private async getViewer(teamMatch: TeamMatchWithRelations, user: V1AuthUser | null) {
     if (!user) {
-      return { state: 'guest', manageableHostTeam: false, participantMember: false, eligibleTeams: [], manageRoute: null };
+      return {
+        state: 'guest',
+        manageableHostTeam: false,
+        manageableOpponentTeam: false,
+        participantMember: false,
+        eligibleTeams: [],
+        manageRoute: null,
+      };
     }
     const hostMembership = teamMatch.hostTeam.memberships[0];
     const manageableHostTeam = hostMembership?.role === 'owner' || hostMembership?.role === 'manager';
+    // 결과 승인 게이트용 — "상대팀(승인된 신청팀)의 owner/manager 인가".
+    // `state === 'approved'` 로는 이 판정을 할 수 없다: 그건 **신청서를 낸 사람 한 명**만
+    // 통과하는데, 리그 대진의 신청서는 운영자가 자동 생성하면서 appliedByUserId 가
+    // 운영자로 남는다(league-match-admin.service.ts) -- 그래서 리그에서는 상대팀의
+    // 누구도 결과를 승인할 수 없었다(alpha 실측: 원정팀 owner 의 state 가 'none').
+    // 서버의 실제 권한 판정(games.service.ts resolveActor 의 opponent_result_decide)은
+    // 이미 팀 멤버십 기준이므로, 화면도 같은 기준을 쓰게 맞춘다.
+    const opponentMembership = teamMatch.approvedApplicantTeam?.memberships?.[0];
+    const manageableOpponentTeam =
+      opponentMembership?.role === 'owner' || opponentMembership?.role === 'manager';
     // 후기 자격 판정용 — 역할을 가리지 않는 "참가팀 소속" 여부.
     // `state` 는 이 목적에 못 쓴다: 'host_team' 은 host 팀 owner/manager 만, 'approved' 는
     // 신청서를 낸 사람 한 명만 받는다. 그 둘로 화면을 게이팅하면 양 팀 일반 팀원은 물론
@@ -1279,6 +1414,7 @@ export class TeamMatchesService {
     return {
       state: this.getViewerState(teamMatch, user),
       manageableHostTeam,
+      manageableOpponentTeam,
       participantMember,
       eligibleTeams: eligibleTeams.map((team) => {
         const application = teamMatch.applications.find((item) => item.applicantTeamId === team.id);
@@ -1664,9 +1800,11 @@ export class TeamMatchesService {
   }
 }
 
+// 리그 일괄 생성 행은 startAt·createdAt이 전부 동일할 수 있어, 유일 tie-breaker(id)가
+// 없으면 cursor 페이지네이션 경계에서 행이 누락/중복된다.
 function getOrderBy(sort: TeamMatchesQueryDto['sort']): Prisma.V1TeamMatchOrderByWithRelationInput[] {
-  if (sort === 'latest') return [{ createdAt: 'desc' }];
-  return [{ startAt: 'asc' }, { createdAt: 'desc' }];
+  if (sort === 'latest') return [{ createdAt: 'desc' }, { id: 'desc' }];
+  return [{ startAt: 'asc' }, { createdAt: 'desc' }, { id: 'desc' }];
 }
 
 function getGenderRuleWhere(genderRule: NonNullable<TeamMatchesQueryDto['genderRule']>) {

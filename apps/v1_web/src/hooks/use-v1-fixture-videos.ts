@@ -19,6 +19,7 @@ import { v1Delete, v1Get, v1MultipartPost, v1Post } from '@/lib/api-client';
 
 export const fixtureVideoKeys = {
   tournament: (tournamentId: string) => ['v1', 'tournament-videos', tournamentId] as const,
+  league: (leagueId: string) => ['v1', 'league-videos', leagueId] as const,
 };
 
 export type FixtureVideoSource = 'upload' | 'external';
@@ -106,6 +107,72 @@ export function useDeleteFixtureVideo(tournamentId: string) {
       ),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: fixtureVideoKeys.tournament(tournamentId) });
+    },
+  });
+}
+
+// ── 리그 대진 영상 (2026-08-25) ─────────────────────────────────────────────
+// 서버 계약(`apps/v1_api/src/league-matches/league-fixture-videos.*`) — 대회 계약의
+// 팀매치 판이라 응답 모양(TournamentVideoFixture/TournamentFixtureVideo)을 공유한다.
+//  - `GET    /admin/league-matches/:leagueId/videos`
+//  - `POST   /admin/league-matches/:leagueId/fixtures/:teamMatchId/videos`        (링크)
+//  - `POST   /admin/league-matches/:leagueId/fixtures/:teamMatchId/videos/upload` (파일)
+//  - `DELETE /admin/league-matches/:leagueId/fixtures/:teamMatchId/videos/:videoId`
+
+function leagueFixtureVideosPath(leagueId: string, teamMatchId: string) {
+  return `/admin/league-matches/${encodeURIComponent(leagueId)}/fixtures/${encodeURIComponent(teamMatchId)}/videos`;
+}
+
+export function useLeagueFixtureVideos(leagueId: string) {
+  return useQuery({
+    queryKey: fixtureVideoKeys.league(leagueId),
+    queryFn: () =>
+      v1Get<{ items: TournamentVideoFixture[] }>(`/admin/league-matches/${encodeURIComponent(leagueId)}/videos`),
+    enabled: Boolean(leagueId),
+  });
+}
+
+export function useCreateLeagueFixtureVideoLink(leagueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { fixtureId: string; url: string; title?: string }) =>
+      v1Post<TournamentFixtureVideo>(leagueFixtureVideosPath(leagueId, payload.fixtureId), {
+        url: payload.url,
+        ...(payload.title ? { title: payload.title } : {}),
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: fixtureVideoKeys.league(leagueId) });
+    },
+  });
+}
+
+export function useUploadLeagueFixtureVideo(leagueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { fixtureId: string; file: File; title?: string }) => {
+      const formData = new FormData();
+      formData.append('files', payload.file);
+      if (payload.title) formData.append('title', payload.title);
+      return v1MultipartPost<TournamentFixtureVideo>(
+        `${leagueFixtureVideosPath(leagueId, payload.fixtureId)}/upload`,
+        formData,
+      );
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: fixtureVideoKeys.league(leagueId) });
+    },
+  });
+}
+
+export function useDeleteLeagueFixtureVideo(leagueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { fixtureId: string; videoId: string }) =>
+      v1Delete<{ deleted: boolean }>(
+        `${leagueFixtureVideosPath(leagueId, payload.fixtureId)}/${encodeURIComponent(payload.videoId)}`,
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: fixtureVideoKeys.league(leagueId) });
     },
   });
 }

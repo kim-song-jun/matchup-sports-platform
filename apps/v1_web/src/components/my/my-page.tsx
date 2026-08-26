@@ -19,6 +19,7 @@ import {
   Star,
   UserCheck,
   Users,
+  ListOrdered,
 } from 'lucide-react';
 import { LogoutButton } from '@/components/auth/logout-button';
 import { buildPhoneVerifyHref } from '@/components/auth/phone-verification/phone-verify-route';
@@ -26,6 +27,7 @@ import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, KPIStat, ListItem } from '@/components/v1-ui/primitives';
+import { MyPlayerCardSection } from './my-player-card-section';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { cssUrl } from '@/lib/assets';
 import { PendingReviewsCard } from '@/components/tournaments/pending-review-card';
@@ -40,7 +42,6 @@ import type {
   MyMember,
   MyMenuItem,
   MyTeam,
-  MyTeamDetailViewModel,
   MyTeamMembersViewModel,
   MyTeamsViewModel,
   NotificationSettingsViewModel,
@@ -51,6 +52,7 @@ import type {
 /** Lucide 아이콘 이름 → 컴포넌트 매핑. view-model의 icon 문자열을 참조함. */
 const MENU_ICON_MAP: Record<string, React.ComponentType<LucideProps>> = {
   Award,
+  ListOrdered,
   ClipboardList,
   Plus,
   Users,
@@ -80,54 +82,72 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
         <div className="tm-my-desktop-layout">
           {/* LEFT sticky: profile identity */}
           <div className="tm-my-desktop-sidebar">
-            <section className="tm-my-profile-head tm-my-home-profile-head">
-              <div className="tm-my-avatar" style={avatarStyle}>{model.user.profileImageUrl ? null : model.user.initials}</div>
-              <div className="tm-my-profile-copy">
-                <div className="tm-text-heading tm-my-profile-name">{model.user.name}</div>
-                <div className="tm-text-caption tm-my-profile-meta">{model.user.handle} · {model.user.region} · {model.user.genderLabel}</div>
-                {model.user.loginMethod || model.phoneVerified ? (
-                  <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {model.user.loginMethod ? (
-                      <span
-                        className="tm-badge tm-badge-grey"
-                        style={model.user.loginMethodProvider === 'kakao'
-                          ? { background: 'var(--kakao-yellow)', color: 'var(--static-black)' }
-                          : undefined}
-                      >
-                        {model.user.loginMethod}
-                      </span>
-                    ) : null}
-                    {/* 컬러만으로 상태를 전달하지 않도록 아이콘 + 텍스트를 함께 쓴다. */}
-                    {model.phoneVerified ? (
-                      <span className="tm-badge tm-badge-grey" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                        <ShieldCheck size={12} strokeWidth={2.5} aria-hidden="true" />
-                        본인인증 완료
-                      </span>
-                    ) : null}
+            {/* 내 선수 카드 (Task 155, 사용자 선택 A안 -- 카드 독립, 2026-08-26).
+                카드를 상자에서 꺼내 페이지 위에 직접 놓는다. 이전에는 카드가 무대 상자
+                안에 있고 그 안에 계정 버튼(내 프로필·프로필 수정)까지 함께 있어,
+                모바일에서 상자 속 상자 + 카드 조작과 계정 조작이 한 덩어리로 섞였다.
+                카드 아래에는 **카드 조작만** 남고(뒤집기·공유·설정), 계정은 아래 프로필
+                카드로 내려간다. 카드가 없으면(숨김·로딩·실패) 기존 신원 박스가 그 자리에 선다. */}
+            {model.user.userId !== null ? (
+              <MyPlayerCardSection
+                userId={model.user.userId}
+                displayName={model.user.name}
+                profileImageUrl={model.user.profileImageUrl ?? null}
+              />
+            ) : null}
+            {/* 프로필(계정) -- 카드와 **다른 블록**이다. 카드 유무와 무관하게 항상 선다:
+                카드를 숨긴 사용자에게는 이것이 유일한 신원 표시이고, 카드가 있는
+                사용자에게는 계정 조작이 카드 조작과 섞이지 않는 자리다. */}
+            {model.user.userId !== null ? (
+              <Card pad={16}>
+                <div className="tm-text-body-lg">프로필</div>
+                <div className="tm-my-account-block">
+                  <div className="tm-my-avatar tm-my-account-avatar" style={avatarStyle}>
+                    {model.user.profileImageUrl ? null : model.user.initials}
                   </div>
-                ) : null}
-                <div
-                  className="tm-text-caption"
-                  style={{
-                    marginTop: 6,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {model.user.intro}
+                  <div className="tm-my-account-name">{model.user.name}</div>
+                  <div className="tm-my-account-meta">
+                    {model.user.handle} · {model.user.region} · {model.user.genderLabel}
+                  </div>
+                  {model.user.loginMethod || model.phoneVerified ? (
+                    <div className="tm-my-account-badges">
+                      {model.user.loginMethod ? (
+                        <span
+                          className="tm-badge tm-badge-grey"
+                          style={model.user.loginMethodProvider === 'kakao'
+                            ? { background: 'var(--kakao-yellow)', color: 'var(--static-black)' }
+                            : undefined}
+                        >
+                          {model.user.loginMethod}
+                        </span>
+                      ) : null}
+                      {model.phoneVerified ? (
+                        <span className="tm-badge tm-badge-grey" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <ShieldCheck size={12} strokeWidth={2.5} aria-hidden="true" />
+                          본인인증 완료
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  <div className="tm-my-account-actions">
+                    <Link
+                      className="tm-btn tm-btn-sm tm-btn-neutral"
+                      href={`/users/${encodeURIComponent(model.user.userId)}`}
+                    >
+                      내 프로필
+                    </Link>
+                    <Link className="tm-btn tm-btn-sm tm-btn-neutral" href="/my/profile/edit">프로필 수정</Link>
+                  </div>
                 </div>
-              </div>
-              <Link className="tm-btn tm-btn-sm tm-btn-neutral tm-my-profile-edit-link" href="/my/profile/edit">프로필 수정</Link>
-            </section>
+              </Card>
+            ) : null}
             {model.phoneVerified === false ? <PhoneVerificationCallout /> : null}
-            {/* 활동 요약: stats strip을 Card로 감싸 섹션 라벨과 border/radius/padding 정합 */}
+            {/* 활동 -- 전체 활동과 이번 달을 한 카드로 합친다(사용자 확정 2026-08-26).
+                성격이 같은 숫자 묶음이 상자 두 개로 나뉘어 모바일 스크롤만 길었다. */}
             <Card pad={16}>
-              <div className="tm-text-body-lg">활동 요약</div>
+              <div className="tm-text-body-lg">활동</div>
               <div className="tm-my-profile-stats">{model.user.stats.map((stat) => <KPIStat key={stat.label} {...stat} />)}</div>
-            </Card>
-            <Card pad={16}>
-              <div className="tm-text-body-lg">이번 달 활동</div>
+              <div className="tm-my-activity-divider" />
               <div className="tm-my-monthly">{model.user.monthly.map((stat) => <KPIStat key={stat.label} {...stat} />)}</div>
             </Card>
           </div>
@@ -358,65 +378,6 @@ export function MyJoinApplicationsPageView({ model }: { model: MyJoinApplication
             ))}
           </div>
         )}
-      </div>
-    </AppChrome>
-  );
-}
-
-export function MyTeamDetailPageView({ model }: { model: MyTeamDetailViewModel }) {
-  return (
-    <AppChrome title="팀 정보" activeTab="my" bottomNav={false} backHref="/my/teams">
-      <div className="tm-my-shell">
-        {/* Desktop page head */}
-        <div className="tm-desktop-page-head tm-show-desktop">
-          <Link className="tm-desktop-back" href="/my/teams" aria-label="내 팀 목록으로 돌아가기">
-            <ChevronLeftIcon size={22} strokeWidth={2.5} />
-          </Link>
-          <h1 className="tm-text-heading">{model.team.name}</h1>
-        </div>
-        {/* Desktop 2-column layout */}
-        <div className="tm-my-team-detail-desktop">
-          {/* LEFT: hero + info + recent matches */}
-          <div className="tm-my-team-detail-left">
-            <section className="tm-my-team-hero">
-              <TeamAvatar seed={model.team.id} name={model.team.name} logoUrl={model.team.logoUrl} size="xl" />
-              <div>
-                <h2 className="tm-text-heading">{model.team.name}</h2>
-                <div className="tm-text-caption" style={{ marginTop: 4 }}>{model.team.sport} · {model.team.region} · {model.team.roleLabel}</div>
-              </div>
-              <p className="tm-text-body" style={{ margin: 0, lineHeight: 1.55 }}>{model.team.description}</p>
-            </section>
-            <Card pad={16}>
-              <InfoRow label="멤버" value={`${model.team.members}명`} />
-              <InfoRow label="매너" value={model.team.manner} />
-              <InfoRow label="다음 일정" value={model.team.next} />
-            </Card>
-            {model.recentMatches.length > 0 ? (
-              <>
-                <div className="tm-my-section-label">최근 팀매치</div>
-                <div className="tm-my-list-stack">{model.recentMatches.map((match) => <MyMatchCard key={match.id} match={match} manage />)}</div>
-              </>
-            ) : null}
-          </div>
-          {/* RIGHT sticky: action menu + CTA */}
-          <div className="tm-my-team-detail-right">
-            <MenuSection section={{ title: '운영 메뉴', items: model.actions }} />
-            {/* Desktop inline CTA (replaces fixed bottom bar) */}
-            <div className="tm-my-team-detail-cta tm-show-desktop">
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                <Link className="tm-btn tm-btn-lg tm-btn-primary" href={model.chatHref ?? '/chat'}>팀 채팅</Link>
-                <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={`/teams/${model.team.id}`}>팀 정보</Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      {/* Mobile fixed CTA — hidden on desktop */}
-      <div className="tm-fixed-cta tm-hide-desktop">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-          <Link className="tm-btn tm-btn-lg tm-btn-primary" href={model.chatHref ?? '/chat'}>팀 채팅</Link>
-          <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={`/teams/${model.team.id}`}>팀 정보</Link>
-        </div>
       </div>
     </AppChrome>
   );

@@ -17,7 +17,7 @@ type RevisionRow = {
   submittedAt: Date | null;
   teamMatchId: string | null;
   tournamentId: string | null;
-  seriesId: string | null;
+  leagueId: string | null;
   hostTeamId: string | null;
 };
 
@@ -92,7 +92,7 @@ function supersededRevision(overrides: Partial<RevisionRow> = {}): RevisionRow {
     submittedAt,
     teamMatchId: 'tm1',
     tournamentId: null,
-    seriesId: null,
+    leagueId: null,
     hostTeamId: null,
     ...overrides,
   };
@@ -139,7 +139,7 @@ describe('GameResultSubmittedEscalationService — ASSIST_SYNC supersession (#39
       const tx = fakeTx({
         revisionRow: supersededRevision({
           revisionId: 'rev-old-3',
-          seriesId: 's1',
+          leagueId: 'lg1',
           teamMatchId: 'tm1',
           hostTeamId: 'home-team',
         }),
@@ -205,7 +205,7 @@ describe('GameResultSubmittedEscalationService — ASSIST_SYNC supersession (#39
       const tx = fakeTx({
         revisionRow: supersededRevision({
           revisionId: 'rev-live-3',
-          seriesId: 's1',
+          leagueId: 'lg1',
           teamMatchId: 'tm1',
           hostTeamId: 'home-team',
         }),

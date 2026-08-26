@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+/* 치수 계열 디자인 토큰(간격·라운드·그림자·모션·레이어·컨트롤 크기)의 SSOT.
+ * @theme 블록이 있어 Tailwind 유틸리티와 이 파일의 CSS 클래스가 같은 값을 본다.
+ * 색상 토큰은 아래 :root 가 계속 담당한다. 근거·흡수 규칙은 tokens.css 주석 참조. */
+@import "./tokens.css";
+
 /* 다크모드 전략을 OS 자동(prefers-color-scheme, Tailwind v4 기본값)에서 수동 토글
  * (class 기반)로 전환한다. `<html>`에 .dark 클래스가 있을 때만 dark: 유틸리티가
  * 적용된다 — 적용 여부는 ThemeProvider(src/components/providers/theme-provider.tsx)가
@@ -77,24 +82,17 @@
   --orange-soft: var(--orange50);
   --red: var(--red500);
   --red-soft: var(--red50);
-  --grey-900: var(--grey900);
-  --grey-700: var(--grey700);
-  --grey-500: var(--grey500);
-  --grey-300: var(--grey300);
-  --grey-100: var(--grey100);
   --accent: var(--blue);
-  /* ── [P2 Elevation] named shadow — 역할 매핑 (값 변경 없음, 의미 명문화) ──────
+  /* ── [P2 Elevation] named shadow — 역할 매핑 ────────────────────────────────
+   * 정의는 tokens.css 의 @theme 로 옮겼다(치수 계열 SSOT). 값은 그대로다.
    * elevation-0: flat surface (배경과 동일, shadow 없음)
-   * elevation-1: card — 콘텐츠 카드, 인라인 칩, 세그먼트 탭 활성
-   * elevation-2: dropdown / overlay — 검색 드롭다운, 툴팁, 하단 스크림
+   * elevation-1: card — 콘텐츠 카드, 인라인 칩, 세그먼트 탭 활성 (--shadow-card)
+   * elevation-2: dropdown / overlay — 검색 드롭다운, 툴팁, 하단 스크림 (--shadow-dropdown)
    * elevation-3: dialog — 모달·alert dialog (--shadow-modal)
-   * elevation-4: sidebar / drawer — 사이드 네비 (--shadow-sidebar)
+   * elevation-4: sidebar / drawer — 사이드 네비 (--shadow-drawer)
    * elevation-5: toast / FAB — 화면 최상단 플로팅 (별도 box-shadow 인라인)
    * ──────────────────────────────────────────────────────────────────────────── */
-  --shadow-1: 0 1px 2px rgba(15, 23, 42, 0.05);       /* elevation-1: card */
-  --shadow-2: 0 8px 24px rgba(20, 28, 45, 0.08);      /* elevation-2: dropdown/overlay */
   /* ── 시맨틱 별칭 — 컴포넌트 CSS가 참조하지만 정의가 누락됐던 토큰(WS1 복구) ── */
-  --sh-1: var(--shadow-1); /* box-shadow: .tm-auth-segment-active, .tm-chat-bubble 등 */
   --line: var(--border); /* hairline border: .tm-auth-profile-upload 등 */
   --red-alpha-08: rgba(240, 68, 82, 0.08); /* --red500(#f04452) 8% — 에러 카드 border */
   /* ── WS6 토큰화 — 소비자 하드코딩 hex/rgba → 의미 토큰 ── */
@@ -136,8 +134,6 @@
   --overlay-white-92: rgba(255, 255, 255, 0.92);  /* 프로모 eyebrow 텍스트, CTA hover */
   --glass-white-96: rgba(255, 255, 255, 0.96);   /* 네비/헤더 유리 배경 */
   /* 모달·사이드바 그림자 */
-  --shadow-modal: 0 8px 32px rgba(20, 28, 45, 0.14);  /* elevation-3: dialog */
-  --shadow-sidebar: 4px 0 24px rgba(20, 28, 45, 0.12); /* elevation-4: sidebar/drawer */
   /* 검색 포커스 링 */
   --blue-focus-ring: rgba(49, 130, 246, 0.12);
   /* 대회 상금 / 보조 색 */
@@ -229,7 +225,6 @@
    * DESIGN.md: "카드는 배경색 차이로 구분한다: … gray-50 카드 on 흰 배경". */
   --card-border:                var(--border);
   --card-surface:               #ffffff;
-  --card-radius:                16px;
   /* List row — 원래 시각(grey50 bg / grey100 border) 유지 (component 토큰 계층만 정리) */
   --list-row-bg:                var(--grey50);
   --list-row-border:            var(--grey100);
@@ -253,6 +248,11 @@
   --v1-shell-bottom-nav-height: 74px;
   --v1-shell-wide-bottom-nav-height: 76px;
   --v1-shell-page-x: 20px;
+  /* 후기 화면들이 데스크톱에서 공유하는 본문 폭. 후기는 한 흐름 안에서 화면을 넘나든다
+     (대회 후기 목록 → 리뷰할 수 있는 경기 → 리뷰 남기기) — 화면마다 폭이 다르면 같은
+     흐름인데 매번 레이아웃이 갈아엎히는 것처럼 보인다(오너 지적). 값을 바꿀 일이 생기면
+     여기 한 곳만 고친다. */
+  --v1-review-column-width: 720px;
   --v1-shell-topbar-x: 16px;
   --v1-shell-wide-topbar-left-x: 20px;
   --v1-shell-wide-topbar-right-x: 14px;
@@ -486,7 +486,7 @@ button:disabled {
   top: 0;
   left: 0;
   width: 100%;
-  z-index: 20;
+  z-index: var(--z-chrome);
 }
 
 .tm-topbar-actions {
@@ -526,7 +526,7 @@ button:disabled {
 }
 
 .tm-topbar-title .tm-btn-icon {
-  margin-left: -10px;
+  margin-left: -12px;
   margin-right: 2px;
 }
 
@@ -556,14 +556,18 @@ button:disabled {
   border-top: 1px solid var(--grey100);
   background: rgba(255, 255, 255, 0.94);
   backdrop-filter: blur(18px);
-  padding: 6px 0 calc(16px + var(--v1-shell-safe-bottom));
+  padding: 8px 0 calc(16px + var(--v1-shell-safe-bottom));
   display: grid;
+  /* D5 — shell.tsx의 BottomNav가 tabs.length로 인라인 style을 얹어 실제 열 수를
+     결정한다(탭 6개 = repeat(6, 1fr)). 여기 5는 JS가 실패했을 때만 쓰이는 fallback값이라
+     탭이 늘어도 이 파일을 다시 고칠 필요가 없다 — 하드코딩된 열 수에 다시 묶이지 않도록
+     일부러 인라인 스타일을 우선시키는 구조다. */
   grid-template-columns: repeat(5, 1fr);
   position: absolute;
   bottom: 0;
   left: 0;
   width: 100%;
-  z-index: 20;
+  z-index: var(--z-chrome);
 }
 
 .tm-bottom-tab {
@@ -573,14 +577,25 @@ button:disabled {
   justify-content: center;
   gap: 4px;
   min-width: 0;
+  /* 탭이 6개로 늘면서(D5) 폭이 가장 좁은 뷰포트(iPhone SE 320px 기준)에서
+     320/6 ≈ 53px/tab까지 좁아진다. 아이콘 23px는 그대로 두되(53px의 ≈43%, 여전히
+     여유), 좌우 압박을 줄이려 최소 패딩을 준다 — 라벨(최대 2글자)이 탭 경계에
+     바짝 붙는 것을 막는다. 아래 .tm-bottom-tab span 주석에 열 수·라벨 폭 계산 근거. */
+  padding: 0 2px;
   color: var(--grey400);
 }
 
 .tm-bottom-tab span {
   color: var(--grey500);
-  /* [알파 감사 B] 11px는 R-T2 최소 하한(12px) 미달 — 하단 탭바 5개
-     라벨(홈/매치/대회/팀/마이) 전부 해당. 토큰(--font-size-caption)으로
-     교체. 탭바는 min-height라 1px 증가가 레이아웃을 깨지 않는다. */
+  /* [알파 감사 B] 11px는 R-T2 최소 하한(12px) 미달 — 하단 탭바 6개
+     라벨(홈/매치/대회/리그/팀/마이) 전부 해당. 토큰(--font-size-caption)으로
+     교체. 탭바는 min-height라 1px 증가가 레이아웃을 깨지 않는다.
+     [D5] 6열 계산: 390px viewport → .tm-app-frame width = min(100%, 480px) = 390px →
+     탭당 390/6 = 65px. 라벨은 전부 한글 1~2글자(홈/매치/대회/리그/팀/마이) — 12px
+     캡션 폰트 기준 한글 1글자 ≈ 13~14px 폭이라 2글자 라벨도 ≈26~28px로 65px 탭 폭에
+     여유 있게 들어간다(아이콘 23px도 동일). 최소 지원 폭 320px(iPhone SE) 기준으로도
+     320/6 ≈ 53px로 2글자 라벨(≈28px)이 아이콘과 겹치지 않는다 — 라벨이 줄바꿈되는
+     시점은 탭 폭이 라벨 폭보다 좁아질 때인데, 6글자 이상 라벨이 아니면 도달하지 않는다. */
   font-size: var(--font-size-caption);
   line-height: 16px;
   font-weight: 500;
@@ -609,7 +624,7 @@ button:disabled {
 
 .tm-auth-topbar {
   min-height: 56px;
-  padding: 8px 10px 8px 8px;
+  padding: 8px 12px 8px 8px;
   border-bottom: 1px solid var(--grey100);
   background: var(--bg);
   display: flex;
@@ -660,7 +675,7 @@ button:disabled {
 .tm-auth-logo {
   width: 72px;
   height: 72px;
-  border-radius: 20px;
+  border-radius: var(--radius-hero);
   background: var(--blue500);
   color: var(--static-white);
   display: grid;
@@ -693,7 +708,7 @@ button:disabled {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
 }
 
 .tm-auth-feature {
@@ -705,7 +720,7 @@ button:disabled {
 .tm-auth-feature-icon {
   width: 30px;
   height: 30px;
-  border-radius: 9px;
+  border-radius: var(--radius-chip);
   background: var(--blue50);
   color: var(--blue500);
   display: grid;
@@ -715,7 +730,7 @@ button:disabled {
 
 /* The guest button sits under the primary login button in the bottom CTA group. */
 .tm-auth-guest-link {
-  margin-top: 14px;
+  margin-top: 16px;
 }
 
 /* Email login — 짧은 폼이 화면 중앙에 떠서 아래쪽에 빈 보이드를 만들지 않도록
@@ -732,7 +747,7 @@ button:disabled {
 }
 
 .tm-auth-email-submit {
-  margin-top: 22px;
+  margin-top: 24px;
 }
 
 .tm-auth-center {
@@ -748,7 +763,7 @@ button:disabled {
 .tm-auth-divider {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   padding: 20px 0;
 }
 
@@ -764,7 +779,7 @@ button:disabled {
 
 .tm-auth-provider-row {
   display: flex;
-  gap: 10px;
+  gap: 12px;
 }
 
 .tm-auth-provider-row > * {
@@ -808,14 +823,14 @@ button:disabled {
 
 .tm-auth-stack {
   display: grid;
-  gap: 10px;
-  margin-top: 18px;
+  gap: 12px;
+  margin-top: 20px;
 }
 
 .tm-auth-form {
   display: grid;
-  gap: 18px;
-  margin-top: 30px;
+  gap: 20px;
+  margin-top: 32px;
 }
 
 .tm-auth-signup-form {
@@ -856,16 +871,16 @@ button:disabled {
 .tm-auth-segmented {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
+  gap: 8px;
   padding: 4px;
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   background: var(--grey100);
 }
 
 .tm-auth-segment {
   min-height: 40px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--text-muted);
   font-size: 13px;
@@ -875,7 +890,7 @@ button:disabled {
 .tm-auth-segment-active {
   background: var(--bg);
   color: var(--blue500);
-  box-shadow: var(--sh-1);
+  box-shadow: var(--shadow-card);
 }
 
 /* 모드 탭 아래 한 단계 낮은 선택지(계정 찾기의 '본인 확인 방법')에 쓰는 축소 변형.
@@ -885,11 +900,11 @@ button:disabled {
 .tm-auth-segmented-sm {
   gap: 4px;
   padding: 3px;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
 }
 
 .tm-auth-segmented-sm .tm-auth-segment {
-  border-radius: 9px;
+  border-radius: var(--radius-chip);
   font-size: 12px;
   font-weight: 700;
 }
@@ -899,18 +914,18 @@ button:disabled {
    내부 영역은 카드가 아니라 tint 된 inset 으로 통일한다. */
 .tm-auth-inset {
   border: 1px solid var(--grey200);
-  border-radius: 16px;
+  border-radius: var(--radius-container);
   background: var(--grey50);
 }
 
 .tm-auth-profile-upload {
   display: grid;
   grid-template-columns: 72px minmax(0, 1fr);
-  gap: 14px;
+  gap: 16px;
   align-items: center;
-  padding: 14px;
+  padding: 16px;
   border: 1px solid var(--grey200);
-  border-radius: 16px;
+  border-radius: var(--radius-container);
   background: var(--grey50);
 }
 
@@ -918,7 +933,7 @@ button:disabled {
 .tm-auth-profile-preview-trigger {
   position: relative;
   display: inline-flex;
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   cursor: pointer;
 }
 
@@ -942,7 +957,7 @@ button:disabled {
   height: 72px;
   display: grid;
   place-items: center;
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   background: var(--grey100);
   background-position: center;
   background-size: cover;
@@ -960,7 +975,7 @@ button:disabled {
   height: 24px;
   display: grid;
   place-items: center;
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   background: var(--blue500);
   color: var(--static-white);
   border: 2px solid var(--grey50);
@@ -983,7 +998,7 @@ button:disabled {
 }
 
 .tm-auth-link-row {
-  margin-top: 18px;
+  margin-top: 20px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -991,7 +1006,7 @@ button:disabled {
 
 .tm-card.tm-auth-soft-card,
 .tm-auth-soft-card {
-  margin-top: 22px;
+  margin-top: 24px;
   background: var(--grey50);
 }
 
@@ -1009,8 +1024,8 @@ button:disabled {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  padding: 10px 12px;
-  border-radius: 10px;
+  padding: 12px 12px;
+  border-radius: var(--radius-control);
   background: var(--red50);
   color: var(--red700);
 }
@@ -1031,23 +1046,23 @@ button:disabled {
 }
 
 .tm-auth-soft-card .tm-text-caption {
-  margin-top: 6px;
+  margin-top: 8px;
 }
 
 .tm-auth-exception {
   min-height: 100%;
-  padding: 72px 24px 42px;
+  padding: 72px 24px 44px;
   display: flex;
   flex-direction: column;
   justify-content: center;
 }
 
 .tm-auth-exception-card {
-  margin-top: 22px;
+  margin-top: 24px;
 }
 
 .tm-auth-exception-card .tm-text-caption {
-  margin-top: 6px;
+  margin-top: 8px;
 }
 
 .tm-auth-exception-card-orange {
@@ -1059,7 +1074,7 @@ button:disabled {
 }
 
 .tm-auth-agree-all {
-  margin-top: 22px;
+  margin-top: 24px;
   border-color: rgba(49, 130, 246, .18);
   background: var(--blue50);
   min-height: 58px;
@@ -1083,7 +1098,7 @@ button:disabled {
 
 .tm-auth-agreement {
   min-height: 64px;
-  padding: 15px;
+  padding: 16px;
   display: grid;
   grid-template-columns: 26px minmax(0, 1fr) 44px;
   align-items: center;
@@ -1122,7 +1137,7 @@ button:disabled {
   height: 44px;
   display: grid;
   place-items: center;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
 }
 
 .tm-auth-agreement-arrow[aria-expanded="true"] svg {
@@ -1135,16 +1150,16 @@ button:disabled {
 }
 
 .tm-auth-agreement-detail {
-  margin: 0 15px 15px 51px;
-  padding: 12px 14px;
-  border-radius: 14px;
+  margin: 0 16px 16px 52px;
+  padding: 12px 16px;
+  border-radius: var(--radius-field);
   background: var(--grey50);
 }
 
 .tm-auth-check {
   width: 24px;
   height: 24px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--grey200);
   background: var(--bg);
   color: var(--grey400);
@@ -1169,7 +1184,7 @@ button:disabled {
 
 .tm-auth-complete {
   min-height: 100%;
-  padding: 72px 24px 42px;
+  padding: 72px 24px 44px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -1178,7 +1193,7 @@ button:disabled {
 .tm-auth-complete-icon {
   width: 72px;
   height: 72px;
-  border-radius: 24px;
+  border-radius: var(--radius-hero);
   background: var(--blue500);
   color: var(--static-white);
   display: grid;
@@ -1206,10 +1221,10 @@ button:disabled {
   left: 0;
   right: 0;
   bottom: 0;
-  padding: 14px 20px 22px;
+  padding: 16px 20px 24px;
   border-top: 1px solid var(--grey100);
   background: var(--bg);
-  z-index: 20;
+  z-index: var(--z-chrome);
 }
 
 .tm-auth-fixed-reason {
@@ -1226,7 +1241,7 @@ button:disabled {
 
 .tm-auth-progress {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
 .tm-auth-progress .tm-text-micro {
@@ -1237,12 +1252,12 @@ button:disabled {
 .tm-auth-progress-bars {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 5px;
+  gap: 4px;
 }
 
 .tm-auth-progress-bars span {
   height: 4px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--grey150);
 }
 
@@ -1253,7 +1268,7 @@ button:disabled {
 .tm-auth-sport-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 12px;
   margin-top: 24px;
 }
 
@@ -1278,11 +1293,11 @@ button:disabled {
 }
 
 .tm-auth-notice {
-  margin-top: 18px;
+  margin-top: 20px;
 }
 
 .tm-auth-notice .tm-text-caption {
-  margin-top: 5px;
+  margin-top: 4px;
 }
 
 .tm-auth-notice-blue {
@@ -1377,7 +1392,7 @@ button:disabled {
 .tm-card {
   background: var(--card-surface); /* [P1 component token] */
   border: 1px solid var(--card-border);
-  border-radius: var(--card-radius);
+  border-radius: var(--radius-container);
 }
 
 .tm-pressable {
@@ -1390,11 +1405,11 @@ button:disabled {
 
 .tm-btn {
   border: 0;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
   font-weight: 700;
   word-break: keep-all; /* [P2 한글] TDS 패턴 — 음절 단위 줄바꿈 방지 */
 }
@@ -1408,7 +1423,7 @@ button:disabled {
 
 .tm-btn-sm {
   min-height: 44px; /* WS11 a11y 터치 타깃 (40→44) */
-  padding: 0 14px;
+  padding: 0 16px;
   font-size: 13px;
 }
 
@@ -1420,7 +1435,7 @@ button:disabled {
 
 .tm-btn-lg {
   min-height: 50px;
-  padding: 0 18px;
+  padding: 0 20px;
   font-size: 15px;
 }
 
@@ -1438,7 +1453,7 @@ button:disabled {
   display: inline-block;
   width: 15px;
   height: 15px;
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   border: 2px solid var(--border);
   border-top-color: var(--blue500);
   animation: tm-spin 0.8s linear infinite;
@@ -1494,7 +1509,11 @@ button:disabled {
  * - active scale은 :not(:disabled) 가드로 비활성 버튼 눌림 피드백 차단
  * ─────────────────────────────────────────────────────────────────────────── */
 .tm-btn {
-  transition: background-color 0.12s ease, transform 0.08s ease;
+  /* 0.12s / 0.08s 를 같은 값의 토큰으로 표기 통일 (120ms / 80ms — 값 변화 없음).
+   * easing 은 여기서 건드리지 않는다: ease 는 cubic-bezier(.25,.1,.25,1) 이고
+   * --ease-standard 는 (.4,0,.2,1) 이라 서로 다른 곡선이다. 통일하려면 의도적
+   * 결정과 시각 검증이 따라야 한다. */
+  transition: background-color var(--duration-fast) ease, transform var(--duration-instant) ease;
 }
 
 @media (hover: hover) {
@@ -1573,7 +1592,7 @@ button:disabled {
  * ─────────────────────────────────────────────────────────────────────────── */
 @media (hover: hover) {
   .tm-card-interactive:hover {
-    box-shadow: var(--shadow-1); /* elevation-1 lift */
+    box-shadow: var(--shadow-card); /* elevation-1 lift */
     cursor: pointer;
   }
 
@@ -1598,7 +1617,7 @@ button:disabled {
 
 .tm-badge {
   min-height: 24px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 0 8px;
   display: inline-flex;
   align-items: center;
@@ -1641,6 +1660,44 @@ button:disabled {
   background: var(--grey150);
 }
 
+/* 리그전 배지 링크화(R3, team-matches-page.tsx TeamMatchCard) — 팀매치 목록 카드는
+ * 카드 전체가 이미 상세로 가는 Link라 리그 배지는 <a>가 아니라 button으로 구현했다.
+ * .tm-badge UA 기본 button 스타일(폰트·테두리)을 리셋하고, "클릭 가능함"을 컬러가
+ * 아니라 밑줄 + 화살표 아이콘으로 전달한다(색맹 대응, DESIGN.md 컬러 전용 전달 금지). */
+.tm-league-badge-link {
+  font: inherit;
+  gap: 3px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  /* a11y 터치 타깃 (26->44). 이 배지는 원래 비인터랙티브 span 이라 배지 높이 그대로
+     26px 였는데, 카드 전체를 감싼 Link 안에서 중첩 앵커를 피하려고 button 으로 바꾸면서
+     "누를 수 있는 26px 표면"이 생겼다 — alpha 라이브 측정에서 390/768/1440 전부 26px
+     로 확인됐다. 히트 영역만 ::after 로 넓히는 방법도 있지만, 배지가 카드 Link 안에
+     있어 넓힌 영역이 위아래 형제 배지 줄을 덮으면 그 자리 탭이 팀이 아니라 리그로
+     새는 부작용이 생긴다. 그래서 이 저장소의 다른 a11y 상향 선례와 동일하게 요소
+     자체를 44px 로 올린다. */
+  min-height: 44px;
+  /* F7: 리그명이 길면 배지가 부모 카드 밖으로 밀려 나가 페이지가 가로로 스크롤됐다
+     (390px alpha 실측: 카드 밖 152px, main.tm-scroll-area scrollWidth 427 vs client 390).
+     .tm-badge 가 nowrap 이라 flex 안에서 줄지 않는 것이 원인 — 최대 폭을 부모로 묶고
+     리그명만 .tm-league-badge-text 에서 말줄임한다(화살표는 항상 보인다). */
+  max-width: 100%;
+  min-width: 0;
+}
+
+.tm-league-badge-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.tm-league-badge-link:focus-visible {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+}
+
 .tm-badge-orange {
   background: var(--orange50);
   color: var(--orange700);
@@ -1661,17 +1718,17 @@ button:disabled {
   /* [공개 화면 R-T2 정리] 실제 라벨 텍스트(room.typeLabel 등)라 캡션 토큰으로 상향.
      min-height 18px면 12px 텍스트도 여유 있게 들어간다. */
   font-size: var(--font-size-caption);
-  padding: 0 6px;
+  padding: 0 8px;
 }
 
 .tm-input {
   width: 100%;
   min-height: 50px;
   border: 1px solid var(--input-border); /* [P1 component token] */
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   background: var(--input-surface);
   color: var(--input-text);
-  padding: 0 14px;
+  padding: 0 16px;
   font: inherit;
   font-size: 15px;
   outline: none;
@@ -1721,7 +1778,7 @@ button:disabled {
   min-height: 50px;
   place-items: center;
   border: 1px solid var(--input-border);
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   background: var(--input-surface);
   color: var(--text-muted);
   cursor: pointer;
@@ -1782,10 +1839,10 @@ button:disabled {
 .tm-chip {
   min-height: 44px; /* WS11 a11y 터치 타깃 (34→44) — 라이브 검증으로 토스 균형 확인 */
   border: 1px solid var(--grey200);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--bg);
   color: var(--text-muted);
-  padding: 0 13px;
+  padding: 0 12px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1825,7 +1882,7 @@ button:disabled {
   right: 2px;
   width: 7px;
   height: 7px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--red500);
   border: 2px solid var(--bg);
 }
@@ -1848,7 +1905,7 @@ button:disabled {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--red500);
   color: var(--static-white);
   border: 2px solid var(--bg);
@@ -1896,7 +1953,7 @@ button:disabled {
      shadow-2 를 히어로 카드에도 적용해, 이미지 비중이 커진 만큼 media+content 를 한
      덩어리로 묶어 '붕 떠' 보이지 않게 한다. border만 있던 이전보다 카드가 배경 위에
      자연스럽게 자리 잡은 느낌을 준다(과한 확산 없는 절제된 값 그대로 재사용). */
-  box-shadow: var(--shadow-2);
+  box-shadow: var(--shadow-dropdown);
 }
 
 .tm-featured-content {
@@ -1971,7 +2028,7 @@ button:disabled {
   padding: 20px 12px;
   /* 페이지 배경(--bg) 위에 한 단계 얹는 서브 패널 — main과 동일하게 --grey50. */
   background: var(--grey50);
-  border-radius: 16px;
+  border-radius: var(--radius-container);
 }
 
 .tm-quick-action {
@@ -1994,7 +2051,7 @@ button:disabled {
 .tm-quick-icon {
   width: 44px;
   height: 44px;
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   display: grid;
   place-items: center;
   font-weight: 800;
@@ -2042,9 +2099,9 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 14px;
+  padding: 12px 16px;
   background: var(--blue50);
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   border: 1px solid var(--blue100);
 }
 
@@ -2053,7 +2110,7 @@ button:disabled {
   height: 32px;
   display: grid;
   place-items: center;
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   background: var(--yellow50);
   color: var(--yellow700);
   flex-shrink: 0;
@@ -2120,13 +2177,13 @@ button:disabled {
   width: 220px;
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   overflow: hidden;
   padding: 0;
   text-align: left;
   color: inherit;
   /* hairline shadow 로 이미지+내용을 한 카드로 묶어 '붕 떠' 보이지 않게 */
-  box-shadow: var(--shadow-2);
+  box-shadow: var(--shadow-dropdown);
 }
 
 .tm-match-card-media {
@@ -2137,7 +2194,7 @@ button:disabled {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 10px;
+  margin-top: 12px;
 }
 
 .tm-notice-head {
@@ -2149,29 +2206,29 @@ button:disabled {
 }
 
 .tm-notice-page {
-  padding: 18px 20px 112px;
+  padding: 20px 20px 112px;
 }
 
 .tm-notice-lead {
-  margin-top: 6px;
+  margin-top: 8px;
   color: var(--text-muted);
   line-height: 1.55;
 }
 
 .tm-notice-filter-row {
-  margin-top: 18px;
+  margin-top: 20px;
   padding-bottom: 2px;
 }
 
 .tm-notice-stack {
   display: grid;
-  gap: 10px;
-  margin-top: 18px;
+  gap: 12px;
+  margin-top: 20px;
 }
 
 .tm-notice-row {
   min-height: 82px;
-  padding: 14px 16px;
+  padding: 16px 16px;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -2182,7 +2239,7 @@ button:disabled {
 .tm-notice-row-icon {
   width: 38px;
   height: 38px;
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   background: var(--grey100);
   color: var(--blue500);
   display: grid;
@@ -2229,8 +2286,8 @@ button:disabled {
 
 .tm-notice-body {
   display: grid;
-  gap: 14px;
-  margin-top: 22px;
+  gap: 16px;
+  margin-top: 24px;
 }
 
 .tm-notice-body p {
@@ -2252,7 +2309,7 @@ button:disabled {
 }
 
 .tm-notice-related .tm-text-caption {
-  margin-top: 6px;
+  margin-top: 8px;
   color: var(--text-muted);
   line-height: 1.55;
 }
@@ -2260,25 +2317,25 @@ button:disabled {
 .tm-list-row {
   width: 100%;
   min-height: 58px;
-  padding: 12px 14px;
-  border-radius: 14px;
+  padding: 12px 16px;
+  border-radius: var(--radius-field);
   background: var(--list-row-bg); /* [P1 component token] */
   border: 1px solid var(--list-row-border);
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   text-align: left;
 }
 
 .tm-match-list {
-  padding: 14px var(--v1-shell-page-x) 108px;
+  padding: 16px var(--v1-shell-page-x) 108px;
 }
 
 .tm-sport-chip-row {
   display: flex;
   gap: 8px;
   overflow-x: auto;
-  padding: 2px 0 10px;
+  padding: 2px 0 12px;
   scrollbar-width: none;
 }
 
@@ -2288,12 +2345,12 @@ button:disabled {
 
 .tm-match-summary-row {
   min-height: 44px;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--grey50); /* 페이지 배경(--bg) 위 한 단계 — main과 동일 */
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 12px;
   padding: 0 12px;
 }
 
@@ -2321,7 +2378,7 @@ button:disabled {
   display: block;
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   background: var(--bg);
 }
 
@@ -2355,8 +2412,8 @@ button:disabled {
   right: 12px;
   top: 12px;
   min-height: 26px;
-  border-radius: 999px;
-  padding: 0 9px;
+  border-radius: var(--radius-pill);
+  padding: 0 8px;
   display: inline-flex;
   align-items: center;
   background: rgba(25, 31, 40, 0.72);
@@ -2366,14 +2423,14 @@ button:disabled {
 }
 
 .tm-match-list-card-body {
-  padding: 14px;
+  padding: 16px;
 }
 
 .tm-match-list-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   margin-top: 12px;
 }
 
@@ -2383,7 +2440,7 @@ button:disabled {
   bottom: 92px;
   width: 56px;
   height: 56px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--blue500);
   color: var(--static-white);
   display: grid;
@@ -2392,7 +2449,7 @@ button:disabled {
   line-height: 1;
   font-weight: 500;
   box-shadow: 0 12px 26px rgba(49, 130, 246, 0.32);
-  z-index: 30;
+  z-index: var(--z-floating);
 }
 
 .tm-create-fixed-cta {
@@ -2409,8 +2466,8 @@ button:disabled {
   right: -3px;
   min-width: 20px;
   height: 20px;
-  border-radius: 999px;
-  padding: 0 5px;
+  border-radius: var(--radius-pill);
+  padding: 0 4px;
   background: var(--red500);
   border: 2px solid var(--bg);
   color: var(--static-white);
@@ -2438,7 +2495,7 @@ button:disabled {
 
 .tm-match-detail-overlay {
   height: 100%;
-  padding: 14px 16px 18px;
+  padding: 16px 16px 20px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -2458,7 +2515,7 @@ button:disabled {
 }
 
 .tm-match-detail-body {
-  padding: 6px 20px 0;
+  padding: 8px 20px 0;
 }
 
 .tm-info-row {
@@ -2467,7 +2524,7 @@ button:disabled {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
+  gap: 16px;
 }
 
 .tm-fixed-cta {
@@ -2476,8 +2533,8 @@ button:disabled {
   bottom: 0;
   width: min(100%, var(--v1-app-chrome-frame-width));
   transform: translateX(-50%);
-  z-index: 31;
-  padding: 14px var(--v1-shell-page-x) calc(var(--v1-shell-cta-bottom-pad) + var(--v1-shell-safe-bottom));
+  z-index: var(--z-cta);
+  padding: 16px var(--v1-shell-page-x) calc(var(--v1-shell-cta-bottom-pad) + var(--v1-shell-safe-bottom));
   border-top: 1px solid var(--grey100);
   background: var(--bg);
 }
@@ -2489,7 +2546,7 @@ button:disabled {
   left: 50%;
   width: min(100%, var(--v1-app-chrome-frame-width));
   transform: translateX(-50%);
-  z-index: 38;
+  z-index: var(--z-scrim);
   background: rgba(25, 31, 40, 0.18);
   animation: tm-filter-scrim-fade .18s ease-out;
 }
@@ -2502,7 +2559,7 @@ button:disabled {
   right: 0;
   width: min(100%, var(--v1-app-chrome-frame-width));
   margin: 0 auto;
-  z-index: 40;
+  z-index: var(--z-layer);
   overflow: hidden;
   pointer-events: none;
 }
@@ -2513,9 +2570,9 @@ button:disabled {
   right: 0;
   bottom: 0;
   width: 100%;
-  padding: 10px var(--v1-shell-page-x) calc(20px + var(--v1-shell-safe-bottom));
+  padding: 12px var(--v1-shell-page-x) calc(20px + var(--v1-shell-safe-bottom));
   border-top: 1px solid var(--grey100);
-  border-radius: 24px 24px 0 0;
+  border-radius: var(--radius-hero) var(--radius-hero) 0 0;
   background: var(--bg);
   box-shadow: 0 -16px 32px rgba(25, 31, 40, 0.14);
   touch-action: none;
@@ -2564,7 +2621,7 @@ button:disabled {
   width: 42px;
   height: 4px;
   margin: 0 auto 16px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--grey300);
 }
 
@@ -2576,21 +2633,21 @@ button:disabled {
 }
 
 .tm-filter-section {
-  margin-top: 18px;
+  margin-top: 20px;
 }
 
 .tm-filter-chip-wrap {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 10px;
+  margin-top: 12px;
 }
 
 .tm-filter-actions {
   display: grid;
   grid-template-columns: 96px 1fr;
   gap: 8px;
-  margin-top: 18px;
+  margin-top: 20px;
 }
 
 .tm-create-shell {
@@ -2602,13 +2659,13 @@ button:disabled {
 }
 
 .tm-create-progress {
-  padding: 14px 0 10px;
+  padding: 16px 0 12px;
 }
 
 .tm-create-bars {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
+  gap: 8px;
   margin-top: 12px;
 }
 
@@ -2618,7 +2675,7 @@ button:disabled {
 
 .tm-create-bars span {
   height: 4px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--grey100);
 }
 
@@ -2634,7 +2691,7 @@ button:disabled {
 .tm-create-sport-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 12px;
   margin-top: 20px;
 }
 
@@ -2644,19 +2701,19 @@ button:disabled {
 }
 
 .tm-create-field {
-  margin-top: 22px;
+  margin-top: 24px;
 }
 
 .tm-team-logo-picker {
   display: grid;
-  gap: 14px;
-  margin-top: 10px;
+  gap: 16px;
+  margin-top: 12px;
 }
 
 .tm-team-logo-current {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
 }
 
 .tm-team-logo-presets {
@@ -2670,10 +2727,10 @@ button:disabled {
   display: grid;
   width: 52px;
   height: 52px;
-  padding: 5px;
+  padding: 4px;
   place-items: center;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   background: var(--card-surface);
   cursor: pointer;
 }
@@ -2706,7 +2763,7 @@ button:disabled {
   height: 20px;
   place-items: center;
   border: 2px solid var(--card-surface);
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   background: var(--blue500);
   color: var(--static-white);
 }
@@ -2726,11 +2783,11 @@ button:disabled {
    있었으므로 grey300(--border-strong)을 유지 — 이 앱의 헤어라인 톤 안에서 인지 가능한 최대치. */
 .tm-create-input {
   min-height: 48px;
-  margin-top: 10px;
+  margin-top: 12px;
   border: 1px solid var(--border-strong); /* [P1 component token] 기존 --grey100(1.10:1) 대체 */
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--grey50);
-  padding: 0 14px;
+  padding: 0 16px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -2758,8 +2815,8 @@ button:disabled {
 .tm-create-field-error {
   display: flex;
   align-items: center;
-  gap: 5px;
-  margin-top: 6px;
+  gap: 4px;
+  margin-top: 8px;
   color: var(--orange500);
   font-size: var(--font-size-caption);
 }
@@ -2811,7 +2868,7 @@ button:disabled {
   flex: 0 0 48px;
   height: 48px;
   border: 1px solid var(--border-strong);
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--grey50);
   color: var(--blue500);
   font-size: 22px;
@@ -2874,7 +2931,7 @@ button:disabled {
   display: block;
   overflow: hidden;
   border: 1px solid var(--grey100);
-  border-radius: 16px;
+  border-radius: var(--radius-container);
   background: var(--bg);
   color: inherit;
   text-decoration: none;
@@ -2909,7 +2966,7 @@ button:disabled {
 
 .tm-team-vs-hero {
   min-height: 224px;
-  padding: 12px 16px 18px;
+  padding: 12px 16px 20px;
   background: var(--grey900);
   color: var(--static-white);
   display: flex;
@@ -2926,8 +2983,8 @@ button:disabled {
 
 .tm-team-create-preview {
   height: 132px;
-  margin-top: 14px;
-  border-radius: 14px;
+  margin-top: 16px;
+  border-radius: var(--radius-field);
   background: var(--grey900);
   display: grid;
   place-items: center;
@@ -2935,7 +2992,7 @@ button:disabled {
 
 .tm-list-searchbar {
   min-height: 56px;
-  padding: 8px 10px 8px 20px;
+  padding: 8px 12px 8px 20px;
   border-bottom: 1px solid var(--grey100);
   background: var(--bg);
   display: flex;
@@ -2943,11 +3000,11 @@ button:disabled {
   gap: 8px;
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: var(--z-raised);
 }
 
 .tm-team-list {
-  padding: 14px var(--v1-shell-page-x) 104px;
+  padding: 16px var(--v1-shell-page-x) 104px;
 }
 
 .tm-team-searchbar {
@@ -2957,13 +3014,13 @@ button:disabled {
 .tm-list-search-input {
   flex: 1;
   min-height: 44px;
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   background: var(--grey100);
   border: 1px solid transparent;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 8px 0 14px;
+  gap: 8px;
+  padding: 0 8px 0 16px;
   color: var(--text-strong);
   font-size: 15px;
   font-weight: 600;
@@ -3008,7 +3065,7 @@ button:disabled {
   min-width: 44px;
   height: 44px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--text-caption);
   display: grid;
@@ -3025,9 +3082,9 @@ button:disabled {
   top: calc(100% + 6px);
   left: 0;
   right: 0;
-  z-index: 30;
+  z-index: var(--z-floating);
   border: 1px solid var(--grey100);
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   background: var(--bg);
   box-shadow: 0 12px 28px rgba(15, 23, 42, .12);
   overflow: hidden;
@@ -3037,7 +3094,7 @@ button:disabled {
 .tm-list-search-empty,
 .tm-list-search-recent {
   min-height: 40px;
-  padding: 0 14px;
+  padding: 0 16px;
   display: flex;
   align-items: center;
 }
@@ -3060,7 +3117,7 @@ button:disabled {
   background: transparent;
   color: var(--text-strong);
   justify-content: space-between;
-  gap: 10px;
+  gap: 12px;
   font-size: 14px;
   font-weight: 700;
   text-align: left;
@@ -3070,7 +3127,7 @@ button:disabled {
   width: 44px; /* WS11 a11y 터치 타깃 (40→44) */
   min-width: 44px;
   height: 44px;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   display: grid;
   place-items: center;
   position: relative;
@@ -3083,7 +3140,7 @@ button:disabled {
   right: 3px;
   min-width: 17px;
   height: 17px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 0 4px;
   background: var(--blue500);
   color: var(--static-white);
@@ -3098,17 +3155,17 @@ button:disabled {
 
 .tm-team-summary-bar {
   min-height: 44px;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--grey50); /* 페이지 배경(--bg) 위 한 단계 — main과 동일 */
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 12px;
   padding: 0 12px;
 }
 
 .tm-section-row {
-  margin-top: 14px;
+  margin-top: 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -3131,7 +3188,7 @@ button:disabled {
 .tm-team-card {
   display: block;
   border: 1px solid var(--grey100);
-  border-radius: 16px;
+  border-radius: var(--radius-container);
   background: var(--bg);
   color: inherit;
   text-decoration: none;
@@ -3149,13 +3206,13 @@ button:disabled {
 }
 
 .tm-team-card-action-row {
-  margin-top: 14px;
+  margin-top: 16px;
   padding-top: 12px;
   border-top: 1px solid var(--grey100);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 12px;
   font-size: 13px;
   font-weight: 700;
 }
@@ -3176,9 +3233,9 @@ button:disabled {
 }
 
 .tm-team-intro-box {
-  margin-top: 14px;
+  margin-top: 16px;
   border: 1px solid var(--grey100);
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   background: var(--grey50);
   padding: 12px;
 }
@@ -3201,7 +3258,7 @@ button:disabled {
 }
 
 .tm-team-detail-body {
-  padding: 18px 20px 128px;
+  padding: 20px 20px 128px;
 }
 
 /* 가입 승인 대기 안내 — 토스트가 사라진 뒤에도 상태를 알려주는 상시 카드.
@@ -3225,15 +3282,15 @@ button:disabled {
 }
 
 .tm-section-title {
-  margin-top: 22px;
-  margin-bottom: 10px;
+  margin-top: 24px;
+  margin-bottom: 12px;
 }
 
 .tm-team-info-row {
   display: grid;
   grid-template-columns: 92px minmax(0, 1fr);
   gap: 12px;
-  padding: 10px 0;
+  padding: 12px 0;
   border-bottom: 1px solid var(--grey100);
 }
 
@@ -3249,20 +3306,20 @@ button:disabled {
 }
 
 .tm-team-info-block {
-  padding: 10px 0;
+  padding: 12px 0;
   border-bottom: 1px solid var(--grey100);
 }
 
 .tm-team-form-chip-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 7px;
+  gap: 8px;
   margin-top: 8px;
 }
 
 .tm-team-form-chip-row .tm-chip {
   /* a11y: min-height 44px 유지 (base .tm-chip 상속) — padding만 축소해 밀도 조정 */
-  padding: 0 10px;
+  padding: 0 12px;
 }
 
 @media (max-width: 767px) {
@@ -3278,14 +3335,14 @@ button:disabled {
 }
 
 .tm-member-section {
-  margin-top: 18px;
+  margin-top: 20px;
 }
 
 .tm-member-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 10px;
+  margin-top: 12px;
 }
 
 .tm-chat-list {
@@ -3295,7 +3352,7 @@ button:disabled {
 }
 
 .tm-chat-list .tm-sport-chip-row {
-  padding: 14px 20px 10px;
+  padding: 16px 20px 12px;
 }
 
 .tm-chat-section {
@@ -3303,7 +3360,7 @@ button:disabled {
 }
 
 .tm-chat-section-label {
-  padding: 8px 20px 6px;
+  padding: 8px 20px 8px;
   color: var(--text-muted);
   font-size: var(--font-size-label); /* 13px — R-T2 토큰 */
   font-weight: 700;
@@ -3334,7 +3391,7 @@ button:disabled {
 .tm-chat-row-main {
   min-height: 76px;
   width: 100%;
-  padding: 14px 20px;
+  padding: 16px 20px;
   color: inherit;
   text-decoration: none;
   display: flex;
@@ -3355,7 +3412,7 @@ button:disabled {
 .tm-chat-avatar {
   width: 46px;
   height: 46px;
-  border-radius: 16px;
+  border-radius: var(--radius-container);
   background: var(--grey900);
   background-position: center;
   background-size: cover;
@@ -3434,7 +3491,7 @@ button:disabled {
 .tm-chat-last-line {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
   color: var(--text-caption);
   font-size: var(--font-size-label); /* 13px — R-T2 토큰 */
@@ -3466,8 +3523,8 @@ button:disabled {
 .tm-chat-inline-unread {
   min-width: 24px;
   height: 24px;
-  padding: 0 6px;
-  border-radius: 999px;
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
   background: var(--blue500);
   color: var(--static-white);
   display: inline-grid;
@@ -3500,8 +3557,8 @@ button:disabled {
 .tm-chat-context-card {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 14px;
+  gap: 12px;
+  padding: 16px;
   color: inherit;
   text-decoration: none;
 }
@@ -3509,7 +3566,7 @@ button:disabled {
 .tm-chat-context-icon {
   width: 40px;
   height: 40px;
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   background: var(--blue50);
   color: var(--blue500);
   display: grid;
@@ -3529,8 +3586,8 @@ button:disabled {
 .tm-chat-message-row {
   display: flex;
   align-items: flex-end;
-  gap: 6px;
-  margin-bottom: 10px;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
 .tm-chat-message-row-me {
@@ -3579,15 +3636,15 @@ button:disabled {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 18px 0 14px;
+  margin: 20px 0 16px;
   color: var(--text-caption);
   font-size: 12px;
   line-height: 1.4;
 }
 
 .tm-chat-date-divider span {
-  padding: 4px 10px;
-  border-radius: 999px;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
   background: var(--grey100);
 }
 
@@ -3603,14 +3660,14 @@ button:disabled {
 .tm-chat-system-message {
   display: flex;
   justify-content: center;
-  margin: 10px 0 14px;
+  margin: 12px 0 16px;
   text-align: center;
 }
 
 .tm-chat-system-message span {
   max-width: min(100%, 320px);
-  padding: 6px 10px;
-  border-radius: 999px;
+  padding: 8px 12px;
+  border-radius: var(--radius-pill);
   background: var(--grey100); /* [토큰 충돌 fix] 이전엔 --grey50 — .tm-chat-room 배경(3494행)과 동일 토큰이라
    pill이 채팅방 배경에 녹아 안 보였음. 인접한 .tm-chat-date-divider span(3592행) 선례와 동일 패턴 적용 */
   color: var(--text-muted);
@@ -3628,11 +3685,11 @@ button:disabled {
 
 .tm-chat-bubble {
   max-width: 286px;
-  padding: 10px 12px;
-  border-radius: 14px;
+  padding: 12px 12px;
+  border-radius: var(--radius-field);
   background: var(--bg);
   color: var(--text-strong);
-  box-shadow: var(--sh-1);
+  box-shadow: var(--shadow-card);
 }
 
 .tm-chat-bubble-me {
@@ -3659,7 +3716,7 @@ button:disabled {
 }
 
 .tm-chat-message-group-end {
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 
 /* 상대방 그룹의 첫 메시지 위에만 이름 노출 — 내 메시지는 정렬·색상으로 이미 구분되므로 라벨 생략 */
@@ -3672,7 +3729,7 @@ button:disabled {
 .tm-chat-message-line {
   display: flex;
   align-items: flex-end;
-  gap: 6px;
+  gap: 8px;
 }
 
 .tm-chat-message-line-me {
@@ -3681,21 +3738,21 @@ button:disabled {
 
 /* 그룹 첫 버블만 이름표/정렬 방향 쪽 모서리를 살짝 좁혀 "말풍선 시작" 느낌을 준다 */
 .tm-chat-bubble-head.tm-chat-bubble-other {
-  border-top-left-radius: 6px;
+  border-top-left-radius: var(--radius-chip);
 }
 
 .tm-chat-bubble-head.tm-chat-bubble-me {
-  border-top-right-radius: 6px;
+  border-top-right-radius: var(--radius-chip);
 }
 
 /* 그룹 내 후속 버블(첫 메시지 제외)도 동일한 모서리 처리를 유지해
    촘촘히 붙은 그룹 전체가 하나로 이어지는 말풍선처럼 보이게 한다. */
 .tm-chat-bubble-grouped.tm-chat-bubble-other {
-  border-top-left-radius: 6px;
+  border-top-left-radius: var(--radius-chip);
 }
 
 .tm-chat-bubble-grouped.tm-chat-bubble-me {
-  border-top-right-radius: 6px;
+  border-top-right-radius: var(--radius-chip);
 }
 
 .tm-chat-inputbar {
@@ -3703,9 +3760,9 @@ button:disabled {
   left: auto;
   bottom: auto;
   flex: 0 0 auto;
-  z-index: 34;
+  z-index: var(--z-inputbar);
   width: 100%;
-  padding: 12px var(--v1-shell-page-x) calc(22px + var(--v1-shell-safe-bottom));
+  padding: 12px var(--v1-shell-page-x) calc(24px + var(--v1-shell-safe-bottom));
   border-top: 1px solid var(--grey100);
   background: var(--bg);
   display: flex;
@@ -3715,12 +3772,12 @@ button:disabled {
 .tm-chat-input-placeholder {
   flex: 1;
   min-height: 44px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--grey100);
   color: var(--text-caption);
   display: flex;
   align-items: center;
-  padding: 0 14px;
+  padding: 0 16px;
   font-size: var(--font-size-body-sm); /* 14px — R-T2 토큰 */
   font-weight: 600;
 }
@@ -3742,15 +3799,15 @@ button:disabled {
   left: var(--v1-shell-page-x);
   right: var(--v1-shell-page-x);
   bottom: calc(22px + var(--v1-shell-safe-bottom));
-  z-index: 40;
+  z-index: var(--z-layer);
   min-height: 44px;
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   background: var(--green50);
   color: var(--green700); /* green500은 라이트 green50 배경 위 2.5:1로 AA(4.5:1) 미달 —
     .tm-badge-green과 동일하게 짙은 --green700(라이트 4.87:1 통과)으로 교체 */
   display: grid;
   place-items: center;
-  padding: 0 14px;
+  padding: 0 16px;
   text-align: center;
   font-size: var(--font-size-label); /* 13px — R-T2 토큰 */
   font-weight: 800;
@@ -3773,12 +3830,12 @@ button:disabled {
   width: 100%;
   min-height: 82px;
   border: 1px solid var(--grey100);
-  border-radius: 16px;
+  border-radius: var(--radius-container);
   background: var(--bg);
   color: inherit;
   text-decoration: none;
   text-align: left;
-  padding: 14px;
+  padding: 16px;
   display: flex;
   gap: 12px;
   cursor: pointer;
@@ -3794,7 +3851,7 @@ button:disabled {
 .tm-notification-icon {
   width: 42px;
   height: 42px;
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   background: var(--grey100);
   color: var(--text-muted);
   display: grid;
@@ -3810,7 +3867,7 @@ button:disabled {
 .tm-notification-card-title {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
 /* 미읽음 카드 제목 — 컬러 반전 대신 굵기로 강조(본문 대비 유지) */
@@ -3822,13 +3879,13 @@ button:disabled {
 .tm-notification-dot {
   width: 6px;
   height: 6px;
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   background: var(--blue500);
   flex: 0 0 auto;
 }
 
 .tm-notification-meta {
-  margin-top: 6px;
+  margin-top: 8px;
   color: var(--text-caption);
   font-size: var(--font-size-caption); /* 12px — R-T2 토큰 */
   font-weight: 700;
@@ -3841,7 +3898,7 @@ button:disabled {
 .tm-notification-sheet-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 60;
+  z-index: var(--z-modal);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -3851,8 +3908,8 @@ button:disabled {
 
 .tm-notification-sheet {
   width: min(100%, var(--v1-app-chrome-frame-width));
-  padding: 10px var(--v1-shell-page-x) calc(20px + var(--v1-shell-safe-bottom));
-  border-radius: 24px 24px 0 0;
+  padding: 12px var(--v1-shell-page-x) calc(20px + var(--v1-shell-safe-bottom));
+  border-radius: var(--radius-hero) var(--radius-hero) 0 0;
   background: var(--bg);
   box-shadow: 0 -16px 32px rgba(25, 31, 40, 0.14);
   animation: tm-filter-sheet-up 0.22s ease-out;
@@ -3862,7 +3919,7 @@ button:disabled {
   width: 42px;
   height: 4px;
   margin: 0 auto 16px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--grey300);
 }
 
@@ -3896,7 +3953,7 @@ button:disabled {
   .tm-notification-sheet {
     width: min(100%, 440px);
     padding: 20px 24px 24px;
-    border-radius: 20px;
+    border-radius: var(--radius-hero);
     box-shadow: 0 8px 32px rgba(20, 28, 45, 0.14);
     animation: fade-in 0.18s ease-out;
   }
@@ -3917,7 +3974,7 @@ button:disabled {
 .tm-empty-icon {
   width: 80px;
   height: 80px;
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   background: var(--blue50);
   color: var(--blue500);
   margin-bottom: 20px;
@@ -3934,7 +3991,7 @@ button:disabled {
 
   .tm-quick-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    row-gap: 14px;
+    row-gap: 16px;
   }
 
   .tm-search-quick-grid,
@@ -3953,7 +4010,7 @@ button:disabled {
     flex-direction: column;
     justify-content: center;
     gap: 4px;
-    padding: 9px 12px;
+    padding: 8px 12px;
   }
 
   .tm-match-list-footer,
@@ -3995,7 +4052,7 @@ button:disabled {
     align-items: flex-start;
     flex-direction: column;
     gap: 4px;
-    padding: 11px 0;
+    padding: 12px 0;
   }
 
   .tm-info-row > div:last-child {
@@ -4027,13 +4084,13 @@ button:disabled {
   .tm-chat-row-main {
     padding-left: var(--v1-shell-page-x);
     padding-right: var(--v1-shell-page-x);
-    gap: 10px;
+    gap: 12px;
   }
 
   .tm-chat-avatar {
     width: 42px;
     height: 42px;
-    border-radius: 14px;
+    border-radius: var(--radius-field);
   }
 
   .tm-chat-row-meta {
@@ -4043,7 +4100,7 @@ button:disabled {
   .tm-chat-inline-unread {
     min-width: 18px;
     height: 18px;
-    padding: 0 5px;
+    padding: 0 4px;
   }
 
   .tm-chat-context,
@@ -4095,7 +4152,7 @@ button:disabled {
 
 .v1-main {
   min-height: 100vh;
-  padding: calc(var(--v1-shell-wide-topbar-height) + 6px) var(--v1-shell-page-x) calc(20px + var(--v1-shell-wide-bottom-nav-height) + var(--v1-shell-safe-bottom));
+  padding: calc(var(--v1-shell-wide-topbar-height) + 8px) var(--v1-shell-page-x) calc(20px + var(--v1-shell-wide-bottom-nav-height) + var(--v1-shell-safe-bottom));
 }
 
 .v1-button:active {
@@ -4104,9 +4161,9 @@ button:disabled {
 
 .v1-card {
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-chip);
   background: var(--surface);
-  box-shadow: var(--shadow-1);
+  box-shadow: var(--shadow-card);
 }
 
 .v1-card-pad {
@@ -4131,8 +4188,8 @@ button:disabled {
 .v1-button {
   min-height: 42px;
   border: 0;
-  border-radius: 8px;
-  padding: 0 14px;
+  border-radius: var(--radius-chip);
+  padding: 0 16px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -4145,8 +4202,8 @@ button:disabled {
 
 .tm-my-shell {
   display: grid;
-  gap: 14px;
-  padding: 18px var(--v1-shell-page-x) 124px;
+  gap: 16px;
+  padding: 20px var(--v1-shell-page-x) 124px;
 }
 
 /* 프로필 헤더는 페이지 배경(--bg) 위에 --grey50 한 단계로 얹힌다 — main과 동일.
@@ -4156,16 +4213,16 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 16px;
-  margin: -18px -20px 0;
-  padding: 20px 20px 18px;
+  margin: -20px -20px 0;
+  padding: 20px 20px 20px;
   border-bottom: 1px solid var(--border);
   background: var(--grey50);
 }
 
 .tm-my-home-profile-head {
   position: relative;
-  margin: -18px 0 0;
-  padding: 20px 0 18px;
+  margin: -20px 0 0;
+  padding: 20px 0 20px;
   border-bottom: 0;
   background: transparent;
 }
@@ -4186,7 +4243,7 @@ button:disabled {
 .tm-my-avatar {
   width: 64px;
   height: 64px;
-  border-radius: 22px;
+  border-radius: var(--radius-hero);
   background: var(--grey900);
   color: var(--static-white);
   background-size: cover;
@@ -4221,40 +4278,50 @@ button:disabled {
   flex-shrink: 0;
 }
 
+/* 프로필 헤더 우측 액션 묶음("내 프로필" + "프로필 수정").
+   세로로 쌓는 이유: 390 폭에서는 아바타와 이름이 남기는 자리에 두 버튼을 가로로 넣을 수
+   없어 이름이 먼저 줄어든다. 데스크톱 사이드바에서도 폭이 좁아 같은 문제가 생긴다. */
+.tm-my-profile-actions {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .tm-profile-level-panel {
   /* 흰 카드(--card-surface) 내부에 렌더되므로 grey50/grey100은 카드와 명도가 거의
      동일해(대비 ~1.04~1.10:1) 패널 경계가 사실상 안 보였다. .tm-create-input과 동일
      패턴으로 --surface-soft(카드보다 한 단계 진한 표면) + --border-strong으로 교체. */
   border: 1px solid var(--border-strong);
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--surface-soft);
-  padding: 14px;
+  padding: 16px;
 }
 
 .tm-profile-edit-shell {
   display: grid;
-  gap: 14px;
-  padding-top: 18px;
+  gap: 16px;
+  padding-top: 20px;
   /*
    * (1) 모바일 fixed CTA가 생년월일 등 하단 필드를 가리는 버그 수정.
    * 버튼 높이 56px + CTA 상단 패딩 14px + 여백 16px = 86px + safe-area.
    * tm-create-shell의 하드코딩 124px보다 이 값이 적용 순서상 뒤에 오므로
    * specificity로 덮어씌우기 위해 별도 속성으로 선언합니다.
    */
-  padding-bottom: calc(86px + env(safe-area-inset-bottom, 0px) + 16px);
+  padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px) + 16px);
 }
 
 .tm-profile-edit-shell .tm-my-profile-head {
   margin: 0;
   border: 1px solid var(--border-strong);
-  border-radius: 16px;
+  border-radius: var(--radius-container);
 }
 
 .tm-my-profile-stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0;
-  margin-top: 14px;
+  margin-top: 16px;
 }
 
 .tm-my-profile-stats > div {
@@ -4270,14 +4337,14 @@ button:disabled {
 .tm-my-stat-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
 }
 
 .tm-my-monthly {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0;
-  margin-top: 14px;
+  margin-top: 16px;
 }
 
 .tm-my-monthly > div {
@@ -4298,7 +4365,7 @@ button:disabled {
   color: var(--text-muted);
   font-size: 12px;
   font-weight: 800;
-  margin: 6px 2px 8px;
+  margin: 8px 2px 8px;
   letter-spacing: .3px;
 }
 
@@ -4319,7 +4386,7 @@ button:disabled {
 .tm-my-menu-icon {
   width: 34px;
   height: 34px;
-  border-radius: 8px;
+  border-radius: var(--radius-chip);
   background: var(--grey150); /* [토큰 충돌 fix] grey100(대비 ≈1.10:1)은 흰 .tm-card 위에서 배지 형태가
   거의 안 보임 — grey150으로 한 단계 올려 원형 배지 경계를 명확히 함 */
   color: var(--text-strong);
@@ -4331,7 +4398,7 @@ button:disabled {
 
 .tm-my-list-stack {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
 .tm-my-card-head {
@@ -4349,7 +4416,7 @@ button:disabled {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 14px;
+  margin-top: 16px;
 }
 
 .tm-segment-row {
@@ -4357,7 +4424,7 @@ button:disabled {
   grid-template-columns: 1fr 1fr;
   gap: 8px;
   padding: 4px;
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   background: var(--grey100);
 }
 
@@ -4381,8 +4448,8 @@ button:disabled {
 
 .tm-review-shell {
   display: grid;
-  gap: 14px;
-  padding: 18px var(--v1-shell-page-x) 124px;
+  gap: 16px;
+  padding: 20px var(--v1-shell-page-x) 124px;
 }
 
 .tm-review-compose-shell {
@@ -4392,16 +4459,16 @@ button:disabled {
 .tm-review-tabs {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
+  gap: 8px;
   padding: 4px;
-  border-radius: 15px;
+  border-radius: var(--radius-field);
   background: var(--grey100);
 }
 
 .tm-review-tab {
   /* a11y: 터치 타깃 44px 확보 (시각 높이 유지, grid/place-items로 내용 중앙 정렬) */
   min-height: 44px;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   display: grid;
   place-items: center;
   color: var(--text-muted);
@@ -4468,7 +4535,7 @@ button:disabled {
   display: grid;
   gap: 12px;
   border: 1px solid var(--grey100);
-  border-radius: 16px;
+  border-radius: var(--radius-container);
   background: var(--surface);
   padding: 16px;
   color: inherit;
@@ -4478,19 +4545,19 @@ button:disabled {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 10px;
+  gap: 12px;
 }
 
 .tm-review-card-foot {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 12px;
 }
 
 .tm-review-target-stack {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
 .tm-review-target-card {
@@ -4505,7 +4572,7 @@ button:disabled {
 .tm-review-target-head {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 12px;
 }
 
 .tm-review-avatar {
@@ -4513,7 +4580,7 @@ button:disabled {
      아바타 사각 경계가 흐릿했다. .tm-profile-level-panel(4666-4674행)과 동일 패턴으로
      --surface-soft(카드보다 한 단계 진한 표면) + --border-strong 보더를 더한다. */
   flex-shrink: 0;
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   border: 1px solid var(--border-strong);
   background: var(--surface-soft);
   background-position: center;
@@ -4528,7 +4595,7 @@ button:disabled {
 .tm-review-stars {
   display: flex;
   gap: 2px;
-  margin-top: 10px;
+  margin-top: 12px;
 }
 
 .tm-review-star {
@@ -4552,7 +4619,10 @@ button:disabled {
 }
 
 .tm-review-star[data-active="true"] {
-  color: var(--blue500);
+  /* 읽기 전용 별(`RatingStar`, awards-page-client.tsx)이 `--orange500` 이라, 후기 흐름
+     안에서 같은 별점이 화면마다 다른 색으로 보였다(오너 결정: 둘 다 주황으로 통일).
+     입력 가능하다는 신호는 색이 아니라 커서·호버·터치 타깃(::before 44px)이 맡는다. */
+  color: var(--orange500);
 }
 
 .tm-review-star:disabled {
@@ -4563,7 +4633,7 @@ button:disabled {
 .tm-review-chip-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 7px;
+  gap: 8px;
   margin-top: 12px;
 }
 
@@ -4571,13 +4641,13 @@ button:disabled {
   /* a11y: 터치 타깃 44px 확보 (패딩 증가로 시각적 변화 최소화, 시각 무게 유지) */
   min-height: 44px;
   border: 1px solid var(--grey200);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--surface);
   color: var(--text-muted);
   font-size: 12px;
   font-weight: 700;
   line-height: 16px;
-  padding: 13px 10px;
+  padding: 12px 12px;
 }
 
 .tm-review-tag-chip[data-active="true"] {
@@ -4593,33 +4663,33 @@ button:disabled {
 
 .tm-review-received-list {
   display: grid;
-  gap: 10px;
-  margin-top: 14px;
+  gap: 12px;
+  margin-top: 16px;
 }
 
 .tm-review-received-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   min-height: 44px;
 }
 
 .tm-review-skeleton {
   min-height: 92px;
   border: 1px solid var(--grey100);
-  border-radius: 16px;
+  border-radius: var(--radius-container);
   background: linear-gradient(90deg, var(--grey50), var(--grey100), var(--grey50));
 }
 
 .tm-review-complete {
-  padding: 72px 20px 118px;
+  padding: 72px 20px 120px;
   text-align: center;
 }
 
 .tm-review-complete-icon {
   width: 72px;
   height: 72px;
-  border-radius: 26px;
+  border-radius: var(--radius-hero);
   background: var(--blue50);
   color: var(--blue500);
   display: grid;
@@ -4635,7 +4705,7 @@ button:disabled {
   align-items: center;
   gap: 12px;
   border: 1px solid var(--grey100);
-  border-radius: 16px;
+  border-radius: var(--radius-container);
   background: var(--surface);
   padding: 16px;
   color: inherit;
@@ -4645,16 +4715,16 @@ button:disabled {
   display: grid;
   gap: 12px;
   border: 1px solid var(--grey100);
-  border-radius: 16px;
+  border-radius: var(--radius-container);
   background: var(--surface);
-  padding: 18px;
+  padding: 20px;
 }
 
 .tm-my-toggle-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
+  gap: 16px;
 }
 
 /* WCAG 1.4.1 — off 상태는 배경색(grey200)만으로 형태를 나타내고 있어
@@ -4663,7 +4733,7 @@ button:disabled {
 .tm-toggle {
   width: 46px;
   height: 28px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--grey200);
   border: 1px solid var(--grey300);
   position: relative;
@@ -4677,7 +4747,7 @@ button:disabled {
   left: 3px;
   width: 22px;
   height: 22px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--static-white);
   transition: transform .18s ease;
 }
@@ -4693,10 +4763,10 @@ button:disabled {
 }
 
 .tm-danger-panel {
-  border-radius: 8px;
+  border-radius: var(--radius-chip);
   background: var(--red50);
   color: var(--red700);
-  padding: 18px;
+  padding: 20px;
 }
 
 .tm-withdrawal-info-toggle {
@@ -4720,7 +4790,7 @@ button:disabled {
   flex-shrink: 0;
   display: grid;
   place-items: center;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   color: var(--text-caption);
   transition: transform 0.15s ease;
 }
@@ -4734,13 +4804,13 @@ button:disabled {
   padding-top: 12px;
   border-top: 1px solid var(--grey100);
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
 .tm-danger-panel-head {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .tm-danger-panel-icon {
@@ -4760,7 +4830,7 @@ button:disabled {
   width: 28px;
   height: 28px;
   flex-shrink: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--blue50);
   color: var(--blue500);
   display: grid;
@@ -4775,9 +4845,9 @@ button:disabled {
   .v1-frame {
     min-height: calc(100vh - 56px);
     border: 1px solid var(--border);
-    border-radius: 18px;
+    border-radius: var(--radius-container);
     overflow: hidden;
-    box-shadow: var(--shadow-2);
+    box-shadow: var(--shadow-dropdown);
   }
 
   .v1-main {
@@ -4793,7 +4863,7 @@ button:disabled {
   left: 0;
   right: 0;
   height: 3px;
-  z-index: 9999;
+  z-index: var(--z-top);
   pointer-events: none;
 }
 
@@ -4801,7 +4871,7 @@ button:disabled {
   height: 100%;
   background: var(--blue500);
   box-shadow: 0 0 8px rgba(49, 130, 246, 0.5);
-  border-radius: 0 2px 2px 0;
+  border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
   transition: width 180ms ease;
 }
 
@@ -4870,14 +4940,14 @@ button:disabled {
 .tm-signup-progress {
   display: grid;
   grid-template-columns: repeat(var(--signup-steps, 5), 1fr);
-  gap: 6px;
+  gap: 8px;
   height: 5px;
-  margin-bottom: 26px;
+  margin-bottom: 28px;
 }
 
 .tm-signup-progress span {
   height: 5px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--grey150);
   transition: background 240ms ease;
 }
@@ -4889,7 +4959,7 @@ button:disabled {
 /* 관심 운동 카드 아이콘 */
 .tm-signup-sport-icon {
   color: var(--text-muted);
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 .tm-auth-option-selected .tm-signup-sport-icon {
@@ -4898,13 +4968,13 @@ button:disabled {
 
 .tm-signup-back {
   align-self: flex-start;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
   padding-inline: 0;
   color: var(--text-muted);
 }
 
 .tm-signup-hero {
-  margin-bottom: 30px;
+  margin-bottom: 32px;
 }
 
 .tm-signup-hero .tm-auth-heading {
@@ -4914,7 +4984,7 @@ button:disabled {
 }
 
 .tm-signup-hero .tm-auth-sub {
-  margin-top: 10px;
+  margin-top: 12px;
 }
 
 @media (min-width: 1024px) {
@@ -4952,7 +5022,7 @@ button:disabled {
   background: transparent;
   color: var(--text-caption);
   cursor: pointer;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   transition: color 120ms ease;
 }
 
@@ -5003,8 +5073,8 @@ button:disabled {
 .tm-landing-sport-soon {
   display: inline-flex;
   align-items: center;
-  padding: 1px 5px;
-  border-radius: 4px;
+  padding: 1px 4px;
+  border-radius: var(--radius-tight);
   /* [공개 화면 R-T2 정리] '준비 중' 실텍스트 배지 — 고정폭 없이 padding만 있어
      캡션 토큰으로 올려도 넘치지 않는다. */
   font-size: var(--font-size-caption);
@@ -5045,11 +5115,11 @@ button:disabled {
 .tm-invitation-card {
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 16px;           /* .tm-card 와 동일 radius */
+  border-radius: var(--radius-container);           /* .tm-card 와 동일 radius */
   padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 /* 카드 상단: 아바타 + 이름/이메일 + 상태 뱃지를 가로 배치 */
@@ -5095,8 +5165,8 @@ button:disabled {
   font-size: var(--font-size-label);    /* 13px */
   color: var(--text-body);
   background: var(--grey50);
-  border-radius: 10px;
-  padding: 10px 12px;
+  border-radius: var(--radius-control);
+  padding: 12px 12px;
   line-height: 1.5;
 }
 
@@ -5129,7 +5199,7 @@ button:disabled {
 .tm-invitation-status {
   /* .tm-badge 와 동일 구조, 추가 override만 선언 */
   min-height: 24px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 0 8px;
   display: inline-flex;
   align-items: center;
@@ -5154,7 +5224,7 @@ button:disabled {
 
 /* ── 대회 진행 단계 표시기 (리그 종료 → 준결승 → 결승) ── */
 .tm-hub-stages {
-  padding: 14px 20px 16px;
+  padding: 16px 20px 16px;
   display: flex;
   align-items: center;
   gap: 0;
@@ -5168,7 +5238,7 @@ button:disabled {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   flex: none;
   min-width: 72px;
 }
@@ -5177,7 +5247,7 @@ button:disabled {
 .tm-hub-stage-dot {
   width: 28px;
   height: 28px;
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   border: 2px solid var(--grey250, #d1d5db);
   background: var(--grey50);
   display: flex;
@@ -5222,7 +5292,7 @@ button:disabled {
   content: '';
   width: 10px;
   height: 10px;
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   background: var(--blue500);
   display: block;
   position: absolute;
@@ -5266,8 +5336,8 @@ button:disabled {
   min-width: 16px;
   height: 2px;
   background: var(--grey200);
-  margin-bottom: 22px;
-  border-radius: 1px;
+  margin-bottom: 24px;
+  border-radius: var(--radius-pill);
   transition: background 0.3s;
 }
 .tm-hub-stage-connector-done { background: var(--blue500); }
@@ -5289,7 +5359,7 @@ button:disabled {
 .tm-standings-thead th:first-child { padding-left: 8px; }
 .tm-standings-thead th.num { text-align: right; }
 .tm-standings-row td {
-  padding: 10px 8px 10px 0;
+  padding: 12px 8px 12px 0;
   font-size: 13px;
   color: var(--text);
   border-bottom: 1px solid var(--grey100);
@@ -5304,7 +5374,7 @@ button:disabled {
   justify-content: center;
   width: 22px;
   height: 22px;
-  border-radius: 6px;
+  border-radius: var(--radius-chip);
   font-size: 12px;
   font-weight: 700;
   color: var(--text-muted);
@@ -5340,14 +5410,14 @@ button:disabled {
 .tm-bk2-pill {
   font-size: 12px; font-weight: 800; color: var(--text-muted);
   text-transform: uppercase; letter-spacing: 0.04em;
-  padding: 3px 12px; background: var(--grey100); border-radius: 20px;
+  padding: 3px 12px; background: var(--grey100); border-radius: var(--radius-pill);
 }
-.tm-bk2-pill-sm { padding: 2px 10px; font-size: 12px; }
+.tm-bk2-pill-sm { padding: 2px 12px; font-size: 12px; }
 
 /* 매치 카드 */
 .tm-bk2-card {
   border: 1px solid var(--grey200);
-  border-radius: 11px;
+  border-radius: var(--radius-control);
   overflow: hidden;
   background: var(--card-surface);
   width: 180px;
@@ -5356,8 +5426,8 @@ button:disabled {
 
 /* 팀 행 */
 .tm-bk2-row {
-  display: flex; align-items: center; gap: 7px;
-  padding: 8px 10px; min-height: 36px;
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; min-height: 36px;
 }
 .tm-bk2-row[data-winner=true] { background: var(--blue50); }
 .tm-bk2-row[data-loser=true]  { opacity: 0.55; }
@@ -5385,7 +5455,7 @@ button:disabled {
 
 /* 뱃지 */
 .tm-bk2-badge {
-  padding: 3px 10px 4px; font-size: 12px; font-weight: 600;
+  padding: 3px 12px 4px; font-size: 12px; font-weight: 600;
   color: var(--text-caption); background: var(--grey50); text-align: center;
 }
 .tm-bk2-badge-live { background: #fff0f0; color: #d9363e; font-weight: 800; }
@@ -5399,15 +5469,15 @@ button:disabled {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
 /* 챔피언 슬롯 */
 .tm-bk2-champ {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 5px; width: 100px; min-height: 88px;
-  border: 2px dashed var(--grey300); border-radius: 14px;
+  gap: 4px; width: 100px; min-height: 88px;
+  border: 2px dashed var(--grey300); border-radius: var(--radius-field);
   padding: 12px 8px; text-align: center;
 }
 .tm-bk2-champ-won {
@@ -5433,15 +5503,15 @@ button:disabled {
 /* 3·4위전 */
 .tm-bk2-third {
   margin-top: 20px;
-  padding: 14px;
+  padding: 16px;
   border: 1px solid var(--grey200);
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--grey50); /* 페이지 배경(--bg) 위 한 단계 — main과 동일 */
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
-.tm-bk2-third-header { display: flex; align-items: center; gap: 10px; }
+.tm-bk2-third-header { display: flex; align-items: center; gap: 12px; }
 .tm-bk2-third-match { width: 240px; max-width: 100%; }
 .tm-bk2-third .tm-bk2-card { width: 100%; }
 .tm-bk2-scroll-hint {
@@ -5456,7 +5526,7 @@ button:disabled {
   right: 0;
   bottom: 8px;
   width: 24px;
-  border-radius: 0 8px 8px 0;
+  border-radius: 0 var(--radius-chip) var(--radius-chip) 0;
   background: linear-gradient(to right, transparent, rgba(255,255,255,0.92));
   pointer-events: none;
 }
@@ -5489,15 +5559,15 @@ button:disabled {
 }
 /* [R-T1] 13px → --font-size-caption(12px) — 부제 문단은 보조 정보 tier(4단계). */
 .tm-bracket-page-intro p {
-  margin: 7px 0 0;
+  margin: 8px 0 0;
   color: var(--text-caption);
   font-size: var(--font-size-caption);
   line-height: 1.55;
 }
 .tm-bracket-page-format {
   flex-shrink: 0;
-  padding: 6px 10px;
-  border-radius: 999px;
+  padding: 8px 12px;
+  border-radius: var(--radius-pill);
   background: var(--blue50);
   color: var(--blue500);
   font-size: 12px;
@@ -5576,8 +5646,8 @@ button:disabled {
   position: relative;
   overflow: hidden;
   background: #111827;
-  border-radius: 18px;
-  padding: 28px 20px 22px;
+  border-radius: var(--radius-container);
+  padding: 28px 20px 24px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -5595,7 +5665,7 @@ button:disabled {
 .tm-res-hero-trophy { font-size: 44px; line-height: 1; margin-bottom: 4px; filter: drop-shadow(0 4px 12px rgba(246, 185, 59, 0.35)); }
 .tm-res-hero-name { font-size: 26px; font-weight: 900; letter-spacing: -0.02em; line-height: 1.2; }
 .tm-res-hero-inline-stat {
-  margin-top: 10px;
+  margin-top: 12px;
   font-size: 12px;
   font-weight: 500;
   color: rgba(255,255,255,0.5);
@@ -5632,7 +5702,7 @@ button:disabled {
 .tm-res-match-row {
   display: block;
   width: 100%;
-  padding: 12px 14px;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--grey100);
   background: transparent;
   text-align: left;
@@ -5643,16 +5713,16 @@ button:disabled {
 }
 .tm-res-match-row:last-child { border-bottom: none; }
 .tm-res-match-row:hover, .tm-res-match-row:focus-visible { background: var(--grey50); }
-.tm-res-match-meta { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.tm-res-match-meta { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 
 /* 경기 결과 블록 */
 .tm-res-matches-block {
   border: 1px solid var(--grey150);
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   overflow: hidden;
 }
 .tm-res-match-row {
-  padding: 12px 14px;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--grey100);
 }
 .tm-res-match-row:last-child { border-bottom: none; }
@@ -5681,7 +5751,7 @@ button:disabled {
   font-size: 14px; font-weight: 900; color: var(--text-strong);
   flex-shrink: 0; text-align: center; min-width: 52px;
   background: var(--grey100);
-  border-radius: 8px;
+  border-radius: var(--radius-chip);
   padding: 4px 0;
 }
 
@@ -5697,7 +5767,7 @@ button:disabled {
   padding: 12px 16px;
   background: var(--grey50);
   border: 1px solid var(--grey150);
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   font-size: 13px;
   font-weight: 600;
   color: var(--text);
@@ -5724,7 +5794,7 @@ button:disabled {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  gap: 10px;
+  gap: 12px;
   padding: 28px 0 8px;
   position: relative;
 }
@@ -5744,7 +5814,7 @@ button:disabled {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   flex: 1;
   position: relative;
   opacity: 0;
@@ -5760,7 +5830,7 @@ button:disabled {
 }
 .tm-awards-podium-block {
   width: 100%;
-  border-radius: 10px 10px 0 0;
+  border-radius: var(--radius-control) var(--radius-control) 0 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -5809,8 +5879,8 @@ button:disabled {
 /* 리뷰 카드 */
 .tm-review-card {
   border: 1px solid var(--grey150);
-  border-radius: 12px;
-  padding: 14px 16px;
+  border-radius: var(--radius-control);
+  padding: 16px 16px;
   background: #fff;
   display: flex;
   flex-direction: column;
@@ -5819,12 +5889,12 @@ button:disabled {
 .tm-review-card-header {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 .tm-review-card-avatar {
   width: 36px;
   height: 36px;
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   background: var(--grey100);
   display: flex;
   align-items: center;
@@ -5835,8 +5905,6 @@ button:disabled {
   flex-shrink: 0;
 }
 .tm-review-card-author { font-size: 13px; font-weight: 700; color: var(--text-strong); }
-/* 팀명 뒤에 붙는 작성자 개인 이름 — 팀명보다 약하게 보여 주체(팀)와 작성자를 함께 읽히게 한다. */
-.tm-review-card-author-sub { font-weight: 500; color: var(--text-muted); }
 /* [공개 화면 R-T2 정리] .tm-review-card-team(11px)은 TSX 어디서도 참조되지
    않는 죽은 코드(리뷰 카드는 팀명을 author 슬롯에 합쳐 렌더 — awards-page-client.tsx
    review.teamName ?? review.authorNickname)라 삭제. */
@@ -5863,7 +5931,7 @@ button:disabled {
   background: none;
   text-align: left;
   cursor: pointer;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
 }
 .tm-video-strip-item:focus-visible {
   outline: 2px solid var(--blue500);
@@ -5874,7 +5942,7 @@ button:disabled {
   display: block;
   width: 100%;
   aspect-ratio: 16 / 9;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   overflow: hidden;
   background: var(--grey900, #191f28);
 }
@@ -5916,13 +5984,13 @@ button:disabled {
   place-items: center;
   width: 38px;
   height: 38px;
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   background: rgba(255, 255, 255, 0.92);
   color: var(--blue500);
 }
 .tm-video-strip-title {
   display: block;
-  margin-top: 6px;
+  margin-top: 8px;
   /* [공개 화면 R-T2 정리] 168px 폭 카드 안에서 ellipsis로 잘리는 한 줄 제목 —
      캡션 토큰으로 올려도 넘치는 대신 자연스럽게 더 잘린다(레이아웃 깨짐 없음). */
   font-size: var(--font-size-caption);
@@ -5936,17 +6004,17 @@ button:disabled {
 .tm-video-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
 }
 .tm-video-chip {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   /* 결승 외 경기의 유일한 인터랙션 — 44px 터치 타겟 + 보더로 "누를 수 있음"을 명확히 */
   min-height: 44px;
-  padding: 0 14px;
+  padding: 0 16px;
   border: 1px solid var(--blue100, #d4e5fc);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--blue50);
   font-size: 12px;
   font-weight: 600;
@@ -5965,7 +6033,7 @@ button:disabled {
 .tm-video-modal {
   position: fixed;
   inset: 0;
-  z-index: 9999;
+  z-index: var(--z-top);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -5980,7 +6048,7 @@ button:disabled {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 12px;
   margin-bottom: 8px;
 }
 .tm-video-modal-title {
@@ -5995,7 +6063,7 @@ button:disabled {
   min-width: 44px;
   min-height: 44px;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   background: rgba(255, 255, 255, 0.12);
   color: #fff;
   cursor: pointer;
@@ -6027,7 +6095,7 @@ button:disabled {
   position: relative;
   width: 100%;
   aspect-ratio: 16 / 9;
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   overflow: hidden;
   background: #000;
 }
@@ -6049,10 +6117,10 @@ button:disabled {
      유일한 경로라, 모달 안에서 놓치면 안 되는 핵심 액션이다. */
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   min-height: 44px;
-  padding: 0 14px;
-  border-radius: 999px;
+  padding: 0 16px;
+  border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.14);
   font-size: 12px;
   font-weight: 600;
@@ -6070,17 +6138,17 @@ button:disabled {
 .tm-video-playlist {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 10px;
+  gap: 8px;
+  margin-top: 12px;
 }
 .tm-video-playlist-chip {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   min-height: 34px;
   padding: 0 12px;
   border: none;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.14);
   font-size: 12px;
   font-weight: 600;
@@ -6108,7 +6176,7 @@ button:disabled {
 .tm-fmt-text {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 .tm-fmt-p { margin: 0; }
 .tm-fmt-list {
@@ -6117,7 +6185,7 @@ button:disabled {
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 .tm-fmt-li { display: flex; gap: 8px; }
 .tm-fmt-marker {
@@ -6148,10 +6216,10 @@ button:disabled {
   align-items: center;
   gap: 8px;
   min-height: 44px;
-  padding: 0 14px;
-  margin-bottom: 14px;
+  padding: 0 16px;
+  margin-bottom: 16px;
   border: 1px solid var(--grey150);
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--text-caption);
 }
@@ -6169,17 +6237,20 @@ button:disabled {
 .tm-reviews-count {
   font-size: 12px;
   color: var(--text-caption);
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
+/* 모든 폭에서 같은 후기 카드를 쓴다 — 넓어지면 열 수만 늘린다. 예전에는 1024px 이상에서
+   카드를 숨기고 같은 데이터를 6열 표로 다시 그렸는데, 별점이 칸에 갇히고 후기 본문은 한 줄로
+   잘려 정작 읽으러 온 내용이 가장 안 읽혔다(오너 지적). 카드 한 벌만 남기면 좁은 화면에서
+   검증한 레이아웃이 넓은 화면에도 그대로 적용된다. */
 .tm-reviews-cards {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  align-items: start;
   transition: opacity 0.15s;
 }
-
-.tm-reviews-table-wrap { display: none; }
 
 .tm-reviews-pager {
   display: flex;
@@ -6195,9 +6266,9 @@ button:disabled {
   justify-content: center;
   min-width: 44px;
   min-height: 44px;
-  padding: 0 6px;
+  padding: 0 8px;
   border: 1px solid var(--grey150);
-  border-radius: 9px;
+  border-radius: var(--radius-chip);
   background: var(--surface);
   color: var(--text);
   font-size: 13px;
@@ -6232,85 +6303,39 @@ button:disabled {
 }
 
 @media (min-width: 1024px) {
-  /*
-   * 후기 목록은 데스크탑에서 표로 바뀌는데(아래 .tm-reviews-table 전환) 760px 로 묶어 두고
-   * margin:0 으로 좌측에 붙여 놔서, 1440px 화면에서 왼쪽 절반만 쓰고 오른쪽이 통째로 비었다.
-   * 표는 넓을수록 한 화면에 더 많은 행이 들어오므로 상한을 올리고 가운데로 정렬한다.
-   * 검색바는 따로 상한을 두지 않으면 함께 늘어나 입력칸만 과하게 길어진다.
-   */
+  /* 본문을 데스크탑 전체 폭에 늘리지 않고 좌측 라인에 고정 */
   .tm-reviews-body {
-    max-width: 1080px;
-    margin-left: auto;
-    margin-right: auto;
-  }
-  .tm-reviews-searchbar {
-    max-width: 560px;
+    /* `desktop/my.css` 의 `.tm-review-shell`/`.tm-review-compose-shell` 과 같은 토큰을
+       쓴다 — 이 화면에서 "리뷰할 수 있는 경기"를 눌러 넘어가는 곳이 바로 그 셸이다. */
+    max-width: var(--v1-review-column-width);
+    margin: 0;
   }
 
-  /* 카드 목록 → 테이블로 전환 */
-  .tm-reviews-cards { display: none; }
-  .tm-reviews-table-wrap {
-    display: block;
-    overflow-x: auto;
-    border: 1px solid var(--grey150);
-    border-radius: 12px;
-  }
-  .tm-reviews-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 13px;
-  }
-  .tm-reviews-table thead th {
-    text-align: left;
-    padding: 10px 14px;
-    background: var(--grey50);
-    color: var(--text-caption);
-    font-weight: 600;
-    font-size: 12px;
-    border-bottom: 1px solid var(--grey150);
-    white-space: nowrap;
-  }
-  .tm-reviews-table tbody td {
-    padding: 12px 14px;
-    border-bottom: 1px solid var(--grey100);
-    color: var(--text);
-    vertical-align: middle;
-  }
-  .tm-reviews-table tbody tr:last-child td { border-bottom: none; }
-  .tm-reviews-table tbody tr:hover { background: var(--grey50); }
-  .tm-reviews-table-team { color: var(--text-caption); white-space: nowrap; }
-  .tm-reviews-table-stars { display: flex; gap: 1px; white-space: nowrap; }
-  .tm-reviews-table-comment {
-    max-width: 260px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .tm-reviews-table-empty { color: var(--text-caption); }
-  .tm-reviews-table-photos { display: flex; gap: 4px; }
-  .tm-reviews-table-photos a {
-    display: block;
-    width: 28px;
-    height: 28px;
-    border-radius: 6px;
-    overflow: hidden;
-    flex-shrink: 0;
-  }
-  .tm-reviews-table-photos img { width: 100%; height: 100%; object-fit: cover; }
-  .tm-reviews-table-photo-more {
-    display: inline-flex;
-    align-items: center;
-    /* [공개 화면 R-T2 정리] "+N" 인디케이터 — 고정폭 없어 캡션 토큰으로 상향. */
-    font-size: var(--font-size-caption);
-    color: var(--text-caption);
-    padding-left: 2px;
-  }
-  .tm-reviews-table-date {
-    color: var(--text-caption);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-  }
+  /* 넓은 화면에서는 카드를 2열로 — 표로 갈아끼우지 않는다(위 .tm-reviews-cards 주석 참고). */
+  .tm-reviews-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* §경기 일정 목록 — **경기 하나가 카드 하나**다. 예전엔 카드 한 장을 grid 로 쪼개서
+   화면에는 한 장을 반으로 자른 것처럼 보였고, 경기마다 테두리가 없어 카드로 읽히지
+   않았다(오너 지적). 이제 목록은 카드들을 담는 그리드일 뿐이다. */
+.tm-schedule-list {
+  display: grid;
+  gap: 12px;
+  /* 그리드 기본값(stretch)이면 같은 행의 카드가 **가장 높은 카드에 맞춰 늘어난다**.
+     내 팀 경기 카드는 "라인업 보기" 버튼을 한 줄 더 달고 있어서, 같은 행의 상대 카드가
+     그만큼 아래가 빈 채로 늘어났다(alpha 실측 1440: 4강 오른쪽 카드 콘텐츠 111px인데
+     카드 높이 208px — 97px가 빈 공간). 폭에서 auto-fill을 고른 이유와 같은 판단이다 —
+     빈 그리드 칸은 페이지 배경이라 넘어가지만, 테두리 안이 빈 카드는 결함으로 읽힌다.
+     각 카드가 제 콘텐츠 높이만 갖게 한다. */
+  align-items: start;
+}
+.tm-schedule-card {
+  border: 1px solid var(--grey150);
+  border-radius: var(--radius-control);
+  background: var(--bg);
+  overflow: hidden;
+}
+
 .tm-hub-section-title {
   font-size: 15px;
   font-weight: 850;
@@ -6327,7 +6352,7 @@ button:disabled {
 /* 리텐션 CTA 카드 — 페이지 배경(--bg) 위 --grey50 한 단계. main과 동일. */
 .tm-retention-card {
   background: var(--grey50);
-  border-radius: 16px;
+  border-radius: var(--radius-container);
   padding: 20px;
   display: flex;
   flex-direction: column;
@@ -6394,11 +6419,27 @@ button:disabled {
     justify-content: center;
   }
 
-  /* §일정 탭 가로 밀도 — 1440에서 일정 카드가 998px까지 늘어나는데 팀명·점수는 중앙
-     정렬이라 좌우로 각각 300px 가까이 비고, 조·시간·구장은 양 끝에 붙어 시선 이동만
-     길어졌다. 읽기 좋은 폭으로 묶어 가운데 세운다. */
+  /* §경기 일정 가로 밀도. 세 번 뒤집힌 자리라 경위를 남긴다.
+     ① 한 열로만 쌓여 세로로 길다는 지적 → 두 열로 폄.
+     ② 조·라운드로 묶고 나니 한 그룹에 경기가 하나뿐인 경우(A조 1경기)가 흔해졌고,
+        2열 고정에서는 오른쪽 절반이 비어 보였다 → 빈 트랙을 접는 `auto-fit` 으로.
+     ③ 그런데 auto-fit 이 트랙을 접으면 그 카드가 콘텐츠 폭(alpha 실측 1000px)을 통째로
+        먹고, 카드 안 팀명·스코어는 가운데 정렬이라 **카드 자체가 빈 상자처럼** 보였다.
+        게다가 그룹마다 카드 폭이 1000 ↔ 495 로 널뛰어 리듬이 깨졌다.
+     그래서 지금은 `auto-fill` 이다 — 빈 트랙을 남기는 대신 카드 폭이 그룹 경기 수와
+     무관하게 일정하다. ②에서 기각했던 "오른쪽 절반이 빈다"를 다시 받아들인 셈인데,
+     **카드 안이 비는 것보다 그리드 칸이 비는 편이 낫다**고 판단했다(빈 칸은 페이지
+     배경이라 깨져 보이지 않지만, 빈 카드는 테두리 안이 비어 결함으로 읽힌다).
+     데스크톱 폭 체계상(scroll-area max 1120) 트랙은 항상 정확히 2개다. */
+  .tm-schedule-list {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr));
+  }
+
   .tm-bracket-schedule-pane {
-    max-width: 840px;
+    /* 840 → 1040: 이 폭은 경기 카드가 한 열로 쌓이던 시절 "읽기 좋은 한 열 폭"으로 정한
+       값이다. 위 `.tm-schedule-list` 가 두 열로 펴면서 전제가 바뀌었다 — 840 이면 열당
+       약 420px 라 팀명·스코어·득점자 줄이 다시 눌린다. 열당 약 520px 가 되게 넓힌다. */
+    max-width: 1040px;
     margin: 0 auto;
     width: 100%;
   }
@@ -6416,7 +6457,7 @@ button:disabled {
   .tm-tourn-sub-col .tm-award-card span[aria-hidden="true"][style*="font-size: 52px"],
   .tm-tourn-sub-col .tm-award-card span[aria-hidden="true"][style*="font-size: 42px"] {
     font-size: 28px !important;
-    margin-right: 10px !important;
+    margin-right: 12px !important;
   }
 
   /* ── FlowNav 데스크탑: 우측 컴팩트 ── */
@@ -6448,7 +6489,7 @@ button:disabled {
 
 .tm-rich-editor .ProseMirror {
   min-height: 280px;
-  padding: 18px;
+  padding: 20px;
   color: var(--text-strong);
   font-size: 14px;
   line-height: 1.7;
@@ -6519,9 +6560,9 @@ button:disabled {
 .tm-rich-editor .ProseMirror blockquote {
   margin: 1em 0;
   border: 1px solid var(--grey200);
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--grey50);
-  padding: 12px 14px;
+  padding: 12px 16px;
   color: var(--text-muted);
 }
 
@@ -6550,7 +6591,7 @@ button:disabled {
   width: 100%;
   height: auto;
   max-height: 720px;
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   object-fit: contain;
 }
 
@@ -6567,16 +6608,16 @@ button:disabled {
    화면에 묶지 않도록 일반화했다. 컬럼 수는 쓰는 쪽이 grid-template-columns 로 정한다. */
 .tm-seg-tabs {
   display: grid;
-  gap: 6px;
+  gap: 8px;
   padding: 4px;
-  border-radius: 15px;
+  border-radius: var(--radius-field);
   background: var(--grey100);
 }
 
 .tm-seg-tab {
   /* a11y: 터치 타깃 44px 확보 (시각 높이 유지, grid/place-items 로 내용 중앙 정렬) */
   min-height: 44px;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   display: grid;
   place-items: center;
   color: var(--text-muted);
@@ -6613,7 +6654,7 @@ button:disabled {
 .tm-fixture-lineup-roster-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
+  gap: 8px;
 }
 
 /* 고정 저장/제출 바는 검증 문구까지 포함해 기본 120px 안팎이다. 본문이 기존 96px만
@@ -6632,7 +6673,7 @@ button:disabled {
 .tm-fixture-lineup-player-controls {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -6649,7 +6690,7 @@ button:disabled {
 
 .tm-fixture-lineup-gk {
   border: 1.5px dashed var(--grey300);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: transparent;
   color: var(--text-caption);
   font-size: 12px;
@@ -6667,7 +6708,7 @@ button:disabled {
 .tm-fixture-lineup-player-controls .tm-input {
   width: 54px;
   min-width: 0;
-  padding-inline: 6px;
+  padding-inline: 8px;
 }
 
 @media (max-width: 420px) {
@@ -6695,7 +6736,7 @@ button:disabled {
 .tm-review-player-summary {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   min-height: 44px;
   cursor: pointer;
   font-size: 14px;
@@ -6720,3 +6761,731 @@ button:disabled {
   .tm-review-player-summary::after { transition: none; }
 }
 
+/* ── 선수 카드 (Task 155 — 티어별 형태·재질·엠블럼·뒷면) ─────────────────
+   사용자 확정 목업(카드 티어 스타일 아티팩트)을 그대로 옮긴 것이다. 구조 요약:
+
+   .tm-player-card                → 레이아웃 래퍼(클립 없음). data-tier / data-shape /
+                                    data-flipped 를 여기서만 내보내고 형태는 전부 CSS 가 그린다.
+   .tm-pcard-scene > .tm-pcard-flip → 원근 + 뒤집기(앞/뒷면 preserve-3d).
+   .tm-pcard-frame                → 기울기·발광의 대상. **테두리는 border 가 아니라
+                                    ::before(바깥으로 3px 키운 같은 도형)** 이다 --
+                                    clip-path 는 border 를 잘라내고, 안쪽 상자를 4px 줄이는
+                                    방식은 % 폴리곤에서 가로/세로가 다른 비율로 줄어
+                                    대각선·곡선 모서리의 테두리가 사라진다(실측).
+   .tm-pcard-face                 → 실루엣으로 잘린 카드 면. 재질(::before) + 광택
+                                    스윕(::after) + 티어 장식(.tm-pcard-fx)이 겹친다.
+
+   티어 토큰(--tm-rim/--tm-facefill/--tm-ink…)은 루트 data-tier 에서 한 번만 정해지고
+   앞면·뒷면·글레어가 전부 그 토큰을 읽는다. 글자색 대비는 목업에서 픽셀 실측으로
+   보정된 값이다(밝은 금속은 어두운 글자 -- 흰 글자로는 4.5:1 을 못 넘겼다). */
+
+/* 숫자 전용 서체. FIFA 카드의 인상은 콘덴스드 숫자에서 나온다 -- latin 서브셋만
+   동봉했으므로 한글·기호는 Pretendard 로 자연 폴백된다. */
+@font-face {
+  font-family: 'Saira Condensed';
+  src: url('/fonts/SairaCondensed-Bold.woff2') format('woff2');
+  font-style: normal; font-weight: 700; font-display: swap;
+  unicode-range: U+0000-00FF;
+}
+@font-face {
+  font-family: 'Saira Condensed';
+  src: url('/fonts/SairaCondensed-ExtraBold.woff2') format('woff2');
+  font-style: normal; font-weight: 800; font-display: swap;
+  unicode-range: U+0000-00FF;
+}
+
+.tm-player-card {
+  --tm-num: 'Saira Condensed', 'Pretendard Variable', Pretendard, sans-serif;
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+}
+
+/* ── 형태 두 벌 × 티어 5단계 실루엣 ──
+   방패(shield)는 실제 FUT 카드 알파 채널에서 추출한 윤곽(등급마다 돔이 높아진다),
+   네모(rect)는 FO4 풍 각진 모서리(등급이 오를수록 더 크게 깎는다).
+   네모의 모서리를 %가 아니라 px 로 자르는 이유: 카드가 정사각형이 아니라 %로 두면
+   테두리(바깥으로 키운 같은 도형)와 안쪽 면의 대각선이 겹쳐 모서리 테두리가 사라진다. */
+.tm-player-card[data-shape='shield'][data-tier='bronze'] { --tm-silhouette: polygon(33.5% 3%, 26.9% 4%, 21.7% 5%, 17.8% 6%, 15.2% 7%, 14.3% 10%, 13.3% 11%, 12.0% 12%, 10.2% 13%, 7.0% 14%, 3.9% 15%, 4.8% 85%, 5.9% 86%, 8.0% 87%, 11.3% 88%, 16.1% 89%, 21.3% 90%, 25.9% 91%, 30.4% 92%, 34.3% 93%, 38.0% 94%, 41.7% 95%, 44.4% 96%, 46.9% 97%, 48.7% 98%, 50.0% 99.5%, 50.9% 98%, 52.8% 97%, 55.2% 96%, 58.0% 95%, 61.7% 94%, 65.4% 93%, 69.3% 92%, 73.5% 91%, 78.0% 90%, 83.1% 89%, 88.0% 88%, 91.7% 87%, 93.7% 86%, 94.8% 85%, 95.6% 15%, 92.6% 14%, 89.4% 13%, 87.6% 12%, 86.3% 11%, 85.4% 10%, 84.3% 7%, 81.7% 6%, 77.8% 5%, 72.6% 4%, 65.9% 3%); }
+.tm-player-card[data-shape='shield'][data-tier='silver'] { --tm-silhouette: polygon(33.5% 3%, 26.9% 4%, 21.7% 5%, 17.8% 6%, 15.4% 7%, 14.3% 10%, 13.3% 11%, 12.0% 12%, 10.2% 13%, 7.0% 14%, 3.9% 15%, 4.8% 85%, 5.9% 86%, 8.0% 87%, 11.1% 88%, 16.1% 89%, 21.3% 90%, 25.9% 91%, 30.2% 92%, 34.3% 93%, 37.8% 94%, 41.7% 95%, 44.4% 96%, 46.9% 97%, 48.7% 98%, 50.0% 99.5%, 50.9% 98%, 52.8% 97%, 55.2% 96%, 58.0% 95%, 61.7% 94%, 65.4% 93%, 69.3% 92%, 73.5% 91%, 78.0% 90%, 83.1% 89%, 88.0% 88%, 91.7% 87%, 93.7% 86%, 94.8% 85%, 95.6% 15%, 92.4% 14%, 89.3% 13%, 87.4% 12%, 86.3% 11%, 85.4% 10%, 84.3% 7%, 81.7% 6%, 77.8% 5%, 72.6% 4%, 65.9% 3%); }
+.tm-player-card[data-shape='shield'][data-tier='gold'] { --tm-silhouette: polygon(42.0% 2%, 30.7% 3%, 25.4% 4%, 21.1% 5%, 17.8% 6%, 15.2% 7%, 14.1% 10%, 13.1% 11%, 11.9% 12%, 10.2% 13%, 7.0% 14%, 3.7% 15%, 4.8% 85%, 5.9% 86%, 8.0% 87%, 11.1% 88%, 16.1% 89%, 21.3% 90%, 25.7% 91%, 30.2% 92%, 34.3% 93%, 37.8% 94%, 41.7% 95%, 44.4% 96%, 46.9% 97%, 48.7% 98%, 50.0% 99.5%, 50.9% 98%, 52.8% 97%, 55.2% 96%, 58.0% 95%, 61.7% 94%, 65.4% 93%, 69.3% 92%, 73.7% 91%, 78.0% 90%, 83.1% 89%, 88.1% 88%, 91.7% 87%, 93.9% 86%, 95.0% 85%, 95.7% 15%, 92.6% 14%, 89.4% 13%, 87.6% 12%, 86.3% 11%, 85.4% 10%, 84.3% 7%, 81.9% 6%, 78.0% 5%, 72.6% 4%, 66.1% 3%, 51.7% 2%); }
+.tm-player-card[data-shape='shield'][data-tier='legend'] { --tm-silhouette: polygon(49.6% 1%, 48.5% 2%, 32.8% 3%, 29.6% 4%, 26.7% 5%, 24.4% 6%, 22.4% 7%, 20.6% 8%, 18.5% 9%, 16.3% 10%, 14.4% 11%, 12.2% 12%, 9.6% 13%, 5.4% 14%, 3.7% 15%, 4.8% 85%, 5.9% 86%, 8.1% 87%, 11.9% 88%, 16.7% 89%, 21.9% 90%, 26.3% 91%, 30.6% 92%, 34.6% 93%, 38.1% 94%, 41.9% 95%, 44.6% 96%, 47.0% 97%, 48.9% 98%, 50.0% 99.5%, 50.7% 98%, 52.6% 97%, 54.8% 96%, 57.4% 95%, 61.1% 94%, 64.6% 93%, 68.5% 92%, 72.8% 91%, 77.0% 90%, 82.2% 89%, 87.0% 88%, 91.1% 87%, 93.3% 86%, 94.6% 85%, 95.7% 15%, 94.1% 14%, 89.8% 13%, 87.2% 12%, 85.2% 11%, 83.1% 10%, 80.9% 9%, 78.9% 8%, 77.0% 7%, 75.0% 6%, 72.6% 5%, 69.8% 4%, 66.5% 3%, 51.1% 2%, 50.0% 1%); }
+.tm-player-card[data-shape='shield'][data-tier='special'] { --tm-silhouette: polygon(49.6% 1%, 48.5% 2%, 32.8% 3%, 29.6% 4%, 26.7% 5%, 24.4% 6%, 22.4% 7%, 20.6% 8%, 18.5% 9%, 16.3% 10%, 14.4% 11%, 12.2% 12%, 9.6% 13%, 5.4% 14%, 3.7% 15%, 4.8% 85%, 5.9% 86%, 8.1% 87%, 11.9% 88%, 16.7% 89%, 21.9% 90%, 26.3% 91%, 30.6% 92%, 34.6% 93%, 38.1% 94%, 41.9% 95%, 44.6% 96%, 47.0% 97%, 48.9% 98%, 50.0% 99.5%, 50.7% 98%, 52.6% 97%, 54.8% 96%, 57.4% 95%, 61.1% 94%, 64.6% 93%, 68.5% 92%, 72.8% 91%, 77.0% 90%, 82.2% 89%, 87.0% 88%, 91.1% 87%, 93.3% 86%, 94.6% 85%, 95.7% 15%, 94.1% 14%, 89.8% 13%, 87.2% 12%, 85.2% 11%, 83.1% 10%, 80.9% 9%, 78.9% 8%, 77.0% 7%, 75.0% 6%, 72.6% 5%, 69.8% 4%, 66.5% 3%, 51.1% 2%, 50.0% 1%); }
+.tm-player-card[data-shape='rect'][data-tier='bronze'] { --tm-silhouette: polygon(0px 14px, 14px 0px, calc(100% - 14px) 0px, 100% 14px, 100% calc(100% - 8px), calc(100% - 8px) 100%, 8px 100%, 0px calc(100% - 8px)); }
+.tm-player-card[data-shape='rect'][data-tier='silver'] { --tm-silhouette: polygon(0px 18px, 18px 0px, calc(100% - 18px) 0px, 100% 18px, 100% calc(100% - 9px), calc(100% - 9px) 100%, 9px 100%, 0px calc(100% - 9px)); }
+.tm-player-card[data-shape='rect'][data-tier='gold'] { --tm-silhouette: polygon(0px 22px, 22px 0px, calc(100% - 22px) 0px, 100% 22px, 100% calc(100% - 10px), calc(100% - 10px) 100%, 10px 100%, 0px calc(100% - 10px)); }
+.tm-player-card[data-shape='rect'][data-tier='legend'] { --tm-silhouette: polygon(0px 27px, 27px 0px, calc(100% - 27px) 0px, 100% 27px, 100% calc(100% - 11px), calc(100% - 11px) 100%, 11px 100%, 0px calc(100% - 11px)); }
+.tm-player-card[data-shape='rect'][data-tier='special'] { --tm-silhouette: polygon(0px 33px, 33px 0px, calc(100% - 33px) 0px, 100% 33px, 100% calc(100% - 12px), calc(100% - 12px) 100%, 12px 100%, 0px calc(100% - 12px)); }
+
+/* ── 씬·뒤집기 ── */
+.tm-pcard-scene { perspective: 1100px; width: 280px; }
+.tm-pcard-flip {
+  position: relative; width: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.72s cubic-bezier(0.3, 0.85, 0.25, 1);
+}
+.tm-player-card[data-flipped='true'] .tm-pcard-flip { transform: rotateY(180deg); }
+.tm-pcard-side { backface-visibility: hidden; }
+.tm-pcard-side[data-side='back'] { position: absolute; inset: 0; transform: rotateY(180deg); }
+
+/* ── 프레임 = 기울기 + 림 ── */
+.tm-pcard-frame {
+  width: 280px; position: relative;
+  /* 기울기 변수는 .tm-pcard-scene 이 소유한다(포인터 핸들러가 거기 붙는다) --
+     frame 이 직접 선언하면 상속이 막혀 기울기가 전달되지 않는다.
+     호버 리프트는 없다(2026-08-25 사용자 결정) -- 기울기·글레어만으로 충분하다. */
+  transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1), filter 0.45s ease;
+  animation: tmCardRise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  filter: drop-shadow(0 16px 30px rgba(0, 0, 0, 0.55));
+}
+/* 형태마다 위·아래로 먹는 양이 다르다 -- 돔은 크게, 네모는 조금. 여백·높이도 형태를 따른다.
+   퍼센트 패딩은 위아래도 가로 기준으로 계산돼 실루엣과 어긋나므로 px 로 못 박는다. */
+.tm-player-card[data-shape='shield'] .tm-pcard-frame { height: 488px; --tm-pad: 48px 16px 64px; }
+.tm-player-card[data-shape='rect'] .tm-pcard-frame { height: 424px; --tm-pad: 26px 16px 24px; }
+.tm-pcard-frame::before {
+  content: ''; position: absolute; inset: -3px; z-index: 0;
+  clip-path: var(--tm-silhouette);
+  background: var(--tm-rim);
+  pointer-events: none;
+}
+.tm-pcard-scene[data-active='true'] .tm-pcard-frame { transition-duration: 0.08s; }
+/* 누르면 뜨는 대신 살짝 눌린다 -- 물건은 누르면 들어간다. */
+.tm-pcard-scene[data-press='true'] .tm-pcard-frame {
+  transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) scale(0.985);
+}
+@keyframes tmCardRise { from { opacity: 0; transform: translateY(22px) scale(0.97); } to { opacity: 1; } }
+
+/* 글레어 -- 포인터를 따라 움직이는 반사광. 부드러운 원 하나로는 "빛이 닿았다" 수준에
+   그친다. 실물은 날카로운 대각 줄무늬가 함께 지나가고 screen 으로 합성돼 유리처럼 읽힌다. */
+.tm-pcard-glare {
+  position: absolute; inset: 0; z-index: 3; pointer-events: none;
+  clip-path: var(--tm-silhouette);
+  background:
+    linear-gradient(115deg,
+      transparent calc(var(--gx, 50%) - 22%),
+      rgba(255, 255, 255, 0.06) calc(var(--gx, 50%) - 9%),
+      rgba(255, 255, 255, 0.26) var(--gx, 50%),
+      rgba(255, 255, 255, 0.07) calc(var(--gx, 50%) + 9%),
+      transparent calc(var(--gx, 50%) + 20%)),
+    radial-gradient(120% 90% at var(--gx, 50%) var(--gy, 50%), rgba(255, 255, 255, 0.12), transparent 60%);
+  mix-blend-mode: screen;
+  opacity: 0; transition: opacity 0.3s ease;
+}
+.tm-pcard-scene[data-active='true'] .tm-pcard-glare { opacity: 1; }
+/* 손가락 조작 기기에서는 기울기가 오히려 방해다 -- 누름 반응만 남긴다. */
+@media (hover: none) {
+  .tm-pcard-scene { --rx: 0deg !important; --ry: 0deg !important; }
+  .tm-pcard-glare { display: none; }
+}
+
+/* ── 카드 면 ── */
+.tm-pcard-face {
+  width: 100%; height: 100%; position: relative; z-index: 1;
+  clip-path: var(--tm-silhouette);
+  background: var(--tm-facefill);
+  color: var(--tm-ink);
+  overflow: hidden;
+  display: flex; flex-direction: column;
+  padding: var(--tm-pad);
+}
+/* 재질 = 한 겹으로 안 된다. 넓은 반사 + 미세 빗살을 겹쳐야 금속으로 읽힌다. */
+.tm-pcard-face::before {
+  content: ''; position: absolute; inset: -20%;
+  background:
+    linear-gradient(158deg,
+      rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.05) 26%,
+      rgba(0, 0, 0, 0.02) 58%, rgba(0, 0, 0, 0.1) 100%),
+    repeating-linear-gradient(104deg,
+      rgba(255, 255, 255, 0.1) 0 1px, rgba(255, 255, 255, 0) 1px 6px);
+  mix-blend-mode: overlay; pointer-events: none;
+}
+/* 광택 스윕 -- 넓은 반사 옆에 가는 하이라이트를 붙여 두 줄이 함께 지나가야 포일로 보인다. */
+.tm-pcard-face::after {
+  content: ''; position: absolute; top: -60%; left: -85%;
+  width: 62%; height: 240%;
+  background: linear-gradient(90deg,
+    rgba(255, 255, 255, 0) 0%, var(--tm-sheen) 38%,
+    rgba(255, 255, 255, 0.55) 50%, var(--tm-sheen) 62%, rgba(255, 255, 255, 0) 100%);
+  transform: rotate(18deg);
+  animation: tmCardSweep 5.6s ease-in-out infinite;
+  animation-delay: var(--tm-sweep-delay, 0s);
+  pointer-events: none; z-index: 2;
+}
+@keyframes tmCardSweep { 0%, 62% { left: -80%; } 88%, 100% { left: 160%; } }
+/* 각인된 브랜드 마크 -- 색을 칠하지 않고 마스크로 뚫어 티어 잉크색을 그대로 쓴다. */
+.tm-pcard-crest-bg {
+  position: absolute; right: -26px; top: -16px;
+  width: 150px; height: 150px;
+  background: var(--tm-ink);
+  -webkit-mask: url('/brand/teameet-mark.png') center / contain no-repeat;
+  mask: url('/brand/teameet-mark.png') center / contain no-repeat;
+  opacity: 0.1; pointer-events: none; z-index: 0;
+}
+.tm-pcard-fx { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
+
+/* ── 앞면 콘텐츠 ── */
+.tm-player-card-top { display: flex; gap: 12px; align-items: flex-start; position: relative; z-index: 1; }
+.tm-player-card-ovr { text-align: center; min-width: 52px; margin-left: 4px; }
+.tm-player-card[data-shape='shield'] .tm-player-card-ovr { margin-left: 28px; }
+/* 레전드·스페셜 돔은 가장 가팔라 같은 높이에서 폭이 가장 좁다 -- 총점만 더 안쪽으로. */
+.tm-player-card[data-shape='shield'][data-tier='legend'] .tm-player-card-ovr,
+.tm-player-card[data-shape='shield'][data-tier='special'] .tm-player-card-ovr { margin-left: 44px; }
+.tm-player-card-ovr-value {
+  font-family: var(--tm-num);
+  font-size: 40px; font-weight: 800; line-height: 0.86;
+  letter-spacing: -0.01em; font-variant-numeric: tabular-nums;
+}
+/* 아직 총점이 없는 카드. 40px 숫자 자리에 "NEW" 를 그대로 넣으면 글자가 넘친다 --
+   크기를 줄이고 톤을 낮춰 "값이 없다"는 사실이 조용히 읽히게 한다. */
+.tm-player-card-ovr-value[data-empty='true'] {
+  font-size: 20px; letter-spacing: 0.06em; color: var(--tm-dim);
+}
+.tm-player-card-ovr-rule { height: 1px; background: var(--tm-rule); margin: 8px 4px 4px; }
+.tm-player-card-ovr-pos {
+  font-family: var(--tm-num);
+  font-size: 13px; font-weight: 800; letter-spacing: 0.18em; color: var(--tm-ink);
+}
+.tm-pcard-tier-tag {
+  margin-top: 3px; font-family: var(--tm-num);
+  font-size: 9.5px; font-weight: 800; letter-spacing: 0.16em; color: var(--tm-dim);
+}
+/* 배지 열 -- 실제 FUT 카드에서 등급·희귀도 표식이 앉는 자리. 엠블럼(티어 배지)이
+   머리, 그 아래 브랜드 마크. 이 스택이 없으면 아무리 색을 맞춰도 피파로 안 읽힌다. */
+.tm-pcard-badges { display: flex; flex-direction: column; align-items: center; gap: 2px; margin-top: 4px; }
+.tm-pcard-crest {
+  width: 38px; height: 38px;
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.45));
+  animation: tmCrestBreathe 3.8s ease-in-out infinite;
+}
+.tm-pcard-crest svg { display: block; width: 100%; height: 100%; }
+@keyframes tmCrestBreathe { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.5px); } }
+.tm-pcard-badge {
+  width: 19px; height: 19px; border-radius: var(--radius-tight);
+  display: grid; place-items: center;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--tm-rim-line);
+}
+.tm-pcard-badge-mark {
+  width: 13px; height: 13px; background: var(--tm-ink);
+  -webkit-mask: url('/brand/teameet-mark.png') center / contain no-repeat;
+  mask: url('/brand/teameet-mark.png') center / contain no-repeat;
+}
+
+/* 선수 렌더 -- 원형 아바타가 아니라 아래가 잘려 사라지는 큰 컷아웃. 프레임 위로 걸친다. */
+.tm-pcard-render {
+  position: absolute; right: 8px; top: 26px; width: 138px; height: 140px;
+  display: flex; align-items: flex-end; justify-content: center; z-index: 1;
+}
+.tm-player-card[data-shape='shield'] .tm-pcard-render { top: 48px; }
+.tm-pcard-render-img {
+  width: 100%; height: 100%;
+  /* 배경을 아래로만 페이드하면 좌우·위가 직각으로 남아 **밝은 사각형이 카드 위에 한 겹
+     더 얹힌 것처럼** 보인다(사용자 지적 2026-08-26, 실버·골드·브론즈 공통). 사진과 같은
+     네 변 교집합 마스크를 써서 이니셜 배경도 카드에 녹인다. */
+  background: radial-gradient(72% 68% at 50% 42%, rgba(255, 255, 255, 0.17), rgba(255, 255, 255, 0) 72%);
+  -webkit-mask-image:
+    linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, #000 10%, #000 58%, rgba(0, 0, 0, 0) 100%),
+    linear-gradient(90deg, rgba(0, 0, 0, 0) 0%, #000 16%, #000 84%, rgba(0, 0, 0, 0) 100%);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, #000 10%, #000 58%, rgba(0, 0, 0, 0) 100%),
+    linear-gradient(90deg, rgba(0, 0, 0, 0) 0%, #000 16%, #000 84%, rgba(0, 0, 0, 0) 100%);
+  mask-composite: intersect;
+  display: grid; place-items: end center;
+  font-size: 54px; font-weight: 800; color: var(--tm-ink);
+  opacity: 0.95; padding-bottom: 8px;
+}
+.tm-pcard-render-photo {
+  width: 100%; height: 100%;
+  background-size: cover; background-position: center top;
+  /* 사진을 카드에 **녹인다**. 아래로만 페이드하면(예전: 180deg 74%) 좌우·위가 직각으로
+     남아 카드 위에 사각 사진을 붙여 놓은 것처럼 보인다(alpha 실측 2026-08-26, 실제
+     사진 업로드로 확인). 세로·가로 두 그라디언트의 **교집합**을 마스크로 써서 네 변이
+     모두 사라지게 한다 -- 실물 FUT 카드의 배경 제거된 선수 컷아웃에 가장 가까운 근사다.
+     mask-composite 는 표준(intersect)과 WebKit(source-in) 문법이 달라 둘 다 적는다. */
+  -webkit-mask-image:
+    linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, #000 8%, #000 58%, rgba(0, 0, 0, 0) 100%),
+    linear-gradient(90deg, rgba(0, 0, 0, 0) 0%, #000 16%, #000 84%, rgba(0, 0, 0, 0) 100%);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, #000 8%, #000 58%, rgba(0, 0, 0, 0) 100%),
+    linear-gradient(90deg, rgba(0, 0, 0, 0) 0%, #000 16%, #000 84%, rgba(0, 0, 0, 0) 100%);
+  mask-composite: intersect;
+}
+
+/* 이름 줄 -- 실물은 이름 아래에만 헤어라인이 있다. 위아래를 다 그으면 표처럼 보인다. */
+.tm-player-card-name {
+  margin-top: 2px; position: relative; z-index: 2;
+  display: flex; align-items: baseline; justify-content: center; gap: 8px;
+  padding-bottom: 8px; border-bottom: 1px solid var(--tm-rule);
+  font-size: 19px; font-weight: 800; letter-spacing: -0.01em; line-height: 1.1;
+}
+/* 등번호는 이름과 같은 줄에. 왼쪽 큰 숫자가 총점이라 no. 를 붙여야 둘이 안 헷갈린다. */
+.tm-player-card-jersey { display: inline-flex; align-items: baseline; gap: 2px; }
+.tm-pcard-no-lbl {
+  font-family: var(--tm-num); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.06em; color: var(--tm-dim);
+}
+.tm-pcard-no-num {
+  font-family: var(--tm-num); font-size: 21px; font-weight: 800;
+  letter-spacing: -0.01em; color: var(--tm-dim);
+}
+
+/* 능력치 -- gitfut/FUT 실물은 값 + 3글자 코드뿐이다. 한글 뜻은 뒷면에서 푼다. */
+.tm-player-card-stats {
+  margin-top: 12px; position: relative; z-index: 1;
+  display: grid; grid-template-columns: 1fr 1px 1fr;
+  column-gap: 12px; row-gap: 4px; align-items: center;
+}
+.tm-pcard-stats-div { grid-row: span 3; width: 1px; height: 100%; background: var(--tm-rule); }
+.tm-player-card-stat { display: flex; align-items: baseline; gap: 8px; }
+.tm-player-card-stat-value {
+  font-family: var(--tm-num); font-size: 19px; font-weight: 800;
+  min-width: 25px; letter-spacing: -0.01em; text-align: right;
+  display: inline-flex; align-items: center; justify-content: flex-end;
+  font-variant-numeric: tabular-nums;
+}
+.tm-player-card-stat-code {
+  font-family: var(--tm-num); font-size: 14px; font-weight: 600;
+  letter-spacing: 0.04em; color: var(--tm-dim);
+}
+.tm-player-card-stat[data-locked='true'] .tm-player-card-stat-value,
+.tm-player-card-stat[data-locked='true'] .tm-player-card-stat-code { color: var(--tm-lock); }
+
+/* 발치 -- 팀 · 경기수 한 줄, 브랜드는 그 아래 눕힌다(알약 배지로 두면 카드의 주인이
+   팀밋인 것처럼 보인다). */
+.tm-pcard-meta {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  margin-top: auto; padding-top: 8px; position: relative; z-index: 1;
+  border-top: 1px solid var(--tm-rule);
+  width: 72%; margin-left: auto; margin-right: auto;
+  font-size: 10.5px; font-weight: 700; color: var(--tm-ink);
+}
+.tm-pcard-meta-line { display: flex; align-items: center; gap: 8px; min-width: 0; letter-spacing: 0.01em; }
+.tm-pcard-meta-line b { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tm-pcard-meta-line i { width: 3px; height: 3px; border-radius: var(--radius-pill); background: currentColor; flex: none; }
+.tm-pcard-meta-line span { font-family: var(--tm-num); letter-spacing: 0.04em; flex: none; }
+.tm-pcard-brand {
+  display: inline-flex; align-items: center; gap: 4px; opacity: 0.62;
+  font-family: var(--tm-num); font-size: 9px; font-weight: 800; letter-spacing: 0.18em;
+}
+.tm-pcard-brand em {
+  width: 11px; height: 11px; font-style: normal; display: block;
+  background: currentColor;
+  -webkit-mask: url('/brand/teameet-mark.png') center / contain no-repeat;
+  mask: url('/brand/teameet-mark.png') center / contain no-repeat;
+}
+
+/* ── 티어 토큰 ── 실루엣 + 재질 + 엠블럼이 한 세트로 움직인다.
+   명도 폭을 좁게 유지한다 -- 넓히면 같은 글자색이 위에서는 읽히고 아래에서는 안 읽힌다.
+   밝은 금속(실버·골드·레전드)은 글자를 어둡게 뒤집는다(흰 글자로는 4.5:1 을 못 넘겼다). */
+.tm-player-card[data-tier='bronze'] {
+  --tm-rim: linear-gradient(160deg, #e0ab72, #8a5a30 46%, #4a2c15);
+  --tm-rim-line: rgba(240, 200, 160, 0.45);
+  --tm-facefill: linear-gradient(163deg, #6e4423 0%, #5a3619 34%, #3c2210 74%, #2a170a 100%);
+  --tm-rule: rgba(255, 224, 196, 0.34);
+  --tm-ink: #fff5ec;
+  --tm-dim: rgba(255, 240, 226, 0.88);
+  --tm-lock: rgba(255, 240, 226, 0.62);
+  --tm-sheen: rgba(255, 214, 170, 0.16);
+  --tm-back-accent: #e0ab72;
+  --tm-sweep-delay: 0s;
+}
+.tm-player-card[data-tier='silver'] {
+  --tm-rim: linear-gradient(160deg, #f2f6fb, #93a0b1 48%, #4c5563);
+  --tm-rim-line: rgba(60, 70, 84, 0.4);
+  --tm-facefill: linear-gradient(163deg, #eef2f7 0%, #d5dbe3 32%, #bcc5d0 70%, #a9b4c2 100%);
+  --tm-rule: rgba(40, 46, 55, 0.34);
+  --tm-ink: #1f242b;
+  --tm-dim: rgba(31, 36, 43, 0.9);
+  --tm-lock: rgba(31, 36, 43, 0.78);
+  --tm-sheen: rgba(255, 255, 255, 0.4);
+  --tm-back-accent: #c9d4e2;
+  --tm-sweep-delay: 0.5s;
+}
+.tm-player-card[data-tier='gold'] {
+  --tm-rim: linear-gradient(160deg, #fff0bd, #d9a832 46%, #7a5510);
+  --tm-rim-line: rgba(122, 85, 16, 0.5);
+  --tm-facefill: linear-gradient(163deg, #ffe9a6 0%, #f0cd6a 32%, #dcae3f 70%, #c99a2f 100%);
+  --tm-rule: rgba(74, 51, 7, 0.42);
+  --tm-ink: #2a1d04;
+  --tm-dim: rgba(48, 33, 4, 0.88);
+  --tm-lock: rgba(48, 33, 4, 0.62);
+  --tm-sheen: rgba(255, 255, 255, 0.34);
+  --tm-back-accent: #f0cd6a;
+  --tm-sweep-delay: 1s;
+}
+/* 레전드 = 실제 Icon 카드 컨셉: 크림색 바탕 + 얇은 금색 이중 테두리 + 상단 메달.
+   최상위 두 등급이 둘 다 금색이면 30경기와 100경기가 구분되지 않는다 -- 레전드는
+   정갈함(크림+금), 스페셜은 화려함(남색+청색 광휘)으로 갈라진다. */
+.tm-player-card[data-tier='legend'] {
+  --tm-rim: linear-gradient(160deg, #f6e7ae, #c9a227 46%, #7a5f14);
+  --tm-rim-line: rgba(122, 95, 20, 0.45);
+  --tm-facefill: linear-gradient(168deg, #fbf8ee 0%, #f2ecdb 38%, #e2d8bd 72%, #d3c7a4 100%);
+  --tm-rule: rgba(96, 76, 22, 0.38);
+  --tm-ink: #3f3517;
+  --tm-dim: rgba(70, 58, 22, 0.88);
+  --tm-lock: rgba(70, 58, 22, 0.6);
+  --tm-sheen: rgba(255, 255, 255, 0.42);
+  --tm-back-accent: #e8d9a8;
+  --tm-sweep-delay: 1.6s;
+}
+.tm-player-card[data-tier='special'] {
+  --tm-rim: linear-gradient(160deg, #f6e7ae 0%, #cfe8ff 26%, #4d9dff 58%, #10305e 100%);
+  --tm-rim-line: rgba(150, 205, 255, 0.55);
+  --tm-facefill:
+    radial-gradient(120% 62% at 50% 0%, rgba(96, 170, 255, 0.42), rgba(0, 0, 0, 0) 62%),
+    linear-gradient(180deg, rgba(10, 18, 34, 0) 0 34%, #0a1222 44% 100%),
+    linear-gradient(90deg, rgba(120, 190, 255, 0) 30%, rgba(120, 190, 255, 0.3) 50%, rgba(120, 190, 255, 0) 70%),
+    linear-gradient(163deg, #16294a 0%, #0c1730 46%, #04070e 100%);
+  --tm-rule: rgba(160, 205, 255, 0.4);
+  --tm-ink: #f2f8ff;
+  --tm-dim: rgba(206, 228, 255, 0.9);
+  --tm-lock: rgba(206, 228, 255, 0.62);
+  --tm-sheen: rgba(170, 215, 255, 0.36);
+  --tm-back-accent: #8fc2ff;
+  --tm-sweep-delay: 2.2s;
+}
+
+/* ── 티어별 장식 -- 브론즈는 아무것도 없다. 위로 갈수록 하나씩 얹혀 "올라간 게 보이게". ── */
+.tm-player-card[data-tier='bronze'] .tm-pcard-fx {
+  /* 실물 카드의 가로 톤 분할. 딱 끊으면 카드 위에 사각 오버레이가 한 겹 더 있는 것처럼
+     보인다(사용자 지적) -- 경계를 몇 퍼센트에 걸쳐 흐린다. */
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.05) 0 48%, rgba(255, 255, 255, 0.04) 62%, rgba(255, 255, 255, 0.04) 100%);
+}
+.tm-player-card[data-tier='bronze'] .tm-pcard-frame { filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.5)); }
+.tm-player-card[data-tier='bronze'] .tm-pcard-face::after { animation: none; opacity: 0; }
+.tm-player-card[data-tier='bronze'] .tm-pcard-crest { animation: none; }
+
+.tm-player-card[data-tier='silver'] .tm-pcard-fx {
+  background:
+    radial-gradient(66% 42% at 50% 24%, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0) 72%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.06) 0 48%, rgba(255, 255, 255, 0.07) 62%, rgba(255, 255, 255, 0.07) 100%);
+}
+.tm-player-card[data-tier='silver'] .tm-pcard-frame {
+  filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 12px rgba(205, 220, 240, 0.28));
+}
+.tm-player-card[data-tier='silver'] .tm-pcard-face::after { animation-duration: 7s; opacity: 0.8; }
+
+.tm-player-card[data-tier='gold'] .tm-pcard-fx {
+  background:
+    radial-gradient(20% 13% at 12% 12%, rgba(255, 244, 200, 0.7), rgba(255, 255, 255, 0) 72%),
+    radial-gradient(20% 13% at 88% 12%, rgba(255, 244, 200, 0.7), rgba(255, 255, 255, 0) 72%),
+    radial-gradient(60% 34% at 50% 2%, rgba(255, 248, 220, 0.5), rgba(255, 255, 255, 0) 76%),
+    linear-gradient(180deg, rgba(120, 82, 10, 0.1) 0 48%, rgba(255, 252, 230, 0.12) 62%, rgba(255, 252, 230, 0.12) 100%);
+}
+.tm-player-card[data-tier='gold'] .tm-pcard-face {
+  box-shadow: inset 0 0 0 1px rgba(255, 245, 205, 0.34), inset 0 2px 10px rgba(255, 240, 190, 0.22);
+}
+.tm-player-card[data-tier='gold'] .tm-pcard-frame {
+  animation: tmCardRise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both, tmGoldBreathe 5s ease-in-out infinite 1s;
+}
+@keyframes tmGoldBreathe {
+  0%, 100% { filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 14px rgba(255, 205, 90, 0.38)); }
+  50% { filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 22px rgba(255, 205, 90, 0.58)); }
+}
+.tm-player-card[data-tier='gold'] .tm-pcard-face::after { animation-duration: 5.5s; }
+
+/* 레전드: 이중 테두리 안쪽 선 + 상단 중앙 메달 -- 실물 Icon 카드의 서명 요소. */
+.tm-player-card[data-tier='legend'] .tm-pcard-fx {
+  background:
+    radial-gradient(circle at 50% 4.2%, rgba(201, 162, 39, 0.95) 0 5px,
+      rgba(255, 255, 255, 0.9) 5px 7px, rgba(201, 162, 39, 0.9) 7px 9px, rgba(0, 0, 0, 0) 9px),
+    radial-gradient(70% 32% at 50% 8%, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0) 72%);
+}
+.tm-player-card[data-tier='legend'] .tm-pcard-face {
+  box-shadow: inset 0 0 0 1px rgba(201, 162, 39, 0.55),
+    inset 0 0 0 6px rgba(251, 248, 238, 0.9),
+    inset 0 0 0 7px rgba(201, 162, 39, 0.45);
+}
+.tm-player-card[data-tier='legend'] .tm-pcard-frame {
+  animation: tmCardRise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both, tmLegendPulse 3.6s ease-in-out infinite 1s;
+}
+@keyframes tmLegendPulse {
+  0%, 100% { filter: drop-shadow(0 14px 28px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 20px rgba(226, 196, 110, 0.5)); }
+  50% { filter: drop-shadow(0 14px 28px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 36px rgba(226, 196, 110, 0.82)); }
+}
+.tm-player-card[data-tier='legend'] .tm-pcard-face::after { animation-duration: 4.2s; }
+.tm-player-card[data-tier='legend'] .tm-pcard-crest,
+.tm-player-card[data-tier='special'] .tm-pcard-crest {
+  animation: tmCrestBreathe 3.8s ease-in-out infinite, tmCrestGlint 6s ease-in-out infinite;
+}
+@keyframes tmCrestGlint {
+  0%, 82%, 100% { filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.45)); }
+  90% { filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.45)) drop-shadow(0 0 10px rgba(150, 210, 255, 0.9)); }
+}
+
+/* 스페셜: 조용한 오로라 + 이중 테두리. 오로라를 회전시키면 바람개비로 보인다 --
+   실제 오로라처럼 여러 빛덩이가 서로 다른 속도로 흐르게 한다(표류). */
+.tm-player-card[data-tier='special'] .tm-pcard-fx {
+  background:
+    radial-gradient(52% 30% at 22% 24%, rgba(120, 190, 255, 0.34), rgba(255, 255, 255, 0) 70%),
+    radial-gradient(48% 28% at 78% 32%, rgba(226, 196, 110, 0.26), rgba(255, 255, 255, 0) 72%);
+  background-size: 170% 170%, 150% 150%;
+  -webkit-mask: linear-gradient(180deg, #000 0 34%, rgba(0, 0, 0, 0) 46%);
+  mask: linear-gradient(180deg, #000 0 34%, rgba(0, 0, 0, 0) 46%);
+  animation: tmAuroraDrift 17s ease-in-out infinite alternate;
+}
+@keyframes tmAuroraDrift {
+  0% { background-position: 8% 22%, 88% 44%; }
+  50% { background-position: 34% 34%, 58% 24%; }
+  100% { background-position: 16% 10%, 80% 52%; }
+}
+.tm-player-card[data-tier='special'] .tm-pcard-face {
+  box-shadow: inset 0 0 0 1px rgba(246, 231, 174, 0.6), inset 0 0 0 5px rgba(8, 16, 32, 0.7),
+    inset 0 0 0 6px rgba(150, 205, 255, 0.45), inset 0 0 30px rgba(80, 160, 255, 0.34);
+}
+.tm-player-card[data-tier='special'] .tm-pcard-frame {
+  animation: tmCardRise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both, tmSpecialPulse 3.4s ease-in-out infinite 1s;
+}
+@keyframes tmSpecialPulse {
+  0%, 100% { filter: drop-shadow(0 14px 28px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 24px rgba(95, 165, 255, 0.55)); }
+  50% { filter: drop-shadow(0 14px 28px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 44px rgba(95, 165, 255, 0.9)); }
+}
+.tm-player-card[data-tier='special'] .tm-pcard-face::after { animation-duration: 4s; }
+
+/* ── 뒷면 -- 같은 카드다. 같은 실루엣·같은 림을 쓰고, 글이 많으므로 바탕만 어둡게. ── */
+.tm-pcard-backface {
+  width: 100%; height: 100%; position: relative; z-index: 1;
+  clip-path: var(--tm-silhouette);
+  background: linear-gradient(168deg, #1a1f2a 0%, #12161e 58%, #0b0e14 100%);
+  color: #a9b3c2;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.tm-player-card[data-shape='shield'] .tm-pcard-backface { padding: 48px 24px 64px; }
+.tm-player-card[data-shape='rect'] .tm-pcard-backface { padding: 32px 20px 24px; }
+.tm-pcard-back-h {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  font-family: var(--tm-num); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.18em; color: var(--tm-back-accent); text-transform: uppercase;
+  padding-bottom: 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  width: 78%; margin: 0 auto;
+}
+.tm-pcard-back-h em {
+  width: 12px; height: 12px; font-style: normal; background: currentColor;
+  -webkit-mask: url('/brand/teameet-mark.png') center / contain no-repeat;
+  mask: url('/brand/teameet-mark.png') center / contain no-repeat;
+}
+/* 숫자 나열 전에 "어떤 선수인가"를 사람 말로 먼저. */
+.tm-pcard-back-sum { font-size: 11.5px; line-height: 1.55; color: #a9b3c2; text-align: center; }
+.tm-pcard-back-sum b { color: var(--tm-back-accent); font-weight: 700; }
+.tm-pcard-back-sec {
+  display: flex; align-items: center; gap: 8px; margin-top: 3px;
+  font-family: var(--tm-num); font-size: 9px; font-weight: 800; letter-spacing: 0.16em;
+  color: #6f7a8a;
+}
+.tm-pcard-back-sec::before, .tm-pcard-back-sec::after {
+  content: ''; flex: 1; height: 1px; background: rgba(255, 255, 255, 0.1);
+}
+/* 성향 태그 -- 2열 고정. 흘려 넣으면 줄바꿈이 들쭉날쭉해진다. */
+.tm-pcard-back-tags { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.tm-pcard-tag {
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 0;
+  padding: 4px 8px; border-radius: var(--radius-chip);
+  background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 10.5px; font-weight: 700; color: #a9b3c2;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tm-pcard-tag[data-tone='accent'] { border-color: var(--tm-back-accent); color: var(--tm-back-accent); }
+/* 산식 -- 아이콘 / 값 / 설명이 세로로 맞아야 표처럼 읽힌다. */
+.tm-pcard-back-rows { display: grid; gap: 2px; }
+.tm-pcard-brow {
+  display: grid; grid-template-columns: 14px 26px 1fr; gap: 8px; align-items: center;
+  font-size: 10px; color: #8b95a5; padding: 1px 0;
+}
+.tm-pcard-brow svg { width: 13px; height: 13px; color: var(--tm-back-accent); opacity: 0.8; }
+.tm-pcard-brow b {
+  font-family: var(--tm-num); font-size: 14px; color: #eef2f8; text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.tm-pcard-brow b[data-locked='true'] { color: #6f7a8a; }
+.tm-pcard-back-eq {
+  margin: 4px auto 0; padding-top: 8px; border-top: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 10px; color: #a9b3c2; line-height: 1.5; text-align: center; width: 72%;
+}
+.tm-pcard-back-eq b { color: var(--tm-back-accent); }
+
+/* ── 카드 아래 동반 UI -- 카드는 소장품이라 앞면을 깨끗하게 두고, 안내·행동은 밖에 둔다. ── */
+/* 카드 아래 영역. 카드가 drop-shadow 를 깔고 있어 버튼이 바짝 붙으면 그림자 위에
+   올라탄 것처럼 보인다 -- 그림자가 앉을 자리를 여백으로 비운다(사용자 지적 2026-08-26). */
+.tm-pcard-below { width: 100%; max-width: 320px; display: flex; flex-direction: column; margin-top: 16px; }
+.tm-pcard-flipbtn {
+  margin-top: 4px; width: 100%; min-height: 44px; border-radius: var(--radius-control);
+  background: var(--surface-soft); border: 1px solid var(--border);
+  color: var(--text-strong); font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
+}
+.tm-pcard-flipbtn:focus-visible { outline: 2px solid var(--blue500); outline-offset: 2px; }
+.tm-player-card-sub { margin-top: 12px; font-size: 13px; color: var(--text-muted); text-align: center; }
+.tm-player-card-tier-note { margin-top: 4px; font-size: 11px; color: var(--text-caption); text-align: center; }
+.tm-player-card-progress {
+  margin-top: 12px; padding: 12px 12px; border-radius: var(--radius-control);
+  background: var(--surface-soft); border: 1px solid var(--border);
+}
+.tm-player-card-progress-text { font-size: 12px; color: var(--text-body); }
+.tm-player-card-progress-bar {
+  height: 5px; border-radius: var(--radius-pill); margin-top: 8px; overflow: hidden;
+  background: var(--border);
+}
+.tm-player-card-progress-bar i {
+  display: block; height: 100%; border-radius: var(--radius-pill); background: var(--blue500);
+}
+.tm-player-card-progress-count {
+  margin-top: 8px; font-size: 11px; color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.tm-player-card-cta {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 44px; margin-top: 12px; border-radius: var(--radius-control);
+  background: var(--blue500); color: var(--static-white);
+  font-size: 15px; font-weight: 700; text-decoration: none;
+}
+.tm-player-card-cta:focus-visible { outline: 2px solid var(--blue500); outline-offset: 2px; }
+
+/* 선수 카드 공유 입구 (Task 155). 카드 밖의 보조 액션이라 CTA(파란 채움)보다 약하게 --
+   가장 강한 것은 기록 공개 유도여야 한다. */
+.tm-player-card-share-link {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 44px; margin-top: 12px; border-radius: var(--radius-control);
+  background: var(--surface-soft); border: 1px solid var(--border);
+  color: var(--text-strong); font-size: 15px; font-weight: 700; text-decoration: none;
+}
+.tm-player-card-share-link:focus-visible { outline: 2px solid var(--blue500); outline-offset: 2px; }
+
+/* 공유 전용 화면의 주 버튼 -- 여기서는 공유가 유일한 목적이라 강한 CTA 로 둔다. */
+.tm-player-card-share-btn {
+  min-height: 48px; border-radius: var(--radius-control); border: none;
+  background: var(--blue500); color: var(--static-white);
+  font-family: inherit; font-size: 16px; font-weight: 700; width: 100%; cursor: pointer;
+}
+.tm-player-card-share-secondary {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 44px; color: var(--text-muted); font-size: 14px; text-decoration: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tm-pcard-frame, .tm-pcard-face::after, .tm-pcard-fx, .tm-pcard-crest, .tm-pcard-flip {
+    animation: none !important; transition: none !important;
+  }
+}
+
+/* ── 카드는 상자에 담지 않는다 (사용자 선택 A안, 2026-08-26) ──
+   무대 상자를 거쳐(다크 → 화이트) 결국 **상자 자체를 없앴다**. 상자가 페이지 배경과
+   거의 같은 톤이라 경계에 이유가 없었고, 모바일에서는 좌우 여백이 이중으로 들었으며,
+   무엇보다 그 안에 계정 버튼까지 들어 있어 "카드 조작"과 "계정 조작"이 한 덩어리로
+   섞였다. 카드는 자기 림·그림자를 갖고 있어 배경 위에 그냥 놓아도 소장품으로 선다.
+   계정은 아래 별도 프로필 카드로 내려갔다(my-page.tsx).
+
+   카드 아래 신원 블록 -- 공개 프로필에서만 쓴다(이름·핸들). 마이페이지는 프로필 카드가
+   같은 정보를 더 자세히 말하므로 여기에 넣지 않는다. */
+.tm-pcard-identity {
+  padding: 2px 0 12px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 12px;
+  text-align: center;
+}
+.tm-pcard-identity-name { font-size: 16px; font-weight: 800; color: var(--text-strong); letter-spacing: -0.01em; }
+.tm-pcard-identity-meta { margin-top: 3px; font-size: 12px; color: var(--text-muted); }
+.tm-pcard-identity-badges {
+  margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
+}
+.tm-pcard-identity-actions { margin-top: 12px; display: flex; gap: 8px; }
+.tm-pcard-identity-actions .tm-btn { flex: 1; }
+
+/* ── 상태 적응형 카드 앞면 (Task 155, 사용자 선택 A안) ──────────────────
+   0경기 + 열림 0 = 여정 면: 자물쇠 여섯 개의 벽 대신 큰 렌더와 "시작"을 그린다.
+   기록 면에는 다음 목표 한 줄이 중앙 공백을 채운다 -- 카드가 행동을 만든다. */
+.tm-player-card[data-face='journey'] .tm-pcard-render {
+  right: 50%; transform: translateX(50%);
+  /* alpha 실측(2026-08-25): 렌더를 이름 줄까지 내리면 큰 이니셜이 이름·여정 문구를
+     관통한다. 이름 줄 위에서 끝나도록 높이를 줄이고 글리프를 가운데 정렬한다. */
+  top: 40px; width: 176px; height: 118px;
+}
+.tm-player-card[data-face='journey'][data-shape='shield'] .tm-pcard-render { top: 64px; }
+.tm-player-card[data-face='journey'] .tm-pcard-render-img {
+  font-size: 80px; padding-bottom: 0; place-items: center;
+}
+.tm-player-card[data-face='journey'] .tm-player-card-name { margin-top: 16px; }
+.tm-pcard-journey { margin-top: 16px; text-align: center; position: relative; z-index: 2; }
+.tm-pcard-journey-title { font-size: 15px; font-weight: 800; color: var(--tm-ink); }
+.tm-pcard-journey-sub { margin-top: 4px; font-size: 11px; line-height: 1.55; color: var(--tm-dim); }
+.tm-pcard-next {
+  margin: 12px auto 0; width: fit-content; padding: 4px 12px; border-radius: var(--radius-pill);
+  border: 1px solid var(--tm-rule);
+  font-family: var(--tm-num); font-size: 11px; font-weight: 800; letter-spacing: 0.02em;
+  color: var(--tm-ink);
+  display: flex; align-items: center; gap: 8px;
+  position: relative; z-index: 2;
+}
+.tm-pcard-next i { width: 5px; height: 5px; border-radius: var(--radius-pill); background: var(--tm-ink); opacity: 0.75; }
+/* 공개 프로필 스테이지의 이름은 h1 -- 헤딩 기본 마진·크기를 카드 신원 스타일로 되돌린다. */
+h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
+
+/* ── 카드 설정 입구 (적대 검증 2026-08-25 확정 결함 수정) ──
+   숨김·모양 설정이 카드에서 2클릭 떨어진 메뉴에만 있어 발견 불가능했다 --
+   뒤집기 버튼 옆에 아이콘 입구를 둔다(본인 카드에서만 렌더). */
+/* 카드 조작 한 줄: 뒤집기(글자) + 공유·설정(아이콘). 보조 조작까지 글자로 두면
+   줄이 길어져 아래로 흐르고, 그 사이에 등급 설명이 끼어 버튼 흐름이 끊겼다. */
+.tm-pcard-actions { display: flex; gap: 8px; margin-top: 0; }
+.tm-pcard-actions .tm-pcard-flipbtn { flex: 1; margin-top: 0; }
+.tm-pcard-icon-link {
+  flex: none; width: 44px; min-height: 44px; border-radius: var(--radius-control);
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface-soft); border: 1px solid var(--border);
+  color: var(--text-strong);
+}
+.tm-pcard-icon-link:focus-visible { outline: 2px solid var(--blue500); outline-offset: 2px; }
+
+/* ── 후기 4항목 채점 (Task 155 후속 -- 해금 카운트의 원천) ──
+   종합 별점 아래 실력·매너·시간약속·안전 네 줄. 종합 별점과 같은 별 패턴을
+   축소 재사용한다 -- 새 입력 문법을 만들면 폼이 두 언어로 갈라진다. */
+.tm-review-metric-rows {
+  margin-top: 8px; padding: 8px 12px; border-radius: var(--radius-control);
+  background: var(--surface-soft);
+  display: grid; gap: 2px;
+}
+.tm-review-metric-row { display: flex; align-items: center; gap: 8px; }
+.tm-review-metric-label {
+  width: 56px; flex: none; font-size: 12px; font-weight: 600; color: var(--text-muted);
+}
+.tm-review-stars[data-compact='true'] button { font-size: 15px; min-width: 28px; min-height: 32px; }
+
+/* ── 카드 안 사진 추가 슬롯 (사용자 선택 A안, 2026-08-26) ──
+   사진이 없는 본인 카드에서 렌더 자리를 그대로 버튼으로 바꾼다. 업로드는 이미
+   동작하는데 권하는 화면이 없어 카드가 전부 이니셜로 남아 있었다 -- 결핍이 있는
+   자리에서 해결한다. 사진이 생기면 이 슬롯은 사라지고 렌더가 그 자리를 채운다. */
+.tm-pcard-photo-slot {
+  position: absolute; right: 8px; top: 26px; width: 138px; height: 140px;
+  z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  border: 1.5px dashed var(--tm-rule);
+  border-radius: var(--radius-field);
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--tm-ink);
+  text-decoration: none;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+.tm-player-card[data-shape='shield'] .tm-pcard-photo-slot { top: 48px; }
+.tm-pcard-photo-slot span {
+  font-family: var(--tm-num);
+  font-size: 12px; font-weight: 800; letter-spacing: 0.04em;
+}
+.tm-pcard-photo-slot:hover { background: rgba(255, 255, 255, 0.13); border-color: var(--tm-ink); }
+.tm-pcard-photo-slot:focus-visible { outline: 2px solid var(--tm-ink); outline-offset: 2px; }
+
+
+/* ── 프로필(계정) 블록 · 활동 병합 (사용자 선택 A안, 2026-08-26) ──
+   카드 조작과 계정 조작이 한 상자에 섞여 있던 것을 갈랐다. 여기는 계정 쪽이다. */
+.tm-my-account-block { margin-top: 12px; text-align: center; }
+/* 계정 아바타 -- 카드를 숨긴 사용자에게는 이것이 유일한 얼굴이다. */
+.tm-my-account-avatar {
+  width: 52px; height: 52px; border-radius: var(--radius-container); margin: 0 auto 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; font-weight: 800;
+}
+.tm-my-account-name { font-size: 16px; font-weight: 800; color: var(--text-strong); letter-spacing: -0.01em; }
+.tm-my-account-meta { margin-top: 3px; font-size: 12px; color: var(--text-muted); }
+.tm-my-account-badges {
+  margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
+}
+.tm-my-account-actions { margin-top: 12px; display: flex; gap: 8px; }
+.tm-my-account-actions .tm-btn { flex: 1; }
+/* 활동 요약과 이번 달 활동을 한 카드로 합칠 때 두 묶음을 가르는 선. */
+.tm-my-activity-divider { height: 1px; background: var(--border); margin: 12px 0; }

@@ -15,6 +15,7 @@ const {
   createMutateAsync,
   submitMutateAsync,
   decideMutateAsync,
+  fileDisputeMutateAsync,
 } = vi.hoisted(() => ({
   useV1TeamMatchMock: vi.fn(),
   useV1GameMock: vi.fn(),
@@ -23,6 +24,7 @@ const {
   createMutateAsync: vi.fn(),
   submitMutateAsync: vi.fn(),
   decideMutateAsync: vi.fn(),
+  fileDisputeMutateAsync: vi.fn(),
 }));
 
 // jsdom has no Next router, so `useSearchParams()` returns null and the first
@@ -42,6 +44,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1CreateGameResultRevision: () => ({ mutateAsync: createMutateAsync, isPending: false }),
   useV1SubmitGameResultRevision: () => ({ mutateAsync: submitMutateAsync, isPending: false }),
   useV1DecideGameResultRevision: () => ({ mutateAsync: decideMutateAsync, isPending: false }),
+  useV1FileLeagueDispute: () => ({ mutateAsync: fileDisputeMutateAsync, isPending: false }),
   // Both clients below render `AppChrome`, whose `NotificationBell` calls this
   // hook. Because this factory replaces the whole module, omitting it makes
   // vitest throw "No export is defined on the mock" before any assertion runs.
@@ -120,6 +123,8 @@ function revision(overrides: Partial<V1GameResultRevision> = {}): V1GameResultRe
     missingScorer: false,
     mvpParticipantId: null,
     reason: null,
+    outcomeReason: 'NORMAL',
+    outcomeNote: null,
     createdByActorType: 'USER',
     createdByUserId: 'user-host',
     createdBySystemActor: null,
@@ -163,7 +168,9 @@ describe('TeamMatchResultPageClient — 호스트 결과 입력', () => {
 
   it('상대팀(opponent) 담당자는 결과를 작성할 수 없다', () => {
     useV1TeamMatchMock.mockReturnValue(
-      settledQuery(teamMatch({ viewer: { state: 'approved', manageableHostTeam: false } })),
+      settledQuery(
+        teamMatch({ viewer: { state: 'approved', manageableHostTeam: false, manageableOpponentTeam: true } }),
+      ),
     );
     render(<TeamMatchResultPageClient teamMatchId="tm-1" />);
     expect(screen.getByText('호스트만 결과를 입력할 수 있어요')).toBeInTheDocument();
@@ -477,7 +484,9 @@ describe('TeamMatchResultApprovalPageClient — 상대팀 승인/정정 요청',
   beforeEach(() => {
     vi.clearAllMocks();
     useV1TeamMatchMock.mockReturnValue(
-      settledQuery(teamMatch({ viewer: { state: 'approved', manageableHostTeam: false } })),
+      settledQuery(
+        teamMatch({ viewer: { state: 'approved', manageableHostTeam: false, manageableOpponentTeam: true } }),
+      ),
     );
     useV1GameMock.mockReturnValue(settledQuery(game()));
     // 승인 화면은 own-side 라인업을 쓰지 않지만(needsOwnLineup:false), 훅 자체는 항상 호출되므로
@@ -503,10 +512,32 @@ describe('TeamMatchResultApprovalPageClient — 상대팀 승인/정정 요청',
   });
 
   it('호스트도 상대팀도 아닌 사용자는 승인 화면에 접근할 수 없다', () => {
-    useV1TeamMatchMock.mockReturnValue(settledQuery(teamMatch({ viewer: { state: 'none', manageableHostTeam: false } })));
+    useV1TeamMatchMock.mockReturnValue(
+      settledQuery(teamMatch({ viewer: { state: 'none', manageableHostTeam: false, manageableOpponentTeam: false } })),
+    );
     useV1GameResultRevisionsMock.mockReturnValue(settledQuery<V1GameResultRevision[]>([]));
     render(<TeamMatchResultApprovalPageClient teamMatchId="tm-1" />);
     expect(screen.getByText('상대팀만 결과를 승인할 수 있어요')).toBeInTheDocument();
+  });
+
+  // 리그 대진 회귀: 상대팀 매니저의 viewer.state 는 'none' 이지만 승인 권한은 있다.
+  // 게이트가 state 기반으로 되돌아가면 이 화면 전체가 다시 막힌다.
+  it('신청서를 직접 내지 않은 상대팀 매니저(리그 대진)도 승인 화면에 들어간다', () => {
+    useV1TeamMatchMock.mockReturnValue(
+      settledQuery(teamMatch({ viewer: { state: 'none', manageableHostTeam: false, manageableOpponentTeam: true } })),
+    );
+    useV1GameResultRevisionsMock.mockReturnValue(
+      settledQuery<V1GameResultRevision[]>([
+        revision({
+          state: 'SUBMITTED',
+          score: { regulation: { home: 2, away: 1 }, penalty: null, goals: [], incomplete: false },
+          submittedAt: '2026-08-01T00:00:00.000Z',
+        }),
+      ]),
+    );
+    render(<TeamMatchResultApprovalPageClient teamMatchId="tm-1" />);
+    expect(screen.queryByText('상대팀만 결과를 승인할 수 있어요')).not.toBeInTheDocument();
+    expect(screen.getByText('승인하기')).toBeInTheDocument();
   });
 
   it('409 race: 승인 처리 중 그새 바뀐 버전 충돌을 actionable 메시지로 보여준다', async () => {
@@ -596,6 +627,177 @@ function decideRevisionRejects(error: unknown) {
   decideMutateAsync.mockRejectedValue(error);
 }
 
+function leagueInfo(overrides: Record<string, unknown> = {}) {
+  return {
+    leagueId: 'league-1',
+    title: '테스트 리그',
+    disputeDeadline: '2026-08-08T00:00:00.000Z',
+    disputeBlockedReason: null,
+    openDisputeExists: false,
+    ...overrides,
+  };
+}
+
+// U3-A안: 리그 대진은 호스트/상대 두 진입점 모두 같은 "확정 영수증 + 이의 D-day 카드"
+// 뷰로 합류한다 — "호스트만 입력"/"상대팀만 승인" 프레이밍과 "승인하기" 버튼이 아예
+// 뜨면 안 된다.
+describe('리그 대진 결과 - 확정 영수증 + 이의 D-day 카드 (U3)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useV1GameMock.mockReturnValue(settledQuery(game()));
+    useV1TeamMatchLineupMock.mockReturnValue(settledQuery(lineup()));
+  });
+
+  function renderReceipt(
+    entry: 'host' | 'approval',
+    viewerOverrides: Record<string, unknown> = {},
+    leagueOverrides: Record<string, unknown> = {},
+    revisions: V1GameResultRevision[] = [],
+  ) {
+    useV1TeamMatchMock.mockReturnValue(
+      settledQuery(
+        teamMatch({
+          league: leagueInfo(leagueOverrides),
+          viewer: {
+            state: 'none',
+            manageableHostTeam: false,
+            manageableOpponentTeam: false,
+            participantMember: true,
+            ...viewerOverrides,
+          },
+        }),
+      ),
+    );
+    useV1GameResultRevisionsMock.mockReturnValue(settledQuery<V1GameResultRevision[]>(revisions));
+    return entry === 'host'
+      ? render(<TeamMatchResultPageClient teamMatchId="tm-1" />)
+      : render(<TeamMatchResultApprovalPageClient teamMatchId="tm-1" />);
+  }
+
+  it.each([
+    ['host' as const, '호스트만 결과를 입력할 수 있어요'],
+    ['approval' as const, '상대팀만 결과를 승인할 수 있어요'],
+  ])('%s 진입점도 리그 대진이면 "%s" 문구 대신 확정 영수증을 보여준다', (entry, gatedText) => {
+    renderReceipt(
+      entry,
+      { manageableHostTeam: entry === 'host', manageableOpponentTeam: entry === 'approval' },
+      {},
+      [revision({ state: 'OFFICIAL', score: { home: 2, away: 1 }, officialAt: '2026-08-01T00:00:00.000Z' })],
+    );
+    expect(screen.getByText('공식 결과로 확정됐어요')).toBeInTheDocument();
+    expect(screen.queryByText(gatedText)).not.toBeInTheDocument();
+    expect(screen.queryByText('승인하기')).not.toBeInTheDocument();
+    expect(screen.queryByText('결과 작성 완료')).not.toBeInTheDocument();
+  });
+
+  it('아직 공식 결과가 없으면 "운영자가 입력하면 표시된다"는 빈 상태를 보여준다', () => {
+    renderReceipt('host', { manageableHostTeam: true }, {}, []);
+    expect(screen.getByText('아직 결과가 없어요')).toBeInTheDocument();
+    expect(screen.getByText('운영자가 결과를 입력하면 여기에 표시돼요.')).toBeInTheDocument();
+  });
+
+  it('참가팀 멤버가 아니면 결과 대신 접근 제한 안내를 보여준다', () => {
+    renderReceipt('host', { participantMember: false }, {}, []);
+    expect(screen.getByText('참가팀만 볼 수 있어요')).toBeInTheDocument();
+    expect(screen.queryByText('아직 결과가 없어요')).not.toBeInTheDocument();
+  });
+
+  it('무효 처리된 결과는 무효 안내를 보여준다', () => {
+    renderReceipt('host', {}, {}, [revision({ state: 'VOID', reason: '오심 확인' })]);
+    expect(screen.getByText('이 결과는 무효 처리됐어요')).toBeInTheDocument();
+    // 무효 사유는 이 카드와 아래 변경 이력 두 곳에 함께 나온다.
+    expect(screen.getAllByText('오심 확인').length).toBeGreaterThan(0);
+  });
+
+  it('마감 전 + 미차단이면 D-day 배지와 이의 제기 버튼을 보여준다(권한 있음)', () => {
+    renderReceipt(
+      'host',
+      { manageableHostTeam: true },
+      { disputeDeadline: new Date(Date.now() + 3 * 86_400_000).toISOString(), disputeBlockedReason: null },
+      [revision({ state: 'OFFICIAL', score: { home: 2, away: 1 }, officialAt: '2026-08-01T00:00:00.000Z' })],
+    );
+    expect(screen.getByText(/^D-\d+$/)).toBeInTheDocument();
+    expect(screen.getByText('이의 제기')).toBeInTheDocument();
+  });
+
+  it('마감 전이어도 owner/manager가 아니면 이의 제기 버튼을 숨긴다', () => {
+    renderReceipt(
+      'host',
+      { manageableHostTeam: false, manageableOpponentTeam: false },
+      { disputeDeadline: new Date(Date.now() + 3 * 86_400_000).toISOString(), disputeBlockedReason: null },
+      [revision({ state: 'OFFICIAL', score: { home: 2, away: 1 }, officialAt: '2026-08-01T00:00:00.000Z' })],
+    );
+    expect(screen.queryByText('이의 제기')).not.toBeInTheDocument();
+  });
+
+  it('disputeBlockedReason=window_expired이면 회색 톤으로 기간 만료 안내를 보여준다', () => {
+    renderReceipt(
+      'host',
+      { manageableHostTeam: true },
+      { disputeBlockedReason: 'window_expired' },
+      [revision({ state: 'OFFICIAL', score: { home: 2, away: 1 }, officialAt: '2026-07-01T00:00:00.000Z' })],
+    );
+    expect(screen.getByText('이의 제기 기간이 지났어요')).toBeInTheDocument();
+    expect(screen.queryByText('이의 제기')).not.toBeInTheDocument();
+  });
+
+  it('disputeBlockedReason=promotion_committed이면 승강 확정 안내를 보여준다', () => {
+    renderReceipt(
+      'host',
+      { manageableHostTeam: true },
+      { disputeBlockedReason: 'promotion_committed' },
+      [revision({ state: 'OFFICIAL', score: { home: 2, away: 1 }, officialAt: '2026-08-01T00:00:00.000Z' })],
+    );
+    expect(screen.getByText('승강이 확정되어 이의를 제기할 수 없어요')).toBeInTheDocument();
+    expect(screen.queryByText('이의 제기')).not.toBeInTheDocument();
+  });
+
+  it('openDisputeExists=true이면 접수 확인 안내를 보여주고 버튼은 숨긴다', () => {
+    renderReceipt(
+      'host',
+      { manageableHostTeam: true },
+      { openDisputeExists: true },
+      [revision({ state: 'OFFICIAL', score: { home: 2, away: 1 }, officialAt: '2026-08-01T00:00:00.000Z' })],
+    );
+    expect(screen.getByText('접수된 이의를 운영자가 확인하고 있어요')).toBeInTheDocument();
+    expect(screen.queryByText('이의 제기')).not.toBeInTheDocument();
+  });
+
+  it('이의 제기 폼을 제출하면 올바른 사유로 mutation을 호출하고, 성공하면 접수 안내로 바뀐다', async () => {
+    fileDisputeMutateAsync.mockResolvedValue({ id: 'dispute-1', leagueId: 'league-1', teamMatchId: 'tm-1', status: 'open', createdAt: '2026-08-01T00:00:00.000Z' });
+    renderReceipt(
+      'host',
+      { manageableHostTeam: true },
+      { disputeDeadline: new Date(Date.now() + 3 * 86_400_000).toISOString(), disputeBlockedReason: null },
+      [revision({ state: 'OFFICIAL', score: { home: 2, away: 1 }, officialAt: '2026-08-01T00:00:00.000Z' })],
+    );
+
+    fireEvent.click(screen.getByText('이의 제기'));
+    fireEvent.change(screen.getByLabelText('이의 사유'), { target: { value: '심판 판정에 문제가 있었어요' } });
+    fireEvent.click(screen.getByText('이의 제기 보내기'));
+
+    await waitFor(() => expect(fileDisputeMutateAsync).toHaveBeenCalledWith({ reason: '심판 판정에 문제가 있었어요' }));
+    await waitFor(() => expect(screen.getByText('접수된 이의를 운영자가 확인하고 있어요')).toBeInTheDocument());
+  });
+
+  it('이의 제기가 서버에서 거부되면(409) 에러 메시지를 보여주고 폼은 유지한다', async () => {
+    fileDisputeMutateAsync.mockRejectedValue({ code: 'LEAGUE_RESULT_DISPUTE_ALREADY_OPEN', message: '이미 있음' });
+    renderReceipt(
+      'host',
+      { manageableHostTeam: true },
+      { disputeDeadline: new Date(Date.now() + 3 * 86_400_000).toISOString(), disputeBlockedReason: null },
+      [revision({ state: 'OFFICIAL', score: { home: 2, away: 1 }, officialAt: '2026-08-01T00:00:00.000Z' })],
+    );
+
+    fireEvent.click(screen.getByText('이의 제기'));
+    fireEvent.change(screen.getByLabelText('이의 사유'), { target: { value: '사유' } });
+    fireEvent.click(screen.getByText('이의 제기 보내기'));
+
+    await waitFor(() => expect(screen.getByText('이미 처리 대기 중인 이의가 있어요.')).toBeInTheDocument());
+    expect(screen.getByText('이의 제기 보내기')).toBeInTheDocument();
+  });
+});
+
 describe('scoreLabel', () => {
   // 스코어는 score.regulation 아래에 있다. 예전 구현은 score.home 을 읽어서 화면에
   // "undefined : undefined" 를 그렸는데, 목이 같은 잘못된 형태를 쓰고 있어 테스트는 초록이었다.
@@ -624,5 +826,24 @@ describe('scoreLabel', () => {
   it('renders the flat {home, away} shape this screen\'s own submissions actually produce', () => {
     const flatRevision = { score: { home: 3, away: 1 } } as unknown as V1GameResultRevision;
     expect(scoreLabel(flatRevision)).toBe('3 : 1');
+  });
+});
+
+
+describe('displayRevisionReason — 내부 마커 표시 제거', () => {
+  // 서버는 멱등 판정용으로 reason 앞에 [LEAGUE_RESULT_ENTRY]/[LEAGUE_RESULT_CORRECTION]
+  // 마커를 붙여 저장한다. 화면이 그걸 그대로 렌더해 내부 식별자가 사용자에게 노출됐다
+  // (2026-08-25 alpha 실측). 저장값은 못 바꾸므로 표시에서 벗긴다.
+  it('맨 앞의 대문자 마커를 벗기고 본문만 남긴다', async () => {
+    const { displayRevisionReason } = await import('./team-match-result.types');
+    expect(displayRevisionReason('[LEAGUE_RESULT_CORRECTION] 검증: 스코어 정정')).toBe('검증: 스코어 정정');
+    expect(displayRevisionReason('[LEAGUE_RESULT_ENTRY] 1주차 입력')).toBe('1주차 입력');
+  });
+
+  it('마커가 없거나 사용자가 쓴 소문자 대괄호 사유는 건드리지 않는다', async () => {
+    const { displayRevisionReason } = await import('./team-match-result.types');
+    expect(displayRevisionReason('상대 요청으로 정정')).toBe('상대 요청으로 정정');
+    expect(displayRevisionReason('[비고] 우천 단축')).toBe('[비고] 우천 단축');
+    expect(displayRevisionReason(null)).toBe('');
   });
 });

@@ -10,7 +10,9 @@ import {
   useV1UpdateAdminRole,
 } from '@/hooks/use-v1-api';
 import { v1Get } from '@/lib/api-client';
+import { formatAdminDate } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
+import { useAdminListQuery } from '@/hooks/use-admin-list-query';
 import {
   AdminPageHeader,
   AdminFilterBar,
@@ -31,20 +33,6 @@ const ADMIN_STATUS_FILTER_OPTIONS = [
   { value: 'revoked', label: '회수' },
 ];
 
-// ── Date formatter ─────────────────────────────────────────────────────────
-function formatDateCompact(dateStr: string | null | undefined): string {
-  if (!dateStr) return '—';
-  try {
-    const d = new Date(dateStr);
-    const y = d.getFullYear();
-    const mo = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}.${mo}.${day}`;
-  } catch {
-    return '—';
-  }
-}
-
 function formatUserTitle(row: {
   nickname: string | null;
   displayName: string | null;
@@ -60,7 +48,7 @@ function formatUserTitle(row: {
 function AdminRoleBadge({ role }: { role: 'owner' | 'ops' | 'support' }) {
   if (role === 'owner') {
     return (
-      <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 text-[var(--font-size-micro)] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap">
+      <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 text-[length:var(--font-size-micro)] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap">
         <ShieldCheck size={11} aria-hidden="true" />
         최고운영자
       </span>
@@ -68,7 +56,7 @@ function AdminRoleBadge({ role }: { role: 'owner' | 'ops' | 'support' }) {
   }
   if (role === 'ops') {
     return (
-      <span className="inline-flex items-center gap-1 bg-[var(--surface-soft)] text-[var(--text-body)] text-[var(--font-size-micro)] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap">
+      <span className="inline-flex items-center gap-1 bg-[var(--surface-soft)] text-[var(--text-body)] text-[length:var(--font-size-micro)] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap">
         <Shield size={11} aria-hidden="true" />
         운영
       </span>
@@ -76,7 +64,7 @@ function AdminRoleBadge({ role }: { role: 'owner' | 'ops' | 'support' }) {
   }
   // support
   return (
-    <span className="inline-flex items-center gap-1 bg-[var(--surface-soft)] text-[var(--text-muted)] text-[var(--font-size-micro)] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap">
+    <span className="inline-flex items-center gap-1 bg-[var(--surface-soft)] text-[var(--text-muted)] text-[length:var(--font-size-micro)] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap">
       <ShieldMinus size={11} aria-hidden="true" />
       지원
     </span>
@@ -236,7 +224,7 @@ function GrantModal({ open, onClose, onGrantSuccess }: GrantModalProps) {
           <div className="px-5 py-5 flex flex-col gap-4">
             {/* User search */}
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="grant-user-search" className="text-[var(--font-size-label)] font-semibold text-[var(--text-body)]">
+              <label htmlFor="grant-user-search" className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">
                 회원 검색
               </label>
               <EntityPicker
@@ -254,7 +242,7 @@ function GrantModal({ open, onClose, onGrantSuccess }: GrantModalProps) {
 
             {/* Role selection */}
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="grant-role" className="text-[var(--font-size-label)] font-semibold text-[var(--text-body)]">
+              <label htmlFor="grant-role" className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">
                 부여할 역할
               </label>
               <select
@@ -275,7 +263,7 @@ function GrantModal({ open, onClose, onGrantSuccess }: GrantModalProps) {
 
             {/* Reason */}
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="grant-reason" className="text-[var(--font-size-label)] font-semibold text-[var(--text-body)]">
+              <label htmlFor="grant-reason" className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">
                 부여 사유{' '}
                 <span className="text-red-500" aria-hidden="true">*</span>
                 <span className="sr-only">(필수)</span>
@@ -296,7 +284,7 @@ function GrantModal({ open, onClose, onGrantSuccess }: GrantModalProps) {
                 ].join(' ')}
                 aria-required="true"
               />
-              <p className="text-[var(--font-size-micro)] text-right text-gray-400 tabular-nums">
+              <p className="text-[length:var(--font-size-micro)] text-right text-gray-400 tabular-nums">
                 {reason.length} / 500
               </p>
             </div>
@@ -308,7 +296,7 @@ function GrantModal({ open, onClose, onGrantSuccess }: GrantModalProps) {
               type="button"
               onClick={() => !grantMutation.isPending && onClose()}
               disabled={grantMutation.isPending}
-              className="flex-1 h-[48px] rounded-xl text-[var(--font-size-body)] font-semibold text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+              className="flex-1 h-[48px] rounded-xl text-[length:var(--font-size-body)] font-semibold text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
             >
               취소
             </button>
@@ -316,7 +304,7 @@ function GrantModal({ open, onClose, onGrantSuccess }: GrantModalProps) {
               type="submit"
               disabled={!canSubmit}
               className={[
-                'flex-1 h-[48px] rounded-xl text-[var(--font-size-body)] font-semibold transition-colors',
+                'flex-1 h-[48px] rounded-xl text-[length:var(--font-size-body)] font-semibold transition-colors',
                 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                 canSubmit
                   ? 'bg-blue-500 text-white hover:bg-blue-600'
@@ -350,9 +338,11 @@ const PAGE_SIZE = 20;
 export default function AdminAdminsPage() {
   const { data: adminMe, isPending: mePending } = useV1AdminMe();
 
-  // 커서 누적 대신 페이지 단위 교체다 — 목록 어디쯤인지와 총량이 보여야 한다.
-  const [page, setPage] = useState(1);
-  const [activeStatus, setActiveStatus] = useState('');
+  // 검색 debounce·상태 필터·page 리셋·페이지네이션 조립은 공용 훅이 담당한다.
+  // (이 페이지는 검색 미지원이라 hideSearch 유지 — 훅의 상태 필터·페이지 리셋만 쓴다.)
+  const { activeStatus, setActiveStatus, filters, buildPagination } = useAdminListQuery({
+    pageSize: PAGE_SIZE,
+  });
 
   // Modal state
   const [grantModalOpen, setGrantModalOpen] = useState(false);
@@ -368,15 +358,7 @@ export default function AdminAdminsPage() {
     isError,
     error,
     refetch,
-  } = useV1AdminAdmins({
-    ...(activeStatus ? { status: activeStatus } : {}),
-    page,
-    limit: PAGE_SIZE,
-  });
-
-  useEffect(() => {
-    setPage(1);
-  }, [activeStatus]);
+  } = useV1AdminAdmins(filters);
 
   // ── Loading / gate states ────────────────────────────────────────────────
   if (mePending) {
@@ -480,6 +462,7 @@ export default function AdminAdminsPage() {
   return (
     <>
       <AdminPageHeader
+        eyebrow="설정"
         title="관리자 관리"
         description="운영자·지원 권한을 부여하고 관리해요."
         action={
@@ -488,7 +471,7 @@ export default function AdminAdminsPage() {
             onClick={() => setGrantModalOpen(true)}
             className={[
               'inline-flex items-center justify-center gap-1.5 min-h-[44px] px-5 rounded-xl',
-              'bg-blue-500 hover:bg-blue-600 text-white text-[var(--font-size-body-sm)] font-semibold',
+              'bg-blue-500 hover:bg-blue-600 text-white text-[length:var(--font-size-body-sm)] font-semibold',
               'transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
             ].join(' ')}
           >
@@ -499,7 +482,7 @@ export default function AdminAdminsPage() {
       />
 
       <div className="flex flex-col gap-4">
-        <AdminFilterBar hideSearch searchValue={''} onSearchChange={setActiveStatus} statusOptions={statusOptions} activeStatus={activeStatus} onStatusChange={setActiveStatus} />
+        <AdminFilterBar hideSearch searchValue={''} onSearchChange={() => undefined} statusOptions={statusOptions} activeStatus={activeStatus} onStatusChange={setActiveStatus} />
 
         {/* Card list */}
         <AdminDataTable<V1AdminRow>
@@ -519,7 +502,7 @@ export default function AdminAdminsPage() {
                     {formatUserTitle(row)}
                   </span>
                   {row.email ? (
-                    <span className="block truncate text-[var(--font-size-micro)] text-[var(--text-muted)]" title={row.email}>
+                    <span className="block truncate text-[length:var(--font-size-micro)] text-[var(--text-muted)]" title={row.email}>
                       {row.email}
                     </span>
                   ) : null}
@@ -548,7 +531,7 @@ export default function AdminAdminsPage() {
               width: 'w-[112px]',
               render: (row) => (
                 <span className="whitespace-nowrap text-[var(--text-muted)]">
-                  {formatDateCompact(row.grantedAt)}
+                  {formatAdminDate(row.grantedAt)}
                 </span>
               ),
             },
@@ -558,7 +541,7 @@ export default function AdminAdminsPage() {
               width: 'w-[112px]',
               render: (row) => (
                 <span className="whitespace-nowrap text-[var(--text-muted)]">
-                  {row.revokedAt ? formatDateCompact(row.revokedAt) : '—'}
+                  {row.revokedAt ? formatAdminDate(row.revokedAt) : '—'}
                 </span>
               ),
             },
@@ -577,7 +560,7 @@ export default function AdminAdminsPage() {
                       type="button"
                       onClick={() => setActionModal({ row, action: 'changeRole' })}
                       className={[
-                        'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[var(--font-size-label)] font-medium',
+                        'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[length:var(--font-size-label)] font-medium',
                         'text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors whitespace-nowrap',
                         'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                       ].join(' ')}
@@ -589,7 +572,7 @@ export default function AdminAdminsPage() {
                       type="button"
                       onClick={() => setActionModal({ row, action: 'revoke' })}
                       className={[
-                        'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[var(--font-size-label)] font-medium',
+                        'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[length:var(--font-size-label)] font-medium',
                         'text-[var(--red700)] bg-[var(--red50)] hover:bg-red-100 transition-colors whitespace-nowrap',
                         'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                       ].join(' ')}
@@ -604,7 +587,7 @@ export default function AdminAdminsPage() {
                     type="button"
                     onClick={() => setActionModal({ row, action: 'reactivate' })}
                     className={[
-                      'inline-flex items-center justify-center gap-1 min-h-[44px] px-3 rounded-lg text-[var(--font-size-label)] font-medium',
+                      'inline-flex items-center justify-center gap-1 min-h-[44px] px-3 rounded-lg text-[length:var(--font-size-label)] font-medium',
                       'text-[var(--blue700)] bg-[var(--blue50)] hover:bg-blue-100 transition-colors whitespace-nowrap',
                       'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                     ].join(' ')}
@@ -627,18 +610,7 @@ export default function AdminAdminsPage() {
           error={errorMessage}
           onRetry={() => void refetch()}
           skeletonRows={5}
-          pagination={
-            pageInfo?.totalPages
-              ? {
-                  page: pageInfo.page ?? page,
-                  totalPages: pageInfo.totalPages,
-                  total: pageInfo.total ?? 0,
-                  limit: pageInfo.limit ?? PAGE_SIZE,
-                  onPageChange: setPage,
-                  loading: listFetching,
-                }
-              : undefined
-          }
+          pagination={buildPagination(pageInfo, listFetching)}
         />
       </div>
 

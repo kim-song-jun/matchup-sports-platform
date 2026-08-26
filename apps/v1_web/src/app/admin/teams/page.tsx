@@ -2,14 +2,16 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   useV1AdminTeams,
-  useV1AdminMe,
   useV1ChangeTeamStatus,
 } from '@/hooks/use-v1-api';
 import type { V1AdminTeamRow } from '@/types/api';
+import { formatAdminDate } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
-import { User, Users, Calendar } from 'lucide-react';
+import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
+import { useAdminListQuery } from '@/hooks/use-admin-list-query';
 import {
   AdminPageHeader,
   AdminDataTable,
@@ -21,20 +23,6 @@ import {
   useAdminToast,
   AdminToasts,
 } from '@/components/admin';
-
-// ── Helpers ───────────────────────────────────────────────────────────────
-
-function formatDate(dateStr: string): string {
-  try {
-    return new Intl.DateTimeFormat('ko-KR', {
-      year: 'numeric',
-      month: 'numeric',
-      day: 'numeric',
-    }).format(new Date(dateStr));
-  } catch {
-    return dateStr;
-  }
-}
 
 // ── Status filter options ─────────────────────────────────────────────────
 
@@ -56,46 +44,27 @@ const PAGE_SIZE = 20;
 // ── Page ──────────────────────────────────────────────────────────────────
 
 export default function AdminTeamsPage() {
+  const router = useRouter();
   // ── Admin capabilities ─────────────────────────────────────────────
-  const { data: adminMe } = useV1AdminMe();
-  const canWrite = adminMe?.capabilities.includes('status:write') ?? false;
+  const canWrite = useAdminCanWrite();
 
-  // ── Filter state ───────────────────────────────────────────────────
-  const [searchInput, setSearchInput] = useState('');
-  const [debouncedQ, setDebouncedQ] = useState('');
-  const [activeStatus, setActiveStatus] = useState('');
-
-  // ── Cursor pagination ──────────────────────────────────────────────
-  // 커서 누적 대신 페이지 단위 교체다 — 목록 어디쯤인지와 총량이 보여야 한다.
-  const [page, setPage] = useState(1);
+  // ── Filter state — 검색 debounce·상태 필터·page 리셋은 공용 훅이 담당 ─────
+  const {
+    search,
+    setSearch,
+    activeStatus,
+    setActiveStatus,
+    filters,
+    resetToFirstPage,
+    buildPagination,
+  } = useAdminListQuery({ pageSize: PAGE_SIZE });
 
   // URL searchParam pre-selection on mount
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const s = params.get('status') ?? '';
     if (s) setActiveStatus(s);
-  }, []);
-
-  // Debounce search input ~300ms
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedQ(searchInput), 300);
-    return () => clearTimeout(t);
-  }, [searchInput]);
-
-  // Reset pagination whenever an applied filter changes
-  useEffect(() => {
-    setPage(1);
-  }, [debouncedQ, activeStatus]);
-
-  const handleSearchChange = (value: string) => setSearchInput(value);
-  const handleStatusChange = (value: string) => setActiveStatus(value);
-
-  const filters = {
-    ...(debouncedQ ? { q: debouncedQ } : {}),
-    ...(activeStatus ? { status: activeStatus } : {}),
-    page,
-    limit: PAGE_SIZE,
-  };
+  }, [setActiveStatus]);
 
   const { data, isPending, isFetching, isError, error, refetch } = useV1AdminTeams(filters);
   const rows = data?.items ?? [];
@@ -121,7 +90,7 @@ export default function AdminTeamsPage() {
         onSuccess: () => {
           setModalRow(null);
           showToast('팀 상태를 변경했어요.', 'success');
-          setPage(1);
+          resetToFirstPage();
         },
         onError: (err) => {
           showToast(extractErrorMessage(err, '처리 중 오류가 발생했어요.'), 'error');
@@ -140,7 +109,7 @@ export default function AdminTeamsPage() {
   return (
     <>
       <AdminPageHeader
-        eyebrow="플랫폼 관리"
+        eyebrow="플랫폼"
         title="팀 관리"
         description="플랫폼 내 모든 팀의 상태를 검색하고 관리해요."
       />
@@ -150,17 +119,21 @@ export default function AdminTeamsPage() {
         <AdminFilterBar
           searchLabel="팀명 검색"
           searchPlaceholder="팀명 검색"
-          searchValue={searchInput}
-          onSearchChange={handleSearchChange}
+          searchValue={search}
+          onSearchChange={setSearch}
           statusOptions={statusOptions}
           activeStatus={activeStatus}
-          onStatusChange={handleStatusChange}
+          onStatusChange={setActiveStatus}
         />
 
         {/* Card list */}
         <AdminDataTable<V1AdminTeamRow>
           rows={rows}
           keyExtractor={(r) => r.teamId}
+          // 자매 목록(matches·team-matches)과 같은 행 진입 계약 — "상세 보기" 버튼으로만
+          // 진입 가능하던 유일한 목록 2개(users·teams) 중 하나였다.
+          onRowClick={(row) => router.push(`/admin/teams/${encodeURIComponent(row.teamId)}`)}
+          rowClickLabel={(row) => `${row.name} 상세 보기`}
           tableMaxWidth="max-w-none"
           rowTone={(row) =>
             row.status === 'suspended' || row.status === 'archived' ? 'warning' : undefined
@@ -211,7 +184,7 @@ export default function AdminTeamsPage() {
               header: '생성',
               width: 'w-[112px]',
               render: (row) => (
-                <span className="whitespace-nowrap text-[var(--text-muted)]">{formatDate(row.createdAt)}</span>
+                <span className="whitespace-nowrap text-[var(--text-muted)]">{formatAdminDate(row.createdAt)}</span>
               ),
             },
           ]}
@@ -221,7 +194,7 @@ export default function AdminTeamsPage() {
                 href={`/admin/teams/${row.teamId}`}
                 aria-label={`${row.name} 상세 보기`}
                 className={[
-                  'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[var(--font-size-label)] font-medium',
+                  'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[length:var(--font-size-label)] font-medium',
                   'text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--blue100)] transition-colors whitespace-nowrap',
                   'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                 ].join(' ')}
@@ -234,7 +207,7 @@ export default function AdminTeamsPage() {
                     onClick={() => setModalRow(row)}
                     aria-label={`${row.name} 상태 변경`}
                     className={[
-                      'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[var(--font-size-label)] font-medium',
+                      'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[length:var(--font-size-label)] font-medium',
                       'text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--border)] transition-colors whitespace-nowrap',
                       'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                     ].join(' ')}
@@ -254,18 +227,7 @@ export default function AdminTeamsPage() {
           error={errorMessage}
           onRetry={() => void refetch()}
           skeletonRows={8}
-          pagination={
-            pageInfo?.totalPages
-              ? {
-                  page: pageInfo.page ?? page,
-                  totalPages: pageInfo.totalPages,
-                  total: pageInfo.total ?? 0,
-                  limit: pageInfo.limit ?? PAGE_SIZE,
-                  onPageChange: setPage,
-                  loading: isFetching,
-                }
-              : undefined
-          }
+          pagination={buildPagination(pageInfo, isFetching)}
         />
 
         {/* Load more */}

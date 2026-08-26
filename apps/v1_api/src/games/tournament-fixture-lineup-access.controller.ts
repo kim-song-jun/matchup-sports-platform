@@ -26,6 +26,19 @@ export class TournamentFixtureLineupAccessController {
   }
 
   /**
+   * "이 기록은 제 것입니다" 화면이 쓰는 미연결 참가자 목록 (Task 154 P0-5).
+   * 인가는 신청 자격과 같은 스코프라, 볼 수만 있고 신청은 못 하는 사람이 생기지 않는다.
+   */
+  @Get('claimable-participants')
+  claimableParticipants(
+    @CurrentUser() user: V1AuthUser,
+    @Param('tournamentId') tournamentId: string,
+    @Param('fixtureId') fixtureId: string,
+  ) {
+    return this.gamesService.listClaimableParticipants(user, tournamentId, fixtureId);
+  }
+
+  /**
    * 라인업 편집기가 쓰는 참가 등록 명단. `sideId`로 어느 팀 명단인지 지정한다 —
    * 스태프는 양 팀 중 하나를 골라 대신 짤 수 있어서 "내 팀"만으로는 정해지지 않는다.
    */

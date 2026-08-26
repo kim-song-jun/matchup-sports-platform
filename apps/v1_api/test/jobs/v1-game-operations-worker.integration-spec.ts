@@ -268,12 +268,14 @@ describe('V1GameOperationsWorkerService database lease contract', () => {
     // Built-in handlers as of the outbox-handler cleanup task: GAME_RESULT_OFFICIAL,
     // GAME_RESULT_VOIDED, GAME_RESULT_SUBMITTED, GAME_RESULT_REVIEW_REMINDER,
     // GAME_RESULT_REVIEW_ESCALATION, and the three durable-audit-only handlers
-    // GAME_RESULT_REJECTED / GAME_RESULT_SUPPLEMENT_REQUESTED / GAME_RESULT_CHANGE_REQUESTED
-    // (the last one added this task -- see v1-game-operations-worker.service.ts's
-    // constructor) -- 8 total.
+    // GAME_RESULT_REJECTED / GAME_RESULT_SUPPLEMENT_REQUESTED / GAME_RESULT_CHANGE_REQUESTED,
+    // GAME_RESULT_LEAGUE_AUTO_APPROVE (D2, 리그 결과 24시간 자동 승인), and
+    // LEAGUE_RESULT_ENTRY_REMINDER (리그 대진 결과 미입력 +24시간 운영자 리마인더 -- see
+    // v1-game-operations-worker.service.ts's constructor), and IDENTITY_LINK_EXPIRY
+    // (신원 연결 요청 +24시간 만료 확정·신청자 통보) -- 11 total.
     await expect(service.getHealth()).resolves.toMatchObject({
       status: 'healthy',
-      registeredHandlers: 8,
+      registeredHandlers: 11,
       queue: {
         pending: 0,
         retry: 0,
@@ -286,7 +288,7 @@ describe('V1GameOperationsWorkerService database lease contract', () => {
     service.registerDurableAuditHandler('GAME_OPERATION_FLAG_CHANGED');
     await expect(service.getHealth()).resolves.toMatchObject({
       status: 'healthy',
-      registeredHandlers: 9,
+      registeredHandlers: 12,
     });
 
     await insertJob({ status: 'POISONED', attempts: 6 });

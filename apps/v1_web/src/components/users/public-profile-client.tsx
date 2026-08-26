@@ -1,10 +1,12 @@
 'use client';
 
 import Link from 'next/link';
+import { formatTournamentDateShort } from '@/lib/date-utils';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
-import { useV1PublicProfile } from '@/hooks/use-v1-api';
+import { useV1AuthMe, useV1PublicProfile } from '@/hooks/use-v1-api';
 import { cssUrl } from '@/lib/assets';
+import { PlayerCard } from './player-card';
 import { ShieldCheck, TrendingUp, Activity, Star, AlertCircle, ChevronRight } from 'lucide-react';
 import type { TrustState } from '@/types/api';
 
@@ -28,7 +30,12 @@ function trustConfig(trustState: TrustState) {
     default:
       return {
         label: '샘플',
-        description: '아직 검증된 활동 기록이 없어요. 매치·팀·대회에 참가해 보세요.',
+        // alpha 실화면(2026-08-24)에서 잡은 모순: 이 문구는 "활동이 없다"고 말하는데,
+        // 바로 아래 활동 요약 카드가 "2경기 · 2대회 · 3팀"을 보여준다. 한 화면에서 서로
+        // 다른 말을 한다. sample 상태의 실제 의미는 **후기가 모자라 신뢰 신호를 계산할 수
+        // 없다**는 것이고(이 카드 하단도 "매너 점수는 활동 후기를 기반으로 계산돼요"라고
+        // 적고 있다), 활동 유무와는 다른 축이다. 뜻하는 바를 그대로 쓴다.
+        description: '아직 받은 후기가 없어 신뢰 신호를 계산할 수 없어요. 경기 후 상호 평가가 쌓이면 표시돼요.',
         badgeClass: 'tm-badge tm-badge-grey',
         icon: <AlertCircle size={15} aria-hidden="true" />,
       };
@@ -37,6 +44,12 @@ function trustConfig(trustState: TrustState) {
 
 export function PublicProfilePageClient({ userId }: { userId: string }) {
   const profile = useV1PublicProfile(userId);
+  /**
+   * 본인 여부. 적대 검증(2026-08-25)에서 isOwner=false 하드코딩이 확정됐다 -- 주인이
+   * '내 프로필'로 자기 공개 프로필에 와도 남의 시점으로 렌더돼 진행도·해금 안내가
+   * 사라졌다. 세션 확인 실패(비로그인 4xx)는 곧 '본인 아님'이므로 재시도하지 않는다.
+   */
+  const authMe = useV1AuthMe({ retry: false });
 
   if (profile.isLoading) {
     return (
@@ -74,16 +87,79 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
   return (
     <AppChrome title="프로필" activeTab="teams" bottomNav={false} backHref="/teams" desktopHead>
       <div className="tm-my-shell">
-        {/* 헤더 — 아바타 + 이름 */}
-        <section className="tm-my-profile-head" aria-label="사용자 정보">
-          <div className="tm-my-avatar" style={avatarStyle}>{data.profileImageUrl ? null : initials}</div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <h1 className="tm-text-heading" style={{ margin: 0 }}>{data.displayName}</h1>
-            {data.nickname ? (
-              <div className="tm-text-caption" style={{ marginTop: 4 }}>@{data.nickname}</div>
-            ) : null}
-          </div>
-        </section>
+        {/* 선수 카드 + 신원 (Task 155, 신원 통합 스테이지 -- 마이페이지와 같은 규칙).
+            카드가 있으면 카드가 곧 프로필이다: 흰 헤더(아바타+이름)와 카드가 같은 말을
+            두 번 하지 않도록 이름·핸들은 스테이지 안 카드 아래로 들어간다.
+            숨김을 켠 사용자에게는 서버가 null 을 주므로 기존 헤더가 그대로 선다. */}
+        {data.playerCard ? (
+          <PlayerCard
+              card={data.playerCard}
+              displayName={data.displayName}
+              profileImageUrl={data.profileImageUrl}
+              teamName={data.teams?.[0]?.name ?? null}
+              isOwner={authMe.data?.user?.id === userId}
+              shareHref={`/users/${userId}/card`}
+              belowCardSlot={
+                <div className="tm-pcard-identity">
+                  <h1 className="tm-pcard-identity-name">{data.displayName}</h1>
+                  {data.nickname ? <div className="tm-pcard-identity-meta">@{data.nickname}</div> : null}
+                </div>
+              }
+            />
+        ) : (
+          <section className="tm-my-profile-head" aria-label="사용자 정보">
+            <div className="tm-my-avatar" style={avatarStyle}>{data.profileImageUrl ? null : initials}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <h1 className="tm-text-heading" style={{ margin: 0 }}>{data.displayName}</h1>
+              {data.nickname ? (
+                <div className="tm-text-caption" style={{ marginTop: 4 }}>@{data.nickname}</div>
+              ) : null}
+            </div>
+          </section>
+        )}
+
+        {/* 한 줄 소개 · 소속팀 (Task 154 P1)
+            기록이 0건인 프로필이 통계 카드 하나만 남아 완전히 비어 보이던 문제를 메운다.
+            둘 다 **있을 때만** 렌더한다 -- 빈 카드를 남기면 채우려던 문제를 오히려 키운다. */}
+        {data.bio ? (
+          <Card pad={16}>
+            <div className="tm-text-body" style={{ whiteSpace: 'pre-wrap', wordBreak: 'keep-all' }}>
+              {data.bio}
+            </div>
+          </Card>
+        ) : null}
+        {/* 최근 활동 한 줄 (Task 154 P2-3). 새로 공개되는 정보가 아니라 기록 목록에
+            이미 있는 값을 앞으로 당긴 것이다 -- 같은 게이트를 통과한 것만 서버가 준다. */}
+        {data.recentActivity ? (
+          <Card pad={16}>
+            <div className="tm-text-label" style={{ marginBottom: 6 }}>최근 활동</div>
+            <div className="tm-text-body">
+              {data.recentActivity.teamName}
+              {data.recentActivity.jerseyNumber !== null ? ` · ${data.recentActivity.jerseyNumber}번` : ''}
+              {data.recentActivity.position ? ` · ${data.recentActivity.position}` : ''}
+            </div>
+            <div className="tm-text-caption" style={{ marginTop: 4 }}>
+              {formatTournamentDateShort(data.recentActivity.playedAt)}
+            </div>
+          </Card>
+        ) : null}
+        {data.teams && data.teams.length > 0 ? (
+          <Card pad={16}>
+            <div className="tm-text-label" style={{ marginBottom: 10 }}>소속팀</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {data.teams.map((team) => (
+                <Link
+                  key={team.id}
+                  href={`/teams/${team.id}`}
+                  className="tm-btn tm-btn-sm tm-btn-neutral"
+                  style={{ minHeight: 44, textDecoration: 'none' }}
+                >
+                  {team.name}
+                </Link>
+              ))}
+            </div>
+          </Card>
+        ) : null}
 
         {/* 신뢰 신호 카드 */}
         <Card pad={16}>

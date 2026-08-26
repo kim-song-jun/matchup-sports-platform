@@ -64,6 +64,31 @@ export function formatTournamentDateTimeShort(dateStr: string | null | undefined
 }
 
 /**
+ * 홍보 슬롯용 중간 형식: 'M월 D일 (요일)'
+ * 홈·대회 목록 홍보 카드처럼 한눈에 읽혀야 하는 자리에서 사용해요 — 연도는 빼고
+ * 월/일을 한글로 적어 compact 형식('M/D (요일)')보다 잘 읽힌다.
+ * dateStr 이 없거나 invalid 이면 null 반환.
+ */
+export function formatTournamentDateMedium(dateStr: string | null | undefined): string | null {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return null;
+  return `${d.getMonth() + 1}월 ${d.getDate()}일 (${WEEKDAYS[d.getDay()]})`;
+}
+
+/** 여러 날에 걸친 대회를 'M월 D일 (요일)~M월 D일 (요일)'로 적는다. 하루면 시작일만 준다. */
+export function formatTournamentDateRangeMedium(
+  startStr: string | null | undefined,
+  endStr: string | null | undefined,
+): string | null {
+  const start = formatTournamentDateMedium(startStr);
+  if (!start) return null;
+  const end = formatTournamentDateMedium(endStr);
+  if (!end || end === start) return start;
+  return `${start}~${end}`;
+}
+
+/**
  * 상세 슬롯용 긴 형식: 'YYYY년 M월 D일 (요일)'
  * 대회 상세 페이지에서 사용해요.
  * dateStr 이 없거나 invalid 이면 '날짜 미정' 반환.
@@ -157,13 +182,56 @@ export function formatEntryFee(fee: number): string {
 
 /**
  * 관리자 운영 화면 공용 일시 포맷터: 'YYYY.M.D HH:MM'
- * 대회 도메인 밖의 관리자 로그/운영 테이블(예: 웹 푸시 실패 로그)에서 사용해요.
- * dateStr 이 없거나 invalid 이면 원본 문자열을 그대로 반환.
+ * 대회 도메인 밖의 관리자 로그/운영 테이블·상세 화면에서 사용해요.
+ * 빈 값은 '—'(어드민 공통 폴백), invalid 는 원본 문자열을 그대로 반환.
+ *
+ * 한때 어드민 화면 11곳이 각자 로컬 포맷터를 재구현해 같은 페이지 쌍(목록/상세)
+ * 안에서도 포맷·폴백 문자('-' vs '—')가 갈렸다 — 이 3형제(일시/일시 짧은/날짜)로 수렴.
  */
-export function formatAdminDateTime(dateStr: string): string {
+export function formatAdminDateTime(dateStr: string | null | undefined): string {
+  if (!dateStr) return '—';
   const d = new Date(dateStr);
   if (Number.isNaN(d.getTime())) return dateStr;
   const hour = String(d.getHours()).padStart(2, '0');
   const minute = String(d.getMinutes()).padStart(2, '0');
   return `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()} ${hour}:${minute}`;
+}
+
+/**
+ * 연도 없는 목록용 일시: 'M.D HH:MM' — 목록 열은 폭이 좁아 연도를 의도적으로 뺀다
+ * (로그·최근 활동처럼 대부분 올해 데이터인 열). 상세 화면은 연도 포함 본판을 쓴다.
+ */
+export function formatAdminDateTimeShort(dateStr: string | null | undefined): string {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  const hour = String(d.getHours()).padStart(2, '0');
+  const minute = String(d.getMinutes()).padStart(2, '0');
+  return `${d.getMonth() + 1}.${d.getDate()} ${hour}:${minute}`;
+}
+
+/** formatAdminDateTime 의 날짜 전용 자매 — 어드민 목록의 가입일·생성일 열처럼 시각이 불필요한 곳 */
+export function formatAdminDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  return `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}`;
+}
+
+/**
+ * 리그 대진 timing 타임라인 공용: 경기별 시각 'HH:mm'. 경기 시각은 KST 벽시계 계약이라
+ * (서버가 KST 기준으로 배치한다) 실행 환경 타임존과 무관하게 Asia/Seoul로 고정한다.
+ * dateStr 이 invalid 이면 원본 문자열을 그대로 반환.
+ */
+export function formatKstTime(dateStr: string): string {
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  return d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Seoul' });
+}
+
+/** 리그 대진 timing 타임라인 공용: 매치데이 헤더 날짜 'M. D. (요일)' — 위와 같은 이유로 KST 고정. */
+export function formatKstDateShort(dateStr: string): string {
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric', weekday: 'short', timeZone: 'Asia/Seoul' });
 }

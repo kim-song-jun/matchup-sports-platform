@@ -14,6 +14,7 @@ import { useV1PushRegistration } from '@/hooks/use-v1-push-registration';
 import { cssUrl } from '@/lib/assets';
 import { extractErrorMessage } from '@/lib/error-message';
 import { clearStoredV1Session } from '@/lib/session-storage';
+import { isTeamOperatorRole } from '@/lib/team-role';
 import type { ThemePreference } from '@/lib/theme';
 import { myJoinApplicationStatusLabel, teamJoinApplicationStatusLabel, teamMemberStatusLabel } from '@/lib/v1-status-labels';
 import {
@@ -26,7 +27,6 @@ import {
   useV1DeclineTeamInvitation,
   useV1MyActivitySummary,
   useV1MyTeams,
-  useV1MyTeamMatches,
   useV1MyTournamentStaffAssignments,
   useV1MasterRegions,
   useV1MasterSports,
@@ -43,6 +43,8 @@ import {
   useV1TeamDetail,
   useV1TeamJoinApplications,
   useV1TeamMembers,
+  useV1Tournament,
+  useV1PlayerCardHidden,
   useV1TournamentRealNameVisibility,
   useV1UploadImages,
   useV1UpdateMyPreferences,
@@ -50,6 +52,9 @@ import {
   useV1UpdateProfile,
   useV1UpdateRecordConsent,
   useV1UpdateSettings,
+  useV1UpdatePlayerCardHidden,
+  useV1PlayerCardShape,
+  useV1UpdatePlayerCardShape,
   useV1UpdateTournamentRealNameVisibility,
   useV1WithdrawalRequest,
   useV1WithdrawMyJoinApplication,
@@ -58,20 +63,20 @@ import { usePendingIds } from '@/hooks/use-pending-ids';
 import { formatMonthDay, formatTournamentDateTimeLong } from '@/lib/date-utils';
 import { V1ApiError } from '@/lib/api-client';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
-import type { V1MyActivitySummary, V1MyJoinApplication, V1MyTeam, V1MyTeamMatch, V1Profile, V1ReceivedInvitation, V1Region, V1Settings, V1Sport, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
+import type { V1MyActivitySummary, V1MyJoinApplication, V1MyTeam, V1Profile, V1ReceivedInvitation, V1Region, V1Settings, V1Sport, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
 import {
   MyHomePageView,
   MyInvitationsPageView,
   MyJoinApplicationsPageView,
   SettingsPageView,
-  MyTeamDetailPageView,
   MyTeamMembersPageView,
   MyTeamsPageView,
 } from './my-page';
 import { ErrorState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
-import type { MyHomeViewModel, MyInvitationItem, MyJoinApplicationItem, MyJoinApplicationsViewModel, MyMember, MyTeam, MyTeamDetailViewModel, MyTeamMembersViewModel, MyTeamsViewModel } from './my.types';
+import type { MyHomeViewModel, MyInvitationItem, MyJoinApplicationItem, MyJoinApplicationsViewModel, MyMember, MyTeam, MyTeamMembersViewModel, MyTeamsViewModel } from './my.types';
 import { myHomeModel, settingsModel } from './my.view-model';
+import { RECORD_CONSENT_POLICY_HASH } from '@/lib/record-consent';
 
 type ProfileEditErrors = Partial<Record<'realName' | 'nickname' | 'email' | 'phone' | 'birthDate' | 'gender' | 'profileImage' | 'form', string>>;
 type DuplicateCheckState = {
@@ -113,6 +118,7 @@ export function MyHomePageClient() {
         ...myHomeModel,
         user: {
           ...myHomeModel.user,
+          userId: null,
           name: '—',
           handle: '—',
           region: '—',
@@ -271,44 +277,6 @@ export function MyJoinApplicationsPageClient() {
   );
 }
 
-export function MyTeamDetailPageClient({ teamId }: { teamId: string }) {
-  const query = useV1TeamDetail(teamId);
-  const teamMatches = useV1MyTeamMatches({ limit: 20 });
-
-  // 에러 상태: mock 폴백 없이 에러를 명시적으로 표시한다.
-  if (query.isError) {
-    return <ErrorState message="팀 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void query.refetch()} />;
-  }
-
-  // 로딩 중: data 부재 시 스켈레톤 대신 빈 모델을 사용 (MyTeamDetailPageView 내부 레이아웃 보존)
-  const team = query.data;
-  if (!team) {
-    return <MyTeamDetailPageView model={{ team: { id: teamId, name: '불러오는 중…', logo: '…', sport: '', region: '', role: 'member', roleLabel: '', members: 0, manner: '-', next: '', description: '' }, actions: [], recentMatches: [] }} />;
-  }
-
-  const viewerRole = team.viewer.role;
-  // #10: owner/manager에게만 운영 메뉴(멤버 관리, 팀 설정) 노출. viewer.role은 V1TeamDetail에 실제 존재함.
-  const canManage = isTeamOperatorRole(viewerRole);
-  const actions: MyTeamDetailViewModel['actions'] = [
-    { label: '팀매치 내역', sub: '최근 경기와 결과를 확인해요', href: '/team-matches', icon: 'ClipboardList' },
-    ...(canManage
-      ? [
-          { label: '멤버 관리', sub: '초대와 가입 신청을 검토해요', href: `/teams/${team.teamId}/members`, icon: 'Users' },
-          // #16: 공개 edit 페이지로 가되 from=my로 취소·저장 후 /teams/[id] 복귀 유도
-          { label: '팀 설정', sub: '소개, 조건, 공개 범위를 수정해요', href: `/teams/${team.teamId}/edit?from=my`, icon: 'Settings' },
-        ]
-      : []),
-  ];
-
-  const model: MyTeamDetailViewModel = {
-    team: toTeamDetailModel(team),
-    actions,
-    recentMatches: (teamMatches.data?.items ?? []).filter((match) => match.teamId === team.teamId).slice(0, 3).map(toMyTeamMatch),
-    chatHref: '/chat',
-  };
-
-  return <MyTeamDetailPageView model={model} />;
-}
 
 export function MyTeamMembersPageClient({ teamId }: { teamId: string }) {
   const [activeTab, setActiveTab] = useState<MyTeamMembersViewModel['activeTab']>('members');
@@ -384,6 +352,7 @@ export function ProfileEditPageClient() {
   const checkNickname = useV1CheckNickname();
   const [realName, setRealName] = useState('');
   const [nickname, setNickname] = useState('');
+  const [bio, setBio] = useState('');
   const [email, setEmail] = useState('');
   const [phoneDigits, setPhoneDigits] = useState('');
   const [birthDateDigits, setBirthDateDigits] = useState('');
@@ -408,6 +377,7 @@ export function ProfileEditPageClient() {
     if (!profile.data) return;
     setRealName(profile.data.profile.realName ?? '');
     setNickname(profile.data.profile.nickname ?? '');
+    setBio(profile.data.profile.bio ?? '');
     setEmail(profile.data.email ?? '');
     setPhoneDigits(profile.data.phone ?? '');
     setBirthDateDigits(profile.data.profile.birthDate ?? '');
@@ -533,12 +503,9 @@ export function ProfileEditPageClient() {
       return;
     }
 
-    if (file.size > 2 * 1024 * 1024) {
-      setFieldErrors((current) => ({ ...current, profileImage: '프로필 사진은 2MB 이하 이미지만 선택해 주세요.' }));
-      event.target.value = '';
-      return;
-    }
-
+    // 용량으로 거부하지 않는다(2026-08-25 사용자 확정). 2MB 를 넘는 사진은 업로드 훅이
+    // 자동으로 줄여 WebP 로 변환한다(`compressImagesForUpload`) -- 폰 사진(3~8MB)을
+    // 여기서 막으면 "사진을 올려도 안 된다"가 된다(실사용 보고).
     setUploadingProfileImage(true);
     try {
       const result = await uploadImages.mutateAsync([file]);
@@ -613,6 +580,7 @@ export function ProfileEditPageClient() {
       await update.mutateAsync({
         realName: realName.trim() || null,
         nickname: normalizedNickname,
+        bio: bio.trim() || null,
         email: normalizedEmail || null,
         profileImageUrl: profileImageUrl || null,
         phone: phoneDigits || null,
@@ -666,7 +634,7 @@ export function ProfileEditPageClient() {
                   제거
                 </button>
               ) : null}
-              <span className="tm-text-caption">{profileImageName || '이미지 1장, 2MB 이하'}</span>
+              <span className="tm-text-caption">{profileImageName || '이미지 1장 — 큰 사진은 자동으로 줄여 올려요'}</span>
             </div>
             {fieldErrors.profileImage ? <div className="tm-text-caption tm-auth-field-helper-error" style={{ marginTop: 6 }}>{fieldErrors.profileImage}</div> : null}
           </div>
@@ -683,6 +651,26 @@ export function ProfileEditPageClient() {
           />
           {fieldErrors.realName ? <span id="profile-realName-error" role="alert" className="tm-text-caption tm-auth-field-helper-error">{fieldErrors.realName}</span> : null}
         </label>
+        {/* 한 줄 소개 (Task 154 P1) -- 컬럼은 오래전부터 있었지만 저장 경로가 없어
+            프로덕션 245개 프로필 중 값이 들어간 게 1건뿐이었다. 300자 상한은 공개
+            프로필에서 카드 한 장에 접힘 없이 들어가는 분량 기준. */}
+        <div className="tm-create-field">
+          <label className="tm-text-label" htmlFor="v1-profile-bio">한 줄 소개</label>
+          <textarea
+            id="v1-profile-bio"
+            className="tm-input"
+            value={bio}
+            onChange={(event) => setBio(event.target.value)}
+            maxLength={300}
+            rows={3}
+            placeholder="어떤 선수인지 소개해 주세요"
+            style={{ resize: 'vertical', minHeight: 76 }}
+            aria-describedby="v1-profile-bio-counter"
+          />
+          <span id="v1-profile-bio-counter" className="tm-text-caption">
+            공개 프로필에 표시돼요 · {bio.length}/300
+          </span>
+        </div>
         <div className="tm-create-field">
           <label className="tm-text-label" htmlFor="v1-profile-nickname">닉네임</label>
           <span className="tm-auth-field-with-action">
@@ -1533,7 +1521,39 @@ export function NotificationSettingsPageClient() {
 // 지금은 v1 최초 버전이라 상수 하나로 고정한다 — 서버는 이 값을 그대로
 // V1UserRecordConsent.policyHash에 저장할 뿐 검증하지 않는다(신뢰 경계는 프론트가 아니라
 // "무엇에 동의했는지" 감사 로그 목적).
-const RECORD_CONSENT_POLICY_HASH = 'v1-public-record-consent-1';
+// 정책 해시는 홈 넛지 배너(Task 154 P0-3)와 공유한다 -- 두 곳이 다른 값을 보내면
+// 같은 동의가 서로 다른 문구에 동의한 것으로 기록된다.
+
+/**
+ * 알림에서 온 사람에게만 뜨는 맥락 배너 (Task 154 P0-6, 사용자 선택 A안).
+ *
+ * 이 설정 화면은 원래 맥락 없는 토글이다. 대회 명단에 올라 알림을 받고 들어온 사람에게
+ * "왜 지금 이걸 보고 있는지" 를 설명해 주지 않으면 그냥 나가버린다 -- 그래서 알림
+ * 딥링크가 실어 보낸 대회를 여기서 이름으로 되돌려 준다.
+ *
+ * 설정 메뉴로 직접 들어온 사람에게는 아무것도 렌더하지 않는다(파라미터가 없다).
+ * 대회 조회가 실패하거나 아직 로딩 중이면 이름 없이 "대회 명단" 으로만 말한다 --
+ * 배너가 사라졌다 나타나면 그 아래 토글 위치가 흔들려 오탭을 유발한다.
+ */
+function RecordConsentTournamentContext() {
+  const params = useSearchParams();
+  const fromTournament = params.get('from') === 'tournament';
+  const tournamentId = params.get('tournamentId') ?? '';
+  const tournament = useV1Tournament(fromTournament ? tournamentId : '');
+  if (!fromTournament) return null;
+  const title = tournament.data?.title;
+  return (
+    <Card pad={14} style={{ marginBottom: 8, background: 'var(--blue-soft)' }}>
+      <div className="tm-text-label" style={{ color: 'var(--blue700)' }}>
+        {title ? `"${title}" 명단에 올랐어요` : '대회 명단에 올랐어요'}
+      </div>
+      <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--blue700)' }}>
+        공개를 켜면 이 대회 기록이 프로필에 표시돼요. 켜지 않으면 나에게만 보여요.
+      </div>
+    </Card>
+  );
+}
+
 
 export function RecordConsentSettingsPageClient() {
   const consent = useV1RecordConsent();
@@ -1569,12 +1589,22 @@ export function RecordConsentSettingsPageClient() {
             </Link>
             <h1 className="tm-text-heading">경기 기록 공개</h1>
           </div>
+          <RecordConsentTournamentContext />
           <Card pad={14} style={{ marginBottom: 8 }}>
-            <div className="tm-text-label">공개 프로필에 경기 기록 표시</div>
+            {/* 이 카드는 **무엇이** 공개되는지만 답한다. "왜 지금 이 화면인지"는 위 대회
+                맥락 배너가, "지금 켜져 있는지 / 켜면 어떻게 되는지"는 아래 토글의
+                서브텍스트가 각각 맡는다 -- 셋이 같은 말을 반복하면(실측: 알림에서 들어온
+                화면에 "켜면 공개돼요"가 세 번 나왔다) 정작 무엇이 공개되는지는 아무도
+                말해주지 않는다.
+                경로(/users/:id/records)를 그대로 쓰던 문구는 지웠다. 사용자가 그 URL 을
+                직접 입력하는 일이 없으므로 화면 이름으로 말한다. */}
+            <div className="tm-text-label">공개되는 정보</div>
             <div className="tm-text-caption" style={{ marginTop: 4 }}>
-              팀 라인업에 내 계정으로 연결된 경기가 공개 활동 기록(/users/내ID/records)에 나타나요.
-              {/* 과거 경기까지 소급 공개된다는 게 이 기능의 핵심 조건 — 켜기 전에 반드시
-                  알아야 한다(사용자 명시 결정: "모두 그냥 다 보이게"). */}
+              내 프로필의 활동 기록에 출전 경기, 득점, 경고·퇴장, MVP 가 표시돼요.
+              팀 라인업에 내 계정으로 연결된 경기만 해당돼요.
+              {/* 소급 공개는 "무엇이 공개되는가"의 일부다(앞으로 것만이 아니라 과거 것도).
+                  켜기 전에 반드시 알아야 하는 조건이라(사용자 명시 결정) 여기 둔다 --
+                  아래 토글 서브텍스트에 있던 같은 말은 지웠다. 토글은 현재 상태만 말한다. */}
               {' '}켜면 지금까지 참가한 경기 기록도 함께 공개돼요.
             </div>
           </Card>
@@ -1602,7 +1632,7 @@ export function RecordConsentSettingsPageClient() {
                     ? '저장하는 중이에요…'
                     : granted
                       ? '지금 공개돼 있어요. 끄면 새 경기부터 다시 비공개예요.'
-                      : '지금은 비공개예요. 켜면 과거 경기까지 함께 공개돼요.'}
+                      : '지금은 비공개예요.'}
                 </div>
               </div>
               <span
@@ -1737,6 +1767,181 @@ export function TournamentRealNameVisibilitySettingsPageClient() {
         </div>
       </div>
     </AppChrome>
+  );
+}
+
+/**
+ * 선수 카드 숨김 설정 (Task 155).
+ *
+ * 카드는 게임화된 물건이라 거부감을 느끼는 사용자가 있다. 컬럼(`playerCardHidden`)은
+ * 그 탈출구로 만들었는데 **쓰는 경로가 없어 켤 수가 없었다** -- 이 화면이 그것을 연다.
+ *
+ * 켜면 마이페이지·공개 프로필·공유 화면에서 카드가 모두 사라진다(서버가 `playerCard: null`).
+ * 활동 기록과 프로필 자체는 그대로 남는다 -- 카드만 끄는 것이지 프로필을 숨기는 게 아니다.
+ */
+export function PlayerCardHiddenSettingsPageClient() {
+  const state = useV1PlayerCardHidden();
+  const update = useV1UpdatePlayerCardHidden();
+  const [toggleError, setToggleError] = useState(false);
+
+  if (state.isError) {
+    return (
+      <AppChrome title="선수 카드" activeTab="my" bottomNav={false} backHref="/my/settings" desktopHead>
+        <div className="tm-my-shell">
+          <ErrorState message="설정을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void state.refetch()} />
+        </div>
+      </AppChrome>
+    );
+  }
+
+  const hidden = Boolean(state.data?.hidden);
+  const toggle = () => {
+    setToggleError(false);
+    update.mutate({ hidden: !hidden }, { onError: () => setToggleError(true) });
+  };
+
+  return (
+    <AppChrome title="선수 카드" activeTab="my" bottomNav={false} backHref="/my/settings" desktopHead>
+      <div className="tm-my-shell">
+        <div className="tm-my-settings-desktop">
+          <div className="tm-desktop-page-head tm-show-desktop">
+            <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
+              <ChevronLeftIcon size={22} strokeWidth={2.5} />
+            </Link>
+            <h1 className="tm-text-heading">선수 카드</h1>
+          </div>
+          <Card pad={14} style={{ marginBottom: 8 }}>
+            <div className="tm-text-label">선수 카드 숨기기</div>
+            <div className="tm-text-caption" style={{ marginTop: 4 }}>
+              경기 기록으로 만든 카드예요. 숨기면 마이페이지·공개 프로필·공유 화면에서
+              카드가 보이지 않아요. 활동 기록과 프로필은 그대로 남아요 — 카드만 끄는 거예요.
+            </div>
+          </Card>
+          {toggleError ? (
+            <Card pad={14} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
+              <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
+              <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요.</div>
+            </Card>
+          ) : null}
+          <div className="tm-card" style={{ padding: 0 }}>
+            <button
+              className="tm-my-menu-row tm-pressable tm-noti-toggle-row"
+              onClick={toggle}
+              type="button"
+              disabled={state.isLoading || update.isPending}
+              role="switch"
+              aria-checked={hidden}
+              aria-label="선수 카드 숨기기"
+              style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+            >
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="tm-text-body">선수 카드 숨기기</div>
+                <div className="tm-text-caption" style={{ marginTop: 3 }}>
+                  {update.isPending
+                    ? '저장하는 중이에요…'
+                    : hidden
+                      ? '지금은 카드가 보이지 않아요. 끄면 다시 보여요.'
+                      : '지금은 카드가 보여요. 켜면 어디에도 표시되지 않아요.'}
+                </div>
+              </div>
+              <span
+                className="tm-text-caption"
+                style={{ minWidth: 24, textAlign: 'right', color: hidden ? 'var(--blue500)' : 'var(--text-caption)' }}
+                aria-hidden="true"
+              >
+                {hidden ? 'ON' : 'OFF'}
+              </span>
+              <span className={`tm-toggle ${hidden ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
+            </button>
+          </div>
+
+          <PlayerCardShapePicker />
+        </div>
+      </div>
+    </AppChrome>
+  );
+}
+
+/**
+ * 카드 모양 선택 (코스메틱 업적).
+ *
+ * 별도 화면을 만들지 않고 카드 설정 안에 둔다 -- 카드에 관한 설정이 두 곳으로 갈리면
+ * 사용자가 "카드 숨기기"와 "카드 모양"을 다른 기능으로 오해한다.
+ *
+ * 잠긴 모양도 **목록에서 지우지 않고 자물쇠로 보여준다.** 안 보이면 존재를 모르고,
+ * 존재를 몰라야 할 이유가 없다 -- 오히려 다음 목표가 되는 게 이 기능의 목적이다.
+ */
+function PlayerCardShapePicker() {
+  const state = useV1PlayerCardShape();
+  const update = useV1UpdatePlayerCardShape();
+  const [saveError, setSaveError] = useState(false);
+
+  const shape = state.data?.shape ?? 'rect';
+  const unlocked = state.data?.unlocked ?? ['rect'];
+  const reviewCount = state.data?.reviewCount ?? 0;
+  const required = state.data?.requiredForShield ?? 10;
+
+  const options: { key: 'rect' | 'shield'; label: string; sub: string }[] = [
+    { key: 'rect', label: '네모', sub: '기본 카드예요' },
+    {
+      key: 'shield',
+      label: '방패',
+      sub: unlocked.includes('shield')
+        ? '업적으로 열린 모양이에요'
+        : `후기 ${required}개를 받으면 열려요 (지금 ${reviewCount}개)`,
+    },
+  ];
+
+  return (
+    <>
+      <Card pad={14} style={{ marginTop: 14, marginBottom: 8 }}>
+        <div className="tm-text-label">카드 모양</div>
+        <div className="tm-text-caption" style={{ marginTop: 4 }}>
+          모양은 꾸미기예요 — 능력치나 등급은 바뀌지 않아요.
+        </div>
+      </Card>
+      {saveError ? (
+        <Card pad={14} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
+          <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
+          <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요.</div>
+        </Card>
+      ) : null}
+      <div className="tm-card" style={{ padding: 0 }}>
+        {options.map((opt) => {
+          const locked = !unlocked.includes(opt.key);
+          const selected = shape === opt.key;
+          return (
+            <button
+              key={opt.key}
+              className="tm-my-menu-row tm-pressable"
+              type="button"
+              disabled={locked || state.isLoading || update.isPending}
+              aria-pressed={selected}
+              aria-label={`카드 모양 ${opt.label}${locked ? ' (잠김)' : ''}`}
+              onClick={() => {
+                setSaveError(false);
+                update.mutate({ shape: opt.key }, { onError: () => setSaveError(true) });
+              }}
+              style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: locked ? 'default' : 'pointer' }}
+            >
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="tm-text-body">
+                  {locked ? '🔒 ' : ''}{opt.label}
+                </div>
+                <div className="tm-text-caption" style={{ marginTop: 3 }}>{opt.sub}</div>
+              </div>
+              <span
+                className="tm-text-caption"
+                style={{ minWidth: 24, textAlign: 'right', color: selected ? 'var(--blue500)' : 'var(--text-caption)' }}
+                aria-hidden="true"
+              >
+                {selected ? '선택됨' : ''}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </>
   );
 }
 
@@ -1987,6 +2192,7 @@ function toMyHomeModel(
     sections,
     user: {
       ...myHomeModel.user,
+      userId: profile.userId,
       name: nickname,
       handle: `@${nickname}`,
       region: profile.regionName ?? '지역 미정',
@@ -2121,19 +2327,6 @@ function confirmAction(
   });
 }
 
-function toMyTeamMatch(match: V1MyTeamMatch): MyTeamDetailViewModel['recentMatches'][number] {
-  const status = match.status === 'completed' || match.status === 'expired' || match.status === 'cancelled' ? 'ended' : match.relation === 'requested' ? 'pending' : match.relation === 'approved' ? 'approved' : 'recruiting';
-  return {
-    id: match.teamMatchId,
-    title: match.title,
-    meta: `${new Date(match.startsAt).toLocaleString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false })} · ${match.sportName}`,
-    status,
-    statusLabel: status === 'pending' ? '승인 대기' : status === 'approved' ? '승인 완료' : status === 'ended' ? '종료' : '모집 중',
-    note: match.teamName ? `${match.teamName} 관련 팀매치예요.` : '내 팀 관련 팀매치예요.',
-    href: match.detailRoute,
-  };
-}
-
 function toMyInvitationItem(invitation: V1ReceivedInvitation, actionPending: boolean): MyInvitationItem {
   return {
     invitationId: invitation.invitationId,
@@ -2221,11 +2414,6 @@ function roleLabel(role: string) {
   if (role === 'member') return '멤버';
   return '비회원';
 }
-
-function isTeamOperatorRole(role?: string | null) {
-  return role === 'owner' || role === 'manager' || role === 'admin';
-}
-
 
 function hasTrustValue(value: string) {
   return value === 'verified' || value === 'estimated';

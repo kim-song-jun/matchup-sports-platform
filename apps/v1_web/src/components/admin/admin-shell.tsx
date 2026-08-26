@@ -2,10 +2,12 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useRef, useState, useCallback, type ReactNode } from 'react';
+import { Fragment, useEffect, useRef, useState, useCallback, type ReactNode } from 'react';
 import { useV1AdminInquiriesPendingCount } from '@/hooks/use-v1-api';
+import { CommandPalette } from './command-palette';
 import {
   LayoutDashboard,
+  Search,
   Users,
   Swords,
   UsersRound,
@@ -14,20 +16,16 @@ import {
   Medal,
   Activity,
   Megaphone,
-  PanelsTopLeft,
   MessageSquareText,
-  MessageSquareWarning,
-  ClipboardList,
   ShieldCheck,
   Settings,
-  Star,
   Send,
-  BellRing,
-  ScrollText,
   ChevronLeft,
   Menu,
   X,
   Radio,
+  Gauge,
+  Gavel,
 } from 'lucide-react';
 
 // ── Nav items (reviews/notifications removed per task-97 IA) ───────────────
@@ -40,28 +38,83 @@ interface NavItem {
   badgeCount?: number;
   /** Accessible description appended to the link's aria-label when badgeCount > 0, e.g. "미확인 문의 3건" */
   badgeAriaLabel?: string;
+  /**
+   * 같은 구획 안의 소구획 라벨. 값이 바뀌는 지점에 얇은 구분선과 캡션을 그린다.
+   *
+   * 구획을 하나 더 만들지 않고 소구획으로 나눈 이유: 사이드바는 이미 20개 넘는 항목 + 4구획
+   * 헤더라 헤더를 늘리면 1080p 에서 첫 화면에 보이는 항목이 더 줄어든다. '운영' 이라는
+   * 목적지 이름은 유지한 채 그 안에서 읽기와 쓰기를 가른다.
+   */
+  subgroup?: string;
+  /**
+   * 누르면 사용자에게 즉시 영향이 가는 항목(발송·킬스위치). 색만으로 알리지 않는다 —
+   * 소구획 캡션('제어 · 발송')이 글자로 같은 사실을 말하고, 톤은 그 위에 얹는 강조다.
+   */
+  tone?: 'control';
 }
 
-const BASE_NAV_ITEMS: NavItem[] = [
-  { label: '개요', href: '/admin', icon: <LayoutDashboard size={18} />, exact: true },
-  { label: '회원', href: '/admin/users', icon: <Users size={18} /> },
-  { label: '매치', href: '/admin/matches', icon: <Swords size={18} /> },
-  { label: '팀', href: '/admin/teams', icon: <UsersRound size={18} /> },
-  { label: '팀매치', href: '/admin/team-matches', icon: <Trophy size={18} /> },
-  { label: '리그', href: '/admin/team-match-series', icon: <ListOrdered size={18} /> },
-  { label: '대회', href: '/admin/tournaments', icon: <Medal size={18} /> },
-  { label: '대회 현장 운영', href: '/admin/ops/tournaments', icon: <Activity size={18} /> },
-  { label: '공지사항', href: '/admin/notices', icon: <Megaphone size={18} /> },
-  { label: '팝업', href: '/admin/popups', icon: <PanelsTopLeft size={18} /> },
-  { label: '약관', href: '/admin/terms', icon: <ScrollText size={18} /> },
-  { label: '문의', href: '/admin/inquiries', icon: <MessageSquareText size={18} /> },
-  { label: '감사 로그', href: '/admin/audit', icon: <ClipboardList size={18} /> },
-  { label: '웹 푸시 실패', href: '/admin/ops/push-failures', icon: <BellRing size={18} /> },
-  { label: 'SMS · 인증 실패', href: '/admin/ops/sms-failures', icon: <MessageSquareWarning size={18} /> },
-  { label: '연동 설정', href: '/admin/settings/integrations', icon: <Settings size={18} /> },
-  { label: '후기 정책', href: '/admin/settings/reviews', icon: <Star size={18} /> },
-  { label: '웹 푸시 발송', href: '/admin/ops/push-send', icon: <Send size={18} /> },
-  { label: '경기 운영 플래그', href: '/admin/ops/operation-flags', icon: <Radio size={18} /> },
+/**
+ * 사이드바 구획. `label`이 없는 그룹은 구획 헤더 없이 항목만 렌더된다(최상단 "개요").
+ *
+ * 19개 항목을 평면으로 나열하던 구조를 4구획으로 묶는다 — 성격이 다른 목적지(플랫폼 데이터
+ * 관리 / 콘텐츠 / 운영 도구 / 설정)가 같은 시각적 무게로 붙어 있어 운영자가 목적지를 기억으로
+ * 찾아야 했다. 항목 자체와 경로는 그대로라 이동 동선은 바뀌지 않는다.
+ */
+interface NavGroup {
+  /** 구획 헤더 텍스트. 없으면 헤더를 그리지 않는다. */
+  label?: string;
+  items: NavItem[];
+}
+
+const BASE_NAV_GROUPS: NavGroup[] = [
+  {
+    items: [
+      // '할 일'은 2026-08-25 대시보드(B안)로 흡수 — /admin 최상단 섹션. /admin/hub 는 리다이렉트.
+      { label: '대시보드', href: '/admin', icon: <LayoutDashboard size={18} />, exact: true },
+    ],
+  },
+  {
+    label: '플랫폼',
+    items: [
+      { label: '회원', href: '/admin/users', icon: <Users size={18} /> },
+      { label: '매치', href: '/admin/matches', icon: <Swords size={18} /> },
+      { label: '팀', href: '/admin/teams', icon: <UsersRound size={18} /> },
+      { label: '팀매치', href: '/admin/team-matches', icon: <Trophy size={18} /> },
+      // '리그 체계'는 2026-08-25 리그 허브(B안)로 흡수 — /admin/league-matches?tab=series.
+      // '결과 이의'는 사용자 확정(2026-08-24)대로 독립 유지.
+      { label: '정규 리그', href: '/admin/league-matches', icon: <ListOrdered size={18} /> },
+      { label: '결과 이의', href: '/admin/league-match-disputes', icon: <Gavel size={18} /> },
+      { label: '대회', href: '/admin/tournaments', icon: <Medal size={18} /> },
+    ],
+  },
+  {
+    label: '콘텐츠',
+    items: [
+      // 공지·팝업·약관은 2026-08-25 콘텐츠 허브(A안)로 흡수 — /admin/content 탭.
+      // 문의는 인박스 성격(미확인 뱃지·딥링크 필터)이라 독립 유지.
+      { label: '콘텐츠', href: '/admin/content', icon: <Megaphone size={18} /> },
+      { label: '문의', href: '/admin/inquiries', icon: <MessageSquareText size={18} /> },
+    ],
+  },
+  {
+    label: '운영',
+    items: [
+      // 살펴보는 화면(위)과 누르면 사용자에게 즉시 영향이 가는 화면(아래 '제어 · 발송')을
+      // 분리한다. 감시 4화면(에러·푸시 실패·SMS 실패·감사)은 2026-08-25 모니터링 허브
+      // (/admin/monitoring 탭)로 통합됐고 구 URL 은 리다이렉트로 보존된다.
+      { label: '대회 현장 운영', href: '/admin/ops/tournaments', icon: <Activity size={18} /> },
+      { label: '모니터링', href: '/admin/monitoring', icon: <Gauge size={18} /> },
+      { label: '웹 푸시 발송', href: '/admin/ops/push-send', icon: <Send size={18} />, subgroup: '제어 · 발송', tone: 'control' },
+      { label: '경기 운영 플래그', href: '/admin/ops/operation-flags', icon: <Radio size={18} />, subgroup: '제어 · 발송', tone: 'control' },
+    ],
+  },
+  {
+    label: '설정',
+    items: [
+      // 연동 설정·후기 정책은 2026-08-25 설정 허브(A안)로 흡수 — /admin/settings 탭.
+      { label: '설정', href: '/admin/settings', icon: <Settings size={18} /> },
+    ],
+  },
 ];
 
 const OWNER_NAV_ITEM: NavItem = {
@@ -82,6 +135,12 @@ interface AdminShellProps {
    * Should be set to `true` only for `adminRole === 'owner'`.
    */
   canManageAdmins?: boolean;
+  /**
+   * 표가 넓은 화면(대진 관리 등)에서 본문 폭 상한을 푼다.
+   * 기본값을 넓히지 않는 이유: 대부분의 어드민 화면은 텍스트 문단·폼이라 한 줄이 길어지면
+   * 오히려 읽기 어려워진다. 넓힐 이유가 있는 화면만 켠다.
+   */
+  wide?: boolean;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -90,17 +149,27 @@ function useIsActive(pathname: string) {
     item.exact ? pathname === item.href : pathname.startsWith(item.href);
 }
 
-/** Builds the nav list, optionally appending the owner-only item and the "문의" pending-count badge */
-function buildNavItems(canManageAdmins: boolean, pendingInquiryCount?: number): NavItem[] {
-  const items = canManageAdmins ? [...BASE_NAV_ITEMS, OWNER_NAV_ITEM] : [...BASE_NAV_ITEMS];
-  if (typeof pendingInquiryCount === 'number' && pendingInquiryCount > 0) {
-    return items.map((item) =>
-      item.href === '/admin/inquiries'
+/**
+ * Builds the grouped nav, appending the owner-only "관리자" item to the 설정 group and
+ * injecting the "문의" pending-count badge.
+ */
+function buildNavGroups(canManageAdmins: boolean, pendingInquiryCount?: number): NavGroup[] {
+  const hasBadge = typeof pendingInquiryCount === 'number' && pendingInquiryCount > 0;
+  return BASE_NAV_GROUPS.map((group) => {
+    const items = group.items.map((item) =>
+      hasBadge && item.href === '/admin/inquiries'
         ? { ...item, badgeCount: pendingInquiryCount, badgeAriaLabel: `미확인 문의 ${pendingInquiryCount}건` }
         : item,
     );
-  }
-  return items;
+    return group.label === '설정' && canManageAdmins
+      ? { ...group, items: [...items, OWNER_NAV_ITEM] }
+      : { ...group, items };
+  });
+}
+
+/** Flattens the grouped nav — used for pathname → label lookup. */
+function buildNavItems(canManageAdmins: boolean, pendingInquiryCount?: number): NavItem[] {
+  return buildNavGroups(canManageAdmins, pendingInquiryCount).flatMap((group) => group.items);
 }
 
 /** Current section label derived from pathname (for mobile appbar title) */
@@ -112,12 +181,36 @@ function useSectionLabel(pathname: string, canManageAdmins: boolean): string {
   return match?.label ?? '관리';
 }
 
+/**
+ * Sidebar / drawer section heading. Purely visual — the list semantics stay on the links.
+ *
+ * 높이를 아끼는 이유: 사이드바는 항목 19개(19×44px)만으로도 이미 1080p 뷰포트를 넘긴다.
+ * 구획 라벨을 44px(터치 타겟 크기)로 두면 4구획이 176px를 더해 넘침이 두 배가 된다 —
+ * 라벨은 클릭 대상이 아니므로 44px 규칙 대상이 아니고, 읽히는 최소 높이만 준다.
+ */
+function NavGroupLabel({ label }: { label: string }) {
+  return (
+    <p className="px-4 pt-3 pb-1 leading-none text-[length:var(--font-size-caption)] font-bold tracking-wide text-[var(--text-caption)]">
+      {label}
+    </p>
+  );
+}
+
+/** 구획 안의 소구획 캡션. 구획 헤더보다 한 단계 약하게 — 새 목적지가 아니라 경계 표시다. */
+function NavSubgroupLabel({ label }: { label: string }) {
+  return (
+    <p className="mt-2 border-t border-[var(--border)] px-4 pt-2 pb-1 leading-none text-[length:var(--font-size-micro)] font-semibold text-[var(--text-caption)]">
+      {label}
+    </p>
+  );
+}
+
 /** Numeric pill badge shown at the end of a nav link. Caps the visible number at 99+. */
 function NavBadge({ count }: { count: number }) {
   return (
     <span
       aria-hidden="true"
-      className="ml-auto inline-flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-full bg-blue-500 px-1.5 text-[var(--font-size-caption)] font-semibold leading-none text-white tabular-nums"
+      className="ml-auto inline-flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-full bg-blue-500 px-1.5 text-[length:var(--font-size-caption)] font-semibold leading-none text-white tabular-nums"
     >
       {count > 99 ? '99+' : count}
     </span>
@@ -140,7 +233,10 @@ function SidebarLink({ item, active }: { item: NavItem; active: boolean }) {
           : 'border-transparent text-[var(--text-muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--text-strong)]',
       ].join(' ')}
     >
-      <span className={active ? 'text-blue-500' : 'text-[var(--text-muted)]'} aria-hidden="true">
+      <span
+        className={active ? 'text-blue-500' : item.tone === 'control' ? 'text-[var(--orange700)]' : 'text-[var(--text-muted)]'}
+        aria-hidden="true"
+      >
         {item.icon}
       </span>
       <span>{item.label}</span>
@@ -174,7 +270,7 @@ function Drawer({
   triggerRef,
 }: DrawerProps) {
   const isActive = useIsActive(pathname);
-  const navItems = buildNavItems(canManageAdmins, pendingInquiryCount);
+  const navGroups = buildNavGroups(canManageAdmins, pendingInquiryCount);
   const panelRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -278,7 +374,7 @@ function Drawer({
         aria-hidden={!open}
         className={[
           'fixed inset-y-0 left-0 z-50 w-[280px] bg-[var(--card-surface)] flex flex-col',
-          'shadow-[var(--shadow-sidebar)]',
+          'shadow-[var(--shadow-drawer)]',
           'transition-transform motion-reduce:transition-none',
           open ? 'translate-x-0 visible' : '-translate-x-full invisible',
         ].join(' ')}
@@ -290,7 +386,7 @@ function Drawer({
             <span className="text-[15px] font-bold text-[var(--text-strong)]">Teameet 운영</span>
             {/* [알파 감사 C] ops shell 역할 배지 — 알파 실측 지적(10px → 12px). */}
             {adminRoleLabel && (
-              <span className="text-[var(--font-size-caption)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-1.5 py-0.5">
+              <span className="text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-1.5 py-0.5">
                 {adminRoleLabel}
               </span>
             )}
@@ -307,32 +403,50 @@ function Drawer({
 
         {/* Nav */}
         <nav className="flex-1 py-1.5 overflow-y-auto" aria-label="주 메뉴">
-          {navItems.map((item) => {
-            const active = isActive(item);
-            const hasBadge = typeof item.badgeCount === 'number' && item.badgeCount > 0;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-current={active ? 'page' : undefined}
-                aria-label={hasBadge && item.badgeAriaLabel ? `${item.label} (${item.badgeAriaLabel})` : undefined}
-                onClick={onClose}
-                className={[
-                  'flex items-center gap-3 px-4 py-3 min-h-[44px] text-sm transition-colors border-l-2',
-                  'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-[-2px]',
-                  active
-                    ? 'border-blue-500 bg-[var(--blue50)]/60 text-[var(--blue700)] font-semibold'
-                    : 'border-transparent text-[var(--text-muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--text-strong)]',
-                ].join(' ')}
-              >
-                <span className={active ? 'text-blue-500' : 'text-[var(--text-muted)]'} aria-hidden="true">
-                  {item.icon}
-                </span>
-                <span>{item.label}</span>
-                {hasBadge && <NavBadge count={item.badgeCount!} />}
-              </Link>
-            );
-          })}
+          {navGroups.map((group, index) => (
+            <div
+              key={group.label ?? `nav-group-${index}`}
+              role={group.label ? 'group' : undefined}
+              aria-label={group.label}
+            >
+              {group.label && <NavGroupLabel label={group.label} />}
+              {group.items.map((item, itemIndex) => {
+                const active = isActive(item);
+                const hasBadge = typeof item.badgeCount === 'number' && item.badgeCount > 0;
+                const subgroupStart =
+                  item.subgroup && item.subgroup !== group.items[itemIndex - 1]?.subgroup
+                    ? item.subgroup
+                    : null;
+                return (
+                  <Fragment key={item.href}>
+                  {subgroupStart && <NavSubgroupLabel label={subgroupStart} />}
+                  <Link
+                    href={item.href}
+                    aria-current={active ? 'page' : undefined}
+                    aria-label={hasBadge && item.badgeAriaLabel ? `${item.label} (${item.badgeAriaLabel})` : undefined}
+                    onClick={onClose}
+                    className={[
+                      'flex items-center gap-3 px-4 py-3 min-h-[44px] text-sm transition-colors border-l-2',
+                      'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-[-2px]',
+                      active
+                        ? 'border-blue-500 bg-[var(--blue50)]/60 text-[var(--blue700)] font-semibold'
+                        : 'border-transparent text-[var(--text-muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--text-strong)]',
+                    ].join(' ')}
+                  >
+                    <span
+                      className={active ? 'text-blue-500' : item.tone === 'control' ? 'text-[var(--orange700)]' : 'text-[var(--text-muted)]'}
+                      aria-hidden="true"
+                    >
+                      {item.icon}
+                    </span>
+                    <span>{item.label}</span>
+                    {hasBadge && <NavBadge count={item.badgeCount!} />}
+                  </Link>
+                  </Fragment>
+                );
+              })}
+            </div>
+          ))}
         </nav>
 
         {/* Footer */}
@@ -355,15 +469,28 @@ function Drawer({
 }
 
 // ── Shell ─────────────────────────────────────────────────────────────────
-export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmins = false }: AdminShellProps) {
+export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmins = false, wide = false }: AdminShellProps) {
   const pathname = usePathname();
   const isActive = useIsActive(pathname);
   const { data: pendingInquiries } = useV1AdminInquiriesPendingCount();
-  const navItems = buildNavItems(canManageAdmins, pendingInquiries?.count);
+  const navGroups = buildNavGroups(canManageAdmins, pendingInquiries?.count);
   const sectionLabel = useSectionLabel(pathname, canManageAdmins);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   /** Ref for the hamburger button so focus can be restored when the drawer closes (WCAG 2.4.3) */
   const hamburgerRef = useRef<HTMLButtonElement>(null);
+
+  // ⌘K / Ctrl+K — 어드민 어디서든 전역 검색 팔레트를 연다
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setPaletteOpen(true);
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, []);
 
   const openDrawer = useCallback(() => setDrawerOpen(true), []);
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
@@ -387,17 +514,45 @@ export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmin
             <span className="text-[15px] font-bold text-[var(--text-strong)] leading-tight">Teameet 운영</span>
             {/* [알파 감사 C] ops shell 역할 배지 — 알파 실측 지적(10px → 12px). */}
             {adminRoleLabel && (
-              <span className="text-[var(--font-size-caption)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-1.5 py-0.5 w-fit mt-0.5">
+              <span className="text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-1.5 py-0.5 w-fit mt-0.5">
                 {adminRoleLabel}
               </span>
             )}
           </div>
         </div>
 
+        {/* 전역 검색 트리거 */}
+        <div className="px-3 pt-3">
+          <button
+            type="button"
+            onClick={() => setPaletteOpen(true)}
+            aria-label="전역 검색 열기 (Cmd+K)"
+            className="flex w-full items-center gap-2 min-h-[40px] rounded-lg border border-[var(--border)] bg-[var(--surface-soft)] px-3 text-[13px] text-[var(--text-muted)] hover:border-blue-300 hover:text-[var(--text-body)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+          >
+            <Search size={14} aria-hidden="true" />
+            <span className="flex-1 text-left">회원·팀·매치 검색</span>
+            <kbd className="rounded border border-[var(--border)] bg-[var(--card-surface)] px-1.5 py-0.5 text-[length:var(--font-size-micro)]">⌘K</kbd>
+          </button>
+        </div>
+
         {/* Nav */}
         <nav className="flex-1 py-1.5" aria-label="주 메뉴">
-          {navItems.map((item) => (
-            <SidebarLink key={item.href} item={item} active={isActive(item)} />
+          {navGroups.map((group, index) => (
+            <div
+              key={group.label ?? `nav-group-${index}`}
+              role={group.label ? 'group' : undefined}
+              aria-label={group.label}
+            >
+              {group.label && <NavGroupLabel label={group.label} />}
+              {group.items.map((item, itemIndex) => (
+                <Fragment key={item.href}>
+                  {item.subgroup && item.subgroup !== group.items[itemIndex - 1]?.subgroup && (
+                    <NavSubgroupLabel label={item.subgroup} />
+                  )}
+                  <SidebarLink item={item} active={isActive(item)} />
+                </Fragment>
+              ))}
+            </div>
           ))}
         </nav>
 
@@ -447,15 +602,24 @@ export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmin
           <span className="flex-1 text-center text-[15px] font-bold text-[var(--text-strong)]">
             {sectionLabel}
           </span>
-          {/* Right slot placeholder (keeps title centered) */}
-          <div className="w-[44px]" aria-hidden="true" />
+          {/* Right slot: 전역 검색 (제목 중앙 정렬 유지 — 좌측 햄버거와 같은 44px) */}
+          <button
+            type="button"
+            onClick={() => setPaletteOpen(true)}
+            aria-label="전역 검색 열기"
+            className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-[var(--text-muted)] hover:text-[var(--text-body)] hover:bg-[var(--surface-soft)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+          >
+            <Search size={19} aria-hidden="true" />
+          </button>
         </header>
 
         {/* Page content */}
         <main className="flex-1 px-4 md:px-6 lg:px-8 py-5 md:py-6 lg:py-8">
-          <div className="max-w-[1200px] xl:max-w-[1320px] mx-auto w-full">{children}</div>
+          <div className={`${wide ? 'max-w-none' : 'max-w-[1200px] xl:max-w-[1320px]'} mx-auto w-full`}>{children}</div>
         </main>
       </div>
+
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
     </div>
   );
 }

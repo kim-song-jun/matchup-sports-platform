@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { TeamMatchDetailPageClient } from '@/components/team-matches/team-matches-client';
 import { buildNoIndexMetadata, buildPublicMetadata, fetchPublicV1, metadataDescription } from '@/lib/seo';
 import type { V1TeamMatch } from '@/types/api';
@@ -22,6 +22,13 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function TeamMatchDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  if (!await fetchPublicV1<V1TeamMatch>(`/team-matches/${encodeURIComponent(id)}`)) notFound();
+  const teamMatch = await fetchPublicV1<V1TeamMatch>(`/team-matches/${encodeURIComponent(id)}`);
+  if (!teamMatch) notFound();
+  // 리그 대진은 리그 경기 상세로 보낸다 — 이 화면의 "상대팀 모집 → 신청 → 승인" 프레임은
+  // 상대가 이미 확정된 리그 경기와 맞지 않는다(상대팀 이름 자리에 "승인 완료"가 뜨던
+  // 2026-08-25 사용자 보고). 알림·목록 등 기존 /team-matches/:id 딥링크도 이 리다이렉트를
+  // 지나므로 링크 전수 교체 없이 착지 화면만 바뀐다. 라인업·결과·수정 하위 라우트는
+  // 별도 경로라 영향이 없다.
+  if (teamMatch.league) redirect(`/league-matches/${teamMatch.league.leagueId}/fixtures/${id}`);
   return <TeamMatchDetailPageClient teamMatchId={id} />;
 }

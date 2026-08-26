@@ -4,7 +4,17 @@ import { Prisma } from '@prisma/client';
 import { GameResultOfficialProjectionService } from '../game-operations/game-result-official-projection.service';
 import { GameResultVoidProjectionService } from '../game-operations/game-result-void-projection.service';
 import { GameResultSubmittedEscalationService } from './result-escalation/game-result-submitted-escalation.service';
+import { GameResultLeagueAutoApproveService } from './result-escalation/game-result-league-auto-approve.service';
+import {
+  LEAGUE_RESULT_ENTRY_REMINDER_TYPE,
+  LeagueResultEntryReminderService,
+} from './league-reminders/league-result-entry-reminder.service';
+import {
+  IDENTITY_LINK_EXPIRY_TYPE,
+  IdentityLinkExpiryService,
+} from './identity-link/identity-link-expiry.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { WebPushService } from '../notifications/web-push.service';
 
 export const GAME_OPERATION_RETRY_DELAYS_MS = [1_000, 5_000, 30_000, 120_000, 600_000] as const;
 export const GAME_OPERATION_LEASE_MS = 30_000;
@@ -26,6 +36,15 @@ export type GameOperationClaim = {
   version: number;
   leaseOwner: string;
   leaseUntil: Date;
+  /**
+   * 커밋 뒤에 실행할 부수효과를 담는 자리 (2026-08-26). 핸들러는 트랜잭션 **안에서**
+   * 돌기 때문에, 롤백할 수 없는 외부 발송(웹 푸시 등)을 거기서 바로 하면 트랜잭션이
+   * 뒤집혔을 때 "일어나지 않은 일"의 알림이 나간다. 여기 담아 두면 워커가 커밋 성공
+   * 직후에만 실행한다. 워커가 매 클레임마다 빈 배열로 채우므로 핸들러는 그냥 push 하면
+   * 된다(직접 클레임을 만들어 핸들러를 부르는 유닛 스펙에서는 없을 수 있다 —
+   * 그 경우 호출부가 즉시 실행으로 폴백한다).
+   */
+  afterCommit?: Array<() => void | Promise<void>>;
 };
 
 export type GameOperationHandler = (
@@ -60,12 +79,19 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
   constructor(
     private readonly prisma: PrismaService,
     @Optional() transactionTimeoutMs?: number,
+    // 리그 감사 그룹 A / R1: team_match_completed 알림의 Web Push best-effort 발송용.
+    // ScheduleReminderService(main.ts)가 WebPushService를 받는 것과 같은 이유로 optional이다 —
+    // 이 worktree/모듈 밖에서 `new V1GameOperationsWorkerService(prisma)` 형태로 직접 생성하는
+    // 기존 통합테스트 호출부가 다수 있어(예: test/tournaments/*.integration-spec.ts) 인자 없이도
+    // 계속 동작해야 한다. 실제 워커(v1-game-operations-worker.module.ts)에서는
+    // WorkerNotificationsModule이 내보내는 WebPushService가 DI로 자동 주입된다.
+    @Optional() private readonly webPush?: WebPushService,
   ) {
     this.transactionTimeoutMs = transactionTimeoutMs ?? GAME_OPERATION_TRANSACTION_TIMEOUT_MS;
     if (this.transactionTimeoutMs <= 0 || this.transactionTimeoutMs >= GAME_OPERATION_SHUTDOWN_MS) {
       throw new Error('Worker transaction timeout must be positive and shorter than shutdown grace');
     }
-    const officialProjection = new GameResultOfficialProjectionService();
+    const officialProjection = new GameResultOfficialProjectionService(this.webPush);
     this.registerHandler('GAME_RESULT_OFFICIAL', officialProjection.handler);
     const voidProjection = new GameResultVoidProjectionService();
     this.registerHandler('GAME_RESULT_VOIDED', voidProjection.handler);
@@ -73,6 +99,21 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
     this.registerHandler('GAME_RESULT_SUBMITTED', submittedEscalation.handler);
     this.registerHandler('GAME_RESULT_REVIEW_REMINDER', submittedEscalation.reminderHandler);
     this.registerHandler('GAME_RESULT_REVIEW_ESCALATION', submittedEscalation.escalationHandler);
+    // D2 (E2): 리그 팀매치 결과가 24시간 무응답이면 자동 승인. 위 12시간 알림과는
+    // 별개 잡이다 -- 이쪽은 실제 OFFICIAL 전이를 일으킨다.
+    const leagueAutoApprove = new GameResultLeagueAutoApproveService();
+    this.registerHandler('GAME_RESULT_LEAGUE_AUTO_APPROVE', leagueAutoApprove.handler);
+    // 사용자 확정: 리그 대진의 경기 시작 +24시간에도 결과 미입력(not_entered)이면
+    // active admin(owner/ops, support 제외) 전원에게 1회 알림. 스케줄은
+    // league-match-admin.service.ts의 generateFixtures/regenerateFixtures(대진 생성)와
+    // updateFixture(시작 시각 변경)가 건다 — league-result-entry-reminder.service.ts 참고.
+    const leagueResultEntryReminder = new LeagueResultEntryReminderService();
+    this.registerHandler(LEAGUE_RESULT_ENTRY_REMINDER_TYPE, leagueResultEntryReminder.handler);
+    // 신원 연결 요청은 24시간 뒤 만료된다 — 예전에는 다음 attest 시도 때에야 기록되는
+    // lazy 처리라 아무도 손대지 않으면 신청자가 결말을 알 수 없었다. 신청 시각 +24h 에
+    // 만료를 확정하고 신청자에게 통보한다(identity-link-expiry.service.ts).
+    const identityLinkExpiry = new IdentityLinkExpiryService(this.webPush);
+    this.registerHandler(IDENTITY_LINK_EXPIRY_TYPE, identityLinkExpiry.handler);
     // reject/request_supplement close their own review SLA synchronously in
     // the API command (TournamentResultReviewService.closeReviewSla, Task
     // 22); the durable audit handler here only needs to make the outbox's
@@ -374,6 +415,8 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
     heartbeatTimer.unref();
 
     const work = async () => {
+      // 커밋 뒤 부수효과 수집함 — 핸들러가 여기에 담고, 아래에서 커밋이 확정된 뒤에만 실행한다.
+      claim.afterCommit = [];
       try {
         await this.prisma.$transaction(async (tx) => {
           const locked = await this.lockClaim(tx, claim);
@@ -391,6 +434,23 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
         });
         claim.version += 1;
         this.completionCount += 1;
+        // 커밋이 확정된 뒤에만 외부 발송을 한다. 롤백된 트랜잭션의 알림이 나가는 것을
+        // 막는 유일한 지점이라, 실패해도 잡 결과에는 영향을 주지 않는다.
+        for (const effect of claim.afterCommit ?? []) {
+          const warn = (effectError: unknown) =>
+            this.logger.warn(
+              `after-commit effect failed for outbox job ${claim.id}: ${this.boundedError(effectError)}`,
+            );
+          try {
+            // 비동기 부수효과도 허용한다 — 잡을 붙잡지 않도록 await 하지 않지만,
+            // rejection 을 그냥 두면 unhandled rejection 이 되므로 catch 를 붙인다
+            // (Copilot 리뷰).
+            const outcome = effect();
+            if (outcome instanceof Promise) void outcome.catch(warn);
+          } catch (effectError: unknown) {
+            warn(effectError);
+          }
+        }
       } catch (error: unknown) {
         await this.fail(claim, error);
       } finally {

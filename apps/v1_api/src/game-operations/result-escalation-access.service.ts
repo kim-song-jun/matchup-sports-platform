@@ -147,7 +147,7 @@ export class ResultEscalationAccessService {
       SELECT
         escalation.id, escalation.result_revision_id AS "resultRevisionId",
         revision.game_id AS "gameId", fixture.tournament_id AS "tournamentId",
-        team_match.id AS "teamMatchId", team_match.series_id AS "seriesId",
+        team_match.id AS "teamMatchId", team_match.league_id AS "leagueId",
         escalation.kind::text AS kind, escalation.due_at AS "dueAt", escalation.status,
         escalation.ack_by_user_id AS "ackByUserId", escalation.resolved_by_user_id AS "resolvedByUserId",
         escalation.reason, escalation.version, escalation.created_at AS "createdAt", escalation.updated_at AS "updatedAt"

@@ -133,9 +133,7 @@ describe('TournamentsReadService', () => {
     v1Tournament: {
       findMany: jest.Mock;
       findFirst: jest.Mock;
-    };
-    v1TournamentPopup: {
-      findFirst: jest.Mock;
+      count: jest.Mock;
     };
     // 참가팀 식별 정보 통일 정책(fix/v1-publish)의 운영자·스태프 우회는
     // TournamentStaffAccessService(실제 구현)를 그대로 배선하므로, 그게 의존하는
@@ -148,6 +146,12 @@ describe('TournamentsReadService', () => {
     v1TournamentStaffAssignment: {
       findMany: jest.Mock;
     };
+    v1TournamentOverallStanding: {
+      findMany: jest.Mock;
+    };
+    v1TournamentFixture: {
+      findMany: jest.Mock;
+    };
   };
 
   beforeEach(async () => {
@@ -155,14 +159,18 @@ describe('TournamentsReadService', () => {
       v1Tournament: {
         findMany: jest.fn(),
         findFirst: jest.fn(),
-      },
-      v1TournamentPopup: {
-        findFirst: jest.fn().mockResolvedValue(null),
+        count: jest.fn().mockResolvedValue(0),
       },
       v1AdminUser: {
         findUnique: jest.fn().mockResolvedValue(null),
       },
       v1TournamentStaffAssignment: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      v1TournamentOverallStanding: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      v1TournamentFixture: {
         findMany: jest.fn().mockResolvedValue([]),
       },
     };
@@ -263,6 +271,76 @@ describe('TournamentsReadService', () => {
 
     const callArgs = prisma.v1Tournament.findMany.mock.calls[0][0];
     expect(callArgs.where.sportId).toBeUndefined();
+  });
+
+  // ─── list — 페이지 번호(데스크톱) ────────────────────────────────────────────
+
+  it('list: page=3 → skip=(page-1)*limit, cursor 는 쓰지 않는다', async () => {
+    prisma.v1Tournament.findMany.mockResolvedValue([]);
+
+    await service.list({ page: 3, limit: 20 });
+
+    const callArgs = prisma.v1Tournament.findMany.mock.calls[0][0];
+    expect(callArgs.skip).toBe(40);
+    expect(callArgs.cursor).toBeUndefined();
+  });
+
+  it('list: page 와 cursor 가 함께 오면 page 가 이긴다', async () => {
+    prisma.v1Tournament.findMany.mockResolvedValue([]);
+
+    await service.list({ page: 2, cursor: 'cursor-id', limit: 10 });
+
+    const callArgs = prisma.v1Tournament.findMany.mock.calls[0][0];
+    expect(callArgs.skip).toBe(10);
+    expect(callArgs.cursor).toBeUndefined();
+  });
+
+  it('list: page 요청이면 전체 건수를 세어 totalPages/hasPrev 를 채운다', async () => {
+    prisma.v1Tournament.findMany.mockResolvedValue([tournamentCard({ id: 't-1' })]);
+    prisma.v1Tournament.count.mockResolvedValue(42);
+
+    const result = await service.list({ page: 2, limit: 20 });
+
+    expect(prisma.v1Tournament.count).toHaveBeenCalledTimes(1);
+    expect(result.pageInfo).toMatchObject({ page: 2, total: 42, totalPages: 3, hasPrev: true });
+  });
+
+  it('list: 커서(무한 스크롤) 요청에는 COUNT 를 돌리지 않는다', async () => {
+    prisma.v1Tournament.findMany.mockResolvedValue([]);
+
+    await service.list({ cursor: 'cursor-id', limit: 20 });
+
+    expect(prisma.v1Tournament.count).not.toHaveBeenCalled();
+  });
+
+  it('list: 커서 요청의 pageInfo 는 예전과 같은 두 필드만 갖는다', async () => {
+    // 통합 스펙(`test/integration/health.e2e-spec.ts`)이 이 응답 모양을 통째로 비교한다 —
+    // total 을 세지도 않고 `total: 0` 을 실어 보내면 "전체 0건"이라는 거짓말이 된다.
+    prisma.v1Tournament.findMany.mockResolvedValue([]);
+
+    const result = await service.list({});
+
+    expect(result.pageInfo).toEqual({ nextCursor: null, hasNext: false });
+  });
+
+  it('list: COUNT 필터는 목록 필터와 같은 where 를 쓴다', async () => {
+    prisma.v1Tournament.findMany.mockResolvedValue([]);
+    prisma.v1Tournament.count.mockResolvedValue(0);
+
+    await service.list({ page: 1, sportId: 'sport-uuid-1', status: 'in_progress' });
+
+    const listWhere = prisma.v1Tournament.findMany.mock.calls[0][0].where;
+    const countWhere = prisma.v1Tournament.count.mock.calls[0][0].where;
+    expect(countWhere).toEqual(listWhere);
+  });
+
+  it('list: 정렬은 createdAt 동률을 id 로 깨서 페이지 경계가 흔들리지 않게 한다', async () => {
+    prisma.v1Tournament.findMany.mockResolvedValue([]);
+
+    await service.list({ page: 1 });
+
+    const callArgs = prisma.v1Tournament.findMany.mock.calls[0][0];
+    expect(callArgs.orderBy).toEqual([{ createdAt: 'desc' }, { id: 'desc' }]);
   });
 
   // ─── get — not found / hidden ────────────────────────────────────────────────
@@ -959,39 +1037,98 @@ describe('TournamentsReadService', () => {
     expect(result.createdAt).toBe(new Date('2026-06-01T00:00:00.000Z').toISOString());
   });
 
-  // ─── get — tournament popup (Task 109 Track 8) ───────────────────────────────
+  // ─── getOverallStandings (Task 8, §6.2) ──────────────────────────────────────
 
-  it('get: includes null popup when no active tournament popup exists', async () => {
-    prisma.v1Tournament.findFirst.mockResolvedValue(fullTournamentRow());
-    prisma.v1TournamentPopup.findFirst.mockResolvedValue(null);
+  describe('getOverallStandings', () => {
+    const tournamentId = 'tournament-1';
 
-    const result = await service.get('tournament-1');
-
-    expect(result.popup).toBeNull();
-  });
-
-  it('get: includes the active published popup within its display window', async () => {
-    prisma.v1Tournament.findFirst.mockResolvedValue(fullTournamentRow());
-    prisma.v1TournamentPopup.findFirst.mockResolvedValue({
-      id: 'popup-1',
-      title: '얼리버드 신청 안내',
-      body: '7/31까지 신청하면 참가비 할인!',
-      imageUrl: '/uploads/tournaments/popup.webp',
+    beforeEach(() => {
+      prisma.v1Tournament.findFirst.mockResolvedValue({
+        id: tournamentId,
+        competitionConfig: { tieBreak: { points: { win: 3, draw: 1, loss: 0 } } },
+      });
+      prisma.v1TournamentOverallStanding.findMany.mockResolvedValue([
+        {
+          registrationId: 'reg-1',
+          position: 1,
+          points: 18,
+          wins: 6,
+          draws: 0,
+          losses: 1,
+          goalsFor: 22,
+          goalsAgainst: 9,
+          fairPlayPoints: 3,
+          recalculatedAt: new Date('2026-08-17T10:00:00.000Z'),
+          registration: {
+            team: { name: 'FC 서울' },
+            // 실제 select에는 없는 필드지만, 이후 실수로 select를 넓혀도 응답에
+            // 새지 않는지 방어적으로 검증하기 위해 mock에 PII를 함께 심어 둔다.
+            appliedByUser: {
+              profile: { realName: '홍길동', phone: '010-1234-5678', birthDate: '1990-01-01' },
+            },
+          },
+        },
+        {
+          registrationId: 'reg-2',
+          position: 2,
+          points: 10,
+          wins: 3,
+          draws: 1,
+          losses: 3,
+          goalsFor: 12,
+          goalsAgainst: 15,
+          fairPlayPoints: 5,
+          recalculatedAt: new Date('2026-08-17T10:00:00.000Z'),
+          registration: { team: { name: 'FC 부산' } },
+        },
+      ]);
+      prisma.v1TournamentFixture.findMany.mockResolvedValue([
+        {
+          homeRegistrationId: 'reg-1',
+          awayRegistrationId: 'reg-2',
+          game: { currentOfficialRevision: { state: 'OFFICIAL' } },
+          result: null,
+        },
+        {
+          homeRegistrationId: 'reg-1',
+          awayRegistrationId: 'reg-2',
+          game: null,
+          result: null,
+        },
+      ]);
     });
 
-    const result = await service.get('tournament-1');
+    it('통합 순위·진행률·매직넘버를 반환한다', async () => {
+      const result = await service.getOverallStandings(tournamentId);
 
-    expect(result.popup).toEqual({
-      popupId: 'popup-1',
-      title: '얼리버드 신청 안내',
-      body: '7/31까지 신청하면 참가비 할인!',
-      imageUrl: '/uploads/tournaments/popup.webp',
+      expect(result.standings).toHaveLength(2);
+      expect(result.standings[0]).toMatchObject({
+        registrationId: 'reg-1',
+        teamName: 'FC 서울',
+        position: 1,
+        points: 18,
+      });
+      expect(result.standings[1]).toMatchObject({ registrationId: 'reg-2', teamName: 'FC 부산' });
+      expect(result.progress).toEqual({ total: 2, played: 1, remaining: 1, percent: 50 });
+      // 2위(reg-2) 최대 = 10 + 1(잔여) * 3(승점) = 13, 1위(reg-1) 현재 18 → 확정
+      expect(result.magicNumber).toEqual({ registrationId: 'reg-1', value: 0, clinched: true });
+      expect(result.recalculatedAt).toBe('2026-08-17T10:00:00.000Z');
     });
 
-    const callArgs = prisma.v1TournamentPopup.findFirst.mock.calls[0][0];
-    expect(callArgs.where).toMatchObject({
-      tournamentId: 'tournament-1',
-      status: 'published',
+    it('대회를 찾을 수 없으면 404 TOURNAMENT_NOT_FOUND를 던진다', async () => {
+      prisma.v1Tournament.findFirst.mockResolvedValue(null);
+
+      await expect(service.getOverallStandings('ghost')).rejects.toMatchObject({
+        response: { code: 'TOURNAMENT_NOT_FOUND' },
+      });
+    });
+
+    it('통합 순위 응답에 선수 개인정보가 포함되지 않는다', async () => {
+      const result = await service.getOverallStandings(tournamentId);
+      const serialized = JSON.stringify(result);
+      expect(serialized).not.toContain('realName');
+      expect(serialized).not.toContain('birthDate');
+      expect(serialized).not.toContain('phone');
     });
   });
 });

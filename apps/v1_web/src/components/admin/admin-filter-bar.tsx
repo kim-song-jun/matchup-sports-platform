@@ -20,6 +20,11 @@ interface AdminFilterBarProps {
   /** 검색 입력란을 숨긴다. 백엔드가 q 파라미터를 지원하지 않는 페이지에서 사용 */
   hideSearch?: boolean;
   statusOptions?: StatusOption[];
+  /**
+   * 칩 그룹의 스크린리더 라벨. 칩이 상태가 아닌 다른 축(체계·대상 유형 등)을 거를 때
+   * 기본값 "상태 필터"가 잘못된 의미로 읽히므로 화면이 실제 의미를 지정한다.
+   */
+  statusGroupLabel?: string;
   activeStatus?: string;
   onStatusChange?: (value: string) => void;
   /** Optional content injected to the right of the chips row */
@@ -34,6 +39,7 @@ export function AdminFilterBar({
   onSearchChange,
   hideSearch = false,
   statusOptions,
+  statusGroupLabel = '상태 필터',
   activeStatus,
   onStatusChange,
   rightSlot,
@@ -42,7 +48,8 @@ export function AdminFilterBar({
 
   return (
     <div className="flex flex-col gap-2.5">
-      {/* Search row — hideSearch=true인 경우(백엔드 q 미지원) 렌더 생략 */}
+      {/* Search row — hideSearch=true인 경우 렌더 생략. "백엔드 q 미지원"이라 적혀
+          있었으나 사실이 아니었다(대회 목록도 q 지원) — 숨김 여부는 화면이 결정한다. */}
       {!hideSearch && (
         <div className="relative">
           {/* Visually-hidden label (linked via htmlFor) */}
@@ -74,7 +81,7 @@ export function AdminFilterBar({
       {(statusOptions && statusOptions.length > 0) || rightSlot ? (
         <div className="flex items-center gap-2 flex-wrap">
           {statusOptions && statusOptions.length > 0 && onStatusChange && (
-            <div className="flex items-center gap-1.5 flex-wrap" role="group" aria-label="상태 필터">
+            <div className="flex items-center gap-1.5 flex-wrap" role="group" aria-label={statusGroupLabel}>
               {statusOptions.map((opt) => {
                 const active = activeStatus === opt.value;
                 return (
@@ -85,7 +92,7 @@ export function AdminFilterBar({
                     aria-pressed={active}
                     aria-label={typeof opt.count === 'number' ? `${opt.label} ${opt.count}` : opt.label}
                     className={[
-                      'inline-flex items-center px-3 min-h-[44px] rounded-full text-[var(--font-size-label)] font-medium transition-colors',
+                      'inline-flex items-center px-3 min-h-[44px] rounded-full text-[length:var(--font-size-label)] font-medium transition-colors',
                       'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                       active
                         ? 'bg-blue-500 text-white'

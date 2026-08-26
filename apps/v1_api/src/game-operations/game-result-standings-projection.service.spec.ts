@@ -41,8 +41,15 @@ function revisionRow(overrides: Partial<OfficialRevisionRow> = {}): OfficialRevi
 function makeTx() {
   return {
     v1TournamentFixture: { findUnique: jest.fn() },
-    v1TournamentGroup: { findUnique: jest.fn() },
+    // findMany feeds the invariant-required overall (통합) recalculation —
+    // defaults to empty since most tests below never reach that call
+    // (they return before it via one of the early skip paths).
+    v1TournamentGroup: { findUnique: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
     v1TournamentStanding: { upsert: jest.fn().mockResolvedValue({}) },
+    v1TournamentOverallStanding: {
+      upsert: jest.fn().mockResolvedValue({}),
+      deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any;
 }
@@ -145,6 +152,9 @@ describe('GameResultStandingsProjectionService', () => {
     const tx = makeTx();
     tx.v1TournamentFixture.findUnique.mockResolvedValue({ groupId: 'group-1' });
     tx.v1TournamentGroup.findUnique.mockResolvedValue(groupRow());
+    // 불변식(§7.1)이 재조회하는 "대회 전체 group-phase 조 목록" — 이 트리거는
+    // 영향받은 조 하나만 갖고 있으므로 통합 재계산을 위해 다시 조회한다.
+    tx.v1TournamentGroup.findMany.mockResolvedValue([groupRow()]);
 
     await service.project(tx, revisionRow());
 
@@ -154,27 +164,39 @@ describe('GameResultStandingsProjectionService', () => {
     const loser = calls.find((c) => c[0].create.registrationId === 'reg-2')?.[0].create;
     expect(winner).toMatchObject({ groupId: 'group-1', points: 3, wins: 1, losses: 0, position: 1 });
     expect(loser).toMatchObject({ groupId: 'group-1', points: 0, wins: 0, losses: 1, position: 2 });
+
+    // 불변식(§7.1): recalculateAndUpsertGroupStandings가 호출되는 경로는 같은 tx에서
+    // recalculateAndUpsertOverallStandings도 호출해야 한다 — 조별 화면과 통합 화면이
+    // 어긋나지 않도록.
+    expect(tx.v1TournamentGroup.findMany).toHaveBeenCalledWith({
+      where: { tournamentId: 'tournament-1', phase: 'group' },
+      select: expect.any(Object),
+    });
+    const overallCalls = (tx.v1TournamentOverallStanding.upsert as jest.Mock).mock.calls;
+    expect(overallCalls).toHaveLength(2);
+    const overallWinner = overallCalls.find((c) => c[0].create.registrationId === 'reg-1')?.[0].create;
+    expect(overallWinner).toMatchObject({ tournamentId: 'tournament-1', points: 3, wins: 1, position: 1 });
   });
 
   it('nested {regulation} backfill score shape → still recomputed correctly', async () => {
     const tx = makeTx();
     tx.v1TournamentFixture.findUnique.mockResolvedValue({ groupId: 'group-1' });
-    tx.v1TournamentGroup.findUnique.mockResolvedValue(
-      groupRow({
-        fixtures: [
-          {
-            homeRegistrationId: 'reg-1',
-            awayRegistrationId: 'reg-2',
-            game: {
-              currentOfficialRevision: {
-                state: 'OFFICIAL',
-                score: { regulation: { home: 1, away: 1 }, penalty: null, goals: [], incomplete: false },
-              },
+    const nestedGroup = groupRow({
+      fixtures: [
+        {
+          homeRegistrationId: 'reg-1',
+          awayRegistrationId: 'reg-2',
+          game: {
+            currentOfficialRevision: {
+              state: 'OFFICIAL',
+              score: { regulation: { home: 1, away: 1 }, penalty: null, goals: [], incomplete: false },
             },
           },
-        ],
-      }),
-    );
+        },
+      ],
+    });
+    tx.v1TournamentGroup.findUnique.mockResolvedValue(nestedGroup);
+    tx.v1TournamentGroup.findMany.mockResolvedValue([nestedGroup]);
 
     await service.project(tx, revisionRow());
 

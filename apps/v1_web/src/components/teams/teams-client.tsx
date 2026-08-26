@@ -9,8 +9,10 @@ import {
   useV1ChangeMembershipJersey,
   useV1ChangeTeamMembershipRole,
   useV1CreateTeamJoinApplication,
+  useV1LeagueMatches,
   useV1LeaveTeam,
   useV1MasterSports,
+  useV1MyTeams,
   useV1RecentSearches,
   useV1RecordSearch,
   useV1RejectTeamJoinApplication,
@@ -32,6 +34,8 @@ import { trackEvent } from '@/lib/analytics';
 import { V1ApiError, v1Get } from '@/lib/api-client';
 import { chatRoomHref } from '@/lib/chat-route';
 import { formatTournamentDateShort } from '@/lib/date-utils';
+import { isTeamOperatorRole, normalizeMyTeamsResponse } from '@/lib/team-role';
+import { hasStoredV1Session } from '@/lib/session-storage';
 import { teamSharePath } from '@/lib/team-share-route';
 import { v1Keys } from '@/lib/query-keys';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
@@ -201,6 +205,30 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
     dateLabel: formatTournamentDateShort(match.startsAt) ?? '',
     venue: match.place?.name ?? match.placeName ?? '',
   }));
+  // 컨택 보내기 CTA 노출 조건 중 "로그인 상태" + "운영 권한 팀 보유"를 함께 판정한다.
+  // 팀 상세는 공개 SEO 페이지라 게스트도 항상 렌더되므로, notification-bell.tsx의
+  // useUnreadState와 동일하게 세션 힌트(hasStoredV1Session, 동기 localStorage 체크)가
+  // 있을 때만 /me/teams 를 호출한다 — SSR에서는 localStorage를 못 읽으므로 useEffect로
+  // 마운트 후 세팅한다. 힌트가 없으면(게스트) 쿼리 자체가 안 돌아 operatorTeamCount는 0.
+  const [hasSessionHint, setHasSessionHint] = useState(false);
+  useEffect(() => {
+    setHasSessionHint(hasStoredV1Session());
+  }, []);
+  const myTeamsQuery = useV1MyTeams(undefined, { enabled: hasSessionHint });
+  const operatorTeamCount = normalizeMyTeamsResponse(myTeamsQuery.data).filter((team) => isTeamOperatorRole(team.role)).length;
+  /* R4: "내 리그" — 리그 목록 API 의 teamId 필터로 직접 가져온다.
+   * 원래는 이 팀의 팀매치 목록에서 league 필드를 distinct 로 역산했는데, 그러면
+   * **대진이 생기기 전에는 아무것도 안 뜬다** — 운영자가 팀을 리그에 넣은 시점부터
+   * 대진을 만들 때까지 팀은 자기 참가 사실을 알 수 없었다(2026-08-21 재감사, alpha 의
+   * draft 티어 리그 참가팀이 team-matches 0건인 것으로 확인). D-2 가 "참가 인지는
+   * 노출로 푼다"고 한 이상 이 경로는 참가 테이블을 봐야 한다. */
+  const myLeaguesQuery = useV1LeagueMatches(
+    { teamId, limit: 50 },
+  );
+  const myLeagues = (myLeaguesQuery.data?.items ?? []).map((item) => ({
+    leagueId: item.leagueId,
+    title: item.title,
+  }));
   const fallback = getTeamDetailViewModel();
 
   useEffect(() => {
@@ -275,6 +303,17 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
         onShare: () => shareTeam(query.data),
         openMatches,
         openMatchesLoading: openMatchesQuery.isLoading,
+        contactHref:
+          toDetailMode(query.data, eligibility.data) !== 'mine' && operatorTeamCount > 0
+            ? `/teams/${teamId}/contact/new`
+            : undefined,
+        myLeagues,
+        myLeaguesLoading: myLeaguesQuery.isLoading,
+        // 통신 오류를 "리그 0개"로 위장시키지 않기 위한 3번째 상태 — TeamMyLeaguesSection이
+        // 이 플래그로 EmptyState(재시도)를 렌더한다. refetch를 그대로 넘겨 재시도 버튼이
+        // 같은 쿼리를 다시 부르게 한다.
+        myLeaguesError: myLeaguesQuery.isError,
+        onRetryMyLeagues: () => void myLeaguesQuery.refetch(),
       }
     : fallback;
 
@@ -711,6 +750,7 @@ function formatTeamDetailLevel(team: V1TeamDetail) {
   return minName ?? maxName ?? '';
 }
 
+
 function formatTeamRegion(region?: { name: string; parentName?: string | null } | null, fallback?: string | null) {
   if (region?.parentName) return `${region.parentName} ${region.name}`;
   return region?.name ? `${region.name} 전체` : fallback ?? '지역 미정';
@@ -822,6 +862,11 @@ function buildTeamOperations(team: V1TeamDetail): TeamDetailViewModel['operation
       href: `/teams/${team.teamId}/members`,
     },
     {
+      label: '컨택 설정',
+      sub: '다른 팀의 컨택을 받을 조건과 차단 목록을 관리해요.',
+      href: `/teams/${team.teamId}/contact/settings`,
+    },
+    {
       label: '팀매치 만들기',
       sub: '이 팀 명의로 새 팀매치를 모집해요.',
       href: '/team-matches/new/team',
@@ -833,10 +878,6 @@ function roleLabel(role: string) {
   if (role === 'owner') return '팀장';
   if (role === 'manager' || role === 'admin') return '운영진';
   return '멤버';
-}
-
-function isTeamOperatorRole(role?: string | null) {
-  return role === 'owner' || role === 'manager' || role === 'admin';
 }
 
 function isTeamMemberRole(role?: string | null) {

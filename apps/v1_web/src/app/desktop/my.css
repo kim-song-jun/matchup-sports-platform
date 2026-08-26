@@ -48,7 +48,7 @@
    */
   .tm-my-shell {
     padding: 0 0 48px;
-    gap: 18px;
+    gap: 20px;
   }
 
   /*
@@ -86,7 +86,7 @@
   /* LEFT sticky panel: profile card, stats strip, monthly card. */
   .tm-my-desktop-sidebar {
     display: grid;
-    gap: 14px;
+    gap: 16px;
     position: sticky;
     top: 80px; /* 64px nav + 16px breathing */
     align-self: start;
@@ -96,7 +96,7 @@
      stretch to 1120px. Let sections fill that column. */
   .tm-my-desktop-main {
     display: grid;
-    gap: 18px;
+    gap: 20px;
     min-width: 0;
   }
 
@@ -104,7 +104,7 @@
      effect — on desktop the section sits inside a card, not edge-to-edge. */
   .tm-my-desktop-sidebar .tm-my-profile-head {
     margin: 0;
-    border-radius: 16px;
+    border-radius: var(--radius-container);
     /* 페이지 배경(--bg) 위 --grey50 한 단계 — main과 동일
        (globals.css .tm-my-profile-head와 동일 근거). 경계는 모바일 변형과 같은
        --border(grey200) — main의 grey100은 grey50 배경 위에서 ~1.03:1로 보이지 않는다. */
@@ -125,7 +125,7 @@
     width: 72px;
     height: 72px;
     font-size: var(--font-size-heading); /* 24px — R-T2 토큰, 구 28px */
-    border-radius: 24px;
+    border-radius: var(--radius-hero);
   }
 
   /* Stats strip: 이제 Card(border/radius/padding 내장) 안에 있으므로 독립 스타일 불필요.
@@ -145,7 +145,7 @@
   .tm-my-desktop-menu-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 18px;
+    gap: 20px;
   }
 
   /* Team detail layout wrappers: override display:contents on desktop. */
@@ -187,7 +187,7 @@
   .tm-my-profile-edit-desktop .tm-my-profile-head {
     margin: 0;
     border: 1px solid var(--border);
-    border-radius: 16px;
+    border-radius: var(--radius-container);
   }
 
   /*
@@ -217,7 +217,7 @@
   /* Override display:contents for constraint wrappers. */
   .tm-my-settings-desktop {
     display: grid;
-    gap: 18px;
+    gap: 20px;
     max-width: 640px;
     margin-left: auto;
     margin-right: auto;
@@ -234,7 +234,7 @@
   /* Constrain the reviews shell so single-column rows don't stretch. */
   .tm-review-shell {
     padding: 0 0 48px;
-    max-width: 720px;
+    max-width: var(--v1-review-column-width);
     /* 가운데 정렬 — .tm-my-settings-desktop 패턴 일치 */
     margin-left: auto;
     margin-right: auto;
@@ -246,12 +246,12 @@
   }
 
   .tm-review-schedule-card:hover {
-    box-shadow: var(--shadow-2);
+    box-shadow: var(--shadow-dropdown);
   }
 
   /* Review compose shell: same max-width. */
   .tm-review-compose-shell {
-    max-width: 720px;
+    max-width: var(--v1-review-column-width);
     padding-bottom: 120px;
     /* 가운데 정렬 — .tm-review-shell 패턴 일치 */
     margin-left: auto;
@@ -267,7 +267,7 @@
   .tm-review-target-stack {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
+    gap: 16px;
   }
 }
 
@@ -290,7 +290,7 @@
   }
 
   .tm-my-matches-desktop .tm-my-list-stack .tm-card:hover {
-    box-shadow: var(--shadow-2);
+    box-shadow: var(--shadow-dropdown);
   }
 
   /* Segment row (joined/created toggle): constrain to ~360px, don't stretch */
@@ -324,7 +324,7 @@
   }
 
   .tm-my-teams-desktop .tm-my-team-card:hover {
-    box-shadow: var(--shadow-2);
+    box-shadow: var(--shadow-dropdown);
   }
 
   /* Stat grid: already 3-col on mobile — fine on desktop, no override needed. */
@@ -354,14 +354,14 @@
   /* Left column: hero + info + recent matches */
   .tm-my-team-detail-left {
     display: grid;
-    gap: 18px;
+    gap: 20px;
     min-width: 0;
   }
 
   /* Right sticky panel: action menu */
   .tm-my-team-detail-right {
     display: grid;
-    gap: 14px;
+    gap: 16px;
     position: sticky;
     top: 80px;
     align-self: start;
@@ -371,16 +371,16 @@
   .tm-my-team-detail-left .tm-my-list-stack {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
+    gap: 16px;
   }
 
   /* Fixed CTA (팀 채팅 / 팀 정보 buttons) pinned to right panel on desktop. */
   .tm-my-team-detail-cta {
     background: var(--bg);
     border: 1px solid var(--border);
-    border-radius: 16px;
+    border-radius: var(--radius-container);
     padding: 16px;
-    box-shadow: var(--shadow-1);
+    box-shadow: var(--shadow-card);
   }
 }
 
@@ -399,7 +399,7 @@
 @media (min-width: 1024px) {
   .tm-my-members-desktop {
     display: grid;
-    gap: 14px;
+    gap: 16px;
     max-width: 800px;
     /* .tm-my-settings-desktop(184-186) 패턴과 동일하게 가운데 정렬 */
     margin-left: auto;
@@ -426,7 +426,7 @@
 @media (min-width: 1024px) {
   .tm-my-withdrawal-desktop {
     display: grid;
-    gap: 14px;
+    gap: 16px;
     max-width: 580px;
     margin-left: auto;
     margin-right: auto;
@@ -473,7 +473,7 @@
 
   .tm-my-sports-desktop .tm-auth-sport-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 10px;
+    gap: 12px;
   }
 
   /* 스포츠 설정 CTA: 프로필 편집과 동일하게 static 인라인으로 전환 */
@@ -496,7 +496,7 @@
 @media (min-width: 1024px) {
   .tm-my-location-desktop {
     display: grid;
-    gap: 14px;
+    gap: 16px;
     max-width: 560px;
     margin-left: auto;
     margin-right: auto;

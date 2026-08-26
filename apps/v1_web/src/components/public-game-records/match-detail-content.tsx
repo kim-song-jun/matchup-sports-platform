@@ -4,11 +4,12 @@ import Link from 'next/link';
 import { Card } from '@/components/v1-ui/primitives';
 import { MatchVideos } from '@/components/tournaments/match-videos';
 import { formatTournamentDateTimeLong } from '@/lib/date-utils';
+import { matchOutcomeReasonLabel, toDisplayableOutcomeReason } from '@/lib/match-outcome';
 import { AbnormalClockBadge } from './abnormal-clock-badge';
 import { LiveBadge } from './live-badge';
 import {
-  eventPresentation,
   fixtureStatusLabel,
+  eventPresentation,
   formatClock,
   formatScoreline,
   isClockAbnormal,
@@ -20,6 +21,24 @@ import {
 import { PenaltyScoreline } from './penalty-scoreline';
 import type { PublicLineupSlot, PublicMatchDetail, PublicMatchEvent } from './types';
 
+/**
+ * 선수 이름을 프로필로 잇는다. **열어도 되는지는 서버가 이미 판단해서** `profileHref` 로
+ * 내려주므로(없으면 `null`) 여기서 동의·계정 유무를 다시 따지지 않는다 — 화면 세 곳이
+ * 각자 판단하면 언젠가 갈린다.
+ *
+ * 링크가 없을 때 굳이 span 으로 감싸지 않고 이름을 그대로 돌려주는 이유: 대부분의
+ * 참가자가 그 경우이고, 의미 없는 래퍼가 한 겹 늘면 기존 레이아웃(폭·정렬)이 미묘하게
+ * 달라진다.
+ */
+function ProfileLink({ href, children }: { href: string | null; children: React.ReactNode }) {
+  if (href === null) return <>{children}</>;
+  return (
+    <Link href={href} style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 2 }}>
+      {children}
+    </Link>
+  );
+}
+
 function sideLabel(side: PublicMatchDetail['home']): string {
   return side?.teamName ?? '미정';
 }
@@ -30,12 +49,53 @@ function ResultStateBadge({ state }: { state: PublicMatchDetail['resultState'] }
   const tone = state === 'void' ? 'var(--red500)' : 'var(--blue500)';
   const bg = state === 'void' ? 'var(--red50)' : 'var(--blue50)';
   return (
-    <span
-      role="status"
-      style={{ fontSize: 12, fontWeight: 700, color: tone, background: bg, borderRadius: 8, padding: '3px 8px' }}
-    >
+    // live region 을 쓰지 않는다 — 이 배지는 렌더 후 변하지 않는 정적 텍스트라, role="status"
+    // 를 붙이면 스크린리더가 상태 변경으로 오인해 공지한다. 같은 파일의 몰수·중단 배지와
+    // 같은 이유이고, `LiveBadge`(경기 시계)처럼 값이 실제로 바뀌는 곳에만 쓴다.
+    <span style={{ fontSize: 12, fontWeight: 700, color: tone, background: bg, borderRadius: 8, padding: '3px 8px' }}>
       {resultStateLabel(state)}
     </span>
+  );
+}
+
+/**
+ * 몰수·중단으로 끝난 경기의 표기. 이게 없으면 몰수 0:0 과 실제 0:0 무승부가 관전자
+ * 화면에서 **완전히 같아 보인다** — 회고에서 지적된 "왜 그 점수인지 기록 어디에도 없다"가
+ * 서버에 사유를 저장해 두고도 그대로 남는 상태다. 운영자가 종료 다이얼로그에서 "사유는
+ * 공개 경기 기록에 함께 남는다"는 안내를 읽고 사유를 적으므로, 여기서 보이지 않으면
+ * 그 안내 자체가 거짓이 된다.
+ *
+ * 컬러만으로 구분하지 않는다(WCAG) — 사유 라벨 텍스트가 항상 함께 나온다.
+ */
+function MatchOutcomeNotice({ outcome }: { outcome: PublicMatchDetail['outcome'] }) {
+  const reason = toDisplayableOutcomeReason(outcome?.reason);
+  if (outcome === null || reason === null) return null;
+  const note = outcome.note?.trim() ?? '';
+  return (
+    // live region 을 쓰지 않는 이유는 일정 카드의 같은 배지와 동일하다 — 정적 텍스트다.
+    <div
+      style={{
+        marginTop: 10,
+        padding: '8px 10px',
+        borderRadius: 10,
+        background: 'var(--orange50)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 4,
+        textAlign: 'center',
+      }}
+    >
+      {/* --orange500 텍스트는 이 틴트 배경 위에서 1.97:1 로 WCAG AA 미달이다 —
+          --orange700(5.42:1)이 그 결함을 막으려 도입된 토큰이다. */}
+      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--orange700)' }}>
+        {matchOutcomeReasonLabel(reason)}으로 종료된 경기예요
+      </span>
+      {/* 사유가 비어 있으면 빈 줄을 남기지 않는다. 서버가 사유 없는 몰수를 422 로 막지만
+          그 규칙이 생기기 전에 종료된 과거 경기는 사유가 없을 수 있다. */}
+      {note.length > 0 ? (
+        <span style={{ fontSize: 12, color: 'var(--text-body)', wordBreak: 'keep-all' }}>{note}</span>
+      ) : null}
+    </div>
   );
 }
 
@@ -52,7 +112,9 @@ function LineupColumn({ title, slots }: { title: string; slots: readonly PublicL
               {slot.jerseyNumber !== null ? (
                 <span className="tab-num" style={{ color: 'var(--text-caption)', width: 20 }}>{slot.jerseyNumber}</span>
               ) : null}
-              <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{presentParticipantName(slot.displayName)}</span>
+              <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>
+                <ProfileLink href={slot.profileHref}>{presentParticipantName(slot.displayName)}</ProfileLink>
+              </span>
               {/* [R-T2] 고정폭 없는 인라인 텍스트 — 12로 상향. */}
               {slot.position ? <span style={{ color: 'var(--text-caption)', fontSize: 12 }}>{slot.position}</span> : null}
             </li>
@@ -80,7 +142,9 @@ function EventRow({ event }: { event: PublicMatchEvent }) {
         <span className="tab-num" style={{ color: 'var(--text-caption)', fontSize: 12 }}>{event.jerseyNumber}</span>
       ) : null}
       <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-strong)' }}>
-        {presentGameEventParticipantName(event.type, event.participantName)}
+        <ProfileLink href={event.profileHref}>
+          {presentGameEventParticipantName(event.type, event.participantName)}
+        </ProfileLink>
       </span>
     </span>
   );
@@ -268,6 +332,9 @@ export function MatchDetailContent({ data }: { data: PublicMatchDetail }) {
           </div>
           {/* 스코어 아래 보조 표기 — 승부차기가 없으면 렌더 없음. */}
           <PenaltyScoreline score={data.score} scoreStatus={data.scoreStatus} fontSize={12} />
+          {/* 몰수·중단 표기는 스코어 바로 아래에 둔다 — 점수를 읽은 다음 눈이 가는 자리이자,
+              "이 점수가 정상 경기 결과가 아니다"를 점수와 떼어놓지 않는 유일한 위치다. */}
+          <MatchOutcomeNotice outcome={data.outcome} />
           <div
             style={{
               display: 'flex',
@@ -305,7 +372,7 @@ export function MatchDetailContent({ data }: { data: PublicMatchDetail }) {
         <Card pad={16}>
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', marginBottom: 4 }}>MVP</div>
           <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-strong)' }}>
-            {presentParticipantName(data.mvp.displayName)}
+            <ProfileLink href={data.mvp.profileHref}>{presentParticipantName(data.mvp.displayName)}</ProfileLink>
           </div>
         </Card>
       ) : null}

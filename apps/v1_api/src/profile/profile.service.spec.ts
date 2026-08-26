@@ -332,6 +332,11 @@ describe('ProfileService activitySummary', () => {
         .mockResolvedValueOnce([reverseReview]);
 
       const prisma = {
+        // Task 155: publicProfile() 이 선수 카드를 함께 만든다 -- 카드 입력을 목에 두지
+        // 않으면 이 스펙이 검증하는 것과 무관한 이유로 죽는다. null 은 '카드는 만들어지되
+        // 아무 능력치도 열리지 않는' 최소 상태다.
+        v1UserReputationSummary: { findUnique: jest.fn().mockResolvedValue(null) },
+        v1UserRecordConsent: { findUnique: jest.fn().mockResolvedValue(null) },
         v1TeamMembership: { findMany: jest.fn().mockResolvedValue([{ teamId: 'team-1' }]) },
         v1PostEventReview: { findMany },
         v1MatchParticipant: {
@@ -374,6 +379,11 @@ describe('ProfileService activitySummary', () => {
       };
       const findMany = jest.fn().mockResolvedValueOnce([hiddenReview]).mockResolvedValueOnce([]);
       const prisma = {
+        // Task 155: publicProfile() 이 선수 카드를 함께 만든다 -- 카드 입력을 목에 두지
+        // 않으면 이 스펙이 검증하는 것과 무관한 이유로 죽는다. null 은 '카드는 만들어지되
+        // 아무 능력치도 열리지 않는' 최소 상태다.
+        v1UserReputationSummary: { findUnique: jest.fn().mockResolvedValue(null) },
+        v1UserRecordConsent: { findUnique: jest.fn().mockResolvedValue(null) },
         v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
         v1PostEventReview: { findMany },
         v1MatchParticipant: { count: jest.fn().mockResolvedValue(0) },
@@ -409,6 +419,11 @@ describe('ProfileService activitySummary', () => {
       // reverse 조회 결과는 비어있음 — 상대가 끝까지 반대 방향 리뷰를 제출하지 않았지만, 시간 경과만으로 공개됨
       const findMany = jest.fn().mockResolvedValueOnce([staleRevealedReview]).mockResolvedValueOnce([]);
       const prisma = {
+        // Task 155: publicProfile() 이 선수 카드를 함께 만든다 -- 카드 입력을 목에 두지
+        // 않으면 이 스펙이 검증하는 것과 무관한 이유로 죽는다. null 은 '카드는 만들어지되
+        // 아무 능력치도 열리지 않는' 최소 상태다.
+        v1UserReputationSummary: { findUnique: jest.fn().mockResolvedValue(null) },
+        v1UserRecordConsent: { findUnique: jest.fn().mockResolvedValue(null) },
         v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
         v1PostEventReview: { findMany },
         v1MatchParticipant: { count: jest.fn().mockResolvedValue(0) },
@@ -460,6 +475,11 @@ describe('ProfileService tournament appearance aggregation', () => {
     try {
       const gameResultParticipantFindMany = jest.fn();
       const prisma = {
+        // Task 155: publicProfile() 이 선수 카드를 함께 만든다 -- 카드 입력을 목에 두지
+        // 않으면 이 스펙이 검증하는 것과 무관한 이유로 죽는다. null 은 '카드는 만들어지되
+        // 아무 능력치도 열리지 않는' 최소 상태다.
+        v1UserReputationSummary: { findUnique: jest.fn().mockResolvedValue(null) },
+        v1UserRecordConsent: { findUnique: jest.fn().mockResolvedValue(null) },
         v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
         v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
         v1MatchParticipant: { count: jest.fn().mockResolvedValueOnce(3).mockResolvedValueOnce(1) },
@@ -512,6 +532,11 @@ describe('ProfileService tournament appearance aggregation', () => {
         }),
       ];
       const prisma = {
+        // Task 155: publicProfile() 이 선수 카드를 함께 만든다 -- 카드 입력을 목에 두지
+        // 않으면 이 스펙이 검증하는 것과 무관한 이유로 죽는다. null 은 '카드는 만들어지되
+        // 아무 능력치도 열리지 않는' 최소 상태다.
+        v1UserReputationSummary: { findUnique: jest.fn().mockResolvedValue(null) },
+        v1UserRecordConsent: { findUnique: jest.fn().mockResolvedValue(null) },
         v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
         v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
         v1MatchParticipant: { count: jest.fn().mockResolvedValueOnce(0).mockResolvedValueOnce(0) },
@@ -574,6 +599,11 @@ describe('ProfileService tournament appearance aggregation', () => {
         }),
       ];
       const prisma = {
+        // Task 155: publicProfile() 이 선수 카드를 함께 만든다 -- 카드 입력을 목에 두지
+        // 않으면 이 스펙이 검증하는 것과 무관한 이유로 죽는다. null 은 '카드는 만들어지되
+        // 아무 능력치도 열리지 않는' 최소 상태다.
+        v1UserReputationSummary: { findUnique: jest.fn().mockResolvedValue(null) },
+        v1UserRecordConsent: { findUnique: jest.fn().mockResolvedValue(null) },
         v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
         v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
         v1MatchParticipant: { count: jest.fn().mockResolvedValueOnce(0).mockResolvedValueOnce(0) },
@@ -619,6 +649,11 @@ describe('ProfileService tournament appearance aggregation', () => {
         }),
       ];
       const prisma = {
+        // Task 155: publicProfile() 이 선수 카드를 함께 만든다 -- 카드 입력을 목에 두지
+        // 않으면 이 스펙이 검증하는 것과 무관한 이유로 죽는다. null 은 '카드는 만들어지되
+        // 아무 능력치도 열리지 않는' 최소 상태다.
+        v1UserReputationSummary: { findUnique: jest.fn().mockResolvedValue(null) },
+        v1UserRecordConsent: { findUnique: jest.fn().mockResolvedValue(null) },
         v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
         v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
         v1MatchParticipant: { count: jest.fn().mockResolvedValue(0) },
@@ -661,29 +696,112 @@ describe('ProfileService tournament appearance aggregation', () => {
         }),
       ];
       const prisma = {
+        // Task 155: publicProfile() 이 선수 카드를 함께 만든다 -- 카드 입력을 목에 두지
+        // 않으면 이 스펙이 검증하는 것과 무관한 이유로 죽는다. null 은 '카드는 만들어지되
+        // 아무 능력치도 열리지 않는' 최소 상태다.
+        v1UserReputationSummary: { findUnique: jest.fn().mockResolvedValue(null) },
         v1User: { findFirst: jest.fn().mockResolvedValue(baseUser) },
         v1MatchParticipant: { count: jest.fn().mockResolvedValue(0) },
-        v1TeamMembership: { count: jest.fn().mockResolvedValue(0) },
+        v1TeamMembership: { count: jest.fn().mockResolvedValue(0), findMany: jest.fn().mockResolvedValue([]) },
         v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
         v1ParticipantIdentityLinkCurrent: {
-          // 사용자 단위/participant 단위 동의를 아예 조회하지 않는다 — 이 집계는 게이트 대상이 아니다.
-          findMany: jest.fn().mockResolvedValue([{ participantId: 'participant-1' }]),
+          findMany: jest
+            .fn()
+            .mockResolvedValue([{ participantId: 'participant-1', linkId: 'link-1', userId: targetUserId }]),
         },
         v1GameResultParticipant: { findMany: jest.fn().mockResolvedValue(rows) },
-        v1UserRecordConsent: { findMany: jest.fn() },
-        v1ParticipantConsentSnapshot: { findMany: jest.fn() },
+        // Task 154 P2: publicProfile 이 최근 활동(경기별 상세)을 위해 동의를 **조회하게** 됐다.
+        // 그래서 "동의를 호출하지 않는다"는 예전 단언은 더 이상 계약을 정확히 표현하지 않는다 --
+        // 진짜 계약은 "출전 **횟수** 집계가 동의에 좌우되지 않는다" 이므로, 호출 여부(mechanism)
+        // 대신 결과(outcome)로 검증한다: 동의를 REVOKED 로 두고도 matchCount 가 그대로인지 본다.
+        // 이 편이 예전 단언보다 강하다 -- 구현이 동의를 조회하든 말든 집계가 흔들리면 잡힌다.
+        v1UserRecordConsent: {
+          // Task 155: 선수 카드가 동의 상태를 findUnique 로 읽는다(이 스펙의 findMany 와 별개 경로).
+          findUnique: jest.fn().mockResolvedValue(null),
+          findMany: jest.fn().mockResolvedValue([{ userId: targetUserId, state: 'REVOKED' }]),
+        },
+        v1ParticipantConsentSnapshot: { findMany: jest.fn().mockResolvedValue([]) },
+        v1GameParticipant: { findUnique: jest.fn().mockResolvedValue(null) },
+        v1GameSide: { findUnique: jest.fn().mockResolvedValue(null) },
       };
       const service = new ProfileService(prisma as never);
 
       const result = await service.publicProfile(null, targetUserId);
 
+      // 동의가 REVOKED 인데도 출전 **횟수**는 그대로다 -- 이 집계는 게이트 대상이 아니다
+      // (사용자 결정: 총계 숫자 하나는 개별 경기 상세와 노출 수준이 다르다).
       expect(result.activitySummary.totals.matchCount).toBe(1);
       expect(result.activitySummary.monthly.matchCount).toBe(1);
-      expect(prisma.v1UserRecordConsent.findMany).not.toHaveBeenCalled();
-      expect(prisma.v1ParticipantConsentSnapshot.findMany).not.toHaveBeenCalled();
+      // 반대로 경기별 상세(최근 활동)는 같은 REVOKED 에 막혀야 한다 -- 두 노출 수준이
+      // 실제로 분리돼 있음을 여기서 함께 고정한다.
+      expect(result.recentActivity).toBeNull();
     } finally {
       jest.useRealTimers();
     }
+  });
+});
+
+/**
+ * alpha 실측(2026-08-24)에서 잡은 회귀. bio 는 DB 에 저장됐는데 `toProfilePayload` 가
+ * 그 필드를 안 실어 보내서, `PATCH /me/profile` 응답과 `GET /me/profile` 둘 다 값을
+ * 돌려주지 않았다. 프론트는 그 응답으로 캐시를 갱신하고 편집 폼 초깃값을 채우므로,
+ * **저장 직후 편집 화면에 다시 들어가면 방금 쓴 소개가 비어 보였다**(DB 엔 남아 있는데).
+ *
+ * 공개 프로필에는 별도 경로로 나갔기 때문에 "저장은 됐다"는 착시가 생겨 더 늦게 발견된다.
+ */
+describe('ProfileService 내 프로필 응답의 bio 왕복', () => {
+  function buildMePrisma(bio: string | null) {
+    return {
+      v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
+      v1MatchParticipant: { count: jest.fn().mockResolvedValue(0) },
+      v1User: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'user-1',
+          email: 'a@b.test',
+          phone: null,
+          emailVerifiedAt: null,
+          phoneVerifiedAt: null,
+          accountStatus: 'active',
+          onboardingStatus: 'completed',
+          themePreference: 'system',
+          profile: {
+            nickname: '테스트닉',
+            displayName: null,
+            realName: null,
+            profileImageUrl: null,
+            birthDate: null,
+            gender: 'male',
+            bio,
+          },
+          regions: [],
+          sportPreferences: [],
+          reputationSummary: null,
+          authIdentities: [],
+        }),
+      },
+    };
+  }
+
+  const authUser = {
+    id: 'user-1',
+    email: 'a@b.test',
+    accountStatus: 'active',
+    onboardingStatus: 'completed',
+  } as never;
+
+  it('저장한 bio 를 응답으로 다시 돌려준다', async () => {
+    const service = new ProfileService(buildMePrisma('풋살 좋아하는 미드필더예요.') as never);
+    const result = await service.me(authUser);
+    expect(result.profile.bio).toBe('풋살 좋아하는 미드필더예요.');
+  });
+
+  it('bio 가 없으면 키를 빼지 않고 null 로 내려준다', async () => {
+    // undefined 로 새면 JSON 직렬화에서 키 자체가 사라져, 클라이언트가 "필드를 모르는
+    // 옛 서버"와 "값이 비어 있음"을 구분하지 못한다.
+    const service = new ProfileService(buildMePrisma(null) as never);
+    const result = await service.me(authUser);
+    expect(result.profile).toHaveProperty('bio');
+    expect(result.profile.bio).toBeNull();
   });
 });
 
@@ -741,9 +859,16 @@ describe('ProfileService public profile activity summary (reveal filtering)', ()
     return {
       v1User: { findFirst: jest.fn().mockResolvedValue(baseUser) },
       v1MatchParticipant: { count: jest.fn().mockResolvedValue(0) },
-      v1TeamMembership: { count: jest.fn().mockResolvedValue(0) },
+      v1TeamMembership: { count: jest.fn().mockResolvedValue(0), findMany: jest.fn().mockResolvedValue([]) },
       v1PostEventReview: { findMany },
       v1ParticipantIdentityLinkCurrent: { findMany: jest.fn().mockResolvedValue([]) },
+      // Task 154 P2: 연결이 0개면 최근 활동 조회는 즉시 null 로 끝나지만, 방어적으로 둔다.
+      v1GameResultParticipant: { findMany: jest.fn().mockResolvedValue([]) },
+      // Task 155: publicProfile() 이 선수 카드도 함께 만든다. 이 describe 가 검증하는 것은
+      // 후기 reveal 필터라 카드는 무관하지만, 입력이 없으면 카드 계산에서 죽는다.
+      // null 은 '카드는 만들어지되 아무 능력치도 열리지 않는' 최소 상태다.
+      v1UserReputationSummary: { findUnique: jest.fn().mockResolvedValue(null) },
+      v1UserRecordConsent: { findUnique: jest.fn().mockResolvedValue(null) },
     };
   }
 
@@ -896,10 +1021,22 @@ describe('ProfileService public profile activity summary (reveal filtering)', ()
         };
       }
       const prisma = {
+        // 카드 입력(v1UserReputationSummary/v1UserRecordConsent)은 buildPrisma() 가 이미 준다.
         ...buildPrisma(),
         v1ParticipantIdentityLinkCurrent: {
-          findMany: jest.fn().mockResolvedValue([{ participantId: 'participant-1' }]),
+          // linkId/userId 는 최근 활동 조회(loadParticipantConsentEligibility)가 select 한다.
+          findMany: jest
+            .fn()
+            .mockResolvedValue([{ participantId: 'participant-1', linkId: 'link-1', userId: targetUserId }]),
         },
+        // Task 154 P2: 최근 활동은 동의 게이트를 탄다. 이 스펙의 관심사는 출전 수 집계이므로
+        // 동의 없음(=최근 활동 null)으로 두고 집계만 본다.
+        // Task 155: 선수 카드는 동의 상태를 findUnique 로 읽는다(참가자 스냅샷용 findMany 와 별개 경로).
+        v1UserRecordConsent: {
+          findMany: jest.fn().mockResolvedValue([]),
+          findUnique: jest.fn().mockResolvedValue(null),
+        },
+        v1ParticipantConsentSnapshot: { findMany: jest.fn().mockResolvedValue([]) },
         v1GameResultParticipant: {
           findMany: jest.fn().mockResolvedValue([
             row('game-1', 'tournament-1'),

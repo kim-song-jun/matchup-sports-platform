@@ -101,6 +101,16 @@ jobs:
       - name: Prod deploy security guard tests
         run: node --test scripts/qa/prod-deploy-security-guard.test.mjs
 
+      # `v1_game_operations_worker` 가 alpha compose 에만 선언되고 prod 에는 끝내 들어가지
+      # 않아, 프로덕션이 아웃박스 디스패처 없이 돌던 것을 오래 아무도 몰랐다(2026-08-16).
+      # 그 건은 배포 검증에 해당 서비스를 명시해 막았지만 그건 서비스 하나짜리 방어라,
+      # 다음에 alpha 에만 추가되는 서비스는 똑같이 누락된다 — 집합 자체를 비교한다.
+      - name: Compose service parity (alpha-only service guard)
+        run: pnpm qa:compose-service-parity
+
+      - name: Compose service parity guard tests
+        run: node --test scripts/qa/check-compose-service-parity.test.mjs
+
       # 이 스위트는 존재만 하고 CI 에서 한 번도 실행되지 않았다 — 그래서
       # "changeset 을 전부 소비하면 alpha 배포가 깨진다"는 계약 위반이 계속 살아 있었다.
       # 디렉터리 인자(`node --test scripts/release/`)는 Node 버전에 따라 모듈 해석으로
@@ -178,6 +188,10 @@ jobs:
             git fetch --no-tags origin "${BASE_REF}"
             BASE_SHA="$(git merge-base FETCH_HEAD "${HEAD_SHA}")"
           fi
+          # 게이트 자신의 규칙(SQL 추가성 판정 + base 해석)을 먼저 돌린다. 이게 없던 동안
+          # base 해석 쪽 결함이 오래 살아남아, 대상 브랜치가 전진할 때마다 마이그레이션과
+          # 무관한 PR 이 죽었다. 임시 저장소 몇 개를 만드는 정도라 수 초면 끝난다.
+          node scripts/qa/check-expand-contract-migrations.mjs --self-test
           echo "expand-contract gate: ${BASE_SHA} -> ${HEAD_SHA}"
           node scripts/qa/check-expand-contract-migrations.mjs "${BASE_SHA}" "${HEAD_SHA}"
 
@@ -246,6 +260,8 @@ jobs:
           # here so `test:integration` sees the same DB state.
           DATABASE_URL="$MIGRATE_URL" ./node_modules/.bin/ts-node --transpile-only \
             src/tournaments/competition-config/competition-config-backfill.cli.ts
+          DATABASE_URL="$MIGRATE_URL" ./node_modules/.bin/ts-node --transpile-only \
+            src/tournaments/migration/tournament-award-recipient-backfill.cli.ts --dry-run
           DATABASE_URL="$MIGRATE_URL" pnpm test:integration
           # 게임 운영 플래그 불변 행 시드 CLI 가 실제로 기동하는지 확인한다
           # (배포 경로 deploy/deploy-alpha.sh 가 migrate deploy 직후 돌리는 그 CLI).
@@ -259,6 +275,13 @@ jobs:
           # (test/tournaments/game-operation-flag-seed.integration-spec.ts)이 검증한다.
           DATABASE_URL="$MIGRATE_URL" ./node_modules/.bin/ts-node --transpile-only \
             src/config/game-operation-flags-seed.cli.ts
+          # 골 이벤트 백필 CLI 는 **배포가 자동 실행하지 않는다** — 실행 시점은 운영자가
+          # 정한다(되돌리는 경로가 없는 이벤트를 만들기 때문). 다만 그러면 "코드는 있는데
+          # 배선이 깨진" 결함을 아무도 못 잡으므로, `--dry-run` 으로 기동만 확인한다.
+          # 빈 DB 라 후보는 0건이고, 검증 대상은 개수가 아니라 "부팅해서 정상 종료하는가"다.
+          # 위 시드 CLI 와 같은 이유로 test:integration **뒤에** 둔다.
+          DATABASE_URL="$MIGRATE_URL" ./node_modules/.bin/ts-node --transpile-only \
+            src/games/migration/goal-event-backfill.cli.ts --dry-run
           echo "migration chain OK — empty-DB replay clean, zero schema drift"
 
       - name: V1 API unit tests
@@ -640,6 +663,7 @@ jobs:
           SECRET_GABIA_SENDER_NUMBER: ${{ secrets.GABIA_SENDER_NUMBER }}
           SECRET_SES_REGION: ${{ vars.SES_REGION }}
           SECRET_EMAIL_FROM: ${{ vars.EMAIL_FROM }}
+          SECRET_SLACK_INQUIRY_WEBHOOK_URL: ${{ secrets.SLACK_INQUIRY_WEBHOOK_URL }}
         run: bash scripts/release/sync-prod-runtime-env.sh
 
       - name: Run deploy-prod.sh

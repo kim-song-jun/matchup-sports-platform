@@ -48,8 +48,9 @@ existing file changed.
 |---|---|---|
 | `GET /tournaments/:id/schedule` | `cursor?`, `limit? (1-100, default 20)`, `round?`, `groupId?` | `{ tournamentId, tournamentTitle, bracketPublished, items[], unscheduled[], standings[], nextCursor }` |
 | `GET /tournaments/:id/matches/:fixtureId` | -- | one match projection (see below) |
-| `GET /teams/:id/records` | `cursor?`, `limit?`, `season? (YYYY)` | `{ teamId, teamName, teamLogoUrl, summary, items[] (including opponentTeamLogoUrl), nextCursor }` |
-| `GET /users/:id/records` | `cursor?`, `limit?`, `season? (YYYY)` | `{ userId, nickname, summary, items[], nextCursor }` |
+| `GET /tournaments/:id/player-records` | -- | `{ tournamentId, goals[], assists[] }` -- per-user `{ userId, nickname, profileHref, goals, assists }`, desc-sorted, top 30 each |
+| `GET /teams/:id/records` | `cursor?`, `limit?`, `season? (YYYY)` | `{ teamId, teamName, teamLogoUrl, summary, availableSeasons[], items[] (including opponentTeamLogoUrl), nextCursor }` |
+| `GET /users/:id/records` | `cursor?`, `limit?`, `season? (YYYY)` | `{ userId, nickname, summary, tournamentAwards[], items[], nextCursor }` |
 
 `cursor` is opaque (base64url JSON `{key,id}`); never construct it
 client-side.
@@ -61,12 +62,10 @@ official fact is projected. The list order, cursor key, `season` filter, and
 summary all use this same match instant. A later result correction therefore
 updates the score without moving the match to the correction date.
 
-For `GET /teams/:id/records`, every item exposes `playedAt`, not
-`officialAt`. `playedAt` is copied from `V1TeamMatch.startAt` for team matches
-or `V1TournamentFixture.scheduledAt` for tournament fixtures when the
-official fact is projected. The list order, cursor key, `season` filter, and
-summary all use this same match instant. A later result correction therefore
-updates the score without moving the match to the correction date.
+`availableSeasons` (4-digit years, descending) is the source for the team
+records page's season dropdown -- always computed from every year the team
+has a *current* official fact, independent of the request's own `season`/
+`type` filters (so picking one season never shrinks the option list itself).
 
 ### Server-enforced visibility (matches the frozen output matrix exactly)
 
@@ -281,6 +280,95 @@ identity/side itself:
   game, never one query per fixture. `status_only` fixtures always get `[]`
   (that mode hides events/scores entirely).
 
+- `GET /tournaments/:id/schedule` `items[]`/`unscheduled[]` and
+  `GET /tournaments/:id/matches/:fixtureId` both carry
+  `outcome: { reason: 'FORFEIT' | 'ABANDONED', note: string | null } | null` --
+  the abnormal-end marker. In each view it is non-null only when **that view's
+  own score gate** (`showOfficialResult`) is open *and* the official revision's
+  `outcomeReason` is not `NORMAL`. Tying it to the score gate rather than a
+  bespoke condition is deliberate: a view that shows `0:0` while hiding the fact
+  that the `0:0` is a forfeit is exactly the screen this field exists to remove,
+  so the score and the reason are published together or not at all. A
+  normally-ended game is `null`, so the pre-existing contract is unchanged for
+  the common case.
+
+  **Known gate difference (predates this field).** `getMatch`'s
+  `showOfficialResult` also requires `officialAt !== null`; the schedule's does
+  not. So an OFFICIAL revision with a null `officialAt` (schema-nullable --
+  legacy/backfill rows) shows its score *and* its outcome on the schedule while
+  the match view shows neither. That asymmetry already applied to the score
+  before `outcome` existed; narrowing it would change score visibility and is a
+  separate change. `public-tournament-records.schedule-scorers.spec.ts` pins the
+  current behaviour so a future edit has to be deliberate.
+  `note` is the operator's mandatory reason (the server rejects a forfeit
+  without one, 422 `GAME_OUTCOME_NOTE_REQUIRED`), but it stays nullable in the
+  schema for games ended before that rule existed. The schedule card renders
+  only the reason label; the full note is read on the match view, because a
+  schedule row is a one-line summary and the note has no length bound.
+
+- `GET /tournaments/:id/matches/:fixtureId` carries `profileHref: string | null` on every
+  place a participant is named -- `lineup.home[]`/`lineup.away[]`, `events[]`, and `mvp`.
+  It is the **public profile path** (`/users/:userId`) when the viewer may open it, and
+  `null` otherwise. Deliberately **not** a raw `userId`: shipping the account id would let a
+  caller re-identify the same person across fixtures whose names are withheld, and a link
+  does not need that surface. The server decides once
+  (`resolveParticipantProfileHref`) so the three consuming views never re-derive the
+  policy and drift apart.
+
+  It is non-null only when **all** of these hold:
+  1. the participant has a linked account -- a lineup can be built from names alone, and a
+     guest has no profile to open;
+  2. user-level record consent is `GRANTED` with no per-participant `REVOKED` override --
+     `/users/:id` gates on the same condition, so linking without it lands on an empty page;
+  3. the name itself is visible in that payload. A slot rendered as `비공개 선수` never
+     carries a link.
+
+  Note that (2) is checked **directly**, not through
+  `resolveParticipantNameEligible`'s rollback switch: that switch controls whether *names*
+  are shown, while a profile exposes the person's whole activity history. With the switch
+  off, an unconsented participant's name may appear but their profile still will not open.
+
+- `GET /teams/:teamId/records` carries the same `profileHref` on `items[].events[]`, with the
+  identical rule and the same server-side resolver. Its `consentMap` is loaded
+  unconditionally for the same reason as the match view; unlike the schedule, this endpoint
+  is not polled (`usePublicTeamRecords` sets no `refetchInterval`), so the extra lookup is
+  paid once per view.
+
+- `GET /tournaments/:id/player-records` (retro STATS-1) is the tournament-domain
+  replica of the league's `playerRecords()` (`league-match-public.service.ts`):
+  per-user goal/assist totals aggregated from `V1GameResultParticipant` rows of
+  each game's **current official revision**, consent-gated with the same
+  `isParticipantPubliclyEligible` rule, rows with zero of the ranked stat
+  dropped, sorted descending, top 30 per list. Before the bracket is published
+  it returns empty lists (same axis as this lane's other unpublished-bracket
+  hiding). Every returned row is by construction a linked+consented user, so
+  each carries a non-null `profileHref` (same server-decides convention as
+  above). A forfeit/abandoned game contributes nothing on its own: an
+  operator-entered score has no participant stat rows.
+  The **admin variant** `GET /admin/tournaments/:id/player-records`
+  (`AdminTournamentPlayerRecordsController`, active-admin only) shares the
+  fixture/revision walk minus the visibility filter (hiding is a spectator
+  policy, not an operator one) and is deliberately **not** consent-gated -- it exists
+  to recommend award candidates (retro STATS-3), and a gated ranking would
+  silently drop an unconsented top scorer and recommend the wrong person.
+  Unlinked participants aggregate by normalised name snapshot within the
+  tournament; each row is `{ userId: string | null, name: string, teamName:
+  string | null, goals: number, assists: number }`.
+- **The schedule (`GET /tournaments/:id/schedule`) deliberately does not carry
+  `profileHref`.** Its `consentMap` stays behind the name-gating flag because that endpoint
+  *is* polled while any fixture is live (`LIVE_POLL_INTERVAL_MS`). Loading consent
+  unconditionally there would add up to **three batched queries per poll** — links, user
+  consents, snapshots (`loadParticipantConsentEligibility`). They are batched across the
+  whole page, *not* per fixture, so the cost grows with `IN`-list size rather than with the
+  number of fixtures. That is a real but modest cost, weighed against a scorer line that is
+  a one-line summary: a reader who wants the player opens the match, where the link exists.
+  The stronger reason is structural: the whole schedule card is already one `<Link>` to the
+  match view (`schedule-content.tsx`), and scorer names render inside it -- a profile link
+  there would nest an anchor inside an anchor, which is invalid HTML and would require
+  redesigning the card's tap target. Keeping the card link-free was confirmed as the
+  product decision on 2026-08-24. Revisit only if the card layout is restructured or the
+  schedule needs consent for another reason (the marginal query cost would then be zero).
+
 ### Known scope trims (documented, not silently dropped)
 
 - The schedule list only cursor-paginates fixtures that already have a
@@ -343,3 +431,23 @@ persisted `userId`, no current link, and no prior identity-link event history.
 Rejected, revoked, or otherwise historically adjudicated links are therefore
 never recreated by this command. Applied rows use the system actor
 `GAME_BACKFILL`, and rerunning the command is idempotent.
+
+### Match MVP and tournament awards (2026-08-20)
+
+The user-record summary separates four user-facing metrics: `appearances`,
+`goals`, `matchMvpCount`, and `tournamentAwardCount`. Match MVP is derived
+only from the current official result revision's `mvpParticipantId`.
+`mvpCount` remains as a temporary compatibility alias with the same value as
+`matchMvpCount`; new clients must use the explicit field.
+
+`tournamentAwards[]` is a separate list backed by
+`V1TournamentAward.recipientUserId`. Each item contains `id`,
+`tournamentId`, `tournamentTitle`, `awardType`, the tournament-defined
+`awardLabel`, nullable `iconKey`, `teamName`, `note`, and `awardedAt`.
+Clients display `awardLabel` verbatim because award categories vary by
+tournament; they must not collapse tournament awards into match MVP.
+
+Self-view returns linked tournament awards regardless of public-record consent,
+matching the existing self-view game-record bypass. Other viewers receive the
+linked award list only while the target user's record consent is `GRANTED`;
+the response still omits `consentGranted` for non-owners.

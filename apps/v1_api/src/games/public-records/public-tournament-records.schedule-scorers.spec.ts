@@ -41,7 +41,17 @@ type FakeFixture = {
     id: string;
     state: string;
     visibilityPolicy: { mode: string; lineupAt: null };
-    currentOfficialRevision: { state: string; supersedesId: null; officialAt: Date; score: unknown } | null;
+    currentOfficialRevision: {
+      state: string;
+      supersedesId: null;
+      /** 스키마상 nullable — 레거시/백필 OFFICIAL 리비전은 비어 있을 수 있다. */
+      officialAt: Date | null;
+      score: unknown;
+      /** 프로덕션 select 가 항상 돌려주는 필드라 fake 도 필수로 둔다 — 생략을 허용하면
+       *  `undefined !== 'NORMAL'` 이 참이 되어 정상 경기가 몰수로 오판된다. */
+      outcomeReason: 'NORMAL' | 'FORFEIT' | 'ABANDONED';
+      outcomeNote: string | null;
+    } | null;
     sides: { id: string; sideKey: 'HOME' | 'AWAY' }[];
     periods: never[];
     participants: { id: string; sideId: string; userId: string | null; displayNameSnapshot: string; jerseyNumber: number | null }[];
@@ -74,6 +84,8 @@ type FakeGoalEvent = {
   period: number | null;
   clockMs: number;
   reversesEventId: string | null;
+  /** CARD 이벤트의 색상은 컬럼이 아니라 payload(`{ card: 'YELLOW' | 'RED' }`)에 있다. */
+  payload?: unknown;
 };
 
 function buildFakePrisma(options: {
@@ -472,6 +484,8 @@ describe('PublicTournamentRecordsService.getSchedule -- 리비전 score JSON 두
           supersedesId: null,
           officialAt: new Date('2026-08-01T00:00:00.000Z'),
           score,
+          outcomeReason: 'NORMAL',
+          outcomeNote: null,
         },
         sides: [
           { id: 'side-home', sideKey: 'HOME' },
@@ -643,4 +657,179 @@ describe('PublicTournamentRecordsService.getSchedule -- 참가팀 공개 정책 
 
     expect(result.items[0].home).toEqual({ registrationId: 'reg-home', teamId: 'team-home', teamName: '홈팀' });
   });
+});
+
+/**
+ * 일정 카드 **카드(경고/퇴장) 요약** 전용. 예전에는 이 요약이 골만 실어서, 같은
+ * 경기의 같은 경고가 경기 상세 타임라인에는 나오는데 대회 일정 카드에서는 통째로
+ * 사라졌다(오너 지적). 아래 테스트가 그 회귀를 막는다.
+ */
+describe('PublicTournamentRecordsService.getSchedule -- 일정 카드 카드(경고/퇴장) 요약', () => {
+  it('CARD 이벤트가 색상과 함께 cards에 실리고, scorers에는 섞이지 않는다', async () => {
+    const prisma = buildFakePrisma({
+      fixtures: [makeFixture({})],
+      consentLinks: [],
+      consentSnapshots: [],
+      goalEvents: [
+        { id: 'g1', gameId: 'game-1', type: 'GOAL', sideId: 'side-home', participantId: ELIGIBLE.id, period: 1, clockMs: 600_000, reversesEventId: null },
+        { id: 'c1', gameId: 'game-1', type: 'CARD', sideId: 'side-away', participantId: INELIGIBLE.id, period: 2, clockMs: 1_500_000, reversesEventId: null, payload: { card: 'YELLOW' } },
+        { id: 'c2', gameId: 'game-1', type: 'CARD', sideId: 'side-home', participantId: ELIGIBLE.id, period: 2, clockMs: 1_740_000, reversesEventId: null, payload: { card: 'RED' } },
+      ],
+    });
+    const service = new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE);
+
+    const result = await service.getSchedule(TOURNAMENT_ID, {});
+
+    expect(result.items[0].cards).toEqual([
+      { side: 'away', cardColor: 'YELLOW', participantName: '이영희', jerseyNumber: 10, period: 2, clockMs: 1_500_000 },
+      { side: 'home', cardColor: 'RED', participantName: '김철수', jerseyNumber: 7, period: 2, clockMs: 1_740_000 },
+    ]);
+    // `scorers`는 골만 담는 기존 계약 그대로 -- 이미 배포된 클라이언트가 이 배열의
+    // length를 골 수로 읽고 있어, 카드가 한 건이라도 섞이면 곧장 스코어 오독이 된다.
+    expect(result.items[0].scorers).toEqual([
+      { side: 'home', participantName: '김철수', jerseyNumber: 7, period: 1, clockMs: 600_000 },
+    ]);
+  });
+
+  it('색상을 알 수 없는 과거 payload의 카드는 색을 추측하지 않고 cardColor: null로 내려간다', async () => {
+    const prisma = buildFakePrisma({
+      fixtures: [makeFixture({})],
+      consentLinks: [],
+      consentSnapshots: [],
+      goalEvents: [
+        { id: 'c1', gameId: 'game-1', type: 'CARD', sideId: 'side-home', participantId: ELIGIBLE.id, period: 1, clockMs: 300_000, reversesEventId: null },
+      ],
+    });
+    const service = new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE);
+
+    const result = await service.getSchedule(TOURNAMENT_ID, {});
+
+    expect(result.items[0].cards).toEqual([
+      { side: 'home', cardColor: null, participantName: '김철수', jerseyNumber: 7, period: 1, clockMs: 300_000 },
+    ]);
+  });
+
+  it('취소된(reversesEventId로 되돌려진) 카드는 요약에서 빠진다', async () => {
+    const prisma = buildFakePrisma({
+      fixtures: [makeFixture({})],
+      consentLinks: [],
+      consentSnapshots: [],
+      goalEvents: [
+        { id: 'c1', gameId: 'game-1', type: 'CARD', sideId: 'side-home', participantId: ELIGIBLE.id, period: 1, clockMs: 300_000, reversesEventId: null, payload: { card: 'YELLOW' } },
+        { id: 'x1', gameId: 'game-1', type: 'CORRECTION', sideId: 'side-home', participantId: ELIGIBLE.id, period: 1, clockMs: 300_000, reversesEventId: 'c1' },
+      ],
+    });
+    const service = new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE);
+
+    const result = await service.getSchedule(TOURNAMENT_ID, {});
+
+    expect(result.items[0].cards).toEqual([]);
+  });
+});
+
+/**
+ * 일정 목록의 몰수·중단 표기. 경기 상세(getMatch)에만 있던 동안, 목록만 훑는 관전자에게는
+ * 몰수 0:0 과 실제 0:0 무승부가 완전히 같아 보였다(alpha 실측: 순위표에 세 팀이 나란히
+ * 2점인데 그중 두 경기가 몰수라는 사실이 일정 어디에도 없었다).
+ *
+ * 이 스펙이 지키는 계약은 **노출 조건이 경기 상세와 같다**는 것이다 — 둘이 갈리면 같은
+ * 경기가 목록에서는 몰수인데 상세에서는 아닌(또는 그 반대) 상태가 된다.
+ */
+describe('getSchedule — 몰수·중단 표기(outcome)', () => {
+  const emptyConsent = { consentLinks: [], consentSnapshots: [], goalEvents: [] };
+
+  function fixtureWithOutcome(input: {
+    outcomeReason: 'NORMAL' | 'FORFEIT' | 'ABANDONED';
+    outcomeNote: string | null;
+    revisionState?: string;
+    /** 레거시/백필 리비전은 OFFICIAL 인데도 `officialAt` 이 비어 있을 수 있다(스키마상 nullable). */
+    officialAt?: Date | null;
+  }) {
+    return makeFixture({
+      status: 'completed',
+      game: {
+        id: 'game-1',
+        state: 'ENDED',
+        visibilityPolicy: { mode: 'LIVE', lineupAt: null },
+        currentOfficialRevision: {
+          state: input.revisionState ?? 'OFFICIAL',
+          supersedesId: null,
+          officialAt: input.officialAt === undefined ? new Date('2026-08-01T00:00:00.000Z') : input.officialAt,
+          score: { home: 0, away: 0 },
+          outcomeReason: input.outcomeReason,
+          outcomeNote: input.outcomeNote,
+        },
+        sides: [
+          { id: 'side-home', sideKey: 'HOME' },
+          { id: 'side-away', sideKey: 'AWAY' },
+        ],
+        periods: [],
+        participants: [],
+      },
+    });
+  }
+
+  it('몰수로 끝난 경기는 사유와 함께 outcome 을 싣는다', async () => {
+    const prisma = buildFakePrisma({
+      fixtures: [fixtureWithOutcome({ outcomeReason: 'FORFEIT', outcomeNote: '원정팀 미출석' })],
+      ...emptyConsent,
+    });
+
+    const result = await new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE).getSchedule(TOURNAMENT_ID, {});
+
+    expect(result.items[0].outcome).toEqual({ reason: 'FORFEIT', note: '원정팀 미출석' });
+    // 점수 계약은 그대로여야 한다 — 몰수여도 기록된 점수는 그대로 확정된다.
+    expect(result.items[0].score).toEqual({ home: 0, away: 0, penalties: null });
+  });
+
+  it('정상 종료 경기는 outcome 이 null 이다 (기존 계약 불변)', async () => {
+    const prisma = buildFakePrisma({
+      fixtures: [fixtureWithOutcome({ outcomeReason: 'NORMAL', outcomeNote: null })],
+      ...emptyConsent,
+    });
+
+    const result = await new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE).getSchedule(TOURNAMENT_ID, {});
+
+    expect(result.items[0].outcome).toBeNull();
+  });
+
+  it('공식 결과가 아직 공개되지 않았으면 사유를 미리 흘리지 않는다', async () => {
+    // 확정 전(SUBMITTED) 리비전 — showOfficialResult 가 false 라 점수도 outcome 도 안 나간다.
+    const prisma = buildFakePrisma({
+      fixtures: [
+        fixtureWithOutcome({ outcomeReason: 'FORFEIT', outcomeNote: '원정팀 미출석', revisionState: 'SUBMITTED' }),
+      ],
+      ...emptyConsent,
+    });
+
+    const result = await new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE).getSchedule(TOURNAMENT_ID, {});
+
+    expect(result.items[0].scoreStatus).not.toBe('official');
+    expect(result.items[0].outcome).toBeNull();
+  });
+  /**
+   * `officialAt` 이 비어 있는 OFFICIAL 리비전(스키마상 nullable — 레거시/백필 경로)에서
+   * 목록과 상세의 공개 게이트가 갈린다: 상세(`getMatch`)의 `showOfficialResult` 는
+   * `officialAt !== null` 까지 요구하지만 목록은 요구하지 않는다. **이 차이는 점수에
+   * 대해 이 PR 이전부터 존재하던 것**이고, `outcome` 은 각 뷰의 점수 게이트를 그대로
+   * 따라간다.
+   *
+   * outcome 에만 `officialAt` 조건을 더하지 않는 이유(Copilot 리뷰 제안을 그대로 받지
+   * 않은 이유): 그렇게 하면 목록이 **`0:0` 은 보여주면서 그게 몰수라는 사실만 감추는**
+   * 상태가 된다 — 이 PR 이 없애려던 바로 그 화면이 그 데이터에서 재현된다. 목록 안에서
+   * 점수와 사유는 함께 나가거나 함께 빠져야 한다.
+   */
+  it('officialAt 이 비어도 목록은 점수와 사유를 함께 내보낸다 (한쪽만 감추지 않는다)', async () => {
+    const prisma = buildFakePrisma({
+      fixtures: [fixtureWithOutcome({ outcomeReason: 'FORFEIT', outcomeNote: '원정팀 미출석', officialAt: null })],
+      ...emptyConsent,
+    });
+
+    const result = await new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE).getSchedule(TOURNAMENT_ID, {});
+
+    // 점수를 내보내는 한 사유도 함께 내보낸다 — 둘의 노출 여부가 갈리면 안 된다.
+    expect(result.items[0].scoreStatus).toBe('official');
+    expect(result.items[0].outcome).toEqual({ reason: 'FORFEIT', note: '원정팀 미출석' });
+  });
+
 });

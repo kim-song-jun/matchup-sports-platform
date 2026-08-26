@@ -13,7 +13,7 @@
      상태 배지(모집중/내 매치)는 tm-badge-blue로 별도 적용 — 블루는 상태 전용. */
   background: var(--overlay-white-18);
   color: var(--overlay-white-92);
-  gap: 5px;
+  gap: 4px;
 }
 
 /* dot: 8×8 원형 인디케이터 */
@@ -21,7 +21,7 @@
   display: inline-block;
   width: 8px;
   height: 8px;
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   flex-shrink: 0;
 }
 
@@ -92,10 +92,10 @@
   .tm-match-desktop-create-btn {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     height: 44px;
-    padding: 0 18px;
-    border-radius: 10px;
+    padding: 0 20px;
+    border-radius: var(--radius-control);
     background: var(--blue500);
     color: var(--static-white);
     font-size: 15px;
@@ -113,19 +113,19 @@
   .tm-match-desktop-create-btn:focus-visible {
     outline: 2px solid var(--blue500);
     outline-offset: 2px;
-    border-radius: 10px;
+    border-radius: var(--radius-control);
   }
 
   /* Search bar: full width on desktop with max-width to prevent over-stretch. */
   .tm-list-searchbar {
-    gap: 10px;
+    gap: 12px;
     padding: 0;
     margin-bottom: 16px;
   }
 
   .tm-list-search-input {
     height: 48px;
-    border-radius: 12px;
+    border-radius: var(--radius-control);
   }
 
   /* Convert the vertical card stack → 2-up grid. */
@@ -159,7 +159,7 @@
   .tm-match-card-stack {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
+    gap: 16px;
     margin-top: 16px;
   }
 }
@@ -203,7 +203,7 @@
   /* Constrain the hero to the content column width; add rounded top corners. */
   .tm-match-detail-hero {
     height: 280px;
-    border-radius: 16px 16px 0 0;
+    border-radius: var(--radius-container) var(--radius-container) 0 0;
     overflow: hidden;
   }
 
@@ -234,9 +234,9 @@
     top: 80px; /* 64px nav + 16px breathing */
     background: var(--bg);
     border: 1px solid var(--border);
-    border-radius: 16px;
+    border-radius: var(--radius-container);
     padding: 20px;
-    box-shadow: var(--shadow-1);
+    box-shadow: var(--shadow-card);
   }
 
   .tm-match-detail-desktop-cta-label {
@@ -244,7 +244,7 @@
     justify-content: space-between;
     align-items: center;
     gap: 8px;
-    margin-bottom: 14px;
+    margin-bottom: 16px;
     padding-bottom: 12px;
     border-bottom: 1px solid var(--grey100);
   }
@@ -319,7 +319,7 @@
 
   /* Two-col layout inside match forms. */
   .tm-match-create-shell .tm-create-two-col {
-    gap: 14px;
+    gap: 16px;
   }
 
   /* Progress bars look better with a bit more top padding. */

@@ -15,6 +15,7 @@ function createFakePrisma(config: {
   userConsents: ReadonlyArray<{ userId: string; state: 'GRANTED' | 'REVOKED' }>;
   snapshots: ReadonlyArray<{ linkId: string; state: 'GRANTED' | 'REVOKED' }>;
   resultRows: unknown[];
+  tournamentAwards?: unknown[];
   viewerConsentState?: 'GRANTED' | 'REVOKED' | null;
 }) {
   const linkFindMany = jest.fn().mockImplementation((args: { where: Record<string, unknown> }) => {
@@ -34,7 +35,7 @@ function createFakePrisma(config: {
       findMany: jest.fn().mockResolvedValue(config.userConsents),
       findUnique: jest.fn().mockResolvedValue(
         config.viewerConsentState === undefined
-          ? null
+          ? (config.userConsents.find((consent) => consent.userId === OWNER_ID) ?? null)
           : config.viewerConsentState === null
             ? null
             : { state: config.viewerConsentState },
@@ -43,6 +44,7 @@ function createFakePrisma(config: {
     v1ParticipantIdentityLinkCurrent: { findMany: linkFindMany },
     v1ParticipantConsentSnapshot: { findMany: jest.fn().mockResolvedValue(config.snapshots) },
     v1GameResultParticipant: { findMany: jest.fn().mockResolvedValue(config.resultRows) },
+    v1TournamentAward: { findMany: jest.fn().mockResolvedValue(config.tournamentAwards ?? []) },
     v1GameSide: {
       findMany: jest.fn().mockResolvedValue([
         { id: 'side-1', gameId: 'game-1', sideKey: 'HOME', teamId: null, displayNameSnapshot: '우리팀' },
@@ -54,7 +56,7 @@ function createFakePrisma(config: {
   } as unknown as PrismaService;
 }
 
-function gameResultRow() {
+function gameResultRow(mvpParticipantId: string | null = null) {
   return {
     id: 'result-1',
     resultRevisionId: 'revision-1',
@@ -70,14 +72,62 @@ function gameResultRow() {
       id: 'revision-1',
       gameId: 'game-1',
       officialAt: new Date('2026-08-10T00:00:00Z'),
-      mvpParticipantId: null,
+      mvpParticipantId,
       score: { home: 1, away: 0 },
       game: { sourceType: 'TEAM_MATCH', tournamentFixtureId: null, currentOfficialRevisionId: 'revision-1' },
     },
   };
 }
 
+function tournamentAwardRow() {
+  return {
+    id: 'award-1',
+    tournamentId: 'tournament-1',
+    awardType: 'best_playmaker',
+    awardLabel: '베스트 플레이메이커',
+    iconKey: 'star',
+    teamName: '우리팀',
+    note: '결승전 2도움',
+    createdAt: new Date('2026-08-10T00:00:00Z'),
+    sortOrder: 0,
+    tournament: {
+      title: '2026 여름 챔피언십',
+      scheduledEndAt: new Date('2026-08-10T00:00:00Z'),
+      updatedAt: new Date('2026-08-10T01:00:00Z'),
+    },
+  };
+}
+
 describe('PublicUserRecordsService', () => {
+  it('본인 기록에서 매치 MVP와 대회별 실제 수상명을 별도로 집계한다', async () => {
+    const prisma = createFakePrisma({
+      links: [{ participantId: 'participant-1', linkId: 'link-1', userId: OWNER_ID }],
+      userConsents: [],
+      snapshots: [],
+      resultRows: [gameResultRow('participant-1')],
+      tournamentAwards: [tournamentAwardRow()],
+      viewerConsentState: null,
+    });
+    const service = new PublicUserRecordsService(prisma);
+
+    const result = await service.getRecords(OWNER_ID, {}, OWNER_ID);
+
+    expect(result.summary).toMatchObject({
+      appearances: 1,
+      goals: 1,
+      mvpCount: 1,
+      matchMvpCount: 1,
+      tournamentAwardCount: 1,
+    });
+    expect(result.tournamentAwards).toEqual([
+      expect.objectContaining({
+        awardLabel: '베스트 플레이메이커',
+        tournamentTitle: '2026 여름 챔피언십',
+        teamName: '우리팀',
+      }),
+    ]);
+  });
+
   it('존재하지 않는 사용자는 404를 던진다', async () => {
     const prisma = createFakePrisma({ links: [], userConsents: [], snapshots: [], resultRows: [] });
     (prisma.v1User.findUnique as jest.Mock).mockResolvedValue(null);
@@ -128,6 +178,7 @@ describe('PublicUserRecordsService', () => {
       userConsents: [], // 동의 없음
       snapshots: [],
       resultRows: [gameResultRow()],
+      tournamentAwards: [tournamentAwardRow()],
     });
     const service = new PublicUserRecordsService(prisma);
 
@@ -135,6 +186,8 @@ describe('PublicUserRecordsService', () => {
 
     expect(result.viewerIsOwner).toBe(false);
     expect(result.items).toHaveLength(0);
+    expect(result.tournamentAwards).toHaveLength(0);
+    expect(result.summary.tournamentAwardCount).toBe(0);
     expect('consentGranted' in result).toBe(false);
   });
 
@@ -160,6 +213,7 @@ describe('PublicUserRecordsService', () => {
       userConsents: [{ userId: OWNER_ID, state: 'GRANTED' }],
       snapshots: [],
       resultRows: [gameResultRow()],
+      tournamentAwards: [tournamentAwardRow()],
     });
     const service = new PublicUserRecordsService(prisma);
 
@@ -167,6 +221,8 @@ describe('PublicUserRecordsService', () => {
 
     expect(result.viewerIsOwner).toBe(false);
     expect(result.items).toHaveLength(1);
+    expect(result.tournamentAwards).toHaveLength(1);
+    expect(result.summary.tournamentAwardCount).toBe(1);
     expect('consentGranted' in result).toBe(false);
   });
 });

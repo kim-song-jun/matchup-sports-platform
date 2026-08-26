@@ -75,6 +75,14 @@ export class CreateTournamentDto {
   @IsIn(TOURNAMENT_FORMATS)
   format?: TournamentFormat;
 
+  /** 리그 방식에서 각 팀이 최소 몇 경기를 보장받아야 하는지. 비워두면 검증하지 않는다. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: '최소 경기 수는 정수여야 해요.' })
+  @Min(1, { message: '최소 경기 수는 1경기 이상이어야 해요.' })
+  @Max(50, { message: '최소 경기 수는 50경기를 넘을 수 없어요.' })
+  minMatchesPerTeam?: number;
+
   @IsOptional()
   @IsDateString()
   registrationDeadlineAt?: string;
@@ -217,6 +225,25 @@ export class CreateTournamentDto {
   @IsString()
   @MaxLength(60)
   bankHolder?: string;
+
+  /**
+   * 경고 누적 출전정지 — 옐로 몇 장이 쌓이면 다음 1경기 출전이 막히는가.
+   * **생략·null = 이 대회에는 규정을 적용하지 않는다.** 기본값을 두지 않은 것이
+   * 안전장치다(schema.prisma 의 같은 필드 주석 참고 — 값이 있으면 이미 끝난 대회에
+   * 소급 적용된다). 2026-08-23 사용자 결정 Q4-A.
+   */
+  @IsOptional()
+  @IsInt({ message: '경고 누적 기준은 정수여야 해요.' })
+  @Min(1, { message: '경고 누적 기준은 1장 이상이어야 해요.' })
+  @Max(20, { message: '경고 누적 기준이 20장을 넘으면 사실상 규정이 없는 것과 같아요.' })
+  yellowAccumulationLimit?: number | null;
+
+  /** 레드카드(퇴장) 1장당 출전정지 경기 수. 생략·null = 퇴장 정지 미적용. */
+  @IsOptional()
+  @IsInt({ message: '퇴장 정지 경기 수는 정수여야 해요.' })
+  @Min(1, { message: '퇴장 정지 경기 수는 1경기 이상이어야 해요.' })
+  @Max(20, { message: '퇴장 정지 경기 수는 20경기를 넘을 수 없어요.' })
+  redCardSuspensionMatches?: number | null;
 
   @IsOptional()
   @IsString()
@@ -364,6 +391,14 @@ export class UpdateTournamentDto {
   @IsIn(TOURNAMENT_FORMATS)
   format?: TournamentFormat;
 
+  /** 리그 방식에서 각 팀이 최소 몇 경기를 보장받아야 하는지. 비워두면 검증하지 않는다. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: '최소 경기 수는 정수여야 해요.' })
+  @Min(1, { message: '최소 경기 수는 1경기 이상이어야 해요.' })
+  @Max(50, { message: '최소 경기 수는 50경기를 넘을 수 없어요.' })
+  minMatchesPerTeam?: number;
+
   @IsOptional()
   @IsDateString()
   registrationDeadlineAt?: string | null;
@@ -503,6 +538,25 @@ export class UpdateTournamentDto {
   @IsString()
   @MaxLength(60)
   bankHolder?: string | null;
+
+  /**
+   * 경고 누적 출전정지 — 옐로 몇 장이 쌓이면 다음 1경기 출전이 막히는가.
+   * **생략·null = 이 대회에는 규정을 적용하지 않는다.** 기본값을 두지 않은 것이
+   * 안전장치다(schema.prisma 의 같은 필드 주석 참고 — 값이 있으면 이미 끝난 대회에
+   * 소급 적용된다). 2026-08-23 사용자 결정 Q4-A.
+   */
+  @IsOptional()
+  @IsInt({ message: '경고 누적 기준은 정수여야 해요.' })
+  @Min(1, { message: '경고 누적 기준은 1장 이상이어야 해요.' })
+  @Max(20, { message: '경고 누적 기준이 20장을 넘으면 사실상 규정이 없는 것과 같아요.' })
+  yellowAccumulationLimit?: number | null;
+
+  /** 레드카드(퇴장) 1장당 출전정지 경기 수. 생략·null = 퇴장 정지 미적용. */
+  @IsOptional()
+  @IsInt({ message: '퇴장 정지 경기 수는 정수여야 해요.' })
+  @Min(1, { message: '퇴장 정지 경기 수는 1경기 이상이어야 해요.' })
+  @Max(20, { message: '퇴장 정지 경기 수는 20경기를 넘을 수 없어요.' })
+  redCardSuspensionMatches?: number | null;
 
   @IsOptional()
   @IsString()

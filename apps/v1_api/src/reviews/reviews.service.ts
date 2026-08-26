@@ -21,6 +21,7 @@ import { SubmitReviewDto } from './dto/submit-review.dto';
 import { formatReviewWindow, reviewWindowClosed } from './review-deadline';
 import { ReviewPolicySettingsService } from './review-policy-settings.service';
 import { isReviewRevealed, reviewRevealScope } from './review-visibility';
+import { aggregatePersonalMetricScores, REVIEW_METRICS, type MetricScoreRow } from './review-metric-aggregation';
 import { average, revealGroupKey, trustStateForReviewCount } from './team-trust-aggregation';
 import { TournamentFixtureReviewsService } from './tournament-fixture-reviews.service';
 import { AdminContextService } from '../common/admin-context.service';
@@ -248,8 +249,24 @@ export class ReviewsService {
     };
   }
 
+  /**
+   * 팀 상세 화면이 쓰는 **공개** 요약 — 특정 팀이 받은 후기를 집계한다. 로그인 없이도
+   * 볼 수 있어야 하므로 사용자 기준 필터(`participatingTeamIds`)가 아니라 팀 id 를 직접 건다.
+   *
+   * 공개라고 해서 게이트를 느슨하게 두지 않는다: 아래 `summarizeTargetReviews` 를 그대로
+   * 지나므로 **상호평가 공개 규칙(`isReviewRevealed`)이 동일하게 적용된다** — 상대가 아직
+   * 안 썼고 유예 시간도 안 지난 후기는 여기서도 보이지 않는다. 이 경로만 따로 집계했다면
+   * 그 규칙을 우회하는 구멍이 됐을 것이다.
+   */
+  async publicTeamSummary(teamId: string, query?: { period?: string }) {
+    return this.summarizeTargetReviews(
+      { targetTeamId: teamId, targetType: 'team' as const },
+      'team',
+      query?.period,
+    );
+  }
+
   async receivedSummary(user: V1AuthUser, query: { targetType: 'user' | 'team'; period?: string }) {
-    const now = new Date();
     const targetFilter = query.targetType === 'team'
       ? { targetTeamId: { in: await this.participatingTeamIds(user.id) }, targetType: 'team' as const }
       // 개인 대상 요약은 매너 점수와 같은 소스만 센다(PERSONAL_REPUTATION_SOURCES) — 두 곳이
@@ -258,15 +275,30 @@ export class ReviewsService {
       // 대회 개인 후기는 계속 제외한다: V1UserReputationSummary의 tournament_* 컬럼으로 따로
       // 집계되고, 한 대회에서 상대 로스터 전원에게 수십 건이 들어와 평균이 급변하기 때문이다.
       : { targetUserId: user.id, targetType: 'user' as const, sourceType: { in: PERSONAL_REPUTATION_SOURCES } };
+    return this.summarizeTargetReviews(targetFilter, query.targetType, query.period, user.id);
+  }
 
+  /**
+   * 요약 집계의 단 하나의 구현. "누구의 요약인가"(대상 필터)만 호출부가 정하고, 공개 규칙과
+   * 종목·태그 집계는 전부 여기 있다 — 공개 경로와 내 화면 경로가 각자 집계하면 같은 팀의
+   * 같은 후기가 화면마다 다르게 세어진다.
+   */
+  private async summarizeTargetReviews(
+    targetFilter: Record<string, unknown>,
+    targetType: 'user' | 'team',
+    period?: string,
+    /** 개인 대상일 때 역방향 후기를 찾는 기준 사용자. 팀 대상에는 필요 없다. */
+    reverseUserId?: string,
+  ) {
+    const now = new Date();
     const candidates = await this.prisma.v1PostEventReview.findMany({
       where: { status: 'submitted', sportId: { not: null }, ...targetFilter },
       select: { sourceType: true, sourceId: true, sourceGroupId: true, reviewerUserId: true, reviewerTeamId: true, targetUserId: true, targetTeamId: true, rating: true, sportId: true, submittedAt: true, tags: { select: { tagCode: true, labelSnapshot: true } } },
     });
 
-    const reverseReviews = query.targetType === 'team'
+    const reverseReviews = targetType === 'team'
       ? await this.reverseTeamReviews(candidates)
-      : await this.reverseUserReviews(user.id, candidates);
+      : await this.reverseUserReviews(reverseUserId ?? '', candidates);
 
     const revealed = candidates.filter((review) =>
       isReviewRevealed(
@@ -274,8 +306,8 @@ export class ReviewsService {
           // 짝을 맞추는 단위는 경기가 아니라 reviewRevealScope() — 대회 후기는 중복 방지 스코프가
           // 대회 단위라, 서로 다른 경기에서 평가한 짝이 픽스처 기준으로는 절대 맞지 않는다.
           sourceId: reviewRevealScope(review),
-          reviewerUserId: query.targetType === 'team' ? review.reviewerTeamId ?? '' : review.reviewerUserId,
-          targetUserId: query.targetType === 'team' ? review.targetTeamId : review.targetUserId,
+          reviewerUserId: targetType === 'team' ? review.reviewerTeamId ?? '' : review.reviewerUserId,
+          targetUserId: targetType === 'team' ? review.targetTeamId : review.targetUserId,
           submittedAt: review.submittedAt,
         },
         reverseReviews,
@@ -284,8 +316,8 @@ export class ReviewsService {
     );
 
     const availableMonths = [...new Set(revealed.map((review) => review.submittedAt.toISOString().slice(0, 7)))].sort().reverse();
-    const filtered = query.period
-      ? revealed.filter((review) => review.submittedAt.toISOString().slice(0, 7) === query.period)
+    const filtered = period
+      ? revealed.filter((review) => review.submittedAt.toISOString().slice(0, 7) === period)
       : revealed;
 
     // 프론트의 종목 배지·색상은 v1Sport.code 로 매핑한다(SPORT_ACCENT_MAP). sportId(UUID)만
@@ -594,9 +626,8 @@ export class ReviewsService {
     });
     if (!teamMatch) throw notFound('SOURCE_NOT_FOUND', 'Review source was not found');
     if (!isCompleted(teamMatch)) throw conflict('SOURCE_NOT_COMPLETED', 'Review source is not completed');
-    // team_match 앵커는 completedAt(games.service.ts 결과 확정 시 채워짐) — 정정 승인으로 앵커가
-    // 갱신되면 이 판정도 매 요청마다 다시 계산되므로 마감이 함께 연장된다(저장하지 않는다).
-    // 기간은 어드민 설정(V1ReviewPolicySettings, 기본 168시간=7일)에서 읽는다.
+    // team_match 앵커는 completedAt(games.service.ts 결과 확정 시 채워짐, 스펙 §6.1) — 정정 승인 시
+    // 앵커가 갱신되면 이 판정도 매 요청마다 다시 계산되므로 마감이 함께 연장된다(D-6, 저장 안 함).
     const windowHours = await this.reviewPolicySettings.getWindowHours();
     if (reviewWindowClosed(teamMatch.completedAt, new Date(), windowHours)) {
       throw gone('REVIEW_WINDOW_CLOSED', `평가 가능 기간(${formatReviewWindow(windowHours)})이 지났어요.`);
@@ -759,6 +790,7 @@ export class ReviewsService {
           rating: dto.rating,
           sportId: source.sportId,
           tags: { create: tagCodes.map((tagCode) => ({ tagCode, labelSnapshot: REVIEW_TAGS[tagCode] })) },
+          ...metricScoreCreate(dto),
         },
         include: reviewInclude(),
       });
@@ -793,6 +825,7 @@ export class ReviewsService {
           rating: dto.rating,
           sportId: source.sportId,
           tags: { create: tagCodes.map((tagCode) => ({ tagCode, labelSnapshot: REVIEW_TAGS[tagCode] })) },
+          ...metricScoreCreate(dto),
         },
         include: reviewInclude(),
       });
@@ -1036,7 +1069,7 @@ export class ReviewsService {
       // 모순이 있었다. 대회 개인 후기(tournament_fixture)는 여전히 제외한다 — 한 대회에서
       // 상대 로스터 전원에게 수십 건이 들어와 점수가 급변하므로 tournament_* 컬럼에 따로 쌓는다.
       where: { targetUserId, targetType: 'user', status: 'submitted', sourceType: { in: PERSONAL_REPUTATION_SOURCES } },
-      select: { sourceId: true, reviewerUserId: true, targetUserId: true, rating: true, submittedAt: true },
+      select: { id: true, sourceId: true, reviewerUserId: true, targetUserId: true, rating: true, submittedAt: true },
     });
     const reverseReviews = candidates.length
       ? await tx.v1PostEventReview.findMany({
@@ -1048,10 +1081,28 @@ export class ReviewsService {
     const reviewCount = revealed.length;
     const avgRating = reviewCount ? revealed.reduce((sum, review) => sum + review.rating, 0) / reviewCount : null;
 
+    // 4항목 채점 집계 -- rating 과 같은 reveal 규칙, 표본은 "4항목이 달린 후기"만.
+    // 이 집계가 선수 카드의 SKI/MAN/PUN 값과 해금 카운트(후기 3 / 방패 10)의 원천이다.
+    const revealedIds = new Set(revealed.map((review) => review.id));
+    const metricRows = revealedIds.size
+      ? await tx.v1PostEventReviewMetricScore.findMany({
+          where: { reviewId: { in: [...revealedIds] } },
+          select: { reviewId: true, metric: true, score: true },
+        })
+      : [];
+    const metricAggregate = aggregatePersonalMetricScores(revealedIds, metricRows as MetricScoreRow[]);
+    const metricData = {
+      metricReviewCount: metricAggregate.metricReviewCount,
+      metricSkillScore: decimalScore(metricAggregate.skill),
+      metricMannerScore: decimalScore(metricAggregate.manner),
+      metricPunctualityScore: decimalScore(metricAggregate.punctuality),
+      metricSafetyScore: decimalScore(metricAggregate.safety),
+    };
+
     await tx.v1UserReputationSummary.upsert({
       where: { userId: targetUserId },
-      update: reputationData(reviewCount, avgRating, '완료 경기 리뷰 기반'),
-      create: { userId: targetUserId, ...reputationData(reviewCount, avgRating, '완료 경기 리뷰 기반') },
+      update: { ...reputationData(reviewCount, avgRating, '완료 경기 리뷰 기반'), ...metricData },
+      create: { userId: targetUserId, ...reputationData(reviewCount, avgRating, '완료 경기 리뷰 기반'), ...metricData },
     });
   }
 
@@ -1159,6 +1210,11 @@ export class ReviewsService {
     if (dto.sourceType === 'match' && (dto.targetType !== 'user' || !dto.targetUserId || dto.targetTeamId)) {
       throw badRequest('INVALID_MATCH_REVIEW_TARGET', 'Match reviews require targetType=user and targetUserId only');
     }
+    // 4항목 채점은 사람에게만 -- 팀에 "시간약속" 점수를 주는 것은 의미가 없고,
+    // 조용히 버리면 클라이언트는 저장된 줄 안다(무시 대신 명시적 거부).
+    if (dto.metricScores && dto.targetType !== 'user') {
+      throw badRequest('METRIC_SCORES_USER_ONLY', 'metricScores is only allowed for user targets');
+    }
     // team_match도 대회 경기와 같은 두 대상을 받는다. 개인 대상 명단의 근거는 그 경기에 제출된
     // 라인업(V1GameParticipant.userId)이다 — 팀 매치 라인업은 연동 팀원의 userId를 그대로 저장하고
     // (team-matches/team-match-lineup.service.ts resolveEntry) 게스트만 null로 남긴다. 예전 주석은
@@ -1228,11 +1284,6 @@ export class ReviewsService {
       state: 'done' as const,
       reviewerTeam: review.reviewerTeam ? { teamId: review.reviewerTeam.id, name: review.reviewerTeam.name } : null,
       targetTeam: review.targetTeam ? { teamId: review.targetTeam.id, name: review.targetTeam.name } : null,
-      // 한 경기에서 여러 사람에게 쓴 리뷰는 sourceId 가 같아서, 대상자를 안 실으면 목록에서
-      // 서로 구분되지 않는다("누구에게 쓴 건지" 알 수 없음). targetUser 는 이미 조인돼 있다.
-      targetUser: review.targetUser
-        ? { userId: review.targetUser.id, nickname: review.targetUser.profile?.nickname ?? '참가자' }
-        : null,
     };
   }
 }
@@ -1298,6 +1349,17 @@ function isCompleted(source: { status: string; completedAt: Date | null }) {
 
 function uniqueTagCodes(tagCodes: string[]): ReviewTagCode[] {
   return [...new Set(tagCodes)].filter((tagCode): tagCode is ReviewTagCode => tagCode in REVIEW_TAGS);
+}
+
+/** 4항목 채점을 후기 행에 nested create 로 싣는다. 없으면 legacy 후기 그대로. */
+function metricScoreCreate(dto: SubmitReviewDto) {
+  if (!dto.metricScores) return {};
+  const { skill, manner, punctuality, safety } = dto.metricScores;
+  const byMetric = { SKILL: skill, MANNER: manner, PUNCTUALITY: punctuality, SAFETY: safety } as const;
+  return {
+    scoringVersion: 'four_metric' as const,
+    metricScores: { create: REVIEW_METRICS.map((metric) => ({ metric, score: byMetric[metric] })) },
+  };
 }
 
 function reputationData(reviewCount: number, avgRating: number | null, sourceLabel: string) {

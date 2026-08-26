@@ -18,7 +18,7 @@ import {
   useV1AdminRemovePlayer,
   useV1AdminRosterEligibleMembers,
 } from '@/hooks/use-v1-api';
-import { RegistrationsTab } from './tournament-detail-client';
+import { RegistrationsTab } from './registrations-tab';
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminTournamentRegistrations: vi.fn(),
@@ -178,5 +178,33 @@ describe('RegistrationsTab — 명단 제출 마감 예외 토글', () => {
     const { onSuccess } = revokeMutate.mock.calls[0][1];
     onSuccess();
     expect(showToast).toHaveBeenCalledWith('예외를 해제했어요.', 'success');
+  });
+
+  it('hides every mutation action for read-only admins but keeps roster review and CSV export', () => {
+    useV1RosterDeadlineOverrideGrantMock.mockReturnValue(noopMutationHook());
+    useV1RosterDeadlineOverrideRevokeMock.mockReturnValue(noopMutationHook());
+    useV1AdminTournamentRegistrationsMock.mockReturnValue({
+      data: {
+        items: [
+          baseRegistration({ rosterDeadlineOverrideAt: null }),
+          baseRegistration({ id: 'reg-2', status: 'cancel_requested' }),
+        ],
+        pageInfo: { nextCursor: null, hasNext: false },
+      },
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useV1AdminTournamentRegistrations>);
+
+    render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite={false} />);
+
+    // canWrite=true라면 보였을 mutation 버튼들이 전부 사라져야 한다
+    // ('취소'는 상태 필터 칩과 이름이 겹치므로 모호하지 않은 라벨들로 검증)
+    expect(screen.queryByRole('button', { name: '명단 잠금' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '마감 예외 허용' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '취소 거부(잔류)' })).not.toBeInTheDocument();
+    // 조회성 액션은 유지된다 (RosterModal은 내부에서 canWrite를 별도 게이팅)
+    expect(screen.getAllByRole('button', { name: '명단 검토' })).toHaveLength(2);
   });
 });

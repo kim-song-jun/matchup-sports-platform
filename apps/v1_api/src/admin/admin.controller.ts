@@ -1,16 +1,32 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UploadedFiles,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { UPLOAD_HARD_CAP_BYTES } from '../uploads/uploads.controller';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
+import { Throttle } from '@nestjs/throttler';
 import {
+  AdminGlobalSearchQueryDto,
   AdminListQueryDto,
   AdminLogsQueryDto,
   AdminInquiryListQueryDto,
   AdminMatchListQueryDto,
   AdminOverviewQueryDto,
   AdminPopupListQueryDto,
+  AdminReportedTeamListQueryDto,
   AdminTeamListQueryDto,
   AdminTeamMatchListQueryDto,
   AdminNoticeListQueryDto,
@@ -103,6 +119,19 @@ export class AdminController {
     @Body() dto: ChangeTeamMatchStatusDto,
   ) {
     return this.adminService.changeTeamMatchStatus(user, teamMatchId, dto);
+  }
+
+  /** 전역 검색 — 커맨드 팔레트(⌘K). 클라이언트 300ms debounce 전제, 남용 방지로 60회/분 제한 */
+  @Get('search')
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  globalSearch(@CurrentUser() user: V1AuthUser, @Query() query: AdminGlobalSearchQueryDto) {
+    return this.adminService.globalSearch(user, query);
+  }
+
+  /** 할 일 인박스 — 운영자 액션 대기 항목 요약 (M3 허브) */
+  @Get('hub/inbox')
+  hubInbox(@CurrentUser() user: V1AuthUser) {
+    return this.adminService.hubInbox(user);
   }
 
   @Get('action-logs')
@@ -267,11 +296,31 @@ export class AdminController {
     return this.adminService.changeInquiryStatus(user, inquiryId, dto);
   }
 
+  // ─── Reports (신고 롤업 / 대리 차단) ───────────────────────────────────────
+
+  @Get('reports/teams')
+  listReportedTeams(@CurrentUser() user: V1AuthUser, @Query() query: AdminReportedTeamListQueryDto) {
+    return this.adminService.listReportedTeams(user, query);
+  }
+
+  // 아무것도 생성하지 않는 멱등 통과(이미 차단됨)가 있어 @HttpCode(200) 없이는 NestJS 가
+  // POST 기본값인 201 을 준다 — 아무것도 만들지 않았는데 "생성됨" 이라고 답하는 셈이 된다.
+  @Post('inquiries/:inquiryId/block-reported-team')
+  @HttpCode(200)
+  blockReportedTeam(@CurrentUser() user: V1AuthUser, @Param('inquiryId') inquiryId: string) {
+    return this.adminService.blockReportedTeam(user, inquiryId);
+  }
+
   // ─── Team Matches ─────────────────────────────────────────────────────────
 
   @Get('team-matches')
   listTeamMatches(@CurrentUser() user: V1AuthUser, @Query() query: AdminTeamMatchListQueryDto) {
     return this.adminService.listTeamMatches(user, query);
+  }
+
+  @Get('team-matches/:teamMatchId')
+  getTeamMatch(@CurrentUser() user: V1AuthUser, @Param('teamMatchId') teamMatchId: string) {
+    return this.adminService.getTeamMatch(user, teamMatchId);
   }
 
   // ─── Admin management (owner-only) ────────────────────────────────────────

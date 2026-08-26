@@ -121,6 +121,26 @@ async function waitForContent(page) {
       }
       await waitForContent(page);
 
+      // fullPage:true 만으로는 모바일·태블릿이 뷰포트 높이(900) 그대로 잘린다 — 이 앱의
+      // 모바일 레이아웃은 문서가 아니라 내부 컨테이너가 스크롤해서 document.scrollHeight 가
+      // 뷰포트와 같기 때문이다. 실제 콘텐츠 높이를 재서 뷰포트를 키운 뒤 찍는다.
+      const contentHeight = await page.evaluate(() => {
+        const candidates = [document.documentElement.scrollHeight, document.body.scrollHeight];
+        for (const el of document.querySelectorAll('*')) {
+          const style = getComputedStyle(el);
+          if (/(auto|scroll)/.test(style.overflowY) && el.scrollHeight > el.clientHeight) {
+            // 스크롤 컨테이너는 자기 위쪽 오프셋만큼 더해야 페이지 전체 높이가 된다.
+            candidates.push(el.scrollHeight + el.getBoundingClientRect().top + window.scrollY);
+          }
+        }
+        return Math.ceil(Math.max(...candidates));
+      });
+      const shotHeight = Math.min(Math.max(contentHeight, 900), 6000);
+      if (shotHeight > 900) {
+        await page.setViewportSize({ width, height: shotHeight });
+        await page.waitForTimeout(600);
+      }
+
       const file = path.join(OUT, `${pageName}-${widthName}-${width}.png`);
       await page.screenshot({ path: file, fullPage: true });
 

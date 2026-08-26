@@ -19,19 +19,36 @@ const PENDING_SCAN_LIMIT = 50;
  * 예전에는 이 카드가 대회 후기만 알려줘서, 경기 후기는 마이 메뉴의 서브텍스트 한 줄
  * 말고는 유도 수단이 없었다. 총계를 한 번에 보여주고 소스별로 갈 곳을 나눠 준다.
  */
-export function PendingReviewsCard() {
+/**
+ * 남은 후기 총계와 첫 대회를 함께 돌려준다.
+ *
+ * 카드가 자기 데이터를 직접 가져와 0건이면 스스로 사라지는 구조였는데, 홈 배너 상한
+ * 정책(Task 154 P2-1)이 생기면서 **부모가 "이 카드가 뜰 것인가"를 미리 알아야** 하게
+ * 됐다 -- 안 뜰 카드에 자리를 내주면 그 방문에는 유도 배너가 하나도 안 보인다.
+ *
+ * 훅으로 떼어 부모와 카드가 같은 값을 쓰게 한다. React Query 가 같은 키를 dedupe 하므로
+ * 두 곳에서 불러도 요청은 한 번이다.
+ */
+export function usePendingReviewsSummary() {
   const hasSession = hasStoredV1Session();
   const { data: tournamentPending } = useV1PendingTournamentReviews(hasSession);
   const { data: eventPending } = useV1Reviews(
     { tab: 'pending', limit: PENDING_SCAN_LIMIT },
     { enabled: hasSession },
   );
-
   const tournamentItems = tournamentPending ?? [];
   // 경기 후기는 "경기 수"가 아니라 아직 남은 "대상 수"를 센다 — 한 경기에 상대 팀 1 +
   // 상대 선수 여러 명이 걸리므로, 경기 수로 세면 실제 할 일보다 훨씬 적게 보인다.
   const eventRemaining = (eventPending?.items ?? []).reduce((sum, item) => sum + item.remainingCount, 0);
-  const total = eventRemaining + tournamentItems.length;
+  return {
+    total: eventRemaining + tournamentItems.length,
+    eventRemaining,
+    tournamentItems,
+  };
+}
+
+export function PendingReviewsCard() {
+  const { total, eventRemaining, tournamentItems } = usePendingReviewsSummary();
   if (total === 0) return null;
 
   const firstTournament = tournamentItems[0];

@@ -353,31 +353,44 @@ describe('TournamentsAdminService', () => {
 
   // 대회가 끝나는 순간이 후기를 쓰는 시점이다. 이 알림이 없으면 사용자가 대회 페이지를
   // 다시 찾아 들어오지 않는 한 후기를 쓸 계기가 없다. 수신자는 대회 후기 작성 권한과
-  // 정확히 같아야 한다(참가 확정 팀의 owner/manager) — 넓으면 못 쓰는 알림, 좁으면 누락.
-  it('changeStatus: in_progress → completed 시 참가팀 팀장·운영진에게 후기 요청 알림을 보낸다', async () => {
+  // 정확히 같아야 한다 — 넓으면 못 쓰는 알림, 좁으면 누락.
+  //
+  // 2026-08-18 에 상대 팀 후기를 모든 참가 멤버에게 열었으므로(#554) 수신자도 active 멤버
+  // 전원이다. 그 전 규칙(owner/manager)을 그대로 뒀더니 프로덕션에서 작성 가능 164명 중
+  // 29명만 알림을 받았다.
+  it('changeStatus: in_progress → completed 시 참가팀 active 멤버 전원에게 후기 요청 알림을 보낸다', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'in_progress', entryFee: 0 }));
     prisma.v1Tournament.update.mockResolvedValue(tournamentRow({ status: 'completed' }));
     prisma.v1TournamentRegistration.findMany.mockResolvedValue([
-      { team: { memberships: [{ userId: 'owner-a' }, { userId: 'manager-a' }] } },
-      // 같은 사람이 두 팀의 운영진이면 알림은 한 번만 가야 한다.
+      { team: { memberships: [{ userId: 'owner-a' }, { userId: 'manager-a' }, { userId: 'member-a' }] } },
+      // 같은 사람이 두 팀에 속해 있으면 알림은 한 번만 가야 한다.
       { team: { memberships: [{ userId: 'manager-a' }, { userId: 'owner-b' }] } },
     ]);
 
     await service.changeStatus(ownerAuthUser, 'tournament-1', { status: 'completed' });
 
     expect(notifications.emitNotificationToMany).toHaveBeenCalledWith(
-      ['owner-a', 'manager-a', 'owner-b'],
+      ['owner-a', 'manager-a', 'member-a', 'owner-b'],
       'tournament_completed_review_request',
       'tournament-1',
     );
     // 조회 조건이 후기 권한과 갈리면 못 쓰는 사람에게 알림이 간다 — 조건 자체를 고정한다.
-    const where = prisma.v1TournamentRegistration.findMany.mock.calls[0][0].where;
-    expect(where).toMatchObject({
+    const args = prisma.v1TournamentRegistration.findMany.mock.calls[0][0];
+    expect(args.where).toMatchObject({
       tournamentId: 'tournament-1',
       status: 'confirmed',
       team: { status: 'active', deletedAt: null },
     });
+    // 역할 필터가 되살아나면 팀원이 다시 알림에서 빠진다 — 조회·선택 양쪽을 고정한다.
+    //
+    // 문자열 매칭(`JSON.stringify(args).not.toContain('owner')`) 대신 구조로 본다:
+    // 그 방식은 팀명·주석·픽스처 데이터에 'owner' 가 우연히 섞이기만 해도 깨지고(오탐),
+    // 정작 확인하려는 것은 "role 필터가 있는가" 하나다.
+    expect(args.where.team.memberships.some).toEqual({ status: 'active' });
+    expect(args.where.team.memberships.some).not.toHaveProperty('role');
+    expect(args.select.team.select.memberships.where).toEqual({ status: 'active' });
+    expect(args.select.team.select.memberships.where).not.toHaveProperty('role');
   });
 
   // 알림은 전이의 부수 효과다 — 전이는 트랜잭션에서 이미 커밋됐으므로, 수신자 조회나 발송이
@@ -1133,6 +1146,75 @@ describe('TournamentsAdminService', () => {
       service.update(ownerAuthUser, 'tournament-1', { substitutionMode: 'rolling' }),
     ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_LINEUP_SIZE_LOCKED' } });
     expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
+  });
+
+  /**
+   * alpha 실측: 교체 방식만 담은 PATCH 가 "이미 기록된 경기 결과가 있어 **출전 인원**을
+   * 변경할 수 없어요"로 거부됐다. 운영자는 출전 인원을 건드리지도 않았으므로 무엇이
+   * 막혔는지 알 수 없고, 손대지도 않은 필드를 고치려 들게 된다. 두 필드군이 한 게이트를
+   * 공유하는 것은 맞지만 **메시지는 시도한 것**을 말해야 한다.
+   */
+  it('update: 교체 설정만 바꿨다면 잠금 메시지도 교체 설정이라고 말한다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'in_progress' }));
+
+    // 포함 검사만으로는 '출전 인원·교체 설정' 과 구분되지 않는다 — 손대지 않은 필드가
+    // **빠져 있는지**가 이 테스트의 핵심이므로 메시지를 직접 꺼내 본다.
+    const message = await service
+      .update(ownerAuthUser, 'tournament-1', { substitutionMode: 'rolling' })
+      .then(
+        () => { throw new Error('거부되지 않았다'); },
+        (err: { response?: { code?: string; message?: string } }) => {
+          expect(err.response?.code).toBe('TOURNAMENT_LINEUP_SIZE_LOCKED');
+          return err.response?.message ?? '';
+        },
+      );
+    expect(message).toContain('교체 설정');
+    expect(message).not.toContain('출전 인원');
+  });
+
+  it('update: 출전 인원만 바꿨다면 잠금 메시지도 출전 인원이라고 말한다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'in_progress' }));
+
+    await expect(
+      service.update(ownerAuthUser, 'tournament-1', { lineupMaxPlayers: 5 }),
+    ).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_LINEUP_SIZE_LOCKED', message: expect.stringContaining('출전 인원을') },
+    });
+  });
+
+  /**
+   * 이 잠금은 **이 폼에서만** 막히는 것이고 소급 영향을 확인하는 전용 경로로는 바꿀 수 있다.
+   * 문구가 "변경할 수 없어요"로 끝나면 운영자는 영구 불가로 읽고 엉뚱한 우회를 시도한다 —
+   * alpha 실측에서 경기 결과를 void 해도 풀리지 않는 것을 확인했다(게이트가 세는
+   * startedGameCount 는 결과뿐 아니라 라인업·이벤트·경기 상태까지 보므로 void 로는 0이
+   * 되지 않는다). 되돌릴 방법이 있는데 없다고 믿게 두면 안 된다.
+   */
+  it('update: 잠금 메시지가 되돌릴 경로를 함께 알려준다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'in_progress' }));
+
+    const message = await service
+      .update(ownerAuthUser, 'tournament-1', { substitutionMode: 'rolling' })
+      .then(
+        () => { throw new Error('거부되지 않았다'); },
+        (err: { response?: { message?: string } }) => err.response?.message ?? '',
+      );
+
+    expect(message).toContain('교체 설정');
+    expect(message).toContain('대회 설정 변경');
+  });
+
+  it('update: 둘 다 바꿨다면 둘 다 말한다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'in_progress' }));
+
+    await expect(
+      service.update(ownerAuthUser, 'tournament-1', { lineupMaxPlayers: 5, substitutionMode: 'rolling' }),
+    ).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_LINEUP_SIZE_LOCKED', message: expect.stringContaining('출전 인원·교체 설정') },
+    });
   });
 
   it('update: changing only substitutionMode preserves the currently pinned lineup size instead of resetting it to canonical', async () => {

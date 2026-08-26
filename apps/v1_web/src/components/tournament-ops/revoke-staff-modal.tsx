@@ -115,7 +115,7 @@ export function RevokeStaffModal({
         className="bg-[var(--card-surface)] rounded-2xl shadow-[0_8px_32px_rgba(20,28,45,0.14)] w-full max-w-[400px] overflow-hidden"
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
-          <h2 id="revoke-staff-modal-title" className="text-[16px] font-bold text-[var(--text-strong)]">
+          <h2 id="revoke-staff-modal-title" className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">
             배정 해제
           </h2>
           <button
@@ -131,12 +131,12 @@ export function RevokeStaffModal({
 
         <form onSubmit={handleSubmit} noValidate>
           <div className="px-5 py-5 flex flex-col gap-4">
-            <p className="text-[14px] text-[var(--text-muted)]">
+            <p className="text-[length:var(--font-size-body-sm)] text-[var(--text-muted)]">
               <strong className="text-[var(--text-strong)]">{targetLabel}</strong>의 배정을 해제할까요? 즉시
               해당 실시간 세션에서도 방출돼요.
             </p>
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="revoke-staff-reason" className="text-[13px] font-semibold text-[var(--text-body)]">
+              <label htmlFor="revoke-staff-reason" className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">
                 사유 <span className="text-[var(--red700)]" aria-hidden="true">*</span>
                 <span className="sr-only">(필수)</span>
               </label>
@@ -155,7 +155,7 @@ export function RevokeStaffModal({
             </div>
 
             {errorMessage && (
-              <p className="text-[13px] text-[var(--red700)]" role="alert">
+              <p className="text-[length:var(--font-size-label)] text-[var(--red700)]" role="alert">
                 {errorMessage}
               </p>
             )}
@@ -166,7 +166,7 @@ export function RevokeStaffModal({
               type="button"
               onClick={() => !pending && onClose()}
               disabled={pending}
-              className="flex-1 h-[48px] rounded-xl text-[15px] font-semibold text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-gray-200 dark:hover:bg-white/20 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+              className="flex-1 h-[48px] rounded-xl text-[length:var(--font-size-body)] font-semibold text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-gray-200 dark:hover:bg-white/20 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
             >
               취소
             </button>
@@ -174,7 +174,7 @@ export function RevokeStaffModal({
               type="submit"
               disabled={!canSubmit}
               className={[
-                'flex-1 h-[48px] rounded-xl text-[15px] font-semibold transition-colors',
+                'flex-1 h-[48px] rounded-xl text-[length:var(--font-size-body)] font-semibold transition-colors',
                 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                 canSubmit ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-red-200 dark:bg-red-500/30 text-white cursor-not-allowed',
               ].join(' ')}

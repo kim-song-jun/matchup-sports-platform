@@ -487,7 +487,7 @@ button:disabled {
   top: 0;
   left: 0;
   width: 100%;
-  z-index: 20;
+  z-index: var(--z-chrome);
 }
 
 .tm-topbar-actions {
@@ -568,7 +568,7 @@ button:disabled {
   bottom: 0;
   left: 0;
   width: 100%;
-  z-index: 20;
+  z-index: var(--z-chrome);
 }
 
 .tm-bottom-tab {
@@ -1225,7 +1225,7 @@ button:disabled {
   padding: 14px 20px 22px;
   border-top: 1px solid var(--grey100);
   background: var(--bg);
-  z-index: 20;
+  z-index: var(--z-chrome);
 }
 
 .tm-auth-fixed-reason {
@@ -2450,7 +2450,7 @@ button:disabled {
   line-height: 1;
   font-weight: 500;
   box-shadow: 0 12px 26px rgba(49, 130, 246, 0.32);
-  z-index: 30;
+  z-index: var(--z-floating);
 }
 
 .tm-create-fixed-cta {
@@ -2534,7 +2534,7 @@ button:disabled {
   bottom: 0;
   width: min(100%, var(--v1-app-chrome-frame-width));
   transform: translateX(-50%);
-  z-index: 31;
+  z-index: var(--z-cta);
   padding: 14px var(--v1-shell-page-x) calc(var(--v1-shell-cta-bottom-pad) + var(--v1-shell-safe-bottom));
   border-top: 1px solid var(--grey100);
   background: var(--bg);
@@ -2547,7 +2547,7 @@ button:disabled {
   left: 50%;
   width: min(100%, var(--v1-app-chrome-frame-width));
   transform: translateX(-50%);
-  z-index: 38;
+  z-index: var(--z-scrim);
   background: rgba(25, 31, 40, 0.18);
   animation: tm-filter-scrim-fade .18s ease-out;
 }
@@ -2560,7 +2560,7 @@ button:disabled {
   right: 0;
   width: min(100%, var(--v1-app-chrome-frame-width));
   margin: 0 auto;
-  z-index: 40;
+  z-index: var(--z-layer);
   overflow: hidden;
   pointer-events: none;
 }
@@ -3001,7 +3001,7 @@ button:disabled {
   gap: 8px;
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: var(--z-raised);
 }
 
 .tm-team-list {
@@ -3083,7 +3083,7 @@ button:disabled {
   top: calc(100% + 6px);
   left: 0;
   right: 0;
-  z-index: 30;
+  z-index: var(--z-floating);
   border: 1px solid var(--grey100);
   border-radius: 14px;
   background: var(--bg);
@@ -3761,7 +3761,7 @@ button:disabled {
   left: auto;
   bottom: auto;
   flex: 0 0 auto;
-  z-index: 34;
+  z-index: var(--z-inputbar);
   width: 100%;
   padding: 12px var(--v1-shell-page-x) calc(22px + var(--v1-shell-safe-bottom));
   border-top: 1px solid var(--grey100);
@@ -3800,7 +3800,7 @@ button:disabled {
   left: var(--v1-shell-page-x);
   right: var(--v1-shell-page-x);
   bottom: calc(22px + var(--v1-shell-safe-bottom));
-  z-index: 40;
+  z-index: var(--z-layer);
   min-height: 44px;
   border-radius: 14px;
   background: var(--green50);
@@ -3899,7 +3899,7 @@ button:disabled {
 .tm-notification-sheet-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 60;
+  z-index: var(--z-modal);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -4864,7 +4864,7 @@ button:disabled {
   left: 0;
   right: 0;
   height: 3px;
-  z-index: 9999;
+  z-index: var(--z-top);
   pointer-events: none;
 }
 
@@ -6034,7 +6034,7 @@ button:disabled {
 .tm-video-modal {
   position: fixed;
   inset: 0;
-  z-index: 9999;
+  z-index: var(--z-top);
   display: flex;
   align-items: center;
   justify-content: center;

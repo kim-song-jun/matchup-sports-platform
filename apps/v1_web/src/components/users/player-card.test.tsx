@@ -129,6 +129,37 @@ describe('선수 카드', () => {
     expect(screen.getByText(/다음 목표 · 후기 3개 받기/)).toBeInTheDocument();
   });
 
+  it('사진이 없는 본인 카드에만 사진 추가 슬롯이 뜬다 (A안)', () => {
+    // 업로드 경로는 이미 동작하는데 권하는 화면이 없어 실측 카드가 전부 이니셜이었다.
+    // 남의 카드·공유 화면(isOwner=false)에 뜨면 조작할 수 없는 버튼을 보여주는 셈이라 안 된다.
+    const { rerender } = render(
+      <PlayerCard card={card()} displayName="김선준" profileImageUrl={null} teamName={null} isOwner />,
+    );
+    expect(screen.getByRole('link', { name: /사진 추가하기/ })).toHaveAttribute('href', '/my/profile/edit');
+
+    // 남이 보면 슬롯 대신 이니셜 렌더가 남는다.
+    rerender(
+      <PlayerCard card={card()} displayName="김선준" profileImageUrl={null} teamName={null} isOwner={false} />,
+    );
+    expect(screen.queryByRole('link', { name: /사진 추가하기/ })).not.toBeInTheDocument();
+  });
+
+  it('사진이 있으면 본인 카드에도 슬롯 대신 사진이 들어간다', () => {
+    const { container } = render(
+      <PlayerCard
+        card={card()}
+        displayName="김선준"
+        profileImageUrl="/uploads/2026/08/me.webp"
+        teamName={null}
+        isOwner
+      />,
+    );
+
+    expect(screen.queryByRole('link', { name: /사진 추가하기/ })).not.toBeInTheDocument();
+    const photo = container.querySelector('.tm-pcard-render-photo') as HTMLElement | null;
+    expect(photo?.style.backgroundImage).toContain('/uploads/2026/08/me.webp');
+  });
+
   it('settingsHref 를 주면 카드 설정 입구가, 없으면(남의 카드) 안 보인다', () => {
     // 적대 검증(2026-08-25) 확정 결함: 숨김·모양 설정이 카드에서 2클릭 떨어진 메뉴에만
     // 있어 발견 불가능했다. 입구는 본인 카드에서만 -- 남의 카드에 설정 아이콘이 뜨면 오해다.

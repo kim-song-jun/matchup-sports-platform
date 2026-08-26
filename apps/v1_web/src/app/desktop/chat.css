@@ -185,6 +185,18 @@
     flex-shrink: 0;
     text-decoration: none;
     transition: background-color 0.12s;
+    /* [a11y] 40x40 → 히트 영역만 44px (부모 gap 12px, 겹침 없음). */
+    position: relative;
+  }
+
+  .tm-chat-room-desktop-head .tm-desktop-back::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    transform: translate(-50%, -50%);
   }
 
   .tm-chat-room-desktop-head .tm-desktop-back:hover {

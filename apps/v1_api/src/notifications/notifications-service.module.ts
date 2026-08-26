@@ -4,7 +4,6 @@ import { RealtimeModule } from '../realtime/realtime.module';
 import { NotificationsService } from './notifications.service';
 import { REALTIME_NOTIFIER } from './realtime-notifier.port';
 import { WebPushModule } from './web-push.module';
-import { WebPushService } from './web-push.service';
 
 /**
  * Sole HTTP-side declaring module for NotificationsService + WebPushService. Binds
@@ -32,6 +31,10 @@ import { WebPushService } from './web-push.service';
 @Module({
   imports: [RealtimeModule, WebPushModule],
   providers: [NotificationsService, { provide: REALTIME_NOTIFIER, useExisting: RealtimeGateway }],
-  exports: [NotificationsService, WebPushService, WebPushModule],
+  // WebPushService 자체는 여기 provider 가 아니라 직접 export 할 수 없다(Nest 가
+  // `cannot export a provider that is not part of the currently processed module` 로 거부한다).
+  // WebPushModule 을 재export 하면 이 모듈을 import 하던 기존 소비자들이 WebPushService 를
+  // 그대로 주입받는다.
+  exports: [NotificationsService, WebPushModule],
 })
 export class NotificationsServiceModule {}

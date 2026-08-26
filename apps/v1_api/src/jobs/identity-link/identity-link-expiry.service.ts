@@ -62,8 +62,12 @@ export class IdentityLinkExpiryService {
     );
     // 이미 승인·거절됐거나(정상 종결) lazy expiry 가 먼저 기록했으면 no-op.
     if (terminal !== undefined) return;
-    // 잡이 이르게 깨어난 경우(시계 오차·재시도)는 아직 만료가 아니다 — 다음 기회에 맡긴다.
-    if (Date.now() - requested.effectiveAt.getTime() < IDENTITY_LINK_REQUEST_TTL_MS) return;
+    // 잡이 이르게 깨어난 경우(재시도 등)는 아직 만료가 아니다 — 다음 기회에 맡긴다.
+    // 판정 기준 시각은 **DB 시계**다: 이벤트 시각도 available_at 도 DB 가 찍는데 워커
+    // 프로세스의 `Date.now()` 로 재판정하면, 워커 시계가 DB 보다 뒤처진 환경에서 잡이
+    // 매번 "아직 아님"으로 종료돼 만료가 영영 기록되지 않는다(Copilot 리뷰).
+    const [{ now }] = await tx.$queryRaw<Array<{ now: Date }>>`SELECT CURRENT_TIMESTAMP AS now`;
+    if (now.getTime() - requested.effectiveAt.getTime() < IDENTITY_LINK_REQUEST_TTL_MS) return;
 
     const last = await tx.v1ParticipantIdentityLinkEvent.findFirst({
       where: { participantId },

@@ -39,6 +39,9 @@ describe('IdentityLinkExpiryService', () => {
         findFirst: jest.fn().mockResolvedValue({ displayNameSnapshot: '김민준' }),
       },
       v1NotificationPreference: { findUnique: jest.fn().mockResolvedValue(null) },
+      // TTL 재판정은 DB 시계(CURRENT_TIMESTAMP)로 한다 — 워커 시계가 뒤처져도 만료가
+      // 영영 누락되지 않게 하기 위해서다.
+      $queryRaw: jest.fn().mockResolvedValue([{ now: new Date() }]),
       v1Notification: {
         findUnique: jest.fn().mockResolvedValue(overrides.existingNotification ?? null),
         createMany: jest.fn().mockResolvedValue({ count: 1 }),

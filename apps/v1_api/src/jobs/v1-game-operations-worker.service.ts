@@ -44,7 +44,7 @@ export type GameOperationClaim = {
    * 된다(직접 클레임을 만들어 핸들러를 부르는 유닛 스펙에서는 없을 수 있다 —
    * 그 경우 호출부가 즉시 실행으로 폴백한다).
    */
-  afterCommit?: Array<() => void>;
+  afterCommit?: Array<() => void | Promise<void>>;
 };
 
 export type GameOperationHandler = (
@@ -437,12 +437,18 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
         // 커밋이 확정된 뒤에만 외부 발송을 한다. 롤백된 트랜잭션의 알림이 나가는 것을
         // 막는 유일한 지점이라, 실패해도 잡 결과에는 영향을 주지 않는다.
         for (const effect of claim.afterCommit ?? []) {
-          try {
-            effect();
-          } catch (effectError: unknown) {
+          const warn = (effectError: unknown) =>
             this.logger.warn(
               `after-commit effect failed for outbox job ${claim.id}: ${this.boundedError(effectError)}`,
             );
+          try {
+            // 비동기 부수효과도 허용한다 — 잡을 붙잡지 않도록 await 하지 않지만,
+            // rejection 을 그냥 두면 unhandled rejection 이 되므로 catch 를 붙인다
+            // (Copilot 리뷰).
+            const outcome = effect();
+            if (outcome instanceof Promise) void outcome.catch(warn);
+          } catch (effectError: unknown) {
+            warn(effectError);
           }
         }
       } catch (error: unknown) {

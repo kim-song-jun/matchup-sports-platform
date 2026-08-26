@@ -26,6 +26,12 @@
   color-scheme: light;
   --static-white: #ffffff;
   --static-black: #000000;
+  /* 테마가 뒤집혀도 값이 고정되는 파랑. --static-white 배경 위에 얹는 텍스트처럼
+   * "배경이 테마를 따라가지 않는" 자리에 쓴다 — 그런 곳에 --blue700 을 쓰면 다크에서
+   * 파랑만 밝게 반전(#6ba8ff)해 흰 배경 위 2.42:1 로 무너진다.
+   * 값은 --blue700 의 라이트 값과 같고, --player-marker-blue 가 같은 이유로 이미
+   * 고정해 둔 것과 동일한 패턴이다(:root.dark 오버라이드 없음). */
+  --static-blue: #1b64da;
   --blue50: #e8f3ff;
   --blue100: #d6e7ff;
   /* red/green 의 100 단계 — blue100 과 같은 비율로 만들었다(500 색을 흰 배경에 20%).
@@ -899,7 +905,8 @@ button:disabled {
 }
 
 .tm-auth-field-helper-error {
-  color: var(--red500);
+  /* [a11y] red500 은 흰 배경에서 3.71:1 로 미달. red700 은 6.51:1. */
+  color: var(--red700);
 }
 
 .tm-auth-field-helper-success {
@@ -2888,7 +2895,10 @@ button:disabled {
 
 /* 레인 wizard/A: 스텝 게이팅·결측 필드 인라인 에러 — 색상 단독 전달 금지, 아이콘+문구 병행 */
 .tm-create-input-error {
-  border-color: var(--orange500);
+  /* [a11y] orange500 은 흰 배경에서 2.16:1 — 비텍스트 3:1 기준에도 못 미쳤다.
+   * orange700 은 5.94:1. 다크에서는 --orange700 이 --orange500 을 가리키도록
+   * 정의돼 있어(밝은 주황이 어두운 배경에서 더 잘 보인다) 값이 바뀌지 않는다. */
+  border-color: var(--orange700);
 }
 
 .tm-create-field-error {
@@ -2896,7 +2906,8 @@ button:disabled {
   align-items: center;
   gap: 4px;
   margin-top: 8px;
-  color: var(--orange500);
+  /* [a11y] orange500 2.16:1 → orange700 5.94:1 (다크는 값 동일). */
+  color: var(--orange700);
   font-size: var(--font-size-caption);
 }
 
@@ -5564,8 +5575,11 @@ button:disabled {
   padding: 3px 12px 4px; font-size: 12px; font-weight: 600;
   color: var(--text-caption); background: var(--grey50); text-align: center;
 }
-.tm-bk2-badge-live { background: #fff0f0; color: #d9363e; font-weight: 800; }
-:root.dark .tm-bk2-badge-live { background: rgba(240,68,82,0.16); color: #ff6b76; }
+/* [a11y] 라이트가 #d9363e on #fff0f0 = 4.17:1 로 미달이었다. 토큰으로 바꾸면
+ * 라이트는 5.67:1 이 되고, 다크는 하드코딩 값(rgba(240,68,82,0.16) / #ff6b76)이
+ * --red50 / --red700 의 다크 값과 정확히 같아 값이 그대로다 — 그래서 :root.dark
+ * 오버라이드 규칙 자체가 필요 없어져 함께 지운다. */
+.tm-bk2-badge-live { background: var(--red50); color: var(--red700); font-weight: 800; }
 .tm-bk2-badge-time { font-size: 12px; color: var(--text-muted); }
 
 /* 뱃지 줄 — 시각 배지가 LIVE/PK 배지와 함께 표시될 수 있다 (D-12).

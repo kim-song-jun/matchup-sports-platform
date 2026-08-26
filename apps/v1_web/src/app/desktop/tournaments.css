@@ -1369,7 +1369,10 @@
   padding: 8px 12px;
   border-radius: var(--radius-pill);
   background: var(--static-white);
-  color: var(--blue700);
+  /* [a11y] 배경이 --static-white 로 테마에 고정돼 있는데 글자만 --blue700 을 써서,
+   * 다크에서 파랑이 밝게 반전(#6ba8ff)하며 흰 배경 위 2.42:1 로 무너졌다.
+   * 배경이 고정이면 글자도 고정이어야 한다 — 5.41:1. */
+  color: var(--static-blue);
   font-size: var(--font-size-label);
   font-weight: 700;
   line-height: 1;

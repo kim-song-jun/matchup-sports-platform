@@ -117,9 +117,11 @@ function LeagueHub() {
       </div>
 
       <div
+        key={activeTab}
         id={`league-panel-${activeTab}`}
         role="tabpanel"
         aria-labelledby={`league-tab-${activeTab}`}
+        className="tm-tabpanel-enter"
       >
         {activeTab === 'series' ? (
           <LeagueSeriesView />

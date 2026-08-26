@@ -141,9 +141,11 @@ export function MonitoringClient() {
 
       {/* ── Active tab panel (활성 탭만 마운트) ───────────────────────── */}
       <div
+        key={activeTab}
         id={`monitoring-panel-${activeTab}`}
         role="tabpanel"
         aria-labelledby={`monitoring-tab-${activeTab}`}
+        className="tm-tabpanel-enter"
       >
         {activeTab === 'errors' && <ErrorLogsClient />}
         {activeTab === 'push' && <PushFailureTable />}

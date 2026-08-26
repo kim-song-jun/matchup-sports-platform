@@ -417,7 +417,7 @@ export function ReviewFormModal({
 
   return (
     <div role="dialog" aria-modal="true" aria-label="리뷰 작성" style={{
-      position: 'fixed', inset: 0, zIndex: 9999,
+      position: 'fixed', inset: 0, zIndex: 'var(--z-top)',
       background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
     }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={{

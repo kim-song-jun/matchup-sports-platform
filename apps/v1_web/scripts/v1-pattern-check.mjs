@@ -25,6 +25,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+import { dirname, join } from 'node:path';
 
 const violations = [];
 
@@ -67,10 +68,31 @@ function checkHapnida() {
 }
 
 /* ── 2) 미정의 CSS 토큰 검사 ───────────────────────────────────────── */
-function checkUndefinedTokens() {
-  const css = readFileSync('src/app/globals.css', 'utf8');
+// 엔트리 CSS 와 그것이 로컬 @import 하는 파일들을 따라가며 토큰 정의를 모은다.
+// globals.css 만 읽으면 tokens.css(치수 계열 SSOT)에 정의된 토큰이 전부 "미정의"로
+// 잡힌다 — 정의 위치가 @theme 블록이든 :root 든 이 검사에는 상관없다. 중요한 건
+// "런타임에 값이 실제로 존재하는가" 이고, 그건 import 그래프를 따라가야 알 수 있다.
+function collectDefinedTokens(entry) {
   const defined = new Set();
-  for (const m of css.matchAll(/(?:^|[\s;{])(--[a-zA-Z0-9_-]+)\s*:/g)) defined.add(m[1]);
+  const seen = new Set();
+  const stack = [entry];
+  while (stack.length) {
+    const file = stack.pop();
+    if (seen.has(file)) continue;
+    seen.add(file);
+    let css;
+    try { css = readFileSync(file, 'utf8'); } catch { continue; }
+    for (const m of css.matchAll(/(?:^|[\s;{])(--[a-zA-Z0-9_-]+)\s*:/g)) defined.add(m[1]);
+    // 상대 경로 @import 만 따라간다 ("tailwindcss" 같은 패키지 import 는 제외)
+    for (const m of css.matchAll(/@import\s+["']([^"']+)["']/g)) {
+      if (m[1].startsWith('.')) stack.push(join(dirname(file), m[1]));
+    }
+  }
+  return defined;
+}
+
+function checkUndefinedTokens() {
+  const defined = collectDefinedTokens('src/app/globals.css');
   // tournaments.css 등 desktop css도 참조 대상
   let cssFiles = '';
   try { cssFiles = execSync('find src -name "*.css"', { encoding: 'utf8' }); } catch {}

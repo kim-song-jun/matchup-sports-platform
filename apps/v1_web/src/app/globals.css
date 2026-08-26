@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+/* 치수 계열 디자인 토큰(간격·라운드·그림자·모션·레이어·컨트롤 크기)의 SSOT.
+ * @theme 블록이 있어 Tailwind 유틸리티와 이 파일의 CSS 클래스가 같은 값을 본다.
+ * 색상 토큰은 아래 :root 가 계속 담당한다. 근거·흡수 규칙은 tokens.css 주석 참조. */
+@import "./tokens.css";
+
 /* 다크모드 전략을 OS 자동(prefers-color-scheme, Tailwind v4 기본값)에서 수동 토글
  * (class 기반)로 전환한다. `<html>`에 .dark 클래스가 있을 때만 dark: 유틸리티가
  * 적용된다 — 적용 여부는 ThemeProvider(src/components/providers/theme-provider.tsx)가
@@ -77,24 +82,17 @@
   --orange-soft: var(--orange50);
   --red: var(--red500);
   --red-soft: var(--red50);
-  --grey-900: var(--grey900);
-  --grey-700: var(--grey700);
-  --grey-500: var(--grey500);
-  --grey-300: var(--grey300);
-  --grey-100: var(--grey100);
   --accent: var(--blue);
-  /* ── [P2 Elevation] named shadow — 역할 매핑 (값 변경 없음, 의미 명문화) ──────
+  /* ── [P2 Elevation] named shadow — 역할 매핑 ────────────────────────────────
+   * 정의는 tokens.css 의 @theme 로 옮겼다(치수 계열 SSOT). 값은 그대로다.
    * elevation-0: flat surface (배경과 동일, shadow 없음)
-   * elevation-1: card — 콘텐츠 카드, 인라인 칩, 세그먼트 탭 활성
-   * elevation-2: dropdown / overlay — 검색 드롭다운, 툴팁, 하단 스크림
+   * elevation-1: card — 콘텐츠 카드, 인라인 칩, 세그먼트 탭 활성 (--shadow-card)
+   * elevation-2: dropdown / overlay — 검색 드롭다운, 툴팁, 하단 스크림 (--shadow-dropdown)
    * elevation-3: dialog — 모달·alert dialog (--shadow-modal)
-   * elevation-4: sidebar / drawer — 사이드 네비 (--shadow-sidebar)
+   * elevation-4: sidebar / drawer — 사이드 네비 (--shadow-drawer)
    * elevation-5: toast / FAB — 화면 최상단 플로팅 (별도 box-shadow 인라인)
    * ──────────────────────────────────────────────────────────────────────────── */
-  --shadow-1: 0 1px 2px rgba(15, 23, 42, 0.05);       /* elevation-1: card */
-  --shadow-2: 0 8px 24px rgba(20, 28, 45, 0.08);      /* elevation-2: dropdown/overlay */
   /* ── 시맨틱 별칭 — 컴포넌트 CSS가 참조하지만 정의가 누락됐던 토큰(WS1 복구) ── */
-  --sh-1: var(--shadow-1); /* box-shadow: .tm-auth-segment-active, .tm-chat-bubble 등 */
   --line: var(--border); /* hairline border: .tm-auth-profile-upload 등 */
   --red-alpha-08: rgba(240, 68, 82, 0.08); /* --red500(#f04452) 8% — 에러 카드 border */
   /* ── WS6 토큰화 — 소비자 하드코딩 hex/rgba → 의미 토큰 ── */
@@ -136,8 +134,6 @@
   --overlay-white-92: rgba(255, 255, 255, 0.92);  /* 프로모 eyebrow 텍스트, CTA hover */
   --glass-white-96: rgba(255, 255, 255, 0.96);   /* 네비/헤더 유리 배경 */
   /* 모달·사이드바 그림자 */
-  --shadow-modal: 0 8px 32px rgba(20, 28, 45, 0.14);  /* elevation-3: dialog */
-  --shadow-sidebar: 4px 0 24px rgba(20, 28, 45, 0.12); /* elevation-4: sidebar/drawer */
   /* 검색 포커스 링 */
   --blue-focus-ring: rgba(49, 130, 246, 0.12);
   /* 대회 상금 / 보조 색 */
@@ -229,7 +225,6 @@
    * DESIGN.md: "카드는 배경색 차이로 구분한다: … gray-50 카드 on 흰 배경". */
   --card-border:                var(--border);
   --card-surface:               #ffffff;
-  --card-radius:                16px;
   /* List row — 원래 시각(grey50 bg / grey100 border) 유지 (component 토큰 계층만 정리) */
   --list-row-bg:                var(--grey50);
   --list-row-border:            var(--grey100);
@@ -491,7 +486,7 @@ button:disabled {
   top: 0;
   left: 0;
   width: 100%;
-  z-index: 20;
+  z-index: var(--z-chrome);
 }
 
 .tm-topbar-actions {
@@ -572,7 +567,7 @@ button:disabled {
   bottom: 0;
   left: 0;
   width: 100%;
-  z-index: 20;
+  z-index: var(--z-chrome);
 }
 
 .tm-bottom-tab {
@@ -680,7 +675,7 @@ button:disabled {
 .tm-auth-logo {
   width: 72px;
   height: 72px;
-  border-radius: 20px;
+  border-radius: var(--radius-hero);
   background: var(--blue500);
   color: var(--static-white);
   display: grid;
@@ -725,7 +720,7 @@ button:disabled {
 .tm-auth-feature-icon {
   width: 30px;
   height: 30px;
-  border-radius: 9px;
+  border-radius: var(--radius-chip);
   background: var(--blue50);
   color: var(--blue500);
   display: grid;
@@ -878,14 +873,14 @@ button:disabled {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
   padding: 4px;
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   background: var(--grey100);
 }
 
 .tm-auth-segment {
   min-height: 40px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--text-muted);
   font-size: 13px;
@@ -895,7 +890,7 @@ button:disabled {
 .tm-auth-segment-active {
   background: var(--bg);
   color: var(--blue500);
-  box-shadow: var(--sh-1);
+  box-shadow: var(--shadow-card);
 }
 
 /* 모드 탭 아래 한 단계 낮은 선택지(계정 찾기의 '본인 확인 방법')에 쓰는 축소 변형.
@@ -905,11 +900,11 @@ button:disabled {
 .tm-auth-segmented-sm {
   gap: 4px;
   padding: 3px;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
 }
 
 .tm-auth-segmented-sm .tm-auth-segment {
-  border-radius: 9px;
+  border-radius: var(--radius-chip);
   font-size: 12px;
   font-weight: 700;
 }
@@ -919,7 +914,7 @@ button:disabled {
    내부 영역은 카드가 아니라 tint 된 inset 으로 통일한다. */
 .tm-auth-inset {
   border: 1px solid var(--grey200);
-  border-radius: 16px;
+  border-radius: var(--radius-container);
   background: var(--grey50);
 }
 
@@ -930,7 +925,7 @@ button:disabled {
   align-items: center;
   padding: 14px;
   border: 1px solid var(--grey200);
-  border-radius: 16px;
+  border-radius: var(--radius-container);
   background: var(--grey50);
 }
 
@@ -938,7 +933,7 @@ button:disabled {
 .tm-auth-profile-preview-trigger {
   position: relative;
   display: inline-flex;
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   cursor: pointer;
 }
 
@@ -962,7 +957,7 @@ button:disabled {
   height: 72px;
   display: grid;
   place-items: center;
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   background: var(--grey100);
   background-position: center;
   background-size: cover;
@@ -980,7 +975,7 @@ button:disabled {
   height: 24px;
   display: grid;
   place-items: center;
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   background: var(--blue500);
   color: var(--static-white);
   border: 2px solid var(--grey50);
@@ -1030,7 +1025,7 @@ button:disabled {
   align-items: flex-start;
   gap: 8px;
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   background: var(--red50);
   color: var(--red700);
 }
@@ -1142,7 +1137,7 @@ button:disabled {
   height: 44px;
   display: grid;
   place-items: center;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
 }
 
 .tm-auth-agreement-arrow[aria-expanded="true"] svg {
@@ -1157,14 +1152,14 @@ button:disabled {
 .tm-auth-agreement-detail {
   margin: 0 15px 15px 51px;
   padding: 12px 14px;
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   background: var(--grey50);
 }
 
 .tm-auth-check {
   width: 24px;
   height: 24px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--grey200);
   background: var(--bg);
   color: var(--grey400);
@@ -1198,7 +1193,7 @@ button:disabled {
 .tm-auth-complete-icon {
   width: 72px;
   height: 72px;
-  border-radius: 24px;
+  border-radius: var(--radius-hero);
   background: var(--blue500);
   color: var(--static-white);
   display: grid;
@@ -1229,7 +1224,7 @@ button:disabled {
   padding: 14px 20px 22px;
   border-top: 1px solid var(--grey100);
   background: var(--bg);
-  z-index: 20;
+  z-index: var(--z-chrome);
 }
 
 .tm-auth-fixed-reason {
@@ -1262,7 +1257,7 @@ button:disabled {
 
 .tm-auth-progress-bars span {
   height: 4px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--grey150);
 }
 
@@ -1397,7 +1392,7 @@ button:disabled {
 .tm-card {
   background: var(--card-surface); /* [P1 component token] */
   border: 1px solid var(--card-border);
-  border-radius: var(--card-radius);
+  border-radius: var(--radius-container);
 }
 
 .tm-pressable {
@@ -1410,7 +1405,7 @@ button:disabled {
 
 .tm-btn {
   border: 0;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1458,7 +1453,7 @@ button:disabled {
   display: inline-block;
   width: 15px;
   height: 15px;
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   border: 2px solid var(--border);
   border-top-color: var(--blue500);
   animation: tm-spin 0.8s linear infinite;
@@ -1514,7 +1509,11 @@ button:disabled {
  * - active scale은 :not(:disabled) 가드로 비활성 버튼 눌림 피드백 차단
  * ─────────────────────────────────────────────────────────────────────────── */
 .tm-btn {
-  transition: background-color 0.12s ease, transform 0.08s ease;
+  /* 0.12s / 0.08s 를 같은 값의 토큰으로 표기 통일 (120ms / 80ms — 값 변화 없음).
+   * easing 은 여기서 건드리지 않는다: ease 는 cubic-bezier(.25,.1,.25,1) 이고
+   * --ease-standard 는 (.4,0,.2,1) 이라 서로 다른 곡선이다. 통일하려면 의도적
+   * 결정과 시각 검증이 따라야 한다. */
+  transition: background-color var(--duration-fast) ease, transform var(--duration-instant) ease;
 }
 
 @media (hover: hover) {
@@ -1593,7 +1592,7 @@ button:disabled {
  * ─────────────────────────────────────────────────────────────────────────── */
 @media (hover: hover) {
   .tm-card-interactive:hover {
-    box-shadow: var(--shadow-1); /* elevation-1 lift */
+    box-shadow: var(--shadow-card); /* elevation-1 lift */
     cursor: pointer;
   }
 
@@ -1618,7 +1617,7 @@ button:disabled {
 
 .tm-badge {
   min-height: 24px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 0 8px;
   display: inline-flex;
   align-items: center;
@@ -1726,7 +1725,7 @@ button:disabled {
   width: 100%;
   min-height: 50px;
   border: 1px solid var(--input-border); /* [P1 component token] */
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   background: var(--input-surface);
   color: var(--input-text);
   padding: 0 14px;
@@ -1779,7 +1778,7 @@ button:disabled {
   min-height: 50px;
   place-items: center;
   border: 1px solid var(--input-border);
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   background: var(--input-surface);
   color: var(--text-muted);
   cursor: pointer;
@@ -1840,7 +1839,7 @@ button:disabled {
 .tm-chip {
   min-height: 44px; /* WS11 a11y 터치 타깃 (34→44) — 라이브 검증으로 토스 균형 확인 */
   border: 1px solid var(--grey200);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--bg);
   color: var(--text-muted);
   padding: 0 13px;
@@ -1883,7 +1882,7 @@ button:disabled {
   right: 2px;
   width: 7px;
   height: 7px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--red500);
   border: 2px solid var(--bg);
 }
@@ -1906,7 +1905,7 @@ button:disabled {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--red500);
   color: var(--static-white);
   border: 2px solid var(--bg);
@@ -1954,7 +1953,7 @@ button:disabled {
      shadow-2 를 히어로 카드에도 적용해, 이미지 비중이 커진 만큼 media+content 를 한
      덩어리로 묶어 '붕 떠' 보이지 않게 한다. border만 있던 이전보다 카드가 배경 위에
      자연스럽게 자리 잡은 느낌을 준다(과한 확산 없는 절제된 값 그대로 재사용). */
-  box-shadow: var(--shadow-2);
+  box-shadow: var(--shadow-dropdown);
 }
 
 .tm-featured-content {
@@ -2029,7 +2028,7 @@ button:disabled {
   padding: 20px 12px;
   /* 페이지 배경(--bg) 위에 한 단계 얹는 서브 패널 — main과 동일하게 --grey50. */
   background: var(--grey50);
-  border-radius: 16px;
+  border-radius: var(--radius-container);
 }
 
 .tm-quick-action {
@@ -2052,7 +2051,7 @@ button:disabled {
 .tm-quick-icon {
   width: 44px;
   height: 44px;
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   display: grid;
   place-items: center;
   font-weight: 800;
@@ -2102,7 +2101,7 @@ button:disabled {
   gap: 12px;
   padding: 10px 14px;
   background: var(--blue50);
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   border: 1px solid var(--blue100);
 }
 
@@ -2111,7 +2110,7 @@ button:disabled {
   height: 32px;
   display: grid;
   place-items: center;
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   background: var(--yellow50);
   color: var(--yellow700);
   flex-shrink: 0;
@@ -2178,13 +2177,13 @@ button:disabled {
   width: 220px;
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   overflow: hidden;
   padding: 0;
   text-align: left;
   color: inherit;
   /* hairline shadow 로 이미지+내용을 한 카드로 묶어 '붕 떠' 보이지 않게 */
-  box-shadow: var(--shadow-2);
+  box-shadow: var(--shadow-dropdown);
 }
 
 .tm-match-card-media {
@@ -2240,7 +2239,7 @@ button:disabled {
 .tm-notice-row-icon {
   width: 38px;
   height: 38px;
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   background: var(--grey100);
   color: var(--blue500);
   display: grid;
@@ -2319,7 +2318,7 @@ button:disabled {
   width: 100%;
   min-height: 58px;
   padding: 12px 14px;
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   background: var(--list-row-bg); /* [P1 component token] */
   border: 1px solid var(--list-row-border);
   display: flex;
@@ -2346,7 +2345,7 @@ button:disabled {
 
 .tm-match-summary-row {
   min-height: 44px;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--grey50); /* 페이지 배경(--bg) 위 한 단계 — main과 동일 */
   display: flex;
   align-items: center;
@@ -2379,7 +2378,7 @@ button:disabled {
   display: block;
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   background: var(--bg);
 }
 
@@ -2413,7 +2412,7 @@ button:disabled {
   right: 12px;
   top: 12px;
   min-height: 26px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 0 9px;
   display: inline-flex;
   align-items: center;
@@ -2441,7 +2440,7 @@ button:disabled {
   bottom: 92px;
   width: 56px;
   height: 56px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--blue500);
   color: var(--static-white);
   display: grid;
@@ -2450,7 +2449,7 @@ button:disabled {
   line-height: 1;
   font-weight: 500;
   box-shadow: 0 12px 26px rgba(49, 130, 246, 0.32);
-  z-index: 30;
+  z-index: var(--z-floating);
 }
 
 .tm-create-fixed-cta {
@@ -2467,7 +2466,7 @@ button:disabled {
   right: -3px;
   min-width: 20px;
   height: 20px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 0 5px;
   background: var(--red500);
   border: 2px solid var(--bg);
@@ -2534,7 +2533,7 @@ button:disabled {
   bottom: 0;
   width: min(100%, var(--v1-app-chrome-frame-width));
   transform: translateX(-50%);
-  z-index: 31;
+  z-index: var(--z-cta);
   padding: 14px var(--v1-shell-page-x) calc(var(--v1-shell-cta-bottom-pad) + var(--v1-shell-safe-bottom));
   border-top: 1px solid var(--grey100);
   background: var(--bg);
@@ -2547,7 +2546,7 @@ button:disabled {
   left: 50%;
   width: min(100%, var(--v1-app-chrome-frame-width));
   transform: translateX(-50%);
-  z-index: 38;
+  z-index: var(--z-scrim);
   background: rgba(25, 31, 40, 0.18);
   animation: tm-filter-scrim-fade .18s ease-out;
 }
@@ -2560,7 +2559,7 @@ button:disabled {
   right: 0;
   width: min(100%, var(--v1-app-chrome-frame-width));
   margin: 0 auto;
-  z-index: 40;
+  z-index: var(--z-layer);
   overflow: hidden;
   pointer-events: none;
 }
@@ -2573,7 +2572,7 @@ button:disabled {
   width: 100%;
   padding: 10px var(--v1-shell-page-x) calc(20px + var(--v1-shell-safe-bottom));
   border-top: 1px solid var(--grey100);
-  border-radius: 24px 24px 0 0;
+  border-radius: var(--radius-hero) var(--radius-hero) 0 0;
   background: var(--bg);
   box-shadow: 0 -16px 32px rgba(25, 31, 40, 0.14);
   touch-action: none;
@@ -2622,7 +2621,7 @@ button:disabled {
   width: 42px;
   height: 4px;
   margin: 0 auto 16px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--grey300);
 }
 
@@ -2676,7 +2675,7 @@ button:disabled {
 
 .tm-create-bars span {
   height: 4px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--grey100);
 }
 
@@ -2731,7 +2730,7 @@ button:disabled {
   padding: 5px;
   place-items: center;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   background: var(--card-surface);
   cursor: pointer;
 }
@@ -2764,7 +2763,7 @@ button:disabled {
   height: 20px;
   place-items: center;
   border: 2px solid var(--card-surface);
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   background: var(--blue500);
   color: var(--static-white);
 }
@@ -2786,7 +2785,7 @@ button:disabled {
   min-height: 48px;
   margin-top: 10px;
   border: 1px solid var(--border-strong); /* [P1 component token] 기존 --grey100(1.10:1) 대체 */
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--grey50);
   padding: 0 14px;
   display: flex;
@@ -2869,7 +2868,7 @@ button:disabled {
   flex: 0 0 48px;
   height: 48px;
   border: 1px solid var(--border-strong);
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--grey50);
   color: var(--blue500);
   font-size: 22px;
@@ -2932,7 +2931,7 @@ button:disabled {
   display: block;
   overflow: hidden;
   border: 1px solid var(--grey100);
-  border-radius: 16px;
+  border-radius: var(--radius-container);
   background: var(--bg);
   color: inherit;
   text-decoration: none;
@@ -2985,7 +2984,7 @@ button:disabled {
 .tm-team-create-preview {
   height: 132px;
   margin-top: 14px;
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   background: var(--grey900);
   display: grid;
   place-items: center;
@@ -3001,7 +3000,7 @@ button:disabled {
   gap: 8px;
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: var(--z-raised);
 }
 
 .tm-team-list {
@@ -3015,7 +3014,7 @@ button:disabled {
 .tm-list-search-input {
   flex: 1;
   min-height: 44px;
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   background: var(--grey100);
   border: 1px solid transparent;
   display: flex;
@@ -3066,7 +3065,7 @@ button:disabled {
   min-width: 44px;
   height: 44px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--text-caption);
   display: grid;
@@ -3083,9 +3082,9 @@ button:disabled {
   top: calc(100% + 6px);
   left: 0;
   right: 0;
-  z-index: 30;
+  z-index: var(--z-floating);
   border: 1px solid var(--grey100);
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   background: var(--bg);
   box-shadow: 0 12px 28px rgba(15, 23, 42, .12);
   overflow: hidden;
@@ -3128,7 +3127,7 @@ button:disabled {
   width: 44px; /* WS11 a11y 터치 타깃 (40→44) */
   min-width: 44px;
   height: 44px;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   display: grid;
   place-items: center;
   position: relative;
@@ -3141,7 +3140,7 @@ button:disabled {
   right: 3px;
   min-width: 17px;
   height: 17px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 0 4px;
   background: var(--blue500);
   color: var(--static-white);
@@ -3156,7 +3155,7 @@ button:disabled {
 
 .tm-team-summary-bar {
   min-height: 44px;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--grey50); /* 페이지 배경(--bg) 위 한 단계 — main과 동일 */
   display: flex;
   align-items: center;
@@ -3189,7 +3188,7 @@ button:disabled {
 .tm-team-card {
   display: block;
   border: 1px solid var(--grey100);
-  border-radius: 16px;
+  border-radius: var(--radius-container);
   background: var(--bg);
   color: inherit;
   text-decoration: none;
@@ -3236,7 +3235,7 @@ button:disabled {
 .tm-team-intro-box {
   margin-top: 14px;
   border: 1px solid var(--grey100);
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   background: var(--grey50);
   padding: 12px;
 }
@@ -3413,7 +3412,7 @@ button:disabled {
 .tm-chat-avatar {
   width: 46px;
   height: 46px;
-  border-radius: 16px;
+  border-radius: var(--radius-container);
   background: var(--grey900);
   background-position: center;
   background-size: cover;
@@ -3525,7 +3524,7 @@ button:disabled {
   min-width: 24px;
   height: 24px;
   padding: 0 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--blue500);
   color: var(--static-white);
   display: inline-grid;
@@ -3567,7 +3566,7 @@ button:disabled {
 .tm-chat-context-icon {
   width: 40px;
   height: 40px;
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   background: var(--blue50);
   color: var(--blue500);
   display: grid;
@@ -3645,7 +3644,7 @@ button:disabled {
 
 .tm-chat-date-divider span {
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--grey100);
 }
 
@@ -3668,7 +3667,7 @@ button:disabled {
 .tm-chat-system-message span {
   max-width: min(100%, 320px);
   padding: 6px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--grey100); /* [토큰 충돌 fix] 이전엔 --grey50 — .tm-chat-room 배경(3494행)과 동일 토큰이라
    pill이 채팅방 배경에 녹아 안 보였음. 인접한 .tm-chat-date-divider span(3592행) 선례와 동일 패턴 적용 */
   color: var(--text-muted);
@@ -3687,10 +3686,10 @@ button:disabled {
 .tm-chat-bubble {
   max-width: 286px;
   padding: 10px 12px;
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   background: var(--bg);
   color: var(--text-strong);
-  box-shadow: var(--sh-1);
+  box-shadow: var(--shadow-card);
 }
 
 .tm-chat-bubble-me {
@@ -3761,7 +3760,7 @@ button:disabled {
   left: auto;
   bottom: auto;
   flex: 0 0 auto;
-  z-index: 34;
+  z-index: var(--z-inputbar);
   width: 100%;
   padding: 12px var(--v1-shell-page-x) calc(22px + var(--v1-shell-safe-bottom));
   border-top: 1px solid var(--grey100);
@@ -3773,7 +3772,7 @@ button:disabled {
 .tm-chat-input-placeholder {
   flex: 1;
   min-height: 44px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--grey100);
   color: var(--text-caption);
   display: flex;
@@ -3800,9 +3799,9 @@ button:disabled {
   left: var(--v1-shell-page-x);
   right: var(--v1-shell-page-x);
   bottom: calc(22px + var(--v1-shell-safe-bottom));
-  z-index: 40;
+  z-index: var(--z-layer);
   min-height: 44px;
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   background: var(--green50);
   color: var(--green700); /* green500은 라이트 green50 배경 위 2.5:1로 AA(4.5:1) 미달 —
     .tm-badge-green과 동일하게 짙은 --green700(라이트 4.87:1 통과)으로 교체 */
@@ -3831,7 +3830,7 @@ button:disabled {
   width: 100%;
   min-height: 82px;
   border: 1px solid var(--grey100);
-  border-radius: 16px;
+  border-radius: var(--radius-container);
   background: var(--bg);
   color: inherit;
   text-decoration: none;
@@ -3852,7 +3851,7 @@ button:disabled {
 .tm-notification-icon {
   width: 42px;
   height: 42px;
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   background: var(--grey100);
   color: var(--text-muted);
   display: grid;
@@ -3880,7 +3879,7 @@ button:disabled {
 .tm-notification-dot {
   width: 6px;
   height: 6px;
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   background: var(--blue500);
   flex: 0 0 auto;
 }
@@ -3899,7 +3898,7 @@ button:disabled {
 .tm-notification-sheet-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 60;
+  z-index: var(--z-modal);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -3910,7 +3909,7 @@ button:disabled {
 .tm-notification-sheet {
   width: min(100%, var(--v1-app-chrome-frame-width));
   padding: 10px var(--v1-shell-page-x) calc(20px + var(--v1-shell-safe-bottom));
-  border-radius: 24px 24px 0 0;
+  border-radius: var(--radius-hero) var(--radius-hero) 0 0;
   background: var(--bg);
   box-shadow: 0 -16px 32px rgba(25, 31, 40, 0.14);
   animation: tm-filter-sheet-up 0.22s ease-out;
@@ -3920,7 +3919,7 @@ button:disabled {
   width: 42px;
   height: 4px;
   margin: 0 auto 16px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--grey300);
 }
 
@@ -3954,7 +3953,7 @@ button:disabled {
   .tm-notification-sheet {
     width: min(100%, 440px);
     padding: 20px 24px 24px;
-    border-radius: 20px;
+    border-radius: var(--radius-hero);
     box-shadow: 0 8px 32px rgba(20, 28, 45, 0.14);
     animation: fade-in 0.18s ease-out;
   }
@@ -3975,7 +3974,7 @@ button:disabled {
 .tm-empty-icon {
   width: 80px;
   height: 80px;
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   background: var(--blue50);
   color: var(--blue500);
   margin-bottom: 20px;
@@ -4091,7 +4090,7 @@ button:disabled {
   .tm-chat-avatar {
     width: 42px;
     height: 42px;
-    border-radius: 14px;
+    border-radius: var(--radius-field);
   }
 
   .tm-chat-row-meta {
@@ -4162,9 +4161,9 @@ button:disabled {
 
 .v1-card {
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-chip);
   background: var(--surface);
-  box-shadow: var(--shadow-1);
+  box-shadow: var(--shadow-card);
 }
 
 .v1-card-pad {
@@ -4189,7 +4188,7 @@ button:disabled {
 .v1-button {
   min-height: 42px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-chip);
   padding: 0 14px;
   display: inline-flex;
   align-items: center;
@@ -4244,7 +4243,7 @@ button:disabled {
 .tm-my-avatar {
   width: 64px;
   height: 64px;
-  border-radius: 22px;
+  border-radius: var(--radius-hero);
   background: var(--grey900);
   color: var(--static-white);
   background-size: cover;
@@ -4294,7 +4293,7 @@ button:disabled {
      동일해(대비 ~1.04~1.10:1) 패널 경계가 사실상 안 보였다. .tm-create-input과 동일
      패턴으로 --surface-soft(카드보다 한 단계 진한 표면) + --border-strong으로 교체. */
   border: 1px solid var(--border-strong);
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--surface-soft);
   padding: 14px;
 }
@@ -4315,7 +4314,7 @@ button:disabled {
 .tm-profile-edit-shell .tm-my-profile-head {
   margin: 0;
   border: 1px solid var(--border-strong);
-  border-radius: 16px;
+  border-radius: var(--radius-container);
 }
 
 .tm-my-profile-stats {
@@ -4387,7 +4386,7 @@ button:disabled {
 .tm-my-menu-icon {
   width: 34px;
   height: 34px;
-  border-radius: 8px;
+  border-radius: var(--radius-chip);
   background: var(--grey150); /* [토큰 충돌 fix] grey100(대비 ≈1.10:1)은 흰 .tm-card 위에서 배지 형태가
   거의 안 보임 — grey150으로 한 단계 올려 원형 배지 경계를 명확히 함 */
   color: var(--text-strong);
@@ -4425,7 +4424,7 @@ button:disabled {
   grid-template-columns: 1fr 1fr;
   gap: 8px;
   padding: 4px;
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   background: var(--grey100);
 }
 
@@ -4462,14 +4461,14 @@ button:disabled {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
   padding: 4px;
-  border-radius: 15px;
+  border-radius: var(--radius-field);
   background: var(--grey100);
 }
 
 .tm-review-tab {
   /* a11y: 터치 타깃 44px 확보 (시각 높이 유지, grid/place-items로 내용 중앙 정렬) */
   min-height: 44px;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   display: grid;
   place-items: center;
   color: var(--text-muted);
@@ -4536,7 +4535,7 @@ button:disabled {
   display: grid;
   gap: 12px;
   border: 1px solid var(--grey100);
-  border-radius: 16px;
+  border-radius: var(--radius-container);
   background: var(--surface);
   padding: 16px;
   color: inherit;
@@ -4581,7 +4580,7 @@ button:disabled {
      아바타 사각 경계가 흐릿했다. .tm-profile-level-panel(4666-4674행)과 동일 패턴으로
      --surface-soft(카드보다 한 단계 진한 표면) + --border-strong 보더를 더한다. */
   flex-shrink: 0;
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   border: 1px solid var(--border-strong);
   background: var(--surface-soft);
   background-position: center;
@@ -4642,7 +4641,7 @@ button:disabled {
   /* a11y: 터치 타깃 44px 확보 (패딩 증가로 시각적 변화 최소화, 시각 무게 유지) */
   min-height: 44px;
   border: 1px solid var(--grey200);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--surface);
   color: var(--text-muted);
   font-size: 12px;
@@ -4678,7 +4677,7 @@ button:disabled {
 .tm-review-skeleton {
   min-height: 92px;
   border: 1px solid var(--grey100);
-  border-radius: 16px;
+  border-radius: var(--radius-container);
   background: linear-gradient(90deg, var(--grey50), var(--grey100), var(--grey50));
 }
 
@@ -4690,7 +4689,7 @@ button:disabled {
 .tm-review-complete-icon {
   width: 72px;
   height: 72px;
-  border-radius: 26px;
+  border-radius: var(--radius-hero);
   background: var(--blue50);
   color: var(--blue500);
   display: grid;
@@ -4706,7 +4705,7 @@ button:disabled {
   align-items: center;
   gap: 12px;
   border: 1px solid var(--grey100);
-  border-radius: 16px;
+  border-radius: var(--radius-container);
   background: var(--surface);
   padding: 16px;
   color: inherit;
@@ -4716,7 +4715,7 @@ button:disabled {
   display: grid;
   gap: 12px;
   border: 1px solid var(--grey100);
-  border-radius: 16px;
+  border-radius: var(--radius-container);
   background: var(--surface);
   padding: 18px;
 }
@@ -4734,7 +4733,7 @@ button:disabled {
 .tm-toggle {
   width: 46px;
   height: 28px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--grey200);
   border: 1px solid var(--grey300);
   position: relative;
@@ -4748,7 +4747,7 @@ button:disabled {
   left: 3px;
   width: 22px;
   height: 22px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--static-white);
   transition: transform .18s ease;
 }
@@ -4764,7 +4763,7 @@ button:disabled {
 }
 
 .tm-danger-panel {
-  border-radius: 8px;
+  border-radius: var(--radius-chip);
   background: var(--red50);
   color: var(--red700);
   padding: 18px;
@@ -4791,7 +4790,7 @@ button:disabled {
   flex-shrink: 0;
   display: grid;
   place-items: center;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   color: var(--text-caption);
   transition: transform 0.15s ease;
 }
@@ -4831,7 +4830,7 @@ button:disabled {
   width: 28px;
   height: 28px;
   flex-shrink: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--blue50);
   color: var(--blue500);
   display: grid;
@@ -4846,9 +4845,9 @@ button:disabled {
   .v1-frame {
     min-height: calc(100vh - 56px);
     border: 1px solid var(--border);
-    border-radius: 18px;
+    border-radius: var(--radius-container);
     overflow: hidden;
-    box-shadow: var(--shadow-2);
+    box-shadow: var(--shadow-dropdown);
   }
 
   .v1-main {
@@ -4864,7 +4863,7 @@ button:disabled {
   left: 0;
   right: 0;
   height: 3px;
-  z-index: 9999;
+  z-index: var(--z-top);
   pointer-events: none;
 }
 
@@ -4872,7 +4871,7 @@ button:disabled {
   height: 100%;
   background: var(--blue500);
   box-shadow: 0 0 8px rgba(49, 130, 246, 0.5);
-  border-radius: 0 2px 2px 0;
+  border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
   transition: width 180ms ease;
 }
 
@@ -4948,7 +4947,7 @@ button:disabled {
 
 .tm-signup-progress span {
   height: 5px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--grey150);
   transition: background 240ms ease;
 }
@@ -5023,7 +5022,7 @@ button:disabled {
   background: transparent;
   color: var(--text-caption);
   cursor: pointer;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   transition: color 120ms ease;
 }
 
@@ -5075,7 +5074,7 @@ button:disabled {
   display: inline-flex;
   align-items: center;
   padding: 1px 5px;
-  border-radius: 4px;
+  border-radius: var(--radius-tight);
   /* [공개 화면 R-T2 정리] '준비 중' 실텍스트 배지 — 고정폭 없이 padding만 있어
      캡션 토큰으로 올려도 넘치지 않는다. */
   font-size: var(--font-size-caption);
@@ -5116,7 +5115,7 @@ button:disabled {
 .tm-invitation-card {
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 16px;           /* .tm-card 와 동일 radius */
+  border-radius: var(--radius-container);           /* .tm-card 와 동일 radius */
   padding: 16px;
   display: flex;
   flex-direction: column;
@@ -5166,7 +5165,7 @@ button:disabled {
   font-size: var(--font-size-label);    /* 13px */
   color: var(--text-body);
   background: var(--grey50);
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   padding: 10px 12px;
   line-height: 1.5;
 }
@@ -5200,7 +5199,7 @@ button:disabled {
 .tm-invitation-status {
   /* .tm-badge 와 동일 구조, 추가 override만 선언 */
   min-height: 24px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 0 8px;
   display: inline-flex;
   align-items: center;
@@ -5248,7 +5247,7 @@ button:disabled {
 .tm-hub-stage-dot {
   width: 28px;
   height: 28px;
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   border: 2px solid var(--grey250, #d1d5db);
   background: var(--grey50);
   display: flex;
@@ -5293,7 +5292,7 @@ button:disabled {
   content: '';
   width: 10px;
   height: 10px;
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   background: var(--blue500);
   display: block;
   position: absolute;
@@ -5338,7 +5337,7 @@ button:disabled {
   height: 2px;
   background: var(--grey200);
   margin-bottom: 22px;
-  border-radius: 1px;
+  border-radius: var(--radius-pill);
   transition: background 0.3s;
 }
 .tm-hub-stage-connector-done { background: var(--blue500); }
@@ -5375,7 +5374,7 @@ button:disabled {
   justify-content: center;
   width: 22px;
   height: 22px;
-  border-radius: 6px;
+  border-radius: var(--radius-chip);
   font-size: 12px;
   font-weight: 700;
   color: var(--text-muted);
@@ -5411,14 +5410,14 @@ button:disabled {
 .tm-bk2-pill {
   font-size: 12px; font-weight: 800; color: var(--text-muted);
   text-transform: uppercase; letter-spacing: 0.04em;
-  padding: 3px 12px; background: var(--grey100); border-radius: 20px;
+  padding: 3px 12px; background: var(--grey100); border-radius: var(--radius-pill);
 }
 .tm-bk2-pill-sm { padding: 2px 10px; font-size: 12px; }
 
 /* 매치 카드 */
 .tm-bk2-card {
   border: 1px solid var(--grey200);
-  border-radius: 11px;
+  border-radius: var(--radius-control);
   overflow: hidden;
   background: var(--card-surface);
   width: 180px;
@@ -5478,7 +5477,7 @@ button:disabled {
 .tm-bk2-champ {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 5px; width: 100px; min-height: 88px;
-  border: 2px dashed var(--grey300); border-radius: 14px;
+  border: 2px dashed var(--grey300); border-radius: var(--radius-field);
   padding: 12px 8px; text-align: center;
 }
 .tm-bk2-champ-won {
@@ -5506,7 +5505,7 @@ button:disabled {
   margin-top: 20px;
   padding: 14px;
   border: 1px solid var(--grey200);
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--grey50); /* 페이지 배경(--bg) 위 한 단계 — main과 동일 */
   display: flex;
   flex-direction: column;
@@ -5527,7 +5526,7 @@ button:disabled {
   right: 0;
   bottom: 8px;
   width: 24px;
-  border-radius: 0 8px 8px 0;
+  border-radius: 0 var(--radius-chip) var(--radius-chip) 0;
   background: linear-gradient(to right, transparent, rgba(255,255,255,0.92));
   pointer-events: none;
 }
@@ -5568,7 +5567,7 @@ button:disabled {
 .tm-bracket-page-format {
   flex-shrink: 0;
   padding: 6px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--blue50);
   color: var(--blue500);
   font-size: 12px;
@@ -5647,7 +5646,7 @@ button:disabled {
   position: relative;
   overflow: hidden;
   background: #111827;
-  border-radius: 18px;
+  border-radius: var(--radius-container);
   padding: 28px 20px 22px;
   display: flex;
   flex-direction: column;
@@ -5719,7 +5718,7 @@ button:disabled {
 /* 경기 결과 블록 */
 .tm-res-matches-block {
   border: 1px solid var(--grey150);
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   overflow: hidden;
 }
 .tm-res-match-row {
@@ -5752,7 +5751,7 @@ button:disabled {
   font-size: 14px; font-weight: 900; color: var(--text-strong);
   flex-shrink: 0; text-align: center; min-width: 52px;
   background: var(--grey100);
-  border-radius: 8px;
+  border-radius: var(--radius-chip);
   padding: 4px 0;
 }
 
@@ -5768,7 +5767,7 @@ button:disabled {
   padding: 12px 16px;
   background: var(--grey50);
   border: 1px solid var(--grey150);
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   font-size: 13px;
   font-weight: 600;
   color: var(--text);
@@ -5831,7 +5830,7 @@ button:disabled {
 }
 .tm-awards-podium-block {
   width: 100%;
-  border-radius: 10px 10px 0 0;
+  border-radius: var(--radius-control) var(--radius-control) 0 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -5880,7 +5879,7 @@ button:disabled {
 /* 리뷰 카드 */
 .tm-review-card {
   border: 1px solid var(--grey150);
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   padding: 14px 16px;
   background: #fff;
   display: flex;
@@ -5895,7 +5894,7 @@ button:disabled {
 .tm-review-card-avatar {
   width: 36px;
   height: 36px;
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   background: var(--grey100);
   display: flex;
   align-items: center;
@@ -5932,7 +5931,7 @@ button:disabled {
   background: none;
   text-align: left;
   cursor: pointer;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
 }
 .tm-video-strip-item:focus-visible {
   outline: 2px solid var(--blue500);
@@ -5943,7 +5942,7 @@ button:disabled {
   display: block;
   width: 100%;
   aspect-ratio: 16 / 9;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   overflow: hidden;
   background: var(--grey900, #191f28);
 }
@@ -5985,7 +5984,7 @@ button:disabled {
   place-items: center;
   width: 38px;
   height: 38px;
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   background: rgba(255, 255, 255, 0.92);
   color: var(--blue500);
 }
@@ -6015,7 +6014,7 @@ button:disabled {
   min-height: 44px;
   padding: 0 14px;
   border: 1px solid var(--blue100, #d4e5fc);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--blue50);
   font-size: 12px;
   font-weight: 600;
@@ -6034,7 +6033,7 @@ button:disabled {
 .tm-video-modal {
   position: fixed;
   inset: 0;
-  z-index: 9999;
+  z-index: var(--z-top);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -6064,7 +6063,7 @@ button:disabled {
   min-width: 44px;
   min-height: 44px;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   background: rgba(255, 255, 255, 0.12);
   color: #fff;
   cursor: pointer;
@@ -6096,7 +6095,7 @@ button:disabled {
   position: relative;
   width: 100%;
   aspect-ratio: 16 / 9;
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   overflow: hidden;
   background: #000;
 }
@@ -6121,7 +6120,7 @@ button:disabled {
   gap: 5px;
   min-height: 44px;
   padding: 0 14px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.14);
   font-size: 12px;
   font-weight: 600;
@@ -6149,7 +6148,7 @@ button:disabled {
   min-height: 34px;
   padding: 0 12px;
   border: none;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.14);
   font-size: 12px;
   font-weight: 600;
@@ -6220,7 +6219,7 @@ button:disabled {
   padding: 0 14px;
   margin-bottom: 14px;
   border: 1px solid var(--grey150);
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--text-caption);
 }
@@ -6269,7 +6268,7 @@ button:disabled {
   min-height: 44px;
   padding: 0 6px;
   border: 1px solid var(--grey150);
-  border-radius: 9px;
+  border-radius: var(--radius-chip);
   background: var(--surface);
   color: var(--text);
   font-size: 13px;
@@ -6332,7 +6331,7 @@ button:disabled {
 }
 .tm-schedule-card {
   border: 1px solid var(--grey150);
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--bg);
   overflow: hidden;
 }
@@ -6353,7 +6352,7 @@ button:disabled {
 /* 리텐션 CTA 카드 — 페이지 배경(--bg) 위 --grey50 한 단계. main과 동일. */
 .tm-retention-card {
   background: var(--grey50);
-  border-radius: 16px;
+  border-radius: var(--radius-container);
   padding: 20px;
   display: flex;
   flex-direction: column;
@@ -6561,7 +6560,7 @@ button:disabled {
 .tm-rich-editor .ProseMirror blockquote {
   margin: 1em 0;
   border: 1px solid var(--grey200);
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--grey50);
   padding: 12px 14px;
   color: var(--text-muted);
@@ -6592,7 +6591,7 @@ button:disabled {
   width: 100%;
   height: auto;
   max-height: 720px;
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   object-fit: contain;
 }
 
@@ -6611,14 +6610,14 @@ button:disabled {
   display: grid;
   gap: 6px;
   padding: 4px;
-  border-radius: 15px;
+  border-radius: var(--radius-field);
   background: var(--grey100);
 }
 
 .tm-seg-tab {
   /* a11y: 터치 타깃 44px 확보 (시각 높이 유지, grid/place-items 로 내용 중앙 정렬) */
   min-height: 44px;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   display: grid;
   place-items: center;
   color: var(--text-muted);
@@ -6691,7 +6690,7 @@ button:disabled {
 
 .tm-fixture-lineup-gk {
   border: 1.5px dashed var(--grey300);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: transparent;
   color: var(--text-caption);
   font-size: 12px;
@@ -6960,7 +6959,7 @@ button:disabled {
 .tm-pcard-crest svg { display: block; width: 100%; height: 100%; }
 @keyframes tmCrestBreathe { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.5px); } }
 .tm-pcard-badge {
-  width: 19px; height: 19px; border-radius: 4px;
+  width: 19px; height: 19px; border-radius: var(--radius-tight);
   display: grid; place-items: center;
   background: rgba(255, 255, 255, 0.14);
   border: 1px solid var(--tm-rim-line);
@@ -7054,7 +7053,7 @@ button:disabled {
 }
 .tm-pcard-meta-line { display: flex; align-items: center; gap: 7px; min-width: 0; letter-spacing: 0.01em; }
 .tm-pcard-meta-line b { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tm-pcard-meta-line i { width: 3px; height: 3px; border-radius: 999px; background: currentColor; flex: none; }
+.tm-pcard-meta-line i { width: 3px; height: 3px; border-radius: var(--radius-pill); background: currentColor; flex: none; }
 .tm-pcard-meta-line span { font-family: var(--tm-num); letter-spacing: 0.04em; flex: none; }
 .tm-pcard-brand {
   display: inline-flex; align-items: center; gap: 4px; opacity: 0.62;
@@ -7270,7 +7269,7 @@ button:disabled {
 .tm-pcard-back-tags { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
 .tm-pcard-tag {
   display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 0;
-  padding: 4px 7px; border-radius: 7px;
+  padding: 4px 7px; border-radius: var(--radius-chip);
   background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.12);
   font-size: 10.5px; font-weight: 700; color: #a9b3c2;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -7297,7 +7296,7 @@ button:disabled {
 /* ── 카드 아래 동반 UI -- 카드는 소장품이라 앞면을 깨끗하게 두고, 안내·행동은 밖에 둔다. ── */
 .tm-pcard-below { width: 100%; max-width: 320px; display: flex; flex-direction: column; }
 .tm-pcard-flipbtn {
-  margin-top: 4px; width: 100%; min-height: 44px; border-radius: 11px;
+  margin-top: 4px; width: 100%; min-height: 44px; border-radius: var(--radius-control);
   background: var(--surface-soft); border: 1px solid var(--border);
   color: var(--text-strong); font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
 }
@@ -7305,16 +7304,16 @@ button:disabled {
 .tm-player-card-sub { margin-top: 10px; font-size: 13px; color: var(--text-muted); text-align: center; }
 .tm-player-card-tier-note { margin-top: 4px; font-size: 11px; color: var(--text-caption); text-align: center; }
 .tm-player-card-progress {
-  margin-top: 10px; padding: 10px 12px; border-radius: 10px;
+  margin-top: 10px; padding: 10px 12px; border-radius: var(--radius-control);
   background: var(--surface-soft); border: 1px solid var(--border);
 }
 .tm-player-card-progress-text { font-size: 12px; color: var(--text-body); }
 .tm-player-card-progress-bar {
-  height: 5px; border-radius: 3px; margin-top: 7px; overflow: hidden;
+  height: 5px; border-radius: var(--radius-pill); margin-top: 7px; overflow: hidden;
   background: var(--border);
 }
 .tm-player-card-progress-bar i {
-  display: block; height: 100%; border-radius: 3px; background: var(--blue500);
+  display: block; height: 100%; border-radius: var(--radius-pill); background: var(--blue500);
 }
 .tm-player-card-progress-count {
   margin-top: 6px; font-size: 11px; color: var(--text-muted);
@@ -7322,7 +7321,7 @@ button:disabled {
 }
 .tm-player-card-cta {
   display: flex; align-items: center; justify-content: center;
-  min-height: 44px; margin-top: 12px; border-radius: 12px;
+  min-height: 44px; margin-top: 12px; border-radius: var(--radius-control);
   background: var(--blue500); color: var(--static-white);
   font-size: 15px; font-weight: 700; text-decoration: none;
 }
@@ -7332,7 +7331,7 @@ button:disabled {
    가장 강한 것은 기록 공개 유도여야 한다. */
 .tm-player-card-share-link {
   display: flex; align-items: center; justify-content: center;
-  min-height: 44px; margin-top: 10px; border-radius: 12px;
+  min-height: 44px; margin-top: 10px; border-radius: var(--radius-control);
   background: var(--surface-soft); border: 1px solid var(--border);
   color: var(--text-strong); font-size: 15px; font-weight: 700; text-decoration: none;
 }
@@ -7340,7 +7339,7 @@ button:disabled {
 
 /* 공유 전용 화면의 주 버튼 -- 여기서는 공유가 유일한 목적이라 강한 CTA 로 둔다. */
 .tm-player-card-share-btn {
-  min-height: 48px; border-radius: 12px; border: none;
+  min-height: 48px; border-radius: var(--radius-control); border: none;
   background: var(--blue500); color: var(--static-white);
   font-family: inherit; font-size: 16px; font-weight: 700; width: 100%; cursor: pointer;
 }
@@ -7364,7 +7363,7 @@ button:disabled {
 .tm-my-profile-stage {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius-container);
   padding: 20px 16px 16px;
 }
 /* 카드 아래 신원 블록 -- 카드가 이름을 이미 크게 말하므로 여기서는 보조 정보만. */
@@ -7400,14 +7399,14 @@ button:disabled {
 .tm-pcard-journey-title { font-size: 15px; font-weight: 800; color: var(--tm-ink); }
 .tm-pcard-journey-sub { margin-top: 5px; font-size: 11px; line-height: 1.55; color: var(--tm-dim); }
 .tm-pcard-next {
-  margin: 12px auto 0; width: fit-content; padding: 5px 12px; border-radius: 999px;
+  margin: 12px auto 0; width: fit-content; padding: 5px 12px; border-radius: var(--radius-pill);
   border: 1px solid var(--tm-rule);
   font-family: var(--tm-num); font-size: 11px; font-weight: 800; letter-spacing: 0.02em;
   color: var(--tm-ink);
   display: flex; align-items: center; gap: 6px;
   position: relative; z-index: 2;
 }
-.tm-pcard-next i { width: 5px; height: 5px; border-radius: 999px; background: var(--tm-ink); opacity: 0.75; }
+.tm-pcard-next i { width: 5px; height: 5px; border-radius: var(--radius-pill); background: var(--tm-ink); opacity: 0.75; }
 /* 공개 프로필 스테이지의 이름은 h1 -- 헤딩 기본 마진·크기를 카드 신원 스타일로 되돌린다. */
 h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
 
@@ -7417,7 +7416,7 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
 .tm-pcard-actions { display: flex; gap: 8px; margin-top: 4px; }
 .tm-pcard-actions .tm-pcard-flipbtn { flex: 1; margin-top: 0; }
 .tm-pcard-settings-link {
-  flex: none; width: 44px; min-height: 44px; border-radius: 11px;
+  flex: none; width: 44px; min-height: 44px; border-radius: var(--radius-control);
   display: flex; align-items: center; justify-content: center;
   background: var(--surface-soft); border: 1px solid var(--border);
   color: var(--text-strong);
@@ -7428,7 +7427,7 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
    종합 별점 아래 실력·매너·시간약속·안전 네 줄. 종합 별점과 같은 별 패턴을
    축소 재사용한다 -- 새 입력 문법을 만들면 폼이 두 언어로 갈라진다. */
 .tm-review-metric-rows {
-  margin-top: 8px; padding: 8px 10px; border-radius: 10px;
+  margin-top: 8px; padding: 8px 10px; border-radius: var(--radius-control);
   background: var(--surface-soft);
   display: grid; gap: 2px;
 }
@@ -7446,7 +7445,7 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
   position: absolute; right: 8px; top: 26px; width: 138px; height: 140px;
   z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
   border: 1.5px dashed var(--tm-rule);
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   background: rgba(255, 255, 255, 0.07);
   color: var(--tm-ink);
   text-decoration: none;

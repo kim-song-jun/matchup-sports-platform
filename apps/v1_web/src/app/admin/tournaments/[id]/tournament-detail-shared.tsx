@@ -253,7 +253,7 @@ export function SimpleModal({ open, title, onClose, pending = false, children }:
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="bg-[var(--card-surface)] rounded-2xl shadow-[var(--shadow-2)] w-full max-w-[480px]"
+        className="bg-[var(--card-surface)] rounded-2xl shadow-[var(--shadow-dropdown)] w-full max-w-[480px]"
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
           <h2 id={titleId} className="text-sm font-bold text-[var(--text-strong)]">

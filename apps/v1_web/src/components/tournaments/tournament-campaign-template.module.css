@@ -10,7 +10,7 @@
   position: relative;
   min-height: 480px;
   overflow: hidden;
-  border-radius: 0 0 24px 24px;
+  border-radius: 0 0 var(--radius-hero) var(--radius-hero);
   background: var(--grey100);
   isolation: isolate;
 }
@@ -90,7 +90,7 @@
   margin-top: -28px;
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius-container);
   background: var(--bg);
 }
 
@@ -112,7 +112,7 @@
   height: 36px;
   place-items: center;
   flex: 0 0 auto;
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   background: var(--blue50);
   color: var(--blue600);
 }

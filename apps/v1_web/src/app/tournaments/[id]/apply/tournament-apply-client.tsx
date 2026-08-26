@@ -1946,7 +1946,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
               background: 'var(--scrim-dark-32)',
               display: 'grid',
               placeItems: 'center',
-              zIndex: 9999,
+              zIndex: 'var(--z-top)',
             }}
           >
             <div

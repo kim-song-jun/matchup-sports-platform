@@ -5,7 +5,7 @@
   gap: 8px;
   padding: 9px 12px;
   border: 1px solid color-mix(in srgb, var(--static-white) 28%, transparent);
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: color-mix(in srgb, var(--static-black) 36%, transparent);
   color: var(--static-white);
   font-size: var(--font-size-label);

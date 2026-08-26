@@ -206,7 +206,16 @@ function checkRadiusLiteral() {
       // **토큰 참조를 걷어낸 뒤 숫자가 남아 있으면 리터럴**이다.
       // var( 와 토큰 이름만 지우고 닫는 괄호 안쪽은 남기는 게 핵심 — 그래야
       // var(--x, 12px) 의 fallback 이 계속 검사 대상으로 남는다.
-      const stripped = value.replace(/var\(\s*--[\w-]+/g, ' ');
+      // 정당한 참조는 --radius-* 하나뿐이다. 아무 변수나 통과시키면
+      // `border-radius: var(--font-size-body)` 같은 것으로 우회할 수 있고,
+      // 되살아난 --card-radius 처럼 폐기한 토큰도 조용히 다시 들어온다.
+      const stripped = value.replace(/var\(\s*--radius-[\w-]+/g, ' ');
+      for (const other of stripped.matchAll(/var\(\s*(--[\w-]+)/g)) {
+        violations.push(
+          `[radius 리터럴] ${f}: border-radius: ${value} — ${other[1]} 는 radius 토큰이 아니다. ` +
+            `var(--radius-*) 를 쓸 것 (tight/chip/control/field/container/hero/pill/circle)`,
+        );
+      }
       for (const lit of stripped.matchAll(/(-?[\d.]+)\s*([a-z%]*)/gi)) {
         const n = parseFloat(lit[1]);
         if (n === 0) continue; // 0 / 0px / 0% — 모서리 없음

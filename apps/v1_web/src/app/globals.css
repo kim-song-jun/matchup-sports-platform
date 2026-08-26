@@ -3093,6 +3093,16 @@ button:disabled {
   min-width: 0;
 }
 
+/* [a11y] 안쪽 .tm-list-search-field 가 outline:0 인데 대체 표시가 없어, 키보드로
+ * 들어와도 어디에 있는지 알 수 없었다. -input-active 는 검색바가 "열려 있음"을
+ * 뜻할 뿐(search.isOpen) 포커스와 무관해서, 열린 채 clear/submit 버튼으로 탭을
+ * 옮겨도 테두리가 그대로다 — 포커스 위치를 구분해 주지 못한다.
+ * 컨테이너에 링을 걸어 열림 상태(테두리)와 포커스(외곽 링)를 분리한다. */
+.tm-list-search-input:focus-within {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+}
+
 .tm-list-search-form {
   flex: 1;
   min-width: 0;
@@ -6219,7 +6229,7 @@ button:disabled {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  min-height: 34px;
+  min-height: 44px; /* [a11y] 34px → 44px 터치 기준 */
   padding: 0 12px;
   border: none;
   border-radius: var(--radius-pill);
@@ -6305,6 +6315,11 @@ button:disabled {
   background: transparent;
   font-size: 14px;
   color: var(--text-strong);
+}
+/* [a11y] input 이 outline:none 인데 대체 표시가 없었다. */
+.tm-reviews-searchbar:focus-within {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
 }
 .tm-reviews-searchbar input::placeholder { color: var(--text-caption); }
 

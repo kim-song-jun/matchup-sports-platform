@@ -345,11 +345,23 @@ function TeamSelectStep({
                   disabled={!isManager}
                   type="button"
                   onClick={() => isManager && onSelectTeam(team.teamId)}
+                  className="tm-pressable"
                   style={{
-                    all: 'unset',
+                    // all:'unset' 은 button 기본값을 지우면서 :focus-visible 링까지
+                    // 함께 지웠다 — 키보드로 팀을 고를 때 어느 카드에 있는지 알 수
+                    // 없었다. 지워야 할 것만 명시하고, 링은 .tm-pressable 로 받는다.
                     display: 'block',
                     width: '100%',
                     boxSizing: 'border-box',
+                    margin: 0,
+                    padding: 0,
+                    border: 0,
+                    background: 'transparent',
+                    font: 'inherit',
+                    color: 'inherit',
+                    textAlign: 'left',
+                    appearance: 'none',
+                    cursor: isManager ? 'pointer' : 'default',
                   }}
                 >
                   <Card

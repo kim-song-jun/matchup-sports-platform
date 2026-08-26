@@ -93,7 +93,7 @@ function DeviceButton({
       type="button"
       aria-pressed={active}
       onClick={onClick}
-      className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-colors [&_svg]:h-4 [&_svg]:w-4 ${active ? 'bg-[var(--grey300)] text-[var(--blue700)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-strong)]'}`}
+      className={`inline-flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold transition-colors [&_svg]:h-4 [&_svg]:w-4 ${active ? 'bg-[var(--grey300)] text-[var(--blue700)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-strong)]'}`}
     >
       {children}{label}
     </button>

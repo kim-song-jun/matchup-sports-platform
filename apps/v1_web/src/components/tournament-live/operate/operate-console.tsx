@@ -995,7 +995,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           </div>
           <div className="flex flex-col items-end gap-1 sm:shrink-0">
             {/* UX 감사 item 3 — "경기 종료"는 되돌릴 수 없는데 나머지 명령과
-                6px(gap-1.5)로 붙어 있어 오탭 위험이 컸다. 되돌릴 수 있는
+                6px 간격으로 붙어 있어 오탭 위험이 컸다. 되돌릴 수 있는
                 명령들과 별도 그룹으로 묶고 구분선을 둬 시각적·물리적으로
                 떼어낸다.
                 R-K5 CTA 위계 재설계 — LIVE + 다음 피리어드가 있는 상태에서는
@@ -1006,7 +1006,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
                 "일시 중지"다(피리어드 종료는 절반의 경기 시간에 한 번뿐,
                 일시 중지는 파울·부상 등으로 언제든 필요) — 나머지는 보조
                 (outline)로 후퇴시킨다. */}
-            <div className="flex flex-wrap items-center justify-end gap-1.5">
+            <div className="flex flex-wrap items-center justify-end gap-2">
               {availableCommands
                 .filter((command) => command !== 'end')
                 .map((command, index) => {
@@ -1124,7 +1124,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
             <p className="flex items-center gap-2">
               <span className="text-xs font-semibold text-[var(--text-muted)]">스코어</span>
               <span
-                className="flex items-center gap-1.5 text-4xl font-extrabold leading-none tabular-nums text-[var(--text-strong)]"
+                className="flex items-center gap-2 text-4xl font-extrabold leading-none tabular-nums text-[var(--text-strong)]"
                 aria-label={`스코어 ${sides.map((side) => `${side.displayNameSnapshot} ${scoreBySideId.get(side.id) ?? 0}점`).join(', ')}`}
               >
                 {/* 점수 문자열("2 : 1")은 한 텍스트 노드로 유지한다 — 숫자 사이에
@@ -1150,7 +1150,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
                 aria-label 은 "2:0"이 시각으로 읽히지 않게 점수임을 명시한다. */}
             {confirmedPenalties ? (
               <span
-                className="flex items-center gap-1.5 rounded-lg bg-[var(--blue50)] px-2.5 py-1 text-sm font-bold tabular-nums text-[var(--blue700)] dark:bg-blue-500/10"
+                className="flex items-center gap-2 rounded-lg bg-[var(--blue50)] px-3 py-1 text-sm font-bold tabular-nums text-[var(--blue700)] dark:bg-blue-500/10"
                 aria-label={`승부차기 ${sides
                   .map((side) => `${side.displayNameSnapshot} ${penaltyScoreForSide(side, confirmedPenalties)}점`)
                   .join(', ')}${
@@ -1188,7 +1188,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
               // `Pause`(=PAUSED 상태 배지가 이미 쓰는 아이콘) 대신
               // `Timer`를 써서 "일시 중지"와 헷갈리지 않게 한다 — 아래
               // RestTimer("휴식 타이머")와 같은 아이콘 언어를 공유한다.
-              <span className="flex items-center gap-1.5 rounded-lg bg-[var(--blue50)] px-2.5 py-1 text-sm font-bold text-[var(--blue700)] dark:bg-blue-500/10">
+              <span className="flex items-center gap-2 rounded-lg bg-[var(--blue50)] px-3 py-1 text-sm font-bold text-[var(--blue700)] dark:bg-blue-500/10">
                 <Timer size={16} aria-hidden="true" />
                 하프타임
               </span>
@@ -1198,7 +1198,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
               // 상태 뱃지는 여전히 "진행 중"(게임 자체는 LIVE)이라 이 칩이
               // 없으면 "정규 시간은 끝났고 결과는 아직 확정 전"이라는 사실이
               // 화면 어디에도 드러나지 않는다.
-              <span className="flex items-center gap-1.5 rounded-lg bg-[var(--blue50)] px-2.5 py-1 text-sm font-bold text-[var(--blue700)] dark:bg-blue-500/10">
+              <span className="flex items-center gap-2 rounded-lg bg-[var(--blue50)] px-3 py-1 text-sm font-bold text-[var(--blue700)] dark:bg-blue-500/10">
                 <Timer size={16} aria-hidden="true" />
                 정규 시간 종료
               </span>

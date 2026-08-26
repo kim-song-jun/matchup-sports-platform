@@ -68,7 +68,7 @@ export function ElapsedMatchClock({
           초록 점(진행 중)/일시정지 아이콘을 숫자 바로 옆에 붙여 한눈에 상태를
           읽게 한다 — 경기장에서 흘끗 봐도 파악되는 게 요건이다. */}
       <span
-        className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-mono text-3xl font-extrabold leading-none tabular-nums tracking-tight ${
+        className={`flex items-center gap-2 rounded-lg px-3 py-1 font-mono text-3xl font-extrabold leading-none tabular-nums tracking-tight ${
           isPaused
             ? 'bg-orange-50 text-orange-600 dark:bg-orange-500/10 dark:text-orange-300'
             : 'bg-gray-900/[0.04] text-[var(--text-strong)] dark:bg-white/10'

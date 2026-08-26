@@ -103,7 +103,7 @@ export function AdminReasonModal({
         <form onSubmit={handleSubmit} noValidate>
           <div className="px-5 py-5 flex flex-col gap-4">
             {/* Status selector */}
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               <label
                 htmlFor="admin-reason-status"
                 className="text-[13px] font-semibold text-[var(--text-body)]"
@@ -131,7 +131,7 @@ export function AdminReasonModal({
             </div>
 
             {/* Reason textarea */}
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               <label
                 htmlFor="admin-reason-text"
                 className="text-[13px] font-semibold text-[var(--text-body)]"
@@ -148,7 +148,7 @@ export function AdminReasonModal({
                 disabled={pending}
                 placeholder="처리 사유를 입력해 주세요."
                 className={[
-                  'px-3 py-2.5 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] resize-none',
+                  'px-3 py-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] resize-none',
                   'placeholder:text-[var(--text-muted)]',
                   'focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
                   'transition-colors disabled:opacity-50',

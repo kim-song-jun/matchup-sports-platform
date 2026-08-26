@@ -95,10 +95,10 @@ function ToggleCard({ toggle, gateEnabled, showToast }: ToggleCardProps) {
               </span>
             )}
           </div>
-          <p className="text-[13px] text-[var(--text-muted)] mt-1.5 leading-relaxed">
+          <p className="text-[13px] text-[var(--text-muted)] mt-2 leading-relaxed">
             {isOn ? toggle.onEffect : toggle.offEffect}
           </p>
-          <p className="text-[11px] text-[var(--text-muted)] mt-1.5 font-mono">{toggle.techNote}</p>
+          <p className="text-[11px] text-[var(--text-muted)] mt-2 font-mono">{toggle.techNote}</p>
         </div>
 
         {flagQuery.isError ? (

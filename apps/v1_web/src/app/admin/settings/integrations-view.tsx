@@ -94,7 +94,7 @@ export function IntegrationsView() {
           ) : null}
 
           <form className="mt-4 flex flex-col gap-4" onSubmit={handleSubmit}>
-            <label className="flex flex-col gap-1.5">
+            <label className="flex flex-col gap-2">
               <span className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">카카오 REST API 키</span>
               <input
                 value={kakaoRestApiKey ?? ''}
@@ -115,7 +115,7 @@ export function IntegrationsView() {
               />
             </label>
 
-            <label className="flex flex-col gap-1.5">
+            <label className="flex flex-col gap-2">
               <span className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">카카오맵 JS 키</span>
               <input
                 value={kakaoMapsJsKey ?? ''}

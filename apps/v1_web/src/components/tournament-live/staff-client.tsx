@@ -145,7 +145,7 @@ function TournamentFieldsSection({
           {canCreate ? '아래에서 먼저 등록해 주세요.' : '플랫폼 운영자에게 등록을 요청해 주세요.'}
         </p>
       ) : (
-        <ul className="flex flex-wrap gap-1.5" role="list">
+        <ul className="flex flex-wrap gap-2" role="list">
           {fields.map((field) => (
             <li
               key={field.id}
@@ -295,7 +295,7 @@ export function StaffClient({ tournamentId }: Props) {
                 setGrantError(null);
                 setGrantOpen(true);
               }}
-              className="flex items-center gap-1.5 h-[44px] px-4 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 shrink-0"
+              className="flex items-center gap-2 h-[44px] px-4 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 shrink-0"
             >
               <UserPlus size={16} aria-hidden="true" />
               스태프 배정

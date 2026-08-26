@@ -217,7 +217,7 @@ function AdminInquiriesPageContent() {
           // 문의를 다루는 이 화면이 신고 랭킹의 자연스러운 부모다.
           <Link
             href="/admin/reports/teams"
-            className="inline-flex h-[44px] items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-4 text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            className="inline-flex h-[44px] items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-4 text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
             신고 누적 팀 랭킹
           </Link>
@@ -228,7 +228,7 @@ function AdminInquiriesPageContent() {
         {/* 신고 누적 팀 목록(#657 딥링크)에서 넘어온 팀 필터 — 보이지 않는 필터가 목록을
             좁히면 "왜 결과가 없지?"가 된다. 걸려 있는 동안은 항상 표시하고 해제 수단을 준다. */}
         {activeReportedTeamId ? (
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--tint-blue-border)] bg-[var(--tint-blue)] px-4 py-2.5">
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--tint-blue-border)] bg-[var(--tint-blue)] px-4 py-3">
             <p className="text-sm text-[var(--blue700)]">
               이 팀의 신고만 보는 중이에요{' '}
               <span className="font-mono text-2xs text-[var(--blue700)]">({activeReportedTeamId})</span>
@@ -237,7 +237,7 @@ function AdminInquiriesPageContent() {
               type="button"
               onClick={() => setActiveReportedTeamId('')}
               aria-label="팀 필터 해제"
-              className="inline-flex h-[44px] shrink-0 items-center gap-1 rounded-lg px-2.5 text-sm font-semibold text-[var(--blue700)] transition-colors hover:bg-white/60 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              className="inline-flex h-[44px] shrink-0 items-center gap-1 rounded-lg px-3 text-sm font-semibold text-[var(--blue700)] transition-colors hover:bg-white/60 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
             >
               <X size={16} aria-hidden="true" />
               필터 해제

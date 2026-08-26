@@ -26,7 +26,7 @@ export function TournamentDatetimeField({
   const descriptionId = error ? `${id}-error` : hint ? `${id}-hint` : undefined;
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-2">
       <label
         htmlFor={id}
         className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]"

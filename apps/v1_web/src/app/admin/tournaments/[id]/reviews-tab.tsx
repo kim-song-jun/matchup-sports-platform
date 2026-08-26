@@ -204,7 +204,7 @@ export function ReviewsTab({
           <p className="text-[13px] text-[var(--text-muted)]">
             이 리뷰를 사용자에게 숨길까요? 숨긴 리뷰는 관리자만 볼 수 있어요.
           </p>
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             <label htmlFor="hide-reason" className="text-[13px] text-[var(--text-strong)]">숨김 사유 (선택)</label>
             <textarea
               id="hide-reason"
@@ -264,7 +264,7 @@ function ReviewModerationCard({
   return (
     <div
       className={[
-        'rounded-xl border p-3.5',
+        'rounded-xl border p-4',
         isHidden ? 'bg-[var(--surface-soft)] border-[var(--border)]' : 'bg-[var(--card-surface)] border-[var(--border)]',
       ].join(' ')}
     >
@@ -286,7 +286,7 @@ function ReviewModerationCard({
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
             <p className="text-[13px] font-semibold text-[var(--text-strong)] truncate">{review.authorNickname}</p>
             {review.teamName && (
               <span className="text-[12px] text-[var(--text-muted)] truncate">· {review.teamName}</span>
@@ -314,13 +314,13 @@ function ReviewModerationCard({
       </div>
 
       {review.comment && (
-        <p className="text-[13px] text-[var(--text-body)] mt-2.5 leading-relaxed whitespace-pre-wrap break-words">
+        <p className="text-[13px] text-[var(--text-body)] mt-3 leading-relaxed whitespace-pre-wrap break-words">
           {review.comment}
         </p>
       )}
 
       {photoUrls.length > 0 && (
-        <div className="flex gap-2 mt-2.5 flex-wrap">
+        <div className="flex gap-2 mt-3 flex-wrap">
           {photoUrls.map((url) => (
             <a
               key={url}
@@ -336,7 +336,7 @@ function ReviewModerationCard({
       )}
 
       {isHidden && review.hiddenReason && (
-        <p className="text-[12px] text-[var(--text-muted)] mt-2.5 bg-[var(--card-surface)] border border-[var(--border)] rounded-lg px-3 py-2">
+        <p className="text-[12px] text-[var(--text-muted)] mt-3 bg-[var(--card-surface)] border border-[var(--border)] rounded-lg px-3 py-2">
           숨김 사유: {review.hiddenReason}
         </p>
       )}

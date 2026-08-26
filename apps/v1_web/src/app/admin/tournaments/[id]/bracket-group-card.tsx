@@ -49,12 +49,12 @@ function TeamStagingPicker({
   return (
     <div className="flex flex-col gap-3">
       {suggestedTeams.length > 0 && (
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-2">
           <p className="text-xs text-[var(--text-muted)]">
             예선 상위 진출팀이에요. 목록에 없으면 직접 검색해서 담아 보세요.
           </p>
           {availableSuggested.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-2">
               {availableSuggested.map((t) => (
                 <button
                   key={t.id}
@@ -102,11 +102,11 @@ function TeamStagingPicker({
       )}
 
       {stagedIds.length > 0 && (
-        <div className="flex flex-wrap gap-1.5" aria-label="담은 팀">
+        <div className="flex flex-wrap gap-2" aria-label="담은 팀">
           {stagedIds.map((id) => (
             <span
               key={id}
-              className="inline-flex items-center gap-1 pl-2.5 pr-1 py-0.5 rounded-full bg-[var(--surface-soft)] text-xs text-[var(--text-body)]"
+              className="inline-flex items-center gap-1 pl-3 pr-1 py-0.5 rounded-full bg-[var(--surface-soft)] text-xs text-[var(--text-body)]"
             >
               {labelById.get(id) ?? id}
               <button
@@ -307,7 +307,7 @@ export function BracketGroupCard({
             className={`shrink-0 mt-0.5 text-[var(--text-muted)] transition-transform ${expanded ? 'rotate-90' : ''}`}
           />
           <span className="flex-1 min-w-0">
-            <span className="flex items-center gap-1.5 flex-wrap">
+            <span className="flex items-center gap-2 flex-wrap">
               <span className="text-[15px] font-bold text-[var(--text-strong)]">{group.name}</span>
               {ready && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[length:var(--font-size-caption)] font-semibold bg-blue-500 text-white shrink-0">
@@ -347,11 +347,11 @@ export function BracketGroupCard({
           {/* ── 배정된 팀 + 순위표 ── */}
           <div className="flex flex-col gap-2">
             {group.groupTeams.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-2">
                 {group.groupTeams.map((gt) => (
                   <span
                     key={gt.id}
-                    className="inline-flex items-center gap-1 pl-2.5 pr-1 py-0.5 rounded-full bg-[var(--surface-soft)] text-xs text-[var(--text-body)]"
+                    className="inline-flex items-center gap-1 pl-3 pr-1 py-0.5 rounded-full bg-[var(--surface-soft)] text-xs text-[var(--text-body)]"
                   >
                     {gt.teamName ?? gt.registrationId}
                     <button

@@ -64,7 +64,7 @@ export function AwardRecommendationChips({
       </p>
       <div className="flex flex-col gap-2">
         {groups.map((group) => (
-          <div key={group.kind} className="flex flex-wrap items-center gap-1.5">
+          <div key={group.kind} className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-bold text-[var(--text-strong)] mr-1">{group.label}</span>
             {group.rows.map((row, index) => (
               <button

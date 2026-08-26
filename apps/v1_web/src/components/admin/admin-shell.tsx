@@ -210,7 +210,7 @@ function NavBadge({ count }: { count: number }) {
   return (
     <span
       aria-hidden="true"
-      className="ml-auto inline-flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-full bg-blue-500 px-1.5 text-[length:var(--font-size-caption)] font-semibold leading-none text-white tabular-nums"
+      className="ml-auto inline-flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-full bg-blue-500 px-2 text-[length:var(--font-size-caption)] font-semibold leading-none text-white tabular-nums"
     >
       {count > 99 ? '99+' : count}
     </span>
@@ -226,7 +226,7 @@ function SidebarLink({ item, active }: { item: NavItem; active: boolean }) {
       aria-current={active ? 'page' : undefined}
       aria-label={hasBadge && item.badgeAriaLabel ? `${item.label} (${item.badgeAriaLabel})` : undefined}
       className={[
-        'flex items-center gap-3 px-4 py-2.5 min-h-[44px] text-sm transition-colors border-l-2',
+        'flex items-center gap-3 px-4 py-3 min-h-[44px] text-sm transition-colors border-l-2',
         'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-[-2px]',
         active
           ? 'border-blue-500 bg-[var(--blue50)]/60 text-[var(--blue700)] font-semibold'
@@ -386,7 +386,7 @@ function Drawer({
             <span className="text-[15px] font-bold text-[var(--text-strong)]">Teameet 운영</span>
             {/* [알파 감사 C] ops shell 역할 배지 — 알파 실측 지적(10px → 12px). */}
             {adminRoleLabel && (
-              <span className="text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-1.5 py-0.5">
+              <span className="text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-2 py-0.5">
                 {adminRoleLabel}
               </span>
             )}
@@ -402,7 +402,7 @@ function Drawer({
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 py-1.5 overflow-y-auto" aria-label="주 메뉴">
+        <nav className="flex-1 py-2 overflow-y-auto" aria-label="주 메뉴">
           {navGroups.map((group, index) => (
             <div
               key={group.label ?? `nav-group-${index}`}
@@ -457,7 +457,7 @@ function Drawer({
           <Link
             href="/home"
             onClick={onClose}
-            className="flex items-center gap-1.5 text-[13px] text-[var(--text-muted)] hover:text-[var(--text-strong)] transition-colors min-h-[44px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+            className="flex items-center gap-2 text-[13px] text-[var(--text-muted)] hover:text-[var(--text-strong)] transition-colors min-h-[44px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
           >
             <ChevronLeft size={14} aria-hidden="true" />
             서비스로 돌아가기
@@ -514,7 +514,7 @@ export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmin
             <span className="text-[15px] font-bold text-[var(--text-strong)] leading-tight">Teameet 운영</span>
             {/* [알파 감사 C] ops shell 역할 배지 — 알파 실측 지적(10px → 12px). */}
             {adminRoleLabel && (
-              <span className="text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-1.5 py-0.5 w-fit mt-0.5">
+              <span className="text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-2 py-0.5 w-fit mt-0.5">
                 {adminRoleLabel}
               </span>
             )}
@@ -531,12 +531,12 @@ export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmin
           >
             <Search size={14} aria-hidden="true" />
             <span className="flex-1 text-left">회원·팀·매치 검색</span>
-            <kbd className="rounded border border-[var(--border)] bg-[var(--card-surface)] px-1.5 py-0.5 text-[length:var(--font-size-micro)]">⌘K</kbd>
+            <kbd className="rounded border border-[var(--border)] bg-[var(--card-surface)] px-2 py-0.5 text-[length:var(--font-size-micro)]">⌘K</kbd>
           </button>
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 py-1.5" aria-label="주 메뉴">
+        <nav className="flex-1 py-2" aria-label="주 메뉴">
           {navGroups.map((group, index) => (
             <div
               key={group.label ?? `nav-group-${index}`}
@@ -563,7 +563,7 @@ export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmin
           )}
           <Link
             href="/home"
-            className="flex items-center gap-1.5 text-[13px] text-[var(--text-muted)] hover:text-[var(--text-muted)] transition-colors min-h-[44px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+            className="flex items-center gap-2 text-[13px] text-[var(--text-muted)] hover:text-[var(--text-muted)] transition-colors min-h-[44px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
           >
             <ChevronLeft size={14} aria-hidden="true" />
             서비스로 돌아가기

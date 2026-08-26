@@ -74,7 +74,7 @@ function LeagueFixtureVideoCard({
           type="button"
           onClick={() => setFormOpen((open) => !open)}
           aria-expanded={formOpen}
-          className="shrink-0 inline-flex items-center gap-1.5 h-[44px] px-3 rounded-xl text-sm font-semibold bg-[var(--surface-soft)] text-[var(--text-body)] hover:bg-[var(--border)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+          className="shrink-0 inline-flex items-center gap-2 h-[44px] px-3 rounded-xl text-sm font-semibold bg-[var(--surface-soft)] text-[var(--text-body)] hover:bg-[var(--border)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
         >
           <Film size={16} aria-hidden="true" />
           {formOpen ? '닫기' : '영상 추가'}
@@ -84,7 +84,7 @@ function LeagueFixtureVideoCard({
       {fixture.videos.length === 0 ? (
         <p className="text-[length:var(--font-size-label)] text-[var(--text-muted)]">아직 등록된 영상이 없어요.</p>
       ) : (
-        <ul className="flex flex-col gap-1.5" role="list">
+        <ul className="flex flex-col gap-2" role="list">
           {fixture.videos.map((video, index) => (
             <li key={video.id} className="flex items-center gap-2 rounded-xl bg-[var(--surface-soft)] px-3 py-2">
               <span className="text-[var(--text-muted)] shrink-0" aria-hidden="true">

@@ -460,7 +460,7 @@ export function TournamentInfoSection() {
             <button
               type="button"
               onClick={openEdit}
-              className="inline-flex items-center gap-1.5 h-[44px] px-3 rounded-lg text-xs font-medium text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              className="inline-flex items-center gap-2 h-[44px] px-3 rounded-lg text-xs font-medium text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
             >
               <Pencil size={13} aria-hidden="true" />
               대회 정보 수정
@@ -533,7 +533,7 @@ export function TournamentInfoSection() {
             <button
               type="button"
               onClick={openPromoEdit}
-              className="inline-flex items-center gap-1.5 h-[44px] px-3 rounded-lg text-xs font-medium text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              className="inline-flex items-center gap-2 h-[44px] px-3 rounded-lg text-xs font-medium text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
             >
               <Pencil size={13} aria-hidden="true" />
               홍보 카드 수정
@@ -574,7 +574,7 @@ export function TournamentInfoSection() {
             <div key={promo.key} className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-[13px] font-semibold text-[var(--text-strong)]">{promo.title}</p>
-                <span className={`rounded-full px-2.5 py-1 text-[length:var(--font-size-caption)] font-semibold ${promo.enabled ? 'bg-[var(--blue50)] text-[var(--blue700)]' : 'bg-[var(--card-surface)] text-[var(--text-muted)] border border-[var(--border)]'}`}>
+                <span className={`rounded-full px-3 py-1 text-[length:var(--font-size-caption)] font-semibold ${promo.enabled ? 'bg-[var(--blue50)] text-[var(--blue700)]' : 'bg-[var(--card-surface)] text-[var(--text-muted)] border border-[var(--border)]'}`}>
                   {promo.enabled ? '노출' : '숨김'}
                 </span>
               </div>
@@ -629,7 +629,7 @@ export function TournamentInfoSection() {
         pending={updateTournament.isPending}
       >
         <form onSubmit={handleEditSubmit} noValidate className="flex flex-col gap-4 max-h-[70vh] overflow-y-auto pr-1">
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             <label htmlFor="edit-sport-id" className="text-[13px] text-[var(--text-strong)]">종목</label>
             <select
               id="edit-sport-id"
@@ -645,7 +645,7 @@ export function TournamentInfoSection() {
             <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">종목을 바꾸면 목록·상세의 종목 뱃지와 필터에 바로 반영돼요.</p>
           </div>
 
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             <label htmlFor="edit-title" className="text-[13px] text-[var(--text-strong)]">
               대회명 <span className="text-red-500" aria-hidden="true">*</span>
             </label>
@@ -693,7 +693,7 @@ export function TournamentInfoSection() {
             />
           </div>
 
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             <label htmlFor="edit-venue" className="text-[13px] text-[var(--text-strong)]">장소</label>
             <input
               id="edit-venue"
@@ -706,7 +706,7 @@ export function TournamentInfoSection() {
             />
           </div>
 
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             <label htmlFor="edit-parking-info" className="text-[13px] text-[var(--text-strong)]">주차 안내</label>
             <textarea
               id="edit-parking-info"
@@ -724,7 +724,7 @@ export function TournamentInfoSection() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               <label htmlFor="edit-entry-fee" className="text-[13px] text-[var(--text-strong)]">참가비 (원)</label>
               <input
                 id="edit-entry-fee"
@@ -736,7 +736,7 @@ export function TournamentInfoSection() {
                 className={inputCls}
               />
             </div>
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               <label htmlFor="edit-team-count" className="text-[13px] text-[var(--text-strong)]">팀 수</label>
               <input
                 id="edit-team-count"
@@ -749,7 +749,7 @@ export function TournamentInfoSection() {
                 className={inputCls}
               />
             </div>
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               <label htmlFor="edit-min-players" className="text-[13px] text-[var(--text-strong)]">최소 선수 (등록 명단)</label>
               <input
                 id="edit-min-players"
@@ -762,7 +762,7 @@ export function TournamentInfoSection() {
                 className={inputCls}
               />
             </div>
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               <label htmlFor="edit-max-players" className="text-[13px] text-[var(--text-strong)]">최대 선수 (등록 명단)</label>
               <input
                 id="edit-max-players"
@@ -777,7 +777,7 @@ export function TournamentInfoSection() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             <span className="text-[13px] text-[var(--text-strong)]">출전 인원</span>
             <p className="text-[12px] text-[var(--text-muted)]">
               경기장에 실제로 서는 라인업 인원(골키퍼 포함)이에요. 위 등록 명단 인원과는 달라요.
@@ -817,7 +817,7 @@ export function TournamentInfoSection() {
                       disabled={updateTournament.isPending}
                       onClick={() => setEditLineupMaxPlayers(String(option))}
                       aria-pressed={selected}
-                      className={`inline-flex min-h-[44px] items-center rounded-xl border px-3.5 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:opacity-50 ${
+                      className={`inline-flex min-h-[44px] items-center rounded-xl border px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:opacity-50 ${
                         selected
                           ? 'border-blue-500 bg-blue-500 text-white'
                           : 'border-[var(--border)] bg-white text-[var(--text-strong)] hover:border-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white'
@@ -831,7 +831,7 @@ export function TournamentInfoSection() {
             )}
           </div>
 
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             <span className="text-[13px] text-[var(--text-strong)]">교체 방식</span>
             <p className="text-[12px] text-[var(--text-muted)]">
               경기 중 후보 선수를 주전과 몇 번까지 바꿀 수 있는지예요. 무제한(롤링)은 이미 나갔던 선수도 다시 투입할 수 있어요.
@@ -874,7 +874,7 @@ export function TournamentInfoSection() {
                         disabled={updateTournament.isPending}
                         onClick={() => setEditSubstitutionMode(mode)}
                         aria-pressed={selected}
-                        className={`inline-flex min-h-[44px] items-center rounded-xl border px-3.5 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:opacity-50 ${
+                        className={`inline-flex min-h-[44px] items-center rounded-xl border px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:opacity-50 ${
                           selected
                             ? 'border-blue-500 bg-blue-500 text-white'
                             : 'border-[var(--border)] bg-white text-[var(--text-strong)] hover:border-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white'
@@ -886,7 +886,7 @@ export function TournamentInfoSection() {
                   })}
                 </div>
                 {(editSubstitutionMode || tournament.substitutionMode) === 'limited' ? (
-                  <div className="flex flex-col gap-1.5">
+                  <div className="flex flex-col gap-2">
                     <label htmlFor="edit-max-substitutions" className="text-[13px] text-[var(--text-strong)]">
                       허용 교체 횟수
                     </label>
@@ -911,7 +911,7 @@ export function TournamentInfoSection() {
             )}
           </div>
 
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             <label htmlFor="edit-gender-category" className="text-[13px] text-[var(--text-strong)]">
               성별 카테고리
             </label>
@@ -967,7 +967,7 @@ export function TournamentInfoSection() {
           <p className="text-[12px] text-[var(--text-muted)] -mb-2">상금·시상 정보는 &quot;대회 정보&quot; 탭에서 수정할 수 있어요.</p>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               <label htmlFor="edit-bank-name" className="text-[13px] text-[var(--text-strong)]">은행명</label>
               <input
                 id="edit-bank-name"
@@ -979,7 +979,7 @@ export function TournamentInfoSection() {
                 className={inputCls}
               />
             </div>
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               <label htmlFor="edit-bank-account" className="text-[13px] text-[var(--text-strong)]">계좌번호</label>
               <input
                 id="edit-bank-account"
@@ -991,7 +991,7 @@ export function TournamentInfoSection() {
                 className={inputCls}
               />
             </div>
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               <label htmlFor="edit-bank-holder" className="text-[13px] text-[var(--text-strong)]">예금주</label>
               <input
                 id="edit-bank-holder"
@@ -1005,7 +1005,7 @@ export function TournamentInfoSection() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             <label htmlFor="edit-rules-text" className="text-[13px] text-[var(--text-strong)]">대회 규정</label>
             <textarea
               id="edit-rules-text"
@@ -1021,7 +1021,7 @@ export function TournamentInfoSection() {
           {/* 카드 정지 규정. 비우면 이 대회에는 적용하지 않는다 — 이미 진행된 대회에
               소급 적용되는 것을 막으려고 기본값을 두지 않았다. */}
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               <label htmlFor="edit-yellow-limit" className="text-[13px] text-[var(--text-strong)]">
                 경고 누적 출전정지 (장)
               </label>
@@ -1038,7 +1038,7 @@ export function TournamentInfoSection() {
                 className={inputCls}
               />
             </div>
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               <label htmlFor="edit-red-suspension" className="text-[13px] text-[var(--text-strong)]">
                 퇴장 시 출전정지 (경기)
               </label>
@@ -1057,7 +1057,7 @@ export function TournamentInfoSection() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             <label htmlFor="edit-refund-policy" className="text-[13px] text-[var(--text-strong)]">환불 정책</label>
             <textarea
               id="edit-refund-policy"
@@ -1222,7 +1222,7 @@ function GenderQuotaInput({
   disabled: boolean;
 }) {
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-2">
       <label htmlFor={id} className="text-[13px] text-[var(--text-strong)]">
         {label}
       </label>
@@ -1371,7 +1371,7 @@ function PrizeCard({
         disabled={!canWrite || updateTournament.isPending}
       />
 
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-2">
         <label htmlFor="info-prize-summary" className="text-[12px] text-[var(--text-body)]">상품 및 상금</label>
         <textarea
           id="info-prize-summary"

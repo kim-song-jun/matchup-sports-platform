@@ -64,7 +64,7 @@ export function TournamentCampaignStatusDialog({
           </button>
         </div>
         <form onSubmit={submit} noValidate>
-          <div className="grid gap-1.5 px-5 py-5">
+          <div className="grid gap-2 px-5 py-5">
             <label htmlFor="campaign-status-reason" className="text-[13px] font-semibold text-[var(--text-body)]">사유 <span className="text-[var(--red700)]" aria-hidden="true">*</span></label>
             <textarea
               id="campaign-status-reason"
@@ -75,7 +75,7 @@ export function TournamentCampaignStatusDialog({
               value={reason}
               disabled={pending}
               onChange={(event) => setReason(event.target.value)}
-              className="rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 py-2.5 text-sm text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50"
+              className="rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 py-3 text-sm text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50"
               aria-required="true"
             />
             <p className="text-right text-[length:var(--font-size-caption)] text-[var(--text-muted)] tabular-nums">{reason.length} / 500</p>

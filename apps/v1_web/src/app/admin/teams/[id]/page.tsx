@@ -85,7 +85,7 @@ function TeamMembers({ team }: { team: V1AdminTeamDetail }) {
                   {MEMBER_ROLE_LABEL[member.role]}
                 </span>
               </div>
-              <dl className="mt-3 grid gap-1.5 text-xs">
+              <dl className="mt-3 grid gap-2 text-xs">
                 <div className="flex gap-2"><dt className="w-14 shrink-0 text-[var(--text-muted)]">이메일</dt><dd className="min-w-0 break-all text-[var(--text-body)]">{member.email ?? '미등록'}</dd></div>
                 <div className="flex gap-2"><dt className="w-14 shrink-0 text-[var(--text-muted)]">전화번호</dt><dd className="min-w-0 break-all text-[var(--text-body)]">{member.phone ?? '미등록'}</dd></div>
                 <div className="flex gap-2"><dt className="w-14 shrink-0 text-[var(--text-muted)]">가입일</dt><dd className="min-w-0 text-[var(--text-body)]">{formatAdminDateTime(member.joinedAt)}</dd></div>

@@ -8,7 +8,7 @@
 
 /** h-[44px] 통일 제출 버튼 */
 export const submitBtnCls = [
-  'inline-flex items-center justify-center gap-1.5 h-[44px] px-4 rounded-xl',
+  'inline-flex items-center justify-center gap-2 h-[44px] px-4 rounded-xl',
   'whitespace-nowrap',
   'text-[13px] text-white bg-blue-500 hover:bg-blue-600',
   'transition-colors disabled:opacity-50',

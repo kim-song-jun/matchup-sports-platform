@@ -11,17 +11,17 @@ const inputCls = [
   'focus:ring-blue-100 disabled:bg-[var(--surface-soft)] disabled:text-gray-400',
 ].join(' ');
 const textareaCls = [
-  'min-h-[88px] rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 py-2.5 text-[13px] text-[var(--text-strong)]',
+  'min-h-[88px] rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 py-3 text-[13px] text-[var(--text-strong)]',
   'outline-none transition-colors placeholder:text-[var(--text-muted)] focus:border-blue-500 focus:ring-2',
   'focus:ring-blue-100 disabled:bg-[var(--surface-soft)] disabled:text-gray-400',
 ].join(' ');
 const primaryBtnCls = [
-  'inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl bg-blue-500 px-4',
+  'inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-blue-500 px-4',
   'text-[13px] font-semibold text-white transition-colors hover:bg-blue-600 active:scale-[0.98]',
   'disabled:cursor-not-allowed disabled:opacity-50',
 ].join(' ');
 const secondaryBtnCls = [
-  'inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-[var(--border)]',
+  'inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-[var(--border)]',
   'bg-[var(--card-surface)] px-4 text-[13px] font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--surface-soft)]',
   'active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50',
 ].join(' ');
@@ -243,7 +243,7 @@ function Field({
   readonly children: ReactNode;
 }) {
   return (
-    <label className="flex flex-col gap-1.5 text-[13px] text-[var(--text-strong)]">
+    <label className="flex flex-col gap-2 text-[13px] text-[var(--text-strong)]">
       <span>
         {label}
         {required ? (

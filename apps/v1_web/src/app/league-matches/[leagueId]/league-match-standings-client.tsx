@@ -106,7 +106,7 @@ function FixtureTeamLabel({
     // 안에서 쓰이는데 그 행 전체가 이미 팀매치 상세로 가는 <a> 라, 안에 또 <a> 를 두면
     // HTML 이 무효가 되고 브라우저가 바깥 <a> 를 조기에 닫는다(같은 이유로 리그 배지도
     // button + router.push 를 쓴다). 경기 행에서 기대되는 목적지도 팀이 아니라 그 경기다.
-    <span className="inline-flex items-center gap-1.5">
+    <span className="inline-flex items-center gap-2">
       <TeamAvatar seed={teamId ?? fallback} name={name} logoUrl={entry?.logoUrl ?? null} size="sm" />
       <span className="text-[var(--text-strong)]">{name}</span>
     </span>
@@ -204,7 +204,7 @@ function SeasonSummaryCard({
   const isCoChampion = champions.length > 1;
   return (
     <Card pad={16} className="mb-4">
-      <div className="mb-2 flex items-center gap-1.5">
+      <div className="mb-2 flex items-center gap-2">
         <Trophy size={16} className="tm-medal-gold" aria-hidden="true" />
         <h2 className="text-sm font-bold text-[var(--text-strong)]">이번 시즌 요약</h2>
       </div>
@@ -291,7 +291,7 @@ function ClaimFixturesCard({
               // 끊겨 읽힌다 — 목적지를 한 문장으로 붙여 준다.
               aria-label={`${fixture.title} 경기 상세로 이동, 아직 연결되지 않은 참가자 ${fixture.claimableCount}명`}
             >
-              <span className="flex flex-wrap items-baseline gap-x-1.5">
+              <span className="flex flex-wrap items-baseline gap-x-2">
                 <span className="font-medium text-[var(--text-strong)]">{fixture.title}</span>
                 {/* 주차 라벨만으로는 어느 경기인지 확신하기 어렵다 — 같은 주차에 여러 경기가
                     설 수 있고, 재일정도 흔하다. 경기일을 함께 보여 라벨을 대조 가능하게 한다. */}
@@ -587,7 +587,7 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
           상태 뱃지(진행중/종료)는 제목 옆에 그대로 두고, 티어·시즌 문맥만 윗줄에 얹는다 —
           둘은 다른 축이라 한 줄에 섞으면 무엇이 무엇인지 읽히지 않는다. */}
       {series.tierLabel != null && (
-        <p className="mb-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+        <p className="mb-2 flex flex-wrap items-center gap-2 text-xs">
           {/* 하드코딩 색 대신 목록(league-matches-list-client.tsx)·마이 리그(my-leagues-client.tsx)와
               동일한 공용 뱃지 클래스를 쓴다 — 명암비가 이미 검증돼 있고, 목록→상세 이동 시
               같은 정보의 모양이 바뀌지 않아야 한다. */}
@@ -628,7 +628,7 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
           확인할 수 없었다. 단발 리그(seriesSiblings 빈 배열)에는 아무것도 늘어나지 않는다. */}
       {(series.seriesSiblings ?? []).length > 0 && (
         <nav aria-label="같은 시리즈의 다른 리그" className="mt-2">
-          <ul className="flex flex-wrap gap-1.5">
+          <ul className="flex flex-wrap gap-2">
             {series.seriesSiblings.map((sibling) => {
               const siblingStateMeta = LEAGUE_STATE_META[sibling.state];
               return (
@@ -818,7 +818,7 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
                     href={`/league-matches/${leagueId}/fixtures/${fixture.teamMatchId}`}
                     className="tm-pressable flex min-h-[44px] flex-wrap items-center justify-between gap-2 rounded-lg px-2 text-sm text-[var(--text-strong)] hover:bg-[var(--grey100)]"
                   >
-                    <span className="inline-flex flex-wrap items-center gap-1.5">
+                    <span className="inline-flex flex-wrap items-center gap-2">
                       <FixtureTeamLabel teamId={fixture.homeTeamId} lookup={teamLookup} fallback="홈팀 정보 없음" />
                       <span aria-hidden="true" className="text-[var(--text-muted)]">vs</span>
                       <FixtureTeamLabel teamId={fixture.awayTeamId} lookup={teamLookup} fallback="상대팀 미정" />
@@ -842,7 +842,7 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
               찾으러 온 사람에게는 오름차순이 자연스럽다) "예정만 보기" 필터를 둬서
               지난 경기를 걷어낼 수 있게 하고, 아래에서 다음 경기 행 자체도 강조한다. */}
           {fixtures.length > 0 && (
-            <div role="group" aria-label="경기 일정 필터" className="flex gap-1.5">
+            <div role="group" aria-label="경기 일정 필터" className="flex gap-2">
               <button
                 type="button"
                 onClick={() => setShowUpcomingOnly(false)}
@@ -878,7 +878,7 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
                     href={`/league-matches/${leagueId}/fixtures/${fixture.teamMatchId}`}
                     className={`tm-pressable tm-list-row-interactive flex min-h-[44px] flex-col gap-2 rounded-xl border bg-[var(--card-surface)] p-3 text-sm sm:flex-row sm:items-center sm:justify-between ${isNextUpcoming ? 'border-[var(--blue500)]' : 'border-[var(--border)]'}`}
                   >
-                    <span className="inline-flex flex-wrap items-center gap-1.5">
+                    <span className="inline-flex flex-wrap items-center gap-2">
                       {/* 다음 경기는 컬러(파란 테두리)만으로 구분하지 않는다 — 뱃지 텍스트를 함께 싣는다. */}
                       {isNextUpcoming && <span className="tm-badge tm-badge-sm tm-badge-blue">다음 경기</span>}
                       <FixtureTeamLabel teamId={fixture.homeTeamId} lookup={teamLookup} fallback="홈팀 정보 없음" />

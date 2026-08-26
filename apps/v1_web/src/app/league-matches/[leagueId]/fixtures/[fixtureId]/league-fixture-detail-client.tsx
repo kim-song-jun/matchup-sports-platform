@@ -60,7 +60,7 @@ function TeamSide({ teamId, name, logoUrl, record, align }: {
   align: 'left' | 'right';
 }) {
   const body = (
-    <span className={`flex flex-col gap-1.5 ${align === 'right' ? 'items-end text-right' : 'items-start text-left'}`}>
+    <span className={`flex flex-col gap-2 ${align === 'right' ? 'items-end text-right' : 'items-start text-left'}`}>
       <TeamAvatar seed={teamId ?? name} name={name} logoUrl={logoUrl} size="md" />
       <span className="tm-text-body-lg text-[var(--text-strong)]">{name}</span>
       {record ? <span className="text-xs text-[var(--text-muted)]">{record}</span> : null}
@@ -244,7 +244,7 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
                         href={`/teams/${side.teamId}`}
                         className="tm-pressable tm-list-row-interactive flex min-h-[44px] items-center justify-between gap-2 rounded-lg px-2 text-sm"
                       >
-                        <span className="inline-flex items-center gap-1.5">
+                        <span className="inline-flex items-center gap-2">
                           <TeamAvatar seed={side.teamId} name={side.name} logoUrl={side.row?.teamLogoUrl ?? null} size="sm" />
                           <span className="text-[var(--text-strong)]">{side.name}</span>
                         </span>
@@ -307,7 +307,7 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
                     className="tm-pressable tm-list-row-interactive flex min-h-[44px] flex-wrap items-center justify-between gap-2 rounded-lg px-2 text-sm"
                   >
                     <span className="text-[var(--text-strong)]">{itemHome} <span className="font-bold">{itemResult.text}</span> {itemAway}</span>
-                    <span className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+                    <span className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
                       {itemResult.isForfeit ? <span className="tm-badge tm-badge-sm tm-badge-orange">몰수</span> : null}
                       {formatTournamentDateTimeShort(item.startAt) ?? ''}
                     </span>

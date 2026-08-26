@@ -167,7 +167,7 @@ export function AnnouncementsTab({
           </div>
         )}
         <form onSubmit={handleSave} noValidate className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             <label htmlFor="ann-title" className="text-[13px] text-[var(--text-strong)]">
               제목 <span className="text-red-500" aria-hidden="true">*</span>
               <span className="sr-only">(필수)</span>
@@ -186,7 +186,7 @@ export function AnnouncementsTab({
             />
           </div>
 
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             <label htmlFor="ann-body" className="text-[13px] text-[var(--text-strong)]">
               내용 <span className="text-red-500" aria-hidden="true">*</span>
               <span className="sr-only">(필수)</span>
@@ -205,7 +205,7 @@ export function AnnouncementsTab({
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3">
-            <div className="flex flex-col gap-1.5 flex-1">
+            <div className="flex flex-col gap-2 flex-1">
               <label htmlFor="ann-category" className="text-[13px] text-[var(--text-strong)]">
                 분류
               </label>
@@ -225,7 +225,7 @@ export function AnnouncementsTab({
               </select>
             </div>
 
-            <div className="flex flex-col gap-1.5 flex-1">
+            <div className="flex flex-col gap-2 flex-1">
               <label htmlFor="ann-audience" className="text-[13px] text-[var(--text-strong)]">
                 대상
               </label>

@@ -91,7 +91,7 @@ export default function AdminTournamentsPage() {
           canWrite ? (
             <Link
               href="/admin/tournaments/new"
-              className="inline-flex items-center gap-1.5 h-[44px] px-4 rounded-xl text-[length:var(--font-size-label)] font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              className="inline-flex items-center gap-2 h-[44px] px-4 rounded-xl text-[length:var(--font-size-label)] font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
               aria-label="새 대회 만들기"
             >
               <Plus size={16} aria-hidden="true" />
@@ -220,7 +220,7 @@ export default function AdminTournamentsPage() {
         {/* Load more */}
         {/* 페이지 이동 실패는 목록이 비어 보이지 않으므로 따로 알린다. */}
         {isError && rows.length > 0 && (
-          <div className="flex flex-col items-center gap-1.5">
+          <div className="flex flex-col items-center gap-2">
             <p className="text-[length:var(--font-size-label)] text-[var(--red700)]" role="alert">
               {extractErrorMessage(error, '목록을 불러오지 못했어요.')}
             </p>

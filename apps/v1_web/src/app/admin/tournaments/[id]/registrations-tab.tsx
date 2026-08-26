@@ -159,7 +159,7 @@ export function RosterModal({
                 <div className="flex min-w-0 items-center gap-2">
                   <p className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--text-strong)]">{p.realName}</p>
                   {p.isTeamCaptain ? (
-                    <span className="shrink-0 rounded-md bg-[var(--blue50)] px-1.5 py-0.5 text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)]">팀장</span>
+                    <span className="shrink-0 rounded-md bg-[var(--blue50)] px-2 py-0.5 text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)]">팀장</span>
                   ) : null}
                 </div>
                 <p className="text-xs text-[var(--text-muted)]">
@@ -558,7 +558,7 @@ export function RegistrationsTab({
         </p>
       )}
       {/* P1-2: 상태 필터 칩 */}
-      <div className="flex items-center gap-1.5 flex-wrap mb-3" role="group" aria-label="신청 상태 필터">
+      <div className="flex items-center gap-2 flex-wrap mb-3" role="group" aria-label="신청 상태 필터">
         {REGISTRATION_STATUS_FILTERS.map((opt) => {
           const active = statusFilter === opt.value;
           const count = statusCounts[opt.value] ?? 0;
@@ -569,7 +569,7 @@ export function RegistrationsTab({
               onClick={() => setStatusFilter(opt.value)}
               aria-pressed={active}
               className={[
-                'inline-flex items-center gap-1.5 px-3 min-h-[44px] rounded-full text-[13px] font-medium transition-colors',
+                'inline-flex items-center gap-2 px-3 min-h-[44px] rounded-full text-[13px] font-medium transition-colors',
                 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                 active
                   ? 'bg-blue-500 text-white'
@@ -597,7 +597,7 @@ export function RegistrationsTab({
 
       {/* P1-2: 처리 대기 주의 배너 */}
       {pendingReviewCount > 0 && (
-        <div className="mb-3 flex items-center gap-2 rounded-xl bg-[var(--tint-orange)] border border-[var(--tint-orange-border)] px-4 py-2.5 text-[13px] text-[var(--orange700)]">
+        <div className="mb-3 flex items-center gap-2 rounded-xl bg-[var(--tint-orange)] border border-[var(--tint-orange-border)] px-4 py-3 text-[13px] text-[var(--orange700)]">
           <AlertCircle size={14} aria-hidden="true" className="shrink-0" />
           <span>처리 대기 중인 신청이 {pendingReviewCount}건 있어요.</span>
         </div>
@@ -605,7 +605,7 @@ export function RegistrationsTab({
 
       {/* P2-7: 일괄 처리 바 */}
       {selectedIds.size > 0 && (
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[var(--blue50)] border border-blue-100 px-4 py-2.5">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[var(--blue50)] border border-blue-100 px-4 py-3">
           <span className="text-[13px] text-[var(--blue700)]">{selectedIds.size}건 선택됨</span>
           <button
             type="button"
@@ -630,7 +630,7 @@ export function RegistrationsTab({
               <label
                 className={[
                   // 시각 크기는 체크박스(18px)만 차지하되 히트 영역은 padding + 상쇄 margin으로 36px+ 확보
-                  'inline-flex items-center justify-center p-2.5 -m-2.5 shrink-0 rounded',
+                  'inline-flex items-center justify-center p-3 -m-3 shrink-0 rounded',
                   r.status === 'awaiting_payment' ? 'cursor-pointer' : 'invisible pointer-events-none',
                 ].join(' ')}
                 onClick={(e) => e.stopPropagation()}

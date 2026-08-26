@@ -99,7 +99,7 @@ export function AdminCardList<T>({
         {Array.from({ length: skeletonCards }).map((_, i) => (
           <div
             key={i}
-            className="bg-[var(--card-surface)] rounded-xl border border-[var(--border)] p-3.5 animate-pulse"
+            className="bg-[var(--card-surface)] rounded-xl border border-[var(--border)] p-4 animate-pulse"
           >
             <div className="flex justify-between items-start gap-2">
               <div className="flex-1 min-w-0">
@@ -108,13 +108,13 @@ export function AdminCardList<T>({
               </div>
               <div className="h-5 w-14 rounded-full bg-[var(--surface-soft)]" />
             </div>
-            <div className="mt-3.5 grid grid-cols-2 gap-2">
+            <div className="mt-4 grid grid-cols-2 gap-2">
               <div className="h-2.5 rounded bg-[var(--surface-soft)]" />
               <div className="h-2.5 rounded bg-[var(--surface-soft)]" />
               <div className="h-2.5 rounded bg-[var(--surface-soft)]" />
               <div className="h-2.5 rounded bg-[var(--surface-soft)]" />
             </div>
-            <div className="mt-3.5 h-10 rounded-lg bg-[var(--surface-soft)]" />
+            <div className="mt-4 h-10 rounded-lg bg-[var(--surface-soft)]" />
           </div>
         ))}
       </div>
@@ -142,7 +142,7 @@ export function AdminCardList<T>({
           <li
             key={keyExtractor(row)}
             className={[
-              'bg-[var(--card-surface)] rounded-xl border border-[var(--border)] p-3.5 flex flex-col transition-colors hover:border-[var(--border-strong)]',
+              'bg-[var(--card-surface)] rounded-xl border border-[var(--border)] p-4 flex flex-col transition-colors hover:border-[var(--border-strong)]',
               tone ? TONE_CARD[tone] : '',
             ]
               .filter(Boolean)
@@ -171,11 +171,11 @@ export function AdminCardList<T>({
 
             {/* 메타 그리드 */}
             {model.meta && model.meta.length > 0 && (
-              <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 mt-2.5">
+              <dl className="grid grid-cols-2 gap-x-3 gap-y-2 mt-3">
                 {model.meta.map((m, i) => (
                   <dd
                     key={i}
-                    className="flex items-center gap-1.5 text-[length:var(--font-size-label)] text-[var(--text-muted)] tabular-nums min-w-0"
+                    className="flex items-center gap-2 text-[length:var(--font-size-label)] text-[var(--text-muted)] tabular-nums min-w-0"
                   >
                     {m.icon && (
                       <span className="shrink-0 text-[var(--text-muted)] inline-flex" aria-hidden="true">
@@ -189,7 +189,7 @@ export function AdminCardList<T>({
             )}
 
             {model.description ? (
-              <div className="mt-2.5 rounded-lg bg-[var(--surface-soft)] px-3 py-2 text-[length:var(--font-size-caption)] text-[var(--text-muted)] leading-relaxed whitespace-pre-wrap break-words">
+              <div className="mt-3 rounded-lg bg-[var(--surface-soft)] px-3 py-2 text-[length:var(--font-size-caption)] text-[var(--text-muted)] leading-relaxed whitespace-pre-wrap break-words">
                 {model.description}
               </div>
             ) : null}

@@ -405,7 +405,7 @@ export function TermsView() {
                       label={current ? `${current.version} · ${statusLabel[current.status]}` : '버전 없음'}
                     />
                   </div>
-                  <div className="mt-3 flex flex-wrap gap-1.5">
+                  <div className="mt-3 flex flex-wrap gap-2">
                     {policy.placements.map((placement) => (
                       <span key={placement.placementId} className="rounded-full bg-[var(--surface-soft)] px-2 py-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
                         {contextLabel[placement.context]} · {requirementLabel[placement.requirement]}
@@ -435,7 +435,7 @@ export function TermsView() {
                   <p className="mt-1 text-xs text-[var(--text-muted)]">발행된 본문은 감사 이력을 위해 수정할 수 없어요.</p>
                 </div>
                 {!creatingPolicy && canWrite ? (
-                  <button type="button" onClick={beginNewVersion} className="inline-flex min-h-[40px] items-center gap-1.5 rounded-xl border border-[var(--tint-blue-border)] px-3 text-sm font-semibold text-[var(--blue700)] hover:bg-[var(--blue50)]">
+                  <button type="button" onClick={beginNewVersion} className="inline-flex min-h-[40px] items-center gap-2 rounded-xl border border-[var(--tint-blue-border)] px-3 text-sm font-semibold text-[var(--blue700)] hover:bg-[var(--blue50)]">
                     <FilePlus2 size={15} aria-hidden="true" />
                     새 버전
                   </button>
@@ -444,12 +444,12 @@ export function TermsView() {
 
               <div className="grid gap-3 md:grid-cols-2">
                 {creatingPolicy ? (
-                  <label className="space-y-1.5">
+                  <label className="space-y-2">
                     <span className="text-xs font-semibold text-[var(--text-body)]">정책 코드</span>
                     <input className={fieldClass} value={newCode} onChange={(event) => setNewCode(event.target.value)} placeholder="예: signup_marketing" disabled={!canWrite} />
                   </label>
                 ) : null}
-                <label className="space-y-1.5">
+                <label className="space-y-2">
                   <span className="text-xs font-semibold text-[var(--text-body)]">관리 이름</span>
                   <input className={fieldClass} value={policyName} onChange={(event) => setPolicyName(event.target.value)} disabled={!canWrite} />
                 </label>
@@ -481,7 +481,7 @@ export function TermsView() {
                   </div>
                 ))}
                 {!creatingPolicy && canWrite ? (
-                  <button type="button" onClick={savePolicySettings} disabled={saving} className="inline-flex min-h-[40px] items-center gap-1.5 rounded-xl border border-[var(--border)] px-3 text-sm font-semibold text-[var(--text-body)] hover:border-blue-300 disabled:opacity-50">
+                  <button type="button" onClick={savePolicySettings} disabled={saving} className="inline-flex min-h-[40px] items-center gap-2 rounded-xl border border-[var(--border)] px-3 text-sm font-semibold text-[var(--text-body)] hover:border-blue-300 disabled:opacity-50">
                     <ShieldCheck size={15} aria-hidden="true" />
                     노출 설정 저장
                   </button>
@@ -511,17 +511,17 @@ export function TermsView() {
 
               <form className="space-y-4" onSubmit={submitDocument}>
                 <div className="grid gap-3 md:grid-cols-2">
-                  <label className="space-y-1.5">
+                  <label className="space-y-2">
                     <span className="text-xs font-semibold text-[var(--text-body)]">버전</span>
                     <input className={fieldClass} value={form.version} onChange={(event) => setForm((current) => ({ ...current, version: event.target.value }))} disabled={!editable} placeholder="v1.2" />
                   </label>
-                  <label className="space-y-1.5">
+                  <label className="space-y-2">
                     <span className="text-xs font-semibold text-[var(--text-body)]">적용 예정일</span>
                     <input className={fieldClass} type="datetime-local" value={form.effectiveAt} onChange={(event) => setForm((current) => ({ ...current, effectiveAt: event.target.value }))} disabled={!editable} />
                   </label>
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">
-                  <label className="space-y-1.5">
+                  <label className="space-y-2">
                     <span className="text-xs font-semibold text-[var(--text-body)]">기존 회원 적용 시점</span>
                     <input className={fieldClass} type="datetime-local" value={form.enforcementAt} onChange={(event) => setForm((current) => ({ ...current, enforcementAt: event.target.value }))} disabled={!editable} />
                   </label>
@@ -530,19 +530,19 @@ export function TermsView() {
                     기존 동의자도 이 버전에 재동의
                   </label>
                 </div>
-                <label className="block space-y-1.5">
+                <label className="block space-y-2">
                   <span className="text-xs font-semibold text-[var(--text-body)]">표시 제목</span>
                   <input className={fieldClass} value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} disabled={!editable} />
                 </label>
-                <label className="block space-y-1.5">
+                <label className="block space-y-2">
                   <span className="text-xs font-semibold text-[var(--text-body)]">서브 타이틀</span>
                   <input className={fieldClass} value={form.subtitle} onChange={(event) => setForm((current) => ({ ...current, subtitle: event.target.value }))} disabled={!editable} placeholder="전체 조회에서 제목 아래에 표시할 설명" />
                 </label>
-                <label className="block space-y-1.5">
+                <label className="block space-y-2">
                   <span className="text-xs font-semibold text-[var(--text-body)]">변경 요약</span>
                   <input className={fieldClass} value={form.changeSummary} onChange={(event) => setForm((current) => ({ ...current, changeSummary: event.target.value }))} disabled={!editable} placeholder="이 버전에서 바뀐 내용을 기록해 주세요." />
                 </label>
-                <label className="block space-y-1.5">
+                <label className="block space-y-2">
                   <span className="text-xs font-semibold text-[var(--text-body)]">약관 본문</span>
                   <textarea className={`${fieldClass} min-h-[320px] resize-y py-3 leading-6`} value={form.content} onChange={(event) => setForm((current) => ({ ...current, content: event.target.value }))} disabled={!editable} />
                 </label>
@@ -557,18 +557,18 @@ export function TermsView() {
 
               {!creatingPolicy && form.documentId && canWrite && form.status !== 'archived' ? (
                 <div className="space-y-3 rounded-xl border border-[var(--border)] p-3">
-                  <label className="block space-y-1.5">
+                  <label className="block space-y-2">
                     <span className="text-xs font-semibold text-[var(--text-body)]">상태 변경 사유</span>
                     <input className={fieldClass} value={statusReason} onChange={(event) => setStatusReason(event.target.value)} placeholder="감사 로그에 남을 사유" />
                   </label>
                   <div className="flex flex-wrap gap-2">
                     {form.status === 'draft' ? (
-                      <button type="button" onClick={() => submitStatus('published')} disabled={saving} className="inline-flex min-h-[42px] items-center gap-1.5 rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white disabled:opacity-50">
+                      <button type="button" onClick={() => submitStatus('published')} disabled={saving} className="inline-flex min-h-[42px] items-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white disabled:opacity-50">
                         <Send size={15} aria-hidden="true" />
                         발행
                       </button>
                     ) : null}
-                    <button type="button" onClick={() => submitStatus('archived')} disabled={saving} className="inline-flex min-h-[42px] items-center gap-1.5 rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--text-body)] disabled:opacity-50">
+                    <button type="button" onClick={() => submitStatus('archived')} disabled={saving} className="inline-flex min-h-[42px] items-center gap-2 rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--text-body)] disabled:opacity-50">
                       <Archive size={15} aria-hidden="true" />
                       보관
                     </button>

@@ -138,7 +138,7 @@ export function AssistPickerSheet({ open, event, scorerName, teamName, whenLabel
         </button>
         <div
           ref={listRef}
-          className={`flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto${
+          className={`flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto${
             listOverflows ? ' [mask-image:linear-gradient(to_bottom,black_calc(100%-24px),transparent)]' : ''
           }`}
           role="list"

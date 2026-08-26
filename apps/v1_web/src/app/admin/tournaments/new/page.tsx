@@ -49,7 +49,7 @@ import {
 const inputClass =
   'h-[44px] w-full rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)] placeholder:text-[var(--text-caption)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
 const textareaClass =
-  'w-full resize-none rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 py-2.5 text-sm text-[var(--text-strong)] placeholder:text-[var(--text-caption)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
+  'w-full resize-none rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 py-3 text-sm text-[var(--text-strong)] placeholder:text-[var(--text-caption)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
 
 export default function AdminTournamentsNewPage() {
   const router = useRouter();
@@ -1372,7 +1372,7 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <div className="grid gap-1.5">
+    <div className="grid gap-2">
       <label htmlFor={id} className="text-sm font-semibold text-[var(--text-body)]">
         {label}
         {required ? (

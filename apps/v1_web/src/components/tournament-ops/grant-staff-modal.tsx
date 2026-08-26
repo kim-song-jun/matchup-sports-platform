@@ -249,7 +249,7 @@ export function GrantStaffModal({
                 관리에서 ID를 복사해 오라"였다 — 어드민이 아닌 대회 디렉터는 그 화면에
                 들어갈 수 없으므로 사실상 배정할 방법이 없었다(2026-08-13 사용자 제보).
                 닉네임으로 찾아 고르는 방식으로 바꾼다. */}
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               <label htmlFor="grant-staff-user-search" className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">
                 배정할 사람 <span className="text-[var(--red700)]" aria-hidden="true">*</span>
                 <span className="sr-only">(필수)</span>
@@ -363,7 +363,7 @@ export function GrantStaffModal({
               )}
             </div>
 
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               <label htmlFor="grant-staff-role" className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">
                 역할
               </label>
@@ -383,7 +383,7 @@ export function GrantStaffModal({
             </div>
 
             {requiresField && (
-              <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-2">
                 <label htmlFor="grant-staff-field" className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">
                   담당 필드 <span className="text-[var(--red700)]" aria-hidden="true">*</span>
                   <span className="sr-only">(필수)</span>
@@ -414,7 +414,7 @@ export function GrantStaffModal({
               </div>
             )}
 
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               <label htmlFor="grant-staff-expires" className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">
                 만료 시각 (선택)
               </label>

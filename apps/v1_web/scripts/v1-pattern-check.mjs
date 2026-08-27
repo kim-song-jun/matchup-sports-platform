@@ -278,12 +278,74 @@ function checkTsxArbitrarySpacing() {
   }
 }
 
+/* ── 7) 글자 크기 하드코딩 — 새 유입만 막는다 ─────────────────────
+ * 같은 12px 를 text-xs · text-[12px] · text-[length:var(--font-size-caption)] ·
+ * .tm-text-caption 네 가지로 적고 있다(실측 1,541곳). 표기가 갈리면 스케일을
+ * 조정할 때 콜사이트를 하나씩 찾아야 한다.
+ *
+ * **기존 463곳을 한 번에 고치지는 않는다.** 값이 하나도 안 바뀌는 치환이라
+ * 리뷰가 잡을 결함이 없는데 규모만 크다(격자 작업 세 층보다 크다). 대신
+ * 파일별 baseline 을 두고 **그 수를 넘으면 실패**시킨다 — 새 코드는 토큰을
+ * 쓰게 되고, 기존은 그 파일을 손댈 때 자연히 줄어든다.
+ *
+ * 줄인 뒤에는 baseline 을 갱신해 다시 늘지 못하게 한다(그 갱신도 이 게이트가
+ * 요구한다 — 줄었는데 baseline 이 그대로면 그만큼 다시 들어올 여지가 남는다).
+ * ────────────────────────────────────────────────────────────────── */
+function checkFontSizeLiterals() {
+  const BASELINE_PATH = 'scripts/font-size-baseline.json';
+  let baseline;
+  try {
+    baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8'));
+  } catch (e) {
+    violations.push(`[게이트 실행 실패] ${BASELINE_PATH} 를 읽을 수 없다 (${e.message})`);
+    return;
+  }
+  let list;
+  try {
+    list = execSync('find src \\( -name "*.tsx" -o -name "*.ts" \\)', { encoding: 'utf8' });
+  } catch (e) {
+    violations.push(`[게이트 실행 실패] TSX 목록을 만들 수 없다 (${e.message})`);
+    return;
+  }
+  const files = list.split('\n').filter(Boolean);
+  if (!files.length) {
+    violations.push('[게이트 실행 실패] src 아래 TSX/TS 파일이 0개다');
+    return;
+  }
+  // 소수도 잡는다 — text-[13.5px] 같은 값이 baseline 밖에서 조용히 통과하고
+  // 있었다(실측 3곳). px 리터럴은 정수만 쓰인다는 보장이 없다.
+  const PAT = /\btext-\[(\d+(?:\.\d+)?)px\]|fontSize:\s*(\d+(?:\.\d+)?)\b/g;
+  const seen = new Set();
+  for (const f of files) {
+    const n = (readFileSync(f, 'utf8').match(PAT) || []).length;
+    const allowed = baseline[f] ?? 0;
+    seen.add(f);
+    if (n > allowed) {
+      violations.push(
+        `[글자 크기 하드코딩] ${f}: ${n}곳 (허용 ${allowed}) — ` +
+          `text-[Npx] · fontSize:N 대신 .tm-text-* 나 var(--font-size-*) 를 쓸 것`,
+      );
+    } else if (n < allowed) {
+      violations.push(
+        `[baseline 갱신 필요] ${f}: ${n}곳으로 줄었는데 baseline 은 ${allowed} 이다 — ` +
+          `${BASELINE_PATH} 를 ${n} 로 낮춰야 그만큼 다시 들어오지 못한다`,
+      );
+    }
+  }
+  // 파일이 사라졌는데 baseline 에 남아 있으면 그 몫이 다른 곳으로 새어 나갈 수 있다
+  for (const f of Object.keys(baseline)) {
+    if (f.startsWith('_') || seen.has(f)) continue;
+    violations.push(`[baseline 갱신 필요] ${f}: 파일이 없는데 baseline 에 남아 있다`);
+  }
+}
+
 checkHapnida();
 checkUndefinedTokens();
 checkInertFontSizeClasses();
 checkSpacingGrid();
 checkRadiusLiteral();
 checkTsxArbitrarySpacing();
+checkFontSizeLiterals();
 
 if (violations.length) {
   console.error(`\n✗ v1 패턴 검사 실패 — ${violations.length}건:\n`);
@@ -292,5 +354,5 @@ if (violations.length) {
   process.exit(1);
 }
 console.log(
-  '✓ v1 패턴 검사 통과 (합니다체 0, 미정의 CSS 토큰 0, 무효 폰트 크기 클래스 0, 간격 격자 이탈 0(CSS+TSX 임의값), radius 리터럴 0)',
+  '✓ v1 패턴 검사 통과 (합니다체 0, 미정의 CSS 토큰 0, 무효 폰트 크기 클래스 0, 간격 격자 이탈 0(CSS+TSX 임의값), radius 리터럴 0, 글자 크기 하드코딩 baseline 유지)',
 );

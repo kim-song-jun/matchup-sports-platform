@@ -54,7 +54,12 @@ for (const [label, width, wantName] of [
   // backdrop 도 함께 판정한다. 값만 찍고 넘어가면 **배경이 시트보다 먼저 걷히는
   // 어긋남**을 놓친다 — 실제로 첫 실행에서 backdrop 0.18s / 시트 0.22s 로 40ms
   // 동안 시트가 배경 없이 떠 있는 상태를 이 스크립트가 지나쳤다.
+  // HTTP 상태를 판정에 넣지 않으면 **404/500 을 받고도** got.* 만 맞으면 통과한다.
+  // backdropName 도 본다 — duration·direction 만으로는 우연히 같은 값을 가진
+  // 다른 애니메이션과 구분되지 않는다.
   const ok =
+    (resp?.status() ?? 0) === 200 &&
+    got.backdropName === 'tm-filter-scrim-fade' &&
     got.name === wantName &&
     got.duration === '0.22s' &&
     got.direction === 'reverse' &&
@@ -94,14 +99,20 @@ for (const [label, width, wantName] of [
   results.push({
     label: '탭 크로스페이드(#801)',
     status: resp?.status() ?? 0,
-    ok: got.tabpanelName === 'tm-tabpanel-in' && got.tabpanelDuration === '0.16s',
+    ok:
+      (resp?.status() ?? 0) === 200 &&
+      got.tabpanelName === 'tm-tabpanel-in' &&
+      got.tabpanelDuration === '0.16s',
     got: { name: got.tabpanelName, duration: got.tabpanelDuration },
     want: 'tm-tabpanel-in / 0.16s',
   });
   results.push({
     label: '하단 탭바 전환(#790)',
     status: resp?.status() ?? 0,
-    ok: got.bottomTabProperty === 'color' && got.bottomTabDuration === '0.12s',
+    ok:
+      (resp?.status() ?? 0) === 200 &&
+      got.bottomTabProperty === 'color' &&
+      got.bottomTabDuration === '0.12s',
     got: { property: got.bottomTabProperty, duration: got.bottomTabDuration },
     want: 'color / 0.12s',
   });
@@ -132,7 +143,11 @@ for (const [label, width, wantName] of [
     label: '토스트 퇴장(#810)',
     status: resp?.status() ?? 0,
     // 진입은 정방향, 퇴장은 reverse — 방향이 갈리는 것이 이 변경의 핵심이다
-    ok: got.exit.direction === 'reverse' && got.enter.direction === 'normal',
+    ok:
+      (resp?.status() ?? 0) === 200 &&
+      got.exit.name === 'fade-in' &&
+      got.exit.direction === 'reverse' &&
+      got.enter.direction === 'normal',
     got: { 진입: got.enter.direction, 퇴장: got.exit.direction, duration: got.exit.duration },
     want: '진입 normal / 퇴장 reverse',
   });

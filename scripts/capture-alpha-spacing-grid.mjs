@@ -145,10 +145,12 @@ for (const [pname, path] of PAGES) {
         stable = cur === prev ? stable + 1 : 0;
         prev = cur;
         if (stable >= 3 && skeleton() === 0) {
-          return { waited, nodes: count(), height: document.body.scrollHeight, skeleton: 0 };
+          return { waited, nodes: count(), height: document.body.scrollHeight, skeleton: 0, timedOut: false };
         }
       }
-      return { waited, nodes: count(), height: document.body.scrollHeight, skeleton: skeleton() };
+      // 상한까지 갔다는 건 노드수:높이가 끝내 멎지 않았다는 뜻이다 — 스켈레톤이
+      // 없더라도 **아직 그려지는 중**이라 그 시점의 여백은 최종값이 아니다.
+      return { waited, nodes: count(), height: document.body.scrollHeight, skeleton: skeleton(), timedOut: true };
     });
     const audit = await page.evaluate(AUDIT);
     const file = `${pname}-${wname}-${width}.png`;
@@ -160,7 +162,7 @@ for (const [pname, path] of PAGES) {
     const sameRoute = landedOn === expected;
     // 캡처가 403/500 이나 엉뚱한 라우트를 찍고 통과로 읽히는 사고를 막는다
     const ok = status === 200 && sameRoute;
-    const settled = settle.skeleton === 0;
+    const settled = settle.skeleton === 0 && !settle.timedOut;
     // 시트를 하나도 못 읽었으면 auto 판별이 무력화된 상태다 — 그 측정은 못 믿는다.
     const cssomOk = audit.sheetsRead > 0;
     results.push({ pname, wname, width, status, landedOn, sameRoute, ...audit, ...settle, settled, cssomOk, file, ok });
@@ -170,7 +172,9 @@ for (const [pname, path] of PAGES) {
       `여백 ${String(audit.checked).padStart(4)}개 중 격자 이탈 ${audit.offCount}` +
       `  (렌더 ${settle.waited}ms·노드 ${settle.nodes}·auto규칙 ${audit.autoRuleCount}` +
       (cssomOk ? '' : '·CSSOM 차단 ⚠️') +
-      (settled ? ')' : `·스켈레톤 ${settle.skeleton} 남음 ⚠️)`) +
+      (settled
+        ? ')'
+        : `·${settle.timedOut ? '렌더 미정착' : ''}${settle.skeleton ? `스켈레톤 ${settle.skeleton} 남음` : ''} ⚠️)`) +
       (audit.offCount ? `  ${JSON.stringify(audit.byValue)}` : ''),
     );
     if (audit.offCount && audit.sample.length) {

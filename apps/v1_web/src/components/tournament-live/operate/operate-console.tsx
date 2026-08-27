@@ -1298,11 +1298,14 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           !(gameState === 'SCHEDULED' && sidesMissingLineup.length > 0) && (
             <Banner tone="info">경기를 시작해 주세요.</Banner>
           )}
-        {ops.takeover.status === 'revoked' && (
-          <Banner tone="warning">
-            운영 권한이 해제됐어요. 다른 운영자가 이 경기를 담당하고 있어요.
-          </Banner>
-        )}
+        {/*
+          takeover 가 'revoked' 로 가는 경로는 use-v1-game-operations-console.ts 의
+          onPermissionRevoked 하나뿐이고, 그 경로는 서버 리스를 건드리지 않는다 —
+          아무도 실제로 인수하지 않았으므로 "다른 운영자가 담당하고 있어요" 는 언제나
+          근거 없는 단정이었다. 같은 경로가 확인된 사실만 말하는 배너
+          ("운영 권한을 다시 확인하지 못했어요")를 bannerMessage 로 이미 세우므로,
+          여기서 별도 배너를 렌더하면 모순되는 안내 두 개가 동시에 뜬다.
+        */}
         {ops.takeover.status === 'expired' && (
           <Banner tone="warning">운영 권한을 다시 가져오는 중이에요…</Banner>
         )}
@@ -1543,13 +1546,20 @@ function penaltyScoreForSide(
   return side.sideKey === 'HOME' ? penalties.home : penalties.away;
 }
 
-function teammatesForSide(
+/** 테스트 전용 export — 순수 로직이라 OperateConsole 전체를 렌더링하지 않고
+ * 이 함수 하나만 검증한다(lineup-revision-state-consistency 회귀 테스트). */
+export function teammatesForSide(
   sideId: string | null,
   lineups: readonly GameLineup[],
   excludeParticipantId: string | null,
 ): readonly GameLineupParticipant[] {
   if (sideId === null) return [];
-  const lineup = lineups.find((row) => row.sideId === sideId);
+  // LineupGrid·ArrivalCheckinPanel과 같은 규칙을 재사용한다: SUBMITTED/LOCKED 중
+  // 최고 revision만이 "지금 운영 중인 라인업"이다. 여기서 `lineups.find`로 배열의
+  // 첫 행(revision desc 정렬이라 DRAFT가 최상단일 수 있다)을 집으면, 팀이 저장만
+  // 하고 제출하지 않은 DRAFT의 선수가 어시스트 후보로 올라온다 — 그 선수는
+  // LineupGrid에는 아예 보이지 않는데도 후보 목록에는 뜨는 모순이 생긴다.
+  const lineup = latestOperableLineup(lineups, sideId);
   return (lineup?.participants ?? []).filter((participant) => participant.id !== excludeParticipantId);
 }
 

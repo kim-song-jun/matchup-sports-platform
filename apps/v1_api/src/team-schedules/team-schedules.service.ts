@@ -193,7 +193,7 @@ export class TeamSchedulesService {
 
     const rows = await this.prisma.v1TeamSchedule.findMany({
       where,
-      include: { attendance: { select: { status: true } } },
+      include: { attendance: { select: { status: true, userId: true } } },
       orderBy: [{ startAt: 'asc' }, { id: 'asc' }],
       take: limit + 1,
       ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
@@ -201,9 +201,10 @@ export class TeamSchedulesService {
     const pageItems = rows.slice(0, limit);
     const hasNext = rows.length > limit;
     const matchConfirmedByTeamMatchId = await this.loadMatchConfirmationMap(pageItems);
+    const activeMemberUserIds = await this.activeMemberUserIds(teamId);
 
     return {
-      items: pageItems.map((row) => this.toSummary(row, matchConfirmedByTeamMatchId)),
+      items: pageItems.map((row) => this.toSummary(row, matchConfirmedByTeamMatchId, activeMemberUserIds)),
       nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
     };
   }
@@ -246,17 +247,22 @@ export class TeamSchedulesService {
     // 집계 숫자와 본인 행(myAttendance)만 내려줘 "누가 왔는지" 자체를 볼 방법이 없었다.
     // 비멤버/공개 열람자에게 팀원 실명 성격의 닉네임 목록을 노출하지 않도록
     // guestRecruitment의 MEMBERS 가시성 게이트와 동일하게 isMember로만 제한한다.
+    // 정원 산정 일원화: 이 멤버십 조회를 isMember일 때만 하면 goingCount(아래 toSummary)가
+    // active 멤버십으로 걸러지지 않는다 — 비멤버/공개 열람자에게도 goingCount는 여전히
+    // 내려가므로(attendees만 null) 이 조회는 isMember 여부와 무관하게 항상 실행한다.
+    const activeMembers = await this.prisma.v1TeamMembership.findMany({
+      where: { teamId, status: 'active', user: { accountStatus: 'active' } },
+      select: {
+        userId: true,
+        user: { select: { profile: { select: { nickname: true, profileImageUrl: true } } } },
+      },
+    });
+    const activeMemberUserIds = new Set(activeMembers.map((m) => m.userId));
+
     const attendees = isMember
-      ? await (async () => {
-          const memberships = await this.prisma.v1TeamMembership.findMany({
-            where: { teamId, status: 'active', user: { accountStatus: 'active' } },
-            select: {
-              userId: true,
-              user: { select: { profile: { select: { nickname: true, profileImageUrl: true } } } },
-            },
-          });
+      ? (() => {
           const attendanceByUser = new Map(schedule.attendance.map((row) => [row.userId, row]));
-          return memberships.map((membership) => {
+          return activeMembers.map((membership) => {
             const row = attendanceByUser.get(membership.userId);
             return {
               userId: membership.userId,
@@ -279,7 +285,7 @@ export class TeamSchedulesService {
     const matchConfirmedByTeamMatchId = await this.loadMatchConfirmationMap([schedule]);
 
     return {
-      ...this.toSummary(schedule, matchConfirmedByTeamMatchId),
+      ...this.toSummary(schedule, matchConfirmedByTeamMatchId, activeMemberUserIds),
       cancelReason: schedule.cancelReason,
       cancelledAt: schedule.state === V1ScheduleState.CANCELLED ? schedule.updatedAt : null,
       guestRecruitment:
@@ -354,12 +360,26 @@ export class TeamSchedulesService {
     const hasNext = rows.length > limit;
     const matchConfirmedByTeamMatchId = await this.loadMatchConfirmationMap(pageItems);
 
+    // 정원 산정 일원화: /me/schedule은 여러 팀에 걸쳐 있으므로 팀별 active 멤버십 집합을
+    // 한 번에 모아 두고(N+1 방지), 각 스케줄이 속한 팀의 집합으로 goingCount를 걸러낸다.
+    const teamIds = [...infoByTeam.keys()];
+    const activeMembershipRows = await this.prisma.v1TeamMembership.findMany({
+      where: { teamId: { in: teamIds }, status: 'active', user: { accountStatus: 'active' } },
+      select: { teamId: true, userId: true },
+    });
+    const activeMemberUserIdsByTeam = new Map<string, Set<string>>();
+    for (const m of activeMembershipRows) {
+      const set = activeMemberUserIdsByTeam.get(m.teamId) ?? new Set<string>();
+      set.add(m.userId);
+      activeMemberUserIdsByTeam.set(m.teamId, set);
+    }
+
     return {
       items: pageItems.map((row) => {
         const info = infoByTeam.get(row.teamId);
         const mine = row.attendance.find((a) => a.userId === user.id) ?? null;
         return {
-          ...this.toSummary(row, matchConfirmedByTeamMatchId),
+          ...this.toSummary(row, matchConfirmedByTeamMatchId, activeMemberUserIdsByTeam.get(row.teamId) ?? new Set()),
           teamId: row.teamId,
           teamName: info?.teamName ?? null,
           myRole: info?.role ?? null,
@@ -502,7 +522,18 @@ export class TeamSchedulesService {
       // partially mutates anything.
       let goingCountForCapacityChange: number | null = null;
       if (nextCapacity !== schedule.capacity) {
-        goingCountForCapacityChange = await tx.v1ScheduleAttendance.count({ where: { scheduleId, status: 'GOING' } });
+        // 정원 산정 일원화: 여기서 세는 GOING 수도 팀을 나가거나 추방된 멤버의 유령 행을
+        // 제외해야 한다 — 안 그러면 매니저가 정원을 실제 참석 가능 인원(active 멤버십
+        // 기준)에 맞게 줄이려 해도 유령 행 때문에 409로 거부된다. attendance.service.ts의
+        // capacity 판정·toSummary()의 goingCount와 동일한 정의.
+        const goingCountRows = await tx.$queryRaw<Array<{ count: bigint }>>`
+          SELECT COUNT(*)::bigint AS count
+          FROM v1_schedule_attendance a
+          INNER JOIN v1_team_memberships m ON m.team_id = ${teamId} AND m.user_id = a.user_id AND m.status = 'active'
+          INNER JOIN v1_users u ON u.id = a.user_id AND u.account_status = 'active'
+          WHERE a.schedule_id = ${scheduleId} AND a.status = 'GOING'::"V1AttendanceStatus"
+        `;
+        goingCountForCapacityChange = Number(goingCountRows[0]?.count ?? 0);
         if (nextCapacity !== null && nextCapacity < goingCountForCapacityChange) {
           throw new ConflictException({
             code: 'SCHEDULE_CAPACITY_BELOW_GOING_COUNT',
@@ -892,11 +923,19 @@ export class TeamSchedulesService {
       state: string;
       version: number;
       teamMatchId: string | null;
-      attendance?: Array<{ status: string }>;
+      attendance?: Array<{ status: string; userId: string }>;
     },
     matchConfirmedByTeamMatchId: Map<string, boolean> = new Map(),
+    // 정원 산정 일원화 (M-F-team-schedule-attendance-orphan-cleanup fix): 팀을 나가거나
+    // 추방된 멤버의 GOING/WAITLISTED 행은 v1_schedule_attendance에서 지워지지 않는다(이탈
+    // 경로가 teams.service.ts·profile.service.ts·admin.service.ts 4곳으로 흩어져 있어 각
+    // 경로에 정리 훅을 심으면 새 경로가 생길 때마다 또 빠뜨리기 쉽다). 대신 이 원시 행을
+    // active 멤버십으로 걸러 셈으로써 detail()의 attendees 목록과 항상 같은 숫자를
+    // 가리키게 한다 — 파라미터를 필수로 둬 새 호출부가 이 필터링을 빠뜨리면 컴파일이
+    // 깨지게 한다.
+    activeMemberUserIds: Set<string>,
   ) {
-    const attendance = row.attendance ?? [];
+    const attendance = (row.attendance ?? []).filter((a) => activeMemberUserIds.has(a.userId));
     return {
       id: row.id,
       title: row.title,
@@ -988,6 +1027,16 @@ export class TeamSchedulesService {
       select: { id: true },
     });
     return membership !== null;
+  }
+
+  // 정원 산정 일원화: toSummary()의 goingCount/waitlistedCount가 attendees 목록(위 detail())과
+  // 같은 정의(active 멤버십 + 계정 active)를 쓰게 만드는 단일 소스.
+  private async activeMemberUserIds(teamId: string): Promise<Set<string>> {
+    const rows = await this.prisma.v1TeamMembership.findMany({
+      where: { teamId, status: 'active', user: { accountStatus: 'active' } },
+      select: { userId: true },
+    });
+    return new Set(rows.map((r) => r.userId));
   }
 
   /**

@@ -534,8 +534,14 @@ function nextCreateHref(step: MatchCreateStep) {
   return '/matches/new/confirm';
 }
 
+// toISOString()은 UTC 기준이라 toTimeInput()(로컬 기준)과 섞어 쓰면 KST 00:00~08:59 시작
+// 매치를 수정 화면에서 열 때 날짜만 하루 앞으로 밀린다(2026-08-27 감사
+// M-A-personal-match-state) — 날짜도 로컬 기준으로 뽑아 시간과 같은 기준시를 쓰게 한다.
 function toDateInput(date: Date) {
-  return date.toISOString().slice(0, 10);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function toTimeInput(date: Date) {

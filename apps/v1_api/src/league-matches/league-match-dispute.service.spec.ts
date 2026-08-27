@@ -139,6 +139,35 @@ describe('LeagueMatchDisputeService 알림 수신자', () => {
       prisma.v1LeagueMatchDispute.updateMany.mockResolvedValue({ count: 1 });
     }
 
+    // 감사 L-E finding 1: fileDispute는 제기 시점에만 승강 확정 여부를 본다 -- 이의가
+    // 열려 있는 동안 승강이 확정될 수 있으므로 resolveDispute도 처리 직전에 같은 검사를
+    // 다시 태워야 한다. 이 게이트가 없으면 정정/무효로 순위표가 바뀌는데 이미 확정된
+    // 승강 결정은 옛 순위 그대로 남는다.
+    it('승강이 이미 확정된 리그의 이의는 수락할 수 없다 -- 결과를 건드리지 않고 409', async () => {
+      const prisma = makePrisma();
+      const notifications = makeNotifications();
+      setupOpenDispute(prisma);
+      prisma.v1LeaguePromotion.findFirst.mockResolvedValue({ id: 'promotion-row-1' });
+      const service = makeService(prisma, notifications);
+
+      await expect(
+        service.resolveDispute(adminActor, 'dispute-1', {
+          resolution: 'correction',
+          note: '승강 확정 후 뒤늦은 정정 시도',
+          homeScore: 2,
+          awayScore: 1,
+        }),
+      ).rejects.toMatchObject({ response: { code: 'LEAGUE_PROMOTION_ALREADY_COMMITTED' } });
+
+      expect(prisma.v1LeaguePromotion.findFirst).toHaveBeenCalledWith({
+        where: { fromLeagueId: 'league-1' },
+        select: { id: true },
+      });
+      expect((service as any).resultEntry.correctResult).not.toHaveBeenCalled();
+      expect(prisma.v1LeagueMatchDispute.updateMany).not.toHaveBeenCalled();
+      expect(notifications.emitToManyDeferred).not.toHaveBeenCalled();
+    });
+
     it('정정(correction) 수락 시 양 팀 owner/manager 전원에게 알리고 문구는 "정정"이다', async () => {
       const prisma = makePrisma();
       const notifications = makeNotifications();

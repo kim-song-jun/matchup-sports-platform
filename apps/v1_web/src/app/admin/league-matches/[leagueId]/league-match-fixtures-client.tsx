@@ -6,6 +6,7 @@ import { AlertTriangle, X } from 'lucide-react';
 import { AdminPageHeader, AdminDataTable, AdminReasonModal, AdminStatusPill, AdminTableSkeleton, AdminToasts, useAdminToast } from '@/components/admin';
 import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-picker';
 import { GateConfirmModal } from '@/components/admin/operation-flag-gate-confirm-modal';
+import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { LeagueResultEntryModal } from '@/components/admin/league-result-entry-modal';
 import {
   useV1AddLeagueTeam,
@@ -124,6 +125,8 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
   const [gamesPerTeamPerDay, setGamesPerTeamPerDay] = useState('');
   // R12: 취소 확인 대상 대진. null이면 모달을 닫는다.
   const [cancelTarget, setCancelTarget] = useState<V1LeagueFixture | null>(null);
+  // 그룹 B 감사 결함 3: 참가팀 제외 확인 대상. null이면 모달을 닫는다.
+  const [removeTarget, setRemoveTarget] = useState<{ teamId: string; teamName: string } | null>(null);
   // R13: 대진 재생성 확인 모달 열림 상태.
   const [regenerateModalOpen, setRegenerateModalOpen] = useState(false);
   // 감사 결함 1: 대진 표의 title은 자동 생성이라 리그 전체가 "N주차"로 똑같이 보인다 —
@@ -289,6 +292,14 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
     }
   };
 
+  // 그룹 B 감사 결함 2: 공식 결과가 확정된 대진이 하나라도 있으면 서버는 재생성을
+  // 409 LEAGUE_FIXTURES_HAVE_OFFICIAL_RESULTS로 영구 거부한다(regenerateFixtures) — 그런
+  // 리그에 팀을 추가하고도 "재생성을 눌러 주세요"라고 안내하면 운영자는 실행 불가능한
+  // 액션으로 안내받는다. 서버 응답(hasExistingFixtures)이 아니라 이미 화면이 들고 있는
+  // series.fixtures의 resultStage로 직접 판정한다 — detail()이 대진마다 resultStage를
+  // 내려주므로 별도 조회 없이 "재생성 가능한가"를 정확히 알 수 있다.
+  const leagueHasOfficialResult = series.fixtures.some((fixture) => fixture.resultStage === 'official');
+
   // 그룹 B 감사 결함 1: 참가팀 추가. EntityPicker의 onChange가 넘기는 item이 null이면
   // (검색 초기화 등) 아무것도 하지 않는다.
   const onAddTeam = (item: EntityPickerItem | null) => {
@@ -300,9 +311,11 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
           setTeamPickerValue(null);
           setTeamSearch('');
           showToast(
-            result.hasExistingFixtures
-              ? `${item.label}을(를) 추가했어요. 대진에 반영하려면 "대진 재생성"을 눌러 주세요.`
-              : `${item.label}을(를) 추가했어요.`,
+            !result.hasExistingFixtures
+              ? `${item.label}을(를) 추가했어요.`
+              : leagueHasOfficialResult
+                ? `${item.label}을(를) 추가했어요. 다만 이 리그는 이미 확정된 결과가 있어 대진 재생성이 불가능해요 — 이 팀은 순위표에만 표시돼요.`
+                : `${item.label}을(를) 추가했어요. 대진에 반영하려면 "대진 재생성"을 눌러 주세요.`,
             'success',
           );
         },
@@ -313,9 +326,15 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
 
   // 그룹 B 감사 결함 1: 참가팀 제거. 공식 결과가 확정된 대진이 낀 팀은 서버가 409로
   // 거부한다(checkLeagueTeamRemovalAllowed) — 여기서는 그 실패를 토스트로만 알린다.
-  const onRemoveTeam = (teamId: string, teamName: string) => {
+  // 그룹 B 감사 결함 3: 실제 제거는 확인 모달(onConfirmRemoveTeam)에서만 실행한다 —
+  // 이전에는 칩의 X 버튼이 확인 없이 곧바로 이 mutate를 호출해, 옆 팀을 잘못 눌러도
+  // 즉시 실제 대진이 취소됐다.
+  const onConfirmRemoveTeam = () => {
+    if (!removeTarget) return;
+    const { teamId, teamName } = removeTarget;
     removeTeam.mutate(teamId, {
       onSuccess: (result) => {
+        setRemoveTarget(null);
         showToast(
           result.cancelledFixtureCount > 0
             ? `${teamName}을(를) 제외했어요. 관련 대진 ${result.cancelledFixtureCount}경기도 함께 취소됐어요.`
@@ -394,6 +413,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
     awayScore: number,
     reason: string,
     participantStats: V1LeagueResultParticipantStat[],
+    isForfeit: boolean | undefined,
   ) => {
     if (!resultEntryFixture) return;
     const mutation = resultEntryMode === 'correction' ? correctResult : recordResult;
@@ -413,6 +433,11 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
             : participantStats.length > 0
               ? { participants: participantStats }
               : {}),
+          // 감사 L-E finding 4 수정: 정정 모드에서만 싣는다(신규 입력은 모달이 항상
+          // undefined 를 넘긴다 — 몰수 개념이 없는 모드). 미전송이면 서버가 base를
+          // 승계하므로, 여기서도 undefined 를 그대로 흘려 "값 없음"과 "false"를
+          // 구분한다(?? 로 접으면 항상 boolean 이 되어 이 구분이 사라진다).
+          ...(isForfeit === undefined ? {} : { isForfeit }),
         },
       },
       {
@@ -565,7 +590,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                 aria-label={`${team.name} 제외`}
                 disabled={removeTeam.isPending || (teamsData?.teams.length ?? 0) <= 2}
                 title={(teamsData?.teams.length ?? 0) <= 2 ? '리그는 팀이 2개 이상이어야 해요' : undefined}
-                onClick={() => onRemoveTeam(team.teamId, team.name)}
+                onClick={() => setRemoveTarget({ teamId: team.teamId, teamName: team.name })}
                 className="flex min-h-[44px] min-w-[44px] items-center justify-center disabled:opacity-40"
               >
                 <X className="h-4 w-4" aria-hidden="true" />
@@ -1029,6 +1054,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
         weekLabel={resultEntryFixture?.title ?? ''}
         currentHomeScore={resultEntryFixture?.homeScore ?? null}
         currentAwayScore={resultEntryFixture?.awayScore ?? null}
+        currentIsForfeit={resultEntryFixture?.isForfeit}
         participants={fixtureParticipants.data ?? null}
         onSubmit={onResultEntrySubmit}
         onClose={() => setResultEntryFixture(null)}
@@ -1051,6 +1077,27 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
         tone="amber"
         onConfirm={onConfirmRevert}
         onClose={() => setRevertModalOpen(false)}
+      />
+
+      {/* 그룹 B 감사 결함 3: 참가팀 제외 확인 — 이전에는 칩의 X 버튼이 확인 없이 곧바로
+          제외 + 관련 대진 취소를 실행했다. 되돌릴 경로(재추가 + 재생성)가 있어
+          GateConfirmModal의 typedChallenge까지는 과하지만, 최소한의 확인은 필요하다.
+          취소될 대진 수는 이미 로딩된 series.fixtures로 정확히 계산해 보여준다. */}
+      <RemoveTeamConfirmModal
+        open={removeTarget !== null}
+        pending={removeTeam.isPending}
+        teamName={removeTarget?.teamName ?? ''}
+        fixtureCount={
+          removeTarget
+            ? series.fixtures.filter(
+                (fixture) =>
+                  fixture.status !== 'cancelled' &&
+                  (fixture.homeTeamId === removeTarget.teamId || fixture.awayTeamId === removeTarget.teamId),
+              ).length
+            : 0
+        }
+        onConfirm={onConfirmRemoveTeam}
+        onClose={() => setRemoveTarget(null)}
       />
 
       <GateConfirmModal
@@ -1083,6 +1130,96 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
         onConfirm={onConfirmRegenerate}
         onClose={() => setRegenerateModalOpen(false)}
       />
+    </div>
+  );
+}
+
+/**
+ * 그룹 B 감사 결함 3 — 참가팀 제외 확인 모달. GateConfirmModal을 그대로 재사용하지
+ * 않은 이유: 그 컴포넌트는 사유 입력을 필수로 강제하는데, DELETE /:leagueId/teams/:teamId
+ * 는 사유 필드를 받지 않는다(감사 로그도 teamId·cancelledFixtureCount만 남긴다) — 입력받은
+ * 사유를 어디에도 보내지 않으면서 필수인 척하는 게 더 나쁜 UX다. 대신 이 조작은
+ * 되돌릴 경로가 있다(팀 재추가 + 대진 재생성, 공식 결과가 없는 한)는 verifierContext
+ * 판단을 따라 typedChallenge 없이 내용 확인 + 클릭 두 번만 요구한다.
+ */
+function RemoveTeamConfirmModal({
+  open,
+  pending,
+  teamName,
+  fixtureCount,
+  onConfirm,
+  onClose,
+}: {
+  open: boolean;
+  pending: boolean;
+  teamName: string;
+  fixtureCount: number;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  const { dialogRef, initialFocusRef, onBackdropClick } = useModalA11y<HTMLButtonElement>({ open, onClose, pending });
+  if (!open) return null;
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-[2px]"
+      onClick={onBackdropClick}
+    >
+      <div
+        ref={dialogRef}
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="remove-team-confirm-title"
+        aria-describedby="remove-team-confirm-desc"
+        className="bg-[var(--card-surface)] rounded-2xl shadow-[var(--shadow-modal)] w-full max-w-[420px] overflow-hidden"
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
+          <h2
+            id="remove-team-confirm-title"
+            className="text-[16px] font-bold text-[var(--text-strong)] flex items-center gap-2"
+          >
+            <AlertTriangle size={17} className="text-[var(--orange700)]" aria-hidden="true" />
+            {teamName}을(를) 제외할까요?
+          </h2>
+          <button
+            type="button"
+            onClick={() => !pending && onClose()}
+            disabled={pending}
+            aria-label="모달 닫기"
+            className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-[var(--text-muted)] hover:bg-[var(--surface-soft)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-40"
+          >
+            <X size={18} aria-hidden="true" />
+          </button>
+        </div>
+        <div className="px-5 py-5 flex flex-col gap-4">
+          <p
+            id="remove-team-confirm-desc"
+            className="text-[13px] leading-relaxed rounded-xl border px-4 py-3 text-[var(--orange700)] bg-[var(--tint-orange)] border-[var(--tint-orange-border)]"
+          >
+            {fixtureCount > 0
+              ? `리그 로스터에서 이 팀을 빼요. 이 팀이 낀 예정 대진 ${fixtureCount}경기도 함께 취소돼요. 되돌리려면 팀을 다시 추가하고 대진을 재생성해야 해요.`
+              : '리그 로스터에서 이 팀을 빼요.'}
+          </p>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={pending}
+              className="min-h-[44px] rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--text-strong)] disabled:opacity-50"
+            >
+              취소
+            </button>
+            <button
+              ref={initialFocusRef}
+              type="button"
+              onClick={onConfirm}
+              disabled={pending}
+              className="min-h-[44px] rounded-xl bg-[var(--button-fill-warning)] px-4 text-sm font-semibold text-white hover:bg-[var(--button-fill-warning-hover)] transition-colors disabled:opacity-50"
+            >
+              {pending ? '제외하는 중…' : '제외'}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

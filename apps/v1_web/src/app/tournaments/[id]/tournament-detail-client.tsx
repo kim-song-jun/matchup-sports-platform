@@ -38,6 +38,12 @@ import {
   formatTournamentDateLong,
   formatEntryFee,
 } from '@/lib/date-utils';
+import {
+  resolveTournamentRegistrationBlock,
+  describeTournamentRegistrationBlock,
+  resolveTournamentCapacity,
+  type TournamentRegistrationBlockReason,
+} from '@/lib/tournament-registration-availability';
 import type {
   V1TournamentDetail,
   V1TournamentFormat,
@@ -295,13 +301,19 @@ function CollapsiblePolicyText({
  * Tournament registrations are team-scoped, so an existing registration must not
  * hide the apply entry; the viewer may manage another team that can still apply.
  */
+/** 차단 사유별 버튼 라벨 — '모집 마감'(정원)과 '신청 마감'(기한)을 구분해 보여준다. */
+function getApplyBlockButtonLabel(reason: TournamentRegistrationBlockReason): string {
+  return reason === 'deadline_passed' ? '신청 마감' : '모집 마감';
+}
+
 function ApplyCTAButtons({
   tournament,
-  isFull,
+  blockReason,
   myRegistration,
 }: {
   tournament: V1TournamentDetail;
-  isFull: boolean;
+  /** null이면 신청 가능. `resolveTournamentRegistrationBlock()` 단일 소스 판정. */
+  blockReason: TournamentRegistrationBlockReason | null;
   myRegistration: V1TournamentRegistration | null;
 }) {
   const hasActiveRegistration =
@@ -323,7 +335,11 @@ function ApplyCTAButtons({
   const applyLabel = myRegistration?.status === 'cancelled' ? '다시 신청하기' : '참가 신청하기';
   const applyAriaLabel = myRegistration?.status === 'cancelled' ? '대회 다시 신청하기' : '참가 신청하기';
 
-  if (isFull) {
+  if (blockReason !== null) {
+    const description = describeTournamentRegistrationBlock(
+      blockReason,
+      resolveTournamentCapacity(tournament),
+    );
     return (
       <button
         type="button"
@@ -331,9 +347,9 @@ function ApplyCTAButtons({
         style={{ fontSize: 'var(--font-size-body-lg)' }}
         disabled
         aria-disabled="true"
-        aria-label="모집이 마감되었어요"
+        aria-label={description}
       >
-        모집 마감
+        {getApplyBlockButtonLabel(blockReason)}
       </button>
     );
   }
@@ -358,14 +374,15 @@ function ApplyCTA({
   myRegistration: V1TournamentRegistration | null;
 }) {
   const isOpen = tournament.status === 'open';
-  const isFull = getReservedTeamCount(tournament) >= tournament.teamCount;
 
   if (!isOpen) return null;
+
+  const blockReason = resolveTournamentRegistrationBlock(tournament);
 
   return (
     /* Mobile-only fixed CTA — hidden on desktop via .tm-hide-desktop */
     <div className="tm-fixed-cta tm-hide-desktop">
-      <ApplyCTAButtons tournament={tournament} isFull={isFull} myRegistration={myRegistration} />
+      <ApplyCTAButtons tournament={tournament} blockReason={blockReason} myRegistration={myRegistration} />
     </div>
   );
 }
@@ -540,12 +557,14 @@ export function TournamentDetailView({
 }) {
   const status = getTournamentStatusConfig(tournament.status);
   const sportAccent = getSportAccent(tournament.sport.code);
-  const hasAnnouncements = tournament.announcements.length > 0;
   const isOpen = tournament.status === 'open';
   const isCompleted = tournament.status === 'completed';
   const pendingPaymentCount = getPendingPaymentCount(tournament);
   const reservedTeamCount = getReservedTeamCount(tournament);
-  const isFull = reservedTeamCount >= tournament.teamCount;
+  /* 신규 신청 차단 사유(마감 경과·정원 마감) — CTA·안내 문구·정원 캡션이 전부 이 하나의
+     판정을 공유한다. status만 보던 예전 로직은 신청 마감이 지난 open 대회에서도
+     '참가 신청하기'를 활성으로 그렸다. */
+  const registrationBlock = resolveTournamentRegistrationBlock(tournament);
   const prizeText = tournament.prizeSummary?.trim() ?? '';
   const genderCategoryLabel = getGenderCategoryLabel(tournament.genderCategory);
   const genderQuotaLabel = getGenderQuotaLabel(tournament);
@@ -555,6 +574,48 @@ export function TournamentDetailView({
   // Mobile: extra bottom padding so fixed CTA doesn't occlude last content row.
   // Desktop: fixed CTA is hidden via .tm-hide-desktop; sticky right panel takes over.
   const bottomPad = isOpen ? 96 : 48;
+
+  /* ── 신청자 본인 대상 targeted 공지(confirmed_only/waitlist/all_registered) ──
+     공개 상세 프로젝션(`tournament.announcements`)은 audience='public'만 담는다(의도된
+     계약 — 비로그인 방문자에게 team-scoped 공지를 노출하면 안 되므로). 하지만 그 결과
+     신청 팀에게 "공지를 확인해 보세요" 알림이 발송돼도 본문을 읽을 화면이 이 페이지
+     어디에도 없었다(실사고). 신청 이력이 있는 사용자만 `/announcements/me`를 조회해
+     본인 자격에 맞는 공지를 가져와 공개 목록과 병합한다.
+     `LeagueStandingsSection`과 같은 이유로 useQuery 대신 수동 fetch — 이 컴포넌트는
+     QueryClientProvider 없이 단독 렌더되는 기존 테스트가 있다(tournament-detail-cta.test.tsx). */
+  const [participantAnnouncements, setParticipantAnnouncements] = useState<V1TournamentAnnouncement[]>([]);
+  useEffect(() => {
+    if (!hasActiveRegistration) {
+      setParticipantAnnouncements([]);
+      return;
+    }
+    let cancelled = false;
+    v1Get<{ items: V1TournamentAnnouncement[] }>(`/tournaments/${tournament.id}/announcements/me`)
+      .then((res) => {
+        if (!cancelled) setParticipantAnnouncements(res.items);
+      })
+      .catch(() => {
+        // 이 fetch는 공개 목록을 보강하는 보조 데이터다 — 실패해도 이미 렌더된
+        // public 공지·나머지 상세 화면은 멀쩡하므로 화면을 막을 이유가 없다.
+        // (조용한 실패지만, silent catch 안티패턴과 달리 "실패해도 안전한 보조
+        // 데이터"라는 판단 근거가 있고 사용자 액션에 대한 응답이 아니다.)
+        if (!cancelled) setParticipantAnnouncements([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tournament.id, hasActiveRegistration]);
+
+  const allAnnouncements = (() => {
+    if (participantAnnouncements.length === 0) return tournament.announcements;
+    const seen = new Set(tournament.announcements.map((a) => a.id));
+    const extra = participantAnnouncements.filter((a) => !seen.has(a.id));
+    if (extra.length === 0) return tournament.announcements;
+    return [...tournament.announcements, ...extra].sort(
+      (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
+    );
+  })();
+  const hasAnnouncements = allAnnouncements.length > 0;
 
   /* ── 통합 진입 CTA(상단 스티키 + 하단, §A-3·4·5) — 모바일/태블릿 전용.
      데스크탑은 railCTA가 이미 항상 보이는 sticky 패널이라 별도 처리가 필요 없다. */
@@ -722,6 +783,11 @@ export function TournamentDetailView({
               if (remaining <= 0) {
                 return <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 8 }}>정원이 가득 찼어요</div>;
               }
+              /* 정원은 남았어도 신청 마감이 지났으면 "아직 N자리 남았어요"는 신청 가능하다는
+                 오해를 만든다(CTA·이 캡션 둘 다 초대 신호를 보내는 문제였다). */
+              if (registrationBlock === 'deadline_passed') {
+                return <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 8 }}>신청이 마감됐어요</div>;
+              }
               const pct = Math.round((reservedTeamCount / Math.max(tournament.teamCount, 1)) * 100);
               const almostFull = pct >= 80;
               return (
@@ -759,9 +825,10 @@ export function TournamentDetailView({
       {/* ── Prize card — shown HIGH in left column, right after metric strip ── */}
       {prizeCard}
 
-      {/* 신청을 실제로 받는 상태(open)에서만 노출한다. 마감·진행 중·완료된 대회에서
+      {/* 신청을 실제로 받는 상태에서만 노출한다. 마감·진행 중·완료된 대회는 물론, status는
+          여전히 open이어도 신청 마감·정원 마감으로 신규 신청이 막힌 대회에서
           "회원가입 후 팀을 만들어 신청하세요" 안내는 따라 할 수 없는 안내라 혼란만 준다. */}
-      {isOpen ? <TournamentApplicationGuideSection /> : null}
+      {isOpen && registrationBlock === null ? <TournamentApplicationGuideSection /> : null}
 
       <TournamentParticipantSection
         teams={tournament.participantTeams}
@@ -773,7 +840,7 @@ export function TournamentDetailView({
       <TournamentVenuePrepSection
         venue={tournament.venue}
         parkingInfo={tournament.parkingInfo}
-        announcements={tournament.announcements}
+        announcements={allAnnouncements}
         latitude={tournament.latitude}
         longitude={tournament.longitude}
       />
@@ -805,7 +872,7 @@ export function TournamentDetailView({
         fixtures={tournament.fixtures}
         hasAnnouncements={hasAnnouncements}
         sponsorCount={tournament.sponsors.length}
-        announcements={tournament.announcements}
+        announcements={allAnnouncements}
       />
 
       {/* ── Section 3 + 4: Format-aware fixtures / standings (non-bracket portions) ── */}
@@ -842,7 +909,7 @@ export function TournamentDetailView({
         fixtures={tournament.fixtures}
         hasAnnouncements={hasAnnouncements}
         sponsorCount={tournament.sponsors.length}
-        announcements={tournament.announcements}
+        announcements={allAnnouncements}
       />
 
       <TournamentParticipantSection
@@ -946,7 +1013,7 @@ export function TournamentDetailView({
         <section aria-labelledby="announcements-heading">
           <div id="announcements-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>공지사항</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {tournament.announcements.map((announcement) => (
+            {allAnnouncements.map((announcement) => (
               <AnnouncementCard key={announcement.id} announcement={announcement} />
             ))}
           </div>
@@ -1032,7 +1099,7 @@ export function TournamentDetailView({
           height={6}
         />
         <div style={{ marginTop: 20 }}>
-          <ApplyCTAButtons tournament={tournament} isFull={isFull} myRegistration={myRegistration} />
+          <ApplyCTAButtons tournament={tournament} blockReason={registrationBlock} myRegistration={myRegistration} />
         </div>
       </div>
 

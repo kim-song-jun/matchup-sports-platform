@@ -103,6 +103,12 @@ function createHarness(options: {
         return removed;
       }),
     },
+    // 같은 업로드 URL 을 리그 대진 영상이 아직 참조 중이면 대회 영상 삭제가
+    // 파일까지 지워선 안 된다 — 서비스가 두 도메인의 참조 수를 함께 센다.
+    // 이 하네스는 리그 쪽 참조가 없는 상태(0건)를 기본으로 둔다.
+    v1TeamMatchVideo: {
+      count: jest.fn(async () => 0),
+    },
     v1UploadAsset: {
       findUnique: jest.fn(async ({ where }: { where: { url: string } }) =>
         uploadAssets.find((asset) => asset.url === where.url) ?? null,

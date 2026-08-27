@@ -122,7 +122,19 @@ export function PromotionRuleForm({ value, tierCount, onChange, disabled = false
             className={inputClass}
             value={value.mode}
             disabled={disabled}
-            onChange={(e) => onChange({ ...value, mode: e.target.value as V1PromotionRule['mode'] })}
+            onChange={(e) => {
+              const mode = e.target.value as V1PromotionRule['mode'];
+              // 모드를 바꾸면 화면에 보이는 값(폴백으로 표시만 되던 값)을 규칙에 실제로
+              // 채워 넣는다. 그렇지 않으면 사용자가 숫자 칸을 건드리지 않는 한 해당
+              // 모드에 필요한 필드(fixed→fixedCount, ratio→ratio)가 계속 undefined 로
+              // 남아 서버 검증(mode=fixed 일 때 fixedCount 필수 등)에서 항상 422 로
+              // 거부된다 — 화면엔 유효한 값이 보이는데 실제로는 전송되지 않는 상태였다.
+              onChange({
+                ...value,
+                mode,
+                ...(mode === 'fixed' ? { fixedCount: value.fixedCount ?? 1 } : { ratio: value.ratio ?? 0.2 }),
+              });
+            }}
           >
             <option value="ratio">팀 수 비례</option>
             <option value="fixed">고정 팀 수</option>

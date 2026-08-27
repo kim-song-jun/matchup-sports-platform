@@ -395,8 +395,11 @@ function RegistrationPass({
         </div>
       ) : (
         <div style={{ borderTop: '1px solid var(--border)', padding: '12px 20px' }}>
+          {/* 감사 finding(reg-confirm-reapply-state-machine #1): "자동으로"라는 문구가 실제로
+              존재하지 않는 자동 승격을 약속하고 있었다 — 대기→확정 전이는 운영자가 수동으로
+              처리한다(어드민 대기 신청 행의 "확정" 버튼). 이행 가능한 문구로 정정한다. */}
           <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, margin: 0 }}>
-            앞 순위 팀이 취소하면 자동으로 확정 알림을 드려요.
+            앞 순위 팀이 취소하면 운영진이 확인 후 확정해 드려요.
           </p>
         </div>
       )}

@@ -257,7 +257,7 @@ export class TeamMatchesService {
       requiresApproval: true,
       requiresPayment: false,
       teams: manageableTeams.map((team) => {
-        const { reasonCode, teamApplication } = judgeApplicationAttempt(teamMatch, ledger, user.id, team.id);
+        const { reasonCode, teamApplication } = judgeApplicationAttempt(teamMatch, ledger, user.id, team.id, team.sportId);
         return {
           teamId: team.id,
           name: team.name,
@@ -761,7 +761,8 @@ export class TeamMatchesService {
     dto: CreateTeamMatchApplicationDto,
   ) {
     this.assertActiveAccount(user);
-    await this.assertCanManageTeam(user.id, dto.applicantTeamId);
+    const applicantMembership = await this.assertCanManageTeam(user.id, dto.applicantTeamId);
+    const applicantTeamSportId = applicantMembership.team.sportId;
     const teamMatch = await this.getPublicTeamMatch(teamMatchId, user);
     // 중복 판정은 화면용 include(teamMatchInclude)가 아니라 신청 원장을 직접 읽는다 — 그
     // include 의 applications 는 `appliedByUserId = 나`로 걸러져 있어 같은 팀의 다른 매니저가
@@ -773,6 +774,7 @@ export class TeamMatchesService {
       await readTeamMatchApplicationLedger(this.prisma, teamMatch.id),
       user.id,
       dto.applicantTeamId,
+      applicantTeamSportId,
     ).reasonCode;
     if (reason !== 'OK') {
       throw stateConflict(getEligibilityReasonMessage(reason), reason);
@@ -786,7 +788,7 @@ export class TeamMatchesService {
       await tx.$queryRaw`SELECT id FROM "v1_team_matches" WHERE id = ${teamMatch.id} FOR UPDATE`;
       const currentTeamMatch = await tx.v1TeamMatch.findFirst({
         where: { id: teamMatch.id, deletedAt: null },
-        select: { hostTeamId: true, status: true, startAt: true, deadlineAt: true },
+        select: { hostTeamId: true, status: true, startAt: true, deadlineAt: true, sportId: true },
       });
       if (!currentTeamMatch) {
         throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Team match was not found' });
@@ -798,6 +800,7 @@ export class TeamMatchesService {
         await readTeamMatchApplicationLedger(tx, teamMatch.id),
         user.id,
         dto.applicantTeamId,
+        applicantTeamSportId,
       );
       if (judged.reasonCode !== 'OK') {
         throw stateConflict(getEligibilityReasonMessage(judged.reasonCode), judged.reasonCode);
@@ -1481,7 +1484,7 @@ export class TeamMatchesService {
       manageableOpponentTeam,
       participantMember,
       eligibleTeams: eligibleTeams.map((team) => {
-        const { reasonCode } = judgeApplicationAttempt(teamMatch, ledger, user.id, team.id);
+        const { reasonCode } = judgeApplicationAttempt(teamMatch, ledger, user.id, team.id, team.sportId);
         return { teamId: team.id, name: team.name, role: team.memberships[0]?.role ?? 'member', eligible: reasonCode === 'OK', reasonCode };
       }),
       manageRoute: manageableHostTeam ? `/team-matches/${teamMatch.id}/manage` : null,
@@ -1916,13 +1919,14 @@ function isLiveApplication(status: V1TeamMatchApplication['status']) {
  *     다른 사람이 자기 팀으로 내는 신청은 정상 경쟁이므로 막지 않는다.
  */
 function judgeApplicationAttempt(
-  teamMatch: Pick<V1TeamMatch, 'hostTeamId' | 'status' | 'startAt' | 'deadlineAt'>,
+  teamMatch: Pick<V1TeamMatch, 'hostTeamId' | 'status' | 'startAt' | 'deadlineAt' | 'sportId'>,
   ledger: TeamMatchApplicationLedgerRow[],
   userId: string,
   applicantTeamId: string,
+  applicantTeamSportId: string,
 ): { reasonCode: string; teamApplication?: TeamMatchApplicationLedgerRow } {
   const teamApplication = ledger.find((row) => row.applicantTeamId === applicantTeamId);
-  const reasonCode = getEligibilityReason(teamMatch, applicantTeamId, teamApplication);
+  const reasonCode = getEligibilityReason(teamMatch, applicantTeamId, applicantTeamSportId, teamApplication);
   if (reasonCode !== 'OK') return { reasonCode, teamApplication };
   const liveOnAnotherTeam = ledger.some(
     (row) =>
@@ -1935,11 +1939,18 @@ function judgeApplicationAttempt(
 }
 
 function getEligibilityReason(
-  teamMatch: Pick<V1TeamMatch, 'hostTeamId' | 'status' | 'startAt' | 'deadlineAt'>,
+  teamMatch: Pick<V1TeamMatch, 'hostTeamId' | 'status' | 'startAt' | 'deadlineAt' | 'sportId'>,
   applicantTeamId: string,
+  applicantTeamSportId: string,
   application?: Pick<V1TeamMatchApplication, 'status'>,
 ) {
   if (teamMatch.hostTeamId === applicantTeamId) return 'HOST_TEAM_CANNOT_APPLY';
+  // create()/update() 는 호스트 팀의 종목이 팀매치 종목과 같아야 한다는 불변식을 이미
+  // 강제한다(this.create:390, this.update:538) — 신청 쪽에도 같은 불변식을 지켜야
+  // approveApplication 이 다른 종목 팀을 AWAY 로 확정하는(hydrateApprovedAwaySnapshot)
+  // 되돌릴 수 없는 사고를 막는다. 기존 신청 상태보다 먼저 검사해, 종목이 다르면
+  // ALREADY_REQUESTED 같은 오해의 소지가 있는 사유로 가려지지 않게 한다.
+  if (teamMatch.sportId !== applicantTeamSportId) return 'SPORT_MISMATCH';
   if (application?.status === 'requested') return 'ALREADY_REQUESTED';
   if (application?.status === 'approved') return 'ALREADY_APPROVED';
   if (teamMatch.status === 'matched') return 'MATCHED_ALREADY';
@@ -1955,6 +1966,7 @@ function getEligibilityReasonMessage(reasonCode: string) {
   const messages: Record<string, string> = {
     OK: '신청할 수 있어요.',
     HOST_TEAM_CANNOT_APPLY: '호스트 팀은 자기 팀매치에 신청할 수 없어요.',
+    SPORT_MISMATCH: '팀매치 종목과 같은 종목의 팀만 신청할 수 있어요.',
     ALREADY_REQUESTED: '이미 신청해서 승인을 기다리고 있어요.',
     ALREADY_REQUESTED_WITH_ANOTHER_TEAM: '이미 다른 팀으로 신청 중이에요. 그 신청을 먼저 취소해주세요.',
     ALREADY_APPROVED: '이미 승인된 신청이에요.',

@@ -536,6 +536,55 @@ describe('TeamMatchLineupPageClient', () => {
     expect(screen.getByText('추가할 수 있는 팀원이 없어요')).toBeInTheDocument();
   });
 
+  // 회귀 방지: "추가 가능한 팀원" 목록이 서버가 이미 내려주는 eligibleMembers[].attending을
+  // 무시하고 활성 팀원 전체를 addable로 보여주던 결함(참석 미확정 팀원을 선발/후보로 넣고
+  // 저장하면 서버가 422 LINEUP_PARTICIPANT_INELIGIBLE로 전체 저장을 막는데, 화면은 누가
+  // 문제인지 전혀 알려주지 않았다). eligibleMembers가 있을 때는 attending===true인 사람만
+  // 추가 버튼이 살아 있어야 하고, 나머지는 분리된 섹션에 배지 + 비활성 버튼으로 보여야 한다.
+  it('participants who have not confirmed attendance are separated from the addable list and cannot be added', () => {
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+      data: baseLineup({
+        eligibleMembers: [
+          { userId: 'user-1', displayName: '홍길동', jerseyNumber: null, attending: true },
+          { userId: 'user-2', displayName: '김철수', jerseyNumber: null, attending: false },
+        ],
+      }),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: hoisted.refetchLineup,
+    });
+    hoisted.useV1TeamMembersMock.mockReturnValue({
+      data: {
+        items: [
+          { membershipId: 'm-1', userId: 'user-1', displayName: '홍길동', role: 'member', status: 'active' },
+          { membershipId: 'm-2', userId: 'user-2', displayName: '김철수', role: 'member', status: 'active' },
+        ],
+      },
+      isLoading: false,
+    });
+
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+
+    // 대기 2명 중 참석 확정자(1명)만 "추가 가능한 팀원" 카운트에 잡힌다.
+    expect(screen.getByText('추가 가능한 팀원 (1)')).toBeInTheDocument();
+    expect(screen.getByText('참석 미확정 팀원 (1)')).toBeInTheDocument();
+    expect(screen.getByText('참석 미확정')).toBeInTheDocument();
+
+    // 참석 확정자는 그대로 추가할 수 있다.
+    fireEvent.click(screen.getByRole('button', { name: '선발 추가' }));
+    expect(screen.getByText('선발 (1)')).toBeInTheDocument();
+
+    // 참석 미확정자의 버튼은 비활성 상태라 눌러도 아무 일도 일어나지 않는다 — 저장을 시도한
+    // 뒤 422로 처음 알게 되는 대신, 애초에 추가할 수 없다는 것을 화면이 미리 말해준다.
+    const blockedStarterButton = screen.getByRole('button', {
+      name: '김철수 선발 추가 — 참석 확정 전이라 비활성화됨',
+    });
+    expect(blockedStarterButton).toBeDisabled();
+    fireEvent.click(blockedStarterButton);
+    expect(screen.getByText('선발 (1)')).toBeInTheDocument();
+  });
+
   it('member (non-manager): shows a permission-denied state instead of the editor', () => {
     hoisted.useV1TeamMatchLineupMock.mockReturnValue({
       data: undefined,

@@ -2,6 +2,7 @@ import { ForbiddenException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getLoggerToken } from 'nestjs-pino';
 import { GameBroadcastRegistry } from '../games/game-broadcast.registry';
+import { GameTakeoverService } from '../games/game-takeover.service';
 import { GamesService } from '../games/games.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { TournamentStaffAccessService } from '../tournaments/staff/tournament-staff-access.service';
@@ -60,9 +61,15 @@ describe('Task 20 game-operations takeover realtime protocol', () => {
   const prisma = { v1Game: { findUnique: jest.fn() }, v1User: { findFirst: jest.fn() } };
   const staffAccess = { assertAccess: jest.fn() };
   const logger = { debug: jest.fn(), warn: jest.fn(), error: jest.fn() };
+  // 백로그 결함 수정(realtime-takeover-and-eviction-protocol): 게이트웨이는
+  // renew 실패를 잡은 뒤 이 서비스에 "지금 이 게임을 쥔, 내 것과 다른 살아있는
+  // grant가 있는가"를 직접 물어 TAKEOVER_TOKEN_EXPIRED와 TAKEOVER_SUPERSEDED를
+  // 가른다. 기본값 false = "아무도 안 쥐고 있다(자연 만료)".
+  const gameTakeover = { isSuperseded: jest.fn().mockReturnValue(false) };
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    gameTakeover.isSuperseded.mockReturnValue(false);
     const moduleRef = await Test.createTestingModule({
       providers: [
         RealtimeGateway,
@@ -71,6 +78,7 @@ describe('Task 20 game-operations takeover realtime protocol', () => {
         { provide: GamesService, useValue: gamesService },
         { provide: getLoggerToken(RealtimeGateway.name), useValue: logger },
         { provide: GameBroadcastRegistry, useValue: { register: jest.fn(), emitToGame: jest.fn() } },
+        { provide: GameTakeoverService, useValue: gameTakeover },
       ],
     }).compile();
     gateway = moduleRef.get(RealtimeGateway);
@@ -193,6 +201,35 @@ describe('Task 20 game-operations takeover realtime protocol', () => {
     });
 
     expect(result).toEqual({ status: 'denied', code: 'TAKEOVER_TOKEN_EXPIRED' });
+    expect(gameTakeover.isSuperseded).toHaveBeenCalledWith(GAME_ID, 'stale-token-value');
+  });
+
+  /**
+   * 백로그 결함 수정(realtime-takeover-and-eviction-protocol): renew 실패가
+   * 항상 TAKEOVER_TOKEN_EXPIRED로만 뭉개지면, 두 콘솔(운영자 두 명, 또는 한
+   * 사람이 탭 두 개)이 같은 게임의 토큰을 서로 뺏는 핑퐁이 된다 — 잃은 쪽이
+   * "내 토큰이 그냥 만료됐구나"라고 오해해 자동으로 재요청하고, 그게 상대의
+   * 토큰을 덮어써 상대도 같은 오해로 재요청하는 게 무한 반복된다. 이 테스트는
+   * `GameTakeoverService.isSuperseded`가 true(=다른, 아직 살아있는 grant가
+   * 이 게임을 쥐고 있다)를 돌려줄 때 게이트웨이가 그 사실을 구분해서
+   * TAKEOVER_SUPERSEDED로 보내는지 검증한다 — 프론트 훅은 이 코드에서는
+   * 자동 재요청하지 않는다(use-v1-game-operations-console.ts).
+   */
+  it('maps a renewal rejection to TAKEOVER_SUPERSEDED when a different, still-live grant now holds the game', async () => {
+    const client = socket();
+    gamesService.renewTakeover.mockRejectedValue(
+      new ForbiddenException({ code: 'TAKEOVER_TOKEN_EXPIRED', message: 'expired' }),
+    );
+    gameTakeover.isSuperseded.mockReturnValue(true);
+
+    const result = await task20Gateway(gateway).renewGameTakeover(client, {
+      gameId: GAME_ID,
+      takeoverToken: 'outbid-token-value',
+      clientInstanceId: 'client-1',
+    });
+
+    expect(result).toEqual({ status: 'denied', code: 'TAKEOVER_SUPERSEDED' });
+    expect(gameTakeover.isSuperseded).toHaveBeenCalledWith(GAME_ID, 'outbid-token-value');
   });
 
   it('maps a scope-denied rejection from GamesService.renewTakeover to STAFF_SCOPE_DENIED, distinct from an expired token', async () => {

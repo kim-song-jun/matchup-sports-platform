@@ -952,42 +952,43 @@ describe('TournamentReviewsService — 팀 후기 권한 (팀장·운영진 mana
     expect(prisma.v1TournamentReview.create).not.toHaveBeenCalled();
   });
 
-  // (d) getMyReview가 팀장이 쓴 후기를 운영진에게도 보여준다
-  it('getMyReview: 팀장이 작성한 후기를 같은 팀 운영진 조회에도 반환한다', async () => {
+  // (d) 대회 후기는 팀당 1건이 아니라 사람당 1건이다.
+  //
+  // 이 두 테스트는 원래 반대 계약("팀장이 쓴 후기를 같은 팀 운영진 조회에도 반환한다")을
+  // 박제하고 있었다. submitReview 의 중복 검사와 listMyPendingReviews 는 2026-08-17 에
+  // 이미 사람(authorUserId) 기준으로 바뀌었는데 getMyReview 만 팀 기준 OR fallback 을
+  // 남겨서, 팀장이 먼저 쓰면 같은 팀의 두 번째 운영진 화면이 '이미 작성함'으로 잠기고
+  // 그 사람은 후기를 영영 못 쓰게 됐다 — 즉 이 테스트들이 결함 쪽을 지키고 있었다.
+  // 단언만 뒤집으면 이름이 옛 정책을 계속 주장하므로 의도까지 새 계약으로 다시 쓴다.
+  it('getMyReview: 같은 팀이라도 남이 쓴 후기는 내 후기로 반환하지 않는다', async () => {
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([
+      { teamId: 'team-1', team: { name: '레알마드리드' } },
+    ]);
+    prisma.v1TournamentReview.findFirst.mockResolvedValue(null);
+
+    const result = await service.getMyReview('tournament-1', 'manager-user-id');
+
+    // 팀 기준 OR fallback 이 사라졌다 — 조회 조건은 오직 '내가 쓴 것'이다.
+    expect(prisma.v1TournamentReview.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { tournamentId: 'tournament-1', authorUserId: 'manager-user-id' },
+      }),
+    );
+    // 팀장이 쓴 후기가 DB 에 있어도(findFirst 가 authorUserId 로 걸러 null 을 준다)
+    // 두 번째 운영진에게는 '아직 안 씀'으로 보여야 작성 화면이 열린다.
+    expect(result).toBeNull();
+  });
+
+  it('getMyReview: 내가 쓴 후기는 그대로 반환한다', async () => {
     prisma.v1TournamentRegistration.findMany.mockResolvedValue([
       { teamId: 'team-1', team: { name: '레알마드리드' } },
     ]);
     prisma.v1TournamentReview.findFirst.mockResolvedValue(
-      reviewRow({ id: 'review-9', authorUserId: 'owner-user-id', teamId: 'team-1', rating: 5 }),
+      reviewRow({ id: 'review-9', authorUserId: 'manager-user-id', teamId: 'team-1', rating: 5 }),
     );
 
     const result = await service.getMyReview('tournament-1', 'manager-user-id');
 
-    expect(prisma.v1TournamentReview.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          tournamentId: 'tournament-1',
-          OR: [{ authorUserId: 'manager-user-id' }, { teamId: { in: ['team-1'] } }],
-        },
-      }),
-    );
     expect(result).toMatchObject({ id: 'review-9', rating: 5 });
-  });
-
-  it('getMyReview: 참가 확정 팀이 전혀 없으면 authorUserId 기준으로만 조회한다', async () => {
-    prisma.v1TournamentRegistration.findMany.mockResolvedValue([]);
-    prisma.v1TournamentReview.findFirst.mockResolvedValue(null);
-
-    const result = await service.getMyReview('tournament-1', 'stranger-user-id');
-
-    expect(prisma.v1TournamentReview.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          tournamentId: 'tournament-1',
-          OR: [{ authorUserId: 'stranger-user-id' }],
-        },
-      }),
-    );
-    expect(result).toBeNull();
   });
 });

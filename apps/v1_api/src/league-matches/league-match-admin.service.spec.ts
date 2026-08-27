@@ -109,6 +109,12 @@ function createFake() {
     v1TeamMatchApplication: {
       create: track('v1TeamMatchApplication.create', async () => ({ id: 'application-1' })),
     },
+    // 리그 대진 생성이 "매치가 곧 팀일정" 불변식을 지키도록 양 팀 스케줄을
+    // createTeamMatchScheduleInTx 로 함께 만든다(league-match-admin.service.ts).
+    // 그 헬퍼가 tx.v1TeamSchedule 을 쓰므로 fake tx 에도 있어야 한다.
+    v1TeamSchedule: {
+      create: track('v1TeamSchedule.create', async () => ({ id: 'team-schedule-1' })),
+    },
     v1IdempotencyRecord: {
       findUnique: track('v1IdempotencyRecord.findUnique', async () => null),
       create: track('v1IdempotencyRecord.create', async () => ({})),

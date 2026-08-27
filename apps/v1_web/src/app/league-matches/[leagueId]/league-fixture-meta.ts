@@ -42,6 +42,14 @@ export function fixtureStatusMeta(status: string): { label: string; badgeClass: 
  * **몰수 결과는 점수 옆에 뱃지로 구분한다.** 몰수는 1:0 으로 기록되는데, 그대로 두면
  * 실제로 치러진 1:0 승리와 화면에서 완전히 같아 보인다 — 관전자가 "이 팀이 이겼다"와
  * "상대가 안 나왔다"를 구분할 수 없다.
+ *
+ * **킥오프 시각이 이미 지난 대진도 '결과 대기'로 본다(감사 L-I 후속).** 이 저장소의 리그
+ * 대진은 생성 시 status='matched' 로 시작해 결과가 제출돼야 비로소 'completed' 로 바뀐다
+ * (league-match-admin.service.ts, games.service.ts). 즉 킥오프는 지났는데 아직 아무도
+ * 결과를 입력하지 않은 대진은 status 가 여전히 'matched' 로 남는다 — status만 보던
+ * 이전 버전은 이 구간을 '예정'으로 오분류했다(결과 미입력 리마인더가 킥오프+24h 에
+ * 발화하도록 설계돼 있을 만큼, 이 구간은 매 대진마다 최소 하루는 정상적으로 발생한다).
+ * status 대신 "지금이 킥오프 이후인가"로 직접 판정해 status 값과 무관하게 잡는다.
  */
 export function fixtureResultLabel(fixture: V1LeagueFixture): { text: string; hasScore: boolean; isForfeit: boolean } {
   if (fixture.status === 'cancelled') {
@@ -52,17 +60,19 @@ export function fixtureResultLabel(fixture: V1LeagueFixture): { text: string; ha
     // 뱃지로 구분한다. 색만으로 알리지 않도록 "몰수" 텍스트를 함께 싣는다.
     return { text: `${fixture.homeScore} : ${fixture.awayScore}`, hasScore: true, isForfeit: fixture.isForfeit === true };
   }
-  return { text: fixture.status === 'completed' ? '결과 대기' : '예정', hasScore: false, isForfeit: false };
+  const kickoffPassed = new Date(fixture.startAt).getTime() <= Date.now();
+  return { text: fixture.status === 'completed' || kickoffPassed ? '결과 대기' : '예정', hasScore: false, isForfeit: false };
 }
 
 /**
  * 이슈 3(감사 보통) — "예정"으로 봐야 할 대진 = 각 행에 실제로 **'예정'이라고 찍히는** 대진.
  *
  * 판정을 fixtureResultLabel 과 **같은 기준으로 맞춘다.** 스코어가 없다고 다 '예정'인 게 아니다 —
- * 이미 치렀지만 공식 결과가 아직 안 붙은 대진(status === 'completed' + 스코어 null)에는
- * 그 함수가 '결과 대기'를 찍는다. 그런데도 필터가 그걸 '예정'으로 세면, "예정만 보기"를 켰을 때
- * 화면엔 '결과 대기'라고 적힌 행이 섞여 나오고 "다음 경기" 강조도 지난 경기에 붙는다
- * (실제로 이 함수가 취소 여부와 스코어 유무만 보고 있어서 그런 상태였다).
+ * 이미 치렀지만 공식 결과가 아직 안 붙은 대진에는 그 함수가 '결과 대기'를 찍는다(status가
+ * 'completed'인 경우뿐 아니라, 감사 L-I 후속으로 킥오프 시각이 이미 지났는데 결과가 아직
+ * 제출조차 안 된 status='matched' 대진도 이제 같은 기준에 포함된다). 그런데도 필터가 그걸
+ * '예정'으로 세면, "예정만 보기"를 켰을 때 화면엔 '결과 대기'라고 적힌 행이 섞여 나오고
+ * "다음 경기" 강조도 지난 경기에 붙는다.
  */
 export function isUpcomingFixture(fixture: V1LeagueFixture): boolean {
   return fixtureResultLabel(fixture).text === '예정';

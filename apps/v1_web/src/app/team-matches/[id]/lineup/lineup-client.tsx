@@ -489,6 +489,23 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
 
   const counts = deriveLineupCounts(state, rosterPool);
   const waitingMembers = rosterPool.filter((member) => !isRosterMemberPlaced(state, member));
+  /** 서버가 저장 시 강제하는 것과 동일한 조건(팀 일정에 '참석'으로 응답)을 화면에서도
+   * 미리 반영한다 — eligibleMembers는 이미 이 판정을 담아 내려온다(위 :94 선언 참조).
+   * `attending`은 이 매치에 팀 일정이 없으면 전원 true다.
+   *
+   * 필드 자체가 없는 응답(구버전 캐시 등)에서는 판정할 근거가 없으므로 걸러내지 않는다
+   * — `eligibleMembers?:`가 optional인 이유가 이것이다. 실제 서버는 항상 이 필드를
+   * 채워 보낸다(team-match-lineup.service.ts loadEligibleMembers). */
+  const hasEligibilityData = lineupQuery.data?.eligibleMembers !== undefined;
+  const attendingUserIds = new Set(
+    eligibleMembers.filter((member) => member.attending).map((member) => member.userId),
+  );
+  const addableWaitingMembers = hasEligibilityData
+    ? waitingMembers.filter((member) => attendingUserIds.has(member.userId))
+    : waitingMembers;
+  const blockedWaitingMembers = hasEligibilityData
+    ? waitingMembers.filter((member) => !attendingUserIds.has(member.userId))
+    : [];
 
   const loadableHistory: LoadableLineup[] = (historyQuery.data?.items ?? []).map((item) => ({
     key: `history:${item.lineupId}`,
@@ -1097,13 +1114,13 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
 
         {editable ? (
           <section aria-labelledby="lineup-roster-heading" style={{ marginBottom: 16 }}>
-            <SectionTitle id="lineup-roster-heading" title={`추가 가능한 팀원 (${counts.waitingCount})`} />
-            {/* 참석 여부로 미리 걸러 보여줄 방법이 없다(Task 15 blocker-5): 일정별 참석자
-                명단을 조회하는 API가 없어 여기 뜨는 목록은 "활성 팀원 전체"다. 실제 등록
-                가능 여부(참석으로 응답했는지 등)는 서버가 저장 시점에 최종 검증하고,
-                해당하지 않으면 위 자동저장 오류 메시지로 이유를 알려준다. */}
+            <SectionTitle id="lineup-roster-heading" title={`추가 가능한 팀원 (${addableWaitingMembers.length})`} />
+            {/* eligibleMembers(:94)가 서버 저장 검증과 동일한 조건(팀 일정에 '참석'으로
+                응답)을 이미 담아 내려주므로, 여기서도 그 조건으로 걸러서 보여준다 — 이
+                일정에 딸린 참석 조건은 "불참을 명시적으로 누른 사람"만이 아니라 무응답·
+                대기(WAITLISTED)까지 전부 포함한다(팀 일정이 없는 매치는 전원 통과). */}
             <p className="tm-text-caption" style={{ color: 'var(--text-muted)', margin: '4px 0 8px' }}>
-              참석 여부와 무관하게 활성 팀원 전체가 표시돼요. 불참으로 응답한 팀원을 추가하면 저장할 때 알려드려요.
+              참석으로 확정된 팀원만 추가할 수 있어요. 아직 확정되지 않은 팀원은 참석 응답 후 다시 보여드려요.
             </p>
             {rosterQuery.isLoading ? (
               <p className="tm-text-caption" style={{ color: 'var(--text-muted)', padding: '8px 0' }}>
@@ -1118,31 +1135,78 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-                {waitingMembers.map((member) => (
-                  <Card key={member.userId} pad={12}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <span className="tm-text-label" style={{ flex: 1, fontWeight: 600 }}>{member.displayName}</span>
-                      <button
-                        type="button"
-                        className="tm-btn tm-btn-sm tm-btn-primary"
-                        onClick={() =>
-                          setState((prev) =>
-                            prev ? withSeatedNewcomers(prev, addRosterMemberToStarters(prev, member)) : prev,
-                          )
-                        }
-                      >
-                        선발 추가
-                      </button>
-                      <button
-                        type="button"
-                        className="tm-btn tm-btn-sm tm-btn-outline"
-                        onClick={() => setState((prev) => (prev ? addRosterMemberToBench(prev, member) : prev))}
-                      >
-                        후보 추가
-                      </button>
-                    </div>
-                  </Card>
-                ))}
+                {addableWaitingMembers.length === 0 ? (
+                  <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+                    지금 추가할 수 있는 팀원이 없어요. 아래 팀원들의 참석 확정을 기다리고 있어요.
+                  </p>
+                ) : (
+                  addableWaitingMembers.map((member) => (
+                    <Card key={member.userId} pad={12}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <span className="tm-text-label" style={{ flex: 1, fontWeight: 600 }}>{member.displayName}</span>
+                        <button
+                          type="button"
+                          className="tm-btn tm-btn-sm tm-btn-primary"
+                          onClick={() =>
+                            setState((prev) =>
+                              prev ? withSeatedNewcomers(prev, addRosterMemberToStarters(prev, member)) : prev,
+                            )
+                          }
+                        >
+                          선발 추가
+                        </button>
+                        <button
+                          type="button"
+                          className="tm-btn tm-btn-sm tm-btn-outline"
+                          onClick={() => setState((prev) => (prev ? addRosterMemberToBench(prev, member) : prev))}
+                        >
+                          후보 추가
+                        </button>
+                      </div>
+                    </Card>
+                  ))
+                )}
+                {blockedWaitingMembers.length > 0 ? (
+                  <>
+                    <p
+                      className="tm-text-caption"
+                      style={{ color: 'var(--text-muted)', margin: '12px 0 4px' }}
+                    >
+                      참석 미확정 팀원 ({blockedWaitingMembers.length})
+                    </p>
+                    {blockedWaitingMembers.map((member) => (
+                      // opacity 로 카드를 통째로 흐리면 이름과 '참석 미확정' 배지의 대비가
+                      // 라이트 2.27:1 / 다크 3.20:1 로 떨어져 WCAG AA(4.5:1) 미달이 된다. 이 둘은
+                      // disabled 컨트롤이 아니라 a11y-decisions.md 의 disabled 예외 대상도 아니다.
+                      // '지금은 추가할 수 없다'는 신호는 이미 배지 텍스트 + disabled 버튼 두 개가
+                      // 전달하므로 opacity 는 정보를 더하지 않고 대비만 깎는다.
+                      <Card key={member.userId} pad={12}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <span className="tm-text-label" style={{ flex: 1, fontWeight: 600 }}>{member.displayName}</span>
+                          <span className="tm-badge tm-badge-grey" aria-label={`${member.displayName}, 참석 미확정이라 지금은 추가할 수 없어요`}>
+                            참석 미확정
+                          </span>
+                          <button
+                            type="button"
+                            className="tm-btn tm-btn-sm tm-btn-primary"
+                            disabled
+                            aria-label={`${member.displayName} 선발 추가 — 참석 확정 전이라 비활성화됨`}
+                          >
+                            선발 추가
+                          </button>
+                          <button
+                            type="button"
+                            className="tm-btn tm-btn-sm tm-btn-outline"
+                            disabled
+                            aria-label={`${member.displayName} 후보 추가 — 참석 확정 전이라 비활성화됨`}
+                          >
+                            후보 추가
+                          </button>
+                        </div>
+                      </Card>
+                    ))}
+                  </>
+                ) : null}
               </div>
             )}
 

@@ -13,6 +13,7 @@ describe('LeagueDisputeResolveModal', () => {
     render(
       <LeagueDisputeResolveModal
         open
+        leagueId="league-1"
         leagueTitle="가을 리그"
         homeTeamName="성수 FC"
         awayTeamName="왕십리 유나이티드"
@@ -33,6 +34,7 @@ describe('LeagueDisputeResolveModal', () => {
     render(
       <LeagueDisputeResolveModal
         open
+        leagueId="league-1"
         leagueTitle="가을 리그"
         homeTeamName="성수 FC"
         awayTeamName="왕십리 유나이티드"
@@ -57,6 +59,7 @@ describe('LeagueDisputeResolveModal', () => {
     render(
       <LeagueDisputeResolveModal
         open
+        leagueId="league-1"
         leagueTitle="가을 리그"
         homeTeamName="성수 FC"
         awayTeamName="왕십리 유나이티드"
@@ -84,6 +87,7 @@ describe('LeagueDisputeResolveModal', () => {
     render(
       <LeagueDisputeResolveModal
         open
+        leagueId="league-1"
         leagueTitle="가을 리그"
         homeTeamName="성수 FC"
         awayTeamName="왕십리 유나이티드"
@@ -102,5 +106,73 @@ describe('LeagueDisputeResolveModal', () => {
     await user.click(screen.getByRole('button', { name: '확인' }));
 
     expect(onSubmit).toHaveBeenCalledWith('correction', '재검토 완료', 3, 1);
+  });
+
+  // 감사 L-E findings[2]: 이 모달엔 득점 입력이 없어 LEAGUE_RESULT_CARRIED_PARTICIPANTS_CONFLICT
+  // 를 받으면 여기서는 정정을 끝낼 수 없다 — 대진 화면 딥링크를 보여줘야 막다른 길이 안 된다.
+  it('carriedParticipantsConflict가 true면 대진 화면 딥링크가 있는 안내 배너를 보여준다', () => {
+    render(
+      <LeagueDisputeResolveModal
+        open
+        leagueId="league-42"
+        leagueTitle="가을 리그"
+        homeTeamName="성수 FC"
+        awayTeamName="왕십리 유나이티드"
+        reason="심판 오심"
+        currentHomeScore={3}
+        currentAwayScore={1}
+        onSubmit={vi.fn()}
+        onClose={vi.fn()}
+        carriedParticipantsConflict
+      />,
+    );
+
+    expect(screen.getByRole('alert')).toHaveTextContent('대진 화면의');
+    expect(screen.getByRole('alert')).toHaveTextContent('결과 정정');
+    expect(screen.getByRole('alert')).toHaveTextContent('득점 기록을 먼저 맞춘 뒤');
+    const link = screen.getByRole('link', { name: '대진 화면으로 이동' });
+    expect(link).toHaveAttribute('href', '/admin/league-matches/league-42');
+  });
+
+  it('carriedParticipantsConflict가 false면 안내 배너가 없다', () => {
+    render(
+      <LeagueDisputeResolveModal
+        open
+        leagueId="league-42"
+        leagueTitle="가을 리그"
+        homeTeamName="성수 FC"
+        awayTeamName="왕십리 유나이티드"
+        reason="심판 오심"
+        currentHomeScore={3}
+        currentAwayScore={1}
+        onSubmit={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole('link', { name: '대진 화면으로 이동' })).not.toBeInTheDocument();
+  });
+
+  it('무효로 전환하면 정정용 안내 배너도 함께 사라진다', async () => {
+    const user = userEvent.setup();
+    render(
+      <LeagueDisputeResolveModal
+        open
+        leagueId="league-42"
+        leagueTitle="가을 리그"
+        homeTeamName="성수 FC"
+        awayTeamName="왕십리 유나이티드"
+        reason="심판 오심"
+        currentHomeScore={3}
+        currentAwayScore={1}
+        onSubmit={vi.fn()}
+        onClose={vi.fn()}
+        carriedParticipantsConflict
+      />,
+    );
+
+    await user.click(screen.getByRole('radio', { name: '무효' }));
+
+    expect(screen.queryByRole('link', { name: '대진 화면으로 이동' })).not.toBeInTheDocument();
   });
 });

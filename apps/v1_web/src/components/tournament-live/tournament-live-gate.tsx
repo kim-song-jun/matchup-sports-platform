@@ -30,18 +30,35 @@ import { fixtureIdFromConsolePath, isAdminLiveConsolePath } from '@/lib/tourname
  * 응답이 성공했는데 내 userId로 활성 배정 행을 찾을 수 없으면 어드민 우회 경로로
  * 통과한 platform_ops로 간주한다(그 경로는 배정 테이블에 행을 남기지 않는다).
  */
+// 한 사용자가 같은 대회에 활성 배정을 여러 개 가질 수 있다(예: 예전 SUPPORT_READONLY/
+// FIELD_OPERATOR 배정을 해제하지 않은 채 TOURNAMENT_DIRECTOR로 추가 배정된 경우) — grant는
+// 항상 새 행을 추가하고 (tournamentId,userId) unique도 없어 옛 행이 그대로 남는다. 목록 순서는
+// 서버가 createdAt asc로 고정하므로 `find`로 "가장 먼저 만들어진" 행을 집으면 나중에 승격된
+// 사람이 옛 낮은 권한으로 화면이 강등된다. 서버 `TournamentOperationsStaffService.myAssignments()`가
+// 같은 문제를 STAFF_ROLE_PRIORITY로 이미 풀고 있으므로 동일 우선순위로 "활성 행 중 최고 권한"을
+// 고른다.
+const STAFF_ROLE_PRIORITY: Record<V1TournamentStaffRole, number> = {
+  TOURNAMENT_DIRECTOR: 0,
+  FIELD_OPERATOR: 1,
+  SUPPORT_READONLY: 2,
+  PLATFORM_OPS: 3,
+};
+
 function deriveRole(
   items: readonly { userId: string; role: V1TournamentStaffRole; revokedAt: string | null; expiresAt: string | null }[],
   myUserId: string,
 ): V1TournamentStaffRole {
   const now = Date.now();
-  const myActiveRow = items.find(
+  const myActiveRows = items.filter(
     (item) =>
       item.userId === myUserId &&
       item.revokedAt === null &&
       (item.expiresAt === null || new Date(item.expiresAt).getTime() > now),
   );
-  return myActiveRow?.role ?? 'PLATFORM_OPS';
+  if (myActiveRows.length === 0) return 'PLATFORM_OPS';
+  return myActiveRows.reduce((best, item) =>
+    STAFF_ROLE_PRIORITY[item.role] < STAFF_ROLE_PRIORITY[best.role] ? item : best,
+  ).role;
 }
 
 // ── 필드 담당자 딥링크 ────────────────────────────────────────────────────

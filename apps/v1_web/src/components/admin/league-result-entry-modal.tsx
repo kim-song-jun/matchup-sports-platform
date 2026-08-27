@@ -25,6 +25,13 @@ interface LeagueResultEntryModalProps {
   currentHomeScore?: number | null;
   currentAwayScore?: number | null;
   /**
+   * 감사 L-E finding 4 수정 — 정정 모드일 때만 의미가 있다. 현재 공식 결과가 몰수로
+   * 표시돼 있는지("전"). 정정 모달의 몰수 체크박스 초기값으로 쓴다 — 없으면 운영자가
+   * 매 정정마다 몰수 여부를 다시 판단해야 하고, 무심코 체크를 건드리지 않고 제출해도
+   * 기존 몰수 표식이 무조건 사라지거나 없던 표식이 생기는 사고로 이어진다.
+   */
+  currentIsForfeit?: boolean;
+  /**
    * 득점자 선택 목록(선택). 부모가 useV1LeagueFixtureParticipants 로 가져와 넘긴다 —
    * 없으면(로딩·실패 포함) 득점 기록 섹션 자체를 숨기고 기존 스코어-사유 흐름만 남긴다.
    */
@@ -34,6 +41,12 @@ interface LeagueResultEntryModalProps {
     awayScore: number,
     reason: string,
     participantStats: V1LeagueResultParticipantStat[],
+    /**
+     * 정정 모드에서만 몰수 체크박스의 현재 값을 싣는다(신규 입력 모드는 항상
+     * undefined — 그 모드에는 몰수 개념이 없다, 전용 몰수 처리 엔드포인트가 담당한다).
+     * 부모(`league-match-fixtures-client.tsx`)가 정정 모드일 때만 body 에 반영한다.
+     */
+    isForfeit: boolean | undefined,
   ) => void;
   onClose: () => void;
   /** True while the parent mutation is in flight */
@@ -65,6 +78,7 @@ export function LeagueResultEntryModal({
   weekLabel,
   currentHomeScore,
   currentAwayScore,
+  currentIsForfeit,
   participants,
   onSubmit,
   onClose,
@@ -74,6 +88,7 @@ export function LeagueResultEntryModal({
   const [awayScore, setAwayScore] = useState('');
   const [reason, setReason] = useState('');
   const [scorerRows, setScorerRows] = useState<ScorerRowState[]>([]);
+  const [isForfeit, setIsForfeit] = useState(false);
 
   // dialog/focus-trap/ESC/backdrop/스크롤 잠금 — useModalA11y 공용 훅 (한때 이 파일이
   // admin-reason-modal 을 본뜬 원본이었고 이의 모달 2종이 다시 이걸 본떠 네 벌이 됐었다)
@@ -131,9 +146,14 @@ export function LeagueResultEntryModal({
   // 득점자만 고치려는 정정에서도 같은 숫자를 매번 다시 타이핑해야 했고, 그 사이 오타가
   // 그대로 공식 스코어가 된다. 아래 득점·도움 행 프리필과 같은 이유다.
   //
-  // deps 를 [open, mode] 로 좁게 유지하는 것이 의도다 — currentHomeScore/currentAwayScore 를
-  // deps 에 넣으면 목록 refetch 로 props 가 다시 들어올 때마다 이 effect 가 재실행돼
-  // 운영자가 편집 중이던 값을 덮어쓴다. 두 값은 open 이 켜지는 렌더에 이미 확정돼 있다.
+  // deps 를 [open, mode] 로 좁게 유지하는 것이 의도다 — currentHomeScore/currentAwayScore/
+  // currentIsForfeit 를 deps 에 넣으면 목록 refetch 로 props 가 다시 들어올 때마다 이
+  // effect 가 재실행돼 운영자가 편집 중이던 값을 덮어쓴다. 세 값은 open 이 켜지는 렌더에
+  // 이미 확정돼 있다.
+  //
+  // 감사 L-E finding 4 수정: 몰수 체크박스는 base(직전 공식 결과)의 몰수 여부로
+  // 초기화한다(RecordLeagueResultDto.isForfeit 의 "미지정 = 승계" 계약과 대칭 —
+  // 화면 기본값도 승계, 운영자가 건드리면 명시적 override).
   useEffect(() => {
     if (open) {
       const prefillScore = mode === 'correction' && currentHomeScore != null && currentAwayScore != null;
@@ -141,6 +161,7 @@ export function LeagueResultEntryModal({
       setAwayScore(prefillScore ? String(currentAwayScore) : '');
       setReason('');
       setScorerRows([]);
+      setIsForfeit(mode === 'correction' && currentIsForfeit === true);
       prefillDoneRef.current = false;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 위 주석: 열림당 1회가 계약이다
@@ -250,7 +271,7 @@ export function LeagueResultEntryModal({
         ...(assists === 0 ? {} : { assists }),
       });
     }
-    onSubmit(parsedHome, parsedAway, trimmedReason, participantStats);
+    onSubmit(parsedHome, parsedAway, trimmedReason, participantStats, mode === 'correction' ? isForfeit : undefined);
   };
 
   const addScorerRow = (side: 'home' | 'away', participantId: string) => {
@@ -639,6 +660,43 @@ export function LeagueResultEntryModal({
               <p className="text-[12px] text-[var(--red700)]" role="alert">
                 공백만 입력하면 제출할 수 없어요.
               </p>
+            )}
+
+            {/* 감사 L-E finding 4 수정 — 몰수 표식 의도. 정정 전용(신규 입력은 몰수
+                개념이 없다 — 전용 몰수 처리 버튼이 담당). 스크롤 본문 맨 아래에 둔다:
+                고정 영역(위 스코어 블록)의 alpha 실측 px 예산을 건드리지 않기 위해서다
+                — 여기 추가되는 높이는 본문이 이미 스크롤 컨테이너라 넘칠 때 스크롤로만
+                흡수된다. 기본값은 base 승계(위 reset effect)라 손대지 않고 제출하면
+                "정정 전과 같은 몰수 여부"가 그대로 유지된다. */}
+            {mode === 'correction' && (
+              <div className="flex min-h-[44px] items-start gap-3 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-4 py-2">
+                <input
+                  id="league-result-correction-is-forfeit"
+                  type="checkbox"
+                  checked={isForfeit}
+                  onChange={(e) => setIsForfeit(e.target.checked)}
+                  disabled={pending}
+                  aria-describedby="league-result-correction-is-forfeit-hint"
+                  className="mt-[2px] h-5 w-5 shrink-0 rounded border-[var(--border-strong)] text-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                />
+                {/* label 은 제목 문장만 담는다 — 설명까지 label **안**에 두면 브라우저
+                    접근성 이름은 aria-describedby 로 올바로 분리해도, testing-library
+                    getByLabelText 는 label 의 전체 textContent 를 이어 붙여 매칭한다
+                    (실측: 라벨 안에 두자 정확 문자열 매칭이 깨졌다). 설명은 label
+                    바깥 형제로 두고 aria-describedby 로만 연결한다(사유 textarea와
+                    같은 label/설명 분리 관례). */}
+                <div className="flex flex-col gap-0.5">
+                  <label
+                    htmlFor="league-result-correction-is-forfeit"
+                    className="cursor-pointer text-sm font-semibold text-[var(--text-strong)]"
+                  >
+                    이 결과는 몰수예요
+                  </label>
+                  <p id="league-result-correction-is-forfeit-hint" className="text-[12px] text-[var(--text-muted)]">
+                    체크하면 순위표·경기 상세에 몰수 표시가 붙어요. 몰수가 아니면 해제해 주세요.
+                  </p>
+                </div>
+              </div>
             )}
           </div>
 

@@ -61,6 +61,58 @@ export class TournamentAnnouncementsService {
   }
 
   /**
+   * 신청자 본인이 볼 수 있는 공지 목록.
+   *
+   * 공개 상세 프로젝션(`tournaments-read.query.ts`)은 `audience:'public'` 공지만 반환한다 —
+   * 그건 의도된 계약이다(비로그인 방문자까지 노출하면 안 되는 confirmed_only/waitlist
+   * 공지가 있기 때문). 문제는 그 계약의 반대편이 없었다는 것: audience가 public이 아닌
+   * 공지가 발행되면 `notifyAnnouncementPublished()`가 신청 팀에게 알림을 보내지만
+   * (registrationStatusesForAudience로 수신자를 정하는 바로 그 로직), 알림을 받은
+   * 사람이 본문을 읽을 수 있는 화면·엔드포인트가 하나도 없었다 — 발송 자격과 열람
+   * 자격이 서로 다른 소스로 어긋나 있었던 게 근본 원인이다.
+   *
+   * 이 메서드는 "알림을 받을 자격이 있는 사람은 반드시 그 공지를 읽을 수 있어야 한다"는
+   * 계약을 세우기 위해, 알림 수신자 판정과 **동일한** `registrationStatusesForAudience()`를
+   * 열람 판정에도 재사용한다 — 두 판정이 갈라지면 "알림은 왔는데 못 읽는다"가 다시
+   * 재현되므로 반드시 같은 소스를 쓴다.
+   */
+  async listForParticipant(user: V1AuthUser, tournamentId: string) {
+    // 삭제된 대회의 공지는 id 를 알아도 읽히면 안 된다 — 같은 파일 create() 의
+    // 존재 확인은 이미 `deletedAt: null` 을 쓰는데 조회 쪽 두 곳만 빠져 있었다.
+    const tournament = await this.prisma.v1Tournament.findFirst({
+      where: { id: tournamentId, deletedAt: null },
+    });
+    if (!tournament) {
+      throw new NotFoundException({
+        code: 'TOURNAMENT_NOT_FOUND',
+        message: '대회를 찾을 수 없어요.',
+      });
+    }
+
+    const myActiveRegistrations = await this.prisma.v1TournamentRegistration.findMany({
+      where: {
+        tournamentId,
+        appliedByUserId: user.id,
+        status: { in: ACTIVE_TOURNAMENT_REGISTRATION_STATUSES },
+      },
+      select: { status: true },
+    });
+    const myStatuses = new Set(myActiveRegistrations.map((r) => r.status));
+
+    const rows = await this.prisma.v1TournamentAnnouncement.findMany({
+      where: { tournamentId, publishedAt: { not: null } },
+      orderBy: { publishedAt: 'desc' },
+    });
+
+    const visible = rows.filter((row) => {
+      if (row.audience === 'public') return true;
+      return registrationStatusesForAudience(row.audience).some((status) => myStatuses.has(status));
+    });
+
+    return { items: visible.map((r) => this.serialize(r)) };
+  }
+
+  /**
    * 어드민 공지 목록 조회.
    * 대회 소속 전체 공지(초안+공개)를 createdAt 내림차순으로 반환.
    * active admin이면 support 포함 조회 가능 (읽기 전용이므로 getMutationAdmin 불필요).
@@ -68,8 +120,10 @@ export class TournamentAnnouncementsService {
   async listByTournament(user: V1AuthUser, tournamentId: string) {
     await this.adminContext.getActiveAdmin(user.id);
 
+    // 삭제된 대회의 공지는 id 를 알아도 읽히면 안 된다 — 같은 파일 create() 의
+    // 존재 확인은 이미 `deletedAt: null` 을 쓰는데 조회 쪽 두 곳만 빠져 있었다.
     const tournament = await this.prisma.v1Tournament.findFirst({
-      where: { id: tournamentId },
+      where: { id: tournamentId, deletedAt: null },
     });
     if (!tournament) {
       throw new NotFoundException({

@@ -412,4 +412,59 @@ describe('Task 12 attendance lane — ScheduleAttendanceService', () => {
       expect(cRepeat).toMatchObject({ status: 'WAITLISTED', waitlistPosition: 1, version: 2 });
     },
   );
+
+  // M-F-team-schedule-attendance-orphan-cleanup regression: V1ScheduleAttendance has no FK to
+  // V1TeamMembership, so a member's GOING row survives every departure path (leaveTeam,
+  // removeMembership, self-withdrawal, admin deactivation — all of which only flip the
+  // membership row's status). Before this fix, setMyAttendance's capacity check counted that
+  // orphaned GOING row forever, permanently stranding one real slot behind a person who is no
+  // longer on the team. This test flips a membership to 'left' directly (the common effect of
+  // all four departure paths) rather than depending on teams.service.ts's specific transaction
+  // shape, so it proves the read-side (attendance.service.ts) fix independent of which departure
+  // path produced the orphan.
+  it(
+    'excludes a departed member\'s GOING row from both the capacity check and the returned ' +
+      'counts, so a real member is never waitlisted behind a vacated slot',
+    async () => {
+      const schedule = await createSchedule({ id: '6c000000-0000-4000-8000-000000000110', capacity: 2 });
+
+      await service.setMyAttendance(authUser(ids.userA), ids.team, schedule.id, { status: 'GOING', expectedVersion: 0 }, 'orphan-a-key');
+      await service.setMyAttendance(authUser(ids.userB), ids.team, schedule.id, { status: 'GOING', expectedVersion: 0 }, 'orphan-b-key');
+
+      // userB leaves the team. Their v1_schedule_attendance row is left untouched (no cleanup
+      // hook exists for it — that is exactly the defect), only the membership row changes.
+      await prisma.v1TeamMembership.updateMany({
+        where: { teamId: ids.team, userId: ids.userB },
+        data: { status: 'left', leftAt: new Date() },
+      });
+
+      try {
+        // Raw table state: 2 GOING rows (userA, ghost userB) against capacity 2 — a definition
+        // that ignores membership would waitlist userC here. The fix must not.
+        const rawGoingCount = await prisma.v1ScheduleAttendance.count({
+          where: { scheduleId: schedule.id, status: 'GOING' },
+        });
+        expect(rawGoingCount).toBe(2);
+
+        const userC = await service.setMyAttendance(
+          authUser(ids.userC),
+          ids.team,
+          schedule.id,
+          { status: 'GOING', expectedVersion: 0 },
+          'orphan-c-key',
+        );
+        expect(userC).toMatchObject({ status: 'GOING', waitlistPosition: null });
+        // The response's own counts must also exclude the ghost row, matching the definition
+        // capacity uses — a caller reading `counts.going` must never see a number the capacity
+        // check itself disagrees with.
+        expect(userC.counts).toEqual({ going: 2, maybe: 0, notGoing: 0, waitlisted: 0 });
+      } finally {
+        // Restore fixture state for any later test relying on userB's membership.
+        await prisma.v1TeamMembership.updateMany({
+          where: { teamId: ids.team, userId: ids.userB },
+          data: { status: 'active', leftAt: null },
+        });
+      }
+    },
+  );
 });

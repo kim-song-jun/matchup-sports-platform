@@ -183,8 +183,15 @@ export function MatchDetailPageClient({ matchId }: { matchId: string }) {
         match: {
           ...fallback.match,
           ...toMatchCard(query.data, fallback.match),
-          description: query.data.description ?? query.data.descriptionPreview ?? fallback.match.description,
-          address: query.data.place?.addressText ?? query.data.placeName ?? fallback.match.address,
+          // fallback.match.description/address는 로딩 스켈레톤(fallback 전체를 그대로 보여주는
+          // 케이스)에서만 써야 하는 하드코딩 목업이다 — 실제 매치가 로드된 뒤 API가 값을 안 주면
+          // ''로 둔다(team-matches-client.tsx의 동일 패턴과 통일). 렌더 쪽(matches-page.tsx)이
+          // falsy면 이미 섹션·sub를 숨긴다(설명은 InfoRow 미사용, 주소는 InfoRow의 sub
+          // optional 처리, 규칙은 `.length` 가드) — 상세 주소를 비워 만든 매치에 목업 주소
+          // '서울 양천구 안양천로 939'가 실제 주소처럼 뜨던 결함(2026-08-27 감사
+          // M-A-personal-match-state)을 막는다.
+          description: query.data.description ?? query.data.descriptionPreview ?? '',
+          address: query.data.place?.addressText ?? query.data.placeName ?? '',
           rules: query.data.rulesText ? [query.data.rulesText] : fallback.match.rules,
           editHref: viewerState === 'host' ? `/matches/${matchId}/edit` : undefined,
           applicationsHref: viewerState === 'host' ? `/matches/${matchId}/applications` : undefined,

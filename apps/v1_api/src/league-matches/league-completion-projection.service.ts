@@ -63,11 +63,15 @@ export class LeagueCompletionProjectionService {
         status: true,
         game: {
           select: {
-            currentOfficialRevisionId: true,
-            // 무효(VOID) 리비전이 하나라도 있고 지금 공식 결과가 없으면 "무효로 끝난 대진"이다.
-            // 무효 뒤 운영자가 다시 입력했다면 currentOfficialRevisionId 가 채워져 있으므로
-            // 아래 isVoided 가 false 가 되고 정상 대진으로 되돌아온다.
-            resultRevisions: { where: { state: 'VOID' }, select: { id: true }, take: 1 },
+            // 감사 L-E finding 5 수정: 예전 계산은 "currentOfficialRevisionId == null"을
+            // "무효"의 신호로 삼았는데, voidTeamMatchResult(games.service.ts)는 포인터를
+            // null로 풀지 않고 VOID 리비전 자신으로 옮긴다 -- 그래서 hasOfficialResult와
+            // isVoided가 서로 배타적인 이 계산식에서 isVoided는 프로덕션에서 절대 true가
+            // 될 수 없었다(항상 hasOfficialResult=true로 잘못 잡혀 "이 대진은 결과가
+            // 확정됐다"로 세어짐). 포인터가 실제로 가리키는 리비전의 state를 직접 읽으면
+            // 두 값이 항상 정확히 하나만 참이 된다 -- 재입력으로 새 OFFICIAL 리비전이
+            // 생기면 포인터가 그쪽으로 옮겨가므로 isVoided는 자연히 다시 false가 된다.
+            currentOfficialRevision: { select: { state: true } },
           },
         },
       },
@@ -76,10 +80,8 @@ export class LeagueCompletionProjectionService {
       state: league.state,
       fixtures: fixtures.map((fixture) => ({
         status: fixture.status,
-        hasOfficialResult: fixture.game?.currentOfficialRevisionId != null,
-        isVoided:
-          fixture.game?.currentOfficialRevisionId == null &&
-          (fixture.game?.resultRevisions.length ?? 0) > 0,
+        hasOfficialResult: fixture.game?.currentOfficialRevision?.state === 'OFFICIAL',
+        isVoided: fixture.game?.currentOfficialRevision?.state === 'VOID',
       })),
     });
     if (!ready) return false;

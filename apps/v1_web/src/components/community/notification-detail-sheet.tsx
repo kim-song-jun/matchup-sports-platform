@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useId, useRef } from 'react';
+import { useDelayedUnmount } from '@/components/v1-ui/use-delayed-unmount';
 import type { NotificationModel } from './community.types';
 import { NotificationTypeIcon, notificationTypeLabel } from './notification-visual';
 
@@ -27,6 +28,9 @@ export function NotificationDetailSheet({ notification, onClose, onNavigate }: N
   const closeBtnRef = useRef<HTMLButtonElement>(null);
   const previousFocusRef = useRef<Element | null>(null);
   const open = notification !== null;
+  // CSS 의 .is-closing 애니메이션(0.22s)과 같은 값이어야 한다.
+  const { mounted, closing } = useDelayedUnmount(open, 220);
+  const lastNotificationRef = useRef<NotificationModel | null>(null);
 
   // 열릴 때 이전 포커스 저장, 닫힐 때 복원 (WCAG 2.4.3)
   useEffect(() => {
@@ -99,11 +103,16 @@ export function NotificationDetailSheet({ notification, onClose, onNavigate }: N
     };
   }, [open]);
 
-  if (!notification) return null;
+  // 닫히는 동안 보여줄 내용을 붙들어 둔다 — notification 이 곧 열림 상태라
+  // 그대로 두면 퇴장 애니메이션이 도는 사이 빈 시트가 보인다.
+  if (notification) lastNotificationRef.current = notification;
+  const shown = notification ?? lastNotificationRef.current;
+
+  if (!mounted || !shown) return null;
 
   return (
     <div
-      className="tm-notification-sheet-backdrop"
+      className={`tm-notification-sheet-backdrop${closing ? ' is-closing' : ''}`}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -114,27 +123,27 @@ export function NotificationDetailSheet({ notification, onClose, onNavigate }: N
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={bodyId}
-        className="tm-notification-sheet"
+        className={`tm-notification-sheet${closing ? ' is-closing' : ''}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="tm-notification-sheet-grabber" aria-hidden="true" />
 
         <div className="tm-notification-sheet-head">
           <div className="tm-notification-icon" aria-hidden="true">
-            <NotificationTypeIcon type={notification.type} size={18} />
+            <NotificationTypeIcon type={shown.type} size={18} />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <h2 id={titleId} className="tm-text-body-lg" style={{ margin: 0 }}>
-              {notification.title}
+              {shown.title}
             </h2>
             <div className="tm-notification-meta">
-              {notificationTypeLabel(notification.type)} · {notification.time}
+              {notificationTypeLabel(shown.type)} · {shown.time}
             </div>
           </div>
         </div>
 
         <p id={bodyId} className="tm-notification-sheet-body">
-          {notification.body || '추가 안내 내용이 없어요.'}
+          {shown.body || '추가 안내 내용이 없어요.'}
         </p>
 
         <div className="tm-notification-sheet-actions">
@@ -151,9 +160,9 @@ export function NotificationDetailSheet({ notification, onClose, onNavigate }: N
             type="button"
             className="tm-btn tm-btn-md tm-btn-primary"
             style={{ flex: 1, minHeight: 44 }}
-            onClick={() => onNavigate(notification)}
+            onClick={() => onNavigate(shown)}
           >
-            {notification.actionLabel}
+            {shown.actionLabel}
           </button>
         </div>
       </div>

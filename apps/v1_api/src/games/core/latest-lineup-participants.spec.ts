@@ -1,5 +1,5 @@
 import { V1GameLineupState } from '@prisma/client';
-import { selectLatestLineupParticipants } from './latest-lineup-participants';
+import { selectLatestLineupParticipants, selectLineupParticipantsWithDraftFallback } from './latest-lineup-participants';
 
 describe('selectLatestLineupParticipants', () => {
   it('keeps only the latest lineup revision independently for each side', () => {
@@ -71,4 +71,68 @@ describe('selectLatestLineupParticipants', () => {
     expect(selectLatestLineupParticipants(participants, lineups)).toEqual([]);
   });
 
+});
+
+describe('selectLineupParticipantsWithDraftFallback — 리그 결과 입력용 사이드별 폴백', () => {
+  // 리그는 라이브 콘솔 시작 게이트를 거치지 않아 "끝났으면 제출본이 있다"가 거짓이다.
+  // 팀장이 자동저장만 하고 '제출'을 안 누른 채 경기가 끝나는 것이 흔한 경로이고,
+  // 그때 엄격 셀렉터를 쓰면 운영자 득점자 목록이 0명이 되고 출전 기록도 안 쌓였다.
+  it('제출본이 하나도 없는 사이드는 최신 DRAFT 를 인정한다', () => {
+    const participants = [
+      { id: 'p-old', sideId: 'home', lineupId: 'home-1' },
+      { id: 'p-latest', sideId: 'home', lineupId: 'home-2' },
+    ];
+    const lineups = [
+      { id: 'home-1', sideId: 'home', revision: 1, state: V1GameLineupState.DRAFT },
+      { id: 'home-2', sideId: 'home', revision: 2, state: V1GameLineupState.DRAFT },
+    ];
+
+    expect(
+      selectLineupParticipantsWithDraftFallback(participants, lineups).map((p) => p.id),
+    ).toEqual(['p-latest']);
+  });
+
+  it('제출본이 있는 사이드에서는 그 위에 얹힌 DRAFT 가 직전 제출을 밀어내지 못한다', () => {
+    // 정정 요청으로 재오픈된 초안이 확정 제출을 덮어쓰면 안 된다 — 폴백을 넣어도
+    // 이 보호는 그대로여야 한다.
+    const participants = [
+      { id: 'p-submitted', sideId: 'home', lineupId: 'home-1' },
+      { id: 'p-reopened-draft', sideId: 'home', lineupId: 'home-2' },
+    ];
+    const lineups = [
+      { id: 'home-1', sideId: 'home', revision: 1, state: V1GameLineupState.SUBMITTED },
+      { id: 'home-2', sideId: 'home', revision: 2, state: V1GameLineupState.DRAFT },
+    ];
+
+    expect(
+      selectLineupParticipantsWithDraftFallback(participants, lineups).map((p) => p.id),
+    ).toEqual(['p-submitted']);
+  });
+
+  it('사이드마다 따로 판단한다 — 한쪽은 제출본, 다른 쪽은 DRAFT 폴백', () => {
+    const participants = [
+      { id: 'home-submitted', sideId: 'home', lineupId: 'home-1' },
+      { id: 'home-draft', sideId: 'home', lineupId: 'home-2' },
+      { id: 'away-draft', sideId: 'away', lineupId: 'away-1' },
+    ];
+    const lineups = [
+      { id: 'home-1', sideId: 'home', revision: 1, state: V1GameLineupState.SUBMITTED },
+      { id: 'home-2', sideId: 'home', revision: 2, state: V1GameLineupState.DRAFT },
+      { id: 'away-1', sideId: 'away', revision: 1, state: V1GameLineupState.DRAFT },
+    ];
+
+    expect(
+      selectLineupParticipantsWithDraftFallback(participants, lineups).map((p) => p.id).sort(),
+    ).toEqual(['away-draft', 'home-submitted']);
+  });
+
+  it('엄격 셀렉터는 같은 입력에서 DRAFT-only 사이드를 여전히 비운다 (두 셀렉터의 차이를 고정)', () => {
+    const participants = [{ id: 'p-draft', sideId: 'home', lineupId: 'home-1' }];
+    const lineups = [{ id: 'home-1', sideId: 'home', revision: 1, state: V1GameLineupState.DRAFT }];
+
+    expect(selectLatestLineupParticipants(participants, lineups)).toEqual([]);
+    expect(selectLineupParticipantsWithDraftFallback(participants, lineups).map((p) => p.id)).toEqual([
+      'p-draft',
+    ]);
+  });
 });

@@ -43,8 +43,26 @@ type TournamentKstParts = {
  * 실사례: KST 22:00 킥오프가 UTC 기기에서 13:00으로 표시됨.
  * dateStr 이 invalid 이면 null.
  */
+/**
+ * 타임존 표기가 없는 값은 KST 벽시계로 읽는다.
+ *
+ * 어드민 폼의 `datetime-local` 입력은 '2026-08-29T09:00' 처럼 오프셋이 없는 문자열을
+ * 준다. `new Date()` 는 이런 값을 **브라우저 로컬**로 해석하므로, 같은 입력이 KST
+ * 브라우저에서는 09:00 KST 로, UTC 브라우저에서는 09:00 UTC(= KST 18:00)로 갈린다.
+ * 쓰기 쪽은 이미 KST 로 고정돼 있는데(`datetimeLocalValueToIso` 가 `+09:00` 을 붙인다)
+ * 표시 쪽만 로컬로 읽으면 저장 전 미리보기와 저장 후 화면이 어긋난다 — 실제로
+ * "하루짜리 대회"가 UTC 러너에서 이틀 범위로 표시됐다.
+ */
+function withKstOffsetIfNaive(dateStr: string): string {
+  if (!dateStr.includes('T')) return dateStr;
+  if (/(?:Z|[+-]\d{2}:?\d{2})$/.test(dateStr)) return dateStr;
+  // 'YYYY-MM-DDTHH:mm' 처럼 초가 없으면 채워 준다.
+  const withSeconds = /T\d{2}:\d{2}$/.test(dateStr) ? `${dateStr}:00` : dateStr;
+  return `${withSeconds}+09:00`;
+}
+
 function getTournamentKstParts(dateStr: string): TournamentKstParts | null {
-  const d = new Date(dateStr);
+  const d = new Date(withKstOffsetIfNaive(dateStr));
   if (Number.isNaN(d.getTime())) return null;
   const parts = new Intl.DateTimeFormat('ko-KR', {
     year: 'numeric',

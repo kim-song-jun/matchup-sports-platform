@@ -29,7 +29,10 @@ function makeGroupFixture(scheduledAt: string | null): V1TournamentFixture {
 
 describe('FixtureCard 조별 일정 시간', () => {
   it('경기 날짜와 시간을 함께 표시한다', () => {
-    const scheduledAt = new Date(2026, 7, 7, 20, 30).toISOString();
+    // `new Date(2026, 7, 7, 20, 30)` 는 **실행 머신 로컬**의 20:30 을 뜻해서, 화면이
+    // KST 로 고정 렌더하는 이상 러너 타임존에 따라 기대값이 흔들린다(KST 머신은 통과,
+    // UTC 러너는 8/8 05:30 이 되어 실패). 경기 시각은 KST 계약이므로 오프셋을 박는다.
+    const scheduledAt = new Date('2026-08-07T20:30:00+09:00').toISOString();
 
     render(<FixtureCard fixture={makeGroupFixture(scheduledAt)} />);
 

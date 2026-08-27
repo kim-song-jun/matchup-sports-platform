@@ -97,7 +97,7 @@ describe('RealtimeGateway', () => {
   let gateway: RealtimeGateway;
   const prisma = {
     v1User: { findFirst: jest.fn() },
-    v1Game: { findUnique: jest.fn() },
+    v1Game: { findUnique: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
   };
   const gamesService = { listEvents: jest.fn() };
   const server = {
@@ -260,6 +260,12 @@ describe('RealtimeGateway', () => {
 
     function resolveScopedGame() {
       prisma.v1Game.findUnique.mockResolvedValue(gameScopeRecord(GAME_SCOPE));
+      // 하트비트 재검증은 구독 게임들의 픽스처 스코프를 한 번의 findMany 로 읽는다
+      // (게임당 findUnique 를 돌리면 구독 수만큼 왕복이 늘어나서 바꿨다).
+      prisma.v1Game.findMany.mockResolvedValue([
+        gameScopeRecord(GAME_SCOPE),
+        gameScopeRecord(OTHER_GAME_SCOPE),
+      ]);
       staffAccess.assertAccess.mockResolvedValue(staffPrincipal(GAME_SCOPE));
     }
 

@@ -268,6 +268,15 @@ export class PublicTeamRecordsService {
       SELECT DISTINCT to_char(trf.played_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul', 'YYYY') AS season
       FROM v1_team_record_facts trf
       INNER JOIN v1_games g ON g.id = trf.game_id AND g.current_official_revision_id = trf.revision_id
+      -- 목록 본문은 hidden 경기를 통째로 빼는데(위 visibleRows) 시즌 후보만 빼지 않으면,
+      -- 그 해 경기가 전부 hidden 인 시즌이 드롭다운에 남아 "고르면 빈 목록"이 된다 —
+      -- 숨긴 경기의 존재 자체를 드러내는 간접 노출이다. 정책 row 가 없는 경기는
+      -- effectivePublicVisibilityMode 와 같은 기준으로 fail-closed(=hidden) 취급해야
+      -- 하므로 INNER JOIN 이고, 미래에 enum 값이 추가돼도 새 값이 조용히 노출되지
+      -- 않도록 부정(<> 'HIDDEN')이 아니라 허용 목록으로 적는다.
+      INNER JOIN v1_game_visibility_policies vp
+        ON vp.game_id = g.id
+       AND vp.mode IN ('LIVE', 'STATUS_ONLY', 'OFFICIAL_ONLY')
       WHERE trf.team_id = ${teamId}
       ORDER BY season DESC
     `);

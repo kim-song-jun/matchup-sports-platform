@@ -30,7 +30,23 @@ type V1Socket = Socket & {
     authUser?: V1AuthUser;
     clientInstanceId?: string;
     authorizationSubjectVersion?: number;
+    lastStaffRevalidationAt?: number;
   };
+};
+
+/**
+ * 하트비트(15초)마다 재검증하면 구독 게임 수 × 동시 소켓 수만큼 DB 조회가 반복된다
+ * (게임당 fixture 조회 1 + assertAccess 내부 조회 2). 만료된 스태프를 쫓아내는 데
+ * 15초 해상도가 필요한 것은 아니므로 소켓당 재검증을 60초로 묶는다 — 만료 후
+ * 방송을 계속 받는 창은 최대 60초로 유지되면서(수정 전에는 무제한) 하트비트가
+ * 만드는 DB 부하는 1/4로 줄어든다.
+ */
+const STAFF_REVALIDATION_INTERVAL_MS = 60_000;
+
+type GameFixtureScope = {
+  readonly tournamentId: string;
+  readonly fixtureId: string;
+  readonly fieldId: string | null;
 };
 
 type GameBackfill = {
@@ -651,9 +667,23 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
         }
       }
     }
+    if (subscribedGameIds.length === 0) {
+      return;
+    }
+
+    const now = Date.now();
+    const lastAt = client.data.lastStaffRevalidationAt;
+    if (lastAt !== undefined && now - lastAt < STAFF_REVALIDATION_INTERVAL_MS) {
+      return;
+    }
+    client.data.lastStaffRevalidationAt = now;
+
+    // 게임마다 findUnique 를 돌리면 구독 수만큼 왕복이 늘어난다(N+1).
+    // 한 번의 findMany 로 픽스처 스코프를 모두 읽어 온다.
+    const scopes = await this.loadGameFixtureScopes(subscribedGameIds);
 
     for (const gameId of subscribedGameIds) {
-      const scope = await this.loadGameFixtureScope(gameId);
+      const scope = scopes.get(gameId) ?? null;
       if (scope === null) {
         // 픽스처가 없는 게임(team-match 등)은 애초에 스태프 스코프 검사 없이
         // 구독됐다 — game.subscribe 의 `if (fixture !== null)` 분기와 동일 기준.
@@ -678,6 +708,31 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
         client.emit('game.permission.revoked', { gameId, assignmentVersion: null });
       }
     }
+  }
+
+  private async loadGameFixtureScopes(
+    gameIds: readonly string[],
+  ): Promise<ReadonlyMap<string, GameFixtureScope>> {
+    const games = await this.prisma.v1Game.findMany({
+      where: { id: { in: [...gameIds] } },
+      select: {
+        id: true,
+        tournamentFixture: { select: { id: true, tournamentId: true, fieldId: true } },
+      },
+    });
+    const scopes = new Map<string, GameFixtureScope>();
+    for (const game of games) {
+      const fixture = game.tournamentFixture;
+      if (fixture === null) {
+        continue;
+      }
+      scopes.set(game.id, {
+        tournamentId: fixture.tournamentId,
+        fixtureId: fixture.id,
+        fieldId: fixture.fieldId,
+      });
+    }
+    return scopes;
   }
 
   private async loadGameFixtureScope(gameId: string): Promise<{

@@ -312,7 +312,9 @@ function checkFontSizeLiterals() {
     violations.push('[게이트 실행 실패] src 아래 TSX/TS 파일이 0개다');
     return;
   }
-  const PAT = /\btext-\[(\d+)px\]|fontSize:\s*(\d+)\b/g;
+  // 소수도 잡는다 — text-[13.5px] 같은 값이 baseline 밖에서 조용히 통과하고
+  // 있었다(실측 3곳). px 리터럴은 정수만 쓰인다는 보장이 없다.
+  const PAT = /\btext-\[(\d+(?:\.\d+)?)px\]|fontSize:\s*(\d+(?:\.\d+)?)\b/g;
   const seen = new Set();
   for (const f of files) {
     const n = (readFileSync(f, 'utf8').match(PAT) || []).length;

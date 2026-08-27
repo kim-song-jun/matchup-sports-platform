@@ -173,4 +173,34 @@ describe('TeamMatchCompletionNotificationService', () => {
 
     expect(createMany).not.toHaveBeenCalled();
   });
+
+  // 2026-08-27 감사 41/44: outbox 트랜잭션이 롤백되면 이미 나간 웹 푸시는 되돌릴 수
+  // 없다 — claim.afterCommit이 있으면 project()가 그 안에 push만 하고 커밋 전에는
+  // 절대 sendToUser를 직접 부르지 않아야 한다.
+  it('claim.afterCommit이 주어지면 push를 즉시 보내지 않고 커밋 후 실행할 effect로만 담는다', async () => {
+    const { tx } = fakeTx({
+      teamMatch: { id: 'tm-1', title: '테스트 팀매치', hostTeamId: 'team-home', approvedApplicantTeamId: 'team-away', leagueId: null },
+      memberships: [{ userId: 'user-host-owner' }],
+      preferences: [],
+      alreadyDelivered: [],
+    });
+    const webPush = { sendToUser: jest.fn().mockResolvedValue(undefined) };
+    const service = new TeamMatchCompletionNotificationService(webPush as never);
+    const afterCommit: Array<() => void | Promise<void>> = [];
+    const claim = { afterCommit } as never;
+
+    await service.project(tx, revisionFixture(), claim);
+
+    // 트랜잭션이 아직 안 끝났으니(테스트에서는 project()가 반환된 시점) 푸시가
+    // 나가면 안 된다 — 워커가 커밋 확정 후 afterCommit을 실행하기 전이다.
+    expect(webPush.sendToUser).not.toHaveBeenCalled();
+    expect(afterCommit).toHaveLength(1);
+
+    // 워커가 커밋 확정 뒤 afterCommit을 실행하는 시점을 흉내낸다.
+    await afterCommit[0]();
+    expect(webPush.sendToUser).toHaveBeenCalledWith(
+      'user-host-owner',
+      expect.objectContaining({ url: '/my/reviews/team_match/tm-1' }),
+    );
+  });
 });

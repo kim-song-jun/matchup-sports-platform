@@ -112,6 +112,12 @@ export interface PublicScheduleEntry {
   readonly groupName: string | null;
   readonly scheduledAt: string | null;
   readonly venue: string | null;
+  /**
+   * 이 경기가 열리는 필드(경기장)의 식별자. 표시용 `fieldName` 과 달리 **배정 대조에 쓰는
+   * 값**이다 — 필드 단위 스태프 배정이 이름이 겹치는 필드의 경기까지 "내 담당"으로 묶던 것을
+   * 막으려고 서버가 함께 내려준다(이름은 중복될 수 있지만 id 는 그렇지 않다).
+   */
+  readonly fieldId: string | null;
   readonly fieldName: string | null;
   readonly home: PublicSideSummary | null;
   readonly away: PublicSideSummary | null;

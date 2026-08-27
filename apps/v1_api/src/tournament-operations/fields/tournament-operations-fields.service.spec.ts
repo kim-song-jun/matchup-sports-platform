@@ -93,6 +93,9 @@ function createFakeTx(initialFixtureFieldId: string | null) {
       ),
     },
     v1TournamentField: {
+      // finding #76: create()가 이름 중복을 먼저 findFirst로 확인한다. 기본값은
+      // "중복 없음"(null) -- 이름 중복 자체를 검증하는 케이스만 아래에서 override한다.
+      findFirst: jest.fn(async (): Promise<{ id: string } | null> => null),
       create: jest.fn(async ({ data }: { data: { scopeKey: string; name: string; sortOrder: number } }) => ({
         id: fieldId,
         tournamentId,
@@ -269,6 +272,30 @@ describe('TournamentOperationsFieldsService', () => {
       ).rejects.toMatchObject({ response: { code: 'IDEMPOTENCY_PAYLOAD_CONFLICT' } });
 
       expect(tx.v1TournamentField.create).toHaveBeenCalledTimes(1);
+    } finally {
+      await moduleRef.close();
+    }
+  });
+
+  // finding #76 -- 이름에는 DB unique 제약이 없어 클라이언트 가드를 우회하면(직접 API
+  // 호출, 오래된 목록을 들고 있는 두 번째 기기 등) 동명 필드가 그대로 생겼다. 서버가
+  // 대소문자 무시 비교로 한 번 더 막아야 한다.
+  it('create() rejects a name that already exists in this tournament (case-insensitive)', async () => {
+    const assertAccess = jest.fn().mockResolvedValue(platformOpsPrincipal());
+    const { service, moduleRef, tx } = await buildHarness({ assertAccess });
+    tx.v1TournamentField.findFirst = jest.fn(async () => ({ id: 'existing-field' }));
+
+    try {
+      await expect(
+        service.create(
+          actorUserId,
+          tournamentId,
+          { scopeKey: 'court-b', name: '  court a  ', sortOrder: 1 },
+          audit('dup-name-key'),
+        ),
+      ).rejects.toMatchObject({ response: { code: 'FIELD_NAME_DUPLICATE' } });
+
+      expect(tx.v1TournamentField.create).not.toHaveBeenCalled();
     } finally {
       await moduleRef.close();
     }

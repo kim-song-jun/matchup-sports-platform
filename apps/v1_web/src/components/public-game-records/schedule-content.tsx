@@ -25,7 +25,13 @@ import {
   resultStateLabel,
 } from './format';
 import { PenaltyScoreline } from './penalty-scoreline';
-import { buildScheduleFilters, groupScheduleEntries, groupUnscheduledEntries } from './schedule-grouping';
+import {
+  buildScheduleFilters,
+  groupScheduleEntries,
+  groupUnscheduledEntries,
+  phaseKeyOf,
+  type ScheduleFilter,
+} from './schedule-grouping';
 import type { PublicScheduleEntry, PublicStandingRow, PublicTournamentScheduleResponse } from './types';
 
 /**
@@ -654,23 +660,28 @@ function ScheduleGroupBlock({
  *
  * 필터는 **지금 일정에 실제로 있는 것만** 칩으로 만든다 — 고를 게 없는 칩은 눌러도 빈
  * 화면이라, 있는 척하는 버튼이 된다.
+ *
+ * F4 fix: 필터 state(`activeFilter`)와 칩 목록(`filters`)은 더 이상 이 컴포넌트가
+ * 스스로 갖지 않는다 — `ScheduleContent`가 소유하고 "시간 미정 경기" 섹션과 공유한다.
+ * 예전엔 이 컴포넌트 안에만 있어서, 칩을 눌러도 시간 미정 섹션은 필터 state에 접근할
+ * 경로 자체가 없어 항상 전체를 그렸다.
  */
 function ScheduleSections({
   tournamentId,
   entries,
   myFixtureById,
+  filters,
+  activeFilter,
+  onSelectFilter,
 }: {
   tournamentId: string;
   entries: readonly PublicScheduleEntry[];
   myFixtureById: Map<string, MyFixtureRowInfo>;
+  filters: ScheduleFilter[];
+  activeFilter: string;
+  onSelectFilter: (key: string) => void;
 }) {
-  const [filter, setFilter] = useState('all');
   const phases = groupScheduleEntries(entries);
-  const hasMyFixtures = entries.some((entry) => myFixtureById.has(entry.fixtureId));
-  const filters = buildScheduleFilters(phases, hasMyFixtures);
-
-  // 고른 칩이 사라진 경우(내 경기가 없어졌다거나) 전체로 되돌린다 — 빈 화면에 갇히지 않게.
-  const activeFilter = filters.some((option) => option.key === filter) ? filter : 'all';
 
   const visiblePhases = phases
     .filter((phase) => activeFilter === 'all' || activeFilter === 'mine' || activeFilter === phase.key)
@@ -699,7 +710,7 @@ function ScheduleSections({
               role="tab"
               aria-selected={activeFilter === option.key}
               className={`tm-chip${activeFilter === option.key ? ' tm-chip-active' : ''}`}
-              onClick={() => setFilter(option.key)}
+              onClick={() => onSelectFilter(option.key)}
             >
               {option.label}
             </button>
@@ -761,6 +772,11 @@ export function ScheduleContent({
    */
   myFixtures?: V1MyTournamentFixtures;
 }) {
+  // F4 fix: 필터는 "경기 일정"과 "시간 미정 경기" 두 섹션이 공유해야 한다 — 컴포넌트
+  // 최상단(이른 return보다 앞)에서 훅을 선언해 두 섹션 모두 같은 값을 본다. early
+  // return(!data.bracketPublished) 뒤에 두면 훅 순서가 렌더마다 달라질 수 있어 여기에 둔다.
+  const [filter, setFilter] = useState('all');
+
   if (!data.bracketPublished) {
     return (
       <div style={{ padding: '40px 20px' }}>
@@ -789,6 +805,26 @@ export function ScheduleContent({
     }
   }
   const myTeams = (myFixtures?.teams ?? []).filter((team) => team.fixtures.length > 0);
+
+  // F4 fix: 칩(전체/내 팀/조별리그/결선)은 "경기 일정" 섹션(data.items)만 보고 만들던 걸
+  // 그대로 두되(단계 칩은 일정이 잡힌 경기 기준이 자연스럽다), "내 팀" 칩은 내 경기가
+  // 전부 시간 미정이어도 뜨도록 unscheduled까지 함께 본다 — 예전엔 data.items만 봐서
+  // 그 경우 칩 자체가 안 떴다.
+  const phases = groupScheduleEntries(data.items);
+  const hasMyFixtures =
+    data.items.some((entry) => myFixtureById.has(entry.fixtureId)) ||
+    data.unscheduled.some((entry) => myFixtureById.has(entry.fixtureId));
+  const filters = buildScheduleFilters(phases, hasMyFixtures);
+  // 고른 칩이 사라진 경우(내 경기가 없어졌다거나) 전체로 되돌린다 — 빈 화면에 갇히지 않게.
+  const activeFilter = filters.some((option) => option.key === filter) ? filter : 'all';
+
+  // "시간 미정 경기" 섹션도 위 칩과 같은 기준으로 거른다 — 예전엔 필터 state에 접근할
+  // 경로 자체가 없어 어떤 칩을 눌러도 이 섹션은 항상 전체를 그렸다.
+  const filteredUnscheduled = data.unscheduled.filter((entry) => {
+    if (activeFilter === 'all') return true;
+    if (activeFilter === 'mine') return myFixtureById.has(entry.fixtureId);
+    return phaseKeyOf(entry) === activeFilter;
+  });
 
   return (
     <div style={{ padding: '16px 20px 40px', display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -833,6 +869,9 @@ export function ScheduleContent({
             tournamentId={tournamentId}
             entries={data.items}
             myFixtureById={myFixtureById}
+            filters={filters}
+            activeFilter={activeFilter}
+            onSelectFilter={setFilter}
           />
         )}
         {hasNextPage ? (
@@ -858,17 +897,23 @@ export function ScheduleContent({
               컨테이너도 `Card` 가 아니라 그룹 목록과 같은 `tm-schedule-list` 다: 행 자체가
               이미 `tm-schedule-card` 라 바깥 카드는 이중 크롬이고, 경기가 1건일 때는 테두리
               안 우측이 "액자 속 빈 공간"으로 남았다. */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {groupUnscheduledEntries(data.unscheduled).map((group) => (
-              <ScheduleGroupBlock
-                key={group.key}
-                tournamentId={tournamentId}
-                group={group}
-                showGroupHeading
-                myFixtureById={myFixtureById}
-              />
-            ))}
-          </div>
+          {filteredUnscheduled.length === 0 ? (
+            // 필터가 걸려 시간 미정 경기 전부가 걸러진 경우 — 섹션 제목만 남고 내용이
+            // 사라지면 "칩이 먹통인가" 오해를 산다. ScheduleSections의 빈 상태와 같은 문구.
+            <EmptyState title="해당하는 경기가 없어요" sub="다른 보기를 선택해 주세요." />
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {groupUnscheduledEntries(filteredUnscheduled).map((group) => (
+                <ScheduleGroupBlock
+                  key={group.key}
+                  tournamentId={tournamentId}
+                  group={group}
+                  showGroupHeading
+                  myFixtureById={myFixtureById}
+                />
+              ))}
+            </div>
+          )}
         </section>
       ) : null}
     </div>

@@ -526,12 +526,20 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
 
   async getHealth() {
     const queue = await this.getQueueCounts();
+    // 새 잡을 받아 처리할 수 있는지만 보는 판정 — POISONED 잡 존재와 무관하다. 녹아웃
+    // 무승부처럼 알려진 정상 경로로 잡 1건이 POISONED 되면(knockout-penalties.ts:150
+    // 참고) status 는 아래처럼 영구히 'degraded' 로 남는데, 그걸 프로덕션 배포
+    // 헬스체크(deploy/docker-compose.prod.yml)가 그대로 게이트로 삼으면 그 배포는
+    // 물론 실패한 배포를 되돌리는 restore_active_release() 의 롤백까지 같은 이유로
+    // 영구 차단된다(2026-08-27, C-poisoned-outbox-deploy-gate). POISONED 존재는 여전히
+    // 운영 알람 대상이므로 status/queue 필드에는 그대로 남기되, 배포 게이트는 이 필드만
+    // 보게 분리한다.
+    const deploymentStatus = this.handlers.size === 0 ? 'not_ready' : 'healthy';
     return {
       status: queue.poisoned > 0 || this.poisonCount > 0
         ? 'degraded'
-        : this.handlers.size === 0
-          ? 'not_ready'
-          : 'healthy',
+        : deploymentStatus,
+      deploymentStatus,
       acceptingClaims: this.acceptingClaims,
       activeHandlers: this.active.size,
       registeredHandlers: this.handlers.size,

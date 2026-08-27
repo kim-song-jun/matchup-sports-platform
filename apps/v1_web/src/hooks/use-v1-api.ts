@@ -1652,6 +1652,14 @@ export type V1FixtureLineupAccess = {
   gameId: string;
   mySideId: string | null;
   isStaff: boolean;
+  /**
+   * F61/F62 fix: `isStaff`는 SUPPORT_READONLY(조회 전용)와 실제 저장 권한이 있는
+   * 스태프(field_operator/tournament_director/platform_ops)를 구분하지 못했다 — 그
+   * 결과 조회 전용 스태프도 매니저와 동일한 편집기를 받았다가 저장 시점에야 서버
+   * 403으로 걸러졌다. 서버가 실제 lineup_mutate 인가 판정을 그대로 내려준다
+   * (mySideId가 있는 팀 매니저/오너도 true).
+   */
+  canMutateLineup: boolean;
   scheduledAt: string | null;
   homeSideId: string | null;
   homeTeamName: string | null;

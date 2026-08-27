@@ -498,6 +498,96 @@ describe('2-E: missingScorer는 이벤트에서 계산되어야 한다', () => {
 });
 
 /**
+ * finding #67. 위 2-E는 `changes.goalEvents`를 실어 보내지 않는 `correct({})`만
+ * 쓴다 — 그래서 서비스가 `resultInvariantInput`(정본) 분기를 타고, 정정 폼이 실제로
+ * 항상 보내는 `assertGoalTimelineConsistent` 분기(goalEvents !== undefined일 때)는
+ * 한 번도 실행되지 않았다. 그 분기는 무득점자 골을 만나면 `continue`만 하고
+ * `missingScorer`를 대입한 적이 없어 **항상 false를 반환**했다 — 정정을 한 번이라도
+ * 거치면 득점자 미상 경고가 조용히 사라지는 실제 버그다. 여기서는 `goalEvents`를
+ * 명시적으로 실어 보내 그 분기를 직접 타격한다.
+ */
+describe('finding #67: goalEvents를 실어 보내는 정정·재제출도 missingScorer를 계산해야 한다', () => {
+  it('정정(correct)이 무득점자 GOAL을 anonymous 표식과 함께 보내면 missingScorer가 true다', async () => {
+    const harness = createHarness();
+
+    await harness.correct({
+      actualParticipants: [
+        { ...validParticipants[0], goals: 0 },
+        { ...validParticipants[1], goals: 0 },
+      ],
+      goalEvents: [
+        {
+          id: 'anonymous-goal-1',
+          sideId: ids.homeSide,
+          anonymous: true,
+          minute: 10,
+          period: 1,
+          ownGoal: false,
+        },
+      ],
+    });
+
+    expect(harness.createdRevisions).toHaveLength(1);
+    expect(harness.createdRevisions[0].missingScorer).toBe(true);
+  });
+
+  it('재제출(supersede)이 무득점자 GOAL을 anonymous 표식과 함께 보내도 missingScorer가 true다', async () => {
+    // supersede는 REJECTED/SUPPLEMENT_REQUESTED base에서만 허용된다(위
+    // '재제출 레인' describe 블록과 동일한 전제).
+    const harness = createHarness({ baseState: V1GameResultRevisionState.REJECTED });
+
+    await harness.supersede({
+      actualParticipants: [
+        { ...validParticipants[0], goals: 0 },
+        { ...validParticipants[1], goals: 0 },
+      ],
+      goalEvents: [
+        {
+          id: 'anonymous-goal-1',
+          sideId: ids.homeSide,
+          anonymous: true,
+          minute: 10,
+          period: 1,
+          ownGoal: false,
+        },
+      ],
+    });
+
+    expect(harness.createdRevisions).toHaveLength(1);
+    expect(harness.createdRevisions[0].missingScorer).toBe(true);
+  });
+
+  /**
+   * 짝. 자책골(ownGoal)은 정본(`resultInvariantInput`)도 애초에 missingScorer
+   * 판정에서 제외하는 타입이라(`event.type === GOAL`만 본다) 무득점자여도
+   * false로 남아야 한다 — 위 "명시적인 익명 자책골" 테스트가 이미 이 축을
+   * 덮지만, `ownGoal: false`와 대조되는 짝으로 여기 다시 남겨 회귀를 좁힌다.
+   */
+  it('무득점자 자책골(ownGoal)은 anonymous 표식이 있으면 missingScorer가 false로 남는다', async () => {
+    const harness = createHarness();
+
+    await harness.correct({
+      actualParticipants: [
+        { ...validParticipants[0], goals: 0 },
+        { ...validParticipants[1], goals: 0 },
+      ],
+      goalEvents: [
+        {
+          id: 'anonymous-own-goal-2',
+          sideId: ids.homeSide,
+          anonymous: true,
+          minute: 10,
+          period: 1,
+          ownGoal: true,
+        },
+      ],
+    });
+
+    expect(harness.createdRevisions[0].missingScorer).toBe(false);
+  });
+});
+
+/**
  * 2-F. `assertCorrectionParticipantsValid`는 **중복과 sideId만** 본다 —
  * 그 `participantId`가 *이 경기의* 참가자인지는 확인하지 않는다.
  * `v1_game_result_participants.participantId`에는 FK도 없으므로(schema.prisma)

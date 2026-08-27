@@ -89,7 +89,16 @@ function TournamentFieldsSection({
   const [notice, setNotice] = useState<string | null>(null);
 
   const trimmedName = name.trim();
-  const canSubmit = trimmedName.length > 0 && !create.isPending;
+  // finding #76: 필드 이름에는 서버 유일성 제약이 없고(schema.prisma의 unique는
+  // scopeKey/id뿐), scopeKey는 매 제출마다 새로 생성돼(아래 참고) 서버의
+  // FIELD_SCOPE_KEY_DUPLICATE도 절대 걸리지 않는다 -- 그래서 두 번 눌리거나(오탭)
+  // 여러 기기에서 동시에 등록하면 같은 이름의 필드가 그대로 두 개 생겼고, 한 번
+  // 생기면 고치거나 지울 방법이 없다(수정·삭제 라우트 부재). 클라이언트에서라도
+  // 대소문자·공백을 무시한 이름 중복을 먼저 막아 사고 발생 지점을 원천 차단한다.
+  const isDuplicateName = fields.some(
+    (field) => field.name.trim().toLowerCase() === trimmedName.toLowerCase() && trimmedName.length > 0,
+  );
+  const canSubmit = trimmedName.length > 0 && !isDuplicateName && !create.isPending;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -173,6 +182,8 @@ function TournamentFieldsSection({
             maxLength={120}
             disabled={create.isPending}
             placeholder="예: A구장, 1번 코트"
+            aria-invalid={isDuplicateName}
+            aria-describedby={isDuplicateName ? 'tournament-field-name-duplicate' : undefined}
             className="flex-1 h-[44px] px-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors disabled:opacity-50"
           />
           <button
@@ -189,6 +200,17 @@ function TournamentFieldsSection({
             {create.isPending ? '등록 중…' : '경기장 추가'}
           </button>
         </form>
+      )}
+
+      {isDuplicateName && (
+        <p
+          id="tournament-field-name-duplicate"
+          className="text-[length:var(--font-size-label)] text-[var(--red700)]"
+          role="alert"
+        >
+          이미 같은 이름의 경기장이 있어요. 다른 이름을 써주세요 — 같은 이름이 두 개
+          생기면 나중에 구분·수정·삭제할 방법이 없어요.
+        </p>
       )}
 
       {error !== null && (

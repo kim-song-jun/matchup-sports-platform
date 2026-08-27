@@ -33,6 +33,20 @@ const ADMIN_CONFIRMABLE_STATUSES: V1TournamentRegistration['status'][] = [
   'paid',
 ];
 
+/**
+ * 정원 한 자리를 점유하는 상태 목록. tournament-registrations.service.ts의 동일 이름 상수와
+ * 같은 목록이다 — 그 파일은 이 배치(T-reg-roster-state-machine)의 ownedFiles 밖이라 공유
+ * export로 승격하지 않고 여기 그대로 중복 정의한다. **상태값이 바뀌면 두 곳을 함께 고친다**
+ * (감사 finding #48: 팀 자진 철회(withdrawCancelRequest, R17-006)에는 이미 이 가드가 있었는데
+ * 운영자 잔류 처리(rejectCancelRequest)에는 빠져 있어 정원을 넘는 확정 팀이 생길 수 있었다).
+ */
+const CAPACITY_HOLD_STATUSES: V1TournamentRegistration['status'][] = [
+  'awaiting_payment',
+  'payment_checking',
+  'paid',
+  'confirmed',
+];
+
 @Injectable()
 export class AdminRegistrationsService {
   constructor(
@@ -191,8 +205,12 @@ export class AdminRegistrationsService {
         where: { id: registrationId },
         data: {
           status: targetStatus,
-          confirmedAt: new Date(),
-          confirmedByAdminUserId: admin.id,
+          // 감사 finding #47: 이전에는 decision과 무관하게 항상 confirmedAt을 채워, '대기(waitlist)'
+          // 처리된 팀도 참가 화면에 "확정일"이 표시됐다 — 팀이 대회 참가가 확정된 줄 알고 선수
+          // 소집·이동을 준비하게 된다. confirmedAt은 실제로 '확정'된 경우에만 의미가 있다.
+          ...(dto.decision === 'confirm'
+            ? { confirmedAt: new Date(), confirmedByAdminUserId: admin.id }
+            : {}),
         },
       });
       await this.adminContext.logAdminAction(
@@ -308,6 +326,33 @@ export class AdminRegistrationsService {
     const restoredStatus = registration.cancelPreviousStatus ?? 'confirmed';
 
     const result = await this.prisma.$transaction(async (tx) => {
+      // 감사 finding #48: 잔류 처리도 팀 자진 철회(withdrawCancelRequest)와 같은 '이전 상태로
+      // 복원' 동작이라 같은 위험(정원 초과)을 안는다 — R17-006과 동일한 가드를 여기도 건다.
+      // FOR UPDATE로 대회 row를 잠가 두 관리자가 동시에 마지막 자리를 처리해도 안전하게 만든다.
+      if (CAPACITY_HOLD_STATUSES.includes(restoredStatus)) {
+        await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${registration.tournamentId} FOR UPDATE`;
+        const tournament = await tx.v1Tournament.findFirst({
+          where: { id: registration.tournamentId, deletedAt: null },
+          select: { teamCount: true },
+        });
+        if (!tournament) {
+          throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
+        }
+        const reservedCount = await tx.v1TournamentRegistration.count({
+          where: {
+            tournamentId: registration.tournamentId,
+            id: { not: registrationId },
+            status: { in: CAPACITY_HOLD_STATUSES },
+          },
+        });
+        if (reservedCount >= tournament.teamCount) {
+          throw new ConflictException({
+            code: 'TOURNAMENT_CAPACITY_FULL',
+            message: '정원이 가득 차 취소 요청을 잔류 처리할 수 없어요.',
+          });
+        }
+      }
+
       const updated = await tx.v1TournamentRegistration.update({
         where: { id: registrationId },
         data: {

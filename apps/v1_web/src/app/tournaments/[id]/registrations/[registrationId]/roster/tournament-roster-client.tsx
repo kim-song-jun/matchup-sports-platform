@@ -20,7 +20,26 @@ import { v1Keys } from '@/lib/query-keys';
 import { extractErrorMessage } from '@/lib/error-message';
 import { randomUuid } from '@/lib/uuid';
 import { formatTournamentDateTimeLong } from '@/lib/date-utils';
-import type { V1TournamentPlayer, V1PlayerEligibilityStatus, V1TeamMembersPage } from '@/types/api';
+import type {
+  V1TournamentPlayer,
+  V1PlayerEligibilityStatus,
+  V1TeamMembersPage,
+  V1TournamentGenderCategory,
+} from '@/types/api';
+
+/**
+ * 서버 `ROSTER_MUTABLE_TOURNAMENT_STATUSES`(apps/v1_api/.../roster-cleanup.ts)와 동일 집합.
+ * 감사 finding #1(2026-08): 이 화면이 대회 status를 전혀 보지 않아, 완료·취소된 대회에서도
+ * '수정 가능' 배지·버튼이 그대로 떠 있다가 서버 409(TOURNAMENT_ROSTER_NOT_MUTABLE)로 실패했다.
+ * 두 목록이 갈리지 않도록, 서버 값이 바뀌면 이 상수도 함께 고친다.
+ */
+const ROSTER_MUTABLE_TOURNAMENT_STATUSES = new Set(['open', 'closed', 'in_progress']);
+
+/** tournament가 아직 로딩 중이면(undefined) 막지 않는다 — 기존 낙관적 렌더링과 동일. */
+export function isTournamentRosterMutable(status: string | null | undefined): boolean {
+  if (!status) return true;
+  return ROSTER_MUTABLE_TOURNAMENT_STATUSES.has(status);
+}
 
 /* ── Roster deadline helper ── */
 
@@ -111,12 +130,15 @@ export function getRegistrationDeadlineState(
 
 export function TournamentRosterDeadlineCard({
   deadlineAt,
+  isTournamentRosterClosed = false,
   isRosterLocked,
   isRosterEditBlockedByStatus,
   isRosterDeadlineBlocked,
   nowMs,
 }: {
   deadlineAt: string | null;
+  /** 대회가 완료·취소돼 누구도 명단을 못 고치는 상태 — 잠금·마감보다 우선한다(서버 assertRosterMutable과 동일 순서). */
+  isTournamentRosterClosed?: boolean;
   isRosterLocked: boolean;
   isRosterEditBlockedByStatus: boolean;
   isRosterDeadlineBlocked: boolean;
@@ -128,21 +150,26 @@ export function TournamentRosterDeadlineCard({
     : deadlineState === 'closed'
       ? { label: '신청 마감', className: 'tm-badge-grey' }
       : { label: '일정 미정', className: 'tm-badge-grey' };
-  const canEditRoster = !isRosterLocked && !isRosterEditBlockedByStatus && !isRosterDeadlineBlocked;
-  const rosterEditBadge = isRosterLocked
-    ? '명단 마감'
-    : isRosterEditBlockedByStatus
-      ? '수정 불가'
-      : isRosterDeadlineBlocked
-        ? '제출 마감'
-        : '수정 가능';
-  const rosterEditMessage = isRosterLocked
-    ? '선수 명단이 운영진에 의해 마감됐어요.'
-    : isRosterEditBlockedByStatus
-      ? '취소 요청 또는 취소 완료된 신청은 선수 명단을 수정할 수 없어요.'
-      : isRosterDeadlineBlocked
-        ? '선수 명단 제출 기간이 종료됐어요.'
-        : '대회 신청 마감과 별개로, 운영진이 명단을 잠그기 전까지 수정할 수 있어요.';
+  const canEditRoster =
+    !isTournamentRosterClosed && !isRosterLocked && !isRosterEditBlockedByStatus && !isRosterDeadlineBlocked;
+  const rosterEditBadge = isTournamentRosterClosed
+    ? '수정 불가'
+    : isRosterLocked
+      ? '명단 마감'
+      : isRosterEditBlockedByStatus
+        ? '수정 불가'
+        : isRosterDeadlineBlocked
+          ? '제출 마감'
+          : '수정 가능';
+  const rosterEditMessage = isTournamentRosterClosed
+    ? '대회가 종료되었거나 취소돼 더 이상 선수 명단을 수정할 수 없어요.'
+    : isRosterLocked
+      ? '선수 명단이 운영진에 의해 마감됐어요.'
+      : isRosterEditBlockedByStatus
+        ? '취소 요청 또는 취소 완료된 신청은 선수 명단을 수정할 수 없어요.'
+        : isRosterDeadlineBlocked
+          ? '선수 명단 제출 기간이 종료됐어요.'
+          : '대회 신청 마감과 별개로, 운영진이 명단을 잠그기 전까지 수정할 수 있어요.';
 
   return (
     <Card pad={16} style={{ marginBottom: 16 }}>
@@ -244,30 +271,83 @@ function memberRoleLabel(role: 'owner' | 'manager' | 'member'): string {
   }
 }
 
-function isRegisterableMember(member: { realName?: unknown; birthDate?: unknown; phone?: unknown }) {
-  return Boolean(
-    normalizeProfileText(member.realName) &&
-    normalizeBirthDateForInput(member.birthDate) &&
-    normalizeProfileText(member.phone),
-  );
+/** 대회 성별 구분이 요구하는 선수 성별. 서버 genderRequiredByCategory와 동일 판정. */
+function genderRequiredByCategory(
+  category: V1TournamentGenderCategory | null | undefined,
+): 'male' | 'female' | null {
+  return category === 'male' || category === 'female' ? category : null;
+}
+
+type MemberIneligibility = {
+  /** 드롭다운 옵션 뒤에 붙는 짧은 사유. */
+  listReason: string;
+  /** 선택 시 보여줄 상세 안내. */
+  message: string;
+};
+
+/**
+ * 이 팀원을 지금 명단에 추가할 수 있는가 — 서버 `evaluateRosterCandidate`(tournament-players.service.ts)의
+ * 프로필·성별 판정을 프론트에서도 같은 기준으로 미리 계산한다.
+ *
+ * 감사 finding #49(2026-08): 이 화면이 실명·생년월일·휴대폰만 보고 "선택 가능"으로 표시해,
+ * 여성부 대회의 남성 팀원·mixed 대회의 성별 미등록 팀원이 눌러 봐야 400을 받았다. 어드민 후보
+ * 목록(listEligiblePlayersForAdmin)은 이미 같은 함수로 사유를 미리 계산해 주는데 팀 경로만
+ * 빠져 있었다 — 여기서 그 간극을 메운다.
+ *
+ * 휴대폰 본인인증 여부(phoneVerifiedAt)는 이 화면이 쓰는 `GET /teams/:id/members` 응답에
+ * 아직 없어(팀 멤버 조회 서비스는 이 배치 담당 파일이 아니다) 프론트에서 판정할 수 없다 —
+ * 그 항목은 여전히 서버 제출 시 400 `PLAYER_PHONE_NOT_VERIFIED`가 최종 방어선이다.
+ */
+export function getMemberIneligibility(
+  member: { realName?: unknown; birthDate?: unknown; phone?: unknown; gender?: 'male' | 'female' | null },
+  genderCategory: V1TournamentGenderCategory | null | undefined,
+): MemberIneligibility | null {
+  const requiresAnyGender = genderCategory === 'mixed';
+  const missing = [
+    !normalizeProfileText(member.realName) ? '실명' : null,
+    !normalizeBirthDateForInput(member.birthDate) ? '생년월일' : null,
+    !normalizeProfileText(member.phone) ? '휴대폰 번호' : null,
+    requiresAnyGender && !member.gender ? '성별' : null,
+  ].filter((v): v is string => v !== null);
+  if (missing.length > 0) {
+    return {
+      listReason: `${missing.join(', ')} 미입력`,
+      message: requiresAnyGender
+        ? '실명, 생년월일, 휴대폰 번호, 성별이 모두 등록된 팀원만 선수로 등록할 수 있어요.'
+        : '실명, 생년월일, 휴대폰 번호가 모두 등록된 팀원만 선수로 등록할 수 있어요.',
+    };
+  }
+  const requiredGender = genderRequiredByCategory(genderCategory);
+  if (requiredGender && member.gender !== requiredGender) {
+    return requiredGender === 'male'
+      ? { listReason: '남성부 대회예요', message: '남성부 대회에는 남성 팀원만 등록할 수 있어요.' }
+      : { listReason: '여성부 대회예요', message: '여성부 대회에는 여성 팀원만 등록할 수 있어요.' };
+  }
+  return null;
+}
+
+function isRegisterableMember(
+  member: { realName?: unknown; birthDate?: unknown; phone?: unknown; gender?: 'male' | 'female' | null },
+  genderCategory: V1TournamentGenderCategory | null | undefined,
+) {
+  return getMemberIneligibility(member, genderCategory) === null;
 }
 
 function isRegisterableForm(form: AddPlayerFormState) {
   return Boolean(form.realName.trim() && form.birthDate.trim() && form.phone.trim());
 }
 
-function memberMissingReason(member: { realName?: unknown; birthDate?: unknown; phone?: unknown }): string {
-  const missing = [
-    !normalizeProfileText(member.realName) ? '실명' : null,
-    !normalizeBirthDateForInput(member.birthDate) ? '생년월일' : null,
-    !normalizeProfileText(member.phone) ? '휴대폰 번호' : null,
-  ].filter(Boolean);
-  return `${missing.join(', ')} 미입력`;
+function memberMissingReason(
+  member: { realName?: unknown; birthDate?: unknown; phone?: unknown; gender?: 'male' | 'female' | null },
+  genderCategory: V1TournamentGenderCategory | null | undefined,
+): string {
+  return getMemberIneligibility(member, genderCategory)?.listReason ?? '';
 }
 
 function AddPlayerForm({
   formId,
   teamId,
+  genderCategory,
   onSubmit,
   onRemove,
   onUserChange,
@@ -278,6 +358,8 @@ function AddPlayerForm({
 }: {
   formId: string;
   teamId: string;
+  /** 명단 추가 자격(성별 구분) 판정에 쓴다 — getMemberIneligibility 참조. */
+  genderCategory: V1TournamentGenderCategory | null;
   onSubmit: (formId: string, data: AddPlayerFormState) => void;
   onRemove: (formId: string) => void;
   onUserChange: (formId: string, userId: string) => void;
@@ -317,8 +399,8 @@ function AddPlayerForm({
     [membersPages],
   );
   const unavailableMembers = useMemo(
-    () => members.filter((member) => !isRegisterableMember(member)),
-    [members],
+    () => members.filter((member) => !isRegisterableMember(member, genderCategory)),
+    [members, genderCategory],
   );
   // ROSTER P2-8: 팀원이 많은 팀(8명 이상)에서만 검색으로 select 옵션을 좁힌다.
   const showMemberSearch = members.length >= 8;
@@ -348,13 +430,20 @@ function AddPlayerForm({
   const birthDateValid = isValidBirthDate(form.birthDate);
   const selectedAlreadyRegistered = form.userId ? registeredUserIds.has(form.userId) : false;
   const selectedAlreadyPending = form.userId ? pendingUserIds.has(form.userId) : false;
+  const selectedMember = form.userId ? members.find((m) => m.userId === form.userId) : undefined;
+  // 폼 입력값(form.realName/birthDate/phone)만으론 성별을 판정할 수 없다 — 선택된 팀원의
+  // 원본 프로필로 다시 계산한다(핸드메이드 오버라이드가 없는 한 form 값은 이 값을 그대로 복사한 것).
+  const selectedIneligibility = selectedMember
+    ? getMemberIneligibility(selectedMember, genderCategory)
+    : null;
   const canSubmit =
     form.userId.trim().length > 0 &&
     isRegisterableForm(form) &&
     birthDateValid &&
     !selectedAlreadyRegistered &&
-    !selectedAlreadyPending;
-  const selectedMemberMissing = form.userId && !isRegisterableForm(form);
+    !selectedAlreadyPending &&
+    selectedIneligibility === null;
+  const selectedMemberMissing = form.userId ? selectedIneligibility !== null : false;
   const memberFieldId = `${formId}-member`;
   const realNameFieldId = `${formId}-realname`;
   const birthDateFieldId = `${formId}-birthdate`;
@@ -420,7 +509,11 @@ function AddPlayerForm({
               ) : null}
               {unavailableMembers.length > 0 ? (
                 <p className="tm-text-micro" style={{ color: 'var(--text-muted)', margin: '0 0 8px' }}>
-                  프로필(생년월일·휴대폰)이 완성된 팀원만 명단에 올릴 수 있어요. 팀원에게 프로필 완성을 요청해 주세요.
+                  {genderCategory === 'mixed'
+                    ? '프로필(생년월일·휴대폰·성별)이 완성되고 대회 성별 구분에 맞는 팀원만 명단에 올릴 수 있어요. 팀원에게 프로필 완성을 요청해 주세요.'
+                    : genderCategory === 'male' || genderCategory === 'female'
+                      ? `프로필(생년월일·휴대폰)이 완성된 ${genderCategory === 'male' ? '남성' : '여성'} 팀원만 명단에 올릴 수 있어요. 팀원에게 프로필 완성을 요청해 주세요.`
+                      : '프로필(생년월일·휴대폰)이 완성된 팀원만 명단에 올릴 수 있어요. 팀원에게 프로필 완성을 요청해 주세요.'}
                 </p>
               ) : null}
               <select
@@ -433,7 +526,7 @@ function AddPlayerForm({
               >
                 <option value="">팀원을 선택해 주세요</option>
                 {filteredMembers.map((m) => {
-                  const registerable = isRegisterableMember(m);
+                  const registerable = isRegisterableMember(m, genderCategory);
                   const alreadyRegistered = registeredUserIds.has(m.userId);
                   const alreadyPending = pendingUserIds.has(m.userId);
                   const disabled = !registerable || alreadyRegistered || alreadyPending;
@@ -443,7 +536,7 @@ function AddPlayerForm({
                       ? ' - 추가 대기 중'
                       : registerable
                         ? ''
-                        : ` - ${memberMissingReason(m)}`;
+                        : ` - ${memberMissingReason(m, genderCategory)}`;
                   return (
                     <option key={m.userId} value={m.userId} disabled={disabled}>
                       {m.displayName} ({memberRoleLabel(m.role)})
@@ -452,9 +545,9 @@ function AddPlayerForm({
                   );
                 })}
               </select>
-              {selectedMemberMissing ? (
+              {selectedMemberMissing && selectedIneligibility ? (
                 <p className="tm-text-micro" role="alert" style={{ color: 'var(--red700)', margin: '8px 0 0' }}>
-                  실명, 생년월일, 휴대폰 번호가 모두 등록된 팀원만 선수로 등록할 수 있어요.
+                  {selectedIneligibility.message}
                 </p>
               ) : null}
               {selectedAlreadyRegistered || selectedAlreadyPending ? (
@@ -466,7 +559,7 @@ function AddPlayerForm({
                 <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>
                   {unavailableMembers.map((m) => (
                     <div key={m.userId} className="tm-text-micro" style={{ color: 'var(--text-muted)' }}>
-                      {josa(m.displayName, ['은', '는'])} {josa(memberMissingReason(m), ['으로', '로'])} 표시돼요. 제출하면 서버가 최신 프로필 기준으로 다시 확인해요.
+                      {josa(m.displayName, ['은', '는'])} {josa(memberMissingReason(m, genderCategory), ['으로', '로'])} 표시돼요.
                     </div>
                   ))}
                 </div>
@@ -908,6 +1001,10 @@ export function TournamentRosterPageClient({
 
   const players = rosterData?.players ?? [];
   const belowMinimum = rosterData?.belowMinimum ?? false;
+  // 종료·취소된 대회는 잠금·마감 예외와 무관하게 누구도 명단을 못 고친다 — 서버
+  // assertRosterMutable의 첫 번째 검사와 같은 순서(감사 finding #1). 이 값이 아직 로딩 중이면
+  // (tournament === undefined) 기존처럼 막지 않는다.
+  const isTournamentRosterClosed = !isTournamentRosterMutable(tournament?.status);
   const isRosterLocked = Boolean(registration?.rosterLockedAt);
   const isRosterEditBlockedByStatus =
     registration?.status === 'cancel_requested' || registration?.status === 'cancelled';
@@ -921,6 +1018,7 @@ export function TournamentRosterPageClient({
   );
   const canEditRoster =
     Boolean(registration) &&
+    !isTournamentRosterClosed &&
     !isRosterLocked &&
     !isRosterEditBlockedByStatus &&
     !rosterDeadlineState.blocked;
@@ -1077,6 +1175,7 @@ export function TournamentRosterPageClient({
         {tournament && registration ? (
           <TournamentRosterDeadlineCard
             deadlineAt={tournament.registrationDeadlineAt}
+            isTournamentRosterClosed={isTournamentRosterClosed}
             isRosterLocked={isRosterLocked}
             isRosterEditBlockedByStatus={isRosterEditBlockedByStatus}
             isRosterDeadlineBlocked={rosterDeadlineState.blocked}
@@ -1093,31 +1192,44 @@ export function TournamentRosterPageClient({
           </p>
         ) : null}
 
-        {/* Roster deadline passed banner (blocks edit unless admin granted an override) */}
-        {rosterDeadlineState.blocked ? (
+        {/*
+          명단 편집 가능 여부의 우선순위: 대회 상태(종료·취소) > 잠금 > 명단 제출 마감(예외 여부) —
+          서버 assertRosterMutable(tournament-players.service.ts)의 검사 순서와 맞춘다. 예전에는
+          세 조건을 독립 배너로 각각 렌더해, 잠긴 팀에 마감 예외를 부여하면 "계속 수정할 수
+          있어요"와 "명단이 마감됐어요"가 동시에 뜨는 모순이 있었다(감사 finding #1·#52).
+        */}
+        {isTournamentRosterClosed ? (
+          <div style={{ marginBottom: 16 }}>
+            <AlertBanner
+              message="대회가 종료되었거나 취소돼 더 이상 선수 명단을 수정할 수 없어요."
+              tone="info"
+            />
+          </div>
+        ) : isRosterLocked && rosterDeadlineState.overridden ? (
+          <div style={{ marginBottom: 16 }}>
+            <AlertBanner
+              message="운영진이 명단 제출 마감 예외를 허용했지만 명단 자체가 잠겨 있어요. 운영진의 잠금 해제가 추가로 필요해요."
+              tone="info"
+            />
+          </div>
+        ) : isRosterLocked ? (
+          <div style={{ marginBottom: 16 }}>
+            <AlertBanner
+              message="선수 명단이 마감됐어요. 변경이 필요하면 운영진에게 문의해 주세요."
+              tone="info"
+            />
+          </div>
+        ) : rosterDeadlineState.blocked ? (
           <div style={{ marginBottom: 16 }}>
             <AlertBanner
               message="명단 제출 기간이 종료됐어요. 수정이 필요하면 운영진에게 문의해 주세요."
               tone="info"
             />
           </div>
-        ) : null}
-
-        {/* Deadline passed but admin granted an override — editing stays open */}
-        {rosterDeadlineState.overridden ? (
+        ) : rosterDeadlineState.overridden ? (
           <div style={{ marginBottom: 16 }}>
             <AlertBanner
               message="운영진이 명단 제출 마감 예외를 허용했어요. 계속 명단을 수정할 수 있어요."
-              tone="info"
-            />
-          </div>
-        ) : null}
-
-        {/* Locked banner */}
-        {isRosterLocked ? (
-          <div style={{ marginBottom: 16 }}>
-            <AlertBanner
-              message="선수 명단이 마감됐어요. 변경이 필요하면 운영진에게 문의해 주세요."
               tone="info"
             />
           </div>
@@ -1230,6 +1342,7 @@ export function TournamentRosterPageClient({
                   key={draftForm.id}
                   formId={draftForm.id}
                   teamId={registration?.teamId ?? ''}
+                  genderCategory={tournament?.genderCategory ?? null}
                   onSubmit={handleAddPlayer}
                   onRemove={handleRemoveDraftForm}
                   onUserChange={handleDraftUserChange}

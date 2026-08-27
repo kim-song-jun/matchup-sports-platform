@@ -130,13 +130,25 @@ export class ReviewsService {
   /** 후기 한 건이 기여하던 집계만 골라 다시 계산한다. 소스·대상 조합마다 쌓이는 컬럼이 다르다. */
   private async recalculateForReview(
     tx: PrismaTx,
-    review: { sourceType: V1PostEventReviewSourceType; targetType: V1PostEventReviewTargetType; targetUserId: string | null; targetTeamId: string | null },
+    review: {
+      sourceType: V1PostEventReviewSourceType;
+      targetType: V1PostEventReviewTargetType;
+      targetUserId: string | null;
+      targetTeamId: string | null;
+      reviewerUserId: string;
+    },
   ) {
     if (review.targetType === 'user' && review.targetUserId) {
       if (review.sourceType === 'tournament_fixture') {
         await recalculateTournamentUserReputation(tx, review.targetUserId);
       } else {
         await this.recalculateUserReputation(tx, review.targetUserId);
+        // reveal(상호 공개)은 이 리뷰와 "짝"이 되는 반대 방향 리뷰의 존재 여부로도 결정된다
+        // (isReviewRevealed). 이 리뷰를 숨기거나 복구하면 작성자(reviewerUserId)가 같은
+        // 소스에서 "받은" 다른 리뷰의 reveal 여부도 함께 달라질 수 있으므로 작성자 본인의
+        // 캐시도 같이 다시 계산한다 — 안 그러면 숨김 처리 이후에도 작성자 화면엔 이미 사라진
+        // 리뷰가 계속 반영된 평판이 남는다(finding: 리뷰 대상만 재계산하는 반쪽 갱신).
+        await this.recalculateUserReputation(tx, review.reviewerUserId);
       }
       return;
     }
@@ -712,13 +724,39 @@ export class ReviewsService {
   }
 
   /**
+   * 사이드(side)별 최신 라인업 id. 라인업 저장은 매번 새 revision 행 + 새 참가자 행을 만들 뿐
+   * 이전 revision의 참가자 행을 지우지 않는다(team-match-lineup.service.ts에 delete/deleteMany가
+   * 0건) — 그래서 "그 경기에 실제로 뛴 명단"을 구하려면 gameId/sideId만으로는 부족하고 반드시
+   * 최신 revision 하나로 좁혀야 한다. team-match-lineup.service.ts의 private latestLineup()과
+   * 같은 규칙(revision desc, 상태 무관)을 그대로 따른다 — 두 곳이 서로 다른 "최신"의 정의를
+   * 갖게 되는 걸 막기 위해 규칙을 일치시켰다.
+   */
+  private async latestLineupIdsBySideId(sideIds: string[]): Promise<Map<string, string>> {
+    if (!sideIds.length) return new Map();
+    const lineups = await this.prisma.v1GameLineup.findMany({
+      where: { sideId: { in: sideIds } },
+      select: { id: true, sideId: true },
+      orderBy: { revision: 'desc' },
+    });
+    const latestBySideId = new Map<string, string>();
+    for (const lineup of lineups) {
+      if (!latestBySideId.has(lineup.sideId)) latestBySideId.set(lineup.sideId, lineup.id);
+    }
+    return latestBySideId;
+  }
+
+  /**
    * 팀 매치에서 "그 경기에 실제로 뛴 상대 선수" 명단.
    *
    * 근거는 제출된 라인업 하나뿐이다 — V1Game.teamMatchId 로 연결된 경기의, 상대 팀 사이드에 속한
-   * V1GameParticipant 중 userId 가 채워진 행(연동 팀원)만 센다. 게스트(userId=null)는 플랫폼 계정이
-   * 없어 평가 대상이 될 수 없고, 라인업을 제출하지 않은 팀 매치는 명단 자체가 없으므로 선수 후기도
-   * 없다(팀 후기만 남는다). 팀 멤버십 전원으로 대체하지 않는 이유: 그 경기에 안 뛴 사람까지
-   * 평가 대상이 되어 "상대했던 팀원"이라는 전제가 깨진다.
+   * "최신 revision 라인업"에 딸린 V1GameParticipant 중 userId 가 채워진 행(연동 팀원)만 센다.
+   * gameId/sideId만으로 조회하면 지워지지 않는 옛 revision의 참가자까지 섞여 최종 명단에서
+   * 빠진 선수가 계속 평가 대상으로 남는다(finding: 라인업을 rev1→rev2로 다시 저장해 선수를
+   * 뺐는데도 rev1 참가자가 그대로 남아 리뷰를 받음) — 그래서 latestLineupIdsBySideId()로 먼저
+   * "지금 유효한" 라인업만 골라낸 뒤 그 lineupId로만 조회한다. 게스트(userId=null)는 플랫폼
+   * 계정이 없어 평가 대상이 될 수 없고, 라인업을 제출하지 않은 팀 매치는 명단 자체가 없으므로
+   * 선수 후기도 없다(팀 후기만 남는다). 팀 멤버십 전원으로 대체하지 않는 이유: 그 경기에 안 뛴
+   * 사람까지 평가 대상이 되어 "상대했던 팀원"이라는 전제가 깨진다.
    */
   private async teamMatchOpponentRosters(teamMatchId: string, opponentTeamIds: string[]) {
     const rosterByTeamId = new Map<string, Array<{ userId: string; name: string; imageUrl: string | null }>>();
@@ -738,8 +776,12 @@ export class ReviewsService {
     const sideIds = [...sideIdsByTeamId.values()].flat();
     if (!sideIds.length) return rosterByTeamId;
 
+    const latestLineupIdBySideId = await this.latestLineupIdsBySideId(sideIds);
+    const latestLineupIds = [...latestLineupIdBySideId.values()];
+    if (!latestLineupIds.length) return rosterByTeamId;
+
     const participants = await this.prisma.v1GameParticipant.findMany({
-      where: { gameId: game.id, sideId: { in: sideIds }, userId: { not: null } },
+      where: { lineupId: { in: latestLineupIds }, userId: { not: null } },
       select: { sideId: true, userId: true, displayNameSnapshot: true },
     });
     // V1GameParticipant.userId 는 FK 가 아니라 nullable 컬럼이라(스키마 주석 참조) relation include 가
@@ -755,7 +797,8 @@ export class ReviewsService {
       const roster: Array<{ userId: string; name: string; imageUrl: string | null }> = [];
       for (const participant of participants) {
         if (!participant.userId || !teamSideIds.includes(participant.sideId)) continue;
-        // 라인업 개정(revision)이 여러 벌 남아 있으면 같은 사람이 여러 번 잡힌다.
+        // 최신 라인업으로 이미 좁혔지만, 한 사람이 같은 라인업에 중복 등록되는 입력 오류까지
+        // 대비해 dedup은 유지한다.
         if (seen.has(participant.userId)) continue;
         seen.add(participant.userId);
         const profile = profileById.get(participant.userId);
@@ -795,6 +838,11 @@ export class ReviewsService {
         include: reviewInclude(),
       });
       await this.recalculateUserReputation(tx, targetUserId);
+      // 이 제출이 "상대가 먼저 남겨둔 리뷰"의 reveal 짝을 완성시키는 이벤트일 수 있다 —
+      // 그 경우 나(user.id)를 target으로 하는 리뷰가 방금 공개로 바뀌므로 내 캐시도 같이
+      // 다시 계산해야 한다. target만 갱신하면 "받은 리뷰는 정확히 뜨는데 선수 카드 해금은
+      // 영영 안 열리는" 결함이 난다(리뷰어 본인 캐시가 재계산되는 경로가 없었음).
+      await this.recalculateUserReputation(tx, user.id);
       return created;
     }).catch(async (error: unknown) => {
       if (!isUniqueConstraintError(error)) throw error;
@@ -830,6 +878,9 @@ export class ReviewsService {
         include: reviewInclude(),
       });
       await this.recalculateUserReputation(tx, targetUserId);
+      // submitPersonalReview와 동일한 이유 — 이 제출이 상대가 먼저 남긴 리뷰의 reveal 짝을
+      // 완성시킬 수 있으므로 리뷰어 본인(user.id) 캐시도 함께 재계산한다.
+      await this.recalculateUserReputation(tx, user.id);
       return created;
     }).catch(async (error: unknown) => {
       if (!isUniqueConstraintError(error)) throw error;
@@ -1017,7 +1068,11 @@ export class ReviewsService {
     return { teams, users };
   }
 
-  /** 여러 팀 매치의 상대팀 로스터를 한 번에 — 목록 화면이 매치마다 왕복하지 않도록 배치 조회한다. */
+  /**
+   * 여러 팀 매치의 상대팀 로스터를 한 번에 — 목록 화면이 매치마다 왕복하지 않도록 배치 조회한다.
+   * teamMatchOpponentRosters()와 동일한 이유로 최신 revision 라인업으로만 좁힌다 — 안 그러면
+   * "남은 리뷰 N명" 카운트가 지워지지 않는 옛 라인업 참가자만큼 부풀려진다.
+   */
   private async teamMatchRostersBySource(teamMatchIds: string[]) {
     const empty = new Map<string, Map<string, string[]>>();
     if (!teamMatchIds.length) return empty;
@@ -1028,10 +1083,16 @@ export class ReviewsService {
     });
     if (!games.length) return empty;
 
-    const participants = await this.prisma.v1GameParticipant.findMany({
-      where: { gameId: { in: games.map((game) => game.id) }, userId: { not: null } },
-      select: { gameId: true, sideId: true, userId: true },
-    });
+    const sideIds = games.flatMap((game) => game.sides.map((side) => side.id));
+    const latestLineupIdBySideId = await this.latestLineupIdsBySideId(sideIds);
+    const latestLineupIds = [...latestLineupIdBySideId.values()];
+
+    const participants = latestLineupIds.length
+      ? await this.prisma.v1GameParticipant.findMany({
+          where: { lineupId: { in: latestLineupIds }, userId: { not: null } },
+          select: { gameId: true, sideId: true, userId: true },
+        })
+      : [];
 
     for (const game of games) {
       if (!game.teamMatchId) continue;

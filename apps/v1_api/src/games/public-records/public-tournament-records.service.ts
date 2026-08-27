@@ -64,7 +64,10 @@ const FIXTURE_SCHEDULE_SELECT = {
   homeRegistration: { select: { team: { select: { id: true, name: true } } } },
   awayRegistration: { select: { team: { select: { id: true, name: true } } } },
   group: { select: { name: true } },
-  field: { select: { name: true } },
+  // finding #76: id도 함께 내려준다 -- fieldName만 있으면 소비처(my-staff-fixtures-client.tsx)가
+  // 필드를 문자열로만 매칭해야 해서, 같은 이름의 필드가 두 개 생기면(이름 유일성 제약이
+  // 없다) 담당자가 아닌 경기까지 "내 담당"으로 잘못 묶인다.
+  field: { select: { id: true, name: true } },
   videos: { select: { id: true } },
   game: {
     select: {
@@ -754,8 +757,14 @@ export class PublicTournamentRecordsService {
     const hideIdentity = shouldHideParticipantIdentity(tournament.status, isStaffBypass);
 
     const lineup = buildLineup(fixture, mode, consentMap, nameProfileByUserId, isStaffBypass);
+    // finding #60: 종료(ended) 직후~공식 확정(officialize) 전 창에서는 위 714-717줄의
+    // `liveScore` 게이트가 이미 닫혀 score=null("- : -")을 보여준다. 이벤트 타임라인이
+    // status_only 만 게이팅하면 이 창에서 score는 비어 있는데 골 타임라인은 그대로 남아
+    // 같은 화면이 서로 모순된 사실을 말한다 — pendingProjection이 식별하는 것과 같은
+    // 창이므로 그 조건을 재사용해 이벤트도 함께 가린다.
+    const hidePendingOfficialEvents = status === 'ended' && !showOfficialResult;
     const events =
-      mode === 'status_only'
+      mode === 'status_only' || hidePendingOfficialEvents
         ? []
         : await this.buildEvents(
             fixture.game?.id ?? null,
@@ -779,7 +788,10 @@ export class PublicTournamentRecordsService {
             select: { revision: true, state: true, officialAt: true, reason: true, supersedesId: true },
           });
 
-    const nextMatch = await this.findNextMatch(fixture);
+    // finding #57: hideIdentity를 넘기지 않으면 이 경기의 home/away는 가려도
+    // findNextMatch가 실명을 그대로 돌려줘, 두 팀 중 정의상 하나(이 경기 참가팀)가
+    // 즉시 재식별된다 — home/away presentSide(아래 797-798줄)와 같은 스코프를 쓴다.
+    const nextMatch = await this.findNextMatch(fixture, hideIdentity);
 
     return {
       tournamentId: tournament.id,
@@ -809,7 +821,12 @@ export class PublicTournamentRecordsService {
       // 몰수·중단 종결 표시. 정상 종료(NORMAL)면 null 이라 기존 화면 계약은 그대로다 —
       // 관전자에게 매번 "정상 종료"라고 말할 이유는 없다. 공식 결과가 공개된 경우에만
       // 내보낸다(showOfficialResult) — 아직 공개 전인 결과의 사유를 미리 흘리면 안 된다.
+      // finding #58: `mode !== 'status_only'`를 함께 요구한다 — status_only는 위 723줄
+      // `score`를 이미 null로 가리므로(docs/api/domains/public-records.md:285-291의
+      // "점수와 사유는 함께 나가거나 함께 빠져야 한다" 불변식), 이 필드만 게이트가
+      // 없으면 "- : -"인데 "몰수으로 종료된 경기예요"가 함께 뜨는 자기모순이 생긴다.
       outcome:
+        mode !== 'status_only' &&
         showOfficialResult &&
         fixture.game?.currentOfficialRevision != null &&
         fixture.game.currentOfficialRevision.outcomeReason !== 'NORMAL'
@@ -1214,7 +1231,13 @@ export class PublicTournamentRecordsService {
     return result;
   }
 
-  private async findNextMatch(fixture: FixtureMatchRow) {
+  /**
+   * `hideIdentity`(finding #57) -- 이 경기의 home/away를 가릴 때(모집 중 대회)는
+   * 다음 경기의 팀명도 함께 가려야 한다. 쿼리 조건이 이 경기의 registrationId 중
+   * 하나를 요구하므로, 반환되는 `next.home`/`next.away` 중 한쪽은 정의상 방금
+   * 가린 두 팀 중 하나와 같은 팀이다 -- 가리지 않으면 재식별 경로가 된다.
+   */
+  private async findNextMatch(fixture: FixtureMatchRow, hideIdentity: boolean) {
     if (fixture.scheduledAt === null) return null;
     const registrationIds = [fixture.homeRegistrationId, fixture.awayRegistrationId].filter(
       (id): id is string => id !== null,
@@ -1242,10 +1265,10 @@ export class PublicTournamentRecordsService {
       round: next.round,
       scheduledAt: next.scheduledAt?.toISOString() ?? null,
       home: next.homeRegistration
-        ? { teamId: next.homeRegistration.team.id, teamName: next.homeRegistration.team.name }
+        ? { teamId: hideIdentity ? null : next.homeRegistration.team.id, teamName: hideIdentity ? null : next.homeRegistration.team.name }
         : null,
       away: next.awayRegistration
-        ? { teamId: next.awayRegistration.team.id, teamName: next.awayRegistration.team.name }
+        ? { teamId: hideIdentity ? null : next.awayRegistration.team.id, teamName: hideIdentity ? null : next.awayRegistration.team.name }
         : null,
     };
   }
@@ -1349,8 +1372,10 @@ export class PublicTournamentRecordsService {
       nameProfileByUserId,
       false,
     );
+    // finding #60: getMatch 와 동일한 창(종료~공식 확정 전)에 대한 트윈 게이트.
+    const hidePendingOfficialEvents = status === 'ended' && !showOfficialResult;
     const events =
-      mode === 'status_only'
+      mode === 'status_only' || hidePendingOfficialEvents
         ? []
         : await this.buildEvents(
             teamMatch.game?.id ?? null,
@@ -1411,7 +1436,9 @@ export class PublicTournamentRecordsService {
       events,
       mvp,
       // getMatch 와 동일한 게이트 — 공식 결과가 공개된 몰수·중단만 사유를 내보낸다.
+      // finding #58: mode !== 'status_only' 도 같은 이유로 함께 요구한다(getMatch 참고).
       outcome:
+        mode !== 'status_only' &&
         showOfficialResult &&
         teamMatch.game?.currentOfficialRevision != null &&
         teamMatch.game.currentOfficialRevision.outcomeReason !== 'NORMAL'
@@ -1561,9 +1588,13 @@ function presentScheduleEntry(
   // (consent)가 eligible일 때만 이름을 채우고, 아니면 시간만 남긴다. "보이면 어떤
   // 이름인가"는 resolveParticipantDisplayName(2026-08-18 닉네임 기본 + 프로필 토글)이
   // 정한다.
+  // finding #60: getMatch/getLeagueFixtureRecord와 동일한 트윈 게이트 — 종료됐지만
+  // 아직 공식 확정 전인 경기는 score가 이미 null(위 clock 게이트 참고)이므로 득점자
+  // 요약도 함께 비운다.
+  const hidePendingOfficialEvents = status === 'ended' && !showOfficialResult;
   const participantById = new Map((fixture.game?.participants ?? []).map((p) => [p.id, p] as const));
   const summarizedEvents =
-    mode === 'status_only' || fixture.game === null
+    mode === 'status_only' || hidePendingOfficialEvents || fixture.game === null
       ? []
       : (eventsByGameId.get(fixture.game.id) ?? []).map((raw) => {
           const consent = raw.participantId === null ? undefined : consentMap.get(raw.participantId);
@@ -1601,6 +1632,10 @@ function presentScheduleEntry(
     groupName: fixture.group?.name ?? null,
     scheduledAt: fixture.scheduledAt?.toISOString() ?? null,
     venue: fixture.venue,
+    // finding #76: fieldId도 함께 내려준다 -- 위 FIXTURE_SCHEDULE_SELECT의 field.id 참고.
+    // 소비처(my-staff-fixtures-client.tsx)가 이제 이 값으로 담당 경기를 매칭한다
+    // (이름은 유일하지 않아 동명 필드가 생기면 오배정된다).
+    fieldId: fixture.field?.id ?? null,
     fieldName: fixture.field?.name ?? null,
     home: presentSide(fixture.homeRegistrationId, fixture.homeRegistration, hideIdentity),
     away: presentSide(fixture.awayRegistrationId, fixture.awayRegistration, hideIdentity),
@@ -1616,10 +1651,13 @@ function presentScheduleEntry(
     periodBreak,
     scorers,
     cards,
-    // **이 뷰의 점수 공개 게이트(`showOfficialResult`)를 그대로 따른다.** 여기서 outcome
-    // 전용 조건을 따로 만들지 않는 이유: 목록이 `0:0` 은 보여주면서 그게 몰수라는 사실만
-    // 감추면, 이 필드를 추가한 목적 자체가 무너진다 — 점수와 사유는 함께 나가거나 함께
-    // 빠져야 한다.
+    // **이 뷰의 점수 공개 게이트를 그대로 따른다.** outcome 전용 조건을 따로 만들지
+    // 않는 이유: 목록이 `0:0` 은 보여주면서 그게 몰수라는 사실만 감추면, 이 필드를
+    // 추가한 목적 자체가 무너진다 — 점수와 사유는 함께 나가거나 함께 빠져야 한다.
+    // finding #58: 그 "점수 공개 게이트"는 `showOfficialResult` 단독이 아니라 위 1630줄
+    // `score`가 실제로 쓰는 `mode === 'status_only' ? null : ...`까지 포함해야 이
+    // 주석의 의도가 실제로 지켜진다 — `showOfficialResult`만 보면 status_only 모드에서
+    // score=null인데 outcome은 그대로 새는 자기모순이 생겼었다.
     //
     // 알려진 차이: 상세(`getMatch`)의 `showOfficialResult` 는 `officialAt !== null` 까지
     // 요구하지만 이 목록은 요구하지 않는다(이 PR 이전부터 **점수**에 대해 그랬다). 따라서
@@ -1627,6 +1665,7 @@ function presentScheduleEntry(
     // 게이트 차이를 좁히는 것은 기존 점수 노출 동작을 바꾸는 별개 변경이라 여기서 하지
     // 않는다(`schedule-scorers.spec.ts` 가 현재 동작을 고정한다).
     outcome:
+      mode !== 'status_only' &&
       showOfficialResult &&
       fixture.game?.currentOfficialRevision != null &&
       fixture.game.currentOfficialRevision.outcomeReason !== 'NORMAL'

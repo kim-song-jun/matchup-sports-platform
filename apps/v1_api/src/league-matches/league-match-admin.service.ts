@@ -462,15 +462,40 @@ export class LeagueMatchAdminService {
         // 먼저 들어온 동시 요청이 이미 뺐다 — 같은 결과를 두 번 만들지 않는다.
         throw new NotFoundException({ code: 'LEAGUE_TEAM_NOT_FOUND', message: '이 리그에 참가 중인 팀이 아니에요.' });
       }
-      if (checkLeagueTeamRemovalAllowed({ remainingTeamCount: remainingAfterRemoval, hasOfficialResultForTeam }) === 'TEAM_COUNT_BELOW_MINIMUM') {
+      // 감사 결함(index 84): 위의 "2팀 이상" 재검사와 똑같은 이유로, "공식 결과 존재" 게이트와
+      // 취소 대상 대진 목록도 잠금 밖 스냅샷(teamFixtures/hasOfficialResultForTeam)을 그대로
+      // 쓰면 TOCTOU다 — (a) 결과 확정 요청과 이 제거 요청이 동시에 들어오면 확정된 경기가
+      // 게이트를 피해 취소되고, 그 경기가 순위표(cancelled 전부 제외)에서 사라져 상대팀이
+      // 실제로 거둔 승리 기록까지 함께 지워진다. (b) 대진 대량 생성(같은 리그 행을 잠그고
+      // 도는 트랜잭션, :197)이 이 요청보다 늦게 커밋되면, 잠금 밖에서 읽은 teamFixtures엔
+      // 아직 없던 새 대진이 하나도 취소되지 않은 채 팀만 로스터에서 빠져 유령 대진이 남는다.
+      // 잠금을 얻은 뒤 tx로 다시 읽어 두 값 다 커밋된 상태 기준으로 재검증한다.
+      const freshTeamFixtures = await tx.v1TeamMatch.findMany({
+        where: { leagueId, OR: [{ hostTeamId: teamId }, { approvedApplicantTeamId: teamId }] },
+        select: { id: true, status: true, game: { select: { currentOfficialRevisionId: true } } },
+      });
+      const freshHasOfficialResultForTeam = freshTeamFixtures.some(
+        (fixture) => fixture.game?.currentOfficialRevisionId != null,
+      );
+      const reChecked = checkLeagueTeamRemovalAllowed({
+        remainingTeamCount: remainingAfterRemoval,
+        hasOfficialResultForTeam: freshHasOfficialResultForTeam,
+      });
+      if (reChecked === 'TEAM_COUNT_BELOW_MINIMUM') {
         throw new UnprocessableEntityException({
           code: 'LEAGUE_TEAM_INVALID',
           message: '리그는 서로 다른 팀 2개 이상이 필요해요.',
         });
       }
+      if (reChecked === 'HAS_OFFICIAL_RESULT') {
+        throw new ConflictException({
+          code: 'LEAGUE_TEAM_HAS_OFFICIAL_RESULTS',
+          message: '이 팀은 이미 확정된 경기 결과가 있어 제외할 수 없어요.',
+        });
+      }
 
       let cancelled = 0;
-      for (const fixture of teamFixtures) {
+      for (const fixture of freshTeamFixtures) {
         if (fixture.status === 'cancelled') continue;
         await tx.v1TeamMatch.update({ where: { id: fixture.id }, data: { status: 'cancelled', cancelledAt: new Date() } });
         await this.cascadeCancelFixtureInTx(tx, fixture.id, TEAM_REMOVAL_CANCEL_REASON);
@@ -724,6 +749,14 @@ export class LeagueMatchAdminService {
     if (teamMatch === null) {
       throw new NotFoundException({ code: 'LEAGUE_NOT_FOUND', message: '이 리그의 대진이 아니에요.' });
     }
+    // 감사 결함(index 9): timing으로 생성된 대진은 startAt·endAt이 한 슬롯의 시작·끝이다.
+    // startAt만 바꾸고 endAt을 그대로 두면 "종료가 시작보다 이전"인 옛 값이 남는다 — 원래
+    // duration(endAt-startAt, generateFixtures가 resolveFixtureTimeSlots로 채운 값)을 새
+    // startAt에 그대로 적용해 유지한다. timing 없이 만들어져 endAt이 애초에 없는(null)
+    // 대진은 계속 없음으로 둔다 — duration 자체가 정의되지 않으므로 임의로 만들어내지 않는다.
+    const durationMs = teamMatch.endAt !== null ? teamMatch.endAt.getTime() - teamMatch.startAt.getTime() : null;
+    const nextStartAt = dto.startsAt === undefined ? undefined : new Date(dto.startsAt);
+    const nextEndAt = nextStartAt !== undefined && durationMs !== null ? new Date(nextStartAt.getTime() + durationMs) : undefined;
     const updated = await this.prisma.$transaction(async (tx) => {
       // generateFixtures와 동일하게: 빈/공백 문자열로 지우는 요청은 "미지정"으로 되돌린다 —
       // 그대로 저장하면 loadRecentVenues distinct 집계에서 조용히 빠지는 값이 남는다.
@@ -731,7 +764,8 @@ export class LeagueMatchAdminService {
       const result = await tx.v1TeamMatch.update({
         where: { id: teamMatchId },
         data: {
-          ...(dto.startsAt === undefined ? {} : { startAt: new Date(dto.startsAt) }),
+          ...(nextStartAt === undefined ? {} : { startAt: nextStartAt }),
+          ...(nextEndAt === undefined ? {} : { endAt: nextEndAt }),
           ...(trimmedPlaceName === undefined ? {} : { placeName: trimmedPlaceName ? trimmedPlaceName : DEFAULT_FIXTURE_PLACE_NAME }),
           ...(dto.placeAddress === undefined ? {} : { placeAddress: dto.placeAddress }),
         },
@@ -748,13 +782,23 @@ export class LeagueMatchAdminService {
           action: 'league_match.update_fixture',
           targetType: 'team_match',
           targetId: teamMatchId,
-          afterJson: { startAt: result.startAt.toISOString(), placeName: result.placeName },
+          afterJson: {
+            startAt: result.startAt.toISOString(),
+            endAt: result.endAt !== null ? result.endAt.toISOString() : null,
+            placeName: result.placeName,
+          },
         },
         tx,
       );
       return result;
     });
-    return { teamMatchId: updated.id, startAt: updated.startAt, placeName: updated.placeName, placeAddress: updated.placeAddress };
+    return {
+      teamMatchId: updated.id,
+      startAt: updated.startAt,
+      endAt: updated.endAt,
+      placeName: updated.placeName,
+      placeAddress: updated.placeAddress,
+    };
   }
 
   // R6/D-3: 전 대진이 확정되면 리그는 자동으로 completed 전이한다(LeagueCompletionProjectionService).

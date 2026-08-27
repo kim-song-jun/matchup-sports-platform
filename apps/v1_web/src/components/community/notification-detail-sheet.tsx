@@ -33,9 +33,12 @@ export function NotificationDetailSheet({ notification, onClose, onNavigate }: N
   const lastNotificationRef = useRef<NotificationModel | null>(null);
 
   // 열릴 때 이전 포커스 저장, 닫힐 때 복원 (WCAG 2.4.3)
+  // 포커스 복원은 **시트가 실제로 사라진 뒤**(mounted=false)에 한다. open 기준으로
+  // 하면 퇴장 애니메이션이 도는 220ms 동안 시트는 화면에 있는데 포커스만 뒤로 가서,
+  // 그 사이 Tab·ESC 가 시트 밖으로 새어 나간다.
   useEffect(() => {
-    if (open) {
-      previousFocusRef.current = document.activeElement;
+    if (mounted) {
+      if (open) previousFocusRef.current = document.activeElement;
       return;
     }
     const el = previousFocusRef.current;
@@ -43,7 +46,7 @@ export function NotificationDetailSheet({ notification, onClose, onNavigate }: N
       (el as HTMLElement).focus();
     }
     previousFocusRef.current = null;
-  }, [open]);
+  }, [open, mounted]);
 
   // 열릴 때 닫기 버튼에 초기 포커스
   useEffect(() => {
@@ -52,19 +55,20 @@ export function NotificationDetailSheet({ notification, onClose, onNavigate }: N
     return () => clearTimeout(id);
   }, [open]);
 
-  // ESC로 닫기
+  // ESC·focus trap 은 시트가 화면에 있는 동안(mounted) 유지한다 — 닫히는 중에
+  // 풀리면 그 사이 키 입력이 뒤 화면으로 샌다.
   useEffect(() => {
-    if (!open) return;
+    if (!mounted) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [open, onClose]);
+  }, [mounted, onClose]);
 
   // focus trap
   useEffect(() => {
-    if (!open) return;
+    if (!mounted) return;
     const dialog = dialogRef.current;
     if (!dialog) return;
     const FOCUSABLE =
@@ -89,11 +93,12 @@ export function NotificationDetailSheet({ notification, onClose, onNavigate }: N
 
     document.addEventListener('keydown', trap);
     return () => document.removeEventListener('keydown', trap);
-  }, [open]);
+  }, [mounted]);
 
-  // body 스크롤 잠금
+  // body 스크롤 잠금도 시트가 사라진 뒤에 푼다 — 닫히는 중에 풀면 시트가 아직
+  // 화면에 있는데 뒤 화면이 스크롤된다.
   useEffect(() => {
-    if (open) {
+    if (mounted) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
@@ -101,7 +106,7 @@ export function NotificationDetailSheet({ notification, onClose, onNavigate }: N
     return () => {
       document.body.style.overflow = '';
     };
-  }, [open]);
+  }, [mounted]);
 
   // 닫히는 동안 보여줄 내용을 붙들어 둔다 — notification 이 곧 열림 상태라
   // 그대로 두면 퇴장 애니메이션이 도는 사이 빈 시트가 보인다.

@@ -14,7 +14,10 @@ import { mkdir } from 'node:fs/promises';
 const BASE = process.env.ALPHA_BASE ?? 'https://alpha.teameet.co.kr';
 // 날짜를 하드코딩하면 다음에 돌릴 때 옛 캡처를 덮어써서 비교가 불가능해진다.
 const STAMP = new Date().toISOString().slice(0, 10).replace(/-/g, '').slice(2);
-const OUT = process.env.OUT_DIR ?? `.screenshots/spacing-grid-${STAMP}`;
+// output/ 아래에 둔다 — .screenshots/ 는 .gitignore 에 없어서, 반복 실행하는
+// 하네스가 PNG 를 작업트리에 쌓고 실수로 커밋될 수 있다(실측: 이미 다른 실행의
+// .screenshots/* 여러 개가 untracked 로 남아 있다).
+const OUT = process.env.OUT_DIR ?? `output/spacing-grid-${STAMP}`;
 const WIDTHS = [
   ['mobile', 390, 950],
   ['tablet', 768, 1024],
@@ -112,9 +115,13 @@ const AUDIT = () => {
   let checked = 0, autoSkipped = 0;
   const off = [];
   for (const el of document.querySelectorAll('body *')) {
-    const r = el.getBoundingClientRect();
-    if (!r.width && !r.height) continue;   // 숨겨진 요소는 화면에 없다
-    const cs = getComputedStyle(el);
+    // "화면에 없다" 는 display:none 처럼 **레이아웃에서 빠진** 경우로만 좁힌다.
+    // width/height 가 0 이어도 margin 은 실제 여백을 만든다(빈 div 의 margin-bottom
+    // 등) — 크기로 거르면 그런 이탈을 통째로 놓친다.
+    const cs0 = getComputedStyle(el);
+    if (cs0.display === 'none' || cs0.visibility === 'hidden') continue;
+    if (!el.getClientRects().length && cs0.position !== 'fixed') continue;
+    const cs = cs0;
     for (const p of PROPS) {
       if (p.startsWith('margin') && isAuto(el, p)) { autoSkipped++; continue; }
       const raw = parseFloat(cs[p]);

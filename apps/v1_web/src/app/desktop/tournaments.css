@@ -129,7 +129,13 @@
   gap: 12px;
 }
 
-@media (min-width: 1024px) {
+/* 768 에서 그리드로 전환한다. 그 전에는 카드가 560px 폭을 혼자 쓰는데 내용은
+ * 390px 기준이라 가로로 텅 빈다(실측: 768 에서 1열·카드 560px).
+ * auto-fit minmax(300px) 라 768(프레임 600px)에서는 2열, 1024+ 에서는 3열이
+ * 자연히 나온다 — 분기를 하나 더 만들지 않고 시작점만 내린다.
+ * 매치 목록(desktop/matches.css:159)이 이미 같은 폭에서 2열로 가고 있어
+ * 목록끼리의 동작도 맞는다. */
+@media (min-width: 768px) {
   .tm-tournament-list-grid {
     display: grid;
     flex-direction: unset;

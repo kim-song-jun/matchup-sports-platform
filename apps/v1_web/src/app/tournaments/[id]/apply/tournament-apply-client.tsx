@@ -507,6 +507,7 @@ function ExpandableCheckRow({
     >
       {/* Main row: checkbox label + expand toggle */}
       <div
+        className="tm-auth-check-row"
         style={{
           display: 'flex',
           alignItems: 'center',

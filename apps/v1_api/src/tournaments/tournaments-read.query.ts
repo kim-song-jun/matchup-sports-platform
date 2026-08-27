@@ -124,6 +124,12 @@ export const TOURNAMENT_DETAIL_INCLUDE = {
       registrations: {
         where: { status: 'confirmed' },
       },
+      // 시상 화면의 '참가팀 후기' 개수 배지가 아래 reviews의 take:30 잘린 배열
+      // length를 쓰면 31건째부터 틀린 숫자로 고정된다(감사 evidence) — 별도 전체
+      // 카운트를 함께 내려 presenter가 잘리지 않은 총계를 노출하게 한다.
+      reviews: {
+        where: { hiddenAt: null },
+      },
     },
   },
   reviews: {

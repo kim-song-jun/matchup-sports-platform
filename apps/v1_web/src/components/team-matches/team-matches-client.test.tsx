@@ -2,8 +2,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
 import type { V1TeamMatch, V1TeamMatchViewerState } from '@/types/api';
-import type { TeamMatchDetailViewModel, TeamMatchModel } from './team-matches.types';
-import { TeamMatchDetailPageClient, toTeamMatch } from './team-matches-client';
+import type { TeamMatchDetailViewModel, TeamMatchListViewModel, TeamMatchModel } from './team-matches.types';
+import { TeamMatchDetailPageClient, TeamMatchListPageClient, toTeamMatch } from './team-matches-client';
 
 vi.mock('@/lib/analytics', () => ({ trackEvent: vi.fn() }));
 
@@ -14,6 +14,7 @@ const {
   routerPush,
   useV1TeamMatchMock,
   useV1TeamMatchEligibilityMock,
+  useV1TeamMatchesMock,
 } = vi.hoisted(() => {
   const withdrawTeamMatchMutateAsync = vi.fn();
   return {
@@ -28,6 +29,7 @@ const {
     routerPush: vi.fn(),
     useV1TeamMatchMock: vi.fn(),
     useV1TeamMatchEligibilityMock: vi.fn(),
+    useV1TeamMatchesMock: vi.fn(),
   };
 });
 
@@ -50,6 +52,10 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1CancelTeamMatch: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useV1ResolveChatRoom: () => ({ mutate: vi.fn(), isPending: false }),
   useV1WithdrawTeamMatchApplication: useV1WithdrawTeamMatchApplicationMock,
+  useV1TeamMatches: useV1TeamMatchesMock,
+  useV1MasterSports: () => ({ data: [] }),
+  useV1RecentSearches: () => ({ data: { items: [] }, isLoading: false }),
+  useV1RecordSearch: () => ({ mutate: vi.fn() }),
 }));
 
 vi.mock('./team-matches-page', () => ({
@@ -70,9 +76,16 @@ vi.mock('./team-matches-page', () => ({
       {model.onApply && <button onClick={model.onApply}>상대팀 신청</button>}
       {model.resultAction && <a href={model.resultAction.href}>{model.resultAction.label}</a>}
       {model.reviewAction && <a href={model.reviewAction.href}>{model.reviewAction.label}</a>}
+      <span data-testid="team-match-chat-label">{model.chatLabel}</span>
+      {model.onChat && <button onClick={model.onChat}>채팅 열기</button>}
     </div>
   ),
-  TeamMatchListPageView: () => null,
+  TeamMatchListPageView: ({ model }: { model: TeamMatchListViewModel }) => (
+    <div>
+      <span data-testid="team-match-count">{model.matches.length}</span>
+      {model.hasNext && model.onLoadMore ? <button onClick={model.onLoadMore}>더 보기</button> : null}
+    </div>
+  ),
   TeamMatchStatePageView: () => null,
 }));
 
@@ -251,6 +264,90 @@ describe('TeamMatchDetailPageClient — result action routing gate (Task 17)', (
     expect(screen.queryByRole('link', { name: '경기 결과 입력' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: '경기 결과 대기' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: '경기 결과 확인/승인' })).not.toBeInTheDocument();
+  });
+});
+
+// 감사 결함 2건 회귀 방지 (2026-08-27):
+// ① canOpenTeamMatchChat 이 viewerState('host_team'/'approved')를 봤는데, 그건 host 팀
+//    owner/manager 와 "신청서를 낸 사람 한 명"만 통과한다 — 리그 대진처럼 운영자가 신청서를
+//    대신 내면 상대팀 owner/manager는 채팅 버튼 자체를 못 봤다.
+// ② status='matched' 로 좁힌 서버 엔타이틀먼트가 결과 제출로 completed 전이되는 순간 채팅을
+//    끊어, 버튼은 그대로 활성인데 눌러도 죽는(409) 증상을 만들었다. 서버(chat-entitlement.ts/
+//    chat.service.ts)를 completed 도 허용하도록 넓혔으니, 프론트 게이트도 status 를 더 이상
+//    보지 않고 팀 멤버십만 봐야 completed 이후에도 버튼이 계속 동작한다.
+describe('TeamMatchDetailPageClient — 채팅 게이트는 팀 멤버십 기준이고 경기 종료 후에도 유지된다', () => {
+  function mockTeamMatchForChat(
+    viewer: { state: V1TeamMatchViewerState; manageableHostTeam?: boolean; manageableOpponentTeam?: boolean },
+    status: string,
+  ) {
+    useV1TeamMatchMock.mockReturnValue({
+      data: {
+        id: 'team-match-1',
+        teamMatchId: 'team-match-1',
+        title: '풋살 팀매치',
+        sportName: '풋살',
+        sport: { sportId: 'sport-futsal', name: '풋살' },
+        placeName: '서울 풋살장',
+        startsAt: '2026-08-01T10:00:00.000Z',
+        capacityText: '2/2',
+        displayState: status,
+        status,
+        viewer: {
+          state: viewer.state,
+          manageableHostTeam: viewer.manageableHostTeam ?? false,
+          manageableOpponentTeam: viewer.manageableOpponentTeam ?? false,
+        },
+        hostTeam: { teamId: 'team-host', name: '호스트 팀' },
+      },
+      isError: false,
+    });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useV1TeamMatchEligibilityMock.mockReturnValue({ data: undefined, isSuccess: false });
+  });
+
+  it('호스트팀 운영진은 매칭 상태에서 채팅을 연다', () => {
+    mockTeamMatchForChat({ state: 'host_team', manageableHostTeam: true }, 'matched');
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    expect(screen.getByRole('button', { name: '채팅 열기' })).toBeInTheDocument();
+    expect(screen.getByTestId('team-match-chat-label')).toHaveTextContent('채팅');
+  });
+
+  it('리그 대진 상대팀 owner/manager는 신청서를 직접 내지 않았어도(state=none) 채팅을 연다', () => {
+    mockTeamMatchForChat({ state: 'none', manageableOpponentTeam: true }, 'matched');
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    expect(screen.getByRole('button', { name: '채팅 열기' })).toBeInTheDocument();
+  });
+
+  it('경기가 completed 로 넘어간 뒤에도 호스트팀 운영진의 채팅 버튼은 계속 동작한다', () => {
+    mockTeamMatchForChat({ state: 'host_team', manageableHostTeam: true }, 'completed');
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    expect(screen.getByRole('button', { name: '채팅 열기' })).toBeInTheDocument();
+  });
+
+  it('경기가 completed 로 넘어간 뒤에도 상대팀 운영진의 채팅 버튼은 계속 동작한다', () => {
+    mockTeamMatchForChat({ state: 'approved', manageableOpponentTeam: true }, 'completed');
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    expect(screen.getByRole('button', { name: '채팅 열기' })).toBeInTheDocument();
+  });
+
+  it('팀 관리 권한이 없는 뷰어에게는 채팅 버튼이 없다', () => {
+    mockTeamMatchForChat({ state: 'none' }, 'matched');
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    expect(screen.queryByRole('button', { name: '채팅 열기' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('team-match-chat-label')).toHaveTextContent('승인 후 채팅');
   });
 });
 
@@ -709,5 +806,52 @@ describe('TeamMatchDetailPageClient — 신청 중인 뷰어의 히어로 CTA는
     expect(label).not.toHaveTextContent('브라보FC');
     expect(label).not.toHaveTextContent('신청 취소');
     expect(label.textContent?.trim()).toBeTruthy();
+  });
+});
+
+// 20건 컷오프 페이지네이션 결함 회귀 방지(2026-08-27 감사) — matches-client.test.tsx의
+// 동일 계열 테스트와 짝을 이룬다.
+describe('TeamMatchListPageClient — 커서 페이지네이션 누적', () => {
+  function page(items: Array<{ id: string; title: string }>, nextCursor: string | null) {
+    return {
+      data: {
+        items: items.map((item) => ({
+          id: item.id,
+          teamMatchId: item.id,
+          title: item.title,
+          sportName: '풋살',
+          startsAt: '2026-09-01T10:00:00.000Z',
+          status: 'recruiting' as const,
+        })),
+        nextCursor,
+        pageInfo: { nextCursor, hasNext: nextCursor !== null },
+      },
+      isError: false,
+      isFetching: false,
+      isLoading: false,
+    };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useV1TeamMatchesMock.mockImplementation((filters?: { cursor?: string }, options?: { enabled?: boolean }) => {
+      if (options && options.enabled === false) {
+        return { data: undefined, isError: false, isFetching: false, isLoading: false };
+      }
+      if (!filters?.cursor) {
+        return page([{ id: 'tm1', title: '팀매치 1' }], 'cursor-page-2');
+      }
+      return page([{ id: 'tm2', title: '팀매치 2' }], null);
+    });
+  });
+
+  it('첫 페이지는 hasNext=true로 "더 보기"를 보여주고, 클릭하면 두 번째 페이지가 이어 붙는다', () => {
+    render(<TeamMatchListPageClient />);
+
+    expect(screen.getByTestId('team-match-count')).toHaveTextContent('1');
+    fireEvent.click(screen.getByRole('button', { name: '더 보기' }));
+
+    expect(screen.getByTestId('team-match-count')).toHaveTextContent('2');
+    expect(screen.queryByRole('button', { name: '더 보기' })).not.toBeInTheDocument();
   });
 });

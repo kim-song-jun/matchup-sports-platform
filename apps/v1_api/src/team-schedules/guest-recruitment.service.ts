@@ -4,11 +4,17 @@ import { Prisma, V1ScheduleGuestRecruitment } from '@prisma/client';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { canonicalGameCommandPayloadHash } from '../games/games.service';
 import { PrismaService } from '../prisma/prisma.service';
-import type { CreateGuestApplicationDto, CreateGuestRecruitmentDto, UpdateGuestRecruitmentDto } from './dto/guest-recruitment.dto';
+import type {
+  CreateGuestApplicationDto,
+  CreateGuestRecruitmentDto,
+  ReviewGuestApplicationDto,
+  UpdateGuestRecruitmentDto,
+} from './dto/guest-recruitment.dto';
 
 const CREATE_ACTION = 'SCHEDULE_GUEST_RECRUITMENT_CREATE';
 const UPDATE_ACTION = 'SCHEDULE_GUEST_RECRUITMENT_UPDATE';
 const APPLICATION_ACTION = 'SCHEDULE_GUEST_RECRUITMENT_APPLY';
+const REVIEW_ACTION = 'SCHEDULE_GUEST_APPLICATION_REVIEW';
 const RECRUITMENT_RESOURCE_TYPE = 'V1_SCHEDULE_GUEST_RECRUITMENT';
 const APPLICATION_RESOURCE_TYPE = 'V1_SCHEDULE_GUEST_APPLICATION';
 const IDEMPOTENCY_RETENTION_MS = 30 * 24 * 60 * 60 * 1_000;
@@ -36,6 +42,23 @@ export interface ApplicationResponse {
   displayName: string;
   note: string | null;
   alreadyApplied: boolean;
+}
+
+export interface ApplicationListItemView {
+  applicationId: string;
+  displayName: string;
+  note: string | null;
+  state: string;
+  createdAt: string;
+}
+
+export interface ReviewApplicationResponse {
+  applicationId: string;
+  state: string;
+  displayName: string;
+  note: string | null;
+  recruitmentState: string;
+  alreadyProcessed: boolean;
 }
 
 /**
@@ -566,6 +589,220 @@ export class GuestRecruitmentService {
   }
 
   /**
+   * manager+ only. Not part of the frozen contract table (docs/api/global-contract.md lists only
+   * GET/POST/PATCH .../guest-recruitment + POST .../applications) — added because without it there
+   * was no way for a manager to even SEE who applied, let alone decide, so every application sat
+   * PENDING forever (see reviewApplication below). A plain (unlocked) read is fine here: this
+   * lists whatever committed state currently exists, with no CAS/versioned mutation attached.
+   */
+  async listApplications(user: V1AuthUser, teamId: string, scheduleId: string): Promise<{ items: ApplicationListItemView[] }> {
+    const schedule = await this.prisma.v1TeamSchedule.findFirst({
+      where: { id: scheduleId, teamId },
+      select: { id: true },
+    });
+    if (!schedule) {
+      throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Schedule was not found' });
+    }
+
+    const isManager = await this.hasActiveManagerRole(teamId, user.id);
+    if (!isManager) {
+      throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Only team owners or managers can view guest applications' });
+    }
+
+    const recruitment = await this.prisma.v1ScheduleGuestRecruitment.findUnique({ where: { scheduleId: schedule.id } });
+    if (!recruitment) {
+      throw new NotFoundException({ code: 'GUEST_RECRUITMENT_NOT_FOUND', message: 'Guest recruitment was not found' });
+    }
+
+    const applications = await this.prisma.v1ScheduleGuestApplication.findMany({
+      where: { recruitmentId: recruitment.id },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    return {
+      items: applications.map((application) => ({
+        applicationId: application.id,
+        displayName: application.displayNameSnapshot,
+        note: application.note,
+        state: application.state,
+        createdAt: application.createdAt.toISOString(),
+      })),
+    };
+  }
+
+  /**
+   * manager+ only. Same gap as listApplications above: PENDING was a one-way door (createApplication
+   * inserts it; nothing anywhere else in this file, or the whole v1_api tree, ever wrote APPROVED or
+   * REJECTED). Mirrors updateRecruitment's lock order (team -> schedule -> recruitment) and extends
+   * it one level deeper (-> application), all FOR UPDATE inside the same transaction, so a
+   * concurrent approve on a second application for the same recruitment can never both land when
+   * only one slot remains — the second reviewer's approvedCount re-read below always sees the
+   * first's already-committed row.
+   */
+  async reviewApplication(
+    user: V1AuthUser,
+    teamId: string,
+    scheduleId: string,
+    applicationId: string,
+    dto: ReviewGuestApplicationDto,
+    idempotencyKey: string,
+  ): Promise<ReviewApplicationResponse & { replayed: boolean }> {
+    return this.prisma.$transaction(async (tx) => {
+      await this.lockIdempotencyScope(tx, user.id, REVIEW_ACTION, APPLICATION_RESOURCE_TYPE, applicationId, idempotencyKey);
+
+      const payloadHash = canonicalGameCommandPayloadHash({ state: dto.state });
+      const replay = await this.findReplay(tx, user.id, REVIEW_ACTION, APPLICATION_RESOURCE_TYPE, applicationId, idempotencyKey);
+      if (replay !== null) {
+        if (replay.payloadHash !== payloadHash) {
+          throw new ConflictException({
+            code: 'IDEMPOTENCY_PAYLOAD_CONFLICT',
+            message: 'Idempotency key was already used with a different payload',
+          });
+        }
+        return { ...(replay.responseBody as unknown as ReviewApplicationResponse), replayed: true };
+      }
+
+      await this.assertActiveManagerLocked(tx, user.id, teamId);
+
+      const scheduleLock = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM v1_team_schedules WHERE id = ${scheduleId} AND team_id = ${teamId} FOR UPDATE
+      `;
+      if (scheduleLock.length === 0) {
+        throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Schedule was not found' });
+      }
+
+      const recruitmentLock = await tx.$queryRaw<Array<{ id: string; slots: number; state: string }>>`
+        SELECT id, slots, state::text AS state FROM v1_schedule_guest_recruitments WHERE schedule_id = ${scheduleId} FOR UPDATE
+      `;
+      if (recruitmentLock.length === 0) {
+        throw new NotFoundException({ code: 'GUEST_RECRUITMENT_NOT_FOUND', message: 'Guest recruitment was not found' });
+      }
+      const recruitment = recruitmentLock[0];
+
+      const applicationLock = await tx.$queryRaw<
+        Array<{ id: string; state: string; display_name_snapshot: string; note: string | null }>
+      >`
+        SELECT id, state::text AS state, display_name_snapshot, note
+        FROM v1_schedule_guest_applications
+        WHERE id = ${applicationId} AND recruitment_id = ${recruitment.id}
+        FOR UPDATE
+      `;
+      if (applicationLock.length === 0) {
+        throw new NotFoundException({ code: 'GUEST_APPLICATION_NOT_FOUND', message: 'Guest application was not found' });
+      }
+      const application = applicationLock[0];
+      const targetState = dto.state === 'approved' ? 'APPROVED' : 'REJECTED';
+
+      if (application.state !== 'PENDING') {
+        if (application.state === targetState) {
+          // Same idempotent-accept/reject shape as teams/applications' accept|reject (see
+          // TeamMembershipService's sibling endpoints): re-reviewing to the SAME state it is
+          // already in is a no-op success, not a conflict — a manager double-clicking "승인" after
+          // a slow response must not see an error for a request that already succeeded.
+          const response: ReviewApplicationResponse = {
+            applicationId: application.id,
+            state: application.state,
+            displayName: application.display_name_snapshot,
+            note: application.note,
+            recruitmentState: recruitment.state,
+            alreadyProcessed: true,
+          };
+          await tx.v1IdempotencyRecord.create({
+            data: {
+              actorUserId: user.id,
+              action: REVIEW_ACTION,
+              resourceType: APPLICATION_RESOURCE_TYPE,
+              resourceId: applicationId,
+              idempotencyKey,
+              payloadHash,
+              responseStatus: 200,
+              responseBody: response as unknown as Prisma.InputJsonValue,
+              expiresAt: new Date(Date.now() + IDEMPOTENCY_RETENTION_MS),
+            },
+          });
+          return { ...response, replayed: false };
+        }
+        throw new ConflictException({
+          code: 'GUEST_APPLICATION_NOT_PENDING',
+          message: 'Guest application has already been reviewed',
+          details: { currentState: application.state },
+        });
+      }
+
+      if (targetState === 'APPROVED') {
+        const approvedCount = await tx.v1ScheduleGuestApplication.count({
+          where: { recruitmentId: recruitment.id, state: 'APPROVED' },
+        });
+        if (approvedCount >= recruitment.slots) {
+          throw new ConflictException({
+            code: 'GUEST_RECRUITMENT_FULL',
+            message: 'Guest recruitment slots are already full',
+            details: { slots: recruitment.slots, approvedCount },
+          });
+        }
+      }
+
+      await tx.$executeRaw`
+        UPDATE v1_schedule_guest_applications
+        SET state = ${targetState}::"V1GuestApplicationState", updated_at = CURRENT_TIMESTAMP
+        WHERE id = ${applicationId}
+      `;
+
+      // Re-derive recruitment.state exactly like updateRecruitment's own nextState formula: CLOSED
+      // always wins outright, otherwise exactly-full becomes FILLED and anything with room left is
+      // OPEN. A reject never changes approvedCount, so this is a no-op transition for reject when
+      // the recruitment was already OPEN/FILLED — it only ever actually moves state on approve.
+      const approvedCountAfter = await tx.v1ScheduleGuestApplication.count({
+        where: { recruitmentId: recruitment.id, state: 'APPROVED' },
+      });
+      let recruitmentState = recruitment.state;
+      if (recruitment.state !== 'CLOSED') {
+        recruitmentState = recruitment.slots === approvedCountAfter ? 'FILLED' : 'OPEN';
+        if (recruitmentState !== recruitment.state) {
+          await tx.$executeRaw`
+            UPDATE v1_schedule_guest_recruitments
+            SET state = ${recruitmentState}::"V1GuestRecruitmentState", version = version + 1, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ${recruitment.id}
+          `;
+        }
+      }
+
+      const response: ReviewApplicationResponse = {
+        applicationId: application.id,
+        state: targetState,
+        displayName: application.display_name_snapshot,
+        note: application.note,
+        recruitmentState,
+        alreadyProcessed: false,
+      };
+      await tx.v1IdempotencyRecord.create({
+        data: {
+          actorUserId: user.id,
+          action: REVIEW_ACTION,
+          resourceType: APPLICATION_RESOURCE_TYPE,
+          resourceId: applicationId,
+          idempotencyKey,
+          payloadHash,
+          responseStatus: 200,
+          responseBody: response as unknown as Prisma.InputJsonValue,
+          expiresAt: new Date(Date.now() + IDEMPOTENCY_RETENTION_MS),
+        },
+      });
+
+      // NOTE: deliberately no applicant-facing outbox notification here (unlike
+      // createApplication's manager notification above). An outbox row's `type` must be
+      // registered with a handler in v1-game-operations-worker.main.ts
+      // (worker.registerHandler(...)) and implemented in schedule-reminder.service.ts — neither
+      // file is in this change's owned files, so inserting an unregistered event type would leave
+      // a dead/poison outbox row instead of a real notification. Wiring an applicant-facing
+      // "your guest application was approved/rejected" notification is real, worthwhile follow-up
+      // work, but belongs in a change that owns the worker registration + handler together.
+
+      return { ...response, replayed: false };
+    });
+  }
+
+  /**
    * FG-3 fix: extracted out of createApplication() specifically so it can be exercised directly
    * by a test, without needing genuine concurrent connections. The review found that
    * createApplication()'s own `insertedRows.length === 0` recovery branch is, today, unreachable
@@ -645,6 +882,16 @@ export class GuestRecruitmentService {
   private async hasActiveMembership(teamId: string, userId: string): Promise<boolean> {
     const membership = await this.prisma.v1TeamMembership.findFirst({
       where: { teamId, userId, status: 'active' },
+      select: { id: true },
+    });
+    return membership !== null;
+  }
+
+  /** Plain (unlocked) manager+ check for listApplications' read path — no CAS/mutation follows it,
+   * so unlike assertActiveManagerLocked this deliberately does not lock any row FOR SHARE/UPDATE. */
+  private async hasActiveManagerRole(teamId: string, userId: string): Promise<boolean> {
+    const membership = await this.prisma.v1TeamMembership.findFirst({
+      where: { teamId, userId, status: 'active', role: { in: ['owner', 'manager'] } },
       select: { id: true },
     });
     return membership !== null;

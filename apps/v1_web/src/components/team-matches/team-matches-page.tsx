@@ -65,6 +65,19 @@ export function TeamMatchListPageView({ model }: { model: TeamMatchListViewModel
             ? <div className="tm-match-card-stack">{model.matches.map((match) => <TeamMatchCard key={match.id} match={match} />)}</div>
             : <EmptyState title="조건에 맞는 팀매치가 없어요" sub="다른 종목을 선택하거나 필터를 초기화해 다시 확인해 주세요." />
         }
+        {/* 서버는 20건씩 커서로 자르는데(team-matches.service.ts) 예전엔 여기서 더 볼 방법이
+            없었다(감사 결함) — league-matches-list-client.tsx와 같은 "더 보기" 누적 패턴. */}
+        {!model.isLoading && model.hasNext ? (
+          <button
+            type="button"
+            className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
+            style={{ marginTop: 16 }}
+            disabled={model.loadMorePending}
+            onClick={model.onLoadMore}
+          >
+            {model.loadMorePending ? '불러오는 중…' : '더 보기'}
+          </button>
+        ) : null}
       </div>
       {model.filterSheet?.open ? <TeamMatchFilterSheet model={model} /> : null}
     </AppChrome>
@@ -166,9 +179,12 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
    * neutral+disabled 조합으로 표시 — primary 파란 버튼처럼 보여 클릭 오인 방지(T1). */
   const ctaTone = mode === 'pending' ? 'tm-btn-warning' : mode === 'approved' ? 'tm-btn-success' : locked ? 'tm-btn-neutral' : canRunAction ? 'tm-btn-primary' : 'tm-btn-neutral tm-btn-disabled';
   // 채팅 버튼: approved/host(mine)는 활성, pending(승인 대기)은 disabled + '승인 완료 후 이용' 안내.
-  // default(비참여자)에는 미노출.
+  // default(비참여자)에는 미노출 — 단 `model.onChat`이 있으면(=canOpenTeamMatchChat이 팀
+  // 멤버십으로 허용) mode가 default여도 보여준다. 신청팀 owner가 신청서를 직접 내지 않은
+  // 경우(매니저가 신청) mode는 'default'로 남는데, 그 owner도 서버는 채팅을 허용한다 —
+  // mode만 보면 그 owner에게 버튼 자체가 사라진다.
   const chatEnabled = Boolean(model.onChat);
-  const showChat = mode === 'approved' || mode === 'mine' || mode === 'pending';
+  const showChat = mode === 'approved' || mode === 'mine' || mode === 'pending' || Boolean(model.onChat);
   const timeRange = match.endTime ? `${match.time}-${match.endTime}` : match.time;
   const [heroMessage, setHeroMessage] = useState('');
 
@@ -211,6 +227,9 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
       </button>
       {!chatEnabled ? (
         <div className="tm-text-micro" style={{ textAlign: 'center', color: 'var(--text-caption)' }}>승인 완료 후 이용할 수 있어요</div>
+      ) : null}
+      {model.chatError ? (
+        <div className="tm-text-micro" role="alert" style={{ textAlign: 'center', color: 'var(--red700)' }}>{model.chatError}</div>
       ) : null}
     </div>
   );
@@ -944,11 +963,19 @@ const MATCH_STYLE_OPTIONS = ['친선', '매너 중시', '교환매치', '실력 
 const MATCH_STYLE_MAX_ITEMS = 3;
 const UNIFORM_COLOR_OPTIONS = ['흰색', '검정', '빨강', '파랑', '노랑', '초록', '주황', '남색'] as const;
 
-// 표시 이름과 id 를 모두 받는다. 이름만 보고 분기하면 로케일이나 표기가 바뀌는 순간 조용히
-// 축구 쪽으로 떨어져, 풋살 경기에 11:11 같은 선택지가 뜨는데도 아무도 눈치채지 못한다.
+// 서버(apps/v1_api/src/team-matches/team-match-conditions.constants.ts의
+// MATCH_FORMAT_OPTIONS_BY_SPORT_SLUG)는 soccer/futsal 두 종목에만 프리셋을 정의한다 —
+// "그 외 종목엔 프리셋이 없다"가 모델이다. 예전엔 풋살이 아니면 무조건 축구 프리셋으로
+// 폴백해 러닝·수영 같은 종목에도 11:11 같은 축구 방식 칩이 떴다. 프리셋이 없는 종목은
+// 빈 배열을 반환해 PresetChipSelector가 "직접입력" 칩만 보여주게 한다(allowFreeText로
+// 이미 지원 중이라 화면 쪽 별도 처리가 필요 없다).
 function matchFormatOptionsForSport(sportNameOrId: string): readonly string[] {
-  const isFutsal = sportNameOrId.includes('풋살') || sportNameOrId.toLowerCase().includes('futsal');
-  return isFutsal ? MATCH_FORMAT_OPTIONS_FUTSAL : MATCH_FORMAT_OPTIONS_SOCCER;
+  const normalized = sportNameOrId.toLowerCase();
+  const isFutsal = sportNameOrId.includes('풋살') || normalized.includes('futsal');
+  if (isFutsal) return MATCH_FORMAT_OPTIONS_FUTSAL;
+  const isSoccer = sportNameOrId.includes('축구') || normalized.includes('soccer') || normalized.includes('football');
+  if (isSoccer) return MATCH_FORMAT_OPTIONS_SOCCER;
+  return [];
 }
 
 function ConditionStep({ model }: { model: TeamMatchCreateViewModel }) {
@@ -1009,7 +1036,7 @@ function PlaceTimeFields({ model }: { model: TeamMatchCreateViewModel }) {
         <CreateField label="종료 시간" value={d.endTime} type="time" onChange={(value) => model.form?.onFieldChange('endTime', value)} />
       </div>
       <div className="tm-create-two-col">
-        <CreateField label="신청 마감일" value={d.deadlineDate} type="date" onChange={(value) => model.form?.onFieldChange('deadlineDate', value)} />
+        <CreateField id="field-deadlineDate" error={errors?.deadlineDate} label="신청 마감일" value={d.deadlineDate} type="date" onChange={(value) => model.form?.onFieldChange('deadlineDate', value)} />
         <CreateField id="field-deadlineTime" error={errors?.deadlineTime} label="신청 마감시간" value={d.deadlineTime} type="time" onChange={(value) => model.form?.onFieldChange('deadlineTime', value)} />
       </div>
       <div className="tm-text-caption" style={{ marginTop: 8 }}>둘 다 비워두면 경기 시작 전까지 신청을 받아요.</div>
@@ -1073,7 +1100,10 @@ function ConfirmStep({ model }: { model: TeamMatchCreateViewModel }) {
   // 상대팀 부담금 0원일 때만 '무료초청' 뱃지 표시 (목록·상세와 동일 조건 #20)
   const isFreeInvite = d.opponentCost === 0;
   const styleText = d.style.join(' · ');
-  return <div><h1 className="tm-text-heading">입력한 내용을 확인해 주세요</h1><Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}><div className="tm-team-create-preview" style={{ backgroundImage: cssUrl(d.imageUrl) }}><div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{model.selectedTeam} vs 상대팀</div></div><div style={{ padding: 16 }}><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{model.selectedSport}</span><span className="tm-badge tm-badge-grey">{d.grade}</span><span className="tm-badge tm-badge-grey">{d.format}</span><span className="tm-badge tm-badge-grey">{d.gender}</span>{isFreeInvite ? <span className="tm-badge tm-badge-blue">무료초청</span> : null}</div><div className="tm-text-subhead" style={{ marginTop: 12 }}>{d.title}</div><div className="tm-text-caption" style={{ marginTop: 8 }}>{d.description}</div></div></Card><Card pad={16} style={{ marginTop: 12 }}><InfoRow label="지역" value={regionName} sub="검색과 추천에 사용돼요" /><InfoRow label="경기조건" value={`${d.grade} · ${d.format}${styleText ? ` · ${styleText}` : ''}`} sub={`${d.uniform} · ${d.gender}`} /><InfoRow label="비용" value={`총 ${d.cost.toLocaleString('ko-KR')}원 · 상대팀 ${d.opponentCost.toLocaleString('ko-KR')}원`} /><InfoRow label="일시" value={`${d.date} ${d.startTime}-${d.endTime}`} /><InfoRow label="신청 마감" value={deadlineText} /><InfoRow label="상세 주소" value={d.venue} /></Card></div>;
+  // 종료 시간은 선택 입력이라 비어 있을 수 있다 — 상세 화면(:349 InfoRow label="장소")과
+  // 동일하게 분기해야 확인 화면에 하이픈만 매달려 남는 것을 막는다.
+  const timeRangeText = d.endTime ? `${d.date} ${d.startTime}-${d.endTime}` : `${d.date} ${d.startTime}`;
+  return <div><h1 className="tm-text-heading">입력한 내용을 확인해 주세요</h1><Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}><div className="tm-team-create-preview" style={{ backgroundImage: cssUrl(d.imageUrl) }}><div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{model.selectedTeam} vs 상대팀</div></div><div style={{ padding: 16 }}><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{model.selectedSport}</span><span className="tm-badge tm-badge-grey">{d.grade}</span><span className="tm-badge tm-badge-grey">{d.format}</span><span className="tm-badge tm-badge-grey">{d.gender}</span>{isFreeInvite ? <span className="tm-badge tm-badge-blue">무료초청</span> : null}</div><div className="tm-text-subhead" style={{ marginTop: 12 }}>{d.title}</div><div className="tm-text-caption" style={{ marginTop: 8 }}>{d.description}</div></div></Card><Card pad={16} style={{ marginTop: 12 }}><InfoRow label="지역" value={regionName} sub="검색과 추천에 사용돼요" /><InfoRow label="경기조건" value={`${d.grade} · ${d.format}${styleText ? ` · ${styleText}` : ''}`} sub={`${d.uniform} · ${d.gender}`} /><InfoRow label="비용" value={`총 ${d.cost.toLocaleString('ko-KR')}원 · 상대팀 ${d.opponentCost.toLocaleString('ko-KR')}원`} /><InfoRow label="일시" value={timeRangeText} /><InfoRow label="신청 마감" value={deadlineText} /><InfoRow label="장소" value={d.venue} sub={d.address} /></Card></div>;
 }
 
 function TeamMatchComplete({ model }: { model: TeamMatchCreateViewModel }) {

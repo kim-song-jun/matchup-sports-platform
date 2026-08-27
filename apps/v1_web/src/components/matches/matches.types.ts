@@ -57,6 +57,14 @@ export type MatchListViewModel = {
     urgent: number;
   };
   matches: MatchCardModel[];
+  /** team-matches.types.ts의 #5와 같은 목적 — true일 때 EmptyState 대신 PageSkeleton 렌더.
+   * 로딩 중(items === undefined)에 matches: []를 EmptyState로 그대로 그리면 "조건에 맞는
+   * 매치가 없어요"가 실제로는 아직 응답을 못 받은 상태에서도 뜬다. */
+  isLoading?: boolean;
+  /** 서버 커서 페이지네이션(20건/페이지)에 다음 페이지가 더 있는지. true면 "더 보기" 노출. */
+  hasNext?: boolean;
+  onLoadMore?: () => void;
+  loadMorePending?: boolean;
 };
 
 export type MatchStateViewModel = MatchListViewModel & {

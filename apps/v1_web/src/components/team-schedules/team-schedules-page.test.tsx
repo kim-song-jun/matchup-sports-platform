@@ -55,6 +55,7 @@ function buildModel(overrides: Partial<ScheduleDetailViewModel['manage']>): Sche
       closesAtLabel: '',
       note: null,
       stateLabel: '',
+      visibilityLabel: '',
       isOpen: false,
     },
     manage: {

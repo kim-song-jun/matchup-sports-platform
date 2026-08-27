@@ -1022,6 +1022,30 @@ export type V1GuestApplicationResult = {
   replayed: boolean;
 };
 
+/** GET .../guest-recruitment/applications 항목 — manager+ 전용 */
+export type V1GuestApplicationListItem = {
+  applicationId: string;
+  displayName: string;
+  note: string | null;
+  state: V1GuestApplicationState;
+  createdAt: string;
+};
+
+export type V1ReviewGuestApplicationDto = {
+  state: 'approved' | 'rejected';
+};
+
+export type V1ReviewGuestApplicationResult = {
+  applicationId: string;
+  state: V1GuestApplicationState;
+  displayName: string;
+  note: string | null;
+  /** 이 리뷰로 recruitment.state가 함께 갱신됐다면 그 최신 값(FILLED 도달 등 반영) */
+  recruitmentState: V1GuestRecruitmentState;
+  alreadyProcessed: boolean;
+  replayed: boolean;
+};
+
 /** GET /me/schedule 항목 — TeamSchedulesService.mySchedule */
 export type V1MyScheduleItem = V1TeamScheduleSummary & {
   teamId: string;
@@ -1769,11 +1793,11 @@ export type V1ReviewReceivedSummaryResponse = {
 
 export type V1ChatRoom = {
   roomId: string;
-  roomType: 'match' | 'team' | 'team_match';
+  roomType: 'match' | 'team' | 'team_match' | 'team_contact';
   title: string;
   status: string;
   linkedTarget: {
-    type: 'match' | 'team' | 'team_match' | null;
+    type: 'match' | 'team' | 'team_match' | 'team_contact' | null;
     id: string | null;
     title: string;
     route: string | null;
@@ -1807,7 +1831,7 @@ export type V1ChatMessage = {
 
 export type V1ChatRoomDetail = {
   roomId: string;
-  roomType: 'match' | 'team' | 'team_match';
+  roomType: 'match' | 'team' | 'team_match' | 'team_contact';
   status: string;
   title: string;
   linkedTarget: V1ChatRoom['linkedTarget'];
@@ -1828,7 +1852,7 @@ export type V1ChatRoomDetail = {
 
 export type V1ChatRoomResolveResult = {
   roomId: string;
-  roomType: 'match' | 'team' | 'team_match';
+  roomType: 'match' | 'team' | 'team_match' | 'team_contact';
   created: boolean;
   route: string;
 };
@@ -3091,6 +3115,12 @@ export type V1TournamentFixtureGoal = {
   team: 'home' | 'away';
   playerId: string | null;
   playerName: string;
+  /**
+   * 대회 전체에서 안정적인 득점자 신원(계정 userId) — playerId는 경기마다 새로 생기는
+   * 값이라 대회 단위 합산 키로 못 쓴다. 명단에 없는 비회원/대타 득점자이거나 레거시
+   * 폴백 결과일 때는 null. 어드민 대진 응답(V1AdminBracketResult)에서만 채워진다.
+   */
+  playerUserId: string | null;
   minute: number | null;
   ownGoal?: boolean;
 };
@@ -3266,8 +3296,10 @@ export type V1TournamentDetail = {
   fixtures: V1TournamentFixture[];
   announcements: V1TournamentAnnouncement[];
   sponsors: V1TournamentSponsor[];
-  /** 대회 참가팀 후기 (status=completed 이후 참가 확정팀만 작성 가능) */
+  /** 대회 참가팀 후기 (status=completed 이후 참가 확정팀만 작성 가능). 최신순 최대 30건만 포함 — 전체 개수는 reviewsTotalCount 참조 */
   reviews: V1TournamentReview[];
+  /** reviews 배열이 담지 못한 잘리지 않은 전체 후기 개수. `/tournaments/:id/reviews` 전용 목록의 total과 동일한 값 */
+  reviewsTotalCount: number;
   /** 어드민이 입력한 개인 어워드 (MVP, 득점왕 등) */
   awards: V1TournamentAward[];
   createdAt: string;
@@ -3490,6 +3522,8 @@ export type V1AdminBracketResult = {
   homePenaltyScore: number | null;
   awayPenaltyScore: number | null;
   note: string | null;
+  /** 정상 종료가 아니면 그 종류 — 몰수/중단 경기는 통계 집계에서 제외해야 한다. */
+  outcomeReason: 'NORMAL' | 'FORFEIT' | 'ABANDONED';
   recordedAt: string;
   createdAt: string;
   updatedAt: string;

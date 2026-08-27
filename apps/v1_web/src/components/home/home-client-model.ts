@@ -16,6 +16,7 @@ import type {
   HomeStats,
   HomeViewModel,
 } from './home.types';
+import { chatRoomTypeLabel } from '@/lib/chat-route';
 
 export function withoutHomeContent(model: HomeViewModel): HomeViewModel {
   return {
@@ -72,7 +73,7 @@ export function toHomeChatRooms(rooms: V1ChatRoom[]): HomeChatRoom[] {
     .map((room) => ({
       id: room.roomId,
       title: room.title,
-      typeLabel: room.roomType === 'match' ? '개인매치' : room.roomType === 'team' ? '팀' : '팀매치',
+      typeLabel: chatRoomTypeLabel(room.roomType),
       lastMessage: room.lastMessage?.contentPreview ?? '아직 메시지가 없어요',
       time: formatRelative(room.lastMessage?.sentAt),
       unreadCount: room.unreadCount,

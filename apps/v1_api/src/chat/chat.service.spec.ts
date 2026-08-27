@@ -521,6 +521,39 @@ describe('ChatService', () => {
     });
   });
 
+  // 감사 결함 회귀 방지(2026-08-27): 결과 제출로 V1TeamMatch.status가 matched→completed로
+  // 넘어간 뒤에도 팀 owner/manager는 채팅을 계속 열 수 있어야 한다. 예전엔
+  // assertCanUseTeamMatchChat이 status:'matched'로 exact-match 해서, completed가 된 팀매치의
+  // resolve/detail/sendMessage 전부가 409 STATE_CONFLICT('Team match chat is available after
+  // matching')로 죽었다 — 버튼은 여전히 활성인데 눌러도 반응이 없는 증상의 원인.
+  it('resolve(team_match): completed 상태에서도 팀 owner/manager 는 채팅을 연다', async () => {
+    prisma.v1TeamMatch.findFirst.mockResolvedValue({
+      hostTeamId: 'team-host', approvedApplicantTeamId: 'team-guest',
+    });
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'membership-1' });
+    prisma.v1ChatRoom.findUnique.mockResolvedValueOnce(null);
+    prisma.v1ChatRoom.create.mockResolvedValueOnce({ id: 'tm-room-1', teamMatchId: 'tm-1', status: 'active' });
+    prisma.v1ChatRoomParticipant.findUnique.mockResolvedValueOnce(null);
+    prisma.v1ChatRoomParticipant.create.mockResolvedValueOnce({});
+
+    const result = await service.resolve(userA, { targetType: 'team_match', targetId: 'tm-1' });
+
+    expect(result).toMatchObject({ roomId: 'tm-room-1', roomType: 'team_match', created: true, route: '/chat/tm-room-1' });
+    // status가 matched/completed 둘 다 통과하도록 findFirst where에 in 조건이 전달됐는지도
+    // 함께 고정한다 — 이 단언 없이는 하드코딩된 'matched'로 되돌아가도 이 테스트는 여전히
+    // 통과한다(위 mockResolvedValue가 무조건 값을 돌려주므로).
+    const where = prisma.v1TeamMatch.findFirst.mock.calls[0][0].where;
+    expect(where.status).toEqual({ in: ['matched', 'completed'] });
+  });
+
+  it('resolve(team_match): 매칭 전(승인된 상대팀 없음) 이면 409 STATE_CONFLICT', async () => {
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(null);
+
+    await expect(service.resolve(userA, { targetType: 'team_match', targetId: 'tm-1' })).rejects.toMatchObject({
+      response: { code: 'STATE_CONFLICT' },
+    });
+  });
+
   // ─── 8. resolve(match): 비-참가자 → 403 PERMISSION_DENIED ──────────────────
 
   it('resolve(match): 매치 비-참가자 사용자 → 403 PERMISSION_DENIED', async () => {

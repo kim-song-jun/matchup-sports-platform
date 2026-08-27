@@ -60,6 +60,8 @@ import { GameTakeoverService } from './game-takeover.service';
 import {
   writeIdentityAttestRequestNotifications,
   type IdentityAttestPushPlan,
+  writeIdentityAttestDecisionNotification,
+  type IdentityAttestDecisionPushPlan,
 } from './identity-attest-notification';
 import {
   IDENTITY_LINK_REQUEST_TTL_MS,
@@ -2905,11 +2907,32 @@ export class GamesService {
     // 신청 자격과 동일한 스코프. 비참가자는 여기서 403 으로 끊긴다.
     await this.resolveActor(this.prisma, gameId, user.id, 'participant_identity');
 
-    const participants = await this.prisma.v1GameParticipant.findMany({
+    // 감사 결함 수정(2026-08-27): 예전엔 gameId 로만 걸러 사이드마다 쌓인 모든 라인업
+    // 리비전의 참가자 행을 통째로 돌려줬다 -- listLineups/listOperationsLineups(위
+    // 2408/2441)는 물론 deriveTournamentRevision(6073, selectLatestLineupParticipants)도
+    // 전부 "사이드별 최신 라인업"으로 스코프하는데 이 목록만 예외였다. 라인업을 한 번이라도
+    // 재저장하면(team-match-lineup.service.ts saveLineup) 리비전마다 참가자 행이 통째로
+    // 새로 생기고 옛 행은 지워지지 않으므로(v1GameParticipant.delete 경로 자체가 없다),
+    // 폐기된 리비전의 동명이인 참가자가 목록에 그대로 남아 화면에서 구분 불가능하게
+    // 중복 표시됐다. 그 행을 골라 연결하면 공식 결과(V1GameResultParticipant)는 최신
+    // participantId 로만 쓰이므로 개인 기록이 영원히 매칭되지 않는다(public-user-records
+    // .service.ts). 최신 리비전으로만 좁혀 애초에 고를 수 없게 한다.
+    const lineups = await this.prisma.v1GameLineup.findMany({
       where: { gameId },
-      select: { id: true, sideId: true, displayNameSnapshot: true, jerseyNumber: true },
+      select: { id: true, sideId: true, revision: true },
+    });
+    const participantCandidates = await this.prisma.v1GameParticipant.findMany({
+      where: { gameId },
+      select: {
+        id: true,
+        sideId: true,
+        lineupId: true,
+        displayNameSnapshot: true,
+        jerseyNumber: true,
+      },
       orderBy: [{ sideId: 'asc' }, { jerseyNumber: 'asc' }],
     });
+    const participants = selectLatestLineupParticipants(participantCandidates, lineups);
     if (participants.length === 0) {
       return { gameId, version: game.version, participants: [] };
     }
@@ -4311,6 +4334,10 @@ export class GamesService {
     // EXPIRED event we just appended). Instead it returns a tagged result and
     // the 409 is raised here, after `withParticipantCommand`'s transaction
     // has already committed.
+    // 승인/거절 결정 통보(2026-08-27 감사 결함 수정) — 감사 결함: 결정 자체가
+    // 신청자에게 어떤 경로로도 통보되지 않았다. requestIdentityLink 의 push box 패턴을
+    // 그대로 따른다: 푸시는 롤백할 수 없으므로 tx 밖에서, 커밋 뒤에만 보낸다.
+    const decisionPush: { plan: IdentityAttestDecisionPushPlan | null } = { plan: null };
     const result = await this.withParticipantCommand(
       {
         gameId,
@@ -4430,6 +4457,15 @@ export class GamesService {
             },
           });
         }
+        // 신청자에게 승인/거절 결과를 통보 — 같은 tx 라 결정 커밋 = 알림 존재.
+        decisionPush.plan = await writeIdentityAttestDecisionNotification(tx, {
+          gameId,
+          participantId,
+          requestId,
+          requesterUserId: requested.userId,
+          decision: dto.decision,
+          reason: dto.reason,
+        });
         const updated = await tx.v1Game.update({
           where: { id: gameId },
           data: { version: { increment: 1 } },
@@ -4470,6 +4506,22 @@ export class GamesService {
         code: 'IDENTITY_LINK_REQUEST_EXPIRED',
         message: '연결 요청이 만료됐어요.',
       });
+    }
+    // 커밋 뒤 best-effort 푸시. 실패해도 이미 커밋된 인앱 알림은 그대로 남고, 승인/거절
+    // 응답에도 영향을 주지 않는다(requestIdentityLink 와 동일한 정책).
+    const decisionPlan = decisionPush.plan;
+    if (decisionPlan !== null && this.webPush !== undefined) {
+      void this.webPush
+        .sendToUser(decisionPlan.recipientUserId, {
+          title: decisionPlan.title,
+          body: decisionPlan.body,
+          url: decisionPlan.url ?? undefined,
+        })
+        .catch((error: unknown) => {
+          this.pushLogger.warn(
+            `web push failed for identity attest decision (game=${gameId}, recipient=${decisionPlan.recipientUserId}): ${String(error)}`,
+          );
+        });
     }
     return result;
   }
@@ -6477,6 +6529,25 @@ export class GamesService {
    * overwriting a reviewer-visible field this command was never asked to
    * touch.
    *
+   * ## Bench-assist fix (2026-08-27 audit finding)
+   *
+   * `assignGoalAssist` validates only that the assist participant belongs to
+   * the scoring SIDE, never that they appeared -- so an operator can attach
+   * an assist to a bench player who never came on (no SUBSTITUTION event
+   * recorded) after the revision was already derived. That participant has
+   * NO predecessor row (the appearance gate in `deriveTournamentRevision`
+   * excluded them), so the copy-through loop above cannot pick them up no
+   * matter what it copies. This method now separately diffs `assistCount`
+   * against `predecessorParticipantIds` and builds a fresh row -- with
+   * `started`/`sideId`/`goalkeeper` looked up directly from
+   * `V1GameParticipant` (mirroring `deriveTournamentRevision`'s own
+   * goalkeeper-position-code lookup) since there is no predecessor row to
+   * copy those columns from -- for every such participant. Without this, the
+   * assist stayed visible in the raw event stream while silently never
+   * reaching `V1GameResultParticipant` (and therefore never reaching
+   * `public-user-records.service.ts` / `player-card-stats.ts`, which read
+   * only from that table).
+   *
    * Returns `null` when there is no SUBMITTED revision to sync, or when the
    * resync would produce no observable change (e.g. an assist toggle that
    * happens to reproduce the value already stored) -- callers use this to
@@ -6535,6 +6606,69 @@ export class GamesService {
         });
       }
     }
+    // 감사 결함 수정(2026-08-27) -- 벤치 어시스트가 통째로 사라지는 결함.
+    // `assignGoalAssist`는 어시스트 참가자가 득점 사이드 소속인지만 확인하고(2331
+    // `assistParticipant.sideId !== target.sideId`) 출전 여부는 전혀 보지 않는다. 그래서
+    // SUBSTITUTION 을 안 찍은 채 실제로는 뛴 벤치 선수(`started:false`) 에게 사후 어시스트를
+    // 붙일 수 있는데, 그 선수는 `deriveTournamentRevision` 의 출전 게이트(appearedIds, 위
+    // 6153)를 리비전 생성 시점에 통과하지 못해 predecessor 에 애초에 행이 없다. 위 루프는
+    // predecessorParticipants 만 순회하므로 이 참가자는 어디에도 안 걸리고, 다른 선수의
+    // 어시스트가 안 움직이면 diffs 가 비어 이 메서드 자체가 null 을 반환해 -- 새 리비전이
+    // 아예 만들어지지 않고 어시스트가 이벤트 목록에는 보이는데 공식 기록(개인 기록·선수
+    // 카드 PAS 가 읽는 V1GameResultParticipant)에는 영원히 반영되지 않는다. predecessor 에
+    // 없지만 지금 assistCount 가 credit 하는 participantId 마다 새 행을 만들어 이 경로를
+    // 막는다.
+    const predecessorParticipantIds = new Set(
+      predecessorParticipants.map((participant) => participant.participantId),
+    );
+    const newAssistParticipantIds = [...assistCount.entries()]
+      .filter(([participantId, assists]) => assists > 0 && !predecessorParticipantIds.has(participantId))
+      .map(([participantId]) => participantId);
+    const newParticipantRows: Array<{
+      participantId: string;
+      sideId: string;
+      started: boolean;
+      goals: number;
+      assists: number;
+      fouls: number;
+      cards: Prisma.InputJsonValue;
+      goalkeeper: boolean;
+    }> = [];
+    if (newAssistParticipantIds.length > 0) {
+      const [missingParticipants, syncGame] = await Promise.all([
+        tx.v1GameParticipant.findMany({
+          where: { id: { in: newAssistParticipantIds }, gameId },
+          select: { id: true, sideId: true, started: true, position: true },
+        }),
+        tx.v1Game.findUnique({ where: { id: gameId }, select: { competitionConfigVersionId: true } }),
+      ]);
+      const config = syncGame
+        ? await tx.v1CompetitionConfigVersion.findUnique({
+            where: { id: syncGame.competitionConfigVersionId },
+            select: { lineup: true },
+          })
+        : null;
+      // deriveTournamentRevision(위 6084)과 같은 판정 -- 종목마다 다른 골키퍼 포지션
+      // 코드를 대회 설정에서 읽는다. 레거시 config 는 같은 이유로 'GK' 로 폴백한다.
+      const goalkeeperPositionCode =
+        parseLineupCatalog(config?.lineup ?? null).positions.find(
+          (position) => position.goalkeeper === true,
+        )?.code ?? 'GK';
+      for (const participant of missingParticipants) {
+        const assists = assistCount.get(participant.id) ?? 0;
+        diffs.push({ participantId: participant.id, assistsBefore: 0, assistsAfter: assists });
+        newParticipantRows.push({
+          participantId: participant.id,
+          sideId: participant.sideId,
+          started: participant.started,
+          goals: 0,
+          assists,
+          fouls: 0,
+          cards: jsonInput({ yellow: 0, red: 0 }),
+          goalkeeper: participant.position === goalkeeperPositionCode,
+        });
+      }
+    }
     if (diffs.length === 0) {
       return null;
     }
@@ -6578,18 +6712,34 @@ export class GamesService {
       },
     });
     await tx.v1GameResultParticipant.createMany({
-      data: predecessorParticipants.map((participant) => ({
-        resultRevisionId: successorDraft.id,
-        participantId: participant.participantId,
-        sideId: participant.sideId,
-        started: participant.started,
-        minutesPlayed: participant.minutesPlayed,
-        goals: participant.goals,
-        assists: assistCount.get(participant.participantId) ?? 0,
-        fouls: participant.fouls,
-        cards: jsonInput(participant.cards),
-        goalkeeper: participant.goalkeeper,
-      })),
+      data: [
+        ...predecessorParticipants.map((participant) => ({
+          resultRevisionId: successorDraft.id,
+          participantId: participant.participantId,
+          sideId: participant.sideId,
+          started: participant.started,
+          minutesPlayed: participant.minutesPlayed,
+          goals: participant.goals,
+          assists: assistCount.get(participant.participantId) ?? 0,
+          fouls: participant.fouls,
+          cards: jsonInput(participant.cards),
+          goalkeeper: participant.goalkeeper,
+        })),
+        // 위에서 새로 지은 벤치-어시스트 행 -- predecessor 에 없던 참가자라 여기 별도로
+        // 붙인다(예전엔 이 배열이 predecessorParticipants 만 순회해 이 케이스가 통째로
+        // 드롭됐다).
+        ...newParticipantRows.map((participant) => ({
+          resultRevisionId: successorDraft.id,
+          participantId: participant.participantId,
+          sideId: participant.sideId,
+          started: participant.started,
+          goals: participant.goals,
+          assists: participant.assists,
+          fouls: participant.fouls,
+          cards: participant.cards,
+          goalkeeper: participant.goalkeeper,
+        })),
+      ],
     });
     try {
       assertRevisionTransition({

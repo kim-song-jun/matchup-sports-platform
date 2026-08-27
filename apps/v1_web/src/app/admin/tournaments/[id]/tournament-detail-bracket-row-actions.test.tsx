@@ -104,7 +104,7 @@ describe('BracketTab 행 액션 (T6-1/T6-4)', () => {
         groups: [], standings: [],
         fixtures: [fixture({
           status: 'completed',
-          result: { id: 'res-1', fixtureId: 'fx-9', homeScore: 2, awayScore: 1, hasPenalty: false, homePenaltyScore: null, awayPenaltyScore: null, note: null, recordedAt: '2026-08-01T00:00:00.000Z', createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z', goals: [] },
+          result: { id: 'res-1', fixtureId: 'fx-9', homeScore: 2, awayScore: 1, hasPenalty: false, homePenaltyScore: null, awayPenaltyScore: null, note: null, outcomeReason: 'NORMAL', recordedAt: '2026-08-01T00:00:00.000Z', createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z', goals: [] },
         })],
       },
       isPending: false, isError: false, error: null, refetch: vi.fn(),

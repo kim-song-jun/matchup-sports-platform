@@ -70,6 +70,14 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
 
   const match = matchQuery.data;
   const matchTitle = match.title;
+  // 상세 직렬화(matches.service.ts)는 capacityText를 내려주지 않는다 — 실제로 오는 건
+  // participantCount/capacity 숫자 필드뿐이다(V1Match 타입의 capacityText 선언은 런타임과
+  // 어긋나 있지만, 그 필드는 이 배치의 소유 범위 밖 다른 소비처에서도 쓰여 타입 자체는
+  // 건드리지 않는다 — 여기서는 실제로 오는 숫자 필드로 직접 정원 문구를 계산한다).
+  const capacityLabel =
+    typeof match.participantCount === 'number' && typeof match.capacity === 'number'
+      ? `${match.participantCount}/${match.capacity}명`
+      : null;
   const items = applicationsQuery.data?.pages.flatMap((page) => page.items) ?? [];
   const pendingCount = items.filter((a) => a.status === 'requested').length;
   const actionPending = approveApplication.isPending || rejectApplication.isPending;
@@ -134,9 +142,8 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
               ? '승인 방식 불러오는 중'
               : eligibilityData.requiresApproval
                 ? '수동 승인 매치'
-                : '자동 승인 매치'} ·
-            {' '}
-            {match.capacityText}
+                : '자동 승인 매치'}
+            {capacityLabel ? ` · ${capacityLabel}` : ''}
             {pendingCount > 0 ? ` · 대기 ${pendingCount}명` : ''}
           </div>
         </Card>

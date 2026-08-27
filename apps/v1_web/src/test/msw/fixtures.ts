@@ -313,6 +313,10 @@ export const v1MatchesFixture: V1Match[] = [
     capacityText: '7/10명',
     status: 'open',
     ctaState: 'can_apply',
+    // matches.service.ts toListItem()이 실제로 host를 내려준다(2026-08-27 수정 전엔 이
+    // 필드가 아예 빠져 있어 프론트가 항상 목업 이름으로 폴백했고, 이 픽스처도 host가 없어
+    // MSW 기반 테스트로는 그 결함을 못 잡았다) — 실제 응답 모양을 따라 여기도 채운다.
+    host: { userId: 'user-host-1', displayName: '지훈', profileImageUrl: null, trustState: 'trusted' },
   },
 ];
 

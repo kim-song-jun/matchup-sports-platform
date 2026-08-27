@@ -1,4 +1,4 @@
-import type { V1ScheduleState, V1ScheduleType, V1ScheduleVisibility } from '@/types/api';
+import type { V1GuestRecruitmentVisibility, V1ScheduleState, V1ScheduleType, V1ScheduleVisibility } from '@/types/api';
 
 export type ScheduleTypeFilter = 'all' | V1ScheduleType;
 export type ScheduleStateFilter = 'all' | V1ScheduleState;
@@ -88,6 +88,9 @@ export type ScheduleGuestRecruitmentModel = {
   closesAtLabel: string;
   note: string | null;
   stateLabel: string;
+  /** "전체 공개"(PUBLIC) 또는 "팀원 전용"(MEMBERS) — 비멤버가 이 모집을 볼 수 있는지가
+   * 화면에서 바로 드러나야, 팀원 전용으로 열어둔 모집에 신청이 안 들어오는 걸 방치하지 않는다. */
+  visibilityLabel: string;
   isOpen: boolean;
   /** owner/manager 전용 */
   manage?: {
@@ -101,16 +104,36 @@ export type ScheduleGuestRecruitmentModel = {
       slots: string;
       closesAt: string;
       note: string;
+      /** 공개 범위 — PUBLIC이어야 비멤버(용병 신청의 유일한 대상)에게 노출된다. */
+      visibility: V1GuestRecruitmentVisibility;
       onSlotsChange: (value: string) => void;
       onClosesAtChange: (value: string) => void;
       onNoteChange: (value: string) => void;
+      onVisibilityChange: (value: V1GuestRecruitmentVisibility) => void;
       onSave: () => void;
       onDismiss: () => void;
       pending: boolean;
       error: string | null;
     };
+    /** manager+ 전용 신청자 목록·승인/거절. 신청이 하나도 없어도 섹션은 노출한다(0건임을 보여줘야 함). */
+    applications: {
+      items: ScheduleGuestApplicantItem[];
+      loading: boolean;
+      error: string | null;
+      onApprove: (applicationId: string) => void;
+      onReject: (applicationId: string) => void;
+      pendingApplicationId: string | null;
+    };
   };
   applicationForm?: ScheduleGuestApplicationFormModel;
+};
+
+export type ScheduleGuestApplicantItem = {
+  applicationId: string;
+  displayName: string;
+  note: string | null;
+  state: 'PENDING' | 'APPROVED' | 'REJECTED' | 'WITHDRAWN';
+  stateLabel: string;
 };
 
 export type ScheduleAttendanceModel = {

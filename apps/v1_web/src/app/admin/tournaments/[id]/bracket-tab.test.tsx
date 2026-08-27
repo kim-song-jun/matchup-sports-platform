@@ -13,8 +13,8 @@
  *     매핑 없는 500 으로 끝나 운영자가 "서버 오류" 만 봤다.
  */
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { V1AdminBracketFixture, V1AdminTournamentBracket } from '@/types/api';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { V1AdminBracketFixture, V1AdminTournamentBracket, V1AdminTournamentRegistration } from '@/types/api';
 import { V1ApiError } from '@/lib/api-client';
 import { BracketTab, describeLeagueReplace } from './bracket-tab';
 
@@ -73,6 +73,8 @@ const bracket: V1AdminTournamentBracket = {
 
 /** `deleteFixture.mutate(id, { onSuccess, onError })` 를 테스트마다 다르게 응답시킨다. */
 const deleteFixtureMutate = vi.fn();
+/** `updateFixture.mutate(body, { onSuccess, onError })` — 실제로 보낸 payload를 검증하는 데 쓴다. */
+const updateFixtureMutate = vi.fn();
 
 function noopMutation() {
   return { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false };
@@ -92,7 +94,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1AssignGroupTeam: noopMutation,
   useV1CreateFixture: noopMutation,
   useV1RecalculateStandings: noopMutation,
-  useV1UpdateFixture: noopMutation,
+  useV1UpdateFixture: () => ({ mutate: updateFixtureMutate, mutateAsync: vi.fn(), isPending: false }),
   useV1DeleteFixture: () => ({ mutate: deleteFixtureMutate, mutateAsync: vi.fn(), isPending: false }),
   useV1UpdateGroup: noopMutation,
   useV1DeleteGroup: noopMutation,
@@ -110,12 +112,12 @@ function alreadyExists(details: Record<string, unknown>) {
   } as unknown as ConstructorParameters<typeof V1ApiError>[0]);
 }
 
-function renderTab(showToast = vi.fn()) {
+function renderTab(showToast = vi.fn(), registrations: V1AdminTournamentRegistration[] = []) {
   render(
     <BracketTab
       tournamentId="t-1"
       showToast={showToast}
-      registrations={[]}
+      registrations={registrations}
       registrationDeadlineAt={null}
       bracketPublishedAt={null}
       bracketPublishScheduledAt={null}
@@ -123,6 +125,32 @@ function renderTab(showToast = vi.fn()) {
     />,
   );
   return showToast;
+}
+
+function confirmedRegistration(overrides: Partial<V1AdminTournamentRegistration>): V1AdminTournamentRegistration {
+  return {
+    id: 'r1',
+    tournamentId: 't-1',
+    teamId: 'team-1',
+    teamName: '팀',
+    appliedByUserId: 'u-1',
+    status: 'confirmed',
+    depositorName: null,
+    agreedRules: true,
+    agreedPrivacy: true,
+    agreedRefund: true,
+    agreedMediaConsent: true,
+    confirmedAt: '2026-08-01T00:00:00.000Z',
+    rosterLockedAt: null,
+    rosterDeadlineOverrideAt: null,
+    cancelRequestedAt: null,
+    cancelReason: null,
+    playerCount: 5,
+    payment: null,
+    paymentInstructions: null,
+    confirmedByAdminUserId: 'admin-1',
+    ...overrides,
+  } as unknown as V1AdminTournamentRegistration;
 }
 
 /** 조 카드의 "대진 자동 생성" → 회전 수 모달의 "자동 생성" 까지 눌러 준다. */
@@ -290,6 +318,7 @@ describe('BracketTab — 대진 삭제 거절 안내', () => {
           homePenaltyScore: null,
           awayPenaltyScore: null,
           note: null,
+          outcomeReason: 'NORMAL',
           recordedAt: '2026-08-01T00:00:00.000Z',
           createdAt: '2026-08-01T00:00:00.000Z',
           updatedAt: '2026-08-01T00:00:00.000Z',
@@ -332,5 +361,120 @@ describe('describeLeagueReplace', () => {
     expect(prompt.replaceable).toBe(false);
     expect(prompt.message).toContain('결과가 확정된 경기 3개');
     expect(prompt.message).not.toContain('지울 수 없는 대진');
+  });
+});
+
+/**
+ * 경기 수정 모달 — 팀을 '미정'으로 되돌리는 해제(TBD) 전송 계약.
+ *
+ * 고치기 전 흐름: 홈/어웨이 팀을 '미정'으로 되돌려 저장하면 '수정했어요' 토스트는 뜨지만
+ * homeRegistrationId 필드 자체가 요청 바디에서 통째로 빠져(빈 문자열이 falsy라 걸러짐)
+ * 서버가 '미변경'으로 읽었다 — 배정이 그대로 남는데 성공 토스트만 떴다. 서버 계약은
+ * undefined=미변경 / null=해제로 이미 갈려 있으므로, 프론트는 해제 의도를 null로 명시해야 한다.
+ */
+describe('BracketTab — 경기 수정: 팀 해제(TBD) 전송', () => {
+  beforeEach(() => {
+    bracketFixtures = [
+      fixtureRow({ id: 'fx-1', round: 'league_r1', fixtureNumber: 1, homeRegistrationId: 'r1', awayRegistrationId: 'r2' }),
+    ];
+    updateFixtureMutate.mockReset();
+  });
+
+  it("홈 팀만 '미정'으로 되돌리면 homeRegistrationId: null 을 보내고 awayRegistrationId 는 아예 건드리지 않는다", async () => {
+    const registrations = [
+      confirmedRegistration({ id: 'r1', teamName: '강남FC' }),
+      confirmedRegistration({ id: 'r2', teamName: '서초유나이티드' }),
+    ];
+    renderTab(vi.fn(), registrations);
+
+    // AdminDataTable 은 데스크톱 <table> 과 모바일 카드 스택을 둘 다 렌더하므로 같은 버튼이
+    // 여러 번 나온다(다른 describe 블록의 선례와 동일) — 첫 번째만 누른다.
+    const editButtons = screen.getAllByRole('button', { name: 'league_r1 1번 경기 수정' });
+    fireEvent.click(editButtons[0]);
+    const dialog = await screen.findByRole('dialog', { name: '경기 수정' });
+
+    // 두 팀 다 이미 배정돼 있어 EntityPicker는 칩+'선택 해제' 버튼을 보여준다.
+    // JSX 순서상 첫 번째가 홈, 두 번째가 어웨이.
+    const clearButtons = within(dialog).getAllByRole('button', { name: '선택 해제' });
+    expect(clearButtons).toHaveLength(2);
+    fireEvent.click(clearButtons[0]);
+
+    await act(async () => {
+      fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+    });
+
+    expect(updateFixtureMutate).toHaveBeenCalledTimes(1);
+    const [payload] = updateFixtureMutate.mock.calls[0] as [Record<string, unknown>, unknown];
+    expect(payload).toMatchObject({ fixtureId: 'fx-1', homeRegistrationId: null });
+    expect(payload).not.toHaveProperty('awayRegistrationId');
+  });
+
+  it('아무것도 바꾸지 않고 저장하면 팀 필드를 아예 보내지 않는다(미변경)', async () => {
+    const registrations = [
+      confirmedRegistration({ id: 'r1', teamName: '강남FC' }),
+      confirmedRegistration({ id: 'r2', teamName: '서초유나이티드' }),
+    ];
+    renderTab(vi.fn(), registrations);
+
+    const editButtons = screen.getAllByRole('button', { name: 'league_r1 1번 경기 수정' });
+    fireEvent.click(editButtons[0]);
+    const dialog = await screen.findByRole('dialog', { name: '경기 수정' });
+
+    await act(async () => {
+      fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+    });
+
+    expect(updateFixtureMutate).toHaveBeenCalledTimes(1);
+    const [payload] = updateFixtureMutate.mock.calls[0] as [Record<string, unknown>, unknown];
+    expect(payload).not.toHaveProperty('homeRegistrationId');
+    expect(payload).not.toHaveProperty('awayRegistrationId');
+  });
+});
+
+/**
+ * 경기 수정 모달 — 킥오프 시각 KST 왕복 계약.
+ *
+ * 고치기 전 흐름: datetime-local 입력값(오프셋 없는 KST 벽시계 문자열)을
+ * `new Date(value).toISOString()`로 바로 변환해 **브라우저 로컬 타임존**으로 해석했다 —
+ * KST가 아닌 기기(해외 출장 중인 운영자 등)에서 저장하면 값을 안 건드려도 킥오프가
+ * 밀렸다. 이 스위트는 일부러 KST가 아닌 TZ를 실행 환경으로 강제해 그 회귀를 잠근다.
+ */
+describe('BracketTab — 경기 수정: 킥오프 시각 KST 왕복', () => {
+  const originalTz = process.env.TZ;
+  beforeAll(() => {
+    process.env.TZ = 'America/New_York'; // KST와 무관한 타임존을 실행 환경으로 강제
+  });
+  afterAll(() => {
+    process.env.TZ = originalTz;
+  });
+  beforeEach(() => {
+    bracketFixtures = [
+      fixtureRow({ id: 'fx-1', round: 'league_r1', fixtureNumber: 1, homeRegistrationId: 'r1', awayRegistrationId: 'r2' }),
+    ];
+    updateFixtureMutate.mockReset();
+  });
+
+  it('datetime-local 입력값을 KST 오프셋(+09:00)으로 고정해 ISO로 보낸다 — 실행 환경 타임존이 밀지 않는다', async () => {
+    const registrations = [
+      confirmedRegistration({ id: 'r1', teamName: '강남FC' }),
+      confirmedRegistration({ id: 'r2', teamName: '서초유나이티드' }),
+    ];
+    renderTab(vi.fn(), registrations);
+
+    const editButtons = screen.getAllByRole('button', { name: 'league_r1 1번 경기 수정' });
+    fireEvent.click(editButtons[0]);
+    const dialog = await screen.findByRole('dialog', { name: '경기 수정' });
+
+    const scheduledInput = within(dialog).getByLabelText('경기 일시');
+    fireEvent.change(scheduledInput, { target: { value: '2026-08-30T22:00' } });
+
+    await act(async () => {
+      fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+    });
+
+    expect(updateFixtureMutate).toHaveBeenCalledTimes(1);
+    const [payload] = updateFixtureMutate.mock.calls[0] as [Record<string, unknown>, unknown];
+    // America/New_York 로컬로 잘못 해석하면 2026-08-31T02:00:00.000Z 가 나온다.
+    expect(payload.scheduledAt).toBe('2026-08-30T13:00:00.000Z');
   });
 });

@@ -909,6 +909,16 @@ export class MatchesService {
       genderRule: match.genderRule,
       approvalRequired: true,
       paymentRequired: false,
+      // detail()과 같은 hostUser include(matchInclude())를 이미 공유하므로 추가 쿼리 없이
+      // 채울 수 있다 — 예전엔 이 필드가 빠져 있어 프론트가 항상 mock 호스트 이름으로
+      // 폴백했다(실사고: 모든 카드가 '김정민'/'박서준' 등 목업 이름을 보여줌).
+      host: {
+        userId: match.hostUser.id,
+        displayName:
+          match.hostUser.profile?.nickname ?? match.hostUser.profile?.displayName ?? '호스트',
+        profileImageUrl: match.hostUser.profile?.profileImageUrl ?? null,
+        trustState: match.hostUser.reputationSummary?.trustState ?? 'none',
+      },
       viewerState: this.getViewer(match, user).state === 'guest' ? 'none' : this.getViewer(match, user).state,
     };
   }

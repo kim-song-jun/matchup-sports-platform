@@ -24,18 +24,59 @@
  *   - formatEntryFee(fee)   → 0이면 '무료', 그 외 'N원' (ko-KR 천 단위 구분)
  */
 
-const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'] as const;
+
+type TournamentKstParts = {
+  year: string;
+  month: string;
+  day: string;
+  weekday: string;
+  hour: string;
+  minute: string;
+};
+
+/**
+ * 대회(Tournament) 날짜 포맷터 공용 — dateStr 을 KST(Asia/Seoul) 벽시계 부분으로 분해한다.
+ * 경기 시각은 서버가 KST 기준으로 배치하는 계약이다(formatKstTime/formatKstDateShort 주석,
+ * round-robin-schedule.ts 참고) — 뷰어 기기 타임존과 무관하게 항상 Asia/Seoul로 고정해야
+ * 관전자·선수가 어드민·서버와 같은 킥오프 시각을 본다. `d.getHours()` 류 로컬 getter를 쓰면
+ * 기기 타임존이 Asia/Seoul이 아닐 때(해외 접속·UTC 데스크톱 등) 시각이 그대로 밀린다 —
+ * 실사례: KST 22:00 킥오프가 UTC 기기에서 13:00으로 표시됨.
+ * dateStr 이 invalid 이면 null.
+ */
+function getTournamentKstParts(dateStr: string): TournamentKstParts | null {
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return null;
+  const parts = new Intl.DateTimeFormat('ko-KR', {
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    weekday: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'Asia/Seoul',
+  }).formatToParts(d);
+  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? '';
+  return {
+    year: get('year'),
+    month: get('month'),
+    day: get('day'),
+    weekday: get('weekday'),
+    hour: get('hour'),
+    minute: get('minute'),
+  };
+}
 
 /**
  * compact 슬롯용 짧은 형식: 'M/D (요일)'
- * 홈 티저 카드 · 대회 목록 카드에서 사용해요.
+ * 홈 티저 카드 · 대회 목록 카드에서 사용해요. KST 벽시계 고정 — getTournamentKstParts 참고.
  * dateStr 이 없거나 invalid 이면 null 반환.
  */
 export function formatTournamentDateShort(dateStr: string | null | undefined): string | null {
   if (!dateStr) return null;
-  const d = new Date(dateStr);
-  if (Number.isNaN(d.getTime())) return null;
-  return `${d.getMonth() + 1}/${d.getDate()} (${WEEKDAYS[d.getDay()]})`;
+  const parts = getTournamentKstParts(dateStr);
+  if (!parts) return null;
+  return `${parts.month}/${parts.day} (${parts.weekday})`;
 }
 
 export function formatTournamentDateRangeShort(
@@ -52,15 +93,14 @@ export function formatTournamentDateRangeShort(
 /**
  * 목록/브래킷 슬롯용 짧은 날짜+시각: 'M/D (요일) HH:MM'
  * 경기 일정 목록 · 결선 대진표 카드처럼 한 줄에 날짜와 시각을 함께 보여줘야 하는
- * compact 슬롯에서 사용해요. dateStr 이 없거나 invalid 이면 null 반환.
+ * compact 슬롯에서 사용해요. KST 벽시계 고정 — getTournamentKstParts 참고.
+ * dateStr 이 없거나 invalid 이면 null 반환.
  */
 export function formatTournamentDateTimeShort(dateStr: string | null | undefined): string | null {
-  const dateLabel = formatTournamentDateShort(dateStr);
-  if (!dateLabel) return null;
-  const d = new Date(dateStr as string);
-  const hour = String(d.getHours()).padStart(2, '0');
-  const minute = String(d.getMinutes()).padStart(2, '0');
-  return `${dateLabel} ${hour}:${minute}`;
+  if (!dateStr) return null;
+  const parts = getTournamentKstParts(dateStr);
+  if (!parts) return null;
+  return `${parts.month}/${parts.day} (${parts.weekday}) ${parts.hour}:${parts.minute}`;
 }
 
 /**
@@ -71,9 +111,11 @@ export function formatTournamentDateTimeShort(dateStr: string | null | undefined
  */
 export function formatTournamentDateMedium(dateStr: string | null | undefined): string | null {
   if (!dateStr) return null;
-  const d = new Date(dateStr);
-  if (Number.isNaN(d.getTime())) return null;
-  return `${d.getMonth() + 1}월 ${d.getDate()}일 (${WEEKDAYS[d.getDay()]})`;
+  // KST 벽시계 고정 — getTournamentKstParts 참고. 자매 함수들과 같은 기준을 써야
+  // 같은 경기가 화면마다 다른 날짜로 보이지 않는다.
+  const parts = getTournamentKstParts(dateStr);
+  if (!parts) return null;
+  return `${parts.month}월 ${parts.day}일 (${parts.weekday})`;
 }
 
 /** 여러 날에 걸친 대회를 'M월 D일 (요일)~M월 D일 (요일)'로 적는다. 하루면 시작일만 준다. */
@@ -95,9 +137,10 @@ export function formatTournamentDateRangeMedium(
  */
 export function formatTournamentDateLong(dateStr: string | null | undefined): string {
   if (!dateStr) return '날짜 미정';
-  const d = new Date(dateStr);
-  if (Number.isNaN(d.getTime())) return '날짜 미정';
-  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 (${WEEKDAYS[d.getDay()]})`;
+  // KST 벽시계 고정 — getTournamentKstParts 참고.
+  const parts = getTournamentKstParts(dateStr);
+  if (!parts) return '날짜 미정';
+  return `${parts.year}년 ${parts.month}월 ${parts.day}일 (${parts.weekday})`;
 }
 
 /**
@@ -107,14 +150,15 @@ export function formatTournamentDateLong(dateStr: string | null | undefined): st
  */
 export function formatTournamentDateTimeLong(dateStr: string | null | undefined): string {
   if (!dateStr) return '일정 미정';
-  const d = new Date(dateStr);
-  if (Number.isNaN(d.getTime())) return '일정 미정';
+  // KST 벽시계 고정 — getTournamentKstParts 참고. 신청 마감처럼 시각이 곧 마감선인
+  // 화면이라 기기 타임존이 다르면 마감 시각을 잘못 읽는다.
+  const parts = getTournamentKstParts(dateStr);
+  if (!parts) return '일정 미정';
 
-  const hour = d.getHours();
+  const hour = Number(parts.hour);
   const period = hour < 12 ? '오전' : '오후';
   const displayHour = hour % 12 || 12;
-  const minute = String(d.getMinutes()).padStart(2, '0');
-  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 (${WEEKDAYS[d.getDay()]}) ${period} ${displayHour}:${minute}`;
+  return `${parts.year}년 ${parts.month}월 ${parts.day}일 (${parts.weekday}) ${period} ${displayHour}:${parts.minute}`;
 }
 
 export function formatTournamentDateRangeLong(
@@ -138,19 +182,22 @@ export function formatTournamentDateRangeWithTime(
   endStr: string | null | undefined,
 ): string | null {
   if (!startStr) return null;
-  const start = new Date(startStr);
-  if (Number.isNaN(start.getTime())) return null;
+  // KST 벽시계 고정 — getTournamentKstParts 참고. formatTournamentDateShort가 반환하는
+  // 날짜 라벨과 여기서 뽑는 시각이 같은 KST 기준이어야 "8/31 (일) 13:00"처럼 날짜·시각이
+  // 서로 다른 타임존을 섞어 뒤틀리지 않는다.
+  const start = getTournamentKstParts(startStr);
+  if (!start) return null;
 
-  const startDateLabel = formatTournamentDateShort(startStr);
-  const startTime = `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`;
+  const startDateLabel = `${start.month}/${start.day} (${start.weekday})`;
+  const startTime = `${start.hour}:${start.minute}`;
   const startFull = `${startDateLabel} ${startTime}`;
 
   if (!endStr) return startFull;
-  const end = new Date(endStr);
-  if (Number.isNaN(end.getTime())) return startFull;
+  const end = getTournamentKstParts(endStr);
+  if (!end) return startFull;
 
-  const endDateLabel = formatTournamentDateShort(endStr);
-  const endTime = `${String(end.getHours()).padStart(2, '0')}:${String(end.getMinutes()).padStart(2, '0')}`;
+  const endDateLabel = `${end.month}/${end.day} (${end.weekday})`;
+  const endTime = `${end.hour}:${end.minute}`;
 
   if (endDateLabel === startDateLabel) {
     if (endTime === startTime) return startFull;

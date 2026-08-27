@@ -182,6 +182,7 @@ function makeTournament(
     announcements: [],
     sponsors: [],
     reviews: [],
+    reviewsTotalCount: 0,
     awards: [],
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',

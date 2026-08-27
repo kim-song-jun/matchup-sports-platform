@@ -515,6 +515,11 @@ function GuestRecruitmentSection({ model }: { model: ScheduleDetailViewModel['gu
         <>
           <div className="tm-text-body">
             {model.applicantCount}/{model.slots}명 신청 · 승인 {model.approvedCount}명 · {model.stateLabel}
+            {model.visibilityLabel ? (
+              <span className={`tm-badge ${model.visibilityLabel === '전체 공개' ? 'tm-badge-blue' : 'tm-badge-grey'}`} style={{ marginLeft: 6 }}>
+                {model.visibilityLabel}
+              </span>
+            ) : null}
           </div>
           <div className="tm-text-caption" style={{ marginTop: 4 }}>{model.closesAtLabel}</div>
           {model.note ? <div className="tm-text-caption" style={{ marginTop: 4 }}>{model.note}</div> : null}
@@ -570,6 +575,33 @@ function GuestRecruitmentSection({ model }: { model: ScheduleDetailViewModel['gu
             onChange={(e) => model.manage?.editPanel?.onNoteChange(e.target.value)}
             disabled={model.manage.editPanel.pending}
           />
+          <div style={{ marginTop: 8 }}>
+            <div className="tm-text-label" style={{ marginBottom: 8, color: 'var(--text-muted)' }}>공개 범위</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {(
+                [
+                  { value: 'PUBLIC' as const, label: '전체 공개' },
+                  { value: 'MEMBERS' as const, label: '팀원 전용' },
+                ]
+              ).map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  aria-pressed={model.manage?.editPanel?.visibility === option.value}
+                  className={`tm-chip ${model.manage?.editPanel?.visibility === option.value ? 'tm-chip-active' : ''}`}
+                  disabled={model.manage?.editPanel?.pending}
+                  onClick={() => model.manage?.editPanel?.onVisibilityChange(option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            {model.manage.editPanel.visibility === 'MEMBERS' ? (
+              <div className="tm-text-caption" style={{ marginTop: 6 }}>
+                팀원 전용으로 두면 팀 밖의 사람은 이 모집을 보거나 신청할 수 없어요.
+              </div>
+            ) : null}
+          </div>
           {model.manage.editPanel.error ? <div style={{ marginTop: 8 }}><AlertBanner tone="error" message={model.manage.editPanel.error} /></div> : null}
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
             <button type="button" className="tm-btn tm-btn-sm tm-btn-neutral" onClick={model.manage.editPanel.onDismiss} disabled={model.manage.editPanel.pending}>
@@ -581,6 +613,8 @@ function GuestRecruitmentSection({ model }: { model: ScheduleDetailViewModel['gu
           </div>
         </div>
       ) : null}
+
+      {model.manage?.exists ? <GuestApplicantList model={model.manage.applications} /> : null}
 
       {model.applicationForm ? (
         <div style={{ marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
@@ -625,6 +659,71 @@ function GuestRecruitmentSection({ model }: { model: ScheduleDetailViewModel['gu
           ) : null}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+const GUEST_APPLICATION_STATE_BADGE_CLASS: Record<string, string> = {
+  PENDING: 'tm-badge-orange',
+  APPROVED: 'tm-badge-green',
+  REJECTED: 'tm-badge-grey',
+  WITHDRAWN: 'tm-badge-grey',
+};
+
+/** manager+ 전용 신청자 목록 — 승인/거절 버튼이 여기 없어서 신청이 영구 PENDING으로 남던
+ * 결함(승인 API 자체가 없었음)의 화면쪽 절반. PENDING 행에만 승인/거절 버튼을 보여준다. */
+function GuestApplicantList({ model }: { model: NonNullable<ScheduleDetailViewModel['guestRecruitment']['manage']>['applications'] }) {
+  return (
+    <div style={{ marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+      <div className="tm-text-label" style={{ marginBottom: 8 }}>신청자 목록</div>
+      {model.error ? <div style={{ marginBottom: 8 }}><AlertBanner tone="error" message={model.error} /></div> : null}
+      {model.loading ? (
+        <div className="tm-text-caption">불러오는 중…</div>
+      ) : model.items.length === 0 ? (
+        <div className="tm-text-caption">아직 신청자가 없어요.</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {model.items.map((item) => {
+            const pending = model.pendingApplicationId === item.applicationId;
+            return (
+              <div
+                key={item.applicationId}
+                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', flexWrap: 'wrap' }}
+              >
+                <div style={{ flex: 1, minWidth: 120 }}>
+                  <div className="tm-text-body">{item.displayName}</div>
+                  {item.note ? <div className="tm-text-caption" style={{ marginTop: 2 }}>{item.note}</div> : null}
+                </div>
+                <span className={`tm-badge ${GUEST_APPLICATION_STATE_BADGE_CLASS[item.state] ?? 'tm-badge-grey'}`}>
+                  {item.stateLabel}
+                </span>
+                {item.state === 'PENDING' ? (
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      type="button"
+                      className="tm-btn tm-btn-sm tm-btn-neutral"
+                      disabled={pending}
+                      onClick={() => model.onReject(item.applicationId)}
+                      aria-label={`${item.displayName}님 신청 거절`}
+                    >
+                      거절
+                    </button>
+                    <button
+                      type="button"
+                      className="tm-btn tm-btn-sm tm-btn-primary"
+                      disabled={pending}
+                      onClick={() => model.onApprove(item.applicationId)}
+                      aria-label={`${item.displayName}님 신청 승인`}
+                    >
+                      {pending ? '처리 중…' : '승인'}
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

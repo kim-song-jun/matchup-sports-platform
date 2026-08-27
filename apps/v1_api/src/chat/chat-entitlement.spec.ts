@@ -1,4 +1,18 @@
-import { currentChatRecipientEntitlementWhere } from './chat-entitlement';
+import { currentChatEntitlementWhere, currentChatRecipientEntitlementWhere } from './chat-entitlement';
+
+// 감사 결함 회귀 방지(2026-08-27): 팀매치 채팅방이 rooms() 목록에 뜨려면 이 where 를
+// 통과해야 한다. 예전엔 status:'matched' 로 exact-match 해서 결과 제출로 completed 로
+// 전이되는 순간 방이 목록에서 사라졌다 — 경기 종료 뒤에도 대화를 이어갈 수 있어야 하므로
+// matched/completed 둘 다 통과해야 한다.
+describe('currentChatEntitlementWhere — 팀매치 채팅 엔타이틀먼트는 matched/completed 둘 다 허용한다', () => {
+  it('team_match 분기의 status 필터가 matched 와 completed 를 모두 포함한다', () => {
+    const where = currentChatEntitlementWhere('user-1');
+    const teamMatchBranch = where.OR?.find((clause: any) => 'teamMatch' in clause) as any;
+
+    expect(teamMatchBranch.teamMatch.is.status).toEqual({ in: ['matched', 'completed'] });
+    expect(teamMatchBranch.teamMatch.is.approvedApplicantTeamId).toEqual({ not: null });
+  });
+});
 
 describe('currentChatRecipientEntitlementWhere', () => {
   it('match 방이면 match 참가자로 좁힌다', () => {

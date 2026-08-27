@@ -65,6 +65,10 @@ export type TeamMatchListViewModel = {
   matches: TeamMatchModel[];
   /** #5: 로딩 중 여부 — true일 때 EmptyState 대신 PageSkeleton 렌더 */
   isLoading?: boolean;
+  /** 서버 커서 페이지네이션(20건/페이지)에 다음 페이지가 더 있는지. true면 "더 보기" 노출. */
+  hasNext?: boolean;
+  onLoadMore?: () => void;
+  loadMorePending?: boolean;
 };
 
 export type TeamMatchStateViewModel = TeamMatchListViewModel & {
@@ -116,6 +120,8 @@ export type TeamMatchDetailViewModel = {
   statusLabel?: string;
   chatLabel?: string;
   chatPending?: boolean;
+  /** 채팅방 열기 실패 사유(409/403 등). onChat 버튼이 조용히 죽지 않도록 클릭 결과를 보여준다. */
+  chatError?: string | null;
   onChat?: () => void;
   onShare?: () => void;
   onNotify?: () => void;

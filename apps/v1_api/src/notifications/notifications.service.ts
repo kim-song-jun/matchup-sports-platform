@@ -112,7 +112,18 @@ export type NotificationEventType =
   // 끝났는지 알 방법이 없었다(화면에서도 조용히 사라진다). 예약 잡
   // (jobs/identity-link/identity-link-expiry.service.ts)이 발송한다.
   | 'team_match_identity_attest_expired'
-  | 'tournament_identity_attest_expired';
+  | 'tournament_identity_attest_expired'
+  // 승인/거절 결정 통보(2026-08-27 감사 결함 수정): attestIdentityLink 가 REQUESTED 를
+  // ATTESTED/REJECTED 로 종결해도 신청자에게는 어떤 알림도 나가지 않았다 — 승인함
+  // 목록도 `event.userId !== user.id` 로 신청자 본인을 명시적으로 제외해서 신청자가
+  // 자기 요청의 결과를 확인할 방법 자체가 없었다. 특히 거절은 만료 잡(위 *_expired)의
+  // 대상도 아니라서(종결 이벤트가 이미 있으면 lazy expiry 가 no-op) 완전한 침묵이었다.
+  // 발송은 games/identity-attest-notification.ts 가 attestIdentityLink 의 같은 tx 안에서
+  // V1Notification 을 직접 쓴다(위 *_requested 와 동일한 이유·패턴).
+  | 'team_match_identity_attest_approved'
+  | 'tournament_identity_attest_approved'
+  | 'team_match_identity_attest_rejected'
+  | 'tournament_identity_attest_rejected';
 
 /** V1NotificationPreference 컬럼 중 이벤트 발송을 게이트하는 필드들. */
 type NotificationPrefField = keyof Pick<
@@ -176,7 +187,9 @@ function preferenceFieldForEvent(type: NotificationEventType): NotificationPrefF
     type === 'league_match_dispute_voided' ||
     type === 'league_match_dispute_rejected' ||
     type === 'team_match_identity_attest_requested' ||
-    type === 'team_match_identity_attest_expired'
+    type === 'team_match_identity_attest_expired' ||
+    type === 'team_match_identity_attest_approved' ||
+    type === 'team_match_identity_attest_rejected'
   ) {
     return 'teamMatchEnabled';
   }
@@ -193,9 +206,11 @@ function preferenceFieldForEvent(type: NotificationEventType): NotificationPrefF
     // importantEnabled 는 "놓치면 안 되는 1:1 문의 답변" 전용이라 성격이 다르고,
     // 새 preference 컬럼을 만들면 마이그레이션이 붙는데 그럴 이유가 없다.
     type === 'tournament_award_received' ||
-    // 신원 연결 승인 요청·만료(대회 판)도 대회 활동 축이다.
+    // 신원 연결 승인 요청·만료·승인·거절(대회 판)도 대회 활동 축이다.
     type === 'tournament_identity_attest_requested' ||
-    type === 'tournament_identity_attest_expired'
+    type === 'tournament_identity_attest_expired' ||
+    type === 'tournament_identity_attest_approved' ||
+    type === 'tournament_identity_attest_rejected'
   ) {
     return 'activityEnabled';
   }
@@ -253,7 +268,9 @@ function targetTypeForEvent(type: NotificationEventType): V1NotificationTargetTy
     // schedule_rsvp_deadline_reminder 의 기존 복합 targetId 선례를 따르고, 딥링크는
     // deepLinkForEvent 에서 명시적으로 파싱한다.
     type === 'tournament_identity_attest_requested' ||
-    type === 'tournament_identity_attest_expired'
+    type === 'tournament_identity_attest_expired' ||
+    type === 'tournament_identity_attest_approved' ||
+    type === 'tournament_identity_attest_rejected'
   ) {
     return 'tournament';
   }
@@ -380,12 +397,15 @@ function deepLinkForEvent(
       return `/teams/${teamId}/schedules/${scheduleId}`;
     }
   }
-  // 신원 연결 승인 요청(대회 판): targetId 는 "${tournamentId}:${fixtureId}" 복합 —
-  // 승인 카드가 실리는 경기 상세로 보낸다(위 schedule 복합 targetId 와 같은 패턴).
-  // 팀매치·리그 판(team_match_identity_attest_requested)은 기본 /team-matches/:id 로
-  // 충분하다 — 리그 대진이면 그 라우트의 서버 redirect 가 리그 경기 상세로 보낸다.
+  // 신원 연결 승인 요청·승인·거절(대회 판): targetId 는 "${tournamentId}:${fixtureId}" 복합 —
+  // 승인 카드/내 연결 상태가 실리는 경기 상세로 보낸다(위 schedule 복합 targetId 와 같은 패턴).
+  // 팀매치·리그 판(team_match_identity_attest_*)은 기본 /team-matches/:id 로 충분하다 —
+  // 리그 대진이면 그 라우트의 서버 redirect 가 리그 경기 상세로 보낸다.
   if (
-    (type === 'tournament_identity_attest_requested' || type === 'tournament_identity_attest_expired') &&
+    (type === 'tournament_identity_attest_requested' ||
+      type === 'tournament_identity_attest_expired' ||
+      type === 'tournament_identity_attest_approved' ||
+      type === 'tournament_identity_attest_rejected') &&
     targetId
   ) {
     const [tournamentId, fixtureId] = targetId.split(':');
@@ -474,6 +494,10 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   tournament_identity_attest_requested: '기록 연결 승인 요청이 도착했어요',
   team_match_identity_attest_expired: '기록 연결 요청이 만료됐어요',
   tournament_identity_attest_expired: '기록 연결 요청이 만료됐어요',
+  team_match_identity_attest_approved: '기록 연결이 승인됐어요',
+  tournament_identity_attest_approved: '기록 연결이 승인됐어요',
+  team_match_identity_attest_rejected: '기록 연결이 거절됐어요',
+  tournament_identity_attest_rejected: '기록 연결이 거절됐어요',
 };
 
 /**
@@ -532,6 +556,10 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   tournament_identity_attest_requested: '경기 명단의 기록 연결 요청을 24시간 안에 확인해 주세요.',
   team_match_identity_attest_expired: '24시간 안에 확인되지 않아 만료됐어요. 다시 신청할 수 있어요.',
   tournament_identity_attest_expired: '24시간 안에 확인되지 않아 만료됐어요. 다시 신청할 수 있어요.',
+  team_match_identity_attest_approved: '연결이 승인됐어요. 내 활동 기록에 이 경기가 표시돼요.',
+  tournament_identity_attest_approved: '연결이 승인됐어요. 내 활동 기록에 이 경기가 표시돼요.',
+  team_match_identity_attest_rejected: '연결 요청이 거절됐어요. 다시 신청할 수 있어요.',
+  tournament_identity_attest_rejected: '연결 요청이 거절됐어요. 다시 신청할 수 있어요.',
 };
 
 @Injectable()

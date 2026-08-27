@@ -619,6 +619,10 @@ export function useV1Matches(filters?: ListFilters, options?: QueryOptions) {
     queryKey: v1Keys.matches(filters),
     queryFn: () => v1Get<CursorPage<V1Match>>('/matches', filters),
     enabled: options?.enabled,
+    // "더 보기"로 cursor가 바뀌면 filters가 달라져 쿼리키가 바뀐다 — 이게 없으면 다음
+    // 페이지를 받는 동안 query.data가 undefined로 잠깐 비어, 이미 쌓아둔 카드까지 통째로
+    // 로딩 스켈레톤으로 되돌아간다(감사 결함 — 20건 컷오프 페이지네이션 추가분).
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -1415,6 +1419,8 @@ export function useV1TeamMatches(filters?: ListFilters, options?: QueryOptions) 
     queryKey: v1Keys.teamMatches(filters),
     queryFn: () => v1Get<CursorPage<V1TeamMatch>>('/team-matches', filters),
     enabled: options?.enabled,
+    // useV1Matches와 동일한 이유 — cursor로 쿼리키가 바뀌는 "더 보기" 중 목록이 비지 않게 한다.
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -4403,12 +4409,24 @@ export function useV1CreateFixture(tournamentId: string) {
   });
 }
 
-/** 경기 일정·장소·대진 수정 (`PATCH /admin/fixtures/:id`) — 결과 있는 경기의 팀 변경은 409 FIXTURE_HAS_RESULT */
+/**
+ * 경기 일정·장소·대진 수정 (`PATCH /admin/fixtures/:id`) — 결과 있는 경기의 팀 변경은 409 FIXTURE_HAS_RESULT.
+ *
+ * `homeRegistrationId`/`awayRegistrationId`는 서버 계약상 `undefined`(필드 미전송) = 미변경,
+ * `null` = 배정 해제(TBD로 되돌리기)로 갈린다(`UpdateFixtureDto`의 `@IsOptional()`은 null도
+ * 통과시킨다). `V1UpdateFixturePayload`는 string만 허용해 "해제" 의도를 표현할 수 없으므로
+ * 이 훅에서만 null을 얹어 확장한다.
+ */
 export function useV1UpdateFixture(tournamentId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ fixtureId, ...body }: { fixtureId: string } & V1UpdateFixturePayload) =>
-      v1Patch<V1AdminBracketFixture>(`/admin/fixtures/${fixtureId}`, body),
+    mutationFn: ({
+      fixtureId,
+      ...body
+    }: { fixtureId: string } & Omit<V1UpdateFixturePayload, 'homeRegistrationId' | 'awayRegistrationId'> & {
+        homeRegistrationId?: string | null;
+        awayRegistrationId?: string | null;
+      }) => v1Patch<V1AdminBracketFixture>(`/admin/fixtures/${fixtureId}`, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentBracket(tournamentId) });
     },

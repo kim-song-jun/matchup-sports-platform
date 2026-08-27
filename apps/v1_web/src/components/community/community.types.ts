@@ -1,7 +1,7 @@
 export type ChatRoomModel = {
   id: string;
   title: string;
-  type: '개인매치' | '팀매치' | '팀';
+  type: '개인매치' | '팀매치' | '팀' | '팀컨택';
   href: string;
   last: string;
   time: string;

@@ -157,6 +157,34 @@ export class TournamentReviewsService {
     };
   }
 
+  /**
+   * 리뷰 `photoUrls` 는 "내가 방금 올린 이미지"만 등록할 수 있다 — 업로드 원장
+   * (`V1UploadAsset`)에서 소유자·종류를 대조한다. `tournament-fixture-videos.service.ts`의
+   * `assertOwnUploadedVideo`(영상)와 동일한 위협 모델: 임의의 외부 URL이나 남이 올린
+   * 업로드 URL을 로그인하지 않은 방문자까지 보는 공개 후기 화면에 그대로 박아 넣는
+   * 경로를 막는다(감사 evidence). 업로드 실패로 존재하지 않는 URL도 이 경로로 함께 걸린다.
+   */
+  private async assertOwnUploadedPhotos(userId: string, urls: string[]) {
+    if (urls.length === 0) return;
+    const uniqueUrls = [...new Set(urls)];
+    const assets = await this.prisma.v1UploadAsset.findMany({
+      where: { url: { in: uniqueUrls } },
+      select: { url: true, ownerUserId: true, kind: true },
+    });
+    const ownedImageUrls = new Set(
+      assets
+        .filter((asset) => asset.kind === 'image' && asset.ownerUserId === userId)
+        .map((asset) => asset.url),
+    );
+    const invalidUrl = uniqueUrls.find((url) => !ownedImageUrls.has(url));
+    if (invalidUrl !== undefined) {
+      throw new BadRequestException({
+        code: 'REVIEW_PHOTO_UPLOAD_NOT_FOUND',
+        message: '업로드한 사진 파일을 찾을 수 없어요. 사진을 다시 업로드해 주세요.',
+      });
+    }
+  }
+
   /** 이 대회에 confirmed 등록이 있고, 내가 owner/manager인 팀 목록 (팀 여러 개면 다건). */
   private async findEligibleTeams(tournamentId: string, userId: string) {
     const registrations = await this.prisma.v1TournamentRegistration.findMany({
@@ -279,6 +307,13 @@ export class TournamentReviewsService {
     if (existing) {
       throw new BadRequestException({ code: 'ALREADY_REVIEWED', message: '이미 리뷰를 작성했어요.' });
     }
+
+    // 3.5. photoUrls 소유권 검증 — 형제 소비처(tournament-fixture-videos.service.ts의
+    //      assertOwnUploadedVideo, league-fixture-videos.service.ts도 동일)와 같은 위협을
+    //      막는다. DTO는 문자열 배열이라는 것만 검증하므로, 여기서 걸지 않으면 로그인하지
+    //      않은 방문자도 보는 공개 후기 화면에 임의의 외부 URL이나 남의 업로드 URL을
+    //      그대로 박아 넣을 수 있다(감사 evidence).
+    await this.assertOwnUploadedPhotos(user.id, dto.photoUrls ?? []);
 
     // 4. 저장
     const review = await this.prisma.v1TournamentReview.create({
@@ -546,13 +581,30 @@ export class TournamentReviewsService {
       });
 
       awards = submittedAwards.map((award) => {
-        const candidates = roster.filter(
-          (player) =>
-            player.userId === award.recipientUserId &&
-            (award.teamName === null || player.teamName === award.teamName),
-        );
-        const recipient = candidates.length === 1 ? candidates[0] : null;
-        if (recipient === null || recipient.realName !== award.recipientName) {
+        // 신원의 1차 키는 계정(userId)이다 — teamName은 DB에 저장된 스냅샷이라
+        // 팀이 그 사이 개명하면 낡은 채로 남는다(`UpdateTeamDto.name`은 필수 필드라
+        // 언제든 바뀔 수 있다). userId만으로 이미 후보가 하나로 좁혀지면 그게
+        // 정답이다 — 스냅샷과 문자열이 다르다는 이유로 거부하면, 손대지도 않은
+        // 다른 행까지 같은 저장(전체 replace)에 묶여 전부 400으로 되돌아간다
+        // (감사 evidence: 팀 개명 후 오타 하나 고치는 저장까지 막힘).
+        //
+        // teamName은 오직 **같은 사람이 이 대회에 두 confirmed 팀에 걸쳐 등록된
+        // 드문 동명이인/중복 등록**을 가르는 2차 판정으로만 쓴다 — userId만으로
+        // 후보가 둘 이상일 때만 좁힌다.
+        const byUserId = roster.filter((player) => player.userId === award.recipientUserId);
+        const recipient =
+          byUserId.length === 1
+            ? byUserId[0]
+            : byUserId.length > 1
+              ? (byUserId.filter(
+                  (player) => award.teamName === null || player.teamName === award.teamName,
+                )[0] ?? null)
+              : null;
+        // 소속 팀이 둘 이상으로 여전히 갈리면(동명 팀 등) 안전하게 재확인을 요구한다.
+        const ambiguous =
+          byUserId.length > 1 &&
+          byUserId.filter((player) => award.teamName === null || player.teamName === award.teamName).length > 1;
+        if (recipient === null || ambiguous || recipient.realName !== award.recipientName) {
           throw new BadRequestException({
             code: 'AWARD_RECIPIENT_NOT_IN_ROSTER',
             message: `'${award.recipientName}' 수상자를 해당 대회 확정 명단에서 확인할 수 없어요. 명단에서 다시 선택해 주세요.`,
@@ -562,6 +614,9 @@ export class TournamentReviewsService {
           ...award,
           recipientName: recipient.realName,
           recipientUserId: recipient.userId,
+          // 저장 시 항상 라이브 팀명으로 다시 정규화한다 — 팀이 나중에 다시 개명해도
+          // 다음 저장(전체 replace 특성상 매번 전 행을 다시 씀)에서 스냅샷이 스스로
+          // 최신화된다.
           teamName: recipient.teamName,
         };
       });
@@ -652,13 +707,26 @@ export class TournamentReviewsService {
      *
      * 사람마다 받은 상이 다르므로 emitNotificationToMany 로 뭉뚱그리지 않고 개별
      * 발송한다 — 본문에 상 이름을 담아야 "무엇을 받았는지"가 알림만 보고 전해진다.
+     *
+     * 정상 운영 흐름은 "시상식 당일 저장 → 나중에 status 를 completed 로 전환"이라
+     * (1차 대회 회고), 발송 자체를 status===completed 로 막으면 정작 필요한 순간에
+     * 알림이 영영 안 간다. 대신 **본문을 현재 상태에 맞게 정직하게** 쓴다 — 아직 대회가
+     * completed 가 아니면 `/tournaments/:id/awards` 링크를 눌러도
+     * `NotCompletedNotice`("대회가 진행 중이에요. 종료 후 시상 결과가 공개돼요.")만
+     * 보이므로, 알림 문구도 "지금 보면 있다"고 약속하지 않고 같은 사실을 미리 알린다
+     * (감사 evidence: 알림과 착지 화면이 서로 다른 말을 하는 막다른 길).
      */
     for (const recipient of newlyAwarded) {
+      const awardedBody = `${tournament.title} — '${recipient.awardLabel}' 수상자로 선정됐어요.`;
+      const body =
+        tournament.status === 'completed'
+          ? awardedBody
+          : `${awardedBody} 공식 발표는 대회 종료 후 이 화면에서 확인할 수 있어요.`;
       await this.notifications.emitNotification(
         recipient.userId,
         'tournament_award_received',
         tournamentId,
-        `${tournament.title} — '${recipient.awardLabel}' 수상자로 선정됐어요.`,
+        body,
       );
     }
 

@@ -68,6 +68,7 @@ function makeTournament(
     announcements: [],
     sponsors: [],
     reviews: [],
+    reviewsTotalCount: 0,
     awards: [],
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
@@ -187,8 +188,8 @@ describe('public tournament QA regressions', () => {
             note: null,
             recordedAt: '2026-07-16T00:00:00.000Z',
             goals: [
-              { id: 'goal-1', team: 'home', playerId: 'player-1', playerName: '홍길동', minute: 23 },
-              { id: 'goal-2', team: 'away', playerId: null, playerName: '대타 선수', minute: 67 },
+              { id: 'goal-1', team: 'home', playerId: 'player-1', playerUserId: null, playerName: '홍길동', minute: 23 },
+              { id: 'goal-2', team: 'away', playerId: null, playerUserId: null, playerName: '대타 선수', minute: 67 },
             ],
           },
           videos: [],

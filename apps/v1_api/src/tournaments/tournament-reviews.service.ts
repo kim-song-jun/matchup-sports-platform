@@ -301,9 +301,9 @@ export class TournamentReviewsService {
 
   /**
    * 내가 팀장·운영진인 팀이 참가 확정한 대회 중 종료됐지만 아직 리뷰가 없는 대회 목록
-   * (최근 종료순). "리뷰가 없다"는 authorUserId(나) 또는 내 자격 팀 어느 쪽 기준으로도
-   * 없어야 한다 — 다른 운영진이 이미 우리 팀 리뷰를 썼으면 더는 pending이 아니다(대회당
-   * 인당 1건 제약이라 어차피 내가 또 쓸 수 없다).
+   * (최근 종료순). "리뷰가 없다"는 authorUserId(나) 기준 — 대회당 인당 1건 정책(2026-08-17)
+   * 아래에서는 같은 팀 다른 운영진이 먼저 썼더라도 나는 여전히 별도로 쓸 수 있으므로 이
+   * 대회는 내 pending 목록에 남아 있어야 한다(팀 기준으로 걸러내면 안 된다).
    */
   async listMyPendingReviews(userId: string) {
     const registrations = await this.prisma.v1TournamentRegistration.findMany({
@@ -352,23 +352,17 @@ export class TournamentReviewsService {
   }
 
   /**
-   * 내 리뷰 조회. "내"의 기준은 (a) 내가 직접 작성한 리뷰(authorUserId) 또는 (b) 내가
-   * 팀장·운영진인 팀 몫으로 다른 운영진이 작성한 리뷰 — 둘 중 하나라도 있으면 반환한다.
-   * (a)만으로는 팀장이 쓴 리뷰를 매니저가 "이미 작성됨"으로 못 봐서 재작성을 시도하다
-   * ALREADY_REVIEWED로 막히는 UX가 생긴다.
+   * 내 리뷰 조회. "내"의 기준은 authorUserId — 내가 직접 작성한 리뷰만이다.
+   * 중복검사(submitReview)·pending 목록(listMyPendingReviews)이 2026-08-17에 사람 기준으로
+   * 바뀌면서(대회당 인당 1건, 팀당 1건 아님) 팀장과 운영진은 각자 독립적으로 후기를 쓸 수
+   * 있게 됐다 — 그러므로 여기서도 팀 기준 OR fallback을 쓰면 안 된다. 팀 기준으로 남겨두면
+   * 팀장이 먼저 쓴 순간 같은 팀 나머지 운영진은 자기가 쓴 적 없는 리뷰를 "이미 작성함"으로
+   * 판정받아 영영 쓸 수 없게 된다(서버 submitReview는 이들을 막지 않으므로 순전히 이 조회의
+   * 오판정 문제였다).
    */
   async getMyReview(tournamentId: string, userId: string) {
-    const eligibleTeams = await this.findEligibleTeams(tournamentId, userId);
     const review = await this.prisma.v1TournamentReview.findFirst({
-      where: {
-        tournamentId,
-        OR: [
-          { authorUserId: userId },
-          ...(eligibleTeams.length > 0
-            ? [{ teamId: { in: eligibleTeams.map((t) => t.teamId) } }]
-            : []),
-        ],
-      },
+      where: { tournamentId, authorUserId: userId },
     });
     if (!review) return null;
     return {

@@ -1114,7 +1114,7 @@ describe('TeamMatchesService', () => {
       applications: [],
     });
     prisma.v1Team.findMany.mockResolvedValue([
-      { id: 'team-applicant', name: '신청팀', memberships: [{ role: 'manager' }] },
+      { id: 'team-applicant', name: '신청팀', sportId: 'sport-1', memberships: [{ role: 'manager' }] },
     ]);
 
     const result = await service.applicationEligibility(manager, 'tm-1', {});
@@ -1127,7 +1127,7 @@ describe('TeamMatchesService', () => {
   });
 
   it('createApplication: 신청 제출 성공 경로는 hostTeam.trustScore를 쓰지 않으므로 live 재계산 쿼리를 건너뛴다', async () => {
-    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-applicant' }); // assertCanManageTeam(applicantTeamId)
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-applicant', team: { sportId: 'sport-1' } }); // assertCanManageTeam(applicantTeamId)
     prisma.v1TeamMatch.findFirst.mockResolvedValue({
       ...teamMatchRow({ status: 'recruiting', startAt: FUTURE, hostTeamId: 'team-host' }),
       sport: { id: 'sport-1', name: '풋살' },
@@ -1163,7 +1163,7 @@ describe('TeamMatchesService', () => {
   });
 
   it('createApplication: 신청 마감시간이 지나면 새 신청을 거부한다', async () => {
-    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-applicant' });
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-applicant', team: { sportId: 'sport-1' } });
     prisma.v1TeamMatch.findFirst.mockResolvedValue({
       ...teamMatchRow({ status: 'recruiting', startAt: FUTURE, deadlineAt: PAST }),
       hostTeam: { id: 'team-host', memberships: [], trustScore: null },
@@ -1190,7 +1190,7 @@ describe('TeamMatchesService', () => {
   // 기대면(사용자 필터가 걸려 있다) 같은 팀의 다른 매니저가 낸 신청서를 놓치기 때문이다.
   describe('createApplication: 중복 신청 가드', () => {
     beforeEach(() => {
-      prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-applicant' });
+      prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-applicant', team: { sportId: 'sport-1' } });
       prisma.v1TeamMatch.findFirst.mockResolvedValue({
         ...teamMatchRow({ status: 'recruiting', startAt: FUTURE, hostTeamId: 'team-host' }),
         sport: { id: 'sport-1', name: '풋살' },
@@ -1285,6 +1285,58 @@ describe('TeamMatchesService', () => {
     });
   });
 
+  // ─── 신청 팀의 종목이 팀매치 종목과 같아야 한다 ─────────────────────────────────
+  //
+  // create()/update()는 hostTeam.sportId !== dto.sportId를 이미 400으로 막는 불변식인데,
+  // 신청자 쪽만 비어 있어 다른 종목 팀이 그대로 신청 → 승인까지 갈 수 있었다. 승인은
+  // approveApplication이 나머지 requested 신청을 자동 거절하고 AWAY 를 되돌릴 수 없게
+  // 핀하므로, 이 검증이 빠지면 사고를 사후에 되돌릴 방법이 없다.
+  describe('createApplication / applicationEligibility: 신청 팀 종목이 팀매치 종목과 달라야 한다', () => {
+    beforeEach(() => {
+      // teamMatchRow 기본 sportId는 'sport-1'(풋살) — 신청팀은 다른 종목('sport-badminton')으로 준다.
+      prisma.v1TeamMatch.findFirst.mockResolvedValue({
+        ...teamMatchRow({ status: 'recruiting', startAt: FUTURE, hostTeamId: 'team-host' }),
+        sport: { id: 'sport-1', name: '풋살' },
+        region: { id: 'region-1', name: '서울' },
+        minSportLevel: null,
+        maxSportLevel: null,
+        hostTeam: { id: 'team-host', memberships: [], trustScore: null },
+        approvedApplicantTeam: null,
+        applications: [],
+      });
+      prisma.v1TeamMatchApplication.findMany.mockResolvedValue([]);
+    });
+
+    it('createApplication: 종목이 다른 팀으로는 신청 자체가 막힌다(409 SPORT_MISMATCH)', async () => {
+      prisma.v1TeamMembership.findFirst.mockResolvedValue({
+        id: 'mem-badminton',
+        team: { sportId: 'sport-badminton' },
+      });
+
+      await expect(
+        service.createApplication(manager, 'tm-1', { applicantTeamId: 'team-badminton' }),
+      ).rejects.toMatchObject({ response: { code: 'SPORT_MISMATCH' } });
+      expect(prisma.v1TeamMatchApplication.create).not.toHaveBeenCalled();
+    });
+
+    it('applicationEligibility: 종목이 다른 팀은 eligible:false + SPORT_MISMATCH, 같은 종목 팀은 그대로 eligible:true', async () => {
+      // U가 배드민턴 팀(최근 생성 → 먼저 옴)과 풋살 팀을 함께 관리한다. 종목 필터가 없던
+      // 종전 코드는 두 팀 모두 eligible:true를 줬고, 화면의 `find(t => t.eligible)`가 배열의
+      // 첫 팀(배드민턴)을 그대로 골라 CTA가 됐다.
+      prisma.v1Team.findMany.mockResolvedValue([
+        { id: 'team-badminton', name: '배드민턴클럽', sportId: 'sport-badminton', memberships: [{ role: 'owner' }] },
+        { id: 'team-futsal', name: '풋살팀', sportId: 'sport-1', memberships: [{ role: 'manager' }] },
+      ]);
+
+      const eligibility = await service.applicationEligibility(manager, 'tm-1', {});
+
+      expect(eligibility.teams).toMatchObject([
+        { teamId: 'team-badminton', eligible: false, reasonCode: 'SPORT_MISMATCH' },
+        { teamId: 'team-futsal', eligible: true, reasonCode: 'OK' },
+      ]);
+    });
+  });
+
   // ─── 자격 판정과 생성 가드는 같은 사실을 본다 ───────────────────────────────────
   //
   // 위 가드가 409 로 막는 조합을 applicationEligibility 가 eligible:true 로 내려주면, 화면에는
@@ -1294,7 +1346,7 @@ describe('TeamMatchesService', () => {
   // 같은가**를 잡는다 — 한쪽만 되돌리면 그 자리에서 깨진다.
   describe('applicationEligibility: 생성 가드와 같은 결론을 낸다', () => {
     beforeEach(() => {
-      prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-applicant' });
+      prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-applicant', team: { sportId: 'sport-1' } });
       prisma.v1TeamMatch.findFirst.mockResolvedValue({
         ...teamMatchRow({ status: 'recruiting', startAt: FUTURE, hostTeamId: 'team-host' }),
         sport: { id: 'sport-1', name: '풋살' },
@@ -1316,7 +1368,7 @@ describe('TeamMatchesService', () => {
 
     it('같은 팀의 다른 매니저가 신청 중이면 신청 불가로 내려주고, 그 신청서 id 도 함께 준다', async () => {
       prisma.v1Team.findMany.mockResolvedValue([
-        { id: 'team-applicant', name: '신청팀', memberships: [{ role: 'manager' }] },
+        { id: 'team-applicant', name: '신청팀', sportId: 'sport-1', memberships: [{ role: 'manager' }] },
       ]);
       prisma.v1TeamMatchApplication.findMany.mockResolvedValue([
         applicationRow({ id: 'app-peer', applicantTeamId: 'team-applicant', appliedByUserId: 'peer-manager', status: 'requested' }),
@@ -1341,8 +1393,8 @@ describe('TeamMatchesService', () => {
 
     it('내가 다른 팀으로 신청 중이면 나머지 관리 팀도 신청 불가로 내려준다', async () => {
       prisma.v1Team.findMany.mockResolvedValue([
-        { id: 'team-alpha', name: '알파', memberships: [{ role: 'owner' }] },
-        { id: 'team-bravo', name: '브라보', memberships: [{ role: 'manager' }] },
+        { id: 'team-alpha', name: '알파', sportId: 'sport-1', memberships: [{ role: 'owner' }] },
+        { id: 'team-bravo', name: '브라보', sportId: 'sport-1', memberships: [{ role: 'manager' }] },
       ]);
       prisma.v1TeamMatchApplication.findMany.mockResolvedValue([
         applicationRow({ id: 'app-alpha', applicantTeamId: 'team-alpha', appliedByUserId: manager.id, status: 'requested' }),
@@ -1364,7 +1416,7 @@ describe('TeamMatchesService', () => {
       // 반대 방향 회귀 가드. 원장을 보게 됐다고 죽은 신청서(withdrawn/rejected)까지 막으면
       // 정당한 재신청이 화면에서 사라진다 — 가드는 통과시키는데 화면만 잠기는 반대편 갈림이다.
       prisma.v1Team.findMany.mockResolvedValue([
-        { id: 'team-applicant', name: '신청팀', memberships: [{ role: 'manager' }] },
+        { id: 'team-applicant', name: '신청팀', sportId: 'sport-1', memberships: [{ role: 'manager' }] },
       ]);
       prisma.v1TeamMatchApplication.findMany.mockResolvedValue([
         applicationRow({ id: 'app-peer', applicantTeamId: 'team-applicant', appliedByUserId: 'peer-manager', status: 'withdrawn' }),

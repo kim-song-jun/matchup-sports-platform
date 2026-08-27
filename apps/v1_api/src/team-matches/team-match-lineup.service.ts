@@ -21,12 +21,24 @@ import {
 type Transaction = Prisma.TransactionClient;
 
 /** `V1GameParticipant.position` sentinel reserved for a bench entry. Chosen
- * because the model has no dedicated starter/bench boolean column (see
- * Task 14 report for the follow-up schema request). */
-const BENCH_MARKER = 'BENCH';
+ * because this write path never sets the `started` boolean column (it
+ * defaults to `true` for every row it inserts) -- `position === BENCH_MARKER`
+ * is the *only* signal that distinguishes bench from starter for rows this
+ * service writes. Exported because `TeamLineupHistoryService` reads these
+ * same rows across team-match and tournament-fixture sources and must use
+ * this exact sentinel (not the generic `started` column) when the source
+ * game is a team match -- see that service's `list()` for the branch (see
+ * Task 14 report for the follow-up schema request that would let this write
+ * path also start using the `started` column). */
+export const BENCH_MARKER = 'BENCH';
 /** Sentinel for the single starting goalkeeper, matching the convention
- * already used implicitly for `V1GameResultParticipant.goalkeeper`. */
-const GOALKEEPER_MARKER = 'GK';
+ * already used implicitly for `V1GameResultParticipant.goalkeeper`. Exported
+ * for the same cross-service reason as `BENCH_MARKER`: team-match lineups
+ * always store this literal string regardless of sport, while
+ * tournament-fixture lineups store the sport dictionary's goalkeeper code
+ * (e.g. futsal's `'GOLEIRO'`) -- `TeamLineupHistoryService` must compare
+ * against this sentinel, not the dictionary code, for team-match sources. */
+export const GOALKEEPER_MARKER = 'GK';
 
 interface TeamMatchLineupContext {
   gameId: string;

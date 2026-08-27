@@ -183,6 +183,9 @@ export class LeagueMatchPublicService {
     const computable = ordered.filter((league) => league.state !== 'draft');
     const standingsResults = await Promise.all(computable.map((league) => this.standings(league.id)));
     const standingsByLeagueId = new Map(computable.map((league, index) => [league.id, standingsResults[index]]));
+    // 감사 L-E finding 6 — 아래 nextFixture 선택에서 "아직 시작 안 한 대진"만 후보로
+    // 삼기 위한 기준 시각. map 클로저 밖에서 한 번만 고정해 항목마다 값이 흔들리지 않게 한다.
+    const now = new Date();
 
     return {
       items: ordered.map((league) => {
@@ -210,10 +213,21 @@ export class LeagueMatchPublicService {
           teamCount: league._count.teams,
           myTeams: mine.map((entry) => {
             const standingRow = result?.standings.find((row) => row.teamId === entry.teamId) ?? null;
-            // 취소는 standings() 안에서 이미 pendingFixtures 대상에서 빠져 있다(R8) --
-            // 여기서 다시 필터링할 필요가 없다. 시작 시각 오름차순으로 가장 이른 것 하나만 고른다.
+            // 취소·무효는 standings() 안에서 이미 pendingFixtures 대상에서 빠져 있다(R8,
+            // 감사 L-E finding 2/5) -- 여기서 다시 필터링할 필요가 없다.
+            //
+            // 감사 L-E finding 6 수정: pendingFixtures는 "결과가 아직 안 들어온 대진"일 뿐
+            // 시각 비교가 없다 -- 운영자 수동 입력 + 지연이 정상 경로인 이 리그에서는
+            // 이미 지난 대진(결과 대기 중)도 여기 섞여 있다. 시작 시각 오름차순으로 그냥
+            // 첫 항목을 고르면 "다음 경기"가 며칠 지난 과거 경기를 가리킨다(타입 계약은
+            // "다음 예정 경기"다). 아직 시작하지 않은 대진 중 가장 이른 것만 후보로 삼고,
+            // 없으면 null -- 진짜 다음 경기가 없다는 뜻이지 지난 미확정 경기로 대체하지 않는다.
             const nextFixture = (result?.pendingFixtures ?? [])
-              .filter((fixture) => fixture.homeTeamId === entry.teamId || fixture.awayTeamId === entry.teamId)
+              .filter(
+                (fixture) =>
+                  (fixture.homeTeamId === entry.teamId || fixture.awayTeamId === entry.teamId) &&
+                  fixture.startAt.getTime() >= now.getTime(),
+              )
               .sort((a, b) => a.startAt.getTime() - b.startAt.getTime())
               .at(0) ?? null;
             const opponentTeamId =
@@ -327,7 +341,11 @@ export class LeagueMatchPublicService {
           awayScore: fact?.awayScore ?? null,
           // 몰수 결과는 스코어만 보면 실제 1:0 승리와 구분되지 않는다. 관전자가 그 둘을
           // 같은 경기로 읽지 않도록 boolean 하나만 내보낸다(사유 원문은 비공개).
-          isForfeit: fact?.resultRevision.reason?.startsWith(FORFEIT_REASON_MARKER) ?? false,
+          // 감사 L-E finding 4 수정: `.includes`로 넓힌 이유 -- 몰수 결과를 정정하면
+          // reason이 `[LEAGUE_RESULT_CORRECTION] [LEAGUE_FORFEIT] ...`처럼 정정 마커가
+          // 앞에 붙는다(league-match-result-entry.service.ts). `startsWith`만 보면 정정을
+          // 한 번만 거쳐도 몰수 표식이 영구히 사라진다.
+          isForfeit: fact?.resultRevision.reason?.includes(FORFEIT_REASON_MARKER) ?? false,
         };
       }),
     };
@@ -344,7 +362,12 @@ export class LeagueMatchPublicService {
         approvedApplicantTeamId: true,
         startAt: true,
         status: true,
-        game: { select: { id: true, currentOfficialRevisionId: true } },
+        // 감사 L-E finding 2/5 수정: 무효(VOID) 처리된 대진은 currentOfficialRevisionId가
+        // null로 풀리는 게 아니라 VOID 리비전 자신을 계속 가리킨다(voidTeamMatchResult,
+        // games.service.ts). fact 유무만으로는 "아직 결과가 없어 미확정"과 "결과가 있었지만
+        // 무효 처리됨"을 구분할 수 없으므로(둘 다 fact가 없다) 포인터가 가리키는 리비전의
+        // state를 직접 읽어야 한다.
+        game: { select: { id: true, currentOfficialRevisionId: true, currentOfficialRevision: { select: { state: true } } } },
       },
     });
 
@@ -378,6 +401,15 @@ export class LeagueMatchPublicService {
       // 그대로 개수만 센다 — 별도 쿼리 없이 이 루프 한 번으로 충분하다.
       if (tm.status === 'cancelled') {
         cancelledFixtureCount += 1;
+        continue;
+      }
+
+      // 감사 L-E finding 2/5 수정: 무효 처리된 대진은 취소와 마찬가지로 "더 이상 결과를
+      // 기다리지 않는" 상태다 -- confirmed(결과가 반영됨)도 pending(미확정 경기로 다시
+      // 뛰어야 함)도 아니다. 여기서 걸러내지 않으면 이 대진이 pendingFixtures로 들어가
+      // 승강 확정 게이트("모든 대진이 확정됐는가")를 영구히 막고, listMine의 "다음 경기"가
+      // 이미 무효 처리된 지난 경기를 계속 가리키게 된다.
+      if (tm.game?.currentOfficialRevision?.state === 'VOID') {
         continue;
       }
 

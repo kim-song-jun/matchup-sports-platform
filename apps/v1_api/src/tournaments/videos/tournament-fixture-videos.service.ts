@@ -44,7 +44,9 @@ type FixtureLookup = { readonly id: string; readonly fieldId: string | null };
  * 디스크와 업로더의 보관 쿼터(`V1UploadAsset` 합계)가 계속 찬다. 이 서비스가 그 책임을 진다:
  * - 등록 실패 시 방금 저장한 파일을 되돌린다(`uploadAndCreate`).
  * - 영상 행을 지울 때 같은 URL 을 참조하는 행이 하나도 남지 않으면 파일과 업로드 원장
- *   (`V1UploadAsset`)을 함께 지운다(`releaseUploadedFile`).
+ *   (`V1UploadAsset`)을 함께 지운다(`releaseUploadedFile`). 같은 업로드 URL 이 리그 대진
+ *   (`V1TeamMatchVideo`, `league-fixture-videos.service.ts`)에도 등록돼 있을 수 있으므로
+ *   참조 카운트는 두 테이블 모두를 센다 — 대회 쪽만 보고 지우면 리그 대진의 재생이 깨진다.
  * - 외부 링크에는 정리할 파일이 없다.
  * 경기(`V1TournamentFixture`)가 통째로 삭제되면 영상 행은 DB cascade 로 사라지지만 파일은
  * 남는다 — 그 경로는 이 서비스를 지나지 않기 때문이다. 경기 삭제는 "결과가 기록되지 않은
@@ -275,13 +277,22 @@ export class TournamentFixtureVideosService {
    * 업로드 파일 회수. 같은 URL 을 참조하는 영상 행이 하나도 남지 않았을 때만 물리 파일과
    * 업로드 원장 행을 지운다 — 같은 파일을 다른 경기에도 등록해 둔 경우 남은 쪽의 재생이
    * 깨지면 안 되기 때문이다. 외부 링크는 지울 파일이 없어 그대로 통과한다.
+   *
+   * 참조 카운트는 **두 테이블 모두**에서 센다(`league-fixture-videos.service.ts` 와 대칭).
+   * 같은 업로드 URL 이 대회 경기(`V1TournamentFixtureVideo`)와 리그 대진(`V1TeamMatchVideo`)에
+   * 동시에 등록돼 있을 수 있다 — `assertOwnUploadedVideo` 가 업로드 원장의 소유자·kind 만
+   * 확인하고 도메인을 구분하지 않기 때문이다. 대회 쪽 참조만 세면 리그 대진이 아직 쓰고
+   * 있는 파일을 지워 그쪽 재생이 영구히 깨진다.
    */
   private async releaseUploadedFile(url: string) {
     const parsed = parseFixtureVideoUrl(url);
     if (!parsed.ok || parsed.source !== 'upload') return;
 
-    const stillReferenced = await this.prisma.v1TournamentFixtureVideo.count({ where: { url } });
-    if (stillReferenced > 0) return;
+    const [tournamentRefs, teamMatchRefs] = await Promise.all([
+      this.prisma.v1TournamentFixtureVideo.count({ where: { url } }),
+      this.prisma.v1TeamMatchVideo.count({ where: { url } }),
+    ]);
+    if (tournamentRefs + teamMatchRefs > 0) return;
 
     try {
       // 파일 → 원장 순서. 반대로 하면 파일 삭제가 실패했을 때 "원장에도 없고 디스크에는 남은"

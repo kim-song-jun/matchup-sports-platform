@@ -1543,13 +1543,20 @@ function penaltyScoreForSide(
   return side.sideKey === 'HOME' ? penalties.home : penalties.away;
 }
 
-function teammatesForSide(
+/** 테스트 전용 export — 순수 로직이라 OperateConsole 전체를 렌더링하지 않고
+ * 이 함수 하나만 검증한다(lineup-revision-state-consistency 회귀 테스트). */
+export function teammatesForSide(
   sideId: string | null,
   lineups: readonly GameLineup[],
   excludeParticipantId: string | null,
 ): readonly GameLineupParticipant[] {
   if (sideId === null) return [];
-  const lineup = lineups.find((row) => row.sideId === sideId);
+  // LineupGrid·ArrivalCheckinPanel과 같은 규칙을 재사용한다: SUBMITTED/LOCKED 중
+  // 최고 revision만이 "지금 운영 중인 라인업"이다. 여기서 `lineups.find`로 배열의
+  // 첫 행(revision desc 정렬이라 DRAFT가 최상단일 수 있다)을 집으면, 팀이 저장만
+  // 하고 제출하지 않은 DRAFT의 선수가 어시스트 후보로 올라온다 — 그 선수는
+  // LineupGrid에는 아예 보이지 않는데도 후보 목록에는 뜨는 모순이 생긴다.
+  const lineup = latestOperableLineup(lineups, sideId);
   return (lineup?.participants ?? []).filter((participant) => participant.id !== excludeParticipantId);
 }
 

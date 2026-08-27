@@ -26,6 +26,19 @@ export type TournamentStatistics = {
   completedFixtures: number;
 };
 
+/**
+ * 서버가 참가자를 특정할 수 없는 골(운영 콘솔의 "익명 골로 기록" 또는 참가자 조회
+ * 실패)에 채워 넣는 고정 플레이스홀더 문자열. `V1TournamentFixtureGoal` 타입에는
+ * 이 상태를 나타내는 별도 플래그가 없어(익명 여부를 구분할 수단 자체가 없음) 서버가
+ * 방출하는 이 리터럴로만 식별할 수 있다 (apps/v1_api/src/tournaments/
+ * tournament-fixture-official-result.ts:256-258, 381-385). 진짜 근본 수정은 API
+ * 계약에 `anonymous` 플래그를 실어 보내는 것이지만 그 변경은 이 파일의 소유 범위
+ * 밖이라, 여기서는 알려진 플레이스홀더 값을 득점자 집계에서 제외해 "실재하지 않는
+ * 득점자"가 TOP 10에 오르는 것만 막는다. 레거시 폴백 경로(playerId=null + 실제
+ * 이름을 타이핑한 비회원/대타 득점자)는 이 리터럴과 다른 값이라 영향받지 않는다.
+ */
+const UNRESOLVED_GOAL_SCORER_PLACEHOLDER = '선수 정보 없음';
+
 export function buildTournamentStatistics(
   fixtures: V1AdminBracketFixture[],
 ): TournamentStatistics {
@@ -68,6 +81,9 @@ export function buildTournamentStatistics(
     for (const goal of fixture.result.goals) {
       // 자책골은 경기 점수와 이벤트 타임라인에만 남고 개인 득점 순위에는 포함하지 않는다.
       if (goal.ownGoal) continue;
+      // 참가자를 특정하지 못한 골(익명 골 등)은 실재하지 않는 "선수 정보 없음"
+      // 득점자 행을 만들지 않도록 개인 득점 집계에서 제외한다.
+      if (goal.playerName.trim() === UNRESOLVED_GOAL_SCORER_PLACEHOLDER) continue;
       const registrationId = goal.team === 'home'
         ? fixture.homeRegistrationId
         : fixture.awayRegistrationId;

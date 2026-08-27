@@ -27,10 +27,15 @@ const ADMIN_CANCELLABLE_STATUSES: V1TournamentRegistration['status'][] = [
   'waitlisted',
 ];
 
-/** 확정/대기 처리 가능 상태 목록. */
+/**
+ * 확정/대기 처리 가능 상태 목록. `waitlisted`가 포함돼야 대기 승격(자리가 나서 대기 팀을
+ * confirmed로 올리는 것)이 가능하다 — 감사 finding(reg-confirm-reapply-state-machine #1):
+ * 이 배열에 waitlisted가 빠져 있어 대기 팀은 취소 후 재신청 말고는 확정될 방법이 없었다.
+ */
 const ADMIN_CONFIRMABLE_STATUSES: V1TournamentRegistration['status'][] = [
   'payment_checking',
   'paid',
+  'waitlisted',
 ];
 
 /**

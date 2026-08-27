@@ -139,8 +139,29 @@ export const TOURNAMENT_DETAIL_INCLUDE = {
       },
     },
   },
+  // 공개 상세 응답의 recipientName은 명단 실명을 그대로 내보내지 않는다 --
+  // `tournament-detail.presenter.ts`가 참가자 이름 공개 정책 정본
+  // (`resolveParticipantDisplayName`, games/public-records/participant-name-gating.ts,
+  // 2026-08-18 사용자 결정: 닉네임 기본 + 프로필 토글)으로 다시 해석해야 하므로,
+  // 그 판정에 필요한 프로필 필드만 좁혀서 함께 가져온다. `recipient`가 null이거나
+  // (미연동 레거시 수상 행) 프로필이 없으면 presenter가 저장된 스냅샷으로 폴백한다.
   awards: {
     orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+    include: {
+      recipient: {
+        select: {
+          profile: {
+            select: {
+              realName: true,
+              displayName: true,
+              nickname: true,
+              tournamentRealNameVisible: true,
+              deletedAt: true,
+            },
+          },
+        },
+      },
+    },
   },
   campaign: { select: { slug: true, status: true } },
 } as const satisfies Prisma.V1TournamentInclude;

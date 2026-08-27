@@ -3419,7 +3419,19 @@ export class GamesService {
           where: { gameId },
           orderBy: { revision: 'desc' },
         });
-        if (latest !== null && latest.state !== V1GameResultRevisionState.CHANGE_REQUESTED) {
+        // 감사 L-E finding 2 수정: VOID도 CHANGE_REQUESTED와 마찬가지로 "현재 유효한
+        // 공식 결과 없음"을 뜻하는 predecessor다 -- revision-state-machine.ts의
+        // VOID_REENTRY purpose(assertRevisionSupersession)가 이미 이 설계를 문서화해
+        // 두었지만, 지금까지 TOURNAMENT_FIXTURE 레인(tournament-result-review.service.ts)
+        // 에만 배선돼 있고 이 TEAM_MATCH 레인은 빠져 있었다 -- 이의 수락으로 무효
+        // 처리된 리그 대진은 결과를 다시 넣을 방법이 전혀 없어 시즌 승강이 영구히
+        // 막혔다(이 함수는 위에서 TOURNAMENT_FIXTURE를 이미 거부했으므로 이 분기는
+        // TEAM_MATCH 전용이다 -- 대회 픽스처의 결과 상태 기계에는 영향이 없다).
+        if (
+          latest !== null &&
+          latest.state !== V1GameResultRevisionState.CHANGE_REQUESTED &&
+          latest.state !== V1GameResultRevisionState.VOID
+        ) {
           throw new ConflictException({
             code: 'RESULT_REVISION_ALREADY_EXISTS',
             message: 'A new draft requires a change-requested predecessor',

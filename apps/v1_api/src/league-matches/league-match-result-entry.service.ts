@@ -8,6 +8,7 @@ import { parseLineupCatalog } from '../tournaments/competition-config/competitio
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { RecordLeagueResultDto } from './dto/league-match-result-entry.dto';
 import { buildLeagueGoalEventSnapshot } from './league-goal-event-snapshot';
+import { FORFEIT_REASON_MARKER } from './league-match-forfeit.service';
 import { parseStoredScore } from './league-lifecycle-rules';
 import {
   assembleLeagueResultParticipants,
@@ -569,7 +570,17 @@ export class LeagueMatchResultEntryService {
       latestRevision !== null &&
       isOurEntry &&
       (latestRevision.state === 'DRAFT' || latestRevision.state === 'SUBMITTED');
-    if (latestRevision !== null && latestRevision.state !== 'CHANGE_REQUESTED' && !resumable) {
+    // 감사 L-E finding 2 수정: VOID(이의 수락으로 무효 처리된 결과)도 CHANGE_REQUESTED와
+    // 마찬가지로 새 신규 입력을 받아들인다 -- games.service.ts의 createResultRevision이
+    // 이제 VOID predecessor를 허용하는 것과 짝을 이루는 게이트다. 이걸 막아 두면 무효
+    // 처리된 대진은 순위표·완료 판정에서 미확정으로도, 확정으로도 정리되지 못한 채
+    // 재입력 자체가 영구히 막혀 그 시즌 승강 확정이 교착됐다.
+    if (
+      latestRevision !== null &&
+      latestRevision.state !== 'CHANGE_REQUESTED' &&
+      latestRevision.state !== 'VOID' &&
+      !resumable
+    ) {
       throw new ConflictException({
         code: 'LEAGUE_FIXTURE_RESULT_IN_PROGRESS',
         message: '이미 처리 중이거나 이력이 있는 결과가 있어 입력할 수 없어요.',
@@ -673,7 +684,6 @@ export class LeagueMatchResultEntryService {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const teamMatch = await this.loadMatchedFixture(leagueId, teamMatchId);
     const gameId = teamMatch.gameId;
-    const persistedReason = `${RESULT_CORRECTION_REASON_MARKER} ${dto.reason.trim()}`;
 
     const latestRevision = await this.prisma.v1GameResultRevision.findFirst({
       where: { gameId },
@@ -686,6 +696,18 @@ export class LeagueMatchResultEntryService {
         message: '정정할 공식 결과가 없어요. 먼저 결과를 입력해 주세요.',
       });
     }
+    // 감사 L-E finding 4 수정: 몰수(forfeit) 결과를 정정하면 새 리비전의 reason이 정정
+    // 마커로만 채워져 [LEAGUE_FORFEIT] 접두어가 사라진다 -- isForfeit 판정
+    // (league-match-public.service.ts)의 유일한 근거가 그 마커뿐이라, 정정을 한 번
+    // 거치면 "몰수" 사실 자체가 공개 화면에서 영구히 사라지고(순위·승패는 정확) 재몰수도
+    // 불가능해진다. base(직전) 리비전이 몰수였다면 정정 리비전의 reason에도 그 마커를
+    // 이어 붙여, 정정을 여러 번 거쳐도(체인) 표식이 유지되게 한다 -- `.includes`로
+    // base를 판정하는 이유는 이미 한 번 정정된 몰수(마커가 맨 앞이 아님)도 놓치지
+    // 않기 위해서다.
+    const baseWasForfeit = latestRevision.reason?.includes(FORFEIT_REASON_MARKER) ?? false;
+    const persistedReason = baseWasForfeit
+      ? `${RESULT_CORRECTION_REASON_MARKER} ${FORFEIT_REASON_MARKER} ${dto.reason.trim()}`
+      : `${RESULT_CORRECTION_REASON_MARKER} ${dto.reason.trim()}`;
     const isOurCorrection = latestRevision.reason?.startsWith(RESULT_CORRECTION_REASON_MARKER) ?? false;
 
     if (latestRevision.state === 'OFFICIAL') {

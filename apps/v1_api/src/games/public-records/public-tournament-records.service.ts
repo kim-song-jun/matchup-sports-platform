@@ -1,5 +1,5 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import type { Prisma, V1GameEventType, V1GameResultRevisionState, V1GameState, V1TeamMatchStatus, V1VisibilityMode } from '@prisma/client';
+import type { Prisma, V1GameEventType, V1GameLineupState, V1GameResultRevisionState, V1GameState, V1TeamMatchStatus, V1VisibilityMode } from '@prisma/client';
 import type { GameScore } from '../games.types';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { V1AuthUser } from '../../auth/v1-auth-user';
@@ -117,7 +117,7 @@ const GAME_MATCH_SELECT = {
   visibilityPolicy: { select: { mode: true, lineupAt: true } },
   sides: { select: { id: true, sideKey: true } },
   lineups: {
-    select: { id: true, sideId: true, revision: true },
+    select: { id: true, sideId: true, revision: true, state: true },
   },
   // `userId`는 표시 이름 해석(resolveParticipantDisplayName)이 V1UserProfile을
   // 조인하는 키다 -- 대회 등록 명단 연결용 신원(주석 위 V1GameParticipant.userId
@@ -1704,8 +1704,20 @@ function buildLineup(
   // 생긴다. 전체 participant를 side로만 묶으면 과거 저장본까지 합쳐지므로,
   // lineups에서 side별 가장 큰 revision의 id 하나만 선택한다. DB 반환 순서에
   // 기대지 않아 조회 옵션이 바뀌어도 최신 저장본 계약을 유지한다.
+  //
+  // `state`도 함께 걸러야 한다 — 대진이 생성되면 등록 명단 전원을 담은
+  // revision 1 DRAFT가 자동으로 깔리고, 팀이 제출을 마치기 전까지는 그게 항상
+  // "가장 큰 revision"이다. state를 안 보면 관중에게는 아직 제출되지 않은
+  // 초안(등록 선수 전원, 전원 '선발')이 공개 라인업으로 보이고, 팀이 제출 후
+  // 라인업을 다시 편집만 하고(저장 → 새 DRAFT) 제출은 누르지 않은 경우에는
+  // 그 미제출 편집본이 공식 명단을 덮어써 버린다. 프론트의 "지금 운영 중인
+  // 라인업" 정의(operate/lineup-grid.tsx의 latestOperableLineup — SUBMITTED/
+  // LOCKED 중 최고 revision)와 동일한 규칙을 여기서도 써야 관중·현장 운영
+  // 콘솔이 같은 명단을 본다.
+  const OPERABLE_LINEUP_STATES: readonly V1GameLineupState[] = ['SUBMITTED', 'LOCKED'];
   const latestLineupBySide = new Map<string, { id: string; revision: number }>();
   for (const lineup of fixture.game.lineups) {
+    if (!OPERABLE_LINEUP_STATES.includes(lineup.state)) continue;
     const current = latestLineupBySide.get(lineup.sideId);
     if (current === undefined || lineup.revision > current.revision) {
       latestLineupBySide.set(lineup.sideId, { id: lineup.id, revision: lineup.revision });

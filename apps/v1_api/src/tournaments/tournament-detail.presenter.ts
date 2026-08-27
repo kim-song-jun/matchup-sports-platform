@@ -1,6 +1,37 @@
 import { publicFixtureStatus } from '../games/public-records/public-visibility';
+import {
+  resolveParticipantDisplayName,
+  type ParticipantNameProfileRow,
+} from '../games/public-records/participant-name-gating';
 import type { TournamentDetailRow } from './tournaments-read.query';
 import { resolveTournamentFixtureOfficialResult } from './tournament-fixture-official-result';
+
+/**
+ * 어워드 수상자 표시 이름 -- 저장된 `recipientName`(명단 실명 스냅샷, `tournament-reviews.service.ts`의
+ * 저장부가 로스터 검증을 위해 강제한 값)을 그대로 내보내지 않고, 대회 경기 기록·랭킹과 동일한
+ * 이름 공개 정책(`resolveParticipantDisplayName`, 2026-08-18 닉네임 기본 + 프로필 토글)으로
+ * 재해석한다. 이 화면만 실명 정책을 안 거치면 같은 대회 한 화면 안에서 득점왕은 닉네임인데
+ * MVP만 실명으로 보이는 불일치가 생긴다(감사 evidence).
+ *
+ * `resolveParticipantDisplayName`은 `participant.userId`가 null이거나 프로필이 없으면
+ * `displayNameSnapshot`으로 그대로 폴백하므로, `recipientUserId`가 없는 레거시 미연동
+ * 수상 행(계정 연결이 모호해 backfill이 null로 남긴 경우)도 저장된 스냅샷을 안전하게 유지한다.
+ */
+function presentAwardRecipientName(award: TournamentDetailRow['awards'][number]): string {
+  const profileByUserId = new Map<string, ParticipantNameProfileRow>();
+  if (award.recipientUserId !== null && award.recipient?.profile) {
+    profileByUserId.set(award.recipientUserId, {
+      userId: award.recipientUserId,
+      ...award.recipient.profile,
+    });
+  }
+  return (
+    resolveParticipantDisplayName(
+      { userId: award.recipientUserId, displayNameSnapshot: award.recipientName },
+      profileByUserId,
+    ) ?? award.recipientName
+  );
+}
 
 /**
  * 대진표 공개 여부 판정의 단일 소스. 즉시 공개(bracketPublishedAt)와 예약 공개
@@ -302,7 +333,7 @@ export function presentTournamentDetail(
       awardType: award.awardType,
       awardLabel: award.awardLabel,
       iconKey: award.iconKey ?? null,
-      recipientName: award.recipientName,
+      recipientName: presentAwardRecipientName(award),
       teamName: award.teamName ?? null,
       note: award.note ?? null,
     })),

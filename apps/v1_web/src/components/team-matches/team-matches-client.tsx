@@ -768,6 +768,10 @@ function getApplyAction({
 
 function reasonLabel(reasonCode?: string) {
   if (reasonCode === 'HOST_TEAM_CANNOT_APPLY') return '내가 만든 팀매치예요';
+  // 종목이 다른 팀은 신청 자체가 막힌다(서버 SPORT_MISMATCH) — 팀 이름만으로는 종목이
+  // 안 드러나는 경우가 많아 "팀을 만들고 신청할 수 있어요"로 떨어지면 이미 관리 중인 팀이
+  // 있는데도 팀을 새로 만들라는 오해를 준다. 종목이 다르다는 걸 명시한다.
+  if (reasonCode === 'SPORT_MISMATCH') return '이 팀매치와 종목이 다른 팀이에요';
   if (reasonCode === 'ALREADY_APPROVED') return '승인 완료';
   if (reasonCode === 'MATCHED_ALREADY') return '이미 상대팀이 정해진 매치예요';
   if (reasonCode === 'NOT_RECRUITING') return '신청 마감된 매치예요';

@@ -65,6 +65,12 @@ export type NotificationEventType =
   // league-series-admin.service.ts). 결과 확정(team_match_completed)은 리그 전용이 아니라서
   // 이 그룹에 넣지 않았다 — 위 team_match_completed 항목이 이미 있다.
   | 'league_fixture_scheduled'
+  // 그룹 B 감사 결함 4: 팀 제외(removeTeam)·대진 단건 취소(cancelFixture)·재생성
+  // (regenerateFixtures)로 예정 대진이 취소되면 관련 팀(들)의 owner/manager에게 알린다.
+  // 이전에는 이 세 경로 모두 알림이 전혀 없었다 — 일반 팀매치 취소(team_match_cancelled)와
+  // 달리 리그 대진은 leagueId가 있으면 team-matches.service.ts의 cancel()이 하드 거부하므로
+  // (LEAGUE_FIXTURE_HOST_CANCEL_FORBIDDEN) 그 알림 코드에 절대 도달하지 못했다.
+  | 'league_fixture_cancelled'
   | 'league_promotion_promoted'
   | 'league_promotion_relegated'
   | 'league_promotion_stayed'
@@ -162,6 +168,7 @@ function preferenceFieldForEvent(type: NotificationEventType): NotificationPrefF
     type === 'team_match_cancelled' ||
     type === 'team_match_completed' ||
     type === 'league_fixture_scheduled' ||
+    type === 'league_fixture_cancelled' ||
     type === 'league_result_dispute_filed' ||
     type === 'league_team_match_completed' ||
     type === 'league_match_dispute_received' ||
@@ -263,10 +270,10 @@ function targetTypeForEvent(type: NotificationEventType): V1NotificationTargetTy
   ) {
     return 'team';
   }
-  // league_fixture_scheduled도 여기 fallthrough로 떨어진다 — 팀매치(리그 대진) 배정
-  // 이벤트라 'team_match'가 맞다. targetId는 리그당 배치 발송이라 leagueId를 쓴다
-  // (특정 team_match id가 아니라 리그 전체를 가리킴 — deepLinkForEvent에서 명시적으로
-  // 처리한다).
+  // league_fixture_scheduled/league_fixture_cancelled도 여기 fallthrough로 떨어진다 —
+  // 팀매치(리그 대진) 배정·취소 이벤트라 'team_match'가 맞다. targetId는 리그당 배치
+  // 발송이라 leagueId를 쓴다(특정 team_match id가 아니라 리그 전체를 가리킴 —
+  // deepLinkForEvent에서 명시적으로 처리한다).
   // league_result_dispute_filed(D2)도 여기로 떨어진다 — 이의는 특정 팀매치(경기)에
   // 대한 것이라 targetId로 teamMatchId를 그대로 쓴다.
   // league_team_match_completed/league_match_dispute_*(리그 알림 문구 전용화)도 전부
@@ -392,6 +399,7 @@ function deepLinkForEvent(
   // team_contact_* 항목의 기존 선례와 동일한 이유). 리그 상세 화면으로 명시적으로 보낸다.
   if (
     (type === 'league_fixture_scheduled' ||
+      type === 'league_fixture_cancelled' ||
       type === 'league_promotion_promoted' ||
       type === 'league_promotion_relegated' ||
       type === 'league_promotion_stayed' ||
@@ -451,6 +459,7 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   schedule_rsvp_deadline_reminder: '참석 여부를 알려주세요',
   schedule_guest_recruitment_close_reminder: '용병 모집이 곧 마감돼요',
   league_fixture_scheduled: '리그 대진이 확정됐어요',
+  league_fixture_cancelled: '리그 대진이 취소됐어요',
   league_promotion_promoted: '축하해요! 다음 시즌 상위 리그로 승격했어요',
   league_promotion_relegated: '다음 시즌 하위 리그로 강등됐어요',
   league_promotion_stayed: '다음 시즌에도 같은 리그예요',
@@ -508,6 +517,7 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   schedule_rsvp_deadline_reminder: 'RSVP 마감 전에 참석 여부를 남겨주세요.',
   schedule_guest_recruitment_close_reminder: '모집 마감 전에 신청 현황을 확인해 주세요.',
   league_fixture_scheduled: '리그 대진 일정을 확인해 주세요.',
+  league_fixture_cancelled: '취소된 대진을 확인해 주세요.',
   league_promotion_promoted: '다음 시즌 상위 리그에서 시작해요.',
   league_promotion_relegated: '아쉽지만 다음 시즌은 하위 리그에서 시작해요.',
   league_promotion_stayed: '현재 리그에서 다음 시즌을 계속해요.',

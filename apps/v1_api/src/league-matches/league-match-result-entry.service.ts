@@ -2,7 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { Prisma } from '@prisma/client';
 import { AdminContextService, type V1ActiveAdmin } from '../common/admin-context.service';
 import { canonicalGameCommandPayloadHash, GamesService } from '../games/games.service';
-import { selectLatestLineupParticipants } from '../games/core/latest-lineup-participants';
+import { selectLineupParticipantsWithDraftFallback } from '../games/core/latest-lineup-participants';
 import { PrismaService } from '../prisma/prisma.service';
 import { parseLineupCatalog } from '../tournaments/competition-config/competition-config.parse';
 import { V1AuthUser } from '../auth/v1-auth-user';
@@ -188,7 +188,7 @@ export class LeagueMatchResultEntryService {
    * 라인업을 저장할 때마다 새 리비전에 새 행을 쌓는다(team-match-lineup.service.ts).
    * 그래서 라인업을 두 번 저장한 팀은 같은 선수가 드롭다운에 3번 뜬다(알파 실측:
    * 14명 → 21명 → 28명). 같은 데이터를 읽는 공개 기록 프로젝션과 공식 결과 스냅샷은
-   * 이미 `selectLatestLineupParticipants` 로 최신 리비전만 고르고 있었고 이 경로만 빠져 있었다.
+   * 이미 최신 리비전만 고르고 있었고 이 경로만 빠져 있었다.
    *
    * **단, 현재 공식 기록이 있는 참가자는 최신 리비전 밖이더라도 남긴다.** 정정 모달은
    * `currentStats` 의 participantId 를 이 목록에서 찾아 이름을 붙이고, 못 찾으면 그 행을
@@ -224,9 +224,10 @@ export class LeagueMatchResultEntryService {
       }),
       this.prisma.v1GameLineup.findMany({
         where: { gameId: fixture.gameId },
-        // `state` 를 함께 읽어 selectLatestLineupParticipants 가 DRAFT 리비전을
-        // "최신" 후보에서 빼도록 한다 — 정정 요청으로 새로 열린 초안이 직전 제출을
-        // 무효화하지 않는다(그 유틸의 계약, SUBMITTED/LOCKED 만 운영 가능).
+        // `state` 를 함께 읽는다. 다만 리그는 **폴백** 셀렉터를 쓴다 — 제출본이 있는
+        // 사이드는 제출본만, 한 번도 제출 안 한 사이드는 최신 DRAFT 를 인정한다.
+        // 리그는 대회와 달리 라이브 콘솔 시작 게이트를 안 거쳐서 "끝났으면 제출본이
+        // 있다"가 거짓이고, 팀장이 자동저장만 하고 끝내는 것이 흔한 경로다.
         select: { id: true, sideId: true, revision: true, state: true },
       }),
       this.prisma.v1Game.findUnique({
@@ -248,7 +249,7 @@ export class LeagueMatchResultEntryService {
             select: { participantId: true, goals: true, assists: true },
           });
 
-    const latestRows = selectLatestLineupParticipants(participants, lineups);
+    const latestRows = selectLineupParticipantsWithDraftFallback(participants, lineups);
     const latestIds = new Set(latestRows.map((row) => row.id));
     // 같은 사이드·같은 사용자의 최신 행. `userId` 가 없는 게스트는 동일인 판정 근거가
     // 없으므로(이름은 동명이인을 구분하지 못한다) 아예 넣지 않는다.
@@ -325,8 +326,10 @@ export class LeagueMatchResultEntryService {
     const [lineups, participants, game, eventCount] = await Promise.all([
       this.prisma.v1GameLineup.findMany({
         where: { gameId },
-        // `state` 를 함께 읽어 selectLatestLineupParticipants 가 DRAFT 리비전을 "최신"
-        // 후보에서 빼도록 한다 — 이 파일의 다른 조회(:225)·공식 결과 스냅샷과 같은 기준.
+        // `state` 를 함께 읽는다. 다만 리그는 **폴백** 셀렉터를 쓴다 — 제출본이 있는
+        // 사이드는 제출본만, 한 번도 제출 안 한 사이드는 최신 DRAFT 를 인정한다.
+        // 리그는 대회와 달리 라이브 콘솔 시작 게이트를 안 거쳐서 "끝났으면 제출본이
+        // 있다"가 거짓이고, 팀장이 자동저장만 하고 끝내는 것이 흔한 경로다.
         select: { id: true, sideId: true, revision: true, supersedesId: true, state: true },
       }),
       this.prisma.v1GameParticipant.findMany({
@@ -359,7 +362,7 @@ export class LeagueMatchResultEntryService {
       }
     }
     const bySideId = new Map<string, { id: string; sideId: string; position: string | null }[]>();
-    for (const participant of selectLatestLineupParticipants(participants, lineups)) {
+    for (const participant of selectLineupParticipantsWithDraftFallback(participants, lineups)) {
       const rows = bySideId.get(participant.sideId) ?? [];
       rows.push({ id: participant.id, sideId: participant.sideId, position: participant.position });
       bySideId.set(participant.sideId, rows);

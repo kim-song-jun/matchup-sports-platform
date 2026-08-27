@@ -266,8 +266,16 @@ const homeDup = dupNames(home);
 const awayDup = dupNames(away);
 record(
   'F1 결과 입력 목록 중복 없음 (라인업 2회 저장 후)',
-  Object.keys(homeDup).length === 0 && Object.keys(awayDup).length === 0,
-  `home ${home.length}명 중복 ${JSON.stringify(homeDup)} · away ${away.length}명 중복 ${JSON.stringify(awayDup)} (수정 전: 28명·최대 3회)`,
+  // **명단이 비어 있으면 통과가 아니다.** 0명이면 중복이 없는 게 당연하다 — 실제로
+  // 라인업 state 회귀 때 home 0/away 0 인 채 이 검사가 PASS 로 찍혔고, 그 공허한
+  // 통과가 진짜 결함(운영자가 득점자를 못 고름)을 한동안 가렸다.
+  home.length > 0 &&
+    away.length > 0 &&
+    Object.keys(homeDup).length === 0 &&
+    Object.keys(awayDup).length === 0,
+  `home ${home.length}명 중복 ${JSON.stringify(homeDup)} · away ${away.length}명 중복 ${JSON.stringify(awayDup)}` +
+    `${home.length === 0 || away.length === 0 ? ' ← 명단이 비었다(중복 검사가 공허하다)' : ''}` +
+    ` (수정 전: 28명·최대 3회)`,
 );
 
 // ── 5. F2 — 라인업에 담긴 사람은 신원이 연결돼야 한다 ───────────────────────

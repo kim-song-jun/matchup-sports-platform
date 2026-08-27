@@ -18,6 +18,11 @@ export const TOURNAMENT_STAFF_ACTIONS = [
   'cancel',
   'result_review',
   'result_officialize',
+  // 2026-08-27: 'event_reverse'가 두 가지 뜻으로 쓰이고 있었다 — ① 실제 게임 이벤트
+  // 되돌리기 ② "디렉터급 관리 권한"의 대리(스태프 임명·해임, 필드 관리, 경기-필드 배정).
+  // ②가 ①에 얹혀 있었기 때문에 현장 스태프에게 ①을 주는 순간 ②까지 함께 열렸다.
+  // 관리 권한을 전용 액션으로 분리해 두 경계를 독립시킨다.
+  'tournament_admin',
 ] as const;
 
 export type TournamentStaffAction = (typeof TOURNAMENT_STAFF_ACTIONS)[number];
@@ -143,6 +148,7 @@ function isAction(value: unknown): value is TournamentStaffAction {
     case 'cancel':
     case 'result_review':
     case 'result_officialize':
+    case 'tournament_admin':
       return true;
     default:
       return false;

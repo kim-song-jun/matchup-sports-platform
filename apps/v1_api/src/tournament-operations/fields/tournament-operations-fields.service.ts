@@ -59,9 +59,9 @@ export type TournamentFixtureFieldResult = {
  * tournament_director read" -- director explicitly excluded from mutation):
  * TOURNAMENT_STAFF_ACTIONS has no action where allowsRoleAction() separates
  * platform_ops from tournament_director (both return true for every action).
- * So field create/update calls assertAccess({action:'event_reverse'}) first
- * (this at least excludes field_operator/support_readonly, who are denied
- * 'event_reverse'), then layers an explicit `principal.role ===
+ * So field create/update calls assertAccess({action:'tournament_admin'})
+ * first (this at least excludes field_operator/support_readonly, who are
+ * denied 'tournament_admin'), then layers an explicit `principal.role ===
  * 'platform_ops'` check on top -- the exact reasoning TournamentStaffService
  * already documents for its own grant-authority nuances
  * (apps/v1_api/src/tournaments/staff/tournament-staff.service.ts,
@@ -71,7 +71,7 @@ export type TournamentFixtureFieldResult = {
  * no such carve-out in the frozen contract or the plan -- it is a Task
  * 18-introduced write path (user decision 2). Sensible default: treat it as
  * an operational action available to the same principals as any other
- * 'event_reverse' action (platform_ops + tournament_director), scoped to the
+ * 'tournament_admin' action (platform_ops + tournament_director), scoped to the
  * fixture's tournamentId. This does NOT require platform_ops-only, unlike
  * literal field CRUD, because assigning an existing field to a fixture is
  * day-of-tournament operations work, not field inventory management.
@@ -368,7 +368,7 @@ export class TournamentOperationsFieldsService {
       const principal = await this.access.assertAccess(
         {
           userId: actorUserId,
-          action: 'event_reverse',
+          action: 'tournament_admin',
           resource: { tournamentId, fixtureId },
         },
         tx,
@@ -484,7 +484,7 @@ export class TournamentOperationsFieldsService {
       const principal = await this.access.assertAccess(
         {
           userId: actorUserId,
-          action: 'event_reverse',
+          action: 'tournament_admin',
           resource: { tournamentId, fixtureId },
         },
         tx,
@@ -581,7 +581,7 @@ export class TournamentOperationsFieldsService {
     const principal = await this.access.assertAccess(
       {
         userId: actorUserId,
-        action: 'event_reverse',
+        action: 'tournament_admin',
         resource: { tournamentId },
       },
       tx,

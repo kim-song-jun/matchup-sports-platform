@@ -65,6 +65,12 @@ describe('Tournament staff policy', () => {
       'event_reverse',
       'lineup_mutate',
       'cancel',
+      // 2026-08-27: 'tournament_admin'을 매트릭스에 넣는 것 자체가 회귀 방지다 —
+      // 스태프 임명·해임과 필드 관리는 예전에 'event_reverse'를 권한 대리로 썼기 때문에,
+      // field_operator에게 event_reverse를 허용하자 그 관리 권한까지 함께 열렸다
+      // (통합 스펙에서만 드러났고 유닛은 통과했다). 이제 두 액션이 독립이므로
+      // 이 매트릭스가 관리 권한 경계를 유닛 수준에서 붙잡는다.
+      'tournament_admin',
     ] as const satisfies readonly TournamentStaffAction[];
     const allowedByRole: Readonly<Record<TournamentStaffRole, readonly TournamentStaffAction[]>> = {
       platform_ops: actions,
@@ -114,7 +120,7 @@ describe('Tournament staff policy', () => {
       }
     }
 
-    expect({ allowed, rejected }).toEqual({ allowed: 21, rejected: 15 });
+    expect({ allowed, rejected }).toEqual({ allowed: 23, rejected: 19 });
   });
 
   it('allows team managers only their frozen read and lineup mutation surface', () => {
@@ -132,7 +138,13 @@ describe('Tournament staff policy', () => {
       allowed: true,
       reason: 'ALLOWED',
     });
-    for (const action of ['tournament_command', 'event_append', 'event_reverse', 'cancel'] as const) {
+    for (const action of [
+      'tournament_command',
+      'event_append',
+      'event_reverse',
+      'cancel',
+      'tournament_admin',
+    ] as const) {
       expect(decideTournamentStaffAccess({ ...base, action })).toEqual({
         allowed: false,
         reason: 'ROLE_ACTION_DENIED',

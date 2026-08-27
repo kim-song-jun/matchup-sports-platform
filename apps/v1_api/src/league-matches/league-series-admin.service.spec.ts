@@ -36,6 +36,9 @@ function makePrisma() {
     },
     v1LeaguePromotion: {
       findFirst: jest.fn().mockResolvedValue(null),
+      // 가드가 "쓰기 전에" 막았는지를 단언하려면 쓰기 자체가 목에 있어야 한다.
+      // 없으면 가드가 풀렸을 때 TypeError 로 죽어 실패 이유가 가드와 무관해 보인다.
+      createMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
     v1LeagueMatchDispute: {
       findFirst: jest.fn().mockResolvedValue(null),
@@ -69,8 +72,10 @@ describe('LeagueSeriesAdminService.commitPromotions 열린 이의 가드', () =>
       where: { leagueId: { in: [LEAGUE_TIER_1, LEAGUE_TIER_2] }, status: 'open' },
       select: { id: true },
     });
-    // 이의 가드가 이 아래 승강 결정(v1LeaguePromotion.createMany) 자체에 닿기 전에 막았어야 한다.
-    expect(prisma.v1LeaguePromotion.findFirst).toHaveBeenCalled();
+    // 핵심 단언: 이의 가드가 **쓰기에 닿기 전에** 막아야 한다. 읽기가 일어났는지가
+    // 아니라 쓰기가 일어나지 않았는지를 본다 — 가드가 아래로 밀려나거나 그 사이에
+    // 새 쓰기가 추가돼도 이 단언이 잡는다.
+    expect(prisma.v1LeaguePromotion.createMany).not.toHaveBeenCalled();
   });
 
   it('열린 이의가 없으면 이의 가드는 통과하고, 승강이 이미 확정된 경우엔 여전히 PROMOTION_ALREADY_DECIDED로 막는다', async () => {

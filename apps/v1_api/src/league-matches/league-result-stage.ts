@@ -38,6 +38,9 @@ export function resolveResultStage(game: LeagueFixtureResultSource | null): Leag
   // dead code가 되고, 무효화된 대진이 '확정'으로 읽혀 화면이 정정 모드로 열린다
   // (league-match-fixtures-client.tsx의 resultEntryMode 파생 참고).
   if (latest?.state === V1GameResultRevisionState.VOID) return 'voided';
+  // 여기 도달했다는 것은 최신 리비전이 VOID 가 **아니라는** 뜻이다 — 포인터가 있으면
+  // 확정으로 읽어도 안전하다. 이 줄만 보고 위 VOID 검사를 아래로 내리거나 지우지 마라.
+  // 그러면 무효 대진이 다시 '확정'으로 읽힌다(그게 이 파일의 원래 결함이었다).
   if (game.currentOfficialRevisionId !== null) return 'official';
   if (latest === undefined) return 'not_entered';
   switch (latest.state) {

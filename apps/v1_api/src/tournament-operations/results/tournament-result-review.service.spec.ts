@@ -67,6 +67,8 @@ type CreatedRevision = {
   goalEvents: unknown;
   missingScorer: boolean;
   eventsHash: string;
+  outcomeReason: unknown;
+  outcomeNote: unknown;
 };
 
 type CreatedParticipant = { participantId: string; sideId: string; goals: number };
@@ -92,6 +94,13 @@ type HarnessOptions = {
   /** base 리비전의 state. 재제출(supersede) 레인은 REJECTED base를 요구한다. */
   readonly baseState?: V1GameResultRevisionState;
   /**
+   * base 리비전의 몰수·중단 표식. 정정·재제출·무효 세 레인 모두 base에서
+   * 새 리비전으로 그대로 승계해야 한다 — 안 하면 기본값 NORMAL로 떨어져
+   * 몰수로 끝난 경기가 정정 한 번에 정상 종료로 둔갑한다.
+   */
+  readonly baseOutcomeReason?: string;
+  readonly baseOutcomeNote?: string | null;
+  /**
    * away 진영 GOAL 이벤트를 하나 더 둔다(= 이벤트 스트림이 1-1). 재제출 레인은
    * `validateGameResultInvariants`의 score↔이벤트 교차검증을 함께 통과해야
    * 하므로, 1-1 무승부 재제출을 검증하려면 이벤트도 1-1이어야 한다.
@@ -106,6 +115,8 @@ type Harness = {
   readonly correct: (changes: Record<string, unknown>) => Promise<unknown>;
   /** 재제출 레인. 정정과 같은 가드를 통과해야 한다. */
   readonly supersede: (body: Record<string, unknown>) => Promise<unknown>;
+  /** 무효(void) 레인. */
+  readonly voidRevision: () => Promise<unknown>;
 };
 
 /** 이 경기의 정상 참가자 두 명 — 정상 정정 본문의 기본값. */
@@ -159,6 +170,8 @@ function createHarness(options: HarnessOptions = {}): Harness {
     goalEvents: null,
     eventsHash: 'b'.repeat(64),
     mvpParticipantId: null,
+    outcomeReason: options.baseOutcomeReason ?? 'NORMAL',
+    outcomeNote: options.baseOutcomeNote ?? null,
   };
 
   const noop = async () => [] as unknown[];
@@ -199,11 +212,15 @@ function createHarness(options: HarnessOptions = {}): Harness {
         const created: CreatedRevision = {
           id: `draft-${createdRevisions.length + 1}`,
           revision: args.data.revision as number,
-          state: V1GameResultRevisionState.DRAFT,
+          // void()는 data.state를 명시적으로 VOID로 실어 보낸다 — 그 값을
+          // 존중해야 한다. 나머지 레인은 (스키마 기본값과 같은) DRAFT다.
+          state: (args.data.state as V1GameResultRevisionState | undefined) ?? V1GameResultRevisionState.DRAFT,
           score: args.data.score,
           goalEvents: args.data.goalEvents,
           missingScorer: args.data.missingScorer as boolean,
           eventsHash: args.data.eventsHash as string,
+          outcomeReason: args.data.outcomeReason,
+          outcomeNote: args.data.outcomeNote,
         };
         createdRevisions.push(created);
         return created;
@@ -326,7 +343,17 @@ function createHarness(options: HarnessOptions = {}): Harness {
     } as never);
   };
 
-  return { service, createdRevisions, createdParticipants, correct, supersede };
+  const voidRevision = () => {
+    attempt += 1;
+    const commandId = `void-guard-${attempt}`;
+    return service.voidResultRevision(authUser, ids.game, ids.baseRevision, commandId, {
+      expectedVersion: GAME_VERSION,
+      clientCommandId: commandId,
+      reason: '오심으로 무효 처리',
+    } as never);
+  };
+
+  return { service, createdRevisions, createdParticipants, correct, supersede, voidRevision };
 }
 
 async function captureFailure(operation: () => Promise<unknown>): Promise<unknown> {
@@ -1066,5 +1093,59 @@ describe('재제출(supersede) 레인도 같은 가드를 통과해야 한다', 
       away: 1,
       penalties: { home: 5, away: 4 },
     });
+  });
+});
+
+/**
+ * 감사 지적: 정정·재제출·무효가 만드는 새 리비전이 몰수·중단 표식
+ * (outcomeReason/outcomeNote)을 base에서 승계하지 않으면, 몰수로 끝난 경기가
+ * 정정 한 번에(또는 재제출/재입력 한 번에) 정상 종료(NORMAL)로 조용히
+ * 둔갑한다. 세 create() 호출 전부를 개별로 잠근다 — 한 곳만 고치고 나머지를
+ * 놓치는 재발을 막기 위해서다.
+ */
+describe('몰수·중단 표식(outcomeReason/outcomeNote) 승계', () => {
+  const forfeitBase = {
+    baseOutcomeReason: 'FORFEIT',
+    baseOutcomeNote: '상대팀 미출전',
+  } as const;
+
+  it('정정(correct)은 base의 몰수 표식을 새 리비전에 그대로 승계한다', async () => {
+    const harness = createHarness(forfeitBase);
+
+    await harness.correct({});
+
+    expect(harness.createdRevisions).toHaveLength(1);
+    expect(harness.createdRevisions[0].outcomeReason).toBe('FORFEIT');
+    expect(harness.createdRevisions[0].outcomeNote).toBe('상대팀 미출전');
+  });
+
+  it('정정 base가 정상 종료(NORMAL)면 그대로 NORMAL을 승계한다(짝 증거 — 하드코딩된 상수를 리턴하는 거짓 초록 방지)', async () => {
+    const harness = createHarness();
+
+    await harness.correct({});
+
+    expect(harness.createdRevisions[0].outcomeReason).toBe('NORMAL');
+    expect(harness.createdRevisions[0].outcomeNote).toBeNull();
+  });
+
+  it('재제출(supersede)은 REJECTED base의 몰수 표식을 새 리비전에 그대로 승계한다', async () => {
+    const harness = createHarness({ ...forfeitBase, baseState: V1GameResultRevisionState.REJECTED });
+
+    await harness.supersede({});
+
+    expect(harness.createdRevisions).toHaveLength(1);
+    expect(harness.createdRevisions[0].outcomeReason).toBe('FORFEIT');
+    expect(harness.createdRevisions[0].outcomeNote).toBe('상대팀 미출전');
+  });
+
+  it('무효(void)는 OFFICIAL base의 몰수 표식을 VOID 리비전에 그대로 승계한다', async () => {
+    const harness = createHarness(forfeitBase);
+
+    await harness.voidRevision();
+
+    expect(harness.createdRevisions).toHaveLength(1);
+    expect(harness.createdRevisions[0].state).toBe(V1GameResultRevisionState.VOID);
+    expect(harness.createdRevisions[0].outcomeReason).toBe('FORFEIT');
+    expect(harness.createdRevisions[0].outcomeNote).toBe('상대팀 미출전');
   });
 });

@@ -193,27 +193,37 @@ function retryAll(...queries: Array<{ refetch: () => unknown }>) {
 }
 
 /**
- * P0-4: 상대팀 승인 화면에서 득점자·카드·MVP를 보여준다.
+ * P0-4: 상대팀 승인 화면 + 호스트의 SUBMITTED/OFFICIAL 화면에서 득점자·카드·MVP를 보여준다.
  *
  * `resultParticipants`에는 이름이 없다(participantId만 있음, `V1GameResultParticipantRow`
- * 참고) — 그리고 승인 화면은 애초에 이름을 가져올 방법이 없다. `TeamMatchLineupService.getLineup`도
+ * 참고). 상대팀 승인 화면은 애초에 이름을 가져올 방법이 없다 — `TeamMatchLineupService.getLineup`도
  * `GamesService.listLineups`도 참가팀 액터에게는 항상 자기 팀(ownSideId) 라인업만 돌려주고,
  * 상대팀(호스트) 라인업을 조회하는 엔드포인트는 존재하지 않는다(공정성 원칙 — 정정 요청은
- * blind action). 그래서 이름 대신 participantId 앞 8자를 노출한다 — "완전히 안 보이는 것"보다는
- * 선수를 구분할 수 있는 만큼은 낫다.
+ * blind action). 그래서 `roster`가 없으면 이름 대신 participantId 앞 8자를 노출한다 —
+ * "완전히 안 보이는 것"보다는 선수를 구분할 수 있는 만큼은 낫다.
+ *
+ * 호스트는 자기 팀 라인업(`roster`)을 항상 조회할 수 있으므로, 호스트 화면에서는 이 컴포넌트에
+ * `roster`를 넘겨 실명 표시로 격상한다 — SUBMITTED 승인 대기 중과 OFFICIAL 확정 후에도(감사
+ * 백로그 M-E) 제출 직후 입력한 득점자·카드·MVP가 화면에서 사라지면 안 된다.
  */
 function ApprovalParticipantSummary({
   resultParticipants,
   mvpParticipantId,
+  roster,
 }: {
   resultParticipants: V1GameResultRevision['resultParticipants'];
   mvpParticipantId: string | null;
+  roster?: ResultRosterRow[];
 }) {
   const scorers = resultParticipants.filter((row) => row.goals > 0);
   const carded = resultParticipants.filter((row) => row.cards.yellow > 0 || row.cards.red > 0);
   if (scorers.length === 0 && carded.length === 0 && !mvpParticipantId) return null;
 
-  const label = (participantId: string) => `선수 #${participantId.slice(0, 8)}`;
+  const label = (participantId: string) => {
+    const rosterRow = roster?.find((row) => row.participantId === participantId);
+    if (rosterRow) return `${rosterRow.jerseyNumber ? `#${rosterRow.jerseyNumber} ` : ''}${rosterRow.displayName}`;
+    return `선수 #${participantId.slice(0, 8)}`;
+  };
 
   return (
     <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
@@ -860,6 +870,14 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
               {opponentName}이(가) 결과를 확인하면 공식 기록으로 확정되거나 정정 요청이 도착해요. 48시간 이내에
               응답이 없으면 운영팀이 대신 검토해요.
             </div>
+            {/* 감사 백로그 M-E: 제출 직후(SUBMITTED)에도 방금 입력한 득점자·카드·MVP가 그대로
+                남아 있어야 한다 — roster를 넘겨 실명으로 보여준다. */}
+            <ApprovalParticipantSummary resultParticipants={latest.resultParticipants} mvpParticipantId={latest.mvpParticipantId} roster={roster} />
+            {latest.missingScorer ? (
+              <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-caption)' }}>
+                일부 득점은 선수 지정 없이 기록됐어요.
+              </div>
+            ) : null}
           </Card>
         ) : null}
 
@@ -868,6 +886,10 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
             <div className="tm-text-body-lg">공식 결과로 확정됐어요</div>
             <div className="tm-text-subhead" style={{ marginTop: 12, fontWeight: 700 }}>{scoreLabel(latest)}</div>
             <GoalTimeline revision={latest} homeName={hostName} awayName={opponentName} />
+            {/* 감사 백로그 M-E: GoalTimeline은 레거시 백필 score({goals:[...]})에서만 렌더된다
+                (docblock 참고) — 이 화면이 만드는 평평한 score({home,away})에서는 항상 null이라
+                득점자·카드·MVP를 보여줄 방법이 없었다. resultParticipants + roster로 실명 요약을 보여준다. */}
+            <ApprovalParticipantSummary resultParticipants={latest.resultParticipants} mvpParticipantId={latest.mvpParticipantId} roster={roster} />
             {latest.missingScorer ? (
               <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-caption)' }}>
                 일부 득점은 선수 지정 없이 기록됐어요.
@@ -893,41 +915,9 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
           <Card pad={16}>
             <div className="tm-text-body-lg">작성한 결과를 확인해 주세요</div>
             <div className="tm-text-label" style={{ marginTop: 12 }}>스코어 {scoreLabel(latest)}</div>
-            {latest.resultParticipants.length > 0 ? (
-              <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
-                {latest.resultParticipants.some((row) => row.goals > 0) ? (
-                  <div>
-                    <div className="tm-text-label">득점자</div>
-                    <div style={{ display: 'grid', gap: 4, marginTop: 4 }}>
-                      {latest.resultParticipants
-                        .filter((row) => row.goals > 0)
-                        .map((row) => {
-                          const rosterRow = roster.find((r) => r.participantId === row.participantId);
-                          const name = rosterRow
-                            ? `${rosterRow.jerseyNumber ? `#${rosterRow.jerseyNumber} ` : ''}${rosterRow.displayName}`
-                            : row.participantId;
-                          return (
-                            <div key={row.id} className="tm-text-caption">{name} · {row.goals}골</div>
-                          );
-                        })}
-                    </div>
-                  </div>
-                ) : null}
-                {latest.mvpParticipantId ? (
-                  <div>
-                    <div className="tm-text-label">MVP</div>
-                    <div className="tm-text-caption" style={{ marginTop: 4 }}>
-                      {(() => {
-                        const rosterRow = roster.find((r) => r.participantId === latest.mvpParticipantId);
-                        return rosterRow
-                          ? `${rosterRow.jerseyNumber ? `#${rosterRow.jerseyNumber} ` : ''}${rosterRow.displayName}`
-                          : latest.mvpParticipantId;
-                      })()}
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
+            {/* 카드(옐로/레드)는 이전에 이 블록에서 누락돼 있었다 — ApprovalParticipantSummary로
+                통일해 득점자·카드·MVP를 빠짐없이 보여준다(감사 백로그 M-E). */}
+            <ApprovalParticipantSummary resultParticipants={latest.resultParticipants} mvpParticipantId={latest.mvpParticipantId} roster={roster} />
             {latest.reason ? (
               <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>{displayRevisionReason(latest.reason)}</div>
             ) : null}
@@ -1385,6 +1375,10 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
             <div className="tm-text-body-lg">공식 결과로 확정됐어요</div>
             <div className="tm-text-subhead" style={{ marginTop: 12, fontWeight: 700 }}>{scoreLabel(latest)}</div>
             <GoalTimeline revision={latest} homeName={hostName} awayName={opponentName} />
+            {/* 감사 백로그 M-E: 승인 전(SUBMITTED)에는 보이던 득점자·카드·MVP 요약이 승인 버튼을
+                누른 순간(OFFICIAL) 사라지고 있었다 — 상대팀은 호스트 라인업이 없어 roster 없이
+                호출한다(참가자 #앞 8자 표시, 위 docblock 참고). */}
+            <ApprovalParticipantSummary resultParticipants={latest.resultParticipants} mvpParticipantId={latest.mvpParticipantId} />
             {latest.missingScorer ? (
               <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-caption)' }}>
                 일부 득점은 선수 지정 없이 기록됐어요.

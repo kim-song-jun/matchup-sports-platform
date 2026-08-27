@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { Star, ImagePlus, X, Trophy, Medal } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   useV1Tournament,
   useV1TournamentParticipantCheck,
@@ -17,7 +17,7 @@ import { TournamentPlayerRecordsSections } from '@/components/public-game-record
 import { extractErrorMessage } from '@/lib/error-message';
 import { hasStoredV1Session } from '@/lib/session-storage';
 import { trackEvent } from '@/lib/analytics';
-import { V1ApiError } from '@/lib/api-client';
+import { V1ApiError, v1Get } from '@/lib/api-client';
 import { TournamentFlowNav } from '@/components/tournaments/tournament-flow-nav';
 import { formatEntryFee } from '@/lib/date-utils';
 import { parsePrizeRows, isPrizeAmountValue, formatPrizeRowValue } from '@/lib/prize-breakdown';
@@ -29,6 +29,7 @@ import { TournamentAwardIcon } from '@/components/tournaments/tournament-award-i
 const REVIEW_PHOTO_MAX = 3;
 const REVIEW_EMBED_CAP = 3;
 import type {
+  V1LeagueOverallStandingsResponse,
   V1TournamentDetail,
   V1TournamentFixture,
   V1TournamentFixtureResult,
@@ -56,10 +57,24 @@ export function getTopThree(tournament: V1TournamentDetail): Array<{ pos: number
     .sort((a, b) => a.position - b.position);
 
   if (allStandings.length >= 3 && tournament.format === 'league') {
-    return [1, 2, 3].map((pos) => {
-      const s = allStandings[pos - 1];
-      return { pos, name: s?.teamName ?? '미정' };
-    });
+    // `standing.position`은 조 단위 순위다(각 조마다 1부터 다시 매겨짐,
+    // `tournament-group-standings.ts`의 `recalculateAndUpsertGroupStandings`). 조가
+    // 2개 이상인 리그에서 조 구분 없이 병합해 정렬하면 [A1,A2,…,B1,B2,…]가 아니라
+    // position 값 기준(1,1,2,2,…)으로 뒤섞여, 서로 맞붙은 적 없는 A조 1위·B조 1위를
+    // "우승·준우승"으로 잘못 확정한다. 이 함수는 group 로우 데이터만 받는 순수함수라
+    // 통합 순위(승점/득실차/페어플레이 5단계 tie-break, `calculateCompetitionStandings`)를
+    // 여기서 다시 계산할 수 없다 — 정본은 `GET /tournaments/:id/standings/overall`
+    // 하나뿐이다(대진표 탭 `LeagueStandingsSection`이 이미 그걸 쓴다). 그래서 다조
+    // 리그는 여기서 답을 만들어내지 않고 빈 배열로 접는다(fail-closed) — 호출부
+    // (`AwardsPageContent`)가 `useMultiGroupLeagueTopThree`로 그 API를 별도 조회해
+    // override한다. 조가 1개면 조 position이 곧 통합 순위이므로 그대로 정확하다.
+    if (tournament.groups.length <= 1) {
+      return [1, 2, 3].map((pos) => {
+        const s = allStandings[pos - 1];
+        return { pos, name: s?.teamName ?? '미정' };
+      });
+    }
+    return [];
   }
 
   // knockout: final + third_place 픽스처에서 추출
@@ -85,6 +100,54 @@ export function getTopThree(tournament: V1TournamentDetail): Array<{ pos: number
   }
 
   return result;
+}
+
+/**
+ * 다조(2개 이상) 리그 전용 top3 override. `getTopThree`가 (조 구분 없이 병합하면
+ * 우승팀을 잘못 확정하므로) 다조 리그에서는 fail-closed로 빈 배열만 돌려주기 때문에,
+ * 통합 순위 정본(`GET /tournaments/:id/standings/overall` — 대진표 탭
+ * `LeagueStandingsSection`과 동일 엔드포인트)을 여기서 별도 조회해 그 자리를 채운다.
+ *
+ * 이 파일은 도메인 훅 배정 파일(`hooks/use-v1-api.ts`)이 아니라서 `LeagueStandingsSection`
+ * (tournament-detail-client.tsx)과 같은 이유로 `v1Get`을 인라인 `useEffect`로 호출한다
+ * (react-query가 아니다 — 이 화면도 QueryClientProvider 없이 단독 렌더되는 테스트가
+ * 있으므로 동일 제약을 따른다).
+ *
+ * `enabled=false`(단일 조·미완료·knockout 등 `getTopThree`가 이미 정확한 답을 내는
+ * 경우)면 요청하지 않고 `null`을 유지한다 — 호출부가 `null`이면 `getTopThree` 결과를
+ * 그대로 쓰고, `[]`(로딩 실패 포함)이면 시상대를 비워 보여준다(틀린 우승팀을 보여주는
+ * 것보다 안전).
+ */
+function useMultiGroupLeagueTopThree(
+  tournamentId: string,
+  enabled: boolean,
+): Array<{ pos: number; name: string }> | null {
+  const [top3, setTop3] = useState<Array<{ pos: number; name: string }> | null>(null);
+
+  useEffect(() => {
+    if (!enabled) {
+      setTop3(null);
+      return;
+    }
+    let cancelled = false;
+    v1Get<V1LeagueOverallStandingsResponse>(`/tournaments/${tournamentId}/standings/overall`)
+      .then((data) => {
+        if (cancelled) return;
+        const ranked = data.standings
+          .filter((s): s is typeof s & { position: number } => s.position !== null && s.position <= 3)
+          .sort((a, b) => a.position - b.position)
+          .map((s) => ({ pos: s.position, name: s.teamName }));
+        setTop3(ranked);
+      })
+      .catch(() => {
+        if (!cancelled) setTop3([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tournamentId, enabled]);
+
+  return top3;
 }
 
 /* ── 시상대 (podium) ── */
@@ -788,7 +851,11 @@ function NotCompletedNotice({ status }: { status: string }) {
  * (좌: 시상 결과·상금 / 우: 개인 어워드·후기) — 모바일은 클래스가 no-op이라 기존 스택 유지. */
 function AwardsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
   const isCompleted = tournament.status === 'completed';
-  const top3 = isCompleted ? getTopThree(tournament) : [];
+  const isMultiGroupLeague = tournament.format === 'league' && tournament.groups.length > 1;
+  const multiGroupTop3 = useMultiGroupLeagueTopThree(tournament.id, isCompleted && isMultiGroupLeague);
+  // 다조 리그는 getTopThree가 fail-closed로 []을 낸다 — 통합 순위 override(multiGroupTop3)가
+  // 도착하기 전(null)에도 틀린 우승팀 대신 빈 시상대를 보여준다(로딩 중 깜빡임보다 안전).
+  const top3 = isCompleted ? (isMultiGroupLeague ? (multiGroupTop3 ?? []) : getTopThree(tournament)) : [];
   const showPrizeColumn = isCompleted && hasPrizeData(tournament);
 
   return (

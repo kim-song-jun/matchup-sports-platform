@@ -1,5 +1,5 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import type { Prisma, V1GameEventType, V1GameResultRevisionState, V1GameState, V1TeamMatchStatus, V1VisibilityMode } from '@prisma/client';
+import type { Prisma, V1GameEventType, V1GameLineupState, V1GameResultRevisionState, V1GameState, V1TeamMatchStatus, V1VisibilityMode } from '@prisma/client';
 import type { GameScore } from '../games.types';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { V1AuthUser } from '../../auth/v1-auth-user';
@@ -45,6 +45,18 @@ const NOT_FOUND = { code: 'TOURNAMENT_MATCH_NOT_FOUND', message: '경기 정보�
 // 리그 대진 공개 기록(getLeagueFixtureRecord)의 404 — 위 NOT_FOUND 와 같은 fail-closed
 // 원칙(존재하지 않는 것과 숨겨진 것을 구분해 주지 않는다)을 리그 도메인 코드로 낸다.
 const LEAGUE_FIXTURE_NOT_FOUND = { code: 'LEAGUE_FIXTURE_NOT_FOUND', message: '경기 정보를 찾을 수 없어요.' } as const;
+// getLeagueFixtureRecord 전용 — league-match-forfeit.service.ts 가 export 하는
+// `FORFEIT_REASON_MARKER`(값: '[LEAGUE_FORFEIT]')와 **의도적으로 동일한 리터럴을
+// 여기 복제**한다. import 로 그 상수를 끌어오면 이 파일(비인증 공개 read 경로)이
+// `league-match-forfeit.service.ts → GamesService → team-schedules.service.ts` 로
+// 이어지는 거대한 어드민/게임 엔진 mutation 모듈 그래프를 전부 끌고 들어온다 —
+// 문자열 하나 때문에 이 read-only 프로젝션의 컴파일 단위가 그 그래프의 아무 파일
+// (심지어 무관한 팀 일정 모듈)에도 깨질 수 있게 된다(실측: 이 값을 정정 중이던
+// 세션이 team-schedules.service.ts 를 동시에 고치고 있어 그 경유로 ts-jest 컴파일이
+// 막혔다). 값이 바뀌면 두 파일이 갈릴 수 있으나, 그 리스크보다 이 파일의 격리가
+// 더 크다 — 몰수 판정 로직 자체는 다른 파일(league-match-public.service.ts 의
+// isForfeit)도 같은 리터럴을 재사용하는 기존 패턴이다.
+const LEAGUE_FORFEIT_REASON_MARKER = '[LEAGUE_FORFEIT]';
 // 리그 도메인(league-match-public.service.ts)과 같은 상한 — 회고 STATS-1은 그 패턴의 복제다.
 const PLAYER_RECORDS_LIMIT = 30;
 // 어드민 추천 근거는 상위 후보만 필요하다 — chip 3개 + 여유분.
@@ -117,7 +129,7 @@ const GAME_MATCH_SELECT = {
   visibilityPolicy: { select: { mode: true, lineupAt: true } },
   sides: { select: { id: true, sideKey: true } },
   lineups: {
-    select: { id: true, sideId: true, revision: true },
+    select: { id: true, sideId: true, revision: true, state: true },
   },
   // `userId`는 표시 이름 해석(resolveParticipantDisplayName)이 V1UserProfile을
   // 조인하는 키다 -- 대회 등록 명단 연결용 신원(주석 위 V1GameParticipant.userId
@@ -146,6 +158,10 @@ const GAME_MATCH_SELECT = {
       mvpParticipantId: true,
       outcomeReason: true,
       outcomeNote: true,
+      // 리그 몰수(getLeagueFixtureRecord) 전용 — `[LEAGUE_FORFEIT]` 마커 감지에만
+      // 쓴다(값 자체를 응답에 그대로 내보내지 않는다). getMatch(대회 경로)는 이 필드를
+      // 읽지 않는다 — outcomeReason/outcomeNote 만으로 충분하다(L-F-forfeit-public-exposure).
+      reason: true,
     },
   },
   // Lane 1 addition -- see FIXTURE_SCHEDULE_SELECT above.
@@ -1437,28 +1453,75 @@ export class PublicTournamentRecordsService {
       mvp,
       // getMatch 와 동일한 게이트 — 공식 결과가 공개된 몰수·중단만 사유를 내보낸다.
       // finding #58: mode !== 'status_only' 도 같은 이유로 함께 요구한다(getMatch 참고).
+      //
+      // getMatch(대회 경로)와 달리 이 리그 경로는 outcomeNote 를 절대 그대로 내보내지
+      // 않는다. 대회의 outcomeReason/outcomeNote 는 처음부터 공개용으로 설계된 채널이지만,
+      // 리그 대진의 이 컬럼을 채우는 유일한 writer 는 league-match-forfeit.service 이고
+      // 그 서비스의 명시 계약은 정반대다: "사유 원문은 공개하지 않는다 — 운영자가 쓴
+      // 자유 텍스트라 그대로 노출하면 내부 메모가 새어 나간다. 읽는 쪽은 boolean 만
+      // 만들고 문자열은 버려야 한다." 그 서비스는 컬럼(outcomeReason='FORFEIT' +
+      // outcomeNote=사유 원문)과 레거시 `[LEAGUE_FORFEIT]` reason 마커 두 채널을 함께
+      // 쓰므로(과거 리비전 호환), 몰수 감지도 두 채널을 모두 인정하되 응답에는 boolean
+      // 만 싣는다 — note 는 항상 null. 사유 원문은 아래 history 매핑에서도 걸러낸다
+      // (같은 발견의 두 증상, 한 커밋으로 함께 해결).
+      //
+      // `.includes` (not `.startsWith`, reason 마커 판정): 몰수 결과가 정정되면 reason 이
+      // `[LEAGUE_RESULT_CORRECTION] [LEAGUE_FORFEIT] ...` 로 마커가 앞이 아니게
+      // 바뀐다(league-match-result-entry.service.ts:707-709, 몰수 표식을 정정 후에도
+      // 잃지 않으려는 의도적 설계). isForfeit 배지(league-match-public.service.ts:348)도
+      // 같은 `.includes` 판정을 쓰므로, 순위표·대진 목록의 "몰수" 배지와 이 상세 화면의
+      // 안내가 정정 이후에도 계속 같은 결론을 내야 한다.
       outcome:
-        mode !== 'status_only' &&
-        showOfficialResult &&
-        teamMatch.game?.currentOfficialRevision != null &&
-        teamMatch.game.currentOfficialRevision.outcomeReason !== 'NORMAL'
-          ? {
-              reason: teamMatch.game.currentOfficialRevision.outcomeReason,
-              note: teamMatch.game.currentOfficialRevision.outcomeNote,
-            }
+        mode !== 'status_only' && showOfficialResult && teamMatch.game?.currentOfficialRevision != null
+          ? teamMatch.game.currentOfficialRevision.outcomeReason !== 'NORMAL' ||
+            (teamMatch.game.currentOfficialRevision.reason?.includes(LEAGUE_FORFEIT_REASON_MARKER) ?? false)
+            ? {
+                reason:
+                  teamMatch.game.currentOfficialRevision.outcomeReason !== 'NORMAL'
+                    ? teamMatch.game.currentOfficialRevision.outcomeReason
+                    : ('FORFEIT' as const),
+                note: null,
+              }
+            : null
           : null,
       pendingProjection: mode === 'live' && resultState === 'pending' && (status === 'live' || status === 'ended'),
-      history: history.map((revision) => ({
-        revision: revision.revision,
-        state: revision.state,
-        officialAt: revision.officialAt?.toISOString() ?? null,
-        // 리그 결과 입력·정정 경로는 감사용 코드 마커("[LEAGUE_RESULT_ENTRY] ...",
-        // league-match-result-entry.service.ts)를 reason 앞에 붙여 저장한다 — 관전자
-        // 화면(결과 변경 이력)에 그대로 나가면 기술 문구다(alpha 실측 2026-08-25).
-        // 표시에서만 마커를 벗긴다 — DB 의 감사 기록 원문은 그대로다.
-        reason: revision.reason === null ? null : revision.reason.replace(/^\[[A-Z0-9_]+\]\s*/, ''),
-        isCorrection: revision.supersedesId !== null,
-      })),
+      history: history.map((revision) => {
+        // 몰수 사유는 운영자가 쓴 자유 텍스트라 공개하지 않는다 — league-match-forfeit.service
+        // 의 명시 계약("읽는 쪽은 boolean 만 만들고 문자열은 버려야 한다"). 마커만 벗겨
+        // 원문을 그대로 내보내던 것이 결함이었다: 위 outcome 필드가 몰수 사실(boolean)을
+        // 이미 전달하므로, history 에서는 이 리비전의 사유를 통째로 null 로 만든다.
+        //
+        // `.includes` 여야 한다(`.startsWith` 아님). 정상 결과를 나중에 몰수로 '정정'하면
+        // reason 이 `[LEAGUE_RESULT_CORRECTION] [LEAGUE_FORFEIT] <운영자 자유 텍스트>` 가
+        // 되어 마커가 맨 앞이 아니다 — startsWith 로는 이 경우가 아래 분기로 떨어져
+        // 마커만 벗겨진 운영자 원문이 그대로 공개됐다. 바로 위 outcome.isForfeit 판정이
+        // 이미 `.includes` 를 쓰고 있어서 같은 파일 안에서 판정 기준이 어긋나 있었다.
+        if (revision.reason?.includes(LEAGUE_FORFEIT_REASON_MARKER)) {
+          return {
+            revision: revision.revision,
+            state: revision.state,
+            officialAt: revision.officialAt?.toISOString() ?? null,
+            reason: null,
+            isCorrection: revision.supersedesId !== null,
+          };
+        }
+        return {
+          revision: revision.revision,
+          state: revision.state,
+          officialAt: revision.officialAt?.toISOString() ?? null,
+          // 리그 결과 입력·정정 경로는 감사용 코드 마커("[LEAGUE_RESULT_ENTRY] ...",
+          // league-match-result-entry.service.ts)를 reason 앞에 붙여 저장한다 — 관전자
+          // 화면(결과 변경 이력)에 그대로 나가면 기술 문구다(alpha 실측 2026-08-25).
+          // 표시에서만 마커를 벗긴다 — DB 의 감사 기록 원문은 그대로다.
+          //
+          // 마커를 하나가 아니라 **연속으로 전부** 벗긴다: 리그 결과 경로는 마커를 겹쳐
+          // 붙일 수 있어서(`[LEAGUE_RESULT_ENTRY] [X] ...`) 하나만 벗기면 남은 마커가
+          // 그대로 노출된다. 몰수 마커가 섞인 리비전은 위 분기에서 이미 통째로 null 이
+          // 되므로 여기 오는 것은 공개해도 되는 사유뿐이다 — 원문은 유지하고 마커만 뗀다.
+          reason: revision.reason === null ? null : revision.reason.replace(/^(\[[A-Z0-9_]+\]\s*)+/, ''),
+          isCorrection: revision.supersedesId !== null,
+        };
+      }),
       videos: teamMatch.videos.map((video) => ({ id: video.id, title: video.title, url: video.url })),
       nextMatch: null,
     };
@@ -1704,8 +1767,20 @@ function buildLineup(
   // 생긴다. 전체 participant를 side로만 묶으면 과거 저장본까지 합쳐지므로,
   // lineups에서 side별 가장 큰 revision의 id 하나만 선택한다. DB 반환 순서에
   // 기대지 않아 조회 옵션이 바뀌어도 최신 저장본 계약을 유지한다.
+  //
+  // `state`도 함께 걸러야 한다 — 대진이 생성되면 등록 명단 전원을 담은
+  // revision 1 DRAFT가 자동으로 깔리고, 팀이 제출을 마치기 전까지는 그게 항상
+  // "가장 큰 revision"이다. state를 안 보면 관중에게는 아직 제출되지 않은
+  // 초안(등록 선수 전원, 전원 '선발')이 공개 라인업으로 보이고, 팀이 제출 후
+  // 라인업을 다시 편집만 하고(저장 → 새 DRAFT) 제출은 누르지 않은 경우에는
+  // 그 미제출 편집본이 공식 명단을 덮어써 버린다. 프론트의 "지금 운영 중인
+  // 라인업" 정의(operate/lineup-grid.tsx의 latestOperableLineup — SUBMITTED/
+  // LOCKED 중 최고 revision)와 동일한 규칙을 여기서도 써야 관중·현장 운영
+  // 콘솔이 같은 명단을 본다.
+  const OPERABLE_LINEUP_STATES: readonly V1GameLineupState[] = ['SUBMITTED', 'LOCKED'];
   const latestLineupBySide = new Map<string, { id: string; revision: number }>();
   for (const lineup of fixture.game.lineups) {
+    if (!OPERABLE_LINEUP_STATES.includes(lineup.state)) continue;
     const current = latestLineupBySide.get(lineup.sideId);
     if (current === undefined || lineup.revision > current.revision) {
       latestLineupBySide.set(lineup.sideId, { id: lineup.id, revision: lineup.revision });

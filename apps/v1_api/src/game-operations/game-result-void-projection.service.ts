@@ -2,6 +2,9 @@ import { Prisma } from '@prisma/client';
 import type { GameOperationHandler } from '../jobs/v1-game-operations-worker.service';
 import { GameResultProjectionWatermarkService } from './game-result-projection-watermark.service';
 import { LeagueCompletionProjectionService } from '../league-matches/league-completion-projection.service';
+import { GameResultStandingsProjectionService } from './game-result-standings-projection.service';
+import type { OfficialRevisionRow } from './game-result-official-projection.types';
+import { officialRevisionRowSelect } from './official-revision-row.query';
 
 type LockedVoidRevisionRow = {
   revisionId: string;
@@ -61,6 +64,11 @@ type FixtureSlotsRow = {
  */
 export class GameResultVoidProjectionService {
   private readonly watermarks = new GameResultProjectionWatermarkService();
+  // GAME_RESULT_OFFICIAL 쪽이 standings.project()를 부르는 것과 대칭
+  // (game-result-official-projection.service.ts:66). 무효도 조 순위표에 반영된
+  // 승점·득실을 되돌려야 하는 "조 구성을 바꾸는 조작"이라, 안 돌리면 무효 처리한
+  // 경기의 승점이 공개 순위표에 영구히 남는다(감사 지적).
+  private readonly standings = new GameResultStandingsProjectionService();
 
   // GAME_RESULT_OFFICIAL 쪽이 LeagueCompletionProjectionService.project() 를 부르는 것과
   // 대칭. 무효도 "남은 대진 집합을 줄이는 조작"이라 완료 판정을 다시 돌려야 한다 --
@@ -74,6 +82,13 @@ export class GameResultVoidProjectionService {
     await this.hidePublicCache(tx, revision);
     if (revision.tournamentFixtureId !== null) {
       await this.reverseBracketAdvancement(tx, revision);
+      // 대회 픽스처의 무효는 조 순위표도 stale 해진다 -- 같은 조의 다른 픽스처가
+      // OFFICIAL 될 때까지(혹은 재입력으로 이 픽스처가 다시 OFFICIAL 될 때까지)
+      // 저절로 치유되지 않는다. `standings.project()`는 `tournamentFixtureId`
+      // 하나만 읽으므로 (`game-result-standings-projection.service.ts`) 나머지
+      // 필드에 가짜 값을 채우는 대신, official 프로젝션과 같은 공유 SELECT로
+      // 이 VOID 리비전 자신의 실제 컬럼을 조회해 넘긴다.
+      await this.standings.project(tx, await this.standingsShapedRevision(tx, revision.revisionId));
     }
     const teamIds = [revision.homeTeamId, revision.awayTeamId].filter(
       (teamId): teamId is string => teamId !== null,
@@ -160,6 +175,38 @@ export class GameResultVoidProjectionService {
       throw new Error(`GAME_RESULT_VOIDED revision ${revisionId} is not VOID`);
     }
     return revision;
+  }
+
+  /**
+   * `standings.project()`'s parameter type is the full `OfficialRevisionRow`
+   * shape, but `LockedVoidRevisionRow` above is deliberately narrower (only
+   * the columns void's own hide/reverse/watermark steps need). Rather than
+   * padding a fake `OfficialRevisionRow` with placeholder values for columns
+   * the standings projector never reads, this re-runs the same shared SELECT
+   * `GameResultOfficialProjectionService.lockOfficialRevision` uses --
+   * scoped to the VOID revision's own id -- so every field is a real column
+   * from this real row. This is safe because `voidResultRevision()`
+   * (tournament-result-review.service.ts) always sets `officialAt` on the
+   * VOID revision it creates, so the null-officialAt guard below should
+   * never actually fire for a revision that reached this handler; it stays
+   * as a defensive check mirroring the OFFICIAL lane's own guard rather than
+   * an unchecked assertion.
+   */
+  private async standingsShapedRevision(
+    tx: Prisma.TransactionClient,
+    revisionId: string,
+  ): Promise<OfficialRevisionRow> {
+    const rows = await tx.$queryRaw<Array<Omit<OfficialRevisionRow, 'officialAt'> & { officialAt: Date | null }>>`
+      ${officialRevisionRowSelect()}
+      WHERE revision.id = ${revisionId}
+    `;
+    const row = rows[0];
+    if (row === undefined || row.officialAt === null) {
+      throw new Error(
+        `GAME_RESULT_VOIDED revision ${revisionId} missing officialAt for standings recalculation`,
+      );
+    }
+    return { ...row, officialAt: row.officialAt };
   }
 
   private async hidePublicCache(

@@ -110,6 +110,7 @@ describe('GamesController — REST 변경의 룸 브로드캐스트', () => {
       {} as never, // GamesService — 동일
       { error: jest.fn(), warn: jest.fn() } as unknown as PinoLogger,
       registry,
+      {} as never, // GameTakeoverService — 동일 (백로그 결함 수정 realtime-takeover-and-eviction-protocol 로 추가된 생성자 인자)
     );
     gateway.afterInit(fakeServer);
 

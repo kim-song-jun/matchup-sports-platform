@@ -6,12 +6,17 @@ import { PrismaService } from '../prisma/prisma.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { NotificationsService } from '../notifications/notifications.service';
 import { resolveTeamMatchCompetitionConfig } from '../team-matches/resolve-team-match-competition-config';
-import { cascadeCancelTeamMatchSchedulesInTx } from '../team-schedules/team-schedules.service';
+import {
+  cascadeCancelTeamMatchSchedulesInTx,
+  createTeamMatchScheduleInTx,
+  syncTeamMatchScheduleInTx,
+} from '../team-schedules/team-schedules.service';
 import { scheduleLeagueResultEntryReminder } from '../jobs/league-reminders/league-result-entry-reminder.service';
 import { LeagueCompletionProjectionService } from './league-completion-projection.service';
 import { buildOddTeamCountWarning, checkLeagueTeamAddAllowed, checkLeagueTeamRemovalAllowed } from './league-lifecycle-rules';
 import { tierLabel } from './league-series-admin.service';
 import { resolveResultStage } from './league-result-stage';
+import { resolveIsForfeit } from './league-match-forfeit.service';
 import { FixtureScheduleTemplate, FixtureTimingOptions, generateRoundRobinFixtures, resolveFixtureStartAt, resolveFixtureTimeSlots, RoundRobinFixture } from './round-robin-schedule';
 import {
   AddLeagueTeamDto,
@@ -198,7 +203,17 @@ export class LeagueMatchAdminService {
         ? []
         : await this.prisma.v1GameOfficialFact.findMany({
             where: { revisionId: { in: officialRevisionIds } },
-            select: { gameId: true, homeScore: true, awayScore: true },
+            // 감사 L-E finding 4(2단계) — 운영자 정정 모달이 "현재 이 대진이 몰수로
+            // 확정돼 있는지"를 알아야 몰수 의도를 표현하는 UI(기본값 승계)를 그릴 수
+            // 있다. reason/outcomeReason은 여기서만 boolean 으로 환산하고(resolveIsForfeit),
+            // 원문 reason은 응답에 절대 싣지 않는다(운영자가 쓴 자유 텍스트라도 다른
+            // 대진의 몰수 사유가 이 화면에 노출되는 건 별개 문제).
+            select: {
+              gameId: true,
+              homeScore: true,
+              awayScore: true,
+              resultRevision: { select: { reason: true, outcomeReason: true } },
+            },
           });
     const factByGameId = new Map(facts.map((fact) => [fact.gameId, fact]));
     // 대진을 아직 안 만든 리그에서만 필요하다(일괄 생성 폼의 "기본 장소" 추천용) —
@@ -227,6 +242,7 @@ export class LeagueMatchAdminService {
           resultStage: resolveResultStage(fixture.game),
           homeScore: fact?.homeScore ?? null,
           awayScore: fact?.awayScore ?? null,
+          isForfeit: fact === undefined ? false : resolveIsForfeit(fact.resultRevision),
         };
       }),
     };
@@ -396,6 +412,34 @@ export class LeagueMatchAdminService {
         message: '리그 종목과 일치하는 활성 팀만 등록할 수 있어요.',
       });
     }
+    // 그룹 B 감사 결함 1(첫 번째 발견): checkLeagueTeamAddAllowed는 "이 리그 안에서만"
+    // 중복을 본다 — 시리즈 소속 리그에서는 같은 팀이 형제 티어(같은 seriesId·seasonNo의
+    // 다른 리그)에 이미 있어도 통과했다. seedSeason()이 이미 강제하는 "한 팀을 두 티어에
+    // 동시에 배정할 수 없다" 불변식(league-series-admin.service.ts:225-230)을 이 경로에도
+    // 그대로 적용한다 — 안 하면 그 시즌의 공개 순위표에 같은 팀이 두 티어에 동시에
+    // 노출되고(standings()가 로스터 기준이라 대진을 안 돌려도 즉시 발생), 승강 확정은
+    // computedByTeamId가 중복 teamId를 뒤 티어 값으로 덮어써 entries.length 불일치로
+    // 항상 422 PROMOTION_ENTRIES_DUPLICATED에 막힌다.
+    if (league.seriesId !== null) {
+      const siblingLeague = await this.prisma.v1League.findFirst({
+        where: {
+          seriesId: league.seriesId,
+          seasonNo: league.seasonNo,
+          id: { not: leagueId },
+          teams: { some: { teamId: dto.teamId } },
+        },
+        select: { tier: true },
+      });
+      if (siblingLeague !== null) {
+        throw new UnprocessableEntityException({
+          code: 'LEAGUE_TEAM_INVALID',
+          message:
+            siblingLeague.tier === null
+              ? '이 팀은 이미 같은 시즌의 다른 리그에 참가 중이에요. 한 팀을 두 티어에 동시에 배정할 수 없어요.'
+              : `이 팀은 이미 같은 시즌 ${tierLabel(siblingLeague.tier)}에 참가 중이에요. 한 팀을 두 티어에 동시에 배정할 수 없어요.`,
+        });
+      }
+    }
 
     const existingFixtureCount = await this.prisma.v1TeamMatch.count({ where: { leagueId } });
     await this.prisma.$transaction(async (tx) => {
@@ -448,7 +492,7 @@ export class LeagueMatchAdminService {
       });
     }
 
-    const { cancelledFixtureCount, leagueCompleted } = await this.prisma.$transaction(async (tx) => {
+    const { cancelledFixtureCount, leagueCompleted, cancelledFixtures } = await this.prisma.$transaction(async (tx) => {
       // 위의 "2팀 이상" 판정은 트랜잭션 밖 스냅샷이라 그대로 두면 TOCTOU 다 — 3팀 리그에서
       // 두 제거 요청이 동시에 들어오면 둘 다 "빼도 2팀 남는다"를 보고 통과해, 결과적으로
       // 1팀만 남는 리그가 만들어진다. 1팀 리그는 대진 생성이 영구히 거부돼 시작도 종료도
@@ -472,7 +516,14 @@ export class LeagueMatchAdminService {
       // 잠금을 얻은 뒤 tx로 다시 읽어 두 값 다 커밋된 상태 기준으로 재검증한다.
       const freshTeamFixtures = await tx.v1TeamMatch.findMany({
         where: { leagueId, OR: [{ hostTeamId: teamId }, { approvedApplicantTeamId: teamId }] },
-        select: { id: true, status: true, game: { select: { currentOfficialRevisionId: true } } },
+        select: {
+          id: true,
+          status: true,
+          title: true,
+          hostTeamId: true,
+          approvedApplicantTeamId: true,
+          game: { select: { currentOfficialRevisionId: true } },
+        },
       });
       const freshHasOfficialResultForTeam = freshTeamFixtures.some(
         (fixture) => fixture.game?.currentOfficialRevisionId != null,
@@ -495,10 +546,21 @@ export class LeagueMatchAdminService {
       }
 
       let cancelled = 0;
+      // 그룹 B 감사 결함 4: 취소되는 대진마다 상대 팀(들)에게 알려야 하므로, 취소 후처리
+      // (cascadeCancelFixtureInTx)와 별개로 알림 발송에 필요한 최소 필드를 tx 밖으로
+      // 들고 나간다 — emitToManyDeferred는 커밋 후에 불러야 한다(notifyFixturesScheduled와
+      // 동일한 관례, 이 파일 하단 주석 참고).
+      const cancelledFixtures: Array<{ id: string; title: string; hostTeamId: string; approvedApplicantTeamId: string | null }> = [];
       for (const fixture of freshTeamFixtures) {
         if (fixture.status === 'cancelled') continue;
         await tx.v1TeamMatch.update({ where: { id: fixture.id }, data: { status: 'cancelled', cancelledAt: new Date() } });
         await this.cascadeCancelFixtureInTx(tx, fixture.id, TEAM_REMOVAL_CANCEL_REASON);
+        cancelledFixtures.push({
+          id: fixture.id,
+          title: fixture.title,
+          hostTeamId: fixture.hostTeamId,
+          approvedApplicantTeamId: fixture.approvedApplicantTeamId,
+        });
         cancelled += 1;
       }
       await tx.v1LeagueTeam.deleteMany({ where: { leagueId, teamId } });
@@ -515,8 +577,13 @@ export class LeagueMatchAdminService {
         },
         tx,
       );
-      return { cancelledFixtureCount: cancelled, leagueCompleted: completed };
+      return { cancelledFixtureCount: cancelled, leagueCompleted: completed, cancelledFixtures };
     });
+
+    // 그룹 B 감사 결함 4: 제외된 팀 본인 + 상대로 배정돼 있던 팀(들) 모두에게 알린다 —
+    // 이전에는 이 경로에 알림이 전혀 없어, 상대 팀은 자기 경기가 취소된 사실을 리그
+    // 상세를 직접 열어보지 않는 한 알 수 없었다.
+    this.notifyFixturesCancelled(leagueId, cancelledFixtures, TEAM_REMOVAL_CANCEL_REASON);
 
     return { leagueId, teamId, cancelledFixtureCount, leagueCompleted };
   }
@@ -544,6 +611,22 @@ export class LeagueMatchAdminService {
       throw new UnprocessableEntityException({
         code: 'LEAGUE_TEAM_INVALID',
         message: '비활성화되었거나 삭제된 팀이 포함돼 있어요.',
+      });
+    }
+    // 그룹 B 감사 결함 2: 이 엔드포인트는 최초 생성 미리보기와 재생성 미리보기를 겸한다
+    // (컨트롤러 주석: "미리보기가 통과했는데 실제 생성은 실패"가 없어야 한다는 불변식).
+    // 그런데 regenerateFixtures가 던지는 LEAGUE_FIXTURES_HAVE_OFFICIAL_RESULTS 게이트가
+    // 여기엔 없어서, 공식 결과가 확정된 대진이 있는 리그의 재생성 미리보기는 새 대진표를
+    // "성공적으로" 보여준 뒤 실제 재생성 시점에야 409로 거부됐다 — 그 불변식이 이 경로에서
+    // 깨져 있었다. 최초 생성(대진 0건)에서는 이 조건이 항상 거짓이라 기존 동작에 영향이 없다.
+    const existingFixturesWithResult = await this.prisma.v1TeamMatch.findMany({
+      where: { leagueId },
+      select: { game: { select: { currentOfficialRevisionId: true } } },
+    });
+    if (existingFixturesWithResult.some((fixture) => fixture.game?.currentOfficialRevisionId != null)) {
+      throw new ConflictException({
+        code: 'LEAGUE_FIXTURES_HAVE_OFFICIAL_RESULTS',
+        message: '공식 결과가 확정된 대진이 있어 대진을 다시 만들 수 없어요.',
       });
     }
     const { totalRounds, timing } = this.resolveFixturePlan(dto);
@@ -628,6 +711,22 @@ export class LeagueMatchAdminService {
       return { cancelledApplications: rejected, leagueCompleted: completed };
     });
 
+    // 그룹 B 감사 결함 4: 단건 취소는 운영상 가장 자주 쓰이는 취소 경로인데도 이전에는
+    // 상대 팀에게 알림이 전혀 없었다 — team-matches.service.ts의 자가취소(team_match_cancelled)는
+    // leagueId가 있는 대진을 하드 거부해 절대 이 알림에 도달하지 못한다(그 경로의 599-604행).
+    this.notifyFixturesCancelled(
+      leagueId,
+      [
+        {
+          id: teamMatch.id,
+          title: teamMatch.title,
+          hostTeamId: teamMatch.hostTeamId,
+          approvedApplicantTeamId: teamMatch.approvedApplicantTeamId,
+        },
+      ],
+      dto.reason,
+    );
+
     return {
       teamMatchId: teamMatch.id,
       status: 'cancelled' as const,
@@ -668,7 +767,14 @@ export class LeagueMatchAdminService {
       await tx.$queryRaw`SELECT id FROM "v1_leagues" WHERE id = ${leagueId} FOR UPDATE`;
       const existingFixtures = await tx.v1TeamMatch.findMany({
         where: { leagueId },
-        select: { id: true, status: true, game: { select: { currentOfficialRevisionId: true } } },
+        select: {
+          id: true,
+          status: true,
+          title: true,
+          hostTeamId: true,
+          approvedApplicantTeamId: true,
+          game: { select: { currentOfficialRevisionId: true } },
+        },
       });
       // ①: 공식 결과가 한 번이라도 확정된 대진이 있으면(취소돼 순위표에서는 빠졌더라도,
       // 게임/결과 리비전 자체는 영구 보존되는 기록이므로) 전체 재생성을 거부한다. 부분
@@ -683,6 +789,9 @@ export class LeagueMatchAdminService {
       }
 
       let cancelledCount = 0;
+      // 그룹 B 감사 결함 4: 재생성으로 취소되는 옛 대진도 알림 대상이다 — 아래 notifyFixturesScheduled는
+      // "새 대진이 배정됐다"만 알리지 "옛 대진이 취소됐다"는 알리지 않는다(별개 사실).
+      const cancelledFixtures: Array<{ id: string; title: string; hostTeamId: string; approvedApplicantTeamId: string | null }> = [];
       for (const fixture of existingFixtures) {
         if (fixture.status === 'cancelled') continue;
         await tx.v1TeamMatch.update({
@@ -690,6 +799,12 @@ export class LeagueMatchAdminService {
           data: { status: 'cancelled', cancelledAt: new Date() },
         });
         await this.cascadeCancelFixtureInTx(tx, fixture.id, dto.reason);
+        cancelledFixtures.push({
+          id: fixture.id,
+          title: fixture.title,
+          hostTeamId: fixture.hostTeamId,
+          approvedApplicantTeamId: fixture.approvedApplicantTeamId,
+        });
         cancelledCount += 1;
       }
 
@@ -724,15 +839,20 @@ export class LeagueMatchAdminService {
         },
         tx,
       );
-      return { cancelledCount, ids };
+      return { cancelledCount, ids, cancelledFixtures };
     }, {
       timeout: 120_000,
       maxWait: 10_000,
     });
 
-    // 리그 감사 그룹 A / R2: 재생성도 새 대진 배정이므로 동일하게 알린다(취소된 옛 대진에는
-    // 알리지 않는다 — cancelFixture 경로가 이미 team_match_cancelled를 담당한다).
+    // 리그 감사 그룹 A / R2: 재생성도 새 대진 배정이므로 동일하게 알린다.
     if (result.ids.length > 0) this.notifyFixturesScheduled(leagueId, league.title, schedule);
+    // 그룹 B 감사 결함 4: 옛 주석은 "cancelFixture 경로가 이미 team_match_cancelled를
+    // 담당한다"고 적혀 있었지만 사실이 아니었다 — 리그 대진은 leagueId가 있어
+    // team-matches.service.ts의 자가취소가 하드 거부하므로(599-604행) 그 알림에 절대
+    // 도달할 수 없었다. 위 notifyFixturesScheduled는 "새 대진이 생겼다"만 알리므로,
+    // 옛 대진이 취소됐다는 사실은 별도로 알린다.
+    if (result.cancelledFixtures.length > 0) this.notifyFixturesCancelled(leagueId, result.cancelledFixtures, dto.reason);
 
     return {
       leagueId,
@@ -775,6 +895,11 @@ export class LeagueMatchAdminService {
       // expectedStartAt 불일치로 스스로 no-op — league-result-entry-reminder.service.ts 참고).
       if (dto.startsAt !== undefined) {
         await scheduleLeagueResultEntryReminder(tx, { teamMatchId, startAt: result.startAt });
+        // 그룹 B 감사 결함 5 후속: createFixturesInTx가 이제 양 팀 스케줄을 만들어 두므로,
+        // 여기서 시작 시각만 바꾸고 스케줄을 그대로 두면 캘린더 시각이 대진 시각과 어긋난다
+        // (team-matches.service.ts:593의 동일 패턴). syncTeamMatchScheduleInTx는 teamMatchId
+        // 기준으로 SCHEDULED 상태인 스케줄을 전부(호스트+원정 최대 2건) 갱신한다.
+        await syncTeamMatchScheduleInTx(tx, teamMatchId, teamMatch.title, result.startAt, result.endAt);
       }
       await this.adminContext.logAdminAction(
         admin,
@@ -972,26 +1097,38 @@ export class LeagueMatchAdminService {
     for (const [index, { round, home, away }] of pairings.entries()) {
       const slot = slots?.[index];
       const startAt = slot !== undefined ? slot.startAt : resolveFixtureStartAt(input.leagueStartsOn, round, input.scheduleTemplate);
+      // 하루에 여러 경기가 서면 "N주차"만으로는 팀 화면에서 같은 제목이 반복되므로
+      // 그날의 경기 순번까지 제목에 담는다. timing 미지정이면 기존 제목 그대로.
+      const title = slot !== undefined
+        ? `${input.leagueTitle} ${slot.matchday}주차 ${slot.orderInDay}경기`
+        : `${input.leagueTitle} ${round}주차`;
+      const endAt = slot !== undefined ? slot.endAt : null;
       const teamMatch = await tx.v1TeamMatch.create({
         data: {
           hostTeamId: home.id,
           createdByUserId: input.adminUserId,
           sportId: input.sportId,
           regionId: input.regionId,
-          // 하루에 여러 경기가 서면 "N주차"만으로는 팀 화면에서 같은 제목이 반복되므로
-          // 그날의 경기 순번까지 제목에 담는다. timing 미지정이면 기존 제목 그대로.
-          title: slot !== undefined
-            ? `${input.leagueTitle} ${slot.matchday}주차 ${slot.orderInDay}경기`
-            : `${input.leagueTitle} ${round}주차`,
+          title,
           placeName,
           startAt,
-          endAt: slot !== undefined ? slot.endAt : undefined,
+          endAt: endAt ?? undefined,
           status: 'matched',
           approvedApplicantTeamId: away.id,
           competitionConfigVersionId: input.competitionConfigId,
           leagueId: input.leagueId,
         },
       });
+      // 그룹 B 감사 결함 5: "매치가 곧 팀일정" 불변식(team-schedules.service.ts:37-41)이
+      // 리그 대진에는 지켜지지 않고 있었다 — team-matches.service.ts의 create()/
+      // approveApplication()이 부르는 createTeamMatchScheduleInTx를 이 raw create 경로는
+      // 우회해서, 참가 팀 캘린더에 리그 경기가 한 건도 안 뜨고 용병 모집(스케줄의 자식
+      // 리소스)도 못 열고 D-1 일정 리마인더 대상에서도 빠졌다. 리그 대진은 생성 시점에
+      // 양 팀이 이미 확정(approved)이므로 일반 팀매치처럼 호스트 먼저·상대 나중이 아니라
+      // 두 팀 모두의 스케줄을 여기서 함께 만든다. title/startAt/endAt은 방금 create에 넘긴
+      // 것과 같은 로컬 변수를 그대로 재사용한다 — create() 반환 행에서 되읽지 않는다.
+      await createTeamMatchScheduleInTx(tx, home.id, teamMatch.id, title, startAt, endAt);
+      await createTeamMatchScheduleInTx(tx, away.id, teamMatch.id, title, startAt, endAt);
       await this.games.createFromSourceInTransaction(
         tx,
         {
@@ -1143,6 +1280,56 @@ export class LeagueMatchAdminService {
         'league_fixture_scheduled',
         leagueId,
         `"${leagueTitle}" 리그 대진이 확정됐어요. 이번 시즌 ${fixtureCount}경기가 배정됐어요.`,
+      );
+    }
+  }
+
+  /**
+   * 그룹 B 감사 결함 4: removeTeam·cancelFixture·regenerateFixtures 셋이 대진을 취소할
+   * 때마다 관련 팀(들)의 owner/manager에게 알린다. 이전에는 이 셋 모두 알림이 전혀
+   * 없었다 — 일반 팀매치 취소(team_match_cancelled)와 달리 리그 대진은 leagueId가
+   * 있으면 team-matches.service.ts의 cancel()이 하드 거부해(LEAGUE_FIXTURE_HOST_CANCEL_
+   * FORBIDDEN, 599-604행) 그 알림 코드에 절대 도달할 수 없었다.
+   *
+   * notifyFixturesScheduled와 같은 이유로 팀 단위로 묶는다 — removeTeam이 한 번에 여러
+   * 대진을 취소할 수 있는데, 대진마다 알림을 쏘면 상대 팀장 알림함이 도배된다. 대진
+   * 하나뿐인 cancelFixture 호출도 같은 함수를 그대로 쓴다(배열 원소 1개).
+   *
+   * 트랜잭션 커밋 후(호출부가 이미 그렇게 부른다)에 불러야 한다 — notifyFixturesScheduled
+   * doc comment와 동일한 이유.
+   */
+  private notifyFixturesCancelled(
+    leagueId: string,
+    fixtures: Array<{ id: string; title: string; hostTeamId: string; approvedApplicantTeamId: string | null }>,
+    reason: string,
+  ): void {
+    if (fixtures.length === 0) return;
+    const fixtureCountByTeamId = new Map<string, number>();
+    for (const fixture of fixtures) {
+      fixtureCountByTeamId.set(fixture.hostTeamId, (fixtureCountByTeamId.get(fixture.hostTeamId) ?? 0) + 1);
+      if (fixture.approvedApplicantTeamId !== null) {
+        fixtureCountByTeamId.set(
+          fixture.approvedApplicantTeamId,
+          (fixtureCountByTeamId.get(fixture.approvedApplicantTeamId) ?? 0) + 1,
+        );
+      }
+    }
+    const body =
+      fixtures.length === 1
+        ? `"${fixtures[0].title}" 대진이 취소됐어요. 사유: ${reason}`
+        : `리그 대진 ${fixtures.length}경기가 취소됐어요. 사유: ${reason}`;
+    for (const [teamId] of fixtureCountByTeamId) {
+      this.notifications.emitToManyDeferred(
+        async () =>
+          (
+            await this.prisma.v1TeamMembership.findMany({
+              where: { teamId, status: 'active', role: { in: ['owner', 'manager'] } },
+              select: { userId: true },
+            })
+          ).map((m) => m.userId),
+        'league_fixture_cancelled',
+        leagueId,
+        body,
       );
     }
   }

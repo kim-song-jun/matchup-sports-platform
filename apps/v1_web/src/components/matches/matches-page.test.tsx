@@ -150,3 +150,39 @@ describe('MatchCreatePageView — 매치 수정 전체 필드', () => {
     expect(screen.getByLabelText('최대 인원 선택')).toContainHTML('<option value="100">100명</option>');
   });
 });
+
+// 2026-08-27 감사 M-A-personal-match-state: '매치 취소' 버튼은 lockedReason 게이트가 없어,
+// 시작 시각이 지난(터미널) 매치에서도 눌리는 죽은 버튼이었다 — 서버 cancel()이 결국 409로
+// 거부하는데도 화면은 아무 사전 신호를 주지 않았다.
+describe('MatchCreatePageView — 매치 취소 버튼 잠금', () => {
+  function editModel(lockedReason: string | null) {
+    const model = getMatchCreateViewModel('edit');
+    model.matchId = 'match-locked';
+    model.form = {
+      selectedSportId: 'sport-futsal',
+      regionId: 'region-gangnam',
+      regions: [{ id: 'region-gangnam', name: '강남구' }],
+      onSelectSport: vi.fn(),
+      onFieldChange: vi.fn(),
+      onRegionChange: vi.fn(),
+      onBack: vi.fn(),
+      onNext: vi.fn(),
+      onSubmit: vi.fn(),
+      onCancel: vi.fn(),
+      lockedReason,
+    };
+    return model;
+  }
+
+  it('lockedReason이 있으면(시작 시각이 지난 매치 등) 매치 취소 버튼도 함께 비활성화한다', () => {
+    render(<MatchCreatePageView model={editModel('완료·취소·종료된 매치는 수정할 수 없어요.')} />);
+
+    expect(screen.getByRole('button', { name: '매치 취소' })).toBeDisabled();
+  });
+
+  it('lockedReason이 없으면 매치 취소 버튼은 눌린다', () => {
+    render(<MatchCreatePageView model={editModel(null)} />);
+
+    expect(screen.getByRole('button', { name: '매치 취소' })).not.toBeDisabled();
+  });
+});

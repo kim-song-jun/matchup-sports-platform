@@ -747,24 +747,41 @@ export function RegistrationsTab({
                   />
                 </>
               )}
-              {canWrite && reg.status === 'confirmed' &&
-                (isLocked ? (
-                  <ActionButton
-                    onClick={() => handleRosterUnlock(reg)}
-                    disabled={rosterUnlock.isPending}
-                    icon={<Unlock size={13} />}
-                    label="잠금 해제"
-                    tone="gray"
-                  />
-                ) : (
-                  <ActionButton
-                    onClick={() => handleRosterLock(reg)}
-                    disabled={rosterLock.isPending}
-                    icon={<Lock size={13} />}
-                    label="명단 잠금"
-                    tone="gray"
-                  />
-                ))}
+              {/* 감사 finding(reg-confirm-reapply-state-machine #1): waitlisted 는 확정 전이
+                  코드 경로 자체가 없어 자리가 나도 대기 팀을 영구히 승격할 수 없었다 —
+                  ADMIN_CONFIRMABLE_STATUSES에 waitlisted를 추가한 서버 수정과 짝을 이루는 버튼. */}
+              {canWrite && reg.status === 'waitlisted' && (
+                <ActionButton
+                  onClick={() => void handleConfirmClick(reg)}
+                  disabled={confirmRegistration.isPending}
+                  icon={<Check size={13} />}
+                  label="확정"
+                  tone="blue"
+                />
+              )}
+              {/* 감사 finding(reg-confirm-reapply-state-machine #2/#3): 잠금 해제는 서버(rosterUnlock)에
+                  status 가드가 없어 confirmed 가 아닌 신청(예: 취소 후 재신청으로 되살아난 draft가
+                  옛 rosterLockedAt을 물려받은 경우)에도 성공한다. 잠금 버튼은 rosterLock 서비스가
+                  confirmed를 요구하므로 그대로 confirmed 전용으로 두되, 해제 버튼은 실제로 잠긴
+                  모든 신청에 노출해 서버가 이미 허용하는 복구 수단을 화면에서도 쓸 수 있게 한다. */}
+              {canWrite && isLocked && (
+                <ActionButton
+                  onClick={() => handleRosterUnlock(reg)}
+                  disabled={rosterUnlock.isPending}
+                  icon={<Unlock size={13} />}
+                  label="잠금 해제"
+                  tone="gray"
+                />
+              )}
+              {canWrite && !isLocked && reg.status === 'confirmed' && (
+                <ActionButton
+                  onClick={() => handleRosterLock(reg)}
+                  disabled={rosterLock.isPending}
+                  icon={<Lock size={13} />}
+                  label="명단 잠금"
+                  tone="gray"
+                />
+              )}
               {canWrite && reg.status === 'confirmed' &&
                 (reg.rosterDeadlineOverrideAt ? (
                   <ActionButton

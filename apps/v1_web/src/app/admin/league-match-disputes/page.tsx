@@ -16,7 +16,12 @@ import { LeagueDisputeRejectModal } from '@/components/admin/league-dispute-reje
 import { useV1AdminLeagueDisputes, useV1ResolveLeagueDispute, useV1RejectLeagueDispute } from '@/hooks/use-v1-api';
 import type { V1AdminLeagueMatchDisputeRow, V1LeagueMatchDisputeStatus } from '@/types/league-match';
 import { formatAdminDateTime } from '@/lib/date-utils';
-import { extractErrorMessage } from '@/lib/error-message';
+import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
+
+// 이 코드가 뜨면 정정 스코어가 기존 득점자 기록보다 작다는 뜻인데, 이 페이지의 처리
+// 모달엔 득점 입력이 없어 여기서는 정정을 끝낼 수 없다 — 대진 화면(league-match-fixtures-client
+// 의 "결과 정정")에서 득점 기록을 먼저 맞춰야 한다. 감사 L-E findings[2].
+const CARRIED_PARTICIPANTS_CONFLICT_CODE = 'LEAGUE_RESULT_CARRIED_PARTICIPANTS_CONFLICT';
 
 // D2 (E4, B안 확정): 어드민 이의 목록·처리 독립 페이지. 대진 표(league-match-fixtures-client)
 // 안에 끼워 넣지 않고 별도 라우트로 둔 이유는 사용자 확정 사항 — 이의는 리그 하나에 갇히지
@@ -35,6 +40,9 @@ export default function AdminLeagueMatchDisputesPage() {
 
   const [resolveRow, setResolveRow] = useState<V1AdminLeagueMatchDisputeRow | null>(null);
   const [rejectRow, setRejectRow] = useState<V1AdminLeagueMatchDisputeRow | null>(null);
+  // 직전 정정 제출이 CARRIED_PARTICIPANTS_CONFLICT_CODE 로 거부됐는지 — 모달을 새로 열 때,
+  // 그리고 정정이 성공했을 때 리셋한다.
+  const [carriedParticipantsConflict, setCarriedParticipantsConflict] = useState(false);
 
   const resolveMutation = useV1ResolveLeagueDispute();
   const rejectMutation = useV1RejectLeagueDispute();
@@ -52,12 +60,20 @@ export default function AdminLeagueMatchDisputesPage() {
       {
         onSuccess: () => {
           setResolveRow(null);
+          setCarriedParticipantsConflict(false);
           showToast(
             resolution === 'correction' ? '결과를 정정하고 이의를 수락했어요.' : '결과를 무효 처리하고 이의를 수락했어요.',
             'success',
           );
         },
         onError: (err) => {
+          if (extractErrorCode(err) === CARRIED_PARTICIPANTS_CONFLICT_CODE) {
+            // 모달은 열어 둔다 — 이 화면에선 못 끝내지만 되돌릴 필요는 없다. 배너 안내는
+            // 모달이, 짧은 안내는 토스트가 맡는다.
+            setCarriedParticipantsConflict(true);
+            showToast("대진 화면의 '결과 정정'에서 득점 기록을 먼저 맞춰 주세요.", 'error');
+            return;
+          }
           showToast(extractErrorMessage(err, '처리 중 오류가 발생했어요.'), 'error');
         },
       },
@@ -168,7 +184,10 @@ export default function AdminLeagueMatchDisputesPage() {
             <>
               <button
                 type="button"
-                onClick={() => setResolveRow(row)}
+                onClick={() => {
+                  setResolveRow(row);
+                  setCarriedParticipantsConflict(false);
+                }}
                 className="inline-flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-lg bg-blue-500 px-3 text-[length:var(--font-size-label)] font-semibold text-white transition-colors hover:bg-blue-600 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
               >
                 처리
@@ -213,6 +232,7 @@ export default function AdminLeagueMatchDisputesPage() {
 
       <LeagueDisputeResolveModal
         open={resolveRow !== null}
+        leagueId={resolveRow?.leagueId ?? ''}
         leagueTitle={resolveRow?.leagueTitle ?? ''}
         homeTeamName={resolveRow?.homeTeamName ?? ''}
         awayTeamName={resolveRow?.awayTeamName ?? ''}
@@ -220,8 +240,12 @@ export default function AdminLeagueMatchDisputesPage() {
         currentHomeScore={resolveRow?.currentHomeScore ?? null}
         currentAwayScore={resolveRow?.currentAwayScore ?? null}
         onSubmit={handleResolveSubmit}
-        onClose={() => setResolveRow(null)}
+        onClose={() => {
+          setResolveRow(null);
+          setCarriedParticipantsConflict(false);
+        }}
         pending={resolveMutation.isPending}
+        carriedParticipantsConflict={carriedParticipantsConflict}
       />
 
       <LeagueDisputeRejectModal

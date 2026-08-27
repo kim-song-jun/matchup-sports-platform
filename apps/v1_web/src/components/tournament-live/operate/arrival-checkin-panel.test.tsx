@@ -167,6 +167,32 @@ describe('ArrivalCheckinPanel — 명단 검인', () => {
     expect(screen.getByText('제출된 선발 명단이 없어 검인할 대상이 없어요.')).toBeInTheDocument();
   });
 
+  it('아직 제출되지 않은 DRAFT는 revision이 가장 커도 검인 대상이 아니다 (대진 생성 직후 자동 생성된 등록 명단 전원을 검인 대상으로 잘못 띄우면 안 된다)', () => {
+    render(
+      <ArrivalCheckinPanel
+        sides={SIDES}
+        lineups={[
+          // 대진 생성 시 자동으로 깔리는 rev1 DRAFT — 등록 명단 전원, 아직 아무도 제출하지 않았다.
+          lineup(
+            [
+              participant({ id: 'p-auto-1', displayNameSnapshot: '자동등록1' }),
+              participant({ id: 'p-auto-2', displayNameSnapshot: '자동등록2' }),
+            ],
+            { id: 'lineup-draft', revision: 1, state: 'DRAFT', submittedAt: null },
+          ),
+        ]}
+        onToggleArrival={vi.fn()}
+      />,
+    );
+
+    // DRAFT를 검인 대상으로 삼으면 여기서 도착 확인을 눌러도, 팀이 실제로 제출하는
+    // 순간 saveLineup이 새 revision·새 participant 행을 만들어 이 검인이 통째로
+    // 사라진다(운영자 입력 소실) — revision이 가장 커도 SUBMITTED/LOCKED가 아니면
+    // 아예 목록에 올리지 않아야 그 소실을 막을 수 있다.
+    expect(screen.queryByRole('switch', { name: /자동등록1/ })).not.toBeInTheDocument();
+    expect(screen.getByText('제출된 선발 명단이 없어 검인할 대상이 없어요.')).toBeInTheDocument();
+  });
+
   it('저장 중인 행만 잠근다 (다른 행은 계속 누를 수 있어야 줄 서서 검인할 수 있다)', () => {
     render(
       <ArrivalCheckinPanel

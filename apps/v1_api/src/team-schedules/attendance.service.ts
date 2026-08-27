@@ -176,9 +176,22 @@ export class ScheduleAttendanceService {
       let waitlistPosition: number | null = previousWaitlistPosition;
 
       if (dto.status === 'GOING' && schedule.capacity !== null) {
-        const goingCount = await tx.v1ScheduleAttendance.count({
-          where: { scheduleId, status: 'GOING', userId: { not: user.id } },
-        });
+        // 정원 산정 일원화 (M-F-team-schedule-attendance-orphan-cleanup fix): 팀을 나가거나
+        // 추방된 멤버의 GOING 행은 v1_schedule_attendance에서 지워지지 않는다 — 이탈 경로가
+        // teams.service.ts(leaveTeam/removeMembership)·profile.service.ts(회원탈퇴)·
+        // admin.service.ts(관리자 비활성화) 4곳으로 흩어져 있어 매 경로마다 정리 훅을 심으면
+        // 새 경로가 생길 때마다 또 빠뜨리기 쉽다. 대신 "누가 정원을 차지하는가"를 active
+        // 멤버십으로 정의해 원시 행은 그대로 두고(백필 불필요) 판정 시점에만 걸러낸다 — 이
+        // 팀의 attendees 목록(team-schedules.service.ts detail())이 이미 쓰는 것과 동일한
+        // 조건이라, 화면에 뜨는 참석자 수와 정원 판정이 항상 같은 정의를 쓰게 된다.
+        const goingCountRows = await tx.$queryRaw<Array<{ count: bigint }>>`
+          SELECT COUNT(*)::bigint AS count
+          FROM v1_schedule_attendance a
+          INNER JOIN v1_team_memberships m ON m.team_id = ${teamId} AND m.user_id = a.user_id AND m.status = 'active'
+          INNER JOIN v1_users u ON u.id = a.user_id AND u.account_status = 'active'
+          WHERE a.schedule_id = ${scheduleId} AND a.status = 'GOING'::"V1AttendanceStatus" AND a.user_id != ${user.id}
+        `;
+        const goingCount = Number(goingCountRows[0]?.count ?? 0);
         if (goingCount >= schedule.capacity) {
           nextStatus = 'WAITLISTED';
         }
@@ -273,10 +286,21 @@ export class ScheduleAttendanceService {
       // GOING and compact the remaining WAITLISTED positions down by one, so a freed slot is
       // never permanently stranded behind a waitlisted user.
       if (previousStatus === 'GOING' && nextStatus !== 'GOING' && schedule.capacity !== null) {
-        const nextInLine = await tx.v1ScheduleAttendance.findFirst({
-          where: { scheduleId, status: 'WAITLISTED' },
-          orderBy: { waitlistPosition: 'asc' },
-        });
+        // 승격 대상도 정원 산정과 **같은 정의**를 써야 한다: 위 goingCount 는 active
+        // 멤버십으로 자리를 세는데, 승격만 맨 findFirst 로 고르면 이미 팀을 나갔거나
+        // 추방된 사람(대기 행은 남아 있다)이 GOING 으로 올라와 자리를 차지한다 —
+        // 그 사람은 정원 계산에서는 안 세어지므로 정원이 조용히 한 자리 새는 셈이고,
+        // 정작 대기 중인 활성 멤버는 계속 밀린다. 이 배치가 고치려던 바로 그 결함이다.
+        const nextInLineRows = await tx.$queryRaw<Array<{ id: string; waitlistPosition: number | null }>>`
+          SELECT a.id, a.waitlist_position AS "waitlistPosition"
+          FROM v1_schedule_attendance a
+          INNER JOIN v1_team_memberships m ON m.team_id = ${teamId} AND m.user_id = a.user_id AND m.status = 'active'
+          INNER JOIN v1_users u ON u.id = a.user_id AND u.account_status = 'active'
+          WHERE a.schedule_id = ${scheduleId} AND a.status = 'WAITLISTED'::"V1AttendanceStatus"
+          ORDER BY a.waitlist_position ASC
+          LIMIT 1
+        `;
+        const nextInLine = nextInLineRows[0] ?? null;
         if (nextInLine) {
           await tx.v1ScheduleAttendance.update({
             where: { id: nextInLine.id },
@@ -298,7 +322,7 @@ export class ScheduleAttendanceService {
         }
       }
 
-      const counts = await this.computeCounts(tx, scheduleId);
+      const counts = await this.computeCounts(tx, teamId, scheduleId);
       const response: SetAttendanceResponse = {
         status: nextStatus,
         version: newVersion,
@@ -325,18 +349,25 @@ export class ScheduleAttendanceService {
     });
   }
 
-  private async computeCounts(tx: Prisma.TransactionClient, scheduleId: string): Promise<AttendanceCounts> {
-    const grouped = await tx.v1ScheduleAttendance.groupBy({
-      by: ['status'],
-      where: { scheduleId },
-      _count: { _all: true },
-    });
+  // 정원 산정 일원화: 이 응답의 counts도 팀을 나가거나 추방된 멤버의 유령 행을 제외해야
+  // capacity 판정(위 setMyAttendance)·team-schedules.service.ts의 goingCount/waitlistedCount·
+  // attendees 목록과 같은 숫자를 가리킨다. active 멤버십으로 조인하는 동일한 정의를 쓴다.
+  private async computeCounts(tx: Prisma.TransactionClient, teamId: string, scheduleId: string): Promise<AttendanceCounts> {
+    const grouped = await tx.$queryRaw<Array<{ status: string; count: bigint }>>`
+      SELECT a.status::text AS status, COUNT(*)::bigint AS count
+      FROM v1_schedule_attendance a
+      INNER JOIN v1_team_memberships m ON m.team_id = ${teamId} AND m.user_id = a.user_id AND m.status = 'active'
+      INNER JOIN v1_users u ON u.id = a.user_id AND u.account_status = 'active'
+      WHERE a.schedule_id = ${scheduleId}
+      GROUP BY a.status
+    `;
     const counts: AttendanceCounts = { going: 0, maybe: 0, notGoing: 0, waitlisted: 0 };
     for (const row of grouped) {
-      if (row.status === 'GOING') counts.going = row._count._all;
-      else if (row.status === 'MAYBE') counts.maybe = row._count._all;
-      else if (row.status === 'NOT_GOING') counts.notGoing = row._count._all;
-      else if (row.status === 'WAITLISTED') counts.waitlisted = row._count._all;
+      const n = Number(row.count);
+      if (row.status === 'GOING') counts.going = n;
+      else if (row.status === 'MAYBE') counts.maybe = n;
+      else if (row.status === 'NOT_GOING') counts.notGoing = n;
+      else if (row.status === 'WAITLISTED') counts.waitlisted = n;
     }
     return counts;
   }

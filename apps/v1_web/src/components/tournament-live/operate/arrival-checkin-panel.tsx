@@ -2,6 +2,7 @@
 
 import type { GameLineup, GameLineupParticipant, GameSide } from '@/types/game-operations';
 import { jerseyText } from './player-label';
+import { latestOperableLineup } from './lineup-grid';
 
 /**
  * 명단 검인(체크인) — 킥오프 전 "누가 실제로 왔는지"를 스태프가 확정하는 자리.
@@ -25,13 +26,6 @@ import { jerseyText } from './player-label';
  * 토글로 그린다.
  */
 
-/** 사이드별 최신 리비전 라인업. LineupGrid 와 같은 규칙을 쓴다(가장 높은 revision). */
-function latestLineupForSide(lineups: readonly GameLineup[], sideId: string): GameLineup | null {
-  const candidates = lineups.filter((lineup) => lineup.sideId === sideId);
-  if (candidates.length === 0) return null;
-  return candidates.reduce((best, current) => (current.revision > best.revision ? current : best));
-}
-
 export interface ArrivalCheckinPanelProps {
   readonly sides: readonly GameSide[];
   readonly lineups: readonly GameLineup[];
@@ -50,7 +44,7 @@ export function ArrivalCheckinPanel({
 }: ArrivalCheckinPanelProps) {
   const sections = sides.map((side) => ({
     side,
-    participants: latestLineupForSide(lineups, side.id)?.participants ?? [],
+    participants: latestOperableLineup(lineups, side.id)?.participants ?? [],
   }));
   const total = sections.reduce((sum, section) => sum + section.participants.length, 0);
   const arrived = sections.reduce(

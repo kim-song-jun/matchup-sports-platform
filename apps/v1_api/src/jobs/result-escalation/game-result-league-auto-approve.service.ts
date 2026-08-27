@@ -8,6 +8,7 @@ type SubmittedRevisionRow = {
   gameId: string;
   state: string;
   leagueId: string | null;
+  teamMatchStatus: string | null;
 };
 
 /**
@@ -46,6 +47,13 @@ export class GameResultLeagueAutoApproveService {
   readonly handler: GameOperationHandler = async (claim, tx) => {
     const revision = await this.lockRevision(tx, this.revisionId(claim.payload));
     if (revision.state !== 'SUBMITTED' || revision.leagueId === null) return;
+    // 대진이 취소됐으면 그대로 no-op -- 형제 잡(league-result-entry-reminder.service.ts:61)과
+    // 운영자 결과입력 경로(league-match-result-entry.service.ts:138-142)가 이미 갖고 있는
+    // "취소 대진에 결과를 확정하지 않는다" 방어를 이 워커에도 동일하게 적용한다. 대진 취소
+    // 진입점(cancelFixture/regenerateFixtures/removeTeam)은 결과 상태와 무관하게 SUBMITTED
+    // 리비전을 그대로 둔 채 team_match.status만 'cancelled'로 바꾸므로, 이 가드가 없으면
+    // 취소된 경기가 24시간 뒤 그대로 OFFICIAL로 확정된다.
+    if (revision.teamMatchStatus === 'cancelled') return;
     if (await this.isSuperseded(tx, revision.revisionId)) return;
     await this.approve(tx, revision);
   };
@@ -67,7 +75,7 @@ export class GameResultLeagueAutoApproveService {
     const rows = await tx.$queryRaw<SubmittedRevisionRow[]>`
       SELECT
         revision.id AS "revisionId", revision.game_id AS "gameId", revision.state::text AS state,
-        team_match.league_id AS "leagueId"
+        team_match.league_id AS "leagueId", team_match.status::text AS "teamMatchStatus"
       FROM v1_game_result_revisions revision
       INNER JOIN v1_games game ON game.id = revision.game_id
       LEFT JOIN v1_team_matches team_match ON team_match.id = game.team_match_id

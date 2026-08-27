@@ -135,7 +135,8 @@ export interface V1LeagueFixture {
   /**
    * 몰수패로 확정된 결과인지. 몰수는 스코어만 보면 실제 1:0 승리와 구분되지 않아서
    * 서버가 boolean 으로 알려준다(어드민이 쓴 몰수 사유 원문은 공개하지 않는다).
-   * 공개 상세에만 있고 어드민 상세엔 없다.
+   * 공개 상세·어드민 상세 둘 다 채워진다(감사 L-E finding 4 수정 — 어드민 정정
+   * 모달이 "현재 몰수로 확정돼 있어요"를 보여주려면 어드민 쪽에도 필요했다).
    */
   isForfeit?: boolean;
 }
@@ -518,6 +519,13 @@ export interface V1RecordLeagueResultPayload {
    * participantId는 참가자 조회(V1LeagueFixtureParticipantsResponse)에서 온 값만 유효하다.
    */
   participants?: V1LeagueResultParticipantStat[];
+  /**
+   * 감사 L-E finding 4 수정 — **정정(`.../result/correct`) 전용 필드**. 신규 입력은
+   * 무시한다(백엔드 `RecordLeagueResultDto.isForfeit` docblock과 동일 계약).
+   * 미전송 시 base(직전) 리비전의 몰수 여부를 그대로 승계한다 — `LeagueResultEntryModal`이
+   * 몰수 토글을 조작하지 않은 채 제출하면 이 필드를 아예 보내지 않는다.
+   */
+  isForfeit?: boolean;
 }
 
 export interface V1LeagueResultParticipantStat {

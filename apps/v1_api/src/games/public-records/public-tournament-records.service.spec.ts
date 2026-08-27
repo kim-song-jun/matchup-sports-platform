@@ -123,7 +123,7 @@ function buildFakePrisma(options: {
    * 경기에서 라이브 전용 필드가 새는지 확인할 수 있다.
    */
   gameState?: string;
-  lineups?: readonly { id: string; sideId: string; revision: number }[];
+  lineups?: readonly { id: string; sideId: string; revision: number; state?: string }[];
   participants?: readonly FakeParticipant[];
   /**
    * 2026-08-18 대회 실명 표시 정책 -- `loadParticipantNameProfiles`가 in 조회하는
@@ -177,8 +177,8 @@ function buildFakePrisma(options: {
               { id: 'side-away', sideKey: 'AWAY' },
             ],
             lineups: options.lineups ?? [
-              { id: 'lineup-home-1', sideId: 'side-home', revision: 1 },
-              { id: 'lineup-away-1', sideId: 'side-away', revision: 1 },
+              { id: 'lineup-home-1', sideId: 'side-home', revision: 1, state: 'SUBMITTED' },
+              { id: 'lineup-away-1', sideId: 'side-away', revision: 1, state: 'SUBMITTED' },
             ],
             participants: options.participants ?? [ELIGIBLE_PARTICIPANT, INELIGIBLE_PARTICIPANT],
             currentOfficialRevision: options.officialRevision ?? null,
@@ -300,10 +300,10 @@ describe('PublicTournamentRecordsService.getMatch -- event participant identity 
       scheduledAt: new Date(Date.now() - 60_000),
       consentLinks: [], consentSnapshots: [], events: [],
       lineups: [
-        { id: 'lineup-home-1', sideId: 'side-home', revision: 1 },
-        { id: 'lineup-away-1', sideId: 'side-away', revision: 1 },
-        { id: 'lineup-home-2', sideId: 'side-home', revision: 2 },
-        { id: 'lineup-away-3', sideId: 'side-away', revision: 3 },
+        { id: 'lineup-home-1', sideId: 'side-home', revision: 1, state: 'SUBMITTED' },
+        { id: 'lineup-away-1', sideId: 'side-away', revision: 1, state: 'SUBMITTED' },
+        { id: 'lineup-home-2', sideId: 'side-home', revision: 2, state: 'SUBMITTED' },
+        { id: 'lineup-away-3', sideId: 'side-away', revision: 3, state: 'SUBMITTED' },
       ],
       participants: [oldHome, latestHome, oldAway, latestAway],
     });
@@ -1003,7 +1003,7 @@ describe('PublicTournamentRecordsService.getMatch -- 선수 프로필 링크(pro
   const base = {
     scheduledAt: new Date(Date.now() - 60_000),
     events: [],
-    lineups: [{ id: 'lineup-home-1', sideId: 'side-home', revision: 1 }],
+    lineups: [{ id: 'lineup-home-1', sideId: 'side-home', revision: 1, state: 'SUBMITTED' }],
     participants: [LINKED],
   };
 

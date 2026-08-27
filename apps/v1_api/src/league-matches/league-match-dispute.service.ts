@@ -24,9 +24,11 @@ import {
  * - **수락**: 정정은 이미 있는 `LeagueMatchResultEntryService.correctResult`를,
  *   무효는 `GamesService.voidTeamMatchResult`(D2 신규)를 그대로 재사용한다 --
  *   새 상태 전이 로직을 여기서 만들지 않는다. 처리 후 리그가 completed 였다면
- *   `LeagueMatchAdminService.revertCompletionInTx`로 active 로 되돌린다(승강 확정
- *   전이라는 전제는 위 파일 단계 검증이 이미 보장한다 -- 확정됐으면 애초에 이의
- *   제기가 막혔을 것이다).
+ *   `LeagueMatchAdminService.revertCompletionInTx`로 active 로 되돌린다.
+ *   **승강 확정 전이라는 전제는 제기 시점(`fileDispute`)에만 보장된다** -- 이의가
+ *   열려 있는 동안에도 운영자가 승강을 확정(commitPromotions)할 수 있고 그 경로는
+ *   열린 이의를 검사하지 않으므로(감사 L-E finding 1, 2026-08-27), `resolveDispute`
+ *   진입부에서 같은 `v1LeaguePromotion` 존재 여부를 다시 검사한다.
  * - **거부**: 상태만 바꾼다. 결과에는 아무 영향이 없다.
  *
  * 순위표에서 무효 처리된 경기를 빼는 로직은 여기에 없다 -- `voidTeamMatchResult`의
@@ -150,6 +152,24 @@ export class LeagueMatchDisputeService {
     if (dispute.status !== 'open') {
       // Task 69/73과 같은 idempotent 계약: 이미 처리된 이의는 조용히 현재 상태를 반환한다.
       return { id: dispute.id, status: dispute.status, resolution: dispute.resolution, alreadyProcessed: true };
+    }
+
+    // 감사 L-E finding 1 수정: 이 파일 위 docblock은 "승강 확정 전이라는 전제는 이미
+    // fileDispute 단계 검증이 보장한다"고 적어 두었지만, 그건 **제기 시점**에만 참이다.
+    // 이의가 열려 있는 동안 운영자가 승강을 확정(league-series-admin.service.ts의
+    // commitPromotions)할 수 있고, 그 경로는 열린 이의의 존재를 검사하지 않는다. 여기서
+    // 막지 않으면 이 아래 correctResult/applyVoid가 순위표를 바꾸는데 이미 확정된 승강
+    // 결정(V1LeaguePromotion 행)은 옛 순위 그대로 남아 두 화면이 어긋난다. 거부
+    // (rejectDispute)는 결과에 아무 영향이 없으므로 이 게이트 대상이 아니다.
+    const promotionCommitted = await this.prisma.v1LeaguePromotion.findFirst({
+      where: { fromLeagueId: dispute.leagueId },
+      select: { id: true },
+    });
+    if (promotionCommitted !== null) {
+      throw new ConflictException({
+        code: 'LEAGUE_PROMOTION_ALREADY_COMMITTED',
+        message: '승강이 이미 확정된 리그의 이의는 수락할 수 없어요. 운영팀에 문의해 주세요.',
+      });
     }
 
     if (dto.resolution === 'correction') {

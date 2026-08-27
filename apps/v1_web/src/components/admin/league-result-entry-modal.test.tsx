@@ -127,9 +127,15 @@ describe('LeagueResultEntryModal 득점·도움 기록', () => {
 
     await user.click(screen.getByRole('button', { name: '확인' }));
 
-    expect(onSubmit).toHaveBeenCalledWith(2, 1, '실측 결과 입력', [
-      { participantId: 'p-h1', goals: 2, assists: 1 },
-    ]);
+    // 신규 입력 모드는 감사 L-E finding 4 의 5번째 인자(isForfeit)를 항상 undefined 로
+    // 보낸다 — 그 모드에는 몰수 개념이 없다(전용 몰수 처리 버튼이 담당).
+    expect(onSubmit).toHaveBeenCalledWith(
+      2,
+      1,
+      '실측 결과 입력',
+      [{ participantId: 'p-h1', goals: 2, assists: 1 }],
+      undefined,
+    );
   });
 
   it('사이드 득점 합이 팀 스코어를 넘으면 경고를 띄우고 제출을 잠근다', async () => {
@@ -178,7 +184,74 @@ describe('LeagueResultEntryModal 득점·도움 기록', () => {
 
     expect(screen.queryByText(/득점·도움 기록/)).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '확인' }));
-    expect(onSubmit).toHaveBeenCalledWith(2, 1, '실측 결과 입력', []);
+    expect(onSubmit).toHaveBeenCalledWith(2, 1, '실측 결과 입력', [], undefined);
+  });
+});
+
+// 감사 L-E finding 4(2단계): 정정 모달이 몰수 의도를 표현할 수 있어야 한다. 기본값은
+// base(직전 공식 결과)의 몰수 여부를 승계하고, 운영자가 체크박스를 건드리면 그 값이
+// onSubmit 5번째 인자(isForfeit)로 나간다. 신규 입력 모드는 체크박스 자체가 없다.
+describe('LeagueResultEntryModal 몰수 표식 (감사 L-E finding 4)', () => {
+  it('신규 입력 모드에는 몰수 체크박스가 없다', async () => {
+    const user = userEvent.setup();
+    renderModal({ mode: 'entry', participants: null });
+    await fillBaseForm(user);
+
+    expect(screen.queryByLabelText('이 결과는 몰수예요')).not.toBeInTheDocument();
+  });
+
+  it('currentIsForfeit=true 인 정정을 열면 체크박스가 켜진 채 시작하고, 건드리지 않고 제출하면 true 로 나간다', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderModal({
+      mode: 'correction',
+      currentHomeScore: 1,
+      currentAwayScore: 0,
+      currentIsForfeit: true,
+      participants: { ...PARTICIPANTS, currentStats: [] },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const checkbox = screen.getByLabelText('이 결과는 몰수예요');
+    expect(checkbox).toBeChecked();
+
+    await user.type(screen.getByLabelText(/사유/), '몰수팀 재확인 후 스코어 정정');
+    await user.click(screen.getByRole('button', { name: '확인' }));
+
+    expect(onSubmit).toHaveBeenCalledWith(1, 0, '몰수팀 재확인 후 스코어 정정', [], true);
+  });
+
+  it('currentIsForfeit=true 인 정정에서 운영자가 체크박스를 해제하면 false 로 나간다 (오지정 몰수 해제 경로)', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderModal({
+      mode: 'correction',
+      currentHomeScore: 0,
+      currentAwayScore: 1,
+      currentIsForfeit: true,
+      participants: { ...PARTICIPANTS, currentStats: [] },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const checkbox = screen.getByLabelText('이 결과는 몰수예요');
+    expect(checkbox).toBeChecked();
+    await user.click(checkbox);
+    expect(checkbox).not.toBeChecked();
+
+    await user.type(screen.getByLabelText(/사유/), '몰수팀을 반대로 지정한 오류를 정정');
+    await user.click(screen.getByRole('button', { name: '확인' }));
+
+    expect(onSubmit).toHaveBeenCalledWith(0, 1, '몰수팀을 반대로 지정한 오류를 정정', [], false);
+  });
+
+  it('currentIsForfeit 미지정인 정정은 체크박스가 꺼진 채 시작한다', async () => {
+    renderModal({
+      mode: 'correction',
+      currentHomeScore: 2,
+      currentAwayScore: 1,
+      participants: { ...PARTICIPANTS, currentStats: [] },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(screen.getByLabelText('이 결과는 몰수예요')).not.toBeChecked();
   });
 });
 
@@ -202,7 +275,9 @@ describe('LeagueResultEntryModal 정정 프리필·본문 높이 (F5)', () => {
     await user.type(screen.getByLabelText(/사유/), '득점자만 정정해요');
     await user.click(screen.getByRole('button', { name: '확인' }));
 
-    expect(onSubmit).toHaveBeenCalledWith(2, 1, '득점자만 정정해요', []);
+    // 정정 모드는 5번째 인자로 몰수 체크박스 값을 싣는다 — currentIsForfeit 을 넘기지
+    // 않았으므로(위 renderModal 호출) 기본값 false 로 승계된다(감사 L-E finding 4).
+    expect(onSubmit).toHaveBeenCalledWith(2, 1, '득점자만 정정해요', [], false);
   });
 
   it('열려 있는 동안 props 가 다시 들어와도 운영자가 고친 스코어를 덮지 않는다', async () => {

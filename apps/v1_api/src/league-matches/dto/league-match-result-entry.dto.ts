@@ -2,6 +2,7 @@ import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
+  IsBoolean,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -87,6 +88,25 @@ export class RecordLeagueResultDto {
   @IsNotEmpty()
   @MaxLength(500)
   reason!: string;
+
+  /**
+   * 감사 L-E finding 4 수정 — **정정(`correctResult`) 경로에서만 의미가 있다.**
+   * 신규 입력(`recordResult`)은 무시한다(몰수 입력은 별도의 몰수 처리 엔드포인트가
+   * 전담한다). 이 정정이 확정한 결과가 몰수인지 운영자가 명시적으로 선언한다:
+   *
+   * | 값 | 뜻 |
+   * |---|---|
+   * | 미전송(`undefined`) | base(직전) 리비전의 몰수 여부를 그대로 승계 |
+   * | `true` | 이 정정 결과를 몰수로 표시(순위표·상세에 "몰수" 뱃지) |
+   * | `false` | 이 정정 결과에서 몰수 표식을 명시적으로 해제(오지정된 몰수를 바로잡을 때) |
+   *
+   * 미지정 시 승계가 기본값인 이유: 이의(dispute) 수락이 이 DTO를 재사용하는 경로
+   * (`league-match-dispute.service.ts`)는 몰수 의도를 물을 화면이 없다 — 승계를
+   * 기본값으로 둬야 정당한 몰수 경기의 이의를 정정으로 처리해도 표식이 사라지지 않는다.
+   */
+  @IsOptional()
+  @IsBoolean()
+  isForfeit?: boolean;
 
   /** 선수별 득점·도움 (선택). 한 대진 양 팀 로스터 합보다 넉넉한 60명 상한. */
   @IsOptional()

@@ -5,6 +5,7 @@ import {
   V1_SESSION_COOKIE_NAME,
 } from '../auth/v1-session';
 import { GameBroadcastRegistry } from '../games/game-broadcast.registry';
+import { GameTakeoverService } from '../games/game-takeover.service';
 import { GamesService } from '../games/games.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { TournamentStaffAccessService } from '../tournaments/staff/tournament-staff-access.service';
@@ -108,6 +109,7 @@ describe('Task 8 realtime authenticated pre-connect handshake', () => {
         { provide: GamesService, useValue: gamesService },
         { provide: getLoggerToken(RealtimeGateway.name), useValue: logger },
         { provide: GameBroadcastRegistry, useValue: { register: jest.fn(), emitToGame: jest.fn() } },
+        { provide: GameTakeoverService, useValue: { isSuperseded: jest.fn().mockReturnValue(false) } },
       ],
     }).compile();
     gateway = moduleRef.get(RealtimeGateway);

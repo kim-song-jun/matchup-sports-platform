@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { V1GameSourceType } from '@prisma/client';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
+import { BENCH_MARKER, GOALKEEPER_MARKER } from '../team-matches/team-match-lineup.service';
 import { parseLineupCatalog } from '../tournaments/competition-config/competition-config.parse';
 import { assertTeamLineupManager } from './team-lineup-access';
 
@@ -131,9 +132,20 @@ export class TeamLineupHistoryService {
       // 참가자가 없는 라인업은 목록에 올리지 않는다 — 불러와도 얻을 게 없는 빈 초안이다.
       if (rows.length === 0) continue;
 
-      const goalkeeperCode = goalkeeperCodeByConfigId.get(game.competitionConfigVersionId) ?? 'GK';
       const opponent = game.sides.find((side) => side.id !== lineup.sideId) ?? null;
       const isTournament = game.sourceType === V1GameSourceType.TOURNAMENT_FIXTURE;
+      // 두 쓰기 경로가 서로 다른 계약으로 이 컬럼들을 채운다:
+      //  - 대회 경기(GamesService.saveLineup)는 `started` 컬럼을 그대로 쓰고, 골키퍼는
+      //    종목 사전 코드(축구 'GK', 풋살 'GOLEIRO' 등)로 저장한다.
+      //  - 팀 매치(TeamMatchLineupService)는 `started`를 아예 쓰지 않아(항상 기본값
+      //    true) position === BENCH_MARKER('BENCH')가 유일한 선발/후보 신호이고,
+      //    골키퍼는 종목과 무관하게 항상 GOALKEEPER_MARKER('GK') sentinel이다.
+      // 소스별로 맞는 계약을 골라 읽지 않으면(예: `started` 컬럼만 믿기) 팀 매치
+      // 라인업을 불러올 때 후보 전원이 선발로 뒤집히고, 풋살 팀 매치는 골키퍼 지정이
+      // 통째로 사라진다.
+      const goalkeeperCode = isTournament
+        ? goalkeeperCodeByConfigId.get(game.competitionConfigVersionId) ?? 'GK'
+        : GOALKEEPER_MARKER;
       const tournamentName = game.tournamentFixture?.tournament.title ?? null;
       // round는 자유 문자열 표시 라벨이고 한글·영문이 섞여 저장돼 있다("8강", "Round 1").
       // 파싱하거나 순서를 추론하지 않고 그대로 이어 붙이기만 한다.
@@ -154,20 +166,30 @@ export class TeamLineupHistoryService {
           ? game.tournamentFixture?.tournament.sport?.name ?? null
           : game.teamMatch?.sport?.name ?? null,
         formation: lineup.formation,
-        starterCount: rows.filter((row) => row.started).length,
-        benchCount: rows.filter((row) => !row.started).length,
-        participants: rows.map((row) => ({
-          userId: row.userId,
-          displayName: row.displayNameSnapshot,
-          jerseyNumber: row.jerseyNumber,
-          // 골키퍼는 종목마다 다른 코드로 저장돼 있다(축구 'GK', 풋살 'GOLEIRO').
-          // 클라이언트가 종목 사전을 다시 해석하지 않도록 여기서 boolean으로 풀어 준다.
-          goalkeeper: row.position === goalkeeperCode,
-          position: row.position === goalkeeperCode ? null : row.position,
-          positionX: row.positionX,
-          positionY: row.positionY,
-          started: row.started,
-        })),
+        starterCount: rows.filter((row) => (isTournament ? row.started : row.position !== BENCH_MARKER)).length,
+        benchCount: rows.filter((row) => (isTournament ? !row.started : row.position === BENCH_MARKER)).length,
+        participants: rows.map((row) => {
+          // 팀 매치 소스는 `started` 컬럼을 쓰지 않으므로(위 주석) position 자체가
+          // 선발/후보 판정 근거다 — BENCH_MARKER 는 실제 포지션이 아니므로 화면에
+          // "BENCH"라는 라벨로 노출되지 않도록 null로 지운다.
+          const started = isTournament ? row.started : row.position !== BENCH_MARKER;
+          const isGoalkeeper = row.position === goalkeeperCode;
+          const isBenchSentinel = !isTournament && row.position === BENCH_MARKER;
+          return {
+            userId: row.userId,
+            displayName: row.displayNameSnapshot,
+            jerseyNumber: row.jerseyNumber,
+            // 골키퍼는 종목마다 다른 코드로 저장돼 있다(축구 'GK', 풋살 'GOLEIRO') —
+            // 대회 경기는 그 사전 코드와, 팀 매치는 항상 GOALKEEPER_MARKER('GK')와
+            // 비교한다(위 goalkeeperCode 분기). 클라이언트가 종목 사전을 다시 해석하지
+            // 않도록 여기서 boolean으로 풀어 준다.
+            goalkeeper: isGoalkeeper,
+            position: isGoalkeeper || isBenchSentinel ? null : row.position,
+            positionX: row.positionX,
+            positionY: row.positionY,
+            started,
+          };
+        }),
       });
     }
 

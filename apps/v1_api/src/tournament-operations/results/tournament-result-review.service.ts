@@ -366,6 +366,11 @@ export class TournamentResultReviewService {
             eventsHash: dto.eventsHash,
             missingScorer,
             mvpParticipantId: dto.mvpParticipantId,
+            // 몰수·중단 표식과 사유를 승계한다. 빠뜨리면 기본값 NORMAL 로 떨어져 몰수로
+            // 끝난 경기가 재제출 한 번에 정상 종료로 둔갑한다(games.service.ts의
+            // 어시스트 동기화 승계와 동일한 이유 — Copilot 리뷰 지적 재현).
+            outcomeReason: base.outcomeReason,
+            outcomeNote: base.outcomeNote,
             reason: dto.reason,
             createdByActorType: 'USER',
             createdByUserId: user.id,
@@ -615,6 +620,12 @@ export class TournamentResultReviewService {
             eventsHash: revision.eventsHash,
             missingScorer: revision.missingScorer,
             mvpParticipantId: revision.mvpParticipantId,
+            // 몰수·중단 표식과 사유를 승계한다. VOID 리비전 자체는 공개 화면에
+            // 점수를 노출하지 않지만(showOfficialResult가 state==='OFFICIAL'을
+            // 요구), 이후 VOID_REENTRY 정정이 이 리비전을 base로 승계하므로
+            // 여기서 빠뜨리면 재입력 시점에 몰수 사실이 사라진다.
+            outcomeReason: revision.outcomeReason,
+            outcomeNote: revision.outcomeNote,
             reason: dto.reason,
             createdByActorType: 'USER',
             createdByUserId: user.id,
@@ -755,6 +766,11 @@ export class TournamentResultReviewService {
             eventsHash: dto.changes.eventsHash,
             missingScorer,
             mvpParticipantId: dto.changes.mvpParticipantId,
+            // 몰수·중단 표식과 사유를 승계한다. 빠뜨리면 기본값 NORMAL 로 떨어져 몰수로
+            // 끝난 경기가 정정 한 번에 정상 종료로 둔갑한다(games.service.ts의
+            // 어시스트 동기화 승계와 동일한 이유 — Copilot 리뷰 지적 재현).
+            outcomeReason: base.outcomeReason,
+            outcomeNote: base.outcomeNote,
             reason: dto.reason,
             createdByActorType: 'USER',
             createdByUserId: user.id,

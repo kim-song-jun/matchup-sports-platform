@@ -139,8 +139,17 @@
   .tm-tournament-list-grid {
     display: grid;
     flex-direction: unset;
-    /* auto-fit: 아이템이 적을 때 빈 열이 생기지 않고 자연스럽게 collapse됨 */
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    /* auto-fit: 아이템이 적을 때 빈 열이 생기지 않고 자연스럽게 collapse됨.
+     *
+     * 최소 폭이 264px 인 이유: 768 에서 이 그리드의 실제 폭은 **560px** 다
+     * (앱 프레임 600px − 좌우 패딩). 300px 이면 2열에 300+16+300 = 616px 이
+     * 필요해 56px 이 모자라고, auto-fit 이 조용히 1열로 떨어진다 — 실제로
+     * 그렇게 배포됐다가 실측에서 잡혔다(display:grid 인데 1열).
+     *
+     * 264px 은 2열에 544px 이라 16px 여유가 있다. 272px 이면 정확히 560px 로
+     * 딱 맞는데, 패딩이 1px만 늘어도 다시 1열이 되므로 쓰지 않는다.
+     * 1024(976px)·1440(1040px)에서는 264px 로도 3열이 유지된다. */
+    grid-template-columns: repeat(auto-fit, minmax(264px, 1fr));
     gap: 16px;
     /* 카드 하단 라인을 맞추기 위해 stretch 적용 */
     align-items: stretch;

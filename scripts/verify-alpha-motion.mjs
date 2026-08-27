@@ -17,6 +17,9 @@ const BASE = process.env.ALPHA_BASE ?? 'https://alpha.teameet.co.kr';
 
 const browser = await chromium.launch();
 const results = [];
+// 중간에 던져도 Chromium 을 남기지 않는다 — 하네스가 프로세스를 흘리면
+// 반복 실행에서 호스트가 잠식된다.
+try {
 
 /** 폭별로 시트 퇴장 애니메이션을 잰다 — 모바일/데스크탑이 서로 다른 축이어야 한다. */
 for (const [label, width, wantName] of [
@@ -28,7 +31,10 @@ for (const [label, width, wantName] of [
   await page.waitForTimeout(2200);
   const got = await page.evaluate(() => {
     const d = document.createElement('div');
-    d.className = 'tm-notification-sheet-backdrop';
+    // is-closing 을 반드시 붙인다. 안 붙이면 진입 규칙(0.18s normal)을 재고
+    // 퇴장이라 부르게 된다 — 이 앱에서는 두 값이 우연히 같아 결론이 맞았지만,
+    // 값이 갈리는 순간 조용히 틀린 답을 낸다.
+    d.className = 'tm-notification-sheet-backdrop is-closing';
     d.innerHTML = '<div class="tm-notification-sheet is-closing">x</div>';
     document.body.appendChild(d);
     const sheet = d.querySelector('.tm-notification-sheet');
@@ -40,6 +46,7 @@ for (const [label, width, wantName] of [
       direction: cs.animationDirection,
       backdropName: bs.animationName,
       backdropDuration: bs.animationDuration,
+      backdropDirection: bs.animationDirection,
     };
     d.remove();
     return r;
@@ -51,13 +58,14 @@ for (const [label, width, wantName] of [
     got.name === wantName &&
     got.duration === '0.22s' &&
     got.direction === 'reverse' &&
-    got.backdropDuration === '0.22s';
+    got.backdropDuration === '0.22s' &&
+    got.backdropDirection === 'reverse';
   results.push({
     label,
     status: resp?.status() ?? 0,
     ok,
     got,
-    want: `${wantName} / 0.22s / reverse · backdrop 0.22s`,
+    want: `${wantName} / 0.22s / reverse · backdrop 0.22s reverse`,
   });
   await page.close();
 }
@@ -131,7 +139,9 @@ for (const [label, width, wantName] of [
   await page.close();
 }
 
-await browser.close();
+} finally {
+  await browser.close();
+}
 
 let failed = 0;
 for (const r of results) {

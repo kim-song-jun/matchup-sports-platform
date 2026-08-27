@@ -4078,6 +4078,19 @@ label.tm-btn:focus-within {
   animation: tm-filter-sheet-up 0.22s ease-out;
 }
 
+/* [모션] 진입만 있고 퇴장이 없어 닫을 때 뚝 끊겼다. 진입과 대칭으로 되돌린다.
+ * duration 은 useDelayedUnmount(open, 220) 의 값과 **같아야 한다** — 짧으면
+ * 애니메이션이 잘리고 길면 빈 화면이 남는다. 바꿀 땐 양쪽을 함께 바꾼다.
+ * 전역 reduced-motion 캐치올이 duration 을 0.01ms 로 만들고, 훅도 지연을 0 으로
+ * 낮춘다 — CSS 만으로는 훅의 setTimeout 이 사라지지 않는다. */
+.tm-notification-sheet-backdrop.is-closing {
+  animation: tm-filter-scrim-fade 0.18s ease-in reverse both;
+}
+
+.tm-notification-sheet.is-closing {
+  animation: tm-filter-sheet-up 0.22s ease-in reverse both;
+}
+
 .tm-notification-sheet-grabber {
   width: 42px;
   height: 4px;
@@ -4119,6 +4132,16 @@ label.tm-btn:focus-within {
     border-radius: var(--radius-hero);
     box-shadow: 0 8px 32px rgba(20, 28, 45, 0.14);
     animation: fade-in 0.18s ease-out;
+  }
+
+  /* 퇴장도 진입과 같은 축이어야 한다. 기본(.is-closing)은 하단 시트용
+   * 슬라이드다운(translateY 100%)이라, 중앙 다이얼로그에 그대로 걸리면
+   * **화면 아래로 날아간다.** 여기서는 진입과 같은 fade 를 되감는다. */
+  .tm-notification-sheet.is-closing {
+    /* 0.22s 는 진입(0.18s)보다 길지만 **훅의 지연과 맞추는 쪽**이 맞다.
+     * 0.18s 로 두면 데스크탑에서 애니메이션이 끝난 뒤 40ms 동안 화면엔 아무것도
+     * 없는데 포커스 트랩·스크롤 잠금·클릭 차단만 남는 구간이 생긴다. */
+    animation: fade-in 0.22s ease-in reverse both;
   }
 
   .tm-notification-sheet-grabber {

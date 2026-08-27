@@ -268,8 +268,16 @@ export function resolvePromotionRule(raw: unknown): PromotionRule {
  * computedKind 와 어드민이 보고 결정한 옛 값이 달라져 **손대지도 않은 팀이
  * overriddenByAdmin=true 로 박제된다**(alpha 실측: 수정 0건인데 overriddenCount=2).
  * 감사 추적이 목적인 필드가 감사할 수 없는 값이 되는 셈이다.
+ *
+ * `tierCount` 도 같은 이유로 지문에 포함한다 — `calculatePromotions`는 `rule` 뿐 아니라
+ * `tierCount`도 입력으로 받아 `tier < tierCount`(canRelegate)로 computedKind 를 직접
+ * 바꾼다(예: 2티어 최하위가 3티어로 늘면서 강등 대상이 된다). rule 자체는 그대로라
+ * 기존 지문(= rule 만 해시)은 이 변경을 못 잡았다 — tierCount 를 여기 포함해야 preview~commit
+ * 사이 티어 수가 바뀐 경우도 규칙 변경과 동일하게 PROMOTION_RULE_CHANGED 로 잡힌다.
+ * 두 번째 인자를 생략하면(기존 호출부·테스트) rule 만 해시하던 이전 동작을 그대로 유지한다 —
+ * 실제 서비스 호출부(preview·commit)는 항상 series.tierCount 를 함께 넘긴다.
  */
-export function promotionRuleFingerprint(rule: PromotionRule): string {
+export function promotionRuleFingerprint(rule: PromotionRule, tierCount?: number): string {
   // JSON.stringify 는 키 삽입 순서를 그대로 쓰므로 같은 규칙도 다른 문자열이 될 수 있다.
   // 키를 정렬해 정규화한 뒤 해시한다.
   const canonical = (value: unknown): unknown => {
@@ -282,7 +290,8 @@ export function promotionRuleFingerprint(rule: PromotionRule): string {
         .map(([k, v]) => [k, canonical(v)]),
     );
   };
-  return createHash('sha256').update(JSON.stringify(canonical(rule))).digest('hex');
+  const payload = tierCount === undefined ? canonical(rule) : { rule: canonical(rule), tierCount };
+  return createHash('sha256').update(JSON.stringify(payload)).digest('hex');
 }
 
 /**

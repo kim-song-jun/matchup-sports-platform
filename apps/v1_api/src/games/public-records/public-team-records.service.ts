@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import type { V1VisibilityMode } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   isMinuteUnknown,
@@ -11,6 +12,7 @@ import {
 import { TeamRecordsQueryDto } from './dto/public-records-query.dto';
 import { decodeRecordCursor, encodeRecordCursor, type RecordCursor } from './public-cursor';
 import { loadParticipantConsentEligibility, type ParticipantConsentEligibility } from './public-consent';
+import { effectivePublicVisibilityMode } from './public-visibility';
 import {
   byUnknownLast,
   isTournamentParticipantNameGatingReverted,
@@ -49,6 +51,8 @@ interface TeamRecordFactRow {
       readonly teamMatchId: string | null;
       readonly sides: readonly GameSideRow[];
       readonly participants: readonly GameParticipantRow[];
+      /** finding #40 -- 정책 row 가 없는 경기는 fail-closed 로 hidden 취급한다 (형제 서비스와 동일). */
+      readonly visibilityPolicy: { readonly mode: V1VisibilityMode } | null;
     };
   };
 }
@@ -85,6 +89,15 @@ type TeamRecordEventRow = {
  * `./participant-name-gating`에서 공유한다(D-03의 "팀 집계는 동의 무관하게
  * 공개"와는 별개 축: 그건 goalsFor/goalsAgainst 같은 *집계 숫자*에만 적용되고,
  * *득점자 실명*은 대회 기록과 동일하게 게이팅된다).
+ *
+ * **감사 finding #40 수정**: 위 문단은 원래 "이 화면의 유일한 프라이버시 규칙은
+ * 현재 공식 리비전 규칙뿐"이라고 적어 D-06(`V1GameVisibilityPolicy` ->
+ * `effectivePublicVisibilityMode`) 게이팅을 아예 빠뜨리고 있었다. 형제 서비스
+ * (`public-tournament-records.service.ts`의 `getMatch`/`getLeagueFixtureRecord`)는
+ * 이 게이팅을 항상 적용한다 -- `mode==='hidden'`이면 그 경기를 목록/집계에서
+ * 완전히 제외하고, `mode==='status_only'`면 스코어·승부차기·이벤트만 가리고
+ * 팀명/일자 같은 lifecycle 정보는 그대로 남긴다. 이 파일도 동일 규칙을
+ * `rowVisibilityMode`(아래)로 통일한다.
  */
 @Injectable()
 export class PublicTeamRecordsService {
@@ -103,6 +116,12 @@ export class PublicTeamRecordsService {
     const cursor = decodeRecordCursor(query.cursor);
     const seasonRange = seasonBounds(query.season);
 
+    // finding #40: mode 계산은 페이지 쿼리보다 먼저 필요하다 -- `fetchSummary`의
+    // raw SQL 집계가 hidden/status_only 경기를 승-무-패·득실 합산에서 빼야 하므로
+    // (랭킹 필터와 동일 이유, participant-name-gating 문서 참고) 그 쿼리에도
+    // `publicLiveEnabled`를 넘겨야 한다.
+    const publicLiveEnabled = await this.isPublicLiveEnabled();
+
     // 집계(summary/byType)는 `type` 필터와 무관하게 항상 전체 기준이다 -- 필터는
     // items 목록에만 적용된다(과제 지시: "페이지네이션과 집계를 섞지 마라"). 종류별
     // 뱃지·탭을 동시에 보여주려면 요약이 필터에 따라 흔들리면 안 된다.
@@ -112,7 +131,7 @@ export class PublicTeamRecordsService {
     // 줄어들면 안 된다(그 시즌만 있는 것처럼 보이는 함정).
     const [rawFacts, summary, availableSeasons] = await Promise.all([
       this.fetchRawFacts(teamId, limit, cursor, seasonRange, query.type),
-      this.fetchSummary(teamId, seasonRange),
+      this.fetchSummary(teamId, seasonRange, publicLiveEnabled),
       this.fetchAvailableSeasons(teamId),
     ]);
 
@@ -122,15 +141,27 @@ export class PublicTeamRecordsService {
       (row) => row.resultRevision.game.currentOfficialRevisionId === row.revisionId,
     );
 
+    // finding #40: 형제 공개 라우트(public-tournament-records.service.ts)와 동일한
+    // hidden -> status_only -> live/official_only 우선순위(D-06). 정책 row 가
+    // 없으면 fail-closed 로 'HIDDEN' 취급한다(`effectivePublicVisibilityMode`).
+    const rowVisibilityMode = (row: TeamRecordFactRow) =>
+      effectivePublicVisibilityMode(row.resultRevision.game.visibilityPolicy?.mode ?? 'HIDDEN', publicLiveEnabled);
+    // hidden 경기는 존재 자체를 숨긴다 -- 목록에서 완전히 제외.
+    const visibleRows = currentRows.filter((row) => rowVisibilityMode(row) !== 'hidden');
+    // status_only 경기는 팀명/일자 같은 lifecycle 정보는 보여주되 스코어·이벤트는
+    // 가린다 -- 아래 events 배치 조회 대상에서부터 제외해 애초에 이벤트가 만들어지지
+    // 않게 한다(형제 서비스의 `mode === 'status_only' ? [] : buildEvents(...)`와 동일).
+    const scoredRows = visibleRows.filter((row) => rowVisibilityMode(row) !== 'status_only');
+
     const opponentTeamIds = Array.from(
-      new Set(currentRows.map((row) => row.opponentTeamId).filter((id): id is string => id !== null)),
+      new Set(visibleRows.map((row) => row.opponentTeamId).filter((id): id is string => id !== null)),
     );
     const tournamentIds = Array.from(
-      new Set(currentRows.map((row) => row.tournamentId).filter((id): id is string => id !== null)),
+      new Set(visibleRows.map((row) => row.tournamentId).filter((id): id is string => id !== null)),
     );
     const teamMatchIds = Array.from(
       new Set(
-        currentRows
+        visibleRows
           .map((row) => row.resultRevision.game.teamMatchId)
           .filter((id): id is string => id !== null),
       ),
@@ -155,7 +186,7 @@ export class PublicTeamRecordsService {
             where: { id: { in: teamMatchIds } },
             select: { id: true, leagueId: true },
           }),
-      this.loadEvents(currentRows, teamId),
+      this.loadEvents(scoredRows, teamId),
     ]);
     const opponentNameById = new Map(opponentTeams.map((row) => [row.id, row.name]));
     const opponentLogoById = new Map(opponentTeams.map((row) => [row.id, row.profile?.logoUrl ?? null]));
@@ -170,9 +201,13 @@ export class PublicTeamRecordsService {
         : await this.prisma.v1League.findMany({ where: { id: { in: leagueIds } }, select: { id: true, title: true } });
     const leagueTitleById = new Map(leagues.map((row) => [row.id, row.title]));
 
-    const items = currentRows.map((row) => {
+    const items = visibleRows.map((row) => {
       const teamMatchId = row.resultRevision.game.teamMatchId;
       const leagueId = teamMatchId === null ? null : (leagueIdByTeamMatchId.get(teamMatchId) ?? null);
+      // finding #40: status_only 는 이 경기가 있었다는 사실(팀명·대회·일자)은 보여주되
+      // 스코어·승부차기·이벤트는 형제 서비스의 `getMatch`(mode==='status_only' ? null : ...)
+      // 와 동일하게 가린다.
+      const isStatusOnly = rowVisibilityMode(row) === 'status_only';
       return {
         gameId: row.gameId,
         // exactly-one-source: a game is either tournament-sourced (tournamentId set) or
@@ -186,13 +221,15 @@ export class PublicTeamRecordsService {
         opponentTeamId: row.opponentTeamId,
         opponentTeamName: row.opponentTeamId === null ? null : (opponentNameById.get(row.opponentTeamId) ?? null),
         opponentTeamLogoUrl: row.opponentTeamId === null ? null : (opponentLogoById.get(row.opponentTeamId) ?? null),
-        result: row.result,
+        result: isStatusOnly ? null : row.result,
         // 정규시간 스코어 그대로 -- 승부차기로 덮어쓰지 않는다(계약). 승부차기는 아래
         // penalties 필드에서 별도로 실린다.
-        goalsFor: row.goalsFor,
-        goalsAgainst: row.goalsAgainst,
-        penalties: resolveTeamPenalties(row.resultRevision.score, row.resultRevision.game.sides, teamId),
-        events: eventsByGameId.get(row.gameId) ?? [],
+        goalsFor: isStatusOnly ? null : row.goalsFor,
+        goalsAgainst: isStatusOnly ? null : row.goalsAgainst,
+        penalties: isStatusOnly
+          ? null
+          : resolveTeamPenalties(row.resultRevision.score, row.resultRevision.game.sides, teamId),
+        events: isStatusOnly ? [] : (eventsByGameId.get(row.gameId) ?? []),
         playedAt: row.playedAt.toISOString(),
       };
     });
@@ -221,10 +258,25 @@ export class PublicTeamRecordsService {
    * 남기지 않는다). 내림차순(최신 시즌 먼저) -- 드롭다운 첫 항목이 최근 시즌이 되도록.
    */
   private async fetchAvailableSeasons(teamId: string): Promise<readonly string[]> {
+    // finding #21: `played_at`(TIMESTAMP(3), without time zone)에는 UTC 벽시계 값이
+    // 그대로 저장된다. 화면(`formatTournamentDateShort`)은 브라우저 로컬(KST)로
+    // 날짜를 렌더하므로, 연도 집계도 KST 캘린더 연도 기준이어야 화면에서 보는
+    // 날짜와 시즌 드롭다운이 어긋나지 않는다. `AT TIME ZONE 'UTC'`로 저장된 값을
+    // 먼저 진짜 UTC 인스턴트로 인식시킨 뒤 `AT TIME ZONE 'Asia/Seoul'`로 KST
+    // 벽시계 값으로 변환한다(Postgres의 이중 AT TIME ZONE 관용구).
     const rows = await this.prisma.$queryRaw<{ readonly season: string }[]>(Prisma.sql`
-      SELECT DISTINCT to_char(trf.played_at, 'YYYY') AS season
+      SELECT DISTINCT to_char(trf.played_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul', 'YYYY') AS season
       FROM v1_team_record_facts trf
       INNER JOIN v1_games g ON g.id = trf.game_id AND g.current_official_revision_id = trf.revision_id
+      -- 목록 본문은 hidden 경기를 통째로 빼는데(위 visibleRows) 시즌 후보만 빼지 않으면,
+      -- 그 해 경기가 전부 hidden 인 시즌이 드롭다운에 남아 "고르면 빈 목록"이 된다 —
+      -- 숨긴 경기의 존재 자체를 드러내는 간접 노출이다. 정책 row 가 없는 경기는
+      -- effectivePublicVisibilityMode 와 같은 기준으로 fail-closed(=hidden) 취급해야
+      -- 하므로 INNER JOIN 이고, 미래에 enum 값이 추가돼도 새 값이 조용히 노출되지
+      -- 않도록 부정(<> 'HIDDEN')이 아니라 허용 목록으로 적는다.
+      INNER JOIN v1_game_visibility_policies vp
+        ON vp.game_id = g.id
+       AND vp.mode IN ('LIVE', 'STATUS_ONLY', 'OFFICIAL_ONLY')
       WHERE trf.team_id = ${teamId}
       ORDER BY season DESC
     `);
@@ -299,6 +351,9 @@ export class PublicTeamRecordsService {
                 // 이벤트 요약(loadEvents)이 이름/등번호를 붙이는 데 쓴다 -- 이미 같은
                 // 메인 쿼리로 불러오므로 gameId별 추가 조회가 필요 없다(N+1 금지).
                 participants: { select: { id: true, sideId: true, userId: true, displayNameSnapshot: true, jerseyNumber: true } },
+                // finding #40: 공개 표면 게이팅(D-06) -- 형제 서비스와 동일하게
+                // 이 경기가 hidden/status_only 인지 판정하는 데 쓴다.
+                visibilityPolicy: { select: { mode: true } },
               },
             },
           },
@@ -498,6 +553,7 @@ export class PublicTeamRecordsService {
   private async fetchSummary(
     teamId: string,
     seasonRange: { readonly gte: Date; readonly lt: Date } | null,
+    publicLiveEnabled: boolean,
   ): Promise<{
     played: number;
     won: number;
@@ -526,9 +582,14 @@ export class PublicTeamRecordsService {
         COALESCE(SUM(trf.goals_against), 0)::int AS "goalsAgainst"
       FROM v1_team_record_facts trf
       INNER JOIN v1_games g ON g.id = trf.game_id AND g.current_official_revision_id = trf.revision_id
+      -- finding #40: 랭킹 필터(getPlayerRecords, 241-250줄)와 동일한 규칙 --
+      -- hidden(정책 row 없음 포함, fail-closed)·status_only 경기는 승-무-패·득실
+      -- 합산에서도 빼야 한다. 그 값 자체가 숨긴 경기의 결과를 간접 노출하기 때문.
+      INNER JOIN v1_game_visibility_policies vp ON vp.game_id = g.id
       LEFT JOIN v1_team_matches tm ON tm.id = g.team_match_id
       WHERE trf.team_id = ${teamId}
       ${seasonSql}
+      AND (vp.mode = 'OFFICIAL_ONLY' OR (vp.mode = 'LIVE' AND ${publicLiveEnabled}))
       GROUP BY category
     `);
 
@@ -558,6 +619,23 @@ export class PublicTeamRecordsService {
     }
 
     return { ...overall, byType };
+  }
+
+  /**
+   * finding #40: D-06 게이팅의 런타임 축(`PUBLIC_LIVE` 운영 킬스위치) --
+   * `public-tournament-records.service.ts`의 동일 이름 private 메서드와 완전히
+   * 같은 조회다. 플래그 row 가 없으면(마이그레이션에 seed 가 없다) fail-closed 로
+   * off 취급한다 -- `effectivePublicVisibilityMode`가 그 경우 LIVE 를 status_only 로
+   * 강등시킨다. 두 서비스가 공유 가능한 헬퍼로 뽑혀 있지 않은 이유는 이 배치의
+   * 수정 범위가 이 파일 하나로 한정돼 있기 때문(needsOwnerElsewhere 참고) --
+   * `public-visibility.ts`에 옮기는 리팩터는 별도 후속 작업이다.
+   */
+  private async isPublicLiveEnabled(): Promise<boolean> {
+    const flag = await this.prisma.v1GameOperationFlag.findUnique({
+      where: { key: 'PUBLIC_LIVE' },
+      select: { value: true },
+    });
+    return flag?.value === 'on';
   }
 }
 
@@ -599,11 +677,23 @@ function resolveTeamPenalties(
     : { for: score.awayPenaltyScore, against: score.homePenaltyScore };
 }
 
+/** KST(UTC+9)는 서머타임이 없어 연중 상수 오프셋 -- `fetchAvailableSeasons`의 이중 `AT TIME ZONE` 변환과 짝을 이루는 상수. */
+const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+
+/**
+ * finding #21: `season`(KST 캘린더 연도 문자열)의 경계를 그 연도의 KST 자정
+ * 인스턴트로 계산한 뒤, `played_at`(TIMESTAMP(3) without time zone -- UTC 벽시계
+ * 값이 그대로 저장됨)과 직접 비교 가능하도록 UTC 로 변환한다. 이전 코드는
+ * `Date.UTC(year,0,1,...)`를 그대로 썼는데, 이는 "UTC 1/1 00:00"을 경계로 삼는
+ * 것이라 KST 1/1 00:00~08:59 에 킥오프한 경기가 전년도 UTC 값(예: 2027 KST 1/1
+ * 08:00 킥오프 -> 저장값 2026-12-31 23:00)을 갖게 되어 화면(브라우저 로컬=KST
+ * 렌더)이 보여주는 연도와 시즌 필터가 어긋났다(`formatTournamentDateShort`).
+ */
 function seasonBounds(season: string | undefined): { readonly gte: Date; readonly lt: Date } | null {
   if (season === undefined) return null;
   const year = Number.parseInt(season, 10);
   return {
-    gte: new Date(Date.UTC(year, 0, 1, 0, 0, 0, 0)),
-    lt: new Date(Date.UTC(year + 1, 0, 1, 0, 0, 0, 0)),
+    gte: new Date(Date.UTC(year, 0, 1, 0, 0, 0, 0) - KST_OFFSET_MS),
+    lt: new Date(Date.UTC(year + 1, 0, 1, 0, 0, 0, 0) - KST_OFFSET_MS),
   };
 }

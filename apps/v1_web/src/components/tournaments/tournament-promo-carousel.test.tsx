@@ -77,6 +77,48 @@ describe('TournamentPromoCarousel', () => {
     expect(screen.getByRole('button', { name: '다시 불러오기' })).toBeInTheDocument();
   });
 
+  /* WCAG 2.2.2(Pause, Stop, Hide) — 5초 자동 전환에 정지 수단이 없던 결함.
+     마우스 hover 만으로 멈출 수 있어야 한다(포커스 없이도). */
+  it('마우스가 캐러셀 위에 있는 동안은 자동 전환을 멈춘다', () => {
+    vi.useFakeTimers();
+    render(<TournamentPromoCarousel items={[promo('first', 30), promo('second', 20)]} />);
+
+    const body = screen.getByText('1 / 2').closest('.tm-tournament-promo-carousel-body') as HTMLElement;
+    fireEvent.mouseEnter(body);
+    act(() => vi.advanceTimersByTime(10_000));
+    expect(screen.getByText('1 / 2')).toBeInTheDocument();
+
+    fireEvent.mouseLeave(body);
+    act(() => vi.advanceTimersByTime(5_000));
+    expect(screen.getByText('2 / 2')).toBeInTheDocument();
+  });
+
+  it('명시적 정지 토글 버튼을 누르면 마우스를 치워도 자동 전환이 멈춘 채로 유지된다', () => {
+    vi.useFakeTimers();
+    render(<TournamentPromoCarousel items={[promo('first', 30), promo('second', 20)]} />);
+
+    const pauseButton = screen.getByRole('button', { name: '자동 전환 멈추기' });
+    fireEvent.click(pauseButton);
+    act(() => vi.advanceTimersByTime(10_000));
+    expect(screen.getByText('1 / 2')).toBeInTheDocument();
+
+    const resumeButton = screen.getByRole('button', { name: '자동 전환 다시 시작' });
+    expect(resumeButton).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(resumeButton);
+    act(() => vi.advanceTimersByTime(5_000));
+    expect(screen.getByText('2 / 2')).toBeInTheDocument();
+  });
+
+  it('캐러셀 밖에 있을 때는 aria-live를 꺼서 스크린리더가 다른 콘텐츠를 읽는 걸 방해하지 않는다', () => {
+    render(<TournamentPromoCarousel items={[promo('first', 30), promo('second', 20)]} />);
+    const liveRegion = screen.getByText('1 / 2');
+    expect(liveRegion).toHaveAttribute('aria-live', 'off');
+
+    const body = liveRegion.closest('.tm-tournament-promo-carousel-body') as HTMLElement;
+    fireEvent.mouseEnter(body);
+    expect(liveRegion).toHaveAttribute('aria-live', 'polite');
+  });
+
   it('links a promoted tournament to its published campaign when a campaign slug exists', () => {
     render(
       <TournamentPromoCarousel

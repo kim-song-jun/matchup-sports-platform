@@ -57,6 +57,7 @@ type Task8RealtimeGatewayContract = {
     readonly tournamentId: string;
     readonly assignmentVersion: number;
   }): void;
+  pingGameTime(client: ReturnType<typeof buildSocket>, payload: unknown): Promise<unknown>;
 };
 
 function buildSocket(
@@ -96,7 +97,7 @@ describe('RealtimeGateway', () => {
   let gateway: RealtimeGateway;
   const prisma = {
     v1User: { findFirst: jest.fn() },
-    v1Game: { findUnique: jest.fn() },
+    v1Game: { findUnique: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
   };
   const gamesService = { listEvents: jest.fn() };
   const server = {
@@ -252,11 +253,19 @@ describe('RealtimeGateway', () => {
           Reflect.apply(gateway.unsubscribeFromGame, gateway, [client, payload]),
         evictUserFromScopedGameRooms: (input) =>
           Reflect.apply(gateway.evictUserFromScopedGameRooms, gateway, [input]),
+        pingGameTime: (client, payload) =>
+          Reflect.apply(gateway.pingGameTime, gateway, [client, payload]),
       };
     }
 
     function resolveScopedGame() {
       prisma.v1Game.findUnique.mockResolvedValue(gameScopeRecord(GAME_SCOPE));
+      // 하트비트 재검증은 구독 게임들의 픽스처 스코프를 한 번의 findMany 로 읽는다
+      // (게임당 findUnique 를 돌리면 구독 수만큼 왕복이 늘어나서 바꿨다).
+      prisma.v1Game.findMany.mockResolvedValue([
+        gameScopeRecord(GAME_SCOPE),
+        gameScopeRecord(OTHER_GAME_SCOPE),
+      ]);
       staffAccess.assertAccess.mockResolvedValue(staffPrincipal(GAME_SCOPE));
     }
 
@@ -500,6 +509,53 @@ describe('RealtimeGateway', () => {
       expect(server.socketsLeave).toHaveBeenCalledWith(`game:${GAME_SCOPE.gameId}`);
       expect(server.socketsLeave).not.toHaveBeenCalledWith(`game:${OTHER_GAME_SCOPE.gameId}`);
       expect(server.disconnectSockets).not.toHaveBeenCalled();
+    });
+
+    // T-staff-realtime-eviction: game.subscribe 는 최초 입장 시점에만
+    // assertAccess 를 검사한다. 배정이 expiresAt 으로 만료돼도 이미 join 된
+    // 소켓을 빼내는 코드가 없으면 만료 후에도 그 경기의 방송을 계속 받는다.
+    // 클라이언트가 15초마다 보내는 game.time.ping 하트비트에 재검증이
+    // 실제로 얹혀 있는지를 이 두 테스트가 증명한다.
+    it('game.time.ping 하트비트가 만료로 거부된 배정을 감지해 그 게임 방에서만 소켓을 내보낸다', async () => {
+      const socket = await connectAuthenticatedSocket();
+      resolveScopedGame();
+      await task8Gateway().subscribeToGame(socket, { gameId: GAME_SCOPE.gameId, afterSequence: 0 });
+      expect(socket.join).toHaveBeenCalledWith(`game:${GAME_SCOPE.gameId}`);
+
+      staffAccess.assertAccess.mockRejectedValueOnce(
+        new ForbiddenException({
+          code: 'STAFF_SCOPE_DENIED',
+          message: 'Tournament staff scope is denied',
+          details: { reason: 'ASSIGNMENT_EXPIRED' },
+        }),
+      );
+
+      await task8Gateway().pingGameTime(socket, { clientSentAt: Date.now() });
+
+      expect(socket.leave).toHaveBeenCalledWith(`game:${GAME_SCOPE.gameId}`);
+      expect(socket.emit).toHaveBeenCalledWith('game.permission.revoked', {
+        gameId: GAME_SCOPE.gameId,
+        assignmentVersion: null,
+      });
+      // 재구독을 시도하면 방금 만료로 제거된 상태에서 다시 정상 판정을 받는지
+      // 확인 — 내부 gameSubscriptions 맵에서도 실제로 지워졌다는 방증.
+      staffAccess.assertAccess.mockResolvedValueOnce(staffPrincipal(GAME_SCOPE));
+      await expect(
+        task8Gateway().subscribeToGame(socket, { gameId: GAME_SCOPE.gameId, afterSequence: 0 }),
+      ).resolves.toMatchObject({ status: 'subscribed' });
+    });
+
+    it('game.time.ping 하트비트는 접근이 여전히 유효한 구독을 건드리지 않는다', async () => {
+      const socket = await connectAuthenticatedSocket();
+      resolveScopedGame();
+      await task8Gateway().subscribeToGame(socket, { gameId: GAME_SCOPE.gameId, afterSequence: 0 });
+      socket.leave.mockClear();
+      socket.emit.mockClear();
+
+      await task8Gateway().pingGameTime(socket, { clientSentAt: Date.now() });
+
+      expect(socket.leave).not.toHaveBeenCalled();
+      expect(socket.emit).not.toHaveBeenCalledWith('game.permission.revoked', expect.anything());
     });
   });
 });

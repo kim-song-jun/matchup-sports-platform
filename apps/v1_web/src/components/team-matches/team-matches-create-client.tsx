@@ -269,6 +269,7 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
 
 export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }) {
   const router = useRouter();
+  const { confirm, ConfirmModal } = useConfirm();
   const editQuery = useV1TeamMatchEdit(teamMatchId);
   const teams = useV1MyTeams();
   const sports = useV1MasterSports();
@@ -374,8 +375,19 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
         },
       );
     },
-    onCancel: () => {
+    onCancel: async () => {
       if (updateTeamMatch.isPending || cancelTeamMatch.isPending) return;
+      // 되돌리는 API가 없는 파괴적 동작 — 신청자 전원이 cancelled_by_host로 넘어가고
+      // 알림도 나간다. '변경사항 저장' 바로 아래 붙은 버튼이라 오탭 가능성이 높으므로
+      // 확인 없이 즉시 실행하지 않는다.
+      const ok = await confirm({
+        title: '팀매치를 취소할까요?',
+        message: '취소하면 되돌릴 수 없어요. 신청자 전원의 참가가 취소되고 취소 알림이 발송돼요.',
+        confirmLabel: '팀매치 취소',
+        tone: 'danger',
+      });
+      if (!ok) return;
+      setError(null);
       cancelTeamMatch.mutate(
         { reason: 'host_cancelled_from_v1_web' },
         {
@@ -388,7 +400,12 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
     backHref: `/team-matches/${teamMatchId}`,
   });
 
-  return <TeamMatchCreatePageView model={model} />;
+  return (
+    <>
+      <TeamMatchCreatePageView model={model} />
+      {ConfirmModal}
+    </>
+  );
 }
 
 function buildCreateModel({
@@ -534,8 +551,21 @@ function buildDefaultDraft(): TeamMatchDraft {
 }
 
 function normalizeDraftDate(draft: TeamMatchDraft): TeamMatchDraft {
-  const startsAt = new Date(`${draft.date}T${draft.startTime || '18:00'}:00`);
-  if (!Number.isNaN(startsAt.getTime()) && startsAt > new Date()) return draft;
+  // 위저드 각 스텝은 별도 라우트라 '이전'만 눌러도 이 컴포넌트가 재마운트되고, 그때마다
+  // usePersistedDraft의 useEffect가 이 함수를 다시 태운다. 시작 시간을 아직 입력하지 않은
+  // 상태(startTime === '')에서 빈 값을 18:00으로 가정해 판정하면, 저녁 18시 이후에 스텝만
+  // 왕복해도 "오늘"이 이미 지난 시각으로 오판돼 사용자가 고른 날짜가 조용히 일주일 뒤로
+  // 리셋된다(같은 세션 안의 정상 왕복인데도). 시작 시간이 아직 없으면 시:분이 아니라
+  // 날짜(당일 자정 기준) 단위로만 지난 초안인지 판단한다 — 오늘 이후는 전부 유효.
+  if (draft.startTime) {
+    const startsAt = new Date(`${draft.date}T${draft.startTime}:00`);
+    if (!Number.isNaN(startsAt.getTime()) && startsAt > new Date()) return draft;
+  } else {
+    const dateOnly = new Date(`${draft.date}T00:00:00`);
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    if (!Number.isNaN(dateOnly.getTime()) && dateOnly >= todayStart) return draft;
+  }
 
   const fallback = buildDefaultDraft();
   return {

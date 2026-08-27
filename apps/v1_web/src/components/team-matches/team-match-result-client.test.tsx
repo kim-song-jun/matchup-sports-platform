@@ -260,6 +260,25 @@ describe('TeamMatchResultPageClient — 호스트 결과 입력', () => {
     expect(screen.queryByText('결과 작성 완료')).not.toBeInTheDocument();
   });
 
+  it('친선 자가 제출 결과는 어시스트 입력란이 없으므로 골이 있어도 "어시스트 미기입" 경고를 띄우지 않는다', () => {
+    // 친선 팀매치 자가 제출 폼은 assists를 상수 0으로 고정 전송한다(입력란 자체가 없음) —
+    // countMissingAssists(totalGoals - totalAssists)를 이 화면에 그대로 적용하면 골이 있는
+    // 모든 결과에 예외 없이 경고가 뜨고, 재제출해도 절대 사라지지 않는다.
+    useV1GameResultRevisionsMock.mockReturnValue(
+      settledQuery<V1GameResultRevision[]>([
+        revision({
+          state: 'OFFICIAL',
+          officialAt: '2026-08-01T01:00:00.000Z',
+          resultParticipants: [
+            { id: 'rp-1', resultRevisionId: 'rev-1', participantId: 'p-1', sideId: 'side-home', started: true, minutesPlayed: null, goals: 3, assists: 0, fouls: 0, cards: { yellow: 0, red: 0 }, goalkeeper: false },
+          ],
+        }),
+      ]),
+    );
+    render(<TeamMatchResultPageClient teamMatchId="tm-1" />);
+    expect(screen.queryByText(/어시스트 미기입/)).not.toBeInTheDocument();
+  });
+
   it('상대팀 정정 요청(CHANGE_REQUESTED) 사유를 배너로 보여주고 재작성 폼을 연다', () => {
     useV1GameResultRevisionsMock.mockReturnValue(
       settledQuery<V1GameResultRevision[]>([revision({ state: 'CHANGE_REQUESTED', reason: '점수가 달라요' })]),
@@ -620,6 +639,24 @@ describe('TeamMatchResultApprovalPageClient — 상대팀 승인/정정 요청',
     );
     render(<TeamMatchResultApprovalPageClient teamMatchId="tm-1" />);
     expect(screen.getByText(/개인 기록·팀 전적 반영에는/)).toBeInTheDocument();
+  });
+
+  it('제출/확정 결과 모두 골이 있어도 "어시스트 미기입" 경고를 띄우지 않는다 (친선 자가 제출은 어시스트 입력란이 없음)', () => {
+    const goalsOnlyParticipants = [
+      { id: 'rp-1', resultRevisionId: 'rev-1', participantId: 'p-1', sideId: 'side-home', started: true, minutesPlayed: null, goals: 2, assists: 0, fouls: 0, cards: { yellow: 0, red: 0 }, goalkeeper: false },
+    ];
+    useV1GameResultRevisionsMock.mockReturnValue(
+      settledQuery<V1GameResultRevision[]>([
+        revision({
+          state: 'SUBMITTED',
+          score: { regulation: { home: 2, away: 1 }, penalty: null, goals: [], incomplete: false },
+          submittedAt: '2026-08-01T00:00:00.000Z',
+          resultParticipants: goalsOnlyParticipants,
+        }),
+      ]),
+    );
+    render(<TeamMatchResultApprovalPageClient teamMatchId="tm-1" />);
+    expect(screen.queryByText(/어시스트 미기입/)).not.toBeInTheDocument();
   });
 });
 

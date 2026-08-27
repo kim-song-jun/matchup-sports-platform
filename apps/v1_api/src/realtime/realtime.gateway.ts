@@ -30,7 +30,23 @@ type V1Socket = Socket & {
     authUser?: V1AuthUser;
     clientInstanceId?: string;
     authorizationSubjectVersion?: number;
+    lastStaffRevalidationAt?: number;
   };
+};
+
+/**
+ * 하트비트(15초)마다 재검증하면 구독 게임 수 × 동시 소켓 수만큼 DB 조회가 반복된다
+ * (게임당 fixture 조회 1 + assertAccess 내부 조회 2). 만료된 스태프를 쫓아내는 데
+ * 15초 해상도가 필요한 것은 아니므로 소켓당 재검증을 60초로 묶는다 — 만료 후
+ * 방송을 계속 받는 창은 최대 60초로 유지되면서(수정 전에는 무제한) 하트비트가
+ * 만드는 DB 부하는 1/4로 줄어든다.
+ */
+const STAFF_REVALIDATION_INTERVAL_MS = 60_000;
+
+type GameFixtureScope = {
+  readonly tournamentId: string;
+  readonly fixtureId: string;
+  readonly fieldId: string | null;
 };
 
 type GameBackfill = {
@@ -395,6 +411,21 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       serverSentAt: Date.now(),
     };
     client.emit('game.time.pong', pong);
+    // 감사 발견(T-staff-realtime-eviction): game.subscribe 는 최초 입장 시점에만
+    // assertAccess 를 부른다. 그 뒤 배정이 expiresAt 으로 만료돼도 이미 join 된
+    // 소켓을 빼내는 코드가 없어서(축출은 revokeStaff → evictUserFromScopedGameRooms
+    // 경로 하나뿐) 만료된 스태프가 이미 열어 둔 콘솔 탭으로 방송을 계속 받는다.
+    // 이 레포엔 cron 인프라(@nestjs/schedule)가 없어(team-contacts.service.ts
+    // settleExpiry 주석 참고) 배치 스윕 대신, 콘솔이 15초마다 이미 보내는
+    // 이 하트비트에 재검증을 얹는다(lazy-flip 패턴).
+    try {
+      await this.revalidateStaffAccessForSocket(client);
+    } catch (error) {
+      this.logger.error(
+        { socketId: client.id, err: error },
+        'Failed to revalidate staff access on clock heartbeat',
+      );
+    }
     return pong;
   }
 
@@ -608,6 +639,118 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     if (tournaments?.size === 0) {
       this.gameSubscriptions.delete(input.userId);
     }
+  }
+
+  /**
+   * `game.time.ping` 하트비트(15초 주기, use-v1-game-operations-console.ts)에서
+   * 호출된다. 이 소켓이 현재 구독 중인 게임들에 대해 스태프 접근을 다시 판정해,
+   * `game.subscribe` 이후 expiresAt 이 지났거나 배정 자체가 사라진 경우 그
+   * 게임 방에서만 이 소켓을 내보낸다 — `evictUserFromScopedGameRooms`(revoke
+   * 경로)처럼 그 유저의 tournamentId 전체를 통째로 비우지 않는다: 재판정
+   * 대상은 "지금 이 소켓이 실제로 붙어 있는 게임들"뿐이라 범위가 이미
+   * 정확하고, 같은 유저의 다른 유효한 배정까지 건드릴 이유가 없다.
+   */
+  private async revalidateStaffAccessForSocket(client: V1Socket): Promise<void> {
+    const userId = client.data.userId;
+    if (userId === undefined) {
+      return;
+    }
+    const tournaments = this.gameSubscriptions.get(userId);
+    if (tournaments === undefined) {
+      return;
+    }
+    const subscribedGameIds: string[] = [];
+    for (const games of tournaments.values()) {
+      for (const [gameId, socketIds] of games) {
+        if (socketIds.has(client.id)) {
+          subscribedGameIds.push(gameId);
+        }
+      }
+    }
+    if (subscribedGameIds.length === 0) {
+      return;
+    }
+
+    const now = Date.now();
+    const lastAt = client.data.lastStaffRevalidationAt;
+    if (lastAt !== undefined && now - lastAt < STAFF_REVALIDATION_INTERVAL_MS) {
+      return;
+    }
+    client.data.lastStaffRevalidationAt = now;
+
+    // 게임마다 findUnique 를 돌리면 구독 수만큼 왕복이 늘어난다(N+1).
+    // 한 번의 findMany 로 픽스처 스코프를 모두 읽어 온다.
+    const scopes = await this.loadGameFixtureScopes(subscribedGameIds);
+
+    for (const gameId of subscribedGameIds) {
+      const scope = scopes.get(gameId) ?? null;
+      if (scope === null) {
+        // 픽스처가 없는 게임(team-match 등)은 애초에 스태프 스코프 검사 없이
+        // 구독됐다 — game.subscribe 의 `if (fixture !== null)` 분기와 동일 기준.
+        continue;
+      }
+      try {
+        await this.tournamentStaffAccess.assertAccess({
+          userId,
+          action: 'read',
+          resource: {
+            tournamentId: scope.tournamentId,
+            fixtureId: scope.fixtureId,
+            ...(scope.fieldId === null ? {} : { fieldId: scope.fieldId }),
+          },
+        });
+      } catch (error) {
+        if (!(error instanceof ForbiddenException)) {
+          throw error;
+        }
+        await client.leave(gameRoom(gameId));
+        this.removeGameSubscription(userId, gameId, client.id);
+        client.emit('game.permission.revoked', { gameId, assignmentVersion: null });
+      }
+    }
+  }
+
+  private async loadGameFixtureScopes(
+    gameIds: readonly string[],
+  ): Promise<ReadonlyMap<string, GameFixtureScope>> {
+    const games = await this.prisma.v1Game.findMany({
+      where: { id: { in: [...gameIds] } },
+      select: {
+        id: true,
+        tournamentFixture: { select: { id: true, tournamentId: true, fieldId: true } },
+      },
+    });
+    const scopes = new Map<string, GameFixtureScope>();
+    for (const game of games) {
+      const fixture = game.tournamentFixture;
+      if (fixture === null) {
+        continue;
+      }
+      scopes.set(game.id, {
+        tournamentId: fixture.tournamentId,
+        fixtureId: fixture.id,
+        fieldId: fixture.fieldId,
+      });
+    }
+    return scopes;
+  }
+
+  private async loadGameFixtureScope(gameId: string): Promise<{
+    readonly tournamentId: string;
+    readonly fixtureId: string;
+    readonly fieldId: string | null;
+  } | null> {
+    const game = await this.prisma.v1Game.findUnique({
+      where: { id: gameId },
+      select: {
+        tournamentFixture: { select: { id: true, tournamentId: true, fieldId: true } },
+      },
+    });
+    const fixture = game?.tournamentFixture ?? null;
+    if (fixture === null) {
+      return null;
+    }
+    return { tournamentId: fixture.tournamentId, fixtureId: fixture.id, fieldId: fixture.fieldId };
   }
 
   emitToUser(userId: string, event: string, payload: unknown): void {

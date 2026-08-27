@@ -18,6 +18,11 @@ export const TOURNAMENT_STAFF_ACTIONS = [
   'cancel',
   'result_review',
   'result_officialize',
+  // 2026-08-27: 'event_reverse'가 두 가지 뜻으로 쓰이고 있었다 — ① 실제 게임 이벤트
+  // 되돌리기 ② "디렉터급 관리 권한"의 대리(스태프 임명·해임, 필드 관리, 경기-필드 배정).
+  // ②가 ①에 얹혀 있었기 때문에 현장 스태프에게 ①을 주는 순간 ②까지 함께 열렸다.
+  // 관리 권한을 전용 액션으로 분리해 두 경계를 독립시킨다.
+  'tournament_admin',
 ] as const;
 
 export type TournamentStaffAction = (typeof TOURNAMENT_STAFF_ACTIONS)[number];
@@ -143,6 +148,7 @@ function isAction(value: unknown): value is TournamentStaffAction {
     case 'cancel':
     case 'result_review':
     case 'result_officialize':
+    case 'tournament_admin':
       return true;
     default:
       return false;
@@ -313,11 +319,16 @@ function allowsRoleAction(role: TournamentStaffRole, action: TournamentStaffActi
       // 2026-08-11: field_operator는 tournament_command(경기 시작)를 갖지만, 그 전제
       // 조건인 라인업 제출은 lineup_mutate가 없어 만들 수 없었다 — 현장 스태프 혼자서는
       // 대회를 굴릴 수 없는 모순(알파 실측 재현). 오너 결정으로 lineup_mutate를 허용한다.
+      // 2026-08-27: 같은 모순이 event_reverse에도 있었다 — 현장에서 오기록한 골/카드를
+      // event_append로 기록만 하고 event_reverse가 없어 되돌리기·어시스트 지정을 직접
+      // 못 해 관리자 '결과 정정' 절차로 우회해야 했다. 현장 정정은 현장에서 완결되어야
+      // 한다는 동일 논리로 event_reverse를 허용한다.
       return (
         action === 'read' ||
         action === 'tournament_command' ||
         action === 'event_append' ||
-        action === 'lineup_mutate'
+        action === 'lineup_mutate' ||
+        action === 'event_reverse'
       );
     case 'support_readonly':
     case 'public':

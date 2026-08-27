@@ -205,6 +205,9 @@ describe('AdminService.deleteUser — realtime disconnect side effect', () => {
     v1StatusChangeLog: { create: jest.Mock };
     v1AuthIdentity: { findMany: jest.Mock; update: jest.Mock };
     v1UserProfile: { updateMany: jest.Mock };
+    // finding #39: 탈퇴 시 사용자 단위 공개 기록 동의도 REVOKED로 함께 전환해야
+    // 공개 기록 게이트(isParticipantPubliclyEligible)가 자연히 막아준다.
+    v1UserRecordConsent: { updateMany: jest.Mock };
     // 계정 비활성화 시 팀 권한 검사·명단 정리가 이 모델들을 쓴다.
     v1TeamMembership: { findFirst: jest.Mock; findMany: jest.Mock; update: jest.Mock };
     v1TournamentPlayer: { findMany: jest.Mock; updateMany: jest.Mock };
@@ -227,6 +230,7 @@ describe('AdminService.deleteUser — realtime disconnect side effect', () => {
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },
       v1AuthIdentity: { findMany: jest.fn().mockResolvedValue([]), update: jest.fn() },
       v1UserProfile: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      v1UserRecordConsent: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
       v1TeamMembership: {
         findFirst: jest.fn().mockResolvedValue(null),
         findMany: jest.fn().mockResolvedValue([]),
@@ -247,7 +251,7 @@ describe('AdminService.deleteUser — realtime disconnect side effect', () => {
         cb: (
           tx: Pick<
             typeof p,
-            'v1AdminUser' | 'v1User' | 'v1AdminActionLog' | 'v1StatusChangeLog' | 'v1AuthIdentity' | 'v1UserProfile' | 'v1TeamMembership' | 'v1Team' | 'v1TournamentPlayer' | '$queryRaw'
+            'v1AdminUser' | 'v1User' | 'v1AdminActionLog' | 'v1StatusChangeLog' | 'v1AuthIdentity' | 'v1UserProfile' | 'v1UserRecordConsent' | 'v1TeamMembership' | 'v1Team' | 'v1TournamentPlayer' | '$queryRaw'
           >,
         ) => Promise<unknown>,
       ) =>
@@ -258,6 +262,7 @@ describe('AdminService.deleteUser — realtime disconnect side effect', () => {
           v1StatusChangeLog: p.v1StatusChangeLog,
           v1AuthIdentity: p.v1AuthIdentity,
           v1UserProfile: p.v1UserProfile,
+          v1UserRecordConsent: p.v1UserRecordConsent,
           v1TeamMembership: p.v1TeamMembership,
           v1Team: p.v1Team,
           v1TournamentPlayer: p.v1TournamentPlayer,
@@ -292,6 +297,23 @@ describe('AdminService.deleteUser — realtime disconnect side effect', () => {
     expect(result).toMatchObject({ userId: targetUserId, status: 'deleted' });
     expect(realtimeGateway.forceDisconnectUser).toHaveBeenCalledTimes(1);
     expect(realtimeGateway.forceDisconnectUser).toHaveBeenCalledWith(targetUserId);
+  });
+
+  it('deleteUser()가 탈퇴 계정의 공개 기록 동의를 REVOKED로 함께 전환한다 (finding #39)', async () => {
+    // 동의 상태가 GRANTED로 남아 있으면 공개 기록 게이트(isParticipantPubliclyEligible,
+    // public-consent.ts)가 탈퇴 후에도 그 사용자의 경기 기록을 계속 공개 후보로 취급한다.
+    prisma.v1AdminUser.findUnique.mockResolvedValueOnce(actorAdminRecord).mockResolvedValueOnce(null);
+    prisma.v1User.findUnique.mockResolvedValue(targetUser('active'));
+    prisma.v1User.update.mockResolvedValue(targetUser('deleted'));
+
+    await service.deleteUser(actorAuthUser, targetUserId, { reason: '이용약관 위반' });
+
+    expect(prisma.v1UserRecordConsent.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: targetUserId, state: 'GRANTED' },
+        data: expect.objectContaining({ state: 'REVOKED' }),
+      }),
+    );
   });
 
   it('a realtime gateway failure during deleteUser() is swallowed with a structured warn log and does not fail the deletion', async () => {

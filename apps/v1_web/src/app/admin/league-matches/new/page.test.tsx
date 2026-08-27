@@ -50,7 +50,12 @@ describe('AdminLeagueMatchNewPage', () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1CreateLeagueMatchMock.mockReturnValue({ mutateAsync, isPending: false } as never);
     useV1MasterSportsMock.mockReturnValue({ data: [{ id: 'sport-futsal', name: '풋살', levels: [] }] } as never);
-    useV1MasterRegionsMock.mockReturnValue({ data: [{ id: 'region-1', name: '서울', parentId: null }] } as never);
+    useV1MasterRegionsMock.mockReturnValue({
+      data: [{
+        id: 'region-seoul', name: '서울특별시', parentId: null, level: 1,
+        children: [{ id: 'region-1', name: '중구', parentId: 'region-seoul', level: 2 }],
+      }],
+    } as never);
     useV1TeamsMock.mockReturnValue({
       data: { items: [
         { id: 'team-a', name: '팀A', sportName: '풋살', sport: { sportId: 'sport-futsal', name: '풋살' }, regionName: '서울', memberCount: 8, trustState: 'none', joinPolicy: 'approval_required' },
@@ -92,7 +97,12 @@ describe('AdminLeagueMatchNewPage', () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1CreateLeagueMatchMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
     useV1MasterSportsMock.mockReturnValue({ data: [{ id: 'sport-futsal', name: '풋살', levels: [] }] } as never);
-    useV1MasterRegionsMock.mockReturnValue({ data: [{ id: 'region-1', name: '서울', parentId: null }] } as never);
+    useV1MasterRegionsMock.mockReturnValue({
+      data: [{
+        id: 'region-seoul', name: '서울특별시', parentId: null, level: 1,
+        children: [{ id: 'region-1', name: '중구', parentId: 'region-seoul', level: 2 }],
+      }],
+    } as never);
     useV1TeamsMock.mockReturnValue({
       data: { items: [
         { id: 'team-a', name: '팀A', sportName: '풋살', sport: { sportId: 'sport-futsal', name: '풋살' }, regionName: '서울', memberCount: 8, trustState: 'none', joinPolicy: 'approval_required' },
@@ -123,7 +133,12 @@ describe('AdminLeagueMatchNewPage', () => {
     useV1MasterSportsMock.mockReturnValue({
       data: [{ id: 'sport-futsal', name: '풋살', levels: [] }, { id: 'sport-soccer', name: '축구', levels: [] }],
     } as never);
-    useV1MasterRegionsMock.mockReturnValue({ data: [{ id: 'region-1', name: '서울', parentId: null }] } as never);
+    useV1MasterRegionsMock.mockReturnValue({
+      data: [{
+        id: 'region-seoul', name: '서울특별시', parentId: null, level: 1,
+        children: [{ id: 'region-1', name: '중구', parentId: 'region-seoul', level: 2 }],
+      }],
+    } as never);
     useV1TeamsMock.mockReturnValue({
       data: { items: [
         { id: 'team-a', name: '팀A', sportName: '풋살', sport: { sportId: 'sport-futsal', name: '풋살' }, regionName: '서울', memberCount: 8, trustState: 'none', joinPolicy: 'approval_required' },

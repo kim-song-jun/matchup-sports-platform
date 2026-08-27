@@ -3,14 +3,37 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
 import { writeExpiringDraft } from '@/lib/expiring-draft';
 import type { MatchCreateViewModel } from './matches.types';
-import { draftFromMatchEdit, MatchCreatePageClient } from './matches-create-client';
+import { draftFromMatchEdit, MatchCreatePageClient, MatchEditPageClient } from './matches-create-client';
 
 vi.mock('@/lib/analytics', () => ({ trackEvent: vi.fn() }));
 
-const { createMatchMutate, routerPush, uploadImagesMutateAsync } = vi.hoisted(() => ({
+const { createMatchMutate, routerPush, uploadImagesMutateAsync, confirmMock, updateMatchMutate, cancelMatchMutate, matchEditData } = vi.hoisted(() => ({
   createMatchMutate: vi.fn(),
   routerPush: vi.fn(),
   uploadImagesMutateAsync: vi.fn(),
+  confirmMock: vi.fn(),
+  updateMatchMutate: vi.fn(),
+  cancelMatchMutate: vi.fn(),
+  // useEffect(..., [editQuery.data])가 참조로 비교하므로, 매 렌더마다 새 객체를 돌려주면
+  // 훅이 재실행 → setDraft → 리렌더 → 훅 재실행의 무한 루프에 빠진다. 안정적인 참조 하나를
+  // 모듈 스코프에 고정해 실제 React Query의 캐시된 참조 안정성을 흉내낸다.
+  matchEditData: {
+    matchId: 'match-edit-1',
+    editable: true,
+    lockedReason: null,
+    form: {
+      sportId: 'sport-futsal',
+      regionId: 'region-gangnam',
+      title: '수정 중인 매치',
+      imageUrl: null,
+      startsAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      capacity: 10,
+      manualPlaceName: '한강 풋살장',
+    },
+    status: 'recruiting',
+    participantCount: 1,
+    version: 'v1',
+  },
 }));
 
 vi.mock('next/navigation', () => ({
@@ -18,7 +41,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('@/components/v1-ui/confirm-modal', () => ({
-  useConfirm: () => ({ confirm: vi.fn(), ConfirmModal: null }),
+  useConfirm: () => ({ confirm: confirmMock, ConfirmModal: null }),
 }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
@@ -42,6 +65,13 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1CreateMatch: () => ({ mutate: createMatchMutate, isPending: false }),
   useV1UploadImages: () => ({ mutateAsync: uploadImagesMutateAsync, isPending: false }),
   useV1MyRecentVenues: () => ({ data: undefined }),
+  useV1MatchEdit: () => ({
+    data: matchEditData,
+    isError: false,
+    isLoading: false,
+  }),
+  useV1UpdateMatch: () => ({ mutate: updateMatchMutate, isPending: false }),
+  useV1CancelMatch: () => ({ mutate: cancelMatchMutate, isPending: false }),
 }));
 
 vi.mock('./matches-page', () => ({
@@ -74,6 +104,11 @@ vi.mock('./matches-page', () => ({
         <button type="button" onClick={form.onSubmit}>
           매치 만들기
         </button>
+        {form.onCancel ? (
+          <button type="button" onClick={form.onCancel}>
+            매치 취소
+          </button>
+        ) : null}
       </div>
     );
   },
@@ -201,5 +236,40 @@ describe('match edit hydration', () => {
     });
 
     expect(draft.image).toBe('');
+  });
+});
+
+// Regression: 매치 취소는 되돌리는 API가 없는 파괴적 동작이다 — 신청자 전원이 강제 취소되고
+// 알림이 발송된다. '변경사항 저장' 바로 아래 붙은 전폭 버튼이라 오탭 가능성이 높은데도
+// 확인 절차 없이 한 번의 탭으로 즉시 실행되던 결함(finding #33)의 회귀 테스트.
+describe('MatchEditPageClient — cancel confirmation', () => {
+  afterEach(cleanup);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('매치 취소 버튼을 눌러도 확인 전에는 취소 API를 호출하지 않는다', async () => {
+    confirmMock.mockResolvedValue(false); // 사용자가 확인 모달에서 '취소'를 누른 경우
+    render(<MatchEditPageClient matchId="match-edit-1" />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '매치 취소' }));
+
+    await waitFor(() => expect(confirmMock).toHaveBeenCalled());
+    expect(cancelMatchMutate).not.toHaveBeenCalled();
+  });
+
+  it('확인 모달에서 승인하면 그제서야 취소 API를 호출한다', async () => {
+    confirmMock.mockResolvedValue(true);
+    render(<MatchEditPageClient matchId="match-edit-1" />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '매치 취소' }));
+
+    await waitFor(() => {
+      expect(cancelMatchMutate).toHaveBeenCalledWith(
+        { reason: 'host_cancelled_from_v1_web' },
+        expect.any(Object),
+      );
+    });
   });
 });

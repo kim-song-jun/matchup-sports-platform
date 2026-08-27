@@ -77,7 +77,7 @@ export class LeagueResultEntryReminderService {
       await tx.$executeRaw`
         INSERT INTO v1_notifications (id, business_key, recipient_user_id, target_type, target_id, title, body, deep_link, created_at, updated_at)
         VALUES (
-          ${randomUUID()}, ${businessKey}, ${admin.userId}, 'team_match'::"V1NotificationTargetType", ${fixture.leagueId},
+          ${randomUUID()}, ${businessKey}, ${admin.userId}, 'team_match'::"V1NotificationTargetType", ${teamMatchId},
           '리그 경기 결과가 아직 입력되지 않았어요', '경기 시작 24시간이 지났는데 결과가 입력되지 않았어요.', ${deepLink},
           CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
         )

@@ -4134,6 +4134,13 @@ label.tm-btn:focus-within {
     animation: fade-in 0.18s ease-out;
   }
 
+  /* 퇴장도 진입과 같은 축이어야 한다. 기본(.is-closing)은 하단 시트용
+   * 슬라이드다운(translateY 100%)이라, 중앙 다이얼로그에 그대로 걸리면
+   * **화면 아래로 날아간다.** 여기서는 진입과 같은 fade 를 되감는다. */
+  .tm-notification-sheet.is-closing {
+    animation: fade-in 0.18s ease-in reverse both;
+  }
+
   .tm-notification-sheet-grabber {
     display: none;
   }

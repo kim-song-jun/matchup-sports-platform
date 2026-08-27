@@ -119,7 +119,9 @@ const AUDIT = () => {
     // width/height 가 0 이어도 margin 은 실제 여백을 만든다(빈 div 의 margin-bottom
     // 등) — 크기로 거르면 그런 이탈을 통째로 놓친다.
     const cs0 = getComputedStyle(el);
-    if (cs0.display === 'none' || cs0.visibility === 'hidden') continue;
+    // visibility:hidden 은 **레이아웃에서 빠지지 않는다** — 자리를 그대로 차지하고
+    // margin 도 살아 있어서 격자 이탈을 만든다. display:none 과 같이 묶으면 안 된다.
+    if (cs0.display === 'none') continue;
     if (!el.getClientRects().length && cs0.position !== 'fixed') continue;
     const cs = cs0;
     for (const p of PROPS) {

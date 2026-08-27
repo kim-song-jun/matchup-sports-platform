@@ -20,6 +20,7 @@ import { requireProductionFrontendOrigin } from '../common/security/v1-mutation-
 import { getPendingSocialSignupRoute } from '../auth/social-signup-access';
 import { AppendGameEventDto } from '../games/dto/game-event.dto';
 import { GameBroadcastRegistry } from '../games/game-broadcast.registry';
+import { GameTakeoverService } from '../games/game-takeover.service';
 import { GamesService } from '../games/games.service';
 import type { GameEventAppendResult } from '../games/games.types';
 import { TournamentStaffAccessService } from '../tournaments/staff/tournament-staff-access.service';
@@ -151,7 +152,18 @@ type GameTakeoverRenewPayload = {
 
 type GameTakeoverResult =
   | ({ readonly status: 'granted' } & GameTakeoverGrantResult)
-  | { readonly status: 'denied'; readonly code: 'STAFF_SCOPE_DENIED' | 'TAKEOVER_TOKEN_EXPIRED' | 'VALIDATION_ERROR' };
+  | {
+      readonly status: 'denied';
+      readonly code:
+        | 'STAFF_SCOPE_DENIED'
+        | 'TAKEOVER_TOKEN_EXPIRED'
+        // Backlog fix (realtime-takeover-and-eviction-protocol): renew-only.
+        // See `renewGameTakeover` for when this is returned instead of
+        // `TAKEOVER_TOKEN_EXPIRED`, and `GameTakeoverService.isSuperseded`
+        // for why the two must not be conflated.
+        | 'TAKEOVER_SUPERSEDED'
+        | 'VALIDATION_ERROR';
+    };
 
 /**
  * UX 감사 추가(alpha 실사고, 2026-08): 옐로카드/파울 기록이 `VALIDATION_ERROR`로
@@ -202,6 +214,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     @Inject(GamesService) private readonly gamesService: GameRealtimeOperations,
     @InjectPinoLogger(RealtimeGateway.name) private readonly logger: PinoLogger,
     private readonly gameBroadcast: GameBroadcastRegistry,
+    private readonly gameTakeover: GameTakeoverService,
   ) {}
 
   private readonly gameSubscriptions = new Map<
@@ -582,10 +595,24 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     } catch (error) {
       if (error instanceof ForbiddenException) {
         const response = error.getResponse();
-        const code =
-          isRecord(response) && response.code === 'PERMISSION_DENIED'
-            ? 'STAFF_SCOPE_DENIED'
-            : 'TAKEOVER_TOKEN_EXPIRED';
+        if (isRecord(response) && response.code === 'PERMISSION_DENIED') {
+          return { status: 'denied', code: 'STAFF_SCOPE_DENIED' };
+        }
+        // `GamesService.renewTakeover` always throws `TAKEOVER_TOKEN_EXPIRED`
+        // here regardless of WHY the underlying `GameTakeoverService.renew`
+        // returned null -- it cannot tell "someone/something else now holds a
+        // still-live grant for this game" (superseded) apart from "nothing
+        // holds it, my own token just lapsed" (naturally expired). Only the
+        // first case is a real handoff the client must respect; blindly
+        // auto-reacquiring on it is exactly what makes two consoles (two
+        // operators, or one operator with two tabs) fight over the token
+        // forever at the ~20s renew cadence. Disambiguate here using the
+        // registry directly (this gateway is where the client-facing code is
+        // decided) so the client can tell the two apart without either
+        // `GamesService` or the wire contract changing for the common case.
+        const code = this.gameTakeover.isSuperseded(input.gameId, input.takeoverToken)
+          ? 'TAKEOVER_SUPERSEDED'
+          : 'TAKEOVER_TOKEN_EXPIRED';
         return { status: 'denied', code };
       }
       throw error;

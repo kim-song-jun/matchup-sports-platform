@@ -59,6 +59,14 @@ import {
  * 쓴다 -- create/submit/decide(또는 correction-create/officialize) 각각이 별도
  * 트랜잭션이라 동시 처리 시 뒤늦은 요청이 40001(Postgres 직렬화 충돌)로 부딪힐 수
  * 있다.
+ *
+ * ## 몰수 표식 승계 (감사 L-E finding 4 수정)
+ * 정정 대상 대진이 몰수(forfeit)로 확정돼 있었다면, 정정은 별다른 지정이 없는 한
+ * 그 표식을 그대로 이어받는다 -- `RecordLeagueResultDto.isForfeit` docblock이 계약을
+ * 정의한다. 판정·저장은 `V1GameResultRevision.outcomeReason` 컬럼으로 하고(과거
+ * 문자열 마커 시절 리비전은 fallback으로만 인정), 운영자가 명시적으로 `isForfeit`을
+ * 보내면 승계 대신 그 값을 따른다 -- 몰수팀을 반대로 지정한 오류를 정정으로 바로잡을
+ * 때 표식을 강제로 남기지 않기 위해서다.
  */
 
 export const RESULT_ENTRY_REASON_MARKER = '[LEAGUE_RESULT_ENTRY]';
@@ -688,7 +696,7 @@ export class LeagueMatchResultEntryService {
     const latestRevision = await this.prisma.v1GameResultRevision.findFirst({
       where: { gameId },
       orderBy: { revision: 'desc' },
-      select: { id: true, revision: true, state: true, reason: true, score: true },
+      select: { id: true, revision: true, state: true, reason: true, score: true, outcomeReason: true },
     });
     if (latestRevision === null) {
       throw new ConflictException({
@@ -696,16 +704,26 @@ export class LeagueMatchResultEntryService {
         message: '정정할 공식 결과가 없어요. 먼저 결과를 입력해 주세요.',
       });
     }
-    // 감사 L-E finding 4 수정: 몰수(forfeit) 결과를 정정하면 새 리비전의 reason이 정정
-    // 마커로만 채워져 [LEAGUE_FORFEIT] 접두어가 사라진다 -- isForfeit 판정
-    // (league-match-public.service.ts)의 유일한 근거가 그 마커뿐이라, 정정을 한 번
-    // 거치면 "몰수" 사실 자체가 공개 화면에서 영구히 사라지고(순위·승패는 정확) 재몰수도
-    // 불가능해진다. base(직전) 리비전이 몰수였다면 정정 리비전의 reason에도 그 마커를
-    // 이어 붙여, 정정을 여러 번 거쳐도(체인) 표식이 유지되게 한다 -- `.includes`로
-    // base를 판정하는 이유는 이미 한 번 정정된 몰수(마커가 맨 앞이 아님)도 놓치지
-    // 않기 위해서다.
-    const baseWasForfeit = latestRevision.reason?.includes(FORFEIT_REASON_MARKER) ?? false;
-    const persistedReason = baseWasForfeit
+    // 감사 L-E finding 4 수정(2단계) -- 판정 근거를 문자열 접두어에서 전용 컬럼
+    // `outcomeReason`으로 옮겼다. base(직전) 리비전이 몰수인지는 컬럼을 1차로 보고,
+    // 컬럼이 생기기 전에 만들어진 옛 리비전(문자열 마커만 갖고 있음)은 `.includes`로
+    // 함께 인정한다 -- `startsWith`만 보면 정정을 한 번만 거쳐도(마커가 맨 앞이 아니게
+    // 되면) 놓친다.
+    const baseWasForfeit =
+      latestRevision.outcomeReason === 'FORFEIT' ||
+      (latestRevision.reason?.includes(FORFEIT_REASON_MARKER) ?? false);
+    // 운영자가 이번 정정의 몰수 여부를 명시하면 그 값을 따르고(몰수 아님으로 되돌리는
+    // 것도 포함), 미지정이면 base를 승계한다 -- RecordLeagueResultDto.isForfeit docblock의
+    // 계약. 이의(dispute) 수락 경로(league-match-dispute.service.ts)는 이 필드를 보내지
+    // 않으므로 항상 승계로 떨어져, 정당한 몰수 경기의 이의를 정정으로 처리해도 표식이
+    // 사라지지 않는다.
+    const effectiveIsForfeit = dto.isForfeit ?? baseWasForfeit;
+    const outcome = effectiveIsForfeit
+      ? ({ outcomeReason: 'FORFEIT', note: dto.reason.trim() } as const)
+      : ({ outcomeReason: 'NORMAL', note: null } as const);
+    // reason 문자열의 마커는 이제 판정 근거가 아니라 컬럼이 생기기 전 레거시 리비전을
+    // 위한 fallback 입력일 뿐이지만, 감사 로그 가독성과 하위 호환을 위해 계속 남긴다.
+    const persistedReason = effectiveIsForfeit
       ? `${RESULT_CORRECTION_REASON_MARKER} ${FORFEIT_REASON_MARKER} ${dto.reason.trim()}`
       : `${RESULT_CORRECTION_REASON_MARKER} ${dto.reason.trim()}`;
     const isOurCorrection = latestRevision.reason?.startsWith(RESULT_CORRECTION_REASON_MARKER) ?? false;
@@ -716,7 +734,8 @@ export class LeagueMatchResultEntryService {
         stored !== null &&
         stored.home === dto.homeScore &&
         stored.away === dto.awayScore &&
-        latestRevision.reason === persistedReason;
+        latestRevision.reason === persistedReason &&
+        latestRevision.outcomeReason === outcome.outcomeReason;
       if (alreadyMatches) {
         return {
           teamMatchId,
@@ -757,14 +776,21 @@ export class LeagueMatchResultEntryService {
         : await this.resolveActualParticipants(gameId, dto);
 
     const createCommandId = `${commandPrefix}:create`;
-    const created = await this.games.createTeamMatchResultCorrection(user, gameId, createCommandId, {
-      expectedVersion: teamMatch.gameVersion,
-      clientCommandId: createCommandId,
-      score: { home: dto.homeScore, away: dto.awayScore },
-      actualParticipants,
-      eventsHash: canonicalGameCommandPayloadHash([]),
-      reason: persistedReason,
-    });
+    const created = await this.games.createTeamMatchResultCorrection(
+      user,
+      gameId,
+      createCommandId,
+      {
+        expectedVersion: teamMatch.gameVersion,
+        clientCommandId: createCommandId,
+        score: { home: dto.homeScore, away: dto.awayScore },
+        actualParticipants,
+        eventsHash: canonicalGameCommandPayloadHash([]),
+        reason: persistedReason,
+      },
+      // 감사 L-E finding 4 수정(2단계): 판정 근거를 컬럼으로 옮긴 실제 쓰기 지점.
+      outcome,
+    );
 
     // 신규 입력과 같은 이유로 officialize 앞에서 득점 스냅샷을 남긴다 — 정정 리비전은
     // 새 행이라 직전 리비전의 goalEvents 를 물려받지 않는다.

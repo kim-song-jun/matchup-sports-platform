@@ -243,19 +243,20 @@ describe('LeagueMatchResultEntryService 득점 스냅샷 경합', () => {
   });
 });
 
-// 감사 L-E finding 4: 몰수(FORFEIT) 결과를 정정하면 새 리비전의 reason이 정정 마커로만
-// 채워져 [LEAGUE_FORFEIT] 접두어가 사라졌다 -- isForfeit 판정(league-match-public.service.ts)의
-// 유일한 근거가 그 마커라, 정정을 한 번 거치면 "몰수" 사실 자체가 공개 화면에서 영구히
-// 사라진다(순위·승패는 정확하지만 표식만 소실, 재몰수도 불가능해진다). base 리비전이
-// 몰수였다면 정정 리비전의 reason에도 그 마커를 이어 붙인다.
-describe('LeagueMatchResultEntryService.correctResult 몰수 표식 보존', () => {
-  it('base 리비전이 몰수였으면 새 정정 리비전의 reason에도 [LEAGUE_FORFEIT] 마커를 이어 붙인다', async () => {
+// 감사 L-E finding 4(2단계 — 컬럼 이관 + 명시적 해제): 몰수(FORFEIT) 결과를 정정하면
+// isForfeit 판정의 근거가 이제 `V1GameResultRevision.outcomeReason` 컬럼이다(레거시
+// 문자열 마커는 컬럼이 없던 시절 리비전을 위한 fallback으로만 남는다). 정정은 미지정
+// 시 base의 몰수 여부를 승계하되, 운영자가 `isForfeit`을 명시하면 그 값이 이긴다 —
+// 몰수팀을 반대로 지정한 오류를 정정으로 바로잡을 때 표식이 강제로 남지 않아야 한다.
+describe('LeagueMatchResultEntryService.correctResult 몰수 표식 보존/해제', () => {
+  it('base 리비전이 (레거시) 문자열 마커만 갖고 있어도 승계하고 outcomeReason 컬럼에 FORFEIT을 쓴다', async () => {
     const prisma = makePrisma();
     prisma.v1GameResultRevision.findFirst.mockResolvedValue({
       id: 'rev-1',
       revision: 1,
       state: 'OFFICIAL',
       reason: '[LEAGUE_FORFEIT] 원정팀 불참',
+      outcomeReason: 'NORMAL', // 컬럼이 생기기 전에 만들어진 옛 리비전 시뮬레이션 -- 마커만 있다.
       score: { home: 3, away: 0 },
     });
     prisma.v1Game.findUniqueOrThrow.mockResolvedValue({
@@ -276,17 +277,54 @@ describe('LeagueMatchResultEntryService.correctResult 몰수 표식 보존', () 
     } as any);
 
     expect(games.createTeamMatchResultCorrection).toHaveBeenCalledTimes(1);
-    const payload = games.createTeamMatchResultCorrection.mock.calls[0][3];
+    const [, , , payload, outcome] = games.createTeamMatchResultCorrection.mock.calls[0];
     expect(payload.reason).toBe('[LEAGUE_RESULT_CORRECTION] [LEAGUE_FORFEIT] 몰수팀 재확인 후 스코어 정정');
+    // 문자열 마커뿐 아니라 전용 컬럼에도 몰수를 쓴다 -- 다음 정정이 문자열 없이도
+    // 컬럼만으로 승계할 수 있어야 한다.
+    expect(outcome).toEqual({ outcomeReason: 'FORFEIT', note: '몰수팀 재확인 후 스코어 정정' });
   });
 
-  it('base 리비전이 몰수가 아니었으면 정정 마커만 붙는다 (기존 계약 유지)', async () => {
+  it('base 리비전이 outcomeReason=FORFEIT 컬럼만 갖고 있어도(레거시 마커 없음) 승계한다', async () => {
+    const prisma = makePrisma();
+    prisma.v1GameResultRevision.findFirst.mockResolvedValue({
+      id: 'rev-1',
+      revision: 1,
+      state: 'OFFICIAL',
+      // 컬럼 이관 이후에 몰수 생성 경로(league-match-forfeit.service.ts)가 만든 신규
+      // 스타일 리비전 시뮬레이션 -- reason에는 마커가 없고 컬럼만 FORFEIT이다.
+      reason: '원정팀 불참',
+      outcomeReason: 'FORFEIT',
+      score: { home: 1, away: 0 },
+    });
+    prisma.v1Game.findUniqueOrThrow.mockResolvedValue({
+      competitionConfig: { lineup: { positions: [], formations: [] } },
+    });
+    prisma.v1GameParticipant.findMany.mockResolvedValue([...homeParticipants, ...awayParticipants]);
+    const games = {
+      ...makeGames(),
+      createTeamMatchResultCorrection: jest.fn().mockResolvedValue({ revisionId: 'rev-2', version: 5 }),
+    };
+    const { service } = makeService(prisma, games);
+
+    await service.correctResult(actor, 'league-1', 'tm-1', {
+      homeScore: 0,
+      awayScore: 0,
+      reason: '몰수팀 재확인 후 스코어 정정',
+      participants: [],
+    } as any);
+
+    const [, , , , outcome] = games.createTeamMatchResultCorrection.mock.calls[0];
+    expect(outcome).toEqual({ outcomeReason: 'FORFEIT', note: '몰수팀 재확인 후 스코어 정정' });
+  });
+
+  it('base 리비전이 몰수가 아니었으면 정정 마커만 붙고 outcomeReason은 NORMAL이다 (기존 계약 유지)', async () => {
     const prisma = makePrisma();
     prisma.v1GameResultRevision.findFirst.mockResolvedValue({
       id: 'rev-1',
       revision: 1,
       state: 'OFFICIAL',
       reason: '[LEAGUE_RESULT_ENTRY] 정상 입력',
+      outcomeReason: 'NORMAL',
       score: { home: 2, away: 1 },
     });
     prisma.v1Game.findUniqueOrThrow.mockResolvedValue({
@@ -306,7 +344,76 @@ describe('LeagueMatchResultEntryService.correctResult 몰수 표식 보존', () 
       participants: [],
     } as any);
 
-    const payload = games.createTeamMatchResultCorrection.mock.calls[0][3];
+    const [, , , payload, outcome] = games.createTeamMatchResultCorrection.mock.calls[0];
     expect(payload.reason).toBe('[LEAGUE_RESULT_CORRECTION] 오기입 정정');
+    expect(outcome).toEqual({ outcomeReason: 'NORMAL', note: null });
+  });
+
+  it('base가 몰수여도 dto.isForfeit === false로 명시하면 몰수 표식을 해제한다 (오지정 몰수를 정정으로 바로잡는 경로)', async () => {
+    const prisma = makePrisma();
+    prisma.v1GameResultRevision.findFirst.mockResolvedValue({
+      id: 'rev-1',
+      revision: 1,
+      state: 'OFFICIAL',
+      reason: '[LEAGUE_FORFEIT] 홈팀 불참(오지정)',
+      outcomeReason: 'FORFEIT',
+      score: { home: 0, away: 1 },
+    });
+    prisma.v1Game.findUniqueOrThrow.mockResolvedValue({
+      competitionConfig: { lineup: { positions: [], formations: [] } },
+    });
+    prisma.v1GameParticipant.findMany.mockResolvedValue([...homeParticipants, ...awayParticipants]);
+    const games = {
+      ...makeGames(),
+      createTeamMatchResultCorrection: jest.fn().mockResolvedValue({ revisionId: 'rev-2', version: 5 }),
+    };
+    const { service } = makeService(prisma, games);
+
+    await service.correctResult(actor, 'league-1', 'tm-1', {
+      homeScore: 2,
+      awayScore: 1,
+      reason: '몰수팀을 반대로 지정한 오류를 정정 -- 실제로는 몰수가 아니다',
+      participants: [],
+      isForfeit: false,
+    } as any);
+
+    const [, , , payload, outcome] = games.createTeamMatchResultCorrection.mock.calls[0];
+    expect(payload.reason).toBe(
+      '[LEAGUE_RESULT_CORRECTION] 몰수팀을 반대로 지정한 오류를 정정 -- 실제로는 몰수가 아니다',
+    );
+    expect(outcome).toEqual({ outcomeReason: 'NORMAL', note: null });
+  });
+
+  it('base가 몰수가 아니어도 dto.isForfeit === true로 명시하면 몰수로 표시한다', async () => {
+    const prisma = makePrisma();
+    prisma.v1GameResultRevision.findFirst.mockResolvedValue({
+      id: 'rev-1',
+      revision: 1,
+      state: 'OFFICIAL',
+      reason: '[LEAGUE_RESULT_ENTRY] 정상 입력',
+      outcomeReason: 'NORMAL',
+      score: { home: 2, away: 1 },
+    });
+    prisma.v1Game.findUniqueOrThrow.mockResolvedValue({
+      competitionConfig: { lineup: { positions: [], formations: [] } },
+    });
+    prisma.v1GameParticipant.findMany.mockResolvedValue([...homeParticipants, ...awayParticipants]);
+    const games = {
+      ...makeGames(),
+      createTeamMatchResultCorrection: jest.fn().mockResolvedValue({ revisionId: 'rev-2', version: 5 }),
+    };
+    const { service } = makeService(prisma, games);
+
+    await service.correctResult(actor, 'league-1', 'tm-1', {
+      homeScore: 1,
+      awayScore: 0,
+      reason: '뒤늦게 몰수로 확인됨',
+      participants: [],
+      isForfeit: true,
+    } as any);
+
+    const [, , , payload, outcome] = games.createTeamMatchResultCorrection.mock.calls[0];
+    expect(payload.reason).toBe('[LEAGUE_RESULT_CORRECTION] [LEAGUE_FORFEIT] 뒤늦게 몰수로 확인됨');
+    expect(outcome).toEqual({ outcomeReason: 'FORFEIT', note: '뒤늦게 몰수로 확인됨' });
   });
 });

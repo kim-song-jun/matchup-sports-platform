@@ -41,13 +41,24 @@ import { resolveStoredForfeit } from './league-lifecycle-rules';
  * 다를 수 있고, 골득실 등 리그 통계에 "1점"이라는 임의 마진이 섞인다 — 이후
  * 종목별 컨벤션이 필요해지면 재검토한다.
  *
- * ## 사유 필드 재사용 (신규 컬럼 없이 몰수를 표시하는 유일한 방법)
- * `V1GameResultRevision.reason`(이미 존재하는 자유 텍스트 컬럼)에
- * `FORFEIT_REASON_MARKER` 접두어를 붙여 저장한다. 이 마커가 "이 결과는 몰수다"의
- * 유일한 표식이라, 상수를 export 해 읽는 쪽과 **단일 출처**로 공유한다.
+ * ## 몰수 표식 (감사 L-E finding 4 정정 — 위 "신규 컬럼 없음" 전제는 더 이상 사실이 아니다)
+ * 이 docblock은 원래 "신규 컬럼이 없어 `reason` 접두어가 유일한 표식"이라고 적고
+ * 있었는데, `V1GameResultRevision`에는 이미 전용 컬럼 `outcomeReason: 'NORMAL' |
+ * 'FORFEIT' | 'ABANDONED'` + `outcomeNote`가 있었다(TOURNAMENT_FIXTURE 레인은 애초에
+ * 이 컬럼을 쓴다). 그 전제를 믿고 정정(`correctResult`) 경로가 이 컬럼을 승계하지
+ * 않은 채 문자열 접두어만 이어 붙이다가, 정정을 한 번 거치면 몰수 표식이 사라지거나
+ * (혹은 반대로 영원히 강제되는) 결함이 났다.
  *
- * 공개 상세(`league-match-public.service.ts`)는 이 접두어를 `isForfeit: boolean` 으로
- * 환산해 내보낸다 — 그래야 관전자가 몰수 결과를 실제 1:0 승리와 같은 경기로 읽지 않는다.
+ * **지금은 컬럼이 유일한 신규 표식이다.** 이 서비스가 `GamesService.createResultRevision`을
+ * 부를 때 `outcome: { outcomeReason: 'FORFEIT', note }`를 함께 넘겨 컬럼에 직접 쓴다.
+ * `FORFEIT_REASON_MARKER` 문자열은 두 가지 **레거시 용도**로만 남는다: ① 컬럼이 아직
+ * 없던 시절에 만들어진 옛 리비전을 읽을 때의 fallback(`league-match-public.service.ts`가
+ * `outcomeReason === 'FORFEIT' OR reason.includes(마커)`로 둘 다 인정) ② 이 서비스 내부의
+ * "이 리비전이 우리가 만든 몰수인가"(`isOurForfeit`) 멱등 판정. 새로 쓰는 값의 판정 근거는
+ * 더 이상 이 마커가 아니다.
+ *
+ * 공개 상세(`league-match-public.service.ts`)는 컬럼(+ 레거시 마커)을 `isForfeit: boolean`
+ * 으로 환산해 내보낸다 — 그래야 관전자가 몰수 결과를 실제 1:0 승리와 같은 경기로 읽지 않는다.
  * **사유 원문은 공개하지 않는다**: 운영자가 쓴 자유 텍스트라 그대로 노출하면 내부 메모가
  * 새어 나간다. 읽는 쪽은 boolean 만 만들고 문자열은 버려야 한다.
  */
@@ -55,6 +66,16 @@ import { resolveStoredForfeit } from './league-lifecycle-rules';
 // 공개 응답에서 몰수 여부를 판정하는 쪽(league-match-public.service.ts)도 같은 값을 봐야 한다.
 // 문자열을 복제하면 한쪽만 바뀌었을 때 조용히 어긋나므로 여기가 단일 출처다.
 export const FORFEIT_REASON_MARKER = '[LEAGUE_FORFEIT]';
+
+/**
+ * 감사 L-E finding 4 수정 — 몰수 판정의 단일 출처 함수. "컬럼(outcomeReason) 우선,
+ * 레거시 문자열 마커는 fallback"이라는 같은 규칙을 `league-match-public.service.ts`
+ * (관전자 상세)와 `league-match-admin.service.ts`(운영자 정정 모달의 "현재 몰수예요"
+ * 표시) 양쪽이 각자 인라인으로 다시 적으면 한쪽만 바뀌었을 때 조용히 어긋난다.
+ */
+export function resolveIsForfeit(revision: { reason: string | null; outcomeReason: string }): boolean {
+  return revision.outcomeReason === 'FORFEIT' || (revision.reason?.includes(FORFEIT_REASON_MARKER) ?? false);
+}
 const WINNER_SCORE = 1;
 const LOSER_SCORE = 0;
 
@@ -255,14 +276,23 @@ export class LeagueMatchForfeitService {
       // 새 DRAFT를 만들 수 있다"를 검증하므로(RESULT_REVISION_ALREADY_EXISTS),
       // 위의 사전 가드와 정확히 같은 조건에서만 이 분기에 도달한다.
       const createCommandId = `${commandPrefix}:create`;
-      const created = await this.games.createResultRevision(user, gameId, createCommandId, {
-        expectedVersion: initialGameVersion,
-        clientCommandId: createCommandId,
-        score: { home: homeScore, away: awayScore },
-        actualParticipants: [],
-        eventsHash: canonicalGameCommandPayloadHash([]),
-        reason: persistedReason,
-      });
+      const created = await this.games.createResultRevision(
+        user,
+        gameId,
+        createCommandId,
+        {
+          expectedVersion: initialGameVersion,
+          clientCommandId: createCommandId,
+          score: { home: homeScore, away: awayScore },
+          actualParticipants: [],
+          eventsHash: canonicalGameCommandPayloadHash([]),
+          reason: persistedReason,
+        },
+        // 감사 L-E finding 4 수정: 이제 컬럼이 판정의 단일 출처다 — 몰수 생성
+        // 시점에 outcomeReason을 직접 써야 이후 정정(correctResult)이 승계할 값이
+        // 생긴다. dto.reason.trim()을 note로 쓴다(운영자가 입력한 사유 원문).
+        { outcomeReason: 'FORFEIT', note: dto.reason.trim() },
+      );
       revisionId = created.revisionId;
       revisionState = created.revisionState;
       version = created.version;

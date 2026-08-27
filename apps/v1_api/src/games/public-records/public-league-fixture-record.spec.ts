@@ -162,7 +162,14 @@ describe('PublicTournamentRecordsService.getLeagueFixtureRecord', () => {
     expect(result.videos).toEqual([{ id: 'video-1', title: '전반 하이라이트', url: 'https://youtu.be/x' }]);
   });
 
-  it('몰수로 확정된 결과는 outcome 사유가 실린다 — 실제 1:0 승리와 구분', async () => {
+  // L-F-forfeit-public-exposure: 이 테스트는 원래 대회 경로(getMatch)의 계약을 그대로
+  // 복제해 `note: '상대팀 불참'` 이 그대로 실린다고 단언하고 있었다 — 즉 리그 몰수의
+  // outcomeNote(운영자가 쓴 내부 메모 원문)가 공개 API 에 그대로 나가는 걸 "정상 동작"
+  // 으로 박제하고 있었다. 대회의 outcomeReason/outcomeNote 는 애초에 공개용으로 설계된
+  // 채널이지만(verifierContext), 리그의 이 컬럼을 채우는 유일한 writer(league-match-
+  // forfeit.service)는 명시적으로 "boolean 만 만들고 문자열은 버려야 한다"는 반대
+  // 계약을 갖는다 — 이름과 단언 모두 그 계약에 맞게 다시 쓴다.
+  it('몰수로 확정된 결과는 boolean 만 실린다 — outcomeNote 의 운영자 메모 원문은 새지 않는다', async () => {
     const service = buildService({
       fixture: makeFixtureRow({
         game: makeGame({
@@ -180,7 +187,140 @@ describe('PublicTournamentRecordsService.getLeagueFixtureRecord', () => {
       }),
     });
     const result = await service.getLeagueFixtureRecord(LEAGUE_ID, TEAM_MATCH_ID);
-    expect(result.outcome).toEqual({ reason: 'FORFEIT', note: '상대팀 불참' });
+    expect(result.outcome).toEqual({ reason: 'FORFEIT', note: null });
+  });
+
+  // L-F-forfeit-public-exposure: 실제 league-match-forfeit.service 경로는 outcomeReason
+  // 컬럼을 채우지 않는다 — `[LEAGUE_FORFEIT]` 마커를 reason 컬럼에 붙일 뿐이다. 위 테스트는
+  // (미사용) 가상의 outcomeReason='FORFEIT' 경로만 고정하고 있었고, 그 사이 실제 경로는
+  // 두 방향으로 다 틀렸다: 사유 원문이 history 로 새고, outcome 표기는 아예 안 떴다.
+  it('실제 몰수 경로(outcomeReason=NORMAL, reason 마커만): outcome 은 boolean 만 실리고 사유 원문은 history 에서 새지 않는다', async () => {
+    const service = buildService({
+      fixture: makeFixtureRow({
+        game: makeGame({
+          currentOfficialRevision: {
+            state: 'OFFICIAL',
+            supersedesId: null,
+            officialAt: new Date('2026-09-05T11:00:00.000Z'),
+            score: { home: 1, away: 0 },
+            goalEvents: null,
+            mvpParticipantId: null,
+            outcomeReason: 'NORMAL',
+            outcomeNote: null,
+            reason: '[LEAGUE_FORFEIT] 원정팀 상습 노쇼 — 팀장 연락 두절, 다음 시즌 참가 제한 검토',
+          },
+        }),
+      }),
+      revisions: [
+        {
+          revision: 1,
+          state: 'OFFICIAL',
+          officialAt: new Date('2026-09-05T11:00:00.000Z'),
+          reason: '[LEAGUE_FORFEIT] 원정팀 상습 노쇼 — 팀장 연락 두절, 다음 시즌 참가 제한 검토',
+          supersedesId: null,
+        },
+      ],
+    });
+    const result = await service.getLeagueFixtureRecord(LEAGUE_ID, TEAM_MATCH_ID);
+    // 몰수 사실(boolean)은 스코어 옆에 뜬다 — 정상 1:0 승리로 오인되지 않는다.
+    expect(result.outcome).toEqual({ reason: 'FORFEIT', note: null });
+    // 운영자가 쓴 내부 메모 원문은 어디에도 없다 — history 항목의 사유가 null.
+    expect(result.history).toEqual([
+      { revision: 1, state: 'OFFICIAL', officialAt: '2026-09-05T11:00:00.000Z', reason: null, isCorrection: false },
+    ]);
+    const serialized = JSON.stringify(result);
+    expect(serialized).not.toContain('노쇼');
+    expect(serialized).not.toContain('LEAGUE_FORFEIT');
+  });
+
+  it('정정된 몰수(마커가 앞이 아님): 몰수 표식은 유지되고 운영자가 쓴 사유는 history 에서도 감춰진다', async () => {
+    const service = buildService({
+      fixture: makeFixtureRow({
+        game: makeGame({
+          currentOfficialRevision: {
+            state: 'OFFICIAL',
+            supersedesId: 'prev-revision-id',
+            officialAt: new Date('2026-09-05T11:00:00.000Z'),
+            score: { home: 1, away: 0 },
+            goalEvents: null,
+            mvpParticipantId: null,
+            outcomeReason: 'NORMAL',
+            outcomeNote: null,
+            reason: '[LEAGUE_RESULT_CORRECTION] [LEAGUE_FORFEIT] 스코어 오기재 정정',
+          },
+        }),
+      }),
+      revisions: [
+        {
+          revision: 2,
+          state: 'OFFICIAL',
+          officialAt: new Date('2026-09-05T11:00:00.000Z'),
+          reason: '[LEAGUE_RESULT_CORRECTION] [LEAGUE_FORFEIT] 스코어 오기재 정정',
+          supersedesId: 'prev-revision-id',
+        },
+      ],
+    });
+    const result = await service.getLeagueFixtureRecord(LEAGUE_ID, TEAM_MATCH_ID);
+    // 정정을 거쳐도 몰수 표식은 사라지지 않는다(league-match-public.service.ts의
+    // isForfeit 배지와 동일한 `.includes` 판정).
+    expect(result.outcome).toEqual({ reason: 'FORFEIT', note: null });
+    // 꼬리 텍스트는 '정정 사유'가 아니라 **몰수 사유 그 자체**다. correctResultOnce 는
+    // 같은 `dto.reason` 을 outcomeNote 로도, persistedReason 의 꼬리로도 쓴다
+    // (league-match-result-entry.service.ts): 
+    //   note: dto.reason.trim()
+    //   persistedReason: `[LEAGUE_RESULT_CORRECTION] [LEAGUE_FORFEIT] ${dto.reason.trim()}`
+    // 즉 outcome.note 를 일부러 null 로 가려 놓고 history 에서 같은 문자열을 내보내면
+    // 가린 의미가 없다. 이 테스트는 원래 그 노출을 '공개 유지'로 박제하고 있었다.
+    expect(result.history).toEqual([
+      { revision: 2, state: 'OFFICIAL', officialAt: '2026-09-05T11:00:00.000Z', reason: null, isCorrection: true },
+    ]);
+    const serialized = JSON.stringify(result);
+    expect(serialized).not.toContain('스코어 오기재 정정');
+    expect(serialized).not.toContain('LEAGUE_FORFEIT');
+  });
+
+  // 위 테스트의 짝. 몰수 사유를 감추는 규칙이 "정정 사유는 전부 감춘다"로 번지면
+  // 관전자는 결과가 왜 바뀌었는지 알 수 없게 된다 — 두 경계를 함께 고정한다.
+  it('몰수가 아닌 정정: 사유는 공개하되 감사용 마커만 벗긴다', async () => {
+    const service = buildService({
+      fixture: makeFixtureRow({
+        game: makeGame({
+          currentOfficialRevision: {
+            state: 'OFFICIAL',
+            supersedesId: 'prev-revision-id',
+            officialAt: new Date('2026-09-05T11:00:00.000Z'),
+            score: { home: 2, away: 1 },
+            goalEvents: null,
+            mvpParticipantId: null,
+            outcomeReason: 'NORMAL',
+            outcomeNote: null,
+            reason: '[LEAGUE_RESULT_CORRECTION] 스코어 오기재 정정',
+          },
+        }),
+      }),
+      revisions: [
+        {
+          revision: 2,
+          state: 'OFFICIAL',
+          officialAt: new Date('2026-09-05T11:00:00.000Z'),
+          reason: '[LEAGUE_RESULT_CORRECTION] 스코어 오기재 정정',
+          supersedesId: 'prev-revision-id',
+        },
+      ],
+    });
+    const result = await service.getLeagueFixtureRecord(LEAGUE_ID, TEAM_MATCH_ID);
+    // 몰수가 아니면 outcome 자체가 null 이다(배지를 띄울 근거가 없다).
+    expect(result.outcome).toBeNull();
+    expect(result.history).toEqual([
+      {
+        revision: 2,
+        state: 'OFFICIAL',
+        officialAt: '2026-09-05T11:00:00.000Z',
+        reason: '스코어 오기재 정정',
+        isCorrection: true,
+      },
+    ]);
+    expect(JSON.stringify(result)).not.toContain('LEAGUE_RESULT_CORRECTION');
   });
 
   it('STATUS_ONLY 정책: 스코어·이벤트·라인업이 가려지고 상태만 공개된다', async () => {

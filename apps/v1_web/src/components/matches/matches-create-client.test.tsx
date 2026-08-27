@@ -237,6 +237,40 @@ describe('match edit hydration', () => {
 
     expect(draft.image).toBe('');
   });
+
+  // 2026-08-27 감사 M-A-personal-match-state: toDateInput()이 toISOString()(UTC)을,
+  // toTimeInput()이 toTimeString()(로컬)을 섞어 써서, UTC 자정을 넘어가는 시각(예: KST
+  // 00:00~08:59 시작 매치)을 수정 화면에서 열면 날짜만 하루 앞으로 밀렸다. 날짜·시간이
+  // 항상 같은(로컬) 기준시에서 나오는지를, 특정 타임존을 가정하지 않고 검증한다 — 기대값도
+  // 테스트 실행 호스트의 로컬 getter로 계산해 date와 startTime이 "같은 시계"를 가리키는지 본다.
+  it('날짜와 시간이 같은 기준시(로컬)에서 나온다 — UTC 날짜 + 로컬 시각 혼용으로 하루가 밀리지 않는다', () => {
+    // UTC 22:00은 UTC보다 앞선(양의 오프셋) 타임존에서는 다음날로 넘어간다 — 이 저장소의
+    // 테스트 실행 환경(Asia/Seoul, UTC+9)에서는 2026-09-05T07:00 KST가 된다.
+    const start = new Date(Date.UTC(2026, 8, 4, 22, 0, 0));
+    const expectedDate = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`;
+    const expectedTime = `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`;
+
+    const draft = draftFromMatchEdit({
+      matchId: 'match-early-morning',
+      editable: true,
+      lockedReason: null,
+      form: {
+        sportId: 'sport-futsal',
+        regionId: 'region-gangnam',
+        title: '새벽 축구 매치',
+        imageUrl: null,
+        startsAt: start.toISOString(),
+        capacity: 10,
+        manualPlaceName: '조기축구장',
+      },
+      status: 'recruiting',
+      participantCount: 1,
+      version: new Date().toISOString(),
+    });
+
+    expect(draft.date).toBe(expectedDate);
+    expect(draft.startTime).toBe(expectedTime);
+  });
 });
 
 // Regression: 매치 취소는 되돌리는 API가 없는 파괴적 동작이다 — 신청자 전원이 강제 취소되고

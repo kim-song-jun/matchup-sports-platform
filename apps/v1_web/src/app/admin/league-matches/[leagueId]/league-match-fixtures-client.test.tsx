@@ -970,9 +970,16 @@ describe('LeagueMatchFixturesClient', () => {
     fireEvent.change(within(dialog).getByLabelText(/^사유/), { target: { value: '오심으로 스코어를 정정해요.' } });
     fireEvent.click(within(dialog).getByRole('button', { name: '확인' }));
 
+    // 감사 L-E finding 4 수정: 정정 모달은 몰수 체크박스를 항상 구체적인 boolean 으로
+    // 들고 있다가(기본값은 이 대진의 현재 isForfeit 승계 — 여기 fixture 는 없음/false)
+    // 제출 시 그대로 body 에 싣는다. 서버는 이 값을 "명시적 지정"으로 처리한다
+    // (RecordLeagueResultDto.isForfeit docblock — 미전송일 때만 base 를 승계).
     await waitFor(() =>
       expect(correctMutate).toHaveBeenCalledWith(
-        { teamMatchId: 'tm-1', body: { homeScore: 2, awayScore: 2, reason: '오심으로 스코어를 정정해요.' } },
+        {
+          teamMatchId: 'tm-1',
+          body: { homeScore: 2, awayScore: 2, reason: '오심으로 스코어를 정정해요.', isForfeit: false },
+        },
         expect.anything(),
       ),
     );

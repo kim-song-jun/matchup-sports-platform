@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { X } from 'lucide-react';
+import Link from 'next/link';
+import { AlertTriangle, X } from 'lucide-react';
 import { useModalA11y } from '../v1-ui/use-modal-a11y';
 import type { V1LeagueMatchDisputeResolution } from '@/types/league-match';
 
@@ -9,9 +10,15 @@ import type { V1LeagueMatchDisputeResolution } from '@/types/league-match';
 // (스코어 없음) 두 경로를 하나의 다이얼로그에서 고른다. accessibility 마크업(dialog/
 // focus-trap/ESC/backdrop/포커스복원)은 league-result-entry-modal.tsx 를 그대로 본떴다
 // — 정정 경로의 "전→후" 비교 카드도 그 모달의 패턴을 재사용한다(사용자 확정: 표준 UI).
-
+//
+// 이 모달은 득점·도움 입력 UI 를 일부러 갖지 않는다(대진 화면의 "결과 정정"
+// league-result-entry-modal.tsx 가 그 UI 를 이미 갖고 있고, 이 서브셋을 다시 만들면
+// 같은 편집 기능이 두 화면에 표류한다). 대신 서버가 기존 득점자 기록과 정정 스코어가
+// 충돌한다고 거부하면(LEAGUE_RESULT_CARRIED_PARTICIPANTS_CONFLICT) 여기서는 그 사실을
+// 안내하고 대진 화면으로 보낸다 — 감사 L-E findings[2].
 interface LeagueDisputeResolveModalProps {
   open: boolean;
+  leagueId: string;
   leagueTitle: string;
   homeTeamName: string;
   awayTeamName: string;
@@ -24,6 +31,9 @@ interface LeagueDisputeResolveModalProps {
   onClose: () => void;
   /** True while the parent mutation is in flight */
   pending?: boolean;
+  /** 직전 제출이 LEAGUE_RESULT_CARRIED_PARTICIPANTS_CONFLICT(409/400) 로 거부됐는지.
+   *  이 모달엔 득점 입력이 없어 여기서는 정정을 끝낼 수 없다는 뜻 — 대진 화면 딥링크를 보여준다. */
+  carriedParticipantsConflict?: boolean;
 }
 
 const NOTE_MAX = 500;
@@ -33,6 +43,7 @@ const scoreInputClass =
 
 export function LeagueDisputeResolveModal({
   open,
+  leagueId,
   leagueTitle,
   homeTeamName,
   awayTeamName,
@@ -42,6 +53,7 @@ export function LeagueDisputeResolveModal({
   onSubmit,
   onClose,
   pending = false,
+  carriedParticipantsConflict = false,
 }: LeagueDisputeResolveModalProps) {
   const [resolution, setResolution] = useState<V1LeagueMatchDisputeResolution>('correction');
   const [homeScore, setHomeScore] = useState('');
@@ -247,6 +259,31 @@ export function LeagueDisputeResolveModal({
                     />
                   </div>
                 </div>
+
+                {/* 서버가 LEAGUE_RESULT_CARRIED_PARTICIPANTS_CONFLICT 로 거부한 경우 —
+                    이 모달엔 득점 입력이 없어 여기서는 못 끝낸다. 대진 화면으로 보낸다. */}
+                {carriedParticipantsConflict && (
+                  <div role="alert" className="flex flex-col gap-2 rounded-xl bg-[var(--red50)] px-4 py-3">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle
+                        size={16}
+                        aria-hidden="true"
+                        className="mt-0.5 shrink-0 text-[var(--red700)]"
+                      />
+                      <p className="text-[13px] text-[var(--red700)]">
+                        기존 득점 기록이 새 스코어보다 많아 여기서는 정정할 수 없어요. 대진 화면의
+                        &lsquo;결과 정정&rsquo;에서 득점 기록을 먼저 맞춘 뒤, 이 화면으로 돌아와 다시
+                        처리해 주세요.
+                      </p>
+                    </div>
+                    <Link
+                      href={`/admin/league-matches/${encodeURIComponent(leagueId)}`}
+                      className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-[var(--card-surface)] px-3 text-[length:var(--font-size-label)] font-semibold text-[var(--red700)] underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                    >
+                      대진 화면으로 이동
+                    </Link>
+                  </div>
+                )}
               </>
             )}
 

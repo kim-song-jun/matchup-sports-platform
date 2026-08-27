@@ -1298,11 +1298,14 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           !(gameState === 'SCHEDULED' && sidesMissingLineup.length > 0) && (
             <Banner tone="info">경기를 시작해 주세요.</Banner>
           )}
-        {ops.takeover.status === 'revoked' && (
-          <Banner tone="warning">
-            운영 권한이 해제됐어요. 다른 운영자가 이 경기를 담당하고 있어요.
-          </Banner>
-        )}
+        {/*
+          takeover 가 'revoked' 로 가는 경로는 use-v1-game-operations-console.ts 의
+          onPermissionRevoked 하나뿐이고, 그 경로는 서버 리스를 건드리지 않는다 —
+          아무도 실제로 인수하지 않았으므로 "다른 운영자가 담당하고 있어요" 는 언제나
+          근거 없는 단정이었다. 같은 경로가 확인된 사실만 말하는 배너
+          ("운영 권한을 다시 확인하지 못했어요")를 bannerMessage 로 이미 세우므로,
+          여기서 별도 배너를 렌더하면 모순되는 안내 두 개가 동시에 뜬다.
+        */}
         {ops.takeover.status === 'expired' && (
           <Banner tone="warning">운영 권한을 다시 가져오는 중이에요…</Banner>
         )}

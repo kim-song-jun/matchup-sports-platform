@@ -16,6 +16,7 @@ import { LeagueCompletionProjectionService } from './league-completion-projectio
 import { buildOddTeamCountWarning, checkLeagueTeamAddAllowed, checkLeagueTeamRemovalAllowed } from './league-lifecycle-rules';
 import { tierLabel } from './league-series-admin.service';
 import { resolveResultStage } from './league-result-stage';
+import { resolveIsForfeit } from './league-match-forfeit.service';
 import { FixtureScheduleTemplate, FixtureTimingOptions, generateRoundRobinFixtures, resolveFixtureStartAt, resolveFixtureTimeSlots, RoundRobinFixture } from './round-robin-schedule';
 import {
   AddLeagueTeamDto,
@@ -202,7 +203,17 @@ export class LeagueMatchAdminService {
         ? []
         : await this.prisma.v1GameOfficialFact.findMany({
             where: { revisionId: { in: officialRevisionIds } },
-            select: { gameId: true, homeScore: true, awayScore: true },
+            // 감사 L-E finding 4(2단계) — 운영자 정정 모달이 "현재 이 대진이 몰수로
+            // 확정돼 있는지"를 알아야 몰수 의도를 표현하는 UI(기본값 승계)를 그릴 수
+            // 있다. reason/outcomeReason은 여기서만 boolean 으로 환산하고(resolveIsForfeit),
+            // 원문 reason은 응답에 절대 싣지 않는다(운영자가 쓴 자유 텍스트라도 다른
+            // 대진의 몰수 사유가 이 화면에 노출되는 건 별개 문제).
+            select: {
+              gameId: true,
+              homeScore: true,
+              awayScore: true,
+              resultRevision: { select: { reason: true, outcomeReason: true } },
+            },
           });
     const factByGameId = new Map(facts.map((fact) => [fact.gameId, fact]));
     // 대진을 아직 안 만든 리그에서만 필요하다(일괄 생성 폼의 "기본 장소" 추천용) —
@@ -231,6 +242,7 @@ export class LeagueMatchAdminService {
           resultStage: resolveResultStage(fixture.game),
           homeScore: fact?.homeScore ?? null,
           awayScore: fact?.awayScore ?? null,
+          isForfeit: fact === undefined ? false : resolveIsForfeit(fact.resultRevision),
         };
       }),
     };

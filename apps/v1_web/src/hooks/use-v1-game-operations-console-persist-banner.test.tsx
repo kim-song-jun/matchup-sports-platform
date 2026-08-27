@@ -22,6 +22,13 @@ const GAME_ID = 'game-1';
 function createMockSocket() {
   const handlers = new Map<string, Set<(...args: never[]) => void>>();
   let sequence = 0;
+  // 백로그 결함 수정(realtime-takeover-and-eviction-protocol): 훅은 이제
+  // `game.permission.revoked`를 받으면 곧바로 revoked로 단정하지 않고 이
+  // 게임을 다시 구독해 재검증한다 — 그 재구독이 성공하면(=오탐이었으면)
+  // 배너 없이 조용히 복구된다. 이 파일은 "진짜 해제" 상황에서 더 급한
+  // 배너가 이전 배너를 덮어쓰는지만 검증하므로, 재구독도 실제로 거부돼야
+  // 그 시나리오가 재현된다.
+  let subscriptionDenied = false;
 
   const socket = {
     connected: true,
@@ -35,6 +42,10 @@ function createMockSocket() {
     },
     emit(event: string, _payload: unknown, cb?: (result: unknown) => void) {
       if (event === 'game.subscribe' && cb) {
+        if (subscriptionDenied) {
+          cb({ status: 'denied', code: 'STAFF_SCOPE_DENIED' });
+          return;
+        }
         cb({
           status: 'subscribed',
           snapshot: { version: 3, state: 'LIVE' as GameState, lastSequence: 0, events: [] },
@@ -62,7 +73,12 @@ function createMockSocket() {
     }
   }
 
-  return { socket, fire };
+  /** 이후의 재구독 재검증까지 실제로 거부되게 만든다 — 진짜 권한 해제를 흉내낸다. */
+  function denySubscriptionFromNowOn() {
+    subscriptionDenied = true;
+  }
+
+  return { socket, fire, denySubscriptionFromNowOn };
 }
 
 vi.mock('@/lib/api-client', () => ({
@@ -123,7 +139,11 @@ async function recordGoal(submit: (input: never) => Promise<void>, clockMs: numb
       participantId: 'p-1',
       period: 1,
       clockMs,
-      occurredAt: '2026-08-16T00:01:00.000Z',
+      // 고정된 과거 날짜가 아니라 "지금"이어야 한다 — 오프라인 큐 첫 전송의
+      // CLOCK_DRIFT 오탐 수정(sendQueuedItem의 isClockDrifted 게이트) 이후,
+      // 30초 넘게 지난 occurredAt은 첫 시도부터 game.event.retry로 나가고
+      // 이 mock 소켓은 'game.event.retry'를 처리하지 않는다(append만 흉내).
+      occurredAt: new Date().toISOString(),
       payload: {},
     });
   });
@@ -131,7 +151,7 @@ async function recordGoal(submit: (input: never) => Promise<void>, clockMs: numb
 
 describe('useV1GameOperationsConsole — 로컬 저장 실패 통지', () => {
   it('저장이 실패하면 배너를 띄우되, 이후 큐가 바뀌어도 더 급한 배너를 덮어쓰지 않는다', async () => {
-    const { fire, result, unmount } = await mountConsole();
+    const { fire, denySubscriptionFromNowOn, result, unmount } = await mountConsole();
 
     failSetItem();
 
@@ -139,13 +159,19 @@ describe('useV1GameOperationsConsole — 로컬 저장 실패 통지', () => {
     await recordGoal(result.current.submitEvent as never, 60_000);
     await waitFor(() => expect(result.current.bannerMessage).toContain('임시 저장하지 못했어요'));
 
-    // 다른 운영자가 인계 — 이쪽이 훨씬 급한 공지다.
+    // 권한 해제 — 이쪽이 훨씬 급한 공지다. 훅은 이제 이 통지를 곧바로 영구
+    // 박탈로 단정하지 않고 이 게임을 재구독해 재검증하므로(백로그 결함 수정
+    // realtime-takeover-and-eviction-protocol), 그 재구독까지 실제로 거부돼야
+    // "진짜 해제" 시나리오가 재현된다.
+    denySubscriptionFromNowOn();
     act(() => fire('game.permission.revoked'));
-    expect(result.current.bannerMessage).toBe('운영 권한이 해제됐어요. 다른 운영자가 이 경기를 담당하고 있어요.');
+    await waitFor(() =>
+      expect(result.current.bannerMessage).toBe('이 경기의 운영 권한을 다시 확인하지 못했어요. 새로고침 후 다시 시도해주세요.'),
+    );
 
     // 저장이 계속 실패하는 기기에서 큐가 한 번 더 바뀌어도 그 공지를 지우면 안 된다.
     await recordGoal(result.current.submitEvent as never, 120_000);
-    expect(result.current.bannerMessage).toBe('운영 권한이 해제됐어요. 다른 운영자가 이 경기를 담당하고 있어요.');
+    expect(result.current.bannerMessage).toBe('이 경기의 운영 권한을 다시 확인하지 못했어요. 새로고침 후 다시 시도해주세요.');
 
     unmount();
   });

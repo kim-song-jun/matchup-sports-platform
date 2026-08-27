@@ -11,7 +11,7 @@ import {
   tierSlotCounts,
   type PromotionKind,
 } from './league-promotion';
-import { FORFEIT_REASON_MARKER } from './league-match-forfeit.service';
+import { resolveIsForfeit } from './league-match-forfeit.service';
 import { ListLeagueMatchesQueryDto } from './dto/league-match.dto';
 
 const PLAYER_RECORDS_LIMIT = 30;
@@ -281,10 +281,17 @@ export class LeagueMatchPublicService {
       ? []
       : await this.prisma.v1GameOfficialFact.findMany({
           where: { revisionId: { in: currentRevisionIds } },
-          // 몰수 여부는 결과 리비전의 사유 접두어로만 알 수 있다(전용 컬럼이 없다).
-          // 사유 원문은 운영자가 쓴 자유 텍스트라 공개 응답에 절대 싣지 않고, 아래에서
-          // boolean 으로만 환산한다.
-          select: { gameId: true, homeScore: true, awayScore: true, resultRevision: { select: { reason: true } } },
+          // 감사 L-E finding 4 수정: 몰수 여부의 1차 판정 근거는 이제 전용 컬럼
+          // `outcomeReason`이다(`league-match-forfeit.service.ts`가 생성 시점에 쓴다).
+          // `reason`은 컬럼이 생기기 전에 만들어진 레거시 리비전을 위한 fallback으로만
+          // 계속 읽는다 — 사유 원문은 운영자가 쓴 자유 텍스트라 공개 응답에 절대 싣지
+          // 않고, 아래에서 boolean 으로만 환산한다.
+          select: {
+            gameId: true,
+            homeScore: true,
+            awayScore: true,
+            resultRevision: { select: { reason: true, outcomeReason: true } },
+          },
         });
     const factByGameId = new Map(facts.map((fact) => [fact.gameId, fact]));
 
@@ -341,11 +348,12 @@ export class LeagueMatchPublicService {
           awayScore: fact?.awayScore ?? null,
           // 몰수 결과는 스코어만 보면 실제 1:0 승리와 구분되지 않는다. 관전자가 그 둘을
           // 같은 경기로 읽지 않도록 boolean 하나만 내보낸다(사유 원문은 비공개).
-          // 감사 L-E finding 4 수정: `.includes`로 넓힌 이유 -- 몰수 결과를 정정하면
-          // reason이 `[LEAGUE_RESULT_CORRECTION] [LEAGUE_FORFEIT] ...`처럼 정정 마커가
-          // 앞에 붙는다(league-match-result-entry.service.ts). `startsWith`만 보면 정정을
-          // 한 번만 거쳐도 몰수 표식이 영구히 사라진다.
-          isForfeit: fact?.resultRevision.reason?.includes(FORFEIT_REASON_MARKER) ?? false,
+          // 감사 L-E finding 4 수정: 판정 근거를 전용 컬럼 `outcomeReason`으로 옮겼다
+          // (정정을 거쳐도 `league-match-result-entry.service.ts`의 correctResultOnce가
+          // 이 컬럼을 승계하므로 표식이 유지된다). 레거시 fallback을 포함한 판정 로직은
+          // `resolveIsForfeit`(league-match-forfeit.service.ts) 단일 출처를 쓴다 —
+          // 어드민 상세(league-match-admin.service.ts)도 같은 함수를 쓴다.
+          isForfeit: fact === undefined ? false : resolveIsForfeit(fact.resultRevision),
         };
       }),
     };

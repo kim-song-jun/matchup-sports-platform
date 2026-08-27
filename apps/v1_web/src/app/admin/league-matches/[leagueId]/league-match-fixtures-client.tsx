@@ -413,6 +413,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
     awayScore: number,
     reason: string,
     participantStats: V1LeagueResultParticipantStat[],
+    isForfeit: boolean | undefined,
   ) => {
     if (!resultEntryFixture) return;
     const mutation = resultEntryMode === 'correction' ? correctResult : recordResult;
@@ -432,6 +433,11 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
             : participantStats.length > 0
               ? { participants: participantStats }
               : {}),
+          // 감사 L-E finding 4 수정: 정정 모드에서만 싣는다(신규 입력은 모달이 항상
+          // undefined 를 넘긴다 — 몰수 개념이 없는 모드). 미전송이면 서버가 base를
+          // 승계하므로, 여기서도 undefined 를 그대로 흘려 "값 없음"과 "false"를
+          // 구분한다(?? 로 접으면 항상 boolean 이 되어 이 구분이 사라진다).
+          ...(isForfeit === undefined ? {} : { isForfeit }),
         },
       },
       {
@@ -1048,6 +1054,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
         weekLabel={resultEntryFixture?.title ?? ''}
         currentHomeScore={resultEntryFixture?.homeScore ?? null}
         currentAwayScore={resultEntryFixture?.awayScore ?? null}
+        currentIsForfeit={resultEntryFixture?.isForfeit}
         participants={fixtureParticipants.data ?? null}
         onSubmit={onResultEntrySubmit}
         onClose={() => setResultEntryFixture(null)}

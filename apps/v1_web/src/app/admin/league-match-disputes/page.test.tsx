@@ -6,7 +6,7 @@
  *  3. 처리/거부 mutation 이 disputeId·body 로 정확히 호출되는지
  * (전→후 스코어 입력 토글은 컴포넌트 단위로 league-dispute-resolve-modal.test.tsx 에서 검증한다.)
  */
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { V1AdminLeagueMatchDisputeRow } from '@/types/league-match';
@@ -144,6 +144,36 @@ describe('AdminLeagueMatchDisputesPage', () => {
       },
       expect.anything(),
     );
+  });
+
+  // 감사 L-E findings[2]: 서버가 LEAGUE_RESULT_CARRIED_PARTICIPANTS_CONFLICT 로 거부하면
+  // (이 모달엔 득점 입력이 없어) 여기서는 정정을 끝낼 수 없다 — 모달이 닫히지 않고 대진
+  // 화면 딥링크가 있는 안내 배너를 보여줘야 막다른 길이 안 된다.
+  it('LEAGUE_RESULT_CARRIED_PARTICIPANTS_CONFLICT 이면 모달이 열린 채로 대진 화면 딥링크를 보여준다', async () => {
+    const user = userEvent.setup();
+    renderWith([OPEN_ROW]);
+
+    await user.click(screen.getAllByRole('button', { name: '처리' })[0]);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    await user.clear(screen.getByLabelText('성수 FC'));
+    await user.type(screen.getByLabelText('성수 FC'), '2');
+    await user.clear(screen.getByLabelText('왕십리 유나이티드'));
+    await user.type(screen.getByLabelText('왕십리 유나이티드'), '1');
+    await user.type(screen.getByLabelText(/처리 사유/), '오프사이드 골 취소');
+    await user.click(screen.getByRole('button', { name: '확인' }));
+
+    expect(resolveMutate).toHaveBeenCalled();
+    const [, options] = resolveMutate.mock.calls.at(-1)!;
+    act(() => {
+      options.onError({
+        response: { data: { code: 'LEAGUE_RESULT_CARRIED_PARTICIPANTS_CONFLICT', message: '기존 선수 득점 합이 정정 스코어보다 많아요.' } },
+      });
+    });
+
+    // 모달은 닫히지 않는다 — 스코어 입력이 여전히 화면에 있다.
+    expect(screen.getByLabelText('성수 FC')).toBeInTheDocument();
+    const link = screen.getByRole('link', { name: '대진 화면으로 이동' });
+    expect(link).toHaveAttribute('href', '/admin/league-matches/league-1');
   });
 
   it('거부 모달에서 제출하면 reject mutation 이 disputeId·body 로 호출된다', async () => {

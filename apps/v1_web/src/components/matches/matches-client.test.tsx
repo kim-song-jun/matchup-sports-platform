@@ -38,19 +38,25 @@ vi.mock('./matches-page', () => ({
     <div>
       {model.onApply && <button onClick={model.onApply}>참가 신청</button>}
       {model.reviewAction && <a href={model.reviewAction.href}>{model.reviewAction.label}</a>}
+      <div data-testid="address">{model.match.address}</div>
+      <div data-testid="description">{model.match.description}</div>
     </div>
   ),
   MatchListPageView: () => null,
   MatchStatePageView: () => null,
 }));
 
+// place는 실제 detail API 응답 모양(`{ name, addressText }`) 그대로 둔다 — 예전 fixture는
+// 실API가 절대 주지 않는 top-level `placeName`을 심어 뒀고, matches-client.tsx의
+// `?? query.data.placeName` 폴백 가지가 이 fixture 때문에만 값을 갖게 되어 실제로는 목업
+// fallback까지 내려가는 결함(2026-08-27 감사 M-A-personal-match-state)을 가리고 있었다.
 const baseMatch = {
   id: 'match-1',
   matchId: 'match-1',
   title: '풋살 매치',
   sportName: '풋살',
   sport: { sportId: 'sport-futsal', name: '풋살' },
-  placeName: '서울 풋살장',
+  place: { name: '서울 풋살장', addressText: '서울 마포구 월드컵로 1' },
   startsAt: '2026-08-01T10:00:00.000Z',
   capacityText: '3/10',
   status: 'open' as const,
@@ -106,6 +112,48 @@ describe('MatchDetailPageClient — GA events', () => {
       expect(withdrawMatchMutateAsync).toHaveBeenCalledWith({ reason: 'applicant_withdrawn_from_v1_web' });
     });
     expect(trackEvent).toHaveBeenCalledWith('match_leave', { matchId: 'match-1' });
+  });
+});
+
+describe('MatchDetailPageClient — 주소·설명 목업 폴백 (2026-08-27 감사 M-A-personal-match-state)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useV1MatchApplicationEligibilityMock.mockReturnValue({ data: { eligible: true, applicationId: null } });
+  });
+
+  it('상세 주소·설명 없이 만든 매치는 목업 문자열("서울 양천구 안양천로 939" 등)로 채워지지 않는다', () => {
+    useV1MatchMock.mockReturnValue({
+      data: {
+        ...baseMatch,
+        place: { name: '성수 실내체육관', addressText: null },
+        description: null,
+        descriptionPreview: null,
+        viewerState: 'none',
+      },
+      isError: false,
+    });
+
+    render(<MatchDetailPageClient matchId="match-1" />);
+
+    expect(screen.getByTestId('address')).toHaveTextContent('');
+    expect(screen.getByTestId('description')).toHaveTextContent('');
+  });
+
+  it('상세 주소·설명이 있는 매치는 실제 API 값을 그대로 보여준다', () => {
+    useV1MatchMock.mockReturnValue({
+      data: {
+        ...baseMatch,
+        place: { name: '성수 실내체육관', addressText: '서울 성동구 아차산로 17' },
+        description: '초보 환영 농구 매치예요.',
+        viewerState: 'none',
+      },
+      isError: false,
+    });
+
+    render(<MatchDetailPageClient matchId="match-1" />);
+
+    expect(screen.getByTestId('address')).toHaveTextContent('서울 성동구 아차산로 17');
+    expect(screen.getByTestId('description')).toHaveTextContent('초보 환영 농구 매치예요.');
   });
 });
 

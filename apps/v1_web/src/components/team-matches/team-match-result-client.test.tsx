@@ -260,6 +260,77 @@ describe('TeamMatchResultPageClient — 호스트 결과 입력', () => {
     expect(screen.queryByText('결과 작성 완료')).not.toBeInTheDocument();
   });
 
+  // 감사 백로그 M-E 재현: OFFICIAL로 확정되는 순간 입력한 득점자·카드·MVP가 화면에서
+  // 통째로 사라졌다 — GoalTimeline은 이 화면이 만드는 평평한 score({home,away})에서는
+  // 항상 null을 반환하고, 확정 카드에는 다른 대체 블록이 없었다. 호스트는 자기 팀
+  // 라인업이 있으므로 실명(잠실 배정 등번호 포함)으로 보여야 한다.
+  it('공식 확정(OFFICIAL) 상태에서도 득점자·카드·MVP를 roster 실명으로 보여준다', () => {
+    useV1GameResultRevisionsMock.mockReturnValue(
+      settledQuery<V1GameResultRevision[]>([
+        revision({
+          state: 'OFFICIAL',
+          officialAt: '2026-08-01T01:00:00.000Z',
+          score: { home: 1, away: 0 },
+          mvpParticipantId: 'p-1',
+          resultParticipants: [
+            {
+              id: 'rp-1',
+              resultRevisionId: 'rev-1',
+              participantId: 'p-1',
+              sideId: 'side-home',
+              started: true,
+              minutesPlayed: null,
+              goals: 1,
+              assists: 0,
+              fouls: 0,
+              cards: { yellow: 1, red: 0 },
+              goalkeeper: false,
+            },
+          ],
+        }),
+      ]),
+    );
+    render(<TeamMatchResultPageClient teamMatchId="tm-1" />);
+    expect(screen.getByText(/#7 김민준.*1골/)).toBeInTheDocument();
+    expect(screen.getByText(/#7 김민준.*옐로/)).toBeInTheDocument();
+    expect(screen.getAllByText('#7 김민준').length).toBeGreaterThan(0); // MVP 줄
+    // participantId 원문이 그대로 노출되면 안 된다(이름 매핑 실패 회귀 가드)
+    expect(screen.queryByText(/^p-1$/)).not.toBeInTheDocument();
+  });
+
+  // 감사 백로그 M-E 재현: 제출 직후에는 latest.state가 SUBMITTED로 넘어가는데, 그 화면은
+  // "상대팀 승인을 기다리고 있어요" 문구만 남기고 방금 입력한 기록을 보여주지 않았다.
+  it('제출 후 SUBMITTED(승인 대기) 상태에서도 득점자·MVP를 roster 실명으로 보여준다', () => {
+    useV1GameResultRevisionsMock.mockReturnValue(
+      settledQuery<V1GameResultRevision[]>([
+        revision({
+          state: 'SUBMITTED',
+          score: { home: 1, away: 0 },
+          mvpParticipantId: 'p-1',
+          submittedAt: '2026-08-01T00:00:00.000Z',
+          resultParticipants: [
+            {
+              id: 'rp-1',
+              resultRevisionId: 'rev-1',
+              participantId: 'p-1',
+              sideId: 'side-home',
+              started: true,
+              minutesPlayed: null,
+              goals: 1,
+              assists: 0,
+              fouls: 0,
+              cards: { yellow: 0, red: 0 },
+              goalkeeper: false,
+            },
+          ],
+        }),
+      ]),
+    );
+    render(<TeamMatchResultPageClient teamMatchId="tm-1" />);
+    expect(screen.getByText('상대팀 승인을 기다리고 있어요')).toBeInTheDocument();
+    expect(screen.getByText(/#7 김민준.*1골/)).toBeInTheDocument();
+  });
+
   it('친선 자가 제출 결과는 어시스트 입력란이 없으므로 골이 있어도 "어시스트 미기입" 경고를 띄우지 않는다', () => {
     // 친선 팀매치 자가 제출 폼은 assists를 상수 0으로 고정 전송한다(입력란 자체가 없음) —
     // countMissingAssists(totalGoals - totalAssists)를 이 화면에 그대로 적용하면 골이 있는
@@ -610,6 +681,42 @@ describe('TeamMatchResultApprovalPageClient — 상대팀 승인/정정 요청',
     fireEvent.click(screen.getByText('승인하기'));
     expect(decideMutateAsync).not.toHaveBeenCalled();
     expect(screen.getByText('승인 확정')).toBeInTheDocument();
+  });
+
+  // 감사 백로그 M-E 재현: 승인 전(SUBMITTED)에는 보이던 득점자·MVP 요약이 "승인하기"를
+  // 눌러 OFFICIAL로 확정된 순간 사라졌다 — 승인 화면은 호스트 라인업을 조회할 수 없으므로
+  // (roster 없음) 이전과 같은 participantId 라벨로라도 계속 보여야 한다.
+  it('OFFICIAL 확정 후에도 승인 화면은 득점자·MVP 요약을 계속 보여준다', () => {
+    useV1GameResultRevisionsMock.mockReturnValue(
+      settledQuery<V1GameResultRevision[]>([
+        revision({
+          state: 'OFFICIAL',
+          score: { home: 1, away: 0 },
+          officialAt: '2026-08-01T01:00:00.000Z',
+          mvpParticipantId: 'p-1',
+          resultParticipants: [
+            {
+              id: 'rp-1',
+              resultRevisionId: 'rev-1',
+              participantId: 'p-1',
+              sideId: 'side-home',
+              started: true,
+              minutesPlayed: null,
+              goals: 1,
+              assists: 0,
+              fouls: 0,
+              cards: { yellow: 0, red: 0 },
+              goalkeeper: false,
+            },
+          ],
+        }),
+      ]),
+    );
+    render(<TeamMatchResultApprovalPageClient teamMatchId="tm-1" />);
+
+    expect(screen.getByText('공식 결과로 확정됐어요')).toBeInTheDocument();
+    expect(screen.getByText(/선수 #p-1.*1골/)).toBeInTheDocument();
+    expect(screen.getByText('선수 #p-1')).toBeInTheDocument(); // MVP 줄
   });
 
   it('정정 요청은 사유 입력 전에는 비활성화, 입력 후 전송된다', async () => {

@@ -137,6 +137,12 @@ export class HomeService {
     const limit = Math.min(Math.max(input.limit ?? 5, 1), 20);
     const where: Prisma.V1MatchWhereInput = {
       status: 'recruiting',
+      // v1에는 만료를 자동으로 다른 status로 넘기는 cron이 없어 시작 시각이 지나도 status는
+      // 계속 'recruiting'으로 남는다 — startAt 필터가 없으면 홈 히어로(featuredMatch)가 가장
+      // 오래 지난 죽은 매치를 "신청 가능"인 것처럼(만료 표시 자체가 없는 payload라 더 나쁘다)
+      // 노출한다(2026-08-27 감사 M-A-personal-match-state, matches.service.ts list()의 동일
+      // 결함과 같은 근본 원인).
+      startAt: { gte: new Date() },
       deletedAt: null,
       ...(input.sportId ? { sportId: input.sportId } : {}),
       ...(input.regionId ? { regionId: input.regionId } : {}),

@@ -51,7 +51,17 @@ export class MatchesService {
     const status = query.status ?? 'recruiting';
     const where: Prisma.V1MatchWhereInput = {
       deletedAt: null,
-      ...(status === 'expired' ? { startAt: { lt: new Date() } } : { status }),
+      // status='recruiting'인 raw DB 행에는 시작 시각이 이미 지난("만료") 매치도 섞여 있다 —
+      // v1에는 만료를 자동으로 다른 status로 넘기는 cron이 없기 때문이다. 'recruiting' 조회는
+      // 그 만료분을 제외해야 목록 정렬(startAt asc)이 가장 오래된 죽은 매치로 첫 페이지를
+      // 채우지 않는다(2026-08-27 감사 M-A-personal-match-state). 'expired' 조회 분기와
+      // completed/cancelled 등 나머지 status 조회는 과거 startAt을 의도적으로 포함해야 하므로
+      // 그대로 둔다.
+      ...(status === 'expired'
+        ? { startAt: { lt: new Date() } }
+        : status === 'recruiting'
+          ? { status, startAt: { gte: new Date() } }
+          : { status }),
       ...(query.sportId ? { sportId: query.sportId } : {}),
       ...(query.regionId ? { regionId: query.regionId } : {}),
       ...(query.genderRule ? { genderRule: getGenderRuleWhere(query.genderRule) } : {}),
@@ -324,11 +334,21 @@ export class MatchesService {
   async edit(user: V1AuthUser, matchId: string) {
     const match = await this.getHostMatch(user, matchId);
     const participantCount = await this.getActiveParticipantCount(match.id);
-    const editable = match.status === 'recruiting' || match.status === 'closed';
+    // update()/cancel()은 raw status뿐 아니라 getApiStatus(match)==='expired'(recruiting +
+    // startAt이 지남)도 막는다 — edit()이 raw status만 봤을 때는 이 판정이 어긋나 수정 화면이
+    // editable:true로 열리고, 저장 시점에야 서버가 영문 'Terminal match cannot be updated' 409로
+    // 거부해 호스트가 일정을 고쳐 탈출할 방법조차 없었다(2026-08-27 감사
+    // M-A-personal-match-state). 세 메서드가 같은 만료 판정을 쓰도록 통일한다.
+    const editable =
+      (match.status === 'recruiting' || match.status === 'closed') && this.getApiStatus(match) !== 'expired';
 
     return {
       matchId: match.id,
       editable,
+      // 값은 기존 'terminal_status' 하나로 통일한다 — 프론트 공용 라벨(lib/v1-status-labels.ts)의
+      // 'terminal_status' 문구("완료·취소·종료된 매치는 수정할 수 없어요.")가 이미 도메인 중립적이라
+      // 만료 케이스에도 그대로 맞고, 팀매치 전용 'expired' 키("...팀매치는...")를 재사용하면
+      // 오문구가 된다.
       lockedReason: editable ? null : 'terminal_status',
       form: {
         sportId: match.sportId,
@@ -962,6 +982,12 @@ export class MatchesService {
     if (viewerState === 'approved' || viewerState === 'participant') return 'ALREADY_PARTICIPANT';
     if (this.getParticipantCount(match) >= match.maxParticipants) return 'FULL';
     if (match.deadlineAt && match.deadlineAt < new Date()) return 'DEADLINE_PASSED';
+    // status='recruiting'인데 시작 시각이 지난 매치("만료")는 raw status만으로는 구분되지 않는다
+    // — 이 서비스의 다른 모든 만료 판정(getApiStatus/getDisplayState, update/cancel의 가드)이 쓰는
+    // 것과 같은 조건을 그대로 재사용해 여기서도 신청을 막는다(2026-08-27 감사
+    // M-A-personal-match-state: 이 검사가 없어 시작 시각이 지난 매치에 신청이 그대로 접수되고,
+    // approveApplication의 startAt 가드에 걸려 호스트가 영원히 승인할 수 없었다).
+    if (match.status === 'recruiting' && match.startAt < new Date()) return 'EXPIRED';
     if (match.status !== 'recruiting') return 'NOT_RECRUITING';
     return 'OK';
   }
@@ -1118,6 +1144,7 @@ function getReasonMessage(reasonCode: string) {
     ALREADY_PARTICIPANT: '이미 참여가 확정된 매치예요.',
     FULL: '정원이 모두 찼어요.',
     DEADLINE_PASSED: '신청 가능 시간이 지났어요.',
+    EXPIRED: '경기 시작 시간이 지나 신청할 수 없어요.',
     NOT_RECRUITING: '지금은 모집 중인 매치가 아니에요.',
     BLOCKED_USER: '신청할 수 없는 계정 상태예요.',
   };

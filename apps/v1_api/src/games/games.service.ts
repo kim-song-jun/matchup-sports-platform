@@ -3379,6 +3379,16 @@ export class GamesService {
     gameId: string,
     headerIdempotencyKey: string | undefined,
     dto: CreateGameResultRevisionDto,
+    /**
+     * 감사 L-E finding 4 수정: TEAM_MATCH 결과 리비전에 몰수·중단 사유를 심는 내부
+     * 전용 파라미터다. `CreateGameResultRevisionDto`(공개 HTTP body)에는 일부러 넣지
+     * 않는다 — 이 필드를 DTO에 두면 `games.controller.ts`의 일반 팀결과제출
+     * 엔드포인트(팀 캡틴도 호출 가능)로 누구나 임의 결과에 몰수 표식을 붙일 수 있게
+     * 된다. 몰수는 `league-match-forfeit.service.ts`·`league-match-result-entry.service.ts`
+     * 같은 신뢰된 내부 호출자만 이 파라미터로 넘긴다. 생략하면 스키마 기본값 NORMAL이
+     * 그대로 적용된다(`deriveTournamentRevision`의 같은 패턴 참고).
+     */
+    outcome?: { outcomeReason: 'NORMAL' | 'FORFEIT' | 'ABANDONED'; note: string | null },
   ): Promise<GameRevisionMutationResult> {
     const source = await this.prisma.v1Game.findUnique({
       where: { id: gameId },
@@ -3446,6 +3456,9 @@ export class GamesService {
             missingScorer: invariant.missingScorer,
             mvpParticipantId: dto.mvpParticipantId,
             reason: dto.reason,
+            ...(outcome === undefined
+              ? {}
+              : { outcomeReason: outcome.outcomeReason, outcomeNote: outcome.note }),
             createdByActorType: 'USER',
             createdByUserId: user.id,
             supersedesId: latest?.id,
@@ -3748,6 +3761,15 @@ export class GamesService {
     gameId: string,
     headerIdempotencyKey: string | undefined,
     dto: CreateGameResultRevisionDto,
+    /**
+     * 감사 L-E finding 4 수정: 정정 리비전에 몰수·중단 사유를 심는 내부 전용
+     * 파라미터. `createResultRevision`의 같은 파라미터와 이유가 같다 —
+     * `league-match-result-entry.service.ts`(유일한 호출자)가 base 리비전의
+     * `outcomeReason`(레거시 데이터는 reason 접두어)과 이번 요청의 명시적 의도를
+     * 조합해 계산한 값을 넘긴다. 생략하면 NORMAL(정정은 기본적으로 몰수를 해제한다는
+     * 뜻이 아니라 — 이 파라미터는 호출자가 항상 명시적으로 채워 넘긴다).
+     */
+    outcome?: { outcomeReason: 'NORMAL' | 'FORFEIT' | 'ABANDONED'; note: string | null },
   ): Promise<GameRevisionMutationResult> {
     const source = await this.prisma.v1Game.findUnique({
       where: { id: gameId },
@@ -3837,6 +3859,9 @@ export class GamesService {
             missingScorer: invariant.missingScorer,
             mvpParticipantId: dto.mvpParticipantId,
             reason: dto.reason,
+            ...(outcome === undefined
+              ? {}
+              : { outcomeReason: outcome.outcomeReason, outcomeNote: outcome.note }),
             createdByActorType: 'USER',
             createdByUserId: user.id,
             supersedesId: latest.id,

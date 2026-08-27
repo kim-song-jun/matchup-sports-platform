@@ -23,7 +23,13 @@ import {
   type TakeoverState,
 } from '@/lib/game-operations-queue';
 import { canonicalGameEventPayloadHash } from '@/lib/game-operations-hash';
-import { medianOffsetMs, pushClockSample, type ClockPingPong } from '@/lib/game-operations-clock';
+import {
+  isClockDrifted,
+  medianOffsetMs,
+  pushClockSample,
+  serverAlignedNowMs,
+  type ClockPingPong,
+} from '@/lib/game-operations-clock';
 import { getV1GameOperationsSocket, setGameOperationsAuthorizationSubjectVersion } from '@/lib/v1-game-operations-socket';
 import { randomUuid } from '@/lib/uuid';
 import { reportClientError } from '@/lib/client-error-reporter';
@@ -585,10 +591,42 @@ export function useV1GameOperationsConsole(
       // 숫자로 이 기준을 올려 버리면, 정작 그 이벤트의 브로드캐스트가 중복으로
       // 취급돼 화면에서 영영 사라진다(receivedSequenceRef 선언부 주석 참고).
     };
+    // 백로그 결함 수정(realtime-takeover-and-eviction-protocol): 서버의
+    // `evictUserFromScopedGameRooms`는 **대회 단위**로 축출한다 — 이 사용자가
+    // 같은 대회에서 배정을 둘 이상(예: 필드 A·B 담당) 갖고 있으면, 그중 하나
+    // (필드 A)만 해제돼도 서버가 그 대회의 구독 중인 게임 전부에
+    // `game.permission.revoked`를 보낸다. 이건 실수가 아니라 명세이자 스펙으로
+    // 박제된 동작이다(realtime.gateway.task8-protocol.spec.ts) — 그래서 이
+    // 소켓 프로토콜 자체를 배정 단위로 좁히는 대신, 이 통지를 곧바로 "영구
+    // 박탈"로 취급하지 않고 **재검증 트리거**로 다룬다: 이 게임 자체를 다시
+    // 구독해 본다. 서버 `subscribeToGame`은 구독마다 이 특정 fixture/field에
+    // 대한 스태프 스코프를 처음부터 다시 검사하므로(해제된 배정과 무관하게),
+    // 해제된 게 다른 배정(필드 A)이고 이 게임(필드 B)을 지키는 배정이 여전히
+    // 유효하면 재구독이 그대로 통과해 room 재가입 + 최신 스냅숏 적용까지
+    // 한 번에 끝난다 — 배너 한 번 깜빡이지 않고 조용히 복구된다(진짜 오탐이던
+    // 경우). 재구독마저 거부되면 그때 비로소 실제로 이 게임에 대한 접근이
+    // 없다는 뜻이므로 기존과 같이 revoked로 전환한다 — 어떤 경로로도 지금보다
+    // 나빠지지 않는다(재검증 실패 시의 동작은 이 픽스 이전과 동일하다).
     const onPermissionRevoked = () => {
       if (cancelled) return;
-      dispatchTakeover({ type: 'REVOKED', assignmentVersion: -1 });
-      setBannerMessage('운영 권한이 해제됐어요. 다른 운영자가 이 경기를 담당하고 있어요.');
+      socket.emit(
+        'game.subscribe',
+        { gameId, afterSequence: 0 },
+        (result: SubscribeAck) => {
+          if (cancelled) return;
+          if (result.status === 'subscribed' && result.snapshot) {
+            applySnapshot(result.snapshot);
+            return;
+          }
+          dispatchTakeover({ type: 'REVOKED', assignmentVersion: -1 });
+          // 서버 리스(GameTakeoverService)는 이 축출 경로에서 전혀 바뀌지
+          // 않는다 — revoke()는 여기서 호출되지 않으므로 아무도 실제로
+          // 인수하지 않았다. "다른 운영자가 담당하고 있어요"는 재검증까지
+          // 실패한 이 상태에서도 근거 없는 단정이라, 실제로 확인된 사실(재검증
+          // 실패)만 말한다.
+          setBannerMessage('이 경기의 운영 권한을 다시 확인하지 못했어요. 새로고침 후 다시 시도해주세요.');
+        },
+      );
     };
     const onGameError = (error: { code: string; clientEventId?: string }) => {
       if (cancelled) return;
@@ -734,20 +772,27 @@ export function useV1GameOperationsConsole(
 
   // UX 감사 — 주기적 renew(위 effect)가 실패하면 'denied'로 떨어지는데,
   // renew가 실패하는 흔한 이유는 (진짜 권한 상실이 아니라) 토큰 자체가
-  // 서버에서 만료돼 renew 창을 놓친 경우다(게이트웨이가 `renewTakeover`
-  // 실패를 거의 항상 `TAKEOVER_TOKEN_EXPIRED`로 매핑한다 —
-  // `RealtimeGateway.renewGameTakeover`, `PERMISSION_DENIED`가 아닌 모든
-  // ForbiddenException이 이 코드로 온다). 배너 문구
+  // 서버에서 만료돼 renew 창을 놓친 경우다. 배너 문구
   // (`gameOperationsErrorMessage('TAKEOVER_TOKEN_EXPIRED')`)는 이미
   // "다시 가져오는 중이에요"라고 말하지만, 이전엔 자동 재요청 effect가
   // `status === 'expired'`(자연 만료, `CHECK_EXPIRY`)만 지켜봐서 실제로는
   // 아무것도 다시 가져오지 않았다 — alpha 실측(2026-08): 배너가 뜬 채 8초를
-  // 기다려도 회복되지 않고 새로고침해야 풀렸다. `game.takeover.request`(재요청,
-  // renew가 아니다)는 이 코드를 절대 돌려주지 않으므로(요청 경로는
-  // STAFF_SCOPE_DENIED/VALIDATION_ERROR/granted만 가능) 이 재시도가 같은
-  // 이유로 계속 실패하며 도는 tight loop이 될 수 없다. STAFF_SCOPE_DENIED 등
-  // 진짜 권한 거부는 그대로 'denied'에 남아 재시도하지 않는다(D-10 취지 —
-  // 같은 이유로 확실히 또 실패할 요청을 자동으로 반복하지 않는다).
+  // 기다려도 회복되지 않고 새로고침해야 풀렸다.
+  //
+  // 백로그 결함 수정(realtime-takeover-and-eviction-protocol): 그 회귀 픽스가
+  // `TAKEOVER_TOKEN_EXPIRED`(renew 실패는 PERMISSION_DENIED가 아닌 한 전부 이
+  // 코드로 왔다)를 전부 자동 재요청 대상으로 삼으면서, 정당하게 다른 콘솔이
+  // 넘겨받은 경우("다른 운영자가 방금 이 경기를 가져감" — 예: 같은 fixture를
+  // 담당자 두 명이 동시에 열었거나, 한 사람이 탭 두 개를 열었을 때)까지 같이
+  // 잡아 버렸다. 그 경우 서버는 grant()가 무조건 덮어쓰기라 상대의 재요청도
+  // 항상 성공하므로, 여기서 무조건 재요청하면 두 콘솔이 20초 renew 주기로
+  // 서로 토큰을 영원히 뺏는다. 서버(`RealtimeGateway.renewGameTakeover`)는
+  // 이제 그 둘을 구분해서 보낸다 — 자연 만료는 여전히 `TAKEOVER_TOKEN_EXPIRED`
+  // (재요청 안전, 아래에서 그대로 자동 재획득), 다른 콘솔에 뺏긴 경우는
+  // `TAKEOVER_SUPERSEDED`(자동 재요청 금지 — 상대도 정당한 보유자이므로 여기서
+  // 다시 뺏으면 핑퐁이 재현된다. 새로고침 전까지는 이 상태로 남는다. 상대가
+  // 놓으면 — 탭을 닫거나 자기 토큰이 자연 만료되면 — 그 시점부터는 이 세션도
+  // 다시 정상적으로 요청·보유할 수 있지만, 자동으로 되찾으러 가지는 않는다).
   const deniedCode = takeover.status === 'denied' ? takeover.code : null;
   useEffect(() => {
     if (takeover.status === 'expired' || (takeover.status === 'denied' && deniedCode === 'TAKEOVER_TOKEN_EXPIRED')) {
@@ -774,7 +819,26 @@ export function useV1GameOperationsConsole(
       // guaranteed to fail again with the exact same VERSION_CONFLICT /
       // OFFLINE_EVENT_REBASE_CONFLICT it failed with the first time, since
       // nothing ever advanced the version the retry presented.
-      const isRetry = item.attempts > 0;
+      //
+      // A SECOND, independent reason to take the retry path even on the
+      // very first attempt (`attempts === 0`): the item was captured while
+      // offline (or while the operator was mid-selection) and its frozen
+      // `occurredAt` is now more than `CLOCK_DRIFT_TOLERANCE_MS` stale.
+      // `game.event.append`'s server-side `assertClockNotDrifted()`
+      // (games.service.ts) rejects that with `422 CLOCK_DRIFT` — deterministically,
+      // on every reconnect-triggered flush, since the queue only ever holds
+      // this back while offline and then sends it as the first thing on
+      // reconnect. `game.event.retry` intentionally has NO such check (its
+      // own comment: "a retry is historical by design and is legitimately
+      // allowed to arrive minutes after occurredAt (offline recovery)") —
+      // that is exactly this item's situation even though it has never
+      // actually been retried yet. Routing it there directly avoids a
+      // guaranteed-to-fail round trip (with a misleading "device clock is
+      // off" banner) that would otherwise require the operator to manually
+      // tap "다시 시도" once per queued item before it can ever succeed.
+      const isRetry =
+        item.attempts > 0 ||
+        isClockDrifted(item.event.occurredAt, serverAlignedNowMs(Date.now(), clockOffsetMs));
       // 이 emit의 ack가 SEND_ACK_TIMEOUT_MS 안에 오지 않으면(소켓이 응답 없이
       // 끊기면 콜백 자체가 영영 안 온다) 'sending'에 갇히지 않도록 FAIL로
       // 전환한다. ackHandler가 먼저 불리면 이 타이머는 취소된다 — 반대로
@@ -847,7 +911,7 @@ export function useV1GameOperationsConsole(
         );
       }
     },
-    [gameId, takeover, sync, queryClient, gameSnapshot],
+    [gameId, takeover, sync, queryClient, gameSnapshot, clockOffsetMs],
   );
 
   useEffect(() => {
@@ -1049,6 +1113,14 @@ export function gameOperationsErrorMessage(code: string): string {
   switch (code) {
     case 'TAKEOVER_TOKEN_EXPIRED':
       return '운영 권한 토큰이 만료됐어요. 다시 가져오는 중이에요.';
+    // 백로그 결함 수정(realtime-takeover-and-eviction-protocol): renew 실패
+    // 중 "다른 콘솔이 방금 이 경기를 가져감"만 이 코드로 온다(자연 만료는
+    // 여전히 TAKEOVER_TOKEN_EXPIRED). 이 경우엔 자동 재요청하지 않으므로
+    // (바로 위 effect 참고) 문구도 "다시 가져오는 중"이라고 하지 않는다 —
+    // 실제로 아무것도 다시 시도하지 않는데 그렇게 말하면 운영자가 기다리기만
+    // 하다 골을 놓친다.
+    case 'TAKEOVER_SUPERSEDED':
+      return '다른 화면에서 이 경기 운영 권한을 가져갔어요. 새로고침 후 다시 시도해주세요.';
     case 'STAFF_SCOPE_DENIED':
       return '이 경기를 운영할 권한이 없어요.';
     case 'TAKEOVER_UNAVAILABLE':

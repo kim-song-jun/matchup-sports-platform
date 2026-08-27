@@ -503,7 +503,10 @@ export function MatchCreatePageView({ model }: { model: MatchCreateViewModel }) 
             <Link className="tm-btn tm-btn-lg tm-btn-primary" href={nextCreateHref(model.step)}>{primaryLabel}</Link>
           )}
         </div>
-        {edit && model.form?.onCancel ? <button className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" type="button" style={{ marginTop: 8 }} disabled={model.form.submitting} onClick={model.form.onCancel}>매치 취소</button> : null}
+        {/* lockedReason이 있으면(완료·취소·만료 등 터미널 상태) 서버 cancel()도 같은 조건으로
+            409를 던진다 — '변경사항 저장' 버튼과 같은 게이트를 걸어 죽은 버튼을 사전에 막는다
+            (2026-08-27 감사 M-A-personal-match-state). */}
+        {edit && model.form?.onCancel ? <button className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" type="button" style={{ marginTop: 8 }} disabled={model.form.submitting || Boolean(model.form?.lockedReason)} onClick={model.form.onCancel}>매치 취소</button> : null}
       </div>
     </AppChrome>
   );

@@ -110,16 +110,6 @@ function Shell({ title, children }: { title: string; children: React.ReactNode }
 }
 
 /**
- * finding #76: 공개 일정 응답이 이제 `fieldId`도 함께 내려준다
- * (`public-tournament-records.service.ts`의 `FIXTURE_SCHEDULE_SELECT`/`presentScheduleEntry`).
- * `components/public-game-records/types.ts`의 `PublicScheduleEntry`는 이 배치가
- * 소유하지 않는 공유 타입이라 여기서 직접 고치지 못한다 — 실제 응답 바디에는 필드가
- * 이미 실려 있으므로, 이 파일 안에서만 지역적으로 타입을 넓혀 읽는다. `types.ts`에
- * `fieldId: string | null`을 정식으로 추가하는 것은 별도 소유자의 후속 작업이다.
- */
-type ScheduleEntryWithFieldId = PublicScheduleEntry & { fieldId: string | null };
-
-/**
  * 내 배정이 덮는 경기만 고른다.
  *
  * 경기 스코프(`fixtureIds`)가 있으면 그 목록이 정답이다. 필드 단위 배정은 `fieldId`로
@@ -142,7 +132,7 @@ export function selectMyFixtures(
       .map((a) => a.fieldId as string),
   );
 
-  return (entries as readonly ScheduleEntryWithFieldId[]).filter(
+  return entries.filter(
     (entry) =>
       scopedFixtureIds.has(entry.fixtureId) ||
       (entry.fieldId !== null && scopedFieldIds.has(entry.fieldId)),

@@ -105,6 +105,7 @@ function fixtureEntry(overrides: Partial<import('./types').PublicScheduleEntry> 
     groupName: null,
     scheduledAt: '2026-08-01T10:00:00.000Z',
     venue: null,
+    fieldId: null,
     fieldName: null,
     home: { registrationId: 'reg-home', teamId: 'team-home', teamName: '홈팀' },
     away: { registrationId: 'reg-away', teamId: 'team-away', teamName: '원정팀' },

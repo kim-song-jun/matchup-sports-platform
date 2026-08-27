@@ -184,8 +184,9 @@ export class TournamentOperationsFieldsService {
       // 다시 확인해야 한다. 이름이 중복되면 공개 일정의 `fieldId` 매칭(finding #57 fix)
       // 자체는 더 이상 잘못된 경기를 섞지 않지만, 운영자가 배정 드롭다운에서 어느 필드가
       // 어느 필드인지 구분할 수 없게 되는 문제는 여전하므로 생성 단계에서 막는다.
-      // 대소문자만 다른 이름도 같은 이름으로 본다(case-insensitive) -- 공백 트림은
-      // DB 컬럼 자체를 바꾸지 않으므로 여기서는 비교에만 적용한다.
+      // 대소문자만 다른 이름도 같은 이름으로 본다(case-insensitive). 앞뒤 공백은 트림해
+      // 비교하고 **트림한 값을 그대로 저장한다** -- 비교 기준과 저장값이 다르면 공백 하나로
+      // 이 가드를 우회할 수 있다(Copilot 리뷰 지적, PR #805).
       const trimmedName = dto.name.trim();
       const duplicate = await tx.v1TournamentField.findFirst({
         where: { tournamentId, name: { equals: trimmedName, mode: 'insensitive' } },
@@ -204,7 +205,10 @@ export class TournamentOperationsFieldsService {
           data: {
             tournamentId,
             scopeKey: dto.scopeKey,
-            name: dto.name,
+            // **비교와 저장이 같은 값이어야 중복 가드가 성립한다.** 위에서 `trim()` 한 값으로
+            // 중복을 찾아 놓고 원문을 저장하면, 앞뒤 공백이 섞인 이름이 통과해 저장된 뒤
+            // 다음 요청이 그 공백 이름과 대조하지 못해 같은 이름이 두 번 만들어진다.
+            name: trimmedName,
             sortOrder: dto.sortOrder ?? 0,
           },
         });

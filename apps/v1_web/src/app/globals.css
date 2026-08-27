@@ -4138,7 +4138,10 @@ label.tm-btn:focus-within {
    * 슬라이드다운(translateY 100%)이라, 중앙 다이얼로그에 그대로 걸리면
    * **화면 아래로 날아간다.** 여기서는 진입과 같은 fade 를 되감는다. */
   .tm-notification-sheet.is-closing {
-    animation: fade-in 0.18s ease-in reverse both;
+    /* 0.22s 는 진입(0.18s)보다 길지만 **훅의 지연과 맞추는 쪽**이 맞다.
+     * 0.18s 로 두면 데스크탑에서 애니메이션이 끝난 뒤 40ms 동안 화면엔 아무것도
+     * 없는데 포커스 트랩·스크롤 잠금·클릭 차단만 남는 구간이 생긴다. */
+    animation: fade-in 0.22s ease-in reverse both;
   }
 
   .tm-notification-sheet-grabber {

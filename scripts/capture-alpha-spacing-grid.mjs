@@ -218,11 +218,16 @@ await browser.close();
 
 // 스켈레톤이 남은 채 잰 측정은 신뢰할 수 없다 — 통과로 읽히면 안 된다
 const unsettled = results.filter((r) => !r.settled || !r.cssomOk);
+// 실패 원인을 섞지 않는다 — HTTP 오류와 라우트 불일치는 대응이 다르다
+// (전자는 서버/네트워크, 후자는 인증 벽이나 경로 변경).
+const badStatus = results.filter((r) => r.status !== 200);
+const badRoute = results.filter((r) => r.status === 200 && !r.sameRoute);
 const bad = results.filter((r) => !r.ok);
 const totalOff = results.reduce((a, r) => a + r.offCount, 0);
 const totalChecked = results.reduce((a, r) => a + r.checked, 0);
 console.log(
-  `\n합계: 여백 ${totalChecked}개 검사 · 격자 이탈 ${totalOff}개 · HTTP 비200 ${bad.length}건` +
+  `\n합계: 여백 ${totalChecked}개 검사 · 격자 이탈 ${totalOff}개` +
+  ` · HTTP 비200 ${badStatus.length}건 · 라우트 불일치 ${badRoute.length}건` +
   (unsettled.length ? ` · ⚠️ 렌더 미완 ${unsettled.length}건` : ''),
 );
 console.log(`저장: ${OUT}`);

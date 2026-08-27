@@ -387,7 +387,16 @@ export const gameSchemaSourceManifest = {
   // game domain(V1Game*) 모델·enum 은 건드리지 않는다. 마이그레이션
   // 20260825070000_v1_team_match_videos. 바인딩된 20260729000100_v1_game_operations 는
   // 그대로다(migration 해시 불변). 아래 값은 shasum -a 256 으로 계산했다.
-  schema: 'f9bc07bdce405f8ef624a692d9eb491e9f6e176b757d311904a47ab6e97559aa',
+  // 재핀(2026-08-27, finding #59): `V1GameResultRevision`에 nullable `card_events`
+  // 컬럼 하나가 늘었다 -- `goal_events`와 대칭인 카드(경고·퇴장) 정정 스냅샷. **이번엔
+  // game domain(V1Game*) 모델을 실제로 건드린다**(위 명단 검인·몰수 재핀과 같은 성격).
+  // 순수 additive(ADD COLUMN nullable, 기본값 없음, 백필 없음) -- 기존 리비전은 전부
+  // NULL 이고, 이 컬럼이 채워지기 전까지 공개 기록 타임라인은 기존처럼 원본 CARD
+  // 이벤트를 그대로 보여준다(schema.prisma 의 필드 doc comment 참고). 뒷받침
+  // 마이그레이션: 20260827090000_v1_result_card_events. 바인딩된
+  // 20260729000100_v1_game_operations 는 그대로다(migration 해시 불변). 아래 값은
+  // 이 브랜치의 schema.prisma 에 shasum -a 256 을 다시 돌려 계산한 것이다.
+  schema: '9564c83d4b0db1affc5a67d167a6e658ec074b58904018e3410a40aec5f8ca0a',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

@@ -58,6 +58,15 @@ function isVersionConflict(err: unknown): boolean {
 }
 
 /**
+ * F5 방어선: submitBlockedReason이 이제 이 상황을 미리 막지만(재편집 후 미저장 상태),
+ * 그래도 서버가 같은 사유로 거부하는 경우(레이스 등)에 영문 원문
+ * ('Only a draft lineup can be submitted')이 그대로 노출되지 않도록 한국어로 옮긴다.
+ */
+function isInvalidLineupState(err: unknown): boolean {
+  return err instanceof V1ApiError && err.code === 'INVALID_LINEUP_STATE';
+}
+
+/**
  * 대회 경기(tournament fixture) 참가팀 자기 서비스 라인업 화면 — team-match
  * 라인업(app/team-matches/[id]/lineup)과 같은 피치 배치 컴포넌트를 재사용한다.
  *
@@ -133,6 +142,13 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
   const formationSupportedSportName = tournamentQuery.data?.sport?.name ?? null;
   const formationSupported =
     formationSupportedSportName !== null && ['축구', '풋살'].includes(formationSupportedSportName);
+  // F6 fix: tournamentQuery만 단독 실패(또는 아직 로딩 중)해도 formationSupportedSportName이
+  // null이 되어 "이 종목은 피치 배치를 아직 지원하지 않아요"로 오분류됐다 — 실제로는
+  // 축구·풋살이어도 조회 실패와 "미지원 종목"이 똑같이 null로 뭉개졌기 때문이다. 로딩/에러를
+  // 별도 상태로 구분해 잘못된 안내와 재시도 경로 없음을 함께 고친다(다른 3개 쿼리는 access의
+  // 로딩 게이트를 타지만, tournamentQuery는 로딩이 길어져도 명단 탭 등 나머지 기능은 계속
+  // 쓸 수 있어야 하므로 전체 페이지 게이트에는 넣지 않고 이 pane만 별도로 처리한다).
+  const formationSupportUnknown = tournamentQuery.isLoading || tournamentQuery.isError;
 
   const [state, setState] = useState<FixtureLineupState | null>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -384,6 +400,23 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
     );
   }
 
+  // F61/F62 fix: SUPPORT_READONLY(조회 전용) 스태프는 `isStaff`는 true지만 서버가
+  // lineup_mutate를 거부한다 — 예전에는 그걸 모른 채 팀 선택 → 명단 작성까지 전부
+  // 진행시켰다가 저장 시점에야 영문 403('Actor scope is not permitted')으로 막아
+  // 입력한 내용이 통째로 사라졌다(#61/#62). 팀 선택 화면에 들어가기 전에 막아
+  // 헛된 편집 자체를 없앤다 — videos-page-client.tsx가 이미 쓰는 "버튼을 감추고
+  // 이유를 적는다" 규약과 동일하게, 여기서는 편집기 진입 자체를 막는다.
+  if (access.data.isStaff && !access.data.canMutateLineup) {
+    return (
+      <AppChrome title="라인업" activeTab="tournaments" backHref={`/tournaments/${tournamentId}`} bottomNav={false} desktopHead>
+        <EmptyState
+          title="조회 전용 권한이에요"
+          sub="지원 담당(조회 전용) 스태프는 라인업을 저장·제출할 수 없어요. 대회 운영자(디렉터)나 현장 담당자에게 요청해 주세요."
+        />
+      </AppChrome>
+    );
+  }
+
   // 스태프가 아직 편집할 팀을 고르지 않았다 — 어느 팀 명단을 짤지 먼저 정한다.
   if (editingSideId === null) {
     const choices = [
@@ -440,7 +473,10 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
   // 상태에서 gameStarted가 참이 되는 경로는 실제로는 나타나지 않지만, 백엔드 가드
   // (game.state !== SCHEDULED면 무조건 거부)와 프론트 판정 기준을 값 하나로 완전히
   // 일치시켜 두면 별도로 다시 어긋날 여지가 없다.
+  // F61/F62 방어선: 위에서 canMutateLineup===false인 스태프는 이미 진입 자체를
+  // 막았지만, editable 판정에도 같은 조건을 접어 넣어 두 판정이 어긋날 여지를 없앤다.
   const editable =
+    access.data.canMutateLineup &&
     !gameStarted &&
     (state.lineupState === null || state.lineupState === 'DRAFT' || (state.lineupState === 'SUBMITTED' && reopened));
   // 안내는 두 갈래다: ① 이 종목에 등록된 대형이 아예 없을 때(축구처럼 서버 카탈로그가 빈
@@ -464,8 +500,15 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
   // 제출을 막는 사유. null 이면 제출 가능하다 — 버튼의 disabled 조건과 하단 CTA 안내
   // 문구가 같은 값을 보므로 "버튼은 잠겼는데 이유는 안 보이는" 어긋남이 생기지 않는다.
   const goalkeeperBlockedReason = goalkeeperCount === 1 ? null : '선발 골키퍼를 한 명 지정해 주세요.';
+  // F5 fix: "다시 편집하기"만 누르고 아무것도 안 고친 채로는 lineupState가 여전히
+  // SUBMITTED다(DRAFT로 바뀌는 건 저장 성공 시점뿐, handleSave 참고) — 서버는 DRAFT가
+  // 아니면 무조건 409 INVALID_LINEUP_STATE로 거부한다(games.service.ts). dirty 검사만으론
+  // 이 경우를 못 걸러 버튼이 활성인 채 영문 오류로 튕겼다. state.dirty보다 먼저 검사해
+  // "재편집 중인데 아직 저장 전"을 항상 막는다.
   const submitBlockedReason = goalkeeperBlockedReason
-    ?? (state.dirty
+    ?? (state.lineupState === 'SUBMITTED'
+      ? '변경 후 저장해야 다시 제출할 수 있어요.'
+    : state.dirty
       ? '저장하지 않은 변경사항이 있어요 — 먼저 저장해 주세요.'
     : emptySlotCount > 0
       ? `포지션 자리 ${emptySlotCount}개가 비어 있어요.`
@@ -667,6 +710,8 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
       if (isVersionConflict(err)) {
         markStaleConflict();
         setSaveError('제출하지 못했어요 — 이 라인업이 다른 곳에서 먼저 바뀌었어요.');
+      } else if (isInvalidLineupState(err)) {
+        setSaveError('변경 후 저장해야 다시 제출할 수 있어요.');
       } else {
         setSaveError(extractErrorMessage(err, '제출하지 못했어요.'));
       }
@@ -797,7 +842,21 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
             className={`tm-fixture-lineup-pane${activeView === 'pitch' ? ' is-active' : ''}`}
           >
             <SectionTitle id="fixture-lineup-pitch-heading" title="피치 배치" />
-            {!formationSupported ? (
+            {formationSupportUnknown ? (
+              // F6 fix: 실패/로딩을 "이 종목은 미지원"으로 잘못 보여주지 않는다. 로딩 중이면
+              // 조용히 대기, 실패면 실제로 무슨 종목인지 몰라 판단할 수 없다는 사실과
+              // 재시도 버튼을 함께 보여준다(다른 3개 쿼리와 동일한 재시도 패턴).
+              tournamentQuery.isError ? (
+                <ErrorState
+                  message={extractErrorMessage(tournamentQuery.error, '대회 종목 정보를 불러오지 못해 피치 배치를 표시할 수 없어요.')}
+                  onRetry={() => void tournamentQuery.refetch()}
+                />
+              ) : (
+                <p className="tm-text-caption" style={{ color: 'var(--text-muted)', padding: '8px 0' }}>
+                  피치 배치를 준비하고 있어요…
+                </p>
+              )
+            ) : !formationSupported ? (
               <EmptyState
                 title="이 종목은 피치 배치를 아직 지원하지 않아요"
                 sub={`${josa(formationSupportedSportName ?? '이 종목', ['은', '는'])} 축구·풋살과 코트 모양·포지션 개념이 달라 준비 중이에요. 명단 탭에서 선발·후보는 그대로 관리할 수 있어요.`}
@@ -964,7 +1023,12 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
                               checked={isStarter}
                               disabled={!editable}
                               aria-label={`${entry.displayName} 선발`}
-                              onChange={() => setState((prev) => (prev ? toggleStarter(prev, entry.key) : prev))}
+                              // F63 fix: 바로 아래 GK 버튼(withSeatedNewcomers로 감쌈)과 달리 이
+                              // 체크박스만 빠져 있었다 — 체크로 선발이 된 선수는 좌표가 없는 채로
+                              // 남아 emptySlotCount가 절대 0이 되지 않고 제출이 영구히 잠겼다.
+                              // withSeatedNewcomers는 새로 선발이 된 사람만 골라 빈 자리에 앉히므로
+                              // 체크 해제(선발→후보) 방향은 그대로 안전하다.
+                              onChange={() => setState((prev) => (prev ? withSeatedNewcomers(prev, toggleStarter(prev, entry.key)) : prev))}
                               style={{ width: 22, height: 22, accentColor: 'var(--blue500)' }}
                             />
                           </label>

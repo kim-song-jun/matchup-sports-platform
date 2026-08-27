@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { V1AdminTournamentRegistration } from '@/types/api';
 import {
@@ -145,6 +145,41 @@ describe('RegistrationsTab — 명단 제출 마감 예외 토글', () => {
     expect(showToast).toHaveBeenCalledWith('명단 제출 마감 예외를 허용했어요.', 'success');
   });
 
+  // 감사 finding #52: 예외 허용은 잠금과 무관하게 성공하는데, 잠긴 신청은 여전히 명단을
+  // 못 고친다(서버가 잠금 검사를 마감 검사보다 먼저 본다) — 무조건 성공 토스트만 뜨면
+  // 운영자가 "팀이 이제 고칠 수 있다"고 잘못 믿는다.
+  it('grant-override toast warns that the roster is still locked when the target registration is locked', () => {
+    const grantMutate = vi.fn();
+    useV1RosterDeadlineOverrideGrantMock.mockReturnValue({
+      mutate: grantMutate,
+      isPending: false,
+    } as unknown as ReturnType<typeof useV1RosterDeadlineOverrideGrant>);
+    useV1RosterDeadlineOverrideRevokeMock.mockReturnValue(noopMutationHook());
+    useV1AdminTournamentRegistrationsMock.mockReturnValue({
+      data: {
+        items: [
+          baseRegistration({ rosterDeadlineOverrideAt: null, rosterLockedAt: '2026-08-01T00:00:00.000Z' }),
+        ],
+        pageInfo: { nextCursor: null, hasNext: false },
+      },
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useV1AdminTournamentRegistrations>);
+
+    render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite />);
+
+    fireEvent.click(screen.getByRole('button', { name: '마감 예외 허용' }));
+
+    const { onSuccess } = grantMutate.mock.calls[0][1];
+    onSuccess();
+    expect(showToast).toHaveBeenCalledWith(
+      '명단 제출 마감 예외를 허용했어요. 다만 명단이 아직 잠겨 있어 팀이 수정하려면 잠금 해제도 함께 해야 해요.',
+      'success',
+    );
+  });
+
   it('shows "예외 해제" for a registration with an active override, and calls the revoke mutation with a success toast', () => {
     const revokeMutate = vi.fn();
     useV1RosterDeadlineOverrideGrantMock.mockReturnValue(noopMutationHook());
@@ -206,5 +241,51 @@ describe('RegistrationsTab — 명단 제출 마감 예외 토글', () => {
     expect(screen.queryByRole('button', { name: '취소 거부(잔류)' })).not.toBeInTheDocument();
     // 조회성 액션은 유지된다 (RosterModal은 내부에서 canWrite를 별도 게이팅)
     expect(screen.getAllByRole('button', { name: '명단 검토' })).toHaveLength(2);
+  });
+
+  // 감사 finding #0: 정원 초과 상태에서 확인 모달이 "대기 명단 처리될 수 있어요"라고 안내해
+  // 놓고 확인 버튼은 항상 decision='confirm'만 보내 서버가 409로 거절했다. 이제 정원 초과
+  // 시에는 버튼 라벨 자체가 "대기로 처리"로 바뀌고, 그 라벨대로 waitlist 결정을 보낸다.
+  it('over-capacity confirm click offers "대기로 처리" and sends decision=waitlist, not confirm', async () => {
+    const confirmMutate = vi.fn();
+    useV1ConfirmRegistrationMock.mockReturnValue({
+      mutate: confirmMutate,
+      isPending: false,
+    } as unknown as ReturnType<typeof useV1ConfirmRegistration>);
+    useV1RosterDeadlineOverrideGrantMock.mockReturnValue(noopMutationHook());
+    useV1RosterDeadlineOverrideRevokeMock.mockReturnValue(noopMutationHook());
+    useV1AdminTournamentRegistrationsMock.mockReturnValue({
+      data: {
+        items: [
+          baseRegistration({ id: 'reg-1', status: 'payment_checking', confirmedAt: null }),
+          // 이미 확정된 1팀 + 정원 1팀 = 이 신청을 확정하면 정원 초과.
+          baseRegistration({ id: 'reg-already-confirmed', status: 'confirmed' }),
+        ],
+        pageInfo: { nextCursor: null, hasNext: false },
+      },
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useV1AdminTournamentRegistrations>);
+
+    render(
+      <RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite tournamentTeamCount={1} />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '확정' }));
+
+    // 모달 안내가 정원 초과 사실을 알리고, 확인 액션은 "대기로 처리"로 뜬다(더 이상 "확정"이
+    // 아니다 — 라벨과 실제 동작이 일치해야 한다).
+    expect(await screen.findByText(/정원을 초과해 확정할 수 없어요/)).toBeInTheDocument();
+    const waitlistButton = await screen.findByRole('button', { name: '대기로 처리' });
+    fireEvent.click(waitlistButton);
+
+    await waitFor(() =>
+      expect(confirmMutate).toHaveBeenCalledWith(
+        { registrationId: 'reg-1', decision: 'waitlist' },
+        expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
+      ),
+    );
   });
 });

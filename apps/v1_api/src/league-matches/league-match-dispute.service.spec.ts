@@ -65,7 +65,11 @@ describe('LeagueMatchDisputeService 알림 수신자', () => {
       prisma.v1GameResultRevision.findUnique.mockResolvedValue({
         id: 'rev-1',
         state: 'OFFICIAL',
-        officialAt: new Date('2026-08-20T00:00:00Z'),
+        // 이의 기간(확정 후 7일) **안**에 있는 시각이어야 이 스펙이 검증하려는 알림 수신자
+        // 로직까지 도달한다. 고정 날짜를 쓰면 실제 시간이 그 날짜에서 7일을 넘기는 순간
+        // 스펙이 조용히 썩어 `LEAGUE_RESULT_DISPUTE_WINDOW_EXPIRED` 로 죽는다 —
+        // 실제로 그렇게 됐고(2026-08-27 dev 에서 2건 red), 그래서 현재 시각 기준 상대값으로 바꾼다.
+        officialAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
       });
       prisma.v1LeagueMatchDispute.create.mockResolvedValue({ id: 'dispute-1', createdAt: new Date() });
       return filerTeamId;

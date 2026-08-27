@@ -40,6 +40,16 @@ function groupLabelOf(entry: PublicScheduleEntry): string {
 }
 
 /**
+ * F4 fix: 이 항목이 속한 단계 키(조별리그/결선). `groupScheduleEntries`가 일정이 잡힌
+ * 목록을 두 단계로 나눌 때 쓰는 것과 같은 분류 로직을 "시간 미정 경기" 섹션에도 그대로
+ * 적용할 수 있도록 노출한다 — 필터 칩(조별리그/결선)이 예전엔 일정이 잡힌 목록에만
+ * 걸리고 시간 미정 목록은 항상 전체가 보였다.
+ */
+export function phaseKeyOf(entry: PublicScheduleEntry): SchedulePhaseKey {
+  return isGroupStage(entry) ? 'group_stage' : 'knockout';
+}
+
+/**
  * 대회 진행 순서는 `fixtureNumber` 가 이미 갖고 있다(alpha 실측: A조 1 · B조 2 · 4강 3,4 ·
  * 결승 5 · 3·4위전 6). `scheduledAt` 으로 정렬하면 일정이 아직 안 잡혔거나 운영상 시간이
  * 뒤바뀐 대회에서 순서가 무너지므로, 그룹 순서는 **그 그룹의 가장 이른 fixtureNumber** 로

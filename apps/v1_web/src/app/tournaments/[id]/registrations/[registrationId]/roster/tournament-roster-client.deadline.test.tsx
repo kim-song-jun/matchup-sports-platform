@@ -73,19 +73,22 @@ describe('TournamentRosterPageClient — 명단 제출 마감 배너/액션 차�
     } as unknown as ReturnType<typeof useV1RemovePlayer>);
   });
 
-  function mockTournament(rosterDeadlineAt: string | null) {
+  function mockTournament(rosterDeadlineAt: string | null, status?: string) {
     useV1TournamentMock.mockReturnValue({
-      data: { minPlayers: 5, maxPlayers: 20, rosterDeadlineAt },
+      data: { minPlayers: 5, maxPlayers: 20, rosterDeadlineAt, status },
     } as unknown as ReturnType<typeof useV1Tournament>);
   }
 
-  function mockRegistration(rosterDeadlineOverrideAt: string | null) {
+  function mockRegistration(
+    rosterDeadlineOverrideAt: string | null,
+    overrides: { rosterLockedAt?: string | null } = {},
+  ) {
     useV1RegistrationMock.mockReturnValue({
       data: {
         id: 'reg-1',
         teamId: 'team-1',
         status: 'confirmed',
-        rosterLockedAt: null,
+        rosterLockedAt: overrides.rosterLockedAt ?? null,
         rosterDeadlineOverrideAt,
       },
     } as unknown as ReturnType<typeof useV1Registration>);
@@ -130,6 +133,45 @@ describe('TournamentRosterPageClient — 명단 제출 마감 배너/액션 차�
       screen.getByText('운영진이 명단 제출 마감 예외를 허용했어요. 계속 명단을 수정할 수 있어요.'),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '홍길동 수정' })).toBeInTheDocument();
+  });
+
+  // 감사 finding #52: 잠긴 신청에 마감 예외를 부여하면 "계속 수정할 수 있어요"와 "명단이
+  // 마감됐어요"가 서로 모순되게 동시에 떴다 — 두 배너를 상호 배타로 합친다.
+  it('shows a single combined message (not two contradicting banners) when a locked roster also has a deadline override', () => {
+    mockTournament(PAST_DEADLINE);
+    mockRegistration('2026-01-05T00:00:00.000Z', { rosterLockedAt: '2026-01-06T00:00:00.000Z' });
+
+    render(<TournamentRosterPageClient tournamentId="tournament-1" registrationId="reg-1" />);
+
+    expect(
+      screen.getByText(
+        '운영진이 명단 제출 마감 예외를 허용했지만 명단 자체가 잠겨 있어요. 운영진의 잠금 해제가 추가로 필요해요.',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('운영진이 명단 제출 마감 예외를 허용했어요. 계속 명단을 수정할 수 있어요.'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('선수 명단이 마감됐어요. 변경이 필요하면 운영진에게 문의해 주세요.'),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '홍길동 수정' })).not.toBeInTheDocument();
+  });
+
+  // 감사 finding #1: 대회가 종료·취소되면 잠금·마감 예외와 무관하게 명단을 못 고친다.
+  it('blocks editing and shows the tournament-closed banner when the tournament has completed, even with a deadline override', () => {
+    mockTournament(PAST_DEADLINE, 'completed');
+    mockRegistration('2026-01-05T00:00:00.000Z');
+
+    render(<TournamentRosterPageClient tournamentId="tournament-1" registrationId="reg-1" />);
+
+    // 데이터 카드(TournamentRosterDeadlineCard)와 배너 두 곳 모두 같은 문구를 낸다.
+    expect(
+      screen.getAllByText('대회가 종료되었거나 취소돼 더 이상 선수 명단을 수정할 수 없어요.').length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.queryByText('운영진이 명단 제출 마감 예외를 허용했어요. 계속 명단을 수정할 수 있어요.'),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '홍길동 수정' })).not.toBeInTheDocument();
   });
 });
 

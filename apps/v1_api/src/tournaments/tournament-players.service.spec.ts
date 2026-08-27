@@ -130,7 +130,7 @@ describe('TournamentPlayersService', () => {
   let prisma: {
     v1TeamMembership: { findFirst: jest.Mock; findMany: jest.Mock };
     v1Tournament: { findFirst: jest.Mock };
-    v1TournamentRegistration: { findFirst: jest.Mock; findUnique: jest.Mock };
+    v1TournamentRegistration: { findFirst: jest.Mock; findUnique: jest.Mock; update: jest.Mock };
     v1TournamentPlayer: {
       findMany: jest.Mock;
       findFirst: jest.Mock;
@@ -153,7 +153,7 @@ describe('TournamentPlayersService', () => {
     prisma = {
       v1TeamMembership: { findFirst: jest.fn(), findMany: jest.fn() },
       v1Tournament: { findFirst: jest.fn() },
-      v1TournamentRegistration: { findFirst: jest.fn(), findUnique: jest.fn() },
+      v1TournamentRegistration: { findFirst: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
       v1TournamentPlayer: {
         findMany: jest.fn(),
         // Prisma 는 못 찾으면 null 을 준다. 기본값을 undefined 로 두면 "찾았다" 로 읽히는
@@ -510,6 +510,30 @@ describe('TournamentPlayersService', () => {
         realName: '홍길동',
       }),
     ).rejects.toMatchObject({ response: { code: 'PLAYER_ALREADY_REGISTERED' } });
+    expect(prisma.v1TournamentPlayer.upsert).not.toHaveBeenCalled();
+  });
+
+  // 감사 finding #50: 중복 판정이 registrationId 단위뿐이라, 같은 대회의 다른 팀 명단에 이미
+  // active 등록돼 있어도 자기 registration만 보면 "중복 없음"으로 통과해 두 팀에 동시 등재됐다.
+  it('addPlayer: userId already active on a DIFFERENT team roster in the same tournament → 409 PLAYER_ALREADY_ON_ANOTHER_TEAM', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst
+      .mockResolvedValueOnce({ id: 'mem-1', role: 'manager' }) // manager 체크
+      .mockResolvedValueOnce(teamPlayerMembershipRow()); // 팀 멤버 체크
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
+    prisma.v1TournamentPlayer.count.mockResolvedValue(2);
+    // 첫 호출(existingActive, 자기 registration) → 없음. 두 번째 호출(existingOnOtherTeam,
+    // 대회 내 다른 registration) → 있음.
+    prisma.v1TournamentPlayer.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(playerRow({ id: 'player-2', registrationId: 'reg-2' }));
+
+    await expect(
+      service.addPlayer(manager, 'tournament-1', 'reg-1', {
+        userId: 'player-user-id',
+        realName: '홍길동',
+      }),
+    ).rejects.toMatchObject({ response: { code: 'PLAYER_ALREADY_ON_ANOTHER_TEAM' } });
     expect(prisma.v1TournamentPlayer.upsert).not.toHaveBeenCalled();
   });
 
@@ -1390,6 +1414,117 @@ describe('TournamentPlayersService', () => {
       response: { code: 'PLAYER_NOT_FOUND' },
     });
     expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
+  });
+
+  // ─── 어드민 추가·제거 후 성별 쿼터 재검증 (finding #53) ─────────────────────────
+  // 잠금(rosterLockedAt)은 "이 시점 기준 성별 인원 조건을 충족했다"는 확정 표시인데, 어드민
+  // 추가·제거는 잠금·마감을 넘기면서도 쿼터를 재검증하지 않아 위반 상태인데도 '확정'으로 남았다.
+
+  it('addPlayerForAdmin: 잠긴 명단에 추가해 성별 쿼터(남 최대 1명)를 벗어나면 잠금을 자동 해제한다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique
+      .mockResolvedValueOnce({ tournamentId: 'tournament-1' }) // addPlayerForAdmin 진입부: tournamentId 조회
+      .mockResolvedValueOnce({ rosterLockedAt: new Date('2026-08-01T00:00:00Z') }); // reconcile: 잠금 여부 재조회
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1Tournament.findFirst.mockResolvedValue(
+      tournamentRow({
+        genderCategory: 'mixed',
+        genderMinMale: 1,
+        genderMaxMale: 1,
+        genderMinFemale: 1,
+        genderMaxFemale: 1,
+      }),
+    );
+    prisma.v1TournamentPlayer.count.mockResolvedValue(2);
+    prisma.v1TeamMembership.findFirst.mockResolvedValue(teamPlayerMembershipRow()); // gender: male
+    prisma.v1TournamentPlayer.upsert.mockResolvedValue(playerRow({ genderSnapshot: 'male' }));
+    // 추가 후 현재 활성 명단 = 남2 · 여1 → genderMaxMale=1 위반
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+      { genderSnapshot: 'male' },
+      { genderSnapshot: 'male' },
+      { genderSnapshot: 'female' },
+    ]);
+
+    const result = await service.addPlayerForAdmin(adminUser, 'reg-1', {
+      userId: 'player-user-id',
+      realName: '홍길동',
+    });
+
+    expect(result.id).toBe('player-1');
+    expect(prisma.v1TournamentRegistration.update).toHaveBeenCalledWith({
+      where: { id: 'reg-1' },
+      data: { rosterLockedAt: null },
+    });
+  });
+
+  it('addPlayerForAdmin: 추가해도 성별 쿼터를 여전히 충족하면 잠금을 건드리지 않는다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique
+      .mockResolvedValueOnce({ tournamentId: 'tournament-1' })
+      .mockResolvedValueOnce({ rosterLockedAt: new Date('2026-08-01T00:00:00Z') });
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1Tournament.findFirst.mockResolvedValue(
+      tournamentRow({
+        genderCategory: 'mixed',
+        genderMinMale: 1,
+        genderMaxMale: 3,
+        genderMinFemale: 1,
+        genderMaxFemale: 3,
+      }),
+    );
+    prisma.v1TournamentPlayer.count.mockResolvedValue(2);
+    prisma.v1TeamMembership.findFirst.mockResolvedValue(teamPlayerMembershipRow());
+    prisma.v1TournamentPlayer.upsert.mockResolvedValue(playerRow({ genderSnapshot: 'male' }));
+    // 남2 · 여1 — max 3 이내라 조건을 여전히 충족.
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+      { genderSnapshot: 'male' },
+      { genderSnapshot: 'male' },
+      { genderSnapshot: 'female' },
+    ]);
+
+    await service.addPlayerForAdmin(adminUser, 'reg-1', {
+      userId: 'player-user-id',
+      realName: '홍길동',
+    });
+
+    expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
+  });
+
+  it('removePlayerForAdmin: 제거로 성별 최소 인원(여 최소 1명) 미달이 되면 잠금을 자동 해제한다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentPlayer.findFirst.mockResolvedValue({
+      id: 'player-1',
+      registrationId: 'reg-1',
+      userId: 'player-user-id',
+      realName: '홍길동',
+      registration: { tournamentId: 'tournament-1' },
+    });
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1Tournament.findFirst.mockResolvedValue(
+      tournamentRow({
+        genderCategory: 'mixed',
+        genderMinMale: 1,
+        genderMaxMale: 5,
+        genderMinFemale: 1,
+        genderMaxFemale: 5,
+      }),
+    );
+    prisma.v1TournamentPlayer.updateMany.mockResolvedValue({ count: 1 });
+    prisma.v1TournamentPlayer.findUniqueOrThrow.mockResolvedValue(
+      playerRow({ removedAt: new Date('2026-08-10T00:00:00Z') }),
+    );
+    // reconcile: 잠긴 상태 + 제거 후 남은 명단 = 남1 · 여0 → genderMinFemale=1 위반
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue({
+      rosterLockedAt: new Date('2026-08-01T00:00:00Z'),
+    });
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([{ genderSnapshot: 'male' }]);
+
+    await service.removePlayerForAdmin(adminUser, 'player-1');
+
+    expect(prisma.v1TournamentRegistration.update).toHaveBeenCalledWith({
+      where: { id: 'reg-1' },
+      data: { rosterLockedAt: null },
+    });
   });
 
   it('listEligiblePlayersForAdmin: 없는 신청이면 404', async () => {

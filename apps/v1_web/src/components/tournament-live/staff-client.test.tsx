@@ -292,6 +292,26 @@ describe('StaffClient', () => {
     expect(mocks.createFieldMutate.mock.calls[0][0]).toMatchObject({ name: 'A구장' });
   });
 
+  /**
+   * finding #76: 필드 이름에는 서버 유일성 제약도 수정·삭제 경로도 없어서, 같은
+   * 이름으로 두 번 등록하면 두 개(F1/F2)가 그대로 생기고 되돌릴 수 없었다. 클라이언트
+   * 단계에서 이름 중복(대소문자·앞뒤 공백 무시)을 먼저 막아 그 사고 지점을 없앤다.
+   */
+  it('이미 있는 이름(대소문자·공백만 다름)으로는 경기장을 등록할 수 없다', async () => {
+    setRole('PLATFORM_OPS');
+    mocks.fieldsResult.mockReturnValue({ data: { items: [{ id: 'field-1', name: 'A구장' }] } });
+    const user = userEvent.setup();
+    render(<StaffClient tournamentId="t-1" />);
+
+    await user.type(screen.getByLabelText('경기장 이름'), '  a구장  ');
+
+    expect(screen.getByRole('alert')).toHaveTextContent('이미 같은 이름의 경기장이 있어요');
+    expect(screen.getByRole('button', { name: '경기장 추가' })).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: '경기장 추가' }));
+    expect(mocks.createFieldMutate).not.toHaveBeenCalled();
+  });
+
   it('등록된 경기장이 없으면 필드 담당자 배정이 왜 막혔는지 알려주고 제출을 잠근다', async () => {
     setRole('PLATFORM_OPS');
     mocks.fieldsResult.mockReturnValue({ data: { items: [] } });

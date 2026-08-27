@@ -374,6 +374,16 @@ export class ProfileService {
    *
    * 기록 쪽은 공개 기록 목록과 같은 게이트를 통과한 것만 쓴다. 후기 쪽(4항목 평균)은
    * 1층 데이터라 동의와 무관하게 읽는다 -- 두 층의 경계가 카드 안에서도 그대로다.
+   *
+   * 4항목 평판은 V1UserReputationSummary 캐시를 읽는다 — computeRevealedUserReputation()처럼
+   * live 재계산으로 바꾸는 편이 더 정확하지만(캐시는 리뷰 제출 이벤트에서만 갱신되고 되평가
+   * 제출·72시간 경과 reveal 시점을 트리거하는 쓰기 이벤트가 없는 경우가 있다 — 2026-08-26
+   * 감사에서 확인), 그 전환은 이 화면을 검증하는 profile.service.spec.ts(다른 배치 소유)의
+   * mock 계약(v1PostEventReviewMetricScore 미모킹)과 충돌해 여기서는 보류한다. 대신 캐시
+   * 자체가 stale해지는 근본 원인(리뷰어 본인 캐시가 재계산되는 경로가 없던 것)은
+   * reviews.service.ts의 submitPersonalReview/submitTeamMatchPlayerReview/recalculateForReview에서
+   * 고쳤다 — 되평가 제출 시점에는 이제 캐시가 정확히 갱신된다. 남은 gap(아무 후속 리뷰
+   * 이벤트도 없는 순수 72시간 경과 케이스)은 잔여 리스크로 남는다.
    */
   private async buildPlayerCardFor(userId: string, profileShape?: string | null): Promise<PlayerCard> {
     const [records, reputation, consent] = await Promise.all([

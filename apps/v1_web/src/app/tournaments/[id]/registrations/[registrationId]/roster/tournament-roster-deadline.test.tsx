@@ -50,4 +50,24 @@ describe('TournamentRosterDeadlineCard', () => {
     expect(screen.getByText('제출 마감')).toBeInTheDocument();
     expect(screen.getByText('선수 명단 제출 기간이 종료됐어요.')).toBeInTheDocument();
   });
+
+  // 감사 finding #1: 대회가 종료·취소되면 잠금·마감 예외와 무관하게 아무도 명단을 못 고친다
+  // (서버 assertRosterMutable의 첫 번째 검사). 이 값이 최우선으로 반영돼야 한다.
+  it('shows the tournament-closed state even when the deadline exception would otherwise allow editing', () => {
+    render(
+      <TournamentRosterDeadlineCard
+        deadlineAt={'2026-07-20T18:30:00'}
+        isTournamentRosterClosed
+        isRosterLocked={false}
+        isRosterEditBlockedByStatus={false}
+        isRosterDeadlineBlocked={false}
+        nowMs={new Date('2026-07-20T19:00:00').getTime()}
+      />,
+    );
+
+    expect(screen.getByText('수정 불가')).toBeInTheDocument();
+    expect(
+      screen.getByText('대회가 종료되었거나 취소돼 더 이상 선수 명단을 수정할 수 없어요.'),
+    ).toBeInTheDocument();
+  });
 });

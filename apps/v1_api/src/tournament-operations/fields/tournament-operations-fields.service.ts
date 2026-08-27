@@ -178,6 +178,26 @@ export class TournamentOperationsFieldsService {
         return replay;
       }
 
+      // finding #76: 이름에는 DB unique 제약이 없다(scopeKey/id만 unique) -- 클라이언트
+      // (staff-client.tsx)가 이제 같은 이름을 막지만, API를 직접 호출하는 경로나
+      // 클라이언트가 오래된 목록을 들고 있는 경합 상황까지 막으려면 서버도 같은 규칙을
+      // 다시 확인해야 한다. 이름이 중복되면 공개 일정의 `fieldId` 매칭(finding #57 fix)
+      // 자체는 더 이상 잘못된 경기를 섞지 않지만, 운영자가 배정 드롭다운에서 어느 필드가
+      // 어느 필드인지 구분할 수 없게 되는 문제는 여전하므로 생성 단계에서 막는다.
+      // 대소문자만 다른 이름도 같은 이름으로 본다(case-insensitive) -- 공백 트림은
+      // DB 컬럼 자체를 바꾸지 않으므로 여기서는 비교에만 적용한다.
+      const trimmedName = dto.name.trim();
+      const duplicate = await tx.v1TournamentField.findFirst({
+        where: { tournamentId, name: { equals: trimmedName, mode: 'insensitive' } },
+        select: { id: true },
+      });
+      if (duplicate !== null) {
+        throw new ConflictException({
+          code: 'FIELD_NAME_DUPLICATE',
+          message: '이미 같은 이름의 경기장이 있어요.',
+        });
+      }
+
       let field: V1TournamentField;
       try {
         field = await tx.v1TournamentField.create({

@@ -110,11 +110,23 @@ function Shell({ title, children }: { title: string; children: React.ReactNode }
 }
 
 /**
+ * finding #76: 공개 일정 응답이 이제 `fieldId`도 함께 내려준다
+ * (`public-tournament-records.service.ts`의 `FIXTURE_SCHEDULE_SELECT`/`presentScheduleEntry`).
+ * `components/public-game-records/types.ts`의 `PublicScheduleEntry`는 이 배치가
+ * 소유하지 않는 공유 타입이라 여기서 직접 고치지 못한다 — 실제 응답 바디에는 필드가
+ * 이미 실려 있으므로, 이 파일 안에서만 지역적으로 타입을 넓혀 읽는다. `types.ts`에
+ * `fieldId: string | null`을 정식으로 추가하는 것은 별도 소유자의 후속 작업이다.
+ */
+type ScheduleEntryWithFieldId = PublicScheduleEntry & { fieldId: string | null };
+
+/**
  * 내 배정이 덮는 경기만 고른다.
  *
- * 경기 스코프(`fixtureIds`)가 있으면 그 목록이 정답이다. 필드 단위 배정은 공개 일정이
- * `fieldId` 를 내려주지 않으므로 `fieldName` 으로 맞춘다 — 두 값 모두 같은 필드 레코드에서
- * 나오고, 여기서 잘못 넓혀도 서버가 최종 판정하므로 과다 노출이 아니다.
+ * 경기 스코프(`fixtureIds`)가 있으면 그 목록이 정답이다. 필드 단위 배정은 `fieldId`로
+ * 맞춘다 — finding #76 이전엔 `fieldName` 문자열로 매칭했는데, 필드 이름에는 유일성
+ * 제약도 수정·삭제 경로도 없어서 같은 이름의 필드가 두 개 생기면(중복 생성을 막는
+ * 장치가 없다) 담당자가 아닌 필드의 경기까지 "내 담당"으로 잘못 묶였다. `fieldId`는
+ * 필드 레코드의 진짜 기본키라 동명이인 문제가 없다.
  */
 export function selectMyFixtures(
   entries: readonly PublicScheduleEntry[],
@@ -124,16 +136,16 @@ export function selectMyFixtures(
   if (fieldOperators.length === 0) return [];
 
   const scopedFixtureIds = new Set(fieldOperators.flatMap((a) => a.fixtureIds));
-  const scopedFieldNames = new Set(
+  const scopedFieldIds = new Set(
     fieldOperators
-      .filter((a) => a.fixtureIds.length === 0 && a.fieldName !== null)
-      .map((a) => a.fieldName as string),
+      .filter((a) => a.fixtureIds.length === 0 && a.fieldId !== null)
+      .map((a) => a.fieldId as string),
   );
 
-  return entries.filter(
+  return (entries as readonly ScheduleEntryWithFieldId[]).filter(
     (entry) =>
       scopedFixtureIds.has(entry.fixtureId) ||
-      (entry.fieldName !== null && scopedFieldNames.has(entry.fieldName)),
+      (entry.fieldId !== null && scopedFieldIds.has(entry.fieldId)),
   );
 }
 

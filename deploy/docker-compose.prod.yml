@@ -135,7 +135,7 @@ services:
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:${WORKER_PORT:-8122}/api/v1/game-operations-worker/health').then(async (res) => { const json = await res.json(); const status = json?.data?.status ?? json?.status; if (!res.ok || status !== 'healthy') throw new Error('game operations worker health ' + res.status + ' status=' + status); }).catch(() => process.exit(1));",
+          "fetch('http://127.0.0.1:${WORKER_PORT:-8122}/api/v1/game-operations-worker/health').then(async (res) => { const json = await res.json(); const status = json?.data?.deploymentStatus ?? json?.deploymentStatus; if (!res.ok || status !== 'healthy') throw new Error('game operations worker health ' + res.status + ' deploymentStatus=' + status); }).catch(() => process.exit(1));",
         ]
       interval: 10s
       timeout: 5s

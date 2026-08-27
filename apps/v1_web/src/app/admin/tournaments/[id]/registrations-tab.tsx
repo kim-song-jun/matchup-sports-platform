@@ -78,6 +78,13 @@ export function RosterModal({
   const players = [...(data?.players ?? [])].sort(
     (left, right) => Number(right.isTeamCaptain) - Number(left.isTeamCaptain),
   );
+  // 감사 finding #53: 잠금(확정) 이후에도 어드민 추가·제거는 성별 쿼터를 재검증하지 않아
+  // "확정" 표시가 남은 채 인원 조건이 깨질 수 있다(서버는 위반 시 자동 잠금 해제로 대응한다 —
+  // tournament-players.service.ts의 reconcileGenderQuotaAfterRosterChange 참조). 화면에는 최소한
+  // 현재 성별 구성을 항상 보여서, 운영자가 몇 명을 추가·제외하기 전에 바로 인지할 수 있게 한다.
+  const maleCount = players.filter((p) => p.genderSnapshot === 'male').length;
+  const femaleCount = players.filter((p) => p.genderSnapshot === 'female').length;
+  const unknownGenderCount = players.length - maleCount - femaleCount;
 
   const handleAddPlayer = () => {
     if (!selectedMember) {
@@ -133,6 +140,12 @@ export function RosterModal({
       title={`명단 검토 — ${registration?.teamName ?? registration?.teamId ?? ''}`}
       onClose={onClose}
     >
+      {!isPending && !isError && players.length > 0 ? (
+        <p className="mb-2 text-xs text-[var(--text-muted)]">
+          {`현재 성별 구성 · 남 ${maleCount}명 · 여 ${femaleCount}명`}
+          {unknownGenderCount > 0 ? ` · 성별 미등록 ${unknownGenderCount}명` : ''}
+        </p>
+      ) : null}
       {isPending ? (
         <p className="text-sm text-[var(--text-muted)]">불러오는 중…</p>
       ) : isError ? (
@@ -401,17 +414,21 @@ export function RegistrationsTab({
         ? `현재 ${confirmedCount}/${tournamentTeamCount}팀 확정 — 이 팀을 확정하면 ${nextCount}/${tournamentTeamCount}팀이 돼요.`
         : `현재 ${confirmedCount}팀이 확정됐어요.`;
     const overCapacity = tournamentTeamCount != null && nextCount > tournamentTeamCount;
+    // 감사 finding #0: 정원 초과 시 이 모달이 "대기 명단 처리될 수 있어요"라고 안내해 놓고
+    // 확인 버튼은 항상 decision='confirm'만 보내, 서버가 409 TOURNAMENT_CAPACITY_FULL로
+    // 거절했다 — 운영자는 안내를 믿고 눌렀다가 아무 처리도 되지 않은 채 에러 토스트만 봤다.
+    // 정원 초과일 땐 버튼 자체를 "대기로 처리"로 바꿔, 버튼 라벨과 실제 동작을 일치시킨다.
     const message = overCapacity
-      ? `${capacityLine} 정원을 초과해요 — 대기 명단(waitlist) 처리될 수 있어요.`
+      ? `${capacityLine} 정원을 초과해 확정할 수 없어요 — 대신 대기 명단으로 처리할까요?`
       : capacityLine;
     const ok = await confirmDialog({
-      title: '참가 확정',
+      title: overCapacity ? '정원 초과 — 대기 처리' : '참가 확정',
       message,
-      confirmLabel: '확정',
+      confirmLabel: overCapacity ? '대기로 처리' : '확정',
       tone: overCapacity ? 'danger' : 'default',
     });
     if (!ok) return;
-    handleConfirm(reg, 'confirm');
+    handleConfirm(reg, overCapacity ? 'waitlist' : 'confirm');
   };
 
   const handleCancel = async (reg: V1AdminTournamentRegistration) => {
@@ -487,10 +504,20 @@ export function RegistrationsTab({
   };
 
   const handleRosterDeadlineOverrideGrant = (reg: V1AdminTournamentRegistration) => {
+    // 감사 finding #52: 예외 허용은 잠금(rosterLockedAt)과 무관하게 성공하는데, 잠긴 신청은
+    // 여전히 명단을 못 고친다(서버가 잠금 검사를 마감 검사보다 먼저 본다) — 무조건 성공 토스트만
+    // 뜨면 운영자가 "팀이 이제 고칠 수 있다"고 잘못 믿는다. 잠겨 있으면 그 사실을 함께 알린다.
+    const stillLocked = !!reg.rosterLockedAt;
     rosterDeadlineOverrideGrant.mutate(
       reg.id,
       {
-        onSuccess: () => showToast('명단 제출 마감 예외를 허용했어요.', 'success'),
+        onSuccess: () =>
+          showToast(
+            stillLocked
+              ? '명단 제출 마감 예외를 허용했어요. 다만 명단이 아직 잠겨 있어 팀이 수정하려면 잠금 해제도 함께 해야 해요.'
+              : '명단 제출 마감 예외를 허용했어요.',
+            'success',
+          ),
         onError: (err) =>
           showToast(extractErrorMessage(err, '마감 예외 허용에 실패했어요.'), 'error'),
       },

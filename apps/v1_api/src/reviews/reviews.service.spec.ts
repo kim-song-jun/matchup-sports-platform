@@ -194,6 +194,76 @@ describe('ReviewsService', () => {
     );
   });
 
+  // finding: 상대가 나를 먼저 평가해 둔 뒤 내가 되평가를 제출하면, 그 되평가가 상대 리뷰의
+  // reveal 짝을 완성시켜 "내가 받은 리뷰"가 공개로 바뀐다. 이 경로가 target(상대)만 재계산하고
+  // 리뷰어 본인 캐시를 재계산하지 않으면 선수 카드 해금이 영구히 stale해진다(2026-08-26 감사).
+  it('submitPersonalReview: 되평가 제출 시 상대뿐 아니라 리뷰어 본인의 평판 캐시도 재계산한다', async () => {
+    const createMock = jest.fn().mockResolvedValue({
+      id: 'review-3',
+      sourceType: 'match',
+      sourceId,
+      targetType: 'user',
+      targetUser: { id: targetUserId, profile: { nickname: '민준', profileImageUrl: null } },
+      targetTeam: null,
+      reviewerUser: { id: user.id, profile: { nickname: '송준', profileImageUrl: null } },
+      reviewerTeam: null,
+      rating: 5,
+      sportId: 'sport-futsal',
+      tags: [],
+      status: 'submitted',
+      submittedAt,
+    });
+    const upsertMock = jest.fn().mockResolvedValue({});
+    const prisma = {
+      v1Match: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: sourceId,
+          title: '성수 풋살파크 개인 매치',
+          status: 'completed',
+          completedAt: submittedAt,
+          startAt: submittedAt,
+          sportId: 'sport-futsal',
+          participants: [
+            { userId: user.id, user: { id: user.id, profile: { nickname: '송준', profileImageUrl: null } } },
+            { userId: targetUserId, user: { id: targetUserId, profile: { nickname: '민준', profileImageUrl: null } } },
+          ],
+        }),
+      },
+      v1PostEventReview: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback({
+        v1PostEventReview: {
+          create: createMock,
+          findMany: jest.fn().mockResolvedValue([]),
+        },
+        v1PostEventReviewMetricScore: {
+          findMany: jest.fn().mockResolvedValue([]),
+        },
+        v1UserReputationSummary: { upsert: upsertMock },
+      })),
+    };
+    const tournamentFixtureReviews = {
+      pending: jest.fn(),
+      source: jest.fn(),
+      submit: jest.fn(),
+      sourceSummaries: jest.fn(),
+    };
+    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub(), reviewPolicyStub());
+
+    await service.submit(user, {
+      sourceType: 'match',
+      sourceId,
+      targetType: 'user',
+      targetUserId,
+      rating: 5,
+      tagCodes: ['manner'],
+    });
+
+    const recalculatedUserIds = upsertMock.mock.calls.map((call) => (call[0] as { where: { userId: string } }).where.userId);
+    expect(recalculatedUserIds).toEqual(expect.arrayContaining([targetUserId, user.id]));
+  });
+
   it('match 소스는 마감 없이 무기한 제출 가능하다(D-12, 완료 플로우 부재)', async () => {
     // V1Match.completedAt 을 채우는 write 경로가 이 저장소에 없다(스펙 §1.2.2) — 앵커가 항상
     // 비어 있으므로 match 소스에는 review-deadline.ts 를 아예 호출하지 않는다. 100일 전 완료로
@@ -1103,6 +1173,43 @@ describe('ReviewsService', () => {
       expect((error as ForbiddenException).getResponse()).toMatchObject({ code: 'TARGET_NOT_REVIEWABLE' });
       expect(createMock).not.toHaveBeenCalled();
     });
+
+    // finding: 라인업을 rev1(opponentA 포함)→rev2(opponentA 제외, opponentB로 교체)로 다시
+    // 저장해도 rev1의 V1GameParticipant 행은 지워지지 않는다. gameId/sideId로만 조회하면
+    // opponentA가 최종 명단에서 빠졌는데도 계속 평가 대상으로 남는다 — 최신 revision으로
+    // 좁혀야 사라진다.
+    it('최신 라인업 revision에서 빠진 선수는 대상 목록에도, 평가 시도에도 뜨지 않는다', async () => {
+      const opponentC = 'away-player-c';
+      const { prisma, createMock } = teamMatchWorld(
+        [{ userId: memberAId, teamId: hostTeamId, role: 'member' }],
+        [],
+        [opponentC],
+        [opponentA], // opponentA는 옛(superseded) revision에만 남아 있다.
+      );
+      const service = makeService(prisma);
+
+      const source = await service.source(authUser(memberAId), { sourceType: 'team_match', sourceId: teamSourceId });
+
+      const targetUserIds = source.targets.filter((target) => target.targetType === 'user').map((target) => target.targetUserId);
+      expect(targetUserIds).toEqual([opponentC]);
+      expect(targetUserIds).not.toContain(opponentA);
+
+      // 대상 목록에서 빠졌으니 실제 제출 시도도 TARGET_NOT_REVIEWABLE로 거부돼야 한다 —
+      // 목록만 고치고 제출 검증이 여전히 옛 로스터를 보면 "화면엔 없는데 API로는 통과"하는
+      // 반쪽 수정이 된다.
+      const error = await service.submit(authUser(memberAId), {
+        sourceType: 'team_match',
+        sourceId: teamSourceId,
+        targetType: 'user',
+        targetUserId: opponentA,
+        rating: 4,
+        tagCodes: ['manner'],
+      }).catch((err: unknown) => err);
+
+      expect(error).toBeInstanceOf(ForbiddenException);
+      expect((error as ForbiddenException).getResponse()).toMatchObject({ code: 'TARGET_NOT_REVIEWABLE' });
+      expect(createMock).not.toHaveBeenCalled();
+    });
   });
 
   describe('recalculateTeamTrust — 팀 평균 1표 환산', () => {
@@ -1231,6 +1338,7 @@ describe('ReviewsService — 어드민 후기 숨김', () => {
     targetType: 'user',
     targetUserId: 'target-user',
     targetTeamId: null,
+    reviewerUserId: 'reviewer-user',
   };
 
   it('숨기면 status 를 hidden 으로 바꾸고 대상의 평판을 다시 계산한다', async () => {
@@ -1246,6 +1354,19 @@ describe('ReviewsService — 어드민 후기 숨김', () => {
     // 숨긴 후기가 매너 점수에 계속 살아 있다.
     expect(upsert).toHaveBeenCalled();
     expect(logAdminAction).toHaveBeenCalled();
+  });
+
+  // finding: 이 리뷰(reviewer→target)가 다른 리뷰(target→reviewer)의 reveal 짝일 수 있다 —
+  // 숨기면 그 다른 리뷰의 reveal이 풀리므로 대상(target)뿐 아니라 작성자(reviewer) 본인의
+  // 캐시도 함께 다시 계산해야 한다. 대상만 재계산하면 숨김 이후에도 작성자 화면엔 이미 사라진
+  // 리뷰가 반영된 평판이 그대로 남는다.
+  it('숨기면 대상뿐 아니라 작성자(reviewerUserId) 본인의 평판도 함께 재계산한다', async () => {
+    const { service, upsert } = makeWorld(submittedReview);
+
+    await service.hideReview(user, 'review-1', { reason: '욕설' });
+
+    const recalculatedUserIds = upsert.mock.calls.map((call) => (call[0] as { where: { userId: string } }).where.userId);
+    expect(recalculatedUserIds).toEqual(expect.arrayContaining([submittedReview.targetUserId, submittedReview.reviewerUserId]));
   });
 
   it('이미 숨겨진 후기는 멱등하게 alreadyHidden 을 돌려준다', async () => {
@@ -1336,8 +1457,14 @@ function teamReviewDto(rating: number) {
 function teamMatchWorld(
   memberships: Array<{ userId: string; teamId: string; role: string }>,
   seededReviews: FakeRow[] = [],
-  /** 상대(원정)팀 라인업에 실린 연동 팀원 userId 목록. 비우면 라인업 없는 팀 매치. */
+  /** 상대(원정)팀 "최신" 라인업 revision에 실린 연동 팀원 userId 목록. 비우면 라인업 없는 팀 매치. */
   awayRosterUserIds: string[] = [],
+  /**
+   * 상대(원정)팀의 옛(superseded) 라인업 revision에만 실려 있고 최신 revision에서는 빠진
+   * userId 목록 — finding: 팀매치 리뷰 로스터가 gameId/sideId로만 조회해 이 사람들까지
+   * 평가 대상으로 새는 회귀를 재현하기 위한 픽스처. 비우면 라인업 revision이 1개뿐이다.
+   */
+  staleAwayRosterUserIds: string[] = [],
 ) {
   const membershipRows: FakeRow[] = memberships.map((membership) => ({
     ...membership,
@@ -1358,8 +1485,9 @@ function teamMatchWorld(
     approvedApplicantTeam: { id: awayTeamId, name: '원정팀', profile: { logoUrl: null } },
   };
 
-  // 원정팀 사이드에 연동 팀원이 실린 라인업 한 벌. 서비스는 gameId+sideId로 참가자를 모아
-  // userId가 있는 행만 후기 대상으로 쓴다.
+  // 원정팀 사이드에 연동 팀원이 실린 라인업. 서비스는 "최신 revision 라인업"의 lineupId로
+  // 참가자를 모아 userId가 있는 행만 후기 대상으로 쓴다 — gameId+sideId만으로 조회하면 지워지지
+  // 않는 옛 revision 참가자까지 섞인다(finding 재현용으로 staleAwayRosterUserIds를 별도 revision에 둔다).
   const awaySideId = 'side-away';
   const gameRow = {
     id: 'game-1',
@@ -1369,12 +1497,34 @@ function teamMatchWorld(
       { id: awaySideId, teamId: awayTeamId },
     ],
   };
-  const gameParticipantRows = awayRosterUserIds.map((userId) => ({
-    gameId: gameRow.id,
-    sideId: awaySideId,
-    userId,
-    displayNameSnapshot: `선수-${userId}`,
-  }));
+  const hasAwayLineup = awayRosterUserIds.length > 0 || staleAwayRosterUserIds.length > 0;
+  const staleLineupId = 'lineup-away-rev1';
+  const latestLineupId = hasAwayLineup ? (staleAwayRosterUserIds.length ? 'lineup-away-rev2' : 'lineup-away-rev1') : null;
+  const lineupRows: FakeRow[] = hasAwayLineup
+    ? staleAwayRosterUserIds.length
+      ? [
+          { id: staleLineupId, gameId: gameRow.id, sideId: awaySideId, revision: 1 },
+          { id: latestLineupId, gameId: gameRow.id, sideId: awaySideId, revision: 2 },
+        ]
+      : [{ id: latestLineupId, gameId: gameRow.id, sideId: awaySideId, revision: 1 }]
+    : [];
+  const gameParticipantRows: FakeRow[] = [
+    // 옛 revision에만 남은, 최종 명단에서 빠진 선수 — 최신 revision으로 스코프하면 제외돼야 한다.
+    ...staleAwayRosterUserIds.map((userId) => ({
+      gameId: gameRow.id,
+      sideId: awaySideId,
+      lineupId: staleLineupId,
+      userId,
+      displayNameSnapshot: `선수-${userId}`,
+    })),
+    ...awayRosterUserIds.map((userId) => ({
+      gameId: gameRow.id,
+      sideId: awaySideId,
+      lineupId: latestLineupId,
+      userId,
+      displayNameSnapshot: `선수-${userId}`,
+    })),
+  ];
 
   let sequence = 0;
   const createMock = jest.fn(async ({ data }: { data: FakeRow }) => {
@@ -1421,15 +1571,27 @@ function teamMatchWorld(
       findFirst: jest.fn(async ({ where }: { where: FakeRow }) => reviewRows.find((row) => matchesWhere(row, where)) ?? null),
       findMany: reviewFindMany,
     },
-    // awayRosterUserIds 가 비면 라인업 없는 팀 매치 — 상대 선수 대상 0명이라 팀 후기 경로만 남는다.
+    // awayRosterUserIds/staleAwayRosterUserIds 가 둘 다 비면 라인업 없는 팀 매치 — 상대 선수 대상
+    // 0명이라 팀 후기 경로만 남는다.
     v1Game: {
-      findUnique: jest.fn().mockResolvedValue(awayRosterUserIds.length ? gameRow : null),
-      findMany: jest.fn().mockResolvedValue(awayRosterUserIds.length ? [{ ...gameRow, teamMatchId: teamSourceId }] : []),
+      findUnique: jest.fn().mockResolvedValue(hasAwayLineup ? gameRow : null),
+      findMany: jest.fn().mockResolvedValue(hasAwayLineup ? [{ ...gameRow, teamMatchId: teamSourceId }] : []),
     },
-    v1GameParticipant: { findMany: jest.fn().mockResolvedValue(gameParticipantRows) },
+    // where 절을 실제로 해석한다 — mock이 인자를 무시하고 고정 배열을 돌려주면 "최신 revision
+    // lineupId로 좁히는지"를 잡을 수 없다(finding: gameId/sideId만으로 조회해 옛 revision까지 샌 회귀).
+    v1GameLineup: {
+      findMany: jest.fn(async ({ where }: { where: FakeRow }) =>
+        lineupRows
+          .filter((row) => matchesWhere(row, where))
+          .sort((a, b) => (b.revision as number) - (a.revision as number)),
+      ),
+    },
+    v1GameParticipant: {
+      findMany: jest.fn(async ({ where }: { where: FakeRow }) => gameParticipantRows.filter((row) => matchesWhere(row, where))),
+    },
     v1User: {
       findMany: jest.fn().mockResolvedValue(
-        awayRosterUserIds.map((userId) => ({
+        [...awayRosterUserIds, ...staleAwayRosterUserIds].map((userId) => ({
           id: userId,
           profile: { nickname: `선수-${userId}`, profileImageUrl: null },
         })),

@@ -47,9 +47,23 @@ const AUDIT = () => {
   const collect = (rules) => {
     for (const r of rules) {
       if (r.selectorText && r.style) {
+        // margin shorthand 는 side 별로 풀어야 한다. `margin: 0 auto` 는 좌우만
+        // auto 인데, 통째로 보면 top/bottom 까지 auto 로 오인해 **실제 격자 이탈을
+        // 그 요소에서 통째로 못 보게 된다**(예외가 너무 넓어지는 쪽 오류다).
+        const short = r.style.getPropertyValue('margin').trim();
+        const sides = short ? (() => {
+          const parts = short.split(/\s+/);
+          // 1값=전부 · 2값=상하/좌우 · 3값=상/좌우/하 · 4값=상/우/하/좌
+          const [a, b, c, d] = parts;
+          if (parts.length === 1) return { marginTop: a, marginRight: a, marginBottom: a, marginLeft: a };
+          if (parts.length === 2) return { marginTop: a, marginRight: b, marginBottom: a, marginLeft: b };
+          if (parts.length === 3) return { marginTop: a, marginRight: b, marginBottom: c, marginLeft: b };
+          return { marginTop: a, marginRight: b, marginBottom: c, marginLeft: d };
+        })() : null;
         for (const k of Object.keys(autoSel)) {
-          const v = r.style.getPropertyValue(KEBAB(k)) || r.style.getPropertyValue('margin');
-          if (v && /(^|\s)auto(\s|$)/.test(v)) autoSel[k].push(r.selectorText);
+          const own = r.style.getPropertyValue(KEBAB(k)).trim();
+          const v = own || (sides ? sides[k] : '');
+          if (v && /^auto$/.test(v)) autoSel[k].push(r.selectorText);
         }
       }
       // @import 는 규칙이 아니라 **다른 시트**를 가리킨다 — cssRules 를 갖지 않으므로

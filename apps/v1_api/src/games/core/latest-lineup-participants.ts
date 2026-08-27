@@ -46,7 +46,8 @@ function pickParticipantsOfChosenRevisions<T extends LineupRevisionParticipant>(
   }
   return participants.filter((participant) => {
     // `undefined === undefined` 로 통과시키지 않는다. 라인업을 한 건도 못 찾은 경우
-    // (`lineups` 가 비었거나 participant 가 사라진/후보 밖 라인업을 가리키는 경우)
+    // (`chosen` 이 비었거나 participant 가 후보 밖 라인업을 가리키는 경우 -- 예: 그
+    // 사이드에 제출본이 있어서 DRAFT 리비전이 후보에서 빠진 참가자)
     // 양쪽이 모두 undefined 라 그냥 비교하면 **필터가 아무것도 거르지 않고 전원을
     // 통과시킨다** -- 이 함수를 붙인 이유(옛 리비전 선수가 기록에 남는 것)와 정반대다.
     const participantRevision = lineupById.get(participant.lineupId)?.revision;

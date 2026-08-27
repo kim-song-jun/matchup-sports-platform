@@ -276,6 +276,36 @@ describe('TournamentRegistrationsService', () => {
     expect(prisma.v1TournamentRegistration.create).not.toHaveBeenCalled();
   });
 
+  // 감사 finding(reg-confirm-reapply-state-machine #2/#3): 취소 후 재신청은 완전히 새로운
+  // 사이클인데, 되살아난 draft가 이전 사이클(확정→잠금→취소)의 흔적을 그대로 물려받아
+  // (a) 새 신청인데 명단이 잠긴 채 시작하고 (b) 임시저장인데 확정일이 함께 표시됐다.
+  // 이전 status 값 하나만 보는 위 테스트는 이 회귀를 못 잡는다 — 취소된 신청건이 실제로
+  // 그 사이클을 거쳤다면(확정→명단잠금→마감예외부여→취소) 4개 필드가 전부 값을 갖고
+  // 있는 상태이고, update() 호출 인자가 그 4개를 명시적으로 null 로 되돌리는지를 직접 봐야 한다.
+  it('create: 재활성화된 신청은 rosterLockedAt/rosterDeadlineOverrideAt/confirmedAt/confirmedByAdminUserId를 모두 null로 초기화한다', async () => {
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament());
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(
+      registrationRow({
+        status: 'cancelled',
+        // 취소 전 실제로 확정 → 명단잠금 → 마감예외 부여까지 거쳤던 신청건.
+        confirmedAt: new Date('2026-06-01T00:00:00Z'),
+        confirmedByAdminUserId: 'admin-1',
+        rosterLockedAt: new Date('2026-06-05T00:00:00Z'),
+        rosterDeadlineOverrideAt: new Date('2026-06-10T00:00:00Z'),
+      }),
+    );
+    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'draft' }));
+
+    await service.create(manager, 'tournament-1', { teamId: 'team-1' });
+
+    const call = prisma.v1TournamentRegistration.update.mock.calls[0][0];
+    expect(call.data.status).toBe('draft');
+    expect(call.data.rosterLockedAt).toBeNull();
+    expect(call.data.rosterDeadlineOverrideAt).toBeNull();
+    expect(call.data.confirmedAt).toBeNull();
+    expect(call.data.confirmedByAdminUserId).toBeNull();
+  });
+
   // ─── submit ───────────────────────────────────────────────────────────────────
 
   it('submit: 본인인증을 안 한 신청자는 403 PHONE_NOT_VERIFIED 로 막고 약관 검증까지 가지 않는다', async () => {

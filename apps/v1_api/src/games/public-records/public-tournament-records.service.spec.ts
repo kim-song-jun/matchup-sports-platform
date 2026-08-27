@@ -317,6 +317,57 @@ describe('PublicTournamentRecordsService.getMatch -- event participant identity 
     });
   });
 
+  it('제출 이후 편집만 하고 다시 제출하지 않은 DRAFT는 revision이 더 커도 공개 라인업을 덮지 못한다', async () => {
+    const submittedHome = { ...ELIGIBLE_PARTICIPANT, id: 'participant-home-submitted', lineupId: 'lineup-home-1', displayNameSnapshot: '제출된 홈 선수' };
+    const draftHome = { ...ELIGIBLE_PARTICIPANT, id: 'participant-home-draft', lineupId: 'lineup-home-2', displayNameSnapshot: '미제출 편집 홈 선수' };
+    const away = { ...INELIGIBLE_PARTICIPANT, id: 'participant-away-1', lineupId: 'lineup-away-1', displayNameSnapshot: '원정 선수' };
+    const prisma = buildFakePrisma({
+      scheduledAt: new Date(Date.now() - 60_000),
+      consentLinks: [], consentSnapshots: [], events: [],
+      lineups: [
+        { id: 'lineup-home-1', sideId: 'side-home', revision: 1, state: 'SUBMITTED' },
+        // revision 2가 revision 1보다 크지만 DRAFT다 -- 팀이 제출 후 라인업을 다시
+        // 편집만 하고 제출은 누르지 않은 상태. "가장 큰 revision"만 보면 이 DRAFT가
+        // 공개 라인업을 덮어써 버린다 -- 그게 이 테스트가 막는 결함이다.
+        { id: 'lineup-home-2', sideId: 'side-home', revision: 2, state: 'DRAFT' },
+        { id: 'lineup-away-1', sideId: 'side-away', revision: 1, state: 'SUBMITTED' },
+      ],
+      participants: [submittedHome, draftHome, away],
+    });
+    const service = new PublicTournamentRecordsService(prisma, NO_ASSIGNMENTS_ACCESS);
+
+    const result = await service.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined);
+
+    expect(result.lineup).toEqual({
+      home: [expect.objectContaining({ participantId: submittedHome.id, displayName: '제출된 홈 선수' })],
+      away: [expect.objectContaining({ participantId: away.id, displayName: '원정 선수' })],
+    });
+  });
+
+  it('한쪽 팀이 아직 제출을 마치지 않아 DRAFT뿐이면 그 사이드는 빈 배열로 나간다', async () => {
+    const draftHome = { ...ELIGIBLE_PARTICIPANT, id: 'participant-home-draft', lineupId: 'lineup-home-1', displayNameSnapshot: '미제출 홈 선수' };
+    const submittedAway = { ...INELIGIBLE_PARTICIPANT, id: 'participant-away-submitted', lineupId: 'lineup-away-1', displayNameSnapshot: '제출된 원정 선수' };
+    const prisma = buildFakePrisma({
+      scheduledAt: new Date(Date.now() - 60_000),
+      consentLinks: [], consentSnapshots: [], events: [],
+      lineups: [
+        // 대진 생성 시 자동으로 깔리는 revision 1 DRAFT -- 홈팀은 아직 제출을
+        // 마치지 않았다. 이 사이드에는 SUBMITTED/LOCKED가 하나도 없다.
+        { id: 'lineup-home-1', sideId: 'side-home', revision: 1, state: 'DRAFT' },
+        { id: 'lineup-away-1', sideId: 'side-away', revision: 1, state: 'SUBMITTED' },
+      ],
+      participants: [draftHome, submittedAway],
+    });
+    const service = new PublicTournamentRecordsService(prisma, NO_ASSIGNMENTS_ACCESS);
+
+    const result = await service.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined);
+
+    expect(result.lineup).toEqual({
+      home: [],
+      away: [expect.objectContaining({ participantId: submittedAway.id, displayName: '제출된 원정 선수' })],
+    });
+  });
+
   it('동의한 참가자의 골 이벤트에 participantName/jerseyNumber 가 실린다', async () => {
     const now = new Date();
     const prisma = buildFakePrisma({

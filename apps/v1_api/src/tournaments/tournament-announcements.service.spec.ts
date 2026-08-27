@@ -126,6 +126,105 @@ describe('TournamentAnnouncementsService', () => {
 
   afterEach(() => jest.clearAllMocks());
 
+  // ─── listForParticipant ───────────────────────────────────────────────────────
+  //
+  // 알림 수신 자격(notifyAnnouncementPublished가 registrationStatusesForAudience로 정하는
+  // 대상)과 열람 자격이 갈리면 "알림은 왔는데 못 읽는다"가 재현된다 — 아래는 audience별
+  // 4갈래(public/confirmed_only/waitlist/all_registered) 분기를 각각 실측한다.
+
+  it('listForParticipant: 삭제된 대회 → 404 TOURNAMENT_NOT_FOUND', async () => {
+    prisma.v1Tournament.findFirst.mockResolvedValue(null);
+    await expect(service.listForParticipant(plainUser, 'ghost')).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_NOT_FOUND' },
+    });
+    expect(prisma.v1TournamentAnnouncement.findMany).not.toHaveBeenCalled();
+  });
+
+  it('listForParticipant: audience=public 공지는 신청 내역이 전혀 없어도 보인다', async () => {
+    prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1' });
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([]); // 미신청자
+    prisma.v1TournamentAnnouncement.findMany.mockResolvedValue([
+      announcementRow({ id: 'ann-public', audience: 'public', publishedAt: new Date() }),
+    ]);
+
+    const result = await service.listForParticipant(plainUser, 'tournament-1');
+
+    expect(result.items.map((i) => i.id)).toEqual(['ann-public']);
+  });
+
+  it('listForParticipant: audience=confirmed_only은 confirmed 신청자에게만 보인다', async () => {
+    prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1' });
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([{ status: 'confirmed' }]);
+    prisma.v1TournamentAnnouncement.findMany.mockResolvedValue([
+      announcementRow({ id: 'ann-confirmed', audience: 'confirmed_only', publishedAt: new Date() }),
+    ]);
+
+    const result = await service.listForParticipant(plainUser, 'tournament-1');
+
+    expect(result.items.map((i) => i.id)).toEqual(['ann-confirmed']);
+  });
+
+  it('listForParticipant: audience=confirmed_only은 waitlisted 신청자에게는 안 보인다', async () => {
+    prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1' });
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([{ status: 'waitlisted' }]);
+    prisma.v1TournamentAnnouncement.findMany.mockResolvedValue([
+      announcementRow({ id: 'ann-confirmed', audience: 'confirmed_only', publishedAt: new Date() }),
+    ]);
+
+    const result = await service.listForParticipant(plainUser, 'tournament-1');
+
+    expect(result.items).toEqual([]);
+  });
+
+  it('listForParticipant: audience=waitlist은 waitlisted 신청자에게만 보인다', async () => {
+    prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1' });
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([{ status: 'waitlisted' }]);
+    prisma.v1TournamentAnnouncement.findMany.mockResolvedValue([
+      announcementRow({ id: 'ann-waitlist', audience: 'waitlist', publishedAt: new Date() }),
+    ]);
+
+    const result = await service.listForParticipant(plainUser, 'tournament-1');
+
+    expect(result.items.map((i) => i.id)).toEqual(['ann-waitlist']);
+  });
+
+  it('listForParticipant: audience=waitlist은 confirmed 신청자에게는 안 보인다', async () => {
+    prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1' });
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([{ status: 'confirmed' }]);
+    prisma.v1TournamentAnnouncement.findMany.mockResolvedValue([
+      announcementRow({ id: 'ann-waitlist', audience: 'waitlist', publishedAt: new Date() }),
+    ]);
+
+    const result = await service.listForParticipant(plainUser, 'tournament-1');
+
+    expect(result.items).toEqual([]);
+  });
+
+  it('listForParticipant: audience=all_registered은 활성 신청 상태(예: paid)면 보인다', async () => {
+    prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1' });
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([{ status: 'paid' }]);
+    prisma.v1TournamentAnnouncement.findMany.mockResolvedValue([
+      announcementRow({ id: 'ann-all', audience: 'all_registered', publishedAt: new Date() }),
+    ]);
+
+    const result = await service.listForParticipant(plainUser, 'tournament-1');
+
+    expect(result.items.map((i) => i.id)).toEqual(['ann-all']);
+  });
+
+  it('listForParticipant: audience=all_registered이라도 활성 신청 내역이 없으면(신청 자체가 없거나 취소만 있으면) 안 보인다', async () => {
+    prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1' });
+    // ACTIVE_TOURNAMENT_REGISTRATION_STATUSES에 cancelled는 없으므로 조회 자체가 빈 배열을 반환한다.
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([]);
+    prisma.v1TournamentAnnouncement.findMany.mockResolvedValue([
+      announcementRow({ id: 'ann-all', audience: 'all_registered', publishedAt: new Date() }),
+    ]);
+
+    const result = await service.listForParticipant(plainUser, 'tournament-1');
+
+    expect(result.items).toEqual([]);
+  });
+
   // ─── listByTournament ─────────────────────────────────────────────────────────
 
   it('listByTournament: non-admin → 403 PERMISSION_DENIED', async () => {

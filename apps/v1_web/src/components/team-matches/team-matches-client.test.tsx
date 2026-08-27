@@ -177,6 +177,29 @@ describe('TeamMatchDetailPageClient — GA events', () => {
     expect(screen.getByTestId('team-match-apply-label')).toHaveTextContent('신청 불가');
     expect(screen.queryByText('승인 완료')).not.toBeInTheDocument();
   });
+
+  it('종목이 다른 팀만 있으면 "팀 만들기" 유도 대신 종목이 다르다는 사유를 보여준다', () => {
+    // status는 beforeEach 기준 'recruiting'이라 신청 마감 분기(status !== 'recruiting')를
+    // 타지 않고 reasonLabel(reasonCode)까지 도달한다. eligible:false + SPORT_MISMATCH인
+    // 팀이 teams 배열의 유일한 항목이므로 selectedEligibility는 teams[0]로 이 팀을 고른다
+    // (hasNoTeam은 배열이 비어있지 않아 false — "팀을 만들고 신청할 수 있어요" fallback으로
+    // 새지 않는다).
+    useV1TeamMatchEligibilityMock.mockReturnValue({
+      data: {
+        teamMatchId: 'team-match-1',
+        requiresApproval: true,
+        requiresPayment: false,
+        teams: [
+          { teamId: 'team-mine', name: '내 팀', role: 'owner', eligible: false, reasonCode: 'SPORT_MISMATCH', applicationId: null },
+        ],
+      },
+      isSuccess: true,
+    });
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    expect(screen.getByTestId('team-match-apply-label')).toHaveTextContent('이 팀매치와 종목이 다른 팀이에요');
+  });
 });
 
 // Task 17: buildResultAction() is the sole routing gate between the host's

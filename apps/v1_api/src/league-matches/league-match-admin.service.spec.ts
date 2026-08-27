@@ -54,12 +54,14 @@ interface FakeState {
   sides: Array<{ id: string; sideKey: string }>;
   links: Array<{ participantId: string; userId: string }>;
   linkEvents: Array<{ participantId: string; action: string; userId: string }>;
+  /** "매치가 곧 팀일정" 배선(createTeamMatchScheduleInTx) 검증용 — 대진마다 홈/원정 각각. */
+  scheduleCreates: Array<{ teamId: string; teamMatchId: string }>;
   /** 이 트랜잭션에서 실제로 실행된 statement 이름(`모델.메서드`) 순서대로. */
   calls: string[];
 }
 
 function createFake() {
-  const state: FakeState = { participants: [], sides: [], links: [], linkEvents: [], calls: [] };
+  const state: FakeState = { participants: [], sides: [], links: [], linkEvents: [], scheduleCreates: [], calls: [] };
   let seq = 0;
   const next = (prefix: string) => {
     seq += 1;
@@ -113,7 +115,10 @@ function createFake() {
     // createTeamMatchScheduleInTx 로 함께 만든다(league-match-admin.service.ts).
     // 그 헬퍼가 tx.v1TeamSchedule 을 쓰므로 fake tx 에도 있어야 한다.
     v1TeamSchedule: {
-      create: track('v1TeamSchedule.create', async () => ({ id: 'team-schedule-1' })),
+      create: track('v1TeamSchedule.create', async (args: { data: { teamId: string; teamMatchId: string } }) => {
+        state.scheduleCreates.push({ teamId: args.data.teamId, teamMatchId: args.data.teamMatchId });
+        return { id: next('team-schedule') };
+      }),
     },
     v1IdempotencyRecord: {
       findUnique: track('v1IdempotencyRecord.findUnique', async () => null),
@@ -254,6 +259,206 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
       (call) => call === 'v1GameParticipant.create' || call.startsWith('v1ParticipantIdentityLink'),
     );
     expect(perParticipant).toHaveLength(state.participants.length);
+  });
+
+  it('대진마다 홈/원정 팀 모두에 팀 일정이 생긴다 — "매치가 곧 팀일정" 불변식', async () => {
+    // 그룹 B 감사 결함 5: raw create 경로(createFixturesInTx)는 일반 팀매치 생성/신청승인이
+    // 부르는 createTeamMatchScheduleInTx를 우회해서, 리그 대진이 참가 팀 캘린더에 한 건도
+    // 뜨지 않았다. weeksCount:1 · 2팀이면 라운드로빈 대진은 1건이므로 홈·원정 각 1건씩,
+    // 정확히 2건의 팀일정이 생겨야 한다.
+    await service.generateFixtures(adminUser, 'league-1', { weeksCount: 1 });
+
+    expect(state.scheduleCreates).toHaveLength(2);
+    expect(state.scheduleCreates.map((row) => row.teamId).sort()).toEqual(['team-a', 'team-b']);
+    // 두 스케줄이 같은 대진(teamMatchId)을 가리켜야 한다 — 따로 생성되면 팀 캘린더가
+    // 서로 다른 경기 id를 가리켜 "매치가 곧 팀일정" 1:1 관계가 깨진다.
+    const teamMatchIds = new Set(state.scheduleCreates.map((row) => row.teamMatchId));
+    expect(teamMatchIds.size).toBe(1);
+  });
+});
+
+// ── addTeam: 형제 티어 중복 게이트 ──────────────────────────────────────────
+// 그룹 B 감사 결함 1(두 번째 발견): checkLeagueTeamAddAllowed()는 "이 리그 안에서만"
+// 중복을 본다. 시리즈 소속 리그(같은 seriesId·seasonNo)에서는 같은 팀이 형제 티어에
+// 이미 있어도 그 게이트를 통과했다 — addTeam 안에 인라인으로 추가된 형제 티어 조회가
+// 그 구멍을 막는다(league-match-admin.service.ts:423-441). 이 조회는 어디에서도
+// 테스트된 적이 없었다(addTeam/removeTeam 전체가 이 스펙 추가 전엔 spec 커버리지 0건).
+describe('LeagueMatchAdminService.addTeam — 형제 티어 중복 게이트', () => {
+  const LEAGUE_ID = 'league-1';
+  const SERIES_ID = 'series-1';
+  const NEW_TEAM_ID = 'team-new';
+
+  function makePrisma(siblingLeague: { tier: number | null } | null) {
+    const prisma: any = {
+      v1League: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: LEAGUE_ID,
+          seriesId: SERIES_ID,
+          seasonNo: 1,
+          sportId: 'sport-futsal',
+          teams: [{ teamId: 'team-a' }],
+        }),
+        findFirst: jest.fn().mockResolvedValue(siblingLeague),
+      },
+      v1Team: {
+        findFirst: jest.fn().mockResolvedValue({ id: NEW_TEAM_ID, sportId: 'sport-futsal' }),
+      },
+      v1TeamMatch: { count: jest.fn().mockResolvedValue(0) },
+      v1LeagueTeam: { create: jest.fn().mockResolvedValue({}) },
+    };
+    prisma.$transaction = async (fn: (tx: unknown) => Promise<unknown>) => fn(prisma);
+    return prisma;
+  }
+
+  function makeAdminContext() {
+    return {
+      getMutationAdmin: jest.fn().mockResolvedValue({ id: 'admin-row-1', userId: adminUser.id, adminRole: 'ops' }),
+      getActiveAdmin: jest.fn(),
+      logAdminAction: jest.fn().mockResolvedValue(undefined),
+    };
+  }
+
+  it('같은 시즌 형제 티어에 이미 있는 팀을 추가하면 422 LEAGUE_TEAM_INVALID로 거부한다', async () => {
+    const prisma = makePrisma({ tier: 2 });
+    const adminContext = makeAdminContext();
+    const notifications = { emitToManyDeferred: jest.fn() };
+    const service = new LeagueMatchAdminService(prisma, adminContext as any, {} as any, notifications as any);
+
+    await expect(
+      service.addTeam(adminUser, LEAGUE_ID, { teamId: NEW_TEAM_ID } as never),
+    ).rejects.toMatchObject({
+      response: { code: 'LEAGUE_TEAM_INVALID', message: expect.stringContaining('2부') },
+    });
+
+    // 거부됐으면 로스터에 아무것도 안 쓴다 — 검증 게이트를 통과한 뒤에야 create를 부른다.
+    expect(prisma.v1LeagueTeam.create).not.toHaveBeenCalled();
+    expect(prisma.v1League.findFirst).toHaveBeenCalledWith({
+      where: { seriesId: SERIES_ID, seasonNo: 1, id: { not: LEAGUE_ID }, teams: { some: { teamId: NEW_TEAM_ID } } },
+      select: { tier: true },
+    });
+  });
+
+  it('형제 티어에 없으면 통과해서 로스터에 팀이 추가된다', async () => {
+    const prisma = makePrisma(null);
+    const adminContext = makeAdminContext();
+    const notifications = { emitToManyDeferred: jest.fn() };
+    const service = new LeagueMatchAdminService(prisma, adminContext as any, {} as any, notifications as any);
+
+    const result = await service.addTeam(adminUser, LEAGUE_ID, { teamId: NEW_TEAM_ID } as never);
+
+    expect(result).toMatchObject({ leagueId: LEAGUE_ID, teamId: NEW_TEAM_ID });
+    expect(prisma.v1LeagueTeam.create).toHaveBeenCalledWith({ data: { leagueId: LEAGUE_ID, teamId: NEW_TEAM_ID } });
+  });
+});
+
+// ── removeTeam: 대진 취소 알림 + 제외 확인 ──────────────────────────────────
+// 그룹 B 감사 결함 4: 팀 제외로 대진이 취소돼도 상대 팀·제외된 팀 본인 그 누구에게도
+// 알림이 없었다(notifyFixturesCancelled 자체가 이번에 처음 생겼다). 이 스펙 추가
+// 전에는 removeTeam을 부르는 테스트가 이 파일을 포함해 어디에도 없었다.
+describe('LeagueMatchAdminService.removeTeam — 대진 취소 알림과 제외 확인', () => {
+  const LEAGUE_ID = 'league-1';
+  const REMOVED_TEAM = 'team-a';
+  const OPPONENT_TEAM = 'team-b';
+  const OTHER_HOST_TEAM = 'team-c';
+  const CANCEL_REASON = '리그 참가팀에서 제외돼 자동으로 취소했어요.';
+
+  function makePrisma() {
+    const fixtures = [
+      {
+        id: 'fixture-1',
+        status: 'matched',
+        title: '1주차 A vs B',
+        hostTeamId: REMOVED_TEAM,
+        approvedApplicantTeamId: OPPONENT_TEAM,
+        game: { currentOfficialRevisionId: null },
+      },
+      {
+        id: 'fixture-2',
+        status: 'matched',
+        title: '2주차 C vs A',
+        hostTeamId: OTHER_HOST_TEAM,
+        approvedApplicantTeamId: REMOVED_TEAM,
+        game: { currentOfficialRevisionId: null },
+      },
+    ];
+    const prisma: any = {
+      v1League: {
+        // state를 'active'가 아닌 값으로 둔다 — LeagueCompletionProjectionService.settle()이
+        // 첫 조회에서 조기 반환해, 이 테스트의 관심사(취소·알림)와 무관한 추가 목을 안 늘려도 된다.
+        findUnique: jest.fn().mockResolvedValue({
+          id: LEAGUE_ID,
+          state: 'scheduled',
+          teams: [{ teamId: REMOVED_TEAM }, { teamId: OPPONENT_TEAM }, { teamId: OTHER_HOST_TEAM }],
+        }),
+      },
+      // removeTeam은 트랜잭션 밖에서 한 번(초기 게이트 판정), 락을 잡은 트랜잭션 안에서
+      // 다시 한 번(TOCTOU 재검증, :517) 같은 조건으로 대진을 읽는다 — 둘 다 이 목록을 본다.
+      v1TeamMatch: {
+        findMany: jest.fn().mockResolvedValue(fixtures),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      v1LeagueTeam: {
+        count: jest.fn().mockImplementation(async ({ where }: any) => {
+          // remainingAfterRemoval: where.teamId = { not: teamId } → 제거 후 남는 팀 수(2).
+          if (where.teamId && typeof where.teamId === 'object') return 2;
+          // stillPresent: where.teamId = teamId(원시값) → 아직 로스터에 있음(1).
+          return 1;
+        }),
+        deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      v1TeamMatchApplication: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      v1TeamSchedule: { findMany: jest.fn().mockResolvedValue([]) },
+      v1TeamMembership: {
+        findMany: jest.fn().mockImplementation(async ({ where }: any) => [{ userId: `owner-of-${where.teamId}` }]),
+      },
+      $queryRaw: jest.fn().mockResolvedValue([{ id: LEAGUE_ID }]),
+      $executeRaw: jest.fn().mockResolvedValue(1),
+    };
+    prisma.$transaction = async (fn: (tx: unknown) => Promise<unknown>) => fn(prisma);
+    return prisma;
+  }
+
+  function makeAdminContext() {
+    return {
+      getMutationAdmin: jest.fn().mockResolvedValue({ id: 'admin-row-1', userId: adminUser.id, adminRole: 'ops' }),
+      getActiveAdmin: jest.fn(),
+      logAdminAction: jest.fn().mockResolvedValue(undefined),
+    };
+  }
+
+  it('제외된 팀의 예정 대진을 취소하고, 취소된 대진에 걸린 모든 팀(제외된 팀 본인 포함)에게 알린다', async () => {
+    const prisma = makePrisma();
+    const adminContext = makeAdminContext();
+    const notifications = { emitToManyDeferred: jest.fn() };
+    const service = new LeagueMatchAdminService(prisma, adminContext as any, {} as any, notifications as any);
+
+    const result = await service.removeTeam(adminUser, LEAGUE_ID, REMOVED_TEAM);
+
+    // 제외 확인 — 어드민 화면이 그대로 보여줄 결과값.
+    expect(result).toMatchObject({
+      leagueId: LEAGUE_ID,
+      teamId: REMOVED_TEAM,
+      cancelledFixtureCount: 2,
+      leagueCompleted: false,
+    });
+    expect(prisma.v1TeamMatch.update).toHaveBeenCalledTimes(2);
+
+    // 대진 취소 알림 — fixture-1(A·B) + fixture-2(C·A)에 걸린 고유 팀은 A·B·C 3개.
+    // "제외된 팀 본인"도 포함된다는 게 이 알림 함수의 핵심 계약(코드 주석 :583-586).
+    expect(notifications.emitToManyDeferred).toHaveBeenCalledTimes(3);
+    for (const call of notifications.emitToManyDeferred.mock.calls) {
+      expect(call[1]).toBe('league_fixture_cancelled');
+      expect(call[2]).toBe(LEAGUE_ID);
+      expect(call[3]).toBe(`리그 대진 2경기가 취소됐어요. 사유: ${CANCEL_REASON}`);
+    }
+    // 알림 대상 결정 클로저를 실제로 실행해 어느 팀이 조회됐는지까지 못박는다 —
+    // 호출 횟수만 3이고 실제로는 같은 팀을 3번 쐈다면 위 개수 단언만으론 못 잡는다.
+    const resolvedUserIds = (
+      await Promise.all(notifications.emitToManyDeferred.mock.calls.map((call: any) => call[0]()))
+    ).flat();
+    expect(resolvedUserIds.sort()).toEqual(
+      ['owner-of-team-a', 'owner-of-team-b', 'owner-of-team-c'].sort(),
+    );
   });
 });
 

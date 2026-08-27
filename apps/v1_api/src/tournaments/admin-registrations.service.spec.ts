@@ -237,6 +237,27 @@ describe('AdminRegistrationsService', () => {
     expect(result).toMatchObject({ status: 'waitlisted', alreadyProcessed: false });
   });
 
+  // 감사 finding(reg-confirm-reapply-state-machine #1): ADMIN_CONFIRMABLE_STATUSES에
+  // waitlisted가 빠져 있어 대기 팀은 정원에 자리가 나도 취소 후 재신청 말고는 확정될
+  // 방법이 없었다. waitlisted 신청건에 decision=confirm을 걸면 confirmed로 승격돼야 한다
+  // (대기 승격, "자리가 나서 대기 팀을 confirmed로 올리는 것").
+  it('confirm: waitlisted + decision=confirm → 대기 승격으로 confirmed', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(registrationRow({ status: 'waitlisted' }));
+    prisma.v1TournamentRegistration.update.mockResolvedValue(
+      registrationRow({ status: 'confirmed', confirmedAt: new Date(), confirmedByAdminUserId: opsAdminRecord.id }),
+    );
+    prisma.v1TournamentPayment.findUnique.mockResolvedValue(paymentRow({ status: 'paid' }));
+
+    const result = await service.confirm(opsAuth, 'reg-1', { decision: 'confirm' });
+
+    expect(result).toMatchObject({ status: 'confirmed', alreadyProcessed: false });
+    const call = prisma.v1TournamentRegistration.update.mock.calls[0][0];
+    expect(call.data.status).toBe('confirmed');
+    expect(call.data.confirmedAt).toBeInstanceOf(Date);
+    expect(call.data.confirmedByAdminUserId).toBe(opsAdminRecord.id);
+  });
+
   // AREG-03 정원 가드
   it('confirm: decision=confirm but capacity full → 409 TOURNAMENT_CAPACITY_FULL', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);

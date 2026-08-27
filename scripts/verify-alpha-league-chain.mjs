@@ -1,4 +1,7 @@
-// alpha 실측 — 리그 명단→라인업→결과→전적 연결 복구(PR #787) 검증 하네스.
+// alpha 실측 — 리그 "명단 → 라인업 → 결과 → 전적" 연결이 끊기지 않았는지 검증하는 하네스.
+//
+// 특정 PR 이 아니라 **그 연결 자체**를 지킨다. 실제로 이 하네스가 서로 다른 시점의 회귀를
+// 두 번 잡았다: 최초 연결 복구, 그리고 라인업 state 필터가 결과 입력 명단을 비운 회귀.
 //
 // 감사(2026-08-26)에서 실측한 증상을 **같은 방법으로 다시 재서** 사라졌는지 확인한다.
 // 판정은 화면 육안이 아니라 공개/운영 API 가 실제로 돌려주는 값으로 한다.
@@ -37,6 +40,17 @@ function emailForNickname(displayName) {
   if (invitee) return `alpha.e2e.invitee${invitee[1]}@teameet.test`;
   return null;
 }
+
+/**
+ * 리그 기간은 **오늘 기준 상대 날짜**로 만든다. 고정 문자열을 쓰면 그 날짜가 지나는 순간
+ * 하네스가 스스로 깨진다 — 이 저장소에서 고정 날짜를 쓴 스펙이 실시간이 지나 red 가 된
+ * 사고가 이미 있었다(league-match-dispute.service.spec.ts 의 7일 이의 기간).
+ * 대진은 아래에서 요일·시각으로 잡히므로 시작일은 내일, 종료일은 8주 뒤로 넉넉히 둔다.
+ */
+const KST_DAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' });
+const dayFromNow = (days) => KST_DAY.format(new Date(Date.now() + days * 24 * 60 * 60 * 1000));
+const leagueStartsOn = dayFromNow(1);
+const leagueEndsOn = dayFromNow(56);
 
 const results = [];
 const record = (name, ok, detail) => {
@@ -122,8 +136,8 @@ const created = await api('/admin/league-matches', {
     title: `(테스트) 연결복구 검증 ${stamp}`,
     sportId: SPORT_FUTSAL,
     regionId: REGION_L2,
-    startsOn: '2026-09-09',
-    endsOn: '2026-10-31',
+    startsOn: leagueStartsOn,
+    endsOn: leagueEndsOn,
     teamIds: [TEAM_A, TEAM_B],
   },
 });

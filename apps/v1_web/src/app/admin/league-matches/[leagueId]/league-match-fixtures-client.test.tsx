@@ -809,7 +809,10 @@ describe('LeagueMatchFixturesClient', () => {
   });
 
   // U1(A안 "확정 다이얼로그") — '관리' 열 버튼은 결과 진행 단계에 따라 갈린다.
-  it('결과 진행 단계에 따라 관리 버튼 레이블이 바뀐다 — 미확정 3단계는 결과 입력, 확정이면 결과 정정, 승인대기 단계는 버튼이 없다', () => {
+  // 감사 확인(A-league-void-stage): voided(무효화된 결과)도 백엔드가 신규 입력을 이미
+  // 허용하므로 '결과 입력' 버튼이 떠야 한다 — 여기서 빠지면 무효 대진은 재입력 버튼
+  // 자체가 사라져 그 시즌 승강 확정이 영구히 막힌다.
+  it('결과 진행 단계에 따라 관리 버튼 레이블이 바뀐다 — 미확정 4단계(voided 포함)는 결과 입력, 확정이면 결과 정정, 승인대기 단계는 버튼이 없다', () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1AdminLeagueMatchMock.mockReturnValue({
       data: {
@@ -823,6 +826,7 @@ describe('LeagueMatchFixturesClient', () => {
           { teamMatchId: 'tm-change-requested', title: '3주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-15T20:00:00.000Z', placeName: '장소 미정', status: 'matched', resultStage: 'change_requested', homeScore: null, awayScore: null },
           { teamMatchId: 'tm-official', title: '4주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-22T20:00:00.000Z', placeName: '장소 미정', status: 'completed', resultStage: 'official', homeScore: 3, awayScore: 1 },
           { teamMatchId: 'tm-awaiting', title: '5주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-29T20:00:00.000Z', placeName: '장소 미정', status: 'matched', resultStage: 'awaiting_approval', homeScore: null, awayScore: null },
+          { teamMatchId: 'tm-voided', title: '6주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-10-06T20:00:00.000Z', placeName: '장소 미정', status: 'matched', resultStage: 'voided', homeScore: null, awayScore: null },
         ],
       },
       isPending: false,
@@ -842,6 +846,11 @@ describe('LeagueMatchFixturesClient', () => {
     expect(screen.getAllByRole('button', { name: '4주차 결과 정정' }).length).toBeGreaterThan(0);
     expect(screen.queryAllByRole('button', { name: '5주차 결과 입력' })).toHaveLength(0);
     expect(screen.queryAllByRole('button', { name: '5주차 결과 정정' })).toHaveLength(0);
+    // voided는 '결과 정정'이 아니라 '결과 입력'으로 떠야 한다 — resultEntryMode가
+    // resultStage === 'official' 일 때만 'correction'이므로, 정정 레이블이 뜨면
+    // 백엔드의 재입력 흐름과 어긋난다(위 careful 경고).
+    expect(screen.getAllByRole('button', { name: '6주차 결과 입력' }).length).toBeGreaterThan(0);
+    expect(screen.queryAllByRole('button', { name: '6주차 결과 정정' })).toHaveLength(0);
   });
 
   // U1: 요구사항 3 — 정정 모드는 확정 전 "전 → 후" 비교를 보여준다. 이게 이 안의 존재 이유라

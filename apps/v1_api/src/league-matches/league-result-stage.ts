@@ -30,8 +30,15 @@ export interface LeagueFixtureResultSource {
 export function resolveResultStage(game: LeagueFixtureResultSource | null): LeagueFixtureResultStage {
   // 대진에는 항상 경기가 붙지만(생성 시 함께 만든다), 방어적으로 null 을 미입력으로 읽는다.
   if (game === null) return 'not_entered';
-  if (game.currentOfficialRevisionId !== null) return 'official';
   const latest = game.resultRevisions[0];
+  // 무효화(VOID)는 games.service.ts의 voidTeamMatchResult가 새로 만든 VOID 리비전을
+  // `currentOfficialRevisionId`가 **그대로 가리키도록 옮겨간다**(4111행) — 즉 VOID는
+  // 항상 포인터가 세팅된 채로 도착한다. 그래서 "포인터가 있으면 무조건 확정"이라는
+  // 아래 규칙보다 반드시 먼저 걸러야 한다 — 아니면 이 분기는 영원히 도달 불가능한
+  // dead code가 되고, 무효화된 대진이 '확정'으로 읽혀 화면이 정정 모드로 열린다
+  // (league-match-fixtures-client.tsx의 resultEntryMode 파생 참고).
+  if (latest?.state === V1GameResultRevisionState.VOID) return 'voided';
+  if (game.currentOfficialRevisionId !== null) return 'official';
   if (latest === undefined) return 'not_entered';
   switch (latest.state) {
     case V1GameResultRevisionState.DRAFT:
@@ -44,12 +51,12 @@ export function resolveResultStage(game: LeagueFixtureResultSource | null): Leag
     case V1GameResultRevisionState.REJECTED:
     case V1GameResultRevisionState.SUPPLEMENT_REQUESTED:
       return 'change_requested';
-    // 확정본이 무효화된 경우. currentOfficialRevisionId 가 이미 풀린 뒤라 위에서 안 걸린다.
-    case V1GameResultRevisionState.VOID:
-      return 'voided';
     // OFFICIAL 인데 currentOfficialRevisionId 가 비어 있는 것은 정상 상태가 아니다.
     // 확정으로 읽으면 운영자가 "끝난 경기"로 오해하므로, 손이 필요한 쪽으로 읽는다.
     case V1GameResultRevisionState.OFFICIAL:
       return 'change_requested';
+    // VOID는 위에서 이미 걸러졌다(latest.state === VOID 조기 반환) — TypeScript가 그
+    // 분기 이후 이 switch에서 VOID를 유니온에서 제외해 주므로 여기 case를 두면 오히려
+    // never 타입 에러가 난다.
   }
 }

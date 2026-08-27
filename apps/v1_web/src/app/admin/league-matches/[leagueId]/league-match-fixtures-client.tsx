@@ -828,14 +828,20 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
               ) : (
                 <div className="flex items-center gap-2">
                   {/* U1(A안): 상대팀이 확정된(awayTeamId not null) 대진만 결과 처리 대상이다.
-                      resultStage 미확정 3단계(not_entered/draft/change_requested)는 신규
-                      입력, official 은 정정 — 그 사이 단계(awaiting_approval/voided)는
-                      운영자 직접 입력 대상이 아니라 버튼을 내지 않는다. */}
+                      resultStage 미확정 4단계(not_entered/draft/change_requested/voided)는
+                      신규 입력, official 은 정정 — awaiting_approval(상대팀 승인 대기 중)만
+                      운영자 직접 입력 대상이 아니라 버튼을 내지 않는다.
+                      voided(무효화된 결과)는 감사 확인 결과 백엔드가 이미 신규 입력을
+                      허용하고 있었다(league-match-result-entry.service.ts의 VOID predecessor
+                      게이트) — 여기서 빼면 재입력 버튼 자체가 사라져 재입력이 불가능해진다.
+                      resultEntryMode는 resultStage === 'official' 일 때만 'correction'이므로
+                      voided는 자동으로 'entry'로 열린다. */}
                   {row.awayTeamId !== null &&
                   (row.resultStage === undefined ||
                     row.resultStage === 'not_entered' ||
                     row.resultStage === 'draft' ||
                     row.resultStage === 'change_requested' ||
+                    row.resultStage === 'voided' ||
                     row.resultStage === 'official') ? (
                     <button
                       type="button"

@@ -759,12 +759,17 @@ export function RegistrationsTab({
                   tone="blue"
                 />
               )}
-              {/* 감사 finding(reg-confirm-reapply-state-machine #2/#3): 잠금 해제는 서버(rosterUnlock)에
-                  status 가드가 없어 confirmed 가 아닌 신청(예: 취소 후 재신청으로 되살아난 draft가
-                  옛 rosterLockedAt을 물려받은 경우)에도 성공한다. 잠금 버튼은 rosterLock 서비스가
-                  confirmed를 요구하므로 그대로 confirmed 전용으로 두되, 해제 버튼은 실제로 잠긴
-                  모든 신청에 노출해 서버가 이미 허용하는 복구 수단을 화면에서도 쓸 수 있게 한다. */}
-              {canWrite && isLocked && (
+              {/* 감사 finding(reg-confirm-reapply-state-machine #2/#3, D-small-ux-consistency #1):
+                  rosterUnlock 서버는 status 가드가 없어 어떤 상태의 신청에도 성공한다 — 그런데
+                  rosterLockedAt이 실제로 하는 일은 명단(TournamentPlayer) 수정 차단뿐이고(
+                  tournament-players.service.ts allowLockedAndExpired 가드), 그게 뜻이 있는 상태는
+                  '아직 명단이 쓰일 수 있는' confirmed·cancel_requested 뿐이다. rosterLock은 confirmed
+                  에서만 걸리므로 잠긴 신청은 이 두 상태에서 시작해 admin cancel()로 넘어가면 cancelled
+                  로 종료된다(취소 후 재신청은 위 draft 재활성화 경로가 rosterLockedAt을 이미 null로
+                  리셋한다) — cancelled 는 팀이 대회에서 완전히 빠진 종결 상태라 명단을 다시 열어줄
+                  이유가 없다. 취소 요청(cancel_requested)은 잔류 처리(rejectCancelRequest)로 confirmed
+                  복귀가 가능하므로 여전히 노출한다. */}
+              {canWrite && isLocked && (reg.status === 'confirmed' || reg.status === 'cancel_requested') && (
                 <ActionButton
                   onClick={() => handleRosterUnlock(reg)}
                   disabled={rosterUnlock.isPending}

@@ -113,7 +113,9 @@ describe('GamesService.listLeagueClaimableParticipants', () => {
     const { service } = makeService({
       teamMatch: { game: { id: 'game-1', version: 4 } },
       memberships: [{ teamId: 'team-host', role: 'member' }],
-      lineups: [{ id: 'lineup-1', sideId: 's-1', revision: 1 }],
+      // state 는 selectLatestLineupParticipants 의 필수 입력 — 제출된 리비전만
+      // "최신"을 다툰다(DRAFT 는 후보에서 빠진다).
+      lineups: [{ id: 'lineup-1', sideId: 's-1', revision: 1, state: 'SUBMITTED' }],
       participants: [
         { id: 'p-1', sideId: 's-1', lineupId: 'lineup-1', displayNameSnapshot: '김민준', jerseyNumber: 7 },
         { id: 'p-2', sideId: 's-1', lineupId: 'lineup-1', displayNameSnapshot: '이서준', jerseyNumber: null },
@@ -142,8 +144,8 @@ describe('GamesService.listLeagueClaimableParticipants', () => {
       teamMatch: { game: { id: 'game-1', version: 6 } },
       memberships: [{ teamId: 'team-host', role: 'member' }],
       lineups: [
-        { id: 'lineup-1', sideId: 's-1', revision: 1 },
-        { id: 'lineup-2', sideId: 's-1', revision: 2 },
+        { id: 'lineup-1', sideId: 's-1', revision: 1, state: 'SUBMITTED' },
+        { id: 'lineup-2', sideId: 's-1', revision: 2, state: 'SUBMITTED' },
       ],
       participants: [
         { id: 'p-stale', sideId: 's-1', lineupId: 'lineup-1', displayNameSnapshot: '김민준', jerseyNumber: 7 },

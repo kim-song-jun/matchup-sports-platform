@@ -224,7 +224,10 @@ export class LeagueMatchResultEntryService {
       }),
       this.prisma.v1GameLineup.findMany({
         where: { gameId: fixture.gameId },
-        select: { id: true, sideId: true, revision: true },
+        // `state` 를 함께 읽어 selectLatestLineupParticipants 가 DRAFT 리비전을
+        // "최신" 후보에서 빼도록 한다 — 정정 요청으로 새로 열린 초안이 직전 제출을
+        // 무효화하지 않는다(그 유틸의 계약, SUBMITTED/LOCKED 만 운영 가능).
+        select: { id: true, sideId: true, revision: true, state: true },
       }),
       this.prisma.v1Game.findUnique({
         where: { id: fixture.gameId },
@@ -322,7 +325,9 @@ export class LeagueMatchResultEntryService {
     const [lineups, participants, game, eventCount] = await Promise.all([
       this.prisma.v1GameLineup.findMany({
         where: { gameId },
-        select: { id: true, sideId: true, revision: true, supersedesId: true },
+        // `state` 를 함께 읽어 selectLatestLineupParticipants 가 DRAFT 리비전을 "최신"
+        // 후보에서 빼도록 한다 — 이 파일의 다른 조회(:225)·공식 결과 스냅샷과 같은 기준.
+        select: { id: true, sideId: true, revision: true, supersedesId: true, state: true },
       }),
       this.prisma.v1GameParticipant.findMany({
         where: { gameId },

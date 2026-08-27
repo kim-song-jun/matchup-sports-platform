@@ -2919,7 +2919,10 @@ export class GamesService {
     // .service.ts). 최신 리비전으로만 좁혀 애초에 고를 수 없게 한다.
     const lineups = await this.prisma.v1GameLineup.findMany({
       where: { gameId },
-      select: { id: true, sideId: true, revision: true },
+      // 공식 결과 스냅샷(deriveTournamentRevision)이 DRAFT 리비전을 빼는 이상, 신원
+      // 연결 후보도 같은 기준이어야 한다 — 아니면 위 주석이 경고한 그대로, 공식 결과에
+      // 실리지 않을 participantId 를 연결해 개인 기록이 영원히 매칭되지 않는다.
+      select: { id: true, sideId: true, revision: true, state: true },
     });
     const participantCandidates = await this.prisma.v1GameParticipant.findMany({
       where: { gameId },
@@ -6114,7 +6117,10 @@ export class GamesService {
       tx.v1GameParticipant.findMany({ where: { gameId: game.id } }),
       tx.v1GameLineup.findMany({
         where: { gameId: game.id },
-        select: { id: true, sideId: true, revision: true },
+        // `state` 를 함께 읽어 selectLatestLineupParticipants 가 DRAFT 리비전을
+        // "최신" 후보에서 빼도록 한다 — 정정 요청으로 새로 열린 초안이 직전 제출을
+        // 무효화하지 않는다(그 유틸의 계약, SUBMITTED/LOCKED 만 운영 가능).
+        select: { id: true, sideId: true, revision: true, state: true },
       }),
       tx.v1GameSide.findMany({ where: { gameId: game.id } }),
       tx.v1CompetitionConfigVersion.findUnique({

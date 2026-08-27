@@ -141,4 +141,33 @@ describe('TournamentFixtureCompletionNotificationService', () => {
     );
     expect(sendToUser).not.toHaveBeenCalled();
   });
+
+  // 2026-08-27 감사 41/44: outbox 트랜잭션이 롤백되면 이미 나간 웹 푸시는 되돌릴 수
+  // 없다 — claim.afterCommit이 있으면 project()가 그 안에 push만 하고 커밋 전에는
+  // 절대 sendToUser를 직접 부르지 않아야 한다.
+  it('claim.afterCommit이 주어지면 push를 즉시 보내지 않고 커밋 후 실행할 effect로만 담는다', async () => {
+    const sendToUser = jest.fn().mockResolvedValue(undefined);
+    const { tx } = fakeTx({
+      memberships: [{ userId: 'captain-home' }],
+      preferences: [],
+      alreadyDelivered: [],
+    });
+    const afterCommit: Array<() => void | Promise<void>> = [];
+    const claim = { afterCommit } as never;
+
+    await new TournamentFixtureCompletionNotificationService({ sendToUser } as never).project(
+      tx,
+      revisionFixture(),
+      claim,
+    );
+
+    expect(sendToUser).not.toHaveBeenCalled();
+    expect(afterCommit).toHaveLength(1);
+
+    await afterCommit[0]();
+    expect(sendToUser).toHaveBeenCalledWith(
+      'captain-home',
+      expect.objectContaining({ url: '/tournaments/tour-1/matches/fixture-1' }),
+    );
+  });
 });

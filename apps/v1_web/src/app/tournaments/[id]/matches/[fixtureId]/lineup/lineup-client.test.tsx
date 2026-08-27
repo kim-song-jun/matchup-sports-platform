@@ -57,6 +57,9 @@ function baseAccess(overrides: Partial<V1FixtureLineupAccess> = {}): V1FixtureLi
     gameId: 'game-1',
     mySideId: 'side-host',
     isStaff: false,
+    // F61/F62 fix: 기본값은 "저장 가능"(팀 매니저/오너, 또는 mutate 가능한 스태프) —
+    // SUPPORT_READONLY(조회 전용) 시나리오를 검증하는 테스트만 명시적으로 false로 오버라이드한다.
+    canMutateLineup: true,
     scheduledAt: null,
     homeSideId: 'side-host',
     homeTeamName: '홈팀',
@@ -638,6 +641,99 @@ describe('골키퍼 지정 버튼의 aria-label 조사(을/를)', () => {
 });
 
 /**
+ * F63 회귀 테스트 — 명단 탭 체크박스로 선발을 고르면 바로 옆 GK 버튼(withSeatedNewcomers로
+ * 감싼 경로)과 달리 좌표가 없는 채로 남아, 포메이션이 선택된 상태에서는 저장해도
+ * "포지션 자리 N개가 비어 있어요"로 제출이 계속 잠겼다. 체크박스로 선발한 선수도 GK
+ * 버튼과 동일하게 빈 슬롯에 자동으로 앉아야 한다 — 저장 페이로드의 좌표로 직접 증명한다
+ * (제출 버튼 disabled 사유는 dirty 상태가 emptySlot 사유보다 우선순위가 높아 가려진다).
+ */
+describe('F63 — 명단 체크박스로 선발하면 포메이션 빈 자리에 자동으로 앉는다', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.useV1FixtureLineupRosterMock.mockReturnValue(
+      baseRoster([
+        { userId: 'u-hong', name: '홍길동' },
+        { userId: 'u-cheol', name: '박철' },
+      ]),
+    );
+    hoisted.useV1TournamentMock.mockReturnValue({ data: { sport: { name: '풋살' } }, isLoading: false, isError: false });
+    hoisted.useV1FixtureLineupAccessMock.mockReturnValue({
+      data: baseAccess(),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    hoisted.useV1GameMock.mockReturnValue({
+      data: baseGame({
+        lineupConfig: {
+          positions: [
+            { code: 'GK', label: '골키퍼', short: 'GK', goalkeeper: true },
+            { code: 'FW', label: '공격수', short: 'FW' },
+          ],
+          formations: [{ code: '1-1', label: '1-1', outfield: 1, slots: [{ position: 'FW', x: 50, y: 70 }] }],
+        },
+      }),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    hoisted.useV1GameLineupsMock.mockReturnValue({
+      data: [
+        baseGameLineup({
+          formation: '1-1',
+          // 골키퍼는 이미 슬롯에 놓여 있다(positionX/Y = GK 슬롯 좌표) — 이 테스트가
+          // 증명하려는 건 오직 "체크박스로 선발한 선수도 자동으로 앉는가"이므로, 나머지
+          // 조건(골키퍼 1명 지정)은 미리 충족시켜 둔다.
+          participants: [
+            {
+              id: 'p-1',
+              gameId: 'game-1',
+              sideId: 'side-host',
+              lineupId: 'lineup-1',
+              userId: 'u-hong',
+              displayNameSnapshot: '홍길동',
+              jerseyNumber: 7,
+              position: 'GK',
+              positionX: 50,
+              positionY: 6,
+              started: true,
+              arrivedAt: null,
+              createdAt: '2026-08-01T00:00:00.000Z',
+              updatedAt: '2026-08-01T00:00:00.000Z',
+            },
+          ],
+        }),
+      ],
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+  });
+
+  it('체크박스로 선발한 선수의 저장 페이로드에 좌표가 채워진다(자동 착석)', async () => {
+    hoisted.saveMutateAsync.mockResolvedValue({ lineupId: 'lineup-2', lineupRevision: 3 });
+
+    render(<FixtureLineupPageClient tournamentId="t-1" fixtureId="f-1" />);
+    fireEvent.click(screen.getByRole('checkbox', { name: '박철 선발' }));
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+
+    await waitFor(() => expect(hoisted.saveMutateAsync).toHaveBeenCalled());
+    const payload = hoisted.saveMutateAsync.mock.calls[0][0].payload as {
+      participants: Array<{ displayNameSnapshot: string; positionX?: number; positionY?: number }>;
+    };
+    const cheol = payload.participants.find((p) => p.displayNameSnapshot === '박철');
+    expect(cheol).toBeDefined();
+    // 고치기 전에는 positionX/Y가 아예 안 실렸다(체크만으로는 좌표가 안 생겼으므로) —
+    // 지금은 GK가 이미 차지한 GK 슬롯이 아닌 남은 빈 슬롯(FW, x:50,y:70)에 자동으로 앉는다.
+    expect(cheol?.positionX).toBe(50);
+    expect(cheol?.positionY).toBe(70);
+  });
+});
+
+/**
  * 순환 막다른 길 회귀 가드.
  *
  * 대회 스태프는 어느 팀에도 속하지 않아 `mySideId` 가 null 이다. 예전엔 그걸 곧바로
@@ -695,6 +791,23 @@ describe('대회 스태프도 라인업을 짤 수 있다', () => {
     expect(screen.getByText('이 경기의 라인업을 관리할 권한이 없어요')).toBeInTheDocument();
     expect(screen.queryByText('어느 팀의 명단을 짤까요?')).toBeNull();
   });
+
+  // F61/F62 회귀 테스트: SUPPORT_READONLY(조회 전용) 스태프는 isStaff=true지만
+  // canMutateLineup=false다 — 예전에는 이 구분이 없어 팀 선택 → 명단 작성까지 전부
+  // 진행시켰다가 저장 시점에야 서버 403('Actor scope is not permitted')으로 막혀
+  // 입력한 내용이 통째로 사라졌다. 이제는 팀 선택 화면 자체에 들어가지 못하게 막는다.
+  it('canMutateLineup=false(조회 전용 스태프)는 팀 선택 화면조차 보여주지 않고 이유를 알려준다', () => {
+    hoisted.useV1FixtureLineupAccessMock.mockReturnValue({
+      data: baseAccess({ mySideId: null, isStaff: true, canMutateLineup: false }),
+      isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    });
+
+    render(<FixtureLineupPageClient tournamentId="t-1" fixtureId="f-1" />);
+
+    expect(screen.getByText('조회 전용 권한이에요')).toBeInTheDocument();
+    expect(screen.queryByText('어느 팀의 명단을 짤까요?')).toBeNull();
+    expect(screen.queryByRole('button', { name: '홈팀 명단 짜기' })).not.toBeInTheDocument();
+  });
 });
 
 /**
@@ -749,6 +862,28 @@ describe('이슈 #378 — SUBMITTED 이후 재편집 진입점', () => {
     expect(screen.getByRole('button', { name: '저장' })).toBeInTheDocument();
     // 편집이 열렸다는 건 선발 체크가 다시 눌린다는 뜻이다 — 제출 상태에서는 잠겨 있다.
     expect(screen.getByRole('checkbox', { name: '홍길동 선발' })).toBeEnabled();
+  });
+
+  // F5 회귀 테스트 — "다시 편집하기"만 누르고 아무것도 안 고친 채로 곧바로
+  // "라인업 제출하기"를 누르면, 서버는 여전히 SUBMITTED 상태라 409 INVALID_LINEUP_STATE로
+  // 거부한다. 예전에는 이 경우를 submitBlockedReason이 못 걸러서 버튼이 활성으로
+  // 렌더됐다가 영문 오류 배너가 떴다 — 이제는 재편집 직후(미저장) 상태를 버튼 자체가
+  // 비활성 + 안내 문구로 미리 알려야 한다.
+  it('"다시 편집하기" 직후(아직 저장 전)에는 "라인업 제출하기"가 비활성이고 이유가 보인다', () => {
+    hoisted.useV1GameMock.mockReturnValue({
+      data: baseGame({ state: 'SCHEDULED' }),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(<FixtureLineupPageClient tournamentId="t-1" fixtureId="f-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '다시 편집하기' }));
+
+    const submitButton = screen.getByRole('button', { name: '라인업 제출하기' });
+    expect(submitButton).toBeDisabled();
+    expect(screen.getByText('변경 후 저장해야 다시 제출할 수 있어요.')).toBeInTheDocument();
   });
 
   it('경기가 시작(LIVE)되면 "다시 편집하기" 진입점이 아예 보이지 않는다', () => {

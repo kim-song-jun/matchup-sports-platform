@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import type { AdminContextService } from '../common/admin-context.service';
 import type { PrismaService } from '../prisma/prisma.service';
 import type { UploadsService } from '../uploads/uploads.service';
@@ -21,6 +21,7 @@ function buildService(options: {
   videos?: Array<{ id: string; url: string; sortOrder: number; title: string | null; createdAt: Date; teamMatchId: string }>;
   teamMatchUrlRefs?: number;
   tournamentUrlRefs?: number;
+  adminContext?: AdminContextService;
 }) {
   const removed: string[] = [];
   const created: Array<Record<string, unknown>> = [];
@@ -50,7 +51,12 @@ function buildService(options: {
       deleteMany: async () => ({ count: 1 }),
     },
   } as unknown as PrismaService;
-  const adminContext = { getMutationAdmin: async () => ({ id: 'admin-row' }) } as unknown as AdminContextService;
+  const adminContext =
+    options.adminContext ??
+    ({
+      getActiveAdmin: async () => ({ id: 'admin-row' }),
+      getMutationAdmin: async () => ({ id: 'admin-row' }),
+    } as unknown as AdminContextService);
   const uploads = {
     discardTemps: async () => undefined,
     storeFiles: async () => ({ urls: ['/uploads/2026/08/new.mp4'] }),
@@ -68,6 +74,17 @@ describe('LeagueFixtureVideosService', () => {
     const result = await service.listLeagueVideos(USER, LEAGUE_ID);
     expect(result.items[0]).toMatchObject({ fixtureId: 'fx-1', round: '1주차', homeTeamName: '성수 FC', awayTeamName: '왕십리 유나이티드' });
     expect(result.items[1]).toMatchObject({ fixtureId: 'fx-2', round: '2주차', awayTeamName: null });
+  });
+
+  it('목록 조회는 support 등급을 막지 않는다 (대회 쪽과 인가 축을 맞춤) — getMutationAdmin 대신 getActiveAdmin 사용', async () => {
+    const supportBlocking = {
+      getActiveAdmin: async () => ({ id: 'admin-row', adminRole: 'support' }),
+      getMutationAdmin: async () => {
+        throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Support admins cannot mutate' });
+      },
+    } as unknown as AdminContextService;
+    const { service } = buildService({ adminContext: supportBlocking });
+    await expect(service.listLeagueVideos(USER, LEAGUE_ID)).resolves.toBeDefined();
   });
 
   it('잘못된 URL 스킴은 등록을 거부한다 (대회와 같은 단일 관문)', async () => {

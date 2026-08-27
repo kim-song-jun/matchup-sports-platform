@@ -2,7 +2,8 @@ import { Logger } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import type { LineupTodo, LineupTodoService } from '../../team-lineups/lineup-todo.service';
 import type { WebPushService } from '../../notifications/web-push.service';
-import type { GameOperationHandler } from '../v1-game-operations-worker.service';
+import type { PrismaService } from '../../prisma/prisma.service';
+import type { GameOperationClaim, GameOperationHandler } from '../v1-game-operations-worker.service';
 import { isQuietHour, kstParts } from './quiet-hours';
 
 /** 스캔 주기. 슬롯 경계로 정규화해 재예약 키를 만들기 때문에, 재시도가 겹쳐도 같은
@@ -45,6 +46,7 @@ export class LineupReminderService {
 
   constructor(
     private readonly todoService: LineupTodoService,
+    private readonly prisma: PrismaService,
     private readonly webPush?: WebPushService,
   ) {}
 
@@ -52,19 +54,28 @@ export class LineupReminderService {
    * 워커가 claim할 때마다 한 번 도는 스캔. 처리 결과와 무관하게 **항상 다음 스캔을
    * 예약**한다 — 한 번의 실패로 리마인더가 영구히 멈추면 안 되고, 그 예약은 슬롯 키로
    * 중복이 막혀 있어 재시도가 겹쳐도 안전하다.
+   *
+   * **예약을 스캔과 분리된 독립 트랜잭션으로 먼저 커밋한다 (2026-08-27 감사 45).**
+   * 예전에는 `finally { await scheduleNextScan(tx, now) }`처럼 스캔과 **같은** `tx`를
+   * 썼는데, `tx`는 워커의 `$transaction(...)` 콜백이라 스캔이 15초 데드라인을 넘기거나
+   * 도중 DB 오류로 throw하면 그 예외가 `finally`를 통과해 콜백 밖으로 나가 트랜잭션
+   * 전체가 롤백된다 — 방금 `finally`에서 넣은 다음 슬롯 INSERT까지 함께 사라진다.
+   * 알림을 못 받은 팀은 todo가 줄지 않으니 재시도(최대 6회, ~13분)도 매번 같은 이유로
+   * 실패하고, 끝내 POISONED가 되면 체인을 다시 심는 지점이 워커 부팅(main.ts) 뿐이라
+   * 다음 배포까지 플랫폼 전체 라인업 리마인더가 멈춘다. 예약을 스캔 실행 **전에** 별도
+   * 트랜잭션(`this.prisma.$transaction`)으로 먼저 커밋해 두면, 그 뒤 스캔이 어떻게
+   * 실패하든 다음 슬롯은 이미 확정돼 있다 — 슬롯 키가 같으면 `skipDuplicates`가 중복도
+   * 막아 준다.
    */
-  readonly scanHandler: GameOperationHandler = async (_claim, tx) => {
+  readonly scanHandler: GameOperationHandler = async (claim, tx) => {
     const now = new Date();
-    try {
-      await this.runScan(tx, now);
-    } finally {
-      await scheduleNextScan(tx, now);
-    }
+    await this.prisma.$transaction((scheduleTx) => scheduleNextScan(scheduleTx, now));
+    await this.runScan(tx, now, claim);
   };
 
-  private async runScan(tx: Prisma.TransactionClient, now: Date): Promise<void> {
-    // 야간에는 아무것도 보내지 않는다. 다음 스캔 예약은 finally에서 그대로 이뤄지므로
-    // 아침 9시 이후 첫 스캔이 그날치를 보낸다.
+  private async runScan(tx: Prisma.TransactionClient, now: Date, claim: GameOperationClaim): Promise<void> {
+    // 야간에는 아무것도 보내지 않는다. 다음 스캔 예약은 scanHandler에서 스캔 전에 이미
+    // 커밋됐으므로 아침 9시 이후 첫 스캔이 그날치를 보낸다.
     if (isQuietHour(now)) return;
 
     const todos = await this.todoService.listAllPending(now);
@@ -77,7 +88,7 @@ export class LineupReminderService {
     ];
 
     for (const message of messages) {
-      await this.deliver(tx, message);
+      await this.deliver(tx, message, claim);
     }
   }
 
@@ -87,8 +98,17 @@ export class LineupReminderService {
    * 전달 순서는 기존 리마인더(schedule-reminder.service.ts)와 같다: 알림 선호도를 확인하고,
    * 이미 받은 사람을 먼저 조회한 뒤, durable한 알림 행을 만들고, **이번에 새로 만들어진
    * 사람에게만** 웹푸시를 던진다. 푸시는 best-effort라 실패해도 알림 행을 되돌리지 않는다.
+   *
+   * 웹 푸시는 `claim.afterCommit`에 담아 워커 트랜잭션이 실제로 커밋된 뒤에만 보낸다
+   * (2026-08-27 감사 41/44 — schedule-reminder.service.ts의 같은 수정과 동일한 이유:
+   * 이 스캔이 이 메시지를 보낸 뒤에도 다른 팀 메시지를 계속 처리하다 실패하면 트랜잭션
+   * 전체가 롤백돼 방금 나간 푸시를 되돌릴 수 없다).
    */
-  private async deliver(tx: Prisma.TransactionClient, message: ReminderMessage & { teamId: string }): Promise<void> {
+  private async deliver(
+    tx: Prisma.TransactionClient,
+    message: ReminderMessage & { teamId: string },
+    claim: GameOperationClaim,
+  ): Promise<void> {
     const managers = await tx.v1TeamMembership.findMany({
       where: { teamId: message.teamId, status: 'active', role: { in: ['owner', 'manager'] } },
       select: { userId: true },
@@ -125,11 +145,17 @@ export class LineupReminderService {
     });
 
     for (const userId of enabled.filter((candidate) => !deliveredKeys.has(businessKeyFor(candidate)))) {
-      void this.webPush
-        ?.sendToUser(userId, { title: message.title, body: message.body, url: message.deepLink })
-        .catch(() => {
-          // 알림 행은 이미 durable하다 — 푸시 실패가 그걸 되돌리거나 잡을 실패시켜서는 안 된다.
-        });
+      const send = () =>
+        void this.webPush
+          ?.sendToUser(userId, { title: message.title, body: message.body, url: message.deepLink })
+          .catch(() => {
+            // 알림 행은 이미 durable하다 — 푸시 실패가 그걸 되돌리거나 잡을 실패시켜서는 안 된다.
+          });
+      if (claim.afterCommit === undefined) {
+        send();
+      } else {
+        claim.afterCommit.push(send);
+      }
     }
   }
 }

@@ -63,8 +63,14 @@ export class PublicUserRecordsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getRecords(userId: string, query: PublicRecordsQueryDto, viewerId?: string) {
-    const user = await this.prisma.v1User.findUnique({
-      where: { id: userId },
+    // profile.service.ts의 publicProfile과 동일한 게이트(`deletedAt: null, accountStatus: 'active'`).
+    // 탈퇴 계정은 profile.nickname이 내부 삭제 식별자(`deleted_xxxxxxxx`)로 덮여 있고
+    // (admin.service.ts deleteUser), 그 값을 그대로 공개 응답에 실으면 SEO 인덱싱되는
+    // 페이지 제목에 그대로 노출된다 -- 자매 라우트인 public-profile은 이미 404를 던지는데
+    // 이 라우트만 계정 상태를 보지 않아 비대칭이 생겼던 것을 바로잡는다. 정지/차단/탈퇴대기
+    // 중인 계정도 같은 이유로 함께 막는다(publicProfile과 정확히 같은 기준).
+    const user = await this.prisma.v1User.findFirst({
+      where: { id: userId, deletedAt: null, accountStatus: 'active' },
       select: { id: true, profile: { select: { nickname: true } } },
     });
     if (user === null) {

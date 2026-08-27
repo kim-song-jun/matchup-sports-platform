@@ -1449,6 +1449,19 @@ export class TournamentResultReviewService {
               : 'Anonymous goal must be explicitly marked',
           });
         }
+        // finding #67: 이 분기가 `missingScorer`를 대입한 적이 없어서(초기값 false 를
+        // 그대로 반환) 정정·재제출로 goalEvents 가 실릴 때마다 MISSING_SCORER 경고가
+        // 조용히 사라졌다 — 득점자 미상 골을 실제로 만난 여기서 표식을 세운다.
+        //
+        // 자책골(ownGoal)은 예외로 둔다 — `resultInvariantInput`(:1538, 실시간 이벤트
+        // 스트림에서 계산하는 정본)도 `event.type === GOAL`만 보고 OWN_GOAL은 애초에
+        // missingScorer 판정에서 제외한다(자책골은 상대 팀 득점일 뿐 "누가 넣었는지"를
+        // 추적해야 할 개인 기록이 아니기 때문). 이 함수에 도달하는 모든 무득점자 골은
+        // (바로 위에서 검증했듯) `anonymous: true`가 붙어 있어야만 하는데, 정정 폼은
+        // "득점자를 아직 못 찾았다"와 "이 골은 원래 개인 득점자가 없다(자책골)"를
+        // 구분 없이 같은 표식으로 보낸다 — 그래서 타입(ownGoal)으로 나눈다: 일반 GOAL은
+        // 여전히 "채워 넣어야 할 미상"으로 취급하고, OWN_GOAL만 정본과 같은 이유로 제외한다.
+        if (!goal.ownGoal) missingScorer = true;
         continue;
       }
       const participant = participantById.get(goal.participantId);

@@ -1218,6 +1218,16 @@ button:disabled {
  * grey200 테두리는 흰 배경에서 1.23:1(비텍스트 3:1 기준 미달), grey400 글리프는
  * 2.01:1 이라 "체크 안 된 동그라미가 거기 있다" 는 것 자체가 보이지 않았다.
  * grey600 으로 올리면 라이트 4.62:1 · 다크(#8b95a1 on #1c1e24) 5.48:1 로 둘 다 통과한다. */
+/* [a11y] sr-only 체크박스를 감싸는 행. label 이 display:contents 라 박스가 없고
+ * 행 <div> 에도 클래스가 없어 포커스를 표시할 대상이 아예 없었다 — 키보드로
+ * 약관 항목에 들어와도 어디에 있는지 알 수 없다. 행이 링을 대신 그린다.
+ * offset 은 안쪽(-2px)이다: 행이 화면 폭을 꽉 채워 바깥 링은 잘린다. */
+.tm-auth-check-row:focus-within {
+  outline: 2px solid var(--blue500);
+  outline-offset: -2px;
+  border-radius: var(--radius-chip);
+}
+
 .tm-auth-check {
   width: 24px;
   height: 24px;
@@ -1384,21 +1394,21 @@ button:disabled {
 }
 
 .tm-text-heading {
-  font-size: 24px;
+  font-size: var(--font-size-heading);
   line-height: 32px;
   font-weight: 700;
   color: var(--text-strong);
 }
 
 .tm-text-subhead {
-  font-size: 20px;
+  font-size: var(--font-size-subhead);
   line-height: 28px;
   font-weight: 700;
   color: var(--text-strong);
 }
 
 .tm-text-body-lg {
-  font-size: 17px;
+  font-size: var(--font-size-body-lg);
   line-height: 28px; /* [P1 4pt snap] 26→28 (4의 배수, ×1.65 — 한국어 +0.1 여유 포함) */
   font-weight: 700;
   color: var(--text-strong);
@@ -1406,21 +1416,21 @@ button:disabled {
 }
 
 .tm-text-body {
-  font-size: 15px;
+  font-size: var(--font-size-body);
   line-height: 24px; /* [P1 4pt snap] 22→24 (×1.6 — 한국어 권장 1.5~1.6) */
   font-weight: 500;
   color: var(--text);
 }
 
 .tm-text-label {
-  font-size: 13px;
+  font-size: var(--font-size-label);
   line-height: 20px; /* [P1 4pt snap] 19→20 (4의 배수, ×1.54) */
   font-weight: 600;
   color: var(--text);
 }
 
 .tm-text-caption {
-  font-size: 12px;
+  font-size: var(--font-size-caption);
   line-height: 16px; /* [P1 4pt snap] 18→16 (4의 배수, ×1.33 — caption은 짧은 보조 텍스트라 압축해도 가독 OK) */
   font-weight: 400;
   color: var(--text-caption);
@@ -1432,20 +1442,28 @@ button:disabled {
    다르다 — 대진표 페이지에 산발적으로 흩어져 있던 fontSize:12/fontWeight:700
    인라인 스타일들을 이 토큰 하나로 수렴한다. */
 .tm-text-caption-strong {
-  font-size: 12px;
+  font-size: var(--font-size-caption);
   line-height: 16px;
   font-weight: 700;
   color: var(--text-muted);
 }
 
 .tm-text-micro {
-  /* [공개 화면 R-T2 정리] 11px는 하한(12px) 미달 — PR #396(알파 감사 B)이 이미
-     .tm-bottom-tab 등 하드코딩 11px를 caption 토큰으로 올린 것과 같은 논리.
-     이 클래스는 공개 화면 전역(홈·대회 신청/명단·팀 매치 등)에서 50곳 넘게
-     쓰여 콜사이트를 하나씩 옮기는 대신 정의 자체를 캡션 토큰으로 올린다 —
-     line-height(16px)는 이미 tm-text-caption과 동일해 이 변경만으로 줄바꿈
-     간격이 흔들리지 않는다. font-weight 500은 caption(400)과의 유일한 차이로
-     그대로 유지(시맨틱 구분 보존). */
+  /* [읽기 쉬움] 이름은 micro 인데 값은 caption(12px) 이다 — 의도한 불일치다.
+     공개 화면 전역(홈·대회 신청/명단·팀 매치 등) 70곳에서 쓰이는데 11px 은
+     작은 화면에서 읽기 부담이 커서, 콜사이트를 하나씩 옮기는 대신 정의를
+     한 단계 올렸다. line-height(16px)가 이미 tm-text-caption 과 같아 이 변경만으로
+     줄바꿈 간격이 흔들리지 않고, font-weight 500 은 caption(400)과의 유일한
+     차이라 시맨틱 구분용으로 남긴다.
+
+     ※ 이 주석은 원래 "공개 화면 12px 하한(R-T2)" 을 근거로 들고 있었는데,
+        확인해 보니 **저장소에 그런 하한 규칙이 없다**(R-T2 는 "하드코딩 px 폰트
+        크기 금지" 이고, 타입 스케일의 최소 토큰은 --font-size-micro 11px 다).
+        결정 자체는 유지하되 근거를 실제 이유로 바로잡았다.
+        자세한 정리: docs/design/a11y-decisions.md §3
+
+     ※ --font-size-micro(11px) 토큰은 그대로 살아 있고 다른 51곳이 쓴다.
+        그쪽까지 12px 로 올릴지는 별도 판단이 필요해 손대지 않았다. */
   font-size: var(--font-size-caption);
   line-height: 16px; /* [P1 4pt snap] 15→16 (4의 배수, ×1.45) */
   font-weight: 500;
@@ -1656,7 +1674,16 @@ button:disabled {
 
 /* ── Keyboard focus ring (WCAG 2.1 AA) ── */
 .tm-btn:focus-visible,
-.tm-pressable:focus-visible {
+.tm-pressable:focus-visible,
+/* [a11y] <label class="tm-btn"> 이 sr-only 파일 input 을 감싸는 패턴이 4곳 있다.
+ * 키보드 포커스는 label 이 아니라 **숨은 input** 에 가는데, sr-only 는 1x1 로
+ * 잘려 있어 브라우저 기본 링이 그려져도 화면에서는 보이지 않는다(alpha 에 같은
+ * 구조를 심어 확인: input 1x1 · label/행/시각표시 어디에도 링 없음).
+ * 안쪽이 포커스를 받으면 버튼이 링을 대신 그린다.
+ * label 로 좁힌 것은 의도다 — .tm-btn 전체에 걸면 <button>·<a> 를 **마우스로
+ * 클릭**했을 때도 링이 떠서 :focus-visible 의 키보드 전용 동작을 우회한다.
+ * label.tm-btn 은 이 sr-only 패턴에서만 쓰인다. */
+label.tm-btn:focus-within {
   outline: 2px solid var(--blue500);
   outline-offset: 2px;
 }

@@ -375,6 +375,16 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
           deletedAt,
         },
       });
+      // 공개 개인 기록 게이트(`isParticipantPubliclyEligible`, public-consent.ts)는
+      // `V1UserRecordConsent.state`가 GRANTED인지만 본다 -- 여기서 REVOKED로 함께
+      // 전환하지 않으면 탈퇴 전 동의를 켰던 사용자의 경기 기록(사용자 기록 페이지 +
+      // 대회 기록/랭킹 등 같은 게이트를 쓰는 다른 공개 화면)이 탈퇴 후에도 계속 공개
+      // 후보로 남는다. 동의 행이 없던 사용자는 그대로 두어도 이미 non-eligible이므로
+      // updateMany 로 기존 GRANTED 행만 REVOKED 전환한다(없는 행을 새로 만들 필요 없음).
+      await tx.v1UserRecordConsent.updateMany({
+        where: { userId, state: 'GRANTED' },
+        data: { state: 'REVOKED', effectiveAt: deletedAt },
+      });
       const result = await this.writeAdminStatusLogs(
         admin,
         {

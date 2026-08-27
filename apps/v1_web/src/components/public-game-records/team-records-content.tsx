@@ -229,7 +229,12 @@ function TeamRecordRow({
           paddingRight: reserveToggleSpace ? 40 : 0,
         }}
       >
-        <span style={resultChipStyle(item.result)}>{teamRecordResultLabel(item.result)}</span>
+        {/* `status_only` 경기는 승패도 감춘다 — 점수와 같은 이유로 "경기가 있었다"만 남긴다. */}
+        {item.result === null ? (
+          <span style={resultChipStyle('PENDING')}>결과 비공개</span>
+        ) : (
+          <span style={resultChipStyle(item.result)}>{teamRecordResultLabel(item.result)}</span>
+        )}
         <span
           style={{
             fontSize: 12,
@@ -257,7 +262,11 @@ function TeamRecordRow({
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, gap: 2 }}>
           <span className="tab-num" style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-strong)' }}>
-            {item.goalsFor} : {item.goalsAgainst}
+            {/* 공개 가시성이 `status_only` 인 경기는 점수를 감춘다 — 빈칸으로 두면 "0:0 인가?"
+                로 읽히므로 감춰졌다는 사실 자체를 글자로 말한다(색만으로 전달하지 않는다). */}
+            {item.goalsFor === null || item.goalsAgainst === null
+              ? '비공개'
+              : `${item.goalsFor} : ${item.goalsAgainst}`}
           </span>
           {/* 정규시간 스코어 그대로 두고, 승부차기는 아래 보조 표기로만 덧붙인다 --
               대회 화면(PenaltyScoreline)과 동일한 "승부차기 N-M" 문구. */}

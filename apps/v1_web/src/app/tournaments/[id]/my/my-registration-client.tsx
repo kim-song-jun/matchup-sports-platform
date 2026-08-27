@@ -104,6 +104,21 @@ export function shouldShowBankTransferAccountInfo({
     Boolean(bankName?.trim() && bankAccount?.trim() && bankHolder?.trim());
 }
 
+/**
+ * confirmedAt을 "확정일"로 표시해도 되는가.
+ *
+ * 감사 finding #47: 서버가 예전엔 decision과 무관하게 confirmedAt을 채워, 대기(waitlisted)
+ * 처리된 팀도 화면에 "확정일"이 함께 떴다. 서버는 이제 decision==='confirm'일 때만 채우지만
+ * (admin-registrations.service.ts), 그 전에 이미 오염된 과거 데이터가 남아 있을 수 있어
+ * status까지 함께 확인한다 — status가 실제로 'confirmed'일 때만 표시한다.
+ */
+export function shouldShowConfirmedAt(
+  status: V1TournamentRegistrationStatus,
+  confirmedAt: string | null | undefined,
+): boolean {
+  return Boolean(confirmedAt) && status === 'confirmed';
+}
+
 /** Returns the badge class + label for the roster shortage badge.
  *  Mirrors the body-card logic: confirmed/paid → softer orange; else → hard red. */
 function rosterShortagebadge(status: V1TournamentRegistrationStatus): { badgeClass: string; label: string } {
@@ -358,21 +373,25 @@ function RegistrationPass({
                   : `${rosterCount}명 등록 완료`}
             </div>
           </div>
-          {!isRosterLocked ? (
-            <Link
-              href={rosterHref}
-              className="tm-text-label"
-              aria-label={belowMinimum ? '선수 명단 등록하기' : '선수 명단 수정하기'}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 1,
-                color: 'var(--blue700)', fontWeight: 700, flexShrink: 0,
-                minHeight: 44, paddingLeft: 8,
-              }}
-            >
-              {belowMinimum ? '선수 등록' : '선수 수정'}
-              <ChevronRight size={16} />
-            </Link>
-          ) : null}
+          {/*
+            감사 finding #51: 잠기면 이 링크가 통째로 사라져, 팀장이 대회 당일 자기 팀 확정
+            명단을 앱에서 확인할 방법이 없었다(명단 페이지 자체는 잠금 상태에서도 읽기 전용으로
+            잘 그린다 — tournament-roster-client.tsx 참조). 잠겼을 땐 라벨만 '명단 확인'으로
+            바꿔 읽기 전용으로라도 계속 연결한다.
+          */}
+          <Link
+            href={rosterHref}
+            className="tm-text-label"
+            aria-label={isRosterLocked ? '선수 명단 확인하기' : belowMinimum ? '선수 명단 등록하기' : '선수 명단 수정하기'}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 1,
+              color: 'var(--blue700)', fontWeight: 700, flexShrink: 0,
+              minHeight: 44, paddingLeft: 8,
+            }}
+          >
+            {isRosterLocked ? '명단 확인' : belowMinimum ? '선수 등록' : '선수 수정'}
+            <ChevronRight size={16} />
+          </Link>
         </div>
       ) : (
         <div style={{ borderTop: '1px solid var(--border)', padding: '12px 20px' }}>
@@ -634,6 +653,8 @@ function RegistrationDetailView({
   const players = rosterData?.players ?? [];
   const belowMinimum = rosterData?.belowMinimum ?? false;
   const isRosterLocked = Boolean(registration.rosterLockedAt);
+  // 감사 finding #47 방어선 — shouldShowConfirmedAt 주석 참조.
+  const showConfirmedAt = shouldShowConfirmedAt(registration.status, registration.confirmedAt);
   const isRosterEditBlockedByStatus =
     registration.status === 'cancel_requested' || registration.status === 'cancelled';
   const isRosterEditable = canManageRegistration && !isRosterLocked && !isRosterEditBlockedByStatus;
@@ -724,7 +745,8 @@ function RegistrationDetailView({
         <div className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 700, lineHeight: 1.4 }}>
           {tournament.title}
         </div>
-        {registration.confirmedAt ? (
+        {/* 감사 finding #47 방어선 — shouldShowConfirmedAt 주석 참조. */}
+        {showConfirmedAt ? (
           <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 4 }}>
             확정일 {formatDateShort(registration.confirmedAt)}
           </div>
@@ -776,6 +798,17 @@ function RegistrationDetailView({
           style={{ marginBottom: 8 }}
         >
           선수 수정
+        </Link>
+      ) : canManageRegistration && isRosterLocked ? (
+        // 감사 finding #51: 명단이 잠기면 이 레일에서 명단으로 가는 링크가 통째로 사라져,
+        // 팀장이 대회 당일 확정 명단을 확인할 방법이 없었다. 읽기 전용으로라도 계속 연결한다.
+        <Link
+          href={rosterHref}
+          className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block"
+          aria-label="선수 명단 확인하기"
+          style={{ marginBottom: 8 }}
+        >
+          명단 확인
         </Link>
       ) : null}
 
@@ -902,6 +935,16 @@ function RegistrationDetailView({
                       >
                         선수 수정
                       </Link>
+                    ) : canManageRegistration && isRosterLocked ? (
+                      // 감사 finding #51 — 위 데스크톱 레일과 같은 이유로 읽기 전용 링크를 남긴다.
+                      <Link
+                        href={rosterHref}
+                        className="tm-btn tm-btn-md tm-btn-neutral"
+                        aria-label="선수 명단 확인하기"
+                        style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+                      >
+                        명단 확인
+                      </Link>
                     ) : null}
                   </div>
                 </div>
@@ -930,12 +973,13 @@ function RegistrationDetailView({
                 {/* 신청 group */}
                 <div id="reg-detail-heading" style={{ display: 'flex', flexDirection: 'column' }}>
                   <StatusInfoRow label="신청 상태" statusConfig={statusConfig} />
+                  {/* 감사 finding #47 방어선 — 위 데스크톱 레일과 같은 이유로 status까지 함께 본다. */}
                   <InfoRow
                     label="신청일"
                     value={formatDateShort(registration.createdAt)}
-                    isLast={!registration.confirmedAt && !registration.cancelRequestedAt && !registration.cancelReason}
+                    isLast={!showConfirmedAt && !registration.cancelRequestedAt && !registration.cancelReason}
                   />
-                  {registration.confirmedAt ? (
+                  {showConfirmedAt ? (
                     <InfoRow
                       label="확정일"
                       value={formatDateShort(registration.confirmedAt)}

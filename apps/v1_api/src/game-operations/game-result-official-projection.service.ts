@@ -65,8 +65,12 @@ export class GameResultOfficialProjectionService {
     await this.bracket.project(tx, revision, score);
     await this.standings.project(tx, revision);
     await this.leagueCompletion.project(tx, revision);
-    await this.teamMatchCompletion.project(tx, revision);
-    await this.tournamentFixtureCompletion.project(tx, revision);
+    // 2026-08-27 감사 41/44: 두 project() 호출에 claim을 넘겨 내부 웹 푸시가
+    // claim.afterCommit에 담기도록 한다 — 이 handler 뒤로도 terminal.close ·
+    // writeAggregateWatermarks · watermarks.write가 이어지는데, 그중 하나가
+    // 실패해 트랜잭션이 롤백되면 이미 나간 푸시는 되돌릴 수 없다.
+    await this.teamMatchCompletion.project(tx, revision, claim);
+    await this.tournamentFixtureCompletion.project(tx, revision, claim);
     await this.terminal.close(tx, revision);
     await this.writeAggregateWatermarks(tx, revision, teamIds);
     await this.watermarks.write(tx, {

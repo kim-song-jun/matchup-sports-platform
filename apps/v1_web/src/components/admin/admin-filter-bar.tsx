@@ -45,6 +45,9 @@ export function AdminFilterBar({
   rightSlot,
 }: AdminFilterBarProps) {
   const inputId = useId();
+  // 옵션 전체에 count 가 하나도 없으면(화면이 애초에 카운트를 제공하지 않으면) 카운트
+  // span 자체를 렌더하지 않는다 — 일부만 없는 경우(로딩 중)는 '—' 플레이스홀더 유지.
+  const hasAnyChipCount = statusOptions?.some((o) => typeof o.count === 'number') ?? false;
 
   return (
     <div className="flex flex-col gap-3">
@@ -100,15 +103,17 @@ export function AdminFilterBar({
                     ].join(' ')}
                   >
                     <span>{opt.label}</span>
-                    <span
-                      className={[
-                        'ml-2 min-w-[1.25rem] text-center font-semibold tabular-nums',
-                        active ? 'text-white/90' : 'text-[var(--text-muted)]',
-                      ].join(' ')}
-                      aria-hidden="true"
-                    >
-                      {typeof opt.count === 'number' ? opt.count.toLocaleString('ko-KR') : '—'}
-                    </span>
+                    {hasAnyChipCount && (
+                      <span
+                        className={[
+                          'ml-2 min-w-[1.25rem] text-center font-semibold tabular-nums',
+                          active ? 'text-white/90' : 'text-[var(--text-muted)]',
+                        ].join(' ')}
+                        aria-hidden="true"
+                      >
+                        {typeof opt.count === 'number' ? opt.count.toLocaleString('ko-KR') : '—'}
+                      </span>
+                    )}
                   </button>
                 );
               })}

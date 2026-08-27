@@ -112,6 +112,12 @@ export interface PublicScheduleEntry {
   readonly groupName: string | null;
   readonly scheduledAt: string | null;
   readonly venue: string | null;
+  /**
+   * 이 경기가 열리는 필드(경기장)의 식별자. 표시용 `fieldName` 과 달리 **배정 대조에 쓰는
+   * 값**이다 — 필드 단위 스태프 배정이 이름이 겹치는 필드의 경기까지 "내 담당"으로 묶던 것을
+   * 막으려고 서버가 함께 내려준다(이름은 중복될 수 있지만 id 는 그렇지 않다).
+   */
+  readonly fieldId: string | null;
   readonly fieldName: string | null;
   readonly home: PublicSideSummary | null;
   readonly away: PublicSideSummary | null;
@@ -339,11 +345,19 @@ export interface PublicTeamRecordItem {
   readonly opponentTeamId: string | null;
   readonly opponentTeamName: string | null;
   readonly opponentTeamLogoUrl: string | null;
-  /** `WON | DRAWN | LOST` (`V1TeamRecordResult`), kept as `string` to avoid a `@prisma/client` import. */
-  readonly result: string;
-  /** 정규시간 점수 그대로 -- 승부차기가 있어도 이 값을 승부차기 스코어로 덮어쓰지 않는다. */
-  readonly goalsFor: number;
-  readonly goalsAgainst: number;
+  /**
+   * `WON | DRAWN | LOST` (`V1TeamRecordResult`), kept as `string` to avoid a `@prisma/client` import.
+   *
+   * **공개 가시성이 `status_only` 인 경기에서는 `null` 이다** — 경기가 있었다는 사실만 알리고
+   * 승패·점수는 감춘다(서버 `public-team-records.service.ts` 가 그렇게 내려준다).
+   */
+  readonly result: string | null;
+  /**
+   * 정규시간 점수 그대로 -- 승부차기가 있어도 이 값을 승부차기 스코어로 덮어쓰지 않는다.
+   * `result` 와 같은 이유로 `status_only` 경기에서는 `null` 이다.
+   */
+  readonly goalsFor: number | null;
+  readonly goalsAgainst: number | null;
   /** Scheduled match instant (`teamMatch.startAt` or tournament fixture `scheduledAt`). */
   readonly playedAt: string;
   /** 승부차기가 있었던 경기(결선 무승부 후 승부차기)만 채워진다. */

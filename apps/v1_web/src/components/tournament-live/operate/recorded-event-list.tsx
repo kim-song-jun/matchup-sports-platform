@@ -75,6 +75,7 @@ export function RecordedEventList({
   onAttachAssist,
   onReverseEvent,
   onReverseSubstitution,
+  resultOfficialized,
 }: {
   readonly events: readonly GameEventRecord[];
   /** 이 목록이 실제로 읽는 건 `id`·`displayNameSnapshot` 둘뿐이라 구조적
@@ -90,6 +91,14 @@ export function RecordedEventList({
   readonly onReverseEvent?: (event: GameEventRecord) => void;
   /** @deprecated 새 호출부는 모든 수정 가능 이벤트를 받는 onReverseEvent를 사용한다. */
   readonly onReverseSubstitution?: (event: GameEventRecord) => void;
+  /**
+   * F66 fix: 결과가 OFFICIAL로 확정된 뒤에는 서버도 reverseEvent를 409
+   * RESULT_ALREADY_OFFICIAL로 거부한다(games.service.ts) — 이 플래그가 없으면 확정 후에도
+   * 되돌리기 버튼이 그대로 눌려서, 사용자가 눌러 본 뒤에야 실패를 알게 된다("눌러 보고
+   * 403을 받는 버튼은 만들지 않는다" 규약, videos-page-client.tsx와 동일). 넘기지 않으면
+   * (호출부가 아직 반영 전이면) 기존 동작 그대로 항상 노출한다 — back-compat.
+   */
+  readonly resultOfficialized?: boolean;
 }) {
   if (events.length === 0) {
     return (
@@ -143,6 +152,7 @@ export function RecordedEventList({
         const reverseHandler = onReverseEvent ?? onReverseSubstitution;
         const canReverse =
           reverseHandler !== undefined &&
+          resultOfficialized !== true &&
           (onReverseEvent !== undefined || event.type === 'SUBSTITUTION') &&
           ['GOAL', 'OWN_GOAL', 'CARD', 'FOUL', 'SUBSTITUTION'].includes(event.type) &&
           !reversedIds.has(event.id);

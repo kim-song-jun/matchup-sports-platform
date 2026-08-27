@@ -201,6 +201,7 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
 
 export function MatchEditPageClient({ matchId }: { matchId: string }) {
   const router = useRouter();
+  const { confirm, ConfirmModal } = useConfirm();
   const editQuery = useV1MatchEdit(matchId);
   const sports = useV1MasterSports();
   const regions = useV1MasterRegions();
@@ -290,8 +291,18 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
         },
       );
     },
-    onCancel: () => {
+    onCancel: async () => {
       if (updateMatch.isPending || cancelMatch.isPending) return;
+      // 되돌리는 API가 없는 파괴적 동작 — 신청자 전원이 cancelled_by_host로 넘어가고
+      // 알림도 나간다. '변경사항 저장' 바로 아래 붙은 버튼이라 오탭 가능성이 높으므로
+      // 확인 없이 즉시 실행하지 않는다.
+      const ok = await confirm({
+        title: '매치를 취소할까요?',
+        message: '취소하면 되돌릴 수 없어요. 신청자 전원의 참가가 취소되고 취소 알림이 발송돼요.',
+        confirmLabel: '매치 취소',
+        tone: 'danger',
+      });
+      if (!ok) return;
       setError(null);
       cancelMatch.mutate(
         { reason: 'host_cancelled_from_v1_web' },
@@ -304,7 +315,12 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
     submitLabel: '변경사항 저장',
   });
 
-  return <MatchCreatePageView model={model} />;
+  return (
+    <>
+      <MatchCreatePageView model={model} />
+      {ConfirmModal}
+    </>
+  );
 }
 
 function buildCreateModel({

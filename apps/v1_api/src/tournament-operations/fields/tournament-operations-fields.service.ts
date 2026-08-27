@@ -59,9 +59,9 @@ export type TournamentFixtureFieldResult = {
  * tournament_director read" -- director explicitly excluded from mutation):
  * TOURNAMENT_STAFF_ACTIONS has no action where allowsRoleAction() separates
  * platform_ops from tournament_director (both return true for every action).
- * So field create/update calls assertAccess({action:'event_reverse'}) first
- * (this at least excludes field_operator/support_readonly, who are denied
- * 'event_reverse'), then layers an explicit `principal.role ===
+ * So field create/update calls assertAccess({action:'tournament_admin'})
+ * first (this at least excludes field_operator/support_readonly, who are
+ * denied 'tournament_admin'), then layers an explicit `principal.role ===
  * 'platform_ops'` check on top -- the exact reasoning TournamentStaffService
  * already documents for its own grant-authority nuances
  * (apps/v1_api/src/tournaments/staff/tournament-staff.service.ts,
@@ -71,7 +71,7 @@ export type TournamentFixtureFieldResult = {
  * no such carve-out in the frozen contract or the plan -- it is a Task
  * 18-introduced write path (user decision 2). Sensible default: treat it as
  * an operational action available to the same principals as any other
- * 'event_reverse' action (platform_ops + tournament_director), scoped to the
+ * 'tournament_admin' action (platform_ops + tournament_director), scoped to the
  * fixture's tournamentId. This does NOT require platform_ops-only, unlike
  * literal field CRUD, because assigning an existing field to a fixture is
  * day-of-tournament operations work, not field inventory management.
@@ -178,13 +178,37 @@ export class TournamentOperationsFieldsService {
         return replay;
       }
 
+      // finding #76: 이름에는 DB unique 제약이 없다(scopeKey/id만 unique) -- 클라이언트
+      // (staff-client.tsx)가 이제 같은 이름을 막지만, API를 직접 호출하는 경로나
+      // 클라이언트가 오래된 목록을 들고 있는 경합 상황까지 막으려면 서버도 같은 규칙을
+      // 다시 확인해야 한다. 이름이 중복되면 공개 일정의 `fieldId` 매칭(finding #57 fix)
+      // 자체는 더 이상 잘못된 경기를 섞지 않지만, 운영자가 배정 드롭다운에서 어느 필드가
+      // 어느 필드인지 구분할 수 없게 되는 문제는 여전하므로 생성 단계에서 막는다.
+      // 대소문자만 다른 이름도 같은 이름으로 본다(case-insensitive). 앞뒤 공백은 트림해
+      // 비교하고 **트림한 값을 그대로 저장한다** -- 비교 기준과 저장값이 다르면 공백 하나로
+      // 이 가드를 우회할 수 있다(Copilot 리뷰 지적, PR #805).
+      const trimmedName = dto.name.trim();
+      const duplicate = await tx.v1TournamentField.findFirst({
+        where: { tournamentId, name: { equals: trimmedName, mode: 'insensitive' } },
+        select: { id: true },
+      });
+      if (duplicate !== null) {
+        throw new ConflictException({
+          code: 'FIELD_NAME_DUPLICATE',
+          message: '이미 같은 이름의 경기장이 있어요.',
+        });
+      }
+
       let field: V1TournamentField;
       try {
         field = await tx.v1TournamentField.create({
           data: {
             tournamentId,
             scopeKey: dto.scopeKey,
-            name: dto.name,
+            // **비교와 저장이 같은 값이어야 중복 가드가 성립한다.** 위에서 `trim()` 한 값으로
+            // 중복을 찾아 놓고 원문을 저장하면, 앞뒤 공백이 섞인 이름이 통과해 저장된 뒤
+            // 다음 요청이 그 공백 이름과 대조하지 못해 같은 이름이 두 번 만들어진다.
+            name: trimmedName,
             sortOrder: dto.sortOrder ?? 0,
           },
         });
@@ -344,7 +368,7 @@ export class TournamentOperationsFieldsService {
       const principal = await this.access.assertAccess(
         {
           userId: actorUserId,
-          action: 'event_reverse',
+          action: 'tournament_admin',
           resource: { tournamentId, fixtureId },
         },
         tx,
@@ -460,7 +484,7 @@ export class TournamentOperationsFieldsService {
       const principal = await this.access.assertAccess(
         {
           userId: actorUserId,
-          action: 'event_reverse',
+          action: 'tournament_admin',
           resource: { tournamentId, fixtureId },
         },
         tx,
@@ -557,7 +581,7 @@ export class TournamentOperationsFieldsService {
     const principal = await this.access.assertAccess(
       {
         userId: actorUserId,
-        action: 'event_reverse',
+        action: 'tournament_admin',
         resource: { tournamentId },
       },
       tx,

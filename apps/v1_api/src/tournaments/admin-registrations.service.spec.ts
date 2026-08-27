@@ -264,6 +264,98 @@ describe('AdminRegistrationsService', () => {
     expect(result).toMatchObject({ status: 'waitlisted', alreadyProcessed: false });
   });
 
+  // 감사 finding #47: decision과 무관하게 confirmedAt이 항상 채워져, 대기(waitlisted) 처리된
+  // 팀도 참가 화면에 "확정일"이 함께 떴다. 실제 update() 호출 인자를 직접 검사한다 — 이
+  // spec 파일의 기존 테스트들은 update.mockResolvedValue()로 반환값을 고정해 두고 있어서,
+  // 호출 인자를 보지 않으면 confirmedAt이 잘못 채워져도 통과해 버린다.
+  it('confirm: decision=waitlist does NOT set confirmedAt/confirmedByAdminUserId', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(registrationRow({ status: 'paid' }));
+    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'waitlisted' }));
+    prisma.v1TournamentPayment.findUnique.mockResolvedValue(paymentRow({ status: 'paid' }));
+
+    await service.confirm(opsAuth, 'reg-1', { decision: 'waitlist' });
+
+    const call = prisma.v1TournamentRegistration.update.mock.calls[0][0];
+    expect(call.data.status).toBe('waitlisted');
+    expect(call.data).not.toHaveProperty('confirmedAt');
+    expect(call.data).not.toHaveProperty('confirmedByAdminUserId');
+  });
+
+  it('confirm: decision=confirm DOES set confirmedAt/confirmedByAdminUserId', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(registrationRow({ status: 'payment_checking' }));
+    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'confirmed', confirmedAt: new Date() }));
+    prisma.v1TournamentPayment.findUnique.mockResolvedValue(paymentRow({ status: 'paid' }));
+
+    await service.confirm(opsAuth, 'reg-1', { decision: 'confirm' });
+
+    const call = prisma.v1TournamentRegistration.update.mock.calls[0][0];
+    expect(call.data.status).toBe('confirmed');
+    expect(call.data.confirmedAt).toBeInstanceOf(Date);
+    expect(call.data.confirmedByAdminUserId).toBe(opsAdminRecord.id);
+  });
+
+  // ─── rejectCancelRequest (취소 요청 거부/잔류) ─────────────────────────────────
+  // 감사 finding #48: 팀 자진 철회(withdrawCancelRequest, tournament-registrations.service.ts)엔
+  // 이미 정원 재검증 가드가 있었는데 운영자 잔류 처리엔 빠져 있어, 정원을 넘는 확정 팀이
+  // 생길 수 있었다.
+
+  it('rejectCancelRequest: not cancel_requested → 409 NOT_CANCEL_REQUESTED', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(registrationRow({ status: 'confirmed' }));
+
+    await expect(service.rejectCancelRequest(opsAuth, 'reg-1')).rejects.toMatchObject({
+      response: { code: 'NOT_CANCEL_REQUESTED' },
+    });
+  });
+
+  it('rejectCancelRequest: restoring to confirmed when capacity is already full → 409 TOURNAMENT_CAPACITY_FULL, no write', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(
+      registrationRow({ status: 'cancel_requested', cancelPreviousStatus: 'confirmed' }),
+    );
+    prisma.v1Tournament.findFirst.mockResolvedValue({ teamCount: 8 });
+    // 다른 8팀이 이미 정원 점유 상태(confirmed 등) → 잔류시키면 9번째가 된다.
+    prisma.v1TournamentRegistration.count.mockResolvedValue(8);
+
+    await expect(service.rejectCancelRequest(opsAuth, 'reg-1')).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_CAPACITY_FULL' },
+    });
+    expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
+  });
+
+  it('rejectCancelRequest: restoring to confirmed with room in capacity → succeeds and restores status', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(
+      registrationRow({ status: 'cancel_requested', cancelPreviousStatus: 'confirmed' }),
+    );
+    prisma.v1Tournament.findFirst.mockResolvedValue({ teamCount: 8 });
+    prisma.v1TournamentRegistration.count.mockResolvedValue(6);
+    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'confirmed' }));
+
+    const result = await service.rejectCancelRequest(opsAuth, 'reg-1');
+
+    expect(result.status).toBe('confirmed');
+    expect(prisma.v1TournamentRegistration.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'confirmed' }) }),
+    );
+  });
+
+  it('rejectCancelRequest: restoring to a non-capacity-hold status (e.g. draft) skips the capacity check entirely', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(
+      registrationRow({ status: 'cancel_requested', cancelPreviousStatus: 'draft' }),
+    );
+    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'draft' }));
+
+    const result = await service.rejectCancelRequest(opsAuth, 'reg-1');
+
+    expect(result.status).toBe('draft');
+    // draft는 정원을 점유하지 않으므로 대회 조회/카운트 없이 바로 복원돼야 한다.
+    expect(prisma.v1Tournament.findFirst).not.toHaveBeenCalled();
+  });
+
   // ─── cancel ─────────────────────────────────────────────────────────────────
 
   it('cancel: draft status → 409 REGISTRATION_NOT_CANCELLABLE', async () => {

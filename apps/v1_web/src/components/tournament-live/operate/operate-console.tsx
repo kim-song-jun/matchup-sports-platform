@@ -432,6 +432,21 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     return readGameResultScore(chosen?.score)?.penalties ?? null;
   }, [gameEnded, resultRevisions.data, gameDetail.data?.currentOfficialRevisionId]);
 
+  /**
+   * F66 fix: 결과가 실제로 OFFICIAL(확정)까지 갔는지 — 게임이 끝났다고 곧바로
+   * 확정된 건 아니다(검토·승인 단계가 남아 있을 수 있다). 위 `confirmedPenalties`와
+   * 같은 재료(currentOfficialRevisionId + 그 리비전의 실제 state)를 쓴다. `RecordedEventList`가
+   * 이 값을 받아 되돌리기 버튼을 감춘다 — 서버(games.service.ts reverseEvent)도 확정 후엔
+   * 409 RESULT_ALREADY_OFFICIAL로 거부하므로, 눌러 보고서야 아는 대신 미리 감춘다.
+   */
+  const resultOfficialized = useMemo(() => {
+    if (!gameEnded) return false;
+    const officialId = gameDetail.data?.currentOfficialRevisionId ?? null;
+    if (officialId === null) return false;
+    const revisions = resultRevisions.data ?? [];
+    return revisions.some((revision) => revision.id === officialId && revision.state === 'OFFICIAL');
+  }, [gameEnded, gameDetail.data?.currentOfficialRevisionId, resultRevisions.data]);
+
   /* 확정된 승부차기의 선축 사이드. 저장값은 `sideKey`(`'HOME'|'AWAY'`)이므로 여기서
      사이드 목록과 맞춰 실제 팀으로 되돌린다. 선축이 없던 시절에 저장된 경기(그리고 중첩
      백필 형태)는 `null` — 모르는 것을 지어내지 않고 표시 자체를 생략한다. */
@@ -712,9 +727,14 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   // `payload`는 승부차기 종료가 `{ penalties: { home, away } }`를 실어 보내는
   // 통로다 — 새 커맨드나 새 엔드포인트가 아니라 `end`가 이미 갖고 있던 범용
   // payload 슬롯을 그대로 쓴다(`GamesService.extractEndPenalties` doc 참고).
+  // F65 fix: 반환값(성공 true / 실패 false)을 추가했다 — 예전엔 항상 undefined라
+  // 호출부가 성공 여부를 알 방법이 없었다. 승부차기 종료(`handleFinishPenaltyShootout`)가
+  // 이 값으로 "서버가 실제로 받아들였을 때만" 로컬 킥 입력을 지운다. 기존 호출부
+  // (revert-period 토스트, confirmAndRunCommand, 몰수 종료)는 반환값을 그냥 무시하므로
+  // 동작이 그대로다.
   const handleRunCommand = useCallback(
-    async (command: GameCommandName, payload: Record<string, unknown> = {}) => {
-      if (!gameId || !isTakeoverHeld(ops.takeover)) return;
+    async (command: GameCommandName, payload: Record<string, unknown> = {}): Promise<boolean> => {
+      if (!gameId || !isTakeoverHeld(ops.takeover)) return false;
       setCommandPending(true);
       setCommandError(null);
       setLastCommandFeedback(null);
@@ -770,8 +790,10 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
             },
           });
         }
+        return true;
       } catch (error) {
         setCommandError(extractErrorMessage(error, '명령을 처리하지 못했어요. 다시 시도해주세요.'));
+        return false;
       } finally {
         setCommandPending(false);
       }
@@ -879,8 +901,13 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           )
         : penaltyShootoutFinishConfirmCopy(homeSide, awaySide, homeScore, awayScore, firstKickSide);
     if (!(await confirm(copy))) return;
-    setPenaltyKicks(null);
-    await handleRunCommand('end', {
+    // F65 fix: 예전엔 여기서 곧바로 setPenaltyKicks(null)을 부른 뒤 handleRunCommand를
+    // await했다 — 그 사이 네트워크 끊김·409 충돌로 서버 요청이 실패해도 킥 8개와 선축은
+    // 이미 지워진 뒤였다(handleRunCommand는 실패를 삼키고 배너만 세울 뿐 이 호출부로
+    // 알리지 않았다, 킥 단위 기록은 서버에 없어 복구 불가). 이제 handleRunCommand가
+    // 성공 여부를 돌려주므로, **서버가 실제로 받아들였을 때만** 패널을 닫는다 — 실패하면
+    // 패널이 그대로 열려 있어 운영자가 재시도하거나 킥을 다시 입력할 필요가 없다.
+    const succeeded = await handleRunCommand('end', {
       penalties: {
         home: homeScore,
         away: awayScore,
@@ -896,6 +923,9 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         ...(availability === 'OVERRIDABLE' ? { operatorOverride: true } : {}),
       },
     });
+    if (succeeded) {
+      setPenaltyKicks(null);
+    }
   }, [penaltyKicks, firstKickSideId, penaltyPolicy, gameDetail.data?.sides, confirm, handleRunCommand]);
 
   // 이슈 #375 — Copilot review 패턴 재사용(PR #276, 위 liveEventsRef와 같은
@@ -1431,6 +1461,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           lineups={lineups}
           onAttachAssist={(event) => setAssistTarget({ event })}
           onReverseEvent={(event) => void handleReverseEvent(event)}
+          resultOfficialized={resultOfficialized}
         />
       </section>
 

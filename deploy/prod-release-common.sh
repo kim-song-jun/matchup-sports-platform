@@ -209,6 +209,12 @@ check_prod_health_contract() {
   fi
   worker_container="$("${compose[@]}" ps -q v1_game_operations_worker)" || return 1
   [[ -n "${worker_container}" ]] || return 1
+  # docker inspect 가 읽는 Health.Status 는 docker-compose.prod.yml 의 healthcheck 스크립트가
+  # 정한다. 그 스크립트는 워커 /health 응답의 status(운영 알람용, POISONED 잡이 하나라도
+  # 남아 있으면 영구히 'degraded')가 아니라 deploymentStatus(새 잡을 받을 수 있는지만 보는
+  # 배포 전용 지표)를 본다 — 그래야 알려진 정상 경로(녹아웃 무승부 등)로 생긴 POISONED
+  # 잡 1건이 이 배포 게이트와, 실패한 배포를 되돌리는 restore_active_release() 의 롤백까지
+  # 영구히 막는 사고를 반복하지 않는다(2026-08-27, C-poisoned-outbox-deploy-gate).
   worker_health="$(sudo docker inspect --format '{{.State.Health.Status}}' "${worker_container}")" || return 1
   [[ "${worker_health}" == "healthy" ]] || return 1
   headers="$(curl -fsSI --connect-timeout 3 --max-time 10 \

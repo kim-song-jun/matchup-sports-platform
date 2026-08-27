@@ -136,6 +136,27 @@ export function planNextSeasonTiers(input: {
 }
 
 /**
+ * `planNextSeasonTiers`가 만든 다음 시즌 로스터(teamIds) 중 **비활성화되었거나
+ * 소프트삭제된 팀**을 찾아낸다.
+ *
+ * seedSeason(league-series-admin.service.ts:240-249)과 addTeam(league-match-admin.service.ts:381)
+ * 은 둘 다 `v1Team.findMany({ status:'active', deletedAt:null })`로 "리그 로스터는 항상
+ * 활성 팀만"이라는 불변식을 강제하는데, 승강(commitPromotions) 경로만 이 불변식이 없었다
+ * — planNextSeasonTiers 는 kind/toTier 만 보고 팀 상태를 전혀 모른다. 어드민이 승강 확정
+ * 전후로 팀을 정지(suspended)시키면 그 팀이 그대로 다음 시즌 로스터에 들어가고, 이후
+ * 대진 생성이 영구히 422 LEAGUE_TEAM_INVALID 로 막혀 복구 경로가 없는 死 리그가 만들어진다.
+ *
+ * DB 조회(v1Team.findMany)는 서비스가 하고, 이 함수는 그 결과(활성 팀 ID 집합)와 다음
+ * 시즌 로스터를 비교만 한다 — 이 파일의 다른 판정과 같은 이유로 순수 함수로 뺐다.
+ */
+export function findInactivePromotionTeamIds(
+  nextSeasonTeamIds: readonly string[],
+  activeTeamIds: ReadonlySet<string>,
+): string[] {
+  return nextSeasonTeamIds.filter((teamId) => !activeTeamIds.has(teamId));
+}
+
+/**
  * 리그 목록의 상태 우선순위: 진행 중 -> 준비 중 -> 종료.
  *
  * Prisma 의 enum 정렬(`state: 'asc'`)은 **선언 순서**를 쓰는데 V1LeagueState 는

@@ -1723,9 +1723,25 @@ export class GamesService {
         pausedAt: null,
       },
     });
+    // F64 fix: previous가 ENDED로 머문 구간(endedAt → 지금)을 "정지 시간"으로 접어
+    // 넣지 않으면, LIVE로 되살아난 순간부터 프런트 시계(elapsedMatchMs =
+    // now - startedAt - pausedTotalMs, game-operations-clock.ts)가 실제 경과시간보다
+    // 그 구간만큼 부풀어 보이고, 그 뒤 기록되는 골/카드의 clockMs도 같은 값으로 영구
+    // 저장된다. 바로 위에서 next를 pausedTotalMs:0으로 완전히 되감는 것과 대칭적으로,
+    // previous는 "ENDED로 머문 시간"을 pausedTotalMs에 누적한다(resolveOpenPause와
+    // 동일하게 음수 방지 clamp). endCurrentPeriod는 game.state===LIVE(PAUSED 아님)에서만
+    // 피리어드를 ENDED로 닫으므로 previous.pausedAt은 이 시점에 항상 null이다 — 열린
+    // pause 구간과 겹칠 걱정 없이 그대로 더할 수 있다.
+    const now = new Date();
+    const endedDurationMs =
+      previous.endedAt === null ? 0 : Math.max(0, now.getTime() - previous.endedAt.getTime());
     await tx.v1GamePeriod.update({
       where: { id: previous.id },
-      data: { state: V1GamePeriodState.LIVE, endedAt: null },
+      data: {
+        state: V1GamePeriodState.LIVE,
+        endedAt: null,
+        pausedTotalMs: previous.pausedTotalMs + endedDurationMs,
+      },
     });
     const updated = await tx.v1Game.update({
       where: { id: game.id },
@@ -2116,6 +2132,28 @@ export class GamesService {
             code: 'EVENT_ALREADY_REVERSED',
             message: 'This event was already reversed once',
           });
+        }
+        // F66 fix: assignGoalAssist(바로 아래 메서드, Issue #376 follow-up)가 이미
+        // 갖고 있던 가드를 reverseEvent에도 그대로 이식한다 — 결과가 OFFICIAL로
+        // 확정된 뒤에도 이 커맨드가 무가드였던 탓에, 콘솔에서 골을 취소하면 이벤트
+        // 스트림(공개 기록·콘솔 헤더 스코어가 파생)과 확정된 공식 스코어(순위표·브래킷이
+        // 읽는 스냅샷, 재계산되지 않음)가 영구히 갈라졌다. 확정 후 정정이 필요하면
+        // 사유·검토·확정 기록이 남는 "결과 정정"(createResultCorrection) 흐름을 타야 한다.
+        const officialPointer = await tx.v1Game.findUnique({
+          where: { id: gameId },
+          select: { currentOfficialRevisionId: true },
+        });
+        if (officialPointer?.currentOfficialRevisionId) {
+          const officialRevision = await tx.v1GameResultRevision.findUnique({
+            where: { id: officialPointer.currentOfficialRevisionId },
+            select: { state: true },
+          });
+          if (officialRevision?.state === V1GameResultRevisionState.OFFICIAL) {
+            throw new ConflictException({
+              code: 'RESULT_ALREADY_OFFICIAL',
+              message: '이미 확정된 결과예요. 이벤트를 취소하려면 결과 정정을 이용해주세요.',
+            });
+          }
         }
         const sequence = game.lastSequence + 1;
         await tx.v1GameEvent.create({
@@ -3056,10 +3094,29 @@ export class GamesService {
       actor.role === 'team_manager' || actor.role === 'team_owner'
         ? (sides.find((side) => side.teamId === actor.teamId)?.id ?? null)
         : null;
+    // F61/F62: `isStaff`만으로는 SUPPORT_READONLY(조회 전용)와 실제로 lineup_mutate
+    // 권한이 있는 스태프(field_operator/tournament_director/platform_ops)를 구분할 수
+    // 없었다 — 그 결과 SUPPORT_READONLY도 매니저와 동일한 편집기를 받고 저장을 눌러야만
+    // 서버 403으로 뒤늦게 걸러졌다. 여기서 'lineup_mutate' 액션으로 resolveActor를 한 번
+    // 더 태워 실제 판정을 재사용한다(정책을 여기 복제하지 않음 — tournament-staff-policy.ts
+    // 변경에 자동으로 맞춰진다). ForbiddenException은 "이 액션은 못 한다"는 정상 판정값이지
+    // 오류가 아니므로 삼키고, 그 외(DB 오류 등)는 그대로 던진다.
+    const canMutateLineup = await this.resolveActor(this.prisma, gameId, user.id, 'lineup_mutate')
+      .then(() => true)
+      .catch((error: unknown) => {
+        if (!(error instanceof ForbiddenException)) {
+          throw error;
+        }
+        return false;
+      });
     return {
       gameId,
       mySideId,
       isStaff: actor.role !== 'team_manager' && actor.role !== 'team_owner',
+      // F61/F62 fix: 프론트가 "조회 전용 스태프에게는 편집기를 열지 않는다"를 판단할 수
+      // 있도록 실제 lineup_mutate 인가 결과를 노출한다. mySideId가 있는(=팀 매니저/오너)
+      // 경우도 true다.
+      canMutateLineup,
       scheduledAt: fixture.scheduledAt,
       homeSideId: homeSide?.id ?? null,
       homeTeamName: fixture.homeRegistration?.team.name ?? null,
@@ -3241,7 +3298,21 @@ export class GamesService {
             orderBy: { revision: 'desc' },
             select: { sideId: true, state: true, revision: true },
           });
-    const latestLineupBySideId = latestLineupStateBySideId(lineups);
+    // F3 fix: 게임이 만들어질 때(createGame/fixture-game-backfill) 사이드마다 revision=1
+    // DRAFT 라인업 행이 자동으로 함께 생긴다 — 한 번도 편집하지 않은 라인업도 항상 이 행을
+    // 갖는다. 그래서 latestLineupStateBySideId(state만 남기는 공용 헬퍼)를 그대로 쓰면
+    // "아직 아무도 저장한 적 없음"이 절대 null이 되지 못하고 항상 'DRAFT'("작성 중")로
+    // 보였다. saveLineup은 저장할 때마다 새 revision 행을 만들므로(previous.revision+1,
+    // previous는 항상 그 eager 행에서 시작) 실제 저장 여부는 revision>=2로만 구분된다 —
+    // revision=1은 이 자동 생성 경로에서만 나온다. 그래서 여기서는 latestLineupStateBySideId를
+    // 재사용하지 않고 revision까지 함께 남기는 지역 맵을 따로 만든다.
+    const latestLineupBySideId = new Map<string, { state: V1GameLineupState; revision: number }>();
+    for (const lineup of lineups) {
+      const current = latestLineupBySideId.get(lineup.sideId);
+      if (current === undefined || lineup.revision > current.revision) {
+        latestLineupBySideId.set(lineup.sideId, { state: lineup.state, revision: lineup.revision });
+      }
+    }
     const sideByGameAndTeam = new Map<string, { id: string }>();
     for (const side of sides) {
       sideByGameAndTeam.set(`${side.gameId}:${side.teamId}`, { id: side.id });
@@ -3280,7 +3351,14 @@ export class GamesService {
                   ? fixture.awayRegistration?.team.name
                   : fixture.homeRegistration?.team.name) ?? null,
               // 라인업을 아직 한 번도 저장하지 않았으면 null — 화면은 이걸 "미작성"으로 읽는다.
-              lineupState: side === undefined ? null : (latestLineupBySideId.get(side.id) ?? null),
+              // revision===1은 게임 생성 시 자동으로 깔린 미편집 DRAFT 행이라 저장한 적 없음과
+              // 동일하게 취급한다(위 주석 참고).
+              lineupState: (() => {
+                if (side === undefined) return null;
+                const latest = latestLineupBySideId.get(side.id);
+                if (latest === undefined || latest.revision === 1) return null;
+                return latest.state;
+              })(),
             };
           }),
       })),

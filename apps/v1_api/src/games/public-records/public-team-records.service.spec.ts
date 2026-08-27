@@ -21,6 +21,9 @@ describe('PublicTeamRecordsService', () => {
           goalEvents: null,
           game: {
             currentOfficialRevisionId: 'revision-2',
+            // 공개 가시성 정책이 없으면 서비스가 fail-closed 로 hidden 처리해 행이 전부 걸러진다
+            // (형제 서비스 public-tournament-records 와 같은 규칙). 실제 응답에는 항상 실려 온다.
+            visibilityPolicy: { mode: 'LIVE' },
             teamMatchId: null,
             sides: [
               { id: 'side-home', sideKey: 'HOME', teamId: 'team-1' },
@@ -40,6 +43,9 @@ describe('PublicTeamRecordsService', () => {
       ])
       .mockResolvedValueOnce([{ season: '2026' }]);
     const prisma = {
+      // 공개 가시성 판정(PUBLIC_LIVE 플래그)을 서비스가 조회한다 — 같은 디렉터리의
+      // public-tournament-records 계열 스펙과 같은 모킹 관례를 따른다.
+      v1GameOperationFlag: { findUnique: jest.fn().mockResolvedValue({ value: 'on' }) },
       v1Team: {
         findUnique: jest.fn().mockResolvedValue({
           id: 'team-1',
@@ -119,6 +125,7 @@ describe('PublicTeamRecordsService', () => {
           goalEvents: null,
           game: {
             currentOfficialRevisionId: 'revision-9',
+            visibilityPolicy: { mode: 'LIVE' },
             teamMatchId: 'team-match-9',
             sides: [
               { id: 'side-home', sideKey: 'HOME', teamId: 'team-1' },
@@ -139,6 +146,7 @@ describe('PublicTeamRecordsService', () => {
     const teamMatchFindMany = jest.fn().mockResolvedValue([{ id: 'team-match-9', leagueId: 'league-1' }]);
     const leagueFindMany = jest.fn().mockResolvedValue([{ id: 'league-1', title: '2026 여름 정규 리그' }]);
     const prisma = {
+      v1GameOperationFlag: { findUnique: jest.fn().mockResolvedValue({ value: 'on' }) },
       v1Team: {
         findUnique: jest.fn().mockResolvedValue({ id: 'team-1', name: '서울 유나이티드', profile: null }),
         findMany: jest.fn().mockResolvedValue([{ id: 'team-2', name: '부산 FC', profile: null }]),
@@ -186,6 +194,7 @@ describe('PublicTeamRecordsService', () => {
           goalEvents: null,
           game: {
             currentOfficialRevisionId: 'revision-3',
+            visibilityPolicy: { mode: 'LIVE' },
             teamMatchId: 'team-match-3',
             sides: [
               { id: 'side-home', sideKey: 'HOME', teamId: 'team-1' },
@@ -206,6 +215,7 @@ describe('PublicTeamRecordsService', () => {
     const teamMatchFindMany = jest.fn().mockResolvedValue([{ id: 'team-match-3', leagueId: null }]);
     const leagueFindMany = jest.fn();
     const prisma = {
+      v1GameOperationFlag: { findUnique: jest.fn().mockResolvedValue({ value: 'on' }) },
       v1Team: {
         findUnique: jest.fn().mockResolvedValue({ id: 'team-1', name: '서울 유나이티드', profile: null }),
         findMany: jest.fn().mockResolvedValue([]),
@@ -259,6 +269,7 @@ describe('PublicTeamRecordsService', () => {
           ],
           game: {
             currentOfficialRevisionId: 'revision-1',
+            visibilityPolicy: { mode: 'LIVE' },
             teamMatchId: null,
             sides: [
               { id: 'side-home', sideKey: 'HOME', teamId: 'team-1' },
@@ -273,6 +284,7 @@ describe('PublicTeamRecordsService', () => {
       },
     ]);
     const prisma = {
+      v1GameOperationFlag: { findUnique: jest.fn().mockResolvedValue({ value: 'on' }) },
       v1Team: {
         findUnique: jest.fn().mockResolvedValue({ id: 'team-1', name: '서울 유나이티드', profile: null }),
         findMany: jest.fn().mockResolvedValue([{ id: 'team-2', name: '부산 FC', profile: null }]),

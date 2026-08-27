@@ -18,9 +18,11 @@ import type { CreateFixtureVideoDto } from '../tournaments/videos/dto/fixture-vi
  * 소유 확인·파일 회수 규칙을 대회 쪽(`tournament-fixture-videos.service.ts`)과 그대로
  * 공유한다 — 같은 "경기 영상" 개념이 도메인마다 다른 규칙을 가지면 화면·운영이 갈린다.
  *
- * 권한은 대회의 스태프 스코프와 달리 **플랫폼 운영자 단일 게이트**다
- * (`AdminContextService.getMutationAdmin`) — 리그 운영(대진 생성·결과 입력)이 전부
- * 운영자 입력으로 확정된 정책(2026-08-24)과 같은 축이다.
+ * 권한은 대회의 스태프 스코프와 달리 **플랫폼 운영자 게이트**다 — 등록·삭제(mutation)는
+ * `AdminContextService.getMutationAdmin`(support 등급 차단, 리그 운영은 전부 운영자
+ * 입력으로 확정된 정책(2026-08-24)과 같은 축), 조회(`listLeagueVideos`)는 대회 쪽
+ * (`tournament-fixture-videos.service.ts`)과 맞춰 `getActiveAdmin`으로 support 등급도
+ * 통과시킨다 — mutation 정책은 '입력'에 관한 것이지 '조회'를 막을 근거가 아니다.
  */
 @Injectable()
 export class LeagueFixtureVideosService {
@@ -46,7 +48,8 @@ export class LeagueFixtureVideosService {
   /** 리그 전체 대진 + 등록된 영상 — 어드민 영상 관리 화면용. 응답 모양은
    * `listTournamentVideos` 와 동일하게 맞춘다(화면 데이터 레이어 공유). */
   async listLeagueVideos(user: V1AuthUser, leagueId: string) {
-    await this.adminContext.getMutationAdmin(user.id);
+    // 조회 전용 — support 등급도 통과해야 한다. 등록·삭제(mutation)만 getMutationAdmin.
+    await this.adminContext.getActiveAdmin(user.id);
     const league = await this.prisma.v1League.findUnique({ where: { id: leagueId }, select: { id: true } });
     if (league === null) {
       throw new NotFoundException({ code: 'LEAGUE_NOT_FOUND', message: '리그를 찾을 수 없어요.' });

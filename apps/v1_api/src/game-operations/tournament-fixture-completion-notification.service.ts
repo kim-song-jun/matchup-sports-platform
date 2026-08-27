@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { Logger } from '@nestjs/common';
 import type { WebPushService } from '../notifications/web-push.service';
+import type { GameOperationClaim } from '../jobs/v1-game-operations-worker.service';
 import type { OfficialRevisionRow } from './game-result-official-projection.types';
 import { parseOfficialScore } from './parse-official-score';
 
@@ -24,13 +25,21 @@ import { parseOfficialScore } from './parse-official-score';
  *   (sibling 헤더의 W1 관례 설명 참조). Web Push는 커밋 밖 best-effort.
  * - 본문에 확정 스코어를 싣는다. `parseOfficialScore`는 핸들러 선두에서 같은
  *   리비전으로 이미 성공한 뒤라 여기서 다시 던질 수 없다.
+ *
+ * **afterCommit 경계 (2026-08-27 감사 41/44)**: sibling(`TeamMatchCompletionNotificationService`)과
+ * 같은 이유로 웹 푸시를 `claim.afterCommit`에 담아 커밋 확정 뒤에만 보낸다 — 자세한
+ * 근거는 그 클래스의 docblock 참조. `claim`도 같은 이유로 옵셔널이다(유닛 스펙 폴백).
  */
 export class TournamentFixtureCompletionNotificationService {
   private readonly logger = new Logger(TournamentFixtureCompletionNotificationService.name);
 
   constructor(private readonly webPush?: WebPushService) {}
 
-  async project(tx: Prisma.TransactionClient, revision: OfficialRevisionRow): Promise<void> {
+  async project(
+    tx: Prisma.TransactionClient,
+    revision: OfficialRevisionRow,
+    claim?: GameOperationClaim,
+  ): Promise<void> {
     if (revision.sourceType !== 'TOURNAMENT_FIXTURE') return;
     if (revision.tournamentId === null || revision.tournamentFixtureId === null) return;
 
@@ -103,16 +112,24 @@ export class TournamentFixtureCompletionNotificationService {
       (userId) => !alreadyDeliveredKeys.has(businessKeyFor(userId)),
     );
     for (const userId of newlyDelivered) {
-      void this.webPush
-        ?.sendToUser(userId, { title, body, url: deepLink })
-        .catch((error: unknown) => {
-          // Best-effort — 실패해도 이미 커밋된 알림 row는 그대로 유지되지만,
-          // 조용히 삼키면 sendToUser 내부 실패(조회·전송)를 추적할 수 없다
-          // (이 저장소의 silent-catch 안티패턴 규칙). warn 한 줄은 남긴다.
-          this.logger.warn(
-            `web push failed for tournament fixture completion (fixture=${revision.tournamentFixtureId}): ${String(error)}`,
-          );
-        });
+      const send = () =>
+        void this.webPush
+          ?.sendToUser(userId, { title, body, url: deepLink })
+          .catch((error: unknown) => {
+            // Best-effort — 실패해도 이미 커밋된 알림 row는 그대로 유지되지만,
+            // 조용히 삼키면 sendToUser 내부 실패(조회·전송)를 추적할 수 없다
+            // (이 저장소의 silent-catch 안티패턴 규칙). warn 한 줄은 남긴다.
+            this.logger.warn(
+              `web push failed for tournament fixture completion (fixture=${revision.tournamentFixtureId}): ${String(error)}`,
+            );
+          });
+      // 커밋 확정 뒤에만 보낸다(위 클래스 docblock 참조). claim이 없거나
+      // afterCommit 훅이 없는 호출부(유닛 스펙)는 즉시 실행으로 폴백한다.
+      if (claim?.afterCommit === undefined) {
+        send();
+      } else {
+        claim.afterCommit.push(send);
+      }
     }
   }
 }

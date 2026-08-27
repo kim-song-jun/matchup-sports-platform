@@ -293,6 +293,35 @@ describe('ScheduleReminderService', () => {
       },
     );
 
+    // 2026-08-27 감사 41/44: 워커의 outbox 트랜잭션이 롤백되면 이미 나간 웹 푸시는
+    // 되돌릴 수 없다 — claim.afterCommit이 있으면 deliverDurableReminder가 그 안에
+    // push만 하고 커밋 전에는 절대 sendToUser를 직접 부르지 않아야 한다.
+    it('claim.afterCommit이 주어지면 push를 즉시 보내지 않고 커밋 후 실행할 effect로만 담는다', async () => {
+      const webPush = fakeWebPush();
+      const service = new ScheduleReminderService(fakeNotifications() as never, webPush as never);
+      const tx = txWith({
+        lockRows: [{ id: 's1', teamId: 't1', state: 'SCHEDULED' }],
+        memberRows: [{ userId: 'u1' }],
+      });
+      const afterCommit: Array<() => void | Promise<void>> = [];
+      const claimWithAfterCommit = { ...claim('s1', 'outbox-99'), afterCommit };
+
+      await service.rsvpDeadlineReminderHandler(claimWithAfterCommit as never, tx as never);
+
+      // 알림 row는 이미 durable하게 만들어졌지만, 아직 워커 트랜잭션이 커밋되지
+      // 않았다고 가정하는 시점이라 푸시는 나가면 안 된다.
+      expect(tx.v1Notification.createMany).toHaveBeenCalled();
+      expect(webPush.sendToUser).not.toHaveBeenCalled();
+      expect(afterCommit).toHaveLength(1);
+
+      // 워커가 커밋 확정 뒤 afterCommit을 실행하는 시점을 흉내낸다.
+      await afterCommit[0]();
+      expect(webPush.sendToUser).toHaveBeenCalledWith(
+        'u1',
+        expect.objectContaining({ title: '참석 여부를 알려주세요' }),
+      );
+    });
+
     it('is safe to construct without a webPush dependency (main.ts backward compatibility) and still persists durably', async () => {
       const service = new ScheduleReminderService(fakeNotifications() as never);
       const tx = txWith({

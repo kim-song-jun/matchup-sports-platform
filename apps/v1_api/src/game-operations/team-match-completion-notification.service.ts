@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { LEAGUE_RESULT_DISPUTE_WINDOW_MS } from '../league-matches/league-result-dispute.constants';
 import { notificationCopyFor } from '../notifications/notifications.service';
 import type { WebPushService } from '../notifications/web-push.service';
+import type { GameOperationClaim } from '../jobs/v1-game-operations-worker.service';
 import type { OfficialRevisionRow } from './game-result-official-projection.types';
 
 const LEAGUE_RESULT_DISPUTE_WINDOW_DAYS = LEAGUE_RESULT_DISPUTE_WINDOW_MS / (24 * 60 * 60 * 1_000);
@@ -41,11 +42,27 @@ const LEAGUE_RESULT_DISPUTE_WINDOW_DAYS = LEAGUE_RESULT_DISPUTE_WINDOW_MS / (24 
  * 한 글자도 바뀌지 않는다(기존 리비전 정정 재알림 회피 등 나머지 로직은 두 경로가
  * 공유한다 — businessKey 형식도 그대로: 팀매치 하나는 생애주기 내내 리그 아니면
  * 일반 중 하나로 고정이라 리그 여부로 businessKey 네임스페이스를 나눌 이유가 없다).
+ *
+ * **afterCommit 경계 (2026-08-27 감사 41/44)**: 이 project()는 워커의 outbox
+ * 트랜잭션(`tx`) 안에서 돈다. 예전에는 `tx.v1Notification.createMany` 직후 같은
+ * 스코프에서 바로 웹 푸시를 던졌는데, 그 뒤로도 handler가 대회 픽스처 프로젝션·
+ * 워터마크 기록 등을 계속 이어가다 실패하면(리스 CAS 경합·데드락·트랜잭션 타임아웃)
+ * 트랜잭션 전체가 롤백된다 — 이미 나간 푸시는 되돌릴 수 없으니 "확정되지 않은
+ * 결과"의 "확정됐어요" 푸시가 팀장 폰에 남고, 재시도마다 alreadyDelivered 조회가
+ * 롤백으로 다시 비어 있어 같은 푸시가 반복된다. identity-link-expiry.service.ts가
+ * 이미 쓰는 `claim.afterCommit` 훅으로 옮겨 커밋이 실제로 확정된 뒤에만 나가게
+ * 한다. `claim`은 옵셔널로 둔다 — 이 클래스를 직접 `new`해 project()를 호출하는
+ * 유닛 스펙(claim 없이 (tx, revision) 두 인자만 넘김)은 그대로 컴파일되고, claim이
+ * 없거나 claim.afterCommit이 없으면 즉시 발송으로 폴백해 기존 스펙의 동작을 보존한다.
  */
 export class TeamMatchCompletionNotificationService {
   constructor(private readonly webPush?: WebPushService) {}
 
-  async project(tx: Prisma.TransactionClient, revision: OfficialRevisionRow): Promise<void> {
+  async project(
+    tx: Prisma.TransactionClient,
+    revision: OfficialRevisionRow,
+    claim?: GameOperationClaim,
+  ): Promise<void> {
     if (revision.sourceType !== 'TEAM_MATCH') return;
 
     const game = await tx.v1Game.findUnique({
@@ -122,11 +139,19 @@ export class TeamMatchCompletionNotificationService {
 
     const newlyDelivered = enabledRecipients.filter((userId) => !alreadyDeliveredKeys.has(businessKeyFor(userId)));
     for (const userId of newlyDelivered) {
-      void this.webPush
-        ?.sendToUser(userId, { title, body, url: deepLink ?? undefined })
-        .catch(() => {
-          // Best-effort — 실패해도 이미 커밋된 알림 row는 그대로 유지된다.
-        });
+      const send = () =>
+        void this.webPush
+          ?.sendToUser(userId, { title, body, url: deepLink ?? undefined })
+          .catch(() => {
+            // Best-effort — 실패해도 이미 커밋된 알림 row는 그대로 유지된다.
+          });
+      // 커밋 확정 뒤에만 보낸다(위 클래스 docblock 참조). claim이 없거나
+      // afterCommit 훅이 없는 호출부(유닛 스펙)는 즉시 실행으로 폴백한다.
+      if (claim?.afterCommit === undefined) {
+        send();
+      } else {
+        claim.afterCommit.push(send);
+      }
     }
   }
 }

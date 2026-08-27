@@ -1218,6 +1218,16 @@ button:disabled {
  * grey200 테두리는 흰 배경에서 1.23:1(비텍스트 3:1 기준 미달), grey400 글리프는
  * 2.01:1 이라 "체크 안 된 동그라미가 거기 있다" 는 것 자체가 보이지 않았다.
  * grey600 으로 올리면 라이트 4.62:1 · 다크(#8b95a1 on #1c1e24) 5.48:1 로 둘 다 통과한다. */
+/* [a11y] sr-only 체크박스를 감싸는 행. label 이 display:contents 라 박스가 없고
+ * 행 <div> 에도 클래스가 없어 포커스를 표시할 대상이 아예 없었다 — 키보드로
+ * 약관 항목에 들어와도 어디에 있는지 알 수 없다. 행이 링을 대신 그린다.
+ * offset 은 안쪽(-2px)이다: 행이 화면 폭을 꽉 채워 바깥 링은 잘린다. */
+.tm-auth-check-row:focus-within {
+  outline: 2px solid var(--blue500);
+  outline-offset: -2px;
+  border-radius: var(--radius-chip);
+}
+
 .tm-auth-check {
   width: 24px;
   height: 24px;
@@ -1656,7 +1666,14 @@ button:disabled {
 
 /* ── Keyboard focus ring (WCAG 2.1 AA) ── */
 .tm-btn:focus-visible,
-.tm-pressable:focus-visible {
+.tm-pressable:focus-visible,
+/* [a11y] <label class="tm-btn"> 이 sr-only 파일 input 을 감싸는 패턴이 4곳 있다.
+ * 키보드 포커스는 label 이 아니라 **숨은 input** 에 가는데, sr-only 는 1x1 로
+ * 잘려 있어 브라우저 기본 링이 그려져도 화면에서는 보이지 않는다(alpha 에 같은
+ * 구조를 심어 확인: input 1x1 · label/행/시각표시 어디에도 링 없음).
+ * 안쪽이 포커스를 받으면 버튼이 링을 대신 그린다. */
+.tm-btn:focus-within,
+.tm-auth-profile-preview-trigger:focus-within {
   outline: 2px solid var(--blue500);
   outline-offset: 2px;
 }

@@ -1679,9 +1679,11 @@ button:disabled {
  * 키보드 포커스는 label 이 아니라 **숨은 input** 에 가는데, sr-only 는 1x1 로
  * 잘려 있어 브라우저 기본 링이 그려져도 화면에서는 보이지 않는다(alpha 에 같은
  * 구조를 심어 확인: input 1x1 · label/행/시각표시 어디에도 링 없음).
- * 안쪽이 포커스를 받으면 버튼이 링을 대신 그린다. */
-.tm-btn:focus-within,
-.tm-auth-profile-preview-trigger:focus-within {
+ * 안쪽이 포커스를 받으면 버튼이 링을 대신 그린다.
+ * label 로 좁힌 것은 의도다 — .tm-btn 전체에 걸면 <button>·<a> 를 **마우스로
+ * 클릭**했을 때도 링이 떠서 :focus-visible 의 키보드 전용 동작을 우회한다.
+ * label.tm-btn 은 이 sr-only 패턴에서만 쓰인다. */
+label.tm-btn:focus-within {
   outline: 2px solid var(--blue500);
   outline-offset: 2px;
 }

@@ -50,6 +50,26 @@ const AUDIT = () => {
         // margin shorthand 는 side 별로 풀어야 한다. `margin: 0 auto` 는 좌우만
         // auto 인데, 통째로 보면 top/bottom 까지 auto 로 오인해 **실제 격자 이탈을
         // 그 요소에서 통째로 못 보게 된다**(예외가 너무 넓어지는 쪽 오류다).
+        // 논리 속성도 auto 를 실어 나른다 — `margin-inline: auto` 는 좌우가 auto 다.
+        // 이 앱은 전부 LTR·horizontal-tb 라 논리→물리 매핑이 고정이다
+        // (writing-mode 를 쓰는 곳이 생기면 이 매핑을 다시 봐야 한다).
+        const logical = {};
+        for (const [prop, targets] of [
+          ['margin-inline', ['marginLeft', 'marginRight']],
+          ['margin-block', ['marginTop', 'marginBottom']],
+          ['margin-inline-start', ['marginLeft']],
+          ['margin-inline-end', ['marginRight']],
+          ['margin-block-start', ['marginTop']],
+          ['margin-block-end', ['marginBottom']],
+        ]) {
+          const v = r.style.getPropertyValue(prop).trim();
+          if (!v) continue;
+          // margin-inline 은 1~2값이다: 1값=양쪽, 2값=start end
+          const parts = v.split(/\s+/);
+          targets.forEach((t, i) => {
+            logical[t] = parts.length > 1 ? parts[Math.min(i, parts.length - 1)] : parts[0];
+          });
+        }
         const short = r.style.getPropertyValue('margin').trim();
         const sides = short ? (() => {
           const parts = short.split(/\s+/);
@@ -61,8 +81,9 @@ const AUDIT = () => {
           return { marginTop: a, marginRight: b, marginBottom: c, marginLeft: d };
         })() : null;
         for (const k of Object.keys(autoSel)) {
+          // 우선순위: longhand > 논리 속성 > shorthand
           const own = r.style.getPropertyValue(KEBAB(k)).trim();
-          const v = own || (sides ? sides[k] : '');
+          const v = own || logical[k] || (sides ? sides[k] : '');
           if (v && /^auto$/.test(v)) autoSel[k].push(r.selectorText);
         }
       }

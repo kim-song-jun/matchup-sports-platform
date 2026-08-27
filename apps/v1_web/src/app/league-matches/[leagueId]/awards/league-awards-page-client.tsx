@@ -20,6 +20,7 @@ import type {
   V1LeaguePlayerRecordRow,
   V1LeagueStandingRow,
 } from '@/types/league-match';
+import { leagueRecordEmptySub } from '../league-record-empty-copy';
 
 /** 아직 종료되지 않은 리그로 딥링크했을 때 — 빈 화면 대신 안내 + 되돌아갈 동선. */
 function NotCompletedNotice({ leagueId, state }: { leagueId: string; state: 'draft' | 'active' }) {
@@ -273,17 +274,22 @@ export function LeagueAwardsPageClient({ leagueId }: { leagueId: string }) {
         <div className="tm-skeleton" style={{ height: 140, borderRadius: 12 }} />
       ) : (
         <>
+          {/*
+            순위가 비는 이유가 두 가지이고 처방이 다르다 — 동의 게이팅으로 가려진 것인지,
+            아직 확정 결과가 없는 것인지. 순위표 화면과 **같은 문구**를 쓰도록 단일 소스
+            (leagueRecordEmptySub)를 거친다.
+          */}
           <LeaderboardSection
             title="득점왕"
             rows={records.goals}
             unit={(row) => row.goals}
-            emptySub="확정된 경기 결과가 쌓이면 득점왕이 나타나요."
+            emptySub={leagueRecordEmptySub('goals', records.hiddenByEligibility)}
           />
           <LeaderboardSection
             title="도움왕"
             rows={records.assists}
             unit={(row) => row.assists}
-            emptySub="확정된 경기 결과가 쌓이면 도움왕이 나타나요."
+            emptySub={leagueRecordEmptySub('assists', records.hiddenByEligibility)}
           />
         </>
       )}

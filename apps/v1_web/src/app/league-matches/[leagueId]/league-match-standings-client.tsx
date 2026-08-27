@@ -21,6 +21,7 @@ import { LEAGUE_STATE_META } from '@/lib/league-state-meta';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { fixtureResultLabel, fixtureStatusMeta, isUpcomingFixture, type TeamLookupEntry } from './league-fixture-meta';
 import type { V1LeagueChampionTeam, V1LeagueFixture } from '@/types/league-match';
+import { leagueRecordEmptySub } from './league-record-empty-copy';
 
 /**
  * 확정된 승강 결과 표기(Task 153 시나리오 4). 컬러만으로 뜻을 전달하지 않도록
@@ -925,11 +926,7 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
         ) : records.goals.length === 0 ? (
           <EmptyState
             title="아직 기록이 없어요"
-            sub={
-              records.hiddenByEligibility
-                ? '득점 기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 순위가 공개돼요.'
-                : '확정된 경기 결과가 쌓이면 득점 순위가 나타나요.'
-            }
+            sub={leagueRecordEmptySub('goals', records.hiddenByEligibility)}
           />
         ) : (
           <ol className="space-y-1">
@@ -955,11 +952,7 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
         ) : records.assists.length === 0 ? (
           <EmptyState
             title="아직 기록이 없어요"
-            sub={
-              records.hiddenByEligibility
-                ? '도움 기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 순위가 공개돼요.'
-                : '확정된 경기 결과가 쌓이면 도움 순위가 나타나요.'
-            }
+            sub={leagueRecordEmptySub('assists', records.hiddenByEligibility)}
           />
         ) : (
           <ol className="space-y-1">

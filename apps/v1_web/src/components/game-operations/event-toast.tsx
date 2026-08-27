@@ -12,9 +12,13 @@ export interface EventToastItem {
   readonly id: number;
   readonly message: string;
   readonly action: EventToastAction | null;
+  /** 퇴장 애니메이션이 재생되는 동안 true. 이 시간이 지나야 실제로 제거된다. */
+  readonly exiting?: boolean;
 }
 
 const AUTO_DISMISS_MS = 5000; // admin-toast.tsx보다 길게 — 액션 버튼을 누를 시간을 준다
+// CSS 의 퇴장 애니메이션 길이와 같아야 한다. 짧으면 잘리고, 길면 빈 자리가 남는다.
+const EXIT_MS = 150;
 
 /**
  * `components/admin/admin-toast.tsx`와 형제 컴포넌트지만, admin 전용이 아니고
@@ -32,8 +36,25 @@ export function useEventToast() {
     };
   }, []);
 
+  // 2단계로 지운다: exiting 을 세워 퇴장 애니메이션을 재생하고, 끝난 뒤 배열에서
+  // 뺀다. 바로 filter 하면 진입만 있고 사라질 땐 뚝 끊기는 비대칭이 된다.
+  // 자동 닫힘·수동 닫힘 모두 이 한 곳을 지나므로 여기만 고치면 된다.
   const dismiss = useCallback((id: number) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
+    const reduced =
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced) {
+      // CSS 의 animation:none 만으로는 아래 setTimeout 이 사라지지 않아 빈 자리만 남는다.
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+      return;
+    }
+    setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, exiting: true } : t)));
+    const removeTimer = setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+      timerRefs.current = timerRefs.current.filter((t) => t !== removeTimer);
+    }, EXIT_MS);
+    timerRefs.current.push(removeTimer);
   }, []);
 
   const showToast = useCallback(
@@ -72,7 +93,11 @@ export function EventToasts({ toasts, onDismiss }: { toasts: readonly EventToast
         <div
           key={toast.id}
           role="status"
-          className="pointer-events-auto flex min-w-[200px] max-w-full items-center gap-3 rounded-2xl bg-gray-900 px-5 py-3 text-sm font-semibold text-white shadow-lg motion-safe:animate-[fade-in_0.15s_ease-out] sm:max-w-[400px]"
+          className={`pointer-events-auto flex min-w-[200px] max-w-full items-center gap-3 rounded-2xl bg-gray-900 px-5 py-3 text-sm font-semibold text-white shadow-lg sm:max-w-[400px] ${
+            toast.exiting
+              ? 'motion-safe:animate-[fade-in_0.15s_ease-in_reverse_both]'
+              : 'motion-safe:animate-[fade-in_0.15s_ease-out]'
+          }`}
         >
           <CheckCircle2 size={16} aria-hidden="true" className="shrink-0" />
           <span className="flex-1">{toast.message}</span>

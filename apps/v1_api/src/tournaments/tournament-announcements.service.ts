@@ -77,8 +77,10 @@ export class TournamentAnnouncementsService {
    * 재현되므로 반드시 같은 소스를 쓴다.
    */
   async listForParticipant(user: V1AuthUser, tournamentId: string) {
+    // 삭제된 대회의 공지는 id 를 알아도 읽히면 안 된다 — 같은 파일 create() 의
+    // 존재 확인은 이미 `deletedAt: null` 을 쓰는데 조회 쪽 두 곳만 빠져 있었다.
     const tournament = await this.prisma.v1Tournament.findFirst({
-      where: { id: tournamentId },
+      where: { id: tournamentId, deletedAt: null },
     });
     if (!tournament) {
       throw new NotFoundException({
@@ -118,8 +120,10 @@ export class TournamentAnnouncementsService {
   async listByTournament(user: V1AuthUser, tournamentId: string) {
     await this.adminContext.getActiveAdmin(user.id);
 
+    // 삭제된 대회의 공지는 id 를 알아도 읽히면 안 된다 — 같은 파일 create() 의
+    // 존재 확인은 이미 `deletedAt: null` 을 쓰는데 조회 쪽 두 곳만 빠져 있었다.
     const tournament = await this.prisma.v1Tournament.findFirst({
-      where: { id: tournamentId },
+      where: { id: tournamentId, deletedAt: null },
     });
     if (!tournament) {
       throw new NotFoundException({

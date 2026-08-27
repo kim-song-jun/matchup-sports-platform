@@ -10,7 +10,25 @@
  * 있어야 한다(가시성 게이트를 너무 조여 정상 시즌을 지워 버리지 않았는지).
  */
 const BASE = process.env.ALPHA_BASE ?? 'https://alpha.teameet.co.kr/api/v1';
-const TEAM_LIMIT = Number(process.env.TEAM_LIMIT ?? 40);
+
+/**
+ * 검증 하네스가 조용히 무력화되는 것을 막는다: `Number('')` 은 0, `Number('abc')` 는
+ * NaN 이라 그대로 쓰면 루프 조건이 전부 false 가 되어 **한 팀도 안 보고 PASS** 로
+ * 끝난다. 잘못된 안심은 검증을 안 한 것보다 나쁘므로, 값이 유효한 양의 정수가
+ * 아니면 기본값으로 되돌리고 그 사실을 출력한다.
+ */
+function positiveIntEnv(name, fallback) {
+  const raw = process.env[name];
+  if (raw === undefined || raw.trim() === '') return fallback;
+  const parsed = Number(raw.trim());
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    console.warn(`[warn] ${name}=${JSON.stringify(raw)} 은 양의 정수가 아니라 무시하고 ${fallback} 을 씁니다.`);
+    return fallback;
+  }
+  return parsed;
+}
+
+const TEAM_LIMIT = positiveIntEnv('TEAM_LIMIT', 40);
 
 async function get(path) {
   const res = await fetch(`${BASE}${path}`, { headers: { accept: 'application/json' } });
@@ -62,13 +80,22 @@ for (const team of teams.slice(0, TEAM_LIMIT)) {
   }
 }
 
+// 아무것도 못 본 실행은 PASS 가 아니다 — 위반이 0건인 것과 검사가 0건인 것은 다르다.
+// (팀 목록 API 가 비었거나, 전적이 있는 팀이 하나도 안 걸렸거나, 필터가 잘못돼
+//  시즌을 한 개도 못 고른 경우가 전부 여기로 걸린다.)
+const violations = emptySeasons.length + missingSeasons.length;
+const covered = seasonsChecked > 0;
+const verdict = !covered ? 'INCONCLUSIVE' : violations === 0 ? 'PASS' : 'FAIL';
+
 console.log(JSON.stringify({
   base: BASE,
+  teamLimit: TEAM_LIMIT,
   teamsScanned: teams.length,
   teamsWithRecords,
   seasonsChecked,
   emptySeasons,
   missingSeasons,
-  verdict: emptySeasons.length === 0 && missingSeasons.length === 0 ? 'PASS' : 'FAIL',
+  verdict,
+  ...(covered ? {} : { note: '검사한 시즌이 0개라 판정할 수 없습니다 — 통과로 읽지 마세요.' }),
 }, null, 2));
-process.exit(emptySeasons.length === 0 && missingSeasons.length === 0 ? 0 : 1);
+process.exit(verdict === 'PASS' ? 0 : 1);

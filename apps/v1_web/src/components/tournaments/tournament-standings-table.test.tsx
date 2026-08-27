@@ -77,6 +77,24 @@ describe('TournamentStandingsTable', () => {
     render(<TournamentStandingsTable rows={[]} advance={null} ariaLabel="테스트 순위표" />);
     expect(screen.getByText('순위 집계 전이에요')).toBeInTheDocument();
   });
+
+  /* WCAG AA(4.5:1) — 흰 카드 위 --blue500/--red500 은 3.71~3.72:1로 미달이라
+     --blue700/--red700(auth-page.tsx 선례와 동일)을 써야 한다. 클래스 문자열이
+     아니라 실제 렌더된 인라인 color 값을 확인한다. */
+  it('득실 +N은 --blue700, -N은 --red700로 칠해 WCAG AA 대비를 지킨다', () => {
+    render(
+      <TournamentStandingsTable
+        rows={[
+          { ...ROW, key: 'plus', teamId: 't-plus', teamName: '득실 플러스팀', goalsFor: 10, goalsAgainst: 4 },
+          { ...ROW, key: 'minus', teamId: 't-minus', teamName: '득실 마이너스팀', goalsFor: 2, goalsAgainst: 5 },
+        ]}
+        advance={null}
+        ariaLabel="테스트 순위표"
+      />,
+    );
+    expect(screen.getByText('+6')).toHaveStyle({ color: 'var(--blue700)' });
+    expect(screen.getByText('-3')).toHaveStyle({ color: 'var(--red700)' });
+  });
 });
 
 /**

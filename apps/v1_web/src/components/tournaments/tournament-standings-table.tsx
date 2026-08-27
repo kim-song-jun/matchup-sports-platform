@@ -72,7 +72,11 @@ function StandingRankBadge({ pos, advance, unranked }: { pos: number; advance: n
 
 function GoalDiff({ gf, ga }: { gf: number; ga: number }) {
   const diff = gf - ga;
-  const color = diff > 0 ? 'var(--blue500)' : diff < 0 ? 'var(--red, #ff4d4f)' : 'var(--text-muted)';
+  // --blue500/--red500 는 흰 카드 위에서 WCAG AA(4.5:1) 미달(3.71~3.72:1, 진출
+  // 하이라이트 행의 --blue50 배경 위에서는 3.31:1까지 떨어진다) — auth-page.tsx
+  // 선례와 동일하게 --blue700/--red700 로 교체한다(다크 모드는 :root.dark 블록이
+  // 이미 두 토큰을 밝게 재정의해 둬서 별도 분기 없이 함께 해결된다).
+  const color = diff > 0 ? 'var(--blue700)' : diff < 0 ? 'var(--red700)' : 'var(--text-muted)';
   return (
     <span style={{ color, fontWeight: diff !== 0 ? 700 : 400 }}>
       {diff > 0 ? '+' : ''}{diff}

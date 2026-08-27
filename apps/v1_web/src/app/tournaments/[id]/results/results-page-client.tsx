@@ -922,28 +922,33 @@ export function ResultsPageContent({ tournament }: { tournament: V1TournamentDet
           <div className="tm-hide-desktop" style={{ marginTop: 16 }}>
             <TournamentSummaryCard tournament={tournament} />
           </div>
-          {videosTotal > 0 && (
-            <nav className="tm-segment-row" aria-label="결과 보기 전환" style={{ marginTop: 16 }}>
-              <button
-                type="button"
-                className="tm-review-tab"
-                data-active={activeTab === 'results'}
-                aria-pressed={activeTab === 'results'}
-                onClick={() => setActiveTab('results')}
-              >
-                경기 결과
-              </button>
-              <button
-                type="button"
-                className="tm-review-tab"
-                data-active={activeTab === 'videos'}
-                aria-pressed={activeTab === 'videos'}
-                onClick={() => setActiveTab('videos')}
-              >
-                경기 영상 {videosTotal}
-              </button>
-            </nav>
-          )}
+        </div>
+      )}
+
+      {/* 결과/영상 탭 전환 — 우승팀을 못 뽑는 대회(리그전, 결승 무승부 등)에서도
+          등록된 경기 영상에 접근할 수 있어야 하므로 챔피언 섹션과 무관하게 렌더한다. */}
+      {isCompleted && videosTotal > 0 && (
+        <div style={{ padding: '16px 20px 0' }}>
+          <nav className="tm-segment-row" aria-label="결과 보기 전환">
+            <button
+              type="button"
+              className="tm-review-tab"
+              data-active={activeTab === 'results'}
+              aria-pressed={activeTab === 'results'}
+              onClick={() => setActiveTab('results')}
+            >
+              경기 결과
+            </button>
+            <button
+              type="button"
+              className="tm-review-tab"
+              data-active={activeTab === 'videos'}
+              aria-pressed={activeTab === 'videos'}
+              onClick={() => setActiveTab('videos')}
+            >
+              경기 영상 {videosTotal}
+            </button>
+          </nav>
         </div>
       )}
 

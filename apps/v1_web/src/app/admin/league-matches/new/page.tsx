@@ -12,6 +12,7 @@ import {
   useV1Teams,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { toDistrictRegionOptions } from '@/lib/v1-regions';
 
 const inputClass =
   'h-[44px] w-full rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)] placeholder:text-[var(--text-muted)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
@@ -33,6 +34,7 @@ export default function AdminLeagueMatchNewPage() {
 
   const { data: sports } = useV1MasterSports();
   const { data: regions } = useV1MasterRegions();
+  const regionOptions = toDistrictRegionOptions(regions ?? []);
   // 첫 팀을 고르기 전까지는(= 아직 종목이 잠기기 전까지는) 검색을 종목으로 막지
   // 않는다 — 검색어가 있으면 전체 종목에서 이름으로 찾고(다른 종목도 안 숨김,
   // 회색으로 보여주고 이유를 알려준다), 검색어가 없을 때만 기본 후보를 sportId로 좁힌다.
@@ -156,7 +158,7 @@ export default function AdminLeagueMatchNewPage() {
             <label htmlFor="series-region" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">지역</label>
             <select id="series-region" value={regionId} onChange={(e) => setRegionId(e.target.value)} className={inputClass}>
               <option value="">지역 선택</option>
-              {(regions ?? []).map((region) => (
+              {regionOptions.map((region) => (
                 <option key={region.id} value={region.id}>{region.name}</option>
               ))}
             </select>

@@ -45,7 +45,7 @@ function createFakePrisma(config: {
 
   return {
     v1User: {
-      findUnique: jest.fn().mockResolvedValue({ id: OWNER_ID, profile: { nickname: '테스트유저' } }),
+      findFirst: jest.fn().mockResolvedValue({ id: OWNER_ID, profile: { nickname: '테스트유저' } }),
     },
     v1UserRecordConsent: {
       findMany: jest.fn().mockResolvedValue(config.userConsents),
@@ -193,10 +193,28 @@ describe('PublicUserRecordsService', () => {
 
   it('존재하지 않는 사용자는 404를 던진다', async () => {
     const prisma = createFakePrisma({ links: [], userConsents: [], snapshots: [], resultRows: [] });
-    (prisma.v1User.findUnique as jest.Mock).mockResolvedValue(null);
+    (prisma.v1User.findFirst as jest.Mock).mockResolvedValue(null);
     const service = new PublicUserRecordsService(prisma);
 
     await expect(service.getRecords('missing-user', {})).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('탈퇴한 계정(deletedAt/accountStatus != active)은 404를 던져 내부 삭제 식별자가 공개 응답에 노출되지 않는다', async () => {
+    // admin.service.ts deleteUser가 profile.nickname을 `deleted_xxxxxxxx`(내부 식별자)로
+    // 덮어쓰는데, 계정 상태 게이트가 없으면 이 값이 그대로 응답에 실려 SEO 인덱싱되는
+    // 페이지 제목에 노출된다(감사 finding #39). v1User.findFirst 는 `deletedAt: null,
+    // accountStatus: 'active'` where 조건에 걸리면 null 을 반환하므로, 여기서는 그
+    // 실제 동작을 모사해 서비스가 계정 상태를 실제로 조회 조건에 반영하는지를 검증한다.
+    const prisma = createFakePrisma({ links: [], userConsents: [], snapshots: [], resultRows: [] });
+    (prisma.v1User.findFirst as jest.Mock).mockImplementation((args: { where: { deletedAt?: unknown; accountStatus?: unknown } }) =>
+      Promise.resolve(args.where.deletedAt === null && args.where.accountStatus === 'active' ? null : { id: OWNER_ID }),
+    );
+    const service = new PublicUserRecordsService(prisma);
+
+    await expect(service.getRecords(OWNER_ID, {})).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.v1User.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ id: OWNER_ID, deletedAt: null, accountStatus: 'active' }) }),
+    );
   });
 
   it('본인 조회는 사용자 단위 동의(GRANTED)가 없어도 신원 연결된 자신의 기록을 볼 수 있다', async () => {

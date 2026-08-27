@@ -312,9 +312,12 @@ export class TournamentStaffService {
     actorUserId: string,
     tournamentId: string,
   ): Promise<TournamentStaffPrincipal> {
+    // 2026-08-27: 예전엔 'event_reverse'를 "디렉터급 권한"의 대리로 썼는데, 그 액션은
+    // 원래 게임 이벤트 되돌리기용이라 현장 스태프에게 그걸 허용하는 순간 스태프
+    // 임명·해임까지 함께 열렸다. 관리 권한 전용 액션으로 바꿔 두 경계를 분리한다.
     const principal = await this.access.assertAccess({
       userId: actorUserId,
-      action: 'event_reverse',
+      action: 'tournament_admin',
       resource: { tournamentId },
     });
     if (principal.tournamentId !== tournamentId) {

@@ -48,9 +48,17 @@ describe('resolveResultStage', () => {
     expect(resolveResultStage({ currentOfficialRevisionId: null, resultRevisions: [rev(state)] })).toBe('change_requested');
   });
 
-  it('무효화된 결과는 무효로 표시한다', () => {
+  // games.service.ts의 voidTeamMatchResult는 새로 만든 VOID 리비전으로
+  // currentOfficialRevisionId를 **함께 옮긴다**(4111행) — 즉 무효화된 결과는 항상
+  // 포인터가 세팅된 채로 도착한다. `currentOfficialRevisionId: null` 조합은 실제로
+  // 생기지 않는 픽스처였고, 그래서 "포인터가 있으면 무조건 확정"이라는 규칙에 먼저
+  // 걸려 이 분기가 도달 불가능한 채로도 테스트가 계속 통과했다(감사 확인).
+  it('무효화된 결과는 무효로 표시한다 (currentOfficialRevisionId가 VOID 리비전을 가리키는 실제 조합)', () => {
     expect(
-      resolveResultStage({ currentOfficialRevisionId: null, resultRevisions: [rev(V1GameResultRevisionState.VOID)] }),
+      resolveResultStage({
+        currentOfficialRevisionId: 'void-revision-id',
+        resultRevisions: [rev(V1GameResultRevisionState.VOID)],
+      }),
     ).toBe('voided');
   });
 

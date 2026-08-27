@@ -39,7 +39,13 @@ export function AnnouncementsTab({
   const [annTitle, setAnnTitle] = useState('');
   const [annBody, setAnnBody] = useState('');
   const [annCategory, setAnnCategory] = useState<V1AnnouncementCategory>('general');
-  const [annAudience, setAnnAudience] = useState<V1AnnouncementAudience>('all_registered');
+  // 감사 finding(D-small-ux-consistency #2): 기본 대상을 'all_registered'(모든 신청팀)로
+  // 두면 운영자가 대상 선택란을 건드리지 않고 저장할 때 의도치 않게 좁은 대상으로 나간다 —
+  // all_registered는 신청팀에게 알림은 가지만(tournament-announcements.service.ts
+  // registrationStatusesForAudience) 대회 공개 상세 페이지에는 노출되지 않는다
+  // (tournaments-read.query.ts: `where: { audience: 'public' }`만 그 프로젝션에 들어간다).
+  // 'public'이 가장 넓은 범위(공개 페이지 노출 + 신청팀 알림 모두 포함)이므로 안전한 기본값이다.
+  const [annAudience, setAnnAudience] = useState<V1AnnouncementAudience>('public');
   const [annPublish, setAnnPublish] = useState(false);
   const isSavingAnnouncement = createAnnouncement.isPending || updateAnnouncement.isPending;
 
@@ -48,7 +54,7 @@ export function AnnouncementsTab({
     setAnnTitle('');
     setAnnBody('');
     setAnnCategory('general');
-    setAnnAudience('all_registered');
+    setAnnAudience('public');
     setAnnPublish(false);
   };
 

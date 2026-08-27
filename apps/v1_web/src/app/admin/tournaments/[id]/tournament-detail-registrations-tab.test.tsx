@@ -215,6 +215,41 @@ describe('RegistrationsTab — 명단 제출 마감 예외 토글', () => {
     expect(showToast).toHaveBeenCalledWith('예외를 해제했어요.', 'success');
   });
 
+  // 감사 finding(D-small-ux-consistency #1): rosterLockedAt은 confirmed일 때만 잠기고, 잠긴
+  // 신청이 admin cancel()로 종료돼도 서버(rosterUnlock)에는 status 가드가 없어 잠금 필드가
+  // 그대로 남는다 — 화면이 isLocked만 보면 취소 완료(cancelled)된 신청에도 "잠금 해제"
+  // 버튼이 떠서 어색하다. 잠금이 실제로 의미 있는(명단이 아직 쓰일 수 있는) confirmed·
+  // cancel_requested에서만 노출해야 한다.
+  it('hides "잠금 해제" for a locked-but-cancelled registration, and still shows it while cancel_requested', () => {
+    useV1RosterDeadlineOverrideGrantMock.mockReturnValue(noopMutationHook());
+    useV1RosterDeadlineOverrideRevokeMock.mockReturnValue(noopMutationHook());
+    useV1AdminTournamentRegistrationsMock.mockReturnValue({
+      data: {
+        items: [
+          baseRegistration({
+            id: 'reg-cancelled',
+            status: 'cancelled',
+            rosterLockedAt: '2026-08-01T00:00:00.000Z',
+          }),
+          baseRegistration({
+            id: 'reg-cancel-requested',
+            status: 'cancel_requested',
+            rosterLockedAt: '2026-08-01T00:00:00.000Z',
+          }),
+        ],
+        pageInfo: { nextCursor: null, hasNext: false },
+      },
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useV1AdminTournamentRegistrations>);
+
+    render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite />);
+
+    expect(screen.getAllByRole('button', { name: '잠금 해제' })).toHaveLength(1);
+  });
+
   it('hides every mutation action for read-only admins but keeps roster review and CSV export', () => {
     useV1RosterDeadlineOverrideGrantMock.mockReturnValue(noopMutationHook());
     useV1RosterDeadlineOverrideRevokeMock.mockReturnValue(noopMutationHook());

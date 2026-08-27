@@ -407,6 +407,103 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
     expect(presented.awards[0]).not.toHaveProperty('recipientUserId');
   });
 
+  // 위 테스트는 award.recipient 자체가 없는(as never로 타입만 우회한) 픽스처를 쓰기 때문에
+  // profileByUserId 맵이 항상 비어 resolveParticipantDisplayName이 profile===undefined
+  // 분기(옛 스냅샷 폴백)만 타고, 2026-08-18에 추가된 닉네임/실명 토글·탈퇴회원 분기는 전혀
+  // 실행되지 않는다. 여기서는 실제 조회 형태(recipient: { profile: {...} })를 채운 픽스처로
+  // 세 분기를 각각 실행한다.
+  it('수상자 프로필의 tournamentRealNameVisible이 꺼져 있으면 닉네임을 표시한다', () => {
+    const row = baseRow({
+      awards: [
+        {
+          id: 'award-1',
+          awardType: 'mvp',
+          awardLabel: 'MVP',
+          iconKey: 'crown',
+          recipientName: '스냅샷실명',
+          recipientUserId: 'user-1',
+          recipient: {
+            profile: {
+              realName: '홍길동',
+              displayName: '홍길동',
+              nickname: '골넣는홍길동',
+              tournamentRealNameVisible: false,
+              deletedAt: null,
+            },
+          },
+          teamName: '서울 FC',
+          note: null,
+        },
+      ],
+    } as never);
+
+    const presented = presentTournamentDetail(row);
+
+    expect(presented.awards[0].recipientName).toBe('골넣는홍길동');
+  });
+
+  it('수상자 프로필의 tournamentRealNameVisible이 켜져 있으면 실명을 표시한다', () => {
+    const row = baseRow({
+      awards: [
+        {
+          id: 'award-1',
+          awardType: 'mvp',
+          awardLabel: 'MVP',
+          iconKey: 'crown',
+          recipientName: '스냅샷실명',
+          recipientUserId: 'user-1',
+          recipient: {
+            profile: {
+              realName: '홍길동',
+              displayName: '홍길동',
+              nickname: '골넣는홍길동',
+              tournamentRealNameVisible: true,
+              deletedAt: null,
+            },
+          },
+          teamName: '서울 FC',
+          note: null,
+        },
+      ],
+    } as never);
+
+    const presented = presentTournamentDetail(row);
+
+    expect(presented.awards[0].recipientName).toBe('홍길동');
+  });
+
+  it('탈퇴한 수상자는 닉네임 대신 탈퇴 표시 문구를 사용한다', () => {
+    const row = baseRow({
+      awards: [
+        {
+          id: 'award-1',
+          awardType: 'mvp',
+          awardLabel: 'MVP',
+          iconKey: 'crown',
+          recipientName: '스냅샷실명',
+          recipientUserId: 'user-1',
+          recipient: {
+            profile: {
+              // 탈퇴 처리(admin.service.ts)는 nickname을 deleted_<8자> 내부 식별자로
+              // 덮어쓰므로, 여기서 nickname을 쓰면 화면에 그 식별자가 그대로 노출된다.
+              realName: null,
+              displayName: '탈퇴 회원',
+              nickname: 'deleted_a1b2c3d4',
+              tournamentRealNameVisible: false,
+              deletedAt: new Date('2026-07-01T00:00:00Z'),
+            },
+          },
+          teamName: '서울 FC',
+          note: null,
+        },
+      ],
+    } as never);
+
+    const presented = presentTournamentDetail(row);
+
+    expect(presented.awards[0].recipientName).toBe('탈퇴 회원');
+  });
+
   // 감사 evidence: `reviews` 배열은 조회 시 take:30으로 잘린다. 시상 화면의 개수
   // 배지가 그 잘린 배열의 length 를 쓰면 31건째부터 실제 후기 수보다 작은 숫자를
   // 계속 보여준다 — reviewsTotalCount 는 반드시 잘리지 않은 _count.reviews 를 그대로

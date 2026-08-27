@@ -34,11 +34,13 @@ function makePrisma() {
     v1GameLineup: {
       findMany: jest.fn().mockResolvedValue([
         // 홈: 대진 생성이 만든 자동 로스터(1) 위에 팀이 두 번 저장(2, 3).
-        { id: 'lineup-home-1', sideId: 'side-home', revision: 1 },
-        { id: 'lineup-home-2', sideId: 'side-home', revision: 2 },
-        { id: 'lineup-home-3', sideId: 'side-home', revision: 3 },
+        // state 는 selectLatestLineupParticipants 의 필수 입력이다 — 제출된
+        // 리비전만 "최신"을 다툰다(DRAFT 는 후보에서 빠진다).
+        { id: 'lineup-home-1', sideId: 'side-home', revision: 1, state: 'SUBMITTED' },
+        { id: 'lineup-home-2', sideId: 'side-home', revision: 2, state: 'SUBMITTED' },
+        { id: 'lineup-home-3', sideId: 'side-home', revision: 3, state: 'SUBMITTED' },
         // 원정: 자동 로스터뿐.
-        { id: 'lineup-away-1', sideId: 'side-away', revision: 1 },
+        { id: 'lineup-away-1', sideId: 'side-away', revision: 1, state: 'SUBMITTED' },
       ]),
     },
     v1Game: { findUnique: jest.fn(), findUniqueOrThrow: jest.fn() },
@@ -415,5 +417,59 @@ describe('LeagueMatchResultEntryService.correctResult 몰수 표식 보존/해�
     const [, , , payload, outcome] = games.createTeamMatchResultCorrection.mock.calls[0];
     expect(payload.reason).toBe('[LEAGUE_RESULT_CORRECTION] [LEAGUE_FORFEIT] 뒤늦게 몰수로 확인됨');
     expect(outcome).toEqual({ outcomeReason: 'FORFEIT', note: '뒤늦게 몰수로 확인됨' });
+  });
+});
+
+// 감사 L-E finding 2 수정: 이의 수락으로 VOID 처리된 결과가 있는 대진도 새 결과 입력을
+// 받아야 한다(recordResultOnce 게이트, league-match-result-entry.service.ts:591-601) —
+// 막아 두면 그 대진은 순위표·완료 판정에서 영원히 미확정으로 남아 시즌 승강 확정이
+// 교착된다(코드 주석 :586-590). recordResult/recordResultOnce는 이 스펙에 추가되기
+// 전엔 이 파일은 물론 통합 스펙에도 커버리지가 없었다.
+describe('LeagueMatchResultEntryService.recordResult — VOID 이전 리비전 재입력 허용', () => {
+  function makeRecordResultGames() {
+    return {
+      createResultRevision: jest.fn().mockResolvedValue({ revisionId: 'rev-new-1', revisionState: 'DRAFT', version: 4 }),
+      submitResultRevision: jest.fn().mockResolvedValue({ revisionState: 'SUBMITTED', version: 5 }),
+      decideResultRevision: jest.fn().mockResolvedValue({ revisionState: 'OFFICIAL', version: 6 }),
+    } as any;
+  }
+
+  it('직전 리비전이 VOID여도 409로 막지 않고 새 결과 입력을 받아들인다', async () => {
+    const prisma = makePrisma();
+    prisma.v1GameResultRevision.findFirst.mockResolvedValue({
+      id: 'rev-void-1',
+      revision: 2,
+      state: 'VOID',
+      reason: '[LEAGUE_RESULT_ENTRY] 이전 결과',
+      score: null,
+    });
+    // 이 테스트의 관심사는 게이트 통과 여부지 참가자 조립 규칙이 아니다 — 라인업·참가자를
+    // 비워 assembleLeagueResultParticipants가 빈 결과(ok:true, [])로 통과하게 한다.
+    prisma.v1GameParticipant.findMany.mockResolvedValue([]);
+    prisma.v1GameLineup.findMany.mockResolvedValue([]);
+    prisma.v1Game.findUniqueOrThrow.mockResolvedValue({
+      competitionConfig: { lineup: { positions: [], formations: [] } },
+    });
+    const games = makeRecordResultGames();
+    const { service } = makeService(prisma, games);
+
+    const result = await service.recordResult(actor, 'league-1', 'tm-1', {
+      homeScore: 2,
+      awayScore: 1,
+      reason: '무효 처리 후 재입력',
+    } as any);
+
+    expect(result).toEqual({
+      teamMatchId: 'tm-1',
+      leagueId: 'league-1',
+      homeScore: 2,
+      awayScore: 1,
+      resultRevisionId: 'rev-new-1',
+      alreadyProcessed: false,
+    });
+    // 게이트를 통과했다는 증거 — create/submit/decide 3단계가 전부 불렸다.
+    expect(games.createResultRevision).toHaveBeenCalledTimes(1);
+    expect(games.submitResultRevision).toHaveBeenCalledTimes(1);
+    expect(games.decideResultRevision).toHaveBeenCalledTimes(1);
   });
 });

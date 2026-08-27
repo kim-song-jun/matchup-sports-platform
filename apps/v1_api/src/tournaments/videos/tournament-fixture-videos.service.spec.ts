@@ -46,11 +46,18 @@ function createHarness(options: {
   videos?: VideoRow[];
   uploadAssets?: { url: string; ownerUserId: string; kind: 'image' | 'video' }[];
   fixtureExists?: boolean;
+  /**
+   * 같은 업로드 URL 을 참조 중인 리그 대진(V1TeamMatchVideo) 행 수. 기본값 0 —
+   * releaseUploadedFile 이 두 테이블을 함께 세는 계약(코드 주석 :281-285)을 검증하려면
+   * 이 값을 1 이상으로 올려야 한다.
+   */
+  teamMatchVideoRefCount?: number;
 }) {
   const assignments = options.assignments ?? [];
   const videos: VideoRow[] = [...(options.videos ?? [])];
   const uploadAssets = [...(options.uploadAssets ?? [])];
   const fixtureExists = options.fixtureExists ?? true;
+  const teamMatchVideoRefCount = options.teamMatchVideoRefCount ?? 0;
 
   const removedUrls: string[] = [];
   const discarded: UploadedFile[][] = [];
@@ -105,9 +112,10 @@ function createHarness(options: {
     },
     // 같은 업로드 URL 을 리그 대진 영상이 아직 참조 중이면 대회 영상 삭제가
     // 파일까지 지워선 안 된다 — 서비스가 두 도메인의 참조 수를 함께 센다.
-    // 이 하네스는 리그 쪽 참조가 없는 상태(0건)를 기본으로 둔다.
+    // 이 하네스는 리그 쪽 참조가 없는 상태(0건)를 기본으로 두되, teamMatchVideoRefCount
+    // 옵션으로 "리그 대진이 아직 참조 중"인 상태를 만들 수 있다.
     v1TeamMatchVideo: {
-      count: jest.fn(async () => 0),
+      count: jest.fn(async () => teamMatchVideoRefCount),
     },
     v1UploadAsset: {
       findUnique: jest.fn(async ({ where }: { where: { url: string } }) =>
@@ -380,6 +388,25 @@ describe('TournamentFixtureVideosService — 삭제와 파일 회수', () => {
 
     await harness.service.deleteVideo(user('director'), tournamentId, fixtureId, 'video-1');
 
+    expect(harness.removedUrls).toEqual([]);
+    expect(harness.uploadAssets).toHaveLength(1);
+  });
+
+  it('같은 업로드 URL을 리그 대진(V1TeamMatchVideo)이 아직 참조하면 파일을 남긴다', async () => {
+    // 대회 쪽(V1TournamentFixtureVideo) 참조는 이 영상 하나뿐이라 지우면 0건이 되지만,
+    // 같은 업로드 URL을 리그 대진 영상이 여전히 참조 중이다(teamMatchVideoRefCount: 1).
+    // releaseUploadedFile은 두 테이블의 참조 수를 합산해서 봐야 한다 — 대회 쪽만 보면
+    // 0건으로 오판해 리그 대진이 아직 쓰는 파일을 지워 그쪽 재생을 영구히 깨뜨린다.
+    const harness = createHarness({
+      assignments: [director],
+      videos: [videoRow()],
+      uploadAssets: [{ url: uploadUrl, ownerUserId: 'director', kind: 'video' }],
+      teamMatchVideoRefCount: 1,
+    });
+
+    await harness.service.deleteVideo(user('director'), tournamentId, fixtureId, 'video-1');
+
+    expect(harness.prisma.v1TeamMatchVideo.count).toHaveBeenCalledWith({ where: { url: uploadUrl } });
     expect(harness.removedUrls).toEqual([]);
     expect(harness.uploadAssets).toHaveLength(1);
   });

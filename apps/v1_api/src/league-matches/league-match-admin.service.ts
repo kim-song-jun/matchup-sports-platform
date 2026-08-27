@@ -338,10 +338,16 @@ export class LeagueMatchAdminService {
       return ids;
     }, {
       // 팀 수 × 주차 수만큼 팀매치·게임·참가자 행을 한 트랜잭션에서 만들어, 대형 리그는
-      // Prisma 기본 timeout(5초)을 쉽게 넘긴다. 레포 선례(mock-tournament-seed 30초,
-      // v1-game-operations-worker의 maxWait 명시)를 따라 넉넉히 잡는다.
-      timeout: 120_000,
-      maxWait: 10_000,
+      // Prisma 기본 timeout(5초)을 쉽게 넘긴다.
+      // **앞단 ALB idle_timeout(60초)보다 낮아야 한다.** 예전 값 120초로는 운영자가 60초에
+      // 504 를 받아 "실패했다"고 믿는 동안 백엔드가 계속 돌아 **그대로 커밋**했다 —
+      // 그 다음 클릭은 "이미 존재" 로 막히고 조가 잠긴다(대회 레인이 같은 이유로 이미
+      // 45+5 로 내렸다: tournaments/league-fixture-generator.service.ts 의
+      // TRANSACTION_TIMEOUT_MS 주석, docs/ops/alb-idle-timeout.md).
+      // 45초 + maxWait 5초 = 최악 50초라 ALB 안에서 끝나고, 만료되면 열려 있던 쓰기는
+      // 전부 롤백돼 운영자가 받는 실패가 실제 실패와 일치한다.
+      timeout: 45_000,
+      maxWait: 5_000,
     });
 
     // 리그 감사 그룹 A / R2: 대진 배정 알림 — 트랜잭션 커밋 후, 대진(수십 건)이 아니라
@@ -841,8 +847,15 @@ export class LeagueMatchAdminService {
       );
       return { cancelledCount, ids, cancelledFixtures };
     }, {
-      timeout: 120_000,
-      maxWait: 10_000,
+      // **앞단 ALB idle_timeout(60초)보다 낮아야 한다.** 예전 값 120초로는 운영자가 60초에
+      // 504 를 받아 "실패했다"고 믿는 동안 백엔드가 계속 돌아 **그대로 커밋**했다 —
+      // 그 다음 클릭은 "이미 존재" 로 막히고 조가 잠긴다(대회 레인이 같은 이유로 이미
+      // 45+5 로 내렸다: tournaments/league-fixture-generator.service.ts 의
+      // TRANSACTION_TIMEOUT_MS 주석, docs/ops/alb-idle-timeout.md).
+      // 45초 + maxWait 5초 = 최악 50초라 ALB 안에서 끝나고, 만료되면 열려 있던 쓰기는
+      // 전부 롤백돼 운영자가 받는 실패가 실제 실패와 일치한다.
+      timeout: 45_000,
+      maxWait: 5_000,
     });
 
     // 리그 감사 그룹 A / R2: 재생성도 새 대진 배정이므로 동일하게 알린다.

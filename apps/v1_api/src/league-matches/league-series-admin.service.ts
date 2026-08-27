@@ -388,6 +388,23 @@ export class LeagueSeriesAdminService {
       });
     }
 
+    // league-match-dispute.service.ts의 resolveDispute는 "승강이 이미 확정된 리그의
+    // 이의는 수락할 수 없다"고 대칭적으로 막는다 — 그 가드만 있고 여기가 비어 있으면,
+    // 열린 이의가 있는 상태에서 운영자가 먼저 승강을 확정해 버릴 수 있고, 그 뒤 그
+    // 이의는 resolveDispute 가드에 걸려 영원히 처리(수락)가 불가능한 409 교착에 빠진다.
+    // 이의를 먼저 처리(수락/거부)하게 하면 순위표와 승강 결정이 항상 같은 시점의
+    // 결과를 기준으로 확정된다.
+    const openDispute = await this.prisma.v1LeagueMatchDispute.findFirst({
+      where: { leagueId: { in: tiers.map((t) => t.leagueId) }, status: 'open' },
+      select: { id: true },
+    });
+    if (openDispute !== null) {
+      throw new ConflictException({
+        code: 'LEAGUE_RESULT_DISPUTE_OPEN',
+        message: '처리되지 않은 이의가 있어요. 이의를 먼저 수락하거나 거부한 뒤 승강을 확정해 주세요.',
+      });
+    }
+
     const rule = this.ruleOf(series);
 
     // preview 이후 어드민이 승강 규칙을 바꿨다면 어드민이 화면에서 보고 승인한 계산과
@@ -702,12 +719,15 @@ export class LeagueSeriesAdminService {
         // 확정 한 번이 승강 이력 + 다음 시즌 리그(최대 3개) + 참가팀 + 감사 로그를 한 묶음으로
         // 처리한다. Prisma 기본값(maxWait 2초 · timeout 5초)으로는 동시 요청이 겹치는 순간
         // 커넥션을 못 잡고 줄줄이 실패했다 — alpha 실측: 동시 6~8건에서 대부분 503.
-        // 같은 파일의 대진 생성(league-match-admin.service.ts)이 같은 이유로 이미
-        // maxWait 10초 · timeout 120초를 쓰고 있어 그 선례를 따른다. 넉넉한 maxWait 는
-        // "빨리 실패"가 아니라 "잠깐 줄 서서 성공"을 택하는 것이다 — 확정은 시즌당 한 번뿐이라
-        // 줄을 서는 편이 재시도를 요구하는 것보다 낫다.
-        maxWait: 10_000,
-        timeout: 120_000,
+        // 다만 **앞단 ALB idle_timeout(60초)** 을 넘겨선 안 된다. 120초로 두면 운영자가
+        // 60초에 504 를 받아 "실패했다"고 믿는 동안 승강이 **그대로 확정**되고, 다시
+        // 누르면 PROMOTION_ALREADY_DECIDED 로 막혀 무슨 일이 일어난 건지 알 수 없다.
+        // 45초 + maxWait 5초 = 최악 50초로 맞춘다(대진 생성·대회 레인과 같은 기준:
+        // tournaments/league-fixture-generator.service.ts, docs/ops/alb-idle-timeout.md).
+        // 줄을 서서 성공한다는 원래 의도는 maxWait 5초로도 유지된다 — 실패 원인이던
+        // Prisma 기본값(2초)보다 여전히 넉넉하다.
+        maxWait: 5_000,
+        timeout: 45_000,
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {

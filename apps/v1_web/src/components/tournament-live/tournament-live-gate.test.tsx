@@ -113,6 +113,30 @@ describe('TournamentLiveGate', () => {
     expect(screen.getByTestId('shell')).toHaveAttribute('data-role', 'PLATFORM_OPS');
   });
 
+  it('내가 활성 배정 행을 여러 개 가지면(예: 옛 SUPPORT_READONLY를 해제하지 않은 채 TOURNAMENT_DIRECTOR로 추가 배정) 최고 권한 행을 role로 선택한다 — 서버 createdAt asc 순서상 가장 먼저 생성된(옛/낮은 권한) 행이 아니다', () => {
+    mocks.useV1TournamentStaffAssignments.mockReturnValue({
+      isPending: false,
+      isError: false,
+      data: {
+        // 서버가 createdAt asc로 정렬해 돌려준다 — 옛 SUPPORT_READONLY 행이 먼저,
+        // 나중에 승격된 TOURNAMENT_DIRECTOR 행이 뒤에 온다. `find`로 첫 행을 집으면
+        // 강등된 권한(SUPPORT_READONLY)이 선택된다.
+        items: [
+          { userId: 'user-me', role: 'SUPPORT_READONLY', revokedAt: null, expiresAt: null },
+          { userId: 'user-me', role: 'TOURNAMENT_DIRECTOR', revokedAt: null, expiresAt: null },
+        ],
+      },
+    });
+
+    render(
+      <TournamentLiveGate tournamentId="t-1">
+        <div>보드 콘텐츠</div>
+      </TournamentLiveGate>,
+    );
+
+    expect(screen.getByTestId('shell')).toHaveAttribute('data-role', 'TOURNAMENT_DIRECTOR');
+  });
+
   it('treats a revoked assignment row as inactive and falls back to PLATFORM_OPS derivation rather than crashing', () => {
     mocks.useV1TournamentStaffAssignments.mockReturnValue({
       isPending: false,

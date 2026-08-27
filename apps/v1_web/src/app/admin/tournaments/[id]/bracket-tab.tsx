@@ -26,6 +26,7 @@ import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-p
 import { formatDate } from './tournament-admin-shared';
 import {
   SimpleModal,
+  datetimeLocalValueToIso,
   inputCls,
   isoToDatetimeLocalValue,
   submitBtnCls,
@@ -173,16 +174,24 @@ export function BracketTab({
   const handleUpdateFixture = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editFixture) return;
-    const changesTeams =
-      editFxHomeRegId !== (editFixture.homeRegistrationId ?? '') ||
-      editFxAwayRegId !== (editFixture.awayRegistrationId ?? '');
+    // 팀 필드는 각각 독립적으로 판단한다 — 홈만 바꾸고 어웨이는 그대로여도 어웨이 필드를
+    // 잘못 건드리지 않기 위해서다. '미정'으로 되돌린 경우(editFx*RegId === '')는 서버 계약대로
+    // null을 명시적으로 보내 배정을 해제한다 — 필드를 아예 빼면(undefined) 서버가 '미변경'으로
+    // 읽어 기존 배정이 그대로 남는다(과거 버그).
+    const homeChanged = editFxHomeRegId !== (editFixture.homeRegistrationId ?? '');
+    const awayChanged = editFxAwayRegId !== (editFixture.awayRegistrationId ?? '');
+    // datetime-local 입력값은 오프셋이 없는 KST 벽시계 문자열이다(isoToDatetimeLocalValue가
+    // Asia/Seoul로 채워 넣는다) — new Date(value).toISOString()로 바로 변환하면 브라우저
+    // 로컬 타임존으로 잘못 해석된다. 대칭 함수 datetimeLocalValueToIso로 KST 오프셋을 고정해야
+    // 값을 안 건드리고 저장만 눌러도 킥오프가 밀리지 않는다.
+    const scheduledAtIso = editFxScheduledAt ? datetimeLocalValueToIso(editFxScheduledAt) : null;
     updateFixture.mutate(
       {
         fixtureId: editFixture.id,
-        ...(editFxScheduledAt ? { scheduledAt: new Date(editFxScheduledAt).toISOString() } : {}),
+        ...(scheduledAtIso ? { scheduledAt: scheduledAtIso } : {}),
         venue: editFxVenue,
-        ...(changesTeams && editFxHomeRegId ? { homeRegistrationId: editFxHomeRegId } : {}),
-        ...(changesTeams && editFxAwayRegId ? { awayRegistrationId: editFxAwayRegId } : {}),
+        ...(homeChanged ? { homeRegistrationId: editFxHomeRegId || null } : {}),
+        ...(awayChanged ? { awayRegistrationId: editFxAwayRegId || null } : {}),
       },
       {
         onSuccess: () => { setEditFixture(null); showToast('경기 정보를 수정했어요.', 'success'); },
@@ -459,23 +468,25 @@ export function BracketTab({
 
   const handleSchedulePublish = async () => {
     if (publishBlockedReason || !publishScheduleInput) return;
-    // datetime-local 은 타임존 표기가 없는 로컬 시각 문자열이라 Date 로 감싸 ISO(UTC)로 바꾼다.
-    const scheduled = new Date(publishScheduleInput);
-    if (Number.isNaN(scheduled.getTime())) {
+    // datetime-local 은 타임존 표기가 없는 KST 벽시계 문자열이다 — new Date(value)로 바로
+    // 감싸면 브라우저 로컬 타임존으로 해석돼 해외/TZ 다른 기기에서 예약 시각이 밀린다
+    // (bracket-tab.tsx 다른 자리와 동일한 계약: datetimeLocalValueToIso로 KST 오프셋 고정).
+    const scheduledIso = datetimeLocalValueToIso(publishScheduleInput);
+    if (!scheduledIso) {
       showToast('공개 예약 시각을 다시 확인해 주세요.', 'error');
       return;
     }
-    if (scheduled.getTime() <= Date.now()) {
+    if (new Date(scheduledIso).getTime() <= Date.now()) {
       showToast('공개 예약 시각은 현재 시각 이후여야 해요.', 'error');
       return;
     }
     const ok = await confirmModal({
       title: '대진표 공개 예약',
-      message: `${formatDate(scheduled.toISOString())}에 대진표가 자동으로 공개돼요. 그 전까지는 계속 수정할 수 있어요.`,
+      message: `${formatDate(scheduledIso)}에 대진표가 자동으로 공개돼요. 그 전까지는 계속 수정할 수 있어요.`,
       confirmLabel: '예약하기',
     });
     if (!ok) return;
-    runPublish(scheduled.toISOString());
+    runPublish(scheduledIso);
   };
 
   const handleUnpublishBracket = async () => {

@@ -57,7 +57,6 @@ export function TeamMatchListPageClient() {
     setSubmittedQuery(initialQuery);
   }, [initialQuery]);
   const sportsQuery = useV1MasterSports();
-  const allQuery = useV1TeamMatches();
   const teamMatchFilters = useMemo(() => {
     const filters: { sportId?: string; query?: string; sort?: 'recommended' | 'deadline' | 'latest'; view?: 'card' | 'compact'; genderRule?: string; levelCodes?: string } = {};
     if (selectedSportId) filters.sportId = selectedSportId;
@@ -68,6 +67,26 @@ export function TeamMatchListPageClient() {
     if (selectedView !== 'card') filters.view = selectedView;
     return Object.keys(filters).length ? filters : undefined;
   }, [selectedGenderRule, selectedLevels, selectedSportId, selectedSort, selectedView, submittedQuery]);
+  // 서버는 20건씩 커서 페이지네이션인데(team-matches.service.ts) 예전엔 이 화면이 단발
+  // useQuery로 첫 페이지만 받아 21번째부터는 볼 방법이 없었다(감사 결함 — matches-client.tsx의
+  // 같은 수정과 동일 패턴, league-matches-list-client.tsx의 "더 보기" 누적 방식을 따른다).
+  const [cursor, setCursor] = useState<string | undefined>(undefined);
+  const [accumulated, setAccumulated] = useState<V1TeamMatch[]>([]);
+  // matches-client.tsx와 동일한 이유로 useEffect가 아니라 렌더 중에 되감는다 — 안 그러면
+  // "새 필터 + 이전 cursor"가 합쳐진 무효 요청이 한 번 나가는 중간 렌더가 생긴다.
+  const teamMatchFiltersKey = teamMatchFilters ? JSON.stringify(teamMatchFilters) : '';
+  const [pagedFiltersKey, setPagedFiltersKey] = useState(teamMatchFiltersKey);
+  if (pagedFiltersKey !== teamMatchFiltersKey) {
+    setPagedFiltersKey(teamMatchFiltersKey);
+    setCursor(undefined);
+    setAccumulated([]);
+  }
+  const allQueryFilters = useMemo(() => (!teamMatchFilters && cursor ? { cursor } : undefined), [teamMatchFilters, cursor]);
+  const filteredQueryFilters = useMemo(
+    () => (teamMatchFilters ? (cursor ? { ...teamMatchFilters, cursor } : teamMatchFilters) : undefined),
+    [teamMatchFilters, cursor],
+  );
+  const allQuery = useV1TeamMatches(allQueryFilters);
   const countFilters = useMemo(() => {
     const filters: { query?: string; genderRule?: string; levelCodes?: string } = {};
     if (selectedGenderRule) filters.genderRule = selectedGenderRule;
@@ -76,7 +95,7 @@ export function TeamMatchListPageClient() {
     return Object.keys(filters).length ? filters : undefined;
   }, [selectedGenderRule, selectedLevels, submittedQuery]);
   const filteredQuery = useV1TeamMatches(
-    teamMatchFilters,
+    filteredQueryFilters,
     { enabled: Boolean(teamMatchFilters) },
   );
   const countQuery = useV1TeamMatches(
@@ -90,9 +109,20 @@ export function TeamMatchListPageClient() {
   if (query.isError) return <TeamMatchStatePageView model={getTeamMatchStateViewModel('error')} />;
 
   const base = getTeamMatchListViewModel();
-  const items = query.data?.items;
+  const pageItems = query.data?.items;
+  const items: V1TeamMatch[] | undefined = pageItems === undefined
+    ? undefined
+    : cursor
+      ? [...accumulated, ...pageItems.filter((item) => !accumulated.some((prev) => (prev.teamMatchId ?? prev.id) === (item.teamMatchId ?? item.id)))]
+      : pageItems;
   const visibleItems = filterTeamMatchesByLevels(items, selectedLevels);
   const countItems = filterTeamMatchesByLevels((countFilters ? countQuery.data?.items ?? allQuery.data?.items : allQuery.data?.items) ?? items, selectedLevels);
+  const hasNext = query.data?.pageInfo?.hasNext ?? false;
+  const handleLoadMore = () => {
+    if (!query.data?.pageInfo?.nextCursor || query.isFetching) return;
+    setAccumulated(items ?? []);
+    setCursor(query.data.pageInfo.nextCursor);
+  };
   const searchModel: NonNullable<TeamMatchListViewModel['search']> = {
     value: searchValue,
     placeholder: '지역, 팀 이름, 경기조건 검색',
@@ -129,6 +159,9 @@ export function TeamMatchListPageClient() {
         }),
         matches: visibleItems.map((item, index) => toTeamMatch(item, base.matches[index] ?? base.matches[0])),
         summary: { ...base.summary, count: visibleItems.length, today: visibleItems.length },
+        hasNext,
+        onLoadMore: handleLoadMore,
+        loadMorePending: query.isFetching,
       }
     : {
         ...base,
@@ -200,6 +233,7 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
   const reopenTeamMatch = useV1ReopenTeamMatch(teamMatchId);
   const cancelTeamMatch = useV1CancelTeamMatch(teamMatchId);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [chatError, setChatError] = useState<string | null>(null);
   const resolveChatRoom = useV1ResolveChatRoom();
   const autoResolvedChatRef = useRef<string | null>(null);
   // 히어로 CTA의 라벨·철회 대상·액션이 함께 나오는 **단일 근거**. 우선순위 자체가 규칙이다.
@@ -226,10 +260,15 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
   const ownTeamId = useMemo(() => resolveOwnTeamId(query.data, myTeamsQuery.data), [query.data, myTeamsQuery.data]);
 
   useEffect(() => {
-    if (!query.data || !canOpenTeamMatchChat(viewerState, getStatus(query.data)) || autoResolvedChatRef.current === teamMatchId) return;
+    if (!query.data || !canOpenTeamMatchChat(canManageHostTeam, canManageOpponentTeam) || autoResolvedChatRef.current === teamMatchId) return;
     autoResolvedChatRef.current = teamMatchId;
-    resolveChatRoom.mutate({ targetType: 'team_match', targetId: teamMatchId });
-  }, [query.data, resolveChatRoom, teamMatchId, viewerState]);
+    resolveChatRoom.mutate(
+      { targetType: 'team_match', targetId: teamMatchId },
+      // 이 자동 resolve는 조용히 실패해도 된다(다시 열면 재시도되고, 배너까지 띄우면
+      // 페이지 진입만으로 매번 에러가 뜬다) — 그래도 삼키지 않고 로그는 남긴다.
+      { onError: (e) => console.warn('team match chat auto-resolve failed', e) },
+    );
+  }, [query.data, resolveChatRoom, teamMatchId, canManageHostTeam, canManageOpponentTeam]);
 
   if (query.isError) return <TeamMatchStatePageView model={getTeamMatchStateViewModel('error')} />;
 
@@ -292,13 +331,20 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
         resultAction: buildResultAction(teamMatchId, getStatus(query.data), canManageHostTeam, canManageOpponentTeam),
         reviewAction: buildReviewAction(teamMatchId, getStatus(query.data), isParticipantMember),
         statusLabel: statusLabel(viewerState, getStatus(query.data)),
-        chatLabel: chatLabel(viewerState, getStatus(query.data)),
+        chatLabel: chatLabel(canManageHostTeam, canManageOpponentTeam),
         chatPending: resolveChatRoom.isPending,
-        onChat: canOpenTeamMatchChat(viewerState, getStatus(query.data))
-          ? () => resolveChatRoom.mutate(
-              { targetType: 'team_match', targetId: teamMatchId },
-              { onSuccess: (room) => router.push(chatRoomHref(room.roomId, room.route)) },
-            )
+        chatError,
+        onChat: canOpenTeamMatchChat(canManageHostTeam, canManageOpponentTeam)
+          ? () => {
+              setChatError(null);
+              resolveChatRoom.mutate(
+                { targetType: 'team_match', targetId: teamMatchId },
+                {
+                  onSuccess: (room) => router.push(chatRoomHref(room.roomId, room.route)),
+                  onError: (e) => setChatError(extractErrorMessage(e, '채팅방을 열지 못했어요. 다시 시도해 주세요.')),
+                },
+              );
+            }
           : undefined,
         onShare: () => shareTeamMatch(query.data),
         onNotify: () => router.push('/notifications'),
@@ -589,12 +635,20 @@ function statusLabel(viewerState: V1TeamMatchViewerState, status: V1TeamMatchApi
   return '신청 가능';
 }
 
-function chatLabel(viewerState: V1TeamMatchViewerState, status: V1TeamMatchApiStatus) {
-  return canOpenTeamMatchChat(viewerState, status) ? '채팅' : '승인 후 채팅';
+function chatLabel(canManageHostTeam: boolean, canManageOpponentTeam: boolean) {
+  return canOpenTeamMatchChat(canManageHostTeam, canManageOpponentTeam) ? '채팅' : '승인 후 채팅';
 }
 
-function canOpenTeamMatchChat(viewerState: V1TeamMatchViewerState, _status: V1TeamMatchApiStatus) {
-  return viewerState === 'approved' || viewerState === 'host_team';
+/**
+ * 서버 assertCanUseTeamMatchChat(chat.service.ts)과 정확히 같은 기준 — 양 팀
+ * owner/manager. 예전엔 `viewerState === 'approved'` 를 썼는데, 그 값은 "신청서를 낸
+ * 사람 한 명"만 통과한다. 리그 대진의 신청서는 운영자가 대신 내기 때문에(원정팀
+ * appliedByUserId가 운영자로 남는다) 원정팀 owner/manager는 영원히 이 값을 얻지 못해
+ * 채팅 버튼 자체가 안 보였다. manageableHostTeam/manageableOpponentTeam은 팀
+ * 멤버십(owner/manager)만으로 판정해 서버 권한과 정확히 일치한다.
+ */
+function canOpenTeamMatchChat(canManageHostTeam: boolean, canManageOpponentTeam: boolean) {
+  return canManageHostTeam || canManageOpponentTeam;
 }
 
 function buildHostActions({

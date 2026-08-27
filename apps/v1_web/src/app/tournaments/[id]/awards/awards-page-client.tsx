@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Star, ImagePlus, X, Trophy, Medal } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
+import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { useEffect, useRef, useState } from 'react';
 import {
   useV1Tournament,
@@ -430,6 +431,19 @@ export function ReviewFormModal({
   const { mutate, isPending } = useV1SubmitTournamentReview(tournamentId);
   const uploadImages = useV1UploadImages();
 
+  // focus 저장·복원(WCAG 2.4.3) / 첫 컨트롤 포커스 / ESC 닫기 / Tab focus trap /
+  // 배경 스크롤 잠금 — 공용 훅. 이 컴포넌트는 조건부 마운트형(부모의 `{showForm && ...}`)
+  // 이라 open은 항상 true고, 언마운트가 곧 "닫힘"이다 — 훅 자체가 cleanup 기반이라 이
+  // 패턴을 지원한다(훅 주석의 LogDetailModal 선례). 제출 중(isPending)에는 ESC·backdrop
+  // 닫기를 잠가 입력을 잃지 않게 한다 — 대회 도메인 형제 모달(my-registration-client.tsx
+  // CancelModal 등)과 동일 규약. (감사 evidence: 이 폼만 ESC·focus trap·포커스 복원·
+  // 스크롤 잠금이 전부 없어 프로젝트 모달 a11y 기준에서 어긋나 있었다.)
+  const { dialogRef, onBackdropClick } = useModalA11y({
+    open: true,
+    onClose,
+    pending: isPending,
+  });
+
   const handlePickPhotos = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     setPhotoError(null);
@@ -479,15 +493,21 @@ export function ReviewFormModal({
   };
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="리뷰 작성" style={{
+    <div style={{
       position: 'fixed', inset: 0, zIndex: 'var(--z-top)',
       background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-    }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={{
-        width: '100%', maxWidth: 480, background: 'var(--background)',
-        borderRadius: '16px 16px 0 0', padding: '24px 20px',
-        paddingBottom: 'max(24px, env(safe-area-inset-bottom))',
-      }}>
+    }} onClick={onBackdropClick}>
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="리뷰 작성"
+        style={{
+          width: '100%', maxWidth: 480, background: 'var(--background)',
+          borderRadius: '16px 16px 0 0', padding: '24px 20px',
+          paddingBottom: 'max(24px, env(safe-area-inset-bottom))',
+        }}
+      >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text-strong)' }}>대회 후기 작성</h3>
           <button type="button" onClick={onClose} style={{ display: 'inline-flex', background: 'none', border: 'none', padding: 4, cursor: 'pointer', color: 'var(--text-muted)' }} aria-label="닫기"><X size={20} /></button>
@@ -717,8 +737,12 @@ function ReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <h3 className="tm-hub-section-title" style={{ margin: 0 }}>참가팀 후기</h3>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            {reviews.length > 0 && (
-              <span style={{ fontSize: 12, color: 'var(--text-caption)' }}>{reviews.length}개</span>
+            {/* 배지는 잘리지 않은 전체 후기 개수(reviewsTotalCount)를 쓴다 —
+                reviews 배열 자체는 서버가 take:30으로 자르므로, 31건째부터
+                array.length는 `/tournaments/:id/reviews` 전용 목록의 total과
+                어긋나게 된다(감사 evidence). */}
+            {tournament.reviewsTotalCount > 0 && (
+              <span style={{ fontSize: 12, color: 'var(--text-caption)' }}>{tournament.reviewsTotalCount}개</span>
             )}
             {canWrite && (
               <button
@@ -864,8 +888,12 @@ function AwardsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
       {!isCompleted && (
         <div style={{ padding: '20px 20px 0' }}>
           <NotCompletedNotice status={tournament.status} />
-          {/* 진행 중에도 상금 정보는 표시 */}
-          {tournament.prizeSummary && <PrizeSection tournament={tournament} top3={top3} />}
+          {/* 진행 중에도 상금 정보는 표시 — hasPrizeData()는 prizeSummary(자유 문구) 뿐 아니라
+              prizePool·prizeBreakdown도 인정한다(완료 분기의 showPrizeColumn과 동일 판정).
+              여기만 prizeSummary 존재만 봤다면, 운영자가 prizePool+prizeBreakdown만 채우고
+              prizeSummary를 비운 흔한 조합에서 대회가 completed로 바뀌기 전까지 총 상금·
+              순위별 배분이 화면에 전혀 안 보이는 모순이 생긴다(감사 evidence). */}
+          {hasPrizeData(tournament) && <PrizeSection tournament={tournament} top3={top3} />}
         </div>
       )}
 

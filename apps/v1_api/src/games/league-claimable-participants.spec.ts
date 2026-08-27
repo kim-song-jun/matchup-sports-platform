@@ -15,8 +15,13 @@ import { GamesService } from './games.service';
  * 2. **인가는 participant_identity 스코프 재사용** — 두 참가팀의 활성 멤버가 아니면
  *    403. 새 인가 규칙을 만들지 않고 resolveActor 의 team-match 분기를 그대로 탄다.
  * 3. **이미 연결된 참가자는 목록에서 뺀다** — 남의 연결을 빼앗는 신호를 애초에 안 만든다.
+ * 4. **사이드별 최신 라인업 리비전만 노출한다**(2026-08-27 감사 결함 수정) — 라인업을
+ *    재저장하면 옛 리비전 참가자 행이 삭제되지 않고 그대로 남는데, 예전 코드는 gameId 로만
+ *    걸러 그 폐기된 리비전의 동명이인까지 목록에 얹었다. 그 행에 연결하면 공식 결과가
+ *    최신 participantId 로만 쓰여 개인 기록이 영원히 안 뜬다 — 최신 리비전만 남기는
+ *    selectLatestLineupParticipants 스코프를 여기서도 고정한다.
  *
- * 대회 판(listClaimableParticipants)과 공통 본문을 공유하므로, 3번은 공통 헬퍼의
+ * 대회 판(listClaimableParticipants)과 공통 본문을 공유하므로, 3·4번은 공통 헬퍼의
  * 회귀 방지도 겸한다.
  */
 describe('GamesService.listLeagueClaimableParticipants', () => {
@@ -25,6 +30,7 @@ describe('GamesService.listLeagueClaimableParticipants', () => {
   function makeService(overrides: {
     teamMatch?: unknown;
     memberships?: unknown[];
+    lineups?: unknown[];
     participants?: unknown[];
     linked?: unknown[];
   }) {
@@ -44,6 +50,9 @@ describe('GamesService.listLeagueClaimableParticipants', () => {
       },
       v1TeamMembership: {
         findMany: jest.fn().mockResolvedValue(overrides.memberships ?? []),
+      },
+      v1GameLineup: {
+        findMany: jest.fn().mockResolvedValue(overrides.lineups ?? []),
       },
       v1GameParticipant: {
         findMany: jest.fn().mockResolvedValue(overrides.participants ?? []),
@@ -104,9 +113,10 @@ describe('GamesService.listLeagueClaimableParticipants', () => {
     const { service } = makeService({
       teamMatch: { game: { id: 'game-1', version: 4 } },
       memberships: [{ teamId: 'team-host', role: 'member' }],
+      lineups: [{ id: 'lineup-1', sideId: 's-1', revision: 1 }],
       participants: [
-        { id: 'p-1', sideId: 's-1', displayNameSnapshot: '김민준', jerseyNumber: 7 },
-        { id: 'p-2', sideId: 's-1', displayNameSnapshot: '이서준', jerseyNumber: null },
+        { id: 'p-1', sideId: 's-1', lineupId: 'lineup-1', displayNameSnapshot: '김민준', jerseyNumber: 7 },
+        { id: 'p-2', sideId: 's-1', lineupId: 'lineup-1', displayNameSnapshot: '이서준', jerseyNumber: null },
       ],
       linked: [{ participantId: 'p-2' }],
     });
@@ -119,6 +129,38 @@ describe('GamesService.listLeagueClaimableParticipants', () => {
       version: 4,
       participants: [
         { participantId: 'p-1', sideId: 's-1', displayName: '김민준', jerseyNumber: 7 },
+      ],
+    });
+  });
+
+  it('라인업을 재저장해 폐기된 리비전의 동명이인은 목록에서 빠진다', async () => {
+    // 리그 대진 참가자 생성 → 매니저가 라인업을 한 번 재저장 → revision 1(폐기)과
+    // revision 2(현재)에 각각 등번호 7번 '김민준' 행이 생긴 상태를 재현한다.
+    // v1GameParticipant.delete 경로가 없어 revision 1 행은 그대로 남는다
+    // (team-match-lineup.service.ts saveLineup).
+    const { service } = makeService({
+      teamMatch: { game: { id: 'game-1', version: 6 } },
+      memberships: [{ teamId: 'team-host', role: 'member' }],
+      lineups: [
+        { id: 'lineup-1', sideId: 's-1', revision: 1 },
+        { id: 'lineup-2', sideId: 's-1', revision: 2 },
+      ],
+      participants: [
+        { id: 'p-stale', sideId: 's-1', lineupId: 'lineup-1', displayNameSnapshot: '김민준', jerseyNumber: 7 },
+        { id: 'p-current', sideId: 's-1', lineupId: 'lineup-2', displayNameSnapshot: '김민준', jerseyNumber: 7 },
+      ],
+      linked: [],
+    });
+
+    await expect(
+      service.listLeagueClaimableParticipants(user, 'league-1', 'tm-1'),
+    ).resolves.toEqual({
+      gameId: 'game-1',
+      version: 6,
+      // 폐기된 revision 1의 'p-stale'은 나오지 않는다 — 골랐다면 공식 결과가 절대
+      // 매칭되지 않는 participantId였다.
+      participants: [
+        { participantId: 'p-current', sideId: 's-1', displayName: '김민준', jerseyNumber: 7 },
       ],
     });
   });

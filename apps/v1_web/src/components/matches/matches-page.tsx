@@ -8,6 +8,7 @@ import { Card, EmptyState, InfoRow, ListItem } from '@/components/v1-ui/primitiv
 import { Button } from '@/components/v1-ui/button';
 import { ChevronLeftIcon, FilterIcon, HomeIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { NotificationBellButton } from '@/components/v1-ui/notification-bell';
+import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { cssUrl } from '@/lib/assets';
 import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
 import { CreateField, DraggableFilterSheet, FieldErrorText, GenderRuleSelector, MissingFieldsBanner, RecentVenueChips } from '@/components/v1-ui/create-form-fields';
@@ -123,7 +124,12 @@ export function MatchListPageView({ model }: { model: MatchListViewModel }) {
           {/* #21 + [P1 tabular-nums]: '모집 중 N' 숫자 weight700 + tabular-nums */}
           <div className="tm-text-caption tab-num">{model.summary.count}개 · 오늘 {model.summary.today} · 모집 중 <strong style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{model.summary.urgent}</strong></div>
         </div>
-        {model.matches.length ? (
+        {/* team-matches-page.tsx #5와 동일 — 로딩 중(isLoading)엔 PageSkeleton, 완료 후
+            비어 있으면 EmptyState. 이 분기 없이는 필터를 바꿔 새 쿼리가 도는 동안에도
+            "조건에 맞는 매치가 없어요"가 잠깐 뜬다(실제로는 아직 응답을 못 받은 상태). */}
+        {model.isLoading ? (
+          <PageSkeleton />
+        ) : model.matches.length ? (
           <div className="tm-match-card-stack">
             {model.matches.map((match) => <MatchCardItem key={match.id} match={match} />)}
           </div>
@@ -135,6 +141,19 @@ export function MatchListPageView({ model }: { model: MatchListViewModel }) {
              pattern already used by teams-page.tsx / team-matches-page.tsx / tournaments page.tsx. */
           <EmptyState title="조건에 맞는 매치가 없어요" sub="다른 종목을 선택하거나 전체 매치로 돌아가면 모집 중인 매치를 볼 수 있어요." />
         )}
+        {/* 서버는 20건씩 커서로 자르는데(matches.service.ts) 예전엔 여기서 더 볼 방법이
+            없었다(감사 결함) — league-matches-list-client.tsx와 같은 "더 보기" 누적 패턴. */}
+        {!model.isLoading && model.hasNext ? (
+          <button
+            type="button"
+            className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
+            style={{ marginTop: 16 }}
+            disabled={model.loadMorePending}
+            onClick={model.onLoadMore}
+          >
+            {model.loadMorePending ? '불러오는 중…' : '더 보기'}
+          </button>
+        ) : null}
       </div>
       {model.filterSheet?.open ? <MatchFilterSheet model={model} /> : null}
     </AppChrome>
@@ -961,7 +980,7 @@ function PlaceTimeFields({ model }: { model: MatchCreateViewModel }) {
         <CreateField label="종료 시간" value={draft.endTime} type="time" onChange={(value) => model.form?.onFieldChange('endTime', value)} />
       </div>
       <div className="tm-create-two-col">
-        <CreateField label="신청 마감일" value={draft.deadlineDate} type="date" onChange={(value) => model.form?.onFieldChange('deadlineDate', value)} />
+        <CreateField id="field-deadlineDate" error={errors?.deadlineDate} label="신청 마감일" value={draft.deadlineDate} type="date" onChange={(value) => model.form?.onFieldChange('deadlineDate', value)} />
         <CreateField id="field-deadlineTime" error={errors?.deadlineTime} label="신청 마감시간" value={draft.deadlineTime} type="time" onChange={(value) => model.form?.onFieldChange('deadlineTime', value)} />
       </div>
       <div className="tm-text-caption" style={{ marginTop: 8 }}>둘 다 비워두면 경기 시작 전까지 신청을 받아요.</div>
@@ -987,7 +1006,8 @@ function ConfirmStep({ model }: { model: MatchCreateViewModel }) {
   const draft = model.draft;
   const regionName = model.form?.regions.find((region) => region.id === model.form?.regionId)?.name ?? '지역 선택 필요';
   const deadlineText = draft.deadlineDate && draft.deadlineTime ? `${draft.deadlineDate} ${draft.deadlineTime}` : '경기 시작 전까지';
-  return <div><h1 className="tm-text-heading">입력한 내용을 확인해 주세요</h1><Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}><div className="tm-create-image-preview" style={{ backgroundImage: cssUrl(draft.image) }} /><div style={{ padding: 16 }}><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{model.selectedSport}</span><span className="tm-badge tm-badge-grey">{draft.minLevel}-{draft.maxLevel}</span><span className="tm-badge tm-badge-grey">{draft.gender}</span></div><div className="tm-text-subhead" style={{ marginTop: 12 }}>{draft.title}</div><div className="tm-text-caption" style={{ marginTop: 8 }}>{draft.description}</div></div></Card><Card pad={16} style={{ marginTop: 12 }}><InfoRow label="지역" value={regionName} sub="검색·추천에 사용돼요" /><InfoRow label="일시" value={`${draft.date} ${draft.startTime}-${draft.endTime}`} /><InfoRow label="신청 마감" value={deadlineText} /><InfoRow label="장소" value={draft.venue} sub={draft.address} /><InfoRow label="인원" value={`최대 ${draft.capacity}명`} /><InfoRow label="이미지" value="대표 이미지" sub="목록과 상세 화면에 표시돼요" /></Card></div>;
+  const timeRangeText = draft.endTime ? `${draft.date} ${draft.startTime}-${draft.endTime}` : `${draft.date} ${draft.startTime}`;
+  return <div><h1 className="tm-text-heading">입력한 내용을 확인해 주세요</h1><Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}><div className="tm-create-image-preview" style={{ backgroundImage: cssUrl(draft.image) }} /><div style={{ padding: 16 }}><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{model.selectedSport}</span><span className="tm-badge tm-badge-grey">{draft.minLevel}-{draft.maxLevel}</span><span className="tm-badge tm-badge-grey">{draft.gender}</span></div><div className="tm-text-subhead" style={{ marginTop: 12 }}>{draft.title}</div><div className="tm-text-caption" style={{ marginTop: 8 }}>{draft.description}</div></div></Card><Card pad={16} style={{ marginTop: 12 }}><InfoRow label="지역" value={regionName} sub="검색·추천에 사용돼요" /><InfoRow label="일시" value={timeRangeText} /><InfoRow label="신청 마감" value={deadlineText} /><InfoRow label="장소" value={draft.venue} sub={draft.address} /><InfoRow label="인원" value={`최대 ${draft.capacity}명`} /><InfoRow label="이미지" value="대표 이미지" sub="목록과 상세 화면에 표시돼요" /></Card></div>;
 }
 
 function MatchComplete({ model }: { model: MatchCreateViewModel }) {

@@ -328,6 +328,10 @@ export function presentTournamentDetail(
       photoUrls: review.photoUrls,
       createdAt: review.createdAt.toISOString(),
     })),
+    // `reviews` 배열은 take:30으로 잘려 있다 — 개수 배지는 이 잘리지 않은 전체
+    // 카운트를 써야 `/tournaments/:id/reviews` 전용 목록 화면의 total과 일치한다
+    // (감사 evidence: 두 화면이 31건째부터 서로 다른 숫자를 보여줌).
+    reviewsTotalCount: row._count.reviews,
     awards: (row.awards ?? []).map((award) => ({
       id: award.id,
       awardType: award.awardType,

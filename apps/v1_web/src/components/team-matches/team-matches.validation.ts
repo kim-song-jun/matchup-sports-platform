@@ -68,6 +68,22 @@ const RULES: Array<{
       return startsAt > new Date();
     },
   },
+  // 마감일·마감시간은 "둘 다 비움(마감 없음)" 또는 "둘 다 채움" 두 상태만 유효하다.
+  // 한쪽만 채우면 parseDeadlineAt이 null을 반환해 deadlineAt=null(마감 없음)로 조용히
+  // 저장되는데, 호스트는 방금 고른 날짜/시간이 반영됐다고 믿는다 — 결측 필드로 명시 안내한다.
+  // (개인 매치 쪽 matches.validation.ts 와 같은 규칙 — 같은 결함이 양쪽에 있었다.)
+  {
+    field: 'deadlineDate',
+    label: '신청 마감일도 입력해 주세요',
+    step: 'place-time',
+    isSatisfied: (ctx) => !(ctx.draft.deadlineTime && !ctx.draft.deadlineDate),
+  },
+  {
+    field: 'deadlineTime',
+    label: '신청 마감시간도 입력해 주세요',
+    step: 'place-time',
+    isSatisfied: (ctx) => !(ctx.draft.deadlineDate && !ctx.draft.deadlineTime),
+  },
   {
     field: 'deadlineTime',
     label: '신청 마감은 시작 시간보다 빨라야 해요',

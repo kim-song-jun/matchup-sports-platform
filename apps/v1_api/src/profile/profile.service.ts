@@ -1028,7 +1028,17 @@ export class ProfileService {
     return { hidden: profile.playerCardHidden };
   }
 
-  logout() {
+  async logout(user: V1AuthUser | undefined) {
+    // 세션 쿠키 무효화(V1SessionLogoutInterceptor)와 별개로, 이 기기에 남아있는
+    // 웹 푸시 구독도 함께 정리한다 — 안 하면 로그아웃한 계정 앞으로 오는 알림(채팅
+    // 원문 포함)이 이 기기에 계속 도착하고, 다음 로그인 사용자는 서버 구독이
+    // 없는데도 브라우저 pushManager 구독이 남아 있어 '켜짐'으로 잘못 보인다.
+    // 브라우저 쪽 pushManager.unsubscribe()는 프론트(logout-button)가 별도로
+    // best-effort 호출한다 — 여기서는 서버 레코드만 확실히 지운다(탭 종료·
+    // 네트워크 유실로 프론트 호출이 안 가도 이 경로는 세션 쿠키가 유효한 한 항상 탄다).
+    if (user) {
+      await this.prisma.v1PushSubscription.deleteMany({ where: { userId: user.id } });
+    }
     return { ok: true };
   }
 

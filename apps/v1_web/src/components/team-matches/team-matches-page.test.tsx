@@ -48,6 +48,34 @@ describe('team match images', () => {
   });
 });
 
+// 20건 컷오프 페이지네이션 결함 회귀 방지(2026-08-27 감사) — matches-page.test.tsx의
+// 동일 계열 테스트와 짝을 이룬다.
+describe('TeamMatchListPageView — 더 보기 (20건 컷오프 페이지네이션)', () => {
+  it('hasNext=true면 "더 보기" 버튼을 보여준다', () => {
+    const onLoadMore = vi.fn();
+    const model = { ...getTeamMatchListViewModel(), hasNext: true, onLoadMore };
+    renderPage(<TeamMatchListPageView model={model} />);
+
+    const button = screen.getByRole('button', { name: '더 보기' });
+    fireEvent.click(button);
+    expect(onLoadMore).toHaveBeenCalledTimes(1);
+  });
+
+  it('hasNext가 없으면(마지막 페이지) "더 보기" 버튼이 없다', () => {
+    const model = { ...getTeamMatchListViewModel(), hasNext: false };
+    renderPage(<TeamMatchListPageView model={model} />);
+
+    expect(screen.queryByRole('button', { name: '더 보기' })).not.toBeInTheDocument();
+  });
+
+  it('loadMorePending 중에는 버튼이 "불러오는 중…"으로 바뀌고 비활성화된다', () => {
+    const model = { ...getTeamMatchListViewModel(), hasNext: true, onLoadMore: vi.fn(), loadMorePending: true };
+    renderPage(<TeamMatchListPageView model={model} />);
+
+    expect(screen.getByRole('button', { name: '불러오는 중…' })).toBeDisabled();
+  });
+});
+
 describe('team match full edit', () => {
   it('shows immutable team context and every mutable field, including the cover image', () => {
     const model = getTeamMatchCreateViewModel('edit');
@@ -172,6 +200,63 @@ describe('경기 조건 — 값이 없는 항목', () => {
 
     expect(screen.getByText('5:5')).toBeInTheDocument();
     expect(screen.getByText('빨강')).toBeInTheDocument();
+  });
+});
+
+describe('팀매치 만들기 confirm 단계 — 마지막 행 표기 결함', () => {
+  it('상세 주소가 아니라 장소를 라벨로 값을 보여주고, 상세 주소는 sub로 노출한다', () => {
+    const model = getTeamMatchCreateViewModel('confirm');
+    model.draft = { ...model.draft, venue: '잠실 풋살파크 A구장', address: '서울 송파구 올림픽로 25, 3층 2번 코트' };
+
+    renderPage(<TeamMatchCreatePageView model={model} />);
+
+    expect(screen.getByText('장소')).toBeInTheDocument();
+    expect(screen.getByText('잠실 풋살파크 A구장')).toBeInTheDocument();
+    expect(screen.getByText('서울 송파구 올림픽로 25, 3층 2번 코트')).toBeInTheDocument();
+    expect(screen.queryByText('상세 주소')).not.toBeInTheDocument();
+  });
+
+  it('종료 시간이 비어 있으면 하이픈 없이 시작 시간까지만 보여준다', () => {
+    const model = getTeamMatchCreateViewModel('confirm');
+    model.draft = { ...model.draft, date: '2026-09-05', startTime: '18:00', endTime: '' };
+
+    renderPage(<TeamMatchCreatePageView model={model} />);
+
+    expect(screen.getByText('2026-09-05 18:00')).toBeInTheDocument();
+    expect(screen.queryByText('2026-09-05 18:00-')).not.toBeInTheDocument();
+  });
+});
+
+describe('경기방식 프리셋 — 축구/풋살 외 종목은 축구 포맷으로 폴백하지 않는다', () => {
+  it('러닝 팀은 11:11류 축구 프리셋 칩이 뜨지 않는다(직접입력만 남는다)', () => {
+    const model = getTeamMatchCreateViewModel('condition');
+    model.selectedSport = '러닝';
+
+    renderPage(<TeamMatchCreatePageView model={model} />);
+
+    expect(screen.queryByRole('button', { name: '11:11' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '9:9' })).not.toBeInTheDocument();
+    // 경기방식 칩 그룹 안에는 '직접입력' 버튼만 남아야 한다.
+    expect(screen.getByRole('group', { name: '경기방식' })).toBeInTheDocument();
+  });
+
+  it('축구 팀은 여전히 축구 프리셋(11:11 등)을 보여준다', () => {
+    const model = getTeamMatchCreateViewModel('condition');
+    model.selectedSport = '축구';
+
+    renderPage(<TeamMatchCreatePageView model={model} />);
+
+    expect(screen.getByRole('button', { name: '11:11' })).toBeInTheDocument();
+  });
+
+  it('풋살 팀은 여전히 풋살 프리셋(5:5 등)을 보여준다', () => {
+    const model = getTeamMatchCreateViewModel('condition');
+    model.selectedSport = '풋살';
+
+    renderPage(<TeamMatchCreatePageView model={model} />);
+
+    expect(screen.getByRole('button', { name: '5:5' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '11:11' })).not.toBeInTheDocument();
   });
 });
 

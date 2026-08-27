@@ -40,8 +40,12 @@ export function useV1PushRegistration(): V1PushRegistration {
 
   useEffect(() => {
     if (!supported) return;
-    navigator.serviceWorker.ready
-      .then((registration) => registration.pushManager.getSubscription())
+    // `ready` 가 아니라 `getRegistration()` 이어야 한다 — 아래 unsubscribe 의 주석 참고.
+    // 이 자리에서는 매달린 프로미스라 화면이 멈추진 않지만, 등록이 없는 브라우저에서
+    // 상태 확인이 조용히 영원히 보류되는 것은 같다.
+    navigator.serviceWorker
+      .getRegistration()
+      .then((registration) => registration?.pushManager.getSubscription() ?? null)
       .then((subscription) => setIsSubscribed(subscription !== null))
       .catch((err) => {
         reportClientError({
@@ -68,7 +72,9 @@ export function useV1PushRegistration(): V1PushRegistration {
       // registration the worker is still installing, and pushManager.subscribe()
       // throws "no active Service Worker" if called before it activates. Wait for
       // navigator.serviceWorker.ready (resolves once *this page* has an active
-      // controller), matching the pattern already used in unsubscribe() below.
+      // controller). 여기서는 바로 위에서 register() 를 부른 뒤라 등록이 반드시
+      // 존재하므로 ready 가 안전하다 — 등록이 없을 수 있는 unsubscribe() 쪽은
+      // getRegistration() 을 쓴다(그 주석 참고).
       await navigator.serviceWorker.register('/sw-push.js');
       const registration = await navigator.serviceWorker.ready;
       const subscription = await registration.pushManager.subscribe({
@@ -98,8 +104,15 @@ export function useV1PushRegistration(): V1PushRegistration {
 
     setIsPending(true);
     try {
-      const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.getSubscription();
+      // `navigator.serviceWorker.ready` 를 쓰면 안 된다: 이 앱은 서비스워커를
+      // subscribe() 안에서만 등록하므로(이 파일의 register 호출이 유일하다), 푸시를
+      // 켠 적 없는 브라우저에는 등록 자체가 없다. 그때 `ready` 는 reject 하는 게
+      // 아니라 **영원히 미결**로 남는다 — 호출부의 .catch 로도 못 잡는다. 로그아웃이
+      // 이 프로미스를 기다린 뒤 리다이렉트하므로(logout-button.tsx), 푸시를 안 쓴
+      // 대다수 사용자의 로그아웃이 그대로 멈춰 선다.
+      // `getRegistration()` 은 등록이 없으면 undefined 로 **항상 결정**된다.
+      const registration = await navigator.serviceWorker.getRegistration();
+      const subscription = registration ? await registration.pushManager.getSubscription() : null;
       if (!subscription) {
         setIsSubscribed(false);
         return;

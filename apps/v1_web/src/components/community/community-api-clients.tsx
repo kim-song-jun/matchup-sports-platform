@@ -20,6 +20,7 @@ import { ChatListPageView, ChatRoomPageView, NotificationsPageView } from './com
 import { formatChatListTimestamp } from './chat-message-time';
 import type { ChatListViewModel, ChatRoomModel, ChatRoomViewModel, NotificationModel, NotificationsViewModel } from './community.types';
 import { getChatRoomViewModel } from './community.view-model';
+import { chatRoomTypeLabel } from '@/lib/chat-route';
 
 type ChatCategory = ChatRoomModel['type'] | '전체';
 
@@ -27,6 +28,7 @@ const CHAT_AVATARS = {
   개인매치: '/mock/profile/profile-01.svg',
   팀매치: '/mock/profile/profile-03.svg',
   팀: '/mock/profile/profile-02.svg',
+  팀컨택: '/mock/profile/profile-02.svg',
 } satisfies Record<ChatRoomModel['type'], string>;
 
 export function ChatListPageClient() {
@@ -49,7 +51,7 @@ function useChatListPageModel(): ChatListViewModel {
     // onToggleMute: () => updateMe.mutate({ roomId: room.id, mutedUntil: room.muted ? null : mutedUntilIndefinite() }),
   }));
   const visibleRooms = selectedCategory === '전체' ? rooms : rooms.filter((room) => room.type === selectedCategory);
-  const categories: ChatCategory[] = ['전체', '개인매치', '팀매치', '팀'];
+  const categories: ChatCategory[] = ['전체', '개인매치', '팀매치', '팀', '팀컨택'];
   const isEmpty = visibleRooms.length === 0;
   const model: ChatListViewModel = {
     categories: categories.map((category) => ({
@@ -63,7 +65,7 @@ function useChatListPageModel(): ChatListViewModel {
     status: query.isPending ? 'loading' : query.isError ? 'error' : 'ready',
     emptyTitle: query.isError ? '채팅방을 불러오지 못했어요' : isEmpty ? `${selectedCategory} 채팅방이 없어요` : undefined,
     emptyBody: query.isError ? '잠시 후 다시 시도해 주세요.' : isEmpty ? '매치에 참가하거나 팀에 가입하면 채팅방이 생겨요.' : undefined,
-    emptyHref: query.isError || selectedCategory === '팀' ? undefined : '/matches',
+    emptyHref: query.isError || selectedCategory === '팀' || selectedCategory === '팀컨택' ? undefined : '/matches',
     onRetry: query.isError ? () => query.refetch() : undefined,
   };
 
@@ -96,7 +98,7 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
     context: room.data
       ? {
           title: room.data.linkedTarget.title,
-          sub: room.data.roomType === 'match' ? '개인매치 채팅' : room.data.roomType === 'team' ? '팀 채팅' : '팀매치 채팅',
+          sub: `${chatRoomTypeLabel(room.data.roomType)} 채팅`,
           href: room.data.linkedTarget.route ?? '/chat',
         }
       : isLoading
@@ -182,7 +184,7 @@ export function NotificationsPageClient() {
 }
 
 function toChatRoomModel(room: V1ChatRoom): ChatRoomModel {
-  const type = room.roomType === 'match' ? '개인매치' : room.roomType === 'team' ? '팀' : '팀매치';
+  const type = chatRoomTypeLabel(room.roomType);
   return {
     id: room.roomId,
     title: room.title,

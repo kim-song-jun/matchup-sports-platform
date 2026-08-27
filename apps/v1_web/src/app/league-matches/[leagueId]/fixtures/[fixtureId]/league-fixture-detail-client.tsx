@@ -184,9 +184,12 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
     viewer?.manageableHostTeam === true ||
     viewer?.manageableOpponentTeam === true ||
     viewer?.participantMember === true;
-  // 채팅 개설 권한은 기존 팀매치 상세와 같은 기준(host_team/approved)을 유지한다 —
-  // 서버 resolve 가 그 밖의 뷰어를 허용하는지 검증된 바 없어 403 버튼을 만들지 않는다.
-  const canChat = viewerState === 'host_team' || viewerState === 'approved';
+  // 서버 assertCanUseTeamMatchChat(chat.service.ts)과 정확히 같은 기준으로 바꾼다 — 양 팀
+  // owner/manager. 예전엔 host_team/approved(=신청서를 낸 사람 한 명)만 봐서, 리그 대진의
+  // 신청서를 운영자가 대신 내는 원정팀 owner/manager는 canChat이 영원히 false였다(alpha
+  // 실측: 원정팀 owner에게 '상대팀과 채팅' 버튼 자체가 없음). manageableHostTeam/
+  // manageableOpponentTeam은 팀 멤버십만으로 판정해 서버가 실제로 허용하는 사용자와 일치한다.
+  const canChat = viewer?.manageableHostTeam === true || viewer?.manageableOpponentTeam === true;
 
   const openChat = () => {
     setChatError('');

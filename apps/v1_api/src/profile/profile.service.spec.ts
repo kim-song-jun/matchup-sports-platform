@@ -1201,3 +1201,34 @@ describe('ProfileService withdrawal admin lockout', () => {
     );
   });
 });
+
+describe('ProfileService logout — 웹 푸시 구독 정리', () => {
+  // 로그아웃이 서버 쪽 V1PushSubscription row 를 지우지 않으면, 로그아웃한 계정 앞으로
+  // 오는 알림(채팅 원문 포함)이 그 기기에 계속 도착하고, 같은 기기에 다음에 로그인한
+  // 사용자는 서버 구독이 없는데도 브라우저 pushManager 구독이 남아 '켜짐'으로 보인다.
+  function createPrisma() {
+    return {
+      v1PushSubscription: {
+        deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+    };
+  }
+
+  it('인증된 사용자로 로그아웃하면 그 사용자의 모든 웹 푸시 구독을 지운다', async () => {
+    const prisma = createPrisma();
+    const service = new ProfileService(prisma as unknown as PrismaService);
+
+    await expect(service.logout(user)).resolves.toEqual({ ok: true });
+
+    expect(prisma.v1PushSubscription.deleteMany).toHaveBeenCalledWith({ where: { userId: user.id } });
+  });
+
+  it('세션이 이미 무효라 사용자를 식별할 수 없어도(OptionalV1AuthGuard 결과 undefined) 에러 없이 성공한다', async () => {
+    const prisma = createPrisma();
+    const service = new ProfileService(prisma as unknown as PrismaService);
+
+    await expect(service.logout(undefined)).resolves.toEqual({ ok: true });
+
+    expect(prisma.v1PushSubscription.deleteMany).not.toHaveBeenCalled();
+  });
+});

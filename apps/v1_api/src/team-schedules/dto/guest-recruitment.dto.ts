@@ -84,3 +84,15 @@ export class CreateGuestApplicationDto {
   // rejects (400 VALIDATION_ERROR) any request body carrying an extra `userId` field outright
   // rather than silently stripping it. The persisted userId always comes from @CurrentUser().
 }
+
+// Not part of the frozen contract table in docs/api/global-contract.md (that table only lists
+// GET/POST/PATCH .../guest-recruitment and POST .../applications) — this closes a real gap the
+// frozen contract left open: there was no route anywhere to move an application off PENDING, so
+// every application stayed PENDING forever and the recruitment could never reach FILLED. Adding
+// this lane does not touch the frozen table's own text (docs/api/global-contract.md is outside
+// this change's owned files) and does not alter any of its four existing routes' request/response
+// shapes.
+export class ReviewGuestApplicationDto {
+  @IsIn(['approved', 'rejected'])
+  state!: 'approved' | 'rejected';
+}

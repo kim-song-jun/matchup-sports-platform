@@ -40,7 +40,12 @@ export function currentChatEntitlementWhere(userId: string): Prisma.V1ChatRoomWh
       {
         teamMatch: {
           is: {
-            status: 'matched',
+            // 'matched' 로 exact-match 하면 결과 제출로 completed 전이되는 순간 채팅방이
+            // 목록에서 통째로 사라진다 — approvedApplicantTeamId가 채워진 시점(=매칭
+            // 확정)부터 completed 까지는 계속 대화가 필요하므로 두 상태 모두 허용한다.
+            // cancelled/expired/recruiting/closed 는 여전히 제외돼 "매칭 전"·"매칭이
+            // 취소된 뒤"는 이전과 동일하게 막힌다.
+            status: { in: ['matched', 'completed'] },
             deletedAt: null,
             approvedApplicantTeamId: { not: null },
             OR: [

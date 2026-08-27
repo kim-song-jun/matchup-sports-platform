@@ -383,8 +383,12 @@ export class ChatService {
   }
 
   private async assertCanUseTeamMatchChat(userId: string, teamMatchId: string) {
+    // chat-entitlement.ts currentChatEntitlementWhere와 같은 이유로 completed도 허용한다:
+    // 결과 제출로 status가 matched→completed 로 넘어가는 순간이 채팅 봉쇄 시점이 되면 안 된다
+    // (경기 종료 뒤에도 두 팀장이 대화를 이어갈 수 있어야 한다). cancelled/expired/pre-match는
+    // 여전히 배제된다.
     const teamMatch = await this.prisma.v1TeamMatch.findFirst({
-      where: { id: teamMatchId, status: 'matched', deletedAt: null },
+      where: { id: teamMatchId, status: { in: ['matched', 'completed'] }, deletedAt: null },
       select: { hostTeamId: true, approvedApplicantTeamId: true },
     });
     if (!teamMatch?.approvedApplicantTeamId) throw stateConflict('Team match chat is available after matching');

@@ -34,7 +34,14 @@ beforeEach(() => {
   pushManager.subscribe.mockResolvedValue(subscription);
   Object.defineProperty(global.navigator, 'serviceWorker', {
     configurable: true,
-    value: { register: vi.fn().mockResolvedValue(registration), ready: Promise.resolve(registration) },
+    value: {
+      register: vi.fn().mockResolvedValue(registration),
+      // subscribe() 는 register() 직후 활성화를 기다리므로 ready 를 계속 쓴다.
+      ready: Promise.resolve(registration),
+      // 상태 확인·구독 해지는 getRegistration() 을 쓴다 — ready 는 등록이 없으면
+      // 영원히 미결이라 로그아웃이 멈춰 서기 때문이다(use-v1-push-registration 주석).
+      getRegistration: vi.fn().mockResolvedValue(registration),
+    },
   });
   Object.defineProperty(global, 'PushManager', {
     configurable: true,
@@ -130,6 +137,7 @@ describe('useV1PushRegistration', () => {
       value: {
         register: vi.fn().mockResolvedValue(installingRegistration),
         ready: Promise.resolve(registration),
+        getRegistration: vi.fn().mockResolvedValue(registration),
       },
     });
 
@@ -213,10 +221,44 @@ describe('useV1PushRegistration', () => {
     );
   });
 
+  // 회귀: 푸시를 켠 적 없는 브라우저에는 서비스워커 등록이 아예 없다(이 앱은
+  // subscribe() 안에서만 register 한다). 예전 구현은 `navigator.serviceWorker.ready`
+  // 를 기다렸는데 그건 등록이 없으면 reject 가 아니라 **영원히 미결**이라, 로그아웃이
+  // 이 프로미스를 기다리다 그대로 멈춰 섰다. `ready` 를 절대 결정되지 않게 두고도
+  // unsubscribe() 가 끝나야 한다 — 그래야 이 테스트가 실제 버그를 잡는다.
+  it('구독한 적 없는 브라우저(서비스워커 등록 없음)에서도 unsubscribe 가 멈추지 않는다', async () => {
+    Object.defineProperty(global.navigator, 'serviceWorker', {
+      configurable: true,
+      value: {
+        register: vi.fn(),
+        ready: new Promise(() => {}), // 등록이 없을 때의 실제 동작: 영원히 미결
+        getRegistration: vi.fn().mockResolvedValue(undefined),
+      },
+    });
+    const { useV1PushRegistration } = await import('./use-v1-push-registration');
+    const { result } = renderHook(() => useV1PushRegistration());
+
+    let settled = false;
+    await act(async () => {
+      await result.current.unsubscribe();
+      settled = true;
+    });
+
+    expect(settled).toBe(true);
+    expect(v1Delete).not.toHaveBeenCalled();
+    expect(result.current.isSubscribed).toBe(false);
+  });
+
   it('reports the initial subscription-status check failure instead of swallowing it silently', async () => {
     Object.defineProperty(global.navigator, 'serviceWorker', {
       configurable: true,
-      value: { register: vi.fn().mockResolvedValue(registration), ready: Promise.reject(new Error('sw registration lost')) },
+      value: {
+        register: vi.fn().mockResolvedValue(registration),
+        ready: Promise.resolve(registration),
+        // 초기 상태 확인은 이제 getRegistration() 을 탄다 — 실패 보고를 검증하려면
+        // 이쪽이 거부돼야 한다(ready 를 거부시키면 이 테스트가 아무것도 안 잡는다).
+        getRegistration: vi.fn().mockRejectedValue(new Error('sw registration lost')),
+      },
     });
     const { useV1PushRegistration } = await import('./use-v1-push-registration');
     renderHook(() => useV1PushRegistration());

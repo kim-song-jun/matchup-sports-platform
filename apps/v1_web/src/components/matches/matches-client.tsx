@@ -41,7 +41,6 @@ export function MatchListPageClient() {
     setSearchValue(initialQuery);
     setSubmittedQuery(initialQuery);
   }, [initialQuery]);
-  const allMatches = useV1Matches();
   const activeFilterCount = countMatchFilters(selectedSort, selectedGenderRule, selectedLevels);
   const matchFilters = useMemo(() => {
     const filters: { sportId?: string; query?: string; sort?: 'recommended' | 'latest' | 'deadline'; view?: 'card' | 'compact'; genderRule?: string; levelCodes?: string } = {};
@@ -53,6 +52,31 @@ export function MatchListPageClient() {
     if (selectedView !== 'card') filters.view = selectedView;
     return Object.keys(filters).length ? filters : undefined;
   }, [selectedGenderRule, selectedLevels, selectedSportId, selectedSort, selectedView, submittedQuery]);
+  // 서버는 20건씩 커서 페이지네이션으로 자르는데(matches.service.ts list()) 예전엔 이 화면이
+  // 단발 useQuery로 첫 페이지만 받아 21번째 매치부터는 볼 방법이 아예 없었다(감사 결함).
+  // league-matches-list-client.tsx와 같은 "더 보기" 누적 방식 — 대회 목록(tournaments/page.tsx)
+  // 수준의 데스크톱 페이지 번호 분기까지는 아직 이 화면 규모에 근거가 없다.
+  const [cursor, setCursor] = useState<string | undefined>(undefined);
+  const [accumulated, setAccumulated] = useState<V1Match[]>([]);
+  // 필터가 바뀌면(종목·성별·레벨·검색·정렬·보기) 새 조건의 1페이지부터 다시 쌓는다.
+  // useEffect가 아니라 렌더 중에 직접 되감는다("prop이 바뀔 때 state 조정" — React 공식
+  // 패턴): useEffect로 하면 effect가 도는 다음 렌더까지 "새 필터 + 이전 cursor"가 합쳐진
+  // 요청이 한 번 나간다 — 그 cursor는 이전 필터 기준 토큰이라 새 필터에서는 무효하고,
+  // 서버가 그 조합을 어떻게 처리할지도 검증된 바 없다. 렌더 중 set을 호출하면 이 렌더의
+  // 출력은 버려지고 즉시 다시 렌더되므로 그 중간 상태가 화면에도, 요청에도 나타나지 않는다.
+  const matchFiltersKey = matchFilters ? JSON.stringify(matchFilters) : '';
+  const [pagedFiltersKey, setPagedFiltersKey] = useState(matchFiltersKey);
+  if (pagedFiltersKey !== matchFiltersKey) {
+    setPagedFiltersKey(matchFiltersKey);
+    setCursor(undefined);
+    setAccumulated([]);
+  }
+  const allMatchesFilters = useMemo(() => (!matchFilters && cursor ? { cursor } : undefined), [matchFilters, cursor]);
+  const filteredMatchesFilters = useMemo(
+    () => (matchFilters ? (cursor ? { ...matchFilters, cursor } : matchFilters) : undefined),
+    [matchFilters, cursor],
+  );
+  const allMatches = useV1Matches(allMatchesFilters);
   const countFilters = useMemo(() => {
     const filters: { query?: string; genderRule?: string; levelCodes?: string } = {};
     if (selectedGenderRule) filters.genderRule = selectedGenderRule;
@@ -60,7 +84,7 @@ export function MatchListPageClient() {
     if (submittedQuery.trim()) filters.query = submittedQuery.trim();
     return Object.keys(filters).length ? filters : undefined;
   }, [selectedGenderRule, selectedLevels, submittedQuery]);
-  const filteredMatches = useV1Matches(matchFilters, { enabled: Boolean(matchFilters) });
+  const filteredMatches = useV1Matches(filteredMatchesFilters, { enabled: Boolean(matchFilters) });
   const countMatches = useV1Matches(countFilters, { enabled: Boolean(countFilters) });
   const recentSearches = useV1RecentSearches();
   const recordSearch = useV1RecordSearch();
@@ -70,9 +94,23 @@ export function MatchListPageClient() {
   if (query.isError) return <MatchStatePageView model={getMatchStateViewModel('error')} />;
 
   const base = getMatchListViewModel();
-  const items = query.data?.items;
+  const pageItems = query.data?.items;
+  // 누적: cursor가 있으면(2페이지 이상) 직전까지 쌓아둔 목록 뒤에 새 페이지를 이어 붙인다 —
+  // id 기준 중복 제거는 in-flight 재요청(포커스 재검증 등)이 겹쳐 와도 카드가 두 번 그려지지
+  // 않게 하기 위함.
+  const items: V1Match[] | undefined = pageItems === undefined
+    ? undefined
+    : cursor
+      ? [...accumulated, ...pageItems.filter((item) => !accumulated.some((prev) => (prev.matchId ?? prev.id) === (item.matchId ?? item.id)))]
+      : pageItems;
   const visibleItems = filterMatchesByLevels(items, selectedLevels);
   const countItems = filterMatchesByLevels((countFilters ? countMatches.data?.items ?? allMatches.data?.items : allMatches.data?.items) ?? items, selectedLevels);
+  const hasNext = query.data?.pageInfo?.hasNext ?? false;
+  const handleLoadMore = () => {
+    if (!query.data?.pageInfo?.nextCursor || query.isFetching) return;
+    setAccumulated(items ?? []);
+    setCursor(query.data.pageInfo.nextCursor);
+  };
   const searchModel: NonNullable<MatchListViewModel['search']> = {
     value: searchValue,
     placeholder: '지역, 시간, 매치명 검색',
@@ -105,6 +143,9 @@ export function MatchListPageClient() {
           today: countToday(visibleItems),
           urgent: visibleItems.filter((item) => statusToCardStatus(getStatus(item)) === 'open').length,
         },
+        hasNext,
+        onLoadMore: handleLoadMore,
+        loadMorePending: query.isFetching,
       }
     : {
         ...base,
@@ -121,6 +162,9 @@ export function MatchListPageClient() {
           today: 0,
           urgent: 0,
         },
+        // team-matches-client.tsx #5와 동일 — 로딩 중임을 명시해 EmptyState 대신 스켈레톤을
+        // 그리게 한다(로딩 중을 "조건에 맞는 매치 0개"로 오인시키지 않는다).
+        isLoading: query.isLoading,
       };
 
   return <MatchListPageView model={model} />;

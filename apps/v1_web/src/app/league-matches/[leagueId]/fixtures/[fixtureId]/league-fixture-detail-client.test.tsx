@@ -185,7 +185,10 @@ describe('LeagueFixtureDetailClient', () => {
 
   it('참가팀(approved)에게는 채팅·라인업 통로가 뜬다', () => {
     mockLeague();
-    mockViewer('approved');
+    // 실제 API 응답에서 state='approved'(신청서를 낸 사람)는 항상 신청팀 owner/manager이므로
+    // manageableOpponentTeam=true 와 함께 온다(둘 다 team-matches.service.ts getViewer()의
+    // 같은 호출에서 나온다) — canChat 이 이제 이 플래그를 직접 보므로 목도 실제 응답 모양을 따른다.
+    mockViewer('approved', { manageableOpponentTeam: true });
     render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
 
     expect(screen.getByRole('button', { name: '상대팀과 채팅' })).toBeInTheDocument();
@@ -196,14 +199,30 @@ describe('LeagueFixtureDetailClient', () => {
 
   // alpha 실측(2026-08-25) — 리그 대진 신청서는 운영자가 만들어서 away 팀 팀장의
   // viewerState 는 'approved' 가 아니라 'none' 이다. 결과 승인 게이트 필드로 판정해야
-  // 카드가 뜬다. 채팅 개설 권한은 없으므로 채팅 버튼은 숨는다.
-  it('away 팀 팀장(manageableOpponentTeam)은 채팅 없이 라인업 통로가 뜬다', () => {
+  // 카드가 뜬다.
+  //
+  // 2026-08-27 정정: 예전엔 여기서 "채팅 버튼은 숨는다"까지 단언했는데, 그게 바로 감사가
+  // 잡은 결함이었다 — canChat 이 서버(chat.service.ts assertCanUseTeamMatchChat, 양 팀
+  // owner/manager 허용)보다 좁은 host_team/approved 게이트를 써서, 신청서를 대신 낸
+  // 운영자 때문에 away 팀장은 채팅에 영원히 못 들어갔다(alpha 실측). canChat 을
+  // manageableHostTeam/manageableOpponentTeam 기준으로 바꿔 서버 권한과 맞춘 뒤에는
+  // away 팀장도 채팅 버튼을 봐야 한다 — 이 테스트는 그 새 계약을 고정한다.
+  it('away 팀 팀장(manageableOpponentTeam)에게도 채팅·라인업 통로가 뜬다', () => {
     mockLeague();
     mockViewer('none', { manageableOpponentTeam: true });
     render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
 
     expect(screen.getByText('우리 팀 경기')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '라인업 관리' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '상대팀과 채팅' })).toBeInTheDocument();
+  });
+
+  it('참여도 관리 권한도 없는 뷰어(일반 팀원 등)에게는 채팅 버튼이 뜨지 않는다', () => {
+    mockLeague();
+    mockViewer('none', { participantMember: true });
+    render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
+
+    expect(screen.getByText('우리 팀 경기')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '상대팀과 채팅' })).not.toBeInTheDocument();
   });
 

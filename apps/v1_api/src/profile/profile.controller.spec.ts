@@ -93,10 +93,16 @@ describe('ProfileController', () => {
     });
   });
 
-  it('logs out', async () => {
-    profileService.logout.mockReturnValue({ ok: true });
-    expect(controller.logout()).toEqual({ ok: true });
-    expect(profileService.logout).toHaveBeenCalledWith();
+  it('logs out an authenticated user and passes it through so subscriptions can be cleaned up', async () => {
+    profileService.logout.mockResolvedValue({ ok: true });
+    await expect(controller.logout(user)).resolves.toEqual({ ok: true });
+    expect(profileService.logout).toHaveBeenCalledWith(user);
+  });
+
+  it('logs out even when the session is already invalid (OptionalV1AuthGuard yields no user)', async () => {
+    profileService.logout.mockResolvedValue({ ok: true });
+    await expect(controller.logout(undefined)).resolves.toEqual({ ok: true });
+    expect(profileService.logout).toHaveBeenCalledWith(undefined);
   });
 
   it('requests withdrawal', async () => {

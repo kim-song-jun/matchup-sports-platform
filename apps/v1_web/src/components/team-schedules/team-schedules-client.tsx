@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   useV1ApplyGuestRecruitment,
   useV1CancelTeamSchedule,
@@ -17,8 +18,23 @@ import {
   useV1UpdateGuestRecruitment,
   useV1UpdateTeamSchedule,
 } from '@/hooks/use-v1-api';
+// guest-recruitment applications 목록·승인/거절 전용 훅은 아직 hooks/use-v1-api.ts에 없다(이
+// 배치의 ownedFiles가 그 파일을 포함하지 않아 새 훅을 그쪽에 추가할 수 없음) — 같은 파일이
+// 이미 쓰는 저수준 클라이언트(v1Get/v1Patch)를 이 컴포넌트 안에서 직접 useQuery/useMutation과
+// 조합해 동일한 패턴(성공 시 teamSchedule invalidate)을 재현한다.
+import { v1Get, v1Patch } from '@/lib/api-client';
+import { v1Keys } from '@/lib/query-keys';
+import { randomUuid } from '@/lib/uuid';
+import { extractErrorCode } from '@/lib/error-message';
 import { formatTournamentDateRangeWithTime, formatTournamentDateTimeLong } from '@/lib/date-utils';
-import type { V1CreateScheduleDto, V1UpdateScheduleDto } from '@/types/api';
+import type {
+  V1CreateScheduleDto,
+  V1GuestApplicationListItem,
+  V1GuestRecruitmentVisibility,
+  V1ReviewGuestApplicationDto,
+  V1ReviewGuestApplicationResult,
+  V1UpdateScheduleDto,
+} from '@/types/api';
 import {
   ScheduleDetailPageView,
   ScheduleFormPageView,
@@ -57,6 +73,34 @@ import {
   toDatetimeLocalValue,
   toScheduleListItemModel,
 } from './team-schedules.view-model';
+
+const GUEST_APPLICATION_STATE_LABELS: Record<string, string> = {
+  PENDING: '대기 중',
+  APPROVED: '승인됨',
+  REJECTED: '거절됨',
+  WITHDRAWN: '취소됨',
+};
+
+const GUEST_RECRUITMENT_VISIBILITY_LABELS: Record<V1GuestRecruitmentVisibility, string> = {
+  PUBLIC: '전체 공개',
+  MEMBERS: '팀원 전용',
+};
+
+// team-schedules.view-model.ts의 mapScheduleErrorMessage/SCHEDULE_ERROR_MESSAGES는 이 배치의
+// ownedFiles 밖이라 새 도메인 코드를 그쪽에 등록할 수 없다 — 등록하지 않으면 서버가 던진 영문
+// message가 그대로 화면에 새어(에러 어조 규칙 위반) 나가므로, 신청 승인/거절 전용 코드 3개만
+// 이 파일 안에서 얹어 감싼다(다른 모든 코드는 그대로 mapScheduleErrorMessage에 위임).
+const GUEST_APPLICATION_REVIEW_ERROR_MESSAGES: Record<string, string> = {
+  GUEST_APPLICATION_NOT_FOUND: '신청 정보를 찾을 수 없어요.',
+  GUEST_APPLICATION_NOT_PENDING: '이미 처리된 신청이에요. 새로고침 후 다시 확인해 주세요.',
+  GUEST_RECRUITMENT_FULL: '모집 인원이 이미 다 찼어요.',
+};
+
+function mapReviewApplicationErrorMessage(err: unknown, fallback: string): string {
+  const code = extractErrorCode(err);
+  if (code && GUEST_APPLICATION_REVIEW_ERROR_MESSAGES[code]) return GUEST_APPLICATION_REVIEW_ERROR_MESSAGES[code];
+  return mapScheduleErrorMessage(err, fallback);
+}
 
 function startOfMonth(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), 1);
@@ -125,6 +169,7 @@ export function TeamScheduleListPageClient({ teamId }: { teamId: string }) {
 // ── 상세 ──────────────────────────────────────────────────────────────────────
 
 export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: string; scheduleId: string }) {
+  const queryClient = useQueryClient();
   const team = useV1TeamDetail(teamId);
   const detail = useV1TeamSchedule(teamId, scheduleId);
   const setAttendance = useV1SetMyScheduleAttendance(teamId, scheduleId);
@@ -146,6 +191,7 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
   const [recruitmentSlots, setRecruitmentSlots] = useState('1');
   const [recruitmentClosesAt, setRecruitmentClosesAt] = useState('');
   const [recruitmentNote, setRecruitmentNote] = useState('');
+  const [recruitmentVisibility, setRecruitmentVisibility] = useState<V1GuestRecruitmentVisibility>('PUBLIC');
   const [recruitmentEditError, setRecruitmentEditError] = useState<string | null>(null);
 
   const [applicantName, setApplicantName] = useState('');
@@ -154,11 +200,51 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
   const [applicationSuccess, setApplicationSuccess] = useState<string | null>(null);
   const [applicationSubmitted, setApplicationSubmitted] = useState(false);
 
+  const [applicationActionError, setApplicationActionError] = useState<string | null>(null);
+  const [pendingApplicationId, setPendingApplicationId] = useState<string | null>(null);
+
   const schedule = detail.data;
   const backHref = `/teams/${teamId}/schedules`;
   const viewerRole = team.data?.viewer.role;
   const canManage = isScheduleManagerRole(viewerRole);
   const canRsvp = isScheduleMemberRole(viewerRole);
+
+  // 신청자 목록 + 승인/거절 — Task 12(guest-recruitment)에 없던 lane. 전용 훅이 아직
+  // hooks/use-v1-api.ts에 없어(이 배치의 ownedFiles 밖) 같은 저수준 클라이언트를 여기서
+  // 직접 조합한다. manager+만, 그리고 모집이 실제로 열려 있을 때만 불러온다.
+  const guestApplicationsQueryKey = ['v1', 'guest-recruitment-applications', teamId, scheduleId] as const;
+  const guestApplicationsQuery = useQuery({
+    queryKey: guestApplicationsQueryKey,
+    queryFn: () =>
+      v1Get<{ items: V1GuestApplicationListItem[] }>(`/teams/${teamId}/schedules/${scheduleId}/guest-recruitment/applications`),
+    enabled: canManage && Boolean(schedule?.guestRecruitment),
+  });
+  const reviewApplication = useMutation({
+    mutationFn: ({ applicationId, state }: { applicationId: string; state: 'approved' | 'rejected' }) =>
+      v1Patch<V1ReviewGuestApplicationResult>(
+        `/teams/${teamId}/schedules/${scheduleId}/guest-recruitment/applications/${applicationId}`,
+        { state } satisfies V1ReviewGuestApplicationDto,
+        { headers: { 'Idempotency-Key': randomUuid() } },
+      ),
+    onSuccess: () => {
+      // 승인은 recruitment.approvedCount/state(FILLED 도달 여부)도 함께 바꾸므로 둘 다 갱신한다.
+      void queryClient.invalidateQueries({ queryKey: v1Keys.teamSchedule(teamId, scheduleId) });
+      void queryClient.invalidateQueries({ queryKey: guestApplicationsQueryKey });
+    },
+  });
+
+  function onReviewApplication(applicationId: string, state: 'approved' | 'rejected') {
+    setApplicationActionError(null);
+    setPendingApplicationId(applicationId);
+    reviewApplication.mutate(
+      { applicationId, state },
+      {
+        onSettled: () => setPendingApplicationId(null),
+        onError: (err) =>
+          setApplicationActionError(mapReviewApplicationErrorMessage(err, state === 'approved' ? '승인하지 못했어요.' : '거절하지 못했어요.')),
+      },
+    );
+  }
 
   function reportPossibleConflict(err: unknown, fallback: string): string {
     const message = mapScheduleErrorMessage(err, fallback);
@@ -204,8 +290,12 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
   function onCreateRecruitment() {
     if (!schedule) return;
     const closesAt = schedule.rsvpDeadlineAt ?? schedule.startAt;
+    // 용병 모집은 정의상 팀 밖 사람을 구하는 기능이다 — visibility를 생략하면 서버가
+    // MEMBERS로 기본값을 매겨, 신청 폼을 볼 수 있는 유일한 대상(비멤버)에게 영원히 보이지
+    // 않는 모집이 만들어진다(신규 결함). 새로 여는 모집은 항상 PUBLIC으로 시작하고,
+    // 필요하면 아래 "모집 정보 수정" 패널에서 팀원 전용으로 바꿀 수 있다.
     createRecruitment.mutate(
-      { slots: 1, closesAt },
+      { slots: 1, closesAt, visibility: 'PUBLIC' },
       { onError: (err) => setConflictBanner(reportPossibleConflict(err, '용병 모집을 열지 못했어요.')) },
     );
   }
@@ -225,6 +315,7 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
     setRecruitmentSlots(String(recruitment.slots));
     setRecruitmentClosesAt(toDatetimeLocalValue(recruitment.closesAt));
     setRecruitmentNote(recruitment.note ?? '');
+    setRecruitmentVisibility(recruitment.visibility);
     setRecruitmentEditError(null);
     setRecruitmentEditOpen(true);
   }
@@ -245,6 +336,7 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
         slots: slotsNum,
         closesAt: closesAtIso,
         note: recruitmentNote.trim() || undefined,
+        visibility: recruitmentVisibility,
       },
       {
         onSuccess: () => setRecruitmentEditOpen(false),
@@ -338,6 +430,7 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
       closesAtLabel: recruitment ? `${formatTournamentDateTimeLong(recruitment.closesAt)} 마감` : '',
       note: recruitment?.note ?? null,
       stateLabel: recruitment ? guestRecruitmentStateLabel(recruitment.state) : '',
+      visibilityLabel: recruitment ? GUEST_RECRUITMENT_VISIBILITY_LABELS[recruitment.visibility] : '',
       isOpen: recruitment?.state === 'OPEN',
       manage: canManage
         ? {
@@ -352,15 +445,33 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
                   slots: recruitmentSlots,
                   closesAt: recruitmentClosesAt,
                   note: recruitmentNote,
+                  visibility: recruitmentVisibility,
                   onSlotsChange: setRecruitmentSlots,
                   onClosesAtChange: setRecruitmentClosesAt,
                   onNoteChange: setRecruitmentNote,
+                  onVisibilityChange: setRecruitmentVisibility,
                   onSave: onSaveRecruitmentEdit,
                   onDismiss: () => setRecruitmentEditOpen(false),
                   pending: updateRecruitment.isPending,
                   error: recruitmentEditError,
                 }
               : undefined,
+            applications: {
+              items: (guestApplicationsQuery.data?.items ?? []).map((item) => ({
+                applicationId: item.applicationId,
+                displayName: item.displayName,
+                note: item.note,
+                state: item.state,
+                stateLabel: GUEST_APPLICATION_STATE_LABELS[item.state] ?? item.state,
+              })),
+              loading: guestApplicationsQuery.isLoading,
+              error: guestApplicationsQuery.isError
+                ? mapScheduleErrorMessage(guestApplicationsQuery.error, '신청자 목록을 불러오지 못했어요.')
+                : applicationActionError,
+              onApprove: (applicationId: string) => onReviewApplication(applicationId, 'approved'),
+              onReject: (applicationId: string) => onReviewApplication(applicationId, 'rejected'),
+              pendingApplicationId,
+            },
           }
         : undefined,
       applicationForm:

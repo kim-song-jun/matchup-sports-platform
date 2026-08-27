@@ -97,7 +97,7 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
       promoListPrizeText: null,
       promoListPriority: 0,
       campaign: null,
-      _count: { registrations: 0 },
+      _count: { registrations: 0, reviews: 0 },
       registrations: [],
       groups: [],
       fixtures: [],
@@ -405,5 +405,43 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
 
     expect(presented.awards[0]).toMatchObject({ awardLabel: 'MVP', recipientName: '김선수' });
     expect(presented.awards[0]).not.toHaveProperty('recipientUserId');
+  });
+
+  // 감사 evidence: `reviews` 배열은 조회 시 take:30으로 잘린다. 시상 화면의 개수
+  // 배지가 그 잘린 배열의 length 를 쓰면 31건째부터 실제 후기 수보다 작은 숫자를
+  // 계속 보여준다 — reviewsTotalCount 는 반드시 잘리지 않은 _count.reviews 를 그대로
+  // 내보내야 하고, 절대 reviews.length 로 재계산되면 안 된다.
+  it('reviewsTotalCount는 잘린 reviews 배열 길이가 아니라 _count.reviews 전체 카운트를 그대로 노출한다', () => {
+    const row = baseRow({
+      // take:30으로 잘려 들어온 상황을 흉내: 배열엔 2건만 있지만 전체는 45건.
+      reviews: [
+        {
+          id: 'review-1',
+          authorUserId: 'user-1',
+          author: { profile: { nickname: '팀장A', profileImageUrl: null } },
+          teamName: '서울 FC',
+          rating: 5,
+          comment: '좋았어요',
+          photoUrls: [],
+          createdAt: new Date('2026-06-01T00:00:00Z'),
+        },
+        {
+          id: 'review-2',
+          authorUserId: 'user-2',
+          author: { profile: { nickname: '팀장B', profileImageUrl: null } },
+          teamName: '부산 SC',
+          rating: 4,
+          comment: null,
+          photoUrls: [],
+          createdAt: new Date('2026-06-02T00:00:00Z'),
+        },
+      ],
+      _count: { registrations: 0, reviews: 45 },
+    } as never);
+
+    const presented = presentTournamentDetail(row);
+
+    expect(presented.reviews).toHaveLength(2);
+    expect(presented.reviewsTotalCount).toBe(45);
   });
 });

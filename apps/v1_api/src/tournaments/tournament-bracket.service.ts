@@ -992,9 +992,16 @@ export class TournamentBracketService {
           game: {
             select: {
               sides: { select: { id: true, sideKey: true } },
-              participants: { select: { id: true, sideId: true, displayNameSnapshot: true } },
+              // `userId` -- 대회 전체에서 안정적인 득점자 신원 판정에 필요(같은 팀 동명이인을
+              // 이름만으로 합치는 결함 방지, tournament-fixture-official-result.ts의
+              // playerUserId 주석 참고). public-tournament-records.service.ts가 이미 같은
+              // 목적으로 select 하는 필드다.
+              participants: { select: { id: true, sideId: true, userId: true, displayNameSnapshot: true } },
               currentOfficialRevision: {
-                select: { id: true, state: true, score: true, goalEvents: true, officialAt: true, createdAt: true, updatedAt: true },
+                // `outcomeReason` -- 몰수·중단을 정상 종료와 구분해 통계 집계에서 다르게
+                // 취급하기 위한 것(tournament-statistics-tab.tsx 소비). public-tournament-
+                // records.service.ts의 FIXTURE_SCHEDULE_SELECT와 동일한 필드.
+                select: { id: true, state: true, score: true, goalEvents: true, outcomeReason: true, officialAt: true, createdAt: true, updatedAt: true },
               },
               events: {
                 where: { OR: [{ type: { in: ['GOAL', 'OWN_GOAL'] } }, { reversesEventId: { not: null } }] },
@@ -1123,6 +1130,7 @@ export class TournamentBracketService {
       homePenaltyScore: resolved.score.homePenaltyScore,
       awayPenaltyScore: resolved.score.awayPenaltyScore,
       note: resolved.note,
+      outcomeReason: resolved.outcomeReason,
       recordedAt: (resolved.officialAt ?? resolved.createdAt).toISOString(),
       createdAt: resolved.createdAt.toISOString(),
       updatedAt: resolved.updatedAt.toISOString(),

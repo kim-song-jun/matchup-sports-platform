@@ -488,6 +488,34 @@ describe('MatchesService', () => {
     expect(where.startAt).toEqual({ gte: expect.any(Date) });
   });
 
+  // 감사 결함 회귀 방지(2026-08-27): toListItem()이 host를 아예 내려주지 않아 프론트가
+  // 항상 목업 호스트 이름으로 폴백했다(모든 카드가 '김정민' 등 동일 이름). detail()과 같은
+  // hostUser include를 목록 직렬화에도 그대로 매핑하는지 고정한다.
+  it('list: 각 아이템에 실제 호스트(hostUser)를 매핑해 내려준다', async () => {
+    prisma.v1Match.findMany.mockResolvedValue([
+      matchRow({
+        hostUserId: 'host-1',
+        sport: { id: 'sport-1', name: '풋살' },
+        region: null,
+        participants: [],
+        hostUser: {
+          id: 'host-1',
+          profile: { nickname: '박지훈', displayName: null, profileImageUrl: null },
+          reputationSummary: { trustState: 'verified' },
+        },
+      }),
+    ]);
+
+    const result = await service.list(null, {});
+
+    expect(result.items[0].host).toEqual({
+      userId: 'host-1',
+      displayName: '박지훈',
+      profileImageUrl: null,
+      trustState: 'verified',
+    });
+  });
+
   it('list: status=completed 조회는 startAt 필터를 적용하지 않는다 (지난 매치를 의도적으로 조회)', async () => {
     prisma.v1Match.findMany.mockResolvedValue([]);
 

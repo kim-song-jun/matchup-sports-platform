@@ -247,7 +247,10 @@ describe('BracketTab — 대진표 전체 공개', () => {
 
     await waitFor(() => {
       expect(mutate).toHaveBeenCalledWith(
-        { scheduledAt: new Date('2099-08-01T18:00').toISOString() },
+        // 운영자가 datetime-local 에 찍는 '2099-08-01T18:00' 은 **KST 18:00** 을 뜻한다
+        // (datetimeLocalValueToIso 가 +09:00 을 붙이는 계약). 기대값도 같은 기준이어야
+        // 러너 타임존과 무관하게 성립한다.
+        { scheduledAt: new Date('2099-08-01T18:00:00+09:00').toISOString() },
         expect.objectContaining({ onSuccess: expect.any(Function) }),
       );
     });

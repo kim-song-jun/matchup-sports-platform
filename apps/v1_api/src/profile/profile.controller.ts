@@ -133,9 +133,10 @@ export class ProfileController {
   }
 
   @Post('auth/logout')
+  @UseGuards(OptionalV1AuthGuard)
   @UseInterceptors(V1SessionLogoutInterceptor)
-  logout() {
-    return this.profileService.logout();
+  logout(@CurrentUser() user: V1AuthUser | undefined) {
+    return this.profileService.logout(user);
   }
 
   @Post('me/withdrawal-request')

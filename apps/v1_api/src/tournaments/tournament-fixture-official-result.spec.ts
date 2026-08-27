@@ -4,9 +4,12 @@
  * R3 §4-3~§4-4단계 사이 한시적 레거시 폴백의 단일 소스(tournament-fixture-official-result.ts)를
  * 직접 검증한다. 순수 함수라 mock 없이 실제 입력/출력만으로 계약을 증명한다.
  *
- * 핵심 두 가지(작업 지시서 그대로):
- *   1. 새 경로에 OFFICIAL 리비전이 없고 레거시 결과만 있을 때 → 레거시로 점수/골/타임스탬프가 나온다.
+ * 핵심 세 가지(작업 지시서 그대로 + 감사 수정):
+ *   1. `revision` 자체가 없고(백필 전 등) 레거시 결과만 있을 때 → 레거시로 점수/골/타임스탬프가 나온다.
  *   2. 새 경로와 레거시가 둘 다 있을 때 → 새 경로가 이긴다(레거시는 무시된다).
+ *   3. `revision`이 있지만 OFFICIAL이 아닐 때(VOID 등) → 레거시로 폴백하지 않고 결과 없음(null/false)이다
+ *      — 무효화된 결과가 레거시 행으로 되살아나면 운영자가 "무효화" 버튼을 눌러도 통계/순위표가
+ *      바뀌지 않는 조용한 데이터 오염이 된다(과거엔 이 케이스가 레거시로 폴백했다 — 실사고 재현 방지).
  * 그 외 hasTournamentFixtureOfficialResult() 가드 판정도 동일 기준으로 함께 검증한다.
  */
 import type { Prisma } from '@prisma/client';
@@ -95,12 +98,15 @@ describe('resolveTournamentFixtureOfficialScore', () => {
     expect(score).toEqual({ homeScore: 2, awayScore: 1, hasPenalty: false, homePenaltyScore: null, awayPenaltyScore: null });
   });
 
-  it('VOID로 넘어간 리비전은 OFFICIAL이 아니므로 레거시로 폴백한다', () => {
+  // 회귀 방지 (감사 수정) — 예전에는 이 케이스가 레거시 스코어(3:0)로 폴백했다. VOID는
+  // "운영자가 이 결과를 무효화했다"는 명시적 답이므로, 무효화 이전의 레거시 스코어를
+  // 조용히 되살리면 안 된다.
+  it('VOID로 넘어간 리비전은 레거시로 폴백하지 않고 결과 없음(null)이다', () => {
     const score = resolveTournamentFixtureOfficialScore(
       { currentOfficialRevision: { state: 'VOID', score: { home: 2, away: 1 } } },
       { homeScore: 3, awayScore: 0, hasPenalty: false, homePenaltyScore: null, awayPenaltyScore: null },
     );
-    expect(score).toEqual({ homeScore: 3, awayScore: 0, hasPenalty: false, homePenaltyScore: null, awayPenaltyScore: null });
+    expect(score).toBeNull();
   });
 
   it('둘 다 없으면 null', () => {
@@ -154,17 +160,19 @@ describe('parseTournamentFixtureOfficialScore (승부차기)', () => {
 });
 
 describe('resolveTournamentFixtureOfficialResult', () => {
-  it('새 경로에 OFFICIAL 리비전이 없고 레거시 결과만 있을 때 → 레거시 스코어/골/note/타임스탬프로 조립한다', () => {
+  it('새 경로에 revision이 없고 레거시 결과만 있을 때 → 레거시 스코어/골/note/타임스탬프로 조립한다', () => {
     const resolved = resolveTournamentFixtureOfficialResult(null, legacyResult());
     expect(resolved).toEqual({
       revisionId: 'legacy-result-1',
       score: { homeScore: 3, awayScore: 0, hasPenalty: false, homePenaltyScore: null, awayPenaltyScore: null },
       note: '레거시 메모',
+      // 레거시 결과 행은 outcomeReason 개념 이전 데이터라 항상 정상 종료로 취급한다.
+      outcomeReason: 'NORMAL',
       officialAt: new Date('2026-07-01T00:00:00.000Z'),
       createdAt: new Date('2026-07-01T00:00:00.000Z'),
       updatedAt: new Date('2026-07-01T00:00:00.000Z'),
       goals: [
-        { id: 'legacy-goal-1', team: 'home', playerId: null, playerName: '레거시 득점자', minute: 10 },
+        { id: 'legacy-goal-1', team: 'home', playerId: null, playerUserId: null, playerName: '레거시 득점자', minute: 10 },
       ],
     });
   });
@@ -175,9 +183,10 @@ describe('resolveTournamentFixtureOfficialResult', () => {
       revisionId: 'revision-new-path',
       score: { homeScore: 2, awayScore: 1 },
       note: null,
+      outcomeReason: 'NORMAL',
     });
     expect(resolved?.goals).toEqual([
-      { id: 'event-1', team: 'home', playerId: 'player-1', playerName: '새경로 선수', minute: 1 },
+      { id: 'event-1', team: 'home', playerId: 'player-1', playerUserId: null, playerName: '새경로 선수', minute: 1 },
     ]);
   });
 
@@ -202,6 +211,60 @@ describe('resolveTournamentFixtureOfficialResult', () => {
     );
     expect(resolved).toBeNull();
   });
+
+  // 회귀 방지 (감사 수정, 핵심 규칙 3) — Task 10 백필로 Game+OFFICIAL 리비전이 만들어진
+  // 대회 픽스처는 원본 레거시 `V1TournamentFixtureResult` 행이 그대로 남아 있다. 운영자가
+  // 오심/재경기 사유로 결과를 무효화하면 revision이 VOID로 넘어가는데, 예전 구현은 이때
+  // 레거시 행으로 폴백해 "무효화 버튼을 눌러도 스코어보드/통계가 그대로"인 결함이 있었다.
+  it('VOID 리비전 + 레거시 결과가 둘 다 있어도(백필된 픽스처의 무효화) 레거시로 되살아나지 않고 null이다', () => {
+    const resolved = resolveTournamentFixtureOfficialResult(
+      officialGame({
+        currentOfficialRevision: {
+          id: 'revision-void',
+          state: 'VOID',
+          score: { home: 2, away: 1 } satisfies Prisma.JsonObject,
+          officialAt: null,
+          createdAt: new Date('2026-08-01T00:00:00.000Z'),
+          updatedAt: new Date('2026-08-01T00:00:00.000Z'),
+        },
+      }),
+      legacyResult(),
+    );
+    expect(resolved).toBeNull();
+  });
+
+  it('OFFICIAL 리비전의 outcomeReason이 FORFEIT/ABANDONED이면 결과에 그대로 실린다', () => {
+    const forfeited = resolveTournamentFixtureOfficialResult(
+      officialGame({
+        currentOfficialRevision: {
+          id: 'revision-new-path',
+          state: 'OFFICIAL',
+          score: { home: 0, away: 0 } satisfies Prisma.JsonObject,
+          outcomeReason: 'FORFEIT',
+          officialAt: new Date('2026-08-01T00:00:00.000Z'),
+          createdAt: new Date('2026-08-01T00:00:00.000Z'),
+          updatedAt: new Date('2026-08-01T00:00:00.000Z'),
+        },
+      }),
+    );
+    expect(forfeited).toMatchObject({ outcomeReason: 'FORFEIT' });
+  });
+
+  it('outcomeReason을 select하지 않는 기존 소비처와의 호환 — undefined면 NORMAL로 취급한다', () => {
+    const resolved = resolveTournamentFixtureOfficialResult(officialGame());
+    expect(resolved).toMatchObject({ outcomeReason: 'NORMAL' });
+  });
+
+  it('참가자에 userId가 있으면 골의 playerUserId로 실린다(대회 전체 안정 신원)', () => {
+    const resolved = resolveTournamentFixtureOfficialResult(
+      officialGame({
+        participants: [{ id: 'player-1', displayNameSnapshot: '새경로 선수', userId: 'user-123' }],
+      }),
+    );
+    expect(resolved?.goals).toEqual([
+      { id: 'event-1', team: 'home', playerId: 'player-1', playerUserId: 'user-123', playerName: '새경로 선수', minute: 1 },
+    ]);
+  });
 });
 
 describe('hasTournamentFixtureOfficialResult', () => {
@@ -221,6 +284,12 @@ describe('hasTournamentFixtureOfficialResult', () => {
   it('VOID 리비전만 있고 레거시가 없으면 false(레거시 결과만 있는 픽스처의 팀 변경 가드와 동일 기준)', () => {
     expect(hasTournamentFixtureOfficialResult({ currentOfficialRevision: { state: 'VOID' } }, null)).toBe(false);
   });
+
+  // 회귀 방지 (감사 수정) — VOID이면서 레거시 결과 행도 있는 경우, revision이 존재한다는
+  // 사실만으로 레거시를 더 이상 보지 않는다 — "결과 없음"과 동등하게 false.
+  it('VOID 리비전 + 레거시 결과가 둘 다 있어도 false(레거시로 되살아나지 않는다)', () => {
+    expect(hasTournamentFixtureOfficialResult({ currentOfficialRevision: { state: 'VOID' } }, { id: 'legacy-result-1' })).toBe(false);
+  });
 });
 
 describe('resolveTournamentFixtureOfficialTimestamp', () => {
@@ -237,12 +306,20 @@ describe('resolveTournamentFixtureOfficialTimestamp', () => {
     ).toEqual(officialAt);
   });
 
+  // 회귀 방지 (감사 수정) — VOID면 레거시 recordedAt으로 폴백하지 않는다. 리뷰 게이트가
+  // "언제 확정됐는지"를 무효화 이전 시점으로 잘못 알면 안 된다.
+  it('VOID 리비전 + 레거시 recordedAt이 둘 다 있어도 null(레거시로 폴백하지 않는다)', () => {
+    const legacyRecordedAt = new Date('2026-07-01T00:00:00.000Z');
+    expect(
+      resolveTournamentFixtureOfficialTimestamp({ currentOfficialRevision: { state: 'VOID', officialAt: null } }, legacyRecordedAt),
+    ).toBeNull();
+  });
+
   it('둘 다 없으면 null(완료 처리 안 된 경기)', () => {
     expect(resolveTournamentFixtureOfficialTimestamp(null, null)).toBeNull();
     expect(resolveTournamentFixtureOfficialTimestamp(null, undefined)).toBeNull();
   });
 });
-
 /**
  * 골 이벤트 백필(goal-event-backfill.ts)이 "몇 분인지 모르는 골"을 넣기 시작하면서
  * 생긴 계약. `V1GameEvent.clockMs`는 non-null이라 분을 모르는 골도 `clockMs: 0`으로

@@ -94,6 +94,61 @@ describe('MatchListPageView — 매치 카드 종목 배지', () => {
   });
 });
 
+// team-matches-page.test.tsx의 동일 계열 회귀 방지(#5)를 matches 쪽에도 적용한다 —
+// 로딩 중을 "조건에 맞는 매치가 없어요"로 잘못 그리던 결함(2026-08-27 감사).
+describe('MatchListPageView — 로딩 중 EmptyState 오표시 방지', () => {
+  it('isLoading=true면 매치가 0개여도 EmptyState 대신 스켈레톤을 그린다', () => {
+    const model = { ...getMatchListViewModel(), matches: [], isLoading: true };
+    const { container } = render(<MatchListPageView model={model} />);
+
+    expect(screen.queryByText('조건에 맞는 매치가 없어요')).not.toBeInTheDocument();
+    expect(container.querySelector('.tm-skeleton')).toBeInTheDocument();
+  });
+
+  it('isLoading이 없고(로딩 완료) 매치가 0개면 EmptyState를 그린다', () => {
+    const model = { ...getMatchListViewModel(), matches: [] };
+    render(<MatchListPageView model={model} />);
+
+    expect(screen.getByText('조건에 맞는 매치가 없어요')).toBeInTheDocument();
+  });
+});
+
+// 20건 컷오프 페이지네이션 결함 회귀 방지(2026-08-27 감사) — 서버는 커서로 20건씩
+// 자르는데 화면에 다음 페이지로 갈 방법이 없었다.
+describe('MatchListPageView — 더 보기 (20건 컷오프 페이지네이션)', () => {
+  it('hasNext=true면 "더 보기" 버튼을 보여준다', () => {
+    const onLoadMore = vi.fn();
+    const model = { ...getMatchListViewModel(), hasNext: true, onLoadMore };
+    render(<MatchListPageView model={model} />);
+
+    const button = screen.getByRole('button', { name: '더 보기' });
+    button.click();
+    expect(onLoadMore).toHaveBeenCalledTimes(1);
+  });
+
+  it('hasNext가 없으면(마지막 페이지) "더 보기" 버튼이 없다', () => {
+    const model = { ...getMatchListViewModel(), hasNext: false };
+    render(<MatchListPageView model={model} />);
+
+    expect(screen.queryByRole('button', { name: '더 보기' })).not.toBeInTheDocument();
+  });
+
+  it('loadMorePending 중에는 버튼이 "불러오는 중…"으로 바뀌고 비활성화된다', () => {
+    const model = { ...getMatchListViewModel(), hasNext: true, onLoadMore: vi.fn(), loadMorePending: true };
+    render(<MatchListPageView model={model} />);
+
+    const button = screen.getByRole('button', { name: '불러오는 중…' });
+    expect(button).toBeDisabled();
+  });
+
+  it('로딩 중(스켈레톤 표시)에는 hasNext여도 더 보기 버튼을 보여주지 않는다', () => {
+    const model = { ...getMatchListViewModel(), matches: [], isLoading: true, hasNext: true };
+    render(<MatchListPageView model={model} />);
+
+    expect(screen.queryByRole('button', { name: '더 보기' })).not.toBeInTheDocument();
+  });
+});
+
 describe('MatchCreatePageView — 장소와 시간 단계', () => {
   it('경기와 신청 마감 날짜·시간을 네이티브 선택 필드로 제공한다', () => {
     const model = getMatchCreateViewModel('place-time');
@@ -116,6 +171,27 @@ describe('MatchCreatePageView — 장소와 시간 단계', () => {
     expect(screen.getByLabelText('종료 시간')).toHaveAttribute('type', 'time');
     expect(screen.getByLabelText('신청 마감일')).toHaveAttribute('type', 'date');
     expect(screen.getByLabelText('신청 마감시간')).toHaveAttribute('type', 'time');
+  });
+});
+
+describe('MatchCreatePageView — confirm 단계 일시 표기 (종료 시간 미입력 시 하이픈 매달림 방지)', () => {
+  it('종료 시간이 비어 있으면 하이픈 없이 시작 시간까지만 보여준다', () => {
+    const model = getMatchCreateViewModel('confirm');
+    model.draft = { ...model.draft, date: '2026-09-05', startTime: '18:00', endTime: '' };
+
+    render(<MatchCreatePageView model={model} />);
+
+    expect(screen.getByText('2026-09-05 18:00')).toBeInTheDocument();
+    expect(screen.queryByText('2026-09-05 18:00-')).not.toBeInTheDocument();
+  });
+
+  it('종료 시간이 있으면 하이픈으로 구간을 보여준다', () => {
+    const model = getMatchCreateViewModel('confirm');
+    model.draft = { ...model.draft, date: '2026-09-05', startTime: '18:00', endTime: '20:00' };
+
+    render(<MatchCreatePageView model={model} />);
+
+    expect(screen.getByText('2026-09-05 18:00-20:00')).toBeInTheDocument();
   });
 });
 

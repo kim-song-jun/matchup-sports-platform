@@ -354,10 +354,110 @@ describe('TournamentReviewsService — awards admin gate', () => {
     );
   });
 
-  it('setAwards: 다른 팀 소속 수상자 + 팀명 조합 → 400, DB 무변경 (교차 검증)', async () => {
+  // 감사 evidence: 대회가 아직 completed 로 전환되지 않은 채(정상 운영 흐름 —
+  // "시상식 당일 저장 → 나중에 status 전환") 수상을 저장하면, 알림이 "공개됐어요"라고
+  // 단정해도 착지 화면(`/tournaments/:id/awards`)은 `NotCompletedNotice`만 보여줘
+  // 알림이 약속을 못 지키는 막다른 길이 됐다. 알림 본문이 그 사실을 미리 알려야 한다.
+  it('setAwards: 대회가 completed 가 아니면 알림 본문에 "종료 후 확인" 안내를 덧붙인다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue({
+      id: 'tournament-1',
+      title: '테스트 대회',
+      status: 'in_progress',
+      deletedAt: null,
+    });
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue(confirmedRegistrationRows);
+    prisma.v1TournamentAward.findMany.mockResolvedValueOnce([]);
+    prisma.v1TournamentAward.deleteMany.mockResolvedValue({ count: 0 });
+    prisma.v1TournamentAward.create.mockResolvedValue(awardRow());
+    prisma.v1TournamentAward.findMany.mockResolvedValue([awardRow()]);
+
+    await service.setAwards(ownerAuthUser, 'tournament-1', {
+      awards: [
+        {
+          awardType: 'mvp', awardLabel: 'MVP', iconKey: 'medal',
+          recipientName: '김철수', recipientUserId: 'user-kim', teamName: '레알마드리드',
+        },
+      ],
+    });
+
+    expect(notifications.emitNotification).toHaveBeenCalledWith(
+      'user-kim', 'tournament_award_received', 'tournament-1',
+      expect.stringContaining('공식 발표는 대회 종료 후'),
+    );
+  });
+
+  it('setAwards: 대회가 이미 completed 면 알림 본문에 "종료 후" 안내를 덧붙이지 않는다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue({
+      id: 'tournament-1',
+      title: '테스트 대회',
+      status: 'completed',
+      deletedAt: null,
+    });
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue(confirmedRegistrationRows);
+    prisma.v1TournamentAward.findMany.mockResolvedValueOnce([]);
+    prisma.v1TournamentAward.deleteMany.mockResolvedValue({ count: 0 });
+    prisma.v1TournamentAward.create.mockResolvedValue(awardRow());
+    prisma.v1TournamentAward.findMany.mockResolvedValue([awardRow()]);
+
+    await service.setAwards(ownerAuthUser, 'tournament-1', {
+      awards: [
+        {
+          awardType: 'mvp', awardLabel: 'MVP', iconKey: 'medal',
+          recipientName: '김철수', recipientUserId: 'user-kim', teamName: '레알마드리드',
+        },
+      ],
+    });
+
+    const [, , , body] = (notifications.emitNotification as jest.Mock).mock.calls[0];
+    expect(body).not.toContain('공식 발표는 대회 종료 후');
+  });
+
+  // 감사 evidence(정합성 회귀 방지): 예전엔 제출된 teamName이 이 대회의 다른 confirmed
+  // 팀 이름과 문자열이 다르기만 해도 400으로 전체 저장을 거부했다. 그런데 신원의
+  // 1차 키는 recipientUserId(계정)이지 teamName 문자열이 아니다 — 이 사람이 이 대회에
+  // confirmed 팀 하나에만(레알마드리드) 속해 있으면, 제출된 teamName이 낡았든(팀 개명)
+  // 잘못 입력됐든 서버는 **그 사람의 실제 라이브 소속 팀**으로 정규화해 저장해야 한다.
+  // (다른 후보와 충돌해 진짜 모호한 경우는 아래 "동일 계정이 두 팀에 걸쳐 있으면" 테스트가
+  // 커버한다.)
+  it('setAwards: userId가 유일하게 일치하면 제출된 teamName이 달라도 실제 소속 팀으로 정규화해 저장한다', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1', deletedAt: null });
     prisma.v1TournamentRegistration.findMany.mockResolvedValue(confirmedRegistrationRows);
+    prisma.v1TournamentAward.deleteMany.mockResolvedValue({ count: 0 });
+    prisma.v1TournamentAward.create.mockResolvedValue(awardRow());
+    prisma.v1TournamentAward.findMany.mockResolvedValue([awardRow()]);
+
+    await service.setAwards(ownerAuthUser, 'tournament-1', {
+      awards: [
+        {
+          awardType: 'mvp',
+          awardLabel: 'MVP',
+          recipientName: '김철수', // 실제로는 레알마드리드 소속
+          recipientUserId: 'user-kim',
+          teamName: '바르셀로나', // 낡았거나 잘못 제출된 값 — 실제 소속이 아니다
+        },
+      ],
+    });
+
+    expect(prisma.v1TournamentAward.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ recipientUserId: 'user-kim', teamName: '레알마드리드' }),
+      }),
+    );
+  });
+
+  // 신규: userId만으로 후보가 둘 이상(같은 사람이 이 대회 confirmed 팀 두 곳에 등록된
+  // 드문 경우)이면, 그때는 teamName이 진짜 판별자가 된다 — 둘 다 만족하는 후보가
+  // 여전히 둘 이상이면 모호하다고 보고 400.
+  it('setAwards: 동일 계정이 두 confirmed 팀에 걸쳐 있고 teamName으로도 못 가르면 400', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1', deletedAt: null });
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([
+      { team: { name: '레알마드리드' }, players: [{ userId: 'user-kim', realName: '김철수' }] },
+      { team: { name: '바르셀로나' }, players: [{ userId: 'user-kim', realName: '김철수' }] },
+    ]);
 
     await expect(
       service.setAwards(ownerAuthUser, 'tournament-1', {
@@ -365,9 +465,10 @@ describe('TournamentReviewsService — awards admin gate', () => {
           {
             awardType: 'mvp',
             awardLabel: 'MVP',
-            recipientName: '김철수', // 레알마드리드 소속
+            recipientName: '김철수',
             recipientUserId: 'user-kim',
-            teamName: '바르셀로나', // 다른 참가 팀
+            // teamName 미제출 — award.teamName === null 취급되어 두 후보 모두를 통과시키므로
+            // (2차 판별자가 없다) 모호한 채로 남는다.
           },
         ],
       }),
@@ -436,7 +537,10 @@ describe('TournamentReviewsService — awards admin gate', () => {
     expect(prisma.v1TournamentAward.deleteMany).not.toHaveBeenCalled();
   });
 
-  it('setAwards: teamName not among confirmed registrations → 400 AWARD_RECIPIENT_NOT_IN_ROSTER, no mutation', async () => {
+  // recipientUserId는 유일하게 일치해도, 함께 제출된 recipientName이 그 계정의 실제
+  // 명단 실명과 다르면 여전히 거부한다 — userId를 신원의 1차 키로 승격했다고 해서
+  // 이름 검증까지 없앤 건 아니다.
+  it('setAwards: userId는 일치해도 recipientName이 명단 실명과 다르면 400', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1', deletedAt: null });
     prisma.v1TournamentRegistration.findMany.mockResolvedValue(confirmedRegistrationRows);
@@ -447,7 +551,7 @@ describe('TournamentReviewsService — awards admin gate', () => {
           {
             awardType: 'mvp',
             awardLabel: 'MVP',
-            recipientName: '김철수',
+            recipientName: '전혀다른이름',
             recipientUserId: 'user-kim',
             teamName: '미참가팀',
           },
@@ -756,6 +860,7 @@ describe('TournamentReviewsService — 팀 후기 권한 (팀장·운영진 mana
     v1Tournament: { findFirst: jest.Mock };
     v1TournamentRegistration: { findMany: jest.Mock; findFirst: jest.Mock };
     v1TournamentReview: { findFirst: jest.Mock; create: jest.Mock };
+    v1UploadAsset: { findMany: jest.Mock };
   };
 
   const completedTournament = { id: 'tournament-1', status: 'completed', deletedAt: null };
@@ -765,6 +870,7 @@ describe('TournamentReviewsService — 팀 후기 권한 (팀장·운영진 mana
       v1Tournament: { findFirst: jest.fn() },
       v1TournamentRegistration: { findMany: jest.fn(), findFirst: jest.fn() },
       v1TournamentReview: { findFirst: jest.fn(), create: jest.fn() },
+      v1UploadAsset: { findMany: jest.fn() },
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -822,6 +928,82 @@ describe('TournamentReviewsService — 팀 후기 권한 (팀장·운영진 mana
       }),
     );
     expect(result.teamName).toBe('레알마드리드');
+  });
+
+  // 감사 evidence: photoUrls 는 형식·소유 검증이 전혀 없어 임의의 외부 URL이나 남이
+  // 올린 업로드 URL을 그대로 저장해 공개 후기 화면(비로그인 방문자 포함)에 노출할 수
+  // 있었다. tournament-fixture-videos.service.ts 의 assertOwnUploadedVideo 와 동일한
+  // 위협 모델을 후기 사진에도 적용했는지 직접 검증한다.
+  it('submitReview: 내가 업로드한 이미지 URL 은 photoUrls 로 그대로 저장된다', async () => {
+    prisma.v1Tournament.findFirst.mockResolvedValue(completedTournament);
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([
+      { teamId: 'team-1', team: { name: '레알마드리드' } },
+    ]);
+    prisma.v1TournamentReview.findFirst.mockResolvedValue(null);
+    prisma.v1UploadAsset.findMany.mockResolvedValue([
+      { url: '/uploads/2026/08/mine.jpg', ownerUserId: 'manager-user-id', kind: 'image' },
+    ]);
+    prisma.v1TournamentReview.create.mockResolvedValue(
+      reviewRow({
+        authorUserId: 'manager-user-id',
+        teamName: '레알마드리드',
+        photoUrls: ['/uploads/2026/08/mine.jpg'],
+      }),
+    );
+
+    await service.submitReview(
+      'tournament-1',
+      { ...plainUser, id: 'manager-user-id' },
+      { rating: 5, photoUrls: ['/uploads/2026/08/mine.jpg'] },
+    );
+
+    expect(prisma.v1UploadAsset.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { url: { in: ['/uploads/2026/08/mine.jpg'] } } }),
+    );
+    expect(prisma.v1TournamentReview.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ photoUrls: ['/uploads/2026/08/mine.jpg'] }),
+      }),
+    );
+  });
+
+  it('submitReview: 남이 올린 업로드 URL 을 photoUrls 에 넣으면 400, DB 무변경', async () => {
+    prisma.v1Tournament.findFirst.mockResolvedValue(completedTournament);
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([
+      { teamId: 'team-1', team: { name: '레알마드리드' } },
+    ]);
+    prisma.v1TournamentReview.findFirst.mockResolvedValue(null);
+    // 남의 자산(ownerUserId 불일치)
+    prisma.v1UploadAsset.findMany.mockResolvedValue([
+      { url: '/uploads/2026/08/someone-else.jpg', ownerUserId: 'other-user-id', kind: 'image' },
+    ]);
+
+    await expect(
+      service.submitReview(
+        'tournament-1',
+        { ...plainUser, id: 'manager-user-id' },
+        { rating: 5, photoUrls: ['/uploads/2026/08/someone-else.jpg'] },
+      ),
+    ).rejects.toMatchObject({ response: { code: 'REVIEW_PHOTO_UPLOAD_NOT_FOUND' } });
+    expect(prisma.v1TournamentReview.create).not.toHaveBeenCalled();
+  });
+
+  it('submitReview: 원장에 없는 임의의 외부 URL 을 photoUrls 에 넣으면 400, DB 무변경', async () => {
+    prisma.v1Tournament.findFirst.mockResolvedValue(completedTournament);
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([
+      { teamId: 'team-1', team: { name: '레알마드리드' } },
+    ]);
+    prisma.v1TournamentReview.findFirst.mockResolvedValue(null);
+    prisma.v1UploadAsset.findMany.mockResolvedValue([]); // 등록된 적 없는 URL
+
+    await expect(
+      service.submitReview(
+        'tournament-1',
+        { ...plainUser, id: 'manager-user-id' },
+        { rating: 5, photoUrls: ['https://attacker.example/nsfw.gif'] },
+      ),
+    ).rejects.toMatchObject({ response: { code: 'REVIEW_PHOTO_UPLOAD_NOT_FOUND' } });
+    expect(prisma.v1TournamentReview.create).not.toHaveBeenCalled();
   });
 
   // (b) 중복 판정 단위는 팀이 아니라 사람이다 (2026-08-17)

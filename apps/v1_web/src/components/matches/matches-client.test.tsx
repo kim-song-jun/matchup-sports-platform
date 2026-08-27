@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
-import type { MatchDetailViewModel } from './matches.types';
-import { MatchDetailPageClient } from './matches-client';
+import type { MatchDetailViewModel, MatchListViewModel } from './matches.types';
+import { MatchDetailPageClient, MatchListPageClient } from './matches-client';
 
 vi.mock('@/lib/analytics', () => ({ trackEvent: vi.fn() }));
 
@@ -12,12 +12,14 @@ const {
   routerPush,
   useV1MatchMock,
   useV1MatchApplicationEligibilityMock,
+  useV1MatchesMock,
 } = vi.hoisted(() => ({
   applyMatchMutateAsync: vi.fn(),
   withdrawMatchMutateAsync: vi.fn(),
   routerPush: vi.fn(),
   useV1MatchMock: vi.fn(),
   useV1MatchApplicationEligibilityMock: vi.fn(),
+  useV1MatchesMock: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -31,6 +33,10 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1ApplyMatch: () => ({ mutateAsync: applyMatchMutateAsync, isPending: false }),
   useV1WithdrawMatchApplication: () => ({ mutateAsync: withdrawMatchMutateAsync, isPending: false }),
   useV1ResolveChatRoom: () => ({ mutate: vi.fn(), isPending: false }),
+  useV1Matches: useV1MatchesMock,
+  useV1MasterSports: () => ({ data: [] }),
+  useV1RecentSearches: () => ({ data: { items: [] }, isLoading: false }),
+  useV1RecordSearch: () => ({ mutate: vi.fn() }),
 }));
 
 vi.mock('./matches-page', () => ({
@@ -42,7 +48,12 @@ vi.mock('./matches-page', () => ({
       <div data-testid="description">{model.match.description}</div>
     </div>
   ),
-  MatchListPageView: () => null,
+  MatchListPageView: ({ model }: { model: MatchListViewModel }) => (
+    <div>
+      <span data-testid="match-count">{model.matches.length}</span>
+      {model.hasNext && model.onLoadMore ? <button onClick={model.onLoadMore}>더 보기</button> : null}
+    </div>
+  ),
   MatchStatePageView: () => null,
 }));
 
@@ -205,5 +216,59 @@ describe('MatchDetailPageClient — 후기 진입점', () => {
     render(<MatchDetailPageClient matchId="match-1" />);
 
     expect(screen.queryByRole('link', { name: '후기 남기기' })).not.toBeInTheDocument();
+  });
+});
+
+// 20건 컷오프 페이지네이션 결함 회귀 방지(2026-08-27 감사) — 서버 커서 응답의 두 번째
+// 페이지가 "더 보기" 클릭 후 첫 페이지에 이어 붙는지, 중복 없이 누적되는지 확인한다.
+describe('MatchListPageClient — 커서 페이지네이션 누적', () => {
+  function page(items: Array<{ id: string; title: string }>, nextCursor: string | null) {
+    return {
+      data: {
+        items: items.map((item) => ({
+          id: item.id,
+          matchId: item.id,
+          title: item.title,
+          sportName: '풋살',
+          startsAt: '2026-09-01T10:00:00.000Z',
+          status: 'open' as const,
+        })),
+        nextCursor,
+        pageInfo: { nextCursor, hasNext: nextCursor !== null },
+      },
+      isError: false,
+      isFetching: false,
+      isLoading: false,
+    };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useV1MatchesMock.mockImplementation((filters?: { cursor?: string }, options?: { enabled?: boolean }) => {
+      // countMatches/filteredMatches는 필터가 없을 때 enabled:false로 호출된다 — 목록에
+      // 쓰이는 allMatches 호출(옵션 없음)만 페이지 데이터를 흉내낸다.
+      if (options && options.enabled === false) {
+        return { data: undefined, isError: false, isFetching: false, isLoading: false };
+      }
+      if (!filters?.cursor) {
+        return page([{ id: 'm1', title: '매치 1' }], 'cursor-page-2');
+      }
+      return page([{ id: 'm2', title: '매치 2' }], null);
+    });
+  });
+
+  it('첫 페이지는 hasNext=true로 "더 보기"를 보여주고, 클릭하면 두 번째 페이지가 이어 붙는다', () => {
+    render(<MatchListPageClient />);
+
+    expect(screen.getByTestId('match-count')).toHaveTextContent('1');
+    const loadMore = screen.getByRole('button', { name: '더 보기' });
+
+    fireEvent.click(loadMore);
+
+    // cursor state 갱신 → 재렌더 → useV1Matches가 cursor-page-2로 다시 호출되어 2페이지를
+    // 받고, 누적 로직이 1페이지 위에 이어 붙인다.
+    expect(screen.getByTestId('match-count')).toHaveTextContent('2');
+    // 마지막 페이지(nextCursor: null)라 "더 보기"가 사라진다.
+    expect(screen.queryByRole('button', { name: '더 보기' })).not.toBeInTheDocument();
   });
 });

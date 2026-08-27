@@ -116,3 +116,45 @@ describe('buildMatchPayloadResult — payload | missingFields 분기', () => {
     expect(fields).toContain('startTime');
   });
 });
+
+describe('신청 마감일/마감시간 부분 입력 — 한쪽만 채우면 조용히 마감 없음으로 저장되던 결함', () => {
+  // start는 baseCtx()가 7일 뒤로 잡으므로 마감은 그보다 이른 3일 뒤로 둬 '마감<시작' 규칙과
+  // 겹치지 않게 한다.
+  const deadline = futureIso(3);
+  const deadlineDate = deadline.toISOString().slice(0, 10);
+  const deadlineTime = deadline.toTimeString().slice(0, 5);
+
+  it('마감일만 고르고 마감시간을 비우면 deadlineTime이 결측 필드로 지목된다', () => {
+    const ctx = baseCtx({ draft: { ...baseCtx().draft, deadlineDate, deadlineTime: '' } });
+
+    const missing = getMatchMissingFields(ctx);
+    expect(missing.some((item) => item.field === 'deadlineTime')).toBe(true);
+  });
+
+  it('마감시간만 고르고 마감일을 비우면 deadlineDate가 결측 필드로 지목된다', () => {
+    const ctx = baseCtx({ draft: { ...baseCtx().draft, deadlineDate: '', deadlineTime } });
+
+    const missing = getMatchMissingFields(ctx);
+    expect(missing.some((item) => item.field === 'deadlineDate')).toBe(true);
+  });
+
+  it('한쪽만 채운 상태로는 buildMatchPayloadResult가 payload 대신 missingFields를 반환한다(마감 없음으로 조용히 저장되지 않는다)', () => {
+    const ctx = baseCtx({ draft: { ...baseCtx().draft, deadlineDate, deadlineTime: '' } });
+    const result = buildMatchPayloadResult(ctx.draft, ctx.sportId, ctx.regionId);
+
+    expect(result.payload).toBeUndefined();
+    expect(result.missingFields?.some((item) => item.field === 'deadlineTime')).toBe(true);
+  });
+
+  it('둘 다 비우면 여전히 유효하다(마감 없음이 의도된 정책)', () => {
+    const ctx = baseCtx({ draft: { ...baseCtx().draft, deadlineDate: '', deadlineTime: '' } });
+
+    expect(getMatchMissingFields(ctx).some((item) => item.field === 'deadlineDate' || item.field === 'deadlineTime')).toBe(false);
+  });
+
+  it('둘 다 채우면 유효하다', () => {
+    const ctx = baseCtx({ draft: { ...baseCtx().draft, deadlineDate, deadlineTime } });
+
+    expect(getMatchMissingFields(ctx).some((item) => item.field === 'deadlineDate' || item.field === 'deadlineTime')).toBe(false);
+  });
+});

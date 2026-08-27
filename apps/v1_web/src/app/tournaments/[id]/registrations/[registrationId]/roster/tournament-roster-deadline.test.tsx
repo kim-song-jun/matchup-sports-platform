@@ -2,15 +2,22 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { TournamentRosterDeadlineCard } from './tournament-roster-client';
 
+// 픽스처의 시각에 오프셋(+09:00)을 명시한다. 타임존 없는 '2026-07-20T18:30:00' 은
+// `new Date()` 가 **실행 머신의 로컬 시간**으로 해석하므로, 같은 문자열이 KST 개발
+// 머신에서는 18:30 KST 로, UTC CI 러너에서는 18:30 UTC(= KST 익일 03:30)로 달라진다.
+// 화면은 대회 시각을 항상 KST 로 고정해 렌더하므로(date-utils.ts getTournamentKstParts),
+// 입력이 모호하면 기대 문자열이 러너 타임존에 따라 흔들린다 — 실제로 로컬은 통과하고
+// CI(UTC)만 깨졌다. 오프셋을 박아 어느 타임존에서 돌려도 같은 순간을 가리키게 한다.
+
 describe('TournamentRosterDeadlineCard', () => {
   it('shows a closed registration deadline while keeping an unlocked roster editable', () => {
     render(
       <TournamentRosterDeadlineCard
-        deadlineAt={'2026-07-20T18:30:00'}
+        deadlineAt={'2026-07-20T18:30:00+09:00'}
         isRosterLocked={false}
         isRosterEditBlockedByStatus={false}
         isRosterDeadlineBlocked={false}
-        nowMs={new Date('2026-07-20T19:00:00').getTime()}
+        nowMs={new Date('2026-07-20T19:00:00+09:00').getTime()}
       />,
     );
 
@@ -23,11 +30,11 @@ describe('TournamentRosterDeadlineCard', () => {
   it('shows an upcoming registration deadline and an independently locked roster', () => {
     render(
       <TournamentRosterDeadlineCard
-        deadlineAt={'2026-07-20T18:30:00'}
+        deadlineAt={'2026-07-20T18:30:00+09:00'}
         isRosterLocked
         isRosterEditBlockedByStatus={false}
         isRosterDeadlineBlocked={false}
-        nowMs={new Date('2026-07-20T17:00:00').getTime()}
+        nowMs={new Date('2026-07-20T17:00:00+09:00').getTime()}
       />,
     );
 
@@ -39,11 +46,11 @@ describe('TournamentRosterDeadlineCard', () => {
   it('shows the separate roster submission deadline when it blocks editing', () => {
     render(
       <TournamentRosterDeadlineCard
-        deadlineAt={'2026-07-20T18:30:00'}
+        deadlineAt={'2026-07-20T18:30:00+09:00'}
         isRosterLocked={false}
         isRosterEditBlockedByStatus={false}
         isRosterDeadlineBlocked
-        nowMs={new Date('2026-07-20T17:00:00').getTime()}
+        nowMs={new Date('2026-07-20T17:00:00+09:00').getTime()}
       />,
     );
 
@@ -56,12 +63,12 @@ describe('TournamentRosterDeadlineCard', () => {
   it('shows the tournament-closed state even when the deadline exception would otherwise allow editing', () => {
     render(
       <TournamentRosterDeadlineCard
-        deadlineAt={'2026-07-20T18:30:00'}
+        deadlineAt={'2026-07-20T18:30:00+09:00'}
         isTournamentRosterClosed
         isRosterLocked={false}
         isRosterEditBlockedByStatus={false}
         isRosterDeadlineBlocked={false}
-        nowMs={new Date('2026-07-20T19:00:00').getTime()}
+        nowMs={new Date('2026-07-20T19:00:00+09:00').getTime()}
       />,
     );
 

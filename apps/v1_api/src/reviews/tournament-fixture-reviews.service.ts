@@ -204,6 +204,7 @@ export class TournamentFixtureReviewsService {
           targetType: 'team',
           targetTeamId,
           rating: dto.rating,
+          sportId: context.fixture.tournament.sportId,
           tags: { create: tagCodes.map((tagCode) => ({ tagCode, labelSnapshot: REVIEW_TAGS[tagCode] })) },
         },
         include: reviewInclude(),

@@ -313,11 +313,16 @@ function allowsRoleAction(role: TournamentStaffRole, action: TournamentStaffActi
       // 2026-08-11: field_operator는 tournament_command(경기 시작)를 갖지만, 그 전제
       // 조건인 라인업 제출은 lineup_mutate가 없어 만들 수 없었다 — 현장 스태프 혼자서는
       // 대회를 굴릴 수 없는 모순(알파 실측 재현). 오너 결정으로 lineup_mutate를 허용한다.
+      // 2026-08-27: 같은 모순이 event_reverse에도 있었다 — 현장에서 오기록한 골/카드를
+      // event_append로 기록만 하고 event_reverse가 없어 되돌리기·어시스트 지정을 직접
+      // 못 해 관리자 '결과 정정' 절차로 우회해야 했다. 현장 정정은 현장에서 완결되어야
+      // 한다는 동일 논리로 event_reverse를 허용한다.
       return (
         action === 'read' ||
         action === 'tournament_command' ||
         action === 'event_append' ||
-        action === 'lineup_mutate'
+        action === 'lineup_mutate' ||
+        action === 'event_reverse'
       );
     case 'support_readonly':
     case 'public':

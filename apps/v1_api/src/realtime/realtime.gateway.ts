@@ -395,6 +395,21 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       serverSentAt: Date.now(),
     };
     client.emit('game.time.pong', pong);
+    // 감사 발견(T-staff-realtime-eviction): game.subscribe 는 최초 입장 시점에만
+    // assertAccess 를 부른다. 그 뒤 배정이 expiresAt 으로 만료돼도 이미 join 된
+    // 소켓을 빼내는 코드가 없어서(축출은 revokeStaff → evictUserFromScopedGameRooms
+    // 경로 하나뿐) 만료된 스태프가 이미 열어 둔 콘솔 탭으로 방송을 계속 받는다.
+    // 이 레포엔 cron 인프라(@nestjs/schedule)가 없어(team-contacts.service.ts
+    // settleExpiry 주석 참고) 배치 스윕 대신, 콘솔이 15초마다 이미 보내는
+    // 이 하트비트에 재검증을 얹는다(lazy-flip 패턴).
+    try {
+      await this.revalidateStaffAccessForSocket(client);
+    } catch (error) {
+      this.logger.error(
+        { socketId: client.id, err: error },
+        'Failed to revalidate staff access on clock heartbeat',
+      );
+    }
     return pong;
   }
 
@@ -608,6 +623,79 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     if (tournaments?.size === 0) {
       this.gameSubscriptions.delete(input.userId);
     }
+  }
+
+  /**
+   * `game.time.ping` 하트비트(15초 주기, use-v1-game-operations-console.ts)에서
+   * 호출된다. 이 소켓이 현재 구독 중인 게임들에 대해 스태프 접근을 다시 판정해,
+   * `game.subscribe` 이후 expiresAt 이 지났거나 배정 자체가 사라진 경우 그
+   * 게임 방에서만 이 소켓을 내보낸다 — `evictUserFromScopedGameRooms`(revoke
+   * 경로)처럼 그 유저의 tournamentId 전체를 통째로 비우지 않는다: 재판정
+   * 대상은 "지금 이 소켓이 실제로 붙어 있는 게임들"뿐이라 범위가 이미
+   * 정확하고, 같은 유저의 다른 유효한 배정까지 건드릴 이유가 없다.
+   */
+  private async revalidateStaffAccessForSocket(client: V1Socket): Promise<void> {
+    const userId = client.data.userId;
+    if (userId === undefined) {
+      return;
+    }
+    const tournaments = this.gameSubscriptions.get(userId);
+    if (tournaments === undefined) {
+      return;
+    }
+    const subscribedGameIds: string[] = [];
+    for (const games of tournaments.values()) {
+      for (const [gameId, socketIds] of games) {
+        if (socketIds.has(client.id)) {
+          subscribedGameIds.push(gameId);
+        }
+      }
+    }
+
+    for (const gameId of subscribedGameIds) {
+      const scope = await this.loadGameFixtureScope(gameId);
+      if (scope === null) {
+        // 픽스처가 없는 게임(team-match 등)은 애초에 스태프 스코프 검사 없이
+        // 구독됐다 — game.subscribe 의 `if (fixture !== null)` 분기와 동일 기준.
+        continue;
+      }
+      try {
+        await this.tournamentStaffAccess.assertAccess({
+          userId,
+          action: 'read',
+          resource: {
+            tournamentId: scope.tournamentId,
+            fixtureId: scope.fixtureId,
+            ...(scope.fieldId === null ? {} : { fieldId: scope.fieldId }),
+          },
+        });
+      } catch (error) {
+        if (!(error instanceof ForbiddenException)) {
+          throw error;
+        }
+        await client.leave(gameRoom(gameId));
+        this.removeGameSubscription(userId, gameId, client.id);
+        client.emit('game.permission.revoked', { gameId, assignmentVersion: null });
+      }
+    }
+  }
+
+  private async loadGameFixtureScope(gameId: string): Promise<{
+    readonly tournamentId: string;
+    readonly fixtureId: string;
+    readonly fieldId: string | null;
+  } | null> {
+    const game = await this.prisma.v1Game.findUnique({
+      where: { id: gameId },
+      select: {
+        tournamentFixture: { select: { id: true, tournamentId: true, fieldId: true } },
+      },
+    });
+    const fixture = game?.tournamentFixture ?? null;
+    if (fixture === null) {
+      return null;
+    }
+    return { tournamentId: fixture.tournamentId, fixtureId: fixture.id, fieldId: fixture.fieldId };
   }
 
   emitToUser(userId: string, event: string, payload: unknown): void {

@@ -71,7 +71,9 @@ describe('Tournament staff policy', () => {
       tournament_director: actions,
       // 2026-08-11: field_operator에 lineup_mutate 추가 — 경기 시작 권한(tournament_command)의
       // 전제조건인 라인업 제출을 현장 스태프가 직접 할 수 있어야 한다(알파 실측, 오너 결정).
-      field_operator: ['read', 'tournament_command', 'event_append', 'lineup_mutate'],
+      // 2026-08-27: field_operator에 event_reverse 추가 — 현장에서 오기록한 골/카드를
+      // 현장에서 직접 되돌리고 어시스트를 지정할 수 있어야 한다(같은 논리, 알파 실측).
+      field_operator: ['read', 'tournament_command', 'event_append', 'lineup_mutate', 'event_reverse'],
       support_readonly: ['read'],
       team_manager: ['read', 'lineup_mutate'],
       public: ['read'],
@@ -112,7 +114,7 @@ describe('Tournament staff policy', () => {
       }
     }
 
-    expect({ allowed, rejected }).toEqual({ allowed: 20, rejected: 16 });
+    expect({ allowed, rejected }).toEqual({ allowed: 21, rejected: 15 });
   });
 
   it('allows team managers only their frozen read and lineup mutation surface', () => {
@@ -138,10 +140,11 @@ describe('Tournament staff policy', () => {
     }
   });
 
-  it('grants field_operator lineup_mutate (2026-08-11 fix) without widening support_readonly', () => {
+  it('grants field_operator lineup_mutate + event_reverse (2026-08-11, 2026-08-27 fixes) without widening support_readonly', () => {
     // Given: field_operator must be able to submit the lineup that is a
     // precondition for the tournament_command it already holds (starting a
-    // fixture requires a saved lineup first).
+    // fixture requires a saved lineup first), and must be able to undo a
+    // misrecorded event it just logged itself.
     const fieldOperatorBase = {
       role: 'field_operator',
       now: NOW,
@@ -149,13 +152,17 @@ describe('Tournament staff policy', () => {
       assignment: scopeAssignment('field_operator'),
     } as const;
 
-    // When / Then: field_operator now gets lineup_mutate...
+    // When / Then: field_operator now gets lineup_mutate and event_reverse...
     expect(decideTournamentStaffAccess({ ...fieldOperatorBase, action: 'lineup_mutate' })).toEqual({
       allowed: true,
       reason: 'ALLOWED',
     });
+    expect(decideTournamentStaffAccess({ ...fieldOperatorBase, action: 'event_reverse' })).toEqual({
+      allowed: true,
+      reason: 'ALLOWED',
+    });
     // ...while its still-excluded actions stay denied.
-    for (const action of ['event_reverse', 'cancel', 'result_review', 'result_officialize'] as const) {
+    for (const action of ['cancel', 'result_review', 'result_officialize'] as const) {
       expect(decideTournamentStaffAccess({ ...fieldOperatorBase, action })).toEqual({
         allowed: false,
         reason: 'ROLE_ACTION_DENIED',

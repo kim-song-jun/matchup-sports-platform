@@ -6,7 +6,7 @@ import { isPrismaAvailabilityError } from '../common/prisma-availability-error';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { NotificationsService } from '../notifications/notifications.service';
 import { LeagueMatchPublicService } from './league-match-public.service';
-import { findUnfinishedSeasonLeagues, planNextSeasonTiers } from './league-lifecycle-rules';
+import { findInactivePromotionTeamIds, findUnfinishedSeasonLeagues, planNextSeasonTiers } from './league-lifecycle-rules';
 import {
   calculatePromotions,
   promotionRuleFingerprint,
@@ -332,9 +332,10 @@ export class LeagueSeriesAdminService {
       seriesId,
       seasonNo,
       rule: this.ruleOf(series),
-      // 이 preview 를 만들어 낸 규칙의 지문. commit 이 그대로 되돌려 보내면 서버가
-      // 그 사이 규칙이 바뀌었는지 판정한다(Task 72 participantHash 와 같은 패턴).
-      ruleFingerprint: promotionRuleFingerprint(this.ruleOf(series)),
+      // 이 preview 를 만들어 낸 규칙 + 티어 수의 지문. commit 이 그대로 되돌려 보내면 서버가
+      // 그 사이 규칙이나 티어 수가 바뀌었는지 판정한다(Task 72 participantHash 와 같은 패턴).
+      // tierCount 를 함께 넘기는 이유는 promotionRuleFingerprint 의 doc comment 참고.
+      ruleFingerprint: promotionRuleFingerprint(this.ruleOf(series), series.tierCount),
       alreadyDecided: alreadyDecided > 0,
       warnings: plan.warnings,
       tiers: plan.tiers.map((tier) => {
@@ -374,7 +375,7 @@ export class LeagueSeriesAdminService {
   async commitPromotions(user: V1AuthUser, seriesId: string, seasonNo: number, dto: CommitPromotionsDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const series = await this.loadSeries(seriesId);
-    const { tiers, leagueByTier } = await this.loadSeasonStandings(seriesId, seasonNo);
+    const { tiers, leagueByTier, teamNameById } = await this.loadSeasonStandings(seriesId, seasonNo);
 
     const decided = await this.prisma.v1LeaguePromotion.findFirst({
       where: { fromLeagueId: { in: tiers.map((t) => t.leagueId) } },
@@ -393,8 +394,10 @@ export class LeagueSeriesAdminService {
     // 지금 서버가 하는 계산이 다르다. fromTier 는 규칙과 무관해 그대로라
     // PROMOTION_ENTRIES_TIER_MISMATCH 로는 절대 잡히지 않고, 대신 손대지도 않은 팀이
     // overriddenByAdmin=true 로 박제된다(alpha 실측: 수정 0건 · overriddenCount=2).
-    // 지문이 어긋나면 다시 계산하게 돌려보낸다.
-    if (dto.ruleFingerprint !== undefined && dto.ruleFingerprint !== promotionRuleFingerprint(rule)) {
+    // 지문이 어긋나면 다시 계산하게 돌려보낸다. tierCount 도 지문에 포함한다 — preview 이후
+    // 다른 탭·다른 어드민이 티어 수를 바꿔도 rule 자체는 그대로라 지문 검사가 못 잡던
+    // 결함(같은 alpha 실측 사고)을 tierCount 를 함께 해시해 잡는다.
+    if (dto.ruleFingerprint !== undefined && dto.ruleFingerprint !== promotionRuleFingerprint(rule, series.tierCount)) {
       throw new ConflictException({
         code: 'PROMOTION_RULE_CHANGED',
         message: '승강 규칙이 바뀌었어요. 승강 후보를 다시 계산해 주세요.',
@@ -515,6 +518,27 @@ export class LeagueSeriesAdminService {
           tiers: nextSeasonPlan.undersized.map((entry) => ({ tier: entry.tier, teamCount: entry.teamIds.length })),
         },
       });
+    }
+
+    // 다음 시즌 로스터에 비활성(suspended)·삭제된 팀이 섞여 있으면 확정 자체를 막는다.
+    // seedSeason(:240-249)/addTeam(league-match-admin.service.ts:381)이 강제하는 "활성 팀만"
+    // 불변식을 이 경로에도 적용한다 — 자세한 이유는 findInactivePromotionTeamIds doc comment 참고.
+    const nextSeasonTeamIds = nextSeasonPlan.tiers.flatMap((t) => t.teamIds);
+    if (nextSeasonTeamIds.length > 0) {
+      const activeTeams = await this.prisma.v1Team.findMany({
+        where: { id: { in: nextSeasonTeamIds }, status: 'active', deletedAt: null },
+        select: { id: true },
+      });
+      const inactiveTeamIds = findInactivePromotionTeamIds(nextSeasonTeamIds, new Set(activeTeams.map((t) => t.id)));
+      if (inactiveTeamIds.length > 0) {
+        throw new UnprocessableEntityException({
+          code: 'PROMOTION_TEAM_INACTIVE',
+          message:
+            `${inactiveTeamIds.map((teamId) => teamNameById.get(teamId) ?? teamId).join(' · ')} 팀이 ` +
+            '비활성화되었거나 삭제됐어요. 승강 확정 전에 팀 상태를 확인하거나 승강 결정을 조정해 주세요.',
+          details: { inactiveTeamIds },
+        });
+      }
     }
 
     const nextSeasonNo = seasonNo + 1;

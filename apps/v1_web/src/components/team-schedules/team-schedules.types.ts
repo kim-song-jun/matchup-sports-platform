@@ -168,6 +168,23 @@ export type ScheduleAttendeeListModel = {
   visible: boolean;
   items: ScheduleAttendeeItem[];
   counts: { all: number; going: number; noResponse: number };
+  /**
+   * 팀장·매니저가 팀원의 참석을 대신 표시할 수 있는지. 리그 대진은 운영자가 일방 배정하는
+   * 의무 경기라 선수가 앱을 안 열면 팀장이 라인업을 못 짠다(라인업 저장의 출석 게이트).
+   * false 면 대리 버튼 자체가 렌더되지 않는다 — 서버도 403 으로 막지만, 누를 수 없는
+   * 버튼을 보여주고 눌러서 실패하게 두지 않는다.
+   */
+  canProxy: boolean;
+  /**
+   * 대리 표시 진행 중인 팀원 userId. 진행 중에는 **모든 줄의** 대리 버튼이 잠기고,
+   * 그 줄만 "처리 중…" 으로 바뀐다 -- 대리 응답은 스케줄의 `expectedVersion` 을 실어
+   * 보내므로 두 줄을 동시에 누르면 뒤엣것이 버전 충돌로 실패한다. 한 번에 하나씩
+   * 보내 실패를 아예 만들지 않는 쪽을 택했다.
+   */
+  proxyPendingUserId: string | null;
+  /** 대리 표시 실패 사유. 실패해도 목록은 그대로 두고 이 문구만 덧붙인다. */
+  proxyError: string | null;
+  onProxyGoing: (userId: string) => void;
 };
 
 export type ScheduleManageActionsModel = {

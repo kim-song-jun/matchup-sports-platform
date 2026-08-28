@@ -467,6 +467,11 @@ function ScheduleAttendeeSection({ model }: { model: ScheduleDetailViewModel['at
           미응답 {model.counts.noResponse}
         </button>
       </div>
+      {model.proxyError ? (
+        <div className="tm-text-caption" role="alert" style={{ color: 'var(--red700)', marginBottom: 8 }}>
+          {model.proxyError}
+        </div>
+      ) : null}
       {filtered.length === 0 ? (
         <div className="tm-text-caption">해당하는 팀원이 없어요.</div>
       ) : (
@@ -494,6 +499,23 @@ function ScheduleAttendeeSection({ model }: { model: ScheduleDetailViewModel['at
                 {item.nickname.slice(0, 1)}
               </div>
               <div className="tm-text-body" style={{ flex: 1, minWidth: 0 }}>{item.nickname}</div>
+              {/*
+                미응답 팀원만 대리 표시 대상이다 — 이미 응답한 사람의 의사를 팀장이
+                덮어쓰지 않는다. 정원이 찼으면 서버가 본인 응답과 똑같이 대기자로
+                내리므로(사용자 확정) 여기서 따로 막지 않는다.
+              */}
+              {model.canProxy && item.status === 'NO_RESPONSE' ? (
+                <button
+                  type="button"
+                  className="tm-btn tm-btn-sm tm-btn-neutral"
+                  style={{ minHeight: 44 }}
+                  disabled={model.proxyPendingUserId !== null}
+                  aria-label={`${item.nickname} 참석으로 대신 표시`}
+                  onClick={() => model.onProxyGoing(item.userId)}
+                >
+                  {model.proxyPendingUserId === item.userId ? '처리 중…' : '참석 대신 표시'}
+                </button>
+              ) : null}
               <span className={`tm-badge ${ATTENDEE_STATUS_BADGE_CLASS[item.status] ?? 'tm-badge-grey'}`}>
                 {ATTENDEE_STATUS_LABEL[item.status] ?? item.status}
               </span>

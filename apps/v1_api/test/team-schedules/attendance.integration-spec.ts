@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { HttpException } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { ScheduleAttendanceService } from '../../src/team-schedules/attendance.service';
@@ -40,15 +41,22 @@ function expectHttpCode(error: unknown, status: number, code: string) {
   expect(exception.getResponse()).toEqual(expect.objectContaining({ code }));
 }
 
+/**
+ * `id` 를 넘기지 않으면 헬퍼가 매번 새로 만든다. 이 스위트는 테스트마다 정리하지 않아
+ * 스케줄 행이 계속 쌓이는데, 예전에는 호출부가 UUID 끝자리를 손으로 매겼다 --
+ * 다른 브랜치가 같은 번호를 고르면 `Unique constraint failed on the fields: (id)` 로
+ * CI 에서만 터진다(실제로 이 PR 에서 한 번 났다). 리터럴 id 를 단언에 쓰는 곳은 없으니
+ * 새 테스트는 id 를 넘기지 않는 쪽이 기본이다.
+ */
 async function createSchedule(overrides: {
-  id: string;
+  id?: string;
   capacity?: number | null;
   rsvpDeadlineAt?: Date | null;
   state?: 'SCHEDULED' | 'CANCELLED' | 'COMPLETED';
-}) {
+} = {}) {
   return prisma.v1TeamSchedule.create({
     data: {
-      id: overrides.id,
+      id: overrides.id ?? randomUUID(),
       teamId: ids.team,
       title: 'Task 12 attendance fixture',
       type: 'TRAINING',
@@ -146,6 +154,201 @@ describe('Task 12 attendance lane — ScheduleAttendanceService', () => {
     const error = await captureFailure(() =>
       service.setMyAttendance(authUser(ids.nonMember), ids.team, schedule.id, { status: 'GOING', expectedVersion: 0 }, 'nonmember-key'),
     );
+    expectHttpCode(error, 403, 'PERMISSION_DENIED');
+    expect(await prisma.v1ScheduleAttendance.count({ where: { scheduleId: schedule.id } })).toBe(0);
+  });
+
+  // 대리 출석 응답 — 리그 대진은 운영자가 일방 배정하는 의무 경기라, 선수 한 명이 앱을
+  // 안 열면 팀장이 라인업을 못 짠다(team-match-lineup.service.ts 의 출석 게이트).
+  // 사용자 확정: 게이트는 유지하되 팀장이 대신 표시할 수 있게 한다. 정원 규칙은 동일.
+  it('팀장은 팀원의 참석을 대신 표시할 수 있고, 출석 행은 그 팀원 것으로 생긴다', async () => {
+    const schedule = await createSchedule();
+
+    const result = await service.setAttendanceOnBehalf(
+      authUser(ids.owner),
+      ids.userA,
+      ids.team,
+      schedule.id,
+      { status: 'GOING', expectedVersion: 0 },
+      'proxy-owner-key',
+    );
+
+    expect(result.status).toBe('GOING');
+    // 행위자(팀장)가 아니라 **대상자**의 행이어야 한다 — 둘을 섞으면 팀장이 자기
+    // 참석을 눌러버린 것이 된다.
+    const rows = await prisma.v1ScheduleAttendance.findMany({ where: { scheduleId: schedule.id } });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.userId).toBe(ids.userA);
+  });
+
+  it('일반 팀원은 남의 참석을 대신 표시할 수 없고 행도 생기지 않는다', async () => {
+    const schedule = await createSchedule();
+
+    const error = await captureFailure(() =>
+      service.setAttendanceOnBehalf(
+        authUser(ids.userB),
+        ids.userA,
+        ids.team,
+        schedule.id,
+        { status: 'GOING', expectedVersion: 0 },
+        'proxy-member-key',
+      ),
+    );
+
+    expectHttpCode(error, 403, 'PERMISSION_DENIED');
+    expect(await prisma.v1ScheduleAttendance.count({ where: { scheduleId: schedule.id } })).toBe(0);
+  });
+
+  it('대리 응답도 정원이 차면 본인 응답과 똑같이 대기자가 된다', async () => {
+    // 사용자 확정: 팀장에게 정원을 넘길 권한을 주지 않는다 — 먼저 응답해 대기자가 된
+    // 사람과의 형평성이 깨지기 때문이다.
+    const schedule = await createSchedule({ capacity: 1 });
+    await service.setMyAttendance(
+      authUser(ids.userB),
+      ids.team,
+      schedule.id,
+      { status: 'GOING', expectedVersion: 0 },
+      'proxy-cap-first',
+    );
+
+    const proxied = await service.setAttendanceOnBehalf(
+      authUser(ids.owner),
+      ids.userA,
+      ids.team,
+      schedule.id,
+      { status: 'GOING', expectedVersion: 0 },
+      'proxy-cap-second',
+    );
+
+    expect(proxied.status).toBe('WAITLISTED');
+  });
+
+  it('이미 답한 팀원의 의사는 팀장이 대리로 덮어쓸 수 없다', async () => {
+    // 화면은 미응답 줄에만 버튼을 내지만, 화면만으로 지키면 반쪽이다 -- 출석은 라인업
+    // 자격을 결정하므로(라인업 저장의 출석 게이트) 서버가 직접 막아야 한다. 특히 첫
+    // 응답의 version 은 0 이라, expectedVersion=0 으로 부르면 그대로 통과했었다.
+    const schedule = await createSchedule();
+    await service.setMyAttendance(
+      authUser(ids.userA),
+      ids.team,
+      schedule.id,
+      { status: 'NOT_GOING', expectedVersion: 0 },
+      'answered-self-key',
+    );
+
+    const error = await captureFailure(() =>
+      service.setAttendanceOnBehalf(
+        authUser(ids.owner),
+        ids.userA,
+        ids.team,
+        schedule.id,
+        { status: 'GOING', expectedVersion: 0 },
+        'proxy-overwrite-key',
+      ),
+    );
+
+    expectHttpCode(error, 409, 'PROXY_ATTENDANCE_ALREADY_ANSWERED');
+    const row = await prisma.v1ScheduleAttendance.findUniqueOrThrow({
+      where: { scheduleId_userId: { scheduleId: schedule.id, userId: ids.userA } },
+    });
+    expect(row.status).toBe('NOT_GOING');
+  });
+
+  it('대리로는 참석만 표시할 수 있다', async () => {
+    // 승인된 범위는 "대신 응답"까지다. 불참·미정을 대신 눌러 주는 것은 대신 답하는 게
+    // 아니라 대신 정하는 것이라 여기 포함되지 않는다.
+    const schedule = await createSchedule();
+
+    const error = await captureFailure(() =>
+      service.setAttendanceOnBehalf(
+        authUser(ids.owner),
+        ids.userA,
+        ids.team,
+        schedule.id,
+        { status: 'NOT_GOING', expectedVersion: 0 },
+        'proxy-notgoing-key',
+      ),
+    );
+
+    expectHttpCode(error, 409, 'PROXY_ATTENDANCE_STATUS_NOT_ALLOWED');
+    expect(await prisma.v1ScheduleAttendance.count({ where: { scheduleId: schedule.id } })).toBe(0);
+  });
+
+  it('같은 키를 다른 대상자에게 재사용하면 조용히 replay 되지 않고 충돌로 드러난다', async () => {
+    // idempotency identity 는 (actor, action, schedule, key) 라 대상자를 구분하지 않는다.
+    // 대상자를 payloadHash 에 넣지 않으면 두 번째 대상자의 출석이 기록되지 않은 채
+    // 첫 번째 응답이 그대로 돌아와, 호출부는 성공으로 읽는다 -- 팀장이 B 를 참석으로
+    // 표시했다고 믿는데 실제로는 A 만 표시된 상태가 된다.
+    const schedule = await createSchedule();
+
+    await service.setAttendanceOnBehalf(
+      authUser(ids.owner),
+      ids.userA,
+      ids.team,
+      schedule.id,
+      { status: 'GOING', expectedVersion: 0 },
+      'proxy-reused-key',
+    );
+
+    const error = await captureFailure(() =>
+      service.setAttendanceOnBehalf(
+        authUser(ids.owner),
+        ids.userB,
+        ids.team,
+        schedule.id,
+        { status: 'GOING', expectedVersion: 0 },
+        'proxy-reused-key',
+      ),
+    );
+
+    expectHttpCode(error, 409, 'IDEMPOTENCY_PAYLOAD_CONFLICT');
+    // 조용한 replay 였다면 userB 행이 없는 채로 성공했을 것이다.
+    const rows = await prisma.v1ScheduleAttendance.findMany({ where: { scheduleId: schedule.id } });
+    expect(rows.map((row) => row.userId)).toEqual([ids.userA]);
+  });
+
+  it('같은 키로 같은 대상자를 다시 부르면 그대로 replay 된다', async () => {
+    // 위 분기가 대상자별로 해시를 갈랐다고 해서 원래의 재시도 흡수까지 깨지면 안 된다.
+    const schedule = await createSchedule();
+
+    const first = await service.setAttendanceOnBehalf(
+      authUser(ids.owner),
+      ids.userA,
+      ids.team,
+      schedule.id,
+      { status: 'GOING', expectedVersion: 0 },
+      'proxy-retry-key',
+    );
+    const second = await service.setAttendanceOnBehalf(
+      authUser(ids.owner),
+      ids.userA,
+      ids.team,
+      schedule.id,
+      { status: 'GOING', expectedVersion: 0 },
+      'proxy-retry-key',
+    );
+
+    // 재시도 흡수는 "같은 결과를 돌려주되 재생임을 밝힌다" 가 계약이다 -- 첫 응답은
+    // replayed: false, 재시도는 그 응답 그대로에 replayed: true 만 얹혀 돌아온다.
+    expect(second).toEqual({ ...first, replayed: true });
+    expect(first.replayed).toBe(false);
+    expect(await prisma.v1ScheduleAttendance.count({ where: { scheduleId: schedule.id } })).toBe(1);
+  });
+
+  it('팀 소속이 아닌 사람을 대상으로는 대리 표시할 수 없다', async () => {
+    const schedule = await createSchedule();
+
+    const error = await captureFailure(() =>
+      service.setAttendanceOnBehalf(
+        authUser(ids.owner),
+        ids.nonMember,
+        ids.team,
+        schedule.id,
+        { status: 'GOING', expectedVersion: 0 },
+        'proxy-nonmember-key',
+      ),
+    );
+
     expectHttpCode(error, 403, 'PERMISSION_DENIED');
     expect(await prisma.v1ScheduleAttendance.count({ where: { scheduleId: schedule.id } })).toBe(0);
   });

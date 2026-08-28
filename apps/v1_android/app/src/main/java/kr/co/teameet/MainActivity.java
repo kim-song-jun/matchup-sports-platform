@@ -41,6 +41,7 @@ public final class MainActivity extends AppCompatActivity {
     private ActivityResultLauncher<Intent> fileChooserLauncher;
     private ActivityResultLauncher<String> notificationPermissionLauncher;
     private String pendingPushRequestId;
+    private int bottomSystemInsetCssPixels;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -84,7 +85,14 @@ public final class MainActivity extends AppCompatActivity {
             Insets insets = windowInsets.getInsets(
                 WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout()
             );
-            view.setPadding(insets.left, insets.top, insets.right, insets.bottom);
+            // Keep the WebView edge-to-edge at the bottom so fixed web chrome can paint behind the
+            // navigation bar. Only its interactive content consumes the bottom inset via the CSS
+            // variable below; padding the native root on all four sides makes the whole web viewport
+            // float above three-button navigation.
+            view.setPadding(insets.left, insets.top, insets.right, 0);
+            float density = getResources().getDisplayMetrics().density;
+            bottomSystemInsetCssPixels = Math.round(insets.bottom / density);
+            publishSystemInsets();
             return windowInsets;
         });
         ViewCompat.requestApplyInsets(rootView);
@@ -133,6 +141,7 @@ public final class MainActivity extends AppCompatActivity {
             @Override public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 if (AllowedNavigation.isInternal(Uri.parse(url))) {
+                    publishSystemInsets();
                     if (canRegisterPush()) {
                         PushRegistrationClient.register(MainActivity.this);
                     } else if (InstallationIdentity.isRegistered(MainActivity.this)) {
@@ -152,6 +161,15 @@ public final class MainActivity extends AppCompatActivity {
             }
         });
         webView.setDownloadListener(this::enqueueInternalDownload);
+    }
+
+    private void publishSystemInsets() {
+        if (webView == null) return;
+        webView.evaluateJavascript(
+            "document.documentElement.style.setProperty('--teameet-native-safe-bottom','"
+                + bottomSystemInsetCssPixels + "px')",
+            null
+        );
     }
 
     private void enqueueInternalDownload(

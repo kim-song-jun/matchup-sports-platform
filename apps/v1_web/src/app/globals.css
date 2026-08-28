@@ -291,7 +291,10 @@
   --v1-shell-wide-topbar-right-x: 14px;
   --v1-shell-scroll-bottom-pad: 12px;
   --v1-shell-cta-bottom-pad: 22px;
-  --v1-shell-safe-bottom: env(safe-area-inset-bottom, 0px);
+  /* Native Android publishes its measured navigation-bar inset here. The nav surface can then paint
+     edge-to-edge while only controls consume the safe area. Browser/PWA clients keep using env(). */
+  --teameet-native-safe-bottom: 0px;
+  --v1-shell-safe-bottom: max(env(safe-area-inset-bottom, 0px), var(--teameet-native-safe-bottom));
 
   /* 홈 공유 추천 미디어(.tm-featured-media)는 모든 소비자와 뷰포트에서 2:1 crop을 유지한다. */
   --tm-featured-media-ratio: 2 / 1;
@@ -575,7 +578,7 @@ button:disabled {
 .tm-scroll-area {
   position: absolute;
   top: var(--v1-shell-topbar-height);
-  bottom: var(--v1-shell-bottom-nav-height);
+  bottom: calc(var(--v1-shell-bottom-nav-height) + var(--v1-shell-safe-bottom));
   left: 0;
   width: 100%;
   min-height: 0;

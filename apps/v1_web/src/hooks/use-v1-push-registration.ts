@@ -3,6 +3,7 @@ import { v1Delete, v1Get, v1Post } from '@/lib/api-client';
 import { extractErrorMessage } from '@/lib/error-message';
 import { reportClientError } from '@/lib/client-error-reporter';
 import { trackEvent } from '@/lib/analytics';
+import { isNativePushAvailable, requestNativePush } from '@/lib/native-push';
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -28,18 +29,34 @@ export interface V1PushRegistration {
 export function useV1PushRegistration(): V1PushRegistration {
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isPending, setIsPending] = useState(false);
-  const supported = typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window;
+  const nativeSupported = isNativePushAvailable();
+  const browserSupported = typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window;
   // 권한은 state로 들고 requestPermission 결과로 갱신한다. 렌더 중 Notification.permission을
   // 직접 읽으면 사용자가 권한 팝업에서 '차단'을 눌러도 리렌더가 없어 UI가 계속 '허용 가능'으로
   // 남는다(구독 실패 → 상태 변화 없음 → 리렌더 없음).
   const [permission, setPermission] = useState<NotificationPermission | 'unsupported'>('unsupported');
 
   useEffect(() => {
-    setPermission(supported ? Notification.permission : 'unsupported');
-  }, [supported]);
+    if (nativeSupported) {
+      void requestNativePush('get-push-state')
+        .then((result) => {
+          setPermission(result.permission);
+          setIsSubscribed(result.subscribed);
+        })
+        .catch((err) => {
+          reportClientError({
+            message: extractErrorMessage(err, '앱 알림 상태를 확인하지 못했어요.'),
+            level: 'warn',
+            context: { flow: 'native-push-state-check' },
+          });
+        });
+      return;
+    }
+    setPermission(browserSupported ? Notification.permission : 'unsupported');
+  }, [browserSupported, nativeSupported]);
 
   useEffect(() => {
-    if (!supported) return;
+    if (!browserSupported || nativeSupported) return;
     // `ready` 가 아니라 `getRegistration()` 이어야 한다 — 아래 unsubscribe 의 주석 참고.
     // 이 자리에서는 매달린 프로미스라 화면이 멈추진 않지만, 등록이 없는 브라우저에서
     // 상태 확인이 조용히 영원히 보류되는 것은 같다.
@@ -54,10 +71,29 @@ export function useV1PushRegistration(): V1PushRegistration {
           context: { flow: 'push-subscription-check' },
         });
       });
-  }, [supported]);
+  }, [browserSupported, nativeSupported]);
 
   const subscribe = useCallback(async (): Promise<boolean> => {
-    if (!supported || Notification.permission === 'denied') return false;
+    if (nativeSupported) {
+      setIsPending(true);
+      try {
+        const result = await requestNativePush('request-notification-permission');
+        setPermission(result.permission);
+        setIsSubscribed(result.subscribed);
+        if (result.subscribed) trackEvent('push_subscribe_complete', { channel: 'native_fcm' });
+        return result.subscribed;
+      } catch (err) {
+        reportClientError({
+          message: extractErrorMessage(err, '앱 알림 등록에 실패했어요.'),
+          level: 'warn',
+          context: { flow: 'native-push-subscribe' },
+        });
+        return false;
+      } finally {
+        setIsPending(false);
+      }
+    }
+    if (!browserSupported || Notification.permission === 'denied') return false;
 
     setIsPending(true);
     try {
@@ -97,10 +133,31 @@ export function useV1PushRegistration(): V1PushRegistration {
     } finally {
       setIsPending(false);
     }
-  }, [supported]);
+  }, [browserSupported, nativeSupported]);
 
   const unsubscribe = useCallback(async () => {
-    if (!supported) return;
+    if (nativeSupported) {
+      setIsPending(true);
+      try {
+        const result = await requestNativePush('revoke-push-device');
+        setPermission(result.permission);
+        setIsSubscribed(result.subscribed);
+        if (result.subscribed) {
+          throw new Error('Native push device revocation was not confirmed by the server.');
+        }
+        return;
+      } catch (err) {
+        reportClientError({
+          message: extractErrorMessage(err, '앱 알림 해제에 실패했어요.'),
+          level: 'warn',
+          context: { flow: 'native-push-unsubscribe' },
+        });
+        return;
+      } finally {
+        setIsPending(false);
+      }
+    }
+    if (!browserSupported) return;
 
     setIsPending(true);
     try {
@@ -140,7 +197,7 @@ export function useV1PushRegistration(): V1PushRegistration {
     } finally {
       setIsPending(false);
     }
-  }, [supported]);
+  }, [browserSupported, nativeSupported]);
 
   return { subscribe, unsubscribe, permission, isSubscribed, isPending };
 }

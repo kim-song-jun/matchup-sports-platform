@@ -1,0 +1,58 @@
+name: Android Alpha
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [dev]
+    paths:
+      - apps/v1_android/**
+      - .github/workflows/android-alpha.yml
+  push:
+    branches: [dev]
+    paths:
+      - apps/v1_android/**
+      - .github/workflows/android-alpha.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-alpha-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ORG_GRADLE_PROJECT_firebaseProjectIdAlpha: ${{ vars.ANDROID_ALPHA_FIREBASE_PROJECT_ID }}
+      ORG_GRADLE_PROJECT_firebaseAppIdAlpha: ${{ vars.ANDROID_ALPHA_FIREBASE_APP_ID }}
+      ORG_GRADLE_PROJECT_firebaseApiKeyAlpha: ${{ vars.ANDROID_ALPHA_FIREBASE_API_KEY }}
+      ORG_GRADLE_PROJECT_firebaseSenderIdAlpha: ${{ vars.ANDROID_ALPHA_FIREBASE_SENDER_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android API 36 SDK
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.1.0'
+
+      - name: Test and build alpha debug APK
+        run: gradle -p apps/v1_android --no-daemon testAlphaDebugUnitTest assembleAlphaDebug
+
+      - name: Upload alpha APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: teameet-alpha-${{ github.sha }}
+          path: apps/v1_android/app/build/outputs/apk/alpha/debug/app-alpha-debug.apk
+          if-no-files-found: error
+          retention-days: 14

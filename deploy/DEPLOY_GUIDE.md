@@ -75,6 +75,8 @@ test "$(curl -sS -o /dev/null -w '%{http_code}' http://localhost:3013/v1/home)" 
 | `VAPID_PUBLIC_KEY` | Web Push VAPID public key, 선택 (미설정 시 `WebPushService`가 graceful disable) |
 | `VAPID_PRIVATE_KEY` | Web Push VAPID private key, 선택 (미설정 시 `WebPushService`가 graceful disable) |
 | `VAPID_SUBJECT` | Web Push VAPID subject (`mailto:` 또는 `https:` URI), 선택 |
+| `V1_PUSH_ENVIRONMENT` | Android 기기 격리 값. Alpha=`alpha`, production=`production` |
+| `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` | Android FCM 서버 자격증명. 세 값 전체가 없으면 disabled, 일부만 있으면 fail-fast. `docs/ops/android-fcm-setup.md` 참조 |
 
 `EC2_KNOWN_HOSTS`는 배포 시점의 `ssh-keyscan` 결과를 즉석에서 신뢰하지 않는다. 먼저 AWS Systems Manager 또는 EC2 콘솔처럼 AWS 제어면을 통해 대상 인스턴스에서 host key fingerprint를 확인하고, 별도 로컬 `ssh-keyscan -t ed25519 <EC2_HOST>` 결과의 fingerprint가 같은지 대조한 뒤 그 known_hosts 줄을 GitHub secret으로 등록한다. 값이 없거나 `EC2_HOST`와 일치하지 않으면 배포는 연결 전에 fail-closed 된다.
 

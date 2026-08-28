@@ -57,10 +57,65 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  delete window.TeameetNative;
   vi.restoreAllMocks();
 });
 
 describe('useV1PushRegistration', () => {
+  it('uses native FCM in the Android shell without invoking browser Web Push', async () => {
+    window.TeameetNative = {
+      postMessage: vi.fn((message) => {
+        const request = JSON.parse(message) as { requestId: string; type: string };
+        window.dispatchEvent(new CustomEvent('teameet:native-push-result', {
+          detail: {
+            requestId: request.requestId,
+            permission: request.type === 'get-push-state' ? 'default' : 'granted',
+            subscribed: request.type === 'request-notification-permission',
+          },
+        }));
+      }),
+    };
+    const { useV1PushRegistration } = await import('./use-v1-push-registration');
+    const { result } = renderHook(() => useV1PushRegistration());
+
+    await act(async () => {
+      await result.current.subscribe();
+    });
+
+    expect(window.TeameetNative.postMessage).toHaveBeenCalled();
+    expect(Notification.requestPermission).not.toHaveBeenCalled();
+    expect(v1Get).not.toHaveBeenCalled();
+    expect(result.current.isSubscribed).toBe(true);
+  });
+
+  it('revokes the native device before logout instead of touching browser Web Push', async () => {
+    const messages: string[] = [];
+    window.TeameetNative = {
+      postMessage: vi.fn((message) => {
+        messages.push(message);
+        const request = JSON.parse(message) as { requestId: string; type: string };
+        window.dispatchEvent(new CustomEvent('teameet:native-push-result', {
+          detail: {
+            requestId: request.requestId,
+            permission: 'granted',
+            subscribed: request.type !== 'revoke-push-device',
+          },
+        }));
+      }),
+    };
+    const { useV1PushRegistration } = await import('./use-v1-push-registration');
+    const { result } = renderHook(() => useV1PushRegistration());
+    await waitFor(() => expect(result.current.isSubscribed).toBe(true));
+
+    await act(async () => {
+      await result.current.unsubscribe();
+    });
+
+    expect(messages.some((message) => JSON.parse(message).type === 'revoke-push-device')).toBe(true);
+    expect(navigator.serviceWorker.getRegistration).not.toHaveBeenCalled();
+    expect(result.current.isSubscribed).toBe(false);
+  });
+
   it('subscribes: requests permission, registers the SW, and posts the subscription', async () => {
     const { useV1PushRegistration } = await import('./use-v1-push-registration');
     const { result } = renderHook(() => useV1PushRegistration());

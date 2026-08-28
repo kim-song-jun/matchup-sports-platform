@@ -597,6 +597,7 @@ model V1User {
   notifications                  V1Notification[]
   notificationPreference         V1NotificationPreference?
   pushSubscriptions              V1PushSubscription[]
+  pushDevices                    V1PushDevice[]
   webPushFailureLogs             V1WebPushFailureLog[]         @relation("V1WebPushFailureLogUser")
   acknowledgedPushFailureLogs    V1WebPushFailureLog[]         @relation("V1WebPushFailureLogAcknowledgedBy")
   searchHistories                V1SearchHistory[]
@@ -2035,6 +2036,39 @@ model V1PushSubscription {
 
   @@index([userId])
   @@map("v1_push_subscriptions")
+}
+
+enum V1PushPlatform {
+  android
+  ios
+}
+
+enum V1PushEnvironment {
+  alpha
+  production
+}
+
+model V1PushDevice {
+  id             String            @id @default(uuid())
+  userId         String            @map("user_id")
+  installationId String            @map("installation_id")
+  platform       V1PushPlatform
+  environment    V1PushEnvironment
+  token          String            @unique
+  appVersion     String?           @map("app_version")
+  deviceModel    String?           @map("device_model")
+  lastSeenAt     DateTime          @default(now()) @map("last_seen_at")
+  revokedAt      DateTime?         @map("revoked_at")
+  failureCount   Int               @default(0) @map("failure_count")
+  lastFailureAt  DateTime?         @map("last_failure_at")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+
+  user V1User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([environment, installationId])
+  @@index([userId, environment, revokedAt])
+  @@map("v1_push_devices")
 }
 
 model V1WebPushFailureLog {

@@ -1,4 +1,4 @@
-import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { Prisma, V1NotificationTargetType } from '@prisma/client';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { V1AuthUser } from '../auth/v1-auth-user';
@@ -10,6 +10,7 @@ import {
 } from './dto/notifications.dto';
 import { REALTIME_NOTIFIER, RealtimeNotifierPort } from './realtime-notifier.port';
 import { WebPushService } from './web-push.service';
+import { FcmPushService } from './fcm-push.service';
 
 /** Notification event types emitted by domain services. */
 export type NotificationEventType =
@@ -569,6 +570,7 @@ export class NotificationsService {
     @Inject(REALTIME_NOTIFIER) private readonly realtimeNotifier: RealtimeNotifierPort,
     private readonly webPushService: WebPushService,
     @InjectPinoLogger(NotificationsService.name) private readonly logger: PinoLogger,
+    @Optional() private readonly fcmPushService?: FcmPushService,
   ) {}
 
   /**
@@ -696,6 +698,17 @@ export class NotificationsService {
       .sendToUser(userId, { title, body: body ?? undefined, url: deepLink ?? undefined })
       .catch((err: unknown) => {
         this.logger.warn({ userId, targetType, targetId, err }, '웹 푸시 발송 실패');
+      });
+
+    void this.fcmPushService
+      ?.sendToUser(userId, {
+        notificationId: notification.id,
+        title,
+        body: body ?? undefined,
+        route: deepLink ?? undefined,
+      })
+      .catch((err: unknown) => {
+        this.logger.warn({ userId, targetType, targetId, err }, 'Android FCM delivery failed');
       });
   }
 

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Teameet</string>
+    <string name="notification_channel_general">Teameet 알림</string>
+    <string name="notification_channel_general_description">경기, 팀, 문의와 서비스 활동 알림</string>
+</resources>

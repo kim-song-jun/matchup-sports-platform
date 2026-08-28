@@ -196,6 +196,7 @@ describe('VerificationService 발송 총량 상한', () => {
 
   it('한 번호에 상한만큼 보냈으면 그 번호로는 더 못 보낸다', async () => {
     const { prisma, handle } = setup({ target: 5, user: 0 });
+    smsEventLog.record.mockClear();
     const service = new VerificationService(prisma, dispatcher, eventLogStub());
 
     await expect(service.requestPhone(authUser, '01012345678')).rejects.toMatchObject({
@@ -204,6 +205,11 @@ describe('VerificationService 발송 총량 상한', () => {
     });
     // 토큰을 만들지 않았다는 것이 곧 유료 SMS 가 나가지 않았다는 뜻이다.
     expect(handle.v1VerificationToken.create).not.toHaveBeenCalled();
+    // 쿨다운("너무 빨리")과 상한("너무 많이")은 운영에서 다른 신호다 — 같은 타입으로
+    // 남기면 알람에서 둘이 섞인다.
+    expect(smsEventLog.record).toHaveBeenCalledWith(
+      expect.objectContaining({ eventType: 'VERIFICATION_SEND_QUOTA_EXCEEDED' }),
+    );
   });
 
   it('요청자가 상한에 닿으면 번호를 바꿔도 막힌다', async () => {

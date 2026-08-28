@@ -118,14 +118,16 @@ export class VerificationService {
     if (targetSends < MAX_SENDS_PER_TARGET && userSends < MAX_SENDS_PER_USER) return;
 
     await this.smsEventLog.record({
-      eventType: SMS_EVENT_TYPE.RESEND_COOLDOWN,
+      eventType: SMS_EVENT_TYPE.SEND_QUOTA_EXCEEDED,
       phone: target,
       detail: `channel=${channel} 24시간 발송 상한 도달 (대상 ${targetSends}/${MAX_SENDS_PER_TARGET}, 요청자 ${userSends}/${MAX_SENDS_PER_USER})`,
     });
     throw new HttpException(
       {
         code: 'VERIFICATION_SEND_QUOTA_EXCEEDED',
-        message: '인증번호를 너무 많이 요청했어요. 24시간 뒤에 다시 시도해 주세요.',
+        // 24시간 "이동 창"이라 실제 대기는 가장 오래된 발송이 창에서 빠질 때까지다 —
+        // 항상 24시간을 기다려야 하는 것처럼 적으면 사실과 다르다.
+        message: '인증번호를 너무 많이 요청했어요. 최대 24시간 뒤에 다시 시도할 수 있어요.',
       },
       HttpStatus.TOO_MANY_REQUESTS,
     );

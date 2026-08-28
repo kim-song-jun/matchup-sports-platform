@@ -216,6 +216,29 @@ export class ScheduleAttendanceService {
         where: { scheduleId_userId: { scheduleId, userId: targetUserId } },
       });
 
+      // 대리 응답은 "아직 답하지 않은 팀원을 대신 참석으로 표시한다"까지다 -- 이미 답한
+      // 사람의 의사를 팀장이 번복하는 것은 승인된 범위가 아니다. 화면은 미응답 줄에만
+      // 버튼을 내지만 화면만으로 지키면 반쪽이다: 출석은 라인업 자격을 결정하므로
+      // (team-match-lineup.service.ts 의 출석 게이트) 서버가 직접 막아야 한다.
+      //
+      // 재시도로 이 분기에 걸리는 일은 없다 -- 같은 키의 재시도는 위 replay 분기에서
+      // 이미 돌아갔고, 여기까지 온 것은 그 키로 처음 들어온 요청이다.
+      if (targetUserId !== actor.id) {
+        if (dto.status !== 'GOING') {
+          throw new ConflictException({
+            code: 'PROXY_ATTENDANCE_STATUS_NOT_ALLOWED',
+            message: 'Only GOING can be set on behalf of another member',
+          });
+        }
+        if (existing !== null) {
+          throw new ConflictException({
+            code: 'PROXY_ATTENDANCE_ALREADY_ANSWERED',
+            message: 'Member already answered; their response cannot be overwritten',
+            details: { currentStatus: existing.status },
+          });
+        }
+      }
+
       if (existing) {
         if (existing.version !== dto.expectedVersion) {
           throw new ConflictException({

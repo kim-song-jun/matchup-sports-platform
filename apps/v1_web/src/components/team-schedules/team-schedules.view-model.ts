@@ -127,6 +127,8 @@ const SCHEDULE_ERROR_MESSAGES: Record<string, string> = {
   GUEST_RECRUITMENT_DEADLINE_PASSED: '용병 모집 마감 시간이 지났어요.',
   IDEMPOTENCY_KEY_REQUIRED: '요청을 다시 시도해 주세요.',
   IDEMPOTENCY_PAYLOAD_CONFLICT: '요청이 겹쳤어요. 새로고침 후 다시 시도해 주세요.',
+  PROXY_ATTENDANCE_ALREADY_ANSWERED: '팀원이 이미 응답했어요. 최신 내용으로 새로고침했어요.',
+  PROXY_ATTENDANCE_STATUS_NOT_ALLOWED: '대신 표시할 수 있는 건 참석뿐이에요.',
   SCHEDULE_MATCH_SOURCE_REQUIRED: '경기 일정은 팀매치를 먼저 선택해야 해요.',
   SCHEDULE_TEAM_MATCH_NOT_ALLOWED: '경기가 아닌 일정에는 팀매치를 연결할 수 없어요.',
   TEAM_MATCH_NOT_FOUND_FOR_TEAM: '선택한 팀매치가 이 팀 소속이 아니에요.',
@@ -139,10 +141,18 @@ export function mapScheduleErrorMessage(err: unknown, fallback: string): string 
   return extractErrorMessage(err, fallback);
 }
 
-/** VERSION_CONFLICT/IDEMPOTENCY_PAYLOAD_CONFLICT는 화면을 새 데이터로 되돌려야 하는 409류다. */
+/**
+ * 화면을 새 데이터로 되돌려야 하는 409류. PROXY_ATTENDANCE_ALREADY_ANSWERED 도 여기 든다 --
+ * 팀장이 보고 있던 "미응답" 목록이 낡아서 나는 충돌이라, 메시지만 띄우고 목록을 그대로 두면
+ * 이미 답한 사람 옆에 대리 버튼이 계속 남는다.
+ */
 export function isScheduleStaleConflict(err: unknown): boolean {
   const code = extractErrorCode(err);
-  return code === 'VERSION_CONFLICT' || code === 'IDEMPOTENCY_PAYLOAD_CONFLICT';
+  return (
+    code === 'VERSION_CONFLICT' ||
+    code === 'IDEMPOTENCY_PAYLOAD_CONFLICT' ||
+    code === 'PROXY_ATTENDANCE_ALREADY_ANSWERED'
+  );
 }
 
 // ── 목록 항목 변환 ────────────────────────────────────────────────────────────

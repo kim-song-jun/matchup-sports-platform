@@ -201,4 +201,4 @@ Required responsibilities:
 - Fresh isolated PostgreSQL 16 replay: all 143 migrations, including `20260828000000_add_v1_push_devices`, applied successfully; owned test container removed.
 - Alpha-over-production Docker Compose config parse: passed.
 - `git diff --check`: passed; touched-path debt grep: no matches.
-- Android native compile/unit task remains a GitHub Actions gate because this host has no Android SDK/Gradle installation. Real-device foreground/background/terminated delivery remains Phase 5 and cannot be claimed before Firebase Alpha configuration and APK installation.
+- Android Alpha CI run `33137141868` passed Java compile, API 36 unit task, Alpha debug APK assembly, and artifact upload after the initial Safe Browsing API compile regression was fixed. Real-device foreground/background/terminated delivery remains Phase 5 and cannot be claimed before Firebase Alpha configuration and APK installation.

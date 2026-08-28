@@ -72,6 +72,11 @@ export default function AdminUserDetailPage() {
     dialogRef: deleteDialogRef,
     initialFocusRef: deleteReasonRef,
     onBackdropClick: onDeleteBackdropClick,
+    // mounted/closing 을 읽지 않으면 훅이 이 컴포넌트(부모)에 살아 있는 채로
+    // 모달 DOM 만 즉시 사라진다 — 퇴장 시간 동안 화면에 아무것도 없는데
+    // 스크롤 잠금·ESC·focus trap 이 그대로 걸려 있게 된다.
+    mounted: deleteMounted,
+    closing: deleteClosing,
   } = useModalA11y<HTMLTextAreaElement, HTMLFormElement>({
     open: deleteOpen,
     onClose: () => setDeleteOpen(false),
@@ -273,9 +278,11 @@ export default function AdminUserDetailPage() {
         </aside>
       </div>
 
-      {deleteOpen ? (
+      {deleteMounted ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 p-4"
+          className={`tm-modal-scrim fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 p-4${
+            deleteClosing ? ' is-closing' : ''
+          }`}
           onClick={onDeleteBackdropClick}
         >
           <form
@@ -283,7 +290,9 @@ export default function AdminUserDetailPage() {
             onSubmit={handleDeleteSubmit}
             // 전수검수: bg-white가 다크에서 안 뒤집혀 안의 text-[var(--text-strong)] 등이
             // 근접색이 되던 회귀 — 다른 어드민 모달들과 동일하게 --card-surface로 교체.
-            className="w-full max-w-[440px] rounded-2xl bg-[var(--card-surface)] p-5 shadow-[var(--shadow-modal)]"
+            className={`tm-modal-panel w-full max-w-[440px] rounded-2xl bg-[var(--card-surface)] p-5 shadow-[var(--shadow-modal)]${
+              deleteClosing ? ' is-closing' : ''
+            }`}
             role="dialog"
             aria-modal="true"
             aria-labelledby="delete-user-title"

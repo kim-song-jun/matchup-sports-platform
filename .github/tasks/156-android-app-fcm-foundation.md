@@ -368,4 +368,15 @@ Samsung device evidence (in progress):
 - The first screenshot exposed a blocking system-bar layout defect: applying insets as WebView padding
   left the CSS viewport full-height and clipped fixed top/bottom chrome. The feature branch now applies
   system-bar/display-cutout padding to a parent `FrameLayout`, shrinking the actual WebView layout
-  viewport. Rebuilt APK and before/after real-device evidence are pending.
+  viewport. Commit `4dd792edc` passed Android Alpha workflow run `33197946216`, including the Firebase
+  identity gates, JVM tests, APK build, production fail-closed checks, checksum, and artifact upload.
+- The rebuilt artifact checksum passed locally. Because GitHub-hosted runs currently generate unrelated
+  debug signing keys, Android rejected an in-place update with `INSTALL_FAILED_UPDATE_INCOMPATIBLE`;
+  the login-free initial app data was removed and the rebuilt APK was installed as a clean replacement.
+  This signing instability remains a release/QA blocker for repeatable Alpha upgrades.
+- The replacement launched successfully with `POST_NOTIFICATIONS` still ungranted and no unsolicited
+  permission prompt. Screenshot
+  `output/task156/android-device-sm-a325n/02-insets-fixed-fresh-launch.png` confirms the top chrome is
+  below the status bar and the complete app bottom navigation is above Samsung's three-button system
+  navigation area. The remaining white bottom band is the expected system navigation inset, not clipped
+  web content.

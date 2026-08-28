@@ -91,6 +91,33 @@ describe('useModalA11y', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it('닫힌 모달은 다른 오버레이의 스크롤 잠금을 건드리지 않는다', () => {
+    // 어드민 drawer 처럼 이 훅과 무관한 오버레이가 이미 잠가 둔 상태
+    document.body.style.overflow = 'hidden';
+    // 훅을 쓰는 모달이 화면에 계속 마운트돼 있지만 닫혀 있다
+    const { rerender } = render(<MountedModal open={false} onClose={() => {}} />);
+    expect(document.body.style.overflow).toBe('hidden');
+    rerender(<MountedModal open={false} onClose={() => {}} />);
+    expect(document.body.style.overflow).toBe('hidden');
+    document.body.style.overflow = '';
+  });
+
+  it('모달이 겹쳐 열리면 안쪽이 닫혀도 바깥쪽 잠금이 남는다', async () => {
+    const outer = render(<MountedModal open onClose={() => {}} />);
+    expect(document.body.style.overflow).toBe('hidden');
+    const inner = render(<MountedModal open onClose={() => {}} />);
+    inner.rerender(<MountedModal open={false} onClose={() => {}} />);
+    // queryByRole 은 document 전체를 보므로 바깥 모달까지 잡는다 — 이 render 의
+    // 컨테이너로 좁혀야 안쪽만 본다
+    await waitFor(() =>
+      expect(inner.container.querySelector('[role="dialog"]')).toBeNull(),
+    );
+    // 안쪽이 사라져도 바깥 모달은 아직 열려 있다 — 여기서 풀리면 뒤 화면이 스크롤된다
+    expect(document.body.style.overflow).toBe('hidden');
+    outer.unmount();
+    inner.unmount();
+  });
+
   it('닫힐 때 이전 포커스를 복원한다 (WCAG 2.4.3)', () => {
     const outside = document.createElement('button');
     outside.textContent = '열기';

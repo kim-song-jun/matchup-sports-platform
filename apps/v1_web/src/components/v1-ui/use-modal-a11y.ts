@@ -190,15 +190,20 @@ export function useModalA11y<
     return () => document.removeEventListener('keydown', trap);
   }, [mounted]);
 
-  // 열려 있는 동안 body 스크롤 잠금
+  // 열려 있는 동안 body 스크롤 잠금.
+  //
+  // 닫힌 상태에서는 body 를 아예 건드리지 않는다. 예전에는 mounted=false 일 때
+  // overflow 를 '' 로 밀었는데, 이 훅을 쓰는 모달이 화면에 계속 마운트돼 있으면
+  // (퇴장 애니메이션을 위해 그렇게 쓴다) **닫혀 있는 모달의 리렌더만으로 다른
+  // 오버레이(어드민 drawer 등)의 잠금이 풀린다.** cleanup 도 '' 로 고정하면
+  // 모달이 겹쳐 열렸다 하나가 닫힐 때 남은 모달의 잠금까지 함께 풀린다.
+  // 이전 값을 저장했다 되돌리면 중첩이 성립한다.
   useEffect(() => {
-    if (mounted) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
+    if (!mounted) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
     return () => {
-      document.body.style.overflow = '';
+      document.body.style.overflow = previous;
     };
   }, [mounted]);
 

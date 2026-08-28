@@ -2763,6 +2763,15 @@ label.tm-btn:focus-within {
   animation: tm-modal-fade var(--duration-base) var(--ease-standard) reverse both;
 }
 
+/* 스크림 안에 있는 패널은 스크림이 이미 통째로 페이드시킨다. 둘 다 opacity 를
+   주면 부모·자식 opacity 가 곱해져 패널만 더 늦게·급하게 나타난다(중간 지점에서
+   0.5 가 아니라 0.25). 실측상 이 저장소의 패널 8곳은 전부 스크림 안에 있다 —
+   패널 클래스는 스크림 없이 단독으로 쓸 때를 위해 남겨 둔다. */
+.tm-modal-scrim .tm-modal-panel,
+.tm-modal-scrim .tm-modal-panel.is-closing {
+  animation: none;
+}
+
 @keyframes tm-modal-fade {
   from { opacity: 0; }
   to { opacity: 1; }

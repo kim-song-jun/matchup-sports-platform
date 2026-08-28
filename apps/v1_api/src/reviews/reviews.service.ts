@@ -327,10 +327,15 @@ export class ReviewsService {
       ),
     );
 
-    const availableMonths = [...new Set(revealed.map((review) => review.submittedAt.toISOString().slice(0, 7)))].sort().reverse();
+    // 팀 대상은 "팀당 1표"라 reviewerTeamId 가 없는 행은 어느 팀의 표인지 정할 수 없어
+    // 평점에서 빠진다(정본 집계도 같은 이유로 제외한다). 그런데 월 선택지를 revealed
+    // 전체에서 뽑으면, 그런 행만 있는 달이 목록에 남아 고르는 순간 평점이 빈 화면이
+    // 된다 -- 평점을 내는 모집단과 월 목록의 모집단을 같게 맞춘다.
+    const scoped = targetType === 'team' ? revealed.filter((review) => review.reviewerTeamId !== null) : revealed;
+    const availableMonths = [...new Set(scoped.map((review) => review.submittedAt.toISOString().slice(0, 7)))].sort().reverse();
     const filtered = period
-      ? revealed.filter((review) => review.submittedAt.toISOString().slice(0, 7) === period)
-      : revealed;
+      ? scoped.filter((review) => review.submittedAt.toISOString().slice(0, 7) === period)
+      : scoped;
 
     // 프론트의 종목 배지·색상은 v1Sport.code 로 매핑한다(SPORT_ACCENT_MAP). sportId(UUID)만
     // 내려주면 어떤 종목이든 "기타"로 떨어지므로 코드를 함께 실어 보낸다.

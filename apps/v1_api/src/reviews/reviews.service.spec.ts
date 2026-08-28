@@ -1010,6 +1010,48 @@ describe('ReviewsService', () => {
       }
     });
 
+    it('team 타깃: 평가한 팀을 알 수 없는 후기는 평점에서도 월 목록에서도 빠진다', async () => {
+      // reviewerTeamId 가 없으면 어느 팀의 표인지 정할 수 없어 팀당 1표 집계에서 빠진다.
+      // 그런데 월 목록만 전체에서 뽑으면 그런 달이 선택지에 남아, 고르는 순간 평점이 빈
+      // 화면이 된다 — 두 모집단이 같아야 한다.
+      const withTeam = new Date('2026-08-01T00:00:00Z');
+      const orphan = new Date('2026-07-01T00:00:00Z');
+      jest.useFakeTimers().setSystemTime(new Date('2026-08-01T01:00:00Z'));
+
+      try {
+        const reviewFindManyMock = jest
+          .fn()
+          .mockResolvedValueOnce([
+            { sourceId: 'tm1', reviewerUserId: 'u1', reviewerTeamId: 'team-a', targetUserId: null, targetTeamId: 'team-x', rating: 4, sportId: 'futsal', submittedAt: withTeam, tags: [] },
+            { sourceId: 'tm0', reviewerUserId: 'u9', reviewerTeamId: null, targetUserId: null, targetTeamId: 'team-x', rating: 1, sportId: 'futsal', submittedAt: orphan, tags: [] },
+          ])
+          .mockResolvedValueOnce([
+            { sourceId: 'tm1', reviewerTeamId: 'team-x', targetTeamId: 'team-a' },
+          ]);
+
+        const prisma = {
+          v1PostEventReview: { findMany: reviewFindManyMock },
+          v1TeamMembership: { findMany: jest.fn().mockResolvedValue([{ teamId: 'team-x' }]) },
+          v1Sport: { findMany: jest.fn().mockResolvedValue([{ id: 'futsal', code: 'futsal' }]) },
+        };
+        const tournamentFixtureReviews = { pending: jest.fn(), source: jest.fn(), submit: jest.fn(), sourceSummaries: jest.fn() };
+        const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub(), reviewPolicyStub());
+
+        const result = await service.receivedSummary(
+          { id: 'user-p', email: 'user-p@teameet.v1', accountStatus: 'active', onboardingStatus: 'completed' },
+          { targetType: 'team' },
+        );
+
+        // 2026-07 은 소속 팀을 알 수 없는 후기뿐이라 고를 수 있는 달이 아니다.
+        expect(result.availableMonths).toEqual(['2026-08']);
+        expect(result.bySport).toEqual([
+          { sportId: 'futsal', sportCode: 'futsal', ratingAvg: 4, ratingCount: 1, tagRates: [] },
+        ]);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
     it('user 타깃은 개별 후기 그대로 센다', async () => {
       // 팀당 1표는 팀 대상 규칙이다 — 개인은 평가자 한 명이 한 표다.
       const submittedAt = new Date('2026-08-01T00:00:00Z');

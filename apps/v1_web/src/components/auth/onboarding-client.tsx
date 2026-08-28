@@ -10,6 +10,7 @@ import { trackEvent } from '@/lib/analytics';
 import { onboardingStepLabel } from '@/lib/v1-status-labels';
 import { useV1PushRegistration } from '@/hooks/use-v1-push-registration';
 import {
+  useV1AuthMe,
   useV1CompleteOnboarding,
   useV1DeferOnboarding,
   useV1MasterRegions,
@@ -51,7 +52,20 @@ type OnboardingRegionGroup = {
   options: OnboardingRegionOption[];
 };
 
-const draftKey = 'teameet.v1.onboardingDraft';
+/**
+ * 온보딩 초안은 **계정별로** 나눠 담는다.
+ *
+ * 예전에는 키가 하나뿐이라, 같은 탭에서 로그아웃하고 다른 계정으로 들어오면 앞사람이
+ * 고른 종목·지역이 그대로 복원됐다(로그아웃이 이 키를 지우지도 않았다). 본인이 고르지
+ * 않은 값으로 매칭 추천을 받게 되는데, 화면상으로는 자기가 고른 것처럼 보인다.
+ */
+const DRAFT_KEY_PREFIX = 'teameet.v1.onboardingDraft';
+/** 계정 구분이 없던 시절의 키. 남아 있으면 남의 선택이므로 눈에 띄는 대로 지운다. */
+const LEGACY_DRAFT_KEY = DRAFT_KEY_PREFIX;
+
+function draftKeyFor(userId: string) {
+  return `${DRAFT_KEY_PREFIX}:${userId}`;
+}
 
 const stepMeta: Record<OnboardingRouteStep, { stepNo: number; title: string; sub: string }> = {
   resume: {
@@ -98,9 +112,15 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
   const [selectedRegionGroupId, setSelectedRegionGroupId] = useState<string | null>(null);
   const [pushRequesting, setPushRequesting] = useState(false);
 
+  // 초안을 계정별로 나누려면 누구인지 알아야 한다. /auth/me 는 앱 전역 캐시라 온보딩
+  // 시점에는 이미 들어와 있는 것이 보통이고, 아직이면 초안을 읽지도 쓰지도 않는다 --
+  // 잠깐 복원이 늦는 쪽이, 남의 선택을 복원하는 쪽보다 낫다.
+  const { data: me } = useV1AuthMe();
+  const viewerId = me?.user.id ?? null;
+
   useEffect(() => {
-    if (hydrated || !onboarding.data) return;
-    const stored = readDraft();
+    if (hydrated || !onboarding.data || !viewerId) return;
+    const stored = readDraft(viewerId);
     const initial = stored ?? {
       sports: onboarding.data.sports.map((sport) => ({ sportId: sport.sportId, levelId: sport.levelId })),
       regions: onboarding.data.regions.map((region) => ({ regionId: region.regionId, primary: region.primary })),
@@ -108,11 +128,11 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
     };
     setDraft(initial);
     setHydrated(true);
-  }, [hydrated, onboarding.data]);
+  }, [hydrated, onboarding.data, viewerId]);
 
   useEffect(() => {
-    if (hydrated) writeDraft(draft);
-  }, [draft, hydrated]);
+    if (hydrated && viewerId) writeDraft(viewerId, draft);
+  }, [draft, hydrated, viewerId]);
 
   // 마스터 데이터 3쿼리 중 하나라도 실패하면 빈 draft 저장 위험이 있으므로 에러 상태 분리.
   const masterError = onboarding.isError || sportsQuery.isError || regionsQuery.isError;
@@ -206,7 +226,7 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
     completeOnboarding.mutate(undefined, {
       onSuccess: (result) => {
         trackEvent('onboarding_complete', {});
-        clearDraft();
+        if (viewerId) clearDraft(viewerId);
         router.replace(result.next?.route ?? '/home');
       },
       onError: (nextError) => setError(getErrorMessage(nextError)),
@@ -482,7 +502,7 @@ function OnboardingFixedAction({
   if (step === 'level') {
     return (
       <>
-        <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" disabled={disabled} onClick={() => saveAndGo('region', '/onboarding/region')} type="button">{pending ? '저장 중' : '지역 선택하기'}</button>
+        <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" disabled={disabled} onClick={() => saveAndGo('level', '/onboarding/region')} type="button">{pending ? '저장 중' : '지역 선택하기'}</button>
         <div className="tm-auth-fixed-skip-row">
           <button className="tm-btn tm-btn-sm tm-btn-ghost" disabled={pending} onClick={defer} type="button">나중에 설정하기</button>
         </div>
@@ -672,21 +692,23 @@ function getBackHref(step: OnboardingRouteStep) {
   return undefined;
 }
 
-function readDraft(): OnboardingDraft | null {
+function readDraft(userId: string): OnboardingDraft | null {
   try {
-    const raw = window.sessionStorage.getItem(draftKey);
+    // 계정 구분이 없던 키는 읽지 않고 지운다 — 그 값은 이 계정의 것이라는 보장이 없다.
+    window.sessionStorage.removeItem(LEGACY_DRAFT_KEY);
+    const raw = window.sessionStorage.getItem(draftKeyFor(userId));
     return raw ? sanitizeDraft(JSON.parse(raw) as Partial<OnboardingDraft>) : null;
   } catch {
     return null;
   }
 }
 
-function writeDraft(draft: OnboardingDraft) {
-  window.sessionStorage.setItem(draftKey, JSON.stringify(sanitizeDraft(draft)));
+function writeDraft(userId: string, draft: OnboardingDraft) {
+  window.sessionStorage.setItem(draftKeyFor(userId), JSON.stringify(sanitizeDraft(draft)));
 }
 
-function clearDraft() {
-  window.sessionStorage.removeItem(draftKey);
+function clearDraft(userId: string) {
+  window.sessionStorage.removeItem(draftKeyFor(userId));
 }
 
 function getErrorMessage(error: unknown) {

@@ -13,7 +13,6 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from './notifications.service';
 import { REALTIME_NOTIFIER } from './realtime-notifier.port';
 import { WebPushService } from './web-push.service';
-import { FcmPushService } from './fcm-push.service';
 
 const user = {
   id: 'user-1',
@@ -54,7 +53,6 @@ describe('NotificationsService', () => {
 
   const realtimeNotifier = { emitToUser: jest.fn() };
   const webPushService = { sendToUser: jest.fn().mockResolvedValue(undefined) };
-  const fcmPushService = { sendToUser: jest.fn().mockResolvedValue(undefined) };
   const logger = { warn: jest.fn(), error: jest.fn(), info: jest.fn(), debug: jest.fn() };
 
   beforeEach(async () => {
@@ -79,7 +77,6 @@ describe('NotificationsService', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: REALTIME_NOTIFIER, useValue: realtimeNotifier },
         { provide: WebPushService, useValue: webPushService },
-        { provide: FcmPushService, useValue: fcmPushService },
         { provide: getLoggerToken(NotificationsService.name), useValue: logger },
       ],
     }).compile();
@@ -112,11 +109,11 @@ describe('NotificationsService', () => {
         }),
       }),
     );
-    expect(fcmPushService.sendToUser).toHaveBeenCalledWith('user-1', {
+    expect(webPushService.sendToUser).toHaveBeenCalledWith('user-1', {
       notificationId: 'notif-1',
       title: expect.any(String),
       body: expect.any(String),
-      route: '/matches/match-1',
+      url: '/matches/match-1',
     });
   });
 
@@ -241,7 +238,7 @@ describe('NotificationsService', () => {
 
     expect(logger.warn).toHaveBeenCalledWith(
       expect.objectContaining({ userId: 'user-1', err: pushError }),
-      '웹 푸시 발송 실패',
+      '푸시 알림 발송 실패',
     );
   });
 

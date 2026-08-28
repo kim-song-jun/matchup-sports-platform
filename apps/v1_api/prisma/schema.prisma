@@ -2060,6 +2060,7 @@ model V1PushDevice {
   lastSeenAt     DateTime          @default(now()) @map("last_seen_at")
   revokedAt      DateTime?         @map("revoked_at")
   failureCount   Int               @default(0) @map("failure_count")
+  lastSuccessAt  DateTime?         @map("last_success_at")
   lastFailureAt  DateTime?         @map("last_failure_at")
   createdAt      DateTime          @default(now()) @map("created_at")
   updatedAt      DateTime          @updatedAt @map("updated_at")

@@ -21,6 +21,7 @@ declare global {
 
 const RESULT_EVENT = 'teameet:native-push-result';
 const RESPONSE_TIMEOUT_MS = 15_000;
+const PERMISSION_RESPONSE_TIMEOUT_MS = 120_000;
 
 export function isNativePushAvailable(): boolean {
   return typeof window !== 'undefined' && typeof window.TeameetNative?.postMessage === 'function';
@@ -52,7 +53,9 @@ export function requestNativePush(action: NativePushAction): Promise<NativePushR
     timeoutId = setTimeout(() => {
       cleanup();
       reject(new Error('Teameet native push request timed out.'));
-    }, RESPONSE_TIMEOUT_MS);
+    }, action === 'request-notification-permission'
+      ? PERMISSION_RESPONSE_TIMEOUT_MS
+      : RESPONSE_TIMEOUT_MS);
 
     try {
       bridge.postMessage(JSON.stringify({ type: action, requestId }));

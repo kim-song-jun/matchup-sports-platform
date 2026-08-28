@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { getLoggerToken } from 'nestjs-pino';
 import { PrismaService } from '../prisma/prisma.service';
 import { WebPushService } from './web-push.service';
+import { FcmPushService } from './fcm-push.service';
 
 function uniqueConstraintError(target: string) {
   return new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
@@ -39,6 +40,7 @@ describe('WebPushService', () => {
     v1WebPushFailureLog: { create: jest.fn() },
   };
   const logger = { warn: jest.fn(), error: jest.fn() };
+  const fcmPushService = { sendToUser: jest.fn().mockResolvedValue({ disabled: false }) };
 
   async function build(env: Record<string, string | undefined>) {
     const originalEnv = { ...process.env };
@@ -56,6 +58,7 @@ describe('WebPushService', () => {
         WebPushService,
         { provide: PrismaService, useValue: prisma },
         { provide: getLoggerToken(WebPushService.name), useValue: logger },
+        { provide: FcmPushService, useValue: fcmPushService },
       ],
     }).compile();
     const service = moduleRef.get(WebPushService);
@@ -65,6 +68,28 @@ describe('WebPushService', () => {
   }
 
   beforeEach(() => jest.clearAllMocks());
+
+  it('fans out to Android FCM even when browser Web Push is disabled', async () => {
+    const service = await build({
+      VAPID_PUBLIC_KEY: undefined,
+      VAPID_PRIVATE_KEY: undefined,
+      VAPID_SUBJECT: undefined,
+    });
+
+    await service.sendToUser('user-1', {
+      notificationId: 'notification-1',
+      title: '문의 답변',
+      body: '답변을 확인해 주세요.',
+      url: '/my/inquiries/inquiry-1',
+    });
+
+    expect(fcmPushService.sendToUser).toHaveBeenCalledWith('user-1', {
+      notificationId: 'notification-1',
+      title: '문의 답변',
+      body: '답변을 확인해 주세요.',
+      route: '/my/inquiries/inquiry-1',
+    });
+  });
 
   it('stays disabled and returns a null public key when VAPID env vars are missing', async () => {
     const service = await build({ VAPID_PUBLIC_KEY: undefined, VAPID_PRIVATE_KEY: undefined, VAPID_SUBJECT: undefined });

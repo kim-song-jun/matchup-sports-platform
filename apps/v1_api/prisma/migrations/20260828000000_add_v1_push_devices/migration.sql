@@ -13,6 +13,7 @@ CREATE TABLE "v1_push_devices" (
     "last_seen_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "revoked_at" TIMESTAMP(3),
     "failure_count" INTEGER NOT NULL DEFAULT 0,
+    "last_success_at" TIMESTAMP(3),
     "last_failure_at" TIMESTAMP(3),
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,

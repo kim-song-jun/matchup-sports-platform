@@ -8,6 +8,7 @@ final class InstallationIdentity {
     private static final String INSTALLATION_ID = "installation_id";
     private static final String FCM_TOKEN = "fcm_token";
     private static final String PUSH_REGISTERED = "push_registered";
+    private static final String PUSH_OPTED_IN = "push_opted_in";
     private static final String PUSH_PERMISSION_REQUESTED = "push_permission_requested";
 
     private InstallationIdentity() {}
@@ -39,6 +40,16 @@ final class InstallationIdentity {
     static boolean isRegistered(Context context) {
         return context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
             .getBoolean(PUSH_REGISTERED, false);
+    }
+
+    static void markOptedIn(Context context, boolean optedIn) {
+        context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+            .edit().putBoolean(PUSH_OPTED_IN, optedIn).apply();
+    }
+
+    static boolean isOptedIn(Context context) {
+        return context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+            .getBoolean(PUSH_OPTED_IN, false);
     }
 
     static void markPermissionRequested(Context context) {

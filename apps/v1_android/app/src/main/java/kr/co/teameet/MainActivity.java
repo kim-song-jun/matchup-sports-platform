@@ -3,7 +3,6 @@ package kr.co.teameet;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -18,7 +17,10 @@ import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.content.ContextCompat;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.webkit.WebMessageCompat;
 import androidx.webkit.WebSettingsCompat;
 import androidx.webkit.WebViewCompat;
@@ -49,21 +51,38 @@ public final class MainActivity extends AppCompatActivity {
                 String requestId = pendingPushRequestId;
                 pendingPushRequestId = null;
                 if (!granted) {
-                    reportPushResult(requestId, false);
+                    InstallationIdentity.markOptedIn(this, false);
+                    PushRegistrationClient.revoke(
+                        this,
+                        ignored -> reportPushResult(requestId, false)
+                    );
                     return;
                 }
                 registerPushAndReport(requestId);
             });
         configureWebView();
         setContentView(webView);
+        applySystemBarInsets();
         registerBackHandler();
         if (FirebaseBootstrap.initialize(this)) {
             FirebaseMessaging.getInstance().getToken().addOnSuccessListener(token -> {
                 InstallationIdentity.saveToken(this, token);
-                PushRegistrationClient.register(this);
+                if (canRegisterPush()) PushRegistrationClient.register(this);
             });
         }
         webView.loadUrl(BuildConfig.WEB_ORIGIN + routeFromIntent(getIntent()));
+    }
+
+    private void applySystemBarInsets() {
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+        ViewCompat.setOnApplyWindowInsetsListener(webView, (view, windowInsets) -> {
+            Insets insets = windowInsets.getInsets(
+                WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout()
+            );
+            view.setPadding(insets.left, insets.top, insets.right, insets.bottom);
+            return windowInsets;
+        });
+        ViewCompat.requestApplyInsets(webView);
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -73,7 +92,7 @@ public final class MainActivity extends AppCompatActivity {
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
         settings.setAllowFileAccess(false);
-        settings.setAllowContentAccess(true);
+        settings.setAllowContentAccess(false);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, false);
@@ -92,15 +111,21 @@ public final class MainActivity extends AppCompatActivity {
         webView.setWebViewClient(new WebViewClient() {
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri target = request.getUrl();
-                if (AllowedNavigation.isInternal(target) || AllowedNavigation.isTrustedAuthProvider(target)) {
-                    return false;
-                }
-                startActivity(new Intent(Intent.ACTION_VIEW, target));
+                if (AllowedNavigation.isInternal(target)) return false;
+                if (!request.isForMainFrame()) return true;
+                if (AllowedNavigation.isTrustedAuthProvider(target)) return false;
+                openExternal(target);
                 return true;
             }
             @Override public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
-                if (AllowedNavigation.isInternal(Uri.parse(url))) PushRegistrationClient.register(MainActivity.this);
+                if (AllowedNavigation.isInternal(Uri.parse(url))) {
+                    if (canRegisterPush()) {
+                        PushRegistrationClient.register(MainActivity.this);
+                    } else if (InstallationIdentity.isRegistered(MainActivity.this)) {
+                        PushRegistrationClient.revoke(MainActivity.this, ignored -> {});
+                    }
+                }
             }
         });
         webView.setWebChromeClient(new WebChromeClient() {
@@ -115,6 +140,24 @@ public final class MainActivity extends AppCompatActivity {
         });
     }
 
+    private void openExternal(Uri target) {
+        if (!AllowedNavigation.isAllowedExternal(target)) return;
+        try {
+            Intent external;
+            if ("intent".equalsIgnoreCase(target.getScheme())) {
+                external = Intent.parseUri(target.toString(), Intent.URI_INTENT_SCHEME);
+            } else {
+                external = new Intent(Intent.ACTION_VIEW, target);
+            }
+            external.addCategory(Intent.CATEGORY_BROWSABLE);
+            external.setComponent(null);
+            external.setSelector(null);
+            if (external.resolveActivity(getPackageManager()) != null) startActivity(external);
+        } catch (Exception ignored) {
+            // Unsupported or malformed external links stay closed instead of crashing the shell.
+        }
+    }
+
     private void handleNativeMessage(WebMessageCompat message) {
         String data = message.getData();
         if (data == null) return;
@@ -123,10 +166,15 @@ public final class MainActivity extends AppCompatActivity {
             String requestId = request.optString("requestId", "");
             switch (request.optString("type", "")) {
                 case "get-push-state" -> reportPushResult(
-                    requestId, hasNotificationPermission() && InstallationIdentity.isRegistered(this));
+                    requestId, canRegisterPush() && InstallationIdentity.isRegistered(this));
                 case "request-notification-permission" -> requestPushPermission(requestId);
-                case "revoke-push-device" -> PushRegistrationClient.revoke(
-                    this, revoked -> reportPushResult(requestId, !revoked ? InstallationIdentity.isRegistered(this) : false));
+                case "revoke-push-device" -> {
+                    InstallationIdentity.markOptedIn(this, false);
+                    PushRegistrationClient.revoke(
+                        this,
+                        ignored -> reportPushResult(requestId, false)
+                    );
+                }
                 default -> reportPushResult(requestId, false);
             }
         } catch (Exception ignored) {
@@ -135,6 +183,7 @@ public final class MainActivity extends AppCompatActivity {
     }
 
     private void requestPushPermission(String requestId) {
+        InstallationIdentity.markOptedIn(this, true);
         if (hasNotificationPermission()) {
             registerPushAndReport(requestId);
             return;
@@ -149,9 +198,19 @@ public final class MainActivity extends AppCompatActivity {
     }
 
     private boolean hasNotificationPermission() {
-        return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
-            || ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-                == PackageManager.PERMISSION_GRANTED;
+        return PushPermission.isGranted(this);
+    }
+
+    private boolean canRegisterPush() {
+        return PushPermission.isGranted(this) && InstallationIdentity.isOptedIn(this);
+    }
+
+    @Override protected void onResume() {
+        super.onResume();
+        if (!PushPermission.isGranted(this)) InstallationIdentity.markOptedIn(this, false);
+        if (!canRegisterPush() && InstallationIdentity.isRegistered(this)) {
+            PushRegistrationClient.revoke(this, ignored -> {});
+        }
     }
 
     private void registerPushAndReport(String requestId) {

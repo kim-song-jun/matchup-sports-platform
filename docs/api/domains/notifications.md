@@ -122,6 +122,12 @@ Body:
 - push VAPID 미설정 환경에서는 Web Push disabled(no-op 가능)
 - Firebase Admin 세 자격증명이 모두 없으면 FCM만 disabled된다. 일부만 설정되거나 `V1_PUSH_ENVIRONMENT`가 유효하지 않으면 API가 기동에 실패한다.
 - `alpha`와 `production` 기기는 DB environment와 별도 Firebase project/application ID로 분리한다.
+- 공통 `WebPushService.sendToUser` dispatcher는 browser Web Push와 Android FCM을 독립적으로 fan-out한다. 한 채널 실패가 알림 row 생성이나 다른 채널 발송을 취소하지 않는다.
+- FCM은 요청당 최대 500 token으로 분할하며, 성공 시 `lastSuccessAt`, transient 실패 시 failure metadata, invalid/unregistered 응답 시 `revokedAt`을 갱신한다. token 자체는 응답과 로그에 포함하지 않는다.
+- 서버는 service-account email/project ID 일치와 Alpha/production Firebase project naming을 검증하며 교차 환경 설정이면 기동에 실패한다.
+- 공통 `WebPushService.sendToUser` dispatcher는 browser Web Push와 Android FCM을 독립적으로 fan-out한다. 한 채널 실패가 알림 row 생성이나 다른 채널 발송을 취소하지 않는다.
+- FCM은 요청당 최대 500 token으로 분할하며, 성공 시 `lastSuccessAt`, transient 실패 시 failure metadata, invalid/unregistered 응답 시 `revokedAt`을 갱신한다. token 자체는 응답과 로그에 포함하지 않는다.
+- 서버는 service-account email/project ID 일치와 Alpha/production Firebase project naming을 검증하며 교차 환경 설정이면 기동에 실패한다.
 - preference 설정이 없을 때도 UI는 정상 초기 상태로 렌더링해야 함
 
 ## Error Example

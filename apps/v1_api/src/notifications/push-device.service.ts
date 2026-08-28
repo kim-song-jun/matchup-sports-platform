@@ -99,6 +99,14 @@ export class PushDeviceService {
     });
   }
 
+  async recordSuccessfulDeliveries(deviceIds: string[]): Promise<void> {
+    if (deviceIds.length === 0) return;
+    await this.prisma.v1PushDevice.updateMany({
+      where: { id: { in: deviceIds } },
+      data: { lastSuccessAt: new Date() },
+    });
+  }
+
   async recordTransientFailures(deviceIds: string[]): Promise<void> {
     if (deviceIds.length === 0) return;
     await this.prisma.v1PushDevice.updateMany({

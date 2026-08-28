@@ -2,6 +2,7 @@ package kr.co.teameet;
 
 import android.net.Uri;
 import java.net.URI;
+import java.util.Locale;
 
 final class AllowedNavigation {
     private AllowedNavigation() {}
@@ -21,6 +22,18 @@ final class AllowedNavigation {
             && "kauth.kakao.com".equalsIgnoreCase(target.getHost())
             && target.getUserInfo() == null
             && target.getPort() == -1;
+    }
+
+    static boolean isAllowedExternal(Uri target) {
+        return target != null && isAllowedExternalScheme(target.getScheme());
+    }
+
+    static boolean isAllowedExternalScheme(String scheme) {
+        if (scheme == null) return false;
+        return switch (scheme.toLowerCase(Locale.ROOT)) {
+            case "http", "https", "mailto", "tel", "sms", "geo", "market", "intent" -> true;
+            default -> false;
+        };
     }
 
     static String safeRoute(String candidate) {

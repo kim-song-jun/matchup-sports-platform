@@ -13,7 +13,9 @@ public final class TeameetMessagingService extends FirebaseMessagingService {
     @Override
     public void onNewToken(String token) {
         InstallationIdentity.saveToken(this, token);
-        PushRegistrationClient.register(this);
+        if (PushPermission.isGranted(this) && InstallationIdentity.isOptedIn(this)) {
+            PushRegistrationClient.register(this);
+        }
     }
 
     @Override
@@ -33,7 +35,8 @@ public final class TeameetMessagingService extends FirebaseMessagingService {
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
         NotificationCompat.Builder notification = new NotificationCompat.Builder(this, NotificationChannels.GENERAL)
-            .setSmallIcon(R.drawable.ic_teameet)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setColor(getColor(R.color.notification_color))
             .setContentTitle(title == null ? getString(R.string.app_name) : title)
             .setContentText(body)
             .setAutoCancel(true)

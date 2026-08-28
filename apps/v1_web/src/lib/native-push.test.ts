@@ -3,6 +3,7 @@ import { isNativePushAvailable, requestNativePush } from './native-push';
 
 afterEach(() => {
   delete window.TeameetNative;
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -29,5 +30,20 @@ describe('native push bridge', () => {
 
   it('fails explicitly when the native bridge is unavailable', async () => {
     await expect(requestNativePush('get-push-state')).rejects.toThrow('unavailable');
+  });
+
+  it('does not time out while the Android permission dialog is still reasonably actionable', async () => {
+    vi.useFakeTimers();
+    window.TeameetNative = { postMessage: vi.fn() };
+    let outcome = 'pending';
+    void requestNativePush('request-notification-permission').then(
+      () => { outcome = 'resolved'; },
+      () => { outcome = 'rejected'; },
+    );
+
+    await vi.advanceTimersByTimeAsync(15_001);
+    expect(outcome).toBe('pending');
+    await vi.advanceTimersByTimeAsync(104_999);
+    expect(outcome).toBe('rejected');
   });
 });

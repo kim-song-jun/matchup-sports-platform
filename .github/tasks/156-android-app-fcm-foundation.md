@@ -202,3 +202,34 @@ Required responsibilities:
 - Alpha-over-production Docker Compose config parse: passed.
 - `git diff --check`: passed; touched-path debt grep: no matches.
 - Android Alpha CI run `33137141868` passed Java compile, API 36 unit task, Alpha debug APK assembly, and artifact upload after the initial Safe Browsing API compile regression was fixed. Real-device foreground/background/terminated delivery remains Phase 5 and cannot be claimed before Firebase Alpha configuration and APK installation.
+
+## Re-audit Snapshot (2026-08-28)
+
+- Synced the feature branch with current `origin/dev` (`039d83f34`) without touching `main`.
+- Added explicit user opt-in gating for every Android API level; token refresh and authenticated
+  page loads cannot register a device before the user enables push.
+- Hardened external navigation to an explicit scheme allowlist and main-frame-only launch, disabled
+  WebView content/file access, and added target-SDK-36 system-bar insets.
+- Added a monochrome notification icon/color and Alpha/production app labels.
+- Converged direct notification paths on the shared Web Push + FCM dispatcher, added 500-token
+  batching, batch exception isolation, invalid-token revocation, and `lastSuccessAt` metadata.
+- Added real HTTP lifecycle E2E coverage for auth, DTO validation, token hiding/refresh,
+  multi-installation ownership, revoke, and Alpha/production database isolation.
+- Added Firebase identity guards to Android build, API startup, Alpha CI, and production deploy
+  regression checks. A PR without Firebase variables compiles/tests but does not publish an APK;
+  a `dev` push or manual run without them fails.
+- Repaired the integration discovery contract to bind all 79 currently selected suites with
+  OS-independent paths. Task 74's conflicting Android Web Push architecture is superseded.
+
+Re-audit validation:
+
+- Web native-push/settings targeted suite: 3 files, 30 tests passed.
+- API notification/device targeted suite: 5 suites, 66 tests passed.
+- Push-device isolated HTTP E2E: 1 suite, 4 tests passed.
+- Integration runner discovery/recovery contract: 1 suite, 8 tests passed, 79 suites discovered.
+- Fresh PostgreSQL 16 replay: all 143 migrations passed; owned test container removed.
+
+Remaining release blockers (Phase 5 stays unchecked): Firebase Alpha values/service account,
+CI-generated FCM-enabled APK, real-device foreground/background/terminated and permission matrix,
+release signing/AAB/versioning, production `assetlinks.json`, adaptive store assets, WebView file
+download device validation, and Play internal testing. Production promotion remains user-only.

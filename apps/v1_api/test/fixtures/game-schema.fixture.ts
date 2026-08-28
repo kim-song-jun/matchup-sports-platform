@@ -391,8 +391,10 @@ export const gameSchemaSourceManifest = {
   // platform/environment enum을 추가했다. game operations 모델·enum은 바뀌지 않았고
   // 전용 additive migration 20260828000000_add_v1_push_devices가 뒷받침한다. 이 guard가
   // schema.prisma 전체 bytes를 결속하므로 schema hash만 현재 committed LF bytes로 재핀한다.
-  schema: 'b41e0672e3bf0ee77784657a9ed37501b23aec601e801863fc6b40098628b2af',
-  migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
+  // Task 156 follow-up: push delivery success metadata was added to V1PushDevice. The game
+  // contract itself is unchanged; this guard binds the complete schema and additive migration.
+  schema: 'f8a911a9420301d801513f23630cd8ac620485b3b6665c13ca4c043010b34aa5',
+  migration: '1dfe7ac33ada2208d000d86bd35f49d2a9950a0daa20858c27b8005058db8aee',
 } as const;
 
 type GameSchemaSourcePaths = {

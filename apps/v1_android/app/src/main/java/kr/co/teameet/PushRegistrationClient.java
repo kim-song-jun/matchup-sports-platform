@@ -25,6 +25,10 @@ final class PushRegistrationClient {
     }
 
     static void register(Context context, Consumer<Boolean> completion) {
+        if (!PushPermission.isGranted(context) || !InstallationIdentity.isOptedIn(context)) {
+            completion.accept(false);
+            return;
+        }
         String token = InstallationIdentity.token(context);
         String cookie = CookieManager.getInstance().getCookie(BuildConfig.WEB_ORIGIN);
         if (token == null || cookie == null || cookie.isBlank()) {

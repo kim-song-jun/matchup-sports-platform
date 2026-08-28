@@ -17,6 +17,7 @@ describe('FcmPushService', () => {
   const messaging = { sendEachForMulticast: jest.fn() };
   const pushDevices = {
     activeAndroidTokens: jest.fn(),
+    recordSuccessfulDeliveries: jest.fn(),
     revokeTokens: jest.fn(),
     recordTransientFailures: jest.fn(),
   };
@@ -26,7 +27,8 @@ describe('FcmPushService', () => {
   function configureCredentials() {
     process.env.V1_PUSH_ENVIRONMENT = 'alpha';
     process.env.FIREBASE_PROJECT_ID = 'teameet-alpha';
-    process.env.FIREBASE_CLIENT_EMAIL = 'firebase-admin@example.test';
+    process.env.FIREBASE_CLIENT_EMAIL =
+      'firebase-adminsdk-test@teameet-alpha.iam.gserviceaccount.com';
     process.env.FIREBASE_PRIVATE_KEY = '-----BEGIN PRIVATE KEY-----\\nsecret\\n-----END PRIVATE KEY-----';
   }
 
@@ -41,6 +43,7 @@ describe('FcmPushService', () => {
     (initializeApp as jest.Mock).mockReturnValue({ name: 'teameet-v1-fcm-alpha' });
     (getMessaging as jest.Mock).mockReturnValue(messaging);
     pushDevices.revokeTokens.mockResolvedValue(undefined);
+    pushDevices.recordSuccessfulDeliveries.mockResolvedValue(undefined);
     pushDevices.recordTransientFailures.mockResolvedValue(undefined);
   });
 
@@ -62,6 +65,23 @@ describe('FcmPushService', () => {
     process.env.FIREBASE_PROJECT_ID = 'teameet-alpha';
     const service = new FcmPushService(pushDevices as never, logger as never);
     expect(() => service.onModuleInit()).toThrow('partially configured');
+  });
+
+  it('fails startup when Alpha is connected to a production Firebase project', () => {
+    configureCredentials();
+    process.env.FIREBASE_PROJECT_ID = 'teameet-production';
+    process.env.FIREBASE_CLIENT_EMAIL =
+      'firebase-adminsdk-test@teameet-production.iam.gserviceaccount.com';
+    const service = new FcmPushService(pushDevices as never, logger as never);
+    expect(() => service.onModuleInit()).toThrow('does not match V1_PUSH_ENVIRONMENT');
+  });
+
+  it('fails startup when the service-account email belongs to another project', () => {
+    configureCredentials();
+    process.env.FIREBASE_CLIENT_EMAIL =
+      'firebase-adminsdk-test@another-alpha.iam.gserviceaccount.com';
+    const service = new FcmPushService(pushDevices as never, logger as never);
+    expect(() => service.onModuleInit()).toThrow('does not belong');
   });
 
   it('delivers notification data and separates permanent from transient token failures', async () => {
@@ -102,5 +122,55 @@ describe('FcmPushService', () => {
     expect(pushDevices.recordTransientFailures).toHaveBeenCalledWith(['device-2']);
     expect(JSON.stringify(logger.warn.mock.calls)).not.toContain(permanentToken);
     expect(JSON.stringify(logger.warn.mock.calls)).not.toContain(transientToken);
+  });
+
+  it('chunks more than 500 devices and records successful delivery timestamps', async () => {
+    configureCredentials();
+    const devices = Array.from({ length: 501 }, (_, index) => ({
+      id: `device-${index}`,
+      token: `registration-token-${index}`,
+    }));
+    pushDevices.activeAndroidTokens.mockResolvedValue(devices);
+    messaging.sendEachForMulticast
+      .mockResolvedValueOnce({
+        successCount: 500,
+        failureCount: 0,
+        responses: Array.from({ length: 500 }, () => ({ success: true })),
+      })
+      .mockResolvedValueOnce({
+        successCount: 1,
+        failureCount: 0,
+        responses: [{ success: true }],
+      });
+    const service = new FcmPushService(pushDevices as never, logger as never);
+    service.onModuleInit();
+
+    await expect(
+      service.sendToUser('user-1', { notificationId: 'notification-1', title: '문의 답변' }),
+    ).resolves.toEqual({ devices: 501, delivered: 501, failed: 0, disabled: false });
+
+    expect(messaging.sendEachForMulticast).toHaveBeenCalledTimes(2);
+    expect(messaging.sendEachForMulticast.mock.calls[0][0].tokens).toHaveLength(500);
+    expect(messaging.sendEachForMulticast.mock.calls[1][0].tokens).toHaveLength(1);
+    expect(pushDevices.recordSuccessfulDeliveries).toHaveBeenCalledWith(
+      devices.map((device) => device.id),
+    );
+  });
+
+  it('tracks an entire rejected multicast batch as transient without exposing tokens', async () => {
+    configureCredentials();
+    pushDevices.activeAndroidTokens.mockResolvedValue([
+      { id: 'device-1', token: 'sensitive-registration-token' },
+    ]);
+    messaging.sendEachForMulticast.mockRejectedValue(new Error('firebase unavailable'));
+    const service = new FcmPushService(pushDevices as never, logger as never);
+    service.onModuleInit();
+
+    await expect(
+      service.sendToUser('user-1', { notificationId: 'notification-1', title: '문의 답변' }),
+    ).resolves.toEqual({ devices: 1, delivered: 0, failed: 1, disabled: false });
+
+    expect(pushDevices.recordTransientFailures).toHaveBeenCalledWith(['device-1']);
+    expect(JSON.stringify(logger.warn.mock.calls)).not.toContain('sensitive-registration-token');
   });
 });

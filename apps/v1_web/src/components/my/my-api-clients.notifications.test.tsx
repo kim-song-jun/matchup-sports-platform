@@ -71,10 +71,10 @@ describe('NotificationSettingsPageClient push toggle', () => {
     const user = userEvent.setup();
     renderWithClient(<NotificationSettingsPageClient />);
 
-    await user.click(screen.getByRole('switch', { name: '브라우저 알림 받기' }));
+    await user.click(screen.getByRole('switch', { name: '푸시 알림 받기' }));
 
     expect(subscribe).toHaveBeenCalled();
-    expect(screen.queryByText('브라우저 알림을 켜지 못했어요')).not.toBeInTheDocument();
+    expect(screen.queryByText('푸시 알림을 켜지 못했어요')).not.toBeInTheDocument();
   });
 
   it('구독에 실패하면 조용히 넘어가지 않고 이유를 화면에 알린다 (서버 VAPID 미설정 등)', async () => {
@@ -91,10 +91,10 @@ describe('NotificationSettingsPageClient push toggle', () => {
     const user = userEvent.setup();
     renderWithClient(<NotificationSettingsPageClient />);
 
-    await user.click(screen.getByRole('switch', { name: '브라우저 알림 받기' }));
+    await user.click(screen.getByRole('switch', { name: '푸시 알림 받기' }));
 
-    expect(await screen.findByText('브라우저 알림을 켜지 못했어요')).toBeInTheDocument();
-    expect(screen.getByText(/지금은 브라우저 알림을 켤 수 없어요/)).toBeInTheDocument();
+    expect(await screen.findByText('푸시 알림을 켜지 못했어요')).toBeInTheDocument();
+    expect(screen.getByText(/지금은 푸시 알림을 켤 수 없어요/)).toBeInTheDocument();
   });
 
   it('권한 팝업에서 차단하면 차단 해제 방법을 안내한다', async () => {
@@ -111,9 +111,9 @@ describe('NotificationSettingsPageClient push toggle', () => {
     const user = userEvent.setup();
     renderWithClient(<NotificationSettingsPageClient />);
 
-    await user.click(screen.getByRole('switch', { name: '브라우저 알림 받기' }));
+    await user.click(screen.getByRole('switch', { name: '푸시 알림 받기' }));
 
-    expect(await screen.findByText(/브라우저 설정에서 이 사이트의 알림을 허용/)).toBeInTheDocument();
+    expect(await screen.findByText(/알림 설정에서 허용한 뒤 다시 시도/)).toBeInTheDocument();
   });
 
   it('unsubscribes from push notifications when the toggle is turned off', async () => {
@@ -128,7 +128,7 @@ describe('NotificationSettingsPageClient push toggle', () => {
     const user = userEvent.setup();
     renderWithClient(<NotificationSettingsPageClient />);
 
-    await user.click(screen.getByRole('switch', { name: '브라우저 알림 받기' }));
+    await user.click(screen.getByRole('switch', { name: '푸시 알림 받기' }));
 
     expect(unsubscribe).toHaveBeenCalled();
   });
@@ -145,7 +145,7 @@ describe('NotificationSettingsPageClient push toggle', () => {
     const user = userEvent.setup();
     renderWithClient(<NotificationSettingsPageClient />);
 
-    const toggle = screen.getByRole('switch', { name: '브라우저 알림 받기' });
+    const toggle = screen.getByRole('switch', { name: '푸시 알림 받기' });
     expect(toggle).toBeDisabled();
 
     await user.click(toggle);
@@ -156,7 +156,7 @@ describe('NotificationSettingsPageClient push toggle', () => {
    * 상태별 문구 회귀 방지: 예전에는 꺼져 있을 때도 "브라우저 푸시로 받아요"라고 적혀 있어
    * 이미 켜진 것으로 읽혔고, 웹 푸시가 기기·브라우저 단위라는 사실이 어디에도 없었다.
    */
-  it('구독 중이면 이 브라우저에서 받는 중이라고 알리고, 기기마다 따로 켜야 함을 밝힌다', () => {
+  it('구독 중이면 이 기기에서 받는 중이라고 알리고, 기기마다 따로 켜야 함을 밝힌다', () => {
     vi.mocked(useV1PushRegistration).mockReturnValue({
       subscribe: vi.fn(),
       unsubscribe: vi.fn(),
@@ -166,10 +166,10 @@ describe('NotificationSettingsPageClient push toggle', () => {
     });
     renderWithClient(<NotificationSettingsPageClient />);
 
-    expect(screen.getByText(/지금 이 브라우저에서 받고 있어요/)).toBeInTheDocument();
+    expect(screen.getByText(/지금 이 기기에서 받고 있어요/)).toBeInTheDocument();
     expect(screen.getByText(/다른 기기에서는 따로 켜야 해요/)).toBeInTheDocument();
-    // 켜져 있으면 항목 설명도 "알림함 + 브라우저 알림 모두"로 바뀐다.
-    expect(screen.getByText(/알림함과 브라우저 알림 모두에서 빠져요/)).toBeInTheDocument();
+    // 켜져 있으면 항목 설명도 "알림함 + 푸시 알림 모두"로 바뀐다.
+    expect(screen.getByText(/알림함과 푸시 알림 모두에서 빠져요/)).toBeInTheDocument();
   });
 
   it('구독 전이면 켰을 때 무엇이 달라지는지 알리고, 지금은 알림함에서만 보인다고 안내한다', () => {
@@ -203,7 +203,7 @@ describe('NotificationSettingsPageClient push toggle', () => {
     });
     renderWithClient(<NotificationSettingsPageClient />);
 
-    const toggle = screen.getByRole('switch', { name: '브라우저 알림 받기' });
+    const toggle = screen.getByRole('switch', { name: '푸시 알림 받기' });
     // 진행 중임을 보조기술에도 알리고, 아직 켜진 상태로 확정하지 않는다.
     expect(toggle).toHaveAttribute('aria-busy', 'true');
     expect(toggle).toHaveAttribute('aria-checked', 'false');
@@ -237,6 +237,6 @@ describe('NotificationSettingsPageClient push toggle', () => {
     });
     renderWithClient(<NotificationSettingsPageClient />);
 
-    expect(screen.queryByRole('switch', { name: '브라우저 알림 받기' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('switch', { name: '푸시 알림 받기' })).not.toBeInTheDocument();
   });
 });

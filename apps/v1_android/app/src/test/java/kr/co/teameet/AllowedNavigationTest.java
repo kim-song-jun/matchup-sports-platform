@@ -12,4 +12,12 @@ public final class AllowedNavigationTest {
         assertEquals("/notifications", AllowedNavigation.safeRoute("//attacker.example/path"));
         assertEquals("/notifications", AllowedNavigation.safeRoute("https://attacker.example/path"));
     }
+
+    @Test public void allowsOnlyReviewedExternalSchemes() {
+        assertEquals(true, AllowedNavigation.isAllowedExternalScheme("https"));
+        assertEquals(true, AllowedNavigation.isAllowedExternalScheme("intent"));
+        assertEquals(false, AllowedNavigation.isAllowedExternalScheme("javascript"));
+        assertEquals(false, AllowedNavigation.isAllowedExternalScheme("file"));
+        assertEquals(false, AllowedNavigation.isAllowedExternalScheme("content"));
+    }
 }

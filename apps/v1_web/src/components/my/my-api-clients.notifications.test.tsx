@@ -36,12 +36,19 @@ function renderWithClient(ui: ReactElement) {
       mutations: { retry: false },
     },
   });
-  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+  const view = render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+  return {
+    ...view,
+    rerenderWithClient(nextUi: ReactElement) {
+      view.rerender(<QueryClientProvider client={queryClient}>{nextUi}</QueryClientProvider>);
+    },
+  };
 }
 
 describe('NotificationSettingsPageClient push toggle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    delete window.TeameetNative;
     hooks.settings.mockReturnValue({
       data: {
         notifications: {
@@ -150,6 +157,53 @@ describe('NotificationSettingsPageClient push toggle', () => {
 
     await user.click(toggle);
     expect(subscribe).not.toHaveBeenCalled();
+  });
+
+  it('Android 권한 차단 상태에서는 기기 알림 설정으로 복구할 수 있다', async () => {
+    const messages: Array<{ type: string; requestId: string }> = [];
+    window.TeameetNative = {
+      postMessage: vi.fn((raw) => {
+        const request = JSON.parse(raw) as { type: string; requestId: string };
+        messages.push(request);
+        window.dispatchEvent(new CustomEvent('teameet:native-push-result', {
+          detail: { requestId: request.requestId, permission: 'denied', subscribed: false },
+        }));
+      }),
+    };
+    vi.mocked(useV1PushRegistration).mockReturnValue({
+      subscribe: vi.fn(),
+      unsubscribe: vi.fn(),
+      permission: 'denied',
+      isSubscribed: false,
+      isPending: false,
+    });
+    const user = userEvent.setup();
+    renderWithClient(<NotificationSettingsPageClient />);
+
+    await user.click(screen.getByRole('button', { name: '기기 알림 설정 열기' }));
+
+    expect(messages).toEqual([
+      expect.objectContaining({ type: 'open-notification-settings' }),
+    ]);
+  });
+
+  it('설정 조회가 성공 화면 이후 실패해도 Hook 순서 오류 없이 전용 오류 상태를 보여준다', () => {
+    vi.mocked(useV1PushRegistration).mockReturnValue({
+      subscribe: vi.fn(),
+      unsubscribe: vi.fn(),
+      permission: 'default',
+      isSubscribed: false,
+      isPending: false,
+    });
+    const view = renderWithClient(<NotificationSettingsPageClient />);
+    hooks.settings.mockReturnValue({
+      data: undefined,
+      isError: true,
+      refetch: vi.fn(),
+    });
+
+    expect(() => view.rerenderWithClient(<NotificationSettingsPageClient />)).not.toThrow();
+    expect(screen.getByText('알림 설정을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.')).toBeInTheDocument();
   });
 
   /**

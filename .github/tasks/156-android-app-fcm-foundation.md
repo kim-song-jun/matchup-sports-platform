@@ -233,3 +233,36 @@ Remaining release blockers (Phase 5 stays unchecked): Firebase Alpha values/serv
 CI-generated FCM-enabled APK, real-device foreground/background/terminated and permission matrix,
 release signing/AAB/versioning, production `assetlinks.json`, adaptive store assets, WebView file
 download device validation, and Play internal testing. Production promotion remains user-only.
+
+## UI/UX Screenshot Audit (2026-08-28)
+
+- Added the headed, real-route audit runner
+  `scripts/qa/capture-task156-android-push-settings.mjs`. It captures the canonical
+  `/my/settings/notifications` route at the 9 viewport baseline plus controlled native
+  off/on/denied/pending/failure states, slow-network loading, terminal API failure, keyboard
+  focus order, and persisted notification preference behavior. Controlled bridge states are
+  rendering evidence only and never substitute for Android OS/device QA.
+- Before-fix evidence:
+  `output/playwright/visual-audit/task156-notification-settings-2026-08-28T05-02-15-912Z`.
+  A terminal settings API failure reproduced `Rendered fewer hooks than expected` and exposed
+  the Next development runtime error instead of the page ErrorState.
+- Fixed the conditional Hook order in `NotificationSettingsPageClient`; the after-fix terminal
+  failure renders the intended retryable ErrorState with no page error.
+- The denied Android state previously disabled the only push control and left no recovery action.
+  It now exposes `기기 알림 설정 열기`, opens the app notification settings through the
+  origin-scoped native bridge, and refreshes native permission/subscription state when the WebView
+  returns to the foreground. Granting the OS permission does not silently restore opt-in; the copy
+  explicitly asks the user to return and enable push again.
+- After-fix evidence:
+  `output/playwright/visual-audit/task156-notification-settings-2026-08-28T05-07-10-381Z`.
+  All 17 capture results completed, all 9 viewports had zero horizontal overflow, default states
+  had zero unexpected console/page/API errors, and the only two 503 console/API entries were the
+  intentionally injected terminal-error scenario. Preference persistence proved
+  `false -> true -> reload true -> restore false`.
+- Final denied-state copy capture:
+  `output/playwright/visual-audit/task156-notification-settings-2026-08-28T05-12-24-676Z`
+  (1/1 captured, zero console/page/API problems).
+- Focused Web validation: 3 files, 33 tests passed. `v1_web` TypeScript `--noEmit` passed.
+- Local Android compilation remains unavailable because this workstation has no Android SDK;
+  the PR Android Alpha workflow (Java 17 + API 36) remains the compile/unit/assemble gate for the
+  new `open-notification-settings` MainActivity branch.

@@ -36,24 +36,42 @@ export function useV1PushRegistration(): V1PushRegistration {
   // 남는다(구독 실패 → 상태 변화 없음 → 리렌더 없음).
   const [permission, setPermission] = useState<NotificationPermission | 'unsupported'>('unsupported');
 
+  const refreshNativeState = useCallback(() => {
+    if (!nativeSupported) return;
+    void requestNativePush('get-push-state')
+      .then((result) => {
+        setPermission(result.permission);
+        setIsSubscribed(result.subscribed);
+      })
+      .catch((err) => {
+        reportClientError({
+          message: extractErrorMessage(err, '앱 알림 상태를 확인하지 못했어요.'),
+          level: 'warn',
+          context: { flow: 'native-push-state-check' },
+        });
+      });
+  }, [nativeSupported]);
+
   useEffect(() => {
     if (nativeSupported) {
-      void requestNativePush('get-push-state')
-        .then((result) => {
-          setPermission(result.permission);
-          setIsSubscribed(result.subscribed);
-        })
-        .catch((err) => {
-          reportClientError({
-            message: extractErrorMessage(err, '앱 알림 상태를 확인하지 못했어요.'),
-            level: 'warn',
-            context: { flow: 'native-push-state-check' },
-          });
-        });
+      refreshNativeState();
       return;
     }
     setPermission(browserSupported ? Notification.permission : 'unsupported');
-  }, [browserSupported, nativeSupported]);
+  }, [browserSupported, nativeSupported, refreshNativeState]);
+
+  useEffect(() => {
+    if (!nativeSupported) return;
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') refreshNativeState();
+    };
+    window.addEventListener('focus', refreshNativeState);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      window.removeEventListener('focus', refreshNativeState);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
+  }, [nativeSupported, refreshNativeState]);
 
   useEffect(() => {
     if (!browserSupported || nativeSupported) return;

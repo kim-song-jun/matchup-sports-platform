@@ -77,6 +77,7 @@ import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import type { MyHomeViewModel, MyInvitationItem, MyJoinApplicationItem, MyJoinApplicationsViewModel, MyMember, MyTeam, MyTeamMembersViewModel, MyTeamsViewModel } from './my.types';
 import { myHomeModel, settingsModel } from './my.view-model';
 import { RECORD_CONSENT_POLICY_HASH } from '@/lib/record-consent';
+import { isNativePushAvailable, requestNativePush } from '@/lib/native-push';
 
 type ProfileEditErrors = Partial<Record<'realName' | 'nickname' | 'email' | 'phone' | 'birthDate' | 'gender' | 'profileImage' | 'form', string>>;
 type DuplicateCheckState = {
@@ -1331,6 +1332,9 @@ export function NotificationSettingsPageClient() {
   const settings = useV1Settings();
   const update = useV1UpdateSettings();
   const pushRegistration = useV1PushRegistration();
+  const [toggleError, setToggleError] = useState(false);
+  const [pushError, setPushError] = useState<string | null>(null);
+  const nativePushAvailable = isNativePushAvailable();
 
   // #12: 설정 로드 실패 시 에러 상태를 명시적으로 표시한다.
   if (settings.isError) {
@@ -1344,10 +1348,7 @@ export function NotificationSettingsPageClient() {
   }
 
   const notifications = settings.data?.notifications;
-  const [toggleError, setToggleError] = useState(false);
-  // 푸시 알림 켜기 실패(권한 차단·네이티브/서버 설정·SW 등록 실패)를 사용자에게 알린다.
-  // 이전에는 subscribe()가 false를 반환해도 토글이 OFF로 남기만 해 원인을 알 수 없었다.
-  const [pushError, setPushError] = useState<string | null>(null);
+  const pushBlocked = pushRegistration.permission === 'denied' && !pushRegistration.isSubscribed;
 
   const togglePush = async () => {
     setPushError(null);
@@ -1365,6 +1366,14 @@ export function NotificationSettingsPageClient() {
           ? '기기 또는 브라우저에서 알림이 차단돼 있어요. 알림 설정에서 허용한 뒤 다시 시도해 주세요.'
           : '지금은 푸시 알림을 켤 수 없어요. 잠시 후 다시 시도해 주세요.',
       );
+    }
+  };
+  const openNativeNotificationSettings = async () => {
+    setPushError(null);
+    try {
+      await requestNativePush('open-notification-settings');
+    } catch {
+      setPushError('기기 알림 설정을 열지 못했어요. 휴대폰 설정에서 Teameet 알림을 직접 허용해 주세요.');
     }
   };
   const items = [
@@ -1403,7 +1412,7 @@ export function NotificationSettingsPageClient() {
           {pushRegistration.permission !== 'unsupported' ? (
             <div className="tm-card" style={{ padding: 0, marginBottom: 8 }}>
               {(() => {
-                const blocked = pushRegistration.permission === 'denied' && !pushRegistration.isSubscribed;
+                const blocked = pushBlocked;
                 // 켜는 중에는 토글을 미리 ON 위치로 옮긴다 — 권한 팝업·서비스워커
                 // 활성화·서버 저장까지 수 초가 걸려서, 그동안 토글이 그대로면 눌리지
                 // 않은 줄 알고 다시 누르게 된다. 다만 '켜짐'이라고 단정하지는 않고
@@ -1456,6 +1465,22 @@ export function NotificationSettingsPageClient() {
                 );
               })()}
             </div>
+          ) : null}
+          {pushBlocked && nativePushAvailable ? (
+            <Card pad={16} style={{ marginBottom: 8 }}>
+              <div className="tm-text-label">휴대폰 알림이 꺼져 있어요</div>
+              <div className="tm-text-caption" style={{ marginTop: 4 }}>
+                기기 설정에서 Teameet 알림을 허용한 뒤 돌아와 푸시 알림을 다시 켜 주세요.
+              </div>
+              <button
+                className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
+                style={{ marginTop: 12 }}
+                type="button"
+                onClick={() => void openNativeNotificationSettings()}
+              >
+                기기 알림 설정 열기
+              </button>
+            </Card>
           ) : null}
           {pushError ? (
             <Card pad={16} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>

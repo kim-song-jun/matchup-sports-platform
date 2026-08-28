@@ -1,6 +1,7 @@
 export type NativePushAction =
   | 'get-push-state'
   | 'request-notification-permission'
+  | 'open-notification-settings'
   | 'revoke-push-device';
 
 export interface NativePushResult {

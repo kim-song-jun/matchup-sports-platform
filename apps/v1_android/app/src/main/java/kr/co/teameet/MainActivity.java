@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.webkit.CookieManager;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -168,6 +169,7 @@ public final class MainActivity extends AppCompatActivity {
                 case "get-push-state" -> reportPushResult(
                     requestId, canRegisterPush() && InstallationIdentity.isRegistered(this));
                 case "request-notification-permission" -> requestPushPermission(requestId);
+                case "open-notification-settings" -> openNotificationSettings(requestId);
                 case "revoke-push-device" -> {
                     InstallationIdentity.markOptedIn(this, false);
                     PushRegistrationClient.revoke(
@@ -195,6 +197,27 @@ public final class MainActivity extends AppCompatActivity {
             return;
         }
         reportPushResult(requestId, false);
+    }
+
+    private void openNotificationSettings(String requestId) {
+        try {
+            Intent settingsIntent = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName());
+            startActivity(settingsIntent);
+        } catch (Exception primaryFailure) {
+            try {
+                startActivity(new Intent(
+                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.parse("package:" + getPackageName())
+                ));
+            } catch (Exception ignored) {
+                // The Web UI keeps the manual settings instructions visible.
+            }
+        }
+        reportPushResult(
+            requestId,
+            canRegisterPush() && InstallationIdentity.isRegistered(this)
+        );
     }
 
     private boolean hasNotificationPermission() {

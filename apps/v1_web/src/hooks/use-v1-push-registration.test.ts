@@ -88,6 +88,33 @@ describe('useV1PushRegistration', () => {
     expect(result.current.isSubscribed).toBe(true);
   });
 
+  it('refreshes the native permission state after returning from Android settings', async () => {
+    let permission: NotificationPermission = 'denied';
+    window.TeameetNative = {
+      postMessage: vi.fn((message) => {
+        const request = JSON.parse(message) as { requestId: string; type: string };
+        window.dispatchEvent(new CustomEvent('teameet:native-push-result', {
+          detail: {
+            requestId: request.requestId,
+            permission,
+            subscribed: permission === 'granted',
+          },
+        }));
+      }),
+    };
+    const { useV1PushRegistration } = await import('./use-v1-push-registration');
+    const { result } = renderHook(() => useV1PushRegistration());
+    await waitFor(() => expect(result.current.permission).toBe('denied'));
+
+    permission = 'granted';
+    window.dispatchEvent(new Event('focus'));
+
+    await waitFor(() => {
+      expect(result.current.permission).toBe('granted');
+      expect(result.current.isSubscribed).toBe(true);
+    });
+  });
+
   it('revokes the native device before logout instead of touching browser Web Push', async () => {
     const messages: string[] = [];
     window.TeameetNative = {

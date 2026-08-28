@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useId, useRef } from 'react';
+import { useId } from 'react';
+import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { Check, X } from 'lucide-react';
 import { Button } from '@/components/v1-ui/button';
 import type { GameSide } from '@/types/game-operations';
@@ -87,33 +88,6 @@ function undecidedReason(
  * 그 버튼으로 되돌려 라디오에 **영원히 도달할 수 없었다**. 선축을 고르기 전에는 킥도 기록할 수
  * 없으므로, 키보드만 쓰는 운영자는 승부차기를 한 킥도 입력하지 못했다(WCAG 2.1.2).
  */
-const FOCUSABLE_SELECTOR =
-  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
-/**
- * 실제로 Tab이 멈추는 요소만 추린다.
- *
- * 라디오 그룹은 DOM에 여러 개가 있어도 tab stop은 **하나뿐**이다 — 체크된 것이 있으면 그것,
- * 없으면 그룹의 첫 번째. 이 규칙을 반영하지 않고 `querySelectorAll` 결과를 그대로 쓰면 트랩의
- * `last`가 영원히 포커스를 받지 못하는 라디오가 되어 되감기가 발동하지 않고, Tab이 다이얼로그
- * 밖으로 새어 나간다(트랩을 고치려다 다른 방향으로 뚫는 셈).
- */
-function tabbableElements(dialog: HTMLElement): HTMLElement[] {
-  const all = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
-  const radiosByGroup = new Map<string, HTMLInputElement[]>();
-  for (const el of all) {
-    if (el instanceof HTMLInputElement && el.type === 'radio') {
-      const group = radiosByGroup.get(el.name) ?? [];
-      group.push(el);
-      radiosByGroup.set(el.name, group);
-    }
-  }
-  return all.filter((el) => {
-    if (!(el instanceof HTMLInputElement) || el.type !== 'radio') return true;
-    const group = radiosByGroup.get(el.name) ?? [];
-    return el === (group.find((radio) => radio.checked) ?? group[0]);
-  });
-}
 
 /**
  * 승부차기 킥 단위 입력 패널.
@@ -144,43 +118,16 @@ export function PenaltyShootoutPanel({
   finishing,
 }: PenaltyShootoutPanelProps) {
   const firstKickGroupId = useId();
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const previousFocusRef = useRef<Element | null>(null);
-  const onCancelRef = useRef(onCancel);
-  onCancelRef.current = onCancel;
 
-  useEffect(() => {
-    previousFocusRef.current = document.activeElement;
-    const dialog = dialogRef.current;
-    dialog?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)?.focus();
-
-    const handler = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onCancelRef.current();
-        return;
-      }
-      if (event.key !== 'Tab' || !dialog) return;
-      const focusable = tabbableElements(dialog);
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey) {
-        if (document.activeElement === first) {
-          event.preventDefault();
-          last.focus();
-        }
-      } else if (document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener('keydown', handler);
-    return () => {
-      document.removeEventListener('keydown', handler);
-      const el = previousFocusRef.current;
-      if (el && typeof (el as HTMLElement).focus === 'function') (el as HTMLElement).focus();
-    };
-  }, []);
+  // ESC·focus trap·포커스 복원·스크롤 잠금을 공용 훅에 맡긴다.
+  // 이 패널이 자기 안에서 풀어 뒀던 "라디오 그룹의 tab stop 은 하나뿐" 처리는
+  // 훅으로 올렸다 — 같은 이유로 트랩이 새던 다른 모달 3곳도 함께 고쳐진다.
+  // 부모가 조건부로 마운트하므로 open 은 true 고정. 스크롤 잠금은 이 이관으로
+  // 새로 생긴다(원래 없어서 뒤 콘솔이 같이 스크롤됐다).
+  const { dialogRef } = useModalA11y<HTMLElement, HTMLDivElement>({
+    open: true,
+    onClose: onCancel,
+  });
 
   const score = penaltyScoreBySideId(kicks);
   const nextSideId = nextPenaltyKicker(kicks, sides, firstKickSideId);

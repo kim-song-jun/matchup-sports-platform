@@ -7,6 +7,7 @@ import { formatMatchClock } from '@/lib/game-operations-clock';
 import type { FrozenEventCapture } from '@/lib/game-operations-clock';
 import { LineupGrid } from './lineup-grid';
 import { periodLabel } from './period-label';
+import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import type {
   GameCardColor,
   GameEventType,
@@ -98,8 +99,6 @@ export function ActionTargetPicker({
   onCommit,
   onCancel,
 }: ActionTargetPickerProps) {
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const previousFocusRef = useRef<Element | null>(null);
   const [substitutionOut, setSubstitutionOut] = useState<{
     readonly sideId: string;
     readonly participant: GameLineupParticipant;
@@ -113,54 +112,13 @@ export function ActionTargetPicker({
     setSubstitutionOut(null);
   }, [actionType, frozen.occurredAt]);
 
-  useEffect(() => {
-    if (open) {
-      previousFocusRef.current = document.activeElement;
-    } else {
-      const el = previousFocusRef.current;
-      if (el && typeof (el as HTMLElement).focus === 'function') (el as HTMLElement).focus();
-      previousFocusRef.current = null;
-    }
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onCancel();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [open, onCancel]);
-
-  useEffect(() => {
-    if (!open) return;
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    const focusableSelectors = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
-    // 열릴 때 포커스를 다이얼로그 안으로 옮긴다. 아래 트랩은 activeElement 가 first/last 일 때만
-    // 순환시키므로, 포커스가 오버레이 바깥에 남아 있으면 트랩이 아예 걸리지 않고 키보드 사용자는
-    // 보이지 않는 배경 요소들을 훑게 된다.
-    const initial = dialog.querySelector<HTMLElement>(focusableSelectors);
-    initial?.focus();
-    const trap = (event: KeyboardEvent) => {
-      if (event.key !== 'Tab') return;
-      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(focusableSelectors));
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey) {
-        if (document.activeElement === first) {
-          event.preventDefault();
-          last.focus();
-        }
-      } else if (document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener('keydown', trap);
-    return () => document.removeEventListener('keydown', trap);
-  }, [open, substitutionOut]);
+  // focus 저장/복원 · ESC 닫기 · Tab focus trap · 스크롤 잠금 · backdrop 클릭 닫기를
+  // 공용 훅에 위임. 렌더 게이트는 기존과 동일하게 `if (!open) return null`이라
+  // 퇴장 애니메이션(mounted/closing)은 쓰지 않는다.
+  const { dialogRef, onBackdropClick } = useModalA11y<HTMLElement, HTMLDivElement>({
+    open,
+    onClose: onCancel,
+  });
 
   if (!open) return null;
 
@@ -228,9 +186,7 @@ export function ActionTargetPicker({
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-gray-900/50 p-0 sm:items-center sm:p-4"
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onCancel();
-      }}
+      onClick={onBackdropClick}
     >
       <div
         ref={dialogRef}

@@ -56,6 +56,36 @@ export const MODAL_EXIT_MS = 160;
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
 
+/**
+ * 실제로 Tab 이 멈추는 요소만 추린다.
+ *
+ * 라디오 그룹은 DOM 에 여러 개가 있어도 tab stop 은 **하나뿐**이다 — 체크된 것이
+ * 있으면 그것, 없으면 그룹의 첫 번째. 나머지는 화살표 키로만 이동한다.
+ * 이 규칙을 반영하지 않고 querySelectorAll 결과를 그대로 쓰면 트랩의 `last` 가
+ * **영원히 포커스를 받지 못하는 라디오**가 되어 되감기가 발동하지 않고, Tab 이
+ * 다이얼로그 밖으로 새어 나간다 — 트랩을 걸어 두고 다른 방향으로 뚫리는 셈이다.
+ *
+ * penalty-shootout-panel 이 자기 파일 안에서 먼저 풀어 둔 것을 여기로 올렸다.
+ * 이 훅을 쓰면서 라디오 그룹을 가진 모달이 이미 3곳 있다(수상 선택·팀 연락처·
+ * 비정상 종료) — 그쪽 트랩이 같은 이유로 새고 있었다.
+ */
+function tabbableElements(dialog: HTMLElement): HTMLElement[] {
+  const all = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+  const radiosByGroup = new Map<string, HTMLInputElement[]>();
+  for (const el of all) {
+    if (el instanceof HTMLInputElement && el.type === 'radio') {
+      const group = radiosByGroup.get(el.name) ?? [];
+      group.push(el);
+      radiosByGroup.set(el.name, group);
+    }
+  }
+  return all.filter((el) => {
+    if (!(el instanceof HTMLInputElement) || el.type !== 'radio') return true;
+    const group = radiosByGroup.get(el.name) ?? [];
+    return el === (group.find((radio) => radio.checked) ?? group[0]);
+  });
+}
+
 export function useModalA11y<
   TInitial extends HTMLElement = HTMLElement,
   TDialog extends HTMLElement = HTMLDivElement,
@@ -172,7 +202,7 @@ export function useModalA11y<
       if (e.key !== 'Tab') return;
       const dialog = dialogRef.current;
       if (!dialog) return;
-      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+      const focusable = tabbableElements(dialog);
       if (focusable.length === 0) return;
       const first = focusable[0];
       const last = focusable[focusable.length - 1];

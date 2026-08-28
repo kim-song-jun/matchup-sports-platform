@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { UsersRound } from 'lucide-react';
 import { buildPhoneVerifyHref } from '@/components/auth/phone-verification/phone-verify-route';
 import { AppChrome } from '@/components/v1-ui/shell';
+import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { AlertBanner, Card, EmptyState, InfoRow, SectionTitle } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { getTournamentRosterNextStep } from '@/components/tournaments/tournament-roster-next-step';
@@ -1109,19 +1110,17 @@ function TournamentConsentDialog({
   document: TournamentConsentDocument;
   onClose: () => void;
 }) {
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  // a11y: focus trap·스크롤 잠금·포커스 저장/복원·ESC 닫기는 공용 훅에 위임
+  // (조건부 마운트형 모달이라 open 은 true 고정)
+  const { dialogRef, initialFocusRef, onBackdropClick } = useModalA11y<HTMLButtonElement, HTMLElement>({
+    open: true,
+    onClose,
+  });
 
   return (
     <div
       role="presentation"
-      onClick={onClose}
+      onClick={onBackdropClick}
       style={{
         position: 'fixed',
         inset: 0,
@@ -1134,6 +1133,7 @@ function TournamentConsentDialog({
       }}
     >
       <section
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="tournament-consent-dialog-title"
@@ -1162,7 +1162,7 @@ function TournamentConsentDialog({
           <h2 id="tournament-consent-dialog-title" className="tm-text-subhead" style={{ margin: 0 }}>
             {document.title}
           </h2>
-          <button className="tm-btn tm-btn-sm tm-btn-ghost" onClick={onClose} type="button" autoFocus>
+          <button ref={initialFocusRef} className="tm-btn tm-btn-sm tm-btn-ghost" onClick={onClose} type="button">
             닫기
           </button>
         </header>
@@ -1188,21 +1188,18 @@ function TournamentSubmitConfirmDialog({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
-  useEffect(() => {
-    if (isSubmitting) return;
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onCancel();
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isSubmitting, onCancel]);
+  // a11y: focus trap·스크롤 잠금·포커스 저장/복원·ESC 닫기는 공용 훅에 위임
+  // (조건부 마운트형 모달이라 open 은 true 고정). 제출 중에는 pending 으로 ESC·backdrop 닫기 잠금
+  const { dialogRef, initialFocusRef, onBackdropClick } = useModalA11y<HTMLButtonElement, HTMLElement>({
+    open: true,
+    onClose: onCancel,
+    pending: isSubmitting,
+  });
 
   return (
     <div
       role="presentation"
-      onClick={isSubmitting ? undefined : onCancel}
+      onClick={onBackdropClick}
       style={{
         position: 'fixed',
         inset: 0,
@@ -1215,6 +1212,7 @@ function TournamentSubmitConfirmDialog({
       }}
     >
       <section
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="tournament-submit-confirm-title"
@@ -1238,11 +1236,11 @@ function TournamentSubmitConfirmDialog({
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.6fr', gap: 8, marginTop: 20 }}>
           <button
+            ref={initialFocusRef}
             type="button"
             className="tm-btn tm-btn-lg tm-btn-neutral"
             disabled={isSubmitting}
             onClick={onCancel}
-            autoFocus
           >
             취소
           </button>

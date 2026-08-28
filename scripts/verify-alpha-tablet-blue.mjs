@@ -31,11 +31,21 @@ try {
       if (!grid) return { err: '.tm-tournament-list-grid 없음' };
       const cards = [...grid.children].filter((e) => e.getBoundingClientRect().width > 100);
       if (!cards.length) return { err: '카드 0개' };
-      // 같은 행에 있는 카드끼리 top 이 같다 — 좌표로 세면 눈으로 세는 것보다 정확하다
-      const tops = new Set(cards.map((e) => Math.round(e.getBoundingClientRect().top)));
+      // 같은 행에 있는 카드끼리 top 이 같다 — 좌표로 세면 눈으로 세는 것보다 정확하다.
+      //
+      // 행 수로 나누면 안 된다. 마지막 행이 덜 차 있으면 그대로 틀린다 —
+      // 카드 4장이 3열이면 행은 2줄이고 4/2 = 2 열이라는 답이 나온다(실측 확인).
+      // 지금까지 통과한 건 alpha 의 카드 수가 우연히 행을 꽉 채웠기 때문이다.
+      // 한 행에 들어간 최대 개수가 곧 열 수다.
+      const perRow = new Map();
+      for (const e of cards) {
+        const top = Math.round(e.getBoundingClientRect().top);
+        perRow.set(top, (perRow.get(top) ?? 0) + 1);
+      }
       return {
         display: getComputedStyle(grid).display,
-        cols: Math.round(cards.length / tops.size),
+        cols: Math.max(...perRow.values()),
+        rows: perRow.size,
         cardW: Math.round(cards[0].getBoundingClientRect().width),
         cards: cards.length,
       };
@@ -72,16 +82,27 @@ try {
       // 투명도 변형은 요소를 심어서 못 잰다 — Tailwind 는 **실제로 쓰인 클래스만**
       // 번들에 넣으므로 ring-4 같은 걸 새로 붙이면 규칙 자체가 없다(빈 값).
       // 번들 CSS 에서 규칙을 직접 찾아야 한다.
+      //
+      // 셀렉터를 `includes('ring-blue-500')` 로 느슨하게 잡으면 **알파 변형이 아닌
+      // 일반 `ring-blue-500` 규칙**을 먼저 집어 통과/실패가 뒤집힌다. 알파 변형만
+      // 노린다: Tailwind 는 `/20` 을 `\/20` 으로 이스케이프해 셀렉터에 넣는다.
       let alphaRule = '';
+      const isAlphaVariant = (sel) => /ring-blue-500\\\/\d+/.test(sel);
       const walk = (rs) => { for (const r of rs) {
-        if (r.styleSheet) { try { walk(r.styleSheet.cssRules); } catch {} }
-        if (r.selectorText && r.selectorText.includes('ring-blue-500')) {
+        if (r.styleSheet) {
+          // cross-origin 스타일시트는 cssRules 접근이 던진다 — 우리 번들이 아니므로
+          // 무시하는 것이 맞다(빈 catch 가 아니라 의도).
+          try { walk(r.styleSheet.cssRules); } catch { /* cross-origin: 검사 대상 아님 */ }
+        }
+        if (r.selectorText && isAlphaVariant(r.selectorText)) {
           const v = r.style.getPropertyValue('--tw-ring-color');
           if (v && !alphaRule) alphaRule = v;
         }
         if (r.cssRules && r.cssRules.length) walk(r.cssRules);
       }};
-      for (const s of document.styleSheets) { try { walk(s.cssRules); } catch {} }
+      for (const s of document.styleSheets) {
+        try { walk(s.cssRules); } catch { /* cross-origin: 검사 대상 아님 */ }
+      }
 
       return {
         util: mk('bg-blue-500').bg,

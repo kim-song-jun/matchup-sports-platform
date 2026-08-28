@@ -393,7 +393,7 @@ export const gameSchemaSourceManifest = {
   // schema.prisma 전체 bytes를 결속하므로 schema hash만 현재 committed LF bytes로 재핀한다.
   // Task 156 follow-up: push delivery success metadata was added to V1PushDevice. The game
   // contract itself is unchanged; this guard binds the complete schema and additive migration.
-  schema: 'f8a911a9420301d801513f23630cd8ac620485b3b6665c13ca4c043010b34aa5',
+  schema: '71c67118897349d9dbe98f87bfc65db5be167408808f61454a052e689234d06c',
   migration: '1dfe7ac33ada2208d000d86bd35f49d2a9950a0daa20858c27b8005058db8aee',
 } as const;
 
@@ -410,7 +410,10 @@ export function verifyGameSchemaSourceSnapshot(
     ['schema', candidates.schema, manifest.schema],
     ['migration', candidates.migration, manifest.migration],
   ] as const) {
-    const actual = createHash('sha256').update(readFileSync(path)).digest('hex');
+    // Git stores canonical LF bytes while Windows may materialize the same source as CRLF.
+    // Normalize only line endings so the source-integrity contract is OS independent.
+    const canonicalBytes = readFileSync(path).toString('utf8').replaceAll('\r\n', '\n');
+    const actual = createHash('sha256').update(canonicalBytes).digest('hex');
     if (actual !== expected) {
       throw new Error(`SOURCE_SNAPSHOT_DRIFT: ${name} bytes differ from bound source snapshot`);
     }

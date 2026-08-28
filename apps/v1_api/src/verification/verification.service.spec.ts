@@ -30,6 +30,9 @@ function buildPrismaMock() {
     updateMany: jest.fn().mockResolvedValue({ count: 1 }),
   };
   prisma.v1AuthIdentity = { updateMany: jest.fn().mockResolvedValue({ count: 1 }) };
+  // issue() 가 상한 확인과 토큰 생성을 한 트랜잭션에 묶으면서 대상 기준 advisory lock 을
+  // 건다 — mock 에 없으면 그 줄에서 터진다.
+  prisma.$executeRaw = jest.fn().mockResolvedValue(1);
   prisma.$transaction = jest.fn((arg: unknown) =>
     Array.isArray(arg) ? Promise.all(arg) : (arg as (tx: unknown) => unknown)(prisma),
   );
@@ -222,6 +225,27 @@ describe('VerificationService 발송 총량 상한', () => {
       response: { code: 'VERIFICATION_SEND_QUOTA_EXCEEDED' },
     });
     expect(handle.v1VerificationToken.create).not.toHaveBeenCalled();
+  });
+
+  it('상한 확인과 토큰 생성이 같은 트랜잭션에서 잠금 아래 일어난다', async () => {
+    // count 로 확인한 뒤 별도로 create 하면, 병렬 요청이 전부 "아직 여유 있음"을 읽고
+    // 통과해 상한이 무의미해진다. 대상 기준 advisory lock 으로 직렬화한다.
+    const { prisma, handle } = setup({ target: 0, user: 0 });
+    const sendSpy = jest.spyOn(dispatcher, 'send').mockResolvedValue(undefined);
+    const service = new VerificationService(prisma, dispatcher, eventLogStub());
+
+    await service.requestPhone(authUser, '01012345678');
+
+    const raw = (prisma as never as { $executeRaw: jest.Mock }).$executeRaw;
+    expect(raw).toHaveBeenCalled();
+    // 잠금이 세는 것보다 먼저 잡혀야 의미가 있다.
+    expect(raw.mock.invocationCallOrder[0]).toBeLessThan(handle.v1VerificationToken.count.mock.invocationCallOrder[0]);
+    // 세는 것과 만드는 것이 같은 트랜잭션 안이어야 그 사이에 끼어들 수 없다.
+    expect(handle.v1VerificationToken.count.mock.invocationCallOrder[0]).toBeLessThan(
+      handle.v1VerificationToken.create.mock.invocationCallOrder[0],
+    );
+    expect((prisma as never as { $transaction: jest.Mock }).$transaction).toHaveBeenCalledTimes(1);
+    sendSpy.mockRestore();
   });
 
   it('상한 아래면 평소대로 발송한다', async () => {

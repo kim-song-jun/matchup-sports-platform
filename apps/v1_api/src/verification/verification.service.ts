@@ -58,9 +58,8 @@ export class VerificationService {
     if (user.emailVerifiedAt) {
       return { sent: false, alreadyVerified: true, channel: 'email' as const };
     }
-    // 이메일도 같은 상한을 쓴다 -- 유료는 아니지만 발신 도메인 평판을 태우고,
-    // 남의 주소로 인증 메일을 반복 보내는 괴롭힘 경로는 동일하다.
-    await this.assertSendQuota('email', user.id, user.email);
+    // 상한은 issue() 안에서 잠금 아래 확인한다 — 이메일도 같은 상한을 쓴다(유료는
+    // 아니지만 발신 도메인 평판을 태우고, 남의 주소로 반복 발송하는 괴롭힘 경로는 동일).
     return this.issue('email', user.id, user.email);
   }
 
@@ -97,7 +96,6 @@ export class VerificationService {
         message: `잠시 후 다시 시도해 주세요. (${retryAfter}초 뒤에 다시 받을 수 있어요)`,
       });
     }
-    await this.assertSendQuota('phone', user.id, phone);
     return this.issue('phone', user.id, phone);
   }
 
@@ -109,11 +107,16 @@ export class VerificationService {
    * 세는 대상은 실제로 나간 발송이다: `issue()` 는 발송이 실패하면 방금 만든 토큰을
    * 지우므로(같은 파일), 남아 있는 행 = 실제로 보낸 건이다.
    */
-  private async assertSendQuota(channel: V1VerificationChannel, userId: string, target: string) {
+  private async assertSendQuota(
+    tx: Prisma.TransactionClient,
+    channel: V1VerificationChannel,
+    userId: string,
+    target: string,
+  ) {
     const since = new Date(Date.now() - SEND_QUOTA_WINDOW_MS);
     const [targetSends, userSends] = await Promise.all([
-      this.prisma.v1VerificationToken.count({ where: { channel, target, createdAt: { gte: since } } }),
-      this.prisma.v1VerificationToken.count({ where: { channel, userId, createdAt: { gte: since } } }),
+      tx.v1VerificationToken.count({ where: { channel, target, createdAt: { gte: since } } }),
+      tx.v1VerificationToken.count({ where: { channel, userId, createdAt: { gte: since } } }),
     ]);
     if (targetSends < MAX_SENDS_PER_TARGET && userSends < MAX_SENDS_PER_USER) return;
 
@@ -240,15 +243,22 @@ export class VerificationService {
     const codeHash = await hashPassword(code);
 
     const expiresAt = new Date(Date.now() + CODE_TTL_MS);
-    const [, created] = await this.prisma.$transaction([
-      this.prisma.v1VerificationToken.updateMany({
+    const created = await this.prisma.$transaction(async (tx) => {
+      // 상한 확인과 토큰 생성 사이에 다른 요청이 끼어들면 상한이 무의미해진다 --
+      // 병렬로 N 개를 던지면 전부 "아직 여유 있음"을 읽고 통과한다. 대상 번호 기준으로
+      // 직렬화해 확인과 기록을 한 트랜잭션에 묶는다(형제 레인들과 같은 방식:
+      // attendance.service.ts / guest-recruitment.service.ts 의 lockIdempotencyScope).
+      const scope = JSON.stringify(['verification-send', channel, target]);
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${scope}, 0))`;
+      await this.assertSendQuota(tx, channel, userId, target);
+      await tx.v1VerificationToken.updateMany({
         where: { userId, channel, consumedAt: null },
         data: { consumedAt: new Date() },
-      }),
-      this.prisma.v1VerificationToken.create({
+      });
+      return tx.v1VerificationToken.create({
         data: { userId, channel, target, codeHash, expiresAt },
-      }),
-    ]);
+      });
+    });
 
     try {
       await this.dispatcher.send(channel, target, code);

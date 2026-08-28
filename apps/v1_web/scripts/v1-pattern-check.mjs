@@ -394,7 +394,7 @@ checkLiteralBaseline({
     // 코너별 longhand 와 Tailwind 임의값까지 함께 본다 — shorthand 만 보면
     // borderTopLeftRadius / rounded-[12px] 로 그대로 우회된다(CSS 쪽에서
     // 실제로 6건이 그랬다).
-    for (const m of txt.matchAll(/border(?:Start|End|Top|Bottom)?(?:Start|End|Left|Right)?Radius:/g)) {
+    for (const m of txt.matchAll(/border(?:Start|End|Top|Bottom)?(?:Start|End|Left|Right)?Radius\s*:/g)) {
       n += literalsIn(readValue(txt, m.index + m[0].length));
     }
     for (const m of txt.matchAll(/\brounded-\[([^\]]+)\]/g)) n += literalsIn(m[1]);

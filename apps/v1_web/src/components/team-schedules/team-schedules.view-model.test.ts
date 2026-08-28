@@ -86,6 +86,33 @@ describe('team-schedules view-model — API failure / 409 conflict mapping', () 
     expect(isScheduleStaleConflict(err)).toBe(true);
   });
 
+  it('이미 답한 팀원 충돌은 목록을 되돌려야 하는 stale 로 다룬다', () => {
+    // 팀장이 보고 있던 "미응답" 목록이 낡아서 나는 충돌이라, 메시지만 띄우고 목록을
+    // 그대로 두면 이미 답한 사람 옆에 대리 버튼이 계속 남는다.
+    const err = new V1ApiError({
+      status: 'error',
+      statusCode: 409,
+      code: 'PROXY_ATTENDANCE_ALREADY_ANSWERED',
+      message: 'already answered',
+      timestamp: new Date().toISOString(),
+    });
+    expect(isScheduleStaleConflict(err)).toBe(true);
+    expect(mapScheduleErrorMessage(err, '실패했어요')).toBe('팀원이 이미 응답했어요. 최신 내용으로 새로고침했어요.');
+  });
+
+  it('대리로 참석 외 상태를 시도한 경우는 stale 이 아니라 그대로 알린다', () => {
+    // 목록이 낡아서 난 것이 아니므로 새로고침해도 달라지지 않는다 -- 되돌릴 것이 없다.
+    const err = new V1ApiError({
+      status: 'error',
+      statusCode: 409,
+      code: 'PROXY_ATTENDANCE_STATUS_NOT_ALLOWED',
+      message: 'only going',
+      timestamp: new Date().toISOString(),
+    });
+    expect(isScheduleStaleConflict(err)).toBe(false);
+    expect(mapScheduleErrorMessage(err, '실패했어요')).toBe('대신 표시할 수 있는 건 참석뿐이에요.');
+  });
+
   it('does not flag an unrelated domain error as a stale conflict', () => {
     const err = new V1ApiError({
       status: 'error',

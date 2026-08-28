@@ -11,6 +11,7 @@ import {
   useV1CreateTeamSchedule,
   useV1MySchedule,
   useV1SetMyScheduleAttendance,
+  useV1SetScheduleAttendanceOnBehalf,
   useV1TeamDetail,
   useV1TeamSchedule,
   useV1TeamSchedules,
@@ -361,6 +362,24 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
 
   const recruitment = schedule?.guestRecruitment ?? null;
   const rsvpDeadlinePassed = isDeadlinePassed(schedule?.rsvpDeadlineAt ?? null);
+  // 본인 응답과 대리 표시가 **같은 제약**을 따르도록 판정을 한 곳에서 만든다 —
+  // 마감이 지났거나 일정이 SCHEDULED 가 아니면 대리로도 바꿀 수 없다. 둘이 갈리면
+  // "팀장은 마감 후에도 바꿀 수 있나?"가 화면마다 다르게 답해진다.
+  const attendanceDisabled = !schedule || schedule.state !== 'SCHEDULED' || rsvpDeadlinePassed;
+  const [proxyPendingUserId, setProxyPendingUserId] = useState<string | null>(null);
+  const [proxyError, setProxyError] = useState<string | null>(null);
+  const setAttendanceOnBehalf = useV1SetScheduleAttendanceOnBehalf(teamId, scheduleId);
+  function onProxyGoing(userId: string) {
+    setProxyError(null);
+    setProxyPendingUserId(userId);
+    setAttendanceOnBehalf.mutate(
+      { userId, status: 'GOING', expectedVersion: 0 },
+      {
+        onError: (err) => setProxyError(reportPossibleConflict(err, '참석을 대신 표시하지 못했어요.')),
+        onSettled: () => setProxyPendingUserId(null),
+      },
+    );
+  }
   const recruitmentDeadlinePassed = isDeadlinePassed(recruitment?.closesAt ?? null);
 
   const history: ScheduleDetailViewModel['history'] = [];
@@ -421,6 +440,13 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
         going: schedule?.attendees?.filter((attendee) => attendee.status === 'GOING').length ?? 0,
         noResponse: schedule?.attendees?.filter((attendee) => attendee.status === 'NO_RESPONSE').length ?? 0,
       },
+      // 대리 표시는 팀장·매니저만 — 서버도 403 으로 막지만 누를 수 없는 버튼을
+      // 보여주고 눌러서 실패하게 두지 않는다. 마감·상태 제약은 본인 응답과 같은
+      // 판정을 쓴다(attendance.disabled) — 마감이 지났으면 대리로도 못 바꾼다.
+      canProxy: canManage && !attendanceDisabled,
+      proxyPendingUserId: proxyPendingUserId,
+      proxyError: proxyError,
+      onProxyGoing: onProxyGoing,
     },
     guestRecruitment: {
       visible: Boolean(recruitment),

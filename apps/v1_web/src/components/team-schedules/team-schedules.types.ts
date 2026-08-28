@@ -184,6 +184,13 @@ export type ScheduleAttendeeListModel = {
   proxyPendingUserId: string | null;
   /** 대리 표시 실패 사유. 실패해도 목록은 그대로 두고 이 문구만 덧붙인다. */
   proxyError: string | null;
+  /**
+   * 보고 있는 사람의 userId. 참석자 목록은 active 멤버 **전원**이라 팀장 자신의 줄도
+   * 거기 있는데, 자기 줄에까지 "대신 표시"가 뜨면 위쪽 "내 참석" 버튼과 같은 일을 하는
+   * 버튼이 두 개가 된다(alpha 실화면에서 확인). 자기 줄을 가려내는 데만 쓴다.
+   * 아직 로그인 정보를 못 받았으면 null -- 그동안은 대리 버튼을 내지 않는다.
+   */
+  viewerUserId: string | null;
   onProxyGoing: (userId: string) => void;
 };
 

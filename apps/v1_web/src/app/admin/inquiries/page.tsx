@@ -24,6 +24,7 @@ import type {
   V1InquiryReportReason,
   V1InquiryStatus,
 } from '@/types/api';
+import { pickAllowedParam } from '../pick-allowed-param';
 
 const STATUS_OPTIONS = [
   { value: '', label: '전체' },
@@ -81,14 +82,8 @@ function requesterContact(row: V1AdminInquiryRow) {
 
 const PAGE_SIZE = 20;
 
-/**
- * URL 값은 사용자가 손으로 고칠 수 있으므로 허용 목록과 대조한다. 검증 없이 그대로 필터에
- * 실으면 서버가 400 을 내고 화면은 원인 모를 에러가 된다.
- */
-function pickAllowed(raw: string | null, allowed: ReadonlyArray<{ value: string }>): string {
-  if (!raw) return '';
-  return allowed.some((option) => option.value === raw && raw !== '') ? raw : '';
-}
+// 이 화면에만 있던 방어를 공용으로 옮겼다 — 같은 규칙이 필요한 화면이 넷이다.
+const pickAllowed = pickAllowedParam;
 
 // useSearchParams 는 Suspense 경계를 요구한다(Next.js App Router).
 export default function AdminInquiriesPage() {

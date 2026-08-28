@@ -12,6 +12,7 @@ import { formatAdminDateTimeShort } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import { useAdminListQuery } from '@/hooks/use-admin-list-query';
+import { pickAllowedParam } from '../pick-allowed-param';
 import {
   AdminPageHeader,
   AdminFilterBar,
@@ -61,7 +62,9 @@ export default function AdminTeamMatchesPage() {
 function AdminTeamMatchesPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const initialStatus = searchParams.get('status') ?? '';
+  // 허용 목록에 없는 값(오타난 북마크·옛 링크)은 조용히 '전체'로 떨어뜨린다 —
+  // 그대로 실으면 서버가 400 을 내고 목록이 통째로 에러 화면이 된다.
+  const initialStatus = pickAllowedParam(searchParams.get('status'), STATUS_OPTIONS);
   // ── Admin capabilities ─────────────────────────────────────────────
   const canWrite = useAdminCanWrite();
 

@@ -223,6 +223,64 @@ describe('Task 12 attendance lane — ScheduleAttendanceService', () => {
     expect(proxied.status).toBe('WAITLISTED');
   });
 
+  it('같은 키를 다른 대상자에게 재사용하면 조용히 replay 되지 않고 충돌로 드러난다', async () => {
+    // idempotency identity 는 (actor, action, schedule, key) 라 대상자를 구분하지 않는다.
+    // 대상자를 payloadHash 에 넣지 않으면 두 번째 대상자의 출석이 기록되지 않은 채
+    // 첫 번째 응답이 그대로 돌아와, 호출부는 성공으로 읽는다 -- 팀장이 B 를 참석으로
+    // 표시했다고 믿는데 실제로는 A 만 표시된 상태가 된다.
+    const schedule = await createSchedule();
+
+    await service.setAttendanceOnBehalf(
+      authUser(ids.owner),
+      ids.userA,
+      ids.team,
+      schedule.id,
+      { status: 'GOING', expectedVersion: 0 },
+      'proxy-reused-key',
+    );
+
+    const error = await captureFailure(() =>
+      service.setAttendanceOnBehalf(
+        authUser(ids.owner),
+        ids.userB,
+        ids.team,
+        schedule.id,
+        { status: 'GOING', expectedVersion: 0 },
+        'proxy-reused-key',
+      ),
+    );
+
+    expectHttpCode(error, 409, 'IDEMPOTENCY_PAYLOAD_CONFLICT');
+    // 조용한 replay 였다면 userB 행이 없는 채로 성공했을 것이다.
+    const rows = await prisma.v1ScheduleAttendance.findMany({ where: { scheduleId: schedule.id } });
+    expect(rows.map((row) => row.userId)).toEqual([ids.userA]);
+  });
+
+  it('같은 키로 같은 대상자를 다시 부르면 그대로 replay 된다', async () => {
+    // 위 분기가 대상자별로 해시를 갈랐다고 해서 원래의 재시도 흡수까지 깨지면 안 된다.
+    const schedule = await createSchedule();
+
+    const first = await service.setAttendanceOnBehalf(
+      authUser(ids.owner),
+      ids.userA,
+      ids.team,
+      schedule.id,
+      { status: 'GOING', expectedVersion: 0 },
+      'proxy-retry-key',
+    );
+    const second = await service.setAttendanceOnBehalf(
+      authUser(ids.owner),
+      ids.userA,
+      ids.team,
+      schedule.id,
+      { status: 'GOING', expectedVersion: 0 },
+      'proxy-retry-key',
+    );
+
+    expect(second).toEqual(first);
+    expect(await prisma.v1ScheduleAttendance.count({ where: { scheduleId: schedule.id } })).toBe(1);
+  });
+
   it('팀 소속이 아닌 사람을 대상으로는 대리 표시할 수 없다', async () => {
     const schedule = await createSchedule();
 

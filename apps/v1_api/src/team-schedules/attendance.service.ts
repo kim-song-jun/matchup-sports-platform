@@ -98,9 +98,21 @@ export class ScheduleAttendanceService {
     return this.prisma.$transaction(async (tx) => {
       await this.lockIdempotencyScope(tx, actor.id, scheduleId, idempotencyKey);
 
+      // 대리 응답이 생기면서 같은 actor 가 같은 스케줄에 대해 **서로 다른 대상자**로
+      // 요청할 수 있게 됐다. idempotency identity 는 (actor, action, schedule, key) 라
+      // 대상자를 구분하지 않으므로, 대상자를 payloadHash 에 넣지 않으면 클라이언트가
+      // 키를 잘못 재사용했을 때 두 번째 대상자의 출석이 기록되지 않은 채 첫 번째
+      // 응답이 그대로 replay 된다 -- 호출부는 성공으로 읽는 조용한 오동작이다.
+      //
+      // 본인 응답(targetUserId === actor.id)일 때는 해시를 예전 그대로 둔다. 이미
+      // 발급돼 있는 기록들의 해시가 배포 경계에서 통째로 어긋나 재시도가 409 가 되는
+      // 것을 피하기 위해서다 -- 본인 경로는 대상자가 늘 자기 자신이라 애초에 모호하지
+      // 않다. 대상자가 다른 요청은 해시가 달라지므로 조용한 replay 대신
+      // IDEMPOTENCY_PAYLOAD_CONFLICT 로 드러난다.
       const payloadHash = canonicalGameCommandPayloadHash({
         status: dto.status,
         expectedVersion: dto.expectedVersion,
+        ...(targetUserId === actor.id ? {} : { targetUserId }),
       });
       const idempotencyIdentity = {
         actorUserId: actor.id,

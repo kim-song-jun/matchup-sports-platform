@@ -424,6 +424,14 @@ function CancelModal({
   error: string | null;
 }) {
   const [reason, setReason] = useState('');
+
+  // 예전에는 부모가 조건부로 마운트해서 닫으면 이 state 가 자동으로 사라졌다.
+  // 퇴장 애니메이션 때문에 컴포넌트를 살려 두게 되면서 그 초기화가 없어졌다 —
+  // 취소 사유를 쓰다 닫으면 다시 열었을 때 그대로 남는다. 열릴 때 비운다.
+  useEffect(() => {
+    if (open) setReason('');
+  }, [open]);
+
   // 포커스 저장·복원, 초기 포커스, ESC, focus trap, 스크롤 잠금을 공용 훅에 맡긴다.
   // 직접 구현해 두면 퇴장 애니메이션을 넣을 때 그 전부를 mounted 기준으로 다시
   // 손봐야 하는데, 훅은 이미 그렇게 돼 있다(알림 시트에서 겪은 문제).

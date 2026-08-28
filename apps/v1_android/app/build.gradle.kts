@@ -1,6 +1,8 @@
+import java.util.Properties
+
 plugins { id("com.android.application") }
 
-val releaseVersion = java.util.Properties().apply {
+val releaseVersion = Properties().apply {
     rootProject.file("version.properties").inputStream().use { load(it) }
 }
 val teameetVersionCode = releaseVersion.getProperty("versionCode")?.toIntOrNull()

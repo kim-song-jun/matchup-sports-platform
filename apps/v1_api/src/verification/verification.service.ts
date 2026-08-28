@@ -245,11 +245,18 @@ export class VerificationService {
     const expiresAt = new Date(Date.now() + CODE_TTL_MS);
     const created = await this.prisma.$transaction(async (tx) => {
       // 상한 확인과 토큰 생성 사이에 다른 요청이 끼어들면 상한이 무의미해진다 --
-      // 병렬로 N 개를 던지면 전부 "아직 여유 있음"을 읽고 통과한다. 대상 번호 기준으로
-      // 직렬화해 확인과 기록을 한 트랜잭션에 묶는다(형제 레인들과 같은 방식:
+      // 병렬로 N 개를 던지면 전부 "아직 여유 있음"을 읽고 통과한다. 확인과 기록을 한
+      // 트랜잭션에 묶고 advisory lock 으로 직렬화한다(형제 레인들과 같은 방식:
       // attendance.service.ts / guest-recruitment.service.ts 의 lockIdempotencyScope).
-      const scope = JSON.stringify(['verification-send', channel, target]);
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${scope}, 0))`;
+      //
+      // 상한이 둘(대상 번호 / 요청자)이므로 잠금도 둘이다. 대상 하나만 잠그면 같은
+      // 사용자가 **서로 다른 번호로** 병렬 요청할 때 요청자 상한이 그대로 레이스로
+      // 뚫린다. 순서는 항상 요청자 → 대상으로 고정한다 -- 모든 호출부가 같은 순서로
+      // 잡으면 서로를 기다리는 고리(교착)가 생기지 않는다.
+      const userScope = JSON.stringify(['verification-send-user', channel, userId]);
+      const targetScope = JSON.stringify(['verification-send-target', channel, target]);
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${userScope}, 0))`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${targetScope}, 0))`;
       await this.assertSendQuota(tx, channel, userId, target);
       await tx.v1VerificationToken.updateMany({
         where: { userId, channel, consumedAt: null },

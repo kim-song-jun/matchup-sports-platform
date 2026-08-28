@@ -237,7 +237,13 @@ describe('VerificationService 발송 총량 상한', () => {
     await service.requestPhone(authUser, '01012345678');
 
     const raw = (prisma as never as { $executeRaw: jest.Mock }).$executeRaw;
-    expect(raw).toHaveBeenCalled();
+    // 상한이 둘(대상/요청자)이므로 잠금도 둘이다 — 대상만 잠그면 같은 사용자가 서로
+    // 다른 번호로 병렬 요청할 때 요청자 상한이 레이스로 뚫린다. 순서는 항상
+    // 요청자 → 대상으로 고정한다(교착 방지).
+    expect(raw).toHaveBeenCalledTimes(2);
+    const scopes = raw.mock.calls.map((call: unknown[]) => JSON.stringify(call));
+    expect(scopes[0]).toContain('verification-send-user');
+    expect(scopes[1]).toContain('verification-send-target');
     // 잠금이 세는 것보다 먼저 잡혀야 의미가 있다.
     expect(raw.mock.invocationCallOrder[0]).toBeLessThan(handle.v1VerificationToken.count.mock.invocationCallOrder[0]);
     // 세는 것과 만드는 것이 같은 트랜잭션 안이어야 그 사이에 끼어들 수 없다.

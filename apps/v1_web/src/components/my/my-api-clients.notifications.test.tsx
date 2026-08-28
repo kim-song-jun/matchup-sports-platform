@@ -281,6 +281,27 @@ describe('NotificationSettingsPageClient push toggle', () => {
     expect(screen.getByText(/끄는 중이에요/)).toBeInTheDocument();
   });
 
+  it('shows a loading state instead of false OFF values before settings arrive', () => {
+    hooks.settings.mockReturnValue({
+      data: undefined,
+      isError: false,
+      isLoading: true,
+      refetch: vi.fn(),
+    });
+    vi.mocked(useV1PushRegistration).mockReturnValue({
+      subscribe: vi.fn(),
+      unsubscribe: vi.fn(),
+      permission: 'default',
+      isSubscribed: false,
+      isPending: false,
+    });
+
+    renderWithClient(<NotificationSettingsPageClient />);
+
+    expect(screen.getByRole('status')).toHaveTextContent('알림 설정을 불러오는 중이에요.');
+    expect(screen.queryAllByRole('switch')).toHaveLength(0);
+  });
+
   it('hides the toggle entirely when push is unsupported', () => {
     vi.mocked(useV1PushRegistration).mockReturnValue({
       subscribe: vi.fn(),

@@ -266,3 +266,25 @@ download device validation, and Play internal testing. Production promotion rema
 - Local Android compilation remains unavailable because this workstation has no Android SDK;
   the PR Android Alpha workflow (Java 17 + API 36) remains the compile/unit/assemble gate for the
   new `open-notification-settings` MainActivity branch.
+
+## UI/UX Re-audit (2026-08-28, pre-device gate)
+
+- Re-ran the real `/my/settings/notifications` route through 17 headed captures: 9 responsive
+  viewports, 5 controlled native states, 2 network states, and keyboard/persistence interaction.
+- RED evidence `task156-notification-settings-2026-08-28T05-40-51-598Z` proved the audit runner
+  could follow an authentication redirect and incorrectly save the login page as a successful
+  notification-settings capture. The runner now requires the canonical route and visible page
+  heading, preserves partial interaction failures, validates mode-specific result totals, and
+  exits non-zero for any blocker.
+- The stricter gate exposed that the mobile AppChrome title was visual text rather than a semantic
+  heading. `titleAsHeading` is now an opt-in AppChrome contract and is enabled for notification
+  settings in success, loading, and error states.
+- Slow-network evidence exposed false OFF values before settings arrived. Initial loading now uses
+  a PageSkeleton plus an accessible status instead of rendering disabled OFF switches.
+- Final evidence: `output/playwright/visual-audit/task156-notification-settings-2026-08-28T06-01-07-982Z`.
+  All 17 results completed, all 9 viewports had zero horizontal overflow, page errors were zero,
+  and only the two intentionally injected 503 responses appeared in console/API evidence.
+  Preference persistence remained `false -> true -> reload true -> restore false`.
+- Mode controls passed: a valid denied-state run completed 1/1 with zero runtime problems, while a
+  missing QA user produced 1 blocker and a non-zero exit as required. Controlled native rendering
+  remains browser evidence only and does not replace the pending real-device matrix.

@@ -1339,9 +1339,31 @@ export function NotificationSettingsPageClient() {
   // #12: 설정 로드 실패 시 에러 상태를 명시적으로 표시한다.
   if (settings.isError) {
     return (
-      <AppChrome title="알림 설정" activeTab="my" bottomNav={false} backHref="/my/settings" desktopHead>
+      <AppChrome title="알림 설정" activeTab="my" bottomNav={false} backHref="/my/settings" desktopHead titleAsHeading>
         <div className="tm-my-shell">
           <ErrorState message="알림 설정을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void settings.refetch()} />
+        </div>
+      </AppChrome>
+    );
+  }
+
+  if (settings.isLoading || !settings.data) {
+    return (
+      <AppChrome title="알림 설정" activeTab="my" bottomNav={false} backHref="/my/settings" desktopHead titleAsHeading>
+        <div className="tm-my-shell">
+          <p className="sr-only" role="status">알림 설정을 불러오는 중이에요.</p>
+          <PageSkeleton variant="list" />
+        </div>
+      </AppChrome>
+    );
+  }
+
+  if (settings.isLoading || !settings.data) {
+    return (
+      <AppChrome title="알림 설정" activeTab="my" bottomNav={false} backHref="/my/settings" desktopHead titleAsHeading>
+        <div className="tm-my-shell">
+          <p className="sr-only" role="status">알림 설정을 불러오는 중이에요.</p>
+          <PageSkeleton variant="list" />
         </div>
       </AppChrome>
     );
@@ -1400,7 +1422,7 @@ export function NotificationSettingsPageClient() {
   };
 
   return (
-    <AppChrome title="알림 설정" activeTab="my" bottomNav={false} backHref="/my/settings">
+    <AppChrome title="알림 설정" activeTab="my" bottomNav={false} backHref="/my/settings" titleAsHeading>
       <div className="tm-my-shell">
         <div className="tm-my-settings-desktop">
           <div className="tm-desktop-page-head tm-show-desktop">

@@ -19,6 +19,7 @@ const OUTPUT_DIR = path.resolve(
 );
 const ROUTE = '/my/settings/notifications';
 const MODE = process.env.TASK156_UIQA_MODE ?? 'full';
+const EXPECTED_RESULT_COUNT = MODE === 'network' ? 2 : MODE === 'denied' ? 1 : 17;
 
 const VIEWPORTS = [
   ['mobile-sm', 360, 780, true, true],
@@ -99,7 +100,11 @@ function attachRuntimeEvidence(page) {
 
 async function settle(page) {
   await page.waitForLoadState('domcontentloaded');
-  await page.getByRole('heading', { name: '알림 설정' }).first().waitFor({ state: 'visible', timeout: 5_000 }).catch(() => {});
+  await page.waitForURL((url) => url.pathname === ROUTE, { timeout: 12_000 });
+  await page.getByRole('heading', { name: '알림 설정', exact: true }).first().waitFor({
+    state: 'visible',
+    timeout: 12_000,
+  });
   await page.waitForTimeout(500);
 }
 
@@ -247,43 +252,56 @@ async function captureKeyboardAndPersistence(browser) {
   const page = await context.newPage();
   page.setDefaultTimeout(8_000);
   const runtime = attachRuntimeEvidence(page);
-  await page.goto(`${WEB_BASE}${ROUTE}`, { waitUntil: 'domcontentloaded', timeout: 45_000 });
-  await settle(page);
-
   const focusOrder = [];
-  for (let index = 0; index < 12; index += 1) {
-    await page.keyboard.press('Tab');
-    focusOrder.push(await page.evaluate(() => ({
-      tag: document.activeElement?.tagName ?? null,
-      label: document.activeElement?.getAttribute('aria-label')
-        || document.activeElement?.textContent?.trim().slice(0, 100)
-        || null,
-    })));
+  let persistence = null;
+  let error = null;
+  try {
+    await page.goto(`${WEB_BASE}${ROUTE}`, { waitUntil: 'domcontentloaded', timeout: 45_000 });
+    await settle(page);
+
+    for (let index = 0; index < 12; index += 1) {
+      await page.keyboard.press('Tab');
+      focusOrder.push(await page.evaluate(() => ({
+        tag: document.activeElement?.tagName ?? null,
+        label: document.activeElement?.getAttribute('aria-label')
+          || document.activeElement?.textContent?.trim().slice(0, 100)
+          || null,
+      })));
+    }
+    await page.screenshot({ path: path.join(OUTPUT_DIR, 'desktop-md__keyboard-focus.png'), fullPage: true });
+
+    const marketing = page.getByRole('switch', { name: '마케팅 소식' });
+    const before = await marketing.getAttribute('aria-checked');
+    await marketing.click();
+    await page.waitForTimeout(800);
+    const afterClick = await marketing.getAttribute('aria-checked');
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await settle(page);
+    const afterReload = await page.getByRole('switch', { name: '마케팅 소식' }).getAttribute('aria-checked');
+    await page.getByRole('switch', { name: '마케팅 소식' }).click();
+    await page.waitForTimeout(800);
+    const afterRestore = await page.getByRole('switch', { name: '마케팅 소식' }).getAttribute('aria-checked');
+    persistence = { before, afterClick, afterReload, afterRestore };
+  } catch (caught) {
+    error = caught instanceof Error ? caught.message : String(caught);
+    await page.screenshot({
+      path: path.join(OUTPUT_DIR, 'desktop-md__keyboard-persistence-blocked.png'),
+      fullPage: true,
+    }).catch(() => {});
+  } finally {
+    results.push({
+      kind: 'interaction',
+      key: 'keyboard-and-persistence',
+      status: error ? 'blocked' : 'captured',
+      error,
+      focusOrder,
+      persistence,
+      runtime,
+      layout: await inspectLayout(page).catch(() => null),
+    });
+    flushResults();
+    await context.close();
   }
-  await page.screenshot({ path: path.join(OUTPUT_DIR, 'desktop-md__keyboard-focus.png'), fullPage: true });
-
-  const marketing = page.getByRole('switch', { name: '마케팅 소식' });
-  const before = await marketing.getAttribute('aria-checked');
-  await marketing.click();
-  await page.waitForTimeout(800);
-  const afterClick = await marketing.getAttribute('aria-checked');
-  await page.reload({ waitUntil: 'domcontentloaded' });
-  await settle(page);
-  const afterReload = await page.getByRole('switch', { name: '마케팅 소식' }).getAttribute('aria-checked');
-  await page.getByRole('switch', { name: '마케팅 소식' }).click();
-  await page.waitForTimeout(800);
-  const afterRestore = await page.getByRole('switch', { name: '마케팅 소식' }).getAttribute('aria-checked');
-
-  results.push({
-    kind: 'interaction',
-    key: 'keyboard-and-persistence',
-    focusOrder,
-    persistence: { before, afterClick, afterReload, afterRestore },
-    runtime,
-    layout: await inspectLayout(page),
-  });
-  flushResults();
-  await context.close();
 }
 
 const browser = await chromium.launch({ headless: false });
@@ -312,6 +330,7 @@ const summary = {
   userEmail: USER_EMAIL,
   capturedAt: new Date().toISOString(),
   nativeStateDisclaimer: 'Controlled bridge rendering only; not an Android OS permission or FCM delivery verdict.',
+  expectedResultCount: EXPECTED_RESULT_COUNT,
   resultCount: results.length,
   blockedCount: results.filter((result) => result.status === 'blocked' || result.error).length,
   consoleErrorCount: results.reduce((sum, result) => sum + (result.runtime?.consoleErrors.length ?? 0), 0),
@@ -336,3 +355,7 @@ fs.writeFileSync(path.join(OUTPUT_DIR, 'report.md'), [
 
 console.log(`TASK156_UIQA_OUTPUT=${OUTPUT_DIR}`);
 console.log(JSON.stringify(summary, null, 2));
+
+if (summary.resultCount !== EXPECTED_RESULT_COUNT || summary.blockedCount > 0) {
+  process.exitCode = 1;
+}

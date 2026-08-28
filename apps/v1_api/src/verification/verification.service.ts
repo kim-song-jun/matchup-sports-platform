@@ -1,4 +1,11 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma, V1AuthProvider, V1VerificationChannel } from '@prisma/client';
 import { randomInt } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -11,6 +18,26 @@ const CODE_TTL_MS = 5 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
 // 동일 번호로 유료 SMS 를 반복 발송하지 못하게 막는 재발송 쿨다운(대상 번호 기준).
 const RESEND_COOLDOWN_MS = 30 * 1000;
+
+/**
+ * 발송 총량 상한(24시간 이동 창).
+ *
+ * 쿨다운은 **간격**만 벌릴 뿐 **총량**을 막지 못한다 -- 30초마다 계속 부르면 하루
+ * 2,800건이 나간다. `requestPhone` 은 대상 번호가 요청자 소유인지 확인하지 않으므로
+ * (소유 증명은 코드 입력 단계에서만 이뤄진다) 계정 하나로 임의의 제3자 번호에 유료
+ * SMS 를 무제한 보낼 수 있었다.
+ *
+ * 컨트롤러의 `@Throttle` 만으로는 부족하다: IP 기준이라 회선을 바꾸면 우회되고,
+ * `V1ThrottlerGuard` 가 NODE_ENV !== 'production' 이면 통째로 스킵한다. 그래서 실제
+ * 방어선은 발송 기록(v1_verification_tokens) 을 세는 이 상한이고, `@Throttle` 은
+ * 같은 형제 경로(auth/phone/issue)와 맞춘 1차 방어일 뿐이다.
+ *
+ * 값의 근거: 정상 사용자는 오타 정정·수신 실패를 감안해도 하루 몇 건이면 충분하다.
+ * 번호를 바꿔 가며 뿌리는 것을 막으려면 요청자 기준 상한도 함께 있어야 한다.
+ */
+const SEND_QUOTA_WINDOW_MS = 24 * 60 * 60 * 1000;
+const MAX_SENDS_PER_TARGET = 5;
+const MAX_SENDS_PER_USER = 10;
 
 @Injectable()
 export class VerificationService {
@@ -31,6 +58,9 @@ export class VerificationService {
     if (user.emailVerifiedAt) {
       return { sent: false, alreadyVerified: true, channel: 'email' as const };
     }
+    // 이메일도 같은 상한을 쓴다 -- 유료는 아니지만 발신 도메인 평판을 태우고,
+    // 남의 주소로 인증 메일을 반복 보내는 괴롭힘 경로는 동일하다.
+    await this.assertSendQuota('email', user.id, user.email);
     return this.issue('email', user.id, user.email);
   }
 
@@ -67,7 +97,38 @@ export class VerificationService {
         message: `잠시 후 다시 시도해 주세요. (${retryAfter}초 뒤에 다시 받을 수 있어요)`,
       });
     }
+    await this.assertSendQuota('phone', user.id, phone);
     return this.issue('phone', user.id, phone);
+  }
+
+  /**
+   * 24시간 이동 창 기준 발송 총량 확인. 대상(피해자가 될 수 있는 번호)과 요청자
+   * 양쪽을 본다 -- 대상만 세면 번호를 바꿔 가며 뿌리는 것을 못 막고, 요청자만 세면
+   * 여러 계정으로 한 번호를 때리는 것을 못 막는다.
+   *
+   * 세는 대상은 실제로 나간 발송이다: `issue()` 는 발송이 실패하면 방금 만든 토큰을
+   * 지우므로(같은 파일), 남아 있는 행 = 실제로 보낸 건이다.
+   */
+  private async assertSendQuota(channel: V1VerificationChannel, userId: string, target: string) {
+    const since = new Date(Date.now() - SEND_QUOTA_WINDOW_MS);
+    const [targetSends, userSends] = await Promise.all([
+      this.prisma.v1VerificationToken.count({ where: { channel, target, createdAt: { gte: since } } }),
+      this.prisma.v1VerificationToken.count({ where: { channel, userId, createdAt: { gte: since } } }),
+    ]);
+    if (targetSends < MAX_SENDS_PER_TARGET && userSends < MAX_SENDS_PER_USER) return;
+
+    await this.smsEventLog.record({
+      eventType: SMS_EVENT_TYPE.RESEND_COOLDOWN,
+      phone: target,
+      detail: `channel=${channel} 24시간 발송 상한 도달 (대상 ${targetSends}/${MAX_SENDS_PER_TARGET}, 요청자 ${userSends}/${MAX_SENDS_PER_USER})`,
+    });
+    throw new HttpException(
+      {
+        code: 'VERIFICATION_SEND_QUOTA_EXCEEDED',
+        message: '인증번호를 너무 많이 요청했어요. 24시간 뒤에 다시 시도해 주세요.',
+      },
+      HttpStatus.TOO_MANY_REQUESTS,
+    );
   }
 
   async confirm(authUser: V1AuthUser, channel: V1VerificationChannel, code: string) {

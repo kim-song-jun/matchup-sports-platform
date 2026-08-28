@@ -20,6 +20,8 @@ function buildPrismaMock() {
     updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     create: jest.fn().mockResolvedValue({ id: 'tok' }),
     deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+    // 24시간 발송 상한(assertSendQuota)이 세는 값. 기본은 "아직 여유 있음".
+    count: jest.fn().mockResolvedValue(0),
   };
   prisma.v1User = {
     findUnique: jest.fn(),
@@ -168,6 +170,72 @@ describe('VerificationService.requestEmail', () => {
     const result = await service.requestEmail(authUser);
 
     expect(result).toMatchObject({ sent: false, alreadyVerified: true });
+    expect(handle.v1VerificationToken.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('VerificationService 발송 총량 상한', () => {
+  // 쿨다운은 간격만 벌릴 뿐 총량을 막지 못한다 — 30초마다 계속 부르면 하루 2,800건이
+  // 나간다. requestPhone 은 대상 번호가 요청자 소유인지 확인하지 않으므로(소유 증명은
+  // 코드 입력 단계에서만) 계정 하나로 임의의 제3자 번호에 유료 SMS 를 무제한 보낼 수
+  // 있었다.
+  function setup(counts: { target: number; user: number }) {
+    const prisma = buildPrismaMock();
+    const handle = prisma as never as {
+      v1User: { findUnique: jest.Mock; findFirst: jest.Mock };
+      v1VerificationToken: { create: jest.Mock; findFirst: jest.Mock; count: jest.Mock };
+    };
+    handle.v1User.findUnique.mockResolvedValue({ id: 'u1', email: 'a@b.com', phone: null, emailVerifiedAt: null, phoneVerifiedAt: null });
+    handle.v1User.findFirst.mockResolvedValue(null);
+    handle.v1VerificationToken.findFirst.mockResolvedValue(null); // 재발송 쿨다운은 통과
+    handle.v1VerificationToken.count.mockImplementation((args: { where: Record<string, unknown> }) =>
+      Promise.resolve('target' in args.where ? counts.target : counts.user),
+    );
+    return { prisma, handle };
+  }
+
+  it('한 번호에 상한만큼 보냈으면 그 번호로는 더 못 보낸다', async () => {
+    const { prisma, handle } = setup({ target: 5, user: 0 });
+    const service = new VerificationService(prisma, dispatcher, eventLogStub());
+
+    await expect(service.requestPhone(authUser, '01012345678')).rejects.toMatchObject({
+      status: 429,
+      response: { code: 'VERIFICATION_SEND_QUOTA_EXCEEDED' },
+    });
+    // 토큰을 만들지 않았다는 것이 곧 유료 SMS 가 나가지 않았다는 뜻이다.
+    expect(handle.v1VerificationToken.create).not.toHaveBeenCalled();
+  });
+
+  it('요청자가 상한에 닿으면 번호를 바꿔도 막힌다', async () => {
+    // 대상만 세면 번호를 갈아 가며 뿌리는 것을 못 막는다.
+    const { prisma, handle } = setup({ target: 0, user: 10 });
+    const service = new VerificationService(prisma, dispatcher, eventLogStub());
+
+    await expect(service.requestPhone(authUser, '01099998888')).rejects.toMatchObject({
+      status: 429,
+      response: { code: 'VERIFICATION_SEND_QUOTA_EXCEEDED' },
+    });
+    expect(handle.v1VerificationToken.create).not.toHaveBeenCalled();
+  });
+
+  it('상한 아래면 평소대로 발송한다', async () => {
+    const { prisma, handle } = setup({ target: 4, user: 9 });
+    const sendSpy = jest.spyOn(dispatcher, 'send').mockResolvedValue(undefined);
+    const service = new VerificationService(prisma, dispatcher, eventLogStub());
+
+    await expect(service.requestPhone(authUser, '01012345678')).resolves.toMatchObject({ sent: true });
+    expect(handle.v1VerificationToken.create).toHaveBeenCalled();
+    sendSpy.mockRestore();
+  });
+
+  it('이메일 발송에도 같은 상한이 걸린다', async () => {
+    const { prisma, handle } = setup({ target: 5, user: 0 });
+    const service = new VerificationService(prisma, dispatcher, eventLogStub());
+
+    await expect(service.requestEmail(authUser)).rejects.toMatchObject({
+      status: 429,
+      response: { code: 'VERIFICATION_SEND_QUOTA_EXCEEDED' },
+    });
     expect(handle.v1VerificationToken.create).not.toHaveBeenCalled();
   });
 });

@@ -2741,6 +2741,45 @@ label.tm-btn:focus-within {
   }
 }
 
+/* ── [모션] 모달·시트 공통 진입/퇴장 ─────────────────────────────────
+ * 지금까지 모달 38곳은 열릴 때도 닫힐 때도 아무 일이 없었다. A안(페이드만)을
+ * 택한 이유는 대상 대부분이 **확인·경고 모달**이기 때문이다 — 사용자가 방금 누른
+ * 버튼과 떠오른 질문을 연결해 읽어야 하는데, 패널이 움직이면 시선이 그걸 쫓는다.
+ * 위치를 바꾸지 않는 페이드가 그 자리에 맞다.
+ *
+ * duration 은 useModalA11y 의 MODAL_EXIT_MS(160ms)와 **같아야 한다** —
+ * 짧으면 애니메이션이 잘리고, 길면 아무것도 안 보이는 빈 시간이 남는다.
+ * 바꿀 땐 양쪽을 함께 바꾼다. */
+.tm-modal-scrim {
+  animation: tm-modal-fade var(--duration-base) var(--ease-out) both;
+}
+
+.tm-modal-panel {
+  animation: tm-modal-fade var(--duration-base) var(--ease-out) both;
+}
+
+.tm-modal-scrim.is-closing,
+.tm-modal-panel.is-closing {
+  animation: tm-modal-fade var(--duration-base) var(--ease-standard) reverse both;
+}
+
+@keyframes tm-modal-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* 필터 시트는 진입(슬라이드업)만 있고 퇴장이 없었다. 알림 시트(#808)와 같은
+ * 비대칭이다. 진입과 대칭으로 되돌린다 — 위 모달과 달리 여기는 위치가 움직이는
+ * 것이 의도다(하단에서 올라오는 시트라 그 방향이 곧 "어디서 왔는가" 다).
+ * duration 은 진입과 같은 0.22s 이고, 훅을 쓰는 쪽에서 그 값을 넘긴다. */
+.tm-filter-scrim.is-closing {
+  animation: tm-filter-scrim-fade 0.22s ease-in reverse both;
+}
+
+.tm-filter-sheet.is-closing {
+  animation: tm-filter-sheet-up 0.22s ease-in reverse both;
+}
+
 /* ── Reduced-motion: zero all durations for users who opt out of animation ── */
 @media (prefers-reduced-motion: reduce) {
   *,

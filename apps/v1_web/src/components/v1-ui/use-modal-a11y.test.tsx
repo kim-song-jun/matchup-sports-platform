@@ -3,7 +3,7 @@
  * 스캐폴딩을 이 훅으로 모으면서, 각 파일에 흩어져 있던(그리고 어디서도 테스트로
  * 고정돼 있지 않던) 동작을 여기서 고정한다.
  */
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { useModalA11y } from './use-modal-a11y';
 
@@ -53,11 +53,14 @@ describe('useModalA11y', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('열리면 body 스크롤을 잠그고 닫히면 되돌린다', () => {
+  it('열리면 body 스크롤을 잠그고 닫히면 되돌린다', async () => {
     const { rerender } = render(<TestModal open onClose={() => {}} />);
     expect(document.body.style.overflow).toBe('hidden');
     rerender(<TestModal open={false} onClose={() => {}} />);
-    expect(document.body.style.overflow).toBe('');
+    // 퇴장 애니메이션이 도는 동안에는 모달이 아직 화면에 있으므로 잠금이 유지된다 —
+    // 여기서 풀면 시트가 떠 있는데 뒤 화면이 스크롤된다. 사라진 뒤에 풀린다.
+    expect(document.body.style.overflow).toBe('hidden');
+    await waitFor(() => expect(document.body.style.overflow).toBe(''));
   });
 
   it('닫힐 때 이전 포커스를 복원한다 (WCAG 2.4.3)', () => {

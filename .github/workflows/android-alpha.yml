@@ -30,9 +30,9 @@ jobs:
       ORG_GRADLE_PROJECT_firebaseApiKeyAlpha: ${{ vars.ANDROID_ALPHA_FIREBASE_API_KEY }}
       ORG_GRADLE_PROJECT_firebaseSenderIdAlpha: ${{ vars.ANDROID_ALPHA_FIREBASE_SENDER_ID }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'

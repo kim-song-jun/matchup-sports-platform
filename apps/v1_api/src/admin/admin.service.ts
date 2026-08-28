@@ -226,6 +226,18 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       const target = await tx.v1User.findUnique({ where: { id: userId } });
       if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'User was not found' });
 
+      // 삭제는 되돌릴 수 없다. 탈퇴 처리는 이메일·전화번호를 tombstone 값으로 덮고
+      // 인증 시각을 지운다 — 그 계정을 다시 active 로 올리면 연락처가 없고 인증도 안 된
+      // 채 살아 있는 계정이 된다. 로그인도, 인증번호 재발송도, 연락도 안 되는데 목록에는
+      // 정상 회원으로 보인다. DTO 가 값을 허용하고 상태 머신 가드가 없어 오클릭 한 번으로
+      // 그 상태가 만들어졌다.
+      if (target.accountStatus === 'deleted' && dto.status !== 'deleted') {
+        throw new ConflictException({
+          code: 'USER_DELETED_IRREVERSIBLE',
+          message: '이미 삭제된 계정이에요. 개인정보가 지워져 되살릴 수 없어요.',
+        });
+      }
+
       const targetAdminRecord = await tx.v1AdminUser.findUnique({ where: { userId } });
       if (targetAdminRecord?.status === 'active') {
         if (admin.userId === userId && dto.status !== 'active') {
@@ -428,9 +440,13 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
 
   async changeMatchStatus(user: V1AuthUser, matchId: string, dto: ChangeMatchStatusDto) {
     const admin = await this.getMutationAdmin(user.id);
-    const target = await this.prisma.v1Match.findUnique({ where: { id: matchId } });
-    if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Match was not found' });
     return this.prisma.$transaction(async (tx) => {
+      // 로그의 "이전 상태"는 바꾸기 직전 값이어야 한다. 트랜잭션 밖에서 읽으면 그 사이에
+      // 다른 조작이 커밋됐을 때 실제와 다른 값이 감사 로그에 남는다 — changeUserStatus 는
+      // 이미 트랜잭션 안에서 행을 잠그고 읽는다. 같은 방식으로 맞춘다.
+      await tx.$queryRaw`SELECT id FROM "v1_matches" WHERE id = ${matchId} FOR UPDATE`;
+      const target = await tx.v1Match.findUnique({ where: { id: matchId } });
+      if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Match was not found' });
       const updated = await tx.v1Match.update({ where: { id: matchId }, data: { status: dto.status } });
       return this.writeAdminStatusLogs(
         admin,
@@ -452,9 +468,13 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
 
   async changeTeamStatus(user: V1AuthUser, teamId: string, dto: ChangeTeamStatusDto) {
     const admin = await this.getMutationAdmin(user.id);
-    const target = await this.prisma.v1Team.findUnique({ where: { id: teamId } });
-    if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Team was not found' });
     return this.prisma.$transaction(async (tx) => {
+      // 로그의 "이전 상태"는 바꾸기 직전 값이어야 한다. 트랜잭션 밖에서 읽으면 그 사이에
+      // 다른 조작이 커밋됐을 때 실제와 다른 값이 감사 로그에 남는다 — changeUserStatus 는
+      // 이미 트랜잭션 안에서 행을 잠그고 읽는다. 같은 방식으로 맞춘다.
+      await tx.$queryRaw`SELECT id FROM "v1_teams" WHERE id = ${teamId} FOR UPDATE`;
+      const target = await tx.v1Team.findUnique({ where: { id: teamId } });
+      if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Team was not found' });
       const updated = await tx.v1Team.update({ where: { id: teamId }, data: { status: dto.status } });
       return this.writeAdminStatusLogs(
         admin,
@@ -476,8 +496,6 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
 
   async changeTeamMatchStatus(user: V1AuthUser, teamMatchId: string, dto: ChangeTeamMatchStatusDto) {
     const admin = await this.getMutationAdmin(user.id);
-    const target = await this.prisma.v1TeamMatch.findUnique({ where: { id: teamMatchId } });
-    if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Team match was not found' });
     // Task 25: `completed` now flows exclusively through the Game result-official
     // transaction (games.service.ts), which also writes the status-change log and
     // keeps the review/projection surface consistent. An admin-driven direct flip
@@ -491,6 +509,12 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       });
     }
     return this.prisma.$transaction(async (tx) => {
+      // 로그의 "이전 상태"는 바꾸기 직전 값이어야 한다. 트랜잭션 밖에서 읽으면 그 사이에
+      // 다른 조작이 커밋됐을 때 실제와 다른 값이 감사 로그에 남는다 — changeUserStatus 는
+      // 이미 트랜잭션 안에서 행을 잠그고 읽는다. 같은 방식으로 맞춘다.
+      await tx.$queryRaw`SELECT id FROM "v1_team_matches" WHERE id = ${teamMatchId} FOR UPDATE`;
+      const target = await tx.v1TeamMatch.findUnique({ where: { id: teamMatchId } });
+      if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Team match was not found' });
       const updated = await tx.v1TeamMatch.update({ where: { id: teamMatchId }, data: { status: dto.status } });
       return this.writeAdminStatusLogs(
         admin,

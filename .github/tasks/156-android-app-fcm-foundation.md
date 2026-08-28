@@ -380,3 +380,13 @@ Samsung device evidence (in progress):
   below the status bar and the complete app bottom navigation is above Samsung's three-button system
   navigation area. The remaining white bottom band is the expected system navigation inset, not clipped
   web content.
+- Follow-up device review found that padding the entire native root still made the bottom navigation
+  surface appear detached. Commits `30f779e7` and `7910a30b` switched the bottom edge to an edge-to-edge
+  contract: Android publishes the measured bottom inset in CSS pixels, the navigation surface paints to
+  the physical bottom edge, and only its controls consume the safe inset. The compatibility assignment
+  also works against the currently deployed Alpha web shell before the matching CSS reaches `dev`.
+- Android Alpha workflow run `33199148054` passed Firebase identity validation, JVM tests, Alpha APK and
+  release-bundle builds, production fail-closed checks, checksum generation, and artifact upload. The
+  downloaded artifact passed `sha256sum -c`, clean replacement installation returned `Success`, and
+  `output/task156/android-device-sm-a325n/03-edge-to-edge-fixed.png` confirms the bottom navigation
+  background is continuous through the Samsung system-navigation area while tabs remain unobscured.

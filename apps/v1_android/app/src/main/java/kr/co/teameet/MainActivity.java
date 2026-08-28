@@ -167,6 +167,8 @@ public final class MainActivity extends AppCompatActivity {
         if (webView == null) return;
         webView.evaluateJavascript(
             "document.documentElement.style.setProperty('--teameet-native-safe-bottom','"
+                + bottomSystemInsetCssPixels
+                + "px');document.documentElement.style.setProperty('--v1-shell-safe-bottom','"
                 + bottomSystemInsetCssPixels + "px')",
             null
         );

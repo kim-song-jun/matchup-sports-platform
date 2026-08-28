@@ -334,7 +334,7 @@ export class ReviewsService {
 
     // 프론트의 종목 배지·색상은 v1Sport.code 로 매핑한다(SPORT_ACCENT_MAP). sportId(UUID)만
     // 내려주면 어떤 종목이든 "기타"로 떨어지므로 코드를 함께 실어 보낸다.
-    const bySport = summarizeBySport(filtered);
+    const bySport = summarizeBySport(filtered, targetType);
     const sports = bySport.length
       ? await this.prisma.v1Sport.findMany({
           where: { id: { in: bySport.map((entry) => entry.sportId) } },
@@ -634,10 +634,16 @@ export class ReviewsService {
         approvedApplicantTeamId: true,
         hostTeam: { select: teamSelect() },
         approvedApplicantTeam: { select: teamSelect() },
+        // 무효(VOID) 판정에 필요한 최소 필드. 결과 무효화는 V1TeamMatch 를 건드리지 않고
+        // 게임의 공식 리비전만 VOID 로 바꾼다(games.service.ts voidTeamMatchResult).
+        game: { select: { currentOfficialRevision: { select: { state: true } } } },
       },
     });
     if (!teamMatch) throw notFound('SOURCE_NOT_FOUND', 'Review source was not found');
     if (!isCompleted(teamMatch)) throw conflict('SOURCE_NOT_COMPLETED', 'Review source is not completed');
+    if (isResultVoided(teamMatch.game)) {
+      throw conflict('SOURCE_RESULT_VOIDED', '결과가 무효 처리된 경기예요. 평가를 남길 수 없어요.');
+    }
     // team_match 앵커는 completedAt(games.service.ts 결과 확정 시 채워짐, 스펙 §6.1) — 정정 승인 시
     // 앵커가 갱신되면 이 판정도 매 요청마다 다시 계산되므로 마감이 함께 연장된다(D-6, 저장 안 함).
     const windowHours = await this.reviewPolicySettings.getWindowHours();
@@ -1408,6 +1414,26 @@ function isCompleted(source: { status: string; completedAt: Date | null }) {
   return source.status === 'completed' || Boolean(source.completedAt);
 }
 
+/**
+ * 결과가 무효(VOID)로 뒤집혔는가.
+ *
+ * 무효화는 `V1TeamMatch.status`/`completedAt` 을 건드리지 않고 게임의 공식 리비전만
+ * VOID 로 바꾼다(games.service.ts voidTeamMatchResult, 호출부는 리그 이의 처리). 그래서
+ * status/completedAt 만 보는 `isCompleted` 로는 무효 경기와 정상 완료 경기를 구별할 수
+ * 없었고, 없던 일이 된 경기에 계속 평가를 남길 수 있었다.
+ *
+ * 대회 픽스처 경로는 같은 판정을 `officialResultTimestamp`(리비전 state === 'OFFICIAL')
+ * 로 이미 하고 있다 — team_match 경로에만 그 대응 검사가 빠져 있었다.
+ *
+ * 리비전 자체가 없으면(게임 연결 전 또는 리비전 체계 이전 데이터) 무효가 아니다 --
+ * 여기서 막으면 옛 경기의 평가가 통째로 닫힌다.
+ */
+function isResultVoided(game: { currentOfficialRevision: { state: string } | null } | null | undefined) {
+  const revision = game?.currentOfficialRevision;
+  if (!revision) return false;
+  return revision.state !== 'OFFICIAL';
+}
+
 function uniqueTagCodes(tagCodes: string[]): ReviewTagCode[] {
   return [...new Set(tagCodes)].filter((tagCode): tagCode is ReviewTagCode => tagCode in REVIEW_TAGS);
 }
@@ -1508,15 +1534,55 @@ function gone(code: string, message: string) {
   return new GoneException({ code, message });
 }
 
+const mean = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / values.length;
+
+/**
+ * 종목별 평점 집계.
+ *
+ * **팀 대상은 "팀당 1표"다.** 2026-08-18 정책 변경으로 상대 팀 평가는 참가팀 멤버가
+ * 각자 1건씩 남길 수 있게 됐다 — 그대로 개별 후기를 산술평균하면 활동 인원이 많은 팀의
+ * 목소리가 그만큼 커진다(15명 팀의 15표 vs 3명 팀의 3표). 그래서 평가한 팀별로 먼저
+ * 평균을 낸 뒤 그 평균들의 평균을 쓴다.
+ *
+ * 이 규칙은 이 저장소의 정본 집계(team-trust-aggregation.ts, recalculateTeamTrust,
+ * tournament-fixture-review-trust.ts)가 이미 같은 근거로 구현하고 있다 -- 이 함수만
+ * 빠져 있어서, 같은 팀의 신뢰 배지와 종목별 평점이 서로 다른 원칙의 다른 숫자를
+ * 보여주고 있었다.
+ *
+ * `ratingCount` 도 정본과 맞춰 **평가에 참여한 팀 수**다(건수가 아니다). 이 값은 화면에서
+ * 종목 간 가중평균의 가중치로도 쓰이므로, 평균이 팀 기준이면 가중치도 팀 기준이어야
+ * 둘이 어긋나지 않는다.
+ *
+ * 태그 비율은 그대로 **후기 건수** 기준이다 -- "이 태그를 붙인 후기가 몇 %인가"라서
+ * 팀 단위로 환산할 대상이 아니다.
+ */
 function summarizeBySport(
-  reviews: Array<{ sportId: string | null; rating: number; tags: Array<{ tagCode: string; labelSnapshot: string }> }>,
+  reviews: Array<{
+    sportId: string | null;
+    rating: number;
+    reviewerTeamId?: string | null;
+    tags: Array<{ tagCode: string; labelSnapshot: string }>;
+  }>,
+  targetType: 'user' | 'team',
 ) {
-  type SportBucket = { ratings: number[]; tagCounts: Map<string, { label: string; count: number }> };
+  type SportBucket = {
+    ratings: number[];
+    ratingsByReviewerTeam: Map<string, number[]>;
+    tagCounts: Map<string, { label: string; count: number }>;
+  };
   const bySport = new Map<string, SportBucket>();
   for (const review of reviews) {
     if (!review.sportId) continue;
-    const bucket: SportBucket = bySport.get(review.sportId) ?? { ratings: [], tagCounts: new Map() };
+    const bucket: SportBucket =
+      bySport.get(review.sportId) ?? { ratings: [], ratingsByReviewerTeam: new Map(), tagCounts: new Map() };
     bucket.ratings.push(review.rating);
+    // 정본과 동일: reviewerTeamId 가 없는 행은 묶지 않는다 -- 컬럼이 nullable 이라
+    // null 을 한 그룹으로 두면 "이름 없는 한 팀"이 생겨 표가 왜곡된다.
+    if (review.reviewerTeamId) {
+      const teamRatings = bucket.ratingsByReviewerTeam.get(review.reviewerTeamId) ?? [];
+      teamRatings.push(review.rating);
+      bucket.ratingsByReviewerTeam.set(review.reviewerTeamId, teamRatings);
+    }
     for (const tag of review.tags) {
       const current = bucket.tagCounts.get(tag.tagCode) ?? { label: tag.labelSnapshot, count: 0 };
       current.count += 1;
@@ -1525,15 +1591,19 @@ function summarizeBySport(
     bySport.set(review.sportId, bucket);
   }
 
-  return [...bySport.entries()].map(([sportId, bucket]) => ({
-    sportId,
-    ratingAvg: bucket.ratings.length ? Number((bucket.ratings.reduce((sum, value) => sum + value, 0) / bucket.ratings.length).toFixed(2)) : null,
-    ratingCount: bucket.ratings.length,
-    tagRates: [...bucket.tagCounts.entries()].map(([tagCode, { label, count }]) => ({
-      tagCode,
-      label,
-      rate: Number((count / bucket.ratings.length).toFixed(2)),
-      count,
-    })),
-  }));
+  return [...bySport.entries()].map(([sportId, bucket]) => {
+    const teamAverages = [...bucket.ratingsByReviewerTeam.values()].map(mean);
+    const scores = targetType === 'team' ? teamAverages : bucket.ratings;
+    return {
+      sportId,
+      ratingAvg: scores.length ? Number(mean(scores).toFixed(2)) : null,
+      ratingCount: scores.length,
+      tagRates: [...bucket.tagCounts.entries()].map(([tagCode, { label, count }]) => ({
+        tagCode,
+        label,
+        rate: Number((count / bucket.ratings.length).toFixed(2)),
+        count,
+      })),
+    };
+  });
 }

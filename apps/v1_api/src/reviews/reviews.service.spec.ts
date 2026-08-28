@@ -335,6 +335,70 @@ describe('ReviewsService', () => {
     expect(createMock).toHaveBeenCalled();
   });
 
+  it('team_match: 결과가 무효(VOID)로 뒤집혔으면 평가를 열지 않는다', async () => {
+    // 무효화는 V1TeamMatch.status/completedAt 을 건드리지 않고 게임의 공식 리비전만
+    // VOID 로 바꾼다(games.service.ts voidTeamMatchResult). status/completedAt 만 보면
+    // 무효 경기와 정상 완료 경기를 구별할 수 없어, 없던 일이 된 경기에 계속 평가를
+    // 남길 수 있었다.
+    const prisma = {
+      v1TeamMatch: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: teamSourceId,
+          title: '성수 풋살파크 팀 매치',
+          status: 'completed',
+          completedAt: new Date(),
+          startAt: new Date(),
+          sportId: 'sport-futsal',
+          hostTeamId,
+          approvedApplicantTeamId: awayTeamId,
+          hostTeam: { id: hostTeamId, name: '홈팀', profile: { logoUrl: null } },
+          approvedApplicantTeam: { id: awayTeamId, name: '원정팀', profile: { logoUrl: null } },
+          game: { currentOfficialRevision: { state: 'VOID' } },
+        }),
+      },
+    };
+    const tournamentFixtureReviews = { pending: jest.fn(), source: jest.fn(), submit: jest.fn(), sourceSummaries: jest.fn() };
+    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub(), reviewPolicyStub());
+
+    const error = await service
+      .source(user, { sourceType: 'team_match', sourceId: teamSourceId })
+      .catch((caught: unknown) => caught);
+
+    expect(error).toMatchObject({ response: { code: 'SOURCE_RESULT_VOIDED' } });
+    // 무효 판정이 멤버십·라인업 조회보다 먼저 걸려야 한다.
+    expect(prisma.v1TeamMatch.findUnique).toHaveBeenCalledTimes(1);
+  });
+
+  it('team_match: 리비전이 없는 옛 경기는 무효로 보지 않는다', async () => {
+    // 리비전 체계 이전 데이터까지 막으면 옛 경기의 평가가 통째로 닫힌다.
+    const prisma = {
+      v1TeamMatch: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: teamSourceId,
+          title: '성수 풋살파크 팀 매치',
+          status: 'completed',
+          completedAt: new Date(),
+          startAt: new Date(),
+          sportId: 'sport-futsal',
+          hostTeamId,
+          approvedApplicantTeamId: awayTeamId,
+          hostTeam: { id: hostTeamId, name: '홈팀', profile: { logoUrl: null } },
+          approvedApplicantTeam: { id: awayTeamId, name: '원정팀', profile: { logoUrl: null } },
+          game: null,
+        }),
+      },
+    };
+    const tournamentFixtureReviews = { pending: jest.fn(), source: jest.fn(), submit: jest.fn(), sourceSummaries: jest.fn() };
+    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub(), reviewPolicyStub());
+
+    const error = await service
+      .source(user, { sourceType: 'team_match', sourceId: teamSourceId })
+      .catch((caught: unknown) => caught);
+
+    // 무효로 막히지 않았다는 것만 본다 — 그 뒤 단계(멤버십 조회)는 이 테스트의 관심이 아니다.
+    expect(error).not.toMatchObject({ response: { code: 'SOURCE_RESULT_VOIDED' } });
+  });
+
   it('team_match: completedAt(앵커) 기준 설정된 기간을 넘기면 REVIEW_WINDOW_CLOSED(410)로 막는다', async () => {
     // completedAt 은 games.service.ts 결과 확정 시 채워진다(스펙 §6.1) — team_match 는 이 값이
     // 앵커라 기간이 지나면 teamMatchSourceContext() 진입 즉시(다른 조회 전에) 막혀야 한다.
@@ -894,6 +958,89 @@ describe('ReviewsService', () => {
           { sportId: 'futsal', sportCode: null, ratingAvg: 5, ratingCount: 1, tagRates: [{ tagCode: 'manner', label: '매너가 좋아요', rate: 1, count: 1 }] },
         ]);
         expect(findManyMock).toHaveBeenCalledTimes(2);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('team 타깃: 인원이 많은 팀이 표를 더 갖지 않는다 (팀당 1표)', async () => {
+      // 2026-08-18 정책 변경으로 상대 팀 평가는 참가팀 멤버가 각자 1건씩 남긴다.
+      // 개별 후기를 산술평균하면 인원이 많은 팀의 목소리가 그만큼 커진다 —
+      // 정본 집계(team-trust-aggregation.ts)는 팀별 평균을 먼저 낸 뒤 그 평균들의
+      // 평균을 쓰는데, 종목별 평점만 그 규칙에서 빠져 있었다.
+      const submittedAt = new Date('2026-08-01T00:00:00Z');
+      jest.useFakeTimers().setSystemTime(new Date('2026-08-01T01:00:00Z'));
+
+      try {
+        const reviewFindManyMock = jest
+          .fn()
+          .mockResolvedValueOnce([
+            // team-big 은 3명이 각각 5점
+            { sourceId: 'tm1', reviewerUserId: 'u1', reviewerTeamId: 'team-big', targetUserId: null, targetTeamId: 'team-x', rating: 5, sportId: 'futsal', submittedAt, tags: [] },
+            { sourceId: 'tm1', reviewerUserId: 'u2', reviewerTeamId: 'team-big', targetUserId: null, targetTeamId: 'team-x', rating: 5, sportId: 'futsal', submittedAt, tags: [] },
+            { sourceId: 'tm1', reviewerUserId: 'u3', reviewerTeamId: 'team-big', targetUserId: null, targetTeamId: 'team-x', rating: 5, sportId: 'futsal', submittedAt, tags: [] },
+            // team-small 은 1명이 1점
+            { sourceId: 'tm2', reviewerUserId: 'u4', reviewerTeamId: 'team-small', targetUserId: null, targetTeamId: 'team-x', rating: 1, sportId: 'futsal', submittedAt, tags: [] },
+          ])
+          .mockResolvedValueOnce([
+            { sourceId: 'tm1', reviewerTeamId: 'team-x', targetTeamId: 'team-big' },
+            { sourceId: 'tm2', reviewerTeamId: 'team-x', targetTeamId: 'team-small' },
+          ]);
+
+        const prisma = {
+          v1PostEventReview: { findMany: reviewFindManyMock },
+          v1TeamMembership: { findMany: jest.fn().mockResolvedValue([{ teamId: 'team-x' }]) },
+          v1Sport: { findMany: jest.fn().mockResolvedValue([{ id: 'futsal', code: 'futsal' }]) },
+        };
+        const tournamentFixtureReviews = { pending: jest.fn(), source: jest.fn(), submit: jest.fn(), sourceSummaries: jest.fn() };
+        const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub(), reviewPolicyStub());
+
+        const result = await service.receivedSummary(
+          { id: 'user-p', email: 'user-p@teameet.v1', accountStatus: 'active', onboardingStatus: 'completed' },
+          { targetType: 'team' },
+        );
+
+        // 원시 평균이라면 (5+5+5+1)/4 = 4.0 이 되고 인원 많은 팀이 이긴다.
+        // 팀당 1표면 (5 + 1)/2 = 3.0 이다.
+        expect(result.bySport).toEqual([
+          { sportId: 'futsal', sportCode: 'futsal', ratingAvg: 3, ratingCount: 2, tagRates: [] },
+        ]);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('user 타깃은 개별 후기 그대로 센다', async () => {
+      // 팀당 1표는 팀 대상 규칙이다 — 개인은 평가자 한 명이 한 표다.
+      const submittedAt = new Date('2026-08-01T00:00:00Z');
+      jest.useFakeTimers().setSystemTime(new Date('2026-08-10T00:00:00Z')); // 공개 대기 경과
+
+      try {
+        const reviewFindManyMock = jest
+          .fn()
+          .mockResolvedValueOnce([
+            { sourceId: 'm1', reviewerUserId: 'u1', reviewerTeamId: 'team-big', targetUserId: 'user-t', targetTeamId: null, rating: 5, sportId: 'futsal', submittedAt, tags: [] },
+            { sourceId: 'm1', reviewerUserId: 'u2', reviewerTeamId: 'team-big', targetUserId: 'user-t', targetTeamId: null, rating: 1, sportId: 'futsal', submittedAt, tags: [] },
+          ])
+          .mockResolvedValueOnce([]);
+
+        const prisma = {
+          v1PostEventReview: { findMany: reviewFindManyMock },
+          v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
+          v1Sport: { findMany: jest.fn().mockResolvedValue([{ id: 'futsal', code: 'futsal' }]) },
+        };
+        const tournamentFixtureReviews = { pending: jest.fn(), source: jest.fn(), submit: jest.fn(), sourceSummaries: jest.fn() };
+        const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub(), reviewPolicyStub());
+
+        const result = await service.receivedSummary(
+          { id: 'user-t', email: 'user-t@teameet.v1', accountStatus: 'active', onboardingStatus: 'completed' },
+          { targetType: 'user' },
+        );
+
+        // 같은 팀 소속 두 명이지만 개인 대상이므로 2표 그대로 — (5+1)/2 = 3, count 2.
+        expect(result.bySport).toEqual([
+          { sportId: 'futsal', sportCode: 'futsal', ratingAvg: 3, ratingCount: 2, tagRates: [] },
+        ]);
       } finally {
         jest.useRealTimers();
       }

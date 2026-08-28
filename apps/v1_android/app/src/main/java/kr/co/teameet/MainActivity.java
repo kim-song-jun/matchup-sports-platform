@@ -16,6 +16,7 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.FrameLayout;
 import android.widget.Toast;
 import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResultLauncher;
@@ -34,6 +35,7 @@ import java.util.Collections;
 import org.json.JSONObject;
 
 public final class MainActivity extends AppCompatActivity {
+    private FrameLayout rootView;
     private WebView webView;
     private ValueCallback<Uri[]> pendingFileChooser;
     private ActivityResultLauncher<Intent> fileChooserLauncher;
@@ -62,7 +64,8 @@ public final class MainActivity extends AppCompatActivity {
                 registerPushAndReport(requestId);
             });
         configureWebView();
-        setContentView(webView);
+        configureRootView();
+        setContentView(rootView);
         applySystemBarInsets();
         registerBackHandler();
         if (FirebaseBootstrap.initialize(this) && canRegisterPush()) {
@@ -77,14 +80,22 @@ public final class MainActivity extends AppCompatActivity {
 
     private void applySystemBarInsets() {
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
-        ViewCompat.setOnApplyWindowInsetsListener(webView, (view, windowInsets) -> {
+        ViewCompat.setOnApplyWindowInsetsListener(rootView, (view, windowInsets) -> {
             Insets insets = windowInsets.getInsets(
                 WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout()
             );
             view.setPadding(insets.left, insets.top, insets.right, insets.bottom);
             return windowInsets;
         });
-        ViewCompat.requestApplyInsets(webView);
+        ViewCompat.requestApplyInsets(rootView);
+    }
+
+    private void configureRootView() {
+        rootView = new FrameLayout(this);
+        rootView.addView(webView, new FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
+        ));
     }
 
     @SuppressLint("SetJavaScriptEnabled")

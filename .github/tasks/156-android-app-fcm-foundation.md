@@ -319,3 +319,53 @@ Internal Testing, and the real-device matrix.
 - Mode controls passed: a valid denied-state run completed 1/1 with zero runtime problems, while a
   missing QA user produced 1 blocker and a non-zero exit as required. Controlled native rendering
   remains browser evidence only and does not replace the pending real-device matrix.
+
+## Firebase Alpha and Device QA (2026-08-29)
+
+Firebase Alpha identity:
+
+- Project ID: `teameet-alpha`
+- Android package: `kr.co.teameet.alpha`
+- Android App ID: `1:816070948845:android:ca38fadea69fa6814199e4`
+- Sender ID: `816070948845`
+- Web API key is stored only as the repository variable
+  `ANDROID_ALPHA_FIREBASE_API_KEY`; its value is intentionally omitted from this document.
+- The four `ANDROID_ALPHA_FIREBASE_*` values are repository variables. An initial mistaken copy in
+  Repository Secrets made workflow run `33188600314` fail closed with all four inputs missing; the
+  variables were moved to the correct scope and the duplicate secrets were deleted.
+- Alpha Firebase Admin credentials were installed in the operator-managed EC2 `deploy/.env` without
+  printing their values. Project/email/key-shape checks passed, the file mode was corrected from `777`
+  to `600`, and downloaded Admin/client JSON copies plus the temporary SSM SecureString were deleted.
+- The Admin service account has one user-managed key. Two downloaded files were duplicate copies, not
+  two active keys.
+
+Build and Alpha runtime evidence:
+
+- Android Alpha workflow run `33188600314` rerun: Firebase presence/identity gates, JVM/build contract,
+  production negative controls, APK checksum generation, and artifact upload all passed.
+- Artifact `teameet-alpha-ed7b96b9a0baf3e349006b287b9a2bd1d6c804d7` contained
+  `app-alpha-debug.apk` (5,286,216 bytes) and its SHA-256 file; `sha256sum -c` returned `OK` both after
+  download and before device installation.
+- Because Alpha only auto-deploys `dev`, the pre-merge feature SHA was deployed through the existing
+  immutable source/image/manifest/SSM scripts with operator AWS credentials. AWS target verification,
+  source and manifest checksums, ECR digests, and the expand-contract gate from active `3fe2c9d52` to
+  candidate `ed7b96b9a` passed. Migration `20260828000000_add_v1_push_devices` applied successfully.
+- Alpha now reports release `0.5.0-alpha.20260828.ged7b96b9a0ba`, commit `ed7b96b9a`, and DB health
+  `true`. Unauthenticated `POST /api/v1/notifications/push-devices` returns the expected `401` auth
+  guard instead of the pre-deploy `404`.
+- First SSM deploy attempt stopped before application mutation because the private-key `.env` assignment
+  was one-line but unquoted. It was atomically quoted, sourced in a no-output subshell, and the same
+  immutable manifest then deployed successfully. The setup runbook now pins this shell requirement.
+
+Samsung device evidence (in progress):
+
+- Device: Samsung `SM-A325N`, Android 13 / API 33, security patch 2025-01-01.
+- Fresh install was confirmed by package absence before install; ADB streamed install returned
+  `Success`. App `versionCode=1`, min SDK 26, target SDK 36.
+- Initial `POST_NOTIFICATIONS` state was `granted=false` / app-op `ignore`; the app launched without
+  an unsolicited permission prompt or a crash. Screenshot:
+  `output/task156/android-device-sm-a325n/01-fresh-launch.png` (raw local QA evidence, not committed).
+- The first screenshot exposed a blocking system-bar layout defect: applying insets as WebView padding
+  left the CSS viewport full-height and clipped fixed top/bottom chrome. The feature branch now applies
+  system-bar/display-cutout padding to a parent `FrameLayout`, shrinking the actual WebView layout
+  viewport. Rebuilt APK and before/after real-device evidence are pending.

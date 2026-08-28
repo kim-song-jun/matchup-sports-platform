@@ -50,6 +50,12 @@ The API requires all three values together:
 
 Store the private key as one line with literal `\n` separators. The API converts those separators back to newlines in memory. If all three values are absent, only FCM is disabled. Partial credentials or an invalid `V1_PUSH_ENVIRONMENT` fail startup.
 
+When the Alpha host loads `deploy/.env` with `source`, wrap the one-line private-key value in single
+quotes. An unquoted PEM assignment contains spaces in `BEGIN PRIVATE KEY` and makes the shell interpret
+the remainder as a command even when its line breaks are correctly encoded as literal `\n` sequences.
+Validate the file by sourcing it in a subshell without printing any of the three values, and keep the
+file mode at `600`.
+
 Production uses the GitHub `production` environment secrets with the names above; `deploy.yml` transfers them through the existing SSM SecureString runtime-env path. Alpha currently keeps the same names in the operator-managed Alpha `deploy/.env`. Do not pass secret values through SSM Run Command arguments or commit an env file.
 
 ## CI artifact

@@ -340,7 +340,7 @@ describe('Task 12 guest-recruitment lane — race regressions (W2/W3/W4)', () =>
         (tx) =>
           tx.$queryRaw`SELECT id FROM v1_schedule_guest_recruitments WHERE schedule_id = ${schedule.id} FOR UPDATE`,
         async (tx) => {
-          await tx.$executeRaw`UPDATE v1_schedule_guest_applications SET state = 'APPROVED'::"V1GuestApplicationState" WHERE id = ${applyA.id}`;
+          await tx.$executeRaw`UPDATE v1_schedule_guest_applications SET state = 'APPROVED'::"V1GuestApplicationState" WHERE id = ${applyA.applicationId}`;
         },
       );
 
@@ -348,7 +348,7 @@ describe('Task 12 guest-recruitment lane — race regressions (W2/W3/W4)', () =>
         authUser(ids.owner),
         ids.team,
         schedule.id,
-        applyB.id,
+        applyB.applicationId,
         { state: 'approved' },
         'full-race-review-b',
       );
@@ -366,7 +366,7 @@ describe('Task 12 guest-recruitment lane — race regressions (W2/W3/W4)', () =>
         where: { recruitmentId: recruitment.id, state: 'APPROVED' },
       });
       expect(approved).toBe(1);
-      const afterB = await prisma.v1ScheduleGuestApplication.findUniqueOrThrow({ where: { id: applyB.id } });
+      const afterB = await prisma.v1ScheduleGuestApplication.findUniqueOrThrow({ where: { id: applyB.applicationId } });
       expect(afterB.state).toBe('PENDING');
     },
   );

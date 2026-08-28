@@ -84,7 +84,7 @@ export function dismissPushNudge() {
  * `//host`·`/\\host`·`https://host`·`javascript:` 가 한 규칙으로 전부 걸리고,
  * 앞으로 나올 변종에도 파서가 아는 만큼은 따라간다.
  */
-const REDIRECT_BASE = 'https://redirect-guard.invalid';
+const REDIRECT_BASE = new URL('https://redirect-guard.invalid');
 
 export function sanitizeRedirectPath(value: string | null | undefined) {
   if (!value) return null;
@@ -96,11 +96,16 @@ export function sanitizeRedirectPath(value: string | null | undefined) {
   } catch {
     return null;
   }
-  if (resolved.origin !== REDIRECT_BASE) return null;
+  if (resolved.origin !== REDIRECT_BASE.origin) return null;
 
   // 로그인 화면으로 되돌리면 로그인 → 로그인 고리가 된다.
   if (resolved.pathname.startsWith('/login')) return null;
-  return value;
+
+  // **검증한 값을 그대로 돌려준다.** 원본 문자열을 돌려주면 호출부(router.replace 등)가
+  // 그 문자열을 다시 파싱하므로, 내가 본 것과 실제로 쓰이는 것이 두 번의 파싱으로
+  // 갈릴 여지가 남는다. 파서가 이미 정규화한 경로를 돌려주면 "검증한 값 == 쓰는 값"이
+  // 되어 그 틈 자체가 없어진다.
+  return `${resolved.pathname}${resolved.search}${resolved.hash}`;
 }
 
 export function getCurrentRedirectPath() {

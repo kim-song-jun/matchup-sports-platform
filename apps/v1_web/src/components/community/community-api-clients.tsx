@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { trackEvent } from '@/lib/analytics';
 import { normalizeNotificationHref } from '@/lib/notification-route';
+import { useV1ChatRoomSocket } from '@/hooks/use-v1-realtime-socket';
 import {
   useV1ChatMessages,
   useV1ChatRoom,
@@ -73,6 +74,11 @@ function useChatListPageModel(): ChatListViewModel {
 }
 
 export function ChatRoomPageClient({ roomId }: { roomId: string }) {
+  // 실시간 수신. 이 훅은 만들어져 있었지만 **어디에도 마운트되지 않아** 열어 둔 채팅방에
+  // 새 메시지가 실시간으로 들어오지 않았다 -- 30초 stale 이 지난 뒤 창 포커스가 바뀔 때만
+  // 갱신됐다. 형제 훅(useV1NotificationSocket)은 notification-socket-bridge 로 마운트돼
+  // 있는데 이것만 소비처가 없었다.
+  useV1ChatRoomSocket(roomId);
   const listModel = useChatListPageModel();
   const room = useV1ChatRoom(roomId);
   const messages = useV1ChatMessages(roomId, { limit: 50 });

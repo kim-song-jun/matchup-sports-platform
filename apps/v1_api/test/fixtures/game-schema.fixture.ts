@@ -387,7 +387,11 @@ export const gameSchemaSourceManifest = {
   // game domain(V1Game*) 모델·enum 은 건드리지 않는다. 마이그레이션
   // 20260825070000_v1_team_match_videos. 바인딩된 20260729000100_v1_game_operations 는
   // 그대로다(migration 해시 불변). 아래 값은 shasum -a 256 으로 계산했다.
-  schema: 'f9bc07bdce405f8ef624a692d9eb491e9f6e176b757d311904a47ab6e97559aa',
+  // 2026-08-28 재핀: Android FCM 설치를 저장하는 V1PushDevice 모델과 user 역관계,
+  // platform/environment enum을 추가했다. game operations 모델·enum은 바뀌지 않았고
+  // 전용 additive migration 20260828000000_add_v1_push_devices가 뒷받침한다. 이 guard가
+  // schema.prisma 전체 bytes를 결속하므로 schema hash만 현재 committed LF bytes로 재핀한다.
+  schema: 'b41e0672e3bf0ee77784657a9ed37501b23aec601e801863fc6b40098628b2af',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

@@ -175,7 +175,12 @@ export type ScheduleAttendeeListModel = {
    * 버튼을 보여주고 눌러서 실패하게 두지 않는다.
    */
   canProxy: boolean;
-  /** 대리 표시 진행 중인 팀원 userId. 그 줄의 버튼만 비활성화한다. */
+  /**
+   * 대리 표시 진행 중인 팀원 userId. 진행 중에는 **모든 줄의** 대리 버튼이 잠기고,
+   * 그 줄만 "처리 중…" 으로 바뀐다 -- 대리 응답은 스케줄의 `expectedVersion` 을 실어
+   * 보내므로 두 줄을 동시에 누르면 뒤엣것이 버전 충돌로 실패한다. 한 번에 하나씩
+   * 보내 실패를 아예 만들지 않는 쪽을 택했다.
+   */
   proxyPendingUserId: string | null;
   /** 대리 표시 실패 사유. 실패해도 목록은 그대로 두고 이 문구만 덧붙인다. */
   proxyError: string | null;

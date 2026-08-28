@@ -1375,8 +1375,11 @@ export function useV1SetMyScheduleAttendance(teamId: string, scheduleId: string)
  * 선수 한 명이 앱을 안 열면 팀장이 라인업을 못 짠다(라인업 저장의 출석 게이트).
  * 정원 규칙은 본인 응답과 동일하다 — 정원이 찼으면 대리로 눌러도 대기자가 된다.
  *
- * invalidate 대상은 본인 응답과 같다. 남의 출석을 바꾸면 그 사람의 "내 일정"도 달라지지만
- * 그건 그 사람 브라우저의 캐시라 여기서 손댈 수 없다 — 서버가 진실이고 다음 조회에 반영된다.
+ * invalidate 대상은 본인 응답(`useV1SetMyScheduleAttendance`)과 같게 맞춘다. 참석자 목록은
+ * active 멤버 **전원**이라 팀장 자신의 줄도 거기 있고, 팀장이 자기 줄을 눌러 이 경로로
+ * 응답할 수 있다 — 그때 "내 일정"을 갱신하지 않으면 내 화면만 옛 값을 보여준다.
+ * 남의 출석을 바꾼 경우 그 사람의 "내 일정"은 그 사람 브라우저의 캐시라 여기서 손댈 수
+ * 없다 — 서버가 진실이고 다음 조회에 반영된다.
  */
 export function useV1SetScheduleAttendanceOnBehalf(teamId: string, scheduleId: string) {
   const queryClient = useQueryClient();
@@ -1390,6 +1393,7 @@ export function useV1SetScheduleAttendanceOnBehalf(teamId: string, scheduleId: s
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.teamSchedule(teamId, scheduleId) });
       queryClient.invalidateQueries({ queryKey: [...v1Keys.team(teamId), 'schedules'] });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'me', 'schedule'] });
     },
   });
 }

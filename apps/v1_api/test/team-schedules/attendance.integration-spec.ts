@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { HttpException } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { ScheduleAttendanceService } from '../../src/team-schedules/attendance.service';
@@ -40,15 +41,22 @@ function expectHttpCode(error: unknown, status: number, code: string) {
   expect(exception.getResponse()).toEqual(expect.objectContaining({ code }));
 }
 
+/**
+ * `id` 를 넘기지 않으면 헬퍼가 매번 새로 만든다. 이 스위트는 테스트마다 정리하지 않아
+ * 스케줄 행이 계속 쌓이는데, 예전에는 호출부가 UUID 끝자리를 손으로 매겼다 --
+ * 다른 브랜치가 같은 번호를 고르면 `Unique constraint failed on the fields: (id)` 로
+ * CI 에서만 터진다(실제로 이 PR 에서 한 번 났다). 리터럴 id 를 단언에 쓰는 곳은 없으니
+ * 새 테스트는 id 를 넘기지 않는 쪽이 기본이다.
+ */
 async function createSchedule(overrides: {
-  id: string;
+  id?: string;
   capacity?: number | null;
   rsvpDeadlineAt?: Date | null;
   state?: 'SCHEDULED' | 'CANCELLED' | 'COMPLETED';
-}) {
+} = {}) {
   return prisma.v1TeamSchedule.create({
     data: {
-      id: overrides.id,
+      id: overrides.id ?? randomUUID(),
       teamId: ids.team,
       title: 'Task 12 attendance fixture',
       type: 'TRAINING',
@@ -154,7 +162,7 @@ describe('Task 12 attendance lane — ScheduleAttendanceService', () => {
   // 안 열면 팀장이 라인업을 못 짠다(team-match-lineup.service.ts 의 출석 게이트).
   // 사용자 확정: 게이트는 유지하되 팀장이 대신 표시할 수 있게 한다. 정원 규칙은 동일.
   it('팀장은 팀원의 참석을 대신 표시할 수 있고, 출석 행은 그 팀원 것으로 생긴다', async () => {
-    const schedule = await createSchedule({ id: '6c000000-0000-4000-8000-000000000110' });
+    const schedule = await createSchedule();
 
     const result = await service.setAttendanceOnBehalf(
       authUser(ids.owner),
@@ -174,7 +182,7 @@ describe('Task 12 attendance lane — ScheduleAttendanceService', () => {
   });
 
   it('일반 팀원은 남의 참석을 대신 표시할 수 없고 행도 생기지 않는다', async () => {
-    const schedule = await createSchedule({ id: '6c000000-0000-4000-8000-000000000111' });
+    const schedule = await createSchedule();
 
     const error = await captureFailure(() =>
       service.setAttendanceOnBehalf(
@@ -194,7 +202,7 @@ describe('Task 12 attendance lane — ScheduleAttendanceService', () => {
   it('대리 응답도 정원이 차면 본인 응답과 똑같이 대기자가 된다', async () => {
     // 사용자 확정: 팀장에게 정원을 넘길 권한을 주지 않는다 — 먼저 응답해 대기자가 된
     // 사람과의 형평성이 깨지기 때문이다.
-    const schedule = await createSchedule({ id: '6c000000-0000-4000-8000-000000000112', capacity: 1 });
+    const schedule = await createSchedule({ capacity: 1 });
     await service.setMyAttendance(
       authUser(ids.userB),
       ids.team,
@@ -216,7 +224,7 @@ describe('Task 12 attendance lane — ScheduleAttendanceService', () => {
   });
 
   it('팀 소속이 아닌 사람을 대상으로는 대리 표시할 수 없다', async () => {
-    const schedule = await createSchedule({ id: '6c000000-0000-4000-8000-000000000113' });
+    const schedule = await createSchedule();
 
     const error = await captureFailure(() =>
       service.setAttendanceOnBehalf(

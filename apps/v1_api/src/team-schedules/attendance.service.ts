@@ -449,12 +449,9 @@ export class ScheduleAttendanceService {
     userId: string,
     teamId: string,
   ): Promise<void> {
-    const teamRows = await tx.$queryRaw<Array<{ id: string }>>`
-      SELECT id FROM v1_teams WHERE id = ${teamId} AND status = 'active' AND deleted_at IS NULL FOR SHARE
-    `;
-    if (teamRows.length === 0) {
-      throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Team was not found' });
-    }
+    // 팀 row 의 존재·active 여부는 호출부(`setAttendanceFor`)가 같은 트랜잭션에서 이미
+    // FOR SHARE 로 잠그고 검증한 뒤에 여기로 들어온다 -- 여기서 다시 조회하면 대리 응답
+    // 한 번마다 같은 row 를 두 번 읽게 되고, 그 분기는 도달할 수도 없다.
     const managerRows = await tx.$queryRaw<Array<{ id: string }>>`
       SELECT id FROM v1_team_memberships
       WHERE team_id = ${teamId} AND user_id = ${userId} AND status = 'active' AND role IN ('owner', 'manager')

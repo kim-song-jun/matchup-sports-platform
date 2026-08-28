@@ -52,7 +52,7 @@ function ResultStateBadge({ state }: { state: PublicMatchDetail['resultState'] }
     // live region 을 쓰지 않는다 — 이 배지는 렌더 후 변하지 않는 정적 텍스트라, role="status"
     // 를 붙이면 스크린리더가 상태 변경으로 오인해 공지한다. 같은 파일의 몰수·중단 배지와
     // 같은 이유이고, `LiveBadge`(경기 시계)처럼 값이 실제로 바뀌는 곳에만 쓴다.
-    <span style={{ fontSize: 12, fontWeight: 700, color: tone, background: bg, borderRadius: 8, padding: '3px 8px' }}>
+    <span style={{ fontSize: 12, fontWeight: 700, color: tone, background: bg, borderRadius: 'var(--radius-chip)', padding: '3px 8px' }}>
       {resultStateLabel(state)}
     </span>
   );
@@ -166,7 +166,7 @@ function EventRow({ event }: { event: PublicMatchEvent }) {
               fontSize: 'var(--font-size-micro)',
               lineHeight: 1.4,
               padding: '0 4px',
-              borderRadius: 4,
+              borderRadius: 'var(--radius-tight)',
               fontWeight: 700,
               // 실제 팔레트 토큰을 쓴다 — `--danger-*` 는 이 코드베이스에 없어서
               // 하드코딩 fallback 이 항상 적용되고 있었다(다크모드도 따라오지 않는다).

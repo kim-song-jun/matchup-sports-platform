@@ -34,9 +34,9 @@ function getPageWindow(current: number, total: number): number[] {
 function ReviewsListSkeleton() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div className="tm-skeleton" style={{ height: 96, borderRadius: 12 }} />
-      <div className="tm-skeleton" style={{ height: 96, borderRadius: 12 }} />
-      <div className="tm-skeleton" style={{ height: 96, borderRadius: 12 }} />
+      <div className="tm-skeleton" style={{ height: 96, borderRadius: 'var(--radius-control)' }} />
+      <div className="tm-skeleton" style={{ height: 96, borderRadius: 'var(--radius-control)' }} />
+      <div className="tm-skeleton" style={{ height: 96, borderRadius: 'var(--radius-control)' }} />
     </div>
   );
 }
@@ -188,7 +188,7 @@ export function TournamentReviewsPageClient({ tournamentId }: { tournamentId: st
                 color: 'var(--text-caption)',
                 background: 'var(--grey100)',
                 padding: '8px 12px',
-                borderRadius: 8,
+                borderRadius: 'var(--radius-chip)',
                 margin: '12px 0 4px',
               }}
             >

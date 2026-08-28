@@ -631,7 +631,7 @@ function BracketEmpty() {
   return (
     <div style={{
       padding: '28px 16px', textAlign: 'center',
-      background: 'var(--grey50)', borderRadius: 14,
+      background: 'var(--grey50)', borderRadius: 'var(--radius-field)',
     }}>
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }} aria-hidden="true"><Trophy size={30} style={{ color: 'var(--grey400)' }} strokeWidth={1.6} /></div>
       {/* [R-T1 타입 위계 정리] 13px → 12px(보조 정보 tier) — weight 700은 유지.

@@ -99,7 +99,7 @@ export function TournamentInquirySection({
             background: 'var(--text-strong)',
             color: 'var(--static-white)',
             padding: '12px 20px',
-            borderRadius: 999,
+            borderRadius: 'var(--radius-pill)',
             fontSize: 13,
             fontWeight: 600,
             maxWidth: 'calc(100vw - 32px)',

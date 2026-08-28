@@ -957,7 +957,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                         flexShrink: 0,
                         minWidth: 44,
                         minHeight: 44,
-                        borderRadius: 999,
+                        borderRadius: 'var(--radius-pill)',
                         border: entry.goalkeeper ? '1.5px solid var(--orange700)' : '1.5px dashed var(--grey300)',
                         background: entry.goalkeeper ? 'var(--orange700)' : 'transparent',
                         color: entry.goalkeeper ? '#fff' : 'var(--text-caption)',

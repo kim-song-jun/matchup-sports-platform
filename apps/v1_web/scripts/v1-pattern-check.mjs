@@ -291,8 +291,14 @@ function checkTsxArbitrarySpacing() {
  * 줄인 뒤에는 baseline 을 갱신해 다시 늘지 못하게 한다(그 갱신도 이 게이트가
  * 요구한다 — 줄었는데 baseline 이 그대로면 그만큼 다시 들어올 여지가 남는다).
  * ────────────────────────────────────────────────────────────────── */
-function checkFontSizeLiterals() {
-  const BASELINE_PATH = 'scripts/font-size-baseline.json';
+/** 파일별 baseline 을 두고 그 수를 넘지 않는지 보는 공용 검사.
+ *  글자 크기와 radius 가 같은 구조라 헬퍼로 묶는다 — 복붙하면 "파일이
+ *  사라졌는데 baseline 에 남아 있다" 같은 가장자리 처리가 한쪽에만 남는다.
+ *  count 는 정규식이 아니라 함수로 받는다: radius 는 "토큰 참조를 걷어낸 뒤
+ *  숫자가 남는가" 로 세야 해서(CSS 쪽 5번 검사가 이미 배운 방식) 단순 매칭으로는
+ *  안 된다. */
+function checkLiteralBaseline({ label, baselinePath, count, hint }) {
+  const BASELINE_PATH = baselinePath;
   let baseline;
   try {
     baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8'));
@@ -312,18 +318,14 @@ function checkFontSizeLiterals() {
     violations.push('[게이트 실행 실패] src 아래 TSX/TS 파일이 0개다');
     return;
   }
-  // 소수도 잡는다 — text-[13.5px] 같은 값이 baseline 밖에서 조용히 통과하고
-  // 있었다(실측 3곳). px 리터럴은 정수만 쓰인다는 보장이 없다.
-  const PAT = /\btext-\[(\d+(?:\.\d+)?)px\]|fontSize:\s*(\d+(?:\.\d+)?)\b/g;
   const seen = new Set();
   for (const f of files) {
-    const n = (readFileSync(f, 'utf8').match(PAT) || []).length;
+    const n = count(readFileSync(f, 'utf8'));
     const allowed = baseline[f] ?? 0;
     seen.add(f);
     if (n > allowed) {
       violations.push(
-        `[글자 크기 하드코딩] ${f}: ${n}곳 (허용 ${allowed}) — ` +
-          `text-[Npx] · fontSize:N 대신 .tm-text-* 나 var(--font-size-*) 를 쓸 것`,
+        `[${label}] ${f}: ${n}곳 (허용 ${allowed}) — ${hint}`,
       );
     } else if (n < allowed) {
       violations.push(
@@ -345,7 +347,38 @@ checkInertFontSizeClasses();
 checkSpacingGrid();
 checkRadiusLiteral();
 checkTsxArbitrarySpacing();
-checkFontSizeLiterals();
+checkLiteralBaseline({
+  label: '글자 크기 하드코딩',
+  baselinePath: 'scripts/font-size-baseline.json',
+  // 소수도 잡는다 — text-[13.5px] 같은 값이 baseline 밖에서 조용히 통과하고
+  // 있었다(실측 3곳). px 리터럴은 정수만 쓰인다는 보장이 없다.
+  count: (txt) => (txt.match(/\btext-\[(\d+(?:\.\d+)?)px\]|fontSize:\s*(\d+(?:\.\d+)?)\b/g) || []).length,
+  hint: 'text-[Npx] · fontSize:N 대신 .tm-text-* 나 var(--font-size-*) 를 쓸 것',
+});
+checkLiteralBaseline({
+  label: 'radius 리터럴(TSX)',
+  baselinePath: 'scripts/radius-baseline.json',
+  // 5번 검사는 CSS 파일만 본다. 이 저장소는 인라인 style 도 쓰기 때문에
+  // 마크업 쪽으로 그대로 들어올 수 있었고, 실제로 201곳이 그렇게 있었다
+  // (그중 139곳은 토큰과 값이 같아 무손실로 치환했다).
+  count: (txt) => {
+    let n = 0;
+    // 코너별 longhand 와 Tailwind 임의값까지 함께 본다 — shorthand 만 보면
+    // borderTopLeftRadius / rounded-[12px] 로 그대로 우회된다(CSS 쪽에서
+    // 실제로 6건이 그랬다).
+    for (const m of txt.matchAll(/border(?:Start|End|Top|Bottom)?(?:Start|End|Left|Right)?Radius:\s*('[^']*'|`[^`]*`|[\w.]+)/g)) {
+      // 토큰 참조를 걷어낸 뒤 0 이 아닌 숫자가 남으면 리터럴이다.
+      const rest = m[1].replace(/var\(\s*--radius-[\w-]+\s*\)/g, ' ');
+      for (const lit of rest.matchAll(/(-?\d+(?:\.\d+)?)/g)) if (parseFloat(lit[1]) !== 0) n++;
+    }
+    for (const m of txt.matchAll(/\brounded-\[([^\]]+)\]/g)) {
+      const rest = m[1].replace(/var\(\s*--radius-[\w-]+\s*\)/g, ' ');
+      for (const lit of rest.matchAll(/(-?\d+(?:\.\d+)?)/g)) if (parseFloat(lit[1]) !== 0) n++;
+    }
+    return n;
+  },
+  hint: 'borderRadius 에 px 를 직접 적지 말고 var(--radius-*) 를 쓸 것 (tight/chip/control/field/container/hero/pill/circle)',
+});
 
 if (violations.length) {
   console.error(`\n✗ v1 패턴 검사 실패 — ${violations.length}건:\n`);
@@ -354,5 +387,5 @@ if (violations.length) {
   process.exit(1);
 }
 console.log(
-  '✓ v1 패턴 검사 통과 (합니다체 0, 미정의 CSS 토큰 0, 무효 폰트 크기 클래스 0, 간격 격자 이탈 0(CSS+TSX 임의값), radius 리터럴 0, 글자 크기 하드코딩 baseline 유지)',
+  '✓ v1 패턴 검사 통과 (합니다체 0, 미정의 CSS 토큰 0, 무효 폰트 크기 클래스 0, 간격 격자 이탈 0(CSS+TSX 임의값), radius 리터럴 0(CSS), 글자 크기·TSX radius baseline 유지)',
 );

@@ -275,7 +275,7 @@ function ScheduleEventRow({ item }: { item: ScheduleEventItem }) {
               fontSize: 'var(--font-size-micro)',
               lineHeight: 1.4,
               padding: '0 4px',
-              borderRadius: 4,
+              borderRadius: 'var(--radius-tight)',
               fontWeight: 700,
               // 실제 팔레트 토큰을 쓴다 — `--danger-*` 는 이 코드베이스에 없어서
               // 하드코딩 fallback 이 항상 적용되고 있었다(다크모드도 따라오지 않는다).
@@ -491,7 +491,7 @@ function ScheduleRow({
             fontWeight: 800,
             color: 'var(--text-strong)',
             background: 'var(--grey50)',
-            borderRadius: 8,
+            borderRadius: 'var(--radius-chip)',
             padding: '4px 0',
           }}
         >

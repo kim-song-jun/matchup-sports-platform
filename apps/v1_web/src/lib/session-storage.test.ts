@@ -37,6 +37,30 @@ describe('sanitizeRedirectPath', () => {
   it('rejects protocol-relative redirects', () => {
     expect(sanitizeRedirectPath('//example.com')).toBeNull();
   });
+
+  // alpha 실측으로 재현한 우회: `/\evil.com` 은 예전 검사(`//` 로 시작하지 않고
+  // `://` 를 담지 않음)를 전부 통과했는데, WHATWG URL 파서는 http(s) 에서 역슬래시를
+  // 슬래시와 똑같이 취급하므로 결국 `//evil.com` 과 같은 곳으로 해석된다.
+  // 로그인 직후 브라우저가 실제로 외부 origin 으로 떠나는 것을 확인했다.
+  it('rejects backslash-disguised absolute redirects', () => {
+    expect(sanitizeRedirectPath('/\\example.com')).toBeNull();
+    expect(sanitizeRedirectPath('/\\/example.com')).toBeNull();
+    expect(sanitizeRedirectPath('/\\\\example.com')).toBeNull();
+  });
+
+  // 위 셋과 `//example.com` 이 **같은 곳으로 해석된다**는 것이 이 규칙의 근거다 --
+  // 하나만 막고 나머지를 두면 막았다고 착각하게 된다.
+  it('treats every off-site form as the same thing', () => {
+    const base = 'https://teameet.example';
+    for (const form of ['//example.com', '/\\example.com', '/\\/example.com']) {
+      expect(new URL(form, base).origin).toBe('https://example.com');
+      expect(sanitizeRedirectPath(form)).toBeNull();
+    }
+  });
+
+  it('still keeps ordinary in-site paths with query and hash', () => {
+    expect(sanitizeRedirectPath('/teams/abc/schedules?tab=all#top')).toBe('/teams/abc/schedules?tab=all#top');
+  });
 });
 
 describe('production session hint', () => {

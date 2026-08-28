@@ -69,12 +69,37 @@ export function dismissPushNudge() {
   window.sessionStorage.setItem(V1_PUSH_NUDGE_DISMISSED_KEY, 'true');
 }
 
+/**
+ * `?redirect=` 로 받은 값을 **같은 사이트 안의 경로일 때만** 통과시킨다.
+ *
+ * 예전에는 금지 문자열을 하나씩 세는 방식이었다(`//` 로 시작하지 않고 `://` 를 담지
+ * 않으면 통과). 그 방식은 `/\\evil.com` 을 막지 못했다 -- WHATWG URL 파서는 http(s)
+ * 에서 역슬래시를 슬래시와 **똑같이** 취급하므로 이 값은 `https://evil.com/` 으로
+ * 해석되는데, 두 번째 글자가 `/` 가 아니라 `\\` 라서 `//` 검사에 걸리지 않았다.
+ * alpha 실측으로 재현했다: 로그인 직후 브라우저가 실제로 외부 origin 으로 떠났고,
+ * 결과가 동일한 `//evil.com` 은 막히고 있었다.
+ *
+ * 그래서 금지 목록을 늘리는 대신 **파서에게 직접 묻는다**: 아무 데도 실재하지 않는
+ * 기준 origin 에 붙여 해석해 보고, origin 이 그대로면 사이트 내부 경로다. 이렇게 하면
+ * `//host`·`/\\host`·`https://host`·`javascript:` 가 한 규칙으로 전부 걸리고,
+ * 앞으로 나올 변종에도 파서가 아는 만큼은 따라간다.
+ */
+const REDIRECT_BASE = 'https://redirect-guard.invalid';
+
 export function sanitizeRedirectPath(value: string | null | undefined) {
   if (!value) return null;
-  if (!value.startsWith('/') || value.startsWith('//')) return null;
-  if (value.includes('://')) return null;
+  if (!value.startsWith('/')) return null;
 
-  if (value.startsWith('/login')) return null;
+  let resolved: URL;
+  try {
+    resolved = new URL(value, REDIRECT_BASE);
+  } catch {
+    return null;
+  }
+  if (resolved.origin !== REDIRECT_BASE) return null;
+
+  // 로그인 화면으로 되돌리면 로그인 → 로그인 고리가 된다.
+  if (resolved.pathname.startsWith('/login')) return null;
   return value;
 }
 

@@ -1368,6 +1368,32 @@ export function useV1SetMyScheduleAttendance(teamId: string, scheduleId: string)
   });
 }
 
+/**
+ * 팀장·매니저가 팀원의 참석을 대신 표시한다.
+ *
+ * 출석은 원래 본인만 설정할 수 있는데, 리그 대진은 운영자가 일방 배정하는 의무 경기라
+ * 선수 한 명이 앱을 안 열면 팀장이 라인업을 못 짠다(라인업 저장의 출석 게이트).
+ * 정원 규칙은 본인 응답과 동일하다 — 정원이 찼으면 대리로 눌러도 대기자가 된다.
+ *
+ * invalidate 대상은 본인 응답과 같다. 남의 출석을 바꾸면 그 사람의 "내 일정"도 달라지지만
+ * 그건 그 사람 브라우저의 캐시라 여기서 손댈 수 없다 — 서버가 진실이고 다음 조회에 반영된다.
+ */
+export function useV1SetScheduleAttendanceOnBehalf(teamId: string, scheduleId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, ...body }: V1SetScheduleAttendanceDto & { userId: string }) =>
+      v1Put<V1SetScheduleAttendanceResult>(
+        `/teams/${teamId}/schedules/${scheduleId}/attendance/${userId}`,
+        body,
+        idempotencyInit(),
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamSchedule(teamId, scheduleId) });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.team(teamId), 'schedules'] });
+    },
+  });
+}
+
 export function useV1CreateGuestRecruitment(teamId: string, scheduleId: string) {
   const queryClient = useQueryClient();
   return useMutation({

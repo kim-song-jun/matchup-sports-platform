@@ -48,15 +48,62 @@ export class ScheduleAttendanceService {
     dto: SetAttendanceDto,
     idempotencyKey: string,
   ): Promise<SetAttendanceResponse> {
+    return this.setAttendanceFor(user, user.id, teamId, scheduleId, dto, idempotencyKey);
+  }
+
+  /**
+   * 팀장·매니저가 팀원의 참석을 **대신** 표시한다.
+   *
+   * 리그 대진 생성이 팀일정을 함께 만들면서 라인업 저장에 출석 게이트가 걸리는데
+   * (team-match-lineup.service.ts, "참석으로 응답한 팀원만"), 출석은 본인만 설정할 수
+   * 있어서 선수 한 명이 앱을 안 열면 팀장이 명단을 못 짠다. 리그 대진은 운영자가 일방
+   * 배정하는 의무 경기라 그 대기가 특히 비싸다.
+   *
+   * **정원 규칙은 본인 응답과 동일하다**(사용자 확정) — 정원이 찼으면 대리로 눌러도
+   * 자동으로 대기자가 된다. 팀장에게 정원을 넘길 권한을 주면 먼저 응답해 대기자가 된
+   * 사람과의 형평성이 깨진다.
+   */
+  async setAttendanceOnBehalf(
+    actor: V1AuthUser,
+    targetUserId: string,
+    teamId: string,
+    scheduleId: string,
+    dto: SetAttendanceDto,
+    idempotencyKey: string,
+  ): Promise<SetAttendanceResponse> {
+    // 본인 것을 이 경로로 부르는 것은 막지 않는다 — 결과가 같고, 화면이 자기 자신을
+    // 목록에서 고르는 것을 특별취급하지 않아도 되게 한다.
+    //
+    // 권한 확인은 **트랜잭션 안에서** 한다(아래 setAttendanceFor). 같은 모듈의
+    // guest-recruitment.service.ts 가 P1-7/P1-8 로 정확히 이 실수를 고쳤다: 트랜잭션
+    // 밖에서 확인하면 그 사이에 커밋된 권한 회수가 이 요청을 막지 못한다.
+    return this.setAttendanceFor(actor, targetUserId, teamId, scheduleId, dto, idempotencyKey);
+  }
+
+  /**
+   * 출석 설정의 공통 본체. **행위자(actor)와 대상자(targetUserId)를 분리한다** —
+   * 대리 응답에서 둘이 갈리기 때문이다:
+   * - 행위자: 멱등키 범위·감사 로그의 actorUserId (누가 눌렀나)
+   * - 대상자: 출석 행·정원 집계·멤버십 검증 (누구의 참석인가)
+   * 이 둘을 한 값으로 두면 대리 응답의 감사 로그에 팀원이 행위자로 남는 등 조용히 틀린다.
+   */
+  private async setAttendanceFor(
+    actor: V1AuthUser,
+    targetUserId: string,
+    teamId: string,
+    scheduleId: string,
+    dto: SetAttendanceDto,
+    idempotencyKey: string,
+  ): Promise<SetAttendanceResponse> {
     return this.prisma.$transaction(async (tx) => {
-      await this.lockIdempotencyScope(tx, user.id, scheduleId, idempotencyKey);
+      await this.lockIdempotencyScope(tx, actor.id, scheduleId, idempotencyKey);
 
       const payloadHash = canonicalGameCommandPayloadHash({
         status: dto.status,
         expectedVersion: dto.expectedVersion,
       });
       const idempotencyIdentity = {
-        actorUserId: user.id,
+        actorUserId: actor.id,
         action: ACTION,
         resourceType: RESOURCE_TYPE,
         resourceId: scheduleId,
@@ -111,8 +158,16 @@ export class ScheduleAttendanceService {
         throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Team was not found' });
       }
 
+      // 대리 응답이면 **행위자의 팀장 권한**을 같은 트랜잭션에서, 대상자 멤버십보다
+      // 먼저 확인한다(팀 -> 행위자 멤버십 -> 대상자 멤버십 순 — 이 파일과 형제 레인이
+      // 쓰는 잠금 순서 그대로). 트랜잭션 밖에서 확인하면 그 사이 커밋된 권한 회수가
+      // 이 요청을 못 막는다 — guest-recruitment.service.ts 의 P1-7/P1-8 이 같은 실수였다.
+      if (targetUserId !== actor.id) {
+        await this.assertActiveManagerLocked(tx, actor.id, teamId);
+      }
+
       const membershipRows = await tx.$queryRaw<Array<{ id: string }>>`
-        SELECT id FROM v1_team_memberships WHERE team_id = ${teamId} AND user_id = ${user.id} AND status = 'active' FOR SHARE
+        SELECT id FROM v1_team_memberships WHERE team_id = ${teamId} AND user_id = ${targetUserId} AND status = 'active' FOR SHARE
       `;
       if (membershipRows.length === 0) {
         throw new ForbiddenException({
@@ -146,7 +201,7 @@ export class ScheduleAttendanceService {
       }
 
       const existing = await tx.v1ScheduleAttendance.findUnique({
-        where: { scheduleId_userId: { scheduleId, userId: user.id } },
+        where: { scheduleId_userId: { scheduleId, userId: targetUserId } },
       });
 
       if (existing) {
@@ -189,7 +244,7 @@ export class ScheduleAttendanceService {
           FROM v1_schedule_attendance a
           INNER JOIN v1_team_memberships m ON m.team_id = ${teamId} AND m.user_id = a.user_id AND m.status = 'active'
           INNER JOIN v1_users u ON u.id = a.user_id AND u.account_status = 'active'
-          WHERE a.schedule_id = ${scheduleId} AND a.status = 'GOING'::"V1AttendanceStatus" AND a.user_id != ${user.id}
+          WHERE a.schedule_id = ${scheduleId} AND a.status = 'GOING'::"V1AttendanceStatus" AND a.user_id != ${targetUserId}
         `;
         const goingCount = Number(goingCountRows[0]?.count ?? 0);
         if (goingCount >= schedule.capacity) {
@@ -241,7 +296,7 @@ export class ScheduleAttendanceService {
         await tx.v1ScheduleAttendance.create({
           data: {
             scheduleId,
-            userId: user.id,
+            userId: targetUserId,
             status: nextStatus,
             waitlistPosition,
             version: 0,
@@ -333,7 +388,7 @@ export class ScheduleAttendanceService {
 
       await tx.v1IdempotencyRecord.create({
         data: {
-          actorUserId: user.id,
+          actorUserId: actor.id,
           action: ACTION,
           resourceType: RESOURCE_TYPE,
           resourceId: scheduleId,
@@ -381,4 +436,36 @@ export class ScheduleAttendanceService {
     const scope = JSON.stringify([userId, ACTION, RESOURCE_TYPE, scheduleId, idempotencyKey]);
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${scope}, 0))`;
   }
+
+  /**
+   * 대리 출석 응답의 행위자 권한 확인 — **트랜잭션 안에서 `FOR SHARE` 로 잠근 채** 본다.
+   * 형제 레인(guest-recruitment.service.ts `assertActiveManagerLocked`)과 같은 이유·같은
+   * 순서다: 보관처리된 팀은 더 읽기 전에 404 로 끊고, 동시에 커밋되는 권한 회수는
+   * Postgres MVCC 락 대기로 직렬화시켜 "이미 권한이 회수된 행위자의 쓰기"가 끼어들지
+   * 못하게 한다.
+   */
+  private async assertActiveManagerLocked(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    teamId: string,
+  ): Promise<void> {
+    const teamRows = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM v1_teams WHERE id = ${teamId} AND status = 'active' AND deleted_at IS NULL FOR SHARE
+    `;
+    if (teamRows.length === 0) {
+      throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Team was not found' });
+    }
+    const managerRows = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM v1_team_memberships
+      WHERE team_id = ${teamId} AND user_id = ${userId} AND status = 'active' AND role IN ('owner', 'manager')
+      FOR SHARE
+    `;
+    if (managerRows.length === 0) {
+      throw new ForbiddenException({
+        code: 'PERMISSION_DENIED',
+        message: 'Only team owners or managers can set attendance for others',
+      });
+    }
+  }
+
 }

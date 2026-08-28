@@ -150,6 +150,89 @@ describe('Task 12 attendance lane — ScheduleAttendanceService', () => {
     expect(await prisma.v1ScheduleAttendance.count({ where: { scheduleId: schedule.id } })).toBe(0);
   });
 
+  // 대리 출석 응답 — 리그 대진은 운영자가 일방 배정하는 의무 경기라, 선수 한 명이 앱을
+  // 안 열면 팀장이 라인업을 못 짠다(team-match-lineup.service.ts 의 출석 게이트).
+  // 사용자 확정: 게이트는 유지하되 팀장이 대신 표시할 수 있게 한다. 정원 규칙은 동일.
+  it('팀장은 팀원의 참석을 대신 표시할 수 있고, 출석 행은 그 팀원 것으로 생긴다', async () => {
+    const schedule = await createSchedule({ id: '6c000000-0000-4000-8000-000000000110' });
+
+    const result = await service.setAttendanceOnBehalf(
+      authUser(ids.owner),
+      ids.userA,
+      ids.team,
+      schedule.id,
+      { status: 'GOING', expectedVersion: 0 },
+      'proxy-owner-key',
+    );
+
+    expect(result.status).toBe('GOING');
+    // 행위자(팀장)가 아니라 **대상자**의 행이어야 한다 — 둘을 섞으면 팀장이 자기
+    // 참석을 눌러버린 것이 된다.
+    const rows = await prisma.v1ScheduleAttendance.findMany({ where: { scheduleId: schedule.id } });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.userId).toBe(ids.userA);
+  });
+
+  it('일반 팀원은 남의 참석을 대신 표시할 수 없고 행도 생기지 않는다', async () => {
+    const schedule = await createSchedule({ id: '6c000000-0000-4000-8000-000000000111' });
+
+    const error = await captureFailure(() =>
+      service.setAttendanceOnBehalf(
+        authUser(ids.userB),
+        ids.userA,
+        ids.team,
+        schedule.id,
+        { status: 'GOING', expectedVersion: 0 },
+        'proxy-member-key',
+      ),
+    );
+
+    expectHttpCode(error, 403, 'PERMISSION_DENIED');
+    expect(await prisma.v1ScheduleAttendance.count({ where: { scheduleId: schedule.id } })).toBe(0);
+  });
+
+  it('대리 응답도 정원이 차면 본인 응답과 똑같이 대기자가 된다', async () => {
+    // 사용자 확정: 팀장에게 정원을 넘길 권한을 주지 않는다 — 먼저 응답해 대기자가 된
+    // 사람과의 형평성이 깨지기 때문이다.
+    const schedule = await createSchedule({ id: '6c000000-0000-4000-8000-000000000112', capacity: 1 });
+    await service.setMyAttendance(
+      authUser(ids.userB),
+      ids.team,
+      schedule.id,
+      { status: 'GOING', expectedVersion: 0 },
+      'proxy-cap-first',
+    );
+
+    const proxied = await service.setAttendanceOnBehalf(
+      authUser(ids.owner),
+      ids.userA,
+      ids.team,
+      schedule.id,
+      { status: 'GOING', expectedVersion: 0 },
+      'proxy-cap-second',
+    );
+
+    expect(proxied.status).toBe('WAITLISTED');
+  });
+
+  it('팀 소속이 아닌 사람을 대상으로는 대리 표시할 수 없다', async () => {
+    const schedule = await createSchedule({ id: '6c000000-0000-4000-8000-000000000113' });
+
+    const error = await captureFailure(() =>
+      service.setAttendanceOnBehalf(
+        authUser(ids.owner),
+        ids.nonMember,
+        ids.team,
+        schedule.id,
+        { status: 'GOING', expectedVersion: 0 },
+        'proxy-nonmember-key',
+      ),
+    );
+
+    expectHttpCode(error, 403, 'PERMISSION_DENIED');
+    expect(await prisma.v1ScheduleAttendance.count({ where: { scheduleId: schedule.id } })).toBe(0);
+  });
+
   it('waitlists a GOING request once capacity is full, and duplicate Idempotency-Key replays the same result', async () => {
     const schedule = await createSchedule({ id: '6c000000-0000-4000-8000-000000000103', capacity: 1 });
     const first = await service.setMyAttendance(

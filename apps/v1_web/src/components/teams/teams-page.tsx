@@ -550,7 +550,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
                     ? '함께 뛴 팀들이 남긴 평가를 확인해요.'
                     : '이 팀과 뛴 팀들이 남긴 평가예요.'
               }
-              badge={teamReviewCount > 0 && teamReviewAvg !== null ? `${teamReviewAvg.toFixed(1)} · ${teamReviewCount}개` : null}
+              badge={teamReviewCount > 0 && teamReviewAvg !== null ? `${teamReviewAvg.toFixed(1)} · ${teamReviewCount}팀` : null}
             />
           ) : null}
           {mode === 'mine' ? (
@@ -747,7 +747,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
                     : '이 팀과 뛴 팀들이 남긴 평가예요.'
               }
               // 별점만 두면 몇 명이 준 점수인지 알 수 없다 — 개수를 함께 적는다.
-              badge={teamReviewCount > 0 && teamReviewAvg !== null ? `${teamReviewAvg.toFixed(1)} · ${teamReviewCount}개` : null}
+              badge={teamReviewCount > 0 && teamReviewAvg !== null ? `${teamReviewAvg.toFixed(1)} · ${teamReviewCount}팀` : null}
             />
           ) : null}
         </div>

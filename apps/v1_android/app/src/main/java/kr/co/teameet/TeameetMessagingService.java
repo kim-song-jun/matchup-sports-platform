@@ -12,14 +12,20 @@ public final class TeameetMessagingService extends FirebaseMessagingService {
 
     @Override
     public void onNewToken(String token) {
+        if (!PushDeliveryPolicy.hasActiveConsent(
+            PushPermission.isGranted(this),
+            InstallationIdentity.isOptedIn(this)
+        )) return;
         InstallationIdentity.saveToken(this, token);
-        if (PushPermission.isGranted(this) && InstallationIdentity.isOptedIn(this)) {
-            PushRegistrationClient.register(this);
-        }
+        PushRegistrationClient.register(this);
     }
 
     @Override
     public void onMessageReceived(RemoteMessage message) {
+        if (!PushDeliveryPolicy.shouldDisplay(
+            PushPermission.isGranted(this),
+            InstallationIdentity.isOptedIn(this)
+        )) return;
         NotificationChannels.create(this);
         String title = message.getNotification() == null ? null : message.getNotification().getTitle();
         String body = message.getNotification() == null ? null : message.getNotification().getBody();
@@ -40,6 +46,7 @@ public final class TeameetMessagingService extends FirebaseMessagingService {
             .setContentTitle(title == null ? getString(R.string.app_name) : title)
             .setContentText(body)
             .setAutoCancel(true)
+            .setOnlyAlertOnce(true)
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_HIGH);
         getSystemService(NotificationManager.class).notify(notificationId.hashCode(), notification.build());

@@ -32,6 +32,13 @@ final class InstallationIdentity {
             .getString(FCM_TOKEN, null);
     }
 
+    static void clearToken(Context context) {
+        context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+            .edit()
+            .remove(FCM_TOKEN)
+            .apply();
+    }
+
     static void markRegistered(Context context, boolean registered) {
         context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
             .edit().putBoolean(PUSH_REGISTERED, registered).apply();

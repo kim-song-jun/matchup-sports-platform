@@ -2,18 +2,21 @@ package kr.co.teameet;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.app.DownloadManager;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.webkit.CookieManager;
+import android.webkit.URLUtil;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.Toast;
 import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -53,10 +56,7 @@ public final class MainActivity extends AppCompatActivity {
                 pendingPushRequestId = null;
                 if (!granted) {
                     InstallationIdentity.markOptedIn(this, false);
-                    PushRegistrationClient.revoke(
-                        this,
-                        ignored -> reportPushResult(requestId, false)
-                    );
+                    revokePushAndDeleteToken(() -> reportPushResult(requestId, false));
                     return;
                 }
                 registerPushAndReport(requestId);
@@ -65,10 +65,11 @@ public final class MainActivity extends AppCompatActivity {
         setContentView(webView);
         applySystemBarInsets();
         registerBackHandler();
-        if (FirebaseBootstrap.initialize(this)) {
+        if (FirebaseBootstrap.initialize(this) && canRegisterPush()) {
+            FirebaseMessaging.getInstance().setAutoInitEnabled(true);
             FirebaseMessaging.getInstance().getToken().addOnSuccessListener(token -> {
                 InstallationIdentity.saveToken(this, token);
-                if (canRegisterPush()) PushRegistrationClient.register(this);
+                PushRegistrationClient.register(this);
             });
         }
         webView.loadUrl(BuildConfig.WEB_ORIGIN + routeFromIntent(getIntent()));
@@ -124,7 +125,7 @@ public final class MainActivity extends AppCompatActivity {
                     if (canRegisterPush()) {
                         PushRegistrationClient.register(MainActivity.this);
                     } else if (InstallationIdentity.isRegistered(MainActivity.this)) {
-                        PushRegistrationClient.revoke(MainActivity.this, ignored -> {});
+                        revokePushAndDeleteToken(() -> {});
                     }
                 }
             }
@@ -139,6 +140,41 @@ public final class MainActivity extends AppCompatActivity {
                 return true;
             }
         });
+        webView.setDownloadListener(this::enqueueInternalDownload);
+    }
+
+    private void enqueueInternalDownload(
+        String url,
+        String userAgent,
+        String contentDisposition,
+        String mimeType,
+        long contentLength
+    ) {
+        if (!AllowedNavigation.isInternalAbsoluteUrl(url)) {
+            showDownloadFailure();
+            return;
+        }
+        try {
+            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url))
+                .setTitle(URLUtil.guessFileName(url, contentDisposition, mimeType))
+                .setNotificationVisibility(
+                    DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED
+                );
+            if (mimeType != null && !mimeType.isBlank()) request.setMimeType(mimeType);
+            String cookie = CookieManager.getInstance().getCookie(BuildConfig.WEB_ORIGIN);
+            if (cookie != null && !cookie.isBlank()) request.addRequestHeader("Cookie", cookie);
+            if (userAgent != null && !userAgent.isBlank()) {
+                request.addRequestHeader("User-Agent", userAgent);
+            }
+            getSystemService(DownloadManager.class).enqueue(request);
+            Toast.makeText(this, R.string.download_started, Toast.LENGTH_SHORT).show();
+        } catch (Exception ignored) {
+            showDownloadFailure();
+        }
+    }
+
+    private void showDownloadFailure() {
+        Toast.makeText(this, R.string.download_failed, Toast.LENGTH_LONG).show();
     }
 
     private void openExternal(Uri target) {
@@ -172,10 +208,7 @@ public final class MainActivity extends AppCompatActivity {
                 case "open-notification-settings" -> openNotificationSettings(requestId);
                 case "revoke-push-device" -> {
                     InstallationIdentity.markOptedIn(this, false);
-                    PushRegistrationClient.revoke(
-                        this,
-                        ignored -> reportPushResult(requestId, false)
-                    );
+                    revokePushAndDeleteToken(() -> reportPushResult(requestId, false));
                 }
                 default -> reportPushResult(requestId, false);
             }
@@ -232,7 +265,7 @@ public final class MainActivity extends AppCompatActivity {
         super.onResume();
         if (!PushPermission.isGranted(this)) InstallationIdentity.markOptedIn(this, false);
         if (!canRegisterPush() && InstallationIdentity.isRegistered(this)) {
-            PushRegistrationClient.revoke(this, ignored -> {});
+            revokePushAndDeleteToken(() -> {});
         }
     }
 
@@ -241,12 +274,30 @@ public final class MainActivity extends AppCompatActivity {
             reportPushResult(requestId, false);
             return;
         }
+        FirebaseMessaging.getInstance().setAutoInitEnabled(true);
         FirebaseMessaging.getInstance().getToken()
             .addOnSuccessListener(token -> {
                 InstallationIdentity.saveToken(this, token);
                 PushRegistrationClient.register(this, registered -> reportPushResult(requestId, registered));
             })
             .addOnFailureListener(ignored -> reportPushResult(requestId, false));
+    }
+
+    private void revokePushAndDeleteToken(Runnable completion) {
+        boolean firebaseReady = FirebaseBootstrap.initialize(this);
+        FirebaseMessaging messaging = firebaseReady ? FirebaseMessaging.getInstance() : null;
+        if (messaging != null) messaging.setAutoInitEnabled(false);
+        InstallationIdentity.clearToken(this);
+        InstallationIdentity.markRegistered(this, false);
+        PushRegistrationClient.revoke(this, ignored -> {
+            if (messaging == null) {
+                completion.run();
+                return;
+            }
+            messaging.deleteToken().addOnCompleteListener(task -> {
+                completion.run();
+            });
+        });
     }
 
     private void reportPushResult(String requestId, boolean subscribed) {

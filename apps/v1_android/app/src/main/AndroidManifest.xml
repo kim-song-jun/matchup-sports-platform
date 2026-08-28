@@ -16,6 +16,9 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_color"
             android:resource="@color/notification_color" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="teameet_general" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

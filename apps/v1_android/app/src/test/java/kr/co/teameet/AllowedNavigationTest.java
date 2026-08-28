@@ -13,6 +13,17 @@ public final class AllowedNavigationTest {
         assertEquals("/notifications", AllowedNavigation.safeRoute("https://attacker.example/path"));
     }
 
+    @Test public void allowsDownloadsOnlyFromTheExactEnvironmentOrigin() {
+        String origin = BuildConfig.APPLICATION_ID.endsWith(".alpha")
+            ? "https://alpha.teameet.co.kr"
+            : "https://teameet.co.kr";
+        assertEquals(true, AllowedNavigation.isInternalAbsoluteUrl(origin + "/api/v1/exports/report.csv?download=1"));
+        assertEquals(false, AllowedNavigation.isInternalAbsoluteUrl(origin.replace("https://", "http://") + "/report.csv"));
+        assertEquals(false, AllowedNavigation.isInternalAbsoluteUrl(origin + ".attacker.example/report.csv"));
+        assertEquals(false, AllowedNavigation.isInternalAbsoluteUrl("https://user@" + origin.substring("https://".length()) + "/report.csv"));
+        assertEquals(false, AllowedNavigation.isInternalAbsoluteUrl("not a url"));
+    }
+
     @Test public void allowsOnlyReviewedExternalSchemes() {
         assertEquals(true, AllowedNavigation.isAllowedExternalScheme("https"));
         assertEquals(true, AllowedNavigation.isAllowedExternalScheme("intent"));

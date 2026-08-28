@@ -234,6 +234,37 @@ CI-generated FCM-enabled APK, real-device foreground/background/terminated and p
 release signing/AAB/versioning, production `assetlinks.json`, adaptive store assets, WebView file
 download device validation, and Play internal testing. Production promotion remains user-only.
 
+## Pre-device Hardening (2026-08-28)
+
+Completed without creating a Firebase project and without claiming a device verdict:
+
+- Background FCM auto-display now uses the canonical `teameet_general` channel instead of the platform
+  fallback channel.
+- Foreground delivery is suppressed unless both OS permission and explicit in-app opt-in remain active;
+  the pure policy has all four boolean combinations pinned by JVM tests.
+- FCM auto-init and token storage now follow the same consent gate. Denial, opt-out, and logout perform
+  server revoke plus local token deletion, and token refresh is ignored without active consent.
+- WebView downloads are accepted only from the exact environment origin. Authentication cookies are
+  forwarded only to that origin, while external, credential-bearing, malformed, or HTTP lookalikes fail
+  closed. Device file opening remains a Phase 5 verdict.
+- `apps/v1_android/version.properties` is the immutable version SSOT. Production bundle/assemble tasks
+  require complete external signing inputs and production Firebase identity.
+- The manual production AAB workflow is `main`-only, protected by the GitHub `production` environment,
+  emits an AAB plus SHA-256, cleans up its temporary keystore, and never uploads to Play.
+- Alpha PR CI exercises negative controls proving that a `dev` production-bundle attempt and a release
+  build without signing inputs both fail closed.
+- Alpha CI now compiles the release-bundle contract and emits an APK checksum when Firebase Alpha values
+  are complete.
+- Inquiry reply notification coverage now pins important-preference gating and the full
+  `/my/inquiries/:id` DB row → Web Push/FCM fan-out contract.
+- Canonical release, checksum, signing, App Links, Play internal testing, and rollback procedures are in
+  `docs/ops/android-release.md`.
+
+Phase 5 remains unchecked. The blockers are now limited to external state or physical-device evidence:
+Firebase Alpha/production projects and credentials, CI-produced FCM-enabled APK, actual signing-key and
+Play App Signing enrollment, final certificate-backed `assetlinks.json`, approved store artwork, Play
+Internal Testing, and the real-device matrix.
+
 ## UI/UX Screenshot Audit (2026-08-28)
 
 - Added the headed, real-route audit runner

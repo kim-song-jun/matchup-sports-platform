@@ -8,12 +8,21 @@ final class AllowedNavigation {
     private AllowedNavigation() {}
 
     static boolean isInternal(Uri target) {
-        if (target == null || target.getScheme() == null || target.getHost() == null) return false;
-        URI origin = URI.create(BuildConfig.WEB_ORIGIN);
-        return "https".equalsIgnoreCase(target.getScheme())
-            && origin.getHost().equalsIgnoreCase(target.getHost())
-            && target.getPort() == origin.getPort()
-            && target.getUserInfo() == null;
+        return target != null && isInternalAbsoluteUrl(target.toString());
+    }
+
+    static boolean isInternalAbsoluteUrl(String candidate) {
+        if (candidate == null) return false;
+        try {
+            URI target = URI.create(candidate);
+            URI origin = URI.create(BuildConfig.WEB_ORIGIN);
+            return "https".equalsIgnoreCase(target.getScheme())
+                && origin.getHost().equalsIgnoreCase(target.getHost())
+                && target.getPort() == origin.getPort()
+                && target.getRawUserInfo() == null;
+        } catch (IllegalArgumentException ignored) {
+            return false;
+        }
     }
 
     static boolean isTrustedAuthProvider(Uri target) {

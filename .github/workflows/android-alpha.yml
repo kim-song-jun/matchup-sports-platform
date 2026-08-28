@@ -71,14 +71,36 @@ jobs:
         if: steps.firebase.outputs.ready == 'true'
         run: gradle -p apps/v1_android --no-daemon verifyAlphaFirebaseConfiguration
 
-      - name: Test and build alpha debug APK
-        run: gradle -p apps/v1_android --no-daemon testAlphaDebugUnitTest testProductionDebugUnitTest assembleAlphaDebug
+      - name: Test and build alpha APK and release bundle contract
+        run: gradle -p apps/v1_android --no-daemon testAlphaDebugUnitTest testProductionDebugUnitTest assembleAlphaDebug bundleAlphaRelease
+
+      - name: Verify production release gates fail closed
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          GITHUB_REF_NAME=main bash scripts/release/require-android-production-ref.sh
+          if GITHUB_REF_NAME=dev bash scripts/release/require-android-production-ref.sh; then
+            echo "::error::Production ref guard accepted dev"
+            exit 1
+          fi
+          if gradle -p apps/v1_android --no-daemon verifyProductionReleaseReadiness > release-gate.log 2>&1; then
+            echo "::error::Production release gate accepted missing signing inputs"
+            exit 1
+          fi
+          grep -q "Missing production release signing configuration" release-gate.log
+
+      - name: Create alpha APK checksum
+        if: steps.firebase.outputs.ready == 'true'
+        working-directory: apps/v1_android/app/build/outputs/apk/alpha/debug
+        run: sha256sum app-alpha-debug.apk > app-alpha-debug.apk.sha256
 
       - name: Upload alpha APK
         if: steps.firebase.outputs.ready == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: teameet-alpha-${{ github.sha }}
-          path: apps/v1_android/app/build/outputs/apk/alpha/debug/app-alpha-debug.apk
+          path: |
+            apps/v1_android/app/build/outputs/apk/alpha/debug/app-alpha-debug.apk
+            apps/v1_android/app/build/outputs/apk/alpha/debug/app-alpha-debug.apk.sha256
           if-no-files-found: error
           retention-days: 14

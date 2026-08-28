@@ -117,6 +117,42 @@ describe('NotificationsService', () => {
     });
   });
 
+  it('문의 답변 알림을 중요 알림으로 분류하고 canonical 문의 상세 경로로 push fan-out 한다', async () => {
+    prisma.v1NotificationPreference.findUnique.mockResolvedValue({ importantEnabled: true });
+    prisma.v1Notification.create.mockResolvedValue(
+      makeNotification({
+        id: 'inquiry-notification-1',
+        targetType: 'inquiry',
+        targetId: 'inquiry-1',
+        title: '문의에 답변이 등록됐어요',
+        body: '답변 내용을 확인해 주세요.',
+        deepLink: '/my/inquiries/inquiry-1',
+      }),
+    );
+
+    await service.emitNotification('user-1', 'inquiry_answered', 'inquiry-1');
+    await new Promise(setImmediate);
+
+    expect(prisma.v1NotificationPreference.findUnique).toHaveBeenCalledWith({
+      where: { userId: 'user-1' },
+      select: { importantEnabled: true },
+    });
+    expect(prisma.v1Notification.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        recipientUserId: 'user-1',
+        targetType: 'inquiry',
+        targetId: 'inquiry-1',
+        deepLink: '/my/inquiries/inquiry-1',
+      }),
+    });
+    expect(webPushService.sendToUser).toHaveBeenCalledWith('user-1', {
+      notificationId: 'inquiry-notification-1',
+      title: '문의에 답변이 등록됐어요',
+      body: '답변 내용을 확인해 주세요.',
+      url: '/my/inquiries/inquiry-1',
+    });
+  });
+
   it('사용자가 해당 카테고리를 비활성화했을 때 알림 DB row를 생성하지 않는다', async () => {
     // matchEnabled = false → match_application_received must be suppressed
     prisma.v1NotificationPreference.findUnique.mockResolvedValue({ matchEnabled: false });

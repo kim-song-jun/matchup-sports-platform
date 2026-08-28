@@ -74,14 +74,18 @@ installation IDs. Never print or export the `token` column. Confirm in this orde
 3. The notification row has the expected canonical root-relative `deepLink`.
 4. Browser Web Push still succeeds independently if FCM is degraded.
 
+Native FCM auto-init stays disabled until the user has both OS permission and explicit in-app opt-in.
+Permission denial, opt-out, and logout revoke the server installation and delete the local FCM token;
+token refresh callbacks are ignored without active consent. This minimizes token retention and closes the
+window where a locally opted-out installation could continue displaying foreground messages.
+
 ## Store release gates
 
-Before production store submission, create a release keystore outside Git, configure repeatable
-`versionCode`/`versionName` and AAB signing, publish `/.well-known/assetlinks.json` for the release
-certificate, replace/verify adaptive launcher and splash assets, and complete Play internal
-testing. Alpha intentionally disables App Link auto-verification because CI debug signing is not a
-stable trust root. File download behavior from WebView also needs a dedicated device test before
-claiming full web-route parity.
+The fail-closed signing, versioning, checksum, AAB, rollback, and Play preparation procedure is in
+[`android-release.md`](./android-release.md). Alpha intentionally disables App Link
+auto-verification because CI debug signing is not a stable trust root. The shell accepts authenticated
+downloads only from its exact environment origin and never forwards the session cookie to an external
+host; successful file opening still needs a device verdict before full route parity is claimed.
 
 ## Required real-device matrix
 
@@ -91,41 +95,3 @@ claiming full web-route parity.
 - Notification tap to the exact root-relative deep link.
 - Token refresh and two-device fan-out.
 - Negative control: an Alpha token is never selected by a production sender.
-
-## Re-audit environment and CI gates
-
-The Alpha Firebase project ID must contain an `alpha` segment (for example,
-`teameet-alpha`). The API verifies that the service-account email belongs to the configured
-project, while production rejects an Alpha project ID. These checks fail startup/build instead of
-silently crossing environment boundaries.
-
-On pull requests, missing Alpha Firebase repository variables permit compile/unit checks but
-suppress APK upload so an FCM-disabled artifact is not presented as test-ready. On `dev` pushes
-and manual dispatches, missing values fail the Android job. When present, the Gradle gate checks
-formats, sender/app ID consistency, Alpha project naming, and separation from any supplied
-production project ID. A downloadable `teameet-alpha-<sha>` artifact is therefore available only
-when the public Firebase app configuration is complete.
-
-## Delivery diagnostics
-
-`V1PushDevice` keeps delivery metadata without exposing the registration token: `lastSuccessAt`,
-`failureCount`, `lastFailureAt`, and `revokedAt`. A successful FCM response updates
-`lastSuccessAt`. Invalid/unregistered tokens are revoked; transient and batch-level failures are
-counted and later batches continue. FCM multicast is split into at most 500 tokens per request.
-
-When investigating delivery, select only the metadata above plus environment/platform/user and
-installation IDs. Never print or export the `token` column. Confirm in this order:
-
-1. API and worker use the expected `V1_PUSH_ENVIRONMENT` and Firebase project.
-2. The device is active (`revokedAt IS NULL`) and has a recent `lastSuccessAt` or traceable failure.
-3. The notification row has the expected canonical root-relative `deepLink`.
-4. Browser Web Push still succeeds independently if FCM is degraded.
-
-## Store release gates
-
-Before production store submission, create a release keystore outside Git, configure repeatable
-`versionCode`/`versionName` and AAB signing, publish `/.well-known/assetlinks.json` for the release
-certificate, replace/verify adaptive launcher and splash assets, and complete Play internal
-testing. Alpha intentionally disables App Link auto-verification because CI debug signing is not a
-stable trust root. File download behavior from WebView also needs a dedicated device test before
-claiming full web-route parity.

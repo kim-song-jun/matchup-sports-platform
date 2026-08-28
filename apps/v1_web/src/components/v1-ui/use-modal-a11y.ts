@@ -53,8 +53,14 @@ export interface ModalA11yHandles<
  */
 export const MODAL_EXIT_MS = 160;
 
+// disabled 는 button 뿐 아니라 input·select·textarea 전부에서 걸러야 한다. 하나라도
+// 빠뜨리면 그 요소가 DOM 마지막에 있을 때 트랩의 last 가 **영원히 포커스를 받지
+// 못하는 요소**가 되어 되감기가 발동하지 않고 Tab 이 밖으로 샌다 — 라디오 그룹
+// 문제와 같은 구조다. 실제로 걸리는 곳이 있다: 팀 연락처의 textarea(저장 중
+// disabled), 승부차기 패널의 라디오.
 const FOCUSABLE_SELECTOR =
-  'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), ' +
+  'select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
  * 실제로 Tab 이 멈추는 요소만 추린다.

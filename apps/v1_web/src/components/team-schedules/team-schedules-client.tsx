@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   useV1ApplyGuestRecruitment,
+  useV1AuthMe,
   useV1CancelTeamSchedule,
   useV1CompleteTeamSchedule,
   useV1CreateGuestRecruitment,
@@ -367,6 +368,7 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
   // "팀장은 마감 후에도 바꿀 수 있나?"가 화면마다 다르게 답해진다.
   const attendanceDisabled = !schedule || schedule.state !== 'SCHEDULED' || rsvpDeadlinePassed;
   const [proxyPendingUserId, setProxyPendingUserId] = useState<string | null>(null);
+  const { data: me } = useV1AuthMe();
   const [proxyError, setProxyError] = useState<string | null>(null);
   const setAttendanceOnBehalf = useV1SetScheduleAttendanceOnBehalf(teamId, scheduleId);
   function onProxyGoing(userId: string) {
@@ -444,6 +446,10 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
       // 보여주고 눌러서 실패하게 두지 않는다. 마감·상태 제약은 본인 응답과 같은
       // 판정을 쓴다(attendance.disabled) — 마감이 지났으면 대리로도 못 바꾼다.
       canProxy: canManage && !attendanceDisabled,
+      // 자기 줄에는 대리 버튼을 내지 않는다 — 위쪽 "내 참석"이 같은 일을 한다.
+      // 아직 /auth/me 가 안 왔으면 null 이고, 그동안은 어느 줄에도 버튼이 안 뜬다:
+      // 잠깐 안 보이는 쪽이, 자기 줄에 잘못 떴다가 사라지는 쪽보다 낫다.
+      viewerUserId: me?.user.id ?? null,
       proxyPendingUserId: proxyPendingUserId,
       proxyError: proxyError,
       onProxyGoing: onProxyGoing,

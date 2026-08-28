@@ -362,19 +362,42 @@ checkLiteralBaseline({
   // 마크업 쪽으로 그대로 들어올 수 있었고, 실제로 201곳이 그렇게 있었다
   // (그중 139곳은 토큰과 값이 같아 무손실로 치환했다).
   count: (txt) => {
+    // 값을 정규식으로 끊으면 표현식에서 샌다. `borderRadius: isRect ? 2 : '50%'` 나
+    // `borderRadius: radius ?? 12` 는 속성 뒤 한 토큰만 보는 정규식에 걸리지 않아
+    // 그 안의 리터럴이 통째로 빠져나갔다(실측 2곳). 값 끝까지 괄호·따옴표 깊이를
+    // 세면서 읽는다.
+    const readValue = (src, from) => {
+      let depth = 0, quote = '';
+      for (let k = from; k < src.length; k++) {
+        const c = src[k];
+        if (quote) {
+          if (c === '\\') k++;
+          else if (c === quote) quote = '';
+          continue;
+        }
+        if (c === "'" || c === '"' || c === '`') { quote = c; continue; }
+        if ('([{'.includes(c)) depth++;
+        else if (')]}'.includes(c)) { if (depth === 0) return src.slice(from, k); depth--; }
+        else if ((c === ',' || c === '\n') && depth === 0) return src.slice(from, k);
+      }
+      return src.slice(from);
+    };
+    const literalsIn = (value) => {
+      // 토큰 참조를 걷어낸 뒤 0 이 아닌 숫자가 남으면 리터럴이다. 단위는 열거하지
+      // 않는다 — 열거하면 목록에 없는 단위로 우회된다.
+      const rest = value.replace(/var\(\s*--radius-[\w-]+\s*\)/g, ' ');
+      let c = 0;
+      for (const lit of rest.matchAll(/(-?\d+(?:\.\d+)?)/g)) if (parseFloat(lit[1]) !== 0) c++;
+      return c;
+    };
     let n = 0;
     // 코너별 longhand 와 Tailwind 임의값까지 함께 본다 — shorthand 만 보면
     // borderTopLeftRadius / rounded-[12px] 로 그대로 우회된다(CSS 쪽에서
     // 실제로 6건이 그랬다).
-    for (const m of txt.matchAll(/border(?:Start|End|Top|Bottom)?(?:Start|End|Left|Right)?Radius:\s*('[^']*'|`[^`]*`|[\w.]+)/g)) {
-      // 토큰 참조를 걷어낸 뒤 0 이 아닌 숫자가 남으면 리터럴이다.
-      const rest = m[1].replace(/var\(\s*--radius-[\w-]+\s*\)/g, ' ');
-      for (const lit of rest.matchAll(/(-?\d+(?:\.\d+)?)/g)) if (parseFloat(lit[1]) !== 0) n++;
+    for (const m of txt.matchAll(/border(?:Start|End|Top|Bottom)?(?:Start|End|Left|Right)?Radius:/g)) {
+      n += literalsIn(readValue(txt, m.index + m[0].length));
     }
-    for (const m of txt.matchAll(/\brounded-\[([^\]]+)\]/g)) {
-      const rest = m[1].replace(/var\(\s*--radius-[\w-]+\s*\)/g, ' ');
-      for (const lit of rest.matchAll(/(-?\d+(?:\.\d+)?)/g)) if (parseFloat(lit[1]) !== 0) n++;
-    }
+    for (const m of txt.matchAll(/\brounded-\[([^\]]+)\]/g)) n += literalsIn(m[1]);
     return n;
   },
   hint: 'borderRadius 에 px 를 직접 적지 말고 var(--radius-*) 를 쓸 것 (tight/chip/control/field/container/hero/pill/circle)',

@@ -106,7 +106,6 @@ export function LeagueDisputeResolveModal({
   return (
     <div
       className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-[2px] tm-modal-scrim${closing ? ' is-closing' : ''}`}
-      aria-hidden={!open}
       onClick={onBackdropClick}
     >
       <div

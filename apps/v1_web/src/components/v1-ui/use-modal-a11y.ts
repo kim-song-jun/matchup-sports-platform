@@ -83,6 +83,16 @@ export function useModalA11y<
     }
     if (!mounted) return;
 
+    // 호출자가 `{open ? <Modal/> : null}` 로 DOM 을 이미 걷어낸 경우 — 훅이 부모에
+    // 살아 있으면 여기까지 온다. 재생할 퇴장 UI 가 없는데 지연만 걸면 화면에
+    // 아무것도 없는 채로 스크롤 잠금·ESC·트랩이 남는다. ref 가 비어 있는 것이
+    // 그 상태의 정확한 신호다.
+    if (!dialogRef.current) {
+      setClosing(false);
+      setMounted(false);
+      return;
+    }
+
     // 모션을 줄이도록 설정했으면 지연 자체를 없앤다 — CSS 의 animation:none 만으로는
     // 이 setTimeout 이 사라지지 않아 아무것도 안 보이는 지연만 남는다.
     const reduced =

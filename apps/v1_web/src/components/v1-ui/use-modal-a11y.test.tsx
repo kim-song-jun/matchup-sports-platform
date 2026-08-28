@@ -32,6 +32,23 @@ function TestModal({
   );
 }
 
+/** 훅이 의도한 사용법 — `mounted` 로 렌더를 붙잡아 퇴장 애니메이션을 재생한다.
+ *  위 TestModal(조건부 언마운트)과는 계약이 다르므로 따로 둔다. */
+function MountedModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { dialogRef, initialFocusRef, onBackdropClick, mounted, closing } = useModalA11y<
+    HTMLInputElement,
+    HTMLDivElement
+  >({ open, onClose });
+  if (!mounted) return null;
+  return (
+    <div data-testid="backdrop" className={closing ? 'is-closing' : ''} onClick={onBackdropClick}>
+      <div ref={dialogRef} role="dialog" aria-modal="true">
+        <input ref={initialFocusRef} aria-label="첫 입력" />
+      </div>
+    </div>
+  );
+}
+
 describe('useModalA11y', () => {
   it('ESC로 닫힌다 — 단 pending 중엔 잠긴다', () => {
     const onClose = vi.fn();
@@ -53,14 +70,25 @@ describe('useModalA11y', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('열리면 body 스크롤을 잠그고 닫히면 되돌린다', async () => {
+  it('조건부 언마운트형은 닫는 즉시 스크롤 잠금을 푼다', () => {
+    // 이 호출자는 open=false 면 DOM 을 바로 걷어낸다 — 재생할 퇴장 UI 가 없다.
+    // 여기서 잠금을 지연시키면 화면에 아무것도 없는데 뒤 화면만 안 움직인다.
     const { rerender } = render(<TestModal open onClose={() => {}} />);
     expect(document.body.style.overflow).toBe('hidden');
     rerender(<TestModal open={false} onClose={() => {}} />);
-    // 퇴장 애니메이션이 도는 동안에는 모달이 아직 화면에 있으므로 잠금이 유지된다 —
-    // 여기서 풀면 시트가 떠 있는데 뒤 화면이 스크롤된다. 사라진 뒤에 풀린다.
+    expect(document.body.style.overflow).toBe('');
+  });
+
+  it('mounted 기반 렌더는 퇴장 애니메이션 동안 잠금을 유지한다', async () => {
+    const { rerender } = render(<MountedModal open onClose={() => {}} />);
     expect(document.body.style.overflow).toBe('hidden');
+    rerender(<MountedModal open={false} onClose={() => {}} />);
+    // 패널이 아직 화면에 있다. 여기서 풀면 시트가 떠 있는데 뒤 화면이 스크롤된다.
+    expect(screen.getByRole('dialog')).toBeTruthy();
+    expect(document.body.style.overflow).toBe('hidden');
+    // 사라진 뒤에 풀린다
     await waitFor(() => expect(document.body.style.overflow).toBe(''));
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('닫힐 때 이전 포커스를 복원한다 (WCAG 2.4.3)', () => {

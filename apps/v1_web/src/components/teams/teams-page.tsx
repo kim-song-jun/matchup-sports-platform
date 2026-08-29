@@ -14,6 +14,7 @@ import { cssUrl } from '@/lib/assets';
 import { useV1PublicTeamReviewSummary } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { isTeamLogoPreset, TEAM_LOGO_PRESETS } from '@/lib/team-logo-presets';
+import { TeamUpcomingGamesCard } from './team-upcoming-games-card';
 import type {
   TeamDetailViewModel,
   TeamFormViewModel,
@@ -578,6 +579,9 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
               <ChevronRightIcon size={18} aria-hidden="true" />
             </Link>
           ) : null}
+          {/* 전술보드 입구. 팀 일정(V1TeamSchedule)에는 대회 경기가 들어오지 않아
+              별도 목록이 필요하다 — 컴포넌트 주석 참고. */}
+          {mode === 'mine' ? <TeamUpcomingGamesCard teamId={team.id} /> : null}
           <SectionTitle title="팀 기본 정보" sub="가입 전 필요한 정보를 확인해 주세요." />
           <Card pad={16}>
             <InfoRow label="팀명" value={team.name} />

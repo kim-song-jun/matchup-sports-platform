@@ -1,4 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService, V1ActiveAdmin } from '../common/admin-context.service';
@@ -47,6 +48,13 @@ export interface AdminMonitoringSummary {
   smsUnacked: number;
   auditToday: number;
 }
+
+/**
+ * 같은 내용의 전체 발송을 다시 보내지 않는 창. 더블 클릭·네트워크 재시도를 흡수할 만큼
+ * 길고, 운영자가 오타를 고쳐 다시 보내는 것을 막지 않을 만큼 짧아야 한다.
+ */
+const BROADCAST_DEDUPE_WINDOW_MS = 10 * 60_000;
+const BROADCAST_IDEMPOTENCY_ACTION = 'admin.push.broadcast';
 
 export interface ManualPushSendResult {
   /** 인앱 알림(V1Notification)을 만든 수신자 수. 웹 푸시 도달과는 별개다. */
@@ -241,6 +249,17 @@ export class AdminOpsService {
    * enum 값을 추가해 마이그레이션을 늘리기보다 기존 값을 재사용했다.
    */
   async sendManualPush(dto: AdminPushSendDto, admin: V1ActiveAdmin): Promise<ManualPushSendResult> {
+    // 전체 발송은 되돌릴 수 없고 대상이 전 사용자다 — 두 번 눌리면 모두가 같은 공지를
+    // 두 번 받는다. 확인 절차도 멱등 키도 없어서 더블 클릭·재시도 한 번이 그대로 사고가
+    // 됐다. 클라이언트가 키를 보내 주기를 기다리는 대신 **내용 자체를 키로 삼는다**:
+    // 같은 운영자가 같은 내용을 짧은 시간 안에 다시 보내면 새로 보내지 않고 첫 결과를
+    // 그대로 돌려준다(저장소의 v1IdempotencyRecord 규약을 그대로 쓴다).
+    //
+    // 개인 발송은 대상이 한 명이라 이 보호를 걸지 않는다 — 운영자가 같은 사람에게
+    // 같은 안내를 다시 보내는 것은 정상적인 조작이다.
+    const replay = dto.target === 'broadcast' ? await this.findBroadcastReplay(dto, admin) : null;
+    if (replay) return replay;
+
     let result: ManualPushSendResult;
     let targetId: string;
 
@@ -310,7 +329,76 @@ export class AdminOpsService {
       );
     }
 
+    if (dto.target === 'broadcast') {
+      await this.rememberBroadcast(dto, admin, result);
+    }
+
     return result;
+  }
+
+  /** 같은 운영자·같은 내용의 전체 발송 기록을 찾는다. 있으면 그 결과를 그대로 돌려준다. */
+  private async findBroadcastReplay(
+    dto: AdminPushSendDto,
+    admin: V1ActiveAdmin,
+  ): Promise<ManualPushSendResult | null> {
+    const record = await this.prisma.v1IdempotencyRecord.findUnique({
+      where: {
+        actorUserId_action_resourceType_resourceId_idempotencyKey: this.broadcastScope(dto, admin),
+      },
+      select: { responseBody: true, expiresAt: true },
+    });
+    if (!record || record.expiresAt <= new Date()) return null;
+    this.logger.warn(
+      `같은 내용의 전체 발송이 최근에 이미 나갔습니다 — 다시 보내지 않고 첫 결과를 돌려줍니다 [admin=${admin.userId}]`,
+    );
+    return record.responseBody as unknown as ManualPushSendResult;
+  }
+
+  /**
+   * 방금 나간 전체 발송을 기록한다. 기록 실패가 발송 자체를 실패로 만들면 안 된다 --
+   * 이미 나간 것을 되돌릴 수 없으므로, 여기서 던지면 호출자는 실패로 알고 다시 누른다
+   * (그게 바로 이 보호가 막으려던 상황이다).
+   */
+  private async rememberBroadcast(
+    dto: AdminPushSendDto,
+    admin: V1ActiveAdmin,
+    result: ManualPushSendResult,
+  ): Promise<void> {
+    const scope = this.broadcastScope(dto, admin);
+    try {
+      await this.prisma.v1IdempotencyRecord.upsert({
+        where: { actorUserId_action_resourceType_resourceId_idempotencyKey: scope },
+        create: {
+          ...scope,
+          payloadHash: scope.idempotencyKey,
+          responseStatus: 200,
+          responseBody: result as unknown as Prisma.InputJsonValue,
+          expiresAt: new Date(Date.now() + BROADCAST_DEDUPE_WINDOW_MS),
+        },
+        update: {
+          responseBody: result as unknown as Prisma.InputJsonValue,
+          expiresAt: new Date(Date.now() + BROADCAST_DEDUPE_WINDOW_MS),
+        },
+      });
+    } catch (err: unknown) {
+      this.logger.warn(
+        `전체 발송 중복 방지 기록 실패: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  /** 내용 자체가 키다 — 클라이언트가 멱등 키를 보내 주지 않아도 중복을 잡는다. */
+  private broadcastScope(dto: AdminPushSendDto, admin: V1ActiveAdmin) {
+    const contentHash = createHash('sha256')
+      .update(JSON.stringify({ title: dto.title, body: dto.body ?? null, url: dto.url ?? null }))
+      .digest('hex');
+    return {
+      actorUserId: admin.userId,
+      action: BROADCAST_IDEMPOTENCY_ACTION,
+      resourceType: 'push',
+      resourceId: 'broadcast',
+      idempotencyKey: contentHash,
+    };
   }
 
   /**

@@ -116,7 +116,12 @@ async function shoot(context, { path, label, name, waitFor }) {
   // 블록에 진입점이 아예 없다는 진짜 원인이 드러났다.
   if (waitFor !== undefined) {
     try {
-      await page.waitForSelector(waitFor, { timeout: 20000 });
+      // `:visible` 이 핵심이다. 이 앱은 데스크톱/모바일 JSX 를 **둘 다** 렌더하고 CSS 로
+      // 한쪽을 숨기므로, 셀렉터가 여러 노드에 맞으면 waitForSelector 는 **DOM 순서상 첫
+      // 번째**(= 데스크톱 블록)를 기다린다 — 모바일 뷰포트에서 그건 영원히 안 보인다.
+      // 실제로 390/768 에서 "진입점 없음" 경고가 났는데, 같은 순간 브라우저로 재보니
+      // visible 10 개가 멀쩡히 있었다. 숨은 노드를 기다리고 있었던 것이다.
+      await page.waitForSelector(waitFor, { timeout: 20000, state: 'visible' });
     } catch {
       // 여기 찍히는 경고가 곧 결함 신호다 — 무시하지 말 것.
       console.warn(`  ! ${label}: ${waitFor} 가 20초 안에 안 나타났다 — 그대로 찍는다`);
@@ -134,9 +139,9 @@ await mkdir(OUT, { recursive: true });
 const browser = await chromium.launch();
 
 const shots = [
-  { who: 'manager', email: MANAGER_EMAIL, path: `/teams/${TEAM_ID}`, slug: 'team-detail-manager', label: '팀 상세(운영진)', waitFor: 'a[href*="/tactics/"]' },
+  { who: 'manager', email: MANAGER_EMAIL, path: `/teams/${TEAM_ID}`, slug: 'team-detail-manager', label: '팀 상세(운영진)', waitFor: 'a[href*="/tactics/"]:visible' },
   { who: 'manager', email: MANAGER_EMAIL, path: `/teams/${TEAM_ID}/tactics/${GAME_ID}`, slug: 'tactics-manager', label: '전술보드(운영진·편집 가능)' },
-  { who: 'member', email: MEMBER_EMAIL, path: `/teams/${TEAM_ID}`, slug: 'team-detail-member', label: '팀 상세(일반 멤버)', waitFor: 'a[href*="/tactics/"]' },
+  { who: 'member', email: MEMBER_EMAIL, path: `/teams/${TEAM_ID}`, slug: 'team-detail-member', label: '팀 상세(일반 멤버)', waitFor: 'a[href*="/tactics/"]:visible' },
   { who: 'member', email: MEMBER_EMAIL, path: `/teams/${TEAM_ID}/tactics/${GAME_ID}`, slug: 'tactics-member', label: '전술보드(일반 멤버·보기 전용)' },
 ];
 if (OTHER_TEAM_ID) {

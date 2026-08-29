@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import type { CSSProperties, KeyboardEvent, PointerEvent, ReactNode } from 'react';
+import type { CSSProperties, PointerEvent, ReactNode } from 'react';
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, ChevronDown, Lock } from 'lucide-react';
@@ -9,6 +9,7 @@ import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, ErrorState, KPIStat, ListItem } from '@/components/v1-ui/primitives';
 import { ChevronLeftIcon, ChevronRightIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
+import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { cssUrl } from '@/lib/assets';
 import { useV1PublicTeamReviewSummary } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -1702,6 +1703,15 @@ function DraggableFilterSheet({
   const draggingRef = useRef(false);
   const [offsetY, setOffsetY] = useState(0);
 
+  // focus 저장/복원 · ESC 닫기 · Tab focus trap · body 스크롤 잠금은 공용 훅(useModalA11y)에
+  // 위임한다. 이 시트는 부모(TeamFilterSheet)가 조건부 렌더로 즉시 마운트/언마운트하고
+  // 퇴장 애니메이션을 쓰지 않으므로 open=true 고정, mounted/closing 은 쓰지 않는다.
+  // backdrop 은 별도 <Link className="tm-filter-scrim"> 로 이미 처리돼 onBackdropClick 은 불필요.
+  const { dialogRef } = useModalA11y<HTMLElement, HTMLElement>({
+    open: true,
+    onClose: () => router.push(closeHref),
+  });
+
   const handlePointerDown = (event: PointerEvent<HTMLElement>) => {
     startYRef.current = event.clientY;
     draggingRef.current = true;
@@ -1727,23 +1737,17 @@ function DraggableFilterSheet({
     setOffsetY(0);
   };
 
-  // a11y: ESC 키로 필터 시트 닫기 (드래그 동작과 독립적으로 동작)
-  const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
-    if (event.key === 'Escape') {
-      router.push(closeHref);
-    }
-  };
-
   return (
     <div className="tm-filter-layer">
       {/* role="dialog" + aria-modal="true": 스크린리더가 시트를 대화상자로 인식하고
-          배경 콘텐츠를 읽지 않도록 함. focus-trap은 드래그 인터랙션 충돌 위험으로 생략. */}
+          배경 콘텐츠를 읽지 않도록 함. ESC·Tab focus trap·스크롤 잠금·포커스 복원은
+          useModalA11y 가 담당(드래그는 pointer 이벤트 전용이라 Tab trap 과 충돌하지 않는다). */}
       <section
+        ref={dialogRef}
         className="tm-filter-sheet"
         role="dialog"
         aria-modal="true"
         aria-label={ariaLabel}
-        onKeyDown={handleKeyDown}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerEnd}

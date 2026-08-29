@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/v1-ui/button';
 import { extractErrorMessage } from '@/lib/error-message';
+import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import type { GameEventRecord, GameLineupParticipant } from '@/types/game-operations';
 import { jerseyText } from './player-label';
 
@@ -48,6 +49,18 @@ export function AssistPickerSheet({ open, event, scorerName, teamName, whenLabel
     return () => observer.disconnect();
   }, [measureOverflow, teammates.length]);
   const [error, setError] = useState<string | null>(null);
+
+  // ESC·focus trap·스크롤 잠금·포커스 복원을 공용 훅에 맡긴다. 이 시트에는
+  // 그 넷이 전부 없었다 — Tab 이 뒤 화면으로 새고, 닫아도 포커스가 돌아오지
+  // 않으며, 뒤 콘솔이 같이 스크롤됐다.
+  // 렌더 게이트는 open 그대로 둔다: 부모도 조건부로 마운트하므로 mounted 로
+  // 바꾸면 퇴장 애니메이션이 없는데 아무것도 안 보이는 지연만 생긴다.
+  const { dialogRef, onBackdropClick } = useModalA11y<HTMLElement, HTMLDivElement>({
+    open,
+    onClose,
+    pending: pending !== null,
+  });
+
   if (!open) return null;
 
   // Copilot review (PR #276): the parent conditionally renders this sheet
@@ -85,14 +98,13 @@ export function AssistPickerSheet({ open, event, scorerName, teamName, whenLabel
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-gray-900/50 sm:items-center sm:p-4"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) closeIfIdle();
-      }}
+      onClick={onBackdropClick}
     >
       {/* max-h-[85vh] + flex 컬럼: 헤더와 "어시스트 없이 두기"는 고정하고 선수 목록만
           스크롤한다. 예전에는 목록에 max-h-56(224px) 고정값만 걸려 있어, 화면이 아무리
           커도 5명이 넘으면 아래가 잘리고 더 있다는 신호조차 없었다(2026-08-18 실화면). */}
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="assist-picker-title"

@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Card } from '@/components/v1-ui/primitives';
 import { ConfirmModal } from '@/components/v1-ui/confirm-modal';
+import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { matchSlotsToEntries, type LineupEntryDraft } from '@/app/team-matches/[id]/lineup/lineup.view-model';
 import { describeFormationChange, type FormationChangeSummary } from './formation-assignment';
 import { GOALKEEPER_SLOT_CODE, slotsWithGoalkeeper, type FormationPreset, type FormationSlot } from './formation-slots';
@@ -786,25 +787,10 @@ function FormationSheet({
 }) {
   const idPrefix = useId();
   const titleId = `${idPrefix}-formation-sheet-title`;
-  const previousFocusRef = useRef<Element | null>(null);
-  const sheetRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    previousFocusRef.current = document.activeElement;
-    document.body.style.overflow = 'hidden';
-    sheetRef.current?.focus();
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') onClose();
-    }
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.body.style.overflow = '';
-      document.removeEventListener('keydown', handleKeyDown);
-      const el = previousFocusRef.current;
-      if (el && typeof (el as HTMLElement).focus === 'function') (el as HTMLElement).focus();
-    };
-  }, [open, onClose]);
+  // focus 저장/복원·ESC 닫기·Tab focus trap·body 스크롤 잠금·backdrop 클릭 닫기를
+  // 공용 훅에 위임한다(기존엔 focus trap이 빠져 있었다). 렌더 게이트(if (!open))는
+  // 그대로 유지 — 이 시트엔 퇴장 애니메이션이 없다.
+  const { dialogRef, onBackdropClick } = useModalA11y<HTMLElement, HTMLDivElement>({ open, onClose });
 
   if (!open) return null;
 
@@ -812,11 +798,11 @@ function FormationSheet({
     <div className="tm-hide-desktop" style={{ position: 'fixed', inset: 0, zIndex: 60 }}>
       <div
         aria-hidden="true"
-        onClick={onClose}
+        onClick={onBackdropClick}
         style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)' }}
       />
       <div
-        ref={sheetRef}
+        ref={dialogRef}
         className="tm-lineup-formation-sheet"
         role="dialog"
         aria-modal="true"
@@ -952,28 +938,17 @@ function SlotPlayerPickerSheet({
 }) {
   const idPrefix = useId();
   const titleId = `${idPrefix}-slot-picker-title`;
-  const sheetRef = useRef<HTMLDivElement>(null);
-  const previousFocusRef = useRef<Element | null>(null);
-
-  useEffect(() => {
-    previousFocusRef.current = document.activeElement;
-    document.body.style.overflow = 'hidden';
-    sheetRef.current?.focus();
-    function handleKeyDown(event: KeyboardEvent) { if (event.key === 'Escape') onClose(); }
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.body.style.overflow = '';
-      document.removeEventListener('keydown', handleKeyDown);
-      const el = previousFocusRef.current;
-      if (el && typeof (el as HTMLElement).focus === 'function') (el as HTMLElement).focus();
-    };
-  }, [onClose]);
+  // 이 시트는 부모가 `{activeSlotTarget ? <SlotPlayerPickerSheet .../> : null}`로
+  // 조건부 마운트한다(렌더 게이트는 부모 쪽 — 여기선 그대로 둔다) — 그래서 open은
+  // true로 고정한다. focus 저장/복원·ESC·Tab focus trap(기존엔 빠져 있었다)·body
+  // 스크롤 잠금·backdrop 클릭 닫기는 공용 훅에 위임.
+  const { dialogRef, onBackdropClick } = useModalA11y<HTMLElement, HTMLDivElement>({ open: true, onClose });
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 70 }}>
-      <div aria-hidden="true" onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)' }} />
+      <div aria-hidden="true" onClick={onBackdropClick} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)' }} />
       <div
-        ref={sheetRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}
+        ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}
         style={{
           position: 'absolute', left: 0, right: 0, bottom: 0, maxHeight: '70vh', overflowY: 'auto',
           background: 'var(--card-surface)', borderRadius: 'var(--radius-container) var(--radius-container) 0 0',

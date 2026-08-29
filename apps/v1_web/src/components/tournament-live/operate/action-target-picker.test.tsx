@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ActionTargetPicker } from './action-target-picker';
@@ -386,5 +386,75 @@ describe('ActionTargetPicker — SUBSTITUTION (나갈 선수 → 들어올 선�
     );
     await userEvent.click(screen.getByRole('button', { name: /정우진/ }));
     expect(screen.queryByText(/남은 교체/)).toBeNull();
+  });
+  /**
+   * 교체 2단계는 1단계의 `<LineupGrid>`를 element type이 다른 `<div>`로 갈아끼우므로
+   * React가 서브트리를 언마운트한다 — 방금 누른 선수 버튼이 사라지면서
+   * `document.activeElement`가 `body`로 떨어진다. focus trap은 activeElement가
+   * first/last일 때만 되감으므로 body 상태에서는 아무 개입도 하지 않고,
+   * 그 순간 Tab이 다이얼로그 밖 배경 문서로 샌다(WCAG 2.1.2).
+   * 그래서 단계가 바뀔 때마다 다이얼로그 안 첫 focusable로 포커스를 재고정한다.
+   */
+  it('2단계로 넘어가도 포커스가 다이얼로그 안에 남는다(배경으로 새지 않는다)', async () => {
+    render(
+      <>
+        <button type="button">배경 버튼</button>
+        <ActionTargetPicker
+          open
+          actionLabel="교체"
+          actionType="SUBSTITUTION"
+          frozen={FROZEN}
+          sides={SIDES}
+          lineups={SUB_LINEUPS}
+          allowTeamOnly={false}
+          onPitchParticipantIds={SUB_ON_PITCH}
+          onCommit={vi.fn()}
+          onCancel={vi.fn()}
+        />
+      </>,
+    );
+
+    const dialog = screen.getByRole('dialog');
+    // 훅의 초기 포커스는 60ms 지연이라 먼저 소진시킨다 — 그래야 아래 단언이
+    // "단계 전환 후 재고정"을 보는 것이지 초기 포커스 타이머의 부수효과를
+    // 잘못 통과로 읽는 것이 아님이 보장된다.
+    await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true));
+
+    await userEvent.click(screen.getByRole('button', { name: /정우진/ }));
+
+    // 2단계로 실제로 전환됐는지 먼저 확인(전환이 없으면 포커스 단언은 무의미하다).
+    expect(screen.getByRole('button', { name: /이민호/ })).toBeInTheDocument();
+    expect(document.activeElement).not.toBe(document.body);
+    expect(dialog.contains(document.activeElement)).toBe(true);
+  });
+
+  it('"뒤로"로 1단계에 돌아와도 포커스가 다이얼로그 안에 남는다', async () => {
+    render(
+      <>
+        <button type="button">배경 버튼</button>
+        <ActionTargetPicker
+          open
+          actionLabel="교체"
+          actionType="SUBSTITUTION"
+          frozen={FROZEN}
+          sides={SIDES}
+          lineups={SUB_LINEUPS}
+          allowTeamOnly={false}
+          onPitchParticipantIds={SUB_ON_PITCH}
+          onCommit={vi.fn()}
+          onCancel={vi.fn()}
+        />
+      </>,
+    );
+
+    const dialog = screen.getByRole('dialog');
+    await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true));
+
+    await userEvent.click(screen.getByRole('button', { name: /정우진/ }));
+    await userEvent.click(screen.getByRole('button', { name: '뒤로' }));
+
+    expect(screen.getByRole('button', { name: /정우진/ })).toBeInTheDocument();
+    expect(document.activeElement).not.toBe(document.body);
+    expect(dialog.contains(document.activeElement)).toBe(true);
   });
 });

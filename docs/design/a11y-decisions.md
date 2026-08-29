@@ -12,6 +12,22 @@
 
 ---
 
+## 필터 시트(`create-form-fields.tsx`)의 focus trap 생략 — 2026-08-28
+
+**결정**: `DraggableFilterSheet` 는 `role="dialog"` + `aria-modal="true"` 는 유지하되
+**Tab focus trap 은 걸지 않는다.** 공용 훅(`useModalA11y`)으로도 이관하지 않는다.
+
+**근거**: 이 시트는 손가락 드래그로 높이를 조절한다. trap 은 Tab 키 경로를 가로채
+포커스를 강제 이동시키는데, 드래그 핸들이 포커스를 받은 상태에서 이 두 인터랙션이
+겹치면 조작이 엉킨다. 또 이 시트는 boolean `open` 이 아니라 **라우트로 열고 닫히므로**
+(닫기 = `router.push(closeHref)`) 훅의 `onClose` 모델과도 맞지 않는다 — 훅은 ESC·
+스크롤 잠금·포커스 복원·trap 을 한 묶음으로 제공하고 trap 만 끄는 옵션이 없다.
+
+**대안 보호**: `aria-modal="true"` 로 스크린리더는 배경을 읽지 않는다. ESC 로 닫힌다.
+
+**다시 볼 조건**: 훅에 `trapFocus: false` 옵션이 생기거나, 시트가 드래그를 버리면
+그때 이관한다.
+
 ## 1. solid-fill 버튼의 흰 글씨 — 현행 유지
 
 **결정일** 2026-08-27 (KST) · **결정자** 사용자 · **상태** 유지, 조건부 재검토

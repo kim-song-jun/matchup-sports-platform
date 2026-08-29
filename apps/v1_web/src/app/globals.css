@@ -624,7 +624,11 @@ button:disabled {
      여유), 좌우 압박을 줄이려 최소 패딩을 준다 — 라벨(최대 2글자)이 탭 경계에
      바짝 붙는 것을 막는다. 아래 .tm-bottom-tab span 주석에 열 수·라벨 폭 계산 근거. */
   padding: 0 2px;
-  color: var(--grey400);
+  /* 활성 pill(::before)의 기준점 */
+  position: relative;
+  /* [대비] grey400 은 흰 배경에서 2.01:1 로 비텍스트 기준(3:1)의 3분의 2였다.
+     grey500 이 3.04:1 로 통과한다. 아이콘은 텍스트가 아니라 3:1 기준. */
+  color: var(--grey500);
   /* [모션] 탭 전환에 색 애니메이션이 없어 활성 탭이 즉시 스냅했다. 하단 내비는
    * 세션당 가장 많이 눌리는 곳이라 여기의 즉시 전환이 앱 전체를 뻣뻣하게 만든다.
    * 아이콘(color)과 라벨(span의 color)이 따로 상속되므로 두 곳 모두에 건다.
@@ -635,7 +639,9 @@ button:disabled {
 }
 
 .tm-bottom-tab span {
-  color: var(--grey500);
+  /* [대비] grey500 은 3.04:1 로 본문 텍스트 기준(4.5:1) 미달이었다.
+     grey600 이 4.62:1 로 통과한다. 12px 이라 큰 텍스트 완화 대상도 아니다. */
+  color: var(--grey600);
   transition: color var(--duration-fast) ease;
   /* [알파 감사 B] 11px는 R-T2 최소 하한(12px) 미달 — 하단 탭바 6개
      라벨(홈/매치/대회/리그/팀/마이) 전부 해당. 토큰(--font-size-caption)으로
@@ -659,6 +665,32 @@ button:disabled {
 .tm-bottom-tab[data-active="true"] span {
   color: var(--blue500);
   font-weight: 700;
+}
+
+/* 활성 탭을 색 말고 **형태로도** 표시한다(Material 3 의 active indicator 방식).
+   활성 파랑 #3182F6 은 흰 배경에서 3.71:1 로 텍스트 기준(4.5:1)에 못 미친다.
+   더 진한 파랑으로 바꾸면 통과하지만 그러면 탭바의 파랑만 앱의 다른 파랑과
+   달라진다 — 브랜드 색을 그대로 두고 pill 로 보조한다.
+   프로젝트 규칙(컬러만으로 정보 전달 금지)도 이쪽이 실제로 만족시킨다.
+   폭 46px 은 가장 좁은 320px 뷰포트의 탭 폭(53px)에도 좌우 3.5px 씩 남는다. */
+.tm-bottom-tab[data-active="true"]::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 46px;
+  height: 26px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--blue500) 14%, transparent);
+  /* 아이콘·라벨보다 뒤에 깔린다 */
+  z-index: 0;
+}
+
+/* pill 이 뒤로 가려면 내용이 위에 있어야 한다 */
+.tm-bottom-tab > * {
+  position: relative;
+  z-index: 1;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1991,7 +2023,7 @@ label.tm-btn:focus-within {
  * 사라졌다 해도(count 확정 시) 같은 자리에서 전환되도록 정렬한다. */
 .tm-unread-dot {
   position: absolute;
-  top: 4px;
+  top: 2px;
   right: 2px;
   width: 7px;
   height: 7px;
@@ -2009,7 +2041,7 @@ label.tm-btn:focus-within {
  * 낫다고 판단해 11px(micro)로 남긴다. */
 .tm-unread-badge {
   position: absolute;
-  top: 4px;
+  top: 2px;
   right: 2px;
   box-sizing: border-box;
   min-width: 16px;
@@ -3347,7 +3379,7 @@ label.tm-btn:focus-within {
 
 .tm-list-filter-count {
   position: absolute;
-  top: 4px;
+  top: 2px;
   right: 3px;
   min-width: 17px;
   height: 17px;

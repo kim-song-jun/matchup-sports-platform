@@ -2814,6 +2814,26 @@ export class GamesService {
           // 생기므로 이 시점에 `V1GameResultParticipant` 가 이 행을 가리킬 수 없다.
           // 라인업에서 빠진 사람의 검인 기록이 함께 사라지는 것도 의도한 동작이다 --
           // 그 사람은 더 이상 이 경기의 명단이 아니다.
+          //
+          // **신원 연결(identity link)은 같이 지우지 않는다.** 참가자를 만들 때
+          // `createRosterAssertedIdentityLink` 가 자동으로 붙으므로(위) 행을 지우면 링크가
+          // 고아로 남는다. 그래도 지우지 않는 이유는 두 가지다:
+          //  ① 무해하다 -- 링크 소비처를 전수로 확인했다.
+          //     · `games.service.ts:3075`·`:3130`, `league-claimable-fixtures.service.ts:144`
+          //       — `participantId IN (현재 참가자)` 로 조회한다. 고아는 애초에 안 나온다.
+          //     · `public-records/player-card-stats.ts:89` — `where: { userId }` 라 고아 링크를
+          //       **읽는다**. 동의 자격 조회(`loadParticipantConsentEligibility`)도
+          //       `v1ParticipantIdentityLinkCurrent` 기준이라 고아가 그대로 통과한다.
+          //       무해해지는 지점은 그 다음이다: `:110` 의 `V1GameResultParticipant`
+          //       조회가 **행을 0건 돌려준다**(SCHEDULED 경기라 결과 자체가 없다).
+          //       즉 집계에 0 으로 기여할 뿐 숫자를 왜곡하지 않는다.
+          //       (처음엔 "자격 조회에서 걸러진다"고 적었다가 코드를 보고 정정했다 --
+          //        걸러지는 곳이 다르다.)
+          //  ② 링크는 **감사 이벤트**다(`V1ParticipantIdentityLinkEvent` 는 append-only).
+          //     "누가 언제 이 사람을 이 경기에 올렸다가 뺐다"는 기록이라 지우는 쪽이 정보
+          //     손실이다.
+          // 이 분석을 여기 남기는 이유: 안 적으면 다음 사람이 "고아 링크가 생기는데
+          // 괜찮은가"를 처음부터 다시 조사한다.
           const leftovers = [...priorByKey.values()].flat();
           if (leftovers.length > 0) {
             await tx.v1GameParticipant.deleteMany({

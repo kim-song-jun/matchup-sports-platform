@@ -336,13 +336,104 @@ back/forward 리스트와 스크롤 위치를 직렬화한다. 이를 영속화�
       `Teameet.entitlements`는 소비처(S7 푸시)가 없어 보류
 - [x] **S3 네비게이션 코어** — `AllowedNavigation.swift`, `DeepLinkRoute.swift` + 유닛 테스트 25개
 - [x] **S4 WebView 셸** — 셸 + 네이티브 로드 실패 화면 + 네트워크 복구 자동 재시도
-- [ ] **S5 JS 브리지**
+- [x] **S5 JS 브리지** — shim·origin 검증·액션 4종·잘못된 입력 방어
 - [ ] **S6 백엔드 일반화**
 - [ ] **S7 푸시 클라이언트**
 - [ ] **S8 CI · 릴리스 가드** — `require-ios-production-ref.sh`는 작성·negative control 통과 상태로 대기
 - [ ] **S9 문서 · changeset**
 - [ ] **S10 PR + Copilot 리뷰 루프**
-- [ ] **S11 실기기 QA** (Firebase iOS 앱 등록 + APNs `.p8` 업로드 이후)
+- [ ] **S11 실기기 QA** (APNs `.p8` 발급 이후)
+  - [ ] **비행기 모드 토글로 오프라인 화면과 자동 재시도 실검증** — S4에서 시뮬레이터로는
+        실제 경로 차단을 만들 수 없어 오류 객체·복구 신호 주입으로만 확인했다. 여기서 갚는다.
+
+## 102 fail-open 수정 (2026-08-29)
+
+`WebKitErrorDomain 102`을 무조건 걸러 **취소가 아무것도 남기지 않은 경우** 백지로 끝났다.
+콜드 스타트 첫 로드가 외부 호스트로 리다이렉트되거나 서버가 메인 문서를 파일로 주면 그렇다.
+
+| | 수정 전 | 수정 후 |
+|---|---|---|
+| 신호 | `code=102 url=nil failureSet=0 present=0` | `code=102 url=nil failureSet=0 present=1` |
+| 화면 | 상태바 아래 **고유 색상 1개**, 순백 2,783,448픽셀 | 고유 색상 646개, "화면을 열지 못했어요" + 재시도 |
+
+판정은 세 갈래다. 취소가 아니면 표시, 취소인데 이미 실패 화면이 있으면 삼킴(5xx 사유 보존),
+취소인데 페이지가 남아 있으면 삼킴(평소 외부 링크), 나머지는 표시.
+
+5xx 회귀(iPhone 17e 콜드 스타트 503 — `hasVisibleContent=false`라 가장 엄격):
+`code=102 url=nil failureSet=1 present=0` → "팀밋 서버에 문제가 생겼어요 (오류 503)" 유지.
+
+## S5 Validation Evidence (2026-08-29)
+
+실제 alpha 페이지에서 계측했고, 프로브는 byte-identical로 원복했다(`PROBE` 0건).
+
+### shim이 실제로 동작한다
+
+```
+{"shim":{"isNativePushAvailable":true,"typeofPostMessage":"function",
+         "frozen":true,"survivedTamper":true}}
+```
+
+`isNativePushAvailable`은 웹 함수 본문(`typeof window.TeameetNative?.postMessage === 'function'`)을
+그대로 평가한 값이다. 전역을 다른 객체로 바꿔치기해도 살아남는다.
+
+### 수정하지 않은 웹이 스스로 브리지를 쓴다
+
+계측 중 예정에 없던 요청이 하나 더 도착했다 — 실제 v1 웹 앱이 자기 UUID로 호출한 것이다.
+
+```
+PROBE received mainFrame=1 origin=https://alpha.teameet.co.kr:0 accepted=1
+      body={"type":"get-push-state","requestId":"fec586d1-7d45-48d5-ae37-790efe3dcdbb"}
+```
+
+또 실행 중 `request-notification-permission`이 실제로 불려 iOS 시스템 권한 다이얼로그가 떴고,
+`open-notification-settings`는 설정 앱을 열었다(둘 다 스크린샷).
+
+### 액션 4종
+
+| 액션 | 확인 방법 | 결과 |
+|---|---|---|
+| `get-push-state` | 응답 이벤트 | `{permission:"default", subscribed:false}`, requestId 그대로 반환 |
+| `revoke-push-device` | 응답 이벤트 | 동일 |
+| `request-notification-permission` | 실화면 | 시스템 권한 다이얼로그 표시 |
+| `open-notification-settings` | 실화면 | 설정 앱 열림 + "◀ Teameet Alpha" 복귀 배너 |
+
+권한 매핑(`notDetermined`→`default` / `denied`→`denied` /
+`authorized`·`provisional`·`ephemeral`→`granted`)과 동의 진리표는 유닛 테스트가 고정한다.
+
+### 잘못된 입력은 응답을 만들지 않는다
+
+5종(`not json`, `{`, `[]`, type 없음, 모르는 type)을 보냈고 전부 네이티브에 **도달했으나**
+응답은 하나도 생기지 않았다. 크래시 없음.
+
+```
+PROBE received ... accepted=1 body=not json
+PROBE received ... accepted=1 body={"type":"delete-everything","requestId":"orphan-unknown"}
+replies: ['req-get-push-state', 'req-revoke-push-device']      ← 정상 2건뿐
+```
+
+### origin 검증 — 라이브로 못 만든 것
+
+발신 프레임의 origin·mainFrame은 매 메시지마다 평가되고 로그로 확인했다(위 `accepted=1`).
+다만 **거부되는 쪽을 실화면에서 만들지 못했다.**
+
+- `kauth.kakao.com`은 셸에 머무르지 않는다. 즉시 `accounts.kakao.com`으로 리다이렉트되고
+  그 호스트는 allowlist에 없어 Safari로 넘어간다.
+- 서브프레임 주입은 alpha 사이트 자체의 CSP가 막았다:
+  `Refused to evaluate a string as JavaScript because 'unsafe-eval' ... is not an allowed source`
+  (`script-src 'self' 'unsafe-inline' https://www.googletagmanager.com`).
+
+규칙 자체는 유닛 테스트가 전수 고정한다 — 올바른 origin, kauth 예외, http, 다른 환경, suffix
+호스트, 빈 origin, 명시 :443, 그리고 **잘못 설정된 기대 origin**. 마지막 것은 테스트가 잡은
+실제 약점이다: xcconfig가 `//`를 잘라 `https:`나 `//host`로 도착하면 host만 비교하던 초안이
+아무 origin이나 통과시켰다.
+
+### 별건 — Kakao 로그인은 두 셸 모두에서 앱을 벗어난다
+
+`kauth.kakao.com/oauth/authorize`를 열면 Kakao가 `accounts.kakao.com`으로 리다이렉트한다.
+allowlist에는 `kauth.kakao.com`만 있으므로 셸이 그 이동을 외부로 넘긴다. Android의
+`isTrustedAuthProvider`도 같은 한 호스트만 허용하므로 **Android도 동일하게 동작할 것으로
+보인다**(Task 156 Phase 5에 Kakao 로그인 검증 기록 없음). 정책 변경이 필요한지는 사용자 판단
+사항이라 손대지 않았다.
 
 ## S4 Validation Evidence (2026-08-29)
 

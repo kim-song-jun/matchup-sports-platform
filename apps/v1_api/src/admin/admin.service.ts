@@ -226,12 +226,22 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       const target = await tx.v1User.findUnique({ where: { id: userId } });
       if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'User was not found' });
 
-      // 삭제는 되돌릴 수 없다. 탈퇴 처리는 이메일·전화번호를 tombstone 값으로 덮고
-      // 인증 시각을 지운다 — 그 계정을 다시 active 로 올리면 연락처가 없고 인증도 안 된
-      // 채 살아 있는 계정이 된다. 로그인도, 인증번호 재발송도, 연락도 안 되는데 목록에는
-      // 정상 회원으로 보인다. DTO 가 값을 허용하고 상태 머신 가드가 없어 오클릭 한 번으로
-      // 그 상태가 만들어졌다.
-      if (target.accountStatus === 'deleted' && dto.status !== 'deleted') {
+      // 탈퇴 처리(deleteUser)는 되돌릴 수 없다. 그 경로는 이메일·전화번호를 tombstone 값으로
+      // 덮고 인증 시각을 지우며 프로필을 마스킹한다 — 그 계정을 다시 active 로 올리면 연락처가
+      // 없고 인증도 안 된 채 살아 있는 계정이 된다. 로그인도, 인증번호 재발송도, 연락도 안
+      // 되는데 목록에는 정상 회원으로 보인다.
+      //
+      // 다만 accountStatus === 'deleted' 만으로는 그 계정인지 알 수 없다. 이 상태를 만드는
+      // 경로가 둘이고 성격이 정반대다:
+      //   1) deleteUser()          — 스크럽 + deletedAt 기록. 되살리면 안 된다.
+      //   2) changeUserStatus('deleted') — accountStatus 한 줄만 바꾼다. 스크럽도 없고
+      //      deletedAt 도 null 이라 개인정보·인증이 그대로 남아 있다(어드민 회원 모달의
+      //      '삭제' 선택지가 실제로 이 경로다).
+      // deletedAt 을 쓰는 곳은 deleteUser() 뿐이므로 그것이 두 경로의 판별자다. 이걸 함께
+      // 보지 않으면 모달 오클릭 한 번으로 만들어진 2)번 계정이 어떤 어드민 경로로도 복구
+      // 불가가 되고(본인 로그인도 차단), 아래 409 문구("개인정보가 지워져")도 그 행에는
+      // 거짓이 된다.
+      if (target.accountStatus === 'deleted' && target.deletedAt !== null && dto.status !== 'deleted') {
         throw new ConflictException({
           code: 'USER_DELETED_IRREVERSIBLE',
           message: '이미 삭제된 계정이에요. 개인정보가 지워져 되살릴 수 없어요.',

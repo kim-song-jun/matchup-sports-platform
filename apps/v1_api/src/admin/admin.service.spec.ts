@@ -53,8 +53,11 @@ describe('AdminService.changeUserStatus — realtime disconnect side effect', ()
   let realtimeGateway: { forceDisconnectUser: jest.Mock };
   let logger: { warn: jest.Mock };
 
-  function targetUser(accountStatus: string) {
-    return { id: targetUserId, accountStatus, deletedAt: null };
+  // deletedAt 은 deleteUser() 만 기록한다. changeUserStatus(status:'deleted') 로 만들어진
+  // 행은 accountStatus 만 'deleted' 이고 deletedAt 은 null 이다 — 두 경우를 구분해야 해서
+  // 헬퍼가 deletedAt 을 받는다.
+  function targetUser(accountStatus: string, deletedAt: Date | null = null) {
+    return { id: targetUserId, accountStatus, deletedAt };
   }
 
   beforeEach(async () => {
@@ -137,12 +140,12 @@ describe('AdminService.changeUserStatus — realtime disconnect side effect', ()
     expect(realtimeGateway.forceDisconnectUser).toHaveBeenCalledWith(targetUserId);
   });
 
-  it('이미 삭제된 계정은 다시 살릴 수 없다', async () => {
-    // 탈퇴 처리는 이메일·전화번호를 tombstone 값으로 덮고 인증 시각을 지운다.
-    // 그 계정을 active 로 올리면 연락처가 없고 인증도 안 된 채 살아 있는 계정이 된다 —
-    // 로그인도, 인증번호 재발송도, 연락도 안 되는데 목록에는 정상 회원으로 보인다.
+  it('탈퇴 처리된 계정(deletedAt 기록됨)은 다시 살릴 수 없다', async () => {
+    // deleteUser() 의 탈퇴 처리는 이메일·전화번호를 tombstone 값으로 덮고 인증 시각을 지우며
+    // deletedAt 을 남긴다. 그 계정을 active 로 올리면 연락처가 없고 인증도 안 된 채 살아 있는
+    // 계정이 된다 — 로그인도, 인증번호 재발송도, 연락도 안 되는데 목록에는 정상 회원으로 보인다.
     prisma.v1AdminUser.findUnique.mockResolvedValueOnce(actorAdminRecord).mockResolvedValueOnce(null);
-    prisma.v1User.findUnique.mockResolvedValue(targetUser('deleted'));
+    prisma.v1User.findUnique.mockResolvedValue(targetUser('deleted', new Date('2026-08-01T00:00:00.000Z')));
 
     await expect(
       service.changeUserStatus(actorAuthUser, targetUserId, { status: 'active', reason: '실수로 삭제' }),
@@ -152,11 +155,32 @@ describe('AdminService.changeUserStatus — realtime disconnect side effect', ()
     expect(prisma.v1User.update).not.toHaveBeenCalled();
   });
 
+  it('상태만 deleted 인 계정(deletedAt 없음)은 active 로 되돌릴 수 있다', async () => {
+    // changeUserStatus(status:'deleted') 는 accountStatus 한 줄만 바꾼다 — tombstone 도,
+    // 프로필 마스킹도, deletedAt 도 없다. 개인정보가 그대로 남아 있으므로 되살려도
+    // "연락 안 되는 유령 계정" 이 되지 않는다. 어드민 모달의 '삭제' 오클릭이 어떤 경로로도
+    // 복구 불가가 되면 안 되고, 409 문구("개인정보가 지워져 되살릴 수 없어요")도 이 행에는
+    // 거짓이다. 가드가 accountStatus 만 보면 이 테스트는 반드시 실패한다.
+    prisma.v1AdminUser.findUnique.mockResolvedValueOnce(actorAdminRecord).mockResolvedValueOnce(null);
+    prisma.v1User.findUnique.mockResolvedValue(targetUser('deleted'));
+    prisma.v1User.update.mockResolvedValue(targetUser('active'));
+
+    const result = await service.changeUserStatus(actorAuthUser, targetUserId, {
+      status: 'active',
+      reason: '오클릭 복구',
+    });
+
+    expect(result).toMatchObject({ userId: targetUserId, status: 'active' });
+    expect(prisma.v1User.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: targetUserId }, data: { accountStatus: 'active' } }),
+    );
+  });
+
   it('이미 삭제된 계정을 다시 삭제로 두는 것은 막지 않는다', async () => {
     // 같은 상태로 두는 요청까지 409 로 만들면 재시도가 실패로 보인다.
     prisma.v1AdminUser.findUnique.mockResolvedValueOnce(actorAdminRecord).mockResolvedValueOnce(null);
-    prisma.v1User.findUnique.mockResolvedValue(targetUser('deleted'));
-    prisma.v1User.update.mockResolvedValue(targetUser('deleted'));
+    prisma.v1User.findUnique.mockResolvedValue(targetUser('deleted', new Date('2026-08-01T00:00:00.000Z')));
+    prisma.v1User.update.mockResolvedValue(targetUser('deleted', new Date('2026-08-01T00:00:00.000Z')));
 
     await expect(
       service.changeUserStatus(actorAuthUser, targetUserId, { status: 'deleted', reason: '재확인' }),

@@ -449,3 +449,8 @@ Samsung device. This is not the complete Phase 5 matrix, so the Phase 5 checkbox
   of the Android bridge value. Ordinary no-nav pages now reserve the shared safe inset; chat input and
   fixed CTA surfaces that already consume it opt out to avoid double spacing. Remaining direct inset
   consumers now use `--v1-shell-safe-bottom`. Real-device route-family evidence is still pending.
+- Android task re-entry previously treated the destination-free MAIN/LAUNCHER intent delivered to the
+  `singleTask` activity as `/home`, so reopening the running app discarded the visible route. Plain
+  launcher re-entry now preserves the current WebView, explicit FCM/App Link intents still navigate,
+  and WebView URL/history is saved and restored across Activity/process recreation. Background/resume,
+  process-recreation, explicit deep-link, and logout-boundary device verdicts remain pending.

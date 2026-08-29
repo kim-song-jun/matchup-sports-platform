@@ -124,6 +124,19 @@ describe('ApnsPushService', () => {
   });
 
   /**
+   * Fail-closed, and loudly. A deployment that supplies the APNs key but forgets
+   * V1_PUSH_ENVIRONMENT cannot be allowed to start: there would be no way to tell the
+   * sandbox gateway from the production one, and the wrong choice delivers nothing while
+   * looking healthy. Nest propagates a throw from onModuleInit, so this stops the boot.
+   */
+  it('fails startup when credentials are present but the push environment is not set', () => {
+    configure();
+    delete process.env.V1_PUSH_ENVIRONMENT;
+    const service = new ApnsPushService(pushDevices as never, logger as never);
+    expect(() => service.onModuleInit()).toThrow('앱 푸시 환경이 설정되지 않았어요');
+  });
+
+  /**
    * Environment isolation, the same guarantee the Firebase adapter makes about its project.
    * The bundle id decides which app a notification is addressed to, so a production build
    * carrying the alpha bundle would deliver alpha notifications to production users.

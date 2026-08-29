@@ -1,7 +1,7 @@
 # Task 157 — iOS App + APNs/FCM Foundation
 
 Status: ACTIVE
-Base branch: `feat/android-fcm-foundation` (PR #821, base `dev`) → `dev` 재타깃 예정
+Base branch: `dev` (PR #821이 2026-08-29에 머지되어 `dev`로 재타깃 완료)
 Working branch: `feat/ios-webview-shell`
 Target: `both` (`apps/v1_ios`, `apps/v1_api`, `apps/v1_android` 1줄, deploy/docs)
 Mode: CODE
@@ -337,7 +337,7 @@ back/forward 리스트와 스크롤 위치를 직렬화한다. 이를 영속화�
 - [x] **S3 네비게이션 코어** — `AllowedNavigation.swift`, `DeepLinkRoute.swift` + 유닛 테스트 25개
 - [x] **S4 WebView 셸** — 셸 + 네이티브 로드 실패 화면 + 네트워크 복구 자동 재시도
 - [x] **S5 JS 브리지** — shim·origin 검증·액션 4종·잘못된 입력 방어
-- [ ] **S6 백엔드 일반화**
+- [x] **S6 백엔드 일반화** — 직접 APNs 어댑터, 플랫폼 팬아웃, `platform` 필수화
 - [ ] **S7 푸시 클라이언트**
 - [ ] **S8 CI · 릴리스 가드** — `require-ios-production-ref.sh`는 작성·negative control 통과 상태로 대기
 - [ ] **S9 문서 · changeset**
@@ -414,6 +414,61 @@ Apple Silicon + iOS 16 이상 시뮬레이터가 푸시를 어디까지 하는�
 
 5xx 회귀(iPhone 17e 콜드 스타트 503 — `hasVisibleContent=false`라 가장 엄격):
 `code=102 url=nil failureSet=1 present=0` → "팀밋 서버에 문제가 생겼어요 (오류 503)" 유지.
+
+## S6 — FCM 중계에서 직접 APNs로 (2026-08-29 사용자 결정)
+
+iOS는 Firebase를 거치지 않고 우리 서버가 APNs와 직접 말한다. 라이브러리 없이
+`node:http2` + `node:crypto`만 쓴다. Android는 FCM 그대로다.
+
+**근거 3가지 (실측)**
+
+| 근거 | 확인한 것 |
+|---|---|
+| 멀티캐스트가 작동할 자리가 없다 | `sendToUser`는 한 사용자 범위(`WHERE userId = ...`)라 N은 그 사람의 기기 수(1~3대). `FCM_MULTICAST_BATCH_SIZE=500` 루프는 스펙이 가짜 기기 501개를 합성해야 겨우 두 바퀴 돈다 |
+| `.p8`은 어느 쪽이든 필요 | Firebase도 같은 APNs로 중계할 뿐이다. 직접 가면 Firebase iOS 앱 등록 단계만 순감한다 |
+| 850MB가 사라진다 | SwiftPM 그래프 제거 후 빌드 로그에서 `Resolve Package Graph` 단계 자체가 사라짐 |
+
+**받아들인 대가**: firebase-admin이 대신 해주던 것을 우리가 쓴다 — ES256 provider token 서명과
+캐싱, HTTP/2 클라이언트, 기기별 fan-out, APNs 오류 분류. 알림 실패는 조용하므로 이 위험은
+테스트로 갚는다.
+
+### 조용히 틀리기 쉬운 자리와 그 대비
+
+- **서명 인코딩**: `node:crypto`의 기본 ECDSA 출력은 DER인데 JOSE의 ES256은 raw `r‖s`를
+  요구한다. DER로 보내면 Apple이 이유 없는 403만 준다. 공개키로 직접 검증하는 테스트와,
+  **DER로 읽으면 실패한다**는 반대 테스트를 함께 뒀다.
+- **토큰 수명 양쪽 벌점**: 1시간 초과는 `ExpiredProviderToken`, 20분 내 재서명은
+  `TooManyProviderTokenUpdates`. 403 뒤 재발급도 하한을 지키므로 거절 하나가 밴으로 번지지 않는다.
+- **라우팅 공백**: 어댑터가 아니라 **디스패처**가 기기를 고른다. 어댑터마다 자기 플랫폼을
+  조회하면 아무도 라우팅하지 않는 플랫폼이 "구독자 없음"과 구별되지 않는다.
+- **`platform` 기본값 금지**: 기본값을 두면 필드를 빠뜨린 클라이언트가 잘못된 플랫폼으로
+  등록되고, APNs 토큰이 Firebase로 가면 에러가 아니라 그냥 알림이 안 온다.
+
+### 운영자가 알아야 할 것 (S9에서 `docs/ops/ios-apns-setup.md`에 반드시 쓸 것)
+
+**`APNS_*` 4개를 넣으면서 `V1_PUSH_ENVIRONMENT`를 빠뜨리면 API가 기동하지 않는다.**
+테스트로 고정했다(`fails startup when credentials are present but the push environment is
+not set` → `앱 푸시 환경이 설정되지 않았어요`). FCM과 같은 fail-closed 계약이며, sandbox와
+production 게이트웨이를 구분할 수 없는 상태로 뜨는 것보다 안 뜨는 것이 낫다. 같은 이유로
+`APNS_BUNDLE_ID`가 환경과 어긋나도 기동 실패한다. 4개 중 일부만 있으면
+`partially configured`로 실패하고, 0개면 조용히 비활성이다.
+
+## 베이스 이동 (2026-08-29)
+
+PR #821이 `dev`에 머지되어 베이스를 `dev`로 옮겼다(`734f442f9`, 29커밋 흡수).
+
+- `apps/v1_api/src/notifications/*`는 충돌이 없었다 — `dev`의 그 파일들이 #821 시점 그대로이고
+  내 S6 변경이 그 위에 얹혔다. 머지 후 표식 9개(활성 토큰 조회, register/revoke, `platform` 필수,
+  어댑터 platform, 디스패처, fail-loud 로그, APNs 호스트, Android 한 줄)를 하나씩 확인했다.
+- 충돌은 `apps/v1_web` 2파일에서 났고 **서로 직교**했다: `dev`는 radius를
+  `var(--radius-container)`로 토큰화했고, 물려받은 `e29209a26`은 `env(safe-area-inset-bottom)`을
+  `var(--v1-shell-safe-bottom)`으로 바꿨다. 둘 다 살렸다.
+- **이 태스크가 작성한 `apps/v1_web` 변경은 여전히 0줄이다.** 브랜치에 남아 있는 web diff
+  10파일(+33/-11)은 전부 `e29209a26`(작성자 seeungmin, Task 156)에서 물려받은 것이고, 같은 SHA가
+  양쪽 브랜치 이력에 있으므로 어느 쪽이 먼저 머지되든 중복되지 않는다.
+- `origin/feat/android-fcm-foundation`은 더 추적하지 않는다. 그 브랜치에만 있는
+  `44a0f1e4c chore(android): add privacy-safe FCM diagnostics`는 Android 전용이라 이 태스크
+  범위가 아니다.
 
 ## S5 Validation Evidence (2026-08-29)
 

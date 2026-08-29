@@ -335,7 +335,7 @@ back/forward 리스트와 스크롤 위치를 직렬화한다. 이를 영속화�
       `version.properties`, `TeameetApp.swift`. 빈 앱이 시뮬레이터에서 실행됨.
       `Teameet.entitlements`는 소비처(S7 푸시)가 없어 보류
 - [x] **S3 네비게이션 코어** — `AllowedNavigation.swift`, `DeepLinkRoute.swift` + 유닛 테스트 25개
-- [ ] **S4 WebView 셸**
+- [x] **S4 WebView 셸** — 셸 + 네이티브 로드 실패 화면 + 네트워크 복구 자동 재시도
 - [ ] **S5 JS 브리지**
 - [ ] **S6 백엔드 일반화**
 - [ ] **S7 푸시 클라이언트**
@@ -343,6 +343,94 @@ back/forward 리스트와 스크롤 위치를 직렬화한다. 이를 영속화�
 - [ ] **S9 문서 · changeset**
 - [ ] **S10 PR + Copilot 리뷰 루프**
 - [ ] **S11 실기기 QA** (Firebase iOS 앱 등록 + APNs `.p8` 업로드 이후)
+
+## S4 Validation Evidence (2026-08-29)
+
+전부 시뮬레이터(iPhone 17, iOS 26.5)에서 실제로 실행한 결과다. 임시 프로브로 계측한 뒤
+`WebShellViewController.swift`는 byte-identical로 원복했고(추가됐던 119줄 제거, `cmp -s` 확인,
+트리에 `PROBE` 문자열 0건) 최종 테스트는 원복된 소스로 다시 돌렸다.
+
+### 안전영역 — 육안이 아니라 숫자로
+
+네이티브가 계산한 값과 페이지가 실제로 해석한 값을 매 `didFinish`마다 대조했다.
+
+```
+inspectable=1 origin=https://alpha.teameet.co.kr
+didFinish url=https://alpha.teameet.co.kr/home
+safearea native_points=34 page={"native":"34px","shell":"34px"}
+didFinish url=https://alpha.teameet.co.kr/my/teams
+safearea native_points=34 page={"native":"34px","shell":"34px"}
+```
+
+`getComputedStyle(document.documentElement)`로 읽은 `--teameet-native-safe-bottom`과
+`--v1-shell-safe-bottom`이 둘 다 네이티브 34pt와 일치한다. 하단 내비가 있는 홈과 상세 화면
+양쪽에서 같은 값이 나왔다.
+
+### 셸 기본 동작
+
+| 항목 | 결과 |
+|---|---|
+| alpha 로그인 → 홈 | `E2E팀장A`로 로그인된 실제 alpha 홈 렌더 |
+| 홈 → 상세 → 뒤로 | `/home` → `/my/teams` → `canGoBack=1` → `/home` |
+| 외부 링크 | Safari가 `apple.com`을 열고 상태바에 `◀ Teameet Alpha` 복귀 배너. 앱 내부 이동 없음 |
+| 다운로드(내부 origin) | `tmp/downloads/<uuid>/2048`에 정확히 2048바이트 기록 후 공유 시트 표시 |
+| `isInspectable` | Alpha 런타임 `1`, Production 런타임 `0` (Info.plist `YES`/`NO`와 일치) |
+| 재진입 route 보존 | `/my/teams`에서 백그라운드 → 종료 → 재실행 시 `/my/teams` 복원 |
+| 손상된 복원 데이터 | 저장 슬롯을 깨뜨린 뒤 재실행 → 크래시 없이 `/home` |
+
+### 로드 실패 화면
+
+| 실패 | 재현 방법 | 관측 |
+|---|---|---|
+| DNS 실패 | `TEAMEET_WEB_ORIGIN`을 존재하지 않는 호스트로 빌드 | `domain=NSURLErrorDomain code=-1003 present=1` → "지금은 팀밋에 연결할 수 없어요" |
+| 서버 5xx | 실제 `https://httpbingo.org/status/503` | `decidePolicyFor navigationResponse`가 가로채 "팀밋 서버에 문제가 생겼어요 (오류 503)" |
+| 오프라인 | `NSURLErrorNotConnectedToInternet`을 델리게이트 핸들러에 주입 | `code=-1009 present=1` → "인터넷에 연결되어 있지 않아요" |
+| 취소 | `NSURLErrorCancelled`를 델리게이트 핸들러에 주입 | `code=-999 present=0` — 오류 화면 뜨지 않음 |
+| 복구(자동) | 경로 복구 신호 | 버튼 없이 재로드되어 오버레이 사라짐 |
+| 복구(수동) | 버튼이 호출하는 `model.retry()` | 재로드 후 오버레이 사라짐 |
+| 5xx + 경로 복구 | 503 화면에서 경로 복구 신호 | **재로드하지 않음**(의도) — 서버 장애에 부하를 더하지 않는다 |
+
+라이트/다크 각각, 그리고 최대 접근성 Dynamic Type에서 잘림 없이 렌더되는 것을 캡처로 확인했다.
+
+### 실행으로 새로 알게 된 것
+
+- **정책 취소는 `WebKitErrorDomain 102`로 되돌아온다.** 5xx를 잡아 `.cancel`을 반환하면 WebKit이
+  곧바로 `didFailProvisionalNavigation`을 102로 호출한다. 이 코드를 거르지 않으면 방금 세운
+  `serverError` 상태를 `unreachable`로 덮어써 잘못된 문구가 뜬다. 다운로드로 전환할 때도 같은
+  102가 온다. 즉 이 필터는 방어가 아니라 **필수 경로**다.
+- 반대로 **로딩 중 다른 링크로 이동하는 경우, 이 WebKit은 실패 콜백을 아예 호출하지 않았다.**
+  같은 시나리오에서 Android가 보이던 오류가 iOS에선 애초에 발생하지 않는다.
+- 이 두 관찰은 `WebShellFailurePolicyTests`가 이미 고정하고 있던 계약과 일치한다.
+
+### 결정 2 종료 증거 (테스트가 앱 컴파일 오류를 잡는가)
+
+```
+BASELINE   Executed 25 tests, with 0 failures  → ** TEST SUCCEEDED **
+RED        TeameetApp.swift:29:29: error: cannot convert value of type 'String' to specified type 'Int'
+           ** TEST FAILED **
+RESTORE    app source restored byte-identical → ** TEST SUCCEEDED **
+```
+
+### 최종 테스트 (원복된 소스)
+
+```
+TeameetAlpha       Executed 59 tests, with 0 failures (0 unexpected) → ** TEST SUCCEEDED **
+TeameetProduction  Executed 59 tests, with 0 failures (0 unexpected) → ** TEST SUCCEEDED **
+```
+
+Swift 6 언어 모드에서 `@preconcurrency`·`nonisolated(unsafe)` 없이 통과했다.
+
+### S4에서 하지 못한 것
+
+- **실제 네트워크 차단으로 오프라인을 만들지 못했다.** 시뮬레이터는 호스트의 네트워크 스택을
+  공유하고 `simctl`에 네트워크 조작 명령이 없다. 호스트 Wi-Fi를 끄는 것은 공용 머신이라 하지
+  않았다. 오프라인 화면과 자동 재시도는 델리게이트 핸들러와 경로 복구 콜백에 **정확한 오류
+  객체·신호를 주입**해 확인했고, 판정 로직 자체는 유닛 테스트가 고정한다. 실제 Wi-Fi 토글은
+  S11 실기기 QA로 남긴다.
+- **화면 터치를 자동화하지 않았다.** 전역 좌표 클릭은 시뮬레이터가 아닌 다른 창을 누를 수
+  있어(실제로 한 번 발생) 중단했다. 재시도 버튼은 버튼의 action 클로저가 호출하는
+  `model.retry()`를 직접 실행해 검증했다. 제스처 단위 검증이 필요하면 XCUITest 타깃을
+  별도로 세우는 편이 안전하다.
 
 ## Validation Evidence (2026-08-29, S1–S3)
 

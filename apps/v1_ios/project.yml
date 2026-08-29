@@ -99,16 +99,36 @@ targets:
     # the whole package rather than only the linked products — about 850MB, of which
     # grpc-binary alone is 609MB (measured). CI caches SourcePackages for this reason; see
     # .github/workflows/ios-alpha.yml.
+    #
+    # Only pure types are listed. Anything importing UIKit, WebKit, Network or Firebase
+    # stays out, which is why the WebShell types are named file by file rather than by
+    # directory: the policy, session and bridge pieces are Foundation-only on purpose,
+    # while the view controller next to them is not.
     sources:
       - path: TeameetTests
       - path: Teameet/Navigation
+      - path: Teameet/Support/AppConfig.swift
+      - path: Teameet/WebShell/WebShellFailurePolicy.swift
+      - path: Teameet/WebShell/WebShellSession.swift
+      - path: Teameet/WebShell/WebShellSessionStore.swift
+      - path: Teameet/WebShell/SafeAreaBridge.swift
     settings:
       base:
-        GENERATE_INFOPLIST_FILE: YES
-        # Mirrors the app's environment contract so a test can assert on the values its
-        # own configuration produced, the way Android's BuildConfigurationTest reads
-        # BuildConfig for the flavor it was compiled into.
-        INFOPLIST_KEY_CFBundleDisplayName: $(TEAMEET_DISPLAY_NAME)
+        GENERATE_INFOPLIST_FILE: NO
+    info:
+      # Generated and gitignored. The test bundle carries the same environment contract as
+      # the app so AppConfigTests can assert on the values its own configuration produced,
+      # the way Android's BuildConfigurationTest reads BuildConfig for its flavor.
+      # INFOPLIST_KEY_<CUSTOM> cannot do this — see the note on the app target.
+      path: TeameetTests-Info.plist
+      properties:
+        CFBundleDisplayName: $(TEAMEET_DISPLAY_NAME)
+        TeameetWebOrigin: $(TEAMEET_WEB_ORIGIN)
+        TeameetWebViewInspectable: $(TEAMEET_WEBVIEW_INSPECTABLE)
+        TeameetFirebaseProjectId: $(TEAMEET_FIREBASE_PROJECT_ID)
+        TeameetFirebaseAppId: $(TEAMEET_FIREBASE_APP_ID)
+        TeameetFirebaseApiKey: $(TEAMEET_FIREBASE_API_KEY)
+        TeameetFirebaseSenderId: $(TEAMEET_FIREBASE_SENDER_ID)
 
 schemes:
   TeameetAlpha:

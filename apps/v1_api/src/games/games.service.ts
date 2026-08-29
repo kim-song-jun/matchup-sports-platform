@@ -2671,30 +2671,128 @@ export class GamesService {
             });
           }
         }
-        const lineup = await tx.v1GameLineup.create({
-          data: {
-            gameId,
-            sideId,
-            revision: (previous?.revision ?? 0) + 1,
-            supersedesId: previous?.id,
-            formation: dto.formation,
-          },
-        });
-        for (const participant of dto.participants) {
-          const createdParticipant = await tx.v1GameParticipant.create({
+        // [P1-b] 대회 경기는 참가자 행을 **재사용**한다 -- 저장할 때마다 새로 만들지 않는다.
+        //
+        // 예전에는 저장 한 번에 새 라인업 리비전 + 새 참가자 행 한 벌이 통째로 생겼다.
+        // 그런데 participant 행에는 그 행에만 붙는 것들이 매달려 있다:
+        //  ① `arrivedAt` -- 현장 명단 검인(1차 대회 회고의 "안 온 사람 확인이 어려움").
+        //  ② `V1GameResultParticipant.participantId` -- 공식 기록의 개인 귀속.
+        //  ③ `V1ParticipantIdentityLink*.participantId` -- 개인 기록 공개의 출발점.
+        // 즉 명단을 한 번 더 저장하는 것만으로 검인이 사라지고 신원 연결이 고아가 됐다.
+        //
+        // **왜 "새 리비전을 안 만든다"가 아니라 "새 행을 안 만든다"인가**: 리비전 번호는
+        // 이 경로의 유일한 낙관적 잠금이다(`dto.expectedVersion !== currentLineupRevision`
+        // 위 2574, 그리고 제출 경로 2788). 클라이언트도 그 전제로 짜여 있다
+        // (fixture-lineup.view-model.ts:146/336). 번호를 고정하면 그 가드 둘이 **살아는
+        // 있고 아무것도 못 잡는** 상태가 된다 -- 있는 줄 알고 안심하게 되므로 더 나쁘다.
+        // 그래서 DRAFT 라인업 **행 하나를 재사용하면서 revision 은 그대로 올린다**:
+        // 참가자는 같은 행에 고정되고, 잠금은 실효를 유지하고, 클라이언트는 안 바뀐다.
+        //
+        // 제출본(SUBMITTED/LOCKED) 위에는 그대로 **새 행**을 만든다 -- 엄격 셀렉터
+        // (selectLatestLineupParticipants)가 제출본을 계속 집어내야 공식 결과와 신원 연결
+        // 후보가 비지 않는다. 그 경로에서는 대신 `arrivedAt` 을 이월한다(아래).
+        //
+        // 범위는 `TOURNAMENT_FIXTURE` 한정이다. TEAM_MATCH 는 위 2528 에서 이미 거부되고,
+        // COMPETITION_FIXTURE/FRIENDLY_MATCH 는 아직 쓰는 코드가 없는 값이라 암묵적으로
+        // 새 동작에 태우지 않는다 -- 그 둘의 정책이 정해질 때 의도적으로 확장한다.
+        const reusesDraftRow =
+          game.sourceType === V1GameSourceType.TOURNAMENT_FIXTURE &&
+          previous !== null &&
+          previous.state === V1GameLineupState.DRAFT;
+        // 재사용 경로든 이월 경로든 직전 행의 참가자를 신원으로 대조해야 한다.
+        const priorParticipants =
+          game.sourceType === V1GameSourceType.TOURNAMENT_FIXTURE && previous !== null
+            ? await tx.v1GameParticipant.findMany({ where: { gameId, sideId, lineupId: previous.id } })
+            : [];
+        // 매칭 키: 계정이 있으면 계정, 게스트는 이름이 유일한 신원이다(V1TeamTacticsBoardEntry
+        // 와 같은 규칙). 이름 대조를 게스트로 한정하는 이유는 전술보드에서와 같다 -- 연동
+        // 팀원까지 이름으로 묶으면 동명이인이 조용히 한 사람으로 합쳐진다.
+        const priorByKey = new Map<string, (typeof priorParticipants)[number][]>();
+        for (const row of priorParticipants) {
+          const key = row.userId !== null ? `u:${row.userId}` : `g:${row.displayNameSnapshot}`;
+          const bucket = priorByKey.get(key);
+          if (bucket === undefined) priorByKey.set(key, [row]);
+          else bucket.push(row);
+        }
+        // 같은 키가 여러 행이면(동명 게스트) 먼저 온 것부터 1:1 로 소진한다.
+        const takePrior = (participant: SaveGameLineupDto['participants'][number]) => {
+          const key =
+            participant.userId !== undefined
+              ? `u:${participant.userId}`
+              : `g:${participant.displayNameSnapshot}`;
+          return priorByKey.get(key)?.shift();
+        };
+
+        let lineup: { id: string; revision: number };
+        if (reusesDraftRow && previous !== null) {
+          // 낙관적 잠금 2단: revision 은 **stale 클라이언트**(먼저 열고 나중에 저장)를,
+          // 이 CAS 는 **같은 순간 겹치는 트랜잭션**을 잡는다. 리비전만으로는 후자가 안
+          // 잡힌다 -- 둘 다 같은 previous 를 읽고 둘 다 통과해 한쪽이 조용히 덮인다.
+          // (`V1GameLineup.version` 은 컬럼만 있고 여태 아무도 안 쓰던 값이다.)
+          const swapped = await tx.v1GameLineup.updateMany({
+            where: { id: previous.id, version: previous.version },
+            data: {
+              revision: previous.revision + 1,
+              version: { increment: 1 },
+              formation: dto.formation,
+            },
+          });
+          if (swapped.count === 0) {
+            throw new ConflictException({
+              code: 'VERSION_CONFLICT',
+              message: '라인업이 그새 변경됐어요. 새로고침 후 다시 시도해 주세요.',
+              details: { expectedVersion: dto.expectedVersion, currentVersion: previous.revision },
+            });
+          }
+          lineup = { id: previous.id, revision: previous.revision + 1 };
+        } else {
+          lineup = await tx.v1GameLineup.create({
             data: {
               gameId,
               sideId,
-              lineupId: lineup.id,
-              userId: participant.userId,
-              displayNameSnapshot: participant.displayNameSnapshot,
-              jerseyNumber: participant.jerseyNumber,
-              position: participant.position,
-              positionX: participant.positionX,
-              positionY: participant.positionY,
-              started: participant.started,
+              revision: (previous?.revision ?? 0) + 1,
+              supersedesId: previous?.id,
+              formation: dto.formation,
             },
           });
+        }
+
+        for (const participant of dto.participants) {
+          const prior = takePrior(participant);
+          // 재사용 경로에서는 **짝지어 update** 한다. deleteMany+createMany 로 갈아끼우면
+          // 행 id 가 바뀌어 위 ①②③ 이 똑같이 끊긴다 -- 그러면 이 작업을 한 이유가 없다.
+          const createdParticipant =
+            reusesDraftRow && prior !== undefined
+              ? await tx.v1GameParticipant.update({
+                  where: { id: prior.id },
+                  data: {
+                    userId: participant.userId ?? null,
+                    displayNameSnapshot: participant.displayNameSnapshot,
+                    jerseyNumber: participant.jerseyNumber,
+                    position: participant.position,
+                    positionX: participant.positionX,
+                    positionY: participant.positionY,
+                    started: participant.started,
+                  },
+                })
+              : await tx.v1GameParticipant.create({
+                  data: {
+                    gameId,
+                    sideId,
+                    lineupId: lineup.id,
+                    userId: participant.userId,
+                    displayNameSnapshot: participant.displayNameSnapshot,
+                    jerseyNumber: participant.jerseyNumber,
+                    position: participant.position,
+                    positionX: participant.positionX,
+                    positionY: participant.positionY,
+                    started: participant.started,
+                    // 제출본 위에 새 리비전을 여는 경로: 검인은 킥오프 직전이라 제출
+                    // **뒤에** 일어나는 것이 정상이므로, 이월하지 않으면 뒤늦은 명단
+                    // 수정 한 번에 이미 받아둔 검인이 통째로 사라진다.
+                    arrivedAt: prior?.arrivedAt ?? null,
+                  },
+                });
           if (participant.userId === undefined) continue;
           // 로스터 귀속을 신원 연결(identity link)로 자동 승격한다 -- 방금 만든
           // participant라 정상적으로는 기존 링크가 있을 수 없지만, 방어적으로 한
@@ -2706,6 +2804,22 @@ export class GamesService {
             { actorType: 'USER', actorUserId: user.id },
             'roster',
           );
+        }
+        if (reusesDraftRow) {
+          // 이번 저장에서 짝을 못 찾고 남은 행 = 명단에서 빠진 사람. 재사용 경로는 행을
+          // 그대로 두면 다음 조회에 그 사람이 계속 실리므로 지운다.
+          //
+          // 여기서 지우는 것이 안전한 이유: 이 경로는 `game.state === SCHEDULED` 에서만
+          // 열린다(위 2549 `LINEUP_DEADLINE_PASSED`). 공식 결과 리비전은 경기가 끝나야
+          // 생기므로 이 시점에 `V1GameResultParticipant` 가 이 행을 가리킬 수 없다.
+          // 라인업에서 빠진 사람의 검인 기록이 함께 사라지는 것도 의도한 동작이다 --
+          // 그 사람은 더 이상 이 경기의 명단이 아니다.
+          const leftovers = [...priorByKey.values()].flat();
+          if (leftovers.length > 0) {
+            await tx.v1GameParticipant.deleteMany({
+              where: { id: { in: leftovers.map((row) => row.id) } },
+            });
+          }
         }
         const updated = await tx.v1Game.update({
           where: { id: gameId },

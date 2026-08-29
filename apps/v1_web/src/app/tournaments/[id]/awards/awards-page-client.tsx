@@ -202,7 +202,7 @@ function AwardsPodium({
                   lineHeight: 1,
                   textShadow: '0 1px 3px rgba(0,0,0,0.2)',
                   background: 'var(--scrim-dark-72)',
-                  borderRadius: 999,
+                  borderRadius: 'var(--radius-pill)',
                   padding: pos === 1 ? '4px 12px' : '3px 9px',
                 }}
               >
@@ -238,7 +238,7 @@ function PrizeSection({
   return (
     <section className="tm-prize-section" style={{ marginBottom: 20 }}>
       <h3 className="tm-hub-section-title">상금 · 시상</h3>
-      <div className="tm-prize-card" style={{ background: 'var(--card-surface)', borderRadius: 14, border: '1px solid var(--grey150)', overflow: 'hidden' }}>
+      <div className="tm-prize-card" style={{ background: 'var(--card-surface)', borderRadius: 'var(--radius-field)', border: '1px solid var(--grey150)', overflow: 'hidden' }}>
         {/* 총 상금 헤더 */}
         {tournament.prizePool !== null && tournament.prizePool > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', padding: '16px 16px', background: 'var(--blue50)', borderBottom: '1px solid var(--grey100)' }}>
@@ -504,7 +504,7 @@ export function ReviewFormModal({
         aria-label="리뷰 작성"
         style={{
           width: '100%', maxWidth: 480, background: 'var(--background)',
-          borderRadius: '16px 16px 0 0', padding: '24px 20px',
+          borderRadius: 'var(--radius-container) var(--radius-container) 0 0', padding: '24px 20px',
           paddingBottom: 'max(24px, var(--v1-shell-safe-bottom))',
         }}
       >
@@ -574,7 +574,7 @@ export function ReviewFormModal({
           maxLength={500}
           rows={4}
           style={{
-            width: '100%', padding: '12px', borderRadius: 8,
+            width: '100%', padding: '12px', borderRadius: 'var(--radius-chip)',
             border: '1px solid var(--grey200)', fontSize: 13, lineHeight: 1.6,
             color: 'var(--text-strong)', background: 'var(--surface)',
             resize: 'none', boxSizing: 'border-box',
@@ -594,7 +594,7 @@ export function ReviewFormModal({
                   onClick={() => setPhotoUrls((prev) => prev.filter((u) => u !== url))}
                   aria-label="사진 삭제"
                   style={{
-                    position: 'absolute', top: 2, right: 2, width: 18, height: 18, borderRadius: '50%',
+                    position: 'absolute', top: 2, right: 2, width: 18, height: 18, borderRadius: 'var(--radius-circle)',
                     background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0,
                   }}
@@ -674,7 +674,7 @@ export function ReviewCard({ review }: { review: V1TournamentReview }) {
       {photoUrls.length > 0 && (
         <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
           {photoUrls.map((url) => (
-            <a key={url} href={publicAssetPath(url)} target="_blank" rel="noreferrer" style={{ display: 'block', width: 72, height: 72, borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}>
+            <a key={url} href={publicAssetPath(url)} target="_blank" rel="noreferrer" style={{ display: 'block', width: 72, height: 72, borderRadius: 'var(--radius-chip)', overflow: 'hidden', flexShrink: 0 }}>
               <img src={publicAssetPath(url)} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </a>
           ))}
@@ -959,8 +959,8 @@ function AwardsPageSkeleton() {
   return (
     <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div className="tm-skeleton" style={{ height: 56, borderRadius: 10 }} />
-      <div className="tm-skeleton" style={{ height: 180, borderRadius: 12 }} />
-      <div className="tm-skeleton" style={{ height: 120, borderRadius: 12 }} />
+      <div className="tm-skeleton" style={{ height: 180, borderRadius: 'var(--radius-control)' }} />
+      <div className="tm-skeleton" style={{ height: 120, borderRadius: 'var(--radius-control)' }} />
     </div>
   );
 }

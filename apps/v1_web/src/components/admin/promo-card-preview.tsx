@@ -119,7 +119,7 @@ export function PromoListPreview({ fields, fallback }: { fields: PromoPreviewFie
         display: 'flex',
         flexDirection: 'column',
         padding: '20px 20px',
-        borderRadius: 16,
+        borderRadius: 'var(--radius-container)',
         background: imageUrl ? `${cssUrl(imageUrl)} center 62%/cover` : 'linear-gradient(135deg, var(--blue500) 0%, var(--blue600) 100%)',
         color: 'var(--static-white)',
         position: 'relative',
@@ -129,7 +129,7 @@ export function PromoListPreview({ fields, fallback }: { fields: PromoPreviewFie
       {imageUrl ? <span aria-hidden="true" style={{ position: 'absolute', inset: 0, background: 'var(--scrim-dark-32)' }} /> : null}
       <div style={{ position: 'relative', zIndex: 1 }}>
         <div>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 999, background: 'var(--overlay-white-18)', fontSize: 'var(--font-size-caption)', fontWeight: 700 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 'var(--radius-pill)', background: 'var(--overlay-white-18)', fontSize: 'var(--font-size-caption)', fontWeight: 700 }}>
             <Trophy size={12} strokeWidth={2} aria-hidden="true" />
             {featuredBadge}
           </span>
@@ -149,7 +149,7 @@ export function PromoListPreview({ fields, fallback }: { fields: PromoPreviewFie
           {featuredPrizeText ? (
             <span className="tm-text-caption" style={{ color: 'var(--overlay-white-85)', fontWeight: 700, minWidth: 0, whiteSpace: 'pre-wrap' }}>{featuredPrizeText}</span>
           ) : null}
-          <span style={{ background: 'var(--static-white)', color: 'var(--blue700)', fontWeight: 700, fontSize: 'var(--font-size-label)', borderRadius: 999, padding: '8px 16px', lineHeight: 1, display: 'inline-block', flexShrink: 0 }}>자세히 보기 →</span>
+          <span style={{ background: 'var(--static-white)', color: 'var(--blue700)', fontWeight: 700, fontSize: 'var(--font-size-label)', borderRadius: 'var(--radius-pill)', padding: '8px 16px', lineHeight: 1, display: 'inline-block', flexShrink: 0 }}>자세히 보기 →</span>
         </div>
       </div>
     </div>

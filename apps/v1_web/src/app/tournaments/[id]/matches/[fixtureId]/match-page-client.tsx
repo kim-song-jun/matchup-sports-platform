@@ -13,8 +13,8 @@ import { ClaimMyRecordSection } from '@/components/public-game-records/claim-my-
 function MatchSkeleton() {
   return (
     <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div className="tm-skeleton" style={{ height: 140, borderRadius: 12 }} />
-      <div className="tm-skeleton" style={{ height: 180, borderRadius: 12 }} />
+      <div className="tm-skeleton" style={{ height: 140, borderRadius: 'var(--radius-control)' }} />
+      <div className="tm-skeleton" style={{ height: 180, borderRadius: 'var(--radius-control)' }} />
     </div>
   );
 }

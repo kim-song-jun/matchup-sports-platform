@@ -60,8 +60,8 @@ export function MyStaffFixturesPageClient({ tournamentId }: { tournamentId: stri
     return (
       <Shell title={title}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div className="tm-skeleton" style={{ height: 72, borderRadius: 12 }} />
-          <div className="tm-skeleton" style={{ height: 72, borderRadius: 12 }} />
+          <div className="tm-skeleton" style={{ height: 72, borderRadius: 'var(--radius-control)' }} />
+          <div className="tm-skeleton" style={{ height: 72, borderRadius: 'var(--radius-control)' }} />
         </div>
       </Shell>
     );

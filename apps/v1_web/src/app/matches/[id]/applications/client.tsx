@@ -242,7 +242,7 @@ function ApplicationRow({
           style={{
             width: 44,
             height: 44,
-            borderRadius: 14,
+            borderRadius: 'var(--radius-field)',
             backgroundColor: 'var(--grey200)',
             backgroundImage: application.profileImageUrl
               ? cssUrl(application.profileImageUrl)
@@ -371,7 +371,7 @@ function ApplicationsSkeletonList() {
         <div
           key={i}
           className="tm-review-skeleton"
-          style={{ minHeight: 76, borderRadius: 16 }}
+          style={{ minHeight: 76, borderRadius: 'var(--radius-container)' }}
           aria-hidden="true"
         />
       ))}

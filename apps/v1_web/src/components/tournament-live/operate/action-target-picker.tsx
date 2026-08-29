@@ -7,6 +7,7 @@ import { formatMatchClock } from '@/lib/game-operations-clock';
 import type { FrozenEventCapture } from '@/lib/game-operations-clock';
 import { LineupGrid } from './lineup-grid';
 import { periodLabel } from './period-label';
+import { FOCUSABLE_SELECTOR, useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import type {
   GameCardColor,
   GameEventType,
@@ -98,8 +99,6 @@ export function ActionTargetPicker({
   onCommit,
   onCancel,
 }: ActionTargetPickerProps) {
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const previousFocusRef = useRef<Element | null>(null);
   const [substitutionOut, setSubstitutionOut] = useState<{
     readonly sideId: string;
     readonly participant: GameLineupParticipant;
@@ -113,54 +112,35 @@ export function ActionTargetPicker({
     setSubstitutionOut(null);
   }, [actionType, frozen.occurredAt]);
 
-  useEffect(() => {
-    if (open) {
-      previousFocusRef.current = document.activeElement;
-    } else {
-      const el = previousFocusRef.current;
-      if (el && typeof (el as HTMLElement).focus === 'function') (el as HTMLElement).focus();
-      previousFocusRef.current = null;
-    }
-  }, [open]);
+  // focus 저장/복원 · ESC 닫기 · Tab focus trap · 스크롤 잠금 · backdrop 클릭 닫기를
+  // 공용 훅에 위임. 렌더 게이트는 기존과 동일하게 `if (!open) return null`이라
+  // 퇴장 애니메이션(mounted/closing)은 쓰지 않는다.
+  const { dialogRef, onBackdropClick } = useModalA11y<HTMLElement, HTMLDivElement>({
+    open,
+    onClose: onCancel,
+  });
 
+  // 교체 단계가 바뀌면 다이얼로그 안 첫 focusable 로 포커스를 **재고정**한다.
+  //
+  // 1단계는 <LineupGrid>, 2단계는 <div> 를 같은 자리에 렌더한다 — element type 이
+  // 달라 React 가 서브트리를 언마운트하므로 방금 누른 선수 버튼이 사라지고
+  // document.activeElement 가 body 로 떨어진다. 훅의 focus trap 은 activeElement 가
+  // first/last 일 때만 되감으므로 body 상태에서는 아무 개입도 하지 않고, 그 순간 Tab 이
+  // 다이얼로그 밖 배경 문서로 샌다(WCAG 2.1.2). '뒤로'로 1단계에 돌아올 때도 같다.
+  //
+  // 훅의 초기 포커스는 deps 가 [open] 뿐이고 `dialog.contains(activeElement)` 가드까지
+  // 있어 이 전환을 커버하지 못한다. 재고정 트리거를 훅에 넣으면 소비처 19곳이 함께
+  // 영향을 받으므로, 이 화면만 갖는 2단계 문제는 이 파일에서 국소로 해결한다.
+  // 이전 값을 ref 로 추적해 **바뀔 때만** 옮기므로 초기 마운트(open 시)에는
+  // 훅의 초기 포커스와 경합하지 않는다.
+  const lastSubstitutionOutIdRef = useRef<string | null>(null);
   useEffect(() => {
+    const currentId = substitutionOut?.participant.id ?? null;
+    if (lastSubstitutionOutIdRef.current === currentId) return;
+    lastSubstitutionOutIdRef.current = currentId;
     if (!open) return;
-    const handler = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onCancel();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [open, onCancel]);
-
-  useEffect(() => {
-    if (!open) return;
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    const focusableSelectors = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
-    // 열릴 때 포커스를 다이얼로그 안으로 옮긴다. 아래 트랩은 activeElement 가 first/last 일 때만
-    // 순환시키므로, 포커스가 오버레이 바깥에 남아 있으면 트랩이 아예 걸리지 않고 키보드 사용자는
-    // 보이지 않는 배경 요소들을 훑게 된다.
-    const initial = dialog.querySelector<HTMLElement>(focusableSelectors);
-    initial?.focus();
-    const trap = (event: KeyboardEvent) => {
-      if (event.key !== 'Tab') return;
-      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(focusableSelectors));
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey) {
-        if (document.activeElement === first) {
-          event.preventDefault();
-          last.focus();
-        }
-      } else if (document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener('keydown', trap);
-    return () => document.removeEventListener('keydown', trap);
-  }, [open, substitutionOut]);
+    dialogRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)?.focus();
+  }, [open, substitutionOut, dialogRef]);
 
   if (!open) return null;
 
@@ -228,9 +208,7 @@ export function ActionTargetPicker({
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-gray-900/50 p-0 sm:items-center sm:p-4"
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onCancel();
-      }}
+      onClick={onBackdropClick}
     >
       <div
         ref={dialogRef}

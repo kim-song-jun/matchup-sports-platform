@@ -154,7 +154,7 @@ export function TournamentsListContent() {
             justifyContent: 'space-between',
             background: 'var(--blue50)',
             border: '1px solid var(--blue100)',
-            borderRadius: 14,
+            borderRadius: 'var(--radius-field)',
             padding: '12px 16px',
             textDecoration: 'none',
           }}

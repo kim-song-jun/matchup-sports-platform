@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
+
+import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 
 type JerseyNumberDialogProps = {
   open: boolean;
@@ -32,57 +34,21 @@ export function JerseyNumberDialog({
   const idPrefix = useId();
   const titleId = `${idPrefix}-jersey-title`;
   const inputId = `${idPrefix}-jersey-input`;
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const previousFocusRef = useRef<Element | null>(null);
   const [value, setValue] = useState('');
 
+  // focus 저장/복원 · ESC 닫기 · Tab focus trap · body 스크롤 잠금 · backdrop 클릭 닫기는
+  // 공용 훅(useModalA11y)에 위임한다. 이 다이얼로그는 퇴장 애니메이션이 없어
+  // mounted/closing 은 쓰지 않고 open 조건부 렌더를 그대로 둔다. 저장 중(saving)에는
+  // ESC·backdrop 으로 실수 이탈하지 않게 pending 으로 잠근다.
+  const { dialogRef, initialFocusRef, onBackdropClick } = useModalA11y<HTMLInputElement, HTMLDivElement>({
+    open,
+    onClose,
+    pending: saving,
+  });
+
   useEffect(() => {
-    if (open) {
-      previousFocusRef.current = document.activeElement;
-      setValue(current === null ? '' : String(current));
-      const id = setTimeout(() => inputRef.current?.focus(), 60);
-      return () => clearTimeout(id);
-    }
-    const element = previousFocusRef.current;
-    if (element && typeof (element as HTMLElement).focus === 'function') {
-      (element as HTMLElement).focus();
-    }
-    previousFocusRef.current = null;
+    if (open) setValue(current === null ? '' : String(current));
   }, [open, current]);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [open, onClose]);
-
-  useEffect(() => {
-    if (!open) return;
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    const FOCUSABLE =
-      'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
-    const trap = (event: KeyboardEvent) => {
-      if (event.key !== 'Tab') return;
-      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE));
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener('keydown', trap);
-    return () => document.removeEventListener('keydown', trap);
-  }, [open]);
 
   if (!open) return null;
 
@@ -94,9 +60,7 @@ export function JerseyNumberDialog({
     <div
       className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4"
       style={{ background: 'rgba(25,31,40,0.45)' }}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
+      onClick={onBackdropClick}
     >
       <div
         ref={dialogRef}
@@ -120,7 +84,7 @@ export function JerseyNumberDialog({
             등번호 (비우면 해제)
           </label>
           <input
-            ref={inputRef}
+            ref={initialFocusRef}
             id={inputId}
             type="number"
             inputMode="numeric"

@@ -109,7 +109,7 @@ export function TournamentVenueMap({
       style={{
         width: '100%',
         height: 180,
-        borderRadius: 12,
+        borderRadius: 'var(--radius-control)',
         overflow: 'hidden',
         marginTop: 12,
         background: 'var(--surface-soft)',

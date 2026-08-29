@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, ErrorState, ListItem } from '@/components/v1-ui/primitives';
+import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import {
   useV1AcceptTeamContact,
   useV1CreateInquiry,
@@ -230,11 +231,10 @@ function TeamContactListRow({ contact, direction }: { contact: V1TeamContact; di
 
 /**
  * 컨택 상세에서 상대 팀을 신고하는 다이얼로그. 공용 Modal 이 없어
- * jersey-number-dialog.tsx 의 관용구(role=dialog + ESC + focus trap)를 그대로 따른다.
+ * jersey-number-dialog.tsx 의 관용구(role=dialog + ESC + focus trap)를 그대로 따르다가,
+ * focus 저장·복원/ESC/Tab 트랩/body 스크롤 잠금은 공용 `useModalA11y` 훅으로 이관했다
+ * (이 컴포넌트엔 원래 스크롤 잠금이 빠져 있었다 — 훅이 채워준다).
  */
-const DIALOG_FOCUSABLE =
-  'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
-
 function ReportContactDialog({
   open,
   saving,
@@ -250,68 +250,15 @@ function ReportContactDialog({
 }) {
   const idPrefix = useId();
   const titleId = `${idPrefix}-report-title`;
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const previousFocusRef = useRef<Element | null>(null);
   const [reason, setReason] = useState<V1InquiryReportReason | null>(null);
   const [detail, setDetail] = useState('');
 
-  useEffect(() => {
-    if (open) {
-      previousFocusRef.current = document.activeElement;
-      setReason(null);
-      setDetail('');
-      return;
-    }
-    const element = previousFocusRef.current;
-    // document.contains 를 확인한다 — 제출 성공처럼 트리거 버튼이 같은 틱에 사라지는 경우
-    // 분리된 노드에 focus() 를 불러 조용히 아무 일도 안 일어나는 것을 막는다.
-    if (element && document.contains(element) && typeof (element as HTMLElement).focus === 'function') {
-      (element as HTMLElement).focus();
-    }
-    previousFocusRef.current = null;
-  }, [open]);
-
-  // 열릴 때 포커스를 다이얼로그 안으로 옮긴다. 이게 없으면 포커스가 배경에 남고, 아래 트랩은
-  // activeElement 가 첫/마지막 요소일 때만 개입하도록 만들어져 있어 **한 번도 발동하지 않는다** —
-  // 결과적으로 aria-modal="true" 가 실제로는 배경을 격리하지 못하고 Shift+Tab 으로 새어나간다.
-  // 관용구 출처: components/teams/jersey-number-dialog.tsx
-  useEffect(() => {
-    if (!open) return;
-    const id = setTimeout(() => {
-      dialogRef.current?.querySelector<HTMLElement>(DIALOG_FOCUSABLE)?.focus();
-    }, 60);
-    return () => clearTimeout(id);
-  }, [open]);
+  const { dialogRef, onBackdropClick } = useModalA11y<HTMLElement, HTMLDivElement>({ open, onClose });
 
   useEffect(() => {
     if (!open) return;
-    const handler = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [open, onClose]);
-
-  useEffect(() => {
-    if (!open) return;
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    const trap = (event: KeyboardEvent) => {
-      if (event.key !== 'Tab') return;
-      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(DIALOG_FOCUSABLE));
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener('keydown', trap);
-    return () => document.removeEventListener('keydown', trap);
+    setReason(null);
+    setDetail('');
   }, [open]);
 
   if (!open) return null;
@@ -320,9 +267,7 @@ function ReportContactDialog({
     <div
       className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4"
       style={{ background: 'rgba(25,31,40,0.45)' }}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
+      onClick={onBackdropClick}
     >
       <div
         ref={dialogRef}

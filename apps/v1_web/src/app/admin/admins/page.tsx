@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ShieldCheck, ShieldMinus, Shield, X, RotateCcw, Calendar, Clock, Activity } from 'lucide-react';
 import {
   useV1AdminMe,
@@ -13,6 +13,7 @@ import { v1Get } from '@/lib/api-client';
 import { formatAdminDate } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import { useAdminListQuery } from '@/hooks/use-admin-list-query';
+import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import {
   AdminPageHeader,
   AdminFilterBar,
@@ -94,16 +95,24 @@ function GrantModal({ open, onClose, onGrantSuccess }: GrantModalProps) {
   const [pickedUser, setPickedUser] = useState<EntityPickerItem | null>(null);
   const [role, setRole] = useState<'ops' | 'support'>('ops');
   const [reason, setReason] = useState('');
-  const panelRef = useRef<HTMLDivElement>(null);
 
   const grantMutation = useV1GrantAdmin();
   const { toasts, showToast } = useAdminToast();
+
+  // ESC 닫기 · Tab focus trap · body 스크롤 잠금 · 닫힐 때 포커스 복원은
+  // 공용 훅으로 이관. panelRef → dialogRef.
+  const { dialogRef, onBackdropClick } = useModalA11y({
+    open,
+    onClose,
+    pending: grantMutation.isPending,
+  });
 
   const { data: usersPage, isPending: usersPending } = useV1AdminUsers(
     query ? { q: query, limit: 10 } : undefined,
   );
 
-  // Reset on open
+  // Reset on open (검색어·선택·역할·사유 초기화 + 검색창 초기 포커스는 EntityPicker가
+  // ref 전달을 지원하지 않아 훅의 initialFocusRef로 옮길 수 없다 — 기존 방식 유지)
   useEffect(() => {
     if (open) {
       setQuery('');
@@ -113,52 +122,6 @@ function GrantModal({ open, onClose, onGrantSuccess }: GrantModalProps) {
       const t = setTimeout(() => document.getElementById('grant-user-search')?.focus(), 60);
       return () => clearTimeout(t);
     }
-  }, [open]);
-
-  // ESC
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !grantMutation.isPending) onClose();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [open, onClose, grantMutation.isPending]);
-
-  // Focus trap
-  useEffect(() => {
-    if (!open) return;
-    const panel = panelRef.current;
-    if (!panel) return;
-    const sel =
-      'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
-    const trap = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab') return;
-      const items = Array.from(panel.querySelectorAll<HTMLElement>(sel));
-      if (items.length === 0) return;
-      const first = items[0];
-      const last = items[items.length - 1];
-      if (e.shiftKey) {
-        if (document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        }
-      } else {
-        if (document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    };
-    document.addEventListener('keydown', trap);
-    return () => document.removeEventListener('keydown', trap);
-  }, [open]);
-
-  // Body scroll lock
-  useEffect(() => {
-    if (open) document.body.style.overflow = 'hidden';
-    else document.body.style.overflow = '';
-    return () => { document.body.style.overflow = ''; };
   }, [open]);
 
   if (!open) return null;
@@ -193,12 +156,10 @@ function GrantModal({ open, onClose, onGrantSuccess }: GrantModalProps) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-[2px]"
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !grantMutation.isPending) onClose();
-      }}
+      onClick={onBackdropClick}
     >
       <div
-        ref={panelRef}
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="grant-modal-title"

@@ -17,6 +17,7 @@ final class WebShellViewController: UIViewController {
     private var webView: WKWebView!
     private var downloads: DownloadHandler!
     private var publishedBottomInset: Int?
+    private let push = PushBridgeService()
 
     init(config: AppConfig, model: WebShellModel, sessionStore: WebShellSessionStore) {
         self.config = config
@@ -64,6 +65,19 @@ final class WebShellViewController: UIViewController {
         configuration.defaultWebpagePreferences.allowsContentJavaScript = true
         // Media on a match or tournament page should not require a second tap to start.
         configuration.allowsInlineMediaPlayback = true
+
+        // Installed before any page script runs, because the web calls
+        // isNativePushAvailable() during render.
+        configuration.userContentController.addUserScript(WKUserScript(
+            source: NativeBridge.shimScript,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true))
+        // Registered through a weak proxy. WKUserContentController retains its handlers, and
+        // this controller owns the web view that owns the configuration that owns the
+        // controller — registering `self` directly would keep the whole graph alive forever
+        // and mean the teardown that unregisters it never runs.
+        configuration.userContentController.add(
+            WeakScriptMessageHandler(target: self), name: NativeBridge.handlerName)
 
         webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = self
@@ -286,5 +300,67 @@ extension WebShellViewController: WKUIDelegate {
             openExternally(url)
         }
         return nil
+    }
+}
+
+// MARK: - Native push bridge
+
+extension WebShellViewController: WKScriptMessageHandler {
+
+    /// Receives `window.TeameetNative.postMessage(...)` from the page.
+    ///
+    /// Two checks stand between the page and the shell, and they are the iOS equivalent of
+    /// the `allowedOriginRules` argument Android passes to `addWebMessageListener`: WebKit
+    /// enforces the origin there, so it has to be enforced here.
+    ///
+    /// Anything that fails is dropped in silence. Replying to an untrusted frame would tell
+    /// it the reader's notification state, and replying to a malformed request would resolve
+    /// a promise nobody made.
+    func userContentController(
+        _ userContentController: WKUserContentController,
+        didReceive message: WKScriptMessage
+    ) {
+        guard message.frameInfo.isMainFrame,
+              matchesConfiguredOrigin(message.frameInfo.securityOrigin),
+              let request = NativeBridge.parse(message.body) else { return }
+        Task { await handle(request) }
+    }
+
+    /// Hands WebKit's already-parsed origin to the rule in `NativeBridge`.
+    private func matchesConfiguredOrigin(_ origin: WKSecurityOrigin) -> Bool {
+        NativeBridge.matchesOrigin(
+            scheme: origin.protocol,
+            host: origin.host,
+            port: origin.port,
+            expectedOrigin: config.webOrigin)
+    }
+
+    private func handle(_ request: NativeBridge.Message) async {
+        switch request.action {
+        case .getPushState:
+            await reply(to: request, permission: await push.currentPermission())
+        case .requestNotificationPermission:
+            await reply(to: request, permission: await push.requestPermission())
+        case .openNotificationSettings:
+            push.openSettings()
+            await reply(to: request, permission: await push.currentPermission())
+        case .revokePushDevice:
+            await push.revoke()
+            await reply(to: request, permission: await push.currentPermission())
+        }
+    }
+
+    private func reply(to request: NativeBridge.Message, permission: PushPermission.WebValue) async {
+        // `subscribed` is the consent pair, not the OS permission alone: a device is only
+        // subscribed when the OS allows delivery AND a registration exists.
+        let subscribed = PushConsent.hasActiveConsent(
+            permissionGranted: permission == .granted,
+            optedIn: push.isDeviceRegistered)
+        let script = NativeBridge.resultScript(
+            requestId: request.requestId,
+            permission: permission.rawValue,
+            subscribed: subscribed)
+        guard !script.isEmpty else { return }
+        _ = try? await webView.evaluateJavaScript(script)
     }
 }

@@ -112,6 +112,9 @@ targets:
       - path: Teameet/WebShell/WebShellSession.swift
       - path: Teameet/WebShell/WebShellSessionStore.swift
       - path: Teameet/WebShell/SafeAreaBridge.swift
+      - path: Teameet/WebShell/NativeBridgeMessage.swift
+      - path: Teameet/Push/PushPermission.swift
+      - path: Teameet/Push/PushConsent.swift
     settings:
       base:
         GENERATE_INFOPLIST_FILE: NO

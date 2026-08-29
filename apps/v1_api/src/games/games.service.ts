@@ -2702,7 +2702,19 @@ export class GamesService {
         // 재사용 경로든 이월 경로든 직전 행의 참가자를 신원으로 대조해야 한다.
         const priorParticipants =
           game.sourceType === V1GameSourceType.TOURNAMENT_FIXTURE && previous !== null
-            ? await tx.v1GameParticipant.findMany({ where: { gameId, sideId, lineupId: previous.id } })
+            ? await tx.v1GameParticipant.findMany({
+                where: { gameId, sideId, lineupId: previous.id },
+                // **정렬은 필수다.** 아래에서 같은 키의 행을 `shift()` 로 1:1 소진하는데,
+                // 동명 게스트 둘(둘 다 userId=null, 둘 다 "김철수")은 **같은 버킷**에 들어간다.
+                // `ORDER BY` 없는 SELECT 의 순서는 Postgres 가 보장하지 않으므로, 정렬이
+                // 없으면 어느 쪽이 먼저 소진되는지가 DB 반환 순서에 좌우된다 -- 저장할 때마다
+                // `arrivedAt` 이월 대상과 재사용되는 행이 뒤바뀔 수 있다(검인이 옆 사람에게
+                // 옮겨 붙는데 재현은 불규칙하다).
+                //
+                // `id` 를 tie-breaker 로 붙이는 이유: 같은 트랜잭션에서 만들어진 행들은
+                // `createdAt` 이 동일할 수 있어 그것만으로는 다시 비결정적이 된다.
+                orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+              })
             : [];
         // 매칭 키: 계정이 있으면 계정, 게스트는 이름이 유일한 신원이다(V1TeamTacticsBoardEntry
         // 와 같은 규칙). 이름 대조를 게스트로 한정하는 이유는 전술보드에서와 같다 -- 연동

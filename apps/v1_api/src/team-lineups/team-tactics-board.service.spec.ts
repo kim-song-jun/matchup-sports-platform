@@ -339,6 +339,27 @@ describe('TeamTacticsBoardService — 저장 규칙', () => {
     }
   });
 
+  it('expectedVersion 을 안 보내도 동시 저장 보호는 꺼지지 않는다 (계약: 항상 CAS)', async () => {
+    // optional 필드를 빠뜨리는 것만으로 동료의 배치가 조용히 덮어써지면 그건 옵션이
+    // 아니라 함정이다. 값을 주는 것은 선제 검사일 뿐이고, 잠금은 언제나 걸린다.
+    const { prisma } = buildPrisma({
+      team: { id: TEAM_ID, deletedAt: null },
+      membershipRole: 'owner',
+      side: HOME_SIDE,
+      board: boardRow({ version: 3 }),
+      swapCount: 0,
+    });
+    const { service, moduleRef } = await buildService(prisma);
+    try {
+      await expect(
+        service.save(USER, TEAM_ID, GAME_ID, { entries: [] }),
+      ).rejects.toMatchObject({ response: { code: 'TACTICS_BOARD_VERSION_CONFLICT' } });
+      expect(prisma.v1TeamTacticsBoardEntry.deleteMany).not.toHaveBeenCalled();
+    } finally {
+      await moduleRef.close();
+    }
+  });
+
   it('조건부 갱신은 읽은 버전을 WHERE 에 걸고 version 을 1 올린다', async () => {
     const { prisma } = buildPrisma({
       team: { id: TEAM_ID, deletedAt: null },

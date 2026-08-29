@@ -116,6 +116,9 @@ export class TeamTacticsBoardService {
 
       // 읽기와 같은 불변식을 쓰기에서도 확인한다 — 어긋난 보드를 덮어쓰는 것도 안 된다.
       if (current.teamId !== side.teamId) throw this.teamMismatch();
+      // 이건 **선제 검사**일 뿐이고 잠금 자체가 아니다. 아래 조건부 갱신이 언제나 CAS 로
+      // 동작하므로, expectedVersion 을 주지 않아도 동시 저장 보호는 그대로다 — 값을 주면
+      // 쓰기를 시도하기 전에 어긋남을 알려주는 것뿐이다(DTO 주석에 이유를 적어 뒀다).
       if (dto.expectedVersion !== undefined && dto.expectedVersion !== current.version) {
         throw this.versionConflict();
       }

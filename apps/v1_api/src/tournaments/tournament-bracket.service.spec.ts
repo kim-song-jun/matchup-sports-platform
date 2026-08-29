@@ -180,7 +180,9 @@ describe('TournamentBracketService', () => {
     v1Tournament: { findFirst: jest.Mock };
     v1TournamentGroup: { findFirst: jest.Mock; create: jest.Mock; findMany: jest.Mock };
     v1TournamentGroupTeam: { findUnique: jest.Mock; create: jest.Mock };
-    v1TournamentRegistration: { findFirst: jest.Mock; findMany: jest.Mock };
+    v1TournamentRegistration: { findFirst: jest.Mock; findMany: jest.Mock; findUnique: jest.Mock };
+    v1GameSide: { update: jest.Mock };
+    v1TeamTacticsBoard: { deleteMany: jest.Mock };
     v1TournamentFixture: {
       findFirst: jest.Mock;
       findUnique: jest.Mock;
@@ -209,7 +211,13 @@ describe('TournamentBracketService', () => {
       v1Tournament: { findFirst: jest.fn() },
       v1TournamentGroup: { findFirst: jest.fn(), create: jest.fn(), findMany: jest.fn() },
       v1TournamentGroupTeam: { findUnique: jest.fn(), create: jest.fn() },
-      v1TournamentRegistration: { findFirst: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
+      v1TournamentRegistration: {
+        findFirst: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+        findUnique: jest.fn(),
+      },
+      v1GameSide: { update: jest.fn().mockResolvedValue({}) },
+      v1TeamTacticsBoard: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
       v1TournamentFixture: {
         findFirst: jest.fn().mockResolvedValue(null),
         findUnique: jest.fn(),
@@ -1059,6 +1067,63 @@ describe('TournamentBracketService', () => {
 
     const result = await service.updateFixture(ownerUser, 'fixture-1', { homeRegistrationId: 'reg-3' });
     expect(result).toMatchObject({ id: 'fixture-1' });
+  });
+
+  it('updateFixture: 사이드의 팀이 바뀌면 그 사이드의 전술보드를 같은 트랜잭션에서 지운다', async () => {
+    // 팀 교체는 결과가 나오기 전이면 정상 운영 동작이다(FIXTURE_HAS_RESULT 는 결과가
+    // 있을 때만 막는다). 그런데 전술보드는 sideId 로 붙어 있고 자기 teamId 를 따로 들고
+    // 있어서, 지우지 않으면 옛 팀의 배치가 새 팀 자리에 남는다 — 읽기 쪽 불변식 검사가
+    // 409 로 막아 주지만 아무도 그 보드를 고칠 수 없어 영구히 잠긴다.
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    prisma.v1TournamentFixture.findUnique.mockResolvedValue({
+      ...fixtureRow(),
+      game: {
+        id: 'game-1',
+        currentOfficialRevision: null,
+        sides: [{ id: 'side-home', sideKey: 'HOME', teamId: 'team-old' }],
+      },
+    });
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow({ id: 'reg-3' }));
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue({
+      team: { id: 'team-new', name: '새로 들어온 팀' },
+    });
+    prisma.v1TournamentFixture.update.mockResolvedValue(fixtureRow({ homeRegistrationId: 'reg-3' }));
+
+    await service.updateFixture(ownerUser, 'fixture-1', { homeRegistrationId: 'reg-3' });
+
+    expect(prisma.v1GameSide.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'side-home' },
+        data: expect.objectContaining({ teamId: 'team-new' }),
+      }),
+    );
+    expect(prisma.v1TeamTacticsBoard.deleteMany).toHaveBeenCalledWith({
+      where: { sideId: 'side-home' },
+    });
+  });
+
+  it('updateFixture: 사이드의 팀이 그대로면 전술보드를 지우지 않는다', async () => {
+    // 일정·장소만 고치는 흔한 호출에서 팀의 전술보드가 날아가면 안 된다.
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    prisma.v1TournamentFixture.findUnique.mockResolvedValue({
+      ...fixtureRow(),
+      game: {
+        id: 'game-1',
+        currentOfficialRevision: null,
+        sides: [{ id: 'side-home', sideKey: 'HOME', teamId: 'team-same' }],
+      },
+    });
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow({ id: 'reg-3' }));
+    // 배정된 팀이 이미 그 사이드의 팀과 같다 → sideTeamUpdates 가 비어야 한다.
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue({
+      team: { id: 'team-same', name: '그대로인 팀' },
+    });
+    prisma.v1TournamentFixture.update.mockResolvedValue(fixtureRow({ homeRegistrationId: 'reg-3' }));
+
+    await service.updateFixture(ownerUser, 'fixture-1', { homeRegistrationId: 'reg-3' });
+
+    expect(prisma.v1GameSide.update).not.toHaveBeenCalled();
+    expect(prisma.v1TeamTacticsBoard.deleteMany).not.toHaveBeenCalled();
   });
 
   it('deleteFixture: 신규 경로에 OFFICIAL 결과가 있으면 삭제가 409로 막힌다', async () => {

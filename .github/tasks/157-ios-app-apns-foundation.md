@@ -73,6 +73,10 @@ Android 셸과 **동일 모델**이며, iOS 관용 표현으로만 다시 쓴다
 - `AllowedNavigation` / `DeepLinkRoute` / `PushConsent` / `AppConfig` 순수 타입.
 - `TeameetTests` 5종 유닛 테스트. Android JVM 테스트와 **동일 케이스**를 이식한다.
 - `xcodegen generate && xcodebuild test`가 시뮬레이터에서 통과.
+- **`Teameet.entitlements`는 S7로 이월한다.** `aps-environment`를 소비하는 코드가 S7 전에는
+  없고, 쓰이지 않는 capability를 미리 박아 두는 것은 이 저장소의 기술부채 원칙에 어긋난다.
+  S7에서 넣을 때는 소스 파일이 아니라 **빌드된 `.app`의 embedded entitlements를 양 flavor
+  모두 실판독**해 alpha=`development` / production=`production`을 증명한다.
 
 ### Phase 2 — WebView 셸
 
@@ -136,6 +140,9 @@ Android 셸과 **동일 모델**이며, iOS 관용 표현으로만 다시 쓴다
   App ID `1:<sender>:ios:<hex>` 형식, alpha/production 프로젝트 교차 사용 차단, sender id ↔ app id 일치.
 - `.github/workflows/ios-alpha.yml`: macos runner에서 `xcodegen generate` → `xcodebuild test` →
   서명 없는 시뮬레이터 빌드. public 저장소라 macOS runner는 무료다.
+- **SourcePackages 캐시가 필수다.** 테스트만 돌려도 xcodebuild가 패키지 그래프를 해석하며
+  SwiftPM이 링크하지 않는 것까지 포함해 약 850MB(grpc-binary 609MB)를 받는다. 캐시 없이는
+  매 실행이 그 비용을 다시 낸다.
 - `scripts/release/require-ios-production-ref.sh`로 production 아티팩트가 `main` 외 ref에서
   나오지 못하게 fail-closed(Android 스크립트와 동일 계약).
 
@@ -266,6 +273,58 @@ xcodebuild test -project Teameet.xcodeproj -scheme TeameetAlpha \
 - 2026-08-29: Android `market:` 스킴은 iOS에 없으므로 `itms-apps:`로 대체하고, `intent:`는 iOS에
   존재하지 않으므로 allowlist에서 제외한다.
 
+## 감독 세션 결정 (2026-08-29, matchup-sports-platform-4a)
+
+| # | 결정 | 근거 · 조건 |
+|---|---|---|
+| 1 | `Teameet.entitlements`는 S7로 이월 | 소비처 없는 capability를 미리 박지 않는다. S7에서 빌드된 `.app`의 embedded entitlements를 양 flavor 실판독해 증명한다 |
+| 2 | 테스트 번들은 host 없는 순수 로직 유지 + 스킴의 test 액션이 앱 타깃을 **빌드**한다 | 테스트 프로세스에 Firebase·UIKit이 딸려 들어오지 않으면서, 앱 코드의 컴파일 오류는 `xcodebuild test`에서 잡힌다. Red 증명 필수 |
+| 3 | 빈 `TeameetApp`은 A·B·C 대상 아님 | 다만 S4에서 **로딩 중 화면**이나 **로드 실패 화면**이 필요해지는 순간 3안 대상이다 |
+| 4 | Swift 6 언어 모드 승인 | `@preconcurrency`·`nonisolated(unsafe)`로 마찰을 덮지 말고 먼저 보고할 것 |
+
+`b5ff48945`가 `apps/v1_web`을 건드린 건 이 태스크와 무관하다 — PR #821의 head이자 이 브랜치의
+base이며 작성자는 seeungmin이다. 이 태스크의 `apps/v1_web` 변경은 0줄로 유지한다.
+
+## 베이스 전진 반영 (2026-08-29)
+
+`origin/feat/android-fcm-foundation`이 전진해 3-way merge(`137568e7d`)로 흡수했다. 그중 두
+커밋이 S4 범위를 직접 바꾼다.
+
+**`e29209a26` fix(v1-web): honor Android safe area across detail flows**
+
+안전영역 CSS 변수의 소비처가 하단 내비가 없는 상세·폼 화면까지 늘었다.
+
+```css
+.tm-app-frame-no-bottom .tm-scroll-area { bottom: var(--v1-shell-safe-bottom); }
+.tm-app-frame-no-bottom .tm-scroll-area:has(.tm-fixed-cta),
+.tm-app-frame-no-bottom .tm-scroll-area:has(.tm-chat-room) { bottom: 0; }
+```
+
+실측으로 확인한 현재 계약:
+
+- `env(safe-area-inset-bottom)`은 `apps/v1_web` 전체에서 **딱 1곳**, 변수 정의에만 등장한다.
+  나머지 11개 파일은 전부 `--v1-shell-safe-bottom`을 거친다.
+- `viewport-fit`은 저장소에 **0건**이다. 따라서 WKWebView에서 `env()`는 0으로 평가되고
+  `--v1-shell-safe-bottom`은 **전적으로 네이티브 주입값**이 된다. 주입을 빠뜨리면 상세·폼
+  화면 전체가 홈 인디케이터에 깔린다.
+- 자기 fixed surface가 이미 inset을 소비하는 화면은 opt-out 하므로, 네이티브는 **하단 inset
+  하나만** 정직하게 publish하면 되고 화면별 보정을 하지 않는다.
+
+**`4e38fe12f` fix(android): preserve WebView route on app re-entry**
+
+`MainActivity`의 수명주기 계약이 바뀌어 S4 설계에 반영해야 한다.
+
+- 콜드 스타트: `savedInstanceState`에서 `webView.restoreState()`가 성공하면 초기 URL을
+  **로드하지 않는다**. 실패하거나 없을 때만 `WEB_ORIGIN + routeFromIntent`.
+- `onNewIntent`: **명시적 route가 있을 때만** 이동한다. `singleTask`가 전달하는 목적지 없는
+  MAIN/LAUNCHER 인텐트는 현재 페이지와 히스토리를 건드리지 않는다.
+- `onSaveInstanceState`에서 `webView.saveState()`로 URL·히스토리를 보존한다.
+
+iOS 대응: `WKWebView.interactionState`(iOS 15+)가 `saveState`/`restoreState`의 정확한 대응물로
+back/forward 리스트와 스크롤 위치를 직렬화한다. 이를 영속화했다가 복원하고, 복원할 것이
+없을 때만 `WEB_ORIGIN + "/home"`을 로드한다. 런처 재진입은 iOS에서 기본이 이미 "아무것도
+하지 않음"이라 추가 코드가 필요 없고, 명시적 이동은 알림 탭(S7)이 담당한다.
+
 ## Progress Snapshot
 
 단계 구분은 설계 세션(matchup-sports-platform-4a)이 2026-08-29에 확정한 S1–S11을 따른다.
@@ -303,14 +362,67 @@ xcodebuild test -project Teameet.xcodeproj -scheme TeameetAlpha \
 - `generate-ios-version-xcconfig.sh` / `require-ios-production-ref.sh` negative control 통과
   (`versionName=0.1` 거부, `versionCode=0` 거부, `GITHUB_REF_NAME=dev` 거부, `main` 허용).
 
-### 실측으로 확정한 빌드 사실
+### 실측으로 확정한 빌드 사실 (모르면 반드시 다시 밟는 함정)
 
-| 사실 | 근거 |
-|---|---|
-| 배포 타깃 iOS 16.0 가능 | firebase-ios-sdk 12.18.0 `Package.swift`가 `platforms: [.iOS(.v15), ...]` |
-| xcconfig 값에 리터럴 `//` 불가 | 주석으로 해석돼 값이 잘림. `SLASHES = //`도 통째로 삼켜짐. `SLASHES = /$()/`만 동작 (`-showBuildSettings`로 확인) |
-| `INFOPLIST_KEY_<커스텀>`은 no-op | 설정은 해석되지만 키가 번들 `Info.plist`에 도달하지 않음. 명시적 `info:` 블록의 `$(VAR)` 치환만 동작 |
-| `xcodebuild test`도 패키지 그래프를 해석 | 앱 타깃을 컴파일하지 않아도 SwiftPM이 링크하지 않는 바이너리까지 약 850MB(grpc-binary 609MB) 수신. CI에 SourcePackages 캐시 필요 |
+**(a) 배포 타깃 iOS 16.0** — Firebase가 바닥을 정한다.
+
+```
+$ curl -fsSL https://raw.githubusercontent.com/firebase/firebase-ios-sdk/12.18.0/Package.swift \
+    | grep -m1 'platforms:'
+  platforms: [.iOS(.v15), .macCatalyst(.v15), .macOS(.v10_15), .tvOS(.v15), .watchOS(.v7)],
+```
+
+최소 iOS 15.0이므로 16.0 타깃과 충돌하지 않는다. SPM 산출물은 `FirebaseMessaging`과
+`FirebaseCore` 두 라이브러리 product를 앱 타깃에 **둘 다** 명시해야 한다.
+
+**(b) xcconfig 값에 리터럴 `//`를 넣을 수 없다** — 유일한 해법은 `/$()/`다.
+
+xcconfig 파서가 `//`를 주석 시작으로 읽어 **변수 치환보다 먼저** 값을 잘라 버린다.
+슬래시를 별도 변수로 빼는 우회도 통하지 않는다(`SLASHES = //` 자체가 주석에 삼켜져
+변수가 아예 생기지 않고 `TEAMEET_WEB_ORIGIN`이 `https:alpha.teameet.co.kr`이 된다).
+두 슬래시 사이에 빈 매크로 확장을 끼우면 raw 텍스트에 인접한 슬래시가 없어 주석 스캐너가
+발동하지 않고, 확장 후 값은 `//`가 된다.
+
+```
+Config/Alpha.xcconfig:
+  SLASHES = /$()/
+  TEAMEET_WEB_ORIGIN = https:$(SLASHES)alpha.teameet.co.kr
+
+$ xcodebuild -showBuildSettings -configuration 'Alpha Debug' | grep -E ' (SLASHES|TEAMEET_WEB_ORIGIN) = '
+    SLASHES = //
+    TEAMEET_WEB_ORIGIN = https://alpha.teameet.co.kr
+```
+
+**(c) `INFOPLIST_KEY_<커스텀>`은 자체 키에 조용한 no-op다.**
+
+Xcode가 이미 아는 키(`CFBundleDisplayName` 등)에만 적용된다. 자체 키는
+`-showBuildSettings`에 빌드 설정으로는 멀쩡히 보이지만 번들 `Info.plist`에는 도달하지
+않는다. 실패가 조용해서 특히 위험하다. 해법은 `project.yml`의 명시적 `info:` 블록에
+`$(VAR)` placeholder를 두고 `INFOPLIST_EXPAND_BUILD_SETTINGS`가 치환하게 하는 것이다.
+빌드된 산출물로 확인한다(소스가 아니라):
+
+```
+$ plutil -p "$DD/Build/Products/Alpha Debug-iphonesimulator/Teameet.app/Info.plist"
+  "CFBundleIdentifier" => "kr.co.teameet.alpha"
+  "CFBundleDisplayName" => "Teameet Alpha"
+  "CFBundleShortVersionString" => "0.1.0"
+  "TeameetWebOrigin" => "https://alpha.teameet.co.kr"
+  "TeameetWebViewInspectable" => "YES"
+$ plutil -p "$DD/Build/Products/Production Debug-iphonesimulator/Teameet.app/Info.plist"
+  "CFBundleIdentifier" => "kr.co.teameet"
+  "CFBundleDisplayName" => "Teameet"
+  "TeameetWebOrigin" => "https://teameet.co.kr"
+  "TeameetWebViewInspectable" => "NO"
+```
+
+**(d) `xcodebuild test`도 패키지 그래프를 해석한다.** 앱 타깃을 컴파일하지 않아도 SwiftPM이
+링크하지 않는 바이너리까지 내려받는다 — `SourcePackages/artifacts` 841MB, 그중
+`grpc-binary` 609MB. S8의 CI는 SourcePackages를 캐시해야 한다.
+
+**(e) DerivedData 경로를 고정하지 않으면 엉뚱한 빌드를 판독한다.** 같은 프로젝트 이름의
+스파이크가 있으면 `~/Library/Developer/Xcode/DerivedData/Teameet-*`가 둘 이상 생긴다.
+실제로 이 세션에서 프로브의 `.app`을 읽고 결함 3건으로 오진했다. 산출물 검증은 항상
+`-derivedDataPath`를 명시한 빌드의 경로로 한다.
 
 ### 알려진 한계
 

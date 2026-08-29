@@ -86,20 +86,19 @@ targets:
   TeameetTests:
     type: bundle.unit-test
     platform: iOS
-    # No `dependencies: [target: Teameet]`, so this bundle runs without a test host: the
-    # test action compiles neither the app target nor Firebase, and a warm
-    # `xcodebuild test` finishes in about 18 seconds (measured).
+    # No `dependencies: [target: Teameet]`, so this bundle runs without a test host and the
+    # test *process* never loads Firebase or UIKit. The scheme still builds the app target
+    # for the test action, so a compile error in the WebView or push code fails
+    # `xcodebuild test` — the coverage gap a hostless bundle would otherwise leave.
     #
-    # It does NOT make the test action offline. xcodebuild still resolves the project's
-    # package graph, and SwiftPM fetches firebase-ios-sdk's binary artifacts for the whole
-    # package rather than only the linked products — about 850MB, of which grpc-binary
-    # alone is 609MB (measured). CI therefore has to cache SourcePackages; see
-    # .github/workflows/ios-alpha.yml.
-    #
-    # Because the test action skips the app target, a compile error in the WebView or push
-    # code would not show up here, so CI also runs an unsigned simulator build of the app.
     # Any file listed below must stay free of UIKit, WebKit and Firebase imports: the test
     # bundle compiles these sources directly instead of importing the app module.
+    #
+    # Note that no arrangement makes the test action offline. xcodebuild resolves the
+    # project's package graph, and SwiftPM fetches firebase-ios-sdk's binary artifacts for
+    # the whole package rather than only the linked products — about 850MB, of which
+    # grpc-binary alone is 609MB (measured). CI caches SourcePackages for this reason; see
+    # .github/workflows/ios-alpha.yml.
     sources:
       - path: TeameetTests
       - path: Teameet/Navigation
@@ -115,9 +114,11 @@ schemes:
   TeameetAlpha:
     build:
       targets:
-        # `test` is intentionally absent from the app target's actions: including it would
-        # make the test action build the app, dragging Firebase back into every test run.
-        Teameet: [run, profile, analyze, archive]
+        # The app target IS built for the test action. It is not linked into the test
+        # bundle — TeameetTests still has no dependency on it — but building it here means
+        # `xcodebuild test` fails on a compile error anywhere in the WebView or push code,
+        # which a hostless test bundle would otherwise never notice.
+        Teameet: [run, test, profile, analyze, archive]
         TeameetTests: [test]
     run:
       config: Alpha Debug
@@ -135,7 +136,7 @@ schemes:
   TeameetProduction:
     build:
       targets:
-        Teameet: [run, profile, analyze, archive]
+        Teameet: [run, test, profile, analyze, archive]
         TeameetTests: [test]
     run:
       config: Production Debug

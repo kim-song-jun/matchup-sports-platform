@@ -593,6 +593,13 @@ button:disabled {
 }
 
 .tm-app-frame-no-bottom .tm-scroll-area {
+  /* Detail/form pages have no bottom nav to consume the Android system inset. Keep ordinary
+     scroll content above it; pages with their own inset-aware fixed surface opt out below. */
+  bottom: var(--v1-shell-safe-bottom);
+}
+
+.tm-app-frame-no-bottom .tm-scroll-area:has(.tm-fixed-cta),
+.tm-app-frame-no-bottom .tm-scroll-area:has(.tm-chat-room) {
   bottom: 0;
 }
 
@@ -4559,7 +4566,7 @@ label.tm-btn:focus-within {
    * tm-create-shell의 하드코딩 124px보다 이 값이 적용 순서상 뒤에 오므로
    * specificity로 덮어씌우기 위해 별도 속성으로 선언합니다.
    */
-  padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px) + 16px);
+  padding-bottom: calc(88px + var(--v1-shell-safe-bottom) + 16px);
 }
 
 .tm-profile-edit-shell .tm-my-profile-head {

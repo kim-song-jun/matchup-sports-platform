@@ -505,7 +505,7 @@ export function ReviewFormModal({
         style={{
           width: '100%', maxWidth: 480, background: 'var(--background)',
           borderRadius: '16px 16px 0 0', padding: '24px 20px',
-          paddingBottom: 'max(24px, env(safe-area-inset-bottom))',
+          paddingBottom: 'max(24px, var(--v1-shell-safe-bottom))',
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>

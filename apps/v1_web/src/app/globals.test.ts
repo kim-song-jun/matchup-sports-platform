@@ -14,3 +14,18 @@ describe('mobile floating action button layout', () => {
     );
   });
 });
+
+describe('Android bottom inset layout', () => {
+  it('keeps no-bottom-nav pages above the system navigation area', () => {
+    const rule = globalsCss.match(/\.tm-app-frame-no-bottom \.tm-scroll-area\s*\{([^}]*)\}/)?.[1];
+
+    expect(rule).toBeDefined();
+    expect(rule).toMatch(/bottom:\s*var\(--v1-shell-safe-bottom\)/);
+  });
+
+  it('does not reserve the inset twice when a child surface already consumes it', () => {
+    expect(globalsCss).toMatch(
+      /\.tm-app-frame-no-bottom \.tm-scroll-area:has\(\.tm-fixed-cta\),\s*\.tm-app-frame-no-bottom \.tm-scroll-area:has\(\.tm-chat-room\)\s*\{\s*bottom:\s*0;/,
+    );
+  });
+});

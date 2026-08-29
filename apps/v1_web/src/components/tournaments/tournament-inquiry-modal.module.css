@@ -204,7 +204,7 @@
   display: grid;
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
   gap: 8px;
-  padding: 16px 20px max(16px, env(safe-area-inset-bottom));
+  padding: 16px 20px max(16px, var(--v1-shell-safe-bottom));
   border-top: 1px solid var(--grey100);
   background: var(--surface);
 }

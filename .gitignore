@@ -60,6 +60,15 @@ v1_before_team_chat_migration.sql
 apps/web/ios/
 apps/web/android/
 
+# iOS native shell (apps/v1_ios) — project.yml is the source of truth, the
+# Xcode project and the version xcconfig are generated build outputs.
+apps/v1_ios/*.xcodeproj/
+apps/v1_ios/*.xcworkspace/
+apps/v1_ios/Config/Version.generated.xcconfig
+apps/v1_ios/Generated-Info.plist
+apps/v1_ios/DerivedData/
+apps/v1_ios/GoogleService-Info.plist
+
 # Build
 out/
 build/

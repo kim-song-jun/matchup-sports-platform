@@ -1,0 +1,20 @@
+#include "Shared.xcconfig"
+
+// Production environment. Counterpart to the `production` product flavor in
+// apps/v1_android/app/build.gradle.kts.
+
+// See Config/Alpha.xcconfig for why the slashes have to be built this way.
+SLASHES = /$()/
+
+PRODUCT_BUNDLE_IDENTIFIER = kr.co.teameet
+TEAMEET_DISPLAY_NAME = Teameet
+TEAMEET_WEB_ORIGIN = https:$(SLASHES)teameet.co.kr
+
+// Never inspectable, including production Debug builds — the same guarantee Android's
+// production flavor makes independently of its build type.
+TEAMEET_WEBVIEW_INSPECTABLE = NO
+
+TEAMEET_FIREBASE_PROJECT_ID =
+TEAMEET_FIREBASE_APP_ID =
+TEAMEET_FIREBASE_API_KEY =
+TEAMEET_FIREBASE_SENDER_ID =

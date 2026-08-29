@@ -1,0 +1,35 @@
+#include "Shared.xcconfig"
+
+// Alpha environment. Counterpart to the `alpha` product flavor in
+// apps/v1_android/app/build.gradle.kts.
+
+// An xcconfig value cannot contain a literal `//`: the parser treats it as the start of a
+// comment and truncates the value before any variable substitution runs, so a plain
+// `TEAMEET_WEB_ORIGIN = https://alpha.teameet.co.kr` silently resolves to `https:`.
+//
+// Assigning the slashes to their own variable does NOT help — `SLASHES = //` is itself
+// swallowed as a comment, and `xcodebuild -showBuildSettings` then shows no SLASHES at all
+// and `TEAMEET_WEB_ORIGIN = https:alpha.teameet.co.kr`. Both were measured, not assumed.
+//
+// What works is separating the two slashes with an empty macro expansion. The raw text
+// `/$()/` contains no adjacent slashes, so the comment scanner never fires, and xcconfig
+// then expands `$()` to nothing — leaving the resolved value as `//`.
+SLASHES = /$()/
+
+PRODUCT_BUNDLE_IDENTIFIER = kr.co.teameet.alpha
+TEAMEET_DISPLAY_NAME = Teameet Alpha
+TEAMEET_WEB_ORIGIN = https:$(SLASHES)alpha.teameet.co.kr
+
+// Alpha builds expose the embedded page to Safari's Web Inspector so QA can diagnose
+// fonts and network calls on a real device. Production pins this to NO regardless of
+// build type, exactly as Android's WEBVIEW_DEBUGGING_ENABLED BuildConfig field does.
+TEAMEET_WEBVIEW_INSPECTABLE = YES
+
+// Firebase identifiers are public app configuration, not secrets, and are injected by CI
+// so GoogleService-Info.plist never has to be committed. Empty here means the app runs
+// with push disabled rather than crashing, matching FirebaseBootstrap.initialize() on
+// Android, which returns false when any of the four values is blank.
+TEAMEET_FIREBASE_PROJECT_ID =
+TEAMEET_FIREBASE_APP_ID =
+TEAMEET_FIREBASE_API_KEY =
+TEAMEET_FIREBASE_SENDER_ID =

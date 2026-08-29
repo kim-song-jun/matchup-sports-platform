@@ -187,21 +187,34 @@ export function TacticsBoardClient({ teamId, gameId }: { teamId: string; gameId:
           teamName={board.data?.teamNameSnapshot ?? null}
         />
 
+        {/* 명단 카드 — 선발과 후보를 한 카드에 두고 **양쪽으로 오갈 수 있게** 한다.
+            예전에는 "선발로"만 있어서 한 번 올린 선수를 되돌릴 방법이 없었다(피치에서
+            빼도 좌표만 지워질 뿐 선발 그대로였다). QA 에서 30초 안에 부딪히는 종류다. */}
         <Card>
           <h2 className="tm-text-body-lg" style={{ fontWeight: 700, margin: '0 0 8px' }}>
-            후보 {bench.length}명
+            선발 {starters.length}명 · 후보 {bench.length}명
           </h2>
-          {bench.length === 0 ? (
+          {starters.length === 0 && bench.length === 0 ? (
             <p className="tm-text-caption" style={{ color: 'var(--text-muted)', margin: 0 }}>
-              후보로 둘 선수를 아래에서 골라 주세요.
+              아래에서 팀원을 골라 보드에 올려 주세요.
             </p>
           ) : (
             <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-              {bench.map((entry) => (
+              {[...starters, ...bench].map((entry) => (
                 <li key={entry.key} style={rowStyle}>
                   <span style={{ flex: 1, minWidth: 0 }}>
                     {entry.jerseyNumber !== null ? `${entry.jerseyNumber}. ` : ''}
                     {entry.displayName}
+                  </span>
+                  <span
+                    className="tm-text-caption"
+                    style={{ flex: '0 0 auto', color: 'var(--text-muted)' }}
+                  >
+                    {!entry.started
+                      ? '후보'
+                      : entry.positionX === null
+                        ? '선발 · 배치 전'
+                        : '선발 · 배치됨'}
                   </span>
                   {canEdit ? (
                     <Button
@@ -209,12 +222,20 @@ export function TacticsBoardClient({ teamId, gameId }: { teamId: string; gameId:
                       size="sm"
                       onClick={() =>
                         mutate((current) =>
-                          current.map((row) => (row.key === entry.key ? { ...row, started: true } : row)),
+                          current.map((row) =>
+                            row.key === entry.key
+                              ? entry.started
+                                // 후보로 내리면 좌표도 함께 지운다 — 후보가 피치 좌표를
+                                // 들고 있으면 다시 선발로 올릴 때 옛 자리로 되살아난다.
+                                ? { ...row, started: false, positionX: null, positionY: null }
+                                : { ...row, started: true }
+                              : row,
+                          ),
                         )
                       }
-                      aria-label={`${entry.displayName} 선발로 올리기`}
+                      aria-label={`${entry.displayName} ${entry.started ? '후보로 내리기' : '선발로 올리기'}`}
                     >
-                      선발로
+                      {entry.started ? '후보로' : '선발로'}
                     </Button>
                   ) : null}
                 </li>

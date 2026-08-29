@@ -46,6 +46,8 @@ export ALPHA_SESSION_TOKEN='v1.<payload>.<signature>'
 | `verify-alpha-league-video.mjs` | 리그 경기 영상 **전 구간 릴레이**: 어드민 목록(주차 라벨) → 링크 등록(재실행 시 중복 건너뜀) → 공개 기록 `videos` 반영 → 경기 상세·어드민 화면 캡처. 라우트가 모듈에 등록 안 된 채 배포돼 전부 404 였던 실사고(#755)를 잡으라고 있다 | 플랫폼 관리자 |
 | `verify-alpha-league-claim.mjs` | "내 기록 연결(claim)" 리그 확장(#770) 실측: 비인증 401 → 참가팀 멤버 목록 200(`gameId/version/participants` 계약) → **다른 리그 id 교차 조회 404**(스코프 게이트) → 경기 상세 배너 3폭 + 모달 캡처. 계정이 참가팀 멤버인 기록 공개 대진을 자동 탐색한다 | 참가팀 멤버 |
 | `verify-alpha-identity-attest.mjs` | 기록 연결 **승인(attest) 전 구간 릴레이**(#774): 팀원 신청 → 확인자 승인함 노출 → 인앱 알림 도착(딥링크는 목록 응답의 `target.route`) → 알림 딥링크 착지(리그 대진은 `/team-matches/:id` 가 리그 상세로 redirect — 브라우저 최종 URL로 판정) → 승인 카드 3폭 캡처 → **거절로 종결**(approve 는 실제 연결을 만들므로 실측 잔여물을 남기지 않는다). 승인 자격은 참가자 사이드 팀 리더에게만 있는데 사이드↔팀 매핑을 공개 API 로 알 수 없어, **양 팀 리더를 받아** 요청을 1건만 만들고 그 요청이 보이는 쪽을 확인자로 삼는다(pending 은 취소 수단이 없어 자격 밖 사이드에 만들면 24h 잔여물이 된다). 캡처 컨텍스트에 로컬 세션 힌트(`teameet.v1.session`)를 심어야 승인함이 조회된다 | 팀원 + 양 팀 리더 3계정 |
+| `verify-alpha-motion.mjs` | 모션 변경(탭바·탭 크로스페이드·시트 퇴장·토스트 퇴장)이 alpha 에 **실제로 실렸는지** computed 값으로 판정. 스크린샷으로는 확인되지 않는다 — 움직임은 프레임 *사이*에 있고 끝난 상태는 변경 전과 픽셀 단위로 같다. 진입/퇴장 **방향**(normal vs reverse)까지 본다 | 불필요 |
+| `verify-alpha-tablet-blue.mjs` | 태블릿 2열 레이아웃과 브랜드 파랑 단일화를 값으로 판정. 열 수는 카드의 **실제 좌표**로 세고(뷰포트 폭으로 세면 격자 폭과 어긋나 1열인데 2열로 읽는다), 색은 유틸·토큰·투명도 변형이 모두 같은 값인지 본다 — 두 파랑은 육안으로 구분되지 않는다 | 불필요 |
 | `wait-alpha-serves-commit.mjs` | alpha 의 `x-teameet-commit` 이 지정 커밋을 **조상으로 포함**할 때까지 대기 — 배포 창(502·구 에셋)에서 측정해 멀쩡한 화면을 결함으로 오진하는 것을 막는 실측 전 게이트. `node scripts/wait-alpha-serves-commit.mjs <commit> [maxPolls] [intervalMs]` | 불필요 |
 
 ```bash

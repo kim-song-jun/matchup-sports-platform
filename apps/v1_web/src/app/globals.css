@@ -2553,7 +2553,10 @@ label.tm-btn:focus-within {
 .tm-floating-fab {
   position: absolute;
   right: 20px;
-  bottom: 92px;
+  /* Keep mobile FABs above the complete navigation hit area. Android's edge-to-edge shell adds its
+     measured system-navigation inset to the web bottom nav, so the old fixed 92px offset overlapped
+     the bar on three-button devices. Preserve the original 18px visual gap above the 74px nav. */
+  bottom: calc(var(--v1-shell-bottom-nav-height) + var(--v1-shell-safe-bottom) + 18px);
   width: 56px;
   height: 56px;
   border-radius: var(--radius-pill);

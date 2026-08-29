@@ -41,6 +41,7 @@ android {
             resValue("string", "app_name", "Teameet Alpha")
             manifestPlaceholders["appHost"] = "alpha.teameet.co.kr"
             manifestPlaceholders["appLinksAutoVerify"] = "false"
+            buildConfigField("boolean", "WEBVIEW_DEBUGGING_ENABLED", "true")
             buildConfigField("String", "WEB_ORIGIN", javaStringQuote + "https://alpha.teameet.co.kr" + javaStringQuote)
             buildConfigField("String", "FIREBASE_PROJECT_ID", javaStringQuote + providers.gradleProperty("firebaseProjectIdAlpha").orElse("").get() + javaStringQuote)
             buildConfigField("String", "FIREBASE_APP_ID", javaStringQuote + providers.gradleProperty("firebaseAppIdAlpha").orElse("").get() + javaStringQuote)
@@ -52,6 +53,7 @@ android {
             resValue("string", "app_name", "Teameet")
             manifestPlaceholders["appHost"] = "teameet.co.kr"
             manifestPlaceholders["appLinksAutoVerify"] = "true"
+            buildConfigField("boolean", "WEBVIEW_DEBUGGING_ENABLED", "false")
             buildConfigField("String", "WEB_ORIGIN", javaStringQuote + "https://teameet.co.kr" + javaStringQuote)
             buildConfigField("String", "FIREBASE_PROJECT_ID", javaStringQuote + providers.gradleProperty("firebaseProjectIdProduction").orElse("").get() + javaStringQuote)
             buildConfigField("String", "FIREBASE_APP_ID", javaStringQuote + providers.gradleProperty("firebaseAppIdProduction").orElse("").get() + javaStringQuote)

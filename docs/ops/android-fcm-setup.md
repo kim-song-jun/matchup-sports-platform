@@ -95,6 +95,22 @@ host; successful file opening still needs a device verdict before full route par
 
 ## Required real-device matrix
 
+### Alpha WebView font and network inspection
+
+The Alpha flavor enables WebView remote debugging; the production flavor always disables it, even for
+a production debug build. On the USB-connected QA workstation:
+
+1. Enable developer options and USB debugging on the device, then launch the installed Teameet Alpha app.
+2. Open `chrome://inspect/#devices` in desktop Chrome and select the Teameet WebView's `inspect` link.
+3. In Network, reload the page and verify `/fonts/PretendardVariable.woff2` returns `200` with a font
+   response rather than a CSP, MIME, or cache error.
+4. In Console, run `document.fonts.check('16px "Pretendard Variable"')` and require `true`.
+5. In Elements > Computed, confirm representative Korean text resolves to `Pretendard Variable`.
+
+Record the commit SHA, APK SHA-256, device model, Android version, Android System WebView version, font
+request result, and console verdict. Remote inspection availability is diagnostic evidence only; it does
+not replace the visual and notification delivery matrix below.
+
 - Fresh install: allow and deny Android notification permission.
 - Logged-in registration and logout revoke.
 - Foreground, background, and terminated notification receipt.

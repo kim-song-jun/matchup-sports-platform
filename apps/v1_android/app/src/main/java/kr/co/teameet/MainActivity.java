@@ -108,6 +108,9 @@ public final class MainActivity extends AppCompatActivity {
 
     @SuppressLint("SetJavaScriptEnabled")
     private void configureWebView() {
+        // Alpha devices expose the embedded page to chrome://inspect for font/network diagnostics.
+        // The production flavor hard-disables this independently of the Android build type.
+        WebView.setWebContentsDebuggingEnabled(BuildConfig.WEBVIEW_DEBUGGING_ENABLED);
         webView = new WebView(this);
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);

@@ -390,3 +390,11 @@ Samsung device evidence (in progress):
   downloaded artifact passed `sha256sum -c`, clean replacement installation returned `Success`, and
   `output/task156/android-device-sm-a325n/03-edge-to-edge-fixed.png` confirms the bottom navigation
   background is continuous through the Samsung system-navigation area while tabs remain unobscured.
+- Follow-up web-shell review found the home chat FAB still used the pre-inset fixed `92px` bottom
+  offset, so it could overlap the enlarged Android bottom navigation. The shared mobile FAB contract
+  now uses the bottom-nav height plus the published native safe inset and preserves the existing 18px
+  visual gap. Browser visual QA and a rebuilt-device verdict remain required before Phase 5 completion.
+- Alpha now enables Android WebView remote debugging explicitly so a USB-connected QA workstation can
+  inspect the embedded Alpha origin through `chrome://inspect`, verify `document.fonts`, and diagnose
+  the `/fonts/PretendardVariable.woff2` request. The production flavor pins the same BuildConfig gate
+  to `false`, including production debug builds, and the JVM build-configuration test enforces both.

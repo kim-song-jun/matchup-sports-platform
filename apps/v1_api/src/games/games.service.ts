@@ -2738,10 +2738,33 @@ export class GamesService {
             },
           });
           if (swapped.count === 0) {
+            // `currentVersion` 에 `previous.revision` 을 넣으면 **항상 expectedVersion 과
+            // 같은 값**이 나간다 -- 위 2574 가드를 통과했다는 것이 곧 둘이 같다는 뜻이라
+            // 여기까지 온 시점에 그 둘은 정의상 일치한다. 그러면 두 값을 비교해 재조회
+            // 여부를 정하는 클라이언트는 409 를 받고도 "충돌 없음"으로 읽어, 무엇을 해야
+            // 할지 모르는 상태가 된다. 그래서 **실패 시점의 실제 최신 revision** 을 다시
+            // 읽어 내려준다.
+            //
+            // 같은 트랜잭션 안에서 다시 읽는 것이 stale 을 볼 것 같지만, 이 경로에서는
+            // 안전하다 -- 근거는 격리 수준이다:
+            //  · Postgres 기본값 **READ COMMITTED** 에서 트랜잭션 안의 *새 문장*은 다른
+            //    트랜잭션이 **커밋한** 변경을 본다.
+            //  · `updateMany` 가 `count === 0` 을 돌려줬다는 것은 상대가 **이미 커밋했다**는
+            //    뜻이다(커밋 전이었다면 행 잠금에 걸려 블록됐을 것이다).
+            //  · 따라서 이 재조회는 반드시 새 값을 본다.
+            //
+            // **전제를 명시한다: 이 처리는 READ COMMITTED 를 가정한다.** 격리 수준을
+            // REPEATABLE READ 이상으로 올리면 이 경로는 애초에 `count === 0` 이 아니라
+            // 직렬화 오류로 터지므로, 그때는 이 블록 자체를 다시 설계해야 한다.
+            const latest = await tx.v1GameLineup.findFirst({
+              where: { gameId, sideId },
+              orderBy: { revision: 'desc' },
+              select: { revision: true },
+            });
             throw new ConflictException({
               code: 'VERSION_CONFLICT',
               message: '라인업이 그새 변경됐어요. 새로고침 후 다시 시도해 주세요.',
-              details: { expectedVersion: dto.expectedVersion, currentVersion: previous.revision },
+              details: { expectedVersion: dto.expectedVersion, currentVersion: latest?.revision ?? previous.revision },
             });
           }
           lineup = { id: previous.id, revision: previous.revision + 1 };

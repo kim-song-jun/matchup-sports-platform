@@ -2095,8 +2095,14 @@ export type V1TeamUpcomingGame = {
 export function useV1TeamUpcomingGames(teamId: string | null, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: v1Keys.teamUpcomingGames(teamId ?? ''),
-    queryFn: () => v1Get<{ items: V1TeamUpcomingGame[] }>(`/teams/${teamId}/upcoming-games`),
-    enabled: (options?.enabled ?? true) && teamId !== null,
+    // id 가 비면 `/teams//upcoming-games` 로 나간다 — enabled 가 `!== null` 이면 빈 문자열이
+    // 그 가드를 통과하므로 이 파일의 다른 훅들과 같이 Boolean 으로 막는다. queryFn 에도
+    // 한 겹 더 둔다: enabled 는 호출자가 옵션으로 덮을 수 있어서 여기 하나로는 부족하다.
+    queryFn: () => {
+      if (!teamId) throw new Error('teamId 없이 팀 경기 목록을 조회할 수 없어요.');
+      return v1Get<{ items: V1TeamUpcomingGame[] }>(`/teams/${teamId}/upcoming-games`);
+    },
+    enabled: (options?.enabled ?? true) && Boolean(teamId),
     retry: false,
   });
 }
@@ -2129,8 +2135,12 @@ export type V1TacticsBoard = {
 export function useV1TacticsBoard(teamId: string | null, gameId: string | null) {
   return useQuery({
     queryKey: v1Keys.tacticsBoard(teamId ?? '', gameId ?? ''),
-    queryFn: () => v1Get<V1TacticsBoard>(`/teams/${teamId}/games/${gameId}/tactics-board`),
-    enabled: teamId !== null && gameId !== null,
+    queryFn: () => {
+      // 위 훅과 같은 이유 — 빈 문자열이 `!== null` 을 통과해 `/teams//games//…` 로 나간다.
+      if (!teamId || !gameId) throw new Error('팀·경기 id 없이 전술보드를 조회할 수 없어요.');
+      return v1Get<V1TacticsBoard>(`/teams/${teamId}/games/${gameId}/tactics-board`);
+    },
+    enabled: Boolean(teamId) && Boolean(gameId),
     retry: false,
   });
 }
@@ -2145,8 +2155,12 @@ export type V1SaveTacticsBoardInput = {
 export function useV1SaveTacticsBoard(teamId: string | null, gameId: string | null) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: V1SaveTacticsBoardInput) =>
-      v1Put<V1TacticsBoard>(`/teams/${teamId}/games/${gameId}/tactics-board`, input),
+    // mutation 에는 enabled 가드가 없다 — id 가 비어 있으면 `/teams/null/games/null/…` 로
+    // 나가 404 를 "경기를 못 찾았다"로 오해하게 만든다. 호출 자체를 막는다.
+    mutationFn: (input: V1SaveTacticsBoardInput) => {
+      if (!teamId || !gameId) throw new Error('팀·경기 id 없이 전술을 저장할 수 없어요.');
+      return v1Put<V1TacticsBoard>(`/teams/${teamId}/games/${gameId}/tactics-board`, input);
+    },
     onSuccess: (board) => {
       // 저장 응답이 곧 최신 판이다 — 다시 받아오지 않고 캐시에 그대로 심는다.
       queryClient.setQueryData(v1Keys.tacticsBoard(teamId ?? '', gameId ?? ''), board);

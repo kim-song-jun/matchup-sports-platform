@@ -112,3 +112,32 @@ gh run list --workflow deploy-alpha.yml --limit 1 \
 # 그리고 그 SHA 가 내 머지를 포함하는지:
 git merge-base --is-ancestor <내 머지 커밋> <배포 SHA> && echo "포함됨"
 ```
+
+## 요소 확인은 `:visible` 로 좁힌 뒤 판정한다 (2026-08-30 실사고)
+
+**이 앱은 데스크톱/모바일 JSX 를 둘 다 렌더하고 CSS 로 한쪽을 숨긴다**
+(`.tm-show-desktop` / `.tm-hide-desktop`, 경계 1024px). 그래서 **숨은 노드가 항상 DOM 에
+있다.** 이걸 모르고 쓰면 아래 둘이 **양방향으로 거짓말한다.**
+
+| 쓰면 안 되는 것 | 어떻게 속나 |
+|---|---|
+| `locator.count()` · `querySelectorAll` | 숨은 노드까지 세서 **없는데 있다고** 한다. 390 뷰포트에서 링크 10개를 세고 "모바일에 진입점 있다"고 판정했는데 그건 데스크톱 노드였다 — 실제로는 모바일에 그 기능으로 가는 길이 아예 없었다. |
+| `waitForSelector(sel)` (`state: 'visible'` 포함) | 여러 노드에 맞으면 **DOM 순서상 첫 매치**만 붙잡고 기다린다. 그게 숨은 데스크톱 노드면 뒤쪽 모바일 노드가 멀쩡히 보여도 타임아웃 — **있는데 없다고** 한다. |
+
+**두 세션이 각자 같은 실수를 했다.** 하나는 `count()` 로, 하나는 `waitForSelector` 로.
+
+```js
+// 잘못
+await page.waitForSelector('a[href*="/tactics/"]');
+const n = await page.locator('a[href*="/tactics/"]').count();
+
+// 맞게 — 매칭 단계에서 숨은 노드를 걷어낸다
+await page.waitForSelector('a[href*="/tactics/"]:visible', { state: 'visible' });
+const n = await page.locator('a[href*="/tactics/"]:visible').count();
+```
+
+**고정 대기(`waitForTimeout`)로 화면 준비를 판정하지 않는다.** 조회 중에 스스로 숨는
+섹션(빈 카드를 얹지 않으려는 의도)이 있어서 **아직 안 온 것과 아예 없는 것이 화면상
+같아 보인다** — 고정 대기는 멀쩡한 기능을 "안 나온다"로 박제하고 진짜 결함을
+"느린가 보다"로 넘긴다(3.5초·8초 둘 다 그렇게 실패했다). 요소가 보일 때까지 기다리고,
+안 나타나면 **경고를 남기고 진행**한다 — 그 경고가 곧 결함 신호다.

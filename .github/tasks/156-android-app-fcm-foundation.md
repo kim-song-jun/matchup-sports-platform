@@ -398,3 +398,50 @@ Samsung device evidence (in progress):
   inspect the embedded Alpha origin through `chrome://inspect`, verify `document.fonts`, and diagnose
   the `/fonts/PretendardVariable.woff2` request. The production flavor pins the same BuildConfig gate
   to `false`, including production debug builds, and the JVM build-configuration test enforces both.
+
+## Focused Physical-device QA (2026-08-29, commit `87c6b859`)
+
+Scope: latest Alpha APK installation plus the requested home FAB and Pretendard checks on one physical
+Samsung device. This is not the complete Phase 5 matrix, so the Phase 5 checkbox remains unchecked.
+
+- Android Alpha run `33235483888` completed successfully for feature head
+  `87c6b85967e76a3129f64a2eb121f500a8a5a425`; Firebase identity, Android tests/build, checksum creation,
+  and artifact upload steps were green. The PR artifact name used Actions' merge SHA
+  `teameet-alpha-c05b38256a99075ebe3852a1c01c23fc82f3ac1d` while its workflow metadata retained the
+  requested feature head SHA.
+- Artifact ZIP SHA-256 matched GitHub's published artifact digest
+  `adeccc25bb32fd0a82c7b3f330f8de44436670cdaf2c8a5fe1ac6cb8e74ffe96`. The adjacent checksum verified
+  `app-alpha-debug.apk` as `f2339e993e631a2b69d7e7062844c1bc01b8e58e09c6114b1e221645a2786c05`.
+- Device: Samsung `SM-A325N`, Android 13 / API 33, security patch 2025-01-01, 1080x2400, Samsung
+  three-button navigation, Android System WebView 152.0.7977.64, Chrome 145.0.7632.159.
+- Updating the previously installed Alpha failed with `INSTALL_FAILED_UPDATE_INCOMPATIBLE`. After
+  explicit user approval, only `kr.co.teameet.alpha` was removed and clean-installed successfully.
+  A second user-requested Alpha-only reinstall also succeeded. Production `kr.co.teameet` was not
+  installed, removed, or launched.
+- **Home FAB verdict: FAIL.** Portrait initial/scroll/resume evidence and landscape evidence all show
+  the chat FAB covering the `마이` tab icon/label area. The required approximately 18 px visual gap is
+  absent. The FAB stays outside the system three-button strip, but it does not stay above the web bottom
+  navigation.
+- **Pretendard verdict: PASS.** A cache-disabled WebView CDP reload returned HTTP 200 and
+  `font/woff2` for `/fonts/PretendardVariable.woff2`, without disk/service-worker cache, loading failure,
+  CSP/CORS/MIME problem, or console error. `document.fonts.check('16px "Pretendard Variable"')` returned
+  `true`; Chrome `CSS.getPlatformFontsForNode` reported the representative heading's rendered custom
+  font as `Pretendard Variable` / `PretendardVariable-Regular`.
+- **FCM device verification remains blocked and unverified.** The live Alpha web/API headers identify
+  commit `41e50ff65bcff7bd24b2cf82dc8e40cdda965546`, not the feature/APK head `87c6b859...`. The live
+  notification-settings page renders all six server category toggles but omits the native
+  `푸시 알림 받기` master control and retains browser-notification copy. The WebView does expose
+  `window.TeameetNative.postMessage`, while native state remains `push_opted_in=false` with no confirmed
+  registration. Because the feature branch has not been merged into `dev`, the remote web shell and APK
+  are version-skewed; foreground/background/terminated delivery must not be marked complete.
+  A follow-up on the same SM-A325N confirmed `POST_NOTIFICATION: ignore`, permission denied,
+  `push_opted_in=false`, and no `push_registered` value. Granting the Alpha package notification
+  permission changed AppOps to `allow`, but restart did not change the native opt-in or registration
+  flags. Firebase logged failed resource-based default initialization followed by the app's explicit
+  `[DEFAULT]` API initialization, consistent with `FirebaseBootstrap`; this warning alone is not marked
+  as the cause. The observed blocker remains that the deployed web UI never requests native opt-in.
+- Focused scenarios processed: 2/2 (FAB and Pretendard). Only Pretendard passed. Full Phase 5 remains
+  unexecuted: permission matrix, token refresh, logout revoke, multi-device, Alpha/production negative
+  control, inquiry deep-link delivery, gesture navigation, and manufacturer/API matrix are still open.
+- Raw evidence: `output/task156/android-device-sm-a325n/` (local QA output, not promoted to
+  `docs/screenshots`). Detailed verdict: `output/task156/android-device-sm-a325n/qa-verdict.md`.

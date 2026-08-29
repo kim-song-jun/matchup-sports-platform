@@ -6,7 +6,7 @@ const globalsCss = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), '
 
 describe('mobile floating action button layout', () => {
   it('keeps the FAB above both the bottom navigation and the native safe inset', () => {
-    const rule = globalsCss.match(/\.tm-floating-fab\s*\{(?<body>[^}]*)\}/)?.groups?.body;
+    const rule = globalsCss.match(/\.tm-floating-fab\s*\{([^}]*)\}/)?.[1];
 
     expect(rule).toBeDefined();
     expect(rule).toMatch(

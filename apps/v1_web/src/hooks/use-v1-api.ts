@@ -2074,6 +2074,86 @@ export function useV1LineupTodos(options?: { enabled?: boolean }) {
   });
 }
 
+/**
+ * 그 팀의 다가오는 경기 — 전술보드로 들어가는 입구.
+ *
+ * 라인업 할 일(`useV1LineupTodos`)과 **같은 수집 경로**지만 완료된 라인업도 온다.
+ * 할 일 규칙을 그대로 쓰면 라인업을 제출하는 순간 그 경기의 전술보드에 다시 못 들어간다.
+ * 알려진 한계: 서버가 지금 시각 기준 앞으로의 경기만 모은다 — 끝난 경기는 오지 않는다.
+ */
+export type V1TeamUpcomingGame = {
+  gameId: string;
+  source: 'TOURNAMENT_FIXTURE' | 'TEAM_MATCH';
+  title: string;
+  opponentName: string | null;
+  scheduledAt: string | null;
+  tournamentId: string | null;
+  tournamentTitle: string | null;
+  lineupState: 'MISSING' | 'DRAFT' | 'DONE';
+};
+
+export function useV1TeamUpcomingGames(teamId: string | null, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: v1Keys.teamUpcomingGames(teamId ?? ''),
+    queryFn: () => v1Get<{ items: V1TeamUpcomingGame[] }>(`/teams/${teamId}/upcoming-games`),
+    enabled: (options?.enabled ?? true) && teamId !== null,
+    retry: false,
+  });
+}
+
+/** 전술보드 한 판. 아직 저장한 적 없으면 `version: 0` 인 빈 판이 온다(404 가 아니다). */
+export type V1TacticsBoardEntry = {
+  userId: string | null;
+  displayName: string;
+  jerseyNumber: number | null;
+  position: string | null;
+  positionX: number | null;
+  positionY: number | null;
+  started: boolean;
+  goalkeeper: boolean;
+};
+
+export type V1TacticsBoard = {
+  gameSideId: string;
+  sideKey: 'HOME' | 'AWAY';
+  teamNameSnapshot: string;
+  formation: string | null;
+  version: number;
+  updatedAt: string | null;
+  updatedByUserId: string | null;
+  starterCount: number;
+  benchCount: number;
+  entries: V1TacticsBoardEntry[];
+};
+
+export function useV1TacticsBoard(teamId: string | null, gameId: string | null) {
+  return useQuery({
+    queryKey: v1Keys.tacticsBoard(teamId ?? '', gameId ?? ''),
+    queryFn: () => v1Get<V1TacticsBoard>(`/teams/${teamId}/games/${gameId}/tactics-board`),
+    enabled: teamId !== null && gameId !== null,
+    retry: false,
+  });
+}
+
+export type V1SaveTacticsBoardInput = {
+  formation: string | null;
+  /** 화면이 마지막으로 읽은 버전. 안 보내도 서버가 조건부 갱신으로 덮어쓰기를 막는다. */
+  expectedVersion?: number;
+  entries: Array<Omit<V1TacticsBoardEntry, 'position'> & { position?: string | null }>;
+};
+
+export function useV1SaveTacticsBoard(teamId: string | null, gameId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: V1SaveTacticsBoardInput) =>
+      v1Put<V1TacticsBoard>(`/teams/${teamId}/games/${gameId}/tactics-board`, input),
+    onSuccess: (board) => {
+      // 저장 응답이 곧 최신 판이다 — 다시 받아오지 않고 캐시에 그대로 심는다.
+      queryClient.setQueryData(v1Keys.tacticsBoard(teamId ?? '', gameId ?? ''), board);
+    },
+  });
+}
+
 export function useV1ChangeMembershipJersey(teamId: string | null) {
   const queryClient = useQueryClient();
   return useMutation({

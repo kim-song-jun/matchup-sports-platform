@@ -3,7 +3,7 @@
  * 스캐폴딩을 이 훅으로 모으면서, 각 파일에 흩어져 있던(그리고 어디서도 테스트로
  * 고정돼 있지 않던) 동작을 여기서 고정한다.
  */
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { useModalA11y } from './use-modal-a11y';
 
@@ -32,6 +32,23 @@ function TestModal({
   );
 }
 
+/** 훅이 의도한 사용법 — `mounted` 로 렌더를 붙잡아 퇴장 애니메이션을 재생한다.
+ *  위 TestModal(조건부 언마운트)과는 계약이 다르므로 따로 둔다. */
+function MountedModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { dialogRef, initialFocusRef, onBackdropClick, mounted, closing } = useModalA11y<
+    HTMLInputElement,
+    HTMLDivElement
+  >({ open, onClose });
+  if (!mounted) return null;
+  return (
+    <div data-testid="backdrop" className={closing ? 'is-closing' : ''} onClick={onBackdropClick}>
+      <div ref={dialogRef} role="dialog" aria-modal="true">
+        <input ref={initialFocusRef} aria-label="첫 입력" />
+      </div>
+    </div>
+  );
+}
+
 describe('useModalA11y', () => {
   it('ESC로 닫힌다 — 단 pending 중엔 잠긴다', () => {
     const onClose = vi.fn();
@@ -53,11 +70,52 @@ describe('useModalA11y', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('열리면 body 스크롤을 잠그고 닫히면 되돌린다', () => {
+  it('조건부 언마운트형은 닫는 즉시 스크롤 잠금을 푼다', () => {
+    // 이 호출자는 open=false 면 DOM 을 바로 걷어낸다 — 재생할 퇴장 UI 가 없다.
+    // 여기서 잠금을 지연시키면 화면에 아무것도 없는데 뒤 화면만 안 움직인다.
     const { rerender } = render(<TestModal open onClose={() => {}} />);
     expect(document.body.style.overflow).toBe('hidden');
     rerender(<TestModal open={false} onClose={() => {}} />);
     expect(document.body.style.overflow).toBe('');
+  });
+
+  it('mounted 기반 렌더는 퇴장 애니메이션 동안 잠금을 유지한다', async () => {
+    const { rerender } = render(<MountedModal open onClose={() => {}} />);
+    expect(document.body.style.overflow).toBe('hidden');
+    rerender(<MountedModal open={false} onClose={() => {}} />);
+    // 패널이 아직 화면에 있다. 여기서 풀면 시트가 떠 있는데 뒤 화면이 스크롤된다.
+    expect(screen.getByRole('dialog')).toBeTruthy();
+    expect(document.body.style.overflow).toBe('hidden');
+    // 사라진 뒤에 풀린다
+    await waitFor(() => expect(document.body.style.overflow).toBe(''));
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('닫힌 모달은 다른 오버레이의 스크롤 잠금을 건드리지 않는다', () => {
+    // 어드민 drawer 처럼 이 훅과 무관한 오버레이가 이미 잠가 둔 상태
+    document.body.style.overflow = 'hidden';
+    // 훅을 쓰는 모달이 화면에 계속 마운트돼 있지만 닫혀 있다
+    const { rerender } = render(<MountedModal open={false} onClose={() => {}} />);
+    expect(document.body.style.overflow).toBe('hidden');
+    rerender(<MountedModal open={false} onClose={() => {}} />);
+    expect(document.body.style.overflow).toBe('hidden');
+    document.body.style.overflow = '';
+  });
+
+  it('모달이 겹쳐 열리면 안쪽이 닫혀도 바깥쪽 잠금이 남는다', async () => {
+    const outer = render(<MountedModal open onClose={() => {}} />);
+    expect(document.body.style.overflow).toBe('hidden');
+    const inner = render(<MountedModal open onClose={() => {}} />);
+    inner.rerender(<MountedModal open={false} onClose={() => {}} />);
+    // queryByRole 은 document 전체를 보므로 바깥 모달까지 잡는다 — 이 render 의
+    // 컨테이너로 좁혀야 안쪽만 본다
+    await waitFor(() =>
+      expect(inner.container.querySelector('[role="dialog"]')).toBeNull(),
+    );
+    // 안쪽이 사라져도 바깥 모달은 아직 열려 있다 — 여기서 풀리면 뒤 화면이 스크롤된다
+    expect(document.body.style.overflow).toBe('hidden');
+    outer.unmount();
+    inner.unmount();
   });
 
   it('닫힐 때 이전 포커스를 복원한다 (WCAG 2.4.3)', () => {

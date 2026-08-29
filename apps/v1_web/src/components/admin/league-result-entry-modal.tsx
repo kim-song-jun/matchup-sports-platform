@@ -92,7 +92,7 @@ export function LeagueResultEntryModal({
 
   // dialog/focus-trap/ESC/backdrop/스크롤 잠금 — useModalA11y 공용 훅 (한때 이 파일이
   // admin-reason-modal 을 본뜬 원본이었고 이의 모달 2종이 다시 이걸 본떠 네 벌이 됐었다)
-  const { dialogRef, initialFocusRef, onBackdropClick } = useModalA11y<HTMLElement>({
+  const { dialogRef, initialFocusRef, onBackdropClick, mounted, closing } = useModalA11y<HTMLElement>({
     open,
     onClose,
     pending,
@@ -213,7 +213,7 @@ export function LeagueResultEntryModal({
     return () => observer.disconnect();
   }, [measureBodyOverflow, open, scorerRows.length, participants]);
 
-  if (!open) return null;
+  if (!mounted) return null;
 
   const trimmedReason = reason.trim();
   const parsedHome = homeScore.trim() === '' ? null : Number(homeScore);
@@ -298,8 +298,7 @@ export function LeagueResultEntryModal({
   return (
     /* Backdrop */
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-[2px]"
-      aria-hidden={!open}
+      className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-[2px] tm-modal-scrim${closing ? ' is-closing' : ''}`}
       onClick={onBackdropClick}
     >
       {/* Panel */}
@@ -334,7 +333,7 @@ export function LeagueResultEntryModal({
            줄이면 패널이 끝까지 굴러 액션 바가 함께 들어온다(실측 844x390: 패널 188/188 ·
            확인·취소 각 48/48 · 사유 94/94 · 글자수 18/18 — 수정 전 0/48 · 33/94 · 0/18).
            패널이 넘치지 않는 뷰포트(약 571px 이상)에서는 굴릴 것이 없어 무해하다. */
-        className="bg-[var(--card-surface)] rounded-2xl shadow-[0_8px_32px_rgba(20,28,45,0.14)] w-full max-w-[440px] max-h-[calc(100dvh-32px)] flex flex-col overflow-x-hidden overflow-y-auto scroll-pb-21"
+        className={`bg-[var(--card-surface)] rounded-2xl shadow-[0_8px_32px_rgba(20,28,45,0.14)] w-full max-w-[440px] max-h-[calc(100dvh-32px)] flex flex-col overflow-x-hidden overflow-y-auto scroll-pb-21 tm-modal-panel${closing ? ' is-closing' : ''}`}
       >
         {/* Header — 패널 스크롤포트에 고정(sticky)한다.
             위 scroll-pb-21 이 가로 모드 좁은 띠(실측 844x390·410·430·450 · 915x412 · 932x430 ·

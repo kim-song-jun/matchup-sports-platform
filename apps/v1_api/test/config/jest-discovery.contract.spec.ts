@@ -61,24 +61,88 @@ describe('v1_api Jest integration discovery contract', () => {
     const listed = JSON.parse(
       runJestResolver('--selectProjects', 'integration', '--runInBand', '--listTests', '--json'),
     ) as string[];
-    expect(listed.map((testPath) => relative(apiRoot, testPath)).sort()).toEqual([
+    expect(
+      listed.map((testPath) => relative(apiRoot, testPath).replaceAll('\\', '/')).sort(),
+    ).toEqual([
+      'test/games/fixture-game-backfill.integration-spec.ts',
       'test/games/game-actor-matrix.integration-spec.ts',
+      'test/games/game-assist-assign-command.integration-spec.ts',
+      'test/games/game-assist-foul-record.integration-spec.ts',
+      'test/games/game-event-assist-validation.integration-spec.ts',
+      'test/games/game-event-substitution-validation.integration-spec.ts',
       'test/games/game-lifecycle.integration-spec.ts',
+      'test/games/game-lineup-fixture-deadline.integration-spec.ts',
+      'test/games/game-lineup-participants.integration-spec.ts',
+      'test/games/game-lineup-roster-identity-link.integration-spec.ts',
+      'test/games/game-lineup-size.integration-spec.ts',
+      'test/games/game-lineup-team-match-forbidden.integration-spec.ts',
+      'test/games/game-missing-scorer-derivation.integration-spec.ts',
+      'test/games/game-operations-lineup.integration-spec.ts',
+      'test/games/game-participant-consent-link-scope.integration-spec.ts',
+      'test/games/game-participant-identity-self-claim.integration-spec.ts',
+      'test/games/game-participant-identity-staff-scope.integration-spec.ts',
+      'test/games/game-participant-identity.integration-spec.ts',
+      'test/games/game-period-halftime.integration-spec.ts',
+      'test/games/game-period-lifecycle.integration-spec.ts',
+      'test/games/game-period-live-backfill.integration-spec.ts',
+      'test/games/game-period-pause-tracking.integration-spec.ts',
       'test/games/game-projection.integration-spec.ts',
       'test/games/game-schema.integration-spec.ts',
+      'test/games/game-team-match-event-authority.integration-spec.ts',
+      'test/games/game-team-match-event-score-mismatch.integration-spec.ts',
+      'test/games/game-team-match-score-invariant.integration-spec.ts',
+      'test/games/game-team-result-authority.integration-spec.ts',
+      'test/games/goal-event-backfill.integration-spec.ts',
+      'test/games/live-game-commands.integration-spec.ts',
+      'test/games/public-records-privacy.integration-spec.ts',
+      'test/games/public-user-records-assist-foul.integration-spec.ts',
+      'test/games/public-user-records-lineup-consent-e2e.integration-spec.ts',
+      'test/games/team-record-facts-backfill.integration-spec.ts',
       'test/integration/admin-owner-invariant.e2e-spec.ts',
       'test/integration/health.e2e-spec.ts',
       'test/integration/integration-app-cleanup.e2e-spec.ts',
       'test/integration/phone-verification-write-gate.e2e-spec.ts',
       'test/integration/phone-verification.e2e-spec.ts',
+      'test/integration/push-device.e2e-spec.ts',
+      'test/integration/roster-cleanup.e2e-spec.ts',
       'test/integration/team-logo-persistence.e2e-spec.ts',
+      'test/integration/team-match-search-scope.e2e-spec.ts',
       'test/integration/tournament-campaign.e2e-spec.ts',
+      'test/integration/tournament-overall-standings.e2e-spec.ts',
+      'test/jobs/game-operation-flags-simplified-gate.integration-spec.ts',
+      'test/jobs/game-operations-control.integration-spec.ts',
+      'test/jobs/game-result-league-escalation.integration-spec.ts',
+      'test/jobs/league-result-entry-reminder.integration-spec.ts',
+      'test/jobs/v1-game-operations-worker.integration-spec.ts',
+      'test/league-matches/league-fixture-timing.integration-spec.ts',
+      'test/league-matches/league-match-detail-dispute-eligibility.integration-spec.ts',
+      'test/league-matches/league-match-dispute.integration-spec.ts',
+      'test/league-matches/league-match-result-entry.integration-spec.ts',
+      'test/league-matches/league-promotion.integration-spec.ts',
+      'test/team-contacts/report-enforcement.integration-spec.ts',
+      'test/team-contacts/team-contact-flow.integration-spec.ts',
+      'test/team-contacts/team-contact-guards.integration-spec.ts',
+      'test/team-lineups/team-lineup-reuse.integration-spec.ts',
+      'test/team-matches/team-match-lineup-size.integration-spec.ts',
+      'test/team-matches/team-match-schedule-link.integration-spec.ts',
       'test/team-schedules/attendance.integration-spec.ts',
+      'test/team-schedules/guest-recruitment.integration-spec.ts',
+      'test/team-schedules/reminder-worker-wiring.integration-spec.ts',
       'test/team-schedules/schedule-crud.integration-spec.ts',
       'test/team-schedules/team-schedules.integration-spec.ts',
+      'test/tournaments/alpha-seed-fixture-config.integration-spec.ts',
+      'test/tournaments/competition-config-version-repoint.integration-spec.ts',
       'test/tournaments/competition-config.integration-spec.ts',
+      'test/tournaments/game-operation-flag-seed.integration-spec.ts',
+      'test/tournaments/seed-alpha-tournament-qa-upsert.integration-spec.ts',
       'test/tournaments/task7-audit-scope.integration-spec.ts',
+      'test/tournaments/tournament-correction-guards.integration-spec.ts',
       'test/tournaments/tournament-game-adapter.integration-spec.ts',
+      'test/tournaments/tournament-officialize-edge.integration-spec.ts',
+      'test/tournaments/tournament-officialize.integration-spec.ts',
+      'test/tournaments/tournament-operations-board.integration-spec.ts',
+      'test/tournaments/tournament-penalty-shootout.integration-spec.ts',
+      'test/tournaments/tournament-standings-recalculation.integration-spec.ts',
     ]);
   });
 
@@ -194,9 +258,9 @@ describe('v1_api Jest integration discovery contract', () => {
     const sourceDatabaseName = decodeURIComponent(new URL(sourceDatabaseUrl).pathname.slice(1));
     const maintenance = new PrismaClient({ datasourceUrl: maintenanceDatabaseUrl });
     const blocker = new PrismaClient({ datasourceUrl: maintenanceDatabaseUrl });
-    let releaseLock = () => undefined;
-    let reportLockReady = () => undefined;
-    let reportLockFailure = (_error: unknown) => undefined;
+    let releaseLock: () => void = () => undefined;
+    let reportLockReady: () => void = () => undefined;
+    let reportLockFailure: (error: unknown) => void = (_error) => undefined;
     const lockReleased = new Promise<void>((resolve) => {
       releaseLock = resolve;
     });
@@ -336,9 +400,9 @@ describe('v1_api Jest integration discovery contract', () => {
     const now = Math.floor(Date.now() / 1000);
     const blocked = `${recoveryContract.CLONE_PREFIX}${now - recoveryContract.STALE_AFTER_SECONDS}_${process.pid}_000000000004`;
     const createdNames: string[] = [];
-    let releaseCatalogLock = () => undefined;
-    let reportCatalogLockReady = () => undefined;
-    let reportCatalogLockFailure = (_error: unknown) => undefined;
+    let releaseCatalogLock: () => void = () => undefined;
+    let reportCatalogLockReady: () => void = () => undefined;
+    let reportCatalogLockFailure: (error: unknown) => void = (_error) => undefined;
     const catalogLockRelease = new Promise<void>((resolve) => {
       releaseCatalogLock = resolve;
     });

@@ -291,7 +291,10 @@
   --v1-shell-wide-topbar-right-x: 14px;
   --v1-shell-scroll-bottom-pad: 12px;
   --v1-shell-cta-bottom-pad: 22px;
-  --v1-shell-safe-bottom: env(safe-area-inset-bottom, 0px);
+  /* Native Android publishes its measured navigation-bar inset here. The nav surface can then paint
+     edge-to-edge while only controls consume the safe area. Browser/PWA clients keep using env(). */
+  --teameet-native-safe-bottom: 0px;
+  --v1-shell-safe-bottom: max(env(safe-area-inset-bottom, 0px), var(--teameet-native-safe-bottom));
 
   /* 홈 공유 추천 미디어(.tm-featured-media)는 모든 소비자와 뷰포트에서 2:1 crop을 유지한다. */
   --tm-featured-media-ratio: 2 / 1;
@@ -575,7 +578,7 @@ button:disabled {
 .tm-scroll-area {
   position: absolute;
   top: var(--v1-shell-topbar-height);
-  bottom: var(--v1-shell-bottom-nav-height);
+  bottom: calc(var(--v1-shell-bottom-nav-height) + var(--v1-shell-safe-bottom));
   left: 0;
   width: 100%;
   min-height: 0;
@@ -2550,7 +2553,10 @@ label.tm-btn:focus-within {
 .tm-floating-fab {
   position: absolute;
   right: 20px;
-  bottom: 92px;
+  /* Keep mobile FABs above the complete navigation hit area. Android's edge-to-edge shell adds its
+     measured system-navigation inset to the web bottom nav, so the old fixed 92px offset overlapped
+     the bar on three-button devices. Preserve the original 18px visual gap above the 74px nav. */
+  bottom: calc(var(--v1-shell-bottom-nav-height) + var(--v1-shell-safe-bottom) + 18px);
   width: 56px;
   height: 56px;
   border-radius: var(--radius-pill);
@@ -2739,6 +2745,54 @@ label.tm-btn:focus-within {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* ── [모션] 모달·시트 공통 진입/퇴장 ─────────────────────────────────
+ * 지금까지 모달 38곳은 열릴 때도 닫힐 때도 아무 일이 없었다. A안(페이드만)을
+ * 택한 이유는 대상 대부분이 **확인·경고 모달**이기 때문이다 — 사용자가 방금 누른
+ * 버튼과 떠오른 질문을 연결해 읽어야 하는데, 패널이 움직이면 시선이 그걸 쫓는다.
+ * 위치를 바꾸지 않는 페이드가 그 자리에 맞다.
+ *
+ * duration 은 useModalA11y 의 MODAL_EXIT_MS(160ms)와 **같아야 한다** —
+ * 짧으면 애니메이션이 잘리고, 길면 아무것도 안 보이는 빈 시간이 남는다.
+ * 바꿀 땐 양쪽을 함께 바꾼다. */
+.tm-modal-scrim {
+  animation: tm-modal-fade var(--duration-base) var(--ease-out) both;
+}
+
+.tm-modal-panel {
+  animation: tm-modal-fade var(--duration-base) var(--ease-out) both;
+}
+
+.tm-modal-scrim.is-closing,
+.tm-modal-panel.is-closing {
+  animation: tm-modal-fade var(--duration-base) var(--ease-standard) reverse both;
+}
+
+/* 스크림 안에 있는 패널은 스크림이 이미 통째로 페이드시킨다. 둘 다 opacity 를
+   주면 부모·자식 opacity 가 곱해져 패널만 더 늦게·급하게 나타난다(중간 지점에서
+   0.5 가 아니라 0.25). 실측상 이 저장소의 패널 8곳은 전부 스크림 안에 있다 —
+   패널 클래스는 스크림 없이 단독으로 쓸 때를 위해 남겨 둔다. */
+.tm-modal-scrim .tm-modal-panel,
+.tm-modal-scrim .tm-modal-panel.is-closing {
+  animation: none;
+}
+
+@keyframes tm-modal-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* 필터 시트는 진입(슬라이드업)만 있고 퇴장이 없었다. 알림 시트(#808)와 같은
+ * 비대칭이다. 진입과 대칭으로 되돌린다 — 위 모달과 달리 여기는 위치가 움직이는
+ * 것이 의도다(하단에서 올라오는 시트라 그 방향이 곧 "어디서 왔는가" 다).
+ * duration 은 진입과 같은 0.22s 이고, 훅을 쓰는 쪽에서 그 값을 넘긴다. */
+.tm-filter-scrim.is-closing {
+  animation: tm-filter-scrim-fade 0.22s ease-in reverse both;
+}
+
+.tm-filter-sheet.is-closing {
+  animation: tm-filter-sheet-up 0.22s ease-in reverse both;
 }
 
 /* ── Reduced-motion: zero all durations for users who opt out of animation ── */

@@ -83,3 +83,15 @@ describe('useV1NotificationUnreadSummary mock wiring', () => {
     expect(vi.mocked(useV1NotificationUnreadSummary)).toHaveBeenCalled();
   });
 });
+
+describe('AppChrome mobile page title semantics', () => {
+  it('renders an opt-in page title as a level-one heading', () => {
+    render(
+      <AppChrome title="알림 설정" titleAsHeading showNotifications={false}>
+        <div>본문</div>
+      </AppChrome>
+    );
+
+    expect(screen.getByRole('heading', { level: 1, name: '알림 설정' })).toBeInTheDocument();
+  });
+});

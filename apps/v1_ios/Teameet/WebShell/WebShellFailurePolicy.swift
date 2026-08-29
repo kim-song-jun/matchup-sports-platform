@@ -32,16 +32,54 @@ enum WebShellFailurePolicy {
     static let webKitErrorFrameLoadInterruptedByPolicyChange = 102
     static let webKitErrorDomain = "WebKitErrorDomain"
 
-    /// Whether a failed navigation should surface the error screen.
-    static func shouldPresentFailure(for error: NSError) -> Bool {
-        if error.domain == NSURLErrorDomain, error.code == urlErrorCancelled { return false }
+    /// Whether this error is a navigation that was called off rather than one that failed.
+    static func isCancellation(_ error: NSError) -> Bool {
+        if error.domain == NSURLErrorDomain, error.code == urlErrorCancelled { return true }
         if error.domain == webKitErrorDomain,
-           error.code == webKitErrorFrameLoadInterruptedByPolicyChange { return false }
-        return true
+           error.code == webKitErrorFrameLoadInterruptedByPolicyChange { return true }
+        return false
     }
 
-    static func shouldPresentFailure(for error: Error) -> Bool {
-        shouldPresentFailure(for: error as NSError)
+    static func isCancellation(_ error: Error) -> Bool { isCancellation(error as NSError) }
+
+    /// Whether a failed navigation should surface the error screen.
+    ///
+    /// A cancellation is normally not worth showing — but "normally" is doing real work
+    /// here, and getting it wrong is how the shell ends up blank.
+    ///
+    /// Every cancellation the shell sees is one it caused: handing a link to Safari,
+    /// intercepting a 5xx, or turning a response into a download all return `.cancel` and
+    /// WebKit answers with `WebKitErrorDomain 102`. Suppressing all of them is right only
+    /// while there is still something on screen. When the cancelled navigation was the
+    /// first one — a cold start whose initial load redirects off-origin, or a server that
+    /// serves the main document as a download — suppressing it leaves a blank window with
+    /// no way out. Measured: that screen is a single flat white, and the retry affordance
+    /// this shell exists to provide never appears.
+    ///
+    /// - Parameters:
+    ///   - hasVisibleContent: whether the web view still shows a page the user can use.
+    ///   - isAlreadyPresentingFailure: whether a failure is already on screen. The 5xx path
+    ///     sets its reason first and is then followed by a 102; without this the follow-up
+    ///     would overwrite an accurate server-error message with a generic one.
+    static func shouldPresentFailure(
+        for error: NSError,
+        hasVisibleContent: Bool,
+        isAlreadyPresentingFailure: Bool
+    ) -> Bool {
+        guard isCancellation(error) else { return true }
+        if isAlreadyPresentingFailure { return false }
+        return !hasVisibleContent
+    }
+
+    static func shouldPresentFailure(
+        for error: Error,
+        hasVisibleContent: Bool,
+        isAlreadyPresentingFailure: Bool
+    ) -> Bool {
+        shouldPresentFailure(
+            for: error as NSError,
+            hasVisibleContent: hasVisibleContent,
+            isAlreadyPresentingFailure: isAlreadyPresentingFailure)
     }
 
     /// Whether a main-frame response should be replaced by the error screen.
@@ -88,6 +126,19 @@ enum WebShellFailureReason: Equatable {
     case unreachable
     /// The server answered, with a 5xx.
     case serverError(statusCode: Int)
+    /// The navigation was called off and left nothing behind — the destination went to
+    /// Safari, or the response was a file rather than a page. Distinct from the network
+    /// cases because the network is fine and saying otherwise would send the reader to
+    /// check Wi-Fi for no reason.
+    case interrupted
+
+    /// Maps an error onto the reason to show.
+    ///
+    /// A cancellation only reaches here when there is nothing left on screen, so it always
+    /// means the interrupted case.
+    static func forFailure(_ error: NSError) -> WebShellFailureReason {
+        WebShellFailurePolicy.isCancellation(error) ? .interrupted : .from(error: error)
+    }
 
     static func from(error: NSError) -> WebShellFailureReason {
         if error.domain == NSURLErrorDomain,
@@ -107,7 +158,9 @@ enum WebShellFailureReason: Equatable {
     var isRetriableOnReconnect: Bool {
         switch self {
         case .offline, .unreachable: return true
-        case .serverError: return false
+        // Neither of these is a connectivity problem, so regaining the network changes
+        // nothing about them.
+        case .serverError, .interrupted: return false
         }
     }
 }

@@ -76,6 +76,7 @@ private extension WebShellFailureReason {
         case .offline: return "wifi.slash"
         case .unreachable: return "antenna.radiowaves.left.and.right.slash"
         case .serverError: return "exclamationmark.triangle"
+        case .interrupted: return "exclamationmark.circle"
         }
     }
 
@@ -84,6 +85,7 @@ private extension WebShellFailureReason {
         case .offline: return "인터넷에 연결되어 있지 않아요"
         case .unreachable: return "지금은 팀밋에 연결할 수 없어요"
         case .serverError: return "팀밋 서버에 문제가 생겼어요"
+        case .interrupted: return "화면을 열지 못했어요"
         }
     }
 
@@ -100,6 +102,11 @@ private extension WebShellFailureReason {
             // the user to come back. The code is included because it is the first thing
             // support will ask for.
             return "잠시 후 다시 시도해 주세요. (오류 \(statusCode))"
+        case .interrupted:
+            // The network is fine here, so this must not send the reader off to check
+            // Wi-Fi. The link left for Safari, or the address returned a file instead of a
+            // page; reloading the home screen is what actually recovers.
+            return "다시 시도하면 처음 화면으로 돌아가요."
         }
     }
 }

@@ -87,7 +87,7 @@ extension DownloadHandler: WKDownloadDelegate {
     func download(_ download: WKDownload, didFailWithError error: Error, resumeData: Data?) {
         destinations.removeValue(forKey: ObjectIdentifier(download))
         // A download the user dismissed is not a failure worth reporting.
-        guard WebShellFailurePolicy.shouldPresentFailure(for: error) else { return }
+        guard !WebShellFailurePolicy.isCancellation(error) else { return }
         onMessage?(Strings.downloadFailed)
     }
 

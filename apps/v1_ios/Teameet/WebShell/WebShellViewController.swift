@@ -226,11 +226,20 @@ extension WebShellViewController: WKNavigationDelegate {
     }
 
     private func handleNavigationFailure(_ error: Error) {
-        // A cancelled navigation is not a failure. Tapping a second link while the first
-        // loads cancels the first, and every link handed to Safari cancels its own
-        // navigation by design — surfacing either would flash an error during normal use.
-        guard WebShellFailurePolicy.shouldPresentFailure(for: error) else { return }
-        present(failure: .from(error: error as NSError))
+        // A cancelled navigation is usually not a failure: every link handed to Safari,
+        // every intercepted 5xx and every response turned into a download cancels itself by
+        // design, and surfacing those would flash an error during normal use.
+        //
+        // The exception is a cancellation that leaves nothing on screen — a cold start whose
+        // first load redirects off-origin, or a main document served as a file. Swallowing
+        // those strands the user on a blank window, which is the state this shell exists to
+        // prevent.
+        guard WebShellFailurePolicy.shouldPresentFailure(
+            for: error,
+            hasVisibleContent: webView.url != nil,
+            isAlreadyPresentingFailure: model.failure != nil
+        ) else { return }
+        present(failure: .forFailure(error as NSError))
     }
 
     func webView(

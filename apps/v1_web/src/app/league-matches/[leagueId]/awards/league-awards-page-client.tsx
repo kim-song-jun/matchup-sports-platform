@@ -198,9 +198,9 @@ function LeaderboardSection({
 function AwardsPageSkeleton() {
   return (
     <div className="mx-auto max-w-4xl space-y-3 px-4 py-6">
-      <div className="tm-skeleton" style={{ height: 180, borderRadius: 16 }} />
-      <div className="tm-skeleton" style={{ height: 140, borderRadius: 12 }} />
-      <div className="tm-skeleton" style={{ height: 100, borderRadius: 12 }} />
+      <div className="tm-skeleton" style={{ height: 180, borderRadius: 'var(--radius-container)' }} />
+      <div className="tm-skeleton" style={{ height: 140, borderRadius: 'var(--radius-control)' }} />
+      <div className="tm-skeleton" style={{ height: 100, borderRadius: 'var(--radius-control)' }} />
     </div>
   );
 }
@@ -271,7 +271,7 @@ export function LeagueAwardsPageClient({ leagueId }: { leagueId: string }) {
           onRetry={() => void recordsQuery.refetch()}
         />
       ) : records === undefined ? (
-        <div className="tm-skeleton" style={{ height: 140, borderRadius: 12 }} />
+        <div className="tm-skeleton" style={{ height: 140, borderRadius: 'var(--radius-control)' }} />
       ) : (
         <>
           {/*

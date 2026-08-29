@@ -59,7 +59,7 @@ export function TournamentPlayerRecordsSections({
   }
   if (isLoading) {
     return emptyBehavior === 'hide' ? null : wrap(
-      <div className="tm-skeleton" style={{ height: 80, borderRadius: 12 }} />,
+      <div className="tm-skeleton" style={{ height: 80, borderRadius: 'var(--radius-control)' }} />,
     );
   }
   if (goalRows.length === 0 && assistRows.length === 0) {

@@ -122,7 +122,7 @@ function TeamListSkeleton() {
   return (
     <div className="tm-team-card-stack" aria-busy="true" aria-label="팀 목록 불러오는 중">
       {[0, 1, 2].map((i) => (
-        <div key={i} className="tm-review-skeleton" style={{ height: 164, borderRadius: 16 }} aria-hidden="true" />
+        <div key={i} className="tm-review-skeleton" style={{ height: 164, borderRadius: 'var(--radius-container)' }} aria-hidden="true" />
       ))}
     </div>
   );
@@ -216,7 +216,7 @@ function TeamOpenMatchesSection({
       {loading ? (
         <div style={{ display: 'grid', gap: 8 }} aria-busy="true" aria-label="열린 매치 불러오는 중">
           {[0, 1].map((i) => (
-            <div key={i} className="tm-review-skeleton" style={{ height: 64, borderRadius: 14 }} aria-hidden="true" />
+            <div key={i} className="tm-review-skeleton" style={{ height: 64, borderRadius: 'var(--radius-field)' }} aria-hidden="true" />
           ))}
         </div>
       ) : items.length ? (
@@ -232,7 +232,7 @@ function TeamOpenMatchesSection({
                 justifyContent: 'space-between',
                 gap: 12,
                 border: '1px solid var(--border)',
-                borderRadius: 14,
+                borderRadius: 'var(--radius-field)',
                 padding: '16px 16px',
                 background: 'var(--bg)',
                 textDecoration: 'none',
@@ -292,7 +292,7 @@ function TeamMyLeaguesSection({
       {loading ? (
         <div style={{ display: 'grid', gap: 8 }} aria-busy="true" aria-label="내 리그 불러오는 중">
           {[0, 1].map((i) => (
-            <div key={i} className="tm-review-skeleton" style={{ height: 56, borderRadius: 14 }} aria-hidden="true" />
+            <div key={i} className="tm-review-skeleton" style={{ height: 56, borderRadius: 'var(--radius-field)' }} aria-hidden="true" />
           ))}
         </div>
       ) : error ? (
@@ -315,7 +315,7 @@ function TeamMyLeaguesSection({
                 justifyContent: 'space-between',
                 gap: 12,
                 border: '1px solid var(--border)',
-                borderRadius: 14,
+                borderRadius: 'var(--radius-field)',
                 padding: '16px 16px',
                 background: 'var(--bg)',
                 textDecoration: 'none',
@@ -359,7 +359,7 @@ function TeamOperationsSection({
               display: 'grid',
               gap: 4,
               border: '1px solid var(--border)',
-              borderRadius: 12,
+              borderRadius: 'var(--radius-control)',
               padding: compact ? '12px 14px' : '14px 16px',
               background: 'var(--bg)',
               color: 'inherit',
@@ -430,7 +430,7 @@ function TeamRecordLinkCard({
     justifyContent: 'space-between',
     gap: 12,
     border: '1px solid var(--border)',
-    borderRadius: 14,
+    borderRadius: 'var(--radius-field)',
     padding: '16px 16px',
     background: 'var(--bg)',
     textDecoration: 'none',
@@ -563,7 +563,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
                 justifyContent: 'space-between',
                 gap: 12,
                 border: '1px solid var(--border)',
-                borderRadius: 14,
+                borderRadius: 'var(--radius-field)',
                 padding: '16px 16px',
                 background: 'var(--bg)',
                 textDecoration: 'none',
@@ -1312,7 +1312,7 @@ function TeamCoverImageField({
         style={{
           marginTop: 12,
           minHeight: 210,
-          borderRadius: 14,
+          borderRadius: 'var(--radius-field)',
           border: '1px solid var(--border-strong)',
           background: coverImageUrl ? `${cssUrl(coverImageUrl)} center/cover` : 'var(--grey50)',
           display: 'flex',
@@ -1527,7 +1527,7 @@ function InvitationSection({ invitations }: { invitations: NonNullable<TeamMembe
       {listLoading ? (
         <div style={{ display: 'grid', gap: 12 }} aria-busy="true" aria-label="초대 목록 불러오는 중">
           {[0, 1].map((i) => (
-            <div key={i} className="tm-review-skeleton" style={{ height: 64, borderRadius: 14 }} aria-hidden="true" />
+            <div key={i} className="tm-review-skeleton" style={{ height: 64, borderRadius: 'var(--radius-field)' }} aria-hidden="true" />
           ))}
         </div>
       ) : listError ? (
@@ -1550,7 +1550,7 @@ function InvitationSection({ invitations }: { invitations: NonNullable<TeamMembe
                   style={{
                     width: 40,
                     height: 40,
-                    borderRadius: '50%',
+                    borderRadius: 'var(--radius-circle)',
                     background: 'var(--grey100)',
                     display: 'flex',
                     alignItems: 'center',
@@ -1870,7 +1870,7 @@ function InfoChips({ label, items }: { label: string; items: string[] }) {
               display: 'inline-block',
               width: 8,
               height: 8,
-              borderRadius: '50%',
+              borderRadius: 'var(--radius-circle)',
               background: 'var(--blue500)',
               flexShrink: 0,
             }}

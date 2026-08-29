@@ -11,8 +11,8 @@ import { useV1MyTournamentFixtures } from '@/hooks/use-v1-api';
 function ScheduleSkeleton() {
   return (
     <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div className="tm-skeleton" style={{ height: 120, borderRadius: 12 }} />
-      <div className="tm-skeleton" style={{ height: 220, borderRadius: 12 }} />
+      <div className="tm-skeleton" style={{ height: 120, borderRadius: 'var(--radius-control)' }} />
+      <div className="tm-skeleton" style={{ height: 220, borderRadius: 'var(--radius-control)' }} />
     </div>
   );
 }

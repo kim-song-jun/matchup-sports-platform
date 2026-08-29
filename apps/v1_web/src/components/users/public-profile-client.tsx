@@ -55,9 +55,9 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
     return (
       <AppChrome title="프로필" activeTab="teams" bottomNav={false} backHref="/teams" desktopHead>
         <div className="tm-my-shell" aria-busy="true" aria-label="프로필 불러오는 중">
-          <div className="tm-review-skeleton" style={{ minHeight: 156, borderRadius: 16 }} />
-          <div className="tm-review-skeleton" style={{ minHeight: 112, borderRadius: 16, marginTop: 12 }} />
-          <div className="tm-review-skeleton" style={{ minHeight: 112, borderRadius: 16, marginTop: 12 }} />
+          <div className="tm-review-skeleton" style={{ minHeight: 156, borderRadius: 'var(--radius-container)' }} />
+          <div className="tm-review-skeleton" style={{ minHeight: 112, borderRadius: 'var(--radius-container)', marginTop: 12 }} />
+          <div className="tm-review-skeleton" style={{ minHeight: 112, borderRadius: 'var(--radius-container)', marginTop: 12 }} />
         </div>
       </AppChrome>
     );
@@ -190,7 +190,7 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
                  --grey50은 다크에서 카드(#1c1e24)와 사실상 같은 값이라 묻힌다. */
               background: 'var(--surface-soft)',
               border: '1px solid var(--border)',
-              borderRadius: 12,
+              borderRadius: 'var(--radius-control)',
               padding: '12px 16px',
             }}
             aria-label={mannerDisplay ? `매너 점수 ${mannerDisplay}점 (${trust.label})` : '매너 점수 없음'}
@@ -287,7 +287,7 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
             justifyContent: 'space-between',
             gap: 12,
             border: '1px solid var(--border)',
-            borderRadius: 14,
+            borderRadius: 'var(--radius-field)',
             padding: '16px 16px',
             background: 'var(--bg)',
             textDecoration: 'none',

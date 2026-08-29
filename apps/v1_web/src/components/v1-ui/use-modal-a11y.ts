@@ -58,7 +58,10 @@ export const MODAL_EXIT_MS = 160;
 // 못하는 요소**가 되어 되감기가 발동하지 않고 Tab 이 밖으로 샌다 — 라디오 그룹
 // 문제와 같은 구조다. 실제로 걸리는 곳이 있다: 팀 연락처의 textarea(저장 중
 // disabled), 승부차기 패널의 라디오.
-const FOCUSABLE_SELECTOR =
+// 소비처에서도 쓸 수 있게 내보낸다 — 콘텐츠가 통째로 갈리는 모달(액션 대상 선택의
+// SUBSTITUTION 2단계처럼)은 자기 파일에서 포커스를 다시 잡아야 하는데, 그때 이 선택자를
+// 복사해 두면 위 주석이 경고하는 drift(disabled 누락 등)가 그대로 재발한다.
+export const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), ' +
   'select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 

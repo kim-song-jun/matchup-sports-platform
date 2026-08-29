@@ -7,7 +7,7 @@ import { formatMatchClock } from '@/lib/game-operations-clock';
 import type { FrozenEventCapture } from '@/lib/game-operations-clock';
 import { LineupGrid } from './lineup-grid';
 import { periodLabel } from './period-label';
-import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
+import { FOCUSABLE_SELECTOR, useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import type {
   GameCardColor,
   GameEventType,
@@ -119,6 +119,28 @@ export function ActionTargetPicker({
     open,
     onClose: onCancel,
   });
+
+  // 교체 단계가 바뀌면 다이얼로그 안 첫 focusable 로 포커스를 **재고정**한다.
+  //
+  // 1단계는 <LineupGrid>, 2단계는 <div> 를 같은 자리에 렌더한다 — element type 이
+  // 달라 React 가 서브트리를 언마운트하므로 방금 누른 선수 버튼이 사라지고
+  // document.activeElement 가 body 로 떨어진다. 훅의 focus trap 은 activeElement 가
+  // first/last 일 때만 되감으므로 body 상태에서는 아무 개입도 하지 않고, 그 순간 Tab 이
+  // 다이얼로그 밖 배경 문서로 샌다(WCAG 2.1.2). '뒤로'로 1단계에 돌아올 때도 같다.
+  //
+  // 훅의 초기 포커스는 deps 가 [open] 뿐이고 `dialog.contains(activeElement)` 가드까지
+  // 있어 이 전환을 커버하지 못한다. 재고정 트리거를 훅에 넣으면 소비처 19곳이 함께
+  // 영향을 받으므로, 이 화면만 갖는 2단계 문제는 이 파일에서 국소로 해결한다.
+  // 이전 값을 ref 로 추적해 **바뀔 때만** 옮기므로 초기 마운트(open 시)에는
+  // 훅의 초기 포커스와 경합하지 않는다.
+  const lastSubstitutionOutIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const currentId = substitutionOut?.participant.id ?? null;
+    if (lastSubstitutionOutIdRef.current === currentId) return;
+    lastSubstitutionOutIdRef.current = currentId;
+    if (!open) return;
+    dialogRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)?.focus();
+  }, [open, substitutionOut, dialogRef]);
 
   if (!open) return null;
 

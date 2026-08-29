@@ -85,12 +85,20 @@ export function TacticsBoardClient({ teamId, gameId }: { teamId: string; gameId:
    * 남아 있는 것을 확인했다. 이름으로도 대조해 같은 사람을 두 번 올리지 않게 한다.
    */
   const available = useMemo(() => {
+    const board = entries ?? [];
     const takenUserIds = new Set(
-      (entries ?? []).map((entry) => entry.userId).filter((id): id is string => id !== null),
+      board.map((entry) => entry.userId).filter((id): id is string => id !== null),
     );
-    const takenNames = new Set((entries ?? []).map((entry) => entry.displayName));
+    // 이름 대조는 **게스트 엔트리에만** 건다. 무조건 걸면 반대 방향으로 더 나쁜 일이
+    // 생긴다 — 보드에 `userId=X · "김철수"` 가 있고 팀에 **다른** `userId=Y · "김철수"` 가
+    // 있으면, Y 가 아무 안내 없이 목록에서 영영 사라진다. 중복 노출은 눈에 보이지만
+    // 이건 안 보인다. userId 가 있는 엔트리는 그 id 로 정확히 판정되므로 이름이 필요 없고,
+    // 게스트는 이름이 유일한 신원이라 그때만 이름으로 거르는 것이 맞다.
+    const takenGuestNames = new Set(
+      board.filter((entry) => entry.userId === null).map((entry) => entry.displayName),
+    );
     return (members.data?.items ?? []).filter(
-      (member) => !takenUserIds.has(member.userId) && !takenNames.has(member.displayName),
+      (member) => !takenUserIds.has(member.userId) && !takenGuestNames.has(member.displayName),
     );
   }, [members.data, entries]);
 

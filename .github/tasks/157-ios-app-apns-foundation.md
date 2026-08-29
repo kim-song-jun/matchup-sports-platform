@@ -342,9 +342,62 @@ back/forward 리스트와 스크롤 위치를 직렬화한다. 이를 영속화�
 - [ ] **S8 CI · 릴리스 가드** — `require-ios-production-ref.sh`는 작성·negative control 통과 상태로 대기
 - [ ] **S9 문서 · changeset**
 - [ ] **S10 PR + Copilot 리뷰 루프**
-- [ ] **S11 실기기 QA** (APNs `.p8` 발급 이후)
+- [ ] **S11 실기기 QA** (APNs `.p8` 발급 이후) — 아래 "시뮬레이터로 옮긴 것" 참조
   - [ ] **비행기 모드 토글로 오프라인 화면과 자동 재시도 실검증** — S4에서 시뮬레이터로는
         실제 경로 차단을 만들 수 없어 오류 객체·복구 신호 주입으로만 확인했다. 여기서 갚는다.
+
+## 시뮬레이터 푸시 실측 (2026-08-29) — S11 범위 재조정
+
+Apple Silicon + iOS 16 이상 시뮬레이터가 푸시를 어디까지 하는지 별도 스파이크로 확인했다.
+**두 질문의 답이 다르다.**
+
+### `xcrun simctl push` — 된다
+
+로컬 페이로드 주입은 완전히 동작한다. 서버도 Apple 계정도 필요 없다. 확인한 것:
+
+- 권한 다이얼로그 표시 → 수락 → `authorization granted=true`
+- foreground 배너 렌더 (스크린샷)
+- `willPresent`가 **커스텀 최상위 키를 온전히** 전달 — `route` 값이 4회 모두 그대로 도착
+- **알림 탭 → `didReceive` → route 추출** (`actionIdentifier=…DefaultActionIdentifier`,
+  `route=team/99/roster`)
+
+마지막 항목이 크다. **Acceptance Criteria 2(알림 탭이 정확한 화면으로 착지)를 실기기 없이
+검증할 수 있다.**
+
+### 실제 APNs device token — 안 된다
+
+`registerForRemoteNotifications`가 성공하긴 하지만 돌아오는 값이 APNs 형식이 아니다.
+
+| | 실제 APNs | 시뮬레이터가 준 값 |
+|---|---|---|
+| 길이 | 64 hex (32바이트) | **160 hex (80바이트)** |
+| 재설치 후 | 달라짐 | **동일** (`8054…444c`, 2회 측정) |
+
+설치를 갈아도 같은 값이 나온다는 것이 이게 네트워크 왕복 없이 CoreSimulator가 만들어 낸
+로컬 placeholder라는 결정적 증거다. Apple 서버에 닿는 경로가 없다.
+
+### 서명 관련 부수 발견 (S8 CI에 영향)
+
+- `CODE_SIGNING_ALLOWED=NO`(현재 CI가 쓰는 방식) 빌드는 등록 자체가 실패한다:
+  `NSCocoaErrorDomain code=3000 "No valid 'aps-environment' entitlement string found"`.
+  → **CI의 서명 없는 시뮬레이터 빌드로는 푸시 등록 경로를 탈 수 없다.** 컴파일 게이트로는
+  충분하지만 푸시 QA에는 ad-hoc 서명("Sign to Run Locally") 빌드가 필요하다.
+- 반대로 진짜 `aps-environment`를 수동 codesign으로 주입하면 SpringBoard가 앱 실행 자체를
+  거부한다(`FBSOpenApplicationServiceErrorDomain code=1`). Xcode가 시뮬레이터용으로 빈
+  entitlements를 대신 넣는 것을 우회하려 하면 안 된다.
+
+### S11에서 로컬로 내려오는 것 / 남는 것
+
+| 로컬(시뮬레이터)로 가능 | 실기기 필요 |
+|---|---|
+| 권한 허용·거부와 그 결과 상태 | 실제 APNs 발급 토큰 등록 |
+| foreground 배너 렌더 | 서버 → APNs → 기기 종단 전달 |
+| 페이로드 커스텀 키(`route`) 수신 | 다기기 fan-out |
+| **알림 탭 → 딥링크 착지** | alpha 토큰이 production 발송 대상이 아님을 보이는 negative control |
+| 등록 실패 경로(entitlement 없음)와 앱의 대응 | 실제 APNs 오류 응답(BadDeviceToken 등)과 네트워크 조건 |
+| 알림 델리게이트 배선 여부 | background·terminated 전달(스파이크에서 확정 못 함, 시뮬레이터로 가능할 수도 있음) |
+
+이 결과는 FCM/APNs 선택에는 **중립**이다. 어느 쪽이든 시뮬레이터는 실제 토큰을 못 받는다.
 
 ## 102 fail-open 수정 (2026-08-29)
 

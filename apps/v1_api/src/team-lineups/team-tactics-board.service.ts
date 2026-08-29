@@ -4,6 +4,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertTeamLineupManager, assertTeamLineupMember } from './team-lineup-access';
@@ -11,6 +12,12 @@ import type {
   SaveTeamTacticsBoardDto,
   TeamTacticsBoardEntryDto,
 } from './dto/team-tactics-board.dto';
+
+/**
+ * 첫 저장의 버전. 스키마 기본값 0 을 그대로 쓰면 "아직 저장 안 됨"(serialize 가 보드 없음을
+ * 0 으로 표현한다)과 "방금 처음 저장됨"이 같은 값이 돼, 화면이 둘을 구분할 수 없다.
+ */
+const FIRST_SAVED_VERSION = 1;
 
 type BoardRow = {
   id: string;
@@ -56,47 +63,82 @@ export class TeamTacticsBoardService {
   async save(user: V1AuthUser, teamId: string, gameId: string, dto: SaveTeamTacticsBoardDto) {
     await assertTeamLineupManager(this.prisma, teamId, user.id);
     const side = await this.resolveSide(gameId, teamId);
-    const existing = await this.loadBoard(side);
-
     this.assertCoordinatePairs(dto.entries);
-    if (dto.expectedVersion !== undefined) {
-      const currentVersion = existing?.version ?? 0;
-      if (dto.expectedVersion !== currentVersion) {
-        throw new ConflictException({
-          code: 'TACTICS_BOARD_VERSION_CONFLICT',
-          message: '다른 운영진이 먼저 저장했어요. 최신 배치를 불러와 다시 저장해 주세요.',
-        });
-      }
-    }
 
     const entryRows = this.toEntryRows(dto.entries);
+    /* 버전 검사와 실제 쓰기가 **한 트랜잭션 안에서** 일어나야 한다.
+     *
+     * 밖에서 읽어 비교하면 두 운영진이 동시에 저장할 때 둘 다 검사를 통과한 뒤 나중 커밋이
+     * 앞 저장을 통째로 덮어쓴다 — 낙관적 잠금이 막으려던 바로 그 일이 그대로 일어난다.
+     * 그래서 트랜잭션 안에서 다시 읽고, 쓰기 자체를 `where: { id, version }` 조건부
+     * updateMany 로 건다(compare-and-swap). 그 사이 다른 트랜잭션이 버전을 올렸다면
+     * WHERE 가 더 이상 맞지 않아 count 가 0 이 되고, 우리는 엔트리를 건드리기 전에 멈춘다.
+     * 엔트리 삭제·생성을 CAS **뒤에** 두는 순서가 중요하다 — 앞에 두면 진 쪽이 이긴 쪽의
+     * 엔트리를 지우고 나서 실패한다. */
     const saved = await this.prisma.$transaction(async (tx) => {
-      if (existing !== null) {
-        // 전체 교체 — 부분 병합을 하지 않는 이유는 DTO 주석 참고.
-        await tx.v1TeamTacticsBoardEntry.deleteMany({ where: { boardId: existing.id } });
-        return tx.v1TeamTacticsBoard.update({
-          where: { id: existing.id },
-          data: {
-            formation: dto.formation ?? null,
-            version: { increment: 1 },
-            updatedByUserId: user.id,
-            entries: { create: entryRows },
-          },
-          include: { entries: { orderBy: { sortOrder: 'asc' } } },
+      const current = await tx.v1TeamTacticsBoard.findUnique({
+        where: { sideId: side.id },
+        select: { id: true, teamId: true, version: true },
+      });
+
+      if (current === null) {
+        // 아직 보드가 없다. 화면이 빈 판(version 0)을 읽고 저장하는 정상 경로다.
+        if (dto.expectedVersion !== undefined && dto.expectedVersion !== 0) {
+          throw this.versionConflict();
+        }
+        try {
+          return await tx.v1TeamTacticsBoard.create({
+            data: {
+              gameId,
+              sideId: side.id,
+              // side 에서 그대로 가져온다 — 호출자가 준 teamId 를 쓰지 않는 것이 요점이다.
+              // loadBoard 의 불변식 검사와 짝을 이뤄 "보드의 팀 ≠ 사이드의 팀" 상태가
+              // 애초에 만들어지지 않게 한다.
+              teamId: side.teamId,
+              formation: dto.formation ?? null,
+              // 스키마 기본값 0 을 그대로 두면 "한 번도 저장 안 됨"과 "방금 처음 저장됨"이
+              // 같은 값이 된다(serialize 가 보드 없음을 0 으로 표현한다). 첫 저장을 1 로
+              // 시작해 그 둘을 구분한다.
+              version: FIRST_SAVED_VERSION,
+              updatedByUserId: user.id,
+              entries: { create: entryRows },
+            },
+            include: { entries: { orderBy: { sortOrder: 'asc' } } },
+          });
+        } catch (error) {
+          // sideId 유니크 — 그 사이 다른 운영진이 먼저 만들었다는 뜻이다.
+          if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+            throw this.versionConflict();
+          }
+          throw error;
+        }
+      }
+
+      // 읽기와 같은 불변식을 쓰기에서도 확인한다 — 어긋난 보드를 덮어쓰는 것도 안 된다.
+      if (current.teamId !== side.teamId) throw this.teamMismatch();
+      if (dto.expectedVersion !== undefined && dto.expectedVersion !== current.version) {
+        throw this.versionConflict();
+      }
+
+      const swapped = await tx.v1TeamTacticsBoard.updateMany({
+        where: { id: current.id, version: current.version },
+        data: {
+          formation: dto.formation ?? null,
+          version: { increment: 1 },
+          updatedByUserId: user.id,
+        },
+      });
+      if (swapped.count === 0) throw this.versionConflict();
+
+      // 전체 교체 — 부분 병합을 하지 않는 이유는 DTO 주석 참고.
+      await tx.v1TeamTacticsBoardEntry.deleteMany({ where: { boardId: current.id } });
+      if (entryRows.length > 0) {
+        await tx.v1TeamTacticsBoardEntry.createMany({
+          data: entryRows.map((row) => ({ ...row, boardId: current.id })),
         });
       }
-      return tx.v1TeamTacticsBoard.create({
-        data: {
-          gameId,
-          sideId: side.id,
-          // side 에서 그대로 가져온다 — 호출자가 준 teamId 를 쓰지 않는 것이 요점이다.
-          // 아래 loadBoard 의 불변식 검사와 짝을 이뤄 "보드의 팀 ≠ 사이드의 팀" 상태가
-          // 애초에 만들어지지 않게 한다.
-          teamId: side.teamId,
-          formation: dto.formation ?? null,
-          updatedByUserId: user.id,
-          entries: { create: entryRows },
-        },
+      return tx.v1TeamTacticsBoard.findUniqueOrThrow({
+        where: { id: current.id },
         include: { entries: { orderBy: { sortOrder: 'asc' } } },
       });
     });
@@ -142,13 +184,22 @@ export class TeamTacticsBoardService {
       include: { entries: { orderBy: { sortOrder: 'asc' } } },
     });
     if (board === null) return null;
-    if (board.teamId !== side.teamId) {
-      throw new ConflictException({
-        code: 'TACTICS_BOARD_TEAM_MISMATCH',
-        message: '이 경기의 팀 구성이 바뀌어 저장된 전술을 열 수 없어요. 운영자에게 문의해 주세요.',
-      });
-    }
+    if (board.teamId !== side.teamId) throw this.teamMismatch();
     return board;
+  }
+
+  private teamMismatch() {
+    return new ConflictException({
+      code: 'TACTICS_BOARD_TEAM_MISMATCH',
+      message: '이 경기의 팀 구성이 바뀌어 저장된 전술을 열 수 없어요. 운영자에게 문의해 주세요.',
+    });
+  }
+
+  private versionConflict() {
+    return new ConflictException({
+      code: 'TACTICS_BOARD_VERSION_CONFLICT',
+      message: '다른 운영진이 먼저 저장했어요. 최신 배치를 불러와 다시 저장해 주세요.',
+    });
   }
 
   /** 좌표는 둘 다 있거나 둘 다 없어야 한다 — 부분 좌표를 허용하면 렌더링이 조용히 깨진다. */

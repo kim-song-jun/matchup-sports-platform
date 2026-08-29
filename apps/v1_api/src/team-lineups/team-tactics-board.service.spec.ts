@@ -23,6 +23,11 @@ type PrismaStub = {
   membershipRole: 'owner' | 'manager' | 'member' | null;
   side: { id: string; teamId: string | null; sideKey: string; displayNameSnapshot: string } | null;
   board: Record<string, unknown> | null;
+  /**
+   * compare-and-swap 결과. 0 이면 "내가 읽은 뒤 다른 트랜잭션이 버전을 올렸다" —
+   * 조건부 updateMany 의 WHERE 가 더 이상 맞지 않는 상태를 재현한다.
+   */
+  swapCount?: number;
 };
 
 /**
@@ -33,6 +38,8 @@ type PrismaStub = {
 function buildPrisma(stub: PrismaStub) {
   const calls: { sideWhere?: Record<string, unknown>; membershipWhere?: Record<string, unknown> } = {};
   const created: Array<Record<string, unknown>> = [];
+  const swapArgs: Array<Record<string, unknown>> = [];
+  const createdEntries: Array<never[]> = [];
   const prisma = {
     v1Team: {
       findFirst: jest.fn().mockResolvedValue(stub.team),
@@ -65,32 +72,44 @@ function buildPrisma(stub: PrismaStub) {
           id: 'board-new',
           teamId: data.teamId,
           formation: data.formation ?? null,
-          version: 0,
+          version: data.version ?? 0,
           updatedByUserId: data.updatedByUserId ?? null,
           updatedAt: new Date('2026-08-29T00:00:00.000Z'),
           entries: ((data.entries as { create?: unknown[] } | undefined)?.create ?? []) as never[],
         });
       }),
-      update: jest.fn(({ data }: { data: Record<string, unknown> }) =>
+      // 조건부 갱신(compare-and-swap). count 0 = 그 사이 버전이 바뀌었다.
+      updateMany: jest.fn(({ data }: { data: Record<string, unknown> }) => {
+        swapArgs.push(data);
+        return Promise.resolve({ count: stub.swapCount ?? 1 });
+      }),
+      // CAS 성공 후 엔트리를 갈아끼운 최종 상태를 다시 읽는 호출.
+      findUniqueOrThrow: jest.fn(() =>
         Promise.resolve({
           id: 'board-1',
           teamId: (stub.board as { teamId?: string } | null)?.teamId ?? TEAM_ID,
-          formation: data.formation ?? null,
+          formation: (swapArgs.at(-1)?.formation ?? null) as string | null,
           version: ((stub.board as { version?: number } | null)?.version ?? 0) + 1,
-          updatedByUserId: data.updatedByUserId ?? null,
+          updatedByUserId: (swapArgs.at(-1)?.updatedByUserId ?? null) as string | null,
           updatedAt: new Date('2026-08-29T00:00:00.000Z'),
-          entries: ((data.entries as { create?: unknown[] } | undefined)?.create ?? []) as never[],
+          entries: createdEntries.at(-1) ?? [],
         }),
       ),
     },
-    v1TeamTacticsBoardEntry: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
+    v1TeamTacticsBoardEntry: {
+      deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+      createMany: jest.fn(({ data }: { data: unknown[] }) => {
+        createdEntries.push(data as never[]);
+        return Promise.resolve({ count: data.length });
+      }),
+    },
   };
   // `$transaction` 은 자기 자신(prisma)을 tx 로 넘겨야 해서 객체 리터럴 안에 둘 수 없다 —
   // 초기화 중 자기 참조라 타입이 any 로 무너진다. 만든 뒤에 붙인다.
   const withTransaction = Object.assign(prisma, {
     $transaction: jest.fn((fn: (tx: typeof prisma) => unknown) => fn(prisma)),
   });
-  return { prisma: withTransaction, calls, created };
+  return { prisma: withTransaction, calls, created, swapArgs };
 }
 
 async function buildService(prisma: unknown) {
@@ -279,7 +298,7 @@ describe('TeamTacticsBoardService — 저장 규칙', () => {
     }
   });
 
-  it('expectedVersion 이 현재와 다르면 덮어쓰지 않고 409', async () => {
+  it('expectedVersion 이 현재와 다르면 엔트리를 건드리기 전에 409', async () => {
     const { prisma } = buildPrisma({
       team: { id: TEAM_ID, deletedAt: null },
       membershipRole: 'owner',
@@ -291,13 +310,36 @@ describe('TeamTacticsBoardService — 저장 규칙', () => {
       await expect(
         service.save(USER, TEAM_ID, GAME_ID, { expectedVersion: 2, entries: [] }),
       ).rejects.toMatchObject({ response: { code: 'TACTICS_BOARD_VERSION_CONFLICT' } });
-      expect(prisma.v1TeamTacticsBoard.update).not.toHaveBeenCalled();
+      expect(prisma.v1TeamTacticsBoard.updateMany).not.toHaveBeenCalled();
+      expect(prisma.v1TeamTacticsBoardEntry.deleteMany).not.toHaveBeenCalled();
     } finally {
       await moduleRef.close();
     }
   });
 
-  it('expectedVersion 을 주지 않으면 버전 검사를 하지 않는다', async () => {
+  it('버전 검사를 통과한 뒤 그 사이 다른 저장이 끼어들면(CAS 실패) 엔트리를 지우지 않고 409', async () => {
+    // 검사와 쓰기가 원자적이지 않으면 둘 다 통과한 뒤 나중 커밋이 앞 저장을 덮어쓴다.
+    // 조건부 updateMany 가 0건을 돌려주는 상황 = 읽은 뒤 버전이 바뀐 상황이다.
+    const { prisma } = buildPrisma({
+      team: { id: TEAM_ID, deletedAt: null },
+      membershipRole: 'owner',
+      side: HOME_SIDE,
+      board: boardRow({ version: 3 }),
+      swapCount: 0,
+    });
+    const { service, moduleRef } = await buildService(prisma);
+    try {
+      await expect(
+        service.save(USER, TEAM_ID, GAME_ID, { expectedVersion: 3, entries: [] }),
+      ).rejects.toMatchObject({ response: { code: 'TACTICS_BOARD_VERSION_CONFLICT' } });
+      // 엔트리 삭제는 CAS 성공 뒤에만 일어나야 한다 — 진 쪽이 이긴 쪽 엔트리를 지우면 안 된다.
+      expect(prisma.v1TeamTacticsBoardEntry.deleteMany).not.toHaveBeenCalled();
+    } finally {
+      await moduleRef.close();
+    }
+  });
+
+  it('조건부 갱신은 읽은 버전을 WHERE 에 걸고 version 을 1 올린다', async () => {
     const { prisma } = buildPrisma({
       team: { id: TEAM_ID, deletedAt: null },
       membershipRole: 'owner',
@@ -307,8 +349,48 @@ describe('TeamTacticsBoardService — 저장 규칙', () => {
     const { service, moduleRef } = await buildService(prisma);
     try {
       const result = await service.save(USER, TEAM_ID, GAME_ID, { entries: [] });
+      expect(prisma.v1TeamTacticsBoard.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'board-1', version: 3 },
+          data: expect.objectContaining({ version: { increment: 1 } }),
+        }),
+      );
       expect(result.version).toBe(4);
       expect(prisma.v1TeamTacticsBoardEntry.deleteMany).toHaveBeenCalled();
+    } finally {
+      await moduleRef.close();
+    }
+  });
+
+  it('첫 저장은 version 1 로 시작한다 — 0 은 "아직 저장 안 됨" 전용이다', async () => {
+    const { prisma, created } = buildPrisma({
+      team: { id: TEAM_ID, deletedAt: null },
+      membershipRole: 'owner',
+      side: HOME_SIDE,
+      board: null,
+    });
+    const { service, moduleRef } = await buildService(prisma);
+    try {
+      const result = await service.save(USER, TEAM_ID, GAME_ID, { entries: [] });
+      expect(created[0]).toMatchObject({ version: 1 });
+      expect(result.version).toBe(1);
+    } finally {
+      await moduleRef.close();
+    }
+  });
+
+  it('보드가 이미 있는데 expectedVersion 0(빈 판을 읽은 상태)으로 저장하면 409', async () => {
+    const { prisma } = buildPrisma({
+      team: { id: TEAM_ID, deletedAt: null },
+      membershipRole: 'owner',
+      side: HOME_SIDE,
+      board: boardRow({ version: 2 }),
+    });
+    const { service, moduleRef } = await buildService(prisma);
+    try {
+      await expect(
+        service.save(USER, TEAM_ID, GAME_ID, { expectedVersion: 0, entries: [] }),
+      ).rejects.toMatchObject({ response: { code: 'TACTICS_BOARD_VERSION_CONFLICT' } });
     } finally {
       await moduleRef.close();
     }

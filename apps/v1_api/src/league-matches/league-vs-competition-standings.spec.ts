@@ -20,10 +20,15 @@ import { CompetitionConfig } from '../tournaments/competition-config/competition
 import { calculateLeagueStandings, LeagueTieBreakCriterion } from './league-standings';
 
 /**
- * 실제 리그가 쓰는 tie-break 순서. 세 곳에 같은 리터럴이 복제돼 있고(생성 시점
- * `league-series-admin.service.ts:28`·`league-match-admin.service.ts:35`, 조회 시점
- * 폴백 `league-match-public.service.ts:432`) **어드민이 바꾸는 경로가 없다** —
- * 즉 현존하는 모든 리그의 실효 순서가 이것 하나다. 대조의 기준선으로 삼는 이유.
+ * 실제 리그가 쓰는 tie-break 순서.
+ *
+ * 리그 생성 시 `tieBreakJson` 에 이 순서가 그대로 저장되고
+ * (`league-series-admin.service.ts:290,601`·`league-match-admin.service.ts:105` 의
+ * `tieBreakJson: { order: DEFAULT_TIE_BREAK_ORDER }`), 저장값이 비어 있을 때의 조회
+ * 폴백도 같은 값이다(`league-match-public.service.ts:432-434`). 그 값을 만드는 리터럴
+ * 자체도 세 벌로 복제돼 있다 — 두 서비스의 상수 정의(`:28`·`:35`)와 조회 폴백의 인라인
+ * 배열. 그리고 **이 값을 바꾸는 어드민 경로도 화면도 없다** — 즉 현존하는 모든 리그의
+ * 실효 순서가 이것 하나다. 대조의 기준선으로 삼는 이유.
  */
 const LEAGUE_ORDER_AS_SHIPPED: LeagueTieBreakCriterion[] = [
   'points',

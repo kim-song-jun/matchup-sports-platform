@@ -77,6 +77,7 @@ import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import type { MyHomeViewModel, MyInvitationItem, MyJoinApplicationItem, MyJoinApplicationsViewModel, MyMember, MyTeam, MyTeamMembersViewModel, MyTeamsViewModel } from './my.types';
 import { myHomeModel, settingsModel } from './my.view-model';
 import { RECORD_CONSENT_POLICY_HASH } from '@/lib/record-consent';
+import { isNativePushAvailable, requestNativePush } from '@/lib/native-push';
 
 type ProfileEditErrors = Partial<Record<'realName' | 'nickname' | 'email' | 'phone' | 'birthDate' | 'gender' | 'profileImage' | 'form', string>>;
 type DuplicateCheckState = {
@@ -1331,11 +1332,14 @@ export function NotificationSettingsPageClient() {
   const settings = useV1Settings();
   const update = useV1UpdateSettings();
   const pushRegistration = useV1PushRegistration();
+  const [toggleError, setToggleError] = useState(false);
+  const [pushError, setPushError] = useState<string | null>(null);
+  const nativePushAvailable = isNativePushAvailable();
 
   // #12: 설정 로드 실패 시 에러 상태를 명시적으로 표시한다.
   if (settings.isError) {
     return (
-      <AppChrome title="알림 설정" activeTab="my" bottomNav={false} backHref="/my/settings" desktopHead>
+      <AppChrome title="알림 설정" activeTab="my" bottomNav={false} backHref="/my/settings" desktopHead titleAsHeading>
         <div className="tm-my-shell">
           <ErrorState message="알림 설정을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void settings.refetch()} />
         </div>
@@ -1343,11 +1347,30 @@ export function NotificationSettingsPageClient() {
     );
   }
 
+  if (settings.isLoading || !settings.data) {
+    return (
+      <AppChrome title="알림 설정" activeTab="my" bottomNav={false} backHref="/my/settings" desktopHead titleAsHeading>
+        <div className="tm-my-shell">
+          <p className="sr-only" role="status">알림 설정을 불러오는 중이에요.</p>
+          <PageSkeleton variant="list" />
+        </div>
+      </AppChrome>
+    );
+  }
+
+  if (settings.isLoading || !settings.data) {
+    return (
+      <AppChrome title="알림 설정" activeTab="my" bottomNav={false} backHref="/my/settings" desktopHead titleAsHeading>
+        <div className="tm-my-shell">
+          <p className="sr-only" role="status">알림 설정을 불러오는 중이에요.</p>
+          <PageSkeleton variant="list" />
+        </div>
+      </AppChrome>
+    );
+  }
+
   const notifications = settings.data?.notifications;
-  const [toggleError, setToggleError] = useState(false);
-  // 브라우저 알림 켜기 실패(권한 차단·서버 VAPID 미설정·SW 등록 실패)를 사용자에게 알린다.
-  // 이전에는 subscribe()가 false를 반환해도 토글이 OFF로 남기만 해 원인을 알 수 없었다.
-  const [pushError, setPushError] = useState<string | null>(null);
+  const pushBlocked = pushRegistration.permission === 'denied' && !pushRegistration.isSubscribed;
 
   const togglePush = async () => {
     setPushError(null);
@@ -1362,9 +1385,17 @@ export function NotificationSettingsPageClient() {
       const denied = typeof Notification !== 'undefined' && Notification.permission === 'denied';
       setPushError(
         denied
-          ? '브라우저에서 알림이 차단돼 있어요. 브라우저 설정에서 이 사이트의 알림을 허용한 뒤 다시 시도해 주세요.'
-          : '지금은 브라우저 알림을 켤 수 없어요. 잠시 후 다시 시도해 주세요.',
+          ? '기기 또는 브라우저에서 알림이 차단돼 있어요. 알림 설정에서 허용한 뒤 다시 시도해 주세요.'
+          : '지금은 푸시 알림을 켤 수 없어요. 잠시 후 다시 시도해 주세요.',
       );
+    }
+  };
+  const openNativeNotificationSettings = async () => {
+    setPushError(null);
+    try {
+      await requestNativePush('open-notification-settings');
+    } catch {
+      setPushError('기기 알림 설정을 열지 못했어요. 휴대폰 설정에서 Teameet 알림을 직접 허용해 주세요.');
     }
   };
   const items = [
@@ -1391,7 +1422,7 @@ export function NotificationSettingsPageClient() {
   };
 
   return (
-    <AppChrome title="알림 설정" activeTab="my" bottomNav={false} backHref="/my/settings">
+    <AppChrome title="알림 설정" activeTab="my" bottomNav={false} backHref="/my/settings" titleAsHeading>
       <div className="tm-my-shell">
         <div className="tm-my-settings-desktop">
           <div className="tm-desktop-page-head tm-show-desktop">
@@ -1403,7 +1434,7 @@ export function NotificationSettingsPageClient() {
           {pushRegistration.permission !== 'unsupported' ? (
             <div className="tm-card" style={{ padding: 0, marginBottom: 8 }}>
               {(() => {
-                const blocked = pushRegistration.permission === 'denied' && !pushRegistration.isSubscribed;
+                const blocked = pushBlocked;
                 // 켜는 중에는 토글을 미리 ON 위치로 옮긴다 — 권한 팝업·서비스워커
                 // 활성화·서버 저장까지 수 초가 걸려서, 그동안 토글이 그대로면 눌리지
                 // 않은 줄 알고 다시 누르게 된다. 다만 '켜짐'이라고 단정하지는 않고
@@ -1417,7 +1448,7 @@ export function NotificationSettingsPageClient() {
                     role="switch"
                     aria-checked={pushRegistration.isSubscribed}
                     aria-busy={pushRegistration.isPending}
-                    aria-label="브라우저 알림 받기"
+                    aria-label="푸시 알림 받기"
                     disabled={blocked || pushRegistration.isPending}
                     style={{
                       width: '100%',
@@ -1429,18 +1460,18 @@ export function NotificationSettingsPageClient() {
                     }}
                   >
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div className="tm-text-body">브라우저 알림 받기</div>
+                      <div className="tm-text-body">푸시 알림 받기</div>
                       <div className="tm-text-caption" style={{ marginTop: 3 }} role="status">
                         {/* 상태별로 다른 문장을 쓴다 — 꺼져 있는데 "받아요"라고 하면 켜진 것으로 읽힌다.
-                            웹 푸시 구독은 브라우저·기기 단위라 그 사실도 켜졌을 때 알려준다. */}
+                            푸시 등록은 기기 단위라 그 사실도 켜졌을 때 알려준다. */}
                         {pushRegistration.isPending
                           ? pushRegistration.isSubscribed
                             ? '끄는 중이에요…'
-                            : '켜는 중이에요… 브라우저가 물어보면 허용해 주세요'
+                            : '켜는 중이에요… 알림 권한을 물어보면 허용해 주세요'
                           : blocked
-                            ? '브라우저 설정에서 이 사이트의 알림을 허용해 주세요'
+                            ? '기기 또는 브라우저 설정에서 알림을 허용해 주세요'
                             : pushRegistration.isSubscribed
-                              ? '지금 이 브라우저에서 받고 있어요. 다른 기기에서는 따로 켜야 해요'
+                              ? '지금 이 기기에서 받고 있어요. 다른 기기에서는 따로 켜야 해요'
                               : '켜면 앱을 닫아도 새 소식을 받을 수 있어요'}
                       </div>
                     </div>
@@ -1457,9 +1488,25 @@ export function NotificationSettingsPageClient() {
               })()}
             </div>
           ) : null}
+          {pushBlocked && nativePushAvailable ? (
+            <Card pad={16} style={{ marginBottom: 8 }}>
+              <div className="tm-text-label">휴대폰 알림이 꺼져 있어요</div>
+              <div className="tm-text-caption" style={{ marginTop: 4 }}>
+                기기 설정에서 Teameet 알림을 허용한 뒤 돌아와 푸시 알림을 다시 켜 주세요.
+              </div>
+              <button
+                className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
+                style={{ marginTop: 12 }}
+                type="button"
+                onClick={() => void openNativeNotificationSettings()}
+              >
+                기기 알림 설정 열기
+              </button>
+            </Card>
+          ) : null}
           {pushError ? (
             <Card pad={16} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
-              <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>브라우저 알림을 켜지 못했어요</div>
+              <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>푸시 알림을 켜지 못했어요</div>
               <div className="tm-text-caption" style={{ marginTop: 4 }} role="status">{pushError}</div>
             </Card>
           ) : null}
@@ -1469,8 +1516,8 @@ export function NotificationSettingsPageClient() {
               {/* 위 푸시 토글과의 관계를 명시한다 — 예전에는 두 영역이 무관해 보여서,
                   푸시를 켜지 않은 사용자가 왜 폰으로 알림이 안 오는지 알 수 없었다. */}
               {pushRegistration.isSubscribed
-                ? '여기서 끈 종류는 알림함과 브라우저 알림 모두에서 빠져요.'
-                : '지금은 앱 안 알림함에서만 볼 수 있어요. 위에서 브라우저 알림을 켜면 같은 종류를 폰으로도 받아요.'}
+                ? '여기서 끈 종류는 알림함과 푸시 알림 모두에서 빠져요.'
+                : '지금은 앱 안 알림함에서만 볼 수 있어요. 위에서 푸시 알림을 켜면 같은 종류를 폰으로도 받아요.'}
             </div>
           </Card>
           {toggleError ? (

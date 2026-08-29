@@ -60,7 +60,7 @@ export function LeagueDisputeResolveModal({
   const [awayScore, setAwayScore] = useState('');
   const [note, setNote] = useState('');
 
-  const { dialogRef, initialFocusRef, onBackdropClick } = useModalA11y<HTMLButtonElement>({
+  const { dialogRef, initialFocusRef, onBackdropClick, mounted, closing } = useModalA11y<HTMLButtonElement>({
     open,
     onClose,
     pending,
@@ -76,7 +76,7 @@ export function LeagueDisputeResolveModal({
     }
   }, [open]);
 
-  if (!open) return null;
+  if (!mounted) return null;
 
   const trimmedNote = note.trim();
   const parsedHome = homeScore.trim() === '' ? null : Number(homeScore);
@@ -105,8 +105,7 @@ export function LeagueDisputeResolveModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-[2px]"
-      aria-hidden={!open}
+      className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-[2px] tm-modal-scrim${closing ? ' is-closing' : ''}`}
       onClick={onBackdropClick}
     >
       <div
@@ -114,7 +113,7 @@ export function LeagueDisputeResolveModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="league-dispute-resolve-modal-title"
-        className="bg-[var(--card-surface)] rounded-2xl shadow-[0_8px_32px_rgba(20,28,45,0.14)] w-full max-w-[440px] overflow-hidden"
+        className={`bg-[var(--card-surface)] rounded-2xl shadow-[0_8px_32px_rgba(20,28,45,0.14)] w-full max-w-[440px] overflow-hidden tm-modal-panel${closing ? ' is-closing' : ''}`}
       >
         {/* Header */}
         <div className="flex items-start justify-between px-5 py-4 border-b border-[var(--border)]">

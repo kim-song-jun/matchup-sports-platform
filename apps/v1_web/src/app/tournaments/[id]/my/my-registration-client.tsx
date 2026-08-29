@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, type ReactNode } from 'react';
+import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
@@ -410,100 +411,54 @@ function RegistrationPass({
 /* ── Cancel confirmation modal ── */
 
 function CancelModal({
+  open,
   onConfirm,
   onClose,
   isSubmitting,
   error,
 }: {
+  open: boolean;
   onConfirm: (reason: string) => void;
   onClose: () => void;
   isSubmitting: boolean;
   error: string | null;
 }) {
   const [reason, setReason] = useState('');
-  const sheetRef = useRef<HTMLElement>(null);
-  const closeBtnRef = useRef<HTMLButtonElement>(null);
-  const previousFocusRef = useRef<Element | null>(null);
 
-  // 열릴 때 이전 포커스 저장, 닫힐 때 복원 (WCAG 2.4.3)
+  // 예전에는 부모가 조건부로 마운트해서 닫으면 이 state 가 자동으로 사라졌다.
+  // 퇴장 애니메이션 때문에 컴포넌트를 살려 두게 되면서 그 초기화가 없어졌다 —
+  // 취소 사유를 쓰다 닫으면 다시 열었을 때 그대로 남는다. 열릴 때 비운다.
   useEffect(() => {
-    previousFocusRef.current = document.activeElement;
-    return () => {
-      const el = previousFocusRef.current;
-      if (el && typeof (el as HTMLElement).focus === 'function') {
-        (el as HTMLElement).focus();
-      }
-    };
-  }, []);
+    if (open) setReason('');
+  }, [open]);
 
-  // 열릴 때 닫기 버튼에 초기 포커스 — 실수로 취소 요청 누르는 것을 방지
-  useEffect(() => {
-    const id = setTimeout(() => closeBtnRef.current?.focus(), 60);
-    return () => clearTimeout(id);
-  }, []);
+  // 포커스 저장·복원, 초기 포커스, ESC, focus trap, 스크롤 잠금을 공용 훅에 맡긴다.
+  // 직접 구현해 두면 퇴장 애니메이션을 넣을 때 그 전부를 mounted 기준으로 다시
+  // 손봐야 하는데, 훅은 이미 그렇게 돼 있다(알림 시트에서 겪은 문제).
+  // exitMs 는 .tm-filter-sheet.is-closing 의 0.22s 와 맞춘다 — 모달(160ms)보다 길다.
+  const { dialogRef: sheetRef, initialFocusRef: closeBtnRef, onBackdropClick, mounted, closing } =
+    useModalA11y<HTMLButtonElement, HTMLElement>({
+      open,
+      onClose,
+      pending: isSubmitting,
+      exitMs: 220,
+    });
 
-  // ESC 키로 모달 닫기
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape' && !isSubmitting) {
-        onClose();
-      }
-    }
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isSubmitting, onClose]);
-
-  // focus-trap: Tab / Shift-Tab을 대화 상자 안에서만 순환
-  useEffect(() => {
-    const sheet = sheetRef.current;
-    if (!sheet) return;
-    const FOCUSABLE =
-      'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
-
-    function trap(e: KeyboardEvent) {
-      if (e.key !== 'Tab') return;
-      const focusable = Array.from(sheet!.querySelectorAll<HTMLElement>(FOCUSABLE));
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (e.shiftKey) {
-        if (document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        }
-      } else {
-        if (document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    }
-
-    document.addEventListener('keydown', trap);
-    return () => document.removeEventListener('keydown', trap);
-  }, []);
-
-  // body 스크롤 잠금 — 모달 뒤 콘텐츠 스크롤 방지
-  useEffect(() => {
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, []);
+  if (!mounted) return null;
 
   return (
     <>
       {/* Scrim — v1 pattern */}
       <div
         aria-hidden="true"
-        className="tm-filter-scrim"
-        onClick={onClose}
+        className={`tm-filter-scrim${closing ? ' is-closing' : ''}`}
+        onClick={onBackdropClick}
       />
       {/* Sheet layer */}
       <div className="tm-filter-layer">
         <section
           ref={sheetRef}
-          className="tm-filter-sheet"
+          className={`tm-filter-sheet${closing ? ' is-closing' : ''}`}
           role="dialog"
           aria-modal="true"
           aria-labelledby="cancel-modal-title"
@@ -1140,14 +1095,15 @@ function RegistrationDetailView({
       </div>
 
       {/* Cancel modal */}
-      {showCancelModal ? (
-        <CancelModal
-          onConfirm={handleCancelConfirm}
-          onClose={() => { setShowCancelModal(false); setCancelError(null); }}
-          isSubmitting={cancelRequest.isPending}
-          error={cancelError}
-        />
-      ) : null}
+      {/* 조건부 렌더 대신 open 을 넘긴다 — 부모가 즉시 언마운트하면 퇴장 애니메이션이
+          재생될 틈이 없다. 실제 언마운트는 CancelModal 안의 훅이 지연시킨다. */}
+      <CancelModal
+        open={showCancelModal}
+        onConfirm={handleCancelConfirm}
+        onClose={() => { setShowCancelModal(false); setCancelError(null); }}
+        isSubmitting={cancelRequest.isPending}
+        error={cancelError}
+      />
     </>
   );
 }

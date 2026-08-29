@@ -68,6 +68,8 @@ export function GateConfirmModal({
     dialogRef: panelRef,
     initialFocusRef,
     onBackdropClick,
+    mounted,
+    closing,
   } = useModalA11y<HTMLTextAreaElement>({ open, onClose, pending });
 
   useEffect(() => {
@@ -77,7 +79,7 @@ export function GateConfirmModal({
     }
   }, [open]);
 
-  if (!open) return null;
+  if (!mounted) return null;
 
   const trimmedReason = reason.trim();
   const typedOk = !typedChallenge || typedInput.trim() === typedChallenge;
@@ -85,7 +87,7 @@ export function GateConfirmModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-[2px]"
+      className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-[2px] tm-modal-scrim${closing ? ' is-closing' : ''}`}
       onClick={onBackdropClick}
     >
       <div
@@ -94,7 +96,7 @@ export function GateConfirmModal({
         aria-modal="true"
         aria-labelledby="gate-confirm-title"
         aria-describedby="gate-confirm-desc"
-        className="bg-[var(--card-surface)] rounded-2xl shadow-[var(--shadow-modal)] w-full max-w-[440px] overflow-hidden"
+        className={`bg-[var(--card-surface)] rounded-2xl shadow-[var(--shadow-modal)] w-full max-w-[440px] overflow-hidden tm-modal-panel${closing ? ' is-closing' : ''}`}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
           <h2 id="gate-confirm-title" className="text-[16px] font-bold text-[var(--text-strong)] flex items-center gap-2">

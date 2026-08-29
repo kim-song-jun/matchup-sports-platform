@@ -33,27 +33,12 @@ configFiles:
   Production Debug: Config/Production.xcconfig
   Production Release: Config/Production.xcconfig
 
-packages:
-  Firebase:
-    url: https://github.com/firebase/firebase-ios-sdk.git
-    # Pinned exactly, mirroring Android's `platform("com.google.firebase:firebase-bom:34.18.0")`.
-    # A floating range would let CI and a developer's machine build different SDKs.
-    # 12.18.0 declares a minimum of iOS 15.0, below this project's 16.0 target.
-    exactVersion: 12.18.0
-
 targets:
   Teameet:
     type: application
     platform: iOS
     sources:
       - path: Teameet
-    dependencies:
-      # FirebaseMessaging depends on FirebaseCore internally, but Firebase's SPM
-      # integration expects both library products to be linked explicitly.
-      - package: Firebase
-        product: FirebaseMessaging
-      - package: Firebase
-        product: FirebaseCore
     settings:
       base:
         PRODUCT_NAME: Teameet
@@ -78,29 +63,20 @@ targets:
         # The environment contract the app reads at runtime through AppConfig.
         TeameetWebOrigin: $(TEAMEET_WEB_ORIGIN)
         TeameetWebViewInspectable: $(TEAMEET_WEBVIEW_INSPECTABLE)
-        TeameetFirebaseProjectId: $(TEAMEET_FIREBASE_PROJECT_ID)
-        TeameetFirebaseAppId: $(TEAMEET_FIREBASE_APP_ID)
-        TeameetFirebaseApiKey: $(TEAMEET_FIREBASE_API_KEY)
-        TeameetFirebaseSenderId: $(TEAMEET_FIREBASE_SENDER_ID)
 
   TeameetTests:
     type: bundle.unit-test
     platform: iOS
     # No `dependencies: [target: Teameet]`, so this bundle runs without a test host and the
-    # test *process* never loads Firebase or UIKit. The scheme still builds the app target
+    # test *process* never loads UIKit. The scheme still builds the app target
     # for the test action, so a compile error in the WebView or push code fails
     # `xcodebuild test` — the coverage gap a hostless bundle would otherwise leave.
     #
-    # Any file listed below must stay free of UIKit, WebKit and Firebase imports: the test
+    # Any file listed below must stay free of UIKit and WebKit imports: the test
     # bundle compiles these sources directly instead of importing the app module.
     #
-    # Note that no arrangement makes the test action offline. xcodebuild resolves the
-    # project's package graph, and SwiftPM fetches firebase-ios-sdk's binary artifacts for
-    # the whole package rather than only the linked products — about 850MB, of which
-    # grpc-binary alone is 609MB (measured). CI caches SourcePackages for this reason; see
-    # .github/workflows/ios-alpha.yml.
     #
-    # Only pure types are listed. Anything importing UIKit, WebKit, Network or Firebase
+    # Only pure types are listed. Anything importing UIKit, WebKit or Network
     # stays out, which is why the WebShell types are named file by file rather than by
     # directory: the policy, session and bridge pieces are Foundation-only on purpose,
     # while the view controller next to them is not.
@@ -128,10 +104,6 @@ targets:
         CFBundleDisplayName: $(TEAMEET_DISPLAY_NAME)
         TeameetWebOrigin: $(TEAMEET_WEB_ORIGIN)
         TeameetWebViewInspectable: $(TEAMEET_WEBVIEW_INSPECTABLE)
-        TeameetFirebaseProjectId: $(TEAMEET_FIREBASE_PROJECT_ID)
-        TeameetFirebaseAppId: $(TEAMEET_FIREBASE_APP_ID)
-        TeameetFirebaseApiKey: $(TEAMEET_FIREBASE_API_KEY)
-        TeameetFirebaseSenderId: $(TEAMEET_FIREBASE_SENDER_ID)
 
 schemes:
   TeameetAlpha:

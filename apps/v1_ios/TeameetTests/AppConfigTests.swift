@@ -53,15 +53,9 @@ final class AppConfigTests: XCTestCase {
         let config = AppConfig(infoDictionary: [
             AppConfig.Key.webOrigin: "https://alpha.teameet.co.kr",
             AppConfig.Key.webViewInspectable: "YES",
-            AppConfig.Key.firebaseProjectId: "teameet-alpha",
-            AppConfig.Key.firebaseAppId: "1:816070948845:ios:abc123",
-            AppConfig.Key.firebaseApiKey: "AIzaSyDummyKeyForUnitTestsOnly1234567",
-            AppConfig.Key.firebaseSenderId: "816070948845",
         ])
         XCTAssertEqual(config.webOrigin, "https://alpha.teameet.co.kr")
         XCTAssertTrue(config.webViewInspectable)
-        XCTAssertEqual(config.firebaseProjectId, "teameet-alpha")
-        XCTAssertTrue(config.isFirebaseConfigured)
     }
 
     func testTreatsAnyValueOtherThanYesAsNotInspectable() {
@@ -75,40 +69,11 @@ final class AppConfigTests: XCTestCase {
         }
     }
 
-    /// Android's `FirebaseBootstrap.initialize()` returns false when any of the four public
-    /// identifiers is blank, leaving push off rather than crashing. A build with no Firebase
-    /// values injected has to behave the same way here.
-    func testFirebaseIsUnconfiguredWhenAnyIdentifierIsMissing() {
-        let complete: [String: Any] = [
-            AppConfig.Key.firebaseProjectId: "teameet-alpha",
-            AppConfig.Key.firebaseAppId: "1:816070948845:ios:abc123",
-            AppConfig.Key.firebaseApiKey: "AIzaSyDummyKeyForUnitTestsOnly1234567",
-            AppConfig.Key.firebaseSenderId: "816070948845",
-        ]
-        XCTAssertTrue(AppConfig(infoDictionary: complete).isFirebaseConfigured)
-
-        for missing in complete.keys {
-            var partial = complete
-            partial[missing] = ""
-            XCTAssertFalse(
-                AppConfig(infoDictionary: partial).isFirebaseConfigured,
-                "blank \(missing) must leave Firebase unconfigured")
-        }
-        XCTAssertFalse(AppConfig(infoDictionary: [:]).isFirebaseConfigured)
-    }
-
-    /// Unsubstituted placeholders and stray whitespace both reach `Info.plist` when an
-    /// xcconfig variable is missing, and neither should read as a configured value.
-    func testTreatsWhitespaceOnlyValuesAsAbsent() {
-        var padded: [String: Any] = [
-            AppConfig.Key.firebaseProjectId: "  ",
-            AppConfig.Key.firebaseAppId: "\n",
-            AppConfig.Key.firebaseApiKey: "\t",
-            AppConfig.Key.firebaseSenderId: " ",
-        ]
-        XCTAssertFalse(AppConfig(infoDictionary: padded).isFirebaseConfigured)
-
-        padded[AppConfig.Key.webOrigin] = "  https://alpha.teameet.co.kr  "
+    /// An xcconfig variable that was never substituted reaches `Info.plist` as whitespace
+    /// rather than as an absent key, so values are trimmed on the way in.
+    func testTrimsWhitespaceAroundValues() {
+        let padded: [String: Any] = [AppConfig.Key.webOrigin: "  https://alpha.teameet.co.kr  "]
         XCTAssertEqual(AppConfig(infoDictionary: padded).webOrigin, "https://alpha.teameet.co.kr")
+        XCTAssertEqual(AppConfig(infoDictionary: [:]).webOrigin, "")
     }
 }

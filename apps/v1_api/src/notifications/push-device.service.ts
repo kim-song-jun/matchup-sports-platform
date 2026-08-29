@@ -21,7 +21,7 @@ const pushDevicePublicSelect = {
 export class PushDeviceService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async registerAndroid(userId: string, dto: RegisterPushDeviceDto) {
+  async register(userId: string, dto: RegisterPushDeviceDto) {
     const environment = resolvePushEnvironment();
 
     try {
@@ -35,7 +35,7 @@ export class PushDeviceService {
         create: {
           userId,
           installationId: dto.installationId,
-          platform: V1PushPlatform.android,
+          platform: dto.platform,
           environment,
           token: dto.token,
           appVersion: dto.appVersion,
@@ -43,7 +43,10 @@ export class PushDeviceService {
         },
         update: {
           userId,
-          platform: V1PushPlatform.android,
+          // A reinstall can change the platform behind a stored installation id — a device
+          // restored from an Android backup onto a new phone keeps the id. Trusting the
+          // registration over the stored row keeps the send path addressing the real device.
+          platform: dto.platform,
           token: dto.token,
           appVersion: dto.appVersion,
           deviceModel: dto.deviceModel,
@@ -65,29 +68,29 @@ export class PushDeviceService {
     }
   }
 
-  async revokeAndroid(userId: string, installationId: string): Promise<void> {
+  /**
+   * Revokes one installation, whatever platform it registered as.
+   *
+   * The platform filter is gone deliberately: the caller identifies the device by
+   * installation id, and a filter that disagreed with the stored row would leave a device
+   * the user asked to unsubscribe still receiving notifications.
+   */
+  async revoke(userId: string, installationId: string): Promise<void> {
     const environment = resolvePushEnvironment();
     await this.prisma.v1PushDevice.updateMany({
-      where: {
-        userId,
-        environment,
-        platform: V1PushPlatform.android,
-        installationId,
-        revokedAt: null,
-      },
+      where: { userId, environment, installationId, revokedAt: null },
       data: { revokedAt: new Date() },
     });
   }
 
-  activeAndroidTokens(userId: string, environment: V1PushEnvironment) {
+  /**
+   * Every device that should receive a notification, with the platform that decides which
+   * service delivers it. The dispatcher groups on that field.
+   */
+  activeTokens(userId: string, environment: V1PushEnvironment) {
     return this.prisma.v1PushDevice.findMany({
-      where: {
-        userId,
-        environment,
-        platform: V1PushPlatform.android,
-        revokedAt: null,
-      },
-      select: { id: true, token: true },
+      where: { userId, environment, revokedAt: null },
+      select: { id: true, token: true, platform: true },
     });
   }
 

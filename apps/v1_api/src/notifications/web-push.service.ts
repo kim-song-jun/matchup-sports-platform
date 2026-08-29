@@ -4,7 +4,12 @@ import { Prisma } from '@prisma/client';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import * as webpush from 'web-push';
 import { PrismaService } from '../prisma/prisma.service';
+import { V1PushEnvironment, V1PushPlatform } from '@prisma/client';
+import { ApnsPushService } from './apns-push.service';
 import { FcmPushService } from './fcm-push.service';
+import { NativePushPayload, PushTarget } from './native-push.types';
+import { PushDeviceService } from './push-device.service';
+import { resolvePushEnvironment } from './push-environment';
 
 interface PushPayload {
   notificationId?: string;
@@ -29,14 +34,31 @@ export interface PushDeliverySummary {
 export class WebPushService implements OnModuleInit {
   private enabled = false;
   private publicKey: string | null = null;
+  /**
+   * Resolved once at startup, like the adapters do, rather than per send. Reading it on
+   * every notification would make a deployment with push switched off log a warning for
+   * each one.
+   */
+  private pushEnvironment: V1PushEnvironment | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
     @InjectPinoLogger(WebPushService.name) private readonly logger: PinoLogger,
+    // PushDeviceService depends only on PrismaService, so injecting it here keeps this
+    // module free of domain imports — the property the module comment relies on.
+    private readonly pushDevices: PushDeviceService,
     @Optional() private readonly fcmPushService?: FcmPushService,
+    @Optional() private readonly apnsPushService?: ApnsPushService,
   ) {}
 
   onModuleInit(): void {
+    // Only meaningful when something can actually deliver. An adapter reports itself
+    // configured only after resolving the environment itself, so this cannot disagree with
+    // what the adapters decided.
+    if (this.fcmPushService?.isConfigured || this.apnsPushService?.isConfigured) {
+      this.pushEnvironment = resolvePushEnvironment();
+    }
+
     const publicKey = process.env.VAPID_PUBLIC_KEY;
     const privateKey = process.env.VAPID_PRIVATE_KEY;
     const subject = process.env.VAPID_SUBJECT;
@@ -94,20 +116,70 @@ export class WebPushService implements OnModuleInit {
    * 성공으로 표시하게 된다. 그래서 상태만 요약해 반환한다.
    */
   async sendToUser(userId: string, payload: PushPayload): Promise<PushDeliverySummary> {
-    const nativeDelivery = this.fcmPushService
-      ?.sendToUser(userId, {
-        notificationId: payload.notificationId ?? randomUUID(),
-        title: payload.title,
-        body: payload.body,
-        route: payload.url,
-      })
-      .catch((err: unknown) => {
-        this.logger.warn({ userId, err }, 'Android FCM delivery failed');
-      });
+    const nativeDelivery = this.sendNativeToUser(userId, payload).catch((err: unknown) => {
+      this.logger.warn({ userId, err }, 'native push delivery failed');
+    });
 
     const webDelivery = this.sendWebPushToUser(userId, payload);
     const [summary] = await Promise.all([webDelivery, nativeDelivery]);
     return summary;
+  }
+
+  /**
+   * Fans a notification out to the user's registered devices, one adapter per platform.
+   *
+   * Device selection lives here rather than inside each adapter so that an unrouted
+   * platform is visible. A platform added to `V1PushPlatform` with no adapter behind it
+   * would otherwise show up as "nobody was subscribed" — indistinguishable from success —
+   * so it is logged as an error and counted as a failure instead.
+   *
+   * One platform failing must not cancel another: each adapter is awaited independently and
+   * its rejection is caught here.
+   */
+  private async sendNativeToUser(userId: string, payload: PushPayload): Promise<void> {
+    // Configured adapters only. A deployment with push turned off has none, and asking for
+    // the environment in that state would throw where the old per-adapter path simply did
+    // nothing.
+    const adapters = [this.fcmPushService, this.apnsPushService].filter(
+      (adapter): adapter is FcmPushService | ApnsPushService =>
+        adapter !== undefined && adapter.isConfigured,
+    );
+    if (adapters.length === 0 || this.pushEnvironment === null) return;
+
+    const devices = await this.pushDevices.activeTokens(userId, this.pushEnvironment);
+    if (devices.length === 0) return;
+
+    const byPlatform = new Map<V1PushPlatform, PushTarget[]>();
+    for (const device of devices) {
+      const bucket = byPlatform.get(device.platform) ?? [];
+      bucket.push(device);
+      byPlatform.set(device.platform, bucket);
+    }
+
+    const native: NativePushPayload = {
+      notificationId: payload.notificationId ?? randomUUID(),
+      title: payload.title,
+      body: payload.body,
+      route: payload.url,
+    };
+
+    await Promise.all(
+      [...byPlatform].map(async ([platform, targets]) => {
+        const adapter = adapters.find((candidate) => candidate.platform === platform);
+        if (!adapter) {
+          this.logger.error(
+            { userId, platform, deviceCount: targets.length },
+            'no push adapter is registered for this platform — devices were not notified',
+          );
+          return;
+        }
+        try {
+          await adapter.send(targets, native);
+        } catch (err) {
+          this.logger.warn({ userId, platform, err }, 'native push adapter failed');
+        }
+      }),
+    );
   }
 
   private async sendWebPushToUser(userId: string, payload: PushPayload): Promise<PushDeliverySummary> {

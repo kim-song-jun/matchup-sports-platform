@@ -13,10 +13,21 @@ jest.mock('firebase-admin/messaging', () => ({
   getMessaging: jest.fn(),
 }));
 
+/**
+ * The dispatcher hands this adapter only Android devices; it never queries for its own.
+ * Building targets here keeps that contract visible in every case.
+ */
+function androidDevices(tokens: string[]) {
+  return tokens.map((token, index) => ({
+    id: `device-${index + 1}`,
+    token,
+    platform: 'android' as const,
+  }));
+}
+
 describe('FcmPushService', () => {
   const messaging = { sendEachForMulticast: jest.fn() };
   const pushDevices = {
-    activeAndroidTokens: jest.fn(),
     recordSuccessfulDeliveries: jest.fn(),
     revokeTokens: jest.fn(),
     recordTransientFailures: jest.fn(),
@@ -56,9 +67,12 @@ describe('FcmPushService', () => {
     service.onModuleInit();
 
     await expect(
-      service.sendToUser('user-1', { notificationId: 'notification-1', title: '문의 답변' }),
+      service.send(androidDevices(['token-with-safe-length-1']), {
+        notificationId: 'notification-1',
+        title: '문의 답변',
+      }),
     ).resolves.toEqual({ devices: 0, delivered: 0, failed: 0, disabled: true });
-    expect(pushDevices.activeAndroidTokens).not.toHaveBeenCalled();
+    expect(messaging.sendEachForMulticast).not.toHaveBeenCalled();
   });
 
   it('fails startup when Firebase credentials are only partially configured', () => {
@@ -88,10 +102,7 @@ describe('FcmPushService', () => {
     configureCredentials();
     const permanentToken = 'permanent-fcm-registration-token';
     const transientToken = 'transient-fcm-registration-token';
-    pushDevices.activeAndroidTokens.mockResolvedValue([
-      { id: 'device-1', token: permanentToken },
-      { id: 'device-2', token: transientToken },
-    ]);
+    const devices = androidDevices([permanentToken, transientToken]);
     messaging.sendEachForMulticast.mockResolvedValue({
       successCount: 0,
       failureCount: 2,
@@ -104,7 +115,7 @@ describe('FcmPushService', () => {
     service.onModuleInit();
 
     await expect(
-      service.sendToUser('user-1', {
+      service.send(devices, {
         notificationId: 'notification-1',
         title: '문의 답변이 등록되었습니다',
         body: '문의 내용을 확인해 주세요.',
@@ -126,11 +137,9 @@ describe('FcmPushService', () => {
 
   it('chunks more than 500 devices and records successful delivery timestamps', async () => {
     configureCredentials();
-    const devices = Array.from({ length: 501 }, (_, index) => ({
-      id: `device-${index}`,
-      token: `registration-token-${index}`,
-    }));
-    pushDevices.activeAndroidTokens.mockResolvedValue(devices);
+    const devices = androidDevices(
+      Array.from({ length: 501 }, (_, index) => `registration-token-${index}`),
+    );
     messaging.sendEachForMulticast
       .mockResolvedValueOnce({
         successCount: 500,
@@ -146,7 +155,7 @@ describe('FcmPushService', () => {
     service.onModuleInit();
 
     await expect(
-      service.sendToUser('user-1', { notificationId: 'notification-1', title: '문의 답변' }),
+      service.send(devices, { notificationId: 'notification-1', title: '문의 답변' }),
     ).resolves.toEqual({ devices: 501, delivered: 501, failed: 0, disabled: false });
 
     expect(messaging.sendEachForMulticast).toHaveBeenCalledTimes(2);
@@ -159,18 +168,31 @@ describe('FcmPushService', () => {
 
   it('tracks an entire rejected multicast batch as transient without exposing tokens', async () => {
     configureCredentials();
-    pushDevices.activeAndroidTokens.mockResolvedValue([
-      { id: 'device-1', token: 'sensitive-registration-token' },
-    ]);
+    const devices = androidDevices(['sensitive-registration-token']);
     messaging.sendEachForMulticast.mockRejectedValue(new Error('firebase unavailable'));
     const service = new FcmPushService(pushDevices as never, logger as never);
     service.onModuleInit();
 
     await expect(
-      service.sendToUser('user-1', { notificationId: 'notification-1', title: '문의 답변' }),
+      service.send(devices, { notificationId: 'notification-1', title: '문의 답변' }),
     ).resolves.toEqual({ devices: 1, delivered: 0, failed: 1, disabled: false });
 
     expect(pushDevices.recordTransientFailures).toHaveBeenCalledWith(['device-1']);
     expect(JSON.stringify(logger.warn.mock.calls)).not.toContain('sensitive-registration-token');
+  });
+});
+
+/**
+ * The android-only contract, stated from this side.
+ *
+ * Device selection moved to the dispatcher when iOS gained its own adapter, so this service
+ * can no longer refuse a foreign token by construction. What it can do — and what this pins
+ * — is declare which platform it serves, so the dispatcher's routing has something to match
+ * against and a device with no adapter is a loud failure rather than a silent zero.
+ */
+describe('FcmPushService platform contract', () => {
+  it('serves android and nothing else', () => {
+    const service = new FcmPushService({} as never, { warn: jest.fn() } as never);
+    expect(service.platform).toBe('android');
   });
 });

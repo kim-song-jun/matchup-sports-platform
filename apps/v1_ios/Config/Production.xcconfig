@@ -13,8 +13,3 @@ TEAMEET_WEB_ORIGIN = https:$(SLASHES)teameet.co.kr
 // Never inspectable, including production Debug builds — the same guarantee Android's
 // production flavor makes independently of its build type.
 TEAMEET_WEBVIEW_INSPECTABLE = NO
-
-TEAMEET_FIREBASE_PROJECT_ID =
-TEAMEET_FIREBASE_APP_ID =
-TEAMEET_FIREBASE_API_KEY =
-TEAMEET_FIREBASE_SENDER_ID =

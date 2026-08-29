@@ -4,6 +4,8 @@ import { getLoggerToken } from 'nestjs-pino';
 import { PrismaService } from '../prisma/prisma.service';
 import { WebPushService } from './web-push.service';
 import { FcmPushService } from './fcm-push.service';
+import { ApnsPushService } from './apns-push.service';
+import { PushDeviceService } from './push-device.service';
 
 function uniqueConstraintError(target: string) {
   return new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
@@ -40,7 +42,10 @@ describe('WebPushService', () => {
     v1WebPushFailureLog: { create: jest.fn() },
   };
   const logger = { warn: jest.fn(), error: jest.fn() };
-  const fcmPushService = { sendToUser: jest.fn().mockResolvedValue({ disabled: false }) };
+  const nativeSummary = { devices: 0, delivered: 0, failed: 0, disabled: false };
+  const fcmPushService = { platform: 'android', isConfigured: true, send: jest.fn().mockResolvedValue(nativeSummary) };
+  const apnsPushService = { platform: 'ios', isConfigured: true, send: jest.fn().mockResolvedValue(nativeSummary) };
+  const pushDevices = { activeTokens: jest.fn().mockResolvedValue([]) };
 
   async function build(env: Record<string, string | undefined>) {
     const originalEnv = { ...process.env };
@@ -53,12 +58,17 @@ describe('WebPushService', () => {
         process.env[key] = value;
       }
     }
+    // The service now resolves the push environment at startup, the way the adapters do,
+    // so every build needs one.
+    process.env.V1_PUSH_ENVIRONMENT ??= 'alpha';
     const moduleRef = await Test.createTestingModule({
       providers: [
         WebPushService,
         { provide: PrismaService, useValue: prisma },
         { provide: getLoggerToken(WebPushService.name), useValue: logger },
         { provide: FcmPushService, useValue: fcmPushService },
+        { provide: ApnsPushService, useValue: apnsPushService },
+        { provide: PushDeviceService, useValue: pushDevices },
       ],
     }).compile();
     const service = moduleRef.get(WebPushService);
@@ -69,7 +79,10 @@ describe('WebPushService', () => {
 
   beforeEach(() => jest.clearAllMocks());
 
-  it('fans out to Android FCM even when browser Web Push is disabled', async () => {
+  it('still reaches native devices when browser Web Push is disabled', async () => {
+    pushDevices.activeTokens.mockResolvedValueOnce([
+      { id: 'a1', token: 'android-token-1', platform: 'android' },
+    ]);
     const service = await build({
       VAPID_PUBLIC_KEY: undefined,
       VAPID_PRIVATE_KEY: undefined,
@@ -83,12 +96,16 @@ describe('WebPushService', () => {
       url: '/my/inquiries/inquiry-1',
     });
 
-    expect(fcmPushService.sendToUser).toHaveBeenCalledWith('user-1', {
-      notificationId: 'notification-1',
-      title: '문의 답변',
-      body: '답변을 확인해 주세요.',
-      route: '/my/inquiries/inquiry-1',
-    });
+    // The web `url` becomes the native `route`; the rest of the payload is shared verbatim.
+    expect(fcmPushService.send).toHaveBeenCalledWith(
+      [{ id: 'a1', token: 'android-token-1', platform: 'android' }],
+      {
+        notificationId: 'notification-1',
+        title: '문의 답변',
+        body: '답변을 확인해 주세요.',
+        route: '/my/inquiries/inquiry-1',
+      },
+    );
   });
 
   it('stays disabled and returns a null public key when VAPID env vars are missing', async () => {
@@ -331,5 +348,138 @@ describe('WebPushService', () => {
 
     await expect(service.subscribe('user-1', dto)).rejects.toThrow('db down');
     expect(prisma.v1PushSubscription.findUnique).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Platform routing.
+ *
+ * The dispatcher, not the adapters, decides which service a device goes to. That placement
+ * is what makes an unrouted platform visible: if each adapter queried for its own devices,
+ * a platform nobody handles would look exactly like "nobody was subscribed".
+ */
+describe('WebPushService native fan-out', () => {
+  const prisma = {
+    v1PushSubscription: { findMany: jest.fn().mockResolvedValue([]) },
+    v1WebPushFailureLog: { create: jest.fn() },
+  };
+  const logger = { warn: jest.fn(), error: jest.fn() };
+  const summary = { devices: 1, delivered: 1, failed: 0, disabled: false };
+  const fcm = { platform: 'android', isConfigured: true, send: jest.fn().mockResolvedValue(summary) };
+  const apns = { platform: 'ios', isConfigured: true, send: jest.fn().mockResolvedValue(summary) };
+  const pushDevices = { activeTokens: jest.fn() };
+  let previousEnvironment: string | undefined;
+
+  async function build() {
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        WebPushService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: getLoggerToken(WebPushService.name), useValue: logger },
+        { provide: FcmPushService, useValue: fcm },
+        { provide: ApnsPushService, useValue: apns },
+        { provide: PushDeviceService, useValue: pushDevices },
+      ],
+    }).compile();
+    const service = moduleRef.get(WebPushService);
+    // Resolves the push environment, as it does in the running app.
+    service.onModuleInit();
+    return service;
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    previousEnvironment = process.env.V1_PUSH_ENVIRONMENT;
+    process.env.V1_PUSH_ENVIRONMENT = 'alpha';
+  });
+
+  afterEach(() => {
+    if (previousEnvironment === undefined) delete process.env.V1_PUSH_ENVIRONMENT;
+    else process.env.V1_PUSH_ENVIRONMENT = previousEnvironment;
+  });
+
+  it('sends each device to the service that owns its platform', async () => {
+    pushDevices.activeTokens.mockResolvedValue([
+      { id: 'a1', token: 'android-token-1', platform: 'android' },
+      { id: 'i1', token: 'ios-token-1', platform: 'ios' },
+      { id: 'a2', token: 'android-token-2', platform: 'android' },
+    ]);
+    const service = await build();
+
+    await service.sendToUser('user-1', { notificationId: 'n-1', title: '문의 답변' });
+
+    expect(fcm.send).toHaveBeenCalledWith(
+      [
+        { id: 'a1', token: 'android-token-1', platform: 'android' },
+        { id: 'a2', token: 'android-token-2', platform: 'android' },
+      ],
+      expect.objectContaining({ notificationId: 'n-1', title: '문의 답변' }),
+    );
+    expect(apns.send).toHaveBeenCalledWith(
+      [{ id: 'i1', token: 'ios-token-1', platform: 'ios' }],
+      expect.objectContaining({ notificationId: 'n-1' }),
+    );
+  });
+
+  it('never hands an iOS token to the Firebase adapter', async () => {
+    pushDevices.activeTokens.mockResolvedValue([
+      { id: 'i1', token: 'ios-token-1', platform: 'ios' },
+    ]);
+    const service = await build();
+
+    await service.sendToUser('user-1', { notificationId: 'n-1', title: '문의 답변' });
+
+    // An APNs token accepted by Firebase does not error — it silently never arrives.
+    expect(fcm.send).not.toHaveBeenCalled();
+    expect(apns.send).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * The failure this routing exists to prevent. A platform added to the enum with no
+   * adapter behind it would otherwise deliver nothing and report the same "0 devices" a
+   * user with no registrations reports.
+   */
+  it('logs an error rather than silently dropping a platform nothing routes', async () => {
+    pushDevices.activeTokens.mockResolvedValue([
+      { id: 'x1', token: 'future-platform-token', platform: 'web_unsupported' },
+    ]);
+    const service = await build();
+
+    await service.sendToUser('user-1', { notificationId: 'n-1', title: '문의 답변' });
+
+    expect(fcm.send).not.toHaveBeenCalled();
+    expect(apns.send).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({ platform: 'web_unsupported', deviceCount: 1 }),
+      expect.stringContaining('no push adapter'),
+    );
+  });
+
+  it('lets one platform fail without cancelling the other', async () => {
+    pushDevices.activeTokens.mockResolvedValue([
+      { id: 'a1', token: 'android-token-1', platform: 'android' },
+      { id: 'i1', token: 'ios-token-1', platform: 'ios' },
+    ]);
+    fcm.send.mockRejectedValueOnce(new Error('firebase unavailable'));
+    const service = await build();
+
+    await expect(
+      service.sendToUser('user-1', { notificationId: 'n-1', title: '문의 답변' }),
+    ).resolves.toEqual(expect.objectContaining({ disabled: expect.any(Boolean) }));
+
+    expect(apns.send).toHaveBeenCalledTimes(1);
+  });
+
+  it('asks for devices once, not once per adapter', async () => {
+    pushDevices.activeTokens.mockResolvedValue([
+      { id: 'a1', token: 'android-token-1', platform: 'android' },
+      { id: 'i1', token: 'ios-token-1', platform: 'ios' },
+    ]);
+    const service = await build();
+
+    await service.sendToUser('user-1', { notificationId: 'n-1', title: '문의 답변' });
+
+    expect(pushDevices.activeTokens).toHaveBeenCalledTimes(1);
+    expect(pushDevices.activeTokens).toHaveBeenCalledWith('user-1', 'alpha');
   });
 });

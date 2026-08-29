@@ -20,6 +20,13 @@
  *   node scripts/capture-alpha-tactics-board.mjs [outDir]
  *
  * 계정은 환경변수로만 넘긴다 — 이 저장소는 PUBLIC 이라 값을 파일에 적지 않는다.
+ *
+ * **요소 존재 확인은 개수가 아니라 가시성으로 한다.** 이 앱은 데스크톱/모바일 JSX 를 따로
+ * 그리고 CSS(.tm-show-desktop/.tm-hide-desktop)로 한쪽을 숨긴다 — 그래서 숨은 노드가 **항상
+ * DOM 에 있다.** `locator.count()`/`querySelectorAll` 로 세면 모바일 뷰포트에서도 데스크톱
+ * 노드가 잡혀 "있다"고 오판한다(2026-08-30 에 실제로 그렇게 판정해 모바일 진입점 부재를
+ * 놓칠 뻔했다 — 두 세션이 각자 같은 실수를 했다). `waitForSelector` 기본값(visible)처럼
+ * 보이는지를 기준으로 판정할 것.
  */
 import { mkdir } from 'node:fs/promises';
 import { chromium } from 'playwright';

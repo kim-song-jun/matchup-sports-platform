@@ -93,7 +93,7 @@ export function TournamentInquirySection({
           style={{
             position: 'fixed',
             left: '50%',
-            bottom: 'max(24px, env(safe-area-inset-bottom))',
+            bottom: 'max(24px, var(--v1-shell-safe-bottom))',
             transform: 'translateX(-50%)',
             zIndex: 10000,
             background: 'var(--text-strong)',

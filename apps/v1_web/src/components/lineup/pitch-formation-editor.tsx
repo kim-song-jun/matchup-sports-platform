@@ -831,7 +831,7 @@ function FormationSheet({
           overflowY: 'auto',
           background: 'var(--card-surface)',
           borderRadius: '16px 16px 0 0',
-          padding: '16px 20px calc(32px + env(safe-area-inset-bottom))',
+          padding: '16px 20px calc(32px + var(--v1-shell-safe-bottom))',
           boxShadow: '0 -8px 24px rgba(0,0,0,0.18)',
         }}
       >
@@ -977,7 +977,7 @@ function SlotPlayerPickerSheet({
         style={{
           position: 'absolute', left: 0, right: 0, bottom: 0, maxHeight: '70vh', overflowY: 'auto',
           background: 'var(--card-surface)', borderRadius: '16px 16px 0 0',
-          padding: '16px 20px calc(20px + env(safe-area-inset-bottom))', boxShadow: '0 -8px 24px rgba(0,0,0,0.18)',
+          padding: '16px 20px calc(20px + var(--v1-shell-safe-bottom))', boxShadow: '0 -8px 24px rgba(0,0,0,0.18)',
         }}
       >
         <div aria-hidden="true" style={{ width: 36, height: 4, borderRadius: 999, background: 'var(--grey100)', margin: '0 auto 16px' }} />

@@ -39,11 +39,11 @@
 }
 
 .tm-onboarding-frame .tm-auth-scroll-with-cta {
-  bottom: calc(132px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(132px + var(--v1-shell-safe-bottom));
 }
 
 .tm-onboarding-frame .tm-auth-fixed-cta {
-  padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(24px + var(--v1-shell-safe-bottom));
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────

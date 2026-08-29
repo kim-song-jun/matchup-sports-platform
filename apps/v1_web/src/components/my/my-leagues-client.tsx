@@ -41,8 +41,8 @@ export function MyLeaguesPageClient() {
         <div className="mt-4">
           {query.isLoading ? (
             <div aria-busy="true" aria-label="내 리그 불러오는 중" className="space-y-2">
-              <div className="tm-skeleton" style={{ height: 76, borderRadius: 12, opacity: 1 }} />
-              <div className="tm-skeleton" style={{ height: 76, borderRadius: 12, opacity: 0.6 }} />
+              <div className="tm-skeleton" style={{ height: 76, borderRadius: 'var(--radius-control)', opacity: 1 }} />
+              <div className="tm-skeleton" style={{ height: 76, borderRadius: 'var(--radius-control)', opacity: 0.6 }} />
             </div>
           ) : query.isError ? (
             <ErrorState
@@ -87,7 +87,7 @@ export function MyLeaguesPageClient() {
                           <span className="inline-flex items-center gap-2">
                             <span
                               aria-hidden="true"
-                              style={{ width: 6, height: 6, borderRadius: '50%', background: accent.dot }}
+                              style={{ width: 6, height: 6, borderRadius: 'var(--radius-circle)', background: accent.dot }}
                             />
                             {accent.label}
                           </span>

@@ -11,8 +11,8 @@ import type { TeamRecordTypeFilter } from '@/components/public-game-records/type
 function RecordsSkeleton() {
   return (
     <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div className="tm-skeleton" style={{ height: 90, borderRadius: 12 }} />
-      <div className="tm-skeleton" style={{ height: 200, borderRadius: 12 }} />
+      <div className="tm-skeleton" style={{ height: 90, borderRadius: 'var(--radius-control)' }} />
+      <div className="tm-skeleton" style={{ height: 200, borderRadius: 'var(--radius-control)' }} />
     </div>
   );
 }

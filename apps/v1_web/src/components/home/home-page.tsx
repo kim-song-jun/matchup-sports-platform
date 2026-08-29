@@ -734,7 +734,7 @@ function SidebarTournamentsWidget({ items, loading }: { items: V1TournamentListI
                     flexShrink: 0,
                     width: 32,
                     height: 32,
-                    borderRadius: 8,
+                    borderRadius: 'var(--radius-chip)',
                     color: 'var(--text-strong)',
                   }}
                   aria-hidden="true"
@@ -845,7 +845,7 @@ function SidebarLeaguesWidget({ items, loading }: { items: V1PublicLeagueListIte
                     flexShrink: 0,
                     width: 32,
                     height: 32,
-                    borderRadius: 8,
+                    borderRadius: 'var(--radius-chip)',
                     color: 'var(--text-strong)',
                   }}
                   aria-hidden="true"

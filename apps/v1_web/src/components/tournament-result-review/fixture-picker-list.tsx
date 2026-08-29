@@ -71,7 +71,7 @@ export function FixturePickerList({
                 textAlign: 'left',
                 minHeight: 44,
                 border: selected ? '2px solid var(--blue500)' : '1px solid transparent',
-                borderRadius: 12,
+                borderRadius: 'var(--radius-control)',
                 cursor: item.gameId ? 'pointer' : 'not-allowed',
                 opacity: item.gameId ? 1 : 0.55,
               }}

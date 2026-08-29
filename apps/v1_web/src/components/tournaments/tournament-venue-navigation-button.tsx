@@ -91,7 +91,7 @@ export function TournamentVenueNavigationButton({
             minWidth: 260,
             background: 'var(--surface, #fff)',
             border: '1px solid var(--border)',
-            borderRadius: 12,
+            borderRadius: 'var(--radius-control)',
             boxShadow: '0 8px 24px rgba(20,28,45,0.14)',
             padding: 8,
             zIndex: 20,
@@ -106,7 +106,7 @@ export function TournamentVenueNavigationButton({
                 justifyContent: 'space-between',
                 gap: 8,
                 padding: '4px 8px',
-                borderRadius: 8,
+                borderRadius: 'var(--radius-chip)',
               }}
             >
               <a

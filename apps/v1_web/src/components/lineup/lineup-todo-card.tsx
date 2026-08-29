@@ -43,7 +43,7 @@ export function LineupTodoCard({ enabled = true }: { enabled?: boolean }) {
                   gap: 12,
                   minHeight: 44,
                   padding: '12px 12px',
-                  borderRadius: 12,
+                  borderRadius: 'var(--radius-control)',
                   border: '1px solid var(--border)',
                   textDecoration: 'none',
                   color: 'inherit',
@@ -76,7 +76,7 @@ export function LineupTodoCard({ enabled = true }: { enabled?: boolean }) {
                   style={{
                     flexShrink: 0,
                     padding: '3px 8px',
-                    borderRadius: 999,
+                    borderRadius: 'var(--radius-pill)',
                     fontWeight: 700,
                     border: '1px solid var(--orange700)',
                     color: 'var(--orange700)',

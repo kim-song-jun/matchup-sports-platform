@@ -72,7 +72,7 @@ export function TournamentApplicationGuideSection() {
                 style={{
                   width: 28,
                   height: 28,
-                  borderRadius: 14,
+                  borderRadius: 'var(--radius-field)',
                   color: 'var(--text-strong)',
                   display: 'grid',
                   placeItems: 'center',
@@ -184,7 +184,7 @@ function ParticipantTeamList({
             alignItems: 'center',
             gap: 12,
             minHeight: 44,
-            borderRadius: 12,
+            borderRadius: 'var(--radius-control)',
             textDecoration: 'none',
           }}
         >

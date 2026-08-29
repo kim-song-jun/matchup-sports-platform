@@ -214,7 +214,7 @@ function DesktopChampionHero({
       style={{
         position: 'relative',
         background: 'linear-gradient(160deg, #0A0E1A 0%, #0D1B2A 40%, #1A0A2E 100%)',
-        borderRadius: 16,
+        borderRadius: 'var(--radius-container)',
         padding: '44px 56px 40px',
         overflow: 'hidden',
         display: 'flex',
@@ -460,7 +460,7 @@ function KnockoutResultsTable({
           flex: '0 0 60px', textAlign: 'center',
           background: 'var(--grey100)',
           border: 'none',
-          borderRadius: 8, padding: '4px 0',
+          borderRadius: 'var(--radius-chip)', padding: '4px 0',
         }}>
           <div style={{
             fontSize: isAccent ? 16 : 14, fontWeight: 900,
@@ -488,7 +488,7 @@ function KnockoutResultsTable({
   );
 
   const divider = <div style={{ height: 1, background: 'var(--grey100)', margin: '0 16px' }} />;
-  const cardStyle: React.CSSProperties = { borderRadius: 12, overflow: 'hidden', border: '1px solid var(--grey150)' };
+  const cardStyle: React.CSSProperties = { borderRadius: 'var(--radius-control)', overflow: 'hidden', border: '1px solid var(--grey150)' };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -583,7 +583,7 @@ const POS_CFG: Record<number, { bg: string; numColor: string; label: string }> =
 
 function FinalStandingsTable({ rows, fixtures }: { rows: FinalRankRow[]; fixtures: V1TournamentFixture[] }) {
   return (
-    <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid var(--grey150)' }}>
+    <div style={{ borderRadius: 'var(--radius-control)', overflow: 'hidden', border: '1px solid var(--grey150)' }}>
       <div style={{
         display: 'grid', gridTemplateColumns: '40px 1fr 64px 36px 36px 40px',
         padding: '8px 16px', background: 'var(--grey50)', borderBottom: '1px solid var(--grey150)',
@@ -1088,8 +1088,8 @@ function ResultsPageSkeleton() {
   return (
     <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div className="tm-skeleton" style={{ height: 56, borderRadius: 10 }} />
-      <div className="tm-skeleton" style={{ height: 180, borderRadius: 16 }} />
-      <div className="tm-skeleton" style={{ height: 160, borderRadius: 12 }} />
+      <div className="tm-skeleton" style={{ height: 180, borderRadius: 'var(--radius-container)' }} />
+      <div className="tm-skeleton" style={{ height: 160, borderRadius: 'var(--radius-control)' }} />
     </div>
   );
 }

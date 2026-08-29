@@ -313,7 +313,7 @@ function TeamSelectStep({
               <div
                 key={i}
                 aria-hidden="true"
-                style={{ height: 72, borderRadius: 14, background: 'var(--grey100)' }}
+                style={{ height: 72, borderRadius: 'var(--radius-field)', background: 'var(--grey100)' }}
               />
             ))}
           </div>
@@ -421,7 +421,7 @@ function TeamSelectStep({
                             flexShrink: 0,
                             width: 20,
                             height: 20,
-                            borderRadius: '50%',
+                            borderRadius: 'var(--radius-circle)',
                             background: 'var(--blue500)',
                             display: 'grid',
                             placeItems: 'center',
@@ -548,7 +548,7 @@ function ExpandableCheckRow({
                   style={{
                     flexShrink: 0,
                     padding: '2px 8px',
-                    borderRadius: 999,
+                    borderRadius: 'var(--radius-pill)',
                     background: consentType === 'required' ? 'var(--red50)' : 'var(--grey100)',
                     color: consentType === 'required' ? 'var(--red700)' : 'var(--text-muted)',
                     fontWeight: 700,
@@ -584,7 +584,7 @@ function ExpandableCheckRow({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              borderRadius: 8,
+              borderRadius: 'var(--radius-chip)',
               fontSize: 12,
               fontWeight: 600,
             }}
@@ -977,7 +977,7 @@ function AgreementsStep({
                 flexShrink: 0,
                 width: 22,
                 height: 22,
-                borderRadius: '50%',
+                borderRadius: 'var(--radius-circle)',
                 border: '2px solid var(--blue500)',
                 background: 'var(--blue500)',
                 display: 'grid',
@@ -988,7 +988,7 @@ function AgreementsStep({
                 style={{
                   width: 8,
                   height: 8,
-                  borderRadius: '50%',
+                  borderRadius: 'var(--radius-circle)',
                   background: 'var(--static-white)',
                   display: 'block',
                 }}
@@ -1325,7 +1325,7 @@ function PaymentGuideStep({
           style={{
             width: 56,
             height: 56,
-            borderRadius: '50%',
+            borderRadius: 'var(--radius-circle)',
             background: 'var(--blue500)',
             display: 'grid',
             placeItems: 'center',
@@ -1453,7 +1453,7 @@ function LoadingSkeleton() {
         <div
           key={i}
           aria-hidden="true"
-          style={{ height: 64, borderRadius: 14, background: 'var(--grey100)', marginBottom: 12 }}
+          style={{ height: 64, borderRadius: 'var(--radius-field)', background: 'var(--grey100)', marginBottom: 12 }}
         />
       ))}
     </div>
@@ -1962,7 +1962,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
           >
             <div
               className="tm-text-label"
-              style={{ color: 'var(--static-white)', background: 'var(--scrim-dark-72)', padding: '12px 20px', borderRadius: 14 }}
+              style={{ color: 'var(--static-white)', background: 'var(--scrim-dark-72)', padding: '12px 20px', borderRadius: 'var(--radius-field)' }}
             >
               잠깐만요…
             </div>

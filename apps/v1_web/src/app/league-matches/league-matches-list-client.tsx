@@ -174,7 +174,7 @@ export default function LeagueMatchesListClient() {
                         )}
                         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--text-muted)] sm:text-sm">
                           <span className="inline-flex items-center gap-2">
-                            <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: '50%', background: accent.dot }} />
+                            <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: 'var(--radius-circle)', background: accent.dot }} />
                             {accent.label}
                           </span>
                           <span aria-hidden="true">·</span>
@@ -216,9 +216,9 @@ export default function LeagueMatchesListClient() {
 function LeagueListSkeleton() {
   return (
     <div aria-busy="true" aria-label="리그 목록 불러오는 중" className="space-y-2">
-      <div className="tm-skeleton" style={{ height: 76, borderRadius: 12, opacity: 1 }} />
-      <div className="tm-skeleton" style={{ height: 76, borderRadius: 12, opacity: 0.65 }} />
-      <div className="tm-skeleton" style={{ height: 76, borderRadius: 12, opacity: 0.35 }} />
+      <div className="tm-skeleton" style={{ height: 76, borderRadius: 'var(--radius-control)', opacity: 1 }} />
+      <div className="tm-skeleton" style={{ height: 76, borderRadius: 'var(--radius-control)', opacity: 0.65 }} />
+      <div className="tm-skeleton" style={{ height: 76, borderRadius: 'var(--radius-control)', opacity: 0.35 }} />
     </div>
   );
 }

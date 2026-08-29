@@ -145,9 +145,9 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
   if (series === undefined) {
     return (
       <div className="mx-auto max-w-2xl space-y-4 px-4 py-6">
-        <div className="tm-skeleton" style={{ height: 24, borderRadius: 8 }} />
-        <div className="tm-skeleton" style={{ height: 180, borderRadius: 16 }} />
-        <div className="tm-skeleton" style={{ height: 120, borderRadius: 12 }} />
+        <div className="tm-skeleton" style={{ height: 24, borderRadius: 'var(--radius-chip)' }} />
+        <div className="tm-skeleton" style={{ height: 180, borderRadius: 'var(--radius-container)' }} />
+        <div className="tm-skeleton" style={{ height: 120, borderRadius: 'var(--radius-control)' }} />
       </div>
     );
   }
@@ -261,7 +261,7 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
           )}
         </>
       ) : recordQuery.isPending ? (
-        <div className="tm-skeleton" style={{ height: 180, borderRadius: 16 }} />
+        <div className="tm-skeleton" style={{ height: 180, borderRadius: 'var(--radius-container)' }} />
       ) : recordQuery.isError &&
         !(recordQuery.error instanceof V1ApiError && recordQuery.error.statusCode === 404) ? (
         /* 404(게임 미공개·숨김)만 정상 폴백이다 — 네트워크/5xx 를 요약 카드로 숨기면

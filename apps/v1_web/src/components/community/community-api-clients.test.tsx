@@ -25,6 +25,21 @@ const analytics = vi.hoisted(() => ({
   trackEvent: vi.fn(),
 }));
 
+// 실시간 수신 검증용. 훅 자체의 동작은 use-v1-realtime-socket.test.tsx 가 덮으므로,
+// 여기서는 "채팅방 화면이 그 훅을 실제로 마운트하는가"만 본다 — 훅이 만들어져 있어도
+// 소비처가 없으면 실시간이 통째로 안 도는데, 그건 훅 테스트로는 절대 드러나지 않는다.
+const socket = vi.hoisted(() => ({
+  listeners: {} as Record<string, (payload: unknown) => void>,
+  on: vi.fn(),
+  off: vi.fn(),
+  emit: vi.fn(),
+}));
+socket.on.mockImplementation((event: string, cb: (payload: unknown) => void) => {
+  socket.listeners[event] = cb;
+});
+
+vi.mock('@/lib/v1-socket', () => ({ getV1Socket: () => socket }));
+
 vi.mock('next/navigation', () => ({
   useRouter: () => router,
   useSearchParams: () => new URLSearchParams(),
@@ -126,6 +141,21 @@ describe('ChatRoomPageClient', () => {
     hooks.updateChatRoomMe.mockReturnValue({ isPending: false, variables: undefined, mutate: vi.fn() });
     hooks.sendChatMessage.mockReturnValue({ isPending: false, isError: false, mutate: vi.fn() });
     hooks.updateMyChatRoom.mockReturnValue({ isPending: false, mutate: vi.fn() });
+  });
+
+  it('채팅방을 열면 실시간 수신을 구독하고, 나가면 해제한다', () => {
+    // 훅은 만들어져 있었지만 어디에도 마운트되지 않아, 열어 둔 채팅방에 새 메시지가
+    // 실시간으로 들어오지 않았다(30초 stale 이 지난 뒤 창 포커스 전환에만 의존).
+    // 훅 자체를 아무리 테스트해도 "아무도 안 쓴다"는 드러나지 않는다.
+    hooks.chatRoom.mockReturnValue({ data: undefined, isPending: true, isError: false, refetch: vi.fn() });
+    hooks.chatMessages.mockReturnValue({ data: undefined, isPending: true, isError: false, refetch: vi.fn() });
+
+    const { unmount } = renderWithClient(<ChatRoomPageClient roomId="room-live" />);
+
+    expect(socket.on).toHaveBeenCalledWith('chat:message', expect.any(Function));
+
+    unmount();
+    expect(socket.off).toHaveBeenCalledWith('chat:message', expect.any(Function));
   });
 
   it('shows a real error state — never the hardcoded mock room/messages — when the room fetch fails', () => {

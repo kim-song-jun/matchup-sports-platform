@@ -80,7 +80,7 @@ export function LeagueStandingsTable({ data }: { data: LeagueStandingsTableData 
               marginTop: 12,
               padding: '4px 12px',
               minHeight: 28,
-              borderRadius: 999,
+              borderRadius: 'var(--radius-pill)',
               fontSize: 12,
               fontWeight: 700,
               background: magicNumber.clinched ? 'var(--blue50)' : 'var(--grey100)',

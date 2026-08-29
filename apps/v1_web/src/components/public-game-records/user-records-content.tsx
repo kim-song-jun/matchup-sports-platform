@@ -175,7 +175,7 @@ export function UserRecordsContent({
                     flexShrink: 0,
                     alignItems: 'center',
                     justifyContent: 'center',
-                    borderRadius: 12,
+                    borderRadius: 'var(--radius-control)',
                     background: 'var(--surface-soft)',
                   }}
                 >

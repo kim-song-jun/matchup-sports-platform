@@ -211,7 +211,7 @@ export function AlertBanner({
       aria-live={isError ? 'assertive' : 'polite'}
       style={{
         padding: '12px 16px',
-        borderRadius: 12,
+        borderRadius: 'var(--radius-control)',
         background: s.bg,
         color: s.color,
         lineHeight: 1.55,

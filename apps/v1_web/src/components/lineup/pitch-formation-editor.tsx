@@ -313,7 +313,7 @@ export function PitchFormationEditor({
         // 변수가 없는 모바일에서는 fallback 420px 그대로.
         maxWidth: 'var(--tm-pitch-max-width, 420px)',
         aspectRatio: `1 / ${1 / PITCH_ASPECT}`,
-        borderRadius: 12,
+        borderRadius: 'var(--radius-control)',
         overflow: 'hidden',
         background: `${TURF_STRIPES}, #1f8a4c`,
         cursor: !slotMode && editable && selectedWaitingKey !== null ? 'crosshair' : 'default',
@@ -416,7 +416,7 @@ export function PitchFormationEditor({
             alignItems: 'center',
             gap: 12,
             padding: '12px 16px',
-            borderRadius: 12,
+            borderRadius: 'var(--radius-control)',
             border: '1px solid var(--border)',
             background: 'var(--card-surface)',
             textAlign: 'left',
@@ -651,7 +651,7 @@ function FormationControls({
                   alignItems: 'center',
                   gap: 8,
                   padding: '8px 12px',
-                  borderRadius: 999,
+                  borderRadius: 'var(--radius-pill)',
                   border: selectedWaitingKey === entry.key ? '2px solid var(--blue500)' : '1px solid var(--border)',
                   background: selectedWaitingKey === entry.key ? 'var(--tint-blue)' : 'var(--card-surface)',
                   cursor: editable ? 'pointer' : 'default',
@@ -816,14 +816,14 @@ function FormationSheet({
           maxHeight: '80vh',
           overflowY: 'auto',
           background: 'var(--card-surface)',
-          borderRadius: '16px 16px 0 0',
+          borderRadius: 'var(--radius-container) var(--radius-container) 0 0',
           padding: '16px 20px calc(32px + env(safe-area-inset-bottom))',
           boxShadow: '0 -8px 24px rgba(0,0,0,0.18)',
         }}
       >
         <div
           aria-hidden="true"
-          style={{ width: 36, height: 4, borderRadius: 999, background: 'var(--grey100)', margin: '0 auto 16px' }}
+          style={{ width: 36, height: 4, borderRadius: 'var(--radius-pill)', background: 'var(--grey100)', margin: '0 auto 16px' }}
         />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <h3 id={titleId} className="tm-text-body-lg" style={{ fontWeight: 700 }}>
@@ -914,7 +914,7 @@ function EmptySlotMarker({ slot, editable, onSelect }: { slot: FormationSlot; ed
       aria-label={`${slot.label} 자리, 비어 있음${editable ? ' — 탭해서 선수 채우기' : ''}`}
       style={{
         position: 'absolute', left: `${slot.x}%`, top: `${topPct}%`, transform: 'translate(-50%, -50%)',
-        width: TOUCH_TARGET_PX, height: TOUCH_TARGET_PX, borderRadius: '50%',
+        width: TOUCH_TARGET_PX, height: TOUCH_TARGET_PX, borderRadius: 'var(--radius-circle)',
         border: '2px dashed rgba(255,255,255,0.85)', background: 'rgba(255,255,255,0.14)', color: '#fff',
         // [R-T2] 44px 원(TOUCH_TARGET_PX)에 포지션 약칭 2~3자라 12px 여유.
         display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700,
@@ -951,11 +951,11 @@ function SlotPlayerPickerSheet({
         ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}
         style={{
           position: 'absolute', left: 0, right: 0, bottom: 0, maxHeight: '70vh', overflowY: 'auto',
-          background: 'var(--card-surface)', borderRadius: '16px 16px 0 0',
+          background: 'var(--card-surface)', borderRadius: 'var(--radius-container) var(--radius-container) 0 0',
           padding: '16px 20px calc(20px + env(safe-area-inset-bottom))', boxShadow: '0 -8px 24px rgba(0,0,0,0.18)',
         }}
       >
-        <div aria-hidden="true" style={{ width: 36, height: 4, borderRadius: 999, background: 'var(--grey100)', margin: '0 auto 16px' }} />
+        <div aria-hidden="true" style={{ width: 36, height: 4, borderRadius: 'var(--radius-pill)', background: 'var(--grey100)', margin: '0 auto 16px' }} />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <h3 id={titleId} className="tm-text-body-lg" style={{ fontWeight: 700 }}>{slot.label} 자리에 채울 선수</h3>
           <button type="button" onClick={onClose} aria-label="닫기" className="tm-btn tm-btn-icon tm-btn-ghost">×</button>
@@ -1040,7 +1040,7 @@ function PlayerToken({
           aspectRatio: '1 / 1',
           minWidth: TOUCH_TARGET_PX,
           minHeight: TOUCH_TARGET_PX,
-          borderRadius: '50%',
+          borderRadius: 'var(--radius-circle)',
           border: '2px solid #fff',
           // blue500/orange500 + 흰 텍스트는 WCAG AA 4.5:1 미달(실측 blue500 ~3.71:1,
           // orange500 ~2.16:1, 2026-08 QA) — 등번호 텍스트가 여기서 유일하게 흰 배경 위
@@ -1087,7 +1087,7 @@ function PlayerToken({
             color: '#fff',
             background: 'var(--player-marker-orange)',
             border: '1px solid #fff',
-            borderRadius: 4,
+            borderRadius: 'var(--radius-tight)',
             padding: '2px 3px',
           }}
         >
@@ -1146,7 +1146,7 @@ function PlayerToken({
             right: -17,
             width: TOUCH_TARGET_PX,
             height: TOUCH_TARGET_PX,
-            borderRadius: '50%',
+            borderRadius: 'var(--radius-circle)',
             border: 'none',
             background: 'transparent',
             display: 'flex',
@@ -1161,7 +1161,7 @@ function PlayerToken({
             style={{
               width: 18,
               height: 18,
-              borderRadius: '50%',
+              borderRadius: 'var(--radius-circle)',
               border: '1px solid var(--border)',
               background: 'var(--card-surface)',
               color: 'var(--text-strong)',

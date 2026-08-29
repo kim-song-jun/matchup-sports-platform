@@ -60,7 +60,7 @@ function TournamentEmblem({
         aria-hidden="true"
         width={size}
         height={size}
-        style={{ width: size, height: size, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }}
+        style={{ width: size, height: size, borderRadius: 'var(--radius-chip)', objectFit: 'cover', flexShrink: 0 }}
       />
     );
   }
@@ -73,7 +73,7 @@ function TournamentEmblem({
       style={{
         width: size,
         height: size,
-        borderRadius: 8,
+        borderRadius: 'var(--radius-chip)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',

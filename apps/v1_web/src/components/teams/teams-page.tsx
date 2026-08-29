@@ -729,6 +729,12 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
         {mode === 'pending' ? (
           <TeamJoinPendingNotice requestedAtLabel={model.joinRequest?.requestedAtLabel} />
         ) : null}
+        {/* 전술보드 입구 — **모바일 블록에도 반드시 있어야 한다.** 이 화면은 데스크톱
+            (.tm-show-desktop)과 모바일(.tm-hide-desktop) JSX 를 따로 그리는데, 처음엔
+            데스크톱 쪽에만 넣어서 **모바일에서는 진입점이 아예 없었다** — 이 앱의 본무대가
+            모바일인데도. alpha 390/768 캡처가 그 섹션을 못 찾아 드러났다(데스크톱 1440
+            에서만 찍혔다). 두 블록을 함께 고치는 것이 이 파일의 규약이다. */}
+        {mode === 'mine' ? <TeamUpcomingGamesCard teamId={team.id} /> : null}
         <TeamOpenMatchesSection matches={model.openMatches} loading={model.openMatchesLoading} />
         <TeamMyLeaguesSection leagues={model.myLeagues} loading={model.myLeaguesLoading} error={model.myLeaguesError} onRetry={model.onRetryMyLeagues} />
 

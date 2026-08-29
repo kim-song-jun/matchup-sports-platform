@@ -20,6 +20,13 @@
  *   node scripts/capture-alpha-tactics-board.mjs [outDir]
  *
  * 계정은 환경변수로만 넘긴다 — 이 저장소는 PUBLIC 이라 값을 파일에 적지 않는다.
+ *
+ * **요소 존재 확인은 개수가 아니라 가시성으로 한다.** 이 앱은 데스크톱/모바일 JSX 를 따로
+ * 그리고 CSS(.tm-show-desktop/.tm-hide-desktop)로 한쪽을 숨긴다 — 그래서 숨은 노드가 **항상
+ * DOM 에 있다.** `locator.count()`/`querySelectorAll` 로 세면 모바일 뷰포트에서도 데스크톱
+ * 노드가 잡혀 "있다"고 오판한다(2026-08-30 에 실제로 그렇게 판정해 모바일 진입점 부재를
+ * 놓칠 뻔했다 — 두 세션이 각자 같은 실수를 했다). `waitForSelector` 기본값(visible)처럼
+ * 보이는지를 기준으로 판정할 것.
  */
 import { mkdir } from 'node:fs/promises';
 import { chromium } from 'playwright';
@@ -87,15 +94,36 @@ async function contextFor(browser, token, viewport) {
   return context;
 }
 
-async function shoot(context, { path, label, name }) {
+async function shoot(context, { path, label, name, waitFor }) {
   const page = await context.newPage();
   const response = await page.goto(`${BASE}${path}`, { waitUntil: 'domcontentloaded' });
   const status = response?.status() ?? 0;
   // 403 을 안 보고 찍으면 레이트리밋 페이지를 화면 결함으로 오진한다.
   if (status === 403) throw new Error(`alpha 레이트리밋(403) — ${path}. 1분 쉬었다 다시 돌리세요.`);
   if (status >= 400) console.warn(`  ! ${label} HTTP ${status}`);
-  // 라이브 폴링 화면이 아니라 networkidle 을 안 쓴다(그쪽은 절대 끝나지 않는다).
-  await page.waitForTimeout(3500);
+  // networkidle 은 안 쓴다 — 라이브 폴링이 도는 화면에서는 절대 끝나지 않는다.
+
+  // 첫 페인트가 자리를 잡을 최소 시간. 여기서 화면이 **완성되기를** 기다리는 게 아니다
+  // (그 판단은 아래 waitFor 가 한다) — 셸·헤더가 먼저 그려져 아래 대기가 엉뚱한 시점에
+  // 걸리지 않게 하는 짧은 여유일 뿐이다. 늘려도 얻는 게 없으니 늘리지 말 것.
+  await page.waitForTimeout(2500);
+
+  // **화면이 준비됐는지는 시간이 아니라 요소로 판정한다.**
+  // "다가오는 경기" 섹션은 조회 중에 스스로 숨는다(빈 카드를 얹지 않으려는 의도) — 그래서
+  // **아직 안 온 것과 아예 없는 것이 화면상 같아 보인다.** 고정 대기로 찍으면 양방향으로
+  // 거짓말을 한다: 멀쩡한 기능이 "안 나온다"로 박제되고, 진짜 결함은 "느린가 보다"로 넘어간다.
+  // 실제로 3.5초·8초 둘 다 그 섹션이 빠진 컷을 만들었고, 요소 대기로 바꾸고서야 모바일
+  // 블록에 진입점이 아예 없다는 진짜 원인이 드러났다.
+  if (waitFor !== undefined) {
+    try {
+      await page.waitForSelector(waitFor, { timeout: 20000 });
+    } catch {
+      // 여기 찍히는 경고가 곧 결함 신호다 — 무시하지 말 것.
+      console.warn(`  ! ${label}: ${waitFor} 가 20초 안에 안 나타났다 — 그대로 찍는다`);
+    }
+  }
+  // 요소가 나타난 직후의 레이아웃 정착(이미지·폰트 반영)만 기다린다.
+  await page.waitForTimeout(1200);
   await page.screenshot({ path: `${OUT}/${name}.png`, fullPage: true });
   console.log(`  ✓ ${name}.png  (HTTP ${status})`);
   await page.close();
@@ -106,9 +134,9 @@ await mkdir(OUT, { recursive: true });
 const browser = await chromium.launch();
 
 const shots = [
-  { who: 'manager', email: MANAGER_EMAIL, path: `/teams/${TEAM_ID}`, slug: 'team-detail-manager', label: '팀 상세(운영진)' },
+  { who: 'manager', email: MANAGER_EMAIL, path: `/teams/${TEAM_ID}`, slug: 'team-detail-manager', label: '팀 상세(운영진)', waitFor: 'a[href*="/tactics/"]' },
   { who: 'manager', email: MANAGER_EMAIL, path: `/teams/${TEAM_ID}/tactics/${GAME_ID}`, slug: 'tactics-manager', label: '전술보드(운영진·편집 가능)' },
-  { who: 'member', email: MEMBER_EMAIL, path: `/teams/${TEAM_ID}`, slug: 'team-detail-member', label: '팀 상세(일반 멤버)' },
+  { who: 'member', email: MEMBER_EMAIL, path: `/teams/${TEAM_ID}`, slug: 'team-detail-member', label: '팀 상세(일반 멤버)', waitFor: 'a[href*="/tactics/"]' },
   { who: 'member', email: MEMBER_EMAIL, path: `/teams/${TEAM_ID}/tactics/${GAME_ID}`, slug: 'tactics-member', label: '전술보드(일반 멤버·보기 전용)' },
 ];
 if (OTHER_TEAM_ID) {
@@ -131,7 +159,7 @@ for (const { width, height, key } of WIDTHS) {
   for (const shot of shots) {
     const context = await contextFor(browser, tokens.get(shot.email), { width, height });
     try {
-      await shoot(context, { path: shot.path, label: shot.label, name: `${shot.slug}-${width}` });
+      await shoot(context, { path: shot.path, label: shot.label, name: `${shot.slug}-${width}`, waitFor: shot.waitFor });
     } finally {
       await context.close();
     }

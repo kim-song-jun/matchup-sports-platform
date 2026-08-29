@@ -10,6 +10,7 @@ import { GamesService } from '../games/games.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { TournamentStaffAccessService } from '../tournaments/staff/tournament-staff-access.service';
 import { RealtimeGateway } from './realtime.gateway';
+import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
 
 const SESSION_SECRET = 'task-8-handshake-session-secret-32-bytes';
 const GAME_ID = '60000000-0000-4000-8000-000000000008';
@@ -76,6 +77,7 @@ function sessionCookie(userId = USER.id, issuedAtMs?: number): string {
 
 describe('Task 8 realtime authenticated pre-connect handshake', () => {
   let gateway: RealtimeGateway;
+  const managedTerms = { signupCompliance: jest.fn(async () => ({ compliant: true })) };
   const prisma = {
     v1User: { findFirst: jest.fn() },
     v1Game: { findUnique: jest.fn() },
@@ -104,6 +106,10 @@ describe('Task 8 realtime authenticated pre-connect handshake', () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         RealtimeGateway,
+        // 핸드셰이크가 REST 와 같은 기준으로 약관 재동의를 본다. 이 스위트들의 관심사는
+        // 약관이 아니므로 "동의 완료" 로 고정한 더블을 넣는다 — 재동의 차단 자체는
+        // 전용 테스트가 따로 덮는다.
+        { provide: ManagedTermsRuntimeService, useValue: managedTerms },
         { provide: PrismaService, useValue: prisma },
         { provide: TournamentStaffAccessService, useValue: staffAccess },
         { provide: GamesService, useValue: gamesService },
@@ -156,6 +162,22 @@ describe('Task 8 realtime authenticated pre-connect handshake', () => {
       });
     }
   }
+
+  it('새 필수 약관에 동의하지 않은 사용자는 소켓 연결 자체가 끊긴다', async () => {
+    // REST 는 재동의 미완 사용자를 (약관 화면 외) 전 경로에서 막는다. 이 소켓은 읽기
+    // 전용이 아니라 game.event.append 같은 쓰기 커맨드를 받으므로, 여기서 막지 않으면
+    // 재동의 강제가 REST 에만 걸리고 실시간 경로로 그대로 우회된다.
+    process.env.NODE_ENV = 'test';
+    delete process.env.V1_SESSION_SECRET;
+    managedTerms.signupCompliance.mockResolvedValueOnce({ compliant: false } as never);
+    const client = socket({}, { 'x-v1-user-id': USER.id });
+
+    await handleConnection(client);
+
+    expect(client.disconnect).toHaveBeenCalled();
+    // 방에 넣지 않았다는 것이 곧 방송을 받지 못한다는 뜻이다.
+    expect(client.join).not.toHaveBeenCalled();
+  });
 
   it('PIN keeps the existing local identity/account gate green', async () => {
     process.env.NODE_ENV = 'test';

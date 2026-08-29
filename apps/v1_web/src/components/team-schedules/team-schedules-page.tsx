@@ -475,7 +475,10 @@ function ScheduleAttendeeSection({ model }: { model: ScheduleDetailViewModel['at
       {filtered.length === 0 ? (
         <div className="tm-text-caption">해당하는 팀원이 없어요.</div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        // A안(사용자 확정): 데스크톱에서 이름은 왼쪽 끝, 액션은 오른쪽 끝으로 벌어져
+        // 사이가 통째로 비었다(1440 실화면). 행마다 다른 구조를 만들지 않고 목록 자체의
+        // 폭을 모바일 리듬에 맞춰 묶는다 -- 코드 경로가 하나로 유지된다.
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxWidth: 560 }}>
           {filtered.map((item) => (
             <div key={item.userId} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0' }}>
               <div
@@ -504,7 +507,10 @@ function ScheduleAttendeeSection({ model }: { model: ScheduleDetailViewModel['at
                 덮어쓰지 않는다. 정원이 찼으면 서버가 본인 응답과 똑같이 대기자로
                 내리므로(사용자 확정) 여기서 따로 막지 않는다.
               */}
-              {model.canProxy && item.status === 'NO_RESPONSE' ? (
+              {model.canProxy &&
+              item.status === 'NO_RESPONSE' &&
+              model.viewerUserId !== null &&
+              item.userId !== model.viewerUserId ? (
                 <button
                   type="button"
                   className="tm-btn tm-btn-sm tm-btn-neutral"

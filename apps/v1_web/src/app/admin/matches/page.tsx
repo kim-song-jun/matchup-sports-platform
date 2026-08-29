@@ -10,6 +10,7 @@ import { formatAdminDateTimeShort } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import { useAdminListQuery } from '@/hooks/use-admin-list-query';
+import { pickAllowedParam } from '../pick-allowed-param';
 import {
   AdminPageHeader,
   AdminFilterBar,
@@ -55,7 +56,9 @@ export default function AdminMatchesPage() {
 function AdminMatchesPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const initialStatus = searchParams.get('status') ?? '';
+  // 허용 목록에 없는 값(오타난 북마크·옛 링크)은 조용히 '전체'로 떨어뜨린다 —
+  // 그대로 실으면 서버가 400 을 내고 목록이 통째로 에러 화면이 된다.
+  const initialStatus = pickAllowedParam(searchParams.get('status'), MATCH_STATUS_FILTER_OPTIONS);
 
   // 검색 debounce·상태 필터·page 리셋·페이지네이션 조립은 공용 훅이 담당한다.
   // (커서 누적 대신 페이지 단위 교체 — 목록 어디쯤인지와 총량이 보여야 한다.)

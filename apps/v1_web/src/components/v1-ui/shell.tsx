@@ -59,6 +59,7 @@ type AppChromeProps = {
   desktopHead?: boolean;
   backHref?: string;
   centerTitle?: boolean;
+  titleAsHeading?: boolean;
 };
 
 export function AppChrome({
@@ -77,6 +78,7 @@ export function AppChrome({
   desktopHead = false,
   backHref,
   centerTitle = false,
+  titleAsHeading = false,
 }: AppChromeProps) {
   const frameClassName = [
     'tm-app-frame',
@@ -101,7 +103,11 @@ export function AppChrome({
                 <ChevronLeftIcon size={22} strokeWidth={2.2} />
               </AppBackLink>
             ) : null}
-            <div className="tm-text-body-lg tm-topbar-heading" style={{ color: 'var(--text-strong)' }}>{title}</div>
+            {titleAsHeading ? (
+              <h1 className="tm-text-body-lg tm-topbar-heading" style={{ color: 'var(--text-strong)' }}>{title}</h1>
+            ) : (
+              <div className="tm-text-body-lg tm-topbar-heading" style={{ color: 'var(--text-strong)' }}>{title}</div>
+            )}
           </div>
           <div className="tm-topbar-actions">
             {showHomeShortcut ? (

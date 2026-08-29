@@ -40,7 +40,7 @@ export function AdminReasonModal({
 
   // focus 저장·복원 / 첫 컨트롤 포커스 / ESC / focus trap / 스크롤 잠금 — 공용 훅.
   // 이 파일의 구현을 리그 모달 3종이 "그대로 본떠" 네 벌이 됐던 것을 한 벌로 모았다.
-  const { dialogRef, initialFocusRef, onBackdropClick } = useModalA11y<HTMLSelectElement>({
+  const { dialogRef, initialFocusRef, onBackdropClick, mounted, closing } = useModalA11y<HTMLSelectElement>({
     open,
     onClose,
     pending,
@@ -54,7 +54,7 @@ export function AdminReasonModal({
     }
   }, [open, currentStatus, statusOptions]);
 
-  if (!open) return null;
+  if (!mounted) return null;
 
   const trimmedReason = reason.trim();
   const canSubmit = trimmedReason.length > 0 && !pending;
@@ -68,8 +68,7 @@ export function AdminReasonModal({
   return (
     /* Backdrop */
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-[2px]"
-      aria-hidden={!open}
+      className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-[2px] tm-modal-scrim${closing ? ' is-closing' : ''}`}
       onClick={onBackdropClick}
     >
       {/* Panel */}
@@ -78,7 +77,7 @@ export function AdminReasonModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="admin-reason-modal-title"
-        className="bg-[var(--card-surface)] rounded-2xl shadow-[0_8px_32px_rgba(20,28,45,0.14)] w-full max-w-[440px] overflow-hidden"
+        className={`bg-[var(--card-surface)] rounded-2xl shadow-[0_8px_32px_rgba(20,28,45,0.14)] w-full max-w-[440px] overflow-hidden tm-modal-panel${closing ? ' is-closing' : ''}`}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">

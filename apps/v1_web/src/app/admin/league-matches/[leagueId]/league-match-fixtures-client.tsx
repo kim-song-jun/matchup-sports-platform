@@ -1163,11 +1163,11 @@ function RemoveTeamConfirmModal({
   onConfirm: () => void;
   onClose: () => void;
 }) {
-  const { dialogRef, initialFocusRef, onBackdropClick } = useModalA11y<HTMLButtonElement>({ open, onClose, pending });
-  if (!open) return null;
+  const { dialogRef, initialFocusRef, onBackdropClick, mounted, closing } = useModalA11y<HTMLButtonElement>({ open, onClose, pending });
+  if (!mounted) return null;
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-[2px]"
+      className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-[2px] tm-modal-scrim${closing ? ' is-closing' : ''}`}
       onClick={onBackdropClick}
     >
       <div
@@ -1176,7 +1176,7 @@ function RemoveTeamConfirmModal({
         aria-modal="true"
         aria-labelledby="remove-team-confirm-title"
         aria-describedby="remove-team-confirm-desc"
-        className="bg-[var(--card-surface)] rounded-2xl shadow-[var(--shadow-modal)] w-full max-w-[420px] overflow-hidden"
+        className={`bg-[var(--card-surface)] rounded-2xl shadow-[var(--shadow-modal)] w-full max-w-[420px] overflow-hidden tm-modal-panel${closing ? ' is-closing' : ''}`}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
           <h2

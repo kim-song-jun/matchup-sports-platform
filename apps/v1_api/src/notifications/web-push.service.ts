@@ -1,10 +1,13 @@
-import { ConflictException, Injectable, OnModuleInit } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
+import { ConflictException, Injectable, OnModuleInit, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import * as webpush from 'web-push';
 import { PrismaService } from '../prisma/prisma.service';
+import { FcmPushService } from './fcm-push.service';
 
 interface PushPayload {
+  notificationId?: string;
   title: string;
   body?: string;
   url?: string;
@@ -30,6 +33,7 @@ export class WebPushService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     @InjectPinoLogger(WebPushService.name) private readonly logger: PinoLogger,
+    @Optional() private readonly fcmPushService?: FcmPushService,
   ) {}
 
   onModuleInit(): void {
@@ -90,6 +94,23 @@ export class WebPushService implements OnModuleInit {
    * 성공으로 표시하게 된다. 그래서 상태만 요약해 반환한다.
    */
   async sendToUser(userId: string, payload: PushPayload): Promise<PushDeliverySummary> {
+    const nativeDelivery = this.fcmPushService
+      ?.sendToUser(userId, {
+        notificationId: payload.notificationId ?? randomUUID(),
+        title: payload.title,
+        body: payload.body,
+        route: payload.url,
+      })
+      .catch((err: unknown) => {
+        this.logger.warn({ userId, err }, 'Android FCM delivery failed');
+      });
+
+    const webDelivery = this.sendWebPushToUser(userId, payload);
+    const [summary] = await Promise.all([webDelivery, nativeDelivery]);
+    return summary;
+  }
+
+  private async sendWebPushToUser(userId: string, payload: PushPayload): Promise<PushDeliverySummary> {
     if (!this.enabled) return { subscriptions: 0, delivered: 0, failed: 0, disabled: true };
 
     const subscriptions = await this.prisma.v1PushSubscription.findMany({ where: { userId } });

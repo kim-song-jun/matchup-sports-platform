@@ -598,9 +598,11 @@ describe('TeamDetailPageView — 팀 기록 섹션', () => {
     expect(reviewLinks).toHaveLength(2);
     const reviewLink = reviewLinks[0];
     expect(reviewLink).toHaveAttribute('href', '/my/reviews?tab=received');
-    // 개수로 가중 평균: (5×3 + 4×1) / 4 = 4.75 → 4.8, 총 4개
+    // 종목별 가중 평균: (5×3 + 4×1) / 4 = 4.75 → 4.8.
+    // 단위는 후기 건수가 아니라 **평가한 팀 수**다 — 팀 평점이 팀당 1표로 계산되므로
+    // 가중치도 팀 수여야 하고, 배지도 같은 단위로 적어야 숫자가 거짓말을 하지 않는다.
     expect(reviewLink).toHaveTextContent('4.8');
-    expect(reviewLink).toHaveTextContent('4개');
+    expect(reviewLink).toHaveTextContent('4팀');
   });
 
   it('남의 팀도 그 팀이 받은 후기를 보여주되, 내 후기 화면으로 보내지는 않는다', () => {

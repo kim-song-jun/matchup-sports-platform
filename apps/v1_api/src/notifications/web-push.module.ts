@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { WebPushService } from './web-push.service';
+import { PushDeviceService } from './push-device.service';
+import { FcmPushService } from './fcm-push.service';
 
 /**
  * `WebPushService` 하나만 담는 최소 모듈 (2026-08-26).
@@ -14,7 +16,7 @@ import { WebPushService } from './web-push.service';
  * 도메인 모듈도 끌고 오지 않는다 — 그래서 누가 import 해도 순환이 생기지 않는다.
  */
 @Module({
-  providers: [WebPushService],
-  exports: [WebPushService],
+  providers: [WebPushService, PushDeviceService, FcmPushService],
+  exports: [WebPushService, PushDeviceService, FcmPushService],
 })
 export class WebPushModule {}

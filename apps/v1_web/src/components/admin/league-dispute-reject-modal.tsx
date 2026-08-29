@@ -34,7 +34,7 @@ export function LeagueDisputeRejectModal({
 }: LeagueDisputeRejectModalProps) {
   const [note, setNote] = useState('');
 
-  const { dialogRef, initialFocusRef, onBackdropClick } = useModalA11y<HTMLTextAreaElement>({
+  const { dialogRef, initialFocusRef, onBackdropClick, mounted, closing } = useModalA11y<HTMLTextAreaElement>({
     open,
     onClose,
     pending,
@@ -44,7 +44,7 @@ export function LeagueDisputeRejectModal({
     if (open) setNote('');
   }, [open]);
 
-  if (!open) return null;
+  if (!mounted) return null;
 
   const trimmedNote = note.trim();
   const canSubmit = trimmedNote.length > 0 && !pending;
@@ -57,8 +57,7 @@ export function LeagueDisputeRejectModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-[2px]"
-      aria-hidden={!open}
+      className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-[2px] tm-modal-scrim${closing ? ' is-closing' : ''}`}
       onClick={onBackdropClick}
     >
       <div
@@ -66,7 +65,7 @@ export function LeagueDisputeRejectModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="league-dispute-reject-modal-title"
-        className="bg-[var(--card-surface)] rounded-2xl shadow-[0_8px_32px_rgba(20,28,45,0.14)] w-full max-w-[440px] overflow-hidden"
+        className={`bg-[var(--card-surface)] rounded-2xl shadow-[0_8px_32px_rgba(20,28,45,0.14)] w-full max-w-[440px] overflow-hidden tm-modal-panel${closing ? ' is-closing' : ''}`}
       >
         <div className="flex items-start justify-between px-5 py-4 border-b border-[var(--border)]">
           <div>

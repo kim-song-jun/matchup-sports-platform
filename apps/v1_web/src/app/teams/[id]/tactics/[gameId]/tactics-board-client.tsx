@@ -76,10 +76,30 @@ export function TacticsBoardClient({ teamId, gameId }: { teamId: string; gameId:
 
   const starters = useMemo(() => (entries ?? []).filter((entry) => entry.started), [entries]);
   const bench = useMemo(() => (entries ?? []).filter((entry) => !entry.started), [entries]);
-  /** 아직 보드에 없는 팀원 — 여기서 골라 넣는다. */
+  /**
+   * 아직 보드에 없는 팀원 — 여기서 골라 넣는다.
+   *
+   * `userId` 만으로 거르면 **이미 올라간 사람이 목록에 또 뜬다.** 보드 엔트리는 게스트를
+   * 위해 `userId` 가 nullable 이라(설계상 이름이 유일한 신원인 사람이 있다), 그런 엔트리는
+   * 어떤 userId 와도 안 맞는다. 실제 alpha 화면에서 선발 3명이 "팀원 추가" 목록에 그대로
+   * 남아 있는 것을 확인했다. 이름으로도 대조해 같은 사람을 두 번 올리지 않게 한다.
+   */
   const available = useMemo(() => {
-    const taken = new Set((entries ?? []).map((entry) => entry.userId).filter(Boolean));
-    return (members.data?.items ?? []).filter((member) => !taken.has(member.userId));
+    const board = entries ?? [];
+    const takenUserIds = new Set(
+      board.map((entry) => entry.userId).filter((id): id is string => id !== null),
+    );
+    // 이름 대조는 **게스트 엔트리에만** 건다. 무조건 걸면 반대 방향으로 더 나쁜 일이
+    // 생긴다 — 보드에 `userId=X · "김철수"` 가 있고 팀에 **다른** `userId=Y · "김철수"` 가
+    // 있으면, Y 가 아무 안내 없이 목록에서 영영 사라진다. 중복 노출은 눈에 보이지만
+    // 이건 안 보인다. userId 가 있는 엔트리는 그 id 로 정확히 판정되므로 이름이 필요 없고,
+    // 게스트는 이름이 유일한 신원이라 그때만 이름으로 거르는 것이 맞다.
+    const takenGuestNames = new Set(
+      board.filter((entry) => entry.userId === null).map((entry) => entry.displayName),
+    );
+    return (members.data?.items ?? []).filter(
+      (member) => !takenUserIds.has(member.userId) && !takenGuestNames.has(member.displayName),
+    );
   }, [members.data, entries]);
 
   function mutate(next: (current: BoardEntryDraft[]) => BoardEntryDraft[]) {
@@ -162,7 +182,17 @@ export function TacticsBoardClient({ teamId, gameId }: { teamId: string; gameId:
 
   return (
     <AppChrome title="우리 팀 전술" activeTab="teams" bottomNav={false} backHref={`/teams/${teamId}`}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+          // 화면 하단에 고정된 저장 바(.tm-fixed-cta)가 본문 마지막 카드를 덮는다 —
+          // 실제 alpha 렌더에서 명단 카드의 마지막 줄이 가려지는 것을 확인했다.
+          // 라인업 화면(team-matches/[id]/lineup)도 같은 사고를 겪고 같은 방식으로 막았다.
+          paddingBottom: canEdit ? 112 : 16,
+        }}
+      >
         <AlertBanner
           tone="info"
           message={`${board.data?.teamNameSnapshot ?? '우리 팀'} 팀원만 볼 수 있어요. 상대 팀과 관중에게는 등번호와 이름만 공개되고, 선발·후보와 배치는 나가지 않아요.`}

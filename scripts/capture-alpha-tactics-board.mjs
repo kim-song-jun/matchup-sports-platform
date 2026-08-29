@@ -47,11 +47,18 @@ if (missing.length > 0) {
   process.exit(1);
 }
 
-/** 폭 세 개 — 저장소 갤러리 관례(모바일·태블릿·데스크톱). */
+/**
+ * 폭 세 개 — 저장소 갤러리 관례(모바일·태블릿·데스크톱).
+ *
+ * 높이를 크게 잡는 이유: 모바일·태블릿 셸은 **내부 스크롤 컨테이너**를 쓴다(문서가 자라지
+ * 않는다). 그래서 `fullPage: true` 를 줘도 뷰포트 높이만큼만 찍히고 아래 섹션이 통째로
+ * 빠진다 — 실제로 팀 상세를 390x900 으로 찍었을 때 화면 절반이 잘렸다. 뷰포트를 길게
+ * 잡아 한 화면에 담는다(데스크톱은 문서가 자라므로 fullPage 가 그대로 동작한다).
+ */
 const WIDTHS = [
-  { key: 'mobile', width: 390, height: 900 },
-  { key: 'tablet', width: 768, height: 1100 },
-  { key: 'desktop', width: 1440, height: 1000 },
+  { key: 'mobile', width: 390, height: 2600 },
+  { key: 'tablet', width: 768, height: 2600 },
+  { key: 'desktop', width: 1440, height: 1200 },
 ];
 
 /** 샷 사이 간격(ms). alpha 레이트리밋에 걸리지 않도록 넉넉히 둔다. */

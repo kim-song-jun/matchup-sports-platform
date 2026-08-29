@@ -129,6 +129,85 @@ describe('TacticsBoardClient — 선발과 후보를 오갈 수 있다', () => {
     expect(moved).toMatchObject({ started: false, positionX: null });
   });
 
+  it('이미 보드에 있는 사람은 "팀원 추가" 목록에 다시 뜨지 않는다 (userId 가 없어도)', () => {
+    // 보드 엔트리는 게스트를 위해 userId 가 nullable 이라, userId 로만 거르면 그런 엔트리가
+    // 어떤 팀원과도 안 맞아 **이미 올라간 사람이 목록에 또 뜬다.** alpha 실화면에서 선발
+    // 3명이 그대로 "추가" 목록에 남아 있는 것을 확인했다.
+    apiMocks.useV1TeamMembers.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: {
+        items: [
+          { userId: 'u1', displayName: '김선발', role: 'member', status: 'active' },
+          { userId: 'u9', displayName: '한대기', role: 'member', status: 'active' },
+        ],
+        viewerRole: 'manager',
+      },
+    });
+    apiMocks.useV1TacticsBoard.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+      data: {
+        gameSideId: 'side-1',
+        sideKey: 'HOME',
+        teamNameSnapshot: '성수 FC',
+        formation: null,
+        version: 1,
+        updatedAt: null,
+        updatedByUserId: null,
+        starterCount: 1,
+        benchCount: 0,
+        // userId 없이 저장된 엔트리 — 이름만으로 같은 사람임을 알아봐야 한다.
+        entries: [boardEntry({ userId: null })],
+      },
+    });
+
+    render(<TacticsBoardClient teamId={TEAM_ID} gameId={GAME_ID} />);
+    expect(screen.queryByRole('button', { name: '김선발 보드에 추가' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '한대기 보드에 추가' })).toBeInTheDocument();
+  });
+
+  it('보드에 있는 사람과 이름이 같은 다른 팀원은 추가 목록에 남는다', () => {
+    // 이름 대조를 무조건 걸면 동명이인이 아무 안내 없이 사라진다 — 중복 노출은 눈에
+    // 보이지만 이건 안 보여서 더 나쁘다. userId 가 있는 엔트리는 id 로 정확히 판정한다.
+    apiMocks.useV1TeamMembers.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: {
+        items: [
+          { userId: 'u1', displayName: '김선발', role: 'member', status: 'active' },
+          // 같은 이름, 다른 사람.
+          { userId: 'u2', displayName: '김선발', role: 'member', status: 'active' },
+        ],
+        viewerRole: 'manager',
+      },
+    });
+    apiMocks.useV1TacticsBoard.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+      data: {
+        gameSideId: 'side-1',
+        sideKey: 'HOME',
+        teamNameSnapshot: '성수 FC',
+        formation: null,
+        version: 1,
+        updatedAt: null,
+        updatedByUserId: null,
+        starterCount: 1,
+        benchCount: 0,
+        entries: [boardEntry({ userId: 'u1' })],
+      },
+    });
+
+    render(<TacticsBoardClient teamId={TEAM_ID} gameId={GAME_ID} />);
+    // u1 은 이미 보드에 있으니 빠지고, 동명이인 u2 는 남아야 한다 — 둘 다 사라지면 회귀다.
+    expect(screen.getAllByRole('button', { name: '김선발 보드에 추가' })).toHaveLength(1);
+  });
+
   it('일반 팀원에게는 바꾸는 버튼도 저장 버튼도 없다', () => {
     apiMocks.useV1TeamMembers.mockReturnValue({
       isLoading: false,

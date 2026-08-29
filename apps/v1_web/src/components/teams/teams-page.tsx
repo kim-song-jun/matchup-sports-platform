@@ -534,6 +534,14 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
               <span className="tm-badge tm-badge-grey">{memberCapacity}</span>
             </div>
           </Card>
+          {/* 전술보드 입구 — 히어로 바로 아래. 팀 일정(V1TeamSchedule)에는 대회 경기가
+              들어오지 않아 별도 목록이 필요하다(컴포넌트 주석 참고).
+              위치를 여기로 올린 이유: 처음엔 기본 정보 위에 뒀는데, 그 자리는 "열린 매치"와
+              "내 리그"(리그가 많은 팀은 카드가 7장 넘는다) 아래라 390px 에서 한참 스크롤해야
+              나왔다 — alpha 실화면 캡처로 확인했다. 팀장이 우리 팀에 들어와 가장 먼저 하는
+              일이 다음 경기 준비이므로 모집 공고보다 앞이 맞다. 경기가 없으면 이 섹션은
+              스스로 사라지므로(컴포넌트가 null 반환) 없는 팀의 화면은 그대로다. */}
+          {mode === 'mine' ? <TeamUpcomingGamesCard teamId={team.id} /> : null}
           <TeamOpenMatchesSection matches={model.openMatches} loading={model.openMatchesLoading} />
           <TeamMyLeaguesSection leagues={model.myLeagues} loading={model.myLeaguesLoading} error={model.myLeaguesError} onRetry={model.onRetryMyLeagues} />
           <TeamRecordLinkCard
@@ -579,9 +587,6 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
               <ChevronRightIcon size={18} aria-hidden="true" />
             </Link>
           ) : null}
-          {/* 전술보드 입구. 팀 일정(V1TeamSchedule)에는 대회 경기가 들어오지 않아
-              별도 목록이 필요하다 — 컴포넌트 주석 참고. */}
-          {mode === 'mine' ? <TeamUpcomingGamesCard teamId={team.id} /> : null}
           <SectionTitle title="팀 기본 정보" sub="가입 전 필요한 정보를 확인해 주세요." />
           <Card pad={16}>
             <InfoRow label="팀명" value={team.name} />

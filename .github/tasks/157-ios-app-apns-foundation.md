@@ -268,15 +268,55 @@ xcodebuild test -project Teameet.xcodeproj -scheme TeameetAlpha \
 
 ## Progress Snapshot
 
-- [x] `git fetch origin`, PR #821 상태 확인(OPEN, base `dev`, MERGEABLE, head `b5ff48945`)
-- [x] `feat/ios-webview-shell` worktree 생성(base `origin/feat/android-fcm-foundation`)
-- [x] Android 참조 구현 전량 정독(셸·브리지·푸시·빌드·테스트·CI·릴리스 스크립트)
-- [x] 웹 브리지 계약과 백엔드 기기 API 계약 확인, Prisma에 `ios` enum 존재 확인
-- [ ] Phase 1 프로젝트 골격 + 순수 정책 + 유닛 테스트 green
-- [ ] Phase 2 WebView 셸
-- [ ] Phase 3 JS 브리지
-- [ ] Phase 4 푸시 파이프라인
-- [ ] Phase 5 백엔드 최소 표면
-- [ ] Phase 6 환경 분리·CI·릴리스 문서
-- [ ] 시뮬레이터 수동 검증
-- [ ] 실기기 QA (Firebase iOS 앱 등록·APNs 키 발급 이후)
+단계 구분은 설계 세션(matchup-sports-platform-4a)이 2026-08-29에 확정한 S1–S11을 따른다.
+
+- [x] **S1 준비** — `git fetch origin`, PR #821 확인(OPEN·base `dev`·MERGEABLE·head `b5ff48945`),
+      worktree `ios-shell` + 브랜치 `feat/ios-webview-shell`, node_modules 심링크 3개, 태스크 문서 157
+- [x] **S2 프로젝트 스캐폴드** — `project.yml`, `Config/{Shared,Alpha,Production}.xcconfig`,
+      `version.properties`, `TeameetApp.swift`. 빈 앱이 시뮬레이터에서 실행됨.
+      `Teameet.entitlements`는 소비처(S7 푸시)가 없어 보류
+- [x] **S3 네비게이션 코어** — `AllowedNavigation.swift`, `DeepLinkRoute.swift` + 유닛 테스트 25개
+- [ ] **S4 WebView 셸**
+- [ ] **S5 JS 브리지**
+- [ ] **S6 백엔드 일반화**
+- [ ] **S7 푸시 클라이언트**
+- [ ] **S8 CI · 릴리스 가드** — `require-ios-production-ref.sh`는 작성·negative control 통과 상태로 대기
+- [ ] **S9 문서 · changeset**
+- [ ] **S10 PR + Copilot 리뷰 루프**
+- [ ] **S11 실기기 QA** (Firebase iOS 앱 등록 + APNs `.p8` 업로드 이후)
+
+## Validation Evidence (2026-08-29, S1–S3)
+
+- `xcodebuild test -scheme TeameetAlpha -destination 'platform=iOS Simulator,name=iPhone 17'`:
+  25 tests, 0 failures, `** TEST SUCCEEDED **`.
+- `xcodebuild build`: `TeameetAlpha`, `TeameetProduction` 모두 `** BUILD SUCCEEDED **`
+  (Firebase SPM 링크 포함, Swift 6 언어 모드).
+- 빌드 산출물 `Info.plist` 실판독 — Alpha `kr.co.teameet.alpha` / `Teameet Alpha` /
+  `https://alpha.teameet.co.kr` / inspectable `YES`, Production `kr.co.teameet` / `Teameet` /
+  `https://teameet.co.kr` / inspectable `NO`. 양쪽 다 `CFBundleShortVersionString = 0.1.0`으로
+  `version.properties` SSOT가 번들까지 도달함을 확인.
+- 시뮬레이터 설치·실행: `kr.co.teameet.alpha` PID 기동, `launchctl`에 프로세스 생존,
+  크래시 리포트 없음.
+- **Red 증명** — ① Java 배제문자 게이트를 제거하니
+  `testRejectsAuthorityConfusionPayloads` 실패, ② 포트 없음을 443으로 합치니
+  `testTreatsAnExplicitDefaultPortAsADifferentOrigin` 실패, 원복 후 다시 25/25 green.
+- `generate-ios-version-xcconfig.sh` / `require-ios-production-ref.sh` negative control 통과
+  (`versionName=0.1` 거부, `versionCode=0` 거부, `GITHUB_REF_NAME=dev` 거부, `main` 허용).
+
+### 실측으로 확정한 빌드 사실
+
+| 사실 | 근거 |
+|---|---|
+| 배포 타깃 iOS 16.0 가능 | firebase-ios-sdk 12.18.0 `Package.swift`가 `platforms: [.iOS(.v15), ...]` |
+| xcconfig 값에 리터럴 `//` 불가 | 주석으로 해석돼 값이 잘림. `SLASHES = //`도 통째로 삼켜짐. `SLASHES = /$()/`만 동작 (`-showBuildSettings`로 확인) |
+| `INFOPLIST_KEY_<커스텀>`은 no-op | 설정은 해석되지만 키가 번들 `Info.plist`에 도달하지 않음. 명시적 `info:` 블록의 `$(VAR)` 치환만 동작 |
+| `xcodebuild test`도 패키지 그래프를 해석 | 앱 타깃을 컴파일하지 않아도 SwiftPM이 링크하지 않는 바이너리까지 약 850MB(grpc-binary 609MB) 수신. CI에 SourcePackages 캐시 필요 |
+
+### 알려진 한계
+
+- `TeameetTests`가 host application 없는 순수 로직 번들이라 `xcodebuild test`는 앱 타깃을
+  컴파일하지 않는다. S4~S7 코드의 컴파일 오류는 이 명령으로 잡히지 않으므로, CI가 서명 없는
+  시뮬레이터 빌드를 **반드시** 별도 단계로 돌려야 한다(S8).
+- Java 파서 동등성은 이 워크스테이션에 JDK가 없어 JVM으로 대조하지 못했다. 근거는
+  `java.net.URI` javadoc의 문자 범주 정의(`other` = 비US-ASCII 중 `isISOControl`·`isSpaceChar`가
+  아닌 것, `escaped` = `%` + 16진수 2자리)이며, Swift 쪽 동작만 실행으로 확인했다.

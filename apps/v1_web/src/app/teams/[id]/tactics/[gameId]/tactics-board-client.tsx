@@ -56,13 +56,23 @@ export function TacticsBoardClient({ teamId, gameId }: { teamId: string; gameId:
   const viewerRole = members.data?.viewerRole;
   const canEdit = viewerRole === 'owner' || viewerRole === 'manager';
 
-  // 서버 판을 화면 상태로 옮긴다. 저장 전까지는 로컬이 진실이므로 한 번만 심는다 —
-  // 매번 덮어쓰면 편집 중에 refetch 가 돌 때 작업이 사라진다.
+  /**
+   * 서버 판 → 화면 상태. **편집 중이 아닐 때만** 다시 심는다.
+   *
+   * 두 실패가 서로 반대 방향이라 조건이 필요하다.
+   * - 매번 덮어쓰면: `refetchOnWindowFocus`(providers.tsx)가 창을 다시 볼 때마다 도는데,
+   *   그때 저장 안 한 편집이 통째로 사라진다.
+   * - 한 번만 심으면: 그 refetch 가 최신 판을 받아와도 화면은 옛 판 그대로고 `baseVersion`
+   *   도 옛 값이라, 사용자가 아무 잘못 없이 첫 저장에서 409 를 맞는다.
+   * `dirty` 가 그 둘을 가른다 — 잃을 편집이 없을 때만 최신으로 맞춘다.
+   */
   useEffect(() => {
-    if (board.data === undefined || entries !== null) return;
+    if (board.data === undefined) return;
+    if (entries !== null && dirty) return;
+    if (entries !== null && board.data.version === baseVersion) return;
     setEntries(hydrate(board.data));
     setBaseVersion(board.data.version);
-  }, [board.data, entries]);
+  }, [board.data, entries, dirty, baseVersion]);
 
   const starters = useMemo(() => (entries ?? []).filter((entry) => entry.started), [entries]);
   const bench = useMemo(() => (entries ?? []).filter((entry) => !entry.started), [entries]);

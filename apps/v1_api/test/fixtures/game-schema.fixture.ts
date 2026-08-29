@@ -393,7 +393,27 @@ export const gameSchemaSourceManifest = {
   // schema.prisma 전체 bytes를 결속하므로 schema hash만 현재 committed LF bytes로 재핀한다.
   // Task 156 follow-up: push delivery success metadata changed the complete schema snapshot only.
   // The bound game-operations migration below remains byte-for-byte unchanged.
-  schema: '71c67118897349d9dbe98f87bfc65db5be167408808f61454a052e689234d06c',
+  //
+  // 재핀(2026-08-29): 대회·리그 통합 R1 expand.
+  // - 무엇이 바뀌었나: enum `V1CompetitionKind`/`V1CompetitionEntrySource` 신규,
+  //   `V1Tournament` 에 kind/seriesId/tier/seasonNo + 시리즈 FK + (seriesId, seasonNo, tier)
+  //   유니크, `V1TournamentRegistration` 에 entrySource/adjustmentNote, 전술보드 모델
+  //   `V1TeamTacticsBoard`/`V1TeamTacticsBoardEntry` 신규, `V1LeagueSeries`·`V1Team` 에
+  //   역참조 배열 한 줄씩.
+  // - game domain 을 건드리나: **컬럼·제약은 건드리지 않는다.** 두 곳만 닿는다 —
+  //   `V1GameSourceType` 에 값 2개 추가(COMPETITION_FIXTURE·FRIENDLY_MATCH, 구 값
+  //   TEAM_MATCH·TOURNAMENT_FIXTURE 는 그대로 남는다. 개명이 아니라 추가다), 그리고
+  //   `V1Game`/`V1GameSide` 에 전술보드 역참조 필드 한 줄씩(테이블 형태 변화 없음).
+  //   이 릴리스에는 새 enum 값을 읽거나 쓰는 코드가 없다 — 소스 승격은 R3 다.
+  // - additive 인가: 그렇다. 새 컬럼은 전부 nullable(kind/entrySource 는 DEFAULT 로 기존
+  //   행이 채워지지만 컬럼 자체는 nullable 로 남는다), rename·데이터 이동·NOT NULL 승격
+  //   없음. 새 유니크 인덱스의 세 컬럼은 같은 마이그레이션에서 추가된 nullable 컬럼이라
+  //   기존 행은 전부 NULL 이고 Postgres 는 NULL 끼리 충돌로 보지 않는다.
+  // - 어느 마이그레이션이 뒷받침하나: 신규 파일
+  //   20260829000000_v1_competition_expand. 바인딩된 20260729000100_v1_game_operations
+  //   는 손대지 않았으므로 아래 `migration` 핀은 그대로다.
+  // 값은 `shasum -a 256 apps/v1_api/prisma/schema.prisma` 로 계산했다.
+  schema: 'e5a36f2dbea62643026787c672e51b1f61846771d6de94252b141decfcd6d5c1',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

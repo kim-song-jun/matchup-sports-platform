@@ -7,6 +7,7 @@ import { TeamLineupPresetService } from './team-lineup-preset.service';
 import { TeamLineupsController } from './team-lineups.controller';
 import { TeamTacticsBoardController } from './team-tactics-board.controller';
 import { TeamTacticsBoardService } from './team-tactics-board.service';
+import { TeamUpcomingGamesService } from './team-upcoming-games.service';
 
 @Module({
   imports: [PrismaModule],
@@ -16,6 +17,7 @@ import { TeamTacticsBoardService } from './team-tactics-board.service';
     TeamLineupPresetService,
     LineupTodoService,
     TeamTacticsBoardService,
+    TeamUpcomingGamesService,
   ],
   exports: [LineupTodoService],
 })

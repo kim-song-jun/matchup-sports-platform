@@ -24,3 +24,12 @@ TEAMEET_WEB_ORIGIN = https:$(SLASHES)alpha.teameet.co.kr
 // fonts and network calls on a real device. Production pins this to NO regardless of
 // build type, exactly as Android's WEBVIEW_DEBUGGING_ENABLED BuildConfig field does.
 TEAMEET_WEBVIEW_INSPECTABLE = YES
+
+// APNs environment for this build's device tokens. Alpha registers against Apple's sandbox
+// gateway, production against the live one; a token from one is not addressable from the
+// other, which is the same boundary ApnsPushService enforces on the server.
+TEAMEET_APS_ENVIRONMENT = development
+
+// Universal Links host, so the Kakao login redirect returns to the app rather than
+// stranding the reader in Safari.
+TEAMEET_APP_LINK_HOST = alpha.teameet.co.kr

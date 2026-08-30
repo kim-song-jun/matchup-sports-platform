@@ -10,9 +10,18 @@ struct WebShellView: UIViewControllerRepresentable {
     let config: AppConfig
     let model: WebShellModel
     let sessionStore: WebShellSessionStore
+    let appDelegate: AppDelegate
 
     func makeUIViewController(context: Context) -> WebShellViewController {
-        WebShellViewController(config: config, model: model, sessionStore: sessionStore)
+        let controller = WebShellViewController(
+            config: config,
+            model: model,
+            sessionStore: sessionStore,
+            push: appDelegate.push)
+        // Gives a notification tap somewhere to navigate, and replays one that arrived
+        // during a cold launch before this controller existed.
+        appDelegate.attach(shell: controller)
+        return controller
     }
 
     func updateUIViewController(_ controller: WebShellViewController, context: Context) {}

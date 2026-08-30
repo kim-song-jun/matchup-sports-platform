@@ -10,6 +10,7 @@ import UIKit
 @main
 struct TeameetApp: App {
 
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var model = WebShellModel()
 
     private let config = AppConfig.main
@@ -20,7 +21,8 @@ struct TeameetApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView(config: config, model: model, sessionStore: sessionStore)
+            RootView(
+                config: config, model: model, sessionStore: sessionStore, appDelegate: appDelegate)
         }
     }
 }
@@ -30,9 +32,11 @@ struct RootView: View {
     let config: AppConfig
     @ObservedObject var model: WebShellModel
     let sessionStore: WebShellSessionStore
+    let appDelegate: AppDelegate
 
     var body: some View {
-        WebShellView(config: config, model: model, sessionStore: sessionStore)
+        WebShellView(
+            config: config, model: model, sessionStore: sessionStore, appDelegate: appDelegate)
             // The controller measures the safe area itself and publishes the bottom inset
             // to the page, so the scene hands it the whole screen.
             .ignoresSafeArea()

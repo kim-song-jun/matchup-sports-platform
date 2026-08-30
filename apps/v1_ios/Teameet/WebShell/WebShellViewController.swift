@@ -17,12 +17,20 @@ final class WebShellViewController: UIViewController {
     private var webView: WKWebView!
     private var downloads: DownloadHandler!
     private var publishedBottomInset: Int?
-    private let push = PushBridgeService()
+    /// Supplied by the app delegate, which owns the APNs callbacks. Absent only in a build
+    /// with no push at all, where the bridge honestly reports "not subscribed".
+    private let push: PushCoordinator?
 
-    init(config: AppConfig, model: WebShellModel, sessionStore: WebShellSessionStore) {
+    init(
+        config: AppConfig,
+        model: WebShellModel,
+        sessionStore: WebShellSessionStore,
+        push: PushCoordinator?
+    ) {
         self.config = config
         self.model = model
         self.sessionStore = sessionStore
+        self.push = push
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -225,6 +233,9 @@ extension WebShellViewController: WKNavigationDelegate {
         // even when the measured inset has not changed.
         publishSafeAreaInset(force: true)
         persistSession()
+        // Mirrors Android's onPageFinished: a registration needs the session cookie, and
+        // this is the first moment it is guaranteed to exist.
+        Task { await push?.register() }
     }
 
     func webView(
@@ -336,26 +347,48 @@ extension WebShellViewController: WKScriptMessageHandler {
     }
 
     private func handle(_ request: NativeBridge.Message) async {
+        guard let push else {
+            // No push lifecycle in this build. Answering honestly beats leaving the page's
+            // promise to time out: the settings screen renders an off switch instead of
+            // spinning.
+            await reply(to: request, permission: .denied, subscribed: false)
+            return
+        }
+
         switch request.action {
         case .getPushState:
-            await reply(to: request, permission: await push.currentPermission())
+            break
         case .requestNotificationPermission:
-            await reply(to: request, permission: await push.requestPermission())
+            _ = await push.requestPermission()
         case .openNotificationSettings:
-            push.openSettings()
-            await reply(to: request, permission: await push.currentPermission())
+            openNotificationSettings()
         case .revokePushDevice:
             await push.revoke()
-            await reply(to: request, permission: await push.currentPermission())
         }
+
+        // Every action answers with freshly read state rather than what it just did. The
+        // difference matters for `open-notification-settings`, where the reader may change
+        // the permission outside the app entirely.
+        await reply(
+            to: request,
+            permission: await push.currentPermission(),
+            subscribed: await push.isSubscribed())
     }
 
-    private func reply(to request: NativeBridge.Message, permission: PushPermission.WebValue) async {
-        // `subscribed` is the consent pair, not the OS permission alone: a device is only
-        // subscribed when the OS allows delivery AND a registration exists.
-        let subscribed = PushConsent.hasActiveConsent(
-            permissionGranted: permission == .granted,
-            optedIn: push.isDeviceRegistered)
+    /// Opens this app's page in Settings. Counterpart of Android's
+    /// `ACTION_APP_NOTIFICATION_SETTINGS` branch, which the web relies on to give a denied
+    /// reader a way back.
+    private func openNotificationSettings() {
+        guard let url = URL(string: UIApplication.openSettingsURLString),
+              UIApplication.shared.canOpenURL(url) else { return }
+        UIApplication.shared.open(url)
+    }
+
+    private func reply(
+        to request: NativeBridge.Message,
+        permission: PushPermission.WebValue,
+        subscribed: Bool
+    ) async {
         let script = NativeBridge.resultScript(
             requestId: request.requestId,
             permission: permission.rawValue,

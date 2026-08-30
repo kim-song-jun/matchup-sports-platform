@@ -13,6 +13,8 @@ struct AppConfig: Equatable {
     enum Key {
         static let webOrigin = "TeameetWebOrigin"
         static let webViewInspectable = "TeameetWebViewInspectable"
+        static let appVersion = "CFBundleShortVersionString"
+        static let buildNumber = "CFBundleVersion"
     }
 
     /// The one origin this build is allowed to load. Everything else is external.
@@ -21,6 +23,13 @@ struct AppConfig: Equatable {
     /// Alpha exposes the embedded page to Safari's Web Inspector; production never does,
     /// whatever the build type. Android pins the same guarantee in `BuildConfig`.
     let webViewInspectable: Bool
+
+    /// Reported with a push registration so a delivery failure can be traced to a release.
+    /// Comes from `version.properties` by way of `MARKETING_VERSION`.
+    let appVersion: String
+
+    /// Used to decide whether a persisted browsing session was written by this build.
+    let buildNumber: String
 
 
     static let main = AppConfig(bundle: .main)
@@ -37,6 +46,8 @@ struct AppConfig: Equatable {
         // xcconfig delivers this as the literal string YES or NO, not a plist boolean,
         // because the value reaches Info.plist through $(VAR) substitution.
         webViewInspectable = string(Key.webViewInspectable).caseInsensitiveCompare("YES") == .orderedSame
+        appVersion = string(Key.appVersion)
+        buildNumber = string(Key.buildNumber)
     }
 
     /// The URL the shell opens for a sanitised route.

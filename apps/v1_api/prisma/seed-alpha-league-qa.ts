@@ -10,7 +10,12 @@ import {
 // 상단 주석과 같은 이유). `assertAlphaSeedAllowed`는 alpha 전용 4중 가드를 그대로 재사용하고,
 // `ensureAlphaQaRecordConsent`는 득점/도움 순위 화면을 실 API로 검증할 수 있게 페르소나의
 // 공개 기록 동의를 GRANTED로 만드는 헬퍼다 — 기존 alpha QA 페르소나 관행과 동일한 소스를 쓴다.
-import { assertAlphaSeedAllowed, ensureAlphaQaRecordConsent } from './seed-alpha-tournament-qa';
+import {
+  assertAlphaSeedAllowed,
+  ensureAlphaQaRecordConsent,
+  FEATURED_PERSONAS,
+  FEATURED_TEAMS,
+} from './seed-alpha-tournament-qa';
 
 /**
  * alpha 리그(League) 화면 QA 시드 (Task R10).
@@ -263,6 +268,8 @@ interface FixtureSpec {
    * 이 대진이 그 한계를 실제로 보여주는 예시가 된다.
    */
   readonly forfeit?: boolean;
+  /** 리그에 속하지 않는 일반 팀매치. 팀 전적의 `친선` 분류를 실제 계약으로 만든다. */
+  readonly friendly?: boolean;
 }
 
 /**
@@ -354,6 +361,110 @@ const FIXTURES: readonly FixtureSpec[] = [
   },
 ] as const;
 
+/** 팀밋fs 한 팀에서 대회·리그·친선·개인 기록을 이어 보는 Alpha 쇼케이스 경기. */
+const SHOWCASE_FIXTURES: readonly FixtureSpec[] = [
+  {
+    no: 101,
+    round: 5,
+    homeTeamNo: 5,
+    awayTeamNo: 1,
+    startAtOffsetDays: -18,
+    result: {
+      homeScore: 4,
+      awayScore: 2,
+      scorers: [
+        { sideKey: 'HOME', playerIdx: 1, goals: 2, assists: 1 },
+        { sideKey: 'HOME', playerIdx: 2, goals: 1, assists: 1 },
+        { sideKey: 'HOME', playerIdx: 3, goals: 1, assists: 0 },
+        { sideKey: 'AWAY', playerIdx: 1, goals: 2, assists: 0 },
+      ],
+    },
+  },
+  {
+    no: 102,
+    round: 1,
+    homeTeamNo: 5,
+    awayTeamNo: 2,
+    startAtOffsetDays: -12,
+    friendly: true,
+    result: {
+      homeScore: 2,
+      awayScore: 2,
+      scorers: [
+        { sideKey: 'HOME', playerIdx: 1, goals: 1, assists: 1 },
+        { sideKey: 'HOME', playerIdx: 4, goals: 1, assists: 0 },
+        { sideKey: 'AWAY', playerIdx: 1, goals: 2, assists: 0 },
+      ],
+    },
+  },
+  {
+    no: 103,
+    round: 2,
+    homeTeamNo: 5,
+    awayTeamNo: 3,
+    startAtOffsetDays: -6,
+    friendly: true,
+    result: {
+      homeScore: 1,
+      awayScore: 3,
+      scorers: [
+        { sideKey: 'HOME', playerIdx: 1, goals: 1, assists: 0 },
+        { sideKey: 'AWAY', playerIdx: 1, goals: 2, assists: 0 },
+        { sideKey: 'AWAY', playerIdx: 2, goals: 1, assists: 1 },
+      ],
+    },
+  },
+] as const;
+
+async function ensureShowcaseRoster(
+  tx: Prisma.TransactionClient,
+): Promise<LeagueTeamRoster> {
+  const teamSeed = FEATURED_TEAMS[0];
+  const playerIds = FEATURED_PERSONAS.map((persona) => persona.id);
+  const existingUsers = await tx.v1User.findMany({
+    where: { id: { in: playerIds } },
+    select: { id: true },
+  });
+  if (existingUsers.length !== playerIds.length) {
+    throw new Error('Featured tournament roster must be seeded before the team showcase.');
+  }
+
+  const jerseyNumbers = [10, 7, 11, 1] as const;
+  for (const [index, userId] of playerIds.entries()) {
+    await ensureAlphaQaRecordConsent(tx, userId);
+    await tx.v1TeamMembership.upsert({
+      where: { teamId_userId: { teamId: teamSeed.id, userId } },
+      update: { status: 'active', leftAt: null, jerseyNumber: jerseyNumbers[index] },
+      create: {
+        teamId: teamSeed.id,
+        userId,
+        role: index === 0 ? 'owner' : index === 1 ? 'manager' : 'member',
+        status: 'active',
+        joinedAt: new Date(),
+        jerseyNumber: jerseyNumbers[index],
+      },
+    });
+  }
+  await tx.v1Team.update({
+    where: { id: teamSeed.id },
+    data: { memberCount: playerIds.length, managerCount: 1, membersVisible: true },
+  });
+  await tx.v1TeamProfile.update({
+    where: { teamId: teamSeed.id },
+    data: {
+      description: 'Alpha 쇼케이스용 샘플 팀입니다. 대회·리그·친선 경기와 선수 기록을 실제 집계 경로로 확인할 수 있어요.',
+      activityNote: '매주 화·토 저녁 · 서울 송파구',
+      activityDays: ['tue', 'sat'],
+      activityFrequency: 'weekly',
+      activityTimeSlots: ['evening'],
+      activityTypes: ['league', 'friendly', 'tournament'],
+      skillNote: '중급 · 패스와 전환 플레이 중심',
+      memberGoalCount: 8,
+    },
+  });
+  return { id: teamSeed.id, name: teamSeed.name, playerIds };
+}
+
 async function createSideWithRoster(
   tx: Prisma.TransactionClient,
   fixtureNo: number,
@@ -383,7 +494,10 @@ async function createSideWithRoster(
         gameId: targetGameId,
         sideId: side.id,
         lineupId: lineup.id,
+        userId: roster.playerIds[index],
         displayNameSnapshot: `${roster.name} ${playerIdx}번`,
+        jerseyNumber: playerIdx === 1 ? 10 : playerIdx === 2 ? 7 : playerIdx === 3 ? 11 : 1,
+        position: playerIdx === 1 ? 'PIVO' : playerIdx === 2 ? 'ALA' : playerIdx === 3 ? 'FIXO' : 'GOLEIRO',
       },
     });
     participantIds.push(pid);
@@ -481,12 +595,12 @@ async function ensureFixture(
     hostTeamId: home.id,
     sportId: league.sportId,
     regionId: league.regionId,
-    title: `${league.title} ${spec.round}주차`,
+    title: spec.friendly ? `팀밋fs 친선전 ${spec.round}` : `${league.title} ${spec.round}주차`,
     placeName: PLACE_NAME,
     startAt,
     approvedApplicantTeamId: away.id,
     competitionConfigVersionId,
-    leagueId: league.id,
+    leagueId: spec.friendly ? null : league.id,
   };
   const teamMatch = await tx.v1TeamMatch.upsert({
     where: { id },
@@ -590,11 +704,43 @@ async function ensureFixture(
     });
   }
 
+  let eventSequence = 0;
+  for (const scorer of spec.result.scorers) {
+    const sideParticipantIds = scorer.sideKey === 'HOME' ? skeleton.homeParticipantIds : skeleton.awayParticipantIds;
+    const pid = sideParticipantIds[scorer.playerIdx - 1];
+    const sideId = scorer.sideKey === 'HOME' ? skeleton.homeSideId : skeleton.awaySideId;
+    for (let goal = 0; goal < scorer.goals; goal += 1) {
+      eventSequence += 1;
+      const clientEventId = `alpha-showcase-${spec.no}-goal-${eventSequence}`;
+      await tx.v1GameEvent.upsert({
+        where: { gameId_clientEventId: { gameId: skeleton.gameId, clientEventId } },
+        update: {},
+        create: {
+          gameId: skeleton.gameId,
+          sequence: eventSequence,
+          clientEventId,
+          payloadHash: `${clientEventId}-hash`,
+          type: 'GOAL',
+          sideId,
+          participantId: pid,
+          period: eventSequence <= Math.ceil((spec.result.homeScore + spec.result.awayScore) / 2) ? 1 : 2,
+          clockMs: (4 + eventSequence * 3) * 60_000,
+          occurredAt: officialAt,
+          actorUserId: createdByUserId,
+          payload: { seeded: true, showcase: spec.no >= 101 },
+        },
+      });
+    }
+  }
+
   await tx.v1GameResultRevision.update({
     where: { id: revision.id },
     data: { state: 'OFFICIAL', submittedAt: officialAt, officialAt },
   });
-  await tx.v1Game.update({ where: { id: skeleton.gameId }, data: { currentOfficialRevisionId: revision.id } });
+  await tx.v1Game.update({
+    where: { id: skeleton.gameId },
+    data: { currentOfficialRevisionId: revision.id, lastSequence: eventSequence, state: 'ENDED' },
+  });
   // v1_guard_game_official_fact_insert 트리거가 이 fact를 방금 만든 리비전과 byte-exact로
   // 대조한다(score/eventsHash/officialAt) + home/awayTeamId가 실제 V1GameSide.teamId와
   // 일치할 것을 요구한다(test/league-matches/league-match-public.integration-spec.ts와
@@ -725,6 +871,78 @@ async function ensureTierSeries(
   return { seriesId: LEAGUE_QA_SERIES_ID, tierLeagues: TIER_LEAGUE_IDS.length };
 }
 
+async function ensureShowcaseReviews(
+  tx: Prisma.TransactionClient,
+  sportId: string,
+  showcase: LeagueTeamRoster,
+  opponents: readonly LeagueTeamRoster[],
+  now: Date,
+) {
+  const tagLabels = ['패스가 좋아요', '시간 약속을 잘 지켜요', '매너가 좋아요'] as const;
+  const submittedDaysAgo = [17, 11, 5] as const;
+  for (const [index, opponent] of opponents.entries()) {
+    const sourceId = fixtureId(101 + index);
+    // 각 경기(-18/-12/-6일) 종료 뒤 하루에 작성되고, 모두 72시간 reveal 폴백을 지난다.
+    const submittedAt = new Date(now.getTime() - submittedDaysAgo[index] * DAY_MS);
+    const teamReviewId = `ae100000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`;
+    const personalReviewId = `ae200000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`;
+    const rating = index === 1 ? 4 : 5;
+
+    for (const review of [
+      {
+        id: teamReviewId,
+        reviewerUserId: opponent.playerIds[0],
+        reviewerTeamId: opponent.id,
+        targetType: 'team' as const,
+        targetTeamId: showcase.id,
+        targetUserId: null,
+      },
+      {
+        id: personalReviewId,
+        reviewerUserId: opponent.playerIds[1],
+        reviewerTeamId: opponent.id,
+        targetType: 'user' as const,
+        targetTeamId: null,
+        targetUserId: showcase.playerIds[0],
+      },
+    ]) {
+      await tx.v1PostEventReview.upsert({
+        where: { id: review.id },
+        update: {},
+        create: {
+          ...review,
+          sourceType: 'team_match',
+          sourceId,
+          rating,
+          sportId,
+          status: 'submitted',
+          scoringVersion: 'four_metric',
+          submittedAt,
+        },
+      });
+      await tx.v1PostEventReviewTag.upsert({
+        where: { reviewId_tagCode: { reviewId: review.id, tagCode: `showcase_${index + 1}` } },
+        update: {},
+        create: { reviewId: review.id, tagCode: `showcase_${index + 1}`, labelSnapshot: tagLabels[index] },
+      });
+      const scores = [
+        ['SKILL', rating],
+        ['MANNER', 5],
+        ['PUNCTUALITY', index === 1 ? 4 : 5],
+        ['SAFETY', 5],
+      ] as const;
+      for (const [metric, score] of scores) {
+        await tx.v1PostEventReviewMetricScore.upsert({
+          where: { reviewId_metric: { reviewId: review.id, metric } },
+          update: {},
+          create: { reviewId: review.id, metric, score },
+        });
+      }
+    }
+  }
+  return { teamReviews: opponents.length, personalReviews: opponents.length };
+}
+
 async function main() {
   assertAlphaSeedAllowed(process.env);
   const prisma = new PrismaClient();
@@ -760,8 +978,10 @@ async function main() {
     const summary = await prisma.$transaction(
       async (tx) => {
         const teams = await ensureLeagueTeams(tx, sport.id, region.id);
-        const teamsByNo = new Map(teams.map((team, index) => [index + 1, team]));
-        const league = await ensureLeague(tx, sport.id, region.id, admin.id, teams, now);
+        const showcase = await ensureShowcaseRoster(tx);
+        const allTeams = [...teams, showcase];
+        const teamsByNo = new Map(allTeams.map((team, index) => [index + 1, team]));
+        const league = await ensureLeague(tx, sport.id, region.id, admin.id, allTeams, now);
 
         let confirmedCount = 0;
         let pendingCount = 0;
@@ -774,6 +994,10 @@ async function main() {
           else pendingCount += 1;
           if (spec.forfeit) forfeitCount += 1;
         }
+        for (const spec of SHOWCASE_FIXTURES) {
+          await ensureFixture(tx, spec, league, teamsByNo, showcase.playerIds[0], competitionConfig.id, now);
+        }
+        const showcaseReviews = await ensureShowcaseReviews(tx, sport.id, showcase, teams.slice(0, 3), now);
 
         const series = await ensureTierSeries(tx, sport.id, region.id, admin.id, teams, now);
 
@@ -787,6 +1011,9 @@ async function main() {
           pendingFixtures: pendingCount,
           cancelledFixtures: cancelledCount,
           forfeitFixtures: forfeitCount,
+          showcaseTeamId: showcase.id,
+          showcaseFixtures: SHOWCASE_FIXTURES.length,
+          ...showcaseReviews,
         };
       },
       // 팀 4 × 선수 4 + 픽스처 6 × (게임 스켈레톤 + 결과) 규모라 Prisma 기본 timeout(5초)을

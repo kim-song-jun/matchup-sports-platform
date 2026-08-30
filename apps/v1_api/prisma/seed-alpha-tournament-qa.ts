@@ -232,14 +232,14 @@ export const TEAMS: readonly TeamSeed[] = [
 // Roster for the one non-QA "featured" scenario (marketing screenshots) — kept
 // separate from PERSONAS/TEAMS above so the alpha-QA teams never carry a
 // realistic-looking name, and vice versa.
-const FEATURED_PERSONAS: readonly PersonaSeed[] = [
+export const FEATURED_PERSONAS: readonly PersonaSeed[] = [
   { id: 'ab200000-0000-4000-8000-000000000001', email: 'summer.cup.champion@teameet.alpha', phone: '01002000001', nickname: '민준선수', realName: '김민준', gender: 'male' },
   { id: 'ab200000-0000-4000-8000-000000000002', email: 'summer.cup.runner@teameet.alpha', phone: '01002000002', nickname: '서연선수', realName: '이서연', gender: 'female' },
   { id: 'ab200000-0000-4000-8000-000000000003', email: 'summer.cup.scorer@teameet.alpha', phone: '01002000003', nickname: '도윤선수', realName: '박도윤', gender: 'male' },
   { id: 'ab200000-0000-4000-8000-000000000004', email: 'summer.cup.keeper@teameet.alpha', phone: '01002000004', nickname: '유나선수', realName: '최유나', gender: 'female' },
 ] as const;
 
-const FEATURED_TEAMS: readonly TeamSeed[] = [
+export const FEATURED_TEAMS: readonly TeamSeed[] = [
   { id: 'ab300000-0000-4000-8000-000000000001', name: '팀밋fs' },
   { id: 'ab300000-0000-4000-8000-000000000002', name: '팀밋 유나이티드' },
   { id: 'ab300000-0000-4000-8000-000000000003', name: '팀밋 레이너스' },

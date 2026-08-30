@@ -58,6 +58,40 @@ export function latestOperableLineup(lineups: readonly GameLineup[], sideId: str
 }
 
 /**
+ * **표시·검인용**: 제출본이 있으면 그것을, 하나도 없으면 그 사이드의 **최신 리비전을
+ * 상태와 무관하게** 쓴다.
+ *
+ * `latestOperableLineup` 과 **일부러 다르게 동작한다. 둘을 하나로 합치지 마라** --
+ * 소비처마다 옳은 답이 다르다:
+ *
+ * | 쓰는 곳 | 써야 하는 것 | 이유 |
+ * |---|---|---|
+ * | 라인업 그리드 · 검인 패널 · 콘솔 표시 | **이 함수(폴백)** | 화면에 선수가 떠야 운영이 된다 |
+ * | "아직 제출 안 했어요" 경고 판정 | `latestOperableLineup` | 폴백을 쓰면 경고가 영영 안 뜬다 |
+ *
+ * **왜 생겼나**: 예전에는 "양 팀이 제출해야 경기를 시작할 수 있다"는 게이트가 있어서
+ * 라이브 경기에는 제출본이 항상 있었다 -- 그래서 표시도 제출본만 보면 됐다. P1-c 가 그
+ * 게이트를 걷어내면서(등록 명단이 곧 참가자라 제출 없이도 기록할 대상이 있다) 그 전제가
+ * 깨졌고, 표시 경로를 그대로 두면 **미제출 상태로 시작한 경기의 콘솔이 통째로 빈다** --
+ * 운영자가 득점을 아무에게도 못 붙이고, 검인할 대상도 안 뜬다(P1-b 에서 지킨 `arrivedAt`
+ * 을 애초에 만들 수 없게 된다).
+ *
+ * 서버도 같은 이유로 같은 규칙을 쓴다(`selectLineupParticipantsWithDraftFallback`).
+ * **서버와 클라이언트가 다른 명단을 보면 안 된다** -- 실제로 P1-c 직후 그 둘이 갈려
+ * 있었고, API 만 측정해서 알아채지 못했다.
+ *
+ * 원래 막으려던 것은 그대로 막는다: 제출본이 **있는** 사이드에서는 그 위에 얹힌 DRAFT
+ * (정정 요청으로 재오픈된 초안)가 직전 제출을 밀어내지 못한다.
+ */
+export function latestLineupForDisplay(lineups: readonly GameLineup[], sideId: string): GameLineup | null {
+  const operable = latestOperableLineup(lineups, sideId);
+  if (operable !== null) return operable;
+  const candidates = lineups.filter((lineup) => lineup.sideId === sideId);
+  if (candidates.length === 0) return null;
+  return candidates.reduce((latest, current) => (current.revision > latest.revision ? current : latest));
+}
+
+/**
  * 검색어로 선수를 좁힌다. 등번호와 이름 **양쪽**을 본다 — 현장에서 운영자가 아는
  * 정보는 둘 중 하나이고(유니폼 번호를 보고 찾거나, 후보 선수가 이름을 불러주거나),
  * 어느 쪽만 지원하면 나머지 절반은 여전히 스크롤로 훑어야 한다.
@@ -156,7 +190,7 @@ export function LineupGrid({
       ) : null}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {visibleSides.map((side) => {
-          const lineup = latestOperableLineup(lineups, side.id);
+          const lineup = latestLineupForDisplay(lineups, side.id);
           const participants = (lineup?.participants ?? [])
             .filter(
               (participant) => filterParticipantIds === undefined || filterParticipantIds.has(participant.id),
@@ -183,7 +217,10 @@ export function LineupGrid({
                 <div className="flex flex-col items-center gap-2 py-6 text-center">
                   <p className="text-sm text-[var(--text-muted)]">
                     {lineup === null
-                      ? '제출된 선발 명단이 없어요.'
+                      // [P1-c 후속] 예전엔 '제출된 선발 명단이 없어요' 였다. 이제 표시는
+                      // 폴백을 쓰므로 여기까지 왔다는 건 **초안조차 없다**는 뜻이다 --
+                      // 등록 명단에서 참가자가 만들어지므로 정상적으로는 도달하지 않는다.
+                      ? '이 팀의 명단을 찾을 수 없어요.'
                       : query.trim().length > 0
                         ? `'${query.trim()}'과 맞는 선수가 없어요.`
                         : '표시할 선수가 없어요.'}

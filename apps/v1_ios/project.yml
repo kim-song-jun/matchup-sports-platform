@@ -42,6 +42,10 @@ targets:
     settings:
       base:
         PRODUCT_NAME: Teameet
+        # The icon set inside Teameet/Resources/Assets.xcassets. Without this the app ships
+        # with the grey placeholder, which is what it did until now — an asset catalog alone
+        # is not enough, the icon has to be named.
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         # Left off deliberately. INFOPLIST_KEY_<CUSTOM> is a silent no-op for keys Xcode
         # does not already know: -showBuildSettings resolves the setting correctly, but the
         # key never reaches the built Info.plist or Bundle.main.infoDictionary. Measured,

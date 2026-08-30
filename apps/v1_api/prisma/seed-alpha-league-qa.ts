@@ -63,19 +63,25 @@ const LEAGUE_QA_ID = 'ad100000-0000-4000-8000-000000000001';
 // API 를 친 세션들이 만든 것이었다. 대진은 만들지 않는다: 뱃지·시리즈 문맥 노출이 목적이고,
 // 경기 진행 검증은 위 단발 리그가 이미 덮는다.
 const LEAGUE_QA_SERIES_ID = 'ad200000-0000-4000-8000-000000000001';
-const LEAGUE_QA_SERIES_TITLE = '(테스트) 리그 QA 풋살 리그 체계';
+const LEAGUE_QA_SERIES_TITLE = '서울 풋살 커뮤니티 리그';
 const TIER_LEAGUE_IDS: readonly string[] = [
   'ad210000-0000-4000-8000-000000000001', // 1부
   'ad210000-0000-4000-8000-000000000002', // 2부
 ];
-const LEAGUE_TITLE = '(테스트) 리그 QA 풋살 정기 리그';
+const LEAGUE_TITLE = '서울 나이트 풋살 리그';
 
 const TEAM_COUNT = 4;
 const PLAYERS_PER_TEAM = 4;
-const TEAM_NAME_SUFFIXES = ['알파', '브라보', '찰리', '델타'] as const;
+export const LEAGUE_TEAM_NAMES = ['마포 레인저스', '성수 아틀레틱', '한강 로버스', '송파 유나이티드'] as const;
+export const LEAGUE_PLAYER_NAMES = [
+  ['강현우', '오지훈', '김태성', '윤서준'],
+  ['이준호', '박시우', '정우진', '한도윤'],
+  ['최민석', '김재윤', '임성호', '조하람'],
+  ['박건우', '이승민', '김도현', '장예준'],
+] as const;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const PLACE_NAME = '서울 송파 리그 QA 구장';
+const PLACE_NAME = '서울 송파 풋살파크';
 
 type SideKey = 'HOME' | 'AWAY';
 
@@ -102,7 +108,7 @@ function personaPhone(teamNo: number, playerNo: number): string {
   return `0103${pad2(teamNo)}${pad2(playerNo)}000`;
 }
 function personaNickname(teamNo: number, playerNo: number): string {
-  return `리그QA${pad2(teamNo)}팀${pad2(playerNo)}`;
+  return LEAGUE_PLAYER_NAMES[teamNo - 1]?.[playerNo - 1] ?? `선수 ${teamNo}-${playerNo}`;
 }
 /** `ad400000-…-{F}` — 대진(V1TeamMatch) 슬롯 1..6. */
 function fixtureId(fixtureNo: number): string {
@@ -163,20 +169,20 @@ async function ensureLeagueTeams(
         update: {
           nickname: personaNickname(teamNo, playerNo),
           displayName: personaNickname(teamNo, playerNo),
-          realName: `리그큐에이${pad2(teamNo)}${pad2(playerNo)}`,
+          realName: personaNickname(teamNo, playerNo),
           gender: playerNo % 2 === 0 ? 'female' : 'male',
           birthDate: '1996-03-10',
-          bio: 'ALPHA 리그 QA 검증용 가상 선수입니다.',
+          bio: `${LEAGUE_TEAM_NAMES[teamNo - 1]}에서 활동하는 풋살 선수입니다. Alpha 쇼케이스 계정입니다.`,
           deletedAt: null,
         },
         create: {
           userId: user.id,
           nickname: personaNickname(teamNo, playerNo),
           displayName: personaNickname(teamNo, playerNo),
-          realName: `리그큐에이${pad2(teamNo)}${pad2(playerNo)}`,
+          realName: personaNickname(teamNo, playerNo),
           gender: playerNo % 2 === 0 ? 'female' : 'male',
           birthDate: '1996-03-10',
-          bio: 'ALPHA 리그 QA 검증용 가상 선수입니다.',
+          bio: `${LEAGUE_TEAM_NAMES[teamNo - 1]}에서 활동하는 풋살 선수입니다. Alpha 쇼케이스 계정입니다.`,
         },
       });
       // 득점/도움 순위 화면을 실 API로 검증하려면 사용자 단위 공개 기록 동의가 GRANTED여야
@@ -188,7 +194,7 @@ async function ensureLeagueTeams(
 
     const id = teamId(teamNo);
     const [ownerId] = memberIds;
-    const name = `(테스트) 리그 QA ${TEAM_NAME_SUFFIXES[teamNo - 1]}FC`;
+    const name = LEAGUE_TEAM_NAMES[teamNo - 1];
     const team = await tx.v1Team.upsert({
       where: { id },
       update: {
@@ -214,17 +220,40 @@ async function ensureLeagueTeams(
         memberCount: memberIds.length,
       },
     });
+    const activityAreas = ['마포구', '성동구', '영등포구', '송파구'] as const;
+    const activityArea = activityAreas[teamNo - 1];
     await tx.v1TeamProfile.upsert({
       where: { teamId: team.id },
-      update: { description: 'ALPHA 리그 QA 검증용 가상 팀입니다.', deletedAt: null },
-      create: { teamId: team.id, description: 'ALPHA 리그 QA 검증용 가상 팀입니다.' },
+      update: {
+        description: `서울 지역에서 주 1회 정기 경기를 진행하는 풋살 팀입니다. ${LEAGUE_TITLE} 참가팀이며 Alpha 쇼케이스 데이터입니다.`,
+        activityNote: `매주 수·일 저녁 · 서울 ${activityArea}`,
+        activityDays: ['wed', 'sun'],
+        activityFrequency: 'weekly',
+        activityTimeSlots: ['evening'],
+        activityTypes: ['league', 'friendly'],
+        skillNote: teamNo % 2 === 0 ? '중상급 · 압박과 빠른 역습 중심' : '중급 · 빌드업과 패스 플레이 중심',
+        memberGoalCount: 6,
+        deletedAt: null,
+      },
+      create: {
+        teamId: team.id,
+        description: `서울 지역에서 주 1회 정기 경기를 진행하는 풋살 팀입니다. ${LEAGUE_TITLE} 참가팀이며 Alpha 쇼케이스 데이터입니다.`,
+        activityNote: `매주 수·일 저녁 · 서울 ${activityArea}`,
+        activityDays: ['wed', 'sun'],
+        activityFrequency: 'weekly',
+        activityTimeSlots: ['evening'],
+        activityTypes: ['league', 'friendly'],
+        skillNote: teamNo % 2 === 0 ? '중상급 · 압박과 빠른 역습 중심' : '중급 · 빌드업과 패스 플레이 중심',
+        memberGoalCount: 6,
+      },
     });
     for (const [index, memberId] of memberIds.entries()) {
       const role = index === 0 ? 'owner' : index === 1 ? 'manager' : 'member';
+      const jerseyNumber = [10, 7, 4, 1][index];
       await tx.v1TeamMembership.upsert({
         where: { teamId_userId: { teamId: team.id, userId: memberId } },
-        update: { role, status: 'active', joinedAt: now, leftAt: null },
-        create: { teamId: team.id, userId: memberId, role, status: 'active', joinedAt: now },
+        update: { role, status: 'active', joinedAt: now, leftAt: null, jerseyNumber },
+        create: { teamId: team.id, userId: memberId, role, status: 'active', joinedAt: now, jerseyNumber },
       });
     }
     await tx.v1Team.update({ where: { id: team.id }, data: { memberCount: memberIds.length, managerCount: 1 } });
@@ -361,7 +390,7 @@ const FIXTURES: readonly FixtureSpec[] = [
   },
 ] as const;
 
-/** 팀밋fs 한 팀에서 대회·리그·친선·개인 기록을 이어 보는 Alpha 쇼케이스 경기. */
+/** 서울 나이트 FC 한 팀에서 대회·리그·친선·개인 기록을 이어 보는 Alpha 쇼케이스 경기. */
 const SHOWCASE_FIXTURES: readonly FixtureSpec[] = [
   {
     no: 101,
@@ -452,7 +481,7 @@ async function ensureShowcaseRoster(
   await tx.v1TeamProfile.update({
     where: { teamId: teamSeed.id },
     data: {
-      description: 'Alpha 쇼케이스용 샘플 팀입니다. 대회·리그·친선 경기와 선수 기록을 실제 집계 경로로 확인할 수 있어요.',
+      description: '서울 송파구를 중심으로 매주 활동하는 풋살 팀입니다. 대회·리그·친선 경기에 꾸준히 참가하며, Alpha 쇼케이스 데이터로 운영됩니다.',
       activityNote: '매주 화·토 저녁 · 서울 송파구',
       activityDays: ['tue', 'sat'],
       activityFrequency: 'weekly',
@@ -595,7 +624,7 @@ async function ensureFixture(
     hostTeamId: home.id,
     sportId: league.sportId,
     regionId: league.regionId,
-    title: spec.friendly ? `팀밋fs 친선전 ${spec.round}` : `${league.title} ${spec.round}주차`,
+    title: spec.friendly ? `서울 나이트 FC 친선전 ${spec.round}` : `${league.title} ${spec.round}주차`,
     placeName: PLACE_NAME,
     startAt,
     approvedApplicantTeamId: away.id,

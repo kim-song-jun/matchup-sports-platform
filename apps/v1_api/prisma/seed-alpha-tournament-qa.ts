@@ -165,7 +165,7 @@ export const ALPHA_TOURNAMENT_SCENARIOS: readonly TournamentScenario[] = [
         benefitText: '참가팀 전원 사은품 증정',
         eventTitle: '결승 스코어 예측 이벤트',
         eventDescription: 'SNS 댓글로 결승 스코어를 맞히면 추첨을 통해 상품을 드려요.',
-        eventResultText: '팀밋fs 우승! 이벤트 당첨자는 개별 안내드렸어요.',
+        eventResultText: '서울 나이트 FC 우승! 이벤트 당첨자는 개별 안내드렸어요.',
       },
     },
   },
@@ -233,17 +233,17 @@ export const TEAMS: readonly TeamSeed[] = [
 // separate from PERSONAS/TEAMS above so the alpha-QA teams never carry a
 // realistic-looking name, and vice versa.
 export const FEATURED_PERSONAS: readonly PersonaSeed[] = [
-  { id: 'ab200000-0000-4000-8000-000000000001', email: 'summer.cup.champion@teameet.alpha', phone: '01002000001', nickname: '민준선수', realName: '김민준', gender: 'male' },
-  { id: 'ab200000-0000-4000-8000-000000000002', email: 'summer.cup.runner@teameet.alpha', phone: '01002000002', nickname: '서연선수', realName: '이서연', gender: 'female' },
-  { id: 'ab200000-0000-4000-8000-000000000003', email: 'summer.cup.scorer@teameet.alpha', phone: '01002000003', nickname: '도윤선수', realName: '박도윤', gender: 'male' },
-  { id: 'ab200000-0000-4000-8000-000000000004', email: 'summer.cup.keeper@teameet.alpha', phone: '01002000004', nickname: '유나선수', realName: '최유나', gender: 'female' },
+  { id: 'ab200000-0000-4000-8000-000000000001', email: 'summer.cup.champion@teameet.alpha', phone: '01002000001', nickname: '김민준', realName: '김민준', gender: 'male' },
+  { id: 'ab200000-0000-4000-8000-000000000002', email: 'summer.cup.runner@teameet.alpha', phone: '01002000002', nickname: '이서연', realName: '이서연', gender: 'female' },
+  { id: 'ab200000-0000-4000-8000-000000000003', email: 'summer.cup.scorer@teameet.alpha', phone: '01002000003', nickname: '박도윤', realName: '박도윤', gender: 'male' },
+  { id: 'ab200000-0000-4000-8000-000000000004', email: 'summer.cup.keeper@teameet.alpha', phone: '01002000004', nickname: '최유나', realName: '최유나', gender: 'female' },
 ] as const;
 
 export const FEATURED_TEAMS: readonly TeamSeed[] = [
-  { id: 'ab300000-0000-4000-8000-000000000001', name: '팀밋fs' },
-  { id: 'ab300000-0000-4000-8000-000000000002', name: '팀밋 유나이티드' },
-  { id: 'ab300000-0000-4000-8000-000000000003', name: '팀밋 레이너스' },
-  { id: 'ab300000-0000-4000-8000-000000000004', name: '팀밋 선라이즈' },
+  { id: 'ab300000-0000-4000-8000-000000000001', name: '서울 나이트 FC' },
+  { id: 'ab300000-0000-4000-8000-000000000002', name: '강남 프라임 FC' },
+  { id: 'ab300000-0000-4000-8000-000000000003', name: '용산 시티' },
+  { id: 'ab300000-0000-4000-8000-000000000004', name: '잠실 오리온' },
 ] as const;
 
 // export: seed-alpha-league-qa.ts 가 같은 4중 가드(NODE_ENV·확인 플래그·alpha DB

@@ -1919,6 +1919,16 @@ export type V1Profile = {
     levelId: string | null;
     levelName: string | null;
     primary: boolean;
+    /** [D14] 이 종목에서 주로 서는 자리. null = 미설정(정상 상태). */
+    preferredPosition?: string | null;
+    /** 부 포지션. 주 없이 부만은 서버가 거부한다. */
+    secondaryPreferredPosition?: string | null;
+    /**
+     * 이 종목에서 고를 수 있는 자리. **서버 프리셋이 유일한 출처**다 — 화면이 자리
+     * 이름을 자체 목록으로 갖지 않는다(종목마다 코드가 다르고 프리셋이 늘 수 있다).
+     * 비어 있으면 포지션 개념이 없는 종목이라 **선호 포지션 UI 를 띄우지 않는다.**
+     */
+    positionOptions?: Array<{ code: string; label: string; goalkeeper: boolean }>;
   }>;
   regions?: Array<{
     regionId: string;

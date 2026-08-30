@@ -27,8 +27,6 @@ export interface PlayerCardInput {
   readonly appearances: number;
   readonly goals: number;
   readonly assists: number;
-  /** 선발 출전 수. `appearances` 이하여야 한다. */
-  readonly startedCount: number;
   readonly position: PlayerCardPosition;
   /**
    * 등번호. **어떤 계산에도 쓰이지 않는다** -- 표시 전용으로 통과시킨다.
@@ -174,7 +172,6 @@ export function resolveTier(appearances: number): PlayerCardTier {
 export function buildPlayerCard(input: PlayerCardInput): PlayerCard {
   const appearances = Math.max(0, input.appearances);
   const perGame = (total: number) => (appearances > 0 ? total / appearances : 0);
-  const startedRatio = appearances > 0 ? Math.min(1, input.startedCount / appearances) : 0;
 
   // 기록 3항목은 2층(동의 필요) 데이터다. 동의가 없으면 출전 수와 무관하게 잠근다 --
   // 이 잠금이 곧 "기록 공개를 켜면 3개가 열려요" 라는 이 기능의 목적이다.
@@ -229,7 +226,16 @@ export function buildPlayerCard(input: PlayerCardInput): PlayerCard {
   const stats: PlayerCardStat[] = [
     makeStat('SHO', rateLock(), () => clamp99(30 + perGame(input.goals) * 55)),
     makeStat('PAS', rateLock(), () => clamp99(30 + perGame(input.assists) * 60)),
-    makeStat('APP', appLock(), () => clamp99(35 + appearances * 2.2 + startedRatio * 15)),
+    // [P1-d] 예전 식은 `35 + appearances * 2.2 + startedRatio * 15` 였다. 선발 비율을
+    // 뺀 이유는 그 값이 **더 이상 아무도 구분하지 못하기 때문**이다 -- 명단에 오르면
+    // 곧 출전자라(D3) 참가자가 전원 `started: true` 가 되어 비율이 항상 1 이 된다.
+    //
+    // 기준값을 35 → 50 으로 올려 사라진 항(최대 +15)을 그대로 흡수한다. **아무의 숫자도
+    // 내려가지 않게** 하려는 것이다: 이 카드는 `/users/:id/card` 로 공개되고 OG 이미지까지
+    // 있어 공유되는 숫자다. 풀타임 선발이었던 사람과 신규 선수는 값이 그대로고(35+15=50),
+    // 과거에 부분 선발이던 사람만 소폭 오른다 -- "이제 명단에 있으면 다 출전자"라는
+    // 방향과 일치한다. 항을 그냥 지웠다면 근거 없이 전원 하락했을 것이다.
+    makeStat('APP', appLock(), () => clamp99(50 + appearances * 2.2)),
     reviewStat('SKI', input.skillScore),
     reviewStat('MAN', input.mannerScore),
     reviewStat('PUN', input.punctualityScore),

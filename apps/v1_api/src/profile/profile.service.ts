@@ -406,7 +406,6 @@ export class ProfileService {
       appearances: records.appearances,
       goals: records.goals,
       assists: records.assists,
-      startedCount: records.startedCount,
       position: records.position,
       jerseyNumber: records.jerseyNumber,
       skillScore: toNumber(reputation?.metricSkillScore),

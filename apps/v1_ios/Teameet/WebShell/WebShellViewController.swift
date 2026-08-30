@@ -98,6 +98,14 @@ final class WebShellViewController: UIViewController {
         webView.backgroundColor = .systemBackground
         webView.scrollView.backgroundColor = .systemBackground
 
+        // The shell owns the bottom inset and hands it to the page as a CSS variable, so
+        // UIKit must not also reserve it. Left at its default `.automatic`, the scroll view
+        // shortens the page by the home-indicator inset *and* the page adds the same value
+        // through --v1-shell-safe-bottom — the bottom navigation then floats a full inset
+        // too high. Measured against the deployed web app at the same viewport: browser
+        // 56pt of clearance, shell 90pt, a difference of exactly one 34pt inset.
+        webView.scrollView.contentInsetAdjustmentBehavior = .never
+
         if #available(iOS 16.4, *) {
             // Alpha only, and production stays false whatever the build type — the same
             // guarantee Android pins through BuildConfig.WEBVIEW_DEBUGGING_ENABLED.

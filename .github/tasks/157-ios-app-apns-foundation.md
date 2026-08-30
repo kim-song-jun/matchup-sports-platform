@@ -842,3 +842,48 @@ association 파일은 앱을 `<TEAMID>.<bundle id>`로 지목한다. Team ID가 
 - `docs/ops/ios-release.md` — 버전 원천, 서명(ad-hoc 필요·수동 codesign 금지), `.p8` 취급, 롤백
 - `docs/ops/pr-review-visual-workflow.md` §3.6 — 네이티브는 기기 2종 × 테마
 - `deploy/aasa/README.md` — Team ID 도착 시 절차
+
+## 하단 여백 이중 계산 (2026-08-30) — 사용자 지적으로 발견
+
+사용자가 "화면이 상하로 잘리는 것 같다"고 해서 실측했다. 상단은 정상이었고, **하단에 안전영역이
+한 번 더 들어가고 있었다.**
+
+### 어떻게 잡았나
+
+같은 뷰포트(390×844)에서 배포된 웹을 브라우저와 셸에 각각 띄우고 마지막 잉크 위치를 픽셀로 쟀다.
+육안 대조로는 "좀 넓은가?" 이상 나오지 않는 차이다.
+
+| | 하단 여백 |
+|---|---|
+| 브라우저 390×844, `--teameet-native-safe-bottom: 34px` | 56.0pt |
+| 셸 (iPhone 17e, 주입값 34pt) | **90.0pt** |
+| 차이 | 정확히 34pt — 인셋 1회분 |
+
+웹이 값을 몇 번 쓰는지도 따로 쟀다(`scripts/ios/measure-safe-bottom.mjs`): 0px→34px로 바꾸면
+`.tm-bottom-nav` 높이가 74→108, `padding-bottom`이 16→50으로 **1회만** 변한다. 즉 웹은 무죄다.
+
+### 원인
+
+`WKWebView.scrollView.contentInsetAdjustmentBehavior`를 설정하지 않아 UIKit 기본값
+`.automatic`이 적용됐다. 스크롤뷰가 홈 인디케이터 인셋만큼 페이지를 줄이고, 그 위에 페이지가
+`--v1-shell-safe-bottom`으로 같은 값을 또 더한다. 웹뷰 바닥을 `view.bottomAnchor`에 붙인 것도,
+CSS 주입도 각각은 맞았다 — 둘이 겹치는 것이 문제였다.
+
+`.never`로 끄면 셸이 인셋 계약의 단일 소유자가 된다.
+
+### 검증
+
+| | 하단 여백 |
+|---|---|
+| 브라우저 (기준) | 56.0pt |
+| 셸 BEFORE | 90.0pt |
+| 셸 AFTER | **56.0pt** |
+
+상단은 수정 전후 모두 웹뷰 상단 기준 21.3pt로, 브라우저 22pt와 일치한다 — 이중 계산 없음.
+상태바 자리는 셸이 의도적으로 비워 두는 밴드다(웹뷰를 `safeAreaLayoutGuide.topAnchor`에 고정).
+
+### 남는 교훈
+
+**유닛·UI 테스트 108건이 전부 통과한 상태에서 이 결함이 살아 있었다.** 요소의 존재·상태는
+잡지만 여백은 못 잡는다. 네이티브 셸의 여백은 "브라우저에서 같은 뷰포트로 렌더한 것과 픽셀로
+대조"가 유일하게 통하는 방법이다.

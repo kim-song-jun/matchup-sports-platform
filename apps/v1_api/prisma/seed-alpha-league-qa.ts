@@ -642,7 +642,51 @@ async function ensureFixture(
   // 공식 결과는 한 번만 만든다 — OFFICIAL 리비전은 v1_block_terminal_revision_mutation
   // 트리거가 이후의 어떤 수정도 막으므로, 재배포 시 완전히 건너뛰는 것이 유일하게 안전한
   // 멱등 전략이다(upsert로 재시도하면 트리거가 예외를 던진다).
-  if (skeleton.currentOfficialRevisionId !== null) return;
+  if (skeleton.currentOfficialRevisionId !== null) {
+    // 이 projection을 만들기 전 버전의 시드가 이미 공식 revision까지만 만든 경우를 복구한다.
+    // OFFICIAL revision은 불변이라 건드리지 않고 누락된 team-record fact만 멱등 추가한다.
+    const existingRevision = await tx.v1GameResultRevision.findUnique({
+      where: { id: skeleton.currentOfficialRevisionId },
+      select: { officialAt: true },
+    });
+    if (!existingRevision?.officialAt) {
+      throw new Error(`league QA fixture ${spec.no} current revision is missing officialAt`);
+    }
+    const homeResult = spec.result.homeScore > spec.result.awayScore ? 'WON' : spec.result.homeScore < spec.result.awayScore ? 'LOST' : 'DRAWN';
+    const awayResult = homeResult === 'WON' ? 'LOST' : homeResult === 'LOST' ? 'WON' : 'DRAWN';
+    await tx.v1TeamRecordFact.createMany({
+      data: [
+        {
+          revisionId: skeleton.currentOfficialRevisionId,
+          gameId: skeleton.gameId,
+          teamId: home.id,
+          opponentTeamId: away.id,
+          tournamentId: null,
+          result: homeResult,
+          goalsFor: spec.result.homeScore,
+          goalsAgainst: spec.result.awayScore,
+          sourceHash: `league-qa-fixture-${spec.no}-hash-home`,
+          playedAt: startAt,
+          officialAt: existingRevision.officialAt,
+        },
+        {
+          revisionId: skeleton.currentOfficialRevisionId,
+          gameId: skeleton.gameId,
+          teamId: away.id,
+          opponentTeamId: home.id,
+          tournamentId: null,
+          result: awayResult,
+          goalsFor: spec.result.awayScore,
+          goalsAgainst: spec.result.homeScore,
+          sourceHash: `league-qa-fixture-${spec.no}-hash-away`,
+          playedAt: startAt,
+          officialAt: existingRevision.officialAt,
+        },
+      ],
+      skipDuplicates: true,
+    });
+    return;
+  }
 
   const score = { home: spec.result.homeScore, away: spec.result.awayScore };
   const eventsHash = `league-qa-fixture-${spec.no}-hash`;
@@ -760,6 +804,46 @@ async function ensureFixture(
       eventsHash,
       officialAt,
     },
+  });
+  const homeResult = spec.result.homeScore > spec.result.awayScore
+    ? 'WON'
+    : spec.result.homeScore < spec.result.awayScore
+      ? 'LOST'
+      : 'DRAWN';
+  const awayResult = homeResult === 'WON' ? 'LOST' : homeResult === 'LOST' ? 'WON' : 'DRAWN';
+  // 공개 팀 전적은 official fact를 매 요청마다 다시 계산하지 않고 이 projection을 읽는다.
+  // 운영 경로에서는 worker가 만들지만 alpha 시드는 한 트랜잭션에서 종료되므로, 양 팀 행을
+  // 함께 심어 배포 직후에도 공식 결과와 팀 전적이 갈리지 않게 한다.
+  await tx.v1TeamRecordFact.createMany({
+    data: [
+      {
+        revisionId: revision.id,
+        gameId: skeleton.gameId,
+        teamId: home.id,
+        opponentTeamId: away.id,
+        tournamentId: null,
+        result: homeResult,
+        goalsFor: spec.result.homeScore,
+        goalsAgainst: spec.result.awayScore,
+        sourceHash: `${eventsHash}-home`,
+        playedAt: startAt,
+        officialAt,
+      },
+      {
+        revisionId: revision.id,
+        gameId: skeleton.gameId,
+        teamId: away.id,
+        opponentTeamId: home.id,
+        tournamentId: null,
+        result: awayResult,
+        goalsFor: spec.result.awayScore,
+        goalsAgainst: spec.result.homeScore,
+        sourceHash: `${eventsHash}-away`,
+        playedAt: startAt,
+        officialAt,
+      },
+    ],
+    skipDuplicates: true,
   });
 }
 

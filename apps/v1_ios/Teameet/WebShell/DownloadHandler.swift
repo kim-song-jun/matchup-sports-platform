@@ -28,14 +28,9 @@ final class DownloadHandler: NSObject {
         self.presenter = presenter
     }
 
-    /// Whether a download may proceed. A file offered by anything other than the exact
-    /// environment origin is refused outright.
-    func accepts(_ download: WKDownload) -> Bool {
-        AllowedNavigation.isInternal(download.originalRequest?.url, origin: origin)
-    }
-
     func attach(_ download: WKDownload) {
-        guard accepts(download) else {
+        guard DownloadPolicy.allowsStart(
+            requestURL: download.originalRequest?.url, origin: origin) else {
             download.cancel()
             onMessage?(Strings.downloadRefused)
             return
@@ -51,9 +46,16 @@ extension DownloadHandler: WKDownloadDelegate {
         decideDestinationUsing response: URLResponse,
         suggestedFilename: String
     ) async -> URL? {
-        // Re-checked at the point the file is about to be written, because a redirect can
-        // move a download off the origin between the request and the response.
-        guard accepts(download) else {
+        // Checked again here, and against a different URL: `response.url` is where the
+        // bytes actually came from after any redirects, while the request URL is only where
+        // the download was aimed. Reading the request URL a second time — which this used to
+        // do — could only repeat the first answer, so a link on our origin that redirected
+        // elsewhere passed both checks and the file was written with our cookies attached.
+        guard DownloadPolicy.allowsWrite(
+            requestURL: download.originalRequest?.url,
+            responseURL: response.url,
+            origin: origin
+        ) else {
             onMessage?(Strings.downloadRefused)
             return nil
         }

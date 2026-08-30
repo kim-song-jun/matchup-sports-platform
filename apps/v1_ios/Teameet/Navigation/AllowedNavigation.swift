@@ -249,6 +249,12 @@ enum AllowedNavigation {
         guard let candidate,
               let target = parse(candidate),
               let expected = parse(origin) else { return false }
+        // The configured origin is held to the same standard as the URL being judged. The
+        // xcconfig parser truncates a literal `//`, so a mangled build can arrive here with
+        // `//host` — which parses, yields a host, and would then match on host alone with no
+        // scheme to compare. A build that cannot say what its origin is must trust nothing.
+        guard let expectedScheme = expected.scheme,
+              expectedScheme.caseInsensitiveCompare("https") == .orderedSame else { return false }
         guard let scheme = target.scheme,
               scheme.caseInsensitiveCompare("https") == .orderedSame else { return false }
         guard let expectedHost = expected.host,

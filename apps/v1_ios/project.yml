@@ -91,6 +91,7 @@ targets:
       - path: Teameet/WebShell/SafeAreaBridge.swift
       - path: Teameet/WebShell/NativeBridgeMessage.swift
       - path: Teameet/WebShell/ChromeColour.swift
+      - path: Teameet/WebShell/DownloadPolicy.swift
       - path: Teameet/Push/PushPermission.swift
       - path: Teameet/Push/PushConsent.swift
       - path: Teameet/Push/PushNotificationPayload.swift

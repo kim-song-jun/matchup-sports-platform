@@ -21,6 +21,13 @@ import {
   type PlayerCard,
 } from './player-card';
 import { PrismaService } from '../prisma/prisma.service';
+import { canonicalCompetitionConfigForSport } from '../tournaments/competition-config/lineup-size';
+import { tryNormalizeCompetitionSportCode } from '../tournaments/competition-config/competition-config.validator';
+import {
+  PREFERRED_POSITION_MESSAGES,
+  positionCodesForSport,
+  validatePreferredPositions,
+} from '../users/preferred-position';
 import { isReviewRevealed } from '../reviews/review-visibility';
 import { removeUserFromActiveRosters } from '../tournaments/roster-cleanup';
 import { verifyPhoneProofToken } from '../verification/phone-proof-token';
@@ -817,6 +824,8 @@ export class ProfileService {
             sportId: sport.sportId,
             sportLevelId: sport.levelId ?? null,
             isPrimary: index === 0,
+            preferredPosition: sport.preferredPosition ?? null,
+            secondaryPreferredPosition: sport.secondaryPreferredPosition ?? null,
           })),
         });
       }
@@ -1208,15 +1217,43 @@ export class ProfileService {
     }
   }
 
-  private async validateSports(sports: Array<{ sportId: string; levelId?: string | null }>) {
+  private async validateSports(
+    sports: Array<{
+      sportId: string;
+      levelId?: string | null;
+      preferredPosition?: string | null;
+      secondaryPreferredPosition?: string | null;
+    }>,
+  ) {
     for (const sport of sports) {
       const activeSport = await this.prisma.v1Sport.findFirst({
         where: { id: sport.sportId, isActive: true },
-        select: { id: true },
+        select: { id: true, code: true },
       });
 
       if (!activeSport) {
         throw validationError('Sport is not active or does not exist', 'sports');
+      }
+
+      // [D14] 선호 포지션은 **종목별로** 유효 집합이 다르다. 전역 화이트리스트 하나로
+      // 처리하면 풋살 유저가 'MF' 를 저장할 수 있고, 그 사람 카드에 풋살엔 없는 자리가
+      // 뜬다 -- 사람 축에 저장되는 값이라 경기마다 고칠 기회가 없다.
+      //
+      // 프리셋이 없는 종목(러닝·수영)은 유효 코드가 0개라 **어떤 값도 통과하지 못한다.**
+      // 그건 오류가 아니라 "이 종목엔 포지션 개념이 없다"는 사실이고, 화면도 그 종목엔
+      // 선호 포지션 섹션을 띄우지 않는다.
+      const positionError = validatePreferredPositions(
+        {
+          primary: sport.preferredPosition ?? null,
+          secondary: sport.secondaryPreferredPosition ?? null,
+        },
+        positionCodesForSport(activeSport.code, {
+          tryNormalize: tryNormalizeCompetitionSportCode,
+          canonicalConfig: canonicalCompetitionConfigForSport,
+        }),
+      );
+      if (positionError !== null) {
+        throw validationError(PREFERRED_POSITION_MESSAGES[positionError], 'sports.preferredPosition');
       }
 
       if (sport.levelId) {

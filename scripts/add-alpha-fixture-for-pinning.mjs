@@ -15,14 +15,21 @@ const API = 'https://alpha.teameet.co.kr/api/v1';
 let SESSION = '';
 
 async function login() {
+  const email = process.env.ALPHA_EMAIL;
+  const password = process.env.ALPHA_PASSWORD;
+  // 누락을 여기서 끊는다 -- 그대로 요청하면 "로그인 실패 HTTP 401" 만 남아서
+  // 자격증명이 틀린 것인지 안 넘어온 것인지 구분이 안 된다.
+  if (!email || !password) throw new Error('ALPHA_EMAIL / ALPHA_PASSWORD 가 필요합니다');
   const res = await fetch(`${API}/auth/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email: process.env.ALPHA_EMAIL, password: process.env.ALPHA_PASSWORD }),
+    body: JSON.stringify({ email, password }),
   });
-  const hit = (res.headers.getSetCookie?.() ?? [])
-    .map((c) => /teameet_v1_session=([^;]+)/.exec(c))
-    .find(Boolean);
+  // `getSetCookie()` 가 없는 런타임을 대비해 `get('set-cookie')` 로 떨어진다 --
+  // 이 저장소의 capture_alpha_league_audit.mjs·capture-admin-report-filter.mjs 와 같은
+  // 처리다. `get()` 은 Set-Cookie 가 여러 개일 때 하나로 합쳐 돌려주므로 폴백일 때만 쓴다.
+  const rawCookies = res.headers.getSetCookie?.() ?? [res.headers.get('set-cookie') ?? ''];
+  const hit = rawCookies.map((c) => /teameet_v1_session=([^;]+)/.exec(c)).find(Boolean);
   if (!hit) throw new Error(`로그인 실패 HTTP ${res.status}`);
   SESSION = hit[1];
 }

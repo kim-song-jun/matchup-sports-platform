@@ -13,7 +13,10 @@
  *
  * 자격증명은 **환경변수로만** 넘긴다(이 저장소는 PUBLIC):
  *   ALPHA_EMAIL / ALPHA_PASSWORD  또는  ALPHA_SESSION_TOKEN
- *   GAME_ID (선택) — 지정하면 그 경기로, 없으면 SCHEDULED 대회 경기를 찾는다
+ *   GAME_ID (필수) — SCHEDULED 상태의 TOURNAMENT_FIXTURE 경기 id.
+ *     alpha 에는 그런 경기가 보통 없으므로 probe-alpha-tournament-state.mjs 로 대상을 찾고
+ *     add-alpha-fixture-for-pinning.mjs 로 만들어서 그 id 를 넘긴다(자동 탐색은 하지 않는다 --
+ *     아무 경기나 골라 잡으면 남의 대회를 건드릴 수 있다).
  *
  * 라인업 저장은 `game.state === 'SCHEDULED'` 동안 takeover 가 면제되므로 Socket.IO 가
  * 필요 없다(verify-alpha-period-break.mjs 의 검증된 전제).
@@ -57,7 +60,9 @@ async function login() {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password }),
   });
-  const setCookie = res.headers.getSetCookie?.() ?? [];
+  // `getSetCookie()` 가 없는 런타임을 대비해 `get('set-cookie')` 로 떨어진다 --
+  // 이 저장소의 capture_alpha_league_audit.mjs 와 같은 처리다.
+  const setCookie = res.headers.getSetCookie?.() ?? [res.headers.get('set-cookie') ?? ''];
   const match = setCookie.map((c) => /teameet_v1_session=([^;]+)/.exec(c)).find(Boolean);
   if (!match) throw new Error(`로그인 실패 HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
   SESSION = match[1];

@@ -83,7 +83,7 @@ import {
   GameContractError,
   projectParticipantForPublic,
   resolveGameIdempotency,
-  selectLatestLineupParticipants,
+  selectLineupParticipantsWithDraftFallback,
   serializeGameVisibility,
   validateGameResultInvariants,
   validateSubstitution,
@@ -1309,9 +1309,24 @@ export class GamesService {
           end: V1GameState.ENDED,
         }[command];
         this.assertLifecycle(game.sourceType, 'TOURNAMENT_COMMAND', game.state, target);
-        if (command === 'start') {
-          await this.assertLineupsSubmittedForStart(tx, game.id);
-        }
+        // [P1-c] "양 팀이 라인업을 제출해야 시작할 수 있다"는 게이트를 걷어냈다.
+        //
+        // 그 게이트는 "시작했는데 기록할 참가자가 없다"를 막으려던 것이었다. 그런데 이제
+        // 참가자는 **대회 등록 명단에서 게임 생성 시점에 이미 만들어진다**
+        // (tournament-bracket.service.ts — registration.players → participants). 즉 제출
+        // 여부와 무관하게 참가자는 항상 있고, 게이트가 막던 상황 자체가 사라졌다.
+        //
+        // 반대로 게이트는 실제 운영을 막고 있었다 — 명단을 미리 못 낸 팀 하나 때문에
+        // 경기를 시작할 수 없었다. 현장에서 그건 흔한 일이다.
+        //
+        // **함께 고쳐야 하는 것**: 이 게이트는 공식 결과 스냅샷의 전제이기도 했다
+        // (latest-lineup-participants.ts 의 엄격 셀렉터 주석 참고 — "대회는 이 게이트를
+        // 반드시 거치므로 종료 시점에 제출본이 항상 있다"). 게이트만 지우면 제출 없이 끝난
+        // 경기에서 그 셀렉터가 **빈 배열**을 돌려주고, 공식 결과에 선수가 한 명도 안 실린다.
+        // 그래서 deriveTournamentRevision 을 리그와 같은 사이드별 폴백 셀렉터로 바꿨다
+        // (selectLineupParticipantsWithDraftFallback) — 리그가 같은 이유로 이미 그 셀렉터를
+        // 쓰고 있고, 제출본이 있는 사이드에서는 그 위에 얹힌 DRAFT 가 직전 제출을 밀어내지
+        // 못한다는 원래 보호는 그대로 유지된다.
         // 이슈 #375 — HALFTIME이 실제로 영속되는 상태가 되면서 "game.state
         // === LIVE인데 LIVE인 피리어드는 없다"(하프타임 도중)가 처음으로
         // 정상 상태가 됐다. `pause`는 LIVE 피리어드가 있어야만 뜻이 통하는
@@ -3078,7 +3093,7 @@ export class GamesService {
 
     // 감사 결함 수정(2026-08-27): 예전엔 gameId 로만 걸러 사이드마다 쌓인 모든 라인업
     // 리비전의 참가자 행을 통째로 돌려줬다 -- listLineups/listOperationsLineups(위
-    // 2408/2441)는 물론 deriveTournamentRevision(6073, selectLatestLineupParticipants)도
+    // 2408/2441)는 물론 deriveTournamentRevision 도
     // 전부 "사이드별 최신 라인업"으로 스코프하는데 이 목록만 예외였다. 라인업을 한 번이라도
     // 재저장하면(team-match-lineup.service.ts saveLineup) 리비전마다 참가자 행이 통째로
     // 새로 생기고 옛 행은 지워지지 않으므로(v1GameParticipant.delete 경로 자체가 없다),
@@ -3104,7 +3119,11 @@ export class GamesService {
       },
       orderBy: [{ sideId: 'asc' }, { jerseyNumber: 'asc' }],
     });
-    const participants = selectLatestLineupParticipants(participantCandidates, lineups);
+    // [P1-c] 공식 결과(deriveTournamentRevision)와 **같은 셀렉터**를 써야 한다. 시작
+    // 게이트를 걷어낸 뒤로 제출 없이 끝난 경기가 생기고, 그 결과는 폴백 셀렉터가 고른
+    // 참가자로 기록된다. 여기만 엄격 셀렉터로 남기면 그 경기의 선수들은 **연결 후보에
+    // 아예 안 뜨고**, 결과에는 실려 있는데 본인 기록으로는 영영 못 가져가는 상태가 된다.
+    const participants = selectLineupParticipantsWithDraftFallback(participantCandidates, lineups);
     if (participants.length === 0) {
       return { gameId, version: game.version, participants: [] };
     }
@@ -6286,9 +6305,8 @@ export class GamesService {
       tx.v1GameParticipant.findMany({ where: { gameId: game.id } }),
       tx.v1GameLineup.findMany({
         where: { gameId: game.id },
-        // `state` 를 함께 읽어 selectLatestLineupParticipants 가 DRAFT 리비전을
-        // "최신" 후보에서 빼도록 한다 — 정정 요청으로 새로 열린 초안이 직전 제출을
-        // 무효화하지 않는다(그 유틸의 계약, SUBMITTED/LOCKED 만 운영 가능).
+        // `state` 를 함께 읽어 셀렉터가 사이드별로 제출본을 우선하도록 한다 — 정정
+        // 요청으로 새로 열린 초안이 직전 제출을 무효화하지 않는다(그 유틸의 계약).
         select: { id: true, sideId: true, revision: true, state: true },
       }),
       tx.v1GameSide.findMany({ where: { gameId: game.id } }),
@@ -6297,7 +6315,13 @@ export class GamesService {
         select: { lineup: true },
       }),
     ]);
-    const participants = selectLatestLineupParticipants(participantCandidates, lineups);
+    // [P1-c] 엄격 셀렉터에서 사이드별 폴백으로 바꿨다. 예전에는 "대회는 시작 게이트를
+    // 반드시 거치므로 종료 시점에 제출본이 항상 있다"가 성립해 엄격 셀렉터가 안전했는데,
+    // 그 게이트를 걷어냈으므로(executeCommand 의 'start') 제출 없이 끝난 경기가 생긴다.
+    // 그대로 두면 그 사이드가 **빈 배열**이 되어 공식 결과에 선수가 한 명도 안 실린다.
+    // 리그 결과 입력이 같은 이유로 이미 이 셀렉터를 쓴다. 원래 보호(제출본이 있는
+    // 사이드에서는 그 위에 얹힌 DRAFT 가 직전 제출을 밀어내지 못한다)는 그대로다.
+    const participants = selectLineupParticipantsWithDraftFallback(participantCandidates, lineups);
     // 하드코딩 버그 수정: started/goalkeeper를 실제 라인업 값과 무관하게
     // 항상 true/false로 박아 넣었다 -- 후보로 저장한 선수도 결과 프로젝션에서는
     // 전부 선발로 보였고, 실제로 골키퍼였던 선수도 항상 goalkeeper:false였다.
@@ -7164,37 +7188,6 @@ export class GamesService {
         throw toGameHttpException(error);
       }
       throw error;
-    }
-  }
-
-  /**
-   * `start` used to only call `assertLifecycle` — a valid SCHEDULED→LIVE
-   * state transition was enough, even with zero lineups submitted on either
-   * side. That left an operator with a LIVE game and no participants to
-   * record events against (`LineupGrid` would show "제출된 선발 명단이
-   * 없어요" with no way back). PR #316 added a client-side gate
-   * (`sidesMissingLineup` in operate-console.tsx, built on
-   * `latestOperableLineup` in lineup-grid.tsx), but that only blocks the
-   * button — calling this API directly still skipped the check entirely.
-   * This mirrors the exact same rule server-side so the API itself refuses
-   * the transition: every `V1GameSide` on the game needs at least one
-   * lineup in SUBMITTED or LOCKED state (a newer DRAFT revision on top
-   * doesn't retract an earlier submission — same semantics as
-   * `latestOperableLineup`, which only ever looks at SUBMITTED/LOCKED rows).
-   */
-  private async assertLineupsSubmittedForStart(tx: Transaction, gameId: string): Promise<void> {
-    const sides = await tx.v1GameSide.findMany({ where: { gameId } });
-    const operableLineups = await tx.v1GameLineup.findMany({
-      where: { gameId, state: { in: [V1GameLineupState.SUBMITTED, V1GameLineupState.LOCKED] } },
-      select: { sideId: true },
-    });
-    const sideIdsWithOperableLineup = new Set(operableLineups.map((lineup) => lineup.sideId));
-    const missingSides = sides.filter((side) => !sideIdsWithOperableLineup.has(side.id));
-    if (missingSides.length > 0) {
-      throw new ConflictException({
-        code: 'LINEUP_NOT_SUBMITTED',
-        message: `${missingSides.map((side) => side.displayNameSnapshot).join(', ')} 팀의 선발 명단을 제출해야 경기를 시작할 수 있어요.`,
-      });
     }
   }
 

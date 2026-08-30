@@ -1048,11 +1048,13 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
                       variant={index === 0 ? 'primary' : 'outline'}
                       disabled={
                         !isTakeoverHeld(ops.takeover) ||
-                        commandPending ||
-                        // UX 감사 item 2 — 라인업 없이 시작하면 되돌릴 수단이
-                        // 없는 막다른 길이 된다. 버튼을 숨기지 않고 비활성 +
-                        // 아래 배너의 사유로 설명한다(감사의 반복 패턴 ①).
-                        (command === 'start' && sidesMissingLineup.length > 0)
+                        commandPending
+                        // [P1-c] 예전에는 라인업 미제출이면 시작 버튼을 비활성화했다.
+                        // 그 근거는 "시작하면 기록할 참가자가 없어 막다른 길"이었는데,
+                        // 이제 참가자는 대회 등록 명단에서 경기 생성 시점에 이미
+                        // 만들어진다 — 제출 여부와 무관하게 항상 있다. 반대로 현장에서
+                        // 한 팀이 명단을 못 낸 것만으로 경기를 못 여는 쪽이 실제 문제였다.
+                        // 아래 배너는 남긴다: 차단이 아니라 **경고**로 바뀐 것이다.
                       }
                       loading={commandPending}
                       // 사용자 결정("예외 없이 전부") 예외는 `revert-period`
@@ -1252,8 +1254,8 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
             링크를 함께 준다. */}
         {gameState === 'SCHEDULED' && sidesMissingLineup.length > 0 && (
           <Banner tone="warning">
-            {sidesMissingLineup.map((side) => side.displayNameSnapshot).join(', ')} 팀의 선발 명단을 제출해야
-            경기를 시작할 수 있어요.{' '}
+            {sidesMissingLineup.map((side) => side.displayNameSnapshot).join(', ')} 팀이 아직 선발 명단을
+            제출하지 않았어요. 이대로도 경기를 시작할 수 있어요.{' '}
             <Link
               href={`/tournaments/${tournamentId}/matches/${fixtureId}/lineup`}
               className="font-semibold underline underline-offset-2"
@@ -1294,8 +1296,10 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           halftimePeriod === null &&
           !regulationEnded &&
           gameState !== 'ENDED' &&
-          gameState !== 'CANCELLED' &&
-          !(gameState === 'SCHEDULED' && sidesMissingLineup.length > 0) && (
+          gameState !== 'CANCELLED' && (
+            // [P1-c] 예전에는 라인업 미제출일 때 이 안내를 숨겼다(시작이 막혀 있었으므로).
+            // 이제 미제출이어도 시작할 수 있으니 숨길 이유가 없다 -- 위 경고 배너가
+            // "아직 안 냈다"를 알리고, 이 배너가 "그래도 시작하면 된다"를 알린다.
             <Banner tone="info">경기를 시작해 주세요.</Banner>
           )}
         {/*

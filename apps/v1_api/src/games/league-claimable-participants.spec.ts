@@ -19,7 +19,7 @@ import { GamesService } from './games.service';
  *    재저장하면 옛 리비전 참가자 행이 삭제되지 않고 그대로 남는데, 예전 코드는 gameId 로만
  *    걸러 그 폐기된 리비전의 동명이인까지 목록에 얹었다. 그 행에 연결하면 공식 결과가
  *    최신 participantId 로만 쓰여 개인 기록이 영원히 안 뜬다 — 최신 리비전만 남기는
- *    selectLatestLineupParticipants 스코프를 여기서도 고정한다.
+ *    selectLineupParticipantsWithDraftFallback 스코프를 여기서도 고정한다.
  *
  * 대회 판(listClaimableParticipants)과 공통 본문을 공유하므로, 3·4번은 공통 헬퍼의
  * 회귀 방지도 겸한다.
@@ -113,7 +113,7 @@ describe('GamesService.listLeagueClaimableParticipants', () => {
     const { service } = makeService({
       teamMatch: { game: { id: 'game-1', version: 4 } },
       memberships: [{ teamId: 'team-host', role: 'member' }],
-      // state 는 selectLatestLineupParticipants 의 필수 입력 — 제출된 리비전만
+      // state 는 selectLineupParticipantsWithDraftFallback 의 필수 입력 — 제출된 리비전만
       // "최신"을 다툰다(DRAFT 는 후보에서 빠진다).
       lineups: [{ id: 'lineup-1', sideId: 's-1', revision: 1, state: 'SUBMITTED' }],
       participants: [

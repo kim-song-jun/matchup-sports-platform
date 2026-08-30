@@ -2704,7 +2704,7 @@ export class GamesService {
         // 참가자는 같은 행에 고정되고, 잠금은 실효를 유지하고, 클라이언트는 안 바뀐다.
         //
         // 제출본(SUBMITTED/LOCKED) 위에는 그대로 **새 행**을 만든다 -- 엄격 셀렉터
-        // (selectLatestLineupParticipants)가 제출본을 계속 집어내야 공식 결과와 신원 연결
+        // (selectLineupParticipantsWithDraftFallback)가 제출본을 계속 집어내야 공식 결과와 신원 연결
         // 후보가 비지 않는다. 그 경로에서는 대신 `arrivedAt` 을 이월한다(아래).
         //
         // 범위는 `TOURNAMENT_FIXTURE` 한정이다. TEAM_MATCH 는 위 2528 에서 이미 거부되고,

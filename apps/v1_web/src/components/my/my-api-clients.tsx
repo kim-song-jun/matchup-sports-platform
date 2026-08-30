@@ -1,5 +1,6 @@
 'use client';
 
+import { PreferredPositionPicker } from './preferred-position-picker';
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -865,7 +866,15 @@ export function SportsSettingsPageClient() {
   const updatePreferences = useV1UpdateMyPreferences();
   const sports = sportsQuery.data ?? [];
   const regionGroups = useMemo(() => toSettingsRegionGroups(regionsQuery.data ?? []), [regionsQuery.data]);
-  const [selectedSports, setSelectedSports] = useState<Array<{ sportId: string; levelId: string | null }>>([]);
+  const [selectedSports, setSelectedSports] = useState<
+    Array<{
+      sportId: string;
+      levelId: string | null;
+      // [D14] 종목별 선호 포지션(주/부). 둘 다 null 이 정상 상태다 -- 강제하지 않는다.
+      preferredPosition: string | null;
+      secondaryPreferredPosition: string | null;
+    }>
+  >([]);
   const [selectedRegionIds, setSelectedRegionIds] = useState<[string, string]>(['', '']);
   const [selectedRegionGroupIds, setSelectedRegionGroupIds] = useState<[string, string]>(['', '']);
   const [hydratedUserId, setHydratedUserId] = useState<string | null>(null);
@@ -873,7 +882,14 @@ export function SportsSettingsPageClient() {
 
   useEffect(() => {
     if (!profile.data || hydratedUserId === profile.data.userId) return;
-    setSelectedSports((profile.data.sports ?? []).map((sport) => ({ sportId: sport.sportId, levelId: sport.levelId })));
+    setSelectedSports(
+      (profile.data.sports ?? []).map((sport) => ({
+        sportId: sport.sportId,
+        levelId: sport.levelId,
+        preferredPosition: sport.preferredPosition ?? null,
+        secondaryPreferredPosition: sport.secondaryPreferredPosition ?? null,
+      })),
+    );
     const profileRegions = profile.data.regions ?? [];
     const primaryRegion = profileRegions.find((region) => region.primary) ?? profileRegions[0];
     const secondaryRegion = profileRegions.find((region) => region.regionId !== primaryRegion?.regionId);
@@ -896,12 +912,24 @@ export function SportsSettingsPageClient() {
   const toggleSport = (sportId: string) => {
     setSelectedSports((current) => {
       const exists = current.some((sport) => sport.sportId === sportId);
-      return exists ? current.filter((sport) => sport.sportId !== sportId) : [...current, { sportId, levelId: null }];
+      return exists
+        ? current.filter((sport) => sport.sportId !== sportId)
+        : [...current, { sportId, levelId: null, preferredPosition: null, secondaryPreferredPosition: null }];
     });
   };
 
   const setSportLevel = (sportId: string, levelId: string) => {
     setSelectedSports((current) => current.map((sport) => (sport.sportId === sportId ? { ...sport, levelId } : sport)));
+  };
+
+  const setSportPositions = (sportId: string, next: { primary: string | null; secondary: string | null }) => {
+    setSelectedSports((current) =>
+      current.map((sport) =>
+        sport.sportId === sportId
+          ? { ...sport, preferredPosition: next.primary, secondaryPreferredPosition: next.secondary }
+          : sport,
+      ),
+    );
   };
 
   const missingLevels = selectedSports.some((sport) => !sport.levelId);
@@ -982,10 +1010,33 @@ export function SportsSettingsPageClient() {
             <div className="tm-text-body-lg">난이도</div>
             <div className="tm-text-caption" style={{ marginTop: 4 }}>선택한 종목마다 현재 실력에 가까운 난이도를 선택해 주세요.</div>
             <div className="tm-auth-stack" style={{ marginTop: 16 }}>
-              {selectedSports.map(({ sportId, levelId }) => {
+              {selectedSports.map(({ sportId, levelId, preferredPosition, secondaryPreferredPosition }) => {
                 const sport = sports.find((candidate) => candidate.id === sportId);
                 if (!sport) return null;
-                return <SportLevelPicker key={sportId} levelId={levelId} onSelect={(nextLevelId) => setSportLevel(sportId, nextLevelId)} sport={sport} />;
+                // [D14] 그 종목의 자리 목록은 **서버가 준다**(프리셋이 단일 출처).
+                // 목록이 비면 포지션 개념이 없는 종목(러닝·수영)이라 피커가 스스로
+                // 아무것도 렌더하지 않는다 -- 빈 코트를 보여주지 않는다.
+                const profileSport = (profile.data?.sports ?? []).find((row) => row.sportId === sportId);
+                const positionOptions = profileSport?.positionOptions ?? [];
+                // 대형이 있으면 피커가 그 좌표 위에 자리를 놓는다(풋살). 없으면 띠(축구).
+                const positionFormations = profileSport?.positionFormations ?? [];
+                return (
+                  <div key={sportId}>
+                    <SportLevelPicker levelId={levelId} onSelect={(nextLevelId) => setSportLevel(sportId, nextLevelId)} sport={sport} />
+                    {positionOptions.length > 0 ? (
+                      <div style={{ marginTop: 12 }}>
+                        <PreferredPositionPicker
+                          formations={positionFormations}
+                          onChange={(next) => setSportPositions(sportId, next)}
+                          options={positionOptions}
+                          primary={preferredPosition}
+                          secondary={secondaryPreferredPosition}
+                          sportName={sport.name}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                );
               })}
             </div>
           </Card>

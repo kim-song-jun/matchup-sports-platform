@@ -522,7 +522,14 @@ export function useV1UpdateMyPreferences() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: {
-      sports: Array<{ sportId: string; levelId?: string | null }>;
+      sports: Array<{
+        sportId: string;
+        levelId?: string | null;
+        // [D14] 선호 포지션(주/부). 타입에 없으면 값이 실려도 **조용히 빠질** 수 있다 --
+        // 저장은 되는데 안 반영되는 종류라 화면만 보면 원인을 못 찾는다.
+        preferredPosition?: string | null;
+        secondaryPreferredPosition?: string | null;
+      }>;
       regions: Array<{ regionId: string; primary: boolean }>;
     }) =>
       v1Patch<{

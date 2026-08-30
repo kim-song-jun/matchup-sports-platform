@@ -1,7 +1,13 @@
 import { V1GameLineupState } from '@prisma/client';
-import { selectLatestLineupParticipants, selectLineupParticipantsWithDraftFallback } from './latest-lineup-participants';
+import { selectLineupParticipantsWithDraftFallback } from './latest-lineup-participants';
 
-describe('selectLatestLineupParticipants', () => {
+/**
+ * [P1-c] 여기 있던 `selectLatestLineupParticipants`(제출본만 인정) 는 소비처가 0 이 되어
+ * 삭제했다 -- 시작 게이트를 걷어내면서 공식 결과와 신원 연결 후보가 모두 폴백 셀렉터로
+ * 넘어갔다. 아래 세 케이스는 **두 셀렉터가 공유하던 리비전 선택 로직**을 검증하던 것이라
+ * 살아남는 셀렉터로 그대로 옮긴다 -- 함께 지웠으면 그 계약의 커버리지가 통째로 사라진다.
+ */
+describe('selectLineupParticipantsWithDraftFallback — 공유 리비전 선택 로직', () => {
   it('keeps only the latest lineup revision independently for each side', () => {
     const participants = [
       { id: 'home-old', sideId: 'home', lineupId: 'home-1' },
@@ -15,7 +21,7 @@ describe('selectLatestLineupParticipants', () => {
       { id: 'away-3', sideId: 'away', revision: 3, state: V1GameLineupState.SUBMITTED },
     ];
 
-    expect(selectLatestLineupParticipants(participants, lineups).map((participant) => participant.id)).toEqual([
+    expect(selectLineupParticipantsWithDraftFallback(participants, lineups).map((participant) => participant.id)).toEqual([
       'home-new',
       'away-current',
       'away-current-2',
@@ -23,7 +29,7 @@ describe('selectLatestLineupParticipants', () => {
   });
 
   it('returns an empty list for a game without a saved lineup', () => {
-    expect(selectLatestLineupParticipants([], [])).toEqual([]);
+    expect(selectLineupParticipantsWithDraftFallback([], [])).toEqual([]);
   });
 
   it('drops participants whose lineup row is missing instead of keeping them all', () => {
@@ -34,7 +40,7 @@ describe('selectLatestLineupParticipants', () => {
       { id: 'orphan-2', sideId: 'away', lineupId: 'away-1' },
     ];
 
-    expect(selectLatestLineupParticipants(participants, [])).toEqual([]);
+    expect(selectLineupParticipantsWithDraftFallback(participants, [])).toEqual([]);
   });
 
   it('ignores an unactioned DRAFT correction-request revision when state is supplied', () => {
@@ -54,21 +60,10 @@ describe('selectLatestLineupParticipants', () => {
       { id: 'away-1', sideId: 'away', revision: 1, state: V1GameLineupState.LOCKED },
     ];
 
-    expect(selectLatestLineupParticipants(participants, lineups).map((participant) => participant.id)).toEqual([
+    expect(selectLineupParticipantsWithDraftFallback(participants, lineups).map((participant) => participant.id)).toEqual([
       'home-submitted',
       'away-locked',
     ]);
-  });
-
-  it('falls back to a lower revision that is still operable when the true latest is DRAFT-only', () => {
-    // 위와 같은 시나리오를 더 극단으로: DRAFT 리비전만 있고 SUBMITTED/LOCKED 인
-    // 리비전이 하나도 없는 사이드(정정 요청 없이 처음부터 저장만 하고 제출 전 킥오프를
-    // 맞은 경우)는 "확정된 최신 운영 가능 리비전"이 아예 없으므로 참가자가 전혀 없어야
-    // 한다 -- 전원 통과가 아니라 전원 배제가 안전한 방향이다(위 회귀 테스트와 동일 원칙).
-    const participants = [{ id: 'home-draft-only', sideId: 'home', lineupId: 'home-1' }];
-    const lineups = [{ id: 'home-1', sideId: 'home', revision: 1, state: V1GameLineupState.DRAFT }];
-
-    expect(selectLatestLineupParticipants(participants, lineups)).toEqual([]);
   });
 
 });
@@ -124,15 +119,5 @@ describe('selectLineupParticipantsWithDraftFallback — 리그 결과 입력용 
     expect(
       selectLineupParticipantsWithDraftFallback(participants, lineups).map((p) => p.id).sort(),
     ).toEqual(['away-draft', 'home-submitted']);
-  });
-
-  it('엄격 셀렉터는 같은 입력에서 DRAFT-only 사이드를 여전히 비운다 (두 셀렉터의 차이를 고정)', () => {
-    const participants = [{ id: 'p-draft', sideId: 'home', lineupId: 'home-1' }];
-    const lineups = [{ id: 'home-1', sideId: 'home', revision: 1, state: V1GameLineupState.DRAFT }];
-
-    expect(selectLatestLineupParticipants(participants, lineups)).toEqual([]);
-    expect(selectLineupParticipantsWithDraftFallback(participants, lineups).map((p) => p.id)).toEqual([
-      'p-draft',
-    ]);
   });
 });

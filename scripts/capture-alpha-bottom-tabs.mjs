@@ -135,6 +135,47 @@ async function main() {
         판정: verdict(r, path),
       });
 
+      // **세그먼트를 실제로 눌러 본다.** 탭을 지웠으니 이게 리그로 가는 경로인데,
+      // 렌더만 확인하면 "보이는데 안 가는" 상태(href 오타·라우팅 실패)를 놓친다.
+      if (path === '/tournaments' && r.segmentPresent) {
+        const link = page.getByRole('link', { name: '정규 리그' }).first();
+        await link.click();
+        // timeout 을 삼키지 않는다 — **왜 못 갔는지**가 실패 원인의 절반이다.
+        // (URL 이 안 바뀐 것과, 바뀌었는데 다른 데로 간 것은 원인이 다르다.)
+        let waitError = null;
+        await page
+          .waitForURL('**/league-matches', { timeout: 15_000 })
+          .catch((error) => { waitError = error instanceof Error ? error.name : String(error); });
+        const after = new URL(page.url()).pathname;
+        const moved = after === '/league-matches';
+        rows[rows.length - 1].클릭이동 = moved
+          ? '✅ 리그로 이동'
+          : `❌ ${after}${waitError ? ` (${waitError})` : ''}`;
+
+        if (moved) {
+          // 성공했을 때만 되돌아간다. 대회 목록 화면이 이 폭의 캡처 대상이기 때문이다.
+          await page.goto(`${BASE}${path}`, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+          await page.waitForTimeout(3000);
+        }
+        // **실패면 되돌아가지 않는다.** 되돌아가면 캡처에 남는 건 멀쩡한 대회 목록이고,
+        // 정작 봐야 할 **잘못 착지한 화면**이 사라진다 — 표의 `❌ /어디로갔나` 만으로는
+        // 거기서 무엇이 보였는지 알 수 없다. 그 화면 그대로 찍는다.
+      }
+
+      // **네비만 따로 찍는다 — 이 변경의 주인공이라서.**
+      // 아래에서 fixed 를 흐름으로 되돌려 전체 페이지를 찍는데, 그러면 하단 네비가
+      // 5000px 짜리 문서 맨 아래로 밀려 **갤러리에서 사실상 안 보인다**(첫 갤러리가
+      // 정확히 그랬다 — 탭 변경 PR 인데 탭이 안 보였다). CSS 를 풀기 **전에**,
+      // 실제 화면 상태 그대로 네비 요소만 크롭한다.
+      // `:visible` 이 없으면 **숨겨진 쪽을 고른다** — 모바일 하단 nav 와 데스크톱 상단 nav 가
+      // DOM 에 둘 다 있고 CSS 로 하나만 보이기 때문이다(이 하네스가 탭을 셀 때 이미 겪은 함정).
+      const navShot = page
+        .locator('nav[aria-label="주요 메뉴"]:visible, nav[aria-label="데스크톱 주요 메뉴"]:visible')
+        .first();
+      if ((await navShot.count()) > 0) {
+        await navShot.screenshot({ path: `${OUT}/nav--${key}.png` });
+      }
+
       // 캡처 직전에만 스크롤을 문서로 되돌린다(측정은 위에서 끝났다).
       await page.addStyleTag({
         content: `html, body, .tm-app-frame { overflow: visible !important; height: auto !important; }
@@ -159,7 +200,7 @@ async function main() {
 
   console.log('\n=== 화면에서 읽은 값 ===');
   console.table(rows);
-  const failed = rows.filter((r) => String(r.판정).includes('❌'));
+  const failed = rows.filter((r) => String(r.판정).includes('❌') || String(r.클릭이동 ?? '').includes('❌'));
   console.log(`\n캡처: ${OUT}/`);
   console.log(failed.length === 0 ? '전 폭·전 경로 기대와 일치' : `기대 불일치 ${failed.length}건`);
 }

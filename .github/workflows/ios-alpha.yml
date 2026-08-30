@@ -42,6 +42,13 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen
 
+      # Config/Version.generated.xcconfig is derived from apps/v1_ios/version.properties and
+      # is gitignored, so a clean checkout does not have it — and Shared.xcconfig includes it
+      # unconditionally. Without this step every build here fails with
+      # "could not find included file 'Version.generated.xcconfig'".
+      - name: Generate the version xcconfig
+        run: bash scripts/release/generate-ios-version-xcconfig.sh
+
       # Teameet.xcodeproj is generated and gitignored — project.yml is the definition. This
       # step is also what catches a project.yml that names a file nobody committed.
       - name: Generate the Xcode project

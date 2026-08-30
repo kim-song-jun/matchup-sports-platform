@@ -802,3 +802,43 @@ association 파일은 앱을 `<TEAMID>.<bundle id>`로 지목한다. Team ID가 
 **paths는 `/callback/*` 하나로 좁혔다.** 여기 적히는 모든 경로는 셸이 세션 쿠키를 붙인 채
 렌더하는 화면이므로, 남이 보낸 링크가 독자 앞에 띄울 수 있는 범위가 그만큼 넓어진다.
 넓히려면 먼저 묻는다.
+
+## 최종 상태 (2026-08-30) — 무엇이 검증됐고 무엇이 안 됐나
+
+한 화면에서 읽으라고 모아 둔다. "검증됨"은 **도구 출력으로 관찰한 것**만이다.
+
+### 검증됨
+
+| 항목 | 어떻게 |
+|---|---|
+| 두 flavor 컴파일 + 오프라인 정책 스위트 108건 | `xcodebuild test` (CI가 같은 것을 돌린다) |
+| Java `URI` 파서 동등 규칙 (allowlist/safeRoute) | 유닛. Android 스위트와 같은 케이스 |
+| 푸시 토큰 hex 인코딩(선행 0·길이 64), 설치 식별자 비덮어쓰기, 쿠키 스코프, 페이로드→라우트 | 유닛 |
+| 유니버설 링크 URL→라우트 판정(타 호스트·http·매립 자격증명·포트·look-alike 거절) | 유닛 11건 |
+| 웹→네이티브 브리지 4개 액션이 실제 상태로 응답 | 시뮬레이터 + 배포된 alpha 웹 |
+| 권한 프롬프트 표시·허용, 그 후 앱 정상 동작 | 같은 실행 |
+| **알림 탭 → 해당 문의 상세 착지** (Acceptance Criteria 2) | 같은 실행, 스크린샷 |
+| 등록 실패(alpha가 400)를 구독됨으로 위장하지 않고 OFF로 보고 | 같은 실행, 테스트가 단언 |
+| 양 flavor 엔타이틀먼트(`aps-environment`, `applinks`) | 빌드 산출물 `.xcent` 실판독 |
+| AASA 서빙: 파일 없으면 404 / 있으면 200 + `application/json` | nginx 컨테이너 실행 |
+| 프로덕션 ref 가드 3방향 | `main` 통과 / `dev` 거부 / 미설정 거부 |
+| CI가 깨끗한 체크아웃에서 빌드된다 | 생성 xcconfig를 지우고 재현 → 실패 확인 → 스텝 추가 → 성공 |
+
+### 검증되지 않음 — 열려 있는 항목
+
+| 미완 | 막고 있는 것 | 닫는 방법 |
+|---|---|---|
+| 실제 APNs 게이트웨이 발송·수신 | `.p8` 미수령 | 키 발급 → `ios-apns-setup.md` 절차 |
+| 시뮬레이터 토큰이 실제 APNs로 라우팅되는지 | 같음 | S11 착수 시 첫 실험 |
+| 물리 기기 QA 전체(다기기 fan-out, 네트워크 조건, `BadDeviceToken` 응답) | 같음 + 기기 | S11 |
+| background / terminated 상태 전달 | 미확정 — 시뮬레이터로 가능할 수도 있다 | S11에서 먼저 시도 |
+| alpha 토큰이 production 발송 대상이 아님을 보이는 negative control | `.p8` | S11 |
+| **유니버설 링크 실제 동작 → 카카오 로그인 종단** | **Apple Team ID 미수령**. AASA를 못 만들어 링크는 여전히 Safari로 열린다 | Team ID → `deploy/aasa/README.md` 절차 → 시뮬레이터에서 로그인 종단 |
+| iOS 등록이 서버에 저장되는 경로 | alpha가 이 PR 이전 API라 400 | 머지 후 `TEAMEET_UITEST_EXPECT_SUBSCRIBED=1`로 같은 스크립트 재실행 |
+
+### 문서
+
+- `docs/ops/ios-apns-setup.md` — 기동 계약 4경우, 콘솔 준비물, 환경변수, 실패 해석
+- `docs/ops/ios-release.md` — 버전 원천, 서명(ad-hoc 필요·수동 codesign 금지), `.p8` 취급, 롤백
+- `docs/ops/pr-review-visual-workflow.md` §3.6 — 네이티브는 기기 2종 × 테마
+- `deploy/aasa/README.md` — Team ID 도착 시 절차

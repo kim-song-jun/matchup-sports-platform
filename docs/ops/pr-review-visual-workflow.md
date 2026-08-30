@@ -163,6 +163,41 @@ await ctx.addInitScript(([id, email]) => {
 
 ---
 
+### 3.6 네이티브 앱 셸 (`apps/v1_ios`, `apps/v1_android`) — 웹 3폭 대신 기기 2종 × 테마
+
+위 3폭(📱390 / 📲768 / 🖥1440)은 브라우저 폭 규약이다. 네이티브 셸 PR은 브라우저 폭이 아니라
+**기기 클래스와 시스템 테마**가 변수이므로 규약이 다르다.
+
+| 축 | 최소 조합 |
+|---|---|
+| 기기 | 작은 화면 1종(iPhone 17e 급) + 큰 화면 1종(iPhone 17 Pro Max 급) |
+| 테마 | light + dark |
+
+즉 **4장**이 최소다. 셸이 화면을 그리지 않으므로 캡처 대상은 웹 화면이지만, 확인하려는 것은
+웹 레이아웃이 아니라 **셸이 웹에 준 값이 맞는지**다:
+
+- 하단 안전영역 — 셸이 주입하는 `--teameet-native-safe-bottom` / `--v1-shell-safe-bottom`이
+  홈 인디케이터를 피하는가. 웹에는 `viewport-fit=cover`가 없어 `env(safe-area-inset-bottom)`이
+  0이므로, 이 주입이 없으면 하단 내비가 인디케이터에 깔린다 — **주입이 load-bearing이다.**
+- 상단 — 상태바와 헤더가 겹치지 않는가.
+- 다크 모드 — 셸의 배경(웹 로드 전·에러 화면)이 시스템 테마를 따르는가. 로드 중 흰 화면이
+  번쩍이면 여기서 잡힌다.
+
+```bash
+# 테마와 글자 크기는 시뮬레이터에 직접 지시한다
+xcrun simctl ui <UDID> appearance dark
+xcrun simctl ui <UDID> content_size accessibility-extra-large
+xcrun simctl io <UDID> screenshot shot.png
+```
+
+**`shutdown all` 같은 all-scope 명령은 쓰지 않는다.** 이 저장소는 여러 세션이 각자 시뮬레이터를
+띄우므로 남의 기기를 내린다. 기기는 항상 UDID로 지정한다.
+
+푸시·권한·딥링크가 걸린 변경이면 스크린샷만으로는 부족하다 —
+`scripts/ios/verify-push-slice.sh`가 권한 프롬프트·행 상태·알림 탭 착지를 실제로 밟는다.
+**그 결과 번들(`*.xcresult`)에는 테스트 계정 비밀번호가 평문으로 남으므로 PR에 첨부하지
+않는다.** 첨부는 거기서 추출한 스크린샷만 한다.
+
 ## 4. 전체 검수 (8차원 적대적 리뷰)
 
 - 큰 검수/피드백은 **built-in `Workflow`(ultracode)**로(=evidence-producing). `/agent-all`은 PR-shipping 코드 변경용이며, 본 레포는 그 Phase 0 전제(트리 청결·`planner/dev/reviewer` 로스터·`agent-policy-hook`)를 미충족.

@@ -26,8 +26,6 @@ import { tryNormalizeCompetitionSportCode } from '../tournaments/competition-con
 import {
   PREFERRED_POSITION_MESSAGES,
   positionCodesForSport,
-  positionFormationsForSport,
-  positionOptionsForSport,
   validatePreferredPositions,
 } from '../users/preferred-position';
 import { isReviewRevealed } from '../reviews/review-visibility';
@@ -866,14 +864,6 @@ export class ProfileService {
         // 대형에 얹든 그건 표현이고, 서버가 배치를 정해 주지 않는다(D4·프리셋 경계).
         preferredPosition: preference.preferredPosition,
         secondaryPreferredPosition: preference.secondaryPreferredPosition,
-        positionOptions: positionOptionsForSport(preference.sport.code, {
-          tryNormalize: tryNormalizeCompetitionSportCode,
-          canonicalConfig: canonicalCompetitionConfigForSport,
-        }),
-        positionFormations: positionFormationsForSport(preference.sport.code, {
-          tryNormalize: tryNormalizeCompetitionSportCode,
-          canonicalConfig: canonicalCompetitionConfigForSport,
-        }),
       })),
       regions: snapshot.regions.map((userRegion) => ({
         regionId: userRegion.region.id,
@@ -1362,14 +1352,6 @@ function toProfileResponse(user: Awaited<ReturnType<ProfileService['getUserSnaps
       // 보인다 -- 저장 응답에만 넣고 끝내면 못 잡는 종류다(매핑이 두 곳이다).
       preferredPosition: preference.preferredPosition,
       secondaryPreferredPosition: preference.secondaryPreferredPosition,
-      positionOptions: positionOptionsForSport(preference.sport.code, {
-        tryNormalize: tryNormalizeCompetitionSportCode,
-        canonicalConfig: canonicalCompetitionConfigForSport,
-      }),
-      positionFormations: positionFormationsForSport(preference.sport.code, {
-        tryNormalize: tryNormalizeCompetitionSportCode,
-        canonicalConfig: canonicalCompetitionConfigForSport,
-      }),
     })),
     regions: user.regions.map((userRegion) => ({
       regionId: userRegion.region.id,

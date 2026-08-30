@@ -34,6 +34,58 @@ export function positionCodesForSport(
   return deps.canonicalConfig(normalized).lineup.positions.map((position) => position.code);
 }
 
+/**
+ * 화면이 그릴 수 있도록 **코드·라벨·골키퍼 여부**까지 준다.
+ *
+ * `positionCodesForSport` 는 검증용이라 코드만 돌려주지만, 화면은 사람이 읽을 라벨과
+ * (골키퍼를 맨 뒤 띠에 놓기 위한) 플래그가 필요하다. **좌표는 주지 않는다** — 배치는
+ * 화면의 표현이고, 서버가 정해 주면 경기 대형 데이터를 창작하는 것이 된다.
+ *
+ * 프리셋이 없는 종목(러닝·수영)은 빈 배열이다. 화면은 이 값이 비면 **섹션을 숨긴다**.
+ */
+export function positionOptionsForSport(
+  rawSportCode: string | null | undefined,
+  deps: {
+    readonly tryNormalize: (value: string) => string | null;
+    readonly canonicalConfig: (normalized: string) => {
+      lineup: { positions: readonly { code: string; label: string; goalkeeper?: boolean }[] };
+    };
+  },
+): { code: string; label: string; goalkeeper: boolean }[] {
+  if (typeof rawSportCode !== 'string') return [];
+  const normalized = deps.tryNormalize(rawSportCode);
+  if (normalized === null) return [];
+  return deps.canonicalConfig(normalized).lineup.positions.map((position) => ({
+    code: position.code,
+    label: position.label,
+    goalkeeper: position.goalkeeper === true,
+  }));
+}
+
+/**
+ * 그 종목의 **대형 좌표**. 있으면 화면이 그 위에 자리를 놓고, 비면 띠로 떨어진다.
+ *
+ * 좌표를 **서버가 만들지 않는다** — 프리셋에 이미 있는 값을 그대로 넘길 뿐이다.
+ * 프리셋에 대형이 없는 종목(현재 축구)은 빈 배열이고, 그건 결함이 아니라
+ * "그 종목 대형 좌표는 설계 문서에 없다"는 사실이다.
+ */
+export function positionFormationsForSport(
+  rawSportCode: string | null | undefined,
+  deps: {
+    readonly tryNormalize: (value: string) => string | null;
+    readonly canonicalConfig: (normalized: string) => {
+      lineup: { formations: readonly { slots?: readonly { position: string; x: number; y: number }[] }[] };
+    };
+  },
+): { slots: { position: string; x: number; y: number }[] }[] {
+  if (typeof rawSportCode !== 'string') return [];
+  const normalized = deps.tryNormalize(rawSportCode);
+  if (normalized === null) return [];
+  return deps.canonicalConfig(normalized).lineup.formations.map((formation) => ({
+    slots: [...(formation.slots ?? [])],
+  }));
+}
+
 export interface PreferredPositionInput {
   /** 주 포지션. null = 미설정. */
   readonly primary: string | null;

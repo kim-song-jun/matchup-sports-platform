@@ -26,6 +26,8 @@ import { tryNormalizeCompetitionSportCode } from '../tournaments/competition-con
 import {
   PREFERRED_POSITION_MESSAGES,
   positionCodesForSport,
+  positionFormationsForSport,
+  positionOptionsForSport,
   validatePreferredPositions,
 } from '../users/preferred-position';
 import { isReviewRevealed } from '../reviews/review-visibility';
@@ -856,6 +858,22 @@ export class ProfileService {
         levelId: preference.sportLevel?.id ?? null,
         levelName: preference.sportLevel?.name ?? null,
         primary: preference.isPrimary,
+        // [D14] 저장된 선호 포지션과 **그 종목에서 고를 수 있는 자리 목록**을 함께 준다.
+        // 화면이 자리 이름을 자체 목록으로 갖지 않게 하려는 것이다 — 종목마다 코드가
+        // 다르고 프리셋이 늘 수 있어서, 화면에 적으면 두 벌이 갈린다.
+        //
+        // **좌표는 주지 않는다.** 코드·라벨·골키퍼 여부까지다. 화면이 그걸로 띠를 깔든
+        // 대형에 얹든 그건 표현이고, 서버가 배치를 정해 주지 않는다(D4·프리셋 경계).
+        preferredPosition: preference.preferredPosition,
+        secondaryPreferredPosition: preference.secondaryPreferredPosition,
+        positionOptions: positionOptionsForSport(preference.sport.code, {
+          tryNormalize: tryNormalizeCompetitionSportCode,
+          canonicalConfig: canonicalCompetitionConfigForSport,
+        }),
+        positionFormations: positionFormationsForSport(preference.sport.code, {
+          tryNormalize: tryNormalizeCompetitionSportCode,
+          canonicalConfig: canonicalCompetitionConfigForSport,
+        }),
       })),
       regions: snapshot.regions.map((userRegion) => ({
         regionId: userRegion.region.id,
@@ -1160,7 +1178,9 @@ export class ProfileService {
         },
         sportPreferences: {
           include: {
-            sport: { select: { id: true, name: true } },
+            // [D14] `code` 가 필요하다 — 그 종목에서 고를 수 있는 자리 목록을 프리셋에서
+            // 꺼내는 키다(이름이 아니라 코드로 정규화한다).
+            sport: { select: { id: true, name: true, code: true } },
             sportLevel: { select: { id: true, name: true } },
           },
           orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
@@ -1337,6 +1357,19 @@ function toProfileResponse(user: Awaited<ReturnType<ProfileService['getUserSnaps
       levelId: preference.sportLevel?.id ?? null,
       levelName: preference.sportLevel?.name ?? null,
       primary: preference.isPrimary,
+      // [D14] **저장 응답과 같은 필드를 여기도 실어야 한다.** 화면은 프로필 조회로
+      // 수화하므로, 여기 빠지면 저장은 되는데 다시 들어왔을 때 선택이 사라진 것처럼
+      // 보인다 -- 저장 응답에만 넣고 끝내면 못 잡는 종류다(매핑이 두 곳이다).
+      preferredPosition: preference.preferredPosition,
+      secondaryPreferredPosition: preference.secondaryPreferredPosition,
+      positionOptions: positionOptionsForSport(preference.sport.code, {
+        tryNormalize: tryNormalizeCompetitionSportCode,
+        canonicalConfig: canonicalCompetitionConfigForSport,
+      }),
+      positionFormations: positionFormationsForSport(preference.sport.code, {
+        tryNormalize: tryNormalizeCompetitionSportCode,
+        canonicalConfig: canonicalCompetitionConfigForSport,
+      }),
     })),
     regions: user.regions.map((userRegion) => ({
       regionId: userRegion.region.id,

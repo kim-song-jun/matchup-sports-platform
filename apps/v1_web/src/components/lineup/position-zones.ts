@@ -73,3 +73,46 @@ export function buildPositionZones(positions: readonly PositionOption[]): Positi
 export function shouldUseZoneLayout(formations: readonly unknown[]): boolean {
   return formations.length === 0;
 }
+
+/** 대형의 한 자리. 좌표는 앱 기준(y=0 우리 골라인, y=100 상대 골라인). */
+export interface FormationSlot {
+  readonly position: string;
+  readonly x: number;
+  readonly y: number;
+}
+
+export interface FormationOption {
+  readonly slots?: readonly FormationSlot[];
+}
+
+/**
+ * 대형 좌표가 있는 종목(풋살)에서 **자리별 대표 위치**를 뽑는다.
+ *
+ * 대형은 **슬롯** 목록이라 같은 자리가 여러 번 나온다(풋살 다이아몬드에 `ALA` 가 좌우
+ * 둘). 그런데 여기서 고르는 것은 **자리(코드)** 이지 슬롯이 아니다 — `ALA` 버튼이 둘이면
+ * "왼쪽 알라와 오른쪽 알라 중 뭘 고르라는 거지?"가 된다. 그래서 같은 코드의 슬롯을
+ * **평균**해 하나로 합친다. 좌표를 지어내는 것이 아니라 프리셋 값에서 파생한다.
+ *
+ * 대형에 없는 자리(골키퍼는 outfield 슬롯에 안 들어간다)는 `null` 로 남기고, 호출부가
+ * 맨 아래(우리 골문)에 놓는다.
+ */
+export function averageSlotPositions(
+  formations: readonly FormationOption[],
+): Map<string, { x: number; y: number }> {
+  const first = formations[0];
+  const result = new Map<string, { x: number; y: number }>();
+  if (first === undefined || first.slots === undefined) return result;
+
+  const buckets = new Map<string, { x: number; y: number; n: number }>();
+  for (const slot of first.slots) {
+    const bucket = buckets.get(slot.position) ?? { x: 0, y: 0, n: 0 };
+    bucket.x += slot.x;
+    bucket.y += slot.y;
+    bucket.n += 1;
+    buckets.set(slot.position, bucket);
+  }
+  for (const [code, bucket] of buckets) {
+    result.set(code, { x: bucket.x / bucket.n, y: bucket.y / bucket.n });
+  }
+  return result;
+}

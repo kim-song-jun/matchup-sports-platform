@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildPositionZones, shouldUseZoneLayout } from './position-zones';
+import { averageSlotPositions, buildPositionZones, shouldUseZoneLayout } from './position-zones';
 
 /**
  * [D14] 띠 순서는 **프리셋에서 파생**한다 — 이 파일에 순서를 다시 적지 않는 것이 계약이다.
@@ -77,5 +77,45 @@ describe('[D14] shouldUseZoneLayout — 종목 이름이 아니라 데이터로 
     // 여전히 띠를 그렸을 것이고, 아무도 그 사실을 모른 채 지나갔을 것이다.
     const footballOnceFormationsExist = [{ code: '4-4-2' }];
     expect(shouldUseZoneLayout(footballOnceFormationsExist)).toBe(false);
+  });
+});
+
+/**
+ * [D14] 대형이 있는 종목(풋살)은 **그 좌표**를 쓴다. 처음 구현에서 `shouldUseZoneLayout`
+ * 을 계산해 놓고 **레이아웃에 안 썼다** — 문서는 "대형 좌표 위에"라는데 코드는 항상 띠를
+ * 그렸다. 리뷰가 그걸 잡았고, 이 스위트가 재발을 막는다.
+ */
+describe('[D14] averageSlotPositions — 같은 자리의 슬롯을 하나로 합친다', () => {
+  const DIAMOND = [
+    {
+      slots: [
+        { position: 'FIXO', x: 50, y: 35 },
+        { position: 'ALA', x: 20, y: 58 },
+        { position: 'ALA', x: 80, y: 58 },
+        { position: 'PIVO', x: 50, y: 83 },
+      ],
+    },
+  ];
+
+  it('좌우로 나뉜 같은 자리는 평균해 버튼 하나가 된다', () => {
+    // 슬롯을 그대로 놓으면 'ALA' 버튼이 둘이 되어 무엇을 고르라는 건지 알 수 없다.
+    const map = averageSlotPositions(DIAMOND);
+    expect(map.get('ALA')).toEqual({ x: 50, y: 58 });
+  });
+
+  it('한 번만 나오는 자리는 그 좌표 그대로다 — 값을 지어내지 않는다', () => {
+    const map = averageSlotPositions(DIAMOND);
+    expect(map.get('FIXO')).toEqual({ x: 50, y: 35 });
+    expect(map.get('PIVO')).toEqual({ x: 50, y: 83 });
+  });
+
+  it('대형에 없는 자리는 없는 채로 둔다 (골키퍼는 outfield 슬롯에 없다)', () => {
+    // 호출부가 이런 자리를 맨 아래(우리 골문)에 놓는다. 여기서 임의 좌표를 만들지 않는다.
+    expect(averageSlotPositions(DIAMOND).has('GOLEIRO')).toBe(false);
+  });
+
+  it('대형이 없으면 빈 맵이다 — 축구는 띠로 떨어진다', () => {
+    expect(averageSlotPositions([]).size).toBe(0);
+    expect(averageSlotPositions([{}]).size).toBe(0);
   });
 });

@@ -1016,13 +1016,17 @@ export function SportsSettingsPageClient() {
                 // [D14] 그 종목의 자리 목록은 **서버가 준다**(프리셋이 단일 출처).
                 // 목록이 비면 포지션 개념이 없는 종목(러닝·수영)이라 피커가 스스로
                 // 아무것도 렌더하지 않는다 -- 빈 코트를 보여주지 않는다.
-                const positionOptions = (profile.data?.sports ?? []).find((row) => row.sportId === sportId)?.positionOptions ?? [];
+                const profileSport = (profile.data?.sports ?? []).find((row) => row.sportId === sportId);
+                const positionOptions = profileSport?.positionOptions ?? [];
+                // 대형이 있으면 피커가 그 좌표 위에 자리를 놓는다(풋살). 없으면 띠(축구).
+                const positionFormations = profileSport?.positionFormations ?? [];
                 return (
                   <div key={sportId}>
                     <SportLevelPicker levelId={levelId} onSelect={(nextLevelId) => setSportLevel(sportId, nextLevelId)} sport={sport} />
                     {positionOptions.length > 0 ? (
                       <div style={{ marginTop: 12 }}>
                         <PreferredPositionPicker
+                          formations={positionFormations}
                           onChange={(next) => setSportPositions(sportId, next)}
                           options={positionOptions}
                           primary={preferredPosition}

@@ -1929,6 +1929,11 @@ export type V1Profile = {
      * 비어 있으면 포지션 개념이 없는 종목이라 **선호 포지션 UI 를 띄우지 않는다.**
      */
     positionOptions?: Array<{ code: string; label: string; goalkeeper: boolean }>;
+    /**
+     * 이 종목의 대형 좌표. 있으면 화면이 **그 위에** 자리를 놓고, 비면 띠로 떨어진다.
+     * 서버가 프리셋 값을 그대로 넘긴다 — 좌표를 만들지 않는다.
+     */
+    positionFormations?: Array<{ slots?: Array<{ position: string; x: number; y: number }> }>;
   }>;
   regions?: Array<{
     regionId: string;

@@ -2,7 +2,13 @@
 
 import { useMemo } from 'react';
 import { PitchLines } from '@/components/lineup/pitch-lines';
-import { buildPositionZones, shouldUseZoneLayout, type PositionOption } from '@/components/lineup/position-zones';
+import {
+  averageSlotPositions,
+  buildPositionZones,
+  shouldUseZoneLayout,
+  type FormationOption,
+  type PositionOption,
+} from '@/components/lineup/position-zones';
 
 /**
  * [D14] 선호 포지션 고르기 — **코트 위에서 자리를 누른다.**
@@ -28,7 +34,7 @@ export interface PreferredPositionPickerProps {
   /** 이 종목에서 고를 수 있는 자리. **서버 프리셋이 유일한 출처**다(화면에 적지 않는다). */
   readonly options: readonly PositionOption[];
   /** 대형 좌표. 비어 있으면 띠로 그린다. */
-  readonly formations?: readonly unknown[];
+  readonly formations?: readonly FormationOption[];
   readonly primary: string | null;
   readonly secondary: string | null;
   readonly onChange: (next: { primary: string | null; secondary: string | null }) => void;
@@ -44,6 +50,9 @@ export function PreferredPositionPicker({
 }: PreferredPositionPickerProps) {
   const zones = useMemo(() => buildPositionZones(options), [options]);
   const useZones = shouldUseZoneLayout(formations);
+  // 대형이 있으면 그 좌표를 쓴다. 같은 자리의 슬롯은 평균해 **버튼 하나**로 합친다 --
+  // 슬롯을 그대로 놓으면 'ALA' 버튼이 둘이 되어 무엇을 고르라는 건지 알 수 없다.
+  const slotPositions = useMemo(() => averageSlotPositions(formations), [formations]);
 
   // 자리가 없는 종목은 아무것도 그리지 않는다. 호출부가 이미 숨기지만, 여기서도
   // 방어한다 -- 빈 코트는 "고를 게 없다"가 아니라 "고장났다"로 보인다.
@@ -66,7 +75,11 @@ export function PreferredPositionPicker({
       return;
     }
     if (primary === null) {
-      onChange({ primary: code, secondary });
+      // **`secondary` 를 버린다.** 여기 왔다는 건 주가 없다는 뜻인데, 그 상태에서 부가
+      // 남아 있으면 서버가 거부하는 조합(주 없이 부만)이 된다. 정상 경로로는 안 생기지만
+      // 저장된 데이터가 어떤 이유로든 그 상태면 **화면이 그걸 유지해선 안 된다** --
+      // 사용자는 자기가 뭘 잘못했는지 모른 채 저장 오류만 만난다.
+      onChange({ primary: code, secondary: null });
       return;
     }
     onChange({ primary, secondary: code });
@@ -95,9 +108,15 @@ export function PreferredPositionPicker({
         <PitchLines />
         {zones.map((zone) => {
           const role = roleOf(zone.code);
-          // 띠: 위(공격)에서 아래(자기 골문)로 균등 분할. **좌표를 만드는 것이 아니라**
-          // 순서를 화면 비율로 나눈 것이다 -- 그래서 자리 수가 바뀌어도 따라간다.
-          const topPct = ((zone.rowIndex + 0.5) / zones.length) * 100;
+          const slot = useZones ? undefined : slotPositions.get(zone.code);
+          // 대형이 있으면 **그 좌표**에 놓는다. 앱 좌표는 y=0 이 우리 골라인이고 화면은
+          // 위가 상대 진영이라 위아래가 뒤집힌다(topPct = 100 - y).
+          //
+          // 대형이 없거나(축구) 그 자리가 대형에 안 나오면(골키퍼는 outfield 슬롯에 없다)
+          // **띠**로 떨어진다 -- 위(공격)에서 아래(자기 골문)로 균등 분할이다. 좌표를
+          // 만드는 것이 아니라 순서를 화면 비율로 나눈 것이라 자리 수가 바뀌어도 따라간다.
+          const topPct = slot ? 100 - slot.y : ((zone.rowIndex + 0.5) / zones.length) * 100;
+          const leftPct = slot ? slot.x : 50;
           return (
             <button
               key={zone.code}
@@ -107,7 +126,7 @@ export function PreferredPositionPicker({
               aria-label={`${zone.label}${role === null ? '' : ` · ${role} 포지션으로 선택됨`}`}
               style={{
                 position: 'absolute',
-                left: '50%',
+                left: `${leftPct}%`,
                 top: `${topPct}%`,
                 transform: 'translate(-50%, -50%)',
                 minHeight: 44,
@@ -135,7 +154,7 @@ export function PreferredPositionPicker({
           : secondary === null
             ? '다시 누르면 해제돼요. 한 곳 더 누르면 부 포지션이 돼요.'
             : '다시 누르면 해제돼요.'}
-        {useZones ? ' 이 종목은 자리별 구역으로 표시돼요.' : ''}
+        {useZones ? ' 이 종목은 자리별 구역으로 표시돼요.' : ' 실제 포메이션 위치로 표시돼요.'}
       </p>
     </div>
   );

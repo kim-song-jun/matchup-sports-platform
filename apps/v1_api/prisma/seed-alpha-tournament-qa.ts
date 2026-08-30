@@ -917,8 +917,8 @@ async function main() {
         region.id,
         FEATURED_PERSONAS,
         FEATURED_TEAMS,
-        '팀밋 정식 대회에 참가하는 활동 팀 소속 선수입니다.',
-        '팀밋 정식 매치·대회에 참가하는 활동 팀입니다.',
+        '서울 지역 풋살 리그와 대회에 정기적으로 참가하는 선수입니다. Alpha 쇼케이스 계정입니다.',
+        '서울 지역 정식 매치와 대회에 참가하는 풋살 팀입니다. Alpha 쇼케이스 데이터입니다.',
       );
       const now = new Date();
       for (const scenario of ALPHA_TOURNAMENT_SCENARIOS) {

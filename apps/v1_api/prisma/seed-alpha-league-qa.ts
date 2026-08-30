@@ -565,6 +565,14 @@ async function ensureGameSkeleton(
     if (!homeSide || !awaySide) {
       throw new Error(`league QA fixture ${spec.no} game ${existingGame.id} is missing a side`);
     }
+    // 팀 이름을 자연스러운 쇼케이스 이름으로 바꿔도 기존 공식 경기의 side snapshot은
+    // 자동으로 따라오지 않는다. 최근 활동 카드가 이 값을 직접 읽으므로 Alpha 시드가
+    // 소유한 결정적 게임에 한해 표시 스냅샷을 현재 팀명과 동기화한다. 점수·리비전·fact는
+    // 건드리지 않아 이미 확정된 기록의 의미는 그대로 유지된다.
+    await Promise.all([
+      tx.v1GameSide.update({ where: { id: homeSide.id }, data: { displayNameSnapshot: home.name } }),
+      tx.v1GameSide.update({ where: { id: awaySide.id }, data: { displayNameSnapshot: away.name } }),
+    ]);
     return {
       gameId: existingGame.id,
       currentOfficialRevisionId: existingGame.currentOfficialRevisionId,

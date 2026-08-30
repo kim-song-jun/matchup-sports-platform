@@ -52,7 +52,7 @@ const STAT_BACK: Record<
 > = {
   SHO: { icon: Target, source: '골 · 경기당 골이 많을수록 올라가요', tag: '골 결정력' },
   PAS: { icon: Zap, source: '도움 · 경기당 도움이 많을수록 올라가요', tag: '찬스 메이킹' },
-  APP: { icon: CalendarCheck, source: '출전 · 나온 경기가 쌓일수록 올라가요', tag: '성실 출석' },
+  APP: { icon: CalendarCheck, source: '엔트리 · 명단에 오른 경기가 쌓일수록 올라가요', tag: '성실 출석' },
   SKI: { icon: Sparkles, source: '실력 · 함께 뛴 동료들의 후기 평균이에요', tag: '탄탄한 기본기' },
   MAN: { icon: HeartHandshake, source: '매너 · 함께 뛴 동료들의 후기 평균이에요', tag: '매너 플레이' },
   PUN: { icon: Clock, source: '시간약속 · 함께 뛴 동료들의 후기 평균이에요', tag: '시간 약속' },
@@ -93,7 +93,7 @@ function nextGoalText(card: V1PlayerCard): string | null {
 function unlockHint(card: V1PlayerCard): string | null {
   if (card.nextUnlock === null) return null;
   const { reason } = card.nextUnlock;
-  if (reason.type === 'consent') return '기록 공개를 켜면 골·도움·출전이 한 번에 열려요';
+  if (reason.type === 'consent') return '기록 공개를 켜면 골·도움·엔트리가 한 번에 열려요';
   if (reason.type === 'appearances') {
     // 아직 한 경기도 안 뛴 사람에게 "1경기 더" 는 틀린 말이다 -- 더 뛸 앞선 경기가 없다.
     if (card.appearances === 0) return '첫 경기 명단에 오르면 기록이 쌓이기 시작해요';

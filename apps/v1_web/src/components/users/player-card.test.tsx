@@ -257,7 +257,7 @@ describe('선수 카드', () => {
     it('본인이 보면 공개 설정으로 데려간다 -- 이게 이 기능의 목적이다', () => {
       renderCard(needsConsent, true);
 
-      expect(screen.getByText('기록 공개를 켜면 골·도움·출전이 한 번에 열려요')).toBeInTheDocument();
+      expect(screen.getByText('기록 공개를 켜면 골·도움·엔트리가 한 번에 열려요')).toBeInTheDocument();
       expect(screen.getByRole('link', { name: '기록 공개하고 3개 열기' })).toHaveAttribute(
         'href',
         '/my/settings/record-consent',
@@ -268,7 +268,7 @@ describe('선수 카드', () => {
       renderCard(needsConsent, false);
 
       expect(screen.queryByRole('link', { name: '기록 공개하고 3개 열기' })).not.toBeInTheDocument();
-      expect(screen.queryByText('기록 공개를 켜면 골·도움·출전이 한 번에 열려요')).not.toBeInTheDocument();
+      expect(screen.queryByText('기록 공개를 켜면 골·도움·엔트리가 한 번에 열려요')).not.toBeInTheDocument();
       // 왜 잠겼는지는 뒷면이 남에게도 말한다 -- 카드가 왜 비었는지 오해하지 않게.
       expect(screen.getByText(/골 · 기록 공개를 켜면 열려요/)).toBeInTheDocument();
     });

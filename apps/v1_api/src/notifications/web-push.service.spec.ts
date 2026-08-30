@@ -119,7 +119,10 @@ describe('WebPushService', () => {
     expect(prisma.v1PushSubscription.findMany).not.toHaveBeenCalled();
     // 꺼져 있다는 사실을 호출부가 알 수 있어야 한다 — 그래야 운영 화면이 "보냈다"고
     // 표시하지 않는다.
-    expect(summary).toEqual({ subscriptions: 0, delivered: 0, failed: 0, disabled: true });
+    expect(summary).toEqual({
+      subscriptions: 0, delivered: 0, failed: 0, disabled: true,
+      native: { devices: 0, delivered: 0, failed: 0, disabled: false },
+    });
   });
 
   /**
@@ -136,7 +139,10 @@ describe('WebPushService', () => {
 
     const summary = await service.sendToUser('user-1', { title: 'hi' });
 
-    expect(summary).toEqual({ subscriptions: 0, delivered: 0, failed: 0, disabled: false });
+    expect(summary).toEqual({
+      subscriptions: 0, delivered: 0, failed: 0, disabled: false,
+      native: { devices: 0, delivered: 0, failed: 0, disabled: false },
+    });
     expect(webpush.sendNotification).not.toHaveBeenCalled();
   });
 
@@ -156,7 +162,10 @@ describe('WebPushService', () => {
 
     const summary = await service.sendToUser('user-1', { title: 'hi' });
 
-    expect(summary).toEqual({ subscriptions: 2, delivered: 1, failed: 1, disabled: false });
+    expect(summary).toEqual({
+      subscriptions: 2, delivered: 1, failed: 1, disabled: false,
+      native: { devices: 0, delivered: 0, failed: 0, disabled: false },
+    });
   });
 
   it('enables and returns the configured public key when all three VAPID vars are set', async () => {
@@ -462,6 +471,28 @@ describe('WebPushService native fan-out', () => {
       expect.anything(),
       expect.stringContaining('V1_PUSH_ENVIRONMENT'),
     );
+  });
+
+  /**
+   * The summary is what an operator sees. `admin-ops.service.ts` returns it straight from
+   * the manual-push endpoint, so a user with only app devices and no browser subscription
+   * used to read as "0 sent" on screen even though the notification had gone out — which
+   * invites sending it again, or filing an outage.
+   */
+  it('reports app deliveries for a user with no browser subscription', async () => {
+    prisma.v1PushSubscription.findMany.mockResolvedValue([]);
+    pushDevices.activeTokens.mockResolvedValue([
+      { id: 'i1', token: 'ios-token-1', platform: 'ios' },
+    ]);
+    const service = await build();
+
+    const result = await service.sendToUser('user-1', { notificationId: 'n-3', title: '문의 답변' });
+
+    expect(result.native).toEqual({ devices: 1, delivered: 1, failed: 0, disabled: false });
+    // The web half stays its own number: nothing was sent there, and saying otherwise would
+    // hide a broken browser subscription behind a working phone.
+    expect(result.subscriptions).toBe(0);
+    expect(result.delivered).toBe(0);
   });
 
   it('sends each device to the service that owns its platform', async () => {

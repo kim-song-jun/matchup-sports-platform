@@ -7,7 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { V1PushEnvironment, V1PushPlatform } from '@prisma/client';
 import { ApnsPushService } from './apns-push.service';
 import { FcmPushService } from './fcm-push.service';
-import { NativePushPayload, PushTarget } from './native-push.types';
+import { NativeDeliverySummary, NativePushPayload, PushTarget } from './native-push.types';
 import { PushDeviceService } from './push-device.service';
 import { resolvePushEnvironment } from './push-environment';
 
@@ -19,7 +19,19 @@ interface PushPayload {
 }
 
 /** 한 사용자에 대한 푸시 발송 결과 요약. */
-export interface PushDeliverySummary {
+/**
+ * 웹 구독과 앱 기기의 결과를 **나란히** 담는다. 한쪽이 0이어도 다른 쪽은 갔을 수 있으므로
+ * 합치지 않는다.
+ *
+ * `native` 가 없던 동안, 앱 기기만 가진 사용자에게 어드민이 수동 푸시를 보내면 실제로는
+ * 발송됐는데 화면에는 0건으로 보였다(admin-ops.service.ts 가 이 요약을 그대로 응답에 싣는다).
+ * 운영자가 안 갔다고 판단해 다시 보내거나 장애로 오인한다.
+ */
+export type PushDeliverySummary = WebDeliverySummary & {
+  native: NativeDeliverySummary;
+};
+
+export interface WebDeliverySummary {
   /** 이 사용자에게 등록돼 있던 구독 수. 0이면 보낼 곳 자체가 없었다는 뜻이다. */
   subscriptions: number;
   /** 푸시 서비스가 접수한 수(기기 도착까지 보장하지는 않는다). */
@@ -109,13 +121,18 @@ export class WebPushService implements OnModuleInit {
    * 성공으로 표시하게 된다. 그래서 상태만 요약해 반환한다.
    */
   async sendToUser(userId: string, payload: PushPayload): Promise<PushDeliverySummary> {
-    const nativeDelivery = this.sendNativeToUser(userId, payload).catch((err: unknown) => {
-      this.logger.warn({ userId, err }, 'native push delivery failed');
-    });
+    // 한쪽 채널의 실패가 다른 쪽을 취소하거나 호출부를 되돌리면 안 된다 — 그래서 예외는
+    // 여기서 삼키고, 그 사실을 0이 아니라 요약으로 돌려준다.
+    const nativeDelivery = this.sendNativeToUser(userId, payload).catch(
+      (err: unknown): NativeDeliverySummary => {
+        this.logger.warn({ userId, err }, 'native push delivery failed');
+        return { devices: 0, delivered: 0, failed: 0, disabled: false };
+      },
+    );
 
     const webDelivery = this.sendWebPushToUser(userId, payload);
-    const [summary] = await Promise.all([webDelivery, nativeDelivery]);
-    return summary;
+    const [summary, native] = await Promise.all([webDelivery, nativeDelivery]);
+    return { ...summary, native };
   }
 
   /**
@@ -129,7 +146,10 @@ export class WebPushService implements OnModuleInit {
    * One platform failing must not cancel another: each adapter is awaited independently and
    * its rejection is caught here.
    */
-  private async sendNativeToUser(userId: string, payload: PushPayload): Promise<void> {
+  private async sendNativeToUser(
+    userId: string,
+    payload: PushPayload,
+  ): Promise<NativeDeliverySummary> {
     // Configured adapters only. A deployment with push turned off has none, and asking for
     // the environment in that state would throw where the old per-adapter path simply did
     // nothing.
@@ -137,7 +157,8 @@ export class WebPushService implements OnModuleInit {
       (adapter): adapter is FcmPushService | ApnsPushService =>
         adapter !== undefined && adapter.isConfigured,
     );
-    if (adapters.length === 0) return;
+    // 앱 푸시가 꺼진 배포. 보낼 통로 자체가 없다는 것과 "보냈는데 0건"은 다르다.
+    if (adapters.length === 0) return { devices: 0, delivered: 0, failed: 0, disabled: true };
 
     const environment = this.nativeEnvironment();
     if (environment === null) {
@@ -148,11 +169,11 @@ export class WebPushService implements OnModuleInit {
         { userId, platforms: adapters.map((adapter) => adapter.platform) },
         'push adapters are configured but V1_PUSH_ENVIRONMENT is unusable — devices were not notified',
       );
-      return;
+      return { devices: 0, delivered: 0, failed: 0, disabled: false };
     }
 
     const devices = await this.pushDevices.activeTokens(userId, environment);
-    if (devices.length === 0) return;
+    if (devices.length === 0) return { devices: 0, delivered: 0, failed: 0, disabled: false };
 
     const byPlatform = new Map<V1PushPlatform, PushTarget[]>();
     for (const device of devices) {
@@ -168,22 +189,35 @@ export class WebPushService implements OnModuleInit {
       route: payload.url,
     };
 
-    await Promise.all(
-      [...byPlatform].map(async ([platform, targets]) => {
+    const perPlatform = await Promise.all(
+      [...byPlatform].map(async ([platform, targets]): Promise<NativeDeliverySummary> => {
+        const failed = { devices: targets.length, delivered: 0, failed: targets.length, disabled: false };
         const adapter = adapters.find((candidate) => candidate.platform === platform);
         if (!adapter) {
           this.logger.error(
             { userId, platform, deviceCount: targets.length },
             'no push adapter is registered for this platform — devices were not notified',
           );
-          return;
+          return failed;
         }
         try {
-          await adapter.send(targets, native);
+          return await adapter.send(targets, native);
         } catch (err) {
           this.logger.warn({ userId, platform, err }, 'native push adapter failed');
+          return failed;
         }
       }),
+    );
+
+    return perPlatform.reduce<NativeDeliverySummary>(
+      (total, one) => ({
+        devices: total.devices + one.devices,
+        delivered: total.delivered + one.delivered,
+        failed: total.failed + one.failed,
+        // 하나라도 실제로 보냈으면 통로가 꺼진 상태가 아니다.
+        disabled: total.disabled && one.disabled,
+      }),
+      { devices: 0, delivered: 0, failed: 0, disabled: true },
     );
   }
 
@@ -210,7 +244,11 @@ export class WebPushService implements OnModuleInit {
     return this.pushEnvironment;
   }
 
-  private async sendWebPushToUser(userId: string, payload: PushPayload): Promise<PushDeliverySummary> {
+  /** 웹 구독만의 결과. 네이티브 결과는 `sendToUser` 가 별도 필드로 합친다. */
+  private async sendWebPushToUser(
+    userId: string,
+    payload: PushPayload,
+  ): Promise<WebDeliverySummary> {
     if (!this.enabled) return { subscriptions: 0, delivered: 0, failed: 0, disabled: true };
 
     const subscriptions = await this.prisma.v1PushSubscription.findMany({ where: { userId } });

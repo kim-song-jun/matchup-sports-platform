@@ -27,7 +27,7 @@ import { Prisma } from '@prisma/client';
  * 조건 자체를 NULL-safe 하게 둔다. 리그 행은 백필이 항상 `regular_league` 를 명시하므로
  * 이 OR 에 걸리지 않는다.
  *
- * `tournament-surface.spec.ts` 의 **세 번째 케이스(`kind=null` 이 나온다)** 가 이 OR 을
+ * `test/tournaments/tournament-surface-kind.integration-spec.ts` 의 **세 번째 케이스(`kind=null` 이 나온다)** 가 이 OR 을
  * "단순화"하려는 다음 사람을 red 로 막는다 — 지우면 그 테스트가 깨진다.
  *
  * ## 여기 걸지 않는 곳 (일부러 안 거른다)

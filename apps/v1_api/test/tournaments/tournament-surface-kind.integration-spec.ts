@@ -85,7 +85,7 @@ describe('대회 표면은 정규 리그 시즌을 보여주지 않는다 (real 
       data: {
         id: ids.legacyNullKind,
         sportId: ids.sportId,
-        title: '표면 테스트 구행(kind 없음)',
+        title: '표면 테스트 R1 이전 행(kind 없음)',
         status: 'in_progress',
         kind: null,
       },
@@ -102,17 +102,15 @@ describe('대회 표면은 정규 리그 시즌을 보여주지 않는다 (real 
     adminSvc = new AdminService(prisma);
   });
 
+  // 심은 행을 지우지 않는다 — `isolated-integration-environment` 가 **파일마다 DB 를
+  // 클론해서 주고 teardown 에서 통째로 DROP** 한다(같은 파일 :38 CREATE ... TEMPLATE,
+  // :89 DROP DATABASE). 직접 지우면 쿼리만 늘고, 그 정리가 실패하면 afterAll 에러가
+  // 진짜 실패 원인을 가린다.
   afterAll(async () => {
-    await prisma.v1Tournament.deleteMany({
-      where: { id: { in: [ids.tournament, ids.league, ids.legacyNullKind] } },
-    });
-    await prisma.v1AdminUser.deleteMany({ where: { id: ids.adminId } });
-    await prisma.v1Sport.deleteMany({ where: { id: ids.sportId } });
-    await prisma.v1User.deleteMany({ where: { id: ids.adminUserId } });
     await prisma.$disconnect();
   });
 
-  it('공개 대회 목록 — 리그는 빠지고, kind 가 없는 구행은 남는다', async () => {
+  it('공개 대회 목록 — 리그는 빠지고, kind 가 없는 R1 이전 행은 남는다', async () => {
     const res = await read.list({ limit: 100 } as never);
     const listedIds = (res.items as Array<{ id: string }>).map((row) => row.id);
 

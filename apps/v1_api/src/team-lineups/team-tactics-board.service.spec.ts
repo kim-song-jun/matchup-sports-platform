@@ -23,6 +23,8 @@ type PrismaStub = {
   membershipRole: 'owner' | 'manager' | 'member' | null;
   side: { id: string; teamId: string | null; sideKey: string; displayNameSnapshot: string } | null;
   board: Record<string, unknown> | null;
+  /** [P1-d] 이 경기 종목의 라인업 설정(선발 최소·최대 인원). 없으면 파서 기본값. */
+  lineupConfig?: unknown;
   /**
    * compare-and-swap 결과. 0 이면 "내가 읽은 뒤 다른 트랜잭션이 버전을 올렸다" —
    * 조건부 updateMany 의 WHERE 가 더 이상 맞지 않는 상태를 재현한다.
@@ -63,6 +65,15 @@ function buildPrisma(stub: PrismaStub) {
         }
         return Promise.resolve(stub.side);
       }),
+    },
+    // [P1-d] 보드 응답에 **선발 인원 한도**가 실린다(경기별 라인업 화면이 하던 인원수
+    // 검사가 이 보드로 옮겨 왔다). 설정을 못 찾으면 파서 기본값이 쓰이므로, 여기서는
+    // 조회 자체가 되는지만 만족시키고 한도 값 검증은 전용 테스트에서 한다.
+    v1Game: {
+      findUnique: jest.fn().mockResolvedValue({ competitionConfigVersionId: 'config-1' }),
+    },
+    v1CompetitionConfigVersion: {
+      findUnique: jest.fn().mockResolvedValue({ lineup: stub.lineupConfig ?? null }),
     },
     v1TeamTacticsBoard: {
       findUnique: jest.fn().mockResolvedValue(stub.board),
@@ -449,6 +460,53 @@ describe('TeamTacticsBoardService — 저장 규칙', () => {
       const result = await service.save(USER, TEAM_ID, GAME_ID, { entries: [] });
       expect(result.entries).toEqual([]);
       expect(result.starterCount).toBe(0);
+    } finally {
+      await moduleRef.close();
+    }
+  });
+
+  /**
+   * [P1-d] 경기별 라인업 화면이 사라지면서 그 화면이 하던 **선발 인원수 검사**가 갈 곳을
+   * 잃었다. 이 보드가 그 자리를 잇는데, **값을 내려줄 뿐 저장을 막지 않는다** — 화면이
+   * "선발 5명이어야 하는데 3명" 같은 경고를 띄우는 데 쓴다.
+   *
+   * 게이트로 만들지 않는 것이 핵심이다. P1-c 가 지운 것이 정확히 그런 게이트였고
+   * (명단이 덜 찼다고 경기를 못 여는 쪽이 현장에서 더 큰 문제였다), 여기서 다시 막으면
+   * 같은 문제를 다른 자리에 만드는 셈이다. **그래서 두 방향을 함께 못박는다.**
+   */
+  it('선발 인원 한도를 응답에 실어 준다 (화면이 경고를 띄우는 근거)', async () => {
+    const { prisma } = buildPrisma({
+      team: { id: TEAM_ID, deletedAt: null },
+      membershipRole: 'manager',
+      side: HOME_SIDE,
+      board: null,
+      lineupConfig: { minPlayers: 5, maxPlayers: 5 },
+    });
+    const { service, moduleRef } = await buildService(prisma);
+    try {
+      const result = await service.get(USER, TEAM_ID, GAME_ID);
+      expect(result.lineupLimits).toEqual(expect.objectContaining({ minPlayers: 5, maxPlayers: 5 }));
+    } finally {
+      await moduleRef.close();
+    }
+  });
+
+  it('한도에 못 미쳐도 저장은 성공한다 — 경고까지이고 게이트가 아니다', async () => {
+    const { prisma } = buildPrisma({
+      team: { id: TEAM_ID, deletedAt: null },
+      membershipRole: 'manager',
+      side: HOME_SIDE,
+      board: null,
+      lineupConfig: { minPlayers: 5, maxPlayers: 5 },
+    });
+    const { service, moduleRef } = await buildService(prisma);
+    try {
+      // 선발 1명 -- 한도(5)에 한참 못 미친다. 그래도 저장은 되어야 한다.
+      const result = await service.save(USER, TEAM_ID, GAME_ID, {
+        entries: [{ displayName: '혼자', started: true }],
+      });
+      expect(result.starterCount).toBe(1);
+      expect(result.lineupLimits).toEqual(expect.objectContaining({ minPlayers: 5 }));
     } finally {
       await moduleRef.close();
     }

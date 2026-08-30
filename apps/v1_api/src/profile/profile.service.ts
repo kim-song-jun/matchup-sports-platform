@@ -856,12 +856,16 @@ export class ProfileService {
         levelId: preference.sportLevel?.id ?? null,
         levelName: preference.sportLevel?.name ?? null,
         primary: preference.isPrimary,
-        // [D14] 저장된 선호 포지션과 **그 종목에서 고를 수 있는 자리 목록**을 함께 준다.
-        // 화면이 자리 이름을 자체 목록으로 갖지 않게 하려는 것이다 — 종목마다 코드가
-        // 다르고 프리셋이 늘 수 있어서, 화면에 적으면 두 벌이 갈린다.
+        // [D14] **저장된 값만 싣는다.** 선택지(positionOptions·positionFormations)는
+        // 여기 없다 — `/master/sports` 가 준다.
         //
-        // **좌표는 주지 않는다.** 코드·라벨·골키퍼 여부까지다. 화면이 그걸로 띠를 깔든
-        // 대형에 얹든 그건 표현이고, 서버가 배치를 정해 주지 않는다(D4·프리셋 경계).
+        // 원칙: **"무엇을 고를 수 있는가"는 마스터 / "무엇을 골랐는가"는 프로필.**
+        //
+        // **여기에 선택지를 다시 넣지 마라.** 처음엔 프로필에서만 줬는데, 그러면 아직
+        // 저장하지 않은 종목에는 목록이 없어 **화면이 포지션 UI 를 아예 못 띄운다**
+        // ("종목 고르기 → 저장 → 다시 들어오기" 가 되어야 했다). 정적으로는 연결이 전부
+        // 맞아 보여 코드 리뷰로는 안 잡히고, alpha 실측에서야 드러났다. 두 곳에서 주면
+        // 출처가 갈려 같은 혼동이 되돌아온다.
         preferredPosition: preference.preferredPosition,
         secondaryPreferredPosition: preference.secondaryPreferredPosition,
       })),
@@ -1350,6 +1354,9 @@ function toProfileResponse(user: Awaited<ReturnType<ProfileService['getUserSnaps
       // [D14] **저장 응답과 같은 필드를 여기도 실어야 한다.** 화면은 프로필 조회로
       // 수화하므로, 여기 빠지면 저장은 되는데 다시 들어왔을 때 선택이 사라진 것처럼
       // 보인다 -- 저장 응답에만 넣고 끝내면 못 잡는 종류다(매핑이 두 곳이다).
+      //
+      // **선택지는 여기 없다** -- `/master/sports` 가 준다. 이유는 위 저장 응답 주석 참고
+      // (프로필에만 두면 아직 저장 안 한 종목에 목록이 없어 UI 가 안 뜬다).
       preferredPosition: preference.preferredPosition,
       secondaryPreferredPosition: preference.secondaryPreferredPosition,
     })),

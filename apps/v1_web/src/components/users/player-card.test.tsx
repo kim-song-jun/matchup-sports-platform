@@ -202,8 +202,11 @@ describe('선수 카드', () => {
       false,
     );
     // 라벨이 <b> 로 감싸져 있어 **텍스트가 요소 경계로 쪼개진다** — getByText 로는 못 잡는다.
-    // 사용자가 실제로 읽는 것은 이어 붙인 문장이므로 컨테이너의 textContent 로 본다.
-    expect(document.body.textContent).toContain(expected);
+    // 사용자가 실제로 읽는 것은 이어 붙인 문장이므로 textContent 로 본다. 다만 body 전체가
+    // 아니라 **그 문장이 사는 요약 영역**으로 좁힌다 — 넓게 잡으면 카드 밖 텍스트가 바뀔 때
+    // 이 테스트가 엉뚱한 이유로 깨지거나, 반대로 다른 곳의 우연한 일치를 통과로 읽는다.
+    const summary = document.querySelector('.tm-pcard-back-sum');
+    expect(summary?.textContent).toContain(expected);
   });
 
   it('0경기 사용자에게 "더" 라고 하지 않고, 잠금 조건을 "뛰기"가 아니라 "명단"으로 말한다', () => {

@@ -348,14 +348,14 @@ describe('ProfileService activitySummary', () => {
 
       const result = await service.activitySummary(user);
 
-      // sourceType='match' — 대회 개인 후기(tournament_fixture)는 V1UserReputationSummary의
-      // tournament_* 컬럼에 따로 집계되므로 이 헤드라인 평점 모집단에 섞이면 안 된다.
+      // 개인 매치와 공식 팀 매치의 개인 후기는 같은 사용자 평판 모집단이다.
+      // 대회 개인 후기(tournament_fixture)는 별도 tournament_* 집계이므로 포함하지 않는다.
       expect(findMany).toHaveBeenNthCalledWith(1, {
-        where: { targetUserId: user.id, targetType: 'user', status: 'submitted', sourceType: 'match' },
+        where: { targetUserId: user.id, targetType: 'user', status: 'submitted', sourceType: { in: ['match', 'team_match'] } },
         select: { sourceId: true, reviewerUserId: true, targetUserId: true, rating: true, submittedAt: true },
       });
       expect(findMany).toHaveBeenNthCalledWith(2, {
-        where: { reviewerUserId: user.id, sourceType: 'match', sourceId: { in: ['source-a', 'source-b'] }, status: 'submitted' },
+        where: { reviewerUserId: user.id, sourceType: { in: ['match', 'team_match'] }, sourceId: { in: ['source-a', 'source-b'] }, status: 'submitted' },
         select: { sourceId: true, reviewerUserId: true, targetUserId: true },
       });
       expect(result.totals).toEqual({ activityCount: 7, teamCount: 1, mannerScore: 5 });
@@ -558,7 +558,7 @@ describe('ProfileService tournament appearance aggregation', () => {
           participantId: { in: ['participant-1'] },
           resultRevision: {
             officialAt: { not: null },
-            game: { sourceType: 'TOURNAMENT_FIXTURE' },
+            game: { sourceType: { in: ['TOURNAMENT_FIXTURE', 'TEAM_MATCH'] } },
           },
         },
         select: {
@@ -582,12 +582,9 @@ describe('ProfileService tournament appearance aggregation', () => {
     }
   });
 
-  it('activitySummary(): TEAM_MATCH(팀 매치) 결과가 섞이지 않도록 쿼리에서 sourceType 을 제한한다', async () => {
-    // 레거시 2자 승인 API(identity-link-requests + attest)는 sourceType 검사 없이
-    // TEAM_MATCH 게임 참가자에도 identity link 를 걸 수 있다 — "대회 경기 출전 수"는
-    // TOURNAMENT_FIXTURE 만 세어야 한다(확정 계약). 걸러내는 주체가 DB(where)이므로
-    // 이 테스트는 "그 필터가 쿼리에 실려 나가는가"를 본다 — 필터를 빼면 TEAM_MATCH 행이
-    // 그대로 합산되고 이 단언이 깨진다.
+  it('activitySummary(): 공식 대회와 TEAM_MATCH 결과를 같은 개인 활동 경기로 집계한다', async () => {
+    // 공개 개인 기록과 마이페이지 활동의 경기 수가 서로 달라지지 않도록 두 공식 게임
+    // sourceType을 같은 쿼리 모집단으로 고정한다.
     jest.useFakeTimers().setSystemTime(now);
     try {
       const rows = [
@@ -621,7 +618,10 @@ describe('ProfileService tournament appearance aggregation', () => {
       expect(prisma.v1GameResultParticipant.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            resultRevision: { officialAt: { not: null }, game: { sourceType: 'TOURNAMENT_FIXTURE' } },
+            resultRevision: {
+              officialAt: { not: null },
+              game: { sourceType: { in: ['TOURNAMENT_FIXTURE', 'TEAM_MATCH'] } },
+            },
           }),
         }),
       );
@@ -962,9 +962,9 @@ describe('ProfileService public profile activity summary (reveal filtering)', ()
 
       expect(result.activitySummary.monthly.reviewCount).toBe(1);
       expect(prisma.v1PostEventReview.findMany).toHaveBeenCalledWith({
-        // 월별 개수도 헤드라인 평점과 같은 모집단(개인 매치)이어야 한다 — 한쪽만 대회 후기를
+        // 월별 개수도 헤드라인 평점과 같은 모집단(개인/공식 팀 매치)이어야 한다 — 한쪽만 대회 후기를
         // 더하면 "이번 달 3건인데 누적은 1건" 같은 어긋난 숫자가 한 화면에 함께 나온다.
-        where: { reviewerUserId: targetUserId, sourceType: 'match', sourceId: { in: ['source-a', 'source-b'] }, status: 'submitted' },
+        where: { reviewerUserId: targetUserId, sourceType: { in: ['match', 'team_match'] }, sourceId: { in: ['source-a', 'source-b'] }, status: 'submitted' },
         select: { sourceId: true, reviewerUserId: true, targetUserId: true },
       });
     } finally {

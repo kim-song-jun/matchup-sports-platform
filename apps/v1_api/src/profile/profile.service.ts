@@ -86,7 +86,7 @@ export class ProfileService {
       reputation,
       personalActivityCount,
       monthlyPersonalMatchCount,
-      tournamentAppearances,
+      officialGameAppearances,
     ] = await Promise.all([
       // V1UserReputationSummary 캐시는 리뷰 제출 이벤트(submitPersonalReview/submitTeamReview) 안에서만 갱신되고,
       // 72시간 경과로 리뷰가 새로 reveal 가능해지는 시점을 트리거하는 cron은 없다(사용자 결정: cron 추가 안 함).
@@ -108,18 +108,18 @@ export class ProfileService {
       }),
       // 레거시 개인매치(V1MatchParticipant)만 세면 대회(V1Game 계열)를 여러 번 뛴 유저도 0으로 보인다
       // (프로덕션 실측: 팀원 7명 전원 matchCount=0). 대회 출전은 별도 카운트로 더한다.
-      this.countTournamentAppearances(user.id, monthStart, nextMonthStart),
+      this.countOfficialGameAppearances(user.id, monthStart, nextMonthStart),
     ]);
     const mannerScore = reputation.mannerScore;
 
     return {
       totals: {
-        activityCount: personalActivityCount + tournamentAppearances.total,
+        activityCount: personalActivityCount + officialGameAppearances.total,
         teamCount: teamIds.length,
         mannerScore,
       },
       monthly: {
-        matchCount: monthlyPersonalMatchCount + tournamentAppearances.monthly,
+        matchCount: monthlyPersonalMatchCount + officialGameAppearances.monthly,
         mannerScore,
         winRate: null,
       },
@@ -433,7 +433,7 @@ export class ProfileService {
       monthlyPersonalMatchCount,
       monthlyTeamJoinCount,
       monthlyReviewCount,
-      tournamentAppearances,
+      officialGameAppearances,
     ] = await Promise.all([
       this.prisma.v1MatchParticipant.count({
         where: {
@@ -473,19 +473,19 @@ export class ProfileService {
       this.getRevealedMonthlyReviewCount(userId, monthStart, nextMonthStart),
       // 레거시 개인매치(V1MatchParticipant)만 세면 대회(V1Game 계열)를 여러 번 뛴 유저도 0으로 보인다
       // (프로덕션 실측: 팀원 7명 전원 matchCount=0). 대회 출전은 별도 카운트로 더한다.
-      this.countTournamentAppearances(userId, monthStart, nextMonthStart),
+      this.countOfficialGameAppearances(userId, monthStart, nextMonthStart),
     ]);
 
     return {
       totals: {
-        matchCount: personalMatchCount + tournamentAppearances.total,
-        tournamentCount: tournamentAppearances.tournamentTotal,
+        matchCount: personalMatchCount + officialGameAppearances.total,
+        tournamentCount: officialGameAppearances.tournamentTotal,
         teamCount,
         reviewCount: reputation.reviewCount,
       },
       monthly: {
-        matchCount: monthlyPersonalMatchCount + tournamentAppearances.monthly,
-        tournamentCount: tournamentAppearances.tournamentMonthly,
+        matchCount: monthlyPersonalMatchCount + officialGameAppearances.monthly,
+        tournamentCount: officialGameAppearances.tournamentMonthly,
         teamJoinCount: monthlyTeamJoinCount,
         reviewCount: monthlyReviewCount,
       },
@@ -493,7 +493,7 @@ export class ProfileService {
   }
 
   /**
-   * 사용자에 연결된(`V1ParticipantIdentityLinkCurrent`) participant 들의 대회 경기 출전 수를
+   * 사용자에 연결된(`V1ParticipantIdentityLinkCurrent`) participant 들의 공식 경기 출전 수를
    * 누적/이번 달로 센다. `GET /users/:id/records`(public-user-records.service.ts)와 같은
    * "현재 공식 리비전만"(`resultRevision.game.currentOfficialRevisionId === resultRevision.id`
    * && `officialAt !== null`) 규칙을 쓴다 — 정정/무효 처리된 경기가 이중 계산되지 않게.
@@ -508,14 +508,14 @@ export class ProfileService {
    * Set으로 중복 제거한다.
    */
   /**
-   * 대회 출전 수(경기 단위)와 참가한 **대회 수**(distinct tournament)를 한 번에 센다.
+   * 공식 경기 출전 수(경기 단위)와 참가한 **대회 수**(distinct tournament)를 한 번에 센다.
    *
    * 두 값을 굳이 한 쿼리로 묶은 이유: 프로필 GET 한 번에 두 번 왕복하지 않기 위해서다.
    * 그리고 여기서 세는 것은 **개수뿐**이라 `PublicUserRecordsService.loadEligibleRows()`
    * 같은 전체 기록 행(골·카드·MVP·상대팀…)을 끌어오지 않는다 -- 출전이 많은 사용자의
    * 프로필 조회마다 목록 전체를 메모리에 올리는 비용을 피한다.
    */
-  private async countTournamentAppearances(
+  private async countOfficialGameAppearances(
     userId: string,
     monthStart: Date,
     nextMonthStart: Date,
@@ -536,7 +536,9 @@ export class ProfileService {
         participantId: { in: participantIds },
         resultRevision: {
           officialAt: { not: null },
-          game: { sourceType: 'TOURNAMENT_FIXTURE' },
+          // 공개 개인 기록과 같은 공식 게임 모집단. 팀매치를 빼면 개인 기록에는 3경기가
+          // 보이는데 마이페이지 활동은 0회가 되어 같은 사용자의 두 화면이 모순된다.
+          game: { sourceType: { in: ['TOURNAMENT_FIXTURE', 'TEAM_MATCH'] } },
         },
       },
       select: {
@@ -564,7 +566,7 @@ export class ProfileService {
     const monthlyTournamentIds = new Set<string>();
     for (const row of rows) {
       const revision = row.resultRevision;
-      // sourceType(TEAM_MATCH 제외)과 officialAt 은 위 where 가 이미 걸렀다 -- 여기서는
+      // sourceType과 officialAt은 위 where가 이미 걸렀다 -- 여기서는
       // where 로 표현할 수 없는 "현재 공식 리비전인가"(컬럼 대 컬럼 비교)만 본다.
       // officialAt 은 스키마상 nullable 이라 아래 비교를 위해 타입만 좁힌다.
       const isCurrent = revision.game.currentOfficialRevisionId === revision.id;
@@ -604,18 +606,27 @@ export class ProfileService {
    */
   private async computeRevealedUserReputation(userId: string): Promise<{ reviewCount: number; mannerScore: number | null }> {
     const candidates = await this.prisma.v1PostEventReview.findMany({
-      // sourceType='match' — 개인 매치 후기만. 대회 개인 후기(tournament_fixture · targetType=user)는
-      // V1UserReputationSummary의 tournament_* 컬럼에 따로 집계되며(ReviewsService 쪽 주석 참고),
-      // 한 대회에서 상대팀 로스터 전원에게 수십 건이 들어올 수 있어 같은 평점에 합산하지 않는다.
-      // 이 프로필 헤드라인 평점은 계속 개인 매치 기준이다.
-      where: { targetUserId: userId, targetType: 'user', status: 'submitted', sourceType: 'match' },
+      // 레거시 개인 매치와 공식 팀 매치의 개인 후기는 같은 사용자 평판으로 묶는다.
+      // 대회 개인 후기(tournament_fixture · targetType=user)는 tournament_* 컬럼에 별도 집계되며,
+      // 한 대회에서 상대팀 로스터 전원에게 수십 건이 들어올 수 있어 이 평점에는 합산하지 않는다.
+      where: {
+        targetUserId: userId,
+        targetType: 'user',
+        status: 'submitted',
+        sourceType: { in: ['match', 'team_match'] },
+      },
       select: { sourceId: true, reviewerUserId: true, targetUserId: true, rating: true, submittedAt: true },
     });
     if (candidates.length === 0) return { reviewCount: 0, mannerScore: null };
 
     const sourceIds = [...new Set(candidates.map((review) => review.sourceId))];
     const reverseReviews = await this.prisma.v1PostEventReview.findMany({
-      where: { reviewerUserId: userId, sourceType: 'match', sourceId: { in: sourceIds }, status: 'submitted' },
+      where: {
+        reviewerUserId: userId,
+        sourceType: { in: ['match', 'team_match'] },
+        sourceId: { in: sourceIds },
+        status: 'submitted',
+      },
       select: { sourceId: true, reviewerUserId: true, targetUserId: true },
     });
 
@@ -640,10 +651,10 @@ export class ProfileService {
         targetUserId: userId,
         targetType: 'user',
         status: 'submitted',
-        // computeRevealedUserReputation()과 같은 모집단(개인 매치 후기)이어야 한다 —
-        // totals.reviewCount는 match 기준인데 monthly.reviewCount만 대회 후기를 더하면
+        // computeRevealedUserReputation()과 같은 모집단(개인/공식 팀 매치 후기)이어야 한다 —
+        // totals.reviewCount와 monthly.reviewCount의 모집단이 달라지면
         // "이번 달 3건인데 누적은 1건" 같은 어긋난 숫자가 한 화면에 함께 나온다.
-        sourceType: 'match',
+        sourceType: { in: ['match', 'team_match'] },
         submittedAt: { gte: monthStart, lt: nextMonthStart },
       },
       select: { sourceId: true, reviewerUserId: true, targetUserId: true, submittedAt: true },
@@ -652,7 +663,12 @@ export class ProfileService {
 
     const sourceIds = [...new Set(candidates.map((review) => review.sourceId))];
     const reverseReviews = await this.prisma.v1PostEventReview.findMany({
-      where: { reviewerUserId: userId, sourceType: 'match', sourceId: { in: sourceIds }, status: 'submitted' },
+      where: {
+        reviewerUserId: userId,
+        sourceType: { in: ['match', 'team_match'] },
+        sourceId: { in: sourceIds },
+        status: 'submitted',
+      },
       select: { sourceId: true, reviewerUserId: true, targetUserId: true },
     });
 

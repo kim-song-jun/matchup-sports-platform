@@ -1024,6 +1024,36 @@ async function ensureShowcaseReviews(
       }
     }
   }
+  // 실제 제출 경로는 후기 저장 직후 이 projection을 재계산한다. 시드는 raw Prisma로 같은
+  // 결과 상태를 만들기 때문에 대표 선수 카드의 후기 기반 능력치도 함께 동기화한다.
+  await tx.v1UserReputationSummary.upsert({
+    where: { userId: showcase.playerIds[0] },
+    update: {
+      trustState: 'verified',
+      mannerScore: 4.67,
+      reviewCount: opponents.length,
+      sourceLabel: 'Alpha 쇼케이스 팀매치 후기 기반',
+      metricSkillScore: 4.67,
+      metricMannerScore: 5,
+      metricPunctualityScore: 4.67,
+      metricSafetyScore: 5,
+      metricReviewCount: opponents.length,
+      calculatedAt: now,
+    },
+    create: {
+      userId: showcase.playerIds[0],
+      trustState: 'verified',
+      mannerScore: 4.67,
+      reviewCount: opponents.length,
+      sourceLabel: 'Alpha 쇼케이스 팀매치 후기 기반',
+      metricSkillScore: 4.67,
+      metricMannerScore: 5,
+      metricPunctualityScore: 4.67,
+      metricSafetyScore: 5,
+      metricReviewCount: opponents.length,
+      calculatedAt: now,
+    },
+  });
   return { teamReviews: opponents.length, personalReviews: opponents.length };
 }
 

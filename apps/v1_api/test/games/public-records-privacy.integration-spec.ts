@@ -498,6 +498,32 @@ describe('Task 24 public tournament schedule/match and team/player record projec
     expect(guestEntry?.displayName).toBe('Guest Scorer');
   });
 
+  /**
+   * [P1-d · D4] **공개 라인업은 등번호와 이름까지다.** 포지션·선발/후보·좌표는 팀이 짜
+   * 넣은 전술 정보라 팀 전술보드 안에 머물고, 상대 팀과 관중에게는 나가지 않는다.
+   *
+   * 이 테스트가 없으면 회귀를 못 잡는다. 실제로 `position` 이 공개 응답으로 나가고 화면에
+   * 그려지고 있었는데(match-detail-content.tsx), 어느 스펙도 그걸 보고 있지 않았다.
+   * 파일 단위로 훑으면 놓친다 -- 같은 파일에 participants select 가 여러 개이고, 그중
+   * 하나만 `position: true` 였다. **필드가 응답에 나가는지**를 직접 단언한다.
+   */
+  it('공개 라인업에는 포지션·선발여부·좌표가 실리지 않는다 (D4 — 등번호와 이름까지)', async () => {
+    const match = await tournamentRecords.getMatch(ids.tournament, ids.fixtureMain, undefined);
+    const entries = [...(match.lineup?.home ?? []), ...(match.lineup?.away ?? [])];
+    expect(entries.length).toBeGreaterThan(0);
+    for (const entry of entries) {
+      // 있어야 하는 것
+      expect(entry).toHaveProperty('displayName');
+      expect(entry).toHaveProperty('jerseyNumber');
+      // 나가면 안 되는 것
+      expect(entry).not.toHaveProperty('position');
+      expect(entry).not.toHaveProperty('started');
+      expect(entry).not.toHaveProperty('positionX');
+      expect(entry).not.toHaveProperty('positionY');
+      expect(entry).not.toHaveProperty('goalkeeper');
+    }
+  });
+
   it('official: the current revision names every scorer in events/lineup regardless of consent (participant-name-public policy), while team goal counts and personal user records stay independent of any scorer\'s consent state', async () => {
     await endGame(gameMainId, 4);
     await drainOutbox();

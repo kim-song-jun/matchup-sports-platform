@@ -142,7 +142,9 @@ const GAME_MATCH_SELECT = {
       userId: true,
       displayNameSnapshot: true,
       jerseyNumber: true,
-      position: true,
+      // [P1-d] `position` 은 더 이상 읽지 않는다 — 공개 응답에서 뺐으므로(D4) 여기서
+      // 계속 select 하면 안 쓰는 값을 나르는 셈이고, 다음 사람이 "이미 있으니 써도
+      // 되겠지" 하고 다시 노출시킬 여지를 남긴다.
     },
   },
   currentOfficialRevision: {
@@ -1805,7 +1807,17 @@ function buildLineup(
         participantId: participant.id,
         displayName: eligible ? resolveParticipantDisplayName(participant, nameProfileByUserId) : null,
         jerseyNumber: participant.jerseyNumber,
-        position: participant.position,
+        // [P1-d] `position` 을 공개 응답에서 뺐다. D4: 상대 팀과 관중에게는 **등번호와
+        // 이름만** 나가고 선발/후보·포지션·좌표는 팀 전술보드 안에 머문다 -- 포지션은
+        // 팀이 짜 넣은 전술 정보이지 관전자에게 공개할 사실이 아니다.
+        //
+        // 새 데이터만으로는 충분하지 않아서 계약에서 뺀다: P1-d 이후 경기는 로스터
+        // 스냅샷이 포지션을 안 넣어 저절로 null 이지만, **과거 데이터는 실제 값을 들고
+        // 있어 계속 공개된다.** 그리고 필드를 계약에 남겨 두면 나중에 누가 채웠을 때
+        // 조용히 새어 나간다.
+        //
+        // 이 자리에 포지션을 보여주려면 **선수 본인이 선언한 선호 포지션**(D14)을 쓴다 --
+        // 그건 공개를 전제로 본인이 정한 값이라 팀의 전술 배치와 성격이 다르다.
         // 두 조건을 **모두** 만족할 때만 링크가 걸린다.
         //   eligible          — 이름이 가려진 사람("비공개 선수")에게 링크를 걸면 안 된다
         //   profileHref !== null — 프로필은 이름보다 강한 노출이라 동의를 직접 본다

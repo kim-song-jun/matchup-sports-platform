@@ -135,6 +135,18 @@ async function main() {
         판정: verdict(r, path),
       });
 
+      // **세그먼트를 실제로 눌러 본다.** 탭을 지웠으니 이게 리그로 가는 경로인데,
+      // 렌더만 확인하면 "보이는데 안 가는" 상태(href 오타·라우팅 실패)를 놓친다.
+      if (path === '/tournaments' && r.segmentPresent) {
+        const link = page.getByRole('link', { name: '정규 리그' }).first();
+        await link.click();
+        await page.waitForURL('**/league-matches', { timeout: 15_000 }).catch(() => {});
+        const after = new URL(page.url()).pathname;
+        rows[rows.length - 1].클릭이동 = after === '/league-matches' ? '✅ 리그로 이동' : `❌ ${after}`;
+        await page.goto(`${BASE}${path}`, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+        await page.waitForTimeout(3000);
+      }
+
       // 캡처 직전에만 스크롤을 문서로 되돌린다(측정은 위에서 끝났다).
       await page.addStyleTag({
         content: `html, body, .tm-app-frame { overflow: visible !important; height: auto !important; }
@@ -159,7 +171,7 @@ async function main() {
 
   console.log('\n=== 화면에서 읽은 값 ===');
   console.table(rows);
-  const failed = rows.filter((r) => String(r.판정).includes('❌'));
+  const failed = rows.filter((r) => String(r.판정).includes('❌') || String(r.클릭이동 ?? '').includes('❌'));
   console.log(`\n캡처: ${OUT}/`);
   console.log(failed.length === 0 ? '전 폭·전 경로 기대와 일치' : `기대 불일치 ${failed.length}건`);
 }

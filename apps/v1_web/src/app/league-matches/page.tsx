@@ -1,5 +1,6 @@
 import { Suspense } from 'react';
 import { AppChrome } from '@/components/v1-ui/shell';
+import { CompetitionKindSegment } from '@/components/v1-ui/competition-kind-segment';
 import { buildPublicMetadata } from '@/lib/seo';
 import LeagueMatchesListClient from './league-matches-list-client';
 
@@ -23,7 +24,8 @@ export const metadata = buildPublicMetadata({
 // 대회/리그 이동은 하단 탭이 전담하므로 상단 세그먼트(E5)는 제거했다.
 export default function LeagueMatchesPage() {
   return (
-    <AppChrome title="정규 리그" activeTab="league" showNotifications>
+    <AppChrome title="정규 리그" activeTab="tournaments" showNotifications>
+      <CompetitionKindSegment active="league" />
       <Suspense fallback={null}>
         <LeagueMatchesListClient />
       </Suspense>

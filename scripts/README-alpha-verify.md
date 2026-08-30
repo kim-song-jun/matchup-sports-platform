@@ -141,3 +141,38 @@ const n = await page.locator('a[href*="/tactics/"]:visible').count();
 같아 보인다** — 고정 대기는 멀쩡한 기능을 "안 나온다"로 박제하고 진짜 결함을
 "느린가 보다"로 넘긴다(3.5초·8초 둘 다 그렇게 실패했다). 요소가 보일 때까지 기다리고,
 안 나타나면 **경고를 남기고 진행**한다 — 그 경고가 곧 결함 신호다.
+
+## P1-b 참가자 고정 실측 하네스 (2026-08-30)
+
+`verify-alpha-participant-pinning.mjs` — 대회 경기에서 라인업을 다시 저장해도 참가자 행이
+유지되는지 잰다. 계약 3개: ① 참가자 수 불변 ② **participantId 동일** ③ `arrivedAt`(현장
+검인) 보존. ②가 중요하다 — 수만 세면 "지우고 같은 수만큼 다시 만든" 경우를 못 잡는다.
+
+**반드시 `TOURNAMENT_FIXTURE` 경기로 재야 한다.** 그 변경은 해당 sourceType 한정이고
+TEAM_MATCH 는 `saveLineup` 입구에서 거부되므로, 팀매치로 재면 **아무것도 검증하지 못한 것**이다.
+스크립트가 sourceType 을 직접 확인해서 아니면 멈춘다.
+
+### 함정 — 참가자를 읽는 곳이 하나뿐이다
+
+**`GET /games/:id` 에는 `participants` 가 실리지 않는다.** `GET /games/:id/lineups`
+(`listLineups()`)만 붙여 준다. 실제로 이 하네스 첫 실행이 "참가자 0명"을 뱉었고, 저장은
+HTTP 200 이었다 — 제품이 아니라 **읽는 소스가 틀렸던 것**이다.
+
+이걸 모르면 결함이 있어도 `0 === 0` 으로 계약 ①이 통과한다. 참가자 수를 세는 어떤 검증이든
+이 소스부터 확인할 것.
+
+### SCHEDULED 대회 경기가 없을 때
+
+alpha 에는 보통 시작 전 대회 경기가 **하나도 없다**(전수 확인: 전부 종료 또는 팀매치).
+"재현 불가"로 접지 말고 만든다:
+
+1. `probe-alpha-tournament-state.mjs` — confirmed 등록이 2건 이상인 대회를 찾는다
+2. `add-alpha-fixture-for-pinning.mjs` — 그 대회에 fixture 를 붙이고 `publish-bracket`
+   (**이걸 해야 공개 API 에 `gameId` 가 생긴다** — 안 하면 계속 404)
+
+새 대회를 만들어 신청·승인까지 밟는 경로는 관문이 많다(대회는 `draft` 로 생기고
+`status !== 'open'` 이면 신청이 409, `format` 은 `league|knockout|group_knockout` 뿐,
+`GET /sports` 는 없다). 이미 confirmed 등록이 있는 대회에 fixture 만 붙이는 쪽이 훨씬 짧고,
+**경기를 시작하지 않으면** 대회에 되돌릴 수 없는 잠금도 안 생긴다.
+
+자격증명은 전부 환경변수로만 받는다(`ALPHA_EMAIL`/`ALPHA_PASSWORD`) — 이 저장소는 PUBLIC 이다.

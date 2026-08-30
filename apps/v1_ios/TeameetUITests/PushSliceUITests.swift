@@ -103,13 +103,6 @@ final class PushSliceUITests: XCTestCase {
         tapMatching(NSPredicate(format: "label BEGINSWITH %@", name), timeout: timeout)
     }
 
-    /// Exact match, for a control whose name is a prefix of another one's — the home nudge's
-    /// "알림 받기" button sits next to "알림 받기 안내 닫기", which dismisses it.
-    @discardableResult
-    private func tapExact(_ name: String, timeout: TimeInterval = 60) -> Bool {
-        tapMatching(NSPredicate(format: "label ==[c] %@", name), timeout: timeout)
-    }
-
     private func tapMatching(_ predicate: NSPredicate, timeout: TimeInterval) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         var lastTop: CGFloat = .greatestFiniteMagnitude
@@ -247,23 +240,12 @@ final class PushSliceUITests: XCTestCase {
     func testALoginAndNotificationSettingsReflectNativeState() throws {
         try signIn()
 
-        // The home nudge is the shortest path to the permission request and the least
-        // fragile: a full-width button near the top of the page, well clear of the tab bar.
-        // Exact match — "알림 받기 안내 닫기" sits beside it and dismisses the card.
-        XCTAssertTrue(tapExact("알림 받기"), "no notification nudge on the home screen")
-
-        // The OS prompt arriving proves `request-notification-permission` reached
-        // UNUserNotificationCenter rather than being answered from a cached value.
-        let alert = springboard.alerts.firstMatch
-        XCTAssertTrue(alert.waitForExistence(timeout: 30), "the system permission prompt never appeared")
-        attach("02-permission-prompt")
-
-        let allow = allowLabels.map { alert.buttons[$0] }.first { $0.exists }
-        XCTAssertNotNil(allow, "no allow button in the prompt")
-        allow?.tap()
-
+        // Enabled from the settings screen, not the home nudge. That nudge is account-scoped:
+        // once the account has push on any device it stops appearing, so on a second device
+        // it is simply absent — which is also why the row itself says other devices have to
+        // be turned on separately. The settings row is on every device, always.
         openNotificationSettings()
-        attachTree("03-settings-tree")
+        attachTree("02-settings-tree")
 
         // The push row only renders when the page believes a push transport exists. Inside
         // this WebView there is no service worker to fall back on, so the row's presence is
@@ -271,7 +253,20 @@ final class PushSliceUITests: XCTestCase {
         XCTAssertTrue(
             pushRow.exists,
             "no push row — the page did not see window.TeameetNative")
-        attachTree("03-push-row")
+        XCTAssertFalse(isPushRowOn, "a freshly installed device should start unsubscribed")
+        attachTree("02-push-row")
+
+        tapRow("푸시 알림 받기")
+
+        // The OS prompt arriving proves `request-notification-permission` reached
+        // UNUserNotificationCenter rather than being answered from a cached value.
+        let alert = springboard.alerts.firstMatch
+        XCTAssertTrue(alert.waitForExistence(timeout: 30), "the system permission prompt never appeared")
+        attach("03-permission-prompt")
+
+        let allow = allowLabels.map { alert.buttons[$0] }.first { $0.exists }
+        XCTAssertNotNil(allow, "no allow button in the prompt")
+        allow?.tap()
 
         // The page is told the outcome through `teameet:native-push-result`. The row settling
         // at all is the first thing that must hold — a bridge that never replied would leave

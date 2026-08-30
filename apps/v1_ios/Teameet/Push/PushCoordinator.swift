@@ -22,6 +22,9 @@ final class PushCoordinator {
     /// and a stored copy could only ever be staler than what the system hands us.
     private var deviceToken: Data?
     private(set) var isRegistered = false
+    /// Whether APNs has answered the current registration attempt, either way. Distinguishes
+    /// "no token yet" from "no token, and there will not be one".
+    private var registrationSettled = false
     /// The user's own choice, separate from the OS permission. Android keeps the same flag,
     /// because granting the system permission again must not silently re-enable push the
     /// reader turned off in the app.
@@ -89,9 +92,27 @@ final class PushCoordinator {
             // OS permission on later does not by itself start delivery.
             return permission
         }
+        registrationSettled = false
         UIApplication.shared.registerForRemoteNotifications()
+        // That call does not return the token — it arrives later on a delegate callback.
+        // Registering before it lands answers the page with "not subscribed" for a device
+        // that is about to be, and the reader watches the switch snap back and taps again.
+        // Measured on a slower simulator: the token took longer than the reply did.
+        await waitForRegistrationToSettle(upTo: 10)
         await register()
         return permission
+    }
+
+    /// Waits for APNs to answer, bounded.
+    ///
+    /// Ends as soon as a token arrives *or* registration fails, so a build with no
+    /// `aps-environment` entitlement does not sit here for the full timeout. The ceiling is
+    /// well inside the web's own two-minute wait for the bridge reply.
+    private func waitForRegistrationToSettle(upTo seconds: Double) async {
+        let deadline = Date().addingTimeInterval(seconds)
+        while !registrationSettled, deviceToken == nil, Date() < deadline {
+            try? await Task.sleep(nanoseconds: 100_000_000)
+        }
     }
 
     /// The web's `revoke-push-device`.
@@ -106,6 +127,7 @@ final class PushCoordinator {
 
     /// Called from `didRegisterForRemoteNotificationsWithDeviceToken`.
     func adopt(deviceToken token: Data) async {
+        registrationSettled = true
         deviceToken = token
         await register()
     }
@@ -116,6 +138,7 @@ final class PushCoordinator {
     /// (`NSCocoaErrorDomain` 3000). The app keeps working; the bridge simply reports the
     /// device as not subscribed, which is the truth.
     func registrationFailed() {
+        registrationSettled = true
         deviceToken = nil
         isRegistered = false
     }

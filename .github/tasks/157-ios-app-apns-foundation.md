@@ -913,3 +913,43 @@ Android 3버튼(48px)에서도 시스템 내비를 48px 그대로 비우므로 �
 
 **이 PR 은 iOS 작업이지만 Android 외형이 16px 바뀐다.** 리뷰어가 놀라지 않도록 PR 본문에
 별도 항목으로 적는다.
+
+## 화면 비율·배율 검증 (2026-08-31)
+
+극단값에서 셸이 웹에 주는 값이 무너지지 않는지 봤다. 기기는 현행 최소(iPhone SE 3세대,
+375×667pt)와 최대(iPhone 17 Pro Max, 440×956pt).
+
+| 축 | 결과 |
+|---|---|
+| 최소 화면 레이아웃 | 정상 — 헤더·카드·하단 탭바·안전영역 모두 어긋남 없음 |
+| 최대 화면 레이아웃 | 정상 |
+| 화면 방향 | **세로 고정.** 빌드된 Info.plist 의 `UISupportedInterfaceOrientations` 가 `Portrait` 단일인 것을 실판독 |
+| Dynamic Type 최대 | **웹 텍스트가 전혀 반응하지 않는다 (1.00x)** |
+
+### 세로 고정으로 둔 근거
+
+iPhone 전용 앱이고, 담고 있는 웹은 모바일 세로를 전제로 만들어졌다(하단 플로팅 탭바,
+`--v1-shell-safe-bottom` 기반 하단 여백). 가로를 열면 셸은 회전하지만 웹 레이아웃이 그 폭을
+가정하지 않아 화면마다 따로 검증해야 하고, 그 검증 없이 여는 것은 "지원한다" 가 아니라
+"깨진 화면을 허용한다" 는 뜻이다. Android 셸도 같은 이유로 세로만 쓴다.
+
+### Dynamic Type — 실측과 그 의미
+
+같은 화면(알림 설정)을 SE 에서 `medium` 과 `accessibility-extra-large` 두 배율로 캡처해 텍스트
+행 높이를 픽셀로 비교했다.
+
+```
+  medium                : text-row heights (px) = [24, 19]
+  accessibility-extra-lg: text-row heights (px) = [24, 19]
+  tallest run: medium=24px  axl=24px  ratio=1.00x
+```
+
+**한 픽셀도 변하지 않는다.** 웹이 글자 크기를 CSS px 로 고정하고 있어 iOS 의 글자 크기 설정이
+닿지 않는다. 시스템 글자를 키워 쓰는 사람에게 이 앱은 아무 반응도 하지 않는다.
+
+이건 셸의 문제가 아니라 **웹의 문제**이고, 고치면 Android 앱과 모바일 브라우저에도 똑같이
+적용된다(`rem` 전환 또는 `-webkit-text-size-adjust`). `apps/v1_web` 변경은 사전 확인 대상이라
+이 PR 에서는 손대지 않고 사실만 남긴다. **결정 필요 항목이다.**
+
+네이티브 텍스트(로드 실패 화면, 알림 배너)는 SwiftUI 의 `.font(.subheadline)` 등을 쓰므로
+Dynamic Type 을 따른다 — 웹과 달리 반응한다.

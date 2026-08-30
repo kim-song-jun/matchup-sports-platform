@@ -50,6 +50,20 @@ struct RootView: View {
                     NoticeBanner(message: notice) { model.dismissNotice() }
                 }
             }
+            // A universal link. This is what brings the Kakao sign-in redirect back into the
+            // app: `AllowedNavigation` sends the authorization pages out to Safari, so
+            // without this the redirect to /callback/kakao completes there and the session
+            // is created in the wrong browser.
+            //
+            // A link for another host produces no route and is ignored here, which leaves
+            // the system to open it in Safari — the right outcome for a page this shell has
+            // no business rendering with the reader's session attached.
+            .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
+                guard let url = activity.webpageURL,
+                      let route = UniversalLink.route(for: url, origin: config.webOrigin)
+                else { return }
+                appDelegate.open(route: route)
+            }
     }
 }
 

@@ -214,6 +214,7 @@ services:
       - "443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./aasa:/etc/nginx/teameet-aasa:ro
       - ./release-metadata.prod.conf:/etc/nginx/snippets/teameet-release-metadata.conf:ro
       - ./certbot/conf:/etc/letsencrypt
       - ./certbot/www:/var/www/certbot

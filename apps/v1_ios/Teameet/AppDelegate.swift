@@ -116,7 +116,11 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         }
     }
 
-    private func open(route: String) {
+    /// Opens a route in the shell, holding it if the shell does not exist yet.
+    ///
+    /// Reached from a notification tap and from a universal link. Both arrive before the
+    /// scene is built on a cold launch, which is why the route is held rather than dropped.
+    func open(route: String) {
         guard let shell else {
             // Cold launch: the shell is not built yet. Held rather than dropped, or the
             // reader lands on the home screen instead of what they tapped.

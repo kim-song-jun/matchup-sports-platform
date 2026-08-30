@@ -719,3 +719,86 @@ $ plutil -p "$DD/Build/Products/Production Debug-iphonesimulator/Teameet.app/Inf
 - Java 파서 동등성은 이 워크스테이션에 JDK가 없어 JVM으로 대조하지 못했다. 근거는
   `java.net.URI` javadoc의 문자 범주 정의(`other` = 비US-ASCII 중 `isISOControl`·`isSpaceChar`가
   아닌 것, `escaped` = `%` + 16진수 2자리)이며, Swift 쪽 동작만 실행으로 확인했다.
+
+## S7 실측 (2026-08-30) — 브리지·권한·알림 탭
+
+iOS 26.5 **시뮬레이터** + 배포된 alpha 웹 대상. 물리 기기·실제 APNs 게이트웨이는 아직 아니다
+(`.p8` 미수령, S11). 하네스: `scripts/ios/verify-push-slice.sh` + `TeameetUITests`.
+
+| 확인한 것 | 결과 |
+|---|---|
+| 페이지가 `window.TeameetNative`를 본다 | 알림 설정 화면에 푸시 행이 렌더됨 |
+| `request-notification-permission` | OS 권한 프롬프트 실제 표시 → 허용 |
+| 상태 회신 | 행이 정착(mid-flight에 멈추지 않음) |
+| 권한 처리 후 앱 | 헤더 홈 → 탭바 복귀 정상 |
+| **알림 탭 → 그 화면** | 배너 탭 → 해당 문의 상세 착지 (Acceptance Criteria 2) |
+| 양 flavor 엔타이틀먼트 | alpha `development` / production `production` |
+
+### 실기기 없이는 못 잡는 결함 1건 — 잡아서 고쳤다
+
+배너를 탭하면 앱이 `Abort trap: 6`으로 죽었다.
+
+```
+-[UIApplication _updateStateRestorationArchiveForBackgroundEvent:...]
+  ← @objc closure #1 in AppDelegate.userNotificationCenter(_:didReceive:)
+  thread: com.apple.root.user-initiated-qos.cooperative
+```
+
+`UNUserNotificationCenterDelegate`의 `async` 변형은 협력 스레드에서 반환되고 UIKit이 그
+스레드에서 완료 핸들러를 실행한다. 알림 탭 뒤에 따라오는 상태 복원 작업이 메인 스레드
+어서션이라 즉시 abort. 완료 핸들러 변형 + `Task { @MainActor in … }`로 고쳤다. **유닛
+테스트로는 절대 나오지 않는다** — 이 UI 테스트가 이 결함의 회귀 테스트다.
+
+### 검증 하네스에서 걸린 함정 3가지 (반복 방지)
+
+1. **`TEST_RUNNER_*` 접두는 테스트 러너에 도달하지 않는다.** 스킴의
+   `environmentVariables: $(BUILD_SETTING)` + xcodebuild 빌드 세팅이 유일하게 동작하는 경로다.
+   모르면 테스트가 **스킵인데 `** TEST SUCCEEDED **`로 보인다** — 실제로 한 번 통과로 오독했다.
+2. **`swipeUp()`은 관성이 남아 탭이 고정 탭바에 맞는다.** 스크롤 직후 XCTest가 해석한 좌표에
+   다른 요소가 미끄러져 들어온다. 제어형 press-drag + 하단 140pt 여유 확보로 교체했다.
+3. **`aria-label`이 붙은 요소는 접근성 리프**라 내부 텍스트가 트리에 없다. 푸시 행의 상태는
+   `staticTexts`가 아니라 행 요소의 `aria-checked`/`disabled`로 읽어야 한다.
+
+### 결과 번들에 비밀번호가 남는다
+
+xcodebuild는 받은 빌드 세팅을 기록하므로 `*.xcresult`와 빌드 로그에 테스트 계정 비밀번호가
+평문으로 남는다. 출력은 임시 디렉터리로 나가며 **PR에 첨부 금지**. 스크립트 헤더에도 적었다.
+
+## 배포 순서 주의 — PR 본문에 반드시 옮길 것
+
+`platform`을 필수 필드로 만든 결과, 배포 전후로 실패 방향이 뒤집힌다.
+
+| 시점 | iOS 셸 | 이미 설치된 Android alpha APK |
+|---|---|---|
+| 지금 (이 PR 머지 전) | 등록 **400** — alpha가 옛 API라 `platform`을 모르는 속성으로 거절 | 정상 |
+| 이 PR 머지 후 | 정상 | 등록 **400** — `platform`을 보내지 않음, **재설치 전까지** |
+
+사용자가 이 트레이드오프를 알고 필수 필드를 택했다(기본값이 있으면 APNs 토큰이 android로
+저장돼 FCM으로 보내진다). 다만 머지하는 사람이 모르면 사고로 읽히므로 PR 본문에 명시한다.
+
+## S7b — Universal Links (2026-08-30)
+
+카카오 로그인 리다이렉트가 Safari에서 끝나 세션이 엉뚱한 브라우저에 생기는 것을 고치는 단계.
+
+**끝난 것**
+- `UniversalLink.route(for:origin:)` — 들어온 URL이 우리 origin인지 검사하고 라우트로 변환.
+  타 호스트·http·매립 자격증명·다른 포트·look-alike 호스트를 전부 거절하고, 마지막에 푸시와
+  **같은** `DeepLinkRoute.safeRoute`를 통과시킨다(링크가 알림보다 넓은 곳에 못 가게).
+  거절은 `nil`이라 시스템이 Safari로 열게 둔다. 유닛 11건.
+- 씬에 `.onContinueUserActivity(NSUserActivityTypeBrowsingWeb)` 연결.
+- `entitlements`의 `applinks:` — flavor별 호스트. Team ID 불필요, 이미 끝났다.
+- nginx가 `/.well-known/apple-app-site-association`을 서빙(alpha·prod 양쪽) +
+  `deploy/aasa/` 마운트. 컨테이너 실측: **파일 없으면 404**(오늘과 동일), **있으면 200 +
+  `application/json`**.
+
+**막힌 것 — Apple Team ID**
+association 파일은 앱을 `<TEAMID>.<bundle id>`로 지목한다. Team ID가 없어 파일을 만들 수 없고,
+따라서 **링크는 여전히 Safari로 열린다.** 종료 증거(시뮬레이터에서 카카오 로그인을 끝까지 해서
+앱 안에 세션이 생기는 것)는 오늘 얻을 수 없다. Team ID를 받으면
+`deploy/aasa/apple-app-site-association.example.json`을 확장자 없는 이름으로 복사하고 `TEAMID`만
+치환해 커밋하면 된다(Team ID는 비밀이 아니라 App Store 메타데이터에 노출된다 — 그래서 배포 시점
+주입 대신 커밋을 택했다).
+
+**paths는 `/callback/*` 하나로 좁혔다.** 여기 적히는 모든 경로는 셸이 세션 쿠키를 붙인 채
+렌더하는 화면이므로, 남이 보낸 링크가 독자 앞에 띄울 수 있는 범위가 그만큼 넓어진다.
+넓히려면 먼저 묻는다.

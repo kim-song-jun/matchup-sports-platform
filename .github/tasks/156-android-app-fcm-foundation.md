@@ -398,7 +398,6 @@ Samsung device evidence (in progress):
   inspect the embedded Alpha origin through `chrome://inspect`, verify `document.fonts`, and diagnose
   the `/fonts/PretendardVariable.woff2` request. The production flavor pins the same BuildConfig gate
   to `false`, including production debug builds, and the JVM build-configuration test enforces both.
-
 ## Focused Physical-device QA (2026-08-29, commit `87c6b859`)
 
 Scope: latest Alpha APK installation plus the requested home FAB and Pretendard checks on one physical
@@ -445,3 +444,13 @@ Samsung device. This is not the complete Phase 5 matrix, so the Phase 5 checkbox
   control, inquiry deep-link delivery, gesture navigation, and manufacturer/API matrix are still open.
 - Raw evidence: `output/task156/android-device-sm-a325n/` (local QA output, not promoted to
   `docs/screenshots`). Detailed verdict: `output/task156/android-device-sm-a325n/qa-verdict.md`.
+- The inset audit also found that no-bottom-nav detail/form pages reset the shared scroll viewport to
+  physical `bottom: 0`, and several overlays read browser `env(safe-area-inset-bottom)` directly instead
+  of the Android bridge value. Ordinary no-nav pages now reserve the shared safe inset; chat input and
+  fixed CTA surfaces that already consume it opt out to avoid double spacing. Remaining direct inset
+  consumers now use `--v1-shell-safe-bottom`. Real-device route-family evidence is still pending.
+- Android task re-entry previously treated the destination-free MAIN/LAUNCHER intent delivered to the
+  `singleTask` activity as `/home`, so reopening the running app discarded the visible route. Plain
+  launcher re-entry now preserves the current WebView, explicit FCM/App Link intents still navigate,
+  and WebView URL/history is saved and restored across Activity/process recreation. Background/resume,
+  process-recreation, explicit deep-link, and logout-boundary device verdicts remain pending.

@@ -76,7 +76,9 @@ public final class MainActivity extends AppCompatActivity {
                 PushRegistrationClient.register(this);
             });
         }
-        webView.loadUrl(BuildConfig.WEB_ORIGIN + routeFromIntent(getIntent()));
+        if (savedInstanceState == null || webView.restoreState(savedInstanceState) == null) {
+            webView.loadUrl(BuildConfig.WEB_ORIGIN + routeFromIntent(getIntent()));
+        }
     }
 
     private void applySystemBarInsets() {
@@ -364,19 +366,34 @@ public final class MainActivity extends AppCompatActivity {
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
-        webView.loadUrl(BuildConfig.WEB_ORIGIN + routeFromIntent(intent));
+        String route = explicitRouteFromIntent(intent);
+        // singleTask delivers a plain MAIN/LAUNCHER intent when the user reopens the running app.
+        // It has no destination and must leave the current WebView page/history untouched. FCM and
+        // verified App Links still carry an explicit route and intentionally navigate here.
+        if (route != null) webView.loadUrl(BuildConfig.WEB_ORIGIN + route);
     }
 
     private String routeFromIntent(Intent intent) {
-        if (intent == null) return "/home";
+        String explicitRoute = explicitRouteFromIntent(intent);
+        return explicitRoute == null ? "/home" : explicitRoute;
+    }
+
+    private String explicitRouteFromIntent(Intent intent) {
+        if (intent == null) return null;
         String route = intent.getStringExtra(TeameetMessagingService.EXTRA_ROUTE);
         if (route == null) route = intent.getStringExtra("route");
         if (route != null) return AllowedNavigation.safeRoute(route);
         Uri data = intent.getData();
+        if (data == null) return null;
         if (!AllowedNavigation.isInternal(data)) return "/home";
         route = data.getEncodedPath();
         if (data.getEncodedQuery() != null) route += "?" + data.getEncodedQuery();
         return AllowedNavigation.safeRoute(route);
+    }
+
+    @Override protected void onSaveInstanceState(Bundle outState) {
+        if (webView != null) webView.saveState(outState);
+        super.onSaveInstanceState(outState);
     }
 
     @Override protected void onDestroy() {

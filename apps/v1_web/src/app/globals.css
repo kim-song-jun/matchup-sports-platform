@@ -593,6 +593,13 @@ button:disabled {
 }
 
 .tm-app-frame-no-bottom .tm-scroll-area {
+  /* Detail/form pages have no bottom nav to consume the Android system inset. Keep ordinary
+     scroll content above it; pages with their own inset-aware fixed surface opt out below. */
+  bottom: var(--v1-shell-safe-bottom);
+}
+
+.tm-app-frame-no-bottom .tm-scroll-area:has(.tm-fixed-cta),
+.tm-app-frame-no-bottom .tm-scroll-area:has(.tm-chat-room) {
   bottom: 0;
 }
 
@@ -601,7 +608,11 @@ button:disabled {
   border-top: 1px solid var(--grey100);
   background: rgba(255, 255, 255, 0.94);
   backdrop-filter: blur(18px);
-  padding: 8px 0 calc(16px + var(--v1-shell-safe-bottom));
+  /* max, not +: 16px 와 안전영역은 같은 목적(손가락이 화면 끝·홈 인디케이터 제스처
+     영역에 닿지 않게)이라 더하면 회피를 두 번 한다. 인셋이 0인 환경에서는 16px 가,
+     iOS(34pt)처럼 인셋이 큰 환경에서는 그 값이 이긴다 — iOS 기본 탭바도 콘텐츠와
+     안전영역 사이에 추가 여백을 두지 않는다. */
+  padding: 8px 0 max(16px, var(--v1-shell-safe-bottom));
   display: grid;
   /* D5 — shell.tsx의 BottomNav가 tabs.length로 인라인 style을 얹어 실제 열 수를
      결정한다(탭 6개 = repeat(6, 1fr)). 여기 5는 JS가 실패했을 때만 쓰이는 fallback값이라
@@ -4559,7 +4570,7 @@ label.tm-btn:focus-within {
    * tm-create-shell의 하드코딩 124px보다 이 값이 적용 순서상 뒤에 오므로
    * specificity로 덮어씌우기 위해 별도 속성으로 선언합니다.
    */
-  padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px) + 16px);
+  padding-bottom: calc(88px + var(--v1-shell-safe-bottom) + 16px);
 }
 
 .tm-profile-edit-shell .tm-my-profile-head {

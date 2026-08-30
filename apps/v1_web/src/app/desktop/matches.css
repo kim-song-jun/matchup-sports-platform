@@ -308,7 +308,7 @@
     background: transparent;
     box-shadow: none;
     border-top: none;
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-bottom: var(--v1-shell-safe-bottom);
   }
 
   /* Sport grid: 3-up on desktop so all sports fit in fewer rows. */

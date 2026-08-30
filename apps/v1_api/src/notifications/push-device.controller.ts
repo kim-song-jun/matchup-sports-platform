@@ -14,7 +14,7 @@ export class PushDeviceController {
   @Post()
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   register(@CurrentUser() user: V1AuthUser, @Body() dto: RegisterPushDeviceDto) {
-    return this.pushDeviceService.registerAndroid(user.id, dto);
+    return this.pushDeviceService.register(user.id, dto);
   }
 
   @Delete(':installationId')
@@ -23,6 +23,6 @@ export class PushDeviceController {
     @CurrentUser() user: V1AuthUser,
     @Param('installationId', new ParseUUIDPipe()) installationId: string,
   ) {
-    return this.pushDeviceService.revokeAndroid(user.id, installationId);
+    return this.pushDeviceService.revoke(user.id, installationId);
   }
 }

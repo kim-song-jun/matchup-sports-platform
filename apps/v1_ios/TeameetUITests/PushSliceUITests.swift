@@ -273,30 +273,32 @@ final class PushSliceUITests: XCTestCase {
             "no push row — the page did not see window.TeameetNative")
         attachTree("03-push-row")
 
-        // The page is told the outcome through `teameet:native-push-result`. Whether the row
-        // ends up subscribed depends on the origin's API: until this change is deployed
-        // there, `platform` is an unknown property and the registration is refused with 400
-        // by the API's `forbidNonWhitelisted` validation. What must hold either way is that
-        // the row settles — a bridge that never replied would leave it mid-flight until the
-        // web's own two-minute timeout.
+        // The page is told the outcome through `teameet:native-push-result`. The row settling
+        // at all is the first thing that must hold — a bridge that never replied would leave
+        // it mid-flight until the web's own two-minute timeout.
         let settled = waitUntilPushRowSettles(timeout: 150)
         attach("04-settings-after-allow")
         attachTree("04-settings-after-allow-tree")
         XCTAssertTrue(settled, "the row stayed mid-flight — no reply reached the page")
 
-        let subscribed = isPushRowOn
-        if ProcessInfo.processInfo.environment["TEAMEET_UITEST_EXPECT_SUBSCRIBED"] == "1" {
-            XCTAssertTrue(subscribed, "the API accepted no iOS registration")
-        } else {
-            // The honest expectation against an origin that predates this change. The point
-            // is that the failure is reported rather than hidden: a shell that claimed
-            // success here would show an enabled switch on a device receiving nothing.
-            XCTAssertFalse(
-                subscribed,
-                "the row claims a subscription the origin's API cannot yet have accepted")
+        // Subscribed is now the expected end state: the origin stores iOS registrations, so a
+        // build that reaches here with the row still off has failed somewhere in the chain —
+        // no entitlement and therefore no token, a registration the server refused, or a
+        // reply that never reached the page.
+        //
+        // The opt-out exists for an origin whose API predates the platform field, where a
+        // refusal is the honest outcome and claiming otherwise would show an enabled switch
+        // on a device that receives nothing.
+        let expectsRefusal = ProcessInfo.processInfo.environment["TEAMEET_UITEST_EXPECT_REFUSAL"] == "1"
+        if expectsRefusal {
             XCTAssertFalse(
                 isPushRowOn,
-                "the row settled on neither of the two states it can honestly report")
+                "the row claims a subscription the origin's API cannot have accepted")
+        } else {
+            XCTAssertTrue(
+                isPushRowOn,
+                "the device did not end up subscribed — check the aps-environment entitlement, "
+                    + "the registration request, and the bridge reply")
         }
 
         // The rest of the app still works after all this — permission handling must not

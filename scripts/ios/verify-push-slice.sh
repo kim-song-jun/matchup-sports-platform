@@ -19,7 +19,9 @@
 #   TEAMEET_UITEST_PASSWORD=…
 #   TEAMEET_UITEST_INQUIRY_ID=…       an inquiry that account can open
 #   TEAMEET_UITEST_INQUIRY_TITLE=…    its title, which the test looks for on screen
-#   TEAMEET_UITEST_EXPECT_SUBSCRIBED=1  only once the origin accepts iOS registrations
+#   TEAMEET_UITEST_EXPECT_REFUSAL=1    only for an origin whose API predates the
+#                                      required platform field, where the device is
+#                                      expected to end up NOT subscribed
 #   TEAMEET_UITEST_DEVICE=…           simulator UDID (default: the only booted one)
 #   TEAMEET_UITEST_OUTPUT=…           where to write the result bundle and attachments
 #
@@ -65,6 +67,10 @@ rm -rf "$OUTPUT/settings.xcresult" "$OUTPUT/tap.xcresult" "$OUTPUT/attachments"
 # as build settings on the command line is what puts them in the test runner's environment.
 # The documented TEST_RUNNER_ prefix does not reach it — measured, not assumed — and a
 # missing value expands to an empty string, which the tests treat as "skip".
+# Ad-hoc signed, not unsigned. An unsigned build carries no `aps-environment`, so
+# `registerForRemoteNotifications` fails with NSCocoaErrorDomain 3000 and no device token is
+# ever issued — the push row could never leave OFF, whatever the server did. Signing to run
+# locally makes Xcode emit Teameet.app-Simulated.xcent with aps-environment=development.
 run_test () {
   local name="$1" bundle="$2"
   xcodebuild test \
@@ -72,12 +78,12 @@ run_test () {
     -destination "platform=iOS Simulator,id=$DEVICE" \
     -derivedDataPath "$OUTPUT/derived" -resultBundlePath "$OUTPUT/$bundle" \
     -only-testing:"TeameetUITests/PushSliceUITests/$name" \
-    CODE_SIGNING_ALLOWED=NO \
+    CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=YES \
     TEAMEET_UITEST_EMAIL="$TEAMEET_UITEST_EMAIL" \
     TEAMEET_UITEST_PASSWORD="$TEAMEET_UITEST_PASSWORD" \
     TEAMEET_UITEST_INQUIRY_ID="$TEAMEET_UITEST_INQUIRY_ID" \
     TEAMEET_UITEST_INQUIRY_TITLE="$TEAMEET_UITEST_INQUIRY_TITLE" \
-    TEAMEET_UITEST_EXPECT_SUBSCRIBED="${TEAMEET_UITEST_EXPECT_SUBSCRIBED:-}"
+    TEAMEET_UITEST_EXPECT_REFUSAL="${TEAMEET_UITEST_EXPECT_REFUSAL:-}"
 }
 
 echo "== 1/2  bridge state on the notification settings screen"

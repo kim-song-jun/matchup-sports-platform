@@ -60,7 +60,7 @@ describe('PushDeviceService', () => {
     const result = await service.register('user-1', {
       installationId: publicDevice.installationId,
       token: 'fcm-registration-token-with-safe-length',
-      platform: 'android' as never,
+      platform: 'android',
       appVersion: '1.0.0',
     });
 
@@ -86,7 +86,7 @@ describe('PushDeviceService', () => {
       service.register('user-1', {
         installationId: '0e65978c-3a58-42e5-a371-cf6d6239699a',
         token: 'fcm-registration-token-with-safe-length',
-        platform: 'android' as never,
+        platform: 'android',
       }),
     ).rejects.toBeInstanceOf(ServiceUnavailableException);
     expect(prisma.v1PushDevice.upsert).not.toHaveBeenCalled();
@@ -98,7 +98,7 @@ describe('PushDeviceService', () => {
       service.register('user-1', {
         installationId: '0e65978c-3a58-42e5-a371-cf6d6239699a',
         token: 'fcm-registration-token-with-safe-length',
-        platform: 'android' as never,
+        platform: 'android',
       }),
     ).rejects.toBeInstanceOf(ConflictException);
   });
@@ -154,7 +154,7 @@ describe('PushDeviceService platform routing inputs', () => {
     await service.register('user-1', {
       installationId: '0e65978c-3a58-42e5-a371-cf6d6239699a',
       token: 'apns-device-token-64-hex-characters-long-enough-for-the-dto',
-      platform: 'ios' as never,
+      platform: 'ios',
     });
     expect(prisma.v1PushDevice.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -166,7 +166,7 @@ describe('PushDeviceService platform routing inputs', () => {
 
   it('returns every platform with the token so the dispatcher can route', async () => {
     prisma.v1PushDevice.findMany.mockResolvedValue([]);
-    await service.activeTokens('user-1', 'alpha' as never);
+    await service.activeTokens('user-1', 'alpha');
     expect(prisma.v1PushDevice.findMany).toHaveBeenCalledWith({
       // Deliberately unfiltered by platform. Filtering here would hide a registered device
       // whose platform has no adapter, turning a routing gap into a silent zero.

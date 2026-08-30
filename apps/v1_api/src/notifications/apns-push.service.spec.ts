@@ -2,6 +2,9 @@ import { EventEmitter } from 'node:events';
 import { generateKeyPairSync } from 'node:crypto';
 import { connect } from 'node:http2';
 import { ApnsPushService } from './apns-push.service';
+import type { PinoLogger } from 'nestjs-pino';
+import type { PushDeviceService } from './push-device.service';
+import type { PushTarget } from './native-push.types';
 
 jest.mock('node:http2', () => {
   const actual = jest.requireActual('node:http2');
@@ -67,6 +70,12 @@ describe('ApnsPushService', () => {
     revokeTokens: jest.fn().mockResolvedValue(undefined),
     recordTransientFailures: jest.fn().mockResolvedValue(undefined),
   };
+  // The same two stubs, named as what the constructor takes. Asserting to the real types
+  // once — rather than `as never` at each call site — means a changed signature fails to
+  // compile here instead of being silently accepted; `never` is assignable to anything.
+  // The untyped originals stay in use for the `.mock` assertions below.
+  const pushDeviceStub = pushDevices as unknown as PushDeviceService;
+  const loggerStub = logger as unknown as PinoLogger;
   const originalEnv = { ...process.env };
 
   function configure(overrides: Record<string, string> = {}) {
@@ -83,13 +92,13 @@ describe('ApnsPushService', () => {
   function build(script: Scripted[] = []) {
     const session = new FakeSession(script);
     (connect as jest.Mock).mockReturnValue(session);
-    const service = new ApnsPushService(pushDevices as never, logger as never, () => nowMs);
+    const service = new ApnsPushService(pushDeviceStub, loggerStub, () => nowMs);
     service.onModuleInit();
     return { service, session };
   }
 
   const iosDevice = (id: string, token: string) =>
-    ({ id, token, platform: 'ios' }) as never;
+    ({ id, token, platform: 'ios' }) as PushTarget;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -108,7 +117,7 @@ describe('ApnsPushService', () => {
 
   it('stays disabled, not broken, when no credentials are present', async () => {
     process.env.V1_PUSH_ENVIRONMENT = 'alpha';
-    const service = new ApnsPushService(pushDevices as never, logger as never);
+    const service = new ApnsPushService(pushDeviceStub, loggerStub);
     service.onModuleInit();
 
     await expect(service.send([iosDevice('d1', 'token')], { notificationId: 'n', title: 't' }))
@@ -119,7 +128,7 @@ describe('ApnsPushService', () => {
   it('fails startup when credentials are only partially configured', () => {
     process.env.V1_PUSH_ENVIRONMENT = 'alpha';
     process.env.APNS_KEY_ID = 'ABC1234DEF';
-    const service = new ApnsPushService(pushDevices as never, logger as never);
+    const service = new ApnsPushService(pushDeviceStub, loggerStub);
     expect(() => service.onModuleInit()).toThrow('partially configured');
   });
 
@@ -132,7 +141,7 @@ describe('ApnsPushService', () => {
   it('fails startup when credentials are present but the push environment is not set', () => {
     configure();
     delete process.env.V1_PUSH_ENVIRONMENT;
-    const service = new ApnsPushService(pushDevices as never, logger as never);
+    const service = new ApnsPushService(pushDeviceStub, loggerStub);
     expect(() => service.onModuleInit()).toThrow('앱 푸시 환경이 설정되지 않았어요');
   });
 
@@ -143,11 +152,11 @@ describe('ApnsPushService', () => {
    */
   it('fails startup when the bundle id belongs to the other environment', () => {
     configure({ V1_PUSH_ENVIRONMENT: 'production', APNS_BUNDLE_ID: 'kr.co.teameet.alpha' });
-    expect(() => new ApnsPushService(pushDevices as never, logger as never).onModuleInit())
+    expect(() => new ApnsPushService(pushDeviceStub, loggerStub).onModuleInit())
       .toThrow('does not match V1_PUSH_ENVIRONMENT');
 
     configure({ V1_PUSH_ENVIRONMENT: 'alpha', APNS_BUNDLE_ID: 'kr.co.teameet' });
-    expect(() => new ApnsPushService(pushDevices as never, logger as never).onModuleInit())
+    expect(() => new ApnsPushService(pushDeviceStub, loggerStub).onModuleInit())
       .toThrow('does not match V1_PUSH_ENVIRONMENT');
   });
 
@@ -286,7 +295,7 @@ describe('ApnsPushService', () => {
 
   it('treats a connection error as transient rather than losing the device', async () => {
     configure();
-    const service = new ApnsPushService(pushDevices as never, logger as never);
+    const service = new ApnsPushService(pushDeviceStub, loggerStub);
     (connect as jest.Mock).mockReturnValue({
       closed: false,
       destroyed: false,

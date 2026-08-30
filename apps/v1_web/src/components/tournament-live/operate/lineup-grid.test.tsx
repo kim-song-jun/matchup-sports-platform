@@ -163,7 +163,7 @@ describe('LineupGrid — 선수 검색', () => {
     expect(screen.getAllByRole('button', { name: /선수 이벤트 기록/ })).toHaveLength(1);
   });
 
-  it('명단 자체가 없으면 기존 안내와 제출 링크를 그대로 보여준다', () => {
+  it('명단 자체가 없으면 안내 문구를 보여준다 (제출 링크는 P1-d 로 사라졌다)', () => {
     render(
       <LineupGrid
         sides={SIDES}
@@ -177,10 +177,9 @@ describe('LineupGrid — 선수 검색', () => {
     // [P1-c 후속] 문구가 바뀌었다. 표시는 이제 폴백을 쓰므로 여기까지 오는 것은
     // **초안조차 없다**는 뜻이다 -- '제출된 명단이 없다'는 더 이상 정확한 설명이 아니다.
     expect(screen.getByText('이 팀의 명단을 찾을 수 없어요.')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '라인업 제출하러 가기' })).toHaveAttribute(
-      'href',
-      '/tournaments/t-1/matches/f-1/lineup',
-    );
+    // [P1-d] 제출 링크 단언은 뺐다 -- 경기별 라인업 화면이 사라져 갈 곳이 없다.
+    // 빈 상태 **문구**는 남는다(운영자가 왜 비었는지 알아야 한다).
+    expect(screen.queryByRole('link', { name: '라인업 제출하러 가기' })).not.toBeInTheDocument();
   });
 
   it('비활성 상태에서는 검색창도 잠근다', () => {

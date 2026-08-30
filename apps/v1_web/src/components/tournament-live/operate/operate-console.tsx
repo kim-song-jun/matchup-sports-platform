@@ -1258,13 +1258,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         {gameState === 'SCHEDULED' && sidesMissingLineup.length > 0 && (
           <Banner tone="warning">
             {sidesMissingLineup.map((side) => side.displayNameSnapshot).join(', ')} 팀이 아직 선발 명단을
-            제출하지 않았어요. 이대로도 경기를 시작할 수 있어요.{' '}
-            <Link
-              href={`/tournaments/${tournamentId}/matches/${fixtureId}/lineup`}
-              className="font-semibold underline underline-offset-2"
-            >
-              라인업 제출하러 가기
-            </Link>
+            제출하지 않았어요. 이대로도 경기를 시작할 수 있어요.
           </Banner>
         )}
         {/* 이슈 #375 — halftimePeriod가 있을 때도 currentPeriod는 null이라

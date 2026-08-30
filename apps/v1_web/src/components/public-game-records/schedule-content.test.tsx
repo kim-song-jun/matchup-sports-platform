@@ -297,7 +297,7 @@ describe('ScheduleContent — 우리 팀 경기 강조', () => {
     ],
   };
 
-  it('내 팀 경기 행에 "우리 팀" 표시와 라인업 상태, 라인업 링크가 붙는다', () => {
+  it('내 팀 경기 행에 "우리 팀" 표시와 라인업 상태가 붙는다', () => {
     const data = { ...makeData(), items: [fixtureEntry()] };
 
     render(<ScheduleContent tournamentId="tour-1" data={data} myFixtures={myFixtures} />);
@@ -305,41 +305,21 @@ describe('ScheduleContent — 우리 팀 경기 강조', () => {
     expect(screen.getByText('우리 팀')).toBeInTheDocument();
     // 색만으로 상태를 전달하지 않는다 — 문구가 함께 있어야 한다.
     expect(screen.getAllByText('라인업 미작성').length).toBeGreaterThan(0);
-    expect(screen.getByRole('link', { name: '라인업 짜기' })).toHaveAttribute(
-      'href',
-      '/tournaments/tour-1/matches/fixture-1/lineup',
-    );
+    // [P1-d] '라인업 짜기' 링크 단언은 뺐다(경기별 라인업 화면 제거). **강조와 상태
+    // 표시 계약은 그대로 남긴다** — 링크가 사라졌다고 함께 지우면 "우리 팀 경기가
+    // 눈에 띄어야 한다"는 별개의 계약까지 커버리지가 없어진다.
+    expect(screen.queryByRole('link', { name: '라인업 짜기' })).not.toBeInTheDocument();
   });
 
-  it('화면 위 요약이 남은 라인업 수와 가장 임박한 경기로 가는 길을 보여준다', () => {
-    const data = { ...makeData(), items: [fixtureEntry()] };
-
-    render(<ScheduleContent tournamentId="tour-1" data={data} myFixtures={myFixtures} />);
-
-    expect(screen.getByText('라인업이 아직 정해지지 않은 경기가 1경기 있어요.')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '원정팀전 라인업 준비하기' })).toHaveAttribute(
-      'href',
-      '/tournaments/tour-1/matches/fixture-1/lineup',
-    );
-  });
-
-  it('제출을 마쳤으면 남은 일이 없다고 알리고 준비하기 CTA를 띄우지 않는다', () => {
-    const data = { ...makeData(), items: [fixtureEntry()] };
-    const submitted = {
-      teams: [
-        {
-          ...myFixtures.teams[0],
-          fixtures: [{ ...myFixtures.teams[0].fixtures[0], lineupState: 'SUBMITTED' as const }],
-        },
-      ],
-    };
-
-    render(<ScheduleContent tournamentId="tour-1" data={data} myFixtures={submitted} />);
-
-    expect(screen.getByText('모든 경기의 라인업을 제출했어요.')).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /라인업 준비하기/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '라인업 보기' })).toBeInTheDocument();
-  });
+  /**
+   * [P1-d] 여기 있던 두 테스트('요약이 남은 라인업 수를 보여준다', '제출을 마쳤으면
+   * CTA 를 안 띄운다')는 화면 상단 **'우리 팀 라인업' 요약 패널** 전용이었다. 그 패널을
+   * 통째로 걷어냈으므로 함께 지운다.
+   *
+   * 패널을 지운 이유(링크만 떼지 않은 이유): 경기별 라인업 화면이 사라지면 아무도 제출을
+   * 할 수 없으므로 "라인업이 아직 정해지지 않은 경기가 N경기 있어요" 가 **영원히 해소되지
+   * 않는 알림**이 된다. 갈 곳 없는 할 일을 계속 띄우는 것이 링크만 없는 것보다 나쁘다.
+   */
 
   it('로그인하지 않았거나 참가팀이 아니면 화면이 종전 그대로다', () => {
     const data = { ...makeData(), items: [fixtureEntry()] };

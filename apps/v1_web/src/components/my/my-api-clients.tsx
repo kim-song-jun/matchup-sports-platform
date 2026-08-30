@@ -1,6 +1,6 @@
-import { PreferredPositionPicker } from './preferred-position-picker';
 'use client';
 
+import { PreferredPositionPicker } from './preferred-position-picker';
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';

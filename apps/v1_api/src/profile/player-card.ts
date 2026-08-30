@@ -90,7 +90,11 @@ export interface PlayerCard {
 const STAT_LABELS: Record<PlayerCardStatCode, string> = {
   SHO: '골',
   PAS: '도움',
-  APP: '출전',
+  // "출전"이 아니라 "엔트리" -- 이 지표가 세는 것은 **명단에 이름이 오른 경기 수**다.
+  // 명단에 오르면 곧 참가자로 집계되므로(D3) 벤치에 있었어도 올라간다. **이 라벨은
+  // 서버가 보낸다** -- 화면 문구만 고치면 카드에는 여전히 "출전"이 뜬다(alpha 실측에서
+  // `{"code":"APP","label":"출전"}` 로 확인했다).
+  APP: '엔트리',
   SKI: '실력',
   MAN: '매너',
   PUN: '시간약속',

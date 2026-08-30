@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import Link from 'next/link';
 import {
   WifiOff,
   Wifi,
@@ -1252,9 +1251,11 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         {(ops.takeover.status === 'none' || ops.takeover.status === 'requesting') && (
           <Banner tone="info">경기 운영 권한을 가져오는 중이에요…</Banner>
         )}
-        {/* UX 감사 item 2 — 라인업 없이 시작하면 복구 불가능한 막다른 길이 된다.
-            버튼이 비활성인 이유를 여기서 설명하고, 바로 제출하러 갈 수 있는
-            링크를 함께 준다. */}
+        {/* [P1-d] 예전에는 "버튼이 비활성인 이유 + 제출하러 가는 링크"였다. 지금은 둘 다
+            아니다 — P1-c 로 미제출이어도 시작할 수 있고(버튼 활성), P1-d 로 경기별 라인업
+            화면이 사라져 갈 곳도 없다. 남긴 이유는 **운영자가 상황을 알아야** 하기
+            때문이다: 명단이 왜 비어 보이는지, 어느 팀이 아직 안 냈는지. 차단이 아니라
+            경고다. */}
         {gameState === 'SCHEDULED' && sidesMissingLineup.length > 0 && (
           <Banner tone="warning">
             {sidesMissingLineup.map((side) => side.displayNameSnapshot).join(', ')} 팀이 아직 선발 명단을

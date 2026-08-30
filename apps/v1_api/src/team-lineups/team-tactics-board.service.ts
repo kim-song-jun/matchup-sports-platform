@@ -8,6 +8,7 @@ import { Prisma } from '@prisma/client';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertTeamLineupManager, assertTeamLineupMember } from './team-lineup-access';
+import { parseLineupLimits } from '../tournaments/competition-config/competition-config.parse';
 import type {
   SaveTeamTacticsBoardDto,
   TeamTacticsBoardEntryDto,
@@ -57,7 +58,7 @@ export class TeamTacticsBoardService {
     await assertTeamLineupMember(this.prisma, teamId, user.id);
     const side = await this.resolveSide(gameId, teamId);
     const board = await this.loadBoard(side);
-    return this.serialize(side, board);
+    return this.serialize(side, board, await this.resolveLineupLimits(gameId));
   }
 
   async save(user: V1AuthUser, teamId: string, gameId: string, dto: SaveTeamTacticsBoardDto) {
@@ -146,7 +147,7 @@ export class TeamTacticsBoardService {
       });
     });
 
-    return this.serialize(side, saved);
+    return this.serialize(side, saved, await this.resolveLineupLimits(gameId));
   }
 
   // ─── internals ───────────────────────────────────────────────────────────
@@ -232,9 +233,30 @@ export class TeamTacticsBoardService {
     }));
   }
 
+  /**
+   * [P1-d] 이 경기의 **선발 인원 한도**를 읽는다. 경기별 라인업 화면이 사라지면서 그
+   * 화면이 하던 인원수 검사가 갈 곳을 잃었고, 이 보드가 그 자리를 잇는다.
+   * 설정을 못 찾으면 파서의 기본값이 쓰인다 — 한도를 모른다고 보드를 못 열게 하지 않는다.
+   */
+  private async resolveLineupLimits(gameId: string) {
+    const game = await this.prisma.v1Game.findUnique({
+      where: { id: gameId },
+      select: { competitionConfigVersionId: true },
+    });
+    const config =
+      game === null
+        ? null
+        : await this.prisma.v1CompetitionConfigVersion.findUnique({
+            where: { id: game.competitionConfigVersionId },
+            select: { lineup: true },
+          });
+    return parseLineupLimits(config?.lineup ?? null);
+  }
+
   private serialize(
     side: { id: string; sideKey: string; displayNameSnapshot: string },
     board: BoardRow | null,
+    lineupLimits: ReturnType<typeof parseLineupLimits>,
   ) {
     return {
       gameSideId: side.id,
@@ -248,6 +270,14 @@ export class TeamTacticsBoardService {
       updatedByUserId: board?.updatedByUserId ?? null,
       starterCount: board?.entries.filter((entry) => entry.started).length ?? 0,
       benchCount: board?.entries.filter((entry) => !entry.started).length ?? 0,
+      // [P1-d] 선발 인원 한도. 경기별 라인업 화면이 사라지면서 그 화면이 하던
+      // 인원수 검사가 갈 곳을 잃었다 -- 이 보드가 그 자리를 잇는다.
+      //
+      // **값을 내려줄 뿐 저장을 막지 않는다.** 화면이 "선발 5명이어야 하는데 3명"
+      // 같은 경고를 띄우는 데 쓴다. 게이트로 만들지 않는 이유는 P1-c 가 지운 것이
+      // 정확히 그런 게이트이기 때문이다 -- 명단이 덜 찼다고 경기를 못 여는 쪽이
+      // 현장에서 더 큰 문제였다. 팀이 유효한 포메이션을 짜도록 **돕되 막지 않는다.**
+      lineupLimits,
       entries:
         board?.entries.map((entry) => ({
           userId: entry.userId,

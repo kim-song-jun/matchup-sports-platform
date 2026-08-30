@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import type { GameLineup, GameLineupParticipant, GameSide } from '@/types/game-operations';
 import { jerseyText } from './player-label';
 
@@ -225,14 +224,6 @@ export function LineupGrid({
                         ? `'${query.trim()}'과 맞는 선수가 없어요.`
                         : '표시할 선수가 없어요.'}
                   </p>
-                  {lineup === null && tournamentId !== undefined && fixtureId !== undefined ? (
-                    <Link
-                      href={`/tournaments/${tournamentId}/matches/${fixtureId}/lineup`}
-                      className="inline-flex min-h-[44px] items-center rounded-lg px-3 text-sm font-semibold text-[var(--blue700)] hover:bg-[var(--blue50)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-                    >
-                      라인업 제출하러 가기
-                    </Link>
-                  ) : null}
                 </div>
               ) : (
                 <ul className="flex flex-col gap-2" role="list">

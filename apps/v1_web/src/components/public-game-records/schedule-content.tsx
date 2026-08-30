@@ -325,55 +325,6 @@ function LineupStatusBadge({ lineupState }: { lineupState: GameLineupState | nul
   );
 }
 
-/**
- * 화면 맨 위의 "우리 팀" 요약 — 팀장이 들어오자마자 **무엇이 남았는지**를 보고, 가장
- * 급한 경기로 바로 갈 수 있게 한다. 아래 목록에서 내 경기를 찾아 훑는 일 자체를 없애는 게
- * 목적이라 미제출 건수와 바로가기가 핵심이고, 할 일이 없으면(전부 제출) 그 사실만 알린다.
- */
-function MyTeamLineupSummary({
-  tournamentId,
-  team,
-}: {
-  tournamentId: string;
-  team: V1MyTournamentFixtures['teams'][number];
-}) {
-  const pending = team.fixtures.filter(
-    (fixture) => fixture.lineupState === null || fixture.lineupState === 'DRAFT',
-  );
-  // 가장 임박한 경기부터 처리하게 한다 — 일정 미정(scheduledAt=null)은 맨 뒤로.
-  const next = [...pending].sort((a, b) => {
-    if (a.scheduledAt === null) return 1;
-    if (b.scheduledAt === null) return -1;
-    return a.scheduledAt.localeCompare(b.scheduledAt);
-  })[0];
-  return (
-    <Card pad={16}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-strong)' }}>{team.teamName}</span>
-        <span style={{ fontSize: 12, color: 'var(--text-caption)' }}>우리 팀 경기 {team.fixtures.length}</span>
-      </div>
-      <div style={{ marginTop: 8, fontSize: 13, color: 'var(--text-strong)' }}>
-        {team.fixtures.length === 0
-          ? '아직 배정된 경기가 없어요.'
-          : pending.length === 0
-            ? '모든 경기의 라인업을 제출했어요.'
-            : `라인업이 아직 정해지지 않은 경기가 ${pending.length}경기 있어요.`}
-      </div>
-      {next !== undefined ? (
-        <div style={{ marginTop: 12 }}>
-          <Link
-            href={`/tournaments/${tournamentId}/matches/${next.fixtureId}/lineup`}
-            className="tm-btn tm-btn-sm tm-btn-primary"
-            style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44 }}
-          >
-            {next.opponentTeamName !== null ? `${next.opponentTeamName}전 라인업 준비하기` : '라인업 준비하기'}
-          </Link>
-        </div>
-      ) : null}
-    </Card>
-  );
-}
-
 function ScheduleRow({
   tournamentId,
   entry,
@@ -539,15 +490,6 @@ function ScheduleRow({
       }}
     >
       {row}
-      <div style={{ padding: '0 16px 12px' }}>
-        <Link
-          href={`/tournaments/${tournamentId}/matches/${entry.fixtureId}/lineup`}
-          className="tm-btn tm-btn-sm tm-btn-primary"
-          style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44 }}
-        >
-          {myFixture.lineupState === null ? '라인업 짜기' : '라인업 보기'}
-        </Link>
-      </div>
     </div>
   );
 }
@@ -828,13 +770,6 @@ export function ScheduleContent({
 
   return (
     <div style={{ padding: '16px 20px 40px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {myTeams.length > 0 ? (
-        <section aria-label="우리 팀 라인업" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {myTeams.map((team) => (
-            <MyTeamLineupSummary key={team.registrationId} tournamentId={tournamentId} team={team} />
-          ))}
-        </section>
-      ) : null}
       {hasHiddenIdentity ? (
         <div
           style={{

@@ -98,6 +98,13 @@ final class WebShellViewController: UIViewController {
         webView.backgroundColor = .systemBackground
         webView.scrollView.backgroundColor = .systemBackground
 
+        // The status bar band belongs to the shell, not to the page, and it has to be the
+        // page's colour rather than the system's. The two disagree whenever the reader's
+        // theme choice in the web app differs from the device's — a dark phone showing the
+        // light site got a black bar above a white header. WebKit already derives the page's
+        // colour for its own over-scroll fill, so that is what gets mirrored here instead of
+        // asking the page and parsing a string back.
+
         // The shell owns the bottom inset and hands it to the page as a CSS variable, so
         // UIKit must not also reserve it. Left at its default `.automatic`, the scroll view
         // shortens the page by the home-indicator inset *and* the page adds the same value
@@ -129,6 +136,27 @@ final class WebShellViewController: UIViewController {
     override func viewSafeAreaInsetsDidChange() {
         super.viewSafeAreaInsetsDidChange()
         publishSafeAreaInset()
+    }
+
+    // MARK: - Chrome colour
+
+    /// Paints the shell's own surfaces with the page's background colour.
+    ///
+    /// The band above the page belongs to the shell — the web view starts below the status
+    /// bar — and it has to be the page's colour, not the device's. The two disagree whenever
+    /// the reader's theme in the web app differs from the system's: a phone in dark mode
+    /// showing the light site got a black bar above a white header.
+    ///
+    /// The colour is read from the page rather than from `underPageBackgroundColor`, which
+    /// reports the system's answer here, not the document's (measured: still black on a
+    /// white page in dark appearance).
+    private func adoptPageBackgroundColour() {
+        webView.evaluateJavaScript(ChromeColour.probeScript) { [weak self] value, _ in
+            guard let self, let colour = ChromeColour.parse(value as? String) else { return }
+            self.view.backgroundColor = colour
+            self.webView.backgroundColor = colour
+            self.webView.scrollView.backgroundColor = colour
+        }
     }
 
     // MARK: - Safe area contract
@@ -240,6 +268,7 @@ extension WebShellViewController: WKNavigationDelegate {
         // Forced because a fresh document has none of the properties the previous one had,
         // even when the measured inset has not changed.
         publishSafeAreaInset(force: true)
+        adoptPageBackgroundColour()
         persistSession()
         // Mirrors Android's onPageFinished: a registration needs the session cookie, and
         // this is the first moment it is guaranteed to exist.

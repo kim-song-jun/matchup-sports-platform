@@ -1016,10 +1016,13 @@ export function SportsSettingsPageClient() {
                 // [D14] 그 종목의 자리 목록은 **서버가 준다**(프리셋이 단일 출처).
                 // 목록이 비면 포지션 개념이 없는 종목(러닝·수영)이라 피커가 스스로
                 // 아무것도 렌더하지 않는다 -- 빈 코트를 보여주지 않는다.
-                const profileSport = (profile.data?.sports ?? []).find((row) => row.sportId === sportId);
-                const positionOptions = profileSport?.positionOptions ?? [];
-                // 대형이 있으면 피커가 그 좌표 위에 자리를 놓는다(풋살). 없으면 띠(축구).
-                const positionFormations = profileSport?.positionFormations ?? [];
+                // [D14] **선택지는 마스터에서 읽는다.** 예전엔 저장된 프로필에서 읽었는데,
+                // 방금 고른 종목은 아직 저장 전이라 목록이 비어 **포지션 UI 가 아예 안 떴다**
+                // (alpha 실측에서 드러났다 -- 정적으로는 연결이 전부 맞아 보인다).
+                //
+                // 원칙: **"무엇을 고를 수 있는가"는 마스터 / "무엇을 골랐는가"는 프로필.**
+                const positionOptions = sport.positionOptions ?? [];
+                const positionFormations = sport.positionFormations ?? [];
                 return (
                   <div key={sportId}>
                     <SportLevelPicker levelId={levelId} onSelect={(nextLevelId) => setSportLevel(sportId, nextLevelId)} sport={sport} />

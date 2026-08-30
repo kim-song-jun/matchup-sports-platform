@@ -64,9 +64,13 @@ function lockReasonText(
 ): string {
   if (reason.type === 'consent') return '기록 공개를 켜면 열려요';
   if (reason.type === 'appearances') {
-    // 0경기 사용자에게 "더 뛰면"은 틀린 말이다 -- 더 뛸 앞선 경기가 없다(앞면 힌트와 같은 규칙).
-    if (appearances === 0) return '첫 경기를 뛰면 열려요';
-    return `${reason.remaining}경기를 더 뛰면 열려요`;
+    // 0경기 사용자에게 "더"는 틀린 말이다 -- 앞선 경기가 없다(앞면 힌트와 같은 규칙).
+    //
+    // "뛰면"도 쓰지 않는다: 이 잠금은 **명단에 오른 경기 수**로 풀린다(D3 이후 명단에
+    // 오르면 곧 참가자다). "뛰면 열려요"라고 하면 벤치에 있던 사람은 열렸는데도 안
+    // 열릴 줄 알고, 반대로 뛰었는데 명단에서 빠진 사람은 안 열린 이유를 못 찾는다.
+    if (appearances === 0) return '첫 경기 명단에 오르면 열려요';
+    return `${reason.remaining}경기 명단에 더 오르면 열려요`;
   }
   return `후기 ${reason.remaining}개를 받으면 열려요`;
 }
@@ -81,7 +85,7 @@ function nextGoalText(card: V1PlayerCard): string | null {
   const { reason } = card.nextUnlock;
   if (reason.type === 'consent') return '기록 공개하기';
   if (reason.type === 'appearances') {
-    return card.appearances === 0 ? '첫 경기 뛰기' : `${reason.remaining}경기 더 뛰기`;
+    return card.appearances === 0 ? '첫 경기 명단 오르기' : `${reason.remaining}경기 명단 더 오르기`;
   }
   return `후기 ${reason.remaining}개 받기`;
 }
@@ -92,8 +96,8 @@ function unlockHint(card: V1PlayerCard): string | null {
   if (reason.type === 'consent') return '기록 공개를 켜면 골·도움·출전이 한 번에 열려요';
   if (reason.type === 'appearances') {
     // 아직 한 경기도 안 뛴 사람에게 "1경기 더" 는 틀린 말이다 -- 더 뛸 앞선 경기가 없다.
-    if (card.appearances === 0) return '첫 경기를 뛰면 기록이 쌓이기 시작해요';
-    return `${reason.remaining}경기 더 뛰면 열려요`;
+    if (card.appearances === 0) return '첫 경기 명단에 오르면 기록이 쌓이기 시작해요';
+    return `${reason.remaining}경기 명단에 더 오르면 열려요`;
   }
   return `후기 ${reason.remaining}개를 더 받으면 열려요`;
 }
@@ -215,7 +219,7 @@ function backSummary(card: V1PlayerCard): ReactNode {
     .sort((a, b) => (b.value ?? 0) - (a.value ?? 0))[0];
   return (
     <>
-      <b>{card.appearances}경기</b>를 뛴 <b>{pos}</b>
+      <b>{card.appearances}경기</b> 명단에 오른 <b>{pos}</b>
       {best ? (
         <>
           . 지금 가장 높은 항목은 <b>{best.label}</b>이에요.

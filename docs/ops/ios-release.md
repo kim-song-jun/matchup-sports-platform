@@ -99,3 +99,107 @@ plutil -p "<DerivedData>/Build/Intermediates.noindex/Teameet.build/Alpha Debug-i
 
 시뮬레이터로 이미 확인한 것(권한 허용, 알림 탭 → 딥링크 착지, 등록 실패 시 정직한 상태 보고)은
 `scripts/ios/verify-push-slice.sh`로 재현한다.
+
+## TestFlight 배포 (S12) — 계획
+
+> 목표: 사용자가 링크 하나로 테스터를 초대할 수 있는 상태. 아래 수치와 규칙은 전부 Apple 문서를
+> 읽어 옮긴 것이고, 출처를 각 항목에 달았다. 기억으로 적은 값은 없다.
+
+### 먼저 알아야 할 것 — "링크" 는 심사를 거친다
+
+TestFlight 에는 두 종류의 테스트가 있고, **원하는 것은 외부 테스트**다.
+
+| | 내부 테스트 | 외부 테스트 |
+|---|---|---|
+| 대상 | 앱에 접근 권한이 있는 **App Store Connect 사용자 최대 100명** | App Store Connect 사용자가 아닌 사람, **앱당 최대 10,000명** |
+| 초대 방법 | 계정 지정 | 이메일 또는 **공개 링크** |
+| 심사 | 없음 | **첫 빌드는 App Review 로 보내진다** |
+| 공개 링크 | 없음 | "누구나" 또는 "조건 필터", 인원 상한 1~10,000 설정 가능 |
+
+- 외부 그룹을 만들려면 **내부 그룹이 먼저 있어야 한다.**
+- 심사는 **첫 빌드만** 전체 심사를 받고 이후 빌드는 전체 심사가 아닐 수 있다. 승인돼야 테스트가 시작된다.
+- 빌드는 업로드 후 **90일** 동안만 테스트할 수 있고, 그 뒤에는 테스터가 쓸 수 없다.
+- TestFlight 대상 빌드는 **프로비저닝 프로파일에 application identifier 가 들어 있어야 한다** —
+  지금 쓰는 ad-hoc 서명으로는 안 된다.
+
+출처: [TestFlight Overview](https://developer.apple.com/help/app-store-connect/test-a-beta-version/testflight-overview/) ·
+[Invite external testers](https://developer.apple.com/help/app-store-connect/test-a-beta-version/invite-external-testers/)
+
+> **Beta App Review 소요 기간은 Apple 이 공표하지 않는다.** 며칠이라고 적을 근거가 없어 적지 않는다.
+> 일정을 세울 때 "승인 대기" 를 길이가 정해지지 않은 구간으로 두고, 그 앞의 (B) 를 최대한 당기는 것이
+> 유일하게 통제 가능한 부분이다.
+
+### 세 갈래와 병목
+
+**(A) 지금 바로 할 수 있는 것 — 우리**
+
+1. Release 아카이브 구성: `TeameetAlpha` 스킴의 `archive` 액션은 이미 `Alpha Release` 를 가리킨다.
+2. `ExportOptions.plist` — `method: app-store-connect`, 팀 ID, 업로드 심볼 여부.
+3. 버전·빌드 번호 체계: `apps/v1_ios/version.properties` 가 원천이다. TestFlight 는 **같은 버전에
+   같은 빌드 번호를 두 번 받지 않는다** → 업로드마다 `versionCode` 증가가 필요하고, 그 규칙을
+   스크립트로 강제한다.
+4. 업로드 스크립트 뼈대(`xcodebuild archive` → `-exportArchive` → `xcrun altool`/`notarytool` 계열).
+5. 이 문서 — 절차·실패 모드.
+
+**(B) 사용자만 할 수 있는 것 — 여기가 시작점이다**
+
+이것이 없으면 (A) 를 아무리 준비해도 업로드 자체가 불가능하다. 순서대로:
+
+- [ ] App Store Connect 에서 **앱 레코드 생성** (번들 ID `kr.co.teameet.alpha`)
+- [ ] 유료·무료 앱 **계약 동의**, 세금·은행 정보 (없으면 앱 레코드가 "준비 중" 에서 멈춘다)
+- [ ] **개인정보처리방침 URL** — 필수 입력값이다
+- [ ] **수출규정(암호화) 답변** — HTTPS 만 쓰는 앱도 답해야 한다
+- [ ] **배포 인증서 + App Store 프로비저닝 프로파일** 발급 승인
+- [ ] 내부 그룹 생성 → 외부 그룹 생성 → 공개 링크 발행 → 테스터 초대
+
+**(C) Apple 이 시간을 쓰는 것**
+
+- 첫 외부 빌드의 **Beta App Review**. 기간 미공표.
+
+```
+(B) 앱 레코드·계약·정책 URL·인증서   ──┐
+(A) archive·업로드 스크립트·문서      ──┴─→ 업로드 → (C) Beta App Review → 공개 링크
+```
+
+**병목은 (B)** 다. (A) 는 (B) 와 무관하게 지금 끝낼 수 있고, (C) 는 (B) 가 끝나야 시작조차 안 된다.
+
+### 심사지침 4.2 — 실재하는 위험
+
+> "Your app should include features, content, and UI that elevate it beyond a repackaged website.
+> If your app is not particularly useful, unique, or 'app-like,' it doesn't belong on the App Store."
+> — [App Review Guidelines 4.2](https://developer.apple.com/app-store/review/guidelines/)
+
+4.2.2 는 "web clippings" 를 명시적으로 든다. **이 앱은 구조상 WebView 래퍼가 맞다.** 숨길 것이
+아니라, 네이티브로만 되는 것이 실제로 얼마나 있는지로 답해야 한다. 현재 가진 방어 재료:
+
+| 재료 | 웹만으로는 안 되는 이유 |
+|---|---|
+| **APNs 네이티브 푸시** | 앱을 닫아도 알림이 온다. iOS 웹에는 이 경로가 없다 |
+| **알림 탭 → 딥링크 착지** | 알림이 해당 화면으로 직접 연다 |
+| **오프라인·실패 화면** | 네트워크가 없을 때 브라우저 오류 대신 앱 화면과 재시도 |
+| **안전영역 처리** | 셸이 기기 인셋을 페이지에 주입한다. 웹만으로는 0 이다 |
+| **유니버설 링크** | 로그인 리다이렉트가 앱 안에서 끝난다 (Team ID 확보 후) |
+| **세션 지속** | 앱 재실행 시 브라우징 세션 복원 |
+
+Beta App Review 가 정식 심사보다 가볍다고 알려져 있어도 **이 조항은 적용된다.** 리젝되면 위 목록을
+심사 노트에 적어 재제출하는 것이 첫 대응이다.
+
+### CI 자동화 — 하지 않는 쪽을 권한다
+
+`.github/workflows/ios-alpha.yml` 은 서명 없는 시뮬레이터 빌드만 한다. archive·업로드를 CI 에
+넣으려면 **배포 인증서(.p12)와 프로파일, App Store Connect API 키**를 secrets 에 넣어야 한다.
+
+GitHub Actions secrets 는 public 저장소에서도 값이 노출되지 않고 fork PR 에는 전달되지 않는다.
+그럼에도 처음에는 **로컬 archive + 수동 업로드**를 권한다:
+
+- 업로드는 되돌릴 수 없다. 잘못 올린 빌드는 삭제가 아니라 만료 처리만 된다
+- 첫 배포는 (B) 의 값들이 맞물리는지 확인하는 과정이라 사람이 보고 있어야 한다
+- 자동화의 이득은 반복이 잦아진 뒤에 생긴다
+
+반복이 잦아지면 그때 CI 로 옮기고, 그 시점에 `pull_request` 트리거에서는 업로드 잡이 돌지 않도록
+막는다.
+
+### 아직 못 정한 것
+
+- production 번들(`kr.co.teameet`)도 앱 레코드를 만들지 여부. 알파만 먼저 올리는 편이 단순하다
+- 스크린샷·설명 등 App Store 메타데이터는 TestFlight 만 쓸 거면 최소한만 있으면 된다

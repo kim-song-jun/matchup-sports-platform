@@ -36,7 +36,7 @@ import {
 import { extractErrorMessage } from '@/lib/error-message';
 import { randomUuid } from '@/lib/uuid';
 import { ActionTargetPicker, type EventCaptureCommitInput } from './action-target-picker';
-import { latestOperableLineup } from './lineup-grid';
+import { latestLineupForDisplay, latestOperableLineup } from './lineup-grid';
 import { ElapsedMatchClock } from './elapsed-match-clock';
 import { QueueStatusPanel, hasUnsettledQueueItems } from './queue-status-panel';
 import { RecordedEventList } from './recorded-event-list';
@@ -346,9 +346,12 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
 
   // UX 감사 item 2 — 라인업 없이 경기를 시작하면 복구 불가능한 막다른 길이
   // 된다(시작 후에는 LineupGrid가 "제출된 선발 명단이 없어요"만 보여줄 뿐
-  // 되돌릴 수단이 없었다). `latestOperableLineup`은 `LineupGrid`가 빈 상태를
-  // 판정하는 것과 정확히 같은 기준(SUBMITTED/LOCKED)이다 — 여기서 다시
-  // 구현하면 두 판정이 갈릴 수 있다.
+  // 되돌릴 수단이 없었다).
+  //
+  // [P1-c 후속] **여기만 `latestOperableLineup`(제출본 전용)을 계속 쓴다.** 표시·검인은
+  // 폴백으로 옮겼지만 이 판정은 "아직 제출 안 했어요" 경고의 근거라, 폴백으로 바꾸면
+  // 초안이 늘 잡혀서 **경고가 영영 안 뜬다.** 두 규칙이 다른 것이 의도다 — 합치지 마라
+  // (lineup-grid.tsx 의 `latestLineupForDisplay` 주석에 표로 정리해 뒀다).
   const sidesMissingLineup = useMemo(() => {
     const sidesList = gameDetail.data?.sides ?? [];
     const lineupsList = fixtureLineup.data?.lineups ?? [];
@@ -1558,12 +1561,14 @@ export function teammatesForSide(
   excludeParticipantId: string | null,
 ): readonly GameLineupParticipant[] {
   if (sideId === null) return [];
-  // LineupGrid·ArrivalCheckinPanel과 같은 규칙을 재사용한다: SUBMITTED/LOCKED 중
-  // 최고 revision만이 "지금 운영 중인 라인업"이다. 여기서 `lineups.find`로 배열의
-  // 첫 행(revision desc 정렬이라 DRAFT가 최상단일 수 있다)을 집으면, 팀이 저장만
-  // 하고 제출하지 않은 DRAFT의 선수가 어시스트 후보로 올라온다 — 그 선수는
-  // LineupGrid에는 아예 보이지 않는데도 후보 목록에는 뜨는 모순이 생긴다.
-  const lineup = latestOperableLineup(lineups, sideId);
+  // LineupGrid·ArrivalCheckinPanel과 **같은 규칙**을 재사용한다. 핵심은 "제출본만"이
+  // 아니라 **셋이 같은 명단을 본다**는 것이다 -- 여기서 규칙이 갈리면 그리드에는 안 보이는
+  // 선수가 어시스트 후보에는 뜨는 모순이 생긴다(이 주석이 원래 막으려던 것).
+  //
+  // [P1-c 후속] 그 셋이 이제 `latestLineupForDisplay`(폴백)로 옮겨 갔다. 제출 없이 시작한
+  // 경기에서 제출본만 보면 세 화면이 통째로 비기 때문이다. 규칙이 바뀌어도 **셋이 함께
+  // 움직인다**는 원래 계약은 그대로다.
+  const lineup = latestLineupForDisplay(lineups, sideId);
   return (lineup?.participants ?? []).filter((participant) => participant.id !== excludeParticipantId);
 }
 

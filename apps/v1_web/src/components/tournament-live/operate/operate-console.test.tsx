@@ -55,21 +55,13 @@ vi.mock('@/hooks/use-v1-game-operations-console', () => ({
 // SUBSTITUTION 테스트가 "나가는 선수 == 들어오는 선수"라는, 실제 계약
 // (validateSubstitution이 거부하는 상태)과 모순되는 입력을 "정상"으로
 // 통과시켰다(Copilot 리뷰 지적).
-vi.mock('./lineup-grid', () => ({
-  // operate-console.tsx가 "라인업 없이 시작 막기"(UX 감사 item 2) 판정에
-  // 실제 구현과 동일한 로직을 쓴다 — 목도 같은 판정을 하도록 실제 함수와
-  // 동일하게 둔다(다르게 두면 이 파일의 다른 테스트가 실제로는 없던 라인업을
-  // "있다"고 오판하게 된다).
-  latestOperableLineup: (
-    lineups: Array<{ sideId: string; state?: string; revision: number }>,
-    sideId: string,
-  ) => {
-    const candidates = lineups.filter(
-      (l) => l.sideId === sideId && (l.state === 'SUBMITTED' || l.state === 'LOCKED'),
-    );
-    if (candidates.length === 0) return null;
-    return candidates.reduce((latest, current) => (current.revision > latest.revision ? current : latest));
-  },
+vi.mock('./lineup-grid', async (importOriginal) => ({
+  // 선택자 함수들은 **실제 구현을 그대로 쓴다**(`importOriginal`). 예전에는 목 안에
+  // 로직을 손으로 베껴 뒀는데, 그러면 구현이 바뀔 때 목이 조용히 뒤처진다 -- 실제로
+  // [P1-c 후속]에서 `latestLineupForDisplay` 가 추가되자 이 목에 없어서 세 테스트가
+  // "export 가 없다"로 깨졌고, 거기서 로직을 또 베꼈다면 **두 규칙이 다르다는 계약을
+  // 목이 왜곡**할 수 있었다. 컴포넌트만 가벼운 스텁으로 대체한다.
+  ...(await importOriginal<typeof import('./lineup-grid')>()),
   LineupGrid: ({
     onSelectPlayer,
     restrictSideId,

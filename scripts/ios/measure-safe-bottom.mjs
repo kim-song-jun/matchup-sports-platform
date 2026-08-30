@@ -39,6 +39,24 @@ async function measure(inset) {
   });
 }
 
+// A candidate CSS rule can be tried against the deployed page before it is deployed:
+// MEASURE_PATCH='.tm-bottom-nav { padding-bottom: max(16px, var(--v1-shell-safe-bottom)) }'
+if (process.env.MEASURE_PATCH) {
+  await measure('34px');
+  const before = await page.screenshot();
+  await page.addStyleTag({ content: process.env.MEASURE_PATCH });
+  await page.waitForTimeout(300);
+  const after = await measure('34px');
+  console.log('patched:', JSON.stringify(after, null, 2));
+  if (process.env.MEASURE_SHOT) {
+    const fs = await import('node:fs/promises');
+    await fs.writeFile(process.env.MEASURE_SHOT.replace('.png', '-before.png'), before);
+    await page.screenshot({ path: process.env.MEASURE_SHOT });
+  }
+  await browser.close();
+  process.exit(0);
+}
+
 if (process.env.MEASURE_SHOT) {
   await measure('34px');
   await page.screenshot({ path: process.env.MEASURE_SHOT });

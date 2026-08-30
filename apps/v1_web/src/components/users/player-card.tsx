@@ -5,6 +5,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { CalendarCheck, Camera, Clock, HeartHandshake, Lock, Settings, Share2, Sparkles, Target, Zap } from 'lucide-react';
 import { cssUrl } from '@/lib/assets';
+import { josa } from '@/lib/korean';
 import type { V1PlayerCard, V1PlayerCardStat } from '@/types/api';
 
 /**
@@ -222,7 +223,11 @@ function backSummary(card: V1PlayerCard): ReactNode {
       <b>{card.appearances}경기</b> 명단에 오른 <b>{pos}</b>
       {best ? (
         <>
-          . 지금 가장 높은 항목은 <b>{best.label}</b>이에요.
+          {/* 지표 라벨은 받침이 있을 수도(골·실력·매너) 없을 수도(엔트리·도움) 있어서
+              조사를 고정하면 한쪽이 틀린다 — "출전"일 땐 맞던 "이에요"가 "엔트리"에선
+              틀렸다(alpha 실측). `josa` 로 라벨의 받침을 보고 고른다. */}
+          . 지금 가장 높은 항목은 <b>{best.label}</b>
+          {josa(best.label, ['이에요', '예요']).slice(best.label.length)}.
         </>
       ) : (
         <>예요.</>

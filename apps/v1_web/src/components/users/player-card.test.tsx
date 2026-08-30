@@ -28,7 +28,7 @@ const card = (overrides: Partial<V1PlayerCard> = {}): V1PlayerCard => ({
   stats: [
     stat('SHO', '골', 68),
     stat('PAS', '도움', 74),
-    stat('APP', '출전', 81),
+    stat('APP', '엔트리', 81),
     stat('SKI', '실력', null, { type: 'reviews', remaining: 3 }),
     stat('MAN', '매너', null, { type: 'reviews', remaining: 3 }),
     stat('PUN', '시간약속', null, { type: 'reviews', remaining: 3 }),
@@ -181,6 +181,31 @@ describe('선수 카드', () => {
     expect(screen.queryByRole('link', { name: '카드 설정' })).not.toBeInTheDocument();
   });
 
+  // 지표 라벨은 받침이 있을 수도(골·실력) 없을 수도(엔트리·도움) 있다. 조사를 고정하면
+  // 한쪽이 반드시 틀린다 -- "출전"일 때 맞던 "이에요"가 "엔트리"에선 틀렸다(alpha 실측).
+  it.each([
+    ['엔트리', '엔트리예요'],
+    ['실력', '실력이에요'],
+  ])('가장 높은 항목이 %s 이면 조사를 받침에 맞춰 붙인다', (label, expected) => {
+    renderCard(
+      card({
+        appearances: 6,
+        stats: [
+          stat('APP', label === '엔트리' ? '엔트리' : '엔트리', 81),
+          stat('SHO', '골', 40),
+          stat('PAS', '도움', 40),
+          stat('SKI', '실력', label === '실력' ? 99 : 30),
+          stat('MAN', '매너', 30),
+          stat('PUN', '시간약속', 30),
+        ],
+      }),
+      false,
+    );
+    // 라벨이 <b> 로 감싸져 있어 **텍스트가 요소 경계로 쪼개진다** — getByText 로는 못 잡는다.
+    // 사용자가 실제로 읽는 것은 이어 붙인 문장이므로 컨테이너의 textContent 로 본다.
+    expect(document.body.textContent).toContain(expected);
+  });
+
   it('0경기 사용자에게 "더" 라고 하지 않고, 잠금 조건을 "뛰기"가 아니라 "명단"으로 말한다', () => {
     // 두 가지를 한꺼번에 못박는다.
     //
@@ -197,7 +222,7 @@ describe('선수 카드', () => {
         stats: [
           stat('SHO', '골', null, { type: 'appearances', remaining: 3 }),
           stat('PAS', '도움', null, { type: 'appearances', remaining: 3 }),
-          stat('APP', '출전', null, { type: 'appearances', remaining: 1 }),
+          stat('APP', '엔트리', null, { type: 'appearances', remaining: 1 }),
           stat('SKI', '실력', null, { type: 'reviews', remaining: 3 }),
           stat('MAN', '매너', null, { type: 'reviews', remaining: 3 }),
           stat('PUN', '시간약속', null, { type: 'reviews', remaining: 3 }),
@@ -245,7 +270,7 @@ describe('선수 카드', () => {
       stats: [
         stat('SHO', '골', null, { type: 'consent' }),
         stat('PAS', '도움', null, { type: 'consent' }),
-        stat('APP', '출전', null, { type: 'consent' }),
+        stat('APP', '엔트리', null, { type: 'consent' }),
         stat('SKI', '실력', 84),
         stat('MAN', '매너', 90),
         stat('PUN', '시간약속', 88),

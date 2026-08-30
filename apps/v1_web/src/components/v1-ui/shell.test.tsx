@@ -62,3 +62,27 @@ describe('AppChrome bottom nav — 탭 5개(리그는 대회 탭 세그먼트로
       });
   });
 });
+
+describe('useV1NotificationUnreadSummary mock wiring', () => {
+  it('테스트 환경에서 실제 네트워크 훅 대신 목이 호출된다', () => {
+    vi.mocked(useV1NotificationUnreadSummary).mockClear();
+    render(
+      <AppChrome title="테스트">
+        <div>본문</div>
+      </AppChrome>
+    );
+    expect(vi.mocked(useV1NotificationUnreadSummary)).toHaveBeenCalled();
+  });
+});
+
+describe('AppChrome mobile page title semantics', () => {
+  it('renders an opt-in page title as a level-one heading', () => {
+    render(
+      <AppChrome title="알림 설정" titleAsHeading showNotifications={false}>
+        <div>본문</div>
+      </AppChrome>
+    );
+
+    expect(screen.getByRole('heading', { level: 1, name: '알림 설정' })).toBeInTheDocument();
+  });
+});

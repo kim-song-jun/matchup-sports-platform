@@ -20,8 +20,9 @@ export const metadata = buildPublicMetadata({
 // 클라이언트 안에 두지 않는 이유: 그러면 목록 클라이언트를 직접 렌더하는 테스트가
 // 알림 벨까지 끌어와 use-v1-api 모킹 표면이 화면과 무관하게 넓어진다.
 //
-// activeTab은 'league' — D5(하단 탭 6개 분리)로 리그가 대회에서 독립된 탭이 됐다.
-// 대회/리그 이동은 하단 탭이 전담하므로 상단 세그먼트(E5)는 제거했다.
+// activeTab은 'tournaments' — 리그는 **대회의 한 종류**라서 하단 탭을 합쳤다(6→5).
+// 리그 전용 탭이 없으므로 대회/리그 이동은 상단 `CompetitionKindSegment` 가 맡는다.
+// (한동안 리그가 독립 탭이었고 그때는 상단 세그먼트를 뺐었다 — 지금은 반대다.)
 export default function LeagueMatchesPage() {
   return (
     <AppChrome title="정규 리그" activeTab="tournaments" showNotifications>

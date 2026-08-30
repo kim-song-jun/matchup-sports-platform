@@ -8,6 +8,7 @@ import { presentTournamentCard } from './tournament-card.presenter';
 import { presentTournamentDetail } from './tournament-detail.presenter';
 import { TournamentListQueryDto } from './dto/tournament-read.dto';
 import { leagueProgressOf, magicNumberOf } from './league-progress';
+import { TOURNAMENT_SURFACE_KIND } from './tournament-surface';
 import { hasTournamentFixtureOfficialResult } from './tournament-fixture-official-result';
 import {
   PUBLIC_TOURNAMENT_STATUS_FILTER,
@@ -71,6 +72,8 @@ export class TournamentsReadService {
     const limit = query.limit ?? 20;
 
     const where: Prisma.V1TournamentWhereInput = {
+      // 정규 리그 시즌은 대회 목록에 나오지 않는다 — 근거는 상수 쪽 주석.
+      ...TOURNAMENT_SURFACE_KIND,
       deletedAt: null,
       status: query.status ? query.status : PUBLIC_TOURNAMENT_STATUS_FILTER,
       ...(query.sportId ? { sportId: query.sportId } : {}),
@@ -121,6 +124,9 @@ export class TournamentsReadService {
   async get(tournamentId: string, user?: V1AuthUser) {
     const row = await this.prisma.v1Tournament.findFirst({
       where: {
+        // 목록만 막으면 **id 를 아는 사람은 그대로 열 수 있다** — 대회 id 는 대진·순위
+        // 응답에 실려 나가므로 상세·순위에도 같은 조건을 건다.
+        ...TOURNAMENT_SURFACE_KIND,
         id: tournamentId,
         deletedAt: null,
         status: PUBLIC_TOURNAMENT_STATUS_FILTER,
@@ -150,6 +156,9 @@ export class TournamentsReadService {
   async getOverallStandings(tournamentId: string) {
     const tournament = await this.prisma.v1Tournament.findFirst({
       where: {
+        // 목록만 막으면 **id 를 아는 사람은 그대로 열 수 있다** — 대회 id 는 대진·순위
+        // 응답에 실려 나가므로 상세·순위에도 같은 조건을 건다.
+        ...TOURNAMENT_SURFACE_KIND,
         id: tournamentId,
         deletedAt: null,
         status: PUBLIC_TOURNAMENT_STATUS_FILTER,

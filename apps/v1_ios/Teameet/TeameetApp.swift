@@ -75,18 +75,23 @@ private struct NoticeBanner: View {
     let onDismiss: () -> Void
 
     var body: some View {
-        Text(message)
-            .font(.subheadline)
-            .foregroundStyle(Color(.systemBackground))
-            .multilineTextAlignment(.center)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .frame(minHeight: 44)
-            .background(Color(.label), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .padding(.horizontal, 20)
-            .padding(.bottom, 24)
-            .onTapGesture(perform: onDismiss)
-            .accessibilityAddTraits(.isStaticText)
-            .accessibilityHint("탭하면 닫아요")
+        // A button, not text with a tap gesture. The only way to dismiss this is to tap it,
+        // and a `.isStaticText` trait told VoiceOver the opposite — that there was nothing
+        // here to activate, leaving the notice on screen with no way to clear it.
+        Button(action: onDismiss) {
+            Text(message)
+                .font(.subheadline)
+                .foregroundStyle(Color(.systemBackground))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .frame(minHeight: 44)
+                .background(Color(.label), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 20)
+        .padding(.bottom, 24)
+        .accessibilityLabel("\(message), 알림 닫기")
+        .accessibilityHint("탭하면 닫아요")
     }
 }

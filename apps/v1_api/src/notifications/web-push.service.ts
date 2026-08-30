@@ -52,13 +52,6 @@ export class WebPushService implements OnModuleInit {
   ) {}
 
   onModuleInit(): void {
-    // Only meaningful when something can actually deliver. An adapter reports itself
-    // configured only after resolving the environment itself, so this cannot disagree with
-    // what the adapters decided.
-    if (this.fcmPushService?.isConfigured || this.apnsPushService?.isConfigured) {
-      this.pushEnvironment = resolvePushEnvironment();
-    }
-
     const publicKey = process.env.VAPID_PUBLIC_KEY;
     const privateKey = process.env.VAPID_PRIVATE_KEY;
     const subject = process.env.VAPID_SUBJECT;
@@ -144,9 +137,21 @@ export class WebPushService implements OnModuleInit {
       (adapter): adapter is FcmPushService | ApnsPushService =>
         adapter !== undefined && adapter.isConfigured,
     );
-    if (adapters.length === 0 || this.pushEnvironment === null) return;
+    if (adapters.length === 0) return;
 
-    const devices = await this.pushDevices.activeTokens(userId, this.pushEnvironment);
+    const environment = this.nativeEnvironment();
+    if (environment === null) {
+      // Something can deliver but nothing says where to. Unreachable through the adapters'
+      // own startup guards, which refuse to boot in this state — but a silent return here
+      // is how a deployment sends nothing for days, so it is said out loud.
+      this.logger.error(
+        { userId, platforms: adapters.map((adapter) => adapter.platform) },
+        'push adapters are configured but V1_PUSH_ENVIRONMENT is unusable — devices were not notified',
+      );
+      return;
+    }
+
+    const devices = await this.pushDevices.activeTokens(userId, environment);
     if (devices.length === 0) return;
 
     const byPlatform = new Map<V1PushPlatform, PushTarget[]>();
@@ -180,6 +185,29 @@ export class WebPushService implements OnModuleInit {
         }
       }),
     );
+  }
+
+  /**
+   * Which environment's devices to deliver to, resolved on first use and cached.
+   *
+   * This used to be read in `onModuleInit` from the adapters' `isConfigured`, which each
+   * adapter only sets inside its *own* `onModuleInit`. Nest promises no order between two
+   * providers' init hooks, so whether push worked depended on which ran first: this service
+   * going first saw two unconfigured adapters, kept a null environment, and returned from
+   * every later send without a word.
+   *
+   * Deferring keeps the property that put it in `onModuleInit` to begin with — a deployment
+   * with push turned off has no configured adapter, so the caller returns before reaching
+   * here and no per-notification warning is produced.
+   */
+  private nativeEnvironment(): V1PushEnvironment | null {
+    if (this.pushEnvironment !== null) return this.pushEnvironment;
+    try {
+      this.pushEnvironment = resolvePushEnvironment();
+    } catch {
+      return null;
+    }
+    return this.pushEnvironment;
   }
 
   private async sendWebPushToUser(userId: string, payload: PushPayload): Promise<PushDeliverySummary> {

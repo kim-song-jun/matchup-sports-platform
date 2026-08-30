@@ -58,9 +58,11 @@ describe('WebPushService', () => {
         process.env[key] = value;
       }
     }
-    // The service now resolves the push environment at startup, the way the adapters do,
-    // so every build needs one.
+    // The push environment is read when a notification is sent, not at startup — the
+    // startup read made delivery depend on which provider Nest initialised first. So it has
+    // to survive the env restore below, unlike the VAPID keys this helper is juggling.
     process.env.V1_PUSH_ENVIRONMENT ??= 'alpha';
+    const pushEnvironment = process.env.V1_PUSH_ENVIRONMENT;
     const moduleRef = await Test.createTestingModule({
       providers: [
         WebPushService,
@@ -73,7 +75,7 @@ describe('WebPushService', () => {
     }).compile();
     const service = moduleRef.get(WebPushService);
     service.onModuleInit();
-    process.env = originalEnv;
+    process.env = { ...originalEnv, V1_PUSH_ENVIRONMENT: pushEnvironment };
     return service;
   }
 
@@ -396,6 +398,70 @@ describe('WebPushService native fan-out', () => {
   afterEach(() => {
     if (previousEnvironment === undefined) delete process.env.V1_PUSH_ENVIRONMENT;
     else process.env.V1_PUSH_ENVIRONMENT = previousEnvironment;
+  });
+
+  /**
+   * Nest promises no order between one provider's `onModuleInit` and another's, and an
+   * adapter only reports `isConfigured` from inside its own. Reading that flag while
+   * deciding the push environment therefore made delivery depend on which ran first: if
+   * this service went first it saw two unconfigured adapters, kept a null environment, and
+   * every later send returned without a word. Nothing in a log, nothing on a device.
+   */
+  it('delivers even when its own onModuleInit runs before the adapters', async () => {
+    const lateApns = {
+      platform: 'ios',
+      isConfigured: false,
+      configure() {
+        this.isConfigured = true;
+      },
+      send: jest.fn().mockResolvedValue(summary),
+    };
+    const lateFcm = { platform: 'android', isConfigured: false, send: jest.fn() };
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        WebPushService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: getLoggerToken(WebPushService.name), useValue: logger },
+        { provide: FcmPushService, useValue: lateFcm },
+        { provide: ApnsPushService, useValue: lateApns },
+        { provide: PushDeviceService, useValue: pushDevices },
+      ],
+    }).compile();
+    const service = moduleRef.get(WebPushService);
+
+    service.onModuleInit();
+    lateApns.configure();
+
+    pushDevices.activeTokens.mockResolvedValue([
+      { id: 'i1', token: 'ios-token-1', platform: 'ios' },
+    ]);
+    await service.sendToUser('user-1', { notificationId: 'n-late', title: '문의 답변' });
+
+    expect(lateApns.send).toHaveBeenCalledWith(
+      [{ id: 'i1', token: 'ios-token-1', platform: 'ios' }],
+      expect.objectContaining({ notificationId: 'n-late' }),
+    );
+  });
+
+  /**
+   * The one state that must never be silent: something can deliver, but the environment
+   * that says *where* is missing. Returning without a word here is how a deployment ends up
+   * sending nothing for days.
+   */
+  it('says so when an adapter is configured but the environment is not', async () => {
+    delete process.env.V1_PUSH_ENVIRONMENT;
+    pushDevices.activeTokens.mockResolvedValue([
+      { id: 'i1', token: 'ios-token-1', platform: 'ios' },
+    ]);
+    const service = await build();
+
+    await service.sendToUser('user-1', { notificationId: 'n-2', title: '문의 답변' });
+
+    expect(apns.send).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.stringContaining('V1_PUSH_ENVIRONMENT'),
+    );
   });
 
   it('sends each device to the service that owns its platform', async () => {

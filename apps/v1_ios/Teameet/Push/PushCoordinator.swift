@@ -49,6 +49,21 @@ final class PushCoordinator {
         PushPermission.webValue(for: await center.notificationSettings().authorizationStatus)
     }
 
+    /// Whether an arriving notification may be shown while the app is in front.
+    ///
+    /// Lives here rather than at the delegate because the two inputs are this object's own
+    /// state, and a caller that recombines them can silently collapse the policy: passing
+    /// `optedIn: isSubscribed() || granted` reduces `granted && optedIn` to `granted`, which
+    /// is exactly the in-app opt-out this gate exists to honour.
+    func shouldPresentIncomingNotification() async -> Bool {
+        PushConsent.shouldDisplay(
+            permissionGranted: await currentPermission() == .granted, optedIn: optedIn)
+    }
+
+    /// The reader's own choice, readable so the launch path can avoid asking the OS for a
+    /// token nobody asked for.
+    var hasOptedIn: Bool { optedIn }
+
     /// What the bridge reports as `subscribed`.
     ///
     /// All three have to hold: the OS will deliver, the reader asked for it, and the server

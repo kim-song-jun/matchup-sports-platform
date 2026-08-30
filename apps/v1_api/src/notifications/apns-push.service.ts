@@ -1,4 +1,4 @@
-import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Optional, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { V1PushPlatform } from '@prisma/client';
 import { connect, constants, ClientHttp2Session } from 'node:http2';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
@@ -37,8 +37,13 @@ export class ApnsPushService implements NativePushAdapter, OnModuleInit, OnModul
      * Injected so the provider token's lifetime can be exercised without waiting an hour.
      * The retry-after-403 path only fires once the token is older than Apple's minimum
      * re-issue interval, which is unreachable in a test with a real clock.
+     *
+     * `@Optional()` is load-bearing: Nest reads the constructor's parameter types, not its
+     * default values, so without it the container looks for a provider of type `Function`,
+     * finds none, and refuses to build the module. That failure surfaces as every
+     * integration suite failing to create the app, not as anything about push.
      */
-    private readonly clock: () => number = () => Date.now(),
+    @Optional() private readonly clock: () => number = () => Date.now(),
   ) {}
 
   static readonly SANDBOX_HOST = 'api.sandbox.push.apple.com';

@@ -27,13 +27,10 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 
         // A registration the reader already consented to is renewed on every launch: APNs
         // can reissue a token at any time, and a stale one silently stops receiving.
-        Task {
-            // `||` takes autoclosures, which cannot be async, so the two states are read
-            // separately rather than short-circuited.
-            let subscribed = await coordinator.isSubscribed()
-            let granted = await coordinator.currentPermission() == .granted
-            if subscribed || granted { application.registerForRemoteNotifications() }
-        }
+        // Only for a reader who asked for push. Registering on the OS permission alone
+        // would fetch a token for someone who turned push off in the app — the same
+        // conflation the presentation gate had to be fixed for.
+        if coordinator.hasOptedIn { application.registerForRemoteNotifications() }
         return true
     }
 
@@ -89,16 +86,9 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         withCompletionHandler completionHandler: @escaping @Sendable (UNNotificationPresentationOptions) -> Void
     ) {
         Task { @MainActor in
-            let show = await shouldPresentIncomingNotification()
+            let show = await push?.shouldPresentIncomingNotification() ?? false
             completionHandler(show ? [.banner, .sound] : [])
         }
-    }
-
-    private func shouldPresentIncomingNotification() async -> Bool {
-        guard let push else { return false }
-        let granted = await push.currentPermission() == .granted
-        let subscribed = await push.isSubscribed()
-        return PushConsent.shouldDisplay(permissionGranted: granted, optedIn: subscribed || granted)
     }
 
     /// A tap. The last hop of the first vertical slice: an inquiry reply has to open that

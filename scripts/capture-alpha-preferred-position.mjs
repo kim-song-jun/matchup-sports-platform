@@ -29,7 +29,7 @@ import { chromium } from 'playwright';
 
 const BASE = 'https://alpha.teameet.co.kr';
 const API = `${BASE}/api/v1`;
-const OUT = '.screenshots/d14-preferred-position';
+const OUT = process.env.OUT_DIR ?? '.screenshots/d14-preferred-position';
 const WIDTHS = [
   { key: 'mobile', width: 390, height: 844 },
   { key: 'tablet', width: 768, height: 1024 },
@@ -46,10 +46,19 @@ const SPORTS = [
   { name: '수영', expect: 'none' },
 ];
 
+/**
+ * 세션 쿠키를 얻는다. **이미 있으면 로그인하지 않는다.**
+ *
+ * alpha 는 과한 요청에 1분간 전면 403 을 건다. 하네스를 여러 번 돌리는 것이 정상인
+ * 작업(판정식을 고쳐 재측정하는 등)이라 매번 로그인 API 를 때릴 이유가 없다 —
+ * `ALPHA_SESSION_TOKEN` 이 있으면 그대로 쓴다(런북이 정한 표준 변수다).
+ */
 async function login() {
+  const preset = process.env.ALPHA_SESSION_TOKEN;
+  if (preset) return preset;
   const email = process.env.ALPHA_EMAIL;
   const password = process.env.ALPHA_PASSWORD;
-  if (!email || !password) throw new Error('ALPHA_EMAIL / ALPHA_PASSWORD 가 필요합니다');
+  if (!email || !password) throw new Error('ALPHA_SESSION_TOKEN 또는 ALPHA_EMAIL/ALPHA_PASSWORD 가 필요합니다');
   const res = await fetch(`${API}/auth/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -145,6 +154,14 @@ async function main() {
     if (status >= 400) throw new Error(`${PATH} HTTP ${status}`);
     await page.waitForTimeout(5000);
 
+    // **어디에 착지했는지 확인한다.** 세션이 만료되면 `/login` 으로 튕기는데 그 페이지도
+    // HTTP 200 이라 위 검사를 통과한다. 그러면 종목 칩이 없어 전 종목이 '칩 없음'(⚠️)
+    // 으로만 표시되고, 실패 집계는 ❌ 만 세므로 **"전 폭·전 종목 기대와 일치"가 찍힌다** —
+    // 로그인 화면을 찍어 놓고 통과라고 보고하는 것이다. 측정이 실패를 성공으로 뒤집는
+    // 방향이라 반드시 여기서 멈춘다.
+    const landed = new URL(page.url()).pathname;
+    if (landed !== PATH) throw new Error(`${PATH} 로 갔는데 ${landed} 에 착지했다 — 세션 만료(재로그인 필요) 가능성`);
+
     // **종목을 먼저 골라야 포지션 UI 가 뜬다.** 저장은 하지 않는다 — 저장 전에 뜨는지가
     // 이 PR 의 판정이다.
     const missing = [];
@@ -153,6 +170,9 @@ async function main() {
       if ((await chip.count()) === 0) { missing.push(name); continue; }
       if ((await chip.getAttribute('aria-pressed')) !== 'true') await chip.click();
       await page.waitForTimeout(600);
+    }
+    if (missing.length === SPORTS.length) {
+      throw new Error(`종목 칩이 하나도 없다(${missing.join('·')}) — 마스터 미등록이 아니라 페이지가 잘못 떴을 가능성`);
     }
     await page.waitForTimeout(2500);
 

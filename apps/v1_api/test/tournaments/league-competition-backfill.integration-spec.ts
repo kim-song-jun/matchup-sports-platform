@@ -132,9 +132,17 @@ describe('리그 시즌 백필 (real DB)', () => {
       data: { id: strayLeagueId, sportId: ids.futsalSportId, title: '남의 대회', status: 'draft' },
     });
 
-    await expect(backfillLeaguesAsCompetitions(prisma, { dryRun: false })).rejects.toMatchObject({
-      detail: { idConflicts: [{ leagueId: strayLeagueId }] },
-    });
+    try {
+      await expect(backfillLeaguesAsCompetitions(prisma, { dryRun: false })).rejects.toMatchObject({
+        detail: { idConflicts: [{ leagueId: strayLeagueId }] },
+      });
+    } finally {
+      // **이 케이스가 남긴 행은 이 케이스가 치운다.** 파일 전체의 뒷정리는 격리 환경이
+      // 하지만(DB 를 통째로 DROP 한다), 이 리그는 **다음 케이스의 입력**이 된다 — 남겨
+      // 두면 이후에 백필을 부르는 케이스를 추가하는 순간 그 케이스가 이유 없이 깨진다.
+      await prisma.v1Tournament.delete({ where: { id: strayLeagueId } });
+      await prisma.v1League.delete({ where: { id: strayLeagueId } });
+    }
   });
 
   it('백필한 뒤에도 공개 대회 목록·상세에 안 보인다 (게이트 두 겹)', async () => {

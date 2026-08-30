@@ -10,9 +10,16 @@ import { LeagueBackfillBlockedError, backfillLeaguesAsCompetitions } from './lea
  *
  * 관례를 깨는 대신 `--dry-run` 도 그대로 받는다 — CI 가 그 플래그를 붙여 부르더라도
  * 의도한 대로 동작한다(`deploy.yml` 이 다른 CLI 를 그렇게 부른다).
+ *
+ * **둘을 함께 주면 멈춘다.** 한쪽을 조용히 우선하면 사용자가 표현한 모순된 의도를 코드가
+ * 대신 결정하는 것이고, 그 방향이 "쓴다" 쪽이면 이 CLI 의 안전 설계가 통째로 무의미해진다.
  */
 async function main(): Promise<void> {
   const apply = process.argv.includes('--apply');
+  const explicitDryRun = process.argv.includes('--dry-run');
+  if (apply && explicitDryRun) {
+    throw new Error('--apply 와 --dry-run 을 함께 줄 수 없다. 하나만 골라라.');
+  }
   const prisma = new PrismaService();
   await prisma.$connect();
   try {

@@ -115,7 +115,10 @@ export async function backfillLeagueCompetitionDetails(
   //
   // 가드의 목적은 *"모르는 값을 덮어쓰지 않는다"* 인데 **우리가 쓸 값과 같은 것은 모르는
   // 값이 아니다.** 그래서 목표와 **다른** 필드만 막는다. 전부 같으면 할 일이 없어 건너뛴다.
-  const conflicts: Array<{ leagueId: string; fields: string[] }> = [];
+  const conflicts: Array<{
+    leagueId: string;
+    fields: Array<{ field: string; current: string | null; expected: string }>;
+  }> = [];
   const skippable = new Set<string>();
   for (const league of leagues) {
     const row = byId.get(league.id);

@@ -583,7 +583,15 @@ describe('GET /league-matches (list, R5)', () => {
   });
 
   it('sportId/regionId 필터가 다른 종목·지역의 리그를 제외한다', async () => {
-    const scenarioA = await createLeagueScenario({ title: `T5 필터 A ${suiteId}`, startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-09-30T00:00:00.000Z' });
+    // **A 도 고유 종목이어야 한다.** 아래 단언은 `toEqual([A])` — 완전 일치라 A 의 종목으로
+    // 걸렀을 때 **하나만** 와야 한다. 기본값 futsal 을 쓰면 이 스위트의 다른 테스트가 만든
+    // futsal 리그가 전부 섞인다(CI 실측: 1개 기대에 5개 반환).
+    const scenarioA = await createLeagueScenario({
+      title: `T5 필터 A ${suiteId}`,
+      startsOn: '2026-09-01T00:00:00.000Z',
+      endsOn: '2026-09-30T00:00:00.000Z',
+      sportCode: `t5-filter-a-${suiteId}`,
+    });
     // B 는 **종목이 달라야 한다** — 아래 첫 단언이 "A 의 종목으로 거르면 B 가 빠진다" 다.
     // 이 시나리오는 대진을 만들지 않으므로 경기 설정이 없는 종목이어도 된다.
     const scenarioB = await createLeagueScenario({
@@ -614,12 +622,16 @@ describe('GET /league-matches (list, R5)', () => {
     });
   });
 
+  // **이 테스트는 종목을 격리할 수 없다** — 대진을 만들어야 하고(아래 weeksCount), 대진 생성은
+  // 경기 설정이 있는 종목(futsal)을 요구한다. 그래서 격리를 `regionId` 로 한다 — 지역은
+  // 시나리오마다 새로 만들어지므로 이 테스트의 리그만 걸린다. 이 테스트의 계약은 **상태**
+  // 필터이지 종목 필터가 아니므로 무엇으로 좁히든 계약은 그대로다.
   it('state 필터가 draft/active를 구분한다 -- 대진 생성 전은 draft, 생성 후는 active', async () => {
     const scenario = await createLeagueScenario({ title: `T5 상태 ${suiteId}`, startsOn: '2026-09-05T00:00:00.000Z', endsOn: '2026-09-30T00:00:00.000Z' });
 
-    const draftBefore = await request(app.getHttpServer()).get(`/api/v1/league-matches?sportId=${scenario.sportId}&state=draft`);
+    const draftBefore = await request(app.getHttpServer()).get(`/api/v1/league-matches?regionId=${scenario.regionId}&state=draft`);
     expect(draftBefore.body.data.items.map((item: { leagueId: string }) => item.leagueId)).toEqual([scenario.leagueId]);
-    const activeBefore = await request(app.getHttpServer()).get(`/api/v1/league-matches?sportId=${scenario.sportId}&state=active`);
+    const activeBefore = await request(app.getHttpServer()).get(`/api/v1/league-matches?regionId=${scenario.regionId}&state=active`);
     expect(activeBefore.body.data.items).toEqual([]);
 
     await request(app.getHttpServer())
@@ -628,22 +640,22 @@ describe('GET /league-matches (list, R5)', () => {
       .send({ weeksCount: 1 })
       .expect(201);
 
-    const activeAfter = await request(app.getHttpServer()).get(`/api/v1/league-matches?sportId=${scenario.sportId}&state=active`);
+    const activeAfter = await request(app.getHttpServer()).get(`/api/v1/league-matches?regionId=${scenario.regionId}&state=active`);
     expect(activeAfter.body.data.items.map((item: { leagueId: string }) => item.leagueId)).toEqual([scenario.leagueId]);
-    const draftAfter = await request(app.getHttpServer()).get(`/api/v1/league-matches?sportId=${scenario.sportId}&state=draft`);
+    const draftAfter = await request(app.getHttpServer()).get(`/api/v1/league-matches?regionId=${scenario.regionId}&state=draft`);
     expect(draftAfter.body.data.items).toEqual([]);
   });
 
   it('cursor 페이지네이션이 중복·누락 없이 다음 페이지로 이어지고, 마지막 페이지는 hasNext=false다', async () => {
     const scopeId = randomUUID().slice(0, 8);
-    // 대진 생성은 종목의 활성 경기 설정을 요구한다(`resolveTeamMatchCompetitionConfig` —
-    // 종목 코드가 futsal/soccer/football 일 때만 `<code>-v1` 설정을 찾는다). 스코프별로 새
-    // 종목을 만들면 설정이 없어 **409 COMPETITION_CONFIG_REQUIRED** 로 막힌다.
-    // league-fixture-timing 과 같은 방식으로 공유 futsal 종목을 upsert 한다.
+    // **고유 종목이어야 한다** — 이 테스트는 목록을 페이지로 훑으며 `toEqual` 로 완전 일치를
+    // 단언한다. 공유 futsal 을 쓰면 이 스위트의 다른 테스트가 만든 리그가 페이지에 섞인다
+    // (CI 실측: 기대와 전혀 다른 두 리그가 첫 페이지에 왔다). 대진을 만들지 않으므로
+    // 경기 설정이 없는 종목이어도 된다.
     const sport = await prisma.v1Sport.upsert({
-      where: { code: 'futsal' },
+      where: { code: `t5-list-page-sport-${scopeId}` },
       update: {},
-      create: { code: 'futsal', name: '풋살' },
+      create: { code: `t5-list-page-sport-${scopeId}`, name: `T5 페이지 종목 ${scopeId}` },
     });
     const region = await prisma.v1Region.create({ data: { code: `t5-list-page-region-${scopeId}`, name: `T5 페이지 지역 ${scopeId}`, level: 2 } });
     // 서비스 기본 정렬은 createdAt desc(최근 개설순)다 -- 순차로(await) 3개를 만들면

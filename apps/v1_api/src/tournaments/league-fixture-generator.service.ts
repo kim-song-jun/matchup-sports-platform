@@ -162,7 +162,8 @@ export interface LeagueGenerationGuardInput {
  *
  * 최상위 키가 아니라 `details` 아래에 싣는 이유: `AllExceptionsFilter` 가 응답 본문을
  * `{ code, message, details }` 로만 재조립하므로(`common/filters/http-exception.filter.ts`
- * — **파일명과 클래스명이 다르다.** `HttpExceptionFilter` 라는 클래스는 없다)
+ * — **파일명과 클래스명이 다르다.**
+ * `HttpExceptionFilter` 라는 클래스는 없다 — 의도적 언급, 지우지 말 것)
  * 예외 객체 최상위에 얹은 필드는 클라이언트에 **도달하지 않는다**.
  */
 export interface LeagueFixtureReplaceImpact {

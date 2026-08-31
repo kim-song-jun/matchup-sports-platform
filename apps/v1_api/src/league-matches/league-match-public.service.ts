@@ -203,8 +203,8 @@ export class LeagueMatchPublicService {
     // **500 + "Internal server error"** 로 정규화해 **리그 id 도 code 도 전부 유실된다.**
     // 그러면 "어느 리그인지 대며 실패한다" 가 소스에만 참이고 응답에서는 거짓이 된다.
     // (클래스명은 `AllExceptionsFilter` 다 — 파일은 `common/filters/http-exception.filter.ts`
-    // 인데 **파일명과 클래스명이 다르다.** `HttpExceptionFilter` 라는 클래스는 없으므로 그
-    // 이름으로 적으면 검색해도 안 나온다.)
+    // 인데 **파일명과 클래스명이 다르다.** 그 이름으로 적으면 검색해도 안 나온다.
+    // `HttpExceptionFilter` 라는 클래스는 없다 — 의도적 언급, 지우지 말 것)
     // 한 번만 순회해 나눈다. 술어(`isComplete`)가 "완전하다"의 **유일한 정의**이고,
     // 타입 술어라서 통과한 행은 아래에서 단언 없이 non-null 로 쓸 수 있다.
     type LeagueMirrorRow = (typeof mirrors)[number];

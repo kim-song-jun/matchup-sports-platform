@@ -22,6 +22,7 @@ import type {
   CreateTournamentFieldDto,
   UpdateTournamentFieldDto,
 } from './dto/tournament-operations-field.dto';
+import { findTournamentOnSurface, TOURNAMENT_KINDS } from '../../tournaments/tournament-surface-lookup';
 
 export type TournamentOperationsFieldAuditContext = {
   readonly requestId: string;
@@ -597,7 +598,7 @@ export class TournamentOperationsFieldsService {
   }
 
   private async assertTournamentExists(tournamentId: string): Promise<void> {
-    const tournament = await this.prisma.v1Tournament.findFirst({
+    const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
       select: { id: true },
     });

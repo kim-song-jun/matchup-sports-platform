@@ -285,7 +285,7 @@ describe('LeagueFixtureGeneratorService.generate', () => {
   let writeLog: string[] = [];
 
   const prisma = {
-    v1Tournament: { findUnique: jest.fn() },
+    v1Tournament: { findFirst: jest.fn() },
     v1TournamentGroup: { findFirst: jest.fn() },
     v1TournamentRegistration: { findMany: jest.fn() },
     v1TournamentFixture: {
@@ -380,7 +380,7 @@ describe('LeagueFixtureGeneratorService.generate', () => {
     prisma.$transaction.mockImplementation((cb: (tx: typeof prisma) => Promise<unknown>) => cb(prisma));
     adminContext.getMutationAdmin.mockResolvedValue(admin);
     adminContext.logAdminAction.mockResolvedValue({ actionLogId: 'log-1', statusChangeLogId: null });
-    prisma.v1Tournament.findUnique.mockResolvedValue({
+    prisma.v1Tournament.findFirst.mockResolvedValue({
       id: 't1',
       format: 'league',
       minMatchesPerTeam: null,
@@ -515,7 +515,7 @@ describe('LeagueFixtureGeneratorService.generate', () => {
   // C1: 규칙 버전이 없으면 게임을 만들 수 없다 — 그런데도 fixture 만 만들어 두면 그게 바로
   // "공개 일정에서 사라지는" 그 행이 된다. 기존 대진을 건드리기 전에 거부해야 한다.
   it('C1: 대회에 활성 경기 규칙 버전이 없으면 기존 대진을 건드리지 않고 거부한다', async () => {
-    prisma.v1Tournament.findUnique.mockResolvedValue({
+    prisma.v1Tournament.findFirst.mockResolvedValue({
       id: 't1',
       format: 'league',
       minMatchesPerTeam: null,

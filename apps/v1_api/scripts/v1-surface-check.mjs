@@ -44,6 +44,7 @@ import { execSync } from 'node:child_process';
 
 const LOOKUP_BASELINE = 'scripts/tournament-surface-baseline.json';
 const RAW_SQL_BASELINE = 'scripts/tournament-raw-sql-baseline.json';
+const LEAGUE_ALLOWED_BASELINE = 'scripts/tournament-league-allowed-baseline.json';
 
 /**
  * 헬퍼 자신은 세지 않는다 — **원시 조회가 허용된 유일한 자리**다.
@@ -61,10 +62,45 @@ const RAW_LOOKUP = /\bv1Tournament\s*\.\s*(findUnique|findFirst)(OrThrow)?\s*\(/
 /** raw SQL 안의 테이블 이름. 주석은 세지 않는다 — 이 파일들엔 설명 주석이 많다. */
 const RAW_TABLE = /\bv1_tournaments\b/g;
 
+/**
+ * **리그를 의도적으로 허용하는 자리.** 원시 호출을 0 으로 만든 뒤에도 남는 구멍이 하나
+ * 있다 — 호출부가 `ALL_COMPETITION_KINDS` 를 넘기면 헬퍼를 쓰면서도 리그가 통과한다.
+ * 그건 **정당한 선택일 수 있지만 언제나 리뷰 대상**이어야 하므로 개수를 묶는다.
+ * (주석 줄은 세지 않는다 — 이 저장소는 주석에서 식별자를 그대로 인용한다.)
+ */
+const LEAGUE_ALLOWED = /\bALL_COMPETITION_KINDS\b/g;
+
 const violations = [];
 
 function countRawLookups(source) {
   return (source.match(RAW_LOOKUP) ?? []).length;
+}
+
+function countLeagueAllowed(source) {
+  let n = 0;
+  // **import 는 세지 않는다** — 세면 호출 1곳이 2로 잡혀 baseline 이 실제와 어긋나고,
+  // "몇 군데서 리그를 허용하는가"라는 이 검사의 질문에 답하지 못한다.
+  //
+  // **한 줄 판정으로는 부족하다**(Copilot 리뷰 지적, 실측 재현): Prettier 가 import 를
+  // 여러 줄로 감싸면 specifier 가 자기 줄에 오는데(`  ALL_COMPETITION_KINDS,`) 그 줄은
+  // `import` 로 시작하지 않아 그대로 세어진다 → 1곳이 2로 잡혀 **게이트가 오탐으로 깨진다.**
+  // 그래서 `import` 부터 `from '…';` 까지를 **블록으로** 건너뛴다.
+  let inImport = false;
+  for (const line of source.split('\n')) {
+    const trimmed = line.trimStart();
+    if (trimmed.startsWith('*') || trimmed.startsWith('//') || trimmed.startsWith('/*')) continue;
+    if (inImport) {
+      if (/\bfrom\s*['"]/.test(trimmed) || trimmed.endsWith(';')) inImport = false;
+      continue;
+    }
+    if (trimmed.startsWith('import ') || trimmed.startsWith('import{')) {
+      // 한 줄로 끝나지 않는 import 면 다음 줄부터 블록으로 이어 건너뛴다.
+      if (!/\bfrom\s*['"]/.test(trimmed)) inImport = true;
+      continue;
+    }
+    n += (line.match(LEAGUE_ALLOWED) ?? []).length;
+  }
+  return n;
 }
 
 function countRawSqlTable(source) {
@@ -152,6 +188,14 @@ function main() {
     hint: 'findTournamentOnSurface(OrThrow) 를 써라 (src/tournaments/tournament-surface-lookup.ts)',
   });
 
+  const leagueAllowed = checkBaseline({
+    label: '리그 허용 지점',
+    baselinePath: LEAGUE_ALLOWED_BASELINE,
+    files: all.filter((f) => !SANCTIONED.has(f)),
+    count: countLeagueAllowed,
+    hint: '리그를 대회 표면에 허용하는 선택이다 — baseline 에 이유(why)와 함께 올려라',
+  });
+
   const rawSql = checkBaseline({
     label: 'raw SQL 대회 테이블',
     baselinePath: RAW_SQL_BASELINE,
@@ -166,7 +210,8 @@ function main() {
   console.log(
     `[v1-surface-check] 파일 ${all.length}개 스캔 · ` +
       `원시 대회 단건 조회 ${lookup?.total ?? '?'}곳 (baseline ${lookup?.allowedTotal ?? '?'}) · ` +
-      `raw SQL 대회 테이블 ${rawSql?.total ?? '?'}곳 (baseline ${rawSql?.allowedTotal ?? '?'})`,
+      `raw SQL 대회 테이블 ${rawSql?.total ?? '?'}곳 (baseline ${rawSql?.allowedTotal ?? '?'}) · ` +
+      `리그 허용 ${leagueAllowed?.total ?? '?'}곳 (baseline ${leagueAllowed?.allowedTotal ?? '?'})`,
   );
 }
 

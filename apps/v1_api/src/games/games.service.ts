@@ -126,6 +126,7 @@ import type {
   RevokeIdentityLinkDto,
   RevokeParticipantConsentDto,
 } from './dto/game-participant-identity.dto';
+import { findTournamentOnSurface, TOURNAMENT_KINDS } from '../tournaments/tournament-surface-lookup';
 
 type Transaction = Prisma.TransactionClient;
 type CommandResult = object;
@@ -5462,7 +5463,12 @@ export class GamesService {
    * 뒤집어쓴다. 계정 미연결 참가자는 대상에서 빠진다.
    */
   private async suspensionVerdicts(tx: Transaction, tournamentId: string, fixtureId: string) {
-    const tournament = await tx.v1Tournament.findUnique({
+    // **행이 없으면 규정이 조용히 꺼진다**(아래 `?? null` → `suspensionRulesEnabled` false).
+    // 지금은 리그가 이 경로로 오지 않아 대회 표면으로 좁히는 것이 맞지만, 화면 전환
+    // (read-swap)이 리그 경기를 여기로 보내게 되면 **이 줄을 `ALL_COMPETITION_KINDS` 로
+    // 넓혀야 한다** — 안 그러면 리그 징계 규정이 에러 없이 사라진다
+    // (docs/ops/read-swap-preflight.md 에 목록으로 둔다).
+    const tournament = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
       where: { id: tournamentId },
       select: { yellowAccumulationLimit: true, redCardSuspensionMatches: true },
     });

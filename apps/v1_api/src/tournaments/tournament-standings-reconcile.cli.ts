@@ -32,6 +32,7 @@
 import { PrismaService } from '../prisma/prisma.service';
 import { validateCompetitionConfig } from './competition-config/competition-config';
 import { recalculateAndUpsertOverallStandings } from './tournament-overall-standings';
+import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
 
 export interface StandingTotals {
   registrationId: string;
@@ -133,7 +134,7 @@ async function main(): Promise<void> {
   const prisma = new PrismaService();
   await prisma.$connect();
   try {
-    const tournament = await prisma.v1Tournament.findFirst({
+    const tournament = await findTournamentOnSurface(prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
       include: { competitionConfig: true },
     });

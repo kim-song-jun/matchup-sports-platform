@@ -19,6 +19,7 @@ import {
   TournamentStaffAccessService,
   type TournamentStaffPrincipal,
 } from './tournament-staff-access.service';
+import { findTournamentOnSurface, TOURNAMENT_KINDS } from '../tournament-surface-lookup';
 
 export const TOURNAMENT_STAFF_MANAGEMENT_CLOCK = Symbol('TOURNAMENT_STAFF_MANAGEMENT_CLOCK');
 export type TournamentStaffManagementClock = () => Date;
@@ -428,7 +429,7 @@ export class TournamentStaffService {
     targetUserId: string,
   ): Promise<void> {
     const [tournament, target] = await Promise.all([
-      tx.v1Tournament.findUnique({ where: { id: tournamentId }, select: { id: true } }),
+      findTournamentOnSurface(tx, TOURNAMENT_KINDS, { where: { id: tournamentId }, select: { id: true } }),
       tx.v1User.findUnique({
         where: { id: targetUserId },
         select: { id: true, accountStatus: true },

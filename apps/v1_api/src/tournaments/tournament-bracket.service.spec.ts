@@ -25,6 +25,7 @@ import { AdminContextService } from '../common/admin-context.service';
 import { TournamentBracketService } from './tournament-bracket.service';
 import { GamesService } from '../games/games.service';
 import { FOOTBALL_V1_CONFIG } from './competition-config/competition-config';
+import { kindAwareFindFirst } from '../../test/helpers/kind-aware-find-first';
 
 // ─── fixtures ────────────────────────────────────────────────────────────────
 
@@ -398,6 +399,22 @@ describe('TournamentBracketService', () => {
       ).rejects.toMatchObject({
         response: { code: 'LEAGUE_ADVANCE_COUNT_FORBIDDEN' },
       });
+      expect(prisma.v1TournamentGroup.create).not.toHaveBeenCalled();
+    });
+
+    // 위 두 케이스는 **가드**(format/kind)를 본다. 아래는 그보다 앞의 **대회 표면 봉쇄** —
+    // 리그 id 는 가드에 닿기도 전에 대회 조회에서 막혀야 한다(조회가 헬퍼를 거치는지).
+    it('리그 id 는 조 생성 자체가 막힌다 — 조 행이 만들어지지 않는다', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+      prisma.v1Tournament.findFirst.mockImplementation(
+        kindAwareFindFirst(tournamentRow({ kind: 'regular_league' })),
+      );
+      // 봉쇄가 없으면 실제로 성공하도록 채운다.
+      prisma.v1TournamentGroup.create.mockResolvedValue(groupRow({ phase: 'group' }));
+
+      await expect(
+        service.createGroup(ownerUser, 'league-1', { name: 'A조', phase: 'group', sortOrder: 1 }),
+      ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_NOT_FOUND' } });
       expect(prisma.v1TournamentGroup.create).not.toHaveBeenCalled();
     });
 

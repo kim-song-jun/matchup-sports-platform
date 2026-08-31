@@ -6,6 +6,7 @@ import {
   recalculateAndUpsertGroupStandings,
 } from './tournament-group-standings';
 import { recalculateAndUpsertOverallStandings } from './tournament-overall-standings';
+import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
 
 /**
  * Batch counterpart of `TournamentBracketService.recalculateStandings()`
@@ -64,10 +65,14 @@ export async function runTournamentStandingsRecalculation(
   let groupsRecalculated = 0;
 
   for (const tournamentId of tournamentIds) {
-    const tournament = await prisma.v1Tournament.findFirst({
+    const tournament = await findTournamentOnSurface(prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
       include: { competitionConfig: true },
     });
+    // **행이 없으면 조용히 건너뛴다 — 에러가 안 난다.** 지금은 리그가 이 경로로 오지
+    // 않으므로 대회 표면으로 좁히는 것이 맞지만, 화면 전환(read-swap)이 리그를 여기로
+    // 보내면 **리그 순위가 에러 없이 갱신되지 않는다.** 그때 이 줄을
+    // `ALL_COMPETITION_KINDS` 로 넓혀야 한다 (docs/ops/read-swap-preflight.md).
     if (!tournament) continue;
 
     let config;

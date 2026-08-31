@@ -14,6 +14,7 @@ import {
 import { CompetitionConfigRegistry } from './competition-config-registry';
 import { TournamentCompetitionConfig } from './tournament-competition-config';
 import { FOOTBALL_V1_CONFIG, FUTSAL_V1_CONFIG } from './competition-config.presets';
+import { findTournamentOnSurface, ALL_COMPETITION_KINDS } from '../tournament-surface-lookup';
 
 /**
  * Publishes a canonical-matching successor for a drifted well-known
@@ -361,7 +362,12 @@ async function processSeed(
     // then throw NOT_FOUND and abort the whole run over a row that is no
     // longer a repoint target at all. A row that disappeared from the target
     // set is not an error; skip it and account for it.
-    const fresh = await prisma.v1Tournament.findFirst({ where: { id: tournamentId, deletedAt: null } });
+    // **설정 축은 리그도 허용한다**(`tournament-surface.ts` 의 '여기 걸지 않는 곳' 참조) —
+    // 설정은 대회와 리그가 이미 공유하므로 여기서 종류를 가르면 리그만 옛 설정에 남는다.
+    // 허용을 baseline 주석이 아니라 **코드에 명시**한다.
+    const fresh = await findTournamentOnSurface(prisma, ALL_COMPETITION_KINDS, {
+      where: { id: tournamentId, deletedAt: null },
+    });
     if (fresh === null) {
       skippedDeletedTournaments += 1;
       continue;

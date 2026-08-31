@@ -37,7 +37,7 @@ function fakeTx(options: {
       findMany: jest.fn().mockResolvedValue(options.preferences),
     },
     v1Tournament: {
-      findUnique: jest.fn().mockResolvedValue({ title: '테스트 대회' }),
+      findFirst: jest.fn().mockResolvedValue({ title: '테스트 대회' }),
     },
     v1Team: {
       findMany: jest.fn().mockResolvedValue([

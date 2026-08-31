@@ -129,3 +129,36 @@
 
 등록 후 다음 dev 머지(=alpha 배포)부터 적용된다. 확인은 알림을 하나 유발해 보는 것으로 한다 —
 row 만 생기고 폰이 조용하면 여전히 주입되지 않은 것이다.
+
+
+### IAM — 시크릿을 등록해도 이것 없이는 전달되지 않는다 (2026-08-31 실측)
+
+시크릿 4개를 등록한 뒤에도 동기화가 이렇게 실패했다:
+
+```
+AccessDeniedException ... assumed-role/teameet-alpha-github-deploy/GitHubActions
+is not authorized to perform: ssm:PutParameter on
+resource: .../parameter/teameet/alpha/env/APNS_KEY_ID
+```
+
+**권한 자체가 없는 것이 아니다.** 같은 배포에서 문의 Slack 웹훅 동기화는 같은 API 로
+성공한다 — 배포 역할의 정책이 **파라미터 이름 단위로 허용**돼 있고 거기에 APNS 경로가
+없을 뿐이다. Apple 의 오류 문구("no identity-based policy allows the action")가 마치
+권한이 통째로 없는 것처럼 읽혀 엉뚱한 곳을 보게 만든다.
+
+**운영자가 해야 할 것** — 배포 역할 `teameet-alpha-github-deploy` 의 정책에서
+`ssm:PutParameter` 가 허용된 리소스 목록에 아래 4개를 추가한다(리전·계정은 기존 항목과 동일):
+
+```
+arn:aws:ssm:<region>:<account>:parameter/teameet/alpha/env/APNS_KEY_ID
+arn:aws:ssm:<region>:<account>:parameter/teameet/alpha/env/APNS_TEAM_ID
+arn:aws:ssm:<region>:<account>:parameter/teameet/alpha/env/APNS_BUNDLE_ID
+arn:aws:ssm:<region>:<account>:parameter/teameet/alpha/env/APNS_PRIVATE_KEY
+```
+
+**왜 Parameter Store 를 거치나 — 값을 명령에 직접 실어 보내면 권한 추가가 필요 없지만,
+그 값은 SSM 명령 이력에 남아 계정 안에서 조회된다.** 개인 키에는 맞지 않는 거래라
+SecureString 경로를 유지하고 권한을 넓히는 쪽을 택했다.
+
+정책을 고친 뒤에는 다음 dev 머지(=alpha 배포)에서 동기화가 성공한다. 배포 로그의
+`Sync APNs runtime env` 단계에 경고가 없으면 반영된 것이다.

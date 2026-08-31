@@ -95,8 +95,15 @@ DATABASE_URL=<alpha> ts-node src/tournaments/migration/league-competition-backfi
 | 모델 | 언제 붙나 |
 |---|---|
 | `V1GameOfficialResultCache` | 경기 **공식 결과가 확정**될 때 |
-| `V1TournamentStaffAssignment` | 스태프를 배정할 때 |
+| `V1TournamentCampaign` | 대회 캠페인이 생길 때 |
 | `V1OperationAudit` | 운영 감사 로그가 그 대회를 참조할 때 |
+
+> **2026-08-31 정정**: 이 표에는 `V1TournamentStaffAssignment` 가 있었고
+> `V1TournamentCampaign` 이 없었다. pg 카탈로그 실측 결과 스태프 배정의 `tournament`
+> 관계는 **`Cascade`** 이고, 캠페인이 **직접 `Restrict`** 다. 다만 스태프 배정도 창을 닫기는
+> 한다 — 대회가 아니라 **필드**를 Restrict 하고 대회→필드가 Cascade 라 **한 다리 건너**
+> 막는다(같은 경로: `v1_tournament_fixtures`·`v1_operation_audits`).
+> 전체 표와 근거 SQL 은 `docs/ops/read-swap-preflight.md` 2절.
 
 `Cascade` 관계 12개(`registrations`·`groups`·`fixtures`·`awards`…)는 함께 지워지므로
 **창을 닫지 않는다.** 위험한 것은 Restrict 셋뿐이다.

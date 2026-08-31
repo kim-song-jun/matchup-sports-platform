@@ -70,13 +70,53 @@ read-swap 을 붙인 뒤 리그 경기로 각각을 실제로 통과시킨다:
 
 ## 2. 되돌리기 창 — **read-swap 이 그것을 영구히 닫는다**
 
-백필로 만든 `kind='regular_league'` 88행은 **지금은 지울 수 있다.** 그 창을 닫는 것은
-`onDelete: Restrict` 로 대회를 참조하는 **세 관계**다
-(`docs/ops/league-competition-backfill-apply.md` 참조). **쓰기 위치를 전수 확인했다:**
+백필로 만든 `kind='regular_league'` 88행은 **지금은 지울 수 있다** — 2026-08-31 실측으로
+아래 여섯 자리가 **전부 0행**이다.
+
+### ⚠️ 2026-08-31 정정 — **"세 관계"가 아니고, 목록도 하나 틀렸다**
+이 자리에는 `V1TournamentStaffAssignment`·`V1OperationAudit`·`V1GameOfficialResultCache`
+**세 관계**라고 적혀 있었다. **pg 카탈로그로 직접 확인하니 다르다**(스키마 서술이 아니라
+실제 제약을 봤다):
+
+```sql
+SELECT c.conrelid::regclass, c.confdeltype FROM pg_constraint c
+ WHERE c.contype='f' AND c.confrelid='v1_tournaments'::regclass AND c.confdeltype <> 'c';
+```
+
+**① 대회를 직접 Restrict 하는 것 — 3개 (하나가 목록에 없었다)**
+
+| 자식 테이블 | 언제 붙나 | 알파 현재 |
+|---|---|---|
+| `v1_tournament_campaigns` | 대회 캠페인이 생길 때 — **문서에 아예 없던 관계다** | 0 |
+| `v1_operation_audits` | 운영 감사 로그가 그 대회를 참조할 때 | 0 |
+| `v1_game_official_result_cache` | 경기 **공식 결과가 확정**될 때 (**raw SQL**) | 0 |
+
+**② `V1TournamentStaffAssignment` 는 직접 Restrict 이 아니다**
+그 모델의 `tournament` 관계는 **`onDelete: Cascade`** 다. 창을 닫는 것은 대회가 아니라
+**필드**를 향한 `v1_staff_field_fk`(Restrict)이고, 대회 → 필드가 Cascade 라서
+**한 다리 건너** 막는다. 같은 경로로 막는 것이 셋이다:
+
+| 자식 테이블 | 무엇을 Restrict 하나 | 알파 현재 |
+|---|---|---|
+| `v1_tournament_fixtures` | `v1_tournament_fields` | 0 (필드 자체가 0) |
+| `v1_tournament_staff_assignments` | `v1_tournament_fields` | 0 |
+| `v1_operation_audits` | `v1_tournament_fields` | 0 |
+
+> **왜 이게 중요한가**: PostgreSQL 의 `RESTRICT` 는 **즉시 검사**라, 그 자식이 다른 경로로
+> 함께 지워질 예정이어도 삭제를 막는다. 즉 "어차피 Cascade 로 같이 지워지니 괜찮다"가
+> **성립하지 않는다.**
+
+> **원래 표가 "쓰는 곳"까지 전수 확인했다고 적고 있었다.** 관계 목록이 틀린 채로
+> 쓰는 곳을 전수 확인하면, **없는 관계를 봉쇄하고 있는 관계를 놓친다.**
+
+**아직 참인지 확인하는 법**: 위 SQL 을 다시 돌린다(SSM → psql). 행이 늘었으면 이 표를 갱신한다.
+직접 Restrict 셋과 필드 경유 셋 **양쪽 다** 세야 한다 — 직접만 세면 스태프·대진을 놓친다.
+
+**쓰는 곳** (①의 셋):
 
 | 관계 | 쓰는 곳 | 상태 |
 |---|---|---|
-| `V1TournamentStaffAssignment` | `tournaments/staff/tournament-staff.service.ts` | 봉쇄됨 · 테스트로 고정 |
+| `V1TournamentCampaign` | 캠페인 도메인 | **미확인 — 이 정정에서 새로 드러난 자리다** |
 | `V1OperationAudit` | `tournament-operations/fields/…-fields.service.ts` 외 공용 라이터 | 봉쇄됨 · 테스트로 고정 |
 | `V1GameOfficialResultCache` | `game-operations/game-result-public-cache.service.ts` (**raw SQL**) | **read-swap 이 여는 자리** |
 

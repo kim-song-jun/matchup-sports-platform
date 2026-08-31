@@ -11,9 +11,13 @@ import {
   tierSlotCounts,
   type PromotionKind,
 } from './league-promotion';
-import { resolveIsForfeit } from './league-match-forfeit.service';
 import { ListLeagueMatchesQueryDto } from './dto/league-match.dto';
 import { bucketLeagueFixtures } from './league-standings-source';
+import {
+  LEAGUE_FIXTURE_FACT_SELECT,
+  LEAGUE_FIXTURE_LIST_SELECT,
+  toLeagueFixtureList,
+} from './league-fixture-list-source';
 import { LEAGUE_STATE_BY_STATUS } from '../tournaments/league-competition-mirror';
 
 const PLAYER_RECORDS_LIMIT = 30;
@@ -370,10 +374,9 @@ export class LeagueMatchPublicService {
     const fixtures = await this.prisma.v1TeamMatch.findMany({
       where: { leagueId },
       orderBy: { startAt: 'asc' },
-      select: {
-        id: true, title: true, hostTeamId: true, approvedApplicantTeamId: true, startAt: true, placeName: true, status: true,
-        game: { select: { id: true, currentOfficialRevisionId: true } },
-      },
+      // select 를 손으로 적지 않는다 — 대회 표면의 리그 경로가 같은 목록을 만들어야 하고,
+      // 두 곳이 서로 다른 select 를 쓰면 같은 대진이 화면마다 다른 모양으로 나온다.
+      select: LEAGUE_FIXTURE_LIST_SELECT,
     });
 
     // standings()와 동일한 패턴: 확정 리비전 id를 모아 v1_game_official_fact를
@@ -390,12 +393,7 @@ export class LeagueMatchPublicService {
           // `reason`은 컬럼이 생기기 전에 만들어진 레거시 리비전을 위한 fallback으로만
           // 계속 읽는다 — 사유 원문은 운영자가 쓴 자유 텍스트라 공개 응답에 절대 싣지
           // 않고, 아래에서 boolean 으로만 환산한다.
-          select: {
-            gameId: true,
-            homeScore: true,
-            awayScore: true,
-            resultRevision: { select: { reason: true, outcomeReason: true } },
-          },
+          select: LEAGUE_FIXTURE_FACT_SELECT,
         });
     const factByGameId = new Map(facts.map((fact) => [fact.gameId, fact]));
 
@@ -436,30 +434,10 @@ export class LeagueMatchPublicService {
         state: sibling.state,
       })),
       teamIds: league.teams.map((entry) => entry.teamId),
-      fixtures: fixtures.map((fixture) => {
-        const fact = fixture.game === null ? undefined : factByGameId.get(fixture.game.id);
-        return {
-          teamMatchId: fixture.id,
-          title: fixture.title,
-          homeTeamId: fixture.hostTeamId,
-          awayTeamId: fixture.approvedApplicantTeamId,
-          startAt: fixture.startAt,
-          placeName: fixture.placeName,
-          status: fixture.status,
-          // 공식 결과가 아직 없으면(미확정 대진) null -- 0:0으로 오인되지 않게 명시적으로
-          // nullable을 유지한다.
-          homeScore: fact?.homeScore ?? null,
-          awayScore: fact?.awayScore ?? null,
-          // 몰수 결과는 스코어만 보면 실제 1:0 승리와 구분되지 않는다. 관전자가 그 둘을
-          // 같은 경기로 읽지 않도록 boolean 하나만 내보낸다(사유 원문은 비공개).
-          // 감사 L-E finding 4 수정: 판정 근거를 전용 컬럼 `outcomeReason`으로 옮겼다
-          // (정정을 거쳐도 `league-match-result-entry.service.ts`의 correctResultOnce가
-          // 이 컬럼을 승계하므로 표식이 유지된다). 레거시 fallback을 포함한 판정 로직은
-          // `resolveIsForfeit`(league-match-forfeit.service.ts) 단일 출처를 쓴다 —
-          // 어드민 상세(league-match-admin.service.ts)도 같은 함수를 쓴다.
-          isForfeit: fact === undefined ? false : resolveIsForfeit(fact.resultRevision),
-        };
-      }),
+      // 미확정 대진의 점수를 null 로 두는 것, 몰수를 boolean 하나로만 내보내는 것(사유
+      // 원문 비공개)은 `league-fixture-list-source.ts` 가 지킨다 — 대회 표면의 리그
+      // 경로도 같은 함수를 쓴다.
+      fixtures: toLeagueFixtureList(fixtures, factByGameId),
     };
   }
 

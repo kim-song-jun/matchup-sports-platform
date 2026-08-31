@@ -143,7 +143,7 @@ describe('ChatRoomPageClient', () => {
     expect(screen.queryByText('수아님이 참가 승인됐어요')).not.toBeInTheDocument();
   });
 
-  it('shows a timestamp for every consecutive message from the same sender', () => {
+  it('shows one timestamp at the bottom of each same-sender, same-minute run', () => {
     hooks.chatRoom.mockReturnValue({
       data: {
         roomId: 'room-times',
@@ -182,6 +182,15 @@ describe('ChatRoomPageClient', () => {
             messageType: 'text',
             content: 'Other second',
             status: 'sent',
+            sentAt: '2026-08-31T09:01:45.000Z',
+            mine: false,
+          },
+          {
+            messageId: 'other-3',
+            sender: { userId: 'user-other', displayName: 'Other', profileImageUrl: null },
+            messageType: 'text',
+            content: 'Other third',
+            status: 'sent',
             sentAt: '2026-08-31T09:02:00.000Z',
             mine: false,
           },
@@ -200,6 +209,15 @@ describe('ChatRoomPageClient', () => {
             messageType: 'text',
             content: 'Mine second',
             status: 'sent',
+            sentAt: '2026-08-31T09:03:45.000Z',
+            mine: true,
+          },
+          {
+            messageId: 'mine-3',
+            sender: { userId: 'user-me', displayName: 'Me', profileImageUrl: null },
+            messageType: 'text',
+            content: 'Mine third',
+            status: 'sent',
             sentAt: '2026-08-31T09:04:00.000Z',
             mine: true,
           },
@@ -213,10 +231,10 @@ describe('ChatRoomPageClient', () => {
 
     renderWithClient(<ChatRoomPageClient roomId={'room-times'} />);
 
-    expect(screen.getByText('18:01')).toBeInTheDocument();
-    expect(screen.getByText('18:02')).toBeInTheDocument();
-    expect(screen.getByText('18:03')).toBeInTheDocument();
-    expect(screen.getByText('18:04')).toBeInTheDocument();
+    expect(screen.getAllByText('18:01')).toHaveLength(1);
+    expect(screen.getAllByText('18:02')).toHaveLength(1);
+    expect(screen.getAllByText('18:03')).toHaveLength(1);
+    expect(screen.getAllByText('18:04')).toHaveLength(1);
   });
 
   it('still shows the placeholder conversation while the room is loading (documented loading-only behavior)', () => {

@@ -42,6 +42,11 @@ targets:
     settings:
       base:
         PRODUCT_NAME: Teameet
+        # Apple Team ID. Public — it appears in App Store metadata, and the association
+        # file for Universal Links names the app as <TEAMID>.<bundle id>. Setting it here
+        # means an archive fails on the missing certificate rather than on "select a team",
+        # which is a more useful message.
+        DEVELOPMENT_TEAM: U9J95Q6XD3
         # The icon set inside Teameet/Resources/Assets.xcassets. Without this the app ships
         # with the grey placeholder, which is what it did until now — an asset catalog alone
         # is not enough, the icon has to be named.

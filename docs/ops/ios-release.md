@@ -129,6 +129,67 @@ TestFlight 에는 두 종류의 테스트가 있고, **원하는 것은 외부 �
 > 일정을 세울 때 "승인 대기" 를 길이가 정해지지 않은 구간으로 두고, 그 앞의 (B) 를 최대한 당기는 것이
 > 유일하게 통제 가능한 부분이다.
 
+### 내부 테스트만 하는 최소 경로 — 심사 없이 오늘 시작할 수 있는 것
+
+외부 테스트(공개 링크)는 첫 빌드가 App Review 를 거치지만, **내부 테스트는 그 심사가 없다.**
+Apple 문서는 심사를 외부 테스터에 결부해 서술한다: "**If you invite external testers**, your beta
+build may require review."
+([TestFlight Overview](https://developer.apple.com/help/app-store-connect/test-a-beta-version/testflight-overview/))
+
+내부 테스터는 **앱에 접근 권한이 있는 App Store Connect 사용자 최대 100명**이다. 즉 테스터 각자가
+계정을 가져야 하고, 아무에게나 링크로 뿌릴 수는 없다 — 그건 외부 테스트다.
+([Add internal testers](https://developer.apple.com/help/app-store-connect/test-a-beta-version/add-internal-testers/))
+
+| 항목 | 내부 테스트 | 근거 |
+|---|---|---|
+| Beta App Review | **불필요** | 심사는 외부 테스터 초대에 결부돼 서술된다 |
+| 테스터 상한 | 100명 (App Store Connect 사용자) | Add internal testers |
+| 테스터 조건 | 각자 App Store Connect 계정 + 앱 접근 권한 필요 | 같은 문서 |
+| **앱 레코드** | **필요** | 빌드 업로드 전에 앱 레코드를 먼저 만들어야 한다 ([Add a new app](https://developer.apple.com/help/app-store-connect/create-an-app-record/add-a-new-app/)) |
+| **Business 계약 동의** | **필요** | "You can't add an app to your account until the Account Holder signs the latest agreement in the Business section." — 앱 레코드 생성 자체가 막힌다 |
+| **수출규정(암호화)** | **필요** | 암호화를 쓰는 앱은 업로드·테스트·배포 전에 판단이 필요하다. 베타 빌드에도 붙인다 ([Overview of export compliance](https://developer.apple.com/help/app-store-connect/manage-app-information/overview-of-export-compliance/)) |
+| 개인정보처리방침 URL | **확인하지 못함** | 심사 지침 5.1.1(i) 은 "App Store Connect metadata field" 에 링크를 요구하지만, **내부 TestFlight 를 막는다는 서술은 문서에서 찾지 못했다.** 추측으로 "필요 없다" 고 쓰지 않는다 — App Store 제출에는 확실히 필요하므로 어차피 준비하는 편이 낫다 |
+| 세금·은행 정보 | **확인하지 못함** | 무료 앱 내부 테스트에 필요한지 명시한 문서를 찾지 못했다. Business 계약과는 별개 항목이다 |
+
+**정리 — 사용자가 오늘 시작할 것 (내부 테스트 기준)**
+
+1. Account Holder 가 App Store Connect > Business 에서 **최신 계약 동의** ← 이게 없으면 2번이 막힌다
+2. **앱 레코드 생성** — 번들 ID `kr.co.teameet.alpha`
+3. Xcode 에 Apple 계정 로그인 (프로파일 자동 발급용)
+4. 테스터로 쓸 사람을 **App Store Connect 사용자로 초대**하고 앱 접근 권한 부여
+5. 업로드 후 내부 그룹 생성 → 빌드 추가 → 테스터 추가
+
+수출규정 질문은 업로드마다 뜬다. `Info.plist` 에 `ITSAppUsesNonExemptEncryption` 를 넣으면 매번
+묻지 않게 할 수 있다 — 다만 그 값은 **법적 선언**이라 이 저장소가 임의로 정하지 않았다. 이 앱은
+HTTPS 와 Keychain 등 OS 표준 암호화만 쓰므로 면제 대상에 해당할 가능성이 높지만, 확인 후 한 줄로
+넣는다.
+([Complying with Encryption Export Regulations](https://developer.apple.com/documentation/security/complying_with_encryption_export_regulations))
+
+### 준비된 것 — 지금 저장소에 있다
+
+| 산출물 | 상태 |
+|---|---|
+| `apps/v1_ios/ExportOptions.plist` | `method: app-store-connect`, teamID, 자동 서명, 심볼 업로드 |
+| `scripts/ios/archive-and-export.sh` | archive → export → (`--upload` 일 때만) 업로드 |
+| 빌드 번호 강제 | `version.properties` 가 원천. 같은 버전·빌드 번호로 두 번 업로드하면 스크립트가 먼저 막는다 |
+| `DEVELOPMENT_TEAM` | project.yml 에 설정 |
+
+**어디서 멈추는지 실제로 확인했다.** 인증서 없이 스크립트를 돌리면:
+
+```
+[archive] version 0.1.0 (1) from apps/v1_ios/version.properties
+[archive] scheme=TeameetAlpha configuration=Alpha Release
+error: No profiles for 'kr.co.teameet.alpha' were found: Xcode couldn't find any iOS App
+Development provisioning profiles matching 'kr.co.teameet.alpha'.
+** ARCHIVE FAILED **
+```
+
+이 지점이 위 체크리스트 1~3 이 끝나야 넘어가는 곳이다. `-allowProvisioningUpdates` 를 이미 붙여
+뒀으므로, 계정이 준비되면 Xcode 가 프로파일을 스스로 만든다.
+
+업로드는 `--upload` 플래그가 있을 때만 실행된다. **업로드는 되돌릴 수 없다** — 잘못 올린 빌드는
+삭제가 아니라 만료 처리만 된다.
+
 ### 세 갈래와 병목
 
 **(A) 지금 바로 할 수 있는 것 — 우리**

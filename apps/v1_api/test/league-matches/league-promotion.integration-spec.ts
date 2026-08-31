@@ -238,6 +238,23 @@ describe('리그 승강 확정 (Task 153)', () => {
         include: { teams: { select: { teamId: true } } },
       });
       expect(nextLeagues).toHaveLength(2);
+
+      // dual-write — 승강으로 만든 다음 시즌 리그에도 통합 축 거울이 함께 생겨야 한다.
+      // 안 생기면 그 리그는 read-swap 뒤 **에러 없이 화면에서 사라진다**(운영자는 "새 시즌
+      // 리그가 안 보인다"고만 말할 수 있다). 이 경로는 리그를 만드는 세 자리 중 하나다 —
+      // `docs/ops/read-swap-preflight.md` 9절 참고.
+      const nextMirrors = await prisma.v1Tournament.findMany({
+        where: { id: { in: nextLeagues.map((league) => league.id) } },
+        orderBy: { tier: 'asc' },
+      });
+      expect(nextMirrors).toHaveLength(2);
+      expect(nextMirrors.every((mirror) => mirror.kind === 'regular_league')).toBe(true);
+      // 값까지 리그와 같아야 한다 — 행만 있고 값이 비면 화면이 잘못 그려진다.
+      expect(nextMirrors.map((mirror) => mirror.tier)).toEqual(nextLeagues.map((league) => league.tier));
+      expect(nextMirrors.map((mirror) => mirror.seasonNo)).toEqual(
+        nextLeagues.map((league) => league.seasonNo),
+      );
+      expect(nextMirrors.every((mirror) => mirror.regionId !== null)).toBe(true);
       const nextTier1TeamIds = nextLeagues[0].teams.map((t) => t.teamId).sort();
       const nextTier2TeamIds = nextLeagues[1].teams.map((t) => t.teamId).sort();
       // 1부: 잔류 1팀 + 2부에서 승격한 1팀

@@ -33,8 +33,15 @@ function tournament(overrides: Row = {}) {
  * "가드 조건을 where 에서 빼는" 변이가 red 가 되지 않는다 — 그 함정을 이 저장소에서
  * 한 번 밟았다(참가팀 백필 스펙). count 는 조건을 통과한 행에서만 1 이다.
  */
-function fakePrisma(leagues: Row[], tournaments: Row[], onAfterRead?: (stored: Row[]) => void) {
-  const txClient: { v1Tournament: { updateMany: jest.Mock } } = { v1Tournament: { updateMany: undefined as never } };
+function fakePrisma(
+  leagues: Row[],
+  tournaments: Row[],
+  onAfterRead?: (stored: Row[]) => void,
+  mirrorCount?: number,
+) {
+  const txClient: {
+    v1Tournament: { updateMany: jest.Mock; count: jest.Mock };
+  } = { v1Tournament: { updateMany: undefined as never, count: undefined as never } };
   // **실제로 행을 바꾼다.** 안 바꾸면 롤백이 관측되지 않고, "단언이 트랜잭션 안에 있는가"
   // 라는 이 결함의 핵심을 테스트가 구분하지 못한다(실제로 못 잡는 것을 변이로 확인했다).
   const updateMany = jest.fn((args: { where: Row; data: Row }) => {
@@ -52,13 +59,16 @@ function fakePrisma(leagues: Row[], tournaments: Row[], onAfterRead?: (stored: R
     onAfterRead?.(tournaments);
     return snapshot;
   });
+  // 불변식(리그 수 == 거울 수) 관측값. 기본은 리그 수와 같게 둔다.
+  const countMirrors = jest.fn(async () => mirrorCount ?? tournaments.length);
   txClient.v1Tournament.updateMany = updateMany;
+  txClient.v1Tournament.count = countMirrors;
   return {
     updateMany,
     txClient,
     prisma: {
       v1League: { findMany: jest.fn().mockResolvedValue(leagues) },
-      v1Tournament: { findMany: readTournaments, updateMany },
+      v1Tournament: { findMany: readTournaments, updateMany, count: countMirrors },
       // **interactive 형만 받는다.** 배열형을 그대로 통과시키는 fake 를 두면 호출부가
       // 배열형으로 되돌아가도 테스트가 통과해서, 부분 커밋 결함이 다시 들어온다.
       $transaction: jest.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
@@ -152,6 +162,43 @@ describe('backfillLeagueCompetitionDetails', () => {
     expect(updateMany).not.toHaveBeenCalled();
   });
 
+  // ─── dual-write 와의 상호작용 ───────────────────────────────────────────────
+  // dual-write 가 배포된 뒤 새로 생긴 리그는 거울이 **처음부터 올바른 값**으로 만들어진다.
+  // 그걸 "낯선 값" 으로 막으면 **리그 하나 때문에 백필 전체가 멈춘다.**
+
+  it('이미 목표값과 같은 행은 막지 않고 건너뛴다 — dual-write 가 만든 거울', async () => {
+    const alreadyCorrect = tournament({
+      status: 'in_progress',
+      scheduledAt: new Date('2026-03-01T00:00:00.000Z'),
+      scheduledEndAt: new Date('2026-06-30T00:00:00.000Z'),
+      regionId: 'region-1',
+    });
+    const { prisma, updateMany } = fakePrisma([league()], [alreadyCorrect]);
+
+    const result = await backfillLeagueCompetitionDetails(prisma, { dryRun: false });
+
+    expect(result).toEqual({ scanned: 1, skipped: 1, planned: 0, updated: 0, mirrorCount: 1, dryRun: false });
+    expect(updateMany).not.toHaveBeenCalled();
+  });
+
+  it('값이 있지만 목표와 다르면 여전히 막는다 — 건너뛰기가 덮어쓰기 허용이 아니다', async () => {
+    // 한 필드만 달라도 막아야 한다. 같은 것끼리만 건너뛴다.
+    const different = tournament({
+      status: 'in_progress',
+      scheduledAt: new Date('2026-03-01T00:00:00.000Z'),
+      scheduledEndAt: new Date('2026-06-30T00:00:00.000Z'),
+      regionId: 'region-9',
+    });
+    const { prisma, updateMany } = fakePrisma([league()], [different]);
+
+    const error = await backfillLeagueCompetitionDetails(prisma, { dryRun: false }).catch(
+      (e: unknown) => e,
+    );
+
+    expect(error).toBeInstanceOf(LeagueDetailBackfillBlockedError);
+    expect(updateMany).not.toHaveBeenCalled();
+  });
+
   it('가드 2: 이미 값이 채워진 행이 있으면 덮어쓰지 않고 무엇이 찼는지 보고한다', async () => {
     const { prisma, updateMany } = fakePrisma(
       [league()],
@@ -219,11 +266,60 @@ describe('backfillLeagueCompetitionDetails', () => {
     const dry = fakePrisma([league()], [tournament()]);
     const dryResult = await backfillLeagueCompetitionDetails(dry.prisma, { dryRun: true });
     expect(dry.updateMany).not.toHaveBeenCalled();
-    expect(dryResult).toEqual({ scanned: 1, updated: 0, dryRun: true });
+    expect(dryResult).toEqual({ scanned: 1, skipped: 0, planned: 1, updated: 0, mirrorCount: 1, dryRun: true });
 
     const applied = fakePrisma([league()], [tournament()]);
     const applyResult = await backfillLeagueCompetitionDetails(applied.prisma, { dryRun: false });
     expect(applied.updateMany).toHaveBeenCalledTimes(1);
-    expect(applyResult).toEqual({ scanned: 1, updated: 1, dryRun: false });
+    expect(applyResult).toEqual({ scanned: 1, skipped: 0, planned: 1, updated: 1, mirrorCount: 1, dryRun: false });
+  });
+
+  it('불변식: 거울 수가 리그 수와 다르면 실패한다 — dual-write 가 빠진 자리를 드러낸다', async () => {
+    // updateMany 는 0행이어도 조용하다. 그 침묵을 여기서 개수로 깬다.
+    const { prisma } = fakePrisma([league()], [tournament()], undefined, 0);
+
+    await expect(backfillLeagueCompetitionDetails(prisma, { dryRun: false })).rejects.toThrow(
+      /리그 1 · 거울 0/,
+    );
+  });
+
+  it('--apply 인데 고칠 게 없어도 불변식을 센다 — 재실행이 검사를 건너뛰면 안 된다', async () => {
+    // "다 들어갔나" 를 확인하려고 재실행하는 바로 그 순간이 `toUpdate` 가 비는 경우다.
+    // 검사를 트랜잭션 안에만 두면 여기서 통째로 사라지고, 운영자는 "불변식 통과" 로 읽는다.
+    const alreadyCorrect = tournament({
+      status: 'in_progress',
+      scheduledAt: new Date('2026-03-01T00:00:00.000Z'),
+      scheduledEndAt: new Date('2026-06-30T00:00:00.000Z'),
+      regionId: 'region-1',
+    });
+    // 거울 수를 리그 수보다 적게 만든다(dual-write 가 빠진 자리가 있는 상태).
+    const { prisma, updateMany } = fakePrisma([league()], [alreadyCorrect], undefined, 0);
+
+    await expect(backfillLeagueCompetitionDetails(prisma, { dryRun: false })).rejects.toThrow(
+      /리그 1 · 거울 0/,
+    );
+    // 고칠 게 없었으므로 쓰기는 아예 없다 — 그런데도 검사는 돌아야 한다.
+    expect(updateMany).not.toHaveBeenCalled();
+  });
+
+  it('dry-run 은 거울 수가 안 맞아도 실패하지 않는다 — 바꾸지 않는 상태를 이유로 막지 않는다', async () => {
+    const { prisma } = fakePrisma([league()], [tournament()], undefined, 0);
+
+    const result = await backfillLeagueCompetitionDetails(prisma, { dryRun: true });
+
+    expect(result).toMatchObject({ dryRun: true, mirrorCount: 0 });
+  });
+
+  it('dry-run 이 **고칠 계획 수**를 보고한다 — updated 는 항상 0 이라 그것만으론 알 수 없다', async () => {
+    // 승인을 요청할 때 사용자가 볼 숫자가 바로 이것이다. 없으면 "몇 건이 바뀌나" 에
+    // 답할 수 없고, 그 상태로 승인을 받는 것은 승인자에게 빈칸을 주는 것이다.
+    const { prisma } = fakePrisma([league({ id: 'a' }), league({ id: 'b' })], [
+      tournament({ id: 'a' }),
+      tournament({ id: 'b' }),
+    ]);
+
+    const result = await backfillLeagueCompetitionDetails(prisma, { dryRun: true });
+
+    expect(result).toMatchObject({ scanned: 2, planned: 2, updated: 0, dryRun: true });
   });
 });

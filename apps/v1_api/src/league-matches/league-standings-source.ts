@@ -31,8 +31,9 @@
  * 서로 다른 select 를 쓰더라도 이 타입만 만족하면 같은 분류를 얻는다. **그 경계가 이 모듈이
  * 존재하는 이유다.**
  *
- * ⚠️ `game.currentOfficialRevision.state` 를 select 에서 빠뜨리면 무효(VOID)가 미확정으로
- * 섞인다 — 타입이 `null` 을 허용하므로 **컴파일은 통과한다.** 호출부가 지켜야 할 계약이다.
+ * ⚠️ **호출부는 `game.currentOfficialRevision.state` 를 조회해야 한다** — 빠뜨리면 무효(VOID)를
+ * 못 걸러 미확정으로 섞인다. 이 타입의 `currentOfficialRevision` 은 **키가 필수**이므로(값만
+ * nullable) select 에서 빼면 대입이 컴파일에 실패한다 — 실측으로 확인했다(TS2345).
  */
 export type LeagueTeamMatchRow = {
   id: string;

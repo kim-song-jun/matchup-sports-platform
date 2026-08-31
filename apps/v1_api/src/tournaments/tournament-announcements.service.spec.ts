@@ -183,6 +183,10 @@ describe('TournamentAnnouncementsService', () => {
       service.create(ownerAuthUser, 'tournament-1', { title: '공지', body: '본문', publish: true }),
     ).resolves.toBeDefined();
     expect(prisma.v1TournamentAnnouncement.create).toHaveBeenCalled();
+    // **알림까지 단언한다**(Copilot 리뷰 지적) — 이름이 "알림도 나간다"인데 생성만 보면
+    // 음성 테스트의 `emitToManyDeferred 0회` 가 "봉쇄 때문"인지 "이 경로가 원래 알림을
+    // 안 보내서"인지 구분되지 않는다. 양성이 알림 경로가 살아 있음을 증명해야 한다.
+    expect(notifications.emitToManyDeferred).toHaveBeenCalled();
   });
 
   it('listForParticipant: 리그 id 로는 열리지 않는다', async () => {

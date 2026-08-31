@@ -11,6 +11,7 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { v1Get } from '@/lib/api-client';
 import { TournamentFlowNav } from '@/components/tournaments/tournament-flow-nav';
 import { formatTournamentDateRangeShort, formatTournamentDateTimeShort } from '@/lib/date-utils';
+import { isLeagueCompetition } from '@/lib/competition-kind';
 import type {
   V1LeagueOverallStandingsResponse,
   V1TournamentDetail,
@@ -960,7 +961,8 @@ export function ResultsPageContent({ tournament }: { tournament: V1TournamentDet
   );
   const isCompleted  = tournament.status === 'completed';
   const isInProgress = tournament.status === 'in_progress';
-  const isLeague = tournament.format === 'league';
+  // format 만 보면 정규 리그(거울 행 format='group_knockout')를 놓친다 — 두 질문을 다 한다.
+  const isLeague = isLeagueCompetition(tournament);
   const isMultiGroupLeague = isLeague && tournament.groups.filter((g) => g.phase === 'group').length > 1;
   // 다조 리그일 때만 통합 순위 API를 조회한다 — 훅 자체는 매 렌더 동일한 순서로
   // 호출해야 하므로(react hooks rule) enabled 플래그로 조건을 안쪽에 둔다.

@@ -1,14 +1,15 @@
 'use client';
 
-import Link from 'next/link';
-import Image from 'next/image';
 import { Trophy } from 'lucide-react';
 import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { formatTournamentDateRangeShort, formatEntryFee } from '@/lib/date-utils';
 import { publicAssetPath } from '@/lib/assets';
 import { resolveTournamentImage } from '@/lib/tournament-promo';
-import { SportGlyph } from '@/components/v1-ui/sport-glyph';
+import {
+  CompetitionCardHeader,
+  CompetitionCardShell,
+} from '@/components/v1-ui/competition-card';
 import type { V1TournamentListItem } from '@/types/api';
 
 /**
@@ -50,38 +51,6 @@ function renderTitleWithBoundStatusPhrases(title: string) {
  * <div>(관리자 위저드의 "공개 화면 확인" 단계처럼 클릭·포커스를 막아야 하는 곳)로 렌더한다.
  * 두 분기 모두 같은 className/style/aria-label을 써서 시각적으로는 완전히 동일하게 보인다.
  */
-function CardShell({
-  interactive,
-  href,
-  ariaLabel,
-  children,
-}: {
-  interactive: boolean;
-  href: string;
-  ariaLabel: string;
-  children: React.ReactNode;
-}) {
-  const shellStyle: React.CSSProperties = {
-    display: 'flex',
-    flexDirection: 'column',
-    height: '100%',
-    padding: '16px 16px 16px',
-    textDecoration: 'none',
-  };
-  if (interactive) {
-    return (
-      <Link className="tm-card tm-pressable" href={href} style={shellStyle} aria-label={ariaLabel}>
-        {children}
-      </Link>
-    );
-  }
-  return (
-    <div className="tm-card tm-pressable" style={shellStyle} aria-label={ariaLabel}>
-      {children}
-    </div>
-  );
-}
-
 function CapacityMiniBar({ item }: { item: V1TournamentListItem }) {
   const pendingPaymentCount = getPendingPaymentCount(item);
   const max = Math.max(item.teamCount, 1);
@@ -125,115 +94,24 @@ export function TournamentCard({
 
   return (
     <div role="listitem" style={{ height: '100%' }}>
-      <CardShell
+      <CompetitionCardShell
         interactive={interactive}
         href={`/tournaments/${item.id}`}
         ariaLabel={`${item.title} — ${sportAccent.label} — ${status.label}`}
       >
-        {/* Top row: (선택) 커버 이미지 썸네일 + [제목·배지 / 종목·일정·장소] 세로 스택 */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-          {thumbnailImageUrl ? (
-            <div
-              aria-hidden="true"
-              style={{ width: 56, height: 56, borderRadius: 'var(--radius-control)', overflow: 'hidden', flexShrink: 0, background: 'var(--grey100)' }}
-            >
-              <Image
-                src={publicAssetPath(thumbnailImageUrl)}
-                alt=""
-                width={56}
-                height={56}
-                sizes="56px"
-                unoptimized
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
-            </div>
-          ) : (
-            // 커버 이미지도 홈 프로모션 사진(promoHomeImageUrl)도 없는 대회는 종목색
-            // 그라디언트 배지로 대체한다 — 대회 상세 헤더의 트로피 배지(linear-gradient
-            // 135deg, 500→600 + 흰 아이콘)와 동일한 시각 언어.
-            // 이전의 옅은 pastel bg(badgeBg)+톤온톤 아이콘(badgeText) 조합은 카드 목록에서
-            // 밋밋하고 흐릿하게 보였다(사용자 피드백: "아이콘도 촌스러워").
-            <div
-              aria-hidden="true"
-              style={{
-                width: 56,
-                height: 56,
-                borderRadius: 'var(--radius-control)',
-                overflow: 'hidden',
-                flexShrink: 0,
-                background: `linear-gradient(135deg, ${sportAccent.dot} 0%, ${sportAccent.gradientTo} 100%)`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <SportGlyph code={item.sport.code} size={28} style={{ color: 'var(--static-white)' }} />
-            </div>
-          )}
-          {/* 제목·배지 행 + 종목·일정·장소 메타 행을 같은 컬럼에 묶어 아이콘이 아닌
-              제목과 같은 x축에 메타 행이 정렬되도록 한다(이전엔 형제 div라 아이콘 밑에
-              깔려 제목과 어긋나 보였다 — 사용자 피드백: "align도 안맞네"). */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, justifyContent: 'space-between' }}>
-              <div
-                className="tm-text-body-lg"
-                style={{
-                  color: 'var(--text-strong)',
-                  flex: 1,
-                  minWidth: 0,
-                  lineHeight: 1.35,
-                  overflowWrap: 'break-word',
-                  wordBreak: 'keep-all',
-                }}
-              >
-                {renderTitleWithBoundStatusPhrases(item.title)}
-              </div>
-              <span className={`tm-badge ${status.badgeClass}`} style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
-                {status.label}
-              </span>
-            </div>
-
-            {/* Sport identity chip + meta row */}
-            <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 12px' }}>
-              {/* Sport chip: colored dot + Korean label */}
-              <span
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 4,
-                  padding: '2px 8px',
-                  borderRadius: 'var(--radius-pill)',
-                  background: sportAccent.badgeBg,
-                  flexShrink: 0,
-                }}
-                aria-label={`종목: ${sportAccent.label}`}
-              >
-                <span
-                  aria-hidden="true"
-                  style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: 'var(--radius-circle)',
-                    background: sportAccent.dot,
-                    flexShrink: 0,
-                  }}
-                />
-                <span
-                  className="tm-text-caption"
-                  style={{ color: sportAccent.badgeText, fontWeight: 600, lineHeight: 1 }}
-                >
-                  {sportAccent.label}
-                </span>
-              </span>
-
+        <CompetitionCardHeader
+          sportCode={item.sport.code}
+          imageUrl={thumbnailImageUrl}
+          title={renderTitleWithBoundStatusPhrases(item.title)}
+          statusBadge={{ label: status.label, badgeClass: status.badgeClass }}
+          meta={
+            <>
               <span
                 className="tm-badge tm-badge-grey"
                 aria-label={`성별 카테고리: ${getGenderCategoryLabel(item.genderCategory)}`}
               >
                 {getGenderCategoryLabel(item.genderCategory)}
               </span>
-
-              {/* Date + venue */}
               {item.scheduledAt ? (
                 <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
                   {formatTournamentDateRangeShort(item.scheduledAt, item.scheduledEndAt) ?? '날짜 미정'}
@@ -253,9 +131,9 @@ export function TournamentCard({
                   {item.venue}
                 </span>
               ) : null}
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        />
 
         {/* Prize line — admin-entered text is shown as-is. */}
         {item.prizeSummary?.trim() ? (
@@ -329,7 +207,7 @@ export function TournamentCard({
             <span>{pendingPaymentCount > 0 ? '팀 예약' : '팀 확정'}</span>
           </span>
         </div>
-      </CardShell>
+      </CompetitionCardShell>
     </div>
   );
 }

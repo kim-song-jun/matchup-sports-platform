@@ -5,7 +5,10 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { useV1LeagueMatches, useV1MasterSports } from '@/hooks/use-v1-api';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
-import { getSportAccent } from '@/lib/v1-sport-accent';
+import {
+  CompetitionCardHeader,
+  CompetitionCardShell,
+} from '@/components/v1-ui/competition-card';
 import { formatTournamentDateRangeShort } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import { LEAGUE_STATE_META, type V1LeagueState } from '@/lib/league-state-meta';
@@ -142,49 +145,76 @@ export default function LeagueMatchesListClient() {
           />
         ) : (
           <>
-            <ul className="space-y-2" role="list" aria-label="리그 목록">
+            {/* 대회 목록과 **같은 카드 골격**을 쓴다(components/v1-ui/competition-card.tsx).
+                전에는 리그만 얇은 한 줄짜리 행이라 같은 "대회" 탭 안에서 두 종류가 서로 다른
+                물건처럼 보였다 — 종목 썸네일도 종목 칩도 없었다. 통합 축(R4-a)이 백엔드에서
+                끝났는데 화면이 안 따라온 자리가 여기다. */}
+            <ul className="grid gap-2" role="list" aria-label="리그 목록">
               {items.map((item) => {
                 const stateMeta = LEAGUE_STATE_META[item.state];
-                const accent = getSportAccent(item.sport.code);
                 return (
-                  <li key={item.leagueId}>
-                    <Link
+                  <li key={item.leagueId} style={{ height: '100%' }}>
+                    <CompetitionCardShell
+                      interactive
                       href={`/league-matches/${item.leagueId}`}
-                      className="tm-pressable tm-list-row-interactive flex min-h-[44px] flex-col gap-2 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] p-3 text-sm sm:flex-row sm:items-center sm:justify-between"
-                      aria-label={`${item.title} 상세로 이동`}
+                      ariaLabel={`${item.title} 상세로 이동`}
                     >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-semibold text-[var(--text-strong)]">{item.title}</span>
-                          {/* 티어 뱃지 — 리그 체계에 속한 리그에만 붙인다. 단발 리그는
-                              tierLabel 이 null 이라(티어가 "1부"인 게 아니라 개념 자체가 없다)
-                              아무것도 표시하지 않는다. 제목에 "1부"가 들어 있어서 읽히는 것에
-                              기대면 안 된다 — 제목은 운영자 자유 입력이다. 팀이 자기 수준의
-                              리그를 고르는 지점이 바로 이 목록이라 상세뿐 아니라 여기에도 있어야 한다. */}
-                          {item.tierLabel !== null && (
-                            <span className="tm-badge tm-badge-sm tm-badge-blue">{item.tierLabel}</span>
-                          )}
-                          <span className={`tm-badge tm-badge-sm ${stateMeta.badgeClass}`}>{stateMeta.label}</span>
+                      <CompetitionCardHeader
+                        sportCode={item.sport.code}
+                        title={item.title}
+                        statusBadge={{ label: stateMeta.label, badgeClass: stateMeta.badgeClass }}
+                        meta={
+                          <>
+                            {/* 티어 뱃지 — 리그 체계에 속한 리그에만 붙인다. 단발 리그는
+                                tierLabel 이 null 이라(티어가 "1부"인 게 아니라 개념 자체가 없다)
+                                아무것도 표시하지 않는다. 제목에 "1부"가 들어 있어서 읽히는 것에
+                                기대면 안 된다 — 제목은 운영자 자유 입력이다. 팀이 자기 수준의
+                                리그를 고르는 지점이 바로 이 목록이라 상세뿐 아니라 여기에도 있어야 한다. */}
+                            {item.tierLabel !== null ? (
+                              <span className="tm-badge tm-badge-sm tm-badge-blue">{item.tierLabel}</span>
+                            ) : null}
+                            <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+                              {item.region.name}
+                            </span>
+                            <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+                              {formatTournamentDateRangeShort(item.startsOn, item.endsOn) ?? '일정 미정'}
+                            </span>
+                          </>
+                        }
+                      />
+
+                      {item.seriesTitle != null ? (
+                        <div className="tm-text-caption mt-2 truncate" style={{ color: 'var(--text-muted)' }}>
+                          {item.seriesTitle}
+                          {item.seasonNo != null && ` · ${item.seasonNo}시즌`}
                         </div>
-                        {item.seriesTitle != null && (
-                          <div className="mt-0.5 truncate text-xs text-[var(--text-muted)]">
-                            {item.seriesTitle}
-                            {item.seasonNo != null && ` · ${item.seasonNo}시즌`}
-                          </div>
-                        )}
-                        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--text-muted)] sm:text-sm">
-                          <span className="inline-flex items-center gap-2">
-                            <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: 'var(--radius-circle)', background: accent.dot }} />
-                            {accent.label}
-                          </span>
-                          <span aria-hidden="true">·</span>
-                          <span>{item.region.name}</span>
-                          <span aria-hidden="true">·</span>
-                          <span>{formatTournamentDateRangeShort(item.startsOn, item.endsOn) ?? '일정 미정'}</span>
-                        </div>
+                      ) : null}
+
+                      {/* 카드 간 높이 차(시리즈 줄 유무)를 흡수해 하단 행을 같은 라인에 맞춘다 */}
+                      <div style={{ flex: 1 }} aria-hidden="true" />
+
+                      {/* 팀 수는 대회의 정원 진행바 자리에 오지만 **뜻이 다르다** — 대회의
+                          teamCount 는 정원(총)이라 확정/정원 비율이 성립하지만, 리그의
+                          teamCount 는 참가 팀 수 자체다. 같은 진행바를 그리면 리그는 항상
+                          100% 로 보인다. 그래서 비율이 아니라 수를 그대로 적는다. */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'flex-end',
+                          alignItems: 'center',
+                          marginTop: 12,
+                          paddingTop: 12,
+                          borderTop: '1px solid var(--grey100)',
+                        }}
+                      >
+                        {/* 숫자를 별도 span 으로 쪼개지 않는다 — 쪼개면 "6팀 참가" 가 한
+                            텍스트 노드가 아니게 돼 스크린리더가 끊어 읽고 기존 계약 테스트도
+                            깨진다. tab-num 은 감싸는 span 에 걸어도 숫자에 적용된다. */}
+                        <span className="tm-text-caption tab-num" style={{ color: 'var(--text-muted)' }}>
+                          {item.teamCount}팀 참가
+                        </span>
                       </div>
-                      <div className="flex-shrink-0 text-xs text-[var(--text-muted)] sm:text-sm">{item.teamCount}팀 참가</div>
-                    </Link>
+                    </CompetitionCardShell>
                   </li>
                 );
               })}

@@ -69,6 +69,15 @@ describe('LeagueMatchesListClient', () => {
     expect(within(link).getByText('풋살')).toBeInTheDocument();
     expect(within(link).getByText('성수동')).toBeInTheDocument();
     expect(within(link).getByText('6팀 참가')).toBeInTheDocument();
+
+    // 대회 카드와 **같은 골격**을 쓰는지 — 종목 아이덴티티(썸네일 글리프 + 종목 칩)가
+    // 리그 카드에도 있어야 한다. 통합 전 리그 카드는 색 점 하나뿐이라 같은 "대회" 탭
+    // 안에서 두 종류가 다른 물건처럼 보였다. 이 단언이 그 회귀를 막는다.
+    // 종목 칩 — 전에는 색 점 + 라벨뿐이라 `aria-label` 이 없었다(색으로만 알리는 상태).
+    expect(within(link).getByLabelText('종목: 풋살')).toBeInTheDocument();
+    // 썸네일 글리프 — SportGlyph 는 aria-hidden SVG 라 접근성 쿼리로 잡히지 않는다.
+    // 존재만 확인한다(전에는 리그 카드에 아예 없었다).
+    expect(link.querySelector('svg')).not.toBeNull();
   });
 
   it('결과가 0건이면 EmptyState를 렌더한다', () => {

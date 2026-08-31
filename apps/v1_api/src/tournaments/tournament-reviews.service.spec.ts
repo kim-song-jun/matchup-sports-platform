@@ -203,6 +203,27 @@ describe('TournamentReviewsService — awards admin gate', () => {
 
   // ─── setAwards (PUT) ────────────────────────────────────────────────────
 
+  // `listMyPendingReviews` 는 `status: 'confirmed'` 를 쓰는 19곳 중 **유일하게
+  // `tournamentId` 스코프가 없는** 쿼리다 — 사용자의 팀이 확정 등록된 **모든** 대회를 훑는다.
+  // 참가팀 백필이 리그 시즌에 `confirmed` 등록을 만들 것이므로 실재하는 경로다.
+  //
+  // 지금까지 안 보였던 건 `tournament.status = 'completed'` 덕이지만(백필 리그는 draft),
+  // 그건 **다른 파일의 가드에 기댄 것**이다 — P0~P3 가 49곳에서 없앤 그 구조.
+  it('listMyPendingReviews: 종류 조건을 걸어 리그 시즌이 후기 대기 목록에 들어오지 않는다', async () => {
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([]);
+
+    await service.listMyPendingReviews(plainUser.id);
+
+    const where = prisma.v1TournamentRegistration.findMany.mock.calls[0][0].where as {
+      tournament: Record<string, unknown>;
+    };
+    // `OR` 이 있는지가 아니라 **그 OR 이 kind 조건인지**를 본다 — 존재만 보면 호출부가
+    // 자기 OR 을 쓰는 날 봉쇄가 빠져도 통과한다(#866 에서 같은 지적을 받았다).
+    expect(where.tournament.OR).toEqual([{ kind: 'regular_tournament' }, { kind: null }]);
+    // 기존 조건도 살아 있어야 한다 — 종류 조건을 넣다 이걸 덮으면 draft·삭제 대회가 샌다.
+    expect(where.tournament).toMatchObject({ status: 'completed', deletedAt: null });
+  });
+
   it('setAwards: non-admin authenticated user → 403 PERMISSION_DENIED, no data mutated', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(null);
 

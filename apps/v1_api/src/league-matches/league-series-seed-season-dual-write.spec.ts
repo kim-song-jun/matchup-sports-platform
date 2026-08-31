@@ -118,4 +118,20 @@ describe('seedSeason — 통합 축 거울 dual-write', () => {
     expect(tx.v1Tournament.create).toBe(tournamentCreate);
     expect(tournamentCreate).toHaveBeenCalled();
   });
+
+  it('응답은 기존 5개 필드만 담는다 — dual-write 때문에 넓힌 읽기가 새면 안 된다', async () => {
+    // 거울에 `sport.code` 가 필요해서 `create` 를 `select` → `include` 로 넓혔다.
+    // 그 행을 그대로 반환하면 **이 엔드포인트가 줄 생각이 없던 컬럼이 전부 나간다** —
+    // 쓰기를 고치려다 읽기 계약이 조용히 커지는 모양이다(Copilot 이 잡았다).
+    const { service } = makeHarness();
+
+    const result = await service.seedSeason({ id: 'u-1' } as never, SERIES_ID, dto);
+
+    expect(result.leagues).toHaveLength(2);
+    for (const league of result.leagues) {
+      // **키 집합을 통째로 비교한다.** 하나라도 늘면 여기서 걸린다 —
+      // "포함하는가" 만 보면 넓어지는 방향을 못 잡는다.
+      expect(Object.keys(league).sort()).toEqual(['id', 'seasonNo', 'state', 'tier', 'title']);
+    }
+  });
 });

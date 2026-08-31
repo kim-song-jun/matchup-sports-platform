@@ -280,10 +280,19 @@ export class LeagueSeriesAdminService {
     }
 
     const created = await this.prisma.$transaction(async (tx) => {
-      const leagues = [];
+      // **응답에 나갈 것만 담는다.** dual-write 때문에 아래 `create` 를 `select` 에서
+      // `include` 로 넓혔는데(거울에 `sport.code` 가 필요하다), 그 행을 그대로 반환하면
+      // **읽기 계약이 조용히 커진다** — 이 엔드포인트가 줄 생각이 없던 컬럼까지 나간다.
+      // 쓰기를 고치려고 넓힌 읽기가 밖으로 새는 모양이라, 넓게 읽되 **응답은 좁게** 만든다.
+      const leagues: Array<{
+        id: string;
+        title: string;
+        tier: number | null;
+        seasonNo: number | null;
+        state: string;
+      }> = [];
       for (const tier of tiers) {
-        leagues.push(
-          await tx.v1League.create({
+        const league = await tx.v1League.create({
             data: {
               title: tier.title,
               sportId: series.sportId,
@@ -298,10 +307,15 @@ export class LeagueSeriesAdminService {
               teams: { createMany: { data: [...new Set(tier.teamIds)].map((teamId) => ({ teamId })) } },
             },
             include: { sport: { select: { code: true } } },
-          }),
-        );
-        await tx.v1Tournament.create({
-          data: leagueMirrorCreateData(toMirrorSource(leagues[leagues.length - 1])),
+        });
+        // dual-write — 통합 축에 같은 리그를 비춘다(같은 트랜잭션).
+        await tx.v1Tournament.create({ data: leagueMirrorCreateData(toMirrorSource(league)) });
+        leagues.push({
+          id: league.id,
+          title: league.title,
+          tier: league.tier,
+          seasonNo: league.seasonNo,
+          state: league.state,
         });
       }
       await tx.v1LeagueSeries.update({ where: { id: seriesId }, data: { state: 'active' } });

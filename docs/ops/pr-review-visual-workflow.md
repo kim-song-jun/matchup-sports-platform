@@ -62,9 +62,73 @@ for i in $(seq 1 30); do
 done
 ```
 
-- **clean 판정**: 최신 리뷰 본문이 `generated no new comments` → 루프 종료.
 - 폴링은 `run_in_background`로 띄우고 task-notification으로 회수(foreground `sleep`은 블록됨).
 - ⚠️ **count 폴링은 위 `gh pr view --json reviews --jq` 방식 사용**(REST count). 인라인 GraphQL을 루프 안에 넣으면 한 줄 쿼리의 **중괄호 불균형**(`query{repository{pullRequest{reviews{totalCount}}}}` 은 닫는 `}` 4개 필요)으로 매 회차 파싱 실패가 조용히 누적돼 새 리뷰를 못 잡는다(실측 함정). GraphQL 직접 호출 시엔 열고 닫는 `{`/`}` 개수를 반드시 맞출 것.
+
+### 2.2-a clean 판정 — **다섯 개를 다 봐야 한다**
+
+`Comments generated: 0 new` **하나로 판정하지 마라.** 2026-08-31 `#876`·`#881` 두 PR에서
+**네 건의 실재 지적이 그 한 조건을 통과**했다. 셋은 요약 문장의 범위 오류였고 하나는
+suppressed 블록이었다.
+
+| # | 게이트 | 빠뜨리면 무슨 일이 나나 |
+|---|---|---|
+| 1 | 작성자가 Copilot인가 | **스레드에 답하면 리뷰 수가 오른다** — GitHub이 답변도 review 레코드로 만든다. 내 답변을 상대의 재리뷰로 읽는다(5→7을 그렇게 읽을 뻔했다) |
+| 2 | 제출시각 > head 커밋 시각 | 리뷰가 있어도 **이전 커밋을 본 것**이면 아직 안 본 것이다 |
+| 3 | `Comments generated: 0` | — |
+| 4 | `Suppressed comments` 블록 없음(또는 열어서 확인) | **스레드를 안 만들고 새 코멘트도 아니다** → ③·⑤를 **둘 다 통과한다.** 실재 지적이 그대로 통과한 사례가 있다 |
+| 5 | 미해결 스레드 0 | 내가 방금 resolve해도 0이 된다 — 단독으로는 clean의 근거가 아니다 |
+
+**③+⑤만 보면 안 된다.** `0 new`는 *"지적이 없다"*가 아니라 *"새 코멘트가 없다"*다.
+suppressed 블록은 그 둘 사이로 빠져나간다.
+
+```bash
+# 다섯 게이트를 한 번에. 시각을 만들지 않고 API 값만 쓴다(아래 함정 ③·④ 참고)
+gh api graphql -f query='{repository(owner:"<OWNER>",name:"<REPO>"){pullRequest(number:<N>){
+  commits(last:1){nodes{commit{committedDate}}}
+  reviews(first:100){nodes{author{login} submittedAt body}}
+  reviewThreads(first:50){nodes{isResolved}}}}}' \
+  --jq '.data.repository.pullRequest as $p
+    | ($p.commits.nodes[0].commit.committedDate) as $head
+    | ([$p.reviews.nodes[]|select(.author.login=="copilot-pull-request-reviewer")]|last) as $r
+    | "1 작성자   \($r.author.login)",
+      "2 제출시각 \($r.submittedAt) vs head \($head) → " + (if $r.submittedAt > $head then "OK" else "아직 안 봤다" end),
+      "3 Comments " + (($r.body|capture("Comments generated:\\*\\* (?<n>[^\n]*)").n) // "추출실패(0 아님)"),
+      "4 Suppress " + (if ($r.body|test("Suppressed comments")) then "있음 — 열어봐야 한다" else "없음" end),
+      "5 미해결   \([$p.reviewThreads.nodes[]|select(.isResolved==false)]|length)건"'
+```
+
+#### 도착 감지·판정의 함정 넷 — 넷 다 실제로 밟았다
+
+**① 개수로 도착을 감지하지 마라.** 워처를 push 직후 걸면서 기준선을 *그 순간* 재면,
+감시하려는 리뷰가 기준선에 삼켜진다(4초 만에 도착해 `6 > 6`이 성립 안 했다). 게다가
+**조용히** 실패해서 "아직 안 왔다"로 읽힌다. **시각 비교(게이트 2)로 판정하면 기준선이
+없으므로 이 경합 자체가 없다.**
+
+**② 빈 추출은 0이 아니다.** `capture(...)`/`grep -o`가 못 찾으면 **빈 문자열**을 낸다.
+그걸 `0`으로 읽으면 지적이 있는 리뷰를 통과로 읽는다. 출력이 비면 **추출 실패**로 취급하고
+본문을 파일로 받아 눈으로 확인한다:
+```bash
+gh api graphql ... --jq '...|last|.body' > /tmp/r.md
+grep -nE 'Comments generated|Suppressed' /tmp/r.md
+```
+
+**③ `git log --date=format:` 은 TZ를 무시한다.** `submittedAt`은 UTC인데 커밋 시각을
+KST로 뽑아 `Z`를 붙이면 기준이 **9시간 미래**가 되어 어떤 리뷰도 통과하지 못한다.
+```bash
+TZ=UTC git log -1 --format=%cd --date=format:'%Y-%m-%dT%H:%M:%SZ'        # ❌ 로컬시각에 Z만 붙는다
+TZ=UTC git log -1 --format=%cd --date=format-local:'%Y-%m-%dT%H:%M:%SZ'  # ✅ 실제 UTC
+```
+
+**④ 일반형 — 시각을 *만들지* 말고 *받아* 써라.** ①③과 셸 비교 문제(`[ "$a" \> "$b" ]`는
+zsh에서 `condition expected: >`로 실패한다)는 전부 **두 시각을 서로 다른 출처·형식에서
+얻어 맞추려 한** 결과다. 그 맞추는 과정이 곧 버그가 된다.
+```
+❌  GitHub의 submittedAt(UTC) ↔ 로컬 git의 커밋시각(KST)을 셸에서 변환·비교
+✅  둘 다 GitHub API에서 받는다 — submittedAt과 commit.committedDate는 모두 UTC ISO-8601
+    비교도 셸이 아니라 jq 안에서:  select(.submittedAt > $head)
+```
+**같은 출처·같은 형식이면 변환이 없고, 변환이 없으면 변환 버그도 없다.**
 
 ### 2.3 미해결 스레드 조회
 
@@ -233,7 +297,7 @@ gh run view <run-id> --log-failed | grep -iE 'fail|error|FAIL'   # 실패 라인
 | main api (dev) | `:8111` · DB `teameet_dev` :5433 (별개) |
 | dev 인증 헤더 | `x-v1-user-id` · `x-v1-user-email` (← localStorage `teameet.v1.userId`/`userEmail`) |
 | Copilot 요청 | `gh pr edit <N> --add-reviewer copilot-pull-request-reviewer` |
-| Copilot clean | 리뷰 본문 `generated no new comments` |
+| Copilot clean | **5게이트**(작성자·제출시각>head·`Comments generated: 0`·suppressed 없음·미해결 0) — §2.2-a. `0 new` 하나로 판정하지 말 것 |
 | Copilot 한도 | 변경 파일 **300개** 초과 시 리뷰 불가 |
 | 캡처 3폭 | mobile **390** / tablet **768** / desktop **1440** |
 | 갤러리 URL | `raw.githubusercontent.com/<owner>/<repo>/<SHA>/docs/visual-qa/...` (SHA 고정) |

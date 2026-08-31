@@ -460,6 +460,9 @@ export function buildTournamentPreviewItem(
     title: state.title.trim() || '새 대회',
     status: 'open',
     format: state.format,
+    // 이 위저드는 단발 대회만 만든다(정규 리그 시즌은 리그 어드민에서 만들어진다).
+    // state.format 이 'league' 여도 그건 "리그 방식으로 치른다"는 뜻이지 리그 시즌이 아니다.
+    kind: 'regular_tournament',
     registrationDeadlineAt: datetimeLocalToIso(state.registrationDeadlineAt),
     scheduledAt: datetimeLocalToIso(state.scheduledAt),
     scheduledEndAt: datetimeLocalToIso(state.scheduledEndAt),

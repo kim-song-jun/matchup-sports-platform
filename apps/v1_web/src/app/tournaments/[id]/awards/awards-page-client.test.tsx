@@ -47,6 +47,7 @@ function makeCompletedTournament(overrides: Partial<V1TournamentDetail> = {}): V
     title: '테스트 대회',
     status: 'completed',
     format: 'knockout',
+    kind: 'regular_tournament',
     registrationDeadlineAt: null,
     rosterDeadlineAt: null,
     bracketPublishedAt: null,

@@ -124,6 +124,7 @@ function makeTournament(
   overrides: Partial<V1TournamentDetail> & Pick<V1TournamentDetail, 'id' | 'status' | 'format'>,
 ): V1TournamentDetail {
   return {
+    kind: 'regular_tournament',
     sportId: 'sport-futsal',
     sport: { code: 'futsal', name: '풋살' },
     title: '테스트 대회',

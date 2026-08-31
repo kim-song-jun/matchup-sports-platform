@@ -542,3 +542,57 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
     expect(presented.reviewsTotalCount).toBe(45);
   });
 });
+
+
+// `kind` 는 프론트가 정규 리그와 단발 대회를 가르는 **유일한** 필드다. 노출이 끊기면
+// 소비처는 조용히 `format` 을 집는데(그게 유일하게 종류처럼 보이는 필드다) 그건 다른
+// 질문에 답한다 — 아래 두 번째 케이스가 그 차이를 박는다.
+describe('presentTournamentDetail — kind(종류)와 format(방식)은 독립이다', () => {
+  function rowWith(kind: unknown, format: string): TournamentDetailRow {
+    return {
+      id: 't-1',
+      sportId: 's-1',
+      sport: { code: 'football', name: '축구' },
+      title: '대회',
+      status: 'open',
+      format,
+      kind,
+      registrationDeadlineAt: null,
+      rosterDeadlineAt: null,
+      bracketPublishedAt: null,
+      bracketPublishScheduledAt: null,
+      scheduledAt: null,
+      scheduledEndAt: null,
+      groups: [],
+      fixtures: [],
+      announcements: [],
+      sponsors: [],
+      registrations: [],
+      reviews: [],
+      awards: [],
+      createdAt: new Date('2026-01-01T00:00:00Z'),
+      updatedAt: new Date('2026-01-01T00:00:00Z'),
+      _count: { registrations: 0, reviews: 0 },
+    } as unknown as TournamentDetailRow;
+  }
+
+  it('정규 리그 시즌은 kind=regular_league 로 내려간다', () => {
+    expect(presentTournamentDetail(rowWith('regular_league', 'league')).kind).toBe('regular_league');
+  });
+
+  // ⭐ 이 케이스가 이 파일의 이유다. alpha 실측 7건이 정확히 이 모양이고(리그 방식으로
+  //    치르는 진짜 대회), `format === 'league'` 로 종류를 가르면 이 7건이 신청·참가등록을
+  //    잃는다. 두 필드가 **함께 실려야** 소비처가 구분할 수 있다.
+  it('리그 방식으로 치르는 대회는 format=league 이지만 kind 는 regular_tournament 다', () => {
+    const presented = presentTournamentDetail(rowWith('regular_tournament', 'league'));
+
+    expect(presented.format).toBe('league');
+    expect(presented.kind).toBe('regular_tournament');
+  });
+
+  // DB 가 아직 nullable 이라(R5 에서 NOT NULL 승격) null 이 실제로 도달할 수 있다.
+  // 대회로 메우지 않고 null 그대로 넘긴다 — 메우면 리그가 대회로 그려진다.
+  it('kind 가 null 인 행은 regular_tournament 로 메우지 않고 null 로 내려간다', () => {
+    expect(presentTournamentDetail(rowWith(null, 'group_knockout')).kind).toBeNull();
+  });
+});

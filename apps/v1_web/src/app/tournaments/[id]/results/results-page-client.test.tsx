@@ -26,6 +26,8 @@ function baseTournament(overrides: Partial<V1TournamentDetail> = {}): V1Tourname
     title: '테스트 리그',
     status: 'completed',
     format: 'league',
+    // format 은 'league' 인데 kind 는 대회다 — 둘이 독립임을 픽스처에서도 유지한다
+    kind: 'regular_tournament',
     registrationDeadlineAt: null,
     rosterDeadlineAt: null,
     bracketPublishedAt: '2026-01-01T00:00:00.000Z',

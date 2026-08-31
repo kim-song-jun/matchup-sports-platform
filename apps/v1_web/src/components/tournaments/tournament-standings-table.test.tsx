@@ -132,6 +132,7 @@ describe('순위표 컬럼 통일 — 두 소비처(bracket 탭 vs schedule 탭)
       id: 'tour-1',
       status: 'in_progress',
       format: 'group_knockout',
+      kind: 'regular_tournament',
       sportId: 'sport-futsal',
       sport: { code: 'futsal', name: '풋살' },
       title: '테스트 대회',

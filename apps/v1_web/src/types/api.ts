@@ -2885,6 +2885,29 @@ export type V1TournamentStatus =
   | 'cancelled';
 
 export type V1TournamentFormat = 'league' | 'knockout' | 'group_knockout';
+
+/**
+ * 대회 종류 — **`V1TournamentFormat` 과 다른 질문에 답한다.**
+ *
+ * ```
+ * format  어떤 방식으로 치르나   league | knockout | group_knockout
+ * kind    무엇인가              regular_tournament | regular_league
+ * ```
+ * 둘은 독립이다: `format: 'league'` 이면서 `kind: 'regular_tournament'` 인 행이 실제로
+ * 있다(리그 방식으로 치르는 대회 — alpha 실측 7건). **종류를 가릴 땐 반드시 `kind` 를
+ * 쓴다** — `format` 으로 가르면 그 7건이 신청·참가등록을 잃는다.
+ *
+ * ## ⚠️ 비교 방향 — 리그 판별은 반드시 `=== 'regular_league'`
+ * 이 필드는 3상태다(`regular_league` / `regular_tournament` / `null`). 그래서 비교를
+ * 어느 쪽으로 쓰느냐로 결과가 갈린다:
+ * ```
+ * ✅ kind === 'regular_league'      리그.  null·regular_tournament 는 대회로 떨어진다 (사실과 일치)
+ * ❌ kind !== 'regular_tournament'  리그.  null 이 리그가 된다 → 옛 대회가 리그로 그려진다
+ * ```
+ * 둘 다 "리그를 판별한다"로 읽히는데 **결과가 반대다.** 그리고 후자는 null 행이 없으면
+ * 테스트로도 안 걸린다 — 현재 alpha 에 null 이 0건이라 더더욱 조용히 지나간다.
+ */
+export type V1CompetitionKind = 'regular_tournament' | 'regular_league';
 export type V1TournamentGenderCategory = 'mixed' | 'male' | 'female';
 
 export type V1PublicTournamentStatus = Extract<
@@ -2943,7 +2966,10 @@ export type V1TournamentListItem = {
   sport: { code: string; name: string };
   title: string;
   status: V1TournamentStatus;
+  /** 어떤 방식으로 치르나. **종류 판별자가 아니다** — 종류는 `kind`. */
   format: V1TournamentFormat;
+  /** 단발 대회 / 정규 리그 시즌. null 은 아직 채워지지 않은 행이다(R5에서 NOT NULL). */
+  kind: V1CompetitionKind | null;
   registrationDeadlineAt: string | null;
   scheduledAt: string | null;
   scheduledEndAt: string | null;
@@ -3245,7 +3271,10 @@ export type V1TournamentDetail = {
   sport: { code: string; name: string };
   title: string;
   status: V1TournamentStatus;
+  /** 어떤 방식으로 치르나. **종류 판별자가 아니다** — 종류는 `kind`. */
   format: V1TournamentFormat;
+  /** 단발 대회 / 정규 리그 시즌. null 은 아직 채워지지 않은 행이다(R5에서 NOT NULL). */
+  kind: V1CompetitionKind | null;
   registrationDeadlineAt: string | null;
   /** 명단(선수단) 제출 마감일 — 지나면 신청 팀의 명단 추가/삭제/수정이 차단된다(팀별 예외 부여 가능). */
   rosterDeadlineAt: string | null;

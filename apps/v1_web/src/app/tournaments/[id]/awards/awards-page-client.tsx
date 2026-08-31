@@ -26,6 +26,7 @@ import { PrizeRankIcon } from '@/components/tournaments/prize-rank-icon';
 import { PendingReviewsCard } from '@/components/tournaments/pending-review-card';
 import { publicAssetPath } from '@/lib/assets';
 import { TournamentAwardIcon } from '@/components/tournaments/tournament-award-icon';
+import { isLeagueCompetition } from '@/lib/competition-kind';
 
 const REVIEW_PHOTO_MAX = 3;
 const REVIEW_EMBED_CAP = 3;
@@ -57,7 +58,7 @@ export function getTopThree(tournament: V1TournamentDetail): Array<{ pos: number
     .filter((s, i, arr) => arr.findIndex((x) => x.registrationId === s.registrationId) === i)
     .sort((a, b) => a.position - b.position);
 
-  if (allStandings.length >= 3 && tournament.format === 'league') {
+  if (allStandings.length >= 3 && isLeagueCompetition(tournament)) {
     // `standing.position`은 조 단위 순위다(각 조마다 1부터 다시 매겨짐,
     // `tournament-group-standings.ts`의 `recalculateAndUpsertGroupStandings`). 조가
     // 2개 이상인 리그에서 조 구분 없이 병합해 정렬하면 [A1,A2,…,B1,B2,…]가 아니라
@@ -875,7 +876,7 @@ function NotCompletedNotice({ status }: { status: string }) {
  * (좌: 시상 결과·상금 / 우: 개인 어워드·후기) — 모바일은 클래스가 no-op이라 기존 스택 유지. */
 function AwardsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
   const isCompleted = tournament.status === 'completed';
-  const isMultiGroupLeague = tournament.format === 'league' && tournament.groups.length > 1;
+  const isMultiGroupLeague = isLeagueCompetition(tournament) && tournament.groups.length > 1;
   const multiGroupTop3 = useMultiGroupLeagueTopThree(tournament.id, isCompleted && isMultiGroupLeague);
   // 다조 리그는 getTopThree가 fail-closed로 []을 낸다 — 통합 순위 override(multiGroupTop3)가
   // 도착하기 전(null)에도 틀린 우승팀 대신 빈 시상대를 보여준다(로딩 중 깜빡임보다 안전).

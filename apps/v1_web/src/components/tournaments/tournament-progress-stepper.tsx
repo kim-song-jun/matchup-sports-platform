@@ -101,6 +101,7 @@ function StageWithConnector({
 /* ── 헬퍼: V1TournamentDetail → stages 자동 생성 ── */
 
 import type { V1TournamentDetail, V1TournamentFixture } from '@/types/api';
+import { isLeagueCompetition } from '@/lib/competition-kind';
 
 /**
  * 라운드 이름 한 개를 단계 분류로 접는다.
@@ -229,11 +230,14 @@ function knockoutStageDrafts(fixtures: V1TournamentFixture[]): StageDraft[] {
  */
 export function buildTournamentStages(tournament: V1TournamentDetail): TournamentStage[] {
   const { format, fixtures, status } = tournament;
+  // 정규 리그 거울 행은 format='group_knockout' 이라 format 만 보면 아래 리그 분기를
+  // 못 타고 조별+결선 단계를 그린다.
+  const isLeague = isLeagueCompetition(tournament);
 
   const allDone = status === 'completed';
   const inProgress = status === 'in_progress';
 
-  if (format === 'league') {
+  if (isLeague) {
     const playable = fixtures.filter((f) => f.liveStatus !== 'cancelled');
     const anyStarted = fixtures.some(isStarted);
 

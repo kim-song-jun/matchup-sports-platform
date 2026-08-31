@@ -38,8 +38,10 @@ function tournament(over: {
   format: string;
   status: string;
   fixtures: V1TournamentFixture[];
+  /** 생략하면 단발 대회 — 기존 케이스의 동작을 그대로 유지한다. */
+  kind?: 'regular_tournament' | 'regular_league' | null;
 }): V1TournamentDetail {
-  return over as unknown as V1TournamentDetail;
+  return { kind: 'regular_tournament', ...over } as unknown as V1TournamentDetail;
 }
 
 /** 화면에 실제로 찍히는 것 = 라벨 + 상태. 그 쌍만 비교한다. */
@@ -242,5 +244,54 @@ describe('buildTournamentStages — 한국어 라운드 라벨', () => {
       ['4강', 'active'],
       ['결승', 'upcoming'],
     ]);
+  });
+});
+
+
+/**
+ * 통합 거울 행(정규 리그 시즌)이 이 단계 표시기를 탈 때.
+ *
+ * **픽스처가 `format: 'group_knockout'` 인 것이 핵심이다.** 백필과 dual-write 가 `format` 을
+ * 안 채워서 스키마 기본값이 그대로 남는 것이 거울 행의 실제 모양이고, `format` 만 보면
+ * 리그 참가자가 "조별리그 → 4강 → 결승" 단계를 보게 된다.
+ *
+ * `format: 'league'` 로 픽스처를 만들면 `||` 앞쪽이 참이라 `kind` 를 안 타서, `|| kind` 를
+ * 지워도 통과하는 vacuous 테스트가 된다.
+ */
+describe('buildTournamentStages — 정규 리그 거울 행', () => {
+  it('format 이 group_knockout 이어도 kind=regular_league 면 리그 단계를 그린다', () => {
+    const stages = buildTournamentStages(
+      tournament({
+        format: 'group_knockout',
+        kind: 'regular_league',
+        status: 'in_progress',
+        fixtures: [
+          fixture({ round: '1라운드', fixtureNumber: 1, liveStatus: 'ended', status: 'completed' }),
+          fixture({ round: '2라운드', fixtureNumber: 2, liveStatus: 'scheduled' }),
+        ],
+      }),
+    );
+
+    // 리그는 두 칸(리그 방식 · 시상)이다. 조별/4강/결승 칸이 하나라도 있으면 틀렸다.
+    expect(shape(stages)).toEqual([
+      ['리그 방식', 'active'],
+      ['시상', 'upcoming'],
+    ]);
+  });
+
+  it('같은 format 이라도 kind 가 단발 대회면 조별+결선 단계를 그린다 — 회귀 가드', () => {
+    const stages = buildTournamentStages(
+      tournament({
+        format: 'group_knockout',
+        kind: 'regular_tournament',
+        status: 'in_progress',
+        fixtures: [
+          fixture({ round: '조별 1라운드', fixtureNumber: 1, liveStatus: 'ended', status: 'completed' }),
+        ],
+      }),
+    );
+
+    expect(stages.map((s) => s.label)).not.toContain('리그 방식');
+    expect(stages.map((s) => s.label)).toContain('조별리그');
   });
 });

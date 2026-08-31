@@ -31,6 +31,7 @@ import {
 import { TournamentSponsorSection } from '@/components/tournaments/tournament-sponsor-section';
 import { TournamentInquirySection } from '@/components/tournaments/tournament-inquiry-section';
 import { getTournamentAnnouncementCategoryLabel } from '@/components/tournaments/tournament-announcement-category';
+import { isLeagueCompetition } from '@/lib/competition-kind';
 import {
   formatTournamentDateShort,
   formatTournamentDateTimeShort,
@@ -58,12 +59,13 @@ export { getParticipantTeamBuckets } from '@/components/tournaments/tournament-e
 
 /* ── Format helpers ── */
 
-function getFormatLabel(format: V1TournamentFormat): string {
-  switch (format) {
-    case 'league': return '리그';
-    case 'knockout': return '토너먼트';
-    case 'group_knockout': return '조별리그 후 토너먼트';
-  }
+/**
+ * 거울 행의 `format` 은 사실이 아니므로(백필이 안 채워 기본값 `group_knockout` 이 남는다)
+ * **리그 판정을 먼저** 한다 — 안 그러면 정규 리그 배지에 "조별리그 후 토너먼트"라고 적힌다.
+ */
+function getFormatLabel(competition: V1TournamentDetail): string {
+  if (isLeagueCompetition(competition)) return '리그';
+  return competition.format === 'knockout' ? '토너먼트' : '조별리그 후 토너먼트';
 }
 
 /**
@@ -135,7 +137,7 @@ function getGenderQuotaLabel(
  * 히어로가 기존 "대회가 끝났어요" 문구로 안전하게 폴백하도록 한다(과설계 방지).
  */
 export function getCompletedChampionName(tournament: V1TournamentDetail): string | null {
-  if (tournament.format === 'league') {
+  if (isLeagueCompetition(tournament)) {
     const leagueGroup = tournament.groups.find((g) => g.phase === 'group');
     if (!leagueGroup) return null;
     const top = [...leagueGroup.standings].sort((a, b) => a.position - b.position)[0];
@@ -707,8 +709,8 @@ export function TournamentDetailView({
           <span className={`tm-badge ${status.badgeClass}`}>
             {status.label}
           </span>
-          <span className="tm-badge tm-badge-grey" aria-label={`대회 형식: ${getFormatLabel(tournament.format)}`}>
-            {getFormatLabel(tournament.format)}
+          <span className="tm-badge tm-badge-grey" aria-label={`대회 형식: ${getFormatLabel(tournament)}`}>
+            {getFormatLabel(tournament)}
           </span>
           {genderCategoryLabel ? (
             <span className="tm-badge tm-badge-grey" aria-label={`성별 카테고리: ${genderCategoryLabel}`}>
@@ -1506,16 +1508,22 @@ function TournamentPreParticipationNotice() {
  * The format badge alone ("조별리그 후 토너먼트") doesn't tell a participant how it
  * actually runs, so spell it out as numbered steps, format-aware, in 해요체.
  */
-function tournamentFormatLabel(format: V1TournamentFormat): string {
-  switch (format) {
-    case 'group_knockout': return '조별 리그 후 토너먼트';
-    case 'knockout': return '토너먼트 (단판 승부)';
-    case 'league': return '리그 방식 (풀리그)';
-    default: return '대회';
-  }
+function tournamentFormatLabel(competition: V1TournamentDetail): string {
+  if (isLeagueCompetition(competition)) return '리그 방식 (풀리그)';
+  return competition.format === 'knockout' ? '토너먼트 (단판 승부)' : '조별 리그 후 토너먼트';
 }
 
-function getFlowSteps(format: V1TournamentFormat): Array<{ title: string; body: string }> {
+function getFlowSteps(competition: V1TournamentDetail): Array<{ title: string; body: string }> {
+  // 리그를 **먼저** 걸러야 한다. 거울 행은 group_knockout 이라 아래 첫 분기에 걸려
+  // "조별 리그 → 결선 진출 → 결선 토너먼트" 를 리그 참가자에게 보여준다.
+  if (isLeagueCompetition(competition)) {
+    return [
+      { title: '풀리그', body: '참가한 모든 팀이 서로 한 번씩 맞붙어요.' },
+      { title: '순위 집계', body: '승점과 득실차로 최종 순위를 가려요.' },
+      { title: '시상', body: '최종 순위에 따라 상금과 순위를 시상해요.' },
+    ];
+  }
+  const { format } = competition;
   if (format === 'group_knockout') {
     return [
       { title: '조별 리그', body: '같은 조 팀끼리 돌아가며 맞붙어 조 안에서 순위를 가려요.' },
@@ -1538,12 +1546,12 @@ function getFlowSteps(format: V1TournamentFormat): Array<{ title: string; body: 
 }
 
 function TournamentFlowSection({ tournament }: { tournament: V1TournamentDetail }) {
-  const steps = getFlowSteps(tournament.format);
+  const steps = getFlowSteps(tournament);
   return (
     <section aria-labelledby="flow-heading" style={{ marginTop: 24 }}>
       <div id="flow-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>대회 진행 방식</div>
       <Card pad={16} style={{ marginTop: 4 }}>
-        <div className="tm-tourn-flow-format">{tournamentFormatLabel(tournament.format)}</div>
+        <div className="tm-tourn-flow-format">{tournamentFormatLabel(tournament)}</div>
         <ol className="tm-tourn-flow">
           {steps.map((step, index) => (
             <li key={step.title} className="tm-tourn-flow-step">
@@ -1680,7 +1688,7 @@ function FormatLeftSections({ tournament }: { tournament: V1TournamentDetail }) 
     hasAnyFixtures,
   } = partitionTournamentSections(format, fixtures, groups);
 
-  if (format === 'league') {
+  if (isLeagueCompetition(tournament)) {
     return (
       <>
         {hasGroupStandings ? <LeagueStandingsSection tournamentId={tournament.id} /> : null}
@@ -1735,8 +1743,9 @@ function BracketSection({ tournament }: { tournament: V1TournamentDetail }) {
   const { knockoutFixtures, hasKnockoutFixtures, hasAnyFixtures } =
     partitionTournamentSections(format, fixtures, groups);
 
-  /* league: 브래킷 없음 */
-  if (format === 'league') return null;
+  /* league: 브래킷 없음 — 거울 행은 format 이 group_knockout 이라 format 만 보면
+     여기서 안 걸리고 아래 group_knockout 경로로 떨어져 **없는 대진표를 그린다**. */
+  if (isLeagueCompetition(tournament)) return null;
 
   /* knockout: 픽스처가 있을 때만 표시 (모집 중/마감 단계엔 미표시) */
   if (format === 'knockout') {

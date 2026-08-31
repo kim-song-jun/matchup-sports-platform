@@ -23,6 +23,7 @@ import {
 } from '@/app/tournaments/[id]/tournament-detail-client';
 import { usePublicTournamentSchedule } from '@/components/public-game-records/use-public-game-records';
 import { ScheduleContent } from '@/components/public-game-records/schedule-content';
+import { competitionFormatLabel, isLeagueCompetition } from '@/lib/competition-kind';
 import type {
   V1TournamentDetail,
   V1TournamentFixture,
@@ -366,6 +367,9 @@ export function BracketScheduleTab({ tournamentId }: { tournamentId: string }) {
 /* ── 메인 콘텐츠 ── */
 export function BracketPageContent({ tournament }: { tournament: V1TournamentDetail }) {
   const { format, fixtures, groups } = tournament;
+  // 정규 리그 거울 행은 format='group_knockout' 이다(백필·dual-write 가 format 을 안 쓴다).
+  // 그래서 format 만 보면 ① 리그 순위 칼럼이 안 그려지고 ② 없는 대진표를 그리려 든다.
+  const isLeague = isLeagueCompetition(tournament);
   const stages = buildTournamentStages(tournament);
   const [activeTab, setActiveTab] = useState<'standings' | 'schedule'>('schedule');
 
@@ -404,11 +408,12 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
   // 붙었다(오너 지적: 대진표 빈 상태 화면). 반대로 league 포맷은 우측(대진표)이 없는데
   // 2열이라 오른쪽이 비었다. 칼럼이 하나뿐이면 그리드를 1열로 접어 그 칼럼이 가운데 폭을
   // 온전히 쓰게 한다.
-  const hasStandingsColumn =
-    format === 'league'
-      ? allLeagueRows.length > 0 || fixtures.length === 0
-      : format === 'group_knockout' && hasGroupStandings;
-  const hasBracketColumn = format === 'knockout' || format === 'group_knockout';
+  const hasStandingsColumn = isLeague
+    ? allLeagueRows.length > 0 || fixtures.length === 0
+    : format === 'group_knockout' && hasGroupStandings;
+  // 리그엔 토너먼트 대진이 없다. isLeague 를 안 빼면 거울 행(group_knockout)이 여기서
+  // 참이 되어 **빈 대진표 칼럼**이 생긴다 — 이 화면이 리그에서 가장 크게 틀어지는 자리다.
+  const hasBracketColumn = !isLeague && (format === 'knockout' || format === 'group_knockout');
   const isTwoColumn = hasStandingsColumn && hasBracketColumn;
 
   return (
@@ -432,10 +437,15 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
               (globals.css의 .tm-bracket-page-intro p) — 390px에서 이 인트로 블록이
               스크롤 영역의 22%(159px)를 먹어 정작 경기가 2~3개밖에 안 보였다. */}
           <h1>{tournament.title}</h1>
-          <p>경기 일정과 조별 순위, 결선 진행 상황을 확인하세요.</p>
+          {/* 리그엔 조별리그도 결선도 없다 — format 으로만 쓰면 거울 행에 이 문장이 그대로 뜬다. */}
+          <p>
+            {isLeague
+              ? '경기 일정과 순위를 확인하세요.'
+              : '경기 일정과 조별 순위, 결선 진행 상황을 확인하세요.'}
+          </p>
         </div>
         <span className="tm-bracket-page-format">
-          {format === 'league' ? '리그 방식' : format === 'knockout' ? '토너먼트' : '조별리그 + 토너먼트'}
+          {competitionFormatLabel(tournament)}
         </span>
       </header>
       {/* 진행 단계 */}
@@ -509,7 +519,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
             {/* 좌: 순위표 — 그릴 게 없으면 빈 칼럼을 남기지 않고 아예 렌더하지 않는다. */}
             {hasStandingsColumn ? (
             <div className="tm-tourn-sub-col" style={{ padding: '20px 20px 0' }}>
-              {format === 'league' && (
+              {isLeague && (
                 <section>
                   <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>
                     리그 순위
@@ -518,7 +528,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
                 </section>
               )}
 
-              {format === 'group_knockout' && hasGroupStandings && (
+              {!isLeague && format === 'group_knockout' && hasGroupStandings && (
                 <section>
                   <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>
                     조별 순위
@@ -529,7 +539,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
                 </section>
               )}
 
-              {format === 'league' && fixtures.length === 0 && (
+              {isLeague && fixtures.length === 0 && (
                 <div className="tm-hub-empty">경기 일정이 아직 없어요.</div>
               )}
             </div>

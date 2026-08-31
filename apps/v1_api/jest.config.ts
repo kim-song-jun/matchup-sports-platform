@@ -38,6 +38,14 @@ const config: Config = {
       // 고치는 것은 별도 작업이다. **새 스펙을 여기 넣지 마라** — 여기는 "고쳐야 할 빚" 목록이지
       // "안 돌려도 되는 것" 목록이 아니다.
       testPathIgnorePatterns: [
+        // ── team-matches 2개: **상속했던 "7건" 이 측정으로 확인됐다** (2026-09-01 KST CI). ──
+        //   team-match-lineup        5건 실패
+        //   team-match-game-adapter  2건 실패        합계 7 — 옛 주석의 수와 일치한다
+        // Idempotency-Key 필수화 · LOCKED 상태 리네이밍 이후 bit-rot(Task 14/Task 6 영역).
+        // **맞는 걸 확인한 것과 맞다고 믿은 것은 다르다** — 이제 이 수는 측정본이다.
+        '<rootDir>/test/team-matches/team-match-lineup\\.integration-spec\\.ts$',
+        '<rootDir>/test/team-matches/team-match-game-adapter\\.integration-spec\\.ts$',
+        //
         // ── 여기 남은 하나는 **상속한 숫자가 아니라 측정값**이다(2026-09-01 KST CI). ──
         //
         // 측정한 사실만 적는다:

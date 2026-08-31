@@ -169,7 +169,12 @@ describe('TournamentCampaignStatusService', () => {
       status: { in: ['open', 'closed', 'in_progress', 'completed'] },
     });
     // 종류 조건이 실제로 걸렸는지도 본다 — 호출부 조건만 보면 봉쇄가 빠져도 통과한다.
-    expect(where.AND.some((clause) => Array.isArray(clause.OR))).toBe(true);
+    // **`OR` 이 있는지가 아니라 그 `OR` 이 kind 조건인지**를 본다(Copilot 리뷰 지적):
+    // 호출부가 자기 `OR` 을 쓰는 날 "OR 존재"만 보는 단언은 봉쇄 없이도 통과한다.
+    const kindClause = where.AND.find((clause) => Array.isArray(clause.OR)) as {
+      OR: Array<{ kind: unknown }>;
+    };
+    expect(kindClause.OR).toEqual([{ kind: 'regular_tournament' }, { kind: null }]);
   });
 
   it('returns NOT_PUBLISHABLE for a forbidden archived to published transition', async () => {

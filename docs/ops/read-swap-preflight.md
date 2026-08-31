@@ -67,7 +67,6 @@ baseline 주석이 아니라 코드에 둔 이유는 **주석은 드리프트하
 | 1 | `games.service.ts` `suspensionVerdicts` | **리그 징계 규정이 에러 없이 꺼진다.** 행이 없으면 `?? null` → `suspensionRulesEnabled` false → 경고 누적·퇴장 정지가 통째로 동작하지 않는다 |
 | 2 | `tournament-standings-recalculation.ts` | **리그 순위가 에러 없이 갱신되지 않는다.** `if (!tournament) continue` 로 조용히 건너뛴다 |
 | 3 | `tournament-fixture-completion-notification.service.ts` | 결과 확정 알림 본문의 대회명이 `'대회'` 로 폴백된다(`tournament?.title ?? '대회'`). 기능은 살아 있고 **라벨만** 어긋난다 |
-
 | 4 | `tournament-registrations.service.ts` `loadPaymentInstructionSource` | **입금 안내(계좌·금액)가 응답에서 조용히 빠진다.** 조회가 null 을 그대로 넘기고 `serialize` 의 `paymentInstructions` 판정이 `tournament?.…` 로 옵셔널하게 읽어 블록 자체가 안 실린다(조건 전문은 아래) |
 
 1·2·4 는 **기능이 사라지는** 급이고 3 은 문구다. 1~3 은 코드에도 같은 경고를 달아 뒀다.

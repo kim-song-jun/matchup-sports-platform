@@ -109,7 +109,7 @@ gh api graphql -f query='{repository(owner:"<owner>",name:"<repo>"){pullRequest(
   --jq '[.data.repository.pullRequest.reviews.nodes[]
          |select(.author.login=="copilot-pull-request-reviewer")]|max_by(.submittedAt)|(.body // "")' > /tmp/rv.md
 wc -c < /tmp/rv.md          # 0 이면 리뷰가 0건이다 (형식 문제가 아니다)
-grep -nE '^\s*[-*]\s+\*\*Comments generated|Suppressed comments' /tmp/rv.md
+grep -nE '^[[:space:]]*[-*][[:space:]]+\*\*Comments generated|Suppressed comments' /tmp/rv.md
 ```
 **grep 이 빈 결과여도 통과가 아니다.** 두 경우를 먼저 가른다 — **파일이 비었으면 리뷰가 0건**이고
 (`// ""` 없이 쓰면 문자열 `null` 이 파일에 들어가 이 구분이 안 된다), **비지 않았는데 안 잡히면

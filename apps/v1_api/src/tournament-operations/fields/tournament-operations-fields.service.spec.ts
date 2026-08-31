@@ -10,6 +10,7 @@ import {
   TournamentOperationsFieldsService,
   type TournamentOperationsFieldAuditContext,
 } from './tournament-operations-fields.service';
+import { kindAwareFindFirst } from '../../../test/helpers/kind-aware-find-first';
 
 const tournamentId = '00000000-0000-4000-8000-000000000001';
 const fixtureId = '00000000-0000-4000-8000-000000000002';
@@ -211,6 +212,31 @@ describe('TournamentOperationsFieldsService', () => {
   // Finding #8 -- lost update: two operators who both observed fieldId=null
   // must not both succeed. The CAS predicate losing (count !== 1) must
   // surface as a conflict, not a silently accepted overwrite.
+  // **이 자리도 되돌리기 창을 닫는다.** 필드 운영은 `V1OperationAudit` 를 쓰고, 그 관계는
+  // 백필 행을 `onDelete: Restrict` 로 참조한다 — 리그 행에 감사 로그가 하나라도 붙으면
+  // 백필 88행을 **더 이상 지울 수 없다**(docs/ops/read-swap-preflight.md).
+  // 그래서 404 만이 아니라 **필드 행·감사 로그가 만들어지지 않는 것**까지 단언한다.
+  it('리그 id 에는 필드를 만들 수 없다 — 필드 행도 감사 로그도 남지 않는다', async () => {
+    const assertAccess = jest.fn().mockResolvedValue(platformOpsPrincipal());
+    const { service, moduleRef, prisma, tx } = await buildHarness({ assertAccess, fixtureFieldId: null });
+    prisma.v1Tournament.findFirst.mockImplementation(
+      kindAwareFindFirst({ id: tournamentId, kind: 'regular_league' }),
+    );
+
+    await expect(
+      service.create(
+        actorUserId,
+        tournamentId,
+        { scopeKey: 'A', name: 'A구장', sortOrder: 1 },
+        audit('req-league'),
+      ),
+    ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_NOT_FOUND' } });
+
+    expect(tx.v1TournamentField.create).not.toHaveBeenCalled();
+    expect(tx.v1OperationAudit.create).not.toHaveBeenCalled();
+    await moduleRef.close();
+  });
+
   it('assignFixtureField returns 409 when the CAS predicate no longer matches (lost-update race)', async () => {
     const assertAccess = jest.fn().mockResolvedValue(platformOpsPrincipal());
     const { service, moduleRef, tx } = await buildHarness({ assertAccess, fixtureFieldId: null });

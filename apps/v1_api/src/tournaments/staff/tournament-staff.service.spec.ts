@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { RealtimeGateway } from '../../realtime/realtime.gateway';
 import { TournamentStaffAccessService } from './tournament-staff-access.service';
 import { TournamentStaffService } from './tournament-staff.service';
+import { kindAwareFindFirst } from '../../../test/helpers/kind-aware-find-first';
 
 const IDS = {
   tournament: '10000000-0000-4000-8000-000000000001',
@@ -99,6 +100,43 @@ describe('TournamentStaffService', () => {
     expect(context.prisma.$transaction).not.toHaveBeenCalled();
     expect(context.tx.v1TournamentStaffAssignment.create).not.toHaveBeenCalled();
     expect(context.auditWriter.create).not.toHaveBeenCalled();
+  });
+
+  // **되돌리기 창을 닫는 자리다.** `V1TournamentStaffAssignment` 는 백필 행을 `Restrict` 로
+  // 참조하는 세 관계 중 하나라, 리그 행에 스태프가 한 명이라도 붙으면 백필 88행을
+  // **더 이상 지울 수 없다**(docs/ops/read-swap-preflight.md).
+  // 그래서 404 만이 아니라 **배정 행이 만들어지지 않는 것**까지 단언한다.
+  it('리그 id 에는 스태프를 배정할 수 없다 — 배정 행이 만들어지지 않는다', async () => {
+    const context = setup();
+    context.access.assertAccess.mockResolvedValue({
+      userId: IDS.actor,
+      role: 'platform_ops',
+      tournamentId: IDS.tournament,
+      assignmentId: null,
+      assignmentVersion: null,
+    });
+    context.tx.v1AdminUser.findUnique.mockResolvedValue({
+      adminRole: 'ops', status: 'active', revokedAt: null, user: { accountStatus: 'active' },
+    });
+    context.tx.v1Tournament.findFirst.mockImplementation(
+      kindAwareFindFirst({ id: IDS.tournament, kind: 'regular_league' }),
+    );
+    // 봉쇄가 없으면 실제로 성공하도록 채운다 — 비워 두면 아래 단언이 게이트가 아니라
+    // 깨진 mock 덕에 통과한다.
+    context.tx.v1TournamentStaffAssignment.create.mockResolvedValue(
+      assignment({ id: IDS.directorAssignment, role: 'TOURNAMENT_DIRECTOR', fieldId: null, fixtureScopes: [] }),
+    );
+
+    await expect(
+      context.service.bootstrapFirstDirector({
+        actorUserId: IDS.actor,
+        tournamentId: IDS.tournament,
+        targetUserId: IDS.target,
+        audit: AUDIT,
+      }),
+    ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_NOT_FOUND' } });
+
+    expect(context.tx.v1TournamentStaffAssignment.create).not.toHaveBeenCalled();
   });
 
   it('persists the bootstrap operation timestamp as the first director assignment start time', async () => {

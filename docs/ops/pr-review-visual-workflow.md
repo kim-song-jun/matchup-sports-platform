@@ -107,13 +107,19 @@ gh api graphql -f query='{repository(owner:"<owner>",name:"<repo>"){pullRequest(
 gh api graphql -f query='{repository(owner:"<owner>",name:"<repo>"){pullRequest(number:<N>){
   reviews(last:100){nodes{author{login} submittedAt body}}}}}' \
   --jq '[.data.repository.pullRequest.reviews.nodes[]
-         |select(.author.login=="copilot-pull-request-reviewer")]|max_by(.submittedAt)|(.body // "")' > /tmp/rv.md
-wc -c < /tmp/rv.md          # 0 이면 리뷰가 0건이다 (형식 문제가 아니다)
+         |select(.author.login=="copilot-pull-request-reviewer")]|max_by(.submittedAt)|(.body // empty)' > /tmp/rv.md
+[ -s /tmp/rv.md ] || echo "리뷰가 0건이다 (형식 문제가 아니다)"
 grep -nE '^[[:space:]]*[-*][[:space:]]+\*\*Comments generated|Suppressed comments' /tmp/rv.md
 ```
-**grep 이 빈 결과여도 통과가 아니다.** 두 경우를 먼저 가른다 — **파일이 비었으면 리뷰가 0건**이고
-(`// ""` 없이 쓰면 문자열 `null` 이 파일에 들어가 이 구분이 안 된다), **비지 않았는데 안 잡히면
-형식이 바뀐 것**이다. 어느 쪽이든 본문을 직접 연다.
+**grep 이 빈 결과여도 통과가 아니다.** 두 경우를 먼저 가른다 — **파일이 비었으면 리뷰가 0건**,
+**비지 않았는데 안 잡히면 형식이 바뀐 것**이다. 어느 쪽이든 본문을 직접 연다.
+
+> 폴백은 반드시 **`// empty`** 다. 실측(jq 1.7.1)으로 셋이 갈린다:
+> ```
+> 폴백 없음     파일에 문자열 `null` 5바이트   → 구분 자체가 안 된다
+> // ""        개행 1바이트                  → `-s` 도 `wc -c == 0` 도 "비었다"로 안 본다
+> // empty     0바이트                       → `[ -s ]` 로 정확히 갈린다  ✅
+> ```
 `Suppressed comments` 가 잡히면 **반드시 펼쳐 읽는다**(스레드를 안 만들어 게이트 5에 안 잡힌다).
 
 **게이트 5 — 미해결 수는 "받은 수 / 전체 수" 와 함께 본다**

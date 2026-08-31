@@ -239,6 +239,15 @@ jobs:
       - name: V1 API type-check
         run: pnpm --filter v1_api exec tsc --noEmit
 
+      # 대회 표면 게이트: `v1Tournament.findUnique/findFirst` **원시 호출 수**를 파일별
+      # baseline 으로 묶어 늘지 못하게 한다(줄었는데 baseline 이 그대로여도 실패).
+      # **이 스텝이 없으면 스크립트가 디스크에만 있고 CI 에서 한 번도 안 돈다** — 이
+      # 저장소는 그 사고를 이미 겪었다(jest.config.ts 의 glob 미등록 주석들 참조).
+      # 로그에 스캔 파일 수와 조회 개수가 찍히므로, 스텝이 돌았는지뿐 아니라
+      # **실제로 세었는지**까지 로그로 확인할 수 있다.
+      - name: V1 API tournament surface gate
+        run: pnpm --filter v1_api lint:surface
+
       # 마이그레이션 게이트: 빈 DB에 전체 체인 재생 + schema.prisma 드리프트 0 검증.
       # db push로만 스키마를 바꾸면 여기서 CI가 깨진다 — 반드시 migration 파일 동반.
       # (2026-07-12 프로덕션 장애 재발 방지: 리뷰 테이블 migration 누락 → deploy 중단)

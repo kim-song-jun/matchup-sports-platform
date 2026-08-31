@@ -69,6 +69,7 @@ function tournamentRow(overrides: Record<string, unknown> = {}) {
     title: '테스트 대회',
     status: 'in_progress',
     format: 'group_knockout',
+    kind: 'regular_tournament' as const,
     registrationDeadlineAt: null,
     scheduledAt: null,
     venue: null,
@@ -398,6 +399,53 @@ describe('TournamentBracketService', () => {
         response: { code: 'LEAGUE_ADVANCE_COUNT_FORBIDDEN' },
       });
       expect(prisma.v1TournamentGroup.create).not.toHaveBeenCalled();
+    });
+
+    it('kind=regular_league 는 format 이 group_knockout 이어도 knockout 조를 거부한다', async () => {
+      // **이 조합이 통합 백필이 실제로 만드는 행이다.** 백필은 `format` 을 쓰지 않아
+      // 스키마 기본값 `group_knockout` 이 들어간다 — 가드가 `format` 만 보던 동안
+      // 정규 리그 시즌에서는 **예외 없이 즉시 return** 했다(no-op).
+      prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+      prisma.v1Tournament.findFirst.mockResolvedValue(
+        tournamentRow({ format: 'group_knockout', kind: 'regular_league' }),
+      );
+
+      await expect(
+        service.createGroup(ownerUser, 'tournament-1', { name: '4강', phase: 'semi', sortOrder: 1 }),
+      ).rejects.toMatchObject({
+        response: { code: 'LEAGUE_KNOCKOUT_GROUP_FORBIDDEN' },
+      });
+      expect(prisma.v1TournamentGroup.create).not.toHaveBeenCalled();
+    });
+
+    it('format=league + kind=null 은 여전히 리그다 — kind 축을 더해도 원래 판정이 바뀌지 않는다', async () => {
+      // 두 조건은 OR 이다. `kind` 를 보게 만들면서 `format` 판정이 약해지면, 리그 방식으로
+      // 진행하는 옛 대회(kind 미지정)에 토너먼트 조가 다시 만들어진다.
+      prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+      prisma.v1Tournament.findFirst.mockResolvedValue(
+        tournamentRow({ format: 'league', kind: null }),
+      );
+
+      await expect(
+        service.createGroup(ownerUser, 'tournament-1', { name: '4강', phase: 'semi', sortOrder: 1 }),
+      ).rejects.toMatchObject({
+        response: { code: 'LEAGUE_KNOCKOUT_GROUP_FORBIDDEN' },
+      });
+      expect(prisma.v1TournamentGroup.create).not.toHaveBeenCalled();
+    });
+
+    it('format=group_knockout + kind=null(R1 이전 행)은 리그가 아니다 — knockout 조를 그대로 만든다', async () => {
+      // 위 수정이 만들 수 있는 **반대 방향 회귀**를 막는다: `kind` 를 보게 하면서
+      // null 까지 리그로 묶으면 마이그레이션 전에 만들어진 대회가 리그 규칙에 걸린다.
+      prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+      prisma.v1Tournament.findFirst.mockResolvedValue(
+        tournamentRow({ format: 'group_knockout', kind: null }),
+      );
+      prisma.v1TournamentGroup.create.mockResolvedValue(groupRow({ phase: 'semi' }));
+
+      await expect(
+        service.createGroup(ownerUser, 'tournament-1', { name: '4강', phase: 'semi', sortOrder: 1 }),
+      ).resolves.toBeDefined();
     });
 
     it('format=group_knockout인 대회는 knockout 조를 그대로 만들 수 있다', async () => {

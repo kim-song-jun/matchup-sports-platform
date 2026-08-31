@@ -6,6 +6,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import {
+  V1CompetitionKind,
   V1GameSideKey,
   V1GameSourceType,
   V1TournamentFixture,
@@ -86,12 +87,38 @@ export class TournamentBracketService {
   }
 
   /**
-   * 리그 대회는 브래킷(토너먼트) 개념을 갖지 않는다.
-   * 서버가 format을 실제로 읽어 막지 않으면 관리자 화면에서 실수로
-   * 브래킷 액션을 눌렀을 때 데이터가 조용히 뒤섞인다.
+   * 리그는 브래킷(토너먼트) 개념을 갖지 않는다.
+   * 서버가 실제로 읽어 막지 않으면 관리자 화면에서 실수로 브래킷 액션을 눌렀을 때
+   * 데이터가 조용히 뒤섞인다.
+   *
+   * ## `format` 만 보면 정규 리그 시즌에서 **항상 no-op 이었다**
+   * 이 가드는 원래 `format !== 'league'` 하나만 봤다. 그런데 그것과
+   * `kind === 'regular_league'` 는 **다른 질문**이다:
+   * - `format` = 이 대회를 **어떻게 진행하는가**(리그 방식 / 조별+토너먼트)
+   * - `kind`   = 이것이 **무엇인가**(단발 대회 / 정규 리그 시즌)
+   *
+   * 통합 백필(R3)이 만드는 리그 행은 `format` 을 **쓰지 않는다** — 그 값은 read-swap 이
+   * 정할 것이라 비워 두기 때문이다. 그래서 스키마 기본값 `group_knockout` 이 들어가고,
+   * 가드는 **리그 행에서 예외 없이 즉시 return** 했다(실측: 백필 create 는
+   * id·sportId·title·kind·status·seriesId·tier·seasonNo·competitionConfigVersionId 9개만 쓴다).
+   *
+   * 데이터를 `format='league'` 로 채워 맞추지 않는다 — 그러면 **가드는 틀린 채로 우연히
+   * 맞게 동작**하고, 두 개념이 갈리는 다음 지점에서 또 터진다. 질문을 둘 다 한다.
+   *
+   * **`kind: null`(R1 이전 행) 자체로는 리그로 판정하지 않는다.** 두 조건은 OR 이므로
+   * `format === 'league'` 인 행은 `kind` 가 null 이어도 **여전히 리그로 취급된다** — 그건
+   * 이 가드가 원래 하던 일이고 바뀌지 않는다. 이 수정이 더한 것은 `kind` 축 하나뿐이다.
+   * null 을 리그 쪽에 묶었다면 `format` 이 리그가 아닌 옛 대회까지 리그 규칙에 걸려
+   * **새 회귀**가 됐을 것이다.
    */
-  private assertLeagueGroupShape(format: string, phase: string, advanceCount?: number | null) {
-    if (format !== 'league') return;
+  private assertLeagueGroupShape(
+    format: string,
+    kind: V1CompetitionKind | null,
+    phase: string,
+    advanceCount?: number | null,
+  ) {
+    const isLeague = format === 'league' || kind === V1CompetitionKind.regular_league;
+    if (!isLeague) return;
     // V1TournamentGroupPhase = 'group' | 'semi' | 'final' | 'third_place'.
     // 리그 대회는 조별리그만 갖고 브래킷(토너먼트) 단계를 갖지 않으므로 'group' 외
     // 나머지 phase(semi/final/third_place)는 전부 knockout 조로 간주해 막는다.
@@ -188,7 +215,7 @@ export class TournamentBracketService {
   async createGroup(user: V1AuthUser, tournamentId: string, dto: CreateGroupDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const tournament = await this.loadTournament(tournamentId);
-    this.assertLeagueGroupShape(tournament.format, dto.phase ?? 'group', dto.advanceCount);
+    this.assertLeagueGroupShape(tournament.format, tournament.kind, dto.phase ?? 'group', dto.advanceCount);
 
     const created = await this.prisma.$transaction(async (tx) => {
       const group = await tx.v1TournamentGroup.create({
@@ -764,12 +791,12 @@ export class TournamentBracketService {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const group = await this.prisma.v1TournamentGroup.findUnique({
       where: { id: groupId },
-      include: { tournament: { select: { format: true } } },
+      include: { tournament: { select: { format: true, kind: true } } },
     });
     if (!group) {
       throw new NotFoundException({ code: 'GROUP_NOT_FOUND', message: '조를 찾을 수 없어요.' });
     }
-    this.assertLeagueGroupShape(group.tournament.format, group.phase, dto.advanceCount);
+    this.assertLeagueGroupShape(group.tournament.format, group.tournament.kind, group.phase, dto.advanceCount);
     const updated = await this.prisma.$transaction(async (tx) => {
       const row = await tx.v1TournamentGroup.update({
         where: { id: groupId },

@@ -9,6 +9,7 @@ import { presentTournamentDetail } from './tournament-detail.presenter';
 import { TournamentListQueryDto } from './dto/tournament-read.dto';
 import { leagueProgressOf, magicNumberOf } from './league-progress';
 import { TOURNAMENT_SURFACE_KIND } from './tournament-surface';
+import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
 import { hasTournamentFixtureOfficialResult } from './tournament-fixture-official-result';
 import {
   PUBLIC_TOURNAMENT_STATUS_FILTER,
@@ -122,11 +123,10 @@ export class TournamentsReadService {
    *   기록에 스태프 우회를 넣은 것과 동일한 선례.
    */
   async get(tournamentId: string, user?: V1AuthUser) {
-    const row = await this.prisma.v1Tournament.findFirst({
+    const row = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: {
         // 목록만 막으면 **id 를 아는 사람은 그대로 열 수 있다** — 대회 id 는 대진·순위
-        // 응답에 실려 나가므로 상세·순위에도 같은 조건을 건다.
-        ...TOURNAMENT_SURFACE_KIND,
+        // 응답에 실려 나가므로 상세·순위에도 같은 조건을 건다(종류 조건은 헬퍼가 건다).
         id: tournamentId,
         deletedAt: null,
         status: PUBLIC_TOURNAMENT_STATUS_FILTER,
@@ -154,11 +154,10 @@ export class TournamentsReadService {
    * - 팀별 잔여 경기 수를 세어 `magicNumberOf`에 넘긴다
    */
   async getOverallStandings(tournamentId: string) {
-    const tournament = await this.prisma.v1Tournament.findFirst({
+    const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: {
         // 목록만 막으면 **id 를 아는 사람은 그대로 열 수 있다** — 대회 id 는 대진·순위
-        // 응답에 실려 나가므로 상세·순위에도 같은 조건을 건다.
-        ...TOURNAMENT_SURFACE_KIND,
+        // 응답에 실려 나가므로 상세·순위에도 같은 조건을 건다(종류 조건은 헬퍼가 건다).
         id: tournamentId,
         deletedAt: null,
         status: PUBLIC_TOURNAMENT_STATUS_FILTER,

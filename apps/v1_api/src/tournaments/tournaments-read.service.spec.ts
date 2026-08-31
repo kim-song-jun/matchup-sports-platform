@@ -360,11 +360,17 @@ describe('TournamentsReadService', () => {
     await service.get('t-1').catch(() => {});
 
     const callArgs = prisma.v1Tournament.findFirst.mock.calls[0][0];
-    expect(callArgs.where.status).toMatchObject({
+    // `findTournamentOnSurface` 가 종류 조건과 호출부 조건을 `AND` 로 묶으므로
+    // `where.status` 가 한 겹 안으로 들어간다. 순서(AND[1])에 기대지 않고 status 를
+    // 가진 절을 찾는다 — 인덱스로 집으면 헬퍼가 절을 하나 더 붙이는 날 조용히 깨진다.
+    const statusClause = (callArgs.where.AND as Array<Record<string, unknown>>).find(
+      (clause) => 'status' in clause,
+    ) as { status: { in: string[] } };
+    expect(statusClause.status).toMatchObject({
       in: expect.arrayContaining(['open', 'in_progress', 'completed']),
     });
-    expect(callArgs.where.status.in).not.toContain('draft');
-    expect(callArgs.where.status.in).not.toContain('cancelled');
+    expect(statusClause.status.in).not.toContain('draft');
+    expect(statusClause.status.in).not.toContain('cancelled');
   });
 
   it('get: public detail only includes published public announcements', async () => {

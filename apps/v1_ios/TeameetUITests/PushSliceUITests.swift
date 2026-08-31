@@ -217,17 +217,69 @@ final class PushSliceUITests: XCTestCase {
 
         let emailField = webView.textFields.element(boundBy: 0)
         XCTAssertTrue(emailField.waitForExistence(timeout: 40), "the email form never appeared")
-        emailField.tap()
+        XCTAssertTrue(focus(emailField), "the email field never took keyboard focus")
         emailField.typeText(email)
 
         let passwordField = webView.secureTextFields.element(boundBy: 0)
         XCTAssertTrue(passwordField.waitForExistence(timeout: 15), "no password field")
-        passwordField.tap()
+        // Tab out of the email field rather than tapping the password one. Tapping it does
+        // not move focus here — measured: four attempts over sixteen seconds and
+        // `hasKeyboardFocus` stayed false — while the browser's own next-field behaviour
+        // does, because it is the page moving focus rather than a synthesised hit test.
+        //
+        // `typeKey` rather than `typeText("\t")`: the text form inserts a literal tab into
+        // the email instead of moving focus, and the sign-in then fails much later with
+        // "did not complete" — the corrupted address is invisible from that message.
+        if !hasKeyboardFocus(passwordField) {
+            emailField.typeKey(XCUIKeyboardKey.tab, modifierFlags: [])
+        }
+        // The address must be exactly what was typed. A stray tab here is why an earlier run
+        // reached the submit button and still failed to sign in.
+        XCTAssertEqual(emailField.value as? String, email, "the email field holds something else")
+        XCTAssertTrue(focus(passwordField), "the password field never took keyboard focus")
         passwordField.typeText(password)
 
         XCTAssertTrue(tapRow("로그인"), "no submit button on the sign-in form")
         XCTAssertTrue(webView.links["마이"].waitForExistence(timeout: 90), "sign-in did not complete")
         attach("01-signed-in")
+    }
+
+    /// Taps a field and waits until that field actually holds keyboard focus.
+    ///
+    /// A bare `tap()` followed by `typeText` fails intermittently with "Neither element nor
+    /// any descendant has keyboard focus": the tap is dispatched, but on a web form the field
+    /// can still be settling — the previous field's keyboard is dismissing, or the page has
+    /// not finished laying out — so the keystrokes arrive before focus does.
+    ///
+    /// Waiting for `app.keyboards` is not enough, and looked like it worked: a simulator with
+    /// a hardware keyboard attached reports a keyboards element the whole time, so the wait
+    /// returned immediately and the same failure came back at the same line. The element's own
+    /// `hasKeyboardFocus` is the thing that was actually false, so that is what is polled.
+    @discardableResult
+    private func focus(_ field: XCUIElement, attempts: Int = 4) -> Bool {
+        for attempt in 0..<attempts {
+            if hasKeyboardFocus(field) { return true }
+            // An element tap resolves to the element's own hit point, which a web input can
+            // report while the previous field's keyboard still owns focus. A coordinate tap
+            // goes to the same place by a different route and lands when the element tap does
+            // not, so the two are alternated rather than one being repeated.
+            if attempt % 2 == 0 {
+                field.tap()
+            } else {
+                field.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            }
+            let deadline = Date().addingTimeInterval(4)
+            while Date() < deadline {
+                if hasKeyboardFocus(field) { return true }
+                settle(0.5)
+            }
+        }
+        return false
+    }
+
+    /// Exposed through KVC rather than the public API, which has no equivalent.
+    private func hasKeyboardFocus(_ field: XCUIElement) -> Bool {
+        (field.value(forKey: "hasKeyboardFocus") as? Bool) ?? false
     }
 
     // MARK: - Tests

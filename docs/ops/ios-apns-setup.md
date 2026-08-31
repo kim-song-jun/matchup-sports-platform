@@ -101,3 +101,31 @@
 
 `.p8`이 도착하면 [`ios-release.md`](./ios-release.md)의 ad-hoc 서명 절차로 실기기 QA를 먼저
 돌린다.
+
+
+## alpha 런타임 주입 (2026-08-31 추가 — 이게 없으면 푸시가 조용히 죽는다)
+
+**실측으로 확인한 것**: alpha 배포는 시크릿을 4개만 주입하고 있었고 그중 APNs 는 없었다.
+그래서 `ApnsPushService` 가 `APNs credentials not configured — iOS push disabled` 로
+시작하고, 알림 **row 는 만들어지지만** iOS 로는 아무것도 나가지 않는다. 화면에는 알림이
+쌓이는데 폰은 조용하다 — 기기가 고장난 것처럼 보이고 서버가 시도조차 안 했다는 건 안 보인다.
+(2026-08-31 실측: 팀 채팅 메시지 → 알림 row 생성됨 → 시뮬레이터에 배너 없음.)
+
+`scripts/release/sync-alpha-apns-env.sh` 가 이 구멍을 막는다. 문의 Slack 웹훅과 같은 방식이다
+— GitHub secret → SSM SecureString → SSM 원격 실행으로 호스트의 보호된 `deploy/.env` 에 기록.
+값이 워크플로 로그나 이미지 레이어를 거치지 않는다.
+
+**운영자가 해야 할 것 — GitHub Actions secrets 4개 등록:**
+
+| 이름 | 값 |
+|---|---|
+| `APNS_KEY_ID` | 10자 키 ID |
+| `APNS_TEAM_ID` | 10자 팀 ID |
+| `APNS_BUNDLE_ID` | `kr.co.teameet.alpha` (alpha 기준) |
+| `APNS_PRIVATE_KEY` | `.p8` **내용**. 개행이 있는 그대로 붙여넣으면 된다 — 스크립트가 한 줄로 바꾼다 |
+
+넷 중 하나라도 없으면 배포는 **실패하지 않고** 경고만 남긴 채 넘어간다: 푸시 없는 alpha 는
+동작하는 alpha 지만, 막힌 배포는 아니기 때문이다. 경고 문구에 빠진 이름이 찍힌다.
+
+등록 후 다음 dev 머지(=alpha 배포)부터 적용된다. 확인은 알림을 하나 유발해 보는 것으로 한다 —
+row 만 생기고 폰이 조용하면 여전히 주입되지 않은 것이다.

@@ -33,7 +33,7 @@ function tournament(overrides: Row = {}) {
  * "가드 조건을 where 에서 빼는" 변이가 red 가 되지 않는다 — 그 함정을 이 저장소에서
  * 한 번 밟았다(참가팀 백필 스펙). count 는 조건을 통과한 행에서만 1 이다.
  */
-function fakePrisma(leagues: Row[], tournaments: Row[], onAfterRead?: (stored: Row[]) => void) {
+function fakePrisma(leagues: Row[], tournaments: Row[], onAfterRead?: (stored: Row[]) => void, mirrorCount?: number) {
   const updateMany = jest.fn((args: { where: Row; data: Row }) => {
     const row = tournaments.find((t) => t.id === args.where.id);
     const matches =
@@ -52,7 +52,12 @@ function fakePrisma(leagues: Row[], tournaments: Row[], onAfterRead?: (stored: R
     updateMany,
     prisma: {
       v1League: { findMany: jest.fn().mockResolvedValue(leagues) },
-      v1Tournament: { findMany: readTournaments, updateMany },
+      v1Tournament: {
+        findMany: readTournaments,
+        updateMany,
+        // 불변식(리그 수 == 거울 수) 관측값. 기본은 리그 수와 같게 둔다.
+        count: jest.fn(async () => mirrorCount ?? tournaments.length),
+      },
       $transaction: jest.fn((ops: unknown[]) => Promise.all(ops as Promise<unknown>[])),
     } as never,
   };
@@ -145,7 +150,7 @@ describe('backfillLeagueCompetitionDetails', () => {
 
     const result = await backfillLeagueCompetitionDetails(prisma, { dryRun: false });
 
-    expect(result).toEqual({ scanned: 1, skipped: 1, updated: 0, dryRun: false });
+    expect(result).toEqual({ scanned: 1, skipped: 1, updated: 0, mirrorCount: 1, dryRun: false });
     expect(updateMany).not.toHaveBeenCalled();
   });
 
@@ -206,11 +211,20 @@ describe('backfillLeagueCompetitionDetails', () => {
     const dry = fakePrisma([league()], [tournament()]);
     const dryResult = await backfillLeagueCompetitionDetails(dry.prisma, { dryRun: true });
     expect(dry.updateMany).not.toHaveBeenCalled();
-    expect(dryResult).toEqual({ scanned: 1, skipped: 0, updated: 0, dryRun: true });
+    expect(dryResult).toEqual({ scanned: 1, skipped: 0, updated: 0, mirrorCount: 1, dryRun: true });
 
     const applied = fakePrisma([league()], [tournament()]);
     const applyResult = await backfillLeagueCompetitionDetails(applied.prisma, { dryRun: false });
     expect(applied.updateMany).toHaveBeenCalledTimes(1);
-    expect(applyResult).toEqual({ scanned: 1, skipped: 0, updated: 1, dryRun: false });
+    expect(applyResult).toEqual({ scanned: 1, skipped: 0, updated: 1, mirrorCount: 1, dryRun: false });
+  });
+
+  it('불변식: 거울 수가 리그 수와 다르면 실패한다 — dual-write 가 빠진 자리를 드러낸다', async () => {
+    // updateMany 는 0행이어도 조용하다. 그 침묵을 여기서 개수로 깬다.
+    const { prisma } = fakePrisma([league()], [tournament()], undefined, 0);
+
+    await expect(backfillLeagueCompetitionDetails(prisma, { dryRun: false })).rejects.toThrow(
+      /리그 1 · 거울 0/,
+    );
   });
 });

@@ -36,6 +36,8 @@ export interface LeagueDetailBackfillResult {
   scanned: number;
   /** 이미 목표값이라 건드릴 필요가 없던 행 — dual-write 가 만든 새 리그의 거울이 여기 온다. */
   skipped: number;
+  /** `kind='regular_league'` 대회 행 수. **리그 수와 같아야 한다** — 불변식의 관측값이다. */
+  mirrorCount: number;
   updated: number;
   dryRun: boolean;
 }
@@ -142,10 +144,26 @@ export async function backfillLeagueCompetitionDetails(
     }
   }
 
+  // ── 불변식: 리그 수 == 거울 수 ────────────────────────────────────────────
+  // dual-write 의 `updateMany` 는 **0행이어도 조용하다**. 백필 전에는 그게 정상이지만
+  // 백필 후에는 절대 0이면 안 되고, 둘은 겉보기로 구분되지 않는다 — 그래서 주석으로만
+  // 두면 아무도 확인하지 않는다. 여기서 세어 **검사받는 값**으로 만든다.
+  //
+  // 이 백필이 끝난 시점에 리그 하나하나에 거울이 하나씩 있어야 한다. 모자라면 dual-write 가
+  // 빠진 쓰기 자리가 있다는 뜻이고, 그 리그는 read-swap 뒤 화면에서 조용히 사라진다.
+  const mirrorCount = await prisma.v1Tournament.count({ where: { kind: 'regular_league' } });
+  if (!options.dryRun && mirrorCount !== leagues.length) {
+    throw new Error(
+      `거울 수가 리그 수와 다르다: 리그 ${leagues.length} · 거울 ${mirrorCount}. ` +
+        'dual-write 가 빠진 쓰기 자리가 있는지 확인해라(scripts/league-write-site-baseline.json).',
+    );
+  }
+
   return {
     scanned: leagues.length,
     skipped: skippable.size,
     updated: options.dryRun ? 0 : toUpdate.length,
+    mirrorCount,
     dryRun: options.dryRun,
   };
 }

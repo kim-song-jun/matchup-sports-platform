@@ -189,7 +189,12 @@ function main() {
   let list;
   try {
     // 스펙은 제외한다 — 인라인 mock 이 같은 문자열을 갖고, 그건 프로덕션 조회가 아니다.
-    list = execSync('find src -name "*.ts" ! -name "*.spec.ts"', { encoding: 'utf8' });
+    //
+    // `prisma/` 도 본다: alpha QA 시드가 **리그를 만든다**(고정 id upsert). 시드를 스캔에서
+    // 빼면 그 두 자리가 v1League 쓰기 검사에 안 걸리고, 거울 없는 QA 리그가 read-swap 뒤
+    // 조용히 사라진다 — 그런데 QA 리그가 바로 그 read-swap 을 검증하는 화면이라, 빈 목록이
+    // "전환 성공"인지 "전부 망가짐"인지 구분되지 않게 된다.
+    list = execSync('find src prisma -name "*.ts" ! -name "*.spec.ts"', { encoding: 'utf8' });
   } catch (e) {
     violations.push(`[게이트 실행 실패] 소스 목록을 만들 수 없다 (${e.message})`);
     return;

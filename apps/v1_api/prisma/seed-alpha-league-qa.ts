@@ -16,6 +16,7 @@ import {
   FEATURED_PERSONAS,
   FEATURED_TEAMS,
 } from './seed-alpha-tournament-qa';
+import { leagueMirrorCreateData } from '../src/tournaments/league-competition-mirror';
 
 /**
  * alpha 리그(League) 화면 QA 시드 (Task R10).
@@ -908,6 +909,35 @@ async function ensureLeague(
       state: 'active',
     },
   });
+  // dual-write — 통합 축의 거울도 같은 고정 id 로 upsert 한다. 리그당 정확히 한 행이
+  // 영원히 재사용되므로 고아가 생기지 않는다(이 시드는 지우지 않는다).
+  //
+  // **`status` 는 create 전용이다** — 바로 위 `state` 와 같은 이유다. 스태프가 alpha 에서
+  // 직접 바꾼 상태를 재배포가 되돌리면 안 된다. update 분기에 넣으면 **거울만 시드값으로
+  // 되돌아가고 리그는 스태프 값을 유지해 두 축이 반대 방향으로 갈라진다.**
+  await tx.v1Tournament.upsert({
+    where: { id: LEAGUE_QA_ID },
+    update: {
+      title: commonLeagueData.title,
+      sportId,
+      regionId,
+      scheduledAt: startsOn,
+      scheduledEndAt: endsOn,
+    },
+    create: leagueMirrorCreateData({
+      id: LEAGUE_QA_ID,
+      title: commonLeagueData.title,
+      sportId,
+      regionId,
+      state: 'active',
+      startsOn,
+      endsOn,
+      seriesId: null,
+      tier: null,
+      seasonNo: null,
+      sportCode: 'futsal',
+    }),
+  });
   // 참가팀 연결(V1LeagueTeam) — 순위표·득점/도움 순위 둘 다 league.teams(이 조인)를 통해
   // teamId 목록을 읽으므로 이게 없으면 리그가 빈 리그로 보인다.
   for (const team of teams) {
@@ -979,6 +1009,35 @@ async function ensureTierSeries(
         tier,
         seasonNo: 1,
       },
+    });
+    // dual-write — 통합 축의 거울도 같은 고정 id 로 upsert 한다. 리그당 정확히 한 행이
+    // 영원히 재사용되므로 고아가 생기지 않는다(이 시드는 지우지 않는다).
+    //
+    // **`status` 는 create 전용이다** — 바로 위 `state` 와 같은 이유다. 스태프가 alpha 에서
+    // 직접 바꾼 상태를 재배포가 되돌리면 안 된다. update 분기에 넣으면 **거울만 시드값으로
+    // 되돌아가고 리그는 스태프 값을 유지해 두 축이 반대 방향으로 갈라진다.**
+    await tx.v1Tournament.upsert({
+      where: { id: leagueId },
+      update: {
+        title: commonData.title,
+        sportId,
+        regionId,
+        scheduledAt: startsOn,
+        scheduledEndAt: endsOn,
+      },
+      create: leagueMirrorCreateData({
+        id: leagueId,
+        title: commonData.title,
+        sportId,
+        regionId,
+        state: 'draft',
+        startsOn,
+        endsOn,
+        seriesId: LEAGUE_QA_SERIES_ID,
+        tier,
+        seasonNo: 1,
+        sportCode: 'futsal',
+      }),
     });
     for (const team of tierTeams) {
       await tx.v1LeagueTeam.upsert({

@@ -8,6 +8,10 @@
     "allowed": 2,
     "why": "시리즈 최초 생성 + 승강 다음 시즌 생성. 둘 다 같은 트랜잭션에서 거울을 create 한다."
   },
+  "prisma/seed-alpha-league-qa.ts": {
+    "allowed": 2,
+    "why": "alpha QA 시드의 단발 리그 + 티어 리그 upsert. 고정 id 라 리그당 한 행이 재사용되고, 같은 트랜잭션에서 거울도 같은 id 로 upsert 한다. status 는 create 전용 — 스태프가 바꾼 상태를 재배포가 되돌리면 안 된다."
+  },
   "src/league-matches/league-completion-projection.service.ts": {
     "allowed": 1,
     "why": "active→completed 조건부 updateMany. count 0 조기 반환 뒤에 거울을 고쳐 조건부 update 의 승자만 반영한다."

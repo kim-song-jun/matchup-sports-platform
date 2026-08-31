@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { isParticipantPubliclyEligible, loadParticipantConsentEligibility } from '../games/public-records/public-consent';
@@ -182,42 +182,77 @@ export class LeagueMatchPublicService {
       },
     });
 
-    // 거울의 `region` 은 스키마상 nullable 이다 — **기존 대회 행에 지역이 없어서**지 리그에
-    // 없어서가 아니다.
-    //
-    // **여기서 null 은 "값이 없는 경우" 가 아니라 "불변식이 깨진 경우" 다:**
+    // ── 거울의 nullable 세 필드는 **전부 같은 불변식**이다 ─────────────────
+    // `region`·`scheduledAt`·`scheduledEndAt` 은 스키마상 nullable 인데, 그건 **기존 대회
+    // 행에 그 값이 없어서**지 리그에 없어서가 아니다:
     // ```
-    // V1League.regionId   NOT NULL        원본에 항상 있다
-    // dual-write          그대로 복사
-    // --apply             88행을 채운다
+    // V1League.regionId / startsOn / endsOn   전부 NOT NULL — 원본에 항상 있다
+    // dual-write                              그대로 복사한다
+    // --apply (R4-a)                          88행을 채웠다
     // ```
-    // 그래서 `!` 로 넘기지도, **"안전하게 걸러내지" 도 않는다** — 거르면 그 리그가 목록에서
-    // 조용히 사라지고, 그게 이 작업 전체가 막으려는 실패 모습이다. 에러가 맞다.
+    // **그래서 여기서 null 은 "값이 없는 경우" 가 아니라 "불변식이 깨진 경우" 다.**
     //
-    // **거르지 않고 던진다.** 지역 없는 행을 `where` 에서 빼면 그 리그가 목록에서 조용히
-    // 사라지고 — 그게 이 작업 전체가 막으려는 실패 모습이다. 어느 리그인지 이름을 댄다.
-    const withoutRegion = mirrors.filter((mirror) => mirror.region === null).map((mirror) => mirror.id);
-    if (withoutRegion.length > 0) {
-      throw new Error(
-        `거울에 지역이 없다: ${withoutRegion.join(', ')}. ` +
-          '백필(R4-a) 이 regionId 를 채웠는지, dual-write 가 그것을 쓰는지 확인해라.',
-      );
+    // 세 필드를 **같은 방식으로** 다룬다 — 하나는 던지고 하나는 `as Date` 로 단언하면
+    // 다음 사람도 또 다르게 다룬다. **단언은 검사가 아니다**: null 이 섞이면 그대로
+    // 내려가거나 직렬화에서 터지고, 어느 쪽이든 원인이 안 보인다.
+    //
+    // **`where` 에서 거르지 않는 이유**: 거르면 그 리그가 목록에서 조용히 사라지고,
+    // 그게 이 작업 전체가 막으려는 실패 모습이다.
+    //
+    // **`new Error` 를 쓰지 않는 이유**: `HttpException` 이 아니면 `HttpExceptionFilter` 가
+    // **500 + "Internal server error"** 로 정규화해 **리그 id 도 code 도 전부 유실된다.**
+    // 그러면 "어느 리그인지 대며 실패한다" 가 소스에만 참이고 응답에서는 거짓이 된다.
+    // 한 번만 순회해 나눈다. 술어(`isComplete`)가 "완전하다"의 **유일한 정의**이고,
+    // 타입 술어라서 통과한 행은 아래에서 단언 없이 non-null 로 쓸 수 있다.
+    type LeagueMirrorRow = (typeof mirrors)[number];
+    type CompleteLeagueMirror = LeagueMirrorRow & {
+      region: NonNullable<LeagueMirrorRow['region']>;
+      scheduledAt: Date;
+      scheduledEndAt: Date;
+    };
+    const isComplete = (mirror: LeagueMirrorRow): mirror is CompleteLeagueMirror =>
+      mirror.region !== null && mirror.scheduledAt !== null && mirror.scheduledEndAt !== null;
+
+    const complete: CompleteLeagueMirror[] = [];
+    const incomplete: Array<{ leagueId: string; missing: string[] }> = [];
+    for (const mirror of mirrors) {
+      if (isComplete(mirror)) {
+        complete.push(mirror);
+        continue;
+      }
+      incomplete.push({
+        leagueId: mirror.id,
+        missing: [
+          mirror.region === null ? 'region' : null,
+          mirror.scheduledAt === null ? 'scheduledAt' : null,
+          mirror.scheduledEndAt === null ? 'scheduledEndAt' : null,
+        ].filter((field): field is string => field !== null),
+      });
+    }
+    if (incomplete.length > 0) {
+      // `detail` 로 어느 리그의 어느 필드인지 전부 싣는다 — 운영자가 고칠 대상이 그것이다.
+      throw new InternalServerErrorException({
+        code: 'LEAGUE_MIRROR_INCOMPLETE',
+        message: '리그 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
+        detail: incomplete,
+      });
     }
 
     // 응답의 `state` 계약은 그대로 둔다 — 웹이 `LEAGUE_STATE_META[item.state]` 로
     // **인덱싱**해서, 세 값 밖이 나오면 목록 페이지가 통째로 죽는다.
-    const leagues = mirrors.map((mirror) => ({
+    const leagues = complete.map((mirror) => ({
       id: mirror.id,
       title: mirror.title,
       state: LEAGUE_STATE_BY_STATUS[mirror.status],
       // 거울의 날짜는 리그의 `startsOn`/`endsOn` 이 그대로 옮겨온 것이다. nullable 인 이유는
       // **기존 대회 행**에 기간이 없어서지 리그에 없어서가 아니다(원본이 NOT NULL).
-      startsOn: mirror.scheduledAt as Date,
-      endsOn: mirror.scheduledEndAt as Date,
+      // 위 불변식 검사를 통과했으므로 non-null 이다 — 근거는 단언이 아니라 검사다.
+      startsOn: mirror.scheduledAt,
+      endsOn: mirror.scheduledEndAt,
       tier: mirror.tier,
       seasonNo: mirror.seasonNo,
       sport: mirror.sport,
-      region: mirror.region as { id: string; name: string },
+      region: mirror.region,
       series: mirror.series,
       teams: mirror.registrations,
       _count: { teams: mirror._count.registrations },

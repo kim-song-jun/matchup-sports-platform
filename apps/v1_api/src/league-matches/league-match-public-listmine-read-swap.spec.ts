@@ -11,7 +11,9 @@ import { LeagueMatchPublicService } from './league-match-public.service';
  * 2. `kind` 와 **`status: 'confirmed'`** 로 좁힌다 — 확정 등록만 참가로 센다
  * 3. `_count` 도 `confirmed` 로 거른다 — 안 거르면 신청제(D7) 뒤 pending 이 섞인다
  * 4. `status → state` 역매핑 — 웹이 `LEAGUE_STATE_META[state]` 로 **인덱싱**한다
- * 5. 지역 없는 거울은 **거르지 않고 던진다** — 거르면 그 리그가 조용히 사라진다
+ * 5. 불완전한 거울(지역·시작일·종료일)은 **거르지 않고 던진다** — 거르면 조용히 사라진다
+ * 6. 그 실패가 **HTTP 응답까지 간다** — `HttpException` 이 아니면 필터가 500 +
+ *    "Internal server error" 로 정규화해 리그 id 도 code 도 유실된다
  */
 function makePrisma(mirrors: unknown[]) {
   const findMany = jest.fn().mockResolvedValue(mirrors);
@@ -105,12 +107,51 @@ describe('listMine — 통합 축 읽기 (R4-a)', () => {
     expect(result.items[0].state).toBe(expected);
   });
 
-  it('지역 없는 거울은 조용히 거르지 않고 어느 리그인지 대며 실패한다', async () => {
+  // 세 필드는 같은 불변식이다 — 하나만 막고 나머지를 `as Date` 로 단언하면 그 둘은
+  // 되돌려도 green 이다. 그래서 셋을 각각 돌린다.
+  it.each([
+    ['region', { region: null }, ['region']],
+    ['scheduledAt', { scheduledAt: null }, ['scheduledAt']],
+    ['scheduledEndAt', { scheduledEndAt: null }, ['scheduledEndAt']],
+    [
+      '세 개 동시',
+      { region: null, scheduledAt: null, scheduledEndAt: null },
+      ['region', 'scheduledAt', 'scheduledEndAt'],
+    ],
+  ])('불완전한 거울(%s)은 거르지 않고 실패한다', async (_label, broken, missing) => {
     // 거르면 그 리그가 목록에서 사라지고 — 그게 이 작업 전체가 막으려는 실패 모습이다.
-    const { prisma } = makePrisma([mirror({ id: 'lg-broken', region: null })]);
+    const { prisma } = makePrisma([mirror({ id: 'lg-broken', ...(broken as object) })]);
     const service = new LeagueMatchPublicService(prisma);
 
-    await expect(service.listMine('user-1')).rejects.toThrow(/lg-broken/);
+    await expect(service.listMine('user-1')).rejects.toMatchObject({
+      // `HttpException` 이어야 한다. plain `Error` 면 `HttpExceptionFilter` 가
+      // 500 + "Internal server error" 로 덮어써서 아래 code·detail 이 전부 사라진다.
+      // → 이 단언이 `new Error` 로 되돌리는 변이를 잡는 지점이다.
+      status: 500,
+      response: {
+        code: 'LEAGUE_MIRROR_INCOMPLETE',
+        message: '리그 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
+        detail: [{ leagueId: 'lg-broken', missing }],
+      },
+    });
+  });
+
+  it('완전한 거울만 있으면 한 건도 거르지 않는다', async () => {
+    // 위 검사가 "전부 던진다" 로 과잉 반응하면 목록이 통째로 죽는다 — 반대 방향도 고정한다.
+    //
+    // `draft` 를 쓰는 이유: non-draft 는 항목마다 `standings()` 를 부르고, 그건 **아직
+    // 리그 축(`v1League.findUnique`)을 읽는다** — R4-a 는 `listMine` 자신의 조회만
+    // 옮겼고 `standings()` 는 범위 밖이다. 여기서 검증할 건 "완전한 거울이 살아남는가"
+    // 뿐이고 그 검사는 조회 직후에 끝나므로, standings 경로를 끌어들이지 않는다.
+    const { prisma } = makePrisma([
+      mirror({ id: 'lg-a', status: 'draft' }),
+      mirror({ id: 'lg-b', status: 'draft' }),
+    ]);
+    const service = new LeagueMatchPublicService(prisma);
+
+    const result = await service.listMine('user-1');
+
+    expect(result.items.map((item) => item.leagueId)).toEqual(['lg-a', 'lg-b']);
   });
 
   it('소속 팀이 없으면 통합 축을 조회하지도 않는다', async () => {

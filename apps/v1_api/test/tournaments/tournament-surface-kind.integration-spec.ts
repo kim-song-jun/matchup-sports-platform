@@ -36,6 +36,7 @@ const ids = {
   adminUserId: '9a000000-0000-4000-8000-000000000001',
   adminId: '9a000000-0000-4000-8000-000000000002',
   sportId: '9a000000-0000-4000-8000-000000000010',
+  regionId: '9a000000-0000-4000-8000-000000000012',
   tournament: '9a000000-0000-4000-8000-000000000020',
   league: '9a000000-0000-4000-8000-000000000021',
   legacyNullKind: '9a000000-0000-4000-8000-000000000022',
@@ -98,6 +99,28 @@ describe('대회 표면은 정규 리그 시즌을 보여주지 않는다 (real 
         bracketPublishedAt,
       },
     });
+    // **거울 뒤의 진짜 리그 행을 함께 심는다.** 거울(`v1_tournaments`)만 있고 리그
+    // (`v1_leagues`)가 없으면 `getOverallStandings` 가 리그 축 조회에서 못 찾아 던지는데,
+    // 그 코드가 표면 게이트의 코드와 **똑같이** `TOURNAMENT_NOT_FOUND` 다 — 즉 게이트를
+    // 없애도 이 스펙이 green 으로 남는다(실측: 리그 경로에 PROBE 코드를 심자 red 가 됐다).
+    // 리그 행이 있어야 "게이트가 막았다" 와 "리그가 없다" 가 갈린다.
+    await prisma.v1Region.create({
+      data: { id: ids.regionId, code: 'surface-kind-region', name: '표면테스트권역', level: 1 },
+    });
+    await prisma.v1League.create({
+      data: {
+        id: ids.league,
+        title: '표면 테스트 리그 시즌',
+        sportId: ids.sportId,
+        regionId: ids.regionId,
+        createdByAdminUserId: ids.adminId,
+        state: 'active',
+        startsOn: new Date('2026-01-01T00:00:00.000Z'),
+        endsOn: new Date('2026-02-01T00:00:00.000Z'),
+        tieBreakJson: { order: ['points', 'goalDifference', 'goalsFor', 'headToHead'] },
+      },
+    });
+
     // R1 이전 행 재현 — DEFAULT 가 채우지 못한 상태를 명시적으로 만든다.
     await prisma.v1Tournament.create({
       data: {
@@ -207,12 +230,30 @@ describe('대회 표면은 정규 리그 시즌을 보여주지 않는다 (real 
     });
   });
 
-  it('공개 통합 순위 — 리그 id 로는 열리지 않는다', async () => {
-    await expect(read.getOverallStandings(ids.league)).rejects.toMatchObject({
+  /**
+   * **통합 순위만 의도적으로 열려 있다 — 표면에서 유일하게 뚫어 둔 구멍이다.**
+   *
+   * 거울 행에는 조도 대진도 없어 대회 축 계산으로는 **빈 순위표**가 나온다. 404 보다 나쁘다:
+   * 에러가 아니라 "아직 순위가 없다" 로 읽힌다. 그래서 `getOverallStandings` 만
+   * `ALL_COMPETITION_KINDS` 로 넓혀 리그 축에서 같은 모양을 만든다
+   * (`scripts/tournament-league-allowed-baseline.json` 에 why 와 함께 묶여 있다).
+   *
+   * 여기서는 **열렸다는 사실**만 본다 — 값의 정확성(승점·진행률·무효 제외)은
+   * `tournament-overall-standings-league.integration-spec.ts` 가 실 데이터로 검증한다.
+   * 이 리그에는 팀도 대진도 없으므로 빈 순위표가 정상이다.
+   */
+  it('공개 통합 순위 — 리그만 열려 있다(상세는 여전히 닫혀 있다)', async () => {
+    await expect(read.getOverallStandings(ids.league)).resolves.toMatchObject({
+      standings: [],
+      progress: { total: 0, played: 0, remaining: 0 },
+      magicNumber: null,
+    });
+    // 대조군: 대회 축은 그대로 열려 있다.
+    await expect(read.getOverallStandings(ids.tournament)).resolves.toBeDefined();
+    // **상세는 닫힌 채다** — 순위가 열렸다고 상세까지 열린 것으로 오해하지 않도록 함께 못박는다.
+    await expect(read.get(ids.league)).rejects.toMatchObject({
       response: expect.objectContaining({ code: 'TOURNAMENT_NOT_FOUND' }),
     });
-    // 대조군: 같은 조건의 대회는 정상 응답한다(리그만 막혔다는 뜻).
-    await expect(read.getOverallStandings(ids.tournament)).resolves.toBeDefined();
   });
 
   it('어드민 대회 목록과 상태 탭 카운트가 같은 조건을 본다', async () => {

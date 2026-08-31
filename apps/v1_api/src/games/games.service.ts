@@ -126,7 +126,7 @@ import type {
   RevokeIdentityLinkDto,
   RevokeParticipantConsentDto,
 } from './dto/game-participant-identity.dto';
-import { findTournamentOnSurface, ALL_COMPETITION_KINDS, TOURNAMENT_KINDS } from '../tournaments/tournament-surface-lookup';
+import { findTournamentOnSurface, ALL_COMPETITION_KINDS } from '../tournaments/tournament-surface-lookup';
 
 type Transaction = Prisma.TransactionClient;
 type CommandResult = object;

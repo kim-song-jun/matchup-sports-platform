@@ -13,6 +13,7 @@ import {
 } from './league-promotion';
 import { resolveIsForfeit } from './league-match-forfeit.service';
 import { ListLeagueMatchesQueryDto } from './dto/league-match.dto';
+import { bucketLeagueFixtures } from './league-standings-source';
 import { LEAGUE_STATE_BY_STATUS } from '../tournaments/league-competition-mirror';
 
 const PLAYER_RECORDS_LIMIT = 30;
@@ -493,44 +494,14 @@ export class LeagueMatchPublicService {
         });
     const factByGameId = new Map(facts.map((fact) => [fact.gameId, fact]));
 
-    const confirmedFixtures: Array<{ homeTeamId: string; awayTeamId: string; homeScore: number; awayScore: number }> = [];
-    const pendingFixtures: Array<{ teamMatchId: string; homeTeamId: string; awayTeamId: string | null; startAt: Date }> = [];
-    let cancelledFixtureCount = 0;
-    for (const tm of teamMatches) {
-      // [정책 변경 이력 — R8] 이 분기는 원래 "공식 결과 fact가 있으면 팀매치 status와
-      // 무관하게 confirmed로 남긴다"는 의도된 동작이었다(이미 열린 경기의 결과는
-      // 취소돼도 기록으로 남겨야 한다는 전제). 하지만 어드민은 팀매치를 자유롭게
-      // cancelled로 바꿀 수 있어서, 오심·오입력 정정으로 취소된 경기가 여전히
-      // 순위에 반영되는 상태가 만들어질 수 있었다 -- 취소한 경기가 순위표에 그대로
-      // 남는 쪽이(정정이 반영되지 않는 것처럼 보임) 순위표 신뢰도를 해치는 더 큰
-      // 운영 리스크이므로, cancelled는 fact 존재 여부와 무관하게 confirmed·pending
-      // 양쪽에서 전부 제외하도록 뒤집는다. 취소된 대진은 앞으로도 치러지지 않으므로
-      // "예정 경기"로도 영구 집계되지 않는다.
-      // 이슈 3(감사 보통) — "왜 팀마다 치른 경기 수가 다른가"는 취소 대진이 집계에서
-      // 빠지기 때문인데, 순위표 자체에는 그 사실을 알 근거가 없었다(일정 쪽 "취소됨"
-      // 배지를 보고 스스로 유추해야 했다). 위 R8 필터가 이미 취소 건을 걸러내는 지점에서
-      // 그대로 개수만 센다 — 별도 쿼리 없이 이 루프 한 번으로 충분하다.
-      if (tm.status === 'cancelled') {
-        cancelledFixtureCount += 1;
-        continue;
-      }
-
-      // 감사 L-E finding 2/5 수정: 무효 처리된 대진은 취소와 마찬가지로 "더 이상 결과를
-      // 기다리지 않는" 상태다 -- confirmed(결과가 반영됨)도 pending(미확정 경기로 다시
-      // 뛰어야 함)도 아니다. 여기서 걸러내지 않으면 이 대진이 pendingFixtures로 들어가
-      // 승강 확정 게이트("모든 대진이 확정됐는가")를 영구히 막고, listMine의 "다음 경기"가
-      // 이미 무효 처리된 지난 경기를 계속 가리키게 된다.
-      if (tm.game?.currentOfficialRevision?.state === 'VOID') {
-        continue;
-      }
-
-      const fact = tm.game === null ? undefined : factByGameId.get(tm.game.id);
-      if (fact === undefined || tm.approvedApplicantTeamId === null) {
-        pendingFixtures.push({ teamMatchId: tm.id, homeTeamId: tm.hostTeamId, awayTeamId: tm.approvedApplicantTeamId, startAt: tm.startAt });
-        continue;
-      }
-      confirmedFixtures.push({ homeTeamId: tm.hostTeamId, awayTeamId: tm.approvedApplicantTeamId, homeScore: fact.homeScore, awayScore: fact.awayScore });
-    }
+    // 분류 규칙(취소·VOID·pending·confirmed)은 `league-standings-source.ts` 로 뽑았다 —
+    // 통합 화면의 `getOverallStandings` 가 거울 행에서 **같은 계산**을 해야 하는데, 여기 두면
+    // 두 벌이 되고 한쪽만 고쳐지는 날이 온다. 규칙의 근거(R8 · 감사 L-E)는 그 파일 주석에 있다.
+    const {
+      confirmed: confirmedFixtures,
+      pending: pendingFixtures,
+      cancelledCount: cancelledFixtureCount,
+    } = bucketLeagueFixtures(teamMatches, factByGameId);
 
     const tieBreakOrder = (league.tieBreakJson as { order?: LeagueTieBreakCriterion[] }).order ?? [
       'points', 'goalDifference', 'goalsFor', 'headToHead',

@@ -222,6 +222,26 @@ describe('TournamentReviewsService — awards admin gate', () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
+  it('setAwards: 리그 id 는 어워드를 만들지 못한다 — 삭제·생성 모두 일어나지 않는다', async () => {
+    // 어워드는 공개 사용자 기록(`public-user-records`)으로 흘러나간다 — 리그 id 로 만들어지면
+    // 대회 수상 이력에 섞인다. 404 만 보지 않고 **쓰기가 0회**인지 함께 단언한다.
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockImplementation(
+      kindAwareFindFirst({ id: 'league-1', deletedAt: null, kind: 'regular_league' }),
+    );
+    // 봉쇄가 없으면 실제로 성공하도록 채운다.
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue(confirmedRegistrationRows);
+    prisma.v1TournamentAward.deleteMany.mockResolvedValue({ count: 1 });
+    prisma.v1TournamentAward.create.mockResolvedValue(awardRow());
+
+    await expect(
+      service.setAwards(ownerAuthUser, 'league-1', { awards: [] }),
+    ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_NOT_FOUND' } });
+
+    expect(prisma.v1TournamentAward.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.v1TournamentAward.create).not.toHaveBeenCalled();
+  });
+
   it('setAwards: owner admin replaces awards and returns the updated list', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1', deletedAt: null });

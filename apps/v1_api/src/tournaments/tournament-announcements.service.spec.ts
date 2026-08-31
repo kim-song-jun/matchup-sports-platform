@@ -144,6 +144,51 @@ describe('TournamentAnnouncementsService', () => {
   // 통합 백필(R3)이 `v1_tournaments` 에 정규 리그 시즌을 만들면서, 예전엔 없던 id 가 이
   // 조회를 통과하기 시작했다(#863 이 공개 경로에서 실측). 공지는 읽기지만 **존재 오라클**이
   // 되고, 어드민 생성 경로와 이어지면 리그 공지가 대회 공지로 나간다.
+  // **부수효과가 있는 자리라 404 만으로는 부족하다.** 공지 생성은 성공하면 알림이 나가고,
+  // 나간 알림은 되돌릴 수 없다 — 404 는 부수효과가 **이미 일어난 뒤에도** 반환될 수 있으므로
+  // "공지 행이 안 만들어졌는가" 와 "알림이 안 나갔는가" 를 함께 단언한다.
+  it('create(어드민): 리그 id 는 공지 생성도 알림 발송도 하지 않는다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockImplementation(
+      kindAwareFindFirst({ id: 'league-1', kind: 'regular_league' }),
+    );
+    // **봉쇄가 없으면 이 흐름이 실제로 성공하도록** 나머지 mock 을 채운다. 비워 두면 봉쇄를
+    // 지웠을 때 downstream 이 TypeError 로 죽어, `create 안 불림` 단언이 **게이트가 아니라
+    // 깨진 mock 덕에** 통과한다 — 그러면 부수효과 단언이 아무것도 증명하지 못한다.
+    prisma.v1TournamentAnnouncement.create.mockResolvedValue(
+      announcementRow({ id: 'ann-league', audience: 'all_registered', publishedAt: new Date() }),
+    );
+
+    await expect(
+      service.create(ownerAuthUser, 'league-1', { title: '공지', body: '본문', publish: true }),
+    ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_NOT_FOUND' } });
+
+    expect(prisma.v1TournamentAnnouncement.create).not.toHaveBeenCalled();
+    expect(notifications.emitToManyDeferred).not.toHaveBeenCalled();
+    expect(notifications.emitNotification).not.toHaveBeenCalled();
+  });
+
+  it('create(어드민): 대회 id 는 그대로 생성되고 알림도 나간다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    // 음성만 보면 **전부 404 로 만들어도 통과**한다. 봉쇄를 지웠을 때 알림이 실제로
+    // 나가는지(= 위 단언이 무의미하지 않은지)를 이 양성 케이스가 보장한다.
+    prisma.v1Tournament.findFirst.mockImplementation(
+      kindAwareFindFirst({ id: 'tournament-1', kind: 'regular_tournament' }),
+    );
+    prisma.v1TournamentAnnouncement.create.mockResolvedValue(
+      announcementRow({ id: 'ann-new', audience: 'all_registered', publishedAt: new Date() }),
+    );
+
+    await expect(
+      service.create(ownerAuthUser, 'tournament-1', { title: '공지', body: '본문', publish: true }),
+    ).resolves.toBeDefined();
+    expect(prisma.v1TournamentAnnouncement.create).toHaveBeenCalled();
+    // **알림까지 단언한다**(Copilot 리뷰 지적) — 이름이 "알림도 나간다"인데 생성만 보면
+    // 음성 테스트의 `emitToManyDeferred 0회` 가 "봉쇄 때문"인지 "이 경로가 원래 알림을
+    // 안 보내서"인지 구분되지 않는다. 양성이 알림 경로가 살아 있음을 증명해야 한다.
+    expect(notifications.emitToManyDeferred).toHaveBeenCalled();
+  });
+
   it('listForParticipant: 리그 id 로는 열리지 않는다', async () => {
     prisma.v1Tournament.findFirst.mockImplementation(
       kindAwareFindFirst({ id: 'league-1', kind: 'regular_league' }),

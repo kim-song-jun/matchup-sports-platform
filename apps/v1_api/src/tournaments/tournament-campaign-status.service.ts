@@ -12,6 +12,7 @@ import {
   findTournamentCampaign,
   serializeTournamentCampaign,
 } from './tournament-campaign-record';
+import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
 
 const CAMPAIGN_TRANSITIONS: Record<TournamentCampaignStatus, readonly TournamentCampaignStatus[]> = {
   draft: ['published', 'archived'],
@@ -54,7 +55,7 @@ export class TournamentCampaignStatusService {
         let data: Prisma.V1TournamentCampaignUpdateManyMutationInput;
         switch (dto.status) {
           case 'published': {
-            const tournament = await tx.v1Tournament.findFirst({
+            const tournament = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
               where: {
                 id: tournamentId,
                 deletedAt: null,

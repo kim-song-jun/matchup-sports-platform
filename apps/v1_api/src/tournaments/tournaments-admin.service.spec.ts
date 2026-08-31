@@ -15,6 +15,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { CompetitionConfigRegistry } from './competition-config/competition-config-registry';
 import { TournamentCompetitionConfig } from './competition-config/tournament-competition-config';
 import { TournamentsAdminService } from './tournaments-admin.service';
+import { kindAwareFindFirst } from '../../test/helpers/kind-aware-find-first';
 
 const ownerAuthUser = { id: 'owner-user-id', email: 'admin@teameet.v1', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
 const supportAuthUser = { id: 'support-user-id', email: 'support@teameet.v1', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
@@ -315,6 +316,91 @@ describe('TournamentsAdminService', () => {
     );
   });
 
+  // ─── 대회 표면 봉쇄 ───────────────────────────────────────────────────────────
+  // **`changeStatus` 가 이 연쇄의 첫 고리다.** 백필 리그는 `draft` 로 들어오는데,
+  // 전이표가 `draft: ['open','cancelled']` 라 종류 조건이 없으면 운영자가 리그를 `open`
+  // 으로 바꿀 수 있다. 그 순간 등록 게이트(`status === 'open'`)와 후기 게이트
+  // (`status === 'completed'`)가 차례로 열린다 — 다른 PR 의 봉쇄들이 상태 게이트에
+  // 기대고 있던 부분이 함께 무너진다.
+  // **트랜잭션 안 재조회 2곳**(CAS 실패 후)은 바깥 존재확인이 먼저 막아 단순 호출로는
+  // 도달하지 않는다. 그 가드의 존재 이유(두 조회 사이에 행이 바뀜)를 재현해 안쪽을 직접 태운다.
+  // 바깥은 정상 대회, 안쪽(select 에 bracketPublishedAt 이 있는 호출)은 리그로 보이게 한다.
+  it('publishBracket: 트랜잭션 안 재조회가 리그 행을 막는다 (바깥 통과 후 바뀐 경우)', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockImplementation(
+      (args: { select?: Record<string, unknown>; where?: Record<string, unknown> }) =>
+        args.select && 'bracketPublishedAt' in args.select
+          ? kindAwareFindFirst({ bracketPublishedAt: null, deletedAt: null, kind: 'regular_league' })(args)
+          : Promise.resolve(tournamentRow({ bracketPublishedAt: null })),
+    );
+    prisma.v1Tournament.updateMany.mockResolvedValue({ count: 0 }); // CAS 실패 → 재조회로 간다
+
+    await expect(service.publishBracket(ownerAuthUser, 'tournament-1')).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_NOT_FOUND' },
+    });
+    // 봉쇄가 없으면 리그 행이 돌아와 `TOURNAMENT_BRACKET_PUBLISH_CONFLICT` 가 난다 —
+    // 코드가 갈리므로 이 단언이 안쪽 가드를 실제로 검증한다.
+    expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
+  });
+
+  // 나머지 어드민 경로도 같은 조건으로 막힌다. 각각 **쓰기/노출이 일어나지 않는지**까지 본다.
+  it.each([
+    ['get', (svc: TournamentsAdminService) => svc.get(ownerAuthUser, 'league-1')],
+    ['update', (svc: TournamentsAdminService) => svc.update(ownerAuthUser, 'league-1', { title: '바뀐 제목' })],
+    ['publishBracket', (svc: TournamentsAdminService) => svc.publishBracket(ownerAuthUser, 'league-1')],
+    ['unpublishBracket', (svc: TournamentsAdminService) => svc.unpublishBracket(ownerAuthUser, 'league-1')],
+  ])('%s: 리그 id 로는 열리지 않고 쓰기도 일어나지 않는다', async (_name, call) => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockImplementation(
+      kindAwareFindFirst(tournamentRow({ kind: 'regular_league' })),
+    );
+    // 봉쇄가 없으면 실제로 성공하도록 채운다 — 비워 두면 아래 단언이 게이트가 아니라
+    // 깨진 mock 덕에 통과한다.
+    prisma.v1Tournament.update.mockResolvedValue(tournamentRow({}));
+    prisma.v1Tournament.updateMany.mockResolvedValue({ count: 1 });
+
+    await expect(call(service)).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_NOT_FOUND' },
+    });
+    expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
+    expect(prisma.v1Tournament.updateMany).not.toHaveBeenCalled();
+    expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
+  });
+
+  it('changeStatus: 리그 id 는 상태를 바꿀 수 없다 — 쓰기·감사로그 모두 일어나지 않는다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockImplementation(
+      kindAwareFindFirst(tournamentRow({ status: 'draft', entryFee: 0, kind: 'regular_league' })),
+    );
+    // 봉쇄가 없으면 이 전이가 **실제로 성공하도록** 나머지 mock 을 채운다 — 비워 두면
+    // 봉쇄를 지웠을 때 downstream 이 죽어 아래 단언이 게이트가 아니라 깨진 mock 덕에 통과한다.
+    prisma.v1Tournament.update.mockResolvedValue(tournamentRow({ status: 'open' }));
+
+    await expect(
+      service.changeStatus(ownerAuthUser, 'league-1', { status: 'open' }),
+    ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_NOT_FOUND' } });
+
+    expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
+    expect(prisma.v1StatusChangeLog.create).not.toHaveBeenCalled();
+    expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
+  });
+
+  it('changeStatus: 대회 id 와 kind=null(R1 이전 행)은 그대로 전이된다', async () => {
+    // 막는 것만 보면 전부 404 로 만들어도 통과한다. 통과해야 할 것도 확인한다.
+    for (const kind of ['regular_tournament', null]) {
+      jest.clearAllMocks();
+      prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+      prisma.v1Tournament.findFirst.mockImplementation(
+        kindAwareFindFirst(tournamentRow({ status: 'draft', entryFee: 0, kind })),
+      );
+      prisma.v1Tournament.update.mockResolvedValue(tournamentRow({ status: 'open' }));
+
+      await expect(
+        service.changeStatus(ownerAuthUser, 'tournament-1', { status: 'open' }),
+      ).resolves.toMatchObject({ previousStatus: 'draft', status: 'open' });
+    }
+  });
+
   // ─── status transitions ───────────────────────────────────────────────────────
 
   it('changeStatus: draft → open succeeds and records previous/next', async () => {
@@ -471,7 +557,6 @@ describe('TournamentsAdminService', () => {
 
   it('publishBracket: concurrent requests produce one transition and one audit log', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
-    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ bracketPublishedAt: null }));
     let winnerPublishedAt: Date | null = null;
     prisma.v1Tournament.updateMany.mockImplementation(
       ({ data }: { data: { bracketPublishedAt: Date } }) => {
@@ -480,8 +565,13 @@ describe('TournamentsAdminService', () => {
         return Promise.resolve({ count: 1 });
       },
     );
-    prisma.v1Tournament.findUnique.mockImplementation(() =>
-      Promise.resolve({ bracketPublishedAt: winnerPublishedAt, deletedAt: null }),
+    // 진입 존재 확인과 CAS 실패 후 재조회가 **같은 메서드**(findFirst)를 쓴다 — 대회 표면
+    // 헬퍼로 이관하면서 재조회의 `findUnique` 가 없어졌기 때문이다. 이 저장소가 이미 쓰는
+    // 방식대로 **select 형태로 어느 호출인지 구분**한다(public-tournament-records 스펙과 동일).
+    prisma.v1Tournament.findFirst.mockImplementation((args: { select?: Record<string, unknown> }) =>
+      args.select && 'bracketPublishedAt' in args.select
+        ? Promise.resolve({ bracketPublishedAt: winnerPublishedAt, deletedAt: null })
+        : Promise.resolve(tournamentRow({ bracketPublishedAt: null })),
     );
 
     const results = await Promise.all([

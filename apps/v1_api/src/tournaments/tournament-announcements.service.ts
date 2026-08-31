@@ -123,7 +123,7 @@ export class TournamentAnnouncementsService {
 
     // 삭제된 대회의 공지는 id 를 알아도 읽히면 안 된다 — 같은 파일 create() 의
     // 존재 확인은 이미 `deletedAt: null` 을 쓰는데 조회 쪽 두 곳만 빠져 있었다.
-    const tournament = await this.prisma.v1Tournament.findFirst({
+    const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
     });
     if (!tournament) {
@@ -155,7 +155,7 @@ export class TournamentAnnouncementsService {
     const admin = await this.adminContext.getMutationAdmin(user.id);
 
     // 대회 존재 확인 — deletedAt만 체크(모든 status 허용: draft 대회에도 공지 가능).
-    const tournament = await this.prisma.v1Tournament.findFirst({
+    const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
     });
     if (!tournament) {

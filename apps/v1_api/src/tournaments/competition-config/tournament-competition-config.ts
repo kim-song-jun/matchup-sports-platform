@@ -8,6 +8,7 @@ import { AdminContextService } from '../../common/admin-context.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { normalizeCompetitionSportCode } from './competition-config';
 import { ChangeTournamentCompetitionConfigDto } from './competition-config.dto';
+import { findTournamentOnSurface, findTournamentOnSurfaceOrThrow, TOURNAMENT_KINDS } from '../tournament-surface-lookup';
 
 export class TournamentCompetitionConfig {
   constructor(
@@ -21,7 +22,7 @@ export class TournamentCompetitionConfig {
     dto: ChangeTournamentCompetitionConfigDto,
   ) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
-    const tournament = await this.prisma.v1Tournament.findFirst({
+    const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
       include: { sport: true },
     });
@@ -173,7 +174,10 @@ export class TournamentCompetitionConfig {
         },
         tx,
       );
-      return tx.v1Tournament.findUniqueOrThrow({ where: { id: tournamentId } });
+      // 이 재조회는 CAS 갱신 직후 최신 행을 읽는 것이라 종류 조건이 이미 위에서
+      // 검증됐지만, **원시 호출을 남기지 않는다** — 남기면 다음 사람이 여기만 예외라고
+      // 읽고 새 원시 호출을 붙일 여지가 생긴다.
+      return findTournamentOnSurfaceOrThrow(tx, TOURNAMENT_KINDS, { where: { id: tournamentId } });
     });
     return {
       changed: true,

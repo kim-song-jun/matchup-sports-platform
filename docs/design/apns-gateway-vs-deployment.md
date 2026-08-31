@@ -1,6 +1,8 @@
 # APNs 게이트웨이를 배포 환경에서 떼어내기 (제안)
 
-> 상태: **제안 — 구현 전.** 결정을 받으면 별도 PR 로 진행한다.
+> 상태: **구현됨 (2026-08-31).** 아래 A안을 채택해 적용했다. 제안 시점의 서술을 남겨 두는 것은
+> 왜 이 선택이었는지가 트레이드오프와 함께 남아 있어야 하기 때문이다 — 구현 결과는 맨 아래
+> "구현된 것" 절에 있다.
 > 배경 Task: 157 (iOS 셸 · APNs) · 관련 실측: `docs/ops/ios-apns-setup.md`
 
 ## 기(起) — 증상
@@ -116,3 +118,45 @@ production 으로 보내고 `BadDeviceToken` 이면 sandbox 로 한 번 더 보�
    "alpha 토큰이 production 으로 새지 않는다" 를 다시 증명해야 한다. sandbox 로 등록된 기기가
    production host 요청에 절대 포함되지 않는 것을 단위 테스트로 고정한다.
 5. 등록 DTO 가 알 수 없는 값을 거부한다(플랫폼 필드와 같은 규율 — 기본값을 두지 않는다).
+
+
+## 구현된 것 (2026-08-31)
+
+A안을 그대로 채택했고, 환경은 **서명된 엔타이틀먼트에서** 읽는다.
+
+| 어디 | 무엇 |
+|---|---|
+| `V1PushDevice.apnsEnvironment` | nullable enum. Android 는 항상 null, 기존 iOS 행도 null 유지 |
+| 마이그레이션 | `20260831000000_v1_apns_environment` — `CREATE TYPE` + `ADD COLUMN` 뿐, backfill 없음 |
+| `RegisterPushDeviceDto` | optional. **`platform` 과 달리 필수가 아니다** — 이미 테스터 손에 있는 빌드가 이 필드를 모르는데, 거부하면 그 빌드는 등록 자체를 못 한다. 알 수 없는 값은 그대로 거부 |
+| `ApnsPushService.hostFor()` | 기기별 게이트웨이. null 이면 서버 환경(기존 동작) |
+| HTTP/2 세션 | 게이트웨이당 하나(최대 2개). 한 번의 발송에 두 종류가 섞일 수 있다 |
+| `ApnsEnvironment` (iOS) | 번들의 `embedded.mobileprovision` 에서 `aps-environment` 를 읽는다. 없으면(시뮬레이터) sandbox |
+
+**빌드 상수를 쓰지 않은 이유는 가정이 아니라 실측이다.** 첫 TestFlight 빌드를 만들 때
+`Config/Alpha.xcconfig` 는 `development` 라고 적혀 있었는데 App Store 프로파일이 부여한 값은
+`production` 이었고, Xcode 가 서명본에 프로파일 값을 넣었다. 상수를 믿었으면 서버가 정확히
+틀린 게이트웨이를 골랐을 것이다. 파서는 실제 12KB CMS 프로파일로도 확인했다.
+
+알 수 없는 값은 sandbox 로 떨어뜨린다. 방향이 대칭이 아니기 때문이다 — sandbox 기기를
+production 으로 보내면 `BadDeviceToken` 이 돌아와 **등록이 폐기되고**, 반대는 그 알림 한 건이
+전달되지 않을 뿐이다.
+
+### 고정한 테스트
+
+1. production 기기는 production 호스트로, sandbox 기기는 sandbox 호스트로 — 한 번의 발송에
+   섞여 있어도 각자 맞는 곳으로
+2. null 인 기기는 서버 환경 기준(alpha→sandbox, production→production). 기존 동작 유지
+3. Android 는 클라이언트가 값을 보내도 null 로 저장 — FCM 에는 이 축이 없다
+4. **sandbox 기기가 production 요청에 절대 섞이지 않는다** — 이전에는 alpha 배포가 sandbox
+   연결만 열어서 구조적으로 참이었다. 이제 둘 다 열리므로 단언으로 바뀌었다
+5. DTO 가 알 수 없는 값을 거부하고, 값이 없는 등록은 받아들인다
+
+변이 검증: `hostFor` 가 기기를 무시하고 서버 환경만 쓰도록 되돌리면 **4개 중 3개가 red** 가 된다
+(남는 1개는 null 기기만 쓰는 2번으로, 변이와 무관한 것이 맞다).
+
+### 남은 것
+
+기존 iOS 행을 backfill 하지 않는다. 추측한 값과 기기가 실제로 보고한 값을 구분할 수 없게 되고,
+어차피 앱이 다시 등록하면 갱신된다 — 재등록 시에도 이 값을 다시 읽도록 해 뒀다(테스터가 Xcode
+빌드에서 TestFlight 로 옮기면 installation id 는 그대로인 채 서명만 바뀌기 때문이다).

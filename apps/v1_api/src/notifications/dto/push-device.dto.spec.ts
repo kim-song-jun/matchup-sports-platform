@@ -35,6 +35,35 @@ describe('RegisterPushDeviceDto', () => {
     expect(errors.some((error) => error.property === 'platform')).toBe(true);
   });
 
+  /**
+   * Optional where `platform` is required, and the asymmetry is the point: a build is
+   * already in testers' hands that predates this field, and rejecting its registration
+   * would leave it unable to register at all rather than merely mis-routed.
+   */
+  it('accepts a registration that does not say which APNs gateway issued its token', async () => {
+    await expect(validate(plainToInstance(RegisterPushDeviceDto, valid))).resolves.toHaveLength(0);
+  });
+
+  it('accepts either APNs gateway', async () => {
+    for (const apnsEnvironment of ['sandbox', 'production']) {
+      await expect(
+        validate(plainToInstance(RegisterPushDeviceDto, { ...valid, platform: 'ios', apnsEnvironment })),
+      ).resolves.toHaveLength(0);
+    }
+  });
+
+  /**
+   * An unrecognised value can only be a client bug, and accepting it would route a live
+   * token to whichever gateway the fallback picks — where Apple answers BadDeviceToken and
+   * the device is revoked outright.
+   */
+  it('rejects an APNs gateway outside the enum', async () => {
+    const errors = await validate(
+      plainToInstance(RegisterPushDeviceDto, { ...valid, platform: 'ios', apnsEnvironment: 'staging' }),
+    );
+    expect(errors.some((error) => error.property === 'apnsEnvironment')).toBe(true);
+  });
+
   it('rejects a platform outside the enum', async () => {
     const errors = await validate(
       plainToInstance(RegisterPushDeviceDto, { ...valid, platform: 'web' }),

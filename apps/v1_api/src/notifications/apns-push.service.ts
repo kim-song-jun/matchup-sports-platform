@@ -1,5 +1,5 @@
 import { Injectable, Optional, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { V1PushPlatform } from '@prisma/client';
+import { V1ApnsEnvironment, V1PushPlatform } from '@prisma/client';
 import { connect, constants, ClientHttp2Session } from 'node:http2';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { ApnsProviderToken } from './apns-provider-token';
@@ -26,8 +26,16 @@ export class ApnsPushService implements NativePushAdapter, OnModuleInit, OnModul
 
   /** Apple rejects a token older than an hour and a re-issue closer than twenty minutes. */
   private providerToken: ApnsProviderToken | null = null;
-  private session: ClientHttp2Session | null = null;
-  private host: string | null = null;
+  /**
+   * One connection per gateway, not one overall.
+   *
+   * A single deployment now talks to both: a TestFlight build of the alpha app is
+   * production-signed while one installed from Xcode is not, so the same user's two devices
+   * can need different hosts in the same send.
+   */
+  private readonly sessions = new Map<string, ClientHttp2Session>();
+  /** Used only for a device that did not say which gateway issued its token. */
+  private defaultHost: string | null = null;
   private bundleId: string | null = null;
 
   constructor(
@@ -80,18 +88,21 @@ export class ApnsPushService implements NativePushAdapter, OnModuleInit, OnModul
     }
 
     this.bundleId = bundleId!;
-    this.host =
+    // The fallback only. Which gateway a given device needs is a property of its token, and
+    // the device reports it; this is what a registration that predates that reporting gets,
+    // which is the behaviour it already had.
+    this.defaultHost =
       environment === 'alpha' ? ApnsPushService.SANDBOX_HOST : ApnsPushService.PRODUCTION_HOST;
     this.providerToken = new ApnsProviderToken(privateKey!, keyId!, teamId!, this.clock);
   }
 
   onModuleDestroy(): void {
-    this.session?.close();
-    this.session = null;
+    for (const session of this.sessions.values()) session.close();
+    this.sessions.clear();
   }
 
   get isConfigured(): boolean {
-    return this.providerToken !== null && this.host !== null;
+    return this.providerToken !== null && this.defaultHost !== null;
   }
 
   async send(devices: PushTarget[], payload: NativePushPayload): Promise<NativeDeliverySummary> {
@@ -140,13 +151,32 @@ export class ApnsPushService implements NativePushAdapter, OnModuleInit, OnModul
     };
   }
 
+  /**
+   * The gateway this device's token is valid at.
+   *
+   * A token only works at the gateway that issued it: send a sandbox token to the production
+   * host and Apple answers `BadDeviceToken`, which this service classifies as permanent and
+   * the device store then revokes. So getting this wrong does not merely fail a delivery, it
+   * unregisters a working device.
+   */
+  hostFor(device: PushTarget): string {
+    switch (device.apnsEnvironment) {
+      case V1ApnsEnvironment.production:
+        return ApnsPushService.PRODUCTION_HOST;
+      case V1ApnsEnvironment.sandbox:
+        return ApnsPushService.SANDBOX_HOST;
+      default:
+        return this.defaultHost!;
+    }
+  }
+
   private async deliver(
     device: PushTarget,
     payload: NativePushPayload,
     isRetry = false,
   ): Promise<'delivered' | 'permanent' | 'transient'> {
     try {
-      const response = await this.request(device.token, payload, this.providerToken!.current());
+      const response = await this.request(this.hostFor(device), device.token, payload, this.providerToken!.current());
       if (response.status === 200) return 'delivered';
 
       const reason = this.reasonOf(response.body);
@@ -179,11 +209,12 @@ export class ApnsPushService implements NativePushAdapter, OnModuleInit, OnModul
   }
 
   private request(
+    host: string,
     deviceToken: string,
     payload: NativePushPayload,
     providerToken: string,
   ): Promise<{ status: number; body: string }> {
-    const session = this.openSession();
+    const session = this.openSession(host);
     const body = JSON.stringify({
       aps: { alert: { title: payload.title, body: payload.body }, sound: 'default' },
       notificationId: payload.notificationId,
@@ -218,18 +249,19 @@ export class ApnsPushService implements NativePushAdapter, OnModuleInit, OnModul
     });
   }
 
-  /** Reuses one connection across pushes; only a closed session is replaced. */
-  private openSession(): ClientHttp2Session {
-    if (this.session && !this.session.closed && !this.session.destroyed) return this.session;
-    const session = connect(`https://${this.host}`);
+  /** Reuses one connection per gateway across pushes; only a closed session is replaced. */
+  private openSession(host: string): ClientHttp2Session {
+    const existing = this.sessions.get(host);
+    if (existing && !existing.closed && !existing.destroyed) return existing;
+    const session = connect(`https://${host}`);
     session.on('error', (err) => {
-      this.logger.warn({ err }, 'APNs connection error');
-      if (this.session === session) this.session = null;
+      this.logger.warn({ host, err }, 'APNs connection error');
+      if (this.sessions.get(host) === session) this.sessions.delete(host);
     });
     session.on('close', () => {
-      if (this.session === session) this.session = null;
+      if (this.sessions.get(host) === session) this.sessions.delete(host);
     });
-    this.session = session;
+    this.sessions.set(host, session);
     return session;
   }
 }

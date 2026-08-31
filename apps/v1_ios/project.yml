@@ -104,6 +104,7 @@ targets:
       - path: Teameet/Push/PushPermission.swift
       - path: Teameet/Push/PushConsent.swift
       - path: Teameet/Push/PushNotificationPayload.swift
+      - path: Teameet/Push/ApnsEnvironment.swift
       - path: Teameet/Push/PushDeviceRegistration.swift
       - path: Teameet/Push/PushCookieScope.swift
     settings:

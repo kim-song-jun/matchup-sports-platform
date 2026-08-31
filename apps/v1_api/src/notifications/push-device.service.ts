@@ -1,5 +1,5 @@
 import { ConflictException, Injectable } from '@nestjs/common';
-import { Prisma, V1PushEnvironment, V1PushPlatform } from '@prisma/client';
+import { Prisma, V1ApnsEnvironment, V1PushEnvironment, V1PushPlatform } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterPushDeviceDto } from './dto/push-device.dto';
 import { resolvePushEnvironment } from './push-environment';
@@ -16,6 +16,18 @@ const pushDevicePublicSelect = {
   createdAt: true,
   updatedAt: true,
 } satisfies Prisma.V1PushDeviceSelect;
+
+/**
+ * The gateway to record for a registration.
+ *
+ * Null for Android whatever the client sent: Firebase has one endpoint, and storing a value
+ * there would suggest a choice exists. Null too when an iOS client did not report one, which
+ * is how a build older than this field keeps its previous behaviour.
+ */
+function apnsEnvironmentFor(dto: RegisterPushDeviceDto): V1ApnsEnvironment | null {
+  if (dto.platform !== V1PushPlatform.ios) return null;
+  return dto.apnsEnvironment ?? null;
+}
 
 @Injectable()
 export class PushDeviceService {
@@ -37,6 +49,7 @@ export class PushDeviceService {
           installationId: dto.installationId,
           platform: dto.platform,
           environment,
+          apnsEnvironment: apnsEnvironmentFor(dto),
           token: dto.token,
           appVersion: dto.appVersion,
           deviceModel: dto.deviceModel,
@@ -47,6 +60,12 @@ export class PushDeviceService {
           // restored from an Android backup onto a new phone keeps the id. Trusting the
           // registration over the stored row keeps the send path addressing the real device.
           platform: dto.platform,
+          // Re-read on every registration for the same reason as the platform above: a build
+          // can be replaced by one signed differently behind the same installation id — a
+          // tester moving from an Xcode build to TestFlight does exactly that — and a stale
+          // value here sends a live token to the wrong gateway, where Apple's BadDeviceToken
+          // gets it revoked.
+          apnsEnvironment: apnsEnvironmentFor(dto),
           token: dto.token,
           appVersion: dto.appVersion,
           deviceModel: dto.deviceModel,
@@ -90,7 +109,7 @@ export class PushDeviceService {
   activeTokens(userId: string, environment: V1PushEnvironment) {
     return this.prisma.v1PushDevice.findMany({
       where: { userId, environment, revokedAt: null },
-      select: { id: true, token: true, platform: true },
+      select: { id: true, token: true, platform: true, apnsEnvironment: true },
     });
   }
 

@@ -54,8 +54,17 @@ export class LeagueDetailBackfillBlockedError extends Error {
     readonly detail: {
       missingTournaments: Array<{ leagueId: string }>;
       kindMismatches: Array<{ leagueId: string; kind: string | null }>;
-      /** **목표와 다른 값**이 이미 있는 행. 단순히 채워져 있는 것은 여기 오지 않는다. */
-      conflicts: Array<{ leagueId: string; fields: string[] }>;
+      /**
+       * **목표와 다른 값**이 이미 있는 행. 단순히 채워져 있는 것은 여기 오지 않는다.
+       *
+       * 필드 이름만이 아니라 **현재 값과 쓰려던 값을 함께** 싣는다 — 이 에러가 `--apply` 가
+       * 막혔을 때 운영자가 보는 **유일한 단서**이고, 이름만 있으면 결국 DB 를 직접 대조해야
+       * 한다(2026-08-31 에 실제로 그랬다).
+       */
+      conflicts: Array<{
+        leagueId: string;
+        fields: Array<{ field: string; current: string | null; expected: string }>;
+      }>;
     },
   ) {
     super(message);
@@ -118,27 +127,41 @@ export async function backfillLeagueCompetitionDetails(
     }
     // **`null` 은 "아직 안 채움" 이지 "다른 값" 이 아니다** — 그건 우리가 채울 자리다.
     // `status` 의 `draft` 도 같은 뜻이다(백필 전 기본값).
-    const conflicting: string[] = [];
+    const conflicting: Array<{ field: string; current: string | null; expected: string }> = [];
     if (row.status !== V1TournamentStatus.draft && row.status !== target.status) {
-      conflicting.push('status');
+      conflicting.push({ field: 'status', current: row.status, expected: target.status });
     }
     if (row.scheduledAt !== null && row.scheduledAt.getTime() !== target.scheduledAt.getTime()) {
-      conflicting.push('scheduledAt');
+      conflicting.push({
+        field: 'scheduledAt',
+        current: row.scheduledAt.toISOString(),
+        expected: target.scheduledAt.toISOString(),
+      });
     }
     if (
       row.scheduledEndAt !== null &&
       row.scheduledEndAt.getTime() !== target.scheduledEndAt.getTime()
     ) {
-      conflicting.push('scheduledEndAt');
+      conflicting.push({
+        field: 'scheduledEndAt',
+        current: row.scheduledEndAt.toISOString(),
+        expected: target.scheduledEndAt.toISOString(),
+      });
     }
-    if (row.regionId !== null && row.regionId !== target.regionId) conflicting.push('regionId');
+    if (row.regionId !== null && row.regionId !== target.regionId) {
+      conflicting.push({ field: 'regionId', current: row.regionId, expected: target.regionId });
+    }
     if (conflicting.length > 0) conflicts.push({ leagueId: league.id, fields: conflicting });
   }
 
   if (missingTournaments.length > 0 || kindMismatches.length > 0 || conflicts.length > 0) {
+    // **메시지가 실제 의미를 말해야 한다.** "이미 값이 채워진 행" 이라고 하면 다음 사람은
+    // *"그럼 채워진 게 정상인가? skip 하면 되나?"* 로 간다 — 틀린 결론이다. 실제 의미는
+    // **"우리가 쓰려는 값과 다른 값이 있다"** 이고, 그건 *"누가 왜 다른 값을 넣었나"* 라는
+    // 다른 질문으로 이어진다. 이 문장이 `--apply` 가 막혔을 때 보이는 유일한 단서다.
     throw new LeagueDetailBackfillBlockedError(
       '백필을 중단했다 — 대회 행이 없는 리그, 종류가 리그가 아닌 대회 행, ' +
-        '또는 이미 값이 채워진 행이 있다.',
+        '또는 **목표와 다른 값**이 이미 있는 행이 있다(단순히 채워져 있는 것은 막지 않는다).',
       { missingTournaments, kindMismatches, conflicts },
     );
   }

@@ -199,7 +199,7 @@ describe('backfillLeagueCompetitionDetails', () => {
     expect(updateMany).not.toHaveBeenCalled();
   });
 
-  it('가드 2: 이미 값이 채워진 행이 있으면 덮어쓰지 않고 무엇이 찼는지 보고한다', async () => {
+  it('가드 2: 목표와 다른 값이 있으면 덮어쓰지 않고 무엇이 어떻게 다른지 보고한다', async () => {
     const { prisma, updateMany } = fakePrisma(
       [league()],
       [tournament({ status: 'completed', regionId: 'region-9' })],
@@ -211,8 +211,16 @@ describe('backfillLeagueCompetitionDetails', () => {
 
     expect(error).toBeInstanceOf(LeagueDetailBackfillBlockedError);
     // 어느 필드가 찼는지가 조치를 정한다 — "충돌했다" 보다 "무엇과 충돌했다" 가 필요하다.
+    // **필드 이름만으로는 부족하다** — 운영자가 결국 DB 를 직접 대조하게 된다.
+    // 현재 값과 쓰려던 값이 함께 나와야 "누가 왜 다른 값을 넣었나" 를 바로 물을 수 있다.
     expect((error as LeagueDetailBackfillBlockedError).detail.conflicts).toEqual([
-      { leagueId: 'lg-1', fields: ['status', 'regionId'] },
+      {
+        leagueId: 'lg-1',
+        fields: [
+          { field: 'status', current: 'completed', expected: 'in_progress' },
+          { field: 'regionId', current: 'region-9', expected: 'region-1' },
+        ],
+      },
     ]);
     expect(updateMany).not.toHaveBeenCalled();
   });
@@ -371,7 +379,7 @@ describe('backfillLeagueCompetitionDetails', () => {
     expect(error).toBeInstanceOf(LeagueDetailBackfillBlockedError);
     // **목표값과 같은 필드는 이름에 안 나온다** — 나오면 운영자가 엉뚱한 데를 본다.
     expect((error as LeagueDetailBackfillBlockedError).detail.conflicts).toEqual([
-      { leagueId: 'lg-1', fields: ['regionId'] },
+      { leagueId: 'lg-1', fields: [{ field: 'regionId', current: 'region-9', expected: 'region-1' }] },
     ]);
     expect(updateMany).not.toHaveBeenCalled();
   });

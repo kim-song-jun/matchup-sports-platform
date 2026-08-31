@@ -29,17 +29,22 @@ set -Eeuo pipefail
 
 # Apple's identifiers are fixed-width; a pasted-with-whitespace value fails much later, at the
 # first send, as a 403 that says nothing about which field was wrong.
-# A malformed value is worth refusing to write — a broken key on the host fails at send
-# time with a 403 that names nothing — but it is NOT worth failing the deploy over. That was
-# the original principle for a missing secret and it applies just as much to a wrong one:
-# a push-less alpha is a working alpha, a blocked deploy is not. Measured the hard way, by
+# A malformed value is worth refusing to write — a broken key on the host fails at send time
+# with a 403 that names nothing — but it is NOT worth failing the deploy over. That was the
+# original principle for a missing secret and it applies just as much to a wrong one: a
+# push-less alpha is a working alpha, a blocked deploy is not. Measured the hard way, by
 # blocking one.
+#
+# The warning says the host was left UNCHANGED rather than that push is off, because this
+# script does not know which it is: a previous run may have written a working key that is
+# still in place. Saying "disabled" would send whoever reads it looking for a missing key
+# that is not missing.
 for guard in "APNS_KEY_ID:${SECRET_APNS_KEY_ID}:^[A-Z0-9]{10}$" \
              "APNS_TEAM_ID:${SECRET_APNS_TEAM_ID}:^[A-Z0-9]{10}$" \
              "APNS_BUNDLE_ID:${SECRET_APNS_BUNDLE_ID}:^[A-Za-z0-9.-]+$"; do
   name="${guard%%:*}"; rest="${guard#*:}"; value="${rest%:*}"; pattern="${rest##*:}"
   [[ "${value}" =~ ${pattern} ]] || {
-    echo "::warning::${name} does not look right (${#value} chars); iOS push stays disabled"
+    echo "::warning::${name} does not look right (${#value} chars); the host's APNs env was left unchanged"
     exit 0
   }
 done
@@ -50,24 +55,40 @@ done
 #
 # Measured: the first version of this script accepted only a raw PEM and failed the deploy
 # with "does not look like a .p8 PEM" on a key that was in fact fine.
+# Accepted only if OpenSSL can actually read it as a private key.
+#
+# Looking for a BEGIN marker is not enough, and the difference is not theoretical: a secret
+# that was truncated on paste, or a base64 value that decoded partially, still contains the
+# BEGIN line. That passes a substring check, gets written to the host, and then fails at the
+# first send as a 403 that names nothing — the worst place to discover it.
+is_private_key() {
+  printf '%s' "$1" | openssl pkey -noout >/dev/null 2>&1
+}
+
 normalize_private_key() {
   local raw="$1" candidate
-  # Already a PEM, in either line form.
-  case "${raw}" in
-    *"-----BEGIN"*"PRIVATE KEY-----"*) printf '%s' "${raw}"; return 0 ;;
-  esac
-  # base64 of a PEM. `base64 -d` is lenient about wrapping; a value that is not base64 at all
-  # simply fails here and falls through to the caller's warning.
+  # A PEM as stored, either with real newlines or flattened to literal backslash-n.
+  if is_private_key "${raw}"; then printf '%s' "${raw}"; return 0; fi
+  # The newline is built first. Inside a ${var//pattern/replacement} the $'...' form is not
+  # ANSI-C quoting — it is inserted verbatim, so the key ends up containing the four
+  # characters $'\n' and stops parsing. Caught by the parse check; a marker check would have
+  # accepted it.
+  # A plain assignment, not command substitution: $( ) strips trailing newlines, so
+  # newline="$(printf '\n')" silently yields the empty string and the replacement deletes
+  # the separators instead of restoring them.
+  local newline=$'\n'
+  candidate="${raw//\\n/${newline}}"
+  if is_private_key "${candidate}"; then printf '%s' "${candidate}"; return 0; fi
+  # base64 of a PEM — what most "put a .p8 in CI" advice tells people to do. `base64 -d` is
+  # lenient about wrapping; a value that is not base64 at all fails here and falls through.
   candidate="$(printf '%s' "${raw}" | tr -d '[:space:]' | base64 -d 2>/dev/null || true)"
-  case "${candidate}" in
-    *"-----BEGIN"*"PRIVATE KEY-----"*) printf '%s' "${candidate}"; return 0 ;;
-  esac
+  if is_private_key "${candidate}"; then printf '%s' "${candidate}"; return 0; fi
   return 1
 }
 
 if ! private_key_pem="$(normalize_private_key "${SECRET_APNS_PRIVATE_KEY}")"; then
   # Shape of the value only — never the value. This is a key.
-  echo "::warning::APNS_PRIVATE_KEY is neither a PEM nor base64 of one (${#SECRET_APNS_PRIVATE_KEY} chars); iOS push stays disabled"
+  echo "::warning::APNS_PRIVATE_KEY is not a readable private key (${#SECRET_APNS_PRIVATE_KEY} chars); the host's APNs env was left unchanged"
   exit 0
 fi
 

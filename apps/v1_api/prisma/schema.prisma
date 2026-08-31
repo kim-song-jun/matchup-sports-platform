@@ -2156,12 +2156,29 @@ enum V1PushEnvironment {
   production
 }
 
+/// Which APNs gateway a device's token was issued by.
+///
+/// Deliberately separate from V1PushEnvironment, which says *which deployment* a device
+/// belongs to. The two used to coincide — an alpha build was only ever installed from Xcode,
+/// and that is always a development signature — but TestFlight is signed for production, so
+/// an alpha device can now legitimately hold a production token. Sending it to the sandbox
+/// gateway returns BadDeviceToken, which the send path treats as permanent and revokes the
+/// registration outright.
+enum V1ApnsEnvironment {
+  sandbox
+  production
+}
+
 model V1PushDevice {
   id             String            @id @default(uuid())
   userId         String            @map("user_id")
   installationId String            @map("installation_id")
   platform       V1PushPlatform
   environment    V1PushEnvironment
+  /// Which APNs gateway issued this token. Null for Android, which has no such axis, and for
+  /// iOS registrations made before the app reported it — those fall back to the server's own
+  /// environment, which is exactly the behaviour they had.
+  apnsEnvironment V1ApnsEnvironment? @map("apns_environment")
   token          String            @unique
   appVersion     String?           @map("app_version")
   deviceModel    String?           @map("device_model")

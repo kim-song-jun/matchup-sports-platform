@@ -104,6 +104,7 @@ targets:
       - path: Teameet/Push/PushPermission.swift
       - path: Teameet/Push/PushConsent.swift
       - path: Teameet/Push/PushNotificationPayload.swift
+      - path: Teameet/Push/ApnsEnvironment.swift
       - path: Teameet/Push/PushDeviceRegistration.swift
       - path: Teameet/Push/PushCookieScope.swift
     settings:
@@ -199,3 +200,4 @@ schemes:
         TEAMEET_UITEST_INQUIRY_ID: $(TEAMEET_UITEST_INQUIRY_ID)
         TEAMEET_UITEST_INQUIRY_TITLE: $(TEAMEET_UITEST_INQUIRY_TITLE)
         TEAMEET_UITEST_EXPECT_REFUSAL: $(TEAMEET_UITEST_EXPECT_REFUSAL)
+        TEAMEET_UITEST_LINK_PAGE: $(TEAMEET_UITEST_LINK_PAGE)

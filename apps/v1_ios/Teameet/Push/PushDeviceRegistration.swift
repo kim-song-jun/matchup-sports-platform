@@ -18,14 +18,25 @@ struct PushDeviceRegistration: Equatable {
     let token: String
     let appVersion: String?
     let deviceModel: String?
+    /// Which APNs gateway issued `token`. The server cannot infer it: a TestFlight build of
+    /// the alpha app is production-signed while one installed from Xcode is not, and both
+    /// register against the same deployment.
+    let apnsEnvironment: ApnsEnvironment
 
     static let platform = "ios"
 
-    init(installationId: UUID, deviceToken: Data, appVersion: String?, deviceModel: String?) {
+    init(
+        installationId: UUID,
+        deviceToken: Data,
+        appVersion: String?,
+        deviceModel: String?,
+        apnsEnvironment: ApnsEnvironment = .current
+    ) {
         self.installationId = installationId
         self.token = Self.hexString(from: deviceToken)
         self.appVersion = appVersion?.isEmpty == true ? nil : appVersion
         self.deviceModel = deviceModel?.isEmpty == true ? nil : deviceModel
+        self.apnsEnvironment = apnsEnvironment
     }
 
     /// Apple's token is `Data`; the API stores and compares it as a hex string.
@@ -44,6 +55,7 @@ struct PushDeviceRegistration: Equatable {
             "installationId": installationId.uuidString,
             "token": token,
             "platform": Self.platform,
+            "apnsEnvironment": apnsEnvironment.rawValue,
         ]
         if let appVersion { payload["appVersion"] = appVersion }
         if let deviceModel { payload["deviceModel"] = deviceModel }

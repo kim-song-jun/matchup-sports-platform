@@ -1,10 +1,20 @@
-import { V1PushPlatform } from '@prisma/client';
+import { V1ApnsEnvironment, V1PushPlatform } from '@prisma/client';
 
 /** One registered device a notification can be addressed to. */
 export interface PushTarget {
   id: string;
   token: string;
   platform: V1PushPlatform;
+  /**
+   * Which APNs gateway issued this token, when the device said so.
+   *
+   * Null for Android, which has no such axis, and for an iOS registration made before the
+   * app reported it — those fall back to the server's own environment. Carried on the target
+   * rather than read from configuration because a single deployment now legitimately serves
+   * both: a TestFlight build of the alpha app is production-signed while a build installed
+   * from Xcode is not.
+   */
+  apnsEnvironment?: V1ApnsEnvironment | null;
 }
 
 /** The notification content, identical for every platform. */

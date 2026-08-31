@@ -25,6 +25,9 @@ SCHEME="${TEAMEET_ARCHIVE_SCHEME:-TeameetAlpha}"
 CONFIGURATION="${TEAMEET_ARCHIVE_CONFIGURATION:-Alpha Release}"
 OUTPUT="${TEAMEET_ARCHIVE_OUTPUT:-${TMPDIR:-/tmp}/teameet-ios-archive}"
 UPLOAD=false
+TEAM_ID="${TEAMEET_TEAM_ID:-U9J95Q6XD3}"
+SIGNING_IDENTITY="${TEAMEET_SIGNING_IDENTITY:-Apple Distribution}"
+PROFILE_NAME="${TEAMEET_PROFILE_NAME:-Teameet Alpha App Store}"
 [[ "${1:-}" == "--upload" ]] && UPLOAD=true
 
 # --- build number ------------------------------------------------------------------------
@@ -46,12 +49,19 @@ bash "$REPO_ROOT/scripts/release/generate-ios-version-xcconfig.sh"
 ( cd "$IOS_DIR" && xcodegen generate >/dev/null )
 
 # --- archive -----------------------------------------------------------------------------
-# The first step that cannot run without the Apple Developer account. `-allowProvisioningUpdates`
-# lets Xcode create the missing profile itself once the machine is signed in to an account with
-# the right role; without it the archive stops at "No profiles for '<bundle id>' were found".
+# Manual signing, deliberately. Automatic signing (`-allowProvisioningUpdates`) does not work
+# for this project and the reason is not obvious: Xcode's archive action always asks for a
+# *development* profile, and Apple refuses to issue one to a team with no registered devices —
+# "Your team has no devices from which to generate a provisioning profile". Nobody here has an
+# iPhone, and TestFlight does not need one, so that requirement can never be satisfied.
 #
-# The failure is left to Xcode rather than pre-empted by a check here — its message names
-# exactly what is missing, and that changes as the account setup progresses.
+# The way out is not to register a device. A distribution profile contains no device list, so
+# naming one directly skips the development profile entirely. `scripts/ios/asc-profile.mjs`
+# creates it through the App Store Connect API — see docs/ops/ios-release.md.
+#
+# Do NOT "fix" a signing failure by turning signing off. An unsigned archive exports into a
+# perfectly valid .ipa whose app carries none of its entitlements, and nothing fails — see the
+# entitlement gate below, which exists because that already happened once.
 ARCHIVE="$OUTPUT/Teameet-$VERSION_NAME-$VERSION_CODE.xcarchive"
 mkdir -p "$OUTPUT"
 echo "[archive] scheme=$SCHEME configuration=$CONFIGURATION"
@@ -61,7 +71,10 @@ xcodebuild archive \
   -configuration "$CONFIGURATION" \
   -destination 'generic/platform=iOS' \
   -archivePath "$ARCHIVE" \
-  -allowProvisioningUpdates
+  CODE_SIGN_STYLE=Manual \
+  DEVELOPMENT_TEAM="$TEAM_ID" \
+  CODE_SIGN_IDENTITY="$SIGNING_IDENTITY" \
+  PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME"
 
 # --- export ------------------------------------------------------------------------------
 echo "[archive] exporting with $(basename "$IOS_DIR")/ExportOptions.plist"

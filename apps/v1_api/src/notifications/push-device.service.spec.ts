@@ -42,6 +42,58 @@ describe('PushDeviceService', () => {
     else process.env[PUSH_ENVIRONMENT_VARIABLE] = previousEnvironment;
   });
 
+  /**
+   * Which APNs gateway a token belongs to is a property of the build's signature, so it is
+   * recorded per device rather than inferred from the deployment. A TestFlight build of the
+   * alpha app is production-signed while one installed from Xcode is not, and both register
+   * against the same server.
+   */
+  it('records the gateway an iOS registration reports, on create and on re-register', async () => {
+    prisma.v1PushDevice.upsert.mockResolvedValue({ id: 'row' });
+
+    await service.register('user-1', {
+      installationId: '0e65978c-3a58-42e5-a371-cf6d6239699a',
+      token: 'apns-token-with-a-safe-length-value',
+      platform: 'ios',
+      apnsEnvironment: 'production',
+    });
+
+    const call = prisma.v1PushDevice.upsert.mock.calls[0][0];
+    expect(call.create.apnsEnvironment).toBe('production');
+    // Re-read on every registration, not only on create: a tester moving from an Xcode build
+    // to TestFlight keeps the installation id while the signature changes underneath it, and
+    // a stale value would send a live token to the wrong gateway.
+    expect(call.update.apnsEnvironment).toBe('production');
+  });
+
+  it('stores no gateway for Android, even when a client sends one', async () => {
+    prisma.v1PushDevice.upsert.mockResolvedValue({ id: 'row' });
+
+    await service.register('user-1', {
+      installationId: '0e65978c-3a58-42e5-a371-cf6d6239699a',
+      token: 'fcm-registration-token-with-safe-length',
+      platform: 'android',
+      apnsEnvironment: 'production',
+    });
+
+    const call = prisma.v1PushDevice.upsert.mock.calls[0][0];
+    expect(call.create.apnsEnvironment).toBeNull();
+    expect(call.update.apnsEnvironment).toBeNull();
+  });
+
+  /** A build older than this field. Null is what keeps its previous behaviour. */
+  it('stores no gateway when an iOS registration does not report one', async () => {
+    prisma.v1PushDevice.upsert.mockResolvedValue({ id: 'row' });
+
+    await service.register('user-1', {
+      installationId: '0e65978c-3a58-42e5-a371-cf6d6239699a',
+      token: 'apns-token-with-a-safe-length-value',
+      platform: 'ios',
+    });
+
+    expect(prisma.v1PushDevice.upsert.mock.calls[0][0].create.apnsEnvironment).toBeNull();
+  });
+
   it('derives alpha from the server and never returns the token', async () => {
     const publicDevice = {
       id: 'device-row-1',
@@ -171,7 +223,7 @@ describe('PushDeviceService platform routing inputs', () => {
       // Deliberately unfiltered by platform. Filtering here would hide a registered device
       // whose platform has no adapter, turning a routing gap into a silent zero.
       where: { userId: 'user-1', environment: 'alpha', revokedAt: null },
-      select: { id: true, token: true, platform: true },
+      select: { id: true, token: true, platform: true, apnsEnvironment: true },
     });
   });
 });

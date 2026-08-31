@@ -29,16 +29,51 @@ set -Eeuo pipefail
 
 # Apple's identifiers are fixed-width; a pasted-with-whitespace value fails much later, at the
 # first send, as a 403 that says nothing about which field was wrong.
-[[ "${SECRET_APNS_KEY_ID}" =~ ^[A-Z0-9]{10}$ ]] || { echo '[alpha-apns-env] APNS_KEY_ID must be 10 characters' >&2; exit 1; }
-[[ "${SECRET_APNS_TEAM_ID}" =~ ^[A-Z0-9]{10}$ ]] || { echo '[alpha-apns-env] APNS_TEAM_ID must be 10 characters' >&2; exit 1; }
-[[ "${SECRET_APNS_BUNDLE_ID}" =~ ^[A-Za-z0-9.-]+$ ]] || { echo '[alpha-apns-env] APNS_BUNDLE_ID looks wrong' >&2; exit 1; }
-case "${SECRET_APNS_PRIVATE_KEY}" in
-  *"-----BEGIN PRIVATE KEY-----"*) ;;
-  *) echo '[alpha-apns-env] APNS_PRIVATE_KEY does not look like a .p8 PEM' >&2; exit 1 ;;
-esac
+# A malformed value is worth refusing to write — a broken key on the host fails at send
+# time with a 403 that names nothing — but it is NOT worth failing the deploy over. That was
+# the original principle for a missing secret and it applies just as much to a wrong one:
+# a push-less alpha is a working alpha, a blocked deploy is not. Measured the hard way, by
+# blocking one.
+for guard in "APNS_KEY_ID:${SECRET_APNS_KEY_ID}:^[A-Z0-9]{10}$" \
+             "APNS_TEAM_ID:${SECRET_APNS_TEAM_ID}:^[A-Z0-9]{10}$" \
+             "APNS_BUNDLE_ID:${SECRET_APNS_BUNDLE_ID}:^[A-Za-z0-9.-]+$"; do
+  name="${guard%%:*}"; rest="${guard#*:}"; value="${rest%:*}"; pattern="${rest##*:}"
+  [[ "${value}" =~ ${pattern} ]] || {
+    echo "::warning::${name} does not look right (${#value} chars); iOS push stays disabled"
+    exit 0
+  }
+done
+# The key arrives in whichever shape the person storing it chose, and all of these are
+# reasonable: the .p8 pasted as-is, the same thing already flattened to one line with literal
+# backslash-n, or the file base64-encoded — which is what a lot of "how to put a .p8 in CI"
+# advice tells people to do. Rejecting the last two would be rejecting a correct key.
+#
+# Measured: the first version of this script accepted only a raw PEM and failed the deploy
+# with "does not look like a .p8 PEM" on a key that was in fact fine.
+normalize_private_key() {
+  local raw="$1" candidate
+  # Already a PEM, in either line form.
+  case "${raw}" in
+    *"-----BEGIN"*"PRIVATE KEY-----"*) printf '%s' "${raw}"; return 0 ;;
+  esac
+  # base64 of a PEM. `base64 -d` is lenient about wrapping; a value that is not base64 at all
+  # simply fails here and falls through to the caller's warning.
+  candidate="$(printf '%s' "${raw}" | tr -d '[:space:]' | base64 -d 2>/dev/null || true)"
+  case "${candidate}" in
+    *"-----BEGIN"*"PRIVATE KEY-----"*) printf '%s' "${candidate}"; return 0 ;;
+  esac
+  return 1
+}
 
-# One line, literal \n. A key stored with real newlines truncates the .env assignment.
-private_key_one_line="$(printf '%s' "${SECRET_APNS_PRIVATE_KEY}" | awk 'BEGIN{ORS="\\n"} {print}')"
+if ! private_key_pem="$(normalize_private_key "${SECRET_APNS_PRIVATE_KEY}")"; then
+  # Shape of the value only — never the value. This is a key.
+  echo "::warning::APNS_PRIVATE_KEY is neither a PEM nor base64 of one (${#SECRET_APNS_PRIVATE_KEY} chars); iOS push stays disabled"
+  exit 0
+fi
+
+# One line, literal \n. A key stored with real newlines truncates the .env assignment, and
+# the failure then surfaces much later as an unhelpful signing error.
+private_key_one_line="$(printf '%s' "${private_key_pem}" | awk 'BEGIN{ORS="\\n"} {print}')"
 
 names=(APNS_KEY_ID APNS_TEAM_ID APNS_BUNDLE_ID APNS_PRIVATE_KEY)
 values=("${SECRET_APNS_KEY_ID}" "${SECRET_APNS_TEAM_ID}" "${SECRET_APNS_BUNDLE_ID}" "${private_key_one_line}")

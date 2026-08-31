@@ -63,6 +63,8 @@ done
 ```
 
 - 폴링은 `run_in_background`로 띄우고 task-notification으로 회수(foreground `sleep`은 블록됨).
+- ⚠️ **이 count 증분은 "뭔가 왔다" 는 힌트다. 도착 확정·clean 판정은 §2.2-a의 5게이트로 한다** —
+  스레드에 답해도 리뷰 수가 오르고, 기준선을 push 직후 재면 그 리뷰가 기준선에 삼켜진다.
 - ⚠️ **count 폴링은 위 `gh pr view --json reviews --jq` 방식 사용**(REST count). 인라인 GraphQL을 루프 안에 넣으면 한 줄 쿼리의 **중괄호 불균형**(`query{repository{pullRequest{reviews{totalCount}}}}` 은 닫는 `}` 4개 필요)으로 매 회차 파싱 실패가 조용히 누적돼 새 리뷰를 못 잡는다(실측 함정). GraphQL 직접 호출 시엔 열고 닫는 `{`/`}` 개수를 반드시 맞출 것.
 
 ### 2.2-a clean 판정 — **다섯 개를 다 봐야 한다**
@@ -100,16 +102,17 @@ gh api graphql -f query='{repository(owner:"<OWNER>",name:"<REPO>"){pullRequest(
                          elif ($ln|length) == 0 then "⚠️ 추출실패 — 0이 아니다. 본문을 눈으로 봐라"
                          else "⚠️ 후보 \($ln|length)개 — 본문을 눈으로 봐라" end),
       "4 Suppress " + (if ($b|test("Suppressed comments")) then "있음 — 열어봐야 한다" else "없음" end),
-      "5 미해결   \([$p.reviewThreads.nodes[]|select(.isResolved==false)]|length)건"
-        + (if $p.reviewThreads.totalCount > ($p.reviewThreads.nodes|length)
-           then " ⚠️ 스레드 \($p.reviewThreads.totalCount)개 중 \($p.reviewThreads.nodes|length)개만 셌다 — 페이징 필요"
-           else "" end)
+      "5 미해결   " + (if $p.reviewThreads.totalCount > ($p.reviewThreads.nodes|length)
+           then "⛔ 판정 불가 — 스레드 \($p.reviewThreads.totalCount)개 중 \($p.reviewThreads.nodes|length)개만 받았다. 페이징해서 다시 세라"
+           else "\([$p.reviewThreads.nodes[]|select(.isResolved==false)]|length)건" end)
       end'
 ```
 
 #### 도착 감지·판정의 함정 넷 — 넷 다 실제로 밟았다
 
-**① 개수로 도착을 감지하지 마라.** 워처를 push 직후 걸면서 기준선을 *그 순간* 재면,
+**① 개수 증분은 *힌트*지 판정이 아니다.** §2.2의 count 폴링은 "뭔가 왔다" 를 알리는 용도로
+그대로 써도 된다 — 다만 **도착 확정과 clean 판정은 게이트 2(제출시각 > head)로 한다.**
+개수만 믿으면 이렇게 깨진다: 워처를 push 직후 걸면서 기준선을 *그 순간* 재면,
 감시하려는 리뷰가 기준선에 삼켜진다(4초 만에 도착해 `6 > 6`이 성립 안 했다). 게다가
 **조용히** 실패해서 "아직 안 왔다"로 읽힌다. **시각 비교(게이트 2)로 판정하면 기준선이
 없으므로 이 경합 자체가 없다.**
@@ -143,11 +146,12 @@ grep -nE 'Comments generated|Suppressed' /tmp/r.md
 ```
 reviews(last:100)          first:100 은 리뷰가 100개를 넘으면 **오래된 쪽**을 가져와
                            최신 리뷰를 놓친다. last 로 최신 쪽을 받는다
-max_by(.submittedAt)       `| last` 는 반환 순서를 가정한다. 이 저장소에서는 시간순이었지만
-                           보장은 없다 — 정렬을 명시하면 가정이 사라진다
-reviewThreads totalCount    노드 수보다 크면 **잘린 것**이다. 조용한 과소집계 대신
-                           "페이징 필요" 를 찍는다 (게이트 5는 0이어야 의미가 있으므로
-                           과소집계는 곧 통과 쪽 오판이다)
+max_by(.submittedAt)       **최신 리뷰를 제출시각으로 고른다.** 예전엔 `| last` 였는데 그건
+                           반환 순서를 가정한다(이 저장소에선 시간순이었지만 보장은 없다)
+reviewThreads totalCount    노드 수보다 크면 **잘린 것**이다. 이때는 개수를 아예 찍지 않고
+                           **"⛔ 판정 불가"** 로 간다(fail-closed) — 잘린 채 "0건" 을 찍으면
+                           게이트 5를 통과한 것으로 읽힌다. 게이트 5는 0이어야 의미가 있으므로
+                           과소집계는 곧 통과 쪽 오판이다
 ```
 
 **③ `git log --date=format:` 은 TZ를 무시한다.** `submittedAt`은 UTC인데 커밋 시각을

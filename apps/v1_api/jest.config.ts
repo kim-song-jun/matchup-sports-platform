@@ -56,15 +56,9 @@ const config: Config = {
         // 되살리려면 픽스처에 대회 2개를 새로 만들어야 한다. 같은 bit-rot 이지만 **고치는
         // 규모가 "낡은 기대값 갱신" 과 다르다** — 그래서 별도 작업으로 남긴다.
         //
-        // ── 아래 셋은 이 PR 의 CI 가 **처음 돌려서** 드러난 bit-rot 이다(2026-09-01 KST).
-        //    셋 다 **코드가 아니라 테스트가 낡았다** — 안 도는 동안 코드가 앞서 갔다.
-        //    수리는 별도 작업이다(이 PR 은 등록 방식만 바꾼다).
-        //
-        // 응답에 `leagueCompleted: false` 가 추가됐는데 :588 의 `toEqual` 이 옛 모양 그대로다.
-        // 목록 커서가 `<state>:<id>`(`paginateByStatePriority`)로 바뀌었는데 옛 포맷을 기대한다
-        //   Expected "098219f7-…"  /  Received "draft:098219f7-…"
-        // :195 `v1TournamentField.create` 가 FK 위반 — `v1_tournament_fields_tournament_fk`.
-        // 픽스처가 만드는 대회보다 필드 생성이 앞서거나 대회가 안 만들어진다.
+        // 위 사유는 **측정값**이고, 같은 CI 가 드러낸 다른 두 건(league-match-admin 의
+        // `leagueCompleted` · league-match-public 의 커서 포맷)은 **이 PR 에서 고쳐 제외에서 뺐다.**
+        // 여기 남은 것은 task7 하나뿐이다.
         '<rootDir>/test/admin/task7-platform-ops-boundary\\.integration-spec\\.ts$',
       ],
     },

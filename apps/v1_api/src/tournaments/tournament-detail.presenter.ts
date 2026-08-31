@@ -3,7 +3,6 @@ import {
   resolveParticipantDisplayName,
   type ParticipantNameProfileRow,
 } from '../games/public-records/participant-name-gating';
-import { V1CompetitionKind } from '@prisma/client';
 import type { LeagueFixtureListItem } from '../league-matches/league-fixture-list-source';
 import type { TournamentDetailRow } from './tournaments-read.query';
 import { resolveTournamentFixtureOfficialResult } from './tournament-fixture-official-result';
@@ -123,15 +122,16 @@ export function presentTournamentDetail(
   // bracketPublishedAt이 비어 있어도 공개로 간주하므로, 예약 시각과 실제 노출 사이에
   // cron 주기만큼의 지연이 생기지 않는다.
   //
-  // ⚠️ **이 게이트는 대회 축 개념이라 정규 리그 거울에는 적용하지 않는다.** "리그의
-  // 대진표를 아직 공개하지 않은 상태" 라는 것이 없다 — 리그 대진은 만들어지면 바로
-  // 공개된다(`league-match-public.service.ts` 에 이 게이트 참조가 0건이다). 거울 행에
-  // 태우면 `bracketPublishedAt` 이 비어 있어(거울 생성이 그 값을 쓰지 않는다) 일정이
-  // 영영 빈 배열이 되고, 값을 채우는 쪽으로 풀면 **운영자가 리그마다 없던 버튼을
-  // 눌러야** 한다. 리그에 없는 개념을 만들지 않는다.
-  const isLeagueMirror = row.kind === V1CompetitionKind.regular_league;
-  const bracketPublished =
-    isLeagueMirror || isBracketPublished(row.bracketPublishedAt, row.bracketPublishScheduledAt, now);
+  // **리그 거울에 예외를 두지 않는다 — 둘 필요가 없다.** 처음엔 `kind === regular_league`
+  // 면 이 게이트를 건너뛰게 짰는데, 변이 검증에서 그 분기를 없애도 **red 가 0건**이었다.
+  // 확인해보니 리그 대진은 이 게이트 **밖**의 `leagueFixtures` 로 나가고, 게이트가 가리는
+  // `groups`/`fixtures` 는 거울 행에서 어차피 비어 있다 — 즉 그 예외는 **아무것도 하지
+  // 않는 코드**였다. 필드를 나눈 설계(②)가 이미 그 문제를 풀어 놓은 것이다.
+  //
+  // 그래서 여기 리그 분기를 **다시 넣지 마라.** "리그의 대진표를 아직 공개하지 않은 상태"
+  // 는 존재하지 않지만(`league-match-public.service.ts` 에 이 게이트 참조가 0건),
+  // 그 사실은 리그 데이터가 이 게이트를 지나지 않는 것으로 이미 지켜진다.
+  const bracketPublished = isBracketPublished(row.bracketPublishedAt, row.bracketPublishScheduledAt, now);
   // 참가팀 공개 정책 통일(fix/v1-publish) — participantTeams와 groups/fixtures의 팀명이
   // 같은 조건으로 감춰진다. 대진표 공개 여부(bracketPublished)와는 독립 — 대진표는
   // 공개돼도(구조는 보여도) 모집 중이면 그 안의 팀 식별 정보만 별도로 가려진다.

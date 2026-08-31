@@ -189,20 +189,6 @@ describe('통합 순위 — 정규 리그 거울 행 (real DB)', () => {
     expect(detail.leagueFixtures.every((f) => f.placeName === '미정')).toBe(true);
   });
 
-  it('대진표 공개 게이트가 리그에는 걸리지 않는다 — bracketPublishedAt 이 비어 있어도 일정이 나온다', async () => {
-    // 거울 생성(`leagueMirrorCreateData`)은 `bracketPublishedAt` 을 쓰지 않는다. 대회였다면
-    // 이 상태에서 fixtures 가 `[]` 로 감춰진다 — 리그에 그 게이트를 태우면 일정이 영영 안 뜬다.
-    const mirror = await prisma.v1Tournament.findUniqueOrThrow({
-      where: { id: ids.league },
-      select: { bracketPublishedAt: true, bracketPublishScheduledAt: true },
-    });
-    expect(mirror.bracketPublishedAt).toBeNull();
-    expect(mirror.bracketPublishScheduledAt).toBeNull();
-
-    const detail = (await read.get(ids.league)) as { leagueFixtures: unknown[] };
-    expect(detail.leagueFixtures).toHaveLength(3);
-  });
-
 
   it('진행률 — 무효 대진은 played 에도 remaining 에도 세지 않는다', async () => {
     const res = await read.getOverallStandings(ids.league);

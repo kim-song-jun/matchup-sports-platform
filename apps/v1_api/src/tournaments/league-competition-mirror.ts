@@ -172,3 +172,44 @@ export function mirrorDetailMatches(
     row.regionId === target.regionId
   );
 }
+
+/**
+ * **거울의 `status` → 리그 `state` 역매핑.**
+ *
+ * read-swap 이 통합 축에서 읽어도 응답의 `state` 계약은 그대로여야 한다 — 웹이
+ * `LEAGUE_STATE_META[item.state]` 로 **인덱싱**하기 때문에, 세 값 밖이 나오면 `undefined`
+ * 를 역참조해 **목록 페이지가 통째로 죽는다.** 그래서 여섯 상태를 **빠짐없이** 덮는다.
+ *
+ * | 대회 status | 리그 state | 왜 |
+ * |---|---|---|
+ * | `draft` | `draft` | 그대로 |
+ * | `in_progress` | `active` | `STATUS_BY_LEAGUE_STATE` 의 역 |
+ * | `completed` | `completed` | 그대로 |
+ * | `open` | `draft` | "신청 받는 중" = **아직 시작 안 함.** D7 이 도입할 상태다 |
+ * | `closed` | `draft` | 신청 마감이지 시작이 아니다 |
+ * | `cancelled` | `completed` | 방어값. 아래 참조 |
+ *
+ * ## 아래 셋은 **도달 불가**다 — "어떻게 보여줄까" 를 고민할 자리가 아니다
+ * `V1Tournament.status` 를 자유롭게 쓰는 곳은 어드민 `TournamentsAdminService.changeStatus`
+ * 하나뿐이고, 그 진입 조회가 `findTournamentOnSurface(..., TOURNAMENT_KINDS, ...)`
+ * (= `[regular_tournament]`) 라 **리그 거울에 닿지 않는다.** 백필·dual-write 도 위 세 값만
+ * 쓴다. **즉 취소된 리그 같은 것은 존재하지 않는다.**
+ *
+ * (줄 번호를 적지 않는다 — 이 파일은 병렬 세션이 자주 고쳐서 번호가 금방 어긋나고,
+ * 어긋난 번호는 없는 근거를 있는 것처럼 보이게 한다. 메서드 이름으로 찾아라.)
+ *
+ * 그런데도 매핑을 비우지 않는 이유는 **비면 `LEAGUE_STATE_META[undefined]` 로 웹이 죽기
+ * 때문**이지, 그 값이 올 것 같아서가 아니다. 방어값이지 제품 판단이 아니다.
+ *
+ * > **반증**: 어떤 경로가 `ALL_COMPETITION_KINDS` 로 리그를 허용하면 이 값이 실제로 보일 수
+ * > 있다. `scripts/v1-surface-check.mjs` 의 **"리그 허용" baseline 이 1 을 넘으면 여기를 다시
+ * > 본다** — 봉쇄가 느슨해지는 순간 이 자리가 같이 걸리도록 게이트에 묶어 둔 것이다.
+ */
+export const LEAGUE_STATE_BY_STATUS: Record<V1TournamentStatus, V1LeagueState> = {
+  [V1TournamentStatus.draft]: V1LeagueState.draft,
+  [V1TournamentStatus.open]: V1LeagueState.draft,
+  [V1TournamentStatus.closed]: V1LeagueState.draft,
+  [V1TournamentStatus.in_progress]: V1LeagueState.active,
+  [V1TournamentStatus.completed]: V1LeagueState.completed,
+  [V1TournamentStatus.cancelled]: V1LeagueState.completed,
+};

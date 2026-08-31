@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { isParticipantPubliclyEligible, loadParticipantConsentEligibility } from '../games/public-records/public-consent';
@@ -13,6 +13,7 @@ import {
 } from './league-promotion';
 import { resolveIsForfeit } from './league-match-forfeit.service';
 import { ListLeagueMatchesQueryDto } from './dto/league-match.dto';
+import { LEAGUE_STATE_BY_STATUS } from '../tournaments/league-competition-mirror';
 
 const PLAYER_RECORDS_LIMIT = 30;
 const LEAGUE_LIST_DEFAULT_LIMIT = 20;
@@ -138,34 +139,136 @@ export class LeagueMatchPublicService {
     const teamIds = memberships.map((row) => row.teamId);
     if (teamIds.length === 0) return { items: [] };
 
-    const leagues = await this.prisma.v1League.findMany({
-      where: { teams: { some: { teamId: { in: teamIds } } } },
+    // ── R4-a read-swap: 이 목록은 **통합 축**(V1Tournament + V1TournamentRegistration)에서 읽는다 ──
+    //
+    // **두 축 동등성을 코드 전에 실측으로 증명했다**(2026-08-31, alpha captain A):
+    //   리그 축 30개 · 통합 축 30개 · 차집합 양방향 0 · teamCount 합 70 == 70
+    // 집합만으로는 부족해서 **상태 분포까지** 맞춘 뒤에야 이 전환을 켠다 —
+    // 백필 `--apply` 전에는 거울이 전부 `draft` 라 아래 `state !== 'draft'` 게이트가
+    // 30개 중 21개의 순위·다음 경기를 **에러 없이** 날린다(`docs/ops/read-swap-preflight.md` 9절).
+    //
+    // 대진·결과는 **아직 리그 축**이다. 그래서 아래 `standings()` 는 그대로 리그 id 로 부른다 —
+    // 거울 id 가 리그 id 와 같아서 성립한다(대응표를 두지 않은 설계의 값).
+    const mirrors = await this.prisma.v1Tournament.findMany({
+      where: {
+        kind: 'regular_league',
+        deletedAt: null,
+        // 참가 판정이 **확정 등록** 기준이다 — 리그 축의 `V1LeagueTeam` 은 상태가 없어
+        // 전부 참가였고, 백필이 그것을 `confirmed` 로 옮겼다(88개 리그 전부 1:1 실측).
+        registrations: { some: { teamId: { in: teamIds }, status: 'confirmed' } },
+      },
       // 같은 상태 안에서는 최근 개설순. 상태 우선순위는 DB 정렬로 표현할 수 없어 아래에서
-      // 다시 정렬한다 -- `state: 'asc'` 는 enum 선언 순서(draft -> active -> completed)를
-      // 따르므로 draft 가 맨 위로 올라온다. "지금 뛰는 리그"를 찾으러 온 사용자에게
-      // 아직 시작도 안 한 리그가 먼저 보이면 안 된다.
+      // 다시 정렬한다.
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       select: {
         id: true,
         title: true,
-        state: true,
-        startsOn: true,
-        endsOn: true,
+        status: true,
+        scheduledAt: true,
+        scheduledEndAt: true,
         tier: true,
         seasonNo: true,
         sport: { select: { id: true, code: true, name: true } },
         region: { select: { id: true, name: true } },
         series: { select: { title: true } },
-        // 내 팀만 가져온다 -- 화면이 쓰는 건 "내 어느 팀이 이 리그에 있나" 뿐이고,
-        // 전체 참가팀을 실어 오면 리그가 커질수록 쓰지도 않을 행을 join 해 온다.
-        // 전체 팀 수는 아래 _count 가 따로 세므로 이 필터에 영향받지 않는다.
-        teams: {
-          where: { teamId: { in: teamIds } },
+        // 내 팀만 가져온다 — 화면이 쓰는 건 "내 어느 팀이 이 리그에 있나" 뿐이다.
+        registrations: {
+          where: { teamId: { in: teamIds }, status: 'confirmed' },
           select: { teamId: true, team: { select: { name: true } } },
         },
-        _count: { select: { teams: true } },
+        // **`confirmed` 만 센다.** 필터 없이 세면 리그 축의 `teams` 개수와 어긋난다 —
+        // 지금은 전부 confirmed 라 같지만, 신청제(D7)가 들어오면 pending 이 섞인다.
+        _count: { select: { registrations: { where: { status: 'confirmed' } } } },
       },
     });
+
+    // ── 거울의 nullable 세 필드는 **전부 같은 불변식**이다 ─────────────────
+    // `region`·`scheduledAt`·`scheduledEndAt` 은 스키마상 nullable 인데, 그건 **기존 대회
+    // 행에 그 값이 없어서**지 리그에 없어서가 아니다:
+    // ```
+    // V1League.regionId / startsOn / endsOn   전부 NOT NULL — 원본에 항상 있다
+    // dual-write                              그대로 복사한다
+    // --apply (R4-a)                          88행을 채웠다
+    // ```
+    // **그래서 여기서 null 은 "값이 없는 경우" 가 아니라 "불변식이 깨진 경우" 다.**
+    //
+    // 세 필드를 **같은 방식으로** 다룬다 — 하나는 던지고 하나는 `as Date` 로 단언하면
+    // 다음 사람도 또 다르게 다룬다. **단언은 검사가 아니다**: null 이 섞이면 그대로
+    // 내려가거나 직렬화에서 터지고, 어느 쪽이든 원인이 안 보인다.
+    //
+    // **`where` 에서 거르지 않는 이유**: 거르면 그 리그가 목록에서 조용히 사라지고,
+    // 그게 이 작업 전체가 막으려는 실패 모습이다.
+    //
+    // **`new Error` 를 쓰지 않는 이유**: `HttpException` 이 아니면 전역 필터가
+    // **500 + "Internal server error"** 로 정규화해 **리그 id 도 code 도 전부 유실된다.**
+    // 그러면 "어느 리그인지 대며 실패한다" 가 소스에만 참이고 응답에서는 거짓이 된다.
+    // (클래스명은 `AllExceptionsFilter` 다 — 파일은 `common/filters/http-exception.filter.ts`
+    // 인데 **파일명과 클래스명이 다르다.** 그 이름으로 적으면 검색해도 안 나온다.
+    // `HttpExceptionFilter` 라는 클래스는 없다 — 의도적 언급, 지우지 말 것)
+    // 한 번만 순회해 나눈다. 술어(`isComplete`)가 "완전하다"의 **유일한 정의**이고,
+    // 타입 술어라서 통과한 행은 아래에서 단언 없이 non-null 로 쓸 수 있다.
+    type LeagueMirrorRow = (typeof mirrors)[number];
+    type CompleteLeagueMirror = LeagueMirrorRow & {
+      region: NonNullable<LeagueMirrorRow['region']>;
+      scheduledAt: Date;
+      scheduledEndAt: Date;
+    };
+    // 세 검사를 **한 곳에만** 적는다. 술어와 아래 `missing` 목록을 따로 적으면 어긋날 수
+    // 있고(한쪽만 고치면 "불완전한데 빠진 필드는 없다"는 응답이 나온다), 그건 원인을
+    // 가장 못 찾게 만드는 모양이다.
+    const REQUIRED: ReadonlyArray<readonly [string, (row: LeagueMirrorRow) => boolean]> = [
+      ['region', (row) => row.region === null],
+      ['scheduledAt', (row) => row.scheduledAt === null],
+      ['scheduledEndAt', (row) => row.scheduledEndAt === null],
+    ];
+    const missingOf = (row: LeagueMirrorRow) =>
+      REQUIRED.filter(([, isMissing]) => isMissing(row)).map(([field]) => field);
+    const isComplete = (mirror: LeagueMirrorRow): mirror is CompleteLeagueMirror =>
+      missingOf(mirror).length === 0;
+
+    const complete: CompleteLeagueMirror[] = [];
+    const incomplete: Array<{ leagueId: string; missing: string[] }> = [];
+    for (const mirror of mirrors) {
+      if (isComplete(mirror)) {
+        complete.push(mirror);
+        continue;
+      }
+      incomplete.push({ leagueId: mirror.id, missing: missingOf(mirror) });
+    }
+    if (incomplete.length > 0) {
+      // 어느 리그의 어느 필드가 비었는지 전부 싣는다 — 운영자가 고칠 대상이 그것이다.
+      //
+      // **키는 반드시 `details`(복수) 다.** `AllExceptionsFilter` 는 payload 에서
+      // `code`·`message`·**`details`** 만 응답으로 옮기고 **나머지 최상위 필드는 버린다.**
+      // `detail`(단수)로 쓰면 예외 객체에는 담기는데 **응답에서는 사라진다** — 이 PR 이
+      // 고치던 실패(진단 정보가 클라이언트까지 못 감)를 한 겹 안쪽에서 그대로 반복하는
+      // 것이다. 실제로 그렇게 썼고 Copilot #876 재리뷰가 잡았다.
+      throw new InternalServerErrorException({
+        code: 'LEAGUE_MIRROR_INCOMPLETE',
+        message: '리그 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
+        details: incomplete,
+      });
+    }
+
+    // 응답의 `state` 계약은 그대로 둔다 — 웹이 `LEAGUE_STATE_META[item.state]` 로
+    // **인덱싱**해서, 세 값 밖이 나오면 목록 페이지가 통째로 죽는다.
+    const leagues = complete.map((mirror) => ({
+      id: mirror.id,
+      title: mirror.title,
+      state: LEAGUE_STATE_BY_STATUS[mirror.status],
+      // 거울의 날짜는 리그의 `startsOn`/`endsOn` 이 그대로 옮겨온 것이다. nullable 인 이유는
+      // **기존 대회 행**에 기간이 없어서지 리그에 없어서가 아니다(원본이 NOT NULL).
+      // 위 불변식 검사를 통과했으므로 non-null 이다 — 근거는 단언이 아니라 검사다.
+      startsOn: mirror.scheduledAt,
+      endsOn: mirror.scheduledEndAt,
+      tier: mirror.tier,
+      seasonNo: mirror.seasonNo,
+      sport: mirror.sport,
+      region: mirror.region,
+      series: mirror.series,
+      teams: mirror.registrations,
+      _count: { teams: mirror._count.registrations },
+    }));
 
     // 진행 중 -> 준비 중 -> 종료. 목록이 사용자의 소속 팀 수로 묶여 있어(페이지네이션 없음)
     // 메모리 정렬로 충분하다. 규칙과 근거는 sortMyLeaguesByState 참고.

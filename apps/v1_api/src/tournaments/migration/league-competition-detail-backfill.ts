@@ -46,6 +46,7 @@ export class LeagueDetailBackfillBlockedError extends Error {
     message: string,
     readonly detail: {
       missingTournaments: Array<{ leagueId: string }>;
+      kindMismatches: Array<{ leagueId: string; kind: string | null }>;
       alreadyFilled: Array<{ leagueId: string; filled: string[] }>;
     },
   ) {
@@ -63,17 +64,22 @@ export async function backfillLeagueCompetitionDetails(
     orderBy: { id: 'asc' },
   });
 
-  // ── 가드 1: 대회 행이 없거나 종류가 리그가 아닌 것 ────────────────────────
-  // 종류로 거르지 않고 읽는다 — 거르면 "행이 없다" 와 "종류가 다르다" 가 한 통에 섞인다.
-  // (참가팀 백필에서 같은 지적을 받아 고친 것과 같은 규율.)
+  // ── 가드 1: 대회 행이 없는 것 / 종류가 리그가 아닌 것 ─────────────────────
+  // **두 통으로 나눈다.** 종류로 걸러 읽거나 한 배열에 합치면 운영자가 조치를 못 고른다:
+  //   행이 없다      → 리그 시즌 백필을 **먼저 돌려라**
+  //   종류가 다르다  → 그 id 는 **우리 리그가 아니다.** 멈추고 조사해라
+  // (참가팀 백필에서 같은 지적을 받아 고쳤는데 이 파일에 그대로 재현했다 — Copilot 이 잡았다.)
   const tournaments = await prisma.v1Tournament.findMany({
     where: { id: { in: leagues.map((row) => row.id) } },
     select: { id: true, kind: true, status: true, scheduledAt: true, scheduledEndAt: true, regionId: true },
   });
   const byId = new Map(tournaments.map((row) => [row.id, row]));
   const missingTournaments = leagues
-    .filter((league) => byId.get(league.id)?.kind !== 'regular_league')
+    .filter((league) => !byId.has(league.id))
     .map((league) => ({ leagueId: league.id }));
+  const kindMismatches = leagues
+    .filter((league) => byId.has(league.id) && byId.get(league.id)?.kind !== 'regular_league')
+    .map((league) => ({ leagueId: league.id, kind: byId.get(league.id)?.kind ?? null }));
 
   // ── 가드 2: 이미 값이 있는 행 ─────────────────────────────────────────────
   // **덮어쓰기를 하지 않는다.** 덮어쓰는 순간 원래 값이 사라져 되돌리기가 불가능해진다
@@ -92,10 +98,11 @@ export async function backfillLeagueCompetitionDetails(
     })
     .filter((row): row is { leagueId: string; filled: string[] } => row !== null);
 
-  if (missingTournaments.length > 0 || alreadyFilled.length > 0) {
+  if (missingTournaments.length > 0 || kindMismatches.length > 0 || alreadyFilled.length > 0) {
     throw new LeagueDetailBackfillBlockedError(
-      '백필을 중단했다 — 대회 행이 없거나 종류가 리그가 아닌 것, 또는 이미 값이 채워진 행이 있다.',
-      { missingTournaments, alreadyFilled },
+      '백필을 중단했다 — 대회 행이 없는 리그, 종류가 리그가 아닌 대회 행, ' +
+        '또는 이미 값이 채워진 행이 있다.',
+      { missingTournaments, kindMismatches, alreadyFilled },
     );
   }
 

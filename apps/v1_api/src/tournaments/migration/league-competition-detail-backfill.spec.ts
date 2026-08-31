@@ -100,7 +100,23 @@ describe('backfillLeagueCompetitionDetails', () => {
 
   // ─── 가드 ────────────────────────────────────────────────────────────────
 
-  it('가드 1: 대회 행이 없거나 종류가 리그가 아니면 막는다', async () => {
+  it('가드 1: 대회 행이 아예 없으면 missingTournaments 로 막는다', async () => {
+    const { prisma, updateMany } = fakePrisma([league()], []);
+
+    const error = await backfillLeagueCompetitionDetails(prisma, { dryRun: false }).catch(
+      (e: unknown) => e,
+    );
+
+    expect(error).toBeInstanceOf(LeagueDetailBackfillBlockedError);
+    const detail = (error as LeagueDetailBackfillBlockedError).detail;
+    expect(detail.missingTournaments).toEqual([{ leagueId: 'lg-1' }]);
+    expect(detail.kindMismatches).toEqual([]);
+    expect(updateMany).not.toHaveBeenCalled();
+  });
+
+  it('가드 1: id 는 있는데 종류가 리그가 아니면 missingTournaments 가 아니라 kindMismatches 다', async () => {
+    // 두 경우의 조치가 정반대다 — 없으면 리그 시즌 백필을 먼저 돌리고, 종류가 다르면
+    // 그 id 가 우리 것이 아니므로 멈추고 조사한다. 한 통에 담으면 운영자가 못 고른다.
     const { prisma, updateMany } = fakePrisma([league()], [tournament({ kind: 'regular_tournament' })]);
 
     const error = await backfillLeagueCompetitionDetails(prisma, { dryRun: false }).catch(
@@ -108,9 +124,9 @@ describe('backfillLeagueCompetitionDetails', () => {
     );
 
     expect(error).toBeInstanceOf(LeagueDetailBackfillBlockedError);
-    expect((error as LeagueDetailBackfillBlockedError).detail.missingTournaments).toEqual([
-      { leagueId: 'lg-1' },
-    ]);
+    const detail = (error as LeagueDetailBackfillBlockedError).detail;
+    expect(detail.kindMismatches).toEqual([{ leagueId: 'lg-1', kind: 'regular_tournament' }]);
+    expect(detail.missingTournaments).toEqual([]);
     expect(updateMany).not.toHaveBeenCalled();
   });
 

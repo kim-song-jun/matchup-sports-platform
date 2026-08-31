@@ -190,7 +190,6 @@ export const gameSchemaFixture = {
 // One new migration file backs it (20260831080000_v1_tournament_region_expand); the bound
 // 20260729000100_v1_game_operations migration is untouched, so `migration` keeps its value.
 // Recomputed with `shasum -a 256` against the file on this branch.
-// Recomputed with `shasum -a 256` against the file on this branch.
 export const gameSchemaSourceManifest = {
   // 팀 라인업 재사용(2026-08-13)과 dev의 스키마 변경이 여기서 만났다. 두 브랜치가
   // 각자 자기 schema.prisma 해시를 못 박아 둔 탓에 이 값만 충돌했고, schema.prisma

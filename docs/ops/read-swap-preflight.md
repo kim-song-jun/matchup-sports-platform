@@ -49,6 +49,44 @@ baseline 주석이 아니라 코드에 둔 이유는 **주석은 드리프트하
 
 1·2 는 **기능이 사라지는** 급이고 3 은 문구다. 셋 다 코드에도 같은 경고를 달아 뒀다.
 
+### 1-a. R4-a 로 넘어간 것은 `listMine` 의 **목록 조회뿐**이다
+
+`listMine` 이 통합 축을 읽는다고 해서 그 화면이 전부 넘어간 게 아니다. 항목별
+**순위·다음 경기(`standings()`)는 여전히 `v1League.findUnique` 를 읽는다** — R4-b 대상이다.
+여기를 "이미 넘어갔다"고 읽고 리그 축을 정리하면 **순위가 통째로 사라진다**(위 표 2번과
+같은 모양 — 조용히 사라지는 쪽이다).
+
+> **반증**: `grep -n "v1League.findUnique" apps/v1_api/src/league-matches/league-match-public.service.ts`
+> 가 **0** 이 되면 이 줄은 낡았다. 그때까지는 유효하다.
+
+### 1-b. read-swap 은 **백필보다 먼저 배포되면 안 된다** (Copilot #876 지적)
+
+`listMine` 은 거울의 `status` 를 `state` 로 되돌려 쓰고, **`state === 'draft'` 인 항목은
+`standings()` 를 아예 부르지 않는다.** 그래서 거울의 status 가 리그보다 뒤처져 있으면
+(백필 전 상태) 진행 중인 리그가 `draft` 로 보여 **순위·다음 경기가 에러 없이 사라진다.**
+불완전 검사(`LEAGUE_MIRROR_INCOMPLETE`)는 `region`·`scheduledAt`·`scheduledEndAt` 만 보므로
+**틀린 status 는 잡지 못한다** — null 이 아니라 *틀린 값*이기 때문이다.
+
+지금은 순서가 지켜져 있다. `--apply` 를 먼저 돌렸고, 배포를 여러 번 거친 뒤 다시 쟀다:
+
+| 측정 | 값 |
+|---|---|
+| 리그 축 분포 | `draft 35 · active 15 · completed 38` |
+| 거울 축 분포 | `draft 35 · in_progress 15 · completed 38` |
+| 행 단위 status 불일치 | **0** / 88쌍 |
+| `region` 불일치 · 날짜 null | **0** · **0** |
+
+> **반증**: 아래 SQL 의 `status_mismatch` 가 0 이 아니면 이 줄은 낡았고, read-swap 을
+> 배포하면 안 된다.
+> ```sql
+> SELECT count(*) FROM v1_leagues l
+>   JOIN v1_tournaments t ON t.id = l.id AND t.kind = 'regular_league'
+>  WHERE t.status::text <> CASE l.state::text
+>    WHEN 'draft' THEN 'draft' WHEN 'active' THEN 'in_progress'
+>    WHEN 'completed' THEN 'completed' END;
+> ```
+
+
 > **2번은 이미 한 번 터졌다.** 이관 중 그 스펙의 mock 이 `where.id` 를 직접 읽어
 > `undefined` 가 되면서 정확히 이 `continue` 경로로 빠졌고, **에러 없이 3건이 조용히
 > 스킵**됐다. 잡힌 이유는 그 테스트가 **`upsert` 호출을 단언**하고 있어서다 —

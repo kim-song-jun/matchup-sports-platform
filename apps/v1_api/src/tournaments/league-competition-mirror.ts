@@ -190,10 +190,13 @@ export function mirrorDetailMatches(
  * | `cancelled` | `completed` | 방어값. 아래 참조 |
  *
  * ## 아래 셋은 **도달 불가**다 — "어떻게 보여줄까" 를 고민할 자리가 아니다
- * `V1Tournament.status` 를 자유롭게 쓰는 곳은 어드민 `changeStatus`
- * (`tournaments-admin.service.ts:649`) 하나뿐이고, 그 조회는 `TOURNAMENT_KINDS`
- * (= `[regular_tournament]`) 로 걸러 **리그 거울에 닿지 않는다**(`:625`). 백필·dual-write 도
- * 위 세 값만 쓴다. **즉 취소된 리그 같은 것은 존재하지 않는다.**
+ * `V1Tournament.status` 를 자유롭게 쓰는 곳은 어드민 `TournamentsAdminService.changeStatus`
+ * 하나뿐이고, 그 진입 조회가 `findTournamentOnSurface(..., TOURNAMENT_KINDS, ...)`
+ * (= `[regular_tournament]`) 라 **리그 거울에 닿지 않는다.** 백필·dual-write 도 위 세 값만
+ * 쓴다. **즉 취소된 리그 같은 것은 존재하지 않는다.**
+ *
+ * (줄 번호를 적지 않는다 — 이 파일은 병렬 세션이 자주 고쳐서 번호가 금방 어긋나고,
+ * 어긋난 번호는 없는 근거를 있는 것처럼 보이게 한다. 메서드 이름으로 찾아라.)
  *
  * 그런데도 매핑을 비우지 않는 이유는 **비면 `LEAGUE_STATE_META[undefined]` 로 웹이 죽기
  * 때문**이지, 그 값이 올 것 같아서가 아니다. 방어값이지 제품 판단이 아니다.

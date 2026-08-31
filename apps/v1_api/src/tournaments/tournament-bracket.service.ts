@@ -57,6 +57,7 @@ import {
   recalculateAndUpsertGroupStandings,
 } from './tournament-group-standings';
 import { recalculateAndUpsertOverallStandings } from './tournament-overall-standings';
+import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
 
 @Injectable()
 export class TournamentBracketService {
@@ -77,7 +78,7 @@ export class TournamentBracketService {
   // ─── helpers ──────────────────────────────────────────────────────────────
 
   private async loadTournament(tournamentId: string) {
-    const tournament = await this.prisma.v1Tournament.findFirst({
+    const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
     });
     if (!tournament) {
@@ -383,7 +384,7 @@ export class TournamentBracketService {
 
     const created = await this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${durableCommandId}, 0))`;
-      const pinnedTournament = await tx.v1Tournament.findFirst({
+      const pinnedTournament = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
         where: { id: tournamentId, deletedAt: null },
         select: { competitionConfigVersionId: true },
       });
@@ -896,7 +897,7 @@ export class TournamentBracketService {
   }
   async recalculateStandings(user: V1AuthUser, tournamentId: string) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
-    const tournament = await this.prisma.v1Tournament.findFirst({
+    const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
       include: { competitionConfig: true },
     });

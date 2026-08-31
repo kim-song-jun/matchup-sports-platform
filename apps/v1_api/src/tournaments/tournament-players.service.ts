@@ -18,6 +18,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { isPhoneVerificationEnforced } from '../verification/phone-verification-access';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { AddPlayerDto, UpdatePlayerEligibilityDto } from './dto/tournament-player.dto';
+import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
 
 @Injectable()
 export class TournamentPlayersService {
@@ -154,7 +155,7 @@ export class TournamentPlayersService {
     const registration = await this.loadRegistration(tournamentId, registrationId);
     await this.assertTeamMember(registration.teamId, user.id);
 
-    const tournament = await this.prisma.v1Tournament.findFirst({
+    const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
       select: { minPlayers: true },
     });
@@ -184,7 +185,7 @@ export class TournamentPlayersService {
     const registration = await this.loadRegistration(tournamentId, registrationId);
     await this.assertTeamManager(registration.teamId, user.id);
 
-    const tournament = await this.prisma.v1Tournament.findFirst({
+    const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
       select: {
         maxPlayers: true,
@@ -379,7 +380,7 @@ export class TournamentPlayersService {
     const registration = await this.loadRegistration(tournamentId, registrationId);
     await this.assertTeamManager(registration.teamId, user.id);
 
-    const tournament = await this.prisma.v1Tournament.findFirst({
+    const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
       select: { rosterDeadlineAt: true, status: true },
     });
@@ -420,7 +421,7 @@ export class TournamentPlayersService {
     const registration = await this.loadRegistration(tournamentId, registrationId);
     await this.assertTeamManager(registration.teamId, user.id);
 
-    const tournament = await this.prisma.v1Tournament.findFirst({
+    const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
       select: { rosterDeadlineAt: true, status: true },
     });
@@ -840,7 +841,7 @@ export class TournamentPlayersService {
         message: '신청 내역을 찾을 수 없어요.',
       });
     }
-    const tournament = await tx.v1Tournament.findFirst({
+    const tournament = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
       select: {
         maxPlayers: true,

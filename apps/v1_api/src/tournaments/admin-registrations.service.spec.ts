@@ -71,7 +71,7 @@ describe('AdminRegistrationsService', () => {
   let notifications: { emitNotification: jest.Mock };
   let prisma: {
     v1AdminUser: { findUnique: jest.Mock };
-    v1Tournament: { findFirst: jest.Mock; findUnique: jest.Mock };
+    v1Tournament: { findFirst: jest.Mock };
     v1TournamentRegistration: { findUnique: jest.Mock; findMany: jest.Mock; update: jest.Mock; count: jest.Mock };
     v1TournamentPayment: { findUnique: jest.Mock; update: jest.Mock; updateMany: jest.Mock };
     v1TournamentPlayer: { count: jest.Mock; findMany: jest.Mock };
@@ -84,7 +84,7 @@ describe('AdminRegistrationsService', () => {
   beforeEach(async () => {
     prisma = {
       v1AdminUser: { findUnique: jest.fn() },
-      v1Tournament: { findFirst: jest.fn(), findUnique: jest.fn() },
+      v1Tournament: { findFirst: jest.fn() },
       v1TournamentRegistration: { findUnique: jest.fn(), findMany: jest.fn(), update: jest.fn(), count: jest.fn().mockResolvedValue(0) },
       v1TournamentPayment: { findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
       v1TournamentPlayer: {
@@ -100,7 +100,7 @@ describe('AdminRegistrationsService', () => {
     (prisma.$transaction as jest.Mock).mockImplementation((cb: (tx: typeof p) => Promise<unknown>) => cb(p));
 
     // 기본: 정원(teamCount=8) 충분, 현재 confirmed=0 → AREG-03 통과
-    prisma.v1Tournament.findUnique.mockResolvedValue({ id: 'tournament-1', teamCount: 8 });
+    prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1', teamCount: 8 });
 
     notifications = { emitNotification: jest.fn().mockResolvedValue(undefined) };
 
@@ -264,7 +264,7 @@ describe('AdminRegistrationsService', () => {
     prisma.v1TournamentRegistration.findUnique.mockResolvedValue(registrationRow({ status: 'payment_checking' }));
     // 정원 8, 이미 confirmed 8팀 → 초과
     prisma.v1TournamentRegistration.count.mockResolvedValue(8);
-    prisma.v1Tournament.findUnique.mockResolvedValue({ id: 'tournament-1', teamCount: 8 });
+    prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1', teamCount: 8 });
 
     await expect(service.confirm(opsAuth, 'reg-1', { decision: 'confirm' })).rejects.toMatchObject({
       response: { code: 'TOURNAMENT_CAPACITY_FULL' },
@@ -277,7 +277,7 @@ describe('AdminRegistrationsService', () => {
     prisma.v1TournamentRegistration.findUnique.mockResolvedValue(registrationRow({ status: 'paid' }));
     // 정원 초과 상태라도 waitlist는 통과
     prisma.v1TournamentRegistration.count.mockResolvedValue(8);
-    prisma.v1Tournament.findUnique.mockResolvedValue({ id: 'tournament-1', teamCount: 8 });
+    prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1', teamCount: 8 });
     prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'waitlisted', confirmedAt: new Date() }));
     prisma.v1TournamentPayment.findUnique.mockResolvedValue(paymentRow({ status: 'paid' }));
 
@@ -447,7 +447,7 @@ describe('AdminRegistrationsService', () => {
     prisma.v1TournamentRegistration.findUnique.mockResolvedValue(
       registrationRow({ status: 'confirmed' }),
     );
-    prisma.v1Tournament.findUnique.mockResolvedValue({
+    prisma.v1Tournament.findFirst.mockResolvedValue({
       genderCategory: 'mixed',
       genderMinMale: 2,
       genderMaxMale: 4,
@@ -480,7 +480,7 @@ describe('AdminRegistrationsService', () => {
     prisma.v1TournamentRegistration.findUnique.mockResolvedValue(
       registrationRow({ status: 'confirmed' }),
     );
-    prisma.v1Tournament.findUnique.mockResolvedValue({
+    prisma.v1Tournament.findFirst.mockResolvedValue({
       genderCategory: 'mixed',
       genderMinMale: 2,
       genderMaxMale: 4,

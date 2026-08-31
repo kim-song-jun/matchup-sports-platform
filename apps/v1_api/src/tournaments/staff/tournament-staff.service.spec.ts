@@ -39,7 +39,7 @@ function assignment(overrides: Record<string, unknown> = {}) {
 function setup() {
   const tx = {
     v1AdminUser: { findUnique: jest.fn() },
-    v1Tournament: { findUnique: jest.fn().mockResolvedValue({ id: IDS.tournament }) },
+    v1Tournament: { findFirst: jest.fn().mockResolvedValue({ id: IDS.tournament }) },
     v1User: {
       findUnique: jest.fn().mockResolvedValue({ id: IDS.target, accountStatus: 'active' }),
     },

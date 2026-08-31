@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { GenerateLeagueFixturesDto } from './dto/admin-league.dto';
 import { hasTournamentFixtureOfficialResult } from './tournament-fixture-official-result';
+import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
 
 /**
  * ## 교체(`replaceExisting`)는 진짜 삭제다 — 그리고 지울 수 있는 것만 지운다
@@ -420,7 +421,7 @@ export class LeagueFixtureGeneratorService {
   async generate(user: V1AuthUser, tournamentId: string, dto: GenerateLeagueFixturesDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
 
-    const tournament = await this.prisma.v1Tournament.findUnique({
+    const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId },
       select: { id: true, format: true, minMatchesPerTeam: true },
     });
@@ -486,7 +487,7 @@ export class LeagueFixtureGeneratorService {
         // 안 보였고, 경기 상세는 404, 라인업은 TOURNAMENT_FIXTURE_GAME_NOT_FOUND 였다.
         // 규칙 버전 조회를 트랜잭션 안에서 하는 이유는 createFixture 와 같다 — 이 트랜잭션이
         // 쓰는 모든 fixture·game 이 **하나의 같은 버전**에 고정돼야 하기 때문이다.
-        const pinnedTournament = await tx.v1Tournament.findUnique({
+        const pinnedTournament = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
           where: { id: tournamentId },
           select: { competitionConfigVersionId: true },
         });

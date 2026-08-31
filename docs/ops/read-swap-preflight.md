@@ -65,10 +65,28 @@ baseline 주석이 아니라 코드에 둔 이유는 **주석은 드리프트하
 | 2 | `tournament-standings-recalculation.ts` | **리그 순위가 에러 없이 갱신되지 않는다.** `if (!tournament) continue` 로 조용히 건너뛴다 |
 | 3 | `tournament-fixture-completion-notification.service.ts` | 결과 확정 알림 본문의 대회명이 `'대회'` 로 폴백된다(`tournament?.title ?? '대회'`). 기능은 살아 있고 **라벨만** 어긋난다 |
 
-| 4 | `tournament-registrations.service.ts` `loadPaymentInstructionSource` | **입금 안내(계좌·금액)가 응답에서 조용히 빠진다.** `serialize` 가 `tournament?.entryFee ?? 0 > 0 && tournament?.bankName?.trim()` 로 판정하므로 행이 없으면 블록 자체가 안 실린다 |
+| 4 | `tournament-registrations.service.ts` `loadPaymentInstructionSource` | **입금 안내(계좌·금액)가 응답에서 조용히 빠진다.** 조회가 null 을 그대로 넘기고 `serialize` 의 `paymentInstructions` 판정이 `tournament?.…` 로 옵셔널하게 읽어 블록 자체가 안 실린다(조건 전문은 아래) |
 
 1·2·4 는 **기능이 사라지는** 급이고 3 은 문구다. 1~3 은 코드에도 같은 경고를 달아 뒀다.
 
+> **조건 전문** — `serialize` 의 `paymentInstructions`. **여섯 조건이 전부 AND 다:**
+> ```ts
+> payment?.method === 'bank_transfer' &&
+> payment.status === 'ready' &&
+> (tournament?.entryFee ?? 0) > 0 &&
+> tournament?.bankName?.trim() &&
+> tournament.bankAccount?.trim() &&
+> tournament.bankHolder?.trim()
+>   ? { bankName, bankAccount, bankHolder } : null
+> ```
+> **앞의 두 조건이 1차 게이트다** — 계좌이체 신청이 `ready` 상태로 있어야 여기까지 온다.
+> 그래서 리그가 이 자리에 닿으려면 **① 대회 표면 도달 ② 신청 존재 ③ 계좌이체·ready** 세 겹을
+> 통과해야 한다. **아래 "지켜본다" 결론이 그만큼 더 강해진다.**
+>
+> ⚠️ 같은 파일의 `assertPaymentInstructions`(L89)와 **혼동하지 말 것** — 그쪽은
+> `TOURNAMENT_PAYMENT_INSTRUCTIONS_MISSING` 을 **던진다.** 이 항목은 던지지 않는 `serialize`
+> 쪽이다. 함수 이름이 비슷해 실제로 한 번 뒤바뀌어 읽혔다(2026-09-01).
+>
 > **4는 2026-09-01 에 §6 절차로 새로 찾았다** — 이 문서가 쓰인 뒤 후보가 **6건 → 9건**으로
 > 늘었고, 그중 이 자리만 새 판단 대상이었다. **다만 리그가 이 경로에 도달하는지는 별개다**:
 > 참가 신청은 대회 전용 개념이라, 통합 화면이 리그에 신청 UI 를 안 보이면 도달하지 않는다.
@@ -351,6 +369,23 @@ D14(`20260830000000_v1_preferred_position`) 이후 **공유 Prisma 클라이언�
 > (스캔이 주석을 안 거른다), 1건은 16줄 **밖**에서 `throw` 한다(긴 주석이 창을 밀어냈다).
 > 남은 1건이 §1 의 4번이다. **후보 수가 늘었다고 위험이 늘어난 게 아니다** — 오탐이 섞여
 > 있으니 §2 를 반드시 거친다.
+
+### ⚠️ 이 문서에 코드를 인용할 때는 **그 파일을 열어 대조한다**
+
+2026-09-01 에 §1-4 를 추가하면서 조건식을 기억으로 압축해 적었고, **세 군데가 틀렸다**:
+```
+적은 것   tournament?.entryFee ?? 0 > 0 && tournament?.bankName?.trim()
+실제      여섯 조건 AND (위 §1 참조)
+틀린 점   ① 1차 게이트 두 개(method·status)를 통째로 뺐다
+          ② bankAccount·bankHolder 를 뺐다
+          ③ 괄호를 빼서 `entryFee ?? (0 > 0)` = `entryFee ?? false` 가 됐다 — **다른 뜻이다**
+```
+③이 특히 나쁘다: **다음 사람이 그 줄을 그대로 복사해 확인하면 다른 조건을 검사하게 되고,**
+"문서가 적어 준 조건"이라 의심하지 않는다.
+
+**규칙**: 조건식·시그니처·상수를 이 문서에 옮길 때는 **파일을 열어 그대로 복사**한다.
+줄여야 하면 줄이되 **줄였다는 것을 밝힌다**(`…` 등). 같은 세션에서 숫자는 세어 봤는데
+조건식은 안 열어 본 것이 원인이었다 — **"재 본 것"과 "옮겨 적은 것"을 구분한다.**
 
 ```bash
 # ① 후보 좁히기 — 호출 뒤 16줄 안에 throw 가 없는 자리를 뽑는다.

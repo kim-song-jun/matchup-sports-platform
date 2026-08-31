@@ -242,3 +242,56 @@ EOF
 # ③ 게이트 세 숫자 확인
 cd apps/v1_api && node scripts/v1-surface-check.mjs
 ```
+
+---
+
+## 7. 경로 통합(C) 시 **과거 알림 링크는 살리지 않는다**
+
+### ✅ 결정됨 — **2026-08-31 사용자 확정. 되묻지 말 것.**
+
+> **경로 통합 시 과거 알림의 `deepLink` 는 살리지 않는다.** 옛 주소는 제거되고,
+> 이미 발송된 알림을 누르면 그 페이지로 갈 수 없다.
+
+사용자가 "사용자 영향" 을 보고 고른 것이다. 리다이렉트 표를 만들거나 옛 경로를
+유지하는 방향으로 **다시 설계하지 않는다.**
+
+**단, "살리지 않는다" ≠ "날것의 오류 화면을 보여라".** 옛 주소가 죽더라도
+*"더 이상 볼 수 없는 링크예요"* 류 안내 화면으로 착지시키는 것은 이 결정 **안에** 있다.
+착지 화면의 문구·모양은 착수 시 별도 확인 대상이다.
+
+### 고쳐야 하는 자리 — **3파일. `notifications.service.ts` 하나가 아니다**
+
+`deepLink` 를 만드는 파일은 13개고, 그중 **경로 리터럴을 직접 쓰는 것이 7개**다.
+그 7개 중 **리그 경로라서 통합의 영향을 받는 것은 3개**다:
+
+| 파일 | 경로 | 왜 별개 사본인가 |
+|---|---|---|
+| `notifications/notifications.service.ts:429` | `/league-matches/${targetId}` | 리그 6종 알림의 라우팅 분기 |
+| `notifications/notifications.service.ts:443` | `/team-matches/${targetId}/result` | 리그 결과 확정·이의 5종 |
+| `game-operations/team-match-completion-notification.service.ts` | `/team-matches/:id/result` | **위 443 과 같은 목적지를 독립으로 구성** — 파일 주석이 "단일 소스 동기화 대상" 이라고 스스로 적고 있다 |
+| `jobs/league-reminders/league-result-entry-reminder.service.ts:74` | `/admin/league-matches/${leagueId}` | **raw SQL `INSERT` 문자열 안**에 박혀 있다 — TS 리팩터·타입 검사·게이트 어느 것도 이걸 못 본다 |
+
+마지막 것이 함정이다. 나머지 4개(`chat`·`game-result-submitted-escalation` 의
+`/team-matches/…`, `lineup-todo`·`tournament-fixture-completion` 의 `/tournaments/…`)는
+**진짜 팀 매치**거나 **이미 통합 후 모양**이라 대상이 아니다 — 경로 문자열만 grep 해서
+7개를 다 고치면 멀쩡한 것을 건드린다.
+
+### 이게 아직 참인지 확인하는 법
+
+```bash
+# deepLink 를 만드는 파일 중 경로 리터럴을 직접 쓰는 것
+for f in $(grep -rln "deepLink" apps/v1_api/src --include='*.ts' | grep -v spec); do
+  p=$(grep -oE "['\`]/(league-matches|team-matches|tournaments|admin/league-matches)[^'\`]*" "$f" | sort -u | tr '\n' ' ')
+  [ -n "$p" ] && echo "$(basename $f) :: $p"
+done
+```
+`league-matches` 또는 `admin/league-matches` 가 붙은 줄이 **위 3파일 말고 더 나오면**
+표가 낡은 것이다. 반대로 raw SQL 쪽은 **`deepLink` 변수를 거치지 않는 사본**이 생기면 위 루프가 놓친다.
+그때는 아래로 본다 — **맨 `grep -n 'admin/league-matches'` 는 쓰지 말 것.**
+`@Controller('admin/league-matches')` 같은 **백엔드 라우트 데코레이터가 11건** 잡혀
+"경로 사본이 많다"로 읽히는데, 그건 API prefix 지 프론트 딥링크가 아니다:
+
+```bash
+grep -rn "\`/admin/league-matches/" apps/v1_api/src --include='*.ts' | grep -v spec
+```
+(선행 백틱 = 템플릿 리터럴 = 실제로 만들어지는 URL. 현재 1건, 위 표의 reminder.)

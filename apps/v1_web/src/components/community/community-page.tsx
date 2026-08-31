@@ -160,6 +160,8 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
             const showDate = shouldShowChatDate(message.sentAt, model.messages[index - 1]?.sentAt);
             const dateLabel = showDate ? formatChatDate(message.sentAt) : '';
             const timeLabel = formatChatTime(message.sentAt);
+            const nextTimeLabel = next ? formatChatTime(next.sentAt) : '';
+            const showTime = Boolean(timeLabel) && (isLastInGroup || nextTimeLabel !== timeLabel);
 
             return (
               <Fragment key={message.id}>
@@ -176,16 +178,16 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
                   <div className={`tm-chat-message-group ${isLastInGroup ? 'tm-chat-message-group-end' : 'tm-chat-message-group-mid'}`}>
                     {message.who === 'other' && isFirstInGroup ? <div className="tm-text-micro tm-chat-sender-label">{message.label}</div> : null}
                     <div className={`tm-chat-message-row tm-chat-message-row-${message.who} tm-chat-message-line tm-chat-message-line-${message.who}`}>
-                      {message.who === 'me' && (message.unreadCount || timeLabel) ? (
+                      {message.who === 'me' && (message.unreadCount || showTime) ? (
                         <div className="tm-chat-message-meta">
                           {message.unreadCount ? <span className="tm-chat-read-count">{message.unreadCount}</span> : null}
-                          {timeLabel ? <time dateTime={message.sentAt}>{timeLabel}</time> : null}
+                          {showTime ? <time dateTime={message.sentAt}>{timeLabel}</time> : null}
                         </div>
                       ) : null}
                       <div className={`tm-chat-bubble tm-chat-bubble-${message.who} ${isFirstInGroup ? 'tm-chat-bubble-head' : 'tm-chat-bubble-grouped'}`}>
                         <div className="tm-text-body">{message.body}</div>
                       </div>
-                      {message.who === 'other' && timeLabel ? <time className="tm-chat-message-time" dateTime={message.sentAt}>{timeLabel}</time> : null}
+                      {message.who === 'other' && showTime ? <time className="tm-chat-message-time" dateTime={message.sentAt}>{timeLabel}</time> : null}
                     </div>
                   </div>
                 )}

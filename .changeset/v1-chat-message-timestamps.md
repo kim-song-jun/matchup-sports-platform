@@ -2,4 +2,4 @@
 "v1_web": patch
 ---
 
-Show the time on every chat message, including consecutive messages from the same sender.
+Show chat times at each minute boundary, collapsing consecutive same-sender messages with the same displayed time to one timestamp on the bottom message.

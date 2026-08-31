@@ -195,10 +195,31 @@ D14(`20260830000000_v1_preferred_position`) 이후 **공유 Prisma 클라이언�
 새로 좁히는 자리가 생기면 그 호출이 **행이 없을 때 던지는지**를 본다.
 던지지 않고 `?? 기본값` · `continue` · `return null` 로 가면 **1절에 추가한다.**
 
-```bash
-# 헬퍼를 쓰는 파일들
-grep -rl findTournamentOnSurface apps/v1_api/src --include='*.ts'
+**판정은 자동이 아니다.** 아래는 **후보를 좁혀 주는 것**이고, 각 후보가 실제로 위험한지는
+직접 읽어 판단한다(1절 세 자리도 이 스캔으로 6건을 뽑아 **3건만** 남긴 것이다).
 
-# 게이트 세 숫자 확인
+```bash
+# ① 후보 좁히기 — 호출 뒤 16줄 안에 throw 가 없는 자리를 뽑는다.
+#    16줄은 임의값이라 놓칠 수 있다(멀리 있는 throw 를 못 보고 후보로 올리거나 그 반대).
+#    그래서 결과는 "후보"이지 판정이 아니다.
+cd apps/v1_api && python3 - <<'EOF'
+import pathlib, subprocess
+files = [f for f in subprocess.run(
+    ['grep','-rl','findTournamentOnSurface','src','--include=*.ts'],
+    capture_output=True, text=True).stdout.split()
+    if not f.endswith('.spec.ts') and 'tournament-surface-lookup' not in f]
+for f in files:
+    lines = pathlib.Path(f).read_text().split('\n')
+    for i, l in enumerate(lines):
+        if 'findTournamentOnSurface(' in l and 'OrThrow' not in l:
+            if 'throw new' not in '\n'.join(lines[i:i+16]):
+                print(f'{f}:{i+1}')
+EOF
+
+# ② 후보마다 직접 읽는다 — 행이 없을 때 무엇을 하는가?
+#      throw          → 안전(시끄럽게 실패한다)
+#      ?? 기본값 · continue · return null → **1절에 추가**
+
+# ③ 게이트 세 숫자 확인
 cd apps/v1_api && node scripts/v1-surface-check.mjs
 ```

@@ -1,6 +1,7 @@
 import { Test, type TestingModule } from '@nestjs/testing';
 import { LoggerModule } from 'nestjs-pino';
 import { PrismaModule } from '../prisma/prisma.module';
+import { TermsModule } from '../terms/terms.module';
 import { UploadsService } from '../uploads/uploads.service';
 import { LeagueFixtureVideosController } from './league-fixture-videos.controller';
 import { LeagueFixtureVideosService } from './league-fixture-videos.service';
@@ -22,7 +23,10 @@ describe('LeagueMatchModule wiring', () => {
     moduleRef = await Test.createTestingModule({
       // LoggerModule: GamesModule 이 PinoLogger 를 앱 레벨 LoggerModule 에서 받는다 —
       // task-7-module-wiring.spec.ts 와 같은 최소 배선.
-      imports: [PrismaModule, LoggerModule.forRoot(), LeagueMatchModule],
+      // TermsModule: RealtimeGateway 가 ManagedTermsRuntimeService 를 요구한다(TermsModule 은
+      // @Global 이지만 이 부분 모듈 트리엔 다른 경로로 들어오지 않는다) — task-7-module-wiring.spec.ts
+      // 와 같은 이유.
+      imports: [PrismaModule, LoggerModule.forRoot(), TermsModule, LeagueMatchModule],
     }).compile();
   });
 

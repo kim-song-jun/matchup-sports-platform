@@ -77,7 +77,9 @@ function sessionCookie(userId = USER.id, issuedAtMs?: number): string {
 
 describe('Task 8 realtime authenticated pre-connect handshake', () => {
   let gateway: RealtimeGateway;
-  const managedTerms = { signupCompliance: jest.fn(async () => ({ compliant: true })) };
+  const managedTerms = {
+    signupCompliance: jest.fn<Promise<{ compliant: boolean }>, [string]>(async () => ({ compliant: true })),
+  };
   const prisma = {
     v1User: { findFirst: jest.fn() },
     v1Game: { findUnique: jest.fn() },
@@ -169,7 +171,7 @@ describe('Task 8 realtime authenticated pre-connect handshake', () => {
     // 재동의 강제가 REST 에만 걸리고 실시간 경로로 그대로 우회된다.
     process.env.NODE_ENV = 'test';
     delete process.env.V1_SESSION_SECRET;
-    managedTerms.signupCompliance.mockResolvedValueOnce({ compliant: false } as never);
+    managedTerms.signupCompliance.mockResolvedValueOnce({ compliant: false });
     const client = socket({}, { 'x-v1-user-id': USER.id });
 
     await handleConnection(client);

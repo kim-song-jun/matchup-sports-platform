@@ -192,6 +192,20 @@ describe('리그 dual-write (real DB)', () => {
     expect(mirror?.status).toBe('in_progress');
   });
 
+  // ⚠️ **이 케이스는 앞 케이스가 남긴 상태에 기댈 수 있다.**
+  //
+  // 이 파일에는 `beforeEach` 가 없다(`beforeAll` 뿐이라 케이스 사이에 DB 를 지우지 않는다).
+  // 2026-08-31 변이 확인(create dual-write 를 트랜잭션 밖으로) 때 이 케이스가 red 가 됐는데,
+  // **스스로 상황을 만들어 검출한 것이 아니라 위 롤백 케이스가 남긴 고아 거울을 본 것**이다.
+  //
+  // ```
+  // 이 red 가 증명하는 것    "그 변이의 피해가 여기까지 번진다"
+  // 증명하지 않는 것         이 케이스가 **단독으로** 무엇을 잡는가
+  // ```
+  //
+  // **이 red 를 독립 증거로 읽지 말 것.** 진짜 계약은 바로 위 롤백 케이스이고 이건 보조
+  // 지표다. 단독으로 무엇을 잡는지 알려면 **불변식 단언만 겨냥한 변이**를 따로 한 번 돌려
+  // 이 케이스만 red 인지 봐야 한다.
   it('거울 수는 리그 수와 같다 — 백필 불변식이 실제 DB 에서도 성립한다', async () => {
     const leagues = await prisma.v1League.count();
     const mirrors = await prisma.v1Tournament.count({ where: { kind: 'regular_league' } });

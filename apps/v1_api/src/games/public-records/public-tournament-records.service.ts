@@ -4,6 +4,7 @@ import type { GameScore } from '../games.types';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { V1AuthUser } from '../../auth/v1-auth-user';
 import { isBracketPublished, shouldHideParticipantIdentity } from '../../tournaments/tournament-detail.presenter';
+import { TOURNAMENT_SURFACE_KIND } from '../../tournaments/tournament-surface';
 // 골 이벤트 백필이 복원한 골의 "모르는 값" 판정 -- 대진표 쪽
 // (`deriveTournamentFixtureOfficialGoals`)과 공개 기록 쪽이 같은 규칙을 써야 같은 골이
 // 화면마다 다르게(0분 vs 표시 없음 / 전반 vs 기타) 보이지 않는다.
@@ -242,8 +243,12 @@ export class PublicTournamentRecordsService {
    * 참가자 스탯 행 자체가 없어 자연히 집계되지 않는다.
    */
   async getPlayerRecords(tournamentId: string) {
-    const tournament = await this.prisma.v1Tournament.findUnique({
-      where: { id: tournamentId },
+    const tournament = await this.prisma.v1Tournament.findFirst({
+      // **리그 id 로 이 경로를 열 수 없어야 한다.** 통합 백필(R3)이 정규 리그 시즌을
+      // `v1_tournaments` 에 만들면서, 예전에는 없던 id 가 이 조회를 통과하기 시작했다 —
+      // alpha 실측에서 `/tournaments/:리그id/schedule` 이 **리그 제목을 실은 200** 을 줬다.
+      // `findUnique` 는 복합 where 를 못 받으므로 `findFirst` 로 바꿔 대회 표면 조건을 건다.
+      where: { ...TOURNAMENT_SURFACE_KIND, id: tournamentId },
       select: { id: true, bracketPublishedAt: true, bracketPublishScheduledAt: true },
     });
     if (tournament === null) {
@@ -361,8 +366,12 @@ export class PublicTournamentRecordsService {
   async getPlayerRecordsForAdmin(tournamentId: string) {
     // 없는 대회 id에 빈 200을 주면 클라이언트 오배선이 "데이터 없음"으로 위장된다
     // (리뷰 지적) — 공개 라우트와 달리 어드민 표면이라 명시적 코드를 쓴다.
-    const tournament = await this.prisma.v1Tournament.findUnique({
-      where: { id: tournamentId },
+    const tournament = await this.prisma.v1Tournament.findFirst({
+      // **리그 id 로 이 경로를 열 수 없어야 한다.** 통합 백필(R3)이 정규 리그 시즌을
+      // `v1_tournaments` 에 만들면서, 예전에는 없던 id 가 이 조회를 통과하기 시작했다 —
+      // alpha 실측에서 `/tournaments/:리그id/schedule` 이 **리그 제목을 실은 200** 을 줬다.
+      // `findUnique` 는 복합 where 를 못 받으므로 `findFirst` 로 바꿔 대회 표면 조건을 건다.
+      where: { ...TOURNAMENT_SURFACE_KIND, id: tournamentId },
       select: { id: true },
     });
     if (tournament === null) {
@@ -461,8 +470,12 @@ export class PublicTournamentRecordsService {
   }
 
   async getSchedule(tournamentId: string, query: PublicTournamentScheduleQueryDto, user?: V1AuthUser) {
-    const tournament = await this.prisma.v1Tournament.findUnique({
-      where: { id: tournamentId },
+    const tournament = await this.prisma.v1Tournament.findFirst({
+      // **리그 id 로 이 경로를 열 수 없어야 한다.** 통합 백필(R3)이 정규 리그 시즌을
+      // `v1_tournaments` 에 만들면서, 예전에는 없던 id 가 이 조회를 통과하기 시작했다 —
+      // alpha 실측에서 `/tournaments/:리그id/schedule` 이 **리그 제목을 실은 200** 을 줬다.
+      // `findUnique` 는 복합 where 를 못 받으므로 `findFirst` 로 바꿔 대회 표면 조건을 건다.
+      where: { ...TOURNAMENT_SURFACE_KIND, id: tournamentId },
       select: { id: true, title: true, status: true, bracketPublishedAt: true, bracketPublishScheduledAt: true },
     });
     if (tournament === null) {
@@ -693,8 +706,12 @@ export class PublicTournamentRecordsService {
   }
 
   async getMatch(tournamentId: string, fixtureId: string, user: V1AuthUser | undefined) {
-    const tournament = await this.prisma.v1Tournament.findUnique({
-      where: { id: tournamentId },
+    const tournament = await this.prisma.v1Tournament.findFirst({
+      // **리그 id 로 이 경로를 열 수 없어야 한다.** 통합 백필(R3)이 정규 리그 시즌을
+      // `v1_tournaments` 에 만들면서, 예전에는 없던 id 가 이 조회를 통과하기 시작했다 —
+      // alpha 실측에서 `/tournaments/:리그id/schedule` 이 **리그 제목을 실은 200** 을 줬다.
+      // `findUnique` 는 복합 where 를 못 받으므로 `findFirst` 로 바꿔 대회 표면 조건을 건다.
+      where: { ...TOURNAMENT_SURFACE_KIND, id: tournamentId },
       select: { id: true, title: true, status: true, bracketPublishedAt: true, bracketPublishScheduledAt: true },
     });
     if (

@@ -4,6 +4,7 @@ import { TournamentsReadService } from '../../src/tournaments/tournaments-read.s
 import { TournamentsAdminService } from '../../src/tournaments/tournaments-admin.service';
 import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 import { AdminContextService } from '../../src/common/admin-context.service';
+import { PublicTournamentRecordsService } from '../../src/games/public-records/public-tournament-records.service';
 
 /**
  * **"대회 조회는 대회만 본다" — 누출 회귀 테스트.**
@@ -44,6 +45,7 @@ describe('대회 표면은 정규 리그 시즌을 보여주지 않는다 (real 
   let read: TournamentsReadService;
   let admin: TournamentsAdminService;
   let adminSvc: AdminService;
+  let records: PublicTournamentRecordsService;
 
   beforeAll(async () => {
     if (!process.env.DATABASE_URL) {
@@ -100,6 +102,7 @@ describe('대회 표면은 정규 리그 시즌을 보여주지 않는다 (real 
       undefined as never,
     );
     adminSvc = new AdminService(prisma);
+    records = new PublicTournamentRecordsService(prisma, new TournamentStaffAccessService(prisma));
   });
 
   // 심은 행을 지우지 않는다 — `isolated-integration-environment` 가 **파일마다 DB 를
@@ -108,6 +111,28 @@ describe('대회 표면은 정규 리그 시즌을 보여주지 않는다 (real 
   // 진짜 실패 원인을 가린다.
   afterAll(async () => {
     await prisma.$disconnect();
+  });
+
+  // **id 로 찍는 단건 조회도 막아야 한다.** #856 은 목록·집계 6곳만 걸었고 `findUnique({where:{id}})`
+  // 계열은 "어드민 가드 뒤라 안전"으로 넘겼는데, 그 판단이 틀렸다 — 가드는 **권한**을 막지
+  // **잘못된 id** 를 막지 않는다. 백필(R3)로 리그 id 가 `v1_tournaments` 에 실재하게 되자
+  // alpha 에서 `/tournaments/:리그id/schedule` 이 **리그 제목을 실은 200** 을 줬다(실측).
+  it.each([
+    ['getSchedule', (id: string) => records.getSchedule(id, {} as never, undefined)],
+    ['getPlayerRecords', (id: string) => records.getPlayerRecords(id)],
+    ['getPlayerRecordsForAdmin', (id: string) => records.getPlayerRecordsForAdmin(id)],
+    ['getMatch', (id: string) => records.getMatch(id, ids.legacyNullKind, undefined)],
+  ])('공개 대회 기록 %s — 리그 id 로는 열리지 않는다', async (_name, call) => {
+    // 코드를 하드코딩하지 않는다 — 이 서비스는 경로마다 다른 코드를 쓴다
+    // (`TOURNAMENT_MATCH_NOT_FOUND` / `TOURNAMENT_NOT_FOUND`). 중요한 것은 **404 로 막히는 것**이고,
+    // 어떤 코드인지가 아니다. 코드를 추측해 박았다가 이 테스트가 3건 red 였다.
+    await expect(call(ids.league)).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('같은 경로가 대회 id 와 kind=null 구행에는 여전히 열린다', async () => {
+    // 막는 것만 확인하면 **전부 404 로 만들어도 통과**한다. 통과해야 할 것이 통과하는지도 본다.
+    await expect(records.getSchedule(ids.tournament, {} as never, undefined)).resolves.toBeDefined();
+    await expect(records.getSchedule(ids.legacyNullKind, {} as never, undefined)).resolves.toBeDefined();
   });
 
   it('공개 대회 목록 — 리그는 빠지고, kind 가 없는 R1 이전 행은 남는다', async () => {

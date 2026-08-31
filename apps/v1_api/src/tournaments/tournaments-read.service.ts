@@ -9,7 +9,7 @@ import { presentTournamentDetail } from './tournament-detail.presenter';
 import { TournamentListQueryDto } from './dto/tournament-read.dto';
 import { leagueProgressOf, magicNumberOf } from './league-progress';
 import { TOURNAMENT_SURFACE_KIND } from './tournament-surface';
-import { findTournamentOnSurface, ALL_COMPETITION_KINDS, TOURNAMENT_KINDS } from './tournament-surface-lookup';
+import { findTournamentOnSurface, ALL_COMPETITION_KINDS } from './tournament-surface-lookup';
 import { hasTournamentFixtureOfficialResult } from './tournament-fixture-official-result';
 import {
   PUBLIC_TOURNAMENT_STATUS_FILTER,
@@ -133,7 +133,12 @@ export class TournamentsReadService {
    *   기록에 스태프 우회를 넣은 것과 동일한 선례.
    */
   async get(tournamentId: string, user?: V1AuthUser) {
-    const row = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
+    // **문을 여는 자리.** 이 한 줄이 정규 리그 시즌을 `/tournaments/:id` 에 도달하게 한다.
+    // 이 PR 의 **마지막 커밋**인 이유: 앞선 커밋들이 상세 응답에 리그 대진을 싣고(②),
+    // 대진표 공개 게이트를 리그에서 빼고(③), 화면이 그것을 그리게(④⑤⑥) 만든 뒤에야
+    // 열어야 한다. 순서를 뒤집으면 사용자는 404 대신 **빈 껍데기**를 본다 — 사용자가 계속
+    // 말하는 "덜 된 것 같다" 가 정확히 그 인상이고, 그러면 우리가 그걸 직접 만드는 것이다.
+    const row = await findTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, {
       where: {
         // 목록만 막으면 **id 를 아는 사람은 그대로 열 수 있다** — 대회 id 는 대진·순위
         // 응답에 실려 나가므로 상세·순위에도 같은 조건을 건다(종류 조건은 헬퍼가 건다).
@@ -316,10 +321,10 @@ export class TournamentsReadService {
    * - `registrationId` — 리그엔 참가 등록 개념이 없어 **생략하고 `teamId` 를 싣는다.** teamId 를
    *   `registrationId` 라는 이름에 담으면 값은 전달되지만 **이름이 내용과 갈린 상태**가 남고,
    *   나중에 그 값으로 등록을 조회하는 코드가 생기는 순간 터진다.
-   *   **프론트는 아직 이 모양을 못 읽는다** — `league-standings-table.tsx` 는 `key={row.registrationId}`
-   *   를 쓰고 타입도 `registrationId: string`(필수)이다. 그 확장은 프론트 PR 의 몫이고, 그때까지
-   *   거울 행은 `/tournaments/:id` 에 **도달하지 못한다**(문이 아직 `TOURNAMENT_KINDS` 로 닫혀 있다).
-   *   순서를 뒤집으면 사용자는 404 대신 키가 겹친 빈 표를 본다.
+   *   프론트는 `#896` 에서 두 축을 다 읽도록 넓혔다 — `V1LeagueOverallStandingRow` 가
+   *   유니온이 되어 `registrationId`(대회) / `teamId`(리그) 중 **하나는 반드시** 있고,
+   *   행 key 는 `registrationId ?? teamId` 다. 그 확장이 이 문(상세 조회 게이트)보다 먼저
+   *   들어갔다 — 순서가 반대였으면 사용자가 키 겹친 빈 표를 봤다.
    * - `fairPlayPoints` — 리그는 **집계 자체를 하지 않는다.** `0` 은 "감점이 없다" 로 읽히므로
    *   값이 아니라 **부재**로 둔다(optional).
    *

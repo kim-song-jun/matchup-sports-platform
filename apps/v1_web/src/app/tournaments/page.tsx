@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { ClipboardEdit, Wallet, ListChecks, Grid2x2, GitFork, Trophy, Sparkles } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
+import { CompetitionKindSegment } from '@/components/v1-ui/competition-kind-segment';
 import { EmptyState, ErrorState, SectionTitle } from '@/components/v1-ui/primitives';
 import { TournamentPromoCarousel } from '@/components/tournaments/tournament-promo-carousel';
 import { useV1AllTournaments, useV1Tournaments, useV1MasterSports } from '@/hooks/use-v1-api';
@@ -17,6 +18,7 @@ import type { V1TournamentListItem } from '@/types/api';
 export default function TournamentsPage() {
   return (
     <AppChrome title="대회" activeTab="tournaments" showNotifications>
+      <CompetitionKindSegment active="tournament" />
       <TournamentsListContent />
     </AppChrome>
   );
@@ -154,7 +156,7 @@ export function TournamentsListContent() {
             justifyContent: 'space-between',
             background: 'var(--blue50)',
             border: '1px solid var(--blue100)',
-            borderRadius: 14,
+            borderRadius: 'var(--radius-field)',
             padding: '12px 16px',
             textDecoration: 'none',
           }}

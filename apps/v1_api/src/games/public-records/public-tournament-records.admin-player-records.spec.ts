@@ -22,7 +22,7 @@ function buildPrisma(options: {
 }) {
   const consentFindMany = jest.fn().mockResolvedValue([]);
   const prisma = {
-    v1Tournament: { findUnique: jest.fn().mockResolvedValue(options.tournamentExists === false ? null : { id: 'tour-1' }) },
+    v1Tournament: { findFirst: jest.fn().mockResolvedValue(options.tournamentExists === false ? null : { id: 'tour-1' }) },
     v1Game: { findMany: jest.fn().mockResolvedValue(options.games ?? []) },
     v1GameResultParticipant: { findMany: jest.fn().mockResolvedValue(options.participantRows ?? []) },
     v1GameParticipant: { findMany: jest.fn().mockResolvedValue(options.participants ?? []) },

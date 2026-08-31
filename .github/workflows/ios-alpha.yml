@@ -1,0 +1,149 @@
+name: iOS Alpha
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [dev]
+    paths:
+      - apps/v1_ios/**
+      - scripts/ios/**
+      - scripts/release/require-ios-production-ref.sh
+      - .github/workflows/ios-alpha.yml
+  push:
+    branches: [dev]
+    paths:
+      - apps/v1_ios/**
+      - scripts/ios/**
+      - scripts/release/require-ios-production-ref.sh
+      - .github/workflows/ios-alpha.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-alpha-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # What a green run here proves: both flavors compile, and the offline policy suite passes.
+  #
+  # What it does NOT prove, and cannot:
+  #  - that push works. These builds are unsigned, so they carry no `aps-environment`
+  #    entitlement and `registerForRemoteNotifications` fails with NSCocoaErrorDomain 3000
+  #    before any of the registration code runs. Push is exercised by
+  #    scripts/ios/verify-push-slice.sh against a booted simulator and the deployed web app.
+  #  - anything about a physical device or Apple's actual APNs gateway.
+  test-and-build:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      # Config/Version.generated.xcconfig is derived from apps/v1_ios/version.properties and
+      # is gitignored, so a clean checkout does not have it — and Shared.xcconfig includes it
+      # unconditionally. Without this step every build here fails with
+      # "could not find included file 'Version.generated.xcconfig'".
+      - name: Generate the version xcconfig
+        run: bash scripts/release/generate-ios-version-xcconfig.sh
+
+      # Teameet.xcodeproj is generated and gitignored — project.yml is the definition. This
+      # step is also what catches a project.yml that names a file nobody committed.
+      - name: Generate the Xcode project
+        working-directory: apps/v1_ios
+        run: xcodegen generate
+
+      # Runner images change their simulator line-up without notice, so the device is
+      # resolved rather than named. Pinning a name is the usual reason an iOS workflow starts
+      # failing on a week nobody touched it.
+      # Runner images change their simulator line-up without notice, so the device is
+      # resolved rather than named. Pinning a name is the usual reason an iOS workflow starts
+      # failing on a week nobody touched it.
+      - name: Resolve a simulator
+        id: simulator
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          udid="$(xcrun simctl list devices available -j | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; print(next(x['udid'] for r in sorted(d, reverse=True) if 'iOS' in r for x in d[r] if x.get('isAvailable') and 'iPhone' in x['name']))")"
+          echo "udid=${udid}" >> "${GITHUB_OUTPUT}"
+          xcrun simctl list devices | grep -F "${udid}"
+
+      # The scheme builds the app target for the test action, so a compile error anywhere in
+      # the WebView or push code fails here even though the test bundle links none of it.
+      - name: Test alpha and compile the app
+        working-directory: apps/v1_ios
+        run: |
+          xcodebuild test \
+            -project Teameet.xcodeproj -scheme TeameetAlpha \
+            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.udid }}" \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Test production and compile the app
+        working-directory: apps/v1_ios
+        run: |
+          xcodebuild test \
+            -project Teameet.xcodeproj -scheme TeameetProduction \
+            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.udid }}" \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Build the production release configuration
+        working-directory: apps/v1_ios
+        run: |
+          xcodebuild build \
+            -project Teameet.xcodeproj -scheme TeameetProduction -configuration 'Production Release' \
+            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.udid }}" \
+            CODE_SIGNING_ALLOWED=NO
+
+      # The live harness must be inert here, and inert in a way that is visible. A bundle
+      # that silently ran nothing would report the same green as one that passed, which is
+      # exactly the reading error this step exists to prevent: every test must be *skipped*,
+      # and at least one must be.
+      - name: Verify the live UI harness skips without credentials
+        working-directory: apps/v1_ios
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          set +e
+          xcodebuild test \
+            -project Teameet.xcodeproj -scheme TeameetAlphaUITests \
+            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.udid }}" \
+            CODE_SIGNING_ALLOWED=NO > ui-harness.log 2>&1
+          status=$?
+          set -e
+          if (( status != 0 )); then
+            echo "::error::The UI harness did not finish cleanly without credentials"
+            tail -40 ui-harness.log
+            exit 1
+          fi
+          skipped="$(grep -c "Test skipped" ui-harness.log || true)"
+          executed="$(grep -c "' passed (" ui-harness.log || true)"
+          echo "skipped=${skipped} executed=${executed}"
+          if (( skipped == 0 )); then
+            echo "::error::No UI test reported itself skipped — the gate is not working"
+            grep -E "Test Case|Executed [0-9]+ tests" ui-harness.log | tail -20
+            exit 1
+          fi
+          if (( executed != 0 )); then
+            echo "::error::A UI test ran against the deployed web app in CI"
+            grep -E "' passed \(" ui-harness.log | tail -20
+            exit 1
+          fi
+          echo "::notice::iOS UI harness skipped ${skipped} tests: no TEAMEET_UITEST_* credentials in CI. It drives the deployed web app and is run deliberately via scripts/ios/verify-push-slice.sh."
+
+      # A guard is only a guard if it also refuses. Checking one direction would pass just as
+      # happily on a script that returns 0 for everything.
+      - name: Verify the production ref guard fails closed
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          GITHUB_REF_NAME=main bash scripts/release/require-ios-production-ref.sh
+          if GITHUB_REF_NAME=dev bash scripts/release/require-ios-production-ref.sh; then
+            echo "::error::Production ref guard accepted dev"
+            exit 1
+          fi
+          if GITHUB_REF_NAME= bash scripts/release/require-ios-production-ref.sh; then
+            echo "::error::Production ref guard accepted an unset ref"
+            exit 1
+          fi

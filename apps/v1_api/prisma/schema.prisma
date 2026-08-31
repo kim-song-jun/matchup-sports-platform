@@ -356,6 +356,17 @@ enum V1UploadKind {
 enum V1GameSourceType {
   TEAM_MATCH
   TOURNAMENT_FIXTURE
+  /// R1 expand — 통합 후의 이름. **구 값을 개명하지 않고 값만 추가한다.**
+  /// sourceType 이 바뀌는 순간 그 경기에 걸린 운영 규칙이 통째로 달라지기 때문이다
+  /// (예: requireTakeover 는 TEAM_MATCH 를 곧바로 통과시키지만 대회 소스에는 takeover
+  /// 토큰을 요구한다) — 개명은 진행 중인 경기의 조작을 한 번에 막을 수 있다.
+  /// 지금은 이 두 값을 쓰는 코드가 없다. 승격은 R3 에서 종료된 경기부터, LIVE 0건
+  /// 가드를 두고 하고, 구 값 제거는 R5 다.
+  ///
+  /// 주의: Postgres 는 ALTER TYPE … ADD VALUE 로 추가한 값을 **같은 트랜잭션 안에서
+  /// 쓸 수 없다**. R3 백필은 값 추가와 반드시 다른 마이그레이션 파일이어야 한다.
+  COMPETITION_FIXTURE
+  FRIENDLY_MATCH
 }
 
 enum V1GameState {
@@ -597,6 +608,7 @@ model V1User {
   notifications                  V1Notification[]
   notificationPreference         V1NotificationPreference?
   pushSubscriptions              V1PushSubscription[]
+  pushDevices                    V1PushDevice[]
   webPushFailureLogs             V1WebPushFailureLog[]         @relation("V1WebPushFailureLogUser")
   acknowledgedPushFailureLogs    V1WebPushFailureLog[]         @relation("V1WebPushFailureLogAcknowledgedBy")
   searchHistories                V1SearchHistory[]
@@ -1074,6 +1086,22 @@ model V1UserSportPreference {
   sportId      String   @map("sport_id")
   sportLevelId String?  @map("sport_level_id")
   isPrimary    Boolean  @default(false) @map("is_primary")
+  /// 이 종목에서 **주로 서는 자리**. 값은 그 종목 대회 설정의 `lineup.positions[].code`
+  /// 다(축구 `GK`/`DF`/`MF`/`FW`, 풋살 `GOLEIRO`/`FIXO`/`ALA`/`PIVO`) — 종목마다 코드가
+  /// 다르므로 하드코딩하지 않고 **프리셋을 단일 출처**로 쓴다.
+  ///
+  /// 사람 축에 두는 이유: 사용자가 **한 번 정하면 모든 대회·리그에 자동 적용**되는 값이다
+  /// (D14). 대회 참가 명단(`V1TournamentPlayer`)에 두면 대회마다 다시 입력이 된다.
+  ///
+  /// nullable = 미설정. 강제하지 않는다 — 안 고르면 선수 카드 포지션이 '미상'이고
+  /// 능력치 가중치는 균등이다. 그것이 정상 상태이지 결함이 아니다.
+  preferredPosition          String?  @map("preferred_position")
+  /// 부(副) 포지션. **주가 없으면 부만 있을 수 없고**(무의미하다), **주와 같을 수 없다**
+  /// (같으면 정보가 0이다) — 서비스 계층에서 검증한다.
+  ///
+  /// **선수 카드 계산에는 쓰지 않는다.** 가중치는 주 포지션 기준이다 — 둘을 섞으면
+  /// 가중치의 의미가 흐려진다. 이 값의 용도는 표시다("주 ALA / 부 PIVO").
+  secondaryPreferredPosition String?  @map("secondary_preferred_position")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
@@ -1272,6 +1300,7 @@ model V1Team {
   leagueEntries                V1LeagueTeam[]              @relation("V1LeagueTeamTeam")
   leaguePromotions             V1LeaguePromotion[]         @relation("V1LeaguePromotionTeam")
   lineupPresets                V1TeamLineupPreset[]
+  tacticsBoards                V1TeamTacticsBoard[]        @relation("V1TeamTacticsBoardTeam")
   contactRequestsSent          V1TeamContact[]             @relation("V1TeamContactFromTeam")
   contactRequestsReceived      V1TeamContact[]             @relation("V1TeamContactToTeam")
   contactBlocksMade            V1TeamContactBlock[]        @relation("V1TeamContactBlockOwner")
@@ -1399,6 +1428,83 @@ model V1TeamLineupPresetEntry {
 
   @@index([presetId, sortOrder], map: "v1_team_lineup_preset_entries_preset_id_sort_order_idx")
   @@map("v1_team_lineup_preset_entries")
+}
+
+// ── 전술보드 (R1 expand — 테이블만 만들고 읽는 코드는 Phase 1) ─────────────────
+// "누가 뛰는가"(명단 → V1GameParticipant)와 "어떻게 배치하는가"를 서로 다른 축으로
+// 떼어 놓기 위한 저장소다. 지금은 선발/후보·포지션·좌표가 V1GameParticipant 의 컬럼이라
+// 라인업을 저장할 때마다 참가자 행이 바뀌고(중복 누적 사고의 뿌리), 전술이 공식 결과
+// 스냅샷에 섞여 상대팀에 노출된다. 그 세 값의 책임이 Phase 1 에서 이리로 넘어온다.
+//
+// 이 테이블은 **새로 만드는 것이 아니라** 바로 위 V1TeamLineupPreset 층을 확장한 것이다:
+// 프리셋 = 경기와 무관한 팀 템플릿, 보드 = 그 팀의 이 경기 배치. 그래서 사람을 가리키는
+// 방식(userId nullable + displayName 스냅샷)과 골키퍼를 종목 코드가 아니라 의미로 두는
+// 규칙을 프리셋 쪽에서 그대로 가져왔다 — 두 층 사이에서 값을 옮길 때 변환이 필요 없다.
+//
+// 축을 (game, side) 로 잡은 이유: 대회 픽스처·친선 팀매치·리그 대진이 위 계층에서는
+// 갈라져 있지만 그 아래 V1Game 은 셋이 공유하는 한 엔진이고, 대체 대상인 V1GameLineup
+// 자체가 (gameId, sideId) 로 열리기 때문이다. fixtureId 로 잡으면 통합 전에는 가리키는
+// 테이블이 둘이 된다.
+model V1TeamTacticsBoard {
+  id     String @id @default(uuid())
+  gameId String @map("game_id")
+  /// 한 경기의 한 사이드에 보드는 하나뿐이다. 개정 이력을 쌓지 않는 것이 V1GameLineup 과
+  /// 다른 점이자 이 설계의 요점이다 — 보드는 몇 번을 고쳐도 기록에 영향이 없으므로
+  /// 리비전으로 과거를 붙잡아 둘 이유가 없다.
+  sideId String @unique @map("side_id")
+  /// 보드를 소유한 팀. 가시성이 "그 팀 멤버만"이라 판정 주체가 반드시 필요하다.
+  /// V1GameSide.teamId 는 게스트 상대를 위해 nullable 이지만, 팀 없는 사이드에는
+  /// 보드를 열 주체 자체가 없으므로 여기서는 NOT NULL 이다.
+  teamId String @map("team_id")
+  /// 포메이션 프리셋 라벨(예: "4-4-2"). null이면 자유 배치. 실제 좌표는 entries 에 있다.
+  formation       String?
+  /// 낙관적 잠금용. 팀 운영진 여럿이 같은 보드를 동시에 고칠 수 있고, 그 충돌은
+  /// 기록이 아니라 화면의 문제라 V1GameLineup 과 같은 방식으로 처리한다.
+  version         Int      @default(0)
+  /// 마지막으로 저장한 사람. V1TeamLineupPreset.createdByUserId 와 같은 이유로 FK 를 걸지
+  /// 않는다 — 사용자 탈퇴가 팀의 전술보드를 막아서는 안 된다.
+  updatedByUserId String?  @map("updated_by_user_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  game    V1Game                    @relation("V1TeamTacticsBoardGame", fields: [gameId], references: [id], onDelete: Cascade, map: "v1_team_tactics_boards_game_fk")
+  side    V1GameSide                @relation("V1TeamTacticsBoardSide", fields: [sideId], references: [id], onDelete: Cascade, map: "v1_team_tactics_boards_side_fk")
+  team    V1Team                    @relation("V1TeamTacticsBoardTeam", fields: [teamId], references: [id], onDelete: Restrict, map: "v1_team_tactics_boards_team_fk")
+  entries V1TeamTacticsBoardEntry[]
+
+  @@index([gameId], map: "v1_team_tactics_boards_game_id_idx")
+  @@index([teamId, updatedAt], map: "v1_team_tactics_boards_team_id_updated_at_idx")
+  @@map("v1_team_tactics_boards")
+}
+
+model V1TeamTacticsBoardEntry {
+  id      String @id @default(uuid())
+  boardId String @map("board_id")
+  /// 연동 팀원이면 userId. V1TeamLineupPresetEntry 와 같은 이유로 FK 를 걸지 않고,
+  /// 같은 이유로 nullable 이다(게스트에게는 displayName 이 유일한 신원).
+  /// Phase 1 에서 참가자 행(V1GameParticipant)과 맞물릴 때 대조 키가 되는 값이다 —
+  /// participantId 를 들지 않는 이유는 참가자 행이 지금도 라인업 저장마다 다시
+  /// 만들어져(그것이 Phase 1 이 고치는 결함이다) 보드가 조용히 끊기기 때문이다.
+  userId       String?  @map("user_id")
+  displayName  String   @map("display_name")
+  jerseyNumber Int?     @map("jersey_number")
+  /// 포지션 코드(DF/MF/FW 등). 골키퍼는 이 컬럼이 아니라 goalkeeper 플래그로 표시한다.
+  position     String?
+  /// 피치 배치 좌표, 0~100 퍼센트. 선발에만 있고 둘 다 있거나 둘 다 없다.
+  positionX    Float?   @map("position_x")
+  positionY    Float?   @map("position_y")
+  started      Boolean  @default(true)
+  /// 프리셋과 같게 **의미**로 저장한다 — 종목마다 코드가 다르고(축구 'GK', 풋살
+  /// 'GOLEIRO') 보드는 종목이 다른 화면으로도 불려갈 수 있다.
+  goalkeeper   Boolean  @default(false)
+  sortOrder    Int      @map("sort_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  board V1TeamTacticsBoard @relation(fields: [boardId], references: [id], onDelete: Cascade, map: "v1_team_tactics_board_entries_board_fk")
+
+  @@index([boardId, sortOrder], map: "v1_team_tactics_board_entries_board_id_sort_idx")
+  @@map("v1_team_tactics_board_entries")
 }
 
 model V1TeamJoinApplication {
@@ -1832,6 +1938,9 @@ model V1LeagueSeries {
   region         V1Region    @relation("V1LeagueSeriesRegion", fields: [regionId], references: [id], onDelete: Restrict, map: "v1_league_series_region_fk")
   createdByAdmin V1AdminUser @relation("V1LeagueSeriesAdmin", fields: [createdByAdminUserId], references: [id], onDelete: Restrict, map: "v1_league_series_admin_fk")
   leagues        V1League[]  @relation("V1LeagueSeriesLeague")
+  // R1 expand: 통합 후 시즌은 V1Tournament(kind=regular_league) 행이 된다. 아직 이 배열에
+  // 담기는 행은 없고(백필은 R3), 시리즈 테이블 자체의 컬럼은 바뀌지 않는다 — 역참조뿐이다.
+  tournaments    V1Tournament[] @relation("V1TournamentSeries")
 
   @@index([sportId, regionId, state])
   @@map("v1_league_series")
@@ -2035,6 +2144,40 @@ model V1PushSubscription {
 
   @@index([userId])
   @@map("v1_push_subscriptions")
+}
+
+enum V1PushPlatform {
+  android
+  ios
+}
+
+enum V1PushEnvironment {
+  alpha
+  production
+}
+
+model V1PushDevice {
+  id             String            @id @default(uuid())
+  userId         String            @map("user_id")
+  installationId String            @map("installation_id")
+  platform       V1PushPlatform
+  environment    V1PushEnvironment
+  token          String            @unique
+  appVersion     String?           @map("app_version")
+  deviceModel    String?           @map("device_model")
+  lastSeenAt     DateTime          @default(now()) @map("last_seen_at")
+  revokedAt      DateTime?         @map("revoked_at")
+  failureCount   Int               @default(0) @map("failure_count")
+  lastSuccessAt  DateTime?         @map("last_success_at")
+  lastFailureAt  DateTime?         @map("last_failure_at")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+
+  user V1User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([environment, installationId])
+  @@index([userId, environment, revokedAt])
+  @@map("v1_push_devices")
 }
 
 model V1WebPushFailureLog {
@@ -2295,6 +2438,27 @@ enum V1TournamentFormat {
   group_knockout
 }
 
+// ── 대회·리그 통합 (R1 expand) ────────────────────────────────────────────────
+// 정규 리그를 "대회의 한 종류"로 흡수하기 위한 축. 이 단계에서는 컬럼만 만들고
+// 읽는 코드가 없다 — 테이블 rename(v1_tournaments → v1_competitions)은 R5 이후이며
+// 여기서 하지 않는다. 되돌리기는 컬럼 드롭 하나로 끝나야 하기 때문이다.
+
+/// 이 대회가 단발 대회인가, 시리즈에 묶인 정규 리그 시즌인가.
+/// 기존 v1_tournaments 행은 전부 단발 대회이므로 default 가 곧 사실이다.
+enum V1CompetitionKind {
+  regular_tournament
+  regular_league
+}
+
+/// 참가팀이 이 대회에 들어온 경로(D7·D9). applied=팀이 직접 신청,
+/// promoted=직전 시즌 승강 결과로 자동 승계, seeded=운영자가 지정.
+/// 어드민 참가팀 조정 화면이 이 값을 그대로 구분 표시로 쓴다.
+enum V1CompetitionEntrySource {
+  applied
+  promoted
+  seeded
+}
+
 enum V1TournamentGenderCategory {
   mixed
   male
@@ -2455,8 +2619,20 @@ model V1Tournament {
   competitionConfigVersionId String?                     @map("competition_config_version_id")
   /** 리그전에서 각 팀이 최소 몇 경기를 보장받는지. null이면 검증하지 않는다. */
   minMatchesPerTeam          Int?                        @map("min_matches_per_team")
+  // ── 통합 축 (R1 expand, 아직 읽는 코드 없음) ───────────────────────────────
+  /// 단발 대회 / 정규 리그 시즌 구분. nullable + default 라서 기존 행은 전부
+  /// regular_tournament 로 채워지고(사실과 일치한다), NOT NULL 승격은 read-swap 이
+  /// 안정된 뒤 R5 로 미룬다 — expand 단계의 되돌리기를 컬럼 드롭 하나로 유지하기 위해서다.
+  kind                       V1CompetitionKind?          @default(regular_tournament)
+  /// 아래 셋은 정규 리그 시즌에만 채워지고 항상 함께 채워지거나 함께 null 이다 —
+  /// V1League 의 같은 세 컬럼이 이관돼 올 자리이며, 그쪽 주석의 근거(단발 대회에
+  /// "1부" 뱃지가 잘못 붙지 않게 tier 에 기본값 1 을 주지 않는다)를 그대로 승계한다.
+  seriesId                   String?                     @map("series_id")
+  tier                       Int?
+  seasonNo                   Int?                        @map("season_no")
 
   sport                V1Sport                              @relation(fields: [sportId], references: [id], onDelete: Restrict)
+  series               V1LeagueSeries?                      @relation("V1TournamentSeries", fields: [seriesId], references: [id], onDelete: SetNull, map: "v1_tournaments_series_fk")
   competitionConfig    V1CompetitionConfigVersion?          @relation("V1TournamentCompetitionConfig", fields: [competitionConfigVersionId], references: [id], onDelete: Restrict, map: "v1_tournaments_competition_config_fk")
   createdByAdmin       V1AdminUser?                         @relation("V1TournamentCreatedByAdmin", fields: [createdByAdminUserId], references: [id], onDelete: SetNull)
   registrations        V1TournamentRegistration[]
@@ -2478,6 +2654,11 @@ model V1Tournament {
   @@index([status, scheduledAt])
   @@index([sportId, status])
   @@index([competitionConfigVersionId], map: "v1_tournaments_competition_config_idx")
+  // 한 시리즈의 (시즌, 티어) 조합은 하나뿐이다 — V1League 의
+  // v1_leagues_series_season_tier_key 와 같은 불변식을 통합 쪽에도 미리 건다.
+  // 세 컬럼 다 이 마이그레이션에서 새로 생긴 nullable 컬럼이라 기존 대회 행은 전부
+  // NULL 이고, Postgres 는 NULL 끼리 충돌로 보지 않으므로 기존 행끼리는 걸리지 않는다.
+  @@unique([seriesId, seasonNo, tier], map: "v1_tournaments_series_season_tier_key")
   @@map("v1_tournaments")
 }
 
@@ -2579,6 +2760,15 @@ model V1TournamentRegistration {
   cancelReason             String?                         @map("cancel_reason")
   createdAt                DateTime                        @default(now()) @map("created_at")
   updatedAt                DateTime                        @updatedAt @map("updated_at")
+  // ── 통합 축 (R1 expand, 아직 읽는 코드 없음) ─────────────────────────────────
+  /// 이 팀이 대회에 들어온 경로(D7). 기존 행은 전부 팀이 직접 신청해 만들어진
+  /// 것이므로(v1_tournament_registrations 를 만드는 경로는 신청 서비스와 목업 시더
+  /// 둘뿐이다) default 가 곧 사실이다. NOT NULL 승격은 R5 로 미룬다.
+  entrySource              V1CompetitionEntrySource?       @default(applied) @map("entry_source")
+  /// D9 — 정원 초과 시 운영자가 승인·거부·티어 이동을 직접 판단하고 그 사유를 남긴다.
+  /// 필수 여부는 서비스 계층에서 강제한다(몰수·정정이 이미 쓰는 방식과 같다) —
+  /// 컬럼을 NOT NULL 로 걸면 사유가 필요 없는 기존/자동 등록 행까지 막힌다.
+  adjustmentNote           String?                         @map("adjustment_note")
 
   tournament       V1Tournament            @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   team             V1Team                  @relation(fields: [teamId], references: [id], onDelete: Restrict)
@@ -2975,6 +3165,8 @@ model V1Game {
   sides                      V1GameSide[]
   periods                    V1GamePeriod[]
   lineups                    V1GameLineup[]
+  // R1 expand: 역참조 배열 한 줄. v1_games 의 컬럼·제약·인덱스는 바뀌지 않는다.
+  tacticsBoards              V1TeamTacticsBoard[]        @relation("V1TeamTacticsBoardGame")
   participants               V1GameParticipant[]
   events                     V1GameEvent[]
   resultRevisions            V1GameResultRevision[]      @relation("V1GameResultRevisions")
@@ -2997,6 +3189,8 @@ model V1GameSide {
   createdAt           DateTime      @default(now()) @map("created_at")
   updatedAt           DateTime      @updatedAt @map("updated_at")
   game                V1Game        @relation(fields: [gameId], references: [id], onDelete: Cascade, map: "v1_game_sides_game_fk")
+  // R1 expand: 역참조 한 줄. v1_game_sides 의 컬럼·제약·인덱스는 바뀌지 않는다.
+  tacticsBoard        V1TeamTacticsBoard? @relation("V1TeamTacticsBoardSide")
 
   @@unique([gameId, sideKey], map: "v1_game_sides_game_id_side_key_key")
   @@index([teamId], map: "v1_game_sides_team_id_idx")

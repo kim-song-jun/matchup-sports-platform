@@ -2,7 +2,7 @@
 
 import type { GameLineup, GameLineupParticipant, GameSide } from '@/types/game-operations';
 import { jerseyText } from './player-label';
-import { latestOperableLineup } from './lineup-grid';
+import { latestLineupForDisplay } from './lineup-grid';
 
 /**
  * 명단 검인(체크인) — 킥오프 전 "누가 실제로 왔는지"를 스태프가 확정하는 자리.
@@ -44,7 +44,9 @@ export function ArrivalCheckinPanel({
 }: ArrivalCheckinPanelProps) {
   const sections = sides.map((side) => ({
     side,
-    participants: latestOperableLineup(lineups, side.id)?.participants ?? [],
+    // 폴백을 써야 한다 -- 제출본만 보면 미제출 상태로 시작한 경기에서 **검인할 대상이
+    // 통째로 비고**, 그러면 P1-b 가 지킨 `arrivedAt` 을 애초에 만들 수가 없다.
+    participants: latestLineupForDisplay(lineups, side.id)?.participants ?? [],
   }));
   const total = sections.reduce((sum, section) => sum + section.participants.length, 0);
   const arrived = sections.reduce(

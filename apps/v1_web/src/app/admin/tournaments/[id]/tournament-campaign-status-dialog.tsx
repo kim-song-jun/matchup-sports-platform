@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { X } from 'lucide-react';
 import type { V1TournamentCampaignStatus } from '@/types/tournament-campaign';
+import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 
 type StatusDialogProps = {
   readonly target: V1TournamentCampaignStatus | null;
@@ -20,22 +21,18 @@ export function TournamentCampaignStatusDialog({
   onSubmit,
 }: StatusDialogProps) {
   const [reason, setReason] = useState('');
-  const reasonRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (!target) return;
     setReason('');
-    reasonRef.current?.focus();
   }, [target]);
 
-  useEffect(() => {
-    if (!target) return;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !pending) onClose();
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, pending, target]);
+  // ESC 닫기·focus trap·스크롤 잠금·포커스 저장/복원을 공용 훅에 위임
+  const { dialogRef, initialFocusRef, onBackdropClick } = useModalA11y<HTMLTextAreaElement, HTMLDivElement>({
+    open: !!target,
+    onClose,
+    pending,
+  });
 
   if (!target) return null;
   const trimmedReason = reason.trim();
@@ -49,11 +46,9 @@ export function TournamentCampaignStatusDialog({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 p-4 backdrop-blur-[2px]"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !pending) onClose();
-      }}
+      onMouseDown={onBackdropClick}
     >
-      <div role="dialog" aria-modal="true" aria-labelledby="campaign-status-dialog-title" className="w-full max-w-[440px] overflow-hidden rounded-2xl bg-[var(--card-surface)] shadow-[var(--shadow-modal)]">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="campaign-status-dialog-title" className="w-full max-w-[440px] overflow-hidden rounded-2xl bg-[var(--card-surface)] shadow-[var(--shadow-modal)]">
         <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
           <div>
             <h2 id="campaign-status-dialog-title" className="text-base font-bold text-[var(--text-strong)]">캠페인 상태 변경</h2>
@@ -68,8 +63,7 @@ export function TournamentCampaignStatusDialog({
             <label htmlFor="campaign-status-reason" className="text-[13px] font-semibold text-[var(--text-body)]">사유 <span className="text-[var(--red700)]" aria-hidden="true">*</span></label>
             <textarea
               id="campaign-status-reason"
-              ref={reasonRef}
-              autoFocus
+              ref={initialFocusRef}
               rows={4}
               maxLength={500}
               value={reason}

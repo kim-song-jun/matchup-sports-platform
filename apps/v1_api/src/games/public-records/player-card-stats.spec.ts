@@ -118,7 +118,6 @@ async function loadCard(state: Partial<FakeState>, consented: boolean) {
     appearances: records.appearances,
     goals: records.goals,
     assists: records.assists,
-    startedCount: records.startedCount,
     position: records.position,
     jerseyNumber: records.jerseyNumber,
     skillScore: null,
@@ -313,7 +312,6 @@ describe('loadPlayerCardRecordStats -- 언제 "동의를 켜면 열려요" 라�
       expect(records.appearances).toBe(2);
       expect(records.goals).toBe(3);
       expect(records.assists).toBe(1);
-      expect(records.startedCount).toBe(1);
       expect(records.position).toBe('FW');
       expect(records.jerseyNumber).toBe(9);
     });
@@ -356,7 +354,6 @@ describe('loadPlayerCardRecordStats -- 언제 "동의를 켜면 열려요" 라�
 
       expect(records.appearances).toBe(1);
       expect(records.goals).toBe(3);
-      expect(records.startedCount).toBe(1);
     });
 
     it('신원 연결이 아예 없으면 결과를 조회하지도 않는다', async () => {

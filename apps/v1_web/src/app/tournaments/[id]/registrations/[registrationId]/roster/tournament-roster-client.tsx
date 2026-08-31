@@ -655,7 +655,7 @@ function AddPlayerForm({
                       flexShrink: 0,
                       width: 22,
                       height: 22,
-                      borderRadius: '50%',
+                      borderRadius: 'var(--radius-circle)',
                       border: selected ? '2px solid var(--blue500)' : '1px solid var(--grey200)',
                       background: selected ? 'var(--blue500)' : 'var(--bg)',
                       display: 'grid',
@@ -668,7 +668,7 @@ function AddPlayerForm({
                         style={{
                           width: 8,
                           height: 8,
-                          borderRadius: '50%',
+                          borderRadius: 'var(--radius-circle)',
                           background: 'var(--static-white)',
                           display: 'block',
                         }}
@@ -823,7 +823,7 @@ function PlayerRow({
             flexShrink: 0,
             width: 36,
             height: 36,
-            borderRadius: 12,
+            borderRadius: 'var(--radius-control)',
             color: 'var(--text-strong)',
             display: 'grid',
             placeItems: 'center',
@@ -908,7 +908,7 @@ function PlayerRow({
                         flexShrink: 0,
                         width: 20,
                         height: 20,
-                        borderRadius: '50%',
+                        borderRadius: 'var(--radius-circle)',
                         border: selected ? '2px solid var(--blue500)' : '1px solid var(--grey200)',
                         background: selected ? 'var(--blue500)' : 'var(--bg)',
                         display: 'grid',
@@ -920,7 +920,7 @@ function PlayerRow({
                           style={{
                             width: 7,
                             height: 7,
-                            borderRadius: '50%',
+                            borderRadius: 'var(--radius-circle)',
                             background: 'var(--static-white)',
                             display: 'block',
                           }}
@@ -1045,7 +1045,7 @@ export function TournamentRosterPageClient({
             <div
               key={i}
               aria-hidden="true"
-              style={{ height: 56, borderRadius: 12, background: 'var(--grey100)', marginBottom: 8 }}
+              style={{ height: 56, borderRadius: 'var(--radius-control)', background: 'var(--grey100)', marginBottom: 8 }}
             />
           ))}
         </div>
@@ -1254,7 +1254,7 @@ export function TournamentRosterPageClient({
               className="tm-text-label"
               style={{
                 padding: '12px 16px',
-                borderRadius: 12,
+                borderRadius: 'var(--radius-control)',
                 background: 'var(--orange50)',
                 color: 'var(--orange700)',
                 lineHeight: 1.55,

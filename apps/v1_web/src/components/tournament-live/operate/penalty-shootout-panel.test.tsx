@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { PenaltyShootoutPanel } from './penalty-shootout-panel';
@@ -71,8 +71,10 @@ describe('PenaltyShootoutPanel — 키보드 접근성', () => {
     const { onSelectFirstKicker } = renderPanel();
 
     const panel = screen.getByRole('dialog', { name: '승부차기' });
-    // 열린 직후 포커스는 다이얼로그 안(닫기 버튼)에 있다.
-    expect(panel).toContainElement(document.activeElement as HTMLElement);
+    // 포커스는 다이얼로그 안(닫기 버튼)으로 간다. 공용 훅은 이 이동을 60ms 미룬다 —
+    // 마운트 트랜지션 뒤로 보내, 그 사이 사용자가 패널 안 다른 필드를 먼저 클릭해
+    // 타이핑을 시작했으면 되채가지 않기 위해서다. 그래서 기다렸다 확인한다.
+    await waitFor(() => expect(panel).toContainElement(document.activeElement as HTMLElement));
 
     // 트랩이 라디오를 못 보면 여기서 포커스가 닫기 버튼에 갇혀 라디오에 영원히 못 간다.
     await user.tab();

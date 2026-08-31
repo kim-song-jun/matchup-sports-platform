@@ -24,7 +24,6 @@ export interface PlayerCardRecordStats {
   readonly appearances: number;
   readonly goals: number;
   readonly assists: number;
-  readonly startedCount: number;
   readonly position: PlayerCardPosition;
   /**
    * 등번호. 라인업 스냅샷에서 **가장 자주 단 번호**를 쓴다.
@@ -57,7 +56,6 @@ const EMPTY: PlayerCardRecordStats = {
   appearances: 0,
   goals: 0,
   assists: 0,
-  startedCount: 0,
   position: null,
   jerseyNumber: null,
   hasUnlockableRecords: false,
@@ -187,12 +185,10 @@ export async function loadPlayerCardRecordStats(
 
   let goals = 0;
   let assists = 0;
-  let startedCount = 0;
   let goalkeeperGames = 0;
   for (const game of byGame.values()) {
     goals += game.goals;
     assists += game.assists;
-    if (game.started) startedCount += 1;
     if (game.goalkeeper) goalkeeperGames += 1;
   }
 
@@ -242,7 +238,6 @@ export async function loadPlayerCardRecordStats(
     appearances: byGame.size,
     goals,
     assists,
-    startedCount,
     position,
     jerseyNumber,
     hasUnlockableRecords: true,

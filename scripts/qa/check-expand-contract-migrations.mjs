@@ -1043,13 +1043,22 @@ function splitTopLevel(text) {
 // Returns [{ column }] for every `ADD COLUMN <name> ...` clause in an ALTER
 // TABLE statement that does NOT carry `NOT NULL` (i.e. genuinely nullable,
 // matching the same safety bar the existing ADD COLUMN additive rule uses).
+//
+// `splitTopLevel` keeps the separator's trailing whitespace, so every clause
+// after the first arrives as " ADD COLUMN …" — and this match is anchored.
+// Without the trim only the FIRST column of a multi-column ALTER TABLE was
+// ever registered, which silently withdrew the unique-index and FK exemptions
+// from columns 2..n even though they are just as newly-added-and-nullable as
+// the first. Prisma emits exactly that shape (one ALTER TABLE, one ADD COLUMN
+// clause per new column), so the gap fired on ordinary generated migrations.
+// The sibling parsers (uniqueIndexColumns, foreignKeyColumns) already trim.
 function addedNullableColumns(statement) {
   if (!/^ALTER TABLE\b/i.test(statement)) return [];
   const afterTable = statement.replace(/^ALTER TABLE\s+(?:"[^"]+"\.)?(?:"[^"]+"|[a-zA-Z_][\w$]*)\s*/i, '');
   const clauses = splitTopLevel(afterTable);
   const columns = [];
   for (const clause of clauses) {
-    const match = clause.match(/^ADD COLUMN\s+(?:IF NOT EXISTS\s+)?("[^"]+"|[a-zA-Z_][\w$]*)([\s\S]*)$/i);
+    const match = clause.trim().match(/^ADD COLUMN\s+(?:IF NOT EXISTS\s+)?("[^"]+"|[a-zA-Z_][\w$]*)([\s\S]*)$/i);
     if (!match) continue;
     const [, rawColumn, rest] = match;
     if (/\bNOT NULL\b/i.test(rest)) continue;
@@ -1314,6 +1323,32 @@ function selfTest() {
     !fkAfterNotNullFailures.some((message) => message.includes('User_planId_fkey'))
   ) {
     fail('FK-after-SET-NOT-NULL must be rejected once nullability is revoked');
+  }
+
+  // A multi-column ALTER TABLE must register EVERY nullable column it adds,
+  // not just the first — Prisma generates one ALTER TABLE with several ADD
+  // COLUMN clauses, and the clause parser is anchored, so columns 2..n used to
+  // be dropped. Both directions are asserted: the second added column earns the
+  // unique-index exemption, and a NOT NULL DEFAULT column in the same statement
+  // does not (it is not nullable, so a legacy row could collide on it).
+  const multiColumnAccepted = [
+    { file: 'multi.sql', statement: 'ALTER TABLE "User" ADD COLUMN "firstNew" TEXT, ADD COLUMN "secondNew" TEXT' },
+    { file: 'multi.sql', statement: 'CREATE UNIQUE INDEX "User_secondNew_key" ON "User"("secondNew")' },
+  ];
+  const multiColumnAcceptedFailures = [];
+  runAdditivityCheck(multiColumnAccepted, baseFunctionNames, (message) => multiColumnAcceptedFailures.push(message));
+  if (multiColumnAcceptedFailures.length > 0) {
+    fail(`non-first column of a multi-column ADD COLUMN lost its nullable-new status: ${multiColumnAcceptedFailures.join(' | ')}`);
+  }
+
+  const multiColumnRejected = [
+    { file: 'multi.sql', statement: 'ALTER TABLE "User" ADD COLUMN "nullableNew" TEXT, ADD COLUMN "requiredNew" TEXT NOT NULL DEFAULT \'x\'' },
+    { file: 'multi.sql', statement: 'CREATE UNIQUE INDEX "User_requiredNew_key" ON "User"("requiredNew")' },
+  ];
+  const multiColumnRejectedFailures = [];
+  runAdditivityCheck(multiColumnRejected, baseFunctionNames, (message) => multiColumnRejectedFailures.push(message));
+  if (!multiColumnRejectedFailures.some((message) => message.includes('User_requiredNew_key'))) {
+    fail('a NOT NULL column added alongside a nullable one must not earn the unique-index exemption');
   }
 
   // A unique index on an existing table without the `id` column, and with no

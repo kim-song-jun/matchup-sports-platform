@@ -28,7 +28,7 @@ const card = (overrides: Partial<V1PlayerCard> = {}): V1PlayerCard => ({
   stats: [
     stat('SHO', '골', 68),
     stat('PAS', '도움', 74),
-    stat('APP', '출전', 81),
+    stat('APP', '엔트리', 81),
     stat('SKI', '실력', null, { type: 'reviews', remaining: 3 }),
     stat('MAN', '매너', null, { type: 'reviews', remaining: 3 }),
     stat('PUN', '시간약속', null, { type: 'reviews', remaining: 3 }),
@@ -119,7 +119,7 @@ describe('선수 카드', () => {
     // 앞면에 자물쇠 그리드가 없다 -- "잠긴 것 목록"이 첫 카드가 되면 안 된다.
     expect(container.querySelector('.tm-player-card-stats')).toBeNull();
     expect(screen.getByText('첫 경기를 기다리는 선수')).toBeInTheDocument();
-    expect(screen.getByText(/다음 목표 · 첫 경기 뛰기/)).toBeInTheDocument();
+    expect(screen.getByText(/다음 목표 · 첫 경기 명단 오르기/)).toBeInTheDocument();
     expect(container.querySelector('.tm-player-card')?.getAttribute('data-face')).toBe('journey');
   });
 
@@ -181,9 +181,42 @@ describe('선수 카드', () => {
     expect(screen.queryByRole('link', { name: '카드 설정' })).not.toBeInTheDocument();
   });
 
-  it('아직 한 경기도 안 뛴 사람에게 "더 뛰면" 이라고 말하지 않는다', () => {
-    // alpha 실측(2026-08-24)에서 잡았다. 0경기 사용자가 "1경기 더 뛰면 열려요" 를
-    // 받고 있었는데, 더 뛸 앞선 경기가 없는 사람에게는 틀린 말이다.
+  // 지표 라벨은 받침이 있을 수도(골·실력) 없을 수도(엔트리·도움) 있다. 조사를 고정하면
+  // 한쪽이 반드시 틀린다 -- "출전"일 때 맞던 "이에요"가 "엔트리"에선 틀렸다(alpha 실측).
+  it.each([
+    ['엔트리', '엔트리예요'],
+    ['실력', '실력이에요'],
+  ])('가장 높은 항목이 %s 이면 조사를 받침에 맞춰 붙인다', (label, expected) => {
+    renderCard(
+      card({
+        appearances: 6,
+        stats: [
+          stat('APP', label === '엔트리' ? '엔트리' : '엔트리', 81),
+          stat('SHO', '골', 40),
+          stat('PAS', '도움', 40),
+          stat('SKI', '실력', label === '실력' ? 99 : 30),
+          stat('MAN', '매너', 30),
+          stat('PUN', '시간약속', 30),
+        ],
+      }),
+      false,
+    );
+    // 라벨이 <b> 로 감싸져 있어 **텍스트가 요소 경계로 쪼개진다** — getByText 로는 못 잡는다.
+    // 사용자가 실제로 읽는 것은 이어 붙인 문장이므로 textContent 로 본다. 다만 body 전체가
+    // 아니라 **그 문장이 사는 요약 영역**으로 좁힌다 — 넓게 잡으면 카드 밖 텍스트가 바뀔 때
+    // 이 테스트가 엉뚱한 이유로 깨지거나, 반대로 다른 곳의 우연한 일치를 통과로 읽는다.
+    const summary = document.querySelector('.tm-pcard-back-sum');
+    expect(summary?.textContent).toContain(expected);
+  });
+
+  it('0경기 사용자에게 "더" 라고 하지 않고, 잠금 조건을 "뛰기"가 아니라 "명단"으로 말한다', () => {
+    // 두 가지를 한꺼번에 못박는다.
+    //
+    // ① "더" — alpha 실측(2026-08-24)에서 잡았다. 0경기 사용자가 "1경기 더 …" 를
+    //    받고 있었는데, 앞선 경기가 없는 사람에게는 틀린 말이다.
+    // ② "뛰기" — 이 잠금은 **명단에 오른 경기 수**로 풀린다(D3 이후 명단에 오르면 곧
+    //    참가자다). "뛰면 열려요" 라고 하면 벤치에 있던 사람은 이미 열렸는데도 안 열릴
+    //    줄 알고, 뛰었지만 명단에서 빠진 사람은 안 열린 이유를 못 찾는다.
     renderCard(
       card({
         appearances: 0,
@@ -192,7 +225,7 @@ describe('선수 카드', () => {
         stats: [
           stat('SHO', '골', null, { type: 'appearances', remaining: 3 }),
           stat('PAS', '도움', null, { type: 'appearances', remaining: 3 }),
-          stat('APP', '출전', null, { type: 'appearances', remaining: 1 }),
+          stat('APP', '엔트리', null, { type: 'appearances', remaining: 1 }),
           stat('SKI', '실력', null, { type: 'reviews', remaining: 3 }),
           stat('MAN', '매너', null, { type: 'reviews', remaining: 3 }),
           stat('PUN', '시간약속', null, { type: 'reviews', remaining: 3 }),
@@ -202,8 +235,11 @@ describe('선수 카드', () => {
       true,
     );
 
-    expect(screen.getByText('첫 경기를 뛰면 기록이 쌓이기 시작해요')).toBeInTheDocument();
-    expect(screen.queryByText(/더 뛰면/)).not.toBeInTheDocument();
+    expect(screen.getByText('첫 경기 명단에 오르면 기록이 쌓이기 시작해요')).toBeInTheDocument();
+    // **잠금 문구만** 본다. 카드에는 무관한 "많이 뛸수록 올라가요"(티어 툴팁) 같은
+    // 표현이 따로 있어서, 화면 전체에서 /뛰/ 를 금지하면 그것까지 잡는다.
+    expect(screen.queryByText(/경기 더/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/뛰면 열려요|경기 더 뛰기|뛰면 기록이/)).not.toBeInTheDocument();
   });
 
   it('티어와 형태를 data 속성으로 내보내 CSS 가 형태·재질을 그리게 한다', () => {
@@ -237,7 +273,7 @@ describe('선수 카드', () => {
       stats: [
         stat('SHO', '골', null, { type: 'consent' }),
         stat('PAS', '도움', null, { type: 'consent' }),
-        stat('APP', '출전', null, { type: 'consent' }),
+        stat('APP', '엔트리', null, { type: 'consent' }),
         stat('SKI', '실력', 84),
         stat('MAN', '매너', 90),
         stat('PUN', '시간약속', 88),
@@ -249,7 +285,7 @@ describe('선수 카드', () => {
     it('본인이 보면 공개 설정으로 데려간다 -- 이게 이 기능의 목적이다', () => {
       renderCard(needsConsent, true);
 
-      expect(screen.getByText('기록 공개를 켜면 골·도움·출전이 한 번에 열려요')).toBeInTheDocument();
+      expect(screen.getByText('기록 공개를 켜면 골·도움·엔트리가 한 번에 열려요')).toBeInTheDocument();
       expect(screen.getByRole('link', { name: '기록 공개하고 3개 열기' })).toHaveAttribute(
         'href',
         '/my/settings/record-consent',
@@ -260,7 +296,7 @@ describe('선수 카드', () => {
       renderCard(needsConsent, false);
 
       expect(screen.queryByRole('link', { name: '기록 공개하고 3개 열기' })).not.toBeInTheDocument();
-      expect(screen.queryByText('기록 공개를 켜면 골·도움·출전이 한 번에 열려요')).not.toBeInTheDocument();
+      expect(screen.queryByText('기록 공개를 켜면 골·도움·엔트리가 한 번에 열려요')).not.toBeInTheDocument();
       // 왜 잠겼는지는 뒷면이 남에게도 말한다 -- 카드가 왜 비었는지 오해하지 않게.
       expect(screen.getByText(/골 · 기록 공개를 켜면 열려요/)).toBeInTheDocument();
     });

@@ -216,7 +216,7 @@ function SeasonSummaryCard({
         // 화면 전체를 막지 않는다 — 아래 순위표 섹션이 이 같은 요청의 재시도 버튼을 갖고 있다.
         <p className="text-sm text-[var(--text-muted)]">시즌 요약을 불러오지 못했어요.</p>
       ) : standingsLoading ? (
-        <div className="tm-skeleton" style={{ height: 44, borderRadius: 8 }} />
+        <div className="tm-skeleton" style={{ height: 44, borderRadius: 'var(--radius-chip)' }} />
       ) : (
         <div className="space-y-1 text-sm">
           {champions.length > 0 && (
@@ -573,8 +573,8 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
     return (
       <div className="mx-auto max-w-4xl space-y-4 px-4 py-6">
         <div className="tm-skeleton" style={{ height: 32, borderRadius: 10 }} />
-        <div className="tm-skeleton" style={{ height: 180, borderRadius: 16 }} />
-        <div className="tm-skeleton" style={{ height: 160, borderRadius: 12 }} />
+        <div className="tm-skeleton" style={{ height: 180, borderRadius: 'var(--radius-container)' }} />
+        <div className="tm-skeleton" style={{ height: 160, borderRadius: 'var(--radius-control)' }} />
       </div>
     );
   }
@@ -685,7 +685,7 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
             onRetry={() => void standingsQuery.refetch()}
           />
         ) : standings === undefined ? (
-          <div className="tm-skeleton" style={{ height: 160, borderRadius: 12 }} />
+          <div className="tm-skeleton" style={{ height: 160, borderRadius: 'var(--radius-control)' }} />
         ) : standings.standings.length === 0 ? (
           <EmptyState title="아직 확정된 결과가 없어요" sub="리그 경기 결과가 확정되면 순위표가 나타나요." />
         ) : preparingNoGames ? (
@@ -922,7 +922,7 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
             onRetry={() => void recordsQuery.refetch()}
           />
         ) : records === undefined ? (
-          <div className="tm-skeleton" style={{ height: 80, borderRadius: 12 }} />
+          <div className="tm-skeleton" style={{ height: 80, borderRadius: 'var(--radius-control)' }} />
         ) : records.goals.length === 0 ? (
           <EmptyState
             title="아직 기록이 없어요"
@@ -948,7 +948,7 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
             onRetry={() => void recordsQuery.refetch()}
           />
         ) : records === undefined ? (
-          <div className="tm-skeleton" style={{ height: 80, borderRadius: 12 }} />
+          <div className="tm-skeleton" style={{ height: 80, borderRadius: 'var(--radius-control)' }} />
         ) : records.assists.length === 0 ? (
           <EmptyState
             title="아직 기록이 없어요"

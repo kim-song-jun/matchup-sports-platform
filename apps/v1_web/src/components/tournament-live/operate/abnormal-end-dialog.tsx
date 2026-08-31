@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { Button } from '@/components/v1-ui/button';
+import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { type MatchOutcomeReason, matchOutcomeReasonLabel } from '@/lib/match-outcome';
 
 /**
@@ -44,58 +45,26 @@ export function AbnormalEndDialog({ open, onCancel, onConfirm, submitting = fals
   const noteId = useId();
   const [reason, setReason] = useState<AbnormalEndReason>('FORFEIT');
   const [note, setNote] = useState('');
-  const noteRef = useRef<HTMLTextAreaElement | null>(null);
-  const dialogRef = useRef<HTMLDivElement | null>(null);
+
+  // ESC·backdrop 닫기, Tab 포커스 트랩, 스크롤 잠금, 초기 포커스는 공용 훅으로 이관했다.
+  // (기존에 직접 두고 있던 ESC keydown 리스너와 Tab 트랩 querySelectorAll 루프는 제거 —
+  // 훅과 이중으로 걸리면 안 된다.)
+  const { dialogRef, initialFocusRef: noteRef, onBackdropClick } = useModalA11y<
+    HTMLTextAreaElement,
+    HTMLDivElement
+  >({
+    open,
+    onClose: onCancel,
+    pending: submitting,
+  });
 
   // 열릴 때마다 초기화한다 — 직전 경기의 사유가 남아 있으면 그대로 확정될 수 있다.
+  // 포커스 이동은 훅이 initialFocusRef(=noteRef)로 대신 처리한다.
   useEffect(() => {
     if (!open) return;
     setReason('FORFEIT');
     setNote('');
-    noteRef.current?.focus();
   }, [open]);
-
-  /**
-   * Tab 포커스 트랩. 이 콘솔의 다른 다이얼로그(ActionTargetPicker·PenaltyShootoutPanel)가
-   * 이미 같은 트랩을 두고 있는데 여기만 빠져 있었다(Copilot 리뷰 지적) — 키보드로 배경의
-   * 다른 버튼을 잘못 누를 수 있고, 경기 운영 화면에서 그건 곧 오조작이다.
-   * 선례와 같은 셀렉터·순환 방식을 그대로 쓴다.
-   */
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!open || dialog === null) return;
-    const focusableSelectors =
-      'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
-    const trap = (event: KeyboardEvent) => {
-      if (event.key !== 'Tab') return;
-      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(focusableSelectors));
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey) {
-        if (document.activeElement === first) {
-          event.preventDefault();
-          last.focus();
-        }
-      } else if (document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener('keydown', trap);
-    return () => document.removeEventListener('keydown', trap);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    function onKeyDown(event: KeyboardEvent) {
-      // 전송 중에는 ESC 로도 닫지 않는다. 버튼만 잠그면 키보드 경로가 그대로 열려 있어
-      // 중복 종료 방지 의도가 반쪽이 된다(Copilot 리뷰 지적).
-      if (event.key === 'Escape' && !submitting) onCancel();
-    }
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [open, onCancel, submitting]);
 
   if (!open) return null;
 
@@ -106,10 +75,7 @@ export function AbnormalEndDialog({ open, onCancel, onConfirm, submitting = fals
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
       role="presentation"
-      onClick={(event) => {
-        // 백드롭 클릭도 전송 중에는 막는다 — ESC 와 같은 우회 경로다.
-        if (event.target === event.currentTarget && !submitting) onCancel();
-      }}
+      onClick={onBackdropClick}
     >
       <div
         ref={dialogRef}

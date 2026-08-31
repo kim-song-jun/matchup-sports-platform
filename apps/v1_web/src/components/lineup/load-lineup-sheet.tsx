@@ -209,7 +209,7 @@ export function LoadLineupSheet({
                         minHeight: 44,
                         textAlign: 'left',
                         padding: 16,
-                        borderRadius: 12,
+                        borderRadius: 'var(--radius-control)',
                         border: '1px solid var(--border)',
                         background: 'var(--card-surface)',
                         cursor: 'pointer',
@@ -247,7 +247,7 @@ function Badge({ children, tone = 'default' }: { children: React.ReactNode; tone
       className="tm-text-micro"
       style={{
         padding: '2px 8px',
-        borderRadius: 999,
+        borderRadius: 'var(--radius-pill)',
         fontWeight: 600,
         // 색만으로 뜻을 전하지 않는다 — 경고는 문구 자체("○○ 라인업")가 이유를 말한다.
         border: `1px solid ${isWarn ? 'var(--orange700)' : 'var(--border)'}`,

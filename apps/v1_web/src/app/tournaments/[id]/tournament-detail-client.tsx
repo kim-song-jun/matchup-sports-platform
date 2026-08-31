@@ -406,7 +406,7 @@ function BracketEntryCtaButton({ tournament }: { tournament: V1TournamentDetail 
         gap: 12,
         width: '100%',
         padding: '16px 16px',
-        borderRadius: 14,
+        borderRadius: 'var(--radius-field)',
         textDecoration: 'none',
         background: isLive ? 'var(--blue500)' : 'var(--surface)',
         border: isLive ? 'none' : '1px solid var(--border)',
@@ -423,7 +423,7 @@ function BracketEntryCtaButton({ tournament }: { tournament: V1TournamentDetail 
         >
           <span
             style={{
-              width: 6, height: 6, borderRadius: '50%',
+              width: 6, height: 6, borderRadius: 'var(--radius-circle)',
               background: '#4ADE80', flexShrink: 0,
               boxShadow: '0 0 0 2px rgba(74,222,128,0.35)',
             }}
@@ -633,7 +633,7 @@ export function TournamentDetailView({
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div
             aria-hidden="true"
-            style={{ width: 44, height: 44, borderRadius: 12, background: 'var(--orange500)', display: 'grid', placeItems: 'center', flexShrink: 0 }}
+            style={{ width: 44, height: 44, borderRadius: 'var(--radius-control)', background: 'var(--orange500)', display: 'grid', placeItems: 'center', flexShrink: 0 }}
           >
             <Trophy size={24} color="var(--static-white)" />
           </div>
@@ -657,7 +657,7 @@ export function TournamentDetailView({
                   // 특히 다크모드에서 카드는 따뜻한 주황조인데 칩만 차가운 무채색 검정으로
                   // 떠 보이는 결함이 실측 확인됐다(라이브 alpha 스크린샷). 카드 톤에 맞춘
                   // 반투명 --tint-orange(주황 10%, 라이트/다크 공용)로 교체.
-                  style={{ background: 'var(--tint-orange)', border: '1px solid var(--tint-orange-border)', color: 'var(--text-body)', fontWeight: 600, padding: '4px 12px', borderRadius: 999 }}
+                  style={{ background: 'var(--tint-orange)', border: '1px solid var(--tint-orange-border)', color: 'var(--text-body)', fontWeight: 600, padding: '4px 12px', borderRadius: 'var(--radius-pill)' }}
                 >
                   {m ? (
                     <>
@@ -690,7 +690,7 @@ export function TournamentDetailView({
           flexShrink: 0,
           width: 56,
           height: 56,
-          borderRadius: 16,
+          borderRadius: 'var(--radius-container)',
           background: 'linear-gradient(135deg, var(--blue500) 0%, var(--blue600) 100%)',
           display: 'grid',
           placeItems: 'center',
@@ -732,7 +732,7 @@ export function TournamentDetailView({
               style={{
                 width: 7,
                 height: 7,
-                borderRadius: '50%',
+                borderRadius: 'var(--radius-circle)',
                 background: sportAccent.dot,
                 flexShrink: 0,
                 display: 'inline-block',
@@ -1144,14 +1144,14 @@ export function TournamentDetailView({
         style={{
           display: 'flex', alignItems: 'center', gap: 12,
           padding: '16px 16px',
-          background: 'var(--blue500)', borderRadius: 14,
+          background: 'var(--blue500)', borderRadius: 'var(--radius-field)',
           textDecoration: 'none',
           boxShadow: '0 2px 14px rgba(49,130,246,0.28)',
           marginBottom: 16,
         }}
       >
         <span style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.18)', borderRadius: 20, padding: '3px 8px', flexShrink: 0 }}>
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#4ADE80', flexShrink: 0, boxShadow: '0 0 0 2px rgba(74,222,128,0.35)' }} aria-hidden="true" />
+          <span style={{ width: 6, height: 6, borderRadius: 'var(--radius-circle)', background: '#4ADE80', flexShrink: 0, boxShadow: '0 0 0 2px rgba(74,222,128,0.35)' }} aria-hidden="true" />
           <span style={{ fontSize: 'var(--font-size-caption)', fontWeight: 800, color: '#fff', letterSpacing: '0.02em' }}>LIVE</span>
         </span>
         {/* 라벨: getBracketEntryCtaLabel과 단일 소스 — 모바일 상단/하단 CTA와 동일 문구("진행 중인 대회 보기")를 쓴다. */}
@@ -1185,7 +1185,7 @@ export function TournamentDetailView({
         style={{
           display: 'flex', alignItems: 'center', gap: 12,
           padding: '16px 16px',
-          background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14,
+          background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-field)',
           textDecoration: 'none',
           marginBottom: 16,
         }}
@@ -1220,7 +1220,7 @@ export function TournamentDetailView({
         style={{
           display: 'flex', alignItems: 'center', gap: 12,
           padding: '16px 16px',
-          background: 'linear-gradient(135deg, #1A1A2E 0%, #111827 100%)', borderRadius: 14,
+          background: 'linear-gradient(135deg, #1A1A2E 0%, #111827 100%)', borderRadius: 'var(--radius-field)',
           textDecoration: 'none',
           boxShadow: '0 2px 12px rgba(0,0,0,0.2)',
           marginBottom: 16,
@@ -1345,7 +1345,7 @@ function CompletedResultHero({ tournament }: { tournament: V1TournamentDetail })
           gap: 16,
           padding: '16px 20px',
           background: 'linear-gradient(135deg, #1A1A2E 0%, #111827 100%)',
-          borderRadius: 16,
+          borderRadius: 'var(--radius-container)',
           textDecoration: 'none',
           boxShadow: '0 2px 14px rgba(0,0,0,0.2)',
         }}
@@ -1357,7 +1357,7 @@ function CompletedResultHero({ tournament }: { tournament: V1TournamentDetail })
             flexShrink: 0,
             width: 48,
             height: 48,
-            borderRadius: 14,
+            borderRadius: 'var(--radius-field)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -1580,7 +1580,7 @@ function StandingsMovedNotice({ tournamentId }: { tournamentId: string }) {
           gap: 12,
           padding: '16px 16px',
           background: 'var(--grey50)',
-          borderRadius: 14,
+          borderRadius: 'var(--radius-field)',
           textDecoration: 'none',
         }}
       >
@@ -1946,7 +1946,7 @@ function FixtureStatusBadge({ status }: { status: string }) {
           style={{
             width: 5,
             height: 5,
-            borderRadius: '50%',
+            borderRadius: 'var(--radius-circle)',
             background: 'var(--blue500)',
             flexShrink: 0,
             display: 'inline-block',
@@ -2108,7 +2108,7 @@ function TournamentDetailSkeleton() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
         <div
           aria-hidden="true"
-          style={{ width: 52, height: 52, borderRadius: 16, background: 'var(--grey100)', flexShrink: 0 }}
+          style={{ width: 52, height: 52, borderRadius: 'var(--radius-container)', background: 'var(--grey100)', flexShrink: 0 }}
         />
         <div style={{ flex: 1 }}>
           <div style={{ height: 18, borderRadius: 7, background: 'var(--grey100)', width: '75%' }} />

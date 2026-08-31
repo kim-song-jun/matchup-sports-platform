@@ -70,13 +70,53 @@ read-swap 을 붙인 뒤 리그 경기로 각각을 실제로 통과시킨다:
 
 ## 2. 되돌리기 창 — **read-swap 이 그것을 영구히 닫는다**
 
-백필로 만든 `kind='regular_league'` 88행은 **지금은 지울 수 있다.** 그 창을 닫는 것은
-`onDelete: Restrict` 로 대회를 참조하는 **세 관계**다
-(`docs/ops/league-competition-backfill-apply.md` 참조). **쓰기 위치를 전수 확인했다:**
+백필로 만든 `kind='regular_league'` 88행은 **지금은 지울 수 있다** — 2026-08-31 실측으로
+아래 여섯 자리가 **전부 0행**이다.
+
+### ⚠️ 2026-08-31 정정 — **"세 관계"가 아니고, 목록도 하나 틀렸다**
+이 자리에는 `V1TournamentStaffAssignment`·`V1OperationAudit`·`V1GameOfficialResultCache`
+**세 관계**라고 적혀 있었다. **pg 카탈로그로 직접 확인하니 다르다**(스키마 서술이 아니라
+실제 제약을 봤다):
+
+```sql
+SELECT c.conrelid::regclass, c.confdeltype FROM pg_constraint c
+ WHERE c.contype='f' AND c.confrelid='v1_tournaments'::regclass AND c.confdeltype <> 'c';
+```
+
+**① 대회를 직접 Restrict 하는 것 — 3개 (하나가 목록에 없었다)**
+
+| 자식 테이블 | 언제 붙나 | 알파 현재 |
+|---|---|---|
+| `v1_tournament_campaigns` | 대회 캠페인이 생길 때 — **문서에 아예 없던 관계다** | 0 |
+| `v1_operation_audits` | 운영 감사 로그가 그 대회를 참조할 때 | 0 |
+| `v1_game_official_result_cache` | 경기 **공식 결과가 확정**될 때 (**raw SQL**) | 0 |
+
+**② `V1TournamentStaffAssignment` 는 직접 Restrict 이 아니다**
+그 모델의 `tournament` 관계는 **`onDelete: Cascade`** 다. 창을 닫는 것은 대회가 아니라
+**필드**를 향한 `v1_staff_field_fk`(Restrict)이고, 대회 → 필드가 Cascade 라서
+**한 다리 건너** 막는다. 같은 경로로 막는 것이 셋이다:
+
+| 자식 테이블 | 무엇을 Restrict 하나 | 알파 현재 |
+|---|---|---|
+| `v1_tournament_fixtures` | `v1_tournament_fields` | 0 (필드 자체가 0) |
+| `v1_tournament_staff_assignments` | `v1_tournament_fields` | 0 |
+| `v1_operation_audits` | `v1_tournament_fields` | 0 |
+
+> **왜 이게 중요한가**: PostgreSQL 의 `RESTRICT` 는 **즉시 검사**라, 그 자식이 다른 경로로
+> 함께 지워질 예정이어도 삭제를 막는다. 즉 "어차피 Cascade 로 같이 지워지니 괜찮다"가
+> **성립하지 않는다.**
+
+> **원래 표가 "쓰는 곳"까지 전수 확인했다고 적고 있었다.** 관계 목록이 틀린 채로
+> 쓰는 곳을 전수 확인하면, **없는 관계를 봉쇄하고 있는 관계를 놓친다.**
+
+**아직 참인지 확인하는 법**: 위 SQL 을 다시 돌린다(SSM → psql). 행이 늘었으면 이 표를 갱신한다.
+직접 Restrict 셋과 필드 경유 셋 **양쪽 다** 세야 한다 — 직접만 세면 스태프·대진을 놓친다.
+
+**쓰는 곳** (①의 셋):
 
 | 관계 | 쓰는 곳 | 상태 |
 |---|---|---|
-| `V1TournamentStaffAssignment` | `tournaments/staff/tournament-staff.service.ts` | 봉쇄됨 · 테스트로 고정 |
+| `V1TournamentCampaign` | 캠페인 도메인 | **미확인 — 이 정정에서 새로 드러난 자리다** |
 | `V1OperationAudit` | `tournament-operations/fields/…-fields.service.ts` 외 공용 라이터 | 봉쇄됨 · 테스트로 고정 |
 | `V1GameOfficialResultCache` | `game-operations/game-result-public-cache.service.ts` (**raw SQL**) | **read-swap 이 여는 자리** |
 
@@ -190,6 +230,18 @@ tournament-registrations.service.ts   throw new ConflictException({ code: 'TOURN
 
 ## 5. 로컬에서 `Suites failed 5` 를 보면 — **당신 변경이 아니다**
 
+> **2026-08-31 실측: 지금은 안 난다.** `jest src/profile` → **8 suites · 83 tests 통과**,
+> `tsc --noEmit` 에도 `profile` 오류 0. 공유 클라이언트가 그 사이 갱신됐다.
+> **이 절은 "지금 깨져 있다"가 아니라 "이런 증상을 보면 이렇게 읽어라"로 남긴다** —
+> 공유 클라이언트는 언제든 다시 스테일이 될 수 있다.
+>
+> **아직 참인지 확인**: `cd apps/v1_api && ./node_modules/.bin/jest --silent src/profile` 이
+> 통과하면 증상 없음. `Suites failed` 가 나오면 아래를 읽는다.
+>
+> ⚠️ **이 절을 근거로 "profile 오류는 원래 있는 것"이라며 결과에서 빼지 말 것.**
+> 실제로 그렇게 매번 `grep -v profile` 을 붙여 보고하다가, **애초에 0 이었다는 것**을
+> 뒤늦게 알아차린 일이 있다(문서의 서술을 측정 대신 인용한 것). 빼기 전에 **센다.**
+
 ```
 src/profile/*.spec.ts ×5   TS2339 'preferredPosition' does not exist
 ```
@@ -242,3 +294,56 @@ EOF
 # ③ 게이트 세 숫자 확인
 cd apps/v1_api && node scripts/v1-surface-check.mjs
 ```
+
+---
+
+## 7. 경로 통합(C) 시 **과거 알림 링크는 살리지 않는다**
+
+### ✅ 결정됨 — **2026-08-31 사용자 확정. 되묻지 말 것.**
+
+> **경로 통합 시 과거 알림의 `deepLink` 는 살리지 않는다.** 옛 주소는 제거되고,
+> 이미 발송된 알림을 누르면 그 페이지로 갈 수 없다.
+
+사용자가 "사용자 영향" 을 보고 고른 것이다. 리다이렉트 표를 만들거나 옛 경로를
+유지하는 방향으로 **다시 설계하지 않는다.**
+
+**단, "살리지 않는다" ≠ "날것의 오류 화면을 보여라".** 옛 주소가 죽더라도
+*"더 이상 볼 수 없는 링크예요"* 류 안내 화면으로 착지시키는 것은 이 결정 **안에** 있다.
+착지 화면의 문구·모양은 착수 시 별도 확인 대상이다.
+
+### 고쳐야 하는 자리 — **3파일. `notifications.service.ts` 하나가 아니다**
+
+`deepLink` 를 만드는 파일은 13개고, 그중 **경로 리터럴을 직접 쓰는 것이 7개**다.
+그 7개 중 **리그 경로라서 통합의 영향을 받는 것은 3개**다:
+
+| 파일 | 경로 | 왜 별개 사본인가 |
+|---|---|---|
+| `notifications/notifications.service.ts:429` | `/league-matches/${targetId}` | 리그 6종 알림의 라우팅 분기 |
+| `notifications/notifications.service.ts:443` | `/team-matches/${targetId}/result` | 리그 결과 확정·이의 5종 |
+| `game-operations/team-match-completion-notification.service.ts` | `/team-matches/:id/result` | **위 443 과 같은 목적지를 독립으로 구성** — 파일 주석이 "단일 소스 동기화 대상" 이라고 스스로 적고 있다 |
+| `jobs/league-reminders/league-result-entry-reminder.service.ts:74` | `/admin/league-matches/${leagueId}` | **raw SQL `INSERT` 문자열 안**에 박혀 있다 — TS 리팩터·타입 검사·게이트 어느 것도 이걸 못 본다 |
+
+마지막 것이 함정이다. 나머지 4개(`chat`·`game-result-submitted-escalation` 의
+`/team-matches/…`, `lineup-todo`·`tournament-fixture-completion` 의 `/tournaments/…`)는
+**진짜 팀 매치**거나 **이미 통합 후 모양**이라 대상이 아니다 — 경로 문자열만 grep 해서
+7개를 다 고치면 멀쩡한 것을 건드린다.
+
+### 이게 아직 참인지 확인하는 법
+
+```bash
+# deepLink 를 만드는 파일 중 경로 리터럴을 직접 쓰는 것
+for f in $(grep -rln "deepLink" apps/v1_api/src --include='*.ts' | grep -v spec); do
+  p=$(grep -oE "['\`]/(league-matches|team-matches|tournaments|admin/league-matches)[^'\`]*" "$f" | sort -u | tr '\n' ' ')
+  [ -n "$p" ] && echo "$(basename $f) :: $p"
+done
+```
+`league-matches` 또는 `admin/league-matches` 가 붙은 줄이 **위 3파일 말고 더 나오면**
+표가 낡은 것이다. 반대로 raw SQL 쪽은 **`deepLink` 변수를 거치지 않는 사본**이 생기면 위 루프가 놓친다.
+그때는 아래로 본다 — **맨 `grep -n 'admin/league-matches'` 는 쓰지 말 것.**
+`@Controller('admin/league-matches')` 같은 **백엔드 라우트 데코레이터가 11건** 잡혀
+"경로 사본이 많다"로 읽히는데, 그건 API prefix 지 프론트 딥링크가 아니다:
+
+```bash
+grep -rn "\`/admin/league-matches/" apps/v1_api/src --include='*.ts' | grep -v spec
+```
+(선행 백틱 = 템플릿 리터럴 = 실제로 만들어지는 URL. 현재 1건, 위 표의 reminder.)

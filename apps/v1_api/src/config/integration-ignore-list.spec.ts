@@ -31,7 +31,7 @@ import { resolve } from 'node:path';
  * 지금 제외된 스펙 수. **줄이는 방향은 자유롭게, 늘리는 방향은 이 숫자를 고쳐야 한다.**
  * 늘릴 때는 왜 지금 고칠 수 없는지를 `jest.config.ts` 의 해당 항목 옆에 적는다.
  */
-const PINNED_IGNORE_COUNT = 5;
+const PINNED_IGNORE_COUNT = 1;
 
 /** `jest.config.ts` 가 `<rootDir>` 접두사와 정규식 이스케이프를 쓰므로 실제 경로로 되돌린다. */
 function toRepoPath(pattern: string): string {

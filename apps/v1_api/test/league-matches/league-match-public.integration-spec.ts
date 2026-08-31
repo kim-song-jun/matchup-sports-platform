@@ -543,7 +543,15 @@ describe('GET /league-matches (list, R5)', () => {
   // 리그와 뒤섞이면 필터·페이지네이션 단언이 "정확히 이 리그들만"을 보장할 수 없다.
   async function createLeagueScenario(opts: { title: string; startsOn: string; endsOn: string }) {
     const scopeId = randomUUID().slice(0, 8);
-    const sport = await prisma.v1Sport.create({ data: { code: `t5-list-sport-${scopeId}`, name: `T5 목록 종목 ${scopeId}` } });
+    // 대진 생성은 종목의 활성 경기 설정을 요구한다(`resolveTeamMatchCompetitionConfig` —
+    // 종목 코드가 futsal/soccer/football 일 때만 `<code>-v1` 설정을 찾는다). 스코프별로 새
+    // 종목을 만들면 설정이 없어 **409 COMPETITION_CONFIG_REQUIRED** 로 막힌다.
+    // league-fixture-timing 과 같은 방식으로 공유 futsal 종목을 upsert 한다.
+    const sport = await prisma.v1Sport.upsert({
+      where: { code: 'futsal' },
+      update: {},
+      create: { code: 'futsal', name: '풋살' },
+    });
     const region = await prisma.v1Region.create({ data: { code: `t5-list-region-${scopeId}`, name: `T5 목록 지역 ${scopeId}`, level: 2 } });
     const teamA = await prisma.v1Team.create({ data: { ownerUserId: listOwnerUserId, sportId: sport.id, regionId: region.id, name: `t5-list-team-a-${scopeId}` } });
     const teamB = await prisma.v1Team.create({ data: { ownerUserId: listOwnerUserId, sportId: sport.id, regionId: region.id, name: `t5-list-team-b-${scopeId}` } });
@@ -610,7 +618,15 @@ describe('GET /league-matches (list, R5)', () => {
 
   it('cursor 페이지네이션이 중복·누락 없이 다음 페이지로 이어지고, 마지막 페이지는 hasNext=false다', async () => {
     const scopeId = randomUUID().slice(0, 8);
-    const sport = await prisma.v1Sport.create({ data: { code: `t5-list-page-sport-${scopeId}`, name: `T5 페이지 종목 ${scopeId}` } });
+    // 대진 생성은 종목의 활성 경기 설정을 요구한다(`resolveTeamMatchCompetitionConfig` —
+    // 종목 코드가 futsal/soccer/football 일 때만 `<code>-v1` 설정을 찾는다). 스코프별로 새
+    // 종목을 만들면 설정이 없어 **409 COMPETITION_CONFIG_REQUIRED** 로 막힌다.
+    // league-fixture-timing 과 같은 방식으로 공유 futsal 종목을 upsert 한다.
+    const sport = await prisma.v1Sport.upsert({
+      where: { code: 'futsal' },
+      update: {},
+      create: { code: 'futsal', name: '풋살' },
+    });
     const region = await prisma.v1Region.create({ data: { code: `t5-list-page-region-${scopeId}`, name: `T5 페이지 지역 ${scopeId}`, level: 2 } });
     // 서비스 기본 정렬은 createdAt desc(최근 개설순)다 -- 순차로(await) 3개를 만들면
     // 마지막에 만든 리그가 가장 먼저 나와야 한다. leagueIds는 "만든 순서"(day 1→2→3)이므로
@@ -638,7 +654,10 @@ describe('GET /league-matches (list, R5)', () => {
     expect(page1.body.data.items).toHaveLength(2);
     expect(page1.body.data.items.map((item: { leagueId: string }) => item.leagueId)).toEqual([leagueIds[2], leagueIds[1]]);
     expect(page1.body.data.pageInfo.hasNext).toBe(true);
-    expect(page1.body.data.pageInfo.nextCursor).toBe(leagueIds[1]);
+    // 커서는 3e7240133 에서 `<state>:<id>` 복합 포맷이 됐다 — 공개 목록 정렬을 "내 리그"와
+    // 같은 상태 우선으로 통일하면서 "어느 상태 그룹의 어디까지 왔는가"를 한 커서로 복원해야
+    // 하기 때문이다. 이 픽스처의 리그는 대진 생성 전이라 전부 draft 다.
+    expect(page1.body.data.pageInfo.nextCursor).toBe(`draft:${leagueIds[1]}`);
 
     const page2 = await request(app.getHttpServer()).get(
       `/api/v1/league-matches?sportId=${sport.id}&limit=2&cursor=${page1.body.data.pageInfo.nextCursor}`,

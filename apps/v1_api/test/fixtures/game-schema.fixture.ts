@@ -428,7 +428,17 @@ export const gameSchemaSourceManifest = {
   //   그대로다.
   //
   // 값은 `shasum -a 256 apps/v1_api/prisma/schema.prisma` 로 계산했다.
-  schema: '9219a562a6a8d8375a16ee2804b6de63a2ddc12da527a62f582b29b6e3666702',
+  // 2026-08-31 재핀: APNs 게이트웨이를 기기 속성으로 옮기면서 V1ApnsEnvironment enum 과
+  // V1PushDevice.apns_environment(nullable) 이 추가됐다. **게임 도메인 밖이다** — v1_game_*
+  // 모델·enum·relation 을 하나도 건드리지 않았고, 이 guard 가 schema.prisma 전체 바이트를
+  // 결속하기 때문에 걸린 파일 해시 노이즈다(위 후기·어워드 재핀들과 같은 종류).
+  // 배경: TestFlight 빌드는 production 서명이라 production APNs 토큰을 받는데 alpha 서버가
+  // sandbox 로 보내면 Apple 이 BadDeviceToken 을 돌려주고 서버가 그 기기 등록을 폐기한다.
+  // 그래서 게이트웨이를 배포 환경이 아니라 토큰의 속성으로 옮겼다.
+  // 뒷받침 마이그레이션: 20260831000000_v1_apns_environment (CREATE TYPE + ADD COLUMN 뿐,
+  // backfill 없음). 바인딩된 20260729000100_v1_game_operations 는 건드리지 않았으므로
+  // migration 해시는 그대로다. 이 브랜치의 파일에 `shasum -a 256` 을 돌려 새로 계산했다.
+  schema: 'd8a323b24545f35a712f75226a2b4e243c741b6209dfda468cd547f1c6a0bd54',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

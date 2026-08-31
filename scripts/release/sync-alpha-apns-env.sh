@@ -119,7 +119,13 @@ for name in APNS_KEY_ID APNS_TEAM_ID APNS_BUNDLE_ID APNS_PRIVATE_KEY; do
   next="\$(mktemp)"
   chmod 600 "\${next}"
   grep -v "^\${name}=" "\${tmp}" > "\${next}" || true
-  printf '%s=%s\n' "\${name}" "\${value}" >> "\${next}"
+  # Single-quoted. The deploy sources this file, so an unquoted PEM makes the shell read
+  # "-----BEGIN PRIVATE KEY-----..." as a command and the whole deploy dies with
+  # "line 17: PRIVATE: command not found" — measured, and it took alpha's deploys down with
+  # it. An embedded single quote is escaped the only way sh allows: end the quote, emit an
+  # escaped one, start again.
+  escaped="\${value//\'/\'\\\\\'\'}"
+  printf "%s='%s'\n" "\${name}" "\${escaped}" >> "\${next}"
   mv "\${next}" "\${tmp}"
 done
 chown ec2-user:ec2-user "\${tmp}"

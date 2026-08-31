@@ -262,9 +262,9 @@ export class TournamentsReadService {
    * **빈 순위표**를 준다. 404 보다 나쁘다: 에러가 아니라 "아직 순위가 없다" 로 읽힌다.
    *
    * ## 모양이 다른 두 필드
-   * - `registrationId` — 리그엔 참가 등록 개념이 없다. 화면은 이 값을 **React key 와 매직넘버
-   *   행 매칭**에만 쓰므로 `teamId` 를 싣되, **필드 이름과 내용이 갈리지 않게** `teamId` 를
-   *   함께 싣는다(대회 응답에도 있어야 계약이 하나로 유지된다).
+   * - `registrationId` — 리그엔 참가 등록 개념이 없어 **생략한다.** 화면은 이 값을 React key 와
+   *   매직넘버 행 매칭에만 쓰므로 `teamId` 로 대체된다(`key={registrationId ?? teamId}`).
+   *   teamId 를 그 이름에 담으면 값을 함께 실어도 **이름이 내용과 갈린 상태**가 남는다.
    * - `fairPlayPoints` — 리그는 **집계 자체를 하지 않는다.** `0` 은 "감점이 없다" 로 읽히므로
    *   값이 아니라 **부재**로 둔다(optional).
    *
@@ -329,9 +329,10 @@ export class TournamentsReadService {
   
     return {
       standings: leagueStandings.map((row) => ({
-        // 이름과 내용이 갈리지 않게 둘 다 싣는다 — 화면은 key 로만 쓰지만, 다음 사람이
-        // `registrationId` 로 등록을 조회하는 순간 터진다.
-        registrationId: row.teamId,
+        // `registrationId` 는 **싣지 않는다.** 리그엔 참가 등록 개념이 없다 — teamId 를 그
+        // 이름으로 담으면 값을 함께 실어도 **이름이 팀 id 를 담는 상태**가 그대로 남고,
+        // 나중에 그 값으로 등록을 조회하는 코드가 생기는 순간 터진다.
+        // `fairPlayPoints` 와 같은 처리다: 값이 아니라 **부재**다.
         teamId: row.teamId,
         teamName: teamNameById.get(row.teamId) ?? '',
         position: row.position,

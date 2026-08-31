@@ -461,6 +461,20 @@ awk '/private requireTakeover/,/^  }/' apps/v1_api/src/games/games.service.ts \
 league-completion-projection    active→completed
 ```
 
+> **"안 막혔다" 는 dual-write 가 없다는 뜻이 아니다 — 이 표는 "무엇이 그것을 봉쇄하는가" 다.**
+> 헷갈리면 없는 dual-write 를 새로 넣어 **같은 전이를 두 번 쓰게 된다.** 실제 상태:
+> ```
+> dual-write        있다. league-completion-projection.service.ts 의
+>                   `result.count === 0` 조기 반환 **뒤**(조건부 update 승자만 도달)
+>                   커밋 ac933fea4 — origin/dev 에 포함됨
+> 봉쇄 테스트        없다. 이 전이를 지나는 유일한 스펙
+>                   test/league-matches/league-completion-projection.integration-spec.ts 는
+>                   `v1League.state` 와 상태로그만 단언하고 v1Tournament 를 한 번도 조회하지
+>                   않는다 → dual-write 를 지워도 전 단언이 green 이다
+> ```
+> **반증**: `grep -c v1Tournament test/league-matches/league-completion-projection.integration-spec.ts`
+> 가 0 보다 커지면 이 줄은 낡았다(현재 **0**).
+
 > **✅ 필수 마감은 닫혔다.** 시리즈 최초 생성(`seedSeason`)은 유닛으로 막혔다 —
 > 변이 둘(dual-write 제거 / 거울을 `tx` 밖으로) 각각 **3/3 red**.
 > 남은 하나는 아래 표의 `선택` 항목이라, **`--apply` 를 미룰 이유는 없다.**
@@ -477,10 +491,19 @@ league-completion-projection    active→completed
 | 자리 | 안 막혔을 때 무슨 일이 나나 | 마감 | **이 판정이 깨지는 조건** |
 |---|---|---|---|
 | ~~`league-series-admin` 시리즈 최초 생성~~ | **거울이 아예 없다** → 그 리그가 read-swap 뒤 **화면에서 사라진다** | ✅ **닫혔다** (변이 3/3 red ×2) | — |
-| `league-completion-projection` | 거울 status 가 `in_progress` 로 남는다 → 끝난 리그가 **진행 중으로 보인다** | **선택.** 못 막으면 **승인 요청에 이름과 실패 모습을 그대로 적고** 진행한다 | ⚠️ **시상·결산 경로를 통합 축으로 옮기는 순간 `필수` 로 승격**한다 — 아래 |
+| `league-completion-projection` | (dual-write 를 잃으면) 거울 status 가 `in_progress` 로 남는다 → 끝난 리그가 **진행 중으로 보인다** | **선택.** 못 막으면 **승인 요청에 이름과 실패 모습을 그대로 적고** 진행한다 | ⚠️ **시상·결산 경로를 통합 축으로 옮기는 순간 `필수` 로 승격**한다 — 아래. **승격 이유가 하나 더 있다: 여기가 값 불일치의 유일한 회귀 경로다** (§1-b) |
 
 **가르는 축은 "행이 없는가" vs "값이 틀린가"다.** 행이 없으면 화면에서 사라지고 운영자는
 "안 보인다"밖에 말할 수 없다.
+
+> **§1-b 의 값 불일치 blind spot 과 이 줄은 같은 구멍이다.** `listMine` 의 불완전 검사는
+> null 만 보므로 *틀린* status 는 못 잡는데, status 가 틀어지려면 **리그를 바꾸면서 거울을
+> 안 바꾸는 경로**가 있어야 한다. 지금 코드에는 그런 경로가 **없다**(state 를 바꾸는 4곳이
+> 전부 dual-write 를 갖고 있다). 즉 남은 위험은 발생이 아니라 **회귀** — 누가 dual-write 를
+> 지워도 아무 테스트도 red 가 되지 않는 상태다.
+>
+> **그래서 해법은 런타임 값 검사가 아니라 봉쇄 테스트다.** 요청마다 "거울 == 리그" 를 확인하려면
+> 리그를 읽어야 하고, 그러면 **두 축을 영구히 결합시켜 read-swap 자체가 무의미해진다.**
 
 ### ⛔ read-swap 은 **`--apply` 뒤에만** 머지할 수 있다 — 집합 동등성으로는 안 잡힌다
 

@@ -84,29 +84,44 @@ suppressed 블록이었다.
 **③+⑤만 보면 안 된다.** `0 new`는 *"지적이 없다"*가 아니라 *"새 코멘트가 없다"*다.
 suppressed 블록은 그 둘 사이로 빠져나간다.
 
+> **한 줄로 다 하지 않는다.** 예전엔 다섯을 하나의 `jq` 로 합쳤는데, 리뷰 세 라운드가
+> **전부 그 합치는 부분**을 지적했다(상한·순서·정규식·fail-open). **표와 함정은 지적 0건이었다.**
+> 집계가 문제지 조회가 아니다 — 게이트마다 한 줄이면 틀릴 자리가 없다.
+> 편의가 필요하면 스크립트로 옮긴다: **문서에 실린 명령은 CI 가 안 보지만 스크립트는 본다.**
+
+**게이트 1·2 — 최신 Copilot 리뷰의 제출시각을 head 와 나란히 본다**
 ```bash
-# 다섯 게이트를 한 번에. 시각을 만들지 않고 API 값만 쓴다(아래 함정 ③·④ 참고)
 gh api graphql -f query='{repository(owner:"<OWNER>",name:"<REPO>"){pullRequest(number:<N>){
   commits(last:1){nodes{commit{committedDate}}}
-  reviews(last:100){nodes{author{login} submittedAt body}}
-  reviewThreads(first:100){totalCount nodes{isResolved}}}}}' \
-  --jq '.data.repository.pullRequest as $p
-    | ($p.commits.nodes[0].commit.committedDate) as $head
-    | ([$p.reviews.nodes[]|select(.author.login=="copilot-pull-request-reviewer")]|max_by(.submittedAt)) as $r
-    | ($r.body // "") as $b
-    | if $r == null then "Copilot 리뷰가 아직 없다 (판정할 것이 없음)" else
-      "1 작성자   \($r.author.login)",
-      "2 제출시각 \($r.submittedAt) vs head \($head) → " + (if $r.submittedAt > $head then "OK" else "아직 안 봤다" end),
-      "3 Comments " + (($b|split("\n")|map(select(test("^\\s*[-*]\\s+\\*\\*Comments generated")))) as $ln
-                       | if ($ln|length) == 1 then ($ln[0]|gsub("^\\s*[-*]\\s+";""))
-                         elif ($ln|length) == 0 then "⚠️ 추출실패 — 0이 아니다. 본문을 눈으로 봐라"
-                         else "⚠️ 후보 \($ln|length)개 — 본문을 눈으로 봐라" end),
-      "4 Suppress " + (if ($b|test("Suppressed comments")) then "있음 — 열어봐야 한다" else "없음" end),
-      "5 미해결   " + (if $p.reviewThreads.totalCount > ($p.reviewThreads.nodes|length)
-           then "⛔ 판정 불가 — 스레드 \($p.reviewThreads.totalCount)개 중 \($p.reviewThreads.nodes|length)개만 받았다. 페이징해서 다시 세라"
-           else "\([$p.reviewThreads.nodes[]|select(.isResolved==false)]|length)건" end)
-      end'
+  reviews(last:100){nodes{author{login} submittedAt}}}}}' \
+  --jq '.data.repository.pullRequest
+    | "head  \(.commits.nodes[0].commit.committedDate)",
+      "리뷰  " + (([.reviews.nodes[]|select(.author.login=="copilot-pull-request-reviewer")]
+                   |max_by(.submittedAt)|.submittedAt) // "없음 — Copilot 리뷰가 아직 0건이다")'
 ```
+**리뷰 시각이 head 보다 뒤여야** 그 리뷰가 지금 상태를 본 것이다. `last:100`·`max_by` 인 이유는
+아래 ②-b 참고. "없음" 이면 아직 판정할 것이 없다(통과가 아니다).
+
+**게이트 3·4 — 본문을 파일로 받아 두 줄을 grep. 값에 정규식을 걸지 않는다**
+```bash
+gh api graphql -f query='{repository(owner:"<OWNER>",name:"<REPO>"){pullRequest(number:<N>){
+  reviews(last:100){nodes{author{login} submittedAt body}}}}}' \
+  --jq '[.data.repository.pullRequest.reviews.nodes[]
+         |select(.author.login=="copilot-pull-request-reviewer")]|max_by(.submittedAt)|.body' > /tmp/rv.md
+grep -nE '^\s*[-*]\s+\*\*Comments generated|Suppressed comments' /tmp/rv.md
+```
+**아무것도 안 나오면 통과가 아니라 "형식이 바뀐 것"** 이다 — 본문을 직접 연다.
+`Suppressed comments` 가 잡히면 **반드시 펼쳐 읽는다**(스레드를 안 만들어 게이트 5에 안 잡힌다).
+
+**게이트 5 — 미해결 수는 "받은 수 / 전체 수" 와 함께 본다**
+```bash
+gh api graphql -f query='{repository(owner:"<OWNER>",name:"<REPO>"){pullRequest(number:<N>){
+  reviewThreads(first:100){totalCount nodes{isResolved}}}}}' \
+  --jq '.data.repository.pullRequest.reviewThreads
+    | "받은 \(.nodes|length) / 전체 \(.totalCount) · 미해결 \([.nodes[]|select(.isResolved==false)]|length)"'
+```
+**"받은" 과 "전체" 가 다르면 그 미해결 수는 못 믿는다** — 잘린 것이고 **판정 불가**다.
+잘린 채 "0건" 을 읽으면 게이트 5를 통과한 것으로 오독한다.
 
 #### 도착 감지·판정의 함정 넷 — 넷 다 실제로 밟았다
 
@@ -117,41 +132,31 @@ gh api graphql -f query='{repository(owner:"<OWNER>",name:"<REPO>"){pullRequest(
 **조용히** 실패해서 "아직 안 왔다"로 읽힌다. **시각 비교(게이트 2)로 판정하면 기준선이
 없으므로 이 경합 자체가 없다.**
 
-**② 빈 결과는 0이 아니다 — 그리고 `capture`는 입력이 문자열이 아니면 죽는다.**
-실측(jq 1.7.1)으로 갈리는 세 경우:
-```
-매칭 성공          값을 낸다
-매칭 실패          값을 안 낸다(empty). `// "폴백"` 이 받아 준다 — 에러가 아니다, rc=0
-입력이 null        ❌ 에러로 종료(rc=5): "null (null) cannot be matched, as it is not a string"
-                   ← 리뷰가 아직 0건이면 `$r.body` 가 null 이라 여기 걸린다.
-                     PR 을 막 연 직후가 정확히 그 상태다
-```
-**그래서 위 명령은 값에 정규식을 걸지 않는다** — `Comments generated` 가 든 **줄 전체**를 뽑는다.
-본문 형식(`- **Comments generated:** 0 new`)에서 볼드 위치나 `new` 접미가 바뀌어도 안 깨지고,
-못 잡으면 **`⚠️ 추출실패 — 0이 아니다`** 를 찍는다. 조용한 빈 값이 이 문서가 경고하는 그것이다.
-**단 "그 문구가 든 줄" 로 잡으면 안 된다** — suppressed 블록이 지적 본문에서 그 문구를 **인용**할
-수 있어서(실제로 이 PR 에서 그렇게 잡혔다) 요약 줄 대신 남의 문장을 읽는다. 그래서 **불릿 형태**
-(`- **Comments generated:**`)로 좁히고, 후보가 1개가 아니면 그것도 실패로 찍는다.
-그래서 위 명령은 **`$r == null` 을 먼저 가르고** 본문도 `($r.body // "")` 로 받는다.
-`//` 만으로는 매칭 실패는 막아도 **null 입력은 못 막는다.**
+**② 빈 결과는 0이 아니다.** `grep` 이 아무것도 못 찾으면 출력이 없다 — 그걸 `0`으로 읽으면
+**지적이 있는 리뷰를 통과로 읽는다.** 비면 통과가 아니라 **형식이 바뀐 것**으로 보고 본문을 연다.
 
-그리고 빈 결과를 `0`으로 읽으면 지적이 있는 리뷰를 통과로 읽는다. 비면 **추출 실패**로
-취급하고 본문을 파일로 받아 눈으로 확인한다:
-```bash
-gh api graphql ... --jq '...|last|.body' > /tmp/r.md
-grep -nE 'Comments generated|Suppressed' /tmp/r.md
+그리고 **본문 값에 jq 정규식을 걸지 않는 이유**가 여기 있다(실측, jq 1.7.1):
 ```
+매칭 실패      값을 안 낸다(empty). `// "폴백"` 이 받아 준다 — 에러는 아니다
+입력이 null    ❌ rc=5 로 종료: "null (null) cannot be matched, as it is not a string"
+               ← 리뷰가 0건이면 `.body` 가 null 이라 여기 걸린다. PR 을 막 연 직후가 그 상태다
+```
+`//` 는 매칭 실패는 막아도 **null 입력은 못 막는다.** 그래서 게이트 3·4 는 본문을 파일로 받아
+`grep` 하고, 게이트 1·2 는 리뷰가 없을 때를 **`// "없음 …"`** 으로 이름 붙여 찍는다.
 
-**②-b 이 명령의 세 가정도 조여 뒀다** (Copilot #884 suppressed 지적):
+> 잡을 때는 **불릿 형태**(`- **Comments generated:**`)로 좁힌다 — suppressed 블록이 지적 본문에서
+> 그 문구를 **인용**할 수 있어서(이 PR 에서 실제로 그렇게 잡혔다) 요약 줄 대신 남의 문장을 읽는다.
+
+**②-b 위 조회들이 왜 그 형태인가** (Copilot #884 suppressed 지적에서 나왔다):
 ```
 reviews(last:100)          first:100 은 리뷰가 100개를 넘으면 **오래된 쪽**을 가져와
                            최신 리뷰를 놓친다. last 로 최신 쪽을 받는다
 max_by(.submittedAt)       **최신 리뷰를 제출시각으로 고른다.** 예전엔 `| last` 였는데 그건
                            반환 순서를 가정한다(이 저장소에선 시간순이었지만 보장은 없다)
-reviewThreads totalCount    노드 수보다 크면 **잘린 것**이다. 이때는 개수를 아예 찍지 않고
-                           **"⛔ 판정 불가"** 로 간다(fail-closed) — 잘린 채 "0건" 을 찍으면
-                           게이트 5를 통과한 것으로 읽힌다. 게이트 5는 0이어야 의미가 있으므로
-                           과소집계는 곧 통과 쪽 오판이다
+reviewThreads totalCount    **받은 수와 전체 수를 같이 찍는다.** 다르면 잘린 것이고 그 미해결
+                           수는 못 믿는다 — **판정 불가지 통과가 아니다.** 게이트 5는 0이어야
+                           의미가 있어서, 잘린 채 "0건" 만 보면 통과 쪽으로 오판한다.
+                           숫자를 숨기지 않고 분모를 함께 보여 읽는 사람이 갈리게 한다
 ```
 
 **③ `git log --date=format:` 은 TZ를 무시한다.** `submittedAt`은 UTC인데 커밋 시각을

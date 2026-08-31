@@ -43,11 +43,14 @@ describe('bucketLeagueFixtures', () => {
     const buckets = bucketLeagueFixtures(rows, facts);
 
     expect(buckets.voidedCount).toBe(1);
-    expect(buckets.confirmed).toHaveLength(1);
+    // ⭐ **개수가 아니라 내용으로** 단언한다. 길이 1 은 *올바른 경기 하나*와 *엉뚱한 경기
+    //    하나*를 구분하지 못한다 — 무효가 confirmed 로 새면서 유효 경기가 빠지면 길이는
+    //    그대로 1 이다. 남아야 할 경기의 점수까지 못박아 그 경우를 배제한다.
+    expect(buckets.confirmed).toEqual([
+      { homeTeamId: 'home', awayTeamId: 'away', homeScore: 2, awayScore: 0 },
+    ]);
+    // 어느 쪽에도 없다 — 한쪽만 보면 다른 쪽으로 새는 것을 못 잡는다.
     expect(buckets.pending.map((fixture) => fixture.teamMatchId)).toEqual(['tm-pending']);
-    // ⭐ 어느 쪽에도 없다 — 한쪽만 보면 다른 쪽으로 새는 것을 못 잡는다.
-    expect(buckets.pending.some((fixture) => fixture.teamMatchId === 'tm-void')).toBe(false);
-    expect(buckets.confirmed).toHaveLength(1);
   });
 
   it('취소된 대진은 공식 결과가 있어도 confirmed 로 세지 않는다 (R8)', () => {

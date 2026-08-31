@@ -23,7 +23,17 @@
  * 구분할 수 없다 — 둘 다 fact 가 없다. **포인터가 가리키는 리비전의 state 를 읽어야 한다.**
  */
 
-/** `v1TeamMatch` 조회에 최소로 요구되는 모양. 실제 조회는 아래 `loadLeagueFixtureBuckets` 가 한다. */
+/**
+ * `v1TeamMatch` 조회 결과가 이 모듈에 들어올 때의 **최소 모양**.
+ *
+ * **이 파일은 조회를 하지 않는다** — Prisma 를 모르고, 분류만 한다. 조회는 호출부의 몫이고
+ * (`LeagueMatchPublicService.standings()` · `TournamentsReadService`), 그래서 두 호출부가
+ * 서로 다른 select 를 쓰더라도 이 타입만 만족하면 같은 분류를 얻는다. **그 경계가 이 모듈이
+ * 존재하는 이유다.**
+ *
+ * ⚠️ `game.currentOfficialRevision.state` 를 select 에서 빠뜨리면 무효(VOID)가 미확정으로
+ * 섞인다 — 타입이 `null` 을 허용하므로 **컴파일은 통과한다.** 호출부가 지켜야 할 계약이다.
+ */
 export type LeagueTeamMatchRow = {
   id: string;
   hostTeamId: string;

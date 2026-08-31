@@ -24,6 +24,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService } from '../common/admin-context.service';
 import { TournamentPlayersService } from './tournament-players.service';
+import { kindAwareFindFirst } from '../../test/helpers/kind-aware-find-first';
 
 // ─── 테스트 픽스처 ───────────────────────────────────────────────────────────────
 
@@ -219,6 +220,25 @@ describe('TournamentPlayersService', () => {
     await expect(service.listPlayers(nonManager, 'tournament-1', 'reg-1')).rejects.toThrow(
       ForbiddenException,
     );
+  });
+
+  // 대회 표면 봉쇄 — 명단은 **쓰기**라 통과하면 리그 행에 선수가 실제로 붙는다.
+  it('addPlayer: 리그 id 로는 선수를 추가할 수 없다 — 선수 행이 만들어지지 않는다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ role: 'manager', status: 'active' });
+    prisma.v1Tournament.findFirst.mockImplementation(
+      kindAwareFindFirst(tournamentRow({ kind: 'regular_league' })),
+    );
+    // 봉쇄가 없으면 실제로 성공하도록 채운다.
+    prisma.v1TournamentPlayer.create.mockResolvedValue({ id: 'player-1' });
+
+    await expect(
+      service.addPlayer(manager, 'league-1', 'reg-1', {
+        userId: 'player-user-id',
+        realName: '홍길동',
+      }),
+    ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_NOT_FOUND' } });
+    expect(prisma.v1TournamentPlayer.create).not.toHaveBeenCalled();
   });
 
   // ─── 2. 등록 미발견 ─────────────────────────────────────────────────────────

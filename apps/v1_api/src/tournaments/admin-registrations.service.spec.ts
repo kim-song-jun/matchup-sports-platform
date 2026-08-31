@@ -13,6 +13,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService } from '../common/admin-context.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { AdminRegistrationsService } from './admin-registrations.service';
+import { kindAwareFindFirst } from '../../test/helpers/kind-aware-find-first';
 
 const opsAuth = { id: 'ops-user-id', email: 'ops@teameet.v1', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
 const supportAuth = { id: 'support-user-id', email: 'support@teameet.v1', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
@@ -577,6 +578,33 @@ describe('AdminRegistrationsService', () => {
   });
 
   // ─── list ───────────────────────────────────────────────────────────────────
+
+  // 대회 표면 봉쇄 — 리그 id 는 어드민 신청 목록으로 열리지 않는다.
+  it('list: 리그 id 로는 열리지 않는다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1Tournament.findFirst.mockImplementation(
+      kindAwareFindFirst({ id: 'league-1', kind: 'regular_league' }),
+    );
+    // 봉쇄가 없으면 실제로 목록이 나오도록 채운다.
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([]);
+
+    await expect(service.list(opsAuth, 'league-1', {})).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_NOT_FOUND' },
+    });
+    expect(prisma.v1TournamentRegistration.findMany).not.toHaveBeenCalled();
+  });
+
+  it('list: 대회 id 와 kind=null(R1 이전 행)은 그대로 열린다', async () => {
+    for (const kind of ['regular_tournament', null]) {
+      jest.clearAllMocks();
+      prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+      prisma.v1Tournament.findFirst.mockImplementation(
+        kindAwareFindFirst({ id: 'tournament-1', kind }),
+      );
+      prisma.v1TournamentRegistration.findMany.mockResolvedValue([]);
+      await expect(service.list(opsAuth, 'tournament-1', {})).resolves.toBeDefined();
+    }
+  });
 
   it('list: tournament not found → 404', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);

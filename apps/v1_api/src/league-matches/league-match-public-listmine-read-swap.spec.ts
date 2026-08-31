@@ -1,3 +1,4 @@
+import { AllExceptionsFilter } from '../common/filters/http-exception.filter';
 import { LeagueMatchPublicService } from './league-match-public.service';
 
 /**
@@ -15,6 +16,44 @@ import { LeagueMatchPublicService } from './league-match-public.service';
  * 6. 그 실패가 **HTTP 응답까지 간다** — `HttpException` 이 아니면 필터가 500 +
  *    "Internal server error" 로 정규화해 리그 id 도 code 도 유실된다
  */
+/**
+ * **던져진 예외가 아니라 클라이언트가 받는 본문을 단언하기 위한 하네스.**
+ *
+ * 이 스펙이 두 번 놓친 자리다:
+ * ```
+ * 1회차  new Error(...)                            필터가 message 를 통째로 덮었다
+ * 2회차  InternalServerErrorException({ detail })  필터가 안 읽는 키라 응답에서 사라졌다
+ * ```
+ * **두 번 다 예외 객체를 단언해서 통과했다.** 예외 객체는 *코드가 만든 중간 산물*이고
+ * 클라이언트가 받는 것은 *필터를 통과한 뒤*다 — 그 사이에서 유실되면 단언은 못 본다.
+ * 그래서 필터를 실제로 태워 `response.json()` 에 들어간 본문을 본다.
+ */
+async function bodyAfterFilter(run: () => Promise<unknown>) {
+  let thrown: unknown;
+  try {
+    await run();
+  } catch (err) {
+    thrown = err;
+  }
+  expect(thrown).toBeDefined();
+
+  const json = jest.fn();
+  const res = { status: jest.fn().mockReturnValue({ json }) };
+  const req = { id: 'req-1', url: '/league-matches/mine', method: 'GET', headers: {} };
+  const host = { switchToHttp: () => ({ getRequest: () => req, getResponse: () => res }) } as never;
+  const logger = { error: jest.fn(), warn: jest.fn(), info: jest.fn() } as never;
+  const errorLogService = { record: jest.fn() } as never;
+
+  new AllExceptionsFilter(logger, errorLogService).catch(thrown, host);
+
+  expect(json).toHaveBeenCalledTimes(1);
+  return {
+    statusCode: res.status.mock.calls[0][0] as number,
+    body: json.mock.calls[0][0] as Record<string, unknown>,
+  };
+}
+
+
 function makePrisma(mirrors: unknown[]) {
   const findMany = jest.fn().mockResolvedValue(mirrors);
   const leagueFindMany = jest.fn().mockResolvedValue([]);
@@ -123,16 +162,17 @@ describe('listMine — 통합 축 읽기 (R4-a)', () => {
     const { prisma } = makePrisma([mirror({ id: 'lg-broken', ...(broken as object) })]);
     const service = new LeagueMatchPublicService(prisma);
 
-    await expect(service.listMine('user-1')).rejects.toMatchObject({
-      // `HttpException` 이어야 한다. plain `Error` 면 `HttpExceptionFilter` 가
-      // 500 + "Internal server error" 로 덮어써서 아래 code·detail 이 전부 사라진다.
-      // → 이 단언이 `new Error` 로 되돌리는 변이를 잡는 지점이다.
-      status: 500,
-      response: {
-        code: 'LEAGUE_MIRROR_INCOMPLETE',
-        message: '리그 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
-        detail: [{ leagueId: 'lg-broken', missing }],
-      },
+    // **클라이언트가 실제로 받는 본문**을 본다. 예외 객체를 단언하면 아래 둘을
+    // 원리적으로 못 잡는다 — 둘 다 필터를 지나며 유실되기 때문이다:
+    //   plain `Error`      → 필터가 message 를 'Internal server error' 로 덮는다
+    //   키가 `detail`(단수) → 필터가 안 읽어 응답에서 사라진다
+    const { statusCode, body } = await bodyAfterFilter(() => service.listMine('user-1'));
+
+    expect(statusCode).toBe(500);
+    expect(body).toMatchObject({
+      code: 'LEAGUE_MIRROR_INCOMPLETE',
+      message: '리그 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
+      details: [{ leagueId: 'lg-broken', missing }],
     });
   });
 

@@ -233,11 +233,17 @@ export class LeagueMatchPublicService {
       incomplete.push({ leagueId: mirror.id, missing: missingOf(mirror) });
     }
     if (incomplete.length > 0) {
-      // `detail` 로 어느 리그의 어느 필드인지 전부 싣는다 — 운영자가 고칠 대상이 그것이다.
+      // 어느 리그의 어느 필드가 비었는지 전부 싣는다 — 운영자가 고칠 대상이 그것이다.
+      //
+      // **키는 반드시 `details`(복수) 다.** `AllExceptionsFilter` 는 payload 에서
+      // `code`·`message`·**`details`** 만 응답으로 옮기고 **나머지 최상위 필드는 버린다.**
+      // `detail`(단수)로 쓰면 예외 객체에는 담기는데 **응답에서는 사라진다** — 이 PR 이
+      // 고치던 실패(진단 정보가 클라이언트까지 못 감)를 한 겹 안쪽에서 그대로 반복하는
+      // 것이다. 실제로 그렇게 썼고 Copilot #876 재리뷰가 잡았다.
       throw new InternalServerErrorException({
         code: 'LEAGUE_MIRROR_INCOMPLETE',
         message: '리그 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
-        detail: incomplete,
+        details: incomplete,
       });
     }
 

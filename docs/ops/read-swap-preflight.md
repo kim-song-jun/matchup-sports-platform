@@ -488,6 +488,19 @@ league-completion-projection    active→completed
 > ```
 > **반증**: `grep -c v1Tournament test/league-matches/league-completion-projection.integration-spec.ts`
 > 가 0 보다 커지면 이 줄은 낡았다(현재 **0**).
+>
+> **이 봉쇄를 쓸 때 로컬 green 을 믿지 마라 — 통합 스펙이라 Postgres 가 필요하다.**
+> 컨테이너가 없으면 그 스위트는 **실행되지 못하고** 요약에 `Tests: 0` 으로 찍힌다.
+> **`Tests: 0` 은 통과가 아니라 "한 개도 안 돌았다" 다** — `Test Suites: N failed` 를 따로 봐야
+> 드러난다(2026-08-31 실제로 밟았다: 공유 Prisma 클라이언트가 `V1Tournament.region` 을 몰라
+> ts-jest 가 컴파일에서 죽었고, 요약만 보면 실패로 안 읽혔다).
+>
+> 그래서 이 항목의 변이 확인(거울 쓰기 제거 → red)은 **DB 가 있는 환경 또는 CI 에서** 한다.
+> 반증: `docker ps --filter name=teameet --format '{{.Names}}'` 가 비어 있는데 그 스위트가
+> green 이면 **안 돈 것**이다.
+>
+> > `grep postgres` 로 세지 마라 — **다른 프로젝트의 postgres 가 잡힌다.** 이 문장을 쓰면서
+> > 실제로 그렇게 됐다(무관한 `posco-mds-db-1` 이 걸려 "떠 있다"로 읽혔다). 이름으로 좁힌다.
 
 > **✅ 필수 마감은 닫혔다.** 시리즈 최초 생성(`seedSeason`)은 유닛으로 막혔다 —
 > 변이 둘(dual-write 제거 / 거울을 `tx` 밖으로) 각각 **3/3 red**.

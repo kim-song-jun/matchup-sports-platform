@@ -173,9 +173,26 @@ export async function backfillLeagueCompetitionDetails(
       }
     });
   } else {
-    // dry-run 은 **보고만 한다.** 바꾸지 않는 상태를 이유로 실패시키지 않는다 —
-    // 운영자가 승인 전에 이 숫자를 보는 것이 목적이다.
+    // 트랜잭션을 열지 않는 경우다. **여기 오는 길이 둘이라는 걸 놓치기 쉽다:**
+    //   ① dry-run
+    //   ② `--apply` 인데 고칠 게 없다(`toUpdate` 가 비었다)
+    // ②는 **`--apply` 를 한 번 돌린 뒤 확인차 다시 돌릴 때** 오는 길이다.
     mirrorCount = await prisma.v1Tournament.count({ where: { kind: 'regular_league' } });
+  }
+
+  // ── 불변식은 **쓰기 여부와 무관하게** `--apply` 면 항상 센다 ──────────────────
+  // 처음엔 이 검사를 위 트랜잭션 **안에만** 뒀는데, 그러면 `--apply` + `toUpdate` 가 빈
+  // 경우에 **통째로 건너뛰고 통과**한다. 그런데 그 경우가 바로 **"다 들어갔나" 를 확인하려고
+  // 재실행하는 순간**이다 — 검사가 가장 필요한 때에 사라지고, 운영자는 출력만 보고
+  // "불변식 통과" 로 읽는다.
+  //
+  // 쓰기가 있었으면 위 트랜잭션 안에서 이미 걸렸다(그래야 롤백된다). 여기 검사는 **쓰기가
+  // 없었던 경로**를 덮는다 — 던질 뿐 되돌릴 것이 없으므로 트랜잭션 밖이어도 된다.
+  if (!options.dryRun && mirrorCount !== leagues.length) {
+    throw new Error(
+      `거울 수가 리그 수와 다르다: 리그 ${leagues.length} · 거울 ${mirrorCount}. ` +
+        'dual-write 가 빠진 쓰기 자리가 있는지 확인해라(scripts/league-write-site-baseline.json).',
+    );
   }
 
   // **계획이 아니라 실적을 반환한다.** 위 단언이 통과했으면 둘이 같지만, 계획값을 실적으로

@@ -282,4 +282,31 @@ describe('backfillLeagueCompetitionDetails', () => {
       /리그 1 · 거울 0/,
     );
   });
+
+  it('--apply 인데 고칠 게 없어도 불변식을 센다 — 재실행이 검사를 건너뛰면 안 된다', async () => {
+    // "다 들어갔나" 를 확인하려고 재실행하는 바로 그 순간이 `toUpdate` 가 비는 경우다.
+    // 검사를 트랜잭션 안에만 두면 여기서 통째로 사라지고, 운영자는 "불변식 통과" 로 읽는다.
+    const alreadyCorrect = tournament({
+      status: 'in_progress',
+      scheduledAt: new Date('2026-03-01T00:00:00.000Z'),
+      scheduledEndAt: new Date('2026-06-30T00:00:00.000Z'),
+      regionId: 'region-1',
+    });
+    // 거울 수를 리그 수보다 적게 만든다(dual-write 가 빠진 자리가 있는 상태).
+    const { prisma, updateMany } = fakePrisma([league()], [alreadyCorrect], undefined, 0);
+
+    await expect(backfillLeagueCompetitionDetails(prisma, { dryRun: false })).rejects.toThrow(
+      /리그 1 · 거울 0/,
+    );
+    // 고칠 게 없었으므로 쓰기는 아예 없다 — 그런데도 검사는 돌아야 한다.
+    expect(updateMany).not.toHaveBeenCalled();
+  });
+
+  it('dry-run 은 거울 수가 안 맞아도 실패하지 않는다 — 바꾸지 않는 상태를 이유로 막지 않는다', async () => {
+    const { prisma } = fakePrisma([league()], [tournament()], undefined, 0);
+
+    const result = await backfillLeagueCompetitionDetails(prisma, { dryRun: true });
+
+    expect(result).toMatchObject({ dryRun: true, mirrorCount: 0 });
+  });
 });

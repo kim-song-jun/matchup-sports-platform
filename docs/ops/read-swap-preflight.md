@@ -230,6 +230,18 @@ tournament-registrations.service.ts   throw new ConflictException({ code: 'TOURN
 
 ## 5. 로컬에서 `Suites failed 5` 를 보면 — **당신 변경이 아니다**
 
+> **2026-08-31 실측: 지금은 안 난다.** `jest src/profile` → **8 suites · 83 tests 통과**,
+> `tsc --noEmit` 에도 `profile` 오류 0. 공유 클라이언트가 그 사이 갱신됐다.
+> **이 절은 "지금 깨져 있다"가 아니라 "이런 증상을 보면 이렇게 읽어라"로 남긴다** —
+> 공유 클라이언트는 언제든 다시 스테일이 될 수 있다.
+>
+> **아직 참인지 확인**: `cd apps/v1_api && ./node_modules/.bin/jest --silent src/profile` 이
+> 통과하면 증상 없음. `Suites failed` 가 나오면 아래를 읽는다.
+>
+> ⚠️ **이 절을 근거로 "profile 오류는 원래 있는 것"이라며 결과에서 빼지 말 것.**
+> 실제로 그렇게 매번 `grep -v profile` 을 붙여 보고하다가, **애초에 0 이었다는 것**을
+> 뒤늦게 알아차린 일이 있다(문서의 서술을 측정 대신 인용한 것). 빼기 전에 **센다.**
+
 ```
 src/profile/*.spec.ts ×5   TS2339 'preferredPosition' does not exist
 ```

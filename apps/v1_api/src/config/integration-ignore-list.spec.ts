@@ -31,15 +31,25 @@ import { resolve } from 'node:path';
  * 지금 제외된 스펙 수. **줄이는 방향은 자유롭게, 늘리는 방향은 이 숫자를 고쳐야 한다.**
  * 늘릴 때는 왜 지금 고칠 수 없는지를 `jest.config.ts` 의 해당 항목 옆에 적는다.
  */
-const PINNED_IGNORE_COUNT = 5;
+const PINNED_IGNORE_COUNT = 3;
 
 /** `jest.config.ts` 가 `<rootDir>` 접두사와 정규식 이스케이프를 쓰므로 실제 경로로 되돌린다. */
 function toRepoPath(pattern: string): string {
-  return pattern
-    .replace('<rootDir>/', '')
-    .split('\\')
-    .join('')
-    .replace(/\$$/, '');
+  const stripped = pattern.replace('<rootDir>/', '').replace(/[$]$/, '');
+  // **필요한 이스케이프만 명시적으로 되돌린다.** 모든 백슬래시를 무조건 지우면
+  // `\\d` 나 Windows 구분자까지 **조용히 다른 문자열로 변형**되고, 그러면 이 게이트가
+  // 엉뚱한 경로를 검사하면서 통과한다 — 게이트 자신이 틀리는 종류다.
+  // 설정 파일의 **텍스트**에는 백슬래시가 2개 들어 있다(TS 문자열 리터럴의 이스케이프가
+  // 그대로 보인다). 그래서 여기서 지울 것도 `\\\\.` 다 — 1개로 매칭하면 안 물린다.
+  const unescaped = stripped.split('\\\\.').join('.');
+  if (unescaped.includes('\\')) {
+    throw new Error(
+      `제외 패턴에 아직 모르는 이스케이프가 남아 있다: ${pattern}. ` +
+        '`\\.` 외의 정규식 문법을 쓰려면 toRepoPath 를 그 문법까지 다루도록 확장해라 — ' +
+        '조용히 지우면 변형된 경로로 단언이 돌아 게이트가 틀린 채 통과한다.',
+    );
+  }
+  return unescaped;
 }
 
 describe('통합 테스트 제외 목록 (jest.config.ts testPathIgnorePatterns)', () => {

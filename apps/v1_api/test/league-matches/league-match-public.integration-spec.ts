@@ -539,11 +539,37 @@ describe('GET /league-matches (list, R5)', () => {
 
   afterAll(async () => cleanup?.());
 
-  // 각 테스트가 자기 전용 종목/지역/팀을 만든다 -- 같은 describe 안 다른 테스트가 만든
-  // 리그와 뒤섞이면 필터·페이지네이션 단언이 "정확히 이 리그들만"을 보장할 수 없다.
-  async function createLeagueScenario(opts: { title: string; startsOn: string; endsOn: string }) {
+  // **격리 수단이 테스트마다 다르다** — 지역·팀은 항상 전용이지만, 종목은 그렇지 않다:
+  //
+  //   대진을 만드는 테스트   공유 `futsal` 을 써야 한다(경기 설정이 그 종목에만 있다).
+  //                          격리는 `regionId` 로 한다.
+  //   목록만 보는 테스트     전용 종목을 만든다(대진을 안 만들어 설정이 없어도 된다).
+  //
+  // 같은 describe 안 다른 테스트가 만든 리그와 뒤섞이면 필터·페이지네이션 단언이
+  // "정확히 이 리그들만"을 보장할 수 없다 — 2026-09-01 KST CI 에서 실제로 그렇게 깨졌다
+  // (1개 기대에 5개 반환). **어느 축으로 격리하는지를 테스트마다 확인하고 쓴다.**
+  /**
+   * `sportCode` 기본값이 `futsal` 인 이유: 대진 생성이 종목의 활성 경기 설정을 요구한다
+   * (`resolveTeamMatchCompetitionConfig` — 코드가 futsal/soccer/football 일 때만 `<code>-v1`
+   * 설정을 찾는다). 스코프별로 새 종목을 만들면 **409 COMPETITION_CONFIG_REQUIRED** 로 막힌다.
+   *
+   * **다만 종목이 서로 달라야 하는 테스트가 있다** — 종목 필터는 "다른 종목의 리그가 빠지는가"
+   * 를 보므로 두 시나리오가 같은 종목이면 통과할 수가 없다. 그런 테스트는 `sportCode` 를 넘겨
+   * 종목을 가르되, **대진을 만들지 않으므로** 설정이 없어도 된다.
+   */
+  async function createLeagueScenario(opts: {
+    title: string;
+    startsOn: string;
+    endsOn: string;
+    sportCode?: string;
+  }) {
     const scopeId = randomUUID().slice(0, 8);
-    const sport = await prisma.v1Sport.create({ data: { code: `t5-list-sport-${scopeId}`, name: `T5 목록 종목 ${scopeId}` } });
+    const sportCode = opts.sportCode ?? 'futsal';
+    const sport = await prisma.v1Sport.upsert({
+      where: { code: sportCode },
+      update: {},
+      create: { code: sportCode, name: sportCode === 'futsal' ? '풋살' : `T5 종목 ${scopeId}` },
+    });
     const region = await prisma.v1Region.create({ data: { code: `t5-list-region-${scopeId}`, name: `T5 목록 지역 ${scopeId}`, level: 2 } });
     const teamA = await prisma.v1Team.create({ data: { ownerUserId: listOwnerUserId, sportId: sport.id, regionId: region.id, name: `t5-list-team-a-${scopeId}` } });
     const teamB = await prisma.v1Team.create({ data: { ownerUserId: listOwnerUserId, sportId: sport.id, regionId: region.id, name: `t5-list-team-b-${scopeId}` } });
@@ -564,8 +590,23 @@ describe('GET /league-matches (list, R5)', () => {
   });
 
   it('sportId/regionId 필터가 다른 종목·지역의 리그를 제외한다', async () => {
-    const scenarioA = await createLeagueScenario({ title: `T5 필터 A ${suiteId}`, startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-09-30T00:00:00.000Z' });
-    const scenarioB = await createLeagueScenario({ title: `T5 필터 B ${suiteId}`, startsOn: '2026-09-02T00:00:00.000Z', endsOn: '2026-09-30T00:00:00.000Z' });
+    // **A 도 고유 종목이어야 한다.** 아래 단언은 `toEqual([A])` — 완전 일치라 A 의 종목으로
+    // 걸렀을 때 **하나만** 와야 한다. 기본값 futsal 을 쓰면 이 스위트의 다른 테스트가 만든
+    // futsal 리그가 전부 섞인다(CI 실측: 1개 기대에 5개 반환).
+    const scenarioA = await createLeagueScenario({
+      title: `T5 필터 A ${suiteId}`,
+      startsOn: '2026-09-01T00:00:00.000Z',
+      endsOn: '2026-09-30T00:00:00.000Z',
+      sportCode: `t5-filter-a-${suiteId}`,
+    });
+    // B 는 **종목이 달라야 한다** — 아래 첫 단언이 "A 의 종목으로 거르면 B 가 빠진다" 다.
+    // 이 시나리오는 대진을 만들지 않으므로 경기 설정이 없는 종목이어도 된다.
+    const scenarioB = await createLeagueScenario({
+      title: `T5 필터 B ${suiteId}`,
+      startsOn: '2026-09-02T00:00:00.000Z',
+      endsOn: '2026-09-30T00:00:00.000Z',
+      sportCode: `t5-filter-b-${suiteId}`,
+    });
 
     const bySport = await request(app.getHttpServer()).get(`/api/v1/league-matches?sportId=${scenarioA.sportId}`);
     expect(bySport.status).toBe(200);
@@ -588,12 +629,16 @@ describe('GET /league-matches (list, R5)', () => {
     });
   });
 
+  // **이 테스트는 종목을 격리할 수 없다** — 대진을 만들어야 하고(아래 weeksCount), 대진 생성은
+  // 경기 설정이 있는 종목(futsal)을 요구한다. 그래서 격리를 `regionId` 로 한다 — 지역은
+  // 시나리오마다 새로 만들어지므로 이 테스트의 리그만 걸린다. 이 테스트의 계약은 **상태**
+  // 필터이지 종목 필터가 아니므로 무엇으로 좁히든 계약은 그대로다.
   it('state 필터가 draft/active를 구분한다 -- 대진 생성 전은 draft, 생성 후는 active', async () => {
     const scenario = await createLeagueScenario({ title: `T5 상태 ${suiteId}`, startsOn: '2026-09-05T00:00:00.000Z', endsOn: '2026-09-30T00:00:00.000Z' });
 
-    const draftBefore = await request(app.getHttpServer()).get(`/api/v1/league-matches?sportId=${scenario.sportId}&state=draft`);
+    const draftBefore = await request(app.getHttpServer()).get(`/api/v1/league-matches?regionId=${scenario.regionId}&state=draft`);
     expect(draftBefore.body.data.items.map((item: { leagueId: string }) => item.leagueId)).toEqual([scenario.leagueId]);
-    const activeBefore = await request(app.getHttpServer()).get(`/api/v1/league-matches?sportId=${scenario.sportId}&state=active`);
+    const activeBefore = await request(app.getHttpServer()).get(`/api/v1/league-matches?regionId=${scenario.regionId}&state=active`);
     expect(activeBefore.body.data.items).toEqual([]);
 
     await request(app.getHttpServer())
@@ -602,15 +647,23 @@ describe('GET /league-matches (list, R5)', () => {
       .send({ weeksCount: 1 })
       .expect(201);
 
-    const activeAfter = await request(app.getHttpServer()).get(`/api/v1/league-matches?sportId=${scenario.sportId}&state=active`);
+    const activeAfter = await request(app.getHttpServer()).get(`/api/v1/league-matches?regionId=${scenario.regionId}&state=active`);
     expect(activeAfter.body.data.items.map((item: { leagueId: string }) => item.leagueId)).toEqual([scenario.leagueId]);
-    const draftAfter = await request(app.getHttpServer()).get(`/api/v1/league-matches?sportId=${scenario.sportId}&state=draft`);
+    const draftAfter = await request(app.getHttpServer()).get(`/api/v1/league-matches?regionId=${scenario.regionId}&state=draft`);
     expect(draftAfter.body.data.items).toEqual([]);
   });
 
   it('cursor 페이지네이션이 중복·누락 없이 다음 페이지로 이어지고, 마지막 페이지는 hasNext=false다', async () => {
     const scopeId = randomUUID().slice(0, 8);
-    const sport = await prisma.v1Sport.create({ data: { code: `t5-list-page-sport-${scopeId}`, name: `T5 페이지 종목 ${scopeId}` } });
+    // **고유 종목이어야 한다** — 이 테스트는 목록을 페이지로 훑으며 `toEqual` 로 완전 일치를
+    // 단언한다. 공유 futsal 을 쓰면 이 스위트의 다른 테스트가 만든 리그가 페이지에 섞인다
+    // (CI 실측: 기대와 전혀 다른 두 리그가 첫 페이지에 왔다). 대진을 만들지 않으므로
+    // 경기 설정이 없는 종목이어도 된다.
+    const sport = await prisma.v1Sport.upsert({
+      where: { code: `t5-list-page-sport-${scopeId}` },
+      update: {},
+      create: { code: `t5-list-page-sport-${scopeId}`, name: `T5 페이지 종목 ${scopeId}` },
+    });
     const region = await prisma.v1Region.create({ data: { code: `t5-list-page-region-${scopeId}`, name: `T5 페이지 지역 ${scopeId}`, level: 2 } });
     // 서비스 기본 정렬은 createdAt desc(최근 개설순)다 -- 순차로(await) 3개를 만들면
     // 마지막에 만든 리그가 가장 먼저 나와야 한다. leagueIds는 "만든 순서"(day 1→2→3)이므로
@@ -638,7 +691,10 @@ describe('GET /league-matches (list, R5)', () => {
     expect(page1.body.data.items).toHaveLength(2);
     expect(page1.body.data.items.map((item: { leagueId: string }) => item.leagueId)).toEqual([leagueIds[2], leagueIds[1]]);
     expect(page1.body.data.pageInfo.hasNext).toBe(true);
-    expect(page1.body.data.pageInfo.nextCursor).toBe(leagueIds[1]);
+    // 커서는 3e7240133 에서 `<state>:<id>` 복합 포맷이 됐다 — 공개 목록 정렬을 "내 리그"와
+    // 같은 상태 우선으로 통일하면서 "어느 상태 그룹의 어디까지 왔는가"를 한 커서로 복원해야
+    // 하기 때문이다. 이 픽스처의 리그는 대진 생성 전이라 전부 draft 다.
+    expect(page1.body.data.pageInfo.nextCursor).toBe(`draft:${leagueIds[1]}`);
 
     const page2 = await request(app.getHttpServer()).get(
       `/api/v1/league-matches?sportId=${sport.id}&limit=2&cursor=${page1.body.data.pageInfo.nextCursor}`,

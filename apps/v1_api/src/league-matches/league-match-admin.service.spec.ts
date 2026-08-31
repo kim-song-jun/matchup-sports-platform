@@ -58,10 +58,14 @@ interface FakeState {
   scheduleCreates: Array<{ teamId: string; teamMatchId: string }>;
   /** 이 트랜잭션에서 실제로 실행된 statement 이름(`모델.메서드`) 순서대로. */
   calls: string[];
+  /** dual-write 가 통합 축 거울에 보낸 `updateMany` 인자 — where·data 를 그대로 본다. */
+  mirrorUpdates: Array<{ where: { id: string; kind: string }; data: { status: string } }>;
 }
 
 function createFake() {
-  const state: FakeState = { participants: [], sides: [], links: [], linkEvents: [], scheduleCreates: [], calls: [] };
+  const state: FakeState = {
+    participants: [], sides: [], links: [], linkEvents: [], scheduleCreates: [], calls: [], mirrorUpdates: [],
+  };
   let seq = 0;
   const next = (prefix: string) => {
     seq += 1;
@@ -90,8 +94,12 @@ function createFake() {
     },
     // dual-write 대상 — 리그 state 를 바꾸는 자리는 통합 축의 거울도 같이 고친다.
     // `updateMany` 는 백필 전에는 0행이 정상이라(거울이 아직 없다) count 0 을 준다.
+    // **인자를 잡아 둔다** — 호출 여부만 보면 `where` 에서 `kind` 가드가 빠져도 통과한다.
     v1Tournament: {
-      updateMany: track('v1Tournament.updateMany', async () => ({ count: 0 })),
+      updateMany: track('v1Tournament.updateMany', async (args: FakeState['mirrorUpdates'][number]) => {
+        state.mirrorUpdates.push(args);
+        return { count: 0 };
+      }),
     },
     v1Sport: { findFirst: track('v1Sport.findFirst', async () => ({ code: 'futsal' })) },
     v1CompetitionConfigVersion: {
@@ -264,6 +272,16 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
       (call) => call === 'v1GameParticipant.create' || call.startsWith('v1ParticipantIdentityLink'),
     );
     expect(perParticipant).toHaveLength(state.participants.length);
+  });
+
+  it('리그를 active 로 옮길 때 통합 축 거울의 status 도 같이 옮긴다 (dual-write)', async () => {
+    await service.generateFixtures(adminUser, 'league-1', { weeksCount: 1 });
+
+    // 호출 여부만 보지 않는다 — `where` 에서 `kind` 가드가 빠지면 같은 id 의 **진짜 대회**를
+    // 덮어쓸 수 있는데, 호출됐다는 것만으로는 그게 안 보인다.
+    expect(state.mirrorUpdates).toEqual([
+      { where: { id: 'league-1', kind: 'regular_league' }, data: { status: 'in_progress' } },
+    ]);
   });
 
   it('대진마다 홈/원정 팀 모두에 팀 일정이 생긴다 — "매치가 곧 팀일정" 불변식', async () => {

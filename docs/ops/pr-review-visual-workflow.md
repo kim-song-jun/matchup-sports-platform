@@ -107,10 +107,13 @@ gh api graphql -f query='{repository(owner:"<owner>",name:"<repo>"){pullRequest(
 gh api graphql -f query='{repository(owner:"<owner>",name:"<repo>"){pullRequest(number:<N>){
   reviews(last:100){nodes{author{login} submittedAt body}}}}}' \
   --jq '[.data.repository.pullRequest.reviews.nodes[]
-         |select(.author.login=="copilot-pull-request-reviewer")]|max_by(.submittedAt)|.body' > /tmp/rv.md
+         |select(.author.login=="copilot-pull-request-reviewer")]|max_by(.submittedAt)|(.body // "")' > /tmp/rv.md
+wc -c < /tmp/rv.md          # 0 이면 리뷰가 0건이다 (형식 문제가 아니다)
 grep -nE '^\s*[-*]\s+\*\*Comments generated|Suppressed comments' /tmp/rv.md
 ```
-**아무것도 안 나오면 통과가 아니라 "형식이 바뀐 것"** 이다 — 본문을 직접 연다.
+**grep 이 빈 결과여도 통과가 아니다.** 두 경우를 먼저 가른다 — **파일이 비었으면 리뷰가 0건**이고
+(`// ""` 없이 쓰면 문자열 `null` 이 파일에 들어가 이 구분이 안 된다), **비지 않았는데 안 잡히면
+형식이 바뀐 것**이다. 어느 쪽이든 본문을 직접 연다.
 `Suppressed comments` 가 잡히면 **반드시 펼쳐 읽는다**(스레드를 안 만들어 게이트 5에 안 잡힌다).
 
 **게이트 5 — 미해결 수는 "받은 수 / 전체 수" 와 함께 본다**
@@ -139,7 +142,9 @@ gh api graphql -f query='{repository(owner:"<owner>",name:"<repo>"){pullRequest(
 ```
 매칭 실패      값을 안 낸다(empty). `// "폴백"` 이 받아 준다 — 에러는 아니다
 입력이 null    ❌ rc=5 로 종료: "null (null) cannot be matched, as it is not a string"
-               ← 리뷰가 0건이면 `.body` 가 null 이라 여기 걸린다. PR 을 막 연 직후가 그 상태다
+               **단 이건 null 에 `capture`/`test` 같은 정규식을 적용할 때다.**
+               위 게이트 3·4 는 `.body` 를 파일로 내보낼 뿐이라 여기 안 걸린다(rc=0) —
+               대신 파일에 `null` 이 들어가므로 `// ""` 로 받아 **빈 파일**이 되게 한다
 ```
 `//` 는 매칭 실패는 막아도 **null 입력은 못 막는다.** 그래서 게이트 3·4 는 본문을 파일로 받아
 `grep` 하고, 게이트 1·2 는 리뷰가 없을 때를 **`// "없음 …"`** 으로 이름 붙여 찍는다.

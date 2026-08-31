@@ -4,7 +4,6 @@ import { Trophy } from 'lucide-react';
 import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { formatTournamentDateRangeShort, formatEntryFee } from '@/lib/date-utils';
-import { publicAssetPath } from '@/lib/assets';
 import { resolveTournamentImage } from '@/lib/tournament-promo';
 import {
   CompetitionCardHeader,

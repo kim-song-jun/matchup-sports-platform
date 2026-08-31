@@ -75,9 +75,12 @@ describe('LeagueMatchesListClient', () => {
     // 안에서 두 종류가 다른 물건처럼 보였다. 이 단언이 그 회귀를 막는다.
     // 종목 칩 — 전에는 색 점 + 라벨뿐이라 `aria-label` 이 없었다(색으로만 알리는 상태).
     expect(within(link).getByLabelText('종목: 풋살')).toBeInTheDocument();
-    // 썸네일 글리프 — SportGlyph 는 aria-hidden SVG 라 접근성 쿼리로 잡히지 않는다.
-    // 존재만 확인한다(전에는 리그 카드에 아예 없었다).
-    expect(link.querySelector('svg')).not.toBeNull();
+    // 썸네일 — SportGlyph 는 aria-hidden SVG 라 접근성 쿼리로 안 잡힌다. 그렇다고
+    // `link.querySelector('svg')` 로 두면 **카드 어디의 svg 라도 통과**한다 — 지금은
+    // 카드에 svg 가 썸네일뿐이라 결과가 같지만, 다른 svg 가 하나라도 늘면 썸네일이
+    // 사라져도 green 이 된다(Copilot #887 지적). 썸네일을 정확히 집는다.
+    const thumbnail = within(link).getByTestId('competition-thumbnail');
+    expect(thumbnail.querySelector('svg')).not.toBeNull();
   });
 
   it('결과가 0건이면 EmptyState를 렌더한다', () => {

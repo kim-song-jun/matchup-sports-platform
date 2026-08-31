@@ -81,6 +81,7 @@ export function CompetitionThumbnail({
     return (
       <div
         aria-hidden="true"
+        data-testid="competition-thumbnail"
         style={{
           width: 56,
           height: 56,
@@ -105,6 +106,7 @@ export function CompetitionThumbnail({
   return (
     <div
       aria-hidden="true"
+      data-testid="competition-thumbnail"
       style={{
         width: 56,
         height: 56,

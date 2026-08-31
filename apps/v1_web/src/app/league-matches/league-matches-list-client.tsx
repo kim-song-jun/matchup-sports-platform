@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { useV1LeagueMatches, useV1MasterSports } from '@/hooks/use-v1-api';

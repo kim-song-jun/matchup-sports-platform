@@ -16,7 +16,6 @@ import {
   FEATURED_PERSONAS,
   FEATURED_TEAMS,
 } from './seed-alpha-tournament-qa';
-import { leagueMirrorCreateData } from '../src/tournaments/league-competition-mirror';
 
 /**
  * alpha 리그(League) 화면 QA 시드 (Task R10).
@@ -57,6 +56,23 @@ import { leagueMirrorCreateData } from '../src/tournaments/league-competition-mi
  * `V1TeamMatch.status`/`completedAt`은 create에만 쓴다 — 재배포가 그 사이 스태프가 라이브로
  * 진행시킨 상태를 시드 값으로 되돌리면 안 된다(`seed-alpha-tournament-qa.ts`의 동일 관행).
  */
+
+/**
+ * **`../src/...` 를 import 하지 않는다.** 이 시드는 API 프로덕션 이미지 안에서
+ * `ts-node prisma/seed-alpha-league-qa.ts` 로 도는데 그 이미지에는 `src/` 가 없다
+ * (`dist/`·`prisma/`·`node_modules` 만 COPY). 실제로 `../src/` import 하나 때문에
+ * 2026-08-09 배포가 MODULE_NOT_FOUND 로 죽었다.
+ *
+ * 그래서 통합 축 거울에 필요한 값을 **복제한다.** 복제본이 어긋나면 시드가 리그와 다른
+ * 값을 대회 행에 박게 되므로, `seed-alpha-league-qa.spec.ts` 가 원본
+ * (`src/tournaments/league-competition-mirror.ts`)과 같은지 고정한다.
+ */
+export const ALPHA_SEED_LEAGUE_CONFIG_ID = '22222222-2222-4222-8222-222222222222';
+export const ALPHA_SEED_STATUS_BY_LEAGUE_STATE = {
+  draft: 'draft',
+  active: 'in_progress',
+  completed: 'completed',
+} as const;
 
 const LEAGUE_QA_ID = 'ad100000-0000-4000-8000-000000000001';
 // 티어(1부/2부) 표본용 시리즈. 리그 QA 시드에 시리즈가 0건이라 "N부" 뱃지·시리즈 부제가
@@ -924,19 +940,17 @@ async function ensureLeague(
       scheduledAt: startsOn,
       scheduledEndAt: endsOn,
     },
-    create: leagueMirrorCreateData({
+    create: {
       id: LEAGUE_QA_ID,
-      title: commonLeagueData.title,
+      kind: 'regular_league',
       sportId,
+      title: commonLeagueData.title,
+      status: ALPHA_SEED_STATUS_BY_LEAGUE_STATE.active,
       regionId,
-      state: 'active',
-      startsOn,
-      endsOn,
-      seriesId: null,
-      tier: null,
-      seasonNo: null,
-      sportCode: 'futsal',
-    }),
+      scheduledAt: startsOn,
+      scheduledEndAt: endsOn,
+      competitionConfigVersionId: ALPHA_SEED_LEAGUE_CONFIG_ID,
+    },
   });
   // 참가팀 연결(V1LeagueTeam) — 순위표·득점/도움 순위 둘 다 league.teams(이 조인)를 통해
   // teamId 목록을 읽으므로 이게 없으면 리그가 빈 리그로 보인다.
@@ -1025,19 +1039,20 @@ async function ensureTierSeries(
         scheduledAt: startsOn,
         scheduledEndAt: endsOn,
       },
-      create: leagueMirrorCreateData({
+      create: {
         id: leagueId,
-        title: commonData.title,
+        kind: 'regular_league',
         sportId,
+        title: commonData.title,
+        status: ALPHA_SEED_STATUS_BY_LEAGUE_STATE.draft,
         regionId,
-        state: 'draft',
-        startsOn,
-        endsOn,
+        scheduledAt: startsOn,
+        scheduledEndAt: endsOn,
         seriesId: LEAGUE_QA_SERIES_ID,
         tier,
         seasonNo: 1,
-        sportCode: 'futsal',
-      }),
+        competitionConfigVersionId: ALPHA_SEED_LEAGUE_CONFIG_ID,
+      },
     });
     for (const team of tierTeams) {
       await tx.v1LeagueTeam.upsert({

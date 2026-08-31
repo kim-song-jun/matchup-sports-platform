@@ -54,7 +54,17 @@ export class LeagueDetailBackfillBlockedError extends Error {
     readonly detail: {
       missingTournaments: Array<{ leagueId: string }>;
       kindMismatches: Array<{ leagueId: string; kind: string | null }>;
-      alreadyFilled: Array<{ leagueId: string; filled: string[] }>;
+      /**
+       * **목표와 다른 값**이 이미 있는 행. 단순히 채워져 있는 것은 여기 오지 않는다.
+       *
+       * 필드 이름만이 아니라 **현재 값과 쓰려던 값을 함께** 싣는다 — 이 에러가 `--apply` 가
+       * 막혔을 때 운영자가 보는 **유일한 단서**이고, 이름만 있으면 결국 DB 를 직접 대조해야
+       * 한다(2026-08-31 에 실제로 그랬다).
+       */
+      conflicts: Array<{
+        leagueId: string;
+        fields: Array<{ field: string; current: string | null; expected: string }>;
+      }>;
     },
   ) {
     super(message);
@@ -88,36 +98,74 @@ export async function backfillLeagueCompetitionDetails(
     .filter((league) => byId.has(league.id) && byId.get(league.id)?.kind !== 'regular_league')
     .map((league) => ({ leagueId: league.id, kind: byId.get(league.id)?.kind ?? null }));
 
-  // ── 가드 2: 이미 값이 있는 행 ─────────────────────────────────────────────
+  // ── 가드 2: **목표와 다른 값**이 이미 있는 행 ──────────────────────────────
   // **덮어쓰기를 하지 않는다.** 덮어쓰는 순간 원래 값이 사라져 되돌리기가 불가능해진다
   // (앞선 두 백필은 INSERT 라 되돌리기가 DELETE 였지만, UPDATE 는 그렇지 않다).
-  // 지금은 0건이지만 재실행·부분 실행 뒤에는 생길 수 있고, 그때 멈추는 것이 맞다.
   //
-  // **"이미 값이 있다" 를 무조건 막지 않는다.** dual-write 가 배포된 뒤 새로 생긴 리그는
-  // 거울이 **처음부터 올바른 값으로** 만들어진다. 그걸 낯선 값으로 보면 **리그 하나 때문에
-  // 백필 전체가 막힌다.** 목표값과 같으면 할 일이 없는 것이므로 건너뛴다.
-  const alreadyFilled: Array<{ leagueId: string; filled: string[] }> = [];
+  // ⚠️ **"채워져 있다" 가 아니라 "다르다" 로 판정한다.** 처음엔 "값이 있으면 막는다" 로
+  // 썼는데, 2026-08-31 alpha dry-run 이 **QA 시드 리그 하나 때문에 통째로 막혔다**:
+  // ```
+  //         status      scheduled_at   scheduled_end_at   region_id
+  // league  completed   A              B                  R
+  // mirror  draft       A              B                  R      ← 날짜·지역은 이미 목표값이다
+  // ```
+  // QA 시드가 배포마다 dual-write 의 **update 분기**로 title·날짜·region 을 동기화하는데,
+  // `status` 는 (스태프가 바꾼 값을 재배포가 되돌리지 않도록) **create 전용**이라 `draft` 로
+  // 남는다. 그래서 **부분만 채워진 정상 행**이 생긴다.
+  //
+  // 가드의 목적은 *"모르는 값을 덮어쓰지 않는다"* 인데 **우리가 쓸 값과 같은 것은 모르는
+  // 값이 아니다.** 그래서 목표와 **다른** 필드만 막는다. 전부 같으면 할 일이 없어 건너뛴다.
+  const conflicts: Array<{
+    leagueId: string;
+    fields: Array<{ field: string; current: string | null; expected: string }>;
+  }> = [];
   const skippable = new Set<string>();
   for (const league of leagues) {
     const row = byId.get(league.id);
     if (!row || row.kind !== 'regular_league') continue;
-    if (mirrorDetailMatches(row, leagueMirrorDetailData(league))) {
+    const target = leagueMirrorDetailData(league);
+    if (mirrorDetailMatches(row, target)) {
       skippable.add(league.id);
       continue;
     }
-    const filled: string[] = [];
-    if (row.status !== V1TournamentStatus.draft) filled.push('status');
-    if (row.scheduledAt !== null) filled.push('scheduledAt');
-    if (row.scheduledEndAt !== null) filled.push('scheduledEndAt');
-    if (row.regionId !== null) filled.push('regionId');
-    if (filled.length > 0) alreadyFilled.push({ leagueId: league.id, filled });
+    // **`null` 은 "아직 안 채움" 이지 "다른 값" 이 아니다** — 그건 우리가 채울 자리다.
+    // `status` 의 `draft` 도 같은 뜻이다(백필 전 기본값).
+    const conflicting: Array<{ field: string; current: string | null; expected: string }> = [];
+    if (row.status !== V1TournamentStatus.draft && row.status !== target.status) {
+      conflicting.push({ field: 'status', current: row.status, expected: target.status });
+    }
+    if (row.scheduledAt !== null && row.scheduledAt.getTime() !== target.scheduledAt.getTime()) {
+      conflicting.push({
+        field: 'scheduledAt',
+        current: row.scheduledAt.toISOString(),
+        expected: target.scheduledAt.toISOString(),
+      });
+    }
+    if (
+      row.scheduledEndAt !== null &&
+      row.scheduledEndAt.getTime() !== target.scheduledEndAt.getTime()
+    ) {
+      conflicting.push({
+        field: 'scheduledEndAt',
+        current: row.scheduledEndAt.toISOString(),
+        expected: target.scheduledEndAt.toISOString(),
+      });
+    }
+    if (row.regionId !== null && row.regionId !== target.regionId) {
+      conflicting.push({ field: 'regionId', current: row.regionId, expected: target.regionId });
+    }
+    if (conflicting.length > 0) conflicts.push({ leagueId: league.id, fields: conflicting });
   }
 
-  if (missingTournaments.length > 0 || kindMismatches.length > 0 || alreadyFilled.length > 0) {
+  if (missingTournaments.length > 0 || kindMismatches.length > 0 || conflicts.length > 0) {
+    // **메시지가 실제 의미를 말해야 한다.** "이미 값이 채워진 행" 이라고 하면 다음 사람은
+    // *"그럼 채워진 게 정상인가? skip 하면 되나?"* 로 간다 — 틀린 결론이다. 실제 의미는
+    // **"우리가 쓰려는 값과 다른 값이 있다"** 이고, 그건 *"누가 왜 다른 값을 넣었나"* 라는
+    // 다른 질문으로 이어진다. 이 문장이 `--apply` 가 막혔을 때 보이는 유일한 단서다.
     throw new LeagueDetailBackfillBlockedError(
       '백필을 중단했다 — 대회 행이 없는 리그, 종류가 리그가 아닌 대회 행, ' +
-        '또는 이미 값이 채워진 행이 있다.',
-      { missingTournaments, kindMismatches, alreadyFilled },
+        '또는 **목표와 다른 값**이 이미 있는 행이 있다(단순히 채워져 있는 것은 막지 않는다).',
+      { missingTournaments, kindMismatches, conflicts },
     );
   }
 
@@ -145,14 +193,30 @@ export async function backfillLeagueCompetitionDetails(
         // 가드 조건을 `where` 에 넣는다. 위 가드는 트랜잭션 **밖** 스냅샷이라 읽기와 쓰기
         // 사이의 경합을 못 잡지만, 이 `where` 는 **쓰기 시점에** 강제된다 — 그 사이 누가
         // 값을 채웠으면 이 행은 count 0 이 되고 아래 합계 단언이 걸린다.
+        // **`where` 는 "비어 있는가" 가 아니라 "내가 읽은 그대로인가" 를 묻는다.**
+        // `null` 을 요구하면 위 가드가 통과시킨 **부분 채움 행**(시드가 날짜·지역만 동기화한
+        // 것)이 0행 매칭이 되어 개수 단언에 걸린다. 관측값을 그대로 걸면 **경합 보호는
+        // 유지되면서**(읽기~쓰기 사이 누가 바꾸면 0행) 부분 채움도 통과한다.
+        // **`observed?.` 를 쓰지 않는다.** Prisma 의 `where` 는 값이 `undefined` 면 그 조건을
+        // **통째로 버린다** — optional chaining 이면 `observed` 가 없을 때 `status` 조건이
+        // 조용히 사라지고, 가드가 있는데 아무것도 안 거는 상태가 된다.
+        //
+        // 가드 1 이 모든 리그에 거울이 있음을 이미 확인했으므로 여기서 없을 수는 없다.
+        // 그래도 **`!` 로 넘기지 않는다** — 없다면 위 가드가 무력해진 것이고 드러나야 한다.
+        const observed = byId.get(league.id);
+        if (observed === undefined) {
+          throw new Error(
+            `거울을 읽지 못했다: ${league.id}. 가드 1 을 통과했는데 여기서 없다면 그 가드가 무력해진 것이다.`,
+          );
+        }
         const result = await tx.v1Tournament.updateMany({
           where: {
             id: league.id,
             kind: 'regular_league',
-            status: V1TournamentStatus.draft,
-            scheduledAt: null,
-            scheduledEndAt: null,
-            regionId: null,
+            status: observed.status,
+            scheduledAt: observed.scheduledAt,
+            scheduledEndAt: observed.scheduledEndAt,
+            regionId: observed.regionId,
           },
           data: leagueMirrorDetailData(league),
         });

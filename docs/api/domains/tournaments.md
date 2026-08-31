@@ -6,6 +6,7 @@
 |---|---|---|---|---|
 | `GET` | `/api/v1/tournaments` | optional user | `TournamentListQueryDto` | public tournament list page |
 | `GET` | `/api/v1/tournaments/:tournamentId` | optional user | path id | public tournament detail |
+| `GET` | `/api/v1/tournaments/:tournamentId/standings/overall` | optional user | path id | overall standings + progress + magic number |
 | `GET` | `/api/v1/tournaments/campaigns/:slug` | public | lowercase kebab slug | published campaign + safe tournament facts |
 
 Tournament list/detail reads are public. Clients may call them without a stored v1 session; authenticated-only state such as the caller's registrations must use the registration endpoints below and should only be queried after login. Public read endpoints expose only tournaments with `open`, `closed`, `in_progress`, or `completed` status and `deletedAt = null`. Registration, roster, and admin tournament routes remain authenticated.
@@ -13,6 +14,32 @@ Tournament list/detail reads are public. Clients may call them without a stored 
 Public list/detail items include `campaignSlug` only while the related campaign is `published`; otherwise the field is `null`. The slug endpoint also requires a published campaign and a non-deleted tournament in `open`, `closed`, `in_progress`, or `completed`. Its tournament projection contains display facts, rules/refund policy, active sponsors, confirmed count, and public confirmed/waitlisted team summaries. It never returns bank account fields, player/contact PII, creator/admin identity, or deleted-row metadata.
 
 After bracket publication, each public `groups[].standings[]` row includes nullable `teamLogoUrl` from the registered team's current profile. Tournament detail and bracket clients render it through the shared team-avatar fallback contract, so a missing or failed image remains distinguishable without replacing valid saved logos.
+
+### Overall standings — two competition kinds, two row shapes
+
+`v1_tournaments` holds both single tournaments (`kind = regular_tournament`) and the mirror rows of
+regular league seasons (`kind = regular_league`, whose id equals the league id). This endpoint serves
+both, but a mirror row has no groups and no tournament fixtures — those are created only on the
+tournament axis — so its standings are computed from the league axis instead. The response envelope is
+identical; three fields differ:
+
+| Field | Regular tournament | Regular league | Why |
+|---|---|---|---|
+| `registrationId` | present | **absent** | a league has no entry-registration concept; teams join the league directly |
+| `teamId` | absent | **present** | the team id is the row's identity on the league axis |
+| `fairPlayPoints` | present | **absent** | leagues do not tally fair-play points at all — `0` would read as "no penalties", so the field is omitted rather than zero-filled |
+| `magicNumber` | computed | `null` | the magic number is tied to the tournament axis's remaining-fixture count; the league equivalent is a separate decision and is not invented here |
+| `recalculatedAt` | last recalculation | `null` | league standings are computed per request, not persisted |
+
+The handler reads no caller identity, so the response carries no viewer-dependent fields; the
+optional-auth guard is inherited from the controller.
+
+Clients must key each row on **whichever identity field is present** (`registrationId ?? teamId`);
+exactly one of the two is always populated, and treating either as required breaks the other kind.
+
+For a league, `progress` counts only fixtures that can still be played: cancelled and voided fixtures
+are excluded from `played`, `remaining`, **and `total`**. Counting a fixture that will never be played
+as "remaining" would keep progress permanently below 100%.
 
 ## Individual awards
 

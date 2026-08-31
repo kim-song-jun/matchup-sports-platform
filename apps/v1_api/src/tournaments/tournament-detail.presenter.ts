@@ -3,6 +3,8 @@ import {
   resolveParticipantDisplayName,
   type ParticipantNameProfileRow,
 } from '../games/public-records/participant-name-gating';
+import { V1CompetitionKind } from '@prisma/client';
+import type { LeagueFixtureListItem } from '../league-matches/league-fixture-list-source';
 import type { TournamentDetailRow } from './tournaments-read.query';
 import { resolveTournamentFixtureOfficialResult } from './tournament-fixture-official-result';
 
@@ -101,6 +103,17 @@ export function presentTournamentDetail(
   row: TournamentDetailRow,
   now: Date = new Date(),
   staffBypass = false,
+  /**
+   * 정규 리그 시즌(거울 행)의 대진 목록. **호출부가 리그 축에서 조회해 넘긴다** —
+   * 이 presenter 는 조회하지 않는다.
+   *
+   * ⚠️ **`fixtures` 에 합치지 않는다.** 대회 `V1TournamentFixture` 와 리그
+   * `V1LeagueFixture` 는 겹치는 필드가 셋뿐이고, 하필 그 겹치는 `status` 의 **값 영역이
+   * 다르다**(`scheduled|completed` vs `matched|completed|cancelled|…`). 같은 이름에 다른
+   * 것을 담으면 `status === 'scheduled'` 같은 코드가 **모든 리그 경기에서 조용히 거짓**이
+   * 된다 — 타입도 값도 정상으로 보인다. 그래서 별도 필드로 낸다.
+   */
+  leagueFixtures: LeagueFixtureListItem[] = [],
 ) {
   // Task 109 Track 6: bracketPublishedAt이 null이면 대진표(조/픽스처)를 관리자가 아직
   // 일괄 공개하지 않은 상태 — 공개 조회에서는 groups/fixtures를 빈 배열로 감춘다.
@@ -109,7 +122,16 @@ export function presentTournamentDetail(
   // 예약 공개는 스케줄러 없이 여기서 판정한다. 예약 시각이 지났으면 아직
   // bracketPublishedAt이 비어 있어도 공개로 간주하므로, 예약 시각과 실제 노출 사이에
   // cron 주기만큼의 지연이 생기지 않는다.
-  const bracketPublished = isBracketPublished(row.bracketPublishedAt, row.bracketPublishScheduledAt, now);
+  //
+  // ⚠️ **이 게이트는 대회 축 개념이라 정규 리그 거울에는 적용하지 않는다.** "리그의
+  // 대진표를 아직 공개하지 않은 상태" 라는 것이 없다 — 리그 대진은 만들어지면 바로
+  // 공개된다(`league-match-public.service.ts` 에 이 게이트 참조가 0건이다). 거울 행에
+  // 태우면 `bracketPublishedAt` 이 비어 있어(거울 생성이 그 값을 쓰지 않는다) 일정이
+  // 영영 빈 배열이 되고, 값을 채우는 쪽으로 풀면 **운영자가 리그마다 없던 버튼을
+  // 눌러야** 한다. 리그에 없는 개념을 만들지 않는다.
+  const isLeagueMirror = row.kind === V1CompetitionKind.regular_league;
+  const bracketPublished =
+    isLeagueMirror || isBracketPublished(row.bracketPublishedAt, row.bracketPublishScheduledAt, now);
   // 참가팀 공개 정책 통일(fix/v1-publish) — participantTeams와 groups/fixtures의 팀명이
   // 같은 조건으로 감춰진다. 대진표 공개 여부(bracketPublished)와는 독립 — 대진표는
   // 공개돼도(구조는 보여도) 모집 중이면 그 안의 팀 식별 정보만 별도로 가려진다.
@@ -353,6 +375,12 @@ export function presentTournamentDetail(
       recipientName: presentAwardRecipientName(award),
       teamName: award.teamName ?? null,
       note: award.note ?? null,
+    })),
+    // 정규 리그 시즌에만 채워진다. 대회는 항상 빈 배열 — 화면이 길이 0이면 이 섹션을
+    // 아예 그리지 않는다(`fixtures` 와 같은 규약).
+    leagueFixtures: leagueFixtures.map((fixture) => ({
+      ...fixture,
+      startAt: fixture.startAt.toISOString(),
     })),
   };
 }

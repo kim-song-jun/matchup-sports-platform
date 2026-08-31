@@ -18,6 +18,11 @@ import {
 } from './tournaments-read.query';
 import { bucketLeagueFixtures, leagueFixtureProgressInput } from '../league-matches/league-standings-source';
 import {
+  LEAGUE_FIXTURE_FACT_SELECT,
+  LEAGUE_FIXTURE_LIST_SELECT,
+  toLeagueFixtureList,
+} from '../league-matches/league-fixture-list-source';
+import {
   calculateLeagueStandingsWithTieBreakInfo,
   type LeagueTieBreakCriterion,
 } from '../league-matches/league-standings';
@@ -147,8 +152,50 @@ export class TournamentsReadService {
     }
 
     const staffBypass = await this.resolveStaffBypass(user, tournamentId);
+    // 거울 행에는 `V1TournamentFixture` 가 하나도 없다 — 그 행을 만드는 코드가 전부
+    // `TOURNAMENT_KINDS` 게이트 뒤에 있다. 그래서 대회 축 대진으로는 **빈 일정**이 나오고,
+    // 화면은 "대진표 준비 중" 을 띄운다(진행 중인 리그 시즌에 뜨면 틀린 말이다).
+    // 리그 축에서 같은 목록을 만들어 별도 필드로 싣는다.
+    const leagueFixtures =
+      row.kind === V1CompetitionKind.regular_league
+        ? await this.leagueCompetitionFixtures(tournamentId)
+        : [];
 
-    return presentTournamentDetail(row, new Date(), staffBypass);
+    return presentTournamentDetail(row, new Date(), staffBypass, leagueFixtures);
+  }
+
+  /**
+   * 거울 행(`kind = 'regular_league'`, id 가 리그 id 와 같다)의 일정 목록.
+   *
+   * 매핑은 `league-fixture-list-source.ts` 가 한다 — 리그 자기 페이지
+   * (`LeagueMatchPublicService.detail()`)와 **같은 함수**를 쓴다. 두 화면이 같은 대진을
+   * 서로 다른 모양으로 보여주지 않게 하기 위해서다.
+   *
+   * ⚠️ 순위 쪽 소스(`league-standings-source.ts`)와 **합치지 않는다.** 그쪽은 "순위에 세는
+   * 대진이 무엇인가" 에 답하느라 취소·무효를 카운터로 접고 `teamMatchId`·`startAt`·
+   * `placeName` 을 버린다 — 일정은 정확히 그 버린 것들이 필요하고, **취소·무효 대진도
+   * 목록에는 보여야 한다**(화면이 "취소됨"·"집계 제외" 로 적는다). 같은 테이블, 다른 질문.
+   */
+  private async leagueCompetitionFixtures(leagueId: string) {
+    const fixtures = await this.prisma.v1TeamMatch.findMany({
+      where: { leagueId },
+      orderBy: { startAt: 'asc' },
+      select: LEAGUE_FIXTURE_LIST_SELECT,
+    });
+
+    const revisionIds = fixtures
+      .map((fixture) => fixture.game?.currentOfficialRevisionId ?? null)
+      .filter((id): id is string => id !== null);
+    // 대진 수만큼 반복 조회하지 않는다 — 확정 리비전 id 를 모아 단일 IN 조회로 가져온다.
+    const facts =
+      revisionIds.length === 0
+        ? []
+        : await this.prisma.v1GameOfficialFact.findMany({
+            where: { revisionId: { in: revisionIds } },
+            select: LEAGUE_FIXTURE_FACT_SELECT,
+          });
+
+    return toLeagueFixtureList(fixtures, new Map(facts.map((fact) => [fact.gameId, fact])));
   }
 
   /**

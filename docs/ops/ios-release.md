@@ -197,23 +197,46 @@ APNs 프로바이더 토큰의 ES256 서명은 **서버(Node)** 에서 한다 �
 
 | 산출물 | 상태 |
 |---|---|
-| `apps/v1_ios/ExportOptions.plist` | `method: app-store-connect`, teamID, 자동 서명, 심볼 업로드 |
+| `apps/v1_ios/ExportOptions.plist` | `method: app-store-connect`, teamID, **수동 서명**, 심볼 업로드 |
+| `scripts/ios/asc-profile.mjs` | App Store 프로파일을 ASC API 로 생성·설치 (기기 등록 불필요) |
 | `scripts/ios/archive-and-export.sh` | archive → export → (`--upload` 일 때만) 업로드 |
 | 빌드 번호 강제 | `version.properties` 가 원천. 같은 버전·빌드 번호로 두 번 업로드하면 스크립트가 먼저 막는다 |
 | `DEVELOPMENT_TEAM` | project.yml 에 설정 |
 
-**어디서 멈추는지 실제로 확인했다.** 인증서 없이 스크립트를 돌리면:
+### 자동 서명은 이 프로젝트에서 동작하지 않는다 (2026-08-31 실측)
+
+이 문서의 이전 판은 "`-allowProvisioningUpdates` 를 붙여 뒀으므로 계정이 준비되면 Xcode 가
+프로파일을 스스로 만든다" 고 적고 있었다. **틀렸다.** 실제로는 이렇게 멈춘다:
 
 ```
-[archive] version 0.1.0 (1) from apps/v1_ios/version.properties
-[archive] scheme=TeameetAlpha configuration=Alpha Release
+error: Communication with Apple failed: Your team has no devices from which to generate
+a provisioning profile.
 error: No profiles for 'kr.co.teameet.alpha' were found: Xcode couldn't find any iOS App
 Development provisioning profiles matching 'kr.co.teameet.alpha'.
 ** ARCHIVE FAILED **
 ```
 
-이 지점이 위 체크리스트 1~3 이 끝나야 넘어가는 곳이다. `-allowProvisioningUpdates` 를 이미 붙여
-뒀으므로, 계정이 준비되면 Xcode 가 프로파일을 스스로 만든다.
+**Xcode 의 archive 액션은 언제나 *개발용* 프로파일을 요구하고**, Apple 은 등록된 기기가 없는
+팀에 그것을 발급하지 않는다. 이 프로젝트에는 아이폰이 없고 TestFlight 는 애초에 기기가 필요
+없으므로, 이 조건은 영원히 충족되지 않는다.
+
+**해법은 기기 등록이 아니다.** 배포 프로파일에는 기기 목록이 없다 — 그래서 배포 프로파일을
+직접 만들어 이름으로 지정하면 개발용 프로파일 단계를 통째로 건너뛴다.
+
+```bash
+# 한 번만. 인증서는 Xcode → Settings → Accounts → Manage Certificates → + → Apple Distribution
+export ASC_KEY_ID=… ASC_ISSUER_ID=… ASC_KEY_FILE=/path/outside/the/repo/AuthKey_XXXX.p8
+node scripts/ios/asc-profile.mjs create "Teameet Alpha App Store" kr.co.teameet.alpha
+```
+
+그 다음부터는 `archive-and-export.sh` 가 그 프로파일을 이름으로 지정해 수동 서명한다.
+archive 와 export 는 **같은 방식으로 서명해야 한다** — export 만 자동으로 두면 Xcode 가
+관리형 프로파일을 새로 발급하고, 관리형 프로파일은 수동 서명 빌드가 이름으로 지정할 수 없다.
+
+> **서명 실패를 서명을 끄는 것으로 "해결" 하지 마라.** 서명 없이 만든 archive 는 완벽하게
+> 유효하고 완벽하게 서명된 .ipa 로 export 되는데, 그 앱에는 엔타이틀먼트가 하나도 없다.
+> 아무것도 실패하지 않고, 설치되고, 열리고, 푸시만 영원히 오지 않는다. 실제로 한 번 그렇게
+> 만들었다 — 그래서 스크립트에 게이트가 있다.
 
 업로드는 `--upload` 플래그가 있을 때만 실행된다. **업로드는 되돌릴 수 없다** — 잘못 올린 빌드는
 삭제가 아니라 만료 처리만 된다.

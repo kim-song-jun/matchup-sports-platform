@@ -21,6 +21,13 @@ import {
   type PlayerCard,
 } from './player-card';
 import { PrismaService } from '../prisma/prisma.service';
+import { canonicalCompetitionConfigForSport } from '../tournaments/competition-config/lineup-size';
+import { tryNormalizeCompetitionSportCode } from '../tournaments/competition-config/competition-config.validator';
+import {
+  PREFERRED_POSITION_MESSAGES,
+  positionCodesForSport,
+  validatePreferredPositions,
+} from '../users/preferred-position';
 import { isReviewRevealed } from '../reviews/review-visibility';
 import { removeUserFromActiveRosters } from '../tournaments/roster-cleanup';
 import { verifyPhoneProofToken } from '../verification/phone-proof-token';
@@ -79,7 +86,7 @@ export class ProfileService {
       reputation,
       personalActivityCount,
       monthlyPersonalMatchCount,
-      tournamentAppearances,
+      officialGameAppearances,
     ] = await Promise.all([
       // V1UserReputationSummary 캐시는 리뷰 제출 이벤트(submitPersonalReview/submitTeamReview) 안에서만 갱신되고,
       // 72시간 경과로 리뷰가 새로 reveal 가능해지는 시점을 트리거하는 cron은 없다(사용자 결정: cron 추가 안 함).
@@ -101,18 +108,18 @@ export class ProfileService {
       }),
       // 레거시 개인매치(V1MatchParticipant)만 세면 대회(V1Game 계열)를 여러 번 뛴 유저도 0으로 보인다
       // (프로덕션 실측: 팀원 7명 전원 matchCount=0). 대회 출전은 별도 카운트로 더한다.
-      this.countTournamentAppearances(user.id, monthStart, nextMonthStart),
+      this.countOfficialGameAppearances(user.id, monthStart, nextMonthStart),
     ]);
     const mannerScore = reputation.mannerScore;
 
     return {
       totals: {
-        activityCount: personalActivityCount + tournamentAppearances.total,
+        activityCount: personalActivityCount + officialGameAppearances.total,
         teamCount: teamIds.length,
         mannerScore,
       },
       monthly: {
-        matchCount: monthlyPersonalMatchCount + tournamentAppearances.monthly,
+        matchCount: monthlyPersonalMatchCount + officialGameAppearances.monthly,
         mannerScore,
         winRate: null,
       },
@@ -399,7 +406,6 @@ export class ProfileService {
       appearances: records.appearances,
       goals: records.goals,
       assists: records.assists,
-      startedCount: records.startedCount,
       position: records.position,
       jerseyNumber: records.jerseyNumber,
       skillScore: toNumber(reputation?.metricSkillScore),
@@ -427,7 +433,7 @@ export class ProfileService {
       monthlyPersonalMatchCount,
       monthlyTeamJoinCount,
       monthlyReviewCount,
-      tournamentAppearances,
+      officialGameAppearances,
     ] = await Promise.all([
       this.prisma.v1MatchParticipant.count({
         where: {
@@ -467,19 +473,19 @@ export class ProfileService {
       this.getRevealedMonthlyReviewCount(userId, monthStart, nextMonthStart),
       // 레거시 개인매치(V1MatchParticipant)만 세면 대회(V1Game 계열)를 여러 번 뛴 유저도 0으로 보인다
       // (프로덕션 실측: 팀원 7명 전원 matchCount=0). 대회 출전은 별도 카운트로 더한다.
-      this.countTournamentAppearances(userId, monthStart, nextMonthStart),
+      this.countOfficialGameAppearances(userId, monthStart, nextMonthStart),
     ]);
 
     return {
       totals: {
-        matchCount: personalMatchCount + tournamentAppearances.total,
-        tournamentCount: tournamentAppearances.tournamentTotal,
+        matchCount: personalMatchCount + officialGameAppearances.total,
+        tournamentCount: officialGameAppearances.tournamentTotal,
         teamCount,
         reviewCount: reputation.reviewCount,
       },
       monthly: {
-        matchCount: monthlyPersonalMatchCount + tournamentAppearances.monthly,
-        tournamentCount: tournamentAppearances.tournamentMonthly,
+        matchCount: monthlyPersonalMatchCount + officialGameAppearances.monthly,
+        tournamentCount: officialGameAppearances.tournamentMonthly,
         teamJoinCount: monthlyTeamJoinCount,
         reviewCount: monthlyReviewCount,
       },
@@ -487,7 +493,7 @@ export class ProfileService {
   }
 
   /**
-   * 사용자에 연결된(`V1ParticipantIdentityLinkCurrent`) participant 들의 대회 경기 출전 수를
+   * 사용자에 연결된(`V1ParticipantIdentityLinkCurrent`) participant 들의 공식 경기 출전 수를
    * 누적/이번 달로 센다. `GET /users/:id/records`(public-user-records.service.ts)와 같은
    * "현재 공식 리비전만"(`resultRevision.game.currentOfficialRevisionId === resultRevision.id`
    * && `officialAt !== null`) 규칙을 쓴다 — 정정/무효 처리된 경기가 이중 계산되지 않게.
@@ -502,14 +508,14 @@ export class ProfileService {
    * Set으로 중복 제거한다.
    */
   /**
-   * 대회 출전 수(경기 단위)와 참가한 **대회 수**(distinct tournament)를 한 번에 센다.
+   * 공식 경기 출전 수(경기 단위)와 참가한 **대회 수**(distinct tournament)를 한 번에 센다.
    *
    * 두 값을 굳이 한 쿼리로 묶은 이유: 프로필 GET 한 번에 두 번 왕복하지 않기 위해서다.
    * 그리고 여기서 세는 것은 **개수뿐**이라 `PublicUserRecordsService.loadEligibleRows()`
    * 같은 전체 기록 행(골·카드·MVP·상대팀…)을 끌어오지 않는다 -- 출전이 많은 사용자의
    * 프로필 조회마다 목록 전체를 메모리에 올리는 비용을 피한다.
    */
-  private async countTournamentAppearances(
+  private async countOfficialGameAppearances(
     userId: string,
     monthStart: Date,
     nextMonthStart: Date,
@@ -530,7 +536,9 @@ export class ProfileService {
         participantId: { in: participantIds },
         resultRevision: {
           officialAt: { not: null },
-          game: { sourceType: 'TOURNAMENT_FIXTURE' },
+          // 공개 개인 기록과 같은 공식 게임 모집단. 팀매치를 빼면 개인 기록에는 3경기가
+          // 보이는데 마이페이지 활동은 0회가 되어 같은 사용자의 두 화면이 모순된다.
+          game: { sourceType: { in: ['TOURNAMENT_FIXTURE', 'TEAM_MATCH'] } },
         },
       },
       select: {
@@ -558,7 +566,7 @@ export class ProfileService {
     const monthlyTournamentIds = new Set<string>();
     for (const row of rows) {
       const revision = row.resultRevision;
-      // sourceType(TEAM_MATCH 제외)과 officialAt 은 위 where 가 이미 걸렀다 -- 여기서는
+      // sourceType과 officialAt은 위 where가 이미 걸렀다 -- 여기서는
       // where 로 표현할 수 없는 "현재 공식 리비전인가"(컬럼 대 컬럼 비교)만 본다.
       // officialAt 은 스키마상 nullable 이라 아래 비교를 위해 타입만 좁힌다.
       const isCurrent = revision.game.currentOfficialRevisionId === revision.id;
@@ -598,18 +606,27 @@ export class ProfileService {
    */
   private async computeRevealedUserReputation(userId: string): Promise<{ reviewCount: number; mannerScore: number | null }> {
     const candidates = await this.prisma.v1PostEventReview.findMany({
-      // sourceType='match' — 개인 매치 후기만. 대회 개인 후기(tournament_fixture · targetType=user)는
-      // V1UserReputationSummary의 tournament_* 컬럼에 따로 집계되며(ReviewsService 쪽 주석 참고),
-      // 한 대회에서 상대팀 로스터 전원에게 수십 건이 들어올 수 있어 같은 평점에 합산하지 않는다.
-      // 이 프로필 헤드라인 평점은 계속 개인 매치 기준이다.
-      where: { targetUserId: userId, targetType: 'user', status: 'submitted', sourceType: 'match' },
+      // 레거시 개인 매치와 공식 팀 매치의 개인 후기는 같은 사용자 평판으로 묶는다.
+      // 대회 개인 후기(tournament_fixture · targetType=user)는 tournament_* 컬럼에 별도 집계되며,
+      // 한 대회에서 상대팀 로스터 전원에게 수십 건이 들어올 수 있어 이 평점에는 합산하지 않는다.
+      where: {
+        targetUserId: userId,
+        targetType: 'user',
+        status: 'submitted',
+        sourceType: { in: ['match', 'team_match'] },
+      },
       select: { sourceId: true, reviewerUserId: true, targetUserId: true, rating: true, submittedAt: true },
     });
     if (candidates.length === 0) return { reviewCount: 0, mannerScore: null };
 
     const sourceIds = [...new Set(candidates.map((review) => review.sourceId))];
     const reverseReviews = await this.prisma.v1PostEventReview.findMany({
-      where: { reviewerUserId: userId, sourceType: 'match', sourceId: { in: sourceIds }, status: 'submitted' },
+      where: {
+        reviewerUserId: userId,
+        sourceType: { in: ['match', 'team_match'] },
+        sourceId: { in: sourceIds },
+        status: 'submitted',
+      },
       select: { sourceId: true, reviewerUserId: true, targetUserId: true },
     });
 
@@ -634,10 +651,10 @@ export class ProfileService {
         targetUserId: userId,
         targetType: 'user',
         status: 'submitted',
-        // computeRevealedUserReputation()과 같은 모집단(개인 매치 후기)이어야 한다 —
-        // totals.reviewCount는 match 기준인데 monthly.reviewCount만 대회 후기를 더하면
+        // computeRevealedUserReputation()과 같은 모집단(개인/공식 팀 매치 후기)이어야 한다 —
+        // totals.reviewCount와 monthly.reviewCount의 모집단이 달라지면
         // "이번 달 3건인데 누적은 1건" 같은 어긋난 숫자가 한 화면에 함께 나온다.
-        sourceType: 'match',
+        sourceType: { in: ['match', 'team_match'] },
         submittedAt: { gte: monthStart, lt: nextMonthStart },
       },
       select: { sourceId: true, reviewerUserId: true, targetUserId: true, submittedAt: true },
@@ -646,7 +663,12 @@ export class ProfileService {
 
     const sourceIds = [...new Set(candidates.map((review) => review.sourceId))];
     const reverseReviews = await this.prisma.v1PostEventReview.findMany({
-      where: { reviewerUserId: userId, sourceType: 'match', sourceId: { in: sourceIds }, status: 'submitted' },
+      where: {
+        reviewerUserId: userId,
+        sourceType: { in: ['match', 'team_match'] },
+        sourceId: { in: sourceIds },
+        status: 'submitted',
+      },
       select: { sourceId: true, reviewerUserId: true, targetUserId: true },
     });
 
@@ -817,6 +839,8 @@ export class ProfileService {
             sportId: sport.sportId,
             sportLevelId: sport.levelId ?? null,
             isPrimary: index === 0,
+            preferredPosition: sport.preferredPosition ?? null,
+            secondaryPreferredPosition: sport.secondaryPreferredPosition ?? null,
           })),
         });
       }
@@ -848,6 +872,18 @@ export class ProfileService {
         levelId: preference.sportLevel?.id ?? null,
         levelName: preference.sportLevel?.name ?? null,
         primary: preference.isPrimary,
+        // [D14] **저장된 값만 싣는다.** 선택지(positionOptions·positionFormations)는
+        // 여기 없다 — `/master/sports` 가 준다.
+        //
+        // 원칙: **"무엇을 고를 수 있는가"는 마스터 / "무엇을 골랐는가"는 프로필.**
+        //
+        // **여기에 선택지를 다시 넣지 마라.** 처음엔 프로필에서만 줬는데, 그러면 아직
+        // 저장하지 않은 종목에는 목록이 없어 **화면이 포지션 UI 를 아예 못 띄운다**
+        // ("종목 고르기 → 저장 → 다시 들어오기" 가 되어야 했다). 정적으로는 연결이 전부
+        // 맞아 보여 코드 리뷰로는 안 잡히고, alpha 실측에서야 드러났다. 두 곳에서 주면
+        // 출처가 갈려 같은 혼동이 되돌아온다.
+        preferredPosition: preference.preferredPosition,
+        secondaryPreferredPosition: preference.secondaryPreferredPosition,
       })),
       regions: snapshot.regions.map((userRegion) => ({
         regionId: userRegion.region.id,
@@ -1152,7 +1188,9 @@ export class ProfileService {
         },
         sportPreferences: {
           include: {
-            sport: { select: { id: true, name: true } },
+            // [D14] `code` 가 필요하다 — 그 종목에서 고를 수 있는 자리 목록을 프리셋에서
+            // 꺼내는 키다(이름이 아니라 코드로 정규화한다).
+            sport: { select: { id: true, name: true, code: true } },
             sportLevel: { select: { id: true, name: true } },
           },
           orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
@@ -1208,15 +1246,43 @@ export class ProfileService {
     }
   }
 
-  private async validateSports(sports: Array<{ sportId: string; levelId?: string | null }>) {
+  private async validateSports(
+    sports: Array<{
+      sportId: string;
+      levelId?: string | null;
+      preferredPosition?: string | null;
+      secondaryPreferredPosition?: string | null;
+    }>,
+  ) {
     for (const sport of sports) {
       const activeSport = await this.prisma.v1Sport.findFirst({
         where: { id: sport.sportId, isActive: true },
-        select: { id: true },
+        select: { id: true, code: true },
       });
 
       if (!activeSport) {
         throw validationError('Sport is not active or does not exist', 'sports');
+      }
+
+      // [D14] 선호 포지션은 **종목별로** 유효 집합이 다르다. 전역 화이트리스트 하나로
+      // 처리하면 풋살 유저가 'MF' 를 저장할 수 있고, 그 사람 카드에 풋살엔 없는 자리가
+      // 뜬다 -- 사람 축에 저장되는 값이라 경기마다 고칠 기회가 없다.
+      //
+      // 프리셋이 없는 종목(러닝·수영)은 유효 코드가 0개라 **어떤 값도 통과하지 못한다.**
+      // 그건 오류가 아니라 "이 종목엔 포지션 개념이 없다"는 사실이고, 화면도 그 종목엔
+      // 선호 포지션 섹션을 띄우지 않는다.
+      const positionError = validatePreferredPositions(
+        {
+          primary: sport.preferredPosition ?? null,
+          secondary: sport.secondaryPreferredPosition ?? null,
+        },
+        positionCodesForSport(activeSport.code, {
+          tryNormalize: tryNormalizeCompetitionSportCode,
+          canonicalConfig: canonicalCompetitionConfigForSport,
+        }),
+      );
+      if (positionError !== null) {
+        throw validationError(PREFERRED_POSITION_MESSAGES[positionError], 'sports.preferredPosition');
       }
 
       if (sport.levelId) {
@@ -1301,6 +1367,14 @@ function toProfileResponse(user: Awaited<ReturnType<ProfileService['getUserSnaps
       levelId: preference.sportLevel?.id ?? null,
       levelName: preference.sportLevel?.name ?? null,
       primary: preference.isPrimary,
+      // [D14] **저장 응답과 같은 필드를 여기도 실어야 한다.** 화면은 프로필 조회로
+      // 수화하므로, 여기 빠지면 저장은 되는데 다시 들어왔을 때 선택이 사라진 것처럼
+      // 보인다 -- 저장 응답에만 넣고 끝내면 못 잡는 종류다(매핑이 두 곳이다).
+      //
+      // **선택지는 여기 없다** -- `/master/sports` 가 준다. 이유는 위 저장 응답 주석 참고
+      // (프로필에만 두면 아직 저장 안 한 종목에 목록이 없어 UI 가 안 뜬다).
+      preferredPosition: preference.preferredPosition,
+      secondaryPreferredPosition: preference.secondaryPreferredPosition,
     })),
     regions: user.regions.map((userRegion) => ({
       regionId: userRegion.region.id,

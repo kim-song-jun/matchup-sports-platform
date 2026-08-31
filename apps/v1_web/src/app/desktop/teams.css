@@ -426,5 +426,5 @@
  * 이 규칙은 사실상 모바일(<1024)에서만 유효하다.
  */
 .tm-team-form-main {
-  padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(124px + var(--v1-shell-safe-bottom));
 }

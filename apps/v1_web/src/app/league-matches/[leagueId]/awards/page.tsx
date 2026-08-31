@@ -14,7 +14,7 @@ interface Props {
 export default async function LeagueAwardsPage({ params }: Props) {
   const { leagueId } = await params;
   return (
-    <AppChrome title="시즌 결산" activeTab="league" backHref={`/league-matches/${leagueId}`}>
+    <AppChrome title="시즌 결산" activeTab="tournaments" backHref={`/league-matches/${leagueId}`}>
       <LeagueAwardsPageClient leagueId={leagueId} />
     </AppChrome>
   );

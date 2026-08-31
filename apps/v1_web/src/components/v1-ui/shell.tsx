@@ -6,7 +6,6 @@ import {
   MatchIcon,
   MyIcon,
   SearchIcon,
-  TeamMatchIcon,
   TeamsIcon,
   TrophyIcon,
 } from './icons';
@@ -15,12 +14,18 @@ import { BrandMark } from './brand-logo';
 import { AppBackLink } from './app-back-link';
 import { NotificationBellLink } from './notification-bell';
 
-export type V1NavTab = 'home' | 'matches' | 'tournaments' | 'league' | 'teams' | 'my';
+export type V1NavTab = 'home' | 'matches' | 'tournaments' | 'teams' | 'my';
 
-// D5 — 하단 탭 6개(홈/매치/대회/리그/팀/마이). 리그 아이콘은 새로 만들지 않고
-// TeamMatchIcon을 재사용한다: 리그 대진은 도메인상 TEAM_MATCH 레코드이고(팀 대 팀
-// 고정 일정), TeamMatchIcon은 이미 이 저장소에서 랜딩/홈/알림의 "팀매치" 시각 언어로
-// 쓰이고 있다 — TrophyIcon(대회)·TeamsIcon(팀)·MatchIcon(매치)은 이미 다른 탭이 쓴다.
+// 하단 탭 **5개**(홈/매치/대회/팀/마이).
+//
+// 이전에는 '대회'와 '리그'가 **나란히 있었다.** 그런데 리그 방식으로 열린 대회와 정규
+// 리그가 서로 다른 탭에서 같은 이름으로 보여서, 사용자가 "무엇이 어디 있는지"를 탭
+// 이름만으로는 알 수 없었다. 통합 설계(D1)에서 리그는 **대회의 한 종류**가 되므로 탭도
+// 하나로 합치고, 그 안에서 [정규 대회 · 정규 리그] 세그먼트로 가른다.
+//
+// 리그 진입 경로는 사라지지 않는다 — `CompetitionKindSegment` 가 두 목록을 잇고
+// (`/tournaments` ↔ `/league-matches`), 리그 화면들은 `activeTab='tournaments'` 로
+// 대회 탭을 활성 표시한다. **탭만 지우고 세그먼트를 안 넣으면 리그가 도달 불가능해진다.**
 const tabs: Array<{
   id: V1NavTab;
   label: string;
@@ -30,7 +35,6 @@ const tabs: Array<{
   { id: 'home', label: '홈', href: '/home', Icon: HomeIcon },
   { id: 'matches', label: '매치', href: '/matches', Icon: MatchIcon },
   { id: 'tournaments', label: '대회', href: '/tournaments', Icon: TrophyIcon },
-  { id: 'league', label: '리그', href: '/league-matches', Icon: TeamMatchIcon },
   { id: 'teams', label: '팀', href: '/teams', Icon: TeamsIcon },
   { id: 'my', label: '마이', href: '/my', Icon: MyIcon },
 ];

@@ -115,6 +115,24 @@ class MySportPreferenceDto {
   @IsOptional()
   @IsUUID()
   levelId?: string | null;
+
+  /**
+   * [D14] 이 종목에서 주로 서는 자리. 값은 그 종목 프리셋의 `lineup.positions[].code`
+   * 다(축구 `GK`/`DF`/`MF`/`FW`, 풋살 `GOLEIRO`/`FIXO`/`ALA`/`PIVO`).
+   *
+   * **여기서 코드 집합을 검증하지 않는다** — 유효한 값이 종목마다 다르기 때문이다.
+   * DTO 는 "문자열인가"까지만 보고, **종목별 대조는 서비스 계층**에서 한다
+   * (`validatePreferredPositions`). 전역 화이트리스트를 여기 두면 풋살 유저가 `MF` 를
+   * 저장할 수 있게 된다.
+   */
+  @IsOptional()
+  @IsString()
+  preferredPosition?: string | null;
+
+  /** 부 포지션. 주 없이 부만 두거나 주와 같은 값은 서비스 계층이 거부한다. */
+  @IsOptional()
+  @IsString()
+  secondaryPreferredPosition?: string | null;
 }
 
 class MyRegionPreferenceDto {

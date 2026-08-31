@@ -71,6 +71,9 @@ final class PushRegistrationClient {
             JSONObject body = new JSONObject()
                 .put("installationId", InstallationIdentity.installationId(context))
                 .put("token", token)
+                // Required by the API since iOS gained its own delivery path. The server no
+                // longer assumes Android, and a registration without this is rejected.
+                .put("platform", "android")
                 .put("appVersion", BuildConfig.VERSION_NAME)
                 .put("deviceModel", Build.MANUFACTURER + " " + Build.MODEL);
             byte[] bytes = body.toString().getBytes(StandardCharsets.UTF_8);

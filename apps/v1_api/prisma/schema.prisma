@@ -1086,6 +1086,22 @@ model V1UserSportPreference {
   sportId      String   @map("sport_id")
   sportLevelId String?  @map("sport_level_id")
   isPrimary    Boolean  @default(false) @map("is_primary")
+  /// 이 종목에서 **주로 서는 자리**. 값은 그 종목 대회 설정의 `lineup.positions[].code`
+  /// 다(축구 `GK`/`DF`/`MF`/`FW`, 풋살 `GOLEIRO`/`FIXO`/`ALA`/`PIVO`) — 종목마다 코드가
+  /// 다르므로 하드코딩하지 않고 **프리셋을 단일 출처**로 쓴다.
+  ///
+  /// 사람 축에 두는 이유: 사용자가 **한 번 정하면 모든 대회·리그에 자동 적용**되는 값이다
+  /// (D14). 대회 참가 명단(`V1TournamentPlayer`)에 두면 대회마다 다시 입력이 된다.
+  ///
+  /// nullable = 미설정. 강제하지 않는다 — 안 고르면 선수 카드 포지션이 '미상'이고
+  /// 능력치 가중치는 균등이다. 그것이 정상 상태이지 결함이 아니다.
+  preferredPosition          String?  @map("preferred_position")
+  /// 부(副) 포지션. **주가 없으면 부만 있을 수 없고**(무의미하다), **주와 같을 수 없다**
+  /// (같으면 정보가 0이다) — 서비스 계층에서 검증한다.
+  ///
+  /// **선수 카드 계산에는 쓰지 않는다.** 가중치는 주 포지션 기준이다 — 둘을 섞으면
+  /// 가중치의 의미가 흐려진다. 이 값의 용도는 표시다("주 ALA / 부 PIVO").
+  secondaryPreferredPosition String?  @map("secondary_preferred_position")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 

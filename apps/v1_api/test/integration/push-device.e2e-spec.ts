@@ -9,9 +9,10 @@ const ids = {
   userB: '9a560000-0000-4000-8000-000000000002',
   installationA: '9a560000-0000-4000-8000-000000000011',
   installationB: '9a560000-0000-4000-8000-000000000012',
+  installationC: '9a560000-0000-4000-8000-000000000013',
 } as const;
 
-describe('Android push-device HTTP lifecycle', () => {
+describe('push-device HTTP lifecycle', () => {
   let app: INestApplication;
   let cleanupApp: (() => Promise<void>) | undefined;
   let prisma: PrismaService;
@@ -79,12 +80,46 @@ describe('Android push-device HTTP lifecycle', () => {
     expect(invalid.body.code).toBe('VALIDATION_ERROR');
   });
 
+  /**
+   * The field has no default on purpose. A registration that forgets to say which platform
+   * it is would otherwise be stored as the other one, and the send path would hand an APNs
+   * token to Firebase — a delivery that fails silently. Refusing the request is the point,
+   * so it is pinned here rather than left to the DTO's unit spec.
+   */
+  it('refuses a registration that does not say which platform it is', async () => {
+    const missing = await request(app.getHttpServer())
+      .post('/api/v1/notifications/push-devices')
+      .set('x-v1-user-id', ids.userA)
+      .send({
+        installationId: ids.installationC,
+        token: 'registration-token-without-a-platform',
+      })
+      .expect(400);
+    expect(missing.body.code).toBe('VALIDATION_ERROR');
+
+    const unknown = await request(app.getHttpServer())
+      .post('/api/v1/notifications/push-devices')
+      .set('x-v1-user-id', ids.userA)
+      .send({
+        installationId: ids.installationC,
+        platform: 'windows',
+        token: 'registration-token-for-a-platform-we-do-not-send-to',
+      })
+      .expect(400);
+    expect(unknown.body.code).toBe('VALIDATION_ERROR');
+
+    expect(
+      await prisma.v1PushDevice.count({ where: { installationId: ids.installationC } }),
+    ).toBe(0);
+  });
+
   it('registers, refreshes, and returns no registration token', async () => {
     const created = await request(app.getHttpServer())
       .post('/api/v1/notifications/push-devices')
       .set('x-v1-user-id', ids.userA)
       .send({
         installationId: ids.installationA,
+        platform: 'android',
         token: 'alpha-registration-token-version-one',
         appVersion: '0.1.0-alpha',
         deviceModel: 'Test Android',
@@ -103,6 +138,7 @@ describe('Android push-device HTTP lifecycle', () => {
       .set('x-v1-user-id', ids.userA)
       .send({
         installationId: ids.installationA,
+        platform: 'android',
         token: 'alpha-registration-token-version-two',
       })
       .expect(201);
@@ -124,6 +160,7 @@ describe('Android push-device HTTP lifecycle', () => {
       .set('x-v1-user-id', ids.userA)
       .send({
         installationId: ids.installationB,
+        platform: 'android',
         token: 'alpha-registration-token-device-two',
       })
       .expect(201);
@@ -160,6 +197,7 @@ describe('Android push-device HTTP lifecycle', () => {
       .set('x-v1-user-id', ids.userA)
       .send({
         installationId: ids.installationA,
+        platform: 'android',
         token: 'production-registration-token-device-one',
       })
       .expect(201);
@@ -168,5 +206,42 @@ describe('Android push-device HTTP lifecycle', () => {
     expect(
       await prisma.v1PushDevice.count({ where: { installationId: ids.installationA } }),
     ).toBe(2);
+  });
+  /**
+   * The iOS half of the same endpoint. Registered against a second user so the counts the
+   * Android scenarios assert stay untouched.
+   */
+  it('registers and revokes an iOS installation on the same endpoint', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/notifications/push-devices')
+      .set('x-v1-user-id', ids.userB)
+      .send({
+        installationId: ids.installationC,
+        platform: 'ios',
+        token: 'a'.repeat(64),
+        appVersion: '0.1.0',
+        deviceModel: 'iPhone',
+      })
+      .expect(201);
+    expect(created.body.data).toMatchObject({
+      installationId: ids.installationC,
+      platform: 'ios',
+      environment: 'alpha',
+      revokedAt: null,
+    });
+    // The device token never travels back out, on either platform.
+    expect(JSON.stringify(created.body)).not.toContain('a'.repeat(64));
+
+    await request(app.getHttpServer())
+      .delete(`/api/v1/notifications/push-devices/${ids.installationC}`)
+      .set('x-v1-user-id', ids.userB)
+      .expect(204);
+    const row = await prisma.v1PushDevice.findUniqueOrThrow({
+      where: {
+        environment_installationId: { environment: 'alpha', installationId: ids.installationC },
+      },
+    });
+    expect(row.platform).toBe('ios');
+    expect(row.revokedAt).not.toBeNull();
   });
 });

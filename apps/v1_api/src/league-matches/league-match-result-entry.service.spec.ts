@@ -34,7 +34,7 @@ function makePrisma() {
     v1GameLineup: {
       findMany: jest.fn().mockResolvedValue([
         // 홈: 대진 생성이 만든 자동 로스터(1) 위에 팀이 두 번 저장(2, 3).
-        // state 는 selectLatestLineupParticipants 의 필수 입력이다 — 제출된
+        // state 는 selectLineupParticipantsWithDraftFallback 의 필수 입력이다 — 제출된
         // 리비전만 "최신"을 다툰다(DRAFT 는 후보에서 빠진다).
         { id: 'lineup-home-1', sideId: 'side-home', revision: 1, state: 'SUBMITTED' },
         { id: 'lineup-home-2', sideId: 'side-home', revision: 2, state: 'SUBMITTED' },

@@ -20,6 +20,7 @@ import { computeRevealedTeamTrustBatch } from '../reviews/team-trust-aggregation
 import { normalizeRichContent } from '../content/rich-content';
 import { UploadedFile, UploadsService } from '../uploads/uploads.service';
 import { removeUserFromActiveRosters } from '../tournaments/roster-cleanup';
+import { TOURNAMENT_SURFACE_KIND } from '../tournaments/tournament-surface';
 import {
   AdminListQueryDto,
   AdminLogsQueryDto,
@@ -1217,7 +1218,8 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         _count: { _all: true },
       }),
       this.prisma.v1Inquiry.count({ where: { status: { in: ['received', 'reviewing'] } } }),
-      this.prisma.v1Tournament.count({ where: { status: 'in_progress', deletedAt: null } }),
+      // 대시보드 '진행 중 대회' KPI — 정규 리그 시즌은 세지 않는다(상수 주석 참고).
+      this.prisma.v1Tournament.count({ where: { ...TOURNAMENT_SURFACE_KIND, status: 'in_progress', deletedAt: null } }),
     ]);
 
     const tournamentIds = [

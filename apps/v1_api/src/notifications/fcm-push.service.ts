@@ -1,23 +1,11 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
+import { V1PushPlatform } from '@prisma/client';
 import { App, cert, getApp, getApps, initializeApp } from 'firebase-admin/app';
 import { Messaging, getMessaging } from 'firebase-admin/messaging';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
+import { NativePushAdapter, NativeDeliverySummary, NativePushPayload, PushTarget } from './native-push.types';
 import { PushDeviceService } from './push-device.service';
 import { resolvePushEnvironment } from './push-environment';
-
-interface FcmPushPayload {
-  notificationId: string;
-  title: string;
-  body?: string;
-  route?: string;
-}
-
-export interface FcmDeliverySummary {
-  devices: number;
-  delivered: number;
-  failed: number;
-  disabled: boolean;
-}
 
 const PERMANENT_TOKEN_ERRORS = new Set([
   'messaging/registration-token-not-registered',
@@ -26,7 +14,9 @@ const PERMANENT_TOKEN_ERRORS = new Set([
 const FCM_MULTICAST_BATCH_SIZE = 500;
 
 @Injectable()
-export class FcmPushService implements OnModuleInit {
+export class FcmPushService implements NativePushAdapter, OnModuleInit {
+  readonly platform = V1PushPlatform.android;
+
   private messaging: Messaging | null = null;
   private environment: ReturnType<typeof resolvePushEnvironment> | null = null;
 
@@ -35,6 +25,10 @@ export class FcmPushService implements OnModuleInit {
     @InjectPinoLogger(FcmPushService.name) private readonly logger: PinoLogger,
   ) {}
 
+  get isConfigured(): boolean {
+    return this.messaging !== null && this.environment !== null;
+  }
+
   onModuleInit(): void {
     const projectId = process.env.FIREBASE_PROJECT_ID;
     const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
@@ -42,7 +36,7 @@ export class FcmPushService implements OnModuleInit {
     const credentialCount = [projectId, clientEmail, privateKey].filter(Boolean).length;
 
     if (credentialCount === 0) {
-      this.logger.warn('Firebase Admin credentials not configured — Android FCM disabled');
+      this.logger.warn('Firebase Admin credentials not configured — Android push disabled');
       return;
     }
     if (credentialCount !== 3) {
@@ -78,12 +72,17 @@ export class FcmPushService implements OnModuleInit {
     this.messaging = getMessaging(app);
   }
 
-  async sendToUser(userId: string, payload: FcmPushPayload): Promise<FcmDeliverySummary> {
+  /**
+   * Sends to the Android devices the dispatcher selected.
+   *
+   * Device selection moved out of this service when iOS gained its own adapter: leaving each
+   * adapter to query for its own platform would let a platform nobody routes disappear
+   * silently, which is the one failure mode a push dispatcher must not have.
+   */
+  async send(devices: PushTarget[], payload: NativePushPayload): Promise<NativeDeliverySummary> {
     if (!this.messaging || !this.environment) {
       return { devices: 0, delivered: 0, failed: 0, disabled: true };
     }
-
-    const devices = await this.pushDevices.activeAndroidTokens(userId, this.environment);
     if (devices.length === 0) {
       return { devices: 0, delivered: 0, failed: 0, disabled: false };
     }
@@ -129,7 +128,7 @@ export class FcmPushService implements OnModuleInit {
         failed += batch.length;
         transientFailureIds.push(...batch.map((device) => device.id));
         this.logger.warn(
-          { userId, deviceCount: batch.length, err: error },
+          { deviceCount: batch.length, err: error },
           'Android FCM multicast batch failed',
         );
       }
@@ -142,7 +141,6 @@ export class FcmPushService implements OnModuleInit {
     ]).catch((error: unknown) => {
       this.logger.error(
         {
-          userId,
           permanentFailureCount: permanentFailureIds.length,
           transientFailureCount: transientFailureIds.length,
           err: error,
@@ -153,7 +151,7 @@ export class FcmPushService implements OnModuleInit {
 
     if (failed > 0) {
       this.logger.warn(
-        { userId, deviceCount: devices.length, failureCount: failed },
+        { deviceCount: devices.length, failureCount: failed },
         'Android FCM delivery partially failed',
       );
     }

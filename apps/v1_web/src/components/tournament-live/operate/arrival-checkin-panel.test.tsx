@@ -167,7 +167,24 @@ describe('ArrivalCheckinPanel — 명단 검인', () => {
     expect(screen.getByText('제출된 선발 명단이 없어 검인할 대상이 없어요.')).toBeInTheDocument();
   });
 
-  it('아직 제출되지 않은 DRAFT는 revision이 가장 커도 검인 대상이 아니다 (대진 생성 직후 자동 생성된 등록 명단 전원을 검인 대상으로 잘못 띄우면 안 된다)', () => {
+  /**
+   * [P1-c 후속] 이 테스트는 원래 **정반대**를 못박고 있었다 -- "DRAFT 는 검인 대상이
+   * 아니다". 그 근거는 주석에 이렇게 적혀 있었다:
+   *
+   *   > DRAFT를 검인 대상으로 삼으면 도착 확인을 눌러도, 팀이 실제로 제출하는 순간
+   *   > saveLineup이 새 revision·새 participant 행을 만들어 **이 검인이 통째로 사라진다**
+   *
+   * **그 근거가 P1-b 로 사라졌다.** 이제 라인업을 저장해도 참가자 행이 새로 만들어지지
+   * 않고(DRAFT 행을 재사용), 제출본 위에 새 리비전을 여는 경로에서도 `arrivedAt` 을
+   * 이월한다. 즉 DRAFT 단계에서 찍은 검인은 더 이상 소실되지 않는다.
+   *
+   * 그리고 P1-c 로 **제출 없이 시작하는 경기가 정상 경로가 됐다.** 그 경기에서 제출본만
+   * 인정하면 검인할 대상이 아예 없어 -- P1-b 가 지킨 `arrivedAt` 을 애초에 만들 수 없다.
+   *
+   * 단언을 뒤집되 **지우지 않는다**: 자동 등록 명단이 검인 대상으로 뜨는 것이 이제
+   * 의도된 동작이라는 사실 자체를 여기서 못박는다.
+   */
+  it('제출본이 없으면 자동 생성된 등록 명단을 검인 대상으로 쓴다 (P1-b 로 검인 소실 위험이 사라졌다)', () => {
     render(
       <ArrivalCheckinPanel
         sides={SIDES}
@@ -185,12 +202,9 @@ describe('ArrivalCheckinPanel — 명단 검인', () => {
       />,
     );
 
-    // DRAFT를 검인 대상으로 삼으면 여기서 도착 확인을 눌러도, 팀이 실제로 제출하는
-    // 순간 saveLineup이 새 revision·새 participant 행을 만들어 이 검인이 통째로
-    // 사라진다(운영자 입력 소실) — revision이 가장 커도 SUBMITTED/LOCKED가 아니면
-    // 아예 목록에 올리지 않아야 그 소실을 막을 수 있다.
-    expect(screen.queryByRole('switch', { name: /자동등록1/ })).not.toBeInTheDocument();
-    expect(screen.getByText('제출된 선발 명단이 없어 검인할 대상이 없어요.')).toBeInTheDocument();
+    // 제출 없이 시작한 경기에서 이 목록이 비면 운영자는 아무도 검인할 수 없다.
+    expect(screen.getByRole('switch', { name: /자동등록1/ })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: /자동등록2/ })).toBeInTheDocument();
   });
 
   it('저장 중인 행만 잠근다 (다른 행은 계속 누를 수 있어야 줄 서서 검인할 수 있다)', () => {

@@ -84,12 +84,21 @@ describe('teammatesForSide — 어시스트 후보 선택', () => {
     expect(teammates.map((p) => p.id)).toEqual(['p-2']);
   });
 
-  it('SUBMITTED/LOCKED 라인업이 아예 없으면(전부 DRAFT) 후보가 없다', () => {
+  /**
+   * [P1-c 후속] 계약이 뒤집혔다. 예전에는 "전부 DRAFT 면 후보가 없다"였는데, P1-c 로
+   * **제출 없이 시작하는 경기가 정상 경로**가 되면서 그 규칙이 곧 "그런 경기에서는
+   * 어시스트를 아무에게도 못 붙인다"가 됐다.
+   *
+   * 후보 목록은 라인업 그리드·검인 패널과 **같은 명단**을 봐야 한다는 원래 계약은
+   * 그대로다 — 셋이 함께 폴백으로 옮겨 갔을 뿐이다(lineup-grid.tsx 의
+   * `latestLineupForDisplay` 주석 참고).
+   */
+  it('전부 DRAFT 여도 후보로 쓴다 — 그리드·검인과 같은 명단을 본다 (P1-c 로 제출 없는 경기가 정상이 됐다)', () => {
     const lineups: readonly GameLineup[] = [
       lineup([participant({ id: 'p-draft', displayNameSnapshot: '초안선수' })], { state: 'DRAFT' }),
     ];
 
-    expect(teammatesForSide('side-home', lineups, null)).toEqual([]);
+    expect(teammatesForSide('side-home', lineups, null).map((p) => p.id)).toEqual(['p-draft']);
   });
 
   it('sideId가 null이면 빈 배열을 반환한다', () => {

@@ -296,6 +296,17 @@ describe('TeamRecordsContent — 종류 탭 (U2)', () => {
     });
   }
 
+  it('앱 여정 순서대로 전체, 대회, 리그, 친선 탭을 배치한다', () => {
+    render(<TeamRecordsContent data={withByType()} activeType="all" onChangeType={vi.fn()} />);
+
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      '전체',
+      '대회',
+      '리그',
+      '친선',
+    ]);
+  });
+
   it('정규 리그 탭을 고르면 KPI가 summary.byType.league 값으로 바뀐다 (전체 기준으로 새로 계산하지 않는다)', () => {
     render(<TeamRecordsContent data={withByType()} activeType="league" onChangeType={vi.fn()} />);
 

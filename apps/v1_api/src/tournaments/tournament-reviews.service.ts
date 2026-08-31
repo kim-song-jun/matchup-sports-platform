@@ -12,6 +12,7 @@ import { V1AuthUser } from '../auth/v1-auth-user';
 import { ArrayMaxSize, IsArray, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
+import { TOURNAMENT_SURFACE_KIND } from './tournament-surface';
 
 export class ListTournamentReviewsQueryDto {
   @IsOptional()
@@ -346,7 +347,15 @@ export class TournamentReviewsService {
       where: {
         status: 'confirmed',
         team: this.eligibleTeamWhere(userId),
-        tournament: { status: 'completed', deletedAt: null },
+        // **`tournamentId` 스코프가 없는 유일한 `status: 'confirmed'` 쿼리다**(19곳 전수 분류).
+        // 사용자의 팀이 확정 등록된 **모든** 대회를 훑으므로, 리그 시즌 행에 확정 등록이
+        // 생기면 여기 걸린다 — 참가팀 백필이 `confirmed` 로 행을 만들 것이므로 실재하는 경로다.
+        //
+        // 지금까지 안 보였던 건 `status: 'completed'` 덕이다(백필 리그는 `draft` 이고
+        // 어드민 `changeStatus` 가 리그를 막는다). 그건 **다른 파일의 가드에 기댄 것**이고,
+        // 그 의존은 어디에도 안 적혀 있었다 — P0~P3 가 49곳에서 없앤 바로 그 구조다.
+        // 여기서도 종류를 직접 건다.
+        tournament: { ...TOURNAMENT_SURFACE_KIND, status: 'completed', deletedAt: null },
       },
       select: {
         teamId: true,

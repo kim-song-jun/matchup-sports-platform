@@ -23,12 +23,27 @@
  * 장치다 — 한쪽만 보면 래칫이 아니라 그냥 상한선이고, 줄인 만큼 다시 들어온다.
  * (`apps/v1_web/scripts/v1-pattern-check.mjs` 의 `checkLiteralBaseline` 과 같은 계약.)
  *
+ * ## 두 번째 검사 — raw SQL
+ * `$queryRaw`/`$executeRaw` 안의 `v1_tournaments` 는 Prisma 조회가 아니라 정규식이
+ * 못 보는 자리다. 지금 7곳은 **누출이 아니다** — 셋은 `SELECT id … FOR UPDATE`(잠금만
+ * 잡고 데이터를 안 돌려준다), 셋은 설정 축(대회·리그가 공유하는 축이라 일부러 안 거른다),
+ * 하나는 마이그레이션이다. 다만 잠금은 **리그 행에도 걸리고**, 실제 게이트는 그 뒤의
+ * Prisma 검사다 — 순서가 바뀌거나 뒤 검사가 사라지면 곧바로 구멍이 된다.
+ * 그래서 목표는 0 이 아니라 **새로 늘어나면 눈에 띄게 하는 것**이다.
+ *
+ * ## 일부러 안 잡는 것 — 별칭·구조분해
+ * `const t = this.prisma.v1Tournament; t.findFirst(…)` 형태는 이 정규식에 안 걸린다.
+ * **지금 트리에 0건이고**(확인 명령은 `git grep -nE '(const|let)\s+\{?\s*v1Tournament'`),
+ * 잡으려면 정규식이 복잡해져 오탐이 는다. **오탐이 나는 게이트는 baseline 을 올려
+ * 무력화당한다** — 그게 더 나쁘다. 알면서 단순하게 둔다.
+ *
  * 사용: node scripts/v1-surface-check.mjs   (apps/v1_api 에서)
  */
 import { readFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 
-const BASELINE_PATH = 'scripts/tournament-surface-baseline.json';
+const LOOKUP_BASELINE = 'scripts/tournament-surface-baseline.json';
+const RAW_SQL_BASELINE = 'scripts/tournament-raw-sql-baseline.json';
 
 /**
  * 헬퍼 자신은 세지 않는다 — **원시 조회가 허용된 유일한 자리**다.
@@ -43,53 +58,59 @@ const SANCTIONED = new Set(['src/tournaments/tournament-surface-lookup.ts']);
  */
 const RAW_LOOKUP = /\bv1Tournament\s*\.\s*(findUnique|findFirst)(OrThrow)?\s*\(/g;
 
+/** raw SQL 안의 테이블 이름. 주석은 세지 않는다 — 이 파일들엔 설명 주석이 많다. */
+const RAW_TABLE = /\bv1_tournaments\b/g;
+
 const violations = [];
 
 function countRawLookups(source) {
   return (source.match(RAW_LOOKUP) ?? []).length;
 }
 
-function main() {
+function countRawSqlTable(source) {
+  let n = 0;
+  for (const line of source.split('\n')) {
+    const trimmed = line.trimStart();
+    if (trimmed.startsWith('*') || trimmed.startsWith('//') || trimmed.startsWith('/*')) continue;
+    n += (line.match(RAW_TABLE) ?? []).length;
+  }
+  return n;
+}
+
+/** baseline 값은 숫자이거나 `{ allowed, why }` 다 — 남겨 두는 이유를 적을 수 있게. */
+function allowedOf(entry) {
+  if (typeof entry === 'number') return entry;
+  if (entry && typeof entry === 'object' && typeof entry.allowed === 'number') return entry.allowed;
+  return 0;
+}
+
+/**
+ * 파일별 baseline 을 넘지 않는지 보는 공용 검사. 두 검사가 같은 구조라 함수로 묶는다 —
+ * 복붙하면 "파일이 사라졌는데 baseline 에 남아 있다" 같은 가장자리 처리가 한쪽에만 남는다
+ * (`apps/v1_web/scripts/v1-pattern-check.mjs` 가 같은 이유로 같은 선택을 했다).
+ */
+function checkBaseline({ label, baselinePath, files, count, hint }) {
   let baseline;
   try {
-    baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8'));
+    baseline = JSON.parse(readFileSync(baselinePath, 'utf8'));
   } catch (e) {
-    violations.push(`[게이트 실행 실패] ${BASELINE_PATH} 를 읽을 수 없다 (${e.message})`);
-    return;
-  }
-
-  let list;
-  try {
-    // 스펙은 제외한다 — 인라인 mock 이 같은 문자열을 갖고, 그건 프로덕션 조회가 아니다.
-    list = execSync('find src -name "*.ts" ! -name "*.spec.ts"', { encoding: 'utf8' });
-  } catch (e) {
-    violations.push(`[게이트 실행 실패] 소스 목록을 만들 수 없다 (${e.message})`);
-    return;
-  }
-
-  const files = list.split('\n').filter(Boolean).filter((f) => !SANCTIONED.has(f));
-  if (files.length === 0) {
-    // 이 검사가 조용히 0건을 세고 통과하면 게이트가 있으나 마나다.
-    violations.push('[게이트 실행 실패] src 아래 TS 파일이 0개다');
-    return;
+    violations.push(`[게이트 실행 실패] ${baselinePath} 를 읽을 수 없다 (${e.message})`);
+    return null;
   }
 
   const seen = new Set();
   let total = 0;
   for (const file of files) {
-    const n = countRawLookups(readFileSync(file, 'utf8'));
+    const n = count(readFileSync(file, 'utf8'));
     seen.add(file);
     total += n;
-    const allowed = baseline[file] ?? 0;
+    const allowed = allowedOf(baseline[file]);
     if (n > allowed) {
-      violations.push(
-        `[원시 대회 조회] ${file}: ${n}곳 (허용 ${allowed}) — ` +
-          'findTournamentOnSurface(OrThrow) 를 써라 (src/tournaments/tournament-surface-lookup.ts)',
-      );
+      violations.push(`[${label}] ${file}: ${n}곳 (허용 ${allowed}) — ${hint}`);
     } else if (n < allowed) {
       violations.push(
         `[baseline 갱신 필요] ${file}: ${n}곳으로 줄었는데 baseline 은 ${allowed} 이다 — ` +
-          `${BASELINE_PATH} 를 ${n} 로 낮춰야 그만큼 다시 들어오지 못한다`,
+          `${baselinePath} 를 ${n} 로 낮춰야 그만큼 다시 들어오지 못한다`,
       );
     }
   }
@@ -100,14 +121,52 @@ function main() {
     violations.push(`[baseline 갱신 필요] ${file}: 파일이 없는데 baseline 에 남아 있다`);
   }
 
-  // **개수를 반드시 찍는다.** CI 에서 스텝 이름만 보고 "돌았다"고 판단하면, 스크립트가
-  // 조용히 0건을 세고 통과해도 알 수 없다 — 로그에 숫자가 남아야 실제로 센 것이 보인다.
   const allowedTotal = Object.entries(baseline)
     .filter(([f]) => !f.startsWith('_'))
-    .reduce((sum, [, n]) => sum + n, 0);
+    .reduce((sum, [, entry]) => sum + allowedOf(entry), 0);
+  return { total, allowedTotal };
+}
+
+function main() {
+  let list;
+  try {
+    // 스펙은 제외한다 — 인라인 mock 이 같은 문자열을 갖고, 그건 프로덕션 조회가 아니다.
+    list = execSync('find src -name "*.ts" ! -name "*.spec.ts"', { encoding: 'utf8' });
+  } catch (e) {
+    violations.push(`[게이트 실행 실패] 소스 목록을 만들 수 없다 (${e.message})`);
+    return;
+  }
+
+  const all = list.split('\n').filter(Boolean);
+  if (all.length === 0) {
+    // 이 검사가 조용히 0건을 세고 통과하면 게이트가 있으나 마나다.
+    violations.push('[게이트 실행 실패] src 아래 TS 파일이 0개다');
+    return;
+  }
+
+  const lookup = checkBaseline({
+    label: '원시 대회 조회',
+    baselinePath: LOOKUP_BASELINE,
+    files: all.filter((f) => !SANCTIONED.has(f)),
+    count: countRawLookups,
+    hint: 'findTournamentOnSurface(OrThrow) 를 써라 (src/tournaments/tournament-surface-lookup.ts)',
+  });
+
+  const rawSql = checkBaseline({
+    label: 'raw SQL 대회 테이블',
+    baselinePath: RAW_SQL_BASELINE,
+    files: all,
+    count: countRawSqlTable,
+    hint: 'raw SQL 은 종류 조건을 못 건다 — 꼭 필요하면 baseline 에 이유(why)와 함께 올려라',
+  });
+
+  // **개수를 반드시 찍는다.** CI 에서 스텝 이름만 보고 "돌았다"고 판단하면, 스크립트가
+  // 조용히 0건을 세고 통과해도 알 수 없다 — 로그에 숫자가 남아야 실제로 센 것이 보인다.
+  // 로컬과 다른 숫자가 찍히면 CI 가 다른 파일 집합을 보고 있다는 뜻이다(cwd·glob 차이).
   console.log(
-    `[v1-surface-check] 파일 ${files.length}개 스캔 · 원시 대회 단건 조회 ${total}곳 ` +
-      `(baseline 합계 ${allowedTotal})`,
+    `[v1-surface-check] 파일 ${all.length}개 스캔 · ` +
+      `원시 대회 단건 조회 ${lookup?.total ?? '?'}곳 (baseline ${lookup?.allowedTotal ?? '?'}) · ` +
+      `raw SQL 대회 테이블 ${rawSql?.total ?? '?'}곳 (baseline ${rawSql?.allowedTotal ?? '?'})`,
   );
 }
 

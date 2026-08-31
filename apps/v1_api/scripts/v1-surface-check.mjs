@@ -78,12 +78,26 @@ function countRawLookups(source) {
 
 function countLeagueAllowed(source) {
   let n = 0;
+  // **import 는 세지 않는다** — 세면 호출 1곳이 2로 잡혀 baseline 이 실제와 어긋나고,
+  // "몇 군데서 리그를 허용하는가"라는 이 검사의 질문에 답하지 못한다.
+  //
+  // **한 줄 판정으로는 부족하다**(Copilot 리뷰 지적, 실측 재현): Prettier 가 import 를
+  // 여러 줄로 감싸면 specifier 가 자기 줄에 오는데(`  ALL_COMPETITION_KINDS,`) 그 줄은
+  // `import` 로 시작하지 않아 그대로 세어진다 → 1곳이 2로 잡혀 **게이트가 오탐으로 깨진다.**
+  // 그래서 `import` 부터 `from '…';` 까지를 **블록으로** 건너뛴다.
+  let inImport = false;
   for (const line of source.split('\n')) {
     const trimmed = line.trimStart();
     if (trimmed.startsWith('*') || trimmed.startsWith('//') || trimmed.startsWith('/*')) continue;
-    // **import 는 세지 않는다** — 세면 호출 1곳이 항상 2로 잡혀 baseline 이 실제와
-    // 어긋나고, "몇 군데서 리그를 허용하는가"라는 이 검사의 질문에 답하지 못한다.
-    if (trimmed.startsWith('import ') || /^\}\s*from\s*'/.test(trimmed)) continue;
+    if (inImport) {
+      if (/\bfrom\s*['"]/.test(trimmed) || trimmed.endsWith(';')) inImport = false;
+      continue;
+    }
+    if (trimmed.startsWith('import ') || trimmed.startsWith('import{')) {
+      // 한 줄로 끝나지 않는 import 면 다음 줄부터 블록으로 이어 건너뛴다.
+      if (!/\bfrom\s*['"]/.test(trimmed)) inImport = true;
+      continue;
+    }
     n += (line.match(LEAGUE_ALLOWED) ?? []).length;
   }
   return n;

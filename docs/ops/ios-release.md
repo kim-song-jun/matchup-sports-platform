@@ -167,6 +167,14 @@ build may require review."
 
 #### 수출규정(암호화) — 조사 결과
 
+> **2026-08-31 확정 — 이제 빌드가 스스로 답한다.** `ITSAppUsesNonExemptEncryption: false` 를
+> `project.yml` 의 `info:` 에 넣었으므로 업로드마다 다시 답할 필요가 없다. 넣기 전에는 올린
+> 빌드의 `usesNonExemptEncryption` 이 계속 null 이었고, 그 상태의 빌드는 **TestFlight 그룹에
+> 아예 붙지 않는다** — Apple 이 돌려주는 말은 `Build is not in an internally testable state`
+> 로, 암호화를 언급하지 않아 서명 쪽을 뒤지게 만든다(빌드 1·3 에서 실측).
+> 값은 사용자가 확인한 법적 신고다(2026-08-31): 이 앱의 암호화는 OS 가 제공하는 HTTPS 뿐이고
+> 직접 구현한 것도 번들된 암호 라이브러리도 없다.
+
 Apple 의 분류표는 세 갈래다
 ([Export compliance documentation for encryption](https://developer.apple.com/help/app-store-connect/reference/export-compliance-documentation-for-encryption/)):
 

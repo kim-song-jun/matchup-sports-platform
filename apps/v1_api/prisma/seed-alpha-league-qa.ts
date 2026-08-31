@@ -5,6 +5,7 @@ import {
   V1IdentityActorType,
   V1TeamMatchApplicationStatus,
   V1TeamMatchStatus,
+  V1VisibilityMode,
 } from '@prisma/client';
 // 같은 `prisma/` 폴더 안의 모듈이라 프로덕션 이미지에도 함께 복사된다(`seed-alpha-tournament-qa.ts`
 // 상단 주석과 같은 이유). `assertAlphaSeedAllowed`는 alpha 전용 4중 가드를 그대로 재사용하고,
@@ -12,6 +13,7 @@ import {
 // 공개 기록 동의를 GRANTED로 만드는 헬퍼다 — 기존 alpha QA 페르소나 관행과 동일한 소스를 쓴다.
 import {
   assertAlphaSeedAllowed,
+  alphaTeamLogoPreset,
   ensureAlphaQaRecordConsent,
   FEATURED_PERSONAS,
   FEATURED_TEAMS,
@@ -242,6 +244,7 @@ async function ensureLeagueTeams(
     await tx.v1TeamProfile.upsert({
       where: { teamId: team.id },
       update: {
+        logoUrl: alphaTeamLogoPreset(teamNo + 4),
         description: `서울 지역에서 주 1회 정기 경기를 진행하는 풋살 팀입니다. ${LEAGUE_TITLE} 참가팀이며 Alpha 쇼케이스 데이터입니다.`,
         activityNote: `매주 수·일 저녁 · 서울 ${activityArea}`,
         activityDays: ['wed', 'sun'],
@@ -254,6 +257,7 @@ async function ensureLeagueTeams(
       },
       create: {
         teamId: team.id,
+        logoUrl: alphaTeamLogoPreset(teamNo + 4),
         description: `서울 지역에서 주 1회 정기 경기를 진행하는 풋살 팀입니다. ${LEAGUE_TITLE} 참가팀이며 Alpha 쇼케이스 데이터입니다.`,
         activityNote: `매주 수·일 저녁 · 서울 ${activityArea}`,
         activityDays: ['wed', 'sun'],
@@ -498,6 +502,7 @@ async function ensureShowcaseRoster(
   await tx.v1TeamProfile.update({
     where: { teamId: teamSeed.id },
     data: {
+      logoUrl: alphaTeamLogoPreset(1),
       description: '서울 송파구를 중심으로 매주 활동하는 풋살 팀입니다. 대회·리그·친선 경기에 꾸준히 참가하며, Alpha 쇼케이스 데이터로 운영됩니다.',
       activityNote: '매주 화·토 저녁 · 서울 송파구',
       activityDays: ['tue', 'sat'],
@@ -590,6 +595,17 @@ async function ensureGameSkeleton(
       tx.v1GameSide.update({ where: { id: homeSide.id }, data: { displayNameSnapshot: home.name } }),
       tx.v1GameSide.update({ where: { id: awaySide.id }, data: { displayNameSnapshot: away.name } }),
     ]);
+    // 완료된 Alpha 쇼케이스 경기는 공개 라이브 기능 플래그와 무관하게 공식 결과를
+    // 노출해야 한다. LIVE 모드는 플래그가 꺼진 배포에서 STATUS_ONLY로 강등되어 이미
+    // 확정된 스코어까지 "결과 비공개"가 되므로, 시드가 소유한 완료 경기만
+    // OFFICIAL_ONLY로 고정한다. 아직 결과가 없는 경기는 운영 상태를 덮지 않는다.
+    if (spec.result !== null) {
+      await tx.v1GameVisibilityPolicy.upsert({
+        where: { gameId: existingGame.id },
+        update: { mode: V1VisibilityMode.OFFICIAL_ONLY },
+        create: { gameId: existingGame.id, mode: V1VisibilityMode.OFFICIAL_ONLY },
+      });
+    }
     return {
       gameId: existingGame.id,
       currentOfficialRevisionId: existingGame.currentOfficialRevisionId,
@@ -614,7 +630,14 @@ async function ensureGameSkeleton(
   // 그 함수의 malformed-config 폴백값(2)과 동일하게 하드코딩한다.
   await tx.v1GamePeriod.upsert({ where: { gameId_number: { gameId: game.id, number: 1 } }, update: {}, create: { gameId: game.id, number: 1 } });
   await tx.v1GamePeriod.upsert({ where: { gameId_number: { gameId: game.id, number: 2 } }, update: {}, create: { gameId: game.id, number: 2 } });
-  await tx.v1GameVisibilityPolicy.upsert({ where: { gameId: game.id }, update: {}, create: { gameId: game.id } });
+  await tx.v1GameVisibilityPolicy.upsert({
+    where: { gameId: game.id },
+    update: {},
+    create: {
+      gameId: game.id,
+      mode: spec.result === null ? V1VisibilityMode.LIVE : V1VisibilityMode.OFFICIAL_ONLY,
+    },
+  });
 
   return {
     gameId: game.id,

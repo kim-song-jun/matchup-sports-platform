@@ -29,6 +29,16 @@ const COVER_IMAGE_URL = '/mock/generated/futsal-rooftop.webp';
 const TEAM_IMAGE_URL = '/mock/generated/team-huddle.webp';
 const HIGHLIGHT_VIDEO_URL = '/mock/generated/tournament-highlight.webm';
 
+// 팀 생성 폼이 제공하는 10개 번들 프리셋과 같은 public URL 계약이다. 시드 재실행 때
+// 로고가 바뀌면 스크린샷과 운영 검증이 흔들리므로, 팀 슬롯을 한 번 섞은 순서에 고정해
+// 재현 가능한 무작위 선택으로 만든다.
+const TEAM_LOGO_PRESET_ORDER = [7, 2, 10, 4, 9, 1, 6, 3, 8, 5] as const;
+
+export function alphaTeamLogoPreset(slot: number): string {
+  const preset = TEAM_LOGO_PRESET_ORDER[(Math.max(1, slot) - 1) % TEAM_LOGO_PRESET_ORDER.length];
+  return `/images/team-logos/team-logo-${String(preset).padStart(2, '0')}.jpg`;
+}
+
 type TournamentMarketingCopy = {
   readonly promoHomeSubtitle: string;
   readonly announcementTitle: string;
@@ -339,6 +349,21 @@ export async function ensureTeamRoster(
   teamDescription: string,
 ) {
   const teams = [];
+  const requiredTerms = await tx.v1TermsDocument.findMany({
+    where: { isRequired: true, status: 'published' },
+    select: { id: true },
+  });
+  const managedSignupDocuments = await tx.v1ManagedTermsDocument.findMany({
+    where: {
+      status: 'published',
+      OR: [{ effectiveAt: null }, { effectiveAt: { lte: new Date() } }],
+      policy: {
+        isActive: true,
+        placements: { some: { context: 'signup', requirement: 'required', isActive: true } },
+      },
+    },
+    select: { id: true },
+  });
   for (let index = 0; index < personas.length; index += 1) {
     const persona = personas[index];
     const teamSeed = teamSeeds[index];
@@ -362,6 +387,26 @@ export async function ensureTeamRoster(
         onboardingStatus: 'completed',
         emailVerifiedAt: new Date(),
       },
+    });
+    for (const termsDocument of requiredTerms) {
+      await tx.v1UserTermsConsent.upsert({
+        where: { userId_termsDocumentId: { userId: user.id, termsDocumentId: termsDocument.id } },
+        update: { acceptedAt: new Date(), revokedAt: null },
+        create: { userId: user.id, termsDocumentId: termsDocument.id, acceptedAt: new Date() },
+      });
+    }
+    await tx.v1ManagedTermsConsentEvent.createMany({
+      data: managedSignupDocuments.map((document) => ({
+        documentId: document.id,
+        userId: user.id,
+        context: 'signup' as const,
+        decision: 'accepted' as const,
+        decidedAt: new Date(),
+        source: 'web' as const,
+        versionVerified: true,
+        dedupeKey: `alpha-showcase:signup:${user.id}:${document.id}:accepted`,
+      })),
+      skipDuplicates: true,
     });
     await tx.v1UserProfile.upsert({
       where: { userId: user.id },
@@ -413,14 +458,14 @@ export async function ensureTeamRoster(
     await tx.v1TeamProfile.upsert({
       where: { teamId: team.id },
       update: {
-        logoUrl: TEAM_IMAGE_URL,
+        logoUrl: alphaTeamLogoPreset(index + 1),
         coverImageUrl: COVER_IMAGE_URL,
         description: teamDescription,
         deletedAt: null,
       },
       create: {
         teamId: team.id,
-        logoUrl: TEAM_IMAGE_URL,
+        logoUrl: alphaTeamLogoPreset(index + 1),
         coverImageUrl: COVER_IMAGE_URL,
         description: teamDescription,
       },

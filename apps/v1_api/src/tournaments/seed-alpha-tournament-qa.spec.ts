@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import {
   ALPHA_SEED_FUTSAL_COMPETITION_CONFIG_ID,
   ALPHA_TOURNAMENT_SCENARIOS,
+  alphaTeamLogoPreset,
   buildAlphaTournamentCampaignContent,
   createCompetitionData,
   ensureAlphaQaRecordConsent,
@@ -15,6 +16,31 @@ import { parseCampaignContentJson } from './tournament-campaign-content';
 import { FUTSAL_COMPETITION_CONFIG_ID } from './competition-config/competition-config-backfill';
 
 describe('alpha tournament QA campaign content', () => {
+  it('10개 번들 팀 로고를 재현 가능한 셔플 순서로 배정한다', () => {
+    const logos = Array.from({ length: 10 }, (_, index) => alphaTeamLogoPreset(index + 1));
+
+    expect(new Set(logos).size).toBe(10);
+    expect(logos).toEqual(logos.map((_, index) => alphaTeamLogoPreset(index + 1)));
+    expect(logos.every((logo) => /^\/images\/team-logos\/team-logo-\d{2}\.jpg$/.test(logo))).toBe(true);
+  });
+
+  it('완료된 쇼케이스 대회·리그·친선 경기를 OFFICIAL_ONLY로 공개한다', () => {
+    const leagueSeed = readFileSync(
+      resolve(__dirname, '../../prisma/seed-alpha-league-qa.ts'),
+      'utf8',
+    );
+    const localTournamentResultSeed = readFileSync(
+      resolve(__dirname, '../../prisma/seed-local-showcase-tournament-results.ts'),
+      'utf8',
+    );
+
+    expect(leagueSeed).toContain(
+      'mode: spec.result === null ? V1VisibilityMode.LIVE : V1VisibilityMode.OFFICIAL_ONLY',
+    );
+    expect(localTournamentResultSeed).not.toContain("mode: 'LIVE'");
+    expect(localTournamentResultSeed).toContain('update: { mode: V1VisibilityMode.OFFICIAL_ONLY }');
+  });
+
   it('쇼케이스 리그를 자연스러운 5개 팀·20명 선수로 구성한다', () => {
     const teamNames = [FEATURED_TEAMS[0].name, ...LEAGUE_TEAM_NAMES];
     const playerNames = [

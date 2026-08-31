@@ -4,7 +4,7 @@ import type { WebPushService } from '../notifications/web-push.service';
 import type { GameOperationClaim } from '../jobs/v1-game-operations-worker.service';
 import type { OfficialRevisionRow } from './game-result-official-projection.types';
 import { parseOfficialScore } from './parse-official-score';
-import { findTournamentOnSurface, TOURNAMENT_KINDS } from '../tournaments/tournament-surface-lookup';
+import { findTournamentOnSurface, ALL_COMPETITION_KINDS } from '../tournaments/tournament-surface-lookup';
 
 /**
  * 1차 대회 회고 REACH-4: 대회 알림은 등록·대기·취소·결제·공지·후기요청·수상까지
@@ -69,7 +69,11 @@ export class TournamentFixtureCompletionNotificationService {
     if (enabledRecipients.length === 0) return;
 
     const [tournament, teams] = await Promise.all([
-      findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
+      // 좁혀 두면 리그 경기의 알림에서 대회명이 `'대회'` 로 폴백된다(아래 `?? '대회'`).
+      // 기능이 아니라 **라벨**이 어긋나는 급이지만 조용히 틀리는 것은 같다.
+      // 지금은 동작이 안 바뀐다 — 거울 행은 `V1TournamentFixture` 가 없다.
+      // (docs/ops/read-swap-preflight.md §1-3)
+      findTournamentOnSurface(tx, ALL_COMPETITION_KINDS, {
         where: { id: revision.tournamentId },
         select: { title: true },
       }),
@@ -85,9 +89,8 @@ export class TournamentFixtureCompletionNotificationService {
         : `${score.home}:${score.away} (승부차기 ${score.penalties.home}:${score.penalties.away})`;
 
     const title = '대회 경기 결과가 확정됐어요';
-    // `?? '대회'` 는 조용한 폴백이다 — 화면 전환(read-swap)이 리그 경기를 여기로 보내면
-    // 에러 없이 **대회명 자리가 '대회' 로** 나간다. 그때 위 조회를 `ALL_COMPETITION_KINDS`
-    // 로 넓혀야 한다 (docs/ops/read-swap-preflight.md).
+    // `?? '대회'` 는 조용한 폴백이다 — 위 조회를 `ALL_COMPETITION_KINDS` 로 넓혔으므로
+    // 리그가 도달해도 제 이름이 나간다. 폴백 자체는 남긴다(행이 정말 없을 수 있다).
     const body = `${tournament?.title ?? '대회'} — ${homeName} ${scoreline} ${awayName} 결과가 공식 확정됐어요.`;
     const deepLink = `/tournaments/${revision.tournamentId}/matches/${revision.tournamentFixtureId}`;
     const businessKeyFor = (userId: string) =>

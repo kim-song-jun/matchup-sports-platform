@@ -126,7 +126,7 @@ import type {
   RevokeIdentityLinkDto,
   RevokeParticipantConsentDto,
 } from './dto/game-participant-identity.dto';
-import { findTournamentOnSurface, TOURNAMENT_KINDS } from '../tournaments/tournament-surface-lookup';
+import { findTournamentOnSurface, ALL_COMPETITION_KINDS } from '../tournaments/tournament-surface-lookup';
 
 type Transaction = Prisma.TransactionClient;
 type CommandResult = object;
@@ -5464,11 +5464,15 @@ export class GamesService {
    */
   private async suspensionVerdicts(tx: Transaction, tournamentId: string, fixtureId: string) {
     // **행이 없으면 규정이 조용히 꺼진다**(아래 `?? null` → `suspensionRulesEnabled` false).
-    // 지금은 리그가 이 경로로 오지 않아 대회 표면으로 좁히는 것이 맞지만, 화면 전환
-    // (read-swap)이 리그 경기를 여기로 보내게 되면 **이 줄을 `ALL_COMPETITION_KINDS` 로
-    // 넓혀야 한다** — 안 그러면 리그 징계 규정이 에러 없이 사라진다
-    // (docs/ops/read-swap-preflight.md 에 목록으로 둔다).
-    const tournament = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
+    // 그래서 리그를 허용한다 — 좁혀 두면 read-swap 이 리그 경기를 여기로 보내는 순간
+    // **리그 징계 규정이 에러 없이 사라진다**(경고 누적·퇴장 정지가 통째로 안 돈다).
+    //
+    // **지금은 동작이 바뀌지 않는다.** 거울 행은 `V1TournamentFixture` 를 갖지 않는다 —
+    // 그 행을 만드는 세 곳(`tournament-bracket.service` · `league-fixture-generator` ·
+    // mock-seed)이 전부 `TOURNAMENT_KINDS` 게이트 뒤에 있다. 이 함수는 `fixture.tournamentId`
+    // 로 불리므로 리그가 도달할 경로 자체가 없다.
+    // (docs/ops/read-swap-preflight.md §1-1)
+    const tournament = await findTournamentOnSurface(tx, ALL_COMPETITION_KINDS, {
       where: { id: tournamentId },
       select: { yellowAccumulationLimit: true, redCardSuspensionMatches: true },
     });

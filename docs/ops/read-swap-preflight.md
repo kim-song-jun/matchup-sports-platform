@@ -86,7 +86,7 @@ baseline 주석이 아니라 코드에 둔 이유는 **주석은 드리프트하
 > 그래서 리그가 이 자리에 닿으려면 **① 대회 표면 도달 ② 신청 존재 ③ 계좌이체·ready** 세 겹을
 > 통과해야 한다. **아래 "지켜본다" 결론이 그만큼 더 강해진다.**
 >
-> ⚠️ 같은 파일의 `assertPaymentInstructions`(L89)와 **혼동하지 말 것** — 그쪽은
+> ⚠️ 같은 파일의 `assertPaymentInstructions` 와 **혼동하지 말 것** — 그쪽은
 > `TOURNAMENT_PAYMENT_INSTRUCTIONS_MISSING` 을 **던진다.** 이 항목은 던지지 않는 `serialize`
 > 쪽이다. 함수 이름이 비슷해 실제로 한 번 뒤바뀌어 읽혔다(2026-09-01 KST).
 >

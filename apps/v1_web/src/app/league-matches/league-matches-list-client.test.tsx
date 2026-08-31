@@ -81,6 +81,11 @@ describe('LeagueMatchesListClient', () => {
     // 사라져도 green 이 된다(Copilot #887 지적). 썸네일을 정확히 집는다.
     const thumbnail = within(link).getByTestId('competition-thumbnail');
     expect(thumbnail.querySelector('svg')).not.toBeNull();
+
+    // 리그 카드의 배지는 전부 같은 크기여야 한다 — 공유 헤더는 대회 기준의 기본 크기를
+    // 쓰므로 `tm-badge-sm` 을 넘기지 않으면 **상태 배지만 커진다**(같은 행의 티어 배지는
+    // 여전히 small). 크기 클래스를 잃는 회귀를 여기서 잡는다.
+    expect(within(link).getByText('진행 중').className).toContain('tm-badge-sm');
   });
 
   it('결과가 0건이면 EmptyState를 렌더한다', () => {

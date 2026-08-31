@@ -161,7 +161,11 @@ export default function LeagueMatchesListClient() {
                       <CompetitionCardHeader
                         sportCode={item.sport.code}
                         title={item.title}
-                        statusBadge={{ label: stateMeta.label, badgeClass: stateMeta.badgeClass }}
+                        // 리그 카드의 배지는 원래 전부 `tm-badge-sm`(min-height 18px + caption)이다.
+                        // 공유 헤더는 대회 기준의 기본 크기를 쓰므로 크기 클래스를 여기서 넘겨
+                        // **같은 행의 티어 배지와 크기를 맞춘다** — 안 넘기면 상태 배지만 커져
+                        // 카드 안에서 어긋난다(Copilot #887 지적).
+                        statusBadge={{ label: stateMeta.label, badgeClass: `tm-badge-sm ${stateMeta.badgeClass}` }}
                         meta={
                           <>
                             {/* 티어 뱃지 — 리그 체계에 속한 리그에만 붙인다. 단발 리그는

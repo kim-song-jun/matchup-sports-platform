@@ -482,11 +482,16 @@ league-completion-projection    active→completed
 >                   `result.count === 0` 조기 반환 **뒤**(조건부 update 승자만 도달)
 >                   커밋 ac933fea4 — origin/dev 에 포함됨
 > 봉쇄 테스트        없다. 이 전이를 지나는 유일한 스펙
->                   test/league-matches/league-completion-projection.integration-spec.ts 는
+>                   apps/v1_api/test/league-matches/
+>                   league-completion-projection.integration-spec.ts 는
 >                   `v1League.state` 와 상태로그만 단언하고 v1Tournament 를 한 번도 조회하지
 >                   않는다 → dual-write 를 지워도 전 단언이 green 이다
 > ```
-> **반증**: `grep -c v1Tournament test/league-matches/league-completion-projection.integration-spec.ts`
+> **반증**(레포 루트에서 그대로 붙여넣어 돌아간다 — 실행해서 확인했다):
+> ```bash
+> grep -c v1Tournament \
+>   apps/v1_api/test/league-matches/league-completion-projection.integration-spec.ts
+> ```
 > 가 0 보다 커지면 이 줄은 낡았다(현재 **0**).
 >
 > **이 봉쇄를 쓸 때 로컬 green 을 믿지 마라 — 통합 스펙이라 Postgres 가 필요하다.**

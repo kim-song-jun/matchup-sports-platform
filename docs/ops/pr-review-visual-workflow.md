@@ -91,7 +91,7 @@ suppressed 블록은 그 둘 사이로 빠져나간다.
 
 **게이트 1·2 — 최신 Copilot 리뷰의 제출시각을 head 와 나란히 본다**
 ```bash
-gh api graphql -f query='{repository(owner:"<OWNER>",name:"<REPO>"){pullRequest(number:<N>){
+gh api graphql -f query='{repository(owner:"<owner>",name:"<repo>"){pullRequest(number:<N>){
   commits(last:1){nodes{commit{committedDate}}}
   reviews(last:100){nodes{author{login} submittedAt}}}}}' \
   --jq '.data.repository.pullRequest
@@ -104,7 +104,7 @@ gh api graphql -f query='{repository(owner:"<OWNER>",name:"<REPO>"){pullRequest(
 
 **게이트 3·4 — 본문을 파일로 받아 두 줄을 grep. 값에 정규식을 걸지 않는다**
 ```bash
-gh api graphql -f query='{repository(owner:"<OWNER>",name:"<REPO>"){pullRequest(number:<N>){
+gh api graphql -f query='{repository(owner:"<owner>",name:"<repo>"){pullRequest(number:<N>){
   reviews(last:100){nodes{author{login} submittedAt body}}}}}' \
   --jq '[.data.repository.pullRequest.reviews.nodes[]
          |select(.author.login=="copilot-pull-request-reviewer")]|max_by(.submittedAt)|.body' > /tmp/rv.md
@@ -115,7 +115,7 @@ grep -nE '^\s*[-*]\s+\*\*Comments generated|Suppressed comments' /tmp/rv.md
 
 **게이트 5 — 미해결 수는 "받은 수 / 전체 수" 와 함께 본다**
 ```bash
-gh api graphql -f query='{repository(owner:"<OWNER>",name:"<REPO>"){pullRequest(number:<N>){
+gh api graphql -f query='{repository(owner:"<owner>",name:"<repo>"){pullRequest(number:<N>){
   reviewThreads(first:100){totalCount nodes{isResolved}}}}}' \
   --jq '.data.repository.pullRequest.reviewThreads
     | "받은 \(.nodes|length) / 전체 \(.totalCount) · 미해결 \([.nodes[]|select(.isResolved==false)]|length)"'
@@ -126,7 +126,7 @@ gh api graphql -f query='{repository(owner:"<OWNER>",name:"<REPO>"){pullRequest(
 #### 도착 감지·판정의 함정 넷 — 넷 다 실제로 밟았다
 
 **① 개수 증분은 *힌트*지 판정이 아니다.** §2.2의 count 폴링은 "뭔가 왔다" 를 알리는 용도로
-그대로 써도 된다 — 다만 **도착 확정과 clean 판정은 게이트 2(제출시각 > head)로 한다.**
+그대로 써도 된다 — 다만 **도착 확정은 게이트 2(제출시각 > head)**, **clean 판정은 5게이트 전부**다.
 개수만 믿으면 이렇게 깨진다: 워처를 push 직후 걸면서 기준선을 *그 순간* 재면,
 감시하려는 리뷰가 기준선에 삼켜진다(4초 만에 도착해 `6 > 6`이 성립 안 했다). 게다가
 **조용히** 실패해서 "아직 안 왔다"로 읽힌다. **시각 비교(게이트 2)로 판정하면 기준선이
@@ -203,7 +203,8 @@ gh api graphql -f query='mutation($tid:ID!){
 ```
 - 한국어 본문은 bash 따옴표 문제로 **python `subprocess`로 호출** 권장.
 
-4. 미해결 0 확인 → §2.1 재요청 → §2.2 폴링. **`generated no new comments` 나올 때까지 반복.**
+4. 미해결 0 확인 → §2.1 재요청 → §2.2 폴링. **§2.2-a 의 5게이트를 다 만족할 때까지 반복.**
+   (`Comments generated: 0` 하나로 끝내지 않는다 — **suppressed 블록 없음**과 **제출시각 > head** 가 함께 필요하다.)
 
 ### 2.5 300-파일 한도 (중요)
 

@@ -137,13 +137,15 @@ async function seedFixtureResult(
   if (!homeParticipant?.userId || !awayParticipant?.userId) {
     throw new Error(`Showcase fixture ${fixture.id} is missing linked roster participants.`);
   }
+  const homeUserId = homeParticipant.userId;
+  const awayUserId = awayParticipant.userId;
 
   const { homeScore, awayScore, recordedAt } = fixture.result;
   const score = { home: homeScore, away: awayScore };
   const eventsHash = `local-showcase-tournament:${fixture.id}:${homeScore}-${awayScore}`;
   const scorers = [
-    { side: homeSide, participant: homeParticipant, goals: homeScore },
-    { side: awaySide, participant: awayParticipant, goals: awayScore },
+    { side: homeSide, participant: homeParticipant, userId: homeUserId, goals: homeScore },
+    { side: awaySide, participant: awayParticipant, userId: awayUserId, goals: awayScore },
   ] as const;
   const goalEvents: {
     id: string;
@@ -200,7 +202,7 @@ async function seedFixtureResult(
       create: {
         participantId: scorer.participant.id,
         linkId: `local-showcase-link-${scorer.participant.id}`,
-        userId: scorer.participant.userId,
+        userId: scorer.userId,
         version: 1,
         effectiveFrom: recordedAt,
       },
@@ -348,8 +350,9 @@ async function main() {
     let created = 0;
     let preserved = 0;
     for (const fixture of fixtures) {
-      if (!fixture.result) throw new Error(`Showcase fixture ${fixture.id} has no result.`);
-      const outcome = await prisma.$transaction((tx) => seedFixtureResult(tx, { ...fixture, result: fixture.result }));
+      const result = fixture.result;
+      if (!result) throw new Error(`Showcase fixture ${fixture.id} has no result.`);
+      const outcome = await prisma.$transaction((tx) => seedFixtureResult(tx, { ...fixture, result }));
       if (outcome === 'created') created += 1;
       else preserved += 1;
     }

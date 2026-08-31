@@ -1,0 +1,23 @@
+{
+  "_comment": "원시 v1Tournament 단건 조회 허용치. 줄이는 방향으로만 갱신한다 — 늘리면 그 자체가 리뷰 대상이다. 최종 목표는 이 파일에 _comment 만 남는 것(전부 findTournamentOnSurface 로 이관).",
+  "src/game-operations/tournament-fixture-completion-notification.service.ts": 1,
+  "src/games/games.service.ts": 1,
+  "src/tournament-operations/fields/tournament-operations-fields.service.ts": 1,
+  "src/tournaments/admin-registrations.service.ts": 4,
+  "src/tournaments/competition-config/competition-config-version-repoint.ts": 1,
+  "src/tournaments/competition-config/tournament-competition-config.ts": 2,
+  "src/tournaments/league-fixture-generator.service.ts": 2,
+  "src/tournaments/staff/tournament-staff.service.ts": 1,
+  "src/tournaments/tournament-announcements.service.ts": 3,
+  "src/tournaments/tournament-bracket.service.ts": 3,
+  "src/tournaments/tournament-campaign-admin.service.ts": 1,
+  "src/tournaments/tournament-campaign-status.service.ts": 1,
+  "src/tournaments/tournament-players.service.ts": 5,
+  "src/tournaments/tournament-registrations.service.ts": 4,
+  "src/tournaments/tournament-reviews.service.ts": 2,
+  "src/tournaments/tournament-sponsors.service.ts": 1,
+  "src/tournaments/tournament-standings-recalculation.ts": 1,
+  "src/tournaments/tournament-standings-reconcile.cli.ts": 1,
+  "src/tournaments/tournaments-admin.service.ts": 7,
+  "src/tournaments/videos/tournament-fixture-videos.service.ts": 1
+}

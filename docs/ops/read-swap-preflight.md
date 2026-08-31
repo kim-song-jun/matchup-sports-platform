@@ -15,7 +15,7 @@ apps/v1_api 에서 `v1Tournament` 단건 조회는 전부 findTournamentOnSurfac
 
   원시 대회 단건 조회   0곳 (baseline 0)   ← 새 원시 호출은 CI red
   raw SQL 대회 테이블   9곳 (baseline 9)   ← 헬퍼를 못 쓰는 자리, 각 항목에 why
-  리그 허용 지점        1곳 (baseline 1)   ← ALL_COMPETITION_KINDS 를 넘기는 자리
+  리그 허용 지점        4곳 (baseline 4)   ← ALL_COMPETITION_KINDS 를 넘기는 자리
   v1League 쓰기 자리    9곳 (baseline 9)   ← 앞 셋과 달리 **쓰기**를 센다
 ```
 
@@ -23,6 +23,10 @@ apps/v1_api 에서 `v1Tournament` 단건 조회는 전부 findTournamentOnSurfac
 안 걸렸고, 실제로 **총 9곳 중 7곳이 dual-write 없이 살아 있었다**(2026-08-31). 거울을 안 만든 리그는
 read-swap 뒤 **에러 없이 화면에서 사라진다** — 읽는 코드를 아무리 세도 이건 안 보인다.
 네 번째 검사는 새 쓰기 자리가 늘면 CI 를 멈춰 *"dual-write 붙였나"* 를 묻게 하는 일을 한다.
+
+**4 의 내역**: 설정 축 1(§3-c) + §1 의 1·2·3 을 넓힌 3. 세 자리는 *"행이 없으면 조용히
+기본값으로 간다"* 라서 넓혔고, §1-4 는 **넓히지 않았다**(참가 신청은 대회 전용이라 리그가
+도달하지 않고, 넓히면 오히려 문을 하나 더 여는 셈이다 — §1 표 아래 참조).
 
 허용 종류는 **호출부 인자로 코드에 적혀 있다**(`TOURNAMENT_KINDS` / `ALL_COMPETITION_KINDS`).
 baseline 주석이 아니라 코드에 둔 이유는 **주석은 드리프트하지만 인자는 못 하기 때문**이다.
@@ -288,9 +292,12 @@ competition-config-version-repoint
 전부 **내부 호출**이라 id 가 이미 검증된 문맥에서 온다. 억지로 재현하면 배선 단언에
 가까워져 비용 대비 증명력이 낮다.
 
-### 3-c. **의도적 리그 허용** (1지점)
+### 3-c. **의도적 리그 허용** (4지점)
 ```
-competition-config-version-repoint   ALL_COMPETITION_KINDS
+competition-config-version-repoint                     ALL_COMPETITION_KINDS   설정 축
+games.service (suspensionVerdicts)                     ALL_COMPETITION_KINDS   §1-1
+tournament-standings-recalculation                     ALL_COMPETITION_KINDS   §1-2
+tournament-fixture-completion-notification.service     ALL_COMPETITION_KINDS   §1-3
 ```
 설정은 대회와 리그가 **이미 공유하는 축**이다. 여기서 종류를 가르면 리그만 옛 설정에
 남거나 설정 없는 상태로 방치돼 통합을 되돌리는 셈이 된다(`tournament-surface.ts` 의

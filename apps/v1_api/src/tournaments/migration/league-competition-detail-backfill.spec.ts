@@ -177,7 +177,7 @@ describe('backfillLeagueCompetitionDetails', () => {
 
     const result = await backfillLeagueCompetitionDetails(prisma, { dryRun: false });
 
-    expect(result).toEqual({ scanned: 1, skipped: 1, updated: 0, mirrorCount: 1, dryRun: false });
+    expect(result).toEqual({ scanned: 1, skipped: 1, planned: 0, updated: 0, mirrorCount: 1, dryRun: false });
     expect(updateMany).not.toHaveBeenCalled();
   });
 
@@ -266,12 +266,12 @@ describe('backfillLeagueCompetitionDetails', () => {
     const dry = fakePrisma([league()], [tournament()]);
     const dryResult = await backfillLeagueCompetitionDetails(dry.prisma, { dryRun: true });
     expect(dry.updateMany).not.toHaveBeenCalled();
-    expect(dryResult).toEqual({ scanned: 1, skipped: 0, updated: 0, mirrorCount: 1, dryRun: true });
+    expect(dryResult).toEqual({ scanned: 1, skipped: 0, planned: 1, updated: 0, mirrorCount: 1, dryRun: true });
 
     const applied = fakePrisma([league()], [tournament()]);
     const applyResult = await backfillLeagueCompetitionDetails(applied.prisma, { dryRun: false });
     expect(applied.updateMany).toHaveBeenCalledTimes(1);
-    expect(applyResult).toEqual({ scanned: 1, skipped: 0, updated: 1, mirrorCount: 1, dryRun: false });
+    expect(applyResult).toEqual({ scanned: 1, skipped: 0, planned: 1, updated: 1, mirrorCount: 1, dryRun: false });
   });
 
   it('불변식: 거울 수가 리그 수와 다르면 실패한다 — dual-write 가 빠진 자리를 드러낸다', async () => {
@@ -308,5 +308,18 @@ describe('backfillLeagueCompetitionDetails', () => {
     const result = await backfillLeagueCompetitionDetails(prisma, { dryRun: true });
 
     expect(result).toMatchObject({ dryRun: true, mirrorCount: 0 });
+  });
+
+  it('dry-run 이 **고칠 계획 수**를 보고한다 — updated 는 항상 0 이라 그것만으론 알 수 없다', async () => {
+    // 승인을 요청할 때 사용자가 볼 숫자가 바로 이것이다. 없으면 "몇 건이 바뀌나" 에
+    // 답할 수 없고, 그 상태로 승인을 받는 것은 승인자에게 빈칸을 주는 것이다.
+    const { prisma } = fakePrisma([league({ id: 'a' }), league({ id: 'b' })], [
+      tournament({ id: 'a' }),
+      tournament({ id: 'b' }),
+    ]);
+
+    const result = await backfillLeagueCompetitionDetails(prisma, { dryRun: true });
+
+    expect(result).toMatchObject({ scanned: 2, planned: 2, updated: 0, dryRun: true });
   });
 });

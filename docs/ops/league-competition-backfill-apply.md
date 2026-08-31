@@ -15,6 +15,23 @@
 >
 > **prod 는 그대로다** — prod 에는 리그 자체가 없다(맨 아래 절).
 >
+> ## ✅ 참가팀 백필도 실행됐다 (2026-08-31, 사용자 승인)
+> `league-team-registration-backfill.cli.js --apply` → **`created: 211`**.
+> alpha `5196a6ee4` 이미지에서 SSM → `docker exec` 경로로 실행했다.
+> ```
+> v1_tournament_registrations            248 → 459
+> 그중 리그 대회에 달린 것                     211
+> v1_league_teams 와 1:1 매칭                211
+> status/entry_source/appliedBy 위반          0
+> ```
+> **되돌리기 창은 그대로 열려 있다** — Restrict 여섯 자리 전부 0행(실행 후 재확인).
+> 봉쇄도 유지: 리그 id 로 `/tournaments/:id`·`/standings`·`/matches` **전부 404**,
+> `/league-matches/:id` 는 200.
+>
+> **다음에 이 문서를 읽는 사람에게**: 두 백필 모두 **실행 완료** 상태다. 다시 돌리지 마라 —
+> 가드가 막긴 하지만(`alreadyPresent` 로 세고 `idConflicts` 로 멈춘다) alpha 데이터 변경
+> 승인을 헛되이 쓴다.
+>
 > **아직 참인지 확인하는 법**: 아래 "실행 직전 점검 1" 의 SSM → psql 경로로
 > `SELECT count(*) FROM v1_tournaments WHERE kind='regular_league';` 을 본다.
 > 88 이면 실행됨, 0 이면 이 정정이 틀린 것이니 되돌려 적는다.

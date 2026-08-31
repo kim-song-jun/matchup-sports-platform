@@ -122,44 +122,40 @@ describe('리그 dual-write (real DB)', () => {
     expect(league?.regionId).toBe(mirror?.regionId);
   });
 
-  it('리그 쓰기가 롤백되면 거울도 남지 않는다 — 같은 트랜잭션이라는 증명', async () => {
-    // mock 은 롤백하지 않으므로 이 성질은 **유닛으로 짤 수 없다.** dual-write 가 트랜잭션
-    // 밖으로 나가면 리그는 사라지고 거울만 남아, 리그 없는 유령 대회가 생긴다.
+  it('리그 쓰기가 롤백되면 거울도 남지 않는다 — **서비스 경로로** 증명한다', async () => {
+    // ⚠️ 이 테스트를 처음엔 `tx` 안에서 두 행을 **직접** 만들고 throw 하는 형태로 썼는데,
+    // 그건 **Prisma 의 롤백 동작만 재확인**할 뿐 *서비스 코드가 dual-write 를 같은 트랜잭션
+    // 경계 안에 두는지* 는 검증하지 않는다(Copilot 이 잡았다). 이 파일 맨 위 주석이
+    // "직접 만들지 마라" 고 적어 놓고 정작 이 케이스에서 그걸 어겼다.
+    //
+    // 대신 **서비스의 트랜잭션 안에서, dual-write 직후에** 실패를 일으킨다.
+    // `logAdminAction` 이 그 자리(거울 create 바로 다음, 같은 `tx`)에 있다.
+    // dual-write 가 트랜잭션 밖으로 빠지면 **거울만 살아남아** 이 테스트가 red 가 된다.
+    const service = makeService();
+    const failing = service as unknown as {
+      adminContext: { logAdminAction: (...args: unknown[]) => Promise<void> };
+    };
+    const original = failing.adminContext.logAdminAction.bind(failing.adminContext);
+    failing.adminContext.logAdminAction = () => Promise.reject(new Error('강제 실패'));
+
     const before = await prisma.v1Tournament.count({ where: { kind: 'regular_league' } });
+    const leaguesBefore = await prisma.v1League.count();
 
-    await expect(
-      prisma.$transaction(async (tx) => {
-        const league = await tx.v1League.create({
-          data: {
-            title: '롤백될 리그',
-            sportId: ids.sportId,
-            regionId: ids.regionId,
-            createdByAdminUserId: ids.adminId,
-            startsOn: new Date(dto.startsOn),
-            endsOn: new Date(dto.endsOn),
-            tieBreakJson: [],
-          },
-        });
-        await tx.v1Tournament.create({
-          data: {
-            id: league.id,
-            kind: 'regular_league',
-            sportId: ids.sportId,
-            title: league.title,
-            status: 'draft',
-            regionId: ids.regionId,
-            scheduledAt: league.startsOn,
-            scheduledEndAt: league.endsOn,
-            competitionConfigVersionId: '22222222-2222-4222-8222-222222222222',
-          },
-        });
-        throw new Error('강제 실패 — 이 뒤로는 아무것도 남지 않아야 한다');
-      }),
-    ).rejects.toThrow('강제 실패');
+    try {
+      await expect(
+        service.create({ id: ids.adminUserId } as never, {
+          ...dto,
+          title: '롤백될 리그',
+        } as never),
+      ).rejects.toThrow('강제 실패');
+    } finally {
+      failing.adminContext.logAdminAction = original;
+    }
 
-    // 둘 다 없어야 한다. 하나만 남으면 트랜잭션 경계가 깨진 것이다.
-    const after = await prisma.v1Tournament.count({ where: { kind: 'regular_league' } });
-    expect(after).toBe(before);
+    // 둘 다 없어야 한다. **거울만 남으면** dual-write 가 트랜잭션 밖에 있다는 뜻이고,
+    // 리그 없는 유령 대회가 생긴다.
+    expect(await prisma.v1Tournament.count({ where: { kind: 'regular_league' } })).toBe(before);
+    expect(await prisma.v1League.count()).toBe(leaguesBefore);
   });
 
   it('완료를 되돌리면 거울 status 도 함께 되돌아간다 (dual-write)', async () => {

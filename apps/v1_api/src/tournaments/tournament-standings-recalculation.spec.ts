@@ -61,9 +61,14 @@ function makePrisma(options: {
       }),
     },
     v1Tournament: {
-      findFirst: jest.fn().mockImplementation(({ where }: { where: { id: string } }) =>
-        Promise.resolve(options.tournamentsById[where.id] ?? null),
-      ),
+      // `findTournamentOnSurface` 가 `where: { AND: [종류조건, 호출부조건] }` 로 감싸므로
+      // **`where.id` 를 직접 읽으면 undefined** 가 되고, 조회가 null 을 돌려줘 루프가
+      // 조용히 건너뛴다(에러가 안 난다). id 를 가진 절에서 꺼낸다.
+      findFirst: jest.fn().mockImplementation((args: { where: Record<string, unknown> }) => {
+        const clauses = (args.where.AND ?? [args.where]) as Array<Record<string, unknown>>;
+        const id = clauses.find((clause) => 'id' in clause)?.id as string | undefined;
+        return Promise.resolve(id === undefined ? null : (options.tournamentsById[id] ?? null));
+      }),
     },
     $transaction: jest.fn().mockImplementation((fn: (tx: unknown) => unknown) => fn(tx)),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

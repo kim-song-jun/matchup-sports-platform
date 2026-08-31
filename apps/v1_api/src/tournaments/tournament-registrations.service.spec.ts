@@ -12,6 +12,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
 import { TournamentRegistrationsService } from './tournament-registrations.service';
+import { kindAwareFindFirst } from '../../test/helpers/kind-aware-find-first';
 
 const manager = { id: 'manager-user', email: 'm@teameet.v1', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
 
@@ -145,6 +146,84 @@ describe('TournamentRegistrationsService', () => {
   });
 
   afterEach(() => jest.clearAllMocks());
+
+  // ─── 대회 표면 봉쇄 (리그 id 로 열리지 않는다) ───────────────────────────────
+  // 통합 백필(R3)이 `v1_tournaments` 에 정규 리그 시즌을 만들면서, 예전엔 존재하지 않던
+  // id 가 이 조회들을 통과하기 시작했다(#863 이 공개 경로에서 실측). 등록 경로는 **쓰기**라
+  // 통과하면 리그 행에 실제 참가 신청이 붙는다.
+  describe('대회 표면 봉쇄', () => {
+    it('create: 리그 id 는 대회로 열리지 않는다 (404)', async () => {
+      prisma.v1Tournament.findFirst.mockImplementation(
+        kindAwareFindFirst(openTournament({ kind: 'regular_league' })),
+      );
+      await expect(service.create(manager, 'league-1', { teamId: 'team-1' })).rejects.toMatchObject({
+        response: { code: 'TOURNAMENT_NOT_FOUND' },
+      });
+    });
+
+    it('create: 대회 id 와 kind=null(R1 이전 행)은 그대로 열린다', async () => {
+      // 막는 것만 보면 **전부 404 로 만들어도 통과**한다. 통과해야 할 것도 확인한다.
+      for (const kind of ['regular_tournament', null]) {
+        prisma.v1Tournament.findFirst.mockImplementation(kindAwareFindFirst(openTournament({ kind })));
+        prisma.v1TeamMembership.findFirst.mockResolvedValue(null);
+        // 종류 게이트를 지났다는 증거로 **그다음 게이트**(팀 권한 403)까지 도달하는지 본다.
+        await expect(service.create(manager, 'tournament-1', { teamId: 'team-1' })).rejects.toThrow(
+          ForbiddenException,
+        );
+      }
+    });
+
+    // `submit` 은 트랜잭션 **밖**(loadOpenTournament)과 **안**(TOCTOU 재검증) 두 곳에서
+    // 대회를 읽는다. 밖만 막으면 안쪽은 조건 없이 남는데, 그 사실이 밖에서 드러나지 않는다 —
+    // 밖에서 이미 막히니 겉보기엔 닫혀 보이기 때문이다. **두 조회 사이에 행이 바뀌는 상황**
+    // (이 가드의 존재 이유인 TOCTOU)을 만들어 안쪽 가드를 직접 태운다.
+    it('submit: 트랜잭션 안 재검증이 리그 행을 막는다 (바깥 조회 통과 후 바뀐 경우)', async () => {
+      prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+      prisma.v1Tournament.findFirst
+        // 바깥 조회: 정상 대회 → loadOpenTournament 통과
+        .mockImplementationOnce(kindAwareFindFirst(openTournament({ kind: 'regular_tournament' })))
+        // 트랜잭션 안: 같은 id 가 리그 행으로 보인다
+        .mockImplementationOnce(kindAwareFindFirst(openTournament({ kind: 'regular_league' })));
+
+      await expect(service.submit(manager, 'tournament-1', 'reg-1', validSubmit)).rejects.toMatchObject({
+        response: { code: 'TOURNAMENT_NOT_OPEN' },
+      });
+      expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
+      expect(prisma.v1TournamentPayment.upsert).not.toHaveBeenCalled();
+    });
+
+    // `withdrawCancelRequest` 는 대회 조회가 **트랜잭션 안에만** 있다(진입부는 등록 행만
+    // 읽는다) — 바깥에 다른 종류 게이트가 없어서, 여기서 안 막으면 리그 id 로 쓰기가 끝난다.
+    it('withdrawCancelRequest: 리그 id 는 트랜잭션 안에서 막힌다', async () => {
+      prisma.v1TournamentRegistration.findFirst.mockResolvedValue(
+        registrationRow({ tournamentId: 'league-1', status: 'cancel_requested' }),
+      );
+      prisma.v1Tournament.findFirst.mockImplementation(
+        kindAwareFindFirst(openTournament({ id: 'league-1', kind: 'regular_league' })),
+      );
+
+      await expect(
+        service.withdrawCancelRequest(manager, 'league-1', 'reg-1'),
+      ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_NOT_FOUND' } });
+      expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
+    });
+
+    it('내 신청 입금 안내: 리그 id 는 대회 입금 정보를 주지 않는다', async () => {
+      // 백필 행은 entryFee·계좌 필드가 비어 있어 오늘 새는 값은 제목뿐이지만, 운영자가
+      // 그 값을 채우는 순간 계좌 안내가 그대로 나간다 — 조회 자체를 막는다.
+      prisma.v1Tournament.findFirst.mockImplementation(
+        kindAwareFindFirst(openTournament({ kind: 'regular_league' })),
+      );
+      // **등록이 비어 있으면 입금 정보를 아예 안 불러온다** — 그 상태로 두면 필터를 지워도
+      // 통과하는 무의미한 테스트가 된다(실제로 그렇게 짰다가 변이에서 green 인 걸 보고 잡았다).
+      // bank_transfer 결제가 붙은 등록을 넣어 조회가 실제로 일어나게 한다.
+      prisma.v1TournamentRegistration.findMany.mockResolvedValue([
+        { ...registrationRow({ status: 'awaiting_payment' }), payment: paymentRow(), team: null },
+      ]);
+      const rows = await service.getMyRegistrations(manager, 'league-1');
+      expect(JSON.stringify(rows)).not.toContain('국민은행');
+    });
+  });
 
   // ─── create ───────────────────────────────────────────────────────────────────
 

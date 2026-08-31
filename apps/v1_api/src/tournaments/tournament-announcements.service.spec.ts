@@ -13,6 +13,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService } from '../common/admin-context.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { TournamentAnnouncementsService } from './tournament-announcements.service';
+import { kindAwareFindFirst } from '../../test/helpers/kind-aware-find-first';
 
 const ownerAuthUser = {
   id: 'owner-user-id',
@@ -138,6 +139,34 @@ describe('TournamentAnnouncementsService', () => {
       response: { code: 'TOURNAMENT_NOT_FOUND' },
     });
     expect(prisma.v1TournamentAnnouncement.findMany).not.toHaveBeenCalled();
+  });
+
+  // 통합 백필(R3)이 `v1_tournaments` 에 정규 리그 시즌을 만들면서, 예전엔 없던 id 가 이
+  // 조회를 통과하기 시작했다(#863 이 공개 경로에서 실측). 공지는 읽기지만 **존재 오라클**이
+  // 되고, 어드민 생성 경로와 이어지면 리그 공지가 대회 공지로 나간다.
+  it('listForParticipant: 리그 id 로는 열리지 않는다', async () => {
+    prisma.v1Tournament.findFirst.mockImplementation(
+      kindAwareFindFirst({ id: 'league-1', kind: 'regular_league' }),
+    );
+    await expect(service.listForParticipant(plainUser, 'league-1')).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_NOT_FOUND' },
+    });
+    expect(prisma.v1TournamentAnnouncement.findMany).not.toHaveBeenCalled();
+  });
+
+  it('listForParticipant: 대회 id 와 kind=null(R1 이전 행)은 그대로 열린다', async () => {
+    // 막는 것만 보면 **전부 404 로 만들어도 통과**한다. 통과해야 할 것도 확인한다.
+    for (const kind of ['regular_tournament', null]) {
+      prisma.v1Tournament.findFirst.mockImplementation(
+        kindAwareFindFirst({ id: 'tournament-1', kind }),
+      );
+      prisma.v1TournamentRegistration.findMany.mockResolvedValue([]);
+      prisma.v1TournamentAnnouncement.findMany.mockResolvedValue([
+        announcementRow({ id: 'ann-public', audience: 'public', publishedAt: new Date() }),
+      ]);
+      const result = await service.listForParticipant(plainUser, 'tournament-1');
+      expect(result.items.map((i) => i.id)).toEqual(['ann-public']);
+    }
   });
 
   it('listForParticipant: audience=public 공지는 신청 내역이 전혀 없어도 보인다', async () => {

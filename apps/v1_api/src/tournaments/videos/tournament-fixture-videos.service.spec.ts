@@ -4,6 +4,7 @@ import type { PrismaService } from '../../prisma/prisma.service';
 import type { UploadedFile, UploadsService } from '../../uploads/uploads.service';
 import { TournamentStaffAccessService } from '../staff/tournament-staff-access.service';
 import { TournamentFixtureVideosService } from './tournament-fixture-videos.service';
+import { kindAwareFindFirst } from '../../../test/helpers/kind-aware-find-first';
 
 const tournamentId = '00000000-0000-4000-8000-000000000001';
 const fixtureId = '00000000-0000-4000-8000-000000000002';
@@ -88,6 +89,9 @@ function createHarness(options: {
           ? { id: where.tournamentId_id.id, fieldId: options.fixtureFieldId ?? null }
           : null,
       ),
+      // 대회 단위 목록은 대회가 실재할 때만 여기까지 온다 — 기존 테스트는 전부 그 앞
+      // (403/404)에서 끝나 이 스텁이 없었다.
+      findMany: jest.fn().mockResolvedValue([]),
     },
     v1TournamentFixtureVideo: {
       findMany: jest.fn(async ({ where }: { where: { fixtureId: string } }) =>
@@ -455,6 +459,38 @@ describe('TournamentFixtureVideosService — 대회 단위 조회', () => {
     await expect(
       denied.service.listTournamentVideos(user('stranger'), tournamentId),
     ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('리그 id 로는 대회 영상 목록이 열리지 않는다', async () => {
+    // 이 응답은 대회의 fixture 와 영상 URL 을 통째로 담는다 — 리그 id 가 통과하면
+    // 팀명·일정·영상 링크가 '대회 영상 관리' 화면에 그대로 나간다.
+    const harness = createHarness({
+      assignments: [
+        { userId: 'director', role: 'TOURNAMENT_DIRECTOR', fieldId: null, fixtureIds: [] },
+      ],
+    });
+    harness.prisma.v1Tournament.findFirst.mockImplementation(
+      kindAwareFindFirst({ id: tournamentId, kind: 'regular_league' }),
+    );
+    await expect(
+      harness.service.listTournamentVideos(user('director'), tournamentId),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('대회 id 와 kind=null(R1 이전 행)은 그대로 열린다', async () => {
+    for (const kind of ['regular_tournament', null]) {
+      const harness = createHarness({
+        assignments: [
+          { userId: 'director', role: 'TOURNAMENT_DIRECTOR', fieldId: null, fixtureIds: [] },
+        ],
+      });
+      harness.prisma.v1Tournament.findFirst.mockImplementation(
+        kindAwareFindFirst({ id: tournamentId, kind }),
+      );
+      await expect(
+        harness.service.listTournamentVideos(user('director'), tournamentId),
+      ).resolves.toBeDefined();
+    }
   });
 
   it('없는 대회는 404', async () => {

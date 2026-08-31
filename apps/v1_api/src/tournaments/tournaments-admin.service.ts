@@ -14,6 +14,7 @@ import { V1AuthUser } from '../auth/v1-auth-user';
 import { GeocodedCoordinates, KakaoGeocodingService } from './kakao-geocoding.service';
 import { isBracketPublished } from './tournament-detail.presenter';
 import { TOURNAMENT_SURFACE_KIND } from './tournament-surface';
+import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
 import {
   AdminTournamentListQueryDto,
   ChangeTournamentStatusDto,
@@ -162,7 +163,7 @@ export class TournamentsAdminService {
 
   async get(user: V1AuthUser, tournamentId: string) {
     await this.adminContext.getActiveAdmin(user.id);
-    const row = await this.prisma.v1Tournament.findFirst({
+    const row = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
       include: {
         _count: { select: { registrations: true, fixtures: true, announcements: true } },
@@ -366,7 +367,7 @@ export class TournamentsAdminService {
 
   async update(user: V1AuthUser, tournamentId: string, dto: UpdateTournamentDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
-    const existing = await this.prisma.v1Tournament.findFirst({
+    const existing = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
     });
     if (!existing) {
@@ -621,7 +622,7 @@ export class TournamentsAdminService {
 
   async changeStatus(user: V1AuthUser, tournamentId: string, dto: ChangeTournamentStatusDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
-    const existing = await this.prisma.v1Tournament.findFirst({
+    const existing = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
     });
     if (!existing) {
@@ -751,7 +752,7 @@ export class TournamentsAdminService {
    */
   async publishBracket(user: V1AuthUser, tournamentId: string, scheduledAt?: Date) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
-    const existing = await this.prisma.v1Tournament.findFirst({
+    const existing = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
     });
     if (!existing) {
@@ -782,7 +783,7 @@ export class TournamentsAdminService {
       });
 
       if (transition.count === 0) {
-        const current = await tx.v1Tournament.findUnique({
+        const current = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
           where: { id: tournamentId },
           select: { bracketPublishedAt: true, deletedAt: true },
         });
@@ -858,7 +859,7 @@ export class TournamentsAdminService {
 
       if (transition.count === 0) {
         // 예약을 거는 사이 다른 관리자가 즉시 공개했거나, 기존 예약 시각이 지나 공개된 상태.
-        const current = await tx.v1Tournament.findUnique({
+        const current = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
           where: { id: tournamentId },
           select: { bracketPublishedAt: true, deletedAt: true },
         });
@@ -898,7 +899,7 @@ export class TournamentsAdminService {
    */
   async unpublishBracket(user: V1AuthUser, tournamentId: string) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
-    const existing = await this.prisma.v1Tournament.findFirst({
+    const existing = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
       select: { bracketPublishedAt: true, bracketPublishScheduledAt: true },
     });

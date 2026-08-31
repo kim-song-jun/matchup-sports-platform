@@ -16,6 +16,7 @@ import {
 import type { TournamentStaffAction } from '../staff/tournament-staff-policy';
 import type { CreateFixtureVideoDto } from './dto/fixture-video.dto';
 import { fixtureVideoUrlRejectionMessage, parseFixtureVideoUrl } from './fixture-video-url';
+import { findTournamentOnSurface, TOURNAMENT_KINDS } from '../tournament-surface-lookup';
 
 /** 경기당 등록 가능한 영상 수 — 재생 UI 의 플레이리스트가 다룰 수 있는 현실적인 상한. */
 export const MAX_VIDEOS_PER_FIXTURE = 10;
@@ -97,7 +98,7 @@ export class TournamentFixtureVideosService {
   /** 대회 전체 경기 + 등록된 영상 — 운영 콘솔의 영상 관리 화면용. */
   async listTournamentVideos(user: V1AuthUser, tournamentId: string) {
     await this.access.assertAccess({ userId: user.id, action: 'read', resource: { tournamentId } });
-    const tournament = await this.prisma.v1Tournament.findFirst({
+    const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
       select: { id: true },
     });

@@ -5,18 +5,12 @@
   "src/tournament-operations/fields/tournament-operations-fields.service.ts": 1,
   "src/tournaments/admin-registrations.service.ts": 4,
   "src/tournaments/competition-config/competition-config-version-repoint.ts": 1,
-  "src/tournaments/competition-config/tournament-competition-config.ts": 2,
   "src/tournaments/league-fixture-generator.service.ts": 2,
   "src/tournaments/staff/tournament-staff.service.ts": 1,
-  "src/tournaments/tournament-announcements.service.ts": 2,
   "src/tournaments/tournament-bracket.service.ts": 3,
   "src/tournaments/tournament-campaign-admin.service.ts": 1,
-  "src/tournaments/tournament-campaign-status.service.ts": 1,
   "src/tournaments/tournament-players.service.ts": 5,
-  "src/tournaments/tournament-reviews.service.ts": 1,
   "src/tournaments/tournament-sponsors.service.ts": 1,
   "src/tournaments/tournament-standings-recalculation.ts": 1,
-  "src/tournaments/tournament-standings-reconcile.cli.ts": 1,
-  "src/tournaments/tournaments-admin.service.ts": 7,
-  "src/tournaments/videos/tournament-fixture-videos.service.ts": 1
+  "src/tournaments/tournament-standings-reconcile.cli.ts": 1
 }

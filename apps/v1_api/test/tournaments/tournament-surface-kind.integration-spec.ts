@@ -5,6 +5,8 @@ import { TournamentsAdminService } from '../../src/tournaments/tournaments-admin
 import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 import { AdminContextService } from '../../src/common/admin-context.service';
 import { PublicTournamentRecordsService } from '../../src/games/public-records/public-tournament-records.service';
+import { seedCompetitionConfigVersions } from '../../src/tournaments/competition-config/competition-config-backfill';
+import type { PrismaClient } from '@prisma/client';
 
 /**
  * **"대회 조회는 대회만 본다" — 누출 회귀 테스트.**
@@ -37,6 +39,8 @@ const ids = {
   tournament: '9a000000-0000-4000-8000-000000000020',
   league: '9a000000-0000-4000-8000-000000000021',
   legacyNullKind: '9a000000-0000-4000-8000-000000000022',
+  tournamentFixture: '9a000000-0000-4000-8000-000000000030',
+  leagueFixture: '9a000000-0000-4000-8000-000000000031',
 } as const;
 
 const prisma = new PrismaService();
@@ -70,8 +74,19 @@ describe('대회 표면은 정규 리그 시즌을 보여주지 않는다 (real 
 
     // 세 행 모두 **공개 목록에 뜰 수 있는 status** 로 만든다 — status 때문에 빠지면
     // kind 필터가 동작한 것인지 알 수 없다.
+    // **대진표를 공개해 둔다.** `getMatch` 는 대회 조회 직후 `isBracketPublished` 게이트를
+    // 지나는데, 이 값이 없으면 **대회 id 도 리그 id 도 똑같이 404** 라 kind 필터가 있든 없든
+    // 통과하는 무의미한 테스트가 된다(Copilot 리뷰 지적 — 필터를 제거한 변이 실행에서
+    // getSchedule·getPlayerRecords·getPlayerRecordsForAdmin 3건만 red 였고 getMatch 는 green 이었다).
+    const bracketPublishedAt = new Date('2026-01-01T00:00:00.000Z');
     await prisma.v1Tournament.create({
-      data: { id: ids.tournament, sportId: ids.sportId, title: '표면 테스트 대회', status: 'in_progress' },
+      data: {
+        id: ids.tournament,
+        sportId: ids.sportId,
+        title: '표면 테스트 대회',
+        status: 'in_progress',
+        bracketPublishedAt,
+      },
     });
     await prisma.v1Tournament.create({
       data: {
@@ -80,6 +95,7 @@ describe('대회 표면은 정규 리그 시즌을 보여주지 않는다 (real 
         title: '표면 테스트 리그 시즌',
         status: 'in_progress',
         kind: 'regular_league',
+        bracketPublishedAt,
       },
     });
     // R1 이전 행 재현 — DEFAULT 가 채우지 못한 상태를 명시적으로 만든다.
@@ -90,8 +106,38 @@ describe('대회 표면은 정규 리그 시즌을 보여주지 않는다 (real 
         title: '표면 테스트 R1 이전 행(kind 없음)',
         status: 'in_progress',
         kind: null,
+        bracketPublishedAt,
       },
     });
+
+    // **경기 단건(getMatch)이 대회 id 로는 실제로 열려야** 리그 id 의 404 가 의미를 갖는다.
+    // 두 행에 **똑같이** 대진·경기를 심는다 — 차이가 kind 하나뿐이어야 필터를 증명한다.
+    // 갓 마이그레이션한 DB 에는 설정 버전 행이 없다 — 운영과 같은 시더를 그대로 부른다
+    // (`findFirstOrThrow({status:'ACTIVE'})` 로 기존 행에 기대면 여기서 터진다, 실측).
+    await seedCompetitionConfigVersions(prisma as unknown as PrismaClient);
+    const competitionConfig = await prisma.v1CompetitionConfigVersion.findFirstOrThrow({
+      where: { status: 'ACTIVE' },
+      orderBy: { version: 'desc' },
+    });
+    for (const [fixtureId, tournamentId] of [
+      [ids.tournamentFixture, ids.tournament],
+      [ids.leagueFixture, ids.league],
+    ] as ReadonlyArray<readonly [string, string]>) {
+      await prisma.v1TournamentFixture.create({
+        data: { id: fixtureId, tournamentId, round: 'group', fixtureNumber: 1 },
+      });
+      const game = await prisma.v1Game.create({
+        data: {
+          sourceType: 'TOURNAMENT_FIXTURE',
+          tournamentFixtureId: fixtureId,
+          competitionConfigVersionId: competitionConfig.id,
+        },
+        select: { id: true },
+      });
+      // 가시성 정책이 없으면 `?? 'HIDDEN'` 로 떨어져 mode 게이트에서 404 다 — 그러면
+      // 대진 게이트를 열어 둔 의미가 없어지고 다시 무의미한 테스트가 된다.
+      await prisma.v1GameVisibilityPolicy.create({ data: { gameId: game.id, mode: 'LIVE' } });
+    }
 
     read = new TournamentsReadService(prisma, new TournamentStaffAccessService(prisma));
     admin = new TournamentsAdminService(
@@ -121,7 +167,7 @@ describe('대회 표면은 정규 리그 시즌을 보여주지 않는다 (real 
     ['getSchedule', (id: string) => records.getSchedule(id, {} as never, undefined)],
     ['getPlayerRecords', (id: string) => records.getPlayerRecords(id)],
     ['getPlayerRecordsForAdmin', (id: string) => records.getPlayerRecordsForAdmin(id)],
-    ['getMatch', (id: string) => records.getMatch(id, ids.legacyNullKind, undefined)],
+    ['getMatch', () => records.getMatch(ids.league, ids.leagueFixture, undefined)],
   ])('공개 대회 기록 %s — 리그 id 로는 열리지 않는다', async (_name, call) => {
     // 코드를 하드코딩하지 않는다 — 이 서비스는 경로마다 다른 코드를 쓴다
     // (`TOURNAMENT_MATCH_NOT_FOUND` / `TOURNAMENT_NOT_FOUND`). 중요한 것은 **404 로 막히는 것**이고,
@@ -133,6 +179,13 @@ describe('대회 표면은 정규 리그 시즌을 보여주지 않는다 (real 
     // 막는 것만 확인하면 **전부 404 로 만들어도 통과**한다. 통과해야 할 것이 통과하는지도 본다.
     await expect(records.getSchedule(ids.tournament, {} as never, undefined)).resolves.toBeDefined();
     await expect(records.getSchedule(ids.legacyNullKind, {} as never, undefined)).resolves.toBeDefined();
+    // getMatch 는 대회 조회 뒤에 대진 공개·가시성 게이트가 더 있어, 이 양성 단언이 없으면
+    // 위 404 가 **필터 때문인지 게이트 때문인지 구분되지 않는다.**
+    // `tournamentTitle` 로 단언한다 — alpha 에서 리그 제목을 실어 나른 필드가 이것이다.
+    await expect(records.getMatch(ids.tournament, ids.tournamentFixture, undefined)).resolves.toMatchObject({
+      fixtureId: ids.tournamentFixture,
+      tournamentTitle: '표면 테스트 대회',
+    });
   });
 
   it('공개 대회 목록 — 리그는 빠지고, kind 가 없는 R1 이전 행은 남는다', async () => {

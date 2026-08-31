@@ -35,7 +35,8 @@ async function main(): Promise<void> {
 
 main().catch((error) => {
   // 가드에 걸린 것은 "실패"가 아니라 **사람이 판단할 거리**다 — 무엇에 걸렸는지를
-  // 그대로 보여 준다(대회 행 없는 리그 / owner 없는 팀 / 우리 것이 아닌 id 충돌).
+  // 그대로 보여 준다(대회 행 없는 리그 / 종류가 리그가 아닌 행 / owner 없는 팀 /
+  // 우리 것이 아닌 id 충돌).
   if (error instanceof LeagueTeamBackfillBlockedError) {
     process.stderr.write(`${JSON.stringify({ ok: false, blocked: error.detail }, null, 2)}\n`);
     process.stderr.write(`${error.message}\n`);

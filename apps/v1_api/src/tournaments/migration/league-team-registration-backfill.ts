@@ -45,6 +45,7 @@ export class LeagueTeamBackfillBlockedError extends Error {
       teamsWithoutOwner: Array<{ leagueId: string; teamId: string }>;
       idConflicts: Array<{ leagueTeamId: string; existingTournamentId: string }>;
       missingTournaments: Array<{ leagueId: string }>;
+      kindMismatches: Array<{ leagueId: string; kind: string | null }>;
     },
   ) {
     super(message);
@@ -64,15 +65,25 @@ export async function backfillLeagueTeamsAsRegistrations(
   // ── 가드 1: 대회 행이 없는 리그 ────────────────────────────────────────────
   // 리그 시즌 백필이 먼저 돌아 있어야 한다. 안 돌았으면 `tournamentId` FK 가 터지는데,
   // 그때는 "무엇이 빠졌는지"가 에러에 안 나온다 — 먼저 세어서 이름을 보여 준다.
+  //
+  // **종류로 거르지 않고 읽는다.** `where` 에 `kind: 'regular_league'` 를 넣으면 "행이 아예
+  // 없다"와 "행은 있는데 종류가 다르다"가 **같은 통**에 들어가 둘 다 `missingTournaments` 로
+  // 보고된다 — 그런데 운영자가 할 일이 정반대다:
+  //   행이 없다        → 리그 시즌 백필을 **먼저 돌려라**
+  //   종류가 다르다    → 그 id 는 **우리 리그가 아니다.** 멈추고 조사해라
+  // 가드 3 이 id 충돌에 쓰는 규율("이미 있다"를 무조건 skip 으로 뭉개지 않는다)과 같은 축이다.
   const leagueIds = [...new Set(leagueTeams.map((row) => row.leagueId))];
   const tournaments = await prisma.v1Tournament.findMany({
-    where: { id: { in: leagueIds }, kind: 'regular_league' },
-    select: { id: true },
+    where: { id: { in: leagueIds } },
+    select: { id: true, kind: true },
   });
-  const tournamentIds = new Set(tournaments.map((row) => row.id));
+  const kindByTournamentId = new Map(tournaments.map((row) => [row.id, row.kind]));
   const missingTournaments = leagueIds
-    .filter((id) => !tournamentIds.has(id))
+    .filter((id) => !kindByTournamentId.has(id))
     .map((leagueId) => ({ leagueId }));
+  const kindMismatches = leagueIds
+    .filter((id) => kindByTournamentId.has(id) && kindByTournamentId.get(id) !== 'regular_league')
+    .map((leagueId) => ({ leagueId, kind: kindByTournamentId.get(leagueId) ?? null }));
 
   // ── 가드 2: owner 가 없는 팀 ──────────────────────────────────────────────
   // `appliedByUserId` 는 **필수**이고 `onDelete: Restrict` 다. owner 를 못 찾으면 그 행은
@@ -104,10 +115,16 @@ export async function backfillLeagueTeamsAsRegistrations(
     })
     .map((row) => ({ leagueTeamId: row.id, existingTournamentId: existingById.get(row.id) ?? '' }));
 
-  if (missingTournaments.length > 0 || teamsWithoutOwner.length > 0 || idConflicts.length > 0) {
+  if (
+    missingTournaments.length > 0 ||
+    kindMismatches.length > 0 ||
+    teamsWithoutOwner.length > 0 ||
+    idConflicts.length > 0
+  ) {
     throw new LeagueTeamBackfillBlockedError(
-      '백필을 중단했다 — 대회 행이 없는 리그, owner 없는 팀, 또는 우리 것이 아닌 id 충돌이 있다.',
-      { teamsWithoutOwner, idConflicts, missingTournaments },
+      '백필을 중단했다 — 대회 행이 없는 리그, 종류가 리그가 아닌 대회 행, owner 없는 팀, ' +
+        '또는 우리 것이 아닌 id 충돌이 있다.',
+      { teamsWithoutOwner, idConflicts, missingTournaments, kindMismatches },
     );
   }
 
@@ -122,20 +139,30 @@ export async function backfillLeagueTeamsAsRegistrations(
   // 충돌을 조용히 삼켜 **백스톱을 없애고**, 후자는 **남의 행을 덮어쓴다.**
   if (!options.dryRun && toCreate.length > 0) {
     const created = await prisma.$transaction(
-      toCreate.map((row) =>
-        prisma.v1TournamentRegistration.create({
+      toCreate.map((row) => {
+        // 가드 2 를 통과했으니 있어야 한다 — 그런데 가드는 트랜잭션 **밖** 스냅샷이다.
+        // `as string` 은 확인이 아니라 **타입 검사를 끄는 것**이라(`!` 와 같다), 값이 없으면
+        // `undefined` 가 그대로 Prisma 까지 가서 어느 행 때문인지 안 보이는 에러로만 터진다.
+        // 그래서 실제로 다시 확인하고, 없으면 **무엇이 없는지** 붙여 던진다. 이 throw 는
+        // `$transaction` 에 배열을 넘기기 **전**에 나므로 아무것도 쓰이지 않는다.
+        const appliedByUserId = ownerByTeamId.get(row.teamId);
+        if (appliedByUserId === undefined) {
+          throw new Error(
+            `owner 를 찾을 수 없어 등록을 만들 수 없다: leagueId=${row.leagueId} teamId=${row.teamId}`,
+          );
+        }
+        return prisma.v1TournamentRegistration.create({
           data: {
             id: row.id,
             tournamentId: row.leagueId,
             teamId: row.teamId,
-            // 가드 2 를 통과했으므로 반드시 있다. `!` 대신 다시 확인해 조용한 undefined 를 막는다.
-            appliedByUserId: ownerByTeamId.get(row.teamId) as string,
+            appliedByUserId,
             status: REGISTRATION_STATUS,
             entrySource: ENTRY_SOURCE,
             createdAt: row.createdAt,
           },
-        }),
-      ),
+        });
+      }),
     );
     // 조용히 빠진 행이 없는지 확인한다 — 개수가 다르면 위 금지사항 중 하나가 되살아났거나
     // 경합이 있었다는 뜻이다.

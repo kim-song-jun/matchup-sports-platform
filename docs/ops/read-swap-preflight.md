@@ -21,6 +21,9 @@ apps/v1_api 에서 `v1Tournament` 단건 조회는 전부 findTournamentOnSurfac
 허용 종류는 **호출부 인자로 코드에 적혀 있다**(`TOURNAMENT_KINDS` / `ALL_COMPETITION_KINDS`).
 baseline 주석이 아니라 코드에 둔 이유는 **주석은 드리프트하지만 인자는 못 하기 때문**이다.
 
+> **아직 참인지 확인**: `cd apps/v1_api && node scripts/v1-surface-check.mjs` 가 통과하는가.
+> 숫자가 위와 다르면 그 뒤로 작업이 더 있었다는 뜻이니 **이 문서를 먼저 갱신**하고 진행한다.
+
 ---
 
 ## 1. 넓혀야 하는 자리 — **에러 없이 기능이 사라지는 곳**
@@ -53,6 +56,10 @@ read-swap 을 붙인 뒤 리그 경기로 각각을 실제로 통과시킨다:
 
 **"에러가 안 났다"는 통과가 아니다** — 셋 다 에러 없이 실패하는 종류다.
 
+> **아직 참인지 확인**: 세 파일에서 각각 `?? null` · `if (!tournament) continue` · `?? '대회'`
+> 가 **여전히 있는가**. 누가 그 자리를 `throw` 로 바꿨다면 그 항목은 **더 이상 위험이 아니다**
+> (시끄럽게 실패하므로). 행 번호는 바뀌니 **패턴으로 찾는다** — 6절의 grep 참조.
+
 ---
 
 ## 2. 되돌리기 창 — **read-swap 이 그것을 영구히 닫는다**
@@ -81,6 +88,13 @@ read-swap 을 붙인 뒤 리그 경기로 각각을 실제로 통과시킨다:
 - 아니면 read-swap 을 **단계로 나눠** 결과 확정 경로를 마지막에 붙일 것인가?
 
 창이 닫히는 것은 되돌릴 수 없다. **코드가 정할 일이 아니다.**
+
+> **아직 참인지 확인**: `SELECT count(*) FROM v1_game_official_result_cache c
+> JOIN v1_tournaments t ON t.id = c.tournament_id WHERE t.kind = 'regular_league';`
+> **0 이면 창이 아직 열려 있다.** 0 이 아니면 이미 닫혔으니 되돌리기는 선택지가 아니다 —
+> 그 사실부터 사용자에게 알린다. **alpha·prod DB 조회 경로는 저장소에 문서가 없다** —
+> SSM → EC2 → `docker exec … psql` 이고, 자격증명과 인스턴스 선택법은 저장소 밖 비공개
+> 메모리에 있다(이 저장소는 PUBLIC 이라 여기 적지 않는다).
 
 ---
 
@@ -119,6 +133,15 @@ competition-config-version-repoint   ALL_COMPETITION_KINDS
 남거나 설정 없는 상태로 방치돼 통합을 되돌리는 셈이 된다(`tournament-surface.ts` 의
 "여기 걸지 않는 곳"). **게이트가 이 개수를 묶으므로 늘리려면 리뷰를 거친다.**
 
+> **아직 참인지 확인**: 위 지점들에 봉쇄 테스트가 **그 사이 추가됐을 수 있다.**
+> 아래로 어느 파일에 봉쇄 테스트가 있는지 보고 이 절의 목록과 대조한다 —
+> 늘었으면 **이 목록에서 빼고** 3-a/3-b 를 줄인다.
+> ```bash
+> grep -rln '리그 id 로는\|리그 id 는\|리그 id 에는' apps/v1_api/src --include='*.spec.ts'
+> ```
+> **`grep -c` 로 건수만 세지 말 것** — `'리그 id'` 는 이 작업과 무관한 스펙
+> (`lineup-todo` · `league-claimable-participants`)에도 나온다. **파일 목록으로 확인한다.**
+
 ---
 
 ## 4. 남은 선행 결함 하나 — 409 / `TOURNAMENT_NOT_FOUND`
@@ -134,6 +157,9 @@ tournament-registrations.service.ts   throw new ConflictException({ code: 'TOURN
 > **의도는 일관되고 어긋난 것은 코드 *이름*이다.** 상태(409)를 유지하고 이름을 바꾸는
 > 것이 맞다(`TOURNAMENT_STATE_CHANGED` 류). 404 로 뒤집으면 그 보안 수정이 세운 계약을
 > 깬다. 에러 코드도 클라이언트 계약이므로 **별도 변경으로 다룬다.**
+
+> **아직 참인지 확인**: `grep -rn "ConflictException({ code: 'TOURNAMENT_NOT_FOUND'" apps/v1_api/src`
+> 가 **1건인가**. 0 건이면 누가 이미 고쳤으니 **이 절을 지운다.**
 
 ---
 
@@ -151,6 +177,10 @@ D14(`20260830000000_v1_preferred_position`) 이후 **공유 Prisma 클라이언�
 
 그리고 이때 `Tests: N passed / N total` 은 **전부 통과로 보인다** — 컴파일 실패한 스위트는
 테스트 수에 아예 안 잡히기 때문이다. **`Suites` 줄을 따로 본다.**
+
+> **이 증상인지 확인**: 실패 메시지가 **`TS2339 … 'preferredPosition' does not exist`** 인가.
+> **다른 메시지면 이 항목이 아니다** — 원인을 새로 찾아라. 이 절을 근거로 "내 변경이
+> 아니다"라고 넘기지 말 것.
 
 ---
 

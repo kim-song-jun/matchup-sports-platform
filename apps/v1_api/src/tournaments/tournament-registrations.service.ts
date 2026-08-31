@@ -475,7 +475,22 @@ export class TournamentRegistrationsService {
         select: { id: true, status: true, teamCount: true },
       });
       if (!tournament) {
-        throw new ConflictException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
+        // **409 이고 이름은 `TOURNAMENT_STATE_CHANGED` 다.** 여기 도달했다는 것은 바깥 검사를
+        // 통과한 뒤 이 트랜잭션이 `FOR UPDATE` 로 잠그고 **다시 읽었을 때** 대회가 사라졌다는
+        // 뜻이다 — 처음부터 없었던 것이 아니라 **그 사이에 바뀐 것**이다(삭제되었거나, 종류가
+        // 대회 표면을 벗어났거나).
+        //
+        // 상태코드 409 는 유지한다: 커밋 `1fa57256e`(보안 수정)가 이 재검증 블록의 throw 를
+        // 전부 409 로 통일했고, 이웃(`TOURNAMENT_ALREADY_CANCELLED`·`TOURNAMENT_CAPACITY_FULL`)도
+        // 같은 뜻이다. 404 로 뒤집으면 그 계약이 깨진다.
+        //
+        // 어긋나 있던 것은 **이름**뿐이었다 — `TOURNAMENT_NOT_FOUND` 는 이 파일의 `:111`
+        // (진짜 404)과 같은 이름이라, 로그에서 둘을 구분할 수 없었고 원인이 "없는 대회"로
+        // 읽혔다. 실제 원인은 경합이다.
+        throw new ConflictException({
+          code: 'TOURNAMENT_STATE_CHANGED',
+          message: '대회 상태가 방금 바뀌었어요. 다시 시도해 주세요.',
+        });
       }
       if (tournament.status === 'cancelled') {
         throw new ConflictException({

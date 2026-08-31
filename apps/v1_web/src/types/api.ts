@@ -3607,8 +3607,25 @@ export interface V1GenerateLeagueFixturesResponse {
 }
 
 /** GET /tournaments/:id/standings/overall 통합 순위 행 — 리그 대회 전체 조를 합친 순위표 한 줄 */
+/**
+ * 통합 순위 한 행. **두 축이 같은 표를 채우는데 신원 필드가 다르다.**
+ *
+ * | 필드 | 정규 대회 | 정규 리그 |
+ * |---|---|---|
+ * | `registrationId` | 있음 | **없음** — 리그엔 참가 등록 개념이 없다 |
+ * | `teamId` | 없음 | **있음** |
+ * | `fairPlayPoints` | 있음 | **없음** — 리그는 집계 자체를 하지 않는다 |
+ *
+ * `fairPlayPoints` 를 리그에서 `0` 으로 채우지 않는 이유: `0` 은 "감점이 없다" 로 읽힌다.
+ * 집계하지 않는 것은 값이 아니라 **부재**다.
+ *
+ * 행 key 는 `registrationId ?? teamId` 로 잡는다 — 둘 중 하나는 항상 있다.
+ */
 export interface V1LeagueOverallStandingRow {
-  registrationId: string;
+  /** 정규 대회에만 있다. 리그 응답에는 없다. */
+  registrationId?: string;
+  /** 정규 리그에만 있다. 대회 응답에는 없다. */
+  teamId?: string;
   teamName: string;
   position: number | null;
   points: number;
@@ -3617,7 +3634,8 @@ export interface V1LeagueOverallStandingRow {
   losses: number;
   goalsFor: number;
   goalsAgainst: number;
-  fairPlayPoints: number;
+  /** 정규 대회에만 있다 — 리그는 페어플레이 점수를 집계하지 않는다. */
+  fairPlayPoints?: number;
 }
 
 /** GET /tournaments/:id/standings/overall 응답 — 통합 순위 + 진행률 + 매직넘버 */

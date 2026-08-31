@@ -113,7 +113,9 @@ export function LeagueStandingsTable({ data }: { data: LeagueStandingsTableData 
               const diff = row.goalsFor - row.goalsAgainst;
               const diffColor = diff > 0 ? 'var(--blue500)' : diff < 0 ? 'var(--red500)' : 'var(--text-muted)';
               return (
-                <tr key={row.registrationId} className="tm-standings-row">
+                // 정규 대회 행은 `registrationId`, 정규 리그 행은 `teamId` 를 갖는다 —
+                // 둘 중 하나는 항상 있다. 한쪽만 쓰면 다른 축에서 key 가 전부 undefined 다.
+                <tr key={row.registrationId ?? row.teamId} className="tm-standings-row">
                   <td style={{ paddingLeft: 12 }}>
                     <span
                       className="tm-standings-rank"
@@ -127,7 +129,9 @@ export function LeagueStandingsTable({ data }: { data: LeagueStandingsTableData 
                       <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-strong)' }}>
                         {row.teamName}
                       </span>
-                      {row.fairPlayPoints > 0 ? (
+                      {/* 리그는 페어플레이 점수를 집계하지 않아 필드 자체가 없다 —
+                          `undefined > 0` 은 false 라 자연히 숨지만, 의도를 코드로 적어 둔다. */}
+                      {(row.fairPlayPoints ?? 0) > 0 ? (
                         <span
                           className="tm-text-caption"
                           style={{ marginLeft: 8, color: 'var(--text-caption)' }}

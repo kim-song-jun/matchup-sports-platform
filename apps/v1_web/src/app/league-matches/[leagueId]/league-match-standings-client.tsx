@@ -19,7 +19,7 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { hasStoredV1Session } from '@/lib/session-storage';
 import { LEAGUE_STATE_META } from '@/lib/league-state-meta';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
-import { fixtureResultLabel, fixtureStatusMeta, isUpcomingFixture, type TeamLookupEntry } from './league-fixture-meta';
+import { fixtureResultLabel, fixtureStatusMeta, isUpcomingFixture, type TeamLookupEntry } from '@/lib/league-fixture-meta';
 import type { V1LeagueChampionTeam, V1LeagueFixture } from '@/types/league-match';
 import { leagueRecordEmptySub } from './league-record-empty-copy';
 

@@ -21,6 +21,10 @@ import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
 import { splitPrizeSegments, isPrizeAmountValue, formatPrizeRowValue } from '@/lib/prize-breakdown';
 import { TournamentBracket } from '@/components/tournaments/tournament-bracket';
 import {
+  CompetitionFixtureCard,
+  CompetitionFixtureVenue,
+} from '@/components/tournaments/competition-fixture-card';
+import {
   TournamentApplicationGuideSection,
   TournamentParticipantSection,
 } from '@/components/tournaments/tournament-event-hub-sections';
@@ -1967,12 +1971,12 @@ function FixtureStatusBadge({ status }: { status: string }) {
   );
 }
 
+/**
+ * 대회 대진 카드. 껍데기(배치·간격·정렬 축)는 `CompetitionFixtureCard` 와 공유하고
+ * **어휘는 여기서만 갖는다** — 대회 status 는 `scheduled | completed`, 리그는
+ * `matched | completed | cancelled` 로 값 영역이 다르다.
+ */
 export function FixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
-  const hasResult = fixture.result !== null;
-  const homeScore = hasResult ? fixture.result!.homeScore : null;
-  const awayScore = hasResult ? fixture.result!.awayScore : null;
-  const homeGoals = hasResult ? fixture.result!.goals.filter((g) => g.team === 'home') : [];
-  const awayGoals = hasResult ? fixture.result!.goals.filter((g) => g.team === 'away') : [];
   // 라운드 라벨: tournament-bracket.tsx ROUND_LABELS 맵과 동일하게 '4강' 사용
   const roundLabel = fixture.round
     ? fixture.round.replace('group', '조별').replace('semi', '4강').replace('final', '결승').replace('third_place', '3·4위')
@@ -1989,97 +1993,22 @@ export function FixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
   const awayLabel = fixture.awayTeamName === null ? '비공개' : fixture.awayTeamName || '미정';
 
   return (
-    <Card pad={16}>
-      {/* Round + date row */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: 12,
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span className="tm-text-label" style={{ color: 'var(--text-muted)' }}>
-            {roundLabel}
-          </span>
-          <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>
-            {scheduledLabel ?? '시간 미정'}
-          </span>
+    <CompetitionFixtureCard
+      header={{ label: roundLabel, caption: scheduledLabel ?? '시간 미정' }}
+      badge={<FixtureStatusBadge status={fixture.status} />}
+      homeLabel={homeLabel}
+      awayLabel={awayLabel}
+      // 이 카드는 점수를 싣지 않는다 — 결선 대진표·경기 상세가 그 자리다.
+      center={
+        <div className="tm-text-label" style={{ color: 'var(--text-caption)', letterSpacing: 1 }}>
+          vs
         </div>
-        <FixtureStatusBadge status={fixture.status} />
-      </div>
-
-      {/* VS row */}
-      <div
-        role="group"
-        aria-label={`${homeLabel} 대 ${awayLabel}`}
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr auto 1fr',
-          alignItems: 'center',
-          gap: 8,
-        }}
-      >
-        {/* Home team */}
-        <div style={{ textAlign: 'right' }}>
-          <div
-            className="tm-text-body-lg"
-            style={{
-              color: 'var(--text-strong)',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {homeLabel}
-          </div>
-        </div>
-
-        {/* VS — 이 카드는 점수를 싣지 않는다(아래 카드 주석 참조). */}
-        <div style={{ textAlign: 'center', minWidth: 52 }}>
-          <div className="tm-text-label" style={{ color: 'var(--text-caption)', letterSpacing: 1 }}>
-            vs
-          </div>
-        </div>
-
-        {/* Away team */}
-        <div style={{ textAlign: 'left' }}>
-          <div
-            className="tm-text-body-lg"
-            style={{
-              color: 'var(--text-strong)',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {awayLabel}
-          </div>
-        </div>
-      </div>
-
-      {/* Venue — 상단 메타(라운드·시각)와 같은 좌측 축에 둔다. 점수·득점자를 걷어내
-          카드가 비면서, 가운데 정렬된 장소 한 줄만 축이 달라 어정쩡하게 떠 있었다.
-          이제 축은 둘뿐이다: 메타·장소는 왼쪽, 대진은 가운데 대칭. */}
-      {fixture.venue ? (
-        <div
-          className="tm-text-caption"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
-            marginTop: 12,
-            color: 'var(--text-muted)',
-          }}
-        >
-          <MapPin size={12} aria-hidden="true" />
-          <span>{fixture.venue}</span>
-        </div>
-      ) : null}
-    </Card>
+      }
+      caption={fixture.venue ? <CompetitionFixtureVenue venue={fixture.venue} /> : undefined}
+    />
   );
 }
+
 
 /* ── Announcement card ── */
 

@@ -14,7 +14,7 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { V1ApiError } from '@/lib/api-client';
 import { LEAGUE_STATE_META } from '@/lib/league-state-meta';
 import { formatTournamentDateTimeLong, formatTournamentDateTimeShort } from '@/lib/date-utils';
-import { fixtureResultLabel, fixtureStatusMeta } from '../../league-fixture-meta';
+import { fixtureResultLabel, fixtureStatusMeta } from '@/lib/league-fixture-meta';
 import type { V1TeamMatch, V1TeamMatchViewerState } from '@/types/api';
 import type { V1LeagueFixture, V1LeagueStandingRow } from '@/types/league-match';
 

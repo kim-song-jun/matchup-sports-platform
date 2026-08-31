@@ -4,9 +4,19 @@ import type { V1LeagueFixture } from '@/types/league-match';
  * 리그 대진(fixture) 상태·결과 표기의 단일 소스.
  *
  * 원래 league-match-standings-client.tsx 로컬 함수였는데, 리그 경기 상세 페이지
- * (fixtures/[fixtureId])가 같은 판정을 그대로 써야 해서 여기로 옮겼다 — 두 화면이
+ * (fixtures/[fixtureId])가 같은 판정을 그대로 써야 해서 뽑아냈다 — 두 화면이
  * 같은 경기를 서로 다른 상태("예정" vs "결과 대기")로 부르면 사용자는 그것을 다른
  * 개념으로 읽는다(lib/league-state-meta.ts와 같은 이유).
+ *
+ * **세 번째 소비처가 생겨 `app/league-matches/[leagueId]/` 에서 `lib/` 로 옮겼다** —
+ * 대회 표면의 리그 경기 카드(`components/tournaments/league-fixture-card.tsx`)가 같은
+ * 판정을 써야 하는데, 라우트 폴더 안에 있으면 그 파일이 route-local 로 보인다.
+ * 자매 모듈 `lib/league-state-meta.ts` 와 같은 자리다.
+ *
+ * ⚠️ **대회 어휘와 섞지 않는다.** 대회 대진의 status 는 `scheduled | completed` 이고
+ * 리그는 `matched | completed | cancelled | ...` 다 — 이름도 타입도 같은데 **값 영역이
+ * 다르다.** 한 함수가 두 어휘를 받으면 `status === 'scheduled'` 같은 코드가 모든 리그
+ * 경기에서 조용히 거짓이 된다. 이 파일은 **리그 값만** 해석한다.
  */
 
 /**

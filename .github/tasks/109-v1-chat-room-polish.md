@@ -265,6 +265,10 @@ Validation requirement:
   when unread counts are calculated,
   then that participant is not counted as unread for the old message.
 
+- Given one sender posts multiple consecutive messages,
+  when the chat thread renders,
+  then every non-system message shows its own hour-and-minute timestamp.
+
 ## Validation Commands
 
 - Backend unit:
@@ -319,3 +323,4 @@ pnpm qa:v1-db-guardrails
 - 2026-07-16 merge-readiness validation: API typecheck/build and 512 unit tests pass; Web typecheck, production build, pattern check, and 113 unit tests pass. Local data rehearsal reduced missing active-team chat participants from 8 to 0, repaired all 16 visibility boundaries, and preserved the 10 existing system messages.
 - 2026-07-17 production preflight: 57 active memberships have no missing/inactive rooms, no null `joined_at`, and 3 missing chat participants. The unapplied backfill now covers those rows plus inactive-room, inactive-participant, and null-`joined_at` repair without inserting historical system messages.
 - 2026-07-17 isolated PostgreSQL rehearsal: missing/inactive rooms, missing/left participants, null `joined_at`, and existing visibility boundaries all passed. A second backfill run kept 3 rooms, 6 participants, and 2 pre-existing messages with no duplicates or historical join-message inserts.
+- 2026-08-31 hotfix: consecutive messages keep their grouped bubble and sender-label styling, while every non-system message now renders its own timestamp. Added a rendering regression covering consecutive incoming and outgoing messages.

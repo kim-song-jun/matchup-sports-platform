@@ -191,11 +191,31 @@ scanned  > 88,  skipped > 0   → ①일 수 있다. (scanned − 88) == skipped
 > **위 기준선이 ②를 지금 시점에 배제한다** — 채워진 행이 0 이므로, dry-run 에서 `skipped > 0`
 > 이 나오면서 `scanned == 88` 이면 **그 사이에 무언가 채웠다**는 뜻이고 원인이 반드시 있다.
 
-### `--apply` 후 검증 — **개수만 보지 않는다**
+### `--apply` 전후 분포 — **전을 적어 두지 않으면 후를 봐도 증명이 안 된다**
+
+**BEFORE (2026-08-31 실측, 직접 조회 — 파생값 아님):**
+```sql
+SELECT status, count(*) FROM v1_tournaments WHERE kind='regular_league' GROUP BY 1;
+--  draft | 88          ← 한 줄뿐이다. 다른 status 는 아예 없다
+
+SELECT state, count(*) FROM v1_leagues GROUP BY 1;
+--  draft | 35   active | 15   completed | 38
+```
+
+**AFTER (기대):**
+```
+통합 축   draft 35 · in_progress 15 · completed 38    ← 리그 축과 1:1
+```
+
+> **`in_progress` 다.** 리그의 `active` 가 대회 축에서는 `in_progress` 로 옮겨진다
+> (`STATUS_BY_LEAGUE_STATE`). 같은 이름을 찾으면 안 맞는 것으로 오해한다.
+
+### 검증 — **개수만 보지 않는다**
 ```
 거울 수 == 리그 수                    ← CLI 가 자동으로 던진다
-상태 분포 == draft 35 · active 15 · completed 38   ← 이걸 따로 확인한다
+상태 분포 == 위 AFTER                  ← 이건 따로 확인한다
 ```
-**개수 불변식은 값이 틀린 것을 못 본다.** 분포 대조가 `--apply` 가 실제로 먹었는지의 진짜
-지표다 — 88행이 전부 `draft` 로 남아 있어도 개수는 맞기 때문이다.
+**개수 불변식은 값이 틀린 것을 못 본다.** 88행이 전부 `draft` 로 남아 있어도 개수는 맞다 —
+그게 정확히 BEFORE 상태이므로, **개수만 보면 `--apply` 를 안 돌린 것과 구분되지 않는다.**
+분포 대조가 실제로 먹었는지의 유일한 지표다.
 

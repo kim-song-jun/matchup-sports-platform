@@ -51,12 +51,32 @@ describe('통합 테스트 제외 목록 (jest.config.ts testPathIgnorePatterns)
   // **선언부(`testPathIgnorePatterns: [`)에 고정한다.** 이름만으로 찾으면 위쪽 주석의
   // 언급을 먼저 물어 `testMatch` 블록을 파싱하게 된다 — 실제로 그렇게 한 번 틀렸고,
   // 그때 "읽어냈다" 가드는 **통과했다**(0건이 아니라 *다른* 목록을 읽었으니까).
+  // **파싱 실패는 즉시 던진다 — "찾은 게 0건" 을 "제외가 0건" 으로 절대 읽지 않는다.**
+  // 이 구분이 이 파일의 전부다: 조용히 빈 배열을 내면 `it.each([])` 가 **테스트를 하나도
+  // 만들지 않고**, 개수 단언만 남아 실패 이유가 "포맷이 바뀌어 못 읽었다" 로 안 읽힌다.
+  // (실측: 지금 코드도 red 는 난다 — 다만 원인이 안 보인다. 여기서 던지면 원인이 보인다.)
   const DECL = 'testPathIgnorePatterns: [';
   const declAt = source.indexOf(DECL);
+  if (declAt === -1) {
+    throw new Error(
+      `jest.config.ts 에서 '${DECL}' 를 못 찾았다 — 포맷이 바뀌었으면 이 스펙의 파서를 같이 고쳐라. ` +
+        '못 찾은 것을 "제외 0건" 으로 읽으면 이 게이트는 있으나 마나가 된다.',
+    );
+  }
   const block = source.slice(declAt + DECL.length);
-  const patterns = [...block.slice(0, block.indexOf('],')).matchAll(/'([^']*<rootDir>[^']*)'/g)].map(
-    (m) => m[1],
+  const endAt = block.indexOf('],');
+  if (endAt === -1) {
+    throw new Error("testPathIgnorePatterns 배열의 닫힘('],')을 못 찾았다 — 파서를 고쳐라.");
+  }
+  const patterns = [...block.slice(0, endAt).matchAll(/'([^']*<rootDir>[^']*)'/g)].map(
+    (match) => match[1],
   );
+  if (patterns.length === 0) {
+    throw new Error(
+      '제외 목록을 하나도 못 읽었다 — 배열이 정말 비었는지, 파서가 빗나갔는지 확인해라. ' +
+        '둘을 구분하지 않으면 뒤 단언이 전부 vacuous 하다.',
+    );
+  }
 
   it('제외 목록을 실제로 읽어냈다 — 못 읽으면 아래 단언이 전부 vacuous 하다', () => {
     expect(declAt).toBeGreaterThan(-1);

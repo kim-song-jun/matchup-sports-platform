@@ -14,7 +14,12 @@ describe('AdminOpsService', () => {
   const prisma = {
     v1WebPushFailureLog: { findMany: jest.fn(), updateMany: jest.fn(), count: jest.fn() },
     // 전체 발송은 같은 내용의 중복 발송을 막기 위해 멱등 기록을 본다.
-    v1IdempotencyRecord: { findUnique: jest.fn().mockResolvedValue(null), upsert: jest.fn().mockResolvedValue({}) },
+    v1IdempotencyRecord: {
+      findUnique: jest.fn().mockResolvedValue(null),
+      upsert: jest.fn().mockResolvedValue({}),
+      update: jest.fn().mockResolvedValue({}),
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
     v1SmsEventLog: { findMany: jest.fn(), updateMany: jest.fn(), count: jest.fn() },
     v1ErrorLog: { count: jest.fn() },
     v1AdminActionLog: { count: jest.fn() },
@@ -23,6 +28,9 @@ describe('AdminOpsService', () => {
     v1NotificationPreference: { findUnique: jest.fn() },
     v1Notification: { create: jest.fn() },
     $transaction: jest.fn(),
+    // claimBroadcast는 advisory lock을 잡기 위해 트랜잭션 안에서 태그된 템플릿으로
+    // $executeRaw를 호출한다 — 실제 락 동작은 검증하지 않고 호출만 흡수한다.
+    $executeRaw: jest.fn().mockResolvedValue(0),
   };
   const adminContext = { logAdminAction: jest.fn().mockResolvedValue({ actionLogId: 'log-1', statusChangeLogId: null }) };
   const realtimeGateway = { emitToUser: jest.fn() };
@@ -315,6 +323,7 @@ describe('AdminOpsService', () => {
       // 공지를 두 번 받는다. 확인 절차도 멱등 키도 없어서 그 사고가 그대로 가능했다.
       const first = { sent: 2, skipped: 0, failed: 0, push: { subscriptions: 2, delivered: 2, failed: 0, disabled: false } };
       prisma.v1IdempotencyRecord.findUnique.mockResolvedValueOnce({
+        responseStatus: 200,
         responseBody: first,
         expiresAt: new Date(Date.now() + 60_000),
       });
@@ -347,6 +356,37 @@ describe('AdminOpsService', () => {
       await service.sendManualPush({ target: 'user', userId: 'user-1', title: '안내' }, admin);
 
       expect(prisma.v1IdempotencyRecord.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('두 요청이 진짜 동시에 들어오면(발송 중 클레임이 아직 유효) 두 번째는 즉시 거부되고 아무에게도 다시 보내지 않는다', async () => {
+      // 조회와 기록 사이에 원자성이 없던 예전 구현은, 첫 요청이 아직 발송을 끝내기
+      // 전(기록이 아직 없는 순간)에 두 번째 요청이 들어오면 findUnique가 null을 보고
+      // 그대로 통과시켰다 — 진짜 중복 발송. claimBroadcast는 발송 시작 시점에 이미
+      // 202(발송 중)로 선점해 두므로, 아직 만료 전인 202 레코드를 보면 즉시 막는다.
+      prisma.v1IdempotencyRecord.findUnique.mockResolvedValueOnce({
+        responseStatus: 202,
+        responseBody: {},
+        expiresAt: new Date(Date.now() + 60_000),
+      });
+
+      await expect(
+        service.sendManualPush({ target: 'broadcast', title: '전체 공지' }, admin),
+      ).rejects.toMatchObject({ status: 409 });
+
+      expect(prisma.v1User.findMany).not.toHaveBeenCalled();
+      expect(prisma.v1Notification.create).not.toHaveBeenCalled();
+    });
+
+    it('발송 도중 실패하면 클레임을 되돌려 다음 재시도가 발송 중 오인으로 막히지 않게 한다', async () => {
+      prisma.v1User.findMany.mockRejectedValueOnce(new Error('db unavailable'));
+
+      await expect(
+        service.sendManualPush({ target: 'broadcast', title: '전체 공지' }, admin),
+      ).rejects.toThrow('db unavailable');
+
+      expect(prisma.v1IdempotencyRecord.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ responseStatus: 202 }) }),
+      );
     });
 
     it('broadcasts to every active user via cursor pagination, skipping those with noticeEnabled off, and audit-logs targetId "broadcast"', async () => {

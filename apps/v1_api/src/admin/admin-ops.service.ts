@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -257,54 +257,76 @@ export class AdminOpsService {
     //
     // 개인 발송은 대상이 한 명이라 이 보호를 걸지 않는다 — 운영자가 같은 사람에게
     // 같은 안내를 다시 보내는 것은 정상적인 조작이다.
-    const replay = dto.target === 'broadcast' ? await this.findBroadcastReplay(dto, admin) : null;
-    if (replay) return replay;
+    if (dto.target === 'broadcast') {
+      const claim = await this.claimBroadcast(dto, admin);
+      if (claim.status === 'replay') return claim.body;
+      if (claim.status === 'in_progress') {
+        // 조회와 기록 사이에 원자성이 없으면 진짜 동시 요청(더블 클릭)에서는 둘 다
+        // "기록 없음"을 보고 통과해 버린다 — 그래서 조회+클레임을 advisory lock을
+        // 잡은 트랜잭션 하나로 묶는다(team-matches.service.ts의 idempotent 생성
+        // 경로와 동일 패턴). 클레임에 실패하면 발송 자체를 하지 않고 여기서 막는다.
+        throw new ConflictException({
+          code: 'BROADCAST_IN_PROGRESS',
+          message: '같은 공지가 이미 발송 중이에요. 잠시 후 다시 확인해 주세요.',
+        });
+      }
+    }
 
     let result: ManualPushSendResult;
     let targetId: string;
 
-    if (dto.target === 'user') {
-      // dto.userId is guaranteed by AdminPushSendDto's ValidateIf(target === 'user').
-      const userId = dto.userId as string;
-      const user = await this.prisma.v1User.findUnique({ where: { id: userId }, select: { id: true } });
-      if (!user) {
-        throw new NotFoundException({ code: 'USER_NOT_FOUND', message: 'User was not found' });
-      }
-      targetId = userId;
-      const { outcome, push } = await this.sendToOneRecipient(userId, dto);
-      result = {
-        sent: outcome === 'sent' ? 1 : 0,
-        skipped: outcome === 'skipped' ? 1 : 0,
-        failed: outcome === 'failed' ? 1 : 0,
-        push: emptyPushTally(),
-      };
-      addPushTally(result.push, push);
-    } else {
-      targetId = 'broadcast';
-      result = { sent: 0, skipped: 0, failed: 0, push: emptyPushTally() };
-      // 대상 전체를 findMany로 한 번에 메모리에 올리지 않고, id 커서로 DB에서
-      // 청크 단위로 페이지네이션해 가져온다 — 사용자 수가 커져도 한 번에 들고
-      // 있는 row 수는 BROADCAST_CHUNK_SIZE로 고정된다.
-      let cursor: string | undefined;
-      for (;;) {
-        const page = await this.prisma.v1User.findMany({
-          where: { accountStatus: 'active' },
-          take: BROADCAST_CHUNK_SIZE,
-          ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
-          orderBy: { id: 'asc' },
-          select: { id: true },
-        });
-        if (page.length === 0) break;
-        cursor = page[page.length - 1].id;
-
-        const outcomes = await Promise.all(page.map((row) => this.sendToOneRecipient(row.id, dto)));
-        for (const { outcome, push } of outcomes) {
-          result[outcome === 'sent' ? 'sent' : outcome === 'skipped' ? 'skipped' : 'failed'] += 1;
-          addPushTally(result.push, push);
+    try {
+      if (dto.target === 'user') {
+        // dto.userId is guaranteed by AdminPushSendDto's ValidateIf(target === 'user').
+        const userId = dto.userId as string;
+        const user = await this.prisma.v1User.findUnique({ where: { id: userId }, select: { id: true } });
+        if (!user) {
+          throw new NotFoundException({ code: 'USER_NOT_FOUND', message: 'User was not found' });
         }
+        targetId = userId;
+        const { outcome, push } = await this.sendToOneRecipient(userId, dto);
+        result = {
+          sent: outcome === 'sent' ? 1 : 0,
+          skipped: outcome === 'skipped' ? 1 : 0,
+          failed: outcome === 'failed' ? 1 : 0,
+          push: emptyPushTally(),
+        };
+        addPushTally(result.push, push);
+      } else {
+        targetId = 'broadcast';
+        result = { sent: 0, skipped: 0, failed: 0, push: emptyPushTally() };
+        // 대상 전체를 findMany로 한 번에 메모리에 올리지 않고, id 커서로 DB에서
+        // 청크 단위로 페이지네이션해 가져온다 — 사용자 수가 커져도 한 번에 들고
+        // 있는 row 수는 BROADCAST_CHUNK_SIZE로 고정된다.
+        let cursor: string | undefined;
+        for (;;) {
+          const page = await this.prisma.v1User.findMany({
+            where: { accountStatus: 'active' },
+            take: BROADCAST_CHUNK_SIZE,
+            ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+            orderBy: { id: 'asc' },
+            select: { id: true },
+          });
+          if (page.length === 0) break;
+          cursor = page[page.length - 1].id;
 
-        if (page.length < BROADCAST_CHUNK_SIZE) break;
+          const outcomes = await Promise.all(page.map((row) => this.sendToOneRecipient(row.id, dto)));
+          for (const { outcome, push } of outcomes) {
+            result[outcome === 'sent' ? 'sent' : outcome === 'skipped' ? 'skipped' : 'failed'] += 1;
+            addPushTally(result.push, push);
+          }
+
+          if (page.length < BROADCAST_CHUNK_SIZE) break;
+        }
       }
+    } catch (err) {
+      // 발송 도중 실패했다면 클레임을 되돌려 다음 진짜 재시도가 막히지 않게 한다 —
+      // claimBroadcast가 이미 202로 선점해 둔 상태라, 여기서 풀지 않으면 10분 창
+      // 동안 "발송 중"으로 오인돼 정상적인 재시도까지 ConflictException으로 막힌다.
+      if (dto.target === 'broadcast') {
+        await this.releaseBroadcastClaim(dto, admin);
+      }
+      throw err;
     }
 
     // 감사 로그 기록 실패가 이미 완료된 발송 결과를 500으로 뒤엎지 않도록 별도로
@@ -330,59 +352,106 @@ export class AdminOpsService {
     }
 
     if (dto.target === 'broadcast') {
-      await this.rememberBroadcast(dto, admin, result);
+      await this.finalizeBroadcastClaim(dto, admin, result);
     }
 
     return result;
   }
 
-  /** 같은 운영자·같은 내용의 전체 발송 기록을 찾는다. 있으면 그 결과를 그대로 돌려준다. */
-  private async findBroadcastReplay(
+  /**
+   * 조회(findUnique)와 기록(upsert) 사이에 원자성이 없으면, 진짜 동시 요청(더블 클릭·
+   * 네트워크 재시도)이 둘 다 "기록 없음"을 보고 통과해 버려 중복 발송이 그대로 일어난다.
+   * team-matches.service.ts의 idempotent 생성 경로와 동일하게, advisory lock을 잡은
+   * 트랜잭션 안에서 조회와 "발송 중" 클레임(responseStatus=202)을 원자적으로 처리한다.
+   *
+   * - 이미 완료(200)된 유효한 기록이 있으면 그 결과를 그대로 돌려준다(replay).
+   * - 발송 중(202)인 기록이 아직 유효하면 in_progress — 호출자는 막아야 한다.
+   * - 유효한 기록이 없으면 202로 새로 선점하고 claimed를 돌려준다.
+   */
+  private async claimBroadcast(
     dto: AdminPushSendDto,
     admin: V1ActiveAdmin,
-  ): Promise<ManualPushSendResult | null> {
-    const record = await this.prisma.v1IdempotencyRecord.findUnique({
-      where: {
-        actorUserId_action_resourceType_resourceId_idempotencyKey: this.broadcastScope(dto, admin),
-      },
-      select: { responseBody: true, expiresAt: true },
+  ): Promise<
+    | { status: 'replay'; body: ManualPushSendResult }
+    | { status: 'in_progress' }
+    | { status: 'claimed' }
+  > {
+    const scope = this.broadcastScope(dto, admin);
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`broadcast-idempotency:${scope.actorUserId}:${scope.idempotencyKey}`}, 0))`;
+      const existing = await tx.v1IdempotencyRecord.findUnique({
+        where: { actorUserId_action_resourceType_resourceId_idempotencyKey: scope },
+        select: { responseStatus: true, responseBody: true, expiresAt: true },
+      });
+      if (existing && existing.expiresAt > new Date()) {
+        if (existing.responseStatus === 200) {
+          this.logger.warn(
+            `같은 내용의 전체 발송이 최근에 이미 나갔습니다 — 다시 보내지 않고 첫 결과를 돌려줍니다 [admin=${admin.userId}]`,
+          );
+          return { status: 'replay' as const, body: existing.responseBody as unknown as ManualPushSendResult };
+        }
+        return { status: 'in_progress' as const };
+      }
+      await tx.v1IdempotencyRecord.upsert({
+        where: { actorUserId_action_resourceType_resourceId_idempotencyKey: scope },
+        create: {
+          ...scope,
+          payloadHash: scope.idempotencyKey,
+          responseStatus: 202,
+          responseBody: {},
+          expiresAt: new Date(Date.now() + BROADCAST_DEDUPE_WINDOW_MS),
+        },
+        update: {
+          responseStatus: 202,
+          responseBody: {},
+          expiresAt: new Date(Date.now() + BROADCAST_DEDUPE_WINDOW_MS),
+        },
+      });
+      return { status: 'claimed' as const };
     });
-    if (!record || record.expiresAt <= new Date()) return null;
-    this.logger.warn(
-      `같은 내용의 전체 발송이 최근에 이미 나갔습니다 — 다시 보내지 않고 첫 결과를 돌려줍니다 [admin=${admin.userId}]`,
-    );
-    return record.responseBody as unknown as ManualPushSendResult;
   }
 
   /**
-   * 방금 나간 전체 발송을 기록한다. 기록 실패가 발송 자체를 실패로 만들면 안 된다 --
-   * 이미 나간 것을 되돌릴 수 없으므로, 여기서 던지면 호출자는 실패로 알고 다시 누른다
-   * (그게 바로 이 보호가 막으려던 상황이다).
+   * 방금 나간 전체 발송을 완료(200)로 확정한다. 기록 실패가 발송 자체를 실패로 만들면
+   * 안 된다 -- 이미 나간 것을 되돌릴 수 없으므로, 여기서 던지면 호출자는 실패로 알고
+   * 다시 누른다(그게 바로 이 보호가 막으려던 상황이다).
    */
-  private async rememberBroadcast(
+  private async finalizeBroadcastClaim(
     dto: AdminPushSendDto,
     admin: V1ActiveAdmin,
     result: ManualPushSendResult,
   ): Promise<void> {
     const scope = this.broadcastScope(dto, admin);
     try {
-      await this.prisma.v1IdempotencyRecord.upsert({
+      await this.prisma.v1IdempotencyRecord.update({
         where: { actorUserId_action_resourceType_resourceId_idempotencyKey: scope },
-        create: {
-          ...scope,
-          payloadHash: scope.idempotencyKey,
+        data: {
           responseStatus: 200,
-          responseBody: result as unknown as Prisma.InputJsonValue,
-          expiresAt: new Date(Date.now() + BROADCAST_DEDUPE_WINDOW_MS),
-        },
-        update: {
           responseBody: result as unknown as Prisma.InputJsonValue,
           expiresAt: new Date(Date.now() + BROADCAST_DEDUPE_WINDOW_MS),
         },
       });
     } catch (err: unknown) {
       this.logger.warn(
-        `전체 발송 중복 방지 기록 실패: ${err instanceof Error ? err.message : String(err)}`,
+        `전체 발송 완료 기록 실패: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  /**
+   * 발송 도중 실패한 클레임을 되돌린다 — 202로 선점된 채 만료 전에 놔두면 10분 동안
+   * 정상적인 재시도까지 "발송 중"으로 막힌다. 즉시 만료시켜 다음 시도가 새로 클레임을
+   * 잡을 수 있게 한다.
+   */
+  private async releaseBroadcastClaim(dto: AdminPushSendDto, admin: V1ActiveAdmin): Promise<void> {
+    try {
+      await this.prisma.v1IdempotencyRecord.updateMany({
+        where: { ...this.broadcastScope(dto, admin), responseStatus: 202 },
+        data: { expiresAt: new Date(0) },
+      });
+    } catch (err: unknown) {
+      this.logger.warn(
+        `전체 발송 클레임 해제 실패: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
   }

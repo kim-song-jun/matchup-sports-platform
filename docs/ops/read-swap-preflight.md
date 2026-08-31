@@ -398,3 +398,44 @@ awk '/private requireTakeover/,/^  }/' apps/v1_api/src/games/games.service.ts \
 > 오독한다.** (이 문서를 쓰면서 실제로 그 명령을 적었다가 돌려 보고 잡았다.)
 > 함수 전체를 뜨는 `awk` 범위를 쓴다.
 
+---
+
+## 9. `--apply` 전에 닫아야 하는 것 — **dual-write 4곳이 아직 안 막혀 있다**
+
+> 마감은 **참가팀/표시필드 백필 `--apply` 전**이다. 그 자리는 **사용자에게 승인을 요청하는
+> 자리**고, 그때 *"거울은 보호돼 있다"* 고 사실대로 말할 수 있어야 한다. 3/7 만 막힌 상태로
+> 승인을 요청하면 승인자에게 틀린 그림을 주는 것이다.
+
+**막힌 것 (2026-08-31 실측)**
+
+| 자리 | 어떻게 |
+|---|---|
+| `league-match-admin` state→active ×2 | 유닛. 변이 2종(dual-write 제거 / `kind` 가드 제거) 각각 1 red |
+| `create` (서비스 경로) + 트랜잭션 롤백 | 통합 스펙 `league-competition-dual-write.integration-spec.ts` |
+
+**아직 안 막힌 것 — 4곳**
+
+```
+league-match-admin.service.ts   되돌리기 updateMany
+league-completion-projection    active→completed
+league-series-admin.service.ts  시리즈 최초 생성
+league-series-admin.service.ts  승강 다음 시즌
+```
+
+### 닫혔는지 확인하는 법 — **red 를 4개 세라**
+
+각 자리의 dual-write 한 줄을 지우고 통합 스위트를 돌린다.
+**red 가 정확히 4개**여야 하고, **각각 어느 자리인지 이름을 댈 수 있어야 한다.**
+
+> **3개면 하나는 안 막힌 것이다.** 어느 것인지 모른 채 넘어가면 안 막힌 자리가 "통과"로
+> 기록된다 — 이 저장소에서 red 개수를 세지 않아 vacuous 테스트를 올린 전례가 있다.
+
+### 함정 둘
+
+1. **리그를 `prisma.v1League.create` 로 만들지 마라.** 그러면 dual-write 를 한 번도 지나가지
+   않고, 통과하지만 아무것도 증명하지 않는다. **서비스 메서드로 만든다.**
+2. **`jest.config.ts` 에 파일을 명시 등록해라.** `test/league-matches/` 는 와일드카드가
+   **아니다.** 등록을 빠뜨리면 스펙이 디스크에만 있고 CI 가 한 번도 선택하지 않는다 —
+   이 디렉터리에서 6번 반복된 함정이다. `jest --selectProjects integration --listTests` 로
+   실제 선택되는지 확인한다.
+

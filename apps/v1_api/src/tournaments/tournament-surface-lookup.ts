@@ -46,6 +46,16 @@ export const ALL_COMPETITION_KINDS = [
  */
 export type TournamentSurfaceClient = {
   v1Tournament: {
+    // 반환이 `unknown` 인 것은 **구조적 최소 계약**이기 때문이다 — 실제 Prisma 클라이언트와
+    // 트랜잭션 클라이언트가 둘 다 여기에 맞아야 하고, 행 타입은 호출부의 `select`/`include`
+    // 에 따라 달라져 여기서 고정할 수 없다. 실제 행 타입은 아래 함수가
+    // `Prisma.V1TournamentGetPayload<Args>` 로 복원한다.
+    //
+    // `unknown` 은 **이미 `null` 을 포함한다**(`Promise<unknown>` 계약에 `null` 반환이
+    // 그대로 대입된다 — tsc --strict 로 확인). `unknown | null` 로 적어도 같은 타입이라
+    // 바뀌는 게 없다. 미매칭이 `null` 이라는 사실은 아래 함수의 반환 타입
+    // (`… | null`)과 `OrThrow` 변형이 표현한다(Copilot 리뷰가 이 자리를 지적했으나
+    // 전제가 성립하지 않아 그대로 둔다).
     findFirst: (args: Prisma.V1TournamentFindFirstArgs) => Prisma.PrismaPromise<unknown>;
   };
 };

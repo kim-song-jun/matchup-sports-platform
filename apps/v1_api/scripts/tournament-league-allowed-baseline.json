@@ -3,5 +3,17 @@
   "src/tournaments/competition-config/competition-config-version-repoint.ts": {
     "allowed": 1,
     "why": "설정 축 — 설정은 대회와 리그가 이미 공유하므로 여기서 종류를 가르면 리그만 옛 설정에 남거나 설정 없는 상태로 방치된다(tournament-surface.ts 의 '여기 걸지 않는 곳' 참조)."
+  },
+  "src/games/games.service.ts": {
+    "allowed": 1,
+    "why": "징계 규정 조회 — 행이 없으면 `?? null` 로 suspensionRulesEnabled 가 false 가 되어 경고 누적·퇴장 정지가 **에러 없이 통째로 꺼진다**. 좁혀 두면 read-swap 이 리그 경기를 보내는 순간 리그 징계 규정이 조용히 사라진다(read-swap-preflight.md §1-1)."
+  },
+  "src/tournaments/tournament-standings-recalculation.ts": {
+    "allowed": 1,
+    "why": "순위 재계산 — 행이 없으면 `continue` 로 조용히 건너뛴다. 좁혀 두면 리그 순위가 에러 없이 갱신되지 않는다(read-swap-preflight.md §1-2)."
+  },
+  "src/game-operations/tournament-fixture-completion-notification.service.ts": {
+    "allowed": 1,
+    "why": "결과 확정 알림 — 행이 없으면 대회명이 `?? '대회'` 로 폴백된다. 기능이 아니라 라벨이 어긋나는 급이지만 조용히 틀리는 것은 같다(read-swap-preflight.md §1-3)."
   }
 }

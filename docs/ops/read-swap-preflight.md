@@ -49,6 +49,44 @@ baseline 주석이 아니라 코드에 둔 이유는 **주석은 드리프트하
 
 1·2 는 **기능이 사라지는** 급이고 3 은 문구다. 셋 다 코드에도 같은 경고를 달아 뒀다.
 
+### 1-a. R4-a 로 넘어간 것은 `listMine` 의 **목록 조회뿐**이다
+
+`listMine` 이 통합 축을 읽는다고 해서 그 화면이 전부 넘어간 게 아니다. 항목별
+**순위·다음 경기(`standings()`)는 여전히 `v1League.findUnique` 를 읽는다** — R4-b 대상이다.
+여기를 "이미 넘어갔다"고 읽고 리그 축을 정리하면 **순위가 통째로 사라진다**(위 표 2번과
+같은 모양 — 조용히 사라지는 쪽이다).
+
+> **반증**: `grep -n "v1League.findUnique" apps/v1_api/src/league-matches/league-match-public.service.ts`
+> 가 **0** 이 되면 이 줄은 낡았다. 그때까지는 유효하다.
+
+### 1-b. read-swap 은 **백필보다 먼저 배포되면 안 된다** (Copilot #876 지적)
+
+`listMine` 은 거울의 `status` 를 `state` 로 되돌려 쓰고, **`state === 'draft'` 인 항목은
+`standings()` 를 아예 부르지 않는다.** 그래서 거울의 status 가 리그보다 뒤처져 있으면
+(백필 전 상태) 진행 중인 리그가 `draft` 로 보여 **순위·다음 경기가 에러 없이 사라진다.**
+불완전 검사(`LEAGUE_MIRROR_INCOMPLETE`)는 `region`·`scheduledAt`·`scheduledEndAt` 만 보므로
+**틀린 status 는 잡지 못한다** — null 이 아니라 *틀린 값*이기 때문이다.
+
+지금은 순서가 지켜져 있다. `--apply` 를 먼저 돌렸고, 배포를 여러 번 거친 뒤 다시 쟀다:
+
+| 측정 | 값 |
+|---|---|
+| 리그 축 분포 | `draft 35 · active 15 · completed 38` |
+| 거울 축 분포 | `draft 35 · in_progress 15 · completed 38` |
+| 행 단위 status 불일치 | **0** / 88쌍 |
+| `region` 불일치 · 날짜 null | **0** · **0** |
+
+> **반증**: 아래 SQL 의 `status_mismatch` 가 0 이 아니면 이 줄은 낡았고, read-swap 을
+> 배포하면 안 된다.
+> ```sql
+> SELECT count(*) FROM v1_leagues l
+>   JOIN v1_tournaments t ON t.id = l.id AND t.kind = 'regular_league'
+>  WHERE t.status::text <> CASE l.state::text
+>    WHEN 'draft' THEN 'draft' WHEN 'active' THEN 'in_progress'
+>    WHEN 'completed' THEN 'completed' END;
+> ```
+
+
 > **2번은 이미 한 번 터졌다.** 이관 중 그 스펙의 mock 이 `where.id` 를 직접 읽어
 > `undefined` 가 되면서 정확히 이 `continue` 경로로 빠졌고, **에러 없이 3건이 조용히
 > 스킵**됐다. 잡힌 이유는 그 테스트가 **`upsert` 호출을 단언**하고 있어서다 —
@@ -400,28 +438,74 @@ awk '/private requireTakeover/,/^  }/' apps/v1_api/src/games/games.service.ts \
 
 ---
 
-## 9. `--apply` 전에 닫아야 하는 것 — **dual-write 중 아직 안 막힌 자리**
+## 9. `--apply` 전에 닫아야 하는 것 — **dual-write 중 아직 봉쇄 테스트가 없는 자리**
+
+> ### 용어 — 여기서 "막혔다" 는 **테스트**를 말한다
+> ```
+> 막혔다 / 봉쇄됐다  = 그 dual-write 를 지우면 red 가 나는 테스트가 있다
+> 안 막혔다          = dual-write 는 **있는데** 지워도 아무도 red 가 안 난다
+> ```
+> **"안 막혔다" 를 "dual-write 가 없다" 로 읽으면 이미 있는 자리에 두 번째 dual-write 를
+> 넣게 된다.** 실제로 그 오해가 한 번 났다(2026-08-31) — 표를 안 보고 요약 문장을 신뢰한 게
+> 원인이었다. 그래서 칸 이름을 `봉쇄 수단` 으로 바꿨다.
+>
+> **dual-write 자체의 유무는 코드로 센다**: `state` 를 바꾸거나 리그를 만드는 **7곳 전부**
+> 인접한 거울 쓰기를 갖고 있다(2026-08-31 양 세션 독립 확인).
+> 반증: `grep -rn 'v1League\.\(create\|update\|updateMany\|upsert\)' apps/v1_api/src apps/v1_api/prisma`
+> 로 나온 자리마다 인접 `v1Tournament` 쓰기가 있는지 본다 — 하나라도 없으면 이 줄이 낡았다.
 
 > 마감은 **참가팀/표시필드 백필 `--apply` 전**이다. 그 자리는 **사용자에게 승인을 요청하는
-> 자리**고, 그때 *"거울은 보호돼 있다"* 고 사실대로 말할 수 있어야 한다. 안 막힌 자리를 두고
-> 승인을 요청하면 승인자에게 틀린 그림을 주는 것이다.
+> 자리**고, 그때 *"거울 쓰기가 회귀로 사라지지 않게 봉쇄돼 있다"* 고 사실대로 말할 수 있어야
+> 한다. 봉쇄 없는 자리를 두고 승인을 요청하면 승인자에게 틀린 그림을 주는 것이다.
 >
 > **숫자는 아래 표에만 둔다.** 제목·도입에 `N곳`·`3/7` 같은 수를 또 적으면 한쪽만 갱신돼
 > 문서 안에서 두 값이 싸운다 — 실제로 그렇게 됐다(제목 4 vs 본문 2). 분모가 있는 표기는
 > 특히 나쁘다: 자리를 하나 닫을 때마다 **두 곳**을 고쳐야 한다.
 
-**막힌 것 (2026-08-31 실측)**
+**봉쇄된 것 (2026-08-31 실측)**
 
-| 자리 | 어떻게 |
+| 자리 | 봉쇄 수단 |
 |---|---|
 | `league-match-admin` state→active ×2 | 유닛. 변이 2종(dual-write 제거 / `kind` 가드 제거) 각각 1 red |
 | `create` (서비스 경로) + 트랜잭션 롤백 | 통합 스펙 `league-competition-dual-write.integration-spec.ts` |
 
-**아직 안 막힌 것 — 1곳** (2026-08-31 갱신: 되돌리기·승강 다음 시즌·시리즈 최초 생성을 덮었다)
+**아직 봉쇄 테스트가 없는 것 — 1곳** (dual-write 는 있다. 2026-08-31 갱신: 되돌리기·승강 다음 시즌·시리즈 최초 생성을 덮었다)
 
 ```
 league-completion-projection    active→completed
 ```
+
+> **"안 막혔다" 는 dual-write 가 없다는 뜻이 아니다 — 이 표는 "무엇이 그것을 봉쇄하는가" 다.**
+> 헷갈리면 없는 dual-write 를 새로 넣어 **같은 전이를 두 번 쓰게 된다.** 실제 상태:
+> ```
+> dual-write        있다. league-completion-projection.service.ts 의
+>                   `result.count === 0` 조기 반환 **뒤**(조건부 update 승자만 도달)
+>                   커밋 ac933fea4 — origin/dev 에 포함됨
+> 봉쇄 테스트        없다. 이 전이를 지나는 유일한 스펙
+>                   apps/v1_api/test/league-matches/
+>                   league-completion-projection.integration-spec.ts 는
+>                   `v1League.state` 와 상태로그만 단언하고 v1Tournament 를 한 번도 조회하지
+>                   않는다 → dual-write 를 지워도 전 단언이 green 이다
+> ```
+> **반증**(레포 루트에서 그대로 붙여넣어 돌아간다 — 실행해서 확인했다):
+> ```bash
+> grep -c v1Tournament \
+>   apps/v1_api/test/league-matches/league-completion-projection.integration-spec.ts
+> ```
+> 가 0 보다 커지면 이 줄은 낡았다(현재 **0**).
+>
+> **이 봉쇄를 쓸 때 로컬 green 을 믿지 마라 — 통합 스펙이라 Postgres 가 필요하다.**
+> 컨테이너가 없으면 그 스위트는 **실행되지 못하고** 요약에 `Tests: 0` 으로 찍힌다.
+> **`Tests: 0` 은 통과가 아니라 "한 개도 안 돌았다" 다** — `Test Suites: N failed` 를 따로 봐야
+> 드러난다(2026-08-31 실제로 밟았다: 공유 Prisma 클라이언트가 `V1Tournament.region` 을 몰라
+> ts-jest 가 컴파일에서 죽었고, 요약만 보면 실패로 안 읽혔다).
+>
+> 그래서 이 항목의 변이 확인(거울 쓰기 제거 → red)은 **DB 가 있는 환경 또는 CI 에서** 한다.
+> 반증: `docker ps --filter name=teameet --format '{{.Names}}'` 가 비어 있는데 그 스위트가
+> green 이면 **안 돈 것**이다.
+>
+> > `grep postgres` 로 세지 마라 — **다른 프로젝트의 postgres 가 잡힌다.** 이 문장을 쓰면서
+> > 실제로 그렇게 됐다(무관한 `posco-mds-db-1` 이 걸려 "떠 있다"로 읽혔다). 이름으로 좁힌다.
 
 > **✅ 필수 마감은 닫혔다.** 시리즈 최초 생성(`seedSeason`)은 유닛으로 막혔다 —
 > 변이 둘(dual-write 제거 / 거울을 `tx` 밖으로) 각각 **3/3 red**.
@@ -436,13 +520,22 @@ league-completion-projection    active→completed
 승인 요청 직전에 "어디까지 막았는가"를 정하면 그건 **승인자에게 불리한 시점**이다.
 그래서 미리 박는다:
 
-| 자리 | 안 막혔을 때 무슨 일이 나나 | 마감 | **이 판정이 깨지는 조건** |
+| 자리 | 봉쇄가 없을 때 무슨 일이 나나 | 봉쇄 마감 | **이 판정이 깨지는 조건** |
 |---|---|---|---|
 | ~~`league-series-admin` 시리즈 최초 생성~~ | **거울이 아예 없다** → 그 리그가 read-swap 뒤 **화면에서 사라진다** | ✅ **닫혔다** (변이 3/3 red ×2) | — |
-| `league-completion-projection` | 거울 status 가 `in_progress` 로 남는다 → 끝난 리그가 **진행 중으로 보인다** | **선택.** 못 막으면 **승인 요청에 이름과 실패 모습을 그대로 적고** 진행한다 | ⚠️ **시상·결산 경로를 통합 축으로 옮기는 순간 `필수` 로 승격**한다 — 아래 |
+| `league-completion-projection` | (dual-write 를 잃으면) 거울 status 가 `in_progress` 로 남는다 → 끝난 리그가 **진행 중으로 보인다** | **선택.** 못 막으면 **승인 요청에 이름과 실패 모습을 그대로 적고** 진행한다 | ⚠️ **시상·결산 경로를 통합 축으로 옮기는 순간 `필수` 로 승격**한다 — 아래. **승격 이유가 하나 더 있다: 여기가 값 불일치의 유일한 회귀 경로다** (§1-b) |
 
 **가르는 축은 "행이 없는가" vs "값이 틀린가"다.** 행이 없으면 화면에서 사라지고 운영자는
 "안 보인다"밖에 말할 수 없다.
+
+> **§1-b 의 값 불일치 blind spot 과 이 줄은 같은 구멍이다.** `listMine` 의 불완전 검사는
+> null 만 보므로 *틀린* status 는 못 잡는데, status 가 틀어지려면 **리그를 바꾸면서 거울을
+> 안 바꾸는 경로**가 있어야 한다. 지금 코드에는 그런 경로가 **없다**(state 를 바꾸는 4곳이
+> 전부 dual-write 를 갖고 있다). 즉 남은 위험은 발생이 아니라 **회귀** — 누가 dual-write 를
+> 지워도 아무 테스트도 red 가 되지 않는 상태다.
+>
+> **그래서 해법은 런타임 값 검사가 아니라 봉쇄 테스트다.** 요청마다 "거울 == 리그" 를 확인하려면
+> 리그를 읽어야 하고, 그러면 **두 축을 영구히 결합시켜 read-swap 자체가 무의미해진다.**
 
 ### ⛔ read-swap 은 **`--apply` 뒤에만** 머지할 수 있다 — 집합 동등성으로는 안 잡힌다
 

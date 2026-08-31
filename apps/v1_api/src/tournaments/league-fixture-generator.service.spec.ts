@@ -135,7 +135,8 @@ describe('assertLeagueGenerationAllowed', () => {
   });
 
   // 어드민이 "교체할까요?" 를 누르기 전에 무엇이 사라지는지 보여주려면 사전 영향이 응답에
-  // 실려야 한다. 최상위 필드는 HttpExceptionFilter 가 버리므로 details 아래여야 한다.
+  // 실려야 한다. 최상위 필드는 `AllExceptionsFilter` 가 버리므로 details 아래여야 한다
+  // (파일은 common/filters/http-exception.filter.ts — 파일명과 클래스명이 다르다).
   it('ALREADY_EXIST 는 교체 시 무엇이 삭제되는지 details 로 함께 준다', () => {
     const details = detailsOf(() =>
       assertLeagueGenerationAllowed({ ...base, existingFixtureCount: 28 }),

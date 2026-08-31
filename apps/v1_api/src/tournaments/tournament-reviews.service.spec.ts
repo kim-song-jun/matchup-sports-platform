@@ -201,7 +201,7 @@ describe('TournamentReviewsService — awards admin gate', () => {
     expect(result).toEqual([]);
   });
 
-  // ─── setAwards (PUT) ────────────────────────────────────────────────────
+  // ─── listMyPendingReviews (GET) ─────────────────────────────────────────
 
   // `listMyPendingReviews` 는 `status: 'confirmed'` 를 쓰는 19곳 중 **유일하게
   // `tournamentId` 스코프가 없는** 쿼리다 — 사용자의 팀이 확정 등록된 **모든** 대회를 훑는다.
@@ -223,6 +223,8 @@ describe('TournamentReviewsService — awards admin gate', () => {
     // 기존 조건도 살아 있어야 한다 — 종류 조건을 넣다 이걸 덮으면 draft·삭제 대회가 샌다.
     expect(where.tournament).toMatchObject({ status: 'completed', deletedAt: null });
   });
+
+  // ─── setAwards (PUT) ────────────────────────────────────────────────────
 
   it('setAwards: non-admin authenticated user → 403 PERMISSION_DENIED, no data mutated', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(null);

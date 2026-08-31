@@ -61,10 +61,28 @@ SELECT s.code, count(*) FROM v1_leagues l JOIN v1_sports s ON s.id = l.sport_id 
 DATABASE_URL=<alpha> ts-node src/tournaments/migration/league-competition-backfill.cli.ts
 # --apply 없으면 dry-run 이 기본이다. --dry-run 과 --apply 를 함께 주면 멈춘다.
 ```
-지금까지의 dry-run 확인은 **공개 API 로 재현한 것**이지 CLI 실행이 아니다
-(문서화된 DB 접근 경로가 psql 뿐이라 Node/Prisma CLI 를 붙일 길이 없었다).
 `--apply` 전에 **한 번은 진짜 CLI 로** 돌려 `scanned`·`unsupportedSports`·`idConflicts`
-실제 출력을 본다.
+실제 출력을 본다 — SQL 로 같은 값을 재현하는 것은 **가드 코드를 우회한 재현**이라
+가드 자체의 동작을 증명하지 않는다.
+
+> ## ⚠️ "CLI 를 붙일 길이 없다" 도 옛 상태다 (2026-08-31 정정)
+> 이 자리에는 *"문서화된 DB 접근 경로가 psql 뿐이라 Node/Prisma CLI 를 붙일 길이 없었다"*
+> 라고 적혀 있었다. **그 뒤로 경로가 생겼고 문서가 안 따라왔다.** 같은 디렉터리의 형제
+> CLI 두 개가 **alpha 컨테이너 안에서 이미 그렇게 돈다**:
+> ```
+> deploy/deploy-alpha.sh:389
+>   cd /app/apps/v1_api && node dist/src/tournaments/migration/tournament-award-recipient-backfill.cli.js
+> deploy/deploy-alpha.sh:405
+>   cd /app/apps/v1_api && node dist/src/games/migration/fixture-game-backfill.cli.js
+> ```
+> 즉 **SSM → EC2 → `docker exec <api> node dist/src/…/<cli>.js`** 가 검증된 경로다.
+> `DATABASE_URL` 은 컨테이너 환경에 이미 있어 따로 넘기지 않는다.
+>
+> **주의 — 새 CLI 는 배포 뒤에야 `dist` 에 생긴다.** 머지만으로는 안 된다. 실행 전
+> `ls dist/src/tournaments/migration/` 로 그 파일이 **실제로 있는지** 먼저 본다.
+>
+> **아직 참인지 확인하는 법**: `grep -n 'migration/.*cli\.js' deploy/deploy-alpha.sh` 가
+> 비면 이 정정이 낡은 것이다.
 
 ## 되돌리기 — **창이 언제 닫히는가**
 

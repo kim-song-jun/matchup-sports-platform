@@ -214,7 +214,12 @@ jobs:
             echo "::warning::iOS push stays disabled on alpha — missing secrets: ${missing[*]}"
             exit 0
           fi
-          bash scripts/release/sync-alpha-apns-env.sh
+          # Never fails the deploy. Push configuration is a side task here, and the first
+          # version of this step proved the point by blocking an alpha release over the
+          # shape of one secret. A warning is loud enough: the run summary carries it, and
+          # the symptom on the server side is push staying disabled, not a broken alpha.
+          bash scripts/release/sync-alpha-apns-env.sh \
+            || echo "::warning::APNs env sync did not complete; iOS push stays disabled on alpha"
 
       - name: Deploy through AWS Systems Manager
         timeout-minutes: 25

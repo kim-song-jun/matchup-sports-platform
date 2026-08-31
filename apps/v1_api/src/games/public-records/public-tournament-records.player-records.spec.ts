@@ -25,7 +25,7 @@ function buildPrisma(options: {
 }) {
   return {
     v1Tournament: {
-      findUnique: jest.fn().mockResolvedValue({
+      findFirst: jest.fn().mockResolvedValue({
         id: 'tour-1',
         bracketPublishedAt: options.bracketPublishedAt === undefined ? new Date('2026-08-01T00:00:00Z') : options.bracketPublishedAt,
         bracketPublishScheduledAt: null,

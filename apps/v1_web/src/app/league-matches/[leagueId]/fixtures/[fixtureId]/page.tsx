@@ -10,7 +10,7 @@ interface Props {
 export default async function LeagueFixturePage({ params }: Props) {
   const { leagueId, fixtureId } = await params;
   return (
-    <AppChrome title="리그 경기" activeTab="league" backHref={`/league-matches/${leagueId}`}>
+    <AppChrome title="리그 경기" activeTab="tournaments" backHref={`/league-matches/${leagueId}`}>
       <LeagueFixtureDetailClient leagueId={leagueId} fixtureId={fixtureId} />
     </AppChrome>
   );

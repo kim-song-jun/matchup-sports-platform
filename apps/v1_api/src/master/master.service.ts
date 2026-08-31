@@ -1,5 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { canonicalCompetitionConfigForSport } from '../tournaments/competition-config/lineup-size';
+import { tryNormalizeCompetitionSportCode } from '../tournaments/competition-config/competition-config.validator';
+import { positionFormationsForSport, positionOptionsForSport } from '../users/preferred-position';
 import { ResolveLocationDto } from './dto/resolve-location.dto';
 
 type KakaoRegionDocument = {
@@ -33,7 +36,29 @@ export class MasterService {
       },
     });
 
-    return { sports };
+    /**
+     * [D14] 선택지는 **마스터가 준다.**
+     *
+     * 원칙: **"무엇을 고를 수 있는가"는 마스터 / "무엇을 골랐는가"는 프로필.**
+     * 예전엔 자리 목록을 프로필 응답에서만 줬는데, 그러면 **아직 저장 안 한 종목**에는
+     * 목록이 없어 화면이 포지션 UI 를 못 띄운다 — alpha 실측에서 "종목을 골랐는데
+     * 포지션이 안 뜬다"로 드러났다. 코드를 읽어서는 안 보인다(연결은 전부 맞았고,
+     * 데이터가 붙는 **시점**이 틀렸다).
+     *
+     * 좌표를 만들지 않는다 — 프리셋 값을 그대로 넘긴다. 프리셋이 없는 종목(러닝·수영)은
+     * 빈 배열이고, 화면은 그걸 보고 섹션을 숨긴다.
+     */
+    const deps = {
+      tryNormalize: tryNormalizeCompetitionSportCode,
+      canonicalConfig: canonicalCompetitionConfigForSport,
+    };
+    return {
+      sports: sports.map((sport) => ({
+        ...sport,
+        positionOptions: positionOptionsForSport(sport.code, deps),
+        positionFormations: positionFormationsForSport(sport.code, deps),
+      })),
+    };
   }
 
   async getRegions() {

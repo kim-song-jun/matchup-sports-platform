@@ -22,7 +22,6 @@ const base: PlayerCardInput = {
   appearances: 0,
   goals: 0,
   assists: 0,
-  startedCount: 0,
   position: 'MF',
   jerseyNumber: 7,
   skillScore: null,
@@ -39,7 +38,7 @@ const stat = (input: PlayerCardInput, code: PlayerCardStatCode) =>
 describe('선수 카드 산식', () => {
   describe('표본이 모자라면 숫자를 만들지 않는다', () => {
     it('1경기 1골은 SHO 를 잠근다 -- 경기당 1골이라고 99 를 주지 않는다', () => {
-      const card = buildPlayerCard({ ...base, appearances: 1, goals: 1, startedCount: 1 });
+      const card = buildPlayerCard({ ...base, appearances: 1, goals: 1 });
       const sho = card.stats.find((s) => s.code === 'SHO')!;
 
       expect(sho.unlocked).toBe(false);
@@ -48,7 +47,7 @@ describe('선수 카드 산식', () => {
     });
 
     it('3경기부터 SHO 가 열린다', () => {
-      const sho = stat({ ...base, appearances: 3, goals: 3, startedCount: 3 }, 'SHO');
+      const sho = stat({ ...base, appearances: 3, goals: 3 }, 'SHO');
 
       expect(sho.unlocked).toBe(true);
       // 경기당 1골 = 30 + 55 = 85. 계수가 바뀌어도 "상위권이지만 만점은 아니다"는 유지돼야 한다.
@@ -113,7 +112,6 @@ describe('선수 카드 산식', () => {
         appearances: 40,
         goals: 30,
         assists: 20,
-        startedCount: 40,
         recordsConsented: false,
         hasUnlockableRecords: true,
       });
@@ -149,14 +147,12 @@ describe('선수 카드 산식', () => {
         appearances: 10,
         goals: 10,
         assists: 10,
-        startedCount: 10,
       });
       const withLowReviews = buildPlayerCard({
         ...base,
         appearances: 10,
         goals: 10,
         assists: 10,
-        startedCount: 10,
         reviewCount: 5,
         skillScore: 1,
         mannerScore: 1,
@@ -179,14 +175,14 @@ describe('선수 카드 산식', () => {
 
     it('포지션 가중치는 기록의 성격에 맞는 쪽을 올린다 (양방향)', () => {
       // 골이 몰린 기록: SHO 가중치가 높은 FW 가 GK 보다 높아야 한다.
-      const striker = { ...base, appearances: 3, goals: 6, assists: 0, startedCount: 3 };
+      const striker = { ...base, appearances: 3, goals: 6, assists: 0 };
       expect(buildPlayerCard({ ...striker, position: 'FW' }).overall as number).toBeGreaterThan(
         buildPlayerCard({ ...striker, position: 'GK' }).overall as number,
       );
 
       // 골 없이 출전만 쌓인 기록: APP 가중치가 높은 GK 가 FW 보다 높아야 한다.
       // 한 방향만 검사하면 "SHO 가중치만 크게 준 산식"도 통과해버린다.
-      const grinder = { ...base, appearances: 30, goals: 0, assists: 0, startedCount: 30 };
+      const grinder = { ...base, appearances: 30, goals: 0, assists: 0 };
       expect(buildPlayerCard({ ...grinder, position: 'GK' }).overall as number).toBeGreaterThan(
         buildPlayerCard({ ...grinder, position: 'FW' }).overall as number,
       );
@@ -225,7 +221,6 @@ describe('선수 카드 산식', () => {
         appearances: 200,
         goals: 900,
         assists: 900,
-        startedCount: 200,
         reviewCount: 100,
         skillScore: 5,
         mannerScore: 5,
@@ -236,7 +231,6 @@ describe('선수 카드 산식', () => {
         appearances: 3,
         goals: 0,
         assists: 0,
-        startedCount: 0,
         reviewCount: 3,
         skillScore: 1,
         mannerScore: 1,
@@ -253,8 +247,8 @@ describe('선수 카드 산식', () => {
 
   it('등번호는 계산에 쓰이지 않고 그대로 통과한다', () => {
     // 등번호가 총점이나 능력치에 영향을 주면 안 된다 -- 표시 전용 값이다.
-    const withJersey = buildPlayerCard({ ...base, appearances: 10, goals: 5, startedCount: 10, jerseyNumber: 99 });
-    const withoutJersey = buildPlayerCard({ ...base, appearances: 10, goals: 5, startedCount: 10, jerseyNumber: null });
+    const withJersey = buildPlayerCard({ ...base, appearances: 10, goals: 5, jerseyNumber: 99 });
+    const withoutJersey = buildPlayerCard({ ...base, appearances: 10, goals: 5, jerseyNumber: null });
 
     expect(withJersey.jerseyNumber).toBe(99);
     expect(withoutJersey.jerseyNumber).toBeNull();

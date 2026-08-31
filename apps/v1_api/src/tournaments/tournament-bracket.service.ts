@@ -105,8 +105,11 @@ export class TournamentBracketService {
    * 데이터를 `format='league'` 로 채워 맞추지 않는다 — 그러면 **가드는 틀린 채로 우연히
    * 맞게 동작**하고, 두 개념이 갈리는 다음 지점에서 또 터진다. 질문을 둘 다 한다.
    *
-   * `kind: null`(R1 이전 행)은 **리그로 취급하지 않는다.** 옛 대회가 리그 규칙에 걸리면
-   * 그건 이 수정이 만든 새 회귀다.
+   * **`kind: null`(R1 이전 행) 자체로는 리그로 판정하지 않는다.** 두 조건은 OR 이므로
+   * `format === 'league'` 인 행은 `kind` 가 null 이어도 **여전히 리그로 취급된다** — 그건
+   * 이 가드가 원래 하던 일이고 바뀌지 않는다. 이 수정이 더한 것은 `kind` 축 하나뿐이다.
+   * null 을 리그 쪽에 묶었다면 `format` 이 리그가 아닌 옛 대회까지 리그 규칙에 걸려
+   * **새 회귀**가 됐을 것이다.
    */
   private assertLeagueGroupShape(
     format: string,

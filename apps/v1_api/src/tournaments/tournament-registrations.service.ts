@@ -475,18 +475,18 @@ export class TournamentRegistrationsService {
         select: { id: true, status: true, teamCount: true },
       });
       if (!tournament) {
-        // **409 이고 이름은 `TOURNAMENT_STATE_CHANGED` 다.** 여기 도달했다는 것은 바깥 검사를
-        // 통과한 뒤 이 트랜잭션이 `FOR UPDATE` 로 잠그고 **다시 읽었을 때** 대회가 사라졌다는
-        // 뜻이다 — 처음부터 없었던 것이 아니라 **그 사이에 바뀐 것**이다(삭제되었거나, 종류가
-        // 대회 표면을 벗어났거나).
+        // **이 파일의 규칙: 409 = 경합·표면 이탈 / 404 = 진짜 없음.**
         //
-        // 상태코드 409 는 유지한다: 커밋 `1fa57256e`(보안 수정)가 이 재검증 블록의 throw 를
-        // 전부 409 로 통일했고, 이웃(`TOURNAMENT_ALREADY_CANCELLED`·`TOURNAMENT_CAPACITY_FULL`)도
-        // 같은 뜻이다. 404 로 뒤집으면 그 계약이 깨진다.
+        // 여기 도달했다는 것은 바깥 검사를 통과한 뒤 이 트랜잭션이 `FOR UPDATE` 로 잠그고
+        // **다시 읽었을 때** 대회가 사라졌다는 뜻이다 — 처음부터 없었던 것이 아니라
+        // **그 사이에 바뀐 것**이다(삭제되었거나, 종류가 대회 표면을 벗어났거나).
+        // 그래서 `TOURNAMENT_STATE_CHANGED` 이고, 이 재검증 블록의 이웃 throw 들
+        // (`TOURNAMENT_ALREADY_CANCELLED`·`TOURNAMENT_CAPACITY_FULL`)과 같은 계열이다.
         //
-        // 어긋나 있던 것은 **이름**뿐이었다 — `TOURNAMENT_NOT_FOUND` 는 이 파일의 `:111`
-        // (진짜 404)과 같은 이름이라, 로그에서 둘을 구분할 수 없었고 원인이 "없는 대회"로
-        // 읽혔다. 실제 원인은 경합이다.
+        // **404 로 뒤집지 마라.** 잠금 뒤 재검증은 "없다" 가 아니라 "바뀌었다" 를 뜻하고,
+        // 클라이언트의 조치도 다르다(재시도 vs 포기). 진짜 404 는 이 파일 위쪽의 진입
+        // 검사가 `NotFoundException` 으로 던진다 — **두 자리가 같은 코드 이름을 쓰면
+        // 로그에서 구분되지 않고, 원인이 "없는 대회" 로 읽힌다.** 그게 이 이름의 이유다.
         throw new ConflictException({
           code: 'TOURNAMENT_STATE_CHANGED',
           message: '대회 상태가 방금 바뀌었어요. 다시 시도해 주세요.',

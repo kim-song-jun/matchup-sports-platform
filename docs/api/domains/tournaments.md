@@ -153,6 +153,8 @@ Tournament announcement `audience` values are `public`, `all_registered`, `confi
 
 `cancel-request` stores the status that existed before `cancel_requested`. `cancel-request/withdraw` is allowed only while the registration status is `cancel_requested`; it clears `cancelRequestedAt`, `cancelReason`, and the stored previous status after restoring the registration.
 
+`cancel-request/withdraw` re-reads the tournament under a row lock before restoring the registration, so it can reject after the outer checks passed. Two conflicts are possible there: `409 TOURNAMENT_STATE_CHANGED` when the tournament is no longer reachable on the tournament surface at that moment (deleted, or its kind moved off the surface), and `409 TOURNAMENT_ALREADY_CANCELLED` when the tournament was cancelled meanwhile. Both mean *the tournament changed while the request was in flight* — not *the tournament does not exist*, which is a `404 TOURNAMENT_NOT_FOUND` from the entry check. Clients should treat `TOURNAMENT_STATE_CHANGED` as "refresh and retry", not as a dead link.
+
 `POST /registrations` is resumable for the same tournament/team while the existing registration is still `draft`. This covers users leaving the apply flow before final submit; the endpoint returns the existing draft instead of `ALREADY_REGISTERED`.
 
 Registration create and submit both require the team's current `sportId` to match the tournament `sportId`. A mismatch is rejected with `409 TEAM_SPORT_MISMATCH`; clients must only offer same-sport teams as new registration candidates. Submit repeats the check so a saved draft cannot bypass a later team or tournament sport change.

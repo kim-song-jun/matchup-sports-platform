@@ -211,8 +211,8 @@ describe('backfillLeagueCompetitionDetails', () => {
 
     expect(error).toBeInstanceOf(LeagueDetailBackfillBlockedError);
     // 어느 필드가 찼는지가 조치를 정한다 — "충돌했다" 보다 "무엇과 충돌했다" 가 필요하다.
-    expect((error as LeagueDetailBackfillBlockedError).detail.alreadyFilled).toEqual([
-      { leagueId: 'lg-1', filled: ['status', 'regionId'] },
+    expect((error as LeagueDetailBackfillBlockedError).detail.conflicts).toEqual([
+      { leagueId: 'lg-1', fields: ['status', 'regionId'] },
     ]);
     expect(updateMany).not.toHaveBeenCalled();
   });
@@ -321,5 +321,79 @@ describe('backfillLeagueCompetitionDetails', () => {
     const result = await backfillLeagueCompetitionDetails(prisma, { dryRun: true });
 
     expect(result).toMatchObject({ scanned: 2, planned: 2, updated: 0, dryRun: true });
+  });
+
+  // ─── alpha 에서 실제로 걸린 상황 (2026-08-31) ──────────────────────────────
+  // QA 시드가 배포마다 dual-write 의 update 분기로 날짜·지역만 동기화하고 status 는
+  // create 전용이라 draft 로 남는다 → **부분만 채워진 정상 행**. 이걸 "낯선 값" 으로 막아
+  // dry-run 이 리그 하나 때문에 통째로 실패했다.
+
+  it('부분 채움(날짜·지역만 목표값, status 는 draft)은 막지 않고 고친다', async () => {
+    const partiallyFilled = tournament({
+      status: 'draft',
+      scheduledAt: new Date('2026-03-01T00:00:00.000Z'),
+      scheduledEndAt: new Date('2026-06-30T00:00:00.000Z'),
+      regionId: 'region-1',
+    });
+    const { prisma, updateMany } = fakePrisma([league()], [partiallyFilled]);
+
+    const result = await backfillLeagueCompetitionDetails(prisma, { dryRun: false });
+
+    // 막히지 않고, 건너뛰지도 않는다 — status 를 채워야 하므로 **고칠 대상**이다.
+    expect(result).toMatchObject({ scanned: 1, skipped: 0, planned: 1, updated: 1 });
+    // **네 필드를 전부 단언한다.** 일부만 보면 나머지 필드의 조건이 빠져도 통과해서
+    // 보호에 구멍이 생긴다 — 실제로 처음엔 scheduledAt·regionId 둘만 봤고, 그러면
+    // status·scheduledEndAt 조건을 지우는 변이가 green 이 된다.
+    expect(updateMany.mock.calls[0][0].where).toEqual({
+      id: 'lg-1',
+      kind: 'regular_league',
+      status: 'draft',
+      scheduledAt: partiallyFilled.scheduledAt,
+      scheduledEndAt: partiallyFilled.scheduledEndAt,
+      regionId: 'region-1',
+    });
+  });
+
+  it('값이 목표와 다르면 부분이어도 여전히 막고, 다른 필드만 이름을 댄다', async () => {
+    // 날짜는 목표값이고 지역만 다르다 → 지역 하나만 보고돼야 한다.
+    const conflicting = tournament({
+      status: 'draft',
+      scheduledAt: new Date('2026-03-01T00:00:00.000Z'),
+      scheduledEndAt: new Date('2026-06-30T00:00:00.000Z'),
+      regionId: 'region-9',
+    });
+    const { prisma, updateMany } = fakePrisma([league()], [conflicting]);
+
+    const error = await backfillLeagueCompetitionDetails(prisma, { dryRun: false }).catch(
+      (e: unknown) => e,
+    );
+
+    expect(error).toBeInstanceOf(LeagueDetailBackfillBlockedError);
+    // **목표값과 같은 필드는 이름에 안 나온다** — 나오면 운영자가 엉뚱한 데를 본다.
+    expect((error as LeagueDetailBackfillBlockedError).detail.conflicts).toEqual([
+      { leagueId: 'lg-1', fields: ['regionId'] },
+    ]);
+    expect(updateMany).not.toHaveBeenCalled();
+  });
+
+  // ─── 관측값 가드를 **필드마다** 행동으로 막는다 ─────────────────────────────
+  // 형태 단언(`where` 를 toEqual 로 비교)만 두면 "그 필드가 조건에 있다" 까지만 증명한다.
+  // 실제로 지켜야 하는 것은 **읽은 뒤 그 필드가 바뀌면 쓰지 않는다** 이고, 그건 필드마다
+  // 따로 확인해야 한다 — 한 필드로만 경합을 만들면 나머지 셋은 조건을 지워도 green 이다.
+  it.each([
+    ['status', (row: Row) => { row.status = 'completed'; }],
+    ['scheduledAt', (row: Row) => { row.scheduledAt = new Date('2020-01-01T00:00:00.000Z'); }],
+    ['scheduledEndAt', (row: Row) => { row.scheduledEndAt = new Date('2020-12-31T00:00:00.000Z'); }],
+    ['regionId', (row: Row) => { row.regionId = 'region-moved'; }],
+  ])('경합: 읽은 뒤 %s 가 바뀌면 덮어쓰지 않는다', async (_field, mutate) => {
+    const { prisma, updateMany } = fakePrisma([league()], [tournament()], (stored) => {
+      mutate(stored[0]);
+    });
+
+    await expect(backfillLeagueCompetitionDetails(prisma, { dryRun: false })).rejects.toThrow(
+      /계획 1 · 실제 0/,
+    );
+    // 호출은 됐지만 조건이 안 맞아 0행이다 — 아예 호출 안 된 것과 구분한다.
+    expect(updateMany).toHaveBeenCalledTimes(1);
   });
 });

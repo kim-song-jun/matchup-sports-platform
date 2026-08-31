@@ -172,6 +172,23 @@ kind='regular_league' 거울                               88
 > 정상 신호가 아니라 **아무 정보도 아니다** — 몇 건이 바뀌는지는 `planned` 로만 알 수 있다.
 > 그래서 `planned` 를 넣었다(그전에는 그 숫자가 아예 없었다).
 
+### ⛔ `--apply` 전에 **진행 중인 배포가 없는지** 확인한다 — 502 회피와 다른 이유다
+
+```bash
+gh run list --workflow deploy-alpha.yml --branch dev --limit 1 --json status --jq '.[0].status'
+#  completed 여야 한다
+```
+
+**이유가 둘이고 서로 다르다:**
+```
+① 502 회피        배포 중에는 응답이 깨져 멀쩡한 화면을 결함으로 오진한다
+② 헛돌기(신규)    쓰기 조건이 "읽은 시점의 관측값" 이라, 읽기~쓰기 사이에 배포가 돌아
+                  QA 시드가 그 3행의 날짜를 now 기준으로 다시 계산하면 → 0행 매칭 → 전체 롤백
+```
+**②는 데이터가 위험한 게 아니다** — 롤백되므로 안전하다. 문제는 **헛돌고, 실패 원인이 "경합"으로
+보여 진짜 문제로 오해된다**는 것이다. 시드가 날짜를 매 배포 갱신한다는 걸 우리가 이미 알고 있으니
+**배포 중 `--apply` 는 거의 확실히 실패한다.**
+
 ### ⚠️ `skipped ≠ 0` 은 **두 가지 뜻이 있다. 구분해야 한다**
 `skipped` 는 "이미 목표값과 같다" 인데 그렇게 되는 길이 둘이다:
 ```
@@ -182,9 +199,26 @@ kind='regular_league' 거울                               88
 
 **구분법:**
 ```
-scanned == 88,  skipped > 0   → ②다. 멈춘다
+scanned == 88,  skipped > 0   → ② 계열이다. 아래 ②-a 인지 먼저 본다
 scanned  > 88,  skipped > 0   → ①일 수 있다. (scanned − 88) == skipped 인지 확인
 ```
+
+**②를 다시 두 갈래로 가른다 — 2026-08-31 에 실제로 ②-a 가 났다:**
+```
+②-a  QA 시드 dual-write     정상. 시드가 배포마다 update 분기로 날짜·지역을 동기화한다
+                            (status 는 create 전용이라 draft 로 남아 부분 채움이 된다)
+②-b  모르는 쓰기 경로        멈추고 원인을 밝힌다
+```
+**id 로 확인한다 — "3행이니까 시드겠지" 는 판정이 아니다:**
+```sql
+SELECT t.id, t.status, (l.starts_on = t.scheduled_at) AS same_start,
+       (l.region_id = t.region_id) AS same_region
+  FROM v1_tournaments t JOIN v1_leagues l ON l.id = t.id
+ WHERE t.kind='regular_league'
+   AND (t.scheduled_at IS NOT NULL OR t.region_id IS NOT NULL);
+```
+`LEAGUE_QA_ID`(`ad100000-…0001`) + 티어 리그 2개이고 **값이 리그와 일치**하면 ②-a 다.
+그 밖의 id 가 나오거나 값이 다르면 **②-b 이므로 멈춘다.**
 **②면 승인 요청으로 넘어가지 않는다** — dual-write 목록(`scripts/league-write-site-baseline.json`)이
 불완전하다는 신호이고, 그건 백필보다 먼저 풀어야 한다.
 
@@ -218,4 +252,17 @@ SELECT state, count(*) FROM v1_leagues GROUP BY 1;
 **개수 불변식은 값이 틀린 것을 못 본다.** 88행이 전부 `draft` 로 남아 있어도 개수는 맞다 —
 그게 정확히 BEFORE 상태이므로, **개수만 보면 `--apply` 를 안 돌린 것과 구분되지 않는다.**
 분포 대조가 실제로 먹었는지의 유일한 지표다.
+
+### `--apply` 후 — **배포를 한 번 거친 뒤 분포를 다시 잰다**
+
+QA 시드는 `status` 를 **create 전용**으로 두기로 했다(스태프가 alpha 에서 바꾼 상태를 재배포가
+되돌리면 안 된다 — 리그 축의 `state` 와 같은 이유). **그런데 그건 설계 의도이고, 실제로 그렇게
+도는지는 배포를 한 번 거쳐야만 확인된다.**
+
+```
+--apply 직후        통합 축 draft 35 · in_progress 15 · completed 38
+다음 배포 후 다시    같은 분포여야 한다
+```
+**달라졌다면** 시드의 update 분기가 `status` 를 건드리고 있다는 뜻이고, 그러면 **거울만 시드값으로
+되돌아가고 리그는 스태프 값을 유지해 두 축이 반대 방향으로 갈라진다.** 그 경우 시드부터 고친다.
 

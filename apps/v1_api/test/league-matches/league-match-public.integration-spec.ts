@@ -541,16 +541,27 @@ describe('GET /league-matches (list, R5)', () => {
 
   // 각 테스트가 자기 전용 종목/지역/팀을 만든다 -- 같은 describe 안 다른 테스트가 만든
   // 리그와 뒤섞이면 필터·페이지네이션 단언이 "정확히 이 리그들만"을 보장할 수 없다.
-  async function createLeagueScenario(opts: { title: string; startsOn: string; endsOn: string }) {
+  /**
+   * `sportCode` 기본값이 `futsal` 인 이유: 대진 생성이 종목의 활성 경기 설정을 요구한다
+   * (`resolveTeamMatchCompetitionConfig` — 코드가 futsal/soccer/football 일 때만 `<code>-v1`
+   * 설정을 찾는다). 스코프별로 새 종목을 만들면 **409 COMPETITION_CONFIG_REQUIRED** 로 막힌다.
+   *
+   * **다만 종목이 서로 달라야 하는 테스트가 있다** — 종목 필터는 "다른 종목의 리그가 빠지는가"
+   * 를 보므로 두 시나리오가 같은 종목이면 통과할 수가 없다. 그런 테스트는 `sportCode` 를 넘겨
+   * 종목을 가르되, **대진을 만들지 않으므로** 설정이 없어도 된다.
+   */
+  async function createLeagueScenario(opts: {
+    title: string;
+    startsOn: string;
+    endsOn: string;
+    sportCode?: string;
+  }) {
     const scopeId = randomUUID().slice(0, 8);
-    // 대진 생성은 종목의 활성 경기 설정을 요구한다(`resolveTeamMatchCompetitionConfig` —
-    // 종목 코드가 futsal/soccer/football 일 때만 `<code>-v1` 설정을 찾는다). 스코프별로 새
-    // 종목을 만들면 설정이 없어 **409 COMPETITION_CONFIG_REQUIRED** 로 막힌다.
-    // league-fixture-timing 과 같은 방식으로 공유 futsal 종목을 upsert 한다.
+    const sportCode = opts.sportCode ?? 'futsal';
     const sport = await prisma.v1Sport.upsert({
-      where: { code: 'futsal' },
+      where: { code: sportCode },
       update: {},
-      create: { code: 'futsal', name: '풋살' },
+      create: { code: sportCode, name: sportCode === 'futsal' ? '풋살' : `T5 종목 ${scopeId}` },
     });
     const region = await prisma.v1Region.create({ data: { code: `t5-list-region-${scopeId}`, name: `T5 목록 지역 ${scopeId}`, level: 2 } });
     const teamA = await prisma.v1Team.create({ data: { ownerUserId: listOwnerUserId, sportId: sport.id, regionId: region.id, name: `t5-list-team-a-${scopeId}` } });
@@ -573,7 +584,14 @@ describe('GET /league-matches (list, R5)', () => {
 
   it('sportId/regionId 필터가 다른 종목·지역의 리그를 제외한다', async () => {
     const scenarioA = await createLeagueScenario({ title: `T5 필터 A ${suiteId}`, startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-09-30T00:00:00.000Z' });
-    const scenarioB = await createLeagueScenario({ title: `T5 필터 B ${suiteId}`, startsOn: '2026-09-02T00:00:00.000Z', endsOn: '2026-09-30T00:00:00.000Z' });
+    // B 는 **종목이 달라야 한다** — 아래 첫 단언이 "A 의 종목으로 거르면 B 가 빠진다" 다.
+    // 이 시나리오는 대진을 만들지 않으므로 경기 설정이 없는 종목이어도 된다.
+    const scenarioB = await createLeagueScenario({
+      title: `T5 필터 B ${suiteId}`,
+      startsOn: '2026-09-02T00:00:00.000Z',
+      endsOn: '2026-09-30T00:00:00.000Z',
+      sportCode: `t5-filter-b-${suiteId}`,
+    });
 
     const bySport = await request(app.getHttpServer()).get(`/api/v1/league-matches?sportId=${scenarioA.sportId}`);
     expect(bySport.status).toBe(200);

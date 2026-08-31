@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  How the archive is exported for App Store Connect / TestFlight.
+	  Used by scripts/ios/archive-and-export.sh.
+	-->
+	<key>method</key>
+	<string>app-store-connect</string>
+
+	<!-- Apple Team ID. Public — it appears in App Store metadata. -->
+	<key>teamID</key>
+	<string>U9J95Q6XD3</string>
+
+	<!--
+	  Xcode requests the distribution certificate and provisioning profile from the account
+	  it is signed in to. Manual signing would need the profile name pinned here, which is a
+	  value that changes whenever the profile is regenerated — automatic keeps that out of
+	  the repository.
+	-->
+	<key>signingStyle</key>
+	<string>automatic</string>
+
+	<!-- Symbols let App Store Connect symbolicate crash reports from testers. -->
+	<key>uploadSymbols</key>
+	<true/>
+
+	<!--
+	  Bitcode has been removed from the toolchain; leaving this true makes newer Xcode
+	  versions warn on every export.
+	-->
+	<key>uploadBitcode</key>
+	<false/>
+
+	<!-- Thinning is decided at download time by App Store Connect, not here. -->
+	<key>destination</key>
+	<string>export</string>
+</dict>
+</plist>

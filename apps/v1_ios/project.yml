@@ -42,6 +42,15 @@ targets:
     settings:
       base:
         PRODUCT_NAME: Teameet
+        # Apple Team ID. Public — it appears in App Store metadata, and the association
+        # file for Universal Links names the app as <TEAMID>.<bundle id>. Setting it here
+        # means an archive fails on the missing certificate rather than on "select a team",
+        # which is a more useful message.
+        DEVELOPMENT_TEAM: U9J95Q6XD3
+        # The icon set inside Teameet/Resources/Assets.xcassets. Without this the app ships
+        # with the grey placeholder, which is what it did until now — an asset catalog alone
+        # is not enough, the icon has to be named.
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         # Left off deliberately. INFOPLIST_KEY_<CUSTOM> is a silent no-op for keys Xcode
         # does not already know: -showBuildSettings resolves the setting correctly, but the
         # key never reaches the built Info.plist or Bundle.main.infoDictionary. Measured,
@@ -189,4 +198,4 @@ schemes:
         TEAMEET_UITEST_PASSWORD: $(TEAMEET_UITEST_PASSWORD)
         TEAMEET_UITEST_INQUIRY_ID: $(TEAMEET_UITEST_INQUIRY_ID)
         TEAMEET_UITEST_INQUIRY_TITLE: $(TEAMEET_UITEST_INQUIRY_TITLE)
-        TEAMEET_UITEST_EXPECT_SUBSCRIBED: $(TEAMEET_UITEST_EXPECT_SUBSCRIBED)
+        TEAMEET_UITEST_EXPECT_REFUSAL: $(TEAMEET_UITEST_EXPECT_REFUSAL)

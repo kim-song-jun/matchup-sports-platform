@@ -21,7 +21,7 @@ After bracket publication, each public `groups[].standings[]` row includes nulla
 regular league seasons (`kind = regular_league`, whose id equals the league id). This endpoint serves
 both, but a mirror row has no groups and no tournament fixtures — those are created only on the
 tournament axis — so its standings are computed from the league axis instead. The response envelope is
-identical; three fields differ:
+identical; the fields below differ:
 
 | Field | Regular tournament | Regular league | Why |
 |---|---|---|---|

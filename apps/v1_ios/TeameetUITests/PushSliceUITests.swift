@@ -256,7 +256,7 @@ final class PushSliceUITests: XCTestCase {
         XCTAssertFalse(isPushRowOn, "a freshly installed device should start unsubscribed")
         attachTree("02-push-row")
 
-        tapRow("푸시 알림 받기")
+        XCTAssertTrue(tapRow("푸시 알림 받기"), "no push row available to tap")
 
         // The OS prompt arriving proves `request-notification-permission` reached
         // UNUserNotificationCenter rather than being answered from a cached value.

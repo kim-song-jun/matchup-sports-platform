@@ -222,6 +222,20 @@ final class PushSliceUITests: XCTestCase {
 
         let passwordField = webView.secureTextFields.element(boundBy: 0)
         XCTAssertTrue(passwordField.waitForExistence(timeout: 15), "no password field")
+        // Tab out of the email field rather than tapping the password one. Tapping it does
+        // not move focus here — measured: four attempts over sixteen seconds and
+        // `hasKeyboardFocus` stayed false — while the browser's own next-field behaviour
+        // does, because it is the page moving focus rather than a synthesised hit test.
+        //
+        // `typeKey` rather than `typeText("\t")`: the text form inserts a literal tab into
+        // the email instead of moving focus, and the sign-in then fails much later with
+        // "did not complete" — the corrupted address is invisible from that message.
+        if !hasKeyboardFocus(passwordField) {
+            emailField.typeKey(XCUIKeyboardKey.tab, modifierFlags: [])
+        }
+        // The address must be exactly what was typed. A stray tab here is why an earlier run
+        // reached the submit button and still failed to sign in.
+        XCTAssertEqual(emailField.value as? String, email, "the email field holds something else")
         XCTAssertTrue(focus(passwordField), "the password field never took keyboard focus")
         passwordField.typeText(password)
 

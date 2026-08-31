@@ -38,6 +38,12 @@ export interface LeagueDetailBackfillResult {
   skipped: number;
   /** `kind='regular_league'` 대회 행 수. **리그 수와 같아야 한다** — 불변식의 관측값이다. */
   mirrorCount: number;
+  /**
+   * **고칠 계획인 행 수.** dry-run 에서 `updated` 는 항상 0 이라(쓰지 않으니까) 이 값이
+   * 없으면 **"몇 건이 바뀌는가" 를 알 수 없다** — 승인을 요청할 때 필요한 바로 그 숫자다.
+   * `--apply` 후에는 `updated` 와 같아야 하고, 다르면 위 개수 단언이 이미 던졌다.
+   */
+  planned: number;
   updated: number;
   dryRun: boolean;
 }
@@ -200,6 +206,7 @@ export async function backfillLeagueCompetitionDetails(
   return {
     scanned: leagues.length,
     skipped: skippable.size,
+    planned: toUpdate.length,
     updated,
     mirrorCount,
     dryRun: options.dryRun,

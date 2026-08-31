@@ -417,12 +417,15 @@ awk '/private requireTakeover/,/^  }/' apps/v1_api/src/games/games.service.ts \
 | `league-match-admin` state→active ×2 | 유닛. 변이 2종(dual-write 제거 / `kind` 가드 제거) 각각 1 red |
 | `create` (서비스 경로) + 트랜잭션 롤백 | 통합 스펙 `league-competition-dual-write.integration-spec.ts` |
 
-**아직 안 막힌 것 — 2곳** (2026-08-31 갱신: 되돌리기·승강 다음 시즌을 덮었다)
+**아직 안 막힌 것 — 1곳** (2026-08-31 갱신: 되돌리기·승강 다음 시즌·시리즈 최초 생성을 덮었다)
 
 ```
 league-completion-projection    active→completed
-league-series-admin.service.ts  시리즈 최초 생성
 ```
+
+> **✅ 필수 마감은 닫혔다.** 시리즈 최초 생성(`seedSeason`)은 유닛으로 막혔다 —
+> 변이 둘(dual-write 제거 / 거울을 `tx` 밖으로) 각각 **3/3 red**.
+> 남은 하나는 아래 표의 `선택` 항목이라, **`--apply` 를 미룰 이유는 없다.**
 
 > **승강 다음 시즌은 싸게 닫혔다** — `league-promotion.integration-spec.ts` 가 이미 그 경로를
 > **실제 API 로** 지나가며 다음 시즌 리그를 단언하고 있었다. 거울 단언만 얹으면 됐다.
@@ -435,7 +438,7 @@ league-series-admin.service.ts  시리즈 최초 생성
 
 | 자리 | 안 막혔을 때 무슨 일이 나나 | 마감 | **이 판정이 깨지는 조건** |
 |---|---|---|---|
-| `league-series-admin` 시리즈 최초 생성 | **거울이 아예 없다** → 그 리그가 read-swap 뒤 **화면에서 사라진다** | **필수.** 못 막으면 `--apply` 를 미룬다 | — (행 부재는 어느 단계에서도 침묵 실패다) |
+| ~~`league-series-admin` 시리즈 최초 생성~~ | **거울이 아예 없다** → 그 리그가 read-swap 뒤 **화면에서 사라진다** | ✅ **닫혔다** (변이 3/3 red ×2) | — |
 | `league-completion-projection` | 거울 status 가 `in_progress` 로 남는다 → 끝난 리그가 **진행 중으로 보인다** | **선택.** 못 막으면 **승인 요청에 이름과 실패 모습을 그대로 적고** 진행한다 | ⚠️ **시상·결산 경로를 통합 축으로 옮기는 순간 `필수` 로 승격**한다 — 아래 |
 
 **가르는 축은 "행이 없는가" vs "값이 틀린가"다.** 행이 없으면 화면에서 사라지고 운영자는
@@ -537,12 +540,12 @@ apps/v1_web/src/app/league-matches/[leagueId]/awards/page.tsx   ← 시상 화�
 
 **개수와 케이스 이름을 적는다.** "red 를 봤다" 로 끝내지 않는다.
 
-### 닫혔는지 확인하는 법 — **red 를 2개 세라**
+### 닫혔는지 확인하는 법 — **red 를 1개 세라**
 
 각 자리의 dual-write 한 줄을 지우고 통합 스위트를 돌린다.
-**red 가 정확히 2개**여야 하고, **각각 어느 자리인지 이름을 댈 수 있어야 한다.**
+**red 가 정확히 1개**여야 하고, **각각 어느 자리인지 이름을 댈 수 있어야 한다.**
 
-> **1개면 하나는 안 막힌 것이다.** 어느 것인지 모른 채 넘어가면 안 막힌 자리가 "통과"로
+> **0개면 안 막힌 것이다.** 어느 것인지 모른 채 넘어가면 안 막힌 자리가 "통과"로
 > 기록된다 — 이 저장소에서 red 개수를 세지 않아 vacuous 테스트를 올린 전례가 있다.
 
 ### 통합 스펙이 **어느 스텝에서 도는지** — 이름이 오해를 부른다

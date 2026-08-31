@@ -1,0 +1,241 @@
+{
+  "servingSha": "4811d1f6ab83b03a820977d1af63cc9a813681ec",
+  "out": ".screenshots/competition-card/after",
+  "pages": {
+    "league-matches": {
+      "mobile": {
+        "status": 200,
+        "landed": "/league-matches",
+        "cardCount": 20,
+        "firstCardLabel": "(테스트) 연결복구 검증 1350 상세로 이동",
+        "firstCardBadges": [
+          {
+            "text": "진행 중",
+            "height": 18,
+            "sm": true
+          }
+        ],
+        "multiBadgeCard": [
+          {
+            "text": "준비 중",
+            "height": 18,
+            "sm": true
+          },
+          {
+            "text": "2부",
+            "height": 18,
+            "sm": true
+          }
+        ],
+        "multiBadgeHeightsEqual": true,
+        "thumbnail56": {
+          "w": 56,
+          "h": 56
+        },
+        "sportChip": true
+      },
+      "tablet": {
+        "status": 200,
+        "landed": "/league-matches",
+        "cardCount": 20,
+        "firstCardLabel": "(테스트) 연결복구 검증 1350 상세로 이동",
+        "firstCardBadges": [
+          {
+            "text": "진행 중",
+            "height": 18,
+            "sm": true
+          }
+        ],
+        "multiBadgeCard": [
+          {
+            "text": "준비 중",
+            "height": 18,
+            "sm": true
+          },
+          {
+            "text": "2부",
+            "height": 18,
+            "sm": true
+          }
+        ],
+        "multiBadgeHeightsEqual": true,
+        "thumbnail56": {
+          "w": 56,
+          "h": 56
+        },
+        "sportChip": true
+      },
+      "desktop": {
+        "status": 200,
+        "landed": "/league-matches",
+        "cardCount": 20,
+        "firstCardLabel": "(테스트) 연결복구 검증 1350 상세로 이동",
+        "firstCardBadges": [
+          {
+            "text": "진행 중",
+            "height": 18,
+            "sm": true
+          }
+        ],
+        "multiBadgeCard": [
+          {
+            "text": "준비 중",
+            "height": 18,
+            "sm": true
+          },
+          {
+            "text": "2부",
+            "height": 18,
+            "sm": true
+          }
+        ],
+        "multiBadgeHeightsEqual": true,
+        "thumbnail56": {
+          "w": 56,
+          "h": 56
+        },
+        "sportChip": true
+      }
+    },
+    "tournaments": {
+      "mobile": {
+        "status": 200,
+        "landed": "/tournaments",
+        "cardCount": 20,
+        "firstCardLabel": "(목업) 0818-0818 라인업 제출됨 리그 4팀 — 풋살 — 진행 중",
+        "firstCardBadges": [
+          {
+            "text": "진행 중",
+            "height": 24,
+            "sm": false
+          },
+          {
+            "text": "성별 구분 없음",
+            "height": 24,
+            "sm": false
+          },
+          {
+            "text": "마감",
+            "height": 24,
+            "sm": false
+          }
+        ],
+        "multiBadgeCard": [
+          {
+            "text": "진행 중",
+            "height": 24,
+            "sm": false
+          },
+          {
+            "text": "성별 구분 없음",
+            "height": 24,
+            "sm": false
+          },
+          {
+            "text": "마감",
+            "height": 24,
+            "sm": false
+          }
+        ],
+        "multiBadgeHeightsEqual": true,
+        "thumbnail56": {
+          "w": 56,
+          "h": 56
+        },
+        "sportChip": true
+      },
+      "tablet": {
+        "status": 200,
+        "landed": "/tournaments",
+        "cardCount": 20,
+        "firstCardLabel": "(목업) 0818-0818 라인업 제출됨 리그 4팀 — 풋살 — 진행 중",
+        "firstCardBadges": [
+          {
+            "text": "진행 중",
+            "height": 24,
+            "sm": false
+          },
+          {
+            "text": "성별 구분 없음",
+            "height": 24,
+            "sm": false
+          },
+          {
+            "text": "마감",
+            "height": 24,
+            "sm": false
+          }
+        ],
+        "multiBadgeCard": [
+          {
+            "text": "진행 중",
+            "height": 24,
+            "sm": false
+          },
+          {
+            "text": "성별 구분 없음",
+            "height": 24,
+            "sm": false
+          },
+          {
+            "text": "마감",
+            "height": 24,
+            "sm": false
+          }
+        ],
+        "multiBadgeHeightsEqual": true,
+        "thumbnail56": {
+          "w": 56,
+          "h": 56
+        },
+        "sportChip": true
+      },
+      "desktop": {
+        "status": 200,
+        "landed": "/tournaments",
+        "cardCount": 20,
+        "firstCardLabel": "(목업) 0818-0818 라인업 제출됨 리그 4팀 — 풋살 — 진행 중",
+        "firstCardBadges": [
+          {
+            "text": "진행 중",
+            "height": 24,
+            "sm": false
+          },
+          {
+            "text": "성별 구분 없음",
+            "height": 24,
+            "sm": false
+          },
+          {
+            "text": "마감",
+            "height": 24,
+            "sm": false
+          }
+        ],
+        "multiBadgeCard": [
+          {
+            "text": "진행 중",
+            "height": 24,
+            "sm": false
+          },
+          {
+            "text": "성별 구분 없음",
+            "height": 24,
+            "sm": false
+          },
+          {
+            "text": "마감",
+            "height": 24,
+            "sm": false
+          }
+        ],
+        "multiBadgeHeightsEqual": true,
+        "thumbnail56": {
+          "w": 56,
+          "h": 56
+        },
+        "sportChip": true
+      }
+    }
+  }
+}

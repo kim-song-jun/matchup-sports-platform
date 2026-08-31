@@ -10,6 +10,7 @@ import { getGaMeasurementId } from '@/lib/analytics';
 import { GlobalPopup } from '@/components/popups/global-popup';
 import { NotificationSocketBridge } from '@/components/providers/notification-socket-bridge';
 import { ThemeProvider } from '@/components/providers/theme-provider';
+import { KeyboardViewportBridge } from '@/components/providers/keyboard-viewport-bridge';
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
@@ -31,6 +32,7 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
+        <KeyboardViewportBridge />
         <ClientErrorListener />
         <NotificationSocketBridge />
         {getGaMeasurementId() && (

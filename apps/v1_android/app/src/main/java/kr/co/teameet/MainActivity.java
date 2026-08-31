@@ -3,25 +3,37 @@ package kr.co.teameet;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.DownloadManager;
+import android.content.ActivityNotFoundException;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.webkit.CookieManager;
+import android.webkit.GeolocationPermissions;
 import android.webkit.URLUtil;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
+import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.view.Gravity;
+import android.view.View;
+import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
@@ -37,11 +49,17 @@ import org.json.JSONObject;
 public final class MainActivity extends AppCompatActivity {
     private FrameLayout rootView;
     private WebView webView;
+    private View webErrorView;
     private ValueCallback<Uri[]> pendingFileChooser;
     private ActivityResultLauncher<Intent> fileChooserLauncher;
     private ActivityResultLauncher<String> notificationPermissionLauncher;
+    private ActivityResultLauncher<String> locationPermissionLauncher;
+    private GeolocationPermissions.Callback pendingLocationCallback;
+    private String pendingLocationOrigin;
     private String pendingPushRequestId;
     private int bottomSystemInsetCssPixels;
+    private int keyboardInsetCssPixels;
+    private boolean keyboardVisible;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -64,6 +82,9 @@ public final class MainActivity extends AppCompatActivity {
                 }
                 registerPushAndReport(requestId);
             });
+        locationPermissionLauncher = registerForActivityResult(
+            new ActivityResultContracts.RequestPermission(),
+            this::completeLocationPermissionRequest);
         configureWebView();
         configureRootView();
         setContentView(rootView);
@@ -87,13 +108,19 @@ public final class MainActivity extends AppCompatActivity {
             Insets insets = windowInsets.getInsets(
                 WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout()
             );
+            Insets imeInsets = windowInsets.getInsets(WindowInsetsCompat.Type.ime());
+            keyboardVisible = windowInsets.isVisible(WindowInsetsCompat.Type.ime());
             // Keep the WebView edge-to-edge at the bottom so fixed web chrome can paint behind the
             // navigation bar. Only its interactive content consumes the bottom inset via the CSS
             // variable below; padding the native root on all four sides makes the whole web viewport
             // float above three-button navigation.
-            view.setPadding(insets.left, insets.top, insets.right, 0);
+            // Edge-to-edge WebViews do not consistently shrink their CSS viewport for the IME even
+            // with adjustResize. Shrink the native content box only while the keyboard is visible;
+            // normal web/browser layout and the edge-to-edge navigation surface stay unchanged.
+            view.setPadding(insets.left, insets.top, insets.right, keyboardVisible ? imeInsets.bottom : 0);
             float density = getResources().getDisplayMetrics().density;
             bottomSystemInsetCssPixels = Math.round(insets.bottom / density);
+            keyboardInsetCssPixels = keyboardVisible ? Math.round(imeInsets.bottom / density) : 0;
             publishSystemInsets();
             return windowInsets;
         });
@@ -106,6 +133,51 @@ public final class MainActivity extends AppCompatActivity {
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.MATCH_PARENT
         ));
+        webErrorView = createWebErrorView();
+        rootView.addView(webErrorView, new FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
+        ));
+    }
+
+    private View createWebErrorView() {
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setGravity(Gravity.CENTER);
+        container.setBackgroundColor(Color.WHITE);
+        int padding = Math.round(32 * getResources().getDisplayMetrics().density);
+        container.setPadding(padding, padding, padding, padding);
+        container.setVisibility(View.GONE);
+
+        TextView title = new TextView(this);
+        title.setText(R.string.web_error_title);
+        title.setTextColor(Color.rgb(17, 24, 39));
+        title.setTextSize(22);
+        title.setGravity(Gravity.CENTER);
+        container.addView(title);
+
+        TextView description = new TextView(this);
+        description.setText(R.string.web_error_description);
+        description.setTextColor(Color.rgb(75, 85, 99));
+        description.setTextSize(15);
+        description.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams descriptionParams = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        descriptionParams.topMargin = Math.round(12 * getResources().getDisplayMetrics().density);
+        container.addView(description, descriptionParams);
+
+        Button retry = new Button(this);
+        retry.setText(R.string.web_error_retry);
+        retry.setOnClickListener(view -> webView.reload());
+        LinearLayout.LayoutParams retryParams = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        retryParams.topMargin = Math.round(20 * getResources().getDisplayMetrics().density);
+        container.addView(retry, retryParams);
+        return container;
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -135,6 +207,10 @@ public final class MainActivity extends AppCompatActivity {
                 });
         }
         webView.setWebViewClient(new WebViewClient() {
+            @Override public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                super.onPageStarted(view, url, favicon);
+                hideWebError();
+            }
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri target = request.getUrl();
                 if (AllowedNavigation.isInternal(target)) return false;
@@ -154,6 +230,18 @@ public final class MainActivity extends AppCompatActivity {
                     }
                 }
             }
+            @Override public void onReceivedError(
+                WebView view, WebResourceRequest request, WebResourceError error
+            ) {
+                super.onReceivedError(view, request, error);
+                if (request.isForMainFrame()) showWebError();
+            }
+            @Override public void onReceivedHttpError(
+                WebView view, WebResourceRequest request, WebResourceResponse response
+            ) {
+                super.onReceivedHttpError(view, request, response);
+                if (request.isForMainFrame() && response.getStatusCode() >= 400) showWebError();
+            }
         });
         webView.setWebChromeClient(new WebChromeClient() {
             @Override public boolean onShowFileChooser(
@@ -161,11 +249,59 @@ public final class MainActivity extends AppCompatActivity {
             ) {
                 if (pendingFileChooser != null) pendingFileChooser.onReceiveValue(null);
                 pendingFileChooser = callback;
-                fileChooserLauncher.launch(params.createIntent());
+                try {
+                    fileChooserLauncher.launch(params.createIntent());
+                } catch (Exception ignored) {
+                    pendingFileChooser.onReceiveValue(null);
+                    pendingFileChooser = null;
+                    Toast.makeText(MainActivity.this, R.string.file_chooser_failed, Toast.LENGTH_LONG).show();
+                }
                 return true;
+            }
+            @Override public void onGeolocationPermissionsShowPrompt(
+                String origin, GeolocationPermissions.Callback callback
+            ) {
+                requestLocationPermission(origin, callback);
+            }
+            @Override public void onGeolocationPermissionsHidePrompt() {
+                completeLocationPermissionRequest(false);
             }
         });
         webView.setDownloadListener(this::enqueueInternalDownload);
+    }
+
+    private void hideWebError() {
+        if (webErrorView != null) webErrorView.setVisibility(View.GONE);
+    }
+
+    private void showWebError() {
+        if (webErrorView != null) webErrorView.setVisibility(View.VISIBLE);
+    }
+
+    private void requestLocationPermission(
+        String origin, GeolocationPermissions.Callback callback
+    ) {
+        if (!AllowedNavigation.isInternalOrigin(origin)) {
+            callback.invoke(origin, false, false);
+            return;
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
+            == PackageManager.PERMISSION_GRANTED) {
+            callback.invoke(origin, true, false);
+            return;
+        }
+        completeLocationPermissionRequest(false);
+        pendingLocationOrigin = origin;
+        pendingLocationCallback = callback;
+        locationPermissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION);
+    }
+
+    private void completeLocationPermissionRequest(boolean granted) {
+        GeolocationPermissions.Callback callback = pendingLocationCallback;
+        String origin = pendingLocationOrigin;
+        pendingLocationCallback = null;
+        pendingLocationOrigin = null;
+        if (callback != null) callback.invoke(origin, granted, false);
     }
 
     private void publishSystemInsets() {
@@ -175,6 +311,14 @@ public final class MainActivity extends AppCompatActivity {
                 + bottomSystemInsetCssPixels
                 + "px');document.documentElement.style.setProperty('--v1-shell-safe-bottom','"
                 + bottomSystemInsetCssPixels + "px')",
+            null
+        );
+        webView.evaluateJavascript(
+            "document.documentElement.style.setProperty(\"--teameet-native-keyboard-inset\",\""
+                + keyboardInsetCssPixels
+                + "px\");document.documentElement.dataset.teameetNativeKeyboard=\""
+                + (keyboardVisible ? "open" : "closed")
+                + "\"",
             null
         );
     }
@@ -225,9 +369,26 @@ public final class MainActivity extends AppCompatActivity {
             external.addCategory(Intent.CATEGORY_BROWSABLE);
             external.setComponent(null);
             external.setSelector(null);
-            if (external.resolveActivity(getPackageManager()) != null) startActivity(external);
+            try {
+                startActivity(external);
+                return;
+            } catch (ActivityNotFoundException ignored) {
+                // The reviewed Play fallback below is the only recovery path for missing map apps.
+            }
+            String fallbackUrl = AllowedNavigation.externalAppStoreFallback(target);
+            if (fallbackUrl != null) {
+                Intent fallback = new Intent(Intent.ACTION_VIEW, Uri.parse(fallbackUrl));
+                fallback.addCategory(Intent.CATEGORY_BROWSABLE);
+                try {
+                    startActivity(fallback);
+                    return;
+                } catch (ActivityNotFoundException ignored) {
+                    // Surface the same honest unavailable state when no browser or Play Store can open it.
+                }
+            }
+            Toast.makeText(this, R.string.external_app_unavailable, Toast.LENGTH_LONG).show();
         } catch (Exception ignored) {
-            // Unsupported or malformed external links stay closed instead of crashing the shell.
+            Toast.makeText(this, R.string.external_app_unavailable, Toast.LENGTH_LONG).show();
         }
     }
 
@@ -397,6 +558,11 @@ public final class MainActivity extends AppCompatActivity {
     }
 
     @Override protected void onDestroy() {
+        completeLocationPermissionRequest(false);
+        if (pendingFileChooser != null) {
+            pendingFileChooser.onReceiveValue(null);
+            pendingFileChooser = null;
+        }
         if (webView != null) {
             webView.stopLoading();
             webView.destroy();

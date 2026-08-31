@@ -31,6 +31,8 @@ Configure these public identifiers in the protected `production` environment:
 - `ANDROID_PRODUCTION_FIREBASE_APP_ID`
 - `ANDROID_PRODUCTION_FIREBASE_API_KEY`
 - `ANDROID_PRODUCTION_FIREBASE_SENDER_ID`
+- `ANDROID_APP_LINKS_SHA256_CERT_FINGERPRINTS` (Play app-signing SHA-256; comma-separated
+  when Play provides more than one active certificate)
 
 Configure these secrets in the same environment:
 
@@ -64,8 +66,10 @@ removes it in an `always()` cleanup step. Gradle also refuses `bundleProductionR
 Before the first Play test release:
 
 1. Obtain the Play app-signing SHA-256 certificate fingerprint.
-2. Publish `https://teameet.co.kr/.well-known/assetlinks.json` for package `kr.co.teameet` and that
-   fingerprint. Do not use the CI debug or upload-key fingerprint unless it is also the Play signing key.
+2. Set the protected production variable `ANDROID_APP_LINKS_SHA256_CERT_FINGERPRINTS`. The v1 Web
+   route publishes `https://teameet.co.kr/.well-known/assetlinks.json` for `kr.co.teameet`; it returns
+   `503` rather than publishing a placeholder while the fingerprint is missing. Do not use the CI debug
+   or upload-key fingerprint unless it is also the Play signing key.
 3. Validate the production domain response, content type, package name, and fingerprint.
 4. Select and export the approved adaptive launcher icon, 512 px Play icon, feature graphic, screenshots,
    and splash treatment from the versioned Teameet design references.

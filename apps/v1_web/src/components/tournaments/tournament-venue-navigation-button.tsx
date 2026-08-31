@@ -85,10 +85,12 @@ export function TournamentVenueNavigationButton({
           aria-label="내비게이션 앱 선택"
           style={{
             position: 'absolute',
-            top: '100%',
+            bottom: 'calc(100% + 8px)',
             left: 0,
-            marginTop: 8,
             minWidth: 260,
+            maxHeight: 'min(260px, calc(100dvh - 32px - var(--v1-shell-safe-bottom)))',
+            overflowY: 'auto',
+            overscrollBehavior: 'contain',
             background: 'var(--surface, #fff)',
             border: '1px solid var(--border)',
             borderRadius: 'var(--radius-control)',

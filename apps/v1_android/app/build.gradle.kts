@@ -93,10 +93,11 @@ android {
 dependencies {
     implementation(platform("com.google.firebase:firebase-bom:34.18.0"))
     implementation("com.google.firebase:firebase-messaging")
-    implementation("androidx.activity:activity:1.12.1")
-    implementation("androidx.appcompat:appcompat:1.7.1")
+    implementation("androidx.activity:activity:1.13.0")
+    implementation("androidx.appcompat:appcompat:1.8.0")
+    // 1.19.0 requires compileSdk 37 / AGP 9.1; Play target 36 remains the stable release baseline.
     implementation("androidx.core:core:1.17.0")
-    implementation("androidx.webkit:webkit:1.15.0")
+    implementation("androidx.webkit:webkit:1.17.0")
     testImplementation("junit:junit:4.13.2")
 }
 

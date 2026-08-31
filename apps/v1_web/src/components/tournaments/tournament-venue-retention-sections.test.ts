@@ -180,6 +180,12 @@ describe('TournamentVenuePrepSection — rendered venue info (regression guard f
 
     fireEvent.click(screen.getByRole('button', { name: /내비게이션 앱으로 길찾기/ }));
 
+    const navigationMenu = screen.getByRole('menu');
+    expect(navigationMenu).toHaveStyle({
+      bottom: 'calc(100% + 8px)',
+      overflowY: 'auto',
+      overscrollBehavior: 'contain',
+    });
     expect(screen.getByRole('menuitem', { name: '카카오맵' })).toHaveAttribute('href', 'kakaomap://route?ep=37.5,127.07&by=CAR');
     expect(screen.getByRole('menuitem', { name: '네이버지도' })).toHaveAttribute(
       'href',

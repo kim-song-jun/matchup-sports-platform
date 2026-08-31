@@ -191,6 +191,26 @@ Required responsibilities:
 - [x] Phase 4 Alpha debug APK CI scaffold 및 환경 분리 문서
 - [ ] Phase 5 real-device QA/operations
 
+### Play release-prep implementation snapshot (2026-08-31)
+
+- [x] WebView launcher re-entry/history preservation, IME bridge, bottom safe-area contract, main-frame
+  error/retry screen, and file-picker failure handling implemented.
+- [x] Android GPS is limited to `ACCESS_COARSE_LOCATION`, requested only by the web user action, denied
+  for every origin except the exact flavor origin, and never persisted by the WebView grant.
+- [x] FCM consent/register/revoke/deep-link code retained; production diagnostics remain disabled and
+  privacy-bounded. Full delivery verdict remains a real-device gate.
+- [x] Verified App Links endpoint fails closed until the protected Play signing SHA-256 is configured;
+  production deploy sync and compose runtime wiring are implemented.
+- [x] Kakao Map, Naver Map, and TMAP installed/missing flows have an allowlist and official Play fallback;
+  file upload uses the system picker and authenticated same-origin downloads use DownloadManager.
+- [x] Public account deletion route and managed privacy-policy v1.2 additive migration cover Android
+  WebView, FCM, coarse location/Open-Meteo, selected files, retention, and deletion.
+- [x] Adaptive launcher resources, Android 12 splash, 512px Play icon, opaque 1024x500 feature graphic,
+  Korean listing copy, release notes, data-safety worksheet, and reviewer instructions are versioned.
+- [x] Production AAB signing/Firebase/main-ref fail-closed workflow and release runbook are present.
+- [ ] External gate: Play account/app creation, Play App Signing fingerprint, protected production inputs,
+  signed AAB workflow run, Play upload, screenshots, pre-launch report, and full physical-device matrix.
+
 ## Validation Evidence (2026-08-28)
 
 - Backend targeted Jest: 5 suites, 51 tests passed (`push-device` DTO/service/controller, FCM delivery, notification fan-out).
@@ -454,6 +474,79 @@ Samsung device. This is not the complete Phase 5 matrix, so the Phase 5 checkbox
   launcher re-entry now preserves the current WebView, explicit FCM/App Link intents still navigate,
   and WebView URL/history is saved and restored across Activity/process recreation. Background/resume,
   process-recreation, explicit deep-link, and logout-boundary device verdicts remain pending.
+- Follow-up Android route QA found that the tournament venue menu emitted reviewed Kakao Map, Naver Map,
+  and TMAP deep-link schemes that the native shell still rejected. The shell now allowlists only those
+  three explicit navigation schemes. The venue chooser opens above its trigger with a viewport-bounded
+  internal scroll area, preventing the scroll container or Android bottom safe area from clipping its
+  final actions. Real-device app-installed/app-missing fallback and landscape verdicts remain pending.
 - Alpha FCM diagnostics now emit privacy-bounded `TeameetFCM` lifecycle events for token registration,
   message receipt, consent suppression, and Android notification posting. Tokens, content, routes, and
   user identifiers remain excluded, while the production flavor compiles the diagnostic gate off.
+- Keyboard/IME follow-up inventoried all v1 text-entry surfaces: 94 TSX files total (36 route files and
+  58 shared component files). A root `visualViewport` bridge now gives app/auth frames the actually
+  visible height, keeps the focused field in view, hides bottom chrome only while the IME is open, and
+  bounds scrollable modal content. Android also consumes `Type.ime()` insets and publishes a native
+  keyboard state; ordinary browser layout retains the existing `100dvh` fallback and styling.
+- Focused validation passed: keyboard/CSS tests 8/8, representative auth tests 24/24, and v1 Web
+  TypeScript `--noEmit`. Headed Chrome at 390x844 retained an 844px auth frame normally; a simulated
+  480px keyboard viewport produced `tm-keyboard-open`, a 480px frame, and kept the focused input at
+  y=312..362. Screenshots are in `output/playwright/keyboard-viewport/`. The only console error was the
+  expected local `/api/v1/health` proxy failure because backend port 8121 was not running. Real Android
+  IME verification across login/signup/create/edit/search/chat/modal and portrait/landscape remains a
+  physical-device gate; local Android compilation is still unavailable on this workstation.
+
+## Local SDK / Emulator Release Audit (2026-08-31)
+
+This audit supersedes the earlier statement that local Android compilation was unavailable. The official
+Android SDK command-line tools, API 33/API 36 system images, and CI-matching Gradle 9.1.0 were installed
+locally without committing machine paths or generated artifacts.
+
+- Android build gate: `testAlphaDebugUnitTest`, `testProductionDebugUnitTest`, `assembleAlphaDebug`, and
+  `bundleAlphaRelease` completed successfully (115 tasks). The Alpha debug APK is 5,334,383 bytes and the
+  Alpha release AAB is 1,974,355 bytes. This Alpha AAB is not a production submission artifact.
+- Final hardening rerun passed both unit variants, Alpha lint, and Alpha/Production debug APK assembly.
+  Lint fell from 22 to 13 non-fatal warnings after removing package-visibility, backup-policy, obsolete
+  channel guard, unused-vector, and monochrome-icon findings. The remaining warnings are the intentionally
+  pinned API-36-compatible Core version, a redundant min-SDK qualifier, and five raster round-icon
+  shape/duplicate pairs pending final physical-mask artwork acceptance.
+- APK inspection: application ID `kr.co.teameet.alpha`, min SDK 26, target SDK 36. Requested runtime
+  permissions are coarse location and notifications; Firebase contributes network state, wake lock, and
+  C2DM receive permissions. No SMS, call log, contacts, precise location, camera, microphone, broad storage,
+  or package-query permission is present.
+- AndroidX DataStore contributes `libdatastore_shared_counter.so` for arm64-v8a, armeabi-v7a, x86, and
+  x86_64. Build-tools 36 `zipalign -c -P 16 -v 4` passed every ABI, so the transitive native library is
+  16 KB ZIP-aligned. The earlier “Java-only/no native library” assumption is superseded.
+- API 36 Pixel 8 emulator, 1080x2400: portrait home, landscape home, login App Link, email-login form,
+  and live IME were captured. Status-bar and gesture-navigation insets did not overlap web chrome. With
+  the IME shown, `mInputShown=true`; the WebView resized and retained the login action above the keyboard.
+- API 36 Pixel Tablet emulator, 2560x1600 and 1600x2560: both orientations rendered without horizontal
+  overflow or system-bar overlap. Android 16's large-screen orientation/resizability policy therefore has
+  representative emulator evidence, but foldable, freeform/multi-window, and OEM physical-device evidence
+  remain open.
+- API 33 Pixel 7 emulator, 1080x2400: fresh launch rendered without top/bottom clipping. Notification
+  permission began denied and no unsolicited permission dialog appeared. The `teameet_general` channel
+  existed at high importance; an ADB grant changed `POST_NOTIFICATIONS` to granted.
+- App Link intent delivery to `MainActivity` passed when the Alpha package was explicit. Automatic domain
+  verification did not pass: package-manager state listed `alpha.teameet.co.kr` as `Disabled`, consistent
+  with the deployed Alpha `assetlinks.json` returning 404 and the debug certificate not being published.
+- Android 11+ package visibility no longer causes an installed reviewed map app to appear missing:
+  external intents are launched directly and only `ActivityNotFoundException` enters the exact Play URL
+  fallback. No `QUERY_ALL_PACKAGES` or expanded package query was added.
+- Android 12+ cloud backup and device transfer now explicitly exclude all application storage domains,
+  matching `allowBackup=false`; Android 13+ adaptive icons include a monochrome layer.
+- Live deployment probe: production privacy policy returned 200, while production and Alpha
+  `/.well-known/assetlinks.json` and `/account-deletion` returned 404. The source routes are implemented,
+  but Play review URLs must not be declared ready before the v1 Web change is deployed and re-probed.
+- Readiness negative controls behaved correctly. Alpha and production Firebase client properties are
+  absent locally, and production keystore path/password/alias inputs are absent; their three Gradle gates
+  failed with names only and did not expose values. Consequently, real FCM foreground/background/terminated
+  delivery and a signed production AAB remain external-state blockers.
+- Raw captures and the local verdict are under `output/task156/android-emulator/`; they are not promoted to
+  Play listing assets because they show the currently deployed Alpha shell, use 20:9 device framing, and
+  do not prove the final signed production build.
+
+Phase 5 remains unchecked. Emulator coverage closes the stock Android API 33/API 36 UI, rotation, IME,
+permission-default, channel-creation, and explicit deep-link portions only. Samsung three-button evidence
+above remains valid for its recorded build. Final closure still requires deployed App Links/deletion URLs,
+configured Firebase, Play signing, a Play-distributed build, real FCM receipt/tap matrices, Play pre-launch
+report, upgrade preservation, and the remaining OEM/foldable/multi-window matrix.

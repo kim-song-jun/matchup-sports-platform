@@ -1,0 +1,7 @@
+{
+  "_comment": "`ALL_COMPETITION_KINDS` 를 넘겨 **리그를 대회 표면에 허용하는** 자리. 원시 호출을 0 으로 만든 뒤 남는 유일한 구멍이라, 정당하더라도 언제나 리뷰를 거치게 개수를 묶는다. 늘리려면 why 를 함께 적어라.",
+  "src/tournaments/competition-config/competition-config-version-repoint.ts": {
+    "allowed": 1,
+    "why": "설정 축 — 설정은 대회와 리그가 이미 공유하므로 여기서 종류를 가르면 리그만 옛 설정에 남거나 설정 없는 상태로 방치된다(tournament-surface.ts 의 '여기 걸지 않는 곳' 참조)."
+  }
+}

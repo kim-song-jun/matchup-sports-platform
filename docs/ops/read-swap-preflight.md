@@ -43,3 +43,31 @@ read-swap 을 붙인 뒤, 리그 경기로 각각을 실제로 통과시켜 본�
 # 던지지 않는 헬퍼 호출 찾기 (16줄 안에 throw 가 없는 것)
 grep -rl findTournamentOnSurface apps/v1_api/src --include='*.ts'
 ```
+
+---
+
+## 되돌리기 창 — **read-swap 이 그것을 영구히 닫는다**
+
+백필로 만든 `kind='regular_league'` 88행은 지금은 지울 수 있다. 그 창을 닫는 것은
+`onDelete: Restrict` 로 대회를 참조하는 **세 관계**다
+(`docs/ops/league-competition-backfill-apply.md` 참조). 그 **쓰기 위치**를 전수 확인했다:
+
+| 관계 | 쓰는 곳 | 리그 행에 붙는 조건 |
+|---|---|---|
+| `V1TournamentStaffAssignment` | `tournaments/staff/tournament-staff.service.ts` | 운영자가 리그 id 에 스태프 배정 — **P3 가 막았고 테스트로 고정** |
+| `V1OperationAudit` | `tournament-operations/fields/…-fields.service.ts` 외 공용 라이터 | 필드 운영 감사 로그 — **P3 가 막았고 테스트로 고정** |
+| `V1GameOfficialResultCache` | `game-operations/game-result-public-cache.service.ts` (**raw SQL**) | **read-swap 이 리그 경기를 이 경로로 보내는 순간** |
+
+> **세 번째가 read-swap 의 부작용이다.** 이 서비스는 Prisma 접근자가 아니라
+> `INSERT INTO v1_game_official_result_cache … tournament_id` 로 **raw SQL** 을 쓴다 —
+> 그래서 `v1Tournament` 를 세는 게이트에도, `v1_tournaments` 를 세는 raw SQL 게이트에도
+> **걸리지 않는다.** (Prisma 접근자로 찾으면 0건이 나온다. 실제로 그렇게 놓칠 뻔했다.)
+
+**결과**: read-swap 이 붙고 **리그 경기 결과가 한 건이라도 공식 확정되면, 백필 88행은
+더 이상 지울 수 없다.** 그 뒤로는 되돌리는 것이 아니라 고치는 것만 가능하다.
+
+**그래서 read-swap 착수 전에 결정해야 한다:**
+- 되돌릴 필요가 없다고 판단했는가? (그 판단을 어딘가에 남겼는가)
+- 아니면 read-swap 을 **단계로 나눠** 결과 확정 경로를 마지막에 붙일 것인가
+
+이 결정은 코드가 아니라 **사람이 해야 한다** — 창이 닫히는 것은 되돌릴 수 없다.

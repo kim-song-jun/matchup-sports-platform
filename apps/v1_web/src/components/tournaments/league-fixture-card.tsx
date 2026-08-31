@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { fixtureResultLabel, fixtureStatusMeta } from '@/lib/league-fixture-meta';
 import { formatTournamentDateMedium, formatKstTime } from '@/lib/date-utils';
 import type { V1LeagueFixture } from '@/types/league-match';
@@ -94,7 +95,7 @@ export function LeagueFixtureCard({
           </div>
         )
       }
-      caption={<LeagueFixtureCaption fixture={fixture} result={result} />}
+      caption={leagueFixtureCaption(fixture, result)}
     />
   );
 }
@@ -106,13 +107,16 @@ export function LeagueFixtureCard({
  * 공개하지 않는 것이 계약이다), 없는 값을 지어내는 대신 리그 일정 목록이 이미 쓰는
  * "(관례 스코어)" 문구를 그대로 쓴다.
  */
-function LeagueFixtureCaption({
-  fixture,
-  result,
-}: {
-  fixture: V1LeagueFixture;
-  result: ReturnType<typeof fixtureResultLabel>;
-}) {
+/**
+ * ⚠️ **컴포넌트가 아니라 함수다.** `<LeagueFixtureCaption/>` 으로 넘기면 그 컴포넌트가
+ * `undefined` 를 반환해도 **element 자체는 truthy** 라 껍데기의 `caption ? … : null` 이
+ * 통과하고, 내용 없는 캡션 줄(`marginTop: 12` 를 가진 빈 div)이 그려진다. 값을 만들어
+ * 넘겨야 껍데기가 "캡션 없음" 을 실제로 알 수 있다.
+ */
+function leagueFixtureCaption(
+  fixture: V1LeagueFixture,
+  result: ReturnType<typeof fixtureResultLabel>,
+): ReactNode | undefined {
   // 점수가 없을 때의 결과 문구('결과 대기'·'집계 제외')는 가운데 칸이 'vs' 를 그리느라
   // 자리를 못 잡는다 — 여기서 싣는다. '예정' 은 뱃지·날짜와 겹치므로 뺀다.
   const note = !result.hasScore && result.text !== '예정' ? result.text : null;

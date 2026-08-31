@@ -6,7 +6,7 @@ import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { FormattedText } from '@/components/v1-ui/formatted-text';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
-import { Trophy, Goal, ChevronLeft, ChevronRight, MapPin } from 'lucide-react';
+import { Trophy, Goal, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useV1Tournament, useV1MyRegistrations } from '@/hooks/use-v1-api';
 import { v1Get } from '@/lib/api-client';
 import {

@@ -3621,11 +3621,7 @@ export interface V1GenerateLeagueFixturesResponse {
  *
  * 행 key 는 `registrationId ?? teamId` 로 잡는다 — 둘 중 하나는 항상 있다.
  */
-export interface V1LeagueOverallStandingRow {
-  /** 정규 대회에만 있다. 리그 응답에는 없다. */
-  registrationId?: string;
-  /** 정규 리그에만 있다. 대회 응답에는 없다. */
-  teamId?: string;
+interface V1LeagueOverallStandingRowBase {
   teamName: string;
   position: number | null;
   points: number;
@@ -3637,6 +3633,28 @@ export interface V1LeagueOverallStandingRow {
   /** 정규 대회에만 있다 — 리그는 페어플레이 점수를 집계하지 않는다. */
   fairPlayPoints?: number;
 }
+
+/**
+ * **유니온으로 둘 중 하나를 강제한다.** 둘 다 optional 인 단일 인터페이스로 두면
+ * *"둘 중 하나는 항상 있다"* 가 주석에만 있고 **둘 다 없는 행이 컴파일된다** — 그러면
+ * `key` 가 `undefined` 인 행을 만들어 놓고도 타입 검사가 통과한다.
+ *
+ * 이 유니온이 막는 것은 **행을 만드는 쪽**이다(픽스처·mock·어댑터). 소비 쪽에서
+ * `registrationId ?? teamId` 의 결과 타입은 여전히 `string | undefined` 인데
+ * (TS 가 속성 접근에서 유니온을 자동으로 분배하지 않는다), React 의 `key` 가 그것을
+ * 받으므로 실용상 문제가 없다 — **막고 싶은 건 그런 행이 애초에 만들어지는 것**이다.
+ */
+export type V1LeagueOverallStandingRow =
+  | (V1LeagueOverallStandingRowBase & {
+      /** 정규 대회 행. */
+      registrationId: string;
+      teamId?: string;
+    })
+  | (V1LeagueOverallStandingRowBase & {
+      registrationId?: string;
+      /** 정규 리그 행 — 참가 등록 개념이 없어 팀 id 가 신원이다. */
+      teamId: string;
+    });
 
 /** GET /tournaments/:id/standings/overall 응답 — 통합 순위 + 진행률 + 매직넘버 */
 export interface V1LeagueOverallStandingsResponse {

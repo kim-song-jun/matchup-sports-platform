@@ -85,6 +85,22 @@ describe('LeagueFixtureCard', () => {
     expect(screen.getByText(label)).toBeInTheDocument();
   });
 
+  it('실을 게 없으면 캡션 줄 자체를 그리지 않는다 — 빈 줄이 간격을 어긋나게 한다', () => {
+    // 캡션을 **element 로** 넘기면 그 컴포넌트가 undefined 를 반환해도 element 자체가
+    // truthy 라 껍데기의 `caption ? … : null` 이 통과하고, 내용 없는 div 가 marginTop:12
+    // 를 들고 남는다. 값을 만들어 넘겨야 껍데기가 "캡션 없음" 을 실제로 알 수 있다.
+    const { container } = render(
+      <LeagueFixtureCard
+        fixture={{ ...BASE, placeName: '', startAt: new Date(Date.now() + 864e5).toISOString() }}
+        homeLabel="강남 유나이티드"
+        awayLabel="종로 FC"
+      />,
+    );
+    // 카드가 그리는 블록은 헤더 + 대진 그리드 둘뿐이어야 한다.
+    const card = container.firstElementChild as HTMLElement;
+    expect(card.children).toHaveLength(2);
+  });
+
   it('상대팀·장소가 없어도 자리를 비우지 않는다', () => {
     render(
       <LeagueFixtureCard

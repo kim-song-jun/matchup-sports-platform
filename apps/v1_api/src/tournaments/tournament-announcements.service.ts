@@ -5,6 +5,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { CreateAnnouncementDto, UpdateAnnouncementDto } from './dto/tournament-read.dto';
+import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
 
 /**
  * 공지 audience → 알림 수신 대상 신청 상태 매핑.
@@ -79,7 +80,7 @@ export class TournamentAnnouncementsService {
   async listForParticipant(user: V1AuthUser, tournamentId: string) {
     // 삭제된 대회의 공지는 id 를 알아도 읽히면 안 된다 — 같은 파일 create() 의
     // 존재 확인은 이미 `deletedAt: null` 을 쓰는데 조회 쪽 두 곳만 빠져 있었다.
-    const tournament = await this.prisma.v1Tournament.findFirst({
+    const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
     });
     if (!tournament) {

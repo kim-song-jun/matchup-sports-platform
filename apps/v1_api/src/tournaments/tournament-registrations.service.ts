@@ -16,6 +16,7 @@ import {
   CreateRegistrationDto,
   SubmitRegistrationDto,
 } from './dto/tournament-registration.dto';
+import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
 
 /** cancel-request로 어드민 처리가 필요한 상태(이미 운영에 반영됨). */
 const CANCELLABLE_VIA_REQUEST: V1TournamentRegistration['status'][] = [
@@ -103,7 +104,7 @@ export class TournamentRegistrationsService {
   }
 
   private async loadOpenTournament(tournamentId: string): Promise<V1Tournament> {
-    const tournament = await this.prisma.v1Tournament.findFirst({
+    const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
     });
     if (!tournament) {
@@ -275,7 +276,10 @@ export class TournamentRegistrationsService {
       await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${tournamentId} FOR UPDATE`;
 
       // Re-validate tournament state inside the transaction (prevents TOCTOU with status change).
-      const lockedTournament = await tx.v1Tournament.findFirst({
+      // **종류 조건은 트랜잭션 안에서도 걸어야 한다.** 밖의 `loadOpenTournament` 만 막으면
+      // 이 재검증이 리그 행을 통과시키고, 그 사실이 밖에서는 드러나지 않는다 — 겉보기엔
+      // 닫힌 것처럼 보이기 때문이다.
+      const lockedTournament = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
         where: { id: tournamentId, deletedAt: null },
       });
       if (!lockedTournament || lockedTournament.status !== 'open') {
@@ -466,7 +470,7 @@ export class TournamentRegistrationsService {
       // R16-001: lock tournament and re-check its status; an admin-cancelled tournament
       // must not have registrations restored to an active status.
       await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${tournamentId} FOR UPDATE`;
-      const tournament = await tx.v1Tournament.findFirst({
+      const tournament = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
         where: { id: tournamentId, deletedAt: null },
         select: { id: true, status: true, teamCount: true },
       });
@@ -614,7 +618,7 @@ export class TournamentRegistrationsService {
   }
 
   private loadPaymentInstructionSource(tournamentId: string) {
-    return this.prisma.v1Tournament.findFirst({
+    return findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
       select: {
         entryFee: true,

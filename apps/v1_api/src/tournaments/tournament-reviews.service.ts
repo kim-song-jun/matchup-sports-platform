@@ -11,6 +11,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { ArrayMaxSize, IsArray, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
+import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
 
 export class ListTournamentReviewsQueryDto {
   @IsOptional()
@@ -252,7 +253,7 @@ export class TournamentReviewsService {
     dto: SubmitTournamentReviewDto,
   ) {
     // 1. 대회 존재 확인
-    const tournament = await this.prisma.v1Tournament.findFirst({
+    const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
     });
     if (!tournament) {

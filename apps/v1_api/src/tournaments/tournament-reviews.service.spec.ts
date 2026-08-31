@@ -18,6 +18,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService } from '../common/admin-context.service';
 import { TournamentReviewsService } from './tournament-reviews.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { kindAwareFindFirst } from '../../test/helpers/kind-aware-find-first';
 
 const ownerAuthUser = {
   id: 'owner-user-id',
@@ -886,6 +887,25 @@ describe('TournamentReviewsService — 팀 후기 권한 (팀장·운영진 mana
   });
 
   afterEach(() => jest.clearAllMocks());
+
+  // 통합 백필(R3) 이후 리그 id 가 이 조회를 통과할 수 있게 됐다. 리뷰 생성은 **쓰기**이고,
+  // 만들어진 리뷰는 공개 조회(`listReviews`)로 그대로 나간다.
+  //
+  // **오늘 당장 뚫리지는 않는다** — 이 경로는 `status === 'completed'` 를 요구하는데 백필
+  // 리그는 `draft` 라 400 에서 걸린다. 다만 운영자가 `changeStatus` 로 상태를 바꾸면 그
+  // 게이트가 사라지고, 그 전이는 아직 종류 조건이 없다(감사 운영자 11건 중 하나).
+  // **이 지점은 P2 의 `changeStatus` 차단과 함께라야 닫힌다.**
+  it('submitReview: 리그 id 로는 열리지 않는다 (상태 게이트보다 먼저 막힌다)', async () => {
+    // status 를 completed 로 줘서 **상태 게이트를 무력화**한다 — 그래야 404 가 종류 조건
+    // 때문임이 증명된다. 상태로 막히는 걸 보고 "막혔다"고 하면 필터를 안 걸어도 통과한다.
+    prisma.v1Tournament.findFirst.mockImplementation(
+      kindAwareFindFirst({ ...completedTournament, id: 'league-1', kind: 'regular_league' }),
+    );
+    await expect(
+      service.submitReview('league-1', plainUser, { rating: 5, comment: '좋은 대회였어요' }),
+    ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_NOT_FOUND' } });
+    expect(prisma.v1TournamentReview.create).not.toHaveBeenCalled();
+  });
 
   // (a) manager가 후기 작성 성공
   it('submitReview: 팀장이 아닌 매니저(manager)도 참가 확정 팀 몫으로 후기를 작성할 수 있다', async () => {

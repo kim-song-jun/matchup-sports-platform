@@ -210,8 +210,18 @@ export class LeagueMatchPublicService {
       scheduledAt: Date;
       scheduledEndAt: Date;
     };
+    // 세 검사를 **한 곳에만** 적는다. 술어와 아래 `missing` 목록을 따로 적으면 어긋날 수
+    // 있고(한쪽만 고치면 "불완전한데 빠진 필드는 없다"는 응답이 나온다), 그건 원인을
+    // 가장 못 찾게 만드는 모양이다.
+    const REQUIRED: ReadonlyArray<readonly [string, (row: LeagueMirrorRow) => boolean]> = [
+      ['region', (row) => row.region === null],
+      ['scheduledAt', (row) => row.scheduledAt === null],
+      ['scheduledEndAt', (row) => row.scheduledEndAt === null],
+    ];
+    const missingOf = (row: LeagueMirrorRow) =>
+      REQUIRED.filter(([, isMissing]) => isMissing(row)).map(([field]) => field);
     const isComplete = (mirror: LeagueMirrorRow): mirror is CompleteLeagueMirror =>
-      mirror.region !== null && mirror.scheduledAt !== null && mirror.scheduledEndAt !== null;
+      missingOf(mirror).length === 0;
 
     const complete: CompleteLeagueMirror[] = [];
     const incomplete: Array<{ leagueId: string; missing: string[] }> = [];
@@ -220,14 +230,7 @@ export class LeagueMatchPublicService {
         complete.push(mirror);
         continue;
       }
-      incomplete.push({
-        leagueId: mirror.id,
-        missing: [
-          mirror.region === null ? 'region' : null,
-          mirror.scheduledAt === null ? 'scheduledAt' : null,
-          mirror.scheduledEndAt === null ? 'scheduledEndAt' : null,
-        ].filter((field): field is string => field !== null),
-      });
+      incomplete.push({ leagueId: mirror.id, missing: missingOf(mirror) });
     }
     if (incomplete.length > 0) {
       // `detail` 로 어느 리그의 어느 필드인지 전부 싣는다 — 운영자가 고칠 대상이 그것이다.

@@ -14,13 +14,25 @@
 	<string>U9J95Q6XD3</string>
 
 	<!--
-	  Xcode requests the distribution certificate and provisioning profile from the account
-	  it is signed in to. Manual signing would need the profile name pinned here, which is a
-	  value that changes whenever the profile is regenerated — automatic keeps that out of
-	  the repository.
+	  Manual, matching the archive. Automatic signing here re-mints an Xcode-managed profile
+	  rather than reusing the one the archive was signed with, and an Xcode-managed profile
+	  cannot then be named by a manually signed build — the two styles have to agree.
+
+	  Pinning the profile name is the cost. It is a name we choose, not one Apple generates,
+	  so regenerating the profile keeps it as long as the name is reused; the profile itself
+	  is created by scripts/ios/asc-profile.mjs and never lives in the repository.
 	-->
 	<key>signingStyle</key>
-	<string>automatic</string>
+	<string>manual</string>
+
+	<key>signingCertificate</key>
+	<string>Apple Distribution</string>
+
+	<key>provisioningProfiles</key>
+	<dict>
+		<key>kr.co.teameet.alpha</key>
+		<string>Teameet Alpha App Store</string>
+	</dict>
 
 	<!-- Symbols let App Store Connect symbolicate crash reports from testers. -->
 	<key>uploadSymbols</key>

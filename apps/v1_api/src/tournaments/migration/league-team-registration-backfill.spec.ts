@@ -34,9 +34,16 @@ function fakePrisma(opts: {
         findMany: jest.fn().mockResolvedValue(opts.leagueTeams ?? [leagueTeam()]),
       },
       v1Tournament: {
-        findMany: jest
-          .fn()
-          .mockResolvedValue(opts.tournaments ?? [{ id: 'league-1', kind: 'regular_league' }]),
+        // **`where` 를 실제로 적용한다.** `mockResolvedValue` 로 고정 배열을 주면 호출부가
+        // `kind` 로 걸러 읽든 말든 같은 결과가 나와서, 종류 필터를 되살리는 변이가 red 가
+        // 되지 않는다(실제로 그렇게 통과하는 스펙을 한 번 썼다). DB 처럼 걸러야 검증이 산다.
+        findMany: jest.fn((args: { where?: { kind?: string } }) => {
+          const rows = opts.tournaments ?? [{ id: 'league-1', kind: 'regular_league' }];
+          const wantedKind = args?.where?.kind;
+          return Promise.resolve(
+            wantedKind === undefined ? rows : rows.filter((row) => row.kind === wantedKind),
+          );
+        }),
       },
       v1TeamMembership: {
         findMany: jest.fn().mockResolvedValue(opts.owners ?? [{ teamId: 'team-1', userId: 'u-1' }]),

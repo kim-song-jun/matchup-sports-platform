@@ -23,6 +23,12 @@ baseline 주석이 아니라 코드에 둔 이유는 **주석은 드리프트하
 
 > **아직 참인지 확인**: `cd apps/v1_api && node scripts/v1-surface-check.mjs` 가 통과하는가.
 > 숫자가 위와 다르면 그 뒤로 작업이 더 있었다는 뜻이니 **이 문서를 먼저 갱신**하고 진행한다.
+>
+> **게이트를 raw grep 으로 재확인하려 하지 말 것.**
+> `grep -rn 'v1Tournament\.\(findUnique\|findFirst\)' apps/v1_api/src` 는 **1건을 준다** —
+> `tournament-surface-lookup.ts` 의 **헬퍼 자신**이다. 게이트는 그 파일을 일부러 제외하므로
+> **0 이 정확하다.** 이 1건을 "게이트가 새고 있다"로 읽지 않는다.
+> (실제로 그렇게 오해할 뻔한 일이 있었다 — 셀 때는 **무엇을 세는지**부터 본다.)
 
 ---
 

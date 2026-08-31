@@ -172,3 +172,32 @@ export function mirrorDetailMatches(
     row.regionId === target.regionId
   );
 }
+
+/**
+ * **거울의 `status` → 리그 `state` 역매핑.**
+ *
+ * read-swap 이 통합 축에서 읽어도 응답의 `state` 계약은 그대로여야 한다 — 웹이
+ * `LEAGUE_STATE_META[item.state]` 로 **인덱싱**하기 때문에, 세 값 밖이 나오면 `undefined`
+ * 를 역참조해 **목록 페이지가 통째로 죽는다.** 그래서 여섯 상태를 **빠짐없이** 덮는다.
+ *
+ * | 대회 status | 리그 state | 왜 |
+ * |---|---|---|
+ * | `draft` | `draft` | 그대로 |
+ * | `in_progress` | `active` | `STATUS_BY_LEAGUE_STATE` 의 역 |
+ * | `completed` | `completed` | 그대로 |
+ * | `open` | `draft` | "신청 받는 중" = **아직 시작 안 함.** D7 이 도입할 상태다 |
+ * | `closed` | `draft` | 신청 마감이지 시작이 아니다 |
+ * | `cancelled` | `completed` | ⚠️ **판단이 들어간 자리다** — 리그에는 취소 상태가 없다. "더 이상 진행하지 않는다" 쪽에 붙였다. 정확히 맞지 않으므로 리그에 취소 개념이 생기면 여기부터 고친다 |
+ *
+ * **아래 셋은 오늘 리그 거울에 나올 수 없다** — 백필·dual-write 가 위 세 값만 쓰고,
+ * 어드민 `changeStatus` 는 리그를 막는다(#866). 그래도 매핑을 비워 두지 않는 이유는
+ * **비면 화면이 죽기 때문**이지 그 값이 올 것 같아서가 아니다.
+ */
+export const LEAGUE_STATE_BY_STATUS: Record<V1TournamentStatus, V1LeagueState> = {
+  [V1TournamentStatus.draft]: V1LeagueState.draft,
+  [V1TournamentStatus.open]: V1LeagueState.draft,
+  [V1TournamentStatus.closed]: V1LeagueState.draft,
+  [V1TournamentStatus.in_progress]: V1LeagueState.active,
+  [V1TournamentStatus.completed]: V1LeagueState.completed,
+  [V1TournamentStatus.cancelled]: V1LeagueState.completed,
+};

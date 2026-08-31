@@ -199,9 +199,12 @@ export class LeagueMatchPublicService {
     // **`where` 에서 거르지 않는 이유**: 거르면 그 리그가 목록에서 조용히 사라지고,
     // 그게 이 작업 전체가 막으려는 실패 모습이다.
     //
-    // **`new Error` 를 쓰지 않는 이유**: `HttpException` 이 아니면 `HttpExceptionFilter` 가
+    // **`new Error` 를 쓰지 않는 이유**: `HttpException` 이 아니면 전역 필터가
     // **500 + "Internal server error"** 로 정규화해 **리그 id 도 code 도 전부 유실된다.**
     // 그러면 "어느 리그인지 대며 실패한다" 가 소스에만 참이고 응답에서는 거짓이 된다.
+    // (클래스명은 `AllExceptionsFilter` 다 — 파일은 `common/filters/http-exception.filter.ts`
+    // 인데 **파일명과 클래스명이 다르다.** `HttpExceptionFilter` 라는 클래스는 없으므로 그
+    // 이름으로 적으면 검색해도 안 나온다.)
     // 한 번만 순회해 나눈다. 술어(`isComplete`)가 "완전하다"의 **유일한 정의**이고,
     // 타입 술어라서 통과한 행은 아래에서 단언 없이 non-null 로 쓸 수 있다.
     type LeagueMirrorRow = (typeof mirrors)[number];

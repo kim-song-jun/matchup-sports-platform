@@ -83,7 +83,7 @@ const MULTI_PERIOD_EVENTS: FakeEvent[] = [
 function buildFakePrisma(events: readonly FakeEvent[]): PrismaService {
   const database = {
     v1Tournament: {
-      async findUnique() {
+      async findFirst() {
         return {
           id: TOURNAMENT_ID,
           title: '테스트 대회',

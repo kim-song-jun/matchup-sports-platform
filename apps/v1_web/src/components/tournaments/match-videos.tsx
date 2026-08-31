@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ChevronLeft, ChevronRight, Clapperboard, ExternalLink, Play, X } from 'lucide-react';
 import {
   extractYoutubeVideoId,
@@ -9,6 +9,7 @@ import {
   youtubeWatchUrl,
   videoKind,
 } from '@/lib/video-utils';
+import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 
 export interface MatchVideo {
   id: string;
@@ -38,19 +39,12 @@ export function MatchVideos({
 }) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
-  useEffect(() => {
-    if (openIndex === null) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpenIndex(null);
-    };
-    document.addEventListener('keydown', onKey);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prevOverflow;
-    };
-  }, [openIndex]);
+  // ESC 닫기·focus trap·focus 복원·body 스크롤 잠금을 공용 훅에 위임 —
+  // 퇴장 애니메이션이 없는 조건부 마운트형이라 mounted/closing 은 쓰지 않는다.
+  const { dialogRef, onBackdropClick } = useModalA11y<HTMLElement, HTMLDivElement>({
+    open: openIndex !== null,
+    onClose: () => setOpenIndex(null),
+  });
 
   if (videos.length === 0) return null;
 
@@ -156,13 +150,12 @@ export function MatchVideos({
 
       {active && (
         <div
+          ref={dialogRef}
           role="dialog"
           aria-modal="true"
           aria-label={`${matchLabel} 경기 영상`}
           className="tm-video-modal"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setOpenIndex(null);
-          }}
+          onClick={onBackdropClick}
         >
           <div className="tm-video-modal-body">
             <div className="tm-video-modal-head">

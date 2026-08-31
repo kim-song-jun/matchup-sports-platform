@@ -135,7 +135,7 @@ export function TournamentCard({
           {thumbnailImageUrl ? (
             <div
               aria-hidden="true"
-              style={{ width: 56, height: 56, borderRadius: 12, overflow: 'hidden', flexShrink: 0, background: 'var(--grey100)' }}
+              style={{ width: 56, height: 56, borderRadius: 'var(--radius-control)', overflow: 'hidden', flexShrink: 0, background: 'var(--grey100)' }}
             >
               <Image
                 src={publicAssetPath(thumbnailImageUrl)}
@@ -158,7 +158,7 @@ export function TournamentCard({
               style={{
                 width: 56,
                 height: 56,
-                borderRadius: 12,
+                borderRadius: 'var(--radius-control)',
                 overflow: 'hidden',
                 flexShrink: 0,
                 background: `linear-gradient(135deg, ${sportAccent.dot} 0%, ${sportAccent.gradientTo} 100%)`,
@@ -202,7 +202,7 @@ export function TournamentCard({
                   alignItems: 'center',
                   gap: 4,
                   padding: '2px 8px',
-                  borderRadius: 999,
+                  borderRadius: 'var(--radius-pill)',
                   background: sportAccent.badgeBg,
                   flexShrink: 0,
                 }}
@@ -213,7 +213,7 @@ export function TournamentCard({
                   style={{
                     width: 6,
                     height: 6,
-                    borderRadius: '50%',
+                    borderRadius: 'var(--radius-circle)',
                     background: sportAccent.dot,
                     flexShrink: 0,
                   }}
@@ -267,7 +267,7 @@ export function TournamentCard({
               gap: 4,
               marginTop: 8,
               padding: '3px 8px',
-              borderRadius: 999,
+              borderRadius: 'var(--radius-pill)',
               background: 'var(--orange50)',
               whiteSpace: 'normal',
             }}

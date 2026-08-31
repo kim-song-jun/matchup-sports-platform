@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CalendarDays, Search, Shield, User } from 'lucide-react';
 import { useV1AdminGlobalSearch } from '@/hooks/use-v1-api';
+import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { AdminStatusPill } from './admin-status-pill';
 
 /**
@@ -39,27 +40,24 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
 
-  const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
-  const previousFocusRef = useRef<Element | null>(null);
 
   const { data, isFetching } = useV1AdminGlobalSearch(query);
 
-  // 열릴 때 입력 초기화 + 포커스, 닫힐 때 이전 포커스 복원 (WCAG 2.4.3)
+  // 포커스 저장/복원(WCAG 2.4.3) + 첫 포커스 이동 + ESC 닫기 + focus trap +
+  // body 스크롤 잠금 + backdrop 클릭 닫기는 공용 훅에 위임한다.
+  const { dialogRef, initialFocusRef: inputRef, onBackdropClick } = useModalA11y<
+    HTMLInputElement,
+    HTMLDivElement
+  >({ open, onClose });
+
+  // 열릴 때 입력 초기화 (포커스 자체는 훅이 처리)
   useEffect(() => {
     if (open) {
-      previousFocusRef.current = document.activeElement;
       setInput('');
       setQuery('');
       setActiveIndex(0);
-      const id = setTimeout(() => inputRef.current?.focus(), 30);
-      return () => clearTimeout(id);
     }
-    const el = previousFocusRef.current;
-    if (el && typeof (el as HTMLElement).focus === 'function') {
-      (el as HTMLElement).focus();
-    }
-    previousFocusRef.current = null;
   }, [open]);
 
   // 검색 debounce
@@ -68,22 +66,6 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
     const timer = setTimeout(() => setQuery(input.trim()), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [input, open]);
-
-  // ESC 닫기 + body 스크롤 잠금 — 드로어 등 다른 오버레이가 이미 잠근 상태를
-  // 풀어버리지 않도록 이전 overflow 값을 저장했다가 그대로 복원한다.
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', handler);
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.removeEventListener('keydown', handler);
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [open, onClose]);
 
   const items = useMemo<PaletteItem[]>(() => {
     if (!data) return [];
@@ -157,11 +139,10 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center bg-gray-900/40 backdrop-blur-[2px] p-4 pt-[12vh]"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
+      onClick={onBackdropClick}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label="전역 검색"

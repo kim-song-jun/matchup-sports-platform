@@ -9,6 +9,20 @@ import { PrismaService } from '../prisma/prisma.service';
 /** 라인업이 아직 끝나지 않은 상태. 완료(SUBMITTED/LOCKED)는 아예 목록에 오르지 않는다. */
 export type LineupTodoState = 'MISSING' | 'DRAFT';
 
+/**
+ * 라인업 상태 전체 — 완료까지 포함한다. `LineupTodoState` 를 넓히지 않고 따로 둔 이유:
+ * 할 일 목록(홈 카드·알림 워커)은 완료를 **볼 일이 없는** 소비자라, 그 union 에 'DONE' 을
+ * 얹으면 그쪽 코드가 절대 오지 않는 값을 분기해야 한다.
+ */
+export type TeamGameLineupState = LineupTodoState | 'DONE';
+
+/**
+ * 그 팀의 다가오는 경기 하나. 할 일(LineupTodo)과 **같은 수집 경로**에서 나오지만
+ * 완료된 라인업도 포함한다 — 이건 "아직 할 일"이 아니라 "우리 팀 경기 목록"이라
+ * 라인업을 이미 제출했어도 그 경기는 여전히 우리 경기다(전술보드 진입점이 이걸 쓴다).
+ */
+export type TeamUpcomingGame = Omit<LineupTodo, 'state'> & { lineupState: TeamGameLineupState };
+
 export type LineupTodo = {
   source: 'TOURNAMENT_FIXTURE' | 'TEAM_MATCH';
   teamId: string;
@@ -82,9 +96,32 @@ export class LineupTodoService {
     return this.collect(null, now);
   }
 
+  /**
+   * 한 팀의 **다가오는 경기 전부** — 라인업을 이미 제출했어도 포함한다.
+   *
+   * 할 일 목록과 갈리는 지점이 여기 하나다. 전술보드 진입점이 이걸 쓰는데, 할 일 규칙을
+   * 그대로 쓰면 **팀이 라인업을 제출하는 순간 그 경기의 전술보드에 다시 못 들어간다** —
+   * 전술은 제출 후에도 계속 고치는 것이라 그 동작은 틀렸다.
+   *
+   * 알려진 한계: `collect` 계열은 `now` 기준으로 앞으로의 경기만 모은다. 그래서 **끝난
+   * 경기의 전술보드는 이 목록으로 열 수 없다.** 지금은 의도된 범위다(지난 경기 배치를
+   * 다시 여는 화면이 아직 없다) — 이름에 `upcoming` 을 넣어 그 한계를 드러내 둔다.
+   */
+  async listUpcomingForTeam(teamId: string, now: Date): Promise<TeamUpcomingGame[]> {
+    return this.collectWithLineupState([teamId], now);
+  }
+
   // ─── internals ───────────────────────────────────────────────────────────
 
-  private async collect(teamIds: string[] | null, now: Date): Promise<LineupTodo[]> {
+  /**
+   * 수집 경로는 하나다 — 할 일 목록도 팀 경기 목록도 여기서 나온다. 두 벌로 복사하면
+   * 한쪽만 고쳐지는 순간 홈 카드와 팀 화면이 서로 다른 경기를 보여주기 시작한다.
+   * 완료(DONE) 를 걸러내는 것은 **호출자의 판단**이라 여기서 하지 않는다.
+   */
+  private async collectWithLineupState(
+    teamIds: string[] | null,
+    now: Date,
+  ): Promise<TeamUpcomingGame[]> {
     const [fixtures, teamMatches] = await Promise.all([
       this.loadTournamentFixtures(teamIds, now),
       this.loadTeamMatches(teamIds, now),
@@ -97,14 +134,22 @@ export class LineupTodoService {
       teamId: candidate.teamId,
     })));
 
-    const items: LineupTodo[] = [];
-    for (const candidate of candidates) {
-      const state = states.get(`${candidate.gameId}:${candidate.teamId}`);
-      // 제출됐거나 잠긴 라인업은 할 일이 아니다.
-      if (state === 'DONE') continue;
-      items.push({ ...candidate, state: state ?? 'MISSING' });
-    }
+    const items = candidates.map((candidate) => ({
+      ...candidate,
+      lineupState: states.get(`${candidate.gameId}:${candidate.teamId}`) ?? ('MISSING' as const),
+    }));
     items.sort((a, b) => (a.scheduledAt?.getTime() ?? Infinity) - (b.scheduledAt?.getTime() ?? Infinity));
+    return items;
+  }
+
+  private async collect(teamIds: string[] | null, now: Date): Promise<LineupTodo[]> {
+    const rows = await this.collectWithLineupState(teamIds, now);
+    const items: LineupTodo[] = [];
+    for (const { lineupState, ...rest } of rows) {
+      // 제출됐거나 잠긴 라인업은 할 일이 아니다.
+      if (lineupState === 'DONE') continue;
+      items.push({ ...rest, state: lineupState });
+    }
     return items;
   }
 

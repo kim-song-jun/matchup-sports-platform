@@ -330,8 +330,8 @@ export function BracketScheduleTab({ tournamentId }: { tournamentId: string }) {
   if (isLoading) {
     return (
       <div style={{ padding: '20px 20px 0', display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div className="tm-skeleton" style={{ height: 120, borderRadius: 12 }} />
-        <div className="tm-skeleton" style={{ height: 220, borderRadius: 12 }} />
+        <div className="tm-skeleton" style={{ height: 120, borderRadius: 'var(--radius-control)' }} />
+        <div className="tm-skeleton" style={{ height: 220, borderRadius: 'var(--radius-control)' }} />
       </div>
     );
   }
@@ -590,9 +590,9 @@ function BracketPageSkeleton() {
   return (
     <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div className="tm-skeleton" style={{ height: 56, borderRadius: 10 }} />
-      <div className="tm-skeleton" style={{ height: 44, borderRadius: 8 }} />
-      <div className="tm-skeleton" style={{ height: 200, borderRadius: 12 }} />
-      <div className="tm-skeleton" style={{ height: 160, borderRadius: 12 }} />
+      <div className="tm-skeleton" style={{ height: 44, borderRadius: 'var(--radius-chip)' }} />
+      <div className="tm-skeleton" style={{ height: 200, borderRadius: 'var(--radius-control)' }} />
+      <div className="tm-skeleton" style={{ height: 160, borderRadius: 'var(--radius-control)' }} />
     </div>
   );
 }

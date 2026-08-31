@@ -25,6 +25,21 @@ const analytics = vi.hoisted(() => ({
   trackEvent: vi.fn(),
 }));
 
+// 실시간 수신 검증용. 훅 자체의 동작은 use-v1-realtime-socket.test.tsx 가 덮으므로,
+// 여기서는 "채팅방 화면이 그 훅을 실제로 마운트하는가"만 본다 — 훅이 만들어져 있어도
+// 소비처가 없으면 실시간이 통째로 안 도는데, 그건 훅 테스트로는 절대 드러나지 않는다.
+const socket = vi.hoisted(() => ({
+  listeners: {} as Record<string, (payload: unknown) => void>,
+  on: vi.fn(),
+  off: vi.fn(),
+  emit: vi.fn(),
+}));
+socket.on.mockImplementation((event: string, cb: (payload: unknown) => void) => {
+  socket.listeners[event] = cb;
+});
+
+vi.mock('@/lib/v1-socket', () => ({ getV1Socket: () => socket }));
+
 vi.mock('next/navigation', () => ({
   useRouter: () => router,
   useSearchParams: () => new URLSearchParams(),
@@ -128,6 +143,21 @@ describe('ChatRoomPageClient', () => {
     hooks.updateMyChatRoom.mockReturnValue({ isPending: false, mutate: vi.fn() });
   });
 
+  it('채팅방을 열면 실시간 수신을 구독하고, 나가면 해제한다', () => {
+    // 훅은 만들어져 있었지만 어디에도 마운트되지 않아, 열어 둔 채팅방에 새 메시지가
+    // 실시간으로 들어오지 않았다(30초 stale 이 지난 뒤 창 포커스 전환에만 의존).
+    // 훅 자체를 아무리 테스트해도 "아무도 안 쓴다"는 드러나지 않는다.
+    hooks.chatRoom.mockReturnValue({ data: undefined, isPending: true, isError: false, refetch: vi.fn() });
+    hooks.chatMessages.mockReturnValue({ data: undefined, isPending: true, isError: false, refetch: vi.fn() });
+
+    const { unmount } = renderWithClient(<ChatRoomPageClient roomId="room-live" />);
+
+    expect(socket.on).toHaveBeenCalledWith('chat:message', expect.any(Function));
+
+    unmount();
+    expect(socket.off).toHaveBeenCalledWith('chat:message', expect.any(Function));
+  });
+
   it('shows a real error state — never the hardcoded mock room/messages — when the room fetch fails', () => {
     hooks.chatRoom.mockReturnValue({ data: undefined, isPending: false, isError: true, refetch: vi.fn() });
     hooks.chatMessages.mockReturnValue({ data: undefined, isPending: false, isError: true, refetch: vi.fn() });
@@ -141,6 +171,100 @@ describe('ChatRoomPageClient', () => {
     expect(screen.queryByText('주말 풋살 매치')).not.toBeInTheDocument();
     expect(screen.queryByText('오늘 14:00 경기 인원 확인해 주세요')).not.toBeInTheDocument();
     expect(screen.queryByText('수아님이 참가 승인됐어요')).not.toBeInTheDocument();
+  });
+
+  it('shows one timestamp at the bottom of each same-sender, same-minute run', () => {
+    hooks.chatRoom.mockReturnValue({
+      data: {
+        roomId: 'room-times',
+        roomType: 'team',
+        status: 'active',
+        title: 'Timestamp test',
+        linkedTarget: { type: 'team', id: 'team-1', title: 'Test team', route: '/teams/team-1' },
+        me: {
+          participantId: 'participant-me',
+          status: 'active',
+          pinned: false,
+          mutedUntil: null,
+          lastReadMessageId: null,
+        },
+        participants: [],
+      },
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    hooks.chatMessages.mockReturnValue({
+      data: {
+        items: [
+          {
+            messageId: 'other-1',
+            sender: { userId: 'user-other', displayName: 'Other', profileImageUrl: null },
+            messageType: 'text',
+            content: 'Other first',
+            status: 'sent',
+            sentAt: '2026-08-31T09:01:00.000Z',
+            mine: false,
+          },
+          {
+            messageId: 'other-2',
+            sender: { userId: 'user-other', displayName: 'Other', profileImageUrl: null },
+            messageType: 'text',
+            content: 'Other second',
+            status: 'sent',
+            sentAt: '2026-08-31T09:01:45.000Z',
+            mine: false,
+          },
+          {
+            messageId: 'other-3',
+            sender: { userId: 'user-other', displayName: 'Other', profileImageUrl: null },
+            messageType: 'text',
+            content: 'Other third',
+            status: 'sent',
+            sentAt: '2026-08-31T09:02:00.000Z',
+            mine: false,
+          },
+          {
+            messageId: 'mine-1',
+            sender: { userId: 'user-me', displayName: 'Me', profileImageUrl: null },
+            messageType: 'text',
+            content: 'Mine first',
+            status: 'sent',
+            sentAt: '2026-08-31T09:03:00.000Z',
+            mine: true,
+          },
+          {
+            messageId: 'mine-2',
+            sender: { userId: 'user-me', displayName: 'Me', profileImageUrl: null },
+            messageType: 'text',
+            content: 'Mine second',
+            status: 'sent',
+            sentAt: '2026-08-31T09:03:45.000Z',
+            mine: true,
+          },
+          {
+            messageId: 'mine-3',
+            sender: { userId: 'user-me', displayName: 'Me', profileImageUrl: null },
+            messageType: 'text',
+            content: 'Mine third',
+            status: 'sent',
+            sentAt: '2026-08-31T09:04:00.000Z',
+            mine: true,
+          },
+        ],
+        nextCursor: null,
+      },
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+
+    renderWithClient(<ChatRoomPageClient roomId={'room-times'} />);
+
+    expect(screen.getAllByText('18:01')).toHaveLength(1);
+    expect(screen.getAllByText('18:02')).toHaveLength(1);
+    expect(screen.getAllByText('18:03')).toHaveLength(1);
+    expect(screen.getAllByText('18:04')).toHaveLength(1);
   });
 
   it('still shows the placeholder conversation while the room is loading (documented loading-only behavior)', () => {

@@ -3,7 +3,9 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Card } from '@/components/v1-ui/primitives';
 import { ConfirmModal } from '@/components/v1-ui/confirm-modal';
+import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { matchSlotsToEntries, type LineupEntryDraft } from '@/app/team-matches/[id]/lineup/lineup.view-model';
+import { PitchLines } from './pitch-lines';
 import { describeFormationChange, type FormationChangeSummary } from './formation-assignment';
 import { GOALKEEPER_SLOT_CODE, slotsWithGoalkeeper, type FormationPreset, type FormationSlot } from './formation-slots';
 
@@ -312,7 +314,7 @@ export function PitchFormationEditor({
         // 변수가 없는 모바일에서는 fallback 420px 그대로.
         maxWidth: 'var(--tm-pitch-max-width, 420px)',
         aspectRatio: `1 / ${1 / PITCH_ASPECT}`,
-        borderRadius: 12,
+        borderRadius: 'var(--radius-control)',
         overflow: 'hidden',
         background: `${TURF_STRIPES}, #1f8a4c`,
         cursor: !slotMode && editable && selectedWaitingKey !== null ? 'crosshair' : 'default',
@@ -415,7 +417,7 @@ export function PitchFormationEditor({
             alignItems: 'center',
             gap: 12,
             padding: '12px 16px',
-            borderRadius: 12,
+            borderRadius: 'var(--radius-control)',
             border: '1px solid var(--border)',
             background: 'var(--card-surface)',
             textAlign: 'left',
@@ -650,7 +652,7 @@ function FormationControls({
                   alignItems: 'center',
                   gap: 8,
                   padding: '8px 12px',
-                  borderRadius: 999,
+                  borderRadius: 'var(--radius-pill)',
                   border: selectedWaitingKey === entry.key ? '2px solid var(--blue500)' : '1px solid var(--border)',
                   background: selectedWaitingKey === entry.key ? 'var(--tint-blue)' : 'var(--card-surface)',
                   cursor: editable ? 'pointer' : 'default',
@@ -786,25 +788,10 @@ function FormationSheet({
 }) {
   const idPrefix = useId();
   const titleId = `${idPrefix}-formation-sheet-title`;
-  const previousFocusRef = useRef<Element | null>(null);
-  const sheetRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    previousFocusRef.current = document.activeElement;
-    document.body.style.overflow = 'hidden';
-    sheetRef.current?.focus();
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') onClose();
-    }
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.body.style.overflow = '';
-      document.removeEventListener('keydown', handleKeyDown);
-      const el = previousFocusRef.current;
-      if (el && typeof (el as HTMLElement).focus === 'function') (el as HTMLElement).focus();
-    };
-  }, [open, onClose]);
+  // focus 저장/복원·ESC 닫기·Tab focus trap·body 스크롤 잠금·backdrop 클릭 닫기를
+  // 공용 훅에 위임한다(기존엔 focus trap이 빠져 있었다). 렌더 게이트(if (!open))는
+  // 그대로 유지 — 이 시트엔 퇴장 애니메이션이 없다.
+  const { dialogRef, onBackdropClick } = useModalA11y<HTMLElement, HTMLDivElement>({ open, onClose });
 
   if (!open) return null;
 
@@ -812,11 +799,11 @@ function FormationSheet({
     <div className="tm-hide-desktop" style={{ position: 'fixed', inset: 0, zIndex: 60 }}>
       <div
         aria-hidden="true"
-        onClick={onClose}
+        onClick={onBackdropClick}
         style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)' }}
       />
       <div
-        ref={sheetRef}
+        ref={dialogRef}
         className="tm-lineup-formation-sheet"
         role="dialog"
         aria-modal="true"
@@ -830,14 +817,14 @@ function FormationSheet({
           maxHeight: '80vh',
           overflowY: 'auto',
           background: 'var(--card-surface)',
-          borderRadius: '16px 16px 0 0',
-          padding: '16px 20px calc(32px + env(safe-area-inset-bottom))',
+          borderRadius: 'var(--radius-container) var(--radius-container) 0 0',
+          padding: '16px 20px calc(32px + var(--v1-shell-safe-bottom))',
           boxShadow: '0 -8px 24px rgba(0,0,0,0.18)',
         }}
       >
         <div
           aria-hidden="true"
-          style={{ width: 36, height: 4, borderRadius: 999, background: 'var(--grey100)', margin: '0 auto 16px' }}
+          style={{ width: 36, height: 4, borderRadius: 'var(--radius-pill)', background: 'var(--grey100)', margin: '0 auto 16px' }}
         />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <h3 id={titleId} className="tm-text-body-lg" style={{ fontWeight: 700 }}>
@@ -863,61 +850,6 @@ function FormationSheet({
 const TURF_STRIPES =
   'repeating-linear-gradient(180deg, rgba(255,255,255,0.05) 0, rgba(255,255,255,0.05) 8%, rgba(0,0,0,0.04) 8%, rgba(0,0,0,0.04) 16%)';
 
-function PitchLines() {
-  return (
-    <svg
-      viewBox="0 0 100 100"
-      preserveAspectRatio="none"
-      aria-hidden="true"
-      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
-    >
-      {/* 축구장 **전체**를 그린다 — 아래쪽 절반이 우리 진영(우리 골대가 화면 맨 아래),
-          위쪽 절반이 상대 진영(상대 골대가 맨 위)이고 하프라인은 정중앙(SVG y=50)이다.
-          예전엔 우리 진영 절반만 그렸는데, 컨테이너 비율은 PITCH_ASPECT(105:68 = 풀
-          구장)를 쓰고 서버 프리셋 좌표는 최전방을 y=85까지 밀어 두고 있어 — 그림만 반쪽
-          이라 위쪽 절반이 라인 없는 빈 잔디가 되고 페널티박스는 세로로 두 배 늘어나
-          있었다. 풀 구장으로 그리면 셋이 한 좌표계로 맞아떨어진다.
-
-          좌표계: 앱 좌표 y=0(우리 골라인)이 CSS top:100%(피치 하단), y=100(상대 골라인)이
-          top:0%다(PlayerToken의 topPct = 100 - positionY). 그림도 같은 방향이라 SVG y는
-          `2 + (100 - 앱y) * 0.96` — 골키퍼(y=6)는 우리 페널티박스 안, 풋살 PIVO(y=85)는
-          상대 페널티박스 안에 정확히 떨어진다.
-
-          치수는 FIFA 규격(105m×68m, 페널티박스 40.32m×16.5m, 골에어리어 18.32m×5.5m,
-          센터/페널티 아크 반지름 9.15m, 페널티 스폿 11m, 코너 아크 1m, 골대 폭 7.32m)을
-          그대로 환산했다. viewBox 100×100을 preserveAspectRatio="none"으로 늘리므로 축별
-          환산 계수가 다르다 — 폭 68m가 96 단위(x축 1m = 1.4118), 길이 105m가 96 단위
-          (y축 1m = 0.9143). 두 값 모두 화면에서는 같은 픽셀 크기가 되므로(등방) 원은
-          rx/ry를 나눠 준 <ellipse>로 그려야 실제로 정원으로 보인다. */}
-      <rect x={2} y={2} width={96} height={96} rx={1.5} fill="none" stroke="rgba(255,255,255,0.75)" strokeWidth={0.7} />
-      {/* 하프라인 + 센터 서클(9.15m) + 센터 스폿 */}
-      <line x1={2} y1={50} x2={98} y2={50} stroke="rgba(255,255,255,0.9)" strokeWidth={0.9} />
-      <ellipse cx={50} cy={50} rx={12.92} ry={8.37} fill="none" stroke="rgba(255,255,255,0.65)" strokeWidth={0.55} />
-      <ellipse cx={50} cy={50} rx={0.85} ry={0.55} fill="rgba(255,255,255,0.85)" />
-      {/* 우리 진영(아래) — 페널티 박스 · 골에어리어 · 페널티 스폿 · 페널티 아크 */}
-      <rect x={21.53} y={82.91} width={56.93} height={15.09} fill="none" stroke="rgba(255,255,255,0.75)" strokeWidth={0.7} />
-      <rect x={37.07} y={92.97} width={25.87} height={5.03} fill="none" stroke="rgba(255,255,255,0.75)" strokeWidth={0.7} />
-      <ellipse cx={50} cy={87.94} rx={0.85} ry={0.55} fill="rgba(255,255,255,0.85)" />
-      <path d="M 39.68 82.91 A 12.92 8.37 0 0 1 60.32 82.91" fill="none" stroke="rgba(255,255,255,0.65)" strokeWidth={0.55} />
-      {/* 상대 진영(위) — 같은 규격을 하프라인 기준으로 대칭 배치 */}
-      <rect x={21.53} y={2} width={56.93} height={15.09} fill="none" stroke="rgba(255,255,255,0.75)" strokeWidth={0.7} />
-      <rect x={37.07} y={2} width={25.87} height={5.03} fill="none" stroke="rgba(255,255,255,0.75)" strokeWidth={0.7} />
-      <ellipse cx={50} cy={12.06} rx={0.85} ry={0.55} fill="rgba(255,255,255,0.85)" />
-      <path d="M 39.68 17.09 A 12.92 8.37 0 0 0 60.32 17.09" fill="none" stroke="rgba(255,255,255,0.65)" strokeWidth={0.55} />
-      {/* 코너 아크 4곳(1m) — 중심이 각 코너에 오도록 sweep-flag=1로 통일한다. */}
-      <path d="M 2 97.09 A 1.41 0.91 0 0 1 3.41 98" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth={0.5} />
-      <path d="M 96.59 98 A 1.41 0.91 0 0 1 98 97.09" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth={0.5} />
-      <path d="M 3.41 2 A 1.41 0.91 0 0 1 2 2.91" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth={0.5} />
-      <path d="M 98 2.91 A 1.41 0.91 0 0 1 96.59 2" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth={0.5} />
-      {/* 골대 — 골라인 바깥(우리 y>98 / 상대 y<2)에 살짝 걸치는 프레임으로 표현 */}
-      <rect x={44.83} y={98} width={10.33} height={1.83} fill="none" stroke="rgba(255,255,255,0.95)" strokeWidth={0.8} />
-      <rect x={44.83} y={0.17} width={10.33} height={1.83} fill="none" stroke="rgba(255,255,255,0.95)" strokeWidth={0.8} />
-    </svg>
-  );
-}
-
-/** 포지션 라벨이 붙은 빈 슬롯 — 탭하면 채울 선수를 고르는 시트가 열린다. 44px 터치
- * 타겟을 확보하고, aria-label에 포지션 이름과 "비어 있음" 상태를 함께 담는다. */
 function EmptySlotMarker({ slot, editable, onSelect }: { slot: FormationSlot; editable: boolean; onSelect: () => void }) {
   const topPct = 100 - slot.y;
   return (
@@ -928,7 +860,7 @@ function EmptySlotMarker({ slot, editable, onSelect }: { slot: FormationSlot; ed
       aria-label={`${slot.label} 자리, 비어 있음${editable ? ' — 탭해서 선수 채우기' : ''}`}
       style={{
         position: 'absolute', left: `${slot.x}%`, top: `${topPct}%`, transform: 'translate(-50%, -50%)',
-        width: TOUCH_TARGET_PX, height: TOUCH_TARGET_PX, borderRadius: '50%',
+        width: TOUCH_TARGET_PX, height: TOUCH_TARGET_PX, borderRadius: 'var(--radius-circle)',
         border: '2px dashed rgba(255,255,255,0.85)', background: 'rgba(255,255,255,0.14)', color: '#fff',
         // [R-T2] 44px 원(TOUCH_TARGET_PX)에 포지션 약칭 2~3자라 12px 여유.
         display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700,
@@ -952,35 +884,24 @@ function SlotPlayerPickerSheet({
 }) {
   const idPrefix = useId();
   const titleId = `${idPrefix}-slot-picker-title`;
-  const sheetRef = useRef<HTMLDivElement>(null);
-  const previousFocusRef = useRef<Element | null>(null);
-
-  useEffect(() => {
-    previousFocusRef.current = document.activeElement;
-    document.body.style.overflow = 'hidden';
-    sheetRef.current?.focus();
-    function handleKeyDown(event: KeyboardEvent) { if (event.key === 'Escape') onClose(); }
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.body.style.overflow = '';
-      document.removeEventListener('keydown', handleKeyDown);
-      const el = previousFocusRef.current;
-      if (el && typeof (el as HTMLElement).focus === 'function') (el as HTMLElement).focus();
-    };
-  }, [onClose]);
+  // 이 시트는 부모가 `{activeSlotTarget ? <SlotPlayerPickerSheet .../> : null}`로
+  // 조건부 마운트한다(렌더 게이트는 부모 쪽 — 여기선 그대로 둔다) — 그래서 open은
+  // true로 고정한다. focus 저장/복원·ESC·Tab focus trap(기존엔 빠져 있었다)·body
+  // 스크롤 잠금·backdrop 클릭 닫기는 공용 훅에 위임.
+  const { dialogRef, onBackdropClick } = useModalA11y<HTMLElement, HTMLDivElement>({ open: true, onClose });
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 70 }}>
-      <div aria-hidden="true" onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)' }} />
+      <div aria-hidden="true" onClick={onBackdropClick} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)' }} />
       <div
-        ref={sheetRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}
+        ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}
         style={{
           position: 'absolute', left: 0, right: 0, bottom: 0, maxHeight: '70vh', overflowY: 'auto',
-          background: 'var(--card-surface)', borderRadius: '16px 16px 0 0',
-          padding: '16px 20px calc(20px + env(safe-area-inset-bottom))', boxShadow: '0 -8px 24px rgba(0,0,0,0.18)',
+          background: 'var(--card-surface)', borderRadius: 'var(--radius-container) var(--radius-container) 0 0',
+          padding: '16px 20px calc(20px + var(--v1-shell-safe-bottom))', boxShadow: '0 -8px 24px rgba(0,0,0,0.18)',
         }}
       >
-        <div aria-hidden="true" style={{ width: 36, height: 4, borderRadius: 999, background: 'var(--grey100)', margin: '0 auto 16px' }} />
+        <div aria-hidden="true" style={{ width: 36, height: 4, borderRadius: 'var(--radius-pill)', background: 'var(--grey100)', margin: '0 auto 16px' }} />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <h3 id={titleId} className="tm-text-body-lg" style={{ fontWeight: 700 }}>{slot.label} 자리에 채울 선수</h3>
           <button type="button" onClick={onClose} aria-label="닫기" className="tm-btn tm-btn-icon tm-btn-ghost">×</button>
@@ -1065,7 +986,7 @@ function PlayerToken({
           aspectRatio: '1 / 1',
           minWidth: TOUCH_TARGET_PX,
           minHeight: TOUCH_TARGET_PX,
-          borderRadius: '50%',
+          borderRadius: 'var(--radius-circle)',
           border: '2px solid #fff',
           // blue500/orange500 + 흰 텍스트는 WCAG AA 4.5:1 미달(실측 blue500 ~3.71:1,
           // orange500 ~2.16:1, 2026-08 QA) — 등번호 텍스트가 여기서 유일하게 흰 배경 위
@@ -1112,7 +1033,7 @@ function PlayerToken({
             color: '#fff',
             background: 'var(--player-marker-orange)',
             border: '1px solid #fff',
-            borderRadius: 4,
+            borderRadius: 'var(--radius-tight)',
             padding: '2px 3px',
           }}
         >
@@ -1171,7 +1092,7 @@ function PlayerToken({
             right: -17,
             width: TOUCH_TARGET_PX,
             height: TOUCH_TARGET_PX,
-            borderRadius: '50%',
+            borderRadius: 'var(--radius-circle)',
             border: 'none',
             background: 'transparent',
             display: 'flex',
@@ -1186,7 +1107,7 @@ function PlayerToken({
             style={{
               width: 18,
               height: 18,
-              borderRadius: '50%',
+              borderRadius: 'var(--radius-circle)',
               border: '1px solid var(--border)',
               background: 'var(--card-surface)',
               color: 'var(--text-strong)',

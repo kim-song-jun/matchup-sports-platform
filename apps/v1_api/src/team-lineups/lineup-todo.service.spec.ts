@@ -31,7 +31,7 @@ const WEEK3_KICKOFF = new Date('2026-09-12T10:00:00.000Z');
  * 리그에는 KST 9/5·9/8·9/12 세 경기일이 있고, 할 일에 오른 대진은 원래 3주차(9/19)였다가
  * 9/8로 당겨진 경기다 — 제목에는 '3주차'가 박제돼 있지만 실제 순번은 2주차다.
  */
-function buildPrismaMock() {
+function buildPrismaMock(lineupRows: Array<{ sideId: string; state: string }> = []) {
   const teamMatchRows = [
     {
       id: 'match-league',
@@ -81,8 +81,9 @@ function buildPrismaMock() {
         { id: 'side-friendly-home', gameId: 'game-friendly', teamId },
       ]),
     },
-    // 라인업 행이 없으므로 두 경기 모두 MISSING — 할 일 목록에 그대로 오른다.
-    v1GameLineup: { findMany: jest.fn().mockResolvedValue([]) },
+    // 기본값은 라인업 행 없음 = 두 경기 모두 MISSING — 할 일 목록에 그대로 오른다.
+    // 인자로 주면 그 상태를 그대로 쓴다(제출 완료 경기를 재현할 때).
+    v1GameLineup: { findMany: jest.fn().mockResolvedValue(lineupRows) },
     // 리그 제목을 대진마다 따로 조회하면(N+1) 이 mock 이 호출되므로 잡힌다.
     v1League: { findMany: jest.fn().mockResolvedValue([]), findUnique: jest.fn() },
   };
@@ -254,6 +255,45 @@ describe('LineupTodoService — 리그 대진의 맥락', () => {
 
       expect(items).toHaveLength(1);
       expect(prisma.v1TeamMatch.findMany).toHaveBeenCalledTimes(1);
+    } finally {
+      await moduleRef.close();
+    }
+  });
+});
+
+/**
+ * 할 일 목록과 팀 경기 목록은 **같은 수집 경로**를 쓰지만 완료(SUBMITTED/LOCKED) 처리가
+ * 반대다. 한쪽만 보고 필터를 고치면 다른 쪽에 구멍이 난다 — 그래서 양방향으로 못박는다.
+ *
+ * 왜 갈려야 하나: 할 일 목록은 "아직 안 낸 것"을 재촉하는 화면이라 제출한 경기가 빠지는
+ * 게 맞다. 팀 경기 목록은 전술보드 진입점이라, 라인업을 제출했다고 그 경기의 전술보드에
+ * 못 들어가게 되면 안 된다(전술은 제출 후에도 계속 고친다).
+ */
+describe('LineupTodoService — 완료된 라인업 처리는 소비자마다 반대다', () => {
+  const submittedLeagueLineup = [{ sideId: 'side-league-home', state: 'SUBMITTED' }];
+
+  it('할 일 목록(홈 카드)은 제출 완료 경기를 뺀다', async () => {
+    const prisma = buildPrismaMock(submittedLeagueLineup);
+    const { service, moduleRef } = await buildService(prisma);
+    try {
+      const { items } = await service.listForUser({ id: userId } as never);
+      expect(items.map((item) => item.gameId)).toEqual(['game-friendly']);
+      expect(items.some((item) => item.gameId === 'game-league')).toBe(false);
+    } finally {
+      await moduleRef.close();
+    }
+  });
+
+  it('팀 경기 목록(전술보드 진입점)은 제출 완료 경기도 돌려준다', async () => {
+    const prisma = buildPrismaMock(submittedLeagueLineup);
+    const { service, moduleRef } = await buildService(prisma);
+    try {
+      const items = await service.listUpcomingForTeam(teamId, new Date('2026-09-01T00:00:00.000Z'));
+      const league = items.find((item) => item.gameId === 'game-league');
+      expect(league).toBeDefined();
+      expect(league?.lineupState).toBe('DONE');
+      // 제출 안 한 경기도 함께 온다 — 목록이 완료 여부로 갈리지 않는다.
+      expect(items.map((item) => item.gameId).sort()).toEqual(['game-friendly', 'game-league']);
     } finally {
       await moduleRef.close();
     }

@@ -12,13 +12,15 @@ Scope: **entire repository**. 이 파일은 Codex용 프로젝트 엔트리이�
 2. `.codex/AGENTS.md`
 3. `.codex/qa-rules.md`
 4. 작업과 관련된 `.codex/*.md`
-5. 관련 v1 소스: `apps/v1_api`, `apps/v1_web`
+5. 관련 v1 소스: `apps/v1_api`, `apps/v1_web`, Android 작업이면 `apps/v1_android`, iOS 작업이면 `apps/v1_ios`
 6. UI/디자인 작업이면 `docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html`
 
 유효한 소스는 아래로 제한한다.
 
 - Backend: `apps/v1_api`
 - Frontend: `apps/v1_web`
+- Android: `apps/v1_android`
+- iOS: `apps/v1_ios`
 - Design source of truth: `docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html`
 - Scoped Open Design source: explicitly requested/pinned Open Design recovery tasks may use `docs/reference/open-design/**` and the user-provided Open Design export as read-only visual references. This does not make design-only Open Design pages valid runtime routes without a v1 route/API contract.
 - Codex project rules: `.codex/*`
@@ -78,6 +80,8 @@ Errors:
 ## 0) Repo Map
 
 - `apps/v1_web`: v1 Next.js App Router 프론트엔드.
+- `apps/v1_android`: 배포된 v1 Web을 로드하고 Android FCM/권한/딥링크를 담당하는 네이티브 셸.
+- `apps/v1_ios`: 같은 역할의 iOS 셸. 푸시는 Firebase 없이 API가 APNs로 직접 보낸다. Xcode 프로젝트는 생성물이고 정의는 `project.yml`이다.
 - `apps/v1_api`: v1 NestJS 백엔드.
 - `apps/v1_api/prisma`: v1 Prisma schema, migration, seed.
 - `docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html`: v1 UI/디자인 source of truth.

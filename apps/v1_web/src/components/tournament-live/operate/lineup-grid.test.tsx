@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { LineupGrid, matchesPlayerQuery } from './lineup-grid';
+import { latestLineupForDisplay, latestOperableLineup, LineupGrid, matchesPlayerQuery } from './lineup-grid';
 import type { GameLineup, GameLineupParticipant, GameSide } from '@/types/game-operations';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -145,7 +145,7 @@ describe('LineupGrid — 선수 검색', () => {
     });
 
     expect(screen.getByText("'없는이름'과 맞는 선수가 없어요.")).toBeInTheDocument();
-    expect(screen.queryByText('제출된 선발 명단이 없어요.')).not.toBeInTheDocument();
+    expect(screen.queryByText('이 팀의 명단을 찾을 수 없어요.')).not.toBeInTheDocument();
   });
 
   // ② 교체 1·2단계는 이미 온피치/벤치로 좁혀진 목록이라 검색창이 방해만 된다.
@@ -163,7 +163,7 @@ describe('LineupGrid — 선수 검색', () => {
     expect(screen.getAllByRole('button', { name: /선수 이벤트 기록/ })).toHaveLength(1);
   });
 
-  it('명단 자체가 없으면 기존 안내와 제출 링크를 그대로 보여준다', () => {
+  it('명단 자체가 없으면 안내 문구를 보여준다 (제출 링크는 P1-d 로 사라졌다)', () => {
     render(
       <LineupGrid
         sides={SIDES}
@@ -174,16 +174,53 @@ describe('LineupGrid — 선수 검색', () => {
       />,
     );
 
-    expect(screen.getByText('제출된 선발 명단이 없어요.')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '라인업 제출하러 가기' })).toHaveAttribute(
-      'href',
-      '/tournaments/t-1/matches/f-1/lineup',
-    );
+    // [P1-c 후속] 문구가 바뀌었다. 표시는 이제 폴백을 쓰므로 여기까지 오는 것은
+    // **초안조차 없다**는 뜻이다 -- '제출된 명단이 없다'는 더 이상 정확한 설명이 아니다.
+    expect(screen.getByText('이 팀의 명단을 찾을 수 없어요.')).toBeInTheDocument();
+    // [P1-d] 제출 링크 단언은 뺐다 -- 경기별 라인업 화면이 사라져 갈 곳이 없다.
+    // 빈 상태 **문구**는 남는다(운영자가 왜 비었는지 알아야 한다).
+    expect(screen.queryByRole('link', { name: '라인업 제출하러 가기' })).not.toBeInTheDocument();
   });
 
   it('비활성 상태에서는 검색창도 잠근다', () => {
     render(<LineupGrid sides={SIDES} lineups={[lineup(SQUAD)]} onSelectPlayer={vi.fn()} disabled />);
 
     expect(screen.getByLabelText('등번호 또는 이름으로 선수 찾기')).toBeDisabled();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// [P1-c 후속] **두 규칙은 일부러 다르다. 이 스위트가 그것을 고정한다.**
+//
+// P1-c 가 "양 팀이 제출해야 시작할 수 있다"는 게이트를 걷어내면서, 라이브 경기에
+// 제출본이 항상 있다는 전제가 깨졌다. 그런데 화면은 여전히 제출본만 보고 있어서
+// **미제출 상태로 시작한 경기의 콘솔이 통째로 비었다** — 득점을 아무에게도 못 붙이고
+// 검인할 대상도 안 떴다(P1-b 가 지킨 `arrivedAt` 을 만들 수가 없다).
+//
+// 고치면서 규칙을 **하나로 합치지 않았다**. 소비처마다 옳은 답이 다르기 때문이다:
+//   · 표시·검인 → 폴백(`latestLineupForDisplay`). 안 그러면 화면이 빈다.
+//   · "아직 제출 안 했어요" 경고 → 제출본 전용(`latestOperableLineup`).
+//     폴백으로 바꾸면 초안이 늘 잡혀 **경고가 영영 안 뜬다.**
+//
+// 둘을 통일하려는 시도가 이 사고를 재현하므로, 차이 자체를 테스트로 못박는다.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('[P1-c 후속] 표시용 폴백과 제출본 전용 판정은 의도적으로 다르다', () => {
+  const draftOnly: GameLineup[] = [{ ...lineup([]), id: 'l-draft', state: 'DRAFT', revision: 1 }];
+  const submittedThenDraft: GameLineup[] = [
+    { ...lineup([]), id: 'l-submitted', state: 'SUBMITTED', revision: 1 },
+    { ...lineup([]), id: 'l-reopened', state: 'DRAFT', revision: 2 },
+  ];
+
+  it('표시·검인: 제출본이 없으면 최신 DRAFT 를 쓴다 (안 그러면 콘솔이 빈다)', () => {
+    expect(latestLineupForDisplay(draftOnly, 'side-home')?.id).toBe('l-draft');
+  });
+
+  it('미제출 경고: 제출본이 없으면 null 이다 (폴백을 쓰면 경고가 영영 안 뜬다)', () => {
+    expect(latestOperableLineup(draftOnly, 'side-home')).toBeNull();
+  });
+
+  it('제출본이 있으면 둘 다 같은 것을 고른다 — 위에 얹힌 DRAFT 가 제출을 밀어내지 못한다', () => {
+    expect(latestLineupForDisplay(submittedThenDraft, 'side-home')?.id).toBe('l-submitted');
+    expect(latestOperableLineup(submittedThenDraft, 'side-home')?.id).toBe('l-submitted');
   });
 });

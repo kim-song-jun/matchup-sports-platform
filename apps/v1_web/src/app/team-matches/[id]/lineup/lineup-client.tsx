@@ -14,6 +14,7 @@ import {
 } from '@/components/lineup/lineup-source';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { PlusIcon } from '@/components/v1-ui/icons';
+import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import {
   useV1MyTeams,
   useV1RequestTeamMatchLineupChange,
@@ -324,56 +325,18 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   const [changeRequestOpen, setChangeRequestOpen] = useState(false);
   const [changeRequestReason, setChangeRequestReason] = useState('');
   const [changeRequestError, setChangeRequestError] = useState<string | null>(null);
-  const changeRequestDialogRef = useRef<HTMLElement | null>(null);
-  const changeRequestReasonRef = useRef<HTMLTextAreaElement | null>(null);
-  const changeRequestPreviousFocusRef = useRef<Element | null>(null);
 
-  // 접근성: ESC로 닫기 + 열릴 때 이전 포커스 저장/닫힐 때 복원 (WCAG 2.4.3)
-  // — components/v1-ui/confirm-modal.tsx와 동일 패턴
-  useEffect(() => {
-    if (!changeRequestOpen) return;
-    changeRequestPreviousFocusRef.current = document.activeElement;
-    const id = window.setTimeout(() => changeRequestReasonRef.current?.focus(), 60);
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setChangeRequestOpen(false);
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.clearTimeout(id);
-      document.removeEventListener('keydown', handleKeyDown);
-      const previous = changeRequestPreviousFocusRef.current;
-      if (previous && typeof (previous as HTMLElement).focus === 'function') {
-        (previous as HTMLElement).focus();
-      }
-      changeRequestPreviousFocusRef.current = null;
-    };
-  }, [changeRequestOpen]);
-
-  // 접근성: Tab/Shift-Tab 포커스트랩 — components/v1-ui/confirm-modal.tsx와 동일 패턴
-  useEffect(() => {
-    if (!changeRequestOpen) return;
-    const FOCUSABLE = 'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
-    const handleTab = (event: KeyboardEvent) => {
-      if (event.key !== 'Tab') return;
-      const dialog = changeRequestDialogRef.current;
-      if (!dialog) return;
-      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE));
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey) {
-        if (document.activeElement === first) {
-          event.preventDefault();
-          last.focus();
-        }
-      } else if (document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener('keydown', handleTab);
-    return () => document.removeEventListener('keydown', handleTab);
-  }, [changeRequestOpen]);
+  // 접근성(ESC 닫기·포커스 저장/복원·Tab 포커스트랩·body 스크롤 잠금·backdrop 클릭 닫기)은
+  // 공용 훅 useModalA11y 로 위임 — 조건부 마운트형(changeRequestOpen ? … : null)이라
+  // open 은 실제 state 를 그대로 넘긴다.
+  const {
+    dialogRef: changeRequestDialogRef,
+    initialFocusRef: changeRequestReasonRef,
+    onBackdropClick: onChangeRequestBackdropClick,
+  } = useModalA11y<HTMLTextAreaElement, HTMLElement>({
+    open: changeRequestOpen,
+    onClose: () => setChangeRequestOpen(false),
+  });
 
   // insane review(P1-3, 2026-08 GPT Pro): "제외" 버튼은 실제로는 완전 삭제(moveEntry의
   // 선발↔후보 이동과 다르다) — 등번호·GK 지정·피치 좌표가 전부 소실되고, 재수화된 뒤라면
@@ -957,7 +920,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                         flexShrink: 0,
                         minWidth: 44,
                         minHeight: 44,
-                        borderRadius: 999,
+                        borderRadius: 'var(--radius-pill)',
                         border: entry.goalkeeper ? '1.5px solid var(--orange700)' : '1.5px dashed var(--grey300)',
                         background: entry.goalkeeper ? 'var(--orange700)' : 'transparent',
                         color: entry.goalkeeper ? '#fff' : 'var(--text-caption)',
@@ -1322,7 +1285,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
       {changeRequestOpen ? (
         <div
           role="presentation"
-          onClick={() => setChangeRequestOpen(false)}
+          onClick={onChangeRequestBackdropClick}
           style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', background: 'var(--scrim-dark-32)', padding: 20 }}
         >
           <section

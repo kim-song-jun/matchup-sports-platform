@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronRightIcon } from '@/components/v1-ui/icons';
 import { TermsDocumentSubtitleAndCard } from '@/components/auth/terms-document-body';
 import { Button } from '@/components/v1-ui/button';
+import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import {
   useV1AcceptSignupTerms,
   useV1CompleteSocialTerms,
@@ -90,20 +91,8 @@ export function TermsClient() {
     setCheckedByDocumentId((current) => ({ ...current, [documentId]: nextChecked }));
   };
 
-  useEffect(() => {
-    if (!legalDialog) {
-      return undefined;
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setLegalDialog(null);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [legalDialog]);
+  // ESC 닫기는 LegalDocumentDialog 내부의 useModalA11y 로 이관했다(포커스 트랩·스크롤
+  // 잠금·포커스 복원도 함께 그 훅이 담당).
 
   useEffect(() => {
     if (!isRenewalMode || document) return undefined;
@@ -999,10 +988,18 @@ function getSupportSections(): LegalDocumentSection[] {
 }
 
 function LegalDocumentDialog({ title, sections, onClose }: { title: string; sections: LegalDocumentSection[]; onClose: () => void }) {
+  // 포커스 트랩·스크롤 잠금·포커스 복원·ESC 닫기·backdrop 클릭 닫기를 공용 훅에 위임한다.
+  // 이 컴포넌트는 부모(legalDialog ? <LegalDocumentDialog/> : null)가 조건부로만
+  // 마운트하므로 open 은 true 로 고정한다.
+  const { dialogRef, onBackdropClick } = useModalA11y<HTMLElement, HTMLElement>({
+    open: true,
+    onClose,
+  });
+
   return (
     <div
       role="presentation"
-      onClick={onClose}
+      onClick={onBackdropClick}
       style={{
         position: 'fixed',
         inset: 0,
@@ -1015,10 +1012,10 @@ function LegalDocumentDialog({ title, sections, onClose }: { title: string; sect
       }}
     >
       <section
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="terms-dialog-title"
-        onClick={(event) => event.stopPropagation()}
         style={{
           width: 'min(100%, 480px)',
           maxHeight: '82dvh',

@@ -3,12 +3,13 @@ import { render, screen } from '@testing-library/react';
 import { MatchPageClient } from './match-page-client';
 
 /**
- * 라인업 관리 진입점의 계약.
+ * [P1-d] 이 파일에는 원래 **라인업 관리 CTA** 의 노출 규칙(참가팀 매니저·스태프에게
+ * 보이고 관람자에게는 숨긴다)을 지키는 테스트 4건이 있었다. 경기별 라인업 화면이
+ * 통째로 사라지면서 그 CTA 도 없어졌으므로 함께 걷어냈다 — 지금 팀장이 자리를 잡는
+ * 곳은 팀 상세의 전술보드다.
  *
- * 대회 스태프는 `mySideId` 가 null 이지만 라인업 화면에서 팀을 골라 양 팀 명단을
- * 작성할 수 있다(스태프 팀 선택 UI). 예전에는 이 CTA 가 `mySideId` 만 보고 걸러서
- * "권한은 있는데 들어갈 링크가 없는" 상태였고, URL 을 직접 아는 사람만 진입할 수
- * 있었다. 이 테스트가 깨지면 그 상태로 되돌아간 것이다.
+ * 남긴 것은 **화면 제거와 무관한 계약** 하나뿐이다(뒤로가기 목적지). 파일을 통째로
+ * 지웠다면 그것까지 같이 사라졌을 것이다.
  */
 const accessMock = vi.fn();
 const matchMock = vi.fn();
@@ -55,41 +56,11 @@ function renderWith(access: { mySideId: string | null; isStaff: boolean } | unde
   return render(<MatchPageClient tournamentId="t-1" fixtureId="f-1" />);
 }
 
-describe('MatchPageClient — 라인업 관리 진입점', () => {
+describe('MatchPageClient', () => {
   beforeEach(() => {
     accessMock.mockReset();
     matchMock.mockReset();
     chromeMock.mockClear();
-  });
-
-  it('참가팀 매니저에게 라인업 관리 링크를 보여준다', () => {
-    renderWith({ mySideId: 'side-home', isStaff: false });
-
-    const link = screen.getByRole('link', { name: '라인업 관리' });
-    expect(link).toHaveAttribute('href', '/tournaments/t-1/matches/f-1/lineup');
-    expect(screen.getByText('선발·후보 명단을 작성하고 제출하세요.')).toBeInTheDocument();
-  });
-
-  it('소속 팀이 없는 대회 스태프에게도 링크를 보여준다', () => {
-    renderWith({ mySideId: null, isStaff: true });
-
-    expect(screen.getByRole('link', { name: '라인업 관리' })).toHaveAttribute(
-      'href',
-      '/tournaments/t-1/matches/f-1/lineup',
-    );
-    expect(screen.getByText('운영진 권한으로 양 팀 명단을 작성할 수 있어요.')).toBeInTheDocument();
-  });
-
-  it('권한이 없는 일반 관람자에게는 링크를 감춘다', () => {
-    renderWith({ mySideId: null, isStaff: false });
-
-    expect(screen.queryByRole('link', { name: '라인업 관리' })).not.toBeInTheDocument();
-  });
-
-  it('접근 권한을 아직 못 받았으면 링크를 감춘다', () => {
-    renderWith(undefined);
-
-    expect(screen.queryByRole('link', { name: '라인업 관리' })).not.toBeInTheDocument();
   });
 
   it('경기 상세의 뒤로가기는 통합 일정 화면인 bracket으로 돌아간다', () => {

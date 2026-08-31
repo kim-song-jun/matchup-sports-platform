@@ -13,6 +13,7 @@ import { buildPageInfo, paginationArgs } from '../common/pagination/page-args';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { GeocodedCoordinates, KakaoGeocodingService } from './kakao-geocoding.service';
 import { isBracketPublished } from './tournament-detail.presenter';
+import { TOURNAMENT_SURFACE_KIND } from './tournament-surface';
 import {
   AdminTournamentListQueryDto,
   ChangeTournamentStatusDto,
@@ -103,6 +104,9 @@ export class TournamentsAdminService {
     const limit = query.limit ?? 20;
 
     const statusFacetWhere: Prisma.V1TournamentWhereInput = {
+      // 목록과 상태 탭 카운트가 **같은 조건**을 봐야 한다 — 한쪽만 거르면 탭 숫자가
+      // 목록 행 수와 어긋난다. 아래 `where` 가 이 객체를 spread 하므로 둘 다 적용된다.
+      ...TOURNAMENT_SURFACE_KIND,
       deletedAt: null,
       ...(query.sportId ? { sportId: query.sportId } : {}),
       ...(query.q ? { title: { contains: query.q, mode: 'insensitive' } } : {}),

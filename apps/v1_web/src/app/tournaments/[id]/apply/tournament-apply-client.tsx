@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { UsersRound } from 'lucide-react';
 import { buildPhoneVerifyHref } from '@/components/auth/phone-verification/phone-verify-route';
 import { AppChrome } from '@/components/v1-ui/shell';
+import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { AlertBanner, Card, EmptyState, InfoRow, SectionTitle } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { getTournamentRosterNextStep } from '@/components/tournaments/tournament-roster-next-step';
@@ -312,7 +313,7 @@ function TeamSelectStep({
               <div
                 key={i}
                 aria-hidden="true"
-                style={{ height: 72, borderRadius: 14, background: 'var(--grey100)' }}
+                style={{ height: 72, borderRadius: 'var(--radius-field)', background: 'var(--grey100)' }}
               />
             ))}
           </div>
@@ -420,7 +421,7 @@ function TeamSelectStep({
                             flexShrink: 0,
                             width: 20,
                             height: 20,
-                            borderRadius: '50%',
+                            borderRadius: 'var(--radius-circle)',
                             background: 'var(--blue500)',
                             display: 'grid',
                             placeItems: 'center',
@@ -547,7 +548,7 @@ function ExpandableCheckRow({
                   style={{
                     flexShrink: 0,
                     padding: '2px 8px',
-                    borderRadius: 999,
+                    borderRadius: 'var(--radius-pill)',
                     background: consentType === 'required' ? 'var(--red50)' : 'var(--grey100)',
                     color: consentType === 'required' ? 'var(--red700)' : 'var(--text-muted)',
                     fontWeight: 700,
@@ -583,7 +584,7 @@ function ExpandableCheckRow({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              borderRadius: 8,
+              borderRadius: 'var(--radius-chip)',
               fontSize: 12,
               fontWeight: 600,
             }}
@@ -976,7 +977,7 @@ function AgreementsStep({
                 flexShrink: 0,
                 width: 22,
                 height: 22,
-                borderRadius: '50%',
+                borderRadius: 'var(--radius-circle)',
                 border: '2px solid var(--blue500)',
                 background: 'var(--blue500)',
                 display: 'grid',
@@ -987,7 +988,7 @@ function AgreementsStep({
                 style={{
                   width: 8,
                   height: 8,
-                  borderRadius: '50%',
+                  borderRadius: 'var(--radius-circle)',
                   background: 'var(--static-white)',
                   display: 'block',
                 }}
@@ -1109,19 +1110,17 @@ function TournamentConsentDialog({
   document: TournamentConsentDocument;
   onClose: () => void;
 }) {
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  // a11y: focus trap·스크롤 잠금·포커스 저장/복원·ESC 닫기는 공용 훅에 위임
+  // (조건부 마운트형 모달이라 open 은 true 고정)
+  const { dialogRef, initialFocusRef, onBackdropClick } = useModalA11y<HTMLButtonElement, HTMLElement>({
+    open: true,
+    onClose,
+  });
 
   return (
     <div
       role="presentation"
-      onClick={onClose}
+      onClick={onBackdropClick}
       style={{
         position: 'fixed',
         inset: 0,
@@ -1134,6 +1133,7 @@ function TournamentConsentDialog({
       }}
     >
       <section
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="tournament-consent-dialog-title"
@@ -1162,7 +1162,7 @@ function TournamentConsentDialog({
           <h2 id="tournament-consent-dialog-title" className="tm-text-subhead" style={{ margin: 0 }}>
             {document.title}
           </h2>
-          <button className="tm-btn tm-btn-sm tm-btn-ghost" onClick={onClose} type="button" autoFocus>
+          <button ref={initialFocusRef} className="tm-btn tm-btn-sm tm-btn-ghost" onClick={onClose} type="button">
             닫기
           </button>
         </header>
@@ -1188,21 +1188,18 @@ function TournamentSubmitConfirmDialog({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
-  useEffect(() => {
-    if (isSubmitting) return;
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onCancel();
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isSubmitting, onCancel]);
+  // a11y: focus trap·스크롤 잠금·포커스 저장/복원·ESC 닫기는 공용 훅에 위임
+  // (조건부 마운트형 모달이라 open 은 true 고정). 제출 중에는 pending 으로 ESC·backdrop 닫기 잠금
+  const { dialogRef, initialFocusRef, onBackdropClick } = useModalA11y<HTMLButtonElement, HTMLElement>({
+    open: true,
+    onClose: onCancel,
+    pending: isSubmitting,
+  });
 
   return (
     <div
       role="presentation"
-      onClick={isSubmitting ? undefined : onCancel}
+      onClick={onBackdropClick}
       style={{
         position: 'fixed',
         inset: 0,
@@ -1215,6 +1212,7 @@ function TournamentSubmitConfirmDialog({
       }}
     >
       <section
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="tournament-submit-confirm-title"
@@ -1238,11 +1236,11 @@ function TournamentSubmitConfirmDialog({
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.6fr', gap: 8, marginTop: 20 }}>
           <button
+            ref={initialFocusRef}
             type="button"
             className="tm-btn tm-btn-lg tm-btn-neutral"
             disabled={isSubmitting}
             onClick={onCancel}
-            autoFocus
           >
             취소
           </button>
@@ -1327,7 +1325,7 @@ function PaymentGuideStep({
           style={{
             width: 56,
             height: 56,
-            borderRadius: '50%',
+            borderRadius: 'var(--radius-circle)',
             background: 'var(--blue500)',
             display: 'grid',
             placeItems: 'center',
@@ -1455,7 +1453,7 @@ function LoadingSkeleton() {
         <div
           key={i}
           aria-hidden="true"
-          style={{ height: 64, borderRadius: 14, background: 'var(--grey100)', marginBottom: 12 }}
+          style={{ height: 64, borderRadius: 'var(--radius-field)', background: 'var(--grey100)', marginBottom: 12 }}
         />
       ))}
     </div>
@@ -1964,7 +1962,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
           >
             <div
               className="tm-text-label"
-              style={{ color: 'var(--static-white)', background: 'var(--scrim-dark-72)', padding: '12px 20px', borderRadius: 14 }}
+              style={{ color: 'var(--static-white)', background: 'var(--scrim-dark-72)', padding: '12px 20px', borderRadius: 'var(--radius-field)' }}
             >
               잠깐만요…
             </div>

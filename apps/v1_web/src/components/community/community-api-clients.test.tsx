@@ -143,6 +143,82 @@ describe('ChatRoomPageClient', () => {
     expect(screen.queryByText('수아님이 참가 승인됐어요')).not.toBeInTheDocument();
   });
 
+  it('shows a timestamp for every consecutive message from the same sender', () => {
+    hooks.chatRoom.mockReturnValue({
+      data: {
+        roomId: 'room-times',
+        roomType: 'team',
+        status: 'active',
+        title: 'Timestamp test',
+        linkedTarget: { type: 'team', id: 'team-1', title: 'Test team', route: '/teams/team-1' },
+        me: {
+          participantId: 'participant-me',
+          status: 'active',
+          pinned: false,
+          mutedUntil: null,
+          lastReadMessageId: null,
+        },
+        participants: [],
+      },
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    hooks.chatMessages.mockReturnValue({
+      data: {
+        items: [
+          {
+            messageId: 'other-1',
+            sender: { userId: 'user-other', displayName: 'Other', profileImageUrl: null },
+            messageType: 'text',
+            content: 'Other first',
+            status: 'sent',
+            sentAt: '2026-08-31T09:01:00.000Z',
+            mine: false,
+          },
+          {
+            messageId: 'other-2',
+            sender: { userId: 'user-other', displayName: 'Other', profileImageUrl: null },
+            messageType: 'text',
+            content: 'Other second',
+            status: 'sent',
+            sentAt: '2026-08-31T09:02:00.000Z',
+            mine: false,
+          },
+          {
+            messageId: 'mine-1',
+            sender: { userId: 'user-me', displayName: 'Me', profileImageUrl: null },
+            messageType: 'text',
+            content: 'Mine first',
+            status: 'sent',
+            sentAt: '2026-08-31T09:03:00.000Z',
+            mine: true,
+          },
+          {
+            messageId: 'mine-2',
+            sender: { userId: 'user-me', displayName: 'Me', profileImageUrl: null },
+            messageType: 'text',
+            content: 'Mine second',
+            status: 'sent',
+            sentAt: '2026-08-31T09:04:00.000Z',
+            mine: true,
+          },
+        ],
+        nextCursor: null,
+      },
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+
+    renderWithClient(<ChatRoomPageClient roomId={'room-times'} />);
+
+    expect(screen.getByText('18:01')).toBeInTheDocument();
+    expect(screen.getByText('18:02')).toBeInTheDocument();
+    expect(screen.getByText('18:03')).toBeInTheDocument();
+    expect(screen.getByText('18:04')).toBeInTheDocument();
+  });
+
   it('still shows the placeholder conversation while the room is loading (documented loading-only behavior)', () => {
     hooks.chatRoom.mockReturnValue({ data: undefined, isPending: true, isError: false, refetch: vi.fn() });
     hooks.chatMessages.mockReturnValue({ data: undefined, isPending: true, isError: false, refetch: vi.fn() });

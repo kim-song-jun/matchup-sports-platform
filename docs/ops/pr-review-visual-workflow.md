@@ -91,11 +91,14 @@ gh api graphql -f query='{repository(owner:"<OWNER>",name:"<REPO>"){pullRequest(
   --jq '.data.repository.pullRequest as $p
     | ($p.commits.nodes[0].commit.committedDate) as $head
     | ([$p.reviews.nodes[]|select(.author.login=="copilot-pull-request-reviewer")]|last) as $r
-    | "1 작성자   \($r.author.login)",
+    | ($r.body // "") as $b
+    | if $r == null then "Copilot 리뷰가 아직 없다 (판정할 것이 없음)" else
+      "1 작성자   \($r.author.login)",
       "2 제출시각 \($r.submittedAt) vs head \($head) → " + (if $r.submittedAt > $head then "OK" else "아직 안 봤다" end),
-      "3 Comments " + (($r.body|capture("Comments generated:\\*\\* (?<n>[^\n]*)").n) // "추출실패(0 아님)"),
-      "4 Suppress " + (if ($r.body|test("Suppressed comments")) then "있음 — 열어봐야 한다" else "없음" end),
-      "5 미해결   \([$p.reviewThreads.nodes[]|select(.isResolved==false)]|length)건"'
+      "3 Comments " + (($b|capture("Comments generated:\\*\\* (?<n>[^\n]*)").n) // "추출실패(0 아님)"),
+      "4 Suppress " + (if ($b|test("Suppressed comments")) then "있음 — 열어봐야 한다" else "없음" end),
+      "5 미해결   \([$p.reviewThreads.nodes[]|select(.isResolved==false)]|length)건"
+      end'
 ```
 
 #### 도착 감지·판정의 함정 넷 — 넷 다 실제로 밟았다
@@ -105,9 +108,20 @@ gh api graphql -f query='{repository(owner:"<OWNER>",name:"<REPO>"){pullRequest(
 **조용히** 실패해서 "아직 안 왔다"로 읽힌다. **시각 비교(게이트 2)로 판정하면 기준선이
 없으므로 이 경합 자체가 없다.**
 
-**② 빈 추출은 0이 아니다.** `capture(...)`/`grep -o`가 못 찾으면 **빈 문자열**을 낸다.
-그걸 `0`으로 읽으면 지적이 있는 리뷰를 통과로 읽는다. 출력이 비면 **추출 실패**로 취급하고
-본문을 파일로 받아 눈으로 확인한다:
+**② 빈 결과는 0이 아니다 — 그리고 `capture`는 입력이 문자열이 아니면 죽는다.**
+실측(jq 1.7.1)으로 갈리는 세 경우:
+```
+매칭 성공          값을 낸다
+매칭 실패          값을 안 낸다(empty). `// "폴백"` 이 받아 준다 — 에러가 아니다, rc=0
+입력이 null        ❌ 에러로 종료(rc=5): "null (null) cannot be matched, as it is not a string"
+                   ← 리뷰가 아직 0건이면 `$r.body` 가 null 이라 여기 걸린다.
+                     PR 을 막 연 직후가 정확히 그 상태다
+```
+그래서 위 명령은 **`$r == null` 을 먼저 가르고** 본문도 `($r.body // "")` 로 받는다.
+`//` 만으로는 매칭 실패는 막아도 **null 입력은 못 막는다.**
+
+그리고 빈 결과를 `0`으로 읽으면 지적이 있는 리뷰를 통과로 읽는다. 비면 **추출 실패**로
+취급하고 본문을 파일로 받아 눈으로 확인한다:
 ```bash
 gh api graphql ... --jq '...|last|.body' > /tmp/r.md
 grep -nE 'Comments generated|Suppressed' /tmp/r.md

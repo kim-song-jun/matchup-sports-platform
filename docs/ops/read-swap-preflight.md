@@ -347,3 +347,54 @@ done
 grep -rn "\`/admin/league-matches/" apps/v1_api/src --include='*.ts' | grep -v spec
 ```
 (선행 백틱 = 템플릿 리터럴 = 실제로 만들어지는 URL. 현재 1건, 위 표의 reminder.)
+
+---
+
+## 8. read-swap **다음** 단계의 위험 — 게임 소스 승격 (`sourceType`)
+
+> 여기 적는 이유: **이 문서를 읽는 사람이 다음에 마주칠 것**이고, 그 사고는
+> **운영자가 경기 조작을 못 하게 되는 것** — 사용자에게 보이는 사고다.
+
+`V1Game.sourceType` 이 `TEAM_MATCH` → `COMPETITION_FIXTURE` 로 바뀌는 순간
+**그 경기에 걸린 운영 규칙이 통째로 달라진다.**
+
+```ts
+// games.service.ts:7208  requireTakeover
+if (sourceType === V1GameSourceType.TEAM_MATCH) {
+  return;                      // ← 팀 매치는 그냥 통과
+}
+const token = context.takeoverToken?.trim();   // ← 그 외 전부 takeover 토큰 필요
+```
+
+팀 매치 액터는 **애초에 `authorizationSubject` 를 얻을 수 없다**(`resolveActor`).
+그래서 승격이 **진행 중이거나 예정된 경기**에서 일어나면 그 경기의 운영자는
+`event_append`/`event_reverse` 에서 **영구히 잠긴다.**
+
+### 완화 셋 — ①은 이미 됐고 ②③이 남았다
+
+| | 완화 | 상태 |
+|---|---|---|
+| ③ | **enum 에 새 값을 추가하고 구 값은 R5 에서 제거** — 개명하지 않는다 | ✅ **이미 됨.** `COMPETITION_FIXTURE` 가 R1 expand 로 추가돼 있고(`schema.prisma:356` 부근) 구 값 둘은 그대로다. **지금 이 두 값을 쓰는 코드는 없다** |
+| ① | 백필은 **종료된 경기부터**. 진행 중·예정은 별도 창 | ⬜ R3 에서 |
+| ② | 승격 전 그 리그에 **`state=LIVE` 게임이 0건인지 가드** | ⬜ R3 에서 |
+
+### ⚠️ 네 번째 함정 — Postgres 트랜잭션
+
+`ALTER TYPE … ADD VALUE` 로 추가한 enum 값은 **같은 트랜잭션 안에서 쓸 수 없다.**
+→ **R3 백필은 값 추가와 반드시 다른 마이그레이션 파일이어야 한다.**
+(이건 스키마 주석에도 적혀 있다 — 완화 목록에는 없던 것이라 여기 함께 둔다.)
+
+### 이게 아직 참인지 확인하는 법
+
+```bash
+awk '/private requireTakeover/,/^  }/' apps/v1_api/src/games/games.service.ts \
+  | grep -n 'TEAM_MATCH'
+```
+`sourceType === V1GameSourceType.TEAM_MATCH` 로 **일찍 반환하는 줄**이 나오면 위험은 그대로다.
+안 나오면 그 분기가 없어진 것이니 이 절을 다시 쓴다.
+
+> **`grep -A<N>` 을 쓰지 말 것.** 이 함수는 **주석이 여덟 줄**이라 `-A3` 로는 정작 `if` 에
+> 닿지 않고 **빈 결과**를 준다 — 그걸 "분기가 없어졌다"로 읽으면 위험을 **해소된 것으로
+> 오독한다.** (이 문서를 쓰면서 실제로 그 명령을 적었다가 돌려 보고 잡았다.)
+> 함수 전체를 뜨는 `awk` 범위를 쓴다.
+

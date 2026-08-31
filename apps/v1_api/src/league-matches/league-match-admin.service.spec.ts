@@ -88,6 +88,11 @@ function createFake() {
       })),
       update: track('v1League.update', async () => ({ id: 'league-1' })),
     },
+    // dual-write 대상 — 리그 state 를 바꾸는 자리는 통합 축의 거울도 같이 고친다.
+    // `updateMany` 는 백필 전에는 0행이 정상이라(거울이 아직 없다) count 0 을 준다.
+    v1Tournament: {
+      updateMany: track('v1Tournament.updateMany', async () => ({ count: 0 })),
+    },
     v1Sport: { findFirst: track('v1Sport.findFirst', async () => ({ code: 'futsal' })) },
     v1CompetitionConfigVersion: {
       findFirst: track('v1CompetitionConfigVersion.findFirst', async () => ({ id: 'config-1' })),

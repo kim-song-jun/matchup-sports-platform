@@ -130,6 +130,43 @@ describe('backfillLeagueCompetitionDetails', () => {
     expect(updateMany).not.toHaveBeenCalled();
   });
 
+  // ─── dual-write 와의 상호작용 ───────────────────────────────────────────────
+  // dual-write 가 배포된 뒤 새로 생긴 리그는 거울이 **처음부터 올바른 값**으로 만들어진다.
+  // 그걸 "낯선 값" 으로 막으면 **리그 하나 때문에 백필 전체가 멈춘다.**
+
+  it('이미 목표값과 같은 행은 막지 않고 건너뛴다 — dual-write 가 만든 거울', async () => {
+    const alreadyCorrect = tournament({
+      status: 'in_progress',
+      scheduledAt: new Date('2026-03-01T00:00:00.000Z'),
+      scheduledEndAt: new Date('2026-06-30T00:00:00.000Z'),
+      regionId: 'region-1',
+    });
+    const { prisma, updateMany } = fakePrisma([league()], [alreadyCorrect]);
+
+    const result = await backfillLeagueCompetitionDetails(prisma, { dryRun: false });
+
+    expect(result).toEqual({ scanned: 1, skipped: 1, updated: 0, dryRun: false });
+    expect(updateMany).not.toHaveBeenCalled();
+  });
+
+  it('값이 있지만 목표와 다르면 여전히 막는다 — 건너뛰기가 덮어쓰기 허용이 아니다', async () => {
+    // 한 필드만 달라도 막아야 한다. 같은 것끼리만 건너뛴다.
+    const different = tournament({
+      status: 'in_progress',
+      scheduledAt: new Date('2026-03-01T00:00:00.000Z'),
+      scheduledEndAt: new Date('2026-06-30T00:00:00.000Z'),
+      regionId: 'region-9',
+    });
+    const { prisma, updateMany } = fakePrisma([league()], [different]);
+
+    const error = await backfillLeagueCompetitionDetails(prisma, { dryRun: false }).catch(
+      (e: unknown) => e,
+    );
+
+    expect(error).toBeInstanceOf(LeagueDetailBackfillBlockedError);
+    expect(updateMany).not.toHaveBeenCalled();
+  });
+
   it('가드 2: 이미 값이 채워진 행이 있으면 덮어쓰지 않고 무엇이 찼는지 보고한다', async () => {
     const { prisma, updateMany } = fakePrisma(
       [league()],
@@ -169,11 +206,11 @@ describe('backfillLeagueCompetitionDetails', () => {
     const dry = fakePrisma([league()], [tournament()]);
     const dryResult = await backfillLeagueCompetitionDetails(dry.prisma, { dryRun: true });
     expect(dry.updateMany).not.toHaveBeenCalled();
-    expect(dryResult).toEqual({ scanned: 1, updated: 0, dryRun: true });
+    expect(dryResult).toEqual({ scanned: 1, skipped: 0, updated: 0, dryRun: true });
 
     const applied = fakePrisma([league()], [tournament()]);
     const applyResult = await backfillLeagueCompetitionDetails(applied.prisma, { dryRun: false });
     expect(applied.updateMany).toHaveBeenCalledTimes(1);
-    expect(applyResult).toEqual({ scanned: 1, updated: 1, dryRun: false });
+    expect(applyResult).toEqual({ scanned: 1, skipped: 0, updated: 1, dryRun: false });
   });
 });

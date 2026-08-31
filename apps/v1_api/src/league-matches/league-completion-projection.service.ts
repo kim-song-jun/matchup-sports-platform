@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import type { OfficialRevisionRow } from '../game-operations/game-result-official-projection.types';
 import { shouldCompleteLeague } from './league-lifecycle-rules';
+import { STATUS_BY_LEAGUE_STATE } from '../tournaments/league-competition-mirror';
 
 /**
  * `GameResultOfficialProjectionService.handler`가 여는 같은 트랜잭션(tx) 위에서
@@ -97,6 +98,14 @@ export class LeagueCompletionProjectionService {
       data: { state: 'completed' },
     });
     if (result.count === 0) return false;
+
+    // dual-write — 거울의 status 도 completed 로. **`result.count === 0` 인 조기 반환 뒤에**
+    // 두는 것이 중요하다: 위 조건부 update 의 승자만 여기 도달하므로, 늦게 온 트랜잭션이
+    // 거울을 중복으로 건드리지 않는다(그 동시성 설계를 거울에도 그대로 승계한다).
+    await tx.v1Tournament.updateMany({
+      where: { id: leagueId, kind: 'regular_league' },
+      data: { status: STATUS_BY_LEAGUE_STATE.completed },
+    });
 
     await tx.v1StatusChangeLog.create({
       data: {

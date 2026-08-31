@@ -1,0 +1,15 @@
+{
+  "_comment": "v1League 에 쓰는 자리. 늘리려면 통합 축 거울을 같은 트랜잭션에 쓰는 dual-write 를 함께 붙여라 — 거울 없는 리그는 read-swap 뒤 화면에서 에러 없이 사라진다.",
+  "src/league-matches/league-match-admin.service.ts": {
+    "allowed": 4,
+    "why": "신규 리그 create 1 + state→active update 2 + 되돌리기 updateMany 1. 네 곳 모두 같은 트랜잭션 안에서 v1Tournament 거울을 함께 쓴다."
+  },
+  "src/league-matches/league-series-admin.service.ts": {
+    "allowed": 2,
+    "why": "시리즈 최초 생성 + 승강 다음 시즌 생성. 둘 다 같은 트랜잭션에서 거울을 create 한다."
+  },
+  "src/league-matches/league-completion-projection.service.ts": {
+    "allowed": 1,
+    "why": "active→completed 조건부 updateMany. count 0 조기 반환 뒤에 거울을 고쳐 조건부 update 의 승자만 반영한다."
+  }
+}

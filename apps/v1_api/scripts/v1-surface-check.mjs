@@ -45,6 +45,7 @@ import { execSync } from 'node:child_process';
 const LOOKUP_BASELINE = 'scripts/tournament-surface-baseline.json';
 const RAW_SQL_BASELINE = 'scripts/tournament-raw-sql-baseline.json';
 const LEAGUE_ALLOWED_BASELINE = 'scripts/tournament-league-allowed-baseline.json';
+const LEAGUE_WRITE_BASELINE = 'scripts/league-write-site-baseline.json';
 
 /**
  * 헬퍼 자신은 세지 않는다 — **원시 조회가 허용된 유일한 자리**다.
@@ -61,6 +62,7 @@ const RAW_LOOKUP = /\bv1Tournament\s*\.\s*(findUnique|findFirst)(OrThrow)?\s*\(/
 
 /** raw SQL 안의 테이블 이름. 주석은 세지 않는다 — 이 파일들엔 설명 주석이 많다. */
 const RAW_TABLE = /\bv1_tournaments\b/g;
+const LEAGUE_WRITE = /\bv1League\.(create|createMany|update|updateMany|upsert|delete|deleteMany)\b/g;
 
 /**
  * **리그를 의도적으로 허용하는 자리.** 원시 호출을 0 으로 만든 뒤에도 남는 구멍이 하나
@@ -109,6 +111,26 @@ function countRawSqlTable(source) {
     const trimmed = line.trimStart();
     if (trimmed.startsWith('*') || trimmed.startsWith('//') || trimmed.startsWith('/*')) continue;
     n += (line.match(RAW_TABLE) ?? []).length;
+  }
+  return n;
+}
+
+/**
+ * `v1League` 에 **쓰는** 자리를 센다.
+ *
+ * 다른 세 검사는 전부 *읽기*를 센다. 그래서 리그를 만들거나 상태를 바꾸는 자리가 늘어도
+ * 아무 검사에도 안 걸렸고, 실제로 **dual-write 없이 7곳이 살아 있었다**(2026-08-31).
+ * 통합 축에 거울을 안 만든 리그는 read-swap 뒤 **에러 없이 화면에서 사라진다** —
+ * 읽는 코드를 아무리 세도 이건 안 보인다.
+ *
+ * 새 쓰기 자리가 늘면 CI 가 멈춰서 "dual-write 붙였나" 를 묻게 하는 것이 이 검사의 일이다.
+ */
+function countLeagueWrites(source) {
+  let n = 0;
+  for (const line of source.split('\n')) {
+    const trimmed = line.trimStart();
+    if (trimmed.startsWith('*') || trimmed.startsWith('//') || trimmed.startsWith('/*')) continue;
+    n += (line.match(LEAGUE_WRITE) ?? []).length;
   }
   return n;
 }
@@ -196,6 +218,14 @@ function main() {
     hint: '리그를 대회 표면에 허용하는 선택이다 — baseline 에 이유(why)와 함께 올려라',
   });
 
+  const leagueWrites = checkBaseline({
+    label: 'v1League 쓰기 자리',
+    baselinePath: LEAGUE_WRITE_BASELINE,
+    files: all,
+    count: countLeagueWrites,
+    hint: '리그를 만들거나 바꾸는 자리다 — 통합 축에 거울을 쓰는 dual-write 를 같은 트랜잭션에 붙이고 baseline 을 올려라',
+  });
+
   const rawSql = checkBaseline({
     label: 'raw SQL 대회 테이블',
     baselinePath: RAW_SQL_BASELINE,
@@ -212,6 +242,7 @@ function main() {
       `원시 대회 단건 조회 ${lookup?.total ?? '?'}곳 (baseline ${lookup?.allowedTotal ?? '?'}) · ` +
       `raw SQL 대회 테이블 ${rawSql?.total ?? '?'}곳 (baseline ${rawSql?.allowedTotal ?? '?'}) · ` +
       `리그 허용 ${leagueAllowed?.total ?? '?'}곳 (baseline ${leagueAllowed?.allowedTotal ?? '?'})`,
+      `v1League 쓰기 ${leagueWrites?.total ?? '?'}곳 (baseline ${leagueWrites?.allowedTotal ?? '?'})`,
   );
 }
 

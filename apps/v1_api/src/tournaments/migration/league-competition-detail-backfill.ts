@@ -1,4 +1,6 @@
-import { PrismaClient, V1LeagueState, V1TournamentStatus } from '@prisma/client';
+import { PrismaClient, V1TournamentStatus } from '@prisma/client';
+
+import { leagueMirrorDetailData, mirrorDetailMatches } from '../league-competition-mirror';
 
 /**
  * **리그 → 대회 표시 필드 백필 (R4-a).**
@@ -29,14 +31,11 @@ import { PrismaClient, V1LeagueState, V1TournamentStatus } from '@prisma/client'
  * D7(참가 경로를 신청제로 통일)이 도입할 때 생긴다. 즉 이 매핑은 D7 을 미리 정하는 것이
  * 아니라 **현재 의미를 그대로 옮기는 것**이다. `open` 이 비어 있는 것은 누락이 아니다.
  */
-const STATUS_BY_LEAGUE_STATE: Record<V1LeagueState, V1TournamentStatus> = {
-  [V1LeagueState.draft]: V1TournamentStatus.draft,
-  [V1LeagueState.active]: V1TournamentStatus.in_progress,
-  [V1LeagueState.completed]: V1TournamentStatus.completed,
-};
 
 export interface LeagueDetailBackfillResult {
   scanned: number;
+  /** 이미 목표값이라 건드릴 필요가 없던 행 — dual-write 가 만든 새 리그의 거울이 여기 온다. */
+  skipped: number;
   updated: number;
   dryRun: boolean;
 }
@@ -85,18 +84,26 @@ export async function backfillLeagueCompetitionDetails(
   // **덮어쓰기를 하지 않는다.** 덮어쓰는 순간 원래 값이 사라져 되돌리기가 불가능해진다
   // (앞선 두 백필은 INSERT 라 되돌리기가 DELETE 였지만, UPDATE 는 그렇지 않다).
   // 지금은 0건이지만 재실행·부분 실행 뒤에는 생길 수 있고, 그때 멈추는 것이 맞다.
-  const alreadyFilled = leagues
-    .map((league) => {
-      const row = byId.get(league.id);
-      if (!row || row.kind !== 'regular_league') return null;
-      const filled: string[] = [];
-      if (row.status !== V1TournamentStatus.draft) filled.push('status');
-      if (row.scheduledAt !== null) filled.push('scheduledAt');
-      if (row.scheduledEndAt !== null) filled.push('scheduledEndAt');
-      if (row.regionId !== null) filled.push('regionId');
-      return filled.length > 0 ? { leagueId: league.id, filled } : null;
-    })
-    .filter((row): row is { leagueId: string; filled: string[] } => row !== null);
+  //
+  // **"이미 값이 있다" 를 무조건 막지 않는다.** dual-write 가 배포된 뒤 새로 생긴 리그는
+  // 거울이 **처음부터 올바른 값으로** 만들어진다. 그걸 낯선 값으로 보면 **리그 하나 때문에
+  // 백필 전체가 막힌다.** 목표값과 같으면 할 일이 없는 것이므로 건너뛴다.
+  const alreadyFilled: Array<{ leagueId: string; filled: string[] }> = [];
+  const skippable = new Set<string>();
+  for (const league of leagues) {
+    const row = byId.get(league.id);
+    if (!row || row.kind !== 'regular_league') continue;
+    if (mirrorDetailMatches(row, leagueMirrorDetailData(league))) {
+      skippable.add(league.id);
+      continue;
+    }
+    const filled: string[] = [];
+    if (row.status !== V1TournamentStatus.draft) filled.push('status');
+    if (row.scheduledAt !== null) filled.push('scheduledAt');
+    if (row.scheduledEndAt !== null) filled.push('scheduledEndAt');
+    if (row.regionId !== null) filled.push('regionId');
+    if (filled.length > 0) alreadyFilled.push({ leagueId: league.id, filled });
+  }
 
   if (missingTournaments.length > 0 || kindMismatches.length > 0 || alreadyFilled.length > 0) {
     throw new LeagueDetailBackfillBlockedError(
@@ -106,9 +113,11 @@ export async function backfillLeagueCompetitionDetails(
     );
   }
 
-  if (!options.dryRun && leagues.length > 0) {
+  const toUpdate = leagues.filter((league) => !skippable.has(league.id));
+
+  if (!options.dryRun && toUpdate.length > 0) {
     const results = await prisma.$transaction(
-      leagues.map((league) =>
+      toUpdate.map((league) =>
         // `updateMany` + 가드 조건을 `where` 에 넣는다. 위 가드는 트랜잭션 **밖** 스냅샷이라
         // 읽기와 쓰기 사이의 경합을 못 잡지만, 이 `where` 는 **쓰기 시점에** 강제된다 —
         // 그 사이 누가 값을 채웠으면 이 행은 count 0 이 되고 아래 합계 단언이 걸린다.
@@ -121,22 +130,22 @@ export async function backfillLeagueCompetitionDetails(
             scheduledEndAt: null,
             regionId: null,
           },
-          data: {
-            status: STATUS_BY_LEAGUE_STATE[league.state],
-            scheduledAt: league.startsOn,
-            scheduledEndAt: league.endsOn,
-            regionId: league.regionId,
-          },
+          data: leagueMirrorDetailData(league),
         }),
       ),
     );
     const updated = results.reduce((sum, row) => sum + row.count, 0);
-    if (updated !== leagues.length) {
+    if (updated !== toUpdate.length) {
       throw new Error(
-        `백필이 고친 행 수가 계획과 다르다: 계획 ${leagues.length} · 실제 ${updated}`,
+        `백필이 고친 행 수가 계획과 다르다: 계획 ${toUpdate.length} · 실제 ${updated}`,
       );
     }
   }
 
-  return { scanned: leagues.length, updated: options.dryRun ? 0 : leagues.length, dryRun: options.dryRun };
+  return {
+    scanned: leagues.length,
+    skipped: skippable.size,
+    updated: options.dryRun ? 0 : toUpdate.length,
+    dryRun: options.dryRun,
+  };
 }

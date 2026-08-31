@@ -13,6 +13,11 @@ import {
 } from '../team-schedules/team-schedules.service';
 import { scheduleLeagueResultEntryReminder } from '../jobs/league-reminders/league-result-entry-reminder.service';
 import { LeagueCompletionProjectionService } from './league-completion-projection.service';
+import {
+  STATUS_BY_LEAGUE_STATE,
+  leagueMirrorCreateData,
+  toMirrorSource,
+} from '../tournaments/league-competition-mirror';
 import { buildOddTeamCountWarning, checkLeagueTeamAddAllowed, checkLeagueTeamRemovalAllowed } from './league-lifecycle-rules';
 import { tierLabel } from './league-series-admin.service';
 import { resolveResultStage } from './league-result-stage';
@@ -105,7 +110,12 @@ export class LeagueMatchAdminService {
           tieBreakJson: { order: DEFAULT_TIE_BREAK_ORDER },
           teams: { createMany: { data: uniqueTeamIds.map((teamId) => ({ teamId })) } },
         },
+        include: { sport: { select: { code: true } } },
       });
+      // dual-write — 통합 축(V1Tournament)에 같은 리그를 비춘다. **같은 트랜잭션 안이다**:
+      // 밖으로 빼면 리그만 생기고 거울이 없는 창이 열리고, 그 리그는 read-swap 뒤
+      // **에러 없이 화면에서 사라진다**(운영자는 "방금 만든 리그가 안 보인다"고만 말할 수 있다).
+      await tx.v1Tournament.create({ data: leagueMirrorCreateData(toMirrorSource(created)) });
       await this.adminContext.logAdminAction(
         admin,
         {
@@ -314,6 +324,15 @@ export class LeagueMatchAdminService {
       });
       if (ids.length > 0) {
         await tx.v1League.update({ where: { id: league.id }, data: { state: 'active' } });
+        // dual-write — 거울의 status 도 같이 옮긴다. `updateMany` + `kind` 가드인 이유:
+        //   · `upsert` 는 `where` 에 unique 필드만 받아 `kind` 를 못 건다 — 같은 id 의 **진짜
+        //     대회**가 있으면 덮어쓴다. 그 위험을 지우려면 이 형태여야 한다.
+        //   · 백필 `--apply` 전에는 거울이 아직 없어 **0행**이다. 그 구간에선 그게 정상이고,
+        //     백필 이후에는 항상 1행이다(새 리그는 위 create dual-write 가 거울을 만든다).
+        await tx.v1Tournament.updateMany({
+          where: { id: league.id, kind: 'regular_league' },
+          data: { status: STATUS_BY_LEAGUE_STATE.active },
+        });
       }
       await this.adminContext.logAdminAction(
         admin,
@@ -833,6 +852,15 @@ export class LeagueMatchAdminService {
         // completed였던 리그(전 대진 확정)라도 재생성으로 새 미확정 대진이 생겼으니
         // active로 되돌린다 — revertCompletion을 별도로 먼저 호출할 필요가 없다.
         await tx.v1League.update({ where: { id: league.id }, data: { state: 'active' } });
+        // dual-write — 거울의 status 도 같이 옮긴다. `updateMany` + `kind` 가드인 이유:
+        //   · `upsert` 는 `where` 에 unique 필드만 받아 `kind` 를 못 건다 — 같은 id 의 **진짜
+        //     대회**가 있으면 덮어쓴다. 그 위험을 지우려면 이 형태여야 한다.
+        //   · 백필 `--apply` 전에는 거울이 아직 없어 **0행**이다. 그 구간에선 그게 정상이고,
+        //     백필 이후에는 항상 1행이다(새 리그는 위 create dual-write 가 거울을 만든다).
+        await tx.v1Tournament.updateMany({
+          where: { id: league.id, kind: 'regular_league' },
+          data: { status: STATUS_BY_LEAGUE_STATE.active },
+        });
       }
       await this.adminContext.logAdminAction(
         admin,
@@ -991,6 +1019,15 @@ export class LeagueMatchAdminService {
       where: { id: leagueId, state: 'completed' },
       data: { state: 'active' },
     });
+    // dual-write — 되돌리기도 거울에 반영한다. **조건부 update 의 승자만 반영해야 한다**:
+    // 위 `where: { state: 'completed' }` 가 0행이면 이미 누가 되돌린 것이라 여기서 거울을
+    // 건드리면 남의 전이를 덮는다. 그래서 `reverted.count` 를 먼저 본다.
+    if (reverted.count > 0) {
+      await tx.v1Tournament.updateMany({
+        where: { id: leagueId, kind: 'regular_league' },
+        data: { status: STATUS_BY_LEAGUE_STATE.active },
+      });
+    }
     if (reverted.count === 0) return true;
 
     await this.adminContext.logAdminAction(

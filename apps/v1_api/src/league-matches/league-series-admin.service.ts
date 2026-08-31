@@ -24,6 +24,10 @@ import {
   SeedSeasonDto,
   UpdateLeagueSeriesDto,
 } from './dto/league-series.dto';
+import {
+  leagueMirrorCreateData,
+  toMirrorSource,
+} from '../tournaments/league-competition-mirror';
 
 const DEFAULT_TIE_BREAK_ORDER = ['points', 'goalDifference', 'goalsFor', 'headToHead'] as const;
 const SEASON_LENGTH_FALLBACK_DAYS = 90;
@@ -293,9 +297,12 @@ export class LeagueSeriesAdminService {
               seasonNo: 1,
               teams: { createMany: { data: [...new Set(tier.teamIds)].map((teamId) => ({ teamId })) } },
             },
-            select: { id: true, title: true, tier: true, seasonNo: true, state: true },
+            include: { sport: { select: { code: true } } },
           }),
         );
+        await tx.v1Tournament.create({
+          data: leagueMirrorCreateData(toMirrorSource(leagues[leagues.length - 1])),
+        });
       }
       await tx.v1LeagueSeries.update({ where: { id: seriesId }, data: { state: 'active' } });
       await this.adminContext.logAdminAction(admin, {
@@ -604,8 +611,11 @@ export class LeagueSeriesAdminService {
               seasonNo: nextSeasonNo,
               teams: { createMany: { data: teamIds.map((teamId) => ({ teamId })) } },
             },
-            select: { id: true },
+            include: { sport: { select: { code: true } } },
           });
+          // dual-write — 통합 축에 같은 리그를 비춘다(같은 트랜잭션). 없으면 이 리그는
+          // read-swap 뒤 화면에서 에러 없이 사라진다.
+          await tx.v1Tournament.create({ data: leagueMirrorCreateData(toMirrorSource(league)) });
           createdLeagues.push({ id: league.id, tier, teamCount: teamIds.length });
         }
       }

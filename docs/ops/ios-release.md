@@ -159,11 +159,39 @@ build may require review."
 4. 테스터로 쓸 사람을 **App Store Connect 사용자로 초대**하고 앱 접근 권한 부여
 5. 업로드 후 내부 그룹 생성 → 빌드 추가 → 테스터 추가
 
-수출규정 질문은 업로드마다 뜬다. `Info.plist` 에 `ITSAppUsesNonExemptEncryption` 를 넣으면 매번
-묻지 않게 할 수 있다 — 다만 그 값은 **법적 선언**이라 이 저장소가 임의로 정하지 않았다. 이 앱은
-HTTPS 와 Keychain 등 OS 표준 암호화만 쓰므로 면제 대상에 해당할 가능성이 높지만, 확인 후 한 줄로
-넣는다.
-([Complying with Encryption Export Regulations](https://developer.apple.com/documentation/security/complying_with_encryption_export_regulations))
+#### 수출규정(암호화) — 조사 결과
+
+Apple 의 분류표는 세 갈래다
+([Export compliance documentation for encryption](https://developer.apple.com/help/app-store-connect/reference/export-compliance-documentation-for-encryption/)):
+
+| 앱이 쓰는 암호화 | 필요한 서류 |
+|---|---|
+| **Apple 운영체제 안의 암호화로 한정** | **없음** |
+| OS 밖의 산업 표준 알고리즘 | 프랑스 배포 시 French encryption declaration |
+| 국제 표준 기구가 인정하지 않은 독자 알고리즘 | CCATS + French declaration |
+
+이 앱이 첫 번째 칸에 해당하는지 저장소에서 직접 확인했다:
+
+| 확인 항목 | 결과 |
+|---|---|
+| SPM 패키지 | **0개** (`project.yml` 에 `packages:` 자체가 없다) |
+| 빌드된 `.app` 의 내장 프레임워크 | **없음** |
+| CryptoKit / CommonCrypto / 직접 구현한 AES·RSA | **없음** |
+| 암호화 관련 import | `import Security` 하나 — Keychain, OS 제공 |
+| 네트워크 암호화 | `WKWebView` 와 `URLSession` 의 HTTPS/TLS, 즉 OS 제공 |
+
+APNs 프로바이더 토큰의 ES256 서명은 **서버(Node)** 에서 한다 — iOS 앱 바이너리에는 없다.
+
+**따라서 사실관계는 "OS 안의 암호화로 한정" 에 해당한다.** 다만 이 답변은 사용자가 하는 **법적
+선언**이므로 저장소가 값을 대신 넣지 않는다. 사용자가 위 사실관계를 확인하면 `project.yml` 의
+`info.properties` 에 한 줄을 넣어 매 업로드마다 묻지 않게 할 수 있다:
+
+```yaml
+        ITSAppUsesNonExemptEncryption: false
+```
+
+넣지 않으면 업로드할 때마다 App Store Connect 에서 같은 질문에 답하게 된다 — 틀린 것은 아니고
+번거로울 뿐이다.
 
 ### 준비된 것 — 지금 저장소에 있다
 

@@ -550,3 +550,15 @@ permission-default, channel-creation, and explicit deep-link portions only. Sams
 above remains valid for its recorded build. Final closure still requires deployed App Links/deletion URLs,
 configured Firebase, Play signing, a Play-distributed build, real FCM receipt/tap matrices, Play pre-launch
 report, upgrade preservation, and the remaining OEM/foldable/multi-window matrix.
+
+## PR #838 Review Remediation (2026-08-31)
+
+- App Links configuration now fails closed when any comma-separated certificate fingerprint is
+  malformed, including mixed valid/invalid rotation lists. The route returns `503` with `no-store`
+  instead of silently publishing only the surviving certificates.
+- The privacy v1.2 migration now asserts the retained v1.1 baseline and the exact canonical v1.2
+  identity, metadata, content hash, independent content digest, effective timestamp, and supersedes
+  link. Missing baselines and conflicting drift abort with SQLSTATE `23514`.
+- Focused validation passed: App Links Vitest 4/4, privacy Jest 5/5, expand-contract gate, and three
+  rollback-only PostgreSQL fixtures (canonical success, missing baseline failure, conflict drift
+  failure). No production or development data was mutated by the fixture runs.

@@ -4,10 +4,15 @@ export const dynamic = 'force-dynamic';
 
 export function parseCertificateFingerprints(rawValue: string | undefined): string[] {
   if (!rawValue) return [];
-  return [...new Set(rawValue
+  const fingerprints = rawValue
     .split(',')
-    .map((value) => value.trim().toUpperCase())
-    .filter((value) => CERTIFICATE_FINGERPRINT_PATTERN.test(value)))];
+    .map((value) => value.trim().toUpperCase());
+
+  if (fingerprints.some((value) => !CERTIFICATE_FINGERPRINT_PATTERN.test(value))) {
+    return [];
+  }
+
+  return [...new Set(fingerprints)];
 }
 
 export async function GET() {
@@ -17,7 +22,7 @@ export async function GET() {
 
   if (fingerprints.length === 0) {
     return Response.json(
-      { error: 'Android App Links certificate fingerprint is not configured.' },
+      { error: 'Android App Links certificate fingerprint is missing or invalid.' },
       { status: 503, headers: { 'Cache-Control': 'no-store' } },
     );
   }

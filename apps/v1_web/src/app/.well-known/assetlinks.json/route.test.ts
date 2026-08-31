@@ -23,6 +23,19 @@ describe('Android asset links route', () => {
     expect(response.headers.get('cache-control')).toBe('no-store');
   });
 
+  it('fails closed when any configured fingerprint is invalid', async () => {
+    process.env.ANDROID_APP_LINKS_SHA256_CERT_FINGERPRINTS = `${FINGERPRINT}, invalid`;
+
+    expect(parseCertificateFingerprints(
+      process.env.ANDROID_APP_LINKS_SHA256_CERT_FINGERPRINTS,
+    )).toEqual([]);
+
+    const response = await GET();
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+  });
+
   it('publishes the production package relation when configured', async () => {
     process.env.ANDROID_APP_LINKS_SHA256_CERT_FINGERPRINTS = FINGERPRINT;
 

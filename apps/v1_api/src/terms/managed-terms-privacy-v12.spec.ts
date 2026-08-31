@@ -59,6 +59,18 @@ describe('managed privacy policy v1.2', () => {
     expect(migration).not.toMatch(/\b(?:UPDATE|DELETE\s+FROM|TRUNCATE)\b/i);
   });
 
+  it('fails the migration when the canonical v1.2 row is not materialized', () => {
+    const canonicalContentMd5 = createHash('md5')
+      .update(release.document.content, 'utf8')
+      .digest('hex');
+
+    expect(migration).toContain('DO $privacy_v12_guard$');
+    expect(migration).toContain('RAISE EXCEPTION');
+    expect(migration).toContain(release.document.supersedesDocumentId);
+    expect(migration).toContain(release.document.contentHash);
+    expect(migration).toContain(`md5(candidate."content") = '${canonicalContentMd5}'`);
+  });
+
   it('builds exactly the canonical v1.2 body from v1.1 plus the migration appendix', () => {
     const priorContent = baseline.policies.find((policy) => policy.code === 'privacy_policy')
       ?.document.content;

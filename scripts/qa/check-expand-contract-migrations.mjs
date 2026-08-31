@@ -905,6 +905,33 @@ ON CONFLICT ("policy_id", "version") DO NOTHING`,
     reason:
       'Publishes one immutable v1.2 privacy document derived from the retained v1.1 row. It inserts a new version only, uses ON CONFLICT (policy_id, version) DO NOTHING, and never updates or deletes legal history. requires_reconsent=false means old and new app instances do not block existing users during a rolling deploy; older code can render the same managed-terms shape and safely ignores the Android-specific appendix on rollback. Reviewed 2026-08-31 for PR #838.',
   },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260831090000_android_privacy_policy_v12/migration.sql',
+    statement: String.raw`DO $privacy_v12_guard$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM "v1_managed_terms_documents" AS candidate
+    INNER JOIN "v1_managed_terms_documents" AS baseline
+      ON baseline."id" = 'a1110000-0000-4000-8000-000000000004'
+    WHERE candidate."id" = 'a1130000-0000-4000-8000-000000000004'
+      AND candidate."policy_id" = baseline."policy_id"
+      AND candidate."version" = 'v1.2'
+      AND candidate."content_hash" = '8b157cae4348c80f0a185a555b29666c16a5122e516b0f8f17dcc0e55457f8a9'
+      AND md5(candidate."content") = 'd31b4d3136f443697c08b4f987a69f2d'
+      AND candidate."requires_reconsent" = false
+      AND candidate."status" = 'published'::"V1TermsDocumentStatus"
+      AND candidate."effective_at" = '2026-08-31T00:00:00.000Z'::timestamptz
+      AND candidate."supersedes_document_id" = baseline."id"
+  ) THEN
+    RAISE EXCEPTION 'canonical Android privacy policy v1.2 was not materialized'
+      USING ERRCODE = '23514';
+  END IF;
+END
+$privacy_v12_guard$`,
+    reason:
+      'Read-only postcondition guard for the immutable v1.2 insert above. It mutates no row or schema: the block only verifies the retained baseline and exact canonical candidate identity, metadata, SHA-256 field, and independently computed content digest, then aborts the migration with SQLSTATE 23514 instead of recording a silent no-op. Reviewed 2026-08-31 for PR #838 remediation.',
+  },
 ];
 
 const normalizeStatementText = (statement) => statement.replace(/\s+/g, ' ').trim();

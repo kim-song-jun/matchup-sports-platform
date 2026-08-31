@@ -50,3 +50,26 @@ Android 앱은 teameet.co.kr 서비스를 WebView로 제공하며 로그인 세�
 FROM "v1_managed_terms_documents"
 WHERE "id" = 'a1110000-0000-4000-8000-000000000004'
 ON CONFLICT ("policy_id", "version") DO NOTHING;
+
+DO $privacy_v12_guard$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM "v1_managed_terms_documents" AS candidate
+    INNER JOIN "v1_managed_terms_documents" AS baseline
+      ON baseline."id" = 'a1110000-0000-4000-8000-000000000004'
+    WHERE candidate."id" = 'a1130000-0000-4000-8000-000000000004'
+      AND candidate."policy_id" = baseline."policy_id"
+      AND candidate."version" = 'v1.2'
+      AND candidate."content_hash" = '8b157cae4348c80f0a185a555b29666c16a5122e516b0f8f17dcc0e55457f8a9'
+      AND md5(candidate."content") = 'd31b4d3136f443697c08b4f987a69f2d'
+      AND candidate."requires_reconsent" = false
+      AND candidate."status" = 'published'::"V1TermsDocumentStatus"
+      AND candidate."effective_at" = '2026-08-31T00:00:00.000Z'::timestamptz
+      AND candidate."supersedes_document_id" = baseline."id"
+  ) THEN
+    RAISE EXCEPTION 'canonical Android privacy policy v1.2 was not materialized'
+      USING ERRCODE = '23514';
+  END IF;
+END
+$privacy_v12_guard$;

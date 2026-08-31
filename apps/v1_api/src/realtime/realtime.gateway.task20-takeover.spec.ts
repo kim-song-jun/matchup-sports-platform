@@ -7,6 +7,7 @@ import { GamesService } from '../games/games.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { TournamentStaffAccessService } from '../tournaments/staff/tournament-staff-access.service';
 import { RealtimeGateway } from './realtime.gateway';
+import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
 
 const GAME_ID = '92000000-0000-4000-8000-000000000099';
 const USER = {
@@ -73,6 +74,10 @@ describe('Task 20 game-operations takeover realtime protocol', () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         RealtimeGateway,
+        // 핸드셰이크가 REST 와 같은 기준으로 약관 재동의를 본다. 이 스위트들의 관심사는
+        // 약관이 아니므로 "동의 완료" 로 고정한 더블을 넣는다 — 재동의 차단 자체는
+        // 전용 테스트가 따로 덮는다.
+        { provide: ManagedTermsRuntimeService, useValue: { signupCompliance: async () => ({ compliant: true }) } },
         { provide: PrismaService, useValue: prisma },
         { provide: TournamentStaffAccessService, useValue: staffAccess },
         { provide: GamesService, useValue: gamesService },

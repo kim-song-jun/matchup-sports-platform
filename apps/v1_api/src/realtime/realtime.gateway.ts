@@ -21,6 +21,7 @@ import { getPendingSocialSignupRoute } from '../auth/social-signup-access';
 import { AppendGameEventDto } from '../games/dto/game-event.dto';
 import { GameBroadcastRegistry } from '../games/game-broadcast.registry';
 import { GameTakeoverService } from '../games/game-takeover.service';
+import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
 import { GamesService } from '../games/games.service';
 import type { GameEventAppendResult } from '../games/games.types';
 import { TournamentStaffAccessService } from '../tournaments/staff/tournament-staff-access.service';
@@ -38,9 +39,16 @@ type V1Socket = Socket & {
 /**
  * 하트비트(15초)마다 재검증하면 구독 게임 수 × 동시 소켓 수만큼 DB 조회가 반복된다
  * (게임당 fixture 조회 1 + assertAccess 내부 조회 2). 만료된 스태프를 쫓아내는 데
- * 15초 해상도가 필요한 것은 아니므로 소켓당 재검증을 60초로 묶는다 — 만료 후
- * 방송을 계속 받는 창은 최대 60초로 유지되면서(수정 전에는 무제한) 하트비트가
- * 만드는 DB 부하는 1/4로 줄어든다.
+ * 15초 해상도가 필요한 것은 아니므로 소켓당 재검증을 60초로 묶는다 — 하트비트가
+ * 만드는 DB 부하가 1/4로 줄어든다.
+ *
+ * **"최대 60초"는 클라이언트가 계속 핑을 보낼 때만 성립한다.** 핑을 멈춘(또는 멈추게
+ * 만든) 소켓은 이 재검증에 닿지 않아 만료 뒤에도 방송을 계속 받는다 — 이 저장소에는
+ * cron 인프라가 없어 서버가 스스로 도는 스윕을 붙일 수 없다는 것이 그 이유이고,
+ * 여기 적힌 보증은 그만큼만 유효하다. 다만 **쓰기는 별개로 안전하다**: 커맨드는
+ * 매번 games.service 의 resolveActor 가 현재 DB 상태로 권한을 다시 판정하므로,
+ * 만료된 스태프가 핑을 멈춘 채 이벤트를 기록할 수는 없다. 즉 남는 위험은
+ * "이미 열려 있던 콘솔이 라이브 데이터를 계속 본다" 하나다.
  */
 const STAFF_REVALIDATION_INTERVAL_MS = 60_000;
 
@@ -215,6 +223,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     @InjectPinoLogger(RealtimeGateway.name) private readonly logger: PinoLogger,
     private readonly gameBroadcast: GameBroadcastRegistry,
     private readonly gameTakeover: GameTakeoverService,
+    private readonly managedTerms: ManagedTermsRuntimeService,
   ) {}
 
   private readonly gameSubscriptions = new Map<
@@ -306,6 +315,15 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     }
     if (getPendingSocialSignupRoute(user.onboardingStatus)) {
       throw new Error('SOCKET_ONBOARDING_REQUIRED');
+    }
+    // REST 는 새 필수 약관 미동의 사용자를 (약관 화면 외) 전 경로에서 막는다
+    // (v1-auth.guard.ts, TERMS_RECONSENT_REQUIRED). 이 소켓은 읽기 전용이 아니라
+    // game.event.append 같은 **쓰기 커맨드**를 받으므로, 여기서 막지 않으면 재동의
+    // 강제가 REST 에만 걸리고 실시간 경로로 그대로 우회된다. 계정 상태·온보딩과
+    // 같은 자리에서 같은 기준으로 본다.
+    const compliance = await this.managedTerms.signupCompliance(user.id);
+    if (!compliance.compliant) {
+      throw new Error('SOCKET_TERMS_RECONSENT_REQUIRED');
     }
 
     client.data.userId = user.id;

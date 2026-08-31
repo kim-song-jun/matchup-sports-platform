@@ -103,13 +103,6 @@ final class PushSliceUITests: XCTestCase {
         tapMatching(NSPredicate(format: "label BEGINSWITH %@", name), timeout: timeout)
     }
 
-    /// Exact match, for a control whose name is a prefix of another one's — the home nudge's
-    /// "알림 받기" button sits next to "알림 받기 안내 닫기", which dismisses it.
-    @discardableResult
-    private func tapExact(_ name: String, timeout: TimeInterval = 60) -> Bool {
-        tapMatching(NSPredicate(format: "label ==[c] %@", name), timeout: timeout)
-    }
-
     private func tapMatching(_ predicate: NSPredicate, timeout: TimeInterval) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         var lastTop: CGFloat = .greatestFiniteMagnitude
@@ -247,23 +240,12 @@ final class PushSliceUITests: XCTestCase {
     func testALoginAndNotificationSettingsReflectNativeState() throws {
         try signIn()
 
-        // The home nudge is the shortest path to the permission request and the least
-        // fragile: a full-width button near the top of the page, well clear of the tab bar.
-        // Exact match — "알림 받기 안내 닫기" sits beside it and dismisses the card.
-        XCTAssertTrue(tapExact("알림 받기"), "no notification nudge on the home screen")
-
-        // The OS prompt arriving proves `request-notification-permission` reached
-        // UNUserNotificationCenter rather than being answered from a cached value.
-        let alert = springboard.alerts.firstMatch
-        XCTAssertTrue(alert.waitForExistence(timeout: 30), "the system permission prompt never appeared")
-        attach("02-permission-prompt")
-
-        let allow = allowLabels.map { alert.buttons[$0] }.first { $0.exists }
-        XCTAssertNotNil(allow, "no allow button in the prompt")
-        allow?.tap()
-
+        // Enabled from the settings screen, not the home nudge. That nudge is account-scoped:
+        // once the account has push on any device it stops appearing, so on a second device
+        // it is simply absent — which is also why the row itself says other devices have to
+        // be turned on separately. The settings row is on every device, always.
         openNotificationSettings()
-        attachTree("03-settings-tree")
+        attachTree("02-settings-tree")
 
         // The push row only renders when the page believes a push transport exists. Inside
         // this WebView there is no service worker to fall back on, so the row's presence is
@@ -271,32 +253,47 @@ final class PushSliceUITests: XCTestCase {
         XCTAssertTrue(
             pushRow.exists,
             "no push row — the page did not see window.TeameetNative")
-        attachTree("03-push-row")
+        XCTAssertFalse(isPushRowOn, "a freshly installed device should start unsubscribed")
+        attachTree("02-push-row")
 
-        // The page is told the outcome through `teameet:native-push-result`. Whether the row
-        // ends up subscribed depends on the origin's API: until this change is deployed
-        // there, `platform` is an unknown property and the registration is refused with 400
-        // by the API's `forbidNonWhitelisted` validation. What must hold either way is that
-        // the row settles — a bridge that never replied would leave it mid-flight until the
-        // web's own two-minute timeout.
+        XCTAssertTrue(tapRow("푸시 알림 받기"), "no push row available to tap")
+
+        // The OS prompt arriving proves `request-notification-permission` reached
+        // UNUserNotificationCenter rather than being answered from a cached value.
+        let alert = springboard.alerts.firstMatch
+        XCTAssertTrue(alert.waitForExistence(timeout: 30), "the system permission prompt never appeared")
+        attach("03-permission-prompt")
+
+        let allow = allowLabels.map { alert.buttons[$0] }.first { $0.exists }
+        XCTAssertNotNil(allow, "no allow button in the prompt")
+        allow?.tap()
+
+        // The page is told the outcome through `teameet:native-push-result`. The row settling
+        // at all is the first thing that must hold — a bridge that never replied would leave
+        // it mid-flight until the web's own two-minute timeout.
         let settled = waitUntilPushRowSettles(timeout: 150)
         attach("04-settings-after-allow")
         attachTree("04-settings-after-allow-tree")
         XCTAssertTrue(settled, "the row stayed mid-flight — no reply reached the page")
 
-        let subscribed = isPushRowOn
-        if ProcessInfo.processInfo.environment["TEAMEET_UITEST_EXPECT_SUBSCRIBED"] == "1" {
-            XCTAssertTrue(subscribed, "the API accepted no iOS registration")
-        } else {
-            // The honest expectation against an origin that predates this change. The point
-            // is that the failure is reported rather than hidden: a shell that claimed
-            // success here would show an enabled switch on a device receiving nothing.
-            XCTAssertFalse(
-                subscribed,
-                "the row claims a subscription the origin's API cannot yet have accepted")
+        // Subscribed is now the expected end state: the origin stores iOS registrations, so a
+        // build that reaches here with the row still off has failed somewhere in the chain —
+        // no entitlement and therefore no token, a registration the server refused, or a
+        // reply that never reached the page.
+        //
+        // The opt-out exists for an origin whose API predates the platform field, where a
+        // refusal is the honest outcome and claiming otherwise would show an enabled switch
+        // on a device that receives nothing.
+        let expectsRefusal = ProcessInfo.processInfo.environment["TEAMEET_UITEST_EXPECT_REFUSAL"] == "1"
+        if expectsRefusal {
             XCTAssertFalse(
                 isPushRowOn,
-                "the row settled on neither of the two states it can honestly report")
+                "the row claims a subscription the origin's API cannot have accepted")
+        } else {
+            XCTAssertTrue(
+                isPushRowOn,
+                "the device did not end up subscribed — check the aps-environment entitlement, "
+                    + "the registration request, and the bridge reply")
         }
 
         // The rest of the app still works after all this — permission handling must not

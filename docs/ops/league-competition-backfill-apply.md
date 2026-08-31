@@ -145,3 +145,57 @@ DATABASE_URL=<alpha> ts-node src/tournaments/migration/league-competition-backfi
 **이 CLI 의 `--apply` 는 사용자 승인 사항이다.** 라이브 환경에 데이터를 새로 만드는
 일이라 에이전트가 단독으로 판단하지 않는다. `deploy.yml` 에 배선하지 않는 이유도 같다 —
 파이프라인에 들어가면 나중에 누가 `--apply` 로 바꾸는 경로가 생긴다.
+
+---
+
+## 표시 필드 백필(R4-a) `--apply` — 실행 전 판정표
+
+**2026-08-31 실측 기준선** (읽기 전용):
+```
+v1_leagues                                              88
+kind='regular_league' 거울                               88
+그중 status <> 'draft'                                    0
+그중 scheduled_at / scheduled_end_at / region_id 채워진 것  0 / 0 / 0
+리그 축 상태 분포        draft 35 · active 15 · completed 38
+```
+
+### dry-run 출력을 이렇게 읽는다
+
+| 값 | 기대 | 다르면 |
+|---|---|---|
+| `scanned` | **88** | 늘었으면 dual-write 배포 후 리그가 생긴 것 — 늘어난 수가 `skipped` 와 같은지 본다 |
+| `planned` | **88** | — |
+| `skipped` | **0** | ⚠️ 아래 |
+| `mirrorCount` | **88** | 리그 수와 다르면 불변식이 이미 던진다 |
+
+> **`updated: 0` 은 dry-run 에서 항상 0 이다.** "아직 안 바꿨구나" 로 읽히지만 그건
+> 정상 신호가 아니라 **아무 정보도 아니다** — 몇 건이 바뀌는지는 `planned` 로만 알 수 있다.
+> 그래서 `planned` 를 넣었다(그전에는 그 숫자가 아예 없었다).
+
+### ⚠️ `skipped ≠ 0` 은 **두 가지 뜻이 있다. 구분해야 한다**
+`skipped` 는 "이미 목표값과 같다" 인데 그렇게 되는 길이 둘이다:
+```
+① dual-write 가 만든 새 리그        정상
+② 88행 중 일부가 이미 채워졌다      비정상 — 우리가 모르는 쓰기 경로가 있다는 뜻
+```
+`planned + skipped == scanned` 는 **둘 다 성립하므로 판정이 안 된다.**
+
+**구분법:**
+```
+scanned == 88,  skipped > 0   → ②다. 멈춘다
+scanned  > 88,  skipped > 0   → ①일 수 있다. (scanned − 88) == skipped 인지 확인
+```
+**②면 승인 요청으로 넘어가지 않는다** — dual-write 목록(`scripts/league-write-site-baseline.json`)이
+불완전하다는 신호이고, 그건 백필보다 먼저 풀어야 한다.
+
+> **위 기준선이 ②를 지금 시점에 배제한다** — 채워진 행이 0 이므로, dry-run 에서 `skipped > 0`
+> 이 나오면서 `scanned == 88` 이면 **그 사이에 무언가 채웠다**는 뜻이고 원인이 반드시 있다.
+
+### `--apply` 후 검증 — **개수만 보지 않는다**
+```
+거울 수 == 리그 수                    ← CLI 가 자동으로 던진다
+상태 분포 == draft 35 · active 15 · completed 38   ← 이걸 따로 확인한다
+```
+**개수 불변식은 값이 틀린 것을 못 본다.** 분포 대조가 `--apply` 가 실제로 먹었는지의 진짜
+지표다 — 88행이 전부 `draft` 로 남아 있어도 개수는 맞기 때문이다.
+

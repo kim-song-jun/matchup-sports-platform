@@ -34,11 +34,15 @@ function tournament(overrides: Row = {}) {
  * 한 번 밟았다(참가팀 백필 스펙). count 는 조건을 통과한 행에서만 1 이다.
  */
 function fakePrisma(leagues: Row[], tournaments: Row[], onAfterRead?: (stored: Row[]) => void) {
+  const txClient: { v1Tournament: { updateMany: jest.Mock } } = { v1Tournament: { updateMany: undefined as never } };
+  // **실제로 행을 바꾼다.** 안 바꾸면 롤백이 관측되지 않고, "단언이 트랜잭션 안에 있는가"
+  // 라는 이 결함의 핵심을 테스트가 구분하지 못한다(실제로 못 잡는 것을 변이로 확인했다).
   const updateMany = jest.fn((args: { where: Row; data: Row }) => {
     const row = tournaments.find((t) => t.id === args.where.id);
     const matches =
       row !== undefined &&
       Object.entries(args.where).every(([key, want]) => row[key] === want);
+    if (matches && row) Object.assign(row, args.data);
     return Promise.resolve({ count: matches ? 1 : 0 });
   });
   const readTournaments = jest.fn(async () => {
@@ -48,12 +52,30 @@ function fakePrisma(leagues: Row[], tournaments: Row[], onAfterRead?: (stored: R
     onAfterRead?.(tournaments);
     return snapshot;
   });
+  txClient.v1Tournament.updateMany = updateMany;
   return {
     updateMany,
+    txClient,
     prisma: {
       v1League: { findMany: jest.fn().mockResolvedValue(leagues) },
       v1Tournament: { findMany: readTournaments, updateMany },
-      $transaction: jest.fn((ops: unknown[]) => Promise.all(ops as Promise<unknown>[])),
+      // **interactive 형만 받는다.** 배열형을 그대로 통과시키는 fake 를 두면 호출부가
+      // 배열형으로 되돌아가도 테스트가 통과해서, 부분 커밋 결함이 다시 들어온다.
+      $transaction: jest.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
+        if (typeof fn !== 'function') {
+          throw new TypeError('interactive $transaction 콜백이어야 한다 — 배열형은 단언이 롤백을 못 일으킨다');
+        }
+        // **롤백을 흉내낸다.** 콜백이 던지면 이 안에서 바뀐 행을 전부 되돌린다. 그래야
+        // "단언이 트랜잭션 **안**에 있는가" 가 관측된다 — 밖에 있으면 부분 적용이 남는다.
+        const snapshot = tournaments.map((row) => ({ ...row }));
+        try {
+          return await fn(txClient);
+        } catch (error) {
+          tournaments.length = 0;
+          tournaments.push(...snapshot);
+          throw error;
+        }
+      }),
     } as never,
   };
 }
@@ -146,6 +168,34 @@ describe('backfillLeagueCompetitionDetails', () => {
       { leagueId: 'lg-1', filled: ['status', 'regionId'] },
     ]);
     expect(updateMany).not.toHaveBeenCalled();
+  });
+
+  it('개수가 안 맞으면 **부분 적용도 남지 않는다** — 단언이 트랜잭션 안에 있어야 한다', async () => {
+    // 두 리그 중 하나만 매칭되게 만든다. 배열형 `$transaction` 이거나 단언이 트랜잭션 밖에
+    // 있으면 **매칭된 한 행은 이미 커밋되고 종료 코드만 실패**가 된다 — 사용자 승인을 받아
+    // 돌리는 쓰기에서 "실패했다는데 일부는 들어갔다" 는 승인자가 판단할 수 없는 상태다.
+    // 둘 다 읽기 시점에는 깨끗하다(가드 통과). **읽은 뒤** lg-2 만 어긋나게 해서
+    // 쓰기 시점의 `where` 가 안 맞게 만든다 — 가드로는 못 잡고 합계 단언만 잡는 상황이다.
+    const rows = [tournament({ id: 'lg-1' }), tournament({ id: 'lg-2' })];
+    const { prisma } = fakePrisma(
+      [league({ id: 'lg-1' }), league({ id: 'lg-2' })],
+      rows,
+      (stored) => {
+        const target = stored.find((row) => row.id === 'lg-2');
+        if (target) target.status = 'completed';
+      },
+    );
+
+    await expect(backfillLeagueCompetitionDetails(prisma, { dryRun: false })).rejects.toThrow(
+      /계획 2 · 실제 1/,
+    );
+
+    // lg-1 은 매칭돼 한 번 바뀌었지만 롤백돼 원래대로여야 한다.
+    expect(rows.find((row) => row.id === 'lg-1')).toMatchObject({
+      status: 'draft',
+      scheduledAt: null,
+      regionId: null,
+    });
   });
 
   it('쓰기 시점 경합: 읽은 뒤 누가 값을 채우면 덮어쓰지 않고 멈춘다', async () => {

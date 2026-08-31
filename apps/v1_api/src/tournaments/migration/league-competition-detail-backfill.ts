@@ -106,13 +106,29 @@ export async function backfillLeagueCompetitionDetails(
     );
   }
 
+  let updated = 0;
+
   if (!options.dryRun && leagues.length > 0) {
-    const results = await prisma.$transaction(
-      leagues.map((league) =>
-        // `updateMany` + 가드 조건을 `where` 에 넣는다. 위 가드는 트랜잭션 **밖** 스냅샷이라
-        // 읽기와 쓰기 사이의 경합을 못 잡지만, 이 `where` 는 **쓰기 시점에** 강제된다 —
-        // 그 사이 누가 값을 채웠으면 이 행은 count 0 이 되고 아래 합계 단언이 걸린다.
-        prisma.v1Tournament.updateMany({
+    // ── **interactive 트랜잭션이어야 한다 — 배열형이면 단언이 롤백을 못 일으킨다** ────
+    // `$transaction([...])` 는 결과를 돌려주기 **전에 커밋한다.** 그래서 그 뒤에서 개수를
+    // 세고 throw 하면 **이미 커밋된 부분 적용이 남고 종료 코드만 실패**가 된다
+    // (88 중 87 만 매칭되면 87 은 들어간 채 "실패" 로 끝난다).
+    //
+    // 이건 **사용자 승인을 받아 alpha 에 돌리는 쓰기**다. 승인을 받는 작업에 필요한 성질은
+    // 전부 되거나 전부 안 되거나이고, "실패했다는데 87 행은 들어갔다" 는 승인자가 판단할 수
+    // 없는 상태다. interactive 형에서는 아래 throw 가 롤백을 일으킨다.
+    //
+    // > **앞선 참가팀 백필(create)은 같은 모양이어도 이 결함이 아니다** — `create` 는
+    // > 실패하면 트랜잭션 전체가 터져 결과가 아예 안 돌아온다. `updateMany` 만 **에러 없이
+    // > 0행**을 돌려줄 수 있어서 "커밋됐는데 개수가 안 맞는" 상태가 성립한다.
+    //
+    // 88행이라 순차 왕복 비용은 무시해도 된다.
+    await prisma.$transaction(async (tx) => {
+      for (const league of leagues) {
+        // 가드 조건을 `where` 에 넣는다. 위 가드는 트랜잭션 **밖** 스냅샷이라 읽기와 쓰기
+        // 사이의 경합을 못 잡지만, 이 `where` 는 **쓰기 시점에** 강제된다 — 그 사이 누가
+        // 값을 채웠으면 이 행은 count 0 이 되고 아래 합계 단언이 걸린다.
+        const result = await tx.v1Tournament.updateMany({
           where: {
             id: league.id,
             kind: 'regular_league',
@@ -127,16 +143,18 @@ export async function backfillLeagueCompetitionDetails(
             scheduledEndAt: league.endsOn,
             regionId: league.regionId,
           },
-        }),
-      ),
-    );
-    const updated = results.reduce((sum, row) => sum + row.count, 0);
-    if (updated !== leagues.length) {
-      throw new Error(
-        `백필이 고친 행 수가 계획과 다르다: 계획 ${leagues.length} · 실제 ${updated}`,
-      );
-    }
+        });
+        updated += result.count;
+      }
+      if (updated !== leagues.length) {
+        throw new Error(
+          `백필이 고친 행 수가 계획과 다르다: 계획 ${leagues.length} · 실제 ${updated}`,
+        );
+      }
+    });
   }
 
-  return { scanned: leagues.length, updated: options.dryRun ? 0 : leagues.length, dryRun: options.dryRun };
+  // **계획이 아니라 실적을 반환한다.** 위 단언이 통과했으면 둘이 같지만, 계획값을 실적으로
+  // 보고하는 모양 자체가 "쓴 것과 보고한 것이 다를 수 있는" 구조다.
+  return { scanned: leagues.length, updated, dryRun: options.dryRun };
 }

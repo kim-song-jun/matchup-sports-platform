@@ -202,7 +202,7 @@ function ScheduleCalendarGrid({ model }: { model: ScheduleListViewModel }) {
           >
             <span className="tm-text-caption">{day.dayNumber}</span>
             {day.scheduleCount > 0 ? (
-              <span aria-hidden="true" style={{ width: 5, height: 5, borderRadius: 999, background: 'var(--blue500)', marginTop: 2 }} />
+              <span aria-hidden="true" style={{ width: 5, height: 5, borderRadius: 'var(--radius-pill)', background: 'var(--blue500)', marginTop: 2 }} />
             ) : null}
           </button>
         ))}
@@ -486,7 +486,7 @@ function ScheduleAttendeeSection({ model }: { model: ScheduleDetailViewModel['at
                 style={{
                   width: 32,
                   height: 32,
-                  borderRadius: '50%',
+                  borderRadius: 'var(--radius-circle)',
                   /* [다크모드 fix] grey100 다크값(#1c1e24)이 카드 배경 --card-surface
                      다크값(#1c1e24)과 동일해 아바타 원이 안 보였다. grey150(다크 #20222a)로 분리. */
                   background: 'var(--grey150)',

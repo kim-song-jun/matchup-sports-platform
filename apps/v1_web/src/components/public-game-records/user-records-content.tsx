@@ -141,7 +141,10 @@ export function UserRecordsContent({
 
       <Card>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 12 }}>
-          <KPIStat label="출전" value={data.summary.appearances} unit="경기" />
+          {/* "출전"이 아니라 "엔트리" — 이 숫자는 **명단에 이름이 오른 경기 수**다.
+              명단에 오르면 곧 참가자로 집계되므로(D3), 벤치에 있었어도 세어진다.
+              "출전"이라 부르면 뛰지 않은 경기까지 뛴 것처럼 말하게 된다. */}
+          <KPIStat label="엔트리" value={data.summary.appearances} unit="경기" />
           <KPIStat label="골" value={data.summary.goals} unit="골" />
           <KPIStat label="매치 MVP" value={data.summary.matchMvpCount} unit="회" />
           <KPIStat label="대회 수상" value={data.summary.tournamentAwardCount} unit="회" />
@@ -175,7 +178,7 @@ export function UserRecordsContent({
                     flexShrink: 0,
                     alignItems: 'center',
                     justifyContent: 'center',
-                    borderRadius: 12,
+                    borderRadius: 'var(--radius-control)',
                     background: 'var(--surface-soft)',
                   }}
                 >

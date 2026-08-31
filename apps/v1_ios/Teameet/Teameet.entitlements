@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  Which APNs environment this build's device tokens belong to. The value is substituted
+	  per configuration from Config/{Alpha,Production}.xcconfig, because a token issued
+	  against the sandbox gateway is not addressable from the production one and vice versa —
+	  the server draws the same line in ApnsPushService.
+
+	  Without this key the OS refuses to register at all and reports
+	  NSCocoaErrorDomain 3000 ("No valid 'aps-environment' entitlement string found").
+	-->
+	<key>aps-environment</key>
+	<string>$(TEAMEET_APS_ENVIRONMENT)</string>
+
+	<!--
+	  Lets Kakao's login redirect come back into the app instead of stranding the reader in
+	  Safari. The domains are fixed per configuration; what is still missing is the
+	  server-side apple-app-site-association file, which needs the Apple Team ID.
+	-->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:$(TEAMEET_APP_LINK_HOST)</string>
+	</array>
+</dict>
+</plist>

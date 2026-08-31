@@ -256,7 +256,7 @@ function RegistrationPass({
         style={{
           background: 'var(--surface)',
           border: '1px solid var(--border)',
-          borderRadius: 16,
+          borderRadius: 'var(--radius-container)',
           overflow: 'hidden',
           marginBottom: 16,
         }}
@@ -309,7 +309,7 @@ function RegistrationPass({
       style={{
         background: 'var(--surface)',
         border: '1px solid var(--border)',
-        borderRadius: 16,
+        borderRadius: 'var(--radius-container)',
         overflow: 'hidden',
         marginBottom: 16,
       }}
@@ -322,10 +322,10 @@ function RegistrationPass({
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 4,
               background: accent.badgeBg, color: accent.badgeText,
-              fontWeight: 600, padding: '3px 8px', borderRadius: 999, flexShrink: 0,
+              fontWeight: 600, padding: '3px 8px', borderRadius: 'var(--radius-pill)', flexShrink: 0,
             }}
           >
-            <span aria-hidden="true" style={{ width: 5, height: 5, borderRadius: '50%', background: accent.dot }} />
+            <span aria-hidden="true" style={{ width: 5, height: 5, borderRadius: 'var(--radius-circle)', background: accent.dot }} />
             {accent.label}
           </span>
           <span className={`tm-badge ${statusCfg.badgeClass}`}>{statusCfg.label}</span>
@@ -1397,7 +1397,7 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
             <div
               key={i}
               aria-hidden="true"
-              style={{ height: 80, borderRadius: 12, background: 'var(--grey100)', marginBottom: 12 }}
+              style={{ height: 80, borderRadius: 'var(--radius-control)', background: 'var(--grey100)', marginBottom: 12 }}
             />
           ))}
         </div>

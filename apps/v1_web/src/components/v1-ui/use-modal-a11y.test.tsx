@@ -118,6 +118,57 @@ describe('useModalA11y', () => {
     inner.unmount();
   });
 
+  it('라디오 그룹이 있어도 Tab 이 다이얼로그 밖으로 새지 않는다', () => {
+    // 라디오 그룹의 tab stop 은 하나뿐이다 — 체크된 것이 있으면 그것, 없으면 첫 번째.
+    // querySelectorAll 결과를 그대로 쓰면 트랩의 last 가 영원히 포커스를 못 받는
+    // 라디오가 되어 되감기가 발동하지 않는다.
+    function RadioModal() {
+      const { dialogRef } = useModalA11y<HTMLElement, HTMLDivElement>({
+        open: true,
+        onClose: () => {},
+      });
+      return (
+        <div ref={dialogRef} role="dialog" aria-modal="true">
+          <button type="button">확인</button>
+          <input type="radio" name="g" aria-label="가" />
+          <input type="radio" name="g" aria-label="나" />
+          <input type="radio" name="g" aria-label="다" />
+        </div>
+      );
+    }
+    render(<RadioModal />);
+    const confirm = screen.getByRole('button', { name: '확인' });
+    const first = screen.getByRole('radio', { name: '가' });
+    // 아무것도 체크되지 않았으므로 마지막 tab stop 은 '가' 다 ('다' 가 아니다)
+    first.focus();
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(document.activeElement).toBe(confirm);
+  });
+
+  it('disabled 컨트롤이 마지막에 있어도 Tab 이 밖으로 새지 않는다', () => {
+    // disabled 요소는 포커스를 받지 못하므로 트랩의 last 가 될 수 없다.
+    // 선택자에서 걸러 내지 않으면 되감기가 영원히 발동하지 않는다.
+    function DisabledTailModal() {
+      const { dialogRef } = useModalA11y<HTMLElement, HTMLDivElement>({
+        open: true,
+        onClose: () => {},
+      });
+      return (
+        <div ref={dialogRef} role="dialog" aria-modal="true">
+          <button type="button">확인</button>
+          <input aria-label="메모" />
+          <textarea aria-label="사유" disabled />
+        </div>
+      );
+    }
+    render(<DisabledTailModal />);
+    const confirm = screen.getByRole('button', { name: '확인' });
+    const memo = screen.getByLabelText('메모');
+    memo.focus(); // disabled textarea 를 빼면 이게 마지막 tab stop 이다
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(document.activeElement).toBe(confirm);
+  });
+
   it('닫힐 때 이전 포커스를 복원한다 (WCAG 2.4.3)', () => {
     const outside = document.createElement('button');
     outside.textContent = '열기';

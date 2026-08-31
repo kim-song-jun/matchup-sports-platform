@@ -128,6 +128,14 @@ export type V1Sport = {
   code?: string;
   name: string;
   levels: { id: string; code?: string; name: string; description?: string | null }[];
+  /**
+   * [D14] 이 종목에서 **고를 수 있는** 자리. 선택지는 마스터가 준다 — 아직 저장하지 않은
+   * 종목도 고르는 즉시 포지션 UI 가 떠야 하기 때문이다. 서버 프리셋이 단일 출처이고,
+   * 비어 있으면 포지션 개념이 없는 종목이라 화면이 섹션을 숨긴다.
+   */
+  positionOptions?: { code: string; label: string; goalkeeper: boolean }[];
+  /** 대형 좌표. 있으면 그 위에 자리를 놓고(풋살), 비면 가로 띠로 떨어진다(축구). */
+  positionFormations?: { slots?: { position: string; x: number; y: number }[] }[];
 };
 
 export type V1Region = {
@@ -1919,6 +1927,14 @@ export type V1Profile = {
     levelId: string | null;
     levelName: string | null;
     primary: boolean;
+    /** [D14] 이 종목에서 주로 서는 자리. null = 미설정(정상 상태). */
+    preferredPosition?: string | null;
+    /** 부 포지션. 주 없이 부만은 서버가 거부한다. */
+    secondaryPreferredPosition?: string | null;
+    // [D14] **선택지(positionOptions·positionFormations)는 여기 없다.** 마스터 종목
+    // 목록(`V1Sport`)이 준다 — "무엇을 고를 수 있는가"는 마스터, "무엇을 골랐는가"는
+    // 프로필이다. 두 곳에 두면 나중에 갈리고, 실제로 프로필에만 뒀을 때 **아직 저장 안 한
+    // 종목에는 목록이 없어 포지션 UI 가 안 떴다**(alpha 실측에서 드러났다).
   }>;
   regions?: Array<{
     regionId: string;

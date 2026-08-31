@@ -81,7 +81,8 @@ describe('AbnormalEndDialog — 몰수·중단 종료', () => {
     const onCancel = vi.fn();
     render(<AbnormalEndDialog open onCancel={onCancel} onConfirm={vi.fn()} />);
 
-    fireEvent.keyDown(window, { key: 'Escape' });
+    // 공용 훅(useModalA11y)은 document 에 ESC 리스너를 건다 — window 에 쏘면 도달하지 않는다.
+    fireEvent.keyDown(document, { key: 'Escape' });
     expect(onCancel).toHaveBeenCalled();
   });
 
@@ -90,7 +91,7 @@ describe('AbnormalEndDialog — 몰수·중단 종료', () => {
     const onCancel = vi.fn();
     render(<AbnormalEndDialog open submitting onCancel={onCancel} onConfirm={vi.fn()} />);
 
-    fireEvent.keyDown(window, { key: 'Escape' });
+    fireEvent.keyDown(document, { key: 'Escape' });
     expect(onCancel).not.toHaveBeenCalled();
   });
 

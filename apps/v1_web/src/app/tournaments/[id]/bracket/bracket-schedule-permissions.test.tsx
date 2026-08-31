@@ -81,13 +81,12 @@ describe('BracketScheduleTab — 내 팀 경기와 라인업 권한', () => {
     });
   });
 
-  it('bracket 일정 탭에서 내 팀 경기를 강조하고 라인업으로 바로 연결한다', () => {
+  it('bracket 일정 탭에서 내 팀 경기를 강조한다', () => {
     render(<BracketScheduleTab tournamentId="tour-1" />);
 
+    // [P1-d] 라인업 링크 단언은 뺐다(경기별 라인업 화면 제거). **강조 계약은 남긴다** --
+    // 이 탭에서 내 팀 경기가 눈에 띄어야 한다는 것은 링크와 별개의 계약이다.
     expect(screen.getByText('라인업 미작성')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '라인업 짜기' })).toHaveAttribute(
-      'href',
-      '/tournaments/tour-1/matches/fixture-1/lineup',
-    );
+    expect(screen.queryByRole('link', { name: '라인업 짜기' })).not.toBeInTheDocument();
   });
 });

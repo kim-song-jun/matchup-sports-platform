@@ -57,34 +57,16 @@ function pickParticipantsOfChosenRevisions<T extends LineupRevisionParticipant>(
 }
 
 /**
- * **제출된 라인업만 인정한다.** 제출본이 없는 사이드는 통째로 빈다.
- *
- * 쓰는 곳은 "제출됐다는 사실 자체가 전제인" 경로뿐이다:
- * - 대회 공식 결과 스냅샷(`deriveTournamentRevision`) — 대회는 `SCHEDULED→LIVE` 게이트
- *   (`assertLineupsSubmittedForStart`)를 반드시 거치므로 종료 시점에 제출본이 항상 있다.
- * - 신원 연결 후보(`listClaimableParticipantsForGame`) — 제출 안 된 참가자를 연결하면
- *   그 participantId 가 공식 결과에 안 실려 개인 기록이 영원히 안 붙는다.
- *
- * **리그(TEAM_MATCH) 결과 입력에는 쓰지 마라.** 리그는 위 게이트를 거치지 않아
- * "종료 시점엔 제출본이 있다"가 거짓이다 — `selectLineupParticipantsWithDraftFallback` 를 쓴다.
- */
-export function selectLatestLineupParticipants<T extends LineupRevisionParticipant>(
-  participants: readonly T[],
-  lineups: readonly LineupRevision[],
-): T[] {
-  // DRAFT 인 리비전은 "최신"을 다투는 후보에서 통째로 빠진다 -- 그 사이드의 실제 최신
-  // *운영 가능* 리비전(예: 정정 요청 이전의 SUBMITTED 리비전)이 대신 뽑힌다.
-  return pickParticipantsOfChosenRevisions(
-    participants,
-    lineups.filter((lineup) => OPERABLE_LINEUP_STATES.has(lineup.state)),
-  );
-}
-
-/**
  * **사이드별 폴백**: 제출본(SUBMITTED/LOCKED)이 있으면 그것을, 하나도 없으면 그 사이드의
  * 최신 리비전을 상태와 무관하게 쓴다.
  *
- * 리그 결과 입력 경로가 이것을 쓴다. 리그는 팀장이 "저장"만 하고 "제출"을 안 눌러도
+ * **P1-c 이후 대회 경로도 이것을 쓴다.** 예전에는 "제출본만 인정"하는 엄격 셀렉터가
+ * 따로 있었고, 대회 공식 결과와 신원 연결 후보가 그것을 썼다 -- `SCHEDULED→LIVE` 시작
+ * 게이트가 "종료 시점에 제출본이 항상 있다"를 보장했기 때문이다. 그 게이트를 걷어내면서
+ * 그 전제가 깨졌고(제출 없이 끝난 경기가 생긴다), 엄격 셀렉터를 그대로 뒀다면 그 경기의
+ * 공식 결과가 **빈 명단**이 됐을 것이다. 소비처가 0 이 되어 삭제했다.
+ *
+ * 리그 결과 입력 경로가 원래부터 이것을 쓴다. 리그는 팀장이 "저장"만 하고 "제출"을 안 눌러도
  * 경기가 끝나고 운영자가 결과를 넣는다(자동저장이라 이게 오히려 흔한 경로다). 엄격
  * 셀렉터를 쓰면 그 사이드가 통째로 비어서 ① 운영자의 득점자 드롭다운이 0명이 되고
  * ② 라인업을 작성한 팀조차 출전 기록이 안 쌓인다 — `loadSideRosters` 는 리비전 모양만

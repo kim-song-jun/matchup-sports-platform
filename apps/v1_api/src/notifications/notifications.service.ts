@@ -693,9 +693,14 @@ export class NotificationsService {
     }
 
     void this.webPushService
-      .sendToUser(userId, { title, body: body ?? undefined, url: deepLink ?? undefined })
+      .sendToUser(userId, {
+        notificationId: notification.id,
+        title,
+        body: body ?? undefined,
+        url: deepLink ?? undefined,
+      })
       .catch((err: unknown) => {
-        this.logger.warn({ userId, targetType, targetId, err }, '웹 푸시 발송 실패');
+        this.logger.warn({ userId, targetType, targetId, err }, '푸시 알림 발송 실패');
       });
   }
 

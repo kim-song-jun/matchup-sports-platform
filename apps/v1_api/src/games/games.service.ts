@@ -83,7 +83,7 @@ import {
   GameContractError,
   projectParticipantForPublic,
   resolveGameIdempotency,
-  selectLatestLineupParticipants,
+  selectLineupParticipantsWithDraftFallback,
   serializeGameVisibility,
   validateGameResultInvariants,
   validateSubstitution,
@@ -1309,9 +1309,24 @@ export class GamesService {
           end: V1GameState.ENDED,
         }[command];
         this.assertLifecycle(game.sourceType, 'TOURNAMENT_COMMAND', game.state, target);
-        if (command === 'start') {
-          await this.assertLineupsSubmittedForStart(tx, game.id);
-        }
+        // [P1-c] "양 팀이 라인업을 제출해야 시작할 수 있다"는 게이트를 걷어냈다.
+        //
+        // 그 게이트는 "시작했는데 기록할 참가자가 없다"를 막으려던 것이었다. 그런데 이제
+        // 참가자는 **대회 등록 명단에서 게임 생성 시점에 이미 만들어진다**
+        // (tournament-bracket.service.ts — registration.players → participants). 즉 제출
+        // 여부와 무관하게 참가자는 항상 있고, 게이트가 막던 상황 자체가 사라졌다.
+        //
+        // 반대로 게이트는 실제 운영을 막고 있었다 — 명단을 미리 못 낸 팀 하나 때문에
+        // 경기를 시작할 수 없었다. 현장에서 그건 흔한 일이다.
+        //
+        // **함께 고쳐야 하는 것**: 이 게이트는 공식 결과 스냅샷의 전제이기도 했다
+        // (latest-lineup-participants.ts 의 엄격 셀렉터 주석 참고 — "대회는 이 게이트를
+        // 반드시 거치므로 종료 시점에 제출본이 항상 있다"). 게이트만 지우면 제출 없이 끝난
+        // 경기에서 그 셀렉터가 **빈 배열**을 돌려주고, 공식 결과에 선수가 한 명도 안 실린다.
+        // 그래서 deriveTournamentRevision 을 리그와 같은 사이드별 폴백 셀렉터로 바꿨다
+        // (selectLineupParticipantsWithDraftFallback) — 리그가 같은 이유로 이미 그 셀렉터를
+        // 쓰고 있고, 제출본이 있는 사이드에서는 그 위에 얹힌 DRAFT 가 직전 제출을 밀어내지
+        // 못한다는 원래 보호는 그대로 유지된다.
         // 이슈 #375 — HALFTIME이 실제로 영속되는 상태가 되면서 "game.state
         // === LIVE인데 LIVE인 피리어드는 없다"(하프타임 도중)가 처음으로
         // 정상 상태가 됐다. `pause`는 LIVE 피리어드가 있어야만 뜻이 통하는
@@ -2671,30 +2686,163 @@ export class GamesService {
             });
           }
         }
-        const lineup = await tx.v1GameLineup.create({
-          data: {
-            gameId,
-            sideId,
-            revision: (previous?.revision ?? 0) + 1,
-            supersedesId: previous?.id,
-            formation: dto.formation,
-          },
-        });
-        for (const participant of dto.participants) {
-          const createdParticipant = await tx.v1GameParticipant.create({
+        // [P1-b] 대회 경기는 참가자 행을 **재사용**한다 -- 저장할 때마다 새로 만들지 않는다.
+        //
+        // 예전에는 저장 한 번에 새 라인업 리비전 + 새 참가자 행 한 벌이 통째로 생겼다.
+        // 그런데 participant 행에는 그 행에만 붙는 것들이 매달려 있다:
+        //  ① `arrivedAt` -- 현장 명단 검인(1차 대회 회고의 "안 온 사람 확인이 어려움").
+        //  ② `V1GameResultParticipant.participantId` -- 공식 기록의 개인 귀속.
+        //  ③ `V1ParticipantIdentityLink*.participantId` -- 개인 기록 공개의 출발점.
+        // 즉 명단을 한 번 더 저장하는 것만으로 검인이 사라지고 신원 연결이 고아가 됐다.
+        //
+        // **왜 "새 리비전을 안 만든다"가 아니라 "새 행을 안 만든다"인가**: 리비전 번호는
+        // 이 경로의 유일한 낙관적 잠금이다(`dto.expectedVersion !== currentLineupRevision`
+        // 위 2574, 그리고 제출 경로 2788). 클라이언트도 그 전제로 짜여 있다
+        // (fixture-lineup.view-model.ts:146/336). 번호를 고정하면 그 가드 둘이 **살아는
+        // 있고 아무것도 못 잡는** 상태가 된다 -- 있는 줄 알고 안심하게 되므로 더 나쁘다.
+        // 그래서 DRAFT 라인업 **행 하나를 재사용하면서 revision 은 그대로 올린다**:
+        // 참가자는 같은 행에 고정되고, 잠금은 실효를 유지하고, 클라이언트는 안 바뀐다.
+        //
+        // 제출본(SUBMITTED/LOCKED) 위에는 그대로 **새 행**을 만든다 -- 엄격 셀렉터
+        // (selectLineupParticipantsWithDraftFallback)가 제출본을 계속 집어내야 공식 결과와 신원 연결
+        // 후보가 비지 않는다. 그 경로에서는 대신 `arrivedAt` 을 이월한다(아래).
+        //
+        // 범위는 `TOURNAMENT_FIXTURE` 한정이다. TEAM_MATCH 는 위 2528 에서 이미 거부되고,
+        // COMPETITION_FIXTURE/FRIENDLY_MATCH 는 아직 쓰는 코드가 없는 값이라 암묵적으로
+        // 새 동작에 태우지 않는다 -- 그 둘의 정책이 정해질 때 의도적으로 확장한다.
+        const reusesDraftRow =
+          game.sourceType === V1GameSourceType.TOURNAMENT_FIXTURE &&
+          previous !== null &&
+          previous.state === V1GameLineupState.DRAFT;
+        // 재사용 경로든 이월 경로든 직전 행의 참가자를 신원으로 대조해야 한다.
+        const priorParticipants =
+          game.sourceType === V1GameSourceType.TOURNAMENT_FIXTURE && previous !== null
+            ? await tx.v1GameParticipant.findMany({
+                where: { gameId, sideId, lineupId: previous.id },
+                // **정렬은 필수다.** 아래에서 같은 키의 행을 `shift()` 로 1:1 소진하는데,
+                // 동명 게스트 둘(둘 다 userId=null, 둘 다 "김철수")은 **같은 버킷**에 들어간다.
+                // `ORDER BY` 없는 SELECT 의 순서는 Postgres 가 보장하지 않으므로, 정렬이
+                // 없으면 어느 쪽이 먼저 소진되는지가 DB 반환 순서에 좌우된다 -- 저장할 때마다
+                // `arrivedAt` 이월 대상과 재사용되는 행이 뒤바뀔 수 있다(검인이 옆 사람에게
+                // 옮겨 붙는데 재현은 불규칙하다).
+                //
+                // `id` 를 tie-breaker 로 붙이는 이유: 같은 트랜잭션에서 만들어진 행들은
+                // `createdAt` 이 동일할 수 있어 그것만으로는 다시 비결정적이 된다.
+                orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+              })
+            : [];
+        // 매칭 키: 계정이 있으면 계정, 게스트는 이름이 유일한 신원이다(V1TeamTacticsBoardEntry
+        // 와 같은 규칙). 이름 대조를 게스트로 한정하는 이유는 전술보드에서와 같다 -- 연동
+        // 팀원까지 이름으로 묶으면 동명이인이 조용히 한 사람으로 합쳐진다.
+        const priorByKey = new Map<string, (typeof priorParticipants)[number][]>();
+        for (const row of priorParticipants) {
+          const key = row.userId !== null ? `u:${row.userId}` : `g:${row.displayNameSnapshot}`;
+          const bucket = priorByKey.get(key);
+          if (bucket === undefined) priorByKey.set(key, [row]);
+          else bucket.push(row);
+        }
+        // 같은 키가 여러 행이면(동명 게스트) 먼저 온 것부터 1:1 로 소진한다.
+        const takePrior = (participant: SaveGameLineupDto['participants'][number]) => {
+          const key =
+            participant.userId !== undefined
+              ? `u:${participant.userId}`
+              : `g:${participant.displayNameSnapshot}`;
+          return priorByKey.get(key)?.shift();
+        };
+
+        let lineup: { id: string; revision: number };
+        if (reusesDraftRow && previous !== null) {
+          // 낙관적 잠금 2단: revision 은 **stale 클라이언트**(먼저 열고 나중에 저장)를,
+          // 이 CAS 는 **같은 순간 겹치는 트랜잭션**을 잡는다. 리비전만으로는 후자가 안
+          // 잡힌다 -- 둘 다 같은 previous 를 읽고 둘 다 통과해 한쪽이 조용히 덮인다.
+          // (`V1GameLineup.version` 은 컬럼만 있고 여태 아무도 안 쓰던 값이다.)
+          const swapped = await tx.v1GameLineup.updateMany({
+            where: { id: previous.id, version: previous.version },
+            data: {
+              revision: previous.revision + 1,
+              version: { increment: 1 },
+              formation: dto.formation,
+            },
+          });
+          if (swapped.count === 0) {
+            // `currentVersion` 에 `previous.revision` 을 넣으면 **항상 expectedVersion 과
+            // 같은 값**이 나간다 -- 위 2574 가드를 통과했다는 것이 곧 둘이 같다는 뜻이라
+            // 여기까지 온 시점에 그 둘은 정의상 일치한다. 그러면 두 값을 비교해 재조회
+            // 여부를 정하는 클라이언트는 409 를 받고도 "충돌 없음"으로 읽어, 무엇을 해야
+            // 할지 모르는 상태가 된다. 그래서 **실패 시점의 실제 최신 revision** 을 다시
+            // 읽어 내려준다.
+            //
+            // 같은 트랜잭션 안에서 다시 읽는 것이 stale 을 볼 것 같지만, 이 경로에서는
+            // 안전하다 -- 근거는 격리 수준이다:
+            //  · Postgres 기본값 **READ COMMITTED** 에서 트랜잭션 안의 *새 문장*은 다른
+            //    트랜잭션이 **커밋한** 변경을 본다.
+            //  · `updateMany` 가 `count === 0` 을 돌려줬다는 것은 상대가 **이미 커밋했다**는
+            //    뜻이다(커밋 전이었다면 행 잠금에 걸려 블록됐을 것이다).
+            //  · 따라서 이 재조회는 반드시 새 값을 본다.
+            //
+            // **전제를 명시한다: 이 처리는 READ COMMITTED 를 가정한다.** 격리 수준을
+            // REPEATABLE READ 이상으로 올리면 이 경로는 애초에 `count === 0` 이 아니라
+            // 직렬화 오류로 터지므로, 그때는 이 블록 자체를 다시 설계해야 한다.
+            const latest = await tx.v1GameLineup.findFirst({
+              where: { gameId, sideId },
+              orderBy: { revision: 'desc' },
+              select: { revision: true },
+            });
+            throw new ConflictException({
+              code: 'VERSION_CONFLICT',
+              message: '라인업이 그새 변경됐어요. 새로고침 후 다시 시도해 주세요.',
+              details: { expectedVersion: dto.expectedVersion, currentVersion: latest?.revision ?? previous.revision },
+            });
+          }
+          lineup = { id: previous.id, revision: previous.revision + 1 };
+        } else {
+          lineup = await tx.v1GameLineup.create({
             data: {
               gameId,
               sideId,
-              lineupId: lineup.id,
-              userId: participant.userId,
-              displayNameSnapshot: participant.displayNameSnapshot,
-              jerseyNumber: participant.jerseyNumber,
-              position: participant.position,
-              positionX: participant.positionX,
-              positionY: participant.positionY,
-              started: participant.started,
+              revision: (previous?.revision ?? 0) + 1,
+              supersedesId: previous?.id,
+              formation: dto.formation,
             },
           });
+        }
+
+        for (const participant of dto.participants) {
+          const prior = takePrior(participant);
+          // 재사용 경로에서는 **짝지어 update** 한다. deleteMany+createMany 로 갈아끼우면
+          // 행 id 가 바뀌어 위 ①②③ 이 똑같이 끊긴다 -- 그러면 이 작업을 한 이유가 없다.
+          const createdParticipant =
+            reusesDraftRow && prior !== undefined
+              ? await tx.v1GameParticipant.update({
+                  where: { id: prior.id },
+                  data: {
+                    userId: participant.userId ?? null,
+                    displayNameSnapshot: participant.displayNameSnapshot,
+                    jerseyNumber: participant.jerseyNumber,
+                    position: participant.position,
+                    positionX: participant.positionX,
+                    positionY: participant.positionY,
+                    started: participant.started,
+                  },
+                })
+              : await tx.v1GameParticipant.create({
+                  data: {
+                    gameId,
+                    sideId,
+                    lineupId: lineup.id,
+                    userId: participant.userId,
+                    displayNameSnapshot: participant.displayNameSnapshot,
+                    jerseyNumber: participant.jerseyNumber,
+                    position: participant.position,
+                    positionX: participant.positionX,
+                    positionY: participant.positionY,
+                    started: participant.started,
+                    // 제출본 위에 새 리비전을 여는 경로: 검인은 킥오프 직전이라 제출
+                    // **뒤에** 일어나는 것이 정상이므로, 이월하지 않으면 뒤늦은 명단
+                    // 수정 한 번에 이미 받아둔 검인이 통째로 사라진다.
+                    arrivedAt: prior?.arrivedAt ?? null,
+                  },
+                });
           if (participant.userId === undefined) continue;
           // 로스터 귀속을 신원 연결(identity link)로 자동 승격한다 -- 방금 만든
           // participant라 정상적으로는 기존 링크가 있을 수 없지만, 방어적으로 한
@@ -2706,6 +2854,42 @@ export class GamesService {
             { actorType: 'USER', actorUserId: user.id },
             'roster',
           );
+        }
+        if (reusesDraftRow) {
+          // 이번 저장에서 짝을 못 찾고 남은 행 = 명단에서 빠진 사람. 재사용 경로는 행을
+          // 그대로 두면 다음 조회에 그 사람이 계속 실리므로 지운다.
+          //
+          // 여기서 지우는 것이 안전한 이유: 이 경로는 `game.state === SCHEDULED` 에서만
+          // 열린다(위 2549 `LINEUP_DEADLINE_PASSED`). 공식 결과 리비전은 경기가 끝나야
+          // 생기므로 이 시점에 `V1GameResultParticipant` 가 이 행을 가리킬 수 없다.
+          // 라인업에서 빠진 사람의 검인 기록이 함께 사라지는 것도 의도한 동작이다 --
+          // 그 사람은 더 이상 이 경기의 명단이 아니다.
+          //
+          // **신원 연결(identity link)은 같이 지우지 않는다.** 참가자를 만들 때
+          // `createRosterAssertedIdentityLink` 가 자동으로 붙으므로(위) 행을 지우면 링크가
+          // 고아로 남는다. 그래도 지우지 않는 이유는 두 가지다:
+          //  ① 무해하다 -- 링크 소비처를 전수로 확인했다.
+          //     · `games.service.ts:3075`·`:3130`, `league-claimable-fixtures.service.ts:144`
+          //       — `participantId IN (현재 참가자)` 로 조회한다. 고아는 애초에 안 나온다.
+          //     · `public-records/player-card-stats.ts:89` — `where: { userId }` 라 고아 링크를
+          //       **읽는다**. 동의 자격 조회(`loadParticipantConsentEligibility`)도
+          //       `v1ParticipantIdentityLinkCurrent` 기준이라 고아가 그대로 통과한다.
+          //       무해해지는 지점은 그 다음이다: `:110` 의 `V1GameResultParticipant`
+          //       조회가 **행을 0건 돌려준다**(SCHEDULED 경기라 결과 자체가 없다).
+          //       즉 집계에 0 으로 기여할 뿐 숫자를 왜곡하지 않는다.
+          //       (처음엔 "자격 조회에서 걸러진다"고 적었다가 코드를 보고 정정했다 --
+          //        걸러지는 곳이 다르다.)
+          //  ② 링크는 **감사 이벤트**다(`V1ParticipantIdentityLinkEvent` 는 append-only).
+          //     "누가 언제 이 사람을 이 경기에 올렸다가 뺐다"는 기록이라 지우는 쪽이 정보
+          //     손실이다.
+          // 이 분석을 여기 남기는 이유: 안 적으면 다음 사람이 "고아 링크가 생기는데
+          // 괜찮은가"를 처음부터 다시 조사한다.
+          const leftovers = [...priorByKey.values()].flat();
+          if (leftovers.length > 0) {
+            await tx.v1GameParticipant.deleteMany({
+              where: { id: { in: leftovers.map((row) => row.id) } },
+            });
+          }
         }
         const updated = await tx.v1Game.update({
           where: { id: gameId },
@@ -2909,7 +3093,7 @@ export class GamesService {
 
     // 감사 결함 수정(2026-08-27): 예전엔 gameId 로만 걸러 사이드마다 쌓인 모든 라인업
     // 리비전의 참가자 행을 통째로 돌려줬다 -- listLineups/listOperationsLineups(위
-    // 2408/2441)는 물론 deriveTournamentRevision(6073, selectLatestLineupParticipants)도
+    // 2408/2441)는 물론 deriveTournamentRevision 도
     // 전부 "사이드별 최신 라인업"으로 스코프하는데 이 목록만 예외였다. 라인업을 한 번이라도
     // 재저장하면(team-match-lineup.service.ts saveLineup) 리비전마다 참가자 행이 통째로
     // 새로 생기고 옛 행은 지워지지 않으므로(v1GameParticipant.delete 경로 자체가 없다),
@@ -2935,7 +3119,11 @@ export class GamesService {
       },
       orderBy: [{ sideId: 'asc' }, { jerseyNumber: 'asc' }],
     });
-    const participants = selectLatestLineupParticipants(participantCandidates, lineups);
+    // [P1-c] 공식 결과(deriveTournamentRevision)와 **같은 셀렉터**를 써야 한다. 시작
+    // 게이트를 걷어낸 뒤로 제출 없이 끝난 경기가 생기고, 그 결과는 폴백 셀렉터가 고른
+    // 참가자로 기록된다. 여기만 엄격 셀렉터로 남기면 그 경기의 선수들은 **연결 후보에
+    // 아예 안 뜨고**, 결과에는 실려 있는데 본인 기록으로는 영영 못 가져가는 상태가 된다.
+    const participants = selectLineupParticipantsWithDraftFallback(participantCandidates, lineups);
     if (participants.length === 0) {
       return { gameId, version: game.version, participants: [] };
     }
@@ -6117,9 +6305,8 @@ export class GamesService {
       tx.v1GameParticipant.findMany({ where: { gameId: game.id } }),
       tx.v1GameLineup.findMany({
         where: { gameId: game.id },
-        // `state` 를 함께 읽어 selectLatestLineupParticipants 가 DRAFT 리비전을
-        // "최신" 후보에서 빼도록 한다 — 정정 요청으로 새로 열린 초안이 직전 제출을
-        // 무효화하지 않는다(그 유틸의 계약, SUBMITTED/LOCKED 만 운영 가능).
+        // `state` 를 함께 읽어 셀렉터가 사이드별로 제출본을 우선하도록 한다 — 정정
+        // 요청으로 새로 열린 초안이 직전 제출을 무효화하지 않는다(그 유틸의 계약).
         select: { id: true, sideId: true, revision: true, state: true },
       }),
       tx.v1GameSide.findMany({ where: { gameId: game.id } }),
@@ -6128,7 +6315,13 @@ export class GamesService {
         select: { lineup: true },
       }),
     ]);
-    const participants = selectLatestLineupParticipants(participantCandidates, lineups);
+    // [P1-c] 엄격 셀렉터에서 사이드별 폴백으로 바꿨다. 예전에는 "대회는 시작 게이트를
+    // 반드시 거치므로 종료 시점에 제출본이 항상 있다"가 성립해 엄격 셀렉터가 안전했는데,
+    // 그 게이트를 걷어냈으므로(executeCommand 의 'start') 제출 없이 끝난 경기가 생긴다.
+    // 그대로 두면 그 사이드가 **빈 배열**이 되어 공식 결과에 선수가 한 명도 안 실린다.
+    // 리그 결과 입력이 같은 이유로 이미 이 셀렉터를 쓴다. 원래 보호(제출본이 있는
+    // 사이드에서는 그 위에 얹힌 DRAFT 가 직전 제출을 밀어내지 못한다)는 그대로다.
+    const participants = selectLineupParticipantsWithDraftFallback(participantCandidates, lineups);
     // 하드코딩 버그 수정: started/goalkeeper를 실제 라인업 값과 무관하게
     // 항상 true/false로 박아 넣었다 -- 후보로 저장한 선수도 결과 프로젝션에서는
     // 전부 선발로 보였고, 실제로 골키퍼였던 선수도 항상 goalkeeper:false였다.
@@ -6995,37 +7188,6 @@ export class GamesService {
         throw toGameHttpException(error);
       }
       throw error;
-    }
-  }
-
-  /**
-   * `start` used to only call `assertLifecycle` — a valid SCHEDULED→LIVE
-   * state transition was enough, even with zero lineups submitted on either
-   * side. That left an operator with a LIVE game and no participants to
-   * record events against (`LineupGrid` would show "제출된 선발 명단이
-   * 없어요" with no way back). PR #316 added a client-side gate
-   * (`sidesMissingLineup` in operate-console.tsx, built on
-   * `latestOperableLineup` in lineup-grid.tsx), but that only blocks the
-   * button — calling this API directly still skipped the check entirely.
-   * This mirrors the exact same rule server-side so the API itself refuses
-   * the transition: every `V1GameSide` on the game needs at least one
-   * lineup in SUBMITTED or LOCKED state (a newer DRAFT revision on top
-   * doesn't retract an earlier submission — same semantics as
-   * `latestOperableLineup`, which only ever looks at SUBMITTED/LOCKED rows).
-   */
-  private async assertLineupsSubmittedForStart(tx: Transaction, gameId: string): Promise<void> {
-    const sides = await tx.v1GameSide.findMany({ where: { gameId } });
-    const operableLineups = await tx.v1GameLineup.findMany({
-      where: { gameId, state: { in: [V1GameLineupState.SUBMITTED, V1GameLineupState.LOCKED] } },
-      select: { sideId: true },
-    });
-    const sideIdsWithOperableLineup = new Set(operableLineups.map((lineup) => lineup.sideId));
-    const missingSides = sides.filter((side) => !sideIdsWithOperableLineup.has(side.id));
-    if (missingSides.length > 0) {
-      throw new ConflictException({
-        code: 'LINEUP_NOT_SUBMITTED',
-        message: `${missingSides.map((side) => side.displayNameSnapshot).join(', ')} 팀의 선발 명단을 제출해야 경기를 시작할 수 있어요.`,
-      });
     }
   }
 

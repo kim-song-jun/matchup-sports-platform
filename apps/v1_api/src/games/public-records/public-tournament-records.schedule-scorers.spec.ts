@@ -116,7 +116,7 @@ function buildFakePrisma(options: {
 }): PrismaService {
   const database = {
     v1Tournament: {
-      async findUnique() {
+      async findFirst() {
         return {
           id: options.tournamentId ?? TOURNAMENT_ID,
           title: '테스트 대회',

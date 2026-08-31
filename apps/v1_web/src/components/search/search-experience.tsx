@@ -181,10 +181,10 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
     >
     <div className="tm-search-frame" style={{ width: 'min(100%, var(--v1-app-chrome-frame-width))', height: '100%', minHeight: 0, margin: '0 auto', background: 'var(--bg)', fontFamily: 'var(--font)', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
       <form className="tm-search-form-bar" onSubmit={submit} style={{ minHeight: 'var(--v1-shell-topbar-height)', padding: '8px 12px 8px 8px', borderBottom: '1px solid var(--grey100)', display: 'flex', alignItems: 'center', gap: 1, background: 'var(--bg)', flexShrink: 0 }}>
-        <button type="button" aria-label="뒤로가기" onClick={goBack} className="tm-search-back-btn tm-hide-desktop tm-tap-44" style={{ width: 30, minWidth: 30, height: 40, border: 0, background: 'transparent', borderRadius: 12, display: 'grid', placeItems: 'center', color: 'var(--text-strong)', padding: 0 }}>
+        <button type="button" aria-label="뒤로가기" onClick={goBack} className="tm-search-back-btn tm-hide-desktop tm-tap-44" style={{ width: 30, minWidth: 30, height: 40, border: 0, background: 'transparent', borderRadius: 'var(--radius-control)', display: 'grid', placeItems: 'center', color: 'var(--text-strong)', padding: 0 }}>
           <ChevronLeft size={20} />
         </button>
-        <div className="tm-search-input-wrap" style={{ flex: 1, minHeight: 44, borderRadius: 14, background: 'var(--grey100)', border: viewState === 'error' ? '1px solid var(--red500)' : query ? '1px solid var(--blue500)' : '1px solid transparent', display: 'flex', alignItems: 'center', gap: 4, padding: '0 8px 0 16px', minWidth: 0 }}>
+        <div className="tm-search-input-wrap" style={{ flex: 1, minHeight: 44, borderRadius: 'var(--radius-field)', background: 'var(--grey100)', border: viewState === 'error' ? '1px solid var(--red500)' : query ? '1px solid var(--blue500)' : '1px solid transparent', display: 'flex', alignItems: 'center', gap: 4, padding: '0 8px 0 16px', minWidth: 0 }}>
           <input
             aria-label="검색어"
             value={query}
@@ -196,7 +196,7 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
           />
           {query ? (
             <button type="button" aria-label="검색어 지우기" onClick={clear} className="tm-tap-44" style={{ width: 30, minWidth: 30, height: 30, border: 0, background: 'transparent', display: 'grid', placeItems: 'center', padding: 0 }}>
-              <span style={{ width: 20, height: 20, borderRadius: 999, background: 'var(--grey400)', color: 'var(--static-white)', display: 'grid', placeItems: 'center' }}>
+              <span style={{ width: 20, height: 20, borderRadius: 'var(--radius-pill)', background: 'var(--grey400)', color: 'var(--static-white)', display: 'grid', placeItems: 'center' }}>
                 <X size={13} />
               </span>
             </button>
@@ -266,7 +266,7 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
 
             {effectiveViewState === 'new' ? (
               <div className="tm-search-state-msg" style={{ marginTop: 44, textAlign: 'center', color: 'var(--text-muted)' }}>
-                <div style={{ width: 48, height: 48, borderRadius: 16, background: 'var(--grey50)', display: 'grid', placeItems: 'center', margin: '0 auto 16px', color: 'var(--grey500)' }}>
+                <div style={{ width: 48, height: 48, borderRadius: 'var(--radius-container)', background: 'var(--grey50)', display: 'grid', placeItems: 'center', margin: '0 auto 16px', color: 'var(--grey500)' }}>
                   <Search size={22} />
                 </div>
                 <div className="tm-text-body-lg">검색어를 입력하거나 조건을 선택해 주세요</div>
@@ -276,7 +276,7 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
 
             {effectiveShowStateMessage ? (
               <div className="tm-search-state-msg" style={{ marginTop: 44, textAlign: 'center', color: 'var(--text-muted)' }}>
-                <div style={{ width: 48, height: 48, borderRadius: 16, background: 'var(--grey50)', display: 'grid', placeItems: 'center', margin: '0 auto 16px', color: effectiveViewState === 'error' ? 'var(--red500)' : 'var(--grey500)' }}>
+                <div style={{ width: 48, height: 48, borderRadius: 'var(--radius-container)', background: 'var(--grey50)', display: 'grid', placeItems: 'center', margin: '0 auto 16px', color: effectiveViewState === 'error' ? 'var(--red500)' : 'var(--grey500)' }}>
                   {effectiveViewState === 'stale' ? <Clock size={22} /> : effectiveViewState === 'error' ? <AlertCircle size={22} /> : <Search size={22} />}
                 </div>
                 <div className="tm-text-body-lg">{effectiveViewState === 'stale' ? '최신 결과를 불러오는 중이에요.' : effectiveViewState === 'error' ? '검색 결과를 불러오지 못했어요.' : '검색 결과가 없어요.'}</div>
@@ -288,7 +288,7 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
       </div>
 
       {effectiveViewState === 'error' ? (
-        <div className="tm-search-error-toast" style={{ position: 'absolute', left: 'var(--v1-shell-page-x)', right: 'var(--v1-shell-page-x)', bottom: 'calc(22px + var(--v1-shell-safe-bottom))', minHeight: 48, borderRadius: 14, background: 'var(--scrim-dark-94)', color: 'var(--static-white)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 16px', fontSize: 13, fontWeight: 700 }}>
+        <div className="tm-search-error-toast" style={{ position: 'absolute', left: 'var(--v1-shell-page-x)', right: 'var(--v1-shell-page-x)', bottom: 'calc(22px + var(--v1-shell-safe-bottom))', minHeight: 48, borderRadius: 'var(--radius-field)', background: 'var(--scrim-dark-94)', color: 'var(--static-white)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 16px', fontSize: 13, fontWeight: 700 }}>
           검색 중 문제가 생겼어요. 잠시 후 다시 시도해 주세요.
         </div>
       ) : null}

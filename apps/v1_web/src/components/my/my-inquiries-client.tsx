@@ -246,7 +246,7 @@ function InquiryDetail({ inquiry }: { inquiry: V1Inquiry }) {
         {inquiry.replies && inquiry.replies.length > 0 ? (
           <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
             {inquiry.replies.map((reply) => (
-              <div key={reply.replyId} style={{ borderRadius: 14, background: 'var(--surface-soft)', padding: 12 }}>
+              <div key={reply.replyId} style={{ borderRadius: 'var(--radius-field)', background: 'var(--surface-soft)', padding: 12 }}>
                 <div className="tm-text-label" style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                   <span>{reply.adminName ?? '\uc6b4\uc601\ud300'}</span>
                   <span style={{ color: 'var(--text-muted)' }}>{formatDate(reply.createdAt)}</span>

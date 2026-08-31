@@ -550,12 +550,16 @@ export class TournamentBracketService {
     }
 
     const changesTeams = dto.homeRegistrationId !== undefined || dto.awayRegistrationId !== undefined;
-    // updateFixture()는 V1TournamentFixture.home/awayRegistrationId만 바꾸고 V1Game.sides는
-    // 절대 건드리지 않는다 -- 신규 경로 자체에는 "결과가 확정된 경기의 팀 변경을 막는" 별도
-    // 가드가 없으므로(games.service.ts 어디에도 이 경로를 막는 코드가 없음을 확인했다) 이
-    // 가드를 지우지 않고 신규 경로 우선 + 레거시 폴백(officialize된 결과 유무) 기준으로
-    // 다시 판정한다 -- 레거시 결과만 있는(game 백필 전) 픽스처의 팀을 바꿀 수 있게 되면
-    // 안 되므로 폴백도 반드시 반영한다.
+    // 결과가 확정된 경기의 팀 변경을 막는 가드. 신규 경로(V1Game) 자체에는 이 경기의 팀
+    // 변경을 막는 코드가 없으므로(games.service.ts 어디에도 없음을 확인했다) 여기서
+    // 신규 경로 우선 + 레거시 폴백(officialize된 결과 유무) 기준으로 판정한다 --
+    // 레거시 결과만 있는(game 백필 전) 픽스처의 팀을 바꿀 수 있게 되면 안 되므로 폴백도
+    // 반드시 반영한다.
+    //
+    // (이 주석은 원래 "이 메서드는 V1Game.sides를 절대 건드리지 않는다"로 시작했는데,
+    //  그 뒤 아래 sideTeamUpdates 블록이 추가되면서 사실과 어긋나게 됐다. 그 서술을
+    //  걷어냈다 -- 지금 이 가드가 지키는 것은 "결과가 있으면 팀을 못 바꾼다"이고,
+    //  팀이 바뀔 때 사이드가 함께 옮겨간다는 것은 아래 블록이 설명한다.)
     if (changesTeams && hasTournamentFixtureOfficialResult(fixture.game, fixture.result)) {
       throw new ConflictException({
         code: 'FIXTURE_HAS_RESULT',
@@ -627,6 +631,22 @@ export class TournamentBracketService {
           where: { id: update.sideId },
           data: { teamId: update.teamId, displayNameSnapshot: update.teamName },
         });
+        /* 사이드의 팀이 바뀌면 그 사이드에 걸려 있던 전술보드는 주인이 없어진다.
+         *
+         * 전술보드(V1TeamTacticsBoard)는 sideId 로 붙어 있고 자기 teamId 를 따로 들고 있다
+         * (V1GameSide.teamId 가 게스트 상대를 위해 nullable 이라 복합 FK 를 걸 수 없었다).
+         * 그래서 여기서 지우지 않으면 옛 팀의 배치가 새 팀 자리에 그대로 남는다 —
+         * 읽기 쪽 불변식 검사(team-tactics-board.service.ts)가 409 로 막아 주지만, 그건
+         * 마지막 방어이지 정상 상태가 아니다. 아무도 그 보드를 고칠 수 없어 그 경기의
+         * 전술보드가 영구히 잠긴다.
+         *
+         * 지우는 것이 옳은 이유: 새 팀은 그 보드를 만든 적이 없고, 옛 팀은 이제 이 경기에
+         * 없다. 결과가 있는 경기의 팀 변경은 위 FIXTURE_HAS_RESULT 가드가 이미 막으므로
+         * 기록에 영향이 가는 경우도 없다. 엔트리는 boardId FK 의 CASCADE 로 함께 지워진다.
+         *
+         * delete 가 아니라 deleteMany 인 이유는 보드가 없는 사이드가 정상이기 때문이다
+         * (아직 아무도 전술을 짜지 않은 경기 — delete 는 그때 P2025 로 트랜잭션을 깬다). */
+        await tx.v1TeamTacticsBoard.deleteMany({ where: { sideId: update.sideId } });
       }
       await this.adminContext.logAdminAction(
         admin,

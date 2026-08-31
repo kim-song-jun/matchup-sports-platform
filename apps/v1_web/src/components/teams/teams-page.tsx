@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import type { CSSProperties, KeyboardEvent, PointerEvent, ReactNode } from 'react';
+import type { CSSProperties, PointerEvent, ReactNode } from 'react';
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, ChevronDown, Lock } from 'lucide-react';
@@ -9,10 +9,12 @@ import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, ErrorState, KPIStat, ListItem } from '@/components/v1-ui/primitives';
 import { ChevronLeftIcon, ChevronRightIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
+import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { cssUrl } from '@/lib/assets';
 import { useV1PublicTeamReviewSummary } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { isTeamLogoPreset, TEAM_LOGO_PRESETS } from '@/lib/team-logo-presets';
+import { TeamUpcomingGamesCard } from './team-upcoming-games-card';
 import type {
   TeamDetailViewModel,
   TeamFormViewModel,
@@ -122,7 +124,7 @@ function TeamListSkeleton() {
   return (
     <div className="tm-team-card-stack" aria-busy="true" aria-label="팀 목록 불러오는 중">
       {[0, 1, 2].map((i) => (
-        <div key={i} className="tm-review-skeleton" style={{ height: 164, borderRadius: 16 }} aria-hidden="true" />
+        <div key={i} className="tm-review-skeleton" style={{ height: 164, borderRadius: 'var(--radius-container)' }} aria-hidden="true" />
       ))}
     </div>
   );
@@ -216,7 +218,7 @@ function TeamOpenMatchesSection({
       {loading ? (
         <div style={{ display: 'grid', gap: 8 }} aria-busy="true" aria-label="열린 매치 불러오는 중">
           {[0, 1].map((i) => (
-            <div key={i} className="tm-review-skeleton" style={{ height: 64, borderRadius: 14 }} aria-hidden="true" />
+            <div key={i} className="tm-review-skeleton" style={{ height: 64, borderRadius: 'var(--radius-field)' }} aria-hidden="true" />
           ))}
         </div>
       ) : items.length ? (
@@ -232,7 +234,7 @@ function TeamOpenMatchesSection({
                 justifyContent: 'space-between',
                 gap: 12,
                 border: '1px solid var(--border)',
-                borderRadius: 14,
+                borderRadius: 'var(--radius-field)',
                 padding: '16px 16px',
                 background: 'var(--bg)',
                 textDecoration: 'none',
@@ -292,7 +294,7 @@ function TeamMyLeaguesSection({
       {loading ? (
         <div style={{ display: 'grid', gap: 8 }} aria-busy="true" aria-label="내 리그 불러오는 중">
           {[0, 1].map((i) => (
-            <div key={i} className="tm-review-skeleton" style={{ height: 56, borderRadius: 14 }} aria-hidden="true" />
+            <div key={i} className="tm-review-skeleton" style={{ height: 56, borderRadius: 'var(--radius-field)' }} aria-hidden="true" />
           ))}
         </div>
       ) : error ? (
@@ -315,7 +317,7 @@ function TeamMyLeaguesSection({
                 justifyContent: 'space-between',
                 gap: 12,
                 border: '1px solid var(--border)',
-                borderRadius: 14,
+                borderRadius: 'var(--radius-field)',
                 padding: '16px 16px',
                 background: 'var(--bg)',
                 textDecoration: 'none',
@@ -359,7 +361,7 @@ function TeamOperationsSection({
               display: 'grid',
               gap: 4,
               border: '1px solid var(--border)',
-              borderRadius: 12,
+              borderRadius: 'var(--radius-control)',
               padding: compact ? '12px 14px' : '14px 16px',
               background: 'var(--bg)',
               color: 'inherit',
@@ -430,7 +432,7 @@ function TeamRecordLinkCard({
     justifyContent: 'space-between',
     gap: 12,
     border: '1px solid var(--border)',
-    borderRadius: 14,
+    borderRadius: 'var(--radius-field)',
     padding: '16px 16px',
     background: 'var(--bg)',
     textDecoration: 'none',
@@ -532,6 +534,14 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
               <span className="tm-badge tm-badge-grey">{memberCapacity}</span>
             </div>
           </Card>
+          {/* 전술보드 입구 — 히어로 바로 아래. 팀 일정(V1TeamSchedule)에는 대회 경기가
+              들어오지 않아 별도 목록이 필요하다(컴포넌트 주석 참고).
+              위치를 여기로 올린 이유: 처음엔 기본 정보 위에 뒀는데, 그 자리는 "열린 매치"와
+              "내 리그"(리그가 많은 팀은 카드가 7장 넘는다) 아래라 390px 에서 한참 스크롤해야
+              나왔다 — alpha 실화면 캡처로 확인했다. 팀장이 우리 팀에 들어와 가장 먼저 하는
+              일이 다음 경기 준비이므로 모집 공고보다 앞이 맞다. 경기가 없으면 이 섹션은
+              스스로 사라지므로(컴포넌트가 null 반환) 없는 팀의 화면은 그대로다. */}
+          {mode === 'mine' ? <TeamUpcomingGamesCard teamId={team.id} /> : null}
           <TeamOpenMatchesSection matches={model.openMatches} loading={model.openMatchesLoading} />
           <TeamMyLeaguesSection leagues={model.myLeagues} loading={model.myLeaguesLoading} error={model.myLeaguesError} onRetry={model.onRetryMyLeagues} />
           <TeamRecordLinkCard
@@ -563,7 +573,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
                 justifyContent: 'space-between',
                 gap: 12,
                 border: '1px solid var(--border)',
-                borderRadius: 14,
+                borderRadius: 'var(--radius-field)',
                 padding: '16px 16px',
                 background: 'var(--bg)',
                 textDecoration: 'none',
@@ -719,6 +729,12 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
         {mode === 'pending' ? (
           <TeamJoinPendingNotice requestedAtLabel={model.joinRequest?.requestedAtLabel} />
         ) : null}
+        {/* 전술보드 입구 — **모바일 블록에도 반드시 있어야 한다.** 이 화면은 데스크톱
+            (.tm-show-desktop)과 모바일(.tm-hide-desktop) JSX 를 따로 그리는데, 처음엔
+            데스크톱 쪽에만 넣어서 **모바일에서는 진입점이 아예 없었다** — 이 앱의 본무대가
+            모바일인데도. alpha 390/768 캡처가 그 섹션을 못 찾아 드러났다(데스크톱 1440
+            에서만 찍혔다). 두 블록을 함께 고치는 것이 이 파일의 규약이다. */}
+        {mode === 'mine' ? <TeamUpcomingGamesCard teamId={team.id} /> : null}
         <TeamOpenMatchesSection matches={model.openMatches} loading={model.openMatchesLoading} />
         <TeamMyLeaguesSection leagues={model.myLeagues} loading={model.myLeaguesLoading} error={model.myLeaguesError} onRetry={model.onRetryMyLeagues} />
 
@@ -1312,7 +1328,7 @@ function TeamCoverImageField({
         style={{
           marginTop: 12,
           minHeight: 210,
-          borderRadius: 14,
+          borderRadius: 'var(--radius-field)',
           border: '1px solid var(--border-strong)',
           background: coverImageUrl ? `${cssUrl(coverImageUrl)} center/cover` : 'var(--grey50)',
           display: 'flex',
@@ -1527,7 +1543,7 @@ function InvitationSection({ invitations }: { invitations: NonNullable<TeamMembe
       {listLoading ? (
         <div style={{ display: 'grid', gap: 12 }} aria-busy="true" aria-label="초대 목록 불러오는 중">
           {[0, 1].map((i) => (
-            <div key={i} className="tm-review-skeleton" style={{ height: 64, borderRadius: 14 }} aria-hidden="true" />
+            <div key={i} className="tm-review-skeleton" style={{ height: 64, borderRadius: 'var(--radius-field)' }} aria-hidden="true" />
           ))}
         </div>
       ) : listError ? (
@@ -1550,7 +1566,7 @@ function InvitationSection({ invitations }: { invitations: NonNullable<TeamMembe
                   style={{
                     width: 40,
                     height: 40,
-                    borderRadius: '50%',
+                    borderRadius: 'var(--radius-circle)',
                     background: 'var(--grey100)',
                     display: 'flex',
                     alignItems: 'center',
@@ -1702,6 +1718,15 @@ function DraggableFilterSheet({
   const draggingRef = useRef(false);
   const [offsetY, setOffsetY] = useState(0);
 
+  // focus 저장/복원 · ESC 닫기 · Tab focus trap · body 스크롤 잠금은 공용 훅(useModalA11y)에
+  // 위임한다. 이 시트는 부모(TeamFilterSheet)가 조건부 렌더로 즉시 마운트/언마운트하고
+  // 퇴장 애니메이션을 쓰지 않으므로 open=true 고정, mounted/closing 은 쓰지 않는다.
+  // backdrop 은 별도 <Link className="tm-filter-scrim"> 로 이미 처리돼 onBackdropClick 은 불필요.
+  const { dialogRef } = useModalA11y<HTMLElement, HTMLElement>({
+    open: true,
+    onClose: () => router.push(closeHref),
+  });
+
   const handlePointerDown = (event: PointerEvent<HTMLElement>) => {
     startYRef.current = event.clientY;
     draggingRef.current = true;
@@ -1727,23 +1752,17 @@ function DraggableFilterSheet({
     setOffsetY(0);
   };
 
-  // a11y: ESC 키로 필터 시트 닫기 (드래그 동작과 독립적으로 동작)
-  const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
-    if (event.key === 'Escape') {
-      router.push(closeHref);
-    }
-  };
-
   return (
     <div className="tm-filter-layer">
       {/* role="dialog" + aria-modal="true": 스크린리더가 시트를 대화상자로 인식하고
-          배경 콘텐츠를 읽지 않도록 함. focus-trap은 드래그 인터랙션 충돌 위험으로 생략. */}
+          배경 콘텐츠를 읽지 않도록 함. ESC·Tab focus trap·스크롤 잠금·포커스 복원은
+          useModalA11y 가 담당(드래그는 pointer 이벤트 전용이라 Tab trap 과 충돌하지 않는다). */}
       <section
+        ref={dialogRef}
         className="tm-filter-sheet"
         role="dialog"
         aria-modal="true"
         aria-label={ariaLabel}
-        onKeyDown={handleKeyDown}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerEnd}
@@ -1870,7 +1889,7 @@ function InfoChips({ label, items }: { label: string; items: string[] }) {
               display: 'inline-block',
               width: 8,
               height: 8,
-              borderRadius: '50%',
+              borderRadius: 'var(--radius-circle)',
               background: 'var(--blue500)',
               flexShrink: 0,
             }}

@@ -302,7 +302,7 @@ export function SocialSignupClient() {
             >
               <span
                 aria-hidden="true"
-                style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--blue500)', display: 'inline-block' }}
+                style={{ width: 6, height: 6, borderRadius: 'var(--radius-circle)', background: 'var(--blue500)', display: 'inline-block' }}
               />
               휴대폰 본인인증이 완료됐어요
             </div>

@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { Card } from '@/components/v1-ui/primitives';
+import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { extractErrorMessage } from '@/lib/error-message';
 import {
   useV1ClaimableParticipants,
@@ -76,23 +77,20 @@ function ClaimMyRecordView({
   const [selected, setSelected] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
-  const dialogRef = useRef<HTMLDivElement>(null);
+  // 포커스 트랩·ESC 닫기·스크롤 잠금·포커스 복원은 공용 훅(useModalA11y)에 위임.
+  // 신청 mutation 이 진행 중일 때는 ESC/backdrop 으로 닫히지 않게 pending 을 넘긴다.
+  // early return(`if (done) return ...`) 보다 위에서 호출해 Hooks 규칙을 지킨다.
+  const { dialogRef, onBackdropClick } = useModalA11y<HTMLElement, HTMLDivElement>({
+    open,
+    onClose: () => onOpenChange(false),
+    pending: request.isPending,
+  });
   // alpha 실화면(2026-08-24)에서 잡은 것: 고를 참가자가 0명인데 "이 선수가 저예요"
   // 버튼이 그대로 남아 있었다. disabled 라도 회색 버튼이 보이면 "누를 수 있을 것 같은"
   // 신호를 주고, 사용자는 왜 안 눌리는지 찾게 된다. 아무것도 할 수 없는 상태에서는
   // 그 버튼을 아예 렌더하지 않고 닫기만 남긴다.
   const loaded = claimable.data !== undefined;
   const hasCandidates = (claimable.data?.participants.length ?? 0) > 0;
-
-  useEffect(() => {
-    if (!open) return undefined;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onOpenChange(false);
-    };
-    window.addEventListener('keydown', onKey);
-    dialogRef.current?.focus();
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onOpenChange]);
 
   // 신청이 끝나면 배너를 접는다. 같은 경기에 두 번 신청할 이유가 없고, 남겨 두면
   // "아직 안 됐나?" 하고 다시 누르게 된다.
@@ -131,9 +129,7 @@ function ClaimMyRecordView({
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: 'rgba(25, 31, 40, 0.48)' }}
-          onClick={(event) => {
-            if (event.target === event.currentTarget) onOpenChange(false);
-          }}
+          onClick={onBackdropClick}
         >
           <div
             ref={dialogRef}

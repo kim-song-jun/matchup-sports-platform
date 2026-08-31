@@ -55,21 +55,13 @@ vi.mock('@/hooks/use-v1-game-operations-console', () => ({
 // SUBSTITUTION 테스트가 "나가는 선수 == 들어오는 선수"라는, 실제 계약
 // (validateSubstitution이 거부하는 상태)과 모순되는 입력을 "정상"으로
 // 통과시켰다(Copilot 리뷰 지적).
-vi.mock('./lineup-grid', () => ({
-  // operate-console.tsx가 "라인업 없이 시작 막기"(UX 감사 item 2) 판정에
-  // 실제 구현과 동일한 로직을 쓴다 — 목도 같은 판정을 하도록 실제 함수와
-  // 동일하게 둔다(다르게 두면 이 파일의 다른 테스트가 실제로는 없던 라인업을
-  // "있다"고 오판하게 된다).
-  latestOperableLineup: (
-    lineups: Array<{ sideId: string; state?: string; revision: number }>,
-    sideId: string,
-  ) => {
-    const candidates = lineups.filter(
-      (l) => l.sideId === sideId && (l.state === 'SUBMITTED' || l.state === 'LOCKED'),
-    );
-    if (candidates.length === 0) return null;
-    return candidates.reduce((latest, current) => (current.revision > latest.revision ? current : latest));
-  },
+vi.mock('./lineup-grid', async (importOriginal) => ({
+  // 선택자 함수들은 **실제 구현을 그대로 쓴다**(`importOriginal`). 예전에는 목 안에
+  // 로직을 손으로 베껴 뒀는데, 그러면 구현이 바뀔 때 목이 조용히 뒤처진다 -- 실제로
+  // [P1-c 후속]에서 `latestLineupForDisplay` 가 추가되자 이 목에 없어서 세 테스트가
+  // "export 가 없다"로 깨졌고, 거기서 로직을 또 베꼈다면 **두 규칙이 다르다는 계약을
+  // 목이 왜곡**할 수 있었다. 컴포넌트만 가벼운 스텁으로 대체한다.
+  ...(await importOriginal<typeof import('./lineup-grid')>()),
   LineupGrid: ({
     onSelectPlayer,
     restrictSideId,
@@ -647,16 +639,22 @@ describe('OperateConsole — 라인업 게이트 (UX 감사 item 2)', () => {
     mocks.useV1GameOperationsConsole.mockReturnValue(consoleState({ gameSnapshot: { version: 1, state: 'SCHEDULED' } }));
   }
 
-  it('한쪽 팀만 라인업을 제출했으면 "경기 시작"이 비활성이고 사유·복구 링크가 뜬다', () => {
+  /**
+   * [P1-c] 이 테스트는 원래 **반대**를 못박고 있었다 -- "한쪽이 미제출이면 시작 버튼이
+   * 비활성". 그 차단을 걷어냈으므로 계약이 뒤집혔다: **경고는 뜨되 시작은 된다.**
+   *
+   * 단언을 뒤집는 것이지 지우는 것이 아니다. 차단이 사라졌다고 경고까지 없애면
+   * "왜 명단이 비어 있지"를 운영자가 현장에서 알 수 없다.
+   */
+  it('한쪽 팀만 라인업을 제출했어도 "경기 시작"은 활성이고, 미제출 경고는 그대로 뜬다', () => {
     setup([{ sideId: 'side-home', state: 'SUBMITTED', revision: 1 }]);
     render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
 
-    expect(screen.getByRole('button', { name: '경기 시작' })).toBeDisabled();
-    expect(screen.getByText(/성수 풋살 클럽.*선발 명단을 제출해야 경기를 시작할 수 있어요/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '라인업 제출하러 가기' })).toHaveAttribute(
-      'href',
-      '/tournaments/t-1/matches/f-1/lineup',
-    );
+    expect(screen.getByRole('button', { name: '경기 시작' })).toBeEnabled();
+    expect(screen.getByText(/성수 풋살 클럽.*아직 선발 명단을 제출하지 않았어요/)).toBeInTheDocument();
+    // [P1-d] 배너의 제출 링크는 뗐다 -- 화면이 사라졌고, P1-c 로 제출 자체가
+    // 필요 없어졌다. **경고 문구는 남긴다**(운영자가 상황을 알아야 한다).
+    expect(screen.queryByRole('link', { name: '라인업 제출하러 가기' })).not.toBeInTheDocument();
   });
 
   it('양 팀 모두 라인업을 제출하면 "경기 시작"이 활성화되고 배너가 없다', () => {

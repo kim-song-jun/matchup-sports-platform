@@ -387,7 +387,48 @@ export const gameSchemaSourceManifest = {
   // game domain(V1Game*) 모델·enum 은 건드리지 않는다. 마이그레이션
   // 20260825070000_v1_team_match_videos. 바인딩된 20260729000100_v1_game_operations 는
   // 그대로다(migration 해시 불변). 아래 값은 shasum -a 256 으로 계산했다.
-  schema: 'f9bc07bdce405f8ef624a692d9eb491e9f6e176b757d311904a47ab6e97559aa',
+  // 2026-08-28 재핀: Android FCM 설치를 저장하는 V1PushDevice 모델과 user 역관계,
+  // platform/environment enum을 추가했다. game operations 모델·enum은 바뀌지 않았고
+  // 전용 additive migration 20260828000000_add_v1_push_devices가 뒷받침한다. 이 guard가
+  // schema.prisma 전체 bytes를 결속하므로 schema hash만 현재 committed LF bytes로 재핀한다.
+  // Task 156 follow-up: push delivery success metadata changed the complete schema snapshot only.
+  // The bound game-operations migration below remains byte-for-byte unchanged.
+  //
+  // 재핀(2026-08-29): 대회·리그 통합 R1 expand.
+  // - 무엇이 바뀌었나: enum `V1CompetitionKind`/`V1CompetitionEntrySource` 신규,
+  //   `V1Tournament` 에 kind/seriesId/tier/seasonNo + 시리즈 FK + (seriesId, seasonNo, tier)
+  //   유니크, `V1TournamentRegistration` 에 entrySource/adjustmentNote, 전술보드 모델
+  //   `V1TeamTacticsBoard`/`V1TeamTacticsBoardEntry` 신규, `V1LeagueSeries`·`V1Team` 에
+  //   역참조 배열 한 줄씩.
+  // - game domain 을 건드리나: **컬럼·제약은 건드리지 않는다.** 두 곳만 닿는다 —
+  //   `V1GameSourceType` 에 값 2개 추가(COMPETITION_FIXTURE·FRIENDLY_MATCH, 구 값
+  //   TEAM_MATCH·TOURNAMENT_FIXTURE 는 그대로 남는다. 개명이 아니라 추가다), 그리고
+  //   `V1Game`/`V1GameSide` 에 전술보드 역참조 필드 한 줄씩(테이블 형태 변화 없음).
+  //   이 릴리스에는 새 enum 값을 읽거나 쓰는 코드가 없다 — 소스 승격은 R3 다.
+  // - additive 인가: 그렇다. 새 컬럼은 전부 nullable(kind/entrySource 는 DEFAULT 로 기존
+  //   행이 채워지지만 컬럼 자체는 nullable 로 남는다), rename·데이터 이동·NOT NULL 승격
+  //   없음. 새 유니크 인덱스의 세 컬럼은 같은 마이그레이션에서 추가된 nullable 컬럼이라
+  //   기존 행은 전부 NULL 이고 Postgres 는 NULL 끼리 충돌로 보지 않는다.
+  // - 어느 마이그레이션이 뒷받침하나: 신규 파일
+  //   20260829000000_v1_competition_expand. 바인딩된 20260729000100_v1_game_operations
+  //   는 손대지 않았으므로 아래 `migration` 핀은 그대로다.
+  //
+  // [D14 재핀 2026-08-30]
+  // - 무엇이 바뀌었나: `V1UserSportPreference` 에 nullable 컬럼 두 개
+  //   (`preferred_position`, `secondary_preferred_position`) 추가. 종목별 선호 포지션
+  //   (주/부)이고 사람 축에 둔다 — 한 번 정하면 모든 대회·리그에 자동 적용된다.
+  // - 게임 스키마와 무관한가: 그렇다. `V1Game`·`V1GameSide`·`V1GameLineup`·
+  //   `V1GameParticipant` 어느 것도 손대지 않았다. 이 핀이 게임 계약을 지키는 것인데
+  //   그 계약 자체는 변하지 않았고, 해시가 파일 전체를 대상으로 하기 때문에 재핀한다.
+  // - additive 인가: 그렇다. 두 컬럼 모두 nullable 이고 백필하지 않는다 —
+  //   기존 행은 전부 NULL 이며 그것이 정상 상태다(미설정 = 카드 포지션 미상).
+  //   rename·데이터 이동·NOT NULL 승격 없음.
+  // - 어느 마이그레이션이 뒷받침하나: 신규 파일 20260830000000_v1_preferred_position.
+  //   바인딩된 20260729000100_v1_game_operations 는 손대지 않았으므로 `migration` 핀은
+  //   그대로다.
+  //
+  // 값은 `shasum -a 256 apps/v1_api/prisma/schema.prisma` 로 계산했다.
+  schema: '9219a562a6a8d8375a16ee2804b6de63a2ddc12da527a62f582b29b6e3666702',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 
@@ -404,7 +445,10 @@ export function verifyGameSchemaSourceSnapshot(
     ['schema', candidates.schema, manifest.schema],
     ['migration', candidates.migration, manifest.migration],
   ] as const) {
-    const actual = createHash('sha256').update(readFileSync(path)).digest('hex');
+    // Git stores canonical LF bytes while Windows may materialize the same source as CRLF.
+    // Normalize only line endings so the source-integrity contract is OS independent.
+    const canonicalBytes = readFileSync(path).toString('utf8').replaceAll('\r\n', '\n');
+    const actual = createHash('sha256').update(canonicalBytes).digest('hex');
     if (actual !== expected) {
       throw new Error(`SOURCE_SNAPSHOT_DRIFT: ${name} bytes differ from bound source snapshot`);
     }

@@ -7,11 +7,28 @@ import {
   buildAlphaTournamentCampaignContent,
   createCompetitionData,
   ensureAlphaQaRecordConsent,
+  FEATURED_PERSONAS,
+  FEATURED_TEAMS,
 } from '../../prisma/seed-alpha-tournament-qa';
+import { LEAGUE_PLAYER_NAMES, LEAGUE_TEAM_NAMES } from '../../prisma/seed-alpha-league-qa';
 import { parseCampaignContentJson } from './tournament-campaign-content';
 import { FUTSAL_COMPETITION_CONFIG_ID } from './competition-config/competition-config-backfill';
 
 describe('alpha tournament QA campaign content', () => {
+  it('쇼케이스 리그를 자연스러운 5개 팀·20명 선수로 구성한다', () => {
+    const teamNames = [FEATURED_TEAMS[0].name, ...LEAGUE_TEAM_NAMES];
+    const playerNames = [
+      ...FEATURED_PERSONAS.map((persona) => persona.nickname),
+      ...LEAGUE_PLAYER_NAMES.flat(),
+    ];
+
+    expect(teamNames).toHaveLength(5);
+    expect(new Set(teamNames).size).toBe(5);
+    expect(playerNames).toHaveLength(20);
+    expect(new Set(playerNames).size).toBe(20);
+    expect([...teamNames, ...playerNames].filter((name) => /\(테스트\)|QA|리그QA|\d+팀\d+/i.test(name))).toEqual([]);
+  });
+
   it('creates public-record consent for a QA persona without overwriting a later revocation', async () => {
     const upsert = jest.fn().mockResolvedValue({});
     await ensureAlphaQaRecordConsent(

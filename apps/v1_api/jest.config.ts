@@ -89,6 +89,12 @@ const config: Config = {
         // 대진 timing(경기 시간·휴식·팀당 하루 경기 수): 같은 이유로 명시 경로 등록
         // (이 디렉터리 5번째 — 와일드카드 복원은 여전히 기존 4개 스펙의 무관한 실패를 되살린다).
         '<rootDir>/test/league-matches/league-fixture-timing.integration-spec.ts',
+        // dual-write (R4-a-0.5): 같은 이유로 명시 경로 등록 — 이 디렉터리 6번째다.
+        // **이 줄이 없으면 이 스펙은 디스크에만 있고 CI 가 한 번도 선택하지 않는다.**
+        // 그러면 "통합으로 막았다" 가 기록으로만 남고 실제로는 아무것도 안 막는다 —
+        // 유닛으로 증명 못 하는 트랜잭션 경계를 여기서 보려던 것이므로, 등록이 빠지면
+        // 그 성질은 어디에서도 검증되지 않는다.
+        '<rootDir>/test/league-matches/league-competition-dual-write.integration-spec.ts',
         // team-contacts (Task 8): 이 글롭이 없으면 `jest --selectProjects integration`
         // (= CI 의 migration replay + drift gate) 가 이 디렉터리를 절대 선택하지 않는다.
         // 이 레포에서 같은 실수가 이미 4회 반복 지적됐다 — 위 team-schedules/team-match-series/

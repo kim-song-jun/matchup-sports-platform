@@ -187,11 +187,20 @@ export function mirrorDetailMatches(
  * | `completed` | `completed` | 그대로 |
  * | `open` | `draft` | "신청 받는 중" = **아직 시작 안 함.** D7 이 도입할 상태다 |
  * | `closed` | `draft` | 신청 마감이지 시작이 아니다 |
- * | `cancelled` | `completed` | ⚠️ **판단이 들어간 자리다** — 리그에는 취소 상태가 없다. "더 이상 진행하지 않는다" 쪽에 붙였다. 정확히 맞지 않으므로 리그에 취소 개념이 생기면 여기부터 고친다 |
+ * | `cancelled` | `completed` | 방어값. 아래 참조 |
  *
- * **아래 셋은 오늘 리그 거울에 나올 수 없다** — 백필·dual-write 가 위 세 값만 쓰고,
- * 어드민 `changeStatus` 는 리그를 막는다(#866). 그래도 매핑을 비워 두지 않는 이유는
- * **비면 화면이 죽기 때문**이지 그 값이 올 것 같아서가 아니다.
+ * ## 아래 셋은 **도달 불가**다 — "어떻게 보여줄까" 를 고민할 자리가 아니다
+ * `V1Tournament.status` 를 자유롭게 쓰는 곳은 어드민 `changeStatus`
+ * (`tournaments-admin.service.ts:649`) 하나뿐이고, 그 조회는 `TOURNAMENT_KINDS`
+ * (= `[regular_tournament]`) 로 걸러 **리그 거울에 닿지 않는다**(`:625`). 백필·dual-write 도
+ * 위 세 값만 쓴다. **즉 취소된 리그 같은 것은 존재하지 않는다.**
+ *
+ * 그런데도 매핑을 비우지 않는 이유는 **비면 `LEAGUE_STATE_META[undefined]` 로 웹이 죽기
+ * 때문**이지, 그 값이 올 것 같아서가 아니다. 방어값이지 제품 판단이 아니다.
+ *
+ * > **반증**: 어떤 경로가 `ALL_COMPETITION_KINDS` 로 리그를 허용하면 이 값이 실제로 보일 수
+ * > 있다. `scripts/v1-surface-check.mjs` 의 **"리그 허용" baseline 이 1 을 넘으면 여기를 다시
+ * > 본다** — 봉쇄가 느슨해지는 순간 이 자리가 같이 걸리도록 게이트에 묶어 둔 것이다.
  */
 export const LEAGUE_STATE_BY_STATUS: Record<V1TournamentStatus, V1LeagueState> = {
   [V1TournamentStatus.draft]: V1LeagueState.draft,

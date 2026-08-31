@@ -413,21 +413,29 @@ awk '/private requireTakeover/,/^  }/' apps/v1_api/src/games/games.service.ts \
 | `league-match-admin` state→active ×2 | 유닛. 변이 2종(dual-write 제거 / `kind` 가드 제거) 각각 1 red |
 | `create` (서비스 경로) + 트랜잭션 롤백 | 통합 스펙 `league-competition-dual-write.integration-spec.ts` |
 
-**아직 안 막힌 것 — 4곳**
+**아직 안 막힌 것 — 3곳** (2026-08-31 갱신: 되돌리기는 통합 스펙으로 덮었다)
 
 ```
-league-match-admin.service.ts   되돌리기 updateMany
 league-completion-projection    active→completed
 league-series-admin.service.ts  시리즈 최초 생성
 league-series-admin.service.ts  승강 다음 시즌
 ```
 
-### 닫혔는지 확인하는 법 — **red 를 4개 세라**
+> **왜 이 셋만 남았나 — 설정 비용이 다르다.** 되돌리기(`revertCompletionInTx`)는 리그를
+> `completed` 로 두고 부르면 끝이라 통합 스펙에 바로 얹혔다. 나머지 셋은:
+> - `settle` 은 **`currentOfficialRevision.state === 'OFFICIAL'` 인 대진**이 있어야 조건부
+>   update 까지 도달한다 → `V1TeamMatch` + `V1Game` + 결과 리비전 + 포인터가 필요하다
+> - 시리즈 둘은 `LeagueMatchPublicService` 의존과 승강 확정 시즌 상태가 필요하다
+>
+> **로컬에 이 프로젝트용 Postgres 가 없어 통합 스펙은 CI 에서 처음 돈다.** 그래서 설정이
+> 큰 케이스를 한 번에 얹으면 깨졌을 때 CI 왕복으로만 고쳐야 한다 — 작은 것부터 얹는다.
+
+### 닫혔는지 확인하는 법 — **red 를 3개 세라**
 
 각 자리의 dual-write 한 줄을 지우고 통합 스위트를 돌린다.
-**red 가 정확히 4개**여야 하고, **각각 어느 자리인지 이름을 댈 수 있어야 한다.**
+**red 가 정확히 3개**여야 하고, **각각 어느 자리인지 이름을 댈 수 있어야 한다.**
 
-> **3개면 하나는 안 막힌 것이다.** 어느 것인지 모른 채 넘어가면 안 막힌 자리가 "통과"로
+> **2개면 하나는 안 막힌 것이다.** 어느 것인지 모른 채 넘어가면 안 막힌 자리가 "통과"로
 > 기록된다 — 이 저장소에서 red 개수를 세지 않아 vacuous 테스트를 올린 전례가 있다.
 
 ### 함정 둘

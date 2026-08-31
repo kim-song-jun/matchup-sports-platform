@@ -162,6 +162,40 @@ describe('리그 dual-write (real DB)', () => {
     expect(after).toBe(before);
   });
 
+  it('완료를 되돌리면 거울 status 도 함께 되돌아간다 (dual-write)', async () => {
+    const service = makeService();
+    const created = await service.create({ id: ids.adminUserId } as never, {
+      ...dto,
+      title: '되돌리기 검증 리그',
+    } as never);
+
+    // 되돌리기의 조건부 update 는 `state: 'completed'` 인 행만 잡는다 — 그 상태를 만든다.
+    // 거울도 같은 상태로 맞춰 둬야 "되돌아갔다" 가 관측된다.
+    await prisma.v1League.update({
+      where: { id: created.leagueId },
+      data: { state: 'completed' },
+    });
+    await prisma.v1Tournament.update({
+      where: { id: created.leagueId },
+      data: { status: 'completed' },
+    });
+
+    const admin = {
+      id: ids.adminId,
+      userId: ids.adminUserId,
+      adminRole: 'owner' as const,
+      status: 'active' as const,
+    };
+    await prisma.$transaction(async (tx) => {
+      await service.revertCompletionInTx(tx, admin, created.leagueId, '검증');
+    });
+
+    const mirror = await prisma.v1Tournament.findUnique({ where: { id: created.leagueId } });
+    // 거울이 completed 로 남으면 리그는 진행 중인데 통합 축은 끝난 것으로 보인다 —
+    // read-swap 뒤 그 리그가 "종료된 대회" 로 표시된다.
+    expect(mirror?.status).toBe('in_progress');
+  });
+
   it('거울 수는 리그 수와 같다 — 백필 불변식이 실제 DB 에서도 성립한다', async () => {
     const leagues = await prisma.v1League.count();
     const mirrors = await prisma.v1Tournament.count({ where: { kind: 'regular_league' } });

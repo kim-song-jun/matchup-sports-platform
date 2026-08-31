@@ -6,7 +6,7 @@ import {
   recalculateAndUpsertGroupStandings,
 } from './tournament-group-standings';
 import { recalculateAndUpsertOverallStandings } from './tournament-overall-standings';
-import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
+import { findTournamentOnSurface, ALL_COMPETITION_KINDS } from './tournament-surface-lookup';
 
 /**
  * Batch counterpart of `TournamentBracketService.recalculateStandings()`
@@ -65,14 +65,16 @@ export async function runTournamentStandingsRecalculation(
   let groupsRecalculated = 0;
 
   for (const tournamentId of tournamentIds) {
-    const tournament = await findTournamentOnSurface(prisma, TOURNAMENT_KINDS, {
+    const tournament = await findTournamentOnSurface(prisma, ALL_COMPETITION_KINDS, {
       where: { id: tournamentId, deletedAt: null },
       include: { competitionConfig: true },
     });
-    // **행이 없으면 조용히 건너뛴다 — 에러가 안 난다.** 지금은 리그가 이 경로로 오지
-    // 않으므로 대회 표면으로 좁히는 것이 맞지만, 화면 전환(read-swap)이 리그를 여기로
-    // 보내면 **리그 순위가 에러 없이 갱신되지 않는다.** 그때 이 줄을
-    // `ALL_COMPETITION_KINDS` 로 넓혀야 한다 (docs/ops/read-swap-preflight.md).
+    // **행이 없으면 조용히 건너뛴다 — 에러가 안 난다.** 그래서 리그를 허용한다: 좁혀 두면
+    // read-swap 이 리그를 여기로 보내는 순간 **리그 순위가 에러 없이 갱신되지 않는다.**
+    //
+    // **지금은 동작이 바뀌지 않는다.** 이 함수는 경기 결과가 확정된 대회 픽스처에서
+    // 불리는데(`game-result-standings-projection`), 거울 행은 `V1TournamentFixture` 가
+    // 없어 그 경로에 오지 않는다. (docs/ops/read-swap-preflight.md §1-2)
     if (!tournament) continue;
 
     let config;

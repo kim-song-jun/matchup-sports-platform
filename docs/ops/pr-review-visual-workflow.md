@@ -86,18 +86,24 @@ suppressed 블록은 그 둘 사이로 빠져나간다.
 # 다섯 게이트를 한 번에. 시각을 만들지 않고 API 값만 쓴다(아래 함정 ③·④ 참고)
 gh api graphql -f query='{repository(owner:"<OWNER>",name:"<REPO>"){pullRequest(number:<N>){
   commits(last:1){nodes{commit{committedDate}}}
-  reviews(first:100){nodes{author{login} submittedAt body}}
-  reviewThreads(first:50){nodes{isResolved}}}}}' \
+  reviews(last:100){nodes{author{login} submittedAt body}}
+  reviewThreads(first:100){totalCount nodes{isResolved}}}}}' \
   --jq '.data.repository.pullRequest as $p
     | ($p.commits.nodes[0].commit.committedDate) as $head
-    | ([$p.reviews.nodes[]|select(.author.login=="copilot-pull-request-reviewer")]|last) as $r
+    | ([$p.reviews.nodes[]|select(.author.login=="copilot-pull-request-reviewer")]|max_by(.submittedAt)) as $r
     | ($r.body // "") as $b
     | if $r == null then "Copilot 리뷰가 아직 없다 (판정할 것이 없음)" else
       "1 작성자   \($r.author.login)",
       "2 제출시각 \($r.submittedAt) vs head \($head) → " + (if $r.submittedAt > $head then "OK" else "아직 안 봤다" end),
-      "3 Comments " + (($b|capture("Comments generated:\\*\\* (?<n>[^\n]*)").n) // "추출실패(0 아님)"),
+      "3 Comments " + (($b|split("\n")|map(select(test("^\\s*[-*]\\s+\\*\\*Comments generated")))) as $ln
+                       | if ($ln|length) == 1 then ($ln[0]|gsub("^\\s*[-*]\\s+";""))
+                         elif ($ln|length) == 0 then "⚠️ 추출실패 — 0이 아니다. 본문을 눈으로 봐라"
+                         else "⚠️ 후보 \($ln|length)개 — 본문을 눈으로 봐라" end),
       "4 Suppress " + (if ($b|test("Suppressed comments")) then "있음 — 열어봐야 한다" else "없음" end),
       "5 미해결   \([$p.reviewThreads.nodes[]|select(.isResolved==false)]|length)건"
+        + (if $p.reviewThreads.totalCount > ($p.reviewThreads.nodes|length)
+           then " ⚠️ 스레드 \($p.reviewThreads.totalCount)개 중 \($p.reviewThreads.nodes|length)개만 셌다 — 페이징 필요"
+           else "" end)
       end'
 ```
 
@@ -117,6 +123,12 @@ gh api graphql -f query='{repository(owner:"<OWNER>",name:"<REPO>"){pullRequest(
                    ← 리뷰가 아직 0건이면 `$r.body` 가 null 이라 여기 걸린다.
                      PR 을 막 연 직후가 정확히 그 상태다
 ```
+**그래서 위 명령은 값에 정규식을 걸지 않는다** — `Comments generated` 가 든 **줄 전체**를 뽑는다.
+본문 형식(`- **Comments generated:** 0 new`)에서 볼드 위치나 `new` 접미가 바뀌어도 안 깨지고,
+못 잡으면 **`⚠️ 추출실패 — 0이 아니다`** 를 찍는다. 조용한 빈 값이 이 문서가 경고하는 그것이다.
+**단 "그 문구가 든 줄" 로 잡으면 안 된다** — suppressed 블록이 지적 본문에서 그 문구를 **인용**할
+수 있어서(실제로 이 PR 에서 그렇게 잡혔다) 요약 줄 대신 남의 문장을 읽는다. 그래서 **불릿 형태**
+(`- **Comments generated:**`)로 좁히고, 후보가 1개가 아니면 그것도 실패로 찍는다.
 그래서 위 명령은 **`$r == null` 을 먼저 가르고** 본문도 `($r.body // "")` 로 받는다.
 `//` 만으로는 매칭 실패는 막아도 **null 입력은 못 막는다.**
 
@@ -125,6 +137,17 @@ gh api graphql -f query='{repository(owner:"<OWNER>",name:"<REPO>"){pullRequest(
 ```bash
 gh api graphql ... --jq '...|last|.body' > /tmp/r.md
 grep -nE 'Comments generated|Suppressed' /tmp/r.md
+```
+
+**②-b 이 명령의 세 가정도 조여 뒀다** (Copilot #884 suppressed 지적):
+```
+reviews(last:100)          first:100 은 리뷰가 100개를 넘으면 **오래된 쪽**을 가져와
+                           최신 리뷰를 놓친다. last 로 최신 쪽을 받는다
+max_by(.submittedAt)       `| last` 는 반환 순서를 가정한다. 이 저장소에서는 시간순이었지만
+                           보장은 없다 — 정렬을 명시하면 가정이 사라진다
+reviewThreads totalCount    노드 수보다 크면 **잘린 것**이다. 조용한 과소집계 대신
+                           "페이징 필요" 를 찍는다 (게이트 5는 0이어야 의미가 있으므로
+                           과소집계는 곧 통과 쪽 오판이다)
 ```
 
 **③ `git log --date=format:` 은 TZ를 무시한다.** `submittedAt`은 UTC인데 커밋 시각을

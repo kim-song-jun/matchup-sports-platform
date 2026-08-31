@@ -11,8 +11,10 @@ ALTER TABLE "v1_tournaments" ADD COLUMN IF NOT EXISTS "region_id" TEXT;
 -- 추가한 컬럼**을 참조하기 때문이다: Postgres 의 MATCH SIMPLE 규칙상 참조 컬럼이 NULL 이면
 -- FK 가 만족되므로, 이 제약은 기존 행을 하나도 거부할 수 없다.
 --
--- 멱등성은 Prisma 가 `_prisma_migrations` 로 보장한다(파일당 한 번). IF NOT EXISTS 가
--- 필요한 것은 수동 적용분을 나중에 박제하는 경우이고 이 마이그레이션은 그 경우가 아니다.
+-- **`IF NOT EXISTS` 는 위 두 문장에 그대로 둔다** — 이 저장소의 다른 마이그레이션과 같은
+-- 관례이고, 수동 적용분을 나중에 `migrate resolve --applied` 로 박제하는 경로에서 값을 한다.
+-- 다만 `ADD CONSTRAINT` 에는 `IF NOT EXISTS` 문법이 없다. 그래서 DO 블록으로 감싸고 싶어지는데,
+-- 게이트가 그걸 거부하므로 이 한 문장만 맨 형태로 둔다 — 셋의 멱등성 수준이 다른 이유다.
 --
 -- ON DELETE RESTRICT 는 v1_leagues_region_fk 와 같다 — 지역은 마스터 데이터라 그것을
 -- 지우려면 쓰는 대회부터 정리해야 하고, 조용히 NULL 이 되면 안 된다.

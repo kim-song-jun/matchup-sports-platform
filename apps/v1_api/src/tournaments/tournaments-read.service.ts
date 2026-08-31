@@ -254,7 +254,11 @@ export class TournamentsReadService {
 
   /**
    * 거울 행(`kind = 'regular_league'`)의 통합 순위. **리그 축에서 계산해 대회 축 응답 모양으로**
-   * 돌려준다 — 화면(`LeagueStandingsTable`)은 이미 이 모양을 읽고 있으므로 프론트는 안 바뀐다.
+   * 돌려준다 — 같은 화면(`LeagueStandingsTable`)이 두 축을 다 그리게 하기 위해서다.
+   *
+   * ⚠️ **"이 PR 이 프론트를 안 건드린다" 와 "프론트가 지금 이 응답을 읽을 수 있다" 는 다른
+   * 말이다.** 앞은 맞고 뒤는 **아니다** — 아래 `registrationId` 항목 참조. 그 빚은 프론트 PR
+   * 이 갚고, **문 PR(상세 조회 `get` 을 넓히는 것)보다 반드시 먼저 머지돼야 한다.**
    *
    * ## 왜 대회 축 계산을 못 쓰나
    * 거울에는 조(`V1TournamentGroup`)도 대진(`V1TournamentFixture`)도 없다 — 그 행들을 만드는

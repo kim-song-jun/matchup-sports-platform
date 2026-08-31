@@ -299,11 +299,23 @@ async function createVoidedFixture(title: string, homeTeamId: string, awayTeamId
   });
 }
 
+/**
+ * 게임에 붙일 설정 버전 — **활성 최신본**을 고른다.
+ *
+ * `createdAt` 오름차순 첫 행을 고르면 과거 버전이 하나라도 더 생기거나 시드 순서가 바뀌는
+ * 순간 **비활성·옛 버전**을 잡는다. 그러면 이 PR 과 무관한 이유로 red 가 뜨고, 다음 사람은
+ * 리그 순위 경로를 의심하게 된다. 다른 통합 스펙(`tournament-surface-kind`)이 이미
+ * `status='ACTIVE'` + 최신 `version` 을 쓰므로 그쪽과 같은 규칙으로 맞춘다 — 같은 질문에
+ * 두 답을 두지 않는다.
+ *
+ * 이 파일에서 설정 버전을 고르는 자리는 **여기 하나뿐**이고 호출부는 2곳(확정·무효 픽스처)
+ * 이라, 규칙이 둘로 갈릴 여지가 없다.
+ */
 async function futsalConfigVersionId(): Promise<string> {
   const sport = await prisma.v1Sport.findUniqueOrThrow({ where: { id: ids.sportId } });
   const config = await prisma.v1CompetitionConfigVersion.findFirstOrThrow({
-    where: { sportCode: sport.code },
-    orderBy: { createdAt: 'asc' },
+    where: { sportCode: sport.code, status: 'ACTIVE' },
+    orderBy: { version: 'desc' },
   });
   return config.id;
 }

@@ -262,9 +262,13 @@ export class TournamentsReadService {
    * **빈 순위표**를 준다. 404 보다 나쁘다: 에러가 아니라 "아직 순위가 없다" 로 읽힌다.
    *
    * ## 모양이 다른 두 필드
-   * - `registrationId` — 리그엔 참가 등록 개념이 없어 **생략한다.** 화면은 이 값을 React key 와
-   *   매직넘버 행 매칭에만 쓰므로 `teamId` 로 대체된다(`key={registrationId ?? teamId}`).
-   *   teamId 를 그 이름에 담으면 값을 함께 실어도 **이름이 내용과 갈린 상태**가 남는다.
+   * - `registrationId` — 리그엔 참가 등록 개념이 없어 **생략하고 `teamId` 를 싣는다.** teamId 를
+   *   `registrationId` 라는 이름에 담으면 값은 전달되지만 **이름이 내용과 갈린 상태**가 남고,
+   *   나중에 그 값으로 등록을 조회하는 코드가 생기는 순간 터진다.
+   *   **프론트는 아직 이 모양을 못 읽는다** — `league-standings-table.tsx` 는 `key={row.registrationId}`
+   *   를 쓰고 타입도 `registrationId: string`(필수)이다. 그 확장은 프론트 PR 의 몫이고, 그때까지
+   *   거울 행은 `/tournaments/:id` 에 **도달하지 못한다**(문이 아직 `TOURNAMENT_KINDS` 로 닫혀 있다).
+   *   순서를 뒤집으면 사용자는 404 대신 키가 겹친 빈 표를 본다.
    * - `fairPlayPoints` — 리그는 **집계 자체를 하지 않는다.** `0` 은 "감점이 없다" 로 읽히므로
    *   값이 아니라 **부재**로 둔다(optional).
    *
@@ -280,7 +284,7 @@ export class TournamentsReadService {
     if (league === null) {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     }
-  
+
     const teamMatches = await this.prisma.v1TeamMatch.findMany({
       where: { leagueId },
       select: {
@@ -300,7 +304,7 @@ export class TournamentsReadService {
         },
       },
     });
-  
+
     const revisionIds = teamMatches
       .map((teamMatch) => teamMatch.game?.currentOfficialRevisionId ?? null)
       .filter((id): id is string => id !== null);
@@ -312,7 +316,7 @@ export class TournamentsReadService {
             select: { gameId: true, homeScore: true, awayScore: true },
           });
     const factByGameId = new Map(facts.map((fact) => [fact.gameId, fact]));
-  
+
     const buckets = bucketLeagueFixtures(teamMatches, factByGameId);
     const teamNameById = new Map(league.teams.map((entry) => [entry.teamId, entry.team.name]));
     const tieBreakOrder = (league.tieBreakJson as { order?: LeagueTieBreakCriterion[] }).order ?? [
@@ -326,7 +330,7 @@ export class TournamentsReadService {
       fixtures: buckets.confirmed,
       tieBreakOrder,
     });
-  
+
     return {
       standings: leagueStandings.map((row) => ({
         // `registrationId` 는 **싣지 않는다.** 리그엔 참가 등록 개념이 없다 — teamId 를 그
@@ -350,7 +354,7 @@ export class TournamentsReadService {
       recalculatedAt: null,
     };
   }
-  
+
   /**
    * `V1CompetitionConfigVersion.tieBreak`(느슨한 Json)에서 승리 승점만 방어적으로 꺼낸다.
    * 이 조회는 익명 방문자에게도 열려 있는 공개 API라 `validateCompetitionConfig`(관리자

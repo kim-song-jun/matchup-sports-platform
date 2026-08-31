@@ -102,6 +102,7 @@ function makeTournament(overrides: Partial<V1TournamentDetail> = {}): V1Tourname
     pendingPaymentCount: 0,
     groups: [],
     fixtures: [],
+    leagueFixtures: [],
     announcements: [],
     sponsors: [],
     reviews: [],

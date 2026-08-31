@@ -66,6 +66,7 @@ function makeTournament(
     pendingPaymentCount: 0,
     groups: [],
     fixtures: [],
+    leagueFixtures: [],
     announcements: [],
     sponsors: [],
     reviews: [],

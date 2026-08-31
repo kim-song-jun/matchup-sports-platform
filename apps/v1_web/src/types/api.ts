@@ -1,3 +1,8 @@
+// 리그 대진 모양은 `league-match.ts` 가 단일 소스다 — 여기서 다시 선언하면 두 모양이
+// 생기고 서버 계약이 바뀔 때 조용히 갈린다. (league-match.ts 는 이 파일을 import 하지
+// 않으므로 순환이 없다.)
+import type { V1LeagueFixture } from './league-match';
+
 export type ApiEnvelope<T> = {
   status: 'success';
   data: T;
@@ -3339,6 +3344,15 @@ export type V1TournamentDetail = {
   pendingPaymentCount: number;
   groups: V1TournamentGroup[];
   fixtures: V1TournamentFixture[];
+  /**
+   * 정규 리그 시즌(거울 행)의 대진. **대회는 항상 빈 배열이다.**
+   *
+   * `fixtures` 와 합치지 않은 이유: 두 모양은 겹치는 필드가 셋뿐이고 그 중 `status` 의
+   * **값 영역이 다르다**(대회 `scheduled|completed` / 리그 `matched|completed|cancelled|…`).
+   * 한 배열에 섞으면 `status === 'scheduled'` 같은 코드가 모든 리그 경기에서 조용히
+   * 거짓이 된다 — 타입도 값도 정상으로 보인다.
+   */
+  leagueFixtures: V1LeagueFixture[];
   announcements: V1TournamentAnnouncement[];
   sponsors: V1TournamentSponsor[];
   /** 대회 참가팀 후기 (status=completed 이후 참가 확정팀만 작성 가능). 최신순 최대 30건만 포함 — 전체 개수는 reviewsTotalCount 참조 */

@@ -74,6 +74,40 @@ IPA="$(find "$OUTPUT/export" -name '*.ipa' -maxdepth 1 | head -1)"
 [[ -n "$IPA" ]] || { echo "[archive] no .ipa was produced" >&2; exit 1; }
 echo "[archive] built ${IPA#"$OUTPUT/"} ($(du -h "$IPA" | cut -f1))"
 
+# --- entitlement gate ----------------------------------------------------------------------
+# An archive built without signing exports into a perfectly valid, perfectly signed .ipa whose
+# app carries none of the entitlements it needs: the profile grants `aps-environment` and
+# `com.apple.developer.associated-domains`, but with CODE_SIGNING_ALLOWED=NO the entitlement
+# step never runs and the binary ships without them. Nothing fails. The build installs, opens
+# and looks correct — push never arrives and universal links open in Safari instead of the app.
+#
+# That is not a hypothetical: it is what this script produced on the first TestFlight attempt,
+# and the only reason it was caught is that someone opened the built artifact and read it.
+# Checking the shipped binary rather than the build settings is the point — the settings said
+# the entitlements were there.
+REQUIRED_ENTITLEMENTS=(
+  "aps-environment"                             # APNs. Without it the device never gets a token.
+  "com.apple.developer.associated-domains"      # Universal links, incl. the Kakao sign-in return.
+)
+GATE_DIR="$(mktemp -d)"
+trap 'rm -rf "$GATE_DIR"' EXIT
+unzip -q "$IPA" -d "$GATE_DIR"
+GATE_APP="$(find "$GATE_DIR/Payload" -maxdepth 1 -name "*.app" | head -1)"
+[[ -n "$GATE_APP" ]] || { echo "[archive] no .app inside the .ipa" >&2; exit 1; }
+GATE_PLIST="$(codesign -d --entitlements :- "$GATE_APP" 2>/dev/null || true)"
+MISSING=()
+for key in "${REQUIRED_ENTITLEMENTS[@]}"; do
+  grep -q "<key>$key</key>" <<<"$GATE_PLIST" || MISSING+=("$key")
+done
+if (( ${#MISSING[@]} > 0 )); then
+  echo "[archive] The built app is missing entitlements it needs:" >&2
+  printf '[archive]   - %s\n' "${MISSING[@]}" >&2
+  echo "[archive] Uploading this build would ship an app where those features silently do" >&2
+  echo "[archive] nothing. Usual cause: the archive was produced without signing." >&2
+  exit 1
+fi
+echo "[archive] entitlements present: ${REQUIRED_ENTITLEMENTS[*]}"
+
 if [[ "$UPLOAD" != true ]]; then
   echo
   echo "[archive] Stopping before upload. Re-run with --upload to send it to App Store Connect."

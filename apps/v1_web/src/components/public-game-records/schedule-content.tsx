@@ -793,7 +793,19 @@ export function ScheduleContent({
   // 전부 시간 미정이어도 뜨도록 unscheduled까지 함께 본다 — 예전엔 data.items만 봐서
   // 그 경우 칩 자체가 안 떴다.
   const phaseLabels = isRegularLeague ? LEAGUE_PHASE_LABELS : TOURNAMENT_PHASE_LABELS;
-  const standingsGroupCount = new Set(data.standings.map((row) => row.groupId)).size;
+  const standingsHeading = isRegularLeague ? '리그 순위' : '조별 순위';
+  /**
+   * 안쪽 그룹 라벨을 숨길지. **개수가 아니라 값으로 판정한다.**
+   *
+   * 처음엔 `groupId` 종류가 1개면 숨겼는데, **한 리그의 순위는 groupId 가 언제나 하나**다
+   * (서버가 `groupId: leagueId` 를 넣는다 — `1부`·`2부` 는 애초에 **다른 리그**다). 그래서
+   * 그 조건은 티어 리그에서도 참이 되어 사용자가 확정한 `'1부'` 라벨을 숨겼다.
+   *
+   * 숨겨야 하는 건 *"바깥 제목과 같은 말이 두 번 적히는"* 경우뿐이다 — 그건 값을 봐야 안다.
+   */
+  const standingsGroupNames = new Set(data.standings.map((row) => row.groupName));
+  const hideStandingsGroupLabel =
+    isRegularLeague && standingsGroupNames.size === 1 && standingsGroupNames.has(standingsHeading);
   const phases = groupScheduleEntries(data.items, phaseLabels);
   const hasMyFixtures =
     data.items.some((entry) => myFixtureById.has(entry.fixtureId)) ||
@@ -832,11 +844,11 @@ export function ScheduleContent({
               안쪽 그룹 라벨은 티어가 있을 때만 켠다: 단발 리그는 그룹이 하나뿐이고 그
               이름이 이 제목과 같은 말이라("리그 순위") 두 번 적힌다. */}
           <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>
-            {isRegularLeague ? '리그 순위' : '조별 순위'}
+            {standingsHeading}
           </h3>
           <StandingsTable
             rows={data.standings}
-            showGroupLabel={!isRegularLeague || standingsGroupCount > 1}
+            showGroupLabel={!hideStandingsGroupLabel}
           />
         </section>
       ) : null}

@@ -406,7 +406,11 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
    * 요청은 형제 탭(`BracketScheduleTab`)과 같은 쿼리 키라 React Query 가 합친다 —
    * 왕복이 늘지 않는다.
    */
-  const leagueSchedule = usePublicTournamentSchedule(tournament.id);
+  // 대회에서는 이 부모가 그 데이터를 **아예 안 쓴다**(`groups` 를 쓴다) — 안 쓰는 응답을
+  // 라이브 폴링까지 하며 들고 있을 이유가 없다. `enabled` 로 끄는 이유이고, 빈 id 를
+  // 넘겨 끄는 방식은 쓰지 않는다(캐시 키가 오염되고 조용히 잘못된 요청이 갈 수 있다).
+  // 리그일 때는 형제 탭과 **같은 쿼리 키**라 React Query 가 합친다 — 왕복이 안 는다.
+  const leagueSchedule = usePublicTournamentSchedule(tournament.id, {}, { enabled: isRegularLeague });
   const leagueScheduleStandings = isRegularLeague
     ? (leagueSchedule.data?.pages[0]?.standings ?? [])
     : [];

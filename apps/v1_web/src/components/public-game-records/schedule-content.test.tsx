@@ -713,16 +713,20 @@ describe('ScheduleContent — 정규 리그 순위 제목', () => {
     expect(screen.getByRole('region', { name: 'A조 순위' })).toBeInTheDocument();
   });
 
-  it('티어가 있는 리그는 안쪽 라벨을 그린다 — "1부"·"2부" 는 제목과 다른 말이다', () => {
-    const data = makeData({
-      standings: [
-        leagueStandings('1부', 'lg-1', '성수 FC'),
-        leagueStandings('2부', 'lg-2', '왕십리 FC'),
-      ] as never,
-    });
+  /**
+   * ⚠️ **처음엔 이 테스트가 통과하면서도 실물은 숨기고 있었다.** 픽스처에 `groupId` 를 둘
+   * (`lg-1`·`lg-2`) 넣었는데 **그런 응답은 존재할 수 없다** — 서버가 `groupId: leagueId` 를
+   * 넣으므로 한 리그의 순위는 언제나 groupId 가 **하나**고, `1부`·`2부` 는 애초에 **다른
+   * 리그**다. 개수로 판정하던 가드가 그래서 티어 리그에서도 라벨을 숨겼다.
+   *
+   * 픽스처를 실물 모양(groupId 하나 · groupName `'1부'`)으로 고쳤다. **테스트가 통과한다는
+   * 것과 실물에서 동작한다는 것은 픽스처가 실물을 닮았을 때만 같은 말이다.**
+   */
+  it('티어 리그는 안쪽 라벨을 그린다 — "1부" 는 제목("리그 순위")과 다른 말이다', () => {
+    const data = makeData({ standings: [leagueStandings('1부', 'lg-1', '성수 FC')] as never });
     render(<ScheduleContent tournamentId="lg-1" data={data} isRegularLeague />);
 
     expect(screen.getByText('1부')).toBeInTheDocument();
-    expect(screen.getByText('2부')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '리그 순위' })).toBeInTheDocument();
   });
 });

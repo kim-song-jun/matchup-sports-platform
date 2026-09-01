@@ -221,3 +221,46 @@ describe('resolveSportIdParam — 모르는 종목을 서버로 넘기지 않는
     expect(resolveSportIdParam({ raw: 'abc', sports, sportsLoaded: true })).toBeUndefined();
   });
 });
+
+/**
+ * **칩(입구)만 막고 URL(뒷문)을 안 막으면 막다른 상태가 된다.**
+ *
+ * 대회 탭에는 "준비 중" 칩을 안 그리는데, `?kind=tournament&status=draft` 로 **직접 들어오는**
+ * 경로는 그대로 남아 있었다. 그러면 화면이:
+ * ```
+ * 요약 줄   "준비 중"    ← 전역 목록에서 라벨을 찾아서
+ * 목록      비어 있음    ← 서버가 종류와 묶어서 거르니까
+ * 해제 칩   없음         ← 대회 탭엔 그 칩을 안 그리니까
+ * ```
+ * **해제할 방법이 없는 상태**가 된다. 데이터가 새는 게 아니라 **빠져나올 수 없는** 것이 문제다.
+ */
+describe('대회 탭의 draft 는 URL 로도 못 들어온다 — 입구와 뒷문을 같은 기준으로 막는다', () => {
+  it('요약 줄에 "준비 중" 이 남지 않는다', () => {
+    const m = buildCompetitionFilterModel({
+      basePath: '/tournaments',
+      params: new URLSearchParams('kind=tournament&status=draft'),
+      sports: SPORTS,
+    });
+    expect(m.summary).not.toContain('준비 중');
+    expect(m.summary).toBe('전체');
+  });
+
+  it('대조군: 리그 탭에서는 그대로 살아 있다 — 통째로 막으면 사용자가 요구한 칩이 죽는다', () => {
+    const m = buildCompetitionFilterModel({
+      basePath: '/tournaments',
+      params: new URLSearchParams('kind=league&status=draft'),
+      sports: SPORTS,
+    });
+    expect(m.summary).toBe('준비 중');
+    expect(m.activeCount).toBe(1);
+  });
+
+  it('대조군: 전체 탭에서도 살아 있다 — 리그가 담겨 있으니 고를 수 있어야 한다', () => {
+    const m = buildCompetitionFilterModel({
+      basePath: '/tournaments',
+      params: new URLSearchParams('kind=all&status=draft'),
+      sports: SPORTS,
+    });
+    expect(m.summary).toBe('준비 중');
+  });
+});

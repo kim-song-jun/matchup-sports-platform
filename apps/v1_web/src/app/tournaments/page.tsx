@@ -16,7 +16,7 @@ import {
 import {
   buildCompetitionFilterModel,
   resolveSportIdParam,
-  COMPETITION_STATUS_FILTERS,
+  statusFiltersFor,
 } from '@/components/v1-ui/competition-filter-model';
 import { EmptyState, ErrorState, SectionTitle } from '@/components/v1-ui/primitives';
 import { TournamentPromoCarousel } from '@/components/tournaments/tournament-promo-carousel';
@@ -110,9 +110,13 @@ export function TournamentsListContent() {
      ⚠️ `activeStatus` 가 null 이면(파라미터 없음) `some()` 이 '전체' 항목에 맞아 true 가
      된다 — 그대로 두면 쿼리 키에 `status: null` 이 실려 **"파라미터 없음" 과 다른 캐시**가
      생긴다. 그래서 null 을 먼저 걸러 `undefined` 로 떨어뜨린다. */
+  /* ⚠️ **이 탭에서 고를 수 있는 값만** 통과시킨다. 전역 목록으로 검사하면 대회 탭에서
+     칩을 안 그렸는데 `?status=draft` 로 직접 들어온 주소는 그대로 서버까지 간다 —
+     칩(입구)만 막고 URL(뒷문)을 안 막은 셈이다. 데이터는 안 새지만(서버가 종류와 묶는다)
+     화면이 **요약엔 '준비 중', 목록은 비어 있고, 해제할 칩은 없는** 막다른 상태가 된다. */
   const knownStatus =
     activeStatus !== null &&
-    COMPETITION_STATUS_FILTERS.some((option) => option.value === activeStatus)
+    statusFiltersFor(activeKind).some((option) => option.value === activeStatus)
       ? (activeStatus as NonNullable<Parameters<typeof useV1Tournaments>[0]>['status'])
       : undefined;
   // 시트 열림도 URL 이다 — 뒤로가기로 닫히고, 필터가 담긴 주소를 그대로 공유할 수 있다.

@@ -147,7 +147,10 @@ export function buildCompetitionFilterModel(input: {
     })),
   ];
 
-  const statusLabel = COMPETITION_STATUS_FILTERS.find(
+  /* ⚠️ **칩과 같은 목록에서 찾는다.** 전역 목록에서 찾으면 대회 탭에서 칩을 안 그렸는데
+     요약 줄엔 '준비 중' 이 남는다 — 그러면 **해제할 칩이 없는 막다른 상태**가 된다
+     (URL 로 직접 들어오는 경로가 그 뒷문이다). 입구와 표시가 같은 기준이어야 한다. */
+  const statusLabel = statusFiltersFor(params.get('kind')).find(
     (option) => option.value === (activeStatus ?? null),
   )?.label;
   const sportLabel = activeSportId

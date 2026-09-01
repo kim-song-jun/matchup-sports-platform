@@ -26,6 +26,15 @@ import { chromium } from 'playwright';
 const BASE = 'https://alpha.teameet.co.kr';
 const API = `${BASE}/api/v1`;
 const OUT = process.env.OUT_DIR ?? 'output/pr-b-verify';
+/**
+ * `goto` 기본 타임아웃은 30s 다. alpha 는 이미지·폴링 때문에 그걸 넘길 때가 있고, 넘으면
+ * 하네스가 **예외로 끝난다** — "측정 불가"가 아니라 "실패"로 남는다는 뜻이다(setup 을
+ * `INCONCLUSIVE` 로 만든 것과 같은 종류의 구멍). 옆 스크립트 둘이 이미 60s 로 쓰고 있다:
+ * `capture-alpha-competition-lists.mjs:105` · `capture-alpha-league-on-tournament-surface.mjs:267`.
+ * **상수로 둔다 — 값을 다섯 군데 적으면 한 군데는 빠진다.**
+ */
+const GOTO = { waitUntil: 'domcontentloaded', timeout: 60_000 };
+
 const WIDTHS = [
   { key: 'mobile', width: 390, height: 844 },
   { key: 'tablet', width: 768, height: 1024 },
@@ -83,7 +92,7 @@ const topOf = (sel) => `(() => {
 async function measureTopStack(browser) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const page = await ctx.newPage();
-  const res = await page.goto(`${BASE}/tournaments`, { waitUntil: 'domcontentloaded' });
+  const res = await page.goto(`${BASE}/tournaments`, GOTO);
   await page.waitForTimeout(6000);
   const stack = await page.evaluate(`(() => {
     const box = (el) => {
@@ -158,22 +167,32 @@ async function main() {
       const page = await ctx.newPage();
 
       // ── /tournaments (쿼리 없음 = 전체) ──
-      const listRes = await page.goto(`${BASE}/tournaments`, { waitUntil: 'domcontentloaded' });
+      const listRes = await page.goto(`${BASE}/tournaments`, GOTO);
       await page.waitForTimeout(4000);
       const listStatus = listRes?.status();
       await page.screenshot({ path: `${OUT}/tournaments-${vp.key}.png`, fullPage: false });
 
       const list = await page.evaluate(`(() => {
-        const cards = [...document.querySelectorAll('[role="list"][aria-label="대회 목록"] > *')];
-        const badges = [...document.querySelectorAll('[aria-label="정규 리그"]')];
+        /* '첫 화면' 이라고 말하려면 **뷰포트 안에 걸린 카드**만 세야 한다. 예전에는 DOM 전체를
+           세면서 메시지만 "첫 화면" 이라 적었다 — 페이지 크기(20)가 우연히 한 화면처럼 보였을
+           뿐이고, 대회가 섞였는데 스크롤 아래에 있으면 **거짓 PASS** 가 난다.
+           배지도 document 전체가 아니라 **그 카드 안**에서 센다 — 카드 밖 배지를 세면 짝이 안 맞는다. */
+        const inView = (el) => {
+          const r = el.getBoundingClientRect();
+          return r.bottom > 0 && r.top < window.innerHeight;
+        };
+        const allCards = [...document.querySelectorAll('[role="list"][aria-label="대회 목록"] > *')];
+        const cards = allCards.filter(inView);
+        const badges = cards.filter((c) => c.querySelector('[aria-label="정규 리그"]') !== null);
         const seg = document.querySelector('nav[aria-label="대회 유형"]');
         const title = [...document.querySelectorAll('*')].find((e) => e.textContent?.trim() === '대회 목록');
         const chips = document.querySelector('[role="group"][aria-label="종목 필터"]');
         const rect = (el) => (el ? Math.round(el.getBoundingClientRect().left) : null);
         return {
           cardCount: cards.length,
+          domCardCount: allCards.length,
           leagueBadges: badges.length,
-          firstCardTop: cards[0] ? Math.round(cards[0].getBoundingClientRect().top) : null,
+          firstCardTop: allCards[0] ? Math.round(allCards[0].getBoundingClientRect().top) : null,
           segLeft: rect(seg),
           titleLeft: rect(title),
           chipsLeft: rect(chips),
@@ -192,7 +211,8 @@ async function main() {
           record(
             '2-섞임',
             mixed ? 'PASS' : 'FAIL',
-            `첫 화면 카드 ${list.cardCount}개 중 리그 배지 ${list.leagueBadges}개` +
+            `첫 화면(뷰포트) 카드 ${list.cardCount}개 중 리그 ${list.leagueBadges}개` +
+              ` [DOM 전체 ${list.domCardCount}개]` +
               (mixed ? '' : list.leagueBadges === list.cardCount ? ' — 전부 리그다(대회가 안 보인다)' : ' — 리그가 없다'),
           );
         }
@@ -214,7 +234,7 @@ async function main() {
       }
 
       // ── 리그 상세 ──
-      const detRes = await page.goto(`${BASE}/tournaments/${leagueId}`, { waitUntil: 'domcontentloaded' });
+      const detRes = await page.goto(`${BASE}/tournaments/${leagueId}`, GOTO);
       await page.waitForTimeout(5000);
       const detStatus = detRes?.status();
       await page.screenshot({ path: `${OUT}/league-detail-${vp.key}.png`, fullPage: false });
@@ -272,7 +292,7 @@ async function main() {
        * 적용**한다 — 대회에는 참가비 라벨이 **있어야** 하고, 안 나오면 판정식이 죽은 것이다.
        */
       if (vp.key === 'mobile') {
-        const ctrlRes = await page.goto(`${BASE}/tournaments/${tournamentId}`, { waitUntil: 'domcontentloaded' });
+        const ctrlRes = await page.goto(`${BASE}/tournaments/${tournamentId}`, GOTO);
         await page.waitForTimeout(5000);
         const ctrl = await page.evaluate(`(() => {
           const leaf = (t) => [...document.querySelectorAll('*')]
@@ -296,7 +316,7 @@ async function main() {
       }
 
       // ── /league-matches (판정 1 비교 대상) ──
-      const lmRes = await page.goto(`${BASE}/league-matches`, { waitUntil: 'domcontentloaded' });
+      const lmRes = await page.goto(`${BASE}/league-matches`, GOTO);
       await page.waitForTimeout(4000);
       const lmStatus = lmRes?.status();
       await page.screenshot({ path: `${OUT}/league-matches-${vp.key}.png`, fullPage: false });

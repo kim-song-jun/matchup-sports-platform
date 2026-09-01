@@ -46,6 +46,14 @@ import { JerseyNumberDialog } from './jersey-number-dialog';
 import { TeamDetailPageView, TeamListPageView, TeamMembersPageView, TeamStatePageView } from './teams-page';
 import type { TeamDetailViewModel, TeamListViewModel, TeamMembersViewModel, TeamModel } from './teams.types';
 import { getTeamDetailViewModel, getTeamListViewModel, getTeamMembersViewModel, getTeamStateViewModel } from './teams.view-model';
+import {
+  buildTeamHref,
+  buildTeamSportChips,
+  formatTeamRegion,
+  isTeamAtCapacity,
+  splitTeamRegion,
+  toTeam,
+} from './teams.card-model';
 
 export function TeamListPageClient() {
   const router = useRouter();
@@ -578,69 +586,6 @@ function withListActivityFallback(team: V1Team, detail?: V1TeamDetail): V1Team {
   };
 }
 
-function toTeam(team: V1Team, fallback: TeamModel): TeamModel {
-  const id = team.teamId ?? team.id;
-  const sportName = team.sport?.name ?? team.sportName;
-  const regionName = formatTeamRegion(team.region, team.regionName);
-  const levelTag = formatTeamLevelTag(team);
-  const genderRule = team.genderRule ?? '';
-  const full = isTeamAtCapacity(team.memberCount, team.memberGoalCount);
-
-  return {
-    id,
-    name: team.name,
-    logo: team.name.slice(0, 1),
-    logoUrl: team.logoUrl ?? null,
-    coverImageUrl: team.coverImageUrl ?? null,
-    sport: sportName,
-    sports: [sportName],
-    region: regionName,
-    members: team.memberCount,
-    capacity: team.memberGoalCount ?? 0,
-    status: team.joinPolicy === 'closed' || full ? 'closed' : 'open',
-    statusLabel: team.joinPolicy === 'closed' ? '가입 닫힘' : full ? '정원 마감' : '가입 신청 가능',
-    tags: [levelTag, genderRule].filter(Boolean),
-    genderRule,
-    ownerName: team.owner?.displayName,
-    managerName: team.manager?.displayName ?? null,
-    intro: team.introductionPreview ?? `${regionName}에서 활동하는 ${sportName} 팀이에요.`,
-    next: team.activitySummary ?? team.activityAreaText ?? '',
-  };
-}
-
-function formatTeamLevelTag(team: V1Team) {
-  const explicitLabel = team.levelLabel?.trim() || team.skillLevelText?.trim();
-  if (explicitLabel) return explicitLabel;
-  const minName = team.minLevel?.name?.trim();
-  const maxName = team.maxLevel?.name?.trim();
-  if (minName && maxName) return minName === maxName ? minName : `${minName}-${maxName}`;
-  return minName ?? maxName ?? '레벨 미설정';
-}
-
-function buildTeamSportChips(
-  items: V1Team[],
-  fallback: TeamListViewModel,
-  params: URLSearchParams,
-  selectedSportId?: string,
-  masterSports?: Array<{ id: string; name: string }>,
-) {
-  const fixedSports = masterSports?.length
-    ? masterSports.slice(0, 4)
-    : fallback.chips.slice(1, 5).map((chip) => ({ id: chip.label, name: chip.label.replace(/\s+\d+$/, '') }));
-
-  return [
-    { label: fallback.chips[0]?.label.replace(/\s+\d+$/, '') ?? '전체', count: items.length, active: !selectedSportId, href: buildTeamHref(params, { sportId: null }) },
-    ...fixedSports.map((sport) => ({
-      label: sport.name,
-      count: items.filter((team) => {
-        const teamSport = team.sport;
-        return teamSport?.sportId === sport.id || teamSport?.name === sport.name || team.sportName === sport.name;
-      }).length,
-      active: selectedSportId === sport.id,
-      href: buildTeamHref(params, { sportId: sport.id }),
-    })),
-  ];
-}
 
 function buildTeamFilterSheet(
   params: URLSearchParams,
@@ -680,15 +625,6 @@ function buildTeamFilterSheet(
   };
 }
 
-function buildTeamHref(params: URLSearchParams, overrides: Record<string, string | null>) {
-  const next = new URLSearchParams(params.toString());
-  Object.entries(overrides).forEach(([key, value]) => {
-    if (value === null || value === '') next.delete(key);
-    else next.set(key, value);
-  });
-  const queryString = next.toString();
-  return queryString ? `/teams?${queryString}` : '/teams';
-}
 
 function toTeamSort(value: string | null): NonNullable<TeamListViewModel['filterSheet']>['sort'] {
   if (value === 'recommended' || value === 'deadline' || value === 'latest') return value;
@@ -737,9 +673,6 @@ function toTeamDetail(team: V1TeamDetail, fallback: TeamModel): TeamModel {
   };
 }
 
-function isTeamAtCapacity(memberCount: number, memberGoalCount?: number | null) {
-  return memberGoalCount != null && memberCount >= memberGoalCount;
-}
 
 function formatTeamDetailLevel(team: V1TeamDetail) {
   const explicitLabel = team.profile.levelLabel?.trim() || team.profile.skillLevelText?.trim();
@@ -750,20 +683,6 @@ function formatTeamDetailLevel(team: V1TeamDetail) {
   return minName ?? maxName ?? '';
 }
 
-
-function formatTeamRegion(region?: { name: string; parentName?: string | null } | null, fallback?: string | null) {
-  if (region?.parentName) return `${region.parentName} ${region.name}`;
-  return region?.name ? `${region.name} 전체` : fallback ?? '지역 미정';
-}
-
-function splitTeamRegion(region?: { name: string; parentName?: string | null } | null) {
-  if (region?.parentName) return { city: region.parentName, county: region.name };
-  const trimmed = region?.name?.trim();
-  if (!trimmed) return { city: '', county: '지역 미정' };
-  const [city, ...countyParts] = trimmed.split(/\s+/);
-  if (countyParts.length === 0) return { city, county: '전체' };
-  return { city, county: countyParts.join(' ') };
-}
 
 /**
  * 화면 전체가 참조하는 가입 상태 단일 소스.

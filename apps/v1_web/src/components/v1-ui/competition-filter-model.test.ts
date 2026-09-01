@@ -3,6 +3,7 @@ import {
   buildCompetitionFilterModel,
   leagueStateToListStatus,
   statusFiltersFor,
+  resolveSportIdParam,
   LEAGUE_STATE_TO_LIST_STATUS,
 } from './competition-filter-model';
 
@@ -174,5 +175,49 @@ describe('statusFiltersFor — 고를 수 없는 칩은 안 보여준다', () =>
       sports: SPORTS,
     });
     expect(league.statusOptions.some((o) => o.value === 'draft')).toBe(true);
+  });
+});
+
+/**
+ * `?sportId=abc` 하나로 **목록이 통째로 400** 이다(실측). `status` 에만 걸어 둔
+ * *"URL 은 사용자 입력"* 전제를 종목에도 적용한다.
+ */
+describe('resolveSportIdParam — 모르는 종목을 서버로 넘기지 않는다', () => {
+  const sports = [{ id: 's-futsal' }, { id: 's-basket' }];
+
+  it('마스터 목록에 있는 값만 넘긴다', () => {
+    expect(resolveSportIdParam({ raw: 's-futsal', sports, sportsLoaded: true })).toBe('s-futsal');
+  });
+
+  it('모양이 틀린 값은 안 넘긴다 — 서버가 400 이다', () => {
+    expect(resolveSportIdParam({ raw: 'abc', sports, sportsLoaded: true })).toBeUndefined();
+  });
+
+  /**
+   * 모양은 맞는데 없는 값은 서버가 200·빈 결과를 준다 — 400 보다 덜 나쁘지만, 마스터 목록을
+   * 이미 들고 있으니 여기서 함께 거른다.
+   */
+  it('모양은 맞아도 목록에 없으면 안 넘긴다', () => {
+    const uuid = '00000000-0000-4000-8000-000000000000';
+    expect(resolveSportIdParam({ raw: uuid, sports, sportsLoaded: true })).toBeUndefined();
+  });
+
+  it('빈 문자열·null 은 없는 것과 같다', () => {
+    expect(resolveSportIdParam({ raw: '', sports, sportsLoaded: true })).toBeUndefined();
+    expect(resolveSportIdParam({ raw: null, sports, sportsLoaded: true })).toBeUndefined();
+  });
+
+  /**
+   * ⚠️ **눈에 잘 안 띄고 재현이 어려운 자리다.** 로딩 중에 걸러 버리면 링크로 공유받은
+   * 사람이 **필터가 한 번 풀렸다 돌아오는 깜빡임**을 본다 — 정상 링크마다 매번 생긴다.
+   * 그대로 넘기면 손상된 주소에서만 잠깐 400 이 났다가 목록이 도착하며 스스로 낫는다.
+   */
+  it('마스터 목록이 오기 전에는 판단을 보류한다 — 정상 링크가 깜빡이면 안 된다', () => {
+    expect(resolveSportIdParam({ raw: 's-futsal', sports: [], sportsLoaded: false })).toBe('s-futsal');
+  });
+
+  it('대조군: 목록이 도착한 뒤에는 같은 값도 걸러진다 — 보류가 영구 통과는 아니다', () => {
+    expect(resolveSportIdParam({ raw: 'abc', sports: [], sportsLoaded: false })).toBe('abc');
+    expect(resolveSportIdParam({ raw: 'abc', sports, sportsLoaded: true })).toBeUndefined();
   });
 });

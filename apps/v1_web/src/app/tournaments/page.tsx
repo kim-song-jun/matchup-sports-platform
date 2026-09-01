@@ -15,6 +15,7 @@ import {
 } from '@/components/v1-ui/competition-filter-sheet';
 import {
   buildCompetitionFilterModel,
+  resolveSportIdParam,
   COMPETITION_STATUS_FILTERS,
 } from '@/components/v1-ui/competition-filter-model';
 import { EmptyState, ErrorState, SectionTitle } from '@/components/v1-ui/primitives';
@@ -134,16 +135,26 @@ export function TournamentsListContent() {
     .filter((s) => s.id)
     .map((s) => ({ id: s.id, label: s.name }));
 
+  /* URL 의 종목이 **마스터 목록에 있는 값일 때만** 서버로 넘긴다 — `?sportId=abc` 하나로
+     목록이 통째로 400 이 된다(실측). 목록이 아직 안 왔으면 **판단을 보류**한다:
+     로딩 중에 걸러 버리면 공유받은 정상 링크마다 필터가 깜빡인다(`resolveSportIdParam`). */
+  const querySportId = resolveSportIdParam({
+    raw: rawSportId,
+    sports: filterSports,
+    sportsLoaded: sportsData !== undefined,
+  });
+
   const { data, isLoading, isError, error, isFetching, refetch } = useV1Tournaments({
     ...(isDesktop ? { page } : { cursor }),
     limit: TOURNAMENT_PAGE_SIZE,
-    sportId: activeSportId ?? undefined,
+    sportId: querySportId,
     status: knownStatus,
     kind: activeKind,
   });
   const promoTournaments = useV1AllTournaments({
     status: 'open',
-    sportId: activeSportId ?? undefined,
+    // 목록과 **같은 값**을 쓴다 — 여기만 원본을 넘기면 이쪽 요청이 400 이 난다.
+    sportId: querySportId,
   });
 
   const pageItems = data?.items ?? [];

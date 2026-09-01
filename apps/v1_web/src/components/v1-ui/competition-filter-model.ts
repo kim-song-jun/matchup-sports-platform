@@ -66,6 +66,20 @@ export function statusFiltersFor(kind: string | null | undefined) {
 
 const FILTER_PARAM = 'filter';
 
+/**
+ * **URL 파라미터는 전부 사용자 입력이다.** 서버로 넘기기 전에 한 번 정규화한다 — 그러지
+ * 않으면 주소 한 글자로 목록이 통째로 400 이 된다(빈 화면이 아니라 에러다).
+ *
+ * 지금까지 나온 세 사례가 **같은 규칙의 세 얼굴**이다:
+ * ```
+ * 빈 문자열   `?status=`   → null 로 접는다        (서버 400)
+ * 모르는 상태  `?status=xx` → 넘기지 않는다          (서버 400)
+ * 모르는 종목  `?sportId=abc` → 넘기지 않는다        (서버 400 — 실측)
+ * ```
+ * 파라미터가 늘어날 때마다 이 목록에 한 줄을 더한다. 세 곳이 각각 다른 이유로 고쳐졌지만
+ * 뿌리는 하나다.
+ */
+
 /** 빈 문자열을 `null` 로 접는다 — 서버는 빈 값을 400 으로 거절한다(실측). */
 function normalizeParam(value: string | null): string | null {
   return value === null || value === '' ? null : value;
@@ -155,4 +169,31 @@ export function buildCompetitionFilterModel(input: {
     summary: parts.length > 0 ? parts.join(' · ') : '전체',
     activeCount: parts.length,
   };
+}
+
+
+/**
+ * URL 의 `sportId` 를 서버로 넘길지 정한다.
+ *
+ * 모양이 틀린 값(`abc`)은 서버가 **400** 을 내 목록이 통째로 죽는다(실측). 모양은 맞지만
+ * 없는 값(임의 UUID)은 200·빈 결과라 덜 나쁘지만, 마스터 목록을 이미 들고 있으니 둘 다
+ * 여기서 거른다.
+ *
+ * ## ⚠️ 목록이 아직 안 왔을 때는 **판단을 보류한다**
+ * 로딩 중에 "모르는 값" 으로 취급하면 **링크로 공유받은 사람이 필터가 한 번 풀렸다 돌아오는
+ * 깜빡임**을 본다 — 정상 링크마다 매번 생긴다. 반대로 그대로 넘기면 손상된 주소에서만
+ * 잠깐 400 이 났다가 목록이 도착하며 스스로 낫는다.
+ *
+ * **정상 링크의 상시 깜빡임보다 손상 링크의 일시 오류가 낫다.** 그래서 보류를 택했다.
+ */
+export function resolveSportIdParam(input: {
+  readonly raw: string | null;
+  readonly sports: ReadonlyArray<{ id: string }>;
+  /** 마스터 종목 목록이 **도착했는가**. 도착 전에는 판단하지 않는다. */
+  readonly sportsLoaded: boolean;
+}): string | undefined {
+  const value = normalizeParam(input.raw);
+  if (value === null) return undefined;
+  if (!input.sportsLoaded) return value;
+  return input.sports.some((sport) => sport.id === value) ? value : undefined;
 }

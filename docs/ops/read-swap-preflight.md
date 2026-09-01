@@ -797,7 +797,20 @@ step  V1 API unit tests                    ← 여기는 jest --selectProjects u
 
 ### 2026-09-01 실측 — **문제는 "필터가 사라진다" 보다 크다**
 
-alpha 공개 API 전수(88건, 커서 소진). 두 목록의 id 집합을 교차해 봤다:
+alpha 공개 API 전수(88건, 커서 소진). **두 목록의 id 집합을 교차**해 봤다 — 합이 맞는 것
+(53 + 35 = 88)만으로는 *"빠진 35건이 전부 draft 다"* 가 성립하지 않는다.
+
+재현 명령(둘 다 `nextCursor` 가 없을 때까지 이어 받는다 — 결과 수가 `limit` 과 같으면 잘린 것이다):
+
+```bash
+# 리그 축 전수 → 88건
+GET https://alpha.teameet.co.kr/api/v1/league-matches?limit=50[&cursor=…]
+
+# 통합 목록의 리그 전수 → 53건
+GET https://alpha.teameet.co.kr/api/v1/tournaments?limit=50&kind=league[&cursor=…]
+```
+
+앞 응답의 `leagueId` 와 뒤 응답의 `id` 를 `state` 별로 교차한 결과:
 
 ```
                 리그 전용 목록   통합 목록(?kind=league) 에 보이는 수
@@ -820,13 +833,23 @@ completed(종료)      38건                 38
 ### 그리고 **프로덕션과 대조할 수 없다** — 거기엔 리그 기능이 없다
 
 처음엔 *"비율의 실체는 프로덕션에서 확인하라"* 고 적었는데, **실행 불가능한 지시였다.**
-2026-09-01 실측(공개 API 읽기 전용):
+2026-09-01 실측(공개 API 읽기 전용 — 쓰기 없음):
 
+```bash
+GET https://teameet.co.kr/api/v1/health              200   살아 있다
+GET https://teameet.co.kr/api/v1/tournaments         200   대회 축은 정상
+GET https://teameet.co.kr/api/v1/league-matches      404   ← 라우트 자체가 없다
+GET https://alpha.teameet.co.kr/api/v1/league-matches 200  ← **대조군**
 ```
-프로덕션  /api/v1/health         200   (살아 있다)
-          /api/v1/tournaments    200
-          리그 목록 엔드포인트     404   ← 라우트 자체가 없다
-서빙 커밋  origin/main 의 tip · 그 커밋에 league-matches 모듈이 **없다**
+
+⚠️ **대조군이 있어야 결론이 선다.** 프로덕션 404 만 보면 *"그 경로가 원래 없는 것"* 과
+구분되지 않는다 — alpha 에서 같은 경로가 200 이라는 사실이 *"프로덕션에만 없다"* 를 만든다.
+
+코드로도 같은 결론이 나온다(서빙 커밋 = `origin/main` 의 tip):
+
+```bash
+git ls-tree -d --name-only origin/main apps/v1_api/src/league-matches   # → 출력 없음
+git ls-tree -d --name-only origin/dev  apps/v1_api/src/league-matches   # → 경로가 나온다
 ```
 
 리그는 아직 `dev`(alpha)에만 있다. 그래서:

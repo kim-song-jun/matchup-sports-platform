@@ -145,16 +145,31 @@ describe('리그 시즌 백필 (real DB)', () => {
     }
   });
 
-  it('백필한 뒤에도 공개 대회 목록·상세에 안 보인다 (게이트 두 겹)', async () => {
+  /**
+   * **두 겹 중 한 겹만 열렸다.** 예전엔 백필 행이 목록에도 상세에도 안 나왔고, 그 두 겹이
+   * `kind`(대회 목록은 리그를 안 담는다)와 `status`(draft 는 비공개) 였다.
+   *
+   * 2026-09-01 사용자 확정으로 **`status` 겹만 리그에 열었다** — 정규 리그의 `draft` 는
+   * "예정" 이라 사용자에게 보여야 하는 상태이기 때문이다. **`kind` 겹은 그대로다**:
+   * 기본 대회 목록에는 리그가 여전히 안 나온다.
+   *
+   * ⚠️ **두 단언을 같이 완화하지 마라.** 목록까지 열면 봉쇄가 실제보다 넓게 풀린다 —
+   * 아래 `not.toContain` 두 줄이 그 겹이 살아 있다는 증거이고, 상세만 뒤집는다.
+   */
+  it('백필한 뒤 대회 목록엔 여전히 안 나오지만, 상세는 열린다 (kind 겹 유지 · status 겹만 열림)', async () => {
     const read = new TournamentsReadService(prisma, new TournamentStaffAccessService(prisma));
 
+    // kind 겹 — 그대로 막힌다.
     const list = await read.list({ limit: 100 } as never);
     const listedIds = (list.items as Array<{ id: string }>).map((row) => row.id);
     expect(listedIds).not.toContain(ids.futsalLeagueA);
     expect(listedIds).not.toContain(ids.futsalLeagueB);
 
-    await expect(read.get(ids.futsalLeagueA)).rejects.toMatchObject({
-      response: expect.objectContaining({ code: 'TOURNAMENT_NOT_FOUND' }),
+    // status 겹 — 예정(draft) 리그 상세가 열린다. 목록에만 올리고 상세를 닫아 두면
+    // 카드는 보이는데 눌러서 못 여는 상태가 되므로, 두 표면이 같은 조건이어야 한다.
+    await expect(read.get(ids.futsalLeagueA)).resolves.toMatchObject({
+      id: ids.futsalLeagueA,
+      kind: 'regular_league',
     });
   });
 });

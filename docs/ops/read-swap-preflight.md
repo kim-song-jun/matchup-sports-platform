@@ -830,9 +830,9 @@ step  V1 API unit tests                    ← 여기는 jest --selectProjects u
 
 ```
 schedule-grouping.ts:59-62   phases = [ '조별리그', '결선' ]      ← 하드코딩
-schedule-grouping.ts:30      entry.round.startsWith('조별')       ← 이 문자열이 분류만 한다
+schedule-grouping.ts:31      entry.round.startsWith('조별')       ← 이 문자열이 분류만 한다
 buildScheduleFilters:126     filters.push({ label: phase.label })
-schedule-content.tsx:645     filters.length > 1 → 칩 렌더
+schedule-content.tsx:646     filters.length > 1 → 칩 렌더
 ```
 
 API 가 주는 `round` 는 **두 하드코딩 중 하나를 고르게 할 뿐**이고, 리그엔 둘 다 맞지 않는다.
@@ -868,7 +868,7 @@ API 가 주는 `round` 는 **두 하드코딩 중 하나를 고르게 할 뿐**�
 **그래서 이 작업의 결론:**
 - `items[].home` / `items[].away` → **`teamId` 를 담는다.** 같은 파일의 기존 리그 경로와 같은 모양.
 - `standings[].registrationId` → 순위 쪽 선례를 따른다. 프론트가 `#896` 처럼 유니온을 받아야 하고,
-  그 프론트 변경이 함께 필요하다. `schedule-content.tsx:503` 이 그 값을 React key 로 쓴다.
+  그 프론트 변경이 함께 필요하다. `schedule-content.tsx:505` 가 그 값을 React key 로 쓴다.
 
 > **교훈:** 선례를 인용할 때 **하나를 찾고 멈추지 않는다.** 반대 선례가 있는지 먼저 세고,
 > 있으면 *"어느 쪽이 맞나"* 가 아니라 **"둘은 어떤 질문에 답하고 있나"** 로 가른다.
@@ -914,6 +914,6 @@ const hasHiddenIdentity =
 
 ### 11-4. `bracketPublished` 는 **`true`** 로 준다
 
-`false` 로 주면 `schedule-content.tsx:722` 가 리그에 *"대진표가 아직 공개되지 않았어요"* 를
+`false` 로 주면 `schedule-content.tsx:725` 가 리그에 *"대진표가 아직 공개되지 않았어요"* 를
 **영원히** 그린다. 이 응답 필드의 소비처는 그 한 곳뿐이고(나머지는 어드민 축의
 `bracketPublishedAt` 으로 다른 필드다), 여기서 `true` 의 뜻은 *"이 게이트는 리그에 해당 없다"* 다.

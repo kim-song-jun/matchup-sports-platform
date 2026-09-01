@@ -21,8 +21,22 @@ import { toDetailMode } from './matches.mode';
 import { MatchDetailPageView, MatchListPageView, MatchStatePageView } from './matches-page';
 import type { MatchCardModel, MatchDetailViewModel, MatchListViewModel } from './matches.types';
 import { applyLabel, getMatchDetailViewModel, getMatchListViewModel, getMatchStateViewModel } from './matches.view-model';
+import {
+  actionLabel,
+  buildMatchHref,
+  buildSportSummary,
+  countToday,
+  formatDate,
+  formatDeadline,
+  formatDeadlineDetail,
+  formatTime,
+  getCapacity,
+  getStatus,
+  getViewerState,
+  statusToCardStatus,
+  toMatchCard,
+} from './matches.card-model';
 
-const FIXED_MATCH_SPORT_NAMES = ['축구', '풋살', '러닝', '수영'] as const;
 
 export function MatchListPageClient() {
   const router = useRouter();
@@ -281,32 +295,6 @@ export function MatchDetailPageClient({ matchId }: { matchId: string }) {
   return <MatchDetailPageView model={model} />;
 }
 
-function toMatchCard(match: V1Match, fallback: MatchCardModel): MatchCardModel {
-  const capacity = getCapacity(match, fallback);
-  const status = statusToCardStatus(getStatus(match), getViewerState(match));
-
-  return {
-    ...fallback,
-    id: match.matchId ?? match.id ?? fallback.id,
-    title: match.title,
-    sport: match.sport?.name ?? match.sportName ?? fallback.sport,
-    venue: match.place?.name ?? match.placeName ?? fallback.venue,
-    region: match.region?.name ?? match.regionName ?? fallback.region,
-    date: formatDate(match.startsAt),
-    time: formatTime(match.startsAt),
-    endTime: match.endsAt ? formatTime(match.endsAt) : undefined,
-    current: capacity.current,
-    capacity: capacity.capacity,
-    level: match.levelLabel ?? fallback.level,
-    gender: match.genderRule ?? fallback.gender,
-    host: match.host?.displayName ?? fallback.host,
-    image: match.imageUrl ?? fallback.image,
-    status,
-    deadline: formatDeadline(match.deadlineAt, status),
-    deadlineDetail: formatDeadlineDetail(match.deadlineAt, status),
-    actionLabel: actionLabel(status),
-  };
-}
 
 function toParticipants(
   match: V1Match,
@@ -330,28 +318,6 @@ function toParticipants(
   }));
 }
 
-function buildSportSummary(params: URLSearchParams, items: V1Match[], fallback: MatchListViewModel, selectedSportId?: string, masterSports?: V1Sport[]) {
-  const counts = new Map<string, number>();
-  items.forEach((item) => {
-    const name = item.sport?.name ?? item.sportName ?? '기타';
-    counts.set(name, (counts.get(name) ?? 0) + 1);
-  });
-
-  const fixedSports = FIXED_MATCH_SPORT_NAMES.map((name) => {
-    const sport = masterSports?.find((item) => item.name === name);
-    return {
-      label: name,
-      count: counts.get(name) ?? 0,
-      active: sport?.id === selectedSportId,
-      href: sport?.id ? buildMatchHref(params, { sportId: sport.id, filter: null }) : buildMatchHref(params, { sportId: null, filter: null }),
-    };
-  });
-
-  return [
-    { label: fallback.sports[0]?.label ?? '전체', count: items.length, active: !selectedSportId, href: buildMatchHref(params, { sportId: null, filter: null }) },
-    ...fixedSports,
-  ];
-}
 
 function buildMatchFilterSheet(
   params: URLSearchParams,
@@ -393,15 +359,6 @@ function buildMatchFilterSheet(
   };
 }
 
-function buildMatchHref(params: URLSearchParams, overrides: Record<string, string | null>) {
-  const next = new URLSearchParams(params.toString());
-  Object.entries(overrides).forEach(([key, value]) => {
-    if (value === null || value === '') next.delete(key);
-    else next.set(key, value);
-  });
-  const queryString = next.toString();
-  return queryString ? `/matches?${queryString}` : '/matches';
-}
 
 function toMatchSort(value: string | null): '' | 'recommended' | 'deadline' | 'latest' {
   if (value === 'recommended' || value === 'deadline' || value === 'latest') return value;
@@ -430,43 +387,6 @@ function countMatchFilters(
   return Number(Boolean(sort)) + Number(Boolean(genderRule)) + levels.length;
 }
 
-function countToday(items: V1Match[]) {
-  const today = new Date();
-  return items.filter((item) => {
-    const date = new Date(item.startsAt);
-    return (
-      date.getFullYear() === today.getFullYear() &&
-      date.getMonth() === today.getMonth() &&
-      date.getDate() === today.getDate()
-    );
-  }).length;
-}
-
-function getCapacity(match: V1Match, fallback: MatchCardModel) {
-  if (typeof match.participantCount === 'number' && typeof match.capacity === 'number') {
-    return { current: match.participantCount, capacity: match.capacity };
-  }
-
-  const [current, capacity] = match.capacityText?.match(/\d+/g)?.map(Number) ?? [];
-  return {
-    current: current ?? fallback.current,
-    capacity: capacity ?? match.capacity ?? fallback.capacity,
-  };
-}
-
-function getStatus(match: V1Match): V1MatchApiStatus {
-  const base = (match.displayState as V1MatchApiStatus | undefined) ?? (match.status as V1MatchApiStatus);
-  // 마감 UX 선행: deadlineAt < now 면 모집 종료로 표시
-  if (base === 'recruiting' || base === 'open') {
-    const dl = match.deadlineAt ? new Date(match.deadlineAt) : null;
-    if (dl && !Number.isNaN(dl.getTime()) && dl.getTime() < Date.now()) return 'closed';
-  }
-  return base;
-}
-
-function getViewerState(match: V1Match, preflight?: Exclude<V1ViewerState, 'guest'>): V1ViewerState {
-  return preflight ?? match.viewer?.state ?? match.viewerState ?? 'none';
-}
 
 /**
  * 매치가 끝난 뒤 후기 작성 화면으로 가는 진입점. 실제로 평가할 대상이 있는지(같이 뛴 다른
@@ -483,13 +403,6 @@ function buildMatchReviewAction(
   return { label: '후기 남기기', href: `/my/reviews/match/${matchId}` };
 }
 
-function statusToCardStatus(status: V1MatchApiStatus, viewerState: V1ViewerState = 'none'): MatchCardModel['status'] {
-  if (viewerState === 'host') return 'mine';
-  if (viewerState === 'requested') return 'pending';
-  if (viewerState === 'approved' || viewerState === 'participant') return 'approved';
-  if (status === 'closed' || status === 'cancelled' || status === 'completed' || status === 'expired' || status === 'full') return 'full';
-  return 'open';
-}
 
 function statusLabel(viewerState: V1ViewerState, status: V1MatchApiStatus) {
   if (viewerState === 'host') return '내가 만든 매치';
@@ -507,42 +420,6 @@ function canOpenMatchChat(viewerState: V1ViewerState) {
   return viewerState === 'host' || viewerState === 'approved' || viewerState === 'participant';
 }
 
-function actionLabel(status: MatchCardModel['status']) {
-  if (status === 'pending') return '승인 대기';
-  if (status === 'approved') return '승인 완료';
-  if (status === 'full') return '신청 마감';
-  if (status === 'mine') return '내 매치';
-  return '참가 신청';
-}
-
-function formatDeadline(value: string | null | undefined, status: MatchCardModel['status']) {
-  if (status === 'pending') return '승인 대기';
-  if (status === 'approved') return '승인 완료';
-  if (status === 'full') return '신청 마감';
-  if (status === 'mine') return '내 매치';
-  if (!value) return '신청 가능';
-
-  const deadline = new Date(value);
-  if (Number.isNaN(deadline.getTime())) return '신청 가능';
-  const diffMs = deadline.getTime() - Date.now();
-  if (diffMs <= 0) return '신청 마감';
-  const diffHours = Math.ceil(diffMs / 3_600_000);
-  if (diffHours < 24) return `마감 ${diffHours}시간 전`;
-  const diffDays = Math.ceil(diffHours / 24);
-  return `마감 ${diffDays}일 전`;
-}
-
-function formatDeadlineDetail(value: string | null | undefined, status: MatchCardModel['status']) {
-  if (status === 'pending') return '승인 대기';
-  if (status === 'approved') return '승인 완료';
-  if (status === 'full') return '신청 마감';
-  if (status === 'mine') return '내 매치';
-  if (!value) return '경기 시작 전까지';
-
-  const deadline = new Date(value);
-  if (Number.isNaN(deadline.getTime())) return '경기 시작 전까지';
-  return `${formatDate(value)} ${formatTime(value)}`;
-}
 
 async function shareMatch(match: V1Match): Promise<string | null> {
   const title = match.title;
@@ -592,14 +469,4 @@ function getApplyAction({
   return undefined;
 }
 
-function formatDate(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' });
-}
 
-function formatTime(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
-}

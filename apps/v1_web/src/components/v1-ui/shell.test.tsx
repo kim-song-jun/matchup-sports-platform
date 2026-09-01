@@ -113,6 +113,52 @@ describe('AppChrome bottom nav — 활성 pill 이 하나만 있고 인덱스에
   });
 });
 
+describe('AppChrome 하단탭 모션(C안) — 아이콘이 CSS 모션 셀렉터와 맞아떨어진다', () => {
+  // 콘텐츠 크로스페이드를 걷어낸 대신 탭 아이콘 자신이 반응한다(globals.css
+  // `.tm-bottom-tab svg` / `.tm-bottom-tab[data-active="true"] svg` /
+  // `.tm-bottom-tab:active svg`). jsdom은 CSS 애니메이션을 계산하지 않으므로 그
+  // 값 자체는 검증할 수 없지만(→ deviations), 그 셀렉터가 실제로 매칭할 DOM
+  // 구조는 검증할 수 있다 — 아이콘이 svg가 아닌 다른 요소(<img> 등)로 바뀌거나
+  // `.tm-bottom-tab`의 직계가 아닌 래퍼 안으로 옮겨지면(예: 별도 아이콘 시스템
+  // 전환) 이 CSS는 조용히 매칭을 잃고 모션이 사라진다 — 그때 이 테스트가 실패한다.
+  it('탭 5개 전부 .tm-bottom-tab 안에 svg 아이콘이 있다', () => {
+    const { container } = render(
+      <AppChrome title="테스트" activeTab="home" showNotifications={false}>
+        <div>본문</div>
+      </AppChrome>
+    );
+
+    const tabs = container.querySelectorAll('.tm-bottom-tab');
+    expect(tabs).toHaveLength(EXPECTED_TABS.length);
+    expect(container.querySelectorAll('.tm-bottom-tab svg')).toHaveLength(EXPECTED_TABS.length);
+  });
+
+  // data-active 는 모션 셀렉터(`.tm-bottom-tab[data-active="true"] svg`)뿐 아니라
+  // 기존 색상 규칙도 함께 의존하는 속성이다 — "true"/"false" 문자열로 정확히
+  // 직렬화되는지(참/거짓 boolean 자체가 아니라)를 박아 둔다.
+  it('활성 탭에만 data-active="true"가 붙고 나머지는 "false"다', () => {
+    const { container } = render(
+      <AppChrome title="테스트" activeTab="teams" showNotifications={false}>
+        <div>본문</div>
+      </AppChrome>
+    );
+
+    const nav = within(container).getByRole('navigation', { name: '주요 메뉴' });
+    const tabLinks = within(nav)
+      .getAllByRole('link')
+      .filter((link) => link.className.includes('tm-bottom-tab'));
+
+    const teamsLink = tabLinks.find((link) => link.getAttribute('href') === '/teams');
+    expect(teamsLink).toHaveAttribute('data-active', 'true');
+
+    tabLinks
+      .filter((link) => link !== teamsLink)
+      .forEach((link) => {
+        expect(link).toHaveAttribute('data-active', 'false');
+      });
+  });
+});
+
 describe('useV1NotificationUnreadSummary mock wiring', () => {
   it('테스트 환경에서 실제 네트워크 훅 대신 목이 호출된다', () => {
     vi.mocked(useV1NotificationUnreadSummary).mockClear();

@@ -145,7 +145,6 @@ export function MonitoringClient() {
         id={`monitoring-panel-${activeTab}`}
         role="tabpanel"
         aria-labelledby={`monitoring-tab-${activeTab}`}
-        className="tm-tabpanel-enter"
       >
         {activeTab === 'errors' && <ErrorLogsClient />}
         {activeTab === 'push' && <PushFailureTable />}

@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
 
 /**
  * 통합 대회 목록의 유형 축. 서버의 `COMPETITION_LIST_SURFACE` 키와 **같은 이름**을 쓴다 —
@@ -37,30 +37,33 @@ interface CompetitionKindSegmentProps {
  * 유형과 종목은 **축이 다르므로 형태도 다르다** — 유형은 세그먼트, 종목은 칩. 둘 다 "전체"
  * 를 갖는데 같은 모양이면 어느 전체인지 구분되지 않는다.
  *
- * ## 형태
- * `MatchTypeSegment` 와 같은 패턴(`.tm-segment-row` + `.tm-review-tab[data-active]`)을 쓴다.
- * 칸이 셋이라 `.tm-segment-row` 의 2칸 grid 를 `.tm-segment-row-3` 로 덮는다.
- * 터치 타깃 44px 는 `.tm-review-tab` 의 min-height 가 보장한다.
+ * ## 형태 — SegmentedTabs 공용 컴포넌트 (2026-09-02 이관, 세부탭 모션 통일 작업)
+ * 예전엔 `.tm-segment-row`(2칸 grid) 를 `.tm-segment-row-3` 로 덮어 3칸을 만들고,
+ * 활성 항목마다 `.tm-review-tab[data-active]` 로 배경을 켜고 끄는 방식이었다(전환 없이
+ * 툭 켜졌다 꺼짐). `SegmentedTabs` 는 항목 수를 `items.length` 에서 계산하므로 3칸용
+ * 오버라이드 클래스가 필요 없고, 활성 표시는 미끄러지는 thumb 하나 — 하단탭 pill 과
+ * 같은 토큰(`--duration-base`+`--ease-standard`)으로 움직인다. 좌우 여백은 여전히
+ * `tm-competition-kind-segment` 클래스(globals.css)가 트랙에 붙어 담당한다 — 자리만
+ * 옮겼을 뿐 값은 그대로다.
  *
- * 탭 위젯이 아니라 **라우팅 링크**이므로 `role="tab"` 이 아니라 `aria-current="page"` 로
+ * 탭 위젯이 아니라 **라우팅 링크**이므로 `role` 을 주지 않는다 — `SegmentedTabs` 는
+ * role 이 없으면 `<nav aria-label>` 로 렌더하고 각 항목에 `aria-current="page"` 로
  * 현재 위치를 알린다(선택 상태를 색으로만 알리지 않는다 — 프로젝트 접근성 규칙).
+ * 터치 타깃 44px 는 `size` 를 생략한 기본값(`'md'`)이 보장한다.
  */
 export function CompetitionKindSegment({ active }: CompetitionKindSegmentProps) {
   return (
-    <nav className="tm-segment-row tm-segment-row-3 tm-competition-kind-segment" aria-label="대회 유형">
-      {TABS.map(({ kind, label }) => (
-        <Link
-          key={kind}
-          /* '전체' 는 쿼리 없는 `/tournaments` 로 보낸다 — 기본값이 `all` 이라 `?kind=all` 과
-             같은 화면이고, **같은 화면에 주소가 둘이면 안 된다**(색인·공유 링크가 갈린다). */
-          href={kind === 'all' ? '/tournaments' : `/tournaments?kind=${kind}`}
-          className="tm-review-tab"
-          data-active={active === kind}
-          aria-current={active === kind ? 'page' : undefined}
-        >
-          {label}
-        </Link>
-      ))}
-    </nav>
+    <SegmentedTabs
+      items={TABS.map(({ kind, label }) => ({
+        id: kind,
+        label,
+        /* '전체' 는 쿼리 없는 `/tournaments` 로 보낸다 — 기본값이 `all` 이라 `?kind=all` 과
+           같은 화면이고, **같은 화면에 주소가 둘이면 안 된다**(색인·공유 링크가 갈린다). */
+        href: kind === 'all' ? '/tournaments' : `/tournaments?kind=${kind}`,
+      }))}
+      activeId={active}
+      ariaLabel="대회 유형"
+      className="tm-competition-kind-segment"
+    />
   );
 }

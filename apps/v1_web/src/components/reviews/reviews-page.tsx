@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { Card, KPIStat } from '@/components/v1-ui/primitives';
 import { ChevronRightIcon } from '@/components/v1-ui/icons';
+import { SegmentedTabs, type SegmentedTabsItem } from '@/components/v1-ui/segmented-tabs';
 import { cssUrl } from '@/lib/assets';
 import { DEFAULT_REVIEW_RATING, REVIEW_METRIC_FIELDS } from './reviews.types';
 import type { ReviewSourcePageModel, ReviewsPageModel, ReviewsReceivedPageModel, ReviewsTab, ReviewTargetDraft, ReviewTargetViewModel } from './reviews.types';
@@ -378,23 +379,24 @@ function ReviewTargetSections({
   );
 }
 
+// href 기반 라우팅 링크 3개 — 활성 표시는 미끄러지는 thumb 하나가 담당한다(항목별
+// background on/off 방식이던 예전 .tm-review-tab 은 제거). id 는 항상 고정 3개라
+// 렌더 밖 상수로 뺀다(불필요한 배열 재생성 방지).
+const REVIEW_TAB_ITEMS: SegmentedTabsItem[] = [
+  { id: 'pending', label: '작성할 리뷰', href: '/my/reviews?tab=pending' },
+  { id: 'written', label: '작성된 리뷰', href: '/my/reviews?tab=written' },
+  { id: 'received', label: '받은 리뷰', href: '/my/reviews?tab=received' },
+];
+
 function ReviewTabs({ active, onChange }: { active: ReviewsTab; onChange: (tab: ReviewsTab) => void }) {
-  const tabs: Array<[ReviewsTab, string]> = [['pending', '작성할 리뷰'], ['written', '작성된 리뷰'], ['received', '받은 리뷰']];
   return (
-    <div className="tm-review-tabs" role="tablist">
-      {tabs.map(([id, label]) => (
-        <Link
-          key={id}
-          aria-current={active === id ? 'page' : undefined}
-          className="tm-review-tab"
-          data-active={active === id}
-          href={`/my/reviews?tab=${id}`}
-          onClick={() => onChange(id)}
-        >
-          {label}
-        </Link>
-      ))}
-    </div>
+    <SegmentedTabs
+      items={REVIEW_TAB_ITEMS}
+      activeId={active}
+      onSelect={(id) => onChange(id as ReviewsTab)}
+      ariaLabel="리뷰 탭"
+      role="tablist"
+    />
   );
 }
 

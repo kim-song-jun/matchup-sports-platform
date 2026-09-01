@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { Card, EmptyState, KPIStat } from '@/components/v1-ui/primitives';
+import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { formatTournamentDateShort } from '@/lib/date-utils';
 import { AbnormalClockBadge } from './abnormal-clock-badge';
@@ -341,21 +342,13 @@ export function TeamRecordsContent({
   return (
     <div style={{ padding: '16px 20px 40px', display: 'flex', flexDirection: 'column', gap: 20 }}>
       {onChangeType ? (
-        <div role="tablist" aria-label="경기 종류" className="tm-seg-tabs" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
-          {TEAM_RECORD_TYPE_TABS.map((tab) => (
-            <button
-              key={tab.key}
-              type="button"
-              role="tab"
-              aria-selected={resolvedActiveType === tab.key}
-              data-active={resolvedActiveType === tab.key}
-              className="tm-seg-tab"
-              onClick={() => onChangeType(tab.key)}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        <SegmentedTabs
+          items={TEAM_RECORD_TYPE_TABS.map((tab) => ({ id: tab.key, label: tab.label }))}
+          activeId={resolvedActiveType}
+          onSelect={(id) => onChangeType(id as TeamRecordTypeFilter)}
+          ariaLabel="경기 종류"
+          role="tablist"
+        />
       ) : null}
 
       {onChangeSeason ? (

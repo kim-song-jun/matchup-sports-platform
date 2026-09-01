@@ -3,6 +3,7 @@
 import { useEffect, useId, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, EmptyState, ErrorState, ListItem } from '@/components/v1-ui/primitives';
+import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import {
   useV1AcceptTeamContact,
@@ -143,34 +144,17 @@ export function MyTeamContactsListClient() {
           </div>
         ) : (
           <>
-            <div
-              className="tm-seg-tabs"
-              role="tablist"
-              aria-label="컨택 방향"
-              /* tm-review-tabs 는 3컬럼 고정이라 2탭에서는 오른쪽 1/3 이 빈다.
-                 컬럼 수를 소비처가 정하는 tm-seg-tabs 를 쓴다(bracket-page-client 선례). */
-              style={{ marginBottom: 16, gridTemplateColumns: '1fr 1fr' }}
-            >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={direction === 'inbound'}
-                className="tm-seg-tab"
-                data-active={direction === 'inbound'}
-                onClick={() => setDirection('inbound')}
-              >
-                받은 컨택
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={direction === 'outbound'}
-                className="tm-seg-tab"
-                data-active={direction === 'outbound'}
-                onClick={() => setDirection('outbound')}
-              >
-                보낸 컨택
-              </button>
+            <div style={{ marginBottom: 16 }}>
+              <SegmentedTabs
+                items={[
+                  { id: 'inbound', label: '받은 컨택' },
+                  { id: 'outbound', label: '보낸 컨택' },
+                ]}
+                activeId={direction}
+                onSelect={(id) => setDirection(id as Direction)}
+                ariaLabel="컨택 방향"
+                role="tablist"
+              />
             </div>
 
             {contactsQuery.isError ? (

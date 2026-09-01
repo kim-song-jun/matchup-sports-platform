@@ -22,8 +22,10 @@ RUN corepack enable pnpm
 # The Node 22.23.2 image bundles npm 10.9.8 with tar 7.5.11, which is affected
 # by CVE-2026-59873. Runtime operations use node and Corepack-managed pnpm;
 # npm/npx are build-only tools, so exclude the bundled npm tree from the final
-# image instead of shipping an unused Critical package.
-RUN rm -rf /usr/local/lib/node_modules/npm \
+# image instead of shipping an unused Critical package. Upgrade the Alpine
+# OpenSSL runtime libraries to the 3.5.8 fix for CVE-2026-63073 as well.
+RUN apk upgrade --no-cache libcrypto3 libssl3 \
+  && rm -rf /usr/local/lib/node_modules/npm \
   && rm -f /usr/local/bin/npm /usr/local/bin/npx
 
 COPY --from=builder /app/node_modules ./node_modules

@@ -67,7 +67,7 @@ export function TeamMatchListPageView({ model }: { model: TeamMatchListViewModel
             : <EmptyState fill title="조건에 맞는 팀매치가 없어요" sub="다른 종목을 선택하거나 필터를 초기화해 다시 확인해 주세요." />
         }
         {/* 서버는 20건씩 커서로 자르는데(team-matches.service.ts) 예전엔 여기서 더 볼 방법이
-            없었다(감사 결함) — league-matches-list-client.tsx와 같은 "더 보기" 누적 패턴. */}
+            없었다(감사 결함) — tournaments/page.tsx 와 같은 "더 보기" 누적 패턴. */}
         {!model.isLoading && model.hasNext ? (
           <button
             type="button"

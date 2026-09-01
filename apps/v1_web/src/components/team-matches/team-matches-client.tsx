@@ -77,7 +77,7 @@ export function TeamMatchListPageClient() {
   }, [selectedGenderRule, selectedLevels, selectedSportId, selectedSort, selectedView, submittedQuery]);
   // 서버는 20건씩 커서 페이지네이션인데(team-matches.service.ts) 예전엔 이 화면이 단발
   // useQuery로 첫 페이지만 받아 21번째부터는 볼 방법이 없었다(감사 결함 — matches-client.tsx의
-  // 같은 수정과 동일 패턴, league-matches-list-client.tsx의 "더 보기" 누적 방식을 따른다).
+  // 같은 수정과 동일 패턴, tournaments/page.tsx 의 "더 보기" 누적 방식을 따른다).
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [accumulated, setAccumulated] = useState<V1TeamMatch[]>([]);
   // matches-client.tsx와 동일한 이유로 useEffect가 아니라 렌더 중에 되감는다 — 안 그러면

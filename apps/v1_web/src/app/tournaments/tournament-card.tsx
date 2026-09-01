@@ -246,7 +246,8 @@ export function TournamentCard({
               </>
             ) : null}
             {/* 리그는 정원이 없어 비율이 성립하지 않는다 — 수를 그대로 적는다
-                (`league-matches-list-client.tsx:200` 이 같은 이유로 같은 선택을 했다). */}
+                (리그 전용 목록도 같은 이유로 같은 선택을 했었다 — 그 화면은 통합 목록으로
+                    흡수돼 사라졌지만, **판단의 근거는 진행률을 신뢰할 수 없다는 것**이었다). */}
             <span>{capacity ? (pendingPaymentCount > 0 ? '팀 예약' : '팀 확정') : '팀 참가'}</span>
           </span>
         </div>

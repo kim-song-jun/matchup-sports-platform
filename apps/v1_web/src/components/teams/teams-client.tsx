@@ -1,7 +1,6 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useQueries } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   useV1ApproveTeamJoinApplication,
@@ -31,13 +30,12 @@ import {
 import { usePendingIds } from '@/hooks/use-pending-ids';
 import { extractErrorMessage } from '@/lib/error-message';
 import { trackEvent } from '@/lib/analytics';
-import { V1ApiError, v1Get } from '@/lib/api-client';
+import { V1ApiError } from '@/lib/api-client';
 import { chatRoomHref } from '@/lib/chat-route';
 import { formatTournamentDateShort } from '@/lib/date-utils';
 import { isTeamOperatorRole, normalizeMyTeamsResponse } from '@/lib/team-role';
 import { hasStoredV1Session } from '@/lib/session-storage';
 import { teamSharePath } from '@/lib/team-share-route';
-import { v1Keys } from '@/lib/query-keys';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import { teamJoinApplicationStatusLabel } from '@/lib/v1-status-labels';
 import type { V1Team, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
@@ -97,19 +95,20 @@ export function TeamListPageClient() {
   const base = getTeamListViewModel();
   const items = query.data?.items;
   const visibleItems = filterTeamsByLevels(items, selectedLevels);
-  const activityDetailQueries = useQueries({
-    queries: visibleItems.map((item) => {
-      const teamId = item.teamId ?? item.id;
-      const needsActivityFallback = !item.activitySummary && !item.activityAreaText;
-      return {
-        queryKey: [...v1Keys.team(teamId), 'detail', 'list-activity'] as const,
-        queryFn: () => v1Get<V1TeamDetail>(`/teams/${teamId}`),
-        enabled: Boolean(teamId && needsActivityFallback),
-        staleTime: 30_000,
-      };
-    }),
-  });
-  const visibleTeams = visibleItems.map((item, index) => toTeam(withListActivityFallback(item, activityDetailQueries[index]?.data), base.teams[index] ?? base.teams[0]));
+  // 예전에는 목록 항목에 활동 정보가 없으면 **팀마다** `/teams/:id` 를 불러 채우려 했다.
+  // 그 폴백은 구조적으로 성립할 수 없어서 지웠다 — 목록과 상세가 **같은 표현식으로 같은 값**을
+  // 만들기 때문이다(apps/v1_api/src/teams/teams.service.ts 의 목록 190행·상세 2141행이
+  // 둘 다 `formatTeamActivitySummary(team.profile)`). 목록에서 비어 있다는 건 team.profile 에
+  // 활동 데이터가 없다는 뜻이고, 그러면 상세를 불러도 비어 있다.
+  //
+  // 실측(alpha, 2026-09-01): 팀 탭 진입 시 `/teams/:id` 가 **44회** 나갔고 개별 응답이 980ms,
+  // 응답시간 합 32.8초였다. 그 44회가 화면에 더해 준 값은 **없었다**(표본 5팀 전부 상세의
+  // profile.activity* 가 null/[]).
+  //
+  // 다만 이 폴백은 **렌더를 막지는 않았다** — 카드는 목록 응답만으로 그려지므로 탭 전환은
+  // MutationObserver 기준 346ms 로 이미 빨랐다. 지우는 이유는 체감 속도가 아니라 아무 값도
+  // 얻지 못하는 요청 44회 자체다(서버 부하·모바일 데이터·배터리).
+  const visibleTeams = visibleItems.map((item, index) => toTeam(item, base.teams[index] ?? base.teams[0]));
 
   if (query.isError) return <TeamStatePageView model={getTeamStateViewModel('error')} />;
   const countItems = selectedSportId ? (sportCounts.data?.items ?? visibleItems) : visibleItems;
@@ -593,19 +592,6 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
   );
 }
 
-function withListActivityFallback(team: V1Team, detail?: V1TeamDetail): V1Team {
-  if (team.activitySummary || team.activityAreaText || !detail) return team;
-  return {
-    ...team,
-    activityAreaText: detail.profile.activityAreaText ?? null,
-    activityDays: detail.profile.activityDays ?? [],
-    activityFrequency: detail.profile.activityFrequency ?? null,
-    activityTimeSlots: detail.profile.activityTimeSlots ?? [],
-    activityTypes: detail.profile.activityTypes ?? [],
-    activityMemo: detail.profile.activityMemo ?? null,
-    activitySummary: detail.profile.activitySummary ?? detail.profile.activityAreaText ?? null,
-  };
-}
 
 
 function buildTeamFilterSheet(

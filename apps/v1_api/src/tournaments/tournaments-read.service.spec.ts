@@ -411,6 +411,33 @@ describe('TournamentsReadService', () => {
     });
   });
 
+  /**
+   * **상세 화면은 통합 순위를 항상 함께 부른다.** 상세만 열고 여기를 닫으면 화면이 열리자마자
+   * 순위 섹션이 에러가 된다 — 실측(2026-09-01)에서 진행 리그는 상세·일정·통합순위가 다 200
+   * 인데 **예정 리그만 상세·통합순위가 404** 였다.
+   *
+   * 이 게이트가 있는 자리는 정확히 셋(목록·상세·통합순위)이고 **셋이 같은 조건이어야 한다.**
+   * 하나라도 좁으면 그 경로만 죽는다.
+   */
+  it('getOverallStandings: 목록·상세와 같은 조건이다 — 한 화면이 부르는 경로는 하나가 아니다', async () => {
+    prisma.v1Tournament.findFirst.mockResolvedValue(null);
+
+    await service.getOverallStandings('t-1').catch(() => {});
+
+    const callArgs = prisma.v1Tournament.findFirst.mock.calls[0][0];
+    const or = findStatusOr(callArgs.where);
+    expect(or).not.toBeNull();
+
+    expect(or).toEqual(expect.arrayContaining([{ kind: 'regular_league', status: 'draft' }]));
+
+    // 대조군 — 대회의 draft 는 통합 순위에서도 계속 막힌다.
+    const tournamentClause = or!.find((clause) => !('kind' in clause)) as {
+      status: { in: string[] };
+    };
+    expect(tournamentClause.status.in).not.toContain('draft');
+    expect(statusesIn(or!)).not.toContain('cancelled');
+  });
+
   it('get: 목록과 같은 조건 — 리그 draft 는 열리고 대회 draft·cancelled 는 막힌다', async () => {
     prisma.v1Tournament.findFirst.mockResolvedValue(null);
 

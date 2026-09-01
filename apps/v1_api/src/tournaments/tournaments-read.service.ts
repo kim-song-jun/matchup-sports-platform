@@ -13,7 +13,6 @@ import { findTournamentOnSurface, ALL_COMPETITION_KINDS } from './tournament-sur
 import { hasTournamentFixtureOfficialResult } from './tournament-fixture-official-result';
 import {
   PUBLIC_COMPETITION_STATUS_WHERE,
-  PUBLIC_TOURNAMENT_STATUS_FILTER,
   TOURNAMENT_DETAIL_INCLUDE,
   TOURNAMENT_LIST_INCLUDE,
 } from './tournaments-read.query';
@@ -226,7 +225,11 @@ export class TournamentsReadService {
         // 응답에 실려 나가므로 상세·순위에도 같은 조건을 건다(종류 조건은 헬퍼가 건다).
         id: tournamentId,
         deletedAt: null,
-        status: PUBLIC_TOURNAMENT_STATUS_FILTER,
+        // **상세와 같은 조건이어야 한다.** 상세 화면은 이 순위를 **항상 함께** 부른다 —
+        // 상세만 열고 여기를 닫으면 화면이 열리자마자 순위 섹션이 에러가 된다.
+        // 실측(2026-09-01, #932 배포 전): 진행 리그는 상세·일정·통합순위가 다 200 인데
+        // 예정 리그만 상세·통합순위가 404 였다. 한 화면이 부르는 경로는 하나가 아니다.
+        AND: [PUBLIC_COMPETITION_STATUS_WHERE],
       },
       select: {
         id: true,

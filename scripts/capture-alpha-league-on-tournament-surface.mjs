@@ -197,46 +197,63 @@ async function main() {
     });
     const page = await context.newPage();
 
-    const res = await page.goto(`${BASE}${path}`, { waitUntil: 'domcontentloaded', timeout: 60_000 });
-    const status = res?.status() ?? 0;
-    // **403 을 던지지 않고 결과로 남긴다.** alpha 는 과한 캡처에 1분간 전면 403 을 걸고,
-    // 403 페이지도 PNG 로는 멀쩡해 보인다 — 던져 버리면 앞선 폭의 정상 결과까지 잃고,
-    // 남은 스크린샷을 "화면이 비었다" 로 오진하게 된다. 표에 남겨 무엇이 rate limit 이고
-    // 무엇이 진짜 결함인지 갈리게 한다.
-    if (status >= 400) {
-      const why = status === 403
-        ? '403 rate limit — 1분 뒤 이 폭만 다시 돌려라 (화면 결함 아님)'
-        : status === 404
-          ? '404 — 문이 아직 닫혀 있거나 배포 전이다'
-          : `HTTP ${status}`;
-      rows.push({ 폭: key, HTTP: status, 순위행: '-', 판정: `❌ ${why}` });
-      await context.close();
-      continue;
-    }
-    // 순위는 클라이언트 조회라 렌더까지 시간이 걸린다. networkidle 은 폴링 때문에 안 끝난다.
-    await page.waitForTimeout(5000);
+    // **실패를 두 층으로 나눈다.** 섞어서 "실패" 로 보고하면 화면 문제인지 하네스
+    // 문제인지 판정할 수 없다 — 그리고 층 1 인데 화면에 대해 말하면 **빈 스크린샷을
+    // "화면이 비었다" 로 읽는** 그 함정에 그대로 빠진다.
+    //   층 1  하네스가 못 돌았다(goto 타임아웃 · evaluate 실패 · 셀렉터 없음) → 화면 판정 **불가**
+    //   층 2  하네스는 돌았고 판정이 ❌                                      → 화면 결함
+    try {
 
-    const r = await page.evaluate(READ);
-    rows.push({ 폭: key, HTTP: status, 순위행: r.standingsRows, 판정: verdict(r) });
-
-    // 캡처 직전에만 스크롤을 문서로 되돌린다(측정은 위에서 끝났다).
-    await page.addStyleTag({
-      content: `html, body, .tm-app-frame { overflow: visible !important; height: auto !important; }
-                .tm-scroll-area { overflow: visible !important; height: auto !important; max-height: none !important; }`,
-    });
-    await page.evaluate(() => {
-      for (const el of document.querySelectorAll('body *')) {
-        if (getComputedStyle(el).position !== 'fixed') continue;
-        el.style.setProperty('position', 'static', 'important');
-        for (const prop of ['left', 'right', 'top', 'bottom', 'transform', 'width']) {
-          el.style.setProperty(prop, prop === 'width' ? '100%' : 'auto', 'important');
-        }
+      const res = await page.goto(`${BASE}${path}`, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+      const status = res?.status() ?? 0;
+      // **403 을 던지지 않고 결과로 남긴다.** alpha 는 과한 캡처에 1분간 전면 403 을 걸고,
+      // 403 페이지도 PNG 로는 멀쩡해 보인다 — 던져 버리면 앞선 폭의 정상 결과까지 잃고,
+      // 남은 스크린샷을 "화면이 비었다" 로 오진하게 된다. 표에 남겨 무엇이 rate limit 이고
+      // 무엇이 진짜 결함인지 갈리게 한다.
+      if (status >= 400) {
+        const why = status === 403
+          ? '403 rate limit — 1분 뒤 이 폭만 다시 돌려라 (화면 결함 아님)'
+          : status === 404
+            ? '404 — 문이 아직 닫혀 있거나 배포 전이다'
+            : `HTTP ${status}`;
+        rows.push({ 폭: key, HTTP: status, 순위행: '-', 판정: `❌ ${why}` });
+        continue;
       }
-    });
-    await page.waitForTimeout(600);
-    await page.screenshot({ path: `${OUT}/league-detail--${key}.png`, fullPage: true });
-    console.log(`${key}: 캡처 완료`);
-    await context.close();
+      // 순위는 클라이언트 조회라 렌더까지 시간이 걸린다. networkidle 은 폴링 때문에 안 끝난다.
+      await page.waitForTimeout(5000);
+
+      const r = await page.evaluate(READ);
+      rows.push({ 폭: key, HTTP: status, 순위행: r.standingsRows, 판정: verdict(r) });
+
+      // 캡처 직전에만 스크롤을 문서로 되돌린다(측정은 위에서 끝났다).
+      await page.addStyleTag({
+        content: `html, body, .tm-app-frame { overflow: visible !important; height: auto !important; }
+                  .tm-scroll-area { overflow: visible !important; height: auto !important; max-height: none !important; }`,
+      });
+      await page.evaluate(() => {
+        for (const el of document.querySelectorAll('body *')) {
+          if (getComputedStyle(el).position !== 'fixed') continue;
+          el.style.setProperty('position', 'static', 'important');
+          for (const prop of ['left', 'right', 'top', 'bottom', 'transform', 'width']) {
+            el.style.setProperty(prop, prop === 'width' ? '100%' : 'auto', 'important');
+          }
+        }
+      });
+      await page.waitForTimeout(600);
+      await page.screenshot({ path: `${OUT}/league-detail--${key}.png`, fullPage: true });
+      console.log(`${key}: 캡처 완료`);
+    } catch (error) {
+      // 여기 오는 것은 전부 층 1 이다 — 판정 ❌ 는 예외를 던지지 않고 행으로 남는다.
+      rows.push({
+        폭: key,
+        HTTP: '-',
+        순위행: '-',
+        판정: `⛔ 층1 하네스 실패 — 화면 판정 불가: ${error instanceof Error ? error.message.split('\n')[0] : String(error)}`,
+      });
+    } finally {
+      // close 를 한 곳에 모은다 — 조기 반환마다 적으면 하나를 빠뜨린다.
+      await context.close();
+    }
     // alpha rate limit — 폭 사이에 간격을 둔다.
     await new Promise((r2) => setTimeout(r2, 3000));
   }
@@ -244,10 +261,29 @@ async function main() {
 
   console.log('\n=== 화면에서 읽은 값 ===');
   console.table(rows);
-  const failed = rows.filter((r) => String(r.판정).includes('❌'));
   console.log(`\n캡처: ${OUT}/`);
-  console.log(failed.length === 0 ? '전 폭 기대와 일치' : `기대 불일치 ${failed.length}건`);
-  if (failed.length > 0) process.exitCode = 1;
+
+  // **층 1 이 하나라도 있으면 화면에 대해 아무 말도 하지 않는다.** 하네스가 못 돈 폭이
+  // 있는데 나머지로 "통과" 라고 적으면, 판정하는 쪽이 그걸 화면 결론으로 읽는다.
+  const layer1 = rows.filter((r) => String(r.판정).startsWith('⛔'));
+  const layer2 = rows.filter((r) => String(r.판정).includes('❌'));
+
+  if (layer1.length > 0) {
+    console.log(`\n⛔ 층1(하네스 실패) ${layer1.length}건 — **화면 판정 불가**`);
+    for (const r of layer1) console.log(`   ${r.폭}: ${r.판정}`);
+    console.log('   → 화면에 대해 결론 내지 마라. 하네스를 먼저 고치고 다시 돌린다.');
+    process.exitCode = 2;
+    return;
+  }
+
+  if (layer2.length === 0) {
+    console.log('\n✅ 전 폭 기대와 일치 — 문이 열렸고 화면이 리그 축 데이터로 채워졌다');
+    return;
+  }
+  console.log(`\n❌ 층2(화면 결함) ${layer2.length}건`);
+  for (const r of layer2) console.log(`   ${r.폭}: ${r.판정}`);
+  console.log('   → 문은 열렸는데 화면이 안 채워진 상태일 수 있다(부분). 후속 PR 대상.');
+  process.exitCode = 1;
 }
 
 main().catch((error) => {

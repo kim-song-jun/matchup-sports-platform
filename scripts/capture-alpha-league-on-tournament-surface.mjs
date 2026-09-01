@@ -32,7 +32,11 @@ import { chromium } from 'playwright';
 
 const BASE = 'https://alpha.teameet.co.kr';
 const API = `${BASE}/api/v1`;
-const OUT = process.env.OUT_DIR ?? '.screenshots/league-on-tournament-surface';
+// **기본 출력은 `output/` 아래다** — `.gitignore` 에 이미 있다(`.screenshots/` 는 없다).
+// untracked 파일 하나가 이 저장소에서 **모든 세션의 `--ff-only` 를 막고**, 커밋된 PNG 가
+// 변경 파일 300개를 넘겨 **Copilot 리뷰가 거부된** 전례가 있다. 돌릴 때마다 작업트리를
+// 오염시키지 않는다. 다른 곳에 쓰려면 `OUT_DIR` 로 명시한다.
+const OUT = process.env.OUT_DIR ?? 'output/league-on-tournament-surface';
 const WIDTHS = [
   { key: 'mobile', width: 390, height: 844 },
   { key: 'tablet', width: 768, height: 1024 },

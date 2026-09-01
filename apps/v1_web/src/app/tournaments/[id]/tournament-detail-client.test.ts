@@ -738,9 +738,13 @@ describe('TournamentDetailView — completed vs non-completed section rendering'
     expect(screen.queryByText('참가 신청 안내')).not.toBeInTheDocument();
     expect(screen.queryByText('대회 진행 방식')).not.toBeInTheDocument();
     expect(screen.queryByText('순위표')).not.toBeInTheDocument();
-    // 리그 빈 일정 문구가 대회용('대진표 준비 중')에서 리그용으로 바뀌었다 — 옛 문구로
-    // 단언하면 리그에서는 애초에 나올 수 없는 문자열이라 **이 단언이 vacuous** 해진다.
+    // **문구가 아니라 섹션 자체가 없는지 본다.** 특정 문구의 부재만 단언하면 *"무엇이
+    // 있으면 안 되는지"* 를 안 보게 된다 — 실제로 리그용 문구를 대회용
+    // `FixturesPlaceholder` 로 바꾸는 변이에도 이 테스트가 **통과했다**(vacuous).
+    // 헤더 부재로 단언하면 리그 문구든 대회 문구든 **무엇이 렌더돼도 red** 다.
+    expect(screen.queryByText('일정 · 대진')).not.toBeInTheDocument();
     expect(screen.queryByText('아직 등록된 경기가 없어요')).not.toBeInTheDocument();
+    expect(screen.queryByText('대진표 준비 중')).not.toBeInTheDocument();
   });
 
   it('keeps the application guide, flow explainer, and standings-moved notice for open tournaments (non-destructive)', () => {

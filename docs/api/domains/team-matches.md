@@ -40,6 +40,9 @@ Rules:
 - `status=scheduled,completed,cancelled`처럼 다중 조회 가능
 - `teamId`는 `hostTeamId = teamId` 또는 `applications.some(applicantTeamId = teamId)` 둘 중 하나를 만족하면 포함
 - Level response fields: `levelLabel`, `minLevel`, `maxLevel`
+- List and detail responses include `hostTeam.mannerScore` and `hostTeam.wins`.
+  - `mannerScore` is the live aggregate of publicly revealed team-match reviews and is `null` when no score is publishable.
+  - `wins` counts only the team's current official result facts whose result is `WON`; draft and superseded revisions are excluded.
 
 ## POST /team-matches
 

@@ -25,6 +25,13 @@ describe('HomePage', () => {
     analytics.trackEvent.mockClear();
   });
 
+  it('orders team-match discovery before personal matches', () => {
+    expect(getHomeViewModel().quickActions.slice(0, 2).map((action) => action.key)).toEqual([
+      'team_matches',
+      'matches',
+    ]);
+  });
+
   it('tracks a home_view event on mount', async () => {
     render(
       <Providers>

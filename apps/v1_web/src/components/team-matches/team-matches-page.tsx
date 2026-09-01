@@ -365,7 +365,8 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
                 <div>
                   <div className="tm-text-caption" style={{ color: 'var(--overlay-white-68)' }}>홈팀</div>
                   <div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{match.hostTeam}</div>
-                  {/* 매너·승수는 API 가 안 주는 값이라 null 일 수 있다 — 모르면 이 줄을 통째로
+                  {/* 매너·승수는 API 가 내려주지만(hostTeam.mannerScore / hostTeam.wins), 공개된
+                      팀 후기가 0건이면 매너 점수를 낼 수 없어 null 이 온다 — 모르면 이 줄을 통째로
                       감춘다. 0 으로 채워 "매너 0 · 승 0"을 보여주면 실제로 잘하는 팀이 최악으로
                       보이고, 목업으로 채우면 모든 매치가 같은 숫자를 보여준다(2026-08-23 실사고). */}
                   {match.manner !== null && match.wins !== null ? (
@@ -837,7 +838,7 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
         <div className="tm-text-body-lg" style={{ marginTop: 12 }}>{match.title}</div>
         <div className="tm-text-caption" style={{ marginTop: 4 }}>{match.date} {match.time} · {match.venue}</div>
         <div className="tm-match-list-footer">
-          {/* 매너·승수를 모르면(API 미제공) 줄을 비운다 — 0 으로 채우면 잘하는 팀이 최악으로 보인다.
+          {/* 매너·승수를 모르면(공개된 팀 후기 0건 등) 줄을 비운다 — 0 으로 채우면 잘하는 팀이 최악으로 보인다.
               푸터의 좌우 배치를 유지하려고 빈 span 을 자리표시자로 남긴다. */}
           {match.manner !== null && match.wins !== null ? (
             <span className="tm-text-caption">매너 <span style={{ fontVariantNumeric: 'tabular-nums' }}>{match.manner}</span> · 승 <span style={{ fontVariantNumeric: 'tabular-nums' }}>{match.wins}</span></span>

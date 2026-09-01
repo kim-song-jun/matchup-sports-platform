@@ -11,6 +11,7 @@ import { GlobalPopup } from '@/components/popups/global-popup';
 import { NotificationSocketBridge } from '@/components/providers/notification-socket-bridge';
 import { ThemeProvider } from '@/components/providers/theme-provider';
 import { KeyboardViewportBridge } from '@/components/providers/keyboard-viewport-bridge';
+import { NativeAppSurface } from '@/components/providers/native-app-surface';
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
@@ -33,6 +34,7 @@ export function Providers({ children }: { children: ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <KeyboardViewportBridge />
+        <NativeAppSurface />
         <ClientErrorListener />
         <NotificationSocketBridge />
         {getGaMeasurementId() && (

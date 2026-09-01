@@ -173,7 +173,7 @@ export function buildSportsEventLd(
  * 화면 표기와 어긋난다 — 구조화 데이터는 가시 텍스트와 같아야 한다. `regionName` 이 없을
  * 때만 부모 지역과 조합해 같은 형태를 만든다.
  */
-function displayRegionName(team: V1TeamDetail): string | null {
+export function displayRegionName(team: V1TeamDetail): string | null {
   const display = team.regionName?.trim();
   if (display) return display;
   const region = team.region;
@@ -212,9 +212,9 @@ export function buildSportsTeamLd(team: V1TeamDetail): JsonLdNode {
       address: { '@type': 'PostalAddress', addressCountry: 'KR', addressRegion: regionName },
     };
   }
-  if (team.profile?.introduction) {
-    node.description = team.profile.introduction.replace(/\s+/g, ' ').trim();
-  }
+  const description = team.profile?.introduction?.replace(/\s+/g, ' ').trim();
+  // 공백만 있는 소개는 필드를 아예 넣지 않는다 — 빈 description 은 없는 것만 못하다.
+  if (description) node.description = description;
   if (team.profile?.logoUrl) node.logo = absoluteImageUrl(team.profile.logoUrl);
   const image = team.profile?.coverImageUrl || team.profile?.logoUrl;
   if (image) node.image = absoluteImageUrl(image);

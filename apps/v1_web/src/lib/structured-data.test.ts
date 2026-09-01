@@ -182,6 +182,12 @@ describe('buildSportsTeamLd', () => {
     expect(ld.location).toMatchObject({ name: '서울 송파구' });
   });
 
+  it('공백만 있는 소개는 description 을 아예 넣지 않는다', () => {
+    const ld = buildSportsTeamLd(team({ introduction: '  \n\n  ' }));
+
+    expect(ld).not.toHaveProperty('description');
+  });
+
   it('지역 정보가 아예 없으면 location 을 붙이지 않는다', () => {
     const base = team();
     const ld = buildSportsTeamLd({ ...base, regionName: undefined, region: null } as unknown as V1TeamDetail);

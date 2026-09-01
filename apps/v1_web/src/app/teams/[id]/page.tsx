@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { TeamDetailPageClient } from '@/components/teams/teams-client';
 import { JsonLd } from '@/components/seo/json-ld';
 import { buildNoIndexMetadata, buildPublicMetadata, fetchPublicV1, metadataDescription } from '@/lib/seo';
-import { buildBreadcrumbLd, buildSportsTeamLd } from '@/lib/structured-data';
+import { buildBreadcrumbLd, buildSportsTeamLd, displayRegionName } from '@/lib/structured-data';
 import type { V1TeamDetail } from '@/types/api';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -15,7 +15,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   if (!team) return buildNoIndexMetadata('팀을 찾을 수 없어요');
 
   const sportName = team.sport?.name ?? team.sportName;
-  const regionName = team.regionName ?? team.region?.name;
+  // 구조화 데이터와 같은 규칙으로 표시용 지역명을 만든다 — 둘이 갈리면 화면·메타·LD 가 어긋난다.
+  const regionName = displayRegionName(team);
 
   return buildPublicMetadata({
     title: team.name,

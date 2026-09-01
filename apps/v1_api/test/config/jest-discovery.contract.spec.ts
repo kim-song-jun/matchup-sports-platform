@@ -111,11 +111,12 @@ describe('v1_api Jest integration discovery contract', () => {
     );
     const isIgnored = (absPath: string) => ignorePatterns.some((re) => re.test(absPath));
 
-    const onDisk = collectSpecFiles(resolve(apiRoot, 'test'));
-    const integrationSpecs = onDisk.filter((f) => f.endsWith('.integration-spec.ts'));
-    const e2eSpecs = onDisk.filter((f) => f.endsWith('.e2e-spec.ts'));
-
-    const expected = [...integrationSpecs.filter((f) => !isIgnored(f)), ...e2eSpecs]
+    /* ⚠️ `testPathIgnorePatterns` 는 **두 확장자 모두**에 걸린다 — jest 는 `testMatch` 로 찾은
+       뒤 확장자와 무관하게 거른다(실측: e2e 하나를 ignore 에 넣으면 89→88). 한쪽에만 걸면
+       누가 e2e 를 ignore 에 넣는 순간 **거짓 red** 가 난다(config 는 빼는데 기대값은 포함).
+       이 저장소에서 *"두 확장자가 한 프로젝트에 있다"* 를 놓친 게 이번이 세 번째다. */
+    const expected = collectSpecFiles(resolve(apiRoot, 'test'))
+      .filter((absPath) => !isIgnored(absPath))
       .map((absPath) => relative(apiRoot, absPath).replaceAll('\\', '/'))
       .sort();
 
@@ -123,8 +124,10 @@ describe('v1_api Jest integration discovery contract', () => {
       listed.map((testPath) => relative(apiRoot, testPath).replaceAll('\\', '/')).sort(),
     ).toEqual(expected);
 
-    // 디스크를 실제로 훑었는지 못박는다 — expected 가 비면 위 단언이 vacuous 해진다.
-    expect(expected.length).toBeGreaterThan(50);
+    /* 개수는 고정하지 않는다 — 스펙이 늘고 주는 것은 정상이고, 절대 수를 박으면 그 변화마다
+       무관한 red 가 난다. 본 계약은 위 `toEqual`(두 집합이 같다)이고, 여기서 막을 것은
+       **양쪽이 동시에 비어 통과하는 경우** 하나뿐이다. */
+    expect(expected.length).toBeGreaterThan(0);
   });
 
   /**

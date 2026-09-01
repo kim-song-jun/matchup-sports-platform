@@ -1,4 +1,5 @@
 import { leagueStateToListStatus } from '@/components/v1-ui/competition-filter-model';
+import { isUuid } from '@/lib/uuid';
 
 /**
  * `/league-matches`(리그 전용 목록) → `/tournaments?kind=league` 로 보낼 주소를 만든다.
@@ -20,6 +21,9 @@ import { leagueStateToListStatus } from '@/components/v1-ui/competition-filter-m
  * 옮기면 넘어간 화면이 400 이 되는데 — **리다이렉트 직후의 에러는 원인이 가장 안 보인다**
  * (사용자는 자기가 누른 링크가 깨졌다고 생각한다). 모르는 값은 조용히 떨어뜨리고 목록은
  * 열리게 한다.
+ *
+ * 이 원칙은 **두 축 모두**에 걸린다. `state` 만 거르고 `sportId` 를 그냥 넘기면 같은 400 이
+ * 종목 쪽으로 남는다 — 서버 DTO 가 `@IsUUID()` 라 UUID 가 아닌 값은 전부 400 이다.
  */
 export function buildLeagueListRedirect(params: {
   readonly state?: string | string[] | null;
@@ -32,9 +36,11 @@ export function buildLeagueListRedirect(params: {
   const status = leagueStateToListStatus(firstValue(params.state));
   if (status !== null) query.set('status', status);
 
-  // 종목은 이름도 값도 같아 그대로 옮긴다. 다만 **빈 문자열은 버린다** — 서버가 400 이다.
+  /* 종목은 이름도 값도 같아 옮기기만 하면 되지만, 형태는 서버와 맞춰야 한다 — DTO 가
+     `@IsUUID()` 라 빈 문자열뿐 아니라 **UUID 아닌 값 전부**가 400 이다. 판정은 서버 규칙을
+     그대로 미러한 `isUuid` 에 맡긴다(더 엄격하면 멀쩡한 종목이 조용히 사라진다). */
   const sportId = firstValue(params.sportId);
-  if (sportId !== null) query.set('sportId', sportId);
+  if (isUuid(sportId)) query.set('sportId', sportId);
 
   return `/tournaments?${query.toString()}`;
 }

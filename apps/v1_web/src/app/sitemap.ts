@@ -16,7 +16,11 @@ export const revalidate = 300;
 
 // 리그(/league-matches)는 대회(/tournaments)와 같은 "대회 유형" 축인데도 sitemap엔
 // 아예 없었다 — 그룹 C 리그 발견성 감사(Task 153 Wave 3)에서 대회와 동급
-// priority/changeFrequency로 등록한다.
+// priority/changeFrequency로 실었다.
+//
+// 그 뒤 목록이 통합 목록으로 넘어가면서(2026-09-01) **싣는 대상이 바뀌었다**: 아래
+// STATIC_ROUTES 에서 목록 주소는 빠졌고, 대신 리그 **개별 페이지**를 sitemap() 본문에서
+// 싣는다. 발견성은 그대로고, 크롤러가 리다이렉트를 한 번 더 도는 것만 없앴다.
 const STATIC_ROUTES: Array<{ path: string; priority: number; changeFrequency: MetadataRoute.Sitemap[number]['changeFrequency'] }> = [
   { path: '/landing', priority: 1, changeFrequency: 'weekly' },
   { path: '/matches', priority: 0.9, changeFrequency: 'hourly' },

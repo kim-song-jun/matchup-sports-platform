@@ -646,3 +646,64 @@ describe('ScheduleContent — 정규 리그 단계 어휘', () => {
     expect(screen.getByRole('region', { name: '정규 라운드' })).toBeInTheDocument();
   });
 });
+
+/**
+ * **alpha 실측으로 잡힌 어휘 결함(2026-09-01).** 리그 화면의 순위 제목이 대회 말인
+ * **"조별 순위"** 로 떠 있었다 — B안 어휘 정리에서 빠진 자리다.
+ *
+ * 그리고 그냥 "리그 순위" 로 바꾸면 **두 번 적힌다**: 바깥 제목과 안쪽 그룹 라벨이 같은
+ * 말이 된다(티어가 없는 단발 리그의 `groupName` 이 "리그 순위" 다). 그래서 그룹이 하나뿐일
+ * 때는 안쪽 라벨을 끈다 — 티어가 있으면(1부·2부) 그건 다른 말이라 그대로 둔다.
+ */
+describe('ScheduleContent — 정규 리그 순위 제목', () => {
+  const leagueStandings = (groupName: string, groupId: string, teamName: string) => ({
+    groupId,
+    groupName,
+    teamId: `team-${groupId}`,
+    teamName,
+    teamLogoUrl: null,
+    position: 1,
+    points: 3,
+    wins: 1,
+    draws: 0,
+    losses: 0,
+    goalsFor: 2,
+    goalsAgainst: 1,
+  });
+
+  it('리그에는 "조별 순위" 라고 쓰지 않는다 — 리그엔 조가 없다', () => {
+    const data = makeData({ standings: [leagueStandings('리그 순위', 'lg-1', '성수 FC')] as never });
+    render(<ScheduleContent tournamentId="lg-1" data={data} isRegularLeague />);
+
+    expect(screen.getByRole('heading', { name: '리그 순위' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '조별 순위' })).not.toBeInTheDocument();
+  });
+
+  it('대조군: 대회는 "조별 순위" 그대로', () => {
+    const data = makeData({ standings: [leagueStandings('A조', 'g-1', '망원 FC')] as never });
+    render(<ScheduleContent tournamentId="t-1" data={data} />);
+
+    expect(screen.getByRole('heading', { name: '조별 순위' })).toBeInTheDocument();
+  });
+
+  it('단발 리그는 안쪽 그룹 라벨을 숨긴다 — 제목과 같은 말이 두 번 적힌다', () => {
+    const data = makeData({ standings: [leagueStandings('리그 순위', 'lg-1', '성수 FC')] as never });
+    render(<ScheduleContent tournamentId="lg-1" data={data} isRegularLeague />);
+
+    // 제목(h3) 하나만 남고 그룹 라벨 div 는 안 그려진다 — 라벨을 켜면 2가 된다.
+    expect(screen.getAllByText('리그 순위')).toHaveLength(1);
+  });
+
+  it('티어가 있는 리그는 안쪽 라벨을 그린다 — "1부"·"2부" 는 제목과 다른 말이다', () => {
+    const data = makeData({
+      standings: [
+        leagueStandings('1부', 'lg-1', '성수 FC'),
+        leagueStandings('2부', 'lg-2', '왕십리 FC'),
+      ] as never,
+    });
+    render(<ScheduleContent tournamentId="lg-1" data={data} isRegularLeague />);
+
+    expect(screen.getByText('1부')).toBeInTheDocument();
+    expect(screen.getByText('2부')).toBeInTheDocument();
+  });
+});

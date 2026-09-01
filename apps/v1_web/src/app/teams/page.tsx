@@ -2,7 +2,7 @@ import { Suspense } from 'react';
 import { TeamListPageClient } from '@/components/teams/teams-client';
 import { TeamListSsrView } from '@/components/teams/teams-ssr-list';
 import { buildPublicMetadata } from '@/lib/seo';
-import { fetchSeoListPage } from '@/lib/seo-list';
+import { fetchSeoListPage, fetchSeoMasterSports } from '@/lib/seo-list';
 import type { V1Team } from '@/types/api';
 
 export const metadata = buildPublicMetadata({
@@ -14,10 +14,13 @@ export const metadata = buildPublicMetadata({
 export const revalidate = 300;
 
 export default async function TeamsPage() {
-  const teams = await fetchSeoListPage<V1Team>('/teams', 'teams');
+  const [teams, sports] = await Promise.all([
+    fetchSeoListPage<V1Team>('/teams', 'teams'),
+    fetchSeoMasterSports(),
+  ]);
 
   return (
-    <Suspense fallback={<TeamListSsrView teams={teams} />}>
+    <Suspense fallback={<TeamListSsrView teams={teams} sports={sports} />}>
       <TeamListPageClient />
     </Suspense>
   );

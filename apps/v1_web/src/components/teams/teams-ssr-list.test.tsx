@@ -6,12 +6,19 @@ import { render as rtlRender, screen } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { describe, expect, it } from 'vitest';
 import { TeamListSsrView } from './teams-ssr-list';
-import type { V1Team } from '@/types/api';
+import type { V1Sport, V1Team } from '@/types/api';
 
 function render(ui: ReactElement) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return rtlRender(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
 }
+
+const FUTSAL = {
+  id: 'sport-futsal-uuid',
+  code: 'futsal',
+  name: '풋살',
+  levels: [],
+} as unknown as V1Sport;
 
 function team(overrides: Partial<V1Team> = {}): V1Team {
   return {
@@ -42,6 +49,13 @@ describe('TeamListSsrView', () => {
     expect(screen.getByText('강남 유나이티드')).toBeInTheDocument();
     expect(screen.getAllByText(/풋살/).length).toBeGreaterThan(0);
     expect(detailHrefs()).toContain('/teams/team-1');
+  });
+
+  it('마스터 종목을 받으면 진짜 종목 ID 로 필터 링크를 만든다', () => {
+    render(<TeamListSsrView teams={[team()]} sports={[FUTSAL]} />);
+
+    const hrefs = screen.queryAllByRole('link').map((link) => link.getAttribute('href') ?? '');
+    expect(hrefs).toContain('/teams?sportId=sport-futsal-uuid');
   });
 
   it('마스터 종목 목록이 없는 서버 렌더에서 라벨을 sportId 로 쓰지 않는다', () => {

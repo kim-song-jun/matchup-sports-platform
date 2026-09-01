@@ -1,7 +1,7 @@
 import { TeamListPageView } from './teams-page';
 import { buildTeamSportChips, toTeam } from './teams.card-model';
 import { getTeamListViewModel } from './teams.view-model';
-import type { V1Team } from '@/types/api';
+import type { V1Sport, V1Team } from '@/types/api';
 
 /**
  * 팀 목록의 **서버 렌더 첫 화면**. 이유와 트레이드오프는 `matches-ssr-list.tsx` 와 같다 —
@@ -11,7 +11,13 @@ import type { V1Team } from '@/types/api';
  * 클라이언트 전용 최적화라 여기서는 하지 않는다. 서버 렌더의 목적은 **읽을 수 있는 목록**
  * 이고, 활동 요약이 빠진 카드도 팀 이름·종목·지역을 그대로 담는다.
  */
-export function TeamListSsrView({ teams }: { readonly teams: readonly V1Team[] }) {
+export function TeamListSsrView({
+  teams,
+  sports = [],
+}: {
+  readonly teams: readonly V1Team[];
+  readonly sports?: readonly V1Sport[];
+}) {
   const base = getTeamListViewModel();
   const items = [...teams];
   const cards = items.map((item, index) => toTeam(item, base.teams[index] ?? base.teams[0]));
@@ -23,7 +29,7 @@ export function TeamListSsrView({ teams }: { readonly teams: readonly V1Team[] }
         query: '',
         filterCount: 0,
         teams: cards,
-        chips: buildTeamSportChips(items, base, new URLSearchParams()),
+        chips: buildTeamSportChips(items, base, new URLSearchParams(), undefined, [...sports]),
         summary: {
           ...base.summary,
           total: cards.length,

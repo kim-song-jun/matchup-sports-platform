@@ -1,7 +1,7 @@
 import { MatchListPageView } from './matches-page';
 import { buildSportSummary, countToday, statusToCardStatus, getStatus, toMatchCard } from './matches.card-model';
 import { getMatchListViewModel } from './matches.view-model';
-import type { V1Match } from '@/types/api';
+import type { V1Match, V1Sport } from '@/types/api';
 
 /**
  * 매치 목록의 **서버 렌더 첫 화면**.
@@ -18,7 +18,13 @@ import type { V1Match } from '@/types/api';
  * 상호작용 핸들러(`search`·`onLoadMore`)는 넘기지 않는다 — 서버 컴포넌트는 클라이언트로
  * 함수를 건널 수 없고, 이 렌더의 목적은 **읽을 수 있는 콘텐츠**이지 동작이 아니다.
  */
-export function MatchListSsrView({ matches }: { readonly matches: readonly V1Match[] }) {
+export function MatchListSsrView({
+  matches,
+  sports = [],
+}: {
+  readonly matches: readonly V1Match[];
+  readonly sports?: readonly V1Sport[];
+}) {
   const base = getMatchListViewModel();
   const items = [...matches];
 
@@ -29,7 +35,7 @@ export function MatchListSsrView({ matches }: { readonly matches: readonly V1Mat
         query: '',
         filterCount: 0,
         matches: items.map((item, index) => toMatchCard(item, base.matches[index] ?? base.matches[0])),
-        sports: buildSportSummary(new URLSearchParams(), items, base),
+        sports: buildSportSummary(new URLSearchParams(), items, base, undefined, [...sports]),
         summary: {
           ...base.summary,
           count: items.length,

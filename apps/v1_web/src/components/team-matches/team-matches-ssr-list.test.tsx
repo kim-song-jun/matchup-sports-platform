@@ -6,7 +6,7 @@ import { render as rtlRender, screen } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { TeamMatchListSsrView } from './team-matches-ssr-list';
-import type { V1TeamMatch } from '@/types/api';
+import type { V1Sport, V1TeamMatch } from '@/types/api';
 
 // 카드 컴포넌트가 `useRouter()` 를 쓴다 — 실제 앱에서는 App Router 가 SSR 중에도 이 컨텍스트를
 // 준다(team-matches-page.test.tsx 와 같은 mock).
@@ -20,6 +20,13 @@ function render(ui: ReactElement) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return rtlRender(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
 }
+
+const FUTSAL = {
+  id: 'sport-futsal-uuid',
+  code: 'futsal',
+  name: '풋살',
+  levels: [],
+} as unknown as V1Sport;
 
 function teamMatch(overrides: Partial<V1TeamMatch> = {}): V1TeamMatch {
   return {
@@ -50,6 +57,13 @@ describe('TeamMatchListSsrView', () => {
     expect(screen.getByText('주말 풋살 친선전 상대 구해요')).toBeInTheDocument();
     expect(screen.getAllByText(/강남 유나이티드/).length).toBeGreaterThan(0);
     expect(detailHrefs()).toContain('/team-matches/tm-1');
+  });
+
+  it('마스터 종목을 받으면 진짜 종목 ID 로 필터 링크를 만든다', () => {
+    render(<TeamMatchListSsrView matches={[teamMatch()]} sports={[FUTSAL]} />);
+
+    const hrefs = screen.queryAllByRole('link').map((link) => link.getAttribute('href') ?? '');
+    expect(hrefs).toContain('/team-matches?sportId=sport-futsal-uuid');
   });
 
   it('마스터 종목 목록이 없는 서버 렌더에서 라벨을 sportId 로 쓰지 않는다', () => {

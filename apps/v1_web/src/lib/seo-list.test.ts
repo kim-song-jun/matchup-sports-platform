@@ -12,7 +12,7 @@ vi.mock('@/lib/seo', async () => {
   return { ...actual, fetchPublicV1: (path: string) => fetchPublicV1(path) };
 });
 
-const { SEO_LIST_PAGE_SIZE, fetchSeoListPage } = await import('./seo-list');
+const { SEO_LIST_PAGE_SIZE, fetchSeoListPage, fetchSeoMasterSports } = await import('./seo-list');
 
 beforeEach(() => {
   fetchPublicV1.mockReset();
@@ -55,5 +55,26 @@ describe('fetchSeoListPage', () => {
     fetchPublicV1.mockResolvedValue(null);
 
     await expect(fetchSeoListPage('/team-matches', 'team-matches')).resolves.toEqual([]);
+  });
+});
+
+describe('fetchSeoMasterSports', () => {
+  it('공개 마스터 API 의 sports 배열을 그대로 준다', async () => {
+    fetchPublicV1.mockResolvedValue({ sports: [{ id: 'a', name: '풋살', levels: [] }] });
+
+    await expect(fetchSeoMasterSports()).resolves.toEqual([{ id: 'a', name: '풋살', levels: [] }]);
+    expect(fetchPublicV1).toHaveBeenCalledWith('/master/sports');
+  });
+
+  it('배열 형태 응답도 받는다', async () => {
+    fetchPublicV1.mockResolvedValue([{ id: 'a', name: '풋살', levels: [] }]);
+
+    await expect(fetchSeoMasterSports()).resolves.toEqual([{ id: 'a', name: '풋살', levels: [] }]);
+  });
+
+  it('실패해도 던지지 않는다 — 칩보다 목록 본문이 중요하다', async () => {
+    fetchPublicV1.mockRejectedValue(new Error('down'));
+
+    await expect(fetchSeoMasterSports()).resolves.toEqual([]);
   });
 });

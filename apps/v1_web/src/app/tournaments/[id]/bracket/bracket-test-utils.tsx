@@ -24,6 +24,14 @@ export function renderBracketPage(tournament: V1TournamentDetail): RenderResult 
  */
 export function renderBracketStandingsTab(tournament: V1TournamentDetail): RenderResult {
   const result = renderBracketPage(tournament);
-  fireEvent.click(result.getByRole('tab', { name: '순위 · 대진표' }));
+  // 탭 이름은 종류에 따라 다르다 — 정규 리그엔 대진표가 없어 '리그 순위' 로 부른다
+  // (2026-09-01 사용자 확정). 여기서 이름을 하나로 고정하면 리그 픽스처를 쓰는 테스트가
+  // 전부 '탭을 못 찾음' 으로 죽는다.
+  //
+  // ⚠️ 이 헬퍼는 이름 **변경을 흡수**하므로, 탭 이름 자체는 별도 테스트가 단언한다
+  // (`bracket-page-client.test.tsx` 의 '탭 이름' 항목) — 여기만 고치고 끝내면 라벨이
+  // 바뀌어도 아무도 안 깨진다.
+  const standingsTabName = tournament.kind === 'regular_league' ? '리그 순위' : '순위 · 대진표';
+  fireEvent.click(result.getByRole('tab', { name: standingsTabName }));
   return result;
 }

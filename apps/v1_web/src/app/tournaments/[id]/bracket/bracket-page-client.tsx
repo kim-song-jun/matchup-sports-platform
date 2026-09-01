@@ -317,7 +317,18 @@ function BracketEmpty({
  * 목적은 "다음 경기가 언제/어디서"이고, 순위·대진표는 결과가 쌓인 뒤에 보는
  * 정보라 첫 화면을 일정에 내줬다. 세그먼트 탭 나열 순서도 기본 탭과 같게 둔다.
  */
-export function BracketScheduleTab({ tournamentId }: { tournamentId: string }) {
+export function BracketScheduleTab({
+  tournamentId,
+  isRegularLeague = false,
+}: {
+  tournamentId: string;
+  /**
+   * **정규 리그 시즌인가(`kind`)** — 이 파일의 다른 `isLeague`(`isLeagueCompetition`,
+   * `format === 'league'` 인 진짜 대회도 포함)와 **뜻이 다르다.** 이름을 갈라 둔다.
+   * 단계 어휘(칩·aria-label)만 가른다 — `ScheduleContent` 참조.
+   */
+  isRegularLeague?: boolean;
+}) {
   // schedule-page-client.tsx와 동일한 데이터 배선(usePublicTournamentSchedule 페이지
   // 합치기 + 로딩/에러 분기) — AppChrome 래핑만 없는 얇은 버전이라 별도 훅으로
   // 추출하지 않았다(두 곳뿐이라 공용 추상화를 새로 만드는 게 오히려 과설계).
@@ -352,6 +363,7 @@ export function BracketScheduleTab({ tournamentId }: { tournamentId: string }) {
   return (
     <ScheduleContent
       tournamentId={tournamentId}
+      isRegularLeague={isRegularLeague}
       data={combined}
       hasNextPage={hasNextPage}
       isFetchingNextPage={isFetchingNextPage}
@@ -370,6 +382,13 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
   // 정규 리그 거울 행은 format='group_knockout' 이다(백필·dual-write 가 format 을 안 쓴다).
   // 그래서 format 만 보면 ① 리그 순위 칼럼이 안 그려지고 ② 없는 대진표를 그리려 든다.
   const isLeague = isLeagueCompetition(tournament);
+  /**
+   * **위 `isLeague` 와 뜻이 다르다.** `isLeague` 는 *"리그처럼 그릴까"*(리그 방식 대회
+   * 포함)이고, 이쪽은 *"정규 리그 시즌인가"* 다. 어휘 교체는 사용자가 **정규 리그에만**
+   * 적용하라고 확정했으므로(2026-09-01) `kind` 로 묻는다 — `isLeague` 를 쓰면 리그 방식
+   * 대회 7건(alpha 실측)의 문구까지 바뀐다.
+   */
+  const isRegularLeague = tournament.kind === 'regular_league';
   const stages = buildTournamentStages(tournament);
   const [activeTab, setActiveTab] = useState<'standings' | 'schedule'>('schedule');
 
@@ -483,7 +502,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
             className="tm-seg-tab"
             onClick={() => setActiveTab('standings')}
           >
-            순위 · 대진표
+            {isRegularLeague ? '리그 순위' : '순위 · 대진표'}
           </button>
         </div>
       </div>
@@ -496,7 +515,12 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
         // 늘어나는데 안의 팀명·점수는 중앙 정렬 고정이라 좌우로 각각 300px 가까이 비었다.
         // 읽기 좋은 폭으로 묶어 가운데 세운다(제약은 globals.css, ≥1024에서만 적용).
         <div className="tm-bracket-schedule-pane">
-          <BracketScheduleTab tournamentId={tournament.id} />
+          {/* ⚠️ `kind` 로만 판정한다 — `isLeagueCompetition` 은 `format === 'league'` 인
+              리그 방식 대회도 true 라(alpha 62건 중 7건) 그 대회들의 어휘까지 바꾼다. */}
+          <BracketScheduleTab
+            tournamentId={tournament.id}
+            isRegularLeague={isRegularLeague}
+          />
         </div>
       ) : (
         <>

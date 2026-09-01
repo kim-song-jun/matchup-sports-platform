@@ -603,3 +603,46 @@ describe('ScheduleContent — 몰수·중단 배지', () => {
     expect(screen.queryByText(/킥오프 15분 경과까지 미출석/)).not.toBeInTheDocument();
   });
 });
+
+/**
+ * **리그 어휘(2026-09-01 사용자 확정 — B안).**
+ *
+ * 리그 대진은 `round` 가 'N주차' 라 `isGroupStage` 가 false 가 되어 **전부 `knockout` 단계로
+ * 분류된다.** 그 단계 이름이 필터 칩과 `section aria-label` 로 **보이는데**, 대회 어휘인
+ * '결선' 은 리그에 존재하지 않는 단계다.
+ *
+ * ⚠️ 이 describe 는 **변이로 구멍을 확인하고 나서** 썼다: `LEAGUE_PHASE_LABELS.knockout` 을
+ * '결선' 으로 되돌려도 프론트 308개가 전부 통과했다. 사용자가 고른 바로 그 문구를 아무도
+ * 지키지 않고 있었다.
+ *
+ * 상수만 보는 순수 함수 테스트로는 부족하다 — `ScheduleContent` 가 `phaseLabels` 를 넘기지
+ * 않으면 상수가 맞아도 화면엔 '결선' 이 뜬다. 그래서 **렌더해서 본다.**
+ */
+describe('ScheduleContent — 정규 리그 단계 어휘', () => {
+  const leagueData = () =>
+    makeData({ items: [fixtureEntry({ round: '1주차', groupName: null })] });
+
+  it('리그면 단계 칩을 "정규 라운드" 로 부른다 — 리그엔 결선이 없다', () => {
+    render(<ScheduleContent tournamentId="league-1" data={leagueData()} isRegularLeague />);
+
+    expect(screen.getByRole('tab', { name: '정규 라운드' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: '결선' })).not.toBeInTheDocument();
+  });
+
+  it('대조군: 대회는 "결선" 그대로 — 리그 방식 대회 7건의 문구를 바꾸지 않는다', () => {
+    render(<ScheduleContent tournamentId="tour-1" data={leagueData()} />);
+
+    expect(screen.getByRole('tab', { name: '결선' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: '정규 라운드' })).not.toBeInTheDocument();
+  });
+
+  /**
+   * 칩만 보면 놓치는 자리 — 단계 제목은 `phases.length > 1` 이라 화면에서 숨겨지는데
+   * `section aria-label` 로는 **항상** 나간다. 스크린리더 사용자에게만 '결선' 이 들린다.
+   */
+  it('section aria-label 에도 리그 어휘가 들어간다 — 눈에 안 보이는 자리', () => {
+    render(<ScheduleContent tournamentId="league-1" data={leagueData()} isRegularLeague />);
+
+    expect(screen.getByRole('region', { name: '정규 라운드' })).toBeInTheDocument();
+  });
+});

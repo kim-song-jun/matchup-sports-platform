@@ -816,3 +816,104 @@ step  V1 API unit tests                    ← 여기는 jest --selectProjects u
 2. `sitemap` · `robots` 에서 `/league-matches` 제거
 3. 앱 안의 `/league-matches` 링크 정리 (7절의 알림 `deepLink` 3파일과 **별개** — 그쪽은 화면 링크가 아니다)
 4. 종료 증명: `/league-matches` → 308 · 목적지 `?kind=league` · **상세(`/league-matches/:id`)는 200 유지**
+
+## 11. 리그 일정 표면(`/schedule`·`/bracket`) — **API만 고치면 된다는 전제가 틀렸다**
+
+`/tournaments/:id` 가 거울 행을 받도록 넓어지면서 두 하위 화면이 깨졌다. 원인은 **API 하나**
+(`/tournaments/:id/schedule` 가 `TOURNAMENT_KINDS` 게이트에서 404)이고, 두 화면은 같은
+`ScheduleContent` + `usePublicTournamentSchedule` 을 쓰므로 그 API 를 고치면 함께 낫는다.
+
+**그런데 API 만으로는 끝나지 않는다.** 아래 두 가지는 프론트 변경을 요구한다 — 착수 전에 안
+것과 구현 후에 안 것의 차이가 크므로 여기 박아 둔다.
+
+### 11-1. 단계 어휘(`조별리그`/`결선`)는 **프론트 상수**다
+
+```
+schedule-grouping.ts:59-62   phases = [ '조별리그', '결선' ]      ← 하드코딩
+schedule-grouping.ts:31      entry.round.startsWith('조별')       ← 이 문자열이 분류만 한다
+buildScheduleFilters:126     filters.push({ label: phase.label })
+schedule-content.tsx:646     filters.length > 1 → 칩 렌더
+```
+
+API 가 주는 `round` 는 **두 하드코딩 중 하나를 고르게 할 뿐**이고, 리그엔 둘 다 맞지 않는다.
+리그는 `isGroupStage` 가 false 라 전부 `결선` 으로 들어가고, 단계 제목 자체는
+`phases.length > 1` 조건에 막혀 숨겨지지만 **필터 칩과 `section aria-label` 로는 그대로 보인다.**
+
+**실행으로 확인한 것**(임시 vitest 프로브 4/4, 확인 후 삭제):
+
+| 입력 | 결과 |
+|---|---|
+| `round: ''` | 단계 라벨 `결선` |
+| `groupName: '1부'` | 그룹 `1부` · 단계는 여전히 `결선` |
+| `groupName: null` | 그룹 라벨이 `round` 로 떨어진다 — **`round` 는 보이는 값이다** |
+| `round: null` | `TypeError` — **null 로 둘 수 없다**(`types.ts:108` 이 `string` non-null) |
+
+> ⚠️ 첫 실행에서 3건이 실패했는데 프로브가 `...over` 를 빠뜨린 **vacuous 테스트**였다.
+> 실패가 안 났으면 틀린 결론을 문서에 적을 뻔했다 — 오버라이드가 실제로 먹었는지 먼저 본다.
+
+### 11-2. `registrationId` — **선례가 둘이고 서로 반대다.** 어느 필드인지로 갈린다
+
+처음 이 절을 쓸 때 선례를 **하나만** 보고 *"담지 않는 것이 이 저장소의 규약"* 이라고 적었다.
+**틀렸다.** 같은 저장소에 정반대 선례가 있고, 하필 **이 작업이 고칠 바로 그 파일**에 있다.
+
+| 자리 | 결정 | 근거(코드 주석 원문) |
+|---|---|---|
+| `PublicSideSummary`<br>(`home`/`away`) | **`teamId` 를 담는다** | *"리그 대진은 등록(registration) 개념이 없다 — teamId 를 그대로 안정적 id 로 쓴다"*<br>`public-tournament-records.service.ts` `getLeagueFixtureRecord` |
+| 통합 순위 행 | **담지 않는다** | *"teamId 를 `registrationId` 라는 이름에 담으면 값은 전달되지만 이름이 내용과 갈린 상태가 남고, 나중에 그 값으로 등록을 조회하는 코드가 생기는 순간 터진다"*<br>`tournaments-read.service.ts` `leagueOverallStandings` |
+
+**둘 다 옳다 — 묻는 것이 다르기 때문이다.** `PublicSideSummary` 의 `registrationId` 는 소비처에서
+**행을 식별하는 안정 id** 로만 쓰이고(그래서 teamId 를 넣어도 이름과 내용이 갈리지 않는다),
+순위 행의 그것은 **나중에 등록을 조회할 값**으로 읽힐 수 있다(그래서 갈린다).
+
+**그래서 이 작업의 결론:**
+- `items[].home` / `items[].away` → **`teamId` 를 담는다.** 같은 파일의 기존 리그 경로와 같은 모양.
+- `standings[].registrationId` → 순위 쪽 선례를 따른다. 프론트가 `#896` 처럼 유니온을 받아야 하고,
+  그 프론트 변경이 함께 필요하다. `schedule-content.tsx:505` 가 그 값을 React key 로 쓴다.
+
+> **교훈:** 선례를 인용할 때 **하나를 찾고 멈추지 않는다.** 반대 선례가 있는지 먼저 세고,
+> 있으면 *"어느 쪽이 맞나"* 가 아니라 **"둘은 어떤 질문에 답하고 있나"** 로 가른다.
+
+### 11-3. 23필드 대응표 — 세 번째 칸이 지뢰를 잡는다
+
+| 필드 | 리그에 개념이 있나 | 넣을 값 | **화면에서 무엇으로 읽히나** |
+|---|---|---|---|
+| `fixtureId` | ✅ | `teamMatch.id` | 경기 식별 |
+| `scheduledAt` / `venue` | ✅ | `startAt` / `placeName` | 일시·장소 |
+| `home` / `away` | ✅ | 팀 조인 | ⚠️ **`teamName` 절대 null 금지** — 아래 참조 |
+| `status` · `score` · `clock` · `resultState` · `scoreStatus` · `periodBreak` · `outcome` | ✅ | game 기반(대회와 같은 소스) | 상태·점수·시계 |
+| `round` | ⚠️ 라운드로빈 | **`'N주차'`** — 기존 규약(아래) | 단계 분류 + **그룹 제목**(groupName 이 null 이므로) |
+| `groupId` | ⚠️ 다조 리그 존재 | standings 에선 **string 필수** | `groups.get(row.groupId)` Map 키 |
+| `groupName` | ⚠️ | **items 는 `null`** — 기존 규약<br>standings 는 `tierLabel`(55/88) + 폴백 | items: round 가 대신 보인다<br>standings: 섹션 제목 |
+| `fixtureNumber` / `legNumber` | ❌ | 순번 / `1` | 정렬 · 차전 표시 |
+| `fieldId` / `fieldName` | ❌ | `null` | 구장 표시 |
+| `scorers` / `cards` | ⚠️ 신원 연동 없음 | `[]` | "기록 없음" |
+| `hasVideo` | ⚠️ | `false` | 영상 배지 없음 |
+| `registrationId` | ❌ | **11-2 참조** | 순위표 React key |
+
+> **`round`·`groupName` 은 새로 정하지 않는다 — 이 파일에 이미 규약이 있다.**
+> `getLeagueFixtureRecord`(같은 서비스)가 리그 경기 공개 기록을 낼 때 이미
+> `round: \`${weekNumber}주차\`` · `groupName: null` 을 쓴다(`resolveLeagueWeekNumber` 재사용).
+> 주석도 같은 말을 한다 — *"헤더가 `groupName ?? round` 를 찍으므로 round 가 그대로 보인다"*.
+> 그 결과 **주차별로 묶인 일정**이 되는데, 리그에 자연스러운 구획이다. 새 어휘를 발명하면
+> 같은 리그가 화면마다 다른 말로 불린다.
+>
+> 팀명도 마찬가지다 — `hostTeam` / `approvedApplicantTeam` 관계로 직접 읽는다
+> (`league.teams` 맵을 새로 만들 필요가 없다). 같은 주석이 **리그는 참가팀을 가리지 않는다**
+> 고 못박고 있어 `hideIdentity` 분기 자체가 리그엔 없다.
+
+**`teamName` 을 null 로 두면 안 되는 이유**(`schedule-content.tsx:736`):
+
+```tsx
+const hasHiddenIdentity =
+  data.items.some((e) => (e.home && e.home.teamName === null) || ...) || ...
+```
+
+대회에서 null 은 **가림**이고 리그에서 null 은 **미정**인데 **화면은 둘을 구분하지 못한다** —
+리그에 *"팀명이 가려졌다"* 배너가 잘못 뜬다. 상대 미정 대진은 `unscheduled` 에 넣지 말고
+아예 제외한다.
+
+### 11-4. `bracketPublished` 는 **`true`** 로 준다
+
+`false` 로 주면 `schedule-content.tsx:725` 가 리그에 *"대진표가 아직 공개되지 않았어요"* 를
+**영원히** 그린다. 이 응답 필드의 소비처는 그 한 곳뿐이고(나머지는 어드민 축의
+`bracketPublishedAt` 으로 다른 필드다), 여기서 `true` 의 뜻은 *"이 게이트는 리그에 해당 없다"* 다.

@@ -846,6 +846,25 @@ describe('BracketPageContent — 정규 리그 거울 행(format=group_knockout,
     expect(screen.queryByText('경기 일정이 아직 없어요.')).not.toBeInTheDocument();
   });
 
+  /**
+   * 사용자 확정값은 *"tierLabel(1부/2부)을 쓰고 없으면 '리그 순위'"* 인데 이 화면은
+   * `'리그 순위'` 를 박아 두고 있었다 — **alpha 실측 55/88건이 티어 리그**이고 그 전부에서
+   * `'1부'`·`'2부'` 가 안 보였다. 같은 리그가 `/schedule` 에선 보이고 여기선 안 보였다.
+   */
+  it('티어가 있으면 순위 제목이 "2부" 다 — 사용자 확정값을 이 화면에도 적용한다', async () => {
+    const tiered = { ...leagueSchedule(), standings: [{ ...leagueSchedule().standings[0], groupName: '2부' }] };
+    renderBracketStandingsTab(mirrorLeague(), tiered as never);
+
+    expect(await screen.findByRole('heading', { name: '2부' })).toBeInTheDocument();
+  });
+
+  it('대조군: 티어가 없으면 "리그 순위" 그대로', async () => {
+    renderBracketStandingsTab(mirrorLeague(), leagueSchedule() as never);
+
+    expect(await screen.findByRole('heading', { name: '리그 순위' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '2부' })).not.toBeInTheDocument();
+  });
+
   it('안내 문구에서 조별리그·결선을 말하지 않는다', () => {
     renderBracketPage(mirrorLeague());
 

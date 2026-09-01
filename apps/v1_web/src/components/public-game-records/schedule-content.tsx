@@ -535,7 +535,7 @@ export function toStandingsRows(rows: readonly PublicStandingRow[]): TournamentS
  * 단발 리그의 `groupName` 이 "리그 순위" 라, 그대로 조합하면 스크린리더가
  * *"리그 순위 순위표"* 로 읽는다(눈으로는 안 보이는 자리라 캡처로도 안 잡힌다).
  */
-function standingsAriaLabel(groupName: string, suffix: '' | '표' = ''): string {
+export function standingsAriaLabel(groupName: string, suffix: '' | '표' = ''): string {
   const base = groupName.endsWith('순위') ? groupName : `${groupName} 순위`;
   return `${base}${suffix}`;
 }

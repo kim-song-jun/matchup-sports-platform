@@ -16,7 +16,7 @@ import { dismissPushNudge, shouldShowPushNudge } from '@/lib/session-storage';
 import { buildPhoneVerifyHref } from '@/components/auth/phone-verification/phone-verify-route';
 import type { V1ResolveLocationResponse } from '@/types/api';
 import { HomePageView } from './home-page';
-import { toHomeChatRooms, toHomeModel, withoutHomeContent } from './home-client-model';
+import { EMPTY_WEATHER, toHomeChatRooms, toHomeModel, withoutHomeContent } from './home-client-model';
 import type { HomeViewModel } from './home.types';
 import { getHomeViewModel } from './home.view-model';
 import { RECORD_CONSENT_POLICY_HASH } from '@/lib/record-consent';
@@ -164,7 +164,7 @@ export function HomePageClient() {
             chatUnreadCount,
             chatStatus,
             chatRooms: chatRoomSummaries,
-            weather: weather ?? fallback.weather,
+            weather: weather ?? EMPTY_WEATHER,
             weatherPermission,
             weatherRefreshing,
             refreshWeather,
@@ -195,7 +195,7 @@ export function HomePageClient() {
                 phoneVerifyNudge,
                 chatRetry: () => void chatRooms.refetch(),
               }
-            : { ...nonDataFallback, chatUnreadCount, chatStatus, chatRooms: chatRoomSummaries, weather: weather ?? fallback.weather, weatherPermission, weatherRefreshing, refreshWeather, phoneVerifyNudge, chatRetry: () => void chatRooms.refetch() }
+            : { ...nonDataFallback, statsLoading: true, chatUnreadCount, chatStatus, chatRooms: chatRoomSummaries, weather: weather ?? EMPTY_WEATHER, weatherPermission, weatherRefreshing, refreshWeather, phoneVerifyNudge, chatRetry: () => void chatRooms.refetch() }
         }
       />
     </>

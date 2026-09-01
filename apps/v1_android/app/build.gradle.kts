@@ -38,7 +38,7 @@ android {
             dimension = "environment"
             applicationIdSuffix = ".alpha"
             versionNameSuffix = "-alpha"
-            resValue("string", "app_name", "Teameet Alpha")
+            resValue("string", "app_name", "팀밋")
             manifestPlaceholders["appHost"] = "alpha.teameet.co.kr"
             manifestPlaceholders["appLinksAutoVerify"] = "false"
             buildConfigField("boolean", "WEBVIEW_DEBUGGING_ENABLED", "true")
@@ -51,7 +51,7 @@ android {
         }
         create("production") {
             dimension = "environment"
-            resValue("string", "app_name", "Teameet")
+            resValue("string", "app_name", "팀밋")
             manifestPlaceholders["appHost"] = "teameet.co.kr"
             manifestPlaceholders["appLinksAutoVerify"] = "true"
             buildConfigField("boolean", "WEBVIEW_DEBUGGING_ENABLED", "false")

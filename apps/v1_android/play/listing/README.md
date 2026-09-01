@@ -6,14 +6,13 @@ must never be submitted as product evidence.
 
 ## Graphics
 
-- `graphics/play-icon-512.png`: 512×512 Play icon, derived from
-  `docs/reference/app-icons-v4/06-orbit-match-blue.png`.
+- `graphics/play-icon-512.png`: 512×512 Play icon, rendered from the repository-owned adaptive `팀밋` wordmark and brand color.
 - `graphics/feature-graphic-1024x500.png`: 1024×500 Play feature graphic.
 - Device screenshots are intentionally absent until the physical-device matrix is complete.
 
 Feature graphic generation prompt:
 
-> Create a polished Google Play Store feature graphic for Teameet, a Korean community app that
+> Create a polished Google Play Store feature graphic for 팀밋, a Korean community app that
 > helps amateur sports players find matches, teams, venues, and lessons. Exact target composition:
 > 1024×500 landscape. Clean premium product-brand style, not a phone mockup and not a screenshot.
 > Use a vivid royal blue (#3483F5-like), deep navy (#111827-like), white, and very subtle cool gray.

@@ -5,7 +5,7 @@ import { seedCompetitionConfigVersions } from '../../src/tournaments/competition
 import { leagueMirrorCreateData } from '../../src/tournaments/league-competition-mirror';
 
 /**
- * **거울 행의 통합 순위 — `getOverallStandings` 가 리그 축에서 계산한다.**
+ * **거울 행의 공개 조회 — 순위와 상세 둘 다 리그 축에서 만든다.**
  *
  * R1 이후 `v1_tournaments` 에는 정규 리그 시즌의 거울 행(`kind = 'regular_league'`, **id 가
  * 리그 id 와 같다**)이 함께 산다. 그 행에는 조(`V1TournamentGroup`)도 대진
@@ -169,6 +169,26 @@ describe('통합 순위 — 정규 리그 거울 행 (real DB)', () => {
     expect(res.magicNumber).toBeNull();
     expect(res.recalculatedAt).toBeNull();
   });
+
+  it('상세 조회가 열린다 — 거울 행 id 로 200 이고, 리그 대진이 실려 온다', async () => {
+    // **문(get 게이트)이 열렸는지**를 보는 단언이다. 닫혀 있으면 TOURNAMENT_NOT_FOUND 다.
+    const detail = (await read.get(ids.league)) as {
+      id: string;
+      kind: string | null;
+      fixtures: unknown[];
+      leagueFixtures: Array<{ teamMatchId: string; placeName: string; status: string }>;
+    };
+
+    expect(detail.id).toBe(ids.league);
+    expect(detail.kind).toBe('regular_league');
+
+    // 대회 축 대진은 거울에 하나도 없다 — 그래서 리그 축 목록이 필요했다.
+    expect(detail.fixtures).toEqual([]);
+    // 취소·무효 대진도 **목록에는 남는다**(순위에서만 빠진다). 심은 3개가 다 나와야 한다.
+    expect(detail.leagueFixtures).toHaveLength(3);
+    expect(detail.leagueFixtures.every((f) => f.placeName === '미정')).toBe(true);
+  });
+
 
   it('진행률 — 무효 대진은 played 에도 remaining 에도 세지 않는다', async () => {
     const res = await read.getOverallStandings(ids.league);

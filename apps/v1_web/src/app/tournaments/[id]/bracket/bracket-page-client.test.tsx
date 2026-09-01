@@ -67,6 +67,7 @@ function makeTournament(overrides: Partial<V1TournamentDetail> & Pick<V1Tourname
     pendingPaymentCount: 0,
     groups: [],
     fixtures: [],
+    leagueFixtures: [],
     announcements: [],
     sponsors: [],
     reviews: [],

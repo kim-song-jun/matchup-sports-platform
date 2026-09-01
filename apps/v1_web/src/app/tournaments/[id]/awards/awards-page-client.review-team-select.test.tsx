@@ -106,6 +106,7 @@ function makeCompletedTournament(overrides: Partial<V1TournamentDetail> = {}): V
     pendingPaymentCount: 0,
     groups: [],
     fixtures: [],
+    leagueFixtures: [],
     announcements: [],
     sponsors: [],
     reviews: [],

@@ -3,6 +3,7 @@ import {
   resolveParticipantDisplayName,
   type ParticipantNameProfileRow,
 } from '../games/public-records/participant-name-gating';
+import type { LeagueFixtureListItem } from '../league-matches/league-fixture-list-source';
 import type { TournamentDetailRow } from './tournaments-read.query';
 import { resolveTournamentFixtureOfficialResult } from './tournament-fixture-official-result';
 
@@ -101,6 +102,17 @@ export function presentTournamentDetail(
   row: TournamentDetailRow,
   now: Date = new Date(),
   staffBypass = false,
+  /**
+   * 정규 리그 시즌(거울 행)의 대진 목록. **호출부가 리그 축에서 조회해 넘긴다** —
+   * 이 presenter 는 조회하지 않는다.
+   *
+   * ⚠️ **`fixtures` 에 합치지 않는다.** 대회 `V1TournamentFixture` 와 리그
+   * `V1LeagueFixture` 는 겹치는 필드가 셋뿐이고, 하필 그 겹치는 `status` 의 **값 영역이
+   * 다르다**(`scheduled|completed` vs `matched|completed|cancelled|…`). 같은 이름에 다른
+   * 것을 담으면 `status === 'scheduled'` 같은 코드가 **모든 리그 경기에서 조용히 거짓**이
+   * 된다 — 타입도 값도 정상으로 보인다. 그래서 별도 필드로 낸다.
+   */
+  leagueFixtures: LeagueFixtureListItem[] = [],
 ) {
   // Task 109 Track 6: bracketPublishedAt이 null이면 대진표(조/픽스처)를 관리자가 아직
   // 일괄 공개하지 않은 상태 — 공개 조회에서는 groups/fixtures를 빈 배열로 감춘다.
@@ -109,6 +121,16 @@ export function presentTournamentDetail(
   // 예약 공개는 스케줄러 없이 여기서 판정한다. 예약 시각이 지났으면 아직
   // bracketPublishedAt이 비어 있어도 공개로 간주하므로, 예약 시각과 실제 노출 사이에
   // cron 주기만큼의 지연이 생기지 않는다.
+  //
+  // **리그 거울에 예외를 두지 않는다 — 둘 필요가 없다.** 처음엔 `kind === regular_league`
+  // 면 이 게이트를 건너뛰게 짰는데, 변이 검증에서 그 분기를 없애도 **red 가 0건**이었다.
+  // 확인해보니 리그 대진은 이 게이트 **밖**의 `leagueFixtures` 로 나가고, 게이트가 가리는
+  // `groups`/`fixtures` 는 거울 행에서 어차피 비어 있다 — 즉 그 예외는 **아무것도 하지
+  // 않는 코드**였다. 필드를 나눈 설계(②)가 이미 그 문제를 풀어 놓은 것이다.
+  //
+  // 그래서 여기 리그 분기를 **다시 넣지 마라.** "리그의 대진표를 아직 공개하지 않은 상태"
+  // 는 존재하지 않지만(`league-match-public.service.ts` 에 이 게이트 참조가 0건),
+  // 그 사실은 리그 데이터가 이 게이트를 지나지 않는 것으로 이미 지켜진다.
   const bracketPublished = isBracketPublished(row.bracketPublishedAt, row.bracketPublishScheduledAt, now);
   // 참가팀 공개 정책 통일(fix/v1-publish) — participantTeams와 groups/fixtures의 팀명이
   // 같은 조건으로 감춰진다. 대진표 공개 여부(bracketPublished)와는 독립 — 대진표는
@@ -353,6 +375,12 @@ export function presentTournamentDetail(
       recipientName: presentAwardRecipientName(award),
       teamName: award.teamName ?? null,
       note: award.note ?? null,
+    })),
+    // 정규 리그 시즌에만 채워진다. 대회는 항상 빈 배열 — 화면이 길이 0이면 이 섹션을
+    // 아예 그리지 않는다(`fixtures` 와 같은 규약).
+    leagueFixtures: leagueFixtures.map((fixture) => ({
+      ...fixture,
+      startAt: fixture.startAt.toISOString(),
     })),
   };
 }

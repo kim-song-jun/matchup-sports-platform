@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppChrome } from '@/components/v1-ui/shell';
-import { Card, ErrorState } from '@/components/v1-ui/primitives';
+import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { FormattedText } from '@/components/v1-ui/formatted-text';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { Trophy, Goal, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -20,6 +20,7 @@ import { getSportAccent } from '@/lib/v1-sport-accent';
 import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
 import { splitPrizeSegments, isPrizeAmountValue, formatPrizeRowValue } from '@/lib/prize-breakdown';
 import { TournamentBracket } from '@/components/tournaments/tournament-bracket';
+import { LeagueFixtureCard } from '@/components/tournaments/league-fixture-card';
 import {
   CompetitionFixtureCard,
   CompetitionFixtureVenue,
@@ -1630,12 +1631,18 @@ function StandingsMovedNotice({ tournamentId }: { tournamentId: string }) {
  * 로딩 중에는 조용히 아무것도 렌더하지 않고(레이아웃 흔들림 방지), 실패 시에는 기존
  * `ErrorState`를 재사용한다.
  */
-function LeagueStandingsSection({ tournamentId }: { tournamentId: string }) {
-  const [state, setState] = useState<
-    | { status: 'loading' }
-    | { status: 'error' }
-    | { status: 'success'; data: LeagueStandingsTableData }
-  >({ status: 'loading' });
+type LeagueStandingsState =
+  | { status: 'loading' }
+  | { status: 'error' }
+  | { status: 'success'; data: LeagueStandingsTableData };
+
+/**
+ * 통합 순위 조회. **한 번만 부르고 두 곳이 쓴다** — 순위표가 그리고, 일정 카드가 팀 이름을
+ * 여기서 얻는다(리그 대진은 팀 id 만 실려 오고 이름은 순위 응답에 있다. 리그 자기 페이지가
+ * 쓰는 방식 그대로다). 두 번 부르면 같은 화면이 같은 데이터를 두 번 가져온다.
+ */
+function useLeagueOverallStandings(tournamentId: string) {
+  const [state, setState] = useState<LeagueStandingsState>({ status: 'loading' });
   const [retryToken, setRetryToken] = useState(0);
 
   useEffect(() => {
@@ -1654,25 +1661,100 @@ function LeagueStandingsSection({ tournamentId }: { tournamentId: string }) {
     };
   }, [tournamentId, retryToken]);
 
+  return { state, retry: () => setRetryToken((n) => n + 1) };
+}
+
+function LeagueStandingsSection({
+  state,
+  onRetry,
+}: {
+  state: LeagueStandingsState;
+  onRetry: () => void;
+}) {
   if (state.status === 'loading') return null;
 
   if (state.status === 'error') {
     return (
       <section aria-label="통합 순위표" style={{ marginTop: 24 }}>
-        <ErrorState message="순위표를 불러오지 못했어요." onRetry={() => setRetryToken((n) => n + 1)} />
+        <ErrorState message="순위표를 불러오지 못했어요." onRetry={onRetry} />
       </section>
     );
   }
-
-  const { data } = state;
 
   return (
     <section aria-labelledby="league-standings-heading" style={{ marginTop: 24 }}>
       <div id="league-standings-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
         통합 순위
       </div>
-      <LeagueStandingsTable data={data} />
+      <LeagueStandingsTable data={state.data} />
     </section>
+  );
+}
+
+/**
+ * 정규 리그 시즌 화면의 좌측 섹션 — 통합 순위 + 일정.
+ *
+ * `FormatLeftSections` 안의 분기로 두지 않고 컴포넌트로 뺀 이유는 **훅 때문**이다. 순위
+ * 조회를 두 소비처(순위표·일정의 팀 이름)가 함께 써야 하는데, 분기 안에서 훅을 부르면
+ * 조건부 호출이 된다.
+ */
+function LeagueSections({ tournament }: { tournament: V1TournamentDetail }) {
+  const { state, retry } = useLeagueOverallStandings(tournament.id);
+
+  // 팀 이름은 대진에 실려 오지 않는다(팀 id 만 온다) — 순위 응답에서 붙인다. 리그 자기
+  // 페이지가 쓰는 방식과 같다. 순위 조회가 실패하면 빈 Map 이 되고 카드는 fallback 문구를
+  // 보여준다 — 일정 섹션이 통째로 깨지지 않는다.
+  const teamNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    if (state.status !== 'success') return map;
+    for (const row of state.data.standings) {
+      if (row.teamId) map.set(row.teamId, row.teamName);
+    }
+    return map;
+  }, [state]);
+
+  const fixtures = tournament.leagueFixtures;
+
+  return (
+    <>
+      {/* 조가 없어도 그린다 — 리그 거울에는 조가 아예 없고, 조 개수로 게이팅하면
+          순위표가 영영 안 뜬다. 대회 쪽 동작(조 없으면 숨김)은 건드리지 않는다. */}
+      <LeagueStandingsSection state={state} onRetry={retry} />
+
+      {fixtures.length > 0 ? (
+        <section aria-labelledby="fixtures-heading" style={{ marginTop: 24 }}>
+          <div id="fixtures-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
+            일정 · 대진
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+            {fixtures.map((fixture) => (
+              <LeagueFixtureCard
+                key={fixture.teamMatchId}
+                fixture={fixture}
+                homeLabel={teamNameById.get(fixture.homeTeamId) ?? '홈팀 정보 없음'}
+                awayLabel={
+                  fixture.awayTeamId === null
+                    ? '상대팀 미정'
+                    : teamNameById.get(fixture.awayTeamId) ?? '상대팀 정보 없음'
+                }
+              />
+            ))}
+          </div>
+        </section>
+      ) : (
+        /* 대회용 `FixturesPlaceholder` 를 쓰지 않는다 — 그건 "대회 시작 전에 대진표가
+           공개돼요" 라고 적는데, 진행 중인 리그 시즌에 그 말이 뜨면 **틀린 말을 확신 있게**
+           하는 것이다. 리그에는 "대진표 공개" 라는 사건이 없고 "대진 확정" 이 있다.
+           문구는 리그 일정 목록(league-match-standings-client.tsx)이 같은 상황에 쓰는 것을
+           그대로 가져왔다 — 두 화면이 같은 상황을 다르게 부르지 않게. */
+        <section aria-labelledby="fixtures-empty-heading" style={{ marginTop: 24 }}>
+          <div id="fixtures-empty-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
+            일정 · 대진
+          </div>
+          <EmptyState title="아직 등록된 경기가 없어요" sub="대진이 확정되면 경기 일정이 여기에 나타나요." />
+        </section>
+      )}
+    </>
   );
 }
 
@@ -1692,28 +1774,8 @@ function FormatLeftSections({ tournament }: { tournament: V1TournamentDetail }) 
     hasAnyFixtures,
   } = partitionTournamentSections(format, fixtures, groups);
 
-  if (isLeagueCompetition(tournament)) {
-    return (
-      <>
-        {hasGroupStandings ? <LeagueStandingsSection tournamentId={tournament.id} /> : null}
-
-        {hasAnyFixtures ? (
-          <section aria-labelledby="fixtures-heading" style={{ marginTop: 24 }}>
-            <div id="fixtures-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
-              일정 · 대진
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
-              {fixtures.map((fixture) => (
-                <FixtureCard key={fixture.id} fixture={fixture} />
-              ))}
-            </div>
-          </section>
-        ) : (
-          <FixturesPlaceholder />
-        )}
-      </>
-    );
-  }
+  // 리그 시즌은 조도 대회 대진도 없다 — 자기 축의 데이터를 쓰는 전용 섹션으로 보낸다.
+  if (isLeagueCompetition(tournament)) return <LeagueSections tournament={tournament} />;
 
   /* knockout: bracket only — nothing in left sections, bracket goes to bleed */
   if (format === 'knockout') {

@@ -4386,6 +4386,20 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 
 /* 목록 컨테이너가 비었을 때만 스크롤 영역 높이를 채워 자식(.tm-empty-state-fill)이
    남은 공간의 중앙에 놓이게 한다. */
+/*
+ * 화면에 따라 목록과 스크롤 영역 사이에 래퍼가 하나 더 있다(공지의 .tm-notice-page —
+ * display:block, flex:0 이라 flex 사슬이 거기서 끊긴다: alpha 실측에서 목록이 420px 에
+ * 머물러 콘텐츠가 62px 아래로 치우쳤다). 빈 상태를 품은 래퍼만 골라 사슬에 넣는다.
+ *
+ * `display: contents` 인 pane(채팅)에는 이 규칙을 걸면 안 되므로 :has(> …) 로 뭉뚱그리지
+ * 않고 해당 래퍼를 명시한다 — contents 를 flex 로 바꾸면 데스크톱 2단 레이아웃이 깨진다.
+ */
+.tm-notice-page:has(.tm-list-empty) {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
 .tm-list-empty {
   min-height: 100%;
   /* 위 :has 규칙이 래퍼를 flex 로 만들면 이 값이 실제로 남은 높이를 받는다.

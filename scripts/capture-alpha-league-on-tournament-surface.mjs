@@ -146,35 +146,50 @@ function verdict(r) {
  * 서빙하는 것은 마지막 **성공** 배포의 SHA 다. 그래서 상태를 문자 그대로 확인한다.
  */
 async function preflight() {
-  // ① 배포가 끝났는가
-  const runRaw = execFileSync('gh', [
-    'run', 'list', '--workflow', 'deploy-alpha.yml', '--branch', 'dev', '--limit', '1',
-    '--json', 'headSha,status,conclusion',
-  ], { encoding: 'utf8' });
-  const run = JSON.parse(runRaw)[0];
-  console.log(`최근 alpha 배포: ${run?.status} / ${run?.conclusion} (${run?.headSha?.slice(0, 9)})`);
-  if (run?.status !== 'completed') {
-    throw new Error(`배포가 아직 ${run?.status} 다 — 지금 찍으면 502 를 결함으로 오진한다. 끝난 뒤 다시 돌려라`);
-  }
-
-  // ② 무엇을 서빙하고 있는가
+  // ① **무엇이 서빙되는가로 판정한다 — "최신 run 이 끝났는가" 가 아니다.**
+  //
+  // 처음엔 `gh run list --limit 1` 의 status 를 게이트로 썼는데, 그건 **최신 run** 을 보므로
+  // 내 배포가 끝난 뒤 **남의 머지가 새 배포를 띄우면 영원히 막힌다**(실측: `f7a4dbe69` 가
+  // 서빙 중인데 `9229930f3` 이 in_progress 라 통과 못 했다). 게이트의 목적은 "502 창을
+  // 피하는 것" 이고, 그건 **실제 응답을 보는 것**이 정확하다.
   const head = await fetch(`${BASE}/landing`, { method: 'HEAD' });
+  if (!head.ok) throw new Error(`landing HTTP ${head.status} — 배포 중이거나 장애다. 기다려라`);
   const serving = head.headers.get('x-teameet-commit');
-  console.log(`서빙 커밋: ${serving ?? '(헤더 없음)'}`);
+  const health = await fetch(`${API}/health`);
+  const healthy = health.ok && (await health.json())?.data?.checks?.db === true;
+  if (!healthy) throw new Error('health 체크 실패 — 배포 중이거나 DB 문제다');
+  console.log(`서빙 커밋: ${serving ?? '(헤더 없음)'} · health ok`);
 
-  // ③ 내 변경을 보고 있는가 — EXPECT_COMMIT 을 주면 조상 관계를 실제로 확인한다.
+  // ② 내 변경을 보고 있는가
   const expect = process.env.EXPECT_COMMIT;
   if (!expect) {
-    console.log('EXPECT_COMMIT 미지정 — 내 머지가 배포에 포함됐는지는 확인하지 않는다');
-    return;
+    console.log('EXPECT_COMMIT 미지정 — 내 머지 포함 여부는 확인하지 않는다');
+  } else if (!serving) {
+    throw new Error('서빙 커밋 헤더가 없어 EXPECT_COMMIT 대조를 할 수 없다');
+  } else {
+    try {
+      execFileSync('git', ['merge-base', '--is-ancestor', expect, serving], { stdio: 'ignore' });
+    } catch {
+      throw new Error(`서빙 SHA(${serving.slice(0, 9)})가 ${expect.slice(0, 9)} 를 포함하지 않는다 — 옛 빌드다`);
+    }
+    console.log(`✅ 서빙 SHA 가 ${expect.slice(0, 9)} 를 포함한다`);
   }
-  if (!serving) throw new Error('서빙 커밋 헤더가 없어 EXPECT_COMMIT 대조를 할 수 없다');
+
+  // ③ 진행 중인 배포는 **막지 않고 경고만** 한다 — 캡처 도중 서빙본이 바뀔 수 있어서
+  //    끝나고 다시 재서, 바뀌었으면 그 사실을 결과에 남긴다(조용히 섞이는 게 최악이다).
   try {
-    execFileSync('git', ['merge-base', '--is-ancestor', expect, serving], { stdio: 'ignore' });
+    const runs = JSON.parse(execFileSync('gh', [
+      'run', 'list', '--workflow', 'deploy-alpha.yml', '--branch', 'dev', '--limit', '3',
+      '--json', 'headSha,status',
+    ], { encoding: 'utf8' }));
+    const inflight = runs.filter((r) => r.status !== 'completed');
+    if (inflight.length > 0) {
+      console.log(`⚠️  배포 ${inflight.length}건 진행 중(${inflight.map((r) => r.headSha.slice(0, 9)).join(', ')}) — 캡처 중 서빙본이 바뀔 수 있다`);
+    }
   } catch {
-    throw new Error(`서빙 SHA(${serving.slice(0, 9)})가 ${expect.slice(0, 9)} 를 포함하지 않는다 — 옛 빌드를 보고 있다`);
+    console.log('(gh 조회 실패 — 진행 중 배포 확인은 건너뛴다)');
   }
-  console.log(`✅ 서빙 SHA 가 ${expect.slice(0, 9)} 를 포함한다`);
+  return serving;
 }
 
 async function main() {
@@ -182,7 +197,7 @@ async function main() {
   const league = await pickLeague();
   console.log(`대상 리그: ${league.id} (${league.note})`);
 
-  await preflight();
+  const servingBefore = await preflight();
 
   mkdirSync(OUT, { recursive: true });
   const browser = await chromium.launch();
@@ -262,6 +277,13 @@ async function main() {
     await new Promise((r2) => setTimeout(r2, 3000));
   }
   await browser.close();
+
+  // 캡처 도중 배포가 끝나 서빙본이 바뀌었으면 **결과가 두 빌드에 걸쳐 있다.**
+  const servingAfter = (await fetch(`${BASE}/landing`, { method: 'HEAD' })).headers.get('x-teameet-commit');
+  if (servingBefore && servingAfter && servingBefore !== servingAfter) {
+    console.log(`\n⚠️  캡처 중 서빙본이 바뀌었다: ${servingBefore.slice(0, 9)} → ${servingAfter.slice(0, 9)}`);
+    console.log('   결과가 두 빌드에 걸쳐 있다 — 다시 돌려라.');
+  }
 
   console.log('\n=== 화면에서 읽은 값 ===');
   console.table(rows);

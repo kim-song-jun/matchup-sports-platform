@@ -1,12 +1,7 @@
 import { readFileSync } from 'node:fs';
-import type { ReactNode } from 'react';
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import TournamentCampaignNotFound from './not-found';
-
-vi.mock('@/components/v1-ui/shell', () => ({
-  AppChrome: ({ children }: { readonly children: ReactNode }) => <>{children}</>,
-}));
 
 const campaignStyles = readFileSync(
   'src/components/tournaments/tournament-campaign-template.module.css',

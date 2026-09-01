@@ -5,7 +5,7 @@ import type { CSSProperties, PointerEvent, ReactNode } from 'react';
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, ChevronDown, Lock } from 'lucide-react';
-import { AppChrome } from '@/components/v1-ui/shell';
+import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { Card, EmptyState, ErrorState, KPIStat, ListItem } from '@/components/v1-ui/primitives';
 import { ChevronLeftIcon, ChevronRightIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
@@ -72,13 +72,13 @@ const ACTIVITY_TYPE_OPTIONS = [
 ] as const;
 
 export function TeamListPageView({ model }: { model: TeamListViewModel }) {
+  // RouteChromeConfig엔 floatingSlot 필드가 없다(정적 테이블은 ReactNode를 못 담는다,
+  // 설계 문서 §1.3) — FAB이 고정 JSX라도 항상 override로 옮긴다.
+  useShellOverride({
+    floatingSlot: <Link className="tm-floating-fab tm-hide-desktop" href="/teams/new" aria-label="팀 만들기"><PlusIcon size={26} strokeWidth={2.3} /></Link>,
+  });
   return (
-    <AppChrome
-      title="팀"
-      activeTab="teams"
-      topBar={false}
-      floatingSlot={<Link className="tm-floating-fab tm-hide-desktop" href="/teams/new" aria-label="팀 만들기"><PlusIcon size={26} strokeWidth={2.3} /></Link>}
-    >
+    <>
       {/* Desktop-only page header with inline create CTA */}
       <div className="tm-team-desktop-header tm-show-desktop">
         <h1 className="tm-team-desktop-header-title">팀</h1>
@@ -107,7 +107,7 @@ export function TeamListPageView({ model }: { model: TeamListViewModel }) {
         )}
       </div>
       {model.filterSheet?.open ? <TeamFilterSheet model={model} /> : null}
-    </AppChrome>
+    </>
   );
 }
 
@@ -132,10 +132,14 @@ function TeamListSkeleton() {
 }
 
 export function TeamStatePageView({ model }: { model: TeamStateViewModel }) {
+  // 여러 물리적 라우트(/teams, /teams/:id, /teams/:id/members)가 공유하는 에러/제한 뷰다 —
+  // title만 override로 밀어넣고 activeTab/bottomNav/backHref는 그 라우트의 route-chrome
+  // 테이블 값을 그대로 따른다(특별 규칙 불필요, 설계 문서 §1.9 "공유 에러 뷰" 절).
+  useShellOverride({ title: model.title });
   if (model.state === 'filter') return <TeamFilterPageView model={model} />;
 
   return (
-    <AppChrome title={model.title} activeTab="teams" bottomNav={false} backHref="/teams">
+    <>
       {/* Desktop back header for search/empty/error states */}
       <div className="tm-desktop-page-head tm-show-desktop">
         <Link className="tm-desktop-back" href="/teams" aria-label="팀 목록으로">
@@ -156,13 +160,18 @@ export function TeamStatePageView({ model }: { model: TeamStateViewModel }) {
           </Card>
         ) : null}
       </div>
-    </AppChrome>
+    </>
   );
 }
 
 function TeamFilterPageView({ model }: { model: TeamStateViewModel }) {
+  // 이 뷰는 어느 route-chrome 패턴에도 대응하지 않는다 — TeamListPageView가 이미 시트
+  // 기반 필터(TeamFilterSheet)를 담당하고 있어 이 전체화면 필터 뷰로 진입하는 실제 경로가
+  // 저장소에 없다(TeamFilterPageClient가 어디서도 호출되지 않는다, 죽은 경로). 그래도
+  // 렌더될 경우를 대비해 원래 static 값 그대로 override로 보존한다.
+  useShellOverride({ title: '필터' });
   return (
-    <AppChrome title="필터" activeTab="teams" bottomNav={false} backHref="/teams">
+    <>
       {/* Desktop back header */}
       <div className="tm-desktop-page-head tm-show-desktop">
         <Link className="tm-desktop-back" href="/teams" aria-label="팀 목록으로">
@@ -196,7 +205,7 @@ function TeamFilterPageView({ model }: { model: TeamStateViewModel }) {
           <Link className="tm-btn tm-btn-lg tm-btn-primary" href="/teams">{model.teams.length}개 결과 보기</Link>
         </div>
       </div>
-    </AppChrome>
+    </>
   );
 }
 
@@ -449,14 +458,17 @@ function TeamRecordLinkCard({
 
 /**
  * 팀 상세 로딩 셸. 목업 팀(teams.view-model.ts)을 그대로 렌더하던 자리를 대신한다.
- * AppChrome props 는 TeamDetailPageView 와 동일하게 유지한다.
+ * 셸 승격(U29) 이후 title/activeTab/bottomNav/backHref 는 route-chrome/fragments/teams.ts
+ * 테이블의 '/teams/:id' 항목(title: '팀 상세')이 이미 그린다 — TeamDetailPageView(성공
+ * 뷰)도 title을 override하지 않으므로 두 상태가 같은 값을 보여 헤더가 흔들리지 않는다.
+ * 그래서 본문 스켈레톤만 렌더한다.
  */
 export function TeamDetailPageSkeleton() {
   return (
-    <AppChrome title="팀 상세" activeTab="teams" bottomNav={false} backHref="/teams">
+    <>
       <p className="sr-only" role="status">팀 정보를 불러오는 중이에요.</p>
       <PageSkeleton variant="detail" />
-    </AppChrome>
+    </>
   );
 }
 
@@ -516,7 +528,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
   };
 
   return (
-    <AppChrome title="팀 상세" activeTab="teams" bottomNav={false} backHref="/teams">
+    <>
       <h1 className="sr-only">{team.name}</h1>
       {/* Desktop back header */}
       <div className="tm-desktop-page-head tm-show-desktop">
@@ -721,7 +733,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
       </div>
 
       {/* Mobile layout (unchanged) */}
-      <article className="tm-team-detail-body tm-hide-desktop">
+      <article className="tm-team-detail-body tm-hide-desktop tm-content-enter">
         <Card pad={20} className="tm-team-detail-hero-card" style={teamHeroStyle(team)}>
           <button
             className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button"
@@ -866,7 +878,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
           </button>
         )}
       </div>
-    </AppChrome>
+    </>
   );
 }
 
@@ -921,8 +933,14 @@ export function TeamFormPageView({
   const form = model.form;
   const previewSport = form?.sports.find((sport) => sport.id === form.sportId)?.name ?? team.sports[0] ?? '';
   const previewRegion = form?.regions.find((region) => region.id === form.regionId)?.name ?? team.region ?? '';
+  // title은 mode(edit/create)로만 갈리고 mode는 어느 pathname이 이 컴포넌트를 렌더했는지로
+  // 완전히 결정된다(/teams/new → create, /teams/:id/edit → edit) — fetch 의존이 아니라
+  // route-chrome 테이블에 두 pathname 각각의 정적 title로 등록돼 있다(fragments/teams.ts).
+  // backHref(cancelHref)는 `?from=my` 쿼리에 따라 달라질 수 있지만 ShellOverride엔 backHref
+  // 필드가 없어(shell-override.ts) 셸의 back 버튼은 테이블 값을 그대로 쓴다 — 콘텐츠 안의
+  // 데스크톱 back 링크(바로 아래)만 cancelHref를 그대로 반영한다(fragments/teams.ts 주석 참고).
   return (
-    <AppChrome title={edit ? '팀 수정' : '팀 만들기'} activeTab="teams" bottomNav={false} backHref={cancelHref}>
+    <>
       {/* Desktop back header */}
       <div className="tm-desktop-page-head tm-show-desktop">
         <Link className="tm-desktop-back" href={cancelHref} aria-label={edit ? '팀으로 돌아가기' : '팀 목록으로'}>
@@ -930,7 +948,7 @@ export function TeamFormPageView({
         </Link>
         <h1 className="tm-text-heading">{edit ? '팀 수정' : '팀 만들기'}</h1>
       </div>
-      <div className="tm-team-form-grid">
+      <div className="tm-team-form-grid tm-content-enter">
         <div className="tm-create-shell tm-team-form-main">
           {edit ? (
             <Card pad={16}>
@@ -1007,7 +1025,7 @@ export function TeamFormPageView({
         </aside>
       </div>
       <div className="tm-fixed-cta tm-team-form-cta tm-hide-desktop"><div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}><Link className="tm-btn tm-btn-lg tm-btn-neutral" href={cancelHref}>{edit ? '취소' : '이전'}</Link><button className="tm-btn tm-btn-lg tm-btn-primary" type="button" disabled={form?.submitting} onClick={form?.onSubmit}>{form?.submitting ? '저장 중' : edit ? '저장' : '팀 만들기'}</button></div></div>
-    </AppChrome>
+    </>
   );
 }
 
@@ -1435,7 +1453,7 @@ function TeamFormPreview({
 
 export function TeamMembersPageView({ model, backHref = '/teams' }: { model: TeamMembersViewModel; backHref?: string }) {
   return (
-    <AppChrome title="멤버 관리" activeTab="teams" bottomNav={false} backHref={backHref}>
+    <>
       {/* Desktop back header */}
       <div className="tm-desktop-page-head tm-show-desktop">
         <Link className="tm-desktop-back" href={backHref} aria-label="팀으로 돌아가기">
@@ -1443,7 +1461,7 @@ export function TeamMembersPageView({ model, backHref = '/teams' }: { model: Tea
         </Link>
         <h1 className="tm-text-heading">{model.teamName} · 멤버 관리</h1>
       </div>
-      <div className="tm-team-list tm-team-members-list">
+      <div className="tm-team-list tm-team-members-list tm-content-enter">
         <h2 className="tm-text-heading tm-hide-desktop">{model.teamName}</h2>
         <div className="tm-team-stat-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
           <Card pad={12}><KPIStat label="전체" value={model.summary.total} unit="명" /></Card>
@@ -1473,7 +1491,7 @@ export function TeamMembersPageView({ model, backHref = '/teams' }: { model: Tea
           <InvitationSection invitations={model.invitations} />
         ) : null}
       </div>
-    </AppChrome>
+    </>
   );
 }
 

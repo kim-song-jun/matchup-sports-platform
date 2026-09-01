@@ -453,7 +453,7 @@ export function TournamentInfoSection() {
       {/* 대회 정보 — 읽기 요약 하나 + 편집 진입점 하나.
           예전에는 같은 값(마감·참가비·팀 수·출전 인원·교체 방식·계좌…)을 이 카드와 아래
           요약표가 각각 그렸고, '대회 정보 수정' 버튼도 두 곳에 있었다. */}
-      <div className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] px-5 py-4 mb-6">
+      <div className="tm-content-enter bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] px-5 py-4 mb-6">
         <div className="flex items-center justify-between mb-3">
           <span className="text-[13px] font-bold text-[var(--text-strong)]">대회 정보</span>
           {canWrite && (

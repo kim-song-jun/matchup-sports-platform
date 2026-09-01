@@ -118,7 +118,7 @@ export function TournamentCampaignTab({
   const transitions = allowedTournamentCampaignTransitions(campaign.status);
 
   return (
-    <div className="grid gap-6">
+    <div className="tm-content-enter grid gap-6">
       <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5" aria-labelledby="campaign-admin-heading">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">

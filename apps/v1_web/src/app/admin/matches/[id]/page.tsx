@@ -74,7 +74,7 @@ export default function AdminMatchDetailPage() {
         action={<BackLink />}
       />
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="tm-content-enter grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
         <section className="flex min-w-0 flex-col gap-4" aria-label="매치 상세 정보">
           <article className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">

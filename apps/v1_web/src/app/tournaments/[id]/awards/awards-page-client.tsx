@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { Star, ImagePlus, X, Trophy, Medal } from 'lucide-react';
-import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { useEffect, useRef, useState } from 'react';
@@ -589,7 +589,7 @@ export function ReviewFormModal({
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {photoUrls.map((url) => (
               <div key={url} style={{ position: 'relative', width: 64, height: 64, borderRadius: 10, overflow: 'hidden', flexShrink: 0 }}>
-                <img src={publicAssetPath(url)} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <Image src={publicAssetPath(url)} alt="" loading="lazy" width={64} height={64} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 <button
                   type="button"
                   onClick={() => setPhotoUrls((prev) => prev.filter((u) => u !== url))}
@@ -676,7 +676,7 @@ export function ReviewCard({ review }: { review: V1TournamentReview }) {
         <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
           {photoUrls.map((url) => (
             <a key={url} href={publicAssetPath(url)} target="_blank" rel="noreferrer" style={{ display: 'block', width: 72, height: 72, borderRadius: 'var(--radius-chip)', overflow: 'hidden', flexShrink: 0 }}>
-              <img src={publicAssetPath(url)} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <Image src={publicAssetPath(url)} alt="" loading="lazy" width={72} height={72} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </a>
           ))}
         </div>
@@ -971,32 +971,17 @@ export function AwardsPageClient({ tournamentId }: { tournamentId: string }) {
   const { data, isLoading, isError, error, refetch } = useV1Tournament(tournamentId);
 
   if (isLoading) {
-    return (
-      <AppChrome title="시상·리뷰" backHref={`/tournaments/${tournamentId}/results`} activeTab="tournaments" desktopHead>
-        <AwardsPageSkeleton />
-      </AppChrome>
-    );
+    return <AwardsPageSkeleton />;
   }
 
   if (isError || !data) {
     const msg = extractErrorMessage(error, '대회 정보를 불러오지 못했어요.');
     return (
-      <AppChrome title="시상·리뷰" backHref={`/tournaments/${tournamentId}/results`} activeTab="tournaments" desktopHead>
-        <div style={{ padding: '40px 20px' }}>
-          <ErrorState message={msg} onRetry={() => void refetch()} />
-        </div>
-      </AppChrome>
+      <div style={{ padding: '40px 20px' }}>
+        <ErrorState message={msg} onRetry={() => void refetch()} />
+      </div>
     );
   }
 
-  return (
-    <AppChrome
-      title="시상·리뷰"
-      backHref={`/tournaments/${tournamentId}/results`}
-      activeTab="tournaments"
-      desktopHead
-    >
-      <AwardsPageContent tournament={data} />
-    </AppChrome>
-  );
+  return <AwardsPageContent tournament={data} />;
 }

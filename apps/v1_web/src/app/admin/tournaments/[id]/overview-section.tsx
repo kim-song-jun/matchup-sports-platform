@@ -47,7 +47,7 @@ export function TournamentOverviewSection() {
   const counts = tournament.operationCounts;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="tm-content-enter flex flex-col gap-6">
       {/* 상태 밴드 — 상태 pill 과 "지금 무엇을 기다리는가" 한 줄 */}
       <section
         aria-label="대회 진행 상태"

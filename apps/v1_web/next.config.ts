@@ -54,7 +54,14 @@ const nextConfig: NextConfig = {
   // 404s. Skipping the redirect lets the rewrite match the original request as-is.
   skipTrailingSlashRedirect: true,
   experimental: {
-    optimizePackageImports: ['@tanstack/react-query'],
+    // lucide-react는 134곳 전부 named import — 이 옵션 하나로 Next가 빌드 시점에
+    // 개별 아이콘 딥 임포트로 자동 변환한다(호출부 수정 불필요).
+    optimizePackageImports: ['@tanstack/react-query', 'lucide-react'],
+  },
+  images: {
+    // 유튜브 썸네일(match-videos.tsx의 youtubeThumbnailUrl())만 외부 호스트가 필요하다.
+    // /uploads/*·/brand/*·/fonts/*는 같은 origin이라 remotePatterns 없이도 next/image가 동작한다.
+    remotePatterns: [{ protocol: 'https', hostname: 'i.ytimg.com', pathname: '/vi/**' }],
   },
   turbopack: {
     root: path.resolve(__dirname, '../..'),

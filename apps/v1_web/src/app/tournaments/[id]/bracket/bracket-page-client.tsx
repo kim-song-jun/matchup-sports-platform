@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { Trophy } from 'lucide-react';
-import { AppChrome } from '@/components/v1-ui/shell';
 import { ErrorState } from '@/components/v1-ui/primitives';
 import { useV1MyTournamentFixtures, useV1Tournament } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -703,32 +702,17 @@ export function BracketPageClient({ tournamentId }: { tournamentId: string }) {
   const { data, isLoading, isError, error, refetch } = useV1Tournament(tournamentId, { livePolling: true });
 
   if (isLoading) {
-    return (
-      <AppChrome title="순위·브래킷" backHref={`/tournaments/${tournamentId}`} activeTab="tournaments" desktopHead>
-        <BracketPageSkeleton />
-      </AppChrome>
-    );
+    return <BracketPageSkeleton />;
   }
 
   if (isError || !data) {
     const msg = extractErrorMessage(error, '대회 정보를 불러오지 못했어요.');
     return (
-      <AppChrome title="순위·브래킷" backHref={`/tournaments/${tournamentId}`} activeTab="tournaments" desktopHead>
-        <div style={{ padding: '40px 20px' }}>
-          <ErrorState message={msg} onRetry={() => void refetch()} />
-        </div>
-      </AppChrome>
+      <div style={{ padding: '40px 20px' }}>
+        <ErrorState message={msg} onRetry={() => void refetch()} />
+      </div>
     );
   }
 
-  return (
-    <AppChrome
-      title="순위·브래킷"
-      backHref={`/tournaments/${tournamentId}`}
-      activeTab="tournaments"
-      desktopHead
-    >
-      <BracketPageContent tournament={data} />
-    </AppChrome>
-  );
+  return <BracketPageContent tournament={data} />;
 }

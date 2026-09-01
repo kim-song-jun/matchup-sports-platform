@@ -113,7 +113,7 @@ export default function AdminLeagueMatchDisputesPage() {
         description="확정된 리그 경기 결과에 팀이 제기한 이의를 검토하고 정정·무효·거부를 처리해요."
       />
 
-      <div className="mb-4">
+      <div className="tm-content-enter mb-4">
         <AdminFilterBar
           hideSearch
           searchValue=""

@@ -125,7 +125,7 @@ function AdminTeamMatchesPageContent() {
       />
 
       {/* Filter bar — chip 높이 min-h-[44px] + 페이지 간 리듬 통일 */}
-      <div className="mb-4">
+      <div className="tm-content-enter mb-4">
         <AdminFilterBar
           searchLabel="경기 제목·호스트 팀명 검색"
           searchPlaceholder="경기 제목·호스트 팀명 검색"

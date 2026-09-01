@@ -133,7 +133,7 @@ function AdminMatchesPageContent() {
         description="플랫폼 전체 매치의 상태를 검색하고 관리해요."
       />
 
-      <div className="flex flex-col gap-4">
+      <div className="tm-content-enter flex flex-col gap-4">
         {/* Filter bar */}
         <AdminFilterBar
           searchLabel="제목·장소 검색"

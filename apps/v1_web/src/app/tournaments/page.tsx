@@ -4,7 +4,6 @@ import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { ClipboardEdit, Wallet, ListChecks, Grid2x2, GitFork, Trophy, Sparkles } from 'lucide-react';
-import { AppChrome } from '@/components/v1-ui/shell';
 import {
   CompetitionKindSegment,
   parseCompetitionKind,
@@ -27,11 +26,9 @@ import type { V1TournamentListItem } from '@/types/api';
  */
 export default function TournamentsPage() {
   return (
-    <AppChrome title="대회" activeTab="tournaments" showNotifications>
-      <Suspense fallback={null}>
-        <TournamentsListContent />
-      </Suspense>
-    </AppChrome>
+    <Suspense fallback={null}>
+      <TournamentsListContent />
+    </Suspense>
   );
 }
 

@@ -25,7 +25,7 @@ import { LogoutButton } from '@/components/auth/logout-button';
 import { buildPhoneVerifyHref } from '@/components/auth/phone-verification/phone-verify-route';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
-import { AppChrome } from '@/components/v1-ui/shell';
+import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { Card, EmptyState, KPIStat, ListItem } from '@/components/v1-ui/primitives';
 import { MyPlayerCardSection } from './my-player-card-section';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
@@ -73,10 +73,15 @@ const MENU_ICON_MAP: Record<string, React.ComponentType<LucideProps>> = {
 export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
   const avatarStyle = model.user.profileImageUrl ? { backgroundImage: cssUrl(model.user.profileImageUrl) } : undefined;
 
+  // 셸 승격(U36): title/activeTab/centerTitle은 route-chrome/fragments/my-home.ts의 정적
+  // 테이블로 옮겼다. hasNewNotification만 model(런타임 상태) 의존이라 여기서 override로
+  // 밀어넣는다(§0.4-3).
+  useShellOverride({ hasNewNotification: model.hasNewNotification });
+
   return (
-    <AppChrome title="마이페이지" activeTab="my" hasNewNotification={model.hasNewNotification} centerTitle>
+    <>
       <h1 className="sr-only">마이페이지</h1>
-      <div className="tm-my-shell">
+      <div className="tm-my-shell tm-content-enter">
         {/* Mobile layout: flat stack (unchanged) */}
         {/* Desktop layout: 2-column via tm-my-desktop-layout */}
         <div className="tm-my-desktop-layout">
@@ -170,15 +175,16 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
           </div>
         </div>
       </div>
-    </AppChrome>
+    </>
   );
 }
 
 export function MyMatchesPageView({ model }: { model: MyMatchesViewModel }) {
   const joined = model.mode === 'joined';
+  // 셸 승격(U36): title/activeTab/bottomNav/backHref는 route-chrome/fragments/my-home.ts로
+  // 옮겼다(정적 — model.title은 이 컴포넌트가 참조하지 않는 dead field, fragment 주석 참조).
   return (
-    <AppChrome title="내 매치" activeTab="my" bottomNav={false} backHref="/my">
-      <div className="tm-my-shell tm-my-matches-desktop">
+      <div className="tm-my-shell tm-my-matches-desktop tm-content-enter">
         {/* Desktop page head — hidden on mobile via tm-show-desktop */}
         <div className="tm-desktop-page-head tm-show-desktop">
           <Link className="tm-desktop-back" href="/my" aria-label="마이페이지로 돌아가기">
@@ -208,14 +214,13 @@ export function MyMatchesPageView({ model }: { model: MyMatchesViewModel }) {
           )}
         </div>
       </div>
-    </AppChrome>
   );
 }
 
 export function MyTeamsPageView({ model }: { model: MyTeamsViewModel }) {
+  // 셸 승격(U36): title/activeTab/bottomNav/backHref는 route-chrome/fragments/my-home.ts로 옮겼다(정적).
   return (
-    <AppChrome title="내 팀" activeTab="my" bottomNav={false} backHref="/my">
-      <div className="tm-my-shell tm-my-teams-desktop">
+      <div className="tm-my-shell tm-my-teams-desktop tm-content-enter">
         {/* Desktop page head */}
         <div className="tm-desktop-page-head tm-show-desktop">
           <Link className="tm-desktop-back" href="/my" aria-label="마이페이지로 돌아가기">
@@ -233,13 +238,12 @@ export function MyTeamsPageView({ model }: { model: MyTeamsViewModel }) {
             : model.teams.map((team) => <MyTeamCard key={team.id} team={team} />)}
         </div>
       </div>
-    </AppChrome>
   );
 }
 
 export function MyInvitationsPageView({ model }: { model: MyInvitationsViewModel }) {
+  // 셸 승격(U36): title/activeTab/bottomNav/backHref는 route-chrome/fragments/my-home.ts로 옮겼다(정적).
   return (
-    <AppChrome title="받은 초대" activeTab="my" bottomNav={false} backHref="/my">
       <div className="tm-my-shell">
         {/* Desktop page head */}
         <div className="tm-desktop-page-head tm-show-desktop">
@@ -302,7 +306,6 @@ export function MyInvitationsPageView({ model }: { model: MyInvitationsViewModel
           </div>
         )}
       </div>
-    </AppChrome>
   );
 }
 
@@ -315,8 +318,8 @@ const JOIN_APPLICATION_BADGE_CLASS: Record<MyJoinApplicationItem['statusTone'], 
 };
 
 export function MyJoinApplicationsPageView({ model }: { model: MyJoinApplicationsViewModel }) {
+  // 셸 승격(U36): title/activeTab/bottomNav/backHref는 route-chrome/fragments/my-home.ts로 옮겼다(정적).
   return (
-    <AppChrome title="보낸 가입 신청" activeTab="my" bottomNav={false} backHref="/my">
       <div className="tm-my-shell">
         {/* Desktop page head */}
         <div className="tm-desktop-page-head tm-show-desktop">
@@ -379,13 +382,15 @@ export function MyJoinApplicationsPageView({ model }: { model: MyJoinApplication
           </div>
         )}
       </div>
-    </AppChrome>
   );
 }
 
 export function MyTeamMembersPageView({ model, backHref = '/my/teams/team-1' }: { model: MyTeamMembersViewModel; backHref?: string }) {
+  // 셸 승격(U36): 이 컴포넌트는 route-chrome 테이블에 등록하지 않는다 — 유일한 소비 경로였던
+  // app/my/teams/[id]/members/page.tsx가 /teams/:id/members로 redirect만 하는 죽은 라우트라
+  // 이 뷰는 어떤 URL로도 도달하지 않는다(fragments/my-home.ts 주석 참조). AppChrome 호출만
+  // 걷어내고(§2.25~2.38 절차 5) 셸은 없다 — 렌더될 일이 없으므로 무해하다.
   return (
-    <AppChrome title="멤버 관리" activeTab="my" bottomNav={false} backHref={backHref}>
       <div className="tm-my-shell tm-my-members-desktop">
         {/* Desktop page head */}
         <div className="tm-desktop-page-head tm-show-desktop">
@@ -406,15 +411,16 @@ export function MyTeamMembersPageView({ model, backHref = '/my/teams/team-1' }: 
         </div>
         {model.activeTab === 'members' ? <MemberGroup title="멤버" members={model.members} /> : <MemberGroup title="가입 신청" members={model.requests} />}
       </div>
-    </AppChrome>
   );
 }
 
 
 export function SettingsPageView({ model }: { model: SettingsViewModel }) {
+  // 셸 승격(U36): title은 model.title로 넘어오지만 유일한 호출부(my-api-clients.tsx의
+  // SettingsPageClient)가 항상 settingsModel.title='설정' 상수를 그대로 spread하므로
+  // 사실상 정적이다 — route-chrome/fragments/my-home.ts에 title:'설정'로 등록했다.
   return (
-    <AppChrome title={model.title} activeTab="my" bottomNav={false} backHref="/my">
-      <div className="tm-my-shell">
+      <div className="tm-my-shell tm-content-enter">
         <div className="tm-my-settings-desktop">
           {/* Desktop page head */}
           <div className="tm-desktop-page-head tm-show-desktop">
@@ -451,7 +457,6 @@ export function SettingsPageView({ model }: { model: SettingsViewModel }) {
           </div>
         </div>
       </div>
-    </AppChrome>
   );
 }
 
@@ -460,9 +465,9 @@ export function SettingsPageView({ model }: { model: SettingsViewModel }) {
 // The prop is kept for backward compatibility with the existing page.tsx caller.
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function LegalPageView({ model: _model }: { model: SettingsViewModel }) {
+  // 셸 승격(U36): title/activeTab/bottomNav/backHref는 route-chrome/fragments/my-home.ts로 옮겼다(정적).
   return (
-    <AppChrome title="약관 및 정책" activeTab="my" bottomNav={false} backHref="/my/settings">
-      <div className="tm-my-shell">
+      <div className="tm-my-shell tm-content-enter">
         <div className="tm-my-settings-desktop">
           <div className="tm-desktop-page-head tm-show-desktop">
             <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
@@ -477,7 +482,6 @@ export function LegalPageView({ model: _model }: { model: SettingsViewModel }) {
           </Card>
         </div>
       </div>
-    </AppChrome>
   );
 }
 

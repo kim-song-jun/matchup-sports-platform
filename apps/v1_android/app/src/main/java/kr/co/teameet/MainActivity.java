@@ -217,6 +217,14 @@ public final class MainActivity extends AppCompatActivity {
         if (WebViewFeature.isFeatureSupported(WebViewFeature.SAFE_BROWSING_ENABLE)) {
             WebSettingsCompat.setSafeBrowsingEnabled(settings, true);
         }
+        // bfcache(뒤로/앞으로 캐시) 활성화: origin 밖(카카오/네이버 OAuth 리다이렉트 등)으로
+        // 나갔다 돌아올 때 즉시 스냅샷 복원을 제공한다. 인앱 SPA 전환(pushState)에는 영향 없다
+        // — 같은 문서 로드 안의 히스토리 변경이라 WebView 레벨 탐색이 아니기 때문. setCacheMode는
+        // 여기서 건드리지 않는다(SW가 이미 리소스 타입별 정밀 캐싱을 맡고 있어, WebView 레벨의
+        // blunt한 캐시 정책까지 추가하면 오히려 배포 직후 구버전 서빙 위험만 커진다).
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.BACK_FORWARD_CACHE)) {
+            WebSettingsCompat.setBackForwardCacheEnabled(settings, true);
+        }
         if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
             WebViewCompat.addWebMessageListener(
                 webView,

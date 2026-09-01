@@ -101,7 +101,7 @@ export default function AdminTournamentsPage() {
         }
       />
 
-      <div className="flex flex-col gap-4">
+      <div className="tm-content-enter flex flex-col gap-4">
         {/* "backend has no q" 주석 때문에 검색이 죽어 있었다 — 백엔드는 처음부터
             q(제목 contains, insensitive)를 지원한다. tournaments-admin.service.ts list 참조 */}
         <AdminFilterBar

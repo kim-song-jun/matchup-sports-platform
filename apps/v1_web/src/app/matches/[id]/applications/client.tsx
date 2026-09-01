@@ -10,7 +10,6 @@ import {
   useV1MatchApplicationsInfinite,
   useV1RejectMatchApplication,
 } from '@/hooks/use-v1-api';
-import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, EmptyState } from '@/components/v1-ui/primitives';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { ChevronLeftIcon } from '@/components/v1-ui/icons';
@@ -47,24 +46,24 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
 
   if (matchQuery.isError) {
     return (
-      <AppChrome title="신청자 관리" activeTab="matches" bottomNav={false} backHref={`/matches/${matchId}`}>
+      <>
         <DesktopPageHead matchId={matchId} />
         <div className="tm-match-list">
           <ErrorCard message="매치 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요." />
         </div>
-      </AppChrome>
+      </>
     );
   }
 
   // While loading or redirecting non-host, show skeleton
   if (!matchQuery.data || !isHost) {
     return (
-      <AppChrome title="신청자 관리" activeTab="matches" bottomNav={false} backHref={`/matches/${matchId}`}>
+      <>
         <DesktopPageHead matchId={matchId} />
         <div className="tm-match-list">
           <ApplicationsSkeletonList />
         </div>
-      </AppChrome>
+      </>
     );
   }
 
@@ -121,7 +120,7 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
   }
 
   return (
-    <AppChrome title="신청자 관리" activeTab="matches" bottomNav={false} backHref={`/matches/${matchId}`}>
+    <>
       {/* 확인 모달 — window.confirm 대체 */}
       {ConfirmModal}
       <DesktopPageHead matchId={matchId} />
@@ -189,7 +188,7 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
           </div>
         )}
       </div>
-    </AppChrome>
+    </>
   );
 }
 

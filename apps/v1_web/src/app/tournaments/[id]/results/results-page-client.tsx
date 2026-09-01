@@ -4,7 +4,6 @@ import { useState, useEffect, useId, useRef } from 'react';
 import Link from 'next/link';
 import { ChevronRight, Trophy } from 'lucide-react';
 import { MatchVideos } from '@/components/tournaments/match-videos';
-import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { useV1Tournament } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -1099,24 +1098,18 @@ function ResultsPageSkeleton() {
 export function ResultsPageClient({ tournamentId }: { tournamentId: string }) {
   const { data, isLoading, isError, error, refetch } = useV1Tournament(tournamentId);
   if (isLoading) {
-    return (
-      <AppChrome title="최종결과" backHref={'/tournaments/' + tournamentId + '/bracket'} activeTab="tournaments" desktopHead>
-        <ResultsPageSkeleton />
-      </AppChrome>
-    );
+    return <ResultsPageSkeleton />;
   }
   if (isError || !data) {
     const msg = extractErrorMessage(error, '대회 정보를 불러오지 못했어요.');
     return (
-      <AppChrome title="최종결과" backHref={'/tournaments/' + tournamentId + '/bracket'} activeTab="tournaments" desktopHead>
-        <div style={{ padding: '40px 20px' }}>
-          <ErrorState message={msg} onRetry={() => void refetch()} />
-        </div>
-      </AppChrome>
+      <div style={{ padding: '40px 20px' }}>
+        <ErrorState message={msg} onRetry={() => void refetch()} />
+      </div>
     );
   }
   return (
-    <AppChrome title="최종결과" backHref={'/tournaments/' + tournamentId + '/bracket'} activeTab="tournaments" desktopHead>
+    <>
       <ResultsPageContent tournament={data} />
       <div className="tm-tourn-sub-flownav">
         <TournamentFlowNav
@@ -1124,6 +1117,6 @@ export function ResultsPageClient({ tournamentId }: { tournamentId: string }) {
           next={{ href: '/tournaments/' + tournamentId + '/awards', label: '시상·리뷰', enabled: data.status === 'completed', disabledHint: '대회 종료 후 공개' }}
         />
       </div>
-    </AppChrome>
+    </>
   );
 }

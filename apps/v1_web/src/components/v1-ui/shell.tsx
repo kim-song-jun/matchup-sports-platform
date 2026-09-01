@@ -1,5 +1,13 @@
+'use client';
+// AppChrome 은 이중 셸 가드(ShellMountedContext)를 위해 createContext/useContext 를 쓴다.
+// React Server Component 는 createContext 에 의존하는 모듈을 import 할 수 없으므로 이
+// 지시어가 없으면 `app/not-found.tsx`(유일한 서버 컴포넌트 소비처)에서 프로덕션 빌드가
+// 깨진다 — tsc 와 jsdom 테스트는 RSC 경계를 검사하지 않아 `next build` 에서만 드러났다.
+// 실질 비용은 없다: 다른 소비처인 app-shell-frame.tsx 가 이미 'use client' 라 셸은
+// 어차피 클라이언트 청크에 들어 있었고, 이 지시어는 404 화면의 셸도 같은 청크를 쓰게 할 뿐이다.
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { createContext, useContext } from 'react';
 import {
   ChevronLeftIcon,
   HomeIcon,
@@ -66,7 +74,30 @@ type AppChromeProps = {
   titleAsHeading?: boolean;
 };
 
-export function AppChrome({
+/**
+ * 상위(AppShellFrame)가 이미 AppChrome을 렌더했음을 하위의 또 다른 AppChrome 호출이
+ * 감지하는 신호. 마이그레이션 도중 아직 자체 <AppChrome> 래퍼를 못 걷어낸 페이지가
+ * 섞여 있어도 topbar/bottomnav가 두 번 그려지지 않게 하는 안전망이다. **정상 절차라면
+ * 이 분기가 실행될 일이 없다** — 테이블 등록과 페이지 자체 AppChrome 제거를 같은
+ * 커밋에서 하기 때문. 이 분기가 실행 중이라는 건 그 규율이 깨졌다는 신호이므로 오래
+ * 방치하면 안 된다 — 안쪽 호출에만 있던 floatingSlot/동적 title 같은 props는 여기서
+ * 조용히 버려진다.
+ */
+export const ShellMountedContext = createContext(false);
+
+export function AppChrome(props: AppChromeProps) {
+  const alreadyMounted = useContext(ShellMountedContext);
+  if (alreadyMounted) {
+    return <>{props.children}</>;
+  }
+  return (
+    <ShellMountedContext.Provider value={true}>
+      <AppChromeInner {...props} />
+    </ShellMountedContext.Provider>
+  );
+}
+
+function AppChromeInner({
   title,
   children,
   floatingSlot,

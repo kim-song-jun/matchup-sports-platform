@@ -301,7 +301,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="tm-content-enter flex flex-col gap-5">
       <OpsPageHeader
         tournamentTitle={tournament.data?.title}
         title="운영 보드"

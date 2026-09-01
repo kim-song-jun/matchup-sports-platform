@@ -974,7 +974,10 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   const lineups = fixtureLineup.data?.lineups ?? [];
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-4 pb-24 lg:max-w-6xl lg:grid lg:grid-cols-[1.6fr_1fr] lg:items-start lg:gap-6">
+    <div className="tm-content-enter mx-auto flex max-w-3xl flex-col gap-4 pb-24 lg:max-w-6xl lg:grid lg:grid-cols-[1.6fr_1fr] lg:items-start lg:gap-6">
+      {/* tm-content-enter: 로딩(944)→콘텐츠(이 반환문) 전환 시 1회만 페이드인한다
+          (CSS animation, fill-mode both) — 소켓 이벤트로 오는 재렌더는 이 div를
+          리마운트하지 않으므로(고정 key 없음) 라이브 갱신 중 재생되지 않는다. */}
       {/* [알파 감사 F] 1280px+ 데스크톱에서 콘텐츠가 상단 1/3에만 몰리고 그 아래가
           광활하게 비어 있다는 실측 지적 — 모바일/태블릿은 기존과 동일한 세로
           스택(flex-col, max-w-3xl)을 그대로 유지하고, lg(1024px)부터만 2열

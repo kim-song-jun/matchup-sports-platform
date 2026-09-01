@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { V1PublicTournamentStatus } from '@/types/api';
 import type { V1PublicTournamentCampaign } from '@/types/tournament-campaign';
+import { resolveNextImageSrc } from '@/test/next-image';
 import { TournamentCampaignTemplate } from './tournament-campaign-template';
 import { campaign } from './tournament-campaign-template.test-fixture';
 
@@ -274,6 +275,7 @@ describe('TournamentCampaignTemplate', () => {
 
     fireEvent.error(hero);
 
-    expect(hero).toHaveAttribute('src', '/mock/generated/futsal-rooftop.webp');
+    // next/image 전환(U15) 이후 실제 DOM src는 `/_next/image?url=...`로 재작성된다.
+    expect(resolveNextImageSrc(hero)).toBe('/mock/generated/futsal-rooftop.webp');
   });
 });

@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
+import { useShellOverrideForRoute } from '@/components/v1-ui/shell-override';
 import type { V1MyTeam, V1TournamentDetail, V1TournamentRegistration } from '@/types/api';
 import { TournamentApplyPageClient } from './tournament-apply-client';
 
@@ -26,14 +27,25 @@ vi.mock('@/lib/analytics', () => ({
   trackEvent: vi.fn(),
 }));
 
+// `?team=` 유무로 셸 backHref가 갈리는 테스트(아래 "셸 backHref override" describe)를 위해
+// 가변 변수로 뺀다 — admin/content/page.test.tsx의 기존 관례와 동일 패턴.
+let searchParams = new URLSearchParams();
 vi.mock('next/navigation', () => ({
   usePathname: () => '/tournaments/tournament-1/apply',
   useRouter: () => ({
     push: vi.fn(),
     replace: vi.fn(),
   }),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => searchParams,
 }));
+
+// useShellOverride가 렌더 단계에서 모듈 스코프 store에 밀어넣은 값을 읽어 화면에 텍스트로
+// 노출한다 — AppShellFrame을 전부 마운트하지 않고도(그건 app-shell-frame.test.tsx가 이미
+// 검증) 실제 컴포넌트가 useShellOverride({ backHref })를 호출하는 값 자체를 검증한다.
+function BackHrefProbe() {
+  const { backHref } = useShellOverrideForRoute('/tournaments/tournament-1/apply');
+  return <div data-testid="probe-backhref">{backHref ?? '(table-default)'}</div>;
+}
 
 function render(ui: ReactElement) {
   const queryClient = new QueryClient({
@@ -169,6 +181,7 @@ describe('TournamentApplyPageClient GA events', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.sessionStorage.clear();
+    searchParams = new URLSearchParams();
 
     // 기본은 본인인증을 마친 신청자 — 신청 위저드의 정상 경로.
     tournamentApplyApiMocks.useV1AuthMe.mockReturnValue({
@@ -465,6 +478,40 @@ describe('TournamentApplyPageClient GA events', () => {
 
       expect(screen.queryByRole('link', { name: '본인인증 하러 가기' })).not.toBeInTheDocument();
       expect((await screen.findAllByRole('button', { name: /^다음 단계/ })).length).toBeGreaterThan(0);
+    });
+  });
+
+  // route-chrome 테이블(fragments/tournaments-extra.ts)의 backHref는 이 라우트에서 항상
+  // '/tournaments/tournament-1'(대회 상세) 고정값이다 — `?team=` 딥링크로 들어온 경우엔
+  // 셸 topbar 뒤로가기가 '/tournaments/tournament-1/my'로 가야 한다(내 신청 페이지에서
+  // 팀을 골라 들어온 흐름이므로). 이 분기가 깨지면(예: applyBackHref 계산이 원복되면)
+  // 아래 두 단언 중 하나가 red가 된다.
+  describe('셸 backHref override', () => {
+    // Probe를 페이지와 형제로 한 트리에 같이 렌더하면 useSyncExternalStore가 "다른 컴포넌트
+    // 렌더 중 setState" React 경고를 낸다(마운트 직후 자체 재확인이 트리거) — 실제 프로덕션
+    // 배선(app-shell-frame.tsx)에서는 AppShellFrame이 항상 페이지의 조상이라 이 문제가 없다.
+    // 테스트에서 같은 순서를 재현하는 대신, 페이지를 먼저 완전히 커밋시킨 뒤(store가 이미
+    // 갱신된 상태) Probe를 별도 act로 마운트해 첫 렌더에서 바로 최신 값을 읽게 한다 — 경고도
+    // 없고 검증 대상(override 값)도 동일하다.
+    it('`?team=` 없이 진입하면 override를 밀어넣지 않아 테이블 기본값(대회 상세)이 유지된다', () => {
+      tournamentApplyApiMocks.useV1CreateRegistration.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+      tournamentApplyApiMocks.useV1SubmitRegistration.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+
+      render(<TournamentApplyPageClient tournamentId="tournament-1" />);
+      const probe = render(<BackHrefProbe />);
+
+      expect(probe.getByTestId('probe-backhref')).toHaveTextContent('/tournaments/tournament-1');
+    });
+
+    it('`?team=X`로 진입하면 backHref override가 "내 신청" 페이지를 가리킨다', () => {
+      searchParams = new URLSearchParams('team=team-1');
+      tournamentApplyApiMocks.useV1CreateRegistration.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+      tournamentApplyApiMocks.useV1SubmitRegistration.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+
+      render(<TournamentApplyPageClient tournamentId="tournament-1" />);
+      const probe = render(<BackHrefProbe />);
+
+      expect(probe.getByTestId('probe-backhref')).toHaveTextContent('/tournaments/tournament-1/my');
     });
   });
 });

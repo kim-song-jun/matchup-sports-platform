@@ -118,7 +118,7 @@ function InboxSection() {
     (data?.pendingInquiries ?? 0);
 
   return (
-    <section aria-label="할 일" className="mb-6">
+    <section aria-label="할 일" className="tm-content-enter mb-6">
       <h2 className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-body)] mb-3">할 일</h2>
       {isPending ? (
         <AdminKpiGridSkeleton count={4} />

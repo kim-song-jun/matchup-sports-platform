@@ -7864,6 +7864,121 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
 .tm-my-account-actions .tm-btn { flex: 1; }
 /* 활동 요약과 이번 달 활동을 한 카드로 합칠 때 두 묶음을 가르는 선. */
 .tm-my-activity-divider { height: 1px; background: var(--border); margin: 12px 0; }
+
+/* ============================================================================
+   페이지 전환 (Wave 2 U20 — docs/design/app-motion-system.md §2.4/§2.7/§2.8)
+   ----------------------------------------------------------------------------
+   PageTransitionController(U39/U40, components/v1-ui/page-transition-controller.tsx)가
+   document.startViewTransition 호출과 data-nav-kind 속성 설정을 맡는다 -- 이 블록은
+   그 컨트롤러가 붙은 지금부터 실제로 선택자가 매칭돼 살아 있다. 값은 기존
+   duration/easing 토큰만 재사용하고 신규 토큰은 0개 -- tokens.css 의 "용도 확장 매핑" 참조.
+   ============================================================================ */
+
+/* ── VT 경로: old/new page-content 유사요소 슬라이드+페이드 ── */
+@keyframes tm-page-slide {
+  from { translate: var(--tm-slide-offset); }
+  to { translate: 0; }
+}
+@keyframes tm-page-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+::view-transition-old(page-content) {
+  animation:
+    var(--duration-fast) var(--ease-standard) both tm-page-fade reverse,
+    var(--duration-slower) var(--ease-standard) both tm-page-slide reverse;
+}
+::view-transition-new(page-content) {
+  animation:
+    var(--duration-base) var(--ease-out) var(--duration-fast) both tm-page-fade,
+    var(--duration-slower) var(--ease-standard) both tm-page-slide;
+}
+
+:root[data-nav-kind="push"] { --tm-slide-offset: -24%; } /* old 쪽 기준값 -- new 는 아래서 부호 반전 */
+:root[data-nav-kind="push"] ::view-transition-new(page-content) { --tm-slide-offset: 100%; }
+:root[data-nav-kind="pop"]  { --tm-slide-offset: 100%; }
+:root[data-nav-kind="pop"]  ::view-transition-new(page-content) { --tm-slide-offset: -24%; }
+
+/* 탭 전환은 슬라이드 없이 crossfade 만 -- 위 슬라이드 애니메이션을 덮어쓴다 */
+:root[data-nav-kind="tab"] ::view-transition-old(page-content),
+:root[data-nav-kind="tab"] ::view-transition-new(page-content) {
+  animation: var(--duration-base) var(--ease-standard) both tm-page-fade;
+}
+:root[data-nav-kind="tab"] ::view-transition-old(page-content) { animation-direction: reverse; }
+
+/* ── CSS 폴백 경로(VT 미지원 웹뷰) -- template.tsx 마운트 시 재생 ──
+   iOS 16/17(Safari < 18)은 상시 이 경로만 본다 -- "미지원 대비 보험"이 아니라
+   iOS 사용자의 주 경로다. old 는 이미 사라진 상태(new 만 존재)라 §2.4 표대로
+   거리를 16~24px 로 줄여 VT 경로와 같은 모션 언어를 유지한다. */
+@keyframes tm-page-fallback-push {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes tm-page-fallback-pop {
+  from { opacity: 0; transform: translateX(-24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes tm-page-fallback-tab {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.tm-page-transition-enter[data-nav-kind="push"] { animation: tm-page-fallback-push var(--duration-slower) var(--ease-out) both; }
+.tm-page-transition-enter[data-nav-kind="pop"]  { animation: tm-page-fallback-pop var(--duration-slower) var(--ease-out) both; }
+.tm-page-transition-enter[data-nav-kind="tab"]  { animation: tm-page-fallback-tab var(--duration-base) var(--ease-standard) both; }
+/* data-nav-kind 가 아직 없는 최초 진입(딥링크·새로고침)은 애니메이션 없이 그대로
+   보인다 -- 속성 선택자가 매칭 안 되므로 별도 처리가 필요 없다. */
+
+/* ── 스켈레톤 → 콘텐츠 1단 전환(§3.3) -- 176개 loading.tsx 소비처 공용 클래스.
+   VT 의 tm-page-fade keyframe 을 그대로 재사용한다(신규 keyframe 아님). ── */
+.tm-content-enter {
+  animation: tm-page-fade var(--duration-base) var(--ease-out) both;
+}
+
+/* ── sticky/fixed 셸 요소는 VT 캡처 그룹에서 분리한다(§2.7) --
+   이름을 안 주면 topbar/bottom-nav 도 page-content 와 함께 슬라이드해버린다
+   (셸은 "지속"돼야 하므로 명백한 결함). Wave 1 이전엔 화면에 한 순간 하나만
+   존재해 이름 충돌이 없다 -- 병렬 라우트가 생기면 재검토 필요(설계 문서 §2.7). */
+.tm-topbar      { view-transition-name: tm-shell-topbar; }
+.tm-bottom-nav  { view-transition-name: tm-shell-bottomnav; }
+.tm-fixed-cta   { view-transition-name: tm-shell-fixed-cta; }
+.tm-route-progress { view-transition-name: tm-shell-route-progress; }
+
+::view-transition-group(tm-shell-topbar),
+::view-transition-group(tm-shell-bottomnav),
+::view-transition-group(tm-shell-fixed-cta),
+::view-transition-group(tm-shell-route-progress) {
+  animation: none;
+  z-index: 100; /* 슬라이드하는 page-content 그룹 위에 그려지도록 */
+}
+::view-transition-old(tm-shell-topbar),
+::view-transition-old(tm-shell-bottomnav),
+::view-transition-old(tm-shell-fixed-cta),
+::view-transition-old(tm-shell-route-progress) {
+  display: none; /* old+new 가 겹쳐 두 겹으로 보이는 것 방지 */
+}
+::view-transition-new(tm-shell-topbar),
+::view-transition-new(tm-shell-bottomnav),
+::view-transition-new(tm-shell-fixed-cta),
+::view-transition-new(tm-shell-route-progress) {
+  animation: none;
+}
+
+/* ── prefers-reduced-motion (§2.8) --
+   기존 전역 catch-all(`* { animation-duration: 0.01ms !important; ... }`)은
+   ::view-transition-* 유사요소를 잡지 못한다(일반 * 셀렉터로 안 잡히는 별도
+   카테고리) -- VT 도입과 함께 명시 추가하지 않으면 접근성 규칙이 조용히 깨진다.
+   CSS 폴백 경로(.tm-page-transition-enter)는 일반 엘리먼트 애니메이션이라
+   기존 전역 catch-all 이 이미 커버한다 -- 별도 처리 불필요. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+}
+
 /* Android wrapper: transient web feedback reads as an in-app centered popup.
    Browser layouts keep their existing bottom/inline placement. */
 html[data-teameet-native-app='android'] .tm-native-toast-stack {

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { ChangeEvent } from 'react';
 import { useEffect, useRef, useState } from 'react';
-import { AppChrome } from '@/components/v1-ui/shell';
+import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { Card, EmptyState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { ChevronLeftIcon, ChevronRightIcon, FilterIcon, HomeIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
@@ -32,13 +32,12 @@ function teamMatchBackgroundImage(imageUrl: string) {
 }
 
 export function TeamMatchListPageView({ model }: { model: TeamMatchListViewModel }) {
+  // title/activeTab/topBar는 route-chrome 테이블(fragments/team-matches.ts)이 고정값으로
+  // 갖고 있다 — floatingSlot만 ReactNode라 테이블에 담을 수 없어 override로 밀어넣는다
+  // (app-shell-promotion.md §1b, 6곳 중 하나).
+  useShellOverride({ floatingSlot: <TeamMatchCreateFloatingButton /> });
   return (
-    <AppChrome
-      title="매치"
-      activeTab="matches"
-      topBar={false}
-      floatingSlot={<TeamMatchCreateFloatingButton />}
-    >
+    <>
       {/* 데스크톱 전용 인라인 헤더 — FAB가 데스크톱에서 숨겨지므로 대체 CTA 제공 */}
       <div className="tm-team-match-desktop-header tm-show-desktop">
         <h1 className="tm-team-match-desktop-header-title">팀매치</h1>
@@ -80,26 +79,31 @@ export function TeamMatchListPageView({ model }: { model: TeamMatchListViewModel
         ) : null}
       </div>
       {model.filterSheet?.open ? <TeamMatchFilterSheet model={model} /> : null}
-    </AppChrome>
+    </>
   );
 }
 
+// /team-matches와 /team-matches/:id 양쪽의 error 분기가 공유하는 컴포넌트 — usePathname()
+// 기반 useShellOverride가 현재 라우트를 알아서 타깃하므로 어느 쪽에서 렌더돼도 정확히
+// 그 라우트의 override만 남긴다. backHref="/team-matches"·topBar 기본값(true)은 원래
+// 성공 분기(topBar:false)와 달랐지만 ShellOverride가 지원하지 않는 필드라 테이블 값을
+// 그대로 따른다 — "목록으로 돌아가기" Link가 이미 있어 내비게이션은 안전하게 유지된다
+// (fragments/team-matches.ts 주석 참고).
 export function TeamMatchStatePageView({ model }: { model: TeamMatchStateViewModel }) {
+  useShellOverride({ title: model.title, desktopHead: true });
   return (
-    <AppChrome title={model.title} activeTab="matches" bottomNav={false} backHref="/team-matches" desktopHead>
-      <div className="tm-match-list">
-        <EmptyState title={model.title} sub={model.description} />
-        {model.state === 'error' ? (
-          <Card pad={16} style={{ marginTop: 20, background: 'var(--grey50)' }}>
-            <div className="tm-text-label">목록에서 다시 확인해 주세요</div>
-            <div className="tm-text-caption" style={{ marginTop: 8, lineHeight: 1.55 }}>
-              새로고침 후에도 같은 문제가 반복되면 잠시 뒤 다시 시도해 보세요.
-            </div>
-            <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href="/team-matches" style={{ marginTop: 16 }}>목록으로 돌아가기</Link>
-          </Card>
-        ) : null}
-      </div>
-    </AppChrome>
+    <div className="tm-match-list">
+      <EmptyState title={model.title} sub={model.description} />
+      {model.state === 'error' ? (
+        <Card pad={16} style={{ marginTop: 20, background: 'var(--grey50)' }}>
+          <div className="tm-text-label">목록에서 다시 확인해 주세요</div>
+          <div className="tm-text-caption" style={{ marginTop: 8, lineHeight: 1.55 }}>
+            새로고침 후에도 같은 문제가 반복되면 잠시 뒤 다시 시도해 보세요.
+          </div>
+          <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href="/team-matches" style={{ marginTop: 16 }}>목록으로 돌아가기</Link>
+        </Card>
+      ) : null}
+    </div>
   );
 }
 
@@ -170,14 +174,17 @@ function applyResultMessage(result: unknown): string | null {
 
 /**
  * 팀매치 상세 로딩 셸. 목업 팀매치(team-matches.view-model.ts — 'FC 발빠른놈들' 등)를
- * 그대로 렌더하던 자리를 대신한다. AppChrome props 는 TeamMatchDetailPageView 와 동일.
+ * 그대로 렌더하던 자리를 대신한다. 셸 승격(U27) 이후 title/activeTab/bottomNav/topBar 는
+ * route-chrome/fragments/team-matches.ts 테이블의 '/team-matches/:id' 항목(title: '')이
+ * 이미 그린다 — TeamMatchDetailPageView(성공 뷰)도 title을 override하지 않으므로 두
+ * 상태가 같은 값을 보여 헤더가 흔들리지 않는다. 그래서 본문 스켈레톤만 렌더한다.
  */
 export function TeamMatchDetailPageSkeleton() {
   return (
-    <AppChrome title="" activeTab="matches" bottomNav={false} topBar={false}>
+    <>
       <p className="sr-only" role="status">팀매치 정보를 불러오는 중이에요.</p>
       <PageSkeleton variant="detail" />
-    </AppChrome>
+    </>
   );
 }
 
@@ -319,7 +326,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
   );
 
   return (
-    <AppChrome title="" activeTab="matches" bottomNav={false} topBar={false}>
+    <>
       {/* Desktop page header: back link + title (mobile topbar is hidden on desktop) */}
       <div className="tm-desktop-page-head tm-show-desktop">
         <Link className="tm-desktop-back" href="/team-matches" aria-label="팀매치 목록으로 돌아가기">
@@ -329,7 +336,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
       </div>
 
       {/* Desktop 2-column layout wrapper */}
-      <div className="tm-team-match-detail-desktop">
+      <div className="tm-team-match-detail-desktop tm-content-enter">
         {/* LEFT: VS hero + info */}
         <div className="tm-team-match-detail-left">
           <article className="tm-match-detail">
@@ -631,7 +638,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
           {ctaButtons}
         </div>
       </div>
-    </AppChrome>
+    </>
   );
 }
 
@@ -644,8 +651,8 @@ export function TeamMatchCreatePageView({ model }: { model: TeamMatchCreateViewM
   const secondaryAction = model.form?.onBack;
   const missingFields = model.form?.missingFields ?? [];
   return (
-    <AppChrome title={edit ? '팀매치 수정' : '팀매치 만들기'} activeTab="matches" bottomNav={false} backHref={model.backHref ?? '/team-matches'} desktopHead>
-      <div className={`tm-create-shell tm-team-match-create-shell ${edit ? 'tm-create-shell-edit' : ''}`}>
+    <>
+      <div className={`tm-create-shell tm-team-match-create-shell ${edit ? 'tm-create-shell-edit' : ''} tm-content-enter`}>
         <CreateProgress step={step} edit={edit} completeSteps={model.form?.completeSteps?.map(stepToNumber) ?? []} onGoToStep={model.form?.onGoToStep} />
         {model.form?.error ? <StateCard tone="orange" title="저장할 수 없어요" body={model.form.error} /> : null}
         {missingFields.length > 0 ? <MissingFieldsBanner missingFields={missingFields} stepHref={teamMatchStepHref} /> : null}
@@ -658,7 +665,7 @@ export function TeamMatchCreatePageView({ model }: { model: TeamMatchCreateViewM
         {model.step === 'confirm' ? <ConfirmStep model={model} /> : null}
       </div>
       <div className="tm-fixed-cta tm-create-fixed-cta"><div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>{secondaryAction ? <button className="tm-btn tm-btn-lg tm-btn-neutral" type="button" onClick={secondaryAction}>{edit ? '변경 취소' : model.step === 'team' ? '취소' : '이전'}</button> : <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={prevHref(model.step)}>{edit ? '변경 취소' : model.step === 'team' ? '취소' : '이전'}</Link>}{primaryAction ? <button className="tm-btn tm-btn-lg tm-btn-primary" type="button" disabled={model.form?.submitting || Boolean(model.form?.lockedReason)} onClick={primaryAction}>{model.form?.submitting ? '저장 중' : primaryLabel}</button> : <Link className="tm-btn tm-btn-lg tm-btn-primary" href={nextHref(model.step)}>{primaryLabel}</Link>}</div>{edit && model.form?.onCancel ? <button className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" type="button" style={{ marginTop: 8 }} disabled={model.form.submitting} onClick={model.form.onCancel}>팀매치 취소</button> : null}</div>
-    </AppChrome>
+    </>
   );
 }
 
@@ -1144,7 +1151,7 @@ function TeamMatchComplete({ model }: { model: TeamMatchCreateViewModel }) {
   };
 
   return (
-    <AppChrome title="팀매치 만들기 완료" activeTab="matches" bottomNav={false} backHref="/team-matches" desktopHead>
+    <>
       <div className="tm-create-shell">
         {/* P2: 완료 지점에 .tm-complete-check 마이크로인터랙션 (globals.css 키프레임, reduced-motion 안전) */}
         <div className="tm-complete-check">
@@ -1162,7 +1169,7 @@ function TeamMatchComplete({ model }: { model: TeamMatchCreateViewModel }) {
           <button className="tm-btn tm-btn-lg tm-btn-primary" type="button" onClick={() => { void handleShare(); }}>공유하기</button>
         </div>
       </div>
-    </AppChrome>
+    </>
   );
 }
 

@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { AppChrome } from '@/components/v1-ui/shell';
 import { PlayerCard } from './player-card';
 import type { V1PlayerCard } from '@/types/api';
 
@@ -61,30 +60,28 @@ export function PlayerCardShareClient({
   }
 
   return (
-    <AppChrome title="선수 카드" activeTab="my" bottomNav={false} backHref={`/users/${userId}`} desktopHead>
-      <div className="tm-my-shell">
-        <PlayerCard
-          card={card}
-          displayName={displayName}
-          profileImageUrl={profileImageUrl}
-          teamName={teamName}
-          isOwner={false}
-        />
+    <div className="tm-my-shell tm-content-enter">
+      <PlayerCard
+        card={card}
+        displayName={displayName}
+        profileImageUrl={profileImageUrl}
+        teamName={teamName}
+        isOwner={false}
+      />
 
-        <button type="button" className="tm-player-card-share-btn" onClick={onShare}>
-          카드 공유하기
-        </button>
+      <button type="button" className="tm-player-card-share-btn" onClick={onShare}>
+        카드 공유하기
+      </button>
 
-        {notice ? (
-          <div role="status" className="tm-text-caption" style={{ textAlign: 'center' }}>
-            {notice}
-          </div>
-        ) : null}
+      {notice ? (
+        <div role="status" className="tm-text-caption" style={{ textAlign: 'center' }}>
+          {notice}
+        </div>
+      ) : null}
 
-        <Link href={`/users/${userId}`} className="tm-player-card-share-secondary">
-          프로필 전체 보기
-        </Link>
-      </div>
-    </AppChrome>
+      <Link href={`/users/${userId}`} className="tm-player-card-share-secondary">
+        프로필 전체 보기
+      </Link>
+    </div>
   );
 }

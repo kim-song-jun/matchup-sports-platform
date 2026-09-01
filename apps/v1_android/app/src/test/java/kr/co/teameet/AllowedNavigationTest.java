@@ -26,7 +26,7 @@ public final class AllowedNavigationTest {
 
     @Test public void allowsOnlyReviewedExternalSchemes() {
         assertEquals(true, AllowedNavigation.isAllowedExternalScheme("https"));
-        assertEquals(true, AllowedNavigation.isAllowedExternalScheme("intent"));
+        assertEquals(false, AllowedNavigation.isAllowedExternalScheme("intent"));
         assertEquals(true, AllowedNavigation.isAllowedExternalScheme("kakaomap"));
         assertEquals(true, AllowedNavigation.isAllowedExternalScheme("NMAP"));
         assertEquals(true, AllowedNavigation.isAllowedExternalScheme("tmap"));

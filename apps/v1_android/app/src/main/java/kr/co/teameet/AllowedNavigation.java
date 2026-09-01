@@ -58,7 +58,7 @@ final class AllowedNavigation {
     static boolean isAllowedExternalScheme(String scheme) {
         if (scheme == null) return false;
         return switch (scheme.toLowerCase(Locale.ROOT)) {
-            case "http", "https", "mailto", "tel", "sms", "geo", "market", "intent",
+            case "http", "https", "mailto", "tel", "sms", "geo", "market",
                 "kakaomap", "nmap", "tmap" -> true;
             default -> false;
         };

@@ -2,8 +2,10 @@ package kr.co.teameet;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.app.Activity;
 import android.app.DownloadManager;
 import android.content.ActivityNotFoundException;
+import android.content.ClipData;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
@@ -13,6 +15,7 @@ import android.os.Bundle;
 import android.provider.Settings;
 import android.webkit.CookieManager;
 import android.webkit.GeolocationPermissions;
+import android.webkit.RenderProcessGoneDetail;
 import android.webkit.URLUtil;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -44,6 +47,9 @@ import androidx.webkit.WebViewCompat;
 import androidx.webkit.WebViewFeature;
 import com.google.firebase.messaging.FirebaseMessaging;
 import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
 import org.json.JSONObject;
 
 public final class MainActivity extends AppCompatActivity {
@@ -60,16 +66,13 @@ public final class MainActivity extends AppCompatActivity {
     private int bottomSystemInsetCssPixels;
     private int keyboardInsetCssPixels;
     private boolean keyboardVisible;
+    private String lastRecoverableUrl = BuildConfig.WEB_ORIGIN + "/home";
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         fileChooserLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
-            result -> {
-                Uri[] uris = WebChromeClient.FileChooserParams.parseResult(result.getResultCode(), result.getData());
-                if (pendingFileChooser != null) pendingFileChooser.onReceiveValue(uris);
-                pendingFileChooser = null;
-            });
+            result -> deliverFileChooserResult(result.getResultCode(), result.getData()));
         notificationPermissionLauncher = registerForActivityResult(
             new ActivityResultContracts.RequestPermission(),
             granted -> {
@@ -170,7 +173,7 @@ public final class MainActivity extends AppCompatActivity {
 
         Button retry = new Button(this);
         retry.setText(R.string.web_error_retry);
-        retry.setOnClickListener(view -> webView.reload());
+        retry.setOnClickListener(view -> webView.loadUrl(lastRecoverableUrl));
         LinearLayout.LayoutParams retryParams = new LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.WRAP_CONTENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
@@ -209,6 +212,9 @@ public final class MainActivity extends AppCompatActivity {
         webView.setWebViewClient(new WebViewClient() {
             @Override public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
                 super.onPageStarted(view, url, favicon);
+                if (AllowedNavigation.isInternalAbsoluteUrl(url)) {
+                    lastRecoverableUrl = url;
+                }
                 hideWebError();
             }
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
@@ -222,6 +228,7 @@ public final class MainActivity extends AppCompatActivity {
             @Override public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 if (AllowedNavigation.isInternal(Uri.parse(url))) {
+                    lastRecoverableUrl = url;
                     publishSystemInsets();
                     if (canRegisterPush()) {
                         PushRegistrationClient.register(MainActivity.this);
@@ -242,6 +249,11 @@ public final class MainActivity extends AppCompatActivity {
                 super.onReceivedHttpError(view, request, response);
                 if (request.isForMainFrame() && response.getStatusCode() >= 400) showWebError();
             }
+            @Override public boolean onRenderProcessGone(
+                WebView view, RenderProcessGoneDetail detail
+            ) {
+                return recoverFromRendererFailure(view);
+            }
         });
         webView.setWebChromeClient(new WebChromeClient() {
             @Override public boolean onShowFileChooser(
@@ -250,7 +262,7 @@ public final class MainActivity extends AppCompatActivity {
                 if (pendingFileChooser != null) pendingFileChooser.onReceiveValue(null);
                 pendingFileChooser = callback;
                 try {
-                    fileChooserLauncher.launch(params.createIntent());
+                    fileChooserLauncher.launch(buildStoragePickerIntent(params));
                 } catch (Exception ignored) {
                     pendingFileChooser.onReceiveValue(null);
                     pendingFileChooser = null;
@@ -268,6 +280,65 @@ public final class MainActivity extends AppCompatActivity {
             }
         });
         webView.setDownloadListener(this::enqueueInternalDownload);
+    }
+
+    private Intent buildStoragePickerIntent(WebChromeClient.FileChooserParams params) {
+        List<String> mimeTypes = FileChooserPolicy.acceptedMimeTypes(params.getAcceptTypes());
+        Intent picker = new Intent(Intent.ACTION_OPEN_DOCUMENT)
+            .addCategory(Intent.CATEGORY_OPENABLE)
+            .setType(FileChooserPolicy.primaryMimeType(mimeTypes))
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        if (!(mimeTypes.size() == 1 && "*/*".equals(mimeTypes.get(0)))) {
+            picker.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes.toArray(new String[0]));
+        }
+        if (params.getMode() == WebChromeClient.FileChooserParams.MODE_OPEN_MULTIPLE) {
+            picker.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+        }
+        return picker;
+    }
+
+    private void deliverFileChooserResult(int resultCode, Intent resultData) {
+        ValueCallback<Uri[]> callback = pendingFileChooser;
+        pendingFileChooser = null;
+        if (callback == null) return;
+        if (resultCode != Activity.RESULT_OK || resultData == null) {
+            callback.onReceiveValue(null);
+            return;
+        }
+        Set<Uri> selectedUris = new LinkedHashSet<>();
+        ClipData clipData = resultData.getClipData();
+        if (clipData != null) {
+            for (int index = 0; index < clipData.getItemCount(); index += 1) {
+                Uri uri = clipData.getItemAt(index).getUri();
+                if (uri != null) selectedUris.add(uri);
+            }
+        }
+        Uri singleUri = resultData.getData();
+        if (singleUri != null) selectedUris.add(singleUri);
+        callback.onReceiveValue(
+            selectedUris.isEmpty() ? null : selectedUris.toArray(new Uri[0])
+        );
+    }
+
+    private boolean recoverFromRendererFailure(WebView failedView) {
+        if (failedView != webView) {
+            failedView.destroy();
+            return true;
+        }
+        if (pendingFileChooser != null) {
+            pendingFileChooser.onReceiveValue(null);
+            pendingFileChooser = null;
+        }
+        rootView.removeView(failedView);
+        failedView.destroy();
+        configureWebView();
+        rootView.addView(webView, 0, new FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
+        ));
+        ViewCompat.requestApplyInsets(rootView);
+        showWebError();
+        return true;
     }
 
     private void hideWebError() {
@@ -360,12 +431,7 @@ public final class MainActivity extends AppCompatActivity {
     private void openExternal(Uri target) {
         if (!AllowedNavigation.isAllowedExternal(target)) return;
         try {
-            Intent external;
-            if ("intent".equalsIgnoreCase(target.getScheme())) {
-                external = Intent.parseUri(target.toString(), Intent.URI_INTENT_SCHEME);
-            } else {
-                external = new Intent(Intent.ACTION_VIEW, target);
-            }
+            Intent external = new Intent(Intent.ACTION_VIEW, target);
             external.addCategory(Intent.CATEGORY_BROWSABLE);
             external.setComponent(null);
             external.setSelector(null);

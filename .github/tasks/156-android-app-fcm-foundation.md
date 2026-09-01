@@ -562,3 +562,15 @@ report, upgrade preservation, and the remaining OEM/foldable/multi-window matrix
 - Focused validation passed: App Links Vitest 4/4, privacy Jest 5/5, expand-contract gate, and three
   rollback-only PostgreSQL fixtures (canonical success, missing baseline failure, conflict drift
   failure). No production or development data was mutated by the fixture runs.
+
+## Final PR Review Continuation (2026-09-01)
+
+- Merged current `origin/dev` (`50191469f`) into the PR #838 worktree without conflicts; the unrelated root Task 158 worktree was not modified.
+- Replaced the generic WebView chooser intent with Android's scoped-storage `ACTION_OPEN_DOCUMENT` flow. It honors MIME and extension accept filters, supports multiple selection, deduplicates returned URIs, and requires no broad media/storage permission.
+- Added JVM policy coverage for image MIME normalization, extension mapping, invalid accept fallback, and narrow/common picker MIME selection.
+- Added `WebViewClient.onRenderProcessGone` recovery. A dead renderer is removed and destroyed, a hardened WebView is recreated, and the user receives the existing honest retry surface for the last exact-origin URL instead of an application crash.
+- Removed generic `intent:` external navigation. Only the reviewed web/system schemes and explicit Kakao Map, Naver Map, and TMAP schemes remain allowed.
+- Validation passed on Gradle 9.2 with one worker: Alpha and Production JVM suites 12/12 each, Alpha lint, Alpha/Production debug APK assembly, and Alpha release AAB bundling (142 tasks). `git diff --check` passed and touched Android sources contain no TODO/FIXME/HACK/XXX markers.
+- Alpha lint now has 12 non-fatal warnings: one intentionally pinned AndroidX Core version, one redundant min-SDK resource qualifier, and five existing launcher round-shape/duplicate pairs. The renderer-process crash warning is resolved and no broad-storage warning or permission is present.
+- API 36 emulator proof opened `DocumentsUI` `PickActivity` on `Recent images`, returned the selected image filename to the WebView input, and retained the app as the resumed activity. Evidence is in `output/task156/android-emulator-final/` and copied to the requested desktop screenshot folder.
+- Phase 5 remains open only where external state or physical distribution is required: Play account/app ownership, Play App Signing SHA-256, production signing/Firebase protected inputs, Play upload/testing/pre-launch report, final store screenshots, real FCM receive/tap matrix, and remaining OEM/foldable/multi-window coverage.

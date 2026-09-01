@@ -4335,6 +4335,20 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   flex-direction: column;
 }
 
+/*
+ * `.tm-list-empty` 의 min-height:100% 는 **부모가 확정 높이를 가질 때만** 먹는다. 스크롤
+ * 영역과 목록 사이에는 페이지 전환 래퍼(.tm-page-transition-enter, display:block)와
+ * display:contents 인 pane 이 끼어 있어, 그 래퍼가 콘텐츠 높이대로 늘어나면 자식의 100%
+ * 가 auto 로 해석돼 무효가 된다 — alpha 실측에서 채팅 목록이 스크롤 영역 788px 중
+ * 516px 만 차지하고 빈 상태가 위로 128px/아래 296px 로 치우쳤다.
+ *
+ * 빈 상태가 있는 화면에서만 그 래퍼에 높이를 넘긴다(:has 로 스코프를 좁힌다 — 콘텐츠가
+ * 있는 평소 화면에는 이 규칙이 적용되지 않는다).
+ */
+.tm-scroll-area:has(.tm-list-empty) > * {
+  min-height: 100%;
+}
+
 .tm-empty-icon {
   width: 80px;
   height: 80px;

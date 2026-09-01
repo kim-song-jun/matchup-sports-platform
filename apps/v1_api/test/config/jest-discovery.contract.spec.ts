@@ -133,8 +133,19 @@ describe('v1_api Jest integration discovery contract', () => {
   /**
    * `e2e-spec` 은 **`test/integration/` 아래에만** 둔다 — config 의 두 번째 글롭이
    * `test/integration/**` 로 한정돼 있어서, 다른 디렉터리에 두면 **조용히 안 돌아간다.**
-   * 위 계약은 "선택된 것 == 디스크에서 기대한 것" 을 보므로 이 위치 규칙을 못 잡는다
-   * (기대값도 같이 틀리기 때문이다). 그래서 별도로 못박는다.
+   *
+   * ## 위 계약도 이걸 잡는다 — 이 테스트는 **원인을 보이게** 하려고 있다
+   * `collectSpecFiles` 는 접미사만 보므로 stray 도 `expected` 에 들어가고, `listed` 에는
+   * 없으니 위 `toEqual` 이 실패한다. **중복이 아니냐**는 질문이 정당한데, 실패 메시지를
+   * 나란히 재 보면 갈린다(2026-09-01 실측):
+   * ```
+   * 위 계약    89줄 배열 diff 안의 한 줄. 파일명은 보이지만 **왜 문제인지 안 보이고**,
+   *            글롭이 망가졌을 때와 diff 모양이 같아 원인이 구분되지 않는다
+   * 이 테스트  Array [] vs ["test/games/stray-check.e2e-spec.ts"] — 테스트 이름이
+   *            "under test/integration so the config glob can see it" 이라 원인이 즉시 읽힌다
+   * ```
+   * 즉 **같은 결함을 두 번 잡는 게 아니라, 진단을 남기는 것**이다. 위 계약이 잡는다는 이유로
+   * 지우면 다음 사람은 89줄 diff 에서 한 줄을 찾아 의미를 스스로 복원해야 한다.
    */
   it('keeps every e2e-spec under test/integration so the config glob can see it', () => {
     const strays = collectSpecFiles(resolve(apiRoot, 'test'))
@@ -159,7 +170,9 @@ describe('v1_api Jest integration discovery contract', () => {
         ?.testPathIgnorePatterns ?? [];
     const onDisk = collectSpecFiles(resolve(apiRoot, 'test'));
 
-    expect(patterns.length).toBeGreaterThan(0);
+    /* `patterns.length > 0` 을 두지 않는다 — **빚을 다 갚아 목록이 비는 것은 목표 상태**이고,
+       그걸 red 로 만들면 이 스펙이 자기 목적을 방해한다. 여기서 막을 실패는 "죽은 제외가
+       남는 것" 하나뿐이고, 그건 아래 한 줄이 전부 검사한다(빈 배열이면 자연히 통과). */
     const dead = patterns.filter((pattern) => !onDisk.some((f) => new RegExp(pattern).test(f)));
     expect(dead).toEqual([]);
   });

@@ -29,7 +29,8 @@ Alpha 앱에서 `내 팀 → 팀 상세 → 팀 전적(전체/대회/리그/친�
 - [x] 대표 선수 카드와 개인 기록에 출전·득점·도움 등 공식 경기 기반 기록이 보인다.
 - [x] 시드는 재실행해도 중복 데이터가 생기지 않고 기존 사용자의 공개 설정 선택을 덮어쓰지 않는다.
 - [x] 변경 계약을 검증하는 좁은 테스트와 committed-tree 검증이 통과한다.
-- [ ] 모바일 앱 기준 주요 화면 스크린샷을 남긴다.
+- [x] 모바일 앱 기준 주요 화면 스크린샷을 남긴다.
+- [x] 쇼케이스 팀 로고는 생성 폼과 동일한 10개 번들 프리셋 중 재현 가능한 무작위 순서로 DB에 저장한다.
 
 ## Work Plan
 
@@ -37,7 +38,7 @@ Alpha 앱에서 `내 팀 → 팀 상세 → 팀 전적(전체/대회/리그/친�
 - [x] 쇼케이스 팀·선수·경기·후기 시드를 구현한다.
 - [x] 요청 여정에 맞게 프론트 진입점과 전적 탭을 정리한다.
 - [x] 단위/통합 검증 후 alpha에 배포한다.
-- [ ] 390px 모바일 화면에서 전 여정을 확인하고 스크린샷을 캡처한다.
+- [x] 390px 모바일 화면에서 전 여정을 확인하고 스크린샷을 캡처한다.
 
 ## Progress Snapshot
 
@@ -51,9 +52,17 @@ Alpha 앱에서 `내 팀 → 팀 상세 → 팀 전적(전체/대회/리그/친�
 - 남은 작업은 로그인 세션에서 마이페이지를 포함한 10개 모바일 화면을 시각 검증하고 지정 폴더로 복사하는 것이다.
 - 2026-08-30: 사용자 피드백에 따라 화면에 노출되던 `(테스트)`, `QA`, 번호형 선수명을 제거하고, 5개 팀·20명 선수로 구성된 자연스러운 서울 풋살 리그 데이터셋으로 확장한다. 팀/선수 소개에는 Alpha 쇼케이스 고지를 유지한다.
 - Alpha 1차 배포 후 공개 프로필 `recentActivity.teamName`에 과거 side snapshot(`팀밋fs`)이 남은 것을 확인했다. 시드 소유 게임의 표시 스냅샷만 현재 팀명으로 동기화하고 공식 결과·fact는 유지한다.
+- 2026-08-31: 로컬 스크린샷 재현을 시작했다. 기존 로컬 DB를 reset하지 않고 별도 `teameet_alpha` DB를 사용하며, 자연스러운 5개 팀에는 10개 번들 로고 후보를 고정 셔플 순서로 분산 저장한다.
+- 2026-08-31: 완료 대회 7경기의 레거시 스코어를 로컬 전용 안전 가드 아래 `V1Game` OFFICIAL revision, team record fact, result participant, goal event로 투영했다. 팀 전체 전적 7건(대회 4·리그 1·친선 2)과 대표 사용자 개인 기록 7건을 실제 API로 확인했다.
+- 2026-08-31: 390x844 headed Chromium 캡처 17/17, page/console/API 오류 0건을 확인하고 PNG 17개와 manifest를 요청한 바탕화면 폴더에 전달했다.
+- 2026-09-01: 완료된 쇼케이스 게임의 `LIVE` 공개 정책이 public-live OFF 환경에서 `STATUS_ONLY`로 강등되어 `결과 비공개`가 되던 원인을 수정했다. 시드가 소유한 완료 대회·리그·친선 게임만 `OFFICIAL_ONLY`로 복구하고, 미완 경기와 사용자 기록 공개 동의 선택은 덮어쓰지 않는다.
+- 2026-09-01: 실제 API에서 전체 7경기(4승 2무 1패), 대회 4경기, 리그 1경기, 친선 2경기와 누락 스코어 0건을 확인했다. 1주차 리그 상세는 공식 4:2, 이벤트 6건, 비공개 선수 0명이다.
+- 2026-09-01: `output/playwright/task-158-local-showcase`에 headed Chromium 17/17(390x844, console/page/network/API 오류 0)과 `output/task158/android-emulator`에 API 36 Android 캡처 6장을 저장했다.
+
+- 2026-09-01: Confirmed live Alpha had the featured team at 4/8 with seven completed records; expanded only the featured squad to 15/20 and added guarded result projection after game backfill and before standings recalculation.
 
 ## Ambiguity Log
 
 - “실데이터처럼”은 production 사용자의 실제 활동을 조작하는 뜻이 아니라, Alpha 전용임이 명확한 실제 관계형 DB 행과 공식 집계 경로를 사용하는 것으로 해석한다.
 - 팀명·선수명은 실존 구단/인물을 복제하지 않는 자연스러운 가상 이름을 사용한다. 실제 데이터처럼 보이게 만드는 범위는 관계·기록·화면 정합성까지이며 실사용자 활동으로 오인시키는 사칭은 범위 밖이다.
-- 스크린샷은 Android WebView와 같은 모바일 viewport의 Alpha 웹 화면을 기준으로 하며, 실제 기기 최종 확인은 다른 컴퓨터에서 이어갈 수 있게 결과 경로와 계정을 문서화한다.
+- 로컬 Android 증거는 production Next 서버를 API 36 에뮬레이터 Chrome에서 열어 캡처한다. 앱 셸은 HTTPS 고정 origin을 fail-closed로 강제하므로, 아직 배포하지 않은 로컬 데이터를 임시 HTTP WebView로 우회하지 않는다. 서명된 Alpha WebView 최종 확인은 이 변경이 Alpha에 배포된 뒤 같은 경로로 반복한다.

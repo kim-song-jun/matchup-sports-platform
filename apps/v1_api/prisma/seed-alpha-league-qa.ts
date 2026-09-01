@@ -5,6 +5,7 @@ import {
   V1IdentityActorType,
   V1TeamMatchApplicationStatus,
   V1TeamMatchStatus,
+  V1VisibilityMode,
 } from '@prisma/client';
 // 같은 `prisma/` 폴더 안의 모듈이라 프로덕션 이미지에도 함께 복사된다(`seed-alpha-tournament-qa.ts`
 // 상단 주석과 같은 이유). `assertAlphaSeedAllowed`는 alpha 전용 4중 가드를 그대로 재사용하고,
@@ -12,6 +13,7 @@ import {
 // 공개 기록 동의를 GRANTED로 만드는 헬퍼다 — 기존 alpha QA 페르소나 관행과 동일한 소스를 쓴다.
 import {
   assertAlphaSeedAllowed,
+  alphaTeamLogoPreset,
   ensureAlphaQaRecordConsent,
   FEATURED_PERSONAS,
   FEATURED_TEAMS,
@@ -96,6 +98,23 @@ export const LEAGUE_PLAYER_NAMES = [
   ['최민석', '김재윤', '임성호', '조하람'],
   ['박건우', '이승민', '김도현', '장예준'],
 ] as const;
+
+export const SHOWCASE_RESERVE_PERSONAS = [
+  { id: 'ab200000-0000-4000-8000-000000000005', email: 'summer.cup.squad05@teameet.alpha', phone: '01002000005', nickname: '\uC815\uC7AC\uC6D0', realName: '\uC815\uC7AC\uC6D0', gender: 'male' },
+  { id: 'ab200000-0000-4000-8000-000000000006', email: 'summer.cup.squad06@teameet.alpha', phone: '01002000006', nickname: '\uD55C\uC11C\uC724', realName: '\uD55C\uC11C\uC724', gender: 'female' },
+  { id: 'ab200000-0000-4000-8000-000000000007', email: 'summer.cup.squad07@teameet.alpha', phone: '01002000007', nickname: '\uC724\uD0DC\uD638', realName: '\uC724\uD0DC\uD638', gender: 'male' },
+  { id: 'ab200000-0000-4000-8000-000000000008', email: 'summer.cup.squad08@teameet.alpha', phone: '01002000008', nickname: '\uC1A1\uC9C0\uC6B0', realName: '\uC1A1\uC9C0\uC6B0', gender: 'female' },
+  { id: 'ab200000-0000-4000-8000-000000000009', email: 'summer.cup.squad09@teameet.alpha', phone: '01002000009', nickname: '\uC784\uD604\uC218', realName: '\uC784\uD604\uC218', gender: 'male' },
+  { id: 'ab200000-0000-4000-8000-000000000010', email: 'summer.cup.squad10@teameet.alpha', phone: '01002000010', nickname: '\uBC30\uC218\uBE48', realName: '\uBC30\uC218\uBE48', gender: 'female' },
+  { id: 'ab200000-0000-4000-8000-000000000011', email: 'summer.cup.squad11@teameet.alpha', phone: '01002000011', nickname: '\uC2E0\uB3C4\uC724', realName: '\uC2E0\uB3C4\uC724', gender: 'male' },
+  { id: 'ab200000-0000-4000-8000-000000000012', email: 'summer.cup.squad12@teameet.alpha', phone: '01002000012', nickname: '\uBB38\uC608\uB9B0', realName: '\uBB38\uC608\uB9B0', gender: 'female' },
+  { id: 'ab200000-0000-4000-8000-000000000013', email: 'summer.cup.squad13@teameet.alpha', phone: '01002000013', nickname: '\uC870\uBBFC\uC11D', realName: '\uC870\uBBFC\uC11D', gender: 'male' },
+  { id: 'ab200000-0000-4000-8000-000000000014', email: 'summer.cup.squad14@teameet.alpha', phone: '01002000014', nickname: '\uB958\uD558\uC740', realName: '\uB958\uD558\uC740', gender: 'female' },
+  { id: 'ab200000-0000-4000-8000-000000000015', email: 'summer.cup.squad15@teameet.alpha', phone: '01002000015', nickname: '\uC624\uC900\uD638', realName: '\uC624\uC900\uD638', gender: 'male' },
+] as const;
+
+export const SHOWCASE_SQUAD_PERSONAS = [...FEATURED_PERSONAS, ...SHOWCASE_RESERVE_PERSONAS] as const;
+const SHOWCASE_MEMBER_GOAL_COUNT = 20;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const PLACE_NAME = '서울 송파 풋살파크';
@@ -242,6 +261,7 @@ async function ensureLeagueTeams(
     await tx.v1TeamProfile.upsert({
       where: { teamId: team.id },
       update: {
+        logoUrl: alphaTeamLogoPreset(teamNo + 4),
         description: `서울 지역에서 주 1회 정기 경기를 진행하는 풋살 팀입니다. ${LEAGUE_TITLE} 참가팀이며 Alpha 쇼케이스 데이터입니다.`,
         activityNote: `매주 수·일 저녁 · 서울 ${activityArea}`,
         activityDays: ['wed', 'sun'],
@@ -254,6 +274,7 @@ async function ensureLeagueTeams(
       },
       create: {
         teamId: team.id,
+        logoUrl: alphaTeamLogoPreset(teamNo + 4),
         description: `서울 지역에서 주 1회 정기 경기를 진행하는 풋살 팀입니다. ${LEAGUE_TITLE} 참가팀이며 Alpha 쇼케이스 데이터입니다.`,
         activityNote: `매주 수·일 저녁 · 서울 ${activityArea}`,
         activityDays: ['wed', 'sun'],
@@ -466,7 +487,52 @@ async function ensureShowcaseRoster(
   tx: Prisma.TransactionClient,
 ): Promise<LeagueTeamRoster> {
   const teamSeed = FEATURED_TEAMS[0];
-  const playerIds = FEATURED_PERSONAS.map((persona) => persona.id);
+  const now = new Date();
+  for (const persona of SHOWCASE_RESERVE_PERSONAS) {
+    const user = await tx.v1User.upsert({
+      where: { id: persona.id },
+      update: {
+        email: persona.email,
+        phone: persona.phone,
+        phoneVerifiedAt: now,
+        emailVerifiedAt: now,
+        accountStatus: 'active',
+        onboardingStatus: 'completed',
+        deletedAt: null,
+      },
+      create: {
+        id: persona.id,
+        email: persona.email,
+        phone: persona.phone,
+        phoneVerifiedAt: now,
+        emailVerifiedAt: now,
+        accountStatus: 'active',
+        onboardingStatus: 'completed',
+      },
+    });
+    await tx.v1UserProfile.upsert({
+      where: { userId: user.id },
+      update: {
+        nickname: persona.nickname,
+        displayName: persona.nickname,
+        realName: persona.realName,
+        gender: persona.gender,
+        birthDate: '1997-01-15',
+        bio: '\uC11C\uC6B8 \uB098\uC774\uD2B8 FC\uC5D0\uC11C \uD65C\uB3D9\uD558\uB294 \uD48B\uC0B4 \uC120\uC218\uC785\uB2C8\uB2E4. Alpha \uC1FC\uCF00\uC774\uC2A4 \uACC4\uC815\uC785\uB2C8\uB2E4.',
+        deletedAt: null,
+      },
+      create: {
+        userId: user.id,
+        nickname: persona.nickname,
+        displayName: persona.nickname,
+        realName: persona.realName,
+        gender: persona.gender,
+        birthDate: '1997-01-15',
+        bio: '\uC11C\uC6B8 \uB098\uC774\uD2B8 FC\uC5D0\uC11C \uD65C\uB3D9\uD558\uB294 \uD48B\uC0B4 \uC120\uC218\uC785\uB2C8\uB2E4. Alpha \uC1FC\uCF00\uC774\uC2A4 \uACC4\uC815\uC785\uB2C8\uB2E4.',
+      },
+    });
+  }
+  const playerIds = SHOWCASE_SQUAD_PERSONAS.map((persona) => persona.id);
   const existingUsers = await tx.v1User.findMany({
     where: { id: { in: playerIds } },
     select: { id: true },
@@ -475,7 +541,7 @@ async function ensureShowcaseRoster(
     throw new Error('Featured tournament roster must be seeded before the team showcase.');
   }
 
-  const jerseyNumbers = [10, 7, 11, 1] as const;
+  const jerseyNumbers = [10, 7, 11, 1, 3, 5, 6, 8, 9, 12, 13, 14, 16, 17, 18] as const;
   for (const [index, userId] of playerIds.entries()) {
     await ensureAlphaQaRecordConsent(tx, userId);
     await tx.v1TeamMembership.upsert({
@@ -486,7 +552,7 @@ async function ensureShowcaseRoster(
         userId,
         role: index === 0 ? 'owner' : index === 1 ? 'manager' : 'member',
         status: 'active',
-        joinedAt: new Date(),
+        joinedAt: now,
         jerseyNumber: jerseyNumbers[index],
       },
     });
@@ -498,6 +564,7 @@ async function ensureShowcaseRoster(
   await tx.v1TeamProfile.update({
     where: { teamId: teamSeed.id },
     data: {
+      logoUrl: alphaTeamLogoPreset(1),
       description: '서울 송파구를 중심으로 매주 활동하는 풋살 팀입니다. 대회·리그·친선 경기에 꾸준히 참가하며, Alpha 쇼케이스 데이터로 운영됩니다.',
       activityNote: '매주 화·토 저녁 · 서울 송파구',
       activityDays: ['tue', 'sat'],
@@ -505,7 +572,7 @@ async function ensureShowcaseRoster(
       activityTimeSlots: ['evening'],
       activityTypes: ['league', 'friendly', 'tournament'],
       skillNote: '중급 · 패스와 전환 플레이 중심',
-      memberGoalCount: 8,
+      memberGoalCount: SHOWCASE_MEMBER_GOAL_COUNT,
     },
   });
   return { id: teamSeed.id, name: teamSeed.name, playerIds };
@@ -590,6 +657,17 @@ async function ensureGameSkeleton(
       tx.v1GameSide.update({ where: { id: homeSide.id }, data: { displayNameSnapshot: home.name } }),
       tx.v1GameSide.update({ where: { id: awaySide.id }, data: { displayNameSnapshot: away.name } }),
     ]);
+    // 완료된 Alpha 쇼케이스 경기는 공개 라이브 기능 플래그와 무관하게 공식 결과를
+    // 노출해야 한다. LIVE 모드는 플래그가 꺼진 배포에서 STATUS_ONLY로 강등되어 이미
+    // 확정된 스코어까지 "결과 비공개"가 되므로, 시드가 소유한 완료 경기만
+    // OFFICIAL_ONLY로 고정한다. 아직 결과가 없는 경기는 운영 상태를 덮지 않는다.
+    if (spec.result !== null) {
+      await tx.v1GameVisibilityPolicy.upsert({
+        where: { gameId: existingGame.id },
+        update: { mode: V1VisibilityMode.OFFICIAL_ONLY },
+        create: { gameId: existingGame.id, mode: V1VisibilityMode.OFFICIAL_ONLY },
+      });
+    }
     return {
       gameId: existingGame.id,
       currentOfficialRevisionId: existingGame.currentOfficialRevisionId,
@@ -614,7 +692,14 @@ async function ensureGameSkeleton(
   // 그 함수의 malformed-config 폴백값(2)과 동일하게 하드코딩한다.
   await tx.v1GamePeriod.upsert({ where: { gameId_number: { gameId: game.id, number: 1 } }, update: {}, create: { gameId: game.id, number: 1 } });
   await tx.v1GamePeriod.upsert({ where: { gameId_number: { gameId: game.id, number: 2 } }, update: {}, create: { gameId: game.id, number: 2 } });
-  await tx.v1GameVisibilityPolicy.upsert({ where: { gameId: game.id }, update: {}, create: { gameId: game.id } });
+  await tx.v1GameVisibilityPolicy.upsert({
+    where: { gameId: game.id },
+    update: {},
+    create: {
+      gameId: game.id,
+      mode: spec.result === null ? V1VisibilityMode.LIVE : V1VisibilityMode.OFFICIAL_ONLY,
+    },
+  });
 
   return {
     gameId: game.id,

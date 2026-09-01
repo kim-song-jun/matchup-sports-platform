@@ -403,6 +403,13 @@ fi
 # 배포를 깨뜨리지 않는다 — 그래서 이 자리에 두어도 안전하다.
 "${compose[@]}" run --rm --no-deps -T v1_api sh -c \
   'cd /app/apps/v1_api && node dist/src/games/migration/fixture-game-backfill.cli.js'
+# Project the seed-owned completed showcase results into official public records.
+# Production execution is allowed only by the alpha origin/flag/database guard.
+"${compose[@]}" run --rm --no-deps -T \
+  -e V1_ALPHA_QA_SEED=true \
+  -e V1_ALPHA_QA_ORIGIN=https://alpha.teameet.co.kr \
+  v1_api sh -c \
+  'cd /app/apps/v1_api && ./node_modules/.bin/ts-node prisma/seed-alpha-showcase-results.ts'
 # QA 시드는 더 이상 V1TournamentStanding 행을 만들지 않는다(과거엔 배열 인덱스만으로
 # 승점/득실을 하드코딩해 실제 픽스처 결과와 모순되는 값이 나갔다). fixture-game-backfill
 # 뒤에서 돌아야 하는 이유는 순위 재계산이 그 백필이 만드는 V1Game.currentOfficialRevision

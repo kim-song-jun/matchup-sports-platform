@@ -10,6 +10,10 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import {
+  COMPETITION_LIST_KINDS,
+  type CompetitionListKind,
+} from '../tournament-surface';
 
 /**
  * 소비자 대회 목록 쿼리 — 공개 노출 status(open/closed/in_progress/completed)만 필터.
@@ -31,6 +35,18 @@ export class TournamentListQueryDto {
   @IsOptional()
   @IsUUID()
   sportId?: string;
+
+  /**
+   * 담을 종류. **기본값은 `tournament`** — 지금까지의 동작을 그대로 유지한다.
+   *
+   * 기본값을 `all` 로 두지 않은 이유: 이 파라미터만 들어가고 화면이 아직 두 종류를 그리지
+   * 못하는 창에서, `/tournaments` 를 여는 기존 사용자가 **구분되지 않는 섞인 목록**을 보게
+   * 된다(대회는 참가비·정원, 리그는 시즌 기간·티어라 카드가 담는 정보가 다르다).
+   * 화면이 준비된 뒤 기본값을 `all` 로 뒤집는다.
+   */
+  @IsOptional()
+  @IsIn(COMPETITION_LIST_KINDS)
+  kind?: CompetitionListKind;
 
   @IsOptional()
   @IsString()

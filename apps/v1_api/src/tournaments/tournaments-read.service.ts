@@ -8,7 +8,7 @@ import { presentTournamentCard } from './tournament-card.presenter';
 import { presentTournamentDetail } from './tournament-detail.presenter';
 import { TournamentListQueryDto } from './dto/tournament-read.dto';
 import { leagueProgressOf, magicNumberOf } from './league-progress';
-import { TOURNAMENT_SURFACE_KIND } from './tournament-surface';
+import { COMPETITION_LIST_SURFACE } from './tournament-surface';
 import { findTournamentOnSurface, ALL_COMPETITION_KINDS } from './tournament-surface-lookup';
 import { hasTournamentFixtureOfficialResult } from './tournament-fixture-official-result';
 import {
@@ -83,8 +83,10 @@ export class TournamentsReadService {
     const limit = query.limit ?? 20;
 
     const where: Prisma.V1TournamentWhereInput = {
-      // 정규 리그 시즌은 대회 목록에 나오지 않는다 — 근거는 상수 쪽 주석.
-      ...TOURNAMENT_SURFACE_KIND,
+      // 어느 종류를 담을지는 **표가 정한다**(`COMPETITION_LIST_SURFACE`) — 호출부가 조건을
+      // 조립하지 않는다. 기본값 `tournament` 는 지금까지의 동작 그대로다: 리그는 안 나온다.
+      // `kind=all` 로 여는 것은 표면 결정이라 `v1-surface-check` 가 사용처를 세어 묶는다.
+      ...COMPETITION_LIST_SURFACE[query.kind ?? 'tournament'],
       deletedAt: null,
       status: query.status ? query.status : PUBLIC_TOURNAMENT_STATUS_FILTER,
       ...(query.sportId ? { sportId: query.sportId } : {}),

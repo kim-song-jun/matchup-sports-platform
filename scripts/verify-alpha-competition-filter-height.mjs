@@ -45,6 +45,20 @@ async function servingCommit() {
   return res.headers.get('x-teameet-commit') ?? '(헤더 없음)';
 }
 
+/**
+ * 대회 탭에서 `?status=draft` 로 들어왔을 때 **요약 줄에 '준비 중' 이 남는가**.
+ *
+ * 칩(입구)만 막고 URL(뒷문)을 안 막으면 *"요약엔 준비 중이라 쓰여 있는데 목록은 0건이고
+ * 해제할 칩도 없는"* 막다른 상태가 된다. **데이터는 안 새므로 API 로는 안 잡힌다** — 화면
+ * 상태라 렌더로만 확인된다.
+ */
+const MEASURE_SUMMARY_LEAK = () => {
+  const summary = document.querySelector('.tm-competition-filter-summary');
+  if (summary === null) return { err: '요약 줄을 못 찾았다' };
+  const text = (summary.textContent || '').trim();
+  return { summaryText: text, leaks: /준비 중/.test(text) };
+};
+
 /** 브라우저 안에서: 섹션 제목 시작 y ~ 첫 카드 시작 y 의 거리. */
 const MEASURE = () => {
   const title = [...document.querySelectorAll('*')].find(
@@ -109,9 +123,37 @@ async function main() {
       await new Promise((r) => setTimeout(r, 4_000)); // 403 회피 간격
     }
   } finally {
-    await browser.close();
+    /* 요약 누수 측정에서 계속 쓴다 — 아래에서 닫는다 */
+  }
+  const browser2 = browser;
+
+  // ── 요약 줄 누수: 대회 탭 + ?status=draft (모바일 한 폭이면 충분하다 — 폭과 무관한 성질이다)
+  {
+    const ctx = await browser2.newContext({ viewport: { width: 390, height: 844 } });
+    const page = await ctx.newPage();
+    try {
+      const res = await page.goto(`${BASE}/tournaments?kind=tournament&status=draft`, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+      const status = res?.status() ?? 0;
+      if (status >= 400) {
+        rows.push({ 폭: '요약누수', HTTP: status, 필터높이: '-', 기준선: '-', 구성: '-', 판정: `⚠️ HTTP ${status} — 못 쟀다` });
+      } else {
+        await page.waitForTimeout(SETTLE_MS);
+        const r = await page.evaluate(MEASURE_SUMMARY_LEAK);
+        rows.push({
+          폭: '요약누수',
+          HTTP: status,
+          필터높이: '-',
+          기준선: "'준비 중' 없어야",
+          구성: r.err ? '-' : `"${(r.summaryText ?? '').slice(0, 20)}"`,
+          판정: r.err ? `⚠️ ${r.err}` : r.leaks ? "❌ 대회 탭 요약에 '준비 중' 이 남는다" : '✅',
+        });
+      }
+    } finally {
+      await ctx.close();
+    }
   }
 
+  await browser.close();
   console.table(rows);
   const after = await servingCommit();
   console.log(`서빙(후)  ${after}`);

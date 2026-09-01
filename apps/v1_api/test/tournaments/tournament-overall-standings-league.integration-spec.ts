@@ -107,6 +107,10 @@ describe('통합 순위 — 정규 리그 거울 행 (real DB)', () => {
         tier: league.tier,
         seasonNo: league.seasonNo,
         sportCode: 'futsal',
+        // **실물 값을 넘긴다** — `new Date()` 를 넣으면 이 픽스처가 만드는 거울이 실물과
+        // 달라진다(거울의 createdAt 은 원본 리그의 것이어야 한다는 게 이 헬퍼의 계약이다).
+        // 픽스처가 실물과 다르면 여기서 통과하는 것이 프로덕션을 증명하지 못한다.
+        createdAt: league.createdAt,
       }),
     });
 

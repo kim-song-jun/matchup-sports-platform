@@ -11,7 +11,7 @@ import {
   organizationId,
   serializeJsonLd,
 } from './structured-data';
-import type { V1Team, V1TournamentDetail } from '@/types/api';
+import type { V1TeamDetail, V1TournamentDetail } from '@/types/api';
 
 function tournament(overrides: Partial<V1TournamentDetail> = {}): V1TournamentDetail {
   return {
@@ -127,36 +127,56 @@ describe('buildSportsEventLd', () => {
 });
 
 describe('buildSportsTeamLd', () => {
-  const team = {
-    id: 'team-1',
-    name: '강남 FC',
-    sportName: '풋살',
-    regionName: '서울 강남구',
-    memberCount: 12,
-    trustState: 'none',
-    joinPolicy: 'approval_required',
-    introductionPreview: '주말   저녁에\n모이는 팀입니다',
-  } as unknown as V1Team;
+  /** 팀 **상세** 응답 모양 — 로고·소개가 `profile` 아래에 있는 것이 목록 응답과 다른 점이다. */
+  function team(profile: Partial<V1TeamDetail['profile']> = {}): V1TeamDetail {
+    return {
+      id: 'team-1',
+      teamId: 'team-1',
+      name: '강남 FC',
+      sport: { sportId: 's1', name: '풋살' },
+      region: { regionId: 'r1', name: '서울 강남구' },
+      profile: {
+        logoUrl: null,
+        coverImageUrl: null,
+        introduction: '주말   저녁에\n모이는 팀입니다',
+        ...profile,
+      },
+    } as unknown as V1TeamDetail;
+  }
 
-  it('팀 로고·커버도 절대 URL 로 내보낸다', () => {
-    const ld = buildSportsTeamLd({ ...team, logoUrl: '/uploads/logo.png', coverImageUrl: null } as unknown as V1Team);
+  it('상세 응답의 profile 에서 로고·소개를 읽는다 — 목록 구조로 읽으면 통째로 빠진다', () => {
+    // 실사고: 목록 타입(`logoUrl` 최상위)으로 읽어 로고·커버·소개가 전부 LD 에서 누락됐다.
+    const ld = buildSportsTeamLd(team({ logoUrl: '/images/team-logos/a.jpg' }));
 
-    expect(ld.logo).toBe('https://teameet.co.kr/uploads/logo.png');
-    expect(ld.image).toBe('https://teameet.co.kr/uploads/logo.png');
+    expect(ld.logo).toBe('https://teameet.co.kr/images/team-logos/a.jpg');
+    expect(ld.image).toBe('https://teameet.co.kr/images/team-logos/a.jpg');
+    expect(ld.description).toBe('주말 저녁에 모이는 팀입니다');
   });
 
-  it('팀 화면의 종목·지역·소개를 SportsTeam 으로 옮긴다', () => {
-    const ld = buildSportsTeamLd(team);
+  it('커버가 있으면 커버를 대표 이미지로 쓴다', () => {
+    const ld = buildSportsTeamLd(team({ logoUrl: '/a.png', coverImageUrl: '/b.png' }));
+
+    expect(ld.image).toBe('https://teameet.co.kr/b.png');
+    expect(ld.logo).toBe('https://teameet.co.kr/a.png');
+  });
+
+  it('팀 화면의 종목·지역을 SportsTeam 으로 옮긴다', () => {
+    const ld = buildSportsTeamLd(team());
 
     expect(ld).toMatchObject({
       '@type': 'SportsTeam',
       name: '강남 FC',
       sport: '풋살',
       memberOf: { '@id': organizationId() },
-      // 줄바꿈·중복 공백은 한 칸으로 정규화된다.
-      description: '주말 저녁에 모이는 팀입니다',
     });
     expect(ld.location).toMatchObject({ '@type': 'Place', name: '서울 강남구' });
+  });
+
+  it('이미지가 없으면 image/logo 를 아예 넣지 않는다', () => {
+    const ld = buildSportsTeamLd(team());
+
+    expect(ld).not.toHaveProperty('logo');
+    expect(ld).not.toHaveProperty('image');
   });
 });
 

@@ -4,7 +4,7 @@ import { TeamDetailPageClient } from '@/components/teams/teams-client';
 import { JsonLd } from '@/components/seo/json-ld';
 import { buildNoIndexMetadata, buildPublicMetadata, fetchPublicV1, metadataDescription } from '@/lib/seo';
 import { buildBreadcrumbLd, buildSportsTeamLd } from '@/lib/structured-data';
-import type { V1Team } from '@/types/api';
+import type { V1Team, V1TeamDetail } from '@/types/api';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
@@ -24,7 +24,9 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function TeamDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const team = await fetchPublicV1<V1Team>(`/teams/${encodeURIComponent(id)}`);
+  // 상세 응답은 목록과 구조가 다르다(로고·소개가 profile 아래) — 구조화 데이터가 그 값을
+  // 읽어야 하므로 상세 타입으로 받는다.
+  const team = await fetchPublicV1<V1TeamDetail>(`/teams/${encodeURIComponent(id)}`);
   if (!team) notFound();
 
   return (

@@ -1,10 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { ClipboardEdit, Wallet, ListChecks, Grid2x2, GitFork, Trophy, Sparkles } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
-import { CompetitionKindSegment } from '@/components/v1-ui/competition-kind-segment';
+import {
+  CompetitionKindSegment,
+  parseCompetitionKind,
+  type CompetitionKind,
+} from '@/components/v1-ui/competition-kind-segment';
 import { EmptyState, ErrorState, SectionTitle } from '@/components/v1-ui/primitives';
 import { TournamentPromoCarousel } from '@/components/tournaments/tournament-promo-carousel';
 import { useV1AllTournaments, useV1Tournaments, useV1MasterSports } from '@/hooks/use-v1-api';
@@ -15,11 +20,17 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { TournamentCard } from './tournament-card';
 import type { V1TournamentListItem } from '@/types/api';
 
+/**
+ * `?kind=` 를 읽는 `useSearchParams` 는 App Router 에서 Suspense 경계를 요구한다
+ * (경계가 없으면 페이지 전체가 CSR 로 떨어진다). 유형 세그먼트는 이제 목록 헤더 아래에
+ * 있으므로 `TournamentsListContent` 안에서 함께 그려진다.
+ */
 export default function TournamentsPage() {
   return (
     <AppChrome title="대회" activeTab="tournaments" showNotifications>
-      <CompetitionKindSegment active="tournament" />
-      <TournamentsListContent />
+      <Suspense fallback={null}>
+        <TournamentsListContent />
+      </Suspense>
     </AppChrome>
   );
 }
@@ -69,6 +80,25 @@ export function TournamentsListContent() {
   // D3: 종목 필터 — null = '전체'
   const [activeSportId, setActiveSportId] = useState<string | null>(null);
 
+  /* 유형 필터(전체/정규 대회/정규 리그)는 **URL 이 소유한다** — 링크로 공유되고 뒤로가기가
+     통해야 하기 때문이다. 종목 필터는 컴포넌트 state 그대로 둔다: 유형은 "어느 목록을
+     보는가"라 주소가 되어야 하지만, 종목은 그 안에서의 일시적 좁히기다.
+     **기본은 `all`** — 쿼리 없는 `/tournaments` 가 곧 "전체" 다. 그래야 세그먼트의 첫 칸이
+     성립하고(사용자가 고른 화면이다), 통합 목록이 기본 화면이 된다.
+     `/league-matches` 가 아직 살아 있어 리그를 두 곳에서 볼 수 있는데, 그건 중복일 뿐
+     깨지지 않는다 — **리다이렉트 PR 이 정리할 몫**이다. */
+  const searchParams = useSearchParams();
+  const activeKind: CompetitionKind = parseCompetitionKind(searchParams.get('kind'), 'all');
+
+  /* 유형이 바뀌면 목록 자체가 갈리므로 페이지·누적을 리셋한다 — 종목 칩과 같은 처리지만,
+     이쪽은 클릭 핸들러가 아니라 **URL 변화**가 방아쇠라 effect 로 받는다(뒤로가기로 유형이
+     바뀌는 경우까지 덮어야 한다). */
+  useEffect(() => {
+    setPage(1);
+    setCursor(undefined);
+    setAllItems([]);
+  }, [activeKind]);
+
   /* D3: 데이터드리븐 종목 필터 — DB seed 기준 유효한 종목만 노출 (하드코딩 제거) */
   const { data: sportsData } = useV1MasterSports();
   const filterSports: Array<{ id: string; label: string }> = (sportsData ?? [])
@@ -79,6 +109,7 @@ export function TournamentsListContent() {
     ...(isDesktop ? { page } : { cursor }),
     limit: TOURNAMENT_PAGE_SIZE,
     sportId: activeSportId ?? undefined,
+    kind: activeKind,
   });
   const promoTournaments = useV1AllTournaments({
     status: 'open',
@@ -177,6 +208,8 @@ export function TournamentsListContent() {
       <section id="tournament-list" aria-labelledby="tournament-list-heading" className="tm-tournament-list-section">
         <SectionTitle title="대회 목록" />
         <div id="tournament-list-heading" className="sr-only">진행 중인 대회 목록</div>
+
+        <CompetitionKindSegment active={activeKind} />
 
         <div role="group" aria-label="종목 필터" className="tm-sport-chip-row">
           {/* 전체 칩 */}

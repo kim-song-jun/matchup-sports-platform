@@ -2980,7 +2980,20 @@ export type V1TournamentListItem = {
   scheduledEndAt: string | null;
   venue: string | null;
   coverImageUrl: string | null;
-  teamCount: number;
+  /**
+   * **정원. 정규 대회에만 있다** — 리그에는 이 개념이 없어 서버가 생략한다.
+   *
+   * 거울 행은 `v1_tournaments` 에 살고 `team_count` 가 `@default(8)` 이라, 그대로 내보내면
+   * 리그 카드에 **"8팀"** 이 뜬다(실제 참가는 2팀). 그래서 `optional` 이고, **리그 카드는
+   * 참가 팀 수로 `confirmedCount` 를 쓴다.**
+   *
+   * `0` 으로 채우지 않는 이유: `0` 은 "정원이 0 인 대회" 로 읽힌다. 없는 것은 부재로 둔다.
+   */
+  teamCount?: number;
+  /** 리그 시즌에만 있다. 단발 리그는 셋 다 `null`(시리즈 없음) — 없는 것과 다르다. */
+  tier?: number | null;
+  seasonNo?: number | null;
+  seriesId?: string | null;
   genderCategory: V1TournamentGenderCategory | null;
   entryFee: number;
   prizePool: number | null;

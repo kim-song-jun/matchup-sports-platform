@@ -1024,6 +1024,134 @@ describe('TournamentDetailView — 정규 리그 거울 행', () => {
     });
   }
 
+  /**
+   * **정원 블록이 리그에 그려지면 안 된다 — 이 결함은 실제로 alpha 에 떠 있었다.**
+   *
+   * `#898` 로 이 화면을 연 뒤 리그 상세에 *"정원 2 /8팀 아직 6자리 남았어요"* 가 떴다.
+   * 8 은 `team_count` 의 스키마 기본값이고(거울은 아무도 안 넣는다) 리그엔 정원 개념이
+   * 없다 — 게다가 **참여할 방법도 없다**(리그는 status 가 `open` 이 될 수 없다).
+   *
+   * 상세는 타입이 아니라 **분기**로 닫았다(리그가 도달 못 하는 화면 5개를 안 열려고).
+   * 분기는 기억에 의존하므로 여기서 못박는다 — **진행바(컨테이너) 부재**로 단언한다.
+   * 문자열 부재만 보면 "무엇이 있으면 안 되는지" 를 안 보게 된다.
+   */
+  it('리그 상세에 정원 진행바가 없다', async () => {
+    vi.mocked(v1Get).mockResolvedValueOnce(standingsResponse);
+    const { container } = render(
+      createElement(TournamentDetailView, { tournament: makeMirror(), myRegistration: null }),
+    );
+    await screen.findByText('통합 순위');
+
+    // ⚠️ 진행바가 **둘**이다 — 순위표의 "전체 일정 진행률" 은 리그에 있는 게 정상이고,
+    // 정원 진행바만 없어야 한다. `[role=progressbar]` 를 통째로 세면 그 둘이 섞여
+    // "리그에 진행바가 있다" 로 잘못 읽힌다(실제로 처음에 그렇게 틀렸다).
+    // aria-label 로 **정원 쪽만** 겨냥한다.
+    const bars = [...container.querySelectorAll('[role="progressbar"]')];
+    expect(bars.filter((b) => (b.getAttribute('aria-label') ?? '').startsWith('정원'))).toEqual([]);
+    // 순위 진행률은 리그에도 있어야 한다 — 대조군을 같은 자리에 둔다.
+    expect(bars.some((b) => (b.getAttribute('aria-label') ?? '').includes('일정 진행률'))).toBe(true);
+    expect(screen.queryByText(/자리 남았어요/)).toBeNull();
+  });
+
+  /**
+   * 게이트를 처음 넣었을 때 **정원 진행바 두 자리만** 막았는데, 정원·참가비는 화면에 더
+   * 흩어져 있었다. 거울이 안 채우는 필드를 전수로 훑어(`teamCount` · `genderCategory` ·
+   * `entryFee` · `format` · `parkingInfo` …) 실제로 그려지는 자리를 마저 찾은 결과다.
+   *
+   * ```
+   * 참가팀 섹션        "2/8팀 확정"    ← 8 은 스키마 기본값
+   * 완료 기본정보      "2/8팀 확정" + "참가비 무료"
+   * ```
+   * `V1League` 에는 정원도 참가비도 **필드가 아예 없다** — 둘 다 미설정이 화면에 뜬 것이다.
+   */
+  it('리그 상세의 참가팀 줄에 정원이 없다 — 수를 그대로 적는다', async () => {
+    vi.mocked(v1Get).mockResolvedValueOnce(standingsResponse);
+    render(createElement(TournamentDetailView, { tournament: makeMirror(), myRegistration: null }));
+    await screen.findByText('통합 순위');
+    expect(screen.queryByText(/\/\s*8팀 확정/)).toBeNull();
+    expect(screen.getByText(/팀 참가/)).toBeInTheDocument();
+  });
+
+  it('대회 상세의 참가팀 줄에는 정원이 있다 — 대조군', () => {
+    // status='open' 이어야 헤더 숫자가 `confirmedCount` 를 쓴다(모집 중에는 서버가
+    // participantTeams 를 비워 보내므로 그쪽을 세면 0 이 된다 — 컴포넌트 주석 참조).
+    render(
+      createElement(TournamentDetailView, {
+        tournament: makeTournament({ id: 't-cap', status: 'open', format: 'knockout', teamCount: 16, confirmedCount: 4 }),
+        myRegistration: null,
+      }),
+    );
+    // 'open' 대회는 참가팀 헤더 말고도 같은 문구가 더 나온다 — 개수는 이 테스트의 관심사가 아니다.
+    expect(screen.getAllByText('4/16팀 확정').length).toBeGreaterThan(0);
+  });
+
+  it('리그 상세에 참가비를 적지 않는다 — 0 은 "무료"가 아니라 미설정이다', async () => {
+    vi.mocked(v1Get).mockResolvedValueOnce(standingsResponse);
+    render(createElement(TournamentDetailView, { tournament: makeMirror(), myRegistration: null }));
+    await screen.findByText('통합 순위');
+    expect(screen.queryByText('참가비')).toBeNull();
+  });
+
+  it('대회 상세에는 참가비를 적는다 — 대조군', () => {
+    render(
+      createElement(TournamentDetailView, {
+        tournament: makeTournament({ id: 't-cap', status: 'closed', format: 'knockout', teamCount: 16, confirmedCount: 4 }),
+        myRegistration: null,
+      }),
+    );
+    expect(screen.getAllByText('참가비').length).toBeGreaterThan(0);
+  });
+
+  it('대회 상세에는 정원 진행바가 있다 — 대조군', async () => {
+    // 이 대조군이 없으면 정원 블록을 통째로 지워도 위 테스트가 통과한다.
+    //
+    // ⚠️ **정원 진행바가 두 자리에 있다** — 모바일 카드(`tm-hide-desktop`)와 데스크탑
+    // 우측 레일. 게이트(`showsCapacity`)가 지키는 것은 **모바일 쪽**이고, 레일은
+    // `isOpen` 안에 있어 애초에 리그가 도달하지 못한다(아래 테스트에서 못박는다).
+    // 그래서 `container.querySelector('[role=progressbar]')` 로 통째로 잡으면 **레일
+    // 것이 잡혀 게이트를 지워도 통과한다** — 실제로 처음에 그렇게 vacuous 였다.
+    // 게이트가 지키는 자리만 겨냥한다.
+    //
+    // ⚠️ `mockResolvedValueOnce` 를 **쓰지 않는다** — 대회는 순위 섹션을 안 그려 v1Get 을
+    // 부르지 않고, 그러면 큐에 남은 값이 **다음 테스트로 샌다**(실제로 그렇게 깨졌다).
+    const tournament = makeTournament({
+      id: 't-capacity',
+      status: 'open',
+      format: 'knockout',
+      kind: 'regular_tournament',
+      teamCount: 16,
+      confirmedCount: 4,
+    });
+    const { container } = render(
+      createElement(TournamentDetailView, { tournament, myRegistration: null }),
+    );
+    const capacityBars = [...container.querySelectorAll('[role="progressbar"]')].filter((b) =>
+      (b.getAttribute('aria-label') ?? '').startsWith('정원'),
+    );
+    expect(capacityBars.some((b) => b.closest('.tm-hide-desktop') !== null)).toBe(true);
+  });
+
+  /**
+   * 위 대조군이 "레일 것을 잡아서" vacuous 였던 사고의 나머지 절반.
+   *
+   * 레일(`railCTA`)에도 정원 진행바가 있는데 **거기엔 게이트를 안 걸었다.** 리그가 도달할 수
+   * 없기 때문이다 — 거울의 status 는 `STATUS_BY_LEAGUE_STATE`(draft/in_progress/completed)
+   * 로만 만들어져 **`open` 이 나올 수 없고**, 레일은 `status === 'open'` 일 때만 그려진다.
+   * `open` 을 넣을 수 있는 유일한 경로인 어드민 `changeStatus` 는 진입 조회가
+   * `TOURNAMENT_KINDS` 라 거울에 닿지 않는다.
+   *
+   * 그 전제를 여기서 못박는다. 안 박으면 다음 사람은 "왜 레일만 안 막았지?" 를 다시
+   * 판단해야 하고, 전제가 깨져도 아무것도 red 가 되지 않는다.
+   */
+  it('리그 상세에는 참가 신청 레일이 아예 없다 — 레일 정원 블록을 게이팅하지 않은 근거', async () => {
+    vi.mocked(v1Get).mockResolvedValueOnce(standingsResponse);
+    const { container } = render(
+      createElement(TournamentDetailView, { tournament: makeMirror(), myRegistration: null }),
+    );
+    await screen.findByText('통합 순위');
+    expect(container.querySelector('[aria-label="참가 신청"]')).toBeNull();
+  });
+
   it('조가 없어도 통합 순위 섹션을 그린다 — 조 개수로 게이팅하면 리그는 영영 안 뜬다', async () => {
     vi.mocked(v1Get).mockResolvedValueOnce(standingsResponse);
     render(createElement(TournamentDetailView, { tournament: makeMirror(), myRegistration: null }));

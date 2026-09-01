@@ -41,3 +41,36 @@ import { Prisma } from '@prisma/client';
 export const TOURNAMENT_SURFACE_KIND: Prisma.V1TournamentWhereInput = {
   OR: [{ kind: 'regular_tournament' }, { kind: null }],
 };
+
+/**
+ * 공개 목록이 어느 종류를 담을지 — **호출부가 고르는 것이 아니라 이 표가 정한다.**
+ *
+ * `TOURNAMENT_SURFACE_KIND` 하나만 있을 때는 목록에 "리그를 빼는 것" 외의 선택지가
+ * 없었다. 통합(대회가 두 종류를 담는 우산)에서는 세 가지가 필요하다.
+ *
+ * ## ⚠️ `all` 은 **리그를 대회 목록에 넣는다** — 게이트가 세는 자리다
+ * 단건 조회는 `ALL_COMPETITION_KINDS` 를 넘기는 자리를 `v1-surface-check` 가 세서
+ * baseline 으로 묶는다. 목록은 `where` 에 상수를 펴 넣는 방식이라 **그 카운터에 안 걸린다**
+ * — 그래서 이 파일의 `COMPETITION_LIST_SURFACE` 사용처를 따로 센다(같은 스크립트).
+ * 여기를 늘리려면 baseline 을 고쳐 리뷰를 받아야 한다.
+ *
+ * `kind: null`(R1 이전 행)은 **대회 쪽에 붙는다.** 리그는 백필이 언제나 명시적으로
+ * `regular_league` 를 쓰므로 null 이 리그일 수 없다 — 위 `TOURNAMENT_SURFACE_KIND` 주석과
+ * 같은 근거다.
+ */
+export const COMPETITION_LIST_KINDS = ['all', 'tournament', 'league'] as const;
+export type CompetitionListKind = (typeof COMPETITION_LIST_KINDS)[number];
+
+/**
+ * `Record<CompetitionListKind, …>` 로 못박아 **목록과 표가 어긋날 수 없게** 한다 — 위
+ * 배열에 값을 더하면 여기서 컴파일이 깨진다(그 반대도 마찬가지). 두 곳을 손으로 맞추는
+ * 구조였다면 언젠가 하나만 늘어난다.
+ */
+export const COMPETITION_LIST_SURFACE: Record<CompetitionListKind, Prisma.V1TournamentWhereInput> = {
+  /** 두 종류를 함께 — 통합 목록. R1 이전 행도 포함한다(조건을 안 건다). */
+  all: {},
+  /** 지금까지의 기본 동작. 정규 대회 + R1 이전 행. */
+  tournament: TOURNAMENT_SURFACE_KIND,
+  /** 정규 리그 시즌만. */
+  league: { kind: 'regular_league' },
+};

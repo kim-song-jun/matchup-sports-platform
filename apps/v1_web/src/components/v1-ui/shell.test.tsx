@@ -63,6 +63,56 @@ describe('AppChrome bottom nav — 탭 5개(리그는 대회 탭 세그먼트로
   });
 });
 
+describe('AppChrome bottom nav — 활성 pill 이 하나만 있고 인덱스에 따라 미끄러진다', () => {
+  // 이 테스트가 이 변경의 계약이다: 탭마다 하나씩 ::before 를 두던 예전 구조로 되돌리면
+  // (즉 shell.tsx 의 pill 슬롯을 지우면) 이 querySelector 가 아예 null 이라 실패하고,
+  // activeTab 이 바뀌어도 transform 이 그대로면(각 탭이 다시 자기만의 정적 pill 을
+  // 그리는 구조로 퇴행하면) translateX 값이 안 바뀌므로 그것도 잡는다.
+  it('탭마다 pill 이 하나씩 있는 게 아니라 nav 전체에 슬롯이 하나뿐이다', () => {
+    const { container } = render(
+      <AppChrome title="테스트" activeTab="matches" showNotifications={false}>
+        <div>본문</div>
+      </AppChrome>
+    );
+
+    expect(container.querySelectorAll('.tm-bottom-nav-pill-slot')).toHaveLength(1);
+  });
+
+  it('activeTab 인덱스가 다르면 pill 슬롯의 translateX 값도 그만큼 다르다', () => {
+    const { container: homeContainer } = render(
+      <AppChrome title="테스트" activeTab="home" showNotifications={false}>
+        <div>본문</div>
+      </AppChrome>
+    );
+    const { container: teamsContainer } = render(
+      <AppChrome title="테스트" activeTab="teams" showNotifications={false}>
+        <div>본문</div>
+      </AppChrome>
+    );
+
+    const homeSlot = homeContainer.querySelector<HTMLElement>('.tm-bottom-nav-pill-slot');
+    const teamsSlot = teamsContainer.querySelector<HTMLElement>('.tm-bottom-nav-pill-slot');
+
+    // EXPECTED_TABS 순서상 home=index 0, teams=index 3.
+    expect(homeSlot?.style.transform).toBe('translateX(calc(0 * 100%))');
+    expect(teamsSlot?.style.transform).toBe('translateX(calc(3 * 100%))');
+    expect(homeSlot?.style.transform).not.toBe(teamsSlot?.style.transform);
+  });
+
+  // activeTab 이 5개 탭 어디에도 속하지 않는 화면(검색 등)에서 임의의 탭 위에 pill 을
+  // 남겨두면 "그 탭이 활성"이라는 거짓 신호가 된다 — 숨겨야 한다.
+  it('activeTab 이 없으면 pill 을 숨긴다', () => {
+    const { container } = render(
+      <AppChrome title="검색" showNotifications={false}>
+        <div>본문</div>
+      </AppChrome>
+    );
+
+    const slot = container.querySelector<HTMLElement>('.tm-bottom-nav-pill-slot');
+    expect(slot?.style.opacity).toBe('0');
+  });
+});
+
 describe('useV1NotificationUnreadSummary mock wiring', () => {
   it('테스트 환경에서 실제 네트워크 훅 대신 목이 호출된다', () => {
     vi.mocked(useV1NotificationUnreadSummary).mockClear();

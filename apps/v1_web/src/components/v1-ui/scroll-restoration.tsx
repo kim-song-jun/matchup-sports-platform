@@ -9,6 +9,27 @@ const DESKTOP_QUERY = '(min-width: 1024px)'; // desktop/_shell.css 의 breakpoin
   // 한다 — 이 값이 어긋나면 두 스크롤 모델(문서 vs .tm-scroll-area)이 서로 다른 지점에서
   // 전환돼 스크롤 대상이 어긋난다.
 const SAVE_DEBOUNCE_MS = 150;
+
+/**
+ * 이동의 종류. 'tab' 이 'push' 와 갈리는 것이 핵심이다.
+ *
+ * - push : 새 화면으로 들어간다(카드 클릭, CTA). 맨 위에서 시작하는 게 맞다.
+ * - pop  : 뒤로/앞으로. 보던 자리로 돌아가야 한다.
+ * - tab  : 하단 탭·데스크톱 상단 탭. **뒤로가기는 아니지만 "돌아가기"다.**
+ *
+ * 처음에는 tab 을 push 로 뭉뚱그렸다가, 실측에서 그게 정확히 "새로고침당한" 체감의
+ * 원인이라는 것이 드러났다 — 대회 목록을 500px 굴려 놓고 팀 탭에 갔다 돌아오면 0px 였다.
+ * iOS 탭바·안드로이드 하단 내비는 탭마다 스크롤 위치를 들고 있으므로, 이 앱만 매번
+ * 처음으로 되돌리면 네이티브 앱과 다르게 느껴진다.
+ *
+ * 대가: 목록이 그사이 갱신됐다면 사용자가 중간 지점에서 시작해 새로 올라온 항목을
+ * 지나칠 수 있다. 콘텐츠가 짧아졌으면 restoreWhenTallEnough 가 도달 가능한 최댓값으로
+ * 클램프하므로 화면 밖으로 튀지는 않는다.
+ */
+type NavType = 'push' | 'pop' | 'tab';
+
+/** 하단 탭(모바일) · 상단 탭(데스크톱). shell.tsx 가 붙이는 클래스와 같아야 한다. */
+const TAB_LINK_SELECTOR = '.tm-bottom-tab, .tm-desktop-nav-tab';
 const RESTORE_TIMEOUT_MS = 1500;
 
 type ScrollHost = Element | (Window & typeof globalThis);
@@ -80,7 +101,7 @@ export function restoreWhenTallEnough(el: ScrollHost, target: number): void {
 /** 층위 §0 참고: layout.tsx 레벨에 마운트되는 부수효과 전용 컴포넌트. 항상 null 렌더. */
 export function ScrollRestoration() {
   const pathname = usePathname();
-  const navTypeRef = useRef<'push' | 'pop'>('push');
+  const navTypeRef = useRef<NavType>('push');
   const firstRenderRef = useRef(true);
 
   // ① 저장 — 스크롤할 때마다(디바운스) 현재 라우트에 현재 위치를 적는다.
@@ -113,7 +134,7 @@ export function ScrollRestoration() {
       const href = anchor.getAttribute('href');
       if (!href || anchor.getAttribute('target') === '_blank' || anchor.hasAttribute('download')) return;
       if (href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) return;
-      navTypeRef.current = 'push';
+      navTypeRef.current = anchor.closest(TAB_LINK_SELECTOR) ? 'tab' : 'push';
     };
     window.addEventListener('popstate', onPopState);
     document.addEventListener('click', onClick, true);
@@ -132,10 +153,11 @@ export function ScrollRestoration() {
     const el = getScrollElement();
     if (!el) return;
 
-    if (navTypeRef.current === 'pop') {
+    if (navTypeRef.current === 'pop' || navTypeRef.current === 'tab') {
       const saved = readScrollPosition(getCurrentRedirectPath());
       if (saved != null) restoreWhenTallEnough(el, saved);
-      // 저장된 값이 없으면(예: 딥링크로 직접 진입) 아무 것도 하지 않는다 — 이미 0이다.
+      // 저장된 값이 없으면(예: 딥링크로 직접 진입, 또는 그 탭에 처음 들어감) 아무 것도
+      // 하지 않는다 — 이미 0이다.
     } else {
       setScrollTop(el, 0);
     }

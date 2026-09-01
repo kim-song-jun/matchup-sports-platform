@@ -824,7 +824,9 @@ function SidebarLeaguesWidget({ items, loading }: { items: V1PublicLeagueListIte
         <div className="tm-text-body-lg">진행 중인 정규 리그</div>
         <Link
           className="tm-btn tm-btn-sm tm-btn-ghost"
-          href="/league-matches"
+          /* 리그 목록은 통합 목록으로 넘어갔다(2026-09-01) — 리다이렉트를 한 번 더 타지
+             않도록 **직접** 보낸다. 개별 리그 링크(아래)는 그대로다. */
+          href="/tournaments?kind=league"
           style={{ alignSelf: 'flex-end', padding: '0 4px' }}
         >
           전체보기

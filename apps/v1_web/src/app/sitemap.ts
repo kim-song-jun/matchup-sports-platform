@@ -23,7 +23,10 @@ const STATIC_ROUTES: Array<{ path: string; priority: number; changeFrequency: Me
   { path: '/teams', priority: 0.8, changeFrequency: 'daily' },
   { path: '/team-matches', priority: 0.8, changeFrequency: 'hourly' },
   { path: '/tournaments', priority: 0.9, changeFrequency: 'daily' },
-  { path: '/league-matches', priority: 0.9, changeFrequency: 'daily' },
+  /* `/league-matches`(리그 전용 목록)는 **여기서 뺐다** — 이제 `/tournaments?kind=league` 로
+     넘어가므로(2026-09-01) 리다이렉트하는 주소를 사이트맵에 올리면 크롤러가 한 번 더 돈다.
+     ⚠️ **리그 개별 페이지(`/league-matches/:id`)는 그대로 살아 있고 아래에서 계속 싣는다** —
+     넘어간 것은 목록 하나뿐이다. */
   { path: '/events', priority: 0.8, changeFrequency: 'daily' },
   { path: '/notices', priority: 0.5, changeFrequency: 'daily' },
 ];

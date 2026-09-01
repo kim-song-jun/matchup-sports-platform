@@ -1328,7 +1328,12 @@ function mergeBaseOf(baseSha, headSha) {
 function isAncestorOf(ancestor, descendant) {
   try {
     // `stdio: 'ignore'` 였을 땐 git 의 말을 **받지도 않았다.** 고장을 가려내려면 stderr 가 필요하다.
+    // `encoding` 은 진단 문구를 바꾸지 않는다 — `error.message` 에는 둘 다 `fatal: …` 이 실린다
+    // (실측: 차이는 `error.stderr` 가 Uint8Array 냐 String 이냐뿐이고, describeGitFailure 는
+    // message 만 쓴다). 그래도 명시한다 — runGit·mergeBaseOf 와 **세 호출부가 어긋나 있으면**
+    // 나중에 누가 stderr 를 직접 읽도록 고칠 때 여기만 Buffer 라 조용히 달라진다.
     execFileSync('git', ['merge-base', '--is-ancestor', ancestor, descendant], {
+      encoding: 'utf8',
       stdio: ['ignore', 'ignore', 'pipe'],
     });
     return true;

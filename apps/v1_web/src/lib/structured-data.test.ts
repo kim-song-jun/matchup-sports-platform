@@ -134,7 +134,9 @@ describe('buildSportsTeamLd', () => {
       teamId: 'team-1',
       name: '강남 FC',
       sport: { sportId: 's1', name: '풋살' },
-      region: { regionId: 'r1', name: '서울 강남구' },
+      // 실제 shape: regionName 은 표시용 전체 이름, region.name 은 하위 지역명만.
+      regionName: '서울 송파구',
+      region: { regionId: 'r1', name: '송파구', parentName: '서울' },
       profile: {
         logoUrl: null,
         coverImageUrl: null,
@@ -169,7 +171,22 @@ describe('buildSportsTeamLd', () => {
       sport: '풋살',
       memberOf: { '@id': organizationId() },
     });
-    expect(ld.location).toMatchObject({ '@type': 'Place', name: '서울 강남구' });
+    // 화면 표기와 같은 '서울 송파구' 여야 한다 — region.name('송파구')만 쓰면 정보가 깎인다.
+    expect(ld.location).toMatchObject({ '@type': 'Place', name: '서울 송파구' });
+  });
+
+  it('regionName 이 없으면 부모 지역과 조합해 같은 형태를 만든다', () => {
+    const base = team();
+    const ld = buildSportsTeamLd({ ...base, regionName: undefined } as unknown as V1TeamDetail);
+
+    expect(ld.location).toMatchObject({ name: '서울 송파구' });
+  });
+
+  it('지역 정보가 아예 없으면 location 을 붙이지 않는다', () => {
+    const base = team();
+    const ld = buildSportsTeamLd({ ...base, regionName: undefined, region: null } as unknown as V1TeamDetail);
+
+    expect(ld).not.toHaveProperty('location');
   });
 
   it('이미지가 없으면 image/logo 를 아예 넣지 않는다', () => {

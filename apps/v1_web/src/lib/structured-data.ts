@@ -166,6 +166,22 @@ export function buildSportsEventLd(
 }
 
 /**
+ * 화면에 보이는 지역 표기를 그대로 쓴다.
+ *
+ * 실측: 상세 응답은 `regionName` 에 표시용 전체 이름("서울 송파구" · "서울 전체")을 주고,
+ * `region.name` 에는 하위 지역명만("송파구") 준다. 후자를 우선하면 LD 가 "송파구" 로 나가
+ * 화면 표기와 어긋난다 — 구조화 데이터는 가시 텍스트와 같아야 한다. `regionName` 이 없을
+ * 때만 부모 지역과 조합해 같은 형태를 만든다.
+ */
+function displayRegionName(team: V1TeamDetail): string | null {
+  const display = team.regionName?.trim();
+  if (display) return display;
+  const region = team.region;
+  if (!region?.name) return null;
+  return region.parentName ? `${region.parentName} ${region.name}` : region.name;
+}
+
+/**
  * 팀 **상세** 응답(`GET /teams/:id`)을 받는다 — 목록 응답(`V1Team`)이 아니다.
  *
  * 둘은 같은 값을 다른 자리에 담는다: 목록은 `logoUrl`·`introductionPreview` 를 최상위에 주는데,
@@ -177,7 +193,7 @@ export function buildSportsTeamLd(team: V1TeamDetail): JsonLdNode {
   const id = team.id ?? team.teamId;
   const url = absoluteSiteUrl(`/teams/${id}`);
   const sportName = team.sport?.name ?? team.sportName;
-  const regionName = team.region?.name ?? team.regionName;
+  const regionName = displayRegionName(team);
   const node: JsonLdNode = {
     '@context': 'https://schema.org',
     '@type': 'SportsTeam',

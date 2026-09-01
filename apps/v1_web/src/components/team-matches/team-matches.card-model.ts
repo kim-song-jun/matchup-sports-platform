@@ -96,8 +96,10 @@ export function buildSportChips({
         const matchSport = match.sport;
         return matchSport?.sportId === sport.id || matchSport?.name === sport.name || match.sportName === sport.name;
       }).length,
-      active: selectedSportId === sport.id,
-      href: buildTeamMatchHref(params, { sportId: hasMasterSportIds ? sport.id : null, filter: null }),
+      active: hasMasterSportIds && selectedSportId === sport.id,
+      // ID 를 모르면 링크를 아예 붙이지 않는다 — 붙이면 '종목 필터'처럼 보이는데 눌러도
+      // 아무 필터가 걸리지 않는다(teams 목록과 같은 규약).
+      ...(hasMasterSportIds ? { href: buildTeamMatchHref(params, { sportId: sport.id, filter: null }) } : {}),
     })),
   ];
 }

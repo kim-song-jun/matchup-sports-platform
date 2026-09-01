@@ -52,8 +52,10 @@ export function buildSportSummary(params: URLSearchParams, items: V1Match[], fal
     return {
       label: name,
       count: counts.get(name) ?? 0,
-      active: sport?.id === selectedSportId,
-      href: sport?.id ? buildMatchHref(params, { sportId: sport.id, filter: null }) : buildMatchHref(params, { sportId: null, filter: null }),
+      active: sport?.id !== undefined && sport.id === selectedSportId,
+      // 종목 ID 를 모르면(마스터 조회 실패 등) 링크를 붙이지 않는다 — 예전에는 sportId 없는
+      // `/matches` 로 링크해, 눌러도 필터가 걸리지 않는 '가짜 필터'가 됐다.
+      ...(sport?.id ? { href: buildMatchHref(params, { sportId: sport.id, filter: null }) } : {}),
     };
   });
 

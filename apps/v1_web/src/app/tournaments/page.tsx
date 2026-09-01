@@ -97,13 +97,23 @@ export function TournamentsListContent() {
      깨지지 않는다 — **리다이렉트 PR 이 정리할 몫**이다. */
   const searchParams = useSearchParams();
   const activeKind: CompetitionKind = parseCompetitionKind(searchParams.get('kind'), 'all');
-  const activeStatus = searchParams.get('status');
+  /* 빈 문자열은 **없는 것과 같다.** `?status=` 를 그대로 넘기면 서버가 400 을 내 목록이
+     통째로 에러가 된다(실측). 아래 `??` 폴백만으로는 안 걸린다 — `''` 는 null 이 아니다. */
+  const rawStatus = searchParams.get('status');
+  const activeStatus = rawStatus === '' ? null : rawStatus;
+  const rawSportId = searchParams.get('sportId');
+  const activeSportId = rawSportId === '' ? null : rawSportId;
+
   /* URL 은 사용자가 직접 편집할 수 있다 — 모르는 값을 서버로 넘기면 400 이 나고, 그때는
-     원인이 주소인지 화면인지 구분이 안 된다. **아는 값만 통과시킨다.** */
-  const knownStatus = COMPETITION_STATUS_FILTERS.some((option) => option.value === activeStatus)
-    ? (activeStatus as NonNullable<Parameters<typeof useV1Tournaments>[0]>['status'])
-    : undefined;
-  const activeSportId = searchParams.get('sportId');
+     원인이 주소인지 화면인지 구분이 안 된다. **아는 값만 통과시킨다.**
+     ⚠️ `activeStatus` 가 null 이면(파라미터 없음) `some()` 이 '전체' 항목에 맞아 true 가
+     된다 — 그대로 두면 쿼리 키에 `status: null` 이 실려 **"파라미터 없음" 과 다른 캐시**가
+     생긴다. 그래서 null 을 먼저 걸러 `undefined` 로 떨어뜨린다. */
+  const knownStatus =
+    activeStatus !== null &&
+    COMPETITION_STATUS_FILTERS.some((option) => option.value === activeStatus)
+      ? (activeStatus as NonNullable<Parameters<typeof useV1Tournaments>[0]>['status'])
+      : undefined;
   // 시트 열림도 URL 이다 — 뒤로가기로 닫히고, 필터가 담긴 주소를 그대로 공유할 수 있다.
   const filterSheetOpen = searchParams.get('filter') === '1';
 

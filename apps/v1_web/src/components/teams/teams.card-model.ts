@@ -72,13 +72,15 @@ export function buildTeamSportChips(
   selectedSportId?: string,
   masterSports?: Array<{ id: string; name: string }>,
 ) {
-  // 마스터 종목 목록이 없으면(서버 프리렌더 등) fallback 칩의 id 는 **라벨 문자열**이다.
-  // 그대로 sportId 쿼리에 넣으면 `?sportId=풋살` 같은 URL 이 HTML 에 나가는데, 실제 API 필터는
-  // ID 를 받으므로 아무 것도 걸리지 않는 링크다 — 크롤러가 그런 URL 을 수집하게 두지 않는다.
-  const hasMasterSportIds = Boolean(masterSports?.length);
-  const fixedSports = hasMasterSportIds
-    ? masterSports!.slice(0, 4)
-    : fallback.chips.slice(1, 5).map((chip) => ({ id: chip.label, name: chip.label.replace(/\s+\d+$/, '') }));
+  // 마스터 종목 목록이 있으면 그것이 정답이다 — 링크에 실을 **종목 ID** 가 거기에만 있다.
+  //
+  // 없을 때(서버 프리렌더에서 마스터 조회까지 실패한 경우) 예전에는 `fallback.chips` 를 썼는데,
+  // 그 값은 종목이 아니라 '가입 가능 / 내 주변 / 초보-중수 / 주 1회' 다 — 종목 필터 자리에
+  // 종목이 아닌 라벨이 들어가 크롤러가 틀린 내용을 읽는다. 실제 팀 목록에서 종목명을 세어
+  // 상위 4개를 쓰고, ID 를 모르므로 **링크는 아예 붙이지 않는다**(걸리지 않는 URL 을 만들지 않는다).
+  const fixedSports: Array<{ id?: string; name: string }> = masterSports?.length
+    ? masterSports.slice(0, 4).map((sport) => ({ id: sport.id, name: sport.name }))
+    : topSportNames(items).map((name) => ({ name }));
 
   return [
     { label: fallback.chips[0]?.label.replace(/\s+\d+$/, '') ?? '전체', count: items.length, active: !selectedSportId, href: buildTeamHref(params, { sportId: null }) },
@@ -86,12 +88,22 @@ export function buildTeamSportChips(
       label: sport.name,
       count: items.filter((team) => {
         const teamSport = team.sport;
-        return teamSport?.sportId === sport.id || teamSport?.name === sport.name || team.sportName === sport.name;
+        return (sport.id !== undefined && teamSport?.sportId === sport.id) || teamSport?.name === sport.name || team.sportName === sport.name;
       }).length,
-      active: selectedSportId === sport.id,
-      href: buildTeamHref(params, { sportId: hasMasterSportIds ? sport.id : null }),
+      active: sport.id !== undefined && selectedSportId === sport.id,
+      ...(sport.id === undefined ? {} : { href: buildTeamHref(params, { sportId: sport.id }) }),
     })),
   ];
+}
+
+/** 팀 목록에 실제로 있는 종목을 많은 순으로 최대 4개. 마스터 조회가 실패했을 때만 쓴다. */
+function topSportNames(items: V1Team[]): string[] {
+  const counts = new Map<string, number>();
+  for (const team of items) {
+    const name = team.sport?.name ?? team.sportName;
+    if (name) counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([name]) => name);
 }
 
 export function buildTeamHref(params: URLSearchParams, overrides: Record<string, string | null>) {

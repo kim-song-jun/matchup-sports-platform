@@ -58,6 +58,23 @@ describe('TeamListSsrView', () => {
     expect(hrefs).toContain('/teams?sportId=sport-futsal-uuid');
   });
 
+  it('마스터 종목이 없으면 종목 칩을 실제 팀 데이터에서 뽑는다 — 종목이 아닌 라벨을 노출하지 않게', () => {
+    // 예전에는 base 뷰모델의 칩('가입 가능 / 내 주변 / 초보-중수 / 주 1회')이 종목 필터 자리에
+    // 그대로 들어가 크롤러가 그것을 종목으로 읽었다.
+    const { container } = render(
+      <TeamListSsrView teams={[team(), team({ id: 't2', teamId: 't2', name: '농구팀', sportName: '농구' })]} />,
+    );
+
+    // 칩 영역은 '전체 2 · 풋살 1 · 농구 1' 처럼 실제 종목만 담아야 한다.
+    expect(container.textContent).toContain('풋살 1');
+    expect(container.textContent).toContain('농구 1');
+    // base 뷰모델의 비종목 칩이 종목 자리에 새어 나오면 안 된다.
+    // ('가입 가능'은 요약 줄 "2팀 · 가입 가능 2"에 정상 등장하므로 여기서 보지 않는다.)
+    for (const notASport of ['내 주변', '초보-중수', '주 1회']) {
+      expect(container.textContent).not.toContain(notASport);
+    }
+  });
+
   it('마스터 종목 목록이 없는 서버 렌더에서 라벨을 sportId 로 쓰지 않는다', () => {
     // fallback 칩의 id 는 '풋살' 같은 라벨이다. 그대로 쿼리에 넣으면 `?sportId=풋살` 이라는
     // 아무 것도 걸리지 않는 URL 이 HTML 에 나가고 크롤러가 그것을 수집한다.

@@ -342,6 +342,8 @@ export function toTeamMatch(match: V1TeamMatch, fallback: TeamMatchModel): TeamM
     opponentCost: costs.opponentCost,
     uniform: match.uniformColor || '',
     gender: match.genderRule ?? fallback.gender,
+    manner: match.hostTeam?.mannerScore ?? null,
+    wins: match.hostTeam?.wins ?? null,
     status,
   };
 }

@@ -930,11 +930,14 @@ describe('TeamMatchesService', () => {
         applications: [],
       },
     ]);
+    prisma.$queryRaw.mockResolvedValue([{ teamId: 'team-host', wins: 3n }]);
 
     const result = await service.list(null, {});
 
     expect(result.items).toHaveLength(1);
     expect(result.items[0].hostTeam.trustState).toBe('verified');
+    expect(result.items[0].hostTeam.mannerScore).toBe(5);
+    expect(result.items[0].hostTeam.wins).toBe(3);
   });
 
   it('applications: 신청 팀이 2개 이상일 때 배치 크로스토크 없이 각 팀의 live 값을 정확히 매핑한다', async () => {
@@ -976,8 +979,12 @@ describe('TeamMatchesService', () => {
 
     const result = await service.applications(manager, 'tm-1', {});
 
-    const teamA = result.items.find((item) => item.applicantTeam.teamId === 'team-applicant-a');
-    const teamB = result.items.find((item) => item.applicantTeam.teamId === 'team-applicant-b');
+    const teamA = result.items.find(
+      (item: { applicantTeam: { teamId: string } }) => item.applicantTeam.teamId === 'team-applicant-a',
+    );
+    const teamB = result.items.find(
+      (item: { applicantTeam: { teamId: string } }) => item.applicantTeam.teamId === 'team-applicant-b',
+    );
 
     // A팀은 3건 만점 리뷰 → verified/5점. B팀은 1건 낮은 점수 리뷰 → estimated/2점.
     // A팀의 값이 B팀에 섞여 들어가면(크로스토크) 이 assertion이 깨진다.
@@ -1119,9 +1126,12 @@ describe('TeamMatchesService', () => {
     };
     prisma.v1TeamMatch.findFirst.mockResolvedValue(teamMatch);
     prisma.v1Team.findMany.mockResolvedValue([]);
+    prisma.$queryRaw.mockResolvedValue([{ teamId: 'team-host', wins: 2n }]);
 
     const result = await service.detail(null, 'tm-1');
 
     expect(result.hostTeam.trustState).toBe('estimated');
+    expect(result.hostTeam.mannerScore).toBe(4);
+    expect(result.hostTeam.wins).toBe(2);
   });
 });

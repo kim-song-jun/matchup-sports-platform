@@ -251,6 +251,23 @@ describe('toTeamMatch — legacy/unmigrated condition fields never show mock dat
     expect(model.grade).toBe('C등급');
   });
 
+  it('maps live host-team manner and official wins instead of fallback statistics', () => {
+    const model = toTeamMatch(
+      realMatch({
+        hostTeam: {
+          teamId: 'team-live',
+          name: '실제 팀',
+          mannerScore: 4.75,
+          wins: 6,
+        },
+      }),
+      mockFallback,
+    );
+
+    expect(model.manner).toBe(4.75);
+    expect(model.wins).toBe(6);
+  });
+
   it('never shows the mock fallback grade/format/style/uniform for a real match with empty structured fields', () => {
     const model = toTeamMatch(
       realMatch({ matchFormat: null, matchStyle: [], uniformColor: null, levelLabel: null }),

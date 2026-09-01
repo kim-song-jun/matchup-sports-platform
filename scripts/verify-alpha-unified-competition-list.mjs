@@ -122,7 +122,14 @@ async function measureTopStack(browser) {
 
 async function main() {
   mkdirSync(OUT, { recursive: true });
+  try {
+    await run();
+  } finally {
+    writeSummary();
+  }
+}
 
+async function run() {
   if (process.env.PROBE_TOP_STACK) {
     const browser = await chromium.launch();
     try {
@@ -385,10 +392,23 @@ async function main() {
     await browser.close();
   }
 
+}
+
+/**
+ * **어떤 경로로 끝나든 결과를 파일로 남긴다.**
+ *
+ * 예전에는 setup 실패 시 `record(...)` 로 `INCONCLUSIVE` 를 남기고 바로 `return` 했는데,
+ * `verdicts.json` 쓰기가 함수 끝에 있어 **파일이 안 생겼다** — 콘솔에만 남고 사라진다.
+ * 그러면 *"측정 불가였다"* 는 사실을 다음 실행이 비교할 수 없다.
+ *
+ * 층1/층2 를 갈라 놓고 **그 판정을 지속시키지 않은 것**이라, 이 파일에서 같은 계열의
+ * 네 번째다(403 대응 · setup 판정 · 폭 루프 · 이번 쓰기 경로).
+ */
+function writeSummary() {
   writeFileSync(`${OUT}/verdicts.json`, JSON.stringify(results, null, 2));
   const fails = results.filter((r) => r.verdict !== 'PASS');
   console.log(`\n판정 ${results.length}건 — PASS ${results.length - fails.length} / 그 외 ${fails.length}`);
-  console.log(`스크린샷: ${OUT}`);
+  console.log(`결과: ${OUT}/verdicts.json`);
 }
 
 main().catch((err) => {

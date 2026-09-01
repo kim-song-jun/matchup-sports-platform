@@ -1,12 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppChrome } from '@/components/v1-ui/shell';
-import { Card, ErrorState } from '@/components/v1-ui/primitives';
+import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { FormattedText } from '@/components/v1-ui/formatted-text';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
-import { Trophy, Goal, ChevronLeft, ChevronRight, MapPin } from 'lucide-react';
+import { Trophy, Goal, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useV1Tournament, useV1MyRegistrations } from '@/hooks/use-v1-api';
 import { v1Get } from '@/lib/api-client';
 import {
@@ -20,6 +20,11 @@ import { getSportAccent } from '@/lib/v1-sport-accent';
 import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
 import { splitPrizeSegments, isPrizeAmountValue, formatPrizeRowValue } from '@/lib/prize-breakdown';
 import { TournamentBracket } from '@/components/tournaments/tournament-bracket';
+import { LeagueFixtureCard } from '@/components/tournaments/league-fixture-card';
+import {
+  CompetitionFixtureCard,
+  CompetitionFixtureVenue,
+} from '@/components/tournaments/competition-fixture-card';
 import {
   TournamentApplicationGuideSection,
   TournamentParticipantSection,
@@ -31,6 +36,7 @@ import {
 import { TournamentSponsorSection } from '@/components/tournaments/tournament-sponsor-section';
 import { TournamentInquirySection } from '@/components/tournaments/tournament-inquiry-section';
 import { getTournamentAnnouncementCategoryLabel } from '@/components/tournaments/tournament-announcement-category';
+import { isLeagueCompetition } from '@/lib/competition-kind';
 import {
   formatTournamentDateShort,
   formatTournamentDateTimeShort,
@@ -58,12 +64,13 @@ export { getParticipantTeamBuckets } from '@/components/tournaments/tournament-e
 
 /* ── Format helpers ── */
 
-function getFormatLabel(format: V1TournamentFormat): string {
-  switch (format) {
-    case 'league': return '리그';
-    case 'knockout': return '토너먼트';
-    case 'group_knockout': return '조별리그 후 토너먼트';
-  }
+/**
+ * 거울 행의 `format` 은 사실이 아니므로(백필이 안 채워 기본값 `group_knockout` 이 남는다)
+ * **리그 판정을 먼저** 한다 — 안 그러면 정규 리그 배지에 "조별리그 후 토너먼트"라고 적힌다.
+ */
+function getFormatLabel(competition: V1TournamentDetail): string {
+  if (isLeagueCompetition(competition)) return '리그';
+  return competition.format === 'knockout' ? '토너먼트' : '조별리그 후 토너먼트';
 }
 
 /**
@@ -135,7 +142,7 @@ function getGenderQuotaLabel(
  * 히어로가 기존 "대회가 끝났어요" 문구로 안전하게 폴백하도록 한다(과설계 방지).
  */
 export function getCompletedChampionName(tournament: V1TournamentDetail): string | null {
-  if (tournament.format === 'league') {
+  if (isLeagueCompetition(tournament)) {
     const leagueGroup = tournament.groups.find((g) => g.phase === 'group');
     if (!leagueGroup) return null;
     const top = [...leagueGroup.standings].sort((a, b) => a.position - b.position)[0];
@@ -707,8 +714,8 @@ export function TournamentDetailView({
           <span className={`tm-badge ${status.badgeClass}`}>
             {status.label}
           </span>
-          <span className="tm-badge tm-badge-grey" aria-label={`대회 형식: ${getFormatLabel(tournament.format)}`}>
-            {getFormatLabel(tournament.format)}
+          <span className="tm-badge tm-badge-grey" aria-label={`대회 형식: ${getFormatLabel(tournament)}`}>
+            {getFormatLabel(tournament)}
           </span>
           {genderCategoryLabel ? (
             <span className="tm-badge tm-badge-grey" aria-label={`성별 카테고리: ${genderCategoryLabel}`}>
@@ -1506,16 +1513,22 @@ function TournamentPreParticipationNotice() {
  * The format badge alone ("조별리그 후 토너먼트") doesn't tell a participant how it
  * actually runs, so spell it out as numbered steps, format-aware, in 해요체.
  */
-function tournamentFormatLabel(format: V1TournamentFormat): string {
-  switch (format) {
-    case 'group_knockout': return '조별 리그 후 토너먼트';
-    case 'knockout': return '토너먼트 (단판 승부)';
-    case 'league': return '리그 방식 (풀리그)';
-    default: return '대회';
-  }
+function tournamentFormatLabel(competition: V1TournamentDetail): string {
+  if (isLeagueCompetition(competition)) return '리그 방식 (풀리그)';
+  return competition.format === 'knockout' ? '토너먼트 (단판 승부)' : '조별 리그 후 토너먼트';
 }
 
-function getFlowSteps(format: V1TournamentFormat): Array<{ title: string; body: string }> {
+function getFlowSteps(competition: V1TournamentDetail): Array<{ title: string; body: string }> {
+  // 리그를 **먼저** 걸러야 한다. 거울 행은 group_knockout 이라 아래 첫 분기에 걸려
+  // "조별 리그 → 결선 진출 → 결선 토너먼트" 를 리그 참가자에게 보여준다.
+  if (isLeagueCompetition(competition)) {
+    return [
+      { title: '풀리그', body: '참가한 모든 팀이 서로 한 번씩 맞붙어요.' },
+      { title: '순위 집계', body: '승점과 득실차로 최종 순위를 가려요.' },
+      { title: '시상', body: '최종 순위에 따라 상금과 순위를 시상해요.' },
+    ];
+  }
+  const { format } = competition;
   if (format === 'group_knockout') {
     return [
       { title: '조별 리그', body: '같은 조 팀끼리 돌아가며 맞붙어 조 안에서 순위를 가려요.' },
@@ -1538,12 +1551,12 @@ function getFlowSteps(format: V1TournamentFormat): Array<{ title: string; body: 
 }
 
 function TournamentFlowSection({ tournament }: { tournament: V1TournamentDetail }) {
-  const steps = getFlowSteps(tournament.format);
+  const steps = getFlowSteps(tournament);
   return (
     <section aria-labelledby="flow-heading" style={{ marginTop: 24 }}>
       <div id="flow-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>대회 진행 방식</div>
       <Card pad={16} style={{ marginTop: 4 }}>
-        <div className="tm-tourn-flow-format">{tournamentFormatLabel(tournament.format)}</div>
+        <div className="tm-tourn-flow-format">{tournamentFormatLabel(tournament)}</div>
         <ol className="tm-tourn-flow">
           {steps.map((step, index) => (
             <li key={step.title} className="tm-tourn-flow-step">
@@ -1618,12 +1631,18 @@ function StandingsMovedNotice({ tournamentId }: { tournamentId: string }) {
  * 로딩 중에는 조용히 아무것도 렌더하지 않고(레이아웃 흔들림 방지), 실패 시에는 기존
  * `ErrorState`를 재사용한다.
  */
-function LeagueStandingsSection({ tournamentId }: { tournamentId: string }) {
-  const [state, setState] = useState<
-    | { status: 'loading' }
-    | { status: 'error' }
-    | { status: 'success'; data: LeagueStandingsTableData }
-  >({ status: 'loading' });
+type LeagueStandingsState =
+  | { status: 'loading' }
+  | { status: 'error' }
+  | { status: 'success'; data: LeagueStandingsTableData };
+
+/**
+ * 통합 순위 조회. **한 번만 부르고 두 곳이 쓴다** — 순위표가 그리고, 일정 카드가 팀 이름을
+ * 여기서 얻는다(리그 대진은 팀 id 만 실려 오고 이름은 순위 응답에 있다. 리그 자기 페이지가
+ * 쓰는 방식 그대로다). 두 번 부르면 같은 화면이 같은 데이터를 두 번 가져온다.
+ */
+function useLeagueOverallStandings(tournamentId: string) {
+  const [state, setState] = useState<LeagueStandingsState>({ status: 'loading' });
   const [retryToken, setRetryToken] = useState(0);
 
   useEffect(() => {
@@ -1642,25 +1661,100 @@ function LeagueStandingsSection({ tournamentId }: { tournamentId: string }) {
     };
   }, [tournamentId, retryToken]);
 
+  return { state, retry: () => setRetryToken((n) => n + 1) };
+}
+
+function LeagueStandingsSection({
+  state,
+  onRetry,
+}: {
+  state: LeagueStandingsState;
+  onRetry: () => void;
+}) {
   if (state.status === 'loading') return null;
 
   if (state.status === 'error') {
     return (
       <section aria-label="통합 순위표" style={{ marginTop: 24 }}>
-        <ErrorState message="순위표를 불러오지 못했어요." onRetry={() => setRetryToken((n) => n + 1)} />
+        <ErrorState message="순위표를 불러오지 못했어요." onRetry={onRetry} />
       </section>
     );
   }
-
-  const { data } = state;
 
   return (
     <section aria-labelledby="league-standings-heading" style={{ marginTop: 24 }}>
       <div id="league-standings-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
         통합 순위
       </div>
-      <LeagueStandingsTable data={data} />
+      <LeagueStandingsTable data={state.data} />
     </section>
+  );
+}
+
+/**
+ * 정규 리그 시즌 화면의 좌측 섹션 — 통합 순위 + 일정.
+ *
+ * `FormatLeftSections` 안의 분기로 두지 않고 컴포넌트로 뺀 이유는 **훅 때문**이다. 순위
+ * 조회를 두 소비처(순위표·일정의 팀 이름)가 함께 써야 하는데, 분기 안에서 훅을 부르면
+ * 조건부 호출이 된다.
+ */
+function LeagueSections({ tournament }: { tournament: V1TournamentDetail }) {
+  const { state, retry } = useLeagueOverallStandings(tournament.id);
+
+  // 팀 이름은 대진에 실려 오지 않는다(팀 id 만 온다) — 순위 응답에서 붙인다. 리그 자기
+  // 페이지가 쓰는 방식과 같다. 순위 조회가 실패하면 빈 Map 이 되고 카드는 fallback 문구를
+  // 보여준다 — 일정 섹션이 통째로 깨지지 않는다.
+  const teamNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    if (state.status !== 'success') return map;
+    for (const row of state.data.standings) {
+      if (row.teamId) map.set(row.teamId, row.teamName);
+    }
+    return map;
+  }, [state]);
+
+  const fixtures = tournament.leagueFixtures;
+
+  return (
+    <>
+      {/* 조가 없어도 그린다 — 리그 거울에는 조가 아예 없고, 조 개수로 게이팅하면
+          순위표가 영영 안 뜬다. 대회 쪽 동작(조 없으면 숨김)은 건드리지 않는다. */}
+      <LeagueStandingsSection state={state} onRetry={retry} />
+
+      {fixtures.length > 0 ? (
+        <section aria-labelledby="fixtures-heading" style={{ marginTop: 24 }}>
+          <div id="fixtures-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
+            일정 · 대진
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+            {fixtures.map((fixture) => (
+              <LeagueFixtureCard
+                key={fixture.teamMatchId}
+                fixture={fixture}
+                homeLabel={teamNameById.get(fixture.homeTeamId) ?? '홈팀 정보 없음'}
+                awayLabel={
+                  fixture.awayTeamId === null
+                    ? '상대팀 미정'
+                    : teamNameById.get(fixture.awayTeamId) ?? '상대팀 정보 없음'
+                }
+              />
+            ))}
+          </div>
+        </section>
+      ) : (
+        /* 대회용 `FixturesPlaceholder` 를 쓰지 않는다 — 그건 "대회 시작 전에 대진표가
+           공개돼요" 라고 적는데, 진행 중인 리그 시즌에 그 말이 뜨면 **틀린 말을 확신 있게**
+           하는 것이다. 리그에는 "대진표 공개" 라는 사건이 없고 "대진 확정" 이 있다.
+           문구는 리그 일정 목록(league-match-standings-client.tsx)이 같은 상황에 쓰는 것을
+           그대로 가져왔다 — 두 화면이 같은 상황을 다르게 부르지 않게. */
+        <section aria-labelledby="fixtures-empty-heading" style={{ marginTop: 24 }}>
+          <div id="fixtures-empty-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
+            일정 · 대진
+          </div>
+          <EmptyState title="아직 등록된 경기가 없어요" sub="대진이 확정되면 경기 일정이 여기에 나타나요." />
+        </section>
+      )}
+    </>
   );
 }
 
@@ -1680,28 +1774,8 @@ function FormatLeftSections({ tournament }: { tournament: V1TournamentDetail }) 
     hasAnyFixtures,
   } = partitionTournamentSections(format, fixtures, groups);
 
-  if (format === 'league') {
-    return (
-      <>
-        {hasGroupStandings ? <LeagueStandingsSection tournamentId={tournament.id} /> : null}
-
-        {hasAnyFixtures ? (
-          <section aria-labelledby="fixtures-heading" style={{ marginTop: 24 }}>
-            <div id="fixtures-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
-              일정 · 대진
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
-              {fixtures.map((fixture) => (
-                <FixtureCard key={fixture.id} fixture={fixture} />
-              ))}
-            </div>
-          </section>
-        ) : (
-          <FixturesPlaceholder />
-        )}
-      </>
-    );
-  }
+  // 리그 시즌은 조도 대회 대진도 없다 — 자기 축의 데이터를 쓰는 전용 섹션으로 보낸다.
+  if (isLeagueCompetition(tournament)) return <LeagueSections tournament={tournament} />;
 
   /* knockout: bracket only — nothing in left sections, bracket goes to bleed */
   if (format === 'knockout') {
@@ -1735,8 +1809,9 @@ function BracketSection({ tournament }: { tournament: V1TournamentDetail }) {
   const { knockoutFixtures, hasKnockoutFixtures, hasAnyFixtures } =
     partitionTournamentSections(format, fixtures, groups);
 
-  /* league: 브래킷 없음 */
-  if (format === 'league') return null;
+  /* league: 브래킷 없음 — 거울 행은 format 이 group_knockout 이라 format 만 보면
+     여기서 안 걸리고 아래 group_knockout 경로로 떨어져 **없는 대진표를 그린다**. */
+  if (isLeagueCompetition(tournament)) return null;
 
   /* knockout: 픽스처가 있을 때만 표시 (모집 중/마감 단계엔 미표시) */
   if (format === 'knockout') {
@@ -1958,12 +2033,12 @@ function FixtureStatusBadge({ status }: { status: string }) {
   );
 }
 
+/**
+ * 대회 대진 카드. 껍데기(배치·간격·정렬 축)는 `CompetitionFixtureCard` 와 공유하고
+ * **어휘는 여기서만 갖는다** — 대회 status 는 `scheduled | completed`, 리그는
+ * `matched | completed | cancelled` 로 값 영역이 다르다.
+ */
 export function FixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
-  const hasResult = fixture.result !== null;
-  const homeScore = hasResult ? fixture.result!.homeScore : null;
-  const awayScore = hasResult ? fixture.result!.awayScore : null;
-  const homeGoals = hasResult ? fixture.result!.goals.filter((g) => g.team === 'home') : [];
-  const awayGoals = hasResult ? fixture.result!.goals.filter((g) => g.team === 'away') : [];
   // 라운드 라벨: tournament-bracket.tsx ROUND_LABELS 맵과 동일하게 '4강' 사용
   const roundLabel = fixture.round
     ? fixture.round.replace('group', '조별').replace('semi', '4강').replace('final', '결승').replace('third_place', '3·4위')
@@ -1980,97 +2055,22 @@ export function FixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
   const awayLabel = fixture.awayTeamName === null ? '비공개' : fixture.awayTeamName || '미정';
 
   return (
-    <Card pad={16}>
-      {/* Round + date row */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: 12,
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span className="tm-text-label" style={{ color: 'var(--text-muted)' }}>
-            {roundLabel}
-          </span>
-          <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>
-            {scheduledLabel ?? '시간 미정'}
-          </span>
+    <CompetitionFixtureCard
+      header={{ label: roundLabel, caption: scheduledLabel ?? '시간 미정' }}
+      badge={<FixtureStatusBadge status={fixture.status} />}
+      homeLabel={homeLabel}
+      awayLabel={awayLabel}
+      // 이 카드는 점수를 싣지 않는다 — 결선 대진표·경기 상세가 그 자리다.
+      center={
+        <div className="tm-text-label" style={{ color: 'var(--text-caption)', letterSpacing: 1 }}>
+          vs
         </div>
-        <FixtureStatusBadge status={fixture.status} />
-      </div>
-
-      {/* VS row */}
-      <div
-        role="group"
-        aria-label={`${homeLabel} 대 ${awayLabel}`}
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr auto 1fr',
-          alignItems: 'center',
-          gap: 8,
-        }}
-      >
-        {/* Home team */}
-        <div style={{ textAlign: 'right' }}>
-          <div
-            className="tm-text-body-lg"
-            style={{
-              color: 'var(--text-strong)',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {homeLabel}
-          </div>
-        </div>
-
-        {/* VS — 이 카드는 점수를 싣지 않는다(아래 카드 주석 참조). */}
-        <div style={{ textAlign: 'center', minWidth: 52 }}>
-          <div className="tm-text-label" style={{ color: 'var(--text-caption)', letterSpacing: 1 }}>
-            vs
-          </div>
-        </div>
-
-        {/* Away team */}
-        <div style={{ textAlign: 'left' }}>
-          <div
-            className="tm-text-body-lg"
-            style={{
-              color: 'var(--text-strong)',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {awayLabel}
-          </div>
-        </div>
-      </div>
-
-      {/* Venue — 상단 메타(라운드·시각)와 같은 좌측 축에 둔다. 점수·득점자를 걷어내
-          카드가 비면서, 가운데 정렬된 장소 한 줄만 축이 달라 어정쩡하게 떠 있었다.
-          이제 축은 둘뿐이다: 메타·장소는 왼쪽, 대진은 가운데 대칭. */}
-      {fixture.venue ? (
-        <div
-          className="tm-text-caption"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
-            marginTop: 12,
-            color: 'var(--text-muted)',
-          }}
-        >
-          <MapPin size={12} aria-hidden="true" />
-          <span>{fixture.venue}</span>
-        </div>
-      ) : null}
-    </Card>
+      }
+      caption={fixture.venue ? <CompetitionFixtureVenue venue={fixture.venue} /> : undefined}
+    />
   );
 }
+
 
 /* ── Announcement card ── */
 

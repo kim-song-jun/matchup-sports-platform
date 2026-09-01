@@ -23,77 +23,43 @@ const config: Config = {
       rootDir: '.',
       testEnvironment: '<rootDir>/test/helpers/isolated-integration-environment.cjs',
       testMatch: [
-        '<rootDir>/test/integration/**/*.e2e-spec.ts',
-        '<rootDir>/test/tournaments/**/*.integration-spec.ts',
-        '<rootDir>/test/games/**/*.integration-spec.ts',
-        '<rootDir>/test/jobs/**/*.integration-spec.ts',
-        // Task 12 (team schedules): without this glob, none of the three specs under
-        // test/team-schedules/ (attendance, schedule-crud, and this HTTP contract spec) are ever
-        // selected by `jest --selectProjects integration` — the CI "V1 migration replay + drift
-        // gate" step runs exactly that command, so they would silently never execute despite
-        // existing on disk. Added while writing the HTTP contract spec for this reason.
-        '<rootDir>/test/team-schedules/**/*.integration-spec.ts',
-        // T4 (team-match-series): same silent-omission trap as team-schedules above —
-        // without this glob, `jest --selectProjects integration` never selects
-        // test/team-match-series/**, so the admin/public HTTP contract specs would exist
-        // on disk but never run in CI's migration replay + drift gate.
-        '<rootDir>/test/team-match-series/**/*.integration-spec.ts',
-        // 팀 스코프 라인업 재사용(히스토리·프리셋·고정 등번호). 위 두 주석이 경고하는
-        // silent-omission 함정을 피하려고 디렉터리를 만들 때 함께 등록한다 — 등록을
-        // 잊으면 스펙이 디스크에만 있고 CI에서는 한 번도 돌지 않는다.
-        '<rootDir>/test/team-lineups/**/*.integration-spec.ts',
-        // 레인 schedule (매치 ↔ 팀일정 연동) 작업 중 발견: test/team-matches/** 도 같은
-        // silent-omission 함정에 걸려 있다 — 그 디렉터리의 기존 두 스펙
-        // (team-match-lineup.integration-spec.ts, team-match-game-adapter.integration-spec.ts)은
-        // 디스크에 존재하지만 `jest --selectProjects integration`(CI의 migration replay +
-        // drift gate가 그대로 호출)로 한 번도 선택된 적이 없어 이후 코드 변화(Idempotency-Key
-        // 필수화, LOCKED 상태 리네이밍 등)에 이미 bit-rot됐다(이번에 처음 실행해보니 7건 실패 —
-        // 이 레인과 무관한 Task 14/Task 6 영역이라 여기서 고치지 않는다). 그 두 파일까지 와일드카드로
-        // 되살리면 CI가 이 PR과 무관한 이유로 깨지므로, 새로 추가한 이 레인의
-        // team-match-schedule-link.integration-spec.ts 하나만 명시 경로로 등록한다.
-        '<rootDir>/test/team-matches/team-match-schedule-link.integration-spec.ts',
-        // Copilot review finding (PR #306): a lineup-cap change with no CI-run
-        // regression test doesn't actually catch a future regression. This
-        // spec has its own minimal, guest-only fixture (no dependency on the
-        // Idempotency-Key/LOCKED-state bit rot in the rest of
-        // test/team-matches/ noted above) so it can be registered without
-        // reviving the other 6 pre-existing, unrelated failures.
-        '<rootDir>/test/team-matches/team-match-lineup-size.integration-spec.ts',
-        // Task 153 승강 확정 경로. test/league-matches/ 는 이 줄이 생기기 전까지
-        // integration testMatch 에 **한 번도 등록된 적이 없다** — 그 디렉터리의 기존 4개
-        // 스펙(admin·public·forfeit·completion-projection)은 디스크에만 있고
-        // `jest --selectProjects integration`(CI 의 migration replay + drift gate 가 그대로
-        // 호출)으로 선택된 적이 없다. 위 team-schedules·team-match-series·team-lineups
-        // 주석이 경고하는 그 silent-omission 함정이 여기서도 반복됐다.
+        // 디렉터리를 열거하지 않는다 — **`test/**` 한 줄**이다.
         //
-        // 그 4개를 와일드카드로 한꺼번에 되살리면 이 PR 과 무관한 이유로 CI 가 깨진다
-        // (로컬 실측: 45건 중 44건 통과, 1건은 league-match-public 의 "state 필터" 케이스가
-        // 종목을 새로 만들어 경기 설정이 없는 탓에 409 COMPETITION_CONFIG_REQUIRED —
-        // 내 변경과 무관한 선재 결함이다). 그래서 team-matches 선례를 따라 이 레인이
-        // 새로 추가한 파일 하나만 명시 경로로 등록한다.
-        '<rootDir>/test/league-matches/league-promotion.integration-spec.ts',
-        // D1-a: 위 league-promotion 줄과 같은 이유로 명시 경로 등록이 필요하다 --
-        // test/league-matches/ 디렉터리 자체가 와일드카드로 등록돼 있지 않아서
-        // (league-match-forfeit/-admin/-completion-projection 세 스펙이 이미
-        // 디스크에만 존재하고 CI 에서 한 번도 선택된 적이 없다), 새 스펙 하나만
-        // 명시 경로로 추가한다. 그 세 스펙까지 와일드카드로 되살리면 이 PR 과 무관한
-        // 이유로 CI 가 깨질 수 있다(team-matches/team-match-series 선례와 동일).
-        '<rootDir>/test/league-matches/league-match-result-entry.integration-spec.ts',
-        // D2: 위 두 줄과 같은 이유로 명시 경로 등록이 필요하다 -- test/league-matches/
-        // 디렉터리 자체가 와일드카드로 등록돼 있지 않다(이 디렉터리에서 벌써 3번째
-        // 반복되는 silent-omission 함정).
-        '<rootDir>/test/league-matches/league-match-dispute.integration-spec.ts',
-        // U3: 같은 이유로 명시 경로 등록이 필요하다(이 디렉터리에서 벌써 4번째
-        // 반복되는 silent-omission 함정).
-        '<rootDir>/test/league-matches/league-match-detail-dispute-eligibility.integration-spec.ts',
-        // 대진 timing(경기 시간·휴식·팀당 하루 경기 수): 같은 이유로 명시 경로 등록
-        // (이 디렉터리 5번째 — 와일드카드 복원은 여전히 기존 4개 스펙의 무관한 실패를 되살린다).
-        '<rootDir>/test/league-matches/league-fixture-timing.integration-spec.ts',
-        // team-contacts (Task 8): 이 글롭이 없으면 `jest --selectProjects integration`
-        // (= CI 의 migration replay + drift gate) 가 이 디렉터리를 절대 선택하지 않는다.
-        // 이 레포에서 같은 실수가 이미 4회 반복 지적됐다 — 위 team-schedules/team-match-series/
-        // team-lineups/team-matches 주석 참고.
-        '<rootDir>/test/team-contacts/**/*.integration-spec.ts',
+        // 파일 열거를 디렉터리 열거로 바꾸는 것만으로는 **7번째 사고를 못 막는다**: 지난 6회가
+        // 전부 *"새 디렉터리/새 파일을 등록 안 함"* 이었고, 디렉터리 열거는 **새 디렉터리가
+        // 생기면 똑같이 조용히 빠진다.** 등록을 사람이 기억해야 하는 구조가 남아 있으면 같은
+        // 사고가 이름만 바꿔 반복된다.
+        '<rootDir>/test/**/*.integration-spec.ts',
+        // 확장자가 달라 위 글롭에 안 잡힌다 — 이 한 줄은 유지한다.
+        '<rootDir>/test/integration/**/*.e2e-spec.ts',
+      ],
+      // **명시 제외 — 이름과 이유를 적는다.** 침묵 누락과 달리 이 목록은 눈에 보이고,
+      // 지우면 CI 가 바로 말해 준다. 여기 있는 것은 전부 **이 변경과 무관한 선재 결함**이고,
+      // 고치는 것은 별도 작업이다. **새 스펙을 여기 넣지 마라** — 여기는 "고쳐야 할 빚" 목록이지
+      // "안 돌려도 되는 것" 목록이 아니다.
+      testPathIgnorePatterns: [
+        // ── team-matches 2개: **상속했던 "7건" 이 측정으로 확인됐다** (2026-09-01 KST CI). ──
+        //   team-match-lineup        5건 실패
+        //   team-match-game-adapter  2건 실패        합계 7 — 옛 주석의 수와 일치한다
+        // Idempotency-Key 필수화 · LOCKED 상태 리네이밍 이후 bit-rot(Task 14/Task 6 영역).
+        // **맞는 걸 확인한 것과 맞다고 믿은 것은 다르다** — 이제 이 수는 측정본이다.
+        '<rootDir>/test/team-matches/team-match-lineup\\.integration-spec\\.ts$',
+        '<rootDir>/test/team-matches/team-match-game-adapter\\.integration-spec\\.ts$',
+        //
+        // ── 여기 남은 하나는 **상속한 숫자가 아니라 측정값**이다(2026-09-01 KST CI). ──
+        //
+        // 측정한 사실만 적는다:
+        //   2026-08-01 02:15  스펙 작성(878bf0d59) — 이때는 FK 가 없어 유효했다
+        //   2026-08-01 13:40  FK 마이그레이션(7e25c4ce1)이 붙으며 무효화
+        //   그 뒤              등록된 적이 없어 드러나지 않았다(이 파일은 전 이력에서
+        //                      v1Tournament 를 만든 적이 없다 — grep 0)
+        // 되살리려면 픽스처에 대회 2개를 새로 만들어야 한다. 같은 bit-rot 이지만 **고치는
+        // 규모가 "낡은 기대값 갱신" 과 다르다** — 그래서 별도 작업으로 남긴다.
+        //
+        // 위 사유는 **측정값**이고, 같은 CI 가 드러낸 다른 두 건(league-match-admin 의
+        // `leagueCompleted` · league-match-public 의 커서 포맷)은 **이 PR 에서 고쳐 제외에서 뺐다.**
+        // 여기 남은 것은 task7 하나뿐이다.
+        '<rootDir>/test/admin/task7-platform-ops-boundary\\.integration-spec\\.ts$',
       ],
     },
     {

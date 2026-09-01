@@ -585,7 +585,16 @@ describe('POST /admin/league-matches + fixtures', () => {
         .set('x-v1-user-id', ownerUserId)
         .send({ reason: '중복 취소 시도' });
       expect(res.status).toBe(200);
-      expect(res.body.data).toEqual({ teamMatchId, status: 'cancelled', cancelledApplications: 0, alreadyProcessed: true });
+      // `leagueCompleted` 는 abb119c3b 에서 추가됐다 — 취소가 "남은 대진" 을 줄이는 조작이라
+      // 결과 확정과 같은 완료 판정을 다시 돌린다. 멱등 경로는 **이번 호출이 리그를
+      // 완료시켰는가**를 묻는 것이라 재취소에서는 항상 false 다(이미 완료된 리그여도).
+      expect(res.body.data).toEqual({
+        teamMatchId,
+        status: 'cancelled',
+        cancelledApplications: 0,
+        leagueCompleted: false,
+        alreadyProcessed: true,
+      });
 
       const logCountAfter = await prisma.v1AdminActionLog.count({
         where: { action: 'league_match.cancel_fixture', targetId: teamMatchId },

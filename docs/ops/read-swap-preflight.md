@@ -11,12 +11,23 @@
 
 ```
 apps/v1_api 에서 `v1Tournament` 단건 조회는 전부 findTournamentOnSurface(OrThrow) 를 거친다.
-게이트(scripts/v1-surface-check.mjs)가 CI 에서 세 가지를 묶는다:
+게이트(scripts/v1-surface-check.mjs)가 CI 에서 **네 가지**를 묶는다:
 
   원시 대회 단건 조회   0곳 (baseline 0)   ← 새 원시 호출은 CI red
-  raw SQL 대회 테이블   7곳 (baseline 7)   ← 헬퍼를 못 쓰는 자리, 각 항목에 why
-  리그 허용 지점        1곳 (baseline 1)   ← ALL_COMPETITION_KINDS 를 넘기는 자리
+  raw SQL 대회 테이블   9곳 (baseline 9)   ← 헬퍼를 못 쓰는 자리, 각 항목에 why
+  리그 허용 지점        4곳 (baseline 4)   ← ALL_COMPETITION_KINDS 를 넘기는 자리
+  v1League 쓰기 자리    9곳 (baseline 9)   ← 앞 셋과 달리 **쓰기**를 센다
 ```
+
+앞 셋은 전부 *읽기*를 센다. 그래서 **리그를 만들거나 상태를 바꾸는 자리는 앞의 세 게이트로
+아예 안 보인다** — 실제로 dual-write 없이 살아 있던 쓰기 자리들이 그 사각지대에서 발견됐다
+(2026-08-31). 거울을 안 만든 리그는
+read-swap 뒤 **에러 없이 화면에서 사라진다** — 읽는 코드를 아무리 세도 이건 안 보인다.
+네 번째 검사는 새 쓰기 자리가 늘면 CI 를 멈춰 *"dual-write 붙였나"* 를 묻게 하는 일을 한다.
+
+**리그 허용 4곳의 내역**: 설정 축 1곳(§3-c) + §1 의 1·2·3 을 넓힌 3곳. 세 자리는 *"행이 없으면 조용히
+기본값으로 간다"* 라서 넓혔고, §1-4 는 **넓히지 않았다**(참가 신청은 대회 전용이라 리그가
+도달하지 않고, 넓히면 오히려 문을 하나 더 여는 셈이다 — §1 표 아래 참조).
 
 허용 종류는 **호출부 인자로 코드에 적혀 있다**(`TOURNAMENT_KINDS` / `ALL_COMPETITION_KINDS`).
 baseline 주석이 아니라 코드에 둔 이유는 **주석은 드리프트하지만 인자는 못 하기 때문**이다.
@@ -29,6 +40,21 @@ baseline 주석이 아니라 코드에 둔 이유는 **주석은 드리프트하
 > `tournament-surface-lookup.ts` 의 **헬퍼 자신**이다. 게이트는 그 파일을 일부러 제외하므로
 > **0 이 정확하다.** 이 1건을 "게이트가 새고 있다"로 읽지 않는다.
 > (실제로 그렇게 오해할 뻔한 일이 있었다 — 셀 때는 **무엇을 세는지**부터 본다.)
+>
+> **2026-09-01 KST 재발**: 두 세션이 각각 `grep -rn TOURNAMENT_KINDS` 로 세어 **49 와 71** 을
+> 얻고 *"이 중 어디를 넓힐지가 개별 판단"* 이라고 결론냈다. 둘 다 **세는 단위가 틀렸다** —
+> 그건 **호출 수**이고, 판단이 필요한 것은 **행이 없을 때 조용히 넘어가는 자리**뿐이다(§1).
+> 실측(2026-09-01 KST): 헬퍼 호출 **51곳**, §6 스캔 후보 **9건**, 그중 실제 판단 대상 **4건**.
+> 괄호 안은 **4건의 구성이 아니라 9건에서 뺀 5건**이다:
+> ```
+> 후보 9  −  주석 오탐 2  −  16줄 밖에서 throw 2  −  의도적 허용 1(§3-c)  =  판단 대상 4
+> ```
+> **호출 수를 판단 수로 착각하지 말 것.**
+>
+> ⚠️ **그 51 도 판단에 쓸 값이 아니다.** 필터에 따라 49 도 51 도 나온다(주석 2줄을 세느냐).
+> **두 경로가 독립적으로 같은 값을 내도 그것은 검증이 아니다** — 2026-09-01 KST 에 grep 이 49 를,
+> 이 문서 §3 이 49 를 줘서 "일치하니 맞겠지"로 갈 뻔했는데, 둘 다 같은 필터 착각이었다.
+> **판단에 쓸 값은 §6 을 실제로 돌려 나온 4 하나다.**
 
 ---
 
@@ -46,8 +72,85 @@ baseline 주석이 아니라 코드에 둔 이유는 **주석은 드리프트하
 | 1 | `games.service.ts` `suspensionVerdicts` | **리그 징계 규정이 에러 없이 꺼진다.** 행이 없으면 `?? null` → `suspensionRulesEnabled` false → 경고 누적·퇴장 정지가 통째로 동작하지 않는다 |
 | 2 | `tournament-standings-recalculation.ts` | **리그 순위가 에러 없이 갱신되지 않는다.** `if (!tournament) continue` 로 조용히 건너뛴다 |
 | 3 | `tournament-fixture-completion-notification.service.ts` | 결과 확정 알림 본문의 대회명이 `'대회'` 로 폴백된다(`tournament?.title ?? '대회'`). 기능은 살아 있고 **라벨만** 어긋난다 |
+| 4 | `tournament-registrations.service.ts` `loadPaymentInstructionSource` | **입금 안내(계좌·금액)가 응답에서 조용히 빠진다.** 조회가 null 을 그대로 넘기고 `serialize` 의 `paymentInstructions` 판정이 `tournament?.…` 로 옵셔널하게 읽어 블록 자체가 안 실린다(조건 전문은 아래) |
 
-1·2 는 **기능이 사라지는** 급이고 3 은 문구다. 셋 다 코드에도 같은 경고를 달아 뒀다.
+1·2·4 는 **기능이 사라지는** 급이고 3 은 문구다. 1~3 은 코드에도 같은 경고를 달아 뒀다.
+
+> **조건 전문** — `serialize` 의 `paymentInstructions`. **여섯 조건이 전부 AND 다:**
+> ```ts
+> payment?.method === 'bank_transfer' &&
+> payment.status === 'ready' &&
+> (tournament?.entryFee ?? 0) > 0 &&
+> tournament?.bankName?.trim() &&
+> tournament.bankAccount?.trim() &&
+> tournament.bankHolder?.trim()
+>   ? { bankName, bankAccount, bankHolder } : null
+> ```
+> **앞의 두 조건이 1차 게이트다** — 계좌이체 신청이 `ready` 상태로 있어야 여기까지 온다.
+> 그래서 리그가 이 자리에 닿으려면 **① 대회 표면 도달 ② 신청 존재 ③ 계좌이체·ready** 세 겹을
+> 통과해야 한다. **아래 "지켜본다" 결론이 그만큼 더 강해진다.**
+>
+> ⚠️ 같은 파일의 `assertPaymentInstructions` 와 **혼동하지 말 것** — 그쪽은
+> `TOURNAMENT_PAYMENT_INSTRUCTIONS_MISSING` 을 **던진다.** 이 항목은 던지지 않는 `serialize`
+> 쪽이다. 함수 이름이 비슷해 실제로 한 번 뒤바뀌어 읽혔다(2026-09-01 KST).
+>
+> **위 표의 4번은 2026-09-01 KST 에 §6 절차로 새로 찾았다** — 이 문서가 쓰인 뒤 후보가 **6건 → 9건**으로
+> 늘었고, 그중 이 자리만 새 판단 대상이었다. **다만 리그가 이 경로에 도달하는지는 별개다**:
+> 참가 신청은 대회 전용 개념이라, 통합 화면이 리그에 신청 UI 를 안 보이면 도달하지 않는다.
+> **도달 가능성이 정해지기 전까지는 "넓힌다"가 아니라 "지켜본다"** — 안 오는 곳을 넓히면
+> 리그가 대회 신청 흐름에 들어갈 수 있게 되어 오히려 문을 하나 더 여는 셈이다.
+> 여기에는 코드 주석을 아직 안 달았다(1~3 과 달리 결론이 안 났다).
+
+### 이 자리들의 봉쇄는 **baseline 이고, 그게 전부다** — "테스트가 없다"로 읽지 말 것
+
+넓힌 뒤 *"리그가 이 경로를 탄다"* 를 테스트하려면 리그 `kind` 행을 넣고 그 함수를 부르게
+된다. 그 테스트는 **프로덕션 경로가 리그를 보낸다는 것을 증명하지 않는다** — 내가 넣은 행을
+내가 읽는 **배선 단언**이다(§3-b 가 이미 이 자리들을 *"내부 호출이라 증명력 낮음"* 으로
+분류해 뒀다). 지금은 리그가 이 경로에 도달조차 못 하므로 **만들면 가짜 테스트가 된다.**
+
+**의미 있는 red 를 내는 변이는 하나뿐이다:**
+```
+넓힌 자리를 다시 TOURNAMENT_KINDS 로 되돌린다  →  리그 허용 baseline 게이트가 red
+```
+그래서 **봉쇄 = baseline** 이고, 늘리려면 리뷰를 거치게 게이트가 개수를 묶는다.
+
+### 1-a. R4-a 로 넘어간 것은 `listMine` 의 **목록 조회뿐**이다
+
+`listMine` 이 통합 축을 읽는다고 해서 그 화면이 전부 넘어간 게 아니다. 항목별
+**순위·다음 경기(`standings()`)는 여전히 `v1League.findUnique` 를 읽는다** — R4-b 대상이다.
+여기를 "이미 넘어갔다"고 읽고 리그 축을 정리하면 **순위가 통째로 사라진다**(위 표 2번과
+같은 모양 — 조용히 사라지는 쪽이다).
+
+> **반증**: `grep -n "v1League.findUnique" apps/v1_api/src/league-matches/league-match-public.service.ts`
+> 가 **0** 이 되면 이 줄은 낡았다. 그때까지는 유효하다.
+
+### 1-b. read-swap 은 **백필보다 먼저 배포되면 안 된다** (Copilot #876 지적)
+
+`listMine` 은 거울의 `status` 를 `state` 로 되돌려 쓰고, **`state === 'draft'` 인 항목은
+`standings()` 를 아예 부르지 않는다.** 그래서 거울의 status 가 리그보다 뒤처져 있으면
+(백필 전 상태) 진행 중인 리그가 `draft` 로 보여 **순위·다음 경기가 에러 없이 사라진다.**
+불완전 검사(`LEAGUE_MIRROR_INCOMPLETE`)는 `region`·`scheduledAt`·`scheduledEndAt` 만 보므로
+**틀린 status 는 잡지 못한다** — null 이 아니라 *틀린 값*이기 때문이다.
+
+지금은 순서가 지켜져 있다. `--apply` 를 먼저 돌렸고, 배포를 여러 번 거친 뒤 다시 쟀다:
+
+| 측정 | 값 |
+|---|---|
+| 리그 축 분포 | `draft 35 · active 15 · completed 38` |
+| 거울 축 분포 | `draft 35 · in_progress 15 · completed 38` |
+| 행 단위 status 불일치 | **0** / 88쌍 |
+| `region` 불일치 · 날짜 null | **0** · **0** |
+
+> **반증**: 아래 SQL 의 `status_mismatch` 가 0 이 아니면 이 줄은 낡았고, read-swap 을
+> 배포하면 안 된다.
+> ```sql
+> SELECT count(*) FROM v1_leagues l
+>   JOIN v1_tournaments t ON t.id = l.id AND t.kind = 'regular_league'
+>  WHERE t.status::text <> CASE l.state::text
+>    WHEN 'draft' THEN 'draft' WHEN 'active' THEN 'in_progress'
+>    WHEN 'completed' THEN 'completed' END;
+> ```
+
 
 > **2번은 이미 한 번 터졌다.** 이관 중 그 스펙의 mock 이 `where.id` 를 직접 읽어
 > `undefined` 가 되면서 정확히 이 `continue` 경로로 빠졌고, **에러 없이 3건이 조용히
@@ -165,7 +268,7 @@ SELECT c.conrelid::regclass, c.confdeltype FROM pg_constraint c
 
 ## 3. 아직 검증 안 된 지점 — 두 이유를 갈라 적는다
 
-봉쇄는 **49곳 전부**에 걸었지만, **봉쇄를 증명하는 테스트는 그중 일부**에만 있다.
+봉쇄는 **호출 전부**(2026-09-01 KST 실측 51곳)에 걸었지만, **봉쇄를 증명하는 테스트는 그중 일부**에만 있다.
 "이관했다"와 "검증했다"는 다르다.
 
 ### 3-a. 할 수 있었는데 **비용 때문에 안 함** (4파일 9지점)
@@ -190,9 +293,12 @@ competition-config-version-repoint
 전부 **내부 호출**이라 id 가 이미 검증된 문맥에서 온다. 억지로 재현하면 배선 단언에
 가까워져 비용 대비 증명력이 낮다.
 
-### 3-c. **의도적 리그 허용** (1지점)
+### 3-c. **의도적 리그 허용** (4지점)
 ```
-competition-config-version-repoint   ALL_COMPETITION_KINDS
+competition-config-version-repoint                     ALL_COMPETITION_KINDS   설정 축
+games.service (suspensionVerdicts)                     ALL_COMPETITION_KINDS   §1-1
+tournament-standings-recalculation                     ALL_COMPETITION_KINDS   §1-2
+tournament-fixture-completion-notification.service     ALL_COMPETITION_KINDS   §1-3
 ```
 설정은 대회와 리그가 **이미 공유하는 축**이다. 여기서 종류를 가르면 리그만 옛 설정에
 남거나 설정 없는 상태로 방치돼 통합을 되돌리는 셈이 된다(`tournament-surface.ts` 의
@@ -268,6 +374,31 @@ D14(`20260830000000_v1_preferred_position`) 이후 **공유 Prisma 클라이언�
 
 **판정은 자동이 아니다.** 아래는 **후보를 좁혀 주는 것**이고, 각 후보가 실제로 위험한지는
 직접 읽어 판단한다(1절 세 자리도 이 스캔으로 6건을 뽑아 **3건만** 남긴 것이다).
+
+> **2026-09-01 KST 재실행: 후보가 9건이다.** 늘어난 3건 중 2건은 **주석 안의 함수명**을 문 것이고
+> (스캔이 주석을 안 거른다), 1건은 16줄 **밖**에서 `throw` 한다(긴 주석이 창을 밀어냈다).
+> 남은 1건이 §1 의 4번이다. **후보 수가 늘었다고 위험이 늘어난 게 아니다** — 오탐이 섞여
+> 있으니 위 **②(후보마다 직접 읽는다)** 를 반드시 거친다.
+>
+> (16줄 밖 `throw` 는 **늘어난 3건 중 1건**이고, 이전부터 있던 1건을 더해 **총 2건**이다 —
+> §0 의 산식에 쓰인 수가 그 총계다.)
+
+### ⚠️ 이 문서에 코드를 인용할 때는 **그 파일을 열어 대조한다**
+
+2026-09-01 KST 에 §1-4 를 추가하면서 조건식을 기억으로 압축해 적었고, **세 군데가 틀렸다**:
+```
+적은 것   tournament?.entryFee ?? 0 > 0 && tournament?.bankName?.trim()
+실제      여섯 조건 AND (위 §1 참조)
+틀린 점   ① 1차 게이트 두 개(method·status)를 통째로 뺐다
+          ② bankAccount·bankHolder 를 뺐다
+          ③ 괄호를 빼서 `entryFee ?? (0 > 0)` = `entryFee ?? false` 가 됐다 — **다른 뜻이다**
+```
+③이 특히 나쁘다: **다음 사람이 그 줄을 그대로 복사해 확인하면 다른 조건을 검사하게 되고,**
+"문서가 적어 준 조건"이라 의심하지 않는다.
+
+**규칙**: 조건식·시그니처·상수를 이 문서에 옮길 때는 **파일을 열어 그대로 복사**한다.
+줄여야 하면 줄이되 **줄였다는 것을 밝힌다**(`…` 등). 같은 세션에서 숫자는 세어 봤는데
+조건식은 안 열어 본 것이 원인이었다 — **"재 본 것"과 "옮겨 적은 것"을 구분한다.**
 
 ```bash
 # ① 후보 좁히기 — 호출 뒤 16줄 안에 throw 가 없는 자리를 뽑는다.
@@ -347,3 +478,284 @@ done
 grep -rn "\`/admin/league-matches/" apps/v1_api/src --include='*.ts' | grep -v spec
 ```
 (선행 백틱 = 템플릿 리터럴 = 실제로 만들어지는 URL. 현재 1건, 위 표의 reminder.)
+
+---
+
+## 8. read-swap **다음** 단계의 위험 — 게임 소스 승격 (`sourceType`)
+
+> 여기 적는 이유: **이 문서를 읽는 사람이 다음에 마주칠 것**이고, 그 사고는
+> **운영자가 경기 조작을 못 하게 되는 것** — 사용자에게 보이는 사고다.
+
+`V1Game.sourceType` 이 `TEAM_MATCH` → `COMPETITION_FIXTURE` 로 바뀌는 순간
+**그 경기에 걸린 운영 규칙이 통째로 달라진다.**
+
+```ts
+// games.service.ts:7208  requireTakeover
+if (sourceType === V1GameSourceType.TEAM_MATCH) {
+  return;                      // ← 팀 매치는 그냥 통과
+}
+const token = context.takeoverToken?.trim();   // ← 그 외 전부 takeover 토큰 필요
+```
+
+팀 매치 액터는 **애초에 `authorizationSubject` 를 얻을 수 없다**(`resolveActor`).
+그래서 승격이 **진행 중이거나 예정된 경기**에서 일어나면 그 경기의 운영자는
+`event_append`/`event_reverse` 에서 **영구히 잠긴다.**
+
+### 완화 셋 — ①은 이미 됐고 ②③이 남았다
+
+| | 완화 | 상태 |
+|---|---|---|
+| ③ | **enum 에 새 값을 추가하고 구 값은 R5 에서 제거** — 개명하지 않는다 | ✅ **이미 됨.** `COMPETITION_FIXTURE` 가 R1 expand 로 추가돼 있고(`schema.prisma:356` 부근) 구 값 둘은 그대로다. **지금 이 두 값을 쓰는 코드는 없다** |
+| ① | 백필은 **종료된 경기부터**. 진행 중·예정은 별도 창 | ⬜ R3 에서 |
+| ② | 승격 전 그 리그에 **`state=LIVE` 게임이 0건인지 가드** | ⬜ R3 에서 |
+
+### ⚠️ 네 번째 함정 — Postgres 트랜잭션
+
+`ALTER TYPE … ADD VALUE` 로 추가한 enum 값은 **같은 트랜잭션 안에서 쓸 수 없다.**
+→ **R3 백필은 값 추가와 반드시 다른 마이그레이션 파일이어야 한다.**
+(이건 스키마 주석에도 적혀 있다 — 완화 목록에는 없던 것이라 여기 함께 둔다.)
+
+### 이게 아직 참인지 확인하는 법
+
+```bash
+awk '/private requireTakeover/,/^  }/' apps/v1_api/src/games/games.service.ts \
+  | grep -n 'TEAM_MATCH'
+```
+`sourceType === V1GameSourceType.TEAM_MATCH` 로 **일찍 반환하는 줄**이 나오면 위험은 그대로다.
+안 나오면 그 분기가 없어진 것이니 이 절을 다시 쓴다.
+
+> **`grep -A<N>` 을 쓰지 말 것.** 이 함수는 **주석이 여덟 줄**이라 `-A3` 로는 정작 `if` 에
+> 닿지 않고 **빈 결과**를 준다 — 그걸 "분기가 없어졌다"로 읽으면 위험을 **해소된 것으로
+> 오독한다.** (이 문서를 쓰면서 실제로 그 명령을 적었다가 돌려 보고 잡았다.)
+> 함수 전체를 뜨는 `awk` 범위를 쓴다.
+
+---
+
+## 9. `--apply` 전에 닫아야 하는 것 — **dual-write 중 아직 봉쇄 테스트가 없는 자리**
+
+> ### 용어 — 여기서 "막혔다" 는 **테스트**를 말한다
+> ```
+> 막혔다 / 봉쇄됐다  = 그 dual-write 를 지우면 red 가 나는 테스트가 있다
+> 안 막혔다          = dual-write 는 **있는데** 지워도 아무도 red 가 안 난다
+> ```
+> **"안 막혔다" 를 "dual-write 가 없다" 로 읽으면 이미 있는 자리에 두 번째 dual-write 를
+> 넣게 된다.** 실제로 그 오해가 한 번 났다(2026-08-31) — 표를 안 보고 요약 문장을 신뢰한 게
+> 원인이었다. 그래서 칸 이름을 `봉쇄 수단` 으로 바꿨다.
+>
+> **dual-write 자체의 유무는 코드로 센다**: `state` 를 바꾸거나 리그를 만드는 **7곳 전부**
+> 인접한 거울 쓰기를 갖고 있다(2026-08-31 양 세션 독립 확인).
+> 반증: `grep -rn 'v1League\.\(create\|update\|updateMany\|upsert\)' apps/v1_api/src apps/v1_api/prisma`
+> 로 나온 자리마다 인접 `v1Tournament` 쓰기가 있는지 본다 — 하나라도 없으면 이 줄이 낡았다.
+
+> 마감은 **참가팀/표시필드 백필 `--apply` 전**이다. 그 자리는 **사용자에게 승인을 요청하는
+> 자리**고, 그때 *"거울 쓰기가 회귀로 사라지지 않게 봉쇄돼 있다"* 고 사실대로 말할 수 있어야
+> 한다. 봉쇄 없는 자리를 두고 승인을 요청하면 승인자에게 틀린 그림을 주는 것이다.
+>
+> **숫자는 아래 표에만 둔다.** 제목·도입에 `N곳`·`3/7` 같은 수를 또 적으면 한쪽만 갱신돼
+> 문서 안에서 두 값이 싸운다 — 실제로 그렇게 됐다(제목 4 vs 본문 2). 분모가 있는 표기는
+> 특히 나쁘다: 자리를 하나 닫을 때마다 **두 곳**을 고쳐야 한다.
+
+**봉쇄된 것 (2026-08-31 실측)**
+
+| 자리 | 봉쇄 수단 |
+|---|---|
+| `league-match-admin` state→active ×2 | 유닛. 변이 2종(dual-write 제거 / `kind` 가드 제거) 각각 1 red |
+| `create` (서비스 경로) + 트랜잭션 롤백 | 통합 스펙 `league-competition-dual-write.integration-spec.ts` |
+
+**아직 봉쇄 테스트가 없는 것 — 1곳** (dual-write 는 있다. 2026-08-31 갱신: 되돌리기·승강 다음 시즌·시리즈 최초 생성을 덮었다)
+
+```
+league-completion-projection    active→completed
+```
+
+> **"안 막혔다" 는 dual-write 가 없다는 뜻이 아니다 — 이 표는 "무엇이 그것을 봉쇄하는가" 다.**
+> 헷갈리면 없는 dual-write 를 새로 넣어 **같은 전이를 두 번 쓰게 된다.** 실제 상태:
+> ```
+> dual-write        있다. league-completion-projection.service.ts 의
+>                   `result.count === 0` 조기 반환 **뒤**(조건부 update 승자만 도달)
+>                   커밋 ac933fea4 — origin/dev 에 포함됨
+> 봉쇄 테스트        없다. 이 전이를 지나는 유일한 스펙
+>                   apps/v1_api/test/league-matches/
+>                   league-completion-projection.integration-spec.ts 는
+>                   `v1League.state` 와 상태로그만 단언하고 v1Tournament 를 한 번도 조회하지
+>                   않는다 → dual-write 를 지워도 전 단언이 green 이다
+> ```
+> **반증**(레포 루트에서 그대로 붙여넣어 돌아간다 — 실행해서 확인했다):
+> ```bash
+> grep -c v1Tournament \
+>   apps/v1_api/test/league-matches/league-completion-projection.integration-spec.ts
+> ```
+> 가 0 보다 커지면 이 줄은 낡았다(현재 **0**).
+>
+> **이 봉쇄를 쓸 때 로컬 green 을 믿지 마라 — 통합 스펙이라 Postgres 가 필요하다.**
+> 컨테이너가 없으면 그 스위트는 **실행되지 못하고** 요약에 `Tests: 0` 으로 찍힌다.
+> **`Tests: 0` 은 통과가 아니라 "한 개도 안 돌았다" 다** — `Test Suites: N failed` 를 따로 봐야
+> 드러난다(2026-08-31 실제로 밟았다: 공유 Prisma 클라이언트가 `V1Tournament.region` 을 몰라
+> ts-jest 가 컴파일에서 죽었고, 요약만 보면 실패로 안 읽혔다).
+>
+> 그래서 이 항목의 변이 확인(거울 쓰기 제거 → red)은 **DB 가 있는 환경 또는 CI 에서** 한다.
+> 반증: `docker ps --filter name=teameet --format '{{.Names}}'` 가 비어 있는데 그 스위트가
+> green 이면 **안 돈 것**이다.
+>
+> > `grep postgres` 로 세지 마라 — **다른 프로젝트의 postgres 가 잡힌다.** 이 문장을 쓰면서
+> > 실제로 그렇게 됐다(무관한 `posco-mds-db-1` 이 걸려 "떠 있다"로 읽혔다). 이름으로 좁힌다.
+
+> **✅ 필수 마감은 닫혔다.** 시리즈 최초 생성(`seedSeason`)은 유닛으로 막혔다 —
+> 변이 둘(dual-write 제거 / 거울을 `tx` 밖으로) 각각 **3/3 red**.
+> 남은 하나는 아래 표의 `선택` 항목이라, **`--apply` 를 미룰 이유는 없다.**
+
+> **승강 다음 시즌은 싸게 닫혔다** — `league-promotion.integration-spec.ts` 가 이미 그 경로를
+> **실제 API 로** 지나가며 다음 시즌 리그를 단언하고 있었다. 거울 단언만 얹으면 됐다.
+> **새 하네스를 만들기 전에 그 경로를 이미 지나는 스펙이 있는지 먼저 본다.**
+
+### ✅ 마감 정책 — **지금 정한다 (승인 요청 직전에 정하지 않는다)**
+
+승인 요청 직전에 "어디까지 막았는가"를 정하면 그건 **승인자에게 불리한 시점**이다.
+그래서 미리 박는다:
+
+| 자리 | 봉쇄가 없을 때 무슨 일이 나나 | 봉쇄 마감 | **이 판정이 깨지는 조건** |
+|---|---|---|---|
+| ~~`league-series-admin` 시리즈 최초 생성~~ | **거울이 아예 없다** → 그 리그가 read-swap 뒤 **화면에서 사라진다** | ✅ **닫혔다** (변이 3/3 red ×2) | — |
+| `league-completion-projection` | (dual-write 를 잃으면) 거울 status 가 `in_progress` 로 남는다 → 끝난 리그가 **진행 중으로 보인다** | **선택.** 못 막으면 **승인 요청에 이름과 실패 모습을 그대로 적고** 진행한다 | ⚠️ **시상·결산 경로를 통합 축으로 옮기는 순간 `필수` 로 승격**한다 — 아래. **승격 이유가 하나 더 있다: 여기가 값 불일치의 유일한 회귀 경로다** (§1-b) |
+
+**가르는 축은 "행이 없는가" vs "값이 틀린가"다.** 행이 없으면 화면에서 사라지고 운영자는
+"안 보인다"밖에 말할 수 없다.
+
+> **§1-b 의 값 불일치 blind spot 과 이 줄은 같은 구멍이다.** `listMine` 의 불완전 검사는
+> null 만 보므로 *틀린* status 는 못 잡는데, status 가 틀어지려면 **리그를 바꾸면서 거울을
+> 안 바꾸는 경로**가 있어야 한다. 지금 코드에는 그런 경로가 **없다**(state 를 바꾸는 4곳이
+> 전부 dual-write 를 갖고 있다). 즉 남은 위험은 발생이 아니라 **회귀** — 누가 dual-write 를
+> 지워도 아무 테스트도 red 가 되지 않는 상태다.
+>
+> **그래서 해법은 런타임 값 검사가 아니라 봉쇄 테스트다.** 요청마다 "거울 == 리그" 를 확인하려면
+> 리그를 읽어야 하고, 그러면 **두 축을 영구히 결합시켜 read-swap 자체가 무의미해진다.**
+
+### ⛔ read-swap 은 **`--apply` 뒤에만** 머지할 수 있다 — 집합 동등성으로는 안 잡힌다
+
+```
+1. dual-write 머지     쓰기만 추가. 읽는 화면 안 바뀐다      안전
+2. --apply (사용자 승인) 거울 status 가 실제 값이 된다
+3. read-swap 머지       이때부터 통합 축을 읽어도 맞다
+```
+
+**3을 2보다 먼저 머지하면 alpha 가 조용히 깨진다.** 리그 시즌 백필은 88행을 **전부
+`status: 'draft'`** 로 만들었고(`league-competition-backfill.ts:132`), `listMine` 은
+`state !== 'draft'` 로 순위·다음 경기를 가른다(`league-match-public.service.ts:183`).
+
+2026-08-31 실측(captain A):
+```
+리그 축   draft 9 · active 12 · completed 9
+통합 축   draft 30                            ← --apply 전이라 전부 draft
+```
+읽기를 옮기면 **30개 중 21개가 순위·다음 경기를 잃는다. 에러 없이.** 목록에는 30개가
+그대로 보이므로 **집합 차집합 검증도 통과한다** — 동등성 증명이 이 결함을 못 잡는다.
+
+> **그래서 동등성 판정에 `상태 분포`를 반드시 포함한다.** 개수·집합만 비교하면 값 오류가
+> 통과한다. 그리고 이 분포 비교는 **`--apply` 가 실제로 먹었는지 확인하는 가장 좋은 지표**다 —
+> 거울 수 불변식은 **개수만 보고 값은 안 본다.**
+>
+> `--apply` **전에는 반드시 불일치**해야 하고(전부 draft), **후에 일치**해야 read-swap 이 가능하다.
+
+**read-swap PR 은 `--apply` 전까지 draft 로 두고 제목에 `[--apply 이후 머지]` 를 박는다** —
+dev 머지 = 즉시 alpha 실배포라, 실수로 머지되면 그대로 배포된다.
+
+### ⚠️ "값이 틀리면 보이니까 발견된다" 는 **그 값을 게이트로 쓰는 소비처가 없을 때만** 참이다
+
+`settle` 의 `선택` 판정은 **좁은 조건에서만** 성립한다. 이미 그 값을 게이트로 쓰는 자리가 있다:
+
+```ts
+// league-match-public.service.ts:508
+const champions = league.state !== 'completed' ? [] : resolveLeagueChampions(...);
+```
+```
+apps/v1_web/src/app/league-matches/[leagueId]/awards/page.tsx   ← 시상 화면이 실재한다
+```
+
+거울이 `in_progress` 로 남은 채 이 경로가 통합 축을 읽으면 **`champions` 가 `[]` 가 되고
+시상 화면이 빈다.** 그리고 **빈 시상 화면은 "우승팀이 없는 리그"와 구분되지 않는다** —
+에러도 없다. 즉 **값 오류가 행 부재와 같은 모양이 된다.**
+
+> **지금은 안 터진다.** `:508` 은 아직 `league.state`(**리그 축**)를 읽고, R4-a 는 `listMine`
+> 계열만 옮긴다. 그래서 이번 마감의 `선택` 판정은 유효하다.
+>
+> **그 경로를 통합 축으로 옮길 때(R4-b/c) 이 항목은 `필수` 로 승격한다.**
+
+**일반화**: 값 오류가 "보이니까 발견된다"고 판단하기 전에, **그 값을 분기 조건으로 쓰는
+소비처를 먼저 센다.** 게이트가 하나라도 있으면 값 오류도 침묵 실패다. 그래서 이 표에는
+`필수/선택` 옆에 **"이 판정이 깨지는 조건"** 칸이 있다 — 없으면 다음 단계에서 이 표를
+그대로 재사용하다 틀린다.
+
+**아직 참인지 확인**: `grep -n "state !== 'completed'" apps/v1_api/src/league-matches/league-match-public.service.ts`
+가 여전히 `league.state` 를 읽는가. 통합 축(`tournament.status`)으로 바뀌었으면 승격 시점이 온 것이다.
+
+> **`settle` 을 못 막고 진행하기로 했다면 승인 요청에 이 표의 두 번째 줄을 그대로 옮겨 적는다.**
+> "일부 미보호" 같은 요약으로 바꾸지 않는다 — 승인자가 판단할 것은 **무슨 일이 나는가**다.
+
+> **왜 이 셋만 남았나 — 설정 비용이 다르다.** 되돌리기(`revertCompletionInTx`)는 리그를
+> `completed` 로 두고 부르면 끝이라 통합 스펙에 바로 얹혔다. 나머지 셋은:
+> - `settle` 은 **`currentOfficialRevision.state === 'OFFICIAL'` 인 대진**이 있어야 조건부
+>   update 까지 도달한다 → `V1TeamMatch` + `V1Game` + 결과 리비전 + 포인터가 필요하다
+> - 시리즈 둘은 `LeagueMatchPublicService` 의존과 승강 확정 시즌 상태가 필요하다
+>
+> **로컬에 이 프로젝트용 Postgres 가 없어 통합 스펙은 CI 에서 처음 돈다.** 그래서 설정이
+> 큰 케이스를 한 번에 얹으면 깨졌을 때 CI 왕복으로만 고쳐야 한다 — 작은 것부터 얹는다.
+
+### 롤백 케이스는 **변이로 red 를 한 번 봐야** 값이 있다
+
+이 케이스는 **mock 으로 측정 불가능해서 통합까지 온 항목**이다. 여기서 red 를 한 번도 안 보면
+그 우회의 값을 회수하지 못한다 — **red 를 본 적 없는 green 은 "보호됨" 이 아니라 "측정 불가" 다.**
+
+```
+1. 기준선 확보    머지된 커밋의 CI run 에서 `PASS integration <파일명>` 확인
+2. 스크래치 브랜치  그 커밋에서 따고 변이만 얹는다 (PR 을 만들지 않는다)
+3. workflow_dispatch 로 기동
+4. 판정
+5. 브랜치 삭제
+```
+
+**1번을 건너뛰면 3번의 red 를 해석할 수 없다** — 변이 때문인지 그 사이 커밋 때문인지 못 가른다.
+**기준선은 변이를 얹은 코드와 같은 커밋이어야 한다.**
+
+**판정 기준 (미리 박는다 — 없으면 이 확인도 vacuous 해진다):**
+
+| 결과 | 뜻 |
+|---|---|
+| "같은 트랜잭션" 케이스만 red | ✅ 보호된다 |
+| 전부 red | ❌ **설정이 깨진 것**이지 증명이 아니다 |
+| 전부 green | ❌ **변이가 대상에 안 닿았다** |
+
+**개수와 케이스 이름을 적는다.** "red 를 봤다" 로 끝내지 않는다.
+
+### 닫혔는지 확인하는 법 — **red 를 1개 세라**
+
+각 자리의 dual-write 한 줄을 지우고 통합 스위트를 돌린다.
+**red 가 정확히 1개**여야 하고, **각각 어느 자리인지 이름을 댈 수 있어야 한다.**
+
+> **0개면 안 막힌 것이다.** 어느 것인지 모른 채 넘어가면 안 막힌 자리가 "통과"로
+> 기록된다 — 이 저장소에서 red 개수를 세지 않아 vacuous 테스트를 올린 전례가 있다.
+
+### 통합 스펙이 **어느 스텝에서 도는지** — 이름이 오해를 부른다
+
+```
+job   API
+step  V1 migration replay + drift gate     ← 여기서 pnpm test:integration 이 돈다 (deploy.yml:274)
+step  V1 API unit tests                    ← 여기는 jest --selectProjects unit 뿐이다
+```
+
+**스텝 이름만 보면 마이그레이션 검사로 읽힌다.** `V1 API unit tests` 만 뒤지면 통합 스펙 로그를
+못 찾고 **"안 돈다"고 결론내게 된다** — 이 저장소에서 반복된 "확인 안 한 것을 확인한 것으로
+취급" 의 또 다른 자리다.
+
+**확인법**: CI 로그에서 **`PASS integration <스펙 파일명>`** 한 줄을 직접 찾는다.
+> **"CI green" 을 "그 스펙이 돌았다" 로 읽지 않는다.** 통과와 미실행은 로그 없이 구분되지 않고,
+> 등록이 빠진 스펙은 **정확히 green 처럼 보인다.**
+
+### 함정 둘
+
+1. **리그를 `prisma.v1League.create` 로 만들지 마라.** 그러면 dual-write 를 한 번도 지나가지
+   않고, 통과하지만 아무것도 증명하지 않는다. **서비스 메서드로 만든다.**
+2. **`jest.config.ts` 에 파일을 명시 등록해라.** `test/league-matches/` 는 와일드카드가
+   **아니다.** 등록을 빠뜨리면 스펙이 디스크에만 있고 CI 가 한 번도 선택하지 않는다 —
+   이 디렉터리에서 6번 반복된 함정이다. `jest --selectProjects integration --listTests` 로
+   실제 선택되는지 확인한다.
+

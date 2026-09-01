@@ -1,5 +1,5 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, V1CompetitionKind } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { buildPageInfo, paginationArgs } from '../common/pagination/page-args';
 import type { V1AuthUser } from '../auth/v1-auth-user';
@@ -9,13 +9,23 @@ import { presentTournamentDetail } from './tournament-detail.presenter';
 import { TournamentListQueryDto } from './dto/tournament-read.dto';
 import { leagueProgressOf, magicNumberOf } from './league-progress';
 import { TOURNAMENT_SURFACE_KIND } from './tournament-surface';
-import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
+import { findTournamentOnSurface, ALL_COMPETITION_KINDS } from './tournament-surface-lookup';
 import { hasTournamentFixtureOfficialResult } from './tournament-fixture-official-result';
 import {
   PUBLIC_TOURNAMENT_STATUS_FILTER,
   TOURNAMENT_DETAIL_INCLUDE,
   TOURNAMENT_LIST_INCLUDE,
 } from './tournaments-read.query';
+import { bucketLeagueFixtures, leagueFixtureProgressInput } from '../league-matches/league-standings-source';
+import {
+  LEAGUE_FIXTURE_FACT_SELECT,
+  LEAGUE_FIXTURE_LIST_SELECT,
+  toLeagueFixtureList,
+} from '../league-matches/league-fixture-list-source';
+import {
+  calculateLeagueStandingsWithTieBreakInfo,
+  type LeagueTieBreakCriterion,
+} from '../league-matches/league-standings';
 
 /** `V1CompetitionConfigVersion.tieBreak`(Json)에 담긴 승리 승점 기본값 — 프리셋 전부가 3이다. */
 const DEFAULT_WIN_POINTS = 3;
@@ -123,7 +133,12 @@ export class TournamentsReadService {
    *   기록에 스태프 우회를 넣은 것과 동일한 선례.
    */
   async get(tournamentId: string, user?: V1AuthUser) {
-    const row = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
+    // **문을 여는 자리.** 이 한 줄이 정규 리그 시즌을 `/tournaments/:id` 에 도달하게 한다.
+    // 이 PR 의 **마지막 커밋**인 이유: 앞선 커밋들이 상세 응답에 리그 대진을 싣고(②),
+    // 대진표 공개 게이트를 리그에서 빼고(③), 화면이 그것을 그리게(④⑤⑥) 만든 뒤에야
+    // 열어야 한다. 순서를 뒤집으면 사용자는 404 대신 **빈 껍데기**를 본다 — 사용자가 계속
+    // 말하는 "덜 된 것 같다" 가 정확히 그 인상이고, 그러면 우리가 그걸 직접 만드는 것이다.
+    const row = await findTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, {
       where: {
         // 목록만 막으면 **id 를 아는 사람은 그대로 열 수 있다** — 대회 id 는 대진·순위
         // 응답에 실려 나가므로 상세·순위에도 같은 조건을 건다(종류 조건은 헬퍼가 건다).
@@ -142,8 +157,50 @@ export class TournamentsReadService {
     }
 
     const staffBypass = await this.resolveStaffBypass(user, tournamentId);
+    // 거울 행에는 `V1TournamentFixture` 가 하나도 없다 — 그 행을 만드는 코드가 전부
+    // `TOURNAMENT_KINDS` 게이트 뒤에 있다. 그래서 대회 축 대진으로는 **빈 일정**이 나오고,
+    // 화면은 "대진표 준비 중" 을 띄운다(진행 중인 리그 시즌에 뜨면 틀린 말이다).
+    // 리그 축에서 같은 목록을 만들어 별도 필드로 싣는다.
+    const leagueFixtures =
+      row.kind === V1CompetitionKind.regular_league
+        ? await this.leagueCompetitionFixtures(tournamentId)
+        : [];
 
-    return presentTournamentDetail(row, new Date(), staffBypass);
+    return presentTournamentDetail(row, new Date(), staffBypass, leagueFixtures);
+  }
+
+  /**
+   * 거울 행(`kind = 'regular_league'`, id 가 리그 id 와 같다)의 일정 목록.
+   *
+   * 매핑은 `league-fixture-list-source.ts` 가 한다 — 리그 자기 페이지
+   * (`LeagueMatchPublicService.detail()`)와 **같은 함수**를 쓴다. 두 화면이 같은 대진을
+   * 서로 다른 모양으로 보여주지 않게 하기 위해서다.
+   *
+   * ⚠️ 순위 쪽 소스(`league-standings-source.ts`)와 **합치지 않는다.** 그쪽은 "순위에 세는
+   * 대진이 무엇인가" 에 답하느라 취소·무효를 카운터로 접고 `teamMatchId`·`startAt`·
+   * `placeName` 을 버린다 — 일정은 정확히 그 버린 것들이 필요하고, **취소·무효 대진도
+   * 목록에는 보여야 한다**(화면이 "취소됨"·"집계 제외" 로 적는다). 같은 테이블, 다른 질문.
+   */
+  private async leagueCompetitionFixtures(leagueId: string) {
+    const fixtures = await this.prisma.v1TeamMatch.findMany({
+      where: { leagueId },
+      orderBy: { startAt: 'asc' },
+      select: LEAGUE_FIXTURE_LIST_SELECT,
+    });
+
+    const revisionIds = fixtures
+      .map((fixture) => fixture.game?.currentOfficialRevisionId ?? null)
+      .filter((id): id is string => id !== null);
+    // 대진 수만큼 반복 조회하지 않는다 — 확정 리비전 id 를 모아 단일 IN 조회로 가져온다.
+    const facts =
+      revisionIds.length === 0
+        ? []
+        : await this.prisma.v1GameOfficialFact.findMany({
+            where: { revisionId: { in: revisionIds } },
+            select: LEAGUE_FIXTURE_FACT_SELECT,
+          });
+
+    return toLeagueFixtureList(fixtures, new Map(facts.map((fact) => [fact.gameId, fact])));
   }
 
   /**
@@ -154,7 +211,7 @@ export class TournamentsReadService {
    * - 팀별 잔여 경기 수를 세어 `magicNumberOf`에 넘긴다
    */
   async getOverallStandings(tournamentId: string) {
-    const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
+    const tournament = await findTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, {
       where: {
         // 목록만 막으면 **id 를 아는 사람은 그대로 열 수 있다** — 대회 id 는 대진·순위
         // 응답에 실려 나가므로 상세·순위에도 같은 조건을 건다(종류 조건은 헬퍼가 건다).
@@ -164,6 +221,7 @@ export class TournamentsReadService {
       },
       select: {
         id: true,
+        kind: true,
         competitionConfig: { select: { tieBreak: true } },
       },
     });
@@ -173,6 +231,13 @@ export class TournamentsReadService {
         code: 'TOURNAMENT_NOT_FOUND',
         message: '대회를 찾을 수 없어요.',
       });
+    }
+
+    // 거울 행(정규 리그 시즌)은 조도 대진도 없어 **대회 축 계산으로는 빈 순위표**가 나온다.
+    // 404 대신 빈 표를 주는 것이 더 나쁘다 — 에러가 아니라 "아직 순위가 없다" 로 읽힌다.
+    // 그래서 종류로 갈라 리그 축에서 같은 모양을 만든다.
+    if (tournament.kind === V1CompetitionKind.regular_league) {
+      return this.leagueOverallStandings(tournamentId);
     }
 
     const [standingRows, fixtures]: [OverallStandingRow[], OverallStandingsFixtureRow[]] = await Promise.all([
@@ -236,6 +301,113 @@ export class TournamentsReadService {
       progress,
       magicNumber,
       recalculatedAt: recalculatedAt ? recalculatedAt.toISOString() : null,
+    };
+  }
+
+  /**
+   * 거울 행(`kind = 'regular_league'`)의 통합 순위. **리그 축에서 계산해 대회 축 응답 모양으로**
+   * 돌려준다 — 같은 화면(`LeagueStandingsTable`)이 두 축을 다 그리게 하기 위해서다.
+   *
+   * ⚠️ **"이 PR 이 프론트를 안 건드린다" 와 "프론트가 지금 이 응답을 읽을 수 있다" 는 다른
+   * 말이다.** 앞은 맞고 뒤는 **아니다** — 아래 `registrationId` 항목 참조. 그 빚은 프론트 PR
+   * 이 갚고, **문 PR(상세 조회 `get` 을 넓히는 것)보다 반드시 먼저 머지돼야 한다.**
+   *
+   * ## 왜 대회 축 계산을 못 쓰나
+   * 거울에는 조(`V1TournamentGroup`)도 대진(`V1TournamentFixture`)도 없다 — 그 행들을 만드는
+   * 세 곳이 전부 `TOURNAMENT_KINDS` 게이트 뒤라 거울은 도달하지 않는다. 그래서 기존 경로는
+   * **빈 순위표**를 준다. 404 보다 나쁘다: 에러가 아니라 "아직 순위가 없다" 로 읽힌다.
+   *
+   * ## 모양이 다른 두 필드
+   * - `registrationId` — 리그엔 참가 등록 개념이 없어 **생략하고 `teamId` 를 싣는다.** teamId 를
+   *   `registrationId` 라는 이름에 담으면 값은 전달되지만 **이름이 내용과 갈린 상태**가 남고,
+   *   나중에 그 값으로 등록을 조회하는 코드가 생기는 순간 터진다.
+   *   프론트는 `#896` 에서 두 축을 다 읽도록 넓혔다 — `V1LeagueOverallStandingRow` 가
+   *   유니온이 되어 `registrationId`(대회) / `teamId`(리그) 중 **하나는 반드시** 있고,
+   *   행 key 는 `registrationId ?? teamId` 다. 그 확장이 이 문(상세 조회 게이트)보다 먼저
+   *   들어갔다 — 순서가 반대였으면 사용자가 키 겹친 빈 표를 봤다.
+   * - `fairPlayPoints` — 리그는 **집계 자체를 하지 않는다.** `0` 은 "감점이 없다" 로 읽히므로
+   *   값이 아니라 **부재**로 둔다(optional).
+   *
+   * ## 진행률의 분모
+   * 취소·무효 대진은 분모에서도 빠진다 — 앞으로도 치러지지 않을 경기를 "남은 경기" 로 세면
+   * 진행률이 영원히 100% 에 못 닿는다. 그 분류는 `bucketLeagueFixtures` 가 한다.
+   */
+  private async leagueOverallStandings(leagueId: string) {
+    const league = await this.prisma.v1League.findUnique({
+      where: { id: leagueId },
+      include: { teams: { select: { teamId: true, team: { select: { name: true } } } } },
+    });
+    if (league === null) {
+      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
+    }
+
+    const teamMatches = await this.prisma.v1TeamMatch.findMany({
+      where: { leagueId },
+      select: {
+        id: true,
+        hostTeamId: true,
+        approvedApplicantTeamId: true,
+        startAt: true,
+        status: true,
+        // `currentOfficialRevision.state` 가 없으면 무효(VOID)와 미확정이 구분되지 않는다 —
+        // 둘 다 fact 가 없기 때문이다. 이 select 가 빠지면 진행률이 조용히 틀린다.
+        game: {
+          select: {
+            id: true,
+            currentOfficialRevisionId: true,
+            currentOfficialRevision: { select: { state: true } },
+          },
+        },
+      },
+    });
+
+    const revisionIds = teamMatches
+      .map((teamMatch) => teamMatch.game?.currentOfficialRevisionId ?? null)
+      .filter((id): id is string => id !== null);
+    const facts =
+      revisionIds.length === 0
+        ? []
+        : await this.prisma.v1GameOfficialFact.findMany({
+            where: { revisionId: { in: revisionIds } },
+            select: { gameId: true, homeScore: true, awayScore: true },
+          });
+    const factByGameId = new Map(facts.map((fact) => [fact.gameId, fact]));
+
+    const buckets = bucketLeagueFixtures(teamMatches, factByGameId);
+    const teamNameById = new Map(league.teams.map((entry) => [entry.teamId, entry.team.name]));
+    const tieBreakOrder = (league.tieBreakJson as { order?: LeagueTieBreakCriterion[] }).order ?? [
+      'points',
+      'goalDifference',
+      'goalsFor',
+      'headToHead',
+    ];
+    const { standings: leagueStandings } = calculateLeagueStandingsWithTieBreakInfo({
+      teamIds: league.teams.map((entry) => entry.teamId),
+      fixtures: buckets.confirmed,
+      tieBreakOrder,
+    });
+
+    return {
+      standings: leagueStandings.map((row) => ({
+        // `registrationId` 는 **싣지 않는다.** 리그엔 참가 등록 개념이 없다 — teamId 를 그
+        // 이름으로 담으면 값을 함께 실어도 **이름이 팀 id 를 담는 상태**가 그대로 남고,
+        // 나중에 그 값으로 등록을 조회하는 코드가 생기는 순간 터진다.
+        // `fairPlayPoints` 와 같은 처리다: 값이 아니라 **부재**다.
+        teamId: row.teamId,
+        teamName: teamNameById.get(row.teamId) ?? '',
+        position: row.position,
+        points: row.points,
+        wins: row.wins,
+        draws: row.draws,
+        losses: row.losses,
+        goalsFor: row.goalsFor,
+        goalsAgainst: row.goalsAgainst,
+      })),
+      progress: leagueProgressOf(leagueFixtureProgressInput(buckets)),
+      // 매직넘버는 대회 축의 잔여 경기 계산에 묶여 있다. 리그에 같은 개념을 붙이는 것은
+      // 별도 판단이라 여기서 지어내지 않는다.
+      magicNumber: null,
+      recalculatedAt: null,
     };
   }
 

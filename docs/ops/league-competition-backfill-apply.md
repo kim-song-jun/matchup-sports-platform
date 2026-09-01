@@ -15,6 +15,23 @@
 >
 > **prod 는 그대로다** — prod 에는 리그 자체가 없다(맨 아래 절).
 >
+> ## ✅ 참가팀 백필도 실행됐다 (2026-08-31, 사용자 승인)
+> `league-team-registration-backfill.cli.js --apply` → **`created: 211`**.
+> alpha `5196a6ee4` 이미지에서 SSM → `docker exec` 경로로 실행했다.
+> ```
+> v1_tournament_registrations            248 → 459
+> 그중 리그 대회에 달린 것                     211
+> v1_league_teams 와 1:1 매칭                211
+> status/entry_source/appliedBy 위반          0
+> ```
+> **되돌리기 창은 그대로 열려 있다** — Restrict 여섯 자리 전부 0행(실행 후 재확인).
+> 봉쇄도 유지: 리그 id 로 `/tournaments/:id`·`/standings`·`/matches` **전부 404**,
+> `/league-matches/:id` 는 200.
+>
+> **다음에 이 문서를 읽는 사람에게**: 두 백필 모두 **실행 완료** 상태다. 다시 돌리지 마라 —
+> 가드가 막긴 하지만(`alreadyPresent` 로 세고 `idConflicts` 로 멈춘다) alpha 데이터 변경
+> 승인을 헛되이 쓴다.
+>
 > **아직 참인지 확인하는 법**: 아래 "실행 직전 점검 1" 의 SSM → psql 경로로
 > `SELECT count(*) FROM v1_tournaments WHERE kind='regular_league';` 을 본다.
 > 88 이면 실행됨, 0 이면 이 정정이 틀린 것이니 되돌려 적는다.
@@ -128,3 +145,124 @@ DATABASE_URL=<alpha> ts-node src/tournaments/migration/league-competition-backfi
 **이 CLI 의 `--apply` 는 사용자 승인 사항이다.** 라이브 환경에 데이터를 새로 만드는
 일이라 에이전트가 단독으로 판단하지 않는다. `deploy.yml` 에 배선하지 않는 이유도 같다 —
 파이프라인에 들어가면 나중에 누가 `--apply` 로 바꾸는 경로가 생긴다.
+
+---
+
+## 표시 필드 백필(R4-a) `--apply` — 실행 전 판정표
+
+**2026-08-31 실측 기준선** (읽기 전용):
+```
+v1_leagues                                              88
+kind='regular_league' 거울                               88
+그중 status <> 'draft'                                    0
+그중 scheduled_at / scheduled_end_at / region_id 채워진 것  0 / 0 / 0
+리그 축 상태 분포        draft 35 · active 15 · completed 38
+```
+
+### dry-run 출력을 이렇게 읽는다
+
+| 값 | 기대 | 다르면 |
+|---|---|---|
+| `scanned` | **88** | 늘었으면 dual-write 배포 후 리그가 생긴 것 — 늘어난 수가 `skipped` 와 같은지 본다 |
+| `planned` | **88** | — |
+| `skipped` | **0** | ⚠️ 아래 |
+| `mirrorCount` | **88** | 리그 수와 다르면 불변식이 이미 던진다 |
+
+> **`updated: 0` 은 dry-run 에서 항상 0 이다.** "아직 안 바꿨구나" 로 읽히지만 그건
+> 정상 신호가 아니라 **아무 정보도 아니다** — 몇 건이 바뀌는지는 `planned` 로만 알 수 있다.
+> 그래서 `planned` 를 넣었다(그전에는 그 숫자가 아예 없었다).
+
+### ⛔ `--apply` 전에 **진행 중인 배포가 없는지** 확인한다 — 502 회피와 다른 이유다
+
+```bash
+gh run list --workflow deploy-alpha.yml --branch dev --limit 1 --json status --jq '.[0].status'
+#  completed 여야 한다
+```
+
+**이유가 둘이고 서로 다르다:**
+```
+① 502 회피        배포 중에는 응답이 깨져 멀쩡한 화면을 결함으로 오진한다
+② 헛돌기(신규)    쓰기 조건이 "읽은 시점의 관측값" 이라, 읽기~쓰기 사이에 배포가 돌아
+                  QA 시드가 그 3행의 날짜를 now 기준으로 다시 계산하면 → 0행 매칭 → 전체 롤백
+```
+**②는 데이터가 위험한 게 아니다** — 롤백되므로 안전하다. 문제는 **헛돌고, 실패 원인이 "경합"으로
+보여 진짜 문제로 오해된다**는 것이다. 시드가 날짜를 매 배포 갱신한다는 걸 우리가 이미 알고 있으니
+**배포 중 `--apply` 는 거의 확실히 실패한다.**
+
+### ⚠️ `skipped ≠ 0` 은 **두 가지 뜻이 있다. 구분해야 한다**
+`skipped` 는 "이미 목표값과 같다" 인데 그렇게 되는 길이 둘이다:
+```
+① dual-write 가 만든 새 리그        정상
+② 88행 중 일부가 이미 채워졌다      비정상 — 우리가 모르는 쓰기 경로가 있다는 뜻
+```
+`planned + skipped == scanned` 는 **둘 다 성립하므로 판정이 안 된다.**
+
+**구분법:**
+```
+scanned == 88,  skipped > 0   → ② 계열이다. 아래 ②-a 인지 먼저 본다
+scanned  > 88,  skipped > 0   → ①일 수 있다. (scanned − 88) == skipped 인지 확인
+```
+
+**②를 다시 두 갈래로 가른다 — 2026-08-31 에 실제로 ②-a 가 났다:**
+```
+②-a  QA 시드 dual-write     정상. 시드가 배포마다 update 분기로 날짜·지역을 동기화한다
+                            (status 는 create 전용이라 draft 로 남아 부분 채움이 된다)
+②-b  모르는 쓰기 경로        멈추고 원인을 밝힌다
+```
+**id 로 확인한다 — "3행이니까 시드겠지" 는 판정이 아니다:**
+```sql
+SELECT t.id, t.status, (l.starts_on = t.scheduled_at) AS same_start,
+       (l.region_id = t.region_id) AS same_region
+  FROM v1_tournaments t JOIN v1_leagues l ON l.id = t.id
+ WHERE t.kind='regular_league'
+   AND (t.scheduled_at IS NOT NULL OR t.region_id IS NOT NULL);
+```
+`LEAGUE_QA_ID`(`ad100000-…0001`) + 티어 리그 2개이고 **값이 리그와 일치**하면 ②-a 다.
+그 밖의 id 가 나오거나 값이 다르면 **②-b 이므로 멈춘다.**
+**②면 승인 요청으로 넘어가지 않는다** — dual-write 목록(`scripts/league-write-site-baseline.json`)이
+불완전하다는 신호이고, 그건 백필보다 먼저 풀어야 한다.
+
+> **위 기준선이 ②를 지금 시점에 배제한다** — 채워진 행이 0 이므로, dry-run 에서 `skipped > 0`
+> 이 나오면서 `scanned == 88` 이면 **그 사이에 무언가 채웠다**는 뜻이고 원인이 반드시 있다.
+
+### `--apply` 전후 분포 — **전을 적어 두지 않으면 후를 봐도 증명이 안 된다**
+
+**BEFORE (2026-08-31 실측, 직접 조회 — 파생값 아님):**
+```sql
+SELECT status, count(*) FROM v1_tournaments WHERE kind='regular_league' GROUP BY 1;
+--  draft | 88          ← 한 줄뿐이다. 다른 status 는 아예 없다
+
+SELECT state, count(*) FROM v1_leagues GROUP BY 1;
+--  draft | 35   active | 15   completed | 38
+```
+
+**AFTER (기대):**
+```
+통합 축   draft 35 · in_progress 15 · completed 38    ← 리그 축과 1:1
+```
+
+> **`in_progress` 다.** 리그의 `active` 가 대회 축에서는 `in_progress` 로 옮겨진다
+> (`STATUS_BY_LEAGUE_STATE`). 같은 이름을 찾으면 안 맞는 것으로 오해한다.
+
+### 검증 — **개수만 보지 않는다**
+```
+거울 수 == 리그 수                    ← CLI 가 자동으로 던진다
+상태 분포 == 위 AFTER                  ← 이건 따로 확인한다
+```
+**개수 불변식은 값이 틀린 것을 못 본다.** 88행이 전부 `draft` 로 남아 있어도 개수는 맞다 —
+그게 정확히 BEFORE 상태이므로, **개수만 보면 `--apply` 를 안 돌린 것과 구분되지 않는다.**
+분포 대조가 실제로 먹었는지의 유일한 지표다.
+
+### `--apply` 후 — **배포를 한 번 거친 뒤 분포를 다시 잰다**
+
+QA 시드는 `status` 를 **create 전용**으로 두기로 했다(스태프가 alpha 에서 바꾼 상태를 재배포가
+되돌리면 안 된다 — 리그 축의 `state` 와 같은 이유). **그런데 그건 설계 의도이고, 실제로 그렇게
+도는지는 배포를 한 번 거쳐야만 확인된다.**
+
+```
+--apply 직후        통합 축 draft 35 · in_progress 15 · completed 38
+다음 배포 후 다시    같은 분포여야 한다
+```
+**달라졌다면** 시드의 update 분기가 `status` 를 건드리고 있다는 뜻이고, 그러면 **거울만 시드값으로
+되돌아가고 리그는 스태프 값을 유지해 두 축이 반대 방향으로 갈라진다.** 그 경우 시드부터 고친다.
+

@@ -1,3 +1,8 @@
+// 리그 대진 모양은 `league-match.ts` 가 단일 소스다 — 여기서 다시 선언하면 두 모양이
+// 생기고 서버 계약이 바뀔 때 조용히 갈린다. (league-match.ts 는 이 파일을 import 하지
+// 않으므로 순환이 없다.)
+import type { V1LeagueFixture } from './league-match';
+
 export type ApiEnvelope<T> = {
   status: 'success';
   data: T;
@@ -2885,6 +2890,29 @@ export type V1TournamentStatus =
   | 'cancelled';
 
 export type V1TournamentFormat = 'league' | 'knockout' | 'group_knockout';
+
+/**
+ * 대회 종류 — **`V1TournamentFormat` 과 다른 질문에 답한다.**
+ *
+ * ```
+ * format  어떤 방식으로 치르나   league | knockout | group_knockout
+ * kind    무엇인가              regular_tournament | regular_league
+ * ```
+ * 둘은 독립이다: `format: 'league'` 이면서 `kind: 'regular_tournament'` 인 행이 실제로
+ * 있다(리그 방식으로 치르는 대회 — alpha 실측 7건). **종류를 가릴 땐 반드시 `kind` 를
+ * 쓴다** — `format` 으로 가르면 그 7건이 신청·참가등록을 잃는다.
+ *
+ * ## ⚠️ 비교 방향 — 리그 판별은 반드시 `=== 'regular_league'`
+ * 이 필드는 3상태다(`regular_league` / `regular_tournament` / `null`). 그래서 비교를
+ * 어느 쪽으로 쓰느냐로 결과가 갈린다:
+ * ```
+ * ✅ kind === 'regular_league'      리그.  null·regular_tournament 는 대회로 떨어진다 (사실과 일치)
+ * ❌ kind !== 'regular_tournament'  리그.  null 이 리그가 된다 → 옛 대회가 리그로 그려진다
+ * ```
+ * 둘 다 "리그를 판별한다"로 읽히는데 **결과가 반대다.** 그리고 후자는 null 행이 없으면
+ * 테스트로도 안 걸린다 — 현재 alpha 에 null 이 0건이라 더더욱 조용히 지나간다.
+ */
+export type V1CompetitionKind = 'regular_tournament' | 'regular_league';
 export type V1TournamentGenderCategory = 'mixed' | 'male' | 'female';
 
 export type V1PublicTournamentStatus = Extract<
@@ -2943,7 +2971,10 @@ export type V1TournamentListItem = {
   sport: { code: string; name: string };
   title: string;
   status: V1TournamentStatus;
+  /** 어떤 방식으로 치르나. **종류 판별자가 아니다** — 종류는 `kind`. */
   format: V1TournamentFormat;
+  /** 단발 대회 / 정규 리그 시즌. null 은 아직 채워지지 않은 행이다(R5에서 NOT NULL). */
+  kind: V1CompetitionKind | null;
   registrationDeadlineAt: string | null;
   scheduledAt: string | null;
   scheduledEndAt: string | null;
@@ -3245,7 +3276,10 @@ export type V1TournamentDetail = {
   sport: { code: string; name: string };
   title: string;
   status: V1TournamentStatus;
+  /** 어떤 방식으로 치르나. **종류 판별자가 아니다** — 종류는 `kind`. */
   format: V1TournamentFormat;
+  /** 단발 대회 / 정규 리그 시즌. null 은 아직 채워지지 않은 행이다(R5에서 NOT NULL). */
+  kind: V1CompetitionKind | null;
   registrationDeadlineAt: string | null;
   /** 명단(선수단) 제출 마감일 — 지나면 신청 팀의 명단 추가/삭제/수정이 차단된다(팀별 예외 부여 가능). */
   rosterDeadlineAt: string | null;
@@ -3310,6 +3344,15 @@ export type V1TournamentDetail = {
   pendingPaymentCount: number;
   groups: V1TournamentGroup[];
   fixtures: V1TournamentFixture[];
+  /**
+   * 정규 리그 시즌(거울 행)의 대진. **대회는 항상 빈 배열이다.**
+   *
+   * `fixtures` 와 합치지 않은 이유: 두 모양은 겹치는 필드가 셋뿐이고 그 중 `status` 의
+   * **값 영역이 다르다**(대회 `scheduled|completed` / 리그 `matched|completed|cancelled|…`).
+   * 한 배열에 섞으면 `status === 'scheduled'` 같은 코드가 모든 리그 경기에서 조용히
+   * 거짓이 된다 — 타입도 값도 정상으로 보인다.
+   */
+  leagueFixtures: V1LeagueFixture[];
   announcements: V1TournamentAnnouncement[];
   sponsors: V1TournamentSponsor[];
   /** 대회 참가팀 후기 (status=completed 이후 참가 확정팀만 작성 가능). 최신순 최대 30건만 포함 — 전체 개수는 reviewsTotalCount 참조 */
@@ -3578,8 +3621,21 @@ export interface V1GenerateLeagueFixturesResponse {
 }
 
 /** GET /tournaments/:id/standings/overall 통합 순위 행 — 리그 대회 전체 조를 합친 순위표 한 줄 */
-export interface V1LeagueOverallStandingRow {
-  registrationId: string;
+/**
+ * 통합 순위 한 행. **두 축이 같은 표를 채우는데 신원 필드가 다르다.**
+ *
+ * | 필드 | 정규 대회 | 정규 리그 |
+ * |---|---|---|
+ * | `registrationId` | 있음 | **없음** — 리그엔 참가 등록 개념이 없다 |
+ * | `teamId` | 없음 | **있음** |
+ * | `fairPlayPoints` | 있음 | **없음** — 리그는 집계 자체를 하지 않는다 |
+ *
+ * `fairPlayPoints` 를 리그에서 `0` 으로 채우지 않는 이유: `0` 은 "감점이 없다" 로 읽힌다.
+ * 집계하지 않는 것은 값이 아니라 **부재**다.
+ *
+ * 행 key 는 `registrationId ?? teamId` 로 잡는다 — 둘 중 하나는 항상 있다.
+ */
+interface V1LeagueOverallStandingRowBase {
   teamName: string;
   position: number | null;
   points: number;
@@ -3588,8 +3644,31 @@ export interface V1LeagueOverallStandingRow {
   losses: number;
   goalsFor: number;
   goalsAgainst: number;
-  fairPlayPoints: number;
+  /** 정규 대회에만 있다 — 리그는 페어플레이 점수를 집계하지 않는다. */
+  fairPlayPoints?: number;
 }
+
+/**
+ * **유니온으로 둘 중 하나를 강제한다.** 둘 다 optional 인 단일 인터페이스로 두면
+ * *"둘 중 하나는 항상 있다"* 가 주석에만 있고 **둘 다 없는 행이 컴파일된다** — 그러면
+ * `key` 가 `undefined` 인 행을 만들어 놓고도 타입 검사가 통과한다.
+ *
+ * 이 유니온이 막는 것은 **행을 만드는 쪽**이다(픽스처·mock·어댑터). 소비 쪽에서
+ * `registrationId ?? teamId` 의 결과 타입은 여전히 `string | undefined` 인데
+ * (TS 가 속성 접근에서 유니온을 자동으로 분배하지 않는다), React 의 `key` 가 그것을
+ * 받으므로 실용상 문제가 없다 — **막고 싶은 건 그런 행이 애초에 만들어지는 것**이다.
+ */
+export type V1LeagueOverallStandingRow =
+  | (V1LeagueOverallStandingRowBase & {
+      /** 정규 대회 행. */
+      registrationId: string;
+      teamId?: string;
+    })
+  | (V1LeagueOverallStandingRowBase & {
+      registrationId?: string;
+      /** 정규 리그 행 — 참가 등록 개념이 없어 팀 id 가 신원이다. */
+      teamId: string;
+    });
 
 /** GET /tournaments/:id/standings/overall 응답 — 통합 순위 + 진행률 + 매직넘버 */
 export interface V1LeagueOverallStandingsResponse {

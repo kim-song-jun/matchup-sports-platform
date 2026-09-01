@@ -180,6 +180,15 @@ export const gameSchemaFixture = {
 // full chain against an empty database (`prisma migrate deploy`) plus a drift check
 // (`prisma migrate diff --exit-code` → "No difference detected"). The bound
 // 20260729000100_v1_game_operations migration is untouched, so `migration` keeps its value.
+// Re-pinned for R4-a expand (리그를 통합 축에서 그리기): V1Tournament gains a nullable
+// `regionId` + V1Region relation + `@@index([regionId, status])`. Like the theme-preference
+// and post-event-review re-pins and unlike the HALFTIME one, this does NOT touch the game
+// domain — no v1_game_* model, enum, or relation changes; the guard fired only because it
+// hashes the whole schema.prisma file. It is additive and does not alter existing rows:
+// the column is nullable precisely because pre-existing tournaments have no region, and
+// making it NOT NULL would violate the expand rule (expand never rewrites existing rows).
+// One new migration file backs it (20260831080000_v1_tournament_region_expand); the bound
+// 20260729000100_v1_game_operations migration is untouched, so `migration` keeps its value.
 // Recomputed with `shasum -a 256` against the file on this branch.
 export const gameSchemaSourceManifest = {
   // 팀 라인업 재사용(2026-08-13)과 dev의 스키마 변경이 여기서 만났다. 두 브랜치가
@@ -438,7 +447,7 @@ export const gameSchemaSourceManifest = {
   // 뒷받침 마이그레이션: 20260831000000_v1_apns_environment (CREATE TYPE + ADD COLUMN 뿐,
   // backfill 없음). 바인딩된 20260729000100_v1_game_operations 는 건드리지 않았으므로
   // migration 해시는 그대로다. 이 브랜치의 파일에 `shasum -a 256` 을 돌려 새로 계산했다.
-  schema: 'd8a323b24545f35a712f75226a2b4e243c741b6209dfda468cd547f1c6a0bd54',
+  schema: '925419b9d5f7ff4f096197195a14895e8dcc824f2edeade4a8f70839957906e7',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

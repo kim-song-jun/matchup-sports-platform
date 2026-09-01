@@ -69,6 +69,23 @@ describe('LeagueMatchesListClient', () => {
     expect(within(link).getByText('풋살')).toBeInTheDocument();
     expect(within(link).getByText('성수동')).toBeInTheDocument();
     expect(within(link).getByText('6팀 참가')).toBeInTheDocument();
+
+    // 대회 카드와 **같은 골격**을 쓰는지 — 종목 아이덴티티(썸네일 글리프 + 종목 칩)가
+    // 리그 카드에도 있어야 한다. 통합 전 리그 카드는 색 점 하나뿐이라 같은 "대회" 탭
+    // 안에서 두 종류가 다른 물건처럼 보였다. 이 단언이 그 회귀를 막는다.
+    // 종목 칩 — 전에는 색 점 + 라벨뿐이라 `aria-label` 이 없었다(색으로만 알리는 상태).
+    expect(within(link).getByLabelText('종목: 풋살')).toBeInTheDocument();
+    // 썸네일 — SportGlyph 는 aria-hidden SVG 라 접근성 쿼리로 안 잡힌다. 그렇다고
+    // `link.querySelector('svg')` 로 두면 **카드 어디의 svg 라도 통과**한다 — 지금은
+    // 카드에 svg 가 썸네일뿐이라 결과가 같지만, 다른 svg 가 하나라도 늘면 썸네일이
+    // 사라져도 green 이 된다(Copilot #887 지적). 썸네일을 정확히 집는다.
+    const thumbnail = within(link).getByTestId('competition-thumbnail');
+    expect(thumbnail.querySelector('svg')).not.toBeNull();
+
+    // 리그 카드의 배지는 전부 같은 크기여야 한다 — 공유 헤더는 대회 기준의 기본 크기를
+    // 쓰므로 `tm-badge-sm` 을 넘기지 않으면 **상태 배지만 커진다**(같은 행의 티어 배지는
+    // 여전히 small). 크기 클래스를 잃는 회귀를 여기서 잡는다.
+    expect(within(link).getByText('진행 중').className).toContain('tm-badge-sm');
   });
 
   it('결과가 0건이면 EmptyState를 렌더한다', () => {

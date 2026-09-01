@@ -202,9 +202,12 @@ describe('TournamentRegistrationsService', () => {
         kindAwareFindFirst(openTournament({ id: 'league-1', kind: 'regular_league' })),
       );
 
+      // **409 `TOURNAMENT_STATE_CHANGED` 다** — 404 가 아니다. 이 경로는 바깥 검사를 통과한 뒤
+      // 트랜잭션 안에서 `FOR UPDATE` 로 다시 읽어 막는 자리라, "없다" 가 아니라 "그 사이에
+      // 바뀌었다" 를 뜻한다. 같은 파일의 `create`(404)와 **이름이 같으면 로그에서 못 가른다.**
       await expect(
         service.withdrawCancelRequest(manager, 'league-1', 'reg-1'),
-      ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_NOT_FOUND' } });
+      ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_STATE_CHANGED' } });
       expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
     });
 

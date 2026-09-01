@@ -15,5 +15,9 @@
   "src/games/migration/participant-identity-link-backfill.ts": {
     "allowed": 1,
     "why": "일회성 마이그레이션 백필. 사용자 요청 경로가 아니다."
+  },
+  "prisma/cleanup-demo-data.ts": {
+    "allowed": 2,
+    "why": "데모 데이터 정리 스크립트의 CTE. 게이트가 prisma/ 를 안 봐서 이제껏 보이지 않던 자리다(2026-08-31 스캔 확대로 드러남). ⚠️ 리그 거울이 여기 걸릴 수 있다 — seed_tournaments 가 created_by_admin_user_id 와 seed_tournament_registrations 로 대회를 고르는데, 백필·dual-write 로 리그에도 등록 행이 생겼다. 거울만 지워지면 그 리그는 read-swap 뒤 화면에서 사라진다. --execute --confirm 이 둘 다 필요한 수동 스크립트라 즉시 위험은 아니지만, 실행 전 kind='regular_league' 를 제외하는지 확인해야 한다."
   }
 }

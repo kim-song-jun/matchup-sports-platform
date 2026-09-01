@@ -101,3 +101,64 @@
 
 `.p8`이 도착하면 [`ios-release.md`](./ios-release.md)의 ad-hoc 서명 절차로 실기기 QA를 먼저
 돌린다.
+
+
+## alpha 런타임 주입 (2026-08-31 추가 — 이게 없으면 푸시가 조용히 죽는다)
+
+**실측으로 확인한 것**: alpha 배포는 시크릿을 4개만 주입하고 있었고 그중 APNs 는 없었다.
+그래서 `ApnsPushService` 가 `APNs credentials not configured — iOS push disabled` 로
+시작하고, 알림 **row 는 만들어지지만** iOS 로는 아무것도 나가지 않는다. 화면에는 알림이
+쌓이는데 폰은 조용하다 — 기기가 고장난 것처럼 보이고 서버가 시도조차 안 했다는 건 안 보인다.
+(2026-08-31 실측: 팀 채팅 메시지 → 알림 row 생성됨 → 시뮬레이터에 배너 없음.)
+
+`scripts/release/sync-alpha-apns-env.sh` 가 이 구멍을 막는다. 문의 Slack 웹훅과 같은 방식이다
+— GitHub secret → SSM SecureString → SSM 원격 실행으로 호스트의 보호된 `deploy/.env` 에 기록.
+값이 워크플로 로그나 이미지 레이어를 거치지 않는다.
+
+**운영자가 해야 할 것 — GitHub Actions secrets 4개 등록:**
+
+| 이름 | 값 |
+|---|---|
+| `APNS_KEY_ID` | 10자 키 ID |
+| `APNS_TEAM_ID` | 10자 팀 ID |
+| `APNS_BUNDLE_ID` | `kr.co.teameet.alpha` (alpha 기준) |
+| `APNS_PRIVATE_KEY` | `.p8` **내용**. 개행이 있는 그대로 붙여넣으면 된다 — 스크립트가 한 줄로 바꾼다 |
+
+넷 중 하나라도 없으면 배포는 **실패하지 않고** 경고만 남긴 채 넘어간다: 푸시 없는 alpha 는
+동작하는 alpha 지만, 막힌 배포는 아니기 때문이다. 경고 문구에 빠진 이름이 찍힌다.
+
+등록 후 다음 dev 머지(=alpha 배포)부터 적용된다. 확인은 알림을 하나 유발해 보는 것으로 한다 —
+row 만 생기고 폰이 조용하면 여전히 주입되지 않은 것이다.
+
+
+### IAM — 시크릿을 등록해도 이것 없이는 전달되지 않는다 (2026-08-31 실측)
+
+시크릿 4개를 등록한 뒤에도 동기화가 이렇게 실패했다:
+
+```
+AccessDeniedException ... assumed-role/teameet-alpha-github-deploy/GitHubActions
+is not authorized to perform: ssm:PutParameter on
+resource: .../parameter/teameet/alpha/env/APNS_KEY_ID
+```
+
+**권한 자체가 없는 것이 아니다.** 같은 배포에서 문의 Slack 웹훅 동기화는 같은 API 로
+성공한다 — 배포 역할의 정책이 **파라미터 이름 단위로 허용**돼 있고 거기에 APNS 경로가
+없을 뿐이다. Apple 의 오류 문구("no identity-based policy allows the action")가 마치
+권한이 통째로 없는 것처럼 읽혀 엉뚱한 곳을 보게 만든다.
+
+**운영자가 해야 할 것** — 배포 역할 `teameet-alpha-github-deploy` 의 정책에서
+`ssm:PutParameter` 가 허용된 리소스 목록에 아래 4개를 추가한다(리전·계정은 기존 항목과 동일):
+
+```
+arn:aws:ssm:<region>:<account>:parameter/teameet/alpha/env/APNS_KEY_ID
+arn:aws:ssm:<region>:<account>:parameter/teameet/alpha/env/APNS_TEAM_ID
+arn:aws:ssm:<region>:<account>:parameter/teameet/alpha/env/APNS_BUNDLE_ID
+arn:aws:ssm:<region>:<account>:parameter/teameet/alpha/env/APNS_PRIVATE_KEY
+```
+
+**왜 Parameter Store 를 거치나 — 값을 명령에 직접 실어 보내면 권한 추가가 필요 없지만,
+그 값은 SSM 명령 이력에 남아 계정 안에서 조회된다.** 개인 키에는 맞지 않는 거래라
+SecureString 경로를 유지하고 권한을 넓히는 쪽을 택했다.
+
+정책을 고친 뒤에는 다음 dev 머지(=alpha 배포)에서 동기화가 성공한다. 배포 로그의
+`Sync APNs runtime env` 단계에 경고가 없으면 반영된 것이다.

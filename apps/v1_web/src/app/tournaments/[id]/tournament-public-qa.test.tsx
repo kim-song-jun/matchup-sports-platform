@@ -9,6 +9,7 @@ function makeTournament(
   overrides: Partial<V1TournamentDetail> & Pick<V1TournamentDetail, 'format' | 'status'>,
 ): V1TournamentDetail {
   return {
+    kind: 'regular_tournament',
     id: 'tournament-1',
     sportId: 'sport-futsal',
     sport: { code: 'futsal', name: '풋살' },
@@ -65,6 +66,7 @@ function makeTournament(
     pendingPaymentCount: 0,
     groups: [],
     fixtures: [],
+    leagueFixtures: [],
     announcements: [],
     sponsors: [],
     reviews: [],

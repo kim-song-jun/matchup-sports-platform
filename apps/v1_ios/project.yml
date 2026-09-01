@@ -70,6 +70,18 @@ targets:
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+        # Export compliance, declared once in the build rather than answered per upload.
+        #
+        # Without it every uploaded build sits with `usesNonExemptEncryption` unset, and a
+        # build in that state cannot be attached to a TestFlight group at all — Apple answers
+        # "Build is not in an internally testable state", which does not mention encryption
+        # and sends you looking at signing instead. Measured on builds 1 and 3.
+        #
+        # False is the accurate answer for this app, not a convenient one: it is a WKWebView
+        # shell whose only cryptography is the HTTPS the operating system provides. Nothing
+        # is implemented here and no crypto library is bundled — every screen is drawn by the
+        # web app. Confirmed by the user 2026-08-31, since this is a legal declaration.
+        ITSAppUsesNonExemptEncryption: false
         # The environment contract the app reads at runtime through AppConfig.
         TeameetWebOrigin: $(TEAMEET_WEB_ORIGIN)
         TeameetWebViewInspectable: $(TEAMEET_WEBVIEW_INSPECTABLE)

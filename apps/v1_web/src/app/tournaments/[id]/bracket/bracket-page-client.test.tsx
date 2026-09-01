@@ -11,6 +11,7 @@ import type { V1TournamentDetail, V1TournamentFixture, V1TournamentGroup } from 
  */
 function makeTournament(overrides: Partial<V1TournamentDetail> & Pick<V1TournamentDetail, 'id' | 'status' | 'format'>): V1TournamentDetail {
   return {
+    kind: 'regular_tournament',
     sportId: 'sport-futsal',
     sport: { code: 'futsal', name: '풋살' },
     title: '테스트 대회',
@@ -66,6 +67,7 @@ function makeTournament(overrides: Partial<V1TournamentDetail> & Pick<V1Tourname
     pendingPaymentCount: 0,
     groups: [],
     fixtures: [],
+    leagueFixtures: [],
     announcements: [],
     sponsors: [],
     reviews: [],
@@ -698,5 +700,79 @@ describe('BracketPageContent — 한쪽 칼럼만 있을 때는 2열로 펴지 �
     const grid = container.querySelector('.tm-bracket-page-grid');
     expect(grid).not.toHaveClass('tm-tourn-sub-grid-2col');
     expect(container.querySelectorAll('.tm-tourn-sub-col')).toHaveLength(1);
+  });
+});
+
+
+/**
+ * 통합 거울 행(정규 리그 시즌)이 이 화면에 도착했을 때.
+ *
+ * **`format: 'group_knockout'` 인 것이 이 describe 의 전부다.** 백필·dual-write 가 `format` 을
+ * 안 채워 스키마 기본값이 남는 것이 거울 행의 실제 모양이고, 그래서 `format` 만 보는 코드는
+ * 리그에서 ① 리그 순위를 안 그리고 ② 없는 대진표 칼럼을 그리고 ③ "조별리그 + 토너먼트"라고
+ * 적었다.
+ *
+ * `format: 'league'` 로 픽스처를 만들면 `isLeagueCompetition` 의 `||` 앞쪽이 참이라 `kind` 를
+ * 안 탄다 — `|| kind === 'regular_league'` 를 지워도 통과하는 vacuous 테스트가 된다.
+ */
+describe('BracketPageContent — 정규 리그 거울 행(format=group_knockout, kind=regular_league)', () => {
+  function mirrorLeague(): V1TournamentDetail {
+    return makeTournament({
+      id: 'league-1',
+      status: 'in_progress',
+      format: 'group_knockout',
+      kind: 'regular_league',
+      groups: [
+        makeGroup({
+          id: 'group-1',
+          phase: 'league',
+          standings: [
+            {
+              registrationId: 'reg-1',
+              teamId: 'team-42',
+              teamName: '성수 FC',
+              teamLogoUrl: null,
+              position: 1,
+              points: 9,
+              wins: 3,
+              draws: 0,
+              losses: 0,
+              goalsFor: 10,
+              goalsAgainst: 2,
+              recalculatedAt: null,
+            },
+          ],
+        }),
+      ],
+    });
+  }
+
+  it('진행 방식 배지를 "리그 방식"으로 적는다 — format 을 그대로 읽으면 "조별리그 + 토너먼트"가 된다', () => {
+    const { container } = renderBracketPage(mirrorLeague());
+
+    // 단계 표시기에도 "리그 방식" 칸이 있어 getByText 는 2건을 문다 — 헤더 배지로 좁힌다.
+    expect(container.querySelector('.tm-bracket-page-format')).toHaveTextContent('리그 방식');
+    expect(screen.queryByText('조별리그 + 토너먼트')).not.toBeInTheDocument();
+  });
+
+  it('리그 순위를 그리고, 조별 순위는 그리지 않는다', () => {
+    renderBracketStandingsTab(mirrorLeague());
+
+    expect(screen.getByRole('heading', { name: '리그 순위' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '조별 순위' })).not.toBeInTheDocument();
+  });
+
+  // 이 화면이 리그에서 가장 크게 틀어지는 자리 — hasBracketColumn 이 format 만 보면
+  // group_knockout 에서 참이 되어 **빈 토너먼트 대진 칼럼**이 생긴다.
+  it('토너먼트 대진 칼럼을 만들지 않는다', () => {
+    renderBracketStandingsTab(mirrorLeague());
+
+    expect(screen.queryByRole('heading', { name: '토너먼트 대진' })).not.toBeInTheDocument();
+  });
+
+  it('안내 문구에서 조별리그·결선을 말하지 않는다', () => {
+    renderBracketPage(mirrorLeague());
+
+    expect(screen.getByText('경기 일정과 순위를 확인하세요.')).toBeInTheDocument();
   });
 });

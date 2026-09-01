@@ -29,13 +29,27 @@ import type { PrismaClient } from '@prisma/client';
  * `{ kind: 'regular_tournament' }` 한 줄로 바꾸면 **R1 이전 대회가 사용자 화면에서
  * 통째로 사라지는데**, 그 순간 이 케이스가 red 가 된다.
  *
- * **상세·순위도 함께 건다.** 목록만 막으면 id 를 아는 사람은 그대로 열 수 있고
- * (대회 id 는 대진·순위 응답에 실려 나간다), 그 상태로도 목록 테스트만으로는 green 이 된다.
+ * **어디까지 막는지가 표면마다 다르다 — 그것도 함께 건다.**
+ *
+ * | 표면 | 리그 |
+ * |---|---|
+ * | 공개 대회 목록 · 어드민 목록 · 상태 탭 · 대시보드 KPI | **안 나온다** |
+ * | 공개 대회 기록(일정·선수기록·경기단건) | **안 열린다** |
+ * | 공개 상세 · 공개 통합 순위 | **열린다** (read-swap 의 목적) |
+ *
+ * 상세·순위를 연 것은 실수가 아니라 이 개편의 목적이다 — 리그 시즌을 대회 표면에서 볼 수
+ * 있게 하는 것. 다만 **열기 전에** 그 화면이 리그 축 데이터로 채워지도록 먼저 만들었다
+ * (`leagueFixtures` · 대진표 공개 게이트 제외 · 순위 섹션 게이트). 순서를 뒤집으면
+ * 사용자는 404 대신 빈 껍데기를 본다.
+ *
+ * 목록을 계속 막는 이유는 다르다: 리그는 자기 목록이 따로 있고, 대회 목록에 섞이면 성격이
+ * 다른 카드 두 종류가 한 목록에 뜬다.
  */
 const ids = {
   adminUserId: '9a000000-0000-4000-8000-000000000001',
   adminId: '9a000000-0000-4000-8000-000000000002',
   sportId: '9a000000-0000-4000-8000-000000000010',
+  regionId: '9a000000-0000-4000-8000-000000000012',
   tournament: '9a000000-0000-4000-8000-000000000020',
   league: '9a000000-0000-4000-8000-000000000021',
   legacyNullKind: '9a000000-0000-4000-8000-000000000022',
@@ -98,6 +112,28 @@ describe('대회 표면은 정규 리그 시즌을 보여주지 않는다 (real 
         bracketPublishedAt,
       },
     });
+    // **거울 뒤의 진짜 리그 행을 함께 심는다.** 거울(`v1_tournaments`)만 있고 리그
+    // (`v1_leagues`)가 없으면 `getOverallStandings` 가 리그 축 조회에서 못 찾아 던지는데,
+    // 그 코드가 표면 게이트의 코드와 **똑같이** `TOURNAMENT_NOT_FOUND` 다 — 즉 게이트를
+    // 없애도 이 스펙이 green 으로 남는다(실측: 리그 경로에 PROBE 코드를 심자 red 가 됐다).
+    // 리그 행이 있어야 "게이트가 막았다" 와 "리그가 없다" 가 갈린다.
+    await prisma.v1Region.create({
+      data: { id: ids.regionId, code: 'surface-kind-region', name: '표면테스트권역', level: 1 },
+    });
+    await prisma.v1League.create({
+      data: {
+        id: ids.league,
+        title: '표면 테스트 리그 시즌',
+        sportId: ids.sportId,
+        regionId: ids.regionId,
+        createdByAdminUserId: ids.adminId,
+        state: 'active',
+        startsOn: new Date('2026-01-01T00:00:00.000Z'),
+        endsOn: new Date('2026-02-01T00:00:00.000Z'),
+        tieBreakJson: { order: ['points', 'goalDifference', 'goalsFor', 'headToHead'] },
+      },
+    });
+
     // R1 이전 행 재현 — DEFAULT 가 채우지 못한 상태를 명시적으로 만든다.
     await prisma.v1Tournament.create({
       data: {
@@ -196,23 +232,46 @@ describe('대회 표면은 정규 리그 시즌을 보여주지 않는다 (real 
     expect(listedIds).toContain(ids.legacyNullKind);
     expect(listedIds).not.toContain(ids.league);
   });
-
-  it('공개 대회 상세 — 리그 id 로는 열리지 않는다(목록만 막으면 여기가 뚫린다)', async () => {
+  /**
+   * **상세는 의도적으로 열려 있다** — 리그 시즌을 대회 표면에서 볼 수 있게 하는 것이
+   * read-swap 의 목적이다. 열기 전에 상세 응답이 리그 대진을 싣고(`leagueFixtures`),
+   * 대진표 공개 게이트가 리그에 안 걸리고, 화면이 그것을 그리도록 먼저 만들었다 —
+   * 순서를 뒤집으면 사용자는 404 대신 빈 껍데기를 본다.
+   *
+   * **목록은 그대로 닫혀 있다**(위 테스트들). 리그는 자기 목록이 따로 있고, 대회 목록에
+   * 섞이면 카드 두 종류가 한 목록에 뜬다.
+   */
+  it('공개 대회 상세 — 리그 id 로도 열린다(목록은 그대로 닫혀 있다)', async () => {
     await expect(read.get(ids.tournament)).resolves.toEqual(expect.objectContaining({ id: ids.tournament }));
     await expect(read.get(ids.legacyNullKind)).resolves.toEqual(
       expect.objectContaining({ id: ids.legacyNullKind }),
     );
-    await expect(read.get(ids.league)).rejects.toMatchObject({
-      response: expect.objectContaining({ code: 'TOURNAMENT_NOT_FOUND' }),
-    });
+    await expect(read.get(ids.league)).resolves.toEqual(
+      expect.objectContaining({ id: ids.league, kind: 'regular_league' }),
+    );
   });
 
-  it('공개 통합 순위 — 리그 id 로는 열리지 않는다', async () => {
-    await expect(read.getOverallStandings(ids.league)).rejects.toMatchObject({
-      response: expect.objectContaining({ code: 'TOURNAMENT_NOT_FOUND' }),
+  /**
+   * **통합 순위만 의도적으로 열려 있다 — 표면에서 유일하게 뚫어 둔 구멍이다.**
+   *
+   * 거울 행에는 조도 대진도 없어 대회 축 계산으로는 **빈 순위표**가 나온다. 404 보다 나쁘다:
+   * 에러가 아니라 "아직 순위가 없다" 로 읽힌다. 그래서 `getOverallStandings` 만
+   * `ALL_COMPETITION_KINDS` 로 넓혀 리그 축에서 같은 모양을 만든다
+   * (`scripts/tournament-league-allowed-baseline.json` 에 why 와 함께 묶여 있다).
+   *
+   * 여기서는 **열렸다는 사실**만 본다 — 값의 정확성(승점·진행률·무효 제외)은
+   * `tournament-overall-standings-league.integration-spec.ts` 가 실 데이터로 검증한다.
+   * 이 리그에는 팀도 대진도 없으므로 빈 순위표가 정상이다.
+   */
+  it('공개 통합 순위 — 리그 id 로도 열린다', async () => {
+    await expect(read.getOverallStandings(ids.league)).resolves.toMatchObject({
+      standings: [],
+      progress: { total: 0, played: 0, remaining: 0 },
+      magicNumber: null,
     });
-    // 대조군: 같은 조건의 대회는 정상 응답한다(리그만 막혔다는 뜻).
+    // 대조군: 대회 축은 그대로 열려 있다.
     await expect(read.getOverallStandings(ids.tournament)).resolves.toBeDefined();
+    // 상세도 열려 있다 — 그건 바로 위 테스트가 단언한다(여기서 중복하지 않는다).
   });
 
   it('어드민 대회 목록과 상태 탭 카운트가 같은 조건을 본다', async () => {

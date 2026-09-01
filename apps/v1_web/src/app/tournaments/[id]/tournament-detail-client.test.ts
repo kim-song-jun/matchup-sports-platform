@@ -5,6 +5,7 @@ import {
   getTournamentPostEventCards,
   getTournamentVenuePrepItems,
 } from '@/components/tournaments/tournament-venue-retention-sections';
+import { v1Get } from '@/lib/api-client';
 import { getTournamentSponsorCards } from '@/components/tournaments/tournament-sponsor-section';
 import {
   getCompletedChampionName,
@@ -124,6 +125,7 @@ function makeTournament(
   overrides: Partial<V1TournamentDetail> & Pick<V1TournamentDetail, 'id' | 'status' | 'format'>,
 ): V1TournamentDetail {
   return {
+    kind: 'regular_tournament',
     sportId: 'sport-futsal',
     sport: { code: 'futsal', name: '풋살' },
     title: '테스트 대회',
@@ -179,6 +181,7 @@ function makeTournament(
     pendingPaymentCount: 0,
     groups: [],
     fixtures: [],
+    leagueFixtures: [],
     announcements: [],
     sponsors: [],
     reviews: [],
@@ -735,6 +738,12 @@ describe('TournamentDetailView — completed vs non-completed section rendering'
     expect(screen.queryByText('참가 신청 안내')).not.toBeInTheDocument();
     expect(screen.queryByText('대회 진행 방식')).not.toBeInTheDocument();
     expect(screen.queryByText('순위표')).not.toBeInTheDocument();
+    // **문구가 아니라 섹션 자체가 없는지 본다.** 특정 문구의 부재만 단언하면 *"무엇이
+    // 있으면 안 되는지"* 를 안 보게 된다 — 실제로 리그용 문구를 대회용
+    // `FixturesPlaceholder` 로 바꾸는 변이에도 이 테스트가 **통과했다**(vacuous).
+    // 헤더 부재로 단언하면 리그 문구든 대회 문구든 **무엇이 렌더돼도 red** 다.
+    expect(screen.queryByText('일정 · 대진')).not.toBeInTheDocument();
+    expect(screen.queryByText('아직 등록된 경기가 없어요')).not.toBeInTheDocument();
     expect(screen.queryByText('대진표 준비 중')).not.toBeInTheDocument();
   });
 
@@ -760,7 +769,12 @@ describe('TournamentDetailView — completed vs non-completed section rendering'
     // 여기서는 옛 안내 문구가 더 이상 나오지 않는 것을 확인한다.
     // 다른 format(group_knockout 등)에서는 StandingsMovedNotice가 그대로 유지된다.
     expect(screen.queryByText('실시간 순위표는 대진표에서 확인하세요')).not.toBeInTheDocument();
-    expect(screen.getByText('대진표 준비 중')).toBeInTheDocument();
+    // **대회용 문구를 쓰지 않는다.** "대회 시작 전에 대진표가 공개돼요" 는 진행 중인 리그
+    // 시즌에 뜨면 틀린 말이다 — 리그에는 "대진표 공개" 라는 사건이 없고 "대진 확정" 이
+    // 있다. 문구는 리그 일정 목록이 같은 상황에 쓰는 것을 그대로 가져왔다.
+    expect(screen.queryByText('대진표 준비 중')).not.toBeInTheDocument();
+    expect(screen.getByText('아직 등록된 경기가 없어요')).toBeInTheDocument();
+    expect(screen.getByText('대진이 확정되면 경기 일정이 여기에 나타나요.')).toBeInTheDocument();
   });
 
   it('shows a pre-created pending knockout bracket before the group stage finishes', () => {
@@ -965,5 +979,102 @@ describe('AccordionSection toggle (rendered via completed TournamentDetailView)'
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByText('경기 시작 10분 전까지 집합해 주세요.')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * **거울 행(정규 리그 시즌)이 대회 표면에서 자기 축의 데이터로 그려지는가.**
+ *
+ * 여기서 쓰는 픽스처는 **실제 거울 모양**이다 — `format: 'group_knockout'`(스키마 기본값,
+ * 거울 생성이 format 을 안 쓴다) + `kind: 'regular_league'`. `format: 'league'` 로 테스트하면
+ * 실제로 존재하지 않는 조합을 검증하게 되고, 누군가 게이트를 `format` 으로 좁혀도 green 이다.
+ */
+describe('TournamentDetailView — 정규 리그 거울 행', () => {
+  const standingsResponse = {
+    standings: [
+      { teamId: 'team-a', teamName: '강남 유나이티드', position: 1, points: 3, wins: 1, draws: 0, losses: 0, goalsFor: 3, goalsAgainst: 1 },
+      { teamId: 'team-b', teamName: '종로 FC', position: 2, points: 0, wins: 0, draws: 0, losses: 1, goalsFor: 1, goalsAgainst: 3 },
+    ],
+    progress: { total: 2, played: 1, remaining: 1, percent: 50 },
+    magicNumber: null,
+    recalculatedAt: null,
+  };
+
+  function makeMirror(overrides: Partial<V1TournamentDetail> = {}): V1TournamentDetail {
+    return makeTournament({
+      id: 'league-1',
+      status: 'in_progress',
+      // 거울 행은 format 을 쓰지 않아 스키마 기본값이 남는다 — 종류는 kind 가 말한다.
+      format: 'group_knockout',
+      kind: 'regular_league',
+      groups: [],
+      fixtures: [],
+      leagueFixtures: [
+        {
+          teamMatchId: 'tm-1',
+          title: '1R',
+          homeTeamId: 'team-a',
+          awayTeamId: 'team-b',
+          startAt: '2026-08-31T05:00:00.000Z',
+          placeName: '올림픽공원 풋살장 A',
+          status: 'matched',
+        },
+      ],
+      ...overrides,
+    });
+  }
+
+  it('조가 없어도 통합 순위 섹션을 그린다 — 조 개수로 게이팅하면 리그는 영영 안 뜬다', async () => {
+    vi.mocked(v1Get).mockResolvedValueOnce(standingsResponse);
+    render(createElement(TournamentDetailView, { tournament: makeMirror(), myRegistration: null }));
+
+    expect(await screen.findByText('통합 순위')).toBeInTheDocument();
+    // 팀명은 순위표와 일정 카드 **양쪽에** 나온다(그게 정상이다) — 순위 섹션 안으로
+    // 범위를 좁혀 단언한다. 좁히지 않으면 "여러 개 찾음" 으로 실패한다.
+    const standings = screen.getByRole('region', { name: '통합 순위' });
+    expect(within(standings).getByText('강남 유나이티드')).toBeInTheDocument();
+  });
+
+  it('일정은 리그 카드로 그리고 팀 이름을 순위 응답에서 붙인다', async () => {
+    vi.mocked(v1Get).mockResolvedValueOnce(standingsResponse);
+    render(createElement(TournamentDetailView, { tournament: makeMirror(), myRegistration: null }));
+
+    // 대진에는 팀 id 만 실려 온다 — 이름이 붙었다는 것은 lookup 이 동작했다는 뜻이다.
+    expect(await screen.findByRole('group', { name: '강남 유나이티드 대 종로 FC' })).toBeInTheDocument();
+    // 리그 어휘로 그려진다. 대회 카드였다면 status 'matched' 가 어느 분기에도 안 걸려
+    // '예정'(대회의 scheduled 라벨)으로 떨어졌을 것이다.
+    expect(screen.getByText('매칭됨')).toBeInTheDocument();
+    expect(screen.getByText('올림픽공원 풋살장 A')).toBeInTheDocument();
+  });
+
+  it('순위 조회가 실패해도 일정 섹션이 깨지지 않는다 — 팀 이름만 fallback 으로 떨어진다', async () => {
+    vi.mocked(v1Get).mockRejectedValueOnce(new Error('boom'));
+    render(createElement(TournamentDetailView, { tournament: makeMirror(), myRegistration: null }));
+
+    expect(await screen.findByText('홈팀 정보 없음')).toBeInTheDocument();
+    expect(screen.getByText('상대팀 정보 없음')).toBeInTheDocument();
+    // 일정 자체는 그대로 있다 — 장소·상태는 대진에 실려 오므로 순위와 무관하다.
+    expect(screen.getByText('올림픽공원 풋살장 A')).toBeInTheDocument();
+  });
+
+  it('상대팀이 아직 없는 대진은 "상대팀 미정" 으로 구분한다 — 이름을 못 찾은 것과 다르다', async () => {
+    vi.mocked(v1Get).mockResolvedValueOnce(standingsResponse);
+    const tournament = makeMirror({
+      leagueFixtures: [
+        {
+          teamMatchId: 'tm-2',
+          title: '1R',
+          homeTeamId: 'team-a',
+          awayTeamId: null,
+          startAt: '2026-08-31T05:00:00.000Z',
+          placeName: '',
+          status: 'matched',
+        },
+      ],
+    });
+    render(createElement(TournamentDetailView, { tournament, myRegistration: null }));
+
+    expect(await screen.findByText('상대팀 미정')).toBeInTheDocument();
+    expect(screen.queryByText('상대팀 정보 없음')).not.toBeInTheDocument();
   });
 });

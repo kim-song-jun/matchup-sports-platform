@@ -193,6 +193,34 @@ jobs:
           SECRET_SLACK_INQUIRY_WEBHOOK_URL: ${{ secrets.SLACK_INQUIRY_WEBHOOK_URL }}
         run: bash scripts/release/sync-alpha-inquiry-slack-env.sh
 
+      # Skipped until the four APNs secrets are registered, rather than failing the deploy.
+      # A push-less alpha is a working alpha; a blocked deploy is not. The step reports which
+      # names are missing so the gap is visible in the run rather than only in a silent
+      # "iOS push disabled" line in the API's startup log.
+      - name: Sync APNs runtime env
+        env:
+          INSTANCE_ID: ${{ vars.ALPHA_EC2_INSTANCE_ID }}
+          AWS_REGION: ${{ vars.ALPHA_AWS_REGION }}
+          SECRET_APNS_KEY_ID: ${{ secrets.APNS_KEY_ID }}
+          SECRET_APNS_TEAM_ID: ${{ secrets.APNS_TEAM_ID }}
+          SECRET_APNS_BUNDLE_ID: ${{ secrets.APNS_BUNDLE_ID }}
+          SECRET_APNS_PRIVATE_KEY: ${{ secrets.APNS_PRIVATE_KEY }}
+        run: |
+          missing=()
+          for name in SECRET_APNS_KEY_ID SECRET_APNS_TEAM_ID SECRET_APNS_BUNDLE_ID SECRET_APNS_PRIVATE_KEY; do
+            [ -n "${!name:-}" ] || missing+=("${name#SECRET_}")
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::warning::APNs secrets are not set, so the host's APNs env was not updated — missing: ${missing[*]}"
+            exit 0
+          fi
+          # Never fails the deploy. Push configuration is a side task here, and the first
+          # version of this step proved the point by blocking an alpha release over the
+          # shape of one secret. A warning is loud enough: the run summary carries it, and
+          # the symptom on the server side is push staying disabled, not a broken alpha.
+          bash scripts/release/sync-alpha-apns-env.sh \
+            || echo "::warning::APNs env sync did not complete; the host's APNs env may be unchanged from before"
+
       - name: Deploy through AWS Systems Manager
         timeout-minutes: 25
         env:

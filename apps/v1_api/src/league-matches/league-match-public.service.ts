@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { isParticipantPubliclyEligible, loadParticipantConsentEligibility } from '../games/public-records/public-consent';
@@ -11,8 +11,14 @@ import {
   tierSlotCounts,
   type PromotionKind,
 } from './league-promotion';
-import { resolveIsForfeit } from './league-match-forfeit.service';
 import { ListLeagueMatchesQueryDto } from './dto/league-match.dto';
+import { bucketLeagueFixtures } from './league-standings-source';
+import {
+  LEAGUE_FIXTURE_FACT_SELECT,
+  LEAGUE_FIXTURE_LIST_SELECT,
+  toLeagueFixtureList,
+} from './league-fixture-list-source';
+import { LEAGUE_STATE_BY_STATUS } from '../tournaments/league-competition-mirror';
 
 const PLAYER_RECORDS_LIMIT = 30;
 const LEAGUE_LIST_DEFAULT_LIMIT = 20;
@@ -138,34 +144,136 @@ export class LeagueMatchPublicService {
     const teamIds = memberships.map((row) => row.teamId);
     if (teamIds.length === 0) return { items: [] };
 
-    const leagues = await this.prisma.v1League.findMany({
-      where: { teams: { some: { teamId: { in: teamIds } } } },
+    // ── R4-a read-swap: 이 목록은 **통합 축**(V1Tournament + V1TournamentRegistration)에서 읽는다 ──
+    //
+    // **두 축 동등성을 코드 전에 실측으로 증명했다**(2026-08-31, alpha captain A):
+    //   리그 축 30개 · 통합 축 30개 · 차집합 양방향 0 · teamCount 합 70 == 70
+    // 집합만으로는 부족해서 **상태 분포까지** 맞춘 뒤에야 이 전환을 켠다 —
+    // 백필 `--apply` 전에는 거울이 전부 `draft` 라 아래 `state !== 'draft'` 게이트가
+    // 30개 중 21개의 순위·다음 경기를 **에러 없이** 날린다(`docs/ops/read-swap-preflight.md` 9절).
+    //
+    // 대진·결과는 **아직 리그 축**이다. 그래서 아래 `standings()` 는 그대로 리그 id 로 부른다 —
+    // 거울 id 가 리그 id 와 같아서 성립한다(대응표를 두지 않은 설계의 값).
+    const mirrors = await this.prisma.v1Tournament.findMany({
+      where: {
+        kind: 'regular_league',
+        deletedAt: null,
+        // 참가 판정이 **확정 등록** 기준이다 — 리그 축의 `V1LeagueTeam` 은 상태가 없어
+        // 전부 참가였고, 백필이 그것을 `confirmed` 로 옮겼다(88개 리그 전부 1:1 실측).
+        registrations: { some: { teamId: { in: teamIds }, status: 'confirmed' } },
+      },
       // 같은 상태 안에서는 최근 개설순. 상태 우선순위는 DB 정렬로 표현할 수 없어 아래에서
-      // 다시 정렬한다 -- `state: 'asc'` 는 enum 선언 순서(draft -> active -> completed)를
-      // 따르므로 draft 가 맨 위로 올라온다. "지금 뛰는 리그"를 찾으러 온 사용자에게
-      // 아직 시작도 안 한 리그가 먼저 보이면 안 된다.
+      // 다시 정렬한다.
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       select: {
         id: true,
         title: true,
-        state: true,
-        startsOn: true,
-        endsOn: true,
+        status: true,
+        scheduledAt: true,
+        scheduledEndAt: true,
         tier: true,
         seasonNo: true,
         sport: { select: { id: true, code: true, name: true } },
         region: { select: { id: true, name: true } },
         series: { select: { title: true } },
-        // 내 팀만 가져온다 -- 화면이 쓰는 건 "내 어느 팀이 이 리그에 있나" 뿐이고,
-        // 전체 참가팀을 실어 오면 리그가 커질수록 쓰지도 않을 행을 join 해 온다.
-        // 전체 팀 수는 아래 _count 가 따로 세므로 이 필터에 영향받지 않는다.
-        teams: {
-          where: { teamId: { in: teamIds } },
+        // 내 팀만 가져온다 — 화면이 쓰는 건 "내 어느 팀이 이 리그에 있나" 뿐이다.
+        registrations: {
+          where: { teamId: { in: teamIds }, status: 'confirmed' },
           select: { teamId: true, team: { select: { name: true } } },
         },
-        _count: { select: { teams: true } },
+        // **`confirmed` 만 센다.** 필터 없이 세면 리그 축의 `teams` 개수와 어긋난다 —
+        // 지금은 전부 confirmed 라 같지만, 신청제(D7)가 들어오면 pending 이 섞인다.
+        _count: { select: { registrations: { where: { status: 'confirmed' } } } },
       },
     });
+
+    // ── 거울의 nullable 세 필드는 **전부 같은 불변식**이다 ─────────────────
+    // `region`·`scheduledAt`·`scheduledEndAt` 은 스키마상 nullable 인데, 그건 **기존 대회
+    // 행에 그 값이 없어서**지 리그에 없어서가 아니다:
+    // ```
+    // V1League.regionId / startsOn / endsOn   전부 NOT NULL — 원본에 항상 있다
+    // dual-write                              그대로 복사한다
+    // --apply (R4-a)                          88행을 채웠다
+    // ```
+    // **그래서 여기서 null 은 "값이 없는 경우" 가 아니라 "불변식이 깨진 경우" 다.**
+    //
+    // 세 필드를 **같은 방식으로** 다룬다 — 하나는 던지고 하나는 `as Date` 로 단언하면
+    // 다음 사람도 또 다르게 다룬다. **단언은 검사가 아니다**: null 이 섞이면 그대로
+    // 내려가거나 직렬화에서 터지고, 어느 쪽이든 원인이 안 보인다.
+    //
+    // **`where` 에서 거르지 않는 이유**: 거르면 그 리그가 목록에서 조용히 사라지고,
+    // 그게 이 작업 전체가 막으려는 실패 모습이다.
+    //
+    // **`new Error` 를 쓰지 않는 이유**: `HttpException` 이 아니면 전역 필터가
+    // **500 + "Internal server error"** 로 정규화해 **리그 id 도 code 도 전부 유실된다.**
+    // 그러면 "어느 리그인지 대며 실패한다" 가 소스에만 참이고 응답에서는 거짓이 된다.
+    // (클래스명은 `AllExceptionsFilter` 다 — 파일은 `common/filters/http-exception.filter.ts`
+    // 인데 **파일명과 클래스명이 다르다.** 그 이름으로 적으면 검색해도 안 나온다.
+    // `HttpExceptionFilter` 라는 클래스는 없다 — 의도적 언급, 지우지 말 것)
+    // 한 번만 순회해 나눈다. 술어(`isComplete`)가 "완전하다"의 **유일한 정의**이고,
+    // 타입 술어라서 통과한 행은 아래에서 단언 없이 non-null 로 쓸 수 있다.
+    type LeagueMirrorRow = (typeof mirrors)[number];
+    type CompleteLeagueMirror = LeagueMirrorRow & {
+      region: NonNullable<LeagueMirrorRow['region']>;
+      scheduledAt: Date;
+      scheduledEndAt: Date;
+    };
+    // 세 검사를 **한 곳에만** 적는다. 술어와 아래 `missing` 목록을 따로 적으면 어긋날 수
+    // 있고(한쪽만 고치면 "불완전한데 빠진 필드는 없다"는 응답이 나온다), 그건 원인을
+    // 가장 못 찾게 만드는 모양이다.
+    const REQUIRED: ReadonlyArray<readonly [string, (row: LeagueMirrorRow) => boolean]> = [
+      ['region', (row) => row.region === null],
+      ['scheduledAt', (row) => row.scheduledAt === null],
+      ['scheduledEndAt', (row) => row.scheduledEndAt === null],
+    ];
+    const missingOf = (row: LeagueMirrorRow) =>
+      REQUIRED.filter(([, isMissing]) => isMissing(row)).map(([field]) => field);
+    const isComplete = (mirror: LeagueMirrorRow): mirror is CompleteLeagueMirror =>
+      missingOf(mirror).length === 0;
+
+    const complete: CompleteLeagueMirror[] = [];
+    const incomplete: Array<{ leagueId: string; missing: string[] }> = [];
+    for (const mirror of mirrors) {
+      if (isComplete(mirror)) {
+        complete.push(mirror);
+        continue;
+      }
+      incomplete.push({ leagueId: mirror.id, missing: missingOf(mirror) });
+    }
+    if (incomplete.length > 0) {
+      // 어느 리그의 어느 필드가 비었는지 전부 싣는다 — 운영자가 고칠 대상이 그것이다.
+      //
+      // **키는 반드시 `details`(복수) 다.** `AllExceptionsFilter` 는 payload 에서
+      // `code`·`message`·**`details`** 만 응답으로 옮기고 **나머지 최상위 필드는 버린다.**
+      // `detail`(단수)로 쓰면 예외 객체에는 담기는데 **응답에서는 사라진다** — 이 PR 이
+      // 고치던 실패(진단 정보가 클라이언트까지 못 감)를 한 겹 안쪽에서 그대로 반복하는
+      // 것이다. 실제로 그렇게 썼고 Copilot #876 재리뷰가 잡았다.
+      throw new InternalServerErrorException({
+        code: 'LEAGUE_MIRROR_INCOMPLETE',
+        message: '리그 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
+        details: incomplete,
+      });
+    }
+
+    // 응답의 `state` 계약은 그대로 둔다 — 웹이 `LEAGUE_STATE_META[item.state]` 로
+    // **인덱싱**해서, 세 값 밖이 나오면 목록 페이지가 통째로 죽는다.
+    const leagues = complete.map((mirror) => ({
+      id: mirror.id,
+      title: mirror.title,
+      state: LEAGUE_STATE_BY_STATUS[mirror.status],
+      // 거울의 날짜는 리그의 `startsOn`/`endsOn` 이 그대로 옮겨온 것이다. nullable 인 이유는
+      // **기존 대회 행**에 기간이 없어서지 리그에 없어서가 아니다(원본이 NOT NULL).
+      // 위 불변식 검사를 통과했으므로 non-null 이다 — 근거는 단언이 아니라 검사다.
+      startsOn: mirror.scheduledAt,
+      endsOn: mirror.scheduledEndAt,
+      tier: mirror.tier,
+      seasonNo: mirror.seasonNo,
+      sport: mirror.sport,
+      region: mirror.region,
+      series: mirror.series,
+      teams: mirror.registrations,
+      _count: { teams: mirror._count.registrations },
+    }));
 
     // 진행 중 -> 준비 중 -> 종료. 목록이 사용자의 소속 팀 수로 묶여 있어(페이지네이션 없음)
     // 메모리 정렬로 충분하다. 규칙과 근거는 sortMyLeaguesByState 참고.
@@ -266,10 +374,9 @@ export class LeagueMatchPublicService {
     const fixtures = await this.prisma.v1TeamMatch.findMany({
       where: { leagueId },
       orderBy: { startAt: 'asc' },
-      select: {
-        id: true, title: true, hostTeamId: true, approvedApplicantTeamId: true, startAt: true, placeName: true, status: true,
-        game: { select: { id: true, currentOfficialRevisionId: true } },
-      },
+      // select 를 손으로 적지 않는다 — 대회 표면의 리그 경로가 같은 목록을 만들어야 하고,
+      // 두 곳이 서로 다른 select 를 쓰면 같은 대진이 화면마다 다른 모양으로 나온다.
+      select: LEAGUE_FIXTURE_LIST_SELECT,
     });
 
     // standings()와 동일한 패턴: 확정 리비전 id를 모아 v1_game_official_fact를
@@ -286,12 +393,7 @@ export class LeagueMatchPublicService {
           // `reason`은 컬럼이 생기기 전에 만들어진 레거시 리비전을 위한 fallback으로만
           // 계속 읽는다 — 사유 원문은 운영자가 쓴 자유 텍스트라 공개 응답에 절대 싣지
           // 않고, 아래에서 boolean 으로만 환산한다.
-          select: {
-            gameId: true,
-            homeScore: true,
-            awayScore: true,
-            resultRevision: { select: { reason: true, outcomeReason: true } },
-          },
+          select: LEAGUE_FIXTURE_FACT_SELECT,
         });
     const factByGameId = new Map(facts.map((fact) => [fact.gameId, fact]));
 
@@ -332,30 +434,10 @@ export class LeagueMatchPublicService {
         state: sibling.state,
       })),
       teamIds: league.teams.map((entry) => entry.teamId),
-      fixtures: fixtures.map((fixture) => {
-        const fact = fixture.game === null ? undefined : factByGameId.get(fixture.game.id);
-        return {
-          teamMatchId: fixture.id,
-          title: fixture.title,
-          homeTeamId: fixture.hostTeamId,
-          awayTeamId: fixture.approvedApplicantTeamId,
-          startAt: fixture.startAt,
-          placeName: fixture.placeName,
-          status: fixture.status,
-          // 공식 결과가 아직 없으면(미확정 대진) null -- 0:0으로 오인되지 않게 명시적으로
-          // nullable을 유지한다.
-          homeScore: fact?.homeScore ?? null,
-          awayScore: fact?.awayScore ?? null,
-          // 몰수 결과는 스코어만 보면 실제 1:0 승리와 구분되지 않는다. 관전자가 그 둘을
-          // 같은 경기로 읽지 않도록 boolean 하나만 내보낸다(사유 원문은 비공개).
-          // 감사 L-E finding 4 수정: 판정 근거를 전용 컬럼 `outcomeReason`으로 옮겼다
-          // (정정을 거쳐도 `league-match-result-entry.service.ts`의 correctResultOnce가
-          // 이 컬럼을 승계하므로 표식이 유지된다). 레거시 fallback을 포함한 판정 로직은
-          // `resolveIsForfeit`(league-match-forfeit.service.ts) 단일 출처를 쓴다 —
-          // 어드민 상세(league-match-admin.service.ts)도 같은 함수를 쓴다.
-          isForfeit: fact === undefined ? false : resolveIsForfeit(fact.resultRevision),
-        };
-      }),
+      // 미확정 대진의 점수를 null 로 두는 것, 몰수를 boolean 하나로만 내보내는 것(사유
+      // 원문 비공개)은 `league-fixture-list-source.ts` 가 지킨다 — 대회 표면의 리그
+      // 경로도 같은 함수를 쓴다.
+      fixtures: toLeagueFixtureList(fixtures, factByGameId),
     };
   }
 
@@ -390,44 +472,14 @@ export class LeagueMatchPublicService {
         });
     const factByGameId = new Map(facts.map((fact) => [fact.gameId, fact]));
 
-    const confirmedFixtures: Array<{ homeTeamId: string; awayTeamId: string; homeScore: number; awayScore: number }> = [];
-    const pendingFixtures: Array<{ teamMatchId: string; homeTeamId: string; awayTeamId: string | null; startAt: Date }> = [];
-    let cancelledFixtureCount = 0;
-    for (const tm of teamMatches) {
-      // [정책 변경 이력 — R8] 이 분기는 원래 "공식 결과 fact가 있으면 팀매치 status와
-      // 무관하게 confirmed로 남긴다"는 의도된 동작이었다(이미 열린 경기의 결과는
-      // 취소돼도 기록으로 남겨야 한다는 전제). 하지만 어드민은 팀매치를 자유롭게
-      // cancelled로 바꿀 수 있어서, 오심·오입력 정정으로 취소된 경기가 여전히
-      // 순위에 반영되는 상태가 만들어질 수 있었다 -- 취소한 경기가 순위표에 그대로
-      // 남는 쪽이(정정이 반영되지 않는 것처럼 보임) 순위표 신뢰도를 해치는 더 큰
-      // 운영 리스크이므로, cancelled는 fact 존재 여부와 무관하게 confirmed·pending
-      // 양쪽에서 전부 제외하도록 뒤집는다. 취소된 대진은 앞으로도 치러지지 않으므로
-      // "예정 경기"로도 영구 집계되지 않는다.
-      // 이슈 3(감사 보통) — "왜 팀마다 치른 경기 수가 다른가"는 취소 대진이 집계에서
-      // 빠지기 때문인데, 순위표 자체에는 그 사실을 알 근거가 없었다(일정 쪽 "취소됨"
-      // 배지를 보고 스스로 유추해야 했다). 위 R8 필터가 이미 취소 건을 걸러내는 지점에서
-      // 그대로 개수만 센다 — 별도 쿼리 없이 이 루프 한 번으로 충분하다.
-      if (tm.status === 'cancelled') {
-        cancelledFixtureCount += 1;
-        continue;
-      }
-
-      // 감사 L-E finding 2/5 수정: 무효 처리된 대진은 취소와 마찬가지로 "더 이상 결과를
-      // 기다리지 않는" 상태다 -- confirmed(결과가 반영됨)도 pending(미확정 경기로 다시
-      // 뛰어야 함)도 아니다. 여기서 걸러내지 않으면 이 대진이 pendingFixtures로 들어가
-      // 승강 확정 게이트("모든 대진이 확정됐는가")를 영구히 막고, listMine의 "다음 경기"가
-      // 이미 무효 처리된 지난 경기를 계속 가리키게 된다.
-      if (tm.game?.currentOfficialRevision?.state === 'VOID') {
-        continue;
-      }
-
-      const fact = tm.game === null ? undefined : factByGameId.get(tm.game.id);
-      if (fact === undefined || tm.approvedApplicantTeamId === null) {
-        pendingFixtures.push({ teamMatchId: tm.id, homeTeamId: tm.hostTeamId, awayTeamId: tm.approvedApplicantTeamId, startAt: tm.startAt });
-        continue;
-      }
-      confirmedFixtures.push({ homeTeamId: tm.hostTeamId, awayTeamId: tm.approvedApplicantTeamId, homeScore: fact.homeScore, awayScore: fact.awayScore });
-    }
+    // 분류 규칙(취소·VOID·pending·confirmed)은 `league-standings-source.ts` 로 뽑았다 —
+    // 통합 화면의 `getOverallStandings` 가 거울 행에서 **같은 계산**을 해야 하는데, 여기 두면
+    // 두 벌이 되고 한쪽만 고쳐지는 날이 온다. 규칙의 근거(R8 · 감사 L-E)는 그 파일 주석에 있다.
+    const {
+      confirmed: confirmedFixtures,
+      pending: pendingFixtures,
+      cancelledCount: cancelledFixtureCount,
+    } = bucketLeagueFixtures(teamMatches, factByGameId);
 
     const tieBreakOrder = (league.tieBreakJson as { order?: LeagueTieBreakCriterion[] }).order ?? [
       'points', 'goalDifference', 'goalsFor', 'headToHead',

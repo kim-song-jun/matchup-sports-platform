@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { Sparkles } from 'lucide-react';
-import { AppChrome } from '@/components/v1-ui/shell';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { extractErrorMessage } from '@/lib/error-message';
 import { useV1TournamentCampaignsInfinite } from '@/hooks/use-v1-tournament-campaign';
@@ -18,11 +17,7 @@ function getEventErrorMessage(error: unknown, fallback: string) {
 }
 
 export default function EventsPage() {
-  return (
-    <AppChrome title="이벤트" activeTab="tournaments" showNotifications>
-      <EventsContent />
-    </AppChrome>
-  );
+  return <EventsContent />;
 }
 
 function EventsContent() {

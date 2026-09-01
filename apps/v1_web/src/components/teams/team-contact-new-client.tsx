@@ -3,7 +3,6 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { AppChrome } from '@/components/v1-ui/shell';
 import { Card } from '@/components/v1-ui/primitives';
 import { useV1CreateTeamContact, useV1MyTeams, useV1TeamDetail } from '@/hooks/use-v1-api';
 import { extractErrorCode, extractErrorDetails, extractErrorMessage } from '@/lib/error-message';
@@ -79,8 +78,7 @@ export function TeamContactNewPageClient({ teamId }: { teamId: string }) {
   const targetTeamName = teamQuery.data?.name ?? '팀';
 
   return (
-    <AppChrome title="컨택 보내기" activeTab="teams" bottomNav={false} backHref={`/teams/${teamId}`}>
-      <Card pad={20} style={{ marginTop: 12 }}>
+      <Card className="tm-content-enter" pad={20} style={{ marginTop: 12 }}>
         <div className="tm-text-heading">{targetTeamName}에 컨택 보내기</div>
         <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 4 }}>
           팀 간 매치·교류를 제안하는 메시지를 보내요.
@@ -162,6 +160,5 @@ export function TeamContactNewPageClient({ teamId }: { teamId: string }) {
           </button>
         </form>
       </Card>
-    </AppChrome>
   );
 }

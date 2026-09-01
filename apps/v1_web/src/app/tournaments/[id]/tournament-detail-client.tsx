@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { AppChrome } from '@/components/v1-ui/shell';
+import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { FormattedText } from '@/components/v1-ui/formatted-text';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
@@ -509,44 +509,41 @@ export function TournamentDetailPageClient({ tournamentId }: { tournamentId: str
     trackEvent('tournament_view', { tournamentId });
   }, [data, tournamentId]);
 
+  // fetch된 대회명이 있을 때만 덮어쓴다 — 로딩/에러 중엔 테이블의 "대회 상세" 기본값이
+  // 그대로 쓰인다(§1.9 "fetch된 제목" 하위유형). desktopHead:false는 TournamentDetailView가
+  // 자기 desktop head를 직접 그리기 때문(§1.9 R3, :1321 참조) — 로딩/에러 분기의
+  // 제너릭 desktop head(테이블 desktopHead:true)와 중복 렌더를 막는다.
+  useShellOverride(
+    data
+      ? {
+          title: data.title,
+          desktopHead: false,
+          floatingSlot: <ApplyCTA tournament={data} myRegistration={myRegistration} />,
+        }
+      : {},
+  );
 
   if (isLoading) {
-    return (
-      <AppChrome title="대회 상세" backHref="/tournaments" bottomNav={false} activeTab="tournaments" desktopHead>
-        <TournamentDetailSkeleton />
-      </AppChrome>
-    );
+    return <TournamentDetailSkeleton />;
   }
 
   if (isError || !data) {
     const msg = extractErrorMessage(error, '대회 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
     return (
-      <AppChrome title="대회 상세" backHref="/tournaments" bottomNav={false} activeTab="tournaments" desktopHead>
-        <div style={{ padding: '48px 20px 0' }}>
-          <ErrorState
-            message={msg}
-            onRetry={() => void refetch()}
-          />
-        </div>
-      </AppChrome>
+      <div style={{ padding: '48px 20px 0' }}>
+        <ErrorState
+          message={msg}
+          onRetry={() => void refetch()}
+        />
+      </div>
     );
   }
 
   return (
-    <>
-      <AppChrome
-        title={data.title}
-        backHref="/tournaments"
-        bottomNav={false}
-        activeTab="tournaments"
-        floatingSlot={<ApplyCTA tournament={data} myRegistration={myRegistration} />}
-      >
-        <TournamentDetailView
-          tournament={data}
-          myRegistration={myRegistration}
-          />
-      </AppChrome>
-    </>
+    <TournamentDetailView
+      tournament={data}
+      myRegistration={myRegistration}
+    />
   );
 }
 

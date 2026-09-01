@@ -160,7 +160,7 @@ export default function LeagueVideosClient({ leagueId }: { leagueId: string }) {
   }
 
   return (
-    <div>
+    <div className="tm-content-enter">
       <AdminPageHeader
         eyebrow="플랫폼 · 리그"
         title={series.data ? `${series.data.title} 경기 영상` : '경기 영상'}

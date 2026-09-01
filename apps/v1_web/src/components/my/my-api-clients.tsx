@@ -4,7 +4,7 @@ import { PreferredPositionPicker } from './preferred-position-picker';
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { AppChrome } from '@/components/v1-ui/shell';
+import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { AlertTriangleIcon, ChevronLeftIcon, ChevronRightIcon, InfoCircleIcon } from '@/components/v1-ui/icons';
 import { Card, DatePickerTextInput, ListItem } from '@/components/v1-ui/primitives';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
@@ -394,24 +394,25 @@ export function ProfileEditPageClient() {
     setInlineVerifiedPhone(null);
   }, [profile.data]);
 
+  // loading/error 상태에선 테이블 기본값(desktopHead:true)을 쓰고, success 분기만 자기
+  // `.tm-desktop-page-head`를 직접 그려 제너릭 데스크톱 헤더를 꺼야 한다(§1.9 표 R3,
+  // my-api-clients.tsx:613 참조). Hooks 규칙 때문에 이 호출 자체는 조건부 return보다 위,
+  // 매 렌더 항상 실행한다 — 값만 success 여부로 갈린다(undefined면 테이블 기본값이 그대로
+  // 살아남는다, team-schedules-page.tsx의 동일 패턴 참조).
+  useShellOverride({ desktopHead: profile.isPending || profile.isError || !profile.data ? undefined : false });
+
   if (profile.isPending) {
-    return (
-      <AppChrome title="프로필 수정" activeTab="my" bottomNav={false} backHref="/my" desktopHead>
-        <PageSkeleton variant="detail" />
-      </AppChrome>
-    );
+    return <PageSkeleton variant="detail" />;
   }
 
   if (profile.isError || !profile.data) {
     return (
-      <AppChrome title="프로필 수정" activeTab="my" bottomNav={false} backHref="/my" desktopHead>
-        <div className="tm-my-shell">
-          <ErrorState
-            message="프로필 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
-            onRetry={() => void profile.refetch()}
-          />
-        </div>
-      </AppChrome>
+      <div className="tm-my-shell">
+        <ErrorState
+          message="프로필 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
+          onRetry={() => void profile.refetch()}
+        />
+      </div>
     );
   }
 
@@ -610,8 +611,8 @@ export function ProfileEditPageClient() {
   };
 
   return (
-    <AppChrome title="프로필 수정" activeTab="my" bottomNav={false} backHref="/my">
-      <form className="tm-create-shell tm-profile-edit-shell tm-my-profile-edit-desktop" id="v1-profile-edit-form" onSubmit={submit}>
+    <>
+      <form className="tm-create-shell tm-profile-edit-shell tm-my-profile-edit-desktop tm-content-enter" id="v1-profile-edit-form" onSubmit={submit}>
         {/* Desktop page head */}
         <div className="tm-desktop-page-head tm-show-desktop">
           <Link className="tm-desktop-back" href="/my" aria-label="마이페이지로 돌아가기">
@@ -854,7 +855,7 @@ export function ProfileEditPageClient() {
           <div className="tm-text-micro tm-auth-fixed-reason">변경한 닉네임과 이메일은 중복 확인 후 저장할 수 있어요.</div>
         ) : null}
       </div>
-    </AppChrome>
+    </>
   );
 }
 
@@ -975,8 +976,8 @@ export function SportsSettingsPageClient() {
   };
 
   return (
-    <AppChrome title="운동 정보" activeTab="my" bottomNav={false} backHref="/my">
-      <form className="tm-create-shell tm-profile-edit-shell tm-my-sports-desktop" id="v1-sports-settings-form" onSubmit={submit}>
+    <>
+      <form className="tm-create-shell tm-profile-edit-shell tm-my-sports-desktop tm-content-enter" id="v1-sports-settings-form" onSubmit={submit}>
         <div className="tm-desktop-page-head tm-show-desktop">
           <Link className="tm-desktop-back" href="/my" aria-label="마이페이지로 돌아가기">
             <ChevronLeftIcon size={22} strokeWidth={2.5} />
@@ -1078,7 +1079,7 @@ export function SportsSettingsPageClient() {
           {updatePreferences.isPending ? '저장 중' : '운동 정보 저장'}
         </button>
       </div>
-    </AppChrome>
+    </>
   );
 }
 
@@ -1324,8 +1325,8 @@ export function LocationSettingsPageClient() {
   };
 
   return (
-    <AppChrome title="위치 및 활동 지역" activeTab="my" bottomNav={false} backHref="/my/settings">
-      <div className="tm-my-shell">
+    <>
+      <div className="tm-my-shell tm-content-enter">
         <div className="tm-my-location-desktop">
           <div className="tm-desktop-page-head tm-show-desktop">
             <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
@@ -1378,7 +1379,7 @@ export function LocationSettingsPageClient() {
           {updateRegion.isPending ? '저장 중' : '활동 지역 저장'}
         </button>
       </div>
-    </AppChrome>
+    </>
   );
 }
 
@@ -1390,36 +1391,30 @@ export function NotificationSettingsPageClient() {
   const [pushError, setPushError] = useState<string | null>(null);
   const nativePushAvailable = isNativePushAvailable();
 
+  // loading/error 상태에선 테이블 기본값(desktopHead:true)을 쓰고, success 분기만 자기
+  // `.tm-desktop-page-head`를 직접 그려 제너릭 데스크톱 헤더를 꺼야 한다(§1.9 표 R3,
+  // my-api-clients.tsx:1479 참조). Hooks 규칙 때문에 이 호출 자체는 조건부 return보다 위,
+  // 매 렌더 항상 실행한다.
+  useShellOverride({ desktopHead: settings.isError || settings.isLoading || !settings.data ? undefined : false });
+
   // #12: 설정 로드 실패 시 에러 상태를 명시적으로 표시한다.
   if (settings.isError) {
     return (
-      <AppChrome title="알림 설정" activeTab="my" bottomNav={false} backHref="/my/settings" desktopHead titleAsHeading>
-        <div className="tm-my-shell">
-          <ErrorState message="알림 설정을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void settings.refetch()} />
-        </div>
-      </AppChrome>
+      <div className="tm-my-shell">
+        <ErrorState message="알림 설정을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void settings.refetch()} />
+      </div>
     );
   }
 
+  // (원래 이 자리에 동일 조건의 loading 분기가 중복 정의돼 있었다 — 첫 분기가 이미 처리하므로
+  // 두 번째는 도달 불가능한 dead code였다. AppChrome 제거 작업으로 이 블록을 다시 쓰는
+  // 김에 함께 정리한다, 전역 지침 1.)
   if (settings.isLoading || !settings.data) {
     return (
-      <AppChrome title="알림 설정" activeTab="my" bottomNav={false} backHref="/my/settings" desktopHead titleAsHeading>
-        <div className="tm-my-shell">
-          <p className="sr-only" role="status">알림 설정을 불러오는 중이에요.</p>
-          <PageSkeleton variant="list" />
-        </div>
-      </AppChrome>
-    );
-  }
-
-  if (settings.isLoading || !settings.data) {
-    return (
-      <AppChrome title="알림 설정" activeTab="my" bottomNav={false} backHref="/my/settings" desktopHead titleAsHeading>
-        <div className="tm-my-shell">
-          <p className="sr-only" role="status">알림 설정을 불러오는 중이에요.</p>
-          <PageSkeleton variant="list" />
-        </div>
-      </AppChrome>
+      <div className="tm-my-shell">
+        <p className="sr-only" role="status">알림 설정을 불러오는 중이에요.</p>
+        <PageSkeleton variant="list" />
+      </div>
     );
   }
 
@@ -1476,8 +1471,7 @@ export function NotificationSettingsPageClient() {
   };
 
   return (
-    <AppChrome title="알림 설정" activeTab="my" bottomNav={false} backHref="/my/settings" titleAsHeading>
-      <div className="tm-my-shell">
+      <div className="tm-my-shell tm-content-enter">
         <div className="tm-my-settings-desktop">
           <div className="tm-desktop-page-head tm-show-desktop">
             <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
@@ -1614,7 +1608,6 @@ export function NotificationSettingsPageClient() {
           </div>
         </div>
       </div>
-    </AppChrome>
   );
 }
 
@@ -1663,11 +1656,9 @@ export function RecordConsentSettingsPageClient() {
 
   if (consent.isError) {
     return (
-      <AppChrome title="경기 기록 공개" activeTab="my" bottomNav={false} backHref="/my/settings" desktopHead>
-        <div className="tm-my-shell">
-          <ErrorState message="설정을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void consent.refetch()} />
-        </div>
-      </AppChrome>
+      <div className="tm-my-shell">
+        <ErrorState message="설정을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void consent.refetch()} />
+      </div>
     );
   }
 
@@ -1681,8 +1672,7 @@ export function RecordConsentSettingsPageClient() {
   };
 
   return (
-    <AppChrome title="경기 기록 공개" activeTab="my" bottomNav={false} backHref="/my/settings" desktopHead>
-      <div className="tm-my-shell">
+      <div className="tm-my-shell tm-content-enter">
         <div className="tm-my-settings-desktop">
           <div className="tm-desktop-page-head tm-show-desktop">
             <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
@@ -1753,7 +1743,6 @@ export function RecordConsentSettingsPageClient() {
           ) : null}
         </div>
       </div>
-    </AppChrome>
   );
 }
 
@@ -1796,11 +1785,9 @@ export function TournamentRealNameVisibilitySettingsPageClient() {
 
   if (visibility.isError) {
     return (
-      <AppChrome title="대회 기록 실명 표시" activeTab="my" bottomNav={false} backHref="/my/settings" desktopHead>
-        <div className="tm-my-shell">
-          <ErrorState message="설정을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void visibility.refetch()} />
-        </div>
-      </AppChrome>
+      <div className="tm-my-shell">
+        <ErrorState message="설정을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void visibility.refetch()} />
+      </div>
     );
   }
 
@@ -1811,8 +1798,7 @@ export function TournamentRealNameVisibilitySettingsPageClient() {
   };
 
   return (
-    <AppChrome title="대회 기록 실명 표시" activeTab="my" bottomNav={false} backHref="/my/settings" desktopHead>
-      <div className="tm-my-shell">
+      <div className="tm-my-shell tm-content-enter">
         <div className="tm-my-settings-desktop">
           <div className="tm-desktop-page-head tm-show-desktop">
             <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
@@ -1867,7 +1853,6 @@ export function TournamentRealNameVisibilitySettingsPageClient() {
           </div>
         </div>
       </div>
-    </AppChrome>
   );
 }
 
@@ -1887,11 +1872,9 @@ export function PlayerCardHiddenSettingsPageClient() {
 
   if (state.isError) {
     return (
-      <AppChrome title="선수 카드" activeTab="my" bottomNav={false} backHref="/my/settings" desktopHead>
-        <div className="tm-my-shell">
-          <ErrorState message="설정을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void state.refetch()} />
-        </div>
-      </AppChrome>
+      <div className="tm-my-shell">
+        <ErrorState message="설정을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void state.refetch()} />
+      </div>
     );
   }
 
@@ -1902,8 +1885,7 @@ export function PlayerCardHiddenSettingsPageClient() {
   };
 
   return (
-    <AppChrome title="선수 카드" activeTab="my" bottomNav={false} backHref="/my/settings" desktopHead>
-      <div className="tm-my-shell">
+      <div className="tm-my-shell tm-content-enter">
         <div className="tm-my-settings-desktop">
           <div className="tm-desktop-page-head tm-show-desktop">
             <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
@@ -1959,7 +1941,6 @@ export function PlayerCardHiddenSettingsPageClient() {
           <PlayerCardShapePicker />
         </div>
       </div>
-    </AppChrome>
   );
 }
 
@@ -2056,8 +2037,7 @@ export function ThemeSettingsPageClient() {
   const { preference, setPreference, isSaving, saveError } = useTheme();
 
   return (
-    <AppChrome title="화면 테마" activeTab="my" bottomNav={false} backHref="/my/settings">
-      <div className="tm-my-shell">
+      <div className="tm-my-shell tm-content-enter">
         <div className="tm-my-settings-desktop">
           <div className="tm-desktop-page-head tm-show-desktop">
             <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
@@ -2113,7 +2093,6 @@ export function ThemeSettingsPageClient() {
           </div>
         </div>
       </div>
-    </AppChrome>
   );
 }
 
@@ -2147,9 +2126,9 @@ export function WithdrawalPageClient() {
   };
 
   return (
-    <AppChrome title="회원 탈퇴" activeTab="my" bottomNav={false} backHref="/my/settings">
+    <>
       {ConfirmModal}
-      <div className="tm-my-shell">
+      <div className="tm-my-shell tm-content-enter">
         <div className="tm-my-withdrawal-desktop">
           <div className="tm-desktop-page-head tm-show-desktop">
             <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
@@ -2218,7 +2197,7 @@ export function WithdrawalPageClient() {
           {withdrawal.isPending ? '요청 중' : '탈퇴 요청'}
         </button>
       </div>
-    </AppChrome>
+    </>
   );
 }
 

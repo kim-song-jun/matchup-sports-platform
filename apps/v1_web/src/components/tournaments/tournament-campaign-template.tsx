@@ -42,7 +42,7 @@ export function TournamentCampaignTemplate({
   );
   const heroTitleLines = splitCampaignHeroTitle(content.hero.title);
   return (
-    <article className={styles.campaign} data-preview={preview || undefined}>
+    <article className={`${styles.campaign} tm-content-enter`} data-preview={preview || undefined}>
       <section className={styles.hero} aria-labelledby="campaign-title">
         <TournamentCampaignMedia
           src={heroImage}

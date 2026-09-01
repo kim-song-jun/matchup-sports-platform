@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { Search, Star } from 'lucide-react';
 import { publicAssetPath } from '@/lib/assets';
 import { useV1AdminTournamentReviews, useV1HideReview, useV1UnhideReview } from '@/hooks/use-v1-api';
@@ -85,7 +86,7 @@ export function ReviewsTab({
   };
 
   return (
-    <div className="p-4">
+    <div className="tm-content-enter p-4">
       <div className="mb-4">
         <h3 className="text-[15px] font-bold text-[var(--text-strong)]">리뷰 관리</h3>
         <p className="text-[12px] text-[var(--text-muted)] mt-0.5">
@@ -270,11 +271,13 @@ function ReviewModerationCard({
     >
       <div className="flex items-start gap-3">
         {review.authorProfileImageUrl ? (
-          <img
+          <Image
             src={publicAssetPath(review.authorProfileImageUrl)}
             alt=""
             aria-hidden="true"
             loading="lazy"
+            width={36}
+            height={36}
             className="w-9 h-9 rounded-full object-cover shrink-0"
           />
         ) : (
@@ -329,7 +332,14 @@ function ReviewModerationCard({
               rel="noreferrer"
               className="block w-14 h-14 rounded-lg overflow-hidden border border-[var(--border)] shrink-0"
             >
-              <img src={publicAssetPath(url)} alt="" loading="lazy" className="w-full h-full object-cover" />
+              <Image
+                src={publicAssetPath(url)}
+                alt=""
+                loading="lazy"
+                width={56}
+                height={56}
+                className="w-full h-full object-cover"
+              />
             </a>
           ))}
         </div>

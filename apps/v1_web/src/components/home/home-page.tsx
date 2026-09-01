@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Eye, ShieldAlert, X } from 'lucide-react';
-import { AppChrome } from '@/components/v1-ui/shell';
+import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { PendingReviewsCard } from '@/components/tournaments/pending-review-card';
 import { LineupTodoCard } from '@/components/lineup/lineup-todo-card';
 import {
@@ -45,15 +45,17 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
   const weatherPermission = model.weatherPermission ?? 'prompt';
   const weatherPermissionCopy = getWeatherPermissionCopy(weatherPermission);
 
+  // 셸 승격(U25): title/activeTab/showSearch는 route-chrome/fragments/home.ts의 정적 테이블로
+  // 옮겼다. hasNewNotification·floatingSlot은 model(런타임 상태) 의존이라 여기서 override로
+  // 밀어넣는다 — 렌더 함수 본문(조건부 return 위)에서 직접 호출(Hooks 규칙 + useSyncExternalStore
+  // 루프 방지, shell-override.ts 주석 참조).
+  useShellOverride({
+    hasNewNotification: model.hasNewNotification && !model.network,
+    floatingSlot: <HomeChatFloatingButton model={model} />,
+  });
+
   return (
     <>
-      <AppChrome
-        title="teameet"
-        activeTab="home"
-        showSearch
-        hasNewNotification={model.hasNewNotification && !model.network}
-        floatingSlot={<HomeChatFloatingButton model={model} />}
-      >
       <h1 className="sr-only">Teameet 홈</h1>
       {/*
        * .tm-home-desktop: display:contents on mobile → transparent to layout.
@@ -253,7 +255,6 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
         </div>{/* /tm-home-sidebar */}
 
       </div>{/* /tm-home-desktop */}
-      </AppChrome>
     </>
   );
 }

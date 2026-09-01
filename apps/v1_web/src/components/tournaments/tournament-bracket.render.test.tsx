@@ -2,6 +2,7 @@ import { render, screen, within } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { TournamentBracket } from './tournament-bracket';
 import type { V1TournamentFixture } from '@/types/api';
+import { queryImageBySrc } from '@/test/next-image';
 
 function makeFixture(
   overrides: Partial<V1TournamentFixture> & Pick<V1TournamentFixture, 'id' | 'fixtureNumber'>,
@@ -54,8 +55,9 @@ describe('MatchCard — 진행 중·종료 경기도 시각을 유지한다 (D-1
       />,
     );
 
-    expect(container.querySelector('img[src="/uploads/teams/home.png"]')).toBeInTheDocument();
-    expect(container.querySelector('img[src="/uploads/teams/away.png"]')).toBeInTheDocument();
+    // next/image 전환(U15) 이후 실제 DOM src는 `/_next/image?url=...`로 재작성된다.
+    expect(queryImageBySrc(container, '/uploads/teams/home.png')).not.toBeNull();
+    expect(queryImageBySrc(container, '/uploads/teams/away.png')).not.toBeNull();
   });
 
   it('진행 중(LIVE) 경기는 LIVE 배지와 예정 시각을 함께 보여준다', () => {

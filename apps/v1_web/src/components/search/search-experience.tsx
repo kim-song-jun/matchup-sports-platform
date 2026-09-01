@@ -7,7 +7,6 @@ import type { FormEvent } from 'react';
 import { useV1LeagueMatches, useV1Matches, useV1RecentSearches, useV1RecordSearch, useV1TeamMatches, useV1Teams } from '@/hooks/use-v1-api';
 import type { V1Match, V1Team, V1TeamMatch } from '@/types/api';
 import type { V1PublicLeagueListItem } from '@/types/league-match';
-import { AppChrome } from '@/components/v1-ui/shell';
 import { formatTournamentDateRangeShort } from '@/lib/date-utils';
 import { trackEvent } from '@/lib/analytics';
 
@@ -172,14 +171,7 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
   const effectiveShowStateMessage = effectiveViewState === 'empty' || effectiveViewState === 'error' || effectiveViewState === 'stale';
 
   return (
-    <AppChrome
-      title="검색"
-      topBar={false}
-      showSearch={false}
-      showNotifications={false}
-      bottomNav={true}
-    >
-    <div className="tm-search-frame" style={{ width: 'min(100%, var(--v1-app-chrome-frame-width))', height: '100%', minHeight: 0, margin: '0 auto', background: 'var(--bg)', fontFamily: 'var(--font)', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
+    <div className="tm-search-frame tm-content-enter" style={{ width: 'min(100%, var(--v1-app-chrome-frame-width))', height: '100%', minHeight: 0, margin: '0 auto', background: 'var(--bg)', fontFamily: 'var(--font)', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
       <form className="tm-search-form-bar" onSubmit={submit} style={{ minHeight: 'var(--v1-shell-topbar-height)', padding: '8px 12px 8px 8px', borderBottom: '1px solid var(--grey100)', display: 'flex', alignItems: 'center', gap: 1, background: 'var(--bg)', flexShrink: 0 }}>
         <button type="button" aria-label="뒤로가기" onClick={goBack} className="tm-search-back-btn tm-hide-desktop tm-tap-44" style={{ width: 30, minWidth: 30, height: 40, border: 0, background: 'transparent', borderRadius: 'var(--radius-control)', display: 'grid', placeItems: 'center', color: 'var(--text-strong)', padding: 0 }}>
           <ChevronLeft size={20} />
@@ -293,7 +285,6 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
         </div>
       ) : null}
     </div>
-    </AppChrome>
   );
 }
 

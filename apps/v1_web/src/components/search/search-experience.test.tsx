@@ -1,5 +1,4 @@
 import { render, waitFor } from '@testing-library/react';
-import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SearchExperience } from './search-experience';
 
@@ -19,12 +18,6 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/lib/analytics', () => ({
   trackEvent: analytics.trackEvent,
-}));
-
-// AppChrome(desktop nav, bottom nav, notification bell)은 검색 계측과 무관한 무거운
-// 셸이라 children만 통과시키는 얇은 대역으로 대체한다 — 실제 검증 대상은 SearchExperience 로직.
-vi.mock('@/components/v1-ui/shell', () => ({
-  AppChrome: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 
 const apiMocks = vi.hoisted(() => ({

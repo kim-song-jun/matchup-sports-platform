@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AppChrome } from '@/components/v1-ui/shell';
+import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { AlertBanner, Card, EmptyState, ErrorState, ListItem, TextField } from '@/components/v1-ui/primitives';
 import { ChevronLeftIcon, PlusIcon } from '@/components/v1-ui/icons';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
@@ -19,20 +19,18 @@ import type {
 
 export function ScheduleListPageView({ model }: { model: ScheduleListViewModel }) {
   const router = useRouter();
+  // floatingSlot(일정 만들기 FAB)은 model.canManage(팀 상세 fetch 의존) 런타임 값이라
+  // 정적 테이블(fragments/team-schedules.ts)에 못 넣는다 — 렌더 최상단에서 override로
+  // 직접 밀어넣는다(app-shell-promotion.md §1.6, Hooks 규칙 — 조건부 return보다 위).
+  useShellOverride({
+    floatingSlot: model.canManage ? (
+      <Link className="tm-floating-fab tm-hide-desktop" href={model.createHref} aria-label="일정 만들기">
+        <PlusIcon size={26} strokeWidth={2.3} />
+      </Link>
+    ) : undefined,
+  });
   return (
-    <AppChrome
-      title="팀 일정"
-      activeTab="teams"
-      bottomNav={false}
-      backHref={`/teams/${model.teamId}`}
-      floatingSlot={
-        model.canManage ? (
-          <Link className="tm-floating-fab tm-hide-desktop" href={model.createHref} aria-label="일정 만들기">
-            <PlusIcon size={26} strokeWidth={2.3} />
-          </Link>
-        ) : undefined
-      }
-    >
+    <>
       <div className="tm-desktop-page-head tm-show-desktop">
         <Link className="tm-desktop-back" href={`/teams/${model.teamId}`} aria-label="팀으로 돌아가기">
           <ChevronLeftIcon size={22} strokeWidth={2.2} />
@@ -124,7 +122,7 @@ export function ScheduleListPageView({ model }: { model: ScheduleListViewModel }
           </div>
         )}
       </div>
-    </AppChrome>
+    </>
   );
 }
 
@@ -219,26 +217,24 @@ function ScheduleCalendarGrid({ model }: { model: ScheduleListViewModel }) {
 // ── 상세 ──────────────────────────────────────────────────────────────────────
 
 export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewModel }) {
+  // loading/error 상태에선 테이블 기본값(desktopHead:true)을 쓰고, success 분기만 자기
+  // `.tm-desktop-page-head`를 직접 그려 제너릭 데스크톱 헤더를 꺼야 한다(§1.9 표 R3).
+  // Hooks 규칙 때문에 이 호출 자체는 조건부 return보다 위, 매 렌더 항상 실행한다 — 값만
+  // success 여부로 갈린다(undefined면 테이블 기본값이 그대로 살아남는다).
+  useShellOverride({ desktopHead: !model.error && !model.loading ? false : undefined });
+
   if (model.error) {
-    return (
-      <AppChrome title="일정 상세" activeTab="teams" bottomNav={false} backHref={model.backHref} desktopHead>
-        <ErrorState message="일정을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={model.onRetry} />
-      </AppChrome>
-    );
+    return <ErrorState message="일정을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={model.onRetry} />;
   }
 
   if (model.loading) {
-    return (
-      <AppChrome title="일정 상세" activeTab="teams" bottomNav={false} backHref={model.backHref} desktopHead>
-        <PageSkeleton variant="detail" />
-      </AppChrome>
-    );
+    return <PageSkeleton variant="detail" />;
   }
 
   const { attendance, guestRecruitment, manage } = model;
 
   return (
-    <AppChrome title="일정 상세" activeTab="teams" bottomNav={false} backHref={model.backHref}>
+    <>
       <div className="tm-desktop-page-head tm-show-desktop">
         <Link className="tm-desktop-back" href={model.backHref} aria-label="일정 목록으로 돌아가기">
           <ChevronLeftIcon size={22} strokeWidth={2.2} />
@@ -419,7 +415,7 @@ export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewMod
           </Card>
         ) : null}
       </div>
-    </AppChrome>
+    </>
   );
 }
 
@@ -759,36 +755,26 @@ function GuestApplicantList({ model }: { model: NonNullable<ScheduleDetailViewMo
 // ── 생성/수정 폼 ───────────────────────────────────────────────────────────────
 
 export function ScheduleFormPageView({ model }: { model: ScheduleFormViewModel }) {
-  const title = model.mode === 'edit' ? '일정 수정' : '일정 만들기';
-
+  // title은 더 이상 여기서 쓰지 않는다 — mode('create'|'edit')는 fetch가 아니라 라우트
+  // (/schedules/new vs /schedules/:scheduleId/edit)로만 정해지므로, 정적 테이블
+  // (fragments/team-schedules.ts)이 라우트별로 이미 "일정 만들기"/"일정 수정"을 갖고
+  // 있다 — override가 필요 없다(app-motion-wave-plan.md §2.25~2.38 공통 절차 2).
   if (model.forbidden) {
-    return (
-      <AppChrome title={title} activeTab="teams" bottomNav={false} backHref={model.backHref} desktopHead>
-        <EmptyState title="일정을 관리할 권한이 없어요" sub="팀장 또는 운영진만 일정을 만들거나 수정할 수 있어요." />
-      </AppChrome>
-    );
+    return <EmptyState title="일정을 관리할 권한이 없어요" sub="팀장 또는 운영진만 일정을 만들거나 수정할 수 있어요." />;
   }
 
   if (model.loadError) {
-    return (
-      <AppChrome title={title} activeTab="teams" bottomNav={false} backHref={model.backHref} desktopHead>
-        <ErrorState message="일정 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={model.onRetry} />
-      </AppChrome>
-    );
+    return <ErrorState message="일정 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={model.onRetry} />;
   }
 
   if (model.loading) {
-    return (
-      <AppChrome title={title} activeTab="teams" bottomNav={false} backHref={model.backHref} desktopHead>
-        <PageSkeleton variant="detail" />
-      </AppChrome>
-    );
+    return <PageSkeleton variant="detail" />;
   }
 
   const { draft } = model;
 
   return (
-    <AppChrome title={title} activeTab="teams" bottomNav={false} backHref={model.backHref} desktopHead>
+    <>
       {/* 필드를 나열만 하던 화면에서 "기본 정보 / 일정 / 공개 설정" 세 개의 별도 카드로
           나눴었지만, 그러면 흰 배경 위에 흰 카드가 세 번 반복돼 카드 자체가 하나의
           빈 여백 상자처럼 보인다(DESIGN.md: 카드마다 개별 보더 금지). 일정 상세 화면과
@@ -899,7 +885,7 @@ export function ScheduleFormPageView({ model }: { model: ScheduleFormViewModel }
         </button>
       </div>
       </div>
-    </AppChrome>
+    </>
   );
 }
 
@@ -907,8 +893,7 @@ export function ScheduleFormPageView({ model }: { model: ScheduleFormViewModel }
 
 export function MySchedulePageView({ model }: { model: MyScheduleViewModel }) {
   return (
-    <AppChrome title="내 일정" activeTab="my" bottomNav={false} backHref="/my">
-      <div className="tm-my-shell">
+    <div className="tm-my-shell">
         <div className="tm-desktop-page-head tm-show-desktop">
           <Link className="tm-desktop-back" href="/my" aria-label="마이페이지로 돌아가기">
             <ChevronLeftIcon size={22} strokeWidth={2.5} />
@@ -944,6 +929,5 @@ export function MySchedulePageView({ model }: { model: MyScheduleViewModel }) {
           </div>
         )}
       </div>
-    </AppChrome>
   );
 }

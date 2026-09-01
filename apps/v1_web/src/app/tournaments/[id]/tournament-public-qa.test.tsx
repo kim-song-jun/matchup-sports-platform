@@ -4,6 +4,7 @@ import type { V1TournamentDetail } from '@/types/api';
 import { TournamentFlowNav } from '@/components/tournaments/tournament-flow-nav';
 import { renderBracketStandingsTab } from './bracket/bracket-test-utils';
 import { ResultsPageContent } from './results/results-page-client';
+import { queryImageBySrc } from '@/test/next-image';
 
 function makeTournament(
   overrides: Partial<V1TournamentDetail> & Pick<V1TournamentDetail, 'format' | 'status'>,
@@ -133,7 +134,8 @@ describe('public tournament QA regressions', () => {
 
     const { container } = renderBracketStandingsTab(tournament);
 
-    expect(container.querySelector('img[src="/uploads/teams/seongsu-fc.png"]')).toBeInTheDocument();
+    // next/image 전환(U15) 이후 실제 DOM src는 `/_next/image?url=...`로 재작성된다.
+    expect(queryImageBySrc(container, '/uploads/teams/seongsu-fc.png')).not.toBeNull();
   });
 
   it('uses the correct Korean directional particle in journey-link labels', () => {

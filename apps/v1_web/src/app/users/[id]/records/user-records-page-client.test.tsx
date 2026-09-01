@@ -5,7 +5,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UserRecordsPageClient } from './user-records-page-client';
 import type { PublicUserRecordsResponse } from '@/components/public-game-records/types';
 
-// AppChrome 이 알림 벨을 렌더하며 react-query 를 쓴다 — 다른 화면 테스트와 같은 래퍼를 쓴다.
 function render(ui: ReactElement) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -20,13 +19,16 @@ function render(ui: ReactElement) {
  *
  * 공개 신원으로 쓸 수 있는 값은 닉네임뿐이다(D-03/D-11). 닉네임이 없을 때 다른 식별자로
  * 대체하면 프라이버시 계약이 깨지므로, 그 경우엔 제네릭 문구로 남아야 한다.
+ *
+ * 셸 승격(U26) 이후 제목은 이 컴포넌트가 직접 렌더하지 않고 `useShellOverride`로 셸에
+ * 밀어넣는다(app-shell-promotion.md §1.9 "fetch된 제목" 패턴) — 그래서 검증도 DOM 텍스트가
+ * 아니라 그 훅 호출 인자를 본다.
  */
 
-// AppChrome 하위가 navigation 훅을 쓴다 — 다른 화면 테스트와 같은 스텁을 둔다.
-vi.mock('next/navigation', () => ({
-  usePathname: () => '/users/user-1/records',
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
-  useSearchParams: () => new URLSearchParams(),
+const shellOverride = vi.hoisted(() => ({ useShellOverride: vi.fn() }));
+
+vi.mock('@/components/v1-ui/shell-override', () => ({
+  useShellOverride: shellOverride.useShellOverride,
 }));
 
 const mocks = vi.hoisted(() => ({ usePublicUserRecords: vi.fn() }));
@@ -63,9 +65,15 @@ function loaded(nickname: string | null) {
   };
 }
 
+function lastOverrideTitle() {
+  const calls = shellOverride.useShellOverride.mock.calls;
+  return calls[calls.length - 1]?.[0]?.title as string | undefined;
+}
+
 describe('UserRecordsPageClient', () => {
   beforeEach(() => {
     mocks.usePublicUserRecords.mockReset();
+    shellOverride.useShellOverride.mockReset();
   });
 
   it('names whose records these are so a deep-linked visitor can tell', () => {
@@ -73,7 +81,7 @@ describe('UserRecordsPageClient', () => {
 
     render(<UserRecordsPageClient userId="user-1" />);
 
-    expect(screen.getAllByText('멤버현 님의 활동 기록').length).toBeGreaterThan(0);
+    expect(lastOverrideTitle()).toBe('멤버현 님의 활동 기록');
   });
 
   // 닉네임이 없으면 다른 식별자(userId 등)로 채우지 않는다 — 공개 신원은 닉네임뿐이다.
@@ -82,17 +90,7 @@ describe('UserRecordsPageClient', () => {
 
     render(<UserRecordsPageClient userId="user-1" />);
 
-    expect(screen.getAllByText('활동 기록').length).toBeGreaterThan(0);
+    expect(lastOverrideTitle()).toBe('활동 기록');
     expect(screen.queryByText(/user-1/)).toBeNull();
-  });
-
-  // 데스크톱(>=1024px)에서는 .tm-topbar 가 숨겨지므로 desktopHead 가 빠지면 제목·뒤로가기가
-  // 통째로 사라진다. 실제로 그 회귀가 있었다.
-  it('renders the desktop page head so the title survives above 1024px', () => {
-    mocks.usePublicUserRecords.mockReturnValue(loaded('멤버현'));
-
-    const { container } = render(<UserRecordsPageClient userId="user-1" />);
-
-    expect(container.querySelector('.tm-desktop-page-head')).not.toBeNull();
   });
 });

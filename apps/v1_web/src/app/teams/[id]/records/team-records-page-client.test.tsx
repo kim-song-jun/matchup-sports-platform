@@ -11,12 +11,24 @@ import type { PublicTeamRecordsResponse, TeamRecordTypeFilter } from '@/componen
  *
  * 로딩·에러 분기에는 아직 팀명이 없으므로 그때는 제네릭 문구가 정상이다 — 팀명을 알 수 없는
  * 상태에서 무언가로 채우면 그게 오히려 잘못된 정보다.
+ *
+ * 셸 승격(U29) 이후 제목은 이 컴포넌트가 직접 렌더하지 않고 `useShellOverride`로 셸에
+ * 밀어넣는다(app-shell-promotion.md §1.9 "결합 제목" 패턴) — 그래서 검증도 DOM 텍스트가
+ * 아니라 그 훅 호출 인자를 본다. 데스크톱 헤더(.tm-desktop-page-head)도 이제 AppShellFrame이
+ * route-chrome 테이블의 desktopHead:true로 그리므로, 셸 없이 이 컴포넌트만 렌더하는 이
+ * 테스트 파일에서는 검증할 수 없다(user-records-page-client.test.tsx의 동일 마이그레이션과 같은 판단).
  */
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/teams/team-1/records',
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
+}));
+
+const shellOverride = vi.hoisted(() => ({ useShellOverride: vi.fn() }));
+
+vi.mock('@/components/v1-ui/shell-override', () => ({
+  useShellOverride: shellOverride.useShellOverride,
 }));
 
 const mocks = vi.hoisted(() => ({ usePublicTeamRecords: vi.fn() }));
@@ -79,9 +91,15 @@ function loaded(teamName: string) {
   };
 }
 
+function lastOverrideTitle() {
+  const calls = shellOverride.useShellOverride.mock.calls;
+  return calls[calls.length - 1]?.[0]?.title as string | undefined;
+}
+
 describe('TeamRecordsPageClient', () => {
   beforeEach(() => {
     mocks.usePublicTeamRecords.mockReset();
+    shellOverride.useShellOverride.mockReset();
   });
 
   it('names which team these records belong to so a deep-linked visitor can tell', () => {
@@ -89,7 +107,7 @@ describe('TeamRecordsPageClient', () => {
 
     render(<TeamRecordsPageClient teamId="team-1" />);
 
-    expect(screen.getAllByText('강남 러닝 크루 전적').length).toBeGreaterThan(0);
+    expect(lastOverrideTitle()).toBe('강남 러닝 크루 전적');
   });
 
   // 로딩 중에는 팀명을 모른다. 모르는 값을 지어내지 않고 제네릭 문구로 남는 것이 맞다.
@@ -107,7 +125,7 @@ describe('TeamRecordsPageClient', () => {
 
     render(<TeamRecordsPageClient teamId="team-1" />);
 
-    expect(screen.getAllByText('팀 전적').length).toBeGreaterThan(0);
+    expect(lastOverrideTitle()).toBeUndefined();
     expect(screen.queryByText(/team-1/)).toBeNull();
   });
 
@@ -145,13 +163,5 @@ describe('TeamRecordsPageClient', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '전체 시즌' }));
     expect(mocks.usePublicTeamRecords).toHaveBeenLastCalledWith('team-1', undefined, undefined);
-  });
-
-  it('renders the desktop page head so the title survives above 1024px', () => {
-    mocks.usePublicTeamRecords.mockReturnValue(loaded('강남 러닝 크루'));
-
-    const { container } = render(<TeamRecordsPageClient teamId="team-1" />);
-
-    expect(container.querySelector('.tm-desktop-page-head')).not.toBeNull();
   });
 });

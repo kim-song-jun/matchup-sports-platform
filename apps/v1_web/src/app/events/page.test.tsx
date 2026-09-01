@@ -1,5 +1,4 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import EventsPage from './page';
 
@@ -7,10 +6,6 @@ const refetch = vi.hoisted(() => vi.fn());
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1MasterSports: () => ({ data: [] }),
-}));
-
-vi.mock('@/components/v1-ui/shell', () => ({
-  AppChrome: ({ children }: { readonly children: ReactNode }) => <>{children}</>,
 }));
 
 vi.mock('@/hooks/use-v1-tournament-campaign', () => ({

@@ -442,7 +442,7 @@ export default function AdminAdminsPage() {
         }
       />
 
-      <div className="flex flex-col gap-4">
+      <div className="tm-content-enter flex flex-col gap-4">
         <AdminFilterBar hideSearch searchValue={''} onSearchChange={() => undefined} statusOptions={statusOptions} activeStatus={activeStatus} onStatusChange={setActiveStatus} />
 
         {/* Card list */}

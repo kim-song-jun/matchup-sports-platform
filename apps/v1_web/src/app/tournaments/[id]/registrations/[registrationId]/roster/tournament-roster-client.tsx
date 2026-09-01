@@ -3,7 +3,6 @@
 import { useState, useMemo } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import {
@@ -1031,12 +1030,9 @@ export function TournamentRosterPageClient({
   );
   const canAddDraftForm = canEditRoster && players.length + draftForms.length < maxPlayers;
 
-  const backHref = `/tournaments/${tournamentId}/my`;
-
   if (isLoading) {
     return (
-      <AppChrome title="선수 명단" backHref={backHref} activeTab="tournaments" desktopHead>
-        <div
+              <div
           aria-busy="true"
           aria-label="명단 불러오는 중"
           style={{ padding: '0 20px', marginTop: 24 }}
@@ -1049,22 +1045,19 @@ export function TournamentRosterPageClient({
             />
           ))}
         </div>
-      </AppChrome>
-    );
+      );
   }
 
   if (isError) {
     const msg = extractErrorMessage(rosterErr, '명단을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
     return (
-      <AppChrome title="선수 명단" backHref={backHref} activeTab="tournaments" desktopHead>
-        <div style={{ padding: '0 20px', marginTop: 40 }}>
+              <div style={{ padding: '0 20px', marginTop: 40 }}>
           <ErrorState
             message={msg}
             onRetry={() => void refetchRoster()}
           />
         </div>
-      </AppChrome>
-    );
+      );
   }
 
   function handleAddDraftForm() {
@@ -1169,7 +1162,7 @@ export function TournamentRosterPageClient({
   }
 
   return (
-    <AppChrome title="선수 명단" backHref={backHref} activeTab="tournaments" desktopHead>
+    <>
       <div className="tm-tournament-roster-body" style={{ padding: '0 20px 48px', marginTop: 12 }}>
 
         {tournament && registration ? (
@@ -1398,6 +1391,6 @@ export function TournamentRosterPageClient({
 
       {/* 선수 삭제 confirm modal */}
       {RemoveConfirmModal}
-    </AppChrome>
+    </>
   );
 }

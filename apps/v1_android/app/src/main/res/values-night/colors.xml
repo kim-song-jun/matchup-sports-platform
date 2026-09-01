@@ -4,4 +4,7 @@
     <color name="native_error_background">#111827</color>
     <color name="native_error_title">#F9FAFB</color>
     <color name="native_error_body">#D1D5DB</color>
+    <color name="native_message_background">#1C1E24</color>
+    <color name="native_message_border">#343841</color>
+    <color name="native_message_text">#F9FAFB</color>
 </resources>

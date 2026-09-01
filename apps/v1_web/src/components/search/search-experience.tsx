@@ -288,7 +288,7 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
       </div>
 
       {effectiveViewState === 'error' ? (
-        <div className="tm-search-error-toast" style={{ position: 'absolute', left: 'var(--v1-shell-page-x)', right: 'var(--v1-shell-page-x)', bottom: 'calc(22px + var(--v1-shell-safe-bottom))', minHeight: 48, borderRadius: 'var(--radius-field)', background: 'var(--scrim-dark-94)', color: 'var(--static-white)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 16px', fontSize: 13, fontWeight: 700 }}>
+        <div className="tm-native-toast-card tm-search-error-toast" style={{ position: 'absolute', left: 'var(--v1-shell-page-x)', right: 'var(--v1-shell-page-x)', bottom: 'calc(22px + var(--v1-shell-safe-bottom))', minHeight: 48, borderRadius: 'var(--radius-field)', background: 'var(--scrim-dark-94)', color: 'var(--static-white)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 16px', fontSize: 13, fontWeight: 700 }}>
           검색 중 문제가 생겼어요. 잠시 후 다시 시도해 주세요.
         </div>
       ) : null}

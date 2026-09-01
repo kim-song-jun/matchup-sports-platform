@@ -7864,3 +7864,36 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
 .tm-my-account-actions .tm-btn { flex: 1; }
 /* 활동 요약과 이번 달 활동을 한 카드로 합칠 때 두 묶음을 가르는 선. */
 .tm-my-activity-divider { height: 1px; background: var(--border); margin: 12px 0; }
+/* Android wrapper: transient web feedback reads as an in-app centered popup.
+   Browser layouts keep their existing bottom/inline placement. */
+html[data-teameet-native-app='android'] .tm-native-toast-stack {
+  position: fixed !important;
+  inset: 50% 24px auto !important;
+  width: auto !important;
+  transform: translateY(-50%) !important;
+  z-index: 1000 !important;
+}
+
+html[data-teameet-native-app='android'] .tm-native-toast-card {
+  max-width: min(100%, 360px) !important;
+  min-height: 56px;
+  border: 1px solid var(--grey200);
+  border-radius: 18px !important;
+  box-shadow: 0 8px 24px rgb(15 23 42 / 14%);
+  text-align: center;
+}
+
+html[data-teameet-native-app='android'] .tm-notification-toast,
+html[data-teameet-native-app='android'] .tm-search-error-toast {
+  position: fixed !important;
+  inset: 50% auto auto 50% !important;
+  width: min(calc(100vw - 48px), 360px) !important;
+  min-height: 56px !important;
+  transform: translate(-50%, -50%) !important;
+  border: 1px solid var(--grey200);
+  border-radius: 18px !important;
+  box-shadow: 0 8px 24px rgb(15 23 42 / 14%);
+  padding: 16px 20px !important;
+  text-align: center;
+  z-index: 1000 !important;
+}

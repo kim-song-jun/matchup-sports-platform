@@ -16,8 +16,14 @@ export type TeamMatchModel = {
   opponentCost: number;
   uniform: string;
   gender: string;
-  manner: number;
-  wins: number;
+  /**
+   * 매너 평점·승수는 **모를 수 있다**(null). 매너는 공개된 팀 후기가 한 건도 없으면 집계값이
+   * 없고, 승수는 API 를 못 받은 프리렌더/폴백 경로에서 비어 있다. 예전에는 이 자리를 화면
+   * 골격용 목업(매너 4.8 · 승 23)이 채워 **어느 팀 매치를 열어도 같은 가짜 숫자**가 보였다.
+   * null 을 허용하고 화면은 그 줄을 감춘다 — 모르는 값을 지어내지 않는다(dev 와 같은 계약).
+   */
+  manner: number | null;
+  wins: number | null;
   status: 'open' | 'pending' | 'approved' | 'closed' | 'mine';
 };
 

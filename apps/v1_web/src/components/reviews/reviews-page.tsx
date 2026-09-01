@@ -388,6 +388,11 @@ const REVIEW_TAB_ITEMS: SegmentedTabsItem[] = [
   { id: 'received', label: '받은 리뷰', href: '/my/reviews?tab=received' },
 ];
 
+// 세 항목 모두 `/my/reviews?tab=<id>` 로 **주소를 바꾸는 라우팅 링크**다. 따라서
+// role="tablist"(→ 각 항목 role="tab" + aria-selected)를 주지 않는다 — tab 역할은
+// "같은 페이지 안에서 패널을 갈아끼우는 위젯"을 뜻해서, 보조기기에 링크라는 사실과
+// 뒤 이동이 일어난다는 예고가 사라진다. role 을 비우면 SegmentedTabs 가 <nav> +
+// 링크 + aria-current="page" 로 렌더한다(라우팅 하위 내비게이션의 표준 형태).
 function ReviewTabs({ active, onChange }: { active: ReviewsTab; onChange: (tab: ReviewsTab) => void }) {
   return (
     <SegmentedTabs
@@ -395,7 +400,6 @@ function ReviewTabs({ active, onChange }: { active: ReviewsTab; onChange: (tab: 
       activeId={active}
       onSelect={(id) => onChange(id as ReviewsTab)}
       ariaLabel="리뷰 탭"
-      role="tablist"
     />
   );
 }

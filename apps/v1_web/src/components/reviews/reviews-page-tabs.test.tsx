@@ -48,19 +48,22 @@ describe('ReviewTabs(SegmentedTabs 이관) — 탭 3개의 href·활성 표시�
   it('탭 3개가 각자 /my/reviews?tab=<id> 로 라우팅된다(하드코딩 href 오타 방지)', () => {
     renderView('written');
 
-    expect(screen.getByRole('tab', { name: '작성할 리뷰' })).toHaveAttribute('href', '/my/reviews?tab=pending');
-    expect(screen.getByRole('tab', { name: '작성된 리뷰' })).toHaveAttribute('href', '/my/reviews?tab=written');
-    expect(screen.getByRole('tab', { name: '받은 리뷰' })).toHaveAttribute('href', '/my/reviews?tab=received');
+    expect(screen.getByRole('link', { name: '작성할 리뷰' })).toHaveAttribute('href', '/my/reviews?tab=pending');
+    expect(screen.getByRole('link', { name: '작성된 리뷰' })).toHaveAttribute('href', '/my/reviews?tab=written');
+    expect(screen.getByRole('link', { name: '받은 리뷰' })).toHaveAttribute('href', '/my/reviews?tab=received');
   });
 
-  it('현재 탭만 aria-selected="true" 를 갖는다(나머지 둘은 false)', () => {
+  // 주소를 바꾸는 링크이므로 계약은 aria-selected(탭 위젯) 가 아니라 aria-current="page" 다.
+  // getAllByRole('link') 로 집는 것 자체가 "tab 역할이 붙지 않았다"는 회귀 방어를 겸한다 —
+  // role="tablist" 가 되살아나면 링크 role 이 덮여 이 쿼리가 0건이 되어 실패한다.
+  it('현재 탭만 aria-current="page" 를 갖는다(나머지 둘은 없음)', () => {
     renderView('written');
 
-    const tabs = screen.getAllByRole('tab');
-    expect(tabs.map((tab) => [tab.textContent, tab.getAttribute('aria-selected')])).toEqual([
-      ['작성할 리뷰', 'false'],
-      ['작성된 리뷰', 'true'],
-      ['받은 리뷰', 'false'],
+    const tabs = screen.getAllByRole('link');
+    expect(tabs.map((tab) => [tab.textContent, tab.getAttribute('aria-current')])).toEqual([
+      ['작성할 리뷰', null],
+      ['작성된 리뷰', 'page'],
+      ['받은 리뷰', null],
     ]);
   });
 });

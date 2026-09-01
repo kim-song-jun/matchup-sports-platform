@@ -193,6 +193,36 @@ describe('backfillLeagueCreatedAt', () => {
     expect((mirrors[0].createdAt as Date).getTime()).toBe(BACKFILL_STAMP.getTime());
   });
 
+  /**
+   * **멱등이다 — 이게 되돌리기보다 중요한 성질이다.**
+   *
+   * 목표값(`V1League.createdAt`)은 이 백필이 건드리지 않으므로 **불변**이다. 그래서 두 번
+   * 돌려도 같은 상태로 수렴한다 — *"중간에 실패하면 어떻게 되나"* 가 위험이 아니라
+   * **다시 돌리면 되는** 문제가 된다.
+   *
+   * 되돌리기(옛 백필 시각으로 복원)는 dry-run 출력이 유일한 근거지만, 그건 감사를 위한
+   * 것이지 복구 계획이 아니다 — 옛 값은 **행을 만든 시각**이라 되살릴 이유가 없다.
+   *
+   * 2회차에 `updateMany` 를 **아예 안 부르는 것**까지 본다. 결과만 보면 "이미 같은 값을
+   * 다시 쓰기" 도 통과하는데, 그건 승인받은 쓰기를 불필요하게 한 번 더 하는 것이다.
+   */
+  it('두 번 돌려도 같은 상태다 — 2회차엔 쓰지 않는다 (멱등)', async () => {
+    const { prisma, mirrors, updateMany } = fakePrisma([league()], [mirror()]);
+
+    const first = await backfillLeagueCreatedAt(prisma, { dryRun: false });
+    expect(first.updated).toBe(1);
+    expect(updateMany).toHaveBeenCalledTimes(1);
+
+    const second = await backfillLeagueCreatedAt(prisma, { dryRun: false });
+
+    expect(second.planned).toBe(0);
+    expect(second.updated).toBe(0);
+    expect(second.skipped).toBe(1);
+    // **추가 호출이 없어야 한다** — 있으면 같은 값을 다시 쓰는 것이다.
+    expect(updateMany).toHaveBeenCalledTimes(1);
+    expect((mirrors[0].createdAt as Date).getTime()).toBe(ORIGIN.getTime());
+  });
+
   it('updatedAt 은 쓰지 않는다 — @updatedAt 이라 Prisma 가 관리한다', async () => {
     const { prisma, updateMany } = fakePrisma([league()], [mirror()]);
 

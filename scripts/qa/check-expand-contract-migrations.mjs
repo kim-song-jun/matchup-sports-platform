@@ -4,6 +4,23 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+/**
+ * 셀프테스트가 **자기 자신을 자식 프로세스로** 다시 띄울 때 쓰는 경로.
+ *
+ * `new URL(import.meta.url).pathname` 을 쓰면 안 된다 — 그건 **URL 경로**라 퍼센트
+ * 인코딩돼 있어서, 저장소 경로에 공백이나 비ASCII 가 섞이면 파일시스템에 **존재하지 않는
+ * 문자열**이 된다(실측: `has space/디렉터리` 아래에서 `existsSync(pathname) === false`,
+ * `existsSync(fileURLToPath(...)) === true`). 그러면 셀프테스트가 조용히 못 돌거나
+ * 엉뚱한 실패로 보인다.
+ *
+ * **위치가 중요하다** — 바로 위 주석대로 `selfTest()` 는 **모듈 평가 중에** 실행되므로,
+ * 이 `const` 를 파일 아래쪽에 두면 그 시점엔 아직 TDZ 라 `ReferenceError` 가 난다. 그리고
+ * `gateExits` 의 맨 `catch` 가 그걸 삼켜 **"게이트가 exit 1 했다"로 보인다**(실제로 이 PR
+ * 작업 중에 그렇게 한 번 헛짚었다). 선언은 첫 사용보다 위, 여기에 둔다.
+ */
+const SELF_PATH = fileURLToPath(import.meta.url);
 
 // Declared here rather than beside parseStatements because selfTest() runs
 // during module evaluation, before a class declaration further down the file
@@ -1597,7 +1614,7 @@ function baseFailureDiagnosticsSelfTest() {
   /** 게이트를 돌려 **종료코드와 사람이 읽을 메시지**를 함께 받는다. */
   const gateRun = (repo, base, head) => {
     try {
-      execFileSync(process.execPath, [new URL(import.meta.url).pathname, base, head], {
+      execFileSync(process.execPath, [SELF_PATH, base, head], {
         cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
       });
       return { code: 0, text: '' };
@@ -1672,10 +1689,19 @@ function baseResolutionSelfTest() {
   };
   const gateExits = (base, head) => {
     try {
-      execFileSync(process.execPath, [new URL(import.meta.url).pathname, base, head], { cwd: repo, stdio: 'ignore' });
+      execFileSync(process.execPath, [SELF_PATH, base, head], { cwd: repo, stdio: ['ignore', 'ignore', 'pipe'], encoding: 'utf8' });
       return 0;
-    } catch {
-      return 1;
+    } catch (error) {
+      // 맨 `catch { return 1 }` 은 **게이트가 판정으로 exit 1 한 것**과 **자식이 아예 못 뜬
+      // 것**을 같은 값으로 만든다. 이 PR 작업 중에 실제로 당했다 — SELF_PATH 가 TDZ 라
+      // `node undefined` 가 실행됐고, 그것도 exit 1 이라 "게이트가 잘못 판정한다"로 보였다.
+      //
+      // **종료코드로는 못 가른다** — node 가 스크립트를 못 찾아도 1 이다(실측). 가를 수 있는
+      // 것은 게이트가 자기 판정 경로에서 **반드시 찍는 표식**이다. 표식 없이 죽었으면 그건
+      // 판정이 아니라 고장이니 삼키지 않는다.
+      const text = String(error?.stderr ?? '');
+      if (text.includes('[expand-contract-sql-v1]')) return 1;
+      throw new Error(`게이트를 띄우지 못했다 (exit ${error?.status}): ${text.trim() || error?.message}`);
     }
   };
 

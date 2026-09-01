@@ -202,12 +202,22 @@ jobs:
           # 오인되지 않기 때문이다. 더 오래된 커밋을 넣으면 그 판정이 약해져 **게이트가
           # 조용히 느슨해진다.** diff base 를 분기점으로 옮기는 일은 스크립트가 자기 안에서
           # 따로 한다. 그러니 여기서는 tip 을 tip 으로만 보강한다.
+          # `-ge 2` 로 뭉뚱그리면 **예상 밖 코드까지 "fetch 하면 될지도"로 삼킨다** —
+          # 인자 오류나 시그널 종료가 조용히 보강 경로를 타 버린다. 위 표대로 딱 갈라 두고,
+          # 표에 없는 코드는 삼키지 말고 그 자리에서 죽인다.
           merge_base_rc=0
           git merge-base "${BASE_SHA}" "${HEAD_SHA}" >/dev/null 2>&1 || merge_base_rc=$?
-          if [[ ${merge_base_rc} -ge 2 ]]; then
-            git fetch --no-tags origin "${BASE_REF}"
-            BASE_SHA="$(git rev-parse FETCH_HEAD)"
-          fi
+          case "${merge_base_rc}" in
+            0|1) ;;
+            128)
+              git fetch --no-tags origin "${BASE_REF}"
+              BASE_SHA="$(git rev-parse FETCH_HEAD)"
+              ;;
+            *)
+              echo "expand-contract gate: git merge-base 가 예상 밖 코드로 끝났다 (exit ${merge_base_rc})" >&2
+              exit 1
+              ;;
+          esac
           # 게이트 자신의 규칙(SQL 추가성 판정 + base 해석)을 먼저 돌린다. 이게 없던 동안
           # base 해석 쪽 결함이 오래 살아남아, 대상 브랜치가 전진할 때마다 마이그레이션과
           # 무관한 PR 이 죽었다. 임시 저장소 몇 개를 만드는 정도라 수 초면 끝난다.

@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
-import { relative, resolve } from 'node:path';
+import { readdirSync } from 'node:fs';
+import { join, relative, resolve } from 'node:path';
 import { PrismaClient } from '@prisma/client';
 
 const apiRoot = resolve(__dirname, '../..');
@@ -30,6 +31,26 @@ const { recoveryContract } = require('../helpers/isolated-integration-environmen
 
 jest.setTimeout(60_000);
 
+/**
+ * `test/` 아래의 통합 스펙 파일을 **접미사로** 모은다.
+ *
+ * `testMatch` 글롭을 해석하지 않는 이유는 위 계약 주석에 있다 — 재구현이 틀리면 스펙이
+ * 거짓 판정을 낸다. 접미사는 config 의 두 패턴이 공통으로 요구하는 것이고, 위치 조건
+ * (e2e 는 `test/integration/` 아래여야 한다)은 별도 테스트가 따로 못박는다.
+ */
+function collectSpecFiles(dir: string): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      out.push(...collectSpecFiles(full));
+    } else if (full.endsWith('.integration-spec.ts') || full.endsWith('.e2e-spec.ts')) {
+      out.push(full);
+    }
+  }
+  return out;
+}
+
 function runJestResolver(...args: string[]): string {
   const result = spawnSync(process.execPath, [jestBin, ...args], {
     cwd: apiRoot,
@@ -48,7 +69,11 @@ describe('v1_api Jest integration discovery contract', () => {
     const shown = JSON.parse(
       runJestResolver('--selectProjects', 'integration', '--runInBand', '--showConfig', '--json'),
     ) as {
-      configs: Array<{ displayName: { name: string }; testEnvironment: string }>;
+      configs: Array<{
+        displayName: { name: string };
+        testEnvironment: string;
+        testPathIgnorePatterns?: string[];
+      }>;
       globalConfig: { maxWorkers: number };
     };
     const integration = shown.configs.find((project) => project.displayName.name === 'integration');
@@ -61,89 +86,79 @@ describe('v1_api Jest integration discovery contract', () => {
     const listed = JSON.parse(
       runJestResolver('--selectProjects', 'integration', '--runInBand', '--listTests', '--json'),
     ) as string[];
+    /**
+     * **목록을 적지 않는다 — 디스크와 config 로 만든다.**
+     *
+     * 예전에는 여기에 경로 79 개가 박혀 있었고, 그래서 **낡아 있었다**: `jest --listTests`
+     * 는 89 개를 고르는데 목록은 79 개라 10 건(리그 통합 스펙들)이 빠져 있었다. 새 스펙을
+     * 추가할 때마다 사람이 이 목록을 같이 고쳐야 하는 구조였기 때문이다.
+     *
+     * `jest.config.ts` 는 같은 문제를 이미 겪고 **글롭 한 줄**로 바꿨다(그 파일 주석:
+     * *"등록을 사람이 기억해야 하는 구조가 남아 있으면 같은 사고가 이름만 바꿔 반복된다"*).
+     * **그걸 검사하는 이 스펙만 열거로 남아 있었다.** 같은 원칙을 여기에도 적용한다.
+     *
+     * ## 글롭을 다시 구현하지 않는다
+     * `testMatch` 패턴을 이 파일에서 해석하면 **그 재구현이 틀릴 수 있고**, 그러면 스펙이
+     * 거짓 red/green 을 낸다. 대신 **파일 접미사**로 디스크를 훑고, 제외는 config 가 실제로
+     * 쓰는 `testPathIgnorePatterns` 를 그대로 적용한다 — 판단 기준을 우리가 만들지 않는다.
+     *
+     * 이렇게 하면 보호가 **더 강해진다**: 예전 목록은 새 파일을 추가하면서 목록도 같이
+     * 고치면 통과했지만, 지금은 config 글롭이 파일을 놓치는 순간 red 다.
+     */
+    const integrationConfig = shown.configs.find((project) => project.displayName.name === 'integration');
+    const ignorePatterns = (integrationConfig?.testPathIgnorePatterns ?? []).map(
+      (pattern) => new RegExp(pattern),
+    );
+    const isIgnored = (absPath: string) => ignorePatterns.some((re) => re.test(absPath));
+
+    const onDisk = collectSpecFiles(resolve(apiRoot, 'test'));
+    const integrationSpecs = onDisk.filter((f) => f.endsWith('.integration-spec.ts'));
+    const e2eSpecs = onDisk.filter((f) => f.endsWith('.e2e-spec.ts'));
+
+    const expected = [...integrationSpecs.filter((f) => !isIgnored(f)), ...e2eSpecs]
+      .map((absPath) => relative(apiRoot, absPath).replaceAll('\\', '/'))
+      .sort();
+
     expect(
       listed.map((testPath) => relative(apiRoot, testPath).replaceAll('\\', '/')).sort(),
-    ).toEqual([
-      'test/games/fixture-game-backfill.integration-spec.ts',
-      'test/games/game-actor-matrix.integration-spec.ts',
-      'test/games/game-assist-assign-command.integration-spec.ts',
-      'test/games/game-assist-foul-record.integration-spec.ts',
-      'test/games/game-event-assist-validation.integration-spec.ts',
-      'test/games/game-event-substitution-validation.integration-spec.ts',
-      'test/games/game-lifecycle.integration-spec.ts',
-      'test/games/game-lineup-fixture-deadline.integration-spec.ts',
-      'test/games/game-lineup-participants.integration-spec.ts',
-      'test/games/game-lineup-roster-identity-link.integration-spec.ts',
-      'test/games/game-lineup-size.integration-spec.ts',
-      'test/games/game-lineup-team-match-forbidden.integration-spec.ts',
-      'test/games/game-missing-scorer-derivation.integration-spec.ts',
-      'test/games/game-operations-lineup.integration-spec.ts',
-      'test/games/game-participant-consent-link-scope.integration-spec.ts',
-      'test/games/game-participant-identity-self-claim.integration-spec.ts',
-      'test/games/game-participant-identity-staff-scope.integration-spec.ts',
-      'test/games/game-participant-identity.integration-spec.ts',
-      'test/games/game-period-halftime.integration-spec.ts',
-      'test/games/game-period-lifecycle.integration-spec.ts',
-      'test/games/game-period-live-backfill.integration-spec.ts',
-      'test/games/game-period-pause-tracking.integration-spec.ts',
-      'test/games/game-projection.integration-spec.ts',
-      'test/games/game-schema.integration-spec.ts',
-      'test/games/game-team-match-event-authority.integration-spec.ts',
-      'test/games/game-team-match-event-score-mismatch.integration-spec.ts',
-      'test/games/game-team-match-score-invariant.integration-spec.ts',
-      'test/games/game-team-result-authority.integration-spec.ts',
-      'test/games/goal-event-backfill.integration-spec.ts',
-      'test/games/live-game-commands.integration-spec.ts',
-      'test/games/public-records-privacy.integration-spec.ts',
-      'test/games/public-user-records-assist-foul.integration-spec.ts',
-      'test/games/public-user-records-lineup-consent-e2e.integration-spec.ts',
-      'test/games/team-record-facts-backfill.integration-spec.ts',
-      'test/integration/admin-owner-invariant.e2e-spec.ts',
-      'test/integration/health.e2e-spec.ts',
-      'test/integration/integration-app-cleanup.e2e-spec.ts',
-      'test/integration/phone-verification-write-gate.e2e-spec.ts',
-      'test/integration/phone-verification.e2e-spec.ts',
-      'test/integration/push-device.e2e-spec.ts',
-      'test/integration/roster-cleanup.e2e-spec.ts',
-      'test/integration/team-logo-persistence.e2e-spec.ts',
-      'test/integration/team-match-search-scope.e2e-spec.ts',
-      'test/integration/tournament-campaign.e2e-spec.ts',
-      'test/integration/tournament-overall-standings.e2e-spec.ts',
-      'test/jobs/game-operation-flags-simplified-gate.integration-spec.ts',
-      'test/jobs/game-operations-control.integration-spec.ts',
-      'test/jobs/game-result-league-escalation.integration-spec.ts',
-      'test/jobs/league-result-entry-reminder.integration-spec.ts',
-      'test/jobs/v1-game-operations-worker.integration-spec.ts',
-      'test/league-matches/league-fixture-timing.integration-spec.ts',
-      'test/league-matches/league-match-detail-dispute-eligibility.integration-spec.ts',
-      'test/league-matches/league-match-dispute.integration-spec.ts',
-      'test/league-matches/league-match-result-entry.integration-spec.ts',
-      'test/league-matches/league-promotion.integration-spec.ts',
-      'test/team-contacts/report-enforcement.integration-spec.ts',
-      'test/team-contacts/team-contact-flow.integration-spec.ts',
-      'test/team-contacts/team-contact-guards.integration-spec.ts',
-      'test/team-lineups/team-lineup-reuse.integration-spec.ts',
-      'test/team-matches/team-match-lineup-size.integration-spec.ts',
-      'test/team-matches/team-match-schedule-link.integration-spec.ts',
-      'test/team-schedules/attendance.integration-spec.ts',
-      'test/team-schedules/guest-recruitment.integration-spec.ts',
-      'test/team-schedules/reminder-worker-wiring.integration-spec.ts',
-      'test/team-schedules/schedule-crud.integration-spec.ts',
-      'test/team-schedules/team-schedules.integration-spec.ts',
-      'test/tournaments/alpha-seed-fixture-config.integration-spec.ts',
-      'test/tournaments/competition-config-version-repoint.integration-spec.ts',
-      'test/tournaments/competition-config.integration-spec.ts',
-      'test/tournaments/game-operation-flag-seed.integration-spec.ts',
-      'test/tournaments/seed-alpha-tournament-qa-upsert.integration-spec.ts',
-      'test/tournaments/task7-audit-scope.integration-spec.ts',
-      'test/tournaments/tournament-correction-guards.integration-spec.ts',
-      'test/tournaments/tournament-game-adapter.integration-spec.ts',
-      'test/tournaments/tournament-officialize-edge.integration-spec.ts',
-      'test/tournaments/tournament-officialize.integration-spec.ts',
-      'test/tournaments/tournament-operations-board.integration-spec.ts',
-      'test/tournaments/tournament-penalty-shootout.integration-spec.ts',
-      'test/tournaments/tournament-standings-recalculation.integration-spec.ts',
-    ]);
+    ).toEqual(expected);
+
+    // 디스크를 실제로 훑었는지 못박는다 — expected 가 비면 위 단언이 vacuous 해진다.
+    expect(expected.length).toBeGreaterThan(50);
+  });
+
+  /**
+   * `e2e-spec` 은 **`test/integration/` 아래에만** 둔다 — config 의 두 번째 글롭이
+   * `test/integration/**` 로 한정돼 있어서, 다른 디렉터리에 두면 **조용히 안 돌아간다.**
+   * 위 계약은 "선택된 것 == 디스크에서 기대한 것" 을 보므로 이 위치 규칙을 못 잡는다
+   * (기대값도 같이 틀리기 때문이다). 그래서 별도로 못박는다.
+   */
+  it('keeps every e2e-spec under test/integration so the config glob can see it', () => {
+    const strays = collectSpecFiles(resolve(apiRoot, 'test'))
+      .filter((f) => f.endsWith('.e2e-spec.ts'))
+      .map((f) => relative(apiRoot, f).replaceAll('\\', '/'))
+      .filter((f) => !f.startsWith('test/integration/'));
+
+    expect(strays).toEqual([]);
+  });
+
+  /**
+   * `testPathIgnorePatterns` 는 config 주석이 *"고쳐야 할 빚 목록"* 이라고 못박은 자리다.
+   * 가리키는 파일이 사라지면 그 항목은 **죽은 제외**가 되고, 죽은 채로 남으면 다음 사람이
+   * "아직 빚이 있다" 고 잘못 읽는다. 각 패턴이 실제 파일을 하나 이상 가리키는지 본다.
+   */
+  it('keeps every integration ignore pattern pointing at a file that exists', () => {
+    const shown = JSON.parse(
+      runJestResolver('--selectProjects', 'integration', '--runInBand', '--showConfig', '--json'),
+    ) as { configs: Array<{ displayName: { name: string }; testPathIgnorePatterns?: string[] }> };
+    const patterns =
+      shown.configs.find((project) => project.displayName.name === 'integration')
+        ?.testPathIgnorePatterns ?? [];
+    const onDisk = collectSpecFiles(resolve(apiRoot, 'test'));
+
+    expect(patterns.length).toBeGreaterThan(0);
+    const dead = patterns.filter((pattern) => !onDisk.some((f) => new RegExp(pattern).test(f)));
+    expect(dead).toEqual([]);
   });
 
   it('recovers only expired unleased Task 9 clones within the bounded policy', () => {

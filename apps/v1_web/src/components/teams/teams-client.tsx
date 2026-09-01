@@ -194,9 +194,19 @@ export function TeamFilterPageClient() {
   return <TeamStatePageView model={model} />;
 }
 
-export function TeamDetailPageClient({ teamId }: { teamId: string }) {
+/**
+ * `seed` 는 서버 컴포넌트(app/teams/[id]/page.tsx)가 구조화 데이터·메타데이터를 위해 이미
+ * 받아 둔 팀 상세 응답이다. 추가 요청 없이 첫 화면을 채운다.
+ *
+ * 단, 그 응답은 **비인증**이라 `viewer` 가 `{ role: 'none', canRequestJoin: false,
+ * disabledReason: 'LOGIN_REQUIRED' }` 로 채워져 온다(alpha 실측). 매치와 달리 `viewer` 는
+ * required 필드라 지울 수도 없다 — 그대로 쓰면 로그인한 owner 에게 잠깐 "가입 신청"이나
+ * "로그인이 필요해요"가 뜬다. 그래서 seed 로 그리는 동안(`isPlaceholderData`) 뷰어에
+ * 의존하는 것(가입 CTA·컨택 CTA)만 잠그고, 팀 이름·로고·소개·지역·멤버는 바로 보여준다.
+ */
+export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: V1TeamDetail | null }) {
   const router = useRouter();
-  const query = useV1TeamDetail(teamId);
+  const query = useV1TeamDetail(teamId, { seed });
   const eligibility = useV1TeamJoinEligibility(teamId, { enabled: Boolean(query.data) });
   const join = useV1CreateTeamJoinApplication(teamId);
   const withdraw = useV1WithdrawTeamJoinApplication(teamId, eligibility.data?.applicationId);
@@ -254,6 +264,10 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
     return <TeamDetailPageSkeleton />;
   }
 
+  // 서버 seed 로 그리는 중. 비인증 응답이라 viewer 판정이 "비로그인"으로 고정돼 있으므로
+  // 뷰어에 의존하는 것만 잠근다(matches-client.tsx 와 같은 패턴).
+  const seeding = query.isPlaceholderData;
+
   const model: TeamDetailViewModel = {
     ...fallback,
     team: {
@@ -289,9 +303,11 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
       },
     },
     mode: toDetailMode(query.data, eligibility.data),
-    ctaLabel: teamDetailCtaLabel(query.data, eligibility.data),
+    ctaLabel: seeding ? '불러오는 중' : teamDetailCtaLabel(query.data, eligibility.data),
     ctaPending: join.isPending || withdraw.isPending || resolveChat.isPending,
-    onCta: teamDetailCtaAction({
+    // ctaPending 에 seeding 을 넣지 않는다 — 렌더 쪽이 그걸 '처리 중'(= 내 신청 처리
+    // 중)으로 읽어 ctaLabel 을 덮는다. onCta 를 비우면 이미 disabled 다.
+    onCta: seeding ? undefined : teamDetailCtaAction({
       team: query.data,
       eligibility: eligibility.data,
       chat: async () => {
@@ -317,7 +333,7 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
     openMatches,
     openMatchesLoading: openMatchesQuery.isLoading,
     contactHref:
-      toDetailMode(query.data, eligibility.data) !== 'mine' && operatorTeamCount > 0
+      !seeding && toDetailMode(query.data, eligibility.data) !== 'mine' && operatorTeamCount > 0
         ? `/teams/${teamId}/contact/new`
         : undefined,
     myLeagues,

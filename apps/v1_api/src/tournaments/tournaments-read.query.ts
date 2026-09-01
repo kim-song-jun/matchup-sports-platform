@@ -4,6 +4,34 @@ export const PUBLIC_TOURNAMENT_STATUS_FILTER: Prisma.V1TournamentWhereInput['sta
   in: ['open', 'closed', 'in_progress', 'completed'],
 };
 
+/**
+ * 공개 표면의 상태 조건 — **종류마다 다르다.**
+ *
+ * 대회의 `draft` 는 **운영자 준비 중**이라 감춘다(사용자 명시: 그대로 유지). 그런데 정규
+ * 리그의 `draft` 는 **"예정"** 이고, 리그 전용 목록이 지금까지 사용자에게 보여 온 상태다.
+ * 같은 열에 다른 뜻이 담겨 있다.
+ *
+ * 그래서 통합 목록이 리그를 담기 시작하자 **예정 리그가 통째로 사라졌다** — 2026-09-01
+ * 실측: 리그 88건 중 통합 목록에 보이는 것 53건, 빠진 35건이 전부 `draft` 였다.
+ *
+ * ## 조건을 **더하는 방향**으로만 쓴다
+ * 첫 절은 기존 조건 그대로이고 둘째 절이 리그의 `draft` 만 얹는다. 이렇게 하면
+ * **대회에서 빠지는 것이 하나도 없다** — `kind: null`(R1 이전 행)도 첫 절에 그대로 걸린다.
+ * `kind: { not: 'regular_league' }` 로 갈랐다면 Prisma 의 `not` 이 NULL 을 어떻게 다루느냐에
+ * 따라 옛 행이 조용히 사라질 수 있었다.
+ *
+ * ## ⚠️ 이 값을 `where` 에 **펴 넣지(spread) 마라** — `AND` 에 담아라
+ * 이건 최상위 `OR` 을 갖는다. 그런데 `TOURNAMENT_SURFACE_KIND` 도 최상위 `OR` 이라,
+ * 둘을 같은 객체에 펴 넣으면 **뒤엣것이 앞엣것을 덮어 종류 필터가 조용히 사라진다.**
+ * 에러도 안 나고 결과만 넓어진다.
+ */
+export const PUBLIC_COMPETITION_STATUS_WHERE: Prisma.V1TournamentWhereInput = {
+  OR: [
+    { status: PUBLIC_TOURNAMENT_STATUS_FILTER },
+    { kind: 'regular_league', status: 'draft' },
+  ],
+};
+
 export const TOURNAMENT_LIST_INCLUDE = {
   sport: { select: { code: true, name: true } },
   _count: {

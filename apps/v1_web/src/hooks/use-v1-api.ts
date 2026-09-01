@@ -588,11 +588,14 @@ export function useV1Notices(filters?: ListFilters) {
   });
 }
 
-export function useV1Notice(noticeId: string) {
+export function useV1Notice(noticeId: string, options?: { seed?: V1NoticeResponse | null }) {
+  const seed = options?.seed;
   return useQuery({
     queryKey: v1Keys.notice(noticeId),
     queryFn: () => v1Get<V1NoticeResponse>(`/notices/${noticeId}`),
     enabled: Boolean(noticeId),
+    // 공지는 뷰어에 따라 달라지는 값도, 행동 버튼도 없다 — seed 를 그대로 첫 화면에 쓴다.
+    placeholderData: seed ?? undefined,
   });
 }
 
@@ -863,11 +866,21 @@ export function useV1Team(teamId: string) {
   });
 }
 
-export function useV1TeamDetail(teamId: string) {
+export function useV1TeamDetail(teamId: string, options?: { seed?: V1TeamDetail | null }) {
+  const seed = options?.seed;
   return useQuery({
     queryKey: [...v1Keys.team(teamId), 'detail'] as const,
     queryFn: () => v1Get<V1TeamDetail>(`/teams/${teamId}`),
     enabled: Boolean(teamId),
+    // 서버 컴포넌트가 구조화 데이터·메타데이터를 위해 이미 받아 둔 응답을 첫 표시값으로 쓴다
+    // (추가 요청이 아니다). 팀 이름·로고·소개·지역·멤버 수는 그대로 맞다.
+    //
+    // 다만 `viewer` 는 **지울 수 없다**(required 필드). 그리고 이 응답은 비인증이라 서버가
+    // `{ role: 'none', joinState: 'none', canRequestJoin: false, disabledReason:
+    // 'LOGIN_REQUIRED' }` 를 채워 보낸다(alpha 실측) — 로그인한 owner 가 이 값을 그대로
+    // 보면 잠깐 "가입 신청"이나 "로그인이 필요해요"가 뜬다. 그래서 화면 쪽이
+    // `isPlaceholderData` 동안 뷰어 의존 UI(CTA·컨택)를 잠근다.
+    placeholderData: seed ?? undefined,
   });
 }
 

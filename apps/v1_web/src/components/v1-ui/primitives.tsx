@@ -394,11 +394,17 @@ type EmptyStateProps = {
   onCta?: () => void;
   /** Lucide icon node rendered inside the blue circle. Defaults to InboxIcon. */
   icon?: ReactNode;
+  /**
+   * 이 빈 상태가 화면을 혼자 차지할 때 켠다 — 흐름대로 놓여 상단에 붙는 대신 남은 세로
+   * 공간의 중앙에 놓인다. 부모 컨테이너에 `tm-list-empty` 를 함께 붙여야 한다(globals.css).
+   * 카드·탭 안에 다른 내용과 섞여 나오는 빈 상태에는 쓰지 않는다.
+   */
+  fill?: boolean;
 };
 
-export function EmptyState({ title, sub, cta, onCta, icon }: EmptyStateProps) {
+export function EmptyState({ title, sub, cta, onCta, icon, fill }: EmptyStateProps) {
   return (
-    <div className="tm-empty-state">
+    <div className={`tm-empty-state${fill ? ' tm-empty-state-fill' : ''}`}>
       <div className="tm-empty-icon" aria-hidden="true">
         {icon ?? <InboxIcon size={36} strokeWidth={1.5} />}
       </div>

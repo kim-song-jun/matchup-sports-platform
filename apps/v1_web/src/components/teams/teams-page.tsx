@@ -88,7 +88,8 @@ export function TeamListPageView({ model }: { model: TeamListViewModel }) {
         </Link>
       </div>
       <TeamSearchBar model={model} />
-      <div className="tm-team-list">
+      {/* 결과가 0건일 때만 tm-list-empty — matches-page.tsx 와 같은 이유. */}
+      <div className={`tm-team-list${!model.listLoading && model.teams.length === 0 ? ' tm-list-empty' : ''}`}>
         <div className="tm-sport-chip-row" role="group" aria-label="종목 필터">{model.chips.map((chip) => chip.href ? <Link key={chip.label} className={`tm-chip ${chip.active ? 'tm-chip-active' : ''}`} href={chip.href} aria-current={chip.active ? 'page' : undefined}>{chip.label}{typeof chip.count === 'number' ? <span className="tab-num"> {chip.count}</span> : null}</Link> : <button key={chip.label} className={`tm-chip ${chip.active ? 'tm-chip-active' : ''}`} type="button" aria-pressed={chip.active}>{chip.label}{typeof chip.count === 'number' ? <span className="tab-num"> {chip.count}</span> : null}</button>)}</div>
         {/* 모바일 진입점 위계: summary-bar 텍스트를 tm-text-heading으로 승격해 페이지 진입점을 명확히 함.
             desktop에는 이미 .tm-team-desktop-header가 제목을 담당하므로 모바일에서만 노출. */}
@@ -103,7 +104,7 @@ export function TeamListPageView({ model }: { model: TeamListViewModel }) {
         ) : model.teams.length ? (
           <div className="tm-team-card-stack">{model.teams.map((team) => <TeamCard key={team.id} team={team} />)}</div>
         ) : (
-          <EmptyState title="조건에 맞는 팀이 없어요" sub="다른 종목을 선택하거나 필터를 초기화해 다시 확인해 주세요." />
+          <EmptyState fill title="조건에 맞는 팀이 없어요" sub="다른 종목을 선택하거나 필터를 초기화해 다시 확인해 주세요." />
         )}
       </div>
       {model.filterSheet?.open ? <TeamFilterSheet model={model} /> : null}

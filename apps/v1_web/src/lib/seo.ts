@@ -65,6 +65,25 @@ export function buildPublicMetadata({
   };
 }
 
+/**
+ * 팀 목록·상세의 메타 설명 폴백 문구.
+ *
+ * 종목·지역은 둘 다 없을 수 있는데(마스터 미연결 팀 등), 템플릿에 그대로 끼우면
+ * "undefined · null에서 활동하는 …" 이 검색 결과에 그대로 노출된다. 있는 조각만 조합한다.
+ */
+export function teamDescriptionFallback(
+  teamName: string,
+  sportName?: string | null,
+  regionName?: string | null,
+): string {
+  const sport = sportName?.trim();
+  const region = regionName?.trim();
+  if (sport && region) return `${sport} · ${region}에서 활동하는 ${teamName} 팀을 만나보세요.`;
+  if (region) return `${region}에서 활동하는 ${teamName} 팀을 만나보세요.`;
+  if (sport) return `${sport}을 함께할 ${teamName} 팀을 만나보세요.`;
+  return `${teamName} 팀을 만나보세요.`;
+}
+
 export function buildNoIndexMetadata(title: string, description?: string): Metadata {
   return {
     title,

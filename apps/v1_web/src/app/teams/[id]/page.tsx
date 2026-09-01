@@ -2,7 +2,13 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { TeamDetailPageClient } from '@/components/teams/teams-client';
 import { JsonLd } from '@/components/seo/json-ld';
-import { buildNoIndexMetadata, buildPublicMetadata, fetchPublicV1, metadataDescription } from '@/lib/seo';
+import {
+  buildNoIndexMetadata,
+  buildPublicMetadata,
+  fetchPublicV1,
+  metadataDescription,
+  teamDescriptionFallback,
+} from '@/lib/seo';
 import { buildBreadcrumbLd, buildSportsTeamLd, displayRegionName } from '@/lib/structured-data';
 import type { V1TeamDetail } from '@/types/api';
 
@@ -22,7 +28,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     title: team.name,
     description: metadataDescription(
       team.profile?.introduction,
-      `${sportName} · ${regionName}에서 활동하는 ${team.name} 팀을 만나보세요.`,
+      teamDescriptionFallback(team.name, sportName, regionName),
     ),
     path: `/teams/${id}`,
     image: team.profile?.coverImageUrl || team.profile?.logoUrl,

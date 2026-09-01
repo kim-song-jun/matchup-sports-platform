@@ -9,6 +9,8 @@
 import type { MatchCardModel, MatchListViewModel } from './matches.types';
 import type { V1Match, V1MatchApiStatus, V1Sport, V1ViewerState } from '@/types/api';
 
+const KST = 'Asia/Seoul';
+
 export const FIXED_MATCH_SPORT_NAMES = ['축구', '풋살', '러닝', '수영'] as const;
 
 export function toMatchCard(match: V1Match, fallback: MatchCardModel): MatchCardModel {
@@ -154,14 +156,18 @@ export function formatDeadlineDetail(value: string | null | undefined, status: M
   return `${formatDate(value)} ${formatTime(value)}`;
 }
 
+/**
+ * SSR 에서도 호출되므로 타임존을 KST 로 고정한다. 서버 런타임은 대개 UTC 라, 고정하지 않으면
+ * 크롤러가 받는 날짜와 브라우저가 그리는 날짜가 하루씩 어긋난다(하이드레이션 불일치).
+ */
 export function formatDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' });
+  return date.toLocaleDateString('ko-KR', { timeZone: KST, month: 'long', day: 'numeric', weekday: 'short' });
 }
 
 export function formatTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
+  return date.toLocaleTimeString('ko-KR', { timeZone: KST, hour: '2-digit', minute: '2-digit', hour12: false });
 }

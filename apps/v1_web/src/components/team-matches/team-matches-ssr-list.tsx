@@ -19,7 +19,13 @@ export function TeamMatchListSsrView({ matches }: { readonly matches: readonly V
         filterCount: 0,
         matches: cards,
         sports: buildSportChips({ base, params: new URLSearchParams(), matches: items }),
-        summary: { ...base.summary, count: cards.length, today: cards.length },
+        // base.summary 를 그대로 펼치면 목업 urgent 값이 새어 나간다 — 실제 카드 기준으로 다시 센다.
+        summary: {
+          ...base.summary,
+          count: cards.length,
+          today: cards.length,
+          urgent: cards.filter((card) => card.status === 'open').length,
+        },
       }}
     />
   );

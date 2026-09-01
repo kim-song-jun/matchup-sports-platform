@@ -45,6 +45,15 @@ function match(overrides: Partial<V1Match> = {}): V1Match {
 }
 
 describe('MatchListSsrView', () => {
+  it('날짜를 KST 로 그린다 — 서버(UTC)와 브라우저(KST)가 하루 어긋나지 않게', () => {
+    // 2026-10-02T16:30Z = KST 2026-10-03 01:30. 타임존을 고정하지 않으면 서버는 "10월 2일",
+    // 브라우저는 "10월 3일"을 그려 크롤러가 틀린 날짜를 읽는다.
+    render(<MatchListSsrView matches={[match({ startsAt: '2026-10-02T16:30:00.000Z', endsAt: null })]} />);
+
+    expect(screen.getByText(/10월 3일/)).toBeInTheDocument();
+    expect(screen.queryByText(/10월 2일/)).not.toBeInTheDocument();
+  });
+
   it('매치의 제목·종목·장소를 서버 렌더 마크업에 담는다', () => {
     render(<MatchListSsrView matches={[match()]} />);
 

@@ -23,6 +23,8 @@ import type { V1Sport, V1TeamMatch, V1TeamMatchApiStatus, V1TeamMatchViewerState
 // exported for direct unit coverage (see team-matches-client.test.tsx) — a pure mapping
 // function, cheaper to test directly than by plumbing new testids through the mocked
 // page-view component tree.
+const KST = 'Asia/Seoul';
+
 export function toTeamMatch(match: V1TeamMatch, fallback: TeamMatchModel): TeamMatchModel {
   const status = statusToCardStatus(getStatus(match), getViewerState(match));
   const costs = parseCosts(match.costNote);
@@ -73,8 +75,12 @@ export function buildSportChips({
   matches: V1TeamMatch[];
   selectedSportId?: string;
 }): TeamMatchListViewModel['sports'] {
-  const fixedSports = sports?.length
-    ? sports.slice(0, 4)
+  // 마스터 종목 목록이 없으면(서버 프리렌더 등) fallback 칩의 id 는 **라벨 문자열**이다.
+  // 그대로 sportId 쿼리에 넣으면 `?sportId=풋살` 같은 URL 이 HTML 에 나가는데, 실제 API 필터는
+  // ID 를 받으므로 아무 것도 걸리지 않는 링크다 — 크롤러가 그런 URL 을 수집하게 두지 않는다.
+  const hasMasterSportIds = Boolean(sports?.length);
+  const fixedSports = hasMasterSportIds
+    ? sports!.slice(0, 4)
     : base.sports.slice(1, 5).map((sport) => ({ id: sport.label, name: sport.label }));
 
   return [
@@ -91,7 +97,7 @@ export function buildSportChips({
         return matchSport?.sportId === sport.id || matchSport?.name === sport.name || match.sportName === sport.name;
       }).length,
       active: selectedSportId === sport.id,
-      href: buildTeamMatchHref(params, { sportId: sport.id, filter: null }),
+      href: buildTeamMatchHref(params, { sportId: hasMasterSportIds ? sport.id : null, filter: null }),
     })),
   ];
 }
@@ -134,14 +140,18 @@ export function parseCosts(value: string | null | undefined) {
   };
 }
 
+/**
+ * SSR 에서도 호출되므로 타임존을 KST 로 고정한다. 서버 런타임은 대개 UTC 라, 고정하지 않으면
+ * 크롤러가 받는 날짜와 브라우저가 그리는 날짜가 하루씩 어긋난다(하이드레이션 불일치).
+ */
 export function formatDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' });
+  return date.toLocaleDateString('ko-KR', { timeZone: KST, month: 'long', day: 'numeric', weekday: 'short' });
 }
 
 export function formatTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
+  return date.toLocaleTimeString('ko-KR', { timeZone: KST, hour: '2-digit', minute: '2-digit', hour12: false });
 }

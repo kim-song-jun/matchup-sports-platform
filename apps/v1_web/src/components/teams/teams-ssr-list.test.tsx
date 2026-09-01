@@ -44,6 +44,15 @@ describe('TeamListSsrView', () => {
     expect(detailHrefs()).toContain('/teams/team-1');
   });
 
+  it('마스터 종목 목록이 없는 서버 렌더에서 라벨을 sportId 로 쓰지 않는다', () => {
+    // fallback 칩의 id 는 '풋살' 같은 라벨이다. 그대로 쿼리에 넣으면 `?sportId=풋살` 이라는
+    // 아무 것도 걸리지 않는 URL 이 HTML 에 나가고 크롤러가 그것을 수집한다.
+    render(<TeamListSsrView teams={[team()]} />);
+
+    const hrefs = screen.queryAllByRole('link').map((link) => link.getAttribute('href') ?? '');
+    expect(hrefs.filter((href) => href.includes('sportId='))).toEqual([]);
+  });
+
   it('목록이 비어도 목업 팀을 대신 보여주지 않는다', () => {
     render(<TeamListSsrView teams={[]} />);
 

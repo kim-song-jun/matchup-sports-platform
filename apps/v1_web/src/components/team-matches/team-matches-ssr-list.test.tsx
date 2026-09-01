@@ -52,6 +52,20 @@ describe('TeamMatchListSsrView', () => {
     expect(detailHrefs()).toContain('/team-matches/tm-1');
   });
 
+  it('마스터 종목 목록이 없는 서버 렌더에서 라벨을 sportId 로 쓰지 않는다', () => {
+    render(<TeamMatchListSsrView matches={[teamMatch()]} />);
+
+    const hrefs = screen.queryAllByRole('link').map((link) => link.getAttribute('href') ?? '');
+    expect(hrefs.filter((href) => href.includes('sportId='))).toEqual([]);
+  });
+
+  it('요약 숫자에 목업 값이 섞이지 않는다', () => {
+    // `...base.summary` 를 그대로 펼치면 목업 urgent 가 새어 나간다.
+    render(<TeamMatchListSsrView matches={[]} />);
+
+    expect(screen.queryByText('3')).not.toBeInTheDocument();
+  });
+
   it('목록이 비어도 목업 팀매치를 대신 보여주지 않는다', () => {
     render(<TeamMatchListSsrView matches={[]} />);
 

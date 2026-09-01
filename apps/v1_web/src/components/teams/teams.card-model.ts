@@ -72,8 +72,12 @@ export function buildTeamSportChips(
   selectedSportId?: string,
   masterSports?: Array<{ id: string; name: string }>,
 ) {
-  const fixedSports = masterSports?.length
-    ? masterSports.slice(0, 4)
+  // 마스터 종목 목록이 없으면(서버 프리렌더 등) fallback 칩의 id 는 **라벨 문자열**이다.
+  // 그대로 sportId 쿼리에 넣으면 `?sportId=풋살` 같은 URL 이 HTML 에 나가는데, 실제 API 필터는
+  // ID 를 받으므로 아무 것도 걸리지 않는 링크다 — 크롤러가 그런 URL 을 수집하게 두지 않는다.
+  const hasMasterSportIds = Boolean(masterSports?.length);
+  const fixedSports = hasMasterSportIds
+    ? masterSports!.slice(0, 4)
     : fallback.chips.slice(1, 5).map((chip) => ({ id: chip.label, name: chip.label.replace(/\s+\d+$/, '') }));
 
   return [
@@ -85,7 +89,7 @@ export function buildTeamSportChips(
         return teamSport?.sportId === sport.id || teamSport?.name === sport.name || team.sportName === sport.name;
       }).length,
       active: selectedSportId === sport.id,
-      href: buildTeamHref(params, { sportId: sport.id }),
+      href: buildTeamHref(params, { sportId: hasMasterSportIds ? sport.id : null }),
     })),
   ];
 }

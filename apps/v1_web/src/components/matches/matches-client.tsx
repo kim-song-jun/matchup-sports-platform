@@ -18,7 +18,7 @@ import { chatRoomHref } from '@/lib/chat-route';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import type { V1Match, V1MatchApiStatus, V1Sport, V1ViewerState } from '@/types/api';
 import { toDetailMode } from './matches.mode';
-import { MatchDetailPageView, MatchListPageView, MatchStatePageView } from './matches-page';
+import { MatchDetailPageSkeleton, MatchDetailPageView, MatchListPageView, MatchStatePageView } from './matches-page';
 import type { MatchCardModel, MatchDetailViewModel, MatchListViewModel } from './matches.types';
 import { applyLabel, getMatchDetailViewModel, getMatchListViewModel, getMatchStateViewModel } from './matches.view-model';
 import {
@@ -233,75 +233,84 @@ export function MatchDetailPageClient({ matchId }: { matchId: string }) {
     return <MatchStatePageView model={getMatchStateViewModel('error')} />;
   }
 
-  const model: MatchDetailViewModel = query.data
-    ? {
-        ...fallback,
-        match: {
-          ...fallback.match,
-          ...toMatchCard(query.data, fallback.match),
-          // fallback.match.description/address는 로딩 스켈레톤(fallback 전체를 그대로 보여주는
-          // 케이스)에서만 써야 하는 하드코딩 목업이다 — 실제 매치가 로드된 뒤 API가 값을 안 주면
-          // ''로 둔다(team-matches-client.tsx의 동일 패턴과 통일). 렌더 쪽(matches-page.tsx)이
-          // falsy면 이미 섹션·sub를 숨긴다(설명은 InfoRow 미사용, 주소는 InfoRow의 sub
-          // optional 처리, 규칙은 `.length` 가드) — 상세 주소를 비워 만든 매치에 목업 주소
-          // '서울 양천구 안양천로 939'가 실제 주소처럼 뜨던 결함(2026-08-27 감사
-          // M-A-personal-match-state)을 막는다.
-          description: query.data.description ?? query.data.descriptionPreview ?? '',
-          address: query.data.place?.addressText ?? query.data.placeName ?? '',
-          rules: query.data.rulesText ? [query.data.rulesText] : fallback.match.rules,
-          editHref: viewerState === 'host' ? `/matches/${matchId}/edit` : undefined,
-          applicationsHref: viewerState === 'host' ? `/matches/${matchId}/applications` : undefined,
-          participants: toParticipants(
-            query.data,
-            fallback.match.participants,
-            viewerState === 'host' ? `/matches/${matchId}/applications` : undefined,
-          ),
-        },
-        mode: toDetailMode(viewerState, getStatus(query.data)),
-        reviewAction: buildMatchReviewAction(matchId, viewerState, getStatus(query.data)),
-        applyLabel: applyLabel(viewerState, getStatus(query.data), eligibility.data?.eligible, eligibility.data?.message),
-        applyPending: applyMatch.isPending || withdrawMatch.isPending,
-        statusLabel: statusLabel(viewerState, getStatus(query.data)),
-        chatLabel: chatLabel(viewerState),
-        chatPending: resolveChatRoom.isPending,
-        onChat: canOpenMatchChat(viewerState)
-          ? () => resolveChatRoom.mutate(
-              { targetType: 'match', targetId: matchId },
-              { onSuccess: (room) => router.push(chatRoomHref(room.roomId, room.route)) },
-            )
-          : undefined,
-        onShare: () => shareMatch(query.data),
-        onNotify: () => router.push('/notifications'),
-        onApply: getApplyAction({
-          viewerState,
-          eligible: eligibility.data?.eligible,
-          applicationId: eligibility.data?.applicationId ?? query.data.viewer?.applicationId,
-          apply: () =>
-            applyMatch.mutateAsync({ message: null }).then((result) => {
-              trackEvent('match_join_complete', { matchId, sportType: matchSportType ?? '' });
-              return result;
-            }),
-          withdraw: () =>
-            withdrawMatch.mutateAsync({ reason: 'applicant_withdrawn_from_v1_web' }).then((result) => {
-              trackEvent('match_leave', { matchId });
-              return result;
-            }),
+  // 데이터가 오기 전에는 하드코딩 목업(`fallback`)을 화면 전체로 렌더하지 않는다 —
+  // 목업 제목·주소·참가자가 실제 값처럼 보여 사용자가 잘못 읽던 결함이었다.
+  // `fallback` 은 아래에서 필드 단위 기본값으로만 쓴다.
+  if (!query.data) {
+    return <MatchDetailPageSkeleton />;
+  }
+
+  // 목록 캐시에서 승계한 표시용 데이터로 그리는 중. 제목·장소·날짜는 진짜지만 뷰어
+  // 상태·참가자는 아직 없다 — 이 동안 상태 라벨과 행동 버튼을 잠가, 이미 신청한 매치에
+  // "참가 신청"이 뜨는 식의 잘못된 안내를 막는다.
+  const seeding = query.isPlaceholderData;
+
+  const model: MatchDetailViewModel = {
+    ...fallback,
+    match: {
+      ...fallback.match,
+      ...toMatchCard(query.data, fallback.match),
+      // fallback.match.description/address는 로딩 스켈레톤(fallback 전체를 그대로 보여주는
+      // 케이스)에서만 써야 하는 하드코딩 목업이다 — 실제 매치가 로드된 뒤 API가 값을 안 주면
+      // ''로 둔다(team-matches-client.tsx의 동일 패턴과 통일). 렌더 쪽(matches-page.tsx)이
+      // falsy면 이미 섹션·sub를 숨긴다(설명은 InfoRow 미사용, 주소는 InfoRow의 sub
+      // optional 처리, 규칙은 `.length` 가드) — 상세 주소를 비워 만든 매치에 목업 주소
+      // '서울 양천구 안양천로 939'가 실제 주소처럼 뜨던 결함(2026-08-27 감사
+      // M-A-personal-match-state)을 막는다.
+      description: query.data.description ?? query.data.descriptionPreview ?? '',
+      address: query.data.place?.addressText ?? query.data.placeName ?? '',
+      // API가 규칙을 안 주면 빈 배열 — 목업 규칙('풋살화 착용' 등)을 남의 매치에
+      // 붙이지 않는다. 렌더 쪽(matches-page.tsx)이 `.length` 로 섹션을 숨긴다.
+      rules: query.data.rulesText ? [query.data.rulesText] : [],
+      editHref: viewerState === 'host' ? `/matches/${matchId}/edit` : undefined,
+      applicationsHref: viewerState === 'host' ? `/matches/${matchId}/applications` : undefined,
+      participants: toParticipants(
+        query.data,
+        viewerState === 'host' ? `/matches/${matchId}/applications` : undefined,
+      ),
+    },
+    mode: toDetailMode(viewerState, getStatus(query.data)),
+    reviewAction: buildMatchReviewAction(matchId, viewerState, getStatus(query.data)),
+    applyLabel: seeding ? '불러오는 중' : applyLabel(viewerState, getStatus(query.data), eligibility.data?.eligible, eligibility.data?.message),
+    applyPending: seeding || applyMatch.isPending || withdrawMatch.isPending,
+    statusLabel: seeding ? undefined : statusLabel(viewerState, getStatus(query.data)),
+    chatLabel: chatLabel(viewerState),
+    chatPending: seeding || resolveChatRoom.isPending,
+    onChat: !seeding && canOpenMatchChat(viewerState)
+      ? () => resolveChatRoom.mutate(
+          { targetType: 'match', targetId: matchId },
+          { onSuccess: (room) => router.push(chatRoomHref(room.roomId, room.route)) },
+        )
+      : undefined,
+    onShare: () => shareMatch(query.data),
+    onNotify: () => router.push('/notifications'),
+    onApply: seeding ? undefined : getApplyAction({
+      viewerState,
+      eligible: eligibility.data?.eligible,
+      applicationId: eligibility.data?.applicationId ?? query.data.viewer?.applicationId,
+      apply: () =>
+        applyMatch.mutateAsync({ message: null }).then((result) => {
+          trackEvent('match_join_complete', { matchId, sportType: matchSportType ?? '' });
+          return result;
         }),
-      }
-    : fallback;
+      withdraw: () =>
+        withdrawMatch.mutateAsync({ reason: 'applicant_withdrawn_from_v1_web' }).then((result) => {
+          trackEvent('match_leave', { matchId });
+          return result;
+        }),
+    }),
+  };
 
   return <MatchDetailPageView model={model} />;
 }
 
 
-function toParticipants(
-  match: V1Match,
-  fallback: MatchDetailViewModel['match']['participants'],
-  manageHref?: string,
-) {
+function toParticipants(match: V1Match, manageHref?: string) {
   if (!match.participantsPreview?.length) {
     return [{
-      name: match.host?.displayName ?? fallback[0]?.name ?? '호스트',
+      // 목업 참가자('김정민' 등)를 호스트 이름 자리에 쓰지 않는다 — 실제 매치의
+      // 호스트가 다른 사람 이름으로 보이던 결함이었다.
+      name: match.host?.displayName ?? '호스트',
       meta: '호스트',
       status: '승인완료',
       href: manageHref,

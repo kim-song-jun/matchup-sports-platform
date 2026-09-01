@@ -216,6 +216,20 @@ function matchStatusBadgeLabel(mode: MatchDetailViewModel['mode'], status: Match
   return '모집 중';
 }
 
+/**
+ * 매치 상세 로딩 셸. 데이터가 오기 전 하드코딩 목업(matches.view-model.ts)을 그대로
+ * 렌더하던 자리를 대신한다 — 목업 참가자·주소·설명이 실제 매치처럼 보이던 결함을 막는다.
+ * AppChrome props 는 MatchDetailPageView 와 동일해야 데이터 도착 시 헤더가 흔들리지 않는다.
+ */
+export function MatchDetailPageSkeleton() {
+  return (
+    <AppChrome title="" activeTab="matches" bottomNav={false} topBar={false}>
+      <p className="sr-only" role="status">매치 정보를 불러오는 중이에요.</p>
+      <PageSkeleton variant="detail" />
+    </AppChrome>
+  );
+}
+
 export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) {
   const { match, mode } = model;
   const [heroMessage, setHeroMessage] = useState('');

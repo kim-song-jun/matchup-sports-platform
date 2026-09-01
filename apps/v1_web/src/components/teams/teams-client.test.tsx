@@ -483,3 +483,24 @@ describe('TeamDetailPageClient — 내 리그', () => {
     );
   });
 });
+
+describe('TeamDetailPageClient — 로딩 중 목업 노출 방지', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    teamApiMocks.useV1TeamJoinEligibility.mockReturnValue({ data: { eligible: false, joinState: 'none', message: '가입 불가' } });
+    teamApiMocks.useV1CreateTeamJoinApplication.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+    teamApiMocks.useV1WithdrawTeamJoinApplication.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+    teamApiMocks.useV1ResolveChatRoom.mockReturnValue({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false });
+    teamApiMocks.useV1TeamMatches.mockReturnValue({ data: { items: [] }, isLoading: false });
+  });
+
+  it('팀을 아직 못 받았으면 목업 팀("성수 러너스 FC")을 실제 팀처럼 보여주지 않는다', () => {
+    teamApiMocks.useV1TeamDetail.mockReturnValue({ data: undefined, isError: false });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    // 목업 팀(teams.view-model.ts)의 이름·지역·태그 어느 것도 화면에 닿으면 안 된다.
+    expect(screen.queryByText('성수 러너스 FC')).not.toBeInTheDocument();
+    expect(screen.queryByText('서울 성동')).not.toBeInTheDocument();
+  });
+});

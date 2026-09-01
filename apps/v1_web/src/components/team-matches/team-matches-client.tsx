@@ -30,7 +30,7 @@ import { getCurrentRedirectPath, getLoginPathForRedirect } from '@/lib/session-s
 // team-match-lineup.service.ts의 loadContext()와 완전히 동일한 규칙이라 그 규칙을 그대로
 // 재현해둔 순수 함수를 라인업 모듈에서 재사용한다(새로 만들지 않음).
 import { resolveOwnTeamId } from '@/app/team-matches/[id]/lineup/lineup.view-model';
-import { TeamMatchDetailPageView, TeamMatchListPageView, TeamMatchStatePageView } from './team-matches-page';
+import { TeamMatchDetailPageSkeleton, TeamMatchDetailPageView, TeamMatchListPageView, TeamMatchStatePageView } from './team-matches-page';
 import type { TeamMatchDetailViewModel, TeamMatchListViewModel, TeamMatchModel } from './team-matches.types';
 import {
   getTeamMatchDetailViewModel,
@@ -280,102 +280,111 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
 
   if (query.isError) return <TeamMatchStatePageView model={getTeamMatchStateViewModel('error')} />;
 
-  const model: TeamMatchDetailViewModel = query.data
-    ? {
-        ...fallback,
-        match: {
-          ...fallback.match,
-          ...toTeamMatch(query.data, fallback.match),
-          // fallback.match.description/address는 로딩 스켈레톤(fallback 전체를 그대로 보여주는
-          // 케이스)에서만 써야 하는 하드코딩 목업이다 — 실제 매치가 로드된 뒤 API가 값을 안 주면
-          // ''로 둔다. 렌더 쪽(team-matches-page.tsx)이 falsy면 이미 섹션 자체를 숨긴다
-          // (설명 카드: `{match.description ? ... : null}`, 주소: InfoRow의 `sub` optional 처리).
-          description: query.data.description ?? query.data.descriptionPreview ?? '',
-          address: query.data.place?.addressText ?? query.data.placeName ?? '',
-          hostTeamHref: query.data.hostTeam?.teamId ? `/teams/${query.data.hostTeam.teamId}` : undefined,
-          hostTeamId: query.data.hostTeam?.teamId ?? null,
-          hostTeamLogoUrl: query.data.hostTeam?.logoUrl ?? null,
-          hostTeamTrustState: query.data.hostTeam?.trustState ?? null,
-          league: query.data.league ?? null,
-          applicantActionError: actionError,
-          manageHref: canManageHostTeam ? `/team-matches/${teamMatchId}/edit` : undefined,
-          applicantTeams: toApplicantTeamsWithActions(
-            query.data,
-            applications.data,
-            canManageHostTeam ? `/team-matches/${teamMatchId}/edit` : undefined,
-            (applicationId) => {
-              setActionError(null);
-              approveApplication.mutate(
-                { applicationId },
-                { onError: (e) => setActionError(extractErrorMessage(e, '승인 처리에 실패했어요. 다시 시도해 주세요.')) },
-              );
-            },
-            (applicationId) => {
-              setActionError(null);
-              rejectApplication.mutate(
-                { applicationId },
-                { onError: (e) => setActionError(extractErrorMessage(e, '거절 처리에 실패했어요. 다시 시도해 주세요.')) },
-              );
-            },
-            approveApplication.isPending || rejectApplication.isPending,
-          ),
+  // 데이터가 오기 전에는 하드코딩 목업(`fallback`)을 화면 전체로 렌더하지 않는다 —
+  // 목업 제목·주소·참가자가 실제 값처럼 보여 사용자가 잘못 읽던 결함이었다.
+  // `fallback` 은 아래에서 필드 단위 기본값으로만 쓴다.
+  if (!query.data) {
+    return <TeamMatchDetailPageSkeleton />;
+  }
+
+  // matches-client.tsx 와 같은 처리 — 목록 캐시에서 승계한 표시용 데이터로 그리는 동안은
+  // 뷰어 상태·신청 팀 목록이 없으므로 상태 라벨과 행동 버튼을 잠근다.
+  const seeding = query.isPlaceholderData;
+
+  const model: TeamMatchDetailViewModel = {
+    ...fallback,
+    match: {
+      ...fallback.match,
+      ...toTeamMatch(query.data, fallback.match),
+      // fallback.match.description/address는 로딩 스켈레톤(fallback 전체를 그대로 보여주는
+      // 케이스)에서만 써야 하는 하드코딩 목업이다 — 실제 매치가 로드된 뒤 API가 값을 안 주면
+      // ''로 둔다. 렌더 쪽(team-matches-page.tsx)이 falsy면 이미 섹션 자체를 숨긴다
+      // (설명 카드: `{match.description ? ... : null}`, 주소: InfoRow의 `sub` optional 처리).
+      description: query.data.description ?? query.data.descriptionPreview ?? '',
+      address: query.data.place?.addressText ?? query.data.placeName ?? '',
+      hostTeamHref: query.data.hostTeam?.teamId ? `/teams/${query.data.hostTeam.teamId}` : undefined,
+      hostTeamId: query.data.hostTeam?.teamId ?? null,
+      hostTeamLogoUrl: query.data.hostTeam?.logoUrl ?? null,
+      hostTeamTrustState: query.data.hostTeam?.trustState ?? null,
+      league: query.data.league ?? null,
+      applicantActionError: actionError,
+      manageHref: canManageHostTeam ? `/team-matches/${teamMatchId}/edit` : undefined,
+      applicantTeams: toApplicantTeamsWithActions(
+        query.data,
+        applications.data,
+        canManageHostTeam ? `/team-matches/${teamMatchId}/edit` : undefined,
+        (applicationId) => {
+          setActionError(null);
+          approveApplication.mutate(
+            { applicationId },
+            { onError: (e) => setActionError(extractErrorMessage(e, '승인 처리에 실패했어요. 다시 시도해 주세요.')) },
+          );
         },
-        mode: toDetailMode(viewerState, getStatus(query.data)),
-        applyLabel: applyLabel(viewerState, getStatus(query.data), selectedEligibility, isGuest, hasNoTeam, eligibility.isSuccess),
-        applyPending: applyTeamMatch.isPending || withdrawTeamMatch.isPending,
-        hostActions: canManageHostTeam
-          ? buildHostActions({
-              status: getStatus(query.data),
-              // 리그 대진은 서버가 팀 단독 취소를 409 LEAGUE_FIXTURE_HOST_CANCEL_FORBIDDEN 으로
-              // 거부한다(team-matches.service.ts cancel()) — 눌러서 실패를 봐야만 알 수 있게
-              // 두지 않고 애초에 버튼을 노출하지 않는다.
-              isLeagueFixture: Boolean(query.data.league),
-              closeTeamMatch: () => closeTeamMatch.mutateAsync({ reason: 'host_closed_from_v1_web' }),
-              reopenTeamMatch: () => reopenTeamMatch.mutateAsync({ reason: 'host_reopened_from_v1_web' }),
-              cancelTeamMatch: () => cancelTeamMatch.mutateAsync({ reason: 'host_cancelled_from_v1_web' }),
-              pending: closeTeamMatch.isPending || reopenTeamMatch.isPending || cancelTeamMatch.isPending,
-            })
-          : undefined,
-        resultAction: buildResultAction(teamMatchId, getStatus(query.data), canManageHostTeam, canManageOpponentTeam),
-        reviewAction: buildReviewAction(teamMatchId, getStatus(query.data), isParticipantMember),
-        statusLabel: statusLabel(viewerState, getStatus(query.data)),
-        chatLabel: chatLabel(canManageHostTeam, canManageOpponentTeam),
-        chatPending: resolveChatRoom.isPending,
-        chatError,
-        onChat: canOpenTeamMatchChat(canManageHostTeam, canManageOpponentTeam)
-          ? () => {
-              setChatError(null);
-              resolveChatRoom.mutate(
-                { targetType: 'team_match', targetId: teamMatchId },
-                {
-                  onSuccess: (room) => router.push(chatRoomHref(room.roomId, room.route)),
-                  onError: (e) => setChatError(extractErrorMessage(e, '채팅방을 열지 못했어요. 다시 시도해 주세요.')),
-                },
-              );
-            }
-          : undefined,
-        onShare: () => shareTeamMatch(query.data),
-        onNotify: () => router.push('/notifications'),
-        lineupHref: ownTeamId ? `/team-matches/${teamMatchId}/lineup` : undefined,
-        onApply: getApplyAction({
-          viewerState,
+        (applicationId) => {
+          setActionError(null);
+          rejectApplication.mutate(
+            { applicationId },
+            { onError: (e) => setActionError(extractErrorMessage(e, '거절 처리에 실패했어요. 다시 시도해 주세요.')) },
+          );
+        },
+        approveApplication.isPending || rejectApplication.isPending,
+      ),
+    },
+    mode: toDetailMode(viewerState, getStatus(query.data)),
+    applyLabel: seeding ? '불러오는 중' : applyLabel(viewerState, getStatus(query.data), selectedEligibility, isGuest, hasNoTeam, eligibility.isSuccess),
+    applyPending: seeding || applyTeamMatch.isPending || withdrawTeamMatch.isPending,
+    hostActions: !seeding && canManageHostTeam
+      ? buildHostActions({
           status: getStatus(query.data),
-          selectedTeamId: selectedEligibility?.teamId,
-          applicationId: selectedEligibility?.applicationId,
-          eligible: selectedEligibility?.eligible,
-          isGuest,
-          hasNoTeam,
-          apply: (teamId) =>
-            applyTeamMatch.mutateAsync({ applicantTeamId: teamId, message: null }).then((result) => {
-              trackEvent('team_match_apply_complete', { teamMatchId });
-              return result;
-            }),
-          withdraw: () => withdrawTeamMatch.mutateAsync({ reason: 'applicant_team_withdrawn_from_v1_web' }),
-          reasonCode: selectedEligibility?.reasonCode,
-          redirectTo: (href) => router.push(href),
+          // 리그 대진은 서버가 팀 단독 취소를 409 LEAGUE_FIXTURE_HOST_CANCEL_FORBIDDEN 으로
+          // 거부한다(team-matches.service.ts cancel()) — 눌러서 실패를 봐야만 알 수 있게
+          // 두지 않고 애초에 버튼을 노출하지 않는다.
+          isLeagueFixture: Boolean(query.data.league),
+          closeTeamMatch: () => closeTeamMatch.mutateAsync({ reason: 'host_closed_from_v1_web' }),
+          reopenTeamMatch: () => reopenTeamMatch.mutateAsync({ reason: 'host_reopened_from_v1_web' }),
+          cancelTeamMatch: () => cancelTeamMatch.mutateAsync({ reason: 'host_cancelled_from_v1_web' }),
+          pending: closeTeamMatch.isPending || reopenTeamMatch.isPending || cancelTeamMatch.isPending,
+        })
+      : undefined,
+    resultAction: seeding ? undefined : buildResultAction(teamMatchId, getStatus(query.data), canManageHostTeam, canManageOpponentTeam),
+    reviewAction: buildReviewAction(teamMatchId, getStatus(query.data), isParticipantMember),
+    statusLabel: seeding ? undefined : statusLabel(viewerState, getStatus(query.data)),
+    chatLabel: chatLabel(canManageHostTeam, canManageOpponentTeam),
+    chatPending: seeding || resolveChatRoom.isPending,
+    chatError,
+    onChat: !seeding && canOpenTeamMatchChat(canManageHostTeam, canManageOpponentTeam)
+      ? () => {
+          setChatError(null);
+          resolveChatRoom.mutate(
+            { targetType: 'team_match', targetId: teamMatchId },
+            {
+              onSuccess: (room) => router.push(chatRoomHref(room.roomId, room.route)),
+              onError: (e) => setChatError(extractErrorMessage(e, '채팅방을 열지 못했어요. 다시 시도해 주세요.')),
+            },
+          );
+        }
+      : undefined,
+    onShare: () => shareTeamMatch(query.data),
+    onNotify: () => router.push('/notifications'),
+    lineupHref: ownTeamId ? `/team-matches/${teamMatchId}/lineup` : undefined,
+    onApply: seeding ? undefined : getApplyAction({
+      viewerState,
+      status: getStatus(query.data),
+      selectedTeamId: selectedEligibility?.teamId,
+      applicationId: selectedEligibility?.applicationId,
+      eligible: selectedEligibility?.eligible,
+      isGuest,
+      hasNoTeam,
+      apply: (teamId) =>
+        applyTeamMatch.mutateAsync({ applicantTeamId: teamId, message: null }).then((result) => {
+          trackEvent('team_match_apply_complete', { teamMatchId });
+          return result;
         }),
-      }
-    : fallback;
+      withdraw: () => withdrawTeamMatch.mutateAsync({ reason: 'applicant_team_withdrawn_from_v1_web' }),
+      reasonCode: selectedEligibility?.reasonCode,
+      redirectTo: (href) => router.push(href),
+    }),
+  };
 
   return <TeamMatchDetailPageView model={model} />;
 }

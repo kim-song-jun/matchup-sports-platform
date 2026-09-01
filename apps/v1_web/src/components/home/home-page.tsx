@@ -103,27 +103,37 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
             <div className="tm-home-stats">
               <div>
                 <div className="tm-text-micro" style={{ color: 'var(--text-muted)' }}>이번 달 활동</div>
-                <NumberDisplay
-                  value={dash ? '-' : model.stats.monthlyActivity}
-                  unit={dash ? '' : '경기'}
-                  size={24}
-                  sub={dash ? undefined : model.stats.monthlyActivitySub}
-                />
+                {/* 로딩 중엔 '-'(값이 없다는 뜻)와 구분되게 스켈레톤을 그린다 — 레이블은
+                    그대로 둬서 데이터가 도착해도 줄 높이가 바뀌지 않는다. */}
+                {model.statsLoading ? (
+                  <StatValueSkeleton />
+                ) : (
+                  <NumberDisplay
+                    value={dash ? '-' : model.stats.monthlyActivity}
+                    unit={dash ? '' : '경기'}
+                    size={24}
+                    sub={dash ? undefined : model.stats.monthlyActivitySub}
+                  />
+                )}
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div className="tm-text-micro" style={{ color: 'var(--text-muted)' }}>매너 점수</div>
-                <NumberDisplay
-                  value={dash ? '-' : model.stats.mannerScore}
-                  /* 점수 없을 때(빈 sentinel '-')는 '점' 단위 숨김 → "- 점" 어색함 방지 */
-                  unit={dash || model.stats.mannerScore === '-' ? '' : '점'}
-                  size={24}
-                  sub={
-                    /* '-' 단독 문자는 의미 없으므로 리뷰 누적 안내로 대체. */
-                    dash || model.stats.mannerScoreSub === '-'
-                      ? '경기 후 리뷰가 쌓이면 보여요'
-                      : model.stats.mannerScoreSub
-                  }
-                />
+                {model.statsLoading ? (
+                  <StatValueSkeleton align="right" />
+                ) : (
+                  <NumberDisplay
+                    value={dash ? '-' : model.stats.mannerScore}
+                    /* 점수 없을 때(빈 sentinel '-')는 '점' 단위 숨김 → "- 점" 어색함 방지 */
+                    unit={dash || model.stats.mannerScore === '-' ? '' : '점'}
+                    size={24}
+                    sub={
+                      /* '-' 단독 문자는 의미 없으므로 리뷰 누적 안내로 대체. */
+                      dash || model.stats.mannerScoreSub === '-'
+                        ? '경기 후 리뷰가 쌓이면 보여요'
+                        : model.stats.mannerScoreSub
+                    }
+                  />
+                )}
               </div>
             </div>
           </div>
@@ -255,6 +265,28 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
       </div>{/* /tm-home-desktop */}
       </AppChrome>
     </>
+  );
+}
+
+/**
+ * 홈 통계 값 자리의 로딩 스켈레톤. NumberDisplay(size 24 + sub 한 줄)와 같은 세로 공간을
+ * 차지해, 값이 도착해도 인사말 블록의 높이가 바뀌지 않는다.
+ */
+function StatValueSkeleton({ align = 'left' }: { align?: 'left' | 'right' }) {
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: align === 'right' ? 'flex-end' : 'flex-start',
+        gap: 6,
+        marginTop: 4,
+      }}
+    >
+      <div className="tm-skeleton" style={{ width: 64, height: 24, borderRadius: 'var(--radius-chip)' }} />
+      <div className="tm-skeleton" style={{ width: 92, height: 12, borderRadius: 'var(--radius-tight)' }} />
+    </div>
   );
 }
 

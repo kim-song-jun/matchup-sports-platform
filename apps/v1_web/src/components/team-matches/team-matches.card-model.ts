@@ -55,9 +55,9 @@ export function toTeamMatch(match: V1TeamMatch, fallback: TeamMatchModel): TeamM
     // 숫자 통계는 API 어디에도 없다 — `...fallback` 스프레드에 맡겨두면 매치마다 다른 실제 팀인데도
     // 항상 같은 목업(매너 4.8·승 23 등)이 그대로 노출됐다(실사고 원인). 0으로 채우는 것도
     // "매너 0점·0승"이라는 새 거짓말이라(실제로 잘하는 팀이 최악으로 보인다) null 로 두고
-    // 화면이 그 줄을 감춘다 — 값이 생기면(백엔드가 팀 통계를 내려주면) 그때 다시 채우면 된다.
-    manner: null,
-    wins: null,
+    // 화면이 그 줄을 감춘다. 백엔드가 내려주는 실제 공개 통계만 표시한다.
+    manner: match.hostTeam?.mannerScore ?? null,
+    wins: match.hostTeam?.wins ?? null,
     status,
   };
 }

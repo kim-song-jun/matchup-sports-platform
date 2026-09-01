@@ -63,7 +63,10 @@ type TeamMatchWithRelations = V1TeamMatch & {
     ownerUserId: string;
     status: string;
     profile: { logoUrl: string | null } | null;
-    trustScore: { trustState: 'verified' | 'estimated' | 'sample' | 'none' } | null;
+    trustScore: {
+      trustState: 'verified' | 'estimated' | 'sample' | 'none';
+      mannerScore: Prisma.Decimal | number | null;
+    } | null;
     memberships: Array<{ id: string; userId: string; role: 'owner' | 'manager' | 'member'; status: string }>;
   };
   approvedApplicantTeam: {
@@ -126,20 +129,31 @@ export class TeamMatchesService {
     // 캐시(V1TeamTrustScore)는 72시간 경과만으로는 안 갱신될 수 있으므로 이 페이지에 등장하는
     // hostTeam들의 신뢰점수를 배치 1회 호출로 live 재계산해 덮어쓴다 (N+1 방지, computeRevealedTeamTrustBatch 참조).
     const hostTeamIds = [...new Set(pageItems.map((teamMatch) => teamMatch.hostTeamId))];
-    const trustByHostTeam = await computeRevealedTeamTrustBatch(this.prisma, hostTeamIds);
+    const [trustByHostTeam, winsByHostTeam] = await Promise.all([
+      computeRevealedTeamTrustBatch(this.prisma, hostTeamIds),
+      this.loadOfficialWinCounts(hostTeamIds),
+    ]);
     for (const teamMatch of pageItems) {
       const trust = trustByHostTeam.get(teamMatch.hostTeamId);
-      teamMatch.hostTeam.trustScore = trust ? { trustState: trust.trustState } : null;
+      teamMatch.hostTeam.trustScore = trust
+        ? {
+            trustState: trust.trustState,
+            mannerScore: trust.mannerScore == null ? null : new Prisma.Decimal(trust.mannerScore),
+          }
+        : null;
     }
 
     return {
-      items: pageItems.map((teamMatch) => this.toListItem(teamMatch, user)),
+      items: pageItems.map((teamMatch) =>
+        this.toListItem(teamMatch, user, winsByHostTeam.get(teamMatch.hostTeamId) ?? 0),
+      ),
       pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
     };
   }
 
   async detail(user: V1AuthUser | null, teamMatchId: string) {
     const teamMatch = await this.getPublicTeamMatch(teamMatchId, user, { includeTrust: true });
+    const winsByHostTeam = await this.loadOfficialWinCounts([teamMatch.hostTeamId]);
     const viewer = await this.getViewer(teamMatch, user);
     const approvedApplication = teamMatch.applications.find((item) => item.status === 'approved');
     // U3: 리그 대진일 때만 이의 제기 자격을 계산한다 -- 일반 팀 매치는 이 개념 자체가
@@ -185,6 +199,11 @@ export class TeamMatchesService {
         name: teamMatch.hostTeam.name,
         logoUrl: teamMatch.hostTeam.profile?.logoUrl ?? null,
         trustState: teamMatch.hostTeam.trustScore?.trustState ?? 'none',
+        mannerScore:
+          teamMatch.hostTeam.trustScore?.mannerScore == null
+            ? null
+            : Number(teamMatch.hostTeam.trustScore.mannerScore),
+        wins: winsByHostTeam.get(teamMatch.hostTeamId) ?? 0,
         ownerUserId: teamMatch.hostTeam.ownerUserId,
       },
       approvedOpponentTeam:
@@ -1301,7 +1320,7 @@ export class TeamMatchesService {
           ownerUserId: true,
           status: true,
           profile: { select: { logoUrl: true } },
-          trustScore: { select: { trustState: true } },
+          trustScore: { select: { trustState: true, mannerScore: true } },
           memberships: user
             ? { where: { userId: user.id, status: 'active' }, select: { id: true, userId: true, role: true, status: true } }
             : false,
@@ -1337,7 +1356,7 @@ export class TeamMatchesService {
     } satisfies Prisma.V1TeamMatchInclude;
   }
 
-  private toListItem(teamMatch: TeamMatchWithRelations, user: V1AuthUser | null) {
+  private toListItem(teamMatch: TeamMatchWithRelations, user: V1AuthUser | null, wins: number) {
     return {
       teamMatchId: teamMatch.id,
       title: teamMatch.title,
@@ -1355,6 +1374,11 @@ export class TeamMatchesService {
         name: teamMatch.hostTeam.name,
         logoUrl: teamMatch.hostTeam.profile?.logoUrl ?? null,
         trustState: teamMatch.hostTeam.trustScore?.trustState ?? 'none',
+        mannerScore:
+          teamMatch.hostTeam.trustScore?.mannerScore == null
+            ? null
+            : Number(teamMatch.hostTeam.trustScore.mannerScore),
+        wins,
       },
       costNote: teamMatch.costNote,
       league: teamMatch.league ? { leagueId: teamMatch.league.id, title: teamMatch.league.title } : null,
@@ -1387,12 +1411,34 @@ export class TeamMatchesService {
     if (options.includeTrust) {
       const trustByHostTeam = await computeRevealedTeamTrustBatch(this.prisma, [teamMatch.hostTeamId]);
       const trust = trustByHostTeam.get(teamMatch.hostTeamId);
-      teamMatch.hostTeam.trustScore = trust ? { trustState: trust.trustState } : null;
+      teamMatch.hostTeam.trustScore = trust
+        ? {
+            trustState: trust.trustState,
+            mannerScore: trust.mannerScore == null ? null : new Prisma.Decimal(trust.mannerScore),
+          }
+        : null;
     } else {
       teamMatch.hostTeam.trustScore = null;
     }
 
     return teamMatch;
+  }
+
+  private async loadOfficialWinCounts(teamIds: string[]): Promise<Map<string, number>> {
+    if (teamIds.length === 0) return new Map();
+
+    const rows = await this.prisma.$queryRaw<Array<{ teamId: string; wins: bigint }>>(Prisma.sql`
+      SELECT trf.team_id AS "teamId", COUNT(*)::bigint AS wins
+      FROM v1_team_record_facts trf
+      INNER JOIN v1_games game
+        ON game.id = trf.game_id
+       AND game.current_official_revision_id = trf.revision_id
+      WHERE trf.team_id IN (${Prisma.join(teamIds)})
+        AND trf.result = 'WON'
+      GROUP BY trf.team_id
+    `);
+
+    return new Map((rows ?? []).map((row) => [row.teamId, Number(row.wins)]));
   }
 
   /**

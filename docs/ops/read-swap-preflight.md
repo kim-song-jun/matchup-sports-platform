@@ -851,22 +851,27 @@ API 가 주는 `round` 는 **두 하드코딩 중 하나를 고르게 할 뿐**�
 > ⚠️ 첫 실행에서 3건이 실패했는데 프로브가 `...over` 를 빠뜨린 **vacuous 테스트**였다.
 > 실패가 안 났으면 틀린 결론을 문서에 적을 뻔했다 — 오버라이드가 실제로 먹었는지 먼저 본다.
 
-### 11-2. `registrationId` — 선례가 **teamId 를 담지 말라**고 못박았다
+### 11-2. `registrationId` — **선례가 둘이고 서로 반대다.** 어느 필드인지로 갈린다
 
-`getOverallStandings` 의 거울 분기가 같은 문제를 이미 겪었고, 결론은 **담지 않는 것**이었다:
+처음 이 절을 쓸 때 선례를 **하나만** 보고 *"담지 않는 것이 이 저장소의 규약"* 이라고 적었다.
+**틀렸다.** 같은 저장소에 정반대 선례가 있고, 하필 **이 작업이 고칠 바로 그 파일**에 있다.
 
-> `registrationId` — 리그엔 참가 등록 개념이 없어 **생략하고 `teamId` 를 싣는다.** teamId 를
-> `registrationId` 라는 이름에 담으면 값은 전달되지만 **이름이 내용과 갈린 상태**가 남고,
-> 나중에 그 값으로 등록을 조회하는 코드가 생기는 순간 터진다.
-> — `tournaments-read.service.ts` `leagueOverallStandings` 주석
+| 자리 | 결정 | 근거(코드 주석 원문) |
+|---|---|---|
+| `PublicSideSummary`<br>(`home`/`away`) | **`teamId` 를 담는다** | *"리그 대진은 등록(registration) 개념이 없다 — teamId 를 그대로 안정적 id 로 쓴다"*<br>`public-tournament-records.service.ts` `getLeagueFixtureRecord` |
+| 통합 순위 행 | **담지 않는다** | *"teamId 를 `registrationId` 라는 이름에 담으면 값은 전달되지만 이름이 내용과 갈린 상태가 남고, 나중에 그 값으로 등록을 조회하는 코드가 생기는 순간 터진다"*<br>`tournaments-read.service.ts` `leagueOverallStandings` |
 
-프론트는 `#896` 에서 `V1LeagueOverallStandingRow` 를 유니온으로 넓혀 받았다
-(`registrationId`(대회) / `teamId`(리그) 중 하나는 반드시 있고, 행 key 는 `registrationId ?? teamId`).
+**둘 다 옳다 — 묻는 것이 다르기 때문이다.** `PublicSideSummary` 의 `registrationId` 는 소비처에서
+**행을 식별하는 안정 id** 로만 쓰이고(그래서 teamId 를 넣어도 이름과 내용이 갈리지 않는다),
+순위 행의 그것은 **나중에 등록을 조회할 값**으로 읽힐 수 있다(그래서 갈린다).
 
-**일정 응답의 `PublicStandingRow.registrationId` 도 같은 자리다** — 다만 이 소비처의 주석은
-그 필드의 역할을 *"teamId 가 null 이어도 행마다 고유한 키"* 라고 적고 있어 판단이 갈릴 수 있다.
-**같은 저장소에서 두 응답이 반대로 가면 안 되므로 `#896` 선례를 따른다** — 프론트 타입을
-같은 모양으로 넓히는 변경이 함께 필요하다.
+**그래서 이 작업의 결론:**
+- `items[].home` / `items[].away` → **`teamId` 를 담는다.** 같은 파일의 기존 리그 경로와 같은 모양.
+- `standings[].registrationId` → 순위 쪽 선례를 따른다. 프론트가 `#896` 처럼 유니온을 받아야 하고,
+  그 프론트 변경이 함께 필요하다. `schedule-content.tsx:503` 이 그 값을 React key 로 쓴다.
+
+> **교훈:** 선례를 인용할 때 **하나를 찾고 멈추지 않는다.** 반대 선례가 있는지 먼저 세고,
+> 있으면 *"어느 쪽이 맞나"* 가 아니라 **"둘은 어떤 질문에 답하고 있나"** 로 가른다.
 
 ### 11-3. 23필드 대응표 — 세 번째 칸이 지뢰를 잡는다
 
@@ -876,14 +881,25 @@ API 가 주는 `round` 는 **두 하드코딩 중 하나를 고르게 할 뿐**�
 | `scheduledAt` / `venue` | ✅ | `startAt` / `placeName` | 일시·장소 |
 | `home` / `away` | ✅ | 팀 조인 | ⚠️ **`teamName` 절대 null 금지** — 아래 참조 |
 | `status` · `score` · `clock` · `resultState` · `scoreStatus` · `periodBreak` · `outcome` | ✅ | game 기반(대회와 같은 소스) | 상태·점수·시계 |
-| `round` | ⚠️ 라운드로빈 | **비울 수 없다**(11-1) | 단계 분류 + 그룹 제목 폴백 |
+| `round` | ⚠️ 라운드로빈 | **`'N주차'`** — 기존 규약(아래) | 단계 분류 + **그룹 제목**(groupName 이 null 이므로) |
 | `groupId` | ⚠️ 다조 리그 존재 | standings 에선 **string 필수** | `groups.get(row.groupId)` Map 키 |
-| `groupName` | ⚠️ | `tierLabel`(55/88) + 폴백 | 순위표 섹션 제목 |
+| `groupName` | ⚠️ | **items 는 `null`** — 기존 규약<br>standings 는 `tierLabel`(55/88) + 폴백 | items: round 가 대신 보인다<br>standings: 섹션 제목 |
 | `fixtureNumber` / `legNumber` | ❌ | 순번 / `1` | 정렬 · 차전 표시 |
 | `fieldId` / `fieldName` | ❌ | `null` | 구장 표시 |
 | `scorers` / `cards` | ⚠️ 신원 연동 없음 | `[]` | "기록 없음" |
 | `hasVideo` | ⚠️ | `false` | 영상 배지 없음 |
 | `registrationId` | ❌ | **11-2 참조** | 순위표 React key |
+
+> **`round`·`groupName` 은 새로 정하지 않는다 — 이 파일에 이미 규약이 있다.**
+> `getLeagueFixtureRecord`(같은 서비스)가 리그 경기 공개 기록을 낼 때 이미
+> `round: \`${weekNumber}주차\`` · `groupName: null` 을 쓴다(`resolveLeagueWeekNumber` 재사용).
+> 주석도 같은 말을 한다 — *"헤더가 `groupName ?? round` 를 찍으므로 round 가 그대로 보인다"*.
+> 그 결과 **주차별로 묶인 일정**이 되는데, 리그에 자연스러운 구획이다. 새 어휘를 발명하면
+> 같은 리그가 화면마다 다른 말로 불린다.
+>
+> 팀명도 마찬가지다 — `hostTeam` / `approvedApplicantTeam` 관계로 직접 읽는다
+> (`league.teams` 맵을 새로 만들 필요가 없다). 같은 주석이 **리그는 참가팀을 가리지 않는다**
+> 고 못박고 있어 `hideIdentity` 분기 자체가 리그엔 없다.
 
 **`teamName` 을 null 로 두면 안 되는 이유**(`schedule-content.tsx:736`):
 

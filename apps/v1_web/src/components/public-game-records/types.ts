@@ -151,12 +151,9 @@ export interface PublicMatchOutcome {
 }
 
 /** teamId/teamName/teamLogoUrl 비공개 규칙은 PublicSideSummary와 동일. */
-export interface PublicStandingRow {
+interface PublicStandingRowBase {
   readonly groupId: string;
   readonly groupName: string;
-  /** 참가팀 공개 정책 통일(fix/v1-publish) — teamId가 null이어도 행마다 고유한 키. */
-  readonly registrationId: string;
-  readonly teamId: string | null;
   readonly teamName: string | null;
   readonly teamLogoUrl: string | null;
   readonly position: number;
@@ -167,6 +164,29 @@ export interface PublicStandingRow {
   readonly goalsFor: number;
   readonly goalsAgainst: number;
 }
+
+/** 대회 순위 행. `teamId` 는 참가팀 비공개 상태에서 null 이 되므로 행 식별자가 따로 필요하다. */
+export interface PublicTournamentStandingRow extends PublicStandingRowBase {
+  /** 참가팀 공개 정책 통일(fix/v1-publish) — teamId가 null이어도 행마다 고유한 키. */
+  readonly registrationId: string;
+  readonly teamId: string | null;
+}
+
+/**
+ * 정규 리그 순위 행. **`registrationId` 가 없다** — 리그엔 참가 등록 개념이 자체가 없어서,
+ * 서버가 teamId 를 그 이름에 담는 대신 아예 싣지 않는다(`leagueOverallStandings` 선례:
+ * *"이름이 내용과 갈린 상태"* 를 만들지 않는다).
+ *
+ * 그래서 행 key 는 `teamId` 인데, 대회에서 teamId 를 key 로 못 쓰던 이유가 **"비공개 상태에도"**
+ * 였다는 점이 중요하다 — **리그는 참가팀을 가리지 않으므로 그 전제가 성립하지 않는다.**
+ * 한 팀은 순위표에 한 번만 나오므로 teamId 가 유일하고 non-null 이다.
+ */
+export interface PublicLeagueStandingRow extends PublicStandingRowBase {
+  readonly registrationId?: undefined;
+  readonly teamId: string;
+}
+
+export type PublicStandingRow = PublicTournamentStandingRow | PublicLeagueStandingRow;
 
 export interface PublicTournamentScheduleResponse {
   readonly tournamentId: string;

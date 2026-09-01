@@ -24,10 +24,6 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   const tournament = await fetchPublicV1<V1TournamentDetail>(`/tournaments/${encodeURIComponent(id)}`);
   if (!tournament) return buildNoIndexMetadata('대회 일정을 찾을 수 없어요');
-  // **정규 리그는 이 페이지에 오면 안 된다** — 아래 게이트가 `notFound()` 를 부르지만,
-  // 이 라우트는 그때도 **HTTP 200** 을 반환한다(아래 quirk 주석). 상태코드로 못 막으니
-  // **색인만이라도 확실히 막는다.** notFound 경로의 메타데이터 동작에 기대지 않고 직접 준다.
-  if (tournament.kind === 'regular_league') return buildNoIndexMetadata('대회 일정을 찾을 수 없어요');
   return buildPublicMetadata({
     title: `${tournament.title} 경기 일정`,
     description: `${tournament.title}의 경기 일정과 조별 순위를 확인하세요.`,
@@ -46,37 +42,15 @@ export default async function TournamentSchedulePage({
   const tournament = await fetchPublicV1<V1TournamentDetail>(`/tournaments/${encodeURIComponent(id)}`);
   if (!tournament) notFound();
 
-  /**
-   * **정규 리그는 막는다 — 이 페이지가 리그에서 "색인 가능한 에러 화면"이 됐다.**
-   *
-   * `/tournaments/:id` 가 리그를 허용하도록 넓어지면서(통합 축) 리그가 이 게이트를 통과하는데,
-   * 클라이언트가 부르는 `/tournaments/:id/schedule` 은 **리그에서 404** 다. 그래서:
-   * ```
-   * 리그   HTTP 200 · "경기 정보를 찾을 수 없어요" · noindex 없음   ← 색인 가능한 에러 페이지
-   * 대회   HTTP 200 · 일정·조별 순위 정상                          ← 대조군
-   * ```
-   * (2026-09-01 alpha 실측, 배포 창 밖. 대회 대조군이 정상이라 배포 탓이 아니다.)
-   *
-   * ## `isLeagueCompetition` 을 쓰지 않는다
-   * 그 헬퍼는 `format === 'league'` 인 **리그 방식 대회**도 true 로 준다 — 그건 진짜 대회고
-   * 이 페이지가 정상 동작한다. 2026-09-01 alpha 실측:
-   * ```
-   * 대회 62건의 format 분포   group_knockout 50 · **league 7** · knockout 5
-   * 표본 5bb5b6bb            kind=regular_tournament · format=league · /schedule 200 정상 렌더
-   * ```
-   * **`isLeagueCompetition` 으로 막으면 그 7건이 함께 막힌다.** 여기서 묻는 것은 *"무엇인가"*
-   * 이므로 `kind` 만 본다.
-   *
-   * ⚠️ 근거를 **필드와 숫자**로 적는다 — 표본의 제목에 "리그" 가 들어 있기도 한데, 그건 우연히
-   * 참인 근거라 다음 사람이 **판정 기준을 제목으로 오해**할 수 있다.
-   *
-   * ## 상태코드는 못 고친다 — 색인만 막는다
-   * 이 라우트는 `notFound()` 를 불러도 **200** 을 반환한다(아래 quirk). 2026-09-01 재측정에서도
-   * 없는 id 로 `/schedule` 200 · 형제 `/bracket`·`/results` 404 로 **여전히 살아 있다** — 위
-   * 주석의 `next/dynamic` lazy-load 시도가 해소하지 못했다는 뜻이다. 그래도 not-found UI 와
-   * noindex 는 걸리므로 **색인 위험은 닫힌다**, 그게 이 수정의 목표다.
-   */
-  if (tournament.kind === 'regular_league') notFound();
 
-  return <SchedulePageClient tournamentId={id} />;
+  // **정규 리그도 이 화면을 쓴다.** 한동안 여기서 `notFound()` 로 막았는데, 그건 결함을
+  // 가린 것이었다 — 리그가 `/tournaments/:id` 통합 축을 통과하는데 클라이언트가 부르는
+  // `/tournaments/:id/schedule` 만 404 라 화면이 "경기 정보를 찾을 수 없어요" 로 끝났다.
+  // 그 API 가 리그를 응답하도록 고쳐졌으므로(`public-tournament-records.service.ts` 의
+  // `leagueSchedule`) 막을 이유가 사라졌다.
+  //
+  // `isLeague` 는 단계 이름(칩·aria-label)과 선수 기록 섹션 노출만 가른다.
+  // ⚠️ `kind` 로만 판정한다 — `isLeagueCompetition` 은 `format === 'league'` 인 **리그 방식
+  // 대회**도 true 라(alpha 62건 중 7건) 그 대회들의 어휘까지 바꿔 버린다.
+  return <SchedulePageClient tournamentId={id} isLeague={tournament.kind === 'regular_league'} />;
 }

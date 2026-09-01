@@ -127,6 +127,43 @@ function fullTournamentRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/**
+ * 상태 조건의 `OR` 절을 찾는다 — **위치가 아니라 모양으로** 찾는다.
+ *
+ * 조건이 `findTournamentOnSurface` 의 종류 조건과 `AND` 로 겹겹이 묶이므로 인덱스로 집으면
+ * 헬퍼가 절을 하나 더 붙이는 날 조용히 깨진다. 실제로 이 스펙이 그렇게 한 번 깨졌다.
+ */
+function findStatusOr(node: unknown): Array<Record<string, unknown>> | null {
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      const found = findStatusOr(item);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (node !== null && typeof node === 'object') {
+    const obj = node as Record<string, unknown>;
+    if (Array.isArray(obj.OR) && obj.OR.some((c) => c !== null && typeof c === 'object' && 'status' in c)) {
+      return obj.OR as Array<Record<string, unknown>>;
+    }
+    for (const value of Object.values(obj)) {
+      const found = findStatusOr(value);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+/** 조건에 등장하는 모든 상태값. `{in: [...]}` 와 `'draft'` 두 모양을 다 편다. */
+function statusesIn(or: Array<Record<string, unknown>>): string[] {
+  return or.flatMap((clause) => {
+    const status = clause.status;
+    if (typeof status === 'string') return [status];
+    const inList = (status as { in?: string[] } | undefined)?.in;
+    return inList ?? [];
+  });
+}
+
 describe('TournamentsReadService', () => {
   let service: TournamentsReadService;
   let prisma: {
@@ -208,18 +245,38 @@ describe('TournamentsReadService', () => {
     expect(result.pageInfo).toMatchObject({ hasNext: false, nextCursor: null });
   });
 
-  it('list: excludes draft/cancelled via where clause passed to Prisma', async () => {
+  /**
+   * **계약이 바뀌었다(2026-09-01 사용자 확정 A안).** 예전엔 `draft` 를 종류와 무관하게 걸렀는데,
+   * 정규 리그의 `draft` 는 **"예정"** 이고 사용자에게 보여야 하는 상태다. 대회의 `draft`
+   * (운영자 준비 중)는 **그대로 감춘다** — 그 둘을 한 조건 안에서 가른다.
+   *
+   * `cancelled` 는 **어느 쪽에도 없다.** 그건 이번 변경과 무관하고, 넓어지면 안 되는 자리다.
+   */
+  it('list: 리그의 draft 만 열고 대회의 draft·cancelled 는 계속 막는다', async () => {
     prisma.v1Tournament.findMany.mockResolvedValue([]);
 
     await service.list({});
 
     const callArgs = prisma.v1Tournament.findMany.mock.calls[0][0];
-    // status filter must include only public statuses via `in`
-    expect(callArgs.where.status).toMatchObject({
-      in: expect.arrayContaining(['open', 'closed', 'in_progress', 'completed']),
-    });
-    expect(callArgs.where.status.in).not.toContain('draft');
-    expect(callArgs.where.status.in).not.toContain('cancelled');
+    const or = findStatusOr(callArgs.where);
+    expect(or).not.toBeNull();
+
+    // 리그 절 — 이것만 draft 를 연다.
+    expect(or).toEqual(
+      expect.arrayContaining([{ kind: 'regular_league', status: 'draft' }]),
+    );
+
+    // 대회 절 — 종류 조건이 없는 쪽. 여기엔 draft 가 없어야 한다.
+    const tournamentClause = or!.find((clause) => !('kind' in clause)) as {
+      status: { in: string[] };
+    };
+    expect(tournamentClause.status.in).toEqual(
+      expect.arrayContaining(['open', 'closed', 'in_progress', 'completed']),
+    );
+    expect(tournamentClause.status.in).not.toContain('draft');
+
+    // cancelled 는 조건 전체 어디에도 없다.
+    expect(statusesIn(or!)).not.toContain('cancelled');
   });
 
   it('list: status filter narrowing is forwarded as exact string', async () => {
@@ -354,23 +411,26 @@ describe('TournamentsReadService', () => {
     });
   });
 
-  it('get: draft/cancelled filtered out at DB level (status in PUBLIC_STATUSES)', async () => {
+  it('get: 목록과 같은 조건 — 리그 draft 는 열리고 대회 draft·cancelled 는 막힌다', async () => {
     prisma.v1Tournament.findFirst.mockResolvedValue(null);
 
     await service.get('t-1').catch(() => {});
 
     const callArgs = prisma.v1Tournament.findFirst.mock.calls[0][0];
-    // `findTournamentOnSurface` 가 종류 조건과 호출부 조건을 `AND` 로 묶으므로
-    // `where.status` 가 한 겹 안으로 들어간다. 순서(AND[1])에 기대지 않고 status 를
-    // 가진 절을 찾는다 — 인덱스로 집으면 헬퍼가 절을 하나 더 붙이는 날 조용히 깨진다.
-    const statusClause = (callArgs.where.AND as Array<Record<string, unknown>>).find(
-      (clause) => 'status' in clause,
-    ) as { status: { in: string[] } };
-    expect(statusClause.status).toMatchObject({
-      in: expect.arrayContaining(['open', 'in_progress', 'completed']),
-    });
-    expect(statusClause.status.in).not.toContain('draft');
-    expect(statusClause.status.in).not.toContain('cancelled');
+    const or = findStatusOr(callArgs.where);
+    expect(or).not.toBeNull();
+
+    // **목록과 같은 조건이어야 한다.** 상세만 좁으면 목록에 뜬 카드를 눌러서 못 연다.
+    expect(or).toEqual(expect.arrayContaining([{ kind: 'regular_league', status: 'draft' }]));
+
+    const tournamentClause = or!.find((clause) => !('kind' in clause)) as {
+      status: { in: string[] };
+    };
+    expect(tournamentClause.status.in).toEqual(
+      expect.arrayContaining(['open', 'in_progress', 'completed']),
+    );
+    expect(tournamentClause.status.in).not.toContain('draft');
+    expect(statusesIn(or!)).not.toContain('cancelled');
   });
 
   it('get: public detail only includes published public announcements', async () => {

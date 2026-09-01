@@ -49,7 +49,8 @@ export function TeamMatchListPageView({ model }: { model: TeamMatchListViewModel
       </div>
       <TeamMatchSearchBar filterCount={model.filterCount} search={model.search} query={model.query} filterHref={model.filterHref} />
       <MatchTypeSegment active="team" />
-      <div className="tm-match-list">
+      {/* 결과가 0건일 때만 tm-list-empty — matches-page.tsx 와 같은 이유. */}
+      <div className={`tm-match-list${!model.isLoading && model.matches.length === 0 ? ' tm-list-empty' : ''}`}>
         <div className="tm-sport-chip-row">{model.sports.map((sport) => sport.href ? <Link key={sport.label} className={`tm-chip ${sport.active ? 'tm-chip-active' : ''}`} href={sport.href} aria-current={sport.active ? 'page' : undefined}>{sport.label} <span className="tab-num">{sport.count}</span></Link> : <button key={sport.label} className={`tm-chip ${sport.active ? 'tm-chip-active' : ''}`} type="button" aria-pressed={sport.active}>{sport.label} <span className="tab-num">{sport.count}</span></button>)}</div>
         {/* P1: 통계 숫자 tabular-nums + weight 차등 (2:1 원칙) */}
         <div className="tm-match-summary-row">
@@ -63,7 +64,7 @@ export function TeamMatchListPageView({ model }: { model: TeamMatchListViewModel
           ? <PageSkeleton />
           : model.matches.length
             ? <div className="tm-match-card-stack">{model.matches.map((match) => <TeamMatchCard key={match.id} match={match} />)}</div>
-            : <EmptyState title="조건에 맞는 팀매치가 없어요" sub="다른 종목을 선택하거나 필터를 초기화해 다시 확인해 주세요." />
+            : <EmptyState fill title="조건에 맞는 팀매치가 없어요" sub="다른 종목을 선택하거나 필터를 초기화해 다시 확인해 주세요." />
         }
         {/* 서버는 20건씩 커서로 자르는데(team-matches.service.ts) 예전엔 여기서 더 볼 방법이
             없었다(감사 결함) — league-matches-list-client.tsx와 같은 "더 보기" 누적 패턴. */}

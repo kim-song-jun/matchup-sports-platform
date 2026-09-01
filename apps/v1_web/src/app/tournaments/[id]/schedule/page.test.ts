@@ -10,7 +10,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
  *
  * ## 여기서 잡는 것과 못 잡는 것
  * ```
- * 잡는다    리그가 통과하는가 · 리그에 isLeague 가 켜져 내려가는가 · 색인 가능한가
+ * 잡는다    리그가 통과하는가 · 리그에 isRegularLeague 가 켜져 내려가는가 · 색인 가능한가
  *          리그 방식 대회(format='league')가 리그 취급되지 않는가
  * 못 잡는다  HTTP 상태코드 — 이 라우트는 notFound() 를 불러도 200 이다(프레임워크 quirk,
  *          2026-09-01 재측정에서도 없는 id 로 200 · 형제는 404). 그건 별개 문제다.
@@ -74,20 +74,20 @@ describe('일정 페이지 게이트', () => {
    * 통과만으로는 부족하다 — 리그 어휘('정규 라운드' 칩)와 선수 기록 미렌더가 이 플래그
    * 하나에 달려 있어서, 안 넘어가면 리그 화면에 대회 말이 그대로 뜬다.
    */
-  it('리그면 isLeague 를 켜서 내려보낸다 — 어휘와 선수 기록 노출이 여기 달렸다', async () => {
+  it('리그면 isRegularLeague 를 켜서 내려보낸다 — 어휘와 선수 기록 노출이 여기 달렸다', async () => {
     fetchPublicV1.mockResolvedValue(detail({ kind: 'regular_league' }));
     const { default: Page } = await load();
 
     const element = await Page({ params: Promise.resolve({ id: 'lg-1' }) });
-    expect(element.props).toMatchObject({ tournamentId: 'lg-1', isLeague: true });
+    expect(element.props).toMatchObject({ tournamentId: 'lg-1', isRegularLeague: true });
   });
 
-  it('대회에는 isLeague 를 켜지 않는다 — 대조군', async () => {
+  it('대회에는 isRegularLeague 를 켜지 않는다 — 대조군', async () => {
     fetchPublicV1.mockResolvedValue(detail());
     const { default: Page } = await load();
 
     const element = await Page({ params: Promise.resolve({ id: 't-1' }) });
-    expect(element.props).toMatchObject({ isLeague: false });
+    expect(element.props).toMatchObject({ isRegularLeague: false });
   });
 
   it('대회는 통과한다 — 대조군', async () => {
@@ -113,7 +113,7 @@ describe('일정 페이지 게이트', () => {
     expect(notFound).not.toHaveBeenCalled();
     // **여기가 핵심이다.** `isLeagueCompetition` 을 썼다면 이 값이 true 가 되어 진짜 대회
     // 7건의 '결선' 칩이 '정규 라운드' 로 바뀌고 선수 기록 섹션이 사라졌을 것이다.
-    expect(element.props).toMatchObject({ isLeague: false });
+    expect(element.props).toMatchObject({ isRegularLeague: false });
   });
 
   it('없는 대회는 그대로 막는다 — 기존 동작', async () => {

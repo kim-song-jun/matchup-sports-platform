@@ -49,8 +49,8 @@ export default async function TournamentSchedulePage({
   // 그 API 가 리그를 응답하도록 고쳐졌으므로(`public-tournament-records.service.ts` 의
   // `leagueSchedule`) 막을 이유가 사라졌다.
   //
-  // `isLeague` 는 단계 이름(칩·aria-label)과 선수 기록 섹션 노출만 가른다.
+  // `isRegularLeague` 는 단계 이름(칩·aria-label)과 선수 기록 섹션 노출만 가른다.
   // ⚠️ `kind` 로만 판정한다 — `isLeagueCompetition` 은 `format === 'league'` 인 **리그 방식
   // 대회**도 true 라(alpha 62건 중 7건) 그 대회들의 어휘까지 바꿔 버린다.
-  return <SchedulePageClient tournamentId={id} isLeague={tournament.kind === 'regular_league'} />;
+  return <SchedulePageClient tournamentId={id} isRegularLeague={tournament.kind === 'regular_league'} />;
 }

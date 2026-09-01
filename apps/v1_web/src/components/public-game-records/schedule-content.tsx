@@ -708,7 +708,7 @@ export function ScheduleContent({
   onLoadMore,
   showStandings = true,
   myFixtures,
-  isLeague = false,
+  isRegularLeague = false,
 }: {
   tournamentId: string;
   data: PublicTournamentScheduleResponse;
@@ -724,7 +724,7 @@ export function ScheduleContent({
    * `kind === 'regular_league'` 로만 켠다 — `isLeagueCompetition` 은 `format === 'league'`
    * 인 **리그 방식 대회**도 true 라(alpha 62건 중 7건) 그 대회들의 '결선' 까지 바꿔 버린다.
    */
-  isLeague?: boolean;
+  isRegularLeague?: boolean;
   /**
    * 로그인한 팀장이 이 대회에서 이끄는 팀의 경기 — 공개 일정 위에 겹쳐 "우리 팀 경기"를
    * 짚어준다. 비로그인 방문자·참가하지 않은 사용자에게는 undefined라 화면이 종전 그대로다.
@@ -769,7 +769,7 @@ export function ScheduleContent({
   // 그대로 두되(단계 칩은 일정이 잡힌 경기 기준이 자연스럽다), "내 팀" 칩은 내 경기가
   // 전부 시간 미정이어도 뜨도록 unscheduled까지 함께 본다 — 예전엔 data.items만 봐서
   // 그 경우 칩 자체가 안 떴다.
-  const phaseLabels = isLeague ? LEAGUE_PHASE_LABELS : TOURNAMENT_PHASE_LABELS;
+  const phaseLabels = isRegularLeague ? LEAGUE_PHASE_LABELS : TOURNAMENT_PHASE_LABELS;
   const phases = groupScheduleEntries(data.items, phaseLabels);
   const hasMyFixtures =
     data.items.some((entry) => myFixtureById.has(entry.fixtureId)) ||

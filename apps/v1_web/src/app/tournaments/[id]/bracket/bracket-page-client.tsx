@@ -319,11 +319,15 @@ function BracketEmpty({
  */
 export function BracketScheduleTab({
   tournamentId,
-  isLeague = false,
+  isRegularLeague = false,
 }: {
   tournamentId: string;
-  /** 정규 리그 시즌인가. 단계 어휘(칩·aria-label)만 가른다 — `ScheduleContent` 참조. */
-  isLeague?: boolean;
+  /**
+   * **정규 리그 시즌인가(`kind`)** — 이 파일의 다른 `isLeague`(`isLeagueCompetition`,
+   * `format === 'league'` 인 진짜 대회도 포함)와 **뜻이 다르다.** 이름을 갈라 둔다.
+   * 단계 어휘(칩·aria-label)만 가른다 — `ScheduleContent` 참조.
+   */
+  isRegularLeague?: boolean;
 }) {
   // schedule-page-client.tsx와 동일한 데이터 배선(usePublicTournamentSchedule 페이지
   // 합치기 + 로딩/에러 분기) — AppChrome 래핑만 없는 얇은 버전이라 별도 훅으로
@@ -359,7 +363,7 @@ export function BracketScheduleTab({
   return (
     <ScheduleContent
       tournamentId={tournamentId}
-      isLeague={isLeague}
+      isRegularLeague={isRegularLeague}
       data={combined}
       hasNextPage={hasNextPage}
       isFetchingNextPage={isFetchingNextPage}
@@ -378,6 +382,13 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
   // 정규 리그 거울 행은 format='group_knockout' 이다(백필·dual-write 가 format 을 안 쓴다).
   // 그래서 format 만 보면 ① 리그 순위 칼럼이 안 그려지고 ② 없는 대진표를 그리려 든다.
   const isLeague = isLeagueCompetition(tournament);
+  /**
+   * **위 `isLeague` 와 뜻이 다르다.** `isLeague` 는 *"리그처럼 그릴까"*(리그 방식 대회
+   * 포함)이고, 이쪽은 *"정규 리그 시즌인가"* 다. 어휘 교체는 사용자가 **정규 리그에만**
+   * 적용하라고 확정했으므로(2026-09-01) `kind` 로 묻는다 — `isLeague` 를 쓰면 리그 방식
+   * 대회 7건(alpha 실측)의 문구까지 바뀐다.
+   */
+  const isRegularLeague = tournament.kind === 'regular_league';
   const stages = buildTournamentStages(tournament);
   const [activeTab, setActiveTab] = useState<'standings' | 'schedule'>('schedule');
 
@@ -491,7 +502,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
             className="tm-seg-tab"
             onClick={() => setActiveTab('standings')}
           >
-            순위 · 대진표
+            {isRegularLeague ? '리그 순위' : '순위 · 대진표'}
           </button>
         </div>
       </div>
@@ -508,7 +519,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
               리그 방식 대회도 true 라(alpha 62건 중 7건) 그 대회들의 어휘까지 바꾼다. */}
           <BracketScheduleTab
             tournamentId={tournament.id}
-            isLeague={tournament.kind === 'regular_league'}
+            isRegularLeague={isRegularLeague}
           />
         </div>
       ) : (

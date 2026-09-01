@@ -5,4 +5,9 @@
     <string name="notification_channel_general_description">경기, 팀, 문의와 서비스 활동 알림</string>
     <string name="download_started">다운로드를 시작했어요.</string>
     <string name="download_failed">이 파일은 앱에서 안전하게 다운로드할 수 없어요.</string>
+    <string name="web_error_title">페이지를 불러오지 못했어요</string>
+    <string name="web_error_description">인터넷 연결을 확인하고 다시 시도해 주세요.</string>
+    <string name="web_error_retry">다시 시도</string>
+    <string name="file_chooser_failed">파일 선택기를 열 수 없어요.</string>
+    <string name="external_app_unavailable">연결할 앱을 열 수 없어요.</string>
 </resources>

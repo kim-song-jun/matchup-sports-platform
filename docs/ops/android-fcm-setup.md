@@ -111,6 +111,20 @@ Record the commit SHA, APK SHA-256, device model, Android version, Android Syste
 request result, and console verdict. Remote inspection availability is diagnostic evidence only; it does
 not replace the visual and notification delivery matrix below.
 
+Alpha builds also expose privacy-bounded FCM lifecycle events under the `TeameetFCM` log tag. Tokens,
+notification content, routes, and user identifiers are intentionally omitted. Clear stale logs, start
+the filtered stream, and then trigger exactly one notification:
+
+```bash
+adb logcat -c
+adb logcat -v time -s TeameetFCM:I FirebaseMessaging:I '*:S'
+```
+
+`message_received` proves delivery reached the app service, `message_suppressed` identifies a local
+permission/opt-in gate, and `notification_posted` proves the app handed a notification to Android. A
+missing `message_received` after a server-side send requires server fan-out/token investigation. The
+production flavor hard-disables these lifecycle logs.
+
 - Fresh install: allow and deny Android notification permission.
 - Logged-in registration and logout revoke.
 - Foreground, background, and terminated notification receipt.

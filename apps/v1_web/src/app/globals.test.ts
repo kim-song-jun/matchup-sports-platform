@@ -29,3 +29,26 @@ describe('Android bottom inset layout', () => {
     );
   });
 });
+
+describe('keyboard viewport layout', () => {
+  it('keeps app and auth frames on the visual viewport with a normal 100dvh fallback', () => {
+    expect(globalsCss).toMatch(
+      /\.tm-app-frame\s*\{[^}]*height:\s*var\(--teameet-visual-viewport-height,\s*100dvh\)/,
+    );
+    expect(globalsCss).toMatch(
+      /\.tm-auth-frame\s*\{[^}]*height:\s*var\(--teameet-visual-viewport-height,\s*100dvh\)/,
+    );
+  });
+
+  it('changes fixed chrome and scroll bounds only while a browser or native keyboard is open', () => {
+    expect(globalsCss).toMatch(
+      /html\.tm-keyboard-open \.tm-bottom-nav,\s*html\[data-teameet-native-keyboard="open"\] \.tm-bottom-nav\s*\{\s*display:\s*none;/,
+    );
+    expect(globalsCss).toMatch(
+      /html\.tm-keyboard-open \.tm-scroll-area,[^{]+\{[^}]*bottom:\s*0;[^}]*scroll-padding-block:/,
+    );
+    expect(globalsCss).toMatch(
+      /html\.tm-keyboard-open \.tm-modal-panel,[^{]+\{[^}]*max-height:[^}]*overflow-y:\s*auto;/,
+    );
+  });
+});

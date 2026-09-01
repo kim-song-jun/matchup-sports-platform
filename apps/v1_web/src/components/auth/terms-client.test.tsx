@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TermsClient } from './terms-client';
 
 const router = vi.hoisted(() => ({
@@ -79,6 +79,11 @@ function currentTerms(renewal = false): {
 }
 
 let currentTermsValue = currentTerms();
+let footerTermsValue: {
+  data?: { items: Array<{ code: string; title: string; subtitle: string; content: string }> };
+  isPending: boolean;
+  isError: boolean;
+} = { data: undefined, isPending: false, isError: false };
 
 const analytics = vi.hoisted(() => ({
   trackEvent: vi.fn(),
@@ -108,9 +113,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
     isError: false,
   }),
   useV1CurrentTerms: () => ({
-    data: undefined,
-    isPending: false,
-    isError: false,
+    ...footerTermsValue,
   }),
 }));
 
@@ -123,6 +126,10 @@ type SocialTermsCallbacks = {
     readonly next: { readonly route: string };
   }) => void;
 };
+
+afterEach(() => {
+  footerTermsValue = { data: undefined, isPending: false, isError: false };
+});
 
 describe('TermsClient social navigation contract', () => {
   beforeEach(() => {
@@ -242,6 +249,38 @@ describe('TermsClient GA events (email signup)', () => {
 
     expect(screen.queryByText(/새 동의 필요/)).not.toBeInTheDocument();
     expect(screen.queryByText(/동의 완료/)).not.toBeInTheDocument();
+  });
+});
+
+describe('TermsClient Android privacy disclosure', () => {
+  it('discloses FCM, coarse location, file selection, and the public deletion route', () => {
+    searchParamsValue = new URLSearchParams('document=privacy');
+    footerTermsValue = {
+      data: {
+        items: [{
+          code: 'privacy_policy',
+          title: '개인정보처리방침',
+          subtitle: 'Android 앱 개인정보 처리 안내',
+          content: [
+            '11. Android 앱에서의 개인정보 처리',
+            'Firebase Cloud Messaging',
+            '대략적 위치 권한',
+            '기기 저장소 전체를 조회하는 권한을 요청하지 않습니다.',
+            'https://teameet.co.kr/account-deletion',
+          ].join('\n'),
+        }],
+      },
+      isPending: false,
+      isError: false,
+    };
+
+    render(<TermsClient />);
+
+    expect(screen.getByText(/Android 앱에서의 개인정보 처리/)).toBeInTheDocument();
+    expect(screen.getByText(/Firebase Cloud Messaging/)).toBeInTheDocument();
+    expect(screen.getByText(/대략적 위치 권한/)).toBeInTheDocument();
+    expect(screen.getByText(/기기 저장소 전체를 조회하는 권한을 요청하지 않습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/teameet\.co\.kr\/account-deletion/)).toBeInTheDocument();
   });
 });
 

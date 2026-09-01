@@ -11,10 +11,12 @@ public final class BuildConfigurationTest {
             assertEquals("kr.co.teameet.alpha", BuildConfig.APPLICATION_ID);
             assertEquals("https://alpha.teameet.co.kr", BuildConfig.WEB_ORIGIN);
             assertTrue(BuildConfig.WEBVIEW_DEBUGGING_ENABLED);
+            assertTrue(BuildConfig.FCM_DIAGNOSTIC_LOGGING_ENABLED);
         } else {
             assertEquals("kr.co.teameet", BuildConfig.APPLICATION_ID);
             assertEquals("https://teameet.co.kr", BuildConfig.WEB_ORIGIN);
             assertFalse(BuildConfig.WEBVIEW_DEBUGGING_ENABLED);
+            assertFalse(BuildConfig.FCM_DIAGNOSTIC_LOGGING_ENABLED);
         }
     }
 }

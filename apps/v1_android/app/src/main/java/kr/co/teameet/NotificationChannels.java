@@ -3,7 +3,6 @@ package kr.co.teameet;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.content.Context;
-import android.os.Build;
 
 final class NotificationChannels {
     static final String GENERAL = "teameet_general";
@@ -11,7 +10,6 @@ final class NotificationChannels {
     private NotificationChannels() {}
 
     static void create(Context context) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
         NotificationChannel channel = new NotificationChannel(
             GENERAL,
             context.getString(R.string.notification_channel_general),

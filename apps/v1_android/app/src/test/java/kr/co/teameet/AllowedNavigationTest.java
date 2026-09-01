@@ -26,9 +26,42 @@ public final class AllowedNavigationTest {
 
     @Test public void allowsOnlyReviewedExternalSchemes() {
         assertEquals(true, AllowedNavigation.isAllowedExternalScheme("https"));
-        assertEquals(true, AllowedNavigation.isAllowedExternalScheme("intent"));
+        assertEquals(false, AllowedNavigation.isAllowedExternalScheme("intent"));
+        assertEquals(true, AllowedNavigation.isAllowedExternalScheme("kakaomap"));
+        assertEquals(true, AllowedNavigation.isAllowedExternalScheme("NMAP"));
+        assertEquals(true, AllowedNavigation.isAllowedExternalScheme("tmap"));
         assertEquals(false, AllowedNavigation.isAllowedExternalScheme("javascript"));
         assertEquals(false, AllowedNavigation.isAllowedExternalScheme("file"));
         assertEquals(false, AllowedNavigation.isAllowedExternalScheme("content"));
+    }
+
+    @Test public void grantsGeolocationOnlyToTheExactEnvironmentOrigin() {
+        String origin = BuildConfig.APPLICATION_ID.endsWith(".alpha")
+            ? "https://alpha.teameet.co.kr"
+            : "https://teameet.co.kr";
+        assertEquals(true, AllowedNavigation.isInternalOrigin(origin));
+        assertEquals(true, AllowedNavigation.isInternalOrigin(origin + "/"));
+        assertEquals(false, AllowedNavigation.isInternalOrigin(origin + "/location"));
+        assertEquals(false, AllowedNavigation.isInternalOrigin(origin + "?next=/home"));
+        assertEquals(false, AllowedNavigation.isInternalOrigin(origin + ".attacker.example"));
+    }
+
+    @Test public void mapsReviewedNavigationAppsToTheirPlayStoreFallbacks() {
+        assertEquals(
+            "https://play.google.com/store/apps/details?id=net.daum.android.map",
+            AllowedNavigation.externalAppStoreFallback("kakaomap")
+        );
+        assertEquals(
+            "https://play.google.com/store/apps/details?id=com.nhn.android.nmap",
+            AllowedNavigation.externalAppStoreFallback("nmap")
+        );
+        assertEquals(
+            "https://play.google.com/store/apps/details?id=com.skt.tmap.ku",
+            AllowedNavigation.externalAppStoreFallback("tmap")
+        );
+        assertEquals(
+            null,
+            AllowedNavigation.externalAppStoreFallback("https")
+        );
     }
 }

@@ -25,6 +25,24 @@ final class AllowedNavigation {
         }
     }
 
+    static boolean isInternalOrigin(String candidate) {
+        if (candidate == null) return false;
+        try {
+            URI target = URI.create(candidate);
+            URI origin = URI.create(BuildConfig.WEB_ORIGIN);
+            String path = target.getRawPath();
+            return "https".equalsIgnoreCase(target.getScheme())
+                && origin.getHost().equalsIgnoreCase(target.getHost())
+                && target.getPort() == origin.getPort()
+                && target.getRawUserInfo() == null
+                && (path == null || path.isEmpty() || "/".equals(path))
+                && target.getRawQuery() == null
+                && target.getRawFragment() == null;
+        } catch (IllegalArgumentException ignored) {
+            return false;
+        }
+    }
+
     static boolean isTrustedAuthProvider(Uri target) {
         return target != null
             && "https".equalsIgnoreCase(target.getScheme())
@@ -40,9 +58,27 @@ final class AllowedNavigation {
     static boolean isAllowedExternalScheme(String scheme) {
         if (scheme == null) return false;
         return switch (scheme.toLowerCase(Locale.ROOT)) {
-            case "http", "https", "mailto", "tel", "sms", "geo", "market", "intent" -> true;
+            case "http", "https", "mailto", "tel", "sms", "geo", "market",
+                "kakaomap", "nmap", "tmap" -> true;
             default -> false;
         };
+    }
+
+    static String externalAppStoreFallback(Uri target) {
+        return target == null ? null : externalAppStoreFallback(target.getScheme());
+    }
+
+    static String externalAppStoreFallback(String scheme) {
+        if (scheme == null) return null;
+        String packageName = switch (scheme.toLowerCase(Locale.ROOT)) {
+            case "kakaomap" -> "net.daum.android.map";
+            case "nmap" -> "com.nhn.android.nmap";
+            case "tmap" -> "com.skt.tmap.ku";
+            default -> null;
+        };
+        return packageName == null
+            ? null
+            : "https://play.google.com/store/apps/details?id=" + packageName;
     }
 
     static String safeRoute(String candidate) {

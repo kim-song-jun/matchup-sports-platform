@@ -295,6 +295,9 @@
      edge-to-edge while only controls consume the safe area. Browser/PWA clients keep using env(). */
   --teameet-native-safe-bottom: 0px;
   --v1-shell-safe-bottom: max(env(safe-area-inset-bottom, 0px), var(--teameet-native-safe-bottom));
+  /* visualViewport is updated only while the browser or Android WebView changes its visible area. */
+  --teameet-visual-viewport-height: 100dvh;
+  --teameet-keyboard-inset: 0px;
 
   /* 홈 공유 추천 미디어(.tm-featured-media)는 모든 소비자와 뷰포트에서 2:1 crop을 유지한다. */
   --tm-featured-media-ratio: 2 / 1;
@@ -506,7 +509,7 @@ button:disabled {
 
 .tm-app-frame {
   width: min(100%, var(--v1-app-chrome-frame-width));
-  height: 100dvh;
+  height: var(--teameet-visual-viewport-height, 100dvh);
   margin: 0 auto;
   /* 페이지 배경 = --bg(라이트 흰색 / 다크 #121317). 프로덕션(main)과 동일한 셸 배경이며,
      그 위에 얹히는 서브 영역(패널·요약바·입력창 등)이 --grey50/100 한 단계를 써서 대비를
@@ -722,7 +725,7 @@ button:disabled {
 
 .tm-auth-frame {
   width: min(100%, var(--v1-shell-frame-width));
-  height: 100dvh;
+  height: var(--teameet-visual-viewport-height, 100dvh);
   margin: 0 auto;
   background: var(--bg);
   color: var(--foreground);
@@ -2813,6 +2816,40 @@ label.tm-btn:focus-within {
   animation: tm-modal-fade var(--duration-base) var(--ease-out) both;
 }
 
+/* Keep ordinary browser layout unchanged. These overrides exist only while a text-entry IME is open. */
+html.tm-keyboard-open,
+html[data-teameet-native-keyboard="open"] {
+  --v1-shell-safe-bottom: 0px;
+}
+
+html.tm-keyboard-open .tm-bottom-nav,
+html[data-teameet-native-keyboard="open"] .tm-bottom-nav {
+  display: none;
+}
+
+html.tm-keyboard-open .tm-scroll-area,
+html[data-teameet-native-keyboard="open"] .tm-scroll-area {
+  bottom: 0;
+  scroll-padding-block: 16px 24px;
+}
+
+html.tm-keyboard-open .tm-auth-scroll,
+html[data-teameet-native-keyboard="open"] .tm-auth-scroll {
+  scroll-padding-block: 16px 112px;
+}
+
+html.tm-keyboard-open .tm-fixed-cta,
+html[data-teameet-native-keyboard="open"] .tm-fixed-cta {
+  position: absolute;
+}
+
+html.tm-keyboard-open .tm-modal-panel,
+html[data-teameet-native-keyboard="open"] .tm-modal-panel {
+  max-height: calc(var(--teameet-visual-viewport-height, 100dvh) - 24px) !important;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .tm-modal-scrim.is-closing,
 .tm-modal-panel.is-closing {
   animation: tm-modal-fade var(--duration-base) var(--ease-standard) reverse both;
@@ -4413,7 +4450,7 @@ label.tm-btn:focus-within {
 @media (max-width: 430px) {
   .tm-app-frame {
     width: 100%;
-    height: 100dvh;
+    height: var(--teameet-visual-viewport-height, 100dvh);
     min-height: 0;
   }
 }

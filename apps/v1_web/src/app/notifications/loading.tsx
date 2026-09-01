@@ -8,7 +8,15 @@ import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 export default function NotificationsLoading() {
   return (
     <AppChrome
-      title="알림"
+      // 실제 화면 타이틀은 `알림 {unreadCount}` 구조다. 로딩에서 숫자를 빼면 데이터가
+      // 도착할 때 타이틀 폭이 변한다 — 같은 구조에 보이지 않는 한 자리를 둬 공간을 잡는다.
+      // (두 자리 이상이면 그만큼은 여전히 움직인다. 읽음 처리로 숫자가 줄 때도 마찬가지로,
+      //  이건 로딩 셸이 아니라 화면 자체의 성질이다.)
+      title={(
+        <span>
+          알림 <span className="tm-notification-count" aria-hidden="true" style={{ visibility: 'hidden' }}>0</span>
+        </span>
+      )}
       activeTab="my"
       bottomNav={false}
       backHref="/home"

@@ -1,6 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   formatAdminDate,
+  formatCardDate,
+  formatCardTime,
   formatKstDateShort,
   formatKstTime,
   formatTournamentDateRangeWithTime,
@@ -94,5 +96,19 @@ describe('formatTournamentDateShort / formatTournamentDateTimeShort / formatTour
     expect(
       formatTournamentDateRangeWithTime('2026-08-07T11:00:00.000Z', '2026-08-07T12:30:00.000Z'),
     ).toBe('8/7 (금) 20:00~21:30');
+  });
+});
+
+describe('formatCardDate / formatCardTime (목록 카드 공용)', () => {
+  it('KST 달력 기준으로 그린다 — 서버(UTC)와 브라우저가 하루 어긋나지 않게', () => {
+    // 2026-10-02T16:30Z = KST 2026-10-03 01:30
+    expect(formatCardDate('2026-10-02T16:30:00.000Z')).toBe('10월 3일 (토)');
+    expect(formatCardTime('2026-10-02T16:30:00.000Z')).toBe('01:30');
+  });
+
+  it('invalid 입력의 처리는 카드의 기존 동작을 유지한다', () => {
+    // 날짜는 원문 노출(디버깅), 시각은 빈 칸(없을 수 있는 슬롯).
+    expect(formatCardDate('not-a-date')).toBe('not-a-date');
+    expect(formatCardTime('not-a-date')).toBe('');
   });
 });

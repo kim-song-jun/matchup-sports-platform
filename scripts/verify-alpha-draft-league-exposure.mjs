@@ -66,6 +66,12 @@ async function main() {
 
   // 합이 맞는다고 같은 집합인 것은 아니다 — **id 로 교차**한다.
   const draftShown = drafts.filter((d) => unifiedIds.has(d.leagueId)).length;
+  /**
+   * **한 방향만 보면 절반이다.** `35→35` 는 *"예정이 들어왔다"* 를 말하지만 *"엉뚱한 게 안
+   * 섞였다"* 는 말하지 않는다. 리그 축에 없는 id 가 통합 목록에 있으면 조건이 넓게 잡힌 것이다.
+   */
+  const leagueAxisIds = new Set(leagueAxis.map((i) => i.leagueId));
+  const strayInUnified = unified.filter((u) => !leagueAxisIds.has(u.id)).length;
 
   /**
    * 상세 화면은 **경로를 하나만 부르지 않는다.** 상세를 열어도 `/standings/overall` 이 닫혀
@@ -93,6 +99,13 @@ async function main() {
 
   // 대조군: 대회의 준비 중이 목록에 새어나오지 않았나.
   const tournamentDraft = tournaments.filter((t) => t.status === 'draft').length;
+  /**
+   * **통합(`all`) 목록의 draft 는 전부 리그여야 한다.** `?kind=tournament` 만 보면 그 축에서
+   * 걸러졌을 뿐이고, `all` 에서 대회 draft 가 새면 그건 못 잡는다. 종류 분포로 본다.
+   */
+  const all = await pageAll('/tournaments?kind=all');
+  const allDrafts = all.filter((i) => i.status === 'draft');
+  const nonLeagueDraft = allDrafts.filter((i) => i.kind !== 'regular_league').length;
 
   const rows = [
     { 항목: '리그 축 전체', 값: leagueAxis.length, 기대: '88', 판정: leagueAxis.length === 88 ? '✅' : '⚠️ 데이터가 바뀌었다' },
@@ -102,7 +115,9 @@ async function main() {
     { 항목: '예정 리그 상세(표본 3)', 값: detail.map((d) => d.상세).join(','), 기대: '200,200,200', 판정: detail.every((d) => d.상세 === 200) ? '✅' : '❌ 눌러도 안 열린다' },
     { 항목: '예정 리그 통합순위(표본 3)', 값: detail.map((d) => d.통합순위).join(','), 기대: '200,200,200', 판정: detail.every((d) => d.통합순위 === 200) ? '✅' : '❌ 상세는 열리는데 순위가 404' },
     { 항목: '대조군 · 진행 리그 두 경로', 값: control ? `${control['상세']},${control['/standings/overall']}` : '-', 기대: '200,200', 판정: control && control['상세'] === 200 && control['/standings/overall'] === 200 ? '✅' : '❌ 진행 리그가 깨졌다' },
-    { 항목: '대조군 · 대회 준비중 노출', 값: tournamentDraft, 기대: '0', 판정: tournamentDraft === 0 ? '✅' : '❌ 대회 draft 가 새어나왔다' },
+    { 항목: '역방향 · 리그 축에 없는 id 유입', 값: strayInUnified, 기대: '0', 판정: strayInUnified === 0 ? '✅' : '❌ 엉뚱한 것이 섞였다' },
+    { 항목: '대조군 · 대회 준비중 노출(kind=tournament)', 값: tournamentDraft, 기대: '0', 판정: tournamentDraft === 0 ? '✅' : '❌ 대회 draft 가 새어나왔다' },
+    { 항목: '대조군 · all 의 draft 중 리그 아닌 것', 값: `${nonLeagueDraft}/${allDrafts.length}`, 기대: '0', 판정: nonLeagueDraft === 0 ? '✅' : '❌ 대회 draft 가 all 로 샜다' },
   ];
   console.table(rows);
   detail.forEach((d) => console.log(`   표본 ${d.id} 상세 ${d.상세}`));

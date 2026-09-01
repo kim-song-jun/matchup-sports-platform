@@ -51,7 +51,8 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ id:
           { name: team.name, path: `/teams/${id}` },
         ])}
       />
-      <TeamDetailPageClient teamId={id} />
+      {/* 구조화 데이터가 쓰려고 이미 받은 응답이다 — 버리지 않고 첫 표시값으로 넘긴다. */}
+      <TeamDetailPageClient teamId={id} seed={team} />
     </>
   );
 }

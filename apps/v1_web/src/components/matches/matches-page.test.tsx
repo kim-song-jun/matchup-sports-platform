@@ -262,3 +262,30 @@ describe('MatchCreatePageView — 매치 취소 버튼 잠금', () => {
     expect(screen.getByRole('button', { name: '매치 취소' })).not.toBeDisabled();
   });
 });
+
+describe('MatchListPageView — 빈 목록의 세로 정렬', () => {
+  // 빈 상태를 화면 중앙에 놓으려면 컨테이너(.tm-list-empty)와 자식(.tm-empty-state-fill)이
+  // **둘 다** 필요하다 — 하나만 있으면 예전처럼 상단에 붙는다. 그래서 짝으로 검증한다.
+  it('결과가 0건이면 컨테이너에 tm-list-empty 가 붙고 빈 상태가 fill 로 렌더된다', () => {
+    const model = { ...getMatchListViewModel(), matches: [], isLoading: false };
+    const { container } = render(<MatchListPageView model={model} />);
+
+    expect(container.querySelector('.tm-match-list')).toHaveClass('tm-list-empty');
+    expect(container.querySelector('.tm-empty-state')).toHaveClass('tm-empty-state-fill');
+  });
+
+  it('카드가 있으면 tm-list-empty 를 붙이지 않는다 — 평소 목록 레이아웃을 건드리지 않는다', () => {
+    const model = { ...getMatchListViewModel(), isLoading: false };
+    const { container } = render(<MatchListPageView model={model} />);
+
+    expect(model.matches.length).toBeGreaterThan(0);
+    expect(container.querySelector('.tm-match-list')).not.toHaveClass('tm-list-empty');
+  });
+
+  it('로딩 중에는 붙이지 않는다 — 스켈레톤이 차지하는 자리를 흔들지 않는다', () => {
+    const model = { ...getMatchListViewModel(), matches: [], isLoading: true };
+    const { container } = render(<MatchListPageView model={model} />);
+
+    expect(container.querySelector('.tm-match-list')).not.toHaveClass('tm-list-empty');
+  });
+});

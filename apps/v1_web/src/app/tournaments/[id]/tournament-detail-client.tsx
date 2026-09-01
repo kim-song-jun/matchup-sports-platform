@@ -584,7 +584,29 @@ export function TournamentDetailView({
    *
    * 분기는 기억에 의존하므로 **테스트로 못박는다**(`tournament-detail-client.test.ts`).
    */
-  const showsCapacity = !isLeagueCompetition(tournament);
+  /**
+   * **여기서는 `isLeagueCompetition` 을 쓰면 안 된다.**
+   * ```
+   * 리그 방식 대회   format='league'  kind='regular_tournament'   ← 진짜 대회다. 정원·참가비 있다
+   * 정규 리그 시즌   kind='regular_league'                        ← 거울 행. 둘 다 없다
+   * ```
+   * `isLeagueCompetition` 은 위 둘을 **모두** true 로 준다(`format==='league' || kind===…`).
+   * 그 판정은 *"어떻게 치르나"* 를 물을 때 맞다 — 순위표를 그릴지, 대진표 대신 리그 일정을
+   * 보여줄지는 리그 방식 대회에도 같이 적용된다. 하지만 *"정원 개념이 있나"* 는 **무엇인가**의
+   * 질문이라 `kind` 만 봐야 한다. 섞으면 alpha 의 리그 방식 대회 7건이 신청 정원을 잃는다
+   * (실제로 이 스펙이 red 로 잡았다).
+   *
+   * 목록 카드는 같은 질문에 **필드 유무**(`teamCount === undefined`)로 답한다 — 서버가
+   * `kind === 'regular_league'` 일 때만 생략하므로 결과가 같고, 거기서는 타입이 계산까지
+   * 막아 준다.
+   */
+  const isLeagueMirror = tournament.kind === 'regular_league';
+  const showsCapacity = !isLeagueMirror;
+  /* 참가비도 정규 리그에는 개념이 없다 — `V1League` 에 참가비 필드가 **없고**, 거울의
+     `entry_fee` 는 `@default(0)` 이라 그리면 **"무료"** 가 뜬다. 그건 사실이 아니라
+     미설정이다(정원 8 과 같은 자리). 정원과 따로 두는 이유는 두 개념이 언젠가 갈릴 수
+     있어서다 — 한 이름으로 묶으면 그때 이름이 거짓이 된다. */
+  const showsEntryFee = !isLeagueMirror;
   /* 신규 신청 차단 사유(마감 경과·정원 마감) — CTA·안내 문구·정원 캡션이 전부 이 하나의
      판정을 공유한다. status만 보던 예전 로직은 신청 마감이 지난 open 대회에서도
      '참가 신청하기'를 활성으로 그렸다. */
@@ -828,7 +850,7 @@ export function TournamentDetailView({
           <div className="tm-hide-desktop">
             <InfoRow label="일정" value={formatTournamentDateRangeWithTime(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'} />
             <ScheduleNoticeCaption style={{ padding: '12px 16px 16px', marginTop: 0, borderBottom: '1px solid var(--grey100)' }} />
-            <InfoRow label="참가비" value={formatEntryFee(tournament.entryFee)} />
+            {showsEntryFee ? <InfoRow label="참가비" value={formatEntryFee(tournament.entryFee)} /> : null}
           </div>
           {/* 항상 표시 */}
           {tournament.registrationDeadlineAt ? (
@@ -858,7 +880,7 @@ export function TournamentDetailView({
 
       <TournamentParticipantSection
         teams={tournament.participantTeams}
-        teamCount={tournament.teamCount}
+        teamCount={showsCapacity ? tournament.teamCount : null}
         status={tournament.status}
         confirmedCount={tournament.confirmedCount}
       />
@@ -940,7 +962,7 @@ export function TournamentDetailView({
 
       <TournamentParticipantSection
         teams={tournament.participantTeams}
-        teamCount={tournament.teamCount}
+        teamCount={showsCapacity ? tournament.teamCount : null}
         status={tournament.status}
         confirmedCount={tournament.confirmedCount}
       />
@@ -952,8 +974,15 @@ export function TournamentDetailView({
         <Card pad={0}>
           <InfoRow label="일정" value={formatTournamentDateRangeWithTime(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'} />
           <ScheduleNoticeCaption style={{ padding: '12px 16px 16px', marginTop: 0, borderBottom: '1px solid var(--grey100)' }} />
-          <InfoRow label="참가팀" value={`${tournament.confirmedCount}/${tournament.teamCount}팀 확정`} />
-          <InfoRow label="참가비" value={formatEntryFee(tournament.entryFee)} />
+          <InfoRow
+            label="참가팀"
+            value={
+              showsCapacity
+                ? `${tournament.confirmedCount}/${tournament.teamCount}팀 확정`
+                : `${tournament.confirmedCount}팀 참가`
+            }
+          />
+          {showsEntryFee ? <InfoRow label="참가비" value={formatEntryFee(tournament.entryFee)} /> : null}
           {tournament.venue ? (
             <InfoRow label="장소" value={tournament.venue} />
           ) : null}
@@ -1193,14 +1222,25 @@ export function TournamentDetailView({
           <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{formatTournamentDateRangeWithTime(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'}</span>
         </div>
         <ScheduleNoticeCaption style={{ marginTop: 0 }} />
+        {/* **리그가 실제로 닿는 레일은 여기(in_progress)다.** 위 `open` 레일은 리그가
+            도달하지 못한다(거울 status 에 `open` 이 없다) — 진행 중인 리그에 "정원 2/8팀 ·
+            참가비 무료" 가 뜨던 자리가 이쪽이다. */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>정원</span>
-          <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{tournament.confirmedCount}/{tournament.teamCount}팀</span>
+          <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>
+            {showsCapacity ? '정원' : '참가팀'}
+          </span>
+          <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>
+            {showsCapacity
+              ? `${tournament.confirmedCount}/${tournament.teamCount}팀`
+              : `${tournament.confirmedCount}팀`}
+          </span>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>참가비</span>
-          <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{formatEntryFee(tournament.entryFee)}</span>
-        </div>
+        {showsEntryFee ? (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>참가비</span>
+            <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{formatEntryFee(tournament.entryFee)}</span>
+          </div>
+        ) : null}
       </div>
     </aside>
   ) : tournament.status === 'closed' ? (

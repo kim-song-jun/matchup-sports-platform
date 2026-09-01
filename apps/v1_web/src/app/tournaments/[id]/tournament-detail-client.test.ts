@@ -1053,6 +1053,55 @@ describe('TournamentDetailView — 정규 리그 거울 행', () => {
     expect(screen.queryByText(/자리 남았어요/)).toBeNull();
   });
 
+  /**
+   * 게이트를 처음 넣었을 때 **정원 진행바 두 자리만** 막았는데, 정원·참가비는 화면에 더
+   * 흩어져 있었다. 거울이 안 채우는 필드를 전수로 훑어(`teamCount` · `genderCategory` ·
+   * `entryFee` · `format` · `parkingInfo` …) 실제로 그려지는 자리를 마저 찾은 결과다.
+   *
+   * ```
+   * 참가팀 섹션        "2/8팀 확정"    ← 8 은 스키마 기본값
+   * 완료 기본정보      "2/8팀 확정" + "참가비 무료"
+   * ```
+   * `V1League` 에는 정원도 참가비도 **필드가 아예 없다** — 둘 다 미설정이 화면에 뜬 것이다.
+   */
+  it('리그 상세의 참가팀 줄에 정원이 없다 — 수를 그대로 적는다', async () => {
+    vi.mocked(v1Get).mockResolvedValueOnce(standingsResponse);
+    render(createElement(TournamentDetailView, { tournament: makeMirror(), myRegistration: null }));
+    await screen.findByText('통합 순위');
+    expect(screen.queryByText(/\/\s*8팀 확정/)).toBeNull();
+    expect(screen.getByText(/팀 참가/)).toBeInTheDocument();
+  });
+
+  it('대회 상세의 참가팀 줄에는 정원이 있다 — 대조군', () => {
+    // status='open' 이어야 헤더 숫자가 `confirmedCount` 를 쓴다(모집 중에는 서버가
+    // participantTeams 를 비워 보내므로 그쪽을 세면 0 이 된다 — 컴포넌트 주석 참조).
+    render(
+      createElement(TournamentDetailView, {
+        tournament: makeTournament({ id: 't-cap', status: 'open', format: 'knockout', teamCount: 16, confirmedCount: 4 }),
+        myRegistration: null,
+      }),
+    );
+    // 'open' 대회는 참가팀 헤더 말고도 같은 문구가 더 나온다 — 개수는 이 테스트의 관심사가 아니다.
+    expect(screen.getAllByText('4/16팀 확정').length).toBeGreaterThan(0);
+  });
+
+  it('리그 상세에 참가비를 적지 않는다 — 0 은 "무료"가 아니라 미설정이다', async () => {
+    vi.mocked(v1Get).mockResolvedValueOnce(standingsResponse);
+    render(createElement(TournamentDetailView, { tournament: makeMirror(), myRegistration: null }));
+    await screen.findByText('통합 순위');
+    expect(screen.queryByText('참가비')).toBeNull();
+  });
+
+  it('대회 상세에는 참가비를 적는다 — 대조군', () => {
+    render(
+      createElement(TournamentDetailView, {
+        tournament: makeTournament({ id: 't-cap', status: 'closed', format: 'knockout', teamCount: 16, confirmedCount: 4 }),
+        myRegistration: null,
+      }),
+    );
+    expect(screen.getAllByText('참가비').length).toBeGreaterThan(0);
+  });
+
   it('대회 상세에는 정원 진행바가 있다 — 대조군', async () => {
     // 이 대조군이 없으면 정원 블록을 통째로 지워도 위 테스트가 통과한다.
     //

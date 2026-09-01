@@ -5,7 +5,6 @@ import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { formatTournamentDateRangeShort, formatEntryFee } from '@/lib/date-utils';
 import { resolveTournamentImage } from '@/lib/tournament-promo';
-import { isLeagueCompetition } from '@/lib/competition-kind';
 import {
   CompetitionCardHeader,
   CompetitionCardShell,
@@ -103,9 +102,11 @@ export function TournamentCard({
    * `teamCount` 가 여전히 `undefined` 일 수 있다고 본다.
    */
   const capacity = item.teamCount === undefined ? null : { ...item, teamCount: item.teamCount };
-  /* 배지·메타를 고르는 데는 `kind` 를 쓴다 — 위 `capacity` 와 달리 여기서는 좁힐 계산이 없고
-     "무엇인가"를 물을 뿐이라, 필드 유무보다 종류가 곧은 표현이다. */
-  const isLeague = isLeagueCompetition(item);
+  /* 배지·메타는 **`kind` 로만** 고른다. `isLeagueCompetition` 은 `format==='league'` 인
+     **리그 방식 대회**(alpha 실측 7건)도 true 로 주는데, 그건 진짜 대회라 성별부도 정원도
+     있다 — 거기에 "리그" 배지를 붙이면 대회를 리그라고 말하는 것이 된다.
+     `format` 은 "어떻게 치르나", `kind` 는 "무엇인가"이고 여기 질문은 뒤쪽이다. */
+  const isLeague = item.kind === 'regular_league';
   const reservedTeamCount = capacity === null ? 0 : getReservedTeamCount(capacity);
   // 커버가 없는 대회도 홍보용으로 등록한 실사진이 있으면 아이콘 대신 그 사진을 썸네일로
   // 재사용한다 (셋 다 없으면 종목색 그라디언트+아이콘 폴백).

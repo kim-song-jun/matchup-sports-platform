@@ -24,6 +24,7 @@ import { resolve } from 'node:path';
 const READ_ONLY_SCRIPTS = [
   'scripts/probe-alpha-league-subroutes.mjs',
   'scripts/capture-alpha-league-on-tournament-surface.mjs',
+  'scripts/capture-alpha-competition-lists.mjs',
 ];
 
 /**

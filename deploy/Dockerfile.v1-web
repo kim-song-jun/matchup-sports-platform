@@ -36,8 +36,10 @@ WORKDIR /app
 
 # The runtime starts the standalone Next.js server with node. Remove the
 # bundled npm/npx tree because npm 10.9.8 contains tar 7.5.11
-# (CVE-2026-59873); neither command is needed after the builder stage.
-RUN rm -rf /usr/local/lib/node_modules/npm \
+# (CVE-2026-59873); neither command is needed after the builder stage. Alpine
+# OpenSSL 3.5.8 also removes the runtime CVE-2026-63073 finding.
+RUN apk upgrade --no-cache libcrypto3 libssl3 \
+  && rm -rf /usr/local/lib/node_modules/npm \
   && rm -f /usr/local/bin/npm /usr/local/bin/npx
 
 COPY --from=builder /app/apps/v1_web/.next/standalone ./

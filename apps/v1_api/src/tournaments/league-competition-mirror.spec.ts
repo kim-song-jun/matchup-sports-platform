@@ -55,11 +55,18 @@ describe('리그 QA 시드의 복제값 고정', () => {
       createdAt: originCreatedAt,
     });
 
-    // `toBe` 로 본다 — 같은 시각의 **다른 Date 객체**를 만들어 넣는 구현도 값은 맞지만,
-    // 여기서 확인할 것은 "원본을 그대로 옮겼나" 다.
+    /* **`toEqual` 이다 — 참조 동일성은 계약이 아니다.**
+       DB 에 쓰이는 것은 시각 값이므로, 헬퍼가 `new Date(원본)` 로 복사해 넣어도 결과가 같다.
+       `toBe` 로 좁히면 **결함이 아닌 구현을 red 로 잡는다.**
+
+       이 단언이 실제로 무엇을 잡는지 세어 봤다(2026-09-01 실측):
+       ```
+       createdAt 을 아예 안 넣음   → red   ← 진짜 결함(기본값 now() 가 박힌다)
+       now() 를 넣음               → red   ← 진짜 결함
+       new Date(원본)              → green ← 결함 아님. 여기만 toBe 와 갈린다
+       ```
+       앞의 둘이 이 스펙이 막으려는 것이고 둘 다 잡힌다. */
     expect(data.createdAt).toEqual(originCreatedAt);
-    // 생략(undefined)이면 Prisma 가 기본값을 쓴다 — 그게 이 결함의 모양이므로 따로 막는다.
-    expect(data.createdAt).toBeDefined();
   });
 
   it('시드가 만드는 거울의 필드 구성이 원본 헬퍼와 같다 — 키가 빠지면 잡힌다', () => {

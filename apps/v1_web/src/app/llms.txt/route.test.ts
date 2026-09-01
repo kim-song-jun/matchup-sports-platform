@@ -3,7 +3,7 @@
  * "이 사이트엔 llms.txt 가 없다"와 같은 결과가 된다 — 대회 목록 조회가 실패해도
  * 안내서 본문은 반드시 나가야 한다는 것이 이 라우트의 핵심 계약이다.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const fetchPublicV1 = vi.fn();
 
@@ -16,6 +16,12 @@ const { GET } = await import('./route');
 
 beforeEach(() => {
   fetchPublicV1.mockReset();
+});
+
+// 이 프로젝트 vitest 설정에는 restoreMocks 가 없다 — 아래 테스트가 거는 console.error spy 를
+// 직접 되돌리지 않으면 이후 파일까지 경고가 벙어리로 남는다.
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe('GET /llms.txt', () => {

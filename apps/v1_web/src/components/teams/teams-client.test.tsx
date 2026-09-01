@@ -560,6 +560,25 @@ describe('TeamDetailPageClient — 서버 seed 로 그리는 동안 뷰어 의�
     expect(screen.queryByRole('button', { name: '가입 신청' })).toBeNull();
   });
 
+  // eligibility 는 인증 API 이고 `enabled: Boolean(query.data)` 라, seed 가 있으면 곧바로
+  // 실행돼 **팀 상세 실응답보다 먼저 도착할 수 있다.** 그때 CTA 를 열어 두면 라벨은
+  // "불러오는 중"인데 누르면 진짜 가입 신청이 나가 — 라벨과 동작이 어긋난다.
+  it('eligibility 가 seed 보다 먼저 도착해도 CTA 는 눌리지 않는다', () => {
+    teamApiMocks.useV1TeamDetail.mockReturnValue({
+      data: seededDetail(),
+      isError: false,
+      isPlaceholderData: true,
+    });
+    teamApiMocks.useV1TeamJoinEligibility.mockReturnValue({
+      data: { eligible: true, joinState: 'none', message: null },
+    });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    const cta = screen.getAllByRole('button', { name: '불러오는 중' })[0];
+    expect(cta).toBeDisabled();
+  });
+
   it('실응답이 도착하면(placeholder 해제) 뷰어 판정에 따른 CTA 가 열린다', () => {
     teamApiMocks.useV1TeamDetail.mockReturnValue({
       data: { ...seededDetail(), viewer: { role: 'none', membershipId: null, joinState: 'none', canRequestJoin: true, disabledReason: null, manageRoute: null } },

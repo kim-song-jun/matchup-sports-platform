@@ -3,8 +3,15 @@ package kr.co.teameet;
 import android.net.Uri;
 import java.net.URI;
 import java.util.Locale;
+import java.util.Set;
 
 final class AllowedNavigation {
+    private static final Set<String> TRUSTED_KAKAO_AUTH_HOSTS = Set.of(
+        "kauth.kakao.com",
+        "accounts.kakao.com",
+        "auth.kakao.com"
+    );
+
     private AllowedNavigation() {}
 
     static boolean isInternal(Uri target) {
@@ -44,11 +51,22 @@ final class AllowedNavigation {
     }
 
     static boolean isTrustedAuthProvider(Uri target) {
-        return target != null
-            && "https".equalsIgnoreCase(target.getScheme())
-            && "kauth.kakao.com".equalsIgnoreCase(target.getHost())
-            && target.getUserInfo() == null
-            && target.getPort() == -1;
+        return target != null && isTrustedAuthProviderAbsoluteUrl(target.toString());
+    }
+
+    static boolean isTrustedAuthProviderAbsoluteUrl(String candidate) {
+        if (candidate == null) return false;
+        try {
+            URI target = URI.create(candidate);
+            String host = target.getHost();
+            return "https".equalsIgnoreCase(target.getScheme())
+                && host != null
+                && TRUSTED_KAKAO_AUTH_HOSTS.contains(host.toLowerCase(Locale.ROOT))
+                && target.getRawUserInfo() == null
+                && target.getPort() == -1;
+        } catch (IllegalArgumentException ignored) {
+            return false;
+        }
     }
 
     static boolean isAllowedExternal(Uri target) {

@@ -8,7 +8,7 @@ import android.content.ActivityNotFoundException;
 import android.content.ClipData;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.graphics.Color;
+import android.content.res.Configuration;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -41,6 +41,7 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.webkit.WebMessageCompat;
 import androidx.webkit.WebSettingsCompat;
 import androidx.webkit.WebViewCompat;
@@ -91,6 +92,7 @@ public final class MainActivity extends AppCompatActivity {
         configureWebView();
         configureRootView();
         setContentView(rootView);
+        applySystemBarAppearance();
         applySystemBarInsets();
         registerBackHandler();
         if (FirebaseBootstrap.initialize(this) && canRegisterPush()) {
@@ -130,6 +132,20 @@ public final class MainActivity extends AppCompatActivity {
         ViewCompat.requestApplyInsets(rootView);
     }
 
+    private void applySystemBarAppearance() {
+        boolean isDarkMode = (getResources().getConfiguration().uiMode
+            & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+        int systemBarColor = ContextCompat.getColor(this, R.color.system_bar_background);
+        getWindow().setStatusBarColor(systemBarColor);
+        getWindow().setNavigationBarColor(systemBarColor);
+        WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(
+            getWindow(), rootView
+        );
+        controller.setAppearanceLightStatusBars(!isDarkMode);
+        controller.setAppearanceLightNavigationBars(!isDarkMode);
+        rootView.setBackgroundColor(systemBarColor);
+    }
+
     private void configureRootView() {
         rootView = new FrameLayout(this);
         rootView.addView(webView, new FrameLayout.LayoutParams(
@@ -147,21 +163,21 @@ public final class MainActivity extends AppCompatActivity {
         LinearLayout container = new LinearLayout(this);
         container.setOrientation(LinearLayout.VERTICAL);
         container.setGravity(Gravity.CENTER);
-        container.setBackgroundColor(Color.WHITE);
+        container.setBackgroundColor(ContextCompat.getColor(this, R.color.native_error_background));
         int padding = Math.round(32 * getResources().getDisplayMetrics().density);
         container.setPadding(padding, padding, padding, padding);
         container.setVisibility(View.GONE);
 
         TextView title = new TextView(this);
         title.setText(R.string.web_error_title);
-        title.setTextColor(Color.rgb(17, 24, 39));
+        title.setTextColor(ContextCompat.getColor(this, R.color.native_error_title));
         title.setTextSize(22);
         title.setGravity(Gravity.CENTER);
         container.addView(title);
 
         TextView description = new TextView(this);
         description.setText(R.string.web_error_description);
-        description.setTextColor(Color.rgb(75, 85, 99));
+        description.setTextColor(ContextCompat.getColor(this, R.color.native_error_body));
         description.setTextSize(15);
         description.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams descriptionParams = new LinearLayout.LayoutParams(
@@ -526,6 +542,7 @@ public final class MainActivity extends AppCompatActivity {
 
     @Override protected void onResume() {
         super.onResume();
+        if (rootView != null) applySystemBarAppearance();
         if (!PushPermission.isGranted(this)) InstallationIdentity.markOptedIn(this, false);
         if (!canRegisterPush() && InstallationIdentity.isRegistered(this)) {
             revokePushAndDeleteToken(() -> {});

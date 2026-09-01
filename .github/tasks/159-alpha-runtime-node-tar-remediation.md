@@ -26,3 +26,4 @@
 - 2026-09-01: Local Docker verification passed: both images built; API returned Node 22.23.2 and pnpm 9.15.4 with npm/npx absent; Web returned HTTP 200 from the standalone server with npm/npx absent.
 - 2026-09-01: Docker Scout required an external Docker ID and was not used as evidence. The repository's fail-closed ECR gate remains the authoritative remote scan.
 - 2026-09-01: Root cause reproduced from the current public base image. Runtime-only removal selected because npm/npx are not part of either service startup contract and upgrading an unused package would preserve unnecessary attack surface.
+- 2026-09-01: Removing bundled npm did not clear the API Critical count. Added fail-closed diagnostics that print only ECR Critical finding name, URI, and package attributes so the remaining package can be remediated without exposing credentials or bypassing the gate.

@@ -1,0 +1,166 @@
+{
+  "leagues": [
+    {
+      "id": "ccd278af-66cf-462d-bb4d-62fd64e7430d",
+      "groupName": "리그 순위",
+      "note": "티어 없음 ('리그 순위')"
+    },
+    {
+      "id": "829e7a04-88f2-49c6-a80f-e740c3605f06",
+      "groupName": "2부",
+      "note": "티어 '2부'"
+    }
+  ],
+  "tournament": {
+    "id": "5bb5b6bb-56d0-4575-8671-1d17c202564e",
+    "note": "format=league 대회"
+  },
+  "before": "7585e8c933fc1d95e977498a68bcbb9e65517f21",
+  "after": "7585e8c933fc1d95e977498a68bcbb9e65517f21",
+  "rows": [
+    {
+      "화면": "리그1 /bracket",
+      "폭": "mobile",
+      "HTTP": 200,
+      "순위행": 2,
+      "판정": "✅",
+      "파일": "league1-bracket-mobile.png"
+    },
+    {
+      "화면": "리그1 /bracket",
+      "폭": "tablet",
+      "HTTP": 200,
+      "순위행": 2,
+      "판정": "✅",
+      "파일": "league1-bracket-tablet.png"
+    },
+    {
+      "화면": "리그1 /bracket",
+      "폭": "desktop",
+      "HTTP": 200,
+      "순위행": 2,
+      "판정": "✅",
+      "파일": "league1-bracket-desktop.png"
+    },
+    {
+      "화면": "리그1 /schedule",
+      "폭": "mobile",
+      "HTTP": 200,
+      "순위행": 2,
+      "판정": "✅",
+      "파일": "league1-schedule-mobile.png"
+    },
+    {
+      "화면": "리그1 /schedule",
+      "폭": "tablet",
+      "HTTP": 200,
+      "순위행": 2,
+      "판정": "✅",
+      "파일": "league1-schedule-tablet.png"
+    },
+    {
+      "화면": "리그1 /schedule",
+      "폭": "desktop",
+      "HTTP": 200,
+      "순위행": 2,
+      "판정": "✅",
+      "파일": "league1-schedule-desktop.png"
+    },
+    {
+      "화면": "리그2 /bracket",
+      "폭": "mobile",
+      "HTTP": 200,
+      "순위행": 2,
+      "판정": "✅",
+      "파일": "league2-bracket-mobile.png"
+    },
+    {
+      "화면": "리그2 /bracket",
+      "폭": "tablet",
+      "HTTP": 200,
+      "순위행": 2,
+      "판정": "✅",
+      "파일": "league2-bracket-tablet.png"
+    },
+    {
+      "화면": "리그2 /bracket",
+      "폭": "desktop",
+      "HTTP": 200,
+      "순위행": 2,
+      "판정": "✅",
+      "파일": "league2-bracket-desktop.png"
+    },
+    {
+      "화면": "리그2 /schedule",
+      "폭": "mobile",
+      "HTTP": 200,
+      "순위행": 2,
+      "판정": "✅",
+      "파일": "league2-schedule-mobile.png"
+    },
+    {
+      "화면": "리그2 /schedule",
+      "폭": "tablet",
+      "HTTP": 200,
+      "순위행": 2,
+      "판정": "✅",
+      "파일": "league2-schedule-tablet.png"
+    },
+    {
+      "화면": "리그2 /schedule",
+      "폭": "desktop",
+      "HTTP": 200,
+      "순위행": 2,
+      "판정": "✅",
+      "파일": "league2-schedule-desktop.png"
+    },
+    {
+      "화면": "대회 /bracket",
+      "폭": "mobile",
+      "HTTP": 200,
+      "순위행": 4,
+      "판정": "✅",
+      "파일": "tournament-bracket-mobile.png"
+    },
+    {
+      "화면": "대회 /bracket",
+      "폭": "tablet",
+      "HTTP": 200,
+      "순위행": 4,
+      "판정": "✅",
+      "파일": "tournament-bracket-tablet.png"
+    },
+    {
+      "화면": "대회 /bracket",
+      "폭": "desktop",
+      "HTTP": 200,
+      "순위행": 4,
+      "판정": "✅",
+      "파일": "tournament-bracket-desktop.png"
+    },
+    {
+      "화면": "대회 /schedule",
+      "폭": "mobile",
+      "HTTP": 200,
+      "순위행": 4,
+      "판정": "✅",
+      "파일": "tournament-schedule-mobile.png"
+    },
+    {
+      "화면": "대회 /schedule",
+      "폭": "tablet",
+      "HTTP": 200,
+      "순위행": 4,
+      "판정": "✅",
+      "파일": "tournament-schedule-tablet.png"
+    },
+    {
+      "화면": "대회 /schedule",
+      "폭": "desktop",
+      "HTTP": 200,
+      "순위행": 4,
+      "판정": "✅",
+      "파일": "tournament-schedule-desktop.png"
+    }
+  ]
+}

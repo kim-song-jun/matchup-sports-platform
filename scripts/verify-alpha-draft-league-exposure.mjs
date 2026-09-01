@@ -67,13 +67,29 @@ async function main() {
   // 합이 맞는다고 같은 집합인 것은 아니다 — **id 로 교차**한다.
   const draftShown = drafts.filter((d) => unifiedIds.has(d.leagueId)).length;
 
-  // 상세가 열리는지 — 표본 3건(전수는 alpha 에 과하다).
+  /**
+   * 상세 화면은 **경로를 하나만 부르지 않는다.** 상세를 열어도 `/standings/overall` 이 닫혀
+   * 있으면 순위 섹션이 에러가 된다(2026-09-01 실측: 예정 404 · 진행 200). 그래서 **형제 경로를
+   * 함께** 재고, **진행 리그를 대조군으로** 나란히 둔다 — `/player-records` 처럼 *둘 다 404* 인
+   * 것은 리그에 개념이 없는 것이지 결함이 아니다. 대조군이 없으면 그 구분이 안 된다.
+   */
+  const SIBLINGS = ['', '/standings/overall'];
+  const probeAll = async (id) => {
+    const out = {};
+    for (const p of SIBLINGS) {
+      out[p || '상세'] = await status(`/tournaments/${id}${p}`);
+      await new Promise((r) => setTimeout(r, 400));
+    }
+    return out;
+  };
   const sample = drafts.slice(0, 3);
   const detail = [];
   for (const d of sample) {
-    detail.push({ id: d.leagueId.slice(0, 8), 상세: await status(`/tournaments/${d.leagueId}`) });
-    await new Promise((r) => setTimeout(r, 400));
+    const r = await probeAll(d.leagueId);
+    detail.push({ id: d.leagueId.slice(0, 8), 상세: r['상세'], 통합순위: r['/standings/overall'] });
   }
+  const activeLeague = leagueAxis.find((i) => i.state === 'active');
+  const control = activeLeague ? await probeAll(activeLeague.leagueId) : null;
 
   // 대조군: 대회의 준비 중이 목록에 새어나오지 않았나.
   const tournamentDraft = tournaments.filter((t) => t.status === 'draft').length;
@@ -84,6 +100,8 @@ async function main() {
     { 항목: '통합 목록의 리그', 값: unified.length, 기대: `${leagueAxis.length}`, 판정: unified.length === leagueAxis.length ? '✅' : `❌ ${leagueAxis.length - unified.length}건 빠짐` },
     { 항목: '예정 리그가 통합 목록에', 값: `${draftShown}/${drafts.length}`, 기대: '전부', 판정: draftShown === drafts.length ? '✅' : `❌ ${drafts.length - draftShown}건 안 보임` },
     { 항목: '예정 리그 상세(표본 3)', 값: detail.map((d) => d.상세).join(','), 기대: '200,200,200', 판정: detail.every((d) => d.상세 === 200) ? '✅' : '❌ 눌러도 안 열린다' },
+    { 항목: '예정 리그 통합순위(표본 3)', 값: detail.map((d) => d.통합순위).join(','), 기대: '200,200,200', 판정: detail.every((d) => d.통합순위 === 200) ? '✅' : '❌ 상세는 열리는데 순위가 404' },
+    { 항목: '대조군 · 진행 리그 두 경로', 값: control ? `${control['상세']},${control['/standings/overall']}` : '-', 기대: '200,200', 판정: control && control['상세'] === 200 && control['/standings/overall'] === 200 ? '✅' : '❌ 진행 리그가 깨졌다' },
     { 항목: '대조군 · 대회 준비중 노출', 값: tournamentDraft, 기대: '0', 판정: tournamentDraft === 0 ? '✅' : '❌ 대회 draft 가 새어나왔다' },
   ];
   console.table(rows);

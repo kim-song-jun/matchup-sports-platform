@@ -2529,6 +2529,34 @@ label.tm-btn:focus-within {
   padding: 16px var(--v1-shell-page-x) 108px;
 }
 
+/**
+ * 대회 목록의 **필터 요약 줄.** 종목 칩 줄(.tm-sport-chip-row)을 **대신한다** — 새 줄을
+ * 얹는 게 아니라 교체다. 사용자가 "세로 높이를 지금보다 늘리지 않는 것이 이 안의 핵심"
+ * 이라고 못박아서, 칩 줄과 같은 자리·같은 리듬을 쓴다(min-height 44 · 아래 여백 12).
+ * 칩 줄은 종목이 늘면 래핑돼 두 줄이 되지만 이 줄은 하나라 **줄어들 여지만 있다.**
+ */
+.tm-competition-filter-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 2px 0 12px;
+  color: var(--text-strong);
+  font-size: 14px;
+  font-weight: 600;
+}
+.tm-competition-filter-summary-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tm-competition-filter-summary:focus-visible {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+  border-radius: var(--radius-control);
+}
+
 .tm-sport-chip-row {
   display: flex;
   gap: 8px;

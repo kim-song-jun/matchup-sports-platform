@@ -9,6 +9,14 @@ import {
   parseCompetitionKind,
   type CompetitionKind,
 } from '@/components/v1-ui/competition-kind-segment';
+import {
+  CompetitionFilterSheet,
+  CompetitionFilterSummary,
+} from '@/components/v1-ui/competition-filter-sheet';
+import {
+  buildCompetitionFilterModel,
+  COMPETITION_STATUS_FILTERS,
+} from '@/components/v1-ui/competition-filter-model';
 import { EmptyState, ErrorState, SectionTitle } from '@/components/v1-ui/primitives';
 import { TournamentPromoCarousel } from '@/components/tournaments/tournament-promo-carousel';
 import { useV1AllTournaments, useV1Tournaments, useV1MasterSports } from '@/hooks/use-v1-api';
@@ -74,18 +82,30 @@ export function TournamentsListContent() {
   const [page, setPage] = useState(1);
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [allItems, setAllItems] = useState<V1TournamentListItem[]>([]);
-  // D3: 종목 필터 — null = '전체'
-  const [activeSportId, setActiveSportId] = useState<string | null>(null);
+
 
   /* 유형 필터(전체/정규 대회/정규 리그)는 **URL 이 소유한다** — 링크로 공유되고 뒤로가기가
-     통해야 하기 때문이다. 종목 필터는 컴포넌트 state 그대로 둔다: 유형은 "어느 목록을
-     보는가"라 주소가 되어야 하지만, 종목은 그 안에서의 일시적 좁히기다.
+     통해야 하기 때문이다.
+
+     **상태·종목도 URL 로 옮겼다**(2026-09-01 B안). 예전엔 종목만 컴포넌트 state 였는데,
+     ① 필터 시트가 이 저장소의 다른 목록과 같은 규약(열림·닫힘도 URL)을 따르고
+     ② `/league-matches` 리다이렉트가 **고른 상태를 함께 넘겨야** 해서(사용자 확정) —
+     넘길 수 있는 건 URL 뿐이다. state 로 두면 넘겨받을 자리가 없다.
      **기본은 `all`** — 쿼리 없는 `/tournaments` 가 곧 "전체" 다. 그래야 세그먼트의 첫 칸이
      성립하고(사용자가 고른 화면이다), 통합 목록이 기본 화면이 된다.
      `/league-matches` 가 아직 살아 있어 리그를 두 곳에서 볼 수 있는데, 그건 중복일 뿐
      깨지지 않는다 — **리다이렉트 PR 이 정리할 몫**이다. */
   const searchParams = useSearchParams();
   const activeKind: CompetitionKind = parseCompetitionKind(searchParams.get('kind'), 'all');
+  const activeStatus = searchParams.get('status');
+  /* URL 은 사용자가 직접 편집할 수 있다 — 모르는 값을 서버로 넘기면 400 이 나고, 그때는
+     원인이 주소인지 화면인지 구분이 안 된다. **아는 값만 통과시킨다.** */
+  const knownStatus = COMPETITION_STATUS_FILTERS.some((option) => option.value === activeStatus)
+    ? (activeStatus as NonNullable<Parameters<typeof useV1Tournaments>[0]>['status'])
+    : undefined;
+  const activeSportId = searchParams.get('sportId');
+  // 시트 열림도 URL 이다 — 뒤로가기로 닫히고, 필터가 담긴 주소를 그대로 공유할 수 있다.
+  const filterSheetOpen = searchParams.get('filter') === '1';
 
   /* 유형이 바뀌면 목록 자체가 갈리므로 페이지·누적을 리셋한다 — 종목 칩과 같은 처리지만,
      이쪽은 클릭 핸들러가 아니라 **URL 변화**가 방아쇠라 effect 로 받는다(뒤로가기로 유형이
@@ -94,7 +114,9 @@ export function TournamentsListContent() {
     setPage(1);
     setCursor(undefined);
     setAllItems([]);
-  }, [activeKind]);
+    // 상태·종목이 바뀌어도 같은 이유로 리셋한다 — 목록 내용이 갈리므로 누적분이 남으면
+    // 이전 필터의 카드가 섞인 채로 보인다.
+  }, [activeKind, activeStatus, activeSportId]);
 
   /* D3: 데이터드리븐 종목 필터 — DB seed 기준 유효한 종목만 노출 (하드코딩 제거) */
   const { data: sportsData } = useV1MasterSports();
@@ -106,6 +128,7 @@ export function TournamentsListContent() {
     ...(isDesktop ? { page } : { cursor }),
     limit: TOURNAMENT_PAGE_SIZE,
     sportId: activeSportId ?? undefined,
+    status: knownStatus,
     kind: activeKind,
   });
   const promoTournaments = useV1AllTournaments({
@@ -151,12 +174,14 @@ export function TournamentsListContent() {
   };
 
   /** D3: 종목 칩 선택 — 페이지/누적 목록 리셋 후 필터 적용 */
-  const handleSportFilter = (code: string | null) => {
-    setActiveSportId(code);
-    setPage(1);
-    setCursor(undefined);
-    setAllItems([]);
-  };
+
+  /* 필터 링크·요약 문구는 순수 함수가 만든다(`competition-filter-model`) — 화면 없이
+     검증되고, 2단계 리다이렉트가 같은 매핑을 재사용한다. */
+  const filterModel = buildCompetitionFilterModel({
+    basePath: '/tournaments',
+    params: new URLSearchParams(searchParams.toString()),
+    sports: filterSports,
+  });
 
   const activeSportLabel = activeSportId
     ? filterSports.find((sport) => sport.id === activeSportId)?.label
@@ -208,34 +233,10 @@ export function TournamentsListContent() {
 
         <CompetitionKindSegment active={activeKind} />
 
-        <div role="group" aria-label="종목 필터" className="tm-sport-chip-row">
-          {/* 전체 칩 */}
-          <button
-            type="button"
-            onClick={() => handleSportFilter(null)}
-            aria-pressed={activeSportId === null}
-            aria-label="전체 종목"
-            className={`tm-chip${activeSportId === null ? ' tm-chip-active' : ''}`}
-          >
-            전체
-          </button>
-
-          {filterSports.map(({ id, label }) => {
-            const isActive = activeSportId === id;
-            return (
-              <button
-                key={id}
-                type="button"
-                onClick={() => handleSportFilter(id)}
-                aria-pressed={isActive}
-                aria-label={`${label} 종목만 보기`}
-                className={`tm-chip${isActive ? ' tm-chip-active' : ''}`}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
+        {/* 종목 칩 **줄을 대신한다** — 새 줄을 얹는 게 아니라 교체다. 사용자가 "세로 높이를
+            지금보다 늘리지 않는 것이 이 안의 핵심" 이라고 못박았고, 줄 수가 같아야 그게
+            구조적으로 성립한다. 칩 줄은 종목이 늘면 래핑돼 두 줄이 되지만 이 줄은 하나다. */}
+        <CompetitionFilterSummary model={filterModel} />
 
         {isLoading ? (
           <TournamentSkeletonList />
@@ -306,6 +307,8 @@ export function TournamentsListContent() {
             )}
           </>
         )}
+
+        {filterSheetOpen ? <CompetitionFilterSheet model={filterModel} /> : null}
       </section>
 
       <section

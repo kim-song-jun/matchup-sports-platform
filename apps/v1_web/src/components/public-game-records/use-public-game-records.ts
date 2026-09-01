@@ -64,7 +64,11 @@ const LIVE_POLL_INTERVAL_MS = PUBLIC_LIVE_POLL_INTERVAL_MS;
  * callers should read those off `data.pages[0]` and flatten only `items`
  * across pages.
  */
-export function usePublicTournamentSchedule(tournamentId: string, filters: ScheduleFilters = {}) {
+export function usePublicTournamentSchedule(
+  tournamentId: string,
+  filters: ScheduleFilters = {},
+  options: { enabled?: boolean } = {},
+) {
   return useInfiniteQuery({
     queryKey: publicGameRecordsKeys.schedule(tournamentId, filters),
     queryFn: ({ pageParam }: { pageParam: string | null }) =>
@@ -74,7 +78,7 @@ export function usePublicTournamentSchedule(tournamentId: string, filters: Sched
       }),
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-    enabled: Boolean(tournamentId),
+    enabled: Boolean(tournamentId) && (options.enabled ?? true),
     retry: false,
     refetchInterval: (query) => {
       const hasLive = query.state.data?.pages.some((page) => page.items.some((item) => item.status === 'live'));

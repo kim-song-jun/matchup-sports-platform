@@ -781,6 +781,71 @@ describe('BracketPageContent — 정규 리그 거울 행(format=group_knockout,
     expect(tabs.map((tab) => tab.textContent)).toEqual(['경기 일정', '리그 순위']);
   });
 
+  /**
+   * **alpha 실측으로 잡힌 결함(2026-09-01).** `/schedule` 은 리그 순위를 정상으로 주는데
+   * 이 탭만 "순위 집계 전이에요" 를 그렸다 — 거울 행에는 대회 축 `groups` 가 **하나도 없어서**
+   * 상세에서 파생하던 `allLeagueRows` 가 항상 빈 배열이었기 때문이다.
+   *
+   * 서버는 맞았고 **화면이 다른 소스를 보고 있었다.** 그래서 소스만 갈랐다.
+   *
+   * 아래 두 테스트가 짝이다 — 앞은 *"주면 그린다"*, 뒤는 *"안 주면 못 그린다"*.
+   * 뒤가 없으면 이 테스트는 **원래 통과했을 수도 있는지** 알 수 없다.
+   */
+  const leagueSchedule = () => ({
+    tournamentId: 'league-1',
+    tournamentTitle: '테스트 리그',
+    bracketPublished: true,
+    items: [],
+    unscheduled: [],
+    standings: [
+      {
+        groupId: 'league-1',
+        groupName: '리그 순위',
+        teamId: 'team-42',
+        teamName: '성수 FC',
+        teamLogoUrl: null,
+        position: 1,
+        points: 9,
+        wins: 3,
+        draws: 0,
+        losses: 0,
+        goalsFor: 10,
+        goalsAgainst: 2,
+      },
+    ],
+    nextCursor: null,
+  });
+
+  it('순위 탭이 /schedule 의 리그 순위를 그린다 — 상세의 groups 는 리그에서 늘 비어 있다', () => {
+    renderBracketStandingsTab(mirrorLeague(), leagueSchedule() as never);
+
+    expect(screen.getByText('성수 FC')).toBeInTheDocument();
+    expect(screen.queryByText('순위 집계 전이에요')).not.toBeInTheDocument();
+  });
+
+  it('대조군: 그 응답이 없으면 여전히 못 그린다 — 위 테스트가 소스 전환을 실제로 재고 있다', () => {
+    renderBracketStandingsTab(mirrorLeague());
+
+    expect(screen.queryByText('성수 FC')).not.toBeInTheDocument();
+  });
+
+  /**
+   * **못 불러온 것을 "없다" 로 말하면 안 된다.** 순위를 `/schedule` 에 의존하게 만들면서
+   * 그 쿼리의 로딩·에러를 안 가르면, 빈 배열이 그대로 *"순위 집계 전이에요"* 로 읽힌다 —
+   * 이 PR 이 고치려던 바로 그 증상이 원인만 바뀌어 되살아난다. 에러일 때 특히 나쁘다:
+   * 사용자가 다시 시도할 이유를 못 찾는다.
+   *
+   * 이 테스트 환경은 네트워크를 안 태우므로 캐시를 안 넣으면 쿼리가 **에러**로 정착한다.
+   */
+  it('순위를 못 불러왔으면 "없다" 가 아니라 못 불러왔다고 말한다', async () => {
+    renderBracketStandingsTab(mirrorLeague());
+
+    expect(await screen.findByText('순위를 불러오지 못했어요.')).toBeInTheDocument();
+    // 거짓 빈 상태를 함께 막는다 — 둘 다 안 떠야 고쳐진 것이다.
+    expect(screen.queryByText('순위 집계 전이에요')).not.toBeInTheDocument();
+    expect(screen.queryByText('경기 일정이 아직 없어요.')).not.toBeInTheDocument();
+  });
+
   it('안내 문구에서 조별리그·결선을 말하지 않는다', () => {
     renderBracketPage(mirrorLeague());
 

@@ -24,7 +24,10 @@ import {
 import { usePublicTournamentSchedule } from '@/components/public-game-records/use-public-game-records';
 // ⚠️ 이 파일에도 동명 지역 함수가 있다(대회 상세 `V1TournamentStanding` 용). 별칭으로 갈라
 // 둔다 — 같은 이름 두 개가 서로 다른 입력을 받으면 다음 사람이 아무거나 집는다.
-import { toStandingsRows as publicStandingsToRows } from '@/components/public-game-records/schedule-content';
+import {
+  standingsAriaLabel,
+  toStandingsRows as publicStandingsToRows,
+} from '@/components/public-game-records/schedule-content';
 import { ScheduleContent } from '@/components/public-game-records/schedule-content';
 import { competitionFormatLabel, isLeagueCompetition } from '@/lib/competition-kind';
 import type {
@@ -220,10 +223,17 @@ function GroupStandingsSection({ group, fixtures }: { group: V1TournamentGroup; 
 }
 
 /* ── 리그 최종 순위표 (리그 포맷) ── */
-function LeagueStandingsSection({ rows }: { rows: readonly TournamentStandingsRow[] }) {
+function LeagueStandingsSection({
+  rows,
+  label = '리그 순위',
+}: {
+  rows: readonly TournamentStandingsRow[];
+  /** 티어가 있으면 `'1부'`·`'2부'` — 아래 `leagueStandingsHeading` 참조. */
+  label?: string;
+}) {
   return (
-    <section aria-label="리그 순위" style={{ marginBottom: 16 }}>
-      <TournamentStandingsTable rows={rows} advance={null} ariaLabel="리그 순위표" />
+    <section aria-label={standingsAriaLabel(label)} style={{ marginBottom: 16 }}>
+      <TournamentStandingsTable rows={rows} advance={null} ariaLabel={standingsAriaLabel(label, '표')} />
     </section>
   );
 }
@@ -472,6 +482,24 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
   const leagueScheduleSettled = isRegularLeague
     ? !leagueSchedule.isLoading && !leagueSchedule.isError
     : true;
+  /**
+   * 순위표 제목. 사용자 확정값은 **"tierLabel(1부/2부)을 쓰고 없으면 '리그 순위'"** 인데
+   * 이 화면은 `'리그 순위'` 를 박아 두고 있었다 — **티어 리그 55/88건(alpha 실측)에서
+   * `'1부'`·`'2부'` 가 전혀 안 보였다.** 같은 리그가 `/schedule` 에선 티어를 보여주고
+   * 여기선 안 보여주는 상태였다.
+   *
+   * 서버가 그 값을 `standings[].groupName` 에 실어 준다(한 리그는 그룹이 하나뿐이라
+   * 값이 하나로 모인다 — 여럿이면 티어를 특정할 수 없으므로 일반 명칭으로 떨어진다).
+   *
+   * ⚠️ 정규 리그일 때만이다. `format='league'` 인 **대회**는 사용자가 문구를 그대로 두라고
+   * 했으므로 건드리지 않는다.
+   */
+  const leagueStandingsGroupNames = new Set(leagueScheduleStandings.map((row) => row.groupName));
+  const leagueStandingsHeading =
+    isRegularLeague && leagueStandingsGroupNames.size === 1
+      ? [...leagueStandingsGroupNames][0]
+      : '리그 순위';
+
   const leagueHasNoFixtures = isRegularLeague
     ? leagueScheduleSettled && leagueScheduleItemCount === 0
     : fixtures.length === 0;
@@ -595,7 +623,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
               {isLeague && (
                 <section>
                   <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>
-                    리그 순위
+                    {leagueStandingsHeading}
                   </h3>
                   {isRegularLeague && !leagueScheduleSettled ? (
                     leagueSchedule.isError ? (
@@ -608,7 +636,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
                       />
                     )
                   ) : (
-                    <LeagueStandingsSection rows={allLeagueRows} />
+                    <LeagueStandingsSection rows={allLeagueRows} label={leagueStandingsHeading} />
                   )}
                 </section>
               )}

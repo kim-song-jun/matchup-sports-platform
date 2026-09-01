@@ -59,8 +59,16 @@ export default async function TournamentSchedulePage({
    *
    * ## `isLeagueCompetition` 을 쓰지 않는다
    * 그 헬퍼는 `format === 'league'` 인 **리그 방식 대회**도 true 로 준다 — 그건 진짜 대회고
-   * 이 페이지가 정상 동작한다(실측: 제목에 "리그 4팀" 이 든 대회가 984자로 정상 렌더). 여기서
-   * 묻는 것은 *"무엇인가"* 이므로 `kind` 만 본다.
+   * 이 페이지가 정상 동작한다. 2026-09-01 alpha 실측:
+   * ```
+   * 대회 62건의 format 분포   group_knockout 50 · **league 7** · knockout 5
+   * 표본 5bb5b6bb            kind=regular_tournament · format=league · /schedule 200 정상 렌더
+   * ```
+   * **`isLeagueCompetition` 으로 막으면 그 7건이 함께 막힌다.** 여기서 묻는 것은 *"무엇인가"*
+   * 이므로 `kind` 만 본다.
+   *
+   * ⚠️ 근거를 **필드와 숫자**로 적는다 — 표본의 제목에 "리그" 가 들어 있기도 한데, 그건 우연히
+   * 참인 근거라 다음 사람이 **판정 기준을 제목으로 오해**할 수 있다.
    *
    * ## 상태코드는 못 고친다 — 색인만 막는다
    * 이 라우트는 `notFound()` 를 불러도 **200** 을 반환한다(아래 quirk). 2026-09-01 재측정에서도

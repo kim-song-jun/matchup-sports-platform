@@ -81,8 +81,10 @@ describe('일정 페이지 게이트', () => {
 
   /**
    * **`isLeagueCompetition` 을 쓰면 이 테스트가 red 가 된다.**
-   * 그 헬퍼는 `format === 'league'` 도 true 로 주는데, 그건 **리그 방식으로 치르는 진짜 대회**다
-   * (alpha 실측 7건). 이 페이지가 정상 동작하므로 막으면 안 된다.
+   * 그 헬퍼는 `format === 'league'` 도 true 로 주는데, 그건 **리그 방식으로 치르는 진짜 대회**다.
+   * 2026-09-01 alpha 실측 — 대회 62건 중 `format='league'` 가 **7건**이고, 표본 `5bb5b6bb`
+   * (`kind=regular_tournament · format=league`)는 이 페이지가 정상 렌더된다.
+   * **헬퍼로 막으면 그 7건이 함께 막힌다.**
    */
   it('리그 방식으로 치르는 대회는 통과한다 — kind 로 물어야 하는 이유', async () => {
     fetchPublicV1.mockResolvedValue(detail({ format: 'league', kind: 'regular_tournament' }));

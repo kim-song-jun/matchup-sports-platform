@@ -3612,7 +3612,14 @@ export function useAdminErrorLog(id: string) {
 // ---------------------------------------------------------------------------
 
 type TournamentListFilters = {
-  status?: 'open' | 'closed' | 'in_progress' | 'completed';
+  /**
+   * 목록 필터의 상태. `draft` 는 **정규 리그의 "예정"** 이다(2026-09-01 확정).
+   *
+   * ⚠️ 서버가 `draft` 를 `kind: regular_league` 와 **묶어서** 걸므로, 대회 표면에서는
+   * 조건이 모순이라 결과가 나오지 않는다 — 이 타입에 `draft` 가 있다고 대회의 준비 중이
+   * 열린 것은 아니다(`tournament-read.dto.ts` 의 두 상수 주석 참조).
+   */
+  status?: 'open' | 'closed' | 'in_progress' | 'completed' | 'draft';
   sportId?: string;
   cursor?: string;
   /** 데스크톱 페이지 번호. cursor 와 함께 오면 서버가 page 를 택한다. */

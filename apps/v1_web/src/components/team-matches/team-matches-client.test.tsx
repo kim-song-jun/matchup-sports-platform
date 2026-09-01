@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
 import type { V1TeamMatch, V1TeamMatchViewerState } from '@/types/api';
 import type { TeamMatchDetailViewModel, TeamMatchListViewModel, TeamMatchModel } from './team-matches.types';
-import { TeamMatchDetailPageClient, TeamMatchListPageClient, toTeamMatch } from './team-matches-client';
+import { TeamMatchDetailPageClient, TeamMatchListPageClient } from './team-matches-client';
+import { toTeamMatch } from './team-matches.card-model';
 
 vi.mock('@/lib/analytics', () => ({ trackEvent: vi.fn() }));
 

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import type { CSSProperties, PointerEvent, ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, ChevronDown, Lock } from 'lucide-react';
@@ -10,7 +10,7 @@ import { Card, EmptyState, ErrorState, KPIStat, ListItem } from '@/components/v1
 import { ChevronLeftIcon, ChevronRightIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
-import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
+import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
 import { cssUrl } from '@/lib/assets';
 import { useV1PublicTeamReviewSummary } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -1698,13 +1698,18 @@ function TeamSearchBar({ model }: { model: TeamListViewModel }) {
 }
 
 function TeamFilterSheet({ model }: { model: TeamListViewModel }) {
+  const router = useRouter();
   const sheet = model.filterSheet;
   if (!sheet) return null;
 
+  // BottomSheet 는 URL 로 열림·닫힘을 소유하는 controlled 컴포넌트(A안) — 이 함수 자체가
+  // 이미 `model.filterSheet?.open` 게이트(호출부 line 109) 뒤에서만 렌더되므로 open 은 항상
+  // true 로 고정한다. 드래그·ESC 로 닫힐 때는 이 컴포넌트가 상태를 바꾸는 게 아니라
+  // 기존과 동일하게 closeHref 로 네비게이션해 URL 이 실제 권위를 유지하게 한다.
   return (
     <>
       <Link className="tm-filter-scrim" href={sheet.closeHref} aria-label="필터 닫기" />
-      <DraggableFilterSheet closeHref={sheet.closeHref} ariaLabel="팀 필터">
+      <BottomSheet open ariaLabel="팀 필터" onRequestClose={() => router.push(sheet.closeHref)}>
         <div className="tm-filter-sheet-handle" />
         <div className="tm-filter-sheet-head">
           <div>
@@ -1731,79 +1736,8 @@ function TeamFilterSheet({ model }: { model: TeamListViewModel }) {
           <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={sheet.closeHref}>닫기</Link>
           <Link className="tm-btn tm-btn-lg tm-btn-primary" href={sheet.applyHref}>적용하기</Link>
         </div>
-      </DraggableFilterSheet>
+      </BottomSheet>
     </>
-  );
-}
-
-function DraggableFilterSheet({
-  closeHref,
-  ariaLabel,
-  children,
-}: {
-  closeHref: string;
-  ariaLabel: string;
-  children: ReactNode;
-}) {
-  const router = useRouter();
-  const startYRef = useRef(0);
-  const draggingRef = useRef(false);
-  const [offsetY, setOffsetY] = useState(0);
-
-  // focus 저장/복원 · ESC 닫기 · Tab focus trap · body 스크롤 잠금은 공용 훅(useModalA11y)에
-  // 위임한다. 이 시트는 부모(TeamFilterSheet)가 조건부 렌더로 즉시 마운트/언마운트하고
-  // 퇴장 애니메이션을 쓰지 않으므로 open=true 고정, mounted/closing 은 쓰지 않는다.
-  // backdrop 은 별도 <Link className="tm-filter-scrim"> 로 이미 처리돼 onBackdropClick 은 불필요.
-  const { dialogRef } = useModalA11y<HTMLElement, HTMLElement>({
-    open: true,
-    onClose: () => router.push(closeHref),
-  });
-
-  const handlePointerDown = (event: PointerEvent<HTMLElement>) => {
-    startYRef.current = event.clientY;
-    draggingRef.current = true;
-    setOffsetY(0);
-    event.currentTarget.setPointerCapture(event.pointerId);
-  };
-
-  const handlePointerMove = (event: PointerEvent<HTMLElement>) => {
-    if (!draggingRef.current) return;
-    setOffsetY(Math.max(0, event.clientY - startYRef.current));
-  };
-
-  const handlePointerEnd = (event: PointerEvent<HTMLElement>) => {
-    if (!draggingRef.current) return;
-    draggingRef.current = false;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-    if (offsetY > 72) {
-      router.push(closeHref);
-      return;
-    }
-    setOffsetY(0);
-  };
-
-  return (
-    <div className="tm-filter-layer">
-      {/* role="dialog" + aria-modal="true": 스크린리더가 시트를 대화상자로 인식하고
-          배경 콘텐츠를 읽지 않도록 함. ESC·Tab focus trap·스크롤 잠금·포커스 복원은
-          useModalA11y 가 담당(드래그는 pointer 이벤트 전용이라 Tab trap 과 충돌하지 않는다). */}
-      <section
-        ref={dialogRef}
-        className="tm-filter-sheet"
-        role="dialog"
-        aria-modal="true"
-        aria-label={ariaLabel}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerEnd}
-        onPointerCancel={handlePointerEnd}
-        style={{ transform: `translateY(${offsetY}px)` }}
-      >
-        {children}
-      </section>
-    </div>
   );
 }
 

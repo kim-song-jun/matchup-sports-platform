@@ -11,7 +11,8 @@ import { ChevronLeftIcon, ChevronRightIcon, FilterIcon, HomeIcon, PlusIcon, Sear
 import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
 import { NotificationBellButton } from '@/components/v1-ui/notification-bell';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
-import { CreateField, DraggableFilterSheet, FieldErrorText, GenderRuleSelector, MissingFieldsBanner, MultiPresetChipSelector, PresetChipSelector, RecentVenueChips } from '@/components/v1-ui/create-form-fields';
+import { CreateField, FieldErrorText, GenderRuleSelector, MissingFieldsBanner, MultiPresetChipSelector, PresetChipSelector, RecentVenueChips } from '@/components/v1-ui/create-form-fields';
+import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
 import { cssUrl } from '@/lib/assets';
 import type {
   TeamMatchCreateViewModel,
@@ -724,12 +725,16 @@ function TeamMatchSearchBar({ filterCount, search, query, filterHref = '/team-ma
 
 function TeamMatchFilterSheet({ model }: { model: TeamMatchListViewModel }) {
   const sheet = model.filterSheet;
+  const router = useRouter();
   if (!sheet) return null;
 
+  // 열림·닫힘의 권위는 URL이다(A안 계약 1) — open은 부모가 이미 URL에서 유도해 둔
+  // sheet.open을 그대로 넘긴다. 닫기는 기존 Link/DraggableFilterSheet와 동일하게
+  // router.push(closeHref)로 네비게이션한다(뒤로가기·URL 공유 성질 보존, A안 계약 2).
   return (
     <>
       <Link className="tm-filter-scrim" href={sheet.closeHref} aria-label="필터 닫기" />
-      <DraggableFilterSheet closeHref={sheet.closeHref} ariaLabel="팀매치 필터">
+      <BottomSheet open={sheet.open} onRequestClose={() => router.push(sheet.closeHref)} ariaLabel="팀매치 필터">
         <div className="tm-filter-sheet-handle" />
         <div className="tm-filter-sheet-head">
           <div>
@@ -766,7 +771,7 @@ function TeamMatchFilterSheet({ model }: { model: TeamMatchListViewModel }) {
           <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={sheet.closeHref}>닫기</Link>
           <Link className="tm-btn tm-btn-lg tm-btn-primary" href={sheet.applyHref}>적용하기</Link>
         </div>
-      </DraggableFilterSheet>
+      </BottomSheet>
     </>
   );
 }

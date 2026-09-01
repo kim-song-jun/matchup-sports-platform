@@ -641,7 +641,10 @@ button:disabled {
      여유), 좌우 압박을 줄이려 최소 패딩을 준다 — 라벨(최대 2글자)이 탭 경계에
      바짝 붙는 것을 막는다. 아래 .tm-bottom-tab span 주석에 열 수·라벨 폭 계산 근거. */
   padding: 0 2px;
-  /* 활성 pill(::before)의 기준점 */
+  /* 활성 pill 은 이제 nav 레벨의 형제 요소(.tm-bottom-nav-pill-slot)라 이 탭 자신의
+     기준점은 아니다 — 대신 그 pill 위에서 아이콘·라벨이 항상 보이도록 스태킹 순서를
+     맞추는 역할을 한다(position:static 인 요소는 뒤의 position:absolute 형제보다
+     항상 아래에 깔리므로, 이 relative 가 없으면 pill 이 아이콘을 가린다). */
   position: relative;
   /* [대비] grey400 은 흰 배경에서 2.01:1 로 비텍스트 기준(3:1)의 3분의 2였다.
      grey500 이 3.04:1 로 통과한다. 아이콘은 텍스트가 아니라 3:1 기준. */
@@ -695,22 +698,45 @@ button:disabled {
    통과하지만 텍스트 기준(4.5:1)에는 못 미친다 — 텍스트는 위에서 --blue700 으로
    별도 상향했고, pill 은 형태 구분을 보조할 뿐 텍스트 대비를 대체하지 않는다.
    프로젝트 규칙(컬러만으로 정보 전달 금지)도 이쪽이 실제로 만족시킨다.
-   폭 46px 은 가장 좁은 320px 뷰포트의 탭 폭(53px)에도 좌우 3.5px 씩 남는다. */
-.tm-bottom-tab[data-active="true"]::before {
-  content: '';
-  position: absolute;
-  /* 아이콘 중심에 맞춘다. 예전에는 `top: 2px` 로 **탭 상단**에서 쟀는데, 아이콘의 실제
-     위치는 탭 상단이 아니라 탭 **중앙**을 기준으로 정해진다(justify-content: center).
-     그리고 탭 높이는 safe-area 에 따라 달라진다 — 홈 인디케이터가 없으면 50px, 있으면
-     66px. 그래서 고정 오프셋은 한쪽에서만 맞았다: safe-bottom=0 에서는 우연히 정확했고
-     (pill 중심 15px = 아이콘 중심 15px), 홈 인디케이터가 있는 기기에서는 아이콘 중심이
-     23px 로 내려가 **pill 이 8px 위로 떠 보이고 아이콘 아래 6.5px 가 pill 밖으로
-     삐져나왔다.** 즉 실제 iPhone 에서만 어긋나는 종류였다.
+   폭 46px 은 가장 좁은 320px 뷰포트의 탭 폭(53px)에도 좌우 3.5px 씩 남는다.
 
-     탭 중앙에서 재면 탭 높이와 무관해진다. 내용은 아이콘 23px + gap 4px + 라벨 16px 이
-     세로 가운데 정렬이므로, 아이콘 중심은 **언제나** 탭 중심보다 (4px + 16px) / 2 만큼
-     위다 — 아이콘 높이는 상쇄되어 식에 남지 않는다. 값을 계산식 그대로 적어 두는 것은
-     gap 이나 라벨 line-height 가 바뀌면 여기도 같이 바꿔야 한다는 뜻이다. */
+   [미끄러지는 pill, b486d2202 이후 구조 변경] 예전엔 활성 탭마다 ::before 의사요소가
+   하나씩 있어서, 활성 탭이 바뀌면 pill 이 한 탭에서 사라지고 다른 탭에서 나타났다 —
+   탭이 여러 개일 수 없으니 애초에 미끄러질 수 없는 구조였다. 미끄러지려면 pill 이
+   nav 안에 하나만 있어야 하므로, nav 의 그리드 첫 행 전체를 차지하는 슬롯
+   (.tm-bottom-nav-pill-slot, shell.tsx BottomNav 가 탭 목록보다 먼저 렌더)을 두고
+   그 안에 실제 보이는 pill(.tm-bottom-nav-pill)을 얹는다. */
+.tm-bottom-nav-pill-slot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  /* 탭과 정확히 같은 그리드 영역(전체 열 · 유일한 행)을 컨테이닝 블록으로 삼는다 —
+     absolute 로 위치가 잡힌 grid 아이템은 자신이 놓인 그리드 영역(nav 의 padding 을
+     제외한 콘텐츠 박스)을 기준으로 삼기 때문에, 예전에 각 탭(그리드 아이템 — 행
+     높이만큼 stretch)이 기준점이었던 것과 정확히 같은 높이·위치를 얻는다. nav 자신의
+     50% 를 썼다면 padding-top(8px)과 padding-bottom(max(16px, safe-bottom))이
+     비대칭이라 safe-area 유무에 따라 4px~13px 씩 어긋난다(실측). */
+  grid-column: 1 / -1;
+  grid-row: 1;
+  /* 슬롯 폭 = 탭 1칸 폭(`calc(100% / tabCount)`, shell.tsx BottomNav 의 인라인
+     style — 탭 개수가 하드코딩에 묶이지 않도록 기존 grid-template-columns 계산과
+     같은 방식을 따른다). transform 의 `100%` 는 요소 자기 자신의 폭을 가리키므로,
+     이렇게 폭을 잡아 두면 `translateX(index * 100%)` 만으로 정확히 index 칸을
+     이동한다 — 너비를 다시 읽거나(JS 측정) `left`(레이아웃 트리거) 를 바꿀 필요가
+     없다. */
+  /* transform 만 바뀌므로 transform 하나만 전환한다 — transition-all 금지. */
+  transition: transform var(--duration-base) var(--ease-standard);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.tm-bottom-nav-pill {
+  position: absolute;
+  /* 아이콘 중심에 맞춘다 — b486d2202 에서 확정된 계산식 그대로다. 아이콘 23px + gap
+     4px + 라벨 16px 이 세로 가운데 정렬이므로, 아이콘 중심은 **언제나** 슬롯(=탭)
+     중심보다 (4px + 16px) / 2 만큼 위다 — 아이콘 높이는 상쇄되어 식에 남지 않는다.
+     gap 이나 라벨 line-height 가 바뀌면 여기도 같이 바꿔야 한다. */
   top: 50%;
   left: 50%;
   transform: translate(-50%, calc(-50% - (4px + 16px) / 2));
@@ -718,14 +744,6 @@ button:disabled {
   height: 26px;
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--blue500) 14%, transparent);
-  /* 아이콘·라벨보다 뒤에 깔린다 */
-  z-index: 0;
-}
-
-/* pill 이 뒤로 가려면 내용이 위에 있어야 한다 */
-.tm-bottom-tab > * {
-  position: relative;
-  z-index: 1;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2760,8 +2778,19 @@ label.tm-btn:focus-within {
   box-shadow: 0 -16px 32px rgba(25, 31, 40, 0.14);
   touch-action: none;
   animation: tm-filter-sheet-up .22s ease-out;
+  /* 드래그-닫기(BottomSheet) 미달-임계치 복귀용 — 진입/퇴장 `animation` 은 이 속성에서
+   * 항상 우선하므로(같은 프로퍼티에 animation 과 transition 이 동시에 걸리면 animation 승) 여기
+   * transition 을 추가해도 위 keyframe 진입이나 `.is-closing` 퇴장(취소 확인 모달 등)과
+   * 충돌하지 않는다 — 이 transition 은 오직 드래그 손을 뗀 뒤(둘 다 안 도는 순간)에만 적용된다. */
+  transition: transform .22s ease-out;
   will-change: transform;
   pointer-events: auto;
+}
+
+/* 드래그 중에는 transition 을 꺼야 손가락을 정확히 따라온다 — 켜 둔 채로 매 pointermove
+ * 마다 transform 을 바꾸면 각 프레임이 짧게 트랜지션되며 손가락보다 한 박자 늦게 쫓아온다. */
+.tm-filter-sheet.is-dragging {
+  transition: none;
 }
 
 @keyframes tm-filter-scrim-fade {

@@ -7878,7 +7878,7 @@ html[data-teameet-native-app='android'] .tm-native-toast-card {
   max-width: min(100%, 360px) !important;
   min-height: 56px;
   border: 1px solid var(--grey200);
-  border-radius: 18px !important;
+  border-radius: var(--radius-container) !important;
   box-shadow: 0 8px 24px rgb(15 23 42 / 14%);
   text-align: center;
 }
@@ -7891,7 +7891,7 @@ html[data-teameet-native-app='android'] .tm-search-error-toast {
   min-height: 56px !important;
   transform: translate(-50%, -50%) !important;
   border: 1px solid var(--grey200);
-  border-radius: 18px !important;
+  border-radius: var(--radius-container) !important;
   box-shadow: 0 8px 24px rgb(15 23 42 / 14%);
   padding: 16px 20px !important;
   text-align: center;

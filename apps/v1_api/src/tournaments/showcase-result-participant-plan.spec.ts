@@ -1,5 +1,6 @@
 import { buildShowcaseResultParticipantPlan } from '../../prisma/showcase-result-participant-plan';
 import { repairExistingShowcaseOfficialResult } from '../../prisma/showcase-official-result-repair';
+import { ensureShowcaseRepresentativeParticipant } from '../../prisma/seed-alpha-showcase-results';
 
 const row = (participantId: string, sideId: string, goals: number) => ({
   participantId,
@@ -67,6 +68,74 @@ describe('showcase result participant repair plan', () => {
 
     expect(plan.requiresRevision).toBe(false);
     expect(plan.rows).toEqual(currentRows);
+  });
+});
+
+describe('Alpha showcase representative game participant repair', () => {
+  const input = {
+    gameId: 'game-1',
+    sideId: 'home',
+    userId: 'user-1',
+    displayNameSnapshot: 'Representative',
+    jerseyNumber: 7,
+  } as const;
+
+  function participantTransaction(options?: {
+    existing?: { id: string; sideId: string; userId: string };
+    lineup?: { id: string } | null;
+  }) {
+    return {
+      v1GameParticipant: {
+        findFirst: jest.fn().mockResolvedValue(options?.existing ?? null),
+        create: jest.fn().mockResolvedValue({ id: 'participant-new', sideId: input.sideId, userId: input.userId }),
+      },
+      v1GameLineup: {
+        findFirst: jest.fn().mockResolvedValue(options?.lineup === undefined ? { id: 'lineup-existing' } : options.lineup),
+        create: jest.fn().mockResolvedValue({ id: 'lineup-new' }),
+      },
+    };
+  }
+
+  it('preserves an existing representative participant', async () => {
+    const existing = { id: 'participant-existing', sideId: input.sideId, userId: input.userId };
+    const tx = participantTransaction({ existing });
+    await expect(ensureShowcaseRepresentativeParticipant(tx as never, input)).resolves.toEqual(existing);
+    expect(tx.v1GameLineup.findFirst).not.toHaveBeenCalled();
+    expect(tx.v1GameParticipant.create).not.toHaveBeenCalled();
+  });
+
+  it('appends the missing participant to the latest existing lineup', async () => {
+    const tx = participantTransaction();
+    await expect(ensureShowcaseRepresentativeParticipant(tx as never, input)).resolves.toEqual({
+      id: 'participant-new',
+      sideId: input.sideId,
+      userId: input.userId,
+    });
+    expect(tx.v1GameLineup.create).not.toHaveBeenCalled();
+    expect(tx.v1GameParticipant.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ lineupId: 'lineup-existing', userId: input.userId }),
+      select: { id: true, sideId: true, userId: true },
+    });
+  });
+
+  it('creates a lineup only when the side has none', async () => {
+    const tx = participantTransaction({ lineup: null });
+    await ensureShowcaseRepresentativeParticipant(tx as never, input);
+    expect(tx.v1GameLineup.create).toHaveBeenCalledWith({
+      data: { gameId: input.gameId, sideId: input.sideId, revision: 1 },
+      select: { id: true },
+    });
+    expect(tx.v1GameParticipant.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ lineupId: 'lineup-new' }),
+    }));
+  });
+
+  it('fails closed when the representative already belongs to the other side', async () => {
+    const tx = participantTransaction({
+      existing: { id: 'participant-wrong', sideId: 'away', userId: input.userId },
+    });
+    await expect(ensureShowcaseRepresentativeParticipant(tx as never, input)).rejects.toThrow('on the wrong side');
+    expect(tx.v1GameParticipant.create).not.toHaveBeenCalled();
   });
 });
 const repairInput = {

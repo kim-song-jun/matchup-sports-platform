@@ -40,6 +40,52 @@ function resultFor(goalsFor: number, goalsAgainst: number) {
   return 'DRAWN';
 }
 
+export async function ensureShowcaseRepresentativeParticipant(
+  tx: Prisma.TransactionClient,
+  input: {
+    readonly gameId: string;
+    readonly sideId: string;
+    readonly userId: string;
+    readonly displayNameSnapshot: string;
+    readonly jerseyNumber: number;
+  },
+) {
+  const existing = await tx.v1GameParticipant.findFirst({
+    where: { gameId: input.gameId, userId: input.userId },
+    select: { id: true, sideId: true, userId: true },
+  });
+  if (existing) {
+    if (existing.sideId !== input.sideId) {
+      throw new Error(`Showcase game ${input.gameId} has representative ${input.userId} on the wrong side.`);
+    }
+    return existing;
+  }
+
+  let lineup = await tx.v1GameLineup.findFirst({
+    where: { gameId: input.gameId, sideId: input.sideId },
+    orderBy: { revision: 'desc' },
+    select: { id: true },
+  });
+  if (!lineup) {
+    lineup = await tx.v1GameLineup.create({
+      data: { gameId: input.gameId, sideId: input.sideId, revision: 1 },
+      select: { id: true },
+    });
+  }
+  return tx.v1GameParticipant.create({
+    data: {
+      gameId: input.gameId,
+      sideId: input.sideId,
+      lineupId: lineup.id,
+      userId: input.userId,
+      displayNameSnapshot: input.displayNameSnapshot,
+      jerseyNumber: input.jerseyNumber,
+      started: true,
+    },
+    select: { id: true, sideId: true, userId: true },
+  });
+}
+
 async function seedFixtureResult(
   tx: Prisma.TransactionClient,
   fixture: {
@@ -147,17 +193,33 @@ async function seedFixtureResult(
   if (!homeSide || !awaySide) {
     throw new Error('Showcase fixture ' + fixture.id + ' is missing a game side.');
   }
-  const homeUserId = fixture.homeRegistration.players[0]?.userId;
-  const awayUserId = fixture.awayRegistration.players[0]?.userId;
-  const homeParticipant = game.participants.find(
+  const homePlayer = fixture.homeRegistration.players[0];
+  const awayPlayer = fixture.awayRegistration.players[0];
+  const homeUserId = homePlayer?.userId;
+  const awayUserId = awayPlayer?.userId;
+  let homeParticipant = game.participants.find(
     (participant) => participant.sideId === homeSide.id && participant.userId === homeUserId,
   );
-  const awayParticipant = game.participants.find(
+  let awayParticipant = game.participants.find(
     (participant) => participant.sideId === awaySide.id && participant.userId === awayUserId,
   );
-  if (!homeUserId || !awayUserId || !homeParticipant || !awayParticipant) {
+  if (!homePlayer || !awayPlayer || !homeUserId || !awayUserId) {
     throw new Error('Showcase fixture ' + fixture.id + ' is missing its representative roster participants.');
   }
+  homeParticipant ??= await ensureShowcaseRepresentativeParticipant(tx, {
+    gameId: game.id,
+    sideId: homeSide.id,
+    userId: homeUserId,
+    displayNameSnapshot: homePlayer.realName,
+    jerseyNumber: 7,
+  });
+  awayParticipant ??= await ensureShowcaseRepresentativeParticipant(tx, {
+    gameId: game.id,
+    sideId: awaySide.id,
+    userId: awayUserId,
+    displayNameSnapshot: awayPlayer.realName,
+    jerseyNumber: 7,
+  });
 
   const { homeScore, awayScore, recordedAt } = fixture.result;
   if (game.currentOfficialRevisionId) {

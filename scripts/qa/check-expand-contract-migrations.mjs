@@ -1456,12 +1456,21 @@ function selfTest() {
   ];
   for (const [label, sql] of unparsableCases) {
     let refused = false;
+    let unexpected = null;
     try {
       parseStatements(sql, 'selftest.sql');
     } catch (error) {
+      // 기대한 타입이 아니면 `refused` 가 false 로 남아 아래 메시지가 **"splitter 가
+      // 삼켰다"** 라고 말한다 — 실제로는 삼킨 게 아니라 **다른 이유로 죽은** 것이다.
+      // 소리 없이 통과하진 않지만 원인을 엉뚱한 데로 보낸다. 어떤 오류였는지 남긴다.
       refused = error instanceof UnparsableSqlError;
+      if (!refused) unexpected = error;
     }
-    if (!refused) fail(`splitter swallowed ${label} instead of refusing to parse it`);
+    if (!refused) {
+      fail(unexpected
+        ? `splitter threw an unexpected error for ${label}: ${unexpected?.message ?? unexpected}`
+        : `splitter swallowed ${label} instead of refusing to parse it`);
+    }
   }
 
   // A FK on an existing table's column is additive only while that column

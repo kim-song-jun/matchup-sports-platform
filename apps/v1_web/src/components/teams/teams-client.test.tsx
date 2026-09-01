@@ -504,3 +504,72 @@ describe('TeamDetailPageClient — 로딩 중 목업 노출 방지', () => {
     expect(screen.queryByText('서울 성동')).not.toBeInTheDocument();
   });
 });
+
+describe('TeamDetailPageClient — 서버 seed 로 그리는 동안 뷰어 의존 UI 잠금', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    teamApiMocks.useV1TeamJoinEligibility.mockReturnValue({ data: undefined });
+    teamApiMocks.useV1CreateTeamJoinApplication.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+    teamApiMocks.useV1WithdrawTeamJoinApplication.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+    teamApiMocks.useV1ResolveChatRoom.mockReturnValue({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false });
+    teamApiMocks.useV1TeamMatches.mockReturnValue({ data: { items: [] }, isLoading: false });
+  });
+
+  function seededDetail() {
+    return {
+      teamId: 'team-1',
+      name: '성수 풋살 크루',
+      status: 'active',
+      visibility: 'public',
+      sport: { sportId: 'sport-futsal', name: '풋살' },
+      region: { regionId: 'region-seoul', name: '서울', parentName: null },
+      regionName: '서울 성동구',
+      joinPolicy: 'approval_required',
+      membersVisibilityEnabled: true,
+      canViewMembers: true,
+      memberCount: 4,
+      managerCount: 1,
+      profile: { logoUrl: null, coverImageUrl: null, introduction: '', activityAreaText: null, activityDays: [], activityFrequency: null, activityTimeSlots: [], ageRange: null, genderRule: null, memberGoalCount: null },
+      membersPreview: [],
+      owner: null,
+      trust: null,
+      trustState: null,
+      // 비인증 응답이 실제로 주는 모양 — 로그인한 owner 가 이 값을 그대로 보면 안 된다.
+      viewer: { role: 'none', membershipId: null, joinState: 'none', canRequestJoin: false, disabledReason: 'LOGIN_REQUIRED', manageRoute: null },
+    };
+  }
+
+  it('seed 로 그리는 동안 팀 이름은 보여주되 가입 CTA 는 잠근다', () => {
+    teamApiMocks.useV1TeamDetail.mockReturnValue({
+      data: seededDetail(),
+      isError: false,
+      isPlaceholderData: true,
+    });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    // 팀 정보는 즉시 보인다.
+    expect(screen.getAllByText('성수 풋살 크루').length).toBeGreaterThan(0);
+    // 뷰어 판정은 아직 남의 것(비로그인)이므로 행동은 막고, 막힌 이유를 로딩이라고 말한다.
+    const cta = screen.getAllByRole('button', { name: '불러오는 중' })[0];
+    expect(cta).toBeTruthy();
+    expect(cta).toBeDisabled();
+    // '처리 중'(= 내 신청 처리 중)으로 새면 로딩을 잘못 설명한다.
+    expect(screen.queryByRole('button', { name: '처리 중' })).toBeNull();
+    // 비로그인 판정에서 나오던 '가입 신청'도 뜨면 안 된다.
+    expect(screen.queryByRole('button', { name: '가입 신청' })).toBeNull();
+  });
+
+  it('실응답이 도착하면(placeholder 해제) 뷰어 판정에 따른 CTA 가 열린다', () => {
+    teamApiMocks.useV1TeamDetail.mockReturnValue({
+      data: { ...seededDetail(), viewer: { role: 'none', membershipId: null, joinState: 'none', canRequestJoin: true, disabledReason: null, manageRoute: null } },
+      isError: false,
+      isPlaceholderData: false,
+    });
+    teamApiMocks.useV1TeamJoinEligibility.mockReturnValue({ data: { eligible: true, joinState: 'none', message: null } });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    expect(screen.queryByRole('button', { name: '불러오는 중' })).toBeNull();
+  });
+});

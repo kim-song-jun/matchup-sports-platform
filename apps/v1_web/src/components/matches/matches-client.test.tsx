@@ -50,6 +50,7 @@ vi.mock('./matches-page', () => ({
       <div data-testid="title">{model.match.title}</div>
       <div data-testid="status-label">{model.statusLabel}</div>
       <div data-testid="apply-label">{model.applyLabel}</div>
+      <div data-testid="apply-pending">{String(model.applyPending)}</div>
       <div data-testid="rules">{model.match.rules.join('|')}</div>
       <div data-testid="participants">{model.match.participants.map((p) => p.name).join('|')}</div>
     </div>
@@ -338,6 +339,9 @@ describe('MatchDetailPageClient — 목록 캐시 승계(placeholder) 중 행동
 
     expect(screen.getByTestId('title').textContent).toBe('풋살 매치');
     expect(screen.getByTestId('apply-label').textContent).toBe('불러오는 중');
+    // applyPending 을 켜면 렌더 쪽이 라벨을 '처리 중'(= 내 신청 처리 중)으로 덮어써
+    // 로딩을 잘못 설명한다 — 잠금은 onApply 를 비우는 것으로만 한다.
+    expect(screen.getByTestId('apply-pending').textContent).toBe('false');
     expect(screen.getByTestId('status-label').textContent).toBe('');
     expect(screen.queryByRole('button', { name: '참가 신청' })).toBeNull();
   });

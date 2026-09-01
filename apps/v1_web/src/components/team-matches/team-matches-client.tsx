@@ -333,7 +333,8 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
     },
     mode: toDetailMode(viewerState, getStatus(query.data)),
     applyLabel: seeding ? '불러오는 중' : applyLabel(viewerState, getStatus(query.data), selectedEligibility, isGuest, hasNoTeam, eligibility.isSuccess),
-    applyPending: seeding || applyTeamMatch.isPending || withdrawTeamMatch.isPending,
+    // matches-client.tsx 와 같은 이유 — '처리 중' 이 '불러오는 중' 을 덮어쓴다.
+    applyPending: applyTeamMatch.isPending || withdrawTeamMatch.isPending,
     hostActions: !seeding && canManageHostTeam
       ? buildHostActions({
           status: getStatus(query.data),
@@ -351,7 +352,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
     reviewAction: buildReviewAction(teamMatchId, getStatus(query.data), isParticipantMember),
     statusLabel: seeding ? undefined : statusLabel(viewerState, getStatus(query.data)),
     chatLabel: chatLabel(canManageHostTeam, canManageOpponentTeam),
-    chatPending: seeding || resolveChatRoom.isPending,
+    chatPending: resolveChatRoom.isPending,
     chatError,
     onChat: !seeding && canOpenTeamMatchChat(canManageHostTeam, canManageOpponentTeam)
       ? () => {

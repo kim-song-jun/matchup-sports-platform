@@ -54,6 +54,17 @@ describe('MatchListSsrView', () => {
     expect(screen.queryByText(/10월 2일/)).not.toBeInTheDocument();
   });
 
+  it("'오늘' 집계도 KST 기준이다 — 서버가 UTC 라도 크롤러가 같은 숫자를 본다", () => {
+    // KST 자정 직후에 시작하는 매치. 로컬(UTC) 비교였다면 '어제'로 세어 0 이 된다.
+    const kstToday = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
+    const { container } = render(
+      <MatchListSsrView matches={[match({ startsAt: `${kstToday}T00:30:00+09:00` })]} />,
+    );
+
+    // 요약 줄은 '1개 · 오늘 1 · 모집 중 1' 처럼 여러 요소로 쪼개져 렌더된다.
+    expect(container.textContent).toContain('오늘 1');
+  });
+
   it('매치의 제목·종목·장소를 서버 렌더 마크업에 담는다', () => {
     render(<MatchListSsrView matches={[match()]} />);
 

@@ -288,6 +288,29 @@ export function formatAdminDate(dateStr: string | null | undefined): string {
  * (서버가 KST 기준으로 배치한다) 실행 환경 타임존과 무관하게 Asia/Seoul로 고정한다.
  * dateStr 이 invalid 이면 원본 문자열을 그대로 반환.
  */
+/**
+ * 목록 카드용 날짜 'M월 D일 (요일)' — KST 고정.
+ *
+ * 매치·팀매치 카드가 함께 쓴다. 서버 렌더에서도 호출되므로 타임존을 고정하지 않으면
+ * 서버(대개 UTC)와 브라우저(KST)가 하루 어긋난다. invalid 입력에는 원문을 그대로 돌려주는데,
+ * 이는 이 포맷터를 쓰던 카드의 기존 동작이다(빈 칸보다 원문이 디버깅에 낫다).
+ */
+export function formatCardDate(dateStr: string): string {
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', month: 'long', day: 'numeric', weekday: 'short' });
+}
+
+/**
+ * 목록 카드용 시각 'HH:mm' — KST 고정. invalid 입력에는 빈 문자열을 돌려준다(기존 카드 동작:
+ * 시각 슬롯은 비워 두는 편이 원문 노출보다 낫다 — 종료 시각처럼 없을 수 있는 값에 쓰인다).
+ */
+export function formatCardTime(dateStr: string): string {
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
 export function formatKstTime(dateStr: string): string {
   const d = new Date(dateStr);
   if (Number.isNaN(d.getTime())) return dateStr;

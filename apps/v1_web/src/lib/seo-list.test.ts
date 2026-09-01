@@ -3,7 +3,7 @@
  * 서버 프리렌더는 크롤러용 보조 경로이고, 사용자 화면은 하이드레이션 후 클라이언트가
  * 다시 가져온다. 여기서 던지면 얻는 것 없이 사용자만 잃는다.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const fetchPublicV1 = vi.fn();
 
@@ -17,6 +17,12 @@ const { SEO_LIST_PAGE_SIZE, fetchSeoListPage } = await import('./seo-list');
 beforeEach(() => {
   fetchPublicV1.mockReset();
   vi.spyOn(console, 'error').mockImplementation(() => {});
+});
+
+// 이 프로젝트 vitest 설정에는 restoreMocks 가 없다 — 직접 되돌리지 않으면 console.error 가
+// 이후 파일까지 벙어리로 남아 다른 테스트의 경고를 삼킨다.
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe('fetchSeoListPage', () => {

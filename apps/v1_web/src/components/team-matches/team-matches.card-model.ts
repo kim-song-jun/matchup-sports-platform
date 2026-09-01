@@ -5,6 +5,7 @@
  * 크롤러가 받는 HTML 이 비어 있었고, 서버 컴포넌트가 같은 변환을 돌려 첫 화면을 미리
  * 그려야 한다.
  */
+import { formatCardDate as formatDate, formatCardTime as formatTime } from '@/lib/date-utils';
 import type { TeamMatchListViewModel, TeamMatchModel } from './team-matches.types';
 import type { V1Sport, V1TeamMatch, V1TeamMatchApiStatus, V1TeamMatchViewerState } from '@/types/api';
 
@@ -23,7 +24,6 @@ import type { V1Sport, V1TeamMatch, V1TeamMatchApiStatus, V1TeamMatchViewerState
 // exported for direct unit coverage (see team-matches-client.test.tsx) — a pure mapping
 // function, cheaper to test directly than by plumbing new testids through the mocked
 // page-view component tree.
-const KST = 'Asia/Seoul';
 
 export function toTeamMatch(match: V1TeamMatch, fallback: TeamMatchModel): TeamMatchModel {
   const status = statusToCardStatus(getStatus(match), getViewerState(match));
@@ -140,18 +140,4 @@ export function parseCosts(value: string | null | undefined) {
   };
 }
 
-/**
- * SSR 에서도 호출되므로 타임존을 KST 로 고정한다. 서버 런타임은 대개 UTC 라, 고정하지 않으면
- * 크롤러가 받는 날짜와 브라우저가 그리는 날짜가 하루씩 어긋난다(하이드레이션 불일치).
- */
-export function formatDate(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString('ko-KR', { timeZone: KST, month: 'long', day: 'numeric', weekday: 'short' });
-}
 
-export function formatTime(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleTimeString('ko-KR', { timeZone: KST, hour: '2-digit', minute: '2-digit', hour12: false });
-}

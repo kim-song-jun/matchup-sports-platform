@@ -40,8 +40,6 @@ import {
 import {
   buildSportChips,
   buildTeamMatchHref,
-  formatDate,
-  formatTime,
   getStatus,
   getViewerState,
   statusToCardStatus,

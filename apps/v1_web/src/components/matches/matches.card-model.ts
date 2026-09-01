@@ -6,10 +6,10 @@
  * 서버 컴포넌트가 같은 변환을 돌려 첫 화면을 미리 그려야 한다. 클라이언트 전용 파일에
  * 두면 서버가 이 함수들을 호출할 수 없어 마크업이 두 벌로 갈라진다.
  */
+import { formatCardDate as formatDate, formatCardTime as formatTime } from '@/lib/date-utils';
 import type { MatchCardModel, MatchListViewModel } from './matches.types';
 import type { V1Match, V1MatchApiStatus, V1Sport, V1ViewerState } from '@/types/api';
 
-const KST = 'Asia/Seoul';
 
 export const FIXED_MATCH_SPORT_NAMES = ['축구', '풋살', '러닝', '수영'] as const;
 
@@ -73,16 +73,21 @@ export function buildMatchHref(params: URLSearchParams, overrides: Record<string
   return queryString ? `/matches?${queryString}` : '/matches';
 }
 
+/**
+ * '오늘'의 기준은 **KST 달력 날짜**다. 이 함수는 서버 렌더에서도 호출되는데, 서버 런타임은
+ * 대개 UTC 라 로컬 시각으로 비교하면 자정 전후로 크롤러와 브라우저가 다른 숫자를 본다.
+ */
 export function countToday(items: V1Match[]) {
-  const today = new Date();
+  const today = kstDateKey(new Date());
   return items.filter((item) => {
     const date = new Date(item.startsAt);
-    return (
-      date.getFullYear() === today.getFullYear() &&
-      date.getMonth() === today.getMonth() &&
-      date.getDate() === today.getDate()
-    );
+    return !Number.isNaN(date.getTime()) && kstDateKey(date) === today;
   }).length;
+}
+
+/** KST 달력 기준 'YYYY-MM-DD'. en-CA 로케일이 그 형식을 그대로 준다. */
+function kstDateKey(date: Date): string {
+  return date.toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
 }
 
 export function getCapacity(match: V1Match, fallback: MatchCardModel) {
@@ -156,18 +161,4 @@ export function formatDeadlineDetail(value: string | null | undefined, status: M
   return `${formatDate(value)} ${formatTime(value)}`;
 }
 
-/**
- * SSR 에서도 호출되므로 타임존을 KST 로 고정한다. 서버 런타임은 대개 UTC 라, 고정하지 않으면
- * 크롤러가 받는 날짜와 브라우저가 그리는 날짜가 하루씩 어긋난다(하이드레이션 불일치).
- */
-export function formatDate(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString('ko-KR', { timeZone: KST, month: 'long', day: 'numeric', weekday: 'short' });
-}
 
-export function formatTime(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleTimeString('ko-KR', { timeZone: KST, hour: '2-digit', minute: '2-digit', hour12: false });
-}

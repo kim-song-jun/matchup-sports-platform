@@ -178,6 +178,8 @@ async function main() {
           titleLeft: rect(title),
           chipsLeft: rect(chips),
           segTop: seg ? Math.round(seg.getBoundingClientRect().top) : null,
+          segHeight: seg ? Math.round(seg.getBoundingClientRect().height) : null,
+          segMarginBottom: seg ? Math.round(parseFloat(getComputedStyle(seg).marginBottom) || 0) : 0,
         };
       })()`);
 
@@ -301,13 +303,30 @@ async function main() {
       const lmTop = await page.evaluate(topOf('[role="list"][aria-label="리그 목록"] > *'));
 
       if (vp.key === 'mobile') {
-        if (list.firstCardTop === null || lmTop === null) {
-          record('1-첫카드', 'INCONCLUSIVE',
-            `좌표를 못 읽었다 tournaments=${list.firstCardTop} league-matches=${lmTop} (status ${listStatus}/${lmStatus})`);
+        /**
+         * 판정 1 — **세그먼트가 첫 카드를 얼마나 밀었나.**
+         *
+         * ## 옛 기준(`/tournaments` vs `/league-matches` 차이 ≤100px)은 폐기했다
+         * 두 이유로 답을 못 준다:
+         * 1. **두 항의 조건이 다르다.** `/tournaments` 는 프로모 캐러셀(207px)+배너(65px)를
+         *    이고 있고 `/league-matches` 는 아니다. 차이의 대부분이 우리와 무관한 요소다.
+         *    실제로 옛 기준값 128px 은 캐러셀이 안 뜬 순간의 값이었다(548-64=484 여야 한다).
+         * 2. **리다이렉트가 붙으면 비교 대상이 사라진다.** 두 탭이 같은 페이지가 되므로
+         *    첫 카드 top 이 구조적으로 같아져 이 판정이 무의미해진다.
+         *
+         * 그래서 **비교를 버리고 우리 몫만 잰다** — 세그먼트가 차지한 세로. 한 줄(터치 타깃
+         * 44 + 패딩)이면 정상이고, 두 줄로 늘어나면 100px 을 넘어 잡힌다.
+         */
+        const segH = list.segHeight;
+        const segMb = list.segMarginBottom;
+        if (segH === null) {
+          record('1-세그먼트몫', 'INCONCLUSIVE',
+            `세그먼트를 못 찾았다 (status ${listStatus}) — 첫 카드 top=${list.firstCardTop}`);
         } else {
-          const diff = Math.abs(list.firstCardTop - lmTop);
-          record('1-첫카드', diff <= 100 ? 'PASS' : 'FAIL',
-            `첫 카드 top — /tournaments ${list.firstCardTop}px · /league-matches ${lmTop}px (차 ${diff}px, 기준 ≤100)`);
+          const added = segH + segMb;
+          record('1-세그먼트몫', added <= 80 ? 'PASS' : 'FAIL',
+            `세그먼트가 더한 세로 ${added}px (height ${segH} + margin ${segMb}, 기준 ≤80 = 한 줄)` +
+              ` · 참고: 첫 카드 top ${list.firstCardTop}px, /league-matches ${lmTop}px`);
         }
       }
 

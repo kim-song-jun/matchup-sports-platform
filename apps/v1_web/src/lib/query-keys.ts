@@ -1,4 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query';
+import { PERSIST_STORAGE_KEY } from './query-persist';
 
 export const v1Keys = {
   all: ['v1'] as const,
@@ -213,4 +214,18 @@ export const v1Keys = {
 // 이전 사용자 데이터(채팅방/알림 등)가 새 사용자에게 그대로 노출되는 것을 막는다.
 export function clearV1IdentityCache(queryClient: QueryClient) {
   queryClient.removeQueries({ queryKey: v1Keys.all });
+  // 방어적 이중 clear — shouldPersistQuery() 화이트리스트가 identity 스코프 데이터를
+  // 애초에 persist 하지 않도록 설계돼 있지만(query-persist.ts 참고), 화이트리스트가
+  // 실수로 잘못 넓어지는 미래 변경까지 대비해 저장된 스냅샷 자체를 통째로 지운다.
+  // 이 한 줄이 없으면 removeQueries()는 **메모리** 캐시만 지우고, localStorage에
+  // 남은 이전 계정의 persist 스냅샷은 다음 앱 기동 시 그대로 복원된다.
+  if (typeof window !== 'undefined') {
+    try {
+      window.localStorage.removeItem(PERSIST_STORAGE_KEY);
+    } catch {
+      // Safari 프라이빗 모드 등 localStorage 접근 자체가 던질 수 있다 — 무시해도
+      // 안전하다(메모리 캐시는 이미 지워졌고, persist 스냅샷은 원래도 identity
+      // 스코프 데이터를 담지 않도록 설계돼 있다).
+    }
+  }
 }

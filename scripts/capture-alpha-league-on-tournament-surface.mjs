@@ -279,11 +279,28 @@ async function main() {
   await browser.close();
 
   // 캡처 도중 배포가 끝나 서빙본이 바뀌었으면 **결과가 두 빌드에 걸쳐 있다.**
-  const servingAfter = (await fetch(`${BASE}/landing`, { method: 'HEAD' })).headers.get('x-teameet-commit');
-  if (servingBefore && servingAfter && servingBefore !== servingAfter) {
-    console.log(`\n⚠️  캡처 중 서빙본이 바뀌었다: ${servingBefore.slice(0, 9)} → ${servingAfter.slice(0, 9)}`);
-    console.log('   결과가 두 빌드에 걸쳐 있다 — 다시 돌려라.');
+  //
+  // ⚠️ **이 재확인은 게이트가 아니라 결과에 붙는 메모다.** 게이트는 캡처 **전**(preflight)에
+  // 있다. 여기서 던지면 **캡처가 이미 디스크에 있는데도** run 이 실패로 끝나고 표조차 안
+  // 나온다 — 막지 않겠다고 만든 설계가 결과적으로 막는 것이다. 403 을 던지지 않고 행으로
+  // 남기기로 한 것과 **같은 원리**인데, 그때 여기엔 적용하지 않았다.
+  //
+  // 그리고 **실패를 조용히 넘기지도 않는다.** 안 적으면 "안 바뀌었다" 로 읽힌다.
+  let servingNote;
+  try {
+    const after = await fetch(`${BASE}/landing`, { method: 'HEAD' });
+    const servingAfter = after.ok ? after.headers.get('x-teameet-commit') : null;
+    if (!servingBefore || !servingAfter) {
+      servingNote = `서빙본 재확인: 불가(HTTP ${after.status}${servingAfter ? '' : ' · 커밋 헤더 없음'}) — 캡처 중 변경 여부 **미확인**`;
+    } else if (servingBefore !== servingAfter) {
+      servingNote = `⚠️  캡처 중 서빙본이 바뀌었다: ${servingBefore.slice(0, 9)} → ${servingAfter.slice(0, 9)} — 결과가 두 빌드에 걸쳐 있다. 다시 돌려라`;
+    } else {
+      servingNote = `서빙본 재확인: ${servingAfter.slice(0, 9)} 동일 — 결과가 한 빌드에 걸쳐 있다`;
+    }
+  } catch (error) {
+    servingNote = `서빙본 재확인: 실패(${error instanceof Error ? error.message.split('\n')[0] : String(error)}) — 캡처 중 변경 여부 **미확인**`;
   }
+  console.log(`\n${servingNote}`);
 
   console.log('\n=== 화면에서 읽은 값 ===');
   console.table(rows);

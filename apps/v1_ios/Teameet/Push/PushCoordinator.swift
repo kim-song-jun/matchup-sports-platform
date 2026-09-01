@@ -83,6 +83,13 @@ final class PushCoordinator {
     // MARK: - Lifecycle
 
     /// The web's `request-notification-permission`.
+    /// The system's current answer, without showing anything. `requestPermission` would
+    /// display the dialog, which is precisely what the explainer exists to avoid doing
+    /// prematurely.
+    func permissionStatus() async -> PushPermission.WebValue {
+        await currentPermission()
+    }
+
     func requestPermission() async -> PushPermission.WebValue {
         setOptedIn(true)
         _ = try? await center.requestAuthorization(options: [.alert, .badge, .sound])

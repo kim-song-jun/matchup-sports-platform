@@ -12,6 +12,8 @@ final class WebShellViewController: UIViewController {
     private let config: AppConfig
     private let model: WebShellModel
     private let sessionStore: WebShellSessionStore
+    private let promptStore = PushPromptStore()
+    private var urlObservation: NSKeyValueObservation?
     private let reachability = NetworkReachability()
 
     private var webView: WKWebView!
@@ -50,6 +52,7 @@ final class WebShellViewController: UIViewController {
         reachability.onPathRestored = { [weak self] in self?.retryAfterConnectivityReturned() }
         reachability.start()
         observeBackgrounding()
+        observeInPageNavigation()
 
         restoreOrLoadInitialRoute()
     }
@@ -57,6 +60,31 @@ final class WebShellViewController: UIViewController {
     /// The session is written on the way out, so a termination the app is never told about
     /// still leaves the user where they were. The web view owns the state, so it owns the
     /// moment it is saved.
+    /// Re-runs the post-load work when the page changes without loading a document.
+    ///
+    /// `didFinish` fires for document loads only, and the web app is a single-page app: a
+    /// reader who signs in gets a client-side transition, so no document loads and nothing
+    /// re-runs. That is invisible until something depends on state that only exists *after*
+    /// sign-in — the session cookie. Measured: on a clean install the notification explainer
+    /// never appeared, because the one place that asks about it had already run, once, on
+    /// the signed-out landing page.
+    ///
+    /// `url` is the signal because `pushState` updates it. Registration is re-run here too
+    /// for the same reason: it needs the session cookie, which appears at exactly this moment.
+    private func observeInPageNavigation() {
+        urlObservation = webView.observe(\.url, options: [.new]) { [weak self] _, _ in
+            guard let self else { return }
+            MainActor.assumeIsolated {
+                guard AllowedNavigation.isInternal(self.webView.url, origin: self.config.webOrigin)
+                else { return }
+                Task {
+                    await self.push?.register()
+                    await self.considerAskingAboutNotifications()
+                }
+            }
+        }
+    }
+
     private func observeBackgrounding() {
         NotificationCenter.default.addObserver(
             forName: UIApplication.willResignActiveNotification,
@@ -272,7 +300,52 @@ extension WebShellViewController: WKNavigationDelegate {
         persistSession()
         // Mirrors Android's onPageFinished: a registration needs the session cookie, and
         // this is the first moment it is guaranteed to exist.
-        Task { await push?.register() }
+        Task {
+            await push?.register()
+            await considerAskingAboutNotifications()
+        }
+    }
+
+    /// Offers the shell's own notification explainer, once the reader is in a position for it
+    /// to mean something.
+    ///
+    /// Hung off `didFinish` because that is the only moment the shell knows both things the
+    /// decision needs: a page of ours has loaded, and the cookie jar for our origin is
+    /// populated. Without this the sole path to the system dialog is 마이 → 알림 설정, which
+    /// a reader has to go looking for — and iOS asks once, so not looking means never asked.
+    private func considerAskingAboutNotifications() async {
+        guard let push, !model.isAskingAboutNotifications else { return }
+        let permission = await push.permissionStatus()
+        let signedIn = await hasSessionCookie()
+        guard PushPromptPolicy.shouldPrompt(
+            permission: permission, signedIn: signedIn, state: promptStore.state, now: Date())
+        else { return }
+        model.askAboutNotifications()
+    }
+
+    /// Whether the web view holds the API's session cookie for our origin.
+    ///
+    /// Specifically the session cookie, not any cookie: the origin sets cookies for a
+    /// signed-out visitor too, and treating those as a session put the explainer in front of
+    /// a reader who had not signed in — the one case it must not appear in.
+    private func hasSessionCookie() async -> Bool {
+        guard let host = AllowedNavigation.parse(config.webOrigin)?.host else { return false }
+        let cookies = await webView.configuration.websiteDataStore.httpCookieStore.allCookies()
+        return PushCookieScope.hasSession(
+            cookies: cookies.map { (name: $0.name, domain: $0.domain) }, host: host)
+    }
+
+    /// Called by the explainer's buttons.
+    func acceptNotificationPrompt() {
+        promptStore.recordAccepted()
+        model.stopAskingAboutNotifications()
+        // The real dialog, spent deliberately now that the reader has said yes to the idea.
+        Task { _ = await push?.requestPermission() }
+    }
+
+    func deferNotificationPrompt() {
+        promptStore.recordDeferral()
+        model.stopAskingAboutNotifications()
     }
 
     func webView(

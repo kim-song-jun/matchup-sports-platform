@@ -279,6 +279,91 @@ describe('TournamentsReadService', () => {
     expect(statusesIn(or!)).not.toContain('cancelled');
   });
 
+  /**
+   * **`?status=draft` 는 리그로 좁혀서만 적용된다.**
+   *
+   * 사용자 확정 칩은 *전체 · 진행 중 · 준비 중 · 종료* 인데, "준비 중"(draft)은 정규 리그에만
+   * 있는 개념이다. 대회의 `draft` 는 운영자 준비 중이라 계속 감춘다(사용자 명시).
+   *
+   * ⚠️ **이 분리가 없으면 `?status=draft` 한 줄로 대회 비공개가 통째로 열린다.** 지금까지는
+   * DTO 가 `draft` 를 400 으로 막아 줘서 안 샜는데(실측 확인), 칩을 만들려면 그 방어를
+   * 푸는 것이라 **서비스가 대신 막아야 한다.**
+   */
+  it('list: status=draft 는 정규 리그로 좁혀 적용된다 — 대회 draft 는 여전히 안 나온다', async () => {
+    prisma.v1Tournament.findMany.mockResolvedValue([]);
+
+    await service.list({ status: 'draft' } as never);
+
+    const callArgs = prisma.v1Tournament.findMany.mock.calls[0][0];
+    // 종류 조건 없이 status 만 걸리면 대회 draft 가 함께 나온다 — 그렇게 되면 안 된다.
+    expect(callArgs.where.status).toBeUndefined();
+    expect(callArgs.where.AND).toEqual(
+      expect.arrayContaining([{ kind: 'regular_league', status: 'draft' }]),
+    );
+  });
+
+  /**
+   * **`kind` 없이 `status=draft` 가 오면 어떻게 되나** — 정해서 여기 박는다.
+   *
+   * 답: **400 이 아니라 빈 결과다.** 그리고 그 안전성은 **구조적**이다 —
+   * `kind` 기본값이 `tournament` 라 surface 조건이 `OR[{regular_tournament},{null}]` 인데,
+   * 거기에 `AND {kind: regular_league}` 가 겹치면 **만족하는 행이 존재할 수 없다.**
+   * 즉 "막는 코드" 가 따로 있는 게 아니라 **조건이 서로 모순이라 새어나올 수가 없다.**
+   *
+   * 400 으로 막지 않는 이유: 다른 필터도 같은 성질이다(예: 대회 탭에서 리그 전용 종목을
+   * 고르면 400 이 아니라 빈 목록이다). 여기만 예외로 400 을 내면 교차 필터마다 규칙이
+   * 갈린다.
+   */
+  it('list: kind 없이 status=draft 면 빈 결과가 된다 — 대회 draft 가 샐 수 없는 구조다', async () => {
+    prisma.v1Tournament.findMany.mockResolvedValue([]);
+
+    await service.list({ status: 'draft' } as never);
+
+    const where = prisma.v1Tournament.findMany.mock.calls[0][0].where;
+    // 기본 surface(대회 + kind=null)와 리그 한정 절이 **함께** 걸려 있다 → 모순.
+    expect(where.OR).toEqual(
+      expect.arrayContaining([{ kind: 'regular_tournament' }, { kind: null }]),
+    );
+    expect(where.AND).toEqual(
+      expect.arrayContaining([{ kind: 'regular_league', status: 'draft' }]),
+    );
+  });
+
+  it('list: kind=tournament + status=draft 도 같은 모순이다 — 대회 draft 는 어떤 조합으로도 안 나온다', async () => {
+    prisma.v1Tournament.findMany.mockResolvedValue([]);
+
+    await service.list({ kind: 'tournament', status: 'draft' } as never);
+
+    const where = prisma.v1Tournament.findMany.mock.calls[0][0].where;
+    expect(where.AND).toEqual(
+      expect.arrayContaining([{ kind: 'regular_league', status: 'draft' }]),
+    );
+    expect(where.OR).toEqual(
+      expect.arrayContaining([{ kind: 'regular_tournament' }, { kind: null }]),
+    );
+  });
+
+  it('list: kind=league + status=draft 는 정상적으로 리그 예정만 담는다', async () => {
+    prisma.v1Tournament.findMany.mockResolvedValue([]);
+
+    await service.list({ kind: 'league', status: 'draft' } as never);
+
+    const where = prisma.v1Tournament.findMany.mock.calls[0][0].where;
+    expect(where.kind).toBe('regular_league');
+    expect(where.AND).toEqual(
+      expect.arrayContaining([{ kind: 'regular_league', status: 'draft' }]),
+    );
+  });
+
+  it('대조군: draft 가 아닌 status 는 종전대로 그대로 전달된다', async () => {
+    prisma.v1Tournament.findMany.mockResolvedValue([]);
+
+    await service.list({ status: 'in_progress' } as never);
+
+    const callArgs = prisma.v1Tournament.findMany.mock.calls[0][0];
+    expect(callArgs.where.status).toBe('in_progress');
+  });
+
   it('list: status filter narrowing is forwarded as exact string', async () => {
     prisma.v1Tournament.findMany.mockResolvedValue([]);
 

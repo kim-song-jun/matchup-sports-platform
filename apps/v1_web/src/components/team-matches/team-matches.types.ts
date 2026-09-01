@@ -12,8 +12,13 @@ export type TeamMatchModel = {
   format: string;
   grade: string;
   style: string;
-  cost: number;
-  opponentCost: number;
+  /**
+   * 비용은 **모를 수 있다**(null). 호스트가 costNote 를 안 적은 매치가 있고(리그 대진이
+   * 대표적), 그때 목업 금액(280,000원 · 140,000원)을 그대로 보여주던 것이 원래 결함이다.
+   * 0 으로 채우는 것도 '무료초청'이라는 새 거짓말이라 null 로 두고 화면이 그 자리를 감춘다.
+   */
+  cost: number | null;
+  opponentCost: number | null;
   uniform: string;
   gender: string;
   /**

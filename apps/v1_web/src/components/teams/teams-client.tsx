@@ -216,16 +216,19 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
     ? {
         ...fallback,
         team: {
-          ...fallback.team,
-          ...toTeamDetail(query.data, fallback.team),
+          // `...fallback.team` 스프레드를 걷어냈다 — 아래에서 모든 칸을 실제 값으로 채우므로
+          // 목업이 남을 자리가 없다(남아 있으면 새 필드를 추가할 때 조용히 다시 샌다).
+          ...toTeamDetail(query.data),
           description: query.data.profile.introduction ?? '',
           activity: query.data.profile.activitySummary ?? query.data.profile.activityAreaText ?? '',
           condition: formatTeamDetailLevel(query.data),
-          genderRule: query.data.profile.genderRule ?? fallback.team.genderRule,
+          // 목업(teams.view-model.ts)의 '성별 무관'·'초보-중수'로 메우지 않는다 —
+          // 설정하지 않은 팀에 있지도 않은 조건이 붙어 보였다.
+          genderRule: query.data.profile.genderRule ?? '',
           schedule: '',
           city: regionParts.city,
           county: regionParts.county,
-          level: formatTeamDetailLevel(query.data) || fallback.team.level,
+          level: formatTeamDetailLevel(query.data) || '레벨 미설정',
           membersList: query.data.membersPreview.map((member) => ({
             name: member.displayName,
             role: roleLabel(member.role),
@@ -389,10 +392,12 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
     ...fallback,
     activeTab,
     tabs,
-    teamName: team.data?.name ?? fallback.teamName,
+    // 팀 정보가 아직 안 왔을 때 목업 팀('성수 러너스 FC')·목업 인원(운영진 2명)을 보여주지
+    // 않는다 — 다른 팀의 이름과 숫자를 이 팀의 것처럼 읽게 만든다.
+    teamName: team.data?.name ?? '',
     summary: {
       total: members.data?.summary.memberCount ?? memberItems.length,
-      managers: members.data ? members.data.summary.ownerCount + members.data.summary.managerCount : fallback.summary.managers,
+      managers: members.data ? members.data.summary.ownerCount + members.data.summary.managerCount : 0,
       pending: requestItems.length,
     },
     members: memberItems.length
@@ -674,12 +679,21 @@ function countTeamFilters(
   return (sort ? 1 : 0) + (genderRule ? 1 : 0) + levels.length;
 }
 
-function toTeamDetail(team: V1TeamDetail, fallback: TeamModel): TeamModel {
+// 목업 없이 API 값만으로 모델을 만든다 — fallback 인자를 받지 않는 것이 그 계약이다.
+// 직접 유닛 커버리지를 붙이려고 export 한다(team-matches 의 toTeamMatch 와 같은 관행).
+export function toTeamDetail(team: V1TeamDetail): TeamModel {
   const levelLabel = formatTeamDetailLevel(team);
   const full = isTeamAtCapacity(team.memberCount, team.profile.memberGoalCount);
   const recruitmentLabel = team.profile.joinPolicy === 'closed' ? '마감' : full ? '정원 마감' : '모집 중';
+  const regionName = formatTeamRegion(team.region);
+  const genderRule = team.profile.genderRule ?? '';
+  // 목업(teams.view-model.ts)을 fallback 으로 받지 않는다. `...fallback` 스프레드는 여기서
+  // 덮어쓰지 않은 칸(next/ownerName/managerName)에 **다른(가짜) 팀의 값**을 그대로 남겼고,
+  // 그 결과 어느 팀 상세를 열어도 "오늘 21:00 정기전"·"주 1회 정기적으로 풋살을 즐기는
+  // 동네 팀이에요"가 보였다. 목록 매퍼(toTeam)는 이미 목업 없이 API 값만으로 같은 모델을
+  // 만들고 있어, 상세도 그 규칙을 그대로 따른다 — 화면은 빈 값을 이미 처리한다
+  // (teams-page.tsx: 활동 줄은 감추고, 소개는 '팀 소개를 입력하면 여기에 보여요.').
   return {
-    ...fallback,
     id: team.teamId,
     name: team.name,
     logo: team.name.slice(0, 1),
@@ -687,14 +701,16 @@ function toTeamDetail(team: V1TeamDetail, fallback: TeamModel): TeamModel {
     coverImageUrl: team.profile.coverImageUrl ?? null,
     sport: team.sport.name,
     sports: [team.sport.name],
-    region: formatTeamRegion(team.region),
+    region: regionName,
     members: team.memberCount,
     capacity: team.profile.memberGoalCount ?? 0,
     status: team.profile.joinPolicy === 'closed' || full ? 'closed' : team.viewer.joinState === 'requested' ? 'reviewing' : team.viewer.role !== 'none' ? 'mine' : 'open',
     statusLabel: recruitmentLabel,
-    genderRule: team.profile.genderRule ?? fallback.genderRule,
-    intro: team.profile.introduction ?? fallback.intro,
-    tags: levelLabel ? [levelLabel, team.profile.genderRule ?? fallback.genderRule] : fallback.tags,
+    genderRule,
+    ownerName: team.owner?.displayName,
+    intro: team.profile.introduction ?? `${regionName}에서 활동하는 ${team.sport.name} 팀이에요.`,
+    tags: [levelLabel, genderRule].filter(Boolean),
+    next: team.profile.activitySummary ?? team.profile.activityAreaText ?? '',
   };
 }
 

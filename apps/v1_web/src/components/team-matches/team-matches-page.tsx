@@ -275,11 +275,16 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
                 <InfoRow label="유니폼 색상" value={match.uniform} />
                 <InfoRow label="성별 조건" value={match.gender} />
               </div>
-              {/* ── 그룹 3: 비용 — 상대팀 부담금 수치 승격 ── */}
+              {/* ── 그룹 3: 비용 — 상대팀 부담금 수치 승격 ──
+                  호스트가 비용을 안 적은 매치(costNote 없음, 리그 대진이 대표적)는 이 그룹을
+                  통째로 감춘다. 예전에는 목업 금액(140,000원/280,000원)이 그대로 노출됐고,
+                  그걸 0 으로 바꾸면 이번엔 '무료초청 · 실제 청구 없어요'라는 다른 거짓말이 된다. */}
+              {(match.opponentCost !== null || match.cost !== null) && (
               <div className="tm-info-group">
                 <div className="tm-info-group-label">비용</div>
                 {/* 상대팀 부담금은 신청 결정의 핵심 — primary 위치로 승격(R-D1) */}
                 {/* P1: 숫자(subhead/20px/700) : 단위(body/15px) = 2:1 비율 + tabular-nums */}
+                {match.opponentCost !== null && (
                 <div className="tm-info-cost-hero">
                   <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>상대팀 부담금</div>
                   <div className="tm-info-cost-amount">
@@ -301,7 +306,9 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
                     <div className="tm-text-micro" style={{ marginTop: 2, color: 'var(--text-caption)' }}>실제 청구 없어요</div>
                   ) : null}
                 </div>
+                )}
                 {/* P1: 총비용도 숫자:단위 2:1 */}
+                {match.cost !== null && (
                 <div className="tm-info-row">
                   <div className="tm-text-caption">총비용</div>
                   <div style={{ flex: 1, minWidth: 0, textAlign: 'right' }}>
@@ -311,7 +318,9 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
                     </span>
                   </div>
                 </div>
+                )}
               </div>
+              )}
               {/* P2: 능동형 카피 적용 */}
               {mode === 'pending' ? <StateCard tone="orange" title="신청을 접수했어요" body="홈팀이 검토를 마치면 알림으로 알려드릴게요." /> : null}
               {mode === 'approved' ? <StateCard tone="green" title="승인 완료" body="팀매치 참가가 확정됐어요. 경기 전 안내는 채팅에서 확인할 수 있어요." /> : null}
@@ -485,7 +494,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
           <div className="tm-team-match-cta-card">
             <div className="tm-team-match-cta-meta">
               <span className="tm-text-caption">{mode === 'mine' ? '내가 만든 팀매치' : '신청 상태'}</span>
-              <span className="tm-text-label">{model.statusLabel ?? `${match.opponentCost.toLocaleString('ko-KR')}원`}</span>
+              <span className="tm-text-label">{model.statusLabel ?? (match.opponentCost !== null ? `${match.opponentCost.toLocaleString('ko-KR')}원` : '비용 미정')}</span>
             </div>
             <div className="tm-team-match-cta-actions">
               {ctaButtons}
@@ -498,7 +507,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
       <div className="tm-fixed-cta tm-team-match-mobile-cta">
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
           <span className="tm-text-caption">{mode === 'mine' ? '내가 만든 팀매치' : '신청 상태'}</span>
-          <span className="tm-text-label">{model.statusLabel ?? `${match.opponentCost.toLocaleString('ko-KR')}원`}</span>
+          <span className="tm-text-label">{model.statusLabel ?? (match.opponentCost !== null ? `${match.opponentCost.toLocaleString('ko-KR')}원` : '비용 미정')}</span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: showChat ? '120px 1fr' : '1fr', gap: 8 }}>
           {ctaButtons}
@@ -678,7 +687,11 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
             <span />
           )}
           {/* P1: 숫자는 body-lg(17px/700), 단위 "원"은 caption(12px) — 2:1 비율 */}
-          {match.opponentCost === 0 ? (
+          {/* 비용을 모르면(costNote 미기재) 금액 자리를 '비용 미정'으로 둔다 — 0 으로 채워
+              '무료'라고 하면 없는 사실을 만들어낸다. */}
+          {match.opponentCost === null ? (
+            <span className="tm-text-caption">비용 미정</span>
+          ) : match.opponentCost === 0 ? (
             <span className="tm-text-body-lg tab-num" style={{ color: 'var(--blue700)' }}>무료</span>
           ) : (
             <span className="tab-num" style={{ display: 'inline-flex', alignItems: 'baseline', gap: 1 }}>

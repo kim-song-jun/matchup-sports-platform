@@ -190,10 +190,28 @@ async function preflight() {
   } else if (!serving) {
     throw new Error('서빙 커밋 헤더가 없어 EXPECT_COMMIT 대조를 할 수 없다');
   } else {
+    // **"비교 불가" 와 "옛 빌드" 를 가른다.** `merge-base --is-ancestor` 는 둘 다 실패로
+    // 끝난다(객체 없음 128 / 조상 아님 1) — 뭉치면 로컬에 커밋이 없을 뿐인데 "옛 빌드"
+    // 라며 배포를 기다리게 된다. 이 저장소는 다른 세션이 계속 dev 에 머지하므로 내 로컬이
+    // 그 커밋을 아직 fetch 안 한 상태가 **드물지 않다.**
+    //
+    // 문구가 **다음 행동을 지시**해야 한다 — 전자는 `git fetch`, 후자는 배포 대기다.
+    for (const [sha, label] of [[expect, 'EXPECT_COMMIT'], [serving, '서빙 SHA']]) {
+      try {
+        execFileSync('git', ['cat-file', '-e', `${sha}^{commit}`], { stdio: 'ignore' });
+      } catch {
+        throw new Error(
+          `${label}(${sha.slice(0, 9)}) 커밋 객체가 로컬에 없다 — 비교 불가(옛 빌드라는 뜻이 아니다). ` +
+            '`git fetch origin dev` 후 다시 돌려라',
+        );
+      }
+    }
     try {
       execFileSync('git', ['merge-base', '--is-ancestor', expect, serving], { stdio: 'ignore' });
     } catch {
-      throw new Error(`서빙 SHA(${serving.slice(0, 9)})가 ${expect.slice(0, 9)} 를 포함하지 않는다 — 옛 빌드다`);
+      throw new Error(
+        `서빙 SHA(${serving.slice(0, 9)})가 ${expect.slice(0, 9)} 를 포함하지 않는다 — 옛 빌드다. 배포를 기다려라`,
+      );
     }
     console.log(`✅ 서빙 SHA 가 ${expect.slice(0, 9)} 를 포함한다`);
   }

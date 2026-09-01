@@ -589,9 +589,11 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
           둘은 다른 축이라 한 줄에 섞으면 무엇이 무엇인지 읽히지 않는다. */}
       {series.tierLabel != null && (
         <p className="mb-2 flex flex-wrap items-center gap-2 text-xs">
-          {/* 하드코딩 색 대신 목록(league-matches-list-client.tsx)·마이 리그(my-leagues-client.tsx)와
-              동일한 공용 뱃지 클래스를 쓴다 — 명암비가 이미 검증돼 있고, 목록→상세 이동 시
-              같은 정보의 모양이 바뀌지 않아야 한다. */}
+          {/* 하드코딩 색 대신 마이 리그(my-leagues-client.tsx)와 동일한 공용 뱃지 클래스를
+              쓴다 — 명암비가 이미 검증돼 있고, 마이 리그→상세 이동 시 같은 정보의 모양이
+              바뀌지 않아야 한다. 통합 목록(tournaments/tournament-card.tsx)은 아직 티어
+              뱃지를 못 그린다(목록 API 가 `tierLabel` 을 안 실어준다) — 그쪽이 붙는 날
+              여기와 같은 클래스를 써야 한다. */}
           <span className="tm-badge tm-badge-sm tm-badge-blue">
             {series.tierLabel}
           </span>

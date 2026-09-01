@@ -88,10 +88,19 @@ export class TournamentsReadService {
       // `kind=all` 로 여는 것은 표면 결정이라 `v1-surface-check` 가 사용처를 세어 묶는다.
       ...COMPETITION_LIST_SURFACE[query.kind ?? 'tournament'],
       deletedAt: null,
-      // 명시적으로 status 를 요청하면 그대로 존중한다. 기본값일 때만 종류별 조건을 쓴다
-      // (리그의 draft='예정' 은 보이고, 대회의 draft 는 계속 감춰진다).
+      // 명시적으로 status 를 요청해도 **종류 경계는 그대로**다.
+      //
+      // `draft` 는 정규 리그에서만 의미가 있다("예정"). 대회의 `draft` 는 운영자 준비
+      // 중이라 계속 감춘다 — 그래서 `status=draft` 가 와도 **리그로 좁혀서** 적용한다.
+      // 이 한 줄이 없으면 `?status=draft` 하나로 대회 비공개가 통째로 열린다.
+      //
+      // 다른 값(open/closed/in_progress/completed)은 원래 공개 범위라 그대로 쓴다.
       // ⚠️ `AND` 에 담는다 — 펴 넣으면 위 surface 상수의 `OR` 을 덮는다(그 doc comment 참조).
-      ...(query.status ? { status: query.status } : { AND: [PUBLIC_COMPETITION_STATUS_WHERE] }),
+      ...(query.status
+        ? query.status === 'draft'
+          ? { AND: [{ kind: V1CompetitionKind.regular_league, status: 'draft' as const }] }
+          : { status: query.status }
+        : { AND: [PUBLIC_COMPETITION_STATUS_WHERE] }),
       ...(query.sportId ? { sportId: query.sportId } : {}),
     };
 

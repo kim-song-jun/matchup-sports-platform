@@ -215,6 +215,9 @@ function DesktopFooter() {
 }
 
 function BottomNav({ activeTab }: { activeTab?: V1NavTab }) {
+  const tabCount = tabs.length;
+  const activeIndex = tabs.findIndex((tab) => tab.id === activeTab);
+
   return (
     <nav
       className="tm-bottom-nav"
@@ -222,8 +225,39 @@ function BottomNav({ activeTab }: { activeTab?: V1NavTab }) {
       // 탭 개수가 CSS의 하드코딩된 5열에 묶이지 않도록 tabs.length로 열 수를 계산한다.
       // 390px 폭 계산 근거는 shell.tsx 주변 PR 설명 참조 — 6열 기준 탭당 65px,
       // 아이콘 23px + 라벨(최대 2글자, 12px)이 전부 여유 있게 들어간다.
-      style={{ gridTemplateColumns: `repeat(${tabs.length}, 1fr)` }}
+      style={{ gridTemplateColumns: `repeat(${tabCount}, 1fr)` }}
     >
+      {/*
+        활성 탭 인디케이터. 예전엔 탭마다 ::before 의사요소가 하나씩 있어서 활성 탭이
+        바뀌면 pill 이 한 탭에서 사라지고 다른 탭에서 나타났다 — 미끄러질 수 없는 구조였다.
+        미끄러지게 하려면 pill 이 하나뿐이어야 하므로 nav 안에 슬롯을 하나만 두고
+        activeIndex 에 따라 transform: translateX 로 옮긴다.
+
+        슬롯 폭을 탭 1개 폭(`calc(100% / tabCount)`)으로 잡아 두면 transform 의
+        `100%` 가 슬롯 자기 자신의 폭(=탭 1칸)을 가리키므로 `translateX(index * 100%)` 만으로
+        정확히 index 칸을 이동한다 — `left` 처럼 매 렌더마다 레이아웃을 다시 흘리는 속성을
+        건드리지 않고 transform 합성만으로 전환된다(`transition-all` 금지 규칙과 별개로,
+        여기서는 애초에 transform 외의 속성이 바뀌지 않는다).
+
+        activeTab 이 어떤 탭에도 속하지 않는 화면(검색 등)에서는 activeIndex 가 -1이 되는데,
+        그때 임의의 탭 위로 pill 을 붙여두면 "그 탭이 활성"이라는 거짓 신호가 되므로 숨긴다.
+
+        첫 렌더 시에도 activeIndex 는 이미 props 로부터 계산되어 초기 style 에 그대로
+        박히므로(별도의 mount 애니메이션 로직 없음) pill 이 왼쪽 끝에서 미끄러져
+        들어오는 일은 없다 — transition 은 이미 마운트된 DOM 에서 activeTab 이 바뀔
+        때만(재렌더로 style 값이 달라질 때만) 발동한다.
+      */}
+      <div
+        className="tm-bottom-nav-pill-slot"
+        aria-hidden="true"
+        style={{
+          width: `calc(100% / ${tabCount})`,
+          transform: activeIndex >= 0 ? `translateX(calc(${activeIndex} * 100%))` : undefined,
+          opacity: activeIndex >= 0 ? 1 : 0,
+        }}
+      >
+        <span className="tm-bottom-nav-pill" />
+      </div>
       {tabs.map(({ id, label, href, Icon }) => {
         const active = id === activeTab;
         return (

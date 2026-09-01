@@ -7,6 +7,7 @@ import {
 } from '@prisma/client';
 
 import { assertAlphaSeedAllowed } from './seed-alpha-tournament-qa';
+import { repairExistingShowcaseOfficialResult } from './showcase-official-result-repair';
 
 const LOCAL_SHOWCASE_DATABASE = 'teameet_alpha';
 const LOCAL_SHOWCASE_HOST = 'v1_postgres';
@@ -141,20 +142,44 @@ async function seedFixtureResult(
     update: { mode: V1VisibilityMode.OFFICIAL_ONLY },
     create: { gameId: game.id, mode: V1VisibilityMode.OFFICIAL_ONLY },
   });
-  if (game.currentOfficialRevisionId) return 'preserved' as const;
-
   const homeSide = game.sides.find((side) => side.sideKey === 'HOME');
   const awaySide = game.sides.find((side) => side.sideKey === 'AWAY');
-  if (!homeSide || !awaySide) throw new Error(`Showcase fixture ${fixture.id} is missing a game side.`);
-  const homeParticipant = game.participants.find((participant) => participant.sideId === homeSide.id);
-  const awayParticipant = game.participants.find((participant) => participant.sideId === awaySide.id);
-  if (!homeParticipant?.userId || !awayParticipant?.userId) {
-    throw new Error(`Showcase fixture ${fixture.id} is missing linked roster participants.`);
+  if (!homeSide || !awaySide) {
+    throw new Error('Showcase fixture ' + fixture.id + ' is missing a game side.');
   }
-  const homeUserId = homeParticipant.userId;
-  const awayUserId = awayParticipant.userId;
+  const homeUserId = fixture.homeRegistration.players[0]?.userId;
+  const awayUserId = fixture.awayRegistration.players[0]?.userId;
+  const homeParticipant = game.participants.find(
+    (participant) => participant.sideId === homeSide.id && participant.userId === homeUserId,
+  );
+  const awayParticipant = game.participants.find(
+    (participant) => participant.sideId === awaySide.id && participant.userId === awayUserId,
+  );
+  if (!homeUserId || !awayUserId || !homeParticipant || !awayParticipant) {
+    throw new Error('Showcase fixture ' + fixture.id + ' is missing its representative roster participants.');
+  }
 
   const { homeScore, awayScore, recordedAt } = fixture.result;
+  if (game.currentOfficialRevisionId) {
+    return repairExistingShowcaseOfficialResult(tx, {
+      fixtureId: fixture.id,
+      tournamentId: fixture.tournamentId,
+      scheduledAt: fixture.scheduledAt,
+      recordedAt,
+      homeScore,
+      awayScore,
+      homeTeamId: fixture.homeRegistration.teamId,
+      awayTeamId: fixture.awayRegistration.teamId,
+      gameId: game.id,
+      currentOfficialRevisionId: game.currentOfficialRevisionId,
+      homeSideId: homeSide.id,
+      awaySideId: awaySide.id,
+      homeParticipantId: homeParticipant.id,
+      awayParticipantId: awayParticipant.id,
+      homeUserId,
+      awayUserId,
+    });
+  }
   const score = { home: homeScore, away: awayScore };
   const eventsHash = `local-showcase-tournament:${fixture.id}:${homeScore}-${awayScore}`;
   const scorers = [
@@ -225,7 +250,7 @@ async function seedFixtureResult(
 
   for (let index = 0; index < goalEvents.length; index += 1) {
     const goal = goalEvents[index];
-    const actorUserId = goal.sideId === homeSide.id ? homeParticipant.userId : awayParticipant.userId;
+    const actorUserId = goal.sideId === homeSide.id ? homeUserId : awayUserId;
     await tx.v1GameEvent.create({
       data: {
         gameId: game.id,
@@ -363,20 +388,24 @@ async function main() {
 
     let created = 0;
     let preserved = 0;
+    let repaired = 0;
     for (const fixture of fixtures) {
       const result = fixture.result;
       if (!result) throw new Error(`Showcase fixture ${fixture.id} has no result.`);
       const outcome = await prisma.$transaction((tx) => seedFixtureResult(tx, { ...fixture, result }));
       if (outcome === 'created') created += 1;
+      else if (outcome === 'repaired') repaired += 1;
       else preserved += 1;
     }
-    process.stdout.write(JSON.stringify({ status: 'ok', fixtures: fixtures.length, created, preserved }) + '\n');
+    process.stdout.write(JSON.stringify({ status: 'ok', fixtures: fixtures.length, created, repaired, preserved }) + '\n');
   } finally {
     await prisma.$disconnect();
   }
 }
 
-main().catch((error: unknown) => {
-  process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
-  process.exitCode = 1;
-});
+if (require.main === module) {
+  main().catch((error: unknown) => {
+    process.stderr.write((error instanceof Error ? error.message : String(error)) + '\n');
+    process.exitCode = 1;
+  });
+}

@@ -1055,9 +1055,16 @@ describe('TournamentDetailView — 정규 리그 거울 행', () => {
 
   it('대회 상세에는 정원 진행바가 있다 — 대조군', async () => {
     // 이 대조군이 없으면 정원 블록을 통째로 지워도 위 테스트가 통과한다.
-    // ⚠️ 여기서는 `mockResolvedValueOnce` 를 **쓰지 않는다** — 대회는 순위 섹션을 안 그려
-    // v1Get 을 부르지 않고, 그러면 큐에 남은 값이 **다음 테스트로 샌다**(실제로 그렇게
-    // 다음 테스트가 깨졌다).
+    //
+    // ⚠️ **정원 진행바가 두 자리에 있다** — 모바일 카드(`tm-hide-desktop`)와 데스크탑
+    // 우측 레일. 게이트(`showsCapacity`)가 지키는 것은 **모바일 쪽**이고, 레일은
+    // `isOpen` 안에 있어 애초에 리그가 도달하지 못한다(아래 테스트에서 못박는다).
+    // 그래서 `container.querySelector('[role=progressbar]')` 로 통째로 잡으면 **레일
+    // 것이 잡혀 게이트를 지워도 통과한다** — 실제로 처음에 그렇게 vacuous 였다.
+    // 게이트가 지키는 자리만 겨냥한다.
+    //
+    // ⚠️ `mockResolvedValueOnce` 를 **쓰지 않는다** — 대회는 순위 섹션을 안 그려 v1Get 을
+    // 부르지 않고, 그러면 큐에 남은 값이 **다음 테스트로 샌다**(실제로 그렇게 깨졌다).
     const tournament = makeTournament({
       id: 't-capacity',
       status: 'open',
@@ -1069,7 +1076,31 @@ describe('TournamentDetailView — 정규 리그 거울 행', () => {
     const { container } = render(
       createElement(TournamentDetailView, { tournament, myRegistration: null }),
     );
-    expect(container.querySelector('[role="progressbar"]')).not.toBeNull();
+    const capacityBars = [...container.querySelectorAll('[role="progressbar"]')].filter((b) =>
+      (b.getAttribute('aria-label') ?? '').startsWith('정원'),
+    );
+    expect(capacityBars.some((b) => b.closest('.tm-hide-desktop') !== null)).toBe(true);
+  });
+
+  /**
+   * 위 대조군이 "레일 것을 잡아서" vacuous 였던 사고의 나머지 절반.
+   *
+   * 레일(`railCTA`)에도 정원 진행바가 있는데 **거기엔 게이트를 안 걸었다.** 리그가 도달할 수
+   * 없기 때문이다 — 거울의 status 는 `STATUS_BY_LEAGUE_STATE`(draft/in_progress/completed)
+   * 로만 만들어져 **`open` 이 나올 수 없고**, 레일은 `status === 'open'` 일 때만 그려진다.
+   * `open` 을 넣을 수 있는 유일한 경로인 어드민 `changeStatus` 는 진입 조회가
+   * `TOURNAMENT_KINDS` 라 거울에 닿지 않는다.
+   *
+   * 그 전제를 여기서 못박는다. 안 박으면 다음 사람은 "왜 레일만 안 막았지?" 를 다시
+   * 판단해야 하고, 전제가 깨져도 아무것도 red 가 되지 않는다.
+   */
+  it('리그 상세에는 참가 신청 레일이 아예 없다 — 레일 정원 블록을 게이팅하지 않은 근거', async () => {
+    vi.mocked(v1Get).mockResolvedValueOnce(standingsResponse);
+    const { container } = render(
+      createElement(TournamentDetailView, { tournament: makeMirror(), myRegistration: null }),
+    );
+    await screen.findByText('통합 순위');
+    expect(container.querySelector('[aria-label="참가 신청"]')).toBeNull();
   });
 
   it('조가 없어도 통합 순위 섹션을 그린다 — 조 개수로 게이팅하면 리그는 영영 안 뜬다', async () => {

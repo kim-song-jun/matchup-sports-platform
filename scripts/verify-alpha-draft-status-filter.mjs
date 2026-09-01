@@ -52,6 +52,12 @@ async function main() {
   const ctl = await query('status=in_progress'); // 대조군: 종전 동작이 그대로인가
 
   const onlyLeague = a.kinds !== null && Object.keys(a.kinds).every((k) => k === 'regular_league');
+  /**
+   * **판정은 "200 이냐"가 아니라 "리그 아닌 게 있냐"다.** 200+빈 목록과 200+대회 draft 는
+   * 상태코드가 같아서, 개수만 보면 *"막혔다"* 와 *"샜다"* 를 못 가른다. 그리고 개수 기준은
+   * 나중에 기본 표면이 바뀌면 멀쩡한 동작을 ❌ 로 만든다 — 지켜야 하는 성질은 **종류**다.
+   */
+  const nonLeague = (r) => (r.kinds === null ? null : Object.entries(r.kinds).filter(([k]) => k !== 'regular_league').reduce((n, [, v]) => n + v, 0));
 
   const rows = [
     {
@@ -62,15 +68,15 @@ async function main() {
     },
     {
       항목: 'kind=tournament&status=draft',
-      값: b.status === 200 ? `200 · ${b.items}건` : `HTTP ${b.status}`,
-      기대: '200 · 0건',
-      판정: b.status === 200 && b.items === 0 ? '✅' : b.status !== 200 ? `❌ HTTP ${b.status}` : `❌ 대회 draft 가 ${b.items}건 샜다`,
+      값: b.status === 200 ? `200 · ${b.items}건 ${JSON.stringify(b.kinds)}` : `HTTP ${b.status}`,
+      기대: '리그 아닌 것 0',
+      판정: b.status !== 200 ? `❌ HTTP ${b.status}` : nonLeague(b) === 0 ? '✅' : `❌ 대회 draft 가 ${nonLeague(b)}건 샜다`,
     },
     {
       항목: 'status=draft (kind 없음)',
-      값: c.status === 200 ? `200 · ${c.items}건` : `HTTP ${c.status}`,
-      기대: '200 · 0건',
-      판정: c.status === 200 && c.items === 0 ? '✅' : c.status !== 200 ? `❌ HTTP ${c.status}` : `❌ 기본 surface 로 ${c.items}건 샜다`,
+      값: c.status === 200 ? `200 · ${c.items}건 ${JSON.stringify(c.kinds)}` : `HTTP ${c.status}`,
+      기대: '리그 아닌 것 0',
+      판정: c.status !== 200 ? `❌ HTTP ${c.status}` : nonLeague(c) === 0 ? '✅' : `❌ 기본 surface 로 ${nonLeague(c)}건 샜다`,
     },
     {
       항목: '대조군 · status=in_progress',

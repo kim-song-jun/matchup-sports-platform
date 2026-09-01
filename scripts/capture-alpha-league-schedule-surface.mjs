@@ -60,6 +60,12 @@ const WIDTHS = [
   { key: 'desktop', width: 1440, height: 900 },
 ];
 const GOTO_TIMEOUT = 60_000;
+/**
+ * 폭·화면 사이 간격. **1.2초로 18회를 돌렸더니 alpha 가 11번째부터 전면 403 을 걸었다**
+ * (2026-09-01). 403 은 화면 결함이 아니지만 **그 실행의 나머지 판정을 통째로 못 쓰게 만든다** —
+ * 재측정 비용이 간격보다 훨씬 비싸다.
+ */
+const PACE_MS = Number(process.env.PACE_MS ?? 4_000);
 /** 순위는 클라이언트 조회라 렌더까지 시간이 걸린다. `networkidle` 은 폴링 때문에 안 끝난다. */
 const SETTLE_MS = 5_000;
 
@@ -336,7 +342,7 @@ async function main() {
           판정: r.read ? verdict(t.kind, r.read) : `❌ ${r.note}`,
           파일: r.read ? file : '-',
         });
-        await new Promise((resolve) => setTimeout(resolve, 1200)); // 403 회피용 간격
+        await new Promise((resolve) => setTimeout(resolve, PACE_MS)); // 403 회피용 간격
       }
     }
   } finally {
@@ -346,7 +352,13 @@ async function main() {
   const after = await servingCommit();
   console.table(rows);
   console.log(`서빙(후)  ${after}`);
-  if (before !== after) {
+  // **"못 읽음" 과 "바뀜" 은 다른 사건이다.** rate limit 이 걸리면 이 HEAD 도 막혀 헤더가
+  // 안 오는데, 그걸 "배포 창" 으로 보고하면 **원인을 엉뚱한 데로 돌린다**(실제로 한 번 그랬다).
+  const headerMissing = after === '(헤더 없음)' || before === '(헤더 없음)';
+  const swapped = !headerMissing && before !== after;
+  if (headerMissing) {
+    console.log('⚠️ 서빙 커밋 헤더를 못 읽었다 — 배포 창인지 rate limit 인지 이 실행으로는 못 가른다.');
+  } else if (swapped) {
     console.log('⚠️ 측정 도중 서빙본이 바뀌었다 — 이 실행은 버리고 다시 돌려라(배포 창).');
   }
   writeFileSync(`${OUT}/summary.json`, JSON.stringify({ leagues, tournament, before, after, rows }, null, 2));
@@ -357,7 +369,7 @@ async function main() {
   if (harness > 0) {
     console.log(`⚠️ 하네스 실패 ${harness}건 — 화면에 대해 판정하지 마라.`);
     process.exitCode = 2;
-  } else if (failed > 0 || before !== after) {
+  } else if (failed > 0 || swapped || headerMissing) {
     process.exitCode = 1;
   }
 }

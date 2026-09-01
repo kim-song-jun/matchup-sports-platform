@@ -4418,8 +4418,23 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
  *
  * 빈 상태가 있는 화면에서만 그 래퍼에 높이를 넘긴다(:has 로 스코프를 좁힌다 — 콘텐츠가
  * 있는 평소 화면에는 이 규칙이 적용되지 않는다).
+ *
+ * **`> *` 로 되돌리지 마라.** 스크롤 영역의 직계 자식이 래퍼 하나뿐인 게 아니다 —
+ * `shell.tsx` 는 `desktopHead && title` 일 때 `.tm-desktop-page-head` 를
+ * `<main class="tm-scroll-area">` **바로 안에** 그린다(alpha 실측: `/my/inquiries` 에서
+ * 직계 자식 2개, 헤더가 depth 1). `> *` 면 그 헤더까지 `min-height:100%` + column 이 되어
+ * 뒤로가기 화살표가 제목 **위로 쌓이고** 헤더가 504px 로 부푼다(격리 측정, 1440).
+ *
+ * 지금은 그 조합이 나는 라우트가 없다 — `.tm-list-empty` 를 붙이는 7곳이 전부 route-chrome
+ * 에서 `desktopHead` 를 명시하지 않아 `shell.tsx` 기본값 `false` 가 적용된다. 그래서 이
+ * 변경은 오늘 화면을 한 픽셀도 바꾸지 않는다(직계 자식이 래퍼 하나이고 그게 빈 목록을
+ * 품고 있어 `:has` 가 그대로 매치한다). **미래의 지뢰만 제거한다.**
+ *
+ * 남은 것: 헤더가 형제로 있으면 `min-height:100%` 와 헤더 높이가 더해져 그만큼 오버플로가
+ * 생긴다. 그건 이 좁히기로 안 풀리고 레이아웃 재설계가 필요해 백로그다(스크롤 영역을 flex
+ * 로 만드는 안은 `.tm-match-list` 의 padding-bottom:108px 과 얽혀 오히려 늘어났다).
  */
-.tm-scroll-area:has(.tm-list-empty) > * {
+.tm-scroll-area > *:has(.tm-list-empty) {
   min-height: 100%;
   /*
    * min-height 만으로는 부족하다 — 래퍼와 목록 사이에 `display: contents` 인 pane 이

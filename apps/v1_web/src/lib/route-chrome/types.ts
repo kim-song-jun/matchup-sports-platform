@@ -12,7 +12,14 @@ export type RouteChromeConfig = {
   showNotifications?: boolean;
   bottomNav?: boolean;
   topBar?: boolean;
-  desktopHead?: boolean; // 기본값 = "제너릭 desktop head 사용" (설계 문서 §4 R3)
+  /**
+   * 미지정이면 **제너릭 desktop head 를 그리지 않는다** — `shell.tsx` 의 기본값이 `false`
+   * 다(`app-shell-frame.tsx` 가 `override.desktopHead ?? chrome.desktopHead` 로 넘기므로
+   * 여기가 undefined 면 그 기본값이 적용된다). 예전 주석은 반대로 "제너릭 head 사용"이라고
+   * 적혀 있었는데 코드와 어긋난 서술이었다(2026-09-01 alpha 실측으로 확인 — desktopHead 를
+   * 명시하지 않은 목록 라우트들에서 헤더가 렌더되지 않았다). 설계 문서 §4 R3 참조.
+   */
+  desktopHead?: boolean;
   centerTitle?: boolean;
   titleAsHeading?: boolean;
 };

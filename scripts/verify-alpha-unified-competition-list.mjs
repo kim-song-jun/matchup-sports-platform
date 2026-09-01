@@ -163,7 +163,18 @@ async function main() {
   const browser = await chromium.launch();
   try {
     for (const vp of WIDTHS) {
-      const ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height } });
+      /**
+       * **폭 하나가 실패해도 나머지는 계속 잰다.**
+       *
+       * 예전에는 여기서 던지면 top-level catch 가 받아 `process.exit(1)` 로 끝났다 — 1440 이
+       * 죽으면 **이미 성공한 390·768 결과까지 잃는다.** 그러면 결과가 "부분 실패" 가 아니라
+       * "전부 없음" 이 되고, 다음 사람은 원인을 처음부터 다시 찾는다.
+       *
+       * 이 파일에서 같은 결론이 세 번째다(403 대응 · setup · 이번) — **던지지 말고 결과로 남긴다.**
+       */
+      let ctx;
+      try {
+      ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height } });
       const page = await ctx.newPage();
 
       // ── /tournaments (쿼리 없음 = 전체) ──
@@ -173,22 +184,29 @@ async function main() {
       await page.screenshot({ path: `${OUT}/tournaments-${vp.key}.png`, fullPage: false });
 
       const list = await page.evaluate(`(() => {
-        /* '첫 화면' 이라고 말하려면 **뷰포트 안에 걸린 카드**만 세야 한다. 예전에는 DOM 전체를
-           세면서 메시지만 "첫 화면" 이라 적었다 — 페이지 크기(20)가 우연히 한 화면처럼 보였을
-           뿐이고, 대회가 섞였는데 스크롤 아래에 있으면 **거짓 PASS** 가 난다.
-           배지도 document 전체가 아니라 **그 카드 안**에서 센다 — 카드 밖 배지를 세면 짝이 안 맞는다. */
-        const inView = (el) => {
-          const r = el.getBoundingClientRect();
-          return r.bottom > 0 && r.top < window.innerHeight;
-        };
+        /* '첫 화면' 이라고 말하려면 **실제로 보이는 카드**만 세야 한다. 두 번 틀렸다:
+             1차  document 전체를 세면서 "첫 화면" 이라 적었다 (페이지 크기 20 이 한 화면처럼 보였다)
+             2차  window.innerHeight 로 좁혔다 — **이 앱은 window 로 스크롤하지 않는다**
+           실측: body overflow hidden · document 스크롤 불가 · 유일한 스크롤러가 .tm-scroll-area
+                 (top 56 · height 714 vs window 844) → 위 56px 과 아래 74px 은 **안 보인다**
+           그래서 그 컨테이너의 rect 와 교차하는 카드만 센다. 배지도 document 전체가 아니라
+           **그 카드 안**에서 센다 — 카드 밖 배지를 세면 분자와 분모가 다른 집합이 된다. */
+        const scroller = document.querySelector('.tm-scroll-area');
+        const view = scroller ? scroller.getBoundingClientRect() : null;
         const allCards = [...document.querySelectorAll('[role="list"][aria-label="대회 목록"] > *')];
-        const cards = allCards.filter(inView);
+        const cards = view
+          ? allCards.filter((el) => {
+              const r = el.getBoundingClientRect();
+              return r.bottom > view.top && r.top < view.bottom;
+            })
+          : [];
         const badges = cards.filter((c) => c.querySelector('[aria-label="정규 리그"]') !== null);
         const seg = document.querySelector('nav[aria-label="대회 유형"]');
         const title = [...document.querySelectorAll('*')].find((e) => e.textContent?.trim() === '대회 목록');
         const chips = document.querySelector('[role="group"][aria-label="종목 필터"]');
         const rect = (el) => (el ? Math.round(el.getBoundingClientRect().left) : null);
         return {
+          hasScroller: view !== null,
           cardCount: cards.length,
           domCardCount: allCards.length,
           leagueBadges: badges.length,
@@ -204,8 +222,14 @@ async function main() {
 
       if (vp.key === 'mobile') {
         // 판정 2 — 전체 탭에 두 종류가 섞이는가
-        if (list.cardCount === 0) {
-          record('2-섞임', 'INCONCLUSIVE', `카드가 0개다 (status ${listStatus}) — 부재를 통과로 읽지 않는다`);
+        if (!list.hasScroller) {
+          /* 셀렉터를 짐작하면 항상 0개가 나와 **거짓 판정**이 된다 — 컨테이너가 사라졌으면
+             그 사실을 말해야지, 카드가 없다고 말하면 안 된다. */
+          record('2-섞임', 'INCONCLUSIVE',
+            `스크롤 컨테이너(.tm-scroll-area)를 못 찾았다 (status ${listStatus}) — 셸이 바뀌었는지 확인 필요`);
+        } else if (list.cardCount === 0) {
+          record('2-섞임', 'INCONCLUSIVE',
+            `보이는 카드가 0개다 (DOM 전체 ${list.domCardCount}개, status ${listStatus}) — 부재를 통과로 읽지 않는다`);
         } else {
           const mixed = list.leagueBadges > 0 && list.leagueBadges < list.cardCount;
           record(
@@ -351,7 +375,11 @@ async function main() {
       }
 
       console.log(`  [${vp.key}] status list=${listStatus} detail=${detStatus} league=${lmStatus}`);
-      await ctx.close();
+      } catch (err) {
+        record(`폭-${vp.key}`, 'INCONCLUSIVE', `${vp.width}px 측정 중 실패 — ${err.message}`);
+      } finally {
+        if (ctx) await ctx.close().catch(() => {});
+      }
     }
   } finally {
     await browser.close();

@@ -35,6 +35,31 @@ public final class AllowedNavigationTest {
         assertEquals(false, AllowedNavigation.isAllowedExternalScheme("content"));
     }
 
+    @Test public void keepsOnlyExactKakaoAuthenticationHostsInsideTheWebView() {
+        assertEquals(true, AllowedNavigation.isTrustedAuthProviderAbsoluteUrl(
+            "https://kauth.kakao.com/oauth/authorize"
+        ));
+        assertEquals(true, AllowedNavigation.isTrustedAuthProviderAbsoluteUrl(
+            "https://accounts.kakao.com/login"
+        ));
+        assertEquals(true, AllowedNavigation.isTrustedAuthProviderAbsoluteUrl(
+            "https://auth.kakao.com/login"
+        ));
+        assertEquals(false, AllowedNavigation.isTrustedAuthProviderAbsoluteUrl(
+            "http://accounts.kakao.com/login"
+        ));
+        assertEquals(false, AllowedNavigation.isTrustedAuthProviderAbsoluteUrl(
+            "https://accounts.kakao.com.attacker.example/login"
+        ));
+        assertEquals(false, AllowedNavigation.isTrustedAuthProviderAbsoluteUrl(
+            "https://user@accounts.kakao.com/login"
+        ));
+        assertEquals(false, AllowedNavigation.isTrustedAuthProviderAbsoluteUrl(
+            "https://accounts.kakao.com:444/login"
+        ));
+        assertEquals(false, AllowedNavigation.isTrustedAuthProviderAbsoluteUrl("not a url"));
+    }
+
     @Test public void grantsGeolocationOnlyToTheExactEnvironmentOrigin() {
         String origin = BuildConfig.APPLICATION_ID.endsWith(".alpha")
             ? "https://alpha.teameet.co.kr"

@@ -4,16 +4,8 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    <!-- Geometric wordmark: 팀밋. Kept inside the adaptive-icon safe zone. -->
     <path
         android:fillColor="#FFFFFFFF"
-        android:fillType="evenOdd"
-        android:pathData="M54,25A29,29 0,1 1,54 83A29,29 0,1 1,54 25M54,34A20,20 0,1 0,54 74A20,20 0,1 0,54 34" />
-    <group
-        android:pivotX="54"
-        android:pivotY="54"
-        android:rotation="48">
-        <path
-            android:fillColor="#FFFFFFFF"
-            android:pathData="M49,29A5,5 0,0 1,54 24A5,5 0,0 1,59 29L59,55A5,5 0,0 1,54 60A5,5 0,0 1,49 55Z" />
-    </group>
+        android:pathData="M18,29h20v5H18zM18,38h20v5H18zM22,33h5v6h-5zM42,28h5v26h-5zM22,57h22v5H22zM22,62h5v9h-5zM39,62h5v9h-5zM22,71h22v5H22zM59,29h19v5H59zM59,34h5v14h-5zM73,34h5v14h-5zM64,39h9v5h-9zM59,48h19v5H59zM82,28h5v26h-5zM67,57h5L61,76h-6zM71,57h5l11,19h-6z" />
 </vector>

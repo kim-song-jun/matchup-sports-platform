@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="system_bar_background">#111827</color>
+    <color name="native_error_background">#111827</color>
+    <color name="native_error_title">#F9FAFB</color>
+    <color name="native_error_body">#D1D5DB</color>
+</resources>

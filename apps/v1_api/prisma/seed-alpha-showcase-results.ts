@@ -6,6 +6,8 @@ import {
   V1VisibilityMode,
 } from '@prisma/client';
 
+import { assertAlphaSeedAllowed } from './seed-alpha-tournament-qa';
+
 const LOCAL_SHOWCASE_DATABASE = 'teameet_alpha';
 const LOCAL_SHOWCASE_HOST = 'v1_postgres';
 const SHOWCASE_TOURNAMENT_ID = 'ab100000-0000-4000-8000-000000000001';
@@ -17,6 +19,18 @@ function assertLocalShowcaseDatabase(databaseUrl: string | undefined) {
   if (parsed.hostname !== LOCAL_SHOWCASE_HOST || databaseName !== LOCAL_SHOWCASE_DATABASE) {
     throw new Error(`Refusing local showcase result seed for ${parsed.hostname}/${databaseName || '(missing)'}.`);
   }
+}
+
+export function assertShowcaseResultSeedAllowed(env: NodeJS.ProcessEnv) {
+  // Alpha and the guarded local screenshot database deliberately share the same
+  // Docker host/database names. Production mode must therefore pass the full
+  // NODE_ENV + confirmation flag + origin + DB guard; only non-production local
+  // runs may use the narrow host/database guard by itself.
+  if (env.NODE_ENV === 'production') {
+    assertAlphaSeedAllowed(env);
+    return;
+  }
+  assertLocalShowcaseDatabase(env.DATABASE_URL);
 }
 
 function resultFor(goalsFor: number, goalsAgainst: number) {
@@ -293,7 +307,7 @@ async function seedFixtureResult(
 }
 
 async function main() {
-  assertLocalShowcaseDatabase(process.env.DATABASE_URL);
+  assertShowcaseResultSeedAllowed(process.env);
   const prisma = new PrismaClient();
   try {
     const fixtures = await prisma.v1TournamentFixture.findMany({

@@ -8,10 +8,14 @@ import {
   buildAlphaTournamentCampaignContent,
   createCompetitionData,
   ensureAlphaQaRecordConsent,
-  FEATURED_PERSONAS,
   FEATURED_TEAMS,
 } from '../../prisma/seed-alpha-tournament-qa';
-import { LEAGUE_PLAYER_NAMES, LEAGUE_TEAM_NAMES } from '../../prisma/seed-alpha-league-qa';
+import {
+  LEAGUE_PLAYER_NAMES,
+  LEAGUE_TEAM_NAMES,
+  SHOWCASE_SQUAD_PERSONAS,
+} from '../../prisma/seed-alpha-league-qa';
+import { assertShowcaseResultSeedAllowed } from '../../prisma/seed-alpha-showcase-results';
 import { parseCampaignContentJson } from './tournament-campaign-content';
 import { FUTSAL_COMPETITION_CONFIG_ID } from './competition-config/competition-config-backfill';
 
@@ -29,30 +33,67 @@ describe('alpha tournament QA campaign content', () => {
       resolve(__dirname, '../../prisma/seed-alpha-league-qa.ts'),
       'utf8',
     );
-    const localTournamentResultSeed = readFileSync(
-      resolve(__dirname, '../../prisma/seed-local-showcase-tournament-results.ts'),
+    const showcaseResultSeed = readFileSync(
+      resolve(__dirname, '../../prisma/seed-alpha-showcase-results.ts'),
       'utf8',
     );
 
     expect(leagueSeed).toContain(
       'mode: spec.result === null ? V1VisibilityMode.LIVE : V1VisibilityMode.OFFICIAL_ONLY',
     );
-    expect(localTournamentResultSeed).not.toContain("mode: 'LIVE'");
-    expect(localTournamentResultSeed).toContain('update: { mode: V1VisibilityMode.OFFICIAL_ONLY }');
+    expect(showcaseResultSeed).not.toContain("mode: 'LIVE'");
+    expect(showcaseResultSeed).toContain('update: { mode: V1VisibilityMode.OFFICIAL_ONLY }');
   });
 
-  it('쇼케이스 리그를 자연스러운 5개 팀·20명 선수로 구성한다', () => {
+  it('쇼케이스 리그를 자연스러운 5개 팀·31명 선수로 구성한다', () => {
     const teamNames = [FEATURED_TEAMS[0].name, ...LEAGUE_TEAM_NAMES];
     const playerNames = [
-      ...FEATURED_PERSONAS.map((persona) => persona.nickname),
+      ...SHOWCASE_SQUAD_PERSONAS.map((persona) => persona.nickname),
       ...LEAGUE_PLAYER_NAMES.flat(),
     ];
 
     expect(teamNames).toHaveLength(5);
     expect(new Set(teamNames).size).toBe(5);
-    expect(playerNames).toHaveLength(20);
-    expect(new Set(playerNames).size).toBe(20);
+    expect(SHOWCASE_SQUAD_PERSONAS).toHaveLength(15);
+    expect(playerNames).toHaveLength(31);
+    expect(new Set(playerNames).size).toBe(31);
     expect([...teamNames, ...playerNames].filter((name) => /\(테스트\)|QA|리그QA|\d+팀\d+/i.test(name))).toEqual([]);
+  });
+
+  it('guards production showcase-result seeding and preserves the local QA path', () => {
+    expect(() =>
+      assertShowcaseResultSeedAllowed({
+        NODE_ENV: 'production',
+        DATABASE_URL: 'postgresql://u:p@v1_postgres:5432/teameet_alpha',
+      }),
+    ).toThrow();
+
+    expect(() =>
+      assertShowcaseResultSeedAllowed({
+        NODE_ENV: 'production',
+        V1_ALPHA_QA_SEED: 'true',
+        V1_ALPHA_QA_ORIGIN: 'https://alpha.teameet.co.kr',
+        DATABASE_URL: 'postgresql://u:p@v1_postgres:5432/teameet_alpha',
+      }),
+    ).not.toThrow();
+
+    expect(() =>
+      assertShowcaseResultSeedAllowed({
+        NODE_ENV: 'development',
+        DATABASE_URL: 'postgresql://u:p@v1_postgres:5432/teameet_alpha',
+      }),
+    ).not.toThrow();
+  });
+
+  it('runs the public-result projection after game backfill and before standings recalculation', () => {
+    const deployScript = readFileSync(resolve(__dirname, '../../../../deploy/deploy-alpha.sh'), 'utf8');
+    const backfillIndex = deployScript.indexOf('fixture-game-backfill.cli.js');
+    const resultSeedIndex = deployScript.indexOf('seed-alpha-showcase-results.ts');
+    const standingsIndex = deployScript.indexOf('tournament-standings-recalculation.cli.js');
+
+    expect(backfillIndex).toBeGreaterThan(-1);
+    expect(resultSeedIndex).toBeGreaterThan(backfillIndex);
+    expect(standingsIndex).toBeGreaterThan(resultSeedIndex);
   });
 
   it('creates public-record consent for a QA persona without overwriting a later revocation', async () => {

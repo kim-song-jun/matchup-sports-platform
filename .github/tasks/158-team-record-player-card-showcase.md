@@ -59,6 +59,8 @@ Alpha 앱에서 `내 팀 → 팀 상세 → 팀 전적(전체/대회/리그/친�
 - 2026-09-01: 실제 API에서 전체 7경기(4승 2무 1패), 대회 4경기, 리그 1경기, 친선 2경기와 누락 스코어 0건을 확인했다. 1주차 리그 상세는 공식 4:2, 이벤트 6건, 비공개 선수 0명이다.
 - 2026-09-01: `output/playwright/task-158-local-showcase`에 headed Chromium 17/17(390x844, console/page/network/API 오류 0)과 `output/task158/android-emulator`에 API 36 Android 캡처 6장을 저장했다.
 
+- 2026-09-01: Confirmed live Alpha had the featured team at 4/8 with seven completed records; expanded only the featured squad to 15/20 and added guarded result projection after game backfill and before standings recalculation.
+
 ## Ambiguity Log
 
 - “실데이터처럼”은 production 사용자의 실제 활동을 조작하는 뜻이 아니라, Alpha 전용임이 명확한 실제 관계형 DB 행과 공식 집계 경로를 사용하는 것으로 해석한다.

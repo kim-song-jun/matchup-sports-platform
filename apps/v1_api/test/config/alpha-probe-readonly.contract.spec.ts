@@ -25,6 +25,7 @@ const READ_ONLY_SCRIPTS = [
   'scripts/probe-alpha-league-subroutes.mjs',
   'scripts/capture-alpha-league-on-tournament-surface.mjs',
   'scripts/capture-alpha-competition-lists.mjs',
+  'scripts/verify-alpha-unified-competition-list.mjs',
 ];
 
 /**

@@ -34,10 +34,8 @@ describe('CompetitionKindSegment', () => {
   it('둘을 한 번에 보는 전체 칸이 있다 — 통합의 이유가 이 칸이다', () => {
     render(<CompetitionKindSegment active="tournament" />);
     const nav = screen.getByRole('navigation', { name: '대회 유형' });
-    expect(within(nav).getByRole('link', { name: '전체' })).toHaveAttribute(
-      'href',
-      '/tournaments?kind=all',
-    );
+    // 기본값이 `all` 이라 쿼리 없는 주소가 곧 전체다 — 같은 화면에 주소를 둘 만들지 않는다.
+    expect(within(nav).getByRole('link', { name: '전체' })).toHaveAttribute('href', '/tournaments');
   });
 
   it('현재 위치를 색이 아니라 aria-current 로도 알린다', () => {

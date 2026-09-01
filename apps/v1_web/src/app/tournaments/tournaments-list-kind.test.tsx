@@ -51,16 +51,16 @@ describe('대회 목록 — 유형(kind) 축', () => {
     expect(kindSentToServer()).toBe('all');
   });
 
-  it('쿼리가 없으면 지금까지처럼 대회만 묻는다 (리다이렉트 전 기본값)', () => {
+  it('쿼리가 없으면 전체를 묻는다 — 통합 목록이 기본 화면이다', () => {
     search = '';
     render(<TournamentsListContent />);
-    expect(kindSentToServer()).toBe('tournament');
+    expect(kindSentToServer()).toBe('all');
   });
 
   it('모르는 값이 와도 목록이 비지 않는다 — 기본 표면으로 떨어진다', () => {
     search = 'kind=regular_league';
     render(<TournamentsListContent />);
-    expect(kindSentToServer()).toBe('tournament');
+    expect(kindSentToServer()).toBe('all');
   });
 
   it('현재 유형이 세그먼트에 반영된다', () => {

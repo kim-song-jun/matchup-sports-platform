@@ -51,7 +51,9 @@ export function CompetitionKindSegment({ active }: CompetitionKindSegmentProps) 
       {TABS.map(({ kind, label }) => (
         <Link
           key={kind}
-          href={`/tournaments?kind=${kind}`}
+          /* '전체' 는 쿼리 없는 `/tournaments` 로 보낸다 — 기본값이 `all` 이라 `?kind=all` 과
+             같은 화면이고, **같은 화면에 주소가 둘이면 안 된다**(색인·공유 링크가 갈린다). */
+          href={kind === 'all' ? '/tournaments' : `/tournaments?kind=${kind}`}
           className="tm-review-tab"
           data-active={active === kind}
           aria-current={active === kind ? 'page' : undefined}

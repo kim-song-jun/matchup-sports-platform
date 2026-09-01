@@ -83,11 +83,12 @@ export function TournamentsListContent() {
   /* 유형 필터(전체/정규 대회/정규 리그)는 **URL 이 소유한다** — 링크로 공유되고 뒤로가기가
      통해야 하기 때문이다. 종목 필터는 컴포넌트 state 그대로 둔다: 유형은 "어느 목록을
      보는가"라 주소가 되어야 하지만, 종목은 그 안에서의 일시적 좁히기다.
-     기본값이 `tournament` 인 것은 **리다이렉트 전이라서**다. `/league-matches` 가 아직
-     따로 살아 있으므로 `/tournaments` 는 지금까지처럼 대회만 보여준다. 리다이렉트를
-     붙이는 커밋에서 `all` 로 뒤집는다. */
+     **기본은 `all`** — 쿼리 없는 `/tournaments` 가 곧 "전체" 다. 그래야 세그먼트의 첫 칸이
+     성립하고(사용자가 고른 화면이다), 통합 목록이 기본 화면이 된다.
+     `/league-matches` 가 아직 살아 있어 리그를 두 곳에서 볼 수 있는데, 그건 중복일 뿐
+     깨지지 않는다 — **리다이렉트 PR 이 정리할 몫**이다. */
   const searchParams = useSearchParams();
-  const activeKind: CompetitionKind = parseCompetitionKind(searchParams.get('kind'), 'tournament');
+  const activeKind: CompetitionKind = parseCompetitionKind(searchParams.get('kind'), 'all');
 
   /* 유형이 바뀌면 목록 자체가 갈리므로 페이지·누적을 리셋한다 — 종목 칩과 같은 처리지만,
      이쪽은 클릭 핸들러가 아니라 **URL 변화**가 방아쇠라 effect 로 받는다(뒤로가기로 유형이

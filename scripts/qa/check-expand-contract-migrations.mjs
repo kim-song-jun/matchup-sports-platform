@@ -1348,10 +1348,10 @@ function runGit(args) {
   try {
     return execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 1024 * 1024 * 64 });
   } catch (error) {
-    // stderr 를 pipe 해 놓고 `error.message` 만 쓰면 **git 이 한 말이 통째로 사라진다** —
-    // 남는 건 `Command failed: git …` 뿐이라 원인을 밖에서 추측하게 된다(2026-09-01 에
-    // 실제로 그랬다: merge-base 가 죽었는데 로그에 이유가 없어 가설만 여러 개 나왔다).
-    // exit status 도 함께 남긴다 — 아래 판정들이 rc 로 갈리기 때문이다.
+    // 없던 건 **exit status** 다. stderr 는 원래도 안 사라졌다 — Node 가 `error.message`
+    // 뒤에 붙여 준다(describeGitFailure 참조). 2026-09-01 로그에 아무 말이 없었던 건
+    // 유실이 아니라 **rc 1 이라 stderr 가 실제로 비어 있었기** 때문이고, 그 사실을 알려면
+    // rc 가 필요했다. 아래 판정들이 전부 rc 로 갈린다.
     fail(`git ${args.join(' ')} failed${describeGitFailure(error)}`);
   }
 }

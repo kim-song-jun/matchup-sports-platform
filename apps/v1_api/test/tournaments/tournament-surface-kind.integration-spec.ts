@@ -33,9 +33,15 @@ import type { PrismaClient } from '@prisma/client';
  *
  * | 표면 | 리그 |
  * |---|---|
- * | 공개 대회 목록 · 어드민 목록 · 상태 탭 · 대시보드 KPI | **안 나온다** |
+ * | 공개 대회 목록 (기본) | **안 나온다** — `kind` 기본값이 `tournament` 다 |
+ * | 공개 대회 목록 (`?kind=league` · `?kind=all`) | **나온다** — API 계약으로만 열려 있고 화면은 아직 안 보낸다 |
+ * | 어드민 목록 · 상태 탭 · 대시보드 KPI | **안 나온다** — 여기는 앞으로도 닫힌다 |
  * | 공개 대회 기록(일정·선수기록·경기단건) | **안 열린다** |
  * | 공개 상세 · 공개 통합 순위 | **열린다** (read-swap 의 목적) |
+ *
+ * ⚠️ **"공개 목록"과 "어드민 목록"을 한 줄로 묶지 마라.** 둘은 이제 다른 답을 갖는다 —
+ * 공개 목록은 파라미터로 열 수 있고 어드민 목록은 못 연다. 묶어서 *"목록은 안 나온다"* 로
+ * 적으면 다음 사람이 어드민 목록도 같은 방식으로 열어도 되는 줄 안다.
  *
  * 상세·순위를 연 것은 실수가 아니라 이 개편의 목적이다 — 리그 시즌을 대회 표면에서 볼 수
  * 있게 하는 것. 다만 **열기 전에** 그 화면이 리그 축 데이터로 채워지도록 먼저 만들었다
@@ -224,13 +230,60 @@ describe('대회 표면은 정규 리그 시즌을 보여주지 않는다 (real 
     });
   });
 
-  it('공개 대회 목록 — 리그는 빠지고, kind 가 없는 R1 이전 행은 남는다', async () => {
+  /**
+   * **기본값을 못박는다 — 게이트가 이걸 못 잡는다.**
+   *
+   * `v1-surface-check` 는 *"어디서 종류를 고르는가"*(`COMPETITION_LIST_SURFACE` 사용처)를
+   * 세지 *"무엇을 골랐는가"* 는 안 본다. 즉 기본값을 `'tournament'` → `'all'` 로 바꾸는
+   * 한 글자 변경은 **게이트를 그대로 통과한다**(실측). 그건 테스트의 몫이다.
+   *
+   * 그리고 그게 앞으로 가장 있을 법한 변경이다 — 화면이 두 종류를 그릴 수 있게 되면
+   * 기본값을 뒤집는 것이 다음 단계다. 그때 이 단언이 red 가 되어 **의도한 변경임을
+   * 밝히게** 만든다.
+   */
+  it('공개 대회 목록 — 기본값은 대회만. 리그는 빠지고 kind 가 없는 R1 이전 행은 남는다', async () => {
     const res = await read.list({ limit: 100 } as never);
     const listedIds = (res.items as Array<{ id: string }>).map((row) => row.id);
 
     expect(listedIds).toContain(ids.tournament);
     expect(listedIds).toContain(ids.legacyNullKind);
     expect(listedIds).not.toContain(ids.league);
+  });
+
+  /**
+   * `kind` 는 **API 계약으로만** 열려 있다 — 화면은 아직 이 파라미터를 보내지 않는다.
+   * 세 값이 각각 다른 집합을 내는지 한자리에서 대조한다. 하나만 확인하면 "필터가 걸렸다"와
+   * "우연히 같은 답이 나왔다" 를 구분할 수 없다.
+   */
+  it('kind 파라미터 — 세 값이 각각 다른 집합을 낸다', async () => {
+    const idsOf = async (kind?: string) =>
+      ((await read.list({ limit: 100, ...(kind ? { kind } : {}) } as never)).items as Array<{
+        id: string;
+      }>).map((row) => row.id);
+
+    const [dflt, tournament, league, all] = await Promise.all([
+      idsOf(),
+      idsOf('tournament'),
+      idsOf('league'),
+      idsOf('all'),
+    ]);
+
+    // 기본값 === tournament. 둘이 갈리면 "기본값이 무엇인가" 가 두 답을 갖는다.
+    expect(dflt.sort()).toEqual(tournament.sort());
+
+    expect(tournament).toContain(ids.tournament);
+    expect(tournament).toContain(ids.legacyNullKind);
+    expect(tournament).not.toContain(ids.league);
+
+    // 리그만 — R1 이전 행(kind=null)은 **대회 쪽**이라 여기 없어야 한다.
+    expect(league).toContain(ids.league);
+    expect(league).not.toContain(ids.tournament);
+    expect(league).not.toContain(ids.legacyNullKind);
+
+    // 전체 — 셋 다.
+    expect(all).toContain(ids.tournament);
+    expect(all).toContain(ids.legacyNullKind);
+    expect(all).toContain(ids.league);
   });
   /**
    * **상세는 의도적으로 열려 있다** — 리그 시즌을 대회 표면에서 볼 수 있게 하는 것이

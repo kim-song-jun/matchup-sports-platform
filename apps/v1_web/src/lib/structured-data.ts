@@ -158,17 +158,15 @@ export function buildSportsEventLd(
     ...(tournament.registrationDeadlineAt ? { validThrough: tournament.registrationDeadlineAt } : {}),
   };
 
-  // 참가 팀 수는 대회 상세 상단에 노출된다. 0팀(모집 전)일 때는 의미가 없어 생략한다.
-  if (tournament.teamCount > 0) {
-    node.maximumAttendeeCapacity = tournament.teamCount;
-  }
+  // 참가 팀 수는 화면에 노출되지만 LD 에는 싣지 않는다 — `maximumAttendeeCapacity` 는
+  // '최대 참석 인원(개인)'을 뜻해서 팀 수를 넣으면 값의 의미가 어긋난다. 팀 수를 담을
+  // 마땅한 표준 필드가 없으므로, 맞지 않는 필드에 억지로 넣느니 뺀다(멤버 수와 같은 이유).
 
   return node;
 }
 
 export function buildSportsTeamLd(team: V1Team): JsonLdNode {
-  const id = team.id || team.teamId || '';
-  const url = absoluteSiteUrl(`/teams/${id}`);
+  const url = absoluteSiteUrl(`/teams/${team.id}`);
   const node: JsonLdNode = {
     '@context': 'https://schema.org',
     '@type': 'SportsTeam',

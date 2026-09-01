@@ -1,3 +1,4 @@
+import { formatTournamentDateLong } from '@/lib/date-utils';
 import { absoluteSiteUrl, fetchPublicV1 } from '@/lib/seo';
 import type { V1TournamentListItem, V1TournamentListPage } from '@/types/api';
 
@@ -49,7 +50,7 @@ export async function GET(): Promise<Response> {
           '## 현재 모집 중이거나 진행 중인 대회',
           '',
           ...tournaments.map((item) => {
-            const scheduled = item.scheduledAt ? formatKoreanDate(item.scheduledAt) : '';
+            const scheduled = item.scheduledAt ? formatTournamentDateLong(item.scheduledAt) : '';
             const parts = [item.sport.name, scheduled, item.venue ?? ''].filter(Boolean);
             return `- [${item.title}](${absoluteSiteUrl(`/tournaments/${item.id}`)}): ${parts.join(' · ')}`;
           }),
@@ -105,14 +106,3 @@ async function fetchOpenTournaments(): Promise<V1TournamentListItem[]> {
   }
 }
 
-function formatKoreanDate(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '';
-  const formatted = new Intl.DateTimeFormat('ko-KR', {
-    timeZone: 'Asia/Seoul',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  }).format(date);
-  return formatted;
-}

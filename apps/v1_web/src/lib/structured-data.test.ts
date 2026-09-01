@@ -113,6 +113,12 @@ describe('buildSportsEventLd', () => {
     expect(buildSportsEventLd(tournament({ venue: null }))).not.toHaveProperty('location');
   });
 
+  it('참가 팀 수를 참석 인원 필드에 넣지 않는다 — 값의 의미가 다르다', () => {
+    // maximumAttendeeCapacity 는 '최대 참석 인원(개인)'이다. 팀 수를 넣으면 8명 대회처럼
+    // 읽혀 검색엔진이 틀린 사실을 갖게 된다.
+    expect(buildSportsEventLd(tournament({ teamCount: 8 }))).not.toHaveProperty('maximumAttendeeCapacity');
+  });
+
   it('무료 대회는 참가비 0 을 명시한다 — 필드 누락으로 "미확인"이 되지 않게', () => {
     const ld = buildSportsEventLd(tournament({ entryFee: 0 }));
     expect(ld?.offers).toMatchObject({ price: 0, priceCurrency: 'KRW' });

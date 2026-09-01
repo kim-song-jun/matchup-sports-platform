@@ -39,10 +39,32 @@ const record = (id, verdict, detail) => {
   console.log(`${mark} ${id}: ${detail}`);
 };
 
-async function firstLeagueId() {
-  const res = await fetch(`${API}/tournaments?limit=5&kind=league`);
-  const body = await res.json();
-  return body?.data?.items?.[0]?.id ?? null;
+/**
+ * 대상 고르기도 **측정 불가와 결함을 가른다.**
+ *
+ * 예전에는 `res.json()` 을 바로 불렀다 — alpha 가 전면 403 을 걸면(과한 캡처에 실제로 그런
+ * 전례가 있다) 비JSON 응답에 예외가 나고, 그러면 하네스가 **"판정 실패"** 로 끝난다. 다음
+ * 사람은 그걸 *"화면이 깨졌다"* 로 읽는다. 본체 판정은 `INCONCLUSIVE` 로 떨어지게 해뒀는데
+ * **대상을 고르는 단계만 그 밖에 있었다.**
+ */
+async function pickTarget(kind) {
+  let res;
+  try {
+    res = await fetch(`${API}/tournaments?limit=5&kind=${kind}`);
+  } catch (err) {
+    return { error: `네트워크 실패: ${err.message}` };
+  }
+  if (!res.ok) return { error: `HTTP ${res.status}` };
+  const type = res.headers.get('content-type') ?? '';
+  if (!type.includes('json')) return { error: `비JSON 응답 (content-type: ${type})` };
+  let body;
+  try {
+    body = await res.json();
+  } catch (err) {
+    return { error: `JSON 파싱 실패: ${err.message}` };
+  }
+  const id = body?.data?.items?.[0]?.id ?? null;
+  return id ? { id } : { error: `${kind} 항목 0건` };
 }
 
 /** 세로 좌표를 뷰포트 기준으로 읽는다. 없으면 null (0 으로 메우지 않는다 — 0 은 "맨 위" 로 읽힌다). */
@@ -115,12 +137,19 @@ async function main() {
     return;
   }
 
-  const leagueId = await firstLeagueId();
-  if (!leagueId) {
-    record('setup', 'INCONCLUSIVE', '리그를 하나도 못 받았다 — 판정 불가');
+  const league = await pickTarget('league');
+  const tournament = await pickTarget('tournament');
+  if (league.error) {
+    record('setup', 'INCONCLUSIVE', `리그를 못 골랐다 — ${league.error} · 판정 불가(결함 아님)`);
     return;
   }
-  console.log(`리그 id: ${leagueId}\n`);
+  if (tournament.error) {
+    record('setup', 'INCONCLUSIVE', `대조군 대회를 못 골랐다 — ${tournament.error} · 판정 불가(결함 아님)`);
+    return;
+  }
+  const leagueId = league.id;
+  const tournamentId = tournament.id;
+  console.log(`리그 id: ${leagueId}\n대조군 대회 id: ${tournamentId}\n`);
 
   const browser = await chromium.launch();
   try {
@@ -197,11 +226,15 @@ async function main() {
           hasSeats: text.includes('자리 남았어요'),
           hasConfirmed: text.includes('팀 확정'),
           hasGender: text.includes('성별 구분 없음'),
-          /* '참가비' 로 잡으면 거짓 FAIL 이 난다 — "참가 전 꼭 확인해 주세요" 체크리스트가
-             "운영진 확인 + 참가비 입금 완료 후…" 처럼 그 단어를 4번 쓴다(실측).
-             우리가 막은 것은 InfoRow 의 참가비 값이고, entryFee 0 의 표시값은 "무료" 다.
+          /* 참가비는 **라벨 노드**로 본다 — 문자열 매칭은 양쪽으로 틀린다.
+               '참가비' 포함  → "운영진 확인 + 참가비 입금 완료 후…" 안내 4건에 걸려 거짓 FAIL
+               '무료' 포함    → entryFee 가 0 이 아닌 값으로 새면 "N원" 이라 **놓친다**
+             InfoRow 는 라벨을 자기 div 에 담으므로(레일은 span), 자식이 없고 텍스트가 정확히
+             '참가비' 인 노드를 센다. 값이 무엇이든 라벨이 있으면 잡힌다.
+             v1_web 유닛 계약도 같은 방식이다(queryByText 정확 일치) — 한 질문에 판정식은 하나.
              (이 주석은 템플릿 리터럴 안이라 백틱을 쓸 수 없다 — 쓰면 evaluate 인자가 깨진다.) */
-          hasFee: text.includes('무료'),
+          feeLabels: [...document.querySelectorAll('*')]
+            .filter((el) => el.children.length === 0 && el.textContent?.trim() === '참가비').length,
           capacityBars: [...document.querySelectorAll('[role="progressbar"]')]
             .filter((b) => (b.getAttribute('aria-label') ?? '').startsWith('정원')).length,
         };
@@ -217,13 +250,46 @@ async function main() {
             det.hasSeats && '자리 남았어요',
             det.hasConfirmed && '팀 확정',
             det.hasGender && '성별 구분 없음',
-            det.hasFee && '참가비 무료',
+            det.feeLabels > 0 && `참가비 라벨 ${det.feeLabels}개`,
             det.capacityBars > 0 && `정원 진행바 ${det.capacityBars}개`,
           ].filter(Boolean);
           record('3-리그상세', leaks.length === 0 ? 'PASS' : 'FAIL',
             leaks.length === 0
               ? `본문 렌더 확인(팀참가=${det.hasTeamJoin} 순위=${det.hasStandings}) · 정원·참가비·성별 전부 없음`
               : `새는 것: ${leaks.join(' / ')}`);
+        }
+      }
+
+      // ── 대조군: 대회 상세 ──
+      /**
+       * **판정식이 실제로 무언가를 잡는지 증명한다.**
+       *
+       * "리그에 참가비 라벨이 없다" 는 판정식이 **아무것도 못 잡는 것**이어도 통과한다(오늘
+       * 여러 번 잡은 vacuous). 진짜 변이는 `entryFee` 를 0 아닌 값으로 새게 하는 것인데
+       * 그건 **alpha 데이터 변경**이라 사용자 승인 없이 못 한다. 대신 **같은 판정식을 대회에
+       * 적용**한다 — 대회에는 참가비 라벨이 **있어야** 하고, 안 나오면 판정식이 죽은 것이다.
+       */
+      if (vp.key === 'mobile') {
+        const ctrlRes = await page.goto(`${BASE}/tournaments/${tournamentId}`, { waitUntil: 'domcontentloaded' });
+        await page.waitForTimeout(5000);
+        const ctrl = await page.evaluate(`(() => {
+          const leaf = (t) => [...document.querySelectorAll('*')]
+            .filter((el) => el.children.length === 0 && el.textContent?.trim() === t).length;
+          return {
+            len: document.body.innerText.length,
+            feeLabels: leaf('참가비'),
+            capacityBars: [...document.querySelectorAll('[role="progressbar"]')]
+              .filter((b) => (b.getAttribute('aria-label') ?? '').startsWith('정원')).length,
+          };
+        })()`);
+        if (ctrl.len < 500) {
+          record('3b-대조군', 'INCONCLUSIVE',
+            `대회 상세 본문이 안 그려졌다 (status ${ctrlRes?.status()}, ${ctrl.len}자)`);
+        } else {
+          record('3b-대조군', ctrl.feeLabels > 0 ? 'PASS' : 'FAIL',
+            ctrl.feeLabels > 0
+              ? `대회 상세에 참가비 라벨 ${ctrl.feeLabels}개 · 정원 진행바 ${ctrl.capacityBars}개 — 판정식이 살아 있다`
+              : '대회 상세에도 참가비 라벨이 0개다 — **판정식이 아무것도 못 잡는다**(리그 판정 무효)');
         }
       }
 

@@ -8,6 +8,7 @@ import { PUBLIC_LIVE_POLL_INTERVAL_MS } from '@/lib/public-live-polling';
 import { v1Keys } from '@/lib/query-keys';
 import { randomUuid } from '@/lib/uuid';
 import type { GameLineup, GameLineupState } from '@/types/game-operations';
+import type { CompetitionKind } from '@/components/v1-ui/competition-kind-segment';
 import type {
   V1AdminTournamentPlayerRecordsResponse,
   V1AdminRosterEligibleMembersResponse,
@@ -3566,6 +3567,8 @@ type TournamentListFilters = {
   /** 데스크톱 페이지 번호. cursor 와 함께 오면 서버가 page 를 택한다. */
   page?: number;
   limit?: number;
+  /** 목록 표면(전체/정규 대회/정규 리그). 서버 `COMPETITION_LIST_SURFACE` 의 키와 같다. */
+  kind?: CompetitionKind;
 };
 
 export function useV1Tournaments(params?: TournamentListFilters) {

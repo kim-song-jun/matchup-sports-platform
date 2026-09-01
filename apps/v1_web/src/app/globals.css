@@ -4775,6 +4775,17 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   margin: 0 var(--v1-shell-page-x) 12px;
 }
 
+/* 통합 대회 목록의 유형 세그먼트 — 칸이 셋이라 기본 2칸 grid 를 덮는다. */
+.tm-segment-row-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* 좌우 여백을 `.tm-section-title`(20px) 과 종목 칩 행에 맞춘다 — 셸 변수(--v1-shell-page-x)
+   를 쓰면 데스크탑에서 16px 이 돼 위아래 필터와 왼쪽 선이 어긋난다. */
+.tm-competition-kind-segment {
+  margin: 0 20px 12px;
+}
+
 @media (min-width: 1024px) {
   /* 데스크탑에서는 리스트·검색바의 모바일 패딩이 0으로 리셋되고 스크롤 영역이 열 여백을 담당하므로
      세그먼트도 열 가장자리에 맞춰야 제목·검색바와 정렬된다. */

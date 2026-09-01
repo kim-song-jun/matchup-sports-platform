@@ -11,6 +11,14 @@ import { TournamentsListContent } from './page';
  */
 const tournamentsMock = vi.fn();
 
+/* `useSearchParams` 는 App Router 의 컨텍스트에서 값을 읽는다 — 컴포넌트를 직접 render 하는
+   이 테스트에는 그 provider 가 없어 훅이 null 을 돌려준다(실제 페이지에서는 절대 null 이
+   아니고 타입도 non-null 이다). 여기서 막는 건 그 환경 차이지 제품 동작이 아니다.
+   쿼리 없는 `/tournaments` = 지금의 기본 표면이므로 빈 파라미터로 둔다. */
+vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(''),
+}));
+
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1Tournaments: (...args: unknown[]) => tournamentsMock(...args),
   useV1AllTournaments: () => ({ data: [], isLoading: false, isError: false, refetch: vi.fn() }),

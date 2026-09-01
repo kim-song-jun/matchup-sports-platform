@@ -75,15 +75,49 @@ async function servingCommit() {
   return res.headers.get('x-teameet-commit') ?? '(헤더 없음)';
 }
 
+/**
+ * **리그 표본은 둘이어야 한다 — 티어 있는 것과 없는 것.**
+ *
+ * 순위표 제목은 `tierLabel ?? '리그 순위'` 라 **두 갈래**인데, 처음 이 하네스는 티어 없는
+ * 리그 하나만 봤다. 그래서 *"단발 리그는 안쪽 라벨을 숨긴다"* 규칙이 **티어 리그까지 숨기는**
+ * 결함을 못 봤다 — 그 경로를 아예 안 밟았기 때문이다(2026-09-01, Copilot 이 코드로 먼저 잡았다).
+ *
+ * ⚠️ **개수로 두 갈래를 가를 수 없다**: 리그는 티어가 있든 없든 `groupId` 가 leagueId 하나뿐이다.
+ * `'1부'`·`'2부'` 는 같은 리그의 두 조가 아니라 **서로 다른 리그**다. 그래서 `groupName` 의
+ * **값**으로 표본을 고른다.
+ */
+async function pickLeagues(probeLimit = 14) {
+  if (process.env.LEAGUE_ID) {
+    const ids = process.env.LEAGUE_ID.split(',').map((s) => s.trim()).filter(Boolean);
+    return ids.map((id, i) => ({ id, note: `LEAGUE_ID 지정 #${i + 1}` }));
+  }
+  const d = await getJson('/tournaments?limit=50&kind=league');
+  if (d.items.length === 0) throw new Error('통합 목록에 리그가 없다 — 문이 닫혔거나 배포 전이다');
+
+  let plain = null;
+  let tiered = null;
+  for (const item of d.items.slice(0, probeLimit)) {
+    let name;
+    try {
+      const s = await getJson(`/tournaments/${item.id}/schedule`);
+      name = (s.standings ?? [])[0]?.groupName ?? null;
+    } catch {
+      continue; // 못 읽는 리그는 표본에서 제외한다 — 판정 대상이 아니다
+    }
+    if (name === null) continue;
+    if (name === '리그 순위' && plain === null) plain = { id: item.id, note: "티어 없음 ('리그 순위')" };
+    else if (name !== '리그 순위' && tiered === null) tiered = { id: item.id, note: `티어 '${name}'` };
+    if (plain && tiered) break;
+  }
+  const picked = [plain, tiered].filter(Boolean);
+  if (picked.length === 0) throw new Error('표본을 못 골랐다 — 리그 순위 응답을 하나도 못 읽었다');
+  if (!tiered) console.log('⚠️ 티어 리그를 못 찾았다 — 티어 분기는 이 실행에서 검증되지 않는다.');
+  if (!plain) console.log('⚠️ 티어 없는 리그를 못 찾았다 — 단발 분기는 이 실행에서 검증되지 않는다.');
+  return picked;
+}
+
 async function pickTargets() {
-  const league = process.env.LEAGUE_ID
-    ? { id: process.env.LEAGUE_ID, note: 'LEAGUE_ID 지정' }
-    : await (async () => {
-        const d = await getJson('/tournaments?limit=50&kind=league');
-        const hit = d.items.find((i) => i.status === 'in_progress') ?? d.items[0];
-        if (!hit) throw new Error('통합 목록에 리그가 없다 — 문이 닫혔거나 배포 전이다');
-        return { id: hit.id, note: `공개 목록 첫 ${hit.status} 리그` };
-      })();
+  const leagues = await pickLeagues();
 
   // 대조군은 **`format='league'` 인 대회**를 우선한다 — 리그 분기가 넓게 잡히면 여기가 먼저 깨진다.
   const tournament = process.env.TOURNAMENT_ID
@@ -95,7 +129,7 @@ async function pickTargets() {
         return { id: hit.id, note: `format=${hit.format} 대회` };
       })();
 
-  return { league, tournament };
+  return { leagues, tournament };
 }
 
 /** 브라우저 안에서 도는 판정 — 여기서 읽은 값만 표에 들어간다. */
@@ -225,9 +259,9 @@ async function capture(browser, { width, height }, url, file, isBracket) {
 }
 
 async function main() {
-  const { league, tournament } = await pickTargets();
+  const { leagues, tournament } = await pickTargets();
   const before = await servingCommit();
-  console.log(`대상 리그 ${league.id} (${league.note})`);
+  for (const l of leagues) console.log(`대상 리그 ${l.id} (${l.note})`);
   console.log(`대조군    ${tournament.id} (${tournament.note})`);
   console.log(`서빙(전)  ${before}`);
 
@@ -236,16 +270,24 @@ async function main() {
   const rows = [];
 
   const targets = [
-    { kind: 'league', label: '리그 /bracket', id: league.id, path: 'bracket' },
-    { kind: 'league', label: '리그 /schedule', id: league.id, path: 'schedule' },
-    { kind: 'tournament', label: '대회 /bracket', id: tournament.id, path: 'bracket' },
-    { kind: 'tournament', label: '대회 /schedule', id: tournament.id, path: 'schedule' },
+    ...leagues.flatMap((l, i) => {
+      const tag = leagues.length > 1 ? `${i + 1}` : '';
+      return ['bracket', 'schedule'].map((path) => ({
+        kind: 'league',
+        label: `리그${tag} /${path}`,
+        id: l.id,
+        path,
+        slug: `league${tag}`,
+      }));
+    }),
+    { kind: 'tournament', label: '대회 /bracket', id: tournament.id, path: 'bracket', slug: 'tournament' },
+    { kind: 'tournament', label: '대회 /schedule', id: tournament.id, path: 'schedule', slug: 'tournament' },
   ];
 
   try {
     for (const t of targets) {
       for (const w of WIDTHS) {
-        const file = `${t.kind}-${t.path}-${w.key}.png`;
+        const file = `${t.slug}-${t.path}-${w.key}.png`;
         const url = `${BASE}/tournaments/${t.id}/${t.path}`;
         // **층 1(하네스 실패)과 층 2(화면 결함)를 섞지 않는다.** 섞으면 빈 스크린샷을
         // "화면이 비었다" 로 읽는 그 함정에 그대로 빠진다.
@@ -277,7 +319,7 @@ async function main() {
   if (before !== after) {
     console.log('⚠️ 측정 도중 서빙본이 바뀌었다 — 이 실행은 버리고 다시 돌려라(배포 창).');
   }
-  writeFileSync(`${OUT}/summary.json`, JSON.stringify({ league, tournament, before, after, rows }, null, 2));
+  writeFileSync(`${OUT}/summary.json`, JSON.stringify({ leagues, tournament, before, after, rows }, null, 2));
   console.log(`\n출력: ${OUT}`);
 
   const failed = rows.filter((r) => String(r.판정).startsWith('❌')).length;

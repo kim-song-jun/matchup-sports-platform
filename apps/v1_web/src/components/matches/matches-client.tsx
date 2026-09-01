@@ -204,9 +204,16 @@ export function MatchListPageClient() {
   }
 }
 
-export function MatchDetailPageClient({ matchId }: { matchId: string }) {
+/**
+ * `seed` 는 서버 컴포넌트(app/matches/[id]/page.tsx)가 존재 확인·메타데이터를 위해
+ * 이미 받아 둔 공개 매치 응답이다. 그동안 이 값을 버리고 클라이언트가 같은 매치를
+ * 처음부터 다시 받았기 때문에, 딥링크·푸시·새로고침으로 들어오면 첫 화면이 비어 있었다.
+ * 추가 요청 없이 그 결과를 그대로 첫 표시값으로 쓴다(비인증 응답이라 뷰어 상태는 없고,
+ * `revalidate: 300` 캐시라 최대 5분 오래된 값일 수 있어 행동은 잠근 채 표시만 한다).
+ */
+export function MatchDetailPageClient({ matchId, seed }: { matchId: string; seed?: V1Match | null }) {
   const router = useRouter();
-  const query = useV1Match(matchId);
+  const query = useV1Match(matchId, { seed });
   const eligibility = useV1MatchApplicationEligibility(matchId, { enabled: Boolean(query.data) });
   const viewerState = query.data ? getViewerState(query.data, eligibility.data?.viewerState) : 'none';
   const applyMatch = useV1ApplyMatch(matchId);
@@ -272,10 +279,13 @@ export function MatchDetailPageClient({ matchId }: { matchId: string }) {
     mode: toDetailMode(viewerState, getStatus(query.data)),
     reviewAction: buildMatchReviewAction(matchId, viewerState, getStatus(query.data)),
     applyLabel: seeding ? '불러오는 중' : applyLabel(viewerState, getStatus(query.data), eligibility.data?.eligible, eligibility.data?.message),
-    applyPending: seeding || applyMatch.isPending || withdrawMatch.isPending,
+    // seeding 을 여기 넣지 않는다 — 렌더 쪽이 applyPending 을 '처리 중'(= 내 신청을
+    // 처리하는 중)으로 읽어 applyLabel 을 덮어쓴다. 잠금은 onApply 를 비우는 것으로
+    // 충분하고(canRunAction=false → disabled), 라벨은 '불러오는 중'이 남는다.
+    applyPending: applyMatch.isPending || withdrawMatch.isPending,
     statusLabel: seeding ? undefined : statusLabel(viewerState, getStatus(query.data)),
     chatLabel: chatLabel(viewerState),
-    chatPending: seeding || resolveChatRoom.isPending,
+    chatPending: resolveChatRoom.isPending,
     onChat: !seeding && canOpenMatchChat(viewerState)
       ? () => resolveChatRoom.mutate(
           { targetType: 'match', targetId: matchId },

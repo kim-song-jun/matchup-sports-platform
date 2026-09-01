@@ -215,9 +215,10 @@ export function TeamMatchListPageClient() {
   }
 }
 
-export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string }) {
+/** matches-client.tsx 의 `seed` 와 같은 목적·같은 안전장치 — 자세한 근거는 그쪽 주석. */
+export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: string; seed?: V1TeamMatch | null }) {
   const router = useRouter();
-  const query = useV1TeamMatch(teamMatchId);
+  const query = useV1TeamMatch(teamMatchId, { seed });
   const rawViewerState = query.data ? getViewerState(query.data) : 'none';
   const canManageHostTeam = query.data?.viewer?.manageableHostTeam === true;
   // 결과 승인 진입 게이트. `viewerState === 'approved'` 를 쓰면 안 된다 — 그건 신청서를
@@ -332,7 +333,8 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
     },
     mode: toDetailMode(viewerState, getStatus(query.data)),
     applyLabel: seeding ? '불러오는 중' : applyLabel(viewerState, getStatus(query.data), selectedEligibility, isGuest, hasNoTeam, eligibility.isSuccess),
-    applyPending: seeding || applyTeamMatch.isPending || withdrawTeamMatch.isPending,
+    // matches-client.tsx 와 같은 이유 — '처리 중' 이 '불러오는 중' 을 덮어쓴다.
+    applyPending: applyTeamMatch.isPending || withdrawTeamMatch.isPending,
     hostActions: !seeding && canManageHostTeam
       ? buildHostActions({
           status: getStatus(query.data),
@@ -350,7 +352,7 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
     reviewAction: buildReviewAction(teamMatchId, getStatus(query.data), isParticipantMember),
     statusLabel: seeding ? undefined : statusLabel(viewerState, getStatus(query.data)),
     chatLabel: chatLabel(canManageHostTeam, canManageOpponentTeam),
-    chatPending: seeding || resolveChatRoom.isPending,
+    chatPending: resolveChatRoom.isPending,
     chatError,
     onChat: !seeding && canOpenTeamMatchChat(canManageHostTeam, canManageOpponentTeam)
       ? () => {

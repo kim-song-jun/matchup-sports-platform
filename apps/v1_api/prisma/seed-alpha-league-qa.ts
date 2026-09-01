@@ -1035,6 +1035,10 @@ async function ensureLeague(
       scheduledAt: startsOn,
       scheduledEndAt: endsOn,
       competitionConfigVersionId: ALPHA_SEED_LEAGUE_CONFIG_ID,
+      // **원본 리그의 생성 시각을 그대로 쓴다.** 생략하면 `@default(now())` 가 시드 실행
+      // 시각을 박고, 그 값이 통합 목록 정렬(`createdAt desc`)을 지배해 시드 리그가 통째로
+      // 최신이 된다 — 실제 대회보다 앞에 서서 첫 페이지를 차지한다.
+      createdAt: league.createdAt,
     },
   });
   // 참가팀 연결(V1LeagueTeam) — 순위표·득점/도움 순위 둘 다 league.teams(이 조인)를 통해
@@ -1093,7 +1097,7 @@ async function ensureTierSeries(
       startsOn,
       endsOn,
     };
-    await tx.v1League.upsert({
+    const tierLeague = await tx.v1League.upsert({
       where: { id: leagueId },
       update: commonData,
       // state·tier·seasonNo 는 create 전용 — 단발 리그와 같은 이유로, 스태프가 alpha 에서
@@ -1137,6 +1141,9 @@ async function ensureTierSeries(
         tier,
         seasonNo: 1,
         competitionConfigVersionId: ALPHA_SEED_LEAGUE_CONFIG_ID,
+        // 단발 리그 거울과 같은 이유 — 원본 시각을 옮기지 않으면 시드 실행 시각이 박히고
+        // 그게 통합 목록 정렬을 지배한다.
+        createdAt: tierLeague.createdAt,
       },
     });
     for (const team of tierTeams) {

@@ -27,6 +27,41 @@ describe('리그 QA 시드의 복제값 고정', () => {
     expect(ALPHA_SEED_LEAGUE_CONFIG_ID).toBe(FUTSAL_COMPETITION_CONFIG_ID);
   });
 
+  /**
+   * **거울의 `createdAt` 은 원본 리그의 것이어야 한다.**
+   *
+   * 안 옮기면 `@default(now())` 가 **행을 만든 시각**(백필·시드 실행 시각)을 박는다. 그 값은
+   * 아무 뜻도 없는데 **목록 정렬을 지배한다** — `orderBy: [{ createdAt: 'desc' }, ...]` 라서
+   * 한 번에 만들어진 리그가 통째로 최신이 되어 통합 목록 첫 페이지를 다 차지한다.
+   *
+   * 2026-09-01 alpha 실측: 리그 50건이 전부 `2026-08-30T18:43:43`(백필 시각), 대회는 12일
+   * 전 → `?kind=all` 첫 50건이 **전부 리그**였다. 화면에는 에러가 없고 "대회가 없네" 로만
+   * 보인다. 그래서 값 자체를 여기서 못박는다.
+   */
+  it('거울의 createdAt 이 원본 리그의 것과 같다 — 기본값이 새면 목록 정렬이 뒤집힌다', () => {
+    const originCreatedAt = new Date('2026-02-01T09:30:00.000Z');
+    const data = leagueMirrorCreateData({
+      id: 'lg-created-at',
+      title: '리그',
+      sportId: 'sport-1',
+      regionId: 'region-1',
+      state: 'active',
+      startsOn: new Date('2026-03-01T00:00:00.000Z'),
+      endsOn: new Date('2026-06-30T00:00:00.000Z'),
+      seriesId: null,
+      tier: null,
+      seasonNo: null,
+      sportCode: 'futsal',
+      createdAt: originCreatedAt,
+    });
+
+    // `toBe` 로 본다 — 같은 시각의 **다른 Date 객체**를 만들어 넣는 구현도 값은 맞지만,
+    // 여기서 확인할 것은 "원본을 그대로 옮겼나" 다.
+    expect(data.createdAt).toEqual(originCreatedAt);
+    // 생략(undefined)이면 Prisma 가 기본값을 쓴다 — 그게 이 결함의 모양이므로 따로 막는다.
+    expect(data.createdAt).toBeDefined();
+  });
+
   it('시드가 만드는 거울의 필드 구성이 원본 헬퍼와 같다 — 키가 빠지면 잡힌다', () => {
     // 시드는 헬퍼를 못 부르므로 손으로 같은 모양을 만든다. **어떤 키를 만드는지**가
     // 갈라지면 거울에 빈 필드가 생기고, 그건 read-swap 뒤 화면에서만 드러난다.
@@ -42,6 +77,7 @@ describe('리그 QA 시드의 복제값 고정', () => {
       tier: null,
       seasonNo: null,
       sportCode: 'futsal',
+      createdAt: new Date('2026-02-01T00:00:00.000Z'),
     });
 
     // 시드의 단발 리그 거울이 채우는 키(seriesId/tier/seasonNo 는 그 리그에 없어서 뺀다).
@@ -55,6 +91,8 @@ describe('리그 QA 시드의 복제값 고정', () => {
       'scheduledAt',
       'scheduledEndAt',
       'competitionConfigVersionId',
+      // 원본 리그의 생성 시각 — 안 옮기면 시드 실행 시각이 박혀 통합 목록 정렬을 지배한다.
+      'createdAt',
     ];
     for (const key of seedKeys) {
       expect(Object.keys(fromHelper)).toContain(key);

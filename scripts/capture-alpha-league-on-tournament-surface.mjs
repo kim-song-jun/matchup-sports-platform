@@ -85,10 +85,17 @@ const READ = `(() => {
     const r = el.getBoundingClientRect();
     return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden';
   };
-  const text = (sel) => [...document.querySelectorAll(sel)].filter(seen).map((e) => (e.textContent || '').trim());
 
   const standingsRows = [...document.querySelectorAll('.tm-standings-row')].filter(seen).length;
-  const badges = text('.tm-badge');
+
+  // **배지는 일정 섹션 안에서만 센다.** 문서 전체에서 세면 페이지 헤더의 대회 상태 배지가
+  // 섞인다 — 완료된 대회의 헤더 배지가 '종료'(v1-tournament-status.ts:18)라서, 카드가
+  // 완벽히 리그로 그려져도 "대회 어휘가 섞였다" 는 **오탐**이 난다. (같은 함정을 하단 탭
+  // 하네스가 nav 를 문서 전체에서 세다가 겪었다 — 폭과 무관하게 10 이 나왔다.)
+  const fixturesSection = [...document.querySelectorAll('section[aria-labelledby="fixtures-heading"]')].filter(seen)[0];
+  const badges = fixturesSection === undefined
+    ? []
+    : [...fixturesSection.querySelectorAll('.tm-badge')].filter(seen).map((e) => (e.textContent || '').trim());
   const body = document.body.innerText;
 
   return {

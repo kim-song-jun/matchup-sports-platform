@@ -36,7 +36,8 @@ import type { PrismaClient } from '@prisma/client';
  * | 공개 대회 목록 (기본) | **안 나온다** — `kind` 기본값이 `tournament` 다 |
  * | 공개 대회 목록 (`?kind=league` · `?kind=all`) | **나온다** — API 계약으로만 열려 있고 화면은 아직 안 보낸다 |
  * | 어드민 목록 · 상태 탭 · 대시보드 KPI | **안 나온다** — 여기는 앞으로도 닫힌다 |
- * | 공개 대회 기록(일정·선수기록·경기단건) | **안 열린다** |
+ * | 공개 대회 기록 — **일정(`getSchedule`)** | **열린다** (2026-09-01 사용자 확정 B안) |
+ * | 공개 대회 기록 — 선수기록·경기단건 | **안 열린다** |
  * | 공개 상세 · 공개 통합 순위 | **열린다** (read-swap 의 목적) |
  *
  * ⚠️ **"공개 목록"과 "어드민 목록"을 한 줄로 묶지 마라.** 둘은 이제 다른 답을 갖는다 —
@@ -98,6 +99,9 @@ describe('대회 표면은 정규 리그 시즌을 보여주지 않는다 (real 
     // 지나는데, 이 값이 없으면 **대회 id 도 리그 id 도 똑같이 404** 라 kind 필터가 있든 없든
     // 통과하는 무의미한 테스트가 된다(Copilot 리뷰 지적 — 필터를 제거한 변이 실행에서
     // getSchedule·getPlayerRecords·getPlayerRecordsForAdmin 3건만 red 였고 getMatch 는 green 이었다).
+    // ⚠️ 그 관측은 **2026-09-01 이전**의 것이다 — 지금은 getSchedule 이 리그에 열려 있어
+    // 그 목록에서 빠졌다(아래 전용 케이스). 이 픽스처가 대진표를 공개해 두는 이유 자체는
+    // 그대로다: 안 그러면 getMatch 가 kind 와 무관하게 404 라 무의미한 단언이 된다.
     const bracketPublishedAt = new Date('2026-01-01T00:00:00.000Z');
     await prisma.v1Tournament.create({
       data: {
@@ -205,8 +209,10 @@ describe('대회 표면은 정규 리그 시즌을 보여주지 않는다 (real 
   // 계열은 "어드민 가드 뒤라 안전"으로 넘겼는데, 그 판단이 틀렸다 — 가드는 **권한**을 막지
   // **잘못된 id** 를 막지 않는다. 백필(R3)로 리그 id 가 `v1_tournaments` 에 실재하게 되자
   // alpha 에서 `/tournaments/:리그id/schedule` 이 **리그 제목을 실은 200** 을 줬다(실측).
+  // ⚠️ **`getSchedule` 은 이 목록에서 의도적으로 빠졌다** — 아래 전용 케이스로 옮겼다.
+  // 지운 게 아니라 **계약이 바뀐 것**이다(그 케이스의 doc comment 참조). 나머지 셋은 그대로
+  // 막힌다 — 하나가 열렸다고 표면 전체가 열린 것으로 읽지 마라.
   it.each([
-    ['getSchedule', (id: string) => records.getSchedule(id, {} as never, undefined)],
     ['getPlayerRecords', (id: string) => records.getPlayerRecords(id)],
     ['getPlayerRecordsForAdmin', (id: string) => records.getPlayerRecordsForAdmin(id)],
     ['getMatch', () => records.getMatch(ids.league, ids.leagueFixture, undefined)],
@@ -215,6 +221,31 @@ describe('대회 표면은 정규 리그 시즌을 보여주지 않는다 (real 
     // (`TOURNAMENT_MATCH_NOT_FOUND` / `TOURNAMENT_NOT_FOUND`). 중요한 것은 **404 로 막히는 것**이고,
     // 어떤 코드인지가 아니다. 코드를 추측해 박았다가 이 테스트가 3건 red 였다.
     await expect(call(ids.league)).rejects.toMatchObject({ status: 404 });
+  });
+
+  /**
+   * **`getSchedule` 만 의도적으로 열었다 — 이 스위트에서 유일하게 뒤집힌 계약이다.**
+   *
+   * 왜: `/tournaments/:id` 가 통합 축으로 넓어져 리그가 상세를 통과하는데, 화면이 부르는
+   * 이 API 만 리그에서 404 라 **`/schedule` 과 `/bracket` 이 둘 다** "경기 정보를 찾을 수
+   * 없어요" 만 그렸다(두 화면이 같은 `ScheduleContent` 를 쓴다). 리그 상세의 주 CTA 가
+   * 에러 화면으로 가는 상태였다.
+   *
+   * ⚠️ **"봉쇄가 깨졌다" 로 읽지 마라.** 표면 전체가 아니라 이 한 메서드만 열렸고,
+   * `getPlayerRecords`·`getPlayerRecordsForAdmin`·`getMatch` 는 **위 케이스가 계속 막는다.**
+   * 되돌리려면 그게 왜 열렸는지부터 보라 — 되돌리는 순간 두 화면이 다시 죽는다.
+   *
+   * `bracketPublished: true` 는 "대진표가 공개됐다" 가 아니라 **"이 게이트는 리그에 해당
+   * 없다"** 는 뜻이다. `false` 를 주면 화면이 "대진표가 아직 공개되지 않았어요" 를 영원히
+   * 그린다. 이 픽스처 리그엔 `V1TeamMatch` 가 없어 `items`·`standings` 가 비는 것이 정상이다.
+   */
+  it('공개 대회 기록 getSchedule — 리그 id 로 열린다 (의도된 예외)', async () => {
+    await expect(records.getSchedule(ids.league, {} as never, undefined)).resolves.toMatchObject({
+      tournamentId: ids.league,
+      tournamentTitle: '표면 테스트 리그 시즌',
+      bracketPublished: true,
+      unscheduled: [],
+    });
   });
 
   it('같은 경로가 대회 id 와 kind=null 구행에는 여전히 열린다', async () => {

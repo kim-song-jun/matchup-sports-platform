@@ -18,9 +18,14 @@ import type {
 } from './home.types';
 import { chatRoomTypeLabel } from '@/lib/chat-route';
 
+/** 위치 권한이 없거나 날씨를 아직 못 받았을 때 쓰는 빈 값. 목업 날씨('마포 18도 맑음')를
+ *  실제 관측치처럼 보여주지 않는다 — 권한 안내 문구(getWeatherPermissionCopy)가 이유를 말한다. */
+export const EMPTY_WEATHER: HomeViewModel['weather'] = { city: '-', temp: '-', cond: '-', wind: '-' };
+
 export function withoutHomeContent(model: HomeViewModel): HomeViewModel {
   return {
     ...model,
+    weather: EMPTY_WEATHER,
     viewerName: null,
     signedOut: true,
     hasNewNotification: false,
@@ -57,7 +62,7 @@ export function toHomeModel(
     featuredMatch: normalizeFeaturedMatch(home, recommendedMatches, fallback),
     recommendedMatches,
     quickActions: normalizeShortcuts(home.shortcuts, fallback.quickActions),
-    weather: weather ?? fallback.weather,
+    weather: weather ?? EMPTY_WEATHER,
     popup: normalizePopup(home.popup),
     notices: normalizeNotices(home),
   };

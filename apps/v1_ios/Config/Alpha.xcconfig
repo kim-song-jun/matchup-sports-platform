@@ -17,7 +17,7 @@
 SLASHES = /$()/
 
 PRODUCT_BUNDLE_IDENTIFIER = kr.co.teameet.alpha
-TEAMEET_DISPLAY_NAME = Teameet Alpha
+TEAMEET_DISPLAY_NAME = 팀밋 알파
 TEAMEET_WEB_ORIGIN = https:$(SLASHES)alpha.teameet.co.kr
 
 // Alpha builds expose the embedded page to Safari's Web Inspector so QA can diagnose

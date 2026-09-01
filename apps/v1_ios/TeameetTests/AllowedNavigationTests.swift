@@ -179,10 +179,32 @@ final class AllowedNavigationTests: XCTestCase {
 
     // MARK: - Trusted auth provider
 
-    func testAllowsOnlyTheKakaoAuthorizationHostInApp() {
-        XCTAssertTrue(AllowedNavigation.isTrustedAuthProvider("https://kauth.kakao.com/oauth/authorize?x=1"))
+    /// Every host Kakao's sign-in actually visits, not just the one it starts on. Trusting
+    /// only `kauth.kakao.com` sent the reader to Safari at the login form itself.
+    func testKeepsEveryKakaoAuthenticationHostInsideTheWebView() {
+        for host in AllowedNavigation.trustedAuthHosts {
+            XCTAssertTrue(
+                AllowedNavigation.isTrustedAuthProvider("https://\(host)/oauth/authorize?x=1"),
+                "expected \(host) to stay in the WebView")
+            XCTAssertTrue(
+                AllowedNavigation.isTrustedAuthProvider(URL(string: "https://\(host)/oauth")),
+                "expected \(host) to stay in the WebView when given as a URL")
+        }
         XCTAssertTrue(AllowedNavigation.isTrustedAuthProvider("https://KAUTH.KAKAO.COM/oauth"))
-        XCTAssertTrue(AllowedNavigation.isTrustedAuthProvider(URL(string: "https://kauth.kakao.com/oauth")))
+        XCTAssertTrue(AllowedNavigation.isTrustedAuthProvider("https://ACCOUNTS.KAKAO.COM/login"))
+    }
+
+    /// The set is closed. Anything Kakao does not serve stays out, whatever it is named.
+    func testRejectsHostsOutsideTheTrustedSet() {
+        for candidate in [
+            "https://kakao.com/oauth",
+            "https://developers.kakao.com/oauth",
+            "https://accounts.google.com/o/oauth2/auth",
+        ] {
+            XCTAssertFalse(
+                AllowedNavigation.isTrustedAuthProvider(candidate),
+                "expected \(candidate) to be rejected")
+        }
     }
 
     func testRejectsLookalikeAuthProviders() {
@@ -192,6 +214,15 @@ final class AllowedNavigationTests: XCTestCase {
             "https://user@kauth.kakao.com/oauth",
             "https://evil.kauth.kakao.com/oauth",
             "https://kauth.kakao.com.attacker.example/oauth",
+            // The hosts added alongside kauth need the same guarantees: a suffix match
+            // would hand a third party the reader's Kakao session.
+            "http://accounts.kakao.com/login",
+            "https://accounts.kakao.com:443/login",
+            "https://user@accounts.kakao.com/login",
+            "https://evil.accounts.kakao.com/login",
+            "https://accounts.kakao.com.attacker.example/login",
+            "https://evil.auth.kakao.com/login",
+            "https://auth.kakao.com.attacker.example/login",
             "https://kauth.kakao.com\\@attacker.example/",
         ] {
             XCTAssertFalse(

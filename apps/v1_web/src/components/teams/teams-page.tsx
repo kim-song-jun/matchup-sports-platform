@@ -8,6 +8,7 @@ import { Check, ChevronDown, Lock } from 'lucide-react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { Card, EmptyState, ErrorState, KPIStat, ListItem } from '@/components/v1-ui/primitives';
 import { ChevronLeftIcon, ChevronRightIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
+import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { cssUrl } from '@/lib/assets';
@@ -452,6 +453,22 @@ function TeamRecordLinkCard({
     <Link className="tm-pressable" href={href} style={style}>
       {body}
     </Link>
+  );
+}
+
+/**
+ * 팀 상세 로딩 셸. 목업 팀(teams.view-model.ts)을 그대로 렌더하던 자리를 대신한다.
+ * 셸 승격(U29) 이후 title/activeTab/bottomNav/backHref 는 route-chrome/fragments/teams.ts
+ * 테이블의 '/teams/:id' 항목(title: '팀 상세')이 이미 그린다 — TeamDetailPageView(성공
+ * 뷰)도 title을 override하지 않으므로 두 상태가 같은 값을 보여 헤더가 흔들리지 않는다.
+ * 그래서 본문 스켈레톤만 렌더한다.
+ */
+export function TeamDetailPageSkeleton() {
+  return (
+    <>
+      <p className="sr-only" role="status">팀 정보를 불러오는 중이에요.</p>
+      <PageSkeleton variant="detail" />
+    </>
   );
 }
 

@@ -113,6 +113,43 @@ function makeGroup(overrides: Partial<V1TournamentGroup> & Pick<V1TournamentGrou
   };
 }
 
+/**
+ * 정규 리그 시즌의 CTA 문구(2026-09-01 사용자 확정). 리그엔 대진표가 없어 대회 문구가
+ * 그대로 **거짓**이 된다 — '대진표 · 일정 보기' 를 눌러 들어가면 대진표가 없다.
+ *
+ * 대조군을 함께 둔다: **리그 방식으로 치르는 대회(`format === 'league'`)는 대회 문구를
+ * 그대로 쓴다.** 사용자가 *"대회 쪽 문구는 그대로 두고 정규 리그일 때만"* 이라고 못박았고,
+ * `isLeagueCompetition` 으로 판정했다면 alpha 62건 중 7건이 함께 바뀌었을 자리다.
+ */
+describe('getBracketEntryCtaLabel — 정규 리그 문구', () => {
+  it('in_progress: 진행 중인 리그 보기', () => {
+    expect(getBracketEntryCtaLabel('in_progress', true)).toBe('진행 중인 리그 보기');
+  });
+
+  it('completed: 최종 순위 보기 — 리그엔 대진표가 없다', () => {
+    expect(getBracketEntryCtaLabel('completed', true)).toBe('최종 순위 보기');
+  });
+
+  it('closed: 일정 보기 — "대진표" 를 약속하지 않는다', () => {
+    expect(getBracketEntryCtaLabel('closed', true)).toBe('일정 보기');
+  });
+
+  it('draft·cancelled 는 리그에서도 CTA 자체가 없다', () => {
+    expect(getBracketEntryCtaLabel('draft', true)).toBeNull();
+    expect(getBracketEntryCtaLabel('cancelled', true)).toBeNull();
+  });
+
+  it('대조군: 플래그가 꺼져 있으면 대회 문구 그대로 — 리그 방식 대회 7건이 여기 해당한다', () => {
+    expect(getBracketEntryCtaLabel('in_progress', false)).toBe('진행 중인 대회 보기');
+    expect(getBracketEntryCtaLabel('completed', false)).toBe('경기 결과 · 대진표 보기');
+    expect(getBracketEntryCtaLabel('closed', false)).toBe('대진표 · 일정 보기');
+  });
+
+  it('플래그를 안 주면 대회 문구다 — 기본값이 대회여야 기존 호출부가 안 바뀐다', () => {
+    expect(getBracketEntryCtaLabel('in_progress')).toBe(getBracketEntryCtaLabel('in_progress', false));
+  });
+});
+
 describe('getBracketEntryCtaLabel — 상태별 통합 진입 CTA 문구', () => {
   it('in_progress: 오너가 명시한 문구를 그대로 쓴다', () => {
     expect(getBracketEntryCtaLabel('in_progress')).toBe('진행 중인 대회 보기');

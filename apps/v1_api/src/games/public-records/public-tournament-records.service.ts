@@ -1,13 +1,17 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import type { Prisma, V1GameEventType, V1GameLineupState, V1GameResultRevisionState, V1GameState, V1TeamMatchStatus, V1VisibilityMode } from '@prisma/client';
+import type { Prisma, V1GameEventType, V1GameLineupState, V1GameResultRevisionState, V1GameState, V1TeamMatchStatus, V1TournamentFixtureStatus, V1VisibilityMode } from '@prisma/client';
 import type { GameScore } from '../games.types';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { V1AuthUser } from '../../auth/v1-auth-user';
 import { isBracketPublished, shouldHideParticipantIdentity } from '../../tournaments/tournament-detail.presenter';
 import {
+  ALL_COMPETITION_KINDS,
   findTournamentOnSurface,
   TOURNAMENT_KINDS,
 } from '../../tournaments/tournament-surface-lookup';
+import { bucketLeagueFixtures } from '../../league-matches/league-standings-source';
+import { calculateLeagueStandings } from '../../league-matches/league-standings';
+import type { LeagueTieBreakCriterion } from '../../league-matches/league-standings';
 // 골 이벤트 백필이 복원한 골의 "모르는 값" 판정 -- 대진표 쪽
 // (`deriveTournamentFixtureOfficialGoals`)과 공개 기록 쪽이 같은 규칙을 써야 같은 골이
 // 화면마다 다르게(0분 vs 표시 없음 / 전반 vs 기타) 보이지 않는다.
@@ -465,12 +469,35 @@ export class PublicTournamentRecordsService {
   }
 
   async getSchedule(tournamentId: string, query: PublicTournamentScheduleQueryDto, user?: V1AuthUser) {
-    const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
+    const tournament = await findTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, {
       where: { id: tournamentId },
-      select: { id: true, title: true, status: true, bracketPublishedAt: true, bracketPublishScheduledAt: true },
+      select: {
+        id: true,
+        title: true,
+        kind: true,
+        status: true,
+        bracketPublishedAt: true,
+        bracketPublishScheduledAt: true,
+      },
     });
     if (tournament === null) {
       throw new NotFoundException(NOT_FOUND);
+    }
+
+    // 거울 행(정규 리그 시즌)은 대회 축 대진(`V1TournamentFixture`)이 **하나도 없다** -- 그
+    // 행을 만드는 코드가 전부 `TOURNAMENT_KINDS` 게이트 뒤에 있기 때문이다. 그래서 예전엔
+    // 이 조회가 리그를 404 로 막았고, 그 404 하나 때문에 `/tournaments/:id/schedule` 과
+    // `/tournaments/:id/bracket` 이 **함께** 죽어 있었다(두 화면이 같은 `ScheduleContent` +
+    // `usePublicTournamentSchedule` 을 쓴다).
+    //
+    // `getOverallStandings` 가 먼저 같은 모양으로 갈렸다 -- 종류로 갈라 **리그 축에서 계산해
+    // 대회 축 응답 모양으로** 돌려준다. 여기도 그 패턴을 그대로 따른다.
+    //
+    // ⚠️ `isLeagueCompetition` 을 쓰지 않는다. 그 헬퍼는 `format === 'league'` 인 **리그 방식
+    // 대회**도 true 로 주는데(alpha 실측 62건 중 7건) 그건 진짜 대회고 대회 축 대진을 갖고
+    // 있어 기존 경로가 정상 동작한다. 여기서 묻는 것은 *"무엇인가"* 이므로 `kind` 만 본다.
+    if (tournament.kind === 'regular_league') {
+      return this.leagueSchedule(tournament.id, tournament.title, query);
     }
     const bracketPublished = isBracketPublished(tournament.bracketPublishedAt, tournament.bracketPublishScheduledAt);
     if (!bracketPublished) {
@@ -693,6 +720,179 @@ export class PublicTournamentRecordsService {
         ...baselineStandings,
       ],
       nextCursor,
+    };
+  }
+
+  /**
+   * 정규 리그 시즌(거울 행)의 일정·순위를 **대회 축 응답 모양으로** 돌려준다.
+   *
+   * `getOverallStandings` 의 `leagueOverallStandings` 와 같은 갈래다 -- 거울에는 대회 축
+   * 대진이 없으므로 리그 축에서 만들어 같은 모양에 담는다. 그래야 화면
+   * (`ScheduleContent`)이 분기 없이 두 축을 다 그린다.
+   *
+   * ## 대회 경로와 의도적으로 다른 것 넷
+   * - **`bracketPublished: true`.** 리그엔 대진표 공개 개념이 없다. `false` 를 주면
+   *   화면이 *"대진표가 아직 공개되지 않았어요"* 를 **영원히** 그린다(`schedule-content.tsx:725`).
+   *   여기서 `true` 의 뜻은 *"이 게이트는 리그에 해당 없다"* 다. 이 응답 필드의 소비처는
+   *   그 한 곳뿐이고, 어드민 축의 `bracketPublishedAt` 은 **다른 필드**라 영향받지 않는다.
+   * - **`unscheduled: []` 는 항상 빈 배열.** `V1TeamMatch.startAt` 이 non-null 이라 리그엔
+   *   "시간 미정" 상태가 존재하지 않는다. 빈 배열은 누락이 아니라 **없는 개념** 이다.
+   * - **팀명을 가리지 않는다.** `hideIdentity` 는 대회의 모집 중 정책인데 리그 참가팀은
+   *   순위표에 항상 공개된다(`getLeagueFixtureRecord` 가 같은 판단을 먼저 했다).
+   * - **`standings[]` 에 `registrationId` 를 싣지 않고 `teamId` 를 싣는다.** 리그엔 참가
+   *   등록이 없다. 이름과 내용이 갈린 값을 만들지 않는 쪽을 택한 `leagueOverallStandings`
+   *   선례를 따른다 -- 프론트는 `#896` 과 같은 유니온으로 받는다.
+   *   (대진의 `home`/`away` 는 반대로 `teamId` 를 `registrationId` 자리에 넣는다. 그쪽은
+   *   소비처가 **행 식별자** 로만 쓰기 때문이다 -- `toLeagueScheduleRow` 주석 참조.)
+   *
+   * ## 페이지네이션을 메모리에서 하는 이유
+   * 주차 번호는 **리그 전체의 경기일 집합**을 알아야 정해진다(N번째 경기일 = N주차).
+   * DB 에서 페이지만 잘라 오면 그 집합을 모르므로 2페이지의 첫 경기가 1주차가 된다.
+   * 리그 한 시즌의 대진 수는 팀 수의 제곱 규모(수십 건)라 전량 조회가 문제되지 않는다.
+   */
+  private async leagueSchedule(
+    leagueId: string,
+    leagueTitle: string,
+    query: PublicTournamentScheduleQueryDto,
+  ) {
+    const league = await this.prisma.v1League.findUnique({
+      where: { id: leagueId },
+      select: {
+        tier: true,
+        tieBreakJson: true,
+        teams: {
+          select: {
+            teamId: true,
+            team: { select: { name: true, profile: { select: { logoUrl: true } } } },
+          },
+        },
+      },
+    });
+    if (league === null) {
+      throw new NotFoundException(NOT_FOUND);
+    }
+
+    const teamMatches = await this.prisma.v1TeamMatch.findMany({
+      where: { leagueId, deletedAt: null },
+      orderBy: [{ startAt: 'asc' }, { id: 'asc' }],
+      select: LEAGUE_SCHEDULE_SELECT,
+    });
+
+    const weekNumbers = leagueWeekNumbers(teamMatches);
+    const allRows = teamMatches.map((fixture, index) =>
+      toLeagueScheduleRow(fixture, weekNumbers[index], index + 1),
+    );
+
+    // 커서 의미는 대회 경로와 같다(정렬 키 + id 로 동점 처리). 전량이 메모리에 있으므로
+    // 같은 비교를 그대로 적용한다.
+    const cursor = decodeRecordCursor(query.cursor);
+    const remaining =
+      cursor === null
+        ? allRows
+        : allRows.filter((row) => {
+            const key = row.scheduledAt.toISOString();
+            return key > cursor.key || (key === cursor.key && row.id > cursor.id);
+          });
+    const limit = query.limit ?? 20;
+    const pageRows = remaining.slice(0, limit);
+    const hasMore = remaining.length > limit;
+
+    const publicLiveEnabled = await this.isPublicLiveEnabled();
+    const liveScoreByGameId = publicLiveEnabled
+      ? await this.loadLiveScores(pageRows)
+      : new Map<string, GameScore>();
+    const eventsByGameId = await this.loadScheduleEvents(pageRows);
+    const scorerParticipantIds = pageRows.flatMap((row) =>
+      (row.game?.participants ?? []).map((participant) => participant.id),
+    );
+    const consentMap = isTournamentParticipantNameGatingReverted()
+      ? await loadParticipantConsentEligibility(this.prisma, scorerParticipantIds)
+      : new Map<string, ParticipantConsentEligibility>();
+    const nameProfileByUserId = await loadParticipantNameProfiles(
+      this.prisma,
+      pageRows.flatMap((row) => (row.game?.participants ?? []).map((participant) => participant.userId)),
+    );
+    const now = new Date();
+
+    const items = pageRows
+      .map((row) =>
+        presentScheduleEntry(
+          row,
+          publicLiveEnabled,
+          liveScoreByGameId,
+          eventsByGameId,
+          consentMap,
+          nameProfileByUserId,
+          now,
+          // 리그는 참가팀을 가리지 않는다 -- 위 doc comment 참조.
+          false,
+        ),
+      )
+      .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+
+    // ── 순위 ────────────────────────────────────────────────────────────────
+    // 대진 분류(취소·무효·미확정)는 `bucketLeagueFixtures` 가 한다 -- 리그 자기 순위표와
+    // **같은 규칙**이어야 같은 리그가 두 화면에서 다른 순위로 보이지 않는다.
+    const revisionIds = teamMatches
+      .map((fixture) => fixture.game?.currentOfficialRevisionId ?? null)
+      .filter((id): id is string => id !== null);
+    const facts =
+      revisionIds.length === 0
+        ? []
+        : await this.prisma.v1GameOfficialFact.findMany({
+            where: { revisionId: { in: revisionIds } },
+            select: { gameId: true, homeScore: true, awayScore: true },
+          });
+    const { confirmed } = bucketLeagueFixtures(
+      teamMatches,
+      new Map(facts.map((fact) => [fact.gameId, fact])),
+    );
+    const tieBreakOrder = (league.tieBreakJson as { order?: LeagueTieBreakCriterion[] }).order ?? [
+      'points',
+      'goalDifference',
+      'goalsFor',
+      'headToHead',
+    ];
+    const teamNameById = new Map(league.teams.map((entry) => [entry.teamId, entry.team.name]));
+    const teamLogoById = new Map(
+      league.teams.map((entry) => [entry.teamId, entry.team.profile?.logoUrl ?? null]),
+    );
+    // 순위표 섹션 제목. 티어가 있으면 그것이 가장 정확한 이름이고(1부/2부), 시리즈에 속하지
+    // 않은 단발 리그는 티어가 없어 일반 명칭으로 떨어진다. **빈 문자열을 두지 않는다** --
+    // 화면이 제목을 항상 그리므로(`schedule-content.tsx`) 빈 값이면 제목 자리만 남는다.
+    const standingsGroupName = league.tier === null ? '리그 순위' : `${league.tier}부`;
+
+    return {
+      tournamentId: leagueId,
+      tournamentTitle: leagueTitle,
+      bracketPublished: true,
+      items,
+      unscheduled: [],
+      standings: calculateLeagueStandings({
+        teamIds: league.teams.map((entry) => entry.teamId),
+        fixtures: confirmed,
+        tieBreakOrder,
+      }).map((standing) => ({
+        groupId: leagueId,
+        groupName: standingsGroupName,
+        teamId: standing.teamId,
+        teamName: teamNameById.get(standing.teamId) ?? null,
+        teamLogoUrl: teamLogoById.get(standing.teamId) ?? null,
+        position: standing.position,
+        points: standing.points,
+        wins: standing.wins,
+        draws: standing.draws,
+        losses: standing.losses,
+        goalsFor: standing.goalsFor,
+        goalsAgainst: standing.goalsAgainst,
+      })),
+      nextCursor:
+        hasMore && pageRows.length > 0
+          ? encodeRecordCursor({
+              key: pageRows[pageRows.length - 1].scheduledAt.toISOString(),
+              id: pageRows[pageRows.length - 1].id,
+            })
+          : null,
     };
   }
 
@@ -1606,6 +1806,110 @@ function presentSide(
     registrationId,
     teamId: hideIdentity ? null : registration.team.id,
     teamName: hideIdentity ? null : registration.team.name,
+  };
+}
+
+/**
+ * 리그 대진 상태 -> 대회 픽스처 상태. **두 enum 을 전부 적는다**(부분 매핑 + 폴백 금지) --
+ * 리그 상태가 늘어나면 여기서 컴파일이 깨져야 한다. 폴백을 두면 새 상태가 조용히
+ * `scheduled` 로 흘러 화면이 끝난 경기를 예정으로 그린다.
+ *
+ * `archived` 는 **끝난 경기의 보관** 이므로 `completed` 다 -- `cancelled` 로 보내면 순위에서
+ * 빠진 것처럼 읽힌다.
+ *
+ * ⚠️ 이 매핑이 실제로 쓰이는 경우는 드물다: `publicFixtureStatus` 는 게임이 있으면
+ * `gameState` 를 먼저 보고, 리그 대진은 **생성 즉시 게임이 붙는다**. 그래도 정확해야 한다 --
+ * 게임 생성 전 창이 존재하고, 그 창의 화면이 틀리면 원인을 찾기 어렵다.
+ */
+const LEAGUE_STATUS_TO_FIXTURE_STATUS: Record<V1TeamMatchStatus, V1TournamentFixtureStatus> = {
+  recruiting: 'scheduled',
+  closed: 'scheduled',
+  matched: 'scheduled',
+  cancelled: 'cancelled',
+  completed: 'completed',
+  archived: 'completed',
+};
+
+/**
+ * 리그 대진 조회 select. **게임 부분은 대회와 같은 것을 그대로 쓴다**
+ * (`FIXTURE_SCHEDULE_SELECT.game`) -- 점수/시계/득점자/몰수 표시가 대회와 리그에서
+ * 갈리지 않게 하려면 **같은 필드를 읽어 같은 함수에 넣는** 수밖에 없다. 여기서 필드를
+ * 손으로 다시 적으면 한쪽만 고쳐지는 날이 온다.
+ */
+const LEAGUE_SCHEDULE_SELECT = {
+  id: true,
+  startAt: true,
+  placeName: true,
+  status: true,
+  hostTeamId: true,
+  approvedApplicantTeamId: true,
+  hostTeam: { select: { id: true, name: true } },
+  approvedApplicantTeam: { select: { id: true, name: true } },
+  videos: { select: { id: true } },
+  game: {
+    select: {
+      ...FIXTURE_SCHEDULE_SELECT.game.select,
+      // `bucketLeagueFixtures` 가 확정 사실을 찾을 때 쓴다(순위 계산 입력).
+      currentOfficialRevisionId: true,
+    },
+  },
+} as const;
+
+type LeagueScheduleRow = Prisma.V1TeamMatchGetPayload<{ select: typeof LEAGUE_SCHEDULE_SELECT }>;
+
+/**
+ * 대진마다 주차 번호를 매긴다. **한 번에 계산한다** -- `resolveLeagueWeekNumber` 는 대진
+ * 하나마다 쿼리를 던지므로 목록에 쓰면 N+1 이 된다. 규칙은 그것과 같다(KST 날짜를 모아
+ * 정렬하고 인덱스+1).
+ *
+ * 같은 규칙을 쓰는 곳이 셋이다 -- 이 목록, `resolveLeagueFixtureRecord`, 그리고 프론트의
+ * 리그 상세. 규칙이 갈리면 **같은 경기가 화면마다 다른 주차로 불린다.**
+ */
+function leagueWeekNumbers(fixtures: readonly { startAt: Date }[]): number[] {
+  const days = [...new Set(fixtures.map((fixture) => KST_DAY.format(fixture.startAt)))].sort();
+  const indexByDay = new Map(days.map((day, index) => [day, index + 1]));
+  return fixtures.map((fixture) => indexByDay.get(KST_DAY.format(fixture.startAt)) ?? 1);
+}
+
+/**
+ * 리그 대진 -> 대회 일정 행. **어댑터다** -- 변환만 하고 표현은 `presentScheduleEntry` 가
+ * 그대로 한다. 점수 공개 게이트, 라이브 스코어 집계, 몰수 표시, 득점자 동의 게이팅이
+ * 100 줄쯤 되는데 그걸 리그용으로 복제하면 두 벌이 되고 한쪽만 고쳐진다.
+ *
+ * 리그에 없는 대회 개념은 값으로 고정한다:
+ * - `round` <- 'N주차'. **비울 수 없다** -- `schedule-grouping.ts` 가 `round.startsWith('조별')`
+ *   로 단계를 가르고(null 이면 던진다), `groupName` 이 없으면 이 값이 **그룹 제목으로 보인다.**
+ * - `groupName`/`groupId` <- null. 그래서 위 `round` 가 제목이 되어 **주차별로 묶인 일정**이
+ *   된다 -- 리그에 자연스러운 구획이고, `getLeagueFixtureRecord` 가 이미 쓰는 규약이다.
+ * - `legNumber` <- 1, `field` <- null(리그 대진에 필드 개념이 없다).
+ * - `homeRegistrationId` <- **teamId**. 리그엔 참가 등록이 없어 팀 id 를 안정 식별자로 쓴다 --
+ *   `getLeagueFixtureRecord` 의 선례와 같다. 여기서 `registrationId` 는 소비처가 **행을
+ *   식별하는 값** 으로만 쓰므로 이름과 내용이 갈리지 않는다(통합 순위 행은 그 값을 나중에
+ *   등록 조회에 쓸 수 있어 반대로 판단한다 -- `leagueOverallStandings` 주석).
+ *
+ * ⚠️ **팀명을 null 로 두지 않는다.** 화면(`schedule-content.tsx:736`)이 팀명 null 을 보고
+ * *"팀명이 가려졌다"* 배너를 띄우는데, 대회의 null 은 **가림** 이고 리그의 null 은 **미정**
+ * 이라 화면이 둘을 구분하지 못한다. 상대가 아직 없는 대진은 팀명이 null 인 side 가 아니라
+ * **side 자체가 null** 이 되므로(아래 `approvedApplicantTeamId === null`) 그 배너를 밟지 않는다.
+ */
+function toLeagueScheduleRow(fixture: LeagueScheduleRow, weekNumber: number, fixtureNumber: number) {
+  return {
+    id: fixture.id,
+    round: `${weekNumber}주차`,
+    fixtureNumber,
+    legNumber: 1,
+    groupId: null,
+    scheduledAt: fixture.startAt,
+    venue: fixture.placeName,
+    status: LEAGUE_STATUS_TO_FIXTURE_STATUS[fixture.status],
+    homeRegistrationId: fixture.hostTeamId,
+    awayRegistrationId: fixture.approvedApplicantTeamId,
+    homeRegistration: { team: fixture.hostTeam },
+    awayRegistration: fixture.approvedApplicantTeam === null ? null : { team: fixture.approvedApplicantTeam },
+    group: null,
+    field: null,
+    videos: fixture.videos,
+    game: fixture.game,
   };
 }
 

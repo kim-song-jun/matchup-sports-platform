@@ -8,7 +8,8 @@ import android.content.ActivityNotFoundException;
 import android.content.ClipData;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.graphics.Color;
+import android.content.res.Configuration;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -31,7 +32,6 @@ import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
-import android.widget.Toast;
 import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -41,6 +41,7 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.webkit.WebMessageCompat;
 import androidx.webkit.WebSettingsCompat;
 import androidx.webkit.WebViewCompat;
@@ -56,6 +57,7 @@ public final class MainActivity extends AppCompatActivity {
     private FrameLayout rootView;
     private WebView webView;
     private View webErrorView;
+    private TextView inAppMessageView;
     private ValueCallback<Uri[]> pendingFileChooser;
     private ActivityResultLauncher<Intent> fileChooserLauncher;
     private ActivityResultLauncher<String> notificationPermissionLauncher;
@@ -91,6 +93,7 @@ public final class MainActivity extends AppCompatActivity {
         configureWebView();
         configureRootView();
         setContentView(rootView);
+        applySystemBarAppearance();
         applySystemBarInsets();
         registerBackHandler();
         if (FirebaseBootstrap.initialize(this) && canRegisterPush()) {
@@ -130,6 +133,20 @@ public final class MainActivity extends AppCompatActivity {
         ViewCompat.requestApplyInsets(rootView);
     }
 
+    private void applySystemBarAppearance() {
+        boolean isDarkMode = (getResources().getConfiguration().uiMode
+            & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+        int systemBarColor = ContextCompat.getColor(this, R.color.system_bar_background);
+        getWindow().setStatusBarColor(systemBarColor);
+        getWindow().setNavigationBarColor(systemBarColor);
+        WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(
+            getWindow(), rootView
+        );
+        controller.setAppearanceLightStatusBars(!isDarkMode);
+        controller.setAppearanceLightNavigationBars(!isDarkMode);
+        rootView.setBackgroundColor(systemBarColor);
+    }
+
     private void configureRootView() {
         rootView = new FrameLayout(this);
         rootView.addView(webView, new FrameLayout.LayoutParams(
@@ -147,21 +164,21 @@ public final class MainActivity extends AppCompatActivity {
         LinearLayout container = new LinearLayout(this);
         container.setOrientation(LinearLayout.VERTICAL);
         container.setGravity(Gravity.CENTER);
-        container.setBackgroundColor(Color.WHITE);
+        container.setBackgroundColor(ContextCompat.getColor(this, R.color.native_error_background));
         int padding = Math.round(32 * getResources().getDisplayMetrics().density);
         container.setPadding(padding, padding, padding, padding);
         container.setVisibility(View.GONE);
 
         TextView title = new TextView(this);
         title.setText(R.string.web_error_title);
-        title.setTextColor(Color.rgb(17, 24, 39));
+        title.setTextColor(ContextCompat.getColor(this, R.color.native_error_title));
         title.setTextSize(22);
         title.setGravity(Gravity.CENTER);
         container.addView(title);
 
         TextView description = new TextView(this);
         description.setText(R.string.web_error_description);
-        description.setTextColor(Color.rgb(75, 85, 99));
+        description.setTextColor(ContextCompat.getColor(this, R.color.native_error_body));
         description.setTextSize(15);
         description.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams descriptionParams = new LinearLayout.LayoutParams(
@@ -274,7 +291,7 @@ public final class MainActivity extends AppCompatActivity {
                 } catch (Exception ignored) {
                     pendingFileChooser.onReceiveValue(null);
                     pendingFileChooser = null;
-                    Toast.makeText(MainActivity.this, R.string.file_chooser_failed, Toast.LENGTH_LONG).show();
+                    showInAppMessage(R.string.file_chooser_failed);
                 }
                 return true;
             }
@@ -389,7 +406,8 @@ public final class MainActivity extends AppCompatActivity {
             "document.documentElement.style.setProperty('--teameet-native-safe-bottom','"
                 + bottomSystemInsetCssPixels
                 + "px');document.documentElement.style.setProperty('--v1-shell-safe-bottom','"
-                + bottomSystemInsetCssPixels + "px')",
+                + bottomSystemInsetCssPixels
+                + "px');document.documentElement.dataset.teameetNativeApp='android'",
             null
         );
         webView.evaluateJavascript(
@@ -426,14 +444,14 @@ public final class MainActivity extends AppCompatActivity {
                 request.addRequestHeader("User-Agent", userAgent);
             }
             getSystemService(DownloadManager.class).enqueue(request);
-            Toast.makeText(this, R.string.download_started, Toast.LENGTH_SHORT).show();
+            showInAppMessage(R.string.download_started);
         } catch (Exception ignored) {
             showDownloadFailure();
         }
     }
 
     private void showDownloadFailure() {
-        Toast.makeText(this, R.string.download_failed, Toast.LENGTH_LONG).show();
+        showInAppMessage(R.string.download_failed);
     }
 
     private void openExternal(Uri target) {
@@ -460,12 +478,62 @@ public final class MainActivity extends AppCompatActivity {
                     // Surface the same honest unavailable state when no browser or Play Store can open it.
                 }
             }
-            Toast.makeText(this, R.string.external_app_unavailable, Toast.LENGTH_LONG).show();
+            showInAppMessage(R.string.external_app_unavailable);
         } catch (Exception ignored) {
-            Toast.makeText(this, R.string.external_app_unavailable, Toast.LENGTH_LONG).show();
+            showInAppMessage(R.string.external_app_unavailable);
         }
     }
 
+    private void showInAppMessage(int messageResource) {
+        runOnUiThread(() -> {
+            if (rootView == null) return;
+            if (inAppMessageView != null) rootView.removeView(inAppMessageView);
+
+            float density = getResources().getDisplayMetrics().density;
+            TextView messageView = new TextView(this);
+            messageView.setText(messageResource);
+            messageView.setTextColor(ContextCompat.getColor(this, R.color.native_message_text));
+            messageView.setTextSize(15);
+            messageView.setGravity(Gravity.CENTER);
+            messageView.setMaxWidth(Math.round(360 * density));
+            int horizontalPadding = Math.round(22 * density);
+            int verticalPadding = Math.round(16 * density);
+            messageView.setPadding(
+                horizontalPadding,
+                verticalPadding,
+                horizontalPadding,
+                verticalPadding
+            );
+            messageView.setElevation(8 * density);
+            messageView.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+
+            GradientDrawable background = new GradientDrawable();
+            background.setColor(ContextCompat.getColor(this, R.color.native_message_background));
+            background.setCornerRadius(18 * density);
+            background.setStroke(
+                Math.max(1, Math.round(density)),
+                ContextCompat.getColor(this, R.color.native_message_border)
+            );
+            messageView.setBackground(background);
+
+            FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.CENTER
+            );
+            int margin = Math.round(24 * density);
+            params.leftMargin = margin;
+            params.rightMargin = margin;
+            rootView.addView(messageView, params);
+            inAppMessageView = messageView;
+            messageView.announceForAccessibility(getString(messageResource));
+            messageView.postDelayed(() -> {
+                if (inAppMessageView != messageView || rootView == null) return;
+                rootView.removeView(messageView);
+                inAppMessageView = null;
+            }, 3200);
+        });
+    }
     private void handleNativeMessage(WebMessageCompat message) {
         String data = message.getData();
         if (data == null) return;
@@ -534,6 +602,7 @@ public final class MainActivity extends AppCompatActivity {
 
     @Override protected void onResume() {
         super.onResume();
+        if (rootView != null) applySystemBarAppearance();
         if (!PushPermission.isGranted(this)) InstallationIdentity.markOptedIn(this, false);
         if (!canRegisterPush() && InstallationIdentity.isRegistered(this)) {
             revokePushAndDeleteToken(() -> {});

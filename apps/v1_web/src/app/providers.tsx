@@ -19,6 +19,7 @@ import {
   PERSIST_BUSTER,
   PERSIST_MAX_AGE_MS,
 } from '@/lib/query-persist';
+import { NativeAppSurface } from '@/components/providers/native-app-surface';
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
@@ -59,6 +60,7 @@ export function Providers({ children }: { children: ReactNode }) {
     >
       <ThemeProvider>
         <KeyboardViewportBridge />
+        <NativeAppSurface />
         <ClientErrorListener />
         <NotificationSocketBridge />
         {getGaMeasurementId() && (

@@ -86,14 +86,14 @@ export function AdminToasts({ toasts }: { toasts: AdminToastItem[] }) {
     <div
       aria-live="polite"
       aria-atomic="false"
-      className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 items-center pointer-events-none"
+      className="tm-native-toast-stack fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 items-center pointer-events-none"
     >
       {toasts.map((t) => (
         <div
           key={t.id}
           role="status"
           className={[
-            'flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-semibold shadow-lg pointer-events-auto',
+            'tm-native-toast-card flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-semibold shadow-lg pointer-events-auto',
             'min-w-[200px] max-w-[90vw] sm:max-w-[400px]',
             t.exiting
               ? 'motion-safe:animate-[fade-in_0.15s_ease-in_reverse_both]'

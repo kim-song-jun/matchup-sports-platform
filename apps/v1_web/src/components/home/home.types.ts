@@ -75,6 +75,8 @@ export type HomeViewModel = {
   /** 채팅방 목록 조회 전용 재시도 — 전체 홈 데이터(retry)와 별도 쿼리이므로 분리한다. */
   chatRetry?: () => void;
   stats: HomeStats;
+  /** 홈 요약을 아직 못 받은 상태. true면 통계 자리에 스켈레톤을 그린다(목업 숫자·'-' 대신). */
+  statsLoading?: boolean;
   featuredMatch: HomeMatchCard | null;
   recommendedMatches: HomeMatchCard[];
   quickActions: HomeQuickAction[];

@@ -229,6 +229,23 @@ function matchStatusBadgeLabel(mode: MatchDetailViewModel['mode'], status: Match
   return '모집 중';
 }
 
+/**
+ * 매치 상세 로딩 셸. 데이터가 오기 전 하드코딩 목업(matches.view-model.ts)을 그대로
+ * 렌더하던 자리를 대신한다 — 목업 참가자·주소·설명이 실제 매치처럼 보이던 결함을 막는다.
+ * 셸 승격(U27) 이후 title/activeTab/bottomNav/topBar 는 route-chrome/fragments/matches.ts
+ * 테이블의 '/matches/:id' 항목(title: '매치')이 이미 그린다 — MatchDetailPageView(성공
+ * 뷰)도 useShellOverride로 title을 덮어쓰지 않으므로 두 상태가 같은 값을 보여 헤더가
+ * 흔들리지 않는다. 그래서 본문 스켈레톤만 렌더한다.
+ */
+export function MatchDetailPageSkeleton() {
+  return (
+    <>
+      <p className="sr-only" role="status">매치 정보를 불러오는 중이에요.</p>
+      <PageSkeleton variant="detail" />
+    </>
+  );
+}
+
 export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) {
   const { match, mode } = model;
   const [heroMessage, setHeroMessage] = useState('');

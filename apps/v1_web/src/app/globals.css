@@ -699,9 +699,21 @@ button:disabled {
 .tm-bottom-tab[data-active="true"]::before {
   content: '';
   position: absolute;
-  top: 2px;
+  /* 아이콘 중심에 맞춘다. 예전에는 `top: 2px` 로 **탭 상단**에서 쟀는데, 아이콘의 실제
+     위치는 탭 상단이 아니라 탭 **중앙**을 기준으로 정해진다(justify-content: center).
+     그리고 탭 높이는 safe-area 에 따라 달라진다 — 홈 인디케이터가 없으면 50px, 있으면
+     66px. 그래서 고정 오프셋은 한쪽에서만 맞았다: safe-bottom=0 에서는 우연히 정확했고
+     (pill 중심 15px = 아이콘 중심 15px), 홈 인디케이터가 있는 기기에서는 아이콘 중심이
+     23px 로 내려가 **pill 이 8px 위로 떠 보이고 아이콘 아래 6.5px 가 pill 밖으로
+     삐져나왔다.** 즉 실제 iPhone 에서만 어긋나는 종류였다.
+
+     탭 중앙에서 재면 탭 높이와 무관해진다. 내용은 아이콘 23px + gap 4px + 라벨 16px 이
+     세로 가운데 정렬이므로, 아이콘 중심은 **언제나** 탭 중심보다 (4px + 16px) / 2 만큼
+     위다 — 아이콘 높이는 상쇄되어 식에 남지 않는다. 값을 계산식 그대로 적어 두는 것은
+     gap 이나 라벨 line-height 가 바뀌면 여기도 같이 바꿔야 한다는 뜻이다. */
+  top: 50%;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translate(-50%, calc(-50% - (4px + 16px) / 2));
   width: 46px;
   height: 26px;
   border-radius: var(--radius-pill);
@@ -7965,4 +7977,38 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
     animation-duration: 0s !important;
     animation-delay: 0s !important;
   }
+}
+
+/* Android wrapper: transient web feedback reads as an in-app centered popup.
+   Browser layouts keep their existing bottom/inline placement. */
+html[data-teameet-native-app='android'] .tm-native-toast-stack {
+  position: fixed !important;
+  inset: 50% 24px auto !important;
+  width: auto !important;
+  transform: translateY(-50%) !important;
+  z-index: 1000 !important;
+}
+
+html[data-teameet-native-app='android'] .tm-native-toast-card {
+  max-width: min(100%, 360px) !important;
+  min-height: 56px;
+  border: 1px solid var(--grey200);
+  border-radius: var(--radius-container) !important;
+  box-shadow: 0 8px 24px rgb(15 23 42 / 14%);
+  text-align: center;
+}
+
+html[data-teameet-native-app='android'] .tm-notification-toast,
+html[data-teameet-native-app='android'] .tm-search-error-toast {
+  position: fixed !important;
+  inset: 50% auto auto 50% !important;
+  width: min(calc(100vw - 48px), 360px) !important;
+  min-height: 56px !important;
+  transform: translate(-50%, -50%) !important;
+  border: 1px solid var(--grey200);
+  border-radius: var(--radius-container) !important;
+  box-shadow: 0 8px 24px rgb(15 23 42 / 14%);
+  padding: 16px 20px !important;
+  text-align: center;
+  z-index: 1000 !important;
 }

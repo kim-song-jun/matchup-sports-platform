@@ -574,3 +574,20 @@ report, upgrade preservation, and the remaining OEM/foldable/multi-window matrix
 - Alpha lint now has 12 non-fatal warnings: one intentionally pinned AndroidX Core version, one redundant min-SDK resource qualifier, and five existing launcher round-shape/duplicate pairs. The renderer-process crash warning is resolved and no broad-storage warning or permission is present.
 - API 36 emulator proof opened `DocumentsUI` `PickActivity` on `Recent images`, returned the selected image filename to the WebView input, and retained the app as the resumed activity. Evidence is in `output/task156/android-emulator-final/` and copied to the requested desktop screenshot folder.
 - Phase 5 remains open only where external state or physical distribution is required: Play account/app ownership, Play App Signing SHA-256, production signing/Firebase protected inputs, Play upload/testing/pre-launch report, final store screenshots, real FCM receive/tap matrix, and remaining OEM/foldable/multi-window coverage.
+
+## Android Theme, Branding, and Kakao WebView Follow-up (2026-09-01)
+
+- Alpha and Production application labels, notification channel copy, and Korean Play listing title now use the exact two-character name 팀밋.
+- The adaptive/monochrome vector, legacy density launchers, round launchers, and canonical 512 px Play icon use the repository-owned geometric 팀밋 wordmark on the existing #3483F5 brand background. The Play checksum manifest is synchronized.
+- Status/navigation bar backgrounds and icon appearance now follow Android DayNight configuration. API 36 captures measured #FFFFFF in light mode and #111827 at the dark status bar; dark navigation receives the platform contrast scrim while retaining light navigation icons. The native WebView error surface also follows the same light/dark palette.
+- Kakao authorization remains inside MainActivity for the exact official HTTPS hosts kauth.kakao.com, accounts.kakao.com, and auth.kakao.com. User-info URLs, custom ports, HTTP, suffix hosts, and unrelated external origins remain rejected from the in-app OAuth allowlist.
+- Alpha/Production JVM suites passed 13/13 each. Alpha lint completed with 0 errors and 2 pre-existing non-fatal warnings (GradleDependency, ObsoleteSdkInt); Alpha and Production debug APK assembly and the Alpha release AAB bundle passed.
+- API 36 Pixel emulator evidence covers the app-drawer icon and exact 팀밋 label, light/dark system bars, Kakao Account rendered inside the app WebView, and Android Back returning to the Teameet login page. Raw evidence is under output/task156/android-branding-theme/; the five reviewed PNGs were also copied to the operator-requested desktop screenshot directory.
+### Korean system surfaces and centered app feedback (2026-09-01)
+
+- Android permission dialogs and DocumentsUI are OS-owned surfaces; their language follows the device system locale and cannot be overridden by the app. API 36 was switched to `ko-KR` and notification, approximate-location, and recent-image picker copy was verified in Korean.
+- Replaced wrapper-owned Android `Toast` feedback for downloads, picker launch failures, and unavailable external apps with an accessible centered in-app card that follows light/dark resources.
+- Added the exact-origin Android bridge marker and app-only centered placement for shared web toast stacks, notification feedback, and search-error feedback. Normal browser placement remains unchanged.
+- Validation: v1 web targeted Vitest 2 files / 4 tests passed; v1 web `tsc --noEmit` passed; Gradle 9.2 `testAlphaDebugUnitTest assembleAlphaDebug --no-daemon --max-workers=1` passed against API 36.
+- Device evidence: `output/task156/android-korean-popup-qa/21-ko-notification.png`, `22-ko-gps.png`, `23-ko-image-picker.png`, `24-center-popup.png`, and `25-ko-kakao-in-app.png`.
+- Residual external gate remains unchanged: authenticated real FCM delivery (foreground/background/terminated) requires an Alpha QA account/session and server event.

@@ -88,15 +88,30 @@ function getFormatLabel(competition: V1TournamentDetail): string {
  *  - draft(비공개 준비 상태)·cancelled(취소): 볼 대진 자체가 무의미하므로 null을
  *    반환해 CTA를 아예 숨긴다 — 데이터 없는 화면을 억지로 보여주지 않는다는 원칙.
  */
-export function getBracketEntryCtaLabel(status: V1TournamentStatus): string | null {
+export function getBracketEntryCtaLabel(
+  status: V1TournamentStatus,
+  /**
+   * **정규 리그 시즌인가(`kind === 'regular_league'`).** 리그엔 대진표가 없어 대회 문구가
+   * 그대로 거짓이 된다. 2026-09-01 사용자 확정 — 리그 문구는 상태별로
+   * '진행 중인 리그 보기' / '최종 순위 보기' / '일정 보기' 이고, **대회 문구는 그대로 둔다.**
+   *
+   * ⚠️ `isLeagueCompetition` 으로 묻지 않는다 — 그건 `format === 'league'` 인 리그 방식
+   * **대회**(alpha 62건 중 7건)도 true 라 그 대회들의 문구까지 바꾼다.
+   *
+   * ⚠️ 리그의 `open`/`closed` 는 실제로 도달하지 않는다(리그 상태는 draft·active·completed
+   * 만 거울 상태로 매핑된다). 그래도 적어 둔다 — 빠뜨리면 그 경로가 열리는 날 대회 문구가
+   * 조용히 새어 나온다.
+   */
+  isRegularLeague = false,
+): string | null {
   switch (status) {
     case 'in_progress':
-      return '진행 중인 대회 보기';
+      return isRegularLeague ? '진행 중인 리그 보기' : '진행 중인 대회 보기';
     case 'completed':
-      return '경기 결과 · 대진표 보기';
+      return isRegularLeague ? '최종 순위 보기' : '경기 결과 · 대진표 보기';
     case 'open':
     case 'closed':
-      return '대진표 · 일정 보기';
+      return isRegularLeague ? '일정 보기' : '대진표 · 일정 보기';
     case 'draft':
     case 'cancelled':
     default:
@@ -398,7 +413,7 @@ function ApplyCTA({
    uses the always-visible sticky rail below) ── */
 
 function BracketEntryCtaButton({ tournament }: { tournament: V1TournamentDetail }) {
-  const label = getBracketEntryCtaLabel(tournament.status);
+  const label = getBracketEntryCtaLabel(tournament.status, tournament.kind === 'regular_league');
   if (!label) return null;
   const isLive = tournament.status === 'in_progress';
 
@@ -662,7 +677,7 @@ export function TournamentDetailView({
 
   /* ── 통합 진입 CTA(상단 스티키 + 하단, §A-3·4·5) — 모바일/태블릿 전용.
      데스크탑은 railCTA가 이미 항상 보이는 sticky 패널이라 별도 처리가 필요 없다. */
-  const bracketCtaLabel = getBracketEntryCtaLabel(tournament.status);
+  const bracketCtaLabel = getBracketEntryCtaLabel(tournament.status, isLeagueMirror);
   const bottomCtaRef = useRef<HTMLDivElement | null>(null);
   const bottomCtaVisible = useIsInViewport(bottomCtaRef);
 
@@ -1209,7 +1224,7 @@ export function TournamentDetailView({
           <span style={{ fontSize: 'var(--font-size-caption)', fontWeight: 800, color: '#fff', letterSpacing: '0.02em' }}>LIVE</span>
         </span>
         {/* 라벨: getBracketEntryCtaLabel과 단일 소스 — 모바일 상단/하단 CTA와 동일 문구("진행 중인 대회 보기")를 쓴다. */}
-        <span style={{ flex: 1, fontSize: 'var(--font-size-body-lg)', fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>{getBracketEntryCtaLabel(tournament.status)}</span>
+        <span style={{ flex: 1, fontSize: 'var(--font-size-body-lg)', fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>{getBracketEntryCtaLabel(tournament.status, isLeagueMirror)}</span>
         <ChevronRight size={17} strokeWidth={2.5} style={{ color: 'rgba(255,255,255,0.65)', flexShrink: 0 }} aria-hidden="true" />
       </Link>
       {/* Key facts */}
@@ -1263,7 +1278,7 @@ export function TournamentDetailView({
         >
           <Goal size={16} color="var(--text-strong)" strokeWidth={2.2} />
         </span>
-        <span style={{ flex: 1, fontSize: 'var(--font-size-body-lg)', fontWeight: 800, color: 'var(--text-strong)', letterSpacing: '-0.01em' }}>{getBracketEntryCtaLabel(tournament.status)}</span>
+        <span style={{ flex: 1, fontSize: 'var(--font-size-body-lg)', fontWeight: 800, color: 'var(--text-strong)', letterSpacing: '-0.01em' }}>{getBracketEntryCtaLabel(tournament.status, isLeagueMirror)}</span>
         <ChevronRight size={17} strokeWidth={2.5} style={{ color: 'var(--text-caption)', flexShrink: 0 }} aria-hidden="true" />
       </Link>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

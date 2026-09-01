@@ -43,9 +43,17 @@ import { teamJoinApplicationStatusLabel } from '@/lib/v1-status-labels';
 import type { V1Team, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { JerseyNumberDialog } from './jersey-number-dialog';
-import { TeamDetailPageView, TeamListPageView, TeamMembersPageView, TeamStatePageView } from './teams-page';
+import { TeamDetailPageSkeleton, TeamDetailPageView, TeamListPageView, TeamMembersPageView, TeamStatePageView } from './teams-page';
 import type { TeamDetailViewModel, TeamListViewModel, TeamMembersViewModel, TeamModel } from './teams.types';
 import { getTeamDetailViewModel, getTeamListViewModel, getTeamMembersViewModel, getTeamStateViewModel } from './teams.view-model';
+import {
+  buildTeamHref,
+  buildTeamSportChips,
+  formatTeamRegion,
+  isTeamAtCapacity,
+  splitTeamRegion,
+  toTeam,
+} from './teams.card-model';
 
 export function TeamListPageClient() {
   const router = useRouter();
@@ -240,82 +248,87 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
   if (query.isError) return <TeamStatePageView model={getTeamStateViewModel('error')} />;
 
   const regionParts = splitTeamRegion(query.data?.region);
-  const model: TeamDetailViewModel = query.data
-    ? {
-        ...fallback,
-        team: {
-          ...fallback.team,
-          ...toTeamDetail(query.data, fallback.team),
-          description: query.data.profile.introduction ?? '',
-          activity: query.data.profile.activitySummary ?? query.data.profile.activityAreaText ?? '',
-          condition: formatTeamDetailLevel(query.data),
-          genderRule: query.data.profile.genderRule ?? fallback.team.genderRule,
-          schedule: '',
-          city: regionParts.city,
-          county: regionParts.county,
-          level: formatTeamDetailLevel(query.data) || fallback.team.level,
-          membersList: query.data.membersPreview.map((member) => ({
-            name: member.displayName,
-            role: roleLabel(member.role),
-            meta: member.role,
-            status: member.role === 'owner' || member.role === 'manager' ? '관리자' : '활동중',
-            visibility: query.data.membersVisibilityEnabled ? '공개' : '비공개',
-            // 834행 TeamMembersPageClient의 프로필 링크 패턴과 동일 — 새 규칙을 만들지 않는다.
-            profileHref: `/users/${member.userId}`,
-          })),
-          memberAccess: {
-            canView: query.data.canViewMembers,
-            enabled: query.data.membersVisibilityEnabled,
-            message: '',
-            // memberCount는 활성 멤버만 세는 캐시 필드지만 비동기 드리프트 가능성을 배제할 수
-            // 없으므로(예: standings-wrong-check-fixture-status-first 류 캐시 불일치) 음수로
-            // 내려가지 않게 0으로 floor한다 — "+ -2명 더보기" 같은 값을 절대 렌더하지 않기 위함.
-            moreCount: query.data.canViewMembers
-              ? Math.max(0, query.data.memberCount - query.data.membersPreview.length)
-              : 0,
-          },
-        },
-        mode: toDetailMode(query.data, eligibility.data),
-        ctaLabel: teamDetailCtaLabel(query.data, eligibility.data),
-        ctaPending: join.isPending || withdraw.isPending || resolveChat.isPending,
-        onCta: teamDetailCtaAction({
-          team: query.data,
-          eligibility: eligibility.data,
-          chat: async () => {
-            const result = await resolveChat.mutateAsync({ targetType: 'team', targetId: teamId });
-            router.push(chatRoomHref(result.roomId, result.route));
-          },
-          join: () => join.mutateAsync({ message: null }).then((result) => {
-            trackEvent('team_apply_complete', { teamId });
-            return result;
-          }),
-          withdraw: () => withdraw.mutateAsync({ reason: 'team_join_withdrawn_from_v1_web' }),
-        }),
-        // CTA는 상태에 따라 채팅·신청·취소 세 갈래라 안내 문구도 갈래마다 달라야 한다.
-        // 특히 신청 성공은 "승인이 남았다"는 사실을 반드시 알려야 사용자가 기다릴 대상을 안다.
-        ctaSuccessMessage: teamDetailCtaSuccessMessage(query.data, eligibility.data),
-        ctaFailureMessage: teamDetailCtaFailureMessage(query.data, eligibility.data),
-        joinRequest:
-          toDetailMode(query.data, eligibility.data) === 'pending'
-            ? { requestedAtLabel: formatJoinRequestedAt(eligibility.data?.requestedAt) }
-            : undefined,
-        operations: buildTeamOperations(query.data),
-        onShare: () => shareTeam(query.data),
-        openMatches,
-        openMatchesLoading: openMatchesQuery.isLoading,
-        contactHref:
-          toDetailMode(query.data, eligibility.data) !== 'mine' && operatorTeamCount > 0
-            ? `/teams/${teamId}/contact/new`
-            : undefined,
-        myLeagues,
-        myLeaguesLoading: myLeaguesQuery.isLoading,
-        // 통신 오류를 "리그 0개"로 위장시키지 않기 위한 3번째 상태 — TeamMyLeaguesSection이
-        // 이 플래그로 EmptyState(재시도)를 렌더한다. refetch를 그대로 넘겨 재시도 버튼이
-        // 같은 쿼리를 다시 부르게 한다.
-        myLeaguesError: myLeaguesQuery.isError,
-        onRetryMyLeagues: () => void myLeaguesQuery.refetch(),
-      }
-    : fallback;
+  // 데이터가 오기 전에는 하드코딩 목업(`fallback`)을 화면 전체로 렌더하지 않는다 —
+  // 목업 제목·주소·참가자가 실제 값처럼 보여 사용자가 잘못 읽던 결함이었다.
+  // `fallback` 은 아래에서 필드 단위 기본값으로만 쓴다.
+  if (!query.data) {
+    return <TeamDetailPageSkeleton />;
+  }
+
+  const model: TeamDetailViewModel = {
+    ...fallback,
+    team: {
+      ...fallback.team,
+      ...toTeamDetail(query.data, fallback.team),
+      description: query.data.profile.introduction ?? '',
+      activity: query.data.profile.activitySummary ?? query.data.profile.activityAreaText ?? '',
+      condition: formatTeamDetailLevel(query.data),
+      genderRule: query.data.profile.genderRule ?? fallback.team.genderRule,
+      schedule: '',
+      city: regionParts.city,
+      county: regionParts.county,
+      level: formatTeamDetailLevel(query.data) || fallback.team.level,
+      membersList: query.data.membersPreview.map((member) => ({
+        name: member.displayName,
+        role: roleLabel(member.role),
+        meta: member.role,
+        status: member.role === 'owner' || member.role === 'manager' ? '관리자' : '활동중',
+        visibility: query.data.membersVisibilityEnabled ? '공개' : '비공개',
+        // 834행 TeamMembersPageClient의 프로필 링크 패턴과 동일 — 새 규칙을 만들지 않는다.
+        profileHref: `/users/${member.userId}`,
+      })),
+      memberAccess: {
+        canView: query.data.canViewMembers,
+        enabled: query.data.membersVisibilityEnabled,
+        message: '',
+        // memberCount는 활성 멤버만 세는 캐시 필드지만 비동기 드리프트 가능성을 배제할 수
+        // 없으므로(예: standings-wrong-check-fixture-status-first 류 캐시 불일치) 음수로
+        // 내려가지 않게 0으로 floor한다 — "+ -2명 더보기" 같은 값을 절대 렌더하지 않기 위함.
+        moreCount: query.data.canViewMembers
+          ? Math.max(0, query.data.memberCount - query.data.membersPreview.length)
+          : 0,
+      },
+    },
+    mode: toDetailMode(query.data, eligibility.data),
+    ctaLabel: teamDetailCtaLabel(query.data, eligibility.data),
+    ctaPending: join.isPending || withdraw.isPending || resolveChat.isPending,
+    onCta: teamDetailCtaAction({
+      team: query.data,
+      eligibility: eligibility.data,
+      chat: async () => {
+        const result = await resolveChat.mutateAsync({ targetType: 'team', targetId: teamId });
+        router.push(chatRoomHref(result.roomId, result.route));
+      },
+      join: () => join.mutateAsync({ message: null }).then((result) => {
+        trackEvent('team_apply_complete', { teamId });
+        return result;
+      }),
+      withdraw: () => withdraw.mutateAsync({ reason: 'team_join_withdrawn_from_v1_web' }),
+    }),
+    // CTA는 상태에 따라 채팅·신청·취소 세 갈래라 안내 문구도 갈래마다 달라야 한다.
+    // 특히 신청 성공은 "승인이 남았다"는 사실을 반드시 알려야 사용자가 기다릴 대상을 안다.
+    ctaSuccessMessage: teamDetailCtaSuccessMessage(query.data, eligibility.data),
+    ctaFailureMessage: teamDetailCtaFailureMessage(query.data, eligibility.data),
+    joinRequest:
+      toDetailMode(query.data, eligibility.data) === 'pending'
+        ? { requestedAtLabel: formatJoinRequestedAt(eligibility.data?.requestedAt) }
+        : undefined,
+    operations: buildTeamOperations(query.data),
+    onShare: () => shareTeam(query.data),
+    openMatches,
+    openMatchesLoading: openMatchesQuery.isLoading,
+    contactHref:
+      toDetailMode(query.data, eligibility.data) !== 'mine' && operatorTeamCount > 0
+        ? `/teams/${teamId}/contact/new`
+        : undefined,
+    myLeagues,
+    myLeaguesLoading: myLeaguesQuery.isLoading,
+    // 통신 오류를 "리그 0개"로 위장시키지 않기 위한 3번째 상태 — TeamMyLeaguesSection이
+    // 이 플래그로 EmptyState(재시도)를 렌더한다. refetch를 그대로 넘겨 재시도 버튼이
+    // 같은 쿼리를 다시 부르게 한다.
+    myLeaguesError: myLeaguesQuery.isError,
+    onRetryMyLeagues: () => void myLeaguesQuery.refetch(),
+  };
 
   return <TeamDetailPageView model={model} />;
 }
@@ -578,69 +591,6 @@ function withListActivityFallback(team: V1Team, detail?: V1TeamDetail): V1Team {
   };
 }
 
-function toTeam(team: V1Team, fallback: TeamModel): TeamModel {
-  const id = team.teamId ?? team.id;
-  const sportName = team.sport?.name ?? team.sportName;
-  const regionName = formatTeamRegion(team.region, team.regionName);
-  const levelTag = formatTeamLevelTag(team);
-  const genderRule = team.genderRule ?? '';
-  const full = isTeamAtCapacity(team.memberCount, team.memberGoalCount);
-
-  return {
-    id,
-    name: team.name,
-    logo: team.name.slice(0, 1),
-    logoUrl: team.logoUrl ?? null,
-    coverImageUrl: team.coverImageUrl ?? null,
-    sport: sportName,
-    sports: [sportName],
-    region: regionName,
-    members: team.memberCount,
-    capacity: team.memberGoalCount ?? 0,
-    status: team.joinPolicy === 'closed' || full ? 'closed' : 'open',
-    statusLabel: team.joinPolicy === 'closed' ? '가입 닫힘' : full ? '정원 마감' : '가입 신청 가능',
-    tags: [levelTag, genderRule].filter(Boolean),
-    genderRule,
-    ownerName: team.owner?.displayName,
-    managerName: team.manager?.displayName ?? null,
-    intro: team.introductionPreview ?? `${regionName}에서 활동하는 ${sportName} 팀이에요.`,
-    next: team.activitySummary ?? team.activityAreaText ?? '',
-  };
-}
-
-function formatTeamLevelTag(team: V1Team) {
-  const explicitLabel = team.levelLabel?.trim() || team.skillLevelText?.trim();
-  if (explicitLabel) return explicitLabel;
-  const minName = team.minLevel?.name?.trim();
-  const maxName = team.maxLevel?.name?.trim();
-  if (minName && maxName) return minName === maxName ? minName : `${minName}-${maxName}`;
-  return minName ?? maxName ?? '레벨 미설정';
-}
-
-function buildTeamSportChips(
-  items: V1Team[],
-  fallback: TeamListViewModel,
-  params: URLSearchParams,
-  selectedSportId?: string,
-  masterSports?: Array<{ id: string; name: string }>,
-) {
-  const fixedSports = masterSports?.length
-    ? masterSports.slice(0, 4)
-    : fallback.chips.slice(1, 5).map((chip) => ({ id: chip.label, name: chip.label.replace(/\s+\d+$/, '') }));
-
-  return [
-    { label: fallback.chips[0]?.label.replace(/\s+\d+$/, '') ?? '전체', count: items.length, active: !selectedSportId, href: buildTeamHref(params, { sportId: null }) },
-    ...fixedSports.map((sport) => ({
-      label: sport.name,
-      count: items.filter((team) => {
-        const teamSport = team.sport;
-        return teamSport?.sportId === sport.id || teamSport?.name === sport.name || team.sportName === sport.name;
-      }).length,
-      active: selectedSportId === sport.id,
-      href: buildTeamHref(params, { sportId: sport.id }),
-    })),
-  ];
-}
 
 function buildTeamFilterSheet(
   params: URLSearchParams,
@@ -680,15 +630,6 @@ function buildTeamFilterSheet(
   };
 }
 
-function buildTeamHref(params: URLSearchParams, overrides: Record<string, string | null>) {
-  const next = new URLSearchParams(params.toString());
-  Object.entries(overrides).forEach(([key, value]) => {
-    if (value === null || value === '') next.delete(key);
-    else next.set(key, value);
-  });
-  const queryString = next.toString();
-  return queryString ? `/teams?${queryString}` : '/teams';
-}
 
 function toTeamSort(value: string | null): NonNullable<TeamListViewModel['filterSheet']>['sort'] {
   if (value === 'recommended' || value === 'deadline' || value === 'latest') return value;
@@ -737,9 +678,6 @@ function toTeamDetail(team: V1TeamDetail, fallback: TeamModel): TeamModel {
   };
 }
 
-function isTeamAtCapacity(memberCount: number, memberGoalCount?: number | null) {
-  return memberGoalCount != null && memberCount >= memberGoalCount;
-}
 
 function formatTeamDetailLevel(team: V1TeamDetail) {
   const explicitLabel = team.profile.levelLabel?.trim() || team.profile.skillLevelText?.trim();
@@ -750,20 +688,6 @@ function formatTeamDetailLevel(team: V1TeamDetail) {
   return minName ?? maxName ?? '';
 }
 
-
-function formatTeamRegion(region?: { name: string; parentName?: string | null } | null, fallback?: string | null) {
-  if (region?.parentName) return `${region.parentName} ${region.name}`;
-  return region?.name ? `${region.name} 전체` : fallback ?? '지역 미정';
-}
-
-function splitTeamRegion(region?: { name: string; parentName?: string | null } | null) {
-  if (region?.parentName) return { city: region.parentName, county: region.name };
-  const trimmed = region?.name?.trim();
-  if (!trimmed) return { city: '', county: '지역 미정' };
-  const [city, ...countyParts] = trimmed.split(/\s+/);
-  if (countyParts.length === 0) return { city, county: '전체' };
-  return { city, county: countyParts.join(' ') };
-}
 
 /**
  * 화면 전체가 참조하는 가입 상태 단일 소스.

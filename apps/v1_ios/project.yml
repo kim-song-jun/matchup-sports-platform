@@ -114,6 +114,7 @@ targets:
       - path: Teameet/WebShell/ChromeColour.swift
       - path: Teameet/WebShell/DownloadPolicy.swift
       - path: Teameet/Push/PushPermission.swift
+      - path: Teameet/Push/PushPromptPolicy.swift
       - path: Teameet/Push/PushConsent.swift
       - path: Teameet/Push/PushNotificationPayload.swift
       - path: Teameet/Push/ApnsEnvironment.swift

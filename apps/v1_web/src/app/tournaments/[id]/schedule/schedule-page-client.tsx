@@ -17,10 +17,20 @@ function ScheduleSkeleton() {
   );
 }
 
-export function SchedulePageClient({ tournamentId }: { tournamentId: string }) {
+export function SchedulePageClient({
+  tournamentId,
+  isRegularLeague = false,
+}: {
+  tournamentId: string;
+  /** 정규 리그 시즌인가. 단계 어휘와 선수 기록 섹션 노출을 가른다 — 아래 각 사용처 참조. */
+  isRegularLeague?: boolean;
+}) {
   const { data, isLoading, isError, error, refetch, hasNextPage, isFetchingNextPage, fetchNextPage } =
     usePublicTournamentSchedule(tournamentId);
-  const playerRecords = usePublicTournamentPlayerRecords(tournamentId);
+  // **리그는 선수 기록을 집계할 수 없다.** 리그 참가자는 `userId` 로 이어져 있지 않아
+  // 득점·도움을 사람 단위로 합칠 근거가 없다. 빈 표를 그리면 "아직 기록이 없다"로
+  // 읽히는데 사실은 **집계 자체가 불가능**한 것이라, 조회도 렌더도 하지 않는다.
+  const playerRecords = usePublicTournamentPlayerRecords(tournamentId, { enabled: !isRegularLeague });
   // 로그인한 팀장에게만 자기 팀 경기가 얹힌다 — 비로그인·비참가자는 401/빈 응답이라
   // 화면이 종전과 똑같다(공개 일정은 이 조회와 무관하게 그려진다).
   const myFixtures = useV1MyTournamentFixtures(tournamentId);
@@ -60,10 +70,13 @@ export function SchedulePageClient({ tournamentId }: { tournamentId: string }) {
         isFetchingNextPage={isFetchingNextPage}
         onLoadMore={() => void fetchNextPage()}
         myFixtures={myFixtures.data}
+        isRegularLeague={isRegularLeague}
       />
       {/* 회고 STATS-1 — 대회 개인 득점·도움 랭킹. ScheduleContent 컨테이너와 같은
           좌우 20px 리듬. 기록이 없으면 아무것도(래퍼 여백 포함) 그리지 않는다 —
           래퍼는 containerStyle로 컴포넌트 안에서 내용과 함께만 렌더된다. */}
+      {/* 리그에서는 이 섹션을 아예 그리지 않는다 — 위 `playerRecords` 주석 참조. */}
+      {isRegularLeague ? null : (
       <TournamentPlayerRecordsSections
         goals={playerRecords.data?.goals}
         assists={playerRecords.data?.assists}
@@ -74,6 +87,7 @@ export function SchedulePageClient({ tournamentId }: { tournamentId: string }) {
         emptyBehavior="hide"
         containerStyle={{ padding: '0 20px 40px', display: 'flex', flexDirection: 'column', gap: 20 }}
       />
+      )}
     </>
   );
 }

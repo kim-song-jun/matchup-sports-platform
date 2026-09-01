@@ -172,6 +172,22 @@ function applyResultMessage(result: unknown): string | null {
   return null;
 }
 
+/**
+ * 팀매치 상세 로딩 셸. 목업 팀매치(team-matches.view-model.ts — 'FC 발빠른놈들' 등)를
+ * 그대로 렌더하던 자리를 대신한다. 셸 승격(U27) 이후 title/activeTab/bottomNav/topBar 는
+ * route-chrome/fragments/team-matches.ts 테이블의 '/team-matches/:id' 항목(title: '')이
+ * 이미 그린다 — TeamMatchDetailPageView(성공 뷰)도 title을 override하지 않으므로 두
+ * 상태가 같은 값을 보여 헤더가 흔들리지 않는다. 그래서 본문 스켈레톤만 렌더한다.
+ */
+export function TeamMatchDetailPageSkeleton() {
+  return (
+    <>
+      <p className="sr-only" role="status">팀매치 정보를 불러오는 중이에요.</p>
+      <PageSkeleton variant="detail" />
+    </>
+  );
+}
+
 export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewModel }) {
   const router = useRouter();
   const { match, mode } = model;

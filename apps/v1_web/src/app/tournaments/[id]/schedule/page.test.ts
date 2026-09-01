@@ -26,10 +26,22 @@ const notFound = vi.fn(() => {
 
 vi.mock('next/navigation', () => ({ notFound: () => notFound() }));
 vi.mock('next/dynamic', () => ({ default: () => () => null }));
-vi.mock('@/lib/seo', () => ({
+/**
+ * **메타데이터 빌더는 실제 구현을 쓴다 — mock 하지 않는다.**
+ *
+ * 처음엔 손으로 흉내냈는데 **둘 다 실물과 달랐다**:
+ * ```
+ * 내 mock                        실제 (lib/seo.ts)
+ * public  → robots: undefined    robots: { index: true, follow: true }
+ * noindex → {index,follow}       { index: false, follow: false, **nocache: true** }
+ * ```
+ * 그러면 *"색인 가능"* 의 의미가 코드베이스 표준과 달라지고, 실제 빌더가 바뀌어도 이 테스트는
+ * 안 깨진다 — **픽스처가 실물과 다르면 여기서 통과하는 것이 프로덕션을 증명하지 못한다.**
+ * 네트워크만 막고(`fetchPublicV1`) 나머지는 실물을 쓴다.
+ */
+vi.mock('@/lib/seo', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/seo')>()),
   fetchPublicV1: (...args: unknown[]) => fetchPublicV1(...args),
-  buildNoIndexMetadata: (title: string) => ({ title, robots: { index: false, follow: false } }),
-  buildPublicMetadata: ({ title }: { title: string }) => ({ title, robots: undefined }),
 }));
 
 const detail = (overrides: Record<string, unknown> = {}) => ({
@@ -99,7 +111,8 @@ describe('일정 페이지 메타데이터', () => {
 
     const meta = await generateMetadata({ params: Promise.resolve({ id: 'lg-1' }) });
 
-    expect(meta.robots).toEqual({ index: false, follow: false });
+    // 실제 `buildNoIndexMetadata` 의 형태 그대로 — `nocache` 까지 본다.
+    expect(meta.robots).toEqual({ index: false, follow: false, nocache: true });
   });
 
   it('대회는 색인 가능하다 — 대조군', async () => {
@@ -108,6 +121,7 @@ describe('일정 페이지 메타데이터', () => {
 
     const meta = await generateMetadata({ params: Promise.resolve({ id: 't-1' }) });
 
-    expect(meta.robots).toBeUndefined();
+    // 이 저장소의 "색인 가능" 은 **명시적 robots** 다(`undefined` 가 아니다).
+    expect(meta.robots).toEqual({ index: true, follow: true });
   });
 });

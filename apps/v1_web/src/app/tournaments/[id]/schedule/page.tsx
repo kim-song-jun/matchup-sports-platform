@@ -4,13 +4,19 @@ import { notFound } from 'next/navigation';
 import { buildNoIndexMetadata, buildPublicMetadata, fetchPublicV1 } from '@/lib/seo';
 import type { V1TournamentDetail } from '@/types/api';
 
-// 없는 대회에서 이 라우트만 HTTP 200 을 반환하던 결함의 실제 원인(2026-08-09 alpha 실측으로 격리):
-// page.tsx 코드도(#312, 형제와 코드-동일해도 200), 라우트 경로도(#314, 동일 내용을 schedule-view 로
-// 옮겨도 200) 원인이 아니었다 — 유일하게 남은 차이인 **SchedulePageClient 클라이언트 컴포넌트의 import
-// 그래프**가 이 서버 컴포넌트 번들에 정적으로 들어오면서, notFound() 응답이 200 으로 커밋되게 만들었다
-// (형제 results 의 클라이언트는 그렇지 않다). 그래서 **`next/dynamic` 으로 lazy-load** 해 그 그래프를
-// 페이지의 초기 서버 렌더 경로에서 분리한다 — 존재하는 대회에선 그대로 렌더되고(SSR 유지), notFound
-// 경로는 그 그래프를 건드리지 않는다. 200→404 실제 해소는 프로덕션 런타임이라 배포 후 alpha 재측정으로 확정.
+// ⚠️ **이 lazy-load 는 가설이었고, 재측정으로 반증됐다 — 원인은 아직 미확정이다.**
+//
+// 없는 대회에서 이 라우트만 HTTP 200 을 반환하는 결함이 있고, 지금까지 다섯 가설이 전부 실패했다:
+//   #298 notFound 게이트 정렬 · #302 generateMetadata 정렬 · #305 metadata 에서 throw ·
+//   #307 force-dynamic · 그리고 아래 `next/dynamic` lazy-load(#312 계열).
+//
+// 이 lazy-load 는 *"SchedulePageClient 의 import 그래프가 서버 번들에 들어와 200 으로 커밋시킨다"* 는
+// 가설로 넣은 것이고, 원 주석은 그것을 **"실제 원인"** 이라고 적었다. **2026-09-01 alpha 재측정에서
+// 반증됐다:**
+//   없는 id  /schedule 200  ·  형제 /bracket 404  ·  /results 404      ← 여전히 이 라우트만 200
+//
+// **그러니 이 주석을 근거로 "원인은 밝혀졌다" 고 읽지 마라.** lazy-load 자체는 해가 없어 남겨 두지만
+// (SSR 은 유지된다) 결함을 고치지는 못한다. 다음 가설을 세울 때 위 다섯 개를 다시 시도하지 마라.
 const SchedulePageClient = dynamic(() =>
   import('./schedule-page-client').then((mod) => mod.SchedulePageClient),
 );

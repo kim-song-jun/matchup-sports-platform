@@ -829,6 +829,23 @@ describe('BracketPageContent — 정규 리그 거울 행(format=group_knockout,
     expect(screen.queryByText('성수 FC')).not.toBeInTheDocument();
   });
 
+  /**
+   * **못 불러온 것을 "없다" 로 말하면 안 된다.** 순위를 `/schedule` 에 의존하게 만들면서
+   * 그 쿼리의 로딩·에러를 안 가르면, 빈 배열이 그대로 *"순위 집계 전이에요"* 로 읽힌다 —
+   * 이 PR 이 고치려던 바로 그 증상이 원인만 바뀌어 되살아난다. 에러일 때 특히 나쁘다:
+   * 사용자가 다시 시도할 이유를 못 찾는다.
+   *
+   * 이 테스트 환경은 네트워크를 안 태우므로 캐시를 안 넣으면 쿼리가 **에러**로 정착한다.
+   */
+  it('순위를 못 불러왔으면 "없다" 가 아니라 못 불러왔다고 말한다', async () => {
+    renderBracketStandingsTab(mirrorLeague());
+
+    expect(await screen.findByText('순위를 불러오지 못했어요.')).toBeInTheDocument();
+    // 거짓 빈 상태를 함께 막는다 — 둘 다 안 떠야 고쳐진 것이다.
+    expect(screen.queryByText('순위 집계 전이에요')).not.toBeInTheDocument();
+    expect(screen.queryByText('경기 일정이 아직 없어요.')).not.toBeInTheDocument();
+  });
+
   it('안내 문구에서 조별리그·결선을 말하지 않는다', () => {
     renderBracketPage(mirrorLeague());
 

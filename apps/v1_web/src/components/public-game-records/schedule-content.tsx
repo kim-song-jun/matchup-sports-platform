@@ -530,6 +530,16 @@ export function toStandingsRows(rows: readonly PublicStandingRow[]): TournamentS
  * 정보가 없으므로 진출선 하이라이트는 항상 없음(advance=null) — 원래도 이
  * 탭엔 진출 배지가 없었으니 동작 변화 없음.
  */
+/**
+ * 순위표 접근성 라벨. **그룹명이 이미 "…순위" 로 끝나면 또 붙이지 않는다** — 티어가 없는
+ * 단발 리그의 `groupName` 이 "리그 순위" 라, 그대로 조합하면 스크린리더가
+ * *"리그 순위 순위표"* 로 읽는다(눈으로는 안 보이는 자리라 캡처로도 안 잡힌다).
+ */
+function standingsAriaLabel(groupName: string, suffix: '' | '표' = ''): string {
+  const base = groupName.endsWith('순위') ? groupName : `${groupName} 순위`;
+  return `${base}${suffix}`;
+}
+
 function StandingsTable({
   rows,
   showGroupLabel = true,
@@ -552,7 +562,7 @@ function StandingsTable({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {Array.from(groups.entries()).map(([groupId, group]) => (
-        <section key={groupId} aria-label={`${group.groupName} 순위`}>
+        <section key={groupId} aria-label={standingsAriaLabel(group.groupName)}>
           {showGroupLabel ? (
             <div
               style={{
@@ -570,7 +580,7 @@ function StandingsTable({
           <TournamentStandingsTable
             rows={toStandingsRows(group.rows)}
             advance={null}
-            ariaLabel={`${group.groupName} 순위표`}
+            ariaLabel={standingsAriaLabel(group.groupName, '표')}
           />
         </section>
       ))}

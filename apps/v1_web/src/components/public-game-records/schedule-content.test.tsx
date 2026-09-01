@@ -694,6 +694,25 @@ describe('ScheduleContent — 정규 리그 순위 제목', () => {
     expect(screen.getAllByText('리그 순위')).toHaveLength(1);
   });
 
+  /**
+   * **눈으로는 안 보이는 자리다.** 그룹명이 이미 "리그 순위" 인데 라벨 조합이 "순위" 를 또
+   * 붙여 스크린리더가 *"리그 순위 순위표"* 로 읽었다. 캡처로도 안 잡힌다.
+   */
+  it('그룹명이 이미 "순위" 로 끝나면 접근성 라벨에 또 붙이지 않는다', () => {
+    const data = makeData({ standings: [leagueStandings('리그 순위', 'lg-1', '성수 FC')] as never });
+    render(<ScheduleContent tournamentId="lg-1" data={data} isRegularLeague />);
+
+    expect(screen.getByRole('region', { name: '리그 순위' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '리그 순위 순위' })).not.toBeInTheDocument();
+  });
+
+  it('대조군: "A조" 처럼 안 끝나면 "순위" 를 붙인다 — 규칙을 통째로 없앤 게 아니다', () => {
+    const data = makeData({ standings: [leagueStandings('A조', 'g-1', '망원 FC')] as never });
+    render(<ScheduleContent tournamentId="t-1" data={data} />);
+
+    expect(screen.getByRole('region', { name: 'A조 순위' })).toBeInTheDocument();
+  });
+
   it('티어가 있는 리그는 안쪽 라벨을 그린다 — "1부"·"2부" 는 제목과 다른 말이다', () => {
     const data = makeData({
       standings: [

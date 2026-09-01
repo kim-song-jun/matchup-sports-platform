@@ -458,9 +458,22 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
   // 정규 리그의 "경기가 있나" 는 대회 축 `fixtures` 가 아니라 `/schedule` 항목 수로 센다 —
   // 거울엔 대회 축 대진이 없어 `fixtures.length` 가 늘 0 이고, 그러면 경기가 있는 리그에도
   // "경기 일정이 아직 없어요" 가 뜬다(alpha 실측: 일정 탭엔 1건이 보이는데 순위 탭은 그렇게 적었다).
-  const leagueHasNoFixtures = isRegularLeague ? leagueScheduleItemCount === 0 : fixtures.length === 0;
+  /**
+   * 리그 순위가 **아직 안 온 상태**와 **정말 없는 상태**를 가른다. 안 가르면 로딩·에러 중에
+   * `standings` 가 빈 배열이라 *"순위 집계 전이에요"·"경기 일정이 아직 없어요"* 가
+   * **거짓으로** 뜬다 — 이 PR 이 고치려던 바로 그 증상이 원인만 바뀌어 되살아난다.
+   * 에러일 때 특히 나쁘다: 못 불러온 것을 *"없다"* 로 말하면 사용자가 다시 시도할 이유를
+   * 못 찾는다.
+   */
+  const leagueScheduleSettled = isRegularLeague
+    ? !leagueSchedule.isLoading && !leagueSchedule.isError
+    : true;
+  const leagueHasNoFixtures = isRegularLeague
+    ? leagueScheduleSettled && leagueScheduleItemCount === 0
+    : fixtures.length === 0;
   const hasStandingsColumn = isLeague
-    ? allLeagueRows.length > 0 || leagueHasNoFixtures
+    // 로딩·에러 중에도 칼럼은 유지한다 — 안 그러면 칼럼이 나타났다 사라지며 레이아웃이 튄다.
+    ? allLeagueRows.length > 0 || leagueHasNoFixtures || !leagueScheduleSettled
     : format === 'group_knockout' && hasGroupStandings;
   // 리그엔 토너먼트 대진이 없다. isLeague 를 안 빼면 거울 행(group_knockout)이 여기서
   // 참이 되어 **빈 대진표 칼럼**이 생긴다 — 이 화면이 리그에서 가장 크게 틀어지는 자리다.
@@ -580,7 +593,19 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
                   <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>
                     리그 순위
                   </h3>
-                  <LeagueStandingsSection rows={allLeagueRows} />
+                  {isRegularLeague && !leagueScheduleSettled ? (
+                    leagueSchedule.isError ? (
+                      <div className="tm-hub-empty">순위를 불러오지 못했어요.</div>
+                    ) : (
+                      <div
+                        className="tm-skeleton"
+                        style={{ height: 160, borderRadius: 'var(--radius-control)' }}
+                        aria-label="순위 불러오는 중"
+                      />
+                    )
+                  ) : (
+                    <LeagueStandingsSection rows={allLeagueRows} />
+                  )}
                 </section>
               )}
 

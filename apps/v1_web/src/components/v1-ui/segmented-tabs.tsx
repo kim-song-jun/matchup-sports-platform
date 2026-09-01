@@ -70,22 +70,34 @@ export interface SegmentedTabsProps {
 export function SegmentedTabs({ items, activeId, onSelect, ariaLabel, role, size = 'md', className }: SegmentedTabsProps) {
   const count = items.length;
   const activeIndex = items.findIndex((item) => item.id === activeId);
+
+  // 항목이 없으면 아무것도 그리지 않는다. --tm-segmented-count: 0 을 넘기면
+  // grid-template-columns: repeat(0, 1fr) 과 thumb 의 calc(100% / 0) 이 **둘 다
+  // 무효 선언**이 되어 조용히 버려진다 — 콘솔 에러 없이 트랙만 무너지므로 원인을
+  // 찾기 어렵다. 빈 세그먼트 컨트롤은 보여줄 것도 없으니 여기서 끊는다.
+  if (count === 0) return null;
   const itemRole = role === 'radiogroup' ? 'radio' : role === 'tablist' ? 'tab' : undefined;
 
   const trackClassName = ['tm-segmented-tabs', size === 'sm' ? 'tm-segmented-tabs-sm' : '', className]
     .filter(Boolean)
     .join(' ');
 
-  // role 이 없으면(competition-kind-segment/match-type-segment 부류 — 위젯이 아니라
-  // 페이지를 바꾸는 순수 라우팅 링크) <nav aria-label> 로 렌더한다. <div aria-label>
-  // 은 role 없이는 접근성 트리에 이름이 노출되지 않는다 — role="tablist"/"radiogroup"
-  // 일 때는 그 role 자체가 이름을 받을 수 있으므로 평범한 <div> 로 충분하다.
-  const Container = role ? 'div' : 'nav';
+  // 컨테이너는 **항목이 무엇인지**로 정한다(role 유무가 아니라).
+  //   · role 이 있으면        → <div role={role}>. role 자체가 이름을 받는다.
+  //   · role 없고 전부 링크면 → <nav>. 페이지를 바꾸는 하위 내비게이션이다
+  //                             (competition-kind-segment/match-type-segment 부류).
+  //   · role 없고 버튼이 섞이면 → <div role="group">. <nav> 안의 <button> 은
+  //                             "이동한다"고 알려 놓고 이동하지 않는 거짓 예고다.
+  // role 없는 <div> 에 aria-label 만 붙이면 접근성 트리에 이름이 노출되지 않으므로,
+  // 마지막 경우에는 이름을 받을 수 있는 role="group" 을 함께 준다.
+  const allLinks = items.every((item) => Boolean(item.href));
+  const Container = role ? 'div' : allLinks ? 'nav' : 'div';
+  const containerRole = role ?? (allLinks ? undefined : 'group');
 
   return (
     <Container
       className={trackClassName}
-      role={role}
+      role={containerRole}
       aria-label={ariaLabel}
       style={{ '--tm-segmented-count': count } as CSSProperties}
     >

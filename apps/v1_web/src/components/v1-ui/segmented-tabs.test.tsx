@@ -103,3 +103,25 @@ describe('SegmentedTabs — 클릭·라우팅 동작', () => {
     expect(screen.queryAllByRole('button')).toHaveLength(0);
   });
 });
+
+describe('SegmentedTabs — 컨테이너는 "항목이 무엇인지"로 정해진다(role 유무가 아니라)', () => {
+  it('role 없이 버튼 항목만 오면 <nav> 가 아니라 role="group" 으로 렌더된다', () => {
+    // <nav> 는 "누르면 이동한다"는 예고다. 항목이 href 없는 버튼이면 이동하지 않으므로
+    // 거짓 예고가 된다. 그렇다고 role 없는 <div aria-label> 로 두면 접근성 트리에
+    // 이름이 아예 안 뜬다 — 그래서 이름을 받을 수 있는 role="group" 을 준다.
+    render(<SegmentedTabs items={itemsOf(2)} activeId="tab-0" ariaLabel="보기 방식" />);
+
+    expect(screen.queryByRole('navigation')).toBeNull();
+    expect(screen.getByRole('group', { name: '보기 방식' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button')).toHaveLength(2);
+  });
+
+  it('항목이 하나도 없으면 아무것도 그리지 않는다', () => {
+    // --tm-segmented-count: 0 을 넘기면 repeat(0, 1fr) 과 calc(100% / 0) 이 둘 다
+    // 무효 선언이라 조용히 버려진다 — 콘솔 에러 없이 트랙만 무너져 원인 추적이 어렵다.
+    const { container } = render(<SegmentedTabs items={[]} activeId="none" ariaLabel="빈 탭" />);
+
+    expect(container.querySelector('.tm-segmented-tabs')).toBeNull();
+    expect(container.querySelector('.tm-segmented-thumb')).toBeNull();
+  });
+});

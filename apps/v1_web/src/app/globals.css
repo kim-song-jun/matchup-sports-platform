@@ -2857,10 +2857,8 @@ label.tm-btn:focus-within {
  * SegmentedTabs 컴포넌트(components/v1-ui/segmented-tabs.tsx)의 미끄러지는 thumb —
  * 콘텐츠 자체는 더 이상 전환 없이 즉시 바뀐다.
  *
- * 소비처 admin 4곳(app/admin/settings, content, league-matches, monitoring/
- * monitoring-client)은 아직 이 클래스명을 참조한다 — 지금은 존재하지 않는 클래스라
- * 조용히 무시되고 패널이 페이드 없이 즉시 나타난다(하드 에러 아님). 그 4곳의
- * className 정리는 후속 작업이다. */
+ * 소비처(app/admin/settings, content, league-matches, monitoring/monitoring-client)
+ * 의 className 도 같은 변경에서 모두 걷어냈다 — 참조 0건이다. 되살리지 말 것. */
 
 @keyframes fade-in {
   from {

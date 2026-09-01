@@ -111,3 +111,52 @@ describe('TournamentCard — 커버 이미지 fallback', () => {
     expect(screen.getByLabelText('성별 카테고리: 성별 구분 없음')).toBeInTheDocument();
   });
 });
+
+/**
+ * **정원은 대회에만 있다 — 리그 카드에 쓰레기 값이 뜨지 않는지 본다.**
+ *
+ * 거울 행은 `v1_tournaments` 에 살고 `team_count` 가 `@default(8)` 이라, 서버가 생략하지
+ * 않으면 리그 카드에 **"8팀"** 이 뜬다(alpha 실측: 리그 4개 전부 8, 실제 참가는 2팀).
+ * 그리고 정원 진행바는 리그에서 **항상 100%** 로 보인다 — 리그 목록이 같은 이유로 이미
+ * 진행바를 포기했다(`league-matches-list-client.tsx:200`).
+ *
+ * 그래서 **문자열이 아니라 컨테이너(진행바)의 부재**로 단언한다. 문자열 부재만 보면
+ * "무엇이 있으면 안 되는지" 를 안 보게 된다.
+ */
+describe('TournamentCard — 리그는 정원을 그리지 않는다', () => {
+  /** 리그 거울: 서버가 `teamCount` 를 생략하고 `kind` 로 종류를 말한다. */
+  const leagueItem = () => {
+    const item = buildItem({ kind: 'regular_league', confirmedCount: 2 });
+    delete (item as { teamCount?: number }).teamCount;
+    return item;
+  };
+
+  it('리그 카드에 정원 진행바가 없다', () => {
+    render(<TournamentCard item={leagueItem()} />);
+    expect(screen.queryByRole('progressbar')).toBeNull();
+  });
+
+  it('대회 카드에는 정원 진행바가 있다 — 대조군', () => {
+    // 이 대조군이 없으면 진행바를 통째로 지워도 위 테스트가 통과한다.
+    render(<TournamentCard item={buildItem({ teamCount: 16, confirmedCount: 4 })} />);
+    expect(screen.getByRole('progressbar')).toBeInTheDocument();
+  });
+
+  it('리그 카드는 참가 팀 수를 confirmedCount 로 적는다 — "/정원" 이 없다', () => {
+    const { container } = render(<TournamentCard item={leagueItem()} />);
+    const text = (container.textContent ?? '').replace(/\s+/g, ' ');
+    expect(text).toContain('2');
+    expect(text).toContain('팀 참가');
+    // 스키마 기본값 8 이 새어 나오면 여기서 잡힌다.
+    expect(text).not.toContain('8');
+    expect(text).not.toContain('팀 확정');
+  });
+
+  it('대회 카드는 확정/정원을 적는다 — 대조군', () => {
+    const { container } = render(<TournamentCard item={buildItem({ teamCount: 16, confirmedCount: 4 })} />);
+    const text = (container.textContent ?? '').replace(/\s+/g, ' ');
+    expect(text).toContain('16');
+    expect(text).toContain('팀 확정');
+    expect(text).not.toContain('팀 참가');
+  });
+});

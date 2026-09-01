@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { createContext, useContext } from 'react';
 import {
   ChevronLeftIcon,
   HomeIcon,
@@ -66,7 +67,30 @@ type AppChromeProps = {
   titleAsHeading?: boolean;
 };
 
-export function AppChrome({
+/**
+ * 상위(AppShellFrame)가 이미 AppChrome을 렌더했음을 하위의 또 다른 AppChrome 호출이
+ * 감지하는 신호. 마이그레이션 도중 아직 자체 <AppChrome> 래퍼를 못 걷어낸 페이지가
+ * 섞여 있어도 topbar/bottomnav가 두 번 그려지지 않게 하는 안전망이다. **정상 절차라면
+ * 이 분기가 실행될 일이 없다** — 테이블 등록과 페이지 자체 AppChrome 제거를 같은
+ * 커밋에서 하기 때문. 이 분기가 실행 중이라는 건 그 규율이 깨졌다는 신호이므로 오래
+ * 방치하면 안 된다 — 안쪽 호출에만 있던 floatingSlot/동적 title 같은 props는 여기서
+ * 조용히 버려진다.
+ */
+export const ShellMountedContext = createContext(false);
+
+export function AppChrome(props: AppChromeProps) {
+  const alreadyMounted = useContext(ShellMountedContext);
+  if (alreadyMounted) {
+    return <>{props.children}</>;
+  }
+  return (
+    <ShellMountedContext.Provider value={true}>
+      <AppChromeInner {...props} />
+    </ShellMountedContext.Provider>
+  );
+}
+
+function AppChromeInner({
   title,
   children,
   floatingSlot,

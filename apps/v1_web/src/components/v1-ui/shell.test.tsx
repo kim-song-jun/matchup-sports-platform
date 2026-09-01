@@ -86,3 +86,22 @@ describe('AppChrome mobile page title semantics', () => {
     expect(screen.getByRole('heading', { level: 1, name: '알림 설정' })).toBeInTheDocument();
   });
 });
+
+describe('AppChrome 이중 마운트 가드 (§2.2 마이그레이션 안전망)', () => {
+  it('AppChrome 안에 또 다른 AppChrome이 중첩되면 안쪽은 children만 통과시킨다', () => {
+    render(
+      <AppChrome title="바깥" activeTab="home" showNotifications={false}>
+        <AppChrome title="안쪽(마이그레이션 잔재)" activeTab="matches" showNotifications={false}>
+          <div data-testid="leaf">내용</div>
+        </AppChrome>
+      </AppChrome>,
+    );
+
+    // bottom nav가 정확히 1개 — 2개면 이중 셸이 실제로 렌더된 것(구조적 회귀).
+    expect(screen.getAllByRole('navigation', { name: '주요 메뉴' })).toHaveLength(1);
+    expect(screen.getByText('바깥')).toBeInTheDocument();
+    expect(screen.queryByText('안쪽(마이그레이션 잔재)')).not.toBeInTheDocument();
+    // 안쪽 children(leaf)은 그대로 화면에 나온다 — passthrough가 콘텐츠까지 지우지 않음.
+    expect(screen.getByTestId('leaf')).toBeInTheDocument();
+  });
+});

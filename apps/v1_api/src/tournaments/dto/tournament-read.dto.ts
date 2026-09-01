@@ -18,6 +18,10 @@ import {
 /**
  * 소비자 대회 목록 쿼리 — 공개 노출 status(open/closed/in_progress/completed)만 필터.
  * draft/cancelled는 노출 제외(서비스 계층 고정).
+ *
+ * ⚠️ **이 상수는 캠페인 조회 등 다른 곳도 쓴다**(`tournament-campaign-read.service.ts`).
+ * 목록 필터에 값을 더하려고 여기를 늘리면 그 소비처의 공개 범위까지 함께 넓어진다 —
+ * 그래서 `draft` 는 이 배열이 아니라 **아래 목록 전용 배열**에만 더한다.
  */
 export const PUBLIC_TOURNAMENT_STATUSES = [
   'open',
@@ -27,10 +31,22 @@ export const PUBLIC_TOURNAMENT_STATUSES = [
 ] as const;
 export type PublicTournamentStatus = (typeof PUBLIC_TOURNAMENT_STATUSES)[number];
 
+/**
+ * **목록 필터가 받는 값.** 위 공개 status 에 `draft` 를 더한다 — 정규 리그의 `draft` 는
+ * **"예정"** 이고 사용자가 고를 수 있어야 하는 상태이기 때문이다(2026-09-01 확정).
+ *
+ * ⚠️ **여기서 받는다는 것이 "누구에게나 보인다" 는 뜻이 아니다.** 서비스가 `draft` 를
+ * **정규 리그로 좁혀서** 적용한다(`tournaments-read.service.ts`) — 대회의 `draft`(운영자
+ * 준비 중)는 이 값을 줘도 계속 안 나온다. 그 분리가 없으면 이 한 줄이 대회 비공개를
+ * 통째로 여는 구멍이 된다.
+ */
+export const COMPETITION_LIST_STATUSES = [...PUBLIC_TOURNAMENT_STATUSES, 'draft'] as const;
+export type CompetitionListStatus = (typeof COMPETITION_LIST_STATUSES)[number];
+
 export class TournamentListQueryDto {
   @IsOptional()
-  @IsIn(PUBLIC_TOURNAMENT_STATUSES)
-  status?: PublicTournamentStatus;
+  @IsIn(COMPETITION_LIST_STATUSES)
+  status?: CompetitionListStatus;
 
   @IsOptional()
   @IsUUID()

@@ -56,6 +56,20 @@ export interface LeagueMirrorSource {
   tier: number | null;
   seasonNo: number | null;
   sportCode: string;
+  /**
+   * **리그가 실제로 만들어진 시각.** 거울에 그대로 옮긴다.
+   *
+   * 안 옮기면 `V1Tournament.createdAt` 의 스키마 기본값 `now()` 가 남아 **백필을 실행한
+   * 시각**이 박힌다. 그 값은 아무 뜻도 없는데 **목록 정렬을 지배한다**:
+   * `orderBy: [{ createdAt: 'desc' }, { id: 'desc' }]` 라서, 한 번에 백필된 리그가 통째로
+   * 최신이 되어 통합 목록 첫 페이지를 전부 차지한다(2026-09-01 alpha 실측: 리그 50건이
+   * 전부 `2026-08-30T18:43:43`, 대회는 12일 전 → `?kind=all` 첫 50건이 전부 리그).
+   *
+   * `V1League` 에도 `@@index([createdAt desc, id desc])` 가 있어 **리그 목록도 같은 축으로
+   * 정렬한다** — 원본 시각을 옮기면 두 목록의 순서가 일치한다. 새로 만드는 성질이 아니라
+   * 원래 그래야 했던 상태다.
+   */
+  createdAt: Date;
 }
 
 /**
@@ -80,6 +94,9 @@ export function leagueMirrorCreateData(
     tier: league.tier,
     seasonNo: league.seasonNo,
     competitionConfigVersionId: competitionConfigVersionIdForSport(league.sportCode),
+    // 원본 시각을 그대로 쓴다 — 생략하면 `@default(now())` 가 백필/생성 시각을 박고,
+    // 그 값이 목록 정렬(`createdAt desc`)을 지배한다. 위 필드 주석 참조.
+    createdAt: league.createdAt,
   };
 }
 
@@ -95,6 +112,7 @@ export const LEAGUE_MIRROR_SELECT = {
   seriesId: true,
   tier: true,
   seasonNo: true,
+  createdAt: true,
   sport: { select: { code: true } },
 } as const;
 
@@ -110,6 +128,7 @@ export function toMirrorSource(row: {
   seriesId: string | null;
   tier: number | null;
   seasonNo: number | null;
+  createdAt: Date;
   sport: { code: string } | null;
 }): LeagueMirrorSource {
   return {
@@ -123,6 +142,7 @@ export function toMirrorSource(row: {
     seriesId: row.seriesId,
     tier: row.tier,
     seasonNo: row.seasonNo,
+    createdAt: row.createdAt,
     sportCode: row.sport?.code ?? '',
   };
 }

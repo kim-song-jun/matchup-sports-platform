@@ -17,12 +17,22 @@ export const v1Keys = {
   notice: (noticeId: string) => [...v1Keys.all, 'notices', noticeId] as const,
   matches: (filters?: Record<string, unknown>) => [...v1Keys.all, 'matches', filters ?? {}] as const,
   match: (matchId: string) => [...v1Keys.all, 'matches', matchId] as const,
+  /**
+   * 매치 목록·상세를 함께 덮는 접두사 — **캐시 탐색 전용**(무효화에도 쓸 수 있다).
+   * 상세 진입 시 이미 받아 둔 목록 항목을 찾아 초기 표시값으로 쓰는 데 필요하다
+   * (`findInListCache`, lib/list-cache-seed.ts).
+   */
+  matchesAll: () => [...v1Keys.all, 'matches'] as const,
   myRecentVenues: () => [...v1Keys.all, 'matches', 'me', 'recent-venues'] as const,
   teams: (filters?: Record<string, unknown>) => [...v1Keys.all, 'teams', filters ?? {}] as const,
   team: (teamId: string) => [...v1Keys.all, 'teams', teamId] as const,
+  /** 팀 목록·상세 공통 접두사 — 캐시 탐색용(`matchesAll` 과 같은 목적). */
+  teamsAll: () => [...v1Keys.all, 'teams'] as const,
   teamRecentVenues: (teamId: string) => [...v1Keys.all, 'teams', teamId, 'recent-venues'] as const,
   teamMatches: (filters?: Record<string, unknown>) => [...v1Keys.all, 'team-matches', filters ?? {}] as const,
   teamMatch: (teamMatchId: string) => [...v1Keys.all, 'team-matches', teamMatchId] as const,
+  /** 팀매치 목록·상세 공통 접두사 — 캐시 탐색용(`matchesAll` 과 같은 목적). */
+  teamMatchesAll: () => [...v1Keys.all, 'team-matches'] as const,
   teamContacts: (teamId: string, filters?: Record<string, unknown>) =>
     [...v1Keys.team(teamId), 'contacts', filters ?? {}] as const,
   /**

@@ -279,6 +279,10 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
     return <TeamMatchDetailPageSkeleton />;
   }
 
+  // matches-client.tsx 와 같은 처리 — 목록 캐시에서 승계한 표시용 데이터로 그리는 동안은
+  // 뷰어 상태·신청 팀 목록이 없으므로 상태 라벨과 행동 버튼을 잠근다.
+  const seeding = query.isPlaceholderData;
+
   const model: TeamMatchDetailViewModel = {
     ...fallback,
     match: {
@@ -319,9 +323,9 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
       ),
     },
     mode: toDetailMode(viewerState, getStatus(query.data)),
-    applyLabel: applyLabel(viewerState, getStatus(query.data), selectedEligibility, isGuest, hasNoTeam, eligibility.isSuccess),
-    applyPending: applyTeamMatch.isPending || withdrawTeamMatch.isPending,
-    hostActions: canManageHostTeam
+    applyLabel: seeding ? '불러오는 중' : applyLabel(viewerState, getStatus(query.data), selectedEligibility, isGuest, hasNoTeam, eligibility.isSuccess),
+    applyPending: seeding || applyTeamMatch.isPending || withdrawTeamMatch.isPending,
+    hostActions: !seeding && canManageHostTeam
       ? buildHostActions({
           status: getStatus(query.data),
           // 리그 대진은 서버가 팀 단독 취소를 409 LEAGUE_FIXTURE_HOST_CANCEL_FORBIDDEN 으로
@@ -334,13 +338,13 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
           pending: closeTeamMatch.isPending || reopenTeamMatch.isPending || cancelTeamMatch.isPending,
         })
       : undefined,
-    resultAction: buildResultAction(teamMatchId, getStatus(query.data), canManageHostTeam, canManageOpponentTeam),
+    resultAction: seeding ? undefined : buildResultAction(teamMatchId, getStatus(query.data), canManageHostTeam, canManageOpponentTeam),
     reviewAction: buildReviewAction(teamMatchId, getStatus(query.data), isParticipantMember),
-    statusLabel: statusLabel(viewerState, getStatus(query.data)),
+    statusLabel: seeding ? undefined : statusLabel(viewerState, getStatus(query.data)),
     chatLabel: chatLabel(canManageHostTeam, canManageOpponentTeam),
-    chatPending: resolveChatRoom.isPending,
+    chatPending: seeding || resolveChatRoom.isPending,
     chatError,
-    onChat: canOpenTeamMatchChat(canManageHostTeam, canManageOpponentTeam)
+    onChat: !seeding && canOpenTeamMatchChat(canManageHostTeam, canManageOpponentTeam)
       ? () => {
           setChatError(null);
           resolveChatRoom.mutate(
@@ -355,7 +359,7 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
     onShare: () => shareTeamMatch(query.data),
     onNotify: () => router.push('/notifications'),
     lineupHref: ownTeamId ? `/team-matches/${teamMatchId}/lineup` : undefined,
-    onApply: getApplyAction({
+    onApply: seeding ? undefined : getApplyAction({
       viewerState,
       status: getStatus(query.data),
       selectedTeamId: selectedEligibility?.teamId,

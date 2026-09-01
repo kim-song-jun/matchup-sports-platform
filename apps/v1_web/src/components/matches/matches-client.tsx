@@ -228,6 +228,11 @@ export function MatchDetailPageClient({ matchId }: { matchId: string }) {
     return <MatchDetailPageSkeleton />;
   }
 
+  // 목록 캐시에서 승계한 표시용 데이터로 그리는 중. 제목·장소·날짜는 진짜지만 뷰어
+  // 상태·참가자는 아직 없다 — 이 동안 상태 라벨과 행동 버튼을 잠가, 이미 신청한 매치에
+  // "참가 신청"이 뜨는 식의 잘못된 안내를 막는다.
+  const seeding = query.isPlaceholderData;
+
   const model: MatchDetailViewModel = {
     ...fallback,
     match: {
@@ -254,12 +259,12 @@ export function MatchDetailPageClient({ matchId }: { matchId: string }) {
     },
     mode: toDetailMode(viewerState, getStatus(query.data)),
     reviewAction: buildMatchReviewAction(matchId, viewerState, getStatus(query.data)),
-    applyLabel: applyLabel(viewerState, getStatus(query.data), eligibility.data?.eligible, eligibility.data?.message),
-    applyPending: applyMatch.isPending || withdrawMatch.isPending,
-    statusLabel: statusLabel(viewerState, getStatus(query.data)),
+    applyLabel: seeding ? '불러오는 중' : applyLabel(viewerState, getStatus(query.data), eligibility.data?.eligible, eligibility.data?.message),
+    applyPending: seeding || applyMatch.isPending || withdrawMatch.isPending,
+    statusLabel: seeding ? undefined : statusLabel(viewerState, getStatus(query.data)),
     chatLabel: chatLabel(viewerState),
-    chatPending: resolveChatRoom.isPending,
-    onChat: canOpenMatchChat(viewerState)
+    chatPending: seeding || resolveChatRoom.isPending,
+    onChat: !seeding && canOpenMatchChat(viewerState)
       ? () => resolveChatRoom.mutate(
           { targetType: 'match', targetId: matchId },
           { onSuccess: (room) => router.push(chatRoomHref(room.roomId, room.route)) },
@@ -267,7 +272,7 @@ export function MatchDetailPageClient({ matchId }: { matchId: string }) {
       : undefined,
     onShare: () => shareMatch(query.data),
     onNotify: () => router.push('/notifications'),
-    onApply: getApplyAction({
+    onApply: seeding ? undefined : getApplyAction({
       viewerState,
       eligible: eligibility.data?.eligible,
       applicationId: eligibility.data?.applicationId ?? query.data.viewer?.applicationId,

@@ -47,6 +47,9 @@ vi.mock('./matches-page', () => ({
       {model.reviewAction && <a href={model.reviewAction.href}>{model.reviewAction.label}</a>}
       <div data-testid="address">{model.match.address}</div>
       <div data-testid="description">{model.match.description}</div>
+      <div data-testid="title">{model.match.title}</div>
+      <div data-testid="status-label">{model.statusLabel}</div>
+      <div data-testid="apply-label">{model.applyLabel}</div>
       <div data-testid="rules">{model.match.rules.join('|')}</div>
       <div data-testid="participants">{model.match.participants.map((p) => p.name).join('|')}</div>
     </div>
@@ -313,5 +316,41 @@ describe('MatchDetailPageClient — 로딩 중 목업 노출 방지', () => {
     render(<MatchDetailPageClient matchId="match-1" />);
 
     expect(screen.getByTestId('participants').textContent).toBe('호스트');
+  });
+});
+
+describe('MatchDetailPageClient — 목록 캐시 승계(placeholder) 중 행동 잠금', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useV1MatchApplicationEligibilityMock.mockReturnValue({ data: { eligible: true, applicationId: null } });
+  });
+
+  it('목록에서 승계한 데이터로 그리는 동안 제목은 보여주되 참가 신청은 잠근다', () => {
+    // 목록 응답에는 뷰어 상태가 없다 — 그 상태로 CTA를 그리면 이미 신청한 매치에도
+    // "참가 신청"이 떠서 사용자를 잘못 이끈다.
+    useV1MatchMock.mockReturnValue({
+      data: { ...baseMatch, viewerState: undefined, viewer: undefined },
+      isError: false,
+      isPlaceholderData: true,
+    });
+
+    render(<MatchDetailPageClient matchId="match-1" />);
+
+    expect(screen.getByTestId('title').textContent).toBe('풋살 매치');
+    expect(screen.getByTestId('apply-label').textContent).toBe('불러오는 중');
+    expect(screen.getByTestId('status-label').textContent).toBe('');
+    expect(screen.queryByRole('button', { name: '참가 신청' })).toBeNull();
+  });
+
+  it('실제 응답이 도착하면(placeholder 해제) 참가 신청이 다시 열린다', () => {
+    useV1MatchMock.mockReturnValue({
+      data: { ...baseMatch, viewerState: 'none' },
+      isError: false,
+      isPlaceholderData: false,
+    });
+
+    render(<MatchDetailPageClient matchId="match-1" />);
+
+    expect(screen.getByRole('button', { name: '참가 신청' })).toBeTruthy();
   });
 });

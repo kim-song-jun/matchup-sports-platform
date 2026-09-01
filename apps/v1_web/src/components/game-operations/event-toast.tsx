@@ -87,13 +87,13 @@ export function EventToasts({ toasts, onDismiss }: { toasts: readonly EventToast
     <div
       aria-live="polite"
       aria-atomic="false"
-      className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex flex-col items-center gap-2 px-4"
+      className="tm-native-toast-stack pointer-events-none fixed inset-x-0 bottom-6 z-50 flex flex-col items-center gap-2 px-4"
     >
       {toasts.map((toast) => (
         <div
           key={toast.id}
           role="status"
-          className={`pointer-events-auto flex min-w-[200px] max-w-full items-center gap-3 rounded-2xl bg-gray-900 px-5 py-3 text-sm font-semibold text-white shadow-lg sm:max-w-[400px] ${
+          className={`tm-native-toast-card pointer-events-auto flex min-w-[200px] max-w-full items-center gap-3 rounded-2xl bg-gray-900 px-5 py-3 text-sm font-semibold text-white shadow-lg sm:max-w-[400px] ${
             toast.exiting
               ? 'motion-safe:animate-[fade-in_0.15s_ease-in_reverse_both]'
               : 'motion-safe:animate-[fade-in_0.15s_ease-out]'

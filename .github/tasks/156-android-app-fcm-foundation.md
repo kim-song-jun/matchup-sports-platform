@@ -583,3 +583,11 @@ report, upgrade preservation, and the remaining OEM/foldable/multi-window matrix
 - Kakao authorization remains inside MainActivity for the exact official HTTPS hosts kauth.kakao.com, accounts.kakao.com, and auth.kakao.com. User-info URLs, custom ports, HTTP, suffix hosts, and unrelated external origins remain rejected from the in-app OAuth allowlist.
 - Alpha/Production JVM suites passed 13/13 each. Alpha lint completed with 0 errors and 2 pre-existing non-fatal warnings (GradleDependency, ObsoleteSdkInt); Alpha and Production debug APK assembly and the Alpha release AAB bundle passed.
 - API 36 Pixel emulator evidence covers the app-drawer icon and exact 팀밋 label, light/dark system bars, Kakao Account rendered inside the app WebView, and Android Back returning to the Teameet login page. Raw evidence is under output/task156/android-branding-theme/; the five reviewed PNGs were also copied to the operator-requested desktop screenshot directory.
+### Korean system surfaces and centered app feedback (2026-09-01)
+
+- Android permission dialogs and DocumentsUI are OS-owned surfaces; their language follows the device system locale and cannot be overridden by the app. API 36 was switched to `ko-KR` and notification, approximate-location, and recent-image picker copy was verified in Korean.
+- Replaced wrapper-owned Android `Toast` feedback for downloads, picker launch failures, and unavailable external apps with an accessible centered in-app card that follows light/dark resources.
+- Added the exact-origin Android bridge marker and app-only centered placement for shared web toast stacks, notification feedback, and search-error feedback. Normal browser placement remains unchanged.
+- Validation: v1 web targeted Vitest 2 files / 4 tests passed; v1 web `tsc --noEmit` passed; Gradle 9.2 `testAlphaDebugUnitTest assembleAlphaDebug --no-daemon --max-workers=1` passed against API 36.
+- Device evidence: `output/task156/android-korean-popup-qa/21-ko-notification.png`, `22-ko-gps.png`, `23-ko-image-picker.png`, `24-center-popup.png`, and `25-ko-kakao-in-app.png`.
+- Residual external gate remains unchanged: authenticated real FCM delivery (foreground/background/terminated) requires an Alpha QA account/session and server event.

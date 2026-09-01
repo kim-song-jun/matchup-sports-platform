@@ -136,14 +136,25 @@ function verdict(r) {
 }
 
 /**
- * **배포 창을 피한다 — 순서가 중요하다.**
+ * **배포 창을 피한다 — 판정 기준은 "무엇이 서빙되는가" 다.**
  *
- * 배포 중에는 502 가 뜨고, 그 창에서 찍으면 **멀쩡한 화면을 결함으로 오진한다.** 그리고
- * 서빙 SHA 만 먼저 보면 *배포 중인* SHA 를 찍고 그게 맞다고 판단할 수 있다. 그래서
- * `① 배포 완료 → ② 서빙 SHA → ③ 내 커밋 포함 여부` 순으로 본다.
+ * ```
+ * ① landing 200 + health db:true        502 창이면 여기서 걸린다
+ * ② 서빙 SHA 가 EXPECT_COMMIT 포함        옛 빌드면 여기서 걸린다
+ * ③ 진행 중 배포는 **경고만**             막지 않는다
+ * ```
  *
- * 직전 배포 run 이 `cancelled` 로 남아 있을 수 있다(뒤 머지가 앞 배포를 대체) — 그때 alpha 가
- * 서빙하는 것은 마지막 **성공** 배포의 SHA 다. 그래서 상태를 문자 그대로 확인한다.
+ * ## ⚠️ run status 를 게이트로 되돌리지 마라 — 실제로 막혔다
+ * 처음엔 `gh run list --limit 1` 의 `status === 'completed'` 를 게이트로 썼다. 그건 **최신
+ * run** 을 보므로, 내 배포가 끝나도 **다른 세션이 dev 에 머지하면 새 배포가 떠서 영원히
+ * 막힌다.** 이 저장소는 여러 세션이 dev 에 계속 머지하므로 드문 일이 아니고, 실제로 첫
+ * 실행에서 바로 걸렸다(`f7a4dbe69` 를 정상 서빙 중인데 `9229930f3` 이 진행 중이라 차단).
+ *
+ * 게이트가 막으려는 것은 *"배포 중 502 창에서 찍어 멀쩡한 화면을 결함으로 오진하는 것"*
+ * 이고, **그 질문의 답은 run status 가 아니라 실제 응답**이다. 그래서 ①이 응답을 직접 본다.
+ *
+ * ③을 경고로 둔 대가는 캡처 도중 서빙본이 바뀔 수 있다는 것인데, 그건 **캡처 후 서빙 SHA 를
+ * 다시 재서** 사후에 잡는다(main 하단). 막지 않는 대신 조용히 섞이지 않게 한다.
  */
 async function preflight() {
   // ① **무엇이 서빙되는가로 판정한다 — "최신 run 이 끝났는가" 가 아니다.**
@@ -155,9 +166,21 @@ async function preflight() {
   const head = await fetch(`${BASE}/landing`, { method: 'HEAD' });
   if (!head.ok) throw new Error(`landing HTTP ${head.status} — 배포 중이거나 장애다. 기다려라`);
   const serving = head.headers.get('x-teameet-commit');
+  // health 는 **세 가지가 다른 이유**라 메시지를 나눈다. 한 덩어리로 묶으면 재시도할지
+  // (배포 중) 사람을 불러야 할지(DB) 판단할 수 없고, 특히 `.json()` 이 던지면 SyntaxError
+  // 가 그대로 전파돼 **"health 체크 실패" 라는 말조차 안 나온다** — 200 인데 JSON 이 아닌
+  // 경우(프록시·에러 페이지)가 실제로 그렇다.
   const health = await fetch(`${API}/health`);
-  const healthy = health.ok && (await health.json())?.data?.checks?.db === true;
-  if (!healthy) throw new Error('health 체크 실패 — 배포 중이거나 DB 문제다');
+  if (!health.ok) throw new Error(`health HTTP ${health.status} — 배포 중이거나 장애다. 기다려라`);
+  let healthBody;
+  try {
+    healthBody = await health.json();
+  } catch {
+    throw new Error('health 가 200 인데 JSON 이 아니다 — 프록시·에러 페이지일 수 있다(배포 중 의심)');
+  }
+  if (healthBody?.data?.checks?.db !== true) {
+    throw new Error(`health db 체크 실패(db=${JSON.stringify(healthBody?.data?.checks?.db)}) — DB 쪽 문제다`);
+  }
   console.log(`서빙 커밋: ${serving ?? '(헤더 없음)'} · health ok`);
 
   // ② 내 변경을 보고 있는가

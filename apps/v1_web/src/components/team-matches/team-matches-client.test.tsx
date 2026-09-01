@@ -59,6 +59,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
 }));
 
 vi.mock('./team-matches-page', () => ({
+  TeamMatchDetailPageSkeleton: () => <div data-testid="team-match-detail-skeleton" />,
   TeamMatchDetailPageView: ({ model }: { model: TeamMatchDetailViewModel }) => (
     <div>
       <span data-testid="team-match-image">{model.match.imageUrl}</span>
@@ -876,5 +877,18 @@ describe('TeamMatchListPageClient — 커서 페이지네이션 누적', () => {
 
     expect(screen.getByTestId('team-match-count')).toHaveTextContent('2');
     expect(screen.queryByRole('button', { name: '더 보기' })).not.toBeInTheDocument();
+  });
+});
+
+describe('TeamMatchDetailPageClient — 로딩 중 목업 노출 방지', () => {
+  it('팀매치를 아직 못 받았으면 목업 상세("FC 발빠른놈들" 등) 대신 스켈레톤을 렌더한다', () => {
+    useV1TeamMatchMock.mockReturnValue({ data: undefined, isError: false });
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    expect(screen.getByTestId('team-match-detail-skeleton')).toBeTruthy();
+    // 목업 팀매치(team-matches.view-model.ts)의 어떤 필드도 화면에 닿지 않아야 한다.
+    expect(screen.queryByTestId('team-match-address')).toBeNull();
+    expect(screen.queryByTestId('team-match-manner')).toBeNull();
   });
 });

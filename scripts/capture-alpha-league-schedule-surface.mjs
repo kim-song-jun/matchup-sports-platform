@@ -107,6 +107,10 @@ async function pickLeagues(probeLimit = 14) {
     try {
       const s = await getJson(`/tournaments/${item.id}/schedule`);
       name = (s.standings ?? [])[0]?.groupName ?? null;
+      // **경기가 0건이면 단계 칩이 애초에 없다** — 칩 판정을 하려면 경기가 있는 리그를
+      // 골라야 한다. 2026-09-01: 예정 리그가 목록에 올라오면서 경기 0건인 리그가 표본으로
+      // 뽑혔고, 칩이 없다는 이유로 6행이 ❌ 가 됐다(회귀가 아니라 **표본이 바뀐 것**).
+      if ((s.items ?? []).length === 0) continue;
     } catch {
       continue; // 못 읽는 리그는 표본에서 제외한다 — 판정 대상이 아니다
     }
@@ -165,6 +169,8 @@ const READ = (expectGroupName) => {
     hasRegularRoundChip: tabs.includes('정규 라운드') || /정규 라운드/.test(text),
     hasGroupStandingsCopy: /조별 순위/.test(text),
     hasPlayerRecords: /득점 순위|도움 순위|선수 기록/.test(text),
+    // 경기 카드가 하나라도 그려졌나 — 단계 칩은 경기가 있을 때만 생긴다.
+    hasFixtureCards: /주차|조별리그|결선/.test(text) || document.querySelectorAll('[role="tab"]').length > 2,
     // ⚠️ **본문 전체를 검색하면 안 된다.** 리그 이름 자체가 `"… 1시즌 2부"` 라서
     // `text.includes('2부')` 는 순위 제목과 무관하게 참이 된다 — 이 하네스가 실제로 그렇게
     // 아무것도 안 재는 ✅ 를 한 번 냈다(2026-09-01). 순위표를 감싼 **섹션의 `aria-label`**
@@ -194,7 +200,8 @@ function verdict(kind, r) {
   if (kind === 'league') {
     // 빈 상태 문구 유무와 **무관하게** 행이 0이면 결함이다 — 문구가 없어도 순위는 안 보인다.
     if (r.standingsRows === 0) bad.push('순위 행 0');
-    if (!r.hasRegularRoundChip) bad.push("'정규 라운드' 없음");
+    // 경기가 없으면 칩이 없는 게 맞다 — 있을 때만 어휘를 따진다.
+    if (r.hasFixtureCards && !r.hasRegularRoundChip) bad.push("'정규 라운드' 없음");
     if (r.hasKnockoutChip) bad.push("'결선' 남음");
     if (r.hasGroupStandingsCopy) bad.push("'조별 순위' 남음");
     if (r.hasPlayerRecords) bad.push('선수 기록 섹션 노출');

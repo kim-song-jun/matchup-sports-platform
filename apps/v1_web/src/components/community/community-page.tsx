@@ -31,7 +31,8 @@ function ChatListContent({ model, selectedRoomId }: { model: ChatListViewModel; 
   const hasRooms = model.pinnedRooms.length > 0 || model.rooms.length > 0;
 
   return (
-    <div className="tm-chat-list">
+    // 방이 없을 때만 tm-list-empty — 목록이 있는 평소 레이아웃은 그대로 둔다.
+    <div className={`tm-chat-list${!hasRooms ? ' tm-list-empty' : ''}`}>
           <div className="tm-sport-chip-row" role="group" aria-label="채팅 카테고리 필터">{model.categories.map((category) => <button key={category.label} className={`tm-chip ${category.active ? 'tm-chip-active' : ''}`} type="button" onClick={category.onSelect} aria-pressed={category.active}>{category.label} {category.count}</button>)}</div>
           {model.status === 'loading' ? <PageSkeleton variant="list" /> : null}
           {model.status === 'error' && !hasRooms ? (
@@ -42,6 +43,7 @@ function ChatListContent({ model, selectedRoomId }: { model: ChatListViewModel; 
           ) : model.status !== 'loading' && model.status !== 'error' && !hasRooms ? (
             /* [P2 UX 라이팅] cta 능동형 표현 */
             <EmptyState
+              fill
               title={model.emptyTitle ?? '아직 채팅방이 없어요'}
               sub={model.emptyBody ?? '매치에 참가하거나 팀에 가입하면 채팅방이 열려요.'}
               cta={model.emptyHref ? '매치 찾아보기' : undefined}
@@ -140,7 +142,10 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
             <ChevronRightIcon size={18} stroke="var(--text-caption)" />
           </Link>
         </div>
-        <div ref={threadRef} className="tm-chat-thread">
+        <div
+          ref={threadRef}
+          className={`tm-chat-thread${model.messages.length === 0 ? ' tm-list-empty' : ''}`}
+        >
           {model.status === 'loading' ? <PageSkeleton variant="list" /> : null}
           {model.status === 'error' && model.messages.length === 0 ? (
             <ErrorState
@@ -150,6 +155,7 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
           ) : model.status !== 'loading' && model.status !== 'error' && model.messages.length === 0 ? (
             /* [P2 UX 라이팅] 능동형 */
             <EmptyState
+              fill
               title={model.emptyTitle ?? '아직 메시지가 없어요'}
               sub={model.emptyBody ?? '먼저 인사를 건네 대화를 시작해요.'}
             />
@@ -299,7 +305,9 @@ export function NotificationsPageView({ model }: { model: NotificationsViewModel
             </button>
           </div>
         </div>
-        <div className="tm-notification-list">
+        <div
+          className={`tm-notification-list${model.status !== 'loading' && model.notifications.length === 0 ? ' tm-list-empty' : ''}`}
+        >
           {/* 로딩 중에는 EmptyState 노출을 막는다 — ready 이후에만 빈 상태를 판정한다 */}
           {model.status === 'loading' ? (
             <PageSkeleton variant="list" />
@@ -310,7 +318,7 @@ export function NotificationsPageView({ model }: { model: NotificationsViewModel
             />
           ) : model.notifications.length === 0 ? (
             /* [P2 UX 라이팅] 능동형 */
-            <EmptyState title="아직 알림이 없어요" sub="매치, 팀매치, 채팅에 새 소식이 생기면 여기서 바로 알려드려요." />
+            <EmptyState fill title="아직 알림이 없어요" sub="매치, 팀매치, 채팅에 새 소식이 생기면 여기서 바로 알려드려요." />
           ) : (
             groups.map((group) => {
               const items = model.notifications.filter((notification) => notification.group === group);

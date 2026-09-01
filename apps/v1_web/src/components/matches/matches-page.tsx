@@ -115,7 +115,8 @@ export function MatchListPageView({ model }: { model: MatchListViewModel }) {
       </div>
       <MatchSearchBar query={model.query} filterCount={model.filterCount} search={model.search} filterHref={model.filterHref} />
       <MatchTypeSegment active="personal" />
-      <div className="tm-match-list">
+      {/* 결과가 0건일 때만 tm-list-empty — 카드가 있는 평소 레이아웃은 건드리지 않는다. */}
+      <div className={`tm-match-list${!model.isLoading && model.matches.length === 0 ? ' tm-list-empty' : ''}`}>
         <SportSelector sports={model.sports} />
         <div className="tm-match-summary-row">
           <div className="tm-text-label">{model.summary.label}</div>
@@ -138,7 +139,7 @@ export function MatchListPageView({ model }: { model: MatchListViewModel }) {
              grid-item child gets confined to the first grid cell (~50%/33% width), reading
              as flush-left instead of centered across the full content column. Matches the
              pattern already used by teams-page.tsx / team-matches-page.tsx / tournaments page.tsx. */
-          <EmptyState title="조건에 맞는 매치가 없어요" sub="다른 종목을 선택하거나 전체 매치로 돌아가면 모집 중인 매치를 볼 수 있어요." />
+          <EmptyState fill title="조건에 맞는 매치가 없어요" sub="다른 종목을 선택하거나 전체 매치로 돌아가면 모집 중인 매치를 볼 수 있어요." />
         )}
         {/* 서버는 20건씩 커서로 자르는데(matches.service.ts) 예전엔 여기서 더 볼 방법이
             없었다(감사 결함) — league-matches-list-client.tsx와 같은 "더 보기" 누적 패턴. */}

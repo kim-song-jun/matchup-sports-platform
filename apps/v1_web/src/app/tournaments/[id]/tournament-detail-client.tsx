@@ -568,6 +568,23 @@ export function TournamentDetailView({
   const isCompleted = tournament.status === 'completed';
   const pendingPaymentCount = getPendingPaymentCount(tournament);
   const reservedTeamCount = getReservedTeamCount(tournament);
+  /**
+   * **정원·참가비는 대회에만 그린다.**
+   *
+   * 리그에는 정원 개념이 없다 — `V1League` 모델에 `max`·`capacity` 계열 필드가 아예 없다.
+   * 그런데 거울 행은 `v1_tournaments` 에 살고 `team_count` 가 `@default(8)` 이라, 그대로
+   * 그리면 **참여할 방법이 없는 리그에 "정원 2/8팀 아직 6자리 남았어요" 가 뜬다**
+   * (alpha 실측 — #898 로 이 화면을 연 뒤 실제로 그랬다).
+   *
+   * ⚠️ **타입이 아니라 분기로 닫는다.** 상세 타입(`V1TournamentDetail.teamCount`)을
+   * optional 로 바꾸면 `my`·`apply`·`bracket` 등 **리그가 도달할 수 없는 화면 5개 20곳**이
+   * 함께 열린다(실측). 그 셋은 리그와 무관하고, 거기서 undefined 처리를 새로 짜는 것은
+   * 이 결함과 관계없는 작업이다. 목록은 리그가 섞여 들어오는 게 목적이라 타입으로 막았고,
+   * 상세는 리그 분기가 이미 있어 그 분기로 닫는다 — **판단 기준은 도달 가능성이다.**
+   *
+   * 분기는 기억에 의존하므로 **테스트로 못박는다**(`tournament-detail-client.test.ts`).
+   */
+  const showsCapacity = !isLeagueCompetition(tournament);
   /* 신규 신청 차단 사유(마감 경과·정원 마감) — CTA·안내 문구·정원 캡션이 전부 이 하나의
      판정을 공유한다. status만 보던 예전 로직은 신청 마감이 지난 open 대회에서도
      '참가 신청하기'를 활성으로 그렸다. */
@@ -762,7 +779,8 @@ export function TournamentDetailView({
         {/* 핵심 정보 — 하나의 카드로 통합(기존: 틴트 3카드 + 별도 info 카드로 분산).
             일정·정원·참가비는 데스크탑 우측 sticky 레일과 중복되어 모바일 전용(tm-hide-desktop). */}
         <Card pad={0}>
-          {/* 정원 진행 + 잔여 (모바일 전용) */}
+          {/* 정원 진행 + 잔여 (모바일 전용) — 리그는 정원 개념이 없어 통째로 안 그린다 */}
+          {showsCapacity ? (
           <div className="tm-hide-desktop" style={{ padding: '16px 16px', borderBottom: '1px solid var(--grey100)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
               <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>정원</span>
@@ -805,6 +823,7 @@ export function TournamentDetailView({
               );
             })()}
           </div>
+          ) : null}
           {/* 일정·참가비 (모바일 전용 — 데스크탑은 우측 레일) */}
           <div className="tm-hide-desktop">
             <InfoRow label="일정" value={formatTournamentDateRangeWithTime(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'} />
@@ -1129,12 +1148,14 @@ export function TournamentDetailView({
           </span>
         </div>
         <ScheduleNoticeCaption style={{ marginTop: 0 }} />
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>정원</span>
-          <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>
-            {reservedTeamCount}/{tournament.teamCount}팀
-          </span>
-        </div>
+        {showsCapacity ? (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>정원</span>
+            <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>
+              {reservedTeamCount}/{tournament.teamCount}팀
+            </span>
+          </div>
+        ) : null}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>참가비</span>
           <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>

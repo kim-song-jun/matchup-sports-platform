@@ -1024,6 +1024,54 @@ describe('TournamentDetailView — 정규 리그 거울 행', () => {
     });
   }
 
+  /**
+   * **정원 블록이 리그에 그려지면 안 된다 — 이 결함은 실제로 alpha 에 떠 있었다.**
+   *
+   * `#898` 로 이 화면을 연 뒤 리그 상세에 *"정원 2 /8팀 아직 6자리 남았어요"* 가 떴다.
+   * 8 은 `team_count` 의 스키마 기본값이고(거울은 아무도 안 넣는다) 리그엔 정원 개념이
+   * 없다 — 게다가 **참여할 방법도 없다**(리그는 status 가 `open` 이 될 수 없다).
+   *
+   * 상세는 타입이 아니라 **분기**로 닫았다(리그가 도달 못 하는 화면 5개를 안 열려고).
+   * 분기는 기억에 의존하므로 여기서 못박는다 — **진행바(컨테이너) 부재**로 단언한다.
+   * 문자열 부재만 보면 "무엇이 있으면 안 되는지" 를 안 보게 된다.
+   */
+  it('리그 상세에 정원 진행바가 없다', async () => {
+    vi.mocked(v1Get).mockResolvedValueOnce(standingsResponse);
+    const { container } = render(
+      createElement(TournamentDetailView, { tournament: makeMirror(), myRegistration: null }),
+    );
+    await screen.findByText('통합 순위');
+
+    // ⚠️ 진행바가 **둘**이다 — 순위표의 "전체 일정 진행률" 은 리그에 있는 게 정상이고,
+    // 정원 진행바만 없어야 한다. `[role=progressbar]` 를 통째로 세면 그 둘이 섞여
+    // "리그에 진행바가 있다" 로 잘못 읽힌다(실제로 처음에 그렇게 틀렸다).
+    // aria-label 로 **정원 쪽만** 겨냥한다.
+    const bars = [...container.querySelectorAll('[role="progressbar"]')];
+    expect(bars.filter((b) => (b.getAttribute('aria-label') ?? '').startsWith('정원'))).toEqual([]);
+    // 순위 진행률은 리그에도 있어야 한다 — 대조군을 같은 자리에 둔다.
+    expect(bars.some((b) => (b.getAttribute('aria-label') ?? '').includes('일정 진행률'))).toBe(true);
+    expect(screen.queryByText(/자리 남았어요/)).toBeNull();
+  });
+
+  it('대회 상세에는 정원 진행바가 있다 — 대조군', async () => {
+    // 이 대조군이 없으면 정원 블록을 통째로 지워도 위 테스트가 통과한다.
+    // ⚠️ 여기서는 `mockResolvedValueOnce` 를 **쓰지 않는다** — 대회는 순위 섹션을 안 그려
+    // v1Get 을 부르지 않고, 그러면 큐에 남은 값이 **다음 테스트로 샌다**(실제로 그렇게
+    // 다음 테스트가 깨졌다).
+    const tournament = makeTournament({
+      id: 't-capacity',
+      status: 'open',
+      format: 'knockout',
+      kind: 'regular_tournament',
+      teamCount: 16,
+      confirmedCount: 4,
+    });
+    const { container } = render(
+      createElement(TournamentDetailView, { tournament, myRegistration: null }),
+    );
+    expect(container.querySelector('[role="progressbar"]')).not.toBeNull();
+  });
+
   it('조가 없어도 통합 순위 섹션을 그린다 — 조 개수로 게이팅하면 리그는 영영 안 뜬다', async () => {
     vi.mocked(v1Get).mockResolvedValueOnce(standingsResponse);
     render(createElement(TournamentDetailView, { tournament: makeMirror(), myRegistration: null }));

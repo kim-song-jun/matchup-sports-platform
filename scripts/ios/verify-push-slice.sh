@@ -58,7 +58,15 @@ xcrun simctl bootstatus "$DEVICE" -b >/dev/null
 # change what the first test should see. Removing the app makes each run start from the
 # state a new reader is in. Scoped to this one app on this one device: other sessions boot
 # their own simulators, and an all-device command would take theirs down too.
-xcrun simctl uninstall "$DEVICE" "$BUNDLE_ID" >/dev/null 2>&1 || true
+# `erase`, not `uninstall`. Measured: uninstalling the app leaves the WKWebView cookie jar
+# behind, so the next run starts already signed in — which silently inverts any test whose
+# premise is "a reader who has not signed in yet". That cost a false bug report: the
+# notification explainer looked like it was appearing to signed-out readers, and it was not,
+# it was the previous run's session. Erase is scoped to this one simulator, which the check
+# above already refuses to guess at when more than one is booted.
+xcrun simctl shutdown "$DEVICE" >/dev/null 2>&1 || true
+xcrun simctl erase "$DEVICE"
+xcrun simctl bootstatus "$DEVICE" -b >/dev/null
 
 mkdir -p "$OUTPUT"
 rm -rf "$OUTPUT/settings.xcresult" "$OUTPUT/tap.xcresult" "$OUTPUT/attachments"

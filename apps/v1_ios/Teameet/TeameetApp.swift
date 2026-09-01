@@ -50,6 +50,17 @@ struct RootView: View {
                     NoticeBanner(message: notice) { model.dismissNotice() }
                 }
             }
+            // Above the page rather than inside it: the shell is asking, not the web app, and
+            // a reader must be able to tell which. It is also the only overlay that blocks —
+            // an explainer you can scroll past is an explainer nobody answers.
+            .overlay {
+                if model.isAskingAboutNotifications {
+                    PushPromptView(
+                        onAccept: { appDelegate.shell?.acceptNotificationPrompt() },
+                        onDefer: { appDelegate.shell?.deferNotificationPrompt() })
+                        .transition(.opacity)
+                }
+            }
             // A universal link. This is what brings the Kakao sign-in redirect back into the
             // app: `AllowedNavigation` sends the authorization pages out to Safari, so
             // without this the redirect to /callback/kakao completes there and the session

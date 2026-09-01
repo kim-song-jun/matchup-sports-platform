@@ -391,6 +391,82 @@ final class PushSliceUITests: XCTestCase {
         return false
     }
 
+    /// The shell's own explainer, which exists because iOS asks once and the web only asks
+    /// from a settings screen a reader has to go looking for.
+    ///
+    /// Must run on a fresh install: the thing under test only appears while the system status
+    /// is `notDetermined`, and any earlier test that answered the system dialog removes it.
+    func testCTheShellAsksAboutNotificationsOnceSignedIn() throws {
+        _ = try environmentValue("TEAMEET_UITEST_EMAIL")
+        app.launch()
+        waitForWeb()
+
+        // Negative control. Asking a signed-out reader would spend the one system dialog on
+        // someone with no account to attach a token to — if this fails the policy is not
+        // being consulted at all, and the rest of the test would pass for the wrong reason.
+        let explainer = app.otherElements["알림 받기 안내"]
+        XCTAssertFalse(
+            explainer.waitForExistence(timeout: 8),
+            "the explainer appeared before sign-in")
+
+        try signIn()
+
+        XCTAssertTrue(
+            explainer.waitForExistence(timeout: 60),
+            "signing in did not bring up the notification explainer")
+        attach("08-explainer")
+
+        // 나중에 must not spend the system dialog. That is the entire reason the explainer
+        // exists, so it is asserted rather than assumed.
+        app.buttons["push-prompt-defer"].tap()
+        XCTAssertFalse(
+            explainer.waitForExistence(timeout: 5),
+            "declining left the explainer on screen")
+        let systemAlert = springboard.alerts.firstMatch
+        XCTAssertFalse(
+            systemAlert.waitForExistence(timeout: 8),
+            "declining the explainer still showed the system permission dialog")
+        attach("09-after-defer")
+
+        // And it does not come straight back on the next page, or it would be nagging.
+        app.terminate()
+        app.launch()
+        waitForWeb()
+        XCTAssertFalse(
+            explainer.waitForExistence(timeout: 20),
+            "the explainer reappeared immediately after 나중에")
+        attach("10-not-nagging")
+    }
+
+    /// 알림 받기 must dismiss the explainer and hand over to the system dialog.
+    ///
+    /// Asserted separately from the decline path because they go through different code, and
+    /// a reader reported the explainer staying on screen after tapping it. Fresh install
+    /// required: the explainer only appears while the system status is `notDetermined`.
+    func testDAcceptingTheExplainerDismissesItAndAsksTheSystem() throws {
+        _ = try environmentValue("TEAMEET_UITEST_EMAIL")
+        app.launch()
+        waitForWeb()
+        try signIn()
+
+        let explainer = app.otherElements["알림 받기 안내"]
+        XCTAssertTrue(
+            explainer.waitForExistence(timeout: 60), "the explainer never appeared")
+        app.buttons["push-prompt-accept"].tap()
+
+        // The reported bug: the explainer stayed up after the tap.
+        XCTAssertFalse(
+            explainer.waitForExistence(timeout: 8),
+            "the explainer stayed on screen after 알림 받기")
+        attach("11-after-accept")
+
+        // And the tap is only worth anything if it spends the system dialog it was gating.
+        XCTAssertTrue(
+            springboard.alerts.firstMatch.waitForExistence(timeout: 20),
+            "accepting did not bring up the system permission dialog")
+        attachSpringboard("11-system-dialog-tree")
+    }
+
     /// Acceptance Criteria 2: a notification about an inquiry opens that inquiry.
     ///
     /// The notification is sent from outside the process while this test waits, so what runs

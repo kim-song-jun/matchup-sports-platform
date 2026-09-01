@@ -1,20 +1,19 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 /**
- * **정규 리그가 이 페이지에 도달하면 "색인 가능한 에러 화면"이 된다.**
+ * **정규 리그도 이 화면을 쓴다.**
  *
- * `/tournaments/:id` 가 통합 축으로 넓어지면서 리그가 게이트를 통과하는데, 클라이언트가 부르는
- * `/tournaments/:id/schedule` 은 리그에서 404 다. alpha 실측(2026-09-01, 배포 창 밖):
- * ```
- * 리그   HTTP 200 · "경기 정보를 찾을 수 없어요" · noindex 없음
- * 대회   HTTP 200 · 일정·조별 순위 정상            ← 대조군이 정상이라 배포 탓이 아니다
- * ```
+ * 한동안 여기서 `notFound()` 로 리그를 막았다. 그건 결함을 가린 것이었다 — 리그가
+ * `/tournaments/:id` 통합 축을 통과하는데 클라이언트가 부르는 `/tournaments/:id/schedule`
+ * 만 404 라 화면이 "경기 정보를 찾을 수 없어요" 로 끝났다. 그 API 가 리그를 응답하도록
+ * 고쳐졌으므로(`leagueSchedule`) 막을 이유가 사라졌고, **이 파일의 단언도 함께 뒤집힌다.**
  *
  * ## 여기서 잡는 것과 못 잡는 것
  * ```
- * 잡는다    리그가 게이트를 통과하는가 · 리그 메타데이터가 색인 가능한가
+ * 잡는다    리그가 통과하는가 · 리그에 isRegularLeague 가 켜져 내려가는가 · 색인 가능한가
+ *          리그 방식 대회(format='league')가 리그 취급되지 않는가
  * 못 잡는다  HTTP 상태코드 — 이 라우트는 notFound() 를 불러도 200 이다(프레임워크 quirk,
- *           2026-09-01 재측정에서도 없는 id 로 200 · 형제는 404). 그건 별개 문제다.
+ *          2026-09-01 재측정에서도 없는 id 로 200 · 형제는 404). 그건 별개 문제다.
  * ```
  */
 const fetchPublicV1 = vi.fn();
@@ -63,12 +62,32 @@ beforeEach(() => {
 });
 
 describe('일정 페이지 게이트', () => {
-  it('정규 리그는 막는다 — 리그에서 이 화면은 에러만 그린다', async () => {
+  it('정규 리그도 통과한다 — 막던 게이트를 걷어냈다', async () => {
     fetchPublicV1.mockResolvedValue(detail({ kind: 'regular_league', format: 'group_knockout' }));
     const { default: Page } = await load();
 
-    await expect(Page({ params: Promise.resolve({ id: 'lg-1' }) })).rejects.toThrow('NEXT_NOT_FOUND');
-    expect(notFound).toHaveBeenCalled();
+    await expect(Page({ params: Promise.resolve({ id: 'lg-1' }) })).resolves.toBeTruthy();
+    expect(notFound).not.toHaveBeenCalled();
+  });
+
+  /**
+   * 통과만으로는 부족하다 — 리그 어휘('정규 라운드' 칩)와 선수 기록 미렌더가 이 플래그
+   * 하나에 달려 있어서, 안 넘어가면 리그 화면에 대회 말이 그대로 뜬다.
+   */
+  it('리그면 isRegularLeague 를 켜서 내려보낸다 — 어휘와 선수 기록 노출이 여기 달렸다', async () => {
+    fetchPublicV1.mockResolvedValue(detail({ kind: 'regular_league' }));
+    const { default: Page } = await load();
+
+    const element = await Page({ params: Promise.resolve({ id: 'lg-1' }) });
+    expect(element.props).toMatchObject({ tournamentId: 'lg-1', isRegularLeague: true });
+  });
+
+  it('대회에는 isRegularLeague 를 켜지 않는다 — 대조군', async () => {
+    fetchPublicV1.mockResolvedValue(detail());
+    const { default: Page } = await load();
+
+    const element = await Page({ params: Promise.resolve({ id: 't-1' }) });
+    expect(element.props).toMatchObject({ isRegularLeague: false });
   });
 
   it('대회는 통과한다 — 대조군', async () => {
@@ -86,12 +105,15 @@ describe('일정 페이지 게이트', () => {
    * (`kind=regular_tournament · format=league`)는 이 페이지가 정상 렌더된다.
    * **헬퍼로 막으면 그 7건이 함께 막힌다.**
    */
-  it('리그 방식으로 치르는 대회는 통과한다 — kind 로 물어야 하는 이유', async () => {
+  it('리그 방식으로 치르는 대회는 리그 취급하지 않는다 — kind 로 물어야 하는 이유', async () => {
     fetchPublicV1.mockResolvedValue(detail({ format: 'league', kind: 'regular_tournament' }));
     const { default: Page } = await load();
 
-    await expect(Page({ params: Promise.resolve({ id: 't-league-format' }) })).resolves.toBeTruthy();
+    const element = await Page({ params: Promise.resolve({ id: 't-league-format' }) });
     expect(notFound).not.toHaveBeenCalled();
+    // **여기가 핵심이다.** `isLeagueCompetition` 을 썼다면 이 값이 true 가 되어 진짜 대회
+    // 7건의 '결선' 칩이 '정규 라운드' 로 바뀌고 선수 기록 섹션이 사라졌을 것이다.
+    expect(element.props).toMatchObject({ isRegularLeague: false });
   });
 
   it('없는 대회는 그대로 막는다 — 기존 동작', async () => {
@@ -102,18 +124,23 @@ describe('일정 페이지 게이트', () => {
   });
 });
 
-/**
- * **상태코드를 못 고치므로 색인만이라도 확실히 막는다.**
- * `notFound()` 경로의 메타데이터 동작에 기대지 않고 `generateMetadata` 가 직접 noindex 를 준다.
- */
+/** 리그도 정상 화면이 되었으므로 **색인을 막을 이유가 없다.** 없는 대회만 noindex 다. */
 describe('일정 페이지 메타데이터', () => {
-  it('정규 리그는 noindex 다 — 색인 가능한 에러 페이지를 막는 유일한 수단', async () => {
+  it('정규 리그도 색인 가능하다 — 더 이상 에러 화면이 아니다', async () => {
     fetchPublicV1.mockResolvedValue(detail({ kind: 'regular_league' }));
     const { generateMetadata } = await load();
 
     const meta = await generateMetadata({ params: Promise.resolve({ id: 'lg-1' }) });
 
-    // 실제 `buildNoIndexMetadata` 의 형태 그대로 — `nocache` 까지 본다.
+    expect(meta.robots).toEqual({ index: true, follow: true });
+  });
+
+  it('없는 대회는 여전히 noindex 다 — 실제 buildNoIndexMetadata 형태 그대로', async () => {
+    fetchPublicV1.mockResolvedValue(null);
+    const { generateMetadata } = await load();
+
+    const meta = await generateMetadata({ params: Promise.resolve({ id: 'nope' }) });
+
     expect(meta.robots).toEqual({ index: false, follow: false, nocache: true });
   });
 

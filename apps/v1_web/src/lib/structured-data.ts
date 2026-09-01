@@ -1,5 +1,5 @@
 import { absoluteSiteUrl, getSiteOrigin } from '@/lib/seo';
-import type { V1Team, V1TournamentDetail, V1TournamentStatus } from '@/types/api';
+import type { V1TeamDetail, V1TournamentDetail, V1TournamentStatus } from '@/types/api';
 
 /**
  * JSON-LD(schema.org 구조화 데이터) 빌더.
@@ -165,31 +165,58 @@ export function buildSportsEventLd(
   return node;
 }
 
-export function buildSportsTeamLd(team: V1Team): JsonLdNode {
-  const url = absoluteSiteUrl(`/teams/${team.id}`);
+/**
+ * 화면에 보이는 지역 표기를 그대로 쓴다.
+ *
+ * 실측: 상세 응답은 `regionName` 에 표시용 전체 이름("서울 송파구" · "서울 전체")을 주고,
+ * `region.name` 에는 하위 지역명만("송파구") 준다. 후자를 우선하면 LD 가 "송파구" 로 나가
+ * 화면 표기와 어긋난다 — 구조화 데이터는 가시 텍스트와 같아야 한다. `regionName` 이 없을
+ * 때만 부모 지역과 조합해 같은 형태를 만든다.
+ */
+export function displayRegionName(team: V1TeamDetail): string | null {
+  const display = team.regionName?.trim();
+  if (display) return display;
+  const region = team.region;
+  if (!region?.name) return null;
+  return region.parentName ? `${region.parentName} ${region.name}` : region.name;
+}
+
+/**
+ * 팀 **상세** 응답(`GET /teams/:id`)을 받는다 — 목록 응답(`V1Team`)이 아니다.
+ *
+ * 둘은 같은 값을 다른 자리에 담는다: 목록은 `logoUrl`·`introductionPreview` 를 최상위에 주는데,
+ * 상세는 `profile.logoUrl`·`profile.introduction` 아래에 준다. 처음에 목록 타입으로 받아 쓴
+ * 탓에 로고·커버·소개가 전부 `undefined` 가 되어 LD 에서 통째로 빠져 있었다(alpha 실측으로
+ * 확인). 상세 화면에서만 쓰는 함수이므로 상세 구조 하나만 받는다.
+ */
+export function buildSportsTeamLd(team: V1TeamDetail): JsonLdNode {
+  const id = team.id ?? team.teamId;
+  const url = absoluteSiteUrl(`/teams/${id}`);
+  const sportName = team.sport?.name ?? team.sportName;
+  const regionName = displayRegionName(team);
   const node: JsonLdNode = {
     '@context': 'https://schema.org',
     '@type': 'SportsTeam',
     '@id': `${url}#team`,
     name: team.name,
     url,
-    sport: team.sportName,
     inLanguage: 'ko-KR',
     memberOf: { '@id': organizationId() },
   };
 
-  if (team.regionName) {
+  if (sportName) node.sport = sportName;
+  if (regionName) {
     node.location = {
       '@type': 'Place',
-      name: team.regionName,
-      address: { '@type': 'PostalAddress', addressCountry: 'KR', addressRegion: team.regionName },
+      name: regionName,
+      address: { '@type': 'PostalAddress', addressCountry: 'KR', addressRegion: regionName },
     };
   }
-  if (team.introductionPreview) {
-    node.description = team.introductionPreview.replace(/\s+/g, ' ').trim();
-  }
-  if (team.logoUrl) node.logo = absoluteImageUrl(team.logoUrl);
-  const image = team.coverImageUrl || team.logoUrl;
+  const description = team.profile?.introduction?.replace(/\s+/g, ' ').trim();
+  // 공백만 있는 소개는 필드를 아예 넣지 않는다 — 빈 description 은 없는 것만 못하다.
+  if (description) node.description = description;
+  if (team.profile?.logoUrl) node.logo = absoluteImageUrl(team.profile.logoUrl);
+  const image = team.profile?.coverImageUrl || team.profile?.logoUrl;
   if (image) node.image = absoluteImageUrl(image);
   // 멤버 수는 화면에 "N명"으로 노출되지만 SportsTeam에 이를 담는 표준 필드가 없다.
   // `member`는 Person/Organization을 기대하고 `numberOfEmployees`는 팀이 아니라 회사용이다 —

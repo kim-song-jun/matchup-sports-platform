@@ -29,8 +29,11 @@ import {
   buildScheduleFilters,
   groupScheduleEntries,
   groupUnscheduledEntries,
+  LEAGUE_PHASE_LABELS,
   phaseKeyOf,
+  TOURNAMENT_PHASE_LABELS,
   type ScheduleFilter,
+  type SchedulePhaseLabels,
 } from './schedule-grouping';
 import type { PublicScheduleEntry, PublicStandingRow, PublicTournamentScheduleResponse } from './types';
 
@@ -502,7 +505,9 @@ function ScheduleRow({
  */
 function toStandingsRows(rows: readonly PublicStandingRow[]): TournamentStandingsRow[] {
   return rows.map((row) => ({
-    key: row.registrationId,
+    // 대회는 registrationId(비공개 상태에도 유일), 리그는 teamId(가리지 않으므로 항상 있고
+    // 팀당 한 행이라 유일하다). 유니온이 둘 중 하나를 보장한다 — `types.ts` 참조.
+    key: row.registrationId ?? row.teamId,
     teamId: row.teamId,
     teamName: row.teamName,
     teamLogoUrl: row.teamLogoUrl,
@@ -615,6 +620,7 @@ function ScheduleSections({
   filters,
   activeFilter,
   onSelectFilter,
+  phaseLabels,
 }: {
   tournamentId: string;
   entries: readonly PublicScheduleEntry[];
@@ -622,8 +628,9 @@ function ScheduleSections({
   filters: ScheduleFilter[];
   activeFilter: string;
   onSelectFilter: (key: string) => void;
+  phaseLabels: SchedulePhaseLabels;
 }) {
-  const phases = groupScheduleEntries(entries);
+  const phases = groupScheduleEntries(entries, phaseLabels);
 
   const visiblePhases = phases
     .filter((phase) => activeFilter === 'all' || activeFilter === 'mine' || activeFilter === phase.key)
@@ -701,6 +708,7 @@ export function ScheduleContent({
   onLoadMore,
   showStandings = true,
   myFixtures,
+  isRegularLeague = false,
 }: {
   tournamentId: string;
   data: PublicTournamentScheduleResponse;
@@ -708,6 +716,15 @@ export function ScheduleContent({
   isFetchingNextPage?: boolean;
   onLoadMore?: () => void;
   showStandings?: boolean;
+  /**
+   * 정규 리그 시즌인가. **단계 이름만 바꾼다**(칩·`section aria-label`) — 리그 대진은
+   * `round` 가 'N주차' 라 전부 `knockout` 으로 분류되는데 그 자리에 대회 말인 '결선' 이
+   * 그대로 보였다. 분류 규칙과 나머지 화면은 그대로다.
+   *
+   * `kind === 'regular_league'` 로만 켠다 — `isLeagueCompetition` 은 `format === 'league'`
+   * 인 **리그 방식 대회**도 true 라(alpha 62건 중 7건) 그 대회들의 '결선' 까지 바꿔 버린다.
+   */
+  isRegularLeague?: boolean;
   /**
    * 로그인한 팀장이 이 대회에서 이끄는 팀의 경기 — 공개 일정 위에 겹쳐 "우리 팀 경기"를
    * 짚어준다. 비로그인 방문자·참가하지 않은 사용자에게는 undefined라 화면이 종전 그대로다.
@@ -752,7 +769,8 @@ export function ScheduleContent({
   // 그대로 두되(단계 칩은 일정이 잡힌 경기 기준이 자연스럽다), "내 팀" 칩은 내 경기가
   // 전부 시간 미정이어도 뜨도록 unscheduled까지 함께 본다 — 예전엔 data.items만 봐서
   // 그 경우 칩 자체가 안 떴다.
-  const phases = groupScheduleEntries(data.items);
+  const phaseLabels = isRegularLeague ? LEAGUE_PHASE_LABELS : TOURNAMENT_PHASE_LABELS;
+  const phases = groupScheduleEntries(data.items, phaseLabels);
   const hasMyFixtures =
     data.items.some((entry) => myFixtureById.has(entry.fixtureId)) ||
     data.unscheduled.some((entry) => myFixtureById.has(entry.fixtureId));
@@ -807,6 +825,7 @@ export function ScheduleContent({
             filters={filters}
             activeFilter={activeFilter}
             onSelectFilter={setFilter}
+            phaseLabels={phaseLabels}
           />
         )}
         {hasNextPage ? (

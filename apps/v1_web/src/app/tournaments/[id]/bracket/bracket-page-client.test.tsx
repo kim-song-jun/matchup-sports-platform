@@ -770,6 +770,17 @@ describe('BracketPageContent — 정규 리그 거울 행(format=group_knockout,
     expect(screen.queryByRole('heading', { name: '토너먼트 대진' })).not.toBeInTheDocument();
   });
 
+  /**
+   * 탭 이름을 여기서 직접 단언한다 — `renderBracketStandingsTab` 헬퍼가 종류별 이름을
+   * 알아서 고르므로, 헬퍼에만 의존하면 라벨이 바뀌어도 아무 테스트도 안 깨진다.
+   */
+  it('순위 탭을 "리그 순위" 로 부른다 — 리그엔 대진표가 없다', () => {
+    renderBracketPage(mirrorLeague());
+
+    const tabs = screen.getAllByRole('tab');
+    expect(tabs.map((tab) => tab.textContent)).toEqual(['경기 일정', '리그 순위']);
+  });
+
   it('안내 문구에서 조별리그·결선을 말하지 않는다', () => {
     renderBracketPage(mirrorLeague());
 

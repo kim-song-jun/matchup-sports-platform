@@ -1,4 +1,4 @@
-import { LEAGUE_STATE_TO_LIST_STATUS } from '@/components/v1-ui/competition-filter-model';
+import { leagueStateToListStatus } from '@/components/v1-ui/competition-filter-model';
 
 /**
  * `/league-matches`(리그 전용 목록) → `/tournaments?kind=league` 로 보낼 주소를 만든다.
@@ -27,10 +27,10 @@ export function buildLeagueListRedirect(params: {
 }): string {
   const query = new URLSearchParams({ kind: 'league' });
 
-  const state = firstValue(params.state);
-  if (state !== null && Object.hasOwn(LEAGUE_STATE_TO_LIST_STATUS, state)) {
-    query.set('status', LEAGUE_STATE_TO_LIST_STATUS[state as keyof typeof LEAGUE_STATE_TO_LIST_STATUS]);
-  }
+  /* 매핑도 **가드도** 한 곳에 둔다. 여기서 `Object.hasOwn` 을 다시 쓰면 표는 공유해도
+     **프로토타입 방어가 두 벌**이 되어, 가드를 손보거나 리그 상태가 늘 때 한쪽만 고쳐진다. */
+  const status = leagueStateToListStatus(firstValue(params.state));
+  if (status !== null) query.set('status', status);
 
   // 종목은 이름도 값도 같아 그대로 옮긴다. 다만 **빈 문자열은 버린다** — 서버가 400 이다.
   const sportId = firstValue(params.sportId);

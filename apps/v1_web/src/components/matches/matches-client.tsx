@@ -66,7 +66,7 @@ export function MatchListPageClient() {
   }, [selectedGenderRule, selectedLevels, selectedSportId, selectedSort, selectedView, submittedQuery]);
   // 서버는 20건씩 커서 페이지네이션으로 자르는데(matches.service.ts list()) 예전엔 이 화면이
   // 단발 useQuery로 첫 페이지만 받아 21번째 매치부터는 볼 방법이 아예 없었다(감사 결함).
-  // league-matches-list-client.tsx와 같은 "더 보기" 누적 방식 — 대회 목록(tournaments/page.tsx)
+  // 대회 목록(tournaments/page.tsx)과 같은 "더 보기" 누적 방식 — 대회 목록(tournaments/page.tsx)
   // 수준의 데스크톱 페이지 번호 분기까지는 아직 이 화면 규모에 근거가 없다.
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [accumulated, setAccumulated] = useState<V1Match[]>([]);

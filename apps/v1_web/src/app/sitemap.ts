@@ -79,7 +79,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       return id ? [sitemapEntry(`/notices/${id}`, 0.4, 'monthly', item.publishedAt)] : [];
     }),
     // draft(준비 중) 리그도 포함한다 — 대회의 draft와 달리 다르다: 공개 목록 화면
-    // (league-matches-list-client.tsx)이 '준비 중'을 정식 상태 필터 옵션으로 노출해서
+    // (지금은 통합 목록 tournaments/page.tsx)이 '준비 중'을 정식 상태 필터 옵션으로 노출해서
     // 이미 로그인 없이 브라우징 가능하다(admin이 아직 공개 안 한 대회 draft와 다른 개념 —
     // 리그의 draft는 "팀은 모였지만 대진이 아직 안 생성된" 상태다). 로그인 없이 보이는
     // 화면을 sitemap에서만 숨기면 "브라우징은 되는데 검색은 안 되는" 불일치가 생긴다.

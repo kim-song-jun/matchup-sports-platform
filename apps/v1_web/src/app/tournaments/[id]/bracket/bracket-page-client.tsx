@@ -25,10 +25,10 @@ import { usePublicTournamentSchedule } from '@/components/public-game-records/us
 // ⚠️ 이 파일에도 동명 지역 함수가 있다(대회 상세 `V1TournamentStanding` 용). 별칭으로 갈라
 // 둔다 — 같은 이름 두 개가 서로 다른 입력을 받으면 다음 사람이 아무거나 집는다.
 import {
+  ScheduleContent,
   standingsAriaLabel,
   toStandingsRows as publicStandingsToRows,
 } from '@/components/public-game-records/schedule-content';
-import { ScheduleContent } from '@/components/public-game-records/schedule-content';
 import { competitionFormatLabel, isLeagueCompetition } from '@/lib/competition-kind';
 import type {
   V1TournamentDetail,

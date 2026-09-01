@@ -291,7 +291,14 @@ async function main() {
     const after = await fetch(`${BASE}/landing`, { method: 'HEAD' });
     const servingAfter = after.ok ? after.headers.get('x-teameet-commit') : null;
     if (!servingBefore || !servingAfter) {
-      servingNote = `서빙본 재확인: 불가(HTTP ${after.status}${servingAfter ? '' : ' · 커밋 헤더 없음'}) — 캡처 중 변경 여부 **미확인**`;
+      // **어느 쪽이 없는지 밝힌다.** "불가(HTTP 200)" 만 적으면 200 인데 왜 못 쟀는지가
+      // 안 보이고, 읽는 사람이 재실행할지 판단할 수 없다. 원인이 preflight 쪽(before)인지
+      // 이번 재확인 쪽(after)인지에 따라 할 일이 다르다.
+      const missing = [
+        servingBefore ? null : '캡처 전 커밋 헤더 없음',
+        servingAfter ? null : '캡처 후 커밋 헤더 없음',
+      ].filter(Boolean).join(' · ');
+      servingNote = `서빙본 재확인: 불가(HTTP ${after.status} · ${missing}) — 캡처 중 변경 여부 **미확인**`;
     } else if (servingBefore !== servingAfter) {
       servingNote = `⚠️  캡처 중 서빙본이 바뀌었다: ${servingBefore.slice(0, 9)} → ${servingAfter.slice(0, 9)} — 결과가 두 빌드에 걸쳐 있다. 다시 돌려라`;
     } else {

@@ -642,8 +642,9 @@ export function useV1MyMatches(filters?: ListFilters) {
   });
 }
 
-export function useV1Match(matchId: string) {
+export function useV1Match(matchId: string, options?: { seed?: V1Match | null }) {
   const queryClient = useQueryClient();
+  const seed = options?.seed;
   return useQuery({
     queryKey: v1Keys.match(matchId),
     queryFn: () => v1Get<V1Match>(`/matches/${matchId}`),
@@ -655,14 +656,19 @@ export function useV1Match(matchId: string) {
     // 주는지는 엔드포인트마다 다르고, 목록의 축약된 값으로 CTA를 그리면 이미 신청한
     // 매치에 "참가 신청"이 뜨는 식으로 사용자를 잘못 이끈다. 화면 쪽은 이 데이터가
     // placeholder 인 동안(`isPlaceholderData`) CTA를 잠근다.
+    //
+    // 서버가 넘긴 seed 가 있으면 그것을 먼저 쓴다(딥링크·푸시·새로고침 진입). 목록을
+    // 거치지 않은 진입에는 캐시가 없으므로 seed 만이 첫 화면을 채울 수 있다.
     placeholderData: () => {
-      const seed = findInListCache<V1Match>(
-        queryClient,
-        v1Keys.matchesAll(),
-        (item) => (item.matchId ?? item.id) === matchId,
-      );
-      if (!seed) return undefined;
-      return { ...seed, viewerState: undefined, viewer: undefined, participantsPreview: undefined };
+      const source =
+        seed ??
+        findInListCache<V1Match>(
+          queryClient,
+          v1Keys.matchesAll(),
+          (item) => (item.matchId ?? item.id) === matchId,
+        );
+      if (!source) return undefined;
+      return { ...source, viewerState: undefined, viewer: undefined, participantsPreview: undefined };
     },
   });
 }
@@ -1480,21 +1486,24 @@ export function useV1TeamMatches(filters?: ListFilters, options?: QueryOptions) 
   });
 }
 
-export function useV1TeamMatch(teamMatchId: string) {
+export function useV1TeamMatch(teamMatchId: string, options?: { seed?: V1TeamMatch | null }) {
   const queryClient = useQueryClient();
+  const seed = options?.seed;
   return useQuery({
     queryKey: v1Keys.teamMatch(teamMatchId),
     queryFn: () => v1Get<V1TeamMatch>(`/team-matches/${teamMatchId}`),
     enabled: Boolean(teamMatchId),
     // useV1Match 와 같은 이유·같은 안전장치(뷰어 상태·신청 목록 제거) — 자세한 근거는 그쪽 주석.
     placeholderData: () => {
-      const seed = findInListCache<V1TeamMatch>(
-        queryClient,
-        v1Keys.teamMatchesAll(),
-        (item) => (item.teamMatchId ?? item.id) === teamMatchId,
-      );
-      if (!seed) return undefined;
-      return { ...seed, viewerState: undefined, viewer: undefined, applicantTeams: undefined };
+      const source =
+        seed ??
+        findInListCache<V1TeamMatch>(
+          queryClient,
+          v1Keys.teamMatchesAll(),
+          (item) => (item.teamMatchId ?? item.id) === teamMatchId,
+        );
+      if (!source) return undefined;
+      return { ...source, viewerState: undefined, viewer: undefined, applicantTeams: undefined };
     },
   });
 }

@@ -215,9 +215,10 @@ export function TeamMatchListPageClient() {
   }
 }
 
-export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string }) {
+/** matches-client.tsx 의 `seed` 와 같은 목적·같은 안전장치 — 자세한 근거는 그쪽 주석. */
+export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: string; seed?: V1TeamMatch | null }) {
   const router = useRouter();
-  const query = useV1TeamMatch(teamMatchId);
+  const query = useV1TeamMatch(teamMatchId, { seed });
   const rawViewerState = query.data ? getViewerState(query.data) : 'none';
   const canManageHostTeam = query.data?.viewer?.manageableHostTeam === true;
   // 결과 승인 진입 게이트. `viewerState === 'approved'` 를 쓰면 안 된다 — 그건 신청서를

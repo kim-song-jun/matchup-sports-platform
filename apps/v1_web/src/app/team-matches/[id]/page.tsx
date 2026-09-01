@@ -30,5 +30,6 @@ export default async function TeamMatchDetailPage({ params }: { params: Promise<
   // 지나므로 링크 전수 교체 없이 착지 화면만 바뀐다. 라인업·결과·수정 하위 라우트는
   // 별도 경로라 영향이 없다.
   if (teamMatch.league) redirect(`/league-matches/${teamMatch.league.leagueId}/fixtures/${id}`);
-  return <TeamMatchDetailPageClient teamMatchId={id} />;
+  // matches/[id] 와 같은 이유 — 리다이렉트 판정을 위해 이미 받은 응답을 첫 표시값으로 넘긴다.
+  return <TeamMatchDetailPageClient teamMatchId={id} seed={teamMatch} />;
 }

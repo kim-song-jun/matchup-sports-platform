@@ -279,10 +279,13 @@ export function MatchDetailPageClient({ matchId, seed }: { matchId: string; seed
     mode: toDetailMode(viewerState, getStatus(query.data)),
     reviewAction: buildMatchReviewAction(matchId, viewerState, getStatus(query.data)),
     applyLabel: seeding ? '불러오는 중' : applyLabel(viewerState, getStatus(query.data), eligibility.data?.eligible, eligibility.data?.message),
-    applyPending: seeding || applyMatch.isPending || withdrawMatch.isPending,
+    // seeding 을 여기 넣지 않는다 — 렌더 쪽이 applyPending 을 '처리 중'(= 내 신청을
+    // 처리하는 중)으로 읽어 applyLabel 을 덮어쓴다. 잠금은 onApply 를 비우는 것으로
+    // 충분하고(canRunAction=false → disabled), 라벨은 '불러오는 중'이 남는다.
+    applyPending: applyMatch.isPending || withdrawMatch.isPending,
     statusLabel: seeding ? undefined : statusLabel(viewerState, getStatus(query.data)),
     chatLabel: chatLabel(viewerState),
-    chatPending: seeding || resolveChatRoom.isPending,
+    chatPending: resolveChatRoom.isPending,
     onChat: !seeding && canOpenMatchChat(viewerState)
       ? () => resolveChatRoom.mutate(
           { targetType: 'match', targetId: matchId },

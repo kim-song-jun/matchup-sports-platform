@@ -105,8 +105,8 @@ async function pickLeagues(probeLimit = 14) {
       continue; // 못 읽는 리그는 표본에서 제외한다 — 판정 대상이 아니다
     }
     if (name === null) continue;
-    if (name === '리그 순위' && plain === null) plain = { id: item.id, note: "티어 없음 ('리그 순위')" };
-    else if (name !== '리그 순위' && tiered === null) tiered = { id: item.id, note: `티어 '${name}'` };
+    if (name === '리그 순위' && plain === null) plain = { id: item.id, groupName: name, note: "티어 없음 ('리그 순위')" };
+    else if (name !== '리그 순위' && tiered === null) tiered = { id: item.id, groupName: name, note: `티어 '${name}'` };
     if (plain && tiered) break;
   }
   const picked = [plain, tiered].filter(Boolean);
@@ -132,8 +132,14 @@ async function pickTargets() {
   return { leagues, tournament };
 }
 
-/** 브라우저 안에서 도는 판정 — 여기서 읽은 값만 표에 들어간다. */
-const READ = () => {
+/**
+ * 브라우저 안에서 도는 판정 — 여기서 읽은 값만 표에 들어간다.
+ * `expectGroupName` 은 **API 가 준 순위 제목**이다(`/schedule` 의 `standings[].groupName`).
+ * 화면이 그 이름을 안 쓰면 **같은 리그가 화면마다 다른 이름으로 불린다** — 티어 라벨을
+ * 한쪽 화면에만 적용한 결함이 정확히 그 모양이었다(2026-09-01: `/schedule` 은 '2부',
+ * `/bracket` 은 '리그 순위' 하드코딩). 티어 문자열을 하네스에 박지 않고 **두 화면을 맞대어** 잰다.
+ */
+const READ = (expectGroupName) => {
   const text = (document.body.innerText || '').replace(/\n{2,}/g, '\n').trim();
   const tabs = [...document.querySelectorAll('[role="tab"]')].map((e) => e.textContent.trim());
   // 순위표 행 세기. **빈 상태도 `tbody > tr` 이다** — alpha 실측(2026-09-01): 순위가 없을 때
@@ -153,6 +159,21 @@ const READ = () => {
     hasRegularRoundChip: tabs.includes('정규 라운드') || /정규 라운드/.test(text),
     hasGroupStandingsCopy: /조별 순위/.test(text),
     hasPlayerRecords: /득점 순위|도움 순위|선수 기록/.test(text),
+    // ⚠️ **본문 전체를 검색하면 안 된다.** 리그 이름 자체가 `"… 1시즌 2부"` 라서
+    // `text.includes('2부')` 는 순위 제목과 무관하게 참이 된다 — 이 하네스가 실제로 그렇게
+    // 아무것도 안 재는 ✅ 를 한 번 냈다(2026-09-01). 순위표를 감싼 **섹션의 `aria-label`**
+    // 을 앵커로 삼아 그 자리만 본다.
+    standingsAriaLabel: (() => {
+      const table = document.querySelector('table');
+      if (!table) return null;
+      let el = table.parentElement;
+      while (el) {
+        const label = el.getAttribute('aria-label');
+        if (label) return label;
+        el = el.parentElement;
+      }
+      return null;
+    })(),
   };
 };
 
@@ -171,13 +192,18 @@ function verdict(kind, r) {
     if (r.hasKnockoutChip) bad.push("'결선' 남음");
     if (r.hasGroupStandingsCopy) bad.push("'조별 순위' 남음");
     if (r.hasPlayerRecords) bad.push('선수 기록 섹션 노출');
+    // API 가 '2부' 라고 부르는 리그를 화면이 '리그 순위' 로 부르면 같은 리그가 두 이름을 갖는다.
+    // 화면마다 라벨 모양이 달라(`'2부'` vs `'2부 순위'`) 포함 여부로 본다.
+    if (r.expectGroupName && r.standingsAriaLabel && !r.standingsAriaLabel.includes(r.expectGroupName)) {
+      bad.push(`순위 제목이 API 와 다름(화면 '${r.standingsAriaLabel}' vs API '${r.expectGroupName}')`);
+    }
   } else {
     if (r.hasRegularRoundChip) bad.push("대회에 '정규 라운드' 샘");
   }
   return bad.length === 0 ? '✅' : `❌ ${bad.join(' · ')}`;
 }
 
-async function capture(browser, { width, height }, url, file, isBracket) {
+async function capture(browser, { width, height }, url, file, isBracket, expectGroupName) {
   const context = await browser.newContext({ viewport: { width, height } });
   const page = await context.newPage();
   try {
@@ -195,7 +221,7 @@ async function capture(browser, { width, height }, url, file, isBracket) {
       return { status, read: null, note: why };
     }
     await page.waitForTimeout(SETTLE_MS);
-    let read = await page.evaluate(READ);
+    let read = await page.evaluate(READ, expectGroupName);
 
     /**
      * **`/bracket` 은 두 번 읽어야 한다.** 이 화면은 상위 탭이 둘(일정 / 순위)이고 기본이
@@ -219,11 +245,13 @@ async function capture(browser, { width, height }, url, file, isBracket) {
         return { status, read: null, note: '순위 탭을 못 찾았다 — 하네스가 판정할 수 없다' };
       }
       await page.waitForTimeout(2_000);
-      const standingsView = await page.evaluate(READ);
+      const standingsView = await page.evaluate(READ, expectGroupName);
       read = {
         ...read,
         standingsRows: standingsView.standingsRows,
         hasEmptyStandings: standingsView.hasEmptyStandings,
+        // 순위 제목은 **순위 탭에서만** 보인다 — 기본 탭 값으로 판정하면 늘 null 이다.
+        standingsAriaLabel: standingsView.standingsAriaLabel,
         // 에러는 어느 탭에서든 뜨면 결함이다.
         hasError: read.hasError || standingsView.hasError,
       };
@@ -252,7 +280,7 @@ async function capture(browser, { width, height }, url, file, isBracket) {
       }
     });
     await page.screenshot({ path: `${OUT}/${file}`, fullPage: true });
-    return { status, read, note: '' };
+    return { status, read: { ...read, expectGroupName }, note: '' };
   } finally {
     await context.close();
   }
@@ -278,6 +306,8 @@ async function main() {
         id: l.id,
         path,
         slug: `league${tag}`,
+        // API 가 준 순위 제목. 화면이 이 이름을 쓰는지 두 화면 모두에서 본다.
+        expectGroupName: l.groupName ?? null,
       }));
     }),
     { kind: 'tournament', label: '대회 /bracket', id: tournament.id, path: 'bracket', slug: 'tournament' },
@@ -293,7 +323,7 @@ async function main() {
         // "화면이 비었다" 로 읽는 그 함정에 그대로 빠진다.
         let r;
         try {
-          r = await capture(browser, w, url, file, t.path === 'bracket');
+          r = await capture(browser, w, url, file, t.path === 'bracket', t.expectGroupName ?? null);
         } catch (error) {
           rows.push({ 화면: t.label, 폭: w.key, HTTP: '-', 순위행: '-', 판정: `⚠️ 하네스 실패 — ${error.message}` });
           continue;

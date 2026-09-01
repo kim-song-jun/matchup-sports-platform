@@ -181,207 +181,207 @@ async function run() {
        */
       let ctx;
       try {
-      ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height } });
-      const page = await ctx.newPage();
+        ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height } });
+        const page = await ctx.newPage();
 
-      // ── /tournaments (쿼리 없음 = 전체) ──
-      const listRes = await page.goto(`${BASE}/tournaments`, GOTO);
-      await page.waitForTimeout(4000);
-      const listStatus = listRes?.status();
-      await page.screenshot({ path: `${OUT}/tournaments-${vp.key}.png`, fullPage: false });
+        // ── /tournaments (쿼리 없음 = 전체) ──
+        const listRes = await page.goto(`${BASE}/tournaments`, GOTO);
+        await page.waitForTimeout(4000);
+        const listStatus = listRes?.status();
+        await page.screenshot({ path: `${OUT}/tournaments-${vp.key}.png`, fullPage: false });
 
-      const list = await page.evaluate(`(() => {
-        /* '첫 화면' 이라고 말하려면 **실제로 보이는 카드**만 세야 한다. 두 번 틀렸다:
-             1차  document 전체를 세면서 "첫 화면" 이라 적었다 (페이지 크기 20 이 한 화면처럼 보였다)
-             2차  window.innerHeight 로 좁혔다 — **이 앱은 window 로 스크롤하지 않는다**
-           실측: body overflow hidden · document 스크롤 불가 · 유일한 스크롤러가 .tm-scroll-area
-                 (top 56 · height 714 vs window 844) → 위 56px 과 아래 74px 은 **안 보인다**
-           그래서 그 컨테이너의 rect 와 교차하는 카드만 센다. 배지도 document 전체가 아니라
-           **그 카드 안**에서 센다 — 카드 밖 배지를 세면 분자와 분모가 다른 집합이 된다. */
-        const scroller = document.querySelector('.tm-scroll-area');
-        const view = scroller ? scroller.getBoundingClientRect() : null;
-        const allCards = [...document.querySelectorAll('[role="list"][aria-label="대회 목록"] > *')];
-        const cards = view
-          ? allCards.filter((el) => {
-              const r = el.getBoundingClientRect();
-              return r.bottom > view.top && r.top < view.bottom;
-            })
-          : [];
-        const badges = cards.filter((c) => c.querySelector('[aria-label="정규 리그"]') !== null);
-        const seg = document.querySelector('nav[aria-label="대회 유형"]');
-        const title = [...document.querySelectorAll('*')].find((e) => e.textContent?.trim() === '대회 목록');
-        const chips = document.querySelector('[role="group"][aria-label="종목 필터"]');
-        const rect = (el) => (el ? Math.round(el.getBoundingClientRect().left) : null);
-        return {
-          hasScroller: view !== null,
-          cardCount: cards.length,
-          domCardCount: allCards.length,
-          leagueBadges: badges.length,
-          firstCardTop: allCards[0] ? Math.round(allCards[0].getBoundingClientRect().top) : null,
-          segLeft: rect(seg),
-          titleLeft: rect(title),
-          chipsLeft: rect(chips),
-          segTop: seg ? Math.round(seg.getBoundingClientRect().top) : null,
-          segHeight: seg ? Math.round(seg.getBoundingClientRect().height) : null,
-          segMarginBottom: seg ? Math.round(parseFloat(getComputedStyle(seg).marginBottom) || 0) : 0,
-        };
-      })()`);
-
-      if (vp.key === 'mobile') {
-        // 판정 2 — 전체 탭에 두 종류가 섞이는가
-        if (!list.hasScroller) {
-          /* 셀렉터를 짐작하면 항상 0개가 나와 **거짓 판정**이 된다 — 컨테이너가 사라졌으면
-             그 사실을 말해야지, 카드가 없다고 말하면 안 된다. */
-          record('2-섞임', 'INCONCLUSIVE',
-            `스크롤 컨테이너(.tm-scroll-area)를 못 찾았다 (status ${listStatus}) — 셸이 바뀌었는지 확인 필요`);
-        } else if (list.cardCount === 0) {
-          record('2-섞임', 'INCONCLUSIVE',
-            `보이는 카드가 0개다 (DOM 전체 ${list.domCardCount}개, status ${listStatus}) — 부재를 통과로 읽지 않는다`);
-        } else {
-          const mixed = list.leagueBadges > 0 && list.leagueBadges < list.cardCount;
-          record(
-            '2-섞임',
-            mixed ? 'PASS' : 'FAIL',
-            `첫 화면(뷰포트) 카드 ${list.cardCount}개 중 리그 ${list.leagueBadges}개` +
-              ` [DOM 전체 ${list.domCardCount}개]` +
-              (mixed ? '' : list.leagueBadges === list.cardCount ? ' — 전부 리그다(대회가 안 보인다)' : ' — 리그가 없다'),
-          );
-        }
-      }
-
-      if (vp.key === 'desktop') {
-        // 판정 4 — 세그먼트 좌측 선이 제목·칩과 맞는가
-        const { segLeft, titleLeft, chipsLeft } = list;
-        if (segLeft === null || titleLeft === null || chipsLeft === null) {
-          record('4-정렬', 'INCONCLUSIVE', `요소를 못 찾았다 seg=${segLeft} title=${titleLeft} chips=${chipsLeft}`);
-        } else {
-          const maxGap = Math.max(Math.abs(segLeft - titleLeft), Math.abs(segLeft - chipsLeft));
-          record(
-            '4-정렬',
-            maxGap <= 1 ? 'PASS' : 'FAIL',
-            `1440 좌측 x — 세그먼트 ${segLeft} · 제목 ${titleLeft} · 칩 ${chipsLeft} (최대차 ${maxGap}px)`,
-          );
-        }
-      }
-
-      // ── 리그 상세 ──
-      const detRes = await page.goto(`${BASE}/tournaments/${leagueId}`, GOTO);
-      await page.waitForTimeout(5000);
-      const detStatus = detRes?.status();
-      await page.screenshot({ path: `${OUT}/league-detail-${vp.key}.png`, fullPage: false });
-
-      const det = await page.evaluate(`(() => {
-        const text = document.body.innerText;
-        return {
-          len: text.length,
-          hasTeamJoin: text.includes('팀 참가'),
-          hasStandings: text.includes('통합 순위'),
-          hasSeats: text.includes('자리 남았어요'),
-          hasConfirmed: text.includes('팀 확정'),
-          hasGender: text.includes('성별 구분 없음'),
-          /* 참가비는 **라벨 노드**로 본다 — 문자열 매칭은 양쪽으로 틀린다.
-               '참가비' 포함  → "운영진 확인 + 참가비 입금 완료 후…" 안내 4건에 걸려 거짓 FAIL
-               '무료' 포함    → entryFee 가 0 이 아닌 값으로 새면 "N원" 이라 **놓친다**
-             InfoRow 는 라벨을 자기 div 에 담으므로(레일은 span), 자식이 없고 텍스트가 정확히
-             '참가비' 인 노드를 센다. 값이 무엇이든 라벨이 있으면 잡힌다.
-             v1_web 유닛 계약도 같은 방식이다(queryByText 정확 일치) — 한 질문에 판정식은 하나.
-             (이 주석은 템플릿 리터럴 안이라 백틱을 쓸 수 없다 — 쓰면 evaluate 인자가 깨진다.) */
-          feeLabels: [...document.querySelectorAll('*')]
-            .filter((el) => el.children.length === 0 && el.textContent?.trim() === '참가비').length,
-          capacityBars: [...document.querySelectorAll('[role="progressbar"]')]
-            .filter((b) => (b.getAttribute('aria-label') ?? '').startsWith('정원')).length,
-        };
-      })()`);
-
-      if (vp.key === 'mobile') {
-        const rendered = det.hasTeamJoin || det.hasStandings;
-        if (!rendered) {
-          record('3-리그상세', 'INCONCLUSIVE',
-            `본문이 안 그려졌다 (status ${detStatus}, text ${det.len}자) — 부재를 통과로 읽지 않는다`);
-        } else {
-          const leaks = [
-            det.hasSeats && '자리 남았어요',
-            det.hasConfirmed && '팀 확정',
-            det.hasGender && '성별 구분 없음',
-            det.feeLabels > 0 && `참가비 라벨 ${det.feeLabels}개`,
-            det.capacityBars > 0 && `정원 진행바 ${det.capacityBars}개`,
-          ].filter(Boolean);
-          record('3-리그상세', leaks.length === 0 ? 'PASS' : 'FAIL',
-            leaks.length === 0
-              ? `본문 렌더 확인(팀참가=${det.hasTeamJoin} 순위=${det.hasStandings}) · 정원·참가비·성별 전부 없음`
-              : `새는 것: ${leaks.join(' / ')}`);
-        }
-      }
-
-      // ── 대조군: 대회 상세 ──
-      /**
-       * **판정식이 실제로 무언가를 잡는지 증명한다.**
-       *
-       * "리그에 참가비 라벨이 없다" 는 판정식이 **아무것도 못 잡는 것**이어도 통과한다(오늘
-       * 여러 번 잡은 vacuous). 진짜 변이는 `entryFee` 를 0 아닌 값으로 새게 하는 것인데
-       * 그건 **alpha 데이터 변경**이라 사용자 승인 없이 못 한다. 대신 **같은 판정식을 대회에
-       * 적용**한다 — 대회에는 참가비 라벨이 **있어야** 하고, 안 나오면 판정식이 죽은 것이다.
-       */
-      if (vp.key === 'mobile') {
-        const ctrlRes = await page.goto(`${BASE}/tournaments/${tournamentId}`, GOTO);
-        await page.waitForTimeout(5000);
-        const ctrl = await page.evaluate(`(() => {
-          const leaf = (t) => [...document.querySelectorAll('*')]
-            .filter((el) => el.children.length === 0 && el.textContent?.trim() === t).length;
+        const list = await page.evaluate(`(() => {
+          /* '첫 화면' 이라고 말하려면 **실제로 보이는 카드**만 세야 한다. 두 번 틀렸다:
+               1차  document 전체를 세면서 "첫 화면" 이라 적었다 (페이지 크기 20 이 한 화면처럼 보였다)
+               2차  window.innerHeight 로 좁혔다 — **이 앱은 window 로 스크롤하지 않는다**
+             실측: body overflow hidden · document 스크롤 불가 · 유일한 스크롤러가 .tm-scroll-area
+                   (top 56 · height 714 vs window 844) → 위 56px 과 아래 74px 은 **안 보인다**
+             그래서 그 컨테이너의 rect 와 교차하는 카드만 센다. 배지도 document 전체가 아니라
+             **그 카드 안**에서 센다 — 카드 밖 배지를 세면 분자와 분모가 다른 집합이 된다. */
+          const scroller = document.querySelector('.tm-scroll-area');
+          const view = scroller ? scroller.getBoundingClientRect() : null;
+          const allCards = [...document.querySelectorAll('[role="list"][aria-label="대회 목록"] > *')];
+          const cards = view
+            ? allCards.filter((el) => {
+                const r = el.getBoundingClientRect();
+                return r.bottom > view.top && r.top < view.bottom;
+              })
+            : [];
+          const badges = cards.filter((c) => c.querySelector('[aria-label="정규 리그"]') !== null);
+          const seg = document.querySelector('nav[aria-label="대회 유형"]');
+          const title = [...document.querySelectorAll('*')].find((e) => e.textContent?.trim() === '대회 목록');
+          const chips = document.querySelector('[role="group"][aria-label="종목 필터"]');
+          const rect = (el) => (el ? Math.round(el.getBoundingClientRect().left) : null);
           return {
-            len: document.body.innerText.length,
-            feeLabels: leaf('참가비'),
+            hasScroller: view !== null,
+            cardCount: cards.length,
+            domCardCount: allCards.length,
+            leagueBadges: badges.length,
+            firstCardTop: allCards[0] ? Math.round(allCards[0].getBoundingClientRect().top) : null,
+            segLeft: rect(seg),
+            titleLeft: rect(title),
+            chipsLeft: rect(chips),
+            segTop: seg ? Math.round(seg.getBoundingClientRect().top) : null,
+            segHeight: seg ? Math.round(seg.getBoundingClientRect().height) : null,
+            segMarginBottom: seg ? Math.round(parseFloat(getComputedStyle(seg).marginBottom) || 0) : 0,
+          };
+        })()`);
+
+        if (vp.key === 'mobile') {
+          // 판정 2 — 전체 탭에 두 종류가 섞이는가
+          if (!list.hasScroller) {
+            /* 셀렉터를 짐작하면 항상 0개가 나와 **거짓 판정**이 된다 — 컨테이너가 사라졌으면
+               그 사실을 말해야지, 카드가 없다고 말하면 안 된다. */
+            record('2-섞임', 'INCONCLUSIVE',
+              `스크롤 컨테이너(.tm-scroll-area)를 못 찾았다 (status ${listStatus}) — 셸이 바뀌었는지 확인 필요`);
+          } else if (list.cardCount === 0) {
+            record('2-섞임', 'INCONCLUSIVE',
+              `보이는 카드가 0개다 (DOM 전체 ${list.domCardCount}개, status ${listStatus}) — 부재를 통과로 읽지 않는다`);
+          } else {
+            const mixed = list.leagueBadges > 0 && list.leagueBadges < list.cardCount;
+            record(
+              '2-섞임',
+              mixed ? 'PASS' : 'FAIL',
+              `첫 화면(뷰포트) 카드 ${list.cardCount}개 중 리그 ${list.leagueBadges}개` +
+                ` [DOM 전체 ${list.domCardCount}개]` +
+                (mixed ? '' : list.leagueBadges === list.cardCount ? ' — 전부 리그다(대회가 안 보인다)' : ' — 리그가 없다'),
+            );
+          }
+        }
+
+        if (vp.key === 'desktop') {
+          // 판정 4 — 세그먼트 좌측 선이 제목·칩과 맞는가
+          const { segLeft, titleLeft, chipsLeft } = list;
+          if (segLeft === null || titleLeft === null || chipsLeft === null) {
+            record('4-정렬', 'INCONCLUSIVE', `요소를 못 찾았다 seg=${segLeft} title=${titleLeft} chips=${chipsLeft}`);
+          } else {
+            const maxGap = Math.max(Math.abs(segLeft - titleLeft), Math.abs(segLeft - chipsLeft));
+            record(
+              '4-정렬',
+              maxGap <= 1 ? 'PASS' : 'FAIL',
+              `1440 좌측 x — 세그먼트 ${segLeft} · 제목 ${titleLeft} · 칩 ${chipsLeft} (최대차 ${maxGap}px)`,
+            );
+          }
+        }
+
+        // ── 리그 상세 ──
+        const detRes = await page.goto(`${BASE}/tournaments/${leagueId}`, GOTO);
+        await page.waitForTimeout(5000);
+        const detStatus = detRes?.status();
+        await page.screenshot({ path: `${OUT}/league-detail-${vp.key}.png`, fullPage: false });
+
+        const det = await page.evaluate(`(() => {
+          const text = document.body.innerText;
+          return {
+            len: text.length,
+            hasTeamJoin: text.includes('팀 참가'),
+            hasStandings: text.includes('통합 순위'),
+            hasSeats: text.includes('자리 남았어요'),
+            hasConfirmed: text.includes('팀 확정'),
+            hasGender: text.includes('성별 구분 없음'),
+            /* 참가비는 **라벨 노드**로 본다 — 문자열 매칭은 양쪽으로 틀린다.
+                 '참가비' 포함  → "운영진 확인 + 참가비 입금 완료 후…" 안내 4건에 걸려 거짓 FAIL
+                 '무료' 포함    → entryFee 가 0 이 아닌 값으로 새면 "N원" 이라 **놓친다**
+               InfoRow 는 라벨을 자기 div 에 담으므로(레일은 span), 자식이 없고 텍스트가 정확히
+               '참가비' 인 노드를 센다. 값이 무엇이든 라벨이 있으면 잡힌다.
+               v1_web 유닛 계약도 같은 방식이다(queryByText 정확 일치) — 한 질문에 판정식은 하나.
+               (이 주석은 템플릿 리터럴 안이라 백틱을 쓸 수 없다 — 쓰면 evaluate 인자가 깨진다.) */
+            feeLabels: [...document.querySelectorAll('*')]
+              .filter((el) => el.children.length === 0 && el.textContent?.trim() === '참가비').length,
             capacityBars: [...document.querySelectorAll('[role="progressbar"]')]
               .filter((b) => (b.getAttribute('aria-label') ?? '').startsWith('정원')).length,
           };
         })()`);
-        if (ctrl.len < 500) {
-          record('3b-대조군', 'INCONCLUSIVE',
-            `대회 상세 본문이 안 그려졌다 (status ${ctrlRes?.status()}, ${ctrl.len}자)`);
-        } else {
-          record('3b-대조군', ctrl.feeLabels > 0 ? 'PASS' : 'FAIL',
-            ctrl.feeLabels > 0
-              ? `대회 상세에 참가비 라벨 ${ctrl.feeLabels}개 · 정원 진행바 ${ctrl.capacityBars}개 — 판정식이 살아 있다`
-              : '대회 상세에도 참가비 라벨이 0개다 — **판정식이 아무것도 못 잡는다**(리그 판정 무효)');
+
+        if (vp.key === 'mobile') {
+          const rendered = det.hasTeamJoin || det.hasStandings;
+          if (!rendered) {
+            record('3-리그상세', 'INCONCLUSIVE',
+              `본문이 안 그려졌다 (status ${detStatus}, text ${det.len}자) — 부재를 통과로 읽지 않는다`);
+          } else {
+            const leaks = [
+              det.hasSeats && '자리 남았어요',
+              det.hasConfirmed && '팀 확정',
+              det.hasGender && '성별 구분 없음',
+              det.feeLabels > 0 && `참가비 라벨 ${det.feeLabels}개`,
+              det.capacityBars > 0 && `정원 진행바 ${det.capacityBars}개`,
+            ].filter(Boolean);
+            record('3-리그상세', leaks.length === 0 ? 'PASS' : 'FAIL',
+              leaks.length === 0
+                ? `본문 렌더 확인(팀참가=${det.hasTeamJoin} 순위=${det.hasStandings}) · 정원·참가비·성별 전부 없음`
+                : `새는 것: ${leaks.join(' / ')}`);
+          }
         }
-      }
 
-      // ── /league-matches (판정 1 비교 대상) ──
-      const lmRes = await page.goto(`${BASE}/league-matches`, GOTO);
-      await page.waitForTimeout(4000);
-      const lmStatus = lmRes?.status();
-      await page.screenshot({ path: `${OUT}/league-matches-${vp.key}.png`, fullPage: false });
-      const lmTop = await page.evaluate(topOf('[role="list"][aria-label="리그 목록"] > *'));
-
-      if (vp.key === 'mobile') {
+        // ── 대조군: 대회 상세 ──
         /**
-         * 판정 1 — **세그먼트가 첫 카드를 얼마나 밀었나.**
+         * **판정식이 실제로 무언가를 잡는지 증명한다.**
          *
-         * ## 옛 기준(`/tournaments` vs `/league-matches` 차이 ≤100px)은 폐기했다
-         * 두 이유로 답을 못 준다:
-         * 1. **두 항의 조건이 다르다.** `/tournaments` 는 프로모 캐러셀(207px)+배너(65px)를
-         *    이고 있고 `/league-matches` 는 아니다. 차이의 대부분이 우리와 무관한 요소다.
-         *    실제로 옛 기준값 128px 은 캐러셀이 안 뜬 순간의 값이었다(548-64=484 여야 한다).
-         * 2. **리다이렉트가 붙으면 비교 대상이 사라진다.** 두 탭이 같은 페이지가 되므로
-         *    첫 카드 top 이 구조적으로 같아져 이 판정이 무의미해진다.
-         *
-         * 그래서 **비교를 버리고 우리 몫만 잰다** — 세그먼트가 차지한 세로. 한 줄(터치 타깃
-         * 44 + 패딩)이면 정상이고, 두 줄로 늘어나면 100px 을 넘어 잡힌다.
+         * "리그에 참가비 라벨이 없다" 는 판정식이 **아무것도 못 잡는 것**이어도 통과한다(오늘
+         * 여러 번 잡은 vacuous). 진짜 변이는 `entryFee` 를 0 아닌 값으로 새게 하는 것인데
+         * 그건 **alpha 데이터 변경**이라 사용자 승인 없이 못 한다. 대신 **같은 판정식을 대회에
+         * 적용**한다 — 대회에는 참가비 라벨이 **있어야** 하고, 안 나오면 판정식이 죽은 것이다.
          */
-        const segH = list.segHeight;
-        const segMb = list.segMarginBottom;
-        if (segH === null) {
-          record('1-세그먼트몫', 'INCONCLUSIVE',
-            `세그먼트를 못 찾았다 (status ${listStatus}) — 첫 카드 top=${list.firstCardTop}`);
-        } else {
-          const added = segH + segMb;
-          record('1-세그먼트몫', added <= 80 ? 'PASS' : 'FAIL',
-            `세그먼트가 더한 세로 ${added}px (height ${segH} + margin ${segMb}, 기준 ≤80 = 한 줄)` +
-              ` · 참고: 첫 카드 top ${list.firstCardTop}px, /league-matches ${lmTop}px`);
+        if (vp.key === 'mobile') {
+          const ctrlRes = await page.goto(`${BASE}/tournaments/${tournamentId}`, GOTO);
+          await page.waitForTimeout(5000);
+          const ctrl = await page.evaluate(`(() => {
+            const leaf = (t) => [...document.querySelectorAll('*')]
+              .filter((el) => el.children.length === 0 && el.textContent?.trim() === t).length;
+            return {
+              len: document.body.innerText.length,
+              feeLabels: leaf('참가비'),
+              capacityBars: [...document.querySelectorAll('[role="progressbar"]')]
+                .filter((b) => (b.getAttribute('aria-label') ?? '').startsWith('정원')).length,
+            };
+          })()`);
+          if (ctrl.len < 500) {
+            record('3b-대조군', 'INCONCLUSIVE',
+              `대회 상세 본문이 안 그려졌다 (status ${ctrlRes?.status()}, ${ctrl.len}자)`);
+          } else {
+            record('3b-대조군', ctrl.feeLabels > 0 ? 'PASS' : 'FAIL',
+              ctrl.feeLabels > 0
+                ? `대회 상세에 참가비 라벨 ${ctrl.feeLabels}개 · 정원 진행바 ${ctrl.capacityBars}개 — 판정식이 살아 있다`
+                : '대회 상세에도 참가비 라벨이 0개다 — **판정식이 아무것도 못 잡는다**(리그 판정 무효)');
+          }
         }
-      }
 
-      console.log(`  [${vp.key}] status list=${listStatus} detail=${detStatus} league=${lmStatus}`);
+        // ── /league-matches (판정 1 비교 대상) ──
+        const lmRes = await page.goto(`${BASE}/league-matches`, GOTO);
+        await page.waitForTimeout(4000);
+        const lmStatus = lmRes?.status();
+        await page.screenshot({ path: `${OUT}/league-matches-${vp.key}.png`, fullPage: false });
+        const lmTop = await page.evaluate(topOf('[role="list"][aria-label="리그 목록"] > *'));
+
+        if (vp.key === 'mobile') {
+          /**
+           * 판정 1 — **세그먼트가 첫 카드를 얼마나 밀었나.**
+           *
+           * ## 옛 기준(`/tournaments` vs `/league-matches` 차이 ≤100px)은 폐기했다
+           * 두 이유로 답을 못 준다:
+           * 1. **두 항의 조건이 다르다.** `/tournaments` 는 프로모 캐러셀(207px)+배너(65px)를
+           *    이고 있고 `/league-matches` 는 아니다. 차이의 대부분이 우리와 무관한 요소다.
+           *    실제로 옛 기준값 128px 은 캐러셀이 안 뜬 순간의 값이었다(548-64=484 여야 한다).
+           * 2. **리다이렉트가 붙으면 비교 대상이 사라진다.** 두 탭이 같은 페이지가 되므로
+           *    첫 카드 top 이 구조적으로 같아져 이 판정이 무의미해진다.
+           *
+           * 그래서 **비교를 버리고 우리 몫만 잰다** — 세그먼트가 차지한 세로. 한 줄(터치 타깃
+           * 44 + 패딩)이면 정상이고, 두 줄로 늘어나면 100px 을 넘어 잡힌다.
+           */
+          const segH = list.segHeight;
+          const segMb = list.segMarginBottom;
+          if (segH === null) {
+            record('1-세그먼트몫', 'INCONCLUSIVE',
+              `세그먼트를 못 찾았다 (status ${listStatus}) — 첫 카드 top=${list.firstCardTop}`);
+          } else {
+            const added = segH + segMb;
+            record('1-세그먼트몫', added <= 80 ? 'PASS' : 'FAIL',
+              `세그먼트가 더한 세로 ${added}px (height ${segH} + margin ${segMb}, 기준 ≤80 = 한 줄)` +
+                ` · 참고: 첫 카드 top ${list.firstCardTop}px, /league-matches ${lmTop}px`);
+          }
+        }
+
+        console.log(`  [${vp.key}] status list=${listStatus} detail=${detStatus} league=${lmStatus}`);
       } catch (err) {
         record(`폭-${vp.key}`, 'INCONCLUSIVE', `${vp.width}px 측정 중 실패 — ${err.message}`);
       } finally {

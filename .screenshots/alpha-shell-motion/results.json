@@ -1,0 +1,45 @@
+{
+  "origin": "https://alpha.teameet.co.kr",
+  "results": [
+    {
+      "name": "배포 신원",
+      "pass": true,
+      "detail": "release=0.5.0-alpha.20260901.g3fcff76be5d1 commit=3fcff76be5d1"
+    },
+    {
+      "name": "셸 지속성 — 탭 전환 후 하단 탭바가 같은 DOM 노드",
+      "pass": true,
+      "detail": "표식 심음=true(탭 5개) → 전환 후 생존=true @ /teams"
+    },
+    {
+      "name": "셸 지속성 — 상단바도 같은 DOM 노드",
+      "pass": true,
+      "detail": "/home 에서 표식 → /tournaments 로 전환 후 생존=true"
+    },
+    {
+      "name": "전환 배제 — 셸 요소에 view-transition-name",
+      "pass": true,
+      "detail": "VT지원=true topbar=tm-shell-topbar bottomNav=tm-shell-bottomnav"
+    },
+    {
+      "name": "스켈레톤 — 라우트 전환 중 실제 렌더",
+      "pass": true,
+      "detail": "전환 중 .tm-skeleton 관측=true (관측 시점 이후 잔존 10개)"
+    },
+    {
+      "name": "스크롤 복원 — 뒤로가기 후 .tm-scroll-area 위치",
+      "pass": true,
+      "detail": "굴림 400px → 상세 진입 → 뒤로가기 후 400px @ /tournaments"
+    },
+    {
+      "name": "서비스워커 — 등록 + 캐시 생성",
+      "pass": true,
+      "detail": "등록=[\"https://alpha.teameet.co.kr/sw-push.js\"] caches=[\"teameet-static-v1\"]"
+    },
+    {
+      "name": "스크린샷 갤러리",
+      "pass": true,
+      "detail": "9장 저장 → /Users/sungjun/Dev/projects/matchup-sports-platform/.claude/worktrees/tab-scroll/.screenshots/alpha-shell-motion / 전부 콘텐츠 로드됨"
+    }
+  ]
+}

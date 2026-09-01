@@ -25,14 +25,22 @@ identical; the fields below differ:
 
 | Field | Regular tournament | Regular league | Why |
 |---|---|---|---|
-| `registrationId` | present | **absent** | a league has no entry-registration concept; teams join the league directly |
+| `registrationId` | present | **absent** | league standings are computed on the league axis (`v1_league_teams`), which does not carry a registration id — see the note below |
 | `teamId` | absent | **present** | the team id is the row's identity on the league axis |
-| `fairPlayPoints` | present | **absent** | leagues do not tally fair-play points at all — `0` would read as "no penalties", so the field is omitted rather than zero-filled |
+| `fairPlayPoints` | present | **absent** | the league standings engine has no fair-play criterion at all — there is no input slot for penalty points (`league-vs-competition-standings.spec.ts`, case ④). `0` would read as "no penalties", so the field is omitted rather than zero-filled |
 | `magicNumber` | computed | `null` | the magic number is tied to the tournament axis's remaining-fixture count; the league equivalent is a separate decision and is not invented here |
 | `recalculatedAt` | last recalculation | `null` | league standings are computed per request, not persisted |
 
 The handler reads no caller identity, so the response carries no viewer-dependent fields; the
 optional-auth guard is inherited from the controller.
+
+> **`registrationId` about the mirror row — a correction.** An earlier version of this table said
+> *"a league has no entry-registration concept"*. That is **not true**: a mirror row does carry
+> `v1_tournament_registrations` (measured on alpha — a 2-team league season had two `confirmed`
+> registrations whose team ids matched the league's teams exactly, and the detail response's
+> `participantTeams` is built from them). The accurate reason is narrower: the **standings
+> computation** runs on the league axis and never has a registration id in hand. The field is
+> omitted because that code path cannot produce it, not because the concept is absent.
 
 Clients must key each row on **whichever identity field is present** (`registrationId ?? teamId`);
 exactly one of the two is always populated, and treating either as required breaks the other kind.

@@ -184,7 +184,18 @@ jobs:
           # 구하려다 실패했는데(2026-08-20), PR 체크아웃에는 base 브랜치의 원격 추적 ref
           # 가 없어 `origin/dev` 를 해석하지 못한다 — 바로 위 changeset 스텝이 payload
           # 값을 먼저 쓰고 못 쓸 때만 fetch 로 보강하는 것도 같은 이유다.
-          if [[ ! "${BASE_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+          #
+          # 폴백 조건은 **형식이 아니라 실제로 필요한 연산**이다. 예전엔 `=~ ^[0-9a-f]{40}$`
+          # 였는데, payload 의 base.sha 는 **항상** 40자 hex 라 그 조건은 PR 이벤트에서 한
+          # 번도 참이 된 적이 없다 — 즉 아래 두 줄은 도달 불가였다. 정작 실패하는 모양은
+          # "형식은 맞는데 그 SHA 로 merge-base 가 안 되는" 것이라(2026-09-01 #941), 형식·
+          # 객체 존재 같은 **대리 지표** 대신 그 명령 자체가 되는지를 묻는다.
+          #
+          # 이걸로 낫는 것: base 가 아직 fetch 안 된 경우(가져오면 풀린다).
+          # 이걸로 안 낫는 것: 분기점까지의 그래프가 잘린 경우 — 평범한 fetch 로는 회복되지
+          # 않는다(실측). 다만 그때는 아래 merge-base 가 **셸에서** 죽어 git 의 문장이 로그에
+          # 그대로 남는다. 스크립트 안에서 죽는 것보다 원인이 보인다.
+          if ! git merge-base "${BASE_SHA}" "${HEAD_SHA}" >/dev/null 2>&1; then
             git fetch --no-tags origin "${BASE_REF}"
             BASE_SHA="$(git merge-base FETCH_HEAD "${HEAD_SHA}")"
           fi

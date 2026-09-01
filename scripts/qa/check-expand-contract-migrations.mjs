@@ -961,9 +961,7 @@ for (const [label, sha] of [['base', baseSha], ['head', headSha]]) {
 // 게이트를 느슨하게 만들지 않는다는 점이 중요하다: 바꾸는 것은 "무엇을 이 PR 의 변경으로 볼
 // 것인가" 뿐이고, 아래 collectBaseFunctionNames 는 계속 **대상 브랜치 tip**(baseSha)을 본다 —
 // 함수 존재 여부는 머지된 뒤의 현실로 판정해야 CREATE OR REPLACE 가 새 함수로 오인되지 않는다.
-const diffBase = isAncestorOf(baseSha, headSha)
-  ? baseSha
-  : runGit(['merge-base', baseSha, headSha]).trim();
+const diffBase = isAncestorOf(baseSha, headSha) ? baseSha : mergeBaseOf(baseSha, headSha);
 const changes = runGit([
   'diff', '--name-status', '--find-renames', diffBase, headSha, '--',
   'apps/v1_api/prisma/migrations/*/migration.sql',
@@ -1301,12 +1299,48 @@ function isAdditiveStatement(statement, { newTables, nullableNewColumnsByTable, 
 
 // runGit 과 달리 실패를 예외로 흘리지 않고 boolean 으로 돌려준다 — 조상이 아닌 것은
 // 오류가 아니라 판정해야 할 상태다(runGit 은 git 이 non-zero 면 곧바로 fail() 로 종료한다).
+/**
+ * 분기점을 구한다. `runGit` 을 안 쓰는 이유는 **rc 1 이 오류가 아니기 때문**이다 — git 은
+ * "공통 조상이 없다"를 rc 1 + 빈 출력으로 답한다(실측 2026-09-01). 그걸 `Command failed`
+ * 로 뭉뚱그리면 읽는 사람이 원인을 못 짚는다.
+ */
+function mergeBaseOf(baseSha, headSha) {
+  let out;
+  try {
+    out = execFileSync('git', ['merge-base', baseSha, headSha], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }).trim();
+  } catch (error) {
+    if (error?.status === 1) {
+      fail(
+        `base 와 head 의 공통 조상을 찾지 못했다: ${baseSha} / ${headSha}. `
+        + '두 이력이 정말 무관하거나, 이 저장소가 그 분기점까지 갖고 있지 않다 '
+        + '(얕은 클론이면 fetch 깊이를 늘려야 한다 — 평범한 fetch 로는 회복되지 않는다).',
+      );
+    }
+    fail(`git merge-base ${baseSha} ${headSha} failed${describeGitFailure(error)}`);
+  }
+  if (!out) fail(`git merge-base ${baseSha} ${headSha} 가 빈 값을 돌려줬다`);
+  return out;
+}
+
 function isAncestorOf(ancestor, descendant) {
   try {
-    execFileSync('git', ['merge-base', '--is-ancestor', ancestor, descendant], { stdio: 'ignore' });
+    // `stdio: 'ignore'` 였을 땐 git 의 말을 **받지도 않았다.** 고장을 가려내려면 stderr 가 필요하다.
+    execFileSync('git', ['merge-base', '--is-ancestor', ancestor, descendant], {
+      stdio: ['ignore', 'ignore', 'pipe'],
+    });
     return true;
-  } catch {
-    return false;
+  } catch (error) {
+    // 맨 `catch { return false }` 는 **"조상이 아니다"(판정)와 "저장소가 고장났다"(오류)를
+    // 같은 값으로 만든다.** 그래서 base 객체가 없거나 저장소가 깨져도 조용히 `false` 가 되고,
+    // 호출부는 아무 일 없다는 듯 merge-base 로 내려가 거기서 죽는다 — **첫 신호를 여기서
+    // 삼킨다.** git 은 이 둘을 rc 로 구분해 준다(실측 2026-09-01):
+    //   rc 1   → 조상이 아니다. stderr 는 비어 있다. **정상적인 답이다.**
+    //   rc 128 → `fatal: Not a valid commit name …` 류. **고장이다.**
+    if (error?.status === 1) return false;
+    fail(`git merge-base --is-ancestor ${ancestor} ${descendant} failed${describeGitFailure(error)}`);
   }
 }
 
@@ -1314,9 +1348,29 @@ function runGit(args) {
   try {
     return execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 1024 * 1024 * 64 });
   } catch (error) {
-    const details = error instanceof Error ? error.message : String(error);
-    fail(`git ${args.join(' ')} failed: ${details}`);
+    // stderr 를 pipe 해 놓고 `error.message` 만 쓰면 **git 이 한 말이 통째로 사라진다** —
+    // 남는 건 `Command failed: git …` 뿐이라 원인을 밖에서 추측하게 된다(2026-09-01 에
+    // 실제로 그랬다: merge-base 가 죽었는데 로그에 이유가 없어 가설만 여러 개 나왔다).
+    // exit status 도 함께 남긴다 — 아래 판정들이 rc 로 갈리기 때문이다.
+    fail(`git ${args.join(' ')} failed${describeGitFailure(error)}`);
   }
+}
+
+/**
+ * `execFileSync` 가 던진 것에서 **밖에서 판단에 쓸 수 있는 것**만 뽑아 한 줄로 만든다.
+ *
+ * stderr 를 따로 붙이지 않는다 — Node 가 이미 `error.message` 뒤에 이어 준다(실측):
+ *   rc 128 → `Command failed: git merge-base … \nfatal: Not a valid commit name …`
+ *   rc 1   → `Command failed: git merge-base …`            (stderr 가 비어 있다)
+ * 따로 붙이면 같은 문장이 두 번 나오거나, 아무 차이도 없는 분기가 하나 남는다.
+ *
+ * 없던 것은 **exit status** 다. 그리고 그게 이 게이트에서 실제로 갈리는 값이다 —
+ * rc 1 은 git 의 정상적인 답이고 rc 128 은 고장이다.
+ */
+function describeGitFailure(error) {
+  const status = typeof error?.status === 'number' ? ` (exit ${error.status})` : '';
+  const details = error instanceof Error ? error.message : String(error);
+  return `${status}: ${details}`;
 }
 
 function selfTest() {
@@ -1506,6 +1560,91 @@ function selfTest() {
   console.log('[expand-contract-sql-v1] negative controls passed');
 
   baseResolutionSelfTest();
+  baseFailureDiagnosticsSelfTest();
+}
+
+/**
+ * base 해석이 **실패할 때 무엇을 말하는가**를 검증한다.
+ *
+ * 위 baseResolutionSelfTest 는 해석이 **성공하는** 경로만 본다. 그런데 2026-09-01 에 실제로
+ * 터진 것은 실패 경로였고, 그때 로그에 남은 건 `Command failed: git merge-base …` 한 줄뿐이라
+ * **원인을 아무도 못 짚었다**(가설이 여러 개 나왔고 전부 증거와 충돌했다). 그래서 여기서는
+ * 판정 결과가 아니라 **메시지가 원인을 담는지**를 본다.
+ *
+ * ⚠️ 이 대조군은 **프로덕션 실패를 재현하지 않는다.** 그 실패의 원인은 아직 미상이다
+ * (그 CI job 은 `fetch-depth: 0` 이고 두 SHA 는 체크아웃된 머지 커밋의 부모였다 — 아래 두
+ * 모양 어느 쪽도 아니다). 여기서 덮는 것은 **git 이 실패를 알리는 두 가지 방식**이고,
+ * 목적은 다음번에 게이트가 **스스로 원인을 말하게** 하는 것이다.
+ */
+function baseFailureDiagnosticsSelfTest() {
+  const origin = mkdtempSync(join(tmpdir(), 'ec-origin-'));
+  const shallow = mkdtempSync(join(tmpdir(), 'ec-shallow-'));
+  const gitIn = (repo) => (...args) =>
+    execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  const git = gitIn(origin);
+  const commitIn = (repo, dir, sql, message) => {
+    mkdirSync(join(repo, 'apps/v1_api/prisma/migrations', dir), { recursive: true });
+    writeFileSync(join(repo, 'apps/v1_api/prisma/migrations', dir, 'migration.sql'), `${sql}\n`);
+    gitIn(repo)('add', '-A');
+    gitIn(repo)('-c', 'user.email=selftest@local', '-c', 'user.name=selftest', 'commit', '-qm', message);
+    return gitIn(repo)('rev-parse', 'HEAD');
+  };
+  /** 게이트를 돌려 **종료코드와 사람이 읽을 메시지**를 함께 받는다. */
+  const gateRun = (repo, base, head) => {
+    try {
+      execFileSync(process.execPath, [new URL(import.meta.url).pathname, base, head], {
+        cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      return { code: 0, text: '' };
+    } catch (error) {
+      return { code: error?.status ?? -1, text: `${error?.stdout ?? ''}${error?.stderr ?? ''}` };
+    }
+  };
+  const expectMessage = (label, got, needles) => {
+    if (got.code === 0) fail(`base failure self-test: ${label} 은 실패해야 하는데 통과했다`);
+    for (const needle of needles) {
+      if (!got.text.includes(needle)) {
+        fail(`base failure self-test: ${label} 메시지에 "${needle}" 이 없다 — 받은 것: ${got.text.trim()}`);
+      }
+    }
+  };
+
+  try {
+    git('init', '-q', '.');
+    const fork = commitIn(origin, '20260101000000_base', 'CREATE TABLE "Thing" ("id" UUID NOT NULL);', 'base');
+    git('checkout', '-q', '-b', 'mainline');
+    const movedTip = commitIn(origin, '20260103000000_other', 'ALTER TABLE "Thing" ADD COLUMN "other" TEXT;', 'other');
+    git('checkout', '-q', fork);
+    git('checkout', '-q', '-b', 'feature');
+    const featureHead = commitIn(origin, '20260102000000_safe', 'ALTER TABLE "Thing" ADD COLUMN "note" TEXT;', 'safe');
+
+    // (A) 형식은 맞지만 **없는** base — base 가 force-push 로 사라지면 실제로 생긴다.
+    //
+    //     ⚠️ `Not a valid commit name` 만 단언하면 **이 케이스는 헛돈다.** isAncestorOf 를
+    //     예전의 맨 catch 로 되돌려도 통과하기 때문이다 — 거기서 조용히 false 가 된 뒤
+    //     mergeBaseOf 가 같은 rc 128 을 다시 만나 같은 문장을 뱉는다(실제로 변이를 걸어
+    //     확인했다: 통과했다). 그러니 여기서 봐야 하는 건 문구가 아니라 **어느 층이 먼저
+    //     보고하는가** 다. 고장은 처음 감지되는 자리에서 이름을 대야 한다 — 한 층 미뤄지면
+    //     읽는 사람은 "조상이 아니었나 보다" 라고 잘못 읽는다.
+    const missing = '0'.repeat(40);
+    expectMessage('없는 base SHA', gateRun(origin, missing, featureHead), [
+      '--is-ancestor',
+      'Not a valid commit name',
+    ]);
+
+    // (B) 객체는 있는데 **분기점이 없는** 저장소. 얕게 받은 두 tip 이 그 모양이다.
+    //     git 은 이걸 rc 1 + **빈 stderr** 로 답한다 — 그래서 stderr 를 실어도 아무 말이 없고,
+    //     게이트가 직접 문장을 만들어 줘야 한다.
+    gitIn(shallow)('init', '-q', '.');
+    gitIn(shallow)('remote', 'add', 'origin', origin);
+    gitIn(shallow)('fetch', '-q', '--depth=1', 'origin', 'mainline', 'feature');
+    expectMessage('분기점이 없는 저장소', gateRun(shallow, movedTip, featureHead), ['공통 조상']);
+
+    console.log('[expand-contract-sql-v1] base failure diagnostics passed');
+  } finally {
+    rmSync(origin, { recursive: true, force: true });
+    rmSync(shallow, { recursive: true, force: true });
+  }
 }
 
 /**

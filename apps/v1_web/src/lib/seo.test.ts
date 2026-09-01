@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import sitemap from '@/app/sitemap';
 import { metadata as eventsMetadata } from '@/app/events/layout';
-import { absoluteSiteUrl, getSiteOrigin } from './seo';
+import { absoluteSiteUrl, getSiteOrigin, teamDescriptionFallback } from './seo';
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -74,5 +74,34 @@ describe('SEO site origin', () => {
     expect(entries).toContainEqual(
       expect.objectContaining({ url: 'https://teameet.co.kr/events' }),
     );
+  });
+});
+
+describe('teamDescriptionFallback', () => {
+  it('종목·지역이 다 있으면 둘을 함께 쓴다', () => {
+    expect(teamDescriptionFallback('강남 FC', '풋살', '서울 송파구')).toBe(
+      '풋살 · 서울 송파구에서 활동하는 강남 FC 팀을 만나보세요.',
+    );
+  });
+
+  it('지역만 있으면 지역만 쓴다', () => {
+    expect(teamDescriptionFallback('강남 FC', null, '서울 송파구')).toBe(
+      '서울 송파구에서 활동하는 강남 FC 팀을 만나보세요.',
+    );
+  });
+
+  it('종목만 있으면 어색하지 않은 다른 문장을 쓴다', () => {
+    expect(teamDescriptionFallback('강남 FC', '풋살', null)).toBe('풋살을 함께할 강남 FC 팀을 만나보세요.');
+  });
+
+  it('둘 다 없어도 null·undefined 가 문장에 새지 않는다', () => {
+    const text = teamDescriptionFallback('강남 FC', null, null);
+
+    expect(text).toBe('강남 FC 팀을 만나보세요.');
+    expect(text).not.toMatch(/null|undefined/);
+  });
+
+  it('공백만 있는 값은 없는 것으로 본다', () => {
+    expect(teamDescriptionFallback('강남 FC', '  ', ' \n ')).toBe('강남 FC 팀을 만나보세요.');
   });
 });

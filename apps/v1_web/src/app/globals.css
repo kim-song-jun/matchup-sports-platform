@@ -4312,6 +4312,29 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   align-items: center;
 }
 
+/*
+ * 빈 상태가 **화면을 혼자 차지할 때** 쓰는 변형. 기본 .tm-empty-state 는 흐름대로 놓이므로
+ * 목록이 비면 검색바·칩 바로 아래에 붙고 그 아래가 통째로 남는다(390 기준 아래 300px+).
+ *
+ * 부모에 .tm-list-empty 를 함께 얹어야 동작한다 — 그 클래스는 **빈 상태일 때만** 붙이므로
+ * 카드가 있는 평소 목록의 레이아웃(간격·폭)에는 영향이 없다. 부모가 flex 가 아니면
+ * flex:1 이 무시되고 예전과 같은 자리에 놓인다(안전한 degradation).
+ */
+.tm-empty-state-fill {
+  flex: 1;
+  justify-content: center;
+  /* 부모 높이를 못 받는 경우에도 최소한의 세로 여유는 확보한다. */
+  min-height: min(60vh, 420px);
+}
+
+/* 목록 컨테이너가 비었을 때만 스크롤 영역 높이를 채워 자식(.tm-empty-state-fill)이
+   남은 공간의 중앙에 놓이게 한다. */
+.tm-list-empty {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
 .tm-empty-icon {
   width: 80px;
   height: 80px;

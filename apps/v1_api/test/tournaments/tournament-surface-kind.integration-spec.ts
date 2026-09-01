@@ -60,6 +60,10 @@ const ids = {
   tournament: '9a000000-0000-4000-8000-000000000020',
   league: '9a000000-0000-4000-8000-000000000021',
   legacyNullKind: '9a000000-0000-4000-8000-000000000022',
+  /** 예정(draft) 리그 — 사용자에게 보여야 한다. 리그 전용 목록이 지금까지 보여 온 상태다. */
+  draftLeague: '9a000000-0000-4000-8000-000000000023',
+  /** 준비 중(draft) 대회 — **계속 감춰야 한다**(사용자 명시). 위와 짝이 되는 대조군. */
+  draftTournament: '9a000000-0000-4000-8000-000000000024',
   tournamentFixture: '9a000000-0000-4000-8000-000000000030',
   leagueFixture: '9a000000-0000-4000-8000-000000000031',
 } as const;
@@ -120,6 +124,26 @@ describe('대회 표면은 정규 리그 시즌을 보여주지 않는다 (real 
         status: 'in_progress',
         kind: 'regular_league',
         bracketPublishedAt,
+      },
+    });
+    // 예정 리그와 준비 중 대회 — **같은 `draft` 인데 답이 달라야 한다.**
+    // 대회의 draft 는 운영자 준비 중이고, 리그의 draft 는 사용자가 보는 "예정" 이다.
+    await prisma.v1Tournament.create({
+      data: {
+        id: ids.draftLeague,
+        sportId: ids.sportId,
+        title: '표면 테스트 예정 리그',
+        status: 'draft',
+        kind: 'regular_league',
+      },
+    });
+    await prisma.v1Tournament.create({
+      data: {
+        id: ids.draftTournament,
+        sportId: ids.sportId,
+        title: '표면 테스트 준비중 대회',
+        status: 'draft',
+        kind: 'regular_tournament',
       },
     });
     // **거울 뒤의 진짜 리그 행을 함께 심는다.** 거울(`v1_tournaments`)만 있고 리그
@@ -316,6 +340,49 @@ describe('대회 표면은 정규 리그 시즌을 보여주지 않는다 (real 
     expect(all).toContain(ids.legacyNullKind);
     expect(all).toContain(ids.league);
   });
+  /**
+   * **같은 `draft` 인데 종류마다 답이 다르다** — 2026-09-01 사용자 확정(A안).
+   *
+   * 통합 목록이 리그를 담기 시작하자 **예정 리그가 통째로 사라졌다.** 리그 전용 목록이
+   * 지금까지 보여 온 상태인데, 대회 축의 `draft`(운영자 준비 중)와 같은 열에 담겨 있어
+   * 함께 걸러졌다(실측: 리그 88건 중 통합 목록 53건 · 빠진 35건이 전부 draft).
+   *
+   * ⚠️ **대조군이 이 테스트의 절반이다.** 리그만 보면 *"draft 를 통째로 열었다"* 와
+   * 구분되지 않는다 — 대회의 draft 가 **계속 안 보이는 것**까지 봐야 게이트가 살아 있다.
+   */
+  it('예정(draft) 리그는 목록에 보이고, 준비 중 대회는 계속 감춰진다', async () => {
+    const idsOf = async (kind?: string) =>
+      ((await read.list({ limit: 100, ...(kind ? { kind } : {}) } as never)).items as Array<{
+        id: string;
+      }>).map((row) => row.id);
+
+    const [dflt, league, all] = await Promise.all([idsOf(), idsOf('league'), idsOf('all')]);
+
+    expect(league).toContain(ids.draftLeague);
+    expect(all).toContain(ids.draftLeague);
+
+    // 대조군 — 대회의 draft 는 어느 표면에서도 안 나온다.
+    expect(dflt).not.toContain(ids.draftTournament);
+    expect(all).not.toContain(ids.draftTournament);
+  });
+
+  /**
+   * **목록에만 올리면 카드는 보이는데 눌러서 못 연다** — 안 보이는 것보다 나쁘다.
+   * 실측(2026-09-01)에서 이미 그 비대칭이 있었다: draft 리그가 목록 밖인데
+   * `/schedule` 은 200 이라 경로마다 답이 달랐다.
+   */
+  it('예정 리그 상세가 열린다 — 목록과 같은 조건이어야 한다', async () => {
+    await expect(read.get(ids.draftLeague, undefined as never)).resolves.toMatchObject({
+      id: ids.draftLeague,
+    });
+  });
+
+  it('대조군: 준비 중 대회 상세는 계속 404 다', async () => {
+    await expect(read.get(ids.draftTournament, undefined as never)).rejects.toMatchObject({
+      status: 404,
+    });
+  });
+
   /**
    * **상세는 의도적으로 열려 있다** — 리그 시즌을 대회 표면에서 볼 수 있게 하는 것이
    * read-swap 의 목적이다. 열기 전에 상세 응답이 리그 대진을 싣고(`leagueFixtures`),

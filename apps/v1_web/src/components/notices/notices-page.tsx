@@ -36,7 +36,7 @@ export function NoticeListPageView({ model }: { model: NoticeListViewModel }) {
           </button>
         ))}
       </div>
-      <div className="tm-notice-stack">
+      <div className={`tm-notice-stack${model.status === 'ready' && model.notices.length === 0 ? ' tm-list-empty' : ''}`}>
         {model.status === 'loading' ? (
           <PageSkeleton variant="list" />
         ) : model.status === 'error' ? (
@@ -49,6 +49,7 @@ export function NoticeListPageView({ model }: { model: NoticeListViewModel }) {
         ) : (
           /* [P2 UX 라이팅] 능동형 + 해요체 */
           <EmptyState
+            fill
             title="아직 공지가 없어요"
             sub="새 공지가 올라오면 여기서 바로 확인할 수 있어요."
           />

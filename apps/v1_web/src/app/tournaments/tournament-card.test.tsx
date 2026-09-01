@@ -196,4 +196,26 @@ describe('TournamentCard — 통합 목록에서 리그를 알아볼 수 있다'
     render(<TournamentCard item={buildItem({ teamCount: 16, confirmedCount: 4 })} />);
     expect(screen.getByLabelText(/^성별 카테고리:/)).toBeInTheDocument();
   });
+
+  /**
+   * **`isLeagueCompetition` 을 여기 쓰면 이 테스트가 red 가 된다.**
+   * ```
+   * 리그 방식 대회   format='league'  kind='regular_tournament'   ← 진짜 대회 (alpha 실측 7건)
+   * 정규 리그 시즌   kind='regular_league'                        ← 거울 행
+   * isLeagueCompetition   둘 다 true
+   * ```
+   * 그 헬퍼는 *"리그처럼 그릴까"* 에 답한다 — 리그 방식 대회도 순위표를 쓰므로 맞다.
+   * 하지만 *"정원·성별 데이터가 있나"* 는 **무엇인가**의 질문이고, 리그 방식 대회는
+   * 진짜 대회라 둘 다 있다. 배지를 헬퍼로 고르면 **대회를 리그라고 말하게 된다.**
+   */
+  it('리그 방식으로 치르는 대회는 리그가 아니다 — 배지도 정원도 대회 그대로', () => {
+    render(
+      <TournamentCard
+        item={buildItem({ format: 'league', kind: 'regular_tournament', teamCount: 16, confirmedCount: 4 })}
+      />,
+    );
+    expect(screen.queryByLabelText('정규 리그')).toBeNull();
+    expect(screen.getByLabelText(/^성별 카테고리:/)).toBeInTheDocument();
+    expect(screen.getByRole('progressbar')).toBeInTheDocument();
+  });
 });

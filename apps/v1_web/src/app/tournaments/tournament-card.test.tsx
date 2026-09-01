@@ -160,3 +160,40 @@ describe('TournamentCard — 리그는 정원을 그리지 않는다', () => {
     expect(text).not.toContain('팀 참가');
   });
 });
+
+/**
+ * 한 목록에 대회와 리그가 섞이면 **어느 쪽인지 카드에서 보여야 한다.**
+ * 상태 배지(모집중·진행중·종료)는 두 종류가 글자까지 같아서 구분에 못 쓴다.
+ */
+describe('TournamentCard — 통합 목록에서 리그를 알아볼 수 있다', () => {
+  const leagueItem = () => {
+    const item = buildItem({ kind: 'regular_league', confirmedCount: 2 });
+    delete (item as { teamCount?: number }).teamCount;
+    return item;
+  };
+
+  it('리그 카드에 "리그" 배지가 있다', () => {
+    render(<TournamentCard item={leagueItem()} />);
+    expect(screen.getByLabelText('정규 리그')).toBeInTheDocument();
+  });
+
+  it('대회 카드에는 "리그" 배지가 없다 — 대조군', () => {
+    render(<TournamentCard item={buildItem({ teamCount: 16, confirmedCount: 4 })} />);
+    expect(screen.queryByLabelText('정규 리그')).toBeNull();
+  });
+
+  /**
+   * 리그 거울은 `genderCategory` 를 채우는 경로가 없어 항상 null 이고, 그러면 라벨이
+   * "성별 구분 없음" 으로 떨어진다 — 모든 리그 카드에 같은 배지가 하나씩 더 붙는다.
+   * 정원(`teamCount`) 을 뺀 것과 같은 이유로 이 자리도 안 그린다.
+   */
+  it('리그 카드에 성별 배지를 그리지 않는다', () => {
+    render(<TournamentCard item={leagueItem()} />);
+    expect(screen.queryByLabelText(/^성별 카테고리:/)).toBeNull();
+  });
+
+  it('대회 카드에는 성별 배지가 있다 — 대조군', () => {
+    render(<TournamentCard item={buildItem({ teamCount: 16, confirmedCount: 4 })} />);
+    expect(screen.getByLabelText(/^성별 카테고리:/)).toBeInTheDocument();
+  });
+});

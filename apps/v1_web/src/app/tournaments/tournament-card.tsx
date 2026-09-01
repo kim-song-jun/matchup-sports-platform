@@ -5,6 +5,7 @@ import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { formatTournamentDateRangeShort, formatEntryFee } from '@/lib/date-utils';
 import { resolveTournamentImage } from '@/lib/tournament-promo';
+import { isLeagueCompetition } from '@/lib/competition-kind';
 import {
   CompetitionCardHeader,
   CompetitionCardShell,
@@ -102,6 +103,9 @@ export function TournamentCard({
    * `teamCount` 가 여전히 `undefined` 일 수 있다고 본다.
    */
   const capacity = item.teamCount === undefined ? null : { ...item, teamCount: item.teamCount };
+  /* 배지·메타를 고르는 데는 `kind` 를 쓴다 — 위 `capacity` 와 달리 여기서는 좁힐 계산이 없고
+     "무엇인가"를 물을 뿐이라, 필드 유무보다 종류가 곧은 표현이다. */
+  const isLeague = isLeagueCompetition(item);
   const reservedTeamCount = capacity === null ? 0 : getReservedTeamCount(capacity);
   // 커버가 없는 대회도 홍보용으로 등록한 실사진이 있으면 아이콘 대신 그 사진을 썸네일로
   // 재사용한다 (셋 다 없으면 종목색 그라디언트+아이콘 폴백).
@@ -121,12 +125,27 @@ export function TournamentCard({
           statusBadge={{ label: status.label, badgeClass: status.badgeClass }}
           meta={
             <>
-              <span
-                className="tm-badge tm-badge-grey"
-                aria-label={`성별 카테고리: ${getGenderCategoryLabel(item.genderCategory)}`}
-              >
-                {getGenderCategoryLabel(item.genderCategory)}
-              </span>
+              {isLeague ? (
+                /* 한 목록에 두 종류가 섞이므로 "이건 리그다" 를 카드에서 알려야 한다.
+                   상태 배지(진행중 등)는 대회와 글자가 같아서 구분이 안 된다.
+                   티어("1부")도 함께 띄우고 싶지만 **지금은 못 만든다** — 통합 목록 API 는
+                   `tier` 숫자만 주고, 표시 라벨은 시리즈마다 다른 커스텀 값(`tierLabels`)이라
+                   `${tier}부` 로 지어내면 커스텀 라벨을 쓰는 시리즈에서 틀린 이름이 뜬다.
+                   서버가 `tierLabel` 을 이 목록에 실어주면 그때 붙인다. */
+                <span className="tm-badge tm-badge-grey" aria-label="정규 리그">
+                  리그
+                </span>
+              ) : (
+                /* 성별 배지는 대회에만 그린다. 리그 거울은 `genderCategory` 를 채우는 경로가
+                   아예 없어 항상 null 이고, 그러면 모든 리그 카드에 "성별 구분 없음" 이 붙는다
+                   — 정보가 아니라 소음이다(`teamCount` 를 리그에서 뺀 것과 같은 이유). */
+                <span
+                  className="tm-badge tm-badge-grey"
+                  aria-label={`성별 카테고리: ${getGenderCategoryLabel(item.genderCategory)}`}
+                >
+                  {getGenderCategoryLabel(item.genderCategory)}
+                </span>
+              )}
               {item.scheduledAt ? (
                 <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
                   {formatTournamentDateRangeShort(item.scheduledAt, item.scheduledEndAt) ?? '날짜 미정'}

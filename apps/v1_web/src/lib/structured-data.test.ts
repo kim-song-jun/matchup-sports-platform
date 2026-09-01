@@ -90,6 +90,20 @@ describe('buildSportsEventLd', () => {
     });
   });
 
+  it('상대 경로 이미지를 절대 URL 로 바꾼다 — 크롤러가 해석할 수 있게', () => {
+    // API 는 이미지를 `/uploads/...` 로만 내려준다(실측). 그대로 두면 JSON-LD 의 image 가
+    // 상대 경로로 나가 크롤러가 해석하지 못한다.
+    expect(buildSportsEventLd(tournament({ coverImageUrl: '/uploads/cover.png' }), {})?.image).toBe(
+      'https://teameet.co.kr/uploads/cover.png',
+    );
+  });
+
+  it('이미 절대 URL 인 이미지는 건드리지 않는다', () => {
+    expect(
+      buildSportsEventLd(tournament(), { image: 'https://cdn.example.com/a.png' })?.image,
+    ).toBe('https://cdn.example.com/a.png');
+  });
+
   it('좌표가 없으면 geo 를 붙이지 않는다', () => {
     const ld = buildSportsEventLd(tournament({ latitude: null, longitude: null }));
     expect(ld?.location).not.toHaveProperty('geo');
@@ -117,6 +131,13 @@ describe('buildSportsTeamLd', () => {
     joinPolicy: 'approval_required',
     introductionPreview: '주말   저녁에\n모이는 팀입니다',
   } as unknown as V1Team;
+
+  it('팀 로고·커버도 절대 URL 로 내보낸다', () => {
+    const ld = buildSportsTeamLd({ ...team, logoUrl: '/uploads/logo.png', coverImageUrl: null } as unknown as V1Team);
+
+    expect(ld.logo).toBe('https://teameet.co.kr/uploads/logo.png');
+    expect(ld.image).toBe('https://teameet.co.kr/uploads/logo.png');
+  });
 
   it('팀 화면의 종목·지역·소개를 SportsTeam 으로 옮긴다', () => {
     const ld = buildSportsTeamLd(team);

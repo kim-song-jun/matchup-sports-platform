@@ -97,7 +97,10 @@ async function fetchOpenTournaments(): Promise<V1TournamentListItem[]> {
     return page.items
       .filter((item) => item.status === 'open' || item.status === 'in_progress')
       .slice(0, MAX_LISTED_TOURNAMENTS);
-  } catch {
+  } catch (error) {
+    // 조용히 삼키면 upstream 장애를 관측할 방법이 없다 — 응답은 200 을 유지하되
+    // 실패 사실은 서버 로그에 남긴다(lib/seo-list.ts 와 같은 규약).
+    console.error('[seo] llms.txt 대회 목록 조회 실패 — 대회 섹션 없이 내보낸다', error);
     return [];
   }
 }

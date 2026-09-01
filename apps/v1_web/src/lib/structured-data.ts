@@ -8,7 +8,7 @@ import type { V1Team, V1TournamentDetail, V1TournamentStatus } from '@/types/api
  *
  * 1. **가시 텍스트와 100% 일치.** 화면에 없는 사실을 LD에만 넣으면 검색엔진이 스팸으로
  *    판정한다. 여기 들어가는 필드는 전부 해당 화면이 실제로 렌더하는 값이다
- *    (대회 상세: 종목·일정·장소·참가비·상금·참가 팀 / 팀 상세: 종목·지역·소개·멤버 수).
+ *    (대회 상세: 종목·일정·장소·참가비·참가 팀 / 팀 상세: 종목·지역·소개).
  * 2. **엔티티는 전역에서 하나의 `@id`.** 페이지마다 Organization을 새로 선언하면
  *    검색엔진·LLM 안에서 같은 실체가 여러 개로 쪼개진다. 조직·사이트는 루트 레이아웃에서
  *    한 번만 선언하고, 개별 페이지는 `@id`로 참조만 한다.
@@ -30,6 +30,19 @@ export function websiteId(): string {
 }
 
 export type JsonLdNode = Record<string, unknown>;
+
+/**
+ * 이미지 URL 을 절대 URL 로 만든다.
+ *
+ * API 는 이미지를 `/uploads/...` 같은 **루트-상대 경로로만** 내려준다(실측: 대회·팀 응답의
+ * 이미지 URL 전부 상대). `og:image` 는 Next 가 `metadataBase` 로 절대화해 주지만 JSON-LD 는
+ * 우리가 직접 넣는 값이라 그 보정을 받지 못한다 — 상대 경로로 나가면 크롤러가 이미지를
+ * 해석하지 못할 수 있다.
+ */
+function absoluteImageUrl(value: string): string {
+  return /^https?:\/\//i.test(value) ? value : absoluteSiteUrl(value);
+}
+
 
 /**
  * 루트 레이아웃에서 1회만 렌더한다. Organization과 WebSite를 `@graph`로 묶어
@@ -126,7 +139,7 @@ export function buildSportsEventLd(
   if (place) node.location = place;
 
   const image = options.image ?? tournament.coverImageUrl;
-  if (image) node.image = image;
+  if (image) node.image = absoluteImageUrl(image);
 
   const description = tournament.promoListSubtitle || tournament.prizeSummary;
   if (description) node.description = description.replace(/\s+/g, ' ').trim();
@@ -177,9 +190,9 @@ export function buildSportsTeamLd(team: V1Team): JsonLdNode {
   if (team.introductionPreview) {
     node.description = team.introductionPreview.replace(/\s+/g, ' ').trim();
   }
-  if (team.logoUrl) node.logo = team.logoUrl;
+  if (team.logoUrl) node.logo = absoluteImageUrl(team.logoUrl);
   const image = team.coverImageUrl || team.logoUrl;
-  if (image) node.image = image;
+  if (image) node.image = absoluteImageUrl(image);
   // 멤버 수는 화면에 "N명"으로 노출되지만 SportsTeam에 이를 담는 표준 필드가 없다.
   // `member`는 Person/Organization을 기대하고 `numberOfEmployees`는 팀이 아니라 회사용이다 —
   // 맞지 않는 필드에 억지로 넣느니 빼는 쪽이 구조화 데이터의 신뢰를 지킨다.

@@ -61,7 +61,8 @@ describe('GET /llms.txt', () => {
     expect(body).not.toContain('· ·');
   });
 
-  it('대회 목록 조회가 실패해도 200 과 안내서 본문을 낸다', async () => {
+  it('대회 목록 조회가 실패해도 200 과 안내서 본문을 내고, 실패를 로그에 남긴다', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     fetchPublicV1.mockRejectedValue(new Error('upstream down'));
 
     const response = await GET();
@@ -73,5 +74,7 @@ describe('GET /llms.txt', () => {
     expect(body).toContain('https://teameet.co.kr/sitemap.xml');
     // 목록 섹션은 통째로 빠지되 안내서는 살아 있어야 한다.
     expect(body).not.toContain('## 현재 모집 중이거나 진행 중인 대회');
+    // 조용히 삼키면 upstream 장애를 관측할 방법이 없다.
+    expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('llms.txt'), expect.any(Error));
   });
 });

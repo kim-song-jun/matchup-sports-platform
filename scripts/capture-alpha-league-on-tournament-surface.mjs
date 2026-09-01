@@ -26,6 +26,7 @@
  *   ALPHA_SESSION_TOKEN=... LEAGUE_ID=<거울 행 id> node scripts/capture-alpha-league-on-tournament-surface.mjs
  *   (LEAGUE_ID 를 안 주면 공개 리그 목록에서 첫 active 리그를 고른다)
  */
+import { execFileSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { chromium } from 'playwright';
 
@@ -123,14 +124,54 @@ function verdict(r) {
   return out.join(' · ');
 }
 
+/**
+ * **배포 창을 피한다 — 순서가 중요하다.**
+ *
+ * 배포 중에는 502 가 뜨고, 그 창에서 찍으면 **멀쩡한 화면을 결함으로 오진한다.** 그리고
+ * 서빙 SHA 만 먼저 보면 *배포 중인* SHA 를 찍고 그게 맞다고 판단할 수 있다. 그래서
+ * `① 배포 완료 → ② 서빙 SHA → ③ 내 커밋 포함 여부` 순으로 본다.
+ *
+ * 직전 배포 run 이 `cancelled` 로 남아 있을 수 있다(뒤 머지가 앞 배포를 대체) — 그때 alpha 가
+ * 서빙하는 것은 마지막 **성공** 배포의 SHA 다. 그래서 상태를 문자 그대로 확인한다.
+ */
+async function preflight() {
+  // ① 배포가 끝났는가
+  const runRaw = execFileSync('gh', [
+    'run', 'list', '--workflow', 'deploy-alpha.yml', '--branch', 'dev', '--limit', '1',
+    '--json', 'headSha,status,conclusion',
+  ], { encoding: 'utf8' });
+  const run = JSON.parse(runRaw)[0];
+  console.log(`최근 alpha 배포: ${run?.status} / ${run?.conclusion} (${run?.headSha?.slice(0, 9)})`);
+  if (run?.status !== 'completed') {
+    throw new Error(`배포가 아직 ${run?.status} 다 — 지금 찍으면 502 를 결함으로 오진한다. 끝난 뒤 다시 돌려라`);
+  }
+
+  // ② 무엇을 서빙하고 있는가
+  const head = await fetch(`${BASE}/landing`, { method: 'HEAD' });
+  const serving = head.headers.get('x-teameet-commit');
+  console.log(`서빙 커밋: ${serving ?? '(헤더 없음)'}`);
+
+  // ③ 내 변경을 보고 있는가 — EXPECT_COMMIT 을 주면 조상 관계를 실제로 확인한다.
+  const expect = process.env.EXPECT_COMMIT;
+  if (!expect) {
+    console.log('EXPECT_COMMIT 미지정 — 내 머지가 배포에 포함됐는지는 확인하지 않는다');
+    return;
+  }
+  if (!serving) throw new Error('서빙 커밋 헤더가 없어 EXPECT_COMMIT 대조를 할 수 없다');
+  try {
+    execFileSync('git', ['merge-base', '--is-ancestor', expect, serving], { stdio: 'ignore' });
+  } catch {
+    throw new Error(`서빙 SHA(${serving.slice(0, 9)})가 ${expect.slice(0, 9)} 를 포함하지 않는다 — 옛 빌드를 보고 있다`);
+  }
+  console.log(`✅ 서빙 SHA 가 ${expect.slice(0, 9)} 를 포함한다`);
+}
+
 async function main() {
   const session = await login();
   const league = await pickLeague();
   console.log(`대상 리그: ${league.id} (${league.note})`);
 
-  // 배포 창을 피한다 — 서빙 SHA 를 먼저 남긴다(내 머지 포함 여부는 호출자가 대조).
-  const head = await fetch(`${BASE}/landing`, { method: 'HEAD' });
-  console.log(`서빙 커밋: ${head.headers.get('x-teameet-commit') ?? '(헤더 없음)'}`);
+  await preflight();
 
   mkdirSync(OUT, { recursive: true });
   const browser = await chromium.launch();
@@ -151,8 +192,20 @@ async function main() {
 
     const res = await page.goto(`${BASE}${path}`, { waitUntil: 'domcontentloaded', timeout: 60_000 });
     const status = res?.status() ?? 0;
-    if (status === 403) throw new Error('alpha 403 (rate limit) — 1분 후 재시도');
-    if (status >= 400) throw new Error(`${path} HTTP ${status} — 문이 아직 닫혀 있거나 배포 전이다`);
+    // **403 을 던지지 않고 결과로 남긴다.** alpha 는 과한 캡처에 1분간 전면 403 을 걸고,
+    // 403 페이지도 PNG 로는 멀쩡해 보인다 — 던져 버리면 앞선 폭의 정상 결과까지 잃고,
+    // 남은 스크린샷을 "화면이 비었다" 로 오진하게 된다. 표에 남겨 무엇이 rate limit 이고
+    // 무엇이 진짜 결함인지 갈리게 한다.
+    if (status >= 400) {
+      const why = status === 403
+        ? '403 rate limit — 1분 뒤 이 폭만 다시 돌려라 (화면 결함 아님)'
+        : status === 404
+          ? '404 — 문이 아직 닫혀 있거나 배포 전이다'
+          : `HTTP ${status}`;
+      rows.push({ 폭: key, HTTP: status, 순위행: '-', 판정: `❌ ${why}` });
+      await context.close();
+      continue;
+    }
     // 순위는 클라이언트 조회라 렌더까지 시간이 걸린다. networkidle 은 폴링 때문에 안 끝난다.
     await page.waitForTimeout(5000);
 

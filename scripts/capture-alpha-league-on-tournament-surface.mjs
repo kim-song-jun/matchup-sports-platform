@@ -136,45 +136,101 @@ function verdict(r) {
 }
 
 /**
- * **배포 창을 피한다 — 순서가 중요하다.**
+ * **배포 창을 피한다 — 판정 기준은 "무엇이 서빙되는가" 다.**
  *
- * 배포 중에는 502 가 뜨고, 그 창에서 찍으면 **멀쩡한 화면을 결함으로 오진한다.** 그리고
- * 서빙 SHA 만 먼저 보면 *배포 중인* SHA 를 찍고 그게 맞다고 판단할 수 있다. 그래서
- * `① 배포 완료 → ② 서빙 SHA → ③ 내 커밋 포함 여부` 순으로 본다.
+ * ```
+ * ① landing 200 + health db:true        502 창이면 여기서 걸린다
+ * ② 서빙 SHA 가 EXPECT_COMMIT 포함        옛 빌드면 여기서 걸린다
+ * ③ 진행 중 배포는 **경고만**             막지 않는다
+ * ```
  *
- * 직전 배포 run 이 `cancelled` 로 남아 있을 수 있다(뒤 머지가 앞 배포를 대체) — 그때 alpha 가
- * 서빙하는 것은 마지막 **성공** 배포의 SHA 다. 그래서 상태를 문자 그대로 확인한다.
+ * ## ⚠️ run status 를 게이트로 되돌리지 마라 — 실제로 막혔다
+ * 처음엔 `gh run list --limit 1` 의 `status === 'completed'` 를 게이트로 썼다. 그건 **최신
+ * run** 을 보므로, 내 배포가 끝나도 **다른 세션이 dev 에 머지하면 새 배포가 떠서 영원히
+ * 막힌다.** 이 저장소는 여러 세션이 dev 에 계속 머지하므로 드문 일이 아니고, 실제로 첫
+ * 실행에서 바로 걸렸다(`f7a4dbe69` 를 정상 서빙 중인데 `9229930f3` 이 진행 중이라 차단).
+ *
+ * 게이트가 막으려는 것은 *"배포 중 502 창에서 찍어 멀쩡한 화면을 결함으로 오진하는 것"*
+ * 이고, **그 질문의 답은 run status 가 아니라 실제 응답**이다. 그래서 ①이 응답을 직접 본다.
+ *
+ * ③을 경고로 둔 대가는 캡처 도중 서빙본이 바뀔 수 있다는 것인데, 그건 **캡처 후 서빙 SHA 를
+ * 다시 재서** 사후에 잡는다(main 하단). 막지 않는 대신 조용히 섞이지 않게 한다.
  */
 async function preflight() {
-  // ① 배포가 끝났는가
-  const runRaw = execFileSync('gh', [
-    'run', 'list', '--workflow', 'deploy-alpha.yml', '--branch', 'dev', '--limit', '1',
-    '--json', 'headSha,status,conclusion',
-  ], { encoding: 'utf8' });
-  const run = JSON.parse(runRaw)[0];
-  console.log(`최근 alpha 배포: ${run?.status} / ${run?.conclusion} (${run?.headSha?.slice(0, 9)})`);
-  if (run?.status !== 'completed') {
-    throw new Error(`배포가 아직 ${run?.status} 다 — 지금 찍으면 502 를 결함으로 오진한다. 끝난 뒤 다시 돌려라`);
-  }
-
-  // ② 무엇을 서빙하고 있는가
+  // ① **무엇이 서빙되는가로 판정한다 — "최신 run 이 끝났는가" 가 아니다.**
+  //
+  // 처음엔 `gh run list --limit 1` 의 status 를 게이트로 썼는데, 그건 **최신 run** 을 보므로
+  // 내 배포가 끝난 뒤 **남의 머지가 새 배포를 띄우면 영원히 막힌다**(실측: `f7a4dbe69` 가
+  // 서빙 중인데 `9229930f3` 이 in_progress 라 통과 못 했다). 게이트의 목적은 "502 창을
+  // 피하는 것" 이고, 그건 **실제 응답을 보는 것**이 정확하다.
   const head = await fetch(`${BASE}/landing`, { method: 'HEAD' });
+  if (!head.ok) throw new Error(`landing HTTP ${head.status} — 배포 중이거나 장애다. 기다려라`);
   const serving = head.headers.get('x-teameet-commit');
-  console.log(`서빙 커밋: ${serving ?? '(헤더 없음)'}`);
+  // health 는 **세 가지가 다른 이유**라 메시지를 나눈다. 한 덩어리로 묶으면 재시도할지
+  // (배포 중) 사람을 불러야 할지(DB) 판단할 수 없고, 특히 `.json()` 이 던지면 SyntaxError
+  // 가 그대로 전파돼 **"health 체크 실패" 라는 말조차 안 나온다** — 200 인데 JSON 이 아닌
+  // 경우(프록시·에러 페이지)가 실제로 그렇다.
+  const health = await fetch(`${API}/health`);
+  if (!health.ok) throw new Error(`health HTTP ${health.status} — 배포 중이거나 장애다. 기다려라`);
+  let healthBody;
+  try {
+    healthBody = await health.json();
+  } catch {
+    throw new Error('health 가 200 인데 JSON 이 아니다 — 프록시·에러 페이지일 수 있다(배포 중 의심)');
+  }
+  if (healthBody?.data?.checks?.db !== true) {
+    throw new Error(`health db 체크 실패(db=${JSON.stringify(healthBody?.data?.checks?.db)}) — DB 쪽 문제다`);
+  }
+  console.log(`서빙 커밋: ${serving ?? '(헤더 없음)'} · health ok`);
 
-  // ③ 내 변경을 보고 있는가 — EXPECT_COMMIT 을 주면 조상 관계를 실제로 확인한다.
+  // ② 내 변경을 보고 있는가
   const expect = process.env.EXPECT_COMMIT;
   if (!expect) {
-    console.log('EXPECT_COMMIT 미지정 — 내 머지가 배포에 포함됐는지는 확인하지 않는다');
-    return;
+    console.log('EXPECT_COMMIT 미지정 — 내 머지 포함 여부는 확인하지 않는다');
+  } else if (!serving) {
+    throw new Error('서빙 커밋 헤더가 없어 EXPECT_COMMIT 대조를 할 수 없다');
+  } else {
+    // **"비교 불가" 와 "옛 빌드" 를 가른다.** `merge-base --is-ancestor` 는 둘 다 실패로
+    // 끝난다(객체 없음 128 / 조상 아님 1) — 뭉치면 로컬에 커밋이 없을 뿐인데 "옛 빌드"
+    // 라며 배포를 기다리게 된다. 이 저장소는 다른 세션이 계속 dev 에 머지하므로 내 로컬이
+    // 그 커밋을 아직 fetch 안 한 상태가 **드물지 않다.**
+    //
+    // 문구가 **다음 행동을 지시**해야 한다 — 전자는 `git fetch`, 후자는 배포 대기다.
+    for (const [sha, label] of [[expect, 'EXPECT_COMMIT'], [serving, '서빙 SHA']]) {
+      try {
+        execFileSync('git', ['cat-file', '-e', `${sha}^{commit}`], { stdio: 'ignore' });
+      } catch {
+        throw new Error(
+          `${label}(${sha.slice(0, 9)}) 커밋 객체가 로컬에 없다 — 비교 불가(옛 빌드라는 뜻이 아니다). ` +
+            '`git fetch origin dev` 후 다시 돌려라',
+        );
+      }
+    }
+    try {
+      execFileSync('git', ['merge-base', '--is-ancestor', expect, serving], { stdio: 'ignore' });
+    } catch {
+      throw new Error(
+        `서빙 SHA(${serving.slice(0, 9)})가 ${expect.slice(0, 9)} 를 포함하지 않는다 — 옛 빌드다. 배포를 기다려라`,
+      );
+    }
+    console.log(`✅ 서빙 SHA 가 ${expect.slice(0, 9)} 를 포함한다`);
   }
-  if (!serving) throw new Error('서빙 커밋 헤더가 없어 EXPECT_COMMIT 대조를 할 수 없다');
+
+  // ③ 진행 중인 배포는 **막지 않고 경고만** 한다 — 캡처 도중 서빙본이 바뀔 수 있어서
+  //    끝나고 다시 재서, 바뀌었으면 그 사실을 결과에 남긴다(조용히 섞이는 게 최악이다).
   try {
-    execFileSync('git', ['merge-base', '--is-ancestor', expect, serving], { stdio: 'ignore' });
+    const runs = JSON.parse(execFileSync('gh', [
+      'run', 'list', '--workflow', 'deploy-alpha.yml', '--branch', 'dev', '--limit', '3',
+      '--json', 'headSha,status',
+    ], { encoding: 'utf8' }));
+    const inflight = runs.filter((r) => r.status !== 'completed');
+    if (inflight.length > 0) {
+      console.log(`⚠️  배포 ${inflight.length}건 진행 중(${inflight.map((r) => r.headSha.slice(0, 9)).join(', ')}) — 캡처 중 서빙본이 바뀔 수 있다`);
+    }
   } catch {
-    throw new Error(`서빙 SHA(${serving.slice(0, 9)})가 ${expect.slice(0, 9)} 를 포함하지 않는다 — 옛 빌드를 보고 있다`);
+    console.log('(gh 조회 실패 — 진행 중 배포 확인은 건너뛴다)');
   }
-  console.log(`✅ 서빙 SHA 가 ${expect.slice(0, 9)} 를 포함한다`);
+  return serving;
 }
 
 async function main() {
@@ -182,7 +238,7 @@ async function main() {
   const league = await pickLeague();
   console.log(`대상 리그: ${league.id} (${league.note})`);
 
-  await preflight();
+  const servingBefore = await preflight();
 
   mkdirSync(OUT, { recursive: true });
   const browser = await chromium.launch();
@@ -262,6 +318,37 @@ async function main() {
     await new Promise((r2) => setTimeout(r2, 3000));
   }
   await browser.close();
+
+  // 캡처 도중 배포가 끝나 서빙본이 바뀌었으면 **결과가 두 빌드에 걸쳐 있다.**
+  //
+  // ⚠️ **이 재확인은 게이트가 아니라 결과에 붙는 메모다.** 게이트는 캡처 **전**(preflight)에
+  // 있다. 여기서 던지면 **캡처가 이미 디스크에 있는데도** run 이 실패로 끝나고 표조차 안
+  // 나온다 — 막지 않겠다고 만든 설계가 결과적으로 막는 것이다. 403 을 던지지 않고 행으로
+  // 남기기로 한 것과 **같은 원리**인데, 그때 여기엔 적용하지 않았다.
+  //
+  // 그리고 **실패를 조용히 넘기지도 않는다.** 안 적으면 "안 바뀌었다" 로 읽힌다.
+  let servingNote;
+  try {
+    const after = await fetch(`${BASE}/landing`, { method: 'HEAD' });
+    const servingAfter = after.ok ? after.headers.get('x-teameet-commit') : null;
+    if (!servingBefore || !servingAfter) {
+      // **어느 쪽이 없는지 밝힌다.** "불가(HTTP 200)" 만 적으면 200 인데 왜 못 쟀는지가
+      // 안 보이고, 읽는 사람이 재실행할지 판단할 수 없다. 원인이 preflight 쪽(before)인지
+      // 이번 재확인 쪽(after)인지에 따라 할 일이 다르다.
+      const missing = [
+        servingBefore ? null : '캡처 전 커밋 헤더 없음',
+        servingAfter ? null : '캡처 후 커밋 헤더 없음',
+      ].filter(Boolean).join(' · ');
+      servingNote = `서빙본 재확인: 불가(HTTP ${after.status} · ${missing}) — 캡처 중 변경 여부 **미확인**`;
+    } else if (servingBefore !== servingAfter) {
+      servingNote = `⚠️  캡처 중 서빙본이 바뀌었다: ${servingBefore.slice(0, 9)} → ${servingAfter.slice(0, 9)} — 결과가 두 빌드에 걸쳐 있다. 다시 돌려라`;
+    } else {
+      servingNote = `서빙본 재확인: ${servingAfter.slice(0, 9)} 동일 — 결과가 한 빌드에 걸쳐 있다`;
+    }
+  } catch (error) {
+    servingNote = `서빙본 재확인: 실패(${error instanceof Error ? error.message.split('\n')[0] : String(error)}) — 캡처 중 변경 여부 **미확인**`;
+  }
+  console.log(`\n${servingNote}`);
 
   console.log('\n=== 화면에서 읽은 값 ===');
   console.table(rows);

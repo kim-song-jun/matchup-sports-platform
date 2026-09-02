@@ -91,16 +91,36 @@
 `DeviceTokenNotForTopic`이 반복되면 `APNS_BUNDLE_ID`와 앱의 번들 ID, 그리고 sandbox/production
 짝이 어긋난 것이다.
 
+## 검증된 것 (2026-09-02 실측)
+
+- **실제 APNs 게이트웨이로의 발송이 된다.** alpha API(아래 런타임 주입이 들어간 뒤) →
+  `api.sandbox.push.apple.com` → 시뮬레이터 배너 도달까지를
+  `scripts/ios/verify-push-delivery.sh`(`PushSliceUITests` test E)로 확인했다. 앱이 설명 화면 →
+  시스템 다이얼로그 → 등록(알림 설정의 스위치 ON)을 거친 뒤, 어드민 수동 발송 한 건이 홈 화면에
+  배너로 떴다.
+- **시뮬레이터 토큰은 합성값이 아니다.** 예전 서술("시뮬레이터가 주는 기기 토큰은 합성값이라
+  라우팅 자체가 미검증")은 틀렸다 — Apple silicon + macOS 13 이상에서는 시뮬레이터가 실제
+  sandbox 토큰을 받고 실제 APNs 발송을 수신한다. ad-hoc 서명(`CODE_SIGN_IDENTITY=-`)으로
+  `aps-environment`가 들어간 빌드여야 한다([`ios-release.md`](./ios-release.md)).
+- 어드민 수동 발송 응답의 `push` 집계는 **웹 구독만** 센다 — 앱 기기로 간 발송은 거기서
+  `delivered: 0`으로 보인다. 도달 여부는 기기에서 본다(위 스크립트가 그렇게 한다).
+
 ## 아직 검증되지 않은 것
 
-- **실제 APNs 게이트웨이로의 발송.** `.p8`이 없어 한 번도 보내지 않았다. 시뮬레이터가 주는
-  기기 토큰은 합성값이라 라우팅 자체가 미검증이다.
-- 물리 기기에서의 수신. 시뮬레이터에서는 `xcrun simctl push`로 배너·탭·딥링크까지 확인했다
-  (`scripts/ios/verify-push-slice.sh`).
+- 물리 기기에서의 수신 — TestFlight 빌드는 production 게이트웨이를 쓴다(아래 A안 참고,
+  `docs/design/apns-gateway-vs-deployment.md`).
 - background / terminated 상태 전달 동작.
 
-`.p8`이 도착하면 [`ios-release.md`](./ios-release.md)의 ad-hoc 서명 절차로 실기기 QA를 먼저
-돌린다.
+## 알림이 안 올 때 먼저 볼 것
+
+1. **설치된 앱이 진짜 최신 빌드인가.** 2026-09-02에 시뮬레이터에 남아 있던 앱은 8/29
+   프로토타입(origin이 `https://httpbingo.org`, Firebase 번들 포함, 등록 코드 없음)이었다 —
+   어떤 서버 설정으로도 알림이 올 수 없는 빌드다. `xcrun simctl listapps <udid>`로
+   `kr.co.teameet.alpha`의 `CFBundleShortVersionString`과 `TeameetWebOrigin`을 확인한다.
+2. 서버에 `APNS_*` 4개가 실제로 들어갔는가 — 배포 로그의 `Sync APNs runtime env` 단계에
+   `[alpha-apns-env] sync completed`가 있어야 한다(alpha는 2026-09-02 04:59 UTC 배포부터).
+3. 앱에서 옵트인을 했는가 — 설명 화면에서 "알림 받기" 또는 마이 → 알림 설정 스위치.
+   OS 권한만으로는 등록되지 않는다(`PushCoordinator.hasOptedIn`).
 
 
 ## alpha 런타임 주입 (2026-08-31 추가 — 이게 없으면 푸시가 조용히 죽는다)

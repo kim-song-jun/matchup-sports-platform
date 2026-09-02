@@ -8158,8 +8158,14 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
    최소 재현으로 확인했다(Chromium): 공백형은 UA 애니메이션이 그대로 2건 재생되고,
    붙여 쓴 형태만 0건으로 꺼진다. 공백형이던 동안 이 규칙은 **한 번도 발화하지 않았고**,
    탭 전환에서 tm-page-slide 가 그대로 재생됐다(alpha 실측). */
-:root[data-nav-kind="tab"]::view-transition-old(page-content),
-:root[data-nav-kind="tab"]::view-transition-new(page-content) {
+/* [범위 주의] 이름을 지정(page-content)하면 **부족하다.** 그것만 끄면 UA 기본 애니메이션
+   6건이 그대로 남는다 — root 스냅샷의 교차 페이드와 group 리사이즈다(alpha 실측 6건,
+   최소 재현 6건으로 일치 확인). 탭은 "같은 화면에서 보는 각도만 바꾸는" 조작이므로
+   전환 전체를 끈다. 최소 재현 결과: 기준 10건 · 이름 지정만 6건 · old/new(*) 2건 ·
+   여기에 group(*) 까지 더해야 0건. */
+:root[data-nav-kind="tab"]::view-transition-old(*),
+:root[data-nav-kind="tab"]::view-transition-new(*),
+:root[data-nav-kind="tab"]::view-transition-group(*) {
   animation: none;
 }
 

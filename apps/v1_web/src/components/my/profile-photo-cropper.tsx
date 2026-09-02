@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useId, useRef, useState, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from 'react';
+import { createPortal } from 'react-dom';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import {
   cropSourceRect,
@@ -239,7 +240,13 @@ export function ProfilePhotoCropper({
 
   const ready = imageSize !== null && loadError === null;
 
-  return (
+  /*
+   * body 로 포털한다(home-notice-popup 과 같은 패턴). 프로필 수정 폼 안에서 그대로 그리면
+   * 폼의 진입 애니메이션(.tm-content-enter, transform)이 만든 스태킹 컨텍스트에 갇혀 z-index 를
+   * 아무리 올려도 형제인 고정 CTA("프로필 저장", --z-cta) 아래에 깔린다 -- alpha 실화면에서
+   * 확인 버튼이 CTA 에 가려져 누를 수 없었다(2026-09-02). 유닛 테스트는 이걸 못 본다.
+   */
+  return createPortal(
     <div className="tm-modal-scrim tm-photo-crop-scrim" onClick={onBackdropClick}>
       <div
         ref={dialogRef}
@@ -325,6 +332,7 @@ export function ProfilePhotoCropper({
           {pending ? '올리는 중' : exporting ? '자르는 중' : '이 사진으로 할게요'}
         </button>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

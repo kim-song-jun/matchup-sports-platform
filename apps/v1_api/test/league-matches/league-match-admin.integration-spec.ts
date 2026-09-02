@@ -11,6 +11,16 @@ const opsUserId = `t4-league-admin-ops-${suiteId}`;
 // V1AdminUser 행이 없는 일반 활성 유저 — 어드민 경계(403) 네거티브 전용 액터.
 const regularUserId = `t4-league-admin-regular-${suiteId}`;
 
+/**
+ * 대진 날짜는 **미래**여야 한다(Task 164 BE-2: 과거 날짜는 400). 고정 날짜를 박으면
+ * 그 날이 지나는 순간 이 스펙이 시간 때문에 깨지므로 오늘 기준으로 만든다.
+ */
+const futureDates = [7, 14].map((days) => {
+  const at = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+  // KST 달력 날짜로 적는다 — 서버가 그 날의 KST 벽시계로 해석한다.
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(at);
+});
+
 describe('POST /admin/league-matches + fixtures', () => {
   let app: INestApplication;
   let cleanup: (() => Promise<void>) | undefined;
@@ -131,7 +141,7 @@ describe('POST /admin/league-matches + fixtures', () => {
     const fixturesRes = await request(app.getHttpServer())
       .post(`/api/v1/admin/league-matches/${leagueId}/fixtures`)
       .set('x-v1-user-id', ownerUserId)
-      .send({ weeksCount: 2, schedule: { dayOfWeek: 6, time: '18:00' }, placeName: '상암 풋살파크' });
+      .send({ weeksCount: 2, schedule: { dates: futureDates, time: '18:00' }, placeName: '상암 풋살파크' });
     expect(fixturesRes.status).toBe(201);
     expect(fixturesRes.body.data.teamMatchIds).toHaveLength(2);
 
@@ -140,9 +150,11 @@ describe('POST /admin/league-matches + fixtures', () => {
       orderBy: { startAt: 'asc' },
     });
     expect(fixtures.every((f) => f.placeName === '상암 풋살파크')).toBe(true);
-    // 8/15(토) 18:00 KST = 09:00 UTC, 그다음 주는 8/22.
-    expect(fixtures[0].startAt.toISOString()).toBe('2026-08-15T09:00:00.000Z');
-    expect(fixtures[1].startAt.toISOString()).toBe('2026-08-22T09:00:00.000Z');
+    // Task 164 BE-2: 서버는 요일을 모른다 — 운영자가 고른 **날짜 목록**을 오름차순으로 쓴다.
+    // 18:00 KST = 09:00 UTC.
+    expect(fixtures.map((f) => f.startAt.toISOString())).toEqual(
+      futureDates.map((date) => `${date}T09:00:00.000Z`),
+    );
   });
 
   it(
@@ -239,7 +251,7 @@ describe('POST /admin/league-matches + fixtures', () => {
     const res = await request(app.getHttpServer())
       .post(`/api/v1/admin/league-matches/${leagueId}/fixtures`)
       .set('x-v1-user-id', ownerUserId)
-      .send({ weeksCount: 1, schedule: { dayOfWeek: 6, time: '25:99' } });
+      .send({ weeksCount: 1, schedule: { dates: futureDates, time: '25:99' } });
     expect(res.status).toBe(400);
   });
 

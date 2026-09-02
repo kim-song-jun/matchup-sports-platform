@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsDateString, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
+import { ArrayNotEmpty, IsArray, IsDateString, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 
 export class CreateLeagueMatchDto {
   @IsString()
@@ -36,14 +36,28 @@ export class AddLeagueTeamDto {
   teamId!: string;
 }
 
+/**
+ * 대진을 놓을 **날짜 목록**. 서버는 요일을 모른다(Task 164 BE-2).
+ *
+ * 예전엔 요일 하나(`dayOfWeek`)를 받아 "시작일 이후 매주 그 요일" 로 무한 반복했는데,
+ * 그러면 **명절·구장 사정으로 한 주를 건너뛰거나 날짜를 옮기는 것을 표현할 수 없다**.
+ * 요일로 고르고 싶으면 **화면이 날짜 목록으로 전개해서** 보낸다 — 그래야 전개 결과를
+ * 운영자가 눈으로 확인하고 개별 날짜를 지우거나 바꿀 수 있다.
+ *
+ * 규칙(`league-fixture-dates.ts`): 중복 제거 · 오름차순 배정 · 과거 날짜 거부 ·
+ * 날짜가 라운드보다 적으면 400 `LEAGUE_SCHEDULE_SLOTS_INSUFFICIENT`.
+ */
 export class LeagueFixtureScheduleDto {
-  /** 0(일)~6(토), KST 기준 요일. */
-  @IsInt()
-  @Min(0)
-  @Max(6)
-  dayOfWeek!: number;
+  /** `'YYYY-MM-DD'` (KST 달력 날짜). 순서·중복 무관 — 서버가 정리한다. */
+  @IsArray()
+  @ArrayNotEmpty()
+  @Matches(/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/, {
+    each: true,
+    message: '날짜는 YYYY-MM-DD 형식이어야 해요.',
+  })
+  dates!: string[];
 
-  /** 'HH:mm', KST 기준 24시간제 시각. */
+  /** 'HH:mm', KST 기준 24시간제 시각. 모든 날짜에 같은 시각을 쓴다. */
   @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'time은 HH:mm 형식이어야 해요.' })
   time!: string;
 }

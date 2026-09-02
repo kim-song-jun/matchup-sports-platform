@@ -111,7 +111,35 @@ D8 순서 `expand → dual-write → backfill → read-swap → contract` 중 **
 ### BE (순차)
 
 - **BE-1 ③ 수동 대진.** `league-match-admin.service.ts:1156` 부근 생성 루프에서 한 경기 생성을 순수 함수 `createLeagueFixture(tx, league, home, away, startAt, round, placeName)` 로 뽑고, 자동 생성과 `POST /admin/league-matches/:leagueId/fixtures/manual` 이 **같은 함수**를 부른다. 자동 생성 경로의 스냅샷 테스트로 추출 전후 동일성을 증명한다.
-- **BE-2 ① 날짜 목록.** `LeagueFixtureScheduleDto` 를 `{ dates: 'YYYY-MM-DD'[], time: 'HH:mm' }` 로 바꾸고, 요일 입력은 **프론트에서 날짜 목록으로 전개**해 보낸다(서버는 요일을 모른다). preview 도 같은 DTO. 기존 `dayOfWeek` 는 삭제(호환 유지 없음 — 호출처는 어드민 화면 한 곳).
+- **BE-2 ① 날짜 목록.** `LeagueFixtureScheduleDto` 를 `{ dates: 'YYYY-MM-DD'[], time: 'HH:mm' }` 로
+  바꾸고, 요일 입력은 **프론트에서 날짜 목록으로 전개**해 보낸다(서버는 요일을 모른다).
+  preview·regenerate 도 같은 DTO.
+
+  ⚠️ **"dayOfWeek 삭제" 가 아니라 "정규 리그 경로에서 제거" 다.** 착수 시 실측하니 요일
+  템플릿을 쓰는 **살아 있는 경로가 둘**이었다:
+
+  | 레인 | 엔드포인트 | 이번 범위 |
+  |---|---|---|
+  | ① 정규 리그 | `POST /admin/league-matches/:id/fixtures` | ✅ 날짜 목록으로 |
+  | ② 리그 방식 대회 | `POST /admin/tournaments/:id/league/fixtures/generate` | ❌ 그대로 |
+
+  둘이 `resolveFixtureStartAt` 을 공유한다. ②는 정본 §1 이 별도 kind 로 둔 레인이고 경기별
+  `scheduledAt` 편집이 이미 있어 사용자 요구 ①이 막혀 있지 않다 — 지금 함께 바꾸면 Phase 3
+  흡수 때 두 번 손댄다. `resolveFixtureStartAt` docblock 에 "정규 리그는 더 이상 안 쓴다" 를
+  남긴다.
+
+  **AC 의 식별자 0건 검사는 성립하지 않는다 — 정직하게 좁힌다.** `resolveFixtureStartAt` 이
+  `league-matches/round-robin-schedule.ts` 에 살고 레인 ②가 그걸 import 하므로, 그 디렉터리
+  전체에서 `dayOfWeek` 를 0으로 만들 수 없다. 실제 게이트:
+
+  ```
+  league-matches/dto/·league-match-admin.service.ts 에서 dayOfWeek 를 읽는 코드   0건
+  남는 곳: round-robin-schedule.ts(+spec) — 레인 ② 전용, Phase 3 흡수 대상
+  ```
+
+  ⚠️ **필요한 날짜 수는 라운드 수가 아니라 매치데이 수다.** `timing` 이 팀당 하루 G경기를
+  넣으면 라운드 G개가 하루에 들어간다 — 6라운드·G=3 이면 날짜 2개면 된다. 라운드 수로
+  요구하면 멀쩡한 입력을 거부한다.
 - **BE-3 ② 신청(D7).** 리그 거울 행에 `status='open'` + `registrationDeadlineAt` 을 놓는 운영자 액션 `POST /admin/league-matches/:leagueId/open-registration`. 신청·제출·확정은 **대회 서비스 그대로**(추가 코드 0 이 목표). confirm 훅에서 contract 전까지 `V1LeagueTeam` 역방향 dual-write. 승계팀 자동 등록은 `league-series-admin.service.ts` 의 다음 시즌 생성에서 `confirmed` 등록을 함께 만든다.
 - **BE-4 ② 정원·사유(D9) + 자동 확정(D10).** `reason` 필수(리그 거울만). 시즌 시작 시각 크론(`DISABLE_LEAGUE_ROSTER_AUTOCONFIRM_CRON=true` 로 끔 — 기존 cron 선례) 이 미제출 팀 명단을 멤버 전원으로 생성하고 `autoConfirmed` 를 남긴다. 사전 리마인더(시작 24h 전) 알림 1종 + 확정 통보 1종.
 - **BE-5 ④ contract.** `v1League.*` / `v1LeagueTeam.*` 호출 12 파일 → `V1Tournament(kind='regular_league')` / `V1TournamentRegistration` 으로 재배선. 역방향 dual-write 제거. **`git grep -n -w -e v1League -e v1LeagueTeam -- apps/v1_api/src apps/v1_web/src | wc -l` → `0`** 이 된 뒤에만 drop 마이그레이션 PR 을 따로 연다. drop 은 idempotent(`DROP TABLE IF EXISTS`), alpha 실행 전 사용자 직접 승인.

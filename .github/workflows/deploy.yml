@@ -754,6 +754,16 @@ jobs:
           SECRET_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
           SECRET_FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}
           SECRET_FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
+          # iOS push (APNs). One Apple key covers sandbox and production and every App ID of
+          # the team, so the same three secrets alpha uses are reused. The bundle id is NOT
+          # the alpha secret: `ApnsPushService` accepts exactly `kr.co.teameet` when
+          # V1_PUSH_ENVIRONMENT=production (the compose default here) and refuses to start
+          # on anything else — a fixed, public value, so it is written here, not stored.
+          # Only takes effect once main carries the APNs adapter (dev → main promotion).
+          SECRET_APNS_KEY_ID: ${{ secrets.APNS_KEY_ID }}
+          SECRET_APNS_TEAM_ID: ${{ secrets.APNS_TEAM_ID }}
+          SECRET_APNS_BUNDLE_ID: kr.co.teameet
+          SECRET_APNS_PRIVATE_KEY: ${{ secrets.APNS_PRIVATE_KEY }}
           SECRET_SMS_PROVIDER: ${{ secrets.SMS_PROVIDER }}
           SECRET_SOLAPI_API_KEY: ${{ secrets.SOLAPI_API_KEY }}
           SECRET_SOLAPI_API_SECRET: ${{ secrets.SOLAPI_API_SECRET }}

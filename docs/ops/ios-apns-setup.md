@@ -159,6 +159,35 @@
 row 만 생기고 폰이 조용하면 여전히 주입되지 않은 것이다.
 
 
+## 프로덕션 주입 (2026-09-03 추가 — 파이프라인만 준비된 상태)
+
+prod 는 alpha 와 다른 경로로 시크릿을 받는다: `deploy.yml` 의 `deploy` job 이
+`scripts/release/sync-prod-runtime-env.sh` 로 `SECRET_*` 전부를 `/teameet/prod/env/*`
+(SecureString) 에 올리고 호스트 `.env` 를 다시 쓴다. 여기에 APNs 4개가 추가돼 있다.
+
+| 이름 | 값 | 어디서 |
+|---|---|---|
+| `APNS_KEY_ID` · `APNS_TEAM_ID` · `APNS_PRIVATE_KEY` | alpha 와 **같은** GitHub secret | 한 Apple 키가 sandbox·production 과 팀의 모든 App ID 를 덮는다 |
+| `APNS_BUNDLE_ID` | `kr.co.teameet` | 워크플로에 **리터럴**로 적혀 있다. 환경이 값을 정하므로(`V1_PUSH_ENVIRONMENT=production` 이면 이것뿐) 시크릿이 아니다. alpha 의 `APNS_BUNDLE_ID` secret(alpha 번들)을 재사용하면 API 가 기동을 거부한다 |
+
+**private key 는 어떤 모양으로 저장돼 있어도 된다** — 원본 PEM, `\n` 한 줄, base64. 두 sync
+스크립트가 같은 `scripts/release/lib/private-key-pem.sh` 로 한 줄(`\n`) 형태로 바꿔 쓴다. prod
+`.env` 는 compose 원형(따옴표 없는 `KEY=VALUE`, `source` 안 함)이라 실제 개행이 들어가면 그
+줄 뒤가 전부 깨져 배포가 죽는다. OpenSSL 이 못 읽는 키는 **그 그룹(4개) 전부를 쓰지 않고**
+경고만 남긴다 — 3개만 쓰면 `ApnsPushService` 가 "partially configured" 로 API 기동을 막는다.
+
+**아직 안 된 것 — 순서대로:**
+
+1. `dev → main` 승격(사용자). main 에는 APNs 어댑터·`v1_push_devices`·iOS 셸이 없다
+   (2026-09-03 실측: prod API env 는 VAPID 3개뿐, 테이블 없음). 승격 전에는 위 값이 주입돼도
+   구 API 가 무시하므로 해가 없다.
+2. Apple: `kr.co.teameet` App ID 의 Push Notifications 켜기, App Store Connect 에 프로덕션 앱
+   레코드 만들기(현재 레코드는 팀밋 알파 하나), 배포 프로파일(`asc-profile.mjs`), 그리고
+   `TeameetProduction` 스킴으로 **main 에서** 아카이브([`ios-release.md`](./ios-release.md)).
+3. 첫 prod 배포 로그의 `Sync runtime env` 에 APNS 경고가 없는지, API 기동 로그에
+   `APNs credentials not configured` 가 **사라졌는지** 확인한다. prod 배포 role 의
+   `ssm:PutParameter` 가 파라미터 이름 단위로 제한돼 있으면 alpha 때와 같은 IAM 추가가 필요하다.
+
 ### IAM — 시크릿을 등록해도 이것 없이는 전달되지 않는다 (2026-08-31 실측)
 
 시크릿 4개를 등록한 뒤에도 동기화가 이렇게 실패했다:

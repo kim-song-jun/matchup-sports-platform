@@ -64,3 +64,41 @@ describe('useNavigationIntent — 탭으로 분류되는 클릭', () => {
     expect(onIntent).toHaveBeenCalledWith('pop');
   });
 });
+
+describe('useNavigationIntent — popstate 는 셸에 따라 갈린다', () => {
+  afterEach(() => { delete document.documentElement.dataset.teameetNativeApp; });
+
+  it('일반 브라우저·Android 의 popstate 는 pop (웹이 전환을 그린다)', () => {
+    const onIntent = vi.fn();
+    render(<Harness onIntent={onIntent} />);
+
+    window.dispatchEvent(new PopStateEvent('popstate'));
+
+    expect(onIntent).toHaveBeenCalledWith('pop');
+  });
+
+  it('iOS 셸의 popstate 는 native (네이티브가 이미 그렸으니 웹은 안 그린다)', () => {
+    // WKWebView allowsBackForwardNavigationGestures 가 엣지 스와이프 슬라이드를 먼저 그린다.
+    // 여기서 pop 을 주면 그 위에 웹 전환이 한 번 더 겹친다 — 사용자가 "iOS 에서 자체
+    // 트랜지션과 겹친다"고 지적한 바로 그것이다.
+    document.documentElement.dataset.teameetNativeApp = 'ios';
+    const onIntent = vi.fn();
+    render(<Harness onIntent={onIntent} />);
+
+    window.dispatchEvent(new PopStateEvent('popstate'));
+
+    expect(onIntent).toHaveBeenCalledWith('native');
+    expect(onIntent).not.toHaveBeenCalledWith('pop');
+  });
+
+  it('iOS 셸이어도 클릭 뒤로가기(data-nav-back)는 그대로 pop — 네이티브가 안 그리는 경로', () => {
+    document.documentElement.dataset.teameetNativeApp = 'ios';
+    const onIntent = vi.fn();
+    render(<Harness onIntent={onIntent} />);
+
+    clickAnchor('<div><a href="/teams" data-nav-back="true">뒤로</a></div>', '/teams');
+
+    expect(onIntent).toHaveBeenCalledWith('pop');
+  });
+});
+

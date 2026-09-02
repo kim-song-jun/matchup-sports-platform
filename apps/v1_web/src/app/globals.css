@@ -8227,9 +8227,14 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
    최소 재현 6건으로 일치 확인). 탭은 "같은 화면에서 보는 각도만 바꾸는" 조작이므로
    전환 전체를 끈다. 최소 재현 결과: 기준 10건 · 이름 지정만 6건 · old/new(*) 2건 ·
    여기에 group(*) 까지 더해야 0건. */
+/* 'native' 도 같다 — iOS 셸의 엣지 스와이프는 네이티브가 이미 슬라이드를 그렸으므로
+   웹이 또 그리면 두 겹이 된다(use-navigation-intent 가 iOS popstate 를 native 로 분류). */
 :root[data-nav-kind="tab"]::view-transition-old(*),
 :root[data-nav-kind="tab"]::view-transition-new(*),
-:root[data-nav-kind="tab"]::view-transition-group(*) {
+:root[data-nav-kind="tab"]::view-transition-group(*),
+:root[data-nav-kind="native"]::view-transition-old(*),
+:root[data-nav-kind="native"]::view-transition-new(*),
+:root[data-nav-kind="native"]::view-transition-group(*) {
   animation: none;
 }
 
@@ -8261,7 +8266,8 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
      .tm-page-transition-enter[data-nav-kind="..."] 는 그 속성을 **이 요소 자신**에서
      찾으므로 영원히 매칭되지 않는다(template.tsx 는 이 요소에 그 속성을 달지 않는다).
      여기서는 반대로 자손 결합자가 맞다 — <html> 아래의 실제 요소이기 때문이다. */
-  :root[data-nav-kind="tab"] .tm-page-transition-enter { animation: none; }
+  :root[data-nav-kind="tab"] .tm-page-transition-enter,
+  :root[data-nav-kind="native"] .tm-page-transition-enter { animation: none; }
 }
 /* data-nav-kind 가 아직 없는 최초 진입(딥링크·새로고침)은 애니메이션 없이 그대로
    보인다 -- 속성 선택자가 매칭 안 되므로 별도 처리가 필요 없다. */

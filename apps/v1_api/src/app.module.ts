@@ -1,9 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_FILTER, APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 import { buildPinoHttpOptions } from './common/logging/pino-http.config';
+import { UserMutationLoggingInterceptor } from './common/logging/user-mutation-logging.interceptor';
 import { V1ThrottlerGuard } from './common/guards/v1-throttler.guard';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { AuthModule } from './auth/auth.module';
@@ -92,6 +93,7 @@ import { LeagueMatchModule } from './league-matches/league-match.module';
   providers: [
     { provide: APP_GUARD, useClass: V1ThrottlerGuard },
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
+    { provide: APP_INTERCEPTOR, useClass: UserMutationLoggingInterceptor },
   ],
 })
 export class AppModule {}

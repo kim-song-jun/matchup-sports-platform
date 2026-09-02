@@ -74,6 +74,15 @@ describe('data-nav-kind 선택자 형태 — 형태가 틀리면 조용히 발�
     }
   });
 
+  it("'native'(iOS 셸의 popstate)도 tab 과 같은 범위로 끈다", () => {
+    // iOS 엣지 스와이프는 네이티브가 이미 슬라이드를 그렸다. 웹이 또 그리면 두 겹.
+    // VT 경로(old/new/group 전부)와 CSS 폴백 경로 양쪽에 native 가 있어야 한다.
+    for (const part of ['old(*)', 'new(*)', 'group(*)']) {
+      expect(rulesOnly).toMatch(new RegExp(`:root\\[data-nav-kind=["']native["']\\]::view-transition-${part.replace('(*)', '\\(\\*\\)')}`));
+    }
+    expect(rulesOnly).toMatch(/:root\[data-nav-kind=["']native["']\]\s+\.tm-page-transition-enter/);
+  });
+
   it('CSS 폴백은 VT 미지원 환경에서만 적용된다(이중 재생 방지)', () => {
     // 선택자 형태를 고치기 전에는 폴백이 아무 데서도 안 돌았다. 고치고 나니 VT 지원
     // 브라우저에서도 함께 돌아 VT 슬라이드와 이중으로 겹쳤다(alpha 실측: push 이동에서

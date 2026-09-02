@@ -3,7 +3,19 @@
 import { useEffect, useRef } from 'react';
 import { TAB_CONTAINER_SELECTOR } from './navigation-tab-selectors';
 
-export type NavigationIntentKind = 'push' | 'pop' | 'tab';
+export type NavigationIntentKind = 'push' | 'pop' | 'tab' | 'native';
+
+/**
+ * iOS 셸의 popstate 는 엣지 스와이프가 대부분이고, 그 스와이프는 **네이티브가 이미
+ * 슬라이드를 그린 뒤**다(WKWebView allowsBackForwardNavigationGestures). 여기서 다시
+ * 'pop' 을 주면 웹 전환이 그 위에 한 번 더 겹친다. 그래서 'native' — "셸이 이미
+ * 애니메이션했다, 웹은 그리지 말라" — 로 분류한다. 프로그램적 뒤로가기(router.back)도
+ * 같은 popstate 라 함께 애니메이션이 없어지는데, iOS 에서 그 경로는 드물고 두 겹보다 낫다.
+ * 클릭으로 누르는 뒤로가기(‹, data-nav-back)는 popstate 가 아니라 클릭이라 영향 없다.
+ */
+function isIosShell(): boolean {
+  return document.documentElement.dataset.teameetNativeApp === 'ios';
+}
 
 
 export interface NavigationIntentHandlers {
@@ -23,6 +35,7 @@ export interface NavigationIntentHandlers {
  *     사용자 멘탈모델은 "뒤로"이므로 시각적으로 pop 취급. app-back-link.tsx가 이 속성을 단다)
  *  3. 그 외 내부 앵커 클릭 → 'push'
  *  4. popstate 이벤트(하드웨어 백버튼·엣지 스와이프·브라우저 뒤로) → 'pop'
+ *     단 iOS 셸 안이면 'native' — 엣지 스와이프를 네이티브가 이미 그렸으므로 웹은 안 그린다
  *
  * popstate가 forward 버튼에서도 발생하는 것(브라우저 앞으로가기)은 알려진 한계다 — 이
  * 경우도 'pop'으로 분류된다. 모바일 WebView에서 forward 버튼 사용은 극히 드물어(하드웨어
@@ -60,7 +73,7 @@ export function useNavigationIntent({ onIntent }: NavigationIntentHandlers) {
       handlersRef.current.onIntent(kind);
     };
 
-    const onPopState = () => handlersRef.current.onIntent('pop');
+    const onPopState = () => handlersRef.current.onIntent(isIosShell() ? 'native' : 'pop');
 
     document.addEventListener('click', onClick, true);
     window.addEventListener('popstate', onPopState);

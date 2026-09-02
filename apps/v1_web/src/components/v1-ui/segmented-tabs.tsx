@@ -125,7 +125,15 @@ export function SegmentedTabs({ items, activeId, onSelect, ariaLabel, role, size
               className="tm-segmented-tab"
               data-active={active}
               aria-current={active ? 'page' : undefined}
-              onClick={() => onSelect?.(item.id)}
+              onClick={(event) => {
+                // ⌘/Ctrl/Shift/Alt 클릭은 "현재 화면은 그대로 두고 새 탭·새 창으로 연다"는
+                // 뜻이다. 그때도 onSelect 를 부르면 열지도 않은 탭으로 **지금 보고 있는
+                // 화면**이 갈아치워진다(리뷰 탭·대진표 탭이 실제로 이 경로를 탄다).
+                // 가운데 클릭은 최신 브라우저에서 click 이 아니라 auxclick 을 쏘므로 여기
+                // 도달하지 않지만, click(button=1)을 쏘던 구형 동작까지 함께 막아 둔다.
+                if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+                onSelect?.(item.id);
+              }}
               {...stateProps}
             >
               {item.label}

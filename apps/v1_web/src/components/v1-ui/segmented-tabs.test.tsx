@@ -125,3 +125,33 @@ describe('SegmentedTabs — 컨테이너는 "항목이 무엇인지"로 정해�
     expect(container.querySelector('.tm-segmented-thumb')).toBeNull();
   });
 });
+
+describe('SegmentedTabs — 새 탭으로 여는 클릭은 현재 화면을 바꾸지 않는다', () => {
+  const linkItems: SegmentedTabsItem[] = [
+    { id: 'pending', label: '작성할 리뷰', href: '/my/reviews?tab=pending' },
+    { id: 'written', label: '작성된 리뷰', href: '/my/reviews?tab=written' },
+  ];
+
+  it.each([
+    ['⌘(meta)', { metaKey: true }],
+    ['Ctrl', { ctrlKey: true }],
+    ['Shift', { shiftKey: true }],
+    ['Alt', { altKey: true }],
+  ])('%s 클릭은 onSelect 를 부르지 않는다(새 탭에서 열 뿐 현재 화면은 그대로여야 한다)', (_name, modifier) => {
+    const onSelect = vi.fn();
+    render(<SegmentedTabs items={linkItems} activeId="pending" onSelect={onSelect} ariaLabel="리뷰 탭" />);
+
+    fireEvent.click(screen.getByRole('link', { name: '작성된 리뷰' }), modifier);
+
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('수식키 없는 좌클릭은 그대로 onSelect 를 부른다(가드가 정상 경로까지 막지 않는다)', () => {
+    const onSelect = vi.fn();
+    render(<SegmentedTabs items={linkItems} activeId="pending" onSelect={onSelect} ariaLabel="리뷰 탭" />);
+
+    fireEvent.click(screen.getByRole('link', { name: '작성된 리뷰' }));
+
+    expect(onSelect).toHaveBeenCalledWith('written');
+  });
+});

@@ -872,7 +872,14 @@ export class TournamentResultReviewService {
               // 대회와 **같은 함수**를 지난다. 리그 거울엔 스태프 배정이 보통 없지만,
               // 플랫폼 관리자와 대회 운영자는 배정 없이도 통과하는 것이 원래 규칙이라
               // 그대로 성립한다 — 배정 없는 일반 사용자는 여전히 403 이다.
-              resource: { tournamentId: source.tournamentId, fixtureId: source.fixtureId ?? undefined },
+              // ⚠️ 리그 경기는 `fixtureId` **키 자체를 뺀다.** `undefined` 를 담아 보내면
+              // 정책 파서가 `hasOwn` 으로 "있다" 고 보고 값이 stable id 가 아니라며
+              // 리소스 전체를 무효로 만든다 → 플랫폼 관리자까지 STAFF_SCOPE_DENIED
+              // (실측: 이 한 줄 때문에 리그 경기가 권한에서 막혔다).
+              resource:
+                source.fixtureId === null
+                  ? { tournamentId: source.tournamentId }
+                  : { tournamentId: source.tournamentId, fixtureId: source.fixtureId },
             },
             tx,
           );

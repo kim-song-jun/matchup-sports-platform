@@ -18,7 +18,11 @@ import {
   toMirrorSource,
 } from '../tournaments/league-competition-mirror';
 import { buildOddTeamCountWarning, checkLeagueTeamRemovalAllowed } from './league-lifecycle-rules';
-import { findLeagueAdmissionBlocker, leagueAdmissionBlockerMessage } from './league-team-admission';
+import {
+  createLeagueRosterRegistration,
+  findLeagueAdmissionBlocker,
+  leagueAdmissionBlockerMessage,
+} from './league-team-admission';
 import { tierLabel } from './league-series-admin.service';
 import { resolveResultStage } from './league-result-stage';
 import { resolveIsForfeit } from './league-match-forfeit.service';
@@ -434,6 +438,9 @@ export class LeagueMatchAdminService {
     const existingFixtureCount = await this.prisma.v1TeamMatch.count({ where: { leagueId } });
     await this.prisma.$transaction(async (tx) => {
       await tx.v1LeagueTeam.create({ data: { leagueId, teamId: dto.teamId } });
+      // 로스터 행과 짝이 되는 confirmed 등록 — D7 이후 참가의 정본은 등록 쪽이다.
+      // 안 만들면 백필이 세운 "로스터 행 ⟺ confirmed 등록" 불변식이 이 경로에서만 썩는다.
+      await createLeagueRosterRegistration(tx, { leagueId, teamId: dto.teamId, entrySource: 'seeded' });
       await this.adminContext.logAdminAction(
         admin,
         { action: 'league_match.add_team', targetType: 'league_match', targetId: leagueId, afterJson: { teamId: dto.teamId } },

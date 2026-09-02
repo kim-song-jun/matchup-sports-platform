@@ -14,6 +14,7 @@ const ADMIN_ID = 'admin-1';
 
 function makeHarness() {
   const tournamentCreate = jest.fn(async (args: { data: Record<string, unknown> }) => args.data);
+  const registrationCreate = jest.fn(async (args: { data: Record<string, unknown> }) => args.data);
   let seq = 0;
   const tx = {
     v1League: {
@@ -36,6 +37,10 @@ function makeHarness() {
     },
     v1Tournament: { create: tournamentCreate },
     v1LeagueSeries: { update: jest.fn() },
+    // 로스터와 짝이 되는 confirmed 등록(BE-3 ⑤). owner 를 못 찾으면 서비스가 422 로
+    // 던지므로 fake 도 실제처럼 owner 를 준다.
+    v1TeamMembership: { findFirst: jest.fn().mockResolvedValue({ userId: 'owner-1' }) },
+    v1TournamentRegistration: { create: registrationCreate },
   };
   const prisma = {
     v1LeagueSeries: {
@@ -68,7 +73,7 @@ function makeHarness() {
     {} as never,
     {} as never,
   );
-  return { service, tx, tournamentCreate };
+  return { service, tx, tournamentCreate, registrationCreate };
 }
 
 const dto = {
@@ -133,5 +138,29 @@ describe('seedSeason — 통합 축 거울 dual-write', () => {
       // "포함하는가" 만 보면 넓어지는 방향을 못 잡는다.
       expect(Object.keys(league).sort()).toEqual(['id', 'seasonNo', 'state', 'tier', 'title']);
     }
+  });
+
+  it('로스터 팀마다 confirmed 등록을 함께 만든다 — 백필이 세운 짝 불변식을 잇는다', async () => {
+    // 백필은 한 번 돌고 끝났다. 여기서 등록을 안 만들면 이 경로로 만들어진 리그만
+    // "로스터엔 있는데 등록엔 없는" 상태가 되고, 아무도 다시 맞춰 주지 않는다.
+    const { service, registrationCreate } = makeHarness();
+    await service.seedSeason({ id: 'u-1' } as never, SERIES_ID, dto);
+
+    const rows = registrationCreate.mock.calls.map(
+      (call) => call[0].data as { tournamentId: string; teamId: string; status: string; entrySource: string },
+    );
+    // dto 의 두 티어에 든 팀 전부.
+    expect(rows).toHaveLength(4); // 1부 t1·t2 + 2부 t3·t4
+    for (const row of rows) {
+      expect(row).toMatchObject({ status: 'confirmed', entrySource: 'seeded', appliedByUserId: 'owner-1' });
+    }
+    // **거울 뒤에** 만들어져야 한다 — 등록의 tournamentId 가 거울 행을 가리키므로
+    // 순서가 바뀌면 실제 DB 에서 FK 로 막힌다(fake 는 안 막아 주니 순서로 고정한다).
+    expect(rows.map((row) => `${row.tournamentId}:${row.teamId}`)).toEqual([
+      'league-1:t1',
+      'league-1:t2',
+      'league-2:t3',
+      'league-2:t4',
+    ]);
   });
 });

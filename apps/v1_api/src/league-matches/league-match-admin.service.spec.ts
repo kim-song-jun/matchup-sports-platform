@@ -553,6 +553,9 @@ describe('LeagueMatchAdminService.addTeam — 형제 티어 중복 게이트', (
         findFirst: jest.fn().mockResolvedValue({ id: NEW_TEAM_ID, sportId: 'sport-futsal' }),
       },
       v1TeamMatch: { count: jest.fn().mockResolvedValue(0) },
+      // 로스터와 짝이 되는 confirmed 등록(BE-3 ⑤).
+      v1TeamMembership: { findFirst: jest.fn().mockResolvedValue({ userId: 'owner-1' }) },
+      v1TournamentRegistration: { create: jest.fn().mockResolvedValue({}) },
       v1LeagueTeam: {
         create: jest.fn().mockResolvedValue({}),
         // `findLeagueAdmissionBlocker` 가 "이미 이 리그에 있나" 를 여기로 본다. 로스터를

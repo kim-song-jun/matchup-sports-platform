@@ -1,3 +1,4 @@
+import { UnprocessableEntityException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { checkLeagueTeamAddAllowed } from './league-lifecycle-rules';
 import { tierLabel } from './league-series-admin.service';
@@ -80,4 +81,60 @@ export function leagueAdmissionBlockerMessage(blocker: LeagueAdmissionBlocker): 
   return blocker.tier === null
     ? '이 팀은 이미 같은 시즌의 다른 리그에 참가 중이에요. 한 팀을 두 티어에 동시에 배정할 수 없어요.'
     : `이 팀은 이미 같은 시즌 ${tierLabel(blocker.tier)}에 참가 중이에요. 한 팀을 두 티어에 동시에 배정할 수 없어요.`;
+}
+
+/**
+ * 로스터 행과 **짝이 되는 `confirmed` 등록**을 만든다 (Task 164 BE-3 ⑤).
+ *
+ * ## 왜 짝을 맞춰야 하나
+ * D7 이후 리그 참가는 `V1TournamentRegistration` 이 정본이 되고, `V1LeagueTeam` 은
+ * contract 까지 남는 거울이다. 백필(`league-team-registration-backfill.ts`)이 기존
+ * 로스터 전부에 `confirmed` 등록을 만들어 **"로스터 행 ⟺ confirmed 등록"** 불변식을
+ * 세워 뒀다. 로스터를 만드는 경로가 등록을 안 만들면 그 불변식이 그날부터 썩는다 —
+ * 그리고 백필은 **한 번 돌고 끝났으므로** 아무도 다시 맞춰 주지 않는다.
+ *
+ * 로스터를 만드는 길은 넷이다: 어드민 `addTeam` · 시즌 시드 · 승계(다음 시즌 생성) ·
+ * 참가 신청 확정. 마지막 하나만 등록에서 출발하므로, 앞의 셋이 여기를 지난다.
+ *
+ * ## `entrySource` 를 왜 나누나
+ * enum 에 `applied`·`promoted`·`seeded` 가 이미 있는데 지금까지 `seeded` 만 쓰였다.
+ * 승계로 들어온 팀과 운영자가 손으로 넣은 팀은 **운영상 다른 사건**이다 — 다음 시즌
+ * 참가 통보·이의 처리에서 "이 팀은 왜 여기 있나" 의 답이 다르다.
+ *
+ * ## owner 가 없으면 던진다
+ * `appliedByUserId` 는 필수이고 `onDelete: Restrict` 다. 조용히 건너뛰면 로스터엔 있는데
+ * 등록엔 없는 팀이 생겨 불변식이 깨진 채로 성공 응답이 나간다 — 백필이 같은 이유로
+ * 같은 선택을 했다(가드 2).
+ */
+export async function createLeagueRosterRegistration(
+  tx: Prisma.TransactionClient,
+  input: {
+    leagueId: string;
+    teamId: string;
+    entrySource: 'promoted' | 'seeded';
+    /** 등록 생성 시각. 로스터 행과 같은 값을 주면 두 축의 시각이 어긋나지 않는다. */
+    createdAt?: Date;
+  },
+): Promise<void> {
+  const owner = await tx.v1TeamMembership.findFirst({
+    where: { teamId: input.teamId, role: 'owner', status: 'active' },
+    select: { userId: true },
+  });
+  if (owner === null) {
+    throw new UnprocessableEntityException({
+      code: 'LEAGUE_TEAM_INVALID',
+      message: '팀장이 없는 팀은 리그에 등록할 수 없어요.',
+    });
+  }
+  await tx.v1TournamentRegistration.create({
+    data: {
+      tournamentId: input.leagueId,
+      teamId: input.teamId,
+      appliedByUserId: owner.userId,
+      status: 'confirmed',
+      entrySource: input.entrySource,
+      confirmedAt: input.createdAt ?? new Date(),
+      ...(input.createdAt === undefined ? {} : { createdAt: input.createdAt }),
+    },
+  });
 }

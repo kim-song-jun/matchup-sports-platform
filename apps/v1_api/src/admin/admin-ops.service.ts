@@ -81,8 +81,12 @@ export interface ManualPushSendResult {
      * 이 필드가 없던 동안 `sendToUser` 가 돌려주던 native 요약은 여기서 버려졌고, 앱 기기만
      * 가진 사용자에게 보낸 발송이 운영 화면에 "구독 0건 · 나가지 않음" 으로 찍혔다
      * (2026-09-02 alpha 실측: 시뮬레이터에 배너가 도착했는데 응답은 delivered 0).
+     *
+     * Optional 인 이유: 브로드캐스트 재생(`claimBroadcast`)은 그때 저장된 응답을 그대로
+     * 돌려주는데, 이 필드가 없던 시점의 기록에는 앱 쪽 결과가 없다. 그 응답에 0 을 채우면
+     * "알 수 없음" 이 "안 나감" 으로 둔갑한다. 새 발송의 집계에는 항상 들어 있다.
      */
-    native: {
+    native?: {
       /** 수신자들에게 등록돼 있던 활성 기기 수 합계. */
       devices: number;
       /** APNs / FCM 이 접수한 수. */
@@ -554,8 +558,9 @@ function addPushTally(tally: ManualPushSendResult['push'], summary: PushDelivery
   tally.delivered += summary.delivered;
   tally.failed += summary.failed;
   if (summary.disabled) tally.disabled = true;
-  tally.native.devices += summary.native.devices;
-  tally.native.delivered += summary.native.delivered;
-  tally.native.failed += summary.native.failed;
-  if (summary.native.disabled) tally.native.disabled = true;
+  const native = (tally.native ??= { devices: 0, delivered: 0, failed: 0, disabled: false });
+  native.devices += summary.native.devices;
+  native.delivered += summary.native.delivered;
+  native.failed += summary.native.failed;
+  if (summary.native.disabled) native.disabled = true;
 }

@@ -193,6 +193,31 @@ describe('PushSendForm', () => {
     expect(screen.queryByText(/푸시는 나가지 않았어요\)/)).not.toBeInTheDocument();
   });
 
+  it('앱 결과가 없는 예전 응답은 앱 쪽을 알 수 없으므로 토스트에 나가지 않았다고 붙이지 않는다', async () => {
+    sendMutate.mockImplementation((_payload, options) => {
+      options.onSuccess({
+        sent: 1,
+        skipped: 0,
+        failed: 0,
+        push: { subscriptions: 0, delivered: 0, failed: 0, disabled: false },
+      });
+    });
+    const user = userEvent.setup();
+    render(<PushSendForm />);
+
+    await pickUser(user);
+    await user.type(screen.getByLabelText(/제목/), '테스트 알림');
+    await user.click(screen.getByRole('button', { name: '발송하기' }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/발송 완료/)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/푸시는 나가지 않았어요\)/)).not.toBeInTheDocument();
+    // 결과 카드의 웹 줄은 여전히 사실을 말한다.
+    expect(within(screen.getByTestId('push-send-result')).getByText(/브라우저 알림을 켠 사용자가 없어/)).toBeInTheDocument();
+    expect(within(screen.getByTestId('push-send-result')).queryByText(/앱 푸시/)).not.toBeInTheDocument();
+  });
+
   it('앱 푸시 어댑터가 꺼져 있으면 그 사실을 앱 줄에 밝힌다', async () => {
     sendMutate.mockImplementation((_payload, options) => {
       options.onSuccess({

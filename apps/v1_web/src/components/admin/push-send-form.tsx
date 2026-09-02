@@ -183,10 +183,18 @@ function noteTone(disabled: boolean, failed: number, targets: number): string {
 }
 
 
-/** 웹 구독과 앱 기기 어느 쪽으로도 푸시가 접수되지 않았는가. */
+/**
+ * 웹 구독과 앱 기기 어느 쪽으로도 푸시가 접수되지 않은 것이 **확실한가**.
+ *
+ * `native` 가 없는 응답(이 필드 이전 서버, 그때 저장된 브로드캐스트 재생 응답)은 앱 쪽을
+ * 알 수 없는 것이지 안 나간 것이 아니다 — 모르는 것을 "안 나갔다" 로 말하면 실제로 폰에
+ * 도착한 발송을 운영자가 장애로 오인한다. 그 경우는 결과 카드의 웹 줄만 남기고 토스트
+ * 경고는 붙이지 않는다.
+ */
 function pushReachedNobody(push: NonNullable<V1AdminPushSendResult['push']>): boolean {
+  if (!push.native) return false;
   const webNowhere = push.disabled || push.subscriptions === 0;
-  const nativeNowhere = !push.native || push.native.disabled || push.native.devices === 0;
+  const nativeNowhere = push.native.disabled || push.native.devices === 0;
   return webNowhere && nativeNowhere;
 }
 

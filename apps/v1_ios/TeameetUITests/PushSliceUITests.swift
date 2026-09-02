@@ -283,6 +283,9 @@ final class PushSliceUITests: LiveWebHarnessCase {
     /// status is `notDetermined`, and the opt-in it records is what lets the token register.
     func testEAServerSentNotificationReachesThisDevice() throws {
         let title = try environmentValue("TEAMEET_UITEST_BANNER_TITLE")
+        // Read up front, like every other input: a missing value skips the whole test rather
+        // than letting the terminated phase fall away silently behind a green first phase.
+        let terminatedTitle = try environmentValue("TEAMEET_UITEST_TERMINATED_BANNER_TITLE")
         try signIn()
 
         // Opt in the way a reader does: the shell's explainer, then the system dialog.
@@ -322,8 +325,6 @@ final class PushSliceUITests: LiveWebHarnessCase {
         // and a shell whose registration somehow depended on a live process would look fine
         // right up to here. The app is killed, the runner is told to send again under a
         // second title, and that banner has to arrive with no process of ours alive.
-        guard let terminatedTitle = ProcessInfo.processInfo.environment["TEAMEET_UITEST_TERMINATED_BANNER_TITLE"],
-              !terminatedTitle.isEmpty else { return }
         app.terminate()
         if let ready = ProcessInfo.processInfo.environment["TEAMEET_UITEST_READY_FILE"], !ready.isEmpty {
             FileManager.default.createFile(atPath: ready + ".terminated", contents: Data())

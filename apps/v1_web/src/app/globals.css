@@ -7228,6 +7228,13 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   display: grid;
   place-items: center;
   color: var(--text-muted);
+  /* [의도한 시각 변경] 대진표 탭은 15px → 14px 로 **작아진다**.
+     삭제된 .tm-seg-tab 은 R-T1 에서 14→15px 로 올렸는데, 그 근거가 명시적으로
+     "이 페이지 전용 클래스(다른 화면 미사용)라 3단계에 바로 편입" 이었다. 공용
+     컴포넌트로 합치면서 그 전제가 사라졌다 — 이제 같은 클래스를 매치 종류·대회
+     구분·리뷰·전적·컨택 등 여섯 곳이 함께 쓰고, 그쪽 기존 값이 14px 다. 한 화면을
+     위해 나머지 전부를 15px 로 올리는 쪽이 훨씬 큰 변경이므로 14px 로 모은다
+     (대진표는 R-T1 이전 값으로 돌아가는 것이라 폭 여유 문제도 없다). */
   font-size: 14px;
   font-weight: 700;
   white-space: nowrap;

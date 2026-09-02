@@ -143,11 +143,10 @@ async function main() {
      * 내가 띄운 프로세스는 예외 경로에서도 내가 닫는다.
      */
   }
-  const browser2 = browser;
 
   // ── 요약 줄 누수: 대회 탭 + ?status=draft (모바일 한 폭이면 충분하다 — 폭과 무관한 성질이다)
   {
-    const ctx = await browser2.newContext({ viewport: { width: 390, height: 844 } });
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
     const page = await ctx.newPage();
     try {
       const res = await page.goto(`${BASE}/tournaments?kind=tournament&status=draft`, { waitUntil: 'domcontentloaded', timeout: 60_000 });

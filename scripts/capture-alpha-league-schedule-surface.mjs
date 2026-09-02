@@ -408,7 +408,11 @@ async function main() {
   if (harness > 0) {
     console.log(`⚠️ 하네스 실패 ${harness}건 — 화면에 대해 판정하지 마라.`);
     process.exitCode = 2;
-  } else if (failed > 0 || swapped || headerMissing) {
+  } else if (headerMissing || swapped) {
+    // 배포 창의 숫자는 판정에 쓸 수 없다 — 결함(1)이 아니라 버려야 할 실행(2)이다.
+    // (다른 하네스와 같은 규칙. 여기만 `swapped` 라는 다른 이름이라 일괄 수정에서 빠졌었다.)
+    process.exitCode = 2;
+  } else if (failed > 0) {
     process.exitCode = 1;
   }
 }

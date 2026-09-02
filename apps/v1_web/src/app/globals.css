@@ -8133,9 +8133,9 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
 }
 
 :root[data-nav-kind="push"] { --tm-slide-offset: -24%; } /* old 쪽 기준값 -- new 는 아래서 부호 반전 */
-:root[data-nav-kind="push"] ::view-transition-new(page-content) { --tm-slide-offset: 100%; }
+:root[data-nav-kind="push"]::view-transition-new(page-content) { --tm-slide-offset: 100%; }
 :root[data-nav-kind="pop"]  { --tm-slide-offset: 100%; }
-:root[data-nav-kind="pop"]  ::view-transition-new(page-content) { --tm-slide-offset: -24%; }
+:root[data-nav-kind="pop"]::view-transition-new(page-content) { --tm-slide-offset: -24%; }
 
 /* 탭 전환은 콘텐츠에 아무 전환도 걸지 않는다(C안 확정 -- 탭은 페이지가 아니다).
    페이드조차 "다른 것으로 대체됐다"는 신호라 탭에는 맞지 않는다 -- 대신 탭 컨트롤
@@ -8152,8 +8152,13 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
    no-op 이다 -- .tm-scroll-area 는 문서 흐름이 아니라 셸이 고정하는 뷰포트 박스라
    old/new 캡처 rect 가 탭 전환 전후로 항상 같다(v1_web 은 window 로 스크롤하지
    않는다: .tm-scroll-area 가 내부 스크롤러). */
-:root[data-nav-kind="tab"] ::view-transition-old(page-content),
-:root[data-nav-kind="tab"] ::view-transition-new(page-content) {
+/* [선택자 형태 주의]  와  사이에 **공백을 두면 안 된다.**
+   공백은 자손 결합자인데 view-transition 의사요소는 그 방식으로 매칭되지 않는다 —
+   최소 재현으로 확인했다(Chromium): 공백형은 UA 애니메이션이 그대로 2건 재생되고,
+   붙여 쓴 형태만 0건으로 꺼진다. 공백형이던 동안 이 규칙은 **한 번도 발화하지 않았고**,
+   탭 전환에서 tm-page-slide 가 그대로 재생됐다(alpha 실측). */
+:root[data-nav-kind="tab"]::view-transition-old(page-content),
+:root[data-nav-kind="tab"]::view-transition-new(page-content) {
   animation: none;
 }
 
@@ -8169,12 +8174,16 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
   from { opacity: 0; transform: translateX(-24px); }
   to   { opacity: 1; transform: translateX(0); }
 }
-.tm-page-transition-enter[data-nav-kind="push"] { animation: tm-page-fallback-push var(--duration-slower) var(--ease-out) both; }
-.tm-page-transition-enter[data-nav-kind="pop"]  { animation: tm-page-fallback-pop var(--duration-slower) var(--ease-out) both; }
+:root[data-nav-kind="push"] .tm-page-transition-enter { animation: tm-page-fallback-push var(--duration-slower) var(--ease-out) both; }
+:root[data-nav-kind="pop"] .tm-page-transition-enter { animation: tm-page-fallback-pop var(--duration-slower) var(--ease-out) both; }
 /* 탭은 VT 지원 경로와 마찬가지로 이 폴백(iOS 16/17 주 경로)에서도 애니메이션을
    걸지 않는다 -- 규칙을 아예 안 두면 "빠뜨렸나"로 읽히므로 명시적으로 none 을
    남긴다. 예전엔 여기서도 opacity 0→1 로 페이드했다(tm-page-fallback-tab, 삭제됨). */
-.tm-page-transition-enter[data-nav-kind="tab"] { animation: none; }
+/* [선택자 형태 주의] data-nav-kind 는 page-transition-controller 가 <html> 에만 단다.
+    은 그 속성을 **이 요소 자신**에서
+   찾으므로 영원히 매칭되지 않는다(template.tsx 는 이 요소에 그 속성을 달지 않는다).
+   여기서는 반대로 자손 결합자가 맞다 — <html> 아래의 실제 요소이기 때문이다. */
+:root[data-nav-kind="tab"] .tm-page-transition-enter { animation: none; }
 /* data-nav-kind 가 아직 없는 최초 진입(딥링크·새로고침)은 애니메이션 없이 그대로
    보인다 -- 속성 선택자가 매칭 안 되므로 별도 처리가 필요 없다. */
 

@@ -52,3 +52,27 @@ describe('keyboard viewport layout', () => {
     );
   });
 });
+
+describe('data-nav-kind 선택자 형태 — 형태가 틀리면 조용히 발화하지 않는다', () => {
+  // 이 두 규칙은 문법이 멀쩡해서 tsc·lint·유닛테스트가 전부 통과하는데도 **매칭되지 않는다**.
+  // 실제로 그 상태로 배포돼 탭 전환에서 tm-page-slide 가 그대로 재생됐다(alpha 실측).
+  // 화면 없이는 잡을 수 없는 결함이라 텍스트 계약으로 고정한다.
+
+  it('view-transition 의사요소는 :root 에 붙여 쓴다(공백 금지)', () => {
+    // 최소 재현(Chromium): `:root[x] ::view-transition-old(y)` 는 UA 애니메이션을 못 끄고
+    // (2건 재생), `:root[x]::view-transition-old(y)` 만 끈다(0건). 공백은 자손 결합자인데
+    // view-transition 의사요소는 그 방식으로 매칭되지 않는다.
+    const spaced = globalsCss.match(/:root\[data-nav-kind=[^\]]+\]\s+::view-transition-/g) ?? [];
+
+    expect(spaced).toEqual([]);
+  });
+
+  it('실제 요소(.tm-page-transition-enter)는 반대로 자손 결합자로 겨냥한다', () => {
+    // data-nav-kind 는 page-transition-controller 가 <html> 에만 단다. 이 요소 자신에게서
+    // 찾는 형태(.tm-page-transition-enter[data-nav-kind=...])는 영원히 매칭되지 않는다.
+    const onSelf = globalsCss.match(/\.tm-page-transition-enter\[data-nav-kind=/g) ?? [];
+
+    expect(onSelf).toEqual([]);
+    expect(globalsCss).toMatch(/:root\[data-nav-kind="tab"\]\s+\.tm-page-transition-enter/);
+  });
+});

@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { createHash } from 'crypto';
 import type { Request, Response } from 'express';
-import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
+import { PinoLogger } from 'nestjs-pino';
 import { Observable, tap } from 'rxjs';
 import type { V1AuthUser } from '../../auth/v1-auth-user';
 
@@ -40,11 +40,6 @@ const EXCLUDED_FIRST_SEGMENTS = new Set([
 
 @Injectable()
 export class UserMutationLoggingInterceptor implements NestInterceptor {
-  constructor(
-    @InjectPinoLogger(UserMutationLoggingInterceptor.name)
-    private readonly logger: PinoLogger,
-  ) {}
-
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     if (context.getType() !== 'http') {
       return next.handle();
@@ -86,10 +81,22 @@ export class UserMutationLoggingInterceptor implements NestInterceptor {
 
       // Diagnostics must never change the user-visible mutation result.
       try {
+        // The request-scoped Pino logger automatically carries `req`, including
+        // headers and IP metadata. Use the documented root logger so this compact
+        // event contains only the explicitly allowlisted fields below.
+        const logger = PinoLogger.root;
+        if (!logger) return;
+
         if (outcome === 'failure') {
-          this.logger.warn(event, 'Authenticated user mutation failed');
+          logger.warn(
+            { context: UserMutationLoggingInterceptor.name, ...event },
+            'Authenticated user mutation failed',
+          );
         } else {
-          this.logger.info(event, 'Authenticated user mutation completed');
+          logger.info(
+            { context: UserMutationLoggingInterceptor.name, ...event },
+            'Authenticated user mutation completed',
+          );
         }
       } catch {
         // The existing HTTP logger remains available if this optional event cannot be emitted.

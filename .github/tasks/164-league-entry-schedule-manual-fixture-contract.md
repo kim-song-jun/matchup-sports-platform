@@ -91,7 +91,10 @@ D8 순서 `expand → dual-write → backfill → read-swap → contract` 중 **
 - 시즌 시작 시각 경과 → 미제출 팀 명단이 멤버 전원으로 생성, `autoConfirmed=true`, 알림 1건.
 
 ### Edge
-- 날짜 수 < 라운드 수 → 400 `LEAGUE_SCHEDULE_SLOTS_INSUFFICIENT { required, provided }`. 생성 없음.
+- 날짜 수 < **매치데이 수** → **422** `LEAGUE_SCHEDULE_SLOTS_INSUFFICIENT { required, provided }`. 생성 없음.
+  - 두 군데를 실제와 맞춘 것이다: 상태코드는 400 이 아니라 **422**(`UnprocessableEntityException` —
+    같은 파일의 다른 일정 검증도 전부 422 다), 비교 대상은 라운드 수가 아니라
+    **`ceil(라운드 수 / timing.gamesPerTeamPerDay)`**. 팀당 하루 두 경기면 라운드 6 이 날짜 3 개다.
 - 같은 날짜 중복 입력 → 중복 제거 후 계산(에러 아님). 과거 날짜 → 400.
 - 수동 대진에 같은 팀 두 번 → **422 `LEAGUE_TEAM_INVALID`**. 이 리그에 등록되지 않은 팀 →
   **같은 422 `LEAGUE_TEAM_INVALID`**.

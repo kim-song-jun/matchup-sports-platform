@@ -45,7 +45,8 @@ export class AddLeagueTeamDto {
  * 운영자가 눈으로 확인하고 개별 날짜를 지우거나 바꿀 수 있다.
  *
  * 규칙(`league-fixture-dates.ts`): 중복 제거 · 오름차순 배정 · 과거 날짜 거부 ·
- * 날짜가 라운드보다 적으면 400 `LEAGUE_SCHEDULE_SLOTS_INSUFFICIENT`.
+ * 날짜가 **매치데이 수**보다 적으면 422 `LEAGUE_SCHEDULE_SLOTS_INSUFFICIENT`.
+ * (라운드 수가 아니다 — `timing.gamesPerTeamPerDay` 가 2 면 라운드 6 이 매치데이 3 이다.)
  */
 export class LeagueFixtureScheduleDto {
   /** `'YYYY-MM-DD'` (KST 달력 날짜). 순서·중복 무관 — 서버가 정리한다. */

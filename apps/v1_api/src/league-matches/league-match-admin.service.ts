@@ -50,6 +50,23 @@ const DEFAULT_FIXTURE_PLACE_NAME = '장소 미정';
  * 이제 그 함수는 받은 시각만 쓰므로, "timing 은 주고 날짜는 안 주는" 정상 입력에서
  * 호출자가 이 리듬을 만들어 넘긴다.
  */
+/**
+ * 대진 목록에서 **라운드 수**를 되찾는다.
+ *
+ * `weeklyMatchdayStartAts` 는 라운드 수를 받아 `ceil(라운드/G)` 개의 매치데이를 만드는데,
+ * 여기 넘기던 값이 `schedule.length`(=**경기 수**)였다. 4팀 1레그면 라운드 3 · 경기 6 이라
+ * 매치데이가 두 배로 만들어진다. 오늘은 결과가 같다 — 날짜가 `시작일 + index*1주` 로
+ * **인덱스만 보고** 정해지고, 쓰는 인덱스는 `ceil(round/G)-1` 까지뿐이라 뒤쪽 여분이 그냥
+ * 안 쓰이기 때문이다(실측: 배열 6 vs 3, 슬롯 결과 동일). 즉 우연히 무해했다.
+ *
+ * 그래도 고치는 이유는 **양이 틀린 인자는 그 함수가 길이 말고 다른 것에 쓰기 시작하는 순간
+ * 조용히 깨지기 때문**이다. 날짜 목록 경로(`matchdayStartAts`)는 이미 매치데이 수로 검증되고
+ * 있어(`LEAGUE_SCHEDULE_SLOTS_INSUFFICIENT`), 폴백만 다른 단위를 쓰고 있었다.
+ */
+function totalRoundsOf(schedule: readonly RoundRobinFixture[]): number {
+  return schedule.reduce((max, fixture) => (fixture.round > max ? fixture.round : max), 0);
+}
+
 function weeklyMatchdayStartAts(leagueStartsOn: Date, totalRounds: number, timing: FixtureTimingOptions): Date[] {
   const matchdayCount = Math.ceil(totalRounds / timing.gamesPerTeamPerDay);
   return Array.from({ length: matchdayCount }, (_, index) => resolveFixtureStartAt(leagueStartsOn, index + 1));
@@ -1322,7 +1339,8 @@ export class LeagueMatchAdminService {
     const slots = input.timing
       ? resolveFixtureTimeSlots(
           input.schedule,
-          input.matchdayStartAts ?? weeklyMatchdayStartAts(input.leagueStartsOn, input.schedule.length, input.timing),
+          input.matchdayStartAts ??
+            weeklyMatchdayStartAts(input.leagueStartsOn, totalRoundsOf(input.schedule), input.timing),
           input.timing,
         )
       : undefined;

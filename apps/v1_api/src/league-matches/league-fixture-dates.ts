@@ -31,20 +31,27 @@ export type LeagueFixtureDateError =
   | { readonly kind: 'insufficient'; readonly required: number; readonly provided: number };
 
 /**
- * 날짜 목록을 **라운드 수만큼** 오름차순 시작 시각으로 푼다.
+ * 날짜 목록을 **매치데이 수만큼** 오름차순 시작 시각으로 푼다.
  *
- * - **중복 날짜는 제거한다** — 운영자가 같은 날을 두 번 고르는 것은 "그 날에 두 라운드"가
+ * ## 라운드가 아니라 매치데이다
+ * 호출부가 넘기는 값은 `ceil(라운드 수 / timing.gamesPerTeamPerDay)` 다 — 팀당 하루 두
+ * 경기면 라운드 6 이 **날짜 3 개**로 치러진다. 여기에 라운드 수를 넘기면 운영자가 날짜를
+ * 두 배로 고르지 않는 한 항상 `insufficient` 가 난다. 예전 파라미터 이름이 그 오해를
+ * 조장해서(Copilot 리뷰 지적) 이름과 문서를 실제 받는 값에 맞췄다.
+ *
+ * - **중복 날짜는 제거한다** — 운영자가 같은 날을 두 번 고르는 것은 "그 날에 두 경기"가
  *   아니라 입력 실수다. 하루에 여러 경기를 넣는 것은 `timing`(한 구장 순차 진행)이 담당한다.
  * - **과거 날짜는 거부한다** — 이미 지난 날에 경기를 만들면 결과 입력 리마인더가 곧바로
  *   발화하고, 팀 캘린더에 지난 일정이 새로 생긴다.
- * - **날짜가 라운드보다 적으면 거부한다** — 남는 라운드를 조용히 버리면 대진표가 반쪽이
- *   되고, 운영자는 "왜 경기가 덜 생겼지" 를 화면에서 알 수 없다. 몇 개가 필요한지 함께 준다.
- * - 날짜가 라운드보다 **많으면 앞에서부터 필요한 만큼만** 쓴다 — 여유분을 미리 고르는 것은
- *   정상적인 사용이다.
+ * - **날짜가 매치데이 수보다 적으면 거부한다** — 남는 매치데이를 조용히 버리면 대진표가
+ *   반쪽이 되고, 운영자는 "왜 경기가 덜 생겼지" 를 화면에서 알 수 없다. 몇 개가 필요한지
+ *   함께 준다(422 `LEAGUE_SCHEDULE_SLOTS_INSUFFICIENT`).
+ * - 날짜가 매치데이 수보다 **많으면 앞에서부터 필요한 만큼만** 쓴다 — 여유분을 미리 고르는
+ *   것은 정상적인 사용이다.
  */
 export function resolveLeagueFixtureDates(
   schedule: LeagueFixtureDateSchedule,
-  totalRounds: number,
+  requiredMatchdays: number,
   now: Date,
 ): { ok: true; startAts: Date[] } | { ok: false; error: LeagueFixtureDateError } {
   // 정렬 전에 접는다 — 문자열 정렬이 곧 날짜 정렬이다('YYYY-MM-DD').
@@ -65,11 +72,11 @@ export function resolveLeagueFixtureDates(
     return { ok: false, error: { kind: 'past', dates: past } };
   }
 
-  if (startAts.length < totalRounds) {
+  if (startAts.length < requiredMatchdays) {
     // 중복 제거 **뒤**의 수를 보고한다 — 운영자가 고른 개수가 아니라 실제로 쓸 수 있는
     // 날짜 수여야 "몇 개를 더 골라야 하는지" 가 맞는다.
-    return { ok: false, error: { kind: 'insufficient', required: totalRounds, provided: startAts.length } };
+    return { ok: false, error: { kind: 'insufficient', required: requiredMatchdays, provided: startAts.length } };
   }
 
-  return { ok: true, startAts: startAts.slice(0, totalRounds) };
+  return { ok: true, startAts: startAts.slice(0, requiredMatchdays) };
 }

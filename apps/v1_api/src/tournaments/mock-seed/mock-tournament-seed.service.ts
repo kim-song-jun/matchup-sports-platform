@@ -233,10 +233,16 @@ export class MockTournamentSeedService {
   /**
    * 이 대회 경기들의 라인업을 제출 상태로 올린다.
    *
-   * 백필이 이미 등록 명단으로 participant 를 만들어 뒀으므로 새로 만들지 않는다 — 앞에서
-   * minPlayers 명을 선발로, 1명을 골키퍼로 표시하고 나머지는 후보로 남긴 뒤 라인업을 SUBMITTED
-   * 로 올린다. 명단이 minPlayers 에 못 미치는 경기는 건드리지 않는다(반쪽 제출은 화면에서
-   * "자리가 비어 있어요"로 보여 오히려 혼란스럽다).
+   * 백필이 이미 등록 명단으로 participant 를 만들어 뒀으므로 새로 만들지 않는다 — 1명을
+   * 골키퍼로 표시하고 라인업을 SUBMITTED 로 올린다. 명단이 minPlayers 에 못 미치는 경기는
+   * 건드리지 않는다(반쪽 제출은 화면에서 "자리가 비어 있어요"로 보여 오히려 혼란스럽다).
+   *
+   * ⚠️ **선발/후보를 나누지 않는다**(정본 §3: 명단 = 출전자). 예전엔 여기서 앞의
+   * minPlayers 명만 `started: true` 로 두고 나머지를 `false` 로 눌러 후보를 만들었는데,
+   * 그건 이제 **앱의 어떤 저장 경로도 만들지 않는 상태**다 — 시드가 그런 데이터를 심으면
+   * 화면·통계가 실제로는 생기지 않는 모양을 보고 있게 된다.
+   * "골키퍼 정확히 1명" 검증도 없어졌으므로(Task 163 BE-1) GK 지정은 제출 조건이 아니라
+   * **데모 데이터의 사실감**을 위한 것이다.
    */
   private async submitLineups(tournamentId: string, minPlayers: number): Promise<number> {
     const games = await this.prisma.v1Game.findMany({
@@ -254,18 +260,9 @@ export class MockTournamentSeedService {
         const roster = game.participants.filter((participant) => participant.lineupId === lineup.id);
         if (roster.length < minPlayers) continue;
 
-        const starters = roster.slice(0, minPlayers);
         await this.prisma.$transaction(async (tx) => {
-          await tx.v1GameParticipant.updateMany({
-            where: { lineupId: lineup.id },
-            data: { started: false, position: null },
-          });
-          await tx.v1GameParticipant.updateMany({
-            where: { id: { in: starters.map((participant) => participant.id) } },
-            data: { started: true },
-          });
-          // 골키퍼는 정확히 1명이어야 한다 — 없으면 제출이 거부된다.
-          await tx.v1GameParticipant.update({ where: { id: starters[0].id }, data: { position: 'GK' } });
+          // 명단은 그대로 둔다 — 전원이 출전자다(정본 §3). GK 만 한 명 표시한다.
+          await tx.v1GameParticipant.update({ where: { id: roster[0].id }, data: { position: 'GK' } });
           await tx.v1GameLineup.update({
             where: { id: lineup.id },
             data: { state: 'SUBMITTED', submittedAt: new Date(), version: { increment: 1 } },

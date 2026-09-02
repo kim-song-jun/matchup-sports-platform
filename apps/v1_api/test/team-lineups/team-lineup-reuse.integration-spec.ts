@@ -20,8 +20,8 @@ const ids = {
   sideA: '71000000-0000-4000-8000-000000000041',
   sideB: '71000000-0000-4000-8000-000000000042',
   config: '71000000-0000-4000-8000-000000000050',
-  // TeamMatchLineupService의 실제 저장 계약(BENCH_MARKER/GOALKEEPER_MARKER sentinel,
-  // `started` 컬럼 미사용)을 재현하는 두 번째 게임 — 풋살처럼 사전 골키퍼 코드가 'GK'가
+  // TeamMatchLineupService의 실제 저장 계약(선발/후보는 `started` 컬럼, 골키퍼는 종목과
+  // 무관하게 GOALKEEPER_MARKER)을 재현하는 두 번째 게임 — 풋살처럼 사전 골키퍼 코드가 'GK'가
   // 아닌 config로 이 계약이 히스토리 리더에서 올바르게 풀리는지 확인한다.
   futsalTeamMatch: '71000000-0000-4000-8000-000000000060',
   futsalGame: '71000000-0000-4000-8000-000000000061',
@@ -200,8 +200,8 @@ describe('팀 스코프 라인업 재사용 (히스토리 · 프리셋 · 고정
 
     // 풋살처럼 골키퍼 사전 코드가 'GK'가 아닌(config: 'GOLEIRO') 두 번째 팀 매치.
     // TeamMatchLineupService(saveLineup)가 실제로 쓰는 계약을 그대로 재현한다 —
-    // started 컬럼은 절대 세팅하지 않고(기본값 true), 골키퍼는 항상 GOALKEEPER_MARKER
-    // ('GK') sentinel, 후보는 항상 BENCH_MARKER('BENCH') sentinel로만 구분한다.
+    // 명단은 전원 출전자이고, 골키퍼만 종목 사전 코드가 아니라 항상
+    // GOALKEEPER_MARKER('GK') sentinel 이다.
     const futsalConfig = await prisma.v1CompetitionConfigVersion.create({
       data: {
         id: ids.futsalConfig,
@@ -271,8 +271,10 @@ describe('팀 스코프 라인업 재사용 (히스토리 · 프리셋 · 고정
     const futsalLineup = await prisma.v1GameLineup.create({
       data: { gameId: ids.futsalGame, sideId: ids.futsalSideA, revision: 1, formation: '2-2' },
     });
-    // TeamMatchLineupService.resolveEntries가 실제로 만드는 세 가지 행 모양을 그대로
-    // 재현한다 — started는 어느 행에도 지정하지 않는다(기본값 true).
+    // TeamMatchLineupService.resolveEntries 가 실제로 만드는 행 모양을 그대로 재현한다.
+    // **전원이 출전자다**(정본 §3) — 선발/후보 구분이 없으므로 `started` 는 모두 true 이고,
+    // 갈리는 것은 골키퍼뿐이다. 예전엔 후보를 position='BENCH' 센티널로 표시했고
+    // 마이그레이션 20260902000000_v1_lineup_bench_to_started 가 그 구분을 지웠다.
     await prisma.v1GameParticipant.createMany({
       data: [
         {
@@ -282,6 +284,7 @@ describe('팀 스코프 라인업 재사용 (히스토리 · 프리셋 · 고정
           userId: ids.ownerA,
           displayNameSnapshot: '팀장A',
           jerseyNumber: 1,
+          started: true,
           position: 'GK',
         },
         {
@@ -291,6 +294,7 @@ describe('팀 스코프 라인업 재사용 (히스토리 · 프리셋 · 고정
           userId: ids.managerA,
           displayNameSnapshot: '매니저A',
           jerseyNumber: 2,
+          started: true,
           position: null,
         },
         {
@@ -300,7 +304,8 @@ describe('팀 스코프 라인업 재사용 (히스토리 · 프리셋 · 고정
           userId: ids.memberA,
           displayNameSnapshot: '멤버A',
           jerseyNumber: 3,
-          position: 'BENCH',
+          started: true,
+          position: null,
         },
       ],
     });
@@ -361,24 +366,23 @@ describe('팀 스코프 라인업 재사용 (히스토리 · 프리셋 · 고정
     });
 
     it(
-      '팀 매치 소스는 started 컬럼이 아니라 position sentinel(BENCH/GK)로 선발·후보·골키퍼를 ' +
-        '가른다 — 사전 골키퍼 코드가 GK가 아닌 종목(풋살 GOLEIRO)에서도 GK sentinel로 판정한다',
+      '팀 매치 명단은 전원 출전자이고, 골키퍼만 종목 사전이 아니라 GK sentinel 로 판정한다 ' +
+        '— 사전 코드가 GOLEIRO인 풋살에서도 골키퍼로 잡혀야 한다',
       async () => {
         const result = await history.list(authUser(ids.ownerA), ids.teamA, 20);
         const item = result.items.find((entry) => entry.gameId === ids.futsalGame);
         if (item === undefined) throw new Error('futsal team-match lineup missing from history');
 
-        // 세 행 모두 DB의 `started` 컬럼은 기본값 true다(TeamMatchLineupService가
-        // 절대 세팅하지 않으므로) — 그런데도 position sentinel만으로 선발 2 / 후보 1로
-        // 정확히 갈려야 한다. started 컬럼을 그대로 믿었다면 3/0으로 나온다.
-        expect(item.starterCount).toBe(2);
-        expect(item.benchCount).toBe(1);
+        // 명단 = 출전자이므로 전원이 선발로 세어지고 후보는 0이다(정본 §3).
+        // `benchCount` 가 0 이 아니게 되면 어딘가가 다시 후보를 만들고 있다는 뜻이다.
+        expect(item.starterCount).toBe(3);
+        expect(item.benchCount).toBe(0);
 
         const byName = new Map(item.participants.map((p) => [p.displayName, p]));
         const goalkeeper = byName.get('팀장A');
         const fieldPlayer = byName.get('매니저A');
-        const benchPlayer = byName.get('멤버A');
-        if (goalkeeper === undefined || fieldPlayer === undefined || benchPlayer === undefined) {
+        const thirdPlayer = byName.get('멤버A');
+        if (goalkeeper === undefined || fieldPlayer === undefined || thirdPlayer === undefined) {
           throw new Error('expected futsal participants missing');
         }
 
@@ -387,10 +391,9 @@ describe('팀 스코프 라인업 재사용 (히스토리 · 프리셋 · 고정
         // 그대로 노출된다.
         expect(goalkeeper).toMatchObject({ goalkeeper: true, position: null, started: true });
         expect(fieldPlayer).toMatchObject({ goalkeeper: false, started: true });
-        // 저장된 position은 'BENCH'(BENCH_MARKER)다 — started 컬럼(기본값 true)을
-        // 그대로 믿었다면 이 사람도 선발로 나오고, position도 'BENCH' 문자열 그대로
-        // 노출된다.
-        expect(benchPlayer).toMatchObject({ goalkeeper: false, position: null, started: false });
+        // 세 번째 사람도 **출전자**다 — 예전엔 여기가 후보(started:false)였고, 그 구분을
+        // 정본 §3 이 없앴다. 이 줄이 다시 false 를 기대하게 되면 후보 개념이 되살아난 것이다.
+        expect(thirdPlayer).toMatchObject({ goalkeeper: false, position: null, started: true });
       },
     );
   });

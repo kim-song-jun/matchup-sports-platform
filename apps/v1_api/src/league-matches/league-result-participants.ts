@@ -61,14 +61,6 @@
  */
 
 /**
- * team-match 라인업이 후보를 표시하는 센티널. team-match-lineup.service.ts 의
- * `BENCH_MARKER` 와 같은 값이다 — `V1GameParticipant.started` 컬럼은 그 경로가 쓰지 않아
- * 기본값 true 로 남아 있으므로(schema.prisma 의 해당 필드 주석) **컬럼이 아니라 이 관례를
- * 봐야 한다.**
- */
-const TEAM_MATCH_BENCH_POSITION = 'BENCH';
-
-/**
  * team-match 라인업이 선발 골키퍼를 표시하는 센티널(같은 파일의 `GOALKEEPER_MARKER`).
  *
  * 종목별 골키퍼 코드(축구 'GK', 풋살 'GOLEIRO')와 **별개로** 반드시 함께 봐야 한다:
@@ -102,7 +94,12 @@ export interface LeagueGameSideRow {
 export interface LeagueLineupParticipantRow {
   id: string;
   sideId: string;
-  /** team-match 라인업 관례: 'BENCH'=후보, 'GK'=선발 골키퍼, 그 외/null=필드 포지션. */
+  /**
+   * 포지션 코드. 'GK'(팀 매치는 종목 무관 리터럴) 또는 종목 사전 코드, 없으면 null.
+   *
+   * **선발/후보는 여기 없다** — 정본 §3 이 그 구분을 없앴다(명단 = 출전자). 예전엔 이
+   * 자리의 `'BENCH'` 센티널이 후보 표시였고 이 모듈이 그 값을 **복사해** 갖고 있었다.
+   */
   position: string | null;
 }
 
@@ -213,11 +210,6 @@ function foldDuplicateIdentities(
     folded[at] = mergeSamePerson(folded[at]!, row);
   }
   return folded;
-}
-
-/** 후보(BENCH 센티널)가 아니면 선발이다. 위 `TEAM_MATCH_BENCH_POSITION` 주석 참고. */
-function isStarterPosition(position: string | null): boolean {
-  return position !== TEAM_MATCH_BENCH_POSITION;
 }
 
 function isGoalkeeperPosition(position: string | null, goalkeeperPositionCode: string): boolean {
@@ -355,7 +347,7 @@ export function assembleLeagueResultParticipants(input: {
   const emitted = new Set<string>();
 
   // ① 팀이 실제로 작성한 라인업이 있는 사이드: 로스터 **전원**을 기록한다(무득점 포함).
-  //    출전 여부는 라인업이 유일한 증거이므로 started/goalkeeper 도 여기서만 채운다.
+  //    라인업이 출전의 유일한 증거이므로 goalkeeper 도 여기서만 채운다.
   for (const sideKey of SIDE_KEYS) {
     const side = sides.find((row) => row.sideKey === sideKey);
     if (side === undefined) continue;
@@ -369,7 +361,7 @@ export function assembleLeagueResultParticipants(input: {
       assembled.push({
         participantId: row.id,
         sideId: roster.sideId,
-        started: isStarterPosition(row.position),
+        started: true,
         goals: stat?.goals ?? 0,
         ...(assists === 0 ? {} : { assists }),
         cards: { yellow: 0, red: 0 },
@@ -381,9 +373,10 @@ export function assembleLeagueResultParticipants(input: {
 
   // ② 로스터가 덮지 못한 기록: 자동 로스터뿐인 사이드의 득점자, 그리고 최신 라인업에서는
   //    빠졌지만 현재 공식 기록이 있어 승계된 선수(league-match-result-entry.service.ts
-  //    listFixtureParticipants 참고). 출전 근거가 없으므로 예전 규칙 그대로 **기록이 있는
-  //    행만** 싣고 started/goalkeeper 는 false 로 둔다 — 라인업 증거 없이 "선발"이라고
-  //    적는 것이 기록을 비우는 것보다 나쁜 오류다.
+  //    listFixtureParticipants 참고). 라인업 증거가 없으므로 예전 규칙 그대로 **기록이 있는
+  //    행만** 싣는다 — 뛰지 않은 사람의 출전 기록을 만들지 않기 위해서다. `started` 는
+  //    true 다(정본 §3: 행의 존재 자체가 "뛰었다" 이므로 출전자는 전부 true). `goalkeeper`
+  //    는 포지션 증거가 없으므로 false 로 남는다 — 그건 여전히 모르는 값이다.
   for (const stat of participants) {
     if (emitted.has(stat.participantId)) continue;
     const resolved = statById.get(stat.participantId);
@@ -393,7 +386,7 @@ export function assembleLeagueResultParticipants(input: {
     assembled.push({
       participantId: stat.participantId,
       sideId: resolved.sideId,
-      started: false,
+      started: true,
       goals: resolved.goals,
       ...(resolved.assists === 0 ? {} : { assists: resolved.assists }),
       cards: { yellow: 0, red: 0 },
@@ -472,7 +465,7 @@ export function carryForwardResultParticipants(input: {
         {
           participantId: row.id,
           sideId: roster.sideId,
-          started: isStarterPosition(row.position),
+          started: true,
           goals: stored?.goals ?? 0,
           ...(stored === undefined || stored.assists === 0 ? {} : { assists: stored.assists }),
           ...(stored === undefined || stored.fouls === 0 ? {} : { fouls: stored.fouls }),
@@ -496,6 +489,8 @@ export function carryForwardResultParticipants(input: {
       {
         participantId: row.participantId,
         sideId: row.sideId,
+        // ⚠️ 승계는 **원본 그대로**다. 새로 짓는 행(위 ①)은 정본 §3 대로 true 지만,
+        // 이미 저장된 공식 기록의 값을 다시 쓰지는 않는다.
         started: row.started,
         goals: row.goals,
         ...(row.assists === 0 ? {} : { assists: row.assists }),

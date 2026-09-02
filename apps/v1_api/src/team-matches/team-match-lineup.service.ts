@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -10,7 +11,8 @@ import type { V1AuthUser } from '../auth/v1-auth-user';
 import { OperationAuditWriterService } from '../common/audit/operation-audit-writer.service';
 import { canonicalGameCommandPayloadHash, createRosterAssertedIdentityLink } from '../games/games.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { parseLineupConfigForResponse, parseLineupLimits } from '../tournaments/competition-config/competition-config.parse';
+import { parseLineupCatalog, parseLineupConfigForResponse } from '../tournaments/competition-config/competition-config.parse';
+import { findRejectedLineupPosition, rejectedLineupPositionMessage } from '../games/core/lineup-position';
 import {
   ChangeRequestTeamMatchLineupDto,
   SaveTeamMatchLineupDto,
@@ -20,25 +22,42 @@ import {
 
 type Transaction = Prisma.TransactionClient;
 
-/** `V1GameParticipant.position` sentinel reserved for a bench entry. Chosen
- * because this write path never sets the `started` boolean column (it
- * defaults to `true` for every row it inserts) -- `position === BENCH_MARKER`
- * is the *only* signal that distinguishes bench from starter for rows this
- * service writes. Exported because `TeamLineupHistoryService` reads these
- * same rows across team-match and tournament-fixture sources and must use
- * this exact sentinel (not the generic `started` column) when the source
- * game is a team match -- see that service's `list()` for the branch (see
- * Task 14 report for the follow-up schema request that would let this write
- * path also start using the `started` column). */
-export const BENCH_MARKER = 'BENCH';
-/** Sentinel for the single starting goalkeeper, matching the convention
- * already used implicitly for `V1GameResultParticipant.goalkeeper`. Exported
- * for the same cross-service reason as `BENCH_MARKER`: team-match lineups
- * always store this literal string regardless of sport, while
- * tournament-fixture lineups store the sport dictionary's goalkeeper code
- * (e.g. futsal's `'GOLEIRO'`) -- `TeamLineupHistoryService` must compare
- * against this sentinel, not the dictionary code, for team-match sources. */
+/**
+ * 선발 골키퍼를 표시하는 `V1GameParticipant.position` 센티널.
+ * (`V1GameResultParticipant.goalkeeper` 가 암묵적으로 따르던 관례와 같다.)
+ *
+ * **종목과 무관하게 항상 이 리터럴**이다 — 대회 경기 라인업은 종목 사전의 코드를 그대로
+ * 저장하는데(풋살은 `'GOLEIRO'`) 팀 매치는 `goalkeeper: true` 를 받아 여기서 눌러 담는다.
+ * 그래서 읽는 쪽(`TeamLineupHistoryService`, `league-result-participants.ts`)은 팀 매치
+ * 소스에 대해 사전 코드가 아니라 이 센티널과 비교해야 한다 — export 하는 이유다.
+ *
+ * ⚠️ 선발/후보를 나타내던 짝 센티널 `BENCH_MARKER('BENCH')` 는 **없앴다**(Task 163 BE-3).
+ * 후보라는 개념 자체가 사라졌다 — 명단에 있으면 그 경기에 뛴 것이고 `started` 는 항상
+ * true 다(정본 §3). 옛 행은 마이그레이션 `20260902000000_v1_lineup_bench_to_started` 가
+ * 정리했다. 한 컬럼(position)이 소스에 따라 다른 뜻을 갖던 상태가 사라졌으므로
+ * **다시 만들지 마라** — 읽는 쪽마다 소스별 분기를 복제하게 되고, 실제로 한 곳은 상수를
+ * import 하지 않고 값을 복사해 갖고 있었다.
+ */
 export const GOALKEEPER_MARKER = 'GK';
+
+/**
+ * 저장 요청이 실은 명단 **하나**임을 한 곳에서 확정한다.
+ *
+ * 정본 §3 이 선발/후보 구분을 없앴으므로 `participants` 가 정본 형태이고,
+ * `starters`/`bench` 는 프론트가 아직 보내는 옛 형태다 — 어느 쪽에 담겨 왔든 같은 명단이
+ * 되고, **담긴 위치가 저장 결과를 바꾸지 않는다.** 세 배열을 각자 훑는 코드가 생기면 그
+ * 순간 "어느 배열이었나" 가 다시 의미를 갖게 되므로 여기서만 편다.
+ *
+ * ⚠️ **합치지 않고 고른다.** 전환기의 클라이언트는 같은 명단을 두 모양으로 **함께** 보낼
+ * 수 있는데(새 필드를 붙이면서 옛 필드를 아직 안 지운 배포), 무조건 이어 붙이면 같은
+ * 사람이 두 번 실려 `LINEUP_DUPLICATE_PARTICIPANT` 로 400 이 난다 — 보내는 쪽은 아무것도
+ * 잘못한 게 없는데 저장이 막힌다. `participants` 가 비어 있지 않으면 **그것만** 쓰고,
+ * 없을 때만 옛 두 칸으로 돌아간다.
+ */
+function rosterOf(dto: SaveTeamMatchLineupDto): TeamMatchLineupParticipantDto[] {
+  if (dto.participants !== undefined && dto.participants.length > 0) return dto.participants;
+  return [...(dto.starters ?? []), ...(dto.bench ?? [])];
+}
 
 interface TeamMatchLineupContext {
   gameId: string;
@@ -176,6 +195,12 @@ export class TeamMatchLineupService {
                 displayNameSnapshot: entry.displayNameSnapshot,
                 jerseyNumber: entry.jerseyNumber ?? null,
                 position: entry.position,
+                // **명단 = 출전자**(정본 §3) — 이 경로가 만드는 행은 전부 출전자다.
+                // 스키마 기본값도 true 지만 명시한다: 값이 무엇인지 여기서 읽히지 않으면
+                // 다음 사람이 기본값을 바꿀 때 이 경로가 함께 뒤집히는 것을 못 본다.
+                // (그래서 이 줄을 지우는 변이는 지금 green 이다 — 기본값이 같은 값이라
+                //  관측 결과가 안 변한다. red 로 잡히는 것은 `false` 를 넣는 변이다.)
+                started: true,
                 positionX: entry.positionX ?? null,
                 positionY: entry.positionY ?? null,
               },
@@ -409,6 +434,11 @@ export class TeamMatchLineupService {
                 displayNameSnapshot: participant.displayNameSnapshot,
                 jerseyNumber: participant.jerseyNumber,
                 position: participant.position,
+                // 원본 행의 값을 **그대로** 옮긴다. 정본 §3 아래에서는 모두 true 라
+                // 지금은 결과가 같지만, 복사가 원본과 다른 값을 만들어 내는 경로를
+                // 남기지 않는다 — 이 복사본이 그 사이드의 최신 리비전이 되고 결과 입력의
+                // 모집단이 되므로, 여기서 값을 지어내면 공식 기록이 원본과 갈린다.
+                started: participant.started,
                 positionX: participant.positionX,
                 positionY: participant.positionY,
               },
@@ -823,44 +853,58 @@ export class TeamMatchLineupService {
     context: TeamMatchLineupContext,
     dto: SaveTeamMatchLineupDto,
   ) {
-    const config = await tx.v1CompetitionConfigVersion.findUnique({
+    // Task 163 — 제출 시점의 **인원·골키퍼 검증을 하지 않는다.**
+    //
+    // 명단 제출은 "누가 오나"만 받는다. 정본 §3 이 선발/후보 구분을 없앴으므로 여기서
+    // 셀 "선발" 이라는 개념 자체가 없다 — 명단에 있으면 그 경기에 뛴 것이다.
+    //
+    // 함께 사라지는 규칙이 하나 더 있다: `후보는 최대 N명`(교체 가능 인원 제한)도 같은
+    // `LINEUP_SIZE_INVALID` 로 막고 있었는데, 후보라는 구분이 제출에서 없어지므로 셀
+    // 대상이 없다. 교체 횟수 제한 자체는 콘솔 교체 경로가 계속 본다 — 여기서 미리
+    // 막던 것만 없어진다.
+    //
+    // 인원 규칙을 되살리려면 "인원이 안 맞아도 경기는 시작하고 운영 콘솔에서 조정한다"는
+    // 사용자 확정부터 뒤집어야 한다(정본 §3).
+
+    // **빈 명단은 막는다.** 인원 min~max 게이트를 없앤 것과 다른 문제다 — 이건 선발
+    // 규칙이 아니라 **데이터 손실 가드**다. 이 경로는 저장할 때마다 새 리비전을 만들므로
+    // 옛 행이 지워지지는 않지만, 읽는 쪽은 전부 **최신 리비전**을 본다
+    // (serializeLineup · league-result-participants). 빈 리비전이 최신이 되면 그 팀의
+    // 명단이 화면에서 사라지고 출전 기록도 만들어지지 않는다.
+    if (rosterOf(dto).length === 0) {
+      throw new BadRequestException({
+        code: 'LINEUP_EMPTY',
+        message: '명단에 최소 한 명은 있어야 해요.',
+      });
+    }
+
+    // 지운 센티널이 **입력으로 되돌아오는 것**을 막는다. `position` 은 클라이언트가 보내는
+    // 자유 문자열이라, 마이그레이션이 정리한 'BENCH' 가 다음 저장 요청으로 그대로 다시
+    // 들어올 수 있다. 'BENCH' 만 막으면 '벤치'·'sub'·오타는 그대로 들어오므로 **카탈로그에
+    // 있는 값만** 통과시킨다(근거는 games/core/lineup-position.ts).
+    //
+    // BE-1 이 인원 검증과 함께 지웠던 config 조회를 여기서 되살린다 — 그때는 죽은 조회라
+    // 지운 것이고, 지금은 이 가드가 유일한 소비처다.
+    //
+    // ⚠️ 재는 것은 **클라이언트가 보낸 `entry.position` 뿐**이다. 골키퍼는 아래에서 서버가
+    // `GOALKEEPER_MARKER('GK')` 로 눌러 담는데, 풋살 카탈로그에는 'GK' 가 없고 'GOLEIRO'
+    // 가 있어서(실측) 그 리터럴까지 카탈로그로 재면 풋살 골키퍼 저장이 전부 막힌다.
+    const lineupConfig = await tx.v1CompetitionConfigVersion.findUnique({
       where: { id: context.gameCompetitionConfigVersionId },
       select: { lineup: true },
     });
-    const lineupConfig = parseLineupLimits(config?.lineup ?? null);
-
-    if (dto.starters.length < lineupConfig.minPlayers || dto.starters.length > lineupConfig.maxPlayers) {
-      throw new UnprocessableEntityException({
-        code: 'LINEUP_SIZE_INVALID',
-        message: `선발 인원은 ${lineupConfig.minPlayers}명 이상 ${lineupConfig.maxPlayers}명 이하여야 해요.`,
-      });
-    }
-    if (
-      lineupConfig.substitutions === 'limited' &&
-      lineupConfig.maxSubstitutions !== null &&
-      dto.bench.length > lineupConfig.maxSubstitutions
-    ) {
-      throw new UnprocessableEntityException({
-        code: 'LINEUP_SIZE_INVALID',
-        message: `후보는 최대 ${lineupConfig.maxSubstitutions}명까지 등록할 수 있어요.`,
+    const rejectedPosition = findRejectedLineupPosition(
+      rosterOf(dto).map((entry) => entry.position),
+      parseLineupCatalog(lineupConfig?.lineup ?? null).positions.map((position) => position.code),
+    );
+    if (rejectedPosition !== null) {
+      throw new BadRequestException({
+        code: 'LINEUP_POSITION_INVALID',
+        message: rejectedLineupPositionMessage(rejectedPosition),
       });
     }
 
-    const goalkeeperCount = dto.starters.filter((entry) => entry.goalkeeper === true).length;
-    if (goalkeeperCount !== 1) {
-      throw new UnprocessableEntityException({
-        code: 'LINEUP_GOALKEEPER_INVALID',
-        message: '선발 라인업에는 골키퍼가 정확히 한 명 있어야 해요.',
-      });
-    }
-    if (dto.bench.some((entry) => entry.goalkeeper === true)) {
-      throw new UnprocessableEntityException({
-        code: 'LINEUP_GOALKEEPER_INVALID',
-        message: '후보 선수는 골키퍼로 지정할 수 없어요.',
-      });
-    }
-
-    const jerseyNumbers = [...dto.starters, ...dto.bench]
+    const jerseyNumbers = rosterOf(dto)
       .map((entry) => entry.jerseyNumber)
       .filter((jerseyNumber): jerseyNumber is number => jerseyNumber !== undefined);
     if (new Set(jerseyNumbers).size !== jerseyNumbers.length) {
@@ -874,7 +918,7 @@ export class TeamMatchLineupService {
     // 클라이언트가 재수화(hydrate) 시점의 정체성 유실 버그(Task 15 blocker-1) 때문에, 또는
     // 어떤 클라이언트든 버그·경합으로 같은 userId를 두 번 실어 보내는 순간 한 사람에 대해
     // 두 개의 V1GameParticipant 행이 생겨버린다 — 서버가 최종 방어선이다.
-    const userIds = [...dto.starters, ...dto.bench]
+    const userIds = rosterOf(dto)
       .map((entry) => entry.userId)
       .filter((userId): userId is string => userId !== undefined);
     if (new Set(userIds).size !== userIds.length) {
@@ -884,15 +928,19 @@ export class TeamMatchLineupService {
       });
     }
 
-    const starterEntries = await Promise.all(
-      dto.starters.map((entry) =>
-        this.resolveEntry(tx, context, entry, entry.goalkeeper === true ? GOALKEEPER_MARKER : (entry.position ?? null)),
+    // **명단 = 출전자**이므로 갈래가 하나다(정본 §3). 예전엔 후보의 position 을 'BENCH' 로
+    // 덮어썼는데(센티널), 그러면 같은 컬럼이 대회 경기에서는 실제 포지션 코드를 뜻하고
+    // 팀 매치에서는 선발 여부를 뜻해 읽는 쪽마다 소스별 분기가 생겼다 — 그 관례를 없앴다.
+    return Promise.all(
+      rosterOf(dto).map((entry) =>
+        this.resolveEntry(
+          tx,
+          context,
+          entry,
+          entry.goalkeeper === true ? GOALKEEPER_MARKER : (entry.position ?? null),
+        ),
       ),
     );
-    const benchEntries = await Promise.all(
-      dto.bench.map((entry) => this.resolveEntry(tx, context, entry, BENCH_MARKER)),
-    );
-    return [...starterEntries, ...benchEntries];
   }
 
   private async resolveEntry(
@@ -991,31 +1039,25 @@ export class TeamMatchLineupService {
             where: { lineupId: lineup.id },
             orderBy: { createdAt: 'asc' },
           });
-    const starters = participants
-      .filter((participant) => participant.position !== BENCH_MARKER)
-      .map((participant) => ({
-        // Task 17: the result-entry form needs the real `V1GameParticipant.id`
-        // to attribute a goal/card to a specific roster entry — this route was
-        // the only existing lineup read and previously erased the id.
-        id: participant.id,
-        // 저장된 사람 연결. 화면이 재수화할 때 이름 매칭 휴리스틱 대신 이 값을 쓰면
-        // 같은 이름의 다른 팀원을 혼동하지 않는다.
-        userId: participant.userId,
-        displayName: participant.displayNameSnapshot,
-        jerseyNumber: participant.jerseyNumber,
-        position: participant.position === GOALKEEPER_MARKER ? null : participant.position,
-        goalkeeper: participant.position === GOALKEEPER_MARKER,
-        positionX: participant.positionX,
-        positionY: participant.positionY,
-      }));
-    const bench = participants
-      .filter((participant) => participant.position === BENCH_MARKER)
-      .map((participant) => ({
-        id: participant.id,
-        userId: participant.userId,
-        displayName: participant.displayNameSnapshot,
-        jerseyNumber: participant.jerseyNumber,
-      }));
+    // **명단 = 출전자**라 갈래가 없다(정본 §3). 아래 `starters`/`bench` 는 아직 그 두 칸을
+    // 읽는 프론트를 위해 같은 값을 다른 모양으로 한 번 더 담는 것이고, `bench` 는 항상 빈
+    // 배열이다 — 프론트가 `participants` 로 넘어가면(FE-1) 둘 다 지운다.
+    const roster = participants.map((participant) => ({
+      // Task 17: the result-entry form needs the real `V1GameParticipant.id`
+      // to attribute a goal/card to a specific roster entry — this route was
+      // the only existing lineup read and previously erased the id.
+      id: participant.id,
+      // 저장된 사람 연결. 화면이 재수화할 때 이름 매칭 휴리스틱 대신 이 값을 쓰면
+      // 같은 이름의 다른 팀원을 혼동하지 않는다.
+      userId: participant.userId,
+      displayName: participant.displayNameSnapshot,
+      jerseyNumber: participant.jerseyNumber,
+      position: participant.position === GOALKEEPER_MARKER ? null : participant.position,
+      goalkeeper: participant.position === GOALKEEPER_MARKER,
+      positionX: participant.positionX,
+      positionY: participant.positionY,
+    }));
+
     return {
       teamMatchId: context.teamMatchId,
       gameId: context.gameId,
@@ -1027,8 +1069,11 @@ export class TeamMatchLineupService {
       version: lineup?.revision ?? 0,
       formation: lineup?.formation ?? null,
       publicLineupAt: publicLineupAt?.toISOString() ?? null,
-      starters,
-      bench,
+      participants: roster,
+      // 옛 두 칸 — 같은 명단을 프론트가 아직 읽는 모양으로 한 번 더 담는다.
+      // 명단 = 출전자이므로 `bench` 는 언제나 비어 있다.
+      starters: roster,
+      bench: [] as typeof roster,
     };
   }
 }

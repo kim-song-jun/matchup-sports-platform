@@ -63,8 +63,17 @@ export class GameLineupParticipantDto {
   @Max(100)
   positionY?: number;
 
+  /**
+   * **더 이상 읽지 않는다** (Task 163, 정본 §3). 선발/후보 구분 자체가 없어졌다 —
+   * 명단에 있으면 그 경기에 뛴 것이고 `started` 는 항상 true 다. optional 로 남겨 둔
+   * 이유는 **옛 클라이언트가 보내도 400 을 내지 않기 위해서**이며, 값은 저장 경로에서
+   * 무시된다.
+   *
+   * 프론트가 전부 갱신되고 alpha 에서 미전송이 확인되면 이 필드를 지운다.
+   */
+  @IsOptional()
   @IsBoolean()
-  started!: boolean;
+  started?: boolean;
 }
 
 export class SaveGameLineupDto {

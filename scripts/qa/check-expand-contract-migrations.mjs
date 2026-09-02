@@ -72,6 +72,45 @@ const REVIEWED_NON_ADDITIVE = [
       "PR #977 (team contact -> chat absorption). Data-only backfill, part 1 of 4: creates one v1_chat_rooms row per pre-existing requested/accepted team contact that has none (LEFT JOIN ... IS NULL), so it is insert-only and idempotent; rows that already have a room are untouched. The new app creates this room at request time; an old app instance ignores the row (its contact detail never resolved a room before accept), so both rolling-deploy directions are safe. The gate rejects INSERT as a category because it cannot PROVE additivity, not because these rows are unsafe. Verified on a throwaway Postgres 16 with the full migration chain replayed, seeded scenarios, and a second run producing 0 new rows. Reviewed 2026-09-02.",
   },
   {
+    file: 'apps/v1_api/prisma/migrations/20260902000000_v1_lineup_bench_to_started/migration.sql',
+    statement:
+      "DO $$ DECLARE bench_rows bigint; not_started_rows bigint; BEGIN SELECT count(*) INTO bench_rows FROM \"v1_game_participants\" WHERE \"position\" = 'BENCH'; SELECT count(*) INTO not_started_rows FROM \"v1_game_participants\" WHERE \"started\" = false; RAISE NOTICE 'task163: position=BENCH rows=%', bench_rows; RAISE NOTICE 'task163: started=false rows=% (overlaps the above)', not_started_rows; END $$",
+    reason:
+      'Task 163 BE-3. Read-only accounting that runs immediately before the repair UPDATE in the same '
+      + 'file: it counts the rows each of the two conditions matches and RAISE NOTICEs them. It writes '
+      + 'nothing — no table, column, index, constraint, or row is created, altered, or deleted — so it is '
+      + 'safe in a rolling deploy in both directions and a rollback leaves no trace of it. The gate rejects '
+      + 'it only because a DO block is not in its provably-additive list, which cannot inspect the body. '
+      + 'It exists because the repair erases its own evidence: after the UPDATE runs, WHERE position = '
+      + "'BENCH' OR started = false matches nothing, so the sizes can no longer be recovered — and this "
+      + 'migration changes alpha production data, where approval and audit need "how many of what". The '
+      + 'two counts overlap (a bench row could also be started=false) and are reported separately rather '
+      + 'than summed, so the numbers are not misread as disjoint. Reviewed 2026-09-02.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260902000000_v1_lineup_bench_to_started/migration.sql',
+    statement:
+      'UPDATE "v1_game_participants" SET "started" = true, "position" = CASE WHEN "position" = \'BENCH\' THEN NULL ELSE "position" END WHERE "started" = false OR "position" = \'BENCH\'',
+    reason:
+      'Task 163 BE-3. Deletes the bench/starter distinction rather than translating it: the canonical '
+      + 'flow (docs/design/competition-canonical-flow.md §3) makes the submitted roster the list of '
+      + 'players who appeared, it fixes BOTH ways a substitute was recorded: team-match lineups wrote `position=\'BENCH\'` and '
+      + 'left started at its true default, while tournament lineups wrote `started=false` from the DTO. '
+      + 'Repairing only the sentinel would leave the tournament rows false and split the official record '
+      + 'by which path saved it. Not additive '
+      + 'because it rewrites two pre-existing columns on pre-existing rows, so it needs review rather than '
+      + 'a rule change — isAdditiveStatement has no data-statement branch and cannot prove any UPDATE safe. '
+      + 'Rolling-deploy safety: benign in this direction. The OLD app reads bench as `position === '
+      + '\'BENCH\'`; after this runs it simply sees those players as starters, which is the state the new '
+      + 'app also reports, so old and new agree during the window. No row is deleted and no old write path '
+      + 'can corrupt the new shape — an old instance would write the sentinel back, and the new app reads '
+      + 'that as a starter with a stray position, not as data loss. Re-runnable: the first run sets position '
+      + 'to NULL, so a second execution matches zero rows. NOT reversible — which rows were bench is not '
+      + 'recoverable afterwards (started is true both before and after, and position is cleared); a '
+      + 'pre-migration backup is the only rollback, and the canonical flow retires the concept so nothing '
+      + 'consumes it. Reviewed 2026-09-02.',
+  },
+  {
     file: 'apps/v1_api/prisma/migrations/20260821115900_v1_team_record_facts_played_at_compat/migration.sql',
     statement:
       "CREATE OR REPLACE FUNCTION v1_block_team_record_fact_mutation() RETURNS trigger LANGUAGE plpgsql AS $function$ BEGIN IF TG_OP = 'UPDATE' AND (to_jsonb(NEW) - 'played_at') IS NOT DISTINCT FROM (to_jsonb(OLD) - 'played_at') AND OLD.played_at IS NULL AND NEW.played_at IS NOT NULL THEN RETURN NEW; END IF; RAISE EXCEPTION 'team record facts are append-only' USING ERRCODE = '55000'; END $function$",

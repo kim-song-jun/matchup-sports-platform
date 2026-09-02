@@ -43,11 +43,11 @@ import { cascadeCompleteTeamMatchSchedulesInTx } from '../team-schedules/team-sc
 import {
   parseLineupCatalog,
   parseLineupConfigForResponse,
-  parseLineupLimits,
   parsePeriodDurations,
   parseResultPolicy,
 } from '../tournaments/competition-config/competition-config.parse';
 import { readIsKnockoutFixture, readKnockoutFixtureFacts } from '../tournaments/knockout-fixture';
+import { findRejectedLineupPosition, rejectedLineupPositionMessage } from './core/lineup-position';
 import { assertPenaltyShootoutPersistable } from './core/penalty-shootout-outcome';
 import { isCommandConcurrencyConflict } from './command-concurrency-error';
 import {
@@ -2594,38 +2594,45 @@ export class GamesService {
             details: { expectedVersion: dto.expectedVersion, currentVersion: currentLineupRevision },
           });
         }
-        // team-match-lineup.service.ts#resolveEntries enforces this same gate for the
-        // team-match lineup path (LINEUP_SIZE_INVALID against the pinned
-        // V1CompetitionConfigVersion.lineup.{min,max}Players) — this generic
-        // tournament-fixture route had no equivalent check at all, so a director/staff
-        // caller could save a roster of any size regardless of what the tournament's
-        // competition config (and, since Task N, the admin's chosen "출전 인원") actually
-        // allows. Only starters count toward the cap, matching resolveEntries' contract
-        // (bench size is a separate, unrelated concern this route doesn't otherwise gate).
-        const startedCount = dto.participants.filter((participant) => participant.started).length;
-        const config = await tx.v1CompetitionConfigVersion.findUnique({
+        // Task 163 — 여기서 **선발 인원·골키퍼를 검증하지 않는다.**
+        //
+        // 이 게이트는 명단 제출이 곧 선발 결정이던 시절의 것이다. 정본 §3 이 선발/후보
+        // 구분 자체를 없앴으므로 제출 시점에 셀 "선발" 이라는 개념이 없다 — 명단에
+        // 있으면 뛴 것이고, `dto.participants[].started` 는 무시된다.
+        //
+        // 인원이 규칙에 안 맞아도 경기는 시작되고 **운영 콘솔에서 조정한다**(사용자 확정).
+        // 인원 규칙을 강제하던 자리가 통째로 사라지는 것이므로, 되살리려면 그 결정부터
+        // 뒤집어야 한다.
+        // **빈 명단은 막는다.** 인원 min~max 게이트를 없앤 것과 다른 문제다 — 이건
+        // 선발 규칙이 아니라 **데이터 손실 가드**다: 아래 재사용 경로는 이번 저장에서
+        // 짝을 못 찾은 기존 행을 "명단에서 빠진 사람" 으로 보고 지우므로, 빈 배열로
+        // 저장하면 그 사이드의 참가자 행이 검인 기록까지 통째로 사라진다.
+        if (dto.participants.length === 0) {
+          throw new BadRequestException({
+            code: 'LINEUP_EMPTY',
+            message: '명단에 최소 한 명은 있어야 해요.',
+          });
+        }
+
+        // 지운 센티널이 **입력으로 되돌아오는 것**을 막는다. `position` 은 클라이언트가
+        // 보내는 자유 문자열이라, 마이그레이션이 정리한 'BENCH' 가 다음 저장 요청으로
+        // 그대로 다시 들어올 수 있다. 'BENCH' 만 막으면 '벤치'·'sub'·오타는 그대로
+        // 들어오므로 **카탈로그에 있는 값만** 통과시킨다(근거는 core/lineup-position.ts).
+        const lineupConfig = await tx.v1CompetitionConfigVersion.findUnique({
           where: { id: game.competitionConfigVersionId },
           select: { lineup: true },
         });
-        const lineupLimits = parseLineupLimits(config?.lineup ?? null);
-        if (startedCount < lineupLimits.minPlayers || startedCount > lineupLimits.maxPlayers) {
-          throw new UnprocessableEntityException({
-            code: 'LINEUP_SIZE_INVALID',
-            message: `선발 인원은 ${lineupLimits.minPlayers}명 이상 ${lineupLimits.maxPlayers}명 이하여야 해요.`,
+        const rejectedPosition = findRejectedLineupPosition(
+          dto.participants.map((participant) => participant.position),
+          parseLineupCatalog(lineupConfig?.lineup ?? null).positions.map((position) => position.code),
+        );
+        if (rejectedPosition !== null) {
+          throw new BadRequestException({
+            code: 'LINEUP_POSITION_INVALID',
+            message: rejectedLineupPositionMessage(rejectedPosition),
           });
         }
-        const goalkeeperCode =
-          parseLineupCatalog(config?.lineup ?? null).positions.find((position) => position.goalkeeper === true)?.code ??
-          'GK';
-        const goalkeeperCount = dto.participants.filter(
-          (participant) => participant.started && participant.position === goalkeeperCode,
-        ).length;
-        if (goalkeeperCount !== 1) {
-          throw new UnprocessableEntityException({
-            code: 'LINEUP_GOALKEEPER_INVALID',
-            message: '선발 라인업에는 골키퍼를 정확히 한 명 지정해야 해요.',
-          });
-        }
+
         // 라인업에 실려 온 계정(userId) 검증. 이 값이 저장되면 아래에서 신원 연결이
         // 자동으로 생기므로, 아무 계정이나 남의 경기 기록에 붙지 않게 여기서 막는다.
         //
@@ -2823,7 +2830,9 @@ export class GamesService {
                     position: participant.position,
                     positionX: participant.positionX,
                     positionY: participant.positionY,
-                    started: participant.started,
+                    // Task 163 — 명단에 있으면 뛴 것이다(정본 §3). 재사용 행에 옛
+                    // 클라이언트가 보낸 false 가 남지 않도록 **명시**한다.
+                    started: true,
                   },
                 })
               : await tx.v1GameParticipant.create({
@@ -2837,7 +2846,9 @@ export class GamesService {
                     position: participant.position,
                     positionX: participant.positionX,
                     positionY: participant.positionY,
-                    started: participant.started,
+                    // Task 163 — 위 update 경로와 같은 이유. 스키마 기본값도 true 지만
+                    // **의도한 값**임을 남기려고 명시한다(기본값이 바뀌어도 뜻이 안 흔들린다).
+                    started: true,
                     // 제출본 위에 새 리비전을 여는 경로: 검인은 킥오프 직전이라 제출
                     // **뒤에** 일어나는 것이 정상이므로, 이월하지 않으면 뒤늦은 명단
                     // 수정 한 번에 이미 받아둔 검인이 통째로 사라진다.
@@ -3684,7 +3695,10 @@ export class GamesService {
             resultRevisionId: revision.id,
             participantId: participant.participantId,
             sideId: participant.sideId,
-            started: participant.started,
+            // **명단 = 출전자**(정본 §3) — 결과 행이 있다는 것이 곧 출전이다.
+            // DTO/라인업의 started 를 싣지 않는다: 선발/후보 구분이 없어졌으므로
+            // 그 값을 실으면 폐기된 개념이 공식 기록에 되살아난다.
+            started: true,
             minutesPlayed: participant.minutesPlayed,
             goals: participant.goals,
             assists: participant.assists ?? 0,
@@ -4087,7 +4101,10 @@ export class GamesService {
             resultRevisionId: revision.id,
             participantId: participant.participantId,
             sideId: participant.sideId,
-            started: participant.started,
+            // **명단 = 출전자**(정본 §3) — 결과 행이 있다는 것이 곧 출전이다.
+            // DTO/라인업의 started 를 싣지 않는다: 선발/후보 구분이 없어졌으므로
+            // 그 값을 실으면 폐기된 개념이 공식 기록에 되살아난다.
+            started: true,
             minutesPlayed: participant.minutesPlayed,
             goals: participant.goals,
             assists: participant.assists ?? 0,
@@ -6335,7 +6352,7 @@ export class GamesService {
     // 하드코딩 버그 수정: started/goalkeeper를 실제 라인업 값과 무관하게
     // 항상 true/false로 박아 넣었다 -- 후보로 저장한 선수도 결과 프로젝션에서는
     // 전부 선발로 보였고, 실제로 골키퍼였던 선수도 항상 goalkeeper:false였다.
-    // started는 라인업이 저장한 값(participant.started)을 그대로 쓴다.
+    // started 는 항상 true 다 — 명단 = 출전자(정본 §3).
     // goalkeeper는 이 대회 종목의 골키퍼 포지션 코드(competitionConfig의
     // lineup.positions 중 goalkeeper:true인 항목의 code -- 축구 'GK', 풋살
     // 'GOLEIRO' 등 종목마다 다르다. 프론트 formation-slots.ts의
@@ -6422,7 +6439,8 @@ export class GamesService {
           resultRevisionId: revision.id,
           participantId: participant.id,
           sideId: participant.sideId,
-          started: participant.started,
+          // **명단 = 출전자**(정본 §3) — 결과 행이 있다는 것이 곧 출전이다.
+          started: true,
           goals: goalCount.get(participant.id) ?? 0,
           assists: assistCount.get(participant.id) ?? 0,
           fouls: foulCount.get(participant.id) ?? 0,
@@ -6869,7 +6887,9 @@ export class GamesService {
         newParticipantRows.push({
           participantId: participant.id,
           sideId: participant.sideId,
-          started: participant.started,
+          // **명단 = 출전자**(정본 §3). 이 행은 라인업 증거로 **새로** 짓는 것이므로
+          // 승계(아래 predecessor 복사)와 달리 지금 규칙을 적용한다.
+          started: true,
           goals: 0,
           assists,
           fouls: 0,
@@ -6926,6 +6946,8 @@ export class GamesService {
           resultRevisionId: successorDraft.id,
           participantId: participant.participantId,
           sideId: participant.sideId,
+          // ⚠️ 승계는 **원본 그대로** 옮긴다. 정본 §3 이 앞으로의 쓰기를 true 로 고정했지만
+          // 이미 저장된 공식 기록의 값을 다시 쓰지는 않는다(마이그레이션 대상도 아니다).
           started: participant.started,
           minutesPlayed: participant.minutesPlayed,
           goals: participant.goals,

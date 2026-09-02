@@ -210,21 +210,37 @@ describe('Task T1-1 team-match SCORE_EVENT_MISMATCH once real events exist', () 
     expect(await prisma.v1GameResultRevision.count({ where: { gameId } })).toBe(revisionCountBefore);
   });
 
-  it('accepts a submitted score that agrees with the real recorded GOAL events', async () => {
+  /**
+   * 이 케이스는 두 가지를 함께 본다 — 한 번의 제출이 저장하는 것 전부이기 때문이다:
+   *   ① 이벤트와 일치하는 스코어는 통과하고 득점이 그대로 저장된다
+   *   ② **`started` 는 DTO 값을 무시하고 전부 true 다** (정본 §3: 명단 = 출전자.
+   *      결과 행이 있다는 것 자체가 "뛰었다" 이므로 후보 개념이 없다)
+   *
+   * ②를 여기 붙인 이유: 게임 하나에 DRAFT 리비전은 동시에 하나뿐이라 별도 테스트로
+   * 두 번째 리비전을 만들 수 없다(RESULT_REVISION_ALREADY_EXISTS). 그리고 DTO 에
+   * `started: false` 를 실어야 "값을 실었나 / true 로 고정했나" 가 갈린다 — 이 파일의
+   * 다른 케이스처럼 true 를 보내면 두 구현이 같은 결과를 내서 아무것도 증명하지 못한다
+   * (실측: 고정을 되돌리는 변이가 유닛 43건 전부 green 이었다).
+   */
+  it('이벤트와 일치하는 스코어를 받고, started 는 DTO 값을 무시해 전부 true 로 저장한다', async () => {
     const version = await currentVersion();
     const draft = await service.createResultRevision(authUser(ids.hostManager), gameId, 't1-1-match-draft', {
       expectedVersion: version,
       clientCommandId: 't1-1-match-draft',
       score: { home: 2, away: 1 },
       actualParticipants: [
-        { participantId: hostOneId, sideId: hostSideId, started: true, goals: 2, cards: { yellow: 0, red: 0 }, goalkeeper: false },
-        { participantId: hostTwoId, sideId: hostSideId, started: true, goals: 0, cards: { yellow: 0, red: 0 }, goalkeeper: false },
-        { participantId: awayOneId, sideId: awaySideId, started: true, goals: 1, cards: { yellow: 0, red: 0 }, goalkeeper: false },
+        // 옛 클라이언트가 "후보" 라고 보내는 모양 — 저장은 출전자로 한다.
+        { participantId: hostOneId, sideId: hostSideId, started: false, goals: 2, cards: { yellow: 0, red: 0 }, goalkeeper: false },
+        { participantId: hostTwoId, sideId: hostSideId, started: false, goals: 0, cards: { yellow: 0, red: 0 }, goalkeeper: false },
+        { participantId: awayOneId, sideId: awaySideId, started: false, goals: 1, cards: { yellow: 0, red: 0 }, goalkeeper: false },
       ],
       eventsHash: 't1-1-match-events',
     });
     expect(draft.revisionState).toBe('DRAFT');
     const persisted = await prisma.v1GameResultParticipant.findMany({ where: { resultRevisionId: draft.revisionId } });
     expect(persisted.find((p) => p.participantId === hostOneId)?.goals).toBe(2);
+    expect(persisted).toHaveLength(3);
+    expect(persisted.map((row) => row.started)).toEqual([true, true, true]);
   });
+
 });

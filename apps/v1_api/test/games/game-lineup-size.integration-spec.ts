@@ -1,4 +1,3 @@
-import { HttpException } from '@nestjs/common';
 import { V1GameSideKey, V1GameSourceType } from '@prisma/client';
 import { OperationAuditWriterService } from '../../src/common/audit/operation-audit-writer.service';
 import { GameTakeoverService } from '../../src/games/game-takeover.service';
@@ -7,23 +6,21 @@ import type { GameCommandContext, GameSourceCreationInput } from '../../src/game
 import { PrismaService } from '../../src/prisma/prisma.service';
 
 /**
- * Dedicated, minimal-fixture regression spec for
- * `GamesService.saveLineup` — the generic tournament-fixture lineup save
- * route (`PUT /games/:gameId/lineups/:sideId`), used by tournament
- * director/staff to enter a side's lineup. Before this change the route had
- * NO roster-size validation at all (unlike the parallel team-match path,
- * `team-match-lineup.service.ts#resolveEntries`, which already enforces
- * `LINEUP_SIZE_INVALID` against `V1CompetitionConfigVersion.lineup.{min,max}Players`) —
- * a director could save any number of starters regardless of what the
- * tournament's pinned competition config (and, since the admin-selectable
- * "출전 인원" feature, whatever the admin actually picked) allows.
+ * `GamesService.saveLineup` — 대회 경기 라인업 저장 경로의 회귀 스펙.
  *
- * Reads `minPlayers`/`maxPlayers` off the DB-pinned `futsal-v1` config at run
- * time instead of hardcoding a number, mirroring
- * `test/team-matches/team-match-lineup-size.integration-spec.ts` — the
- * property under test is "the save path follows whatever is pinned", so a
- * hardcoded expectation here would defeat the point of the admin-selectable
- * lineup size feature this spec guards.
+ * **Task 163 이후 이 스펙이 지키는 것은 게이트가 아니라 "게이트가 없다" 는 계약이다.**
+ *
+ * 예전엔 저장 시 선발 인원(min~max)과 골키퍼 정확히 1명을 강제했다. 정본 §3 이 선발/후보
+ * 구분 자체를 없앴으므로(명단에 있으면 뛴 것이다) 제출 시점에 셀 "선발" 이 없고,
+ * **어떤 인원·골키퍼 구성이 와도 저장이 성공해야 한다.** 인원이 안 맞으면 경기는 그대로
+ * 시작되고 운영 콘솔에서 조정한다.
+ *
+ * 이 스펙을 지우지 않고 뒤집은 이유: 게이트는 되살리기 쉽다(원래 자리에 다시 넣으면
+ * 그만이다). 그때 이 스펙이 red 로 말한다. 규칙을 없앤 것이 **결정이었다는 사실**을
+ * 코드가 기억하게 하는 자리다 — 되살리려면 정본 §3 의 사용자 확정부터 뒤집어야 한다.
+ *
+ * `minPlayers`/`maxPlayers` 를 DB 에 핀된 `futsal-v1` config 에서 런타임에 읽는 것은
+ * 그대로다 — "그 수를 넘겨도 통과한다" 를 보이려면 그 수가 무엇인지 알아야 한다.
  */
 
 const ids = {
@@ -55,22 +52,6 @@ function creationContext(commandId: string, payload: unknown): GameCommandContex
   };
 }
 
-async function captureFailure(operation: () => Promise<unknown>) {
-  try {
-    await operation();
-  } catch (error) {
-    return error;
-  }
-  throw new Error('Expected operation to fail');
-}
-
-function expectHttpCode(error: unknown, status: number, code: string) {
-  expect(error).toBeInstanceOf(HttpException);
-  const exception = error as HttpException;
-  expect(exception.getStatus()).toBe(status);
-  expect(exception.getResponse()).toEqual(expect.objectContaining({ code }));
-}
-
 function starters(count: number) {
   return Array.from({ length: count }, (_, index) => ({
     displayNameSnapshot: `Lineup size participant ${index + 1}`,
@@ -80,7 +61,7 @@ function starters(count: number) {
   }));
 }
 
-describe('GamesService.saveLineup enforces the pinned competition config roster-size gate', () => {
+describe('GamesService.saveLineup 은 인원·골키퍼를 검증하지 않는다 (Task 163)', () => {
   let pinnedMinPlayers: number;
   let pinnedMaxPlayers: number;
   let gameId: string;
@@ -170,90 +151,220 @@ describe('GamesService.saveLineup enforces the pinned competition config roster-
     await prisma.$disconnect();
   });
 
-  it('accepts a roster exactly at the pinned maxPlayers and rejects one more, with the count in the error message', async () => {
-    expect(pinnedMaxPlayers).toBeGreaterThan(0);
-
-    const before = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } });
-    const saved = await games.saveLineup(authUser(ids.platformOpsUser), gameId, hostSideId, 'idem-game-lineup-size-at-cap', {
-      expectedVersion: 1,
-      clientCommandId: 'idem-game-lineup-size-at-cap',
-      participants: starters(pinnedMaxPlayers),
-    });
-    expect(saved).toEqual(expect.objectContaining({ gameId, version: before.version + 1 }));
-    expect(await prisma.v1GameParticipant.count({ where: { lineupId: saved.lineupId } })).toBe(pinnedMaxPlayers);
-
-    const afterSave = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } });
-    const overCap = await captureFailure(() =>
-      games.saveLineup(authUser(ids.platformOpsUser), gameId, hostSideId, 'idem-game-lineup-size-over-cap', {
-        expectedVersion: saved.lineupRevision,
-        clientCommandId: 'idem-game-lineup-size-over-cap',
-        participants: starters(pinnedMaxPlayers + 1),
-      }),
-    );
-    expectHttpCode(overCap, 422, 'LINEUP_SIZE_INVALID');
-    expect((overCap as HttpException).getResponse()).toEqual(
-      expect.objectContaining({ message: expect.stringContaining(`${pinnedMaxPlayers}명 이하`) }),
-    );
-
-    // The rejected attempt must not have created a new lineup revision.
-    const afterRejection = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } });
-    expect(afterRejection.version).toBe(afterSave.version);
-  });
-
-  it('requires exactly one starting goalkeeper using the sport-specific position code', async () => {
-    const latestLineup = await prisma.v1GameLineup.findFirstOrThrow({
+  /** 매 저장이 리비전을 올리므로, 다음 저장 전에 **최신 리비전을 다시 읽는다.** */
+  async function latestRevision() {
+    const lineup = await prisma.v1GameLineup.findFirst({
       where: { gameId, sideId: hostSideId },
       orderBy: { revision: 'desc' },
     });
+    return lineup?.revision ?? 0;
+  }
+
+  it('핀된 maxPlayers 를 넘겨도 저장된다 — 인원 상한을 막지 않는다', async () => {
+    expect(pinnedMaxPlayers).toBeGreaterThan(0);
+
+    const overCapCount = pinnedMaxPlayers + 1;
+    const saved = await games.saveLineup(
+      authUser(ids.platformOpsUser),
+      gameId,
+      hostSideId,
+      'idem-game-lineup-over-cap-ok',
+      {
+        expectedVersion: await latestRevision(),
+        clientCommandId: 'idem-game-lineup-over-cap-ok',
+        participants: starters(overCapCount),
+      },
+    );
+    expect(saved).toEqual(expect.objectContaining({ gameId }));
+    expect(await prisma.v1GameParticipant.count({ where: { lineupId: saved.lineupId } })).toBe(overCapCount);
+  });
+
+  it('골키퍼가 없어도, 둘이어도 저장된다 — 골키퍼 수를 막지 않는다', async () => {
+    // 골키퍼 0명: `starters()` 가 첫 항목에 붙이는 포지션을 떼어낸다.
     const noGoalkeeper = starters(pinnedMinPlayers).map((participant) => ({
       displayNameSnapshot: participant.displayNameSnapshot,
       jerseyNumber: participant.jerseyNumber,
-      started: participant.started,
     }));
-    const missing = await captureFailure(() =>
-      games.saveLineup(authUser(ids.platformOpsUser), gameId, hostSideId, 'idem-game-lineup-gk-missing', {
-        expectedVersion: latestLineup.revision,
-        clientCommandId: 'idem-game-lineup-gk-missing',
+    const savedNone = await games.saveLineup(
+      authUser(ids.platformOpsUser),
+      gameId,
+      hostSideId,
+      'idem-game-lineup-gk-none-ok',
+      {
+        expectedVersion: await latestRevision(),
+        clientCommandId: 'idem-game-lineup-gk-none-ok',
         participants: noGoalkeeper,
-      }),
+      },
     );
-    expectHttpCode(missing, 422, 'LINEUP_GOALKEEPER_INVALID');
+    expect(savedNone).toEqual(expect.objectContaining({ gameId }));
 
-    const multipleGoalkeepers = starters(pinnedMinPlayers).map((participant, index) =>
+    // 골키퍼 2명.
+    const twoGoalkeepers = starters(pinnedMinPlayers).map((participant, index) =>
       index === 1 ? { ...participant, position: 'GOLEIRO' } : participant,
     );
-    const multiple = await captureFailure(() =>
-      games.saveLineup(authUser(ids.platformOpsUser), gameId, hostSideId, 'idem-game-lineup-gk-multiple', {
-        expectedVersion: latestLineup.revision,
-        clientCommandId: 'idem-game-lineup-gk-multiple',
-        participants: multipleGoalkeepers,
-      }),
+    const savedTwo = await games.saveLineup(
+      authUser(ids.platformOpsUser),
+      gameId,
+      hostSideId,
+      'idem-game-lineup-gk-two-ok',
+      {
+        expectedVersion: await latestRevision(),
+        clientCommandId: 'idem-game-lineup-gk-two-ok',
+        participants: twoGoalkeepers,
+      },
     );
-    expectHttpCode(multiple, 422, 'LINEUP_GOALKEEPER_INVALID');
+    expect(savedTwo).toEqual(expect.objectContaining({ gameId }));
   });
 
-  it('rejects a roster below the pinned minPlayers, with the count in the error message', async () => {
+  it('핀된 minPlayers 미만이어도 저장된다 — 인원 하한을 막지 않는다', async () => {
     expect(pinnedMinPlayers).toBeGreaterThan(0);
     const belowMinCount = pinnedMinPlayers - 1;
 
-    const before = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } });
-    const latestLineup = await prisma.v1GameLineup.findFirstOrThrow({
-      where: { gameId, sideId: hostSideId },
-      orderBy: { revision: 'desc' },
-    });
-    const belowMin = await captureFailure(() =>
-      games.saveLineup(authUser(ids.platformOpsUser), gameId, hostSideId, 'idem-game-lineup-size-below-min', {
-        expectedVersion: latestLineup.revision,
-        clientCommandId: 'idem-game-lineup-size-below-min',
+    const saved = await games.saveLineup(
+      authUser(ids.platformOpsUser),
+      gameId,
+      hostSideId,
+      'idem-game-lineup-below-min-ok',
+      {
+        expectedVersion: await latestRevision(),
+        clientCommandId: 'idem-game-lineup-below-min-ok',
         participants: starters(belowMinCount),
-      }),
+      },
     );
-    expectHttpCode(belowMin, 422, 'LINEUP_SIZE_INVALID');
-    expect((belowMin as HttpException).getResponse()).toEqual(
-      expect.objectContaining({ message: expect.stringContaining(`${pinnedMinPlayers}명 이상`) }),
-    );
+    expect(saved).toEqual(expect.objectContaining({ gameId }));
+    expect(await prisma.v1GameParticipant.count({ where: { lineupId: saved.lineupId } })).toBe(belowMinCount);
+  });
 
-    const after = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } });
-    expect(after.version).toBe(before.version);
+  /**
+   * 인원 min~max 는 없앴지만 **빈 명단은 막는다** — 이건 선발 규칙이 아니라
+   * **데이터 손실 가드**다.
+   *
+   * 재사용 경로는 이번 저장에서 짝을 못 찾은 기존 행을 "명단에서 빠진 사람" 으로 보고
+   * 지운다. 그래서 `participants: []` 로 저장하면 **그 사이드의 참가자 행이 통째로
+   * 사라진다** — 검인 기록도 함께. 인원 규칙을 없앤 것과는 다른 문제다.
+   */
+  it('빈 명단으로 저장하면 400 이고 기존 참가자 행이 그대로 남는다', async () => {
+    const before = await games.saveLineup(
+      authUser(ids.platformOpsUser),
+      gameId,
+      hostSideId,
+      'idem-game-lineup-empty-seed',
+      {
+        expectedVersion: await latestRevision(),
+        clientCommandId: 'idem-game-lineup-empty-seed',
+        participants: starters(pinnedMinPlayers),
+      },
+    );
+    const seeded = await prisma.v1GameParticipant.count({ where: { lineupId: before.lineupId } });
+    expect(seeded).toBe(pinnedMinPlayers);
+
+    await expect(
+      games.saveLineup(authUser(ids.platformOpsUser), gameId, hostSideId, 'idem-game-lineup-empty', {
+        expectedVersion: await latestRevision(),
+        clientCommandId: 'idem-game-lineup-empty',
+        participants: [],
+      }),
+    ).rejects.toMatchObject({ response: { code: 'LINEUP_EMPTY' } });
+
+    // 400 만 보고 끝내지 않는다 — **행이 살아 있는지**가 이 가드의 본론이다.
+    expect(await prisma.v1GameParticipant.count({ where: { lineupId: before.lineupId } })).toBe(seeded);
+  });
+
+  it('한 명만 있어도 저장된다 — 막는 것은 0명뿐이다', async () => {
+    const saved = await games.saveLineup(
+      authUser(ids.platformOpsUser),
+      gameId,
+      hostSideId,
+      'idem-game-lineup-single',
+      {
+        expectedVersion: await latestRevision(),
+        clientCommandId: 'idem-game-lineup-single',
+        participants: starters(1),
+      },
+    );
+    expect(await prisma.v1GameParticipant.count({ where: { lineupId: saved.lineupId } })).toBe(1);
+  });
+
+  /**
+   * 인원 게이트는 없앴지만 **`position` 은 여전히 검증한다** — 없앤 것과 안 없앤 것을
+   * 구분하는 자리다.
+   *
+   * `position` 은 클라이언트가 보내는 자유 문자열이라, 마이그레이션이 정리한 후보 센티널
+   * `'BENCH'` 가 다음 저장 요청으로 그대로 다시 들어올 수 있다. 그러면 마이그레이션이
+   * 한 일이 조용히 되돌아간다. 'BENCH' 만 막으면 `'벤치'`·오타는 그대로 들어오므로
+   * **대회 설정 카탈로그에 있는 값만** 통과시킨다.
+   */
+  it('폐기한 BENCH 센티널을 position 으로 보내면 400 으로 거부한다', async () => {
+    const withSentinel = starters(pinnedMinPlayers).map((participant, index) =>
+      index === 1 ? { ...participant, position: 'BENCH' } : participant,
+    );
+    await expect(
+      games.saveLineup(authUser(ids.platformOpsUser), gameId, hostSideId, 'idem-game-lineup-bench-sentinel', {
+        expectedVersion: await latestRevision(),
+        clientCommandId: 'idem-game-lineup-bench-sentinel',
+        participants: withSentinel,
+      }),
+    ).rejects.toMatchObject({ response: { code: 'LINEUP_POSITION_INVALID' } });
+  });
+
+  it('카탈로그에 없는 다른 문자열도 400 이다 — 센티널 하나만 막는 게 아니다', async () => {
+    const withUnknown = starters(pinnedMinPlayers).map((participant, index) =>
+      index === 1 ? { ...participant, position: '벤치' } : participant,
+    );
+    await expect(
+      games.saveLineup(authUser(ids.platformOpsUser), gameId, hostSideId, 'idem-game-lineup-unknown-position', {
+        expectedVersion: await latestRevision(),
+        clientCommandId: 'idem-game-lineup-unknown-position',
+        participants: withUnknown,
+      }),
+    ).rejects.toMatchObject({ response: { code: 'LINEUP_POSITION_INVALID' } });
+  });
+
+  it('카탈로그에 있는 포지션은 그대로 저장된다 (풋살 FIXO)', async () => {
+    const withCatalogPosition = starters(pinnedMinPlayers).map((participant, index) =>
+      index === 1 ? { ...participant, position: 'FIXO' } : participant,
+    );
+    const saved = await games.saveLineup(
+      authUser(ids.platformOpsUser),
+      gameId,
+      hostSideId,
+      'idem-game-lineup-catalog-position',
+      {
+        expectedVersion: await latestRevision(),
+        clientCommandId: 'idem-game-lineup-catalog-position',
+        participants: withCatalogPosition,
+      },
+    );
+    const rows = await prisma.v1GameParticipant.findMany({
+      where: { lineupId: saved.lineupId },
+      select: { position: true },
+    });
+    expect(rows.map((row) => row.position).sort()).toEqual(['FIXO', 'GOLEIRO', null].sort());
+  });
+
+  it('옛 클라이언트가 보낸 started 는 무시된다 — 400 이 아니라 200 이고 값은 안 쓰인다', async () => {
+    const withStartedFalse = starters(pinnedMinPlayers).map((participant, index) => ({
+      ...participant,
+      started: index !== 0, // 첫 명단원을 '후보' 로 보내 본다
+    }));
+    const saved = await games.saveLineup(
+      authUser(ids.platformOpsUser),
+      gameId,
+      hostSideId,
+      'idem-game-lineup-started-ignored',
+      {
+        expectedVersion: await latestRevision(),
+        clientCommandId: 'idem-game-lineup-started-ignored',
+        participants: withStartedFalse,
+      },
+    );
+    // 400 이 아니라 저장된다. 그리고 보낸 false 가 **행에 남지 않는다** —
+    // 명단에 있으면 뛴 것이므로 저장은 언제나 true 다(정본 §3).
+    const rows = await prisma.v1GameParticipant.findMany({
+      where: { lineupId: saved.lineupId },
+      select: { started: true },
+    });
+    expect(rows).toHaveLength(pinnedMinPlayers);
+    expect(rows.every((row) => row.started === true)).toBe(true);
   });
 });

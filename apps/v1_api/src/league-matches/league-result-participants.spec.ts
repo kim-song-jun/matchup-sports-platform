@@ -41,14 +41,18 @@ const userIdByParticipantId = new Map<string, string | null>([
   ['p-a2', 'u-a2'],
 ]);
 
-/** 홈: 팀이 직접 작성한 라인업(골키퍼 1 + 필드 1 + 후보 1). team-match 관례대로 GK/BENCH 센티널. */
+/**
+ * 홈: 팀이 직접 작성한 라인업(골키퍼 1 + 필드 1 + 후보 1).
+ * 골키퍼는 team-match 관례대로 'GK' 리터럴이고, **선발/후보 구분은 없다**(정본 §3) — 예전엔
+ * position='BENCH' 센티널이었다(Task 163 BE-3 에서 컬럼으로 옮겼다).
+ */
 const authoredHomeRoster: LeagueSideRoster = {
   sideId: 'side-home',
   teamAuthored: true,
   participants: [
     { id: 'p-h1', sideId: 'side-home', position: 'GK' },
     { id: 'p-h2', sideId: 'side-home', position: 'PIVO' },
-    { id: 'p-h3', sideId: 'side-home', position: 'BENCH' },
+    { id: 'p-h3', sideId: 'side-home', position: null },
   ],
 };
 
@@ -87,7 +91,7 @@ function assemble(overrides: {
 }
 
 describe('assembleLeagueResultParticipants', () => {
-  it('팀이 작성한 라인업이 있는 사이드는 무득점 선수까지 출전 기록으로 남기고, BENCH는 started=false로 간다', () => {
+  it('팀이 작성한 라인업이 있는 사이드는 로스터 전원을 출전 기록으로 남긴다 (무득점 포함, 전원 started=true)', () => {
     const result = assemble({
       // p-h2·p-h3 는 아무 기록도 없다 — 그래도 뛴 사람이므로 행이 남아야 한다.
       participants: [{ participantId: 'p-h1', goals: 1 }],
@@ -118,11 +122,51 @@ describe('assembleLeagueResultParticipants', () => {
         {
           participantId: 'p-h3',
           sideId: 'side-home',
-          started: false,
+          started: true,
           goals: 0,
           cards: { yellow: 0, red: 0 },
           goalkeeper: false,
         },
+      ],
+    });
+  });
+
+  /**
+   * 마이그레이션 `20260902000000_v1_lineup_bench_to_started` 가 이 프로젝션을 바꾸지
+   * **않는다**는 계약. 골키퍼 판정은 `position` 만 보고 `started` 를 보지 않는다
+   * (games.service.ts:6433,6877 의 결과 프로젝션과 같은 규칙).
+   *
+   * 왜 이걸 못 박나: 마이그레이션이 만지는 것은 position='BENCH' 인 행뿐이고 'BENCH' 는
+   * 어느 종목에서도 골키퍼 코드가 아니다 — 전에도 후에도 goalkeeper=false 다. 반대로
+   * 진짜 골키퍼 행의 position('GK'/'GOLEIRO')은 마이그레이션이 건드리지 않는다. 그래서
+   * 전후가 같다. 이 성질은 **판정이 position 만 볼 때만** 성립하므로, 누군가 "후보는
+   * 골키퍼일 수 없다"며 started 를 조건에 끼워 넣으면 그 순간 전후가 갈린다.
+   */
+  it('골키퍼 판정은 position 만 본다 — started 와 무관하게 GK 포지션이면 골키퍼다', () => {
+    const result = assemble({
+      participants: [],
+      rosters: [
+        {
+          sideId: 'side-home',
+          teamAuthored: true,
+          participants: [
+            { id: 'p-h1', sideId: 'side-home', position: 'GK' },
+            { id: 'p-h2', sideId: 'side-home', position: 'GOLEIRO' },
+            // 마이그레이션이 옛 후보를 옮겨 놓은 모양. 골키퍼가 아니다 — 전에도(position
+            // 이 'BENCH' 였을 때) 아니었다.
+            { id: 'p-h3', sideId: 'side-home', position: null },
+          ],
+        },
+      ],
+      homeScore: 0,
+      awayScore: 0,
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      actualParticipants: [
+        { participantId: 'p-h1', started: true, goalkeeper: true },
+        { participantId: 'p-h2', started: true, goalkeeper: true },
+        { participantId: 'p-h3', started: true, goalkeeper: false },
       ],
     });
   });
@@ -160,8 +204,8 @@ describe('assembleLeagueResultParticipants', () => {
         {
           participantId: 'p-a1',
           sideId: 'side-away',
-          // 라인업 증거가 없으므로 선발이라고 적지 않는다.
-          started: false,
+          // 기록이 있으니 뛴 사람이다 — 명단 = 출전자(정본 §3).
+          started: true,
           goals: 1,
           cards: { yellow: 0, red: 0 },
           goalkeeper: false,
@@ -182,7 +226,7 @@ describe('assembleLeagueResultParticipants', () => {
     });
     expect(result.ok && result.actualParticipants).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ participantId: 'p-h0', goals: 2, assists: 1, started: false }),
+        expect.objectContaining({ participantId: 'p-h0', goals: 2, assists: 1, started: true }),
       ]),
     );
     // 로스터 전원(3명) + 승계 1명.
@@ -314,7 +358,7 @@ describe('assembleLeagueResultParticipants', () => {
         {
           participantId: 'p-h1',
           sideId: 'side-home',
-          started: false,
+          started: true,
           goals: 1,
           cards: { yellow: 0, red: 0 },
           goalkeeper: false,
@@ -448,8 +492,8 @@ describe('carryForwardResultParticipants', () => {
         {
           participantId: 'p-h1',
           sideId: 'side-home',
-          // 저장값은 started:false 였지만 라인업이 선발 골키퍼로 적어 둔 사람이다 —
-          // started/goalkeeper 는 운영자 입력이 아니라 라인업 파생값이라 다시 읽는다.
+          // 라인업에 있는 사람은 출전자다(정본 §3). goalkeeper 는 운영자 입력이 아니라
+          // 라인업 파생값이라 저장값이 아니라 라인업에서 다시 읽는다.
           started: true,
           goals: 2,
           assists: 1,
@@ -469,7 +513,7 @@ describe('carryForwardResultParticipants', () => {
         {
           participantId: 'p-h3',
           sideId: 'side-home',
-          started: false,
+          started: true,
           goals: 0,
           cards: { yellow: 0, red: 0 },
           goalkeeper: false,

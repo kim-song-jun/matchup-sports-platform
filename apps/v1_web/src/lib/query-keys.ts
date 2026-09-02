@@ -1,4 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query';
+import { PERSIST_STORAGE_KEY } from './query-persist';
 
 export const v1Keys = {
   all: ['v1'] as const,
@@ -17,12 +18,22 @@ export const v1Keys = {
   notice: (noticeId: string) => [...v1Keys.all, 'notices', noticeId] as const,
   matches: (filters?: Record<string, unknown>) => [...v1Keys.all, 'matches', filters ?? {}] as const,
   match: (matchId: string) => [...v1Keys.all, 'matches', matchId] as const,
+  /**
+   * 매치 목록·상세를 함께 덮는 접두사 — **캐시 탐색 전용**(무효화에도 쓸 수 있다).
+   * 상세 진입 시 이미 받아 둔 목록 항목을 찾아 초기 표시값으로 쓰는 데 필요하다
+   * (`findInListCache`, lib/list-cache-seed.ts).
+   */
+  matchesAll: () => [...v1Keys.all, 'matches'] as const,
   myRecentVenues: () => [...v1Keys.all, 'matches', 'me', 'recent-venues'] as const,
   teams: (filters?: Record<string, unknown>) => [...v1Keys.all, 'teams', filters ?? {}] as const,
   team: (teamId: string) => [...v1Keys.all, 'teams', teamId] as const,
+  /** 팀 목록·상세 공통 접두사 — 캐시 탐색용(`matchesAll` 과 같은 목적). */
+  teamsAll: () => [...v1Keys.all, 'teams'] as const,
   teamRecentVenues: (teamId: string) => [...v1Keys.all, 'teams', teamId, 'recent-venues'] as const,
   teamMatches: (filters?: Record<string, unknown>) => [...v1Keys.all, 'team-matches', filters ?? {}] as const,
   teamMatch: (teamMatchId: string) => [...v1Keys.all, 'team-matches', teamMatchId] as const,
+  /** 팀매치 목록·상세 공통 접두사 — 캐시 탐색용(`matchesAll` 과 같은 목적). */
+  teamMatchesAll: () => [...v1Keys.all, 'team-matches'] as const,
   teamContacts: (teamId: string, filters?: Record<string, unknown>) =>
     [...v1Keys.team(teamId), 'contacts', filters ?? {}] as const,
   /**
@@ -213,4 +224,18 @@ export const v1Keys = {
 // 이전 사용자 데이터(채팅방/알림 등)가 새 사용자에게 그대로 노출되는 것을 막는다.
 export function clearV1IdentityCache(queryClient: QueryClient) {
   queryClient.removeQueries({ queryKey: v1Keys.all });
+  // 방어적 이중 clear — shouldPersistQuery() 화이트리스트가 identity 스코프 데이터를
+  // 애초에 persist 하지 않도록 설계돼 있지만(query-persist.ts 참고), 화이트리스트가
+  // 실수로 잘못 넓어지는 미래 변경까지 대비해 저장된 스냅샷 자체를 통째로 지운다.
+  // 이 한 줄이 없으면 removeQueries()는 **메모리** 캐시만 지우고, localStorage에
+  // 남은 이전 계정의 persist 스냅샷은 다음 앱 기동 시 그대로 복원된다.
+  if (typeof window !== 'undefined') {
+    try {
+      window.localStorage.removeItem(PERSIST_STORAGE_KEY);
+    } catch {
+      // Safari 프라이빗 모드 등 localStorage 접근 자체가 던질 수 있다 — 무시해도
+      // 안전하다(메모리 캐시는 이미 지워졌고, persist 스냅샷은 원래도 identity
+      // 스코프 데이터를 담지 않도록 설계돼 있다).
+    }
+  }
 }

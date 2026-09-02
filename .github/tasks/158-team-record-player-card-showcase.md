@@ -60,7 +60,10 @@ Alpha 앱에서 `내 팀 → 팀 상세 → 팀 전적(전체/대회/리그/친�
 - 2026-09-01: `output/playwright/task-158-local-showcase`에 headed Chromium 17/17(390x844, console/page/network/API 오류 0)과 `output/task158/android-emulator`에 API 36 Android 캡처 6장을 저장했다.
 
 - 2026-09-01: Confirmed live Alpha had the featured team at 4/8 with seven completed records; expanded only the featured squad to 15/20 and added guarded result projection after game backfill and before standings recalculation.
-
+- 2026-09-01 후속 실측: 로컬 캡처의 김민준 카드는 공식 7경기라 실버였지만 같은 Alpha 공개 API는 3경기·브론즈를 반환했다. 기존 Alpha 대회 게임에 이미 official revision이 있어 `seed-alpha-showcase-results.ts`가 `preserved`로 조기 종료하고 대표 선수 result participant를 보강하지 않은 것이 원인이다.
+- 2026-09-01 Alpha 배포 실측: ECR 게이트 통과 후 기존 게임 한 건에 등록 명단 대표 선수의 `V1GameParticipant`가 없어 복구가 fail-closed로 중단됐다. 기존 공식 사실은 수정하지 않고 누락 참가자/라인업만 idempotent하게 보강한 뒤 superseding official revision을 추가하는 후속 복구를 적용한다.
+- 기존 official revision/fact는 수정하지 않는다. 현재 공식 결과를 supersede하는 새 official revision에 양 팀 대표 참가자와 동일 스코어 facts를 append하고 current pointer를 옮기는 멱등 repair를 추가했다. 신규 DB 경로는 그대로 유지하며, 현재 revision에 두 대표 행이 있으면 재실행해도 새 revision을 만들지 않는다.
+- 좁은 검증은 showcase seed/repair 2 suites, 22 tests와 v1 API `tsc --noEmit`이 통과했다. Alpha 배포 후 공개 API가 7경기·실버를 반환하는지 다시 확인하고 실서비스 선수 카드 캡처를 교체한다.
 ## Ambiguity Log
 
 - “실데이터처럼”은 production 사용자의 실제 활동을 조작하는 뜻이 아니라, Alpha 전용임이 명확한 실제 관계형 DB 행과 공식 집계 경로를 사용하는 것으로 해석한다.

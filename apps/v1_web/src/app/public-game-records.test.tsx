@@ -13,6 +13,7 @@ import { MatchDetailContent } from '@/components/public-game-records/match-detai
 import { ScheduleContent } from '@/components/public-game-records/schedule-content';
 import { TeamRecordsContent } from '@/components/public-game-records/team-records-content';
 import { UserRecordsContent } from '@/components/public-game-records/user-records-content';
+import { queryImageBySrc } from '@/test/next-image';
 import type {
   PublicMatchDetail,
   PublicTeamRecordEvent,
@@ -261,8 +262,10 @@ describe('TeamRecordsContent — 팀 로고', () => {
   it('현재 팀과 상대 팀의 저장된 로고를 표시한다', () => {
     const { container } = render(<TeamRecordsContent data={makeTeamRecords()} />);
 
-    expect(container.querySelector('img[src="/uploads/teams/seoul.png"]')).toBeInTheDocument();
-    expect(container.querySelector('img[src="/uploads/teams/busan.png"]')).toBeInTheDocument();
+    // next/image 전환(U15) 이후 실제 DOM src는 `/_next/image?url=...`로 재작성된다 —
+    // 원본 경로는 그 url 쿼리 파라미터를 디코딩해야 확인할 수 있다.
+    expect(queryImageBySrc(container, '/uploads/teams/seoul.png')).not.toBeNull();
+    expect(queryImageBySrc(container, '/uploads/teams/busan.png')).not.toBeNull();
   });
 });
 

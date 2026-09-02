@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import type { ChangeEvent } from 'react';
 import { useRef, useState } from 'react';
-import { AppChrome } from '@/components/v1-ui/shell';
+import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { Card, EmptyState, InfoRow, ListItem } from '@/components/v1-ui/primitives';
 import { Button } from '@/components/v1-ui/button';
 import { ChevronLeftIcon, FilterIcon, HomeIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
@@ -11,7 +12,8 @@ import { NotificationBellButton } from '@/components/v1-ui/notification-bell';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { cssUrl } from '@/lib/assets';
 import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
-import { CreateField, DraggableFilterSheet, FieldErrorText, GenderRuleSelector, MissingFieldsBanner, RecentVenueChips } from '@/components/v1-ui/create-form-fields';
+import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
+import { CreateField, FieldErrorText, GenderRuleSelector, MissingFieldsBanner, RecentVenueChips } from '@/components/v1-ui/create-form-fields';
 import type {
   MatchCardModel,
   MatchCreateViewModel,
@@ -99,13 +101,12 @@ function StatusIcon({ tone }: { tone: 'orange' | 'green' | 'grey' }) {
 }
 
 export function MatchListPageView({ model }: { model: MatchListViewModel }) {
+  // 셸 승격(U27): title/activeTab/topBar는 route-chrome/fragments/matches.ts로 옮겼다.
+  // floatingSlot(매치 만들기 FAB)은 이 화면 성공 분기에서만 필요한 런타임 슬롯이라 override로
+  // 밀어넣는다(§1b, home-page.tsx의 동일 패턴 참조).
+  useShellOverride({ floatingSlot: <MatchCreateFloatingButton /> });
   return (
-    <AppChrome
-      title="매치"
-      activeTab="matches"
-      topBar={false}
-      floatingSlot={<MatchCreateFloatingButton />}
-    >
+    <>
       {/* Desktop-only page header with inline "매치 만들기" CTA */}
       <div className="tm-match-desktop-header tm-show-desktop">
         <h1 className="tm-match-desktop-header-title">매치</h1>
@@ -116,7 +117,8 @@ export function MatchListPageView({ model }: { model: MatchListViewModel }) {
       </div>
       <MatchSearchBar query={model.query} filterCount={model.filterCount} search={model.search} filterHref={model.filterHref} />
       <MatchTypeSegment active="personal" />
-      <div className="tm-match-list">
+      {/* 결과가 0건일 때만 tm-list-empty — 카드가 있는 평소 레이아웃은 건드리지 않는다. */}
+      <div className={`tm-match-list${!model.isLoading && model.matches.length === 0 ? ' tm-list-empty' : ''}`}>
         <SportSelector sports={model.sports} />
         <div className="tm-match-summary-row">
           <div className="tm-text-label">{model.summary.label}</div>
@@ -139,10 +141,10 @@ export function MatchListPageView({ model }: { model: MatchListViewModel }) {
              grid-item child gets confined to the first grid cell (~50%/33% width), reading
              as flush-left instead of centered across the full content column. Matches the
              pattern already used by teams-page.tsx / team-matches-page.tsx / tournaments page.tsx. */
-          <EmptyState title="조건에 맞는 매치가 없어요" sub="다른 종목을 선택하거나 전체 매치로 돌아가면 모집 중인 매치를 볼 수 있어요." />
+          <EmptyState fill title="조건에 맞는 매치가 없어요" sub="다른 종목을 선택하거나 전체 매치로 돌아가면 모집 중인 매치를 볼 수 있어요." />
         )}
         {/* 서버는 20건씩 커서로 자르는데(matches.service.ts) 예전엔 여기서 더 볼 방법이
-            없었다(감사 결함) — league-matches-list-client.tsx와 같은 "더 보기" 누적 패턴. */}
+            없었다(감사 결함) — tournaments/page.tsx 와 같은 "더 보기" 누적 패턴. */}
         {!model.isLoading && model.hasNext ? (
           <button
             type="button"
@@ -156,19 +158,33 @@ export function MatchListPageView({ model }: { model: MatchListViewModel }) {
         ) : null}
       </div>
       {model.filterSheet?.open ? <MatchFilterSheet model={model} /> : null}
-    </AppChrome>
+    </>
   );
 }
 
 export function MatchStatePageView({ model }: { model: MatchStateViewModel }) {
+  // 셸 승격(U27): 이 화면은 /matches(목록 에러)와 /matches/:id(상세 에러) 두 라우트에서
+  // 재사용되는 공유 에러 뷰다(app-shell-promotion.md §1.9 "공유 에러 뷰" 절 — 여러 라우트
+  // 재사용은 override 메커니즘엔 영향 없음). title은 에러 상태에 따라 달라지는 런타임 값이라
+  // override로 밀어넣는다.
+  useShellOverride({ title: model.title });
   return (
-    <AppChrome title={model.title} activeTab="matches" bottomNav={false} backHref="/matches">
-      {/* Desktop back + title header (mobile topbar is hidden on desktop) */}
+    <>
+      {/* 데스크톱: 기존 자체 헤더(뒤로가기+제목) 유지 */}
       <div className="tm-desktop-page-head tm-show-desktop">
         <Link className="tm-desktop-back" href="/matches" aria-label="매치 목록으로 돌아가기">
           <ChevronLeftIcon size={20} strokeWidth={2.2} aria-hidden="true" />
         </Link>
         <h1 className="tm-text-heading" style={{ margin: 0 }}>{model.title}</h1>
+      </div>
+      {/* 모바일: 두 라우트 모두 이 화면의 "성공" 짝(MatchListPageView/MatchDetailPageView)
+          기준으로 topBar가 false로 고정돼 있어(route-chrome/fragments/matches.ts) 제너릭
+          토픽바의 뒤로가기가 뜨지 않는다 — 이 화면이 원래 거기에 기대고 있던 유일한 곳이라
+          직접 그려 넣는다(데스크톱은 위 자체 헤더가 이미 대신함). */}
+      <div className="tm-hide-desktop" style={{ padding: '12px 16px 0' }}>
+        <Link className="tm-btn tm-btn-icon tm-btn-ghost" href="/matches" aria-label="매치 목록으로 돌아가기">
+          <ChevronLeftIcon size={22} strokeWidth={2.2} />
+        </Link>
       </div>
       <div className="tm-match-list">
         <EmptyState title={model.title} sub={model.description} />
@@ -187,7 +203,7 @@ export function MatchStatePageView({ model }: { model: MatchStateViewModel }) {
           </div>
         ) : null}
       </div>
-    </AppChrome>
+    </>
   );
 }
 
@@ -214,6 +230,23 @@ function matchStatusBadgeLabel(mode: MatchDetailViewModel['mode'], status: Match
   if (mode === 'mine') return '내 매치';
   if (mode === 'closed' || status === 'full') return '모집 완료';
   return '모집 중';
+}
+
+/**
+ * 매치 상세 로딩 셸. 데이터가 오기 전 하드코딩 목업(matches.view-model.ts)을 그대로
+ * 렌더하던 자리를 대신한다 — 목업 참가자·주소·설명이 실제 매치처럼 보이던 결함을 막는다.
+ * 셸 승격(U27) 이후 title/activeTab/bottomNav/topBar 는 route-chrome/fragments/matches.ts
+ * 테이블의 '/matches/:id' 항목(title: '매치')이 이미 그린다 — MatchDetailPageView(성공
+ * 뷰)도 useShellOverride로 title을 덮어쓰지 않으므로 두 상태가 같은 값을 보여 헤더가
+ * 흔들리지 않는다. 그래서 본문 스켈레톤만 렌더한다.
+ */
+export function MatchDetailPageSkeleton() {
+  return (
+    <>
+      <p className="sr-only" role="status">매치 정보를 불러오는 중이에요.</p>
+      <PageSkeleton variant="detail" />
+    </>
+  );
 }
 
 export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) {
@@ -274,7 +307,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
   };
 
   return (
-    <AppChrome title="" activeTab="matches" bottomNav={false} topBar={false}>
+    <>
       {/* Desktop: back link + match title (mobile topbar is hidden on desktop) */}
       <div className="tm-desktop-page-head tm-show-desktop">
         <Link className="tm-desktop-back" href="/matches" aria-label="매치 목록으로 돌아가기">
@@ -283,7 +316,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
         <h1 className="tm-text-heading" style={{ margin: 0 }}>{match.title}</h1>
       </div>
 
-      <article className="tm-match-detail">
+      <article className="tm-match-detail tm-content-enter">
         <div className="tm-match-detail-hero" style={{ backgroundImage: cssUrl(match.image) }}>
           <div className="tm-match-detail-overlay">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -471,7 +504,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
           )}
         </div>
       </div>
-    </AppChrome>
+    </>
   );
 }
 export function MatchCreatePageView({ model }: { model: MatchCreateViewModel }) {
@@ -483,7 +516,7 @@ export function MatchCreatePageView({ model }: { model: MatchCreateViewModel }) 
   const secondaryAction = model.form?.onBack;
   const missingFields = model.form?.missingFields ?? [];
   return (
-    <AppChrome title={edit ? '매치 수정' : '매치 만들기'} activeTab="matches" bottomNav={false} backHref={edit ? (model.matchId ? `/matches/${model.matchId}` : '/matches') : '/matches'}>
+    <>
       {/* Desktop page head */}
       <div className="tm-desktop-page-head tm-show-desktop">
         <Link className="tm-desktop-back" href={edit ? (model.matchId ? `/matches/${model.matchId}` : '/matches') : '/matches'} aria-label={edit ? '매치 상세로 돌아가기' : '매치 목록으로 돌아가기'}>
@@ -491,7 +524,7 @@ export function MatchCreatePageView({ model }: { model: MatchCreateViewModel }) 
         </Link>
         <h1 className="tm-text-heading" style={{ margin: 0 }}>{edit ? '매치 수정' : '매치 만들기'}</h1>
       </div>
-      <div className="tm-create-shell tm-match-create-shell">
+      <div className="tm-create-shell tm-match-create-shell tm-content-enter">
         {/* 단계 전환 시 스크린리더에 현재 단계 공지 */}
         {!edit ? (
           <div className="sr-only" aria-live="polite" aria-atomic="true">
@@ -527,7 +560,7 @@ export function MatchCreatePageView({ model }: { model: MatchCreateViewModel }) 
             (2026-08-27 감사 M-A-personal-match-state). */}
         {edit && model.form?.onCancel ? <button className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" type="button" style={{ marginTop: 8 }} disabled={model.form.submitting || Boolean(model.form?.lockedReason)} onClick={model.form.onCancel}>매치 취소</button> : null}
       </div>
-    </AppChrome>
+    </>
   );
 }
 
@@ -588,12 +621,13 @@ function MatchSearchBar({ query, filterCount, search, filterHref = '/matches?fil
 
 function MatchFilterSheet({ model }: { model: MatchListViewModel }) {
   const sheet = model.filterSheet;
+  const router = useRouter();
   if (!sheet) return null;
 
   return (
     <>
       <Link className="tm-filter-scrim" href={sheet.closeHref} aria-label="필터 닫기" />
-      <DraggableFilterSheet closeHref={sheet.closeHref} ariaLabel="매치 필터">
+      <BottomSheet open={sheet.open} onRequestClose={() => router.push(sheet.closeHref)} ariaLabel="매치 필터">
         <div className="tm-filter-sheet-handle" />
         <div className="tm-filter-sheet-head">
           <div>
@@ -630,7 +664,7 @@ function MatchFilterSheet({ model }: { model: MatchListViewModel }) {
           <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={sheet.closeHref}>닫기</Link>
           <Link className="tm-btn tm-btn-lg tm-btn-primary" href={sheet.applyHref}>적용하기</Link>
         </div>
-      </DraggableFilterSheet>
+      </BottomSheet>
     </>
   );
 }
@@ -1039,7 +1073,7 @@ function MatchComplete({ model }: { model: MatchCreateViewModel }) {
   };
 
   return (
-    <AppChrome title="매치 만들기 완료" activeTab="matches" bottomNav={false} backHref="/matches">
+    <>
       {/* Desktop page head */}
       <div className="tm-desktop-page-head tm-show-desktop">
         <Link className="tm-desktop-back" href="/matches" aria-label="매치 목록으로 돌아가기">
@@ -1063,7 +1097,7 @@ function MatchComplete({ model }: { model: MatchCreateViewModel }) {
           <button className="tm-btn tm-btn-lg tm-btn-primary" type="button" onClick={() => { void handleShare(); }}>공유하기</button>
         </div>
       </div>
-    </AppChrome>
+    </>
   );
 }
 

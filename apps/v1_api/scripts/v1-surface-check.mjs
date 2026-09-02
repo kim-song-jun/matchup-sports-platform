@@ -45,6 +45,7 @@ import { execSync } from 'node:child_process';
 const LOOKUP_BASELINE = 'scripts/tournament-surface-baseline.json';
 const RAW_SQL_BASELINE = 'scripts/tournament-raw-sql-baseline.json';
 const LEAGUE_ALLOWED_BASELINE = 'scripts/tournament-league-allowed-baseline.json';
+const LIST_SURFACE_BASELINE = 'scripts/tournament-list-surface-baseline.json';
 const LEAGUE_WRITE_BASELINE = 'scripts/league-write-site-baseline.json';
 
 /**
@@ -72,21 +73,43 @@ const LEAGUE_WRITE = /\bv1League\.(create|createMany|update|updateMany|upsert|de
  */
 const LEAGUE_ALLOWED = /\bALL_COMPETITION_KINDS\b/g;
 
+/**
+ * **목록 표면을 리그에 여는 자리.** 위 `LEAGUE_ALLOWED` 는 단건 조회 헬퍼의 인자만 센다 —
+ * 목록·집계는 `where` 에 상수를 펴 넣는 방식이라 **그 카운터에 걸리지 않는다.** 즉 목록을
+ * 리그에 여는 변경은 지금까지 **어느 게이트에도 안 걸렸다.**
+ *
+ * 문(상세 조회)을 열 때는 baseline 이 1→2 로 움직여 리뷰를 거쳤는데, 같은 성질의 결정인
+ * 목록을 열 때는 기록이 안 남는 상태였다. 특히 **어드민 목록·상태 탭·대시보드 KPI 는
+ * 앞으로도 리그를 빼야 하는 자리**라, 그쪽이 조용히 열리는 것을 막을 게 없었다.
+ *
+ * `COMPETITION_LIST_SURFACE` 를 참조하는 곳을 센다 — 그 표가 `all`(두 종류)을 담고 있어서,
+ * 참조 자체가 "이 목록이 어느 종류를 담는지 고른다"는 뜻이다. 정의 파일은 제외한다.
+ */
+const LIST_SURFACE = /\bCOMPETITION_LIST_SURFACE\b/g;
+
 const violations = [];
 
 function countRawLookups(source) {
   return (source.match(RAW_LOOKUP) ?? []).length;
 }
 
-function countLeagueAllowed(source) {
+/**
+ * 주석과 **import 블록을 뺀** 실제 사용처를 센다.
+ *
+ * **import 는 세지 않는다** — 세면 호출 1곳이 2로 잡혀 baseline 이 실제와 어긋나고,
+ * "몇 군데서 그렇게 하는가"라는 검사의 질문에 답하지 못한다.
+ *
+ * **한 줄 판정으로는 부족하다**(Copilot 리뷰 지적, 실측 재현): Prettier 가 import 를
+ * 여러 줄로 감싸면 specifier 가 자기 줄에 오는데(`  ALL_COMPETITION_KINDS,`) 그 줄은
+ * `import` 로 시작하지 않아 그대로 세어진다 → 1곳이 2로 잡혀 **게이트가 오탐으로 깨진다.**
+ * 그래서 `import` 부터 `from '…';` 까지를 **블록으로** 건너뛴다.
+ *
+ * ⚠️ **정규식만 바꿔 쓰고 이 로직을 복붙하지 마라.** 목록 표면 카운터를 추가할 때 이 처리를
+ * 안 가져가서 import 가 세어졌고, baseline 1 인데 2곳으로 잡혀 게이트가 오탐으로 깨졌다
+ * (실측). 복붙하면 한쪽만 고쳐진다.
+ */
+function countUsages(source, pattern) {
   let n = 0;
-  // **import 는 세지 않는다** — 세면 호출 1곳이 2로 잡혀 baseline 이 실제와 어긋나고,
-  // "몇 군데서 리그를 허용하는가"라는 이 검사의 질문에 답하지 못한다.
-  //
-  // **한 줄 판정으로는 부족하다**(Copilot 리뷰 지적, 실측 재현): Prettier 가 import 를
-  // 여러 줄로 감싸면 specifier 가 자기 줄에 오는데(`  ALL_COMPETITION_KINDS,`) 그 줄은
-  // `import` 로 시작하지 않아 그대로 세어진다 → 1곳이 2로 잡혀 **게이트가 오탐으로 깨진다.**
-  // 그래서 `import` 부터 `from '…';` 까지를 **블록으로** 건너뛴다.
   let inImport = false;
   for (const line of source.split('\n')) {
     const trimmed = line.trimStart();
@@ -100,9 +123,13 @@ function countLeagueAllowed(source) {
       if (!/\bfrom\s*['"]/.test(trimmed)) inImport = true;
       continue;
     }
-    n += (line.match(LEAGUE_ALLOWED) ?? []).length;
+    n += (line.match(pattern) ?? []).length;
   }
   return n;
+}
+
+function countLeagueAllowed(source) {
+  return countUsages(source, LEAGUE_ALLOWED);
 }
 
 function countRawSqlTable(source) {
@@ -133,6 +160,10 @@ function countLeagueWrites(source) {
     n += (line.match(LEAGUE_WRITE) ?? []).length;
   }
   return n;
+}
+
+function countListSurface(source) {
+  return countUsages(source, LIST_SURFACE);
 }
 
 /** baseline 값은 숫자이거나 `{ allowed, why }` 다 — 남겨 두는 이유를 적을 수 있게. */
@@ -231,6 +262,16 @@ function main() {
     hint: '리그를 만들거나 바꾸는 자리다 — 통합 축에 거울을 쓰는 dual-write 를 같은 트랜잭션에 붙이고 baseline 을 올려라',
   });
 
+  const listSurface = checkBaseline({
+    label: '목록 표면 종류 선택',
+    baselinePath: LIST_SURFACE_BASELINE,
+    // 정의 파일은 제외한다 — 표 자신이 표를 참조하는 것은 "여는 선택"이 아니다
+    // (`SANCTIONED` 가 조회 헬퍼를 빼는 것과 같은 이유).
+    files: all.filter((f) => f !== 'src/tournaments/tournament-surface.ts'),
+    count: countListSurface,
+    hint: '이 목록이 어느 종류를 담을지 고르는 자리다 — baseline 에 이유(why)와 함께 올려라',
+  });
+
   const rawSql = checkBaseline({
     label: 'raw SQL 대회 테이블',
     baselinePath: RAW_SQL_BASELINE,
@@ -247,7 +288,8 @@ function main() {
       `원시 대회 단건 조회 ${lookup?.total ?? '?'}곳 (baseline ${lookup?.allowedTotal ?? '?'}) · ` +
       `raw SQL 대회 테이블 ${rawSql?.total ?? '?'}곳 (baseline ${rawSql?.allowedTotal ?? '?'}) · ` +
       `리그 허용 ${leagueAllowed?.total ?? '?'}곳 (baseline ${leagueAllowed?.allowedTotal ?? '?'})`,
-      `v1League 쓰기 ${leagueWrites?.total ?? '?'}곳 (baseline ${leagueWrites?.allowedTotal ?? '?'})`,
+      `v1League 쓰기 ${leagueWrites?.total ?? '?'}곳 (baseline ${leagueWrites?.allowedTotal ?? '?'}) · ` +
+      `목록 표면 ${listSurface?.total ?? '?'}곳 (baseline ${listSurface?.allowedTotal ?? '?'})`,
   );
 }
 

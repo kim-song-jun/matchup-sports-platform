@@ -137,7 +137,7 @@ export function AwardsTab({
   }
 
   return (
-    <div className="p-4">
+    <div className="tm-content-enter p-4">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-[15px] font-bold text-[var(--text-strong)]">개인 어워드</h3>

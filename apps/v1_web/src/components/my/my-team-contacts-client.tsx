@@ -2,8 +2,8 @@
 
 import { useEffect, useId, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, ErrorState, ListItem } from '@/components/v1-ui/primitives';
+import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import {
   useV1AcceptTeamContact,
@@ -102,111 +102,92 @@ export function MyTeamContactsListClient() {
   const noOperatorTeams = myTeamsQuery.isSuccess && operatorTeams.length === 0;
 
   return (
-    <AppChrome title="팀 컨택함" activeTab="my" bottomNav={false} backHref="/my" desktopHead>
-      <div className="tm-my-shell">
-        <div className="tm-my-settings-desktop">
-          <div style={{ marginBottom: 16 }}>
-            <div className="tm-text-heading">팀 컨택함</div>
-            <div className="tm-text-caption" style={{ marginTop: 4 }}>
-              다른 팀과 주고받은 컨택 메시지를 확인해요.
-            </div>
+    <div className="tm-my-shell">
+      <div className="tm-my-settings-desktop">
+        <div style={{ marginBottom: 16 }}>
+          <div className="tm-text-heading">팀 컨택함</div>
+          <div className="tm-text-caption" style={{ marginTop: 4 }}>
+            다른 팀과 주고받은 컨택 메시지를 확인해요.
           </div>
-
-          {operatorTeams.length >= 2 ? (
-            <div style={{ marginBottom: 16 }}>
-              <label htmlFor="team-contacts-team" className="tm-text-label">
-                팀 선택
-              </label>
-              <select
-                id="team-contacts-team"
-                className="tm-input tm-input-select"
-                style={{ marginTop: 8 }}
-                value={selectedTeamId}
-                onChange={(event) => setSelectedTeamId(event.target.value)}
-              >
-                <option value="">팀을 선택해 주세요</option>
-                {operatorTeams.map((team) => (
-                  <option key={team.teamId} value={team.teamId}>
-                    {team.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : null}
-
-          {noOperatorTeams ? (
-            <EmptyState
-              title="운영 권한이 있는 팀이 없어요"
-              sub="팀 오너·매니저만 컨택함을 확인할 수 있어요."
-            />
-          ) : !effectiveTeamId ? (
-            <div className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
-              팀을 선택하면 컨택 목록을 볼 수 있어요.
-            </div>
-          ) : (
-            <>
-              <div
-                className="tm-seg-tabs"
-                role="tablist"
-                aria-label="컨택 방향"
-                /* tm-review-tabs 는 3컬럼 고정이라 2탭에서는 오른쪽 1/3 이 빈다.
-                   컬럼 수를 소비처가 정하는 tm-seg-tabs 를 쓴다(bracket-page-client 선례). */
-                style={{ marginBottom: 16, gridTemplateColumns: '1fr 1fr' }}
-              >
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={direction === 'inbound'}
-                  className="tm-seg-tab"
-                  data-active={direction === 'inbound'}
-                  onClick={() => setDirection('inbound')}
-                >
-                  받은 컨택
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={direction === 'outbound'}
-                  className="tm-seg-tab"
-                  data-active={direction === 'outbound'}
-                  onClick={() => setDirection('outbound')}
-                >
-                  보낸 컨택
-                </button>
-              </div>
-
-              {contactsQuery.isError ? (
-                <ErrorState
-                  message="컨택 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
-                  onRetry={() => void contactsQuery.refetch()}
-                />
-              ) : contactsQuery.isLoading ? (
-                /* 로딩을 빈 상태와 구분한다. 이 분기가 없으면 data 가 undefined 인 동안
-                   items 가 [] 라서 "아직 컨택이 없어요" 가 먼저 떴다가 목록으로 바뀐다. */
-                <Card pad={16}>
-                  <div className="tm-text-body-lg">컨택 목록을 불러오는 중이에요.</div>
-                </Card>
-              ) : items.length === 0 ? (
-                <EmptyState
-                  title={direction === 'inbound' ? '아직 받은 컨택이 없어요' : '아직 보낸 컨택이 없어요'}
-                  sub={
-                    direction === 'inbound'
-                      ? '다른 팀이 컨택을 보내면 여기서 확인할 수 있어요.'
-                      : '다른 팀에 컨택을 보내면 여기서 확인할 수 있어요.'
-                  }
-                />
-              ) : (
-                <Card pad={0}>
-                  {items.map((item) => (
-                    <TeamContactListRow key={item.id} contact={item} direction={direction} />
-                  ))}
-                </Card>
-              )}
-            </>
-          )}
         </div>
+
+        {operatorTeams.length >= 2 ? (
+          <div style={{ marginBottom: 16 }}>
+            <label htmlFor="team-contacts-team" className="tm-text-label">
+              팀 선택
+            </label>
+            <select
+              id="team-contacts-team"
+              className="tm-input tm-input-select"
+              style={{ marginTop: 8 }}
+              value={selectedTeamId}
+              onChange={(event) => setSelectedTeamId(event.target.value)}
+            >
+              <option value="">팀을 선택해 주세요</option>
+              {operatorTeams.map((team) => (
+                <option key={team.teamId} value={team.teamId}>
+                  {team.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
+
+        {noOperatorTeams ? (
+          <EmptyState
+            title="운영 권한이 있는 팀이 없어요"
+            sub="팀 오너·매니저만 컨택함을 확인할 수 있어요."
+          />
+        ) : !effectiveTeamId ? (
+          <div className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+            팀을 선택하면 컨택 목록을 볼 수 있어요.
+          </div>
+        ) : (
+          <>
+            <div style={{ marginBottom: 16 }}>
+              <SegmentedTabs
+                items={[
+                  { id: 'inbound', label: '받은 컨택' },
+                  { id: 'outbound', label: '보낸 컨택' },
+                ]}
+                activeId={direction}
+                onSelect={(id) => setDirection(id as Direction)}
+                ariaLabel="컨택 방향"
+                role="tablist"
+              />
+            </div>
+
+            {contactsQuery.isError ? (
+              <ErrorState
+                message="컨택 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
+                onRetry={() => void contactsQuery.refetch()}
+              />
+            ) : contactsQuery.isLoading ? (
+              /* 로딩을 빈 상태와 구분한다. 이 분기가 없으면 data 가 undefined 인 동안
+                 items 가 [] 라서 "아직 컨택이 없어요" 가 먼저 떴다가 목록으로 바뀐다. */
+              <Card pad={16}>
+                <div className="tm-text-body-lg">컨택 목록을 불러오는 중이에요.</div>
+              </Card>
+            ) : items.length === 0 ? (
+              <EmptyState
+                title={direction === 'inbound' ? '아직 받은 컨택이 없어요' : '아직 보낸 컨택이 없어요'}
+                sub={
+                  direction === 'inbound'
+                    ? '다른 팀이 컨택을 보내면 여기서 확인할 수 있어요.'
+                    : '다른 팀에 컨택을 보내면 여기서 확인할 수 있어요.'
+                }
+              />
+            ) : (
+              <Card pad={0}>
+                {items.map((item) => (
+                  <TeamContactListRow key={item.id} contact={item} direction={direction} />
+                ))}
+              </Card>
+            )}
+          </>
+        )}
       </div>
-    </AppChrome>
+    </div>
   );
 }
 
@@ -406,26 +387,22 @@ export function MyTeamContactDetailClient({ contactId }: { contactId: string }) 
 
   if (query.isError) {
     return (
-      <AppChrome title="컨택 상세" activeTab="my" bottomNav={false} backHref="/my/team-contacts" desktopHead>
-        <div className="tm-my-shell">
-          <ErrorState
-            message="컨택 내용을 불러오지 못했어요. 권한이 없거나 삭제된 컨택일 수 있어요."
-            onRetry={() => void query.refetch()}
-          />
-        </div>
-      </AppChrome>
+      <div className="tm-my-shell">
+        <ErrorState
+          message="컨택 내용을 불러오지 못했어요. 권한이 없거나 삭제된 컨택일 수 있어요."
+          onRetry={() => void query.refetch()}
+        />
+      </div>
     );
   }
 
   if (!contact) {
     return (
-      <AppChrome title="컨택 상세" activeTab="my" bottomNav={false} backHref="/my/team-contacts" desktopHead>
-        <div className="tm-my-shell">
-          <Card pad={16}>
-            <div className="tm-text-body-lg">컨택 내용을 불러오는 중이에요.</div>
-          </Card>
-        </div>
-      </AppChrome>
+      <div className="tm-my-shell">
+        <Card pad={16}>
+          <div className="tm-text-body-lg">컨택 내용을 불러오는 중이에요.</div>
+        </Card>
+      </div>
     );
   }
 
@@ -516,7 +493,7 @@ export function MyTeamContactDetailClient({ contactId }: { contactId: string }) 
   }
 
   return (
-    <AppChrome title="컨택 상세" activeTab="my" bottomNav={false} backHref="/my/team-contacts" desktopHead>
+    <>
       <div className="tm-my-shell">
         <div className="tm-my-settings-desktop" style={{ display: 'grid', gap: 12 }}>
           <Card pad={16}>
@@ -699,6 +676,6 @@ export function MyTeamContactDetailClient({ contactId }: { contactId: string }) 
         }}
         onSubmit={handleReportSubmit}
       />
-    </AppChrome>
+    </>
   );
 }

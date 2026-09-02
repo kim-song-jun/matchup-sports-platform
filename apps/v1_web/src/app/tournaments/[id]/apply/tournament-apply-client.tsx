@@ -5,8 +5,8 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { UsersRound } from 'lucide-react';
 import { buildPhoneVerifyHref } from '@/components/auth/phone-verification/phone-verify-route';
-import { AppChrome } from '@/components/v1-ui/shell';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
+import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { AlertBanner, Card, EmptyState, InfoRow, SectionTitle } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { getTournamentRosterNextStep } from '@/components/tournaments/tournament-roster-next-step';
@@ -1469,6 +1469,11 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
   const hubHref = `/tournaments/${tournamentId}/my`;
   const detailHref = `/tournaments/${tournamentId}`;
   const applyBackHref = requestedTeamId ? hubHref : detailHref;
+  // route-chrome 테이블(fragments/tournaments-extra.ts)의 backHref는 항상 detailHref로
+  // 고정돼 있다 — `?team=` 딥링크(내 신청 페이지에서 팀을 골라 들어온 경우, my-registration-
+  // client.tsx의 apply?team= 링크 참조)로 들어온 경우엔 셸 topbar 뒤로가기도 hubHref로
+  // 가야 한다. 이미 콘텐츠 영역의 cancelHref가 쓰는 것과 같은 값을 override로 셸에 밀어넣는다.
+  useShellOverride({ backHref: applyBackHref });
   const { data: tournament, isLoading: loadingTournament, isError: tournamentError, error: tournamentErr } = useV1Tournament(tournamentId);
   const { data: myTeamsData, isLoading: loadingTeams } = useV1MyTeams();
   const { data: myRegistrations = [], isLoading: loadingMyRegistrations } = useV1MyRegistrations(tournamentId);
@@ -1682,17 +1687,14 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
 
   if (loadingTournament || loadingMyRegistrations || (requestedTeamId && loadingTeams) || isRedirectingAway) {
     return (
-      <AppChrome title="참가 신청" backHref={applyBackHref} bottomNav={false} activeTab="tournaments" desktopHead>
-        <LoadingSkeleton />
-      </AppChrome>
-    );
+              <LoadingSkeleton />
+      );
   }
 
   if (tournamentError || !tournament) {
     const msg = extractErrorMessage(tournamentErr, '대회 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
     return (
-      <AppChrome title="참가 신청" backHref={applyBackHref} bottomNav={false} activeTab="tournaments" desktopHead>
-        <div style={{ padding: '0 20px', marginTop: 24 }}>
+              <div style={{ padding: '0 20px', marginTop: 24 }}>
           <AlertBanner message={msg} />
           <Link
             href={`/tournaments/${tournamentId}`}
@@ -1702,8 +1704,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
             대회 상세로 돌아가기
           </Link>
         </div>
-      </AppChrome>
-    );
+      );
   }
 
   // 대회 신청은 본인확인이 전제다(서버도 submit에서 403 PHONE_NOT_VERIFIED로 막는다).
@@ -1711,8 +1712,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
   // 인증이 끝나면 이 신청 화면으로 정확히 되돌아오게 한다.
   if (phoneVerified === false) {
     return (
-      <AppChrome title="참가 신청" backHref={applyBackHref} bottomNav={false} activeTab="tournaments" desktopHead>
-        <div style={{ padding: '0 20px', marginTop: 24 }}>
+              <div style={{ padding: '0 20px', marginTop: 24 }}>
           <AlertBanner
             message="대회 신청은 휴대폰 본인인증을 마친 계정만 할 수 있어요. 인증 후 이 화면으로 돌아옵니다."
             tone="info"
@@ -1732,15 +1732,13 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
             대회 상세로 돌아가기
           </Link>
         </div>
-      </AppChrome>
-    );
+      );
   }
 
   // Only allow apply when tournament is open
   if (tournament.status !== 'open') {
     return (
-      <AppChrome title="참가 신청" backHref={applyBackHref} bottomNav={false} activeTab="tournaments" desktopHead>
-        <div style={{ padding: '0 20px', marginTop: 24 }}>
+              <div style={{ padding: '0 20px', marginTop: 24 }}>
           <AlertBanner
             message="지금은 참가 신청을 받지 않아요."
             tone="info"
@@ -1753,8 +1751,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
             대회 상세로 돌아가기
           </Link>
         </div>
-      </AppChrome>
-    );
+      );
   }
 
   async function handleTeamNext() {
@@ -1857,7 +1854,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
   }
 
   return (
-    <AppChrome title="참가 신청" backHref={applyBackHref} bottomNav={false} activeTab="tournaments" desktopHead>
+    <>
       {/* maxWidth/marginInline 인라인 스타일 제거:
           모바일은 globals.css 기본값이 처리, 데스크톱은 tournaments.css의
           .tm-tournament-apply-body { max-width:unset } + .tm-tournament-form-grid 가 담당 */}
@@ -1976,6 +1973,6 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
           />
         ) : null}
       </div>
-    </AppChrome>
+    </>
   );
 }

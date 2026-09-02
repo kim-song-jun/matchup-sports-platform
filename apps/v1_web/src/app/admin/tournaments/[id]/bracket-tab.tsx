@@ -512,7 +512,7 @@ export function BracketTab({
       {ConfirmModal}
 
       {/* ── 대진표 일괄 공개 ──────────────────────────────────────────── */}
-      <div className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] px-5 py-4 mb-6 flex flex-col gap-3">
+      <div className="tm-content-enter bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] px-5 py-4 mb-6 flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <h3 className="text-[15px] font-bold text-[var(--text-strong)] mb-1">대진표 전체 공개</h3>

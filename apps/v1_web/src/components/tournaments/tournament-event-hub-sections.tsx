@@ -105,7 +105,14 @@ export function TournamentParticipantSection({
   confirmedCount,
 }: {
   teams: V1TournamentParticipantTeam[];
-  teamCount: number;
+  /**
+   * **정원.** 리그면 `null` 을 넘긴다 — 리그에는 정원 개념이 없다(`V1League` 에 정원 계열
+   * 필드가 아예 없다). 거울 행은 `v1_tournaments` 에 살고 `team_count` 가 `@default(8)`
+   * 이라, 그대로 그리면 참가 2팀인 리그에 **"2/8팀 확정"** 이 뜬다.
+   *
+   * `0` 으로 메우지 않는 이유는 목록 카드와 같다 — `0` 은 "정원이 0" 으로 읽힌다.
+   */
+  teamCount: number | null;
   /** 'open'(모집 중)에는 참가팀 명단(팀명·로고)을 숨긴다 — 확정 인원수는 계속 노출. */
   status: V1TournamentStatus;
   confirmedCount: number;
@@ -124,7 +131,8 @@ export function TournamentParticipantSection({
           참가팀
         </div>
         <div className="tm-text-caption" style={{ color: 'var(--text-caption)', whiteSpace: 'nowrap' }}>
-          {confirmedDisplayCount}/{teamCount}팀 확정
+          {/* 정원이 없으면 비율이 성립하지 않는다 — 수를 그대로 적는다(목록 카드와 같은 문구). */}
+          {teamCount === null ? `${confirmedDisplayCount}팀 참가` : `${confirmedDisplayCount}/${teamCount}팀 확정`}
         </div>
       </div>
 

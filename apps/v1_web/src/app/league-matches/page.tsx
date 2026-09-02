@@ -1,35 +1,33 @@
-import { Suspense } from 'react';
-import { AppChrome } from '@/components/v1-ui/shell';
-import { CompetitionKindSegment } from '@/components/v1-ui/competition-kind-segment';
-import { buildPublicMetadata } from '@/lib/seo';
-import LeagueMatchesListClient from './league-matches-list-client';
+import { redirect } from 'next/navigation';
+import { buildLeagueListRedirect } from '@/lib/league-list-redirect';
 
-export const metadata = buildPublicMetadata({
-  title: '정규 리그 찾기',
-  description: '진행 중이거나 곧 시작하는 정규 리그를 종목·지역별로 찾아보세요.',
-  path: '/league-matches',
-});
-
-// team-matches/page.tsx와 동일한 구조: 클라이언트 컴포넌트가 useSearchParams()로
-// 필터 상태를 URL에 반영하므로(공유 가능한 딥링크), Next.js App Router 요구대로
-// Suspense 경계를 여기서 감싼다.
-//
-// AppChrome은 클라이언트 컴포넌트가 아니라 **여기** page에서 두른다. 이 페이지는 원래
-// 셸 밖의 맨 div라 하단 내비가 없어서, 들어온 사용자가 브라우저 뒤로가기 말고는 앱으로
-// 돌아갈 길이 없었다(/tournaments 등 다른 공개 목록은 전부 AppChrome을 쓴다).
-// 클라이언트 안에 두지 않는 이유: 그러면 목록 클라이언트를 직접 렌더하는 테스트가
-// 알림 벨까지 끌어와 use-v1-api 모킹 표면이 화면과 무관하게 넓어진다.
-//
-// activeTab은 'tournaments' — 리그는 **대회의 한 종류**라서 하단 탭을 합쳤다(6→5).
-// 리그 전용 탭이 없으므로 대회/리그 이동은 상단 `CompetitionKindSegment` 가 맡는다.
-// (한동안 리그가 독립 탭이었고 그때는 상단 세그먼트를 뺐었다 — 지금은 반대다.)
-export default function LeagueMatchesPage() {
-  return (
-    <AppChrome title="정규 리그" activeTab="tournaments" showNotifications>
-      <CompetitionKindSegment active="league" />
-      <Suspense fallback={null}>
-        <LeagueMatchesListClient />
-      </Suspense>
-    </AppChrome>
-  );
+/**
+ * **리그 전용 목록은 통합 목록으로 넘어갔다**(2026-09-01 사용자 확정, A안 2단계).
+ *
+ * 리그는 이제 `/tournaments?kind=league` 에서 본다 — 그 목록이 예정(draft)까지 담고
+ * (#932) 상태·종목 필터도 갖췄으므로(#942) 이 화면이 하던 일을 전부 대신한다.
+ * **순서를 지켰다:** 담을 곳을 먼저 만들고 나서 넘긴다 — 반대로 하면 넘어간 화면에
+ * 예정 리그가 없거나 상태 칩이 없는 창이 생긴다.
+ *
+ * ## 넘기는 범위 — **목록만**
+ * 하위 화면(`/league-matches/:id` · `/fixtures/:id` · `/awards`)은 **그대로 둔다**
+ * (사용자 명시). 특히 **시상(`/awards`)은 대회 쪽에 대응 화면이 없다** — 넘기면 갈 곳이
+ * 없어진다.
+ *
+ * ## 고른 상태를 함께 넘긴다
+ * *"진행 중을 보던 사람은 넘어가서도 진행 중"* 이어야 한다. 축마다 상태 이름이 달라
+ * (`active` ↔ `in_progress`) 그냥 실어 보내면 400 이므로 `buildLeagueListRedirect` 가
+ * 옮긴다.
+ *
+ * ⚠️ `redirect()` 는 기본이 **307**(임시)이다. 이 이전은 영구적이지만, 통합 목록이
+ * 자리를 잡을 때까지는 되돌릴 여지를 남기는 편이 안전하다 — 영구(308)로 바꾸면 브라우저가
+ * 캐시해 되돌려도 사용자가 옛 화면을 못 본다.
+ */
+export default async function LeagueMatchesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ state?: string | string[]; sportId?: string | string[] }>;
+}) {
+  const params = await searchParams;
+  redirect(buildLeagueListRedirect(params));
 }

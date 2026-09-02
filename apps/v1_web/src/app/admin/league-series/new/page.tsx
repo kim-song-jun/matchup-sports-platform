@@ -40,7 +40,7 @@ export default function AdminLeagueSeriesNewPage() {
   };
 
   return (
-    <div>
+    <div className="tm-content-enter">
       <AdminPageHeader
         eyebrow="플랫폼"
         title="리그 체계 만들기"

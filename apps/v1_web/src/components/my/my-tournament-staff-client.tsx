@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { staffRoleLabel } from '@/components/tournament-ops/badges';
-import { AppChrome } from '@/components/v1-ui/shell';
 import { ChevronRightIcon } from '@/components/v1-ui/icons';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { useV1MyTournamentStaffAssignments } from '@/hooks/use-v1-api';
@@ -23,36 +22,32 @@ export function MyTournamentStaffPageClient() {
 
   if (query.isError) {
     return (
-      <AppChrome title="담당 대회 운영" activeTab="my" bottomNav={false} backHref="/my" desktopHead>
-        <div className="tm-my-shell">
-          <ErrorState
-            message="담당 대회 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
-            onRetry={() => void query.refetch()}
-          />
-        </div>
-      </AppChrome>
+      <div className="tm-my-shell">
+        <ErrorState
+          message="담당 대회 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
+          onRetry={() => void query.refetch()}
+        />
+      </div>
     );
   }
 
   return (
-    <AppChrome title="담당 대회 운영" activeTab="my" bottomNav={false} backHref="/my" desktopHead>
-      <div className="tm-my-shell">
-        <div className="tm-my-settings-desktop">
-          {!query.isLoading && groups.length === 0 ? (
-            <EmptyState
-              title="담당 중인 대회가 없어요"
-              sub="배정이 만료되었거나 해제됐어요. 대회 운영진으로 새로 배정되면 다시 여기에 표시돼요."
-            />
-          ) : (
-            <div className="tm-my-list-stack">
-              {groups.map((group) => (
-                <StaffTournamentRow key={group.tournamentId} group={group} />
-              ))}
-            </div>
-          )}
-        </div>
+    <div className="tm-my-shell tm-content-enter">
+      <div className="tm-my-settings-desktop">
+        {!query.isLoading && groups.length === 0 ? (
+          <EmptyState
+            title="담당 중인 대회가 없어요"
+            sub="배정이 만료되었거나 해제됐어요. 대회 운영진으로 새로 배정되면 다시 여기에 표시돼요."
+          />
+        ) : (
+          <div className="tm-my-list-stack">
+            {groups.map((group) => (
+              <StaffTournamentRow key={group.tournamentId} group={group} />
+            ))}
+          </div>
+        )}
       </div>
-    </AppChrome>
+    </div>
   );
 }
 

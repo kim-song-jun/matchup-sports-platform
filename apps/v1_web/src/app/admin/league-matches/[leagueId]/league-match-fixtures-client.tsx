@@ -537,7 +537,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
   };
 
   return (
-    <div>
+    <div className="tm-content-enter">
       <AdminPageHeader
         eyebrow="플랫폼 · 리그"
         title={series.title}

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { Card } from '@/components/v1-ui/primitives';
+import { FeaturedSlotSkeleton } from './featured-slot-skeleton';
 import { TrophyIcon } from '@/components/v1-ui/icons';
 import { cssUrl } from '@/lib/assets';
 import { getSortedTournamentPromos, resolveTournamentImage } from '@/lib/tournament-promo';
@@ -14,26 +15,9 @@ import type { V1TournamentListItem } from '@/types/api';
  */
 export function TournamentHeroCard({ items, loading = false }: { items: V1TournamentListItem[]; loading?: boolean }) {
   if (loading) {
-    return (
-      <Card pad={0} className="tm-featured-card" style={{ overflow: 'hidden' }} aria-busy="true">
-        <div
-          className="tm-featured-media"
-          style={{ background: 'linear-gradient(135deg, var(--blue500), var(--blue600))' }}
-        >
-          <div className="tm-featured-overlay" />
-          <div className="tm-featured-text">
-            <div className="tm-text-micro" style={{ color: 'var(--static-white)' }}>상금 대회 · 모집 중</div>
-            <div className="tm-text-subhead" style={{ color: 'var(--static-white)', marginTop: 4 }}>
-              추천 대회를 가져오고 있어요
-            </div>
-          </div>
-        </div>
-        <div className="tm-featured-content">
-          <div className="tm-review-skeleton" style={{ height: 20, borderRadius: 6, width: '72%' }} aria-hidden="true" />
-          <div className="tm-review-skeleton" style={{ height: 14, borderRadius: 6, width: '54%', marginTop: 8 }} aria-hidden="true" />
-        </div>
-      </Card>
-    );
+    // 자리표시 뼈대는 추천 매치 슬롯과 공유한다 — 각자 만들면 한쪽만 실제 카드와 어긋나고
+    // 그 차이가 그대로 레이아웃 이동이 된다(그 사고를 두 번 냈다).
+    return <FeaturedSlotSkeleton eyebrow="상금 대회 · 모집 중" title="추천 대회를 가져오고 있어요" />;
   }
 
   const featuredItems = getSortedTournamentPromos(items, 'home');

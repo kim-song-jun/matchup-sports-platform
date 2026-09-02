@@ -53,3 +53,19 @@ describe('TeamMatchDetailPage (server)', () => {
     expect(vi.mocked(redirect)).not.toHaveBeenCalledWith(expect.stringContaining('/league-matches/'));
   });
 });
+
+describe('TeamMatchDetailPage (server) — 첫 표시값 전달', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  // 리다이렉트 판정을 위해 어차피 받은 응답이다. 넘기지 않으면 딥링크·푸시·새로고침
+  // 진입에서 첫 화면이 다시 비게 된다(seed 는 optional prop 이라 타입검사도 못 잡는다).
+  it('서버에서 받은 팀매치를 클라이언트에 seed 로 넘긴다', async () => {
+    const teamMatch = { id: 'tm-1', teamMatchId: 'tm-1', title: '주말 팀매치', league: null };
+    fetchPublicV1Mock.mockResolvedValue(teamMatch as never);
+
+    const element = await TeamMatchDetailPage({ params: Promise.resolve({ id: 'tm-1' }) });
+
+    expect(element.props.teamMatchId).toBe('tm-1');
+    expect(element.props.seed).toEqual(teamMatch);
+  });
+});

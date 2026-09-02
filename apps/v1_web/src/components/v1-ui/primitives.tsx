@@ -236,6 +236,11 @@ type CardProps = {
   onPointerDown?: (event: PointerEvent<HTMLDivElement>) => void;
   onPointerUp?: (event: PointerEvent<HTMLDivElement>) => void;
   onPointerCancel?: (event: PointerEvent<HTMLDivElement>) => void;
+  /** 로딩 중인 영역임을 보조기기에 알린다. **명시적으로 받아서 넘겨야 한다** —
+   * JSX 는 하이픈이 든 속성명(aria-, data- 계열)을 초과 프로퍼티 검사에서 면제하므로,
+   * 이 선언이 없으면 `<Card aria-busy>` 가 tsc 를 통과하고도 DOM 에 닿지 않는다.
+   * 실제로 두 곳(홈 채팅 로딩 카드·대회 히어로 스켈레톤)이 그렇게 죽어 있었다. */
+  'aria-busy'?: boolean | 'true' | 'false';
 };
 
 export function Card({
@@ -246,6 +251,7 @@ export function Card({
   onPointerDown,
   onPointerUp,
   onPointerCancel,
+  'aria-busy': ariaBusy,
 }: CardProps) {
   return (
     <div
@@ -254,6 +260,7 @@ export function Card({
       onPointerDown={onPointerDown}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
+      aria-busy={ariaBusy}
     >
       {children}
     </div>
@@ -394,11 +401,17 @@ type EmptyStateProps = {
   onCta?: () => void;
   /** Lucide icon node rendered inside the blue circle. Defaults to InboxIcon. */
   icon?: ReactNode;
+  /**
+   * 이 빈 상태가 화면을 혼자 차지할 때 켠다 — 흐름대로 놓여 상단에 붙는 대신 남은 세로
+   * 공간의 중앙에 놓인다. 부모 컨테이너에 `tm-list-empty` 를 함께 붙여야 한다(globals.css).
+   * 카드·탭 안에 다른 내용과 섞여 나오는 빈 상태에는 쓰지 않는다.
+   */
+  fill?: boolean;
 };
 
-export function EmptyState({ title, sub, cta, onCta, icon }: EmptyStateProps) {
+export function EmptyState({ title, sub, cta, onCta, icon, fill }: EmptyStateProps) {
   return (
-    <div className="tm-empty-state">
+    <div className={`tm-empty-state${fill ? ' tm-empty-state-fill' : ''}`}>
       <div className="tm-empty-icon" aria-hidden="true">
         {icon ?? <InboxIcon size={36} strokeWidth={1.5} />}
       </div>

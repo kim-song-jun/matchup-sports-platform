@@ -219,7 +219,7 @@ function AdminInquiriesPageContent() {
         }
       />
 
-      <div className="flex flex-col gap-4">
+      <div className="tm-content-enter flex flex-col gap-4">
         {/* 신고 누적 팀 목록(#657 딥링크)에서 넘어온 팀 필터 — 보이지 않는 필터가 목록을
             좁히면 "왜 결과가 없지?"가 된다. 걸려 있는 동안은 항상 표시하고 해제 수단을 준다. */}
         {activeReportedTeamId ? (

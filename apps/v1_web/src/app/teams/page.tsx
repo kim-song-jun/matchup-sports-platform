@@ -1,6 +1,9 @@
 import { Suspense } from 'react';
 import { TeamListPageClient } from '@/components/teams/teams-client';
+import { TeamListSsrView } from '@/components/teams/teams-ssr-list';
 import { buildPublicMetadata } from '@/lib/seo';
+import { fetchSeoListPage, fetchSeoMasterSports } from '@/lib/seo-list';
+import type { V1Team } from '@/types/api';
 
 export const metadata = buildPublicMetadata({
   title: '스포츠 팀 찾기',
@@ -8,9 +11,16 @@ export const metadata = buildPublicMetadata({
   path: '/teams',
 });
 
-export default function TeamsPage() {
+export const revalidate = 300;
+
+export default async function TeamsPage() {
+  const [teams, sports] = await Promise.all([
+    fetchSeoListPage<V1Team>('/teams', 'teams'),
+    fetchSeoMasterSports(),
+  ]);
+
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<TeamListSsrView teams={teams} sports={sports} />}>
       <TeamListPageClient />
     </Suspense>
   );

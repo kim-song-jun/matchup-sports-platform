@@ -1,46 +1,69 @@
-import Link from 'next/link';
+import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
 
-type CompetitionKind = 'tournament' | 'league';
+/**
+ * 통합 대회 목록의 유형 축. 서버의 `COMPETITION_LIST_SURFACE` 키와 **같은 이름**을 쓴다 —
+ * 이 값이 그대로 `?kind=` 로 나가서 서버의 목록 표면을 고른다.
+ */
+export const COMPETITION_KINDS = ['all', 'tournament', 'league'] as const;
+export type CompetitionKind = (typeof COMPETITION_KINDS)[number];
+
+/**
+ * 쿼리스트링에서 유형을 읽는다. 모르는 값·없음은 `fallback` 으로 떨어진다 —
+ * 주소창에 아무거나 쳐도 목록이 비거나 깨지지 않아야 한다(서버도 같은 이유로 기본값을 둔다).
+ */
+export function parseCompetitionKind(raw: string | null, fallback: CompetitionKind): CompetitionKind {
+  return COMPETITION_KINDS.includes(raw as CompetitionKind) ? (raw as CompetitionKind) : fallback;
+}
+
+const TABS: Array<{ kind: CompetitionKind; label: string }> = [
+  { kind: 'all', label: '전체' },
+  { kind: 'tournament', label: '정규 대회' },
+  { kind: 'league', label: '정규 리그' },
+];
 
 interface CompetitionKindSegmentProps {
   active: CompetitionKind;
 }
 
 /**
- * 대회 유형(정규 대회 / 정규 리그) 세그먼트.
+ * 대회 유형(전체 / 정규 대회 / 정규 리그) 세그먼트.
  *
- * 하단 탭에서 '리그'가 빠지면서 **대회 목록에서 리그로 건너갈 유일한 수단**이 된다.
- * 리그로 들어오는 길이 이것뿐인 것은 아니다(홈의 리그 위젯 등도 `/league-matches` 로
- * 보낸다) — 다만 **대회를 보고 있던 사용자**에게는 이 세그먼트가 사라지면 리그가 없는
- * 것처럼 보인다. 탭만 줄이고 이것을 안 두면 그 경로가 끊긴다.
+ * ## 자리 — "대회 목록" 제목 아래, 종목 칩 위 (2026-09-01 사용자 확정, B안)
+ * 전에는 화면 맨 위(헤더 바로 아래)에 있었다. 그때는 이것이 **다른 페이지로 가는 이동
+ * 메뉴**였기 때문이다. 통합 뒤에는 **같은 목록을 좁히는 필터**라서, 종목 칩과 한 덩어리로
+ * 붙어 있어야 "제목 → 유형 → 종목 → 카드" 가 위에서 아래로 한 줄로 읽힌다. 사이에 프로모
+ * 배너가 끼면 두 필터가 서로 다른 것처럼 갈라진다.
  *
- * 시각 형태를 새로 만들지 않고 `MatchTypeSegment` 와 **같은 패턴**(`.tm-segment-row` +
- * `.tm-review-tab[data-active]`)을 그대로 쓴다 — 매치 탭에 이미 같은 성격의 세그먼트가
- * 있는데 대회 탭만 다른 시각 언어를 쓰면 "같은 역할인데 다르게 보이는" 것이 된다.
- * 터치 타깃 44px 는 `.tm-review-tab` 의 min-height 가 보장한다.
+ * 유형과 종목은 **축이 다르므로 형태도 다르다** — 유형은 세그먼트, 종목은 칩. 둘 다 "전체"
+ * 를 갖는데 같은 모양이면 어느 전체인지 구분되지 않는다.
  *
- * 탭 위젯이 아니라 **라우팅 링크 둘**이므로 `role="tab"` 이 아니라 `aria-current="page"`
- * 로 현재 위치를 알린다(선택 상태를 색으로만 알리지 않는다 — 프로젝트 접근성 규칙).
+ * ## 형태 — SegmentedTabs 공용 컴포넌트 (2026-09-02 이관, 세부탭 모션 통일 작업)
+ * 예전엔 `.tm-segment-row`(2칸 grid) 를 `.tm-segment-row-3` 로 덮어 3칸을 만들고,
+ * 활성 항목마다 `.tm-review-tab[data-active]` 로 배경을 켜고 끄는 방식이었다(전환 없이
+ * 툭 켜졌다 꺼짐). `SegmentedTabs` 는 항목 수를 `items.length` 에서 계산하므로 3칸용
+ * 오버라이드 클래스가 필요 없고, 활성 표시는 미끄러지는 thumb 하나 — 하단탭 pill 과
+ * 같은 토큰(`--duration-base`+`--ease-standard`)으로 움직인다. 좌우 여백은 여전히
+ * `tm-competition-kind-segment` 클래스(globals.css)가 트랙에 붙어 담당한다 — 자리만
+ * 옮겼을 뿐 값은 그대로다.
+ *
+ * 탭 위젯이 아니라 **라우팅 링크**이므로 `role` 을 주지 않는다 — `SegmentedTabs` 는
+ * role 이 없으면 `<nav aria-label>` 로 렌더하고 각 항목에 `aria-current="page"` 로
+ * 현재 위치를 알린다(선택 상태를 색으로만 알리지 않는다 — 프로젝트 접근성 규칙).
+ * 터치 타깃 44px 는 `size` 를 생략한 기본값(`'md'`)이 보장한다.
  */
 export function CompetitionKindSegment({ active }: CompetitionKindSegmentProps) {
   return (
-    <nav className="tm-segment-row tm-match-type-segment" aria-label="대회 유형">
-      <Link
-        href="/tournaments"
-        className="tm-review-tab"
-        data-active={active === 'tournament'}
-        aria-current={active === 'tournament' ? 'page' : undefined}
-      >
-        정규 대회
-      </Link>
-      <Link
-        href="/league-matches"
-        className="tm-review-tab"
-        data-active={active === 'league'}
-        aria-current={active === 'league' ? 'page' : undefined}
-      >
-        정규 리그
-      </Link>
-    </nav>
+    <SegmentedTabs
+      items={TABS.map(({ kind, label }) => ({
+        id: kind,
+        label,
+        /* '전체' 는 쿼리 없는 `/tournaments` 로 보낸다 — 기본값이 `all` 이라 `?kind=all` 과
+           같은 화면이고, **같은 화면에 주소가 둘이면 안 된다**(색인·공유 링크가 갈린다). */
+        href: kind === 'all' ? '/tournaments' : `/tournaments?kind=${kind}`,
+      }))}
+      activeId={active}
+      ariaLabel="대회 유형"
+      className="tm-competition-kind-segment"
+    />
   );
 }

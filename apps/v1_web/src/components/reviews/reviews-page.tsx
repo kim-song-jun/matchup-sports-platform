@@ -1,7 +1,8 @@
 import Link from 'next/link';
-import { AppChrome } from '@/components/v1-ui/shell';
+import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { Card, KPIStat } from '@/components/v1-ui/primitives';
 import { ChevronRightIcon } from '@/components/v1-ui/icons';
+import { SegmentedTabs, type SegmentedTabsItem } from '@/components/v1-ui/segmented-tabs';
 import { cssUrl } from '@/lib/assets';
 import { DEFAULT_REVIEW_RATING, REVIEW_METRIC_FIELDS } from './reviews.types';
 import type { ReviewSourcePageModel, ReviewsPageModel, ReviewsReceivedPageModel, ReviewsTab, ReviewTargetDraft, ReviewTargetViewModel } from './reviews.types';
@@ -51,8 +52,8 @@ export function ReviewsPageView({
   const hasReceivedContent = receivedModel.userGroups.length > 0 || receivedModel.teamGroups.length > 0;
 
   return (
-    <AppChrome title="리뷰" activeTab="my" backHref="/my" desktopHead>
-      <div className="tm-review-shell">
+    <>
+      <div className="tm-review-shell tm-content-enter">
         <ReviewTabs active={model.tab} onChange={onTabChange} />
         {isReceivedTab ? (
           <>
@@ -119,7 +120,7 @@ export function ReviewsPageView({
           </>
         )}
       </div>
-    </AppChrome>
+    </>
   );
 }
 
@@ -168,8 +169,8 @@ export function ReviewSourcePageView({
   const showSubmitHint = !loading && !errorMessage && !submitting && pendingTargets.length > 0 && !canSubmit;
 
   return (
-    <AppChrome title="리뷰 남기기" activeTab="my" bottomNav={false} backHref="/my/reviews" desktopHead>
-      <div className="tm-review-shell tm-review-compose-shell">
+    <>
+      <div className="tm-review-shell tm-review-compose-shell tm-content-enter">
         {loading ? <ReviewSkeleton count={3} /> : null}
         {!loading && errorMessage ? <ReviewNotice title="리뷰 대상을 불러오지 못했어요" sub={errorMessage} onRetry={onRetry} /> : null}
         {!loading && !errorMessage && model ? (
@@ -222,7 +223,7 @@ export function ReviewSourcePageView({
           {submitting ? '전송 중' : '리뷰 보내기'}
         </button>
       </div>
-    </AppChrome>
+    </>
   );
 }
 
@@ -256,41 +257,45 @@ export function ReviewsReceivedPageView({
   // (모델이 비어있는 것과 로딩/에러로 아직 모르는 것을 구분 — 그렇지 않으면 에러 상태가 조용히 사라진다.)
   const hasReceivedContent = model.userGroups.length > 0 || model.teamGroups.length > 0;
   return (
-    // #24: 뒤로가기는 received 탭으로 이동한다 (/my/reviews?tab=received 는 page.tsx에서 파싱됨).
-    <AppChrome title="받은 리뷰" activeTab="my" bottomNav={false} backHref="/my/reviews?tab=received" desktopHead>
-      <div className="tm-review-shell">
-        {/* 개별 리뷰가 주인공이고 요약은 보조다 — 예전엔 순서가 반대라 큰 대시보드 두 개를
-            지나야 정작 받은 리뷰 내용이 나왔다. 요약은 집계가 0건이면 스스로 렌더하지 않는다. */}
-        {hasReceivedContent ? <AnonymousReceivedContent model={model} /> : null}
-        <div style={{ display: 'grid', gap: 12, marginTop: hasReceivedContent ? 24 : 0 }}>
+    // #24: 뒤로가기는 received 탭으로 이동한다 (/my/reviews?tab=received 는 page.tsx에서 파싱됨,
+    // fragments/reviews.ts의 정적 backHref로 이관).
+    <div className="tm-review-shell tm-content-enter">
+      {/* 개별 리뷰가 주인공이고 요약은 보조다 — 예전엔 순서가 반대라 큰 대시보드 두 개를
+          지나야 정작 받은 리뷰 내용이 나왔다. 요약은 집계가 0건이면 스스로 렌더하지 않는다. */}
+      {hasReceivedContent ? <AnonymousReceivedContent model={model} /> : null}
+      <div style={{ display: 'grid', gap: 12, marginTop: hasReceivedContent ? 24 : 0 }}>
+        <ReviewsSummaryDashboard
+          summary={summary}
+          period={period}
+          onPeriodChange={onPeriodChange}
+          loading={summaryLoading}
+          title="내가 받은 리뷰 요약"
+        />
+        {hasManagedTeam ? (
           <ReviewsSummaryDashboard
-            summary={summary}
-            period={period}
-            onPeriodChange={onPeriodChange}
-            loading={summaryLoading}
-            title="내가 받은 리뷰 요약"
+            summary={teamSummary}
+            period={teamPeriod}
+            onPeriodChange={onTeamPeriodChange}
+            loading={teamSummaryLoading}
+            title="내 팀이 받은 리뷰 요약"
           />
-          {hasManagedTeam ? (
-            <ReviewsSummaryDashboard
-              summary={teamSummary}
-              period={teamPeriod}
-              onPeriodChange={onTeamPeriodChange}
-              loading={teamSummaryLoading}
-              title="내 팀이 받은 리뷰 요약"
-            />
-          ) : null}
-        </div>
+        ) : null}
       </div>
-    </AppChrome>
+    </div>
   );
 }
 
 export function ReviewSubmitCompleteView({ model, onConfirm }: { model: ReviewSourcePageModel; onConfirm: () => void }) {
   const reviewed = model.targets.filter((target) => target.alreadySubmitted || target.review).length;
   const remaining = Math.max(0, model.targets.length - reviewed);
+  // 이 뷰가 렌더되는 순간엔 항상 title=""(제출 완료 화면 — fragments/reviews.ts의 정적
+  // "리뷰 남기기"를 덮어씀). 같은 라우트(/my/reviews/:sourceType/:sourceId)에서 폼/완료 두
+  // 분기 중 어느 게 렌더될지가 런타임(complete 쿼리 + fetch 완료 여부) 의존이라 override로
+  // 처리한다(app-shell-promotion.md §1.9 R7).
+  useShellOverride({ title: '' });
 
   return (
-    <AppChrome title="" activeTab="my" bottomNav={false} backHref="/my/reviews" desktopHead>
+    <>
       <div className="tm-review-complete">
         <div className="tm-review-complete-icon">✓</div>
         <div className="tm-text-heading" style={{ marginTop: 24 }}>리뷰를 보냈어요</div>
@@ -307,7 +312,7 @@ export function ReviewSubmitCompleteView({ model, onConfirm }: { model: ReviewSo
       <div className="tm-fixed-cta">
         <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" onClick={onConfirm} type="button">확인</button>
       </div>
-    </AppChrome>
+    </>
   );
 }
 
@@ -374,23 +379,28 @@ function ReviewTargetSections({
   );
 }
 
+// href 기반 라우팅 링크 3개 — 활성 표시는 미끄러지는 thumb 하나가 담당한다(항목별
+// background on/off 방식이던 예전 .tm-review-tab 은 제거). id 는 항상 고정 3개라
+// 렌더 밖 상수로 뺀다(불필요한 배열 재생성 방지).
+const REVIEW_TAB_ITEMS: SegmentedTabsItem[] = [
+  { id: 'pending', label: '작성할 리뷰', href: '/my/reviews?tab=pending' },
+  { id: 'written', label: '작성된 리뷰', href: '/my/reviews?tab=written' },
+  { id: 'received', label: '받은 리뷰', href: '/my/reviews?tab=received' },
+];
+
+// 세 항목 모두 `/my/reviews?tab=<id>` 로 **주소를 바꾸는 라우팅 링크**다. 따라서
+// role="tablist"(→ 각 항목 role="tab" + aria-selected)를 주지 않는다 — tab 역할은
+// "같은 페이지 안에서 패널을 갈아끼우는 위젯"을 뜻해서, 보조기기에 링크라는 사실과
+// 뒤 이동이 일어난다는 예고가 사라진다. role 을 비우면 SegmentedTabs 가 <nav> +
+// 링크 + aria-current="page" 로 렌더한다(라우팅 하위 내비게이션의 표준 형태).
 function ReviewTabs({ active, onChange }: { active: ReviewsTab; onChange: (tab: ReviewsTab) => void }) {
-  const tabs: Array<[ReviewsTab, string]> = [['pending', '작성할 리뷰'], ['written', '작성된 리뷰'], ['received', '받은 리뷰']];
   return (
-    <div className="tm-review-tabs" role="tablist">
-      {tabs.map(([id, label]) => (
-        <Link
-          key={id}
-          aria-current={active === id ? 'page' : undefined}
-          className="tm-review-tab"
-          data-active={active === id}
-          href={`/my/reviews?tab=${id}`}
-          onClick={() => onChange(id)}
-        >
-          {label}
-        </Link>
-      ))}
-    </div>
+    <SegmentedTabs
+      items={REVIEW_TAB_ITEMS}
+      activeId={active}
+      onSelect={(id) => onChange(id as ReviewsTab)}
+      ariaLabel="리뷰 탭"
+    />
   );
 }
 

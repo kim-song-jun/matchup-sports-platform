@@ -33,9 +33,16 @@ import type { PrismaClient } from '@prisma/client';
  *
  * | 표면 | 리그 |
  * |---|---|
- * | 공개 대회 목록 · 어드민 목록 · 상태 탭 · 대시보드 KPI | **안 나온다** |
- * | 공개 대회 기록(일정·선수기록·경기단건) | **안 열린다** |
+ * | 공개 대회 목록 (기본) | **안 나온다** — `kind` 기본값이 `tournament` 다 |
+ * | 공개 대회 목록 (`?kind=league` · `?kind=all`) | **나온다** — API 계약으로만 열려 있고 화면은 아직 안 보낸다 |
+ * | 어드민 목록 · 상태 탭 · 대시보드 KPI | **안 나온다** — 여기는 앞으로도 닫힌다 |
+ * | 공개 대회 기록 — **일정(`getSchedule`)** | **열린다** (2026-09-01 사용자 확정 B안) |
+ * | 공개 대회 기록 — 선수기록·경기단건 | **안 열린다** |
  * | 공개 상세 · 공개 통합 순위 | **열린다** (read-swap 의 목적) |
+ *
+ * ⚠️ **"공개 목록"과 "어드민 목록"을 한 줄로 묶지 마라.** 둘은 이제 다른 답을 갖는다 —
+ * 공개 목록은 파라미터로 열 수 있고 어드민 목록은 못 연다. 묶어서 *"목록은 안 나온다"* 로
+ * 적으면 다음 사람이 어드민 목록도 같은 방식으로 열어도 되는 줄 안다.
  *
  * 상세·순위를 연 것은 실수가 아니라 이 개편의 목적이다 — 리그 시즌을 대회 표면에서 볼 수
  * 있게 하는 것. 다만 **열기 전에** 그 화면이 리그 축 데이터로 채워지도록 먼저 만들었다
@@ -53,6 +60,10 @@ const ids = {
   tournament: '9a000000-0000-4000-8000-000000000020',
   league: '9a000000-0000-4000-8000-000000000021',
   legacyNullKind: '9a000000-0000-4000-8000-000000000022',
+  /** 예정(draft) 리그 — 사용자에게 보여야 한다. 리그 전용 목록이 지금까지 보여 온 상태다. */
+  draftLeague: '9a000000-0000-4000-8000-000000000023',
+  /** 준비 중(draft) 대회 — **계속 감춰야 한다**(사용자 명시). 위와 짝이 되는 대조군. */
+  draftTournament: '9a000000-0000-4000-8000-000000000024',
   tournamentFixture: '9a000000-0000-4000-8000-000000000030',
   leagueFixture: '9a000000-0000-4000-8000-000000000031',
 } as const;
@@ -92,6 +103,9 @@ describe('대회 표면은 정규 리그 시즌을 보여주지 않는다 (real 
     // 지나는데, 이 값이 없으면 **대회 id 도 리그 id 도 똑같이 404** 라 kind 필터가 있든 없든
     // 통과하는 무의미한 테스트가 된다(Copilot 리뷰 지적 — 필터를 제거한 변이 실행에서
     // getSchedule·getPlayerRecords·getPlayerRecordsForAdmin 3건만 red 였고 getMatch 는 green 이었다).
+    // ⚠️ 그 관측은 **2026-09-01 이전**의 것이다 — 지금은 getSchedule 이 리그에 열려 있어
+    // 그 목록에서 빠졌다(아래 전용 케이스). 이 픽스처가 대진표를 공개해 두는 이유 자체는
+    // 그대로다: 안 그러면 getMatch 가 kind 와 무관하게 404 라 무의미한 단언이 된다.
     const bracketPublishedAt = new Date('2026-01-01T00:00:00.000Z');
     await prisma.v1Tournament.create({
       data: {
@@ -110,6 +124,26 @@ describe('대회 표면은 정규 리그 시즌을 보여주지 않는다 (real 
         status: 'in_progress',
         kind: 'regular_league',
         bracketPublishedAt,
+      },
+    });
+    // 예정 리그와 준비 중 대회 — **같은 `draft` 인데 답이 달라야 한다.**
+    // 대회의 draft 는 운영자 준비 중이고, 리그의 draft 는 사용자가 보는 "예정" 이다.
+    await prisma.v1Tournament.create({
+      data: {
+        id: ids.draftLeague,
+        sportId: ids.sportId,
+        title: '표면 테스트 예정 리그',
+        status: 'draft',
+        kind: 'regular_league',
+      },
+    });
+    await prisma.v1Tournament.create({
+      data: {
+        id: ids.draftTournament,
+        sportId: ids.sportId,
+        title: '표면 테스트 준비중 대회',
+        status: 'draft',
+        kind: 'regular_tournament',
       },
     });
     // **거울 뒤의 진짜 리그 행을 함께 심는다.** 거울(`v1_tournaments`)만 있고 리그
@@ -199,8 +233,10 @@ describe('대회 표면은 정규 리그 시즌을 보여주지 않는다 (real 
   // 계열은 "어드민 가드 뒤라 안전"으로 넘겼는데, 그 판단이 틀렸다 — 가드는 **권한**을 막지
   // **잘못된 id** 를 막지 않는다. 백필(R3)로 리그 id 가 `v1_tournaments` 에 실재하게 되자
   // alpha 에서 `/tournaments/:리그id/schedule` 이 **리그 제목을 실은 200** 을 줬다(실측).
+  // ⚠️ **`getSchedule` 은 이 목록에서 의도적으로 빠졌다** — 아래 전용 케이스로 옮겼다.
+  // 지운 게 아니라 **계약이 바뀐 것**이다(그 케이스의 doc comment 참조). 나머지 셋은 그대로
+  // 막힌다 — 하나가 열렸다고 표면 전체가 열린 것으로 읽지 마라.
   it.each([
-    ['getSchedule', (id: string) => records.getSchedule(id, {} as never, undefined)],
     ['getPlayerRecords', (id: string) => records.getPlayerRecords(id)],
     ['getPlayerRecordsForAdmin', (id: string) => records.getPlayerRecordsForAdmin(id)],
     ['getMatch', () => records.getMatch(ids.league, ids.leagueFixture, undefined)],
@@ -209,6 +245,31 @@ describe('대회 표면은 정규 리그 시즌을 보여주지 않는다 (real 
     // (`TOURNAMENT_MATCH_NOT_FOUND` / `TOURNAMENT_NOT_FOUND`). 중요한 것은 **404 로 막히는 것**이고,
     // 어떤 코드인지가 아니다. 코드를 추측해 박았다가 이 테스트가 3건 red 였다.
     await expect(call(ids.league)).rejects.toMatchObject({ status: 404 });
+  });
+
+  /**
+   * **`getSchedule` 만 의도적으로 열었다 — 이 스위트에서 유일하게 뒤집힌 계약이다.**
+   *
+   * 왜: `/tournaments/:id` 가 통합 축으로 넓어져 리그가 상세를 통과하는데, 화면이 부르는
+   * 이 API 만 리그에서 404 라 **`/schedule` 과 `/bracket` 이 둘 다** "경기 정보를 찾을 수
+   * 없어요" 만 그렸다(두 화면이 같은 `ScheduleContent` 를 쓴다). 리그 상세의 주 CTA 가
+   * 에러 화면으로 가는 상태였다.
+   *
+   * ⚠️ **"봉쇄가 깨졌다" 로 읽지 마라.** 표면 전체가 아니라 이 한 메서드만 열렸고,
+   * `getPlayerRecords`·`getPlayerRecordsForAdmin`·`getMatch` 는 **위 케이스가 계속 막는다.**
+   * 되돌리려면 그게 왜 열렸는지부터 보라 — 되돌리는 순간 두 화면이 다시 죽는다.
+   *
+   * `bracketPublished: true` 는 "대진표가 공개됐다" 가 아니라 **"이 게이트는 리그에 해당
+   * 없다"** 는 뜻이다. `false` 를 주면 화면이 "대진표가 아직 공개되지 않았어요" 를 영원히
+   * 그린다. 이 픽스처 리그엔 `V1TeamMatch` 가 없어 `items`·`standings` 가 비는 것이 정상이다.
+   */
+  it('공개 대회 기록 getSchedule — 리그 id 로 열린다 (의도된 예외)', async () => {
+    await expect(records.getSchedule(ids.league, {} as never, undefined)).resolves.toMatchObject({
+      tournamentId: ids.league,
+      tournamentTitle: '표면 테스트 리그 시즌',
+      bracketPublished: true,
+      unscheduled: [],
+    });
   });
 
   it('같은 경로가 대회 id 와 kind=null 구행에는 여전히 열린다', async () => {
@@ -224,7 +285,18 @@ describe('대회 표면은 정규 리그 시즌을 보여주지 않는다 (real 
     });
   });
 
-  it('공개 대회 목록 — 리그는 빠지고, kind 가 없는 R1 이전 행은 남는다', async () => {
+  /**
+   * **기본값을 못박는다 — 게이트가 이걸 못 잡는다.**
+   *
+   * `v1-surface-check` 는 *"어디서 종류를 고르는가"*(`COMPETITION_LIST_SURFACE` 사용처)를
+   * 세지 *"무엇을 골랐는가"* 는 안 본다. 즉 기본값을 `'tournament'` → `'all'` 로 바꾸는
+   * 한 글자 변경은 **게이트를 그대로 통과한다**(실측). 그건 테스트의 몫이다.
+   *
+   * 그리고 그게 앞으로 가장 있을 법한 변경이다 — 화면이 두 종류를 그릴 수 있게 되면
+   * 기본값을 뒤집는 것이 다음 단계다. 그때 이 단언이 red 가 되어 **의도한 변경임을
+   * 밝히게** 만든다.
+   */
+  it('공개 대회 목록 — 기본값은 대회만. 리그는 빠지고 kind 가 없는 R1 이전 행은 남는다', async () => {
     const res = await read.list({ limit: 100 } as never);
     const listedIds = (res.items as Array<{ id: string }>).map((row) => row.id);
 
@@ -232,6 +304,85 @@ describe('대회 표면은 정규 리그 시즌을 보여주지 않는다 (real 
     expect(listedIds).toContain(ids.legacyNullKind);
     expect(listedIds).not.toContain(ids.league);
   });
+
+  /**
+   * `kind` 는 **API 계약으로만** 열려 있다 — 화면은 아직 이 파라미터를 보내지 않는다.
+   * 세 값이 각각 다른 집합을 내는지 한자리에서 대조한다. 하나만 확인하면 "필터가 걸렸다"와
+   * "우연히 같은 답이 나왔다" 를 구분할 수 없다.
+   */
+  it('kind 파라미터 — 세 값이 각각 다른 집합을 낸다', async () => {
+    const idsOf = async (kind?: string) =>
+      ((await read.list({ limit: 100, ...(kind ? { kind } : {}) } as never)).items as Array<{
+        id: string;
+      }>).map((row) => row.id);
+
+    const [dflt, tournament, league, all] = await Promise.all([
+      idsOf(),
+      idsOf('tournament'),
+      idsOf('league'),
+      idsOf('all'),
+    ]);
+
+    // 기본값 === tournament. 둘이 갈리면 "기본값이 무엇인가" 가 두 답을 갖는다.
+    expect(dflt.sort()).toEqual(tournament.sort());
+
+    expect(tournament).toContain(ids.tournament);
+    expect(tournament).toContain(ids.legacyNullKind);
+    expect(tournament).not.toContain(ids.league);
+
+    // 리그만 — R1 이전 행(kind=null)은 **대회 쪽**이라 여기 없어야 한다.
+    expect(league).toContain(ids.league);
+    expect(league).not.toContain(ids.tournament);
+    expect(league).not.toContain(ids.legacyNullKind);
+
+    // 전체 — 셋 다.
+    expect(all).toContain(ids.tournament);
+    expect(all).toContain(ids.legacyNullKind);
+    expect(all).toContain(ids.league);
+  });
+  /**
+   * **같은 `draft` 인데 종류마다 답이 다르다** — 2026-09-01 사용자 확정(A안).
+   *
+   * 통합 목록이 리그를 담기 시작하자 **예정 리그가 통째로 사라졌다.** 리그 전용 목록이
+   * 지금까지 보여 온 상태인데, 대회 축의 `draft`(운영자 준비 중)와 같은 열에 담겨 있어
+   * 함께 걸러졌다(실측: 리그 88건 중 통합 목록 53건 · 빠진 35건이 전부 draft).
+   *
+   * ⚠️ **대조군이 이 테스트의 절반이다.** 리그만 보면 *"draft 를 통째로 열었다"* 와
+   * 구분되지 않는다 — 대회의 draft 가 **계속 안 보이는 것**까지 봐야 게이트가 살아 있다.
+   */
+  it('예정(draft) 리그는 목록에 보이고, 준비 중 대회는 계속 감춰진다', async () => {
+    const idsOf = async (kind?: string) =>
+      ((await read.list({ limit: 100, ...(kind ? { kind } : {}) } as never)).items as Array<{
+        id: string;
+      }>).map((row) => row.id);
+
+    const [dflt, league, all] = await Promise.all([idsOf(), idsOf('league'), idsOf('all')]);
+
+    expect(league).toContain(ids.draftLeague);
+    expect(all).toContain(ids.draftLeague);
+
+    // 대조군 — 대회의 draft 는 어느 표면에서도 안 나온다.
+    expect(dflt).not.toContain(ids.draftTournament);
+    expect(all).not.toContain(ids.draftTournament);
+  });
+
+  /**
+   * **목록에만 올리면 카드는 보이는데 눌러서 못 연다** — 안 보이는 것보다 나쁘다.
+   * 실측(2026-09-01)에서 이미 그 비대칭이 있었다: draft 리그가 목록 밖인데
+   * `/schedule` 은 200 이라 경로마다 답이 달랐다.
+   */
+  it('예정 리그 상세가 열린다 — 목록과 같은 조건이어야 한다', async () => {
+    await expect(read.get(ids.draftLeague, undefined as never)).resolves.toMatchObject({
+      id: ids.draftLeague,
+    });
+  });
+
+  it('대조군: 준비 중 대회 상세는 계속 404 다', async () => {
+    await expect(read.get(ids.draftTournament, undefined as never)).rejects.toMatchObject({
+      status: 404,
+    });
+  });
+
   /**
    * **상세는 의도적으로 열려 있다** — 리그 시즌을 대회 표면에서 볼 수 있게 하는 것이
    * read-swap 의 목적이다. 열기 전에 상세 응답이 리그 대진을 싣고(`leagueFixtures`),

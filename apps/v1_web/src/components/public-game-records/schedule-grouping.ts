@@ -23,6 +23,35 @@ export type SchedulePhase = {
 };
 
 /**
+ * 단계 이름은 **표면마다 다르다.** 예전엔 상수로 박혀 있었는데, 정규 리그가 이 화면을 쓰기
+ * 시작하면서 문제가 드러났다 — 리그 대진은 `round` 가 'N주차' 라 `isGroupStage` 가 false 가
+ * 되어 **전부 `결선` 으로 분류되고**, 그 이름이 필터 칩과 `section aria-label` 로 **보인다.**
+ * 리그에 결선이라는 단계는 없다.
+ *
+ * 그래서 이름만 표면별로 갈아 끼운다 — 분류 규칙(무엇이 어느 단계인가)은 그대로다.
+ */
+export type SchedulePhaseLabels = Readonly<Record<SchedulePhaseKey, string>>;
+
+export const TOURNAMENT_PHASE_LABELS: SchedulePhaseLabels = {
+  group_stage: '조별리그',
+  knockout: '결선',
+};
+
+/**
+ * 정규 리그의 단계 이름(2026-09-01 사용자 확정 — "'결선' 대신 '정규 라운드'로 부르고 칩
+ * 구조는 유지").
+ *
+ * ⚠️ `group_stage` 는 **현재 리그에서 도달하지 않는다** — 서버가 리그 `round` 를 'N주차' 로
+ * 주고 `groupName` 을 비우므로 `isGroupStage` 가 항상 false 다. 그래도 리그 어휘로 적어
+ * 둔다: 조 편성이 있는 리그가 생겨 도달하는 날 '조별리그' 라는 대회 말이 튀어나오면
+ * 그때는 원인을 찾기 어렵다.
+ */
+export const LEAGUE_PHASE_LABELS: SchedulePhaseLabels = {
+  group_stage: '조별 라운드',
+  knockout: '정규 라운드',
+};
+
+/**
  * 조별리그인가. `round` 가 "조별"로 시작하는 게 1차 신호이고, 그게 비어 있는 과거
  * 데이터를 위해 `groupName` 이 "조"로 끝나는지도 함께 본다("A조"/"B조").
  * "3위 결정전"처럼 조가 아닌 이름은 두 조건 모두 걸리지 않는다.
@@ -55,10 +84,13 @@ export function phaseKeyOf(entry: PublicScheduleEntry): SchedulePhaseKey {
  * 뒤바뀐 대회에서 순서가 무너지므로, 그룹 순서는 **그 그룹의 가장 이른 fixtureNumber** 로
  * 정한다.
  */
-export function groupScheduleEntries(entries: readonly PublicScheduleEntry[]): SchedulePhase[] {
+export function groupScheduleEntries(
+  entries: readonly PublicScheduleEntry[],
+  phaseLabels: SchedulePhaseLabels = TOURNAMENT_PHASE_LABELS,
+): SchedulePhase[] {
   const phases: Array<{ key: SchedulePhaseKey; label: string; groups: Map<string, ScheduleGroup> }> = [
-    { key: 'group_stage', label: '조별리그', groups: new Map() },
-    { key: 'knockout', label: '결선', groups: new Map() },
+    { key: 'group_stage', label: phaseLabels.group_stage, groups: new Map() },
+    { key: 'knockout', label: phaseLabels.knockout, groups: new Map() },
   ];
 
   for (const entry of entries) {

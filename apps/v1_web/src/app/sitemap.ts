@@ -16,14 +16,21 @@ export const revalidate = 300;
 
 // 리그(/league-matches)는 대회(/tournaments)와 같은 "대회 유형" 축인데도 sitemap엔
 // 아예 없었다 — 그룹 C 리그 발견성 감사(Task 153 Wave 3)에서 대회와 동급
-// priority/changeFrequency로 등록한다.
+// priority/changeFrequency로 실었다.
+//
+// 그 뒤 목록이 통합 목록으로 넘어가면서(2026-09-01) **싣는 대상이 바뀌었다**: 아래
+// STATIC_ROUTES 에서 목록 주소는 빠졌고, 대신 리그 **개별 페이지**를 sitemap() 본문에서
+// 싣는다. 발견성은 그대로고, 크롤러가 리다이렉트를 한 번 더 도는 것만 없앴다.
 const STATIC_ROUTES: Array<{ path: string; priority: number; changeFrequency: MetadataRoute.Sitemap[number]['changeFrequency'] }> = [
   { path: '/landing', priority: 1, changeFrequency: 'weekly' },
   { path: '/matches', priority: 0.9, changeFrequency: 'hourly' },
   { path: '/teams', priority: 0.8, changeFrequency: 'daily' },
   { path: '/team-matches', priority: 0.8, changeFrequency: 'hourly' },
   { path: '/tournaments', priority: 0.9, changeFrequency: 'daily' },
-  { path: '/league-matches', priority: 0.9, changeFrequency: 'daily' },
+  /* `/league-matches`(리그 전용 목록)는 **여기서 뺐다** — 이제 `/tournaments?kind=league` 로
+     넘어가므로(2026-09-01) 리다이렉트하는 주소를 사이트맵에 올리면 크롤러가 한 번 더 돈다.
+     ⚠️ **리그 개별 페이지(`/league-matches/:id`)는 그대로 살아 있고 아래에서 계속 싣는다** —
+     넘어간 것은 목록 하나뿐이다. */
   { path: '/events', priority: 0.8, changeFrequency: 'daily' },
   { path: '/notices', priority: 0.5, changeFrequency: 'daily' },
 ];
@@ -76,7 +83,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       return id ? [sitemapEntry(`/notices/${id}`, 0.4, 'monthly', item.publishedAt)] : [];
     }),
     // draft(준비 중) 리그도 포함한다 — 대회의 draft와 달리 다르다: 공개 목록 화면
-    // (league-matches-list-client.tsx)이 '준비 중'을 정식 상태 필터 옵션으로 노출해서
+    // (지금은 통합 목록 tournaments/page.tsx)이 '준비 중'을 정식 상태 필터 옵션으로 노출해서
     // 이미 로그인 없이 브라우징 가능하다(admin이 아직 공개 안 한 대회 draft와 다른 개념 —
     // 리그의 draft는 "팀은 모였지만 대진이 아직 안 생성된" 상태다). 로그인 없이 보이는
     // 화면을 sitemap에서만 숨기면 "브라우징은 되는데 검색은 안 되는" 불일치가 생긴다.

@@ -64,7 +64,11 @@ const LIVE_POLL_INTERVAL_MS = PUBLIC_LIVE_POLL_INTERVAL_MS;
  * callers should read those off `data.pages[0]` and flatten only `items`
  * across pages.
  */
-export function usePublicTournamentSchedule(tournamentId: string, filters: ScheduleFilters = {}) {
+export function usePublicTournamentSchedule(
+  tournamentId: string,
+  filters: ScheduleFilters = {},
+  options: { enabled?: boolean } = {},
+) {
   return useInfiniteQuery({
     queryKey: publicGameRecordsKeys.schedule(tournamentId, filters),
     queryFn: ({ pageParam }: { pageParam: string | null }) =>
@@ -74,7 +78,7 @@ export function usePublicTournamentSchedule(tournamentId: string, filters: Sched
       }),
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-    enabled: Boolean(tournamentId),
+    enabled: Boolean(tournamentId) && (options.enabled ?? true),
     retry: false,
     refetchInterval: (query) => {
       const hasLive = query.state.data?.pages.some((page) => page.items.some((item) => item.status === 'live'));
@@ -162,12 +166,23 @@ export function usePublicUserRecords(userId: string, season?: string) {
  * 일정 화면은 10초 폴링을 돌지만 이 쿼리는 그 폴링과 무관한 별도 키다 — 랭킹은
  * 공식 확정 때만 바뀌므로 staleTime을 넉넉히 둬 폴링 화면에 편승 재조회하지 않는다.
  */
-export function usePublicTournamentPlayerRecords(tournamentId: string) {
+/**
+ * 대회 개인 득점·도움 랭킹.
+ *
+ * `options.enabled` 로 조회 자체를 끌 수 있다 — **정규 리그가 그 경우다.** 리그 참가자는
+ * `userId` 로 이어져 있지 않아 사람 단위 집계 근거가 없고, 서버도 같은 이유로 이 표면에서
+ * 리그를 다루지 않는다. 빈 응답을 받아 "기록 없음" 으로 그리면 *"아직 기록이 없다"* 로
+ * 읽히는데 사실은 **집계 자체가 불가능**한 것이라, 호출도 하지 않는 편이 정직하다.
+ */
+export function usePublicTournamentPlayerRecords(
+  tournamentId: string,
+  options: { enabled?: boolean } = {},
+) {
   return useQuery({
     queryKey: publicGameRecordsKeys.playerRecords(tournamentId),
     queryFn: () =>
       v1Get<PublicTournamentPlayerRecordsResponse>(`/tournaments/${tournamentId}/player-records`),
-    enabled: Boolean(tournamentId),
+    enabled: Boolean(tournamentId) && (options.enabled ?? true),
     staleTime: 60_000,
     retry: false,
   });

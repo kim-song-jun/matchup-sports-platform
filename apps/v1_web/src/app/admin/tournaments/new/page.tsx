@@ -261,7 +261,7 @@ export default function AdminTournamentsNewPage() {
 
   return (
     <>
-      <div className="mb-3">
+      <div className="tm-content-enter mb-3">
         <Link
           href="/admin/tournaments"
           className="inline-flex min-h-[44px] items-center gap-1 rounded text-sm text-[var(--text-caption)] hover:text-[var(--text-body)] focus-visible:outline-2 focus-visible:outline-blue-500"

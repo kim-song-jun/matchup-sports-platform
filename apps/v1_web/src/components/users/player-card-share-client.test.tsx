@@ -10,10 +10,6 @@ import type { V1PlayerCard } from '@/types/api';
  * 모바일은 OS 공유 시트, 데스크톱은 링크 복사로 갈리고, 둘 다 안 되면 화면에 말한다.
  */
 
-vi.mock('@/components/v1-ui/shell', () => ({
-  AppChrome: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-}));
-
 const card: V1PlayerCard = {
   formulaVersion: 1,
   position: 'GK',

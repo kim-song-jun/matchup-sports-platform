@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/v1-ui/button';
-import { AppChrome } from '@/components/v1-ui/shell';
+import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { AlertBanner, Card, EmptyState, ErrorState, TextField } from '@/components/v1-ui/primitives';
 import { ClockIcon } from '@/components/v1-ui/icons';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
@@ -506,9 +506,14 @@ function LeagueTeamMatchResultPage({
   const participantMember = teamMatch.viewer?.participantMember === true;
   const canFileDispute =
     teamMatch.viewer?.manageableHostTeam === true || teamMatch.viewer?.manageableOpponentTeam === true;
+  // 리그 대진일 때만 아는 값(teamMatch.league는 fetch 이후에만 존재) — 이 함수는
+  // TeamMatchResultPageClient/TeamMatchResultApprovalPageClient 양쪽에서 진입하는데
+  // 두 라우트 모두 route-chrome 테이블 기본 제목은 "경기 결과 입력"/"경기 결과 승인"이라
+  // 이 화면에서만 "경기 결과"로 덮어써야 한다(fragments/team-matches.ts 주석 참고).
+  useShellOverride({ title: '경기 결과' });
 
   return (
-    <AppChrome title="경기 결과" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`} desktopHead>
+    <>
       <div style={{ display: 'grid', gap: 16, padding: '16px 20px 24px' }}>
         <Card pad={16}>
           <div className="tm-text-body-lg">
@@ -559,7 +564,7 @@ function LeagueTeamMatchResultPage({
 
         <ResultRevisionHistory history={revisions} />
       </div>
-    </AppChrome>
+    </>
   );
 }
 
@@ -703,20 +708,20 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
 
   if (isError) {
     return (
-      <AppChrome title="경기 결과 입력" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`} desktopHead>
+      <>
         <ErrorState
           message="결과 정보를 불러오지 못했어요."
           onRetry={() => retryAll(teamMatch, game, revisions, lineup)}
         />
-      </AppChrome>
+      </>
     );
   }
 
   if (isLoading || !teamMatch.data) {
     return (
-      <AppChrome title="경기 결과 입력" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`} desktopHead>
+      <>
         <PageSkeleton variant="detail" />
-      </AppChrome>
+      </>
     );
   }
 
@@ -730,18 +735,18 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
 
   if (!isHost) {
     return (
-      <AppChrome title="경기 결과 입력" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`} desktopHead>
+      <>
         <EmptyState title="호스트만 결과를 입력할 수 있어요" sub="상대팀은 제출된 결과를 승인하거나 정정을 요청할 수 있어요." />
-      </AppChrome>
+      </>
     );
   }
 
   const status = teamMatchStatus(teamMatch.data);
   if (status !== 'matched' && status !== 'completed') {
     return (
-      <AppChrome title="경기 결과 입력" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`} desktopHead>
+      <>
         <EmptyState title="아직 결과를 입력할 수 없어요" sub="상대팀이 정해진 이후(매칭 완료)부터 결과를 입력할 수 있어요." />
-      </AppChrome>
+      </>
     );
   }
 
@@ -841,10 +846,10 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
   }
 
   return (
-    <AppChrome title="경기 결과 입력" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`} desktopHead>
+    <>
       {/* 상단 여백이 0이라 헤더 바로 아래 카드가 붙어 답답해 보인다는 지적(QA) — 다른
           화면(예: 라인업 페이지)의 16px 20px 관례를 그대로 맞춘다. */}
-      <div style={{ display: 'grid', gap: 16, padding: '16px 20px 24px' }}>
+      <div className="tm-content-enter" style={{ display: 'grid', gap: 16, padding: '16px 20px 24px' }}>
         <Card pad={16}>
           <div className="tm-text-body-lg">
             {hostName} <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>(홈)</span>
@@ -1196,7 +1201,7 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
 
         <ResultRevisionHistory history={revisions.data ?? []} />
       </div>
-    </AppChrome>
+    </>
   );
 }
 
@@ -1224,17 +1229,17 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
 
   if (isError) {
     return (
-      <AppChrome title="경기 결과 승인" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`} desktopHead>
+      <>
         <ErrorState message="결과 정보를 불러오지 못했어요." onRetry={() => retryAll(teamMatch, game, revisions)} />
-      </AppChrome>
+      </>
     );
   }
 
   if (isLoading || !teamMatch.data) {
     return (
-      <AppChrome title="경기 결과 승인" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`} desktopHead>
+      <>
         <PageSkeleton variant="detail" />
-      </AppChrome>
+      </>
     );
   }
 
@@ -1249,9 +1254,9 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
 
   if (!isOpponent) {
     return (
-      <AppChrome title="경기 결과 승인" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`} desktopHead>
+      <>
         <EmptyState title="상대팀만 결과를 승인할 수 있어요" sub="결과 작성/제출은 홈팀 담당자만 할 수 있어요." />
-      </AppChrome>
+      </>
     );
   }
 
@@ -1287,10 +1292,10 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
   }
 
   return (
-    <AppChrome title="경기 결과 승인" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`} desktopHead>
+    <>
       {/* 상단 여백이 0이라 헤더 바로 아래 카드가 붙어 답답해 보인다는 지적(QA) — 다른
           화면(예: 라인업 페이지)의 16px 20px 관례를 그대로 맞춘다. */}
-      <div style={{ display: 'grid', gap: 16, padding: '16px 20px 24px' }}>
+      <div className="tm-content-enter" style={{ display: 'grid', gap: 16, padding: '16px 20px 24px' }}>
         <Card pad={16}>
           <div className="tm-text-body-lg">
             {hostName} <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>(홈)</span>
@@ -1403,7 +1408,7 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
 
         <ResultRevisionHistory history={revisions.data ?? []} />
       </div>
-    </AppChrome>
+    </>
   );
 }
 

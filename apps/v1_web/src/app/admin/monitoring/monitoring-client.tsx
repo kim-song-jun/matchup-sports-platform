@@ -81,7 +81,7 @@ export function MonitoringClient() {
     <>
       {/* ── 신호 스트립: 미확인 신호 4카드, 클릭 = 해당 탭. 개요 페이지 KPI 와
           같은 AdminKpiCard 시각 언어를 쓰고, 활성 탭 표시는 아래 세그먼트가 담당한다. ── */}
-      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="tm-content-enter mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {SIGNAL_CARDS.map((card) => {
           const count = summary ? card.value(summary) : null;
           const alert = card.alerting && (count ?? 0) > 0;
@@ -145,7 +145,6 @@ export function MonitoringClient() {
         id={`monitoring-panel-${activeTab}`}
         role="tabpanel"
         aria-labelledby={`monitoring-tab-${activeTab}`}
-        className="tm-tabpanel-enter"
       >
         {activeTab === 'errors' && <ErrorLogsClient />}
         {activeTab === 'push' && <PushFailureTable />}

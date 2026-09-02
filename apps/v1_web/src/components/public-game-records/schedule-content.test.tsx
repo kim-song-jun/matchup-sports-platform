@@ -603,3 +603,130 @@ describe('ScheduleContent — 몰수·중단 배지', () => {
     expect(screen.queryByText(/킥오프 15분 경과까지 미출석/)).not.toBeInTheDocument();
   });
 });
+
+/**
+ * **리그 어휘(2026-09-01 사용자 확정 — B안).**
+ *
+ * 리그 대진은 `round` 가 'N주차' 라 `isGroupStage` 가 false 가 되어 **전부 `knockout` 단계로
+ * 분류된다.** 그 단계 이름이 필터 칩과 `section aria-label` 로 **보이는데**, 대회 어휘인
+ * '결선' 은 리그에 존재하지 않는 단계다.
+ *
+ * ⚠️ 이 describe 는 **변이로 구멍을 확인하고 나서** 썼다: `LEAGUE_PHASE_LABELS.knockout` 을
+ * '결선' 으로 되돌려도 프론트 308개가 전부 통과했다. 사용자가 고른 바로 그 문구를 아무도
+ * 지키지 않고 있었다.
+ *
+ * 상수만 보는 순수 함수 테스트로는 부족하다 — `ScheduleContent` 가 `phaseLabels` 를 넘기지
+ * 않으면 상수가 맞아도 화면엔 '결선' 이 뜬다. 그래서 **렌더해서 본다.**
+ */
+describe('ScheduleContent — 정규 리그 단계 어휘', () => {
+  const leagueData = () =>
+    makeData({ items: [fixtureEntry({ round: '1주차', groupName: null })] });
+
+  it('리그면 단계 칩을 "정규 라운드" 로 부른다 — 리그엔 결선이 없다', () => {
+    render(<ScheduleContent tournamentId="league-1" data={leagueData()} isRegularLeague />);
+
+    expect(screen.getByRole('tab', { name: '정규 라운드' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: '결선' })).not.toBeInTheDocument();
+  });
+
+  it('대조군: 대회는 "결선" 그대로 — 리그 방식 대회 7건의 문구를 바꾸지 않는다', () => {
+    render(<ScheduleContent tournamentId="tour-1" data={leagueData()} />);
+
+    expect(screen.getByRole('tab', { name: '결선' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: '정규 라운드' })).not.toBeInTheDocument();
+  });
+
+  /**
+   * 칩만 보면 놓치는 자리 — 단계 제목은 `phases.length > 1` 이라 화면에서 숨겨지는데
+   * `section aria-label` 로는 **항상** 나간다. 스크린리더 사용자에게만 '결선' 이 들린다.
+   */
+  it('section aria-label 에도 리그 어휘가 들어간다 — 눈에 안 보이는 자리', () => {
+    render(<ScheduleContent tournamentId="league-1" data={leagueData()} isRegularLeague />);
+
+    expect(screen.getByRole('region', { name: '정규 라운드' })).toBeInTheDocument();
+  });
+});
+
+/**
+ * **alpha 실측으로 잡힌 어휘 결함(2026-09-01).** 리그 화면의 순위 제목이 대회 말인
+ * **"조별 순위"** 로 떠 있었다 — B안 어휘 정리에서 빠진 자리다.
+ *
+ * 그리고 그냥 "리그 순위" 로 바꾸면 **두 번 적힌다**: 바깥 제목과 안쪽 그룹 라벨이 같은
+ * 말이 된다(티어가 없는 단발 리그의 `groupName` 이 "리그 순위" 다). 그래서 그룹이 하나뿐일
+ * 때는 안쪽 라벨을 끈다 — 티어가 있으면(1부·2부) 그건 다른 말이라 그대로 둔다.
+ */
+describe('ScheduleContent — 정규 리그 순위 제목', () => {
+  const leagueStandings = (groupName: string, groupId: string, teamName: string) => ({
+    groupId,
+    groupName,
+    teamId: `team-${groupId}`,
+    teamName,
+    teamLogoUrl: null,
+    position: 1,
+    points: 3,
+    wins: 1,
+    draws: 0,
+    losses: 0,
+    goalsFor: 2,
+    goalsAgainst: 1,
+  });
+
+  it('리그에는 "조별 순위" 라고 쓰지 않는다 — 리그엔 조가 없다', () => {
+    const data = makeData({ standings: [leagueStandings('리그 순위', 'lg-1', '성수 FC')] as never });
+    render(<ScheduleContent tournamentId="lg-1" data={data} isRegularLeague />);
+
+    expect(screen.getByRole('heading', { name: '리그 순위' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '조별 순위' })).not.toBeInTheDocument();
+  });
+
+  it('대조군: 대회는 "조별 순위" 그대로', () => {
+    const data = makeData({ standings: [leagueStandings('A조', 'g-1', '망원 FC')] as never });
+    render(<ScheduleContent tournamentId="t-1" data={data} />);
+
+    expect(screen.getByRole('heading', { name: '조별 순위' })).toBeInTheDocument();
+  });
+
+  it('단발 리그는 안쪽 그룹 라벨을 숨긴다 — 제목과 같은 말이 두 번 적힌다', () => {
+    const data = makeData({ standings: [leagueStandings('리그 순위', 'lg-1', '성수 FC')] as never });
+    render(<ScheduleContent tournamentId="lg-1" data={data} isRegularLeague />);
+
+    // 제목(h3) 하나만 남고 그룹 라벨 div 는 안 그려진다 — 라벨을 켜면 2가 된다.
+    expect(screen.getAllByText('리그 순위')).toHaveLength(1);
+  });
+
+  /**
+   * **눈으로는 안 보이는 자리다.** 그룹명이 이미 "리그 순위" 인데 라벨 조합이 "순위" 를 또
+   * 붙여 스크린리더가 *"리그 순위 순위표"* 로 읽었다. 캡처로도 안 잡힌다.
+   */
+  it('그룹명이 이미 "순위" 로 끝나면 접근성 라벨에 또 붙이지 않는다', () => {
+    const data = makeData({ standings: [leagueStandings('리그 순위', 'lg-1', '성수 FC')] as never });
+    render(<ScheduleContent tournamentId="lg-1" data={data} isRegularLeague />);
+
+    expect(screen.getByRole('region', { name: '리그 순위' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '리그 순위 순위' })).not.toBeInTheDocument();
+  });
+
+  it('대조군: "A조" 처럼 안 끝나면 "순위" 를 붙인다 — 규칙을 통째로 없앤 게 아니다', () => {
+    const data = makeData({ standings: [leagueStandings('A조', 'g-1', '망원 FC')] as never });
+    render(<ScheduleContent tournamentId="t-1" data={data} />);
+
+    expect(screen.getByRole('region', { name: 'A조 순위' })).toBeInTheDocument();
+  });
+
+  /**
+   * ⚠️ **처음엔 이 테스트가 통과하면서도 실물은 숨기고 있었다.** 픽스처에 `groupId` 를 둘
+   * (`lg-1`·`lg-2`) 넣었는데 **그런 응답은 존재할 수 없다** — 서버가 `groupId: leagueId` 를
+   * 넣으므로 한 리그의 순위는 언제나 groupId 가 **하나**고, `1부`·`2부` 는 애초에 **다른
+   * 리그**다. 개수로 판정하던 가드가 그래서 티어 리그에서도 라벨을 숨겼다.
+   *
+   * 픽스처를 실물 모양(groupId 하나 · groupName `'1부'`)으로 고쳤다. **테스트가 통과한다는
+   * 것과 실물에서 동작한다는 것은 픽스처가 실물을 닮았을 때만 같은 말이다.**
+   */
+  it('티어 리그는 안쪽 라벨을 그린다 — "1부" 는 제목("리그 순위")과 다른 말이다', () => {
+    const data = makeData({ standings: [leagueStandings('1부', 'lg-1', '성수 FC')] as never });
+    render(<ScheduleContent tournamentId="lg-1" data={data} isRegularLeague />);
+
+    expect(screen.getByText('1부')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '리그 순위' })).toBeInTheDocument();
+  });
+});

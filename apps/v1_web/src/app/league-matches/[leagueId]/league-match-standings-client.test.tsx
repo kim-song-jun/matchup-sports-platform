@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { Providers } from '@/app/providers';
 import {
   useV1ActivePopup,
@@ -13,6 +13,7 @@ import {
   useV1RecordConsent,
 } from '@/hooks/use-v1-api';
 import { clearStoredV1Session, saveStoredV1Session } from '@/lib/session-storage';
+import { queryImageBySrc } from '@/test/next-image';
 import LeagueMatchStandingsClient from './league-match-standings-client';
 
 vi.mock('@/components/auth/pending-social-signup-gate', () => ({
@@ -52,6 +53,22 @@ const useV1MyTeamsMock = vi.mocked(useV1MyTeams, { partial: true });
 const useV1RecordConsentMock = vi.mocked(useV1RecordConsent, { partial: true });
 
 describe('LeagueMatchStandingsClient', () => {
+  // 이 파일의 픽스처는 킥오프 시각을 **문자열로 고정**해 두고 "아직 안 지났다"를 전제한다
+  // (예: tm-10 은 2026-09-01T20:00Z 이고 라벨이 '예정' 이기를 기대한다). 라벨을 정하는
+  // lib/league-fixture-meta.ts 는 `kickoffPassed` 를 현재 시각과 비교해서 계산하므로,
+  // 시계를 얼려 두지 않으면 그 시각이 지나는 날부터 테스트가 영구히 깨진다 —
+  // 실제로 2026-09-02 에 '예정' → '결과 대기' 로 바뀌며 터졌다. 컴포넌트는 옳았다
+  // (킥오프가 지난 matched 는 '결과 대기' 가 맞다. league-fixture-card.tsx 주석 참조).
+  //
+  // Date 만 얼린다 — setTimeout 까지 얼리면 Testing Library 의 waitFor 가 진행하지 못한다.
+  beforeAll(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-01T12:00:00.000Z')); // 리그 시작 후 · tm-10 킥오프 전
+  });
+  afterAll(() => {
+    vi.useRealTimers();
+  });
+
   // D3(2026-08-24 사용자 확정): 리그 안에서 팀으로 나가는 통로. 그전까지 순위표의 팀
   // 이름은 누를 수 없는 글자였다. 목적지는 팀 전적이 아니라 **팀 상세**로 못 박는다 —
   // 앱의 다른 화면과 같은 곳으로 가야 같은 단어가 화면마다 다른 데로 가지 않는다.
@@ -120,7 +137,8 @@ describe('LeagueMatchStandingsClient', () => {
       </Providers>,
     );
 
-    await waitFor(() => expect(container.querySelector('img[src="/uploads/teams/seongsu.png"]')).toBeInTheDocument());
+    // next/image 전환(U15) 이후 실제 DOM src는 `/_next/image?url=...`로 재작성된다.
+    await waitFor(() => expect(queryImageBySrc(container, '/uploads/teams/seongsu.png')).not.toBeNull());
   });
 
   it('미확정 경기가 있으면 0경기 순위표와 확인 중 배너가 함께 보인다', async () => {

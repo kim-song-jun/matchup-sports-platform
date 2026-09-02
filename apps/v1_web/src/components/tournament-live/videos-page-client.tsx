@@ -199,7 +199,7 @@ export function VideosPageClient({ tournamentId }: Props) {
   return (
     /* 폭·여백은 셸의 <main>(px-4~lg:px-8 + max-w-[1200px])이 이미 책임진다 —
        여기서 max-w-[860px] 를 또 걸면 같은 셸 안의 다른 화면과 본문 폭이 어긋난다. */
-    <div className="flex flex-col gap-4 w-full">
+    <div className="tm-content-enter flex flex-col gap-4 w-full">
       <OpsPageHeader
         tournamentTitle={tournament.data?.title}
         title="경기 영상"

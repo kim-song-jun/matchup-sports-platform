@@ -7,7 +7,7 @@
 SLASHES = /$()/
 
 PRODUCT_BUNDLE_IDENTIFIER = kr.co.teameet
-TEAMEET_DISPLAY_NAME = Teameet
+TEAMEET_DISPLAY_NAME = 팀밋
 TEAMEET_WEB_ORIGIN = https:$(SLASHES)teameet.co.kr
 
 // Never inspectable, including production Debug builds — the same guarantee Android's

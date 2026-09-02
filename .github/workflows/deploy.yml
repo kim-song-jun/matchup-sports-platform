@@ -41,10 +41,56 @@ jobs:
           HEAD_REF: ${{ github.event_name == 'pull_request' && github.head_ref || '' }}
         run: |
           set -Eeuo pipefail
-          if [[ ! "${BASE_SHA}" =~ ^[0-9a-f]{40}$ ]] || [[ "${BASE_SHA}" == "0000000000000000000000000000000000000000" ]]; then
-            BASE_SHA="$(git merge-base origin/main "${HEAD_SHA}")"
+          # base 해석은 세 가지가 함께 맞아야 한다. 하나만 고치면 나머지가 깨진다.
+          #
+          # ① 가드는 **형식이 아니라 연산**을 시험한다. 예전 `=~ ^[0-9a-f]{40}$` 는 payload 의
+          #    base.sha 가 항상 40자 hex 라 PR 이벤트에서 참이 된 적이 없고, 붙어 있던
+          #    `== 000…0` 도 push 로 브랜치를 **새로 만들 때**만 참이라 dev 에선 안 탄다.
+          #    즉 아래 보강은 사실상 죽어 있었다.
+          #
+          #    rc 1 도 보강 대상으로 둔다 — expand-contract 스텝과 다른 점이고 이유가 있다.
+          #    그쪽은 rc 1("공통 조상 없음")을 게이트가 **문장으로 보고**하지만, 여기서는
+          #    아래 `A...B` diff 가 아예 계산 불가라 보고할 것도 없이 죽는다. base tip 을
+          #    받아오면 대개 풀린다.
+          #
+          # ② `BASE_SHA` 에는 **base tip** 을 넣는다. merge-base 결과를 넣으면 안 된다 —
+          #    이 스텝의 base 는 "무엇이 변경됐는가"를 정하므로 더 오래된 커밋을 넣으면
+          #    diff 창이 넓어져 **남의 changeset 을 내 것으로 세게 된다**(= fail-open).
+          #    아래 3-dot 이 분기점을 알아서 구하므로 tip 을 주는 게 맞다. 승격 절의
+          #    `git show ${BASE_SHA}:…` 도 tip 이어야 옳은 값을 읽는다.
+          #
+          # ③ 보강은 **실제 base** 를 받는다. 예전엔 `origin/main` 고정이라, base=dev 인 PR 에서
+          #    이게 타면 main 기준으로 잡혀 diff 가 통째로 부풀었다. push 이벤트에선 BASE_REF
+          #    가 '' 인데, 이 스텝은 push 일 때 `refs/heads/dev` 에서만 돌므로 dev 가 그 기준이다.
+          # ⚠️ all-zero 는 **따로 다룬다.** push 로 브랜치를 새로 만들면 `event.before` 가
+          #    all-zero 인데, 이때 아래 보강을 그대로 태우면 `BASE_REF` 가 '' 라 dev 를 받고
+          #    그게 곧 HEAD 라 **diff 가 비어 게이트가 통과해 버린다**(실측: 파일 0건).
+          #    "이전 상태가 없다" 는 뜻이므로 비교 기준은 main 뿐이다. 여기서 main 을 쓰는 건
+          #    옳다 — 아래 보강에서 main 을 안 쓰는 이유(PR 의 base 는 dev 일 수 있다)와
+          #    상황이 다르다.
+          if [[ "${BASE_SHA}" == "0000000000000000000000000000000000000000" ]]; then
+            git fetch --no-tags origin main
+            BASE_SHA="$(git merge-base FETCH_HEAD "${HEAD_SHA}")"
           fi
-          git diff --name-only "${BASE_SHA}" "${HEAD_SHA}" > /tmp/teameet-changed-files.txt
+          base_rc=0
+          git merge-base "${BASE_SHA}" "${HEAD_SHA}" >/dev/null 2>&1 || base_rc=$?
+          if [[ ${base_rc} -ne 0 ]]; then
+            git fetch --no-tags origin "${BASE_REF:-dev}"
+            BASE_SHA="$(git rev-parse FETCH_HEAD)"
+          fi
+          # base 가 head 와 같으면 **아무 변경도 없는 것으로 보인다** — 게이트가 있으나
+          # 아무것도 못 막는 상태다. 통과시키지 말고 그 자리에서 이름을 대며 죽는다.
+          if [[ "$(git rev-parse "${BASE_SHA}")" == "$(git rev-parse "${HEAD_SHA}")" ]]; then
+            echo "changeset gate: base 와 head 가 같다 (${BASE_SHA}) — 변경을 판정할 수 없다." >&2
+            exit 1
+          fi
+          # 3-dot: **분기점부터 head 까지** — 이 PR 이 실제로 바꾼 것만 센다.
+          # 2-dot 은 base 에만 있고 head 엔 없는 커밋까지 diff 에 넣어서, base 가 전진하면
+          # 남의 파일과 **남의 changeset** 이 내 변경으로 잡힌다. 그러면 게이트가 있는데
+          # 아무것도 안 막는다(실측: 열린 PR 하나가 2-dot 에선 "325 behavior files,
+          # 20 changed Changesets" 로 통과했고 3-dot 에선 "changeset not required" 였다.
+          # 그 PR 이 실제로 건드린 건 scripts/ 6파일뿐이다).
+          git diff --name-only "${BASE_SHA}...${HEAD_SHA}" > /tmp/teameet-changed-files.txt
           if [[ ${BASE_REF} == main && ${HEAD_REF} == dev ]]; then
             # A Changeset can be added and consumed entirely between main and dev,
             # so it is absent from the final tree diff. Preserve deleted Changeset
@@ -60,6 +106,18 @@ jobs:
           node scripts/release/check-changeset-policy.mjs \
             --repo . \
             --changed-files-file /tmp/teameet-changed-files.txt
+
+      - name: Verify changeset gate base resolution
+        if: >-
+          github.event_name == 'pull_request' ||
+          (github.event_name == 'push' && github.ref == 'refs/heads/dev')
+        run: |
+          set -Eeuo pipefail
+          # 위 스텝의 셸을 픽스처 저장소에서 그대로 돌려, base 가 전진했을 때 **남의
+          # changeset 을 내 변경으로 세지 않는지**를 본다. 2-dot 은 더 자연스러워 보여서
+          # 되돌리기 쉬운데, 되돌려도 아무것도 안 깨지고 **더 많이 통과할 뿐**이라
+          # 텍스트로는 못 막는다. 덮는 범위와 못 덮는 범위는 스크립트 헤더에 적혀 있다.
+          node scripts/qa/check-changeset-gate-base.mjs --self-test
 
       - name: Validate planned SemVer
         if: >-
@@ -184,10 +242,40 @@ jobs:
           # 구하려다 실패했는데(2026-08-20), PR 체크아웃에는 base 브랜치의 원격 추적 ref
           # 가 없어 `origin/dev` 를 해석하지 못한다 — 바로 위 changeset 스텝이 payload
           # 값을 먼저 쓰고 못 쓸 때만 fetch 로 보강하는 것도 같은 이유다.
-          if [[ ! "${BASE_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
-            git fetch --no-tags origin "${BASE_REF}"
-            BASE_SHA="$(git merge-base FETCH_HEAD "${HEAD_SHA}")"
-          fi
+          #
+          # 폴백 조건은 **형식이 아니라 실제로 필요한 연산**이다. 예전엔 `=~ ^[0-9a-f]{40}$`
+          # 였는데, payload 의 base.sha 는 **항상** 40자 hex 라 그 조건은 PR 이벤트에서 한
+          # 번도 참이 된 적이 없다 — 즉 아래 두 줄은 도달 불가였다. 정작 실패하는 모양은
+          # "형식은 맞는데 그 SHA 로 merge-base 가 안 되는" 것이라(2026-09-01 #941), 형식·
+          # 객체 존재 같은 **대리 지표** 대신 그 명령 자체가 되는지를 묻는다.
+          #
+          # **rc 를 봐야 한다.** merge-base 의 실패는 두 종류이고 처방이 정반대다:
+          #   rc 1   → "공통 조상이 없다". git 의 **정상적인 답**이다. 여기서 보강하면 안 된다 —
+          #            아래 스크립트가 그 상태를 이름으로 보고하게 두는 것이 이 변경의 목적이다.
+          #   rc 128 → 객체·저장소 문제. base tip 을 받아오면 풀린다.
+          #
+          # 그리고 보강할 때도 BASE_SHA 에 **merge-base 결과를 넣지 않는다.** 스크립트는
+          # baseSha 를 "대상 브랜치 tip"으로 쓴다(collectBaseFunctionNames) — 함수가 이미
+          # 존재하는지를 **머지된 뒤의 현실**로 판정해야 CREATE OR REPLACE 가 새 함수로
+          # 오인되지 않기 때문이다. 더 오래된 커밋을 넣으면 그 판정이 약해져 **게이트가
+          # 조용히 느슨해진다.** diff base 를 분기점으로 옮기는 일은 스크립트가 자기 안에서
+          # 따로 한다. 그러니 여기서는 tip 을 tip 으로만 보강한다.
+          # `-ge 2` 로 뭉뚱그리면 **예상 밖 코드까지 "fetch 하면 될지도"로 삼킨다** —
+          # 인자 오류나 시그널 종료가 조용히 보강 경로를 타 버린다. 위 표대로 딱 갈라 두고,
+          # 표에 없는 코드는 삼키지 말고 그 자리에서 죽인다.
+          merge_base_rc=0
+          git merge-base "${BASE_SHA}" "${HEAD_SHA}" >/dev/null 2>&1 || merge_base_rc=$?
+          case "${merge_base_rc}" in
+            0|1) ;;
+            128)
+              git fetch --no-tags origin "${BASE_REF}"
+              BASE_SHA="$(git rev-parse FETCH_HEAD)"
+              ;;
+            *)
+              echo "expand-contract gate: git merge-base 가 예상 밖 코드로 끝났다 (exit ${merge_base_rc})" >&2
+              exit 1
+              ;;
+          esac
           # 게이트 자신의 규칙(SQL 추가성 판정 + base 해석)을 먼저 돌린다. 이게 없던 동안
           # base 해석 쪽 결함이 오래 살아남아, 대상 브랜치가 전진할 때마다 마이그레이션과
           # 무관한 PR 이 죽었다. 임시 저장소 몇 개를 만드는 정도라 수 초면 끝난다.

@@ -641,7 +641,10 @@ button:disabled {
      여유), 좌우 압박을 줄이려 최소 패딩을 준다 — 라벨(최대 2글자)이 탭 경계에
      바짝 붙는 것을 막는다. 아래 .tm-bottom-tab span 주석에 열 수·라벨 폭 계산 근거. */
   padding: 0 2px;
-  /* 활성 pill(::before)의 기준점 */
+  /* 활성 pill 은 이제 nav 레벨의 형제 요소(.tm-bottom-nav-pill-slot)라 이 탭 자신의
+     기준점은 아니다 — 대신 그 pill 위에서 아이콘·라벨이 항상 보이도록 스태킹 순서를
+     맞추는 역할을 한다(position:static 인 요소는 뒤의 position:absolute 형제보다
+     항상 아래에 깔리므로, 이 relative 가 없으면 pill 이 아이콘을 가린다). */
   position: relative;
   /* [대비] grey400 은 흰 배경에서 2.01:1 로 비텍스트 기준(3:1)의 3분의 2였다.
      grey500 이 3.04:1 로 통과한다. 아이콘은 텍스트가 아니라 3:1 기준. */
@@ -690,35 +693,85 @@ button:disabled {
   font-weight: 700;
 }
 
+/* [모션 C안] 콘텐츠 전환을 걷어낸 대신 탭 자신이 반응한다 — "내가 눌러서
+   바뀌었다"는 신호를 pill 이동(.tm-bottom-nav-pill-slot, 기존)뿐 아니라 아이콘
+   에도 준다. 활성일 때 살짝 뜨고 커지고(translateY(-1px) scale(1.14)), 누르는
+   순간엔 즉시 눌린다(scale(.9)) — 눌림이 활성 확대보다 항상 이겨야 하므로 :active
+   규칙을 아래(소스 순서 뒤)에 둔다(동일 특이도, 나중 규칙이 이긴다). 이징은 신규
+   토큰 없이 기존 --ease-spring 재사용, duration 은 색 전환과 같은 축(--duration-fast)
+   대신 --duration-base — 목업에서 확정된 값 그대로다. transform 하나만 전환하므로
+   transition-all 금지 규칙과도 무관하다. */
+.tm-bottom-tab svg {
+  transition: transform var(--duration-base) var(--ease-spring);
+}
+.tm-bottom-tab[data-active="true"] svg {
+  transform: translateY(-1px) scale(1.14);
+}
+.tm-bottom-tab:active svg {
+  transform: scale(0.9);
+}
+
 /* 활성 탭을 색 말고 **형태로도** 표시한다(Material 3 의 active indicator 방식).
    아이콘의 --blue500 은 흰 배경에서 3.71:1 로 비텍스트 기준(3:1, WCAG 1.4.11)은
    통과하지만 텍스트 기준(4.5:1)에는 못 미친다 — 텍스트는 위에서 --blue700 으로
    별도 상향했고, pill 은 형태 구분을 보조할 뿐 텍스트 대비를 대체하지 않는다.
    프로젝트 규칙(컬러만으로 정보 전달 금지)도 이쪽이 실제로 만족시킨다.
-   폭 46px 은 가장 좁은 320px 뷰포트의 탭 폭(53px)에도 좌우 3.5px 씩 남는다. */
-.tm-bottom-tab[data-active="true"]::before {
-  content: '';
+   폭 46px 은 가장 좁은 320px 뷰포트의 탭 폭(53px)에도 좌우 3.5px 씩 남는다.
+
+   [미끄러지는 pill, b486d2202 이후 구조 변경] 예전엔 활성 탭마다 ::before 의사요소가
+   하나씩 있어서, 활성 탭이 바뀌면 pill 이 한 탭에서 사라지고 다른 탭에서 나타났다 —
+   탭이 여러 개일 수 없으니 애초에 미끄러질 수 없는 구조였다. 미끄러지려면 pill 이
+   nav 안에 하나만 있어야 하므로, nav 의 그리드 첫 행 전체를 차지하는 슬롯
+   (.tm-bottom-nav-pill-slot, shell.tsx BottomNav 가 탭 목록보다 먼저 렌더)을 두고
+   그 안에 실제 보이는 pill(.tm-bottom-nav-pill)을 얹는다. */
+.tm-bottom-nav-pill-slot {
   position: absolute;
-  top: 2px;
+  top: 0;
+  left: 0;
+  height: 100%;
+  /* 탭과 정확히 같은 그리드 영역(전체 열 · 유일한 행)을 컨테이닝 블록으로 삼는다 —
+     absolute 로 위치가 잡힌 grid 아이템은 자신이 놓인 그리드 영역(nav 의 padding 을
+     제외한 콘텐츠 박스)을 기준으로 삼기 때문에, 예전에 각 탭(그리드 아이템 — 행
+     높이만큼 stretch)이 기준점이었던 것과 정확히 같은 높이·위치를 얻는다. nav 자신의
+     50% 를 썼다면 padding-top(8px)과 padding-bottom(max(16px, safe-bottom))이
+     비대칭이라 safe-area 유무에 따라 4px~13px 씩 어긋난다(실측). */
+  grid-column: 1 / -1;
+  grid-row: 1;
+  /* 슬롯 폭 = 탭 1칸 폭(`calc(100% / tabCount)`, shell.tsx BottomNav 의 인라인
+     style — 탭 개수가 하드코딩에 묶이지 않도록 기존 grid-template-columns 계산과
+     같은 방식을 따른다). transform 의 `100%` 는 요소 자기 자신의 폭을 가리키므로,
+     이렇게 폭을 잡아 두면 `translateX(index * 100%)` 만으로 정확히 index 칸을
+     이동한다 — 너비를 다시 읽거나(JS 측정) `left`(레이아웃 트리거) 를 바꿀 필요가
+     없다. */
+  /* transform 만 바뀌므로 transform 하나만 전환한다 — transition-all 금지. */
+  transition: transform var(--duration-base) var(--ease-standard);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.tm-bottom-nav-pill {
+  position: absolute;
+  /* 아이콘 중심에 맞춘다 — b486d2202 에서 확정된 계산식 그대로다. 아이콘 23px + gap
+     4px + 라벨 16px 이 세로 가운데 정렬이므로, 아이콘 중심은 **언제나** 슬롯(=탭)
+     중심보다 (4px + 16px) / 2 만큼 위다 — 아이콘 높이는 상쇄되어 식에 남지 않는다.
+     gap 이나 라벨 line-height 가 바뀌면 여기도 같이 바꿔야 한다. */
+  top: 50%;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translate(-50%, calc(-50% - (4px + 16px) / 2));
   width: 46px;
   height: 26px;
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--blue500) 14%, transparent);
-  /* 아이콘·라벨보다 뒤에 깔린다 */
-  z-index: 0;
-}
-
-/* pill 이 뒤로 가려면 내용이 위에 있어야 한다 */
-.tm-bottom-tab > * {
-  position: relative;
-  z-index: 1;
 }
 
 @media (prefers-reduced-motion: reduce) {
+  /* 아래 전역 규칙(*, ::before, ::after)이 이미 transition-duration 을 0.01ms 로 눌러
+     실제 모션은 여기 없어도 꺼진다. 그런데 이 블록은 하단탭의 전환을 **명시적으로**
+     끄려고 둔 것이라, 목록에서 빠진 선택자는 "일부러 남긴 것"으로 읽힌다. 아이콘
+     transform 전환을 추가했으니 svg 도 함께 적는다 — 의도와 목록을 어긋나게 두지 않는다. */
   .tm-bottom-tab,
-  .tm-bottom-tab span {
+  .tm-bottom-tab span,
+  .tm-bottom-tab svg {
     transition: none;
   }
 }
@@ -981,13 +1034,11 @@ button:disabled {
   gap: 8px;
 }
 
+/* 트랙 공통 스펙(display·gap·padding·radius·background)은 .tm-seg-tabs 근처의
+   그룹 셀렉터(.tm-seg-tabs, .tm-review-tabs, .tm-auth-segmented)로 합쳤다 — 세 화면이
+   각자 베껴 쓴 값이 완전히 같아서 여기 남는 건 이 화면 전용인 열 수뿐이다. */
 .tm-auth-segmented {
-  display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  padding: 4px;
-  border-radius: var(--radius-field);
-  background: var(--grey100);
 }
 
 .tm-auth-segment {
@@ -2184,8 +2235,11 @@ label.tm-btn:focus-within {
 }
 
 /* 카드가 1개뿐일 때는 "다음 카드 peek" 여지를 남길 이유가 없다 — 88% 고정폭이
-   오른쪽에 의도된 듯한 빈 여백을 남기므로, 유일한 자식일 때는 폭을 꽉 채운다. */
-.tm-home-featured-carousel > *:only-child {
+   오른쪽에 의도된 듯한 빈 여백을 남기므로, 유일한 자식일 때는 폭을 꽉 채운다.
+   단 **로딩 스켈레톤은 제외**한다: 스켈레톤은 늘 한 장이라 항상 이 규칙에 걸리는데,
+   미디어가 aspect-ratio 라 폭이 곧 높이여서 실제 카드(여러 장이면 88%)와 높이가
+   어긋나고, 데이터가 도착하는 순간 그 차이만큼 화면이 밀린다. */
+.tm-home-featured-carousel > *:only-child:not(.tm-featured-skeleton) {
   flex: 1 1 100%;
 }
 
@@ -2499,6 +2553,34 @@ label.tm-btn:focus-within {
   padding: 16px var(--v1-shell-page-x) 108px;
 }
 
+/**
+ * 대회 목록의 **필터 요약 줄.** 종목 칩 줄(.tm-sport-chip-row)을 **대신한다** — 새 줄을
+ * 얹는 게 아니라 교체다. 사용자가 "세로 높이를 지금보다 늘리지 않는 것이 이 안의 핵심"
+ * 이라고 못박아서, 칩 줄과 같은 자리·같은 리듬을 쓴다(min-height 44 · 아래 여백 12).
+ * 칩 줄은 종목이 늘면 래핑돼 두 줄이 되지만 이 줄은 하나라 **줄어들 여지만 있다.**
+ */
+.tm-competition-filter-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 2px 0 12px;
+  color: var(--text-strong);
+  font-size: 14px;
+  font-weight: 600;
+}
+.tm-competition-filter-summary-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tm-competition-filter-summary:focus-visible {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+  border-radius: var(--radius-control);
+}
+
 .tm-sport-chip-row {
   display: flex;
   gap: 8px;
@@ -2748,8 +2830,19 @@ label.tm-btn:focus-within {
   box-shadow: 0 -16px 32px rgba(25, 31, 40, 0.14);
   touch-action: none;
   animation: tm-filter-sheet-up .22s ease-out;
+  /* 드래그-닫기(BottomSheet) 미달-임계치 복귀용 — 진입/퇴장 `animation` 은 이 속성에서
+   * 항상 우선하므로(같은 프로퍼티에 animation 과 transition 이 동시에 걸리면 animation 승) 여기
+   * transition 을 추가해도 위 keyframe 진입이나 `.is-closing` 퇴장(취소 확인 모달 등)과
+   * 충돌하지 않는다 — 이 transition 은 오직 드래그 손을 뗀 뒤(둘 다 안 도는 순간)에만 적용된다. */
+  transition: transform .22s ease-out;
   will-change: transform;
   pointer-events: auto;
+}
+
+/* 드래그 중에는 transition 을 꺼야 손가락을 정확히 따라온다 — 켜 둔 채로 매 pointermove
+ * 마다 transform 을 바꾸면 각 프레임이 짧게 트랜지션되며 손가락보다 한 박자 늦게 쫓아온다. */
+.tm-filter-sheet.is-dragging {
+  transition: none;
 }
 
 @keyframes tm-filter-scrim-fade {
@@ -2766,27 +2859,14 @@ label.tm-btn:focus-within {
 
 /* Toast entrance — referenced by admin toasts via animate-[fade-in_0.15s_ease-out]
  * (gated behind motion-safe: so it respects prefers-reduced-motion). */
-/* [모션] 탭을 바꿀 때 내용이 뚝 갈리던 것을 짧은 페이드로 잇는다.
- * role="tab" 을 쓰는 화면이 16곳인데 탭처럼 느껴지는 모션은 하나도 없었다.
+/* [모션 제거, 2026-09-02] .tm-tabpanel-enter 는 지웠다 — 탭 전환마다 진입 페이드를
+ * 거는 것 자체가 "다른 화면으로 대체됐다"는 신호를 만든다는 게 이번 변경의 결론이다
+ * (탭은 같은 화면 안에서 보는 각도를 바꾸는 것이지 대체가 아니다). 대체품은 새
+ * SegmentedTabs 컴포넌트(components/v1-ui/segmented-tabs.tsx)의 미끄러지는 thumb —
+ * 콘텐츠 자체는 더 이상 전환 없이 즉시 바뀐다.
  *
- * 이 클래스가 실제로 재생되려면 패널에 key={activeTab} 이 필요하다 — key 가 없으면
- * React 가 같은 노드를 diff-patch 해서 애니메이션이 처음 한 번만 걸린다.
- * key 리마운트는 패널 안 폼 상태를 날리므로, **탭 전환 시 이미 언마운트되는
- * 조건부 렌더 패널에만** 붙인다(현재 admin 4곳이 전부 그 형태다).
- *
- * translateY 는 쓰지 않는다 — 탭은 제자리에서 갈리는 것이지 올라오는 게 아니다. */
-.tm-tabpanel-enter {
-  animation: tm-tabpanel-in var(--duration-base) var(--ease-out) both;
-}
-
-@keyframes tm-tabpanel-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .tm-tabpanel-enter { animation: none; }
-}
+ * 소비처(app/admin/settings, content, league-matches, monitoring/monitoring-client)
+ * 의 className 도 같은 변경에서 모두 걷어냈다 — 참조 0건이다. 되살리지 말 것. */
 
 @keyframes fade-in {
   from {
@@ -4300,6 +4380,85 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   align-items: center;
 }
 
+/*
+ * 빈 상태가 **화면을 혼자 차지할 때** 쓰는 변형. 기본 .tm-empty-state 는 흐름대로 놓이므로
+ * 목록이 비면 검색바·칩 바로 아래에 붙고 그 아래가 통째로 남는다(390 기준 아래 300px+).
+ *
+ * 부모에 .tm-list-empty 를 함께 얹어야 동작한다 — 그 클래스는 **빈 상태일 때만** 붙이므로
+ * 카드가 있는 평소 목록의 레이아웃(간격·폭)에는 영향이 없다. 부모가 flex 가 아니면
+ * flex:1 이 무시되고 예전과 같은 자리에 놓인다(안전한 degradation).
+ */
+.tm-empty-state-fill {
+  flex: 1;
+  justify-content: center;
+  /* 부모 높이를 못 받는 경우에도 최소한의 세로 여유는 확보한다. */
+  min-height: min(60vh, 420px);
+}
+
+/* 목록 컨테이너가 비었을 때만 스크롤 영역 높이를 채워 자식(.tm-empty-state-fill)이
+   남은 공간의 중앙에 놓이게 한다. */
+/*
+ * 화면에 따라 목록과 스크롤 영역 사이에 래퍼가 하나 더 있다(공지의 .tm-notice-page —
+ * display:block, flex:0 이라 flex 사슬이 거기서 끊긴다: alpha 실측에서 목록이 420px 에
+ * 머물러 콘텐츠가 62px 아래로 치우쳤다). 빈 상태를 품은 래퍼만 골라 사슬에 넣는다.
+ *
+ * `display: contents` 인 pane(채팅)에는 이 규칙을 걸면 안 되므로 :has(> …) 로 뭉뚱그리지
+ * 않고 해당 래퍼를 명시한다 — contents 를 flex 로 바꾸면 데스크톱 2단 레이아웃이 깨진다.
+ */
+.tm-notice-page:has(.tm-list-empty) {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.tm-list-empty {
+  min-height: 100%;
+  /* 위 :has 규칙이 래퍼를 flex 로 만들면 이 값이 실제로 남은 높이를 받는다.
+     퍼센트가 안 먹는 경로(display:contents 가 낀 채팅)에서도 이쪽은 동작한다. */
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/*
+ * `.tm-list-empty` 의 min-height:100% 는 **부모가 확정 높이를 가질 때만** 먹는다. 스크롤
+ * 영역과 목록 사이에는 페이지 전환 래퍼(.tm-page-transition-enter, display:block)와
+ * display:contents 인 pane 이 끼어 있어, 그 래퍼가 콘텐츠 높이대로 늘어나면 자식의 100%
+ * 가 auto 로 해석돼 무효가 된다 — alpha 실측에서 채팅 목록이 스크롤 영역 788px 중
+ * 516px 만 차지하고 빈 상태가 위로 128px/아래 296px 로 치우쳤다.
+ *
+ * 빈 상태가 있는 화면에서만 그 래퍼에 높이를 넘긴다(:has 로 스코프를 좁힌다 — 콘텐츠가
+ * 있는 평소 화면에는 이 규칙이 적용되지 않는다).
+ *
+ * **`> *` 로 되돌리지 마라.** 스크롤 영역의 직계 자식이 래퍼 하나뿐인 게 아니다 —
+ * `shell.tsx` 는 `desktopHead && title` 일 때 `.tm-desktop-page-head` 를
+ * `<main class="tm-scroll-area">` **바로 안에** 그린다(alpha 실측: `/my/inquiries` 에서
+ * 직계 자식 2개, 헤더가 depth 1). `> *` 면 그 헤더까지 `min-height:100%` + column 이 되어
+ * 뒤로가기 화살표가 제목 **위로 쌓이고** 헤더가 504px 로 부푼다(격리 측정, 1440).
+ *
+ * 지금은 그 조합이 나는 라우트가 없다 — `.tm-list-empty` 를 붙이는 7곳이 전부 route-chrome
+ * 에서 `desktopHead` 를 명시하지 않아 `shell.tsx` 기본값 `false` 가 적용된다. 그래서 이
+ * 변경은 오늘 화면을 한 픽셀도 바꾸지 않는다(직계 자식이 래퍼 하나이고 그게 빈 목록을
+ * 품고 있어 `:has` 가 그대로 매치한다). **미래의 지뢰만 제거한다.**
+ *
+ * 남은 것: 헤더가 형제로 있으면 `min-height:100%` 와 헤더 높이가 더해져 그만큼 오버플로가
+ * 생긴다. 그건 이 좁히기로 안 풀리고 레이아웃 재설계가 필요해 백로그다(스크롤 영역을 flex
+ * 로 만드는 안은 `.tm-match-list` 의 padding-bottom:108px 과 얽혀 오히려 늘어났다).
+ */
+.tm-scroll-area > *:has(.tm-list-empty) {
+  min-height: 100%;
+  /*
+   * min-height 만으로는 부족하다 — 래퍼와 목록 사이에 `display: contents` 인 pane 이
+   * 끼어 있으면(채팅) 박스가 없어 그 아래의 100% 가 참조할 부모가 사라진다(alpha 실측:
+   * 래퍼는 788px 로 늘어났는데 목록은 516px 에 머물렀다).
+   *
+   * flex 컨테이너로 만들면 `display: contents` 인 요소의 자식이 flex item 으로 승격되어,
+   * 높이를 퍼센트가 아니라 flex:1 로 넘길 수 있다.
+   */
+  display: flex;
+  flex-direction: column;
+}
+
 .tm-empty-icon {
   width: 80px;
   height: 80px;
@@ -4775,6 +4934,24 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   margin: 0 var(--v1-shell-page-x) 12px;
 }
 
+/* 통합 대회 목록의 유형 세그먼트 — 칸이 셋이라 기본 2칸 grid 를 덮는다. */
+.tm-segment-row-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* 좌우 여백을 **주지 않는다.** 이 세그먼트는 `.tm-tournament-list-section` **안**에 있고,
+   그 섹션이 여백을 책임진다(`desktop/tournaments.css`: 모바일 `padding: 0 20px` →
+   ≥1024px `padding: 0`). 형제인 `.tm-section-title`·`.tm-sport-chip-row` 도 같은 이유로
+   자기 좌우 여백을 `0` 으로 리셋한다.
+
+   ⚠️ `.tm-match-type-segment` 처럼 `margin: 0 20px` 를 주고 데스크탑에서 `margin-inline: 0`
+   으로 덮는 방식을 **따라 하면 안 된다** — 그쪽은 셸 바로 아래(섹션 **밖**)라 자기 여백이
+   필요하다. 여기서 같은 값을 주면 모바일 40px(섹션 20 + 자기 20) · 데스크탑 20px 로
+   **양쪽 다** 제목·칩과 어긋난다. 같은 모양이라고 같은 답이 아니다. */
+.tm-competition-kind-segment {
+  margin: 0 0 12px;
+}
+
 @media (min-width: 1024px) {
   /* 데스크탑에서는 리스트·검색바의 모바일 패딩이 0으로 리셋되고 스크롤 영역이 열 여백을 담당하므로
      세그먼트도 열 가장자리에 맞춰야 제목·검색바와 정렬된다. */
@@ -4793,42 +4970,14 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   padding-bottom: 132px;
 }
 
-.tm-review-tabs {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  padding: 4px;
-  border-radius: var(--radius-field);
-  background: var(--grey100);
-}
-
-.tm-review-tab {
-  /* a11y: 터치 타깃 44px 확보 (시각 높이 유지, grid/place-items로 내용 중앙 정렬) */
-  min-height: 44px;
-  border-radius: var(--radius-control);
-  display: grid;
-  place-items: center;
-  color: var(--text-muted);
-  font-size: 14px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.tm-review-tab[data-active="true"] {
-  background: var(--surface);
-  color: var(--text-strong);
-  font-weight: 800;
-}
-
-/* [토큰 충돌 fix] 다크모드에서 --grey100(트랙, .tm-segment-row/.tm-review-tabs)과
-   --surface(활성 pill)가 둘 다 #1c1e24로 완전히 같은 값이라 활성 탭이 트랙에 녹아
-   사라진다(라이트모드는 #f2f4f6 vs #fff라 그런대로 구분됨 — main에도 있던 원래
-   패턴). .tm-match-type-segment의 dev 전용 오버라이드를 걷어내고서야 드러난, 이
-   컴포넌트를 쓰는 모든 곳(리뷰 탭 3열도 포함)의 근본 다크모드 결함이라 공유
-   셀렉터에서 한 번에 고친다 — --grey150(다크 #20222a)로 실제 구분되게. */
-:root.dark .tm-review-tab[data-active="true"] {
-  background: var(--grey150);
-}
+/* .tm-review-tabs/.tm-review-tab 정의는 .tm-seg-tabs 근처(세그먼트 탭 공통 블록)로
+   옮겨 합쳤다 — 트랙 스펙이 .tm-seg-tabs 와 완전히 같았고, 다크모드 fix 도 두 곳에
+   따로 나 있던 것을 하나로 합쳤다.
+   [2026-09-02 갱신] CompetitionKindSegment/MatchTypeSegment 는 이후 SegmentedTabs
+   로 이관돼 더 이상 이 클래스를 쓰지 않는다 — 지금 유일한 소비처는
+   `app/tournaments/[id]/results/results-page-client.tsx` 의 "결과/영상 탭 전환"
+   (`.tm-segment-row` + `.tm-review-tab`, 아직 SegmentedTabs 로 안 옮김)이다.
+   .tm-review-tab 클래스 자체는 그 소비처가 남아 있으므로 지우지 않는다. */
 
 .tm-tournament-widget-icon {
   background: var(--grey100);
@@ -6947,11 +7096,17 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   text-align: center;
 }
 
-/* 세그먼트 탭 — 트랙 배경 위에 선택된 항목만 떠오르는 형태.
-   나란한 두 버튼(파란 채움 + 회색)은 "탭"이 아니라 "버튼 두 개"로 읽힌다는 오너
-   지적에서 나왔다. .tm-review-tabs 가 이미 쓰던 시각 계약과 동일하되, 이름을 특정
-   화면에 묶지 않도록 일반화했다. 컬럼 수는 쓰는 쪽이 grid-template-columns 로 정한다. */
-.tm-seg-tabs {
+/* ── 세그먼트 탭 공통 블록 (2026-09-02, 하나로 합침) ───────────────────────────
+   .tm-seg-tabs · .tm-review-tabs · .tm-auth-segmented 는 같은 트랙 스펙(gap 8px ·
+   padding 4px · radius field · background grey100)을 세 화면이 각자 베껴 썼다 —
+   다크모드 fix 도 review/seg 두 곳에 따로 났었다(auth 는 활성 pill이 --bg 라 애초에
+   이 충돌이 없다: 다크에서 --grey100 #1c1e24 vs --bg #121317, 서로 다른 값).
+   트랙·항목 스펙이 실제로 같은 review/seg 는 여기서 완전히 합치고, 항목 폰트
+   크기·활성 시 굵기·활성 배색이 서로 다른(각자 이유가 있는) auth 는 트랙 5줄만
+   여기로 옮기고 나머지(.tm-auth-segment 등, 위쪽)는 그대로 둔다. */
+.tm-seg-tabs,
+.tm-review-tabs,
+.tm-auth-segmented {
   display: grid;
   gap: 8px;
   padding: 4px;
@@ -6959,39 +7114,151 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   background: var(--grey100);
 }
 
-.tm-seg-tab {
+/* 컬럼 수 — .tm-seg-tabs 는 쓰는 쪽이 인라인 style 로 정하므로(bracket-page-client
+   선례) 여기 정의가 없다. */
+.tm-review-tabs {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.tm-seg-tab,
+.tm-review-tab {
   /* a11y: 터치 타깃 44px 확보 (시각 높이 유지, grid/place-items 로 내용 중앙 정렬) */
   min-height: 44px;
   border-radius: var(--radius-control);
   display: grid;
   place-items: center;
   color: var(--text-muted);
-  /* [R-T1 타입 위계 정리] 14px → 15px — 이 페이지 전용 클래스(다른 화면 미사용)라
-     3단계(카드 핵심 정보, tm-bk2-score와 동일 15px)에 바로 편입. 탭 버튼은 폭
-     여유가 커서 축소 위험 없음(픽스처 실측: "순위 · 대진표"/"경기 일정" 모두
-     여유 있게 들어감). */
-  font-size: 15px;
   font-weight: 700;
   white-space: nowrap;
 }
 
-/* [R-T3 타입 위계 정리] 활성 상태 800 제거 — R-T3는 800 이상을 히어로 숫자·로고
-   전용으로 규정하고, 세그먼트 탭은 여기 해당하지 않는다. 선택 상태는 굵기가 아니라
-   배경(트랙 위로 떠오르는 pill) + 텍스트 색(muted → strong)으로 구분한다 —
-   font-weight는 비활성과 동일한 700 그대로 둬서 그 자체가 신호가 되지 않게 한다. */
-.tm-seg-tab[data-active='true'] {
+/* [R-T1 타입 위계 정리] .tm-seg-tab 만 14px → 15px — 이 클래스의 원 소비처(대진표
+   보기 전환 등)는 폭 여유가 커서 3단계(tm-bk2-score 와 동일 15px)로 바로 편입해도
+   축소 위험이 없었다(픽스처 실측). .tm-review-tab 은 14px 그대로 — 서로 다른 화면의
+   서로 다른 결정이라 값 자체는 합치지 않는다. */
+.tm-seg-tab {
+  font-size: 15px;
+}
+
+.tm-review-tab {
+  font-size: 14px;
+}
+
+.tm-seg-tab[data-active='true'],
+.tm-review-tab[data-active='true'] {
   background: var(--surface);
   color: var(--text-strong);
 }
 
-/* [토큰 충돌 fix] 다크모드에서 --grey100(트랙, .tm-seg-tabs)과 --surface(활성 pill)가
-   둘 다 #1c1e24로 완전히 같은 값이라 활성 탭이 트랙에 녹아 사라진다(라이트모드는
-   #f2f4f6 vs #fff라 구분됨). 위에서 font-weight 800을 걷어내 배경이 선택 상태를
-   나타내는 유일한 비색상 신호가 됐으므로, 이 충돌을 그대로 두면 다크모드에서 선택
-   상태가 사실상 안 보이게 된다 — .tm-review-tab[data-active]/.tm-match-type-segment에
-   이미 쓰인 동일 패턴(--grey150)으로 다크 전용 오버라이드. */
-:root.dark .tm-seg-tab[data-active='true'] {
+/* [R-T3 타입 위계 정리] .tm-review-tab 만 활성 시 700 → 800 — .tm-seg-tab 는 R-T3가
+   "800 이상은 히어로 숫자·로고 전용"으로 못박은 뒤, 배경(pill) + 텍스트 색만으로
+   선택 상태를 나타내도록 굵기 신호를 일부러 뺐다. 서로 다른 화면의 서로 다른
+   결정이라 .tm-seg-tab 는 위 700 그대로 유지된다. */
+.tm-review-tab[data-active='true'] {
+  font-weight: 800;
+}
+
+/* [토큰 충돌 fix, 하나로 합침] 다크모드에서 트랙 --grey100(#1c1e24)과 활성 pill
+   --surface(#1c1e24)가 완전히 같아 활성 탭이 트랙에 녹는다(라이트모드는 #f2f4f6 vs
+   #fff 라 구분됨). review/seg 두 곳에 따로 나 있던 --grey150(#20222a) 오버라이드를
+   한 셀렉터로 합쳤다. */
+:root.dark .tm-seg-tab[data-active='true'],
+:root.dark .tm-review-tab[data-active='true'] {
   background: var(--grey150);
+}
+
+/* ── SegmentedTabs 컴포넌트 (components/v1-ui/segmented-tabs.tsx, 2026-09-02 신규) ──
+   위 세 클래스는 활성 표시를 **항목마다 배경을 켜고 끄는 방식**으로 구현해서 전환이
+   없다(툭 켜졌다 꺼짐 — 세부탭이 하단탭 pill 보다 나빴던 이유 중 하나). 이 컴포넌트는
+   하단탭 pill(.tm-bottom-nav-pill-slot)과 같은 방식 — **미끄러지는 thumb 하나**가
+   트랙 위를 옮겨 다니는 형태로 통일한다. 같은 토큰(--duration-base·--ease-standard)을
+   써서 하단탭·세부탭이 한 모션 언어를 쓰게 한다. 위 세 클래스는 실제 소비처(10개
+   화면)가 아직 원본 마크업 그대로라 지우지 않았다 — 소비처를 이 컴포넌트로 옮기는
+   마이그레이션은 후속 작업이다. */
+.tm-segmented-tabs {
+  position: relative;
+  display: grid;
+  /* 항목 수를 CSS 에 하드코딩하지 않는다 — segmented-tabs.tsx 가 매 렌더마다
+     items.length 를 이 변수 하나에 실어, 그리드 열 수와 아래 thumb 폭 계산이 같은
+     값을 보게 한다(하단탭이 tabs.length 로 grid-template-columns 를 정하는 것과
+     같은 방식 — 다만 여기는 grid 와 thumb 폭 두 곳이 같은 값을 봐야 해서 인라인
+     style 대신 CSS 변수 하나로 both 를 먹인다). */
+  grid-template-columns: repeat(var(--tm-segmented-count, 1), minmax(0, 1fr));
+  gap: 8px;
+  padding: 4px;
+  border-radius: var(--radius-field);
+  background: var(--grey100);
+}
+
+.tm-segmented-thumb {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 4px; /* 트랙 padding(4px) 안쪽 콘텐츠 박스 시작점 — 그리드 항목과 같은 기준선. */
+  /* 트랙의 가로 비-항목 공간은 padding 좌우 합(8px) + gap*(N-1)(8px 씩)
+     = 8px*N 으로 정리된다(패딩·gap 값이 우연히 같은 8px 라 N 하나로 묶인다).
+     항목 1칸 폭은 그러므로 (100% - 8px*N) / N — %는 절대위치 요소의 포함 블록
+     (트랙의 padding box, 곧 트랙 전체 폭)을 기준으로 한다. index 별 이동 거리는
+     정적 CSS 만으로 못 푼다("몇 번째가 선택됐는지"는 렌더마다 바뀌는 상태라서) —
+     segmented-tabs.tsx 가 인라인 transform 으로 계산해 넣는다(공식의 회귀 테스트는
+     segmented-tabs.test.tsx). */
+  width: calc((100% - 8px * var(--tm-segmented-count, 1)) / var(--tm-segmented-count, 1));
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  /* transform 만 바뀌므로 transform 하나만 전환한다 — transition-all 금지.
+     하단탭 pill 과 같은 토큰 — 셸 전체가 "미끄러진다"는 하나의 모션 언어를 쓰게
+     한다. prefers-reduced-motion 은 전역 catch-all(*, *::before, *::after 에
+     transition-duration: 0.01ms !important)이 이미 처리하므로 여기서 다시
+     정의하지 않는다. */
+  transition: transform var(--duration-base) var(--ease-standard);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* [토큰 충돌 fix, thumb 한 곳에서만] 위 .tm-seg-tab/.tm-review-tab 과 같은 원인
+   (다크모드에서 --grey100 == --surface)이지만, 활성 표시가 thumb 하나뿐이라 고칠
+   곳도 하나뿐이다 — 이 통합이 얻는 실질 이득 중 하나. */
+:root.dark .tm-segmented-thumb {
+  background: var(--grey150);
+}
+
+.tm-segmented-tab {
+  /* thumb 이 absolute 로 먼저 그려지는데, 그리드 아이템은 z-index 를 position 값과
+     무관하게 적용받는다는 스펙 세부(항목이 DOM 순서상 thumb 뒤라 그 규칙만으로도
+     위에 그려지긴 한다)에 기대는 대신, 명시적으로 관계를 고정한다 — 브라우저별
+     그리드 z-index 처리 차이에 좌우되지 않게. */
+  position: relative;
+  z-index: 1;
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  border-radius: var(--radius-control);
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  /* [의도한 시각 변경] 대진표 탭은 15px → 14px 로 **작아진다**.
+     삭제된 .tm-seg-tab 은 R-T1 에서 14→15px 로 올렸는데, 그 근거가 명시적으로
+     "이 페이지 전용 클래스(다른 화면 미사용)라 3단계에 바로 편입" 이었다. 공용
+     컴포넌트로 합치면서 그 전제가 사라졌다 — 이제 같은 클래스를 매치 종류·대회
+     구분·리뷰·전적·컨택 등 여섯 곳이 함께 쓰고, 그쪽 기존 값이 14px 다. 한 화면을
+     위해 나머지 전부를 15px 로 올리는 쪽이 훨씬 큰 변경이므로 14px 로 모은다
+     (대진표는 R-T1 이전 값으로 돌아가는 것이라 폭 여유 문제도 없다). */
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  /* 배경은 thumb 이 담당하므로 항목 자신은 글자색만 전환한다. */
+  transition: color var(--duration-base) var(--ease-standard);
+}
+
+.tm-segmented-tab[data-active='true'] {
+  color: var(--text-strong);
+}
+
+/* auth 전용 40px 변형 — .tm-auth-segment 의 기존 결정(치수를 새로 만든 게 아니라
+   그대로 이식한 것)이다. */
+.tm-segmented-tabs-sm .tm-segmented-tab {
+  min-height: 40px;
+  font-size: 13px;
 }
 
 /* 대회 경기 라인업 명단: 모바일부터 한 줄에 두 선수씩 보여 긴 명단의 스크롤을 줄인다.
@@ -7834,3 +8101,187 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
 .tm-my-account-actions .tm-btn { flex: 1; }
 /* 활동 요약과 이번 달 활동을 한 카드로 합칠 때 두 묶음을 가르는 선. */
 .tm-my-activity-divider { height: 1px; background: var(--border); margin: 12px 0; }
+
+/* ============================================================================
+   페이지 전환 (Wave 2 U20 — docs/design/app-motion-system.md §2.4/§2.7/§2.8)
+   ----------------------------------------------------------------------------
+   PageTransitionController(U39/U40, components/v1-ui/page-transition-controller.tsx)가
+   document.startViewTransition 호출과 data-nav-kind 속성 설정을 맡는다 -- 이 블록은
+   그 컨트롤러가 붙은 지금부터 실제로 선택자가 매칭돼 살아 있다. 값은 기존
+   duration/easing 토큰만 재사용하고 신규 토큰은 0개 -- tokens.css 의 "용도 확장 매핑" 참조.
+   ============================================================================ */
+
+/* ── VT 경로: old/new page-content 유사요소 슬라이드+페이드 ── */
+@keyframes tm-page-slide {
+  from { translate: var(--tm-slide-offset); }
+  to { translate: 0; }
+}
+@keyframes tm-page-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+::view-transition-old(page-content) {
+  animation:
+    var(--duration-fast) var(--ease-standard) both tm-page-fade reverse,
+    var(--duration-slower) var(--ease-standard) both tm-page-slide reverse;
+}
+::view-transition-new(page-content) {
+  animation:
+    var(--duration-base) var(--ease-out) var(--duration-fast) both tm-page-fade,
+    var(--duration-slower) var(--ease-standard) both tm-page-slide;
+}
+
+:root[data-nav-kind="push"] { --tm-slide-offset: -24%; } /* old 쪽 기준값 -- new 는 아래서 부호 반전 */
+:root[data-nav-kind="push"]::view-transition-new(page-content) { --tm-slide-offset: 100%; }
+:root[data-nav-kind="pop"]  { --tm-slide-offset: 100%; }
+:root[data-nav-kind="pop"]::view-transition-new(page-content) { --tm-slide-offset: -24%; }
+
+/* 탭 전환은 콘텐츠에 아무 전환도 걸지 않는다(C안 확정 -- 탭은 페이지가 아니다).
+   페이드조차 "다른 것으로 대체됐다"는 신호라 탭에는 맞지 않는다 -- 대신 탭 컨트롤
+   자신(BottomNav 아이콘/thumb)이 반응해 "내가 바꿨다"를 알린다.
+   VT 자체를 건너뛰는 방법(PageTransitionController 에서 kind==='tab' 이면
+   startViewTransition 호출 자체를 생략)도 검토했으나, 그 컨트롤러는 매 pathname
+   변경마다 template.tsx 마운트를 기다려 pending VT 를 resolve 하는 왕복 로직과
+   묶여 있어 이 좁은 CSS 전용 작업 범위 밖이다 -- animation:none 으로 이 이름-특정
+   선택자(::view-transition-old/new(page-content))가 UA 기본 크로스페이드
+   (::view-transition-old/new(*) 에 걸리는 -ua-view-transition-fade-*)를 그대로
+   덮어써 없애는 쪽이 이 파일만으로 완결되고, 스펙상 "기본 크로스페이드 끄기"의
+   표준 방법이기도 하다(오버레이 없이 old→new 가 그 자리에서 즉시 스왑).
+   ::view-transition-group(page-content) 의 기본 리사이즈 애니메이션도 실질적으로
+   no-op 이다 -- .tm-scroll-area 는 문서 흐름이 아니라 셸이 고정하는 뷰포트 박스라
+   old/new 캡처 rect 가 탭 전환 전후로 항상 같다(v1_web 은 window 로 스크롤하지
+   않는다: .tm-scroll-area 가 내부 스크롤러). */
+/* [선택자 형태 주의] :root[data-nav-kind="..."] 와 ::view-transition-old/new(page-content)
+   사이에 **공백을 두면 안 된다.**
+   공백은 자손 결합자인데 view-transition 의사요소는 그 방식으로 매칭되지 않는다 —
+   최소 재현으로 확인했다(Chromium): 공백형은 UA 애니메이션이 그대로 2건 재생되고,
+   붙여 쓴 형태만 0건으로 꺼진다. 공백형이던 동안 이 규칙은 **한 번도 발화하지 않았고**,
+   탭 전환에서 tm-page-slide 가 그대로 재생됐다(alpha 실측). */
+/* [범위 주의] 이름을 지정(page-content)하면 **부족하다.** 그것만 끄면 UA 기본 애니메이션
+   6건이 그대로 남는다 — root 스냅샷의 교차 페이드와 group 리사이즈다(alpha 실측 6건,
+   최소 재현 6건으로 일치 확인). 탭은 "같은 화면에서 보는 각도만 바꾸는" 조작이므로
+   전환 전체를 끈다. 최소 재현 결과: 기준 10건 · 이름 지정만 6건 · old/new(*) 2건 ·
+   여기에 group(*) 까지 더해야 0건. */
+:root[data-nav-kind="tab"]::view-transition-old(*),
+:root[data-nav-kind="tab"]::view-transition-new(*),
+:root[data-nav-kind="tab"]::view-transition-group(*) {
+  animation: none;
+}
+
+/* ── CSS 폴백 경로(VT 미지원 웹뷰) -- template.tsx 마운트 시 재생 ──
+   iOS 16/17(Safari < 18)은 상시 이 경로만 본다 -- "미지원 대비 보험"이 아니라
+   iOS 사용자의 주 경로다. old 는 이미 사라진 상태(new 만 존재)라 §2.4 표대로
+   거리를 16~24px 로 줄여 VT 경로와 같은 모션 언어를 유지한다. */
+@keyframes tm-page-fallback-push {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes tm-page-fallback-pop {
+  from { opacity: 0; transform: translateX(-24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+/* [적용 범위] 이 폴백은 **VT 미지원 환경 전용**이다. 선택자 형태를 고치기 전에는 아예
+   매칭되지 않아 아무 데서도 안 돌았는데, 고치고 나니 VT 지원 브라우저에서도 함께 돌아
+   VT 슬라이드와 **이중으로 겹쳤다**(alpha 실측: push 이동에서 tm-page-fallback-push 와
+   -ua-view-transition-* 가 동시에 발화). @supports 로 갈라 VT 가 없을 때만 쓴다 —
+   CSS.supports('view-transition-name','none') 가 참인 환경에서는 이 블록이 통째로
+   적용되지 않고, VT 쪽 규칙만 남는다(최소 재현으로 0건 확인). */
+@supports not (view-transition-name: none) {
+  :root[data-nav-kind="push"] .tm-page-transition-enter { animation: tm-page-fallback-push var(--duration-slower) var(--ease-out) both; }
+  :root[data-nav-kind="pop"] .tm-page-transition-enter { animation: tm-page-fallback-pop var(--duration-slower) var(--ease-out) both; }
+  /* 탭은 VT 지원 경로와 마찬가지로 이 폴백(iOS 16/17 주 경로)에서도 애니메이션을
+     걸지 않는다 -- 규칙을 아예 안 두면 "빠뜨렸나"로 읽히므로 명시적으로 none 을
+     남긴다. 예전엔 여기서도 opacity 0→1 로 페이드했다(tm-page-fallback-tab, 삭제됨). */
+  /* [선택자 형태 주의] data-nav-kind 는 page-transition-controller 가 <html> 에만 단다.
+     .tm-page-transition-enter[data-nav-kind="..."] 는 그 속성을 **이 요소 자신**에서
+     찾으므로 영원히 매칭되지 않는다(template.tsx 는 이 요소에 그 속성을 달지 않는다).
+     여기서는 반대로 자손 결합자가 맞다 — <html> 아래의 실제 요소이기 때문이다. */
+  :root[data-nav-kind="tab"] .tm-page-transition-enter { animation: none; }
+}
+/* data-nav-kind 가 아직 없는 최초 진입(딥링크·새로고침)은 애니메이션 없이 그대로
+   보인다 -- 속성 선택자가 매칭 안 되므로 별도 처리가 필요 없다. */
+
+/* ── 스켈레톤 → 콘텐츠 1단 전환(§3.3) -- 176개 loading.tsx 소비처 공용 클래스.
+   VT 의 tm-page-fade keyframe 을 그대로 재사용한다(신규 keyframe 아님). ── */
+.tm-content-enter {
+  animation: tm-page-fade var(--duration-base) var(--ease-out) both;
+}
+
+/* ── sticky/fixed 셸 요소는 VT 캡처 그룹에서 분리한다(§2.7) --
+   이름을 안 주면 topbar/bottom-nav 도 page-content 와 함께 슬라이드해버린다
+   (셸은 "지속"돼야 하므로 명백한 결함). Wave 1 이전엔 화면에 한 순간 하나만
+   존재해 이름 충돌이 없다 -- 병렬 라우트가 생기면 재검토 필요(설계 문서 §2.7). */
+.tm-topbar      { view-transition-name: tm-shell-topbar; }
+.tm-bottom-nav  { view-transition-name: tm-shell-bottomnav; }
+.tm-fixed-cta   { view-transition-name: tm-shell-fixed-cta; }
+.tm-route-progress { view-transition-name: tm-shell-route-progress; }
+
+::view-transition-group(tm-shell-topbar),
+::view-transition-group(tm-shell-bottomnav),
+::view-transition-group(tm-shell-fixed-cta),
+::view-transition-group(tm-shell-route-progress) {
+  animation: none;
+  z-index: 100; /* 슬라이드하는 page-content 그룹 위에 그려지도록 */
+}
+::view-transition-old(tm-shell-topbar),
+::view-transition-old(tm-shell-bottomnav),
+::view-transition-old(tm-shell-fixed-cta),
+::view-transition-old(tm-shell-route-progress) {
+  display: none; /* old+new 가 겹쳐 두 겹으로 보이는 것 방지 */
+}
+::view-transition-new(tm-shell-topbar),
+::view-transition-new(tm-shell-bottomnav),
+::view-transition-new(tm-shell-fixed-cta),
+::view-transition-new(tm-shell-route-progress) {
+  animation: none;
+}
+
+/* ── prefers-reduced-motion (§2.8) --
+   기존 전역 catch-all(`* { animation-duration: 0.01ms !important; ... }`)은
+   ::view-transition-* 유사요소를 잡지 못한다(일반 * 셀렉터로 안 잡히는 별도
+   카테고리) -- VT 도입과 함께 명시 추가하지 않으면 접근성 규칙이 조용히 깨진다.
+   CSS 폴백 경로(.tm-page-transition-enter)는 일반 엘리먼트 애니메이션이라
+   기존 전역 catch-all 이 이미 커버한다 -- 별도 처리 불필요. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+}
+
+/* Android wrapper: transient web feedback reads as an in-app centered popup.
+   Browser layouts keep their existing bottom/inline placement. */
+html[data-teameet-native-app='android'] .tm-native-toast-stack {
+  position: fixed !important;
+  inset: 50% 24px auto !important;
+  width: auto !important;
+  transform: translateY(-50%) !important;
+  z-index: 1000 !important;
+}
+
+html[data-teameet-native-app='android'] .tm-native-toast-card {
+  max-width: min(100%, 360px) !important;
+  min-height: 56px;
+  border: 1px solid var(--grey200);
+  border-radius: var(--radius-container) !important;
+  box-shadow: 0 8px 24px rgb(15 23 42 / 14%);
+  text-align: center;
+}
+
+html[data-teameet-native-app='android'] .tm-notification-toast,
+html[data-teameet-native-app='android'] .tm-search-error-toast {
+  position: fixed !important;
+  inset: 50% auto auto 50% !important;
+  width: min(calc(100vw - 48px), 360px) !important;
+  min-height: 56px !important;
+  transform: translate(-50%, -50%) !important;
+  border: 1px solid var(--grey200);
+  border-radius: var(--radius-container) !important;
+  box-shadow: 0 8px 24px rgb(15 23 42 / 14%);
+  padding: 16px 20px !important;
+  text-align: center;
+  z-index: 1000 !important;
+}

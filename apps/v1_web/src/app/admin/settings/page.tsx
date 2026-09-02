@@ -60,7 +60,7 @@ function SettingsHub() {
       <div
         role="tablist"
         aria-label="설정 항목"
-        className="mb-4 flex w-fit items-center gap-1 rounded-xl bg-[var(--surface-soft)] p-1"
+        className="tm-content-enter mb-4 flex w-fit items-center gap-1 rounded-xl bg-[var(--surface-soft)] p-1"
       >
         {TABS.map((tab) => {
           const isActive = activeTab === tab.key;
@@ -94,7 +94,6 @@ function SettingsHub() {
         id={`settings-panel-${activeTab}`}
         role="tabpanel"
         aria-labelledby={`settings-tab-${activeTab}`}
-        className="tm-tabpanel-enter"
       >
         {activeTab === 'integrations' ? <IntegrationsView /> : <ReviewPolicyView />}
       </div>

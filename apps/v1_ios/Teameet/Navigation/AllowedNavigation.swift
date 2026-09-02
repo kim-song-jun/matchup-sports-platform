@@ -269,8 +269,23 @@ enum AllowedNavigation {
 
     // MARK: - Trusted auth provider
 
-    /// Kakao's authorization host is the one third-party origin the shell keeps inside the
-    /// WebView; handing the login redirect to Safari would strand the session outside it.
+    /// The Kakao hosts the shell keeps inside the WebView.
+    ///
+    /// Kakao's sign-in is not one page. `kauth.kakao.com` starts the authorization and then
+    /// redirects to `accounts.kakao.com` for the actual login form, and `auth.kakao.com`
+    /// appears in the same flow. Trusting only the first one meant the shell handed the
+    /// second to Safari mid-login — the reader watched the app throw them out to a browser
+    /// to type their password, which is what wrapping an app is supposed to avoid.
+    ///
+    /// The set matches Android's, which was verified on a device: the file's own contract is
+    /// that both platforms reach the same verdict for the same URL, and a login that stays
+    /// in the app on one and leaves on the other breaks it.
+    ///
+    /// Exact hosts, never suffixes. `evil.accounts.kakao.com` is not Kakao's, and a suffix
+    /// test would hand a third party the reader's session — the same reason the origin check
+    /// above compares hosts rather than endings.
+    static let trustedAuthHosts = ["kauth.kakao.com", "accounts.kakao.com", "auth.kakao.com"]
+
     static func isTrustedAuthProvider(_ url: URL?) -> Bool {
         guard let url else { return false }
         return isTrustedAuthProvider(url.absoluteString)
@@ -281,7 +296,8 @@ enum AllowedNavigation {
         guard let scheme = target.scheme,
               scheme.caseInsensitiveCompare("https") == .orderedSame else { return false }
         guard let host = target.host,
-              host.caseInsensitiveCompare("kauth.kakao.com") == .orderedSame else { return false }
+              trustedAuthHosts.contains(where: { $0.caseInsensitiveCompare(host) == .orderedSame })
+        else { return false }
         guard target.port == nil else { return false }
         return target.userInfo == nil
     }

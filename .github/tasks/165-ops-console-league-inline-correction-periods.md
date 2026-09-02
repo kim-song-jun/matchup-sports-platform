@@ -1,7 +1,7 @@
 # Task 165 — 경기 운영 콘솔에 리그 편입 · 대시보드 인라인 정정 · 대회별 전후반 설정
 
 > **선행 문서**: [Task 164](./164-league-entry-schedule-manual-fixture-contract.md) (같은 원지시의 마감), `docs/design/league-competition-phase2-decisions.md` D6.
-> 2026-09-02 사용자 지시 3건을 실측과 대조해 적는다. 세 건 모두 **결과 보장(D6) 계약을 바꾸지 않는다** — 입구를 옮기고 화면을 더한다.
+> 2026-09-02 사용자 지시 3건을 실측과 대조해 적는다. 결과 확정 계약은 **정본 `docs/design/competition-canonical-flow.md` §4**(확인 한 단계)를 따른다 — 이 태스크는 입구를 옮기고 화면을 더한다. "결과 검토" 는 그 확인 단계를 가리킨다.
 
 ## Context
 

@@ -1,0 +1,110 @@
+# Task 166 — 결과 흐름 단순화 · 이의 제거 · 롤링 교체 제거 · 전적 탭 4종
+
+> **정본**: `docs/design/competition-canonical-flow.md` §3 · §4 · §5. 이 문서는 그 절을 코드로 옮기는 순서와 계약이다.
+> 선행: Task 163(명단 = 출전자) · Task 165 BE-1(콘솔이 팀 매치 출처를 안다).
+
+## Context
+
+2026-09-02 사용자 확정:
+- 결과는 **종료 → 결과 보내기 → 어드민 확인** 한 단계. 사용자 화면엔 "확정 전" 태그가 붙었다가 확인되면 사라지고 그때 순위·전적 반영.
+- 팀의 **이의 제기 경로 삭제**.
+- **교체 제거는 롤링 교체 종목만**(`lineup.substitutions === 'rolling'`). 제한 교체 종목은 유지.
+- 팀 전적 탭 **전체 / 대회 / 리그 / 친선**, 개인 기록에도 리그 구분.
+
+### 실측 (origin/dev `afeb35565`)
+
+| 항목 | 지금 |
+|---|---|
+| 결과 상태 | `V1GameResultRevisionState = DRAFT · SUBMITTED · CHANGE_REQUESTED · SUPPLEMENT_REQUESTED · REJECTED · OFFICIAL · VOID` (`schema.prisma:435`) |
+| 확정 API | `POST /games/:gameId/result-revisions/:revisionId/{review-decision, supersede-and-submit, officialize, void}` + `POST /games/:gameId/corrections` (`tournament-operations/results/tournament-result-review.controller.ts`) |
+| 이의 | `v1_league_match_disputes` 테이블(`schema.prisma:2040`) · API 11 파일 · 웹 5 파일 · 알림 4종 · `league-match-dispute.service.ts` |
+| 교체 | 설정 `lineup.substitutions: 'rolling' \| 'limited'` + `maxSubstitutions` (`competition-config.parse.ts:78-79`) · API 16 파일 · 웹 21 파일 |
+| 팀 전적 탭 | `'전체'` · `'대회'` 만 존재(`apps/v1_web/src/app/teams`) — 리그·친선 탭 없음 |
+| 개인 기록 | `matchType: 'tournament' \| 'team_match'` — 리그 구분 없음(`public-user-records.service.ts`) |
+
+## Goal
+
+행복 경로가 **SUBMITTED → OFFICIAL 한 클릭**이 되고, 이의 도메인이 코드·스키마에서 사라지며, 롤링 종목 콘솔에서 교체가 사라지고,
+팀·개인 전적이 대회/리그/친선을 구분한다.
+
+## Original Conditions
+
+- [ ] 어드민 확인 = `officialize` 한 번. 검토 요청·보완 요청·거부 상태는 **행복 경로에서 빠진다**. 세 상태의 실제 소비처를 실측해 0 이면 enum 값까지 제거, 있으면 Ambiguity Log 1 로 올린다.
+- [ ] 사용자 화면(경기 상세·일정·라이브 스코어)에 SUBMITTED 는 점수 + "확정 전" 태그, OFFICIAL 은 태그 없음. 순위·승점·전적은 OFFICIAL 만 집계(변이: SUBMITTED 를 세면 red).
+- [ ] 이의 테이블·서비스·컨트롤러·화면·알림 4종 제거. drop 마이그레이션은 사용자 직접 승인.
+- [ ] `lineup.substitutions === 'rolling'` 인 대회의 콘솔에서 교체 커맨드가 **노출되지 않고 서버도 거부**(400 `SUBSTITUTION_NOT_TRACKED`). `'limited'` 는 기존 동작·`maxSubstitutions` 검증 유지(회귀 스펙).
+- [ ] 팀 전적 탭 전체/대회/리그/친선. 개인 기록 `matchType` 에 `league` 추가.
+- [ ] 화면 변경(태그 · 탭 · 콘솔 교체 버튼 제거)은 **3안 → 사용자 선택** 뒤 구현.
+
+## User Scenarios
+
+1. **운영자.** 경기 종료 후 "결과 보내기". 대시보드에 "확정 전 1건" 이 뜬다. 점수를 훑고 **확인**. 끝. 틀렸으면 그 자리에서 고치고 확인(Task 165 FE-2).
+2. **관전자.** 경기 카드에 3:2 와 "확정 전" 태그. 몇 분 뒤 태그가 사라지고 순위표가 바뀐다.
+3. **팀장(문제 발견).** 이의 버튼은 없다. 운영자에게 연락한다(대회 상세의 운영자 연락처).
+4. **풋살 운영자.** 콘솔에 교체 버튼이 없다. 득점자는 명단 전원 중에서 고른다.
+5. **11인 축구 운영자.** 교체 버튼이 있고 3회 제한이 걸린다(지금과 같다).
+
+## Test Scenarios
+
+### Happy
+- SUBMITTED 리비전에 `officialize` → OFFICIAL, 순위 재계산, `team_match_completed` 알림. 중간 상태 없음.
+- 공개 API `GET /tournaments/:id/matches/:fixtureId` 가 SUBMITTED 에서 `resultStage: 'pending_confirmation'`(이름은 구현 시 확정), OFFICIAL 에서 `official`.
+- 롤링 대회 게임에 교체 커맨드 → 400. 제한 대회 게임 → 기존 스펙 통과.
+- 팀 전적 리그 탭 = 정규 리그 공식경기만. 친선 탭 = `leagueId=null` 이고 fixture 도 없는 팀 매치만.
+
+### Edge
+- OFFICIAL 뒤 운영자가 corrections 로 새 리비전 → 다시 SUBMITTED 를 거치지 않고 OFFICIAL(운영자 입력은 즉시 확정 — 08-24 E1 유지).
+- 이의 테이블에 행이 남아 있는 alpha 에서 drop → 마이그레이션이 행 수를 로그로 남기고 진행(복구 불가 경고, 사전 pg_dump).
+
+### Error
+- 관전자·팀장이 `officialize` 호출 → 403(기존 가드 유지 스펙).
+- `matchType` 에 `league` 가 빠진 소비처(프론트 필터·라벨)가 있으면 타입 오류로 잡히도록 유니온을 닫는다.
+
+### Mock updates
+- 이의 픽스처·MSW 핸들러 삭제. 결과 리비전 픽스처에서 CHANGE_REQUESTED 계열 제거(또는 Ambiguity 1 결과에 따라 유지).
+
+## Parallel Work Breakdown
+
+### BE (순차)
+- **BE-1 상태 소비처 실측 + 행복 경로 단순화.** 세 중간 상태의 읽기/쓰기 자리 전수 목록 → 0 이면 enum·전이 코드 제거, 아니면 [ASK]. 공개 API 의 `resultStage` 에 "확정 전" 값 추가. 순위·전적 집계가 OFFICIAL 만 세는 것을 변이로 증명.
+- **BE-2 이의 제거.** 서비스·컨트롤러·알림 4종·DTO 삭제 → 식별자 0건 → drop 마이그레이션 별도 PR(사용자 승인).
+- **BE-3 롤링 교체 차단.** 교체 커맨드 핸들러가 대회 설정을 읽어 `'rolling'` 이면 400. `'limited'` 회귀 스펙.
+- **BE-4 전적 구분.** 팀 전적 집계에 리그/친선 축, 개인 기록 `matchType: 'league'`.
+
+### FE (BE 배포 뒤, 3안 선택 뒤)
+- **FE-1** "확정 전" 태그(경기 카드·상세·라이브 스코어) + 어드민 "확정 전 N건" 큐.
+- **FE-2** 이의 화면·버튼·알림 착지 삭제. 대회 상세에 운영자 연락 경로가 있는지 확인(없으면 3안).
+- **FE-3** 롤링 대회 콘솔의 교체 UI 숨김(설정 기반, 하드코딩 금지).
+- **FE-4** 팀 전적 탭 4종 · 개인 기록 필터.
+
+### Infra / QA
+- alpha 하네스: 종료 → 결과 보내기 → 공개 API "확정 전" → officialize → 공개 API official + 순위 변화. 403/429 는 ⚠️.
+
+## Acceptance Criteria
+
+- [ ] 행복 경로 API 호출 2회(제출·확인)로 OFFICIAL 도달(통합 스펙).
+- [ ] `git grep -c -w -e dispute -i -- apps/v1_api/src/league-matches apps/v1_api/src/tournament-operations apps/v1_web/src` → 0(장터 분쟁 `disputes/` 는 별개 도메인 — 경로로 구분).
+- [ ] 롤링/제한 두 대회에서 교체 커맨드 결과가 갈리는 통합 스펙 2건.
+- [ ] 팀 전적 4탭 · 개인 기록 리그 구분이 alpha 공개 API 로 확인.
+- [ ] FE 항목마다 "3안 제시 → 선택" 기록.
+
+## Tech Debt Resolved
+
+- 결과 상태 7개 → 실제 쓰이는 것만. 이의 도메인 전체 삭제. 리그/대회 두 결과 입력 경로 → 하나(165 와 함께).
+
+## Security Notes
+
+- `officialize` 권한은 운영자·어드민만(기존 가드). 확인 단계가 하나뿐이므로 권한 오류가 곧 결과 조작 — 통합 스펙에 403 케이스 필수.
+- drop 마이그레이션 2건(이의 테이블 · 필요 시 enum 값)은 사용자 직접 승인 + 사전 pg_dump.
+
+## Risks & Dependencies
+
+- Task 163 이 먼저 "명단 = 출전자" 를 끝내야 롤링 교체 제거가 명단과 모순되지 않는다.
+- Task 165 BE-1 이 먼저 있어야 리그 게임의 SUBMITTED → OFFICIAL 이 콘솔에서 보인다.
+- 이의 삭제는 되돌릴 수 없다 — 08-24 D2/E4 의 "이의 수락 시 정정·무효" 흐름이 통째로 사라진다. 정본 §6 에 "잃는 것" 으로 기록됨.
+
+## Ambiguity Log
+
+1. **CHANGE_REQUESTED · SUPPLEMENT_REQUESTED · REJECTED 의 운명.** 소비처 실측 후 결정. 0 이면 삭제, 있으면 [ASK].
+2. **"확정 전" 의 API 값 이름.** `resultStage` 기존 값 체계에 맞춰 BE-1 에서 정한다.
+3. **친선경기의 정의.** `leagueId=null` 이고 fixture 연결도 없는 팀 매치. 용병 매치·개인 매치(`V1Match`)는 D2 로 밖.

@@ -303,4 +303,35 @@ describe('Task 163 BE-3 — 팀 매치 라인업의 명단은 출전자 전원�
       position: null,
     });
   });
+  /**
+   * 팀매치 경로에도 **같은 position 가드**가 걸린다. 대회 경로에만 걸면 지운 센티널이
+   * 이쪽 문으로 되돌아온다 — 애초에 `'BENCH'` 를 쓰던 것이 이 경로다.
+   *
+   * ⚠️ 재는 것은 **클라이언트가 보낸 position 뿐**이다. 골키퍼는 서버가 `'GK'` 로 눌러
+   * 담는데 풋살 카탈로그에는 'GK' 가 없어서(GOLEIRO·FIXO·ALA·PIVO), 그 리터럴까지 재면
+   * 풋살 골키퍼 저장이 전부 막힌다 — 아래 두 번째 케이스가 그것을 지킨다.
+   */
+  it('팀매치 저장도 폐기한 BENCH 센티널을 400 으로 거부한다', async () => {
+    await expect(
+      service.saveLineup(authUser(ids.hostOwner), ids.teamMatch, 'task163-be3-bench-reject', {
+        expectedVersion: await currentVersion(ids.hostOwner),
+        participants: [{ userId: ids.hostOwner, displayName: '팀장', jerseyNumber: 1, position: 'BENCH' }],
+      }),
+    ).rejects.toMatchObject({ response: { code: 'LINEUP_POSITION_INVALID' } });
+  });
+
+  it('카탈로그 포지션과 서버가 정하는 GK 리터럴은 함께 통과한다', async () => {
+    await service.saveLineup(authUser(ids.hostOwner), ids.teamMatch, 'task163-be3-catalog-ok', {
+      expectedVersion: await currentVersion(ids.hostOwner),
+      participants: [
+        // goalkeeper:true 는 position 을 보내지 않는다 — 서버가 'GK' 로 채운다.
+        { userId: ids.hostOwner, displayName: '팀장', jerseyNumber: 1, goalkeeper: true },
+        { userId: ids.hostP2, displayName: '필드', jerseyNumber: 2, position: 'FIXO' },
+      ],
+    });
+
+    const { byName } = await currentRosterByName(hostSideId);
+    expect(byName.get('팀장')?.position).toBe('GK');
+    expect(byName.get('필드')?.position).toBe('FIXO');
+  });
 });

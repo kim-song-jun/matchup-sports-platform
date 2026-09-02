@@ -2214,8 +2214,11 @@ label.tm-btn:focus-within {
 }
 
 /* 카드가 1개뿐일 때는 "다음 카드 peek" 여지를 남길 이유가 없다 — 88% 고정폭이
-   오른쪽에 의도된 듯한 빈 여백을 남기므로, 유일한 자식일 때는 폭을 꽉 채운다. */
-.tm-home-featured-carousel > *:only-child {
+   오른쪽에 의도된 듯한 빈 여백을 남기므로, 유일한 자식일 때는 폭을 꽉 채운다.
+   단 **로딩 스켈레톤은 제외**한다: 스켈레톤은 늘 한 장이라 항상 이 규칙에 걸리는데,
+   미디어가 aspect-ratio 라 폭이 곧 높이여서 실제 카드(여러 장이면 88%)와 높이가
+   어긋나고, 데이터가 도착하는 순간 그 차이만큼 화면이 밀린다. */
+.tm-home-featured-carousel > *:only-child:not(.tm-featured-skeleton) {
   flex: 1 1 100%;
 }
 

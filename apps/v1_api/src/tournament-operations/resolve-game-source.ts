@@ -60,6 +60,11 @@ export async function resolveGameSource(
     return { kind: 'fixture', tournamentId: fixture.tournamentId, fixtureId: game.tournamentFixtureId };
   }
 
+  // ⚠️ **fail-open 을 만들지 않는다.** "대회 대진이 아니면 전부 팀매치" 로 두면 enum 에
+  // 이미 있는 `COMPETITION_FIXTURE`·`FRIENDLY_MATCH`(R1 expand 로 추가된 통합 후 이름)와
+  // 앞으로 늘어날 값까지 조용히 팀매치로 해석한다 — 그 경기들엔 운영 규칙이 다르게 걸린다
+  // (예: takeover 요구 여부). 아는 값만 통과시키고 나머지는 호출부가 404 로 닫는다.
+  if (game.sourceType !== V1GameSourceType.TEAM_MATCH) return null;
   if (game.teamMatchId === null) return null;
   const teamMatch = await tx.v1TeamMatch.findUnique({
     where: { id: game.teamMatchId },

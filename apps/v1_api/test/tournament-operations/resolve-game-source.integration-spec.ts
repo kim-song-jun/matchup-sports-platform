@@ -27,6 +27,7 @@ import type { GameCommandContext, GameSourceCreationInput } from '../../src/game
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 import { TournamentResultReviewService } from '../../src/tournament-operations/results/tournament-result-review.service';
+import { resolveGameSource } from '../../src/tournament-operations/resolve-game-source';
 
 const ids = {
   platformOps: '8b000000-0000-4000-8000-000000000001',
@@ -102,7 +103,9 @@ describe('Task 165 BE-1 — 콘솔 결과 명령 경계가 리그 경기를 해�
       data: { userId: ids.platformOps, adminRole: 'ops', status: 'active' },
       select: { id: true },
     });
-    await prisma.v1Sport.create({ data: { id: ids.sport, code: 'futsal', name: 'Task 165 Futsal' } });
+    // ⚠️ `V1Sport.code` 는 @unique 다. 시드(seed-alpha-*-qa.ts)가 'futsal' 을 쓰므로
+    // 같은 code 로 만들면 시드가 돈 DB 에서 이 스펙이 깨진다 — 태스크 전용 code 를 쓴다.
+    await prisma.v1Sport.create({ data: { id: ids.sport, code: 'futsal-task165', name: 'Task 165 Futsal' } });
     await prisma.v1Region.create({ data: { id: ids.region, code: 'TASK165', name: 'Task 165 Region', level: 1 } });
     await prisma.v1Team.createMany({
       data: [
@@ -218,4 +221,34 @@ describe('Task 165 BE-1 — 콘솔 결과 명령 경계가 리그 경기를 해�
   it('친선 팀매치는 열리지 않는다 — 대회 운영 권한 체계 밖이다', async () => {
     expect(await probeBoundary(ids.platformOps, friendlyGameId)).toBe('GAME_NOT_FOUND');
   });
+  /**
+   * enum 에는 이미 `COMPETITION_FIXTURE`·`FRIENDLY_MATCH` 가 있고(R1 expand) 앞으로 더
+   * 늘어난다. "대회 대진이 아니면 전부 팀매치" 로 두면 그 경기들이 **운영 규칙이 다른 채로**
+   * 콘솔에 열린다(예: takeover 요구 여부).
+   *
+   * DB 로는 이 상태를 만들 수 없다 — `v1_games_source_exactly_one_ck` 가 sourceType 과
+   * FK 조합을 강제해서 sourceType 만 뒤집는 UPDATE 가 거부된다(실측). 그래서 해석기를 직접
+   * 부르고, **조회를 시도하기도 전에** 걸러지는 것까지 본다: 넘긴 tx 가 쓰이면 던진다.
+   */
+  it('알 수 없는 sourceType 은 조회도 하기 전에 막힌다 — fail-open 이 아니다', async () => {
+    const txThatMustNotBeUsed = new Proxy(
+      {},
+      {
+        get() {
+          throw new Error('알 수 없는 sourceType 인데 DB 를 조회했다 — 그 자체가 fail-open 이다');
+        },
+      },
+    ) as Parameters<typeof resolveGameSource>[0];
+
+    for (const sourceType of [V1GameSourceType.COMPETITION_FIXTURE, V1GameSourceType.FRIENDLY_MATCH]) {
+      await expect(
+        resolveGameSource(txThatMustNotBeUsed, {
+          sourceType,
+          tournamentFixtureId: null,
+          teamMatchId: ids.leagueMatch,
+        }),
+      ).resolves.toBeNull();
+    }
+  });
+
 });

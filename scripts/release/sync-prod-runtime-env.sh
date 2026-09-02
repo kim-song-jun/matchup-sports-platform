@@ -40,7 +40,9 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/private-key-pem.sh"
 # does the same — writing three of four values would take the API down on the next deploy,
 # which is worse than leaving push off. The group's earlier values in Parameter Store, if any,
 # stay as they were.
-for var_name in $(compgen -v | grep '^SECRET_.*_PRIVATE_KEY$' || true); do
+# An explicit list, not a *_PRIVATE_KEY glob: VAPID_PRIVATE_KEY is a base64url string, not a
+# PEM, and a glob would have "normalised" it into a warning and dropped the web-push key.
+for var_name in SECRET_APNS_PRIVATE_KEY SECRET_FIREBASE_PRIVATE_KEY; do
   raw="${!var_name-}"
   [[ -n "${raw}" ]] || continue
   if pem="$(normalize_private_key "${raw}")"; then

@@ -448,6 +448,8 @@ export const gameSchemaSourceManifest = {
   // backfill 없음). 바인딩된 20260729000100_v1_game_operations 는 건드리지 않았으므로
   // migration 해시는 그대로다. 이 브랜치의 파일에 `shasum -a 256` 을 돌려 새로 계산했다.
   // 2026-09-02 재핀 (Task 163 BE-3): V1GameParticipant.started 의 `///` 주석만 바뀌었다.
+  // (리뷰 반영으로 한 번 더 재핀 — 첫 문안에 되감은 BE-2 설계(kickoff 이 전술보드를 읽어
+  //  선발을 정한다)가 남아 있었다. 정본 §3 은 그 경로를 폐기했으므로 문안을 바로잡았다.)
   // 모델·필드·enum·relation·index 는 **하나도** 달라지지 않았다 — 그 주석이 "team-match 는
   // 이 컬럼과 무관하게 position='BENCH' 관례를 쓴다" 고 적고 있었는데 그게 이번에 사실이
   // 아니게 됐다. 스키마가 옛 관례를 권위 있게 서술한 채 남으면 다음 사람이 사라진 센티널을
@@ -455,7 +457,7 @@ export const gameSchemaSourceManifest = {
   // (20260902000000_v1_lineup_bench_to_started, UPDATE 한 줄)이고 바인딩된
   // 20260729000100_v1_game_operations 는 건드리지 않았으므로 migration 해시는 그대로다.
   // 이 브랜치의 파일에 sha256 을 다시 돌려 계산한 값이다.
-  schema: 'c6d583d56e07e7c098536697574aa783233af1a3171d57e2b707d6f92d7d0612',
+  schema: '47bafb512b8abaf8c5d6aa0efa4e4483b7b24d72822b545aea5b2b7b9f631f01',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

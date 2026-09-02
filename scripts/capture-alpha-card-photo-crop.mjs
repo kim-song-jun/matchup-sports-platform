@@ -14,7 +14,9 @@ async function login(email) {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password: PW }),
   });
-  const token = (r.headers.getSetCookie?.() ?? []).map((c) => /teameet_v1_session=([^;]+)/.exec(c)?.[1]).find(Boolean);
+  // getSetCookie 가 없는 Node 런타임(≤18.13)에서는 합쳐진 set-cookie 문자열에서 찾는다.
+  const cookies = r.headers.getSetCookie?.() ?? [r.headers.get('set-cookie') ?? ''];
+  const token = cookies.map((c) => /teameet_v1_session=([^;]+)/.exec(c)?.[1]).find(Boolean);
   if (!token) throw new Error(`${email} 로그인 실패 ${r.status}`);
   const me = await (await fetch(`${BASE}/api/v1/auth/me`, { headers: { cookie: `teameet_v1_session=${token}` } })).json();
   return { token, userId: me.data.user.id };

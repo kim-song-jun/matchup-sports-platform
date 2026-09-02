@@ -53,7 +53,7 @@ export class TeamContactsService {
    * emitToManyDeferred 는 수신자 해석을 지연시키고 에러를 삼키므로,
    * 알림 실패가 컨택 생성/수락 자체를 되돌리지 않는다.
    */
-  private notifyTeamManagers(teamId: string, type: NotificationEventType, targetId: string) {
+  private notifyTeamManagers(teamId: string, type: NotificationEventType, targetId: string | null) {
     this.notifications.emitToManyDeferred(
       async () => {
         const rows = await this.prisma.v1TeamMembership.findMany({
@@ -270,12 +270,13 @@ export class TeamContactsService {
     if (nextStatus === 'accepted' || nextStatus === 'declined') {
       // 응답 결과는 '보낸 팀' 이 알아야 한다. 철회는 상대가 아직 안 봤으므로 알리지 않는다.
       // roomId 로 보낸다 — 딥링크가 /chat/{roomId} 라 알림 클릭이 바로 채팅방으로 가야 한다
-      // (create() 의 team_contact_received 와 같은 이유). roomId 가 없는 레거시 행 방어로
-      // contactId 로 폴백한다.
+      // (create() 의 team_contact_received 와 같은 이유). 백필 뒤엔 방 없는 컨택이 없지만,
+      // 혹시 없으면 contactId 로 폴백하지 않는다 — /chat/{contactId} 는 깨진 링크다
+      // (PR #977 Copilot 지적). targetId 를 비워 링크 없는 알림으로 보낸다.
       this.notifyTeamManagers(
         contact.fromTeamId,
         nextStatus === 'accepted' ? 'team_contact_accepted' : 'team_contact_declined',
-        chatRoomId ?? contactId,
+        chatRoomId,
       );
     }
     return { contact: updated, alreadyProcessed: false, chatRoomId };

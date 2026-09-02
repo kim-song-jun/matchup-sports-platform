@@ -24,6 +24,10 @@ is_private_key() {
 # shape parses — the caller decides whether that fails the deploy or only skips the key.
 normalize_private_key() {
   local raw="$1" candidate
+  # A key pasted from Windows carries CRLF. OpenSSL reads it anyway, so it would pass the
+  # check below and reach the host with a \r on every line — and the runtime turns only the
+  # literal \n back into newlines. LF throughout, before any shape is tried.
+  raw="${raw//$'\r'/}"
   # A PEM as stored, either with real newlines or flattened to literal backslash-n.
   if is_private_key "${raw}"; then printf '%s' "${raw}"; return 0; fi
   # The newline is built first. Inside a ${var//pattern/replacement} the $'...' form is not

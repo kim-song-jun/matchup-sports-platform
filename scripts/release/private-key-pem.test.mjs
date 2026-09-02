@@ -30,6 +30,14 @@ test('a base64-encoded PEM (with wrapping) is decoded', () => {
   assert.equal(run('normalize_private_key', wrapped).trimEnd(), pem.trimEnd());
 });
 
+test('a PEM pasted with Windows CRLF comes out LF-only', () => {
+  const crlf = pem.replace(/\n/g, '\r\n');
+  const out = run('normalize_private_key', crlf);
+  assert.ok(!out.includes('\r'), 'no carriage return may survive');
+  assert.equal(out.trimEnd(), pem.trimEnd());
+  assert.ok(!run('private_key_one_line', out).includes('\r'));
+});
+
 test('a truncated PEM still carrying the BEGIN line is refused', () => {
   const truncated = pem.slice(0, Math.floor(pem.length * 0.6));
   assert.throws(() => run('normalize_private_key', truncated), /Command failed/);

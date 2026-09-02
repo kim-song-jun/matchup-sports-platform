@@ -88,8 +88,11 @@ async function main() {
   const before = await servingCommit();
   console.log(`서빙(전)  ${before}\n`);
 
-  const browser = await chromium.launch();
   const rows = [];
+  const browser = await chromium.launch();
+  // ⚠️ 아래 전체를 try/finally 로 감싼다 — 예외 경로에서도 브라우저를 닫기 위해서다.
+  try {
+
   try {
     for (const w of WIDTHS) {
       const ctx = await browser.newContext({ viewport: { width: w.width, height: w.height } });
@@ -132,7 +135,13 @@ async function main() {
       await new Promise((r) => setTimeout(r, 4_000)); // 403 회피 간격
     }
   } finally {
-    /* 요약 누수 측정에서 계속 쓴다 — 아래에서 닫는다 */
+    /**
+     * ⚠️ 여기서 `browser` 를 닫지 않는 건 **아래 요약 누수 측정에서 계속 쓰기 때문**이다.
+     * 그래서 이 블록은 비어 있고, 대신 **`main()` 전체를 감싸는 finally 가 닫는다**(아래).
+     * 예전엔 그 바깥 finally 가 없어서, `page.goto(..., timeout: 60_000)` 이 타임아웃을
+     * 던지면 마지막 `browser.close()` 에 도달하지 못하고 **브라우저가 열린 채 남았다.**
+     * 내가 띄운 프로세스는 예외 경로에서도 내가 닫는다.
+     */
   }
   const browser2 = browser;
 
@@ -162,7 +171,9 @@ async function main() {
     }
   }
 
-  await browser.close();
+  } finally {
+    await browser.close();
+  }
   console.table(rows);
   const after = await servingCommit();
   console.log(`서빙(후)  ${after}`);

@@ -93,7 +93,17 @@ async function main() {
 
     /** 실제로 브라우저를 태워 **최종 URL**을 본다. 상태코드로는 못 가른다(위 주석 참조). */
     const land = async (path) => {
-      await page.goto(`${BASE}${path}`, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+      const res = await page.goto(`${BASE}${path}`, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+      /**
+       * ⚠️ **응답 상태를 안 보면 rate limit 페이지도 "착지"로 센다.** alpha 는 과한 연속 요청에
+       * 전면 403 을 거는데, 그때 최종 URL 은 원래 경로 그대로라 **하위 화면 행이 ✅ 로 통과하고**
+       * 목록 행은 ❌ 로 찍힌다 — 둘 다 거짓이다. URL 만 보면 "못 쟀다"와 "안 넘어갔다"가
+       * 구별되지 않는다. 그래서 상태코드로 먼저 가른다(문구가 아니라 숫자로).
+       */
+      const status = res?.status() ?? 0;
+      if (status === 403 || status === 429 || status === 0) {
+        throw new Error(`HARNESS: ${path} → HTTP ${status} (rate limit/무응답) — 못 쟀다. 화면에 대해 판정하지 마라.`);
+      }
       await page.waitForTimeout(SETTLE_MS);
       const landed = normalize(page.url());
       await sleep(PACE_MS);

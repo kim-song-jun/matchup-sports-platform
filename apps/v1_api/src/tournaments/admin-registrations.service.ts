@@ -16,8 +16,12 @@ import {
   AdminRegistrationListQueryDto,
   AdminRosterLockDto,
 } from './dto/admin-registration.dto';
+import {
+  findLeagueAdmissionBlocker,
+  leagueAdmissionBlockerMessage,
+} from '../league-matches/league-team-admission';
 import { isCapacityFull } from './registration-capacity';
-import { ALL_COMPETITION_KINDS, findTournamentOnSurface } from './tournament-surface-lookup';
+import { ALL_COMPETITION_KINDS, findTournamentOnSurface, LEAGUE_KINDS } from './tournament-surface-lookup';
 
 /** 어드민이 취소 처리할 수 있는 신청 상태 목록. */
 const ADMIN_CANCELLABLE_STATUSES: V1TournamentRegistration['status'][] = [
@@ -205,6 +209,41 @@ export class AdminRegistrationsService {
             code: 'TOURNAMENT_CAPACITY_FULL',
             message: '정원이 모두 찼어요. 더 확정할 수 없어요.',
           });
+        }
+      }
+
+      // 리그 확정은 **리그 축 로스터도 만든다** (D7, contract 전까지 역방향 dual-write).
+      //
+      // 리그 순위·대진·승강은 전부 `V1LeagueTeam` 을 읽는다 — 통합 축 등록만 `confirmed` 로
+      // 두면 운영자 화면엔 "확정" 이 뜨는데 **그 팀은 순위표에도 대진 생성 대상에도 없다.**
+      // 에러가 아니라 조용한 누락이라 대진을 짜고 나서야 드러난다.
+      //
+      // 판정은 `findLeagueAdmissionBlocker` 를 지난다 — 어드민 `addTeam` 과 같은 함수다.
+      // 신청 시점에 통과했어도 확정까지 사이에 팀이 해체되거나 형제 티어에 들어갈 수
+      // 있으므로 **여기서 다시** 본다.
+      if (dto.decision === 'confirm') {
+        const leagueMirror = await findTournamentOnSurface(tx, LEAGUE_KINDS, {
+          where: { id: registration.tournamentId },
+          select: { id: true },
+        });
+        if (leagueMirror !== null) {
+          const blocker = await findLeagueAdmissionBlocker(tx, {
+            leagueId: registration.tournamentId,
+            teamId: registration.teamId,
+          });
+          // 이미 로스터에 있으면 통과시킨다 — 백필로 들어온 팀이나 어드민이 손으로 넣은
+          // 팀의 신청을 확정하는 것은 정상이고, 그때 막으면 확정 자체가 불가능해진다.
+          if (blocker !== null && blocker.kind !== 'ALREADY_IN_LEAGUE') {
+            throw new ConflictException({
+              code: 'LEAGUE_TEAM_INVALID',
+              message: leagueAdmissionBlockerMessage(blocker),
+            });
+          }
+          if (blocker === null) {
+            await tx.v1LeagueTeam.create({
+              data: { leagueId: registration.tournamentId, teamId: registration.teamId },
+            });
+          }
         }
       }
 

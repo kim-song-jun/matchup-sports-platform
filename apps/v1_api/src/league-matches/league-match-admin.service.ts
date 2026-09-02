@@ -17,7 +17,8 @@ import {
   leagueMirrorCreateData,
   toMirrorSource,
 } from '../tournaments/league-competition-mirror';
-import { buildOddTeamCountWarning, checkLeagueTeamAddAllowed, checkLeagueTeamRemovalAllowed } from './league-lifecycle-rules';
+import { buildOddTeamCountWarning, checkLeagueTeamRemovalAllowed } from './league-lifecycle-rules';
+import { findLeagueAdmissionBlocker, leagueAdmissionBlockerMessage } from './league-team-admission';
 import { tierLabel } from './league-series-admin.service';
 import { resolveResultStage } from './league-result-stage';
 import { resolveIsForfeit } from './league-match-forfeit.service';
@@ -31,6 +32,7 @@ import {
   CreateManualLeagueFixtureDto,
   GenerateLeagueFixturesDto,
   RegenerateLeagueFixturesDto,
+  OpenLeagueRegistrationDto,
   RevertLeagueCompletionDto,
   UpdateLeagueFixtureDto,
 } from './dto/league-match.dto';
@@ -419,53 +421,14 @@ export class LeagueMatchAdminService {
   async addTeam(user: V1AuthUser, leagueId: string, dto: AddLeagueTeamDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const league = await this.loadLeague(leagueId);
-    const alreadyInLeague = league.teams.some((entry) => entry.teamId === dto.teamId);
-    const team = await this.prisma.v1Team.findFirst({
-      where: { id: dto.teamId, status: 'active', deletedAt: null },
-      select: { id: true, sportId: true },
-    });
-    const blocked = checkLeagueTeamAddAllowed({
-      alreadyInLeague,
-      teamActive: team !== null,
-      teamSportId: team?.sportId ?? '',
-      leagueSportId: league.sportId,
-    });
-    if (blocked === 'ALREADY_IN_LEAGUE') {
-      throw new UnprocessableEntityException({ code: 'LEAGUE_TEAM_INVALID', message: '이미 참가 중인 팀이에요.' });
-    }
-    if (blocked === 'TEAM_INVALID') {
+    // 판정은 `findLeagueAdmissionBlocker` 하나를 지난다 — D7 의 참가 신청 확정 훅이 같은
+    // 함수를 부르기 때문이다. 여기만 따로 검사하면 확정 경로가 이 불변식들을 우회한다.
+    const blocker = await findLeagueAdmissionBlocker(this.prisma, { leagueId, teamId: dto.teamId });
+    if (blocker !== null) {
       throw new UnprocessableEntityException({
         code: 'LEAGUE_TEAM_INVALID',
-        message: '리그 종목과 일치하는 활성 팀만 등록할 수 있어요.',
+        message: leagueAdmissionBlockerMessage(blocker),
       });
-    }
-    // 그룹 B 감사 결함 1(첫 번째 발견): checkLeagueTeamAddAllowed는 "이 리그 안에서만"
-    // 중복을 본다 — 시리즈 소속 리그에서는 같은 팀이 형제 티어(같은 seriesId·seasonNo의
-    // 다른 리그)에 이미 있어도 통과했다. seedSeason()이 이미 강제하는 "한 팀을 두 티어에
-    // 동시에 배정할 수 없다" 불변식(league-series-admin.service.ts:225-230)을 이 경로에도
-    // 그대로 적용한다 — 안 하면 그 시즌의 공개 순위표에 같은 팀이 두 티어에 동시에
-    // 노출되고(standings()가 로스터 기준이라 대진을 안 돌려도 즉시 발생), 승강 확정은
-    // computedByTeamId가 중복 teamId를 뒤 티어 값으로 덮어써 entries.length 불일치로
-    // 항상 422 PROMOTION_ENTRIES_DUPLICATED에 막힌다.
-    if (league.seriesId !== null) {
-      const siblingLeague = await this.prisma.v1League.findFirst({
-        where: {
-          seriesId: league.seriesId,
-          seasonNo: league.seasonNo,
-          id: { not: leagueId },
-          teams: { some: { teamId: dto.teamId } },
-        },
-        select: { tier: true },
-      });
-      if (siblingLeague !== null) {
-        throw new UnprocessableEntityException({
-          code: 'LEAGUE_TEAM_INVALID',
-          message:
-            siblingLeague.tier === null
-              ? '이 팀은 이미 같은 시즌의 다른 리그에 참가 중이에요. 한 팀을 두 티어에 동시에 배정할 수 없어요.'
-              : `이 팀은 이미 같은 시즌 ${tierLabel(siblingLeague.tier)}에 참가 중이에요. 한 팀을 두 티어에 동시에 배정할 수 없어요.`,
-        });
-      }
     }
 
     const existingFixtureCount = await this.prisma.v1TeamMatch.count({ where: { leagueId } });
@@ -1090,6 +1053,78 @@ export class LeagueMatchAdminService {
 
   // R6/D-3: 전 대진이 확정되면 리그는 자동으로 completed 전이한다(LeagueCompletionProjectionService).
   // 이 메서드는 그 결과를 정정해야 할 때(오심 정정 등)를 위한 운영자 역전이다.
+  /**
+   * 참가 신청을 연다 (D7) — 거울에 `status='open'` + `registrationDeadlineAt` 을 놓는다.
+   *
+   * ## 왜 리그 축이 아니라 거울에 쓰는가
+   * 신청·제출·확정은 **대회 서비스를 그대로** 지난다(`TournamentRegistrationsService` ·
+   * `AdminRegistrationsService`). 그 서비스들이 보는 것은 `V1Tournament.status === 'open'`
+   * 과 `registrationDeadlineAt` 이므로, 신청을 여는 것은 곧 거울에 그 두 값을 놓는 것이다.
+   * 리그 축에 `open` 을 새로 만들면 같은 뜻의 상태가 두 축에 따로 생기고, 둘이 어긋나는
+   * 순간 어느 쪽이 참인지 알 수 없게 된다.
+   *
+   * `V1League.state` 는 `draft` 그대로 둔다 — **신청 접수는 시작이 아니다.**
+   * `LEAGUE_STATE_BY_STATUS` 가 `open → draft` 로 되돌리므로 두 축의 표시가 일치한다.
+   *
+   * ## 닫는 액션이 따로 없는 이유
+   * 마감은 `registrationDeadlineAt` 이 지나면 등록 서비스가 스스로 409
+   * `REGISTRATION_DEADLINE_PASSED` 로 닫고, 대진이 짜이면 `generateFixtures` 가 거울을
+   * `in_progress` 로 옮긴다. 즉 닫히는 경로가 이미 둘이라 세 번째를 만들지 않는다.
+   */
+  async openRegistration(user: V1AuthUser, leagueId: string, dto: OpenLeagueRegistrationDto) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const league = await this.prisma.v1League.findUnique({
+      where: { id: leagueId },
+      select: { id: true, state: true },
+    });
+    if (league === null) {
+      throw new NotFoundException({ code: 'LEAGUE_NOT_FOUND', message: '리그를 찾을 수 없어요.' });
+    }
+    if (league.state !== 'draft') {
+      // 이미 시작했거나 끝난 리그에 신청을 열면, 대진이 짜인 뒤 팀이 들어오는 상태가 된다.
+      throw new ConflictException({
+        code: 'LEAGUE_NOT_DRAFT',
+        message: '아직 시작하지 않은 리그만 참가 신청을 열 수 있어요.',
+      });
+    }
+
+    const deadline = new Date(dto.registrationDeadlineAt);
+    if (deadline.getTime() <= Date.now()) {
+      // 열자마자 닫힌 리그를 만들지 않는다 — 등록 서비스가 곧바로
+      // REGISTRATION_DEADLINE_PASSED 로 막아 "열었는데 아무도 못 신청" 이 된다.
+      throw new UnprocessableEntityException({
+        code: 'LEAGUE_REGISTRATION_DEADLINE_PAST',
+        message: '신청 마감은 지금보다 뒤여야 해요.',
+      });
+    }
+
+    // `updateMany` + `kind` 가드인 이유는 이 파일의 다른 dual-write 와 같다 — `update` 는
+    // `where` 에 unique 필드만 받아 `kind` 를 못 걸어서, 같은 id 의 **진짜 대회**가 있으면
+    // 덮어쓴다. 거울이 아직 없으면(백필 이전) 0행이고, 그건 조용한 성공이 아니라 오류다:
+    // 신청 스택이 보는 행이 없으므로 열었다고 응답하면 거짓말이 된다.
+    const opened = await this.prisma.v1Tournament.updateMany({
+      where: { id: leagueId, kind: 'regular_league' },
+      data: { status: 'open', registrationDeadlineAt: deadline },
+    });
+    if (opened.count === 0) {
+      throw new ConflictException({
+        code: 'LEAGUE_MIRROR_MISSING',
+        message: '이 리그는 아직 통합 대회 축에 올라오지 않아 신청을 열 수 없어요.',
+      });
+    }
+
+    await this.adminContext.logAdminAction(admin, {
+      action: 'league_match.open_registration',
+      targetType: 'league_match',
+      targetId: leagueId,
+      reason: null,
+      fromStatus: 'draft',
+      toStatus: 'open',
+    });
+
+    return { leagueId, status: 'open' as const, registrationDeadlineAt: deadline.toISOString() };
+  }
+
   async revertCompletion(user: V1AuthUser, leagueId: string, dto: RevertLeagueCompletionDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const league = await this.prisma.v1League.findUnique({ where: { id: leagueId }, select: { id: true, state: true } });

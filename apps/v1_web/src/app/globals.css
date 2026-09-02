@@ -8119,13 +8119,17 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
    모르므로 입력을 정규화하는 것이 유일한 근본 해결이다(GitFut 가 GitHub 아바타를 받는 것과
    같은 구조). 스크림·패널의 페이드는 위 .tm-modal-scrim/.tm-modal-panel 규칙을 그대로 쓴다. */
 .tm-photo-crop-scrim {
-  position: fixed; inset: 0; z-index: 50;
-  display: flex; align-items: flex-end; justify-content: center; padding: 16px;
+  position: fixed; inset: 0; z-index: var(--z-modal);
+  display: flex; align-items: flex-end; justify-content: center;
+  /* 아래 여백은 홈 인디케이터(safe-area)만큼 더 준다 -- 확인 버튼이 그 밑에 깔리지 않게 */
+  padding: 16px 16px calc(16px + var(--v1-shell-safe-bottom, 0px));
   background: rgba(25, 31, 40, 0.48);
 }
 @media (min-width: 640px) { .tm-photo-crop-scrim { align-items: center; } }
 .tm-photo-crop-panel {
-  width: 100%; max-width: 360px; overflow: hidden;
+  width: 100%; max-width: 360px;
+  /* 화면이 낮으면(가로 폰·키보드) 패널 안에서 스크롤한다 -- 확인 버튼이 화면 밖으로 밀려나면 안 된다 */
+  max-height: calc(100dvh - 32px - var(--v1-shell-safe-bottom, 0px)); overflow-y: auto;
   background: var(--surface); border-radius: var(--radius-container);
   box-shadow: var(--shadow-modal);
   display: flex; flex-direction: column; align-items: center;

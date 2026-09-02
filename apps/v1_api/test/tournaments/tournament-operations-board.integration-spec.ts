@@ -2444,9 +2444,17 @@ describe('Task 18 operations board query-count/perf proof at realistic scale (re
     // `V1GameOperationFlag.findUnique` (the retired `GAME_READ` mode read), is gone -- `list()` no
     // longer reads any operation flag at all, see tournament-operations-board.service.ts's
     // "Retired: GAME_READ compare/legacy read authority" doc section.
-    expect(queryLog).toHaveLength(4);
+    //
+    // Task 165 BE-2: `V1Tournament.findFirst` joined this list. `list()` must know whether the
+    // competition is a **regular-league mirror** before it can decide which table holds its
+    // matches (`V1TournamentFixture` for tournaments, `V1TeamMatch` for leagues). It is ONE
+    // constant round-trip per page -- it does not grow with page size, which is exactly what
+    // this test defends. The count moving 4 -> 5 is the intended new contract, not a regression;
+    // an N+1 regression would show up as a per-row multiple, not a fixed +1.
+    expect(queryLog).toHaveLength(5);
     expect([...queryLog].sort()).toEqual(
       [
+        'V1Tournament.findFirst',
         'V1TournamentFixture.findMany',
         'V1GameLineup.findMany',
         'V1GameSide.findMany',

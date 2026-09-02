@@ -44,12 +44,19 @@ export const GOALKEEPER_MARKER = 'GK';
  * 저장 요청이 실은 명단 **하나**임을 한 곳에서 확정한다.
  *
  * 정본 §3 이 선발/후보 구분을 없앴으므로 `participants` 가 정본 형태이고,
- * `starters`/`bench` 는 프론트가 아직 보내는 옛 형태다 — 어느 쪽에 담겨 왔든 같은 명단에
- * 합쳐지고, **담긴 위치가 저장 결과를 바꾸지 않는다.** 세 배열을 각자 훑는 코드가
- * 생기면 그 순간 "어느 배열이었나" 가 다시 의미를 갖게 되므로 여기서만 편다.
+ * `starters`/`bench` 는 프론트가 아직 보내는 옛 형태다 — 어느 쪽에 담겨 왔든 같은 명단이
+ * 되고, **담긴 위치가 저장 결과를 바꾸지 않는다.** 세 배열을 각자 훑는 코드가 생기면 그
+ * 순간 "어느 배열이었나" 가 다시 의미를 갖게 되므로 여기서만 편다.
+ *
+ * ⚠️ **합치지 않고 고른다.** 전환기의 클라이언트는 같은 명단을 두 모양으로 **함께** 보낼
+ * 수 있는데(새 필드를 붙이면서 옛 필드를 아직 안 지운 배포), 무조건 이어 붙이면 같은
+ * 사람이 두 번 실려 `LINEUP_DUPLICATE_PARTICIPANT` 로 400 이 난다 — 보내는 쪽은 아무것도
+ * 잘못한 게 없는데 저장이 막힌다. `participants` 가 비어 있지 않으면 **그것만** 쓰고,
+ * 없을 때만 옛 두 칸으로 돌아간다.
  */
 function rosterOf(dto: SaveTeamMatchLineupDto): TeamMatchLineupParticipantDto[] {
-  return [...(dto.participants ?? []), ...(dto.starters ?? []), ...(dto.bench ?? [])];
+  if (dto.participants !== undefined && dto.participants.length > 0) return dto.participants;
+  return [...(dto.starters ?? []), ...(dto.bench ?? [])];
 }
 
 interface TeamMatchLineupContext {

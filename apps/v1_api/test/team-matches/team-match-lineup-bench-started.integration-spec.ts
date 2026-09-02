@@ -368,4 +368,29 @@ describe('Task 163 BE-3 — 팀 매치 라인업의 명단은 출전자 전원�
     ).rejects.toMatchObject({ response: { code: 'LINEUP_EMPTY' } });
   });
 
+  /**
+   * 전환기의 클라이언트는 같은 명단을 **두 모양으로 함께** 보낼 수 있다 — 새 필드를
+   * 붙이면서 옛 필드를 아직 안 지운 배포가 그렇다. 무조건 이어 붙이면 같은 사람이 두 번
+   * 실려 `LINEUP_DUPLICATE_PARTICIPANT` 로 400 이 난다. 보내는 쪽은 아무것도 잘못한 게
+   * 없는데 저장이 막히는 것이라, `participants` 가 있으면 그것만 쓴다.
+   */
+  it('participants 와 옛 두 칸을 함께 보내도 중복으로 막히지 않는다', async () => {
+    const roster = [
+      { userId: ids.hostOwner, displayName: '팀장', jerseyNumber: 1, goalkeeper: true },
+      { userId: ids.hostP2, displayName: '필드', jerseyNumber: 2 },
+    ];
+    await service.saveLineup(authUser(ids.hostOwner), ids.teamMatch, 'task163-be3-both-shapes', {
+      expectedVersion: await currentVersion(ids.hostOwner),
+      // 같은 명단을 두 모양으로 함께 — 전환기 클라이언트가 실제로 보낼 수 있는 형태.
+      participants: roster,
+      starters: roster,
+      bench: [],
+    });
+
+    const { byName } = await currentRosterByName(hostSideId);
+    // 두 번 실리면 여기가 4가 되거나 애초에 400 으로 막힌다.
+    expect(byName.size).toBe(2);
+    expect([...byName.keys()].sort()).toEqual(['팀장', '필드']);
+  });
+
 });

@@ -5,6 +5,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { resolveGameSource } from '../resolve-game-source';
 import { assertPenaltyShootoutPersistable } from '../../games/core/penalty-shootout-outcome';
 import { parseResultPolicy } from '../../tournaments/competition-config/competition-config.parse';
 import {
@@ -845,27 +846,33 @@ export class TournamentResultReviewService {
               id: true,
               sourceType: true,
               tournamentFixtureId: true,
+              // 리그 경기는 팀 매치 기반이라 대회 id 를 여기서 찾는다(resolve-game-source.ts).
+              teamMatchId: true,
               state: true,
               version: true,
               currentOfficialRevisionId: true,
               competitionConfigVersionId: true,
             },
           });
-          if (game === null || game.sourceType !== V1GameSourceType.TOURNAMENT_FIXTURE || game.tournamentFixtureId === null) {
+          if (game === null) {
             throw this.notFound();
           }
-          const fixture = await tx.v1TournamentFixture.findUnique({
-            where: { id: game.tournamentFixtureId },
-            select: { tournamentId: true },
-          });
-          if (fixture === null) {
+          // **이 한 줄이 콘솔의 유일한 출처 경계다.** 다섯 개 공개 명령이 전부 이
+          // `withResultCommand` 를 지난다 — 예전엔 여기서 `sourceType !== TOURNAMENT_FIXTURE`
+          // 를 404 로 튕겨서 리그 경기가 콘솔에 아예 들어오지 못했고, 그래서 리그가 전용
+          // 결과 입력 모달을 따로 갖고 있어야 했다(정본 §4 가 "같은 콘솔" 로 확정).
+          const source = await resolveGameSource(tx, game);
+          if (source === null) {
             throw this.notFound();
           }
           const principal = await this.staffAccess.assertAccess(
             {
               userId: input.userId,
               action: input.staffAction,
-              resource: { tournamentId: fixture.tournamentId, fixtureId: game.tournamentFixtureId },
+              // 대회와 **같은 함수**를 지난다. 리그 거울엔 스태프 배정이 보통 없지만,
+              // 플랫폼 관리자와 대회 운영자는 배정 없이도 통과하는 것이 원래 규칙이라
+              // 그대로 성립한다 — 배정 없는 일반 사용자는 여전히 403 이다.
+              resource: { tournamentId: source.tournamentId, fixtureId: source.fixtureId ?? undefined },
             },
             tx,
           );
@@ -873,8 +880,8 @@ export class TournamentResultReviewService {
             actorType: 'USER',
             actorUserId: input.userId,
             role: principal.role,
-            tournamentId: fixture.tournamentId,
-            fixtureId: game.tournamentFixtureId,
+            tournamentId: source.tournamentId,
+            ...(source.fixtureId === null ? {} : { fixtureId: source.fixtureId }),
             authorizationSubject: principal.authorizationSubject,
           };
           const payloadHash = canonicalGameCommandPayloadHash(input.payload);
@@ -914,8 +921,8 @@ export class TournamentResultReviewService {
                   authorizationSubject: principal.authorizationSubject,
                   directorOfficializeFlag,
                 },
-                tournamentId: fixture.tournamentId,
-                fixtureId: game.tournamentFixtureId,
+                tournamentId: source.tournamentId,
+                fixtureId: source.fixtureId,
               };
               throw new ForbiddenException({
                 code: 'DIRECTOR_OFFICIALIZE_DISABLED',
@@ -978,8 +985,8 @@ export class TournamentResultReviewService {
               authorizationSubject: principal.authorizationSubject,
               ...(directorOfficializeFlag === null ? {} : { directorOfficializeFlag }),
             },
-            tournamentId: fixture.tournamentId,
-            fixtureId: game.tournamentFixtureId,
+            tournamentId: source.tournamentId,
+            fixtureId: source.fixtureId,
           });
           return { ...response, replayed: false };
         },

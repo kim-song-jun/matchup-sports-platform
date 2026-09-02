@@ -91,6 +91,18 @@ jobs:
             --repo . \
             --changed-files-file /tmp/teameet-changed-files.txt
 
+      - name: Verify changeset gate base resolution
+        if: >-
+          github.event_name == 'pull_request' ||
+          (github.event_name == 'push' && github.ref == 'refs/heads/dev')
+        run: |
+          set -Eeuo pipefail
+          # 위 스텝의 셸을 픽스처 저장소에서 그대로 돌려, base 가 전진했을 때 **남의
+          # changeset 을 내 변경으로 세지 않는지**를 본다. 2-dot 은 더 자연스러워 보여서
+          # 되돌리기 쉬운데, 되돌려도 아무것도 안 깨지고 **더 많이 통과할 뿐**이라
+          # 텍스트로는 못 막는다. 덮는 범위와 못 덮는 범위는 스크립트 헤더에 적혀 있다.
+          node scripts/qa/check-changeset-gate-base.mjs --self-test
+
       - name: Validate planned SemVer
         if: >-
           github.event_name == 'pull_request' ||

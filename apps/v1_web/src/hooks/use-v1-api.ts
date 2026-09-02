@@ -588,11 +588,14 @@ export function useV1Notices(filters?: ListFilters) {
   });
 }
 
-export function useV1Notice(noticeId: string) {
+export function useV1Notice(noticeId: string, options?: { seed?: V1NoticeResponse | null }) {
+  const seed = options?.seed;
   return useQuery({
     queryKey: v1Keys.notice(noticeId),
     queryFn: () => v1Get<V1NoticeResponse>(`/notices/${noticeId}`),
     enabled: Boolean(noticeId),
+    // 공지는 뷰어에 따라 달라지는 값도, 행동 버튼도 없다 — seed 를 그대로 첫 화면에 쓴다.
+    placeholderData: seed ?? undefined,
   });
 }
 
@@ -642,8 +645,9 @@ export function useV1MyMatches(filters?: ListFilters) {
   });
 }
 
-export function useV1Match(matchId: string) {
+export function useV1Match(matchId: string, options?: { seed?: V1Match | null }) {
   const queryClient = useQueryClient();
+  const seed = options?.seed;
   return useQuery({
     queryKey: v1Keys.match(matchId),
     queryFn: () => v1Get<V1Match>(`/matches/${matchId}`),
@@ -655,14 +659,19 @@ export function useV1Match(matchId: string) {
     // 주는지는 엔드포인트마다 다르고, 목록의 축약된 값으로 CTA를 그리면 이미 신청한
     // 매치에 "참가 신청"이 뜨는 식으로 사용자를 잘못 이끈다. 화면 쪽은 이 데이터가
     // placeholder 인 동안(`isPlaceholderData`) CTA를 잠근다.
+    //
+    // 서버가 넘긴 seed 가 있으면 그것을 먼저 쓴다(딥링크·푸시·새로고침 진입). 목록을
+    // 거치지 않은 진입에는 캐시가 없으므로 seed 만이 첫 화면을 채울 수 있다.
     placeholderData: () => {
-      const seed = findInListCache<V1Match>(
-        queryClient,
-        v1Keys.matchesAll(),
-        (item) => (item.matchId ?? item.id) === matchId,
-      );
-      if (!seed) return undefined;
-      return { ...seed, viewerState: undefined, viewer: undefined, participantsPreview: undefined };
+      const source =
+        seed ??
+        findInListCache<V1Match>(
+          queryClient,
+          v1Keys.matchesAll(),
+          (item) => (item.matchId ?? item.id) === matchId,
+        );
+      if (!source) return undefined;
+      return { ...source, viewerState: undefined, viewer: undefined, participantsPreview: undefined };
     },
   });
 }
@@ -857,11 +866,21 @@ export function useV1Team(teamId: string) {
   });
 }
 
-export function useV1TeamDetail(teamId: string) {
+export function useV1TeamDetail(teamId: string, options?: { seed?: V1TeamDetail | null }) {
+  const seed = options?.seed;
   return useQuery({
     queryKey: [...v1Keys.team(teamId), 'detail'] as const,
     queryFn: () => v1Get<V1TeamDetail>(`/teams/${teamId}`),
     enabled: Boolean(teamId),
+    // 서버 컴포넌트가 구조화 데이터·메타데이터를 위해 이미 받아 둔 응답을 첫 표시값으로 쓴다
+    // (추가 요청이 아니다). 팀 이름·로고·소개·지역·멤버 수는 그대로 맞다.
+    //
+    // 다만 `viewer` 는 **지울 수 없다**(required 필드). 그리고 이 응답은 비인증이라 서버가
+    // `{ role: 'none', joinState: 'none', canRequestJoin: false, disabledReason:
+    // 'LOGIN_REQUIRED' }` 를 채워 보낸다(alpha 실측) — 로그인한 owner 가 이 값을 그대로
+    // 보면 잠깐 "가입 신청"이나 "로그인이 필요해요"가 뜬다. 그래서 화면 쪽이
+    // `isPlaceholderData` 동안 뷰어 의존 UI(CTA·컨택)를 잠근다.
+    placeholderData: seed ?? undefined,
   });
 }
 
@@ -1480,21 +1499,24 @@ export function useV1TeamMatches(filters?: ListFilters, options?: QueryOptions) 
   });
 }
 
-export function useV1TeamMatch(teamMatchId: string) {
+export function useV1TeamMatch(teamMatchId: string, options?: { seed?: V1TeamMatch | null }) {
   const queryClient = useQueryClient();
+  const seed = options?.seed;
   return useQuery({
     queryKey: v1Keys.teamMatch(teamMatchId),
     queryFn: () => v1Get<V1TeamMatch>(`/team-matches/${teamMatchId}`),
     enabled: Boolean(teamMatchId),
     // useV1Match 와 같은 이유·같은 안전장치(뷰어 상태·신청 목록 제거) — 자세한 근거는 그쪽 주석.
     placeholderData: () => {
-      const seed = findInListCache<V1TeamMatch>(
-        queryClient,
-        v1Keys.teamMatchesAll(),
-        (item) => (item.teamMatchId ?? item.id) === teamMatchId,
-      );
-      if (!seed) return undefined;
-      return { ...seed, viewerState: undefined, viewer: undefined, applicantTeams: undefined };
+      const source =
+        seed ??
+        findInListCache<V1TeamMatch>(
+          queryClient,
+          v1Keys.teamMatchesAll(),
+          (item) => (item.teamMatchId ?? item.id) === teamMatchId,
+        );
+      if (!source) return undefined;
+      return { ...source, viewerState: undefined, viewer: undefined, applicantTeams: undefined };
     },
   });
 }
@@ -3590,7 +3612,14 @@ export function useAdminErrorLog(id: string) {
 // ---------------------------------------------------------------------------
 
 type TournamentListFilters = {
-  status?: 'open' | 'closed' | 'in_progress' | 'completed';
+  /**
+   * 목록 필터의 상태. `draft` 는 **정규 리그의 "예정"** 이다(2026-09-01 확정).
+   *
+   * ⚠️ 서버가 `draft` 를 `kind: regular_league` 와 **묶어서** 걸므로, 대회 표면에서는
+   * 조건이 모순이라 결과가 나오지 않는다 — 이 타입에 `draft` 가 있다고 대회의 준비 중이
+   * 열린 것은 아니다(`tournament-read.dto.ts` 의 두 상수 주석 참조).
+   */
+  status?: 'open' | 'closed' | 'in_progress' | 'completed' | 'draft';
   sportId?: string;
   cursor?: string;
   /** 데스크톱 페이지 번호. cursor 와 함께 오면 서버가 page 를 택한다. */

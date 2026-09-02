@@ -4,7 +4,6 @@ import { FormEvent, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AlertBanner, Card, EmptyState, ErrorState, ListItem, TextField } from '@/components/v1-ui/primitives';
-import { AppChrome } from '@/components/v1-ui/shell';
 import { useV1CreateInquiry, useV1Inquiries, useV1Inquiry } from '@/hooks/use-v1-api';
 import { appRoute } from '@/lib/app-route';
 import { V1ApiError } from '@/lib/api-client';
@@ -74,47 +73,43 @@ export function MyInquiriesListClient() {
 
   if (query.isError) {
     return (
-      <AppChrome title={t.inquiry} activeTab="my" bottomNav={false} backHref="/my" desktopHead>
-        <div className="tm-my-shell">
-          <ErrorState message={t.listError} onRetry={() => void query.refetch()} />
-        </div>
-      </AppChrome>
+      <div className="tm-my-shell">
+        <ErrorState message={t.listError} onRetry={() => void query.refetch()} />
+      </div>
     );
   }
 
   return (
-    <AppChrome title={t.inquiry} activeTab="my" bottomNav={false} backHref="/my" desktopHead>
-      <div className="tm-my-shell">
-        <div className="tm-my-settings-desktop">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-            <div>
-              <div className="tm-text-heading">{t.myInquiries}</div>
-              <div className="tm-text-caption" style={{ marginTop: 4 }}>{t.listSub}</div>
-            </div>
-            <Link className="tm-btn tm-btn-sm tm-btn-primary" href="/my/inquiries/new">{t.inquiryNew}</Link>
+    <div className="tm-my-shell tm-content-enter">
+      <div className="tm-my-settings-desktop">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+          <div>
+            <div className="tm-text-heading">{t.myInquiries}</div>
+            <div className="tm-text-caption" style={{ marginTop: 4 }}>{t.listSub}</div>
           </div>
-          {items.length === 0 ? (
-            <EmptyState
-              title={t.emptyTitle}
-              sub={t.emptySub}
-            />
-          ) : (
-            <Card pad={0}>
-              {items.map((item) => (
-                <ListItem
-                  key={item.inquiryId}
-                  title={item.title}
-                  sub={`${categoryLabel[item.category]} · ${formatDate(item.createdAt)}`}
-                  trailing={statusLabel[item.status]}
-                  href={`/my/inquiries/${item.inquiryId}`}
-                  chev
-                />
-              ))}
-            </Card>
-          )}
+          <Link className="tm-btn tm-btn-sm tm-btn-primary" href="/my/inquiries/new">{t.inquiryNew}</Link>
         </div>
+        {items.length === 0 ? (
+          <EmptyState
+            title={t.emptyTitle}
+            sub={t.emptySub}
+          />
+        ) : (
+          <Card pad={0}>
+            {items.map((item) => (
+              <ListItem
+                key={item.inquiryId}
+                title={item.title}
+                sub={`${categoryLabel[item.category]} · ${formatDate(item.createdAt)}`}
+                trailing={statusLabel[item.status]}
+                href={`/my/inquiries/${item.inquiryId}`}
+                chev
+              />
+            ))}
+          </Card>
+        )}
       </div>
-    </AppChrome>
+    </div>
   );
 }
 
@@ -158,33 +153,31 @@ export function MyInquiryCreateClient() {
   };
 
   return (
-    <AppChrome title={t.inquiryNew} activeTab="my" bottomNav={false} backHref="/my/inquiries" desktopHead>
-      <div className="tm-my-shell">
-        <div className="tm-my-settings-desktop">
-          <Card pad={16}>
-            <form onSubmit={submit} style={{ display: 'grid', gap: 16 }}>
-              <label className="tm-create-field">
-                <span className="tm-text-label">{t.category}</span>
-                <select className="tm-input" value={category} onChange={(event) => setCategory(event.target.value as V1InquiryCategory)}>
-                  {categories.map((item) => (
-                    <option key={item.value} value={item.value}>{item.label}</option>
-                  ))}
-                </select>
-              </label>
-              <TextField label={t.title} value={title} maxLength={80} error={errors.title} onChange={(event) => setTitle(event.target.value)} />
-              <TextField label={t.body} value={body} maxLength={2000} error={errors.body} multiline rows={8} onChange={(event) => setBody(event.target.value)} />
-              {errors.form ? <AlertBanner message={errors.form} tone="error" /> : null}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                <Link className="tm-btn tm-btn-lg tm-btn-neutral" href="/my/inquiries">{t.cancel}</Link>
-                <button className="tm-btn tm-btn-lg tm-btn-primary" type="submit" disabled={createInquiry.isPending}>
-                  {createInquiry.isPending ? t.submitting : t.submit}
-                </button>
-              </div>
-            </form>
-          </Card>
-        </div>
+    <div className="tm-my-shell tm-content-enter">
+      <div className="tm-my-settings-desktop">
+        <Card pad={16}>
+          <form onSubmit={submit} style={{ display: 'grid', gap: 16 }}>
+            <label className="tm-create-field">
+              <span className="tm-text-label">{t.category}</span>
+              <select className="tm-input" value={category} onChange={(event) => setCategory(event.target.value as V1InquiryCategory)}>
+                {categories.map((item) => (
+                  <option key={item.value} value={item.value}>{item.label}</option>
+                ))}
+              </select>
+            </label>
+            <TextField label={t.title} value={title} maxLength={80} error={errors.title} onChange={(event) => setTitle(event.target.value)} />
+            <TextField label={t.body} value={body} maxLength={2000} error={errors.body} multiline rows={8} onChange={(event) => setBody(event.target.value)} />
+            {errors.form ? <AlertBanner message={errors.form} tone="error" /> : null}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <Link className="tm-btn tm-btn-lg tm-btn-neutral" href="/my/inquiries">{t.cancel}</Link>
+              <button className="tm-btn tm-btn-lg tm-btn-primary" type="submit" disabled={createInquiry.isPending}>
+                {createInquiry.isPending ? t.submitting : t.submit}
+              </button>
+            </div>
+          </form>
+        </Card>
       </div>
-    </AppChrome>
+    </div>
   );
 }
 
@@ -194,28 +187,24 @@ export function MyInquiryDetailClient({ inquiryId }: { inquiryId: string }) {
 
   if (query.isError) {
     return (
-      <AppChrome title={t.detail} activeTab="my" bottomNav={false} backHref="/my/inquiries" desktopHead>
-        <div className="tm-my-shell">
-          <ErrorState message={t.detailError} onRetry={() => void query.refetch()} />
-        </div>
-      </AppChrome>
+      <div className="tm-my-shell">
+        <ErrorState message={t.detailError} onRetry={() => void query.refetch()} />
+      </div>
     );
   }
 
   return (
-    <AppChrome title={t.detail} activeTab="my" bottomNav={false} backHref="/my/inquiries" desktopHead>
-      <div className="tm-my-shell">
-        <div className="tm-my-settings-desktop">
-          {!inquiry ? (
-            <Card pad={16}>
-              <div className="tm-text-body-lg">{t.detailLoad}</div>
-            </Card>
-          ) : (
-            <InquiryDetail inquiry={inquiry} />
-          )}
-        </div>
+    <div className="tm-my-shell tm-content-enter">
+      <div className="tm-my-settings-desktop">
+        {!inquiry ? (
+          <Card pad={16}>
+            <div className="tm-text-body-lg">{t.detailLoad}</div>
+          </Card>
+        ) : (
+          <InquiryDetail inquiry={inquiry} />
+        )}
       </div>
-    </AppChrome>
+    </div>
   );
 }
 

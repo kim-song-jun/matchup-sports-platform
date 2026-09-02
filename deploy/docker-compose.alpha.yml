@@ -49,6 +49,7 @@ services:
   nginx:
     volumes:
       - ./nginx.alpha.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./robots.alpha.txt:/etc/nginx/teameet-robots/robots.txt:ro
       - ./aasa:/etc/nginx/teameet-aasa:ro
       - ./nginx.security-headers.conf:/etc/nginx/snippets/teameet-security-headers.conf:ro
       - ./nginx.proxy-hide-security-headers.conf:/etc/nginx/snippets/teameet-proxy-hide-security-headers.conf:ro

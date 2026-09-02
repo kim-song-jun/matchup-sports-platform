@@ -1,7 +1,6 @@
 'use client';
 
 import { useId, useState } from 'react';
-import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState } from '@/components/v1-ui/primitives';
 import {
   useV1RemoveTeamContactBlock,
@@ -60,13 +59,6 @@ export function TeamContactSettingsPageClient({ teamId }: { teamId: string }) {
   }
 
   return (
-    <AppChrome
-      title="컨택 설정"
-      activeTab="teams"
-      bottomNav={false}
-      backHref={`/teams/${teamId}`}
-      desktopHead
-    >
       <div style={{ display: 'grid', gap: 12, padding: '12px 0 24px' }}>
         <Card>
           <div className="tm-text-heading">컨택 수신 설정</div>
@@ -202,6 +194,5 @@ export function TeamContactSettingsPageClient({ teamId }: { teamId: string }) {
           </div>
         ) : null}
       </div>
-    </AppChrome>
   );
 }

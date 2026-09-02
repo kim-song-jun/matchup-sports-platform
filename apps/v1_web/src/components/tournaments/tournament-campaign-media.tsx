@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 
 const SPORT_IMAGE_FALLBACKS = {
   badminton: '/mock/generated/badminton-club.webp',
@@ -39,14 +40,13 @@ export function TournamentCampaignMedia({
   if (hidden) return null;
 
   return (
-    <img
+    <Image
       src={currentSrc}
       alt={alt}
       width={1600}
       height={900}
       className={className}
-      loading={eager ? 'eager' : 'lazy'}
-      fetchPriority={eager ? 'high' : 'auto'}
+      priority={eager}
       onError={() => {
         if (currentSrc === fallbackSrc) {
           setHidden(true);

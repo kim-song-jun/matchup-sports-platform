@@ -51,13 +51,14 @@ export function toTeamMatch(match: V1TeamMatch, fallback: TeamMatchModel): TeamM
     league: match.league ?? null,
     uniform: match.uniformColor || '',
     gender: match.genderRule ?? fallback.gender,
-    // V1TeamMatch(hostTeam)는 신뢰상태(trustState, 등급 문자열)만 내려줄 뿐 매너 평점·승수 같은
-    // 숫자 통계는 API 어디에도 없다 — `...fallback` 스프레드에 맡겨두면 매치마다 다른 실제 팀인데도
-    // 항상 같은 목업(매너 4.8·승 23 등)이 그대로 노출됐다(실사고 원인). 0으로 채우는 것도
-    // "매너 0점·0승"이라는 새 거짓말이라(실제로 잘하는 팀이 최악으로 보인다) null 로 두고
-    // 화면이 그 줄을 감춘다 — 값이 생기면(백엔드가 팀 통계를 내려주면) 그때 다시 채우면 된다.
-    manner: null,
-    wins: null,
+    // 매너 평점·승수는 이제 API 가 실제로 내려준다(hostTeam.mannerScore / hostTeam.wins —
+    // team-matches.service.ts 의 computeRevealedTeamTrustBatch · loadOfficialWinCounts).
+    // `...fallback` 스프레드에 맡겨두면 매치마다 다른 실제 팀인데도 항상 같은 목업
+    // (매너 4.8·승 23 등)이 그대로 노출됐다(실사고 원인) — 그래서 여기서 명시적으로 덮어쓴다.
+    // 값이 없으면(공개된 팀 후기가 0건 등) null 로 두고 화면이 '-' 를 그린다. 0 으로 채우면
+    // "매너 0점"이라는 새 거짓말이 된다.
+    manner: match.hostTeam?.mannerScore ?? null,
+    wins: match.hostTeam?.wins ?? null,
     status,
   };
 }

@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
+import { useShellOverride } from '@/components/v1-ui/shell-override';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, EmptyState, SectionTitle } from '@/components/v1-ui/primitives';
 import { ChevronRight, UsersRound } from 'lucide-react';
 import { getSportAccent } from '@/lib/v1-sport-accent';
@@ -1373,7 +1373,6 @@ function TeamRegistrationHub({
 export function MyRegistrationPageClient({ tournamentId }: { tournamentId: string }) {
   const searchParams = useSearchParams();
   const selectedRegistrationId = searchParams.get('reg');
-  const pageBackHref = selectedRegistrationId ? `/tournaments/${tournamentId}/my` : `/tournaments/${tournamentId}`;
   const { data: tournament, isLoading: loadingTournament } = useV1Tournament(tournamentId);
   const { data: myTeamsData, isLoading: loadingTeams } = useV1MyTeams();
   const {
@@ -1388,11 +1387,17 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
   const selectedRegistration = selectedRegistrationId
     ? registrations.find((item) => item.id === selectedRegistrationId)
     : null;
+  // route-chrome 테이블(fragments/tournaments-extra.ts)의 backHref는 항상 대회 상세로
+  // 고정돼 있다 — `?reg=`로 특정 신청 상세(RegistrationDetailView)를 보는 중일 때는 셸
+  // topbar 뒤로가기가 같은 라우트의 목록(TeamRegistrationHub, 쿼리 없는 /my)으로 가야
+  // 한다. selectedRegistrationId가 아니라 selectedRegistration(실제로 매칭된 신청 존재
+  // 여부)로 분기한다 — 잘못된/만료된 reg 값이면 아래에서 이미 목록 뷰로 폴백하므로
+  // undefined로 둬 테이블 기본값(대회 상세)을 그대로 쓴다.
+  useShellOverride({ backHref: selectedRegistration ? `/tournaments/${tournamentId}/my` : undefined });
 
   if (isLoading) {
     return (
-      <AppChrome title="내 신청" backHref={pageBackHref} activeTab="tournaments" desktopHead>
-        <div aria-busy="true" aria-label="신청 정보 불러오는 중" style={{ padding: '0 20px', marginTop: 24 }}>
+              <div aria-busy="true" aria-label="신청 정보 불러오는 중" style={{ padding: '0 20px', marginTop: 24 }}>
           {[1, 2, 3].map((i) => (
             <div
               key={i}
@@ -1401,15 +1406,13 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
             />
           ))}
         </div>
-      </AppChrome>
-    );
+      );
   }
 
   if (registrationsError) {
     const msg = extractErrorMessage(registrationsErr, '신청 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
     return (
-      <AppChrome title="내 신청" backHref={pageBackHref} activeTab="tournaments" desktopHead>
-        <div style={{ padding: '0 20px', marginTop: 24 }}>
+              <div style={{ padding: '0 20px', marginTop: 24 }}>
           <AlertBanner message={msg} />
           <Link
             href={`/tournaments/${tournamentId}`}
@@ -1419,14 +1422,12 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
             대회 상세로 돌아가기
           </Link>
         </div>
-      </AppChrome>
-    );
+      );
   }
 
   if (!tournament) {
     return (
-      <AppChrome title="내 신청" backHref={pageBackHref} activeTab="tournaments" desktopHead>
-        <TeamRegistrationHub
+              <TeamRegistrationHub
           tournamentId={tournamentId}
           tournamentSportId={null}
           teams={teams}
@@ -1435,8 +1436,7 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
           capacity={null}
           blockReason="not_open"
         />
-      </AppChrome>
-    );
+      );
   }
 
   if (!selectedRegistration) {
@@ -1446,8 +1446,7 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
       (team) => eligibleTeams.includes(team) || registrationTeamIds.has(team.teamId),
     );
     return (
-      <AppChrome title="내 신청" backHref={pageBackHref} activeTab="tournaments" desktopHead>
-        <TeamRegistrationHub
+              <TeamRegistrationHub
           tournamentId={tournamentId}
           tournamentSportId={tournament.sportId}
           teams={visibleTeams}
@@ -1456,16 +1455,14 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
           capacity={resolveTournamentCapacity(tournament)}
           blockReason={resolveTournamentRegistrationBlock(tournament)}
         />
-      </AppChrome>
-    );
+      );
   }
 
   const selectedTeam = teams.find((team) => team.teamId === selectedRegistration.teamId);
   const canManageSelectedRegistration = selectedTeam?.role === 'owner' || selectedTeam?.role === 'manager';
 
   return (
-    <AppChrome title="내 신청" backHref={pageBackHref} activeTab="tournaments" desktopHead>
-      <RegistrationDetailView
+          <RegistrationDetailView
         tournamentId={tournamentId}
         tournament={{
           sportCode: tournament.sport.code,
@@ -1480,6 +1477,5 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
         registration={selectedRegistration}
         canManageRegistration={canManageSelectedRegistration}
       />
-    </AppChrome>
   );
 }

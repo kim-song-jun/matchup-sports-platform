@@ -43,6 +43,10 @@ vi.mock('@/lib/v1-socket', () => ({ getV1Socket: () => socket }));
 vi.mock('next/navigation', () => ({
   useRouter: () => router,
   useSearchParams: () => new URLSearchParams(),
+  // U34(community 이관) 이후 ChatRoomPageView/NotificationsPageView가 useShellOverride를
+  // 직접 호출해(community-page.tsx) usePathname을 필요로 한다 — 이 테스트는 AppShellFrame을
+  // 거치지 않고 뷰를 직접 렌더하므로(renderWithClient) 값 자체는 검증 대상이 아니다.
+  usePathname: () => '/chat/room-1',
 }));
 
 vi.mock('@/lib/analytics', () => ({

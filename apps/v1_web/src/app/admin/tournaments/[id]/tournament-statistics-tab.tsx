@@ -222,7 +222,7 @@ export function TournamentStatisticsTab({ tournamentId }: { tournamentId: string
 
   const stats = buildTournamentStatistics(data.fixtures);
   return (
-    <div className="p-4">
+    <div className="tm-content-enter p-4">
       <div className="mb-4">
         <h2 className="text-[15px] font-bold text-[var(--text-strong)]">대회 통계</h2>
         <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">

@@ -87,7 +87,7 @@ function LeagueHub() {
       <div
         role="tablist"
         aria-label="리그 관리 항목"
-        className="mb-4 flex w-fit items-center gap-1 rounded-xl bg-[var(--surface-soft)] p-1"
+        className="tm-content-enter mb-4 flex w-fit items-center gap-1 rounded-xl bg-[var(--surface-soft)] p-1"
       >
         {TABS.map((tab) => {
           const isActive = activeTab === tab.key;

@@ -75,7 +75,7 @@ export function CorrectionsPageClient({ tournamentId }: { tournamentId: string }
 
   return (
     <RequireAuth>
-      <div className="flex flex-col gap-4">
+      <div className="tm-content-enter flex flex-col gap-4">
         <OpsPageHeader
           tournamentTitle={tournament.data?.title}
           title="결과 정정"

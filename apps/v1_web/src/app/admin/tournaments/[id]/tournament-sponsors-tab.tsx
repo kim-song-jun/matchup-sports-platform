@@ -116,7 +116,7 @@ export function TournamentSponsorsTab({
   };
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="tm-content-enter flex flex-col gap-6">
       {canWrite ? (
         <TournamentSponsorForm
           form={form}

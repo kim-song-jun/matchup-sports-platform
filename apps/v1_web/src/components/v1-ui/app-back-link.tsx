@@ -15,7 +15,7 @@ export function AppBackLink({
   children: ReactNode;
 }) {
   return (
-    <Suspense fallback={<Link className={className} href={fallbackHref} aria-label="뒤로가기">{children}</Link>}>
+    <Suspense fallback={<Link className={className} href={fallbackHref} aria-label="뒤로가기" data-nav-back="true">{children}</Link>}>
       <AppBackLinkContent fallbackHref={fallbackHref} className={className}>
         {children}
       </AppBackLinkContent>
@@ -36,7 +36,7 @@ function AppBackLinkContent({
   const href = searchParams.get('from') === 'notifications' ? '/notifications' : fallbackHref;
 
   return (
-    <Link className={className} href={href} aria-label="뒤로가기">
+    <Link className={className} href={href} aria-label="뒤로가기" data-nav-back="true">
       {children}
     </Link>
   );

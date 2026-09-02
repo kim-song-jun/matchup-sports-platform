@@ -103,21 +103,23 @@ export default function AdminReportedTeamsPage() {
         description={`최근 ${windowDays}일 동안 반복 신고된 팀을 건수 순으로 보여줘요.`}
       />
 
-      <AdminDataTable<V1AdminReportedTeamRow>
-        columns={columns}
-        rows={rows}
-        keyExtractor={(row) => row.teamId}
-        loading={isPending && rows.length === 0}
-        error={errorMessage}
-        onRetry={() => void refetch()}
-        empty={
-          <AdminEmpty
-            title="신고 누적된 팀이 없어요"
-            description="같은 팀이 반복 신고되면 여기에 표시돼요."
-          />
-        }
-        tableMaxWidth="max-w-none"
-      />
+      <div className="tm-content-enter">
+        <AdminDataTable<V1AdminReportedTeamRow>
+          columns={columns}
+          rows={rows}
+          keyExtractor={(row) => row.teamId}
+          loading={isPending && rows.length === 0}
+          error={errorMessage}
+          onRetry={() => void refetch()}
+          empty={
+            <AdminEmpty
+              title="신고 누적된 팀이 없어요"
+              description="같은 팀이 반복 신고되면 여기에 표시돼요."
+            />
+          }
+          tableMaxWidth="max-w-none"
+        />
+      </div>
     </>
   );
 }

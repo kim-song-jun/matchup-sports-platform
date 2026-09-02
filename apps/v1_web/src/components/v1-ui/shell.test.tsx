@@ -63,6 +63,56 @@ describe('AppChrome bottom nav — 탭 5개(리그는 대회 탭 세그먼트로
   });
 });
 
+describe('AppChrome bottom nav — 활성 pill 이 하나만 있고 인덱스에 따라 미끄러진다', () => {
+  // 이 테스트가 이 변경의 계약이다: 탭마다 하나씩 ::before 를 두던 예전 구조로 되돌리면
+  // (즉 shell.tsx 의 pill 슬롯을 지우면) 이 querySelector 가 아예 null 이라 실패하고,
+  // activeTab 이 바뀌어도 transform 이 그대로면(각 탭이 다시 자기만의 정적 pill 을
+  // 그리는 구조로 퇴행하면) translateX 값이 안 바뀌므로 그것도 잡는다.
+  it('탭마다 pill 이 하나씩 있는 게 아니라 nav 전체에 슬롯이 하나뿐이다', () => {
+    const { container } = render(
+      <AppChrome title="테스트" activeTab="matches" showNotifications={false}>
+        <div>본문</div>
+      </AppChrome>
+    );
+
+    expect(container.querySelectorAll('.tm-bottom-nav-pill-slot')).toHaveLength(1);
+  });
+
+  it('activeTab 인덱스가 다르면 pill 슬롯의 translateX 값도 그만큼 다르다', () => {
+    const { container: homeContainer } = render(
+      <AppChrome title="테스트" activeTab="home" showNotifications={false}>
+        <div>본문</div>
+      </AppChrome>
+    );
+    const { container: teamsContainer } = render(
+      <AppChrome title="테스트" activeTab="teams" showNotifications={false}>
+        <div>본문</div>
+      </AppChrome>
+    );
+
+    const homeSlot = homeContainer.querySelector<HTMLElement>('.tm-bottom-nav-pill-slot');
+    const teamsSlot = teamsContainer.querySelector<HTMLElement>('.tm-bottom-nav-pill-slot');
+
+    // EXPECTED_TABS 순서상 home=index 0, teams=index 3.
+    expect(homeSlot?.style.transform).toBe('translateX(calc(0 * 100%))');
+    expect(teamsSlot?.style.transform).toBe('translateX(calc(3 * 100%))');
+    expect(homeSlot?.style.transform).not.toBe(teamsSlot?.style.transform);
+  });
+
+  // activeTab 이 5개 탭 어디에도 속하지 않는 화면(검색 등)에서 임의의 탭 위에 pill 을
+  // 남겨두면 "그 탭이 활성"이라는 거짓 신호가 된다 — 숨겨야 한다.
+  it('activeTab 이 없으면 pill 을 숨긴다', () => {
+    const { container } = render(
+      <AppChrome title="검색" showNotifications={false}>
+        <div>본문</div>
+      </AppChrome>
+    );
+
+    const slot = container.querySelector<HTMLElement>('.tm-bottom-nav-pill-slot');
+    expect(slot?.style.opacity).toBe('0');
+  });
+});
+
 describe('useV1NotificationUnreadSummary mock wiring', () => {
   it('테스트 환경에서 실제 네트워크 훅 대신 목이 호출된다', () => {
     vi.mocked(useV1NotificationUnreadSummary).mockClear();
@@ -84,5 +134,24 @@ describe('AppChrome mobile page title semantics', () => {
     );
 
     expect(screen.getByRole('heading', { level: 1, name: '알림 설정' })).toBeInTheDocument();
+  });
+});
+
+describe('AppChrome 이중 마운트 가드 (§2.2 마이그레이션 안전망)', () => {
+  it('AppChrome 안에 또 다른 AppChrome이 중첩되면 안쪽은 children만 통과시킨다', () => {
+    render(
+      <AppChrome title="바깥" activeTab="home" showNotifications={false}>
+        <AppChrome title="안쪽(마이그레이션 잔재)" activeTab="matches" showNotifications={false}>
+          <div data-testid="leaf">내용</div>
+        </AppChrome>
+      </AppChrome>,
+    );
+
+    // bottom nav가 정확히 1개 — 2개면 이중 셸이 실제로 렌더된 것(구조적 회귀).
+    expect(screen.getAllByRole('navigation', { name: '주요 메뉴' })).toHaveLength(1);
+    expect(screen.getByText('바깥')).toBeInTheDocument();
+    expect(screen.queryByText('안쪽(마이그레이션 잔재)')).not.toBeInTheDocument();
+    // 안쪽 children(leaf)은 그대로 화면에 나온다 — passthrough가 콘텐츠까지 지우지 않음.
+    expect(screen.getByTestId('leaf')).toBeInTheDocument();
   });
 });

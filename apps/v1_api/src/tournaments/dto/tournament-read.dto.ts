@@ -16,8 +16,15 @@ import {
 } from '../tournament-surface';
 
 /**
- * 소비자 대회 목록 쿼리 — 공개 노출 status(open/closed/in_progress/completed)만 필터.
- * draft/cancelled는 노출 제외(서비스 계층 고정).
+ * **공개 대회의 status 집합.** 대회가 공개 표면에 나올 수 있는 상태들이다.
+ *
+ * ⚠️ **이건 "목록 필터가 받는 값" 이 아니다.** 두 개념이 갈렸다 — 목록 입력 범위는 아래
+ * `COMPETITION_LIST_STATUSES` 이고 거기엔 `draft` 가 있다. 이 배열만 보고
+ * *"draft 는 어디서도 안 받는다"* 로 읽으면 틀린다.
+ *
+ * ⚠️ **이 상수는 캠페인 조회도 쓴다**(`tournament-campaign-read.service.ts`). 목록에 값을
+ * 더하려고 여기를 늘리면 **그 소비처의 공개 범위까지 함께 넓어진다** — 그래서 `draft` 는
+ * 여기가 아니라 아래 목록 전용 배열에만 들어갔다.
  */
 export const PUBLIC_TOURNAMENT_STATUSES = [
   'open',
@@ -27,10 +34,26 @@ export const PUBLIC_TOURNAMENT_STATUSES = [
 ] as const;
 export type PublicTournamentStatus = (typeof PUBLIC_TOURNAMENT_STATUSES)[number];
 
+/**
+ * **목록 필터가 받는 입력 범위.** 위 공개 status 에 `draft` 를 더한다 — 정규 리그의 `draft`
+ * 는 **"예정"** 이고 사용자가 고를 수 있어야 하는 상태이기 때문이다(2026-09-01 확정).
+ *
+ * ⚠️ **받는다 ≠ 열린다.** 서비스가 `draft` 를 **`kind: regular_league` 와 묶어서** 건다
+ * (`tournaments-read.service.ts`). 그래서 대회 표면(`kind` 기본값 또는 `tournament`)과는
+ * **조건이 서로 모순이라 결과가 나올 수 없다** — 대회의 `draft`(운영자 준비 중)는 이 값을
+ * 줘도 계속 안 나온다.
+ *
+ * 안전성의 근거가 **검증이 아니라 모순**이라는 점이 중요하다. 이 `@IsIn` 을 누가 넓혀도
+ * 대회 draft 는 여전히 안 샌다 — 반대로, 서비스의 그 묶음을 풀면 이 배열이 그대로 구멍이
+ * 된다. 둘 중 서비스 쪽이 진짜 게이트다.
+ */
+export const COMPETITION_LIST_STATUSES = [...PUBLIC_TOURNAMENT_STATUSES, 'draft'] as const;
+export type CompetitionListStatus = (typeof COMPETITION_LIST_STATUSES)[number];
+
 export class TournamentListQueryDto {
   @IsOptional()
-  @IsIn(PUBLIC_TOURNAMENT_STATUSES)
-  status?: PublicTournamentStatus;
+  @IsIn(COMPETITION_LIST_STATUSES)
+  status?: CompetitionListStatus;
 
   @IsOptional()
   @IsUUID()

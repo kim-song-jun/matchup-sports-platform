@@ -76,16 +76,40 @@ describe('대회 목록 — 유형(kind) 축', () => {
    * 돌아가면 그 사이를 프로모 배너가 가른다. 그건 시각 변경이 아니라 정보구조 변경이라
    * 여기서 잠근다.
    */
-  it('유형 세그먼트는 목록 섹션 안에, 종목 필터보다 앞에 있다', () => {
+  /**
+   * **계약이 바뀌었다(2026-09-01 B안).** 종목 칩 줄이 필터 시트로 들어가고 그 자리에
+   * **요약 한 줄**이 왔다 — 사용자가 *"세로 높이를 지금보다 늘리지 않는 것이 핵심"* 이라고
+   * 못박아서, 새 줄을 얹지 않고 **교체**했다.
+   *
+   * 그래서 `role="group" name="종목 필터"` 는 이 화면에 더 이상 없다. 다만 **검사하려던
+   * 의도는 그대로다**: 유형 세그먼트가 목록 섹션 안에 있고, 필터 줄보다 앞에 온다.
+   */
+  it('유형 세그먼트는 목록 섹션 안에, 필터 요약 줄보다 앞에 있다', () => {
     search = '';
     const { container } = render(<TournamentsListContent />);
     const section = container.querySelector('#tournament-list');
     expect(section).not.toBeNull();
 
     const segment = within(section as HTMLElement).getByRole('navigation', { name: '대회 유형' });
-    const sportFilter = within(section as HTMLElement).getByRole('group', { name: '종목 필터' });
+    const filterSummary = section!.querySelector('.tm-competition-filter-summary');
+    expect(filterSummary).not.toBeNull();
 
-    // DOCUMENT_POSITION_FOLLOWING(4) = segment 뒤에 sportFilter 가 온다
-    expect(segment.compareDocumentPosition(sportFilter) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // DOCUMENT_POSITION_FOLLOWING(4) = segment 뒤에 요약 줄이 온다
+    expect(
+      segment.compareDocumentPosition(filterSummary as Node) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  /**
+   * 높이 조건은 **줄 수**로 지킨다 — 칩 줄을 지우고 요약 줄을 넣었으므로 둘이 동시에
+   * 있으면 안 된다. 있으면 한 줄이 늘어난 것이고 사용자가 못박은 조건이 깨진다.
+   */
+  it('종목 칩 줄과 요약 줄이 동시에 있지 않다 — 교체지 추가가 아니다', () => {
+    search = '';
+    const { container } = render(<TournamentsListContent />);
+    const section = container.querySelector('#tournament-list') as HTMLElement;
+
+    expect(section.querySelector('.tm-competition-filter-summary')).not.toBeNull();
+    expect(section.querySelector('.tm-sport-chip-row')).toBeNull();
   });
 });

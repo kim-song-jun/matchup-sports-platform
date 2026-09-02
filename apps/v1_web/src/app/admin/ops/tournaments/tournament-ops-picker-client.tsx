@@ -36,7 +36,7 @@ export function TournamentOpsPickerClient() {
   const errorMessage = isError ? extractErrorMessage(error, '대회 목록을 불러오지 못했어요.') : undefined;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="tm-content-enter flex flex-col gap-4">
       <AdminFilterBar
         hideSearch
         searchValue=""

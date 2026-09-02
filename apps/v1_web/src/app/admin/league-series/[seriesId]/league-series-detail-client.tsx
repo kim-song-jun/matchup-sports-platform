@@ -102,7 +102,7 @@ export default function LeagueSeriesDetailClient({ seriesId }: { seriesId: strin
         : `${rule.fixedCount ?? 1}팀 고정 승격·강등`;
 
   return (
-    <div>
+    <div className="tm-content-enter">
       <AdminPageHeader
         eyebrow="리그 체계"
         title={series.title}

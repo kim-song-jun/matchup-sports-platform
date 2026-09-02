@@ -43,6 +43,9 @@ export function ReleaseVersionWatcher() {
       if (release !== baselineRef.current) {
         reloadingRef.current = true;
         setUpdating(true);
+        // SW가 살아있으면 정적 자산 캐시를 즉시 무효화한다 — 컨트롤러가 없으면(SW 미등록·
+        // 아직 activate 전) 옵셔널 체이닝으로 조용히 스킵되고 reload()는 그대로 실행된다.
+        navigator.serviceWorker?.controller?.postMessage({ type: 'TEAMEET_RELEASE_CHANGED' });
         window.setTimeout(() => window.location.reload(), RELOAD_DELAY_MS);
       }
     };
@@ -54,12 +57,19 @@ export function ReleaseVersionWatcher() {
     };
     document.addEventListener('visibilitychange', onVisibilityChange);
     window.addEventListener('focus', checkVersion);
+    // bfcache 복귀(뒤로가기 등) 시에도 버전을 재확인한다 — persisted 페이지는
+    // 새로고침 없이 되살아나므로 focus/visibilitychange만으론 놓칠 수 있다.
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) checkVersion();
+    };
+    window.addEventListener('pageshow', onPageShow);
 
     return () => {
       cancelled = true;
       window.clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisibilityChange);
       window.removeEventListener('focus', checkVersion);
+      window.removeEventListener('pageshow', onPageShow);
     };
   }, []);
 

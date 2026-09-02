@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Eye, ShieldAlert, X } from 'lucide-react';
-import { AppChrome } from '@/components/v1-ui/shell';
+import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { PendingReviewsCard } from '@/components/tournaments/pending-review-card';
 import { LineupTodoCard } from '@/components/lineup/lineup-todo-card';
 import {
@@ -45,15 +45,17 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
   const weatherPermission = model.weatherPermission ?? 'prompt';
   const weatherPermissionCopy = getWeatherPermissionCopy(weatherPermission);
 
+  // 셸 승격(U25): title/activeTab/showSearch는 route-chrome/fragments/home.ts의 정적 테이블로
+  // 옮겼다. hasNewNotification·floatingSlot은 model(런타임 상태) 의존이라 여기서 override로
+  // 밀어넣는다 — 렌더 함수 본문(조건부 return 위)에서 직접 호출(Hooks 규칙 + useSyncExternalStore
+  // 루프 방지, shell-override.ts 주석 참조).
+  useShellOverride({
+    hasNewNotification: model.hasNewNotification && !model.network,
+    floatingSlot: <HomeChatFloatingButton model={model} />,
+  });
+
   return (
     <>
-      <AppChrome
-        title="teameet"
-        activeTab="home"
-        showSearch
-        hasNewNotification={model.hasNewNotification && !model.network}
-        floatingSlot={<HomeChatFloatingButton model={model} />}
-      >
       <h1 className="sr-only">Teameet 홈</h1>
       {/*
        * .tm-home-desktop: display:contents on mobile → transparent to layout.
@@ -263,7 +265,6 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
         </div>{/* /tm-home-sidebar */}
 
       </div>{/* /tm-home-desktop */}
-      </AppChrome>
     </>
   );
 }
@@ -823,7 +824,9 @@ function SidebarLeaguesWidget({ items, loading }: { items: V1PublicLeagueListIte
         <div className="tm-text-body-lg">진행 중인 정규 리그</div>
         <Link
           className="tm-btn tm-btn-sm tm-btn-ghost"
-          href="/league-matches"
+          /* 리그 목록은 통합 목록으로 넘어갔다(2026-09-01) — 리다이렉트를 한 번 더 타지
+             않도록 **직접** 보낸다. 개별 리그 링크(아래)는 그대로다. */
+          href="/tournaments?kind=league"
           style={{ alignSelf: 'flex-end', padding: '0 4px' }}
         >
           전체보기

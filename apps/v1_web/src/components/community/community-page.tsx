@@ -4,7 +4,7 @@ import Link from 'next/link';
 import type { MouseEvent, PointerEvent, ReactNode } from 'react';
 import { Fragment, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { Check, Pin, Send } from 'lucide-react';
-import { AppChrome } from '@/components/v1-ui/shell';
+import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { ChatIcon, ChevronLeftIcon, ChevronRightIcon, PlusIcon } from '@/components/v1-ui/icons';
@@ -15,19 +15,15 @@ import { NotificationTypeIcon, notificationTypeLabel } from './notification-visu
 import type { ChatListViewModel, ChatRoomModel, ChatRoomViewModel, NotificationModel, NotificationsViewModel } from './community.types';
 
 export function ChatListPageView({ model }: { model: ChatListViewModel }) {
+  // 셸 승격(U34): title/activeTab/bottomNav/backHref/showNotifications 전부 정적이라
+  // route-chrome/fragments/community.ts 테이블로 옮겼다 — 이 뷰엔 override가 필요 없다.
   return (
-    <AppChrome
-      title="채팅"
-      activeTab="my"
-      bottomNav={false}
-      backHref="/home"
-      showNotifications={false}
-    >
-      <div className="tm-chat-mobile-pane">
+    <>
+      <div className="tm-chat-mobile-pane tm-content-enter">
         <ChatListContent model={model} />
       </div>
       <ChatDesktopWorkspace listModel={model} />
-    </AppChrome>
+    </>
   );
 }
 
@@ -35,7 +31,8 @@ function ChatListContent({ model, selectedRoomId }: { model: ChatListViewModel; 
   const hasRooms = model.pinnedRooms.length > 0 || model.rooms.length > 0;
 
   return (
-    <div className="tm-chat-list">
+    // 방이 없을 때만 tm-list-empty — 목록이 있는 평소 레이아웃은 그대로 둔다.
+    <div className={`tm-chat-list${!hasRooms ? ' tm-list-empty' : ''}`}>
           <div className="tm-sport-chip-row" role="group" aria-label="채팅 카테고리 필터">{model.categories.map((category) => <button key={category.label} className={`tm-chip ${category.active ? 'tm-chip-active' : ''}`} type="button" onClick={category.onSelect} aria-pressed={category.active}>{category.label} {category.count}</button>)}</div>
           {model.status === 'loading' ? <PageSkeleton variant="list" /> : null}
           {model.status === 'error' && !hasRooms ? (
@@ -46,6 +43,7 @@ function ChatListContent({ model, selectedRoomId }: { model: ChatListViewModel; 
           ) : model.status !== 'loading' && model.status !== 'error' && !hasRooms ? (
             /* [P2 UX 라이팅] cta 능동형 표현 */
             <EmptyState
+              fill
               title={model.emptyTitle ?? '아직 채팅방이 없어요'}
               sub={model.emptyBody ?? '매치에 참가하거나 팀에 가입하면 채팅방이 열려요.'}
               cta={model.emptyHref ? '매치 찾아보기' : undefined}
@@ -105,9 +103,15 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
     return undefined;
   }, [model.sending, model.sendError]);
 
+  // 셸 승격(U34): 채팅방 제목은 fetch 의존(§1.9 "fetch된 제목" 유형) — 테이블(community.ts)엔
+  // 로딩 중 기본값만 있고, 실제 값(model.title — room.data.title 또는 로딩 placeholder)은
+  // 여기서 매 렌더 직접 override로 밀어넣는다. Hooks 규칙: 조건부 return보다 위, 렌더 함수
+  // 본문에서 직접 호출(useEffect 아님 — shell-override.ts 주석 참조).
+  useShellOverride({ title: model.title });
+
   return (
-    <AppChrome title={model.title} activeTab="my" bottomNav={false} backHref="/chat" showNotifications={false}>
-      <div className="tm-chat-desktop-workspace">
+    <>
+      <div className="tm-chat-desktop-workspace tm-content-enter">
         <aside className="tm-chat-desktop-list-pane" aria-label="채팅방 목록">
           <div className="tm-chat-desktop-pane-head">
             <h1 className="tm-text-heading">채팅</h1>
@@ -138,7 +142,10 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
             <ChevronRightIcon size={18} stroke="var(--text-caption)" />
           </Link>
         </div>
-        <div ref={threadRef} className="tm-chat-thread">
+        <div
+          ref={threadRef}
+          className={`tm-chat-thread${model.messages.length === 0 ? ' tm-list-empty' : ''}`}
+        >
           {model.status === 'loading' ? <PageSkeleton variant="list" /> : null}
           {model.status === 'error' && model.messages.length === 0 ? (
             <ErrorState
@@ -148,6 +155,7 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
           ) : model.status !== 'loading' && model.status !== 'error' && model.messages.length === 0 ? (
             /* [P2 UX 라이팅] 능동형 */
             <EmptyState
+              fill
               title={model.emptyTitle ?? '아직 메시지가 없어요'}
               sub={model.emptyBody ?? '먼저 인사를 건네 대화를 시작해요.'}
             />
@@ -219,7 +227,7 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
       </div>
         </section>
       </div>
-    </AppChrome>
+    </>
   );
 }
 
@@ -249,30 +257,30 @@ export function NotificationsPageView({ model }: { model: NotificationsViewModel
   // 카드 탭 → 상세 시트. 시트에는 탭한 시점의 모델을 그대로 담아두므로,
   // 읽음 처리로 목록이 갱신돼도 시트 내용이 흔들리지 않는다.
   const [detail, setDetail] = useState<NotificationModel | null>(null);
+  // 셸 승격(U34): title이 ReactNode(안읽음 카운트 뱃지)라 정적 테이블(string)에 못 담고,
+  // topbarActions("모두 읽기" 버튼)도 인터랙티브 JSX라 둘 다 override 대상(§1.9 표).
+  // activeTab/bottomNav/backHref/showNotifications는 정적이라 community.ts 테이블로 옮겼다.
+  useShellOverride({
+    title: <span>알림 <span className={`tm-notification-count ${allRead ? 'tm-notification-count-muted' : ''}`}>{model.unreadCount}</span></span>,
+    topbarActions: (
+      <button
+        className="tm-btn tm-btn-sm tm-btn-ghost"
+        type="button"
+        disabled={allRead || !model.onReadAll || model.readAllPending}
+        onClick={model.onReadAll}
+      >
+        {model.readAllPending ? '읽는 중' : '모두 읽기'}
+      </button>
+    ),
+  });
   return (
-    <AppChrome
-      title={<span>알림 <span className={`tm-notification-count ${allRead ? 'tm-notification-count-muted' : ''}`}>{model.unreadCount}</span></span>}
-      activeTab="my"
-      bottomNav={false}
-      backHref="/home"
-      showNotifications={false}
-      topbarActions={(
-        <button
-          className="tm-btn tm-btn-sm tm-btn-ghost"
-          type="button"
-          disabled={allRead || !model.onReadAll || model.readAllPending}
-          onClick={model.onReadAll}
-        >
-          {model.readAllPending ? '읽는 중' : '모두 읽기'}
-        </button>
-      )}
-    >
+    <>
       {/*
        * Desktop column wrapper — display:contents on mobile, centered block on desktop.
        * Also provides the desktop page head (back + title + read-all action)
        * since the mobile topbar is hidden at ≥1024px.
        */}
-      <div className="tm-notifications-desktop-wrap">
+      <div className="tm-notifications-desktop-wrap tm-content-enter">
         {/* Desktop page head: only visible on desktop (tm-show-desktop) */}
         <div className="tm-notifications-desktop-head tm-show-desktop">
           <Link className="tm-desktop-back" href="/home" aria-label="홈으로 돌아가기">
@@ -297,7 +305,9 @@ export function NotificationsPageView({ model }: { model: NotificationsViewModel
             </button>
           </div>
         </div>
-        <div className="tm-notification-list">
+        <div
+          className={`tm-notification-list${model.status !== 'loading' && model.notifications.length === 0 ? ' tm-list-empty' : ''}`}
+        >
           {/* 로딩 중에는 EmptyState 노출을 막는다 — ready 이후에만 빈 상태를 판정한다 */}
           {model.status === 'loading' ? (
             <PageSkeleton variant="list" />
@@ -308,7 +318,7 @@ export function NotificationsPageView({ model }: { model: NotificationsViewModel
             />
           ) : model.notifications.length === 0 ? (
             /* [P2 UX 라이팅] 능동형 */
-            <EmptyState title="아직 알림이 없어요" sub="매치, 팀매치, 채팅에 새 소식이 생기면 여기서 바로 알려드려요." />
+            <EmptyState fill title="아직 알림이 없어요" sub="매치, 팀매치, 채팅에 새 소식이 생기면 여기서 바로 알려드려요." />
           ) : (
             groups.map((group) => {
               const items = model.notifications.filter((notification) => notification.group === group);
@@ -344,7 +354,7 @@ export function NotificationsPageView({ model }: { model: NotificationsViewModel
         }}
       />
       {model.readAllToastVisible ? <div className="tm-notification-toast" role="status">모든 알림을 읽었어요</div> : null}
-    </AppChrome>
+    </>
   );
 }
 

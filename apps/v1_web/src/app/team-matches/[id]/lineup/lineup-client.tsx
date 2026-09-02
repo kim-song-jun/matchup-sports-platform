@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, EmptyState, ErrorState, SectionTitle } from '@/components/v1-ui/primitives';
 import {
   buildFormationPresets, describeSquadSize, slotsWithGoalkeeper, type FormationPreset,
@@ -413,11 +412,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   }
 
   if (teamMatchQuery.isLoading || lineupQuery.isLoading || myTeamsQuery.isLoading) {
-    return (
-      <AppChrome title="라인업" backHref={`/team-matches/${teamMatchId}`} bottomNav={false} desktopHead>
-        <PageSkeleton variant="detail" />
-      </AppChrome>
-    );
+    return <PageSkeleton variant="detail" />;
   }
 
   if (lineupQuery.isError) {
@@ -431,23 +426,17 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
             ? '경기 정보가 아직 준비되지 않았어요. 잠시 후 다시 시도해 주세요.'
             : extractErrorMessage(lineupQuery.error, '라인업을 불러오지 못했어요.');
     return (
-      <AppChrome title="라인업" backHref={`/team-matches/${teamMatchId}`} bottomNav={false} desktopHead>
-        <div style={{ padding: '40px 20px' }}>
-          <ErrorState
-            message={message}
-            onRetry={code === 'PERMISSION_DENIED' || code === 'TEAM_MATCH_NOT_FOUND' ? undefined : () => void lineupQuery.refetch()}
-          />
-        </div>
-      </AppChrome>
+      <div style={{ padding: '40px 20px' }}>
+        <ErrorState
+          message={message}
+          onRetry={code === 'PERMISSION_DENIED' || code === 'TEAM_MATCH_NOT_FOUND' ? undefined : () => void lineupQuery.refetch()}
+        />
+      </div>
     );
   }
 
   if (!lineupQuery.data || !state || !phase) {
-    return (
-      <AppChrome title="라인업" backHref={`/team-matches/${teamMatchId}`} bottomNav={false} desktopHead>
-        <PageSkeleton variant="detail" />
-      </AppChrome>
-    );
+    return <PageSkeleton variant="detail" />;
   }
 
   const counts = deriveLineupCounts(state, rosterPool);
@@ -656,7 +645,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   }
 
   return (
-    <AppChrome title="라인업" backHref={`/team-matches/${teamMatchId}`} bottomNav={false} desktopHead>
+    <>
       <div style={{ padding: '16px 20px 168px' }}>
         {!isOnline ? (
           <div style={{ marginBottom: 12 }}>
@@ -1351,6 +1340,6 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
         error={presetError}
         onSave={(name) => void handleSavePreset(name)}
       />
-    </AppChrome>
+    </>
   );
 }

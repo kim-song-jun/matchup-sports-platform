@@ -12,7 +12,7 @@ import { COMPETITION_LIST_SURFACE } from './tournament-surface';
 import { findTournamentOnSurface, ALL_COMPETITION_KINDS } from './tournament-surface-lookup';
 import { hasTournamentFixtureOfficialResult } from './tournament-fixture-official-result';
 import {
-  PUBLIC_TOURNAMENT_STATUS_FILTER,
+  PUBLIC_COMPETITION_STATUS_WHERE,
   TOURNAMENT_DETAIL_INCLUDE,
   TOURNAMENT_LIST_INCLUDE,
 } from './tournaments-read.query';
@@ -88,7 +88,19 @@ export class TournamentsReadService {
       // `kind=all` 로 여는 것은 표면 결정이라 `v1-surface-check` 가 사용처를 세어 묶는다.
       ...COMPETITION_LIST_SURFACE[query.kind ?? 'tournament'],
       deletedAt: null,
-      status: query.status ? query.status : PUBLIC_TOURNAMENT_STATUS_FILTER,
+      // 명시적으로 status 를 요청해도 **종류 경계는 그대로**다.
+      //
+      // `draft` 는 정규 리그에서만 의미가 있다("예정"). 대회의 `draft` 는 운영자 준비
+      // 중이라 계속 감춘다 — 그래서 `status=draft` 가 와도 **리그로 좁혀서** 적용한다.
+      // 이 한 줄이 없으면 `?status=draft` 하나로 대회 비공개가 통째로 열린다.
+      //
+      // 다른 값(open/closed/in_progress/completed)은 원래 공개 범위라 그대로 쓴다.
+      // ⚠️ `AND` 에 담는다 — 펴 넣으면 위 surface 상수의 `OR` 을 덮는다(그 doc comment 참조).
+      ...(query.status
+        ? query.status === 'draft'
+          ? { AND: [{ kind: V1CompetitionKind.regular_league, status: 'draft' as const }] }
+          : { status: query.status }
+        : { AND: [PUBLIC_COMPETITION_STATUS_WHERE] }),
       ...(query.sportId ? { sportId: query.sportId } : {}),
     };
 
@@ -146,7 +158,10 @@ export class TournamentsReadService {
         // 응답에 실려 나가므로 상세·순위에도 같은 조건을 건다(종류 조건은 헬퍼가 건다).
         id: tournamentId,
         deletedAt: null,
-        status: PUBLIC_TOURNAMENT_STATUS_FILTER,
+        // 목록과 **같은 조건**이어야 한다. 목록에만 올리면 카드는 보이는데 누르면
+        // "찾을 수 없어요" 가 뜬다 — 안 보이는 것보다 나쁘다(2026-09-01 실측:
+        // draft 리그가 목록 밖인데 `/schedule` 은 200 이라 경로마다 답이 달랐다).
+        AND: [PUBLIC_COMPETITION_STATUS_WHERE],
       },
       include: TOURNAMENT_DETAIL_INCLUDE,
     });
@@ -219,7 +234,11 @@ export class TournamentsReadService {
         // 응답에 실려 나가므로 상세·순위에도 같은 조건을 건다(종류 조건은 헬퍼가 건다).
         id: tournamentId,
         deletedAt: null,
-        status: PUBLIC_TOURNAMENT_STATUS_FILTER,
+        // **상세와 같은 조건이어야 한다.** 상세 화면은 이 순위를 **항상 함께** 부른다 —
+        // 상세만 열고 여기를 닫으면 화면이 열리자마자 순위 섹션이 에러가 된다.
+        // 실측(2026-09-01, #932 배포 전): 진행 리그는 상세·일정·통합순위가 다 200 인데
+        // 예정 리그만 상세·통합순위가 404 였다. 한 화면이 부르는 경로는 하나가 아니다.
+        AND: [PUBLIC_COMPETITION_STATUS_WHERE],
       },
       select: {
         id: true,

@@ -641,7 +641,10 @@ button:disabled {
      여유), 좌우 압박을 줄이려 최소 패딩을 준다 — 라벨(최대 2글자)이 탭 경계에
      바짝 붙는 것을 막는다. 아래 .tm-bottom-tab span 주석에 열 수·라벨 폭 계산 근거. */
   padding: 0 2px;
-  /* 활성 pill(::before)의 기준점 */
+  /* 활성 pill 은 이제 nav 레벨의 형제 요소(.tm-bottom-nav-pill-slot)라 이 탭 자신의
+     기준점은 아니다 — 대신 그 pill 위에서 아이콘·라벨이 항상 보이도록 스태킹 순서를
+     맞추는 역할을 한다(position:static 인 요소는 뒤의 position:absolute 형제보다
+     항상 아래에 깔리므로, 이 relative 가 없으면 pill 이 아이콘을 가린다). */
   position: relative;
   /* [대비] grey400 은 흰 배경에서 2.01:1 로 비텍스트 기준(3:1)의 3분의 2였다.
      grey500 이 3.04:1 로 통과한다. 아이콘은 텍스트가 아니라 3:1 기준. */
@@ -695,22 +698,45 @@ button:disabled {
    통과하지만 텍스트 기준(4.5:1)에는 못 미친다 — 텍스트는 위에서 --blue700 으로
    별도 상향했고, pill 은 형태 구분을 보조할 뿐 텍스트 대비를 대체하지 않는다.
    프로젝트 규칙(컬러만으로 정보 전달 금지)도 이쪽이 실제로 만족시킨다.
-   폭 46px 은 가장 좁은 320px 뷰포트의 탭 폭(53px)에도 좌우 3.5px 씩 남는다. */
-.tm-bottom-tab[data-active="true"]::before {
-  content: '';
-  position: absolute;
-  /* 아이콘 중심에 맞춘다. 예전에는 `top: 2px` 로 **탭 상단**에서 쟀는데, 아이콘의 실제
-     위치는 탭 상단이 아니라 탭 **중앙**을 기준으로 정해진다(justify-content: center).
-     그리고 탭 높이는 safe-area 에 따라 달라진다 — 홈 인디케이터가 없으면 50px, 있으면
-     66px. 그래서 고정 오프셋은 한쪽에서만 맞았다: safe-bottom=0 에서는 우연히 정확했고
-     (pill 중심 15px = 아이콘 중심 15px), 홈 인디케이터가 있는 기기에서는 아이콘 중심이
-     23px 로 내려가 **pill 이 8px 위로 떠 보이고 아이콘 아래 6.5px 가 pill 밖으로
-     삐져나왔다.** 즉 실제 iPhone 에서만 어긋나는 종류였다.
+   폭 46px 은 가장 좁은 320px 뷰포트의 탭 폭(53px)에도 좌우 3.5px 씩 남는다.
 
-     탭 중앙에서 재면 탭 높이와 무관해진다. 내용은 아이콘 23px + gap 4px + 라벨 16px 이
-     세로 가운데 정렬이므로, 아이콘 중심은 **언제나** 탭 중심보다 (4px + 16px) / 2 만큼
-     위다 — 아이콘 높이는 상쇄되어 식에 남지 않는다. 값을 계산식 그대로 적어 두는 것은
-     gap 이나 라벨 line-height 가 바뀌면 여기도 같이 바꿔야 한다는 뜻이다. */
+   [미끄러지는 pill, b486d2202 이후 구조 변경] 예전엔 활성 탭마다 ::before 의사요소가
+   하나씩 있어서, 활성 탭이 바뀌면 pill 이 한 탭에서 사라지고 다른 탭에서 나타났다 —
+   탭이 여러 개일 수 없으니 애초에 미끄러질 수 없는 구조였다. 미끄러지려면 pill 이
+   nav 안에 하나만 있어야 하므로, nav 의 그리드 첫 행 전체를 차지하는 슬롯
+   (.tm-bottom-nav-pill-slot, shell.tsx BottomNav 가 탭 목록보다 먼저 렌더)을 두고
+   그 안에 실제 보이는 pill(.tm-bottom-nav-pill)을 얹는다. */
+.tm-bottom-nav-pill-slot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  /* 탭과 정확히 같은 그리드 영역(전체 열 · 유일한 행)을 컨테이닝 블록으로 삼는다 —
+     absolute 로 위치가 잡힌 grid 아이템은 자신이 놓인 그리드 영역(nav 의 padding 을
+     제외한 콘텐츠 박스)을 기준으로 삼기 때문에, 예전에 각 탭(그리드 아이템 — 행
+     높이만큼 stretch)이 기준점이었던 것과 정확히 같은 높이·위치를 얻는다. nav 자신의
+     50% 를 썼다면 padding-top(8px)과 padding-bottom(max(16px, safe-bottom))이
+     비대칭이라 safe-area 유무에 따라 4px~13px 씩 어긋난다(실측). */
+  grid-column: 1 / -1;
+  grid-row: 1;
+  /* 슬롯 폭 = 탭 1칸 폭(`calc(100% / tabCount)`, shell.tsx BottomNav 의 인라인
+     style — 탭 개수가 하드코딩에 묶이지 않도록 기존 grid-template-columns 계산과
+     같은 방식을 따른다). transform 의 `100%` 는 요소 자기 자신의 폭을 가리키므로,
+     이렇게 폭을 잡아 두면 `translateX(index * 100%)` 만으로 정확히 index 칸을
+     이동한다 — 너비를 다시 읽거나(JS 측정) `left`(레이아웃 트리거) 를 바꿀 필요가
+     없다. */
+  /* transform 만 바뀌므로 transform 하나만 전환한다 — transition-all 금지. */
+  transition: transform var(--duration-base) var(--ease-standard);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.tm-bottom-nav-pill {
+  position: absolute;
+  /* 아이콘 중심에 맞춘다 — b486d2202 에서 확정된 계산식 그대로다. 아이콘 23px + gap
+     4px + 라벨 16px 이 세로 가운데 정렬이므로, 아이콘 중심은 **언제나** 슬롯(=탭)
+     중심보다 (4px + 16px) / 2 만큼 위다 — 아이콘 높이는 상쇄되어 식에 남지 않는다.
+     gap 이나 라벨 line-height 가 바뀌면 여기도 같이 바꿔야 한다. */
   top: 50%;
   left: 50%;
   transform: translate(-50%, calc(-50% - (4px + 16px) / 2));
@@ -718,14 +744,6 @@ button:disabled {
   height: 26px;
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--blue500) 14%, transparent);
-  /* 아이콘·라벨보다 뒤에 깔린다 */
-  z-index: 0;
-}
-
-/* pill 이 뒤로 가려면 내용이 위에 있어야 한다 */
-.tm-bottom-tab > * {
-  position: relative;
-  z-index: 1;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2511,6 +2529,34 @@ label.tm-btn:focus-within {
   padding: 16px var(--v1-shell-page-x) 108px;
 }
 
+/**
+ * 대회 목록의 **필터 요약 줄.** 종목 칩 줄(.tm-sport-chip-row)을 **대신한다** — 새 줄을
+ * 얹는 게 아니라 교체다. 사용자가 "세로 높이를 지금보다 늘리지 않는 것이 이 안의 핵심"
+ * 이라고 못박아서, 칩 줄과 같은 자리·같은 리듬을 쓴다(min-height 44 · 아래 여백 12).
+ * 칩 줄은 종목이 늘면 래핑돼 두 줄이 되지만 이 줄은 하나라 **줄어들 여지만 있다.**
+ */
+.tm-competition-filter-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 2px 0 12px;
+  color: var(--text-strong);
+  font-size: 14px;
+  font-weight: 600;
+}
+.tm-competition-filter-summary-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tm-competition-filter-summary:focus-visible {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+  border-radius: var(--radius-control);
+}
+
 .tm-sport-chip-row {
   display: flex;
   gap: 8px;
@@ -2760,8 +2806,19 @@ label.tm-btn:focus-within {
   box-shadow: 0 -16px 32px rgba(25, 31, 40, 0.14);
   touch-action: none;
   animation: tm-filter-sheet-up .22s ease-out;
+  /* 드래그-닫기(BottomSheet) 미달-임계치 복귀용 — 진입/퇴장 `animation` 은 이 속성에서
+   * 항상 우선하므로(같은 프로퍼티에 animation 과 transition 이 동시에 걸리면 animation 승) 여기
+   * transition 을 추가해도 위 keyframe 진입이나 `.is-closing` 퇴장(취소 확인 모달 등)과
+   * 충돌하지 않는다 — 이 transition 은 오직 드래그 손을 뗀 뒤(둘 다 안 도는 순간)에만 적용된다. */
+  transition: transform .22s ease-out;
   will-change: transform;
   pointer-events: auto;
+}
+
+/* 드래그 중에는 transition 을 꺼야 손가락을 정확히 따라온다 — 켜 둔 채로 매 pointermove
+ * 마다 transform 을 바꾸면 각 프레임이 짧게 트랜지션되며 손가락보다 한 박자 늦게 쫓아온다. */
+.tm-filter-sheet.is-dragging {
+  transition: none;
 }
 
 @keyframes tm-filter-scrim-fade {
@@ -4310,6 +4367,85 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   display: flex;
   flex-direction: column;
   align-items: center;
+}
+
+/*
+ * 빈 상태가 **화면을 혼자 차지할 때** 쓰는 변형. 기본 .tm-empty-state 는 흐름대로 놓이므로
+ * 목록이 비면 검색바·칩 바로 아래에 붙고 그 아래가 통째로 남는다(390 기준 아래 300px+).
+ *
+ * 부모에 .tm-list-empty 를 함께 얹어야 동작한다 — 그 클래스는 **빈 상태일 때만** 붙이므로
+ * 카드가 있는 평소 목록의 레이아웃(간격·폭)에는 영향이 없다. 부모가 flex 가 아니면
+ * flex:1 이 무시되고 예전과 같은 자리에 놓인다(안전한 degradation).
+ */
+.tm-empty-state-fill {
+  flex: 1;
+  justify-content: center;
+  /* 부모 높이를 못 받는 경우에도 최소한의 세로 여유는 확보한다. */
+  min-height: min(60vh, 420px);
+}
+
+/* 목록 컨테이너가 비었을 때만 스크롤 영역 높이를 채워 자식(.tm-empty-state-fill)이
+   남은 공간의 중앙에 놓이게 한다. */
+/*
+ * 화면에 따라 목록과 스크롤 영역 사이에 래퍼가 하나 더 있다(공지의 .tm-notice-page —
+ * display:block, flex:0 이라 flex 사슬이 거기서 끊긴다: alpha 실측에서 목록이 420px 에
+ * 머물러 콘텐츠가 62px 아래로 치우쳤다). 빈 상태를 품은 래퍼만 골라 사슬에 넣는다.
+ *
+ * `display: contents` 인 pane(채팅)에는 이 규칙을 걸면 안 되므로 :has(> …) 로 뭉뚱그리지
+ * 않고 해당 래퍼를 명시한다 — contents 를 flex 로 바꾸면 데스크톱 2단 레이아웃이 깨진다.
+ */
+.tm-notice-page:has(.tm-list-empty) {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.tm-list-empty {
+  min-height: 100%;
+  /* 위 :has 규칙이 래퍼를 flex 로 만들면 이 값이 실제로 남은 높이를 받는다.
+     퍼센트가 안 먹는 경로(display:contents 가 낀 채팅)에서도 이쪽은 동작한다. */
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/*
+ * `.tm-list-empty` 의 min-height:100% 는 **부모가 확정 높이를 가질 때만** 먹는다. 스크롤
+ * 영역과 목록 사이에는 페이지 전환 래퍼(.tm-page-transition-enter, display:block)와
+ * display:contents 인 pane 이 끼어 있어, 그 래퍼가 콘텐츠 높이대로 늘어나면 자식의 100%
+ * 가 auto 로 해석돼 무효가 된다 — alpha 실측에서 채팅 목록이 스크롤 영역 788px 중
+ * 516px 만 차지하고 빈 상태가 위로 128px/아래 296px 로 치우쳤다.
+ *
+ * 빈 상태가 있는 화면에서만 그 래퍼에 높이를 넘긴다(:has 로 스코프를 좁힌다 — 콘텐츠가
+ * 있는 평소 화면에는 이 규칙이 적용되지 않는다).
+ *
+ * **`> *` 로 되돌리지 마라.** 스크롤 영역의 직계 자식이 래퍼 하나뿐인 게 아니다 —
+ * `shell.tsx` 는 `desktopHead && title` 일 때 `.tm-desktop-page-head` 를
+ * `<main class="tm-scroll-area">` **바로 안에** 그린다(alpha 실측: `/my/inquiries` 에서
+ * 직계 자식 2개, 헤더가 depth 1). `> *` 면 그 헤더까지 `min-height:100%` + column 이 되어
+ * 뒤로가기 화살표가 제목 **위로 쌓이고** 헤더가 504px 로 부푼다(격리 측정, 1440).
+ *
+ * 지금은 그 조합이 나는 라우트가 없다 — `.tm-list-empty` 를 붙이는 7곳이 전부 route-chrome
+ * 에서 `desktopHead` 를 명시하지 않아 `shell.tsx` 기본값 `false` 가 적용된다. 그래서 이
+ * 변경은 오늘 화면을 한 픽셀도 바꾸지 않는다(직계 자식이 래퍼 하나이고 그게 빈 목록을
+ * 품고 있어 `:has` 가 그대로 매치한다). **미래의 지뢰만 제거한다.**
+ *
+ * 남은 것: 헤더가 형제로 있으면 `min-height:100%` 와 헤더 높이가 더해져 그만큼 오버플로가
+ * 생긴다. 그건 이 좁히기로 안 풀리고 레이아웃 재설계가 필요해 백로그다(스크롤 영역을 flex
+ * 로 만드는 안은 `.tm-match-list` 의 padding-bottom:108px 과 얽혀 오히려 늘어났다).
+ */
+.tm-scroll-area > *:has(.tm-list-empty) {
+  min-height: 100%;
+  /*
+   * min-height 만으로는 부족하다 — 래퍼와 목록 사이에 `display: contents` 인 pane 이
+   * 끼어 있으면(채팅) 박스가 없어 그 아래의 100% 가 참조할 부모가 사라진다(alpha 실측:
+   * 래퍼는 788px 로 늘어났는데 목록은 516px 에 머물렀다).
+   *
+   * flex 컨테이너로 만들면 `display: contents` 인 요소의 자식이 flex item 으로 승격되어,
+   * 높이를 퍼센트가 아니라 flex:1 로 넘길 수 있다.
+   */
+  display: flex;
+  flex-direction: column;
 }
 
 .tm-empty-icon {
@@ -7864,6 +8000,121 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
 .tm-my-account-actions .tm-btn { flex: 1; }
 /* 활동 요약과 이번 달 활동을 한 카드로 합칠 때 두 묶음을 가르는 선. */
 .tm-my-activity-divider { height: 1px; background: var(--border); margin: 12px 0; }
+
+/* ============================================================================
+   페이지 전환 (Wave 2 U20 — docs/design/app-motion-system.md §2.4/§2.7/§2.8)
+   ----------------------------------------------------------------------------
+   PageTransitionController(U39/U40, components/v1-ui/page-transition-controller.tsx)가
+   document.startViewTransition 호출과 data-nav-kind 속성 설정을 맡는다 -- 이 블록은
+   그 컨트롤러가 붙은 지금부터 실제로 선택자가 매칭돼 살아 있다. 값은 기존
+   duration/easing 토큰만 재사용하고 신규 토큰은 0개 -- tokens.css 의 "용도 확장 매핑" 참조.
+   ============================================================================ */
+
+/* ── VT 경로: old/new page-content 유사요소 슬라이드+페이드 ── */
+@keyframes tm-page-slide {
+  from { translate: var(--tm-slide-offset); }
+  to { translate: 0; }
+}
+@keyframes tm-page-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+::view-transition-old(page-content) {
+  animation:
+    var(--duration-fast) var(--ease-standard) both tm-page-fade reverse,
+    var(--duration-slower) var(--ease-standard) both tm-page-slide reverse;
+}
+::view-transition-new(page-content) {
+  animation:
+    var(--duration-base) var(--ease-out) var(--duration-fast) both tm-page-fade,
+    var(--duration-slower) var(--ease-standard) both tm-page-slide;
+}
+
+:root[data-nav-kind="push"] { --tm-slide-offset: -24%; } /* old 쪽 기준값 -- new 는 아래서 부호 반전 */
+:root[data-nav-kind="push"] ::view-transition-new(page-content) { --tm-slide-offset: 100%; }
+:root[data-nav-kind="pop"]  { --tm-slide-offset: 100%; }
+:root[data-nav-kind="pop"]  ::view-transition-new(page-content) { --tm-slide-offset: -24%; }
+
+/* 탭 전환은 슬라이드 없이 crossfade 만 -- 위 슬라이드 애니메이션을 덮어쓴다 */
+:root[data-nav-kind="tab"] ::view-transition-old(page-content),
+:root[data-nav-kind="tab"] ::view-transition-new(page-content) {
+  animation: var(--duration-base) var(--ease-standard) both tm-page-fade;
+}
+:root[data-nav-kind="tab"] ::view-transition-old(page-content) { animation-direction: reverse; }
+
+/* ── CSS 폴백 경로(VT 미지원 웹뷰) -- template.tsx 마운트 시 재생 ──
+   iOS 16/17(Safari < 18)은 상시 이 경로만 본다 -- "미지원 대비 보험"이 아니라
+   iOS 사용자의 주 경로다. old 는 이미 사라진 상태(new 만 존재)라 §2.4 표대로
+   거리를 16~24px 로 줄여 VT 경로와 같은 모션 언어를 유지한다. */
+@keyframes tm-page-fallback-push {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes tm-page-fallback-pop {
+  from { opacity: 0; transform: translateX(-24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes tm-page-fallback-tab {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.tm-page-transition-enter[data-nav-kind="push"] { animation: tm-page-fallback-push var(--duration-slower) var(--ease-out) both; }
+.tm-page-transition-enter[data-nav-kind="pop"]  { animation: tm-page-fallback-pop var(--duration-slower) var(--ease-out) both; }
+.tm-page-transition-enter[data-nav-kind="tab"]  { animation: tm-page-fallback-tab var(--duration-base) var(--ease-standard) both; }
+/* data-nav-kind 가 아직 없는 최초 진입(딥링크·새로고침)은 애니메이션 없이 그대로
+   보인다 -- 속성 선택자가 매칭 안 되므로 별도 처리가 필요 없다. */
+
+/* ── 스켈레톤 → 콘텐츠 1단 전환(§3.3) -- 176개 loading.tsx 소비처 공용 클래스.
+   VT 의 tm-page-fade keyframe 을 그대로 재사용한다(신규 keyframe 아님). ── */
+.tm-content-enter {
+  animation: tm-page-fade var(--duration-base) var(--ease-out) both;
+}
+
+/* ── sticky/fixed 셸 요소는 VT 캡처 그룹에서 분리한다(§2.7) --
+   이름을 안 주면 topbar/bottom-nav 도 page-content 와 함께 슬라이드해버린다
+   (셸은 "지속"돼야 하므로 명백한 결함). Wave 1 이전엔 화면에 한 순간 하나만
+   존재해 이름 충돌이 없다 -- 병렬 라우트가 생기면 재검토 필요(설계 문서 §2.7). */
+.tm-topbar      { view-transition-name: tm-shell-topbar; }
+.tm-bottom-nav  { view-transition-name: tm-shell-bottomnav; }
+.tm-fixed-cta   { view-transition-name: tm-shell-fixed-cta; }
+.tm-route-progress { view-transition-name: tm-shell-route-progress; }
+
+::view-transition-group(tm-shell-topbar),
+::view-transition-group(tm-shell-bottomnav),
+::view-transition-group(tm-shell-fixed-cta),
+::view-transition-group(tm-shell-route-progress) {
+  animation: none;
+  z-index: 100; /* 슬라이드하는 page-content 그룹 위에 그려지도록 */
+}
+::view-transition-old(tm-shell-topbar),
+::view-transition-old(tm-shell-bottomnav),
+::view-transition-old(tm-shell-fixed-cta),
+::view-transition-old(tm-shell-route-progress) {
+  display: none; /* old+new 가 겹쳐 두 겹으로 보이는 것 방지 */
+}
+::view-transition-new(tm-shell-topbar),
+::view-transition-new(tm-shell-bottomnav),
+::view-transition-new(tm-shell-fixed-cta),
+::view-transition-new(tm-shell-route-progress) {
+  animation: none;
+}
+
+/* ── prefers-reduced-motion (§2.8) --
+   기존 전역 catch-all(`* { animation-duration: 0.01ms !important; ... }`)은
+   ::view-transition-* 유사요소를 잡지 못한다(일반 * 셀렉터로 안 잡히는 별도
+   카테고리) -- VT 도입과 함께 명시 추가하지 않으면 접근성 규칙이 조용히 깨진다.
+   CSS 폴백 경로(.tm-page-transition-enter)는 일반 엘리먼트 애니메이션이라
+   기존 전역 catch-all 이 이미 커버한다 -- 별도 처리 불필요. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+}
+
 /* Android wrapper: transient web feedback reads as an in-app centered popup.
    Browser layouts keep their existing bottom/inline placement. */
 html[data-teameet-native-app='android'] .tm-native-toast-stack {

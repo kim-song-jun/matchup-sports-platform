@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
-import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { useV1Reviews, useV1Tournament, useV1TournamentReviews } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -150,12 +149,7 @@ export function TournamentReviewsPageClient({ tournamentId }: { tournamentId: st
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
-    <AppChrome
-      title="참가팀 후기"
-      backHref={`/tournaments/${tournamentId}/awards`}
-      activeTab="tournaments"
-      desktopHead
-    >
+    <>
       {showForm && <ReviewFormModal tournamentId={tournamentId} onClose={() => setShowForm(false)} />}
       <div className="tm-tourn-sub-page">
         <div className="tm-reviews-body" style={{ padding: '20px 20px 40px' }}>
@@ -256,6 +250,6 @@ export function TournamentReviewsPageClient({ tournamentId }: { tournamentId: st
           )}
         </div>
       </div>
-    </AppChrome>
+    </>
   );
 }

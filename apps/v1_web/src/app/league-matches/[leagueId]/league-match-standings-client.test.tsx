@@ -13,6 +13,7 @@ import {
   useV1RecordConsent,
 } from '@/hooks/use-v1-api';
 import { clearStoredV1Session, saveStoredV1Session } from '@/lib/session-storage';
+import { queryImageBySrc } from '@/test/next-image';
 import LeagueMatchStandingsClient from './league-match-standings-client';
 
 vi.mock('@/components/auth/pending-social-signup-gate', () => ({
@@ -120,7 +121,8 @@ describe('LeagueMatchStandingsClient', () => {
       </Providers>,
     );
 
-    await waitFor(() => expect(container.querySelector('img[src="/uploads/teams/seongsu.png"]')).toBeInTheDocument());
+    // next/image 전환(U15) 이후 실제 DOM src는 `/_next/image?url=...`로 재작성된다.
+    await waitFor(() => expect(queryImageBySrc(container, '/uploads/teams/seongsu.png')).not.toBeNull());
   });
 
   it('미확정 경기가 있으면 0경기 순위표와 확인 중 배너가 함께 보인다', async () => {

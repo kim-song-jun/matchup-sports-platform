@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, ErrorState } from '@/components/v1-ui/primitives';
 import { Button } from '@/components/v1-ui/button';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
@@ -154,35 +153,28 @@ export function TacticsBoardClient({ teamId, gameId }: { teamId: string; gameId:
   }
 
   if (board.isLoading || members.isLoading || entries === null) {
-    return (
-      <AppChrome title="우리 팀 전술" activeTab="teams" bottomNav={false} backHref={`/teams/${teamId}`}>
-        <PageSkeleton />
-      </AppChrome>
-    );
+    return <PageSkeleton />;
   }
 
   if (board.isError) {
     const status = board.error instanceof V1ApiError ? board.error.statusCode : null;
     return (
-      <AppChrome title="우리 팀 전술" activeTab="teams" bottomNav={false} backHref={`/teams/${teamId}`}>
-        <ErrorState
-          title={status === 403 ? '이 팀의 전술은 볼 수 없어요' : '전술을 불러오지 못했어요'}
-          message={
-            status === 403
-              ? '전술보드는 그 팀의 팀원만 볼 수 있어요.'
-              : status === 404
-                ? '이 경기에서 팀을 찾을 수 없어요. 대진이 바뀌었을 수 있어요.'
-                : '잠시 후 다시 시도해 주세요.'
-          }
-          onRetry={status === 403 || status === 404 ? undefined : () => void board.refetch()}
-        />
-      </AppChrome>
+      <ErrorState
+        title={status === 403 ? '이 팀의 전술은 볼 수 없어요' : '전술을 불러오지 못했어요'}
+        message={
+          status === 403
+            ? '전술보드는 그 팀의 팀원만 볼 수 있어요.'
+            : status === 404
+              ? '이 경기에서 팀을 찾을 수 없어요. 대진이 바뀌었을 수 있어요.'
+              : '잠시 후 다시 시도해 주세요.'
+        }
+        onRetry={status === 403 || status === 404 ? undefined : () => void board.refetch()}
+      />
     );
   }
 
   return (
-    <AppChrome title="우리 팀 전술" activeTab="teams" bottomNav={false} backHref={`/teams/${teamId}`}>
-      <div
+    <div
         style={{
           display: 'flex',
           flexDirection: 'column',
@@ -344,7 +336,6 @@ export function TacticsBoardClient({ teamId, gameId }: { teamId: string; gameId:
           </div>
         ) : null}
       </div>
-    </AppChrome>
   );
 }
 

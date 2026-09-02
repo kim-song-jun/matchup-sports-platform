@@ -77,7 +77,7 @@ export function TeamMatchListPageClient() {
   }, [selectedGenderRule, selectedLevels, selectedSportId, selectedSort, selectedView, submittedQuery]);
   // 서버는 20건씩 커서 페이지네이션인데(team-matches.service.ts) 예전엔 이 화면이 단발
   // useQuery로 첫 페이지만 받아 21번째부터는 볼 방법이 없었다(감사 결함 — matches-client.tsx의
-  // 같은 수정과 동일 패턴, league-matches-list-client.tsx의 "더 보기" 누적 방식을 따른다).
+  // 같은 수정과 동일 패턴, tournaments/page.tsx 의 "더 보기" 누적 방식을 따른다).
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [accumulated, setAccumulated] = useState<V1TeamMatch[]>([]);
   // matches-client.tsx와 동일한 이유로 useEffect가 아니라 렌더 중에 되감는다 — 안 그러면
@@ -215,9 +215,10 @@ export function TeamMatchListPageClient() {
   }
 }
 
-export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string }) {
+/** matches-client.tsx 의 `seed` 와 같은 목적·같은 안전장치 — 자세한 근거는 그쪽 주석. */
+export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: string; seed?: V1TeamMatch | null }) {
   const router = useRouter();
-  const query = useV1TeamMatch(teamMatchId);
+  const query = useV1TeamMatch(teamMatchId, { seed });
   const rawViewerState = query.data ? getViewerState(query.data) : 'none';
   const canManageHostTeam = query.data?.viewer?.manageableHostTeam === true;
   // 결과 승인 진입 게이트. `viewerState === 'approved'` 를 쓰면 안 된다 — 그건 신청서를
@@ -332,7 +333,8 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
     },
     mode: toDetailMode(viewerState, getStatus(query.data)),
     applyLabel: seeding ? '불러오는 중' : applyLabel(viewerState, getStatus(query.data), selectedEligibility, isGuest, hasNoTeam, eligibility.isSuccess),
-    applyPending: seeding || applyTeamMatch.isPending || withdrawTeamMatch.isPending,
+    // matches-client.tsx 와 같은 이유 — '처리 중' 이 '불러오는 중' 을 덮어쓴다.
+    applyPending: applyTeamMatch.isPending || withdrawTeamMatch.isPending,
     hostActions: !seeding && canManageHostTeam
       ? buildHostActions({
           status: getStatus(query.data),
@@ -350,7 +352,7 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
     reviewAction: buildReviewAction(teamMatchId, getStatus(query.data), isParticipantMember),
     statusLabel: seeding ? undefined : statusLabel(viewerState, getStatus(query.data)),
     chatLabel: chatLabel(canManageHostTeam, canManageOpponentTeam),
-    chatPending: seeding || resolveChatRoom.isPending,
+    chatPending: resolveChatRoom.isPending,
     chatError,
     onChat: !seeding && canOpenTeamMatchChat(canManageHostTeam, canManageOpponentTeam)
       ? () => {

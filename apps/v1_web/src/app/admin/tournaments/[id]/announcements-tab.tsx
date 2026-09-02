@@ -146,7 +146,7 @@ export function AnnouncementsTab({
   };
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="tm-content-enter flex flex-col gap-6">
       {/* ── 공지 작성 폼 ─────────────────────────────────────────────── */}
       {!canWrite && (
         <p

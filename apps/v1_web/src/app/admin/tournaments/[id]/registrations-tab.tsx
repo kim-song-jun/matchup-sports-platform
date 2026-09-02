@@ -585,7 +585,7 @@ export function RegistrationsTab({
         </p>
       )}
       {/* P1-2: 상태 필터 칩 */}
-      <div className="flex items-center gap-2 flex-wrap mb-3" role="group" aria-label="신청 상태 필터">
+      <div className="tm-content-enter flex items-center gap-2 flex-wrap mb-3" role="group" aria-label="신청 상태 필터">
         {REGISTRATION_STATUS_FILTERS.map((opt) => {
           const active = statusFilter === opt.value;
           const count = statusCounts[opt.value] ?? 0;

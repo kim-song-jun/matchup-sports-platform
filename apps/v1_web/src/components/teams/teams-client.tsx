@@ -1,7 +1,6 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useQueries } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   useV1ApproveTeamJoinApplication,
@@ -31,13 +30,12 @@ import {
 import { usePendingIds } from '@/hooks/use-pending-ids';
 import { extractErrorMessage } from '@/lib/error-message';
 import { trackEvent } from '@/lib/analytics';
-import { V1ApiError, v1Get } from '@/lib/api-client';
+import { V1ApiError } from '@/lib/api-client';
 import { chatRoomHref } from '@/lib/chat-route';
 import { formatTournamentDateShort } from '@/lib/date-utils';
 import { isTeamOperatorRole, normalizeMyTeamsResponse } from '@/lib/team-role';
 import { hasStoredV1Session } from '@/lib/session-storage';
 import { teamSharePath } from '@/lib/team-share-route';
-import { v1Keys } from '@/lib/query-keys';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import { teamJoinApplicationStatusLabel } from '@/lib/v1-status-labels';
 import type { V1Team, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
@@ -97,19 +95,20 @@ export function TeamListPageClient() {
   const base = getTeamListViewModel();
   const items = query.data?.items;
   const visibleItems = filterTeamsByLevels(items, selectedLevels);
-  const activityDetailQueries = useQueries({
-    queries: visibleItems.map((item) => {
-      const teamId = item.teamId ?? item.id;
-      const needsActivityFallback = !item.activitySummary && !item.activityAreaText;
-      return {
-        queryKey: [...v1Keys.team(teamId), 'detail', 'list-activity'] as const,
-        queryFn: () => v1Get<V1TeamDetail>(`/teams/${teamId}`),
-        enabled: Boolean(teamId && needsActivityFallback),
-        staleTime: 30_000,
-      };
-    }),
-  });
-  const visibleTeams = visibleItems.map((item, index) => toTeam(withListActivityFallback(item, activityDetailQueries[index]?.data), base.teams[index] ?? base.teams[0]));
+  // 예전에는 목록 항목에 활동 정보가 없으면 **팀마다** `/teams/:id` 를 불러 채우려 했다.
+  // 그 폴백은 구조적으로 성립할 수 없어서 지웠다 — 목록과 상세가 **같은 표현식으로 같은 값**을
+  // 만들기 때문이다(apps/v1_api/src/teams/teams.service.ts 의 목록 190행·상세 2141행이
+  // 둘 다 `formatTeamActivitySummary(team.profile)`). 목록에서 비어 있다는 건 team.profile 에
+  // 활동 데이터가 없다는 뜻이고, 그러면 상세를 불러도 비어 있다.
+  //
+  // 실측(alpha, 2026-09-01): 팀 탭 진입 시 `/teams/:id` 가 **44회** 나갔고 개별 응답이 980ms,
+  // 응답시간 합 32.8초였다. 그 44회가 화면에 더해 준 값은 **없었다**(표본 5팀 전부 상세의
+  // profile.activity* 가 null/[]).
+  //
+  // 다만 이 폴백은 **렌더를 막지는 않았다** — 카드는 목록 응답만으로 그려지므로 탭 전환은
+  // MutationObserver 기준 346ms 로 이미 빨랐다. 지우는 이유는 체감 속도가 아니라 아무 값도
+  // 얻지 못하는 요청 44회 자체다(서버 부하·모바일 데이터·배터리).
+  const visibleTeams = visibleItems.map((item, index) => toTeam(item, base.teams[index] ?? base.teams[0]));
 
   if (query.isError) return <TeamStatePageView model={getTeamStateViewModel('error')} />;
   const countItems = selectedSportId ? (sportCounts.data?.items ?? visibleItems) : visibleItems;
@@ -195,9 +194,19 @@ export function TeamFilterPageClient() {
   return <TeamStatePageView model={model} />;
 }
 
-export function TeamDetailPageClient({ teamId }: { teamId: string }) {
+/**
+ * `seed` 는 서버 컴포넌트(app/teams/[id]/page.tsx)가 구조화 데이터·메타데이터를 위해 이미
+ * 받아 둔 팀 상세 응답이다. 추가 요청 없이 첫 화면을 채운다.
+ *
+ * 단, 그 응답은 **비인증**이라 `viewer` 가 `{ role: 'none', canRequestJoin: false,
+ * disabledReason: 'LOGIN_REQUIRED' }` 로 채워져 온다(alpha 실측). 매치와 달리 `viewer` 는
+ * required 필드라 지울 수도 없다 — 그대로 쓰면 로그인한 owner 에게 잠깐 "가입 신청"이나
+ * "로그인이 필요해요"가 뜬다. 그래서 seed 로 그리는 동안(`isPlaceholderData`) 뷰어에
+ * 의존하는 것(가입 CTA·컨택 CTA)만 잠그고, 팀 이름·로고·소개·지역·멤버는 바로 보여준다.
+ */
+export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: V1TeamDetail | null }) {
   const router = useRouter();
-  const query = useV1TeamDetail(teamId);
+  const query = useV1TeamDetail(teamId, { seed });
   const eligibility = useV1TeamJoinEligibility(teamId, { enabled: Boolean(query.data) });
   const join = useV1CreateTeamJoinApplication(teamId);
   const withdraw = useV1WithdrawTeamJoinApplication(teamId, eligibility.data?.applicationId);
@@ -255,6 +264,10 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
     return <TeamDetailPageSkeleton />;
   }
 
+  // 서버 seed 로 그리는 중. 비인증 응답이라 viewer 판정이 "비로그인"으로 고정돼 있으므로
+  // 뷰어에 의존하는 것만 잠근다(matches-client.tsx 와 같은 패턴).
+  const seeding = query.isPlaceholderData;
+
   const model: TeamDetailViewModel = {
     ...fallback,
     team: {
@@ -290,9 +303,11 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
       },
     },
     mode: toDetailMode(query.data, eligibility.data),
-    ctaLabel: teamDetailCtaLabel(query.data, eligibility.data),
+    ctaLabel: seeding ? '불러오는 중' : teamDetailCtaLabel(query.data, eligibility.data),
     ctaPending: join.isPending || withdraw.isPending || resolveChat.isPending,
-    onCta: teamDetailCtaAction({
+    // ctaPending 에 seeding 을 넣지 않는다 — 렌더 쪽이 그걸 '처리 중'(= 내 신청 처리
+    // 중)으로 읽어 ctaLabel 을 덮는다. onCta 를 비우면 이미 disabled 다.
+    onCta: seeding ? undefined : teamDetailCtaAction({
       team: query.data,
       eligibility: eligibility.data,
       chat: async () => {
@@ -318,7 +333,7 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
     openMatches,
     openMatchesLoading: openMatchesQuery.isLoading,
     contactHref:
-      toDetailMode(query.data, eligibility.data) !== 'mine' && operatorTeamCount > 0
+      !seeding && toDetailMode(query.data, eligibility.data) !== 'mine' && operatorTeamCount > 0
         ? `/teams/${teamId}/contact/new`
         : undefined,
     myLeagues,
@@ -577,19 +592,6 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
   );
 }
 
-function withListActivityFallback(team: V1Team, detail?: V1TeamDetail): V1Team {
-  if (team.activitySummary || team.activityAreaText || !detail) return team;
-  return {
-    ...team,
-    activityAreaText: detail.profile.activityAreaText ?? null,
-    activityDays: detail.profile.activityDays ?? [],
-    activityFrequency: detail.profile.activityFrequency ?? null,
-    activityTimeSlots: detail.profile.activityTimeSlots ?? [],
-    activityTypes: detail.profile.activityTypes ?? [],
-    activityMemo: detail.profile.activityMemo ?? null,
-    activitySummary: detail.profile.activitySummary ?? detail.profile.activityAreaText ?? null,
-  };
-}
 
 
 function buildTeamFilterSheet(

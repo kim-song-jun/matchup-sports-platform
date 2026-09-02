@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { AppChrome } from '@/components/v1-ui/shell';
+import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { ChevronRightIcon } from '@/components/v1-ui/icons';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { PublicFixtureStateBadge, staffRoleLabel } from '@/components/tournament-ops/badges';
@@ -32,6 +32,9 @@ export function MyStaffFixturesPageClient({ tournamentId }: { tournamentId: stri
 
   const group = findMyTournamentGroup(assignmentsQuery.data, tournamentId);
   const title = group?.tournamentTitle ?? '담당 경기';
+  // 대회명은 fetch 의존이라 route-chrome 테이블엔 기본값("담당 경기")만 있다 — 배정을
+  // 찾으면 여기서 실제 대회명으로 덮어쓴다(fragments/my-secondary.ts 참조).
+  useShellOverride({ title });
 
   const entries = (scheduleQuery.data?.pages ?? []).flatMap((page) => [
     ...page.items,
@@ -44,7 +47,7 @@ export function MyStaffFixturesPageClient({ tournamentId }: { tournamentId: stri
 
   if (isError) {
     return (
-      <Shell title={title}>
+      <Shell>
         <ErrorState
           message="담당 경기를 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
           onRetry={() => {
@@ -58,7 +61,7 @@ export function MyStaffFixturesPageClient({ tournamentId }: { tournamentId: stri
 
   if (isLoading) {
     return (
-      <Shell title={title}>
+      <Shell>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div className="tm-skeleton" style={{ height: 72, borderRadius: 'var(--radius-control)' }} />
           <div className="tm-skeleton" style={{ height: 72, borderRadius: 'var(--radius-control)' }} />
@@ -69,7 +72,7 @@ export function MyStaffFixturesPageClient({ tournamentId }: { tournamentId: stri
 
   if (group === null) {
     return (
-      <Shell title={title}>
+      <Shell>
         <EmptyState
           title="이 대회의 담당 배정이 없어요"
           sub="배정이 만료되었거나 해제됐어요. 대회 운영진에게 문의해 주세요."
@@ -79,8 +82,8 @@ export function MyStaffFixturesPageClient({ tournamentId }: { tournamentId: stri
   }
 
   return (
-    <Shell title={title}>
-      <p className="tm-text-caption" style={{ margin: '0 0 12px' }}>
+    <Shell>
+      <p className="tm-text-caption tm-content-enter" style={{ margin: '0 0 12px' }}>
         {describeScope(group.assignments)}
       </p>
       {mine.length === 0 ? (
@@ -99,13 +102,11 @@ export function MyStaffFixturesPageClient({ tournamentId }: { tournamentId: stri
   );
 }
 
-function Shell({ title, children }: { title: string; children: React.ReactNode }) {
+function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <AppChrome title={title} activeTab="my" bottomNav={false} backHref="/my/tournament-staff" desktopHead>
-      <div className="tm-my-shell">
-        <div className="tm-my-settings-desktop">{children}</div>
-      </div>
-    </AppChrome>
+    <div className="tm-my-shell">
+      <div className="tm-my-settings-desktop">{children}</div>
+    </div>
   );
 }
 

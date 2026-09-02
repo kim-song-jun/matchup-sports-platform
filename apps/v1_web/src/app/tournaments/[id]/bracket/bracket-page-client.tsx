@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { Trophy } from 'lucide-react';
-import { AppChrome } from '@/components/v1-ui/shell';
 import { ErrorState } from '@/components/v1-ui/primitives';
 import { useV1MyTournamentFixtures, useV1Tournament } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -22,7 +21,13 @@ import {
   isGroupStageComplete,
 } from '@/app/tournaments/[id]/tournament-detail-client';
 import { usePublicTournamentSchedule } from '@/components/public-game-records/use-public-game-records';
-import { ScheduleContent } from '@/components/public-game-records/schedule-content';
+// ⚠️ 이 파일에도 동명 지역 함수가 있다(대회 상세 `V1TournamentStanding` 용). 별칭으로 갈라
+// 둔다 — 같은 이름 두 개가 서로 다른 입력을 받으면 다음 사람이 아무거나 집는다.
+import {
+  ScheduleContent,
+  standingsAriaLabel,
+  toStandingsRows as publicStandingsToRows,
+} from '@/components/public-game-records/schedule-content';
 import { competitionFormatLabel, isLeagueCompetition } from '@/lib/competition-kind';
 import type {
   V1TournamentDetail,
@@ -217,10 +222,17 @@ function GroupStandingsSection({ group, fixtures }: { group: V1TournamentGroup; 
 }
 
 /* ── 리그 최종 순위표 (리그 포맷) ── */
-function LeagueStandingsSection({ rows }: { rows: readonly TournamentStandingsRow[] }) {
+function LeagueStandingsSection({
+  rows,
+  label = '리그 순위',
+}: {
+  rows: readonly TournamentStandingsRow[];
+  /** 티어가 있으면 `'1부'`·`'2부'` — 아래 `leagueStandingsHeading` 참조. */
+  label?: string;
+}) {
   return (
-    <section aria-label="리그 순위" style={{ marginBottom: 16 }}>
-      <TournamentStandingsTable rows={rows} advance={null} ariaLabel="리그 순위표" />
+    <section aria-label={standingsAriaLabel(label)} style={{ marginBottom: 16 }}>
+      <TournamentStandingsTable rows={rows} advance={null} ariaLabel={standingsAriaLabel(label, '표')} />
     </section>
   );
 }
@@ -389,6 +401,31 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
    * 대회 7건(alpha 실측)의 문구까지 바뀐다.
    */
   const isRegularLeague = tournament.kind === 'regular_league';
+  /**
+   * **정규 리그의 순위는 대회 축 `groups` 에 없다.** 거울 행에는 `V1TournamentGroup` 이
+   * 하나도 없어서(그 행을 만드는 코드가 전부 대회 게이트 뒤다) 아래 `allLeagueRows` 가
+   * **항상 빈 배열**이 된다 — alpha 실측에서 이 탭이 "순위 집계 전이에요" 만 그렸다.
+   * 서버는 `/tournaments/:id/schedule` 로 리그 순위를 정상으로 준다(같은 페이지의 "경기
+   * 일정" 탭이 이미 그 응답을 그리고 있었다).
+   *
+   * 그래서 **소스만 가른다.** 상세(`groups`)를 채우는 쪽은 이 응답을 쓰는 다른 소비처까지
+   * 건드리게 되고, 두 화면이 서로 다른 계산을 하게 될 여지가 남는다. 이쪽은 `/schedule`
+   * 과 **같은 값을 같은 변환으로** 그린다(`toStandingsRows` 를 공유한다).
+   *
+   * 요청은 형제 탭(`BracketScheduleTab`)과 같은 쿼리 키라 React Query 가 합친다 —
+   * 왕복이 늘지 않는다.
+   */
+  // 대회에서는 이 부모가 그 데이터를 **아예 안 쓴다**(`groups` 를 쓴다) — 안 쓰는 응답을
+  // 라이브 폴링까지 하며 들고 있을 이유가 없다. `enabled` 로 끄는 이유이고, 빈 id 를
+  // 넘겨 끄는 방식은 쓰지 않는다(캐시 키가 오염되고 조용히 잘못된 요청이 갈 수 있다).
+  // 리그일 때는 형제 탭과 **같은 쿼리 키**라 React Query 가 합친다 — 왕복이 안 는다.
+  const leagueSchedule = usePublicTournamentSchedule(tournament.id, {}, { enabled: isRegularLeague });
+  const leagueScheduleStandings = isRegularLeague
+    ? (leagueSchedule.data?.pages[0]?.standings ?? [])
+    : [];
+  const leagueScheduleItemCount = isRegularLeague
+    ? (leagueSchedule.data?.pages.reduce((sum, page) => sum + page.items.length, 0) ?? 0)
+    : 0;
   const stages = buildTournamentStages(tournament);
   const [activeTab, setActiveTab] = useState<'standings' | 'schedule'>('schedule');
 
@@ -416,10 +453,14 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
   // 리그 포맷: 모든 그룹의 순위 행을 합산. 집계 전 조는 toGroupStandingsRows가
   // 편성 팀(groupTeams)을 0값 기준선 행으로 대신 내주므로, 경기 0건이어도 참가 팀이
   // 모두 보인다(#374). 중복 제거 키는 등록 단위(row.key = registrationId)로 그대로 유지.
-  const allLeagueRows = groups
-    .flatMap((g) => toGroupStandingsRows(g))
-    .filter((row, index, arr) => arr.findIndex((x) => x.key === row.key) === index)
-    .sort((a, b) => a.position - b.position);
+  const allLeagueRows = isRegularLeague
+    // 정규 리그는 `/schedule` 응답에서 온다 — 위 doc comment 참조. 변환은 그 화면과
+    // **같은 함수**를 쓴다(행 key 규칙 `registrationId ?? teamId` 포함).
+    ? publicStandingsToRows(leagueScheduleStandings)
+    : groups
+        .flatMap((g) => toGroupStandingsRows(g))
+        .filter((row, index, arr) => arr.findIndex((x) => x.key === row.key) === index)
+        .sort((a, b) => a.position - b.position);
 
   // 좌(순위표) 칼럼에 **실제로 그릴 게 있는지**. 예전엔 이걸 따지지 않고 항상 2열 그리드를
   // 폈다 — 그래서 순위표가 없는 상태(대회 초반이라 성적이 아직 없거나, 애초에 조별 순위가
@@ -427,8 +468,43 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
   // 붙었다(오너 지적: 대진표 빈 상태 화면). 반대로 league 포맷은 우측(대진표)이 없는데
   // 2열이라 오른쪽이 비었다. 칼럼이 하나뿐이면 그리드를 1열로 접어 그 칼럼이 가운데 폭을
   // 온전히 쓰게 한다.
+  // 정규 리그의 "경기가 있나" 는 대회 축 `fixtures` 가 아니라 `/schedule` 항목 수로 센다 —
+  // 거울엔 대회 축 대진이 없어 `fixtures.length` 가 늘 0 이고, 그러면 경기가 있는 리그에도
+  // "경기 일정이 아직 없어요" 가 뜬다(alpha 실측: 일정 탭엔 1건이 보이는데 순위 탭은 그렇게 적었다).
+  /**
+   * 리그 순위가 **아직 안 온 상태**와 **정말 없는 상태**를 가른다. 안 가르면 로딩·에러 중에
+   * `standings` 가 빈 배열이라 *"순위 집계 전이에요"·"경기 일정이 아직 없어요"* 가
+   * **거짓으로** 뜬다 — 이 PR 이 고치려던 바로 그 증상이 원인만 바뀌어 되살아난다.
+   * 에러일 때 특히 나쁘다: 못 불러온 것을 *"없다"* 로 말하면 사용자가 다시 시도할 이유를
+   * 못 찾는다.
+   */
+  const leagueScheduleSettled = isRegularLeague
+    ? !leagueSchedule.isLoading && !leagueSchedule.isError
+    : true;
+  /**
+   * 순위표 제목. 사용자 확정값은 **"tierLabel(1부/2부)을 쓰고 없으면 '리그 순위'"** 인데
+   * 이 화면은 `'리그 순위'` 를 박아 두고 있었다 — **티어 리그 55/88건(alpha 실측)에서
+   * `'1부'`·`'2부'` 가 전혀 안 보였다.** 같은 리그가 `/schedule` 에선 티어를 보여주고
+   * 여기선 안 보여주는 상태였다.
+   *
+   * 서버가 그 값을 `standings[].groupName` 에 실어 준다(한 리그는 그룹이 하나뿐이라
+   * 값이 하나로 모인다 — 여럿이면 티어를 특정할 수 없으므로 일반 명칭으로 떨어진다).
+   *
+   * ⚠️ 정규 리그일 때만이다. `format='league'` 인 **대회**는 사용자가 문구를 그대로 두라고
+   * 했으므로 건드리지 않는다.
+   */
+  const leagueStandingsGroupNames = new Set(leagueScheduleStandings.map((row) => row.groupName));
+  const leagueStandingsHeading =
+    isRegularLeague && leagueStandingsGroupNames.size === 1
+      ? [...leagueStandingsGroupNames][0]
+      : '리그 순위';
+
+  const leagueHasNoFixtures = isRegularLeague
+    ? leagueScheduleSettled && leagueScheduleItemCount === 0
+    : fixtures.length === 0;
   const hasStandingsColumn = isLeague
-    ? allLeagueRows.length > 0 || fixtures.length === 0
+    // 로딩·에러 중에도 칼럼은 유지한다 — 안 그러면 칼럼이 나타났다 사라지며 레이아웃이 튄다.
+    ? allLeagueRows.length > 0 || leagueHasNoFixtures || !leagueScheduleSettled
     : format === 'group_knockout' && hasGroupStandings;
   // 리그엔 토너먼트 대진이 없다. isLeague 를 안 빼면 거울 행(group_knockout)이 여기서
   // 참이 되어 **빈 대진표 칼럼**이 생긴다 — 이 화면이 리그에서 가장 크게 틀어지는 자리다.
@@ -546,9 +622,21 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
               {isLeague && (
                 <section>
                   <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>
-                    리그 순위
+                    {leagueStandingsHeading}
                   </h3>
-                  <LeagueStandingsSection rows={allLeagueRows} />
+                  {isRegularLeague && !leagueScheduleSettled ? (
+                    leagueSchedule.isError ? (
+                      <div className="tm-hub-empty">순위를 불러오지 못했어요.</div>
+                    ) : (
+                      <div
+                        className="tm-skeleton"
+                        style={{ height: 160, borderRadius: 'var(--radius-control)' }}
+                        aria-label="순위 불러오는 중"
+                      />
+                    )
+                  ) : (
+                    <LeagueStandingsSection rows={allLeagueRows} label={leagueStandingsHeading} />
+                  )}
                 </section>
               )}
 
@@ -563,7 +651,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
                 </section>
               )}
 
-              {isLeague && fixtures.length === 0 && (
+              {isLeague && leagueHasNoFixtures && (
                 <div className="tm-hub-empty">경기 일정이 아직 없어요.</div>
               )}
             </div>
@@ -642,32 +730,17 @@ export function BracketPageClient({ tournamentId }: { tournamentId: string }) {
   const { data, isLoading, isError, error, refetch } = useV1Tournament(tournamentId, { livePolling: true });
 
   if (isLoading) {
-    return (
-      <AppChrome title="순위·브래킷" backHref={`/tournaments/${tournamentId}`} activeTab="tournaments" desktopHead>
-        <BracketPageSkeleton />
-      </AppChrome>
-    );
+    return <BracketPageSkeleton />;
   }
 
   if (isError || !data) {
     const msg = extractErrorMessage(error, '대회 정보를 불러오지 못했어요.');
     return (
-      <AppChrome title="순위·브래킷" backHref={`/tournaments/${tournamentId}`} activeTab="tournaments" desktopHead>
-        <div style={{ padding: '40px 20px' }}>
-          <ErrorState message={msg} onRetry={() => void refetch()} />
-        </div>
-      </AppChrome>
+      <div style={{ padding: '40px 20px' }}>
+        <ErrorState message={msg} onRetry={() => void refetch()} />
+      </div>
     );
   }
 
-  return (
-    <AppChrome
-      title="순위·브래킷"
-      backHref={`/tournaments/${tournamentId}`}
-      activeTab="tournaments"
-      desktopHead
-    >
-      <BracketPageContent tournament={data} />
-    </AppChrome>
-  );
+  return <BracketPageContent tournament={data} />;
 }

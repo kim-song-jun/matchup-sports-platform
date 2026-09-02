@@ -503,7 +503,7 @@ function ScheduleRow({
  * teamId를 key로 쓰면 React key가 전부 충돌한다(registrationId는 비공개 상태에도
  * 항상 채워지는 안정 식별자).
  */
-function toStandingsRows(rows: readonly PublicStandingRow[]): TournamentStandingsRow[] {
+export function toStandingsRows(rows: readonly PublicStandingRow[]): TournamentStandingsRow[] {
   return rows.map((row) => ({
     // 대회는 registrationId(비공개 상태에도 유일), 리그는 teamId(가리지 않으므로 항상 있고
     // 팀당 한 행이라 유일하다). 유니온이 둘 중 하나를 보장한다 — `types.ts` 참조.
@@ -530,7 +530,28 @@ function toStandingsRows(rows: readonly PublicStandingRow[]): TournamentStanding
  * 정보가 없으므로 진출선 하이라이트는 항상 없음(advance=null) — 원래도 이
  * 탭엔 진출 배지가 없었으니 동작 변화 없음.
  */
-function StandingsTable({ rows }: { rows: readonly PublicStandingRow[] }) {
+/**
+ * 순위표 접근성 라벨. **그룹명이 이미 "…순위" 로 끝나면 또 붙이지 않는다** — 티어가 없는
+ * 단발 리그의 `groupName` 이 "리그 순위" 라, 그대로 조합하면 스크린리더가
+ * *"리그 순위 순위표"* 로 읽는다(눈으로는 안 보이는 자리라 캡처로도 안 잡힌다).
+ */
+export function standingsAriaLabel(groupName: string, suffix: '' | '표' = ''): string {
+  const base = groupName.endsWith('순위') ? groupName : `${groupName} 순위`;
+  return `${base}${suffix}`;
+}
+
+function StandingsTable({
+  rows,
+  showGroupLabel = true,
+}: {
+  rows: readonly PublicStandingRow[];
+  /**
+   * 그룹 이름을 표 위에 적을지. 대회는 조가 여럿이라 항상 필요한데(`A조`·`B조`),
+   * **티어가 없는 단발 리그는 그룹이 하나뿐이고 그 이름이 바깥 제목과 같은 말**이라
+   * ("리그 순위" / "리그 순위") 두 번 적힌다. 그 경우만 끈다.
+   */
+  showGroupLabel?: boolean;
+}) {
   const groups = new Map<string, { groupName: string; rows: PublicStandingRow[] }>();
   for (const row of rows) {
     const bucket = groups.get(row.groupId) ?? { groupName: row.groupName, rows: [] };
@@ -541,23 +562,25 @@ function StandingsTable({ rows }: { rows: readonly PublicStandingRow[] }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {Array.from(groups.entries()).map(([groupId, group]) => (
-        <section key={groupId} aria-label={`${group.groupName} 순위`}>
-          <div
-            style={{
-              fontSize: 12,
-              fontWeight: 700,
-              color: 'var(--text-muted)',
-              marginBottom: 8,
-              letterSpacing: '0.04em',
-              textTransform: 'uppercase',
-            }}
-          >
-            {group.groupName}
-          </div>
+        <section key={groupId} aria-label={standingsAriaLabel(group.groupName)}>
+          {showGroupLabel ? (
+            <div
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: 'var(--text-muted)',
+                marginBottom: 8,
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase',
+              }}
+            >
+              {group.groupName}
+            </div>
+          ) : null}
           <TournamentStandingsTable
             rows={toStandingsRows(group.rows)}
             advance={null}
-            ariaLabel={`${group.groupName} 순위표`}
+            ariaLabel={standingsAriaLabel(group.groupName, '표')}
           />
         </section>
       ))}
@@ -770,6 +793,19 @@ export function ScheduleContent({
   // 전부 시간 미정이어도 뜨도록 unscheduled까지 함께 본다 — 예전엔 data.items만 봐서
   // 그 경우 칩 자체가 안 떴다.
   const phaseLabels = isRegularLeague ? LEAGUE_PHASE_LABELS : TOURNAMENT_PHASE_LABELS;
+  const standingsHeading = isRegularLeague ? '리그 순위' : '조별 순위';
+  /**
+   * 안쪽 그룹 라벨을 숨길지. **개수가 아니라 값으로 판정한다.**
+   *
+   * 처음엔 `groupId` 종류가 1개면 숨겼는데, **한 리그의 순위는 groupId 가 언제나 하나**다
+   * (서버가 `groupId: leagueId` 를 넣는다 — `1부`·`2부` 는 애초에 **다른 리그**다). 그래서
+   * 그 조건은 티어 리그에서도 참이 되어 사용자가 확정한 `'1부'` 라벨을 숨겼다.
+   *
+   * 숨겨야 하는 건 *"바깥 제목과 같은 말이 두 번 적히는"* 경우뿐이다 — 그건 값을 봐야 안다.
+   */
+  const standingsGroupNames = new Set(data.standings.map((row) => row.groupName));
+  const hideStandingsGroupLabel =
+    isRegularLeague && standingsGroupNames.size === 1 && standingsGroupNames.has(standingsHeading);
   const phases = groupScheduleEntries(data.items, phaseLabels);
   const hasMyFixtures =
     data.items.some((entry) => myFixtureById.has(entry.fixtureId)) ||
@@ -804,10 +840,16 @@ export function ScheduleContent({
       ) : null}
       {showStandings && data.standings.length > 0 ? (
         <section>
+          {/* 리그엔 조가 없다 — 대회 말인 "조별 순위" 가 그대로 뜨던 자리다(alpha 실측).
+              안쪽 그룹 라벨은 티어가 있을 때만 켠다: 단발 리그는 그룹이 하나뿐이고 그
+              이름이 이 제목과 같은 말이라("리그 순위") 두 번 적힌다. */}
           <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>
-            조별 순위
+            {standingsHeading}
           </h3>
-          <StandingsTable rows={data.standings} />
+          <StandingsTable
+            rows={data.standings}
+            showGroupLabel={!hideStandingsGroupLabel}
+          />
         </section>
       ) : null}
 

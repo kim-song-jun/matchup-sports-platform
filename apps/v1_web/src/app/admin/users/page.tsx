@@ -147,7 +147,7 @@ function AdminUsersPageContent() {
         description="플랫폼 전체 회원의 상태를 검색하고 관리해요."
       />
 
-      <div className="flex flex-col gap-4">
+      <div className="tm-content-enter flex flex-col gap-4">
         {/* Filter bar */}
         <AdminFilterBar
           searchLabel="닉네임·이메일 검색"

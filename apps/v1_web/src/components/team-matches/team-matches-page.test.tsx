@@ -631,3 +631,59 @@ describe('팀매치 상세 히어로 CTA — 안내와 실제 동작', () => {
     expect(screen.queryByText('신청을 취소했어요.')).not.toBeInTheDocument();
   });
 });
+
+// 필터 시트 A안(드래그로 닫기) 배선 — DraggableFilterSheet에서 BottomSheet로 교체.
+// 이 파일이 실제로 짜 넣은 건 onRequestClose → router.push(closeHref) 한 줄뿐이다
+// (드래그 임계치 판정 자체는 bottom-sheet.test.tsx가 이미 검증한다). 잘못 배선하면
+// (엉뚱한 href, push 대신 replace 등) 뒤로가기·URL 공유 성질이 조용히 깨지므로 그
+// 배선만 좁게 검증한다 — ESC는 useModalA11y가 이미 물려주는 onClose 경로라 pointer
+// 이벤트 폴리필 없이도 onRequestClose를 발화시킬 수 있다.
+describe('팀매치 목록 필터 시트 — BottomSheet 배선(A안)', () => {
+  function buildFilterSheetModel() {
+    const model = getTeamMatchListViewModel();
+    model.filterSheet = {
+      open: true,
+      closeHref: '/team-matches?filterOpen=false',
+      resetHref: '/team-matches?filterReset=true',
+      applyHref: '/team-matches?filterApply=true',
+      sort: '',
+      view: 'card',
+      genderRule: '',
+      levels: [],
+      sortOptions: [{ label: '추천순', value: 'recommended', href: '/team-matches?sort=recommended', active: true }],
+      genderOptions: [{ label: '성별 무관', value: '성별 무관', href: '/team-matches?gender=all', active: true }],
+      levelOptions: [{ label: '초급', value: 'beginner', href: '/team-matches?level=beginner' }],
+    };
+    return model;
+  }
+
+  it('filterSheet.open이 true면 dialog로 시트가 뜨고 scrim이 closeHref를 그대로 갖는다', () => {
+    const model = buildFilterSheetModel();
+    renderPage(<TeamMatchListPageView model={model} />);
+
+    const dialog = screen.getByRole('dialog', { name: '팀매치 필터' });
+    expect(dialog).toBeInTheDocument();
+
+    const scrim = screen.getByRole('link', { name: '필터 닫기' });
+    expect(scrim).toHaveAttribute('href', '/team-matches?filterOpen=false');
+  });
+
+  it('filterSheet.open이 false면 시트가 아예 마운트되지 않는다(로컬 open 상태를 새로 만들지 않는다)', () => {
+    const model = buildFilterSheetModel();
+    model.filterSheet!.open = false;
+    renderPage(<TeamMatchListPageView model={model} />);
+
+    expect(screen.queryByRole('dialog', { name: '팀매치 필터' })).not.toBeInTheDocument();
+  });
+
+  it('ESC로 닫으면 로컬 상태가 아니라 router.push(closeHref)로 네비게이션한다', () => {
+    const model = buildFilterSheetModel();
+    renderPage(<TeamMatchListPageView model={model} />);
+
+    expect(screen.getByRole('dialog', { name: '팀매치 필터' })).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    expect(routerPush).toHaveBeenCalledTimes(1);
+    expect(routerPush).toHaveBeenCalledWith('/team-matches?filterOpen=false');
+  });
+});

@@ -1,6 +1,5 @@
 'use client';
 
-import { AppChrome } from '@/components/v1-ui/shell';
 import { ErrorState } from '@/components/v1-ui/primitives';
 import { extractErrorMessage } from '@/lib/error-message';
 import { usePublicMatch } from '@/components/public-game-records/use-public-game-records';
@@ -29,25 +28,21 @@ export function MatchPageClient({ tournamentId, fixtureId }: { tournamentId: str
 
   if (isLoading) {
     return (
-      <AppChrome title="경기 기록" backHref={`/tournaments/${tournamentId}/bracket`} activeTab="tournaments" desktopHead>
-        <MatchSkeleton />
-      </AppChrome>
-    );
+              <MatchSkeleton />
+      );
   }
 
   if (isError || !data) {
     const msg = extractErrorMessage(error, '경기 정보를 찾을 수 없어요.');
     return (
-      <AppChrome title="경기 기록" backHref={`/tournaments/${tournamentId}/bracket`} activeTab="tournaments" desktopHead>
-        <div style={{ padding: '0 16px 40px' }}>
+              <div style={{ padding: '0 16px 40px' }}>
           <ErrorState message={msg} onRetry={() => void refetch()} />
         </div>
-      </AppChrome>
-    );
+      );
   }
 
   return (
-    <AppChrome title="경기 기록" backHref={`/tournaments/${tournamentId}/bracket`} activeTab="tournaments" desktopHead>
+    <>
       <MatchDetailContent data={data} />
       <div style={{ padding: '0 16px' }}>
         {/* 기록 연결 승인함 (attest UI C안): 다른 참가자의 연결 신청을 확인·승인하는
@@ -59,6 +54,6 @@ export function MatchPageClient({ tournamentId, fixtureId }: { tournamentId: str
             "명단을 보고 내가 없네를 깨달은 직후"라는 자리 자체는 그대로다. */}
         <ClaimMyRecordSection tournamentId={tournamentId} fixtureId={fixtureId} />
       </div>
-    </AppChrome>
+    </>
   );
 }

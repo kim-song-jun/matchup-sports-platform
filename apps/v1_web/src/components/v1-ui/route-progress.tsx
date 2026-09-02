@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
+import { useNavigationIntent } from './use-navigation-intent';
 
 /**
  * 전역 상단 네비게이션 진행 바.
@@ -50,36 +51,12 @@ export function RouteProgressBar() {
     failsafeRef.current = setTimeout(finish, 8000);
   };
 
-  // 시작 트리거: 내부 링크 클릭(capture) + 뒤로/앞으로
+  // 시작 트리거: 내부 링크 클릭(capture) + 뒤로/앞으로 — 캡처 로직 자체는 use-navigation-intent.ts로 추출됨(동작 무변경)
+  useNavigationIntent({ onIntent: () => start() });
+
+  // 언마운트 시 타이머 정리(기존 클릭/popstate 리스너 cleanup에 함께 있던 것)
   useEffect(() => {
-    const onClick = (event: MouseEvent) => {
-      if (event.defaultPrevented || event.button !== 0) return;
-      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-      const anchor = (event.target as HTMLElement | null)?.closest?.('a');
-      if (!anchor) return;
-      const href = anchor.getAttribute('href');
-      if (!href || anchor.getAttribute('target') === '_blank' || anchor.hasAttribute('download')) return;
-      if (href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) return;
-      let url: URL;
-      try {
-        url = new URL(href, window.location.href);
-      } catch {
-        return;
-      }
-      if (url.origin !== window.location.origin) return;
-      if (url.pathname === window.location.pathname && url.search === window.location.search) return;
-      start();
-    };
-
-    const onPopState = () => start();
-
-    document.addEventListener('click', onClick, true);
-    window.addEventListener('popstate', onPopState);
-    return () => {
-      document.removeEventListener('click', onClick, true);
-      window.removeEventListener('popstate', onPopState);
-      clearTimers();
-    };
+    return () => clearTimers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

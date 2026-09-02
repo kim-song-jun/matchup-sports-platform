@@ -115,7 +115,7 @@ export default function AdminLeagueMatchNewPage() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="tm-content-enter mx-auto max-w-2xl">
       <AdminPageHeader eyebrow="플랫폼 · 리그" title="리그 개설" description="팀을 등록하고 라운드로빈 대진을 자동으로 만들어요." />
 
       {/* 그룹 B 감사 결함 4: 이 폼은 항상 단발 리그만 만든다 — 1부·2부처럼 승격·강등이

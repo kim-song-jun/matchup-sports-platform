@@ -19,6 +19,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function NoticeDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  if (!await fetchPublicV1<V1NoticeResponse>(`/notices/${encodeURIComponent(id)}`)) notFound();
-  return <NoticeDetailPageClient noticeId={id} />;
+  // 존재 확인을 위해 어차피 기다리는 응답이다 — 버리지 않고 첫 표시값으로 넘긴다.
+  const notice = await fetchPublicV1<V1NoticeResponse>(`/notices/${encodeURIComponent(id)}`);
+  if (!notice) notFound();
+  return <NoticeDetailPageClient noticeId={id} seed={notice} />;
 }

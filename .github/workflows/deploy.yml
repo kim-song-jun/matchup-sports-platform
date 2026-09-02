@@ -41,10 +41,40 @@ jobs:
           HEAD_REF: ${{ github.event_name == 'pull_request' && github.head_ref || '' }}
         run: |
           set -Eeuo pipefail
-          if [[ ! "${BASE_SHA}" =~ ^[0-9a-f]{40}$ ]] || [[ "${BASE_SHA}" == "0000000000000000000000000000000000000000" ]]; then
-            BASE_SHA="$(git merge-base origin/main "${HEAD_SHA}")"
+          # base 해석은 세 가지가 함께 맞아야 한다. 하나만 고치면 나머지가 깨진다.
+          #
+          # ① 가드는 **형식이 아니라 연산**을 시험한다. 예전 `=~ ^[0-9a-f]{40}$` 는 payload 의
+          #    base.sha 가 항상 40자 hex 라 PR 이벤트에서 참이 된 적이 없고, 붙어 있던
+          #    `== 000…0` 도 push 로 브랜치를 **새로 만들 때**만 참이라 dev 에선 안 탄다.
+          #    즉 아래 보강은 사실상 죽어 있었다.
+          #
+          #    rc 1 도 보강 대상으로 둔다 — expand-contract 스텝과 다른 점이고 이유가 있다.
+          #    그쪽은 rc 1("공통 조상 없음")을 게이트가 **문장으로 보고**하지만, 여기서는
+          #    아래 `A...B` diff 가 아예 계산 불가라 보고할 것도 없이 죽는다. base tip 을
+          #    받아오면 대개 풀린다.
+          #
+          # ② `BASE_SHA` 에는 **base tip** 을 넣는다. merge-base 결과를 넣으면 안 된다 —
+          #    이 스텝의 base 는 "무엇이 변경됐는가"를 정하므로 더 오래된 커밋을 넣으면
+          #    diff 창이 넓어져 **남의 changeset 을 내 것으로 세게 된다**(= fail-open).
+          #    아래 3-dot 이 분기점을 알아서 구하므로 tip 을 주는 게 맞다. 승격 절의
+          #    `git show ${BASE_SHA}:…` 도 tip 이어야 옳은 값을 읽는다.
+          #
+          # ③ 보강은 **실제 base** 를 받는다. 예전엔 `origin/main` 고정이라, base=dev 인 PR 에서
+          #    이게 타면 main 기준으로 잡혀 diff 가 통째로 부풀었다. push 이벤트에선 BASE_REF
+          #    가 '' 인데, 이 스텝은 push 일 때 `refs/heads/dev` 에서만 돌므로 dev 가 그 기준이다.
+          base_rc=0
+          git merge-base "${BASE_SHA}" "${HEAD_SHA}" >/dev/null 2>&1 || base_rc=$?
+          if [[ ${base_rc} -ne 0 ]]; then
+            git fetch --no-tags origin "${BASE_REF:-dev}"
+            BASE_SHA="$(git rev-parse FETCH_HEAD)"
           fi
-          git diff --name-only "${BASE_SHA}" "${HEAD_SHA}" > /tmp/teameet-changed-files.txt
+          # 3-dot: **분기점부터 head 까지** — 이 PR 이 실제로 바꾼 것만 센다.
+          # 2-dot 은 base 에만 있고 head 엔 없는 커밋까지 diff 에 넣어서, base 가 전진하면
+          # 남의 파일과 **남의 changeset** 이 내 변경으로 잡힌다. 그러면 게이트가 있는데
+          # 아무것도 안 막는다(실측: 열린 PR 하나가 2-dot 에선 "325 behavior files,
+          # 20 changed Changesets" 로 통과했고 3-dot 에선 "changeset not required" 였다.
+          # 그 PR 이 실제로 건드린 건 scripts/ 6파일뿐이다).
+          git diff --name-only "${BASE_SHA}...${HEAD_SHA}" > /tmp/teameet-changed-files.txt
           if [[ ${BASE_REF} == main && ${HEAD_REF} == dev ]]; then
             # A Changeset can be added and consumed entirely between main and dev,
             # so it is absent from the final tree diff. Preserve deleted Changeset

@@ -3931,6 +3931,24 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   overflow-y: hidden;
 }
 
+/*
+ * `.tm-chat-room` 의 height:100% 는 스크롤 영역(절대 배치라 높이가 확정)을 기준으로 삼는데,
+ * 2026-09-01 페이지 전환 래퍼(template.tsx 의 .tm-page-transition-enter, display:block,
+ * height:auto)가 그 사이에 끼면서 100% 가 auto 로 해석됐다. 그러면 채팅방이 콘텐츠 높이
+ * (스레드 전체 + 입력창)만큼 늘어나고, 위의 overflow-y:hidden 때문에 사용자는 아래로 내릴
+ * 수도 없다 — alpha 실측(2026-09-02): 입력창 bottom 이 뷰포트보다 Pixel 7 에서 441px,
+ * iPhone 14 에서 613px 아래. 즉 채팅방에서 입력창이 통째로 잘렸다.
+ *
+ * `.tm-list-empty` 와 같은 처방(4448행)이되 **height** 여야 한다 — min-height 로는 래퍼가
+ * 콘텐츠만큼 계속 자라 스레드가 스크롤러가 되지 못한다. 래퍼와 채팅방 사이의 pane 들은
+ * display:contents 라 박스가 없어, 이 래퍼가 곧 채팅방의 퍼센트 기준이다.
+ * 데스크톱(≥1024px)은 스크롤 영역이 static·height:auto 라 이 100% 도 auto 가 되고, 채팅방
+ * 높이는 .tm-chat-desktop-workspace 의 calc(100dvh - 112px) 가 정한다 — 실측 1440 에서 변화 0.
+ */
+.tm-scroll-area > .tm-page-transition-enter:has(.tm-chat-room) {
+  height: 100%;
+}
+
 .tm-chat-context {
   padding: 16px;
   border-bottom: 1px solid var(--grey100);
@@ -7607,21 +7625,35 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   opacity: 0.95; padding-bottom: 8px;
 }
 .tm-pcard-render-photo {
-  width: 100%; height: 100%;
-  background-size: cover; background-position: center top;
+  width: 100%; height: 100%; position: relative;
   /* 사진을 카드에 **녹인다**. 아래로만 페이드하면(예전: 180deg 74%) 좌우·위가 직각으로
      남아 카드 위에 사각 사진을 붙여 놓은 것처럼 보인다(alpha 실측 2026-08-26, 실제
      사진 업로드로 확인). 세로·가로 두 그라디언트의 **교집합**을 마스크로 써서 네 변이
      모두 사라지게 한다 -- 실물 FUT 카드의 배경 제거된 선수 컷아웃에 가장 가까운 근사다.
-     mask-composite 는 표준(intersect)과 WebKit(source-in) 문법이 달라 둘 다 적는다. */
+     mask-composite 는 표준(intersect)과 WebKit(source-in) 문법이 달라 둘 다 적는다.
+
+     가로 마스크는 8%~92% (예전 16%~84%): 업로드 입구에서 얼굴 중심 정사각으로 잘라
+     저장하므로(2026-09-02, profile-photo-cropper) 사진 가장자리가 곧 얼굴 옆 여백이다.
+     좁게 지우면 얼굴 양옆이 잘려 보이고, 넓게 남기면 배경 사각형이 비친다 -- 정사각
+     전제에서 8% 가 그 사이다. */
   -webkit-mask-image:
     linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, #000 8%, #000 58%, rgba(0, 0, 0, 0) 100%),
-    linear-gradient(90deg, rgba(0, 0, 0, 0) 0%, #000 16%, #000 84%, rgba(0, 0, 0, 0) 100%);
+    linear-gradient(90deg, rgba(0, 0, 0, 0) 0%, #000 8%, #000 92%, rgba(0, 0, 0, 0) 100%);
   -webkit-mask-composite: source-in;
   mask-image:
     linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, #000 8%, #000 58%, rgba(0, 0, 0, 0) 100%),
-    linear-gradient(90deg, rgba(0, 0, 0, 0) 0%, #000 16%, #000 84%, rgba(0, 0, 0, 0) 100%);
+    linear-gradient(90deg, rgba(0, 0, 0, 0) 0%, #000 8%, #000 92%, rgba(0, 0, 0, 0) 100%);
   mask-composite: intersect;
+}
+/* next/image(fill) 가 그리는 실제 <img>. 도착하기 전엔 투명 -- 배경 div 시절엔 사진이
+   한 박자 늦게 "툭" 나타났다. 정사각 저장본을 위쪽 기준으로 덮는다(얼굴은 위에 있다). */
+.tm-pcard-render-photo img {
+  object-fit: cover; object-position: center top;
+  opacity: 0; transition: opacity 0.35s ease;
+}
+.tm-pcard-render-photo[data-loaded='true'] img { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .tm-pcard-render-photo img { transition: none; }
 }
 
 /* 이름 줄 -- 실물은 이름 아래에만 헤어라인이 있다. 위아래를 다 그으면 표처럼 보인다. */
@@ -8082,6 +8114,60 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
 .tm-pcard-photo-slot:hover { background: rgba(255, 255, 255, 0.13); border-color: var(--tm-ink); }
 .tm-pcard-photo-slot:focus-visible { outline: 2px solid var(--tm-ink); outline-offset: 2px; }
 
+/* ── 프로필 사진 크롭 모달 (사용자 선택 A안, 2026-09-02) ──
+   업로드 입구에서 얼굴 중심 정사각으로 잘라 저장한다. 카드 렌더 박스는 사진의 얼굴 위치를
+   모르므로 입력을 정규화하는 것이 유일한 근본 해결이다(GitFut 가 GitHub 아바타를 받는 것과
+   같은 구조). 스크림·패널의 페이드는 위 .tm-modal-scrim/.tm-modal-panel 규칙을 그대로 쓴다. */
+.tm-photo-crop-scrim {
+  position: fixed; inset: 0; z-index: var(--z-modal);
+  display: flex; align-items: flex-end; justify-content: center;
+  /* 아래 여백은 홈 인디케이터(safe-area)만큼 더 준다 -- 확인 버튼이 그 밑에 깔리지 않게 */
+  padding: 16px 16px calc(16px + var(--v1-shell-safe-bottom, 0px));
+  background: rgba(25, 31, 40, 0.48);
+}
+@media (min-width: 640px) { .tm-photo-crop-scrim { align-items: center; } }
+.tm-photo-crop-panel {
+  width: 100%; max-width: 360px;
+  /* 화면이 낮으면(가로 폰·키보드) 패널 안에서 스크롤한다 -- 확인 버튼이 화면 밖으로 밀려나면 안 된다 */
+  max-height: calc(100dvh - 32px - var(--v1-shell-safe-bottom, 0px)); overflow-y: auto;
+  background: var(--surface); border-radius: var(--radius-container);
+  box-shadow: var(--shadow-modal);
+  display: flex; flex-direction: column; align-items: center;
+  padding: 0 0 16px;
+}
+.tm-photo-crop-head {
+  width: 100%; display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 8px 8px 20px;
+}
+/* 뷰포트는 검정 바탕 -- 사진 밖이 보일 일은 없지만(덮기 불변식) 로딩 중엔 이 바탕이 보인다. */
+.tm-photo-crop-viewport {
+  position: relative; overflow: hidden; background: #111;
+  touch-action: none; user-select: none; -webkit-user-select: none;
+  cursor: grab;
+}
+.tm-photo-crop-viewport:active { cursor: grabbing; }
+.tm-photo-crop-photo {
+  position: absolute; left: 0; top: 0; max-width: none;
+  transform-origin: 0 0; pointer-events: none; will-change: transform;
+}
+/* 원형 가이드: 원 밖을 어둡게, 테두리는 흰 선. 저장은 정사각이지만 얼굴 기준은 원이 직관적이다. */
+.tm-photo-crop-guide {
+  position: absolute; inset: 14px; border-radius: var(--radius-circle);
+  box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.5); border: 2px solid rgba(255, 255, 255, 0.92);
+  pointer-events: none;
+}
+.tm-photo-crop-error {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  padding: 24px; text-align: center; color: #fff; font-size: 13px; line-height: 1.5;
+}
+.tm-photo-crop-hint { margin-top: 12px; color: var(--text-muted); }
+.tm-photo-crop-zoom {
+  width: 100%; display: flex; align-items: center; gap: 12px; padding: 8px 20px 4px;
+}
+.tm-photo-crop-zoom input[type='range'] { flex: 1; min-height: 44px; accent-color: var(--blue500); }
+.tm-photo-crop-error-line { padding: 4px 20px 0; }
+.tm-photo-crop-confirm { width: calc(100% - 32px); margin-top: 12px; }
+
 
 /* ── 프로필(계정) 블록 · 활동 병합 (사용자 선택 A안, 2026-08-26) ──
    카드 조작과 계정 조작이 한 상자에 섞여 있던 것을 갈랐다. 여기는 계정 쪽이다. */
@@ -8163,9 +8249,14 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
    최소 재현 6건으로 일치 확인). 탭은 "같은 화면에서 보는 각도만 바꾸는" 조작이므로
    전환 전체를 끈다. 최소 재현 결과: 기준 10건 · 이름 지정만 6건 · old/new(*) 2건 ·
    여기에 group(*) 까지 더해야 0건. */
+/* 'native' 도 같다 — iOS 셸의 엣지 스와이프는 네이티브가 이미 슬라이드를 그렸으므로
+   웹이 또 그리면 두 겹이 된다(use-navigation-intent 가 iOS popstate 를 native 로 분류). */
 :root[data-nav-kind="tab"]::view-transition-old(*),
 :root[data-nav-kind="tab"]::view-transition-new(*),
-:root[data-nav-kind="tab"]::view-transition-group(*) {
+:root[data-nav-kind="tab"]::view-transition-group(*),
+:root[data-nav-kind="native"]::view-transition-old(*),
+:root[data-nav-kind="native"]::view-transition-new(*),
+:root[data-nav-kind="native"]::view-transition-group(*) {
   animation: none;
 }
 
@@ -8197,7 +8288,8 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
      .tm-page-transition-enter[data-nav-kind="..."] 는 그 속성을 **이 요소 자신**에서
      찾으므로 영원히 매칭되지 않는다(template.tsx 는 이 요소에 그 속성을 달지 않는다).
      여기서는 반대로 자손 결합자가 맞다 — <html> 아래의 실제 요소이기 때문이다. */
-  :root[data-nav-kind="tab"] .tm-page-transition-enter { animation: none; }
+  :root[data-nav-kind="tab"] .tm-page-transition-enter,
+  :root[data-nav-kind="native"] .tm-page-transition-enter { animation: none; }
 }
 /* data-nav-kind 가 아직 없는 최초 진입(딥링크·새로고침)은 애니메이션 없이 그대로
    보인다 -- 속성 선택자가 매칭 안 되므로 별도 처리가 필요 없다. */

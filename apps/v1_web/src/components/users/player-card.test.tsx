@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { resolveNextImageSrc } from '@/test/next-image';
 import { PlayerCard } from './player-card';
 import type { V1PlayerCard, V1PlayerCardStat } from '@/types/api';
 
@@ -156,8 +157,12 @@ describe('선수 카드', () => {
     );
 
     expect(screen.queryByRole('link', { name: /사진 추가하기/ })).not.toBeInTheDocument();
-    const photo = container.querySelector('.tm-pcard-render-photo') as HTMLElement | null;
-    expect(photo?.style.backgroundImage).toContain('/uploads/2026/08/me.webp');
+    // background-image div 가 아니라 next/image 다(2026-09-02) -- 실제 DOM src 는
+    // `/_next/image?url=...` 로 재작성되므로 원본 경로는 디코딩해서 본다.
+    const img = container.querySelector('.tm-pcard-render-photo img');
+    expect(resolveNextImageSrc(img)).toBe('/uploads/2026/08/me.webp');
+    // 카드 렌더 폭에 맞춰 줄여 받는다 -- 이 값이 없으면 next/image 는 뷰포트 폭 기준으로 큰 이미지를 고른다.
+    expect(img?.getAttribute('sizes')).toBe('138px');
   });
 
   it('settingsHref 를 주면 카드 설정 입구가, 없으면(남의 카드) 안 보인다', () => {

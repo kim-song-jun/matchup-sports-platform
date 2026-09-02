@@ -2861,6 +2861,17 @@ export type V1AdminPushSendResult = {
     delivered: number;
     failed: number;
     disabled: boolean;
+    /**
+     * 앱 기기(APNs / FCM) 결과. 웹과 나란히 온다 — 합치면 폰이 받았다는 사실이 깨진 브라우저
+     * 구독에 가려진다. 이 필드가 생기기 전 서버의 응답(또는 그때 저장된 브로드캐스트 재생
+     * 응답)에는 없으므로 optional.
+     */
+    native?: {
+      devices: number;
+      delivered: number;
+      failed: number;
+      disabled: boolean;
+    };
   };
 };
 

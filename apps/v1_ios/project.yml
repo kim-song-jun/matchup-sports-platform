@@ -110,6 +110,7 @@ targets:
       - path: Teameet/WebShell/WebShellSession.swift
       - path: Teameet/WebShell/WebShellSessionStore.swift
       - path: Teameet/WebShell/SafeAreaBridge.swift
+      - path: Teameet/WebShell/ViewportLock.swift
       - path: Teameet/WebShell/NativeBridgeMessage.swift
       - path: Teameet/WebShell/ChromeColour.swift
       - path: Teameet/WebShell/DownloadPolicy.swift
@@ -214,3 +215,6 @@ schemes:
         TEAMEET_UITEST_INQUIRY_TITLE: $(TEAMEET_UITEST_INQUIRY_TITLE)
         TEAMEET_UITEST_EXPECT_REFUSAL: $(TEAMEET_UITEST_EXPECT_REFUSAL)
         TEAMEET_UITEST_LINK_PAGE: $(TEAMEET_UITEST_LINK_PAGE)
+        TEAMEET_UITEST_BANNER_TITLE: $(TEAMEET_UITEST_BANNER_TITLE)
+        TEAMEET_UITEST_READY_FILE: $(TEAMEET_UITEST_READY_FILE)
+        TEAMEET_UITEST_TERMINATED_BANNER_TITLE: $(TEAMEET_UITEST_TERMINATED_BANNER_TITLE)

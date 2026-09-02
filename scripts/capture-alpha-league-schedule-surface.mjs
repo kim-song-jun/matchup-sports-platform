@@ -216,7 +216,15 @@ function verdict(kind, r) {
       bad.push(`순위 제목이 API 와 다름(화면 '${r.standingsAriaLabel}' vs API '${r.expectGroupName}')`);
     }
   } else {
+    /**
+     * ⚠️ **대조군도 양방향으로 본다.** 예전엔 `정규 라운드` 누수만 봤는데, 그러면 대회에서
+     * `결선` 이 **사라져도** ✅ 였다 — 파일 머리의 표는 *"단계 칩: 정규 라운드(리그) / 결선(대회)"*
+     * 라고 약속해 놓고 판정은 한쪽만 강제하던 자리다. 리그 분기가 넓게 잡히면 대회 어휘가
+     * **없어지는** 쪽으로 깨지는데, 그게 정확히 이 하네스가 잡으라고 만든 결함이다.
+     * 리그 쪽과 대칭으로 **경기가 있을 때만** 칩을 따진다(경기 0건이면 칩이 없는 게 맞다).
+     */
     if (r.hasRegularRoundChip) bad.push("대회에 '정규 라운드' 샘");
+    if (r.hasFixtureCards && !r.hasKnockoutChip) bad.push("대회에 '결선' 없음");
   }
   return bad.length === 0 ? '✅' : `❌ ${bad.join(' · ')}`;
 }

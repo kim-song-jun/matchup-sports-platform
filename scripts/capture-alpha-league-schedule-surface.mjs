@@ -212,8 +212,19 @@ function verdict(kind, r) {
     if (r.hasPlayerRecords) bad.push('선수 기록 섹션 노출');
     // API 가 '2부' 라고 부르는 리그를 화면이 '리그 순위' 로 부르면 같은 리그가 두 이름을 갖는다.
     // 화면마다 라벨 모양이 달라(`'2부'` vs `'2부 순위'`) 포함 여부로 본다.
-    if (r.expectGroupName && r.standingsAriaLabel && !r.standingsAriaLabel.includes(r.expectGroupName)) {
-      bad.push(`순위 제목이 API 와 다름(화면 '${r.standingsAriaLabel}' vs API '${r.expectGroupName}')`);
+    /**
+     * ⚠️ **앵커가 없으면 비교가 통째로 건너뛴다 — 그게 "측정 없이 통과" 다.**
+     * 예전엔 `expectGroupName && standingsAriaLabel && !includes` 였다. `standingsAriaLabel`
+     * 이 null 이면(= 순위 제목 `aria-label` 이 사라지는 회귀) 세 조건 중 하나가 거짓이라
+     * **비교 자체가 안 돌고 ✅ 로 지나간다.** 앵커가 사라지는 것이야말로 이 행이 잡아야 할
+     * 회귀인데, 그 회귀가 판정을 무력화하는 구조였다. API 가 이름을 줬으면 화면에도 있어야 한다.
+     */
+    if (r.expectGroupName) {
+      if (!r.standingsAriaLabel) {
+        bad.push(`순위 제목 앵커(aria-label) 없음 — API 는 '${r.expectGroupName}' 이라 부른다`);
+      } else if (!r.standingsAriaLabel.includes(r.expectGroupName)) {
+        bad.push(`순위 제목이 API 와 다름(화면 '${r.standingsAriaLabel}' vs API '${r.expectGroupName}')`);
+      }
     }
   } else {
     /**

@@ -5,9 +5,14 @@
  */
 import { chromium, devices } from 'playwright';
 const BASE = 'https://alpha.teameet.co.kr';
-const res = await fetch(`${BASE}/api/v1/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: process.env.ALPHA_EMAIL, password: process.env.ALPHA_PASSWORD }) });
-const token = res.headers.getSetCookie().map((c) => /teameet_v1_session=([^;]+)/.exec(c)).find(Boolean)?.[1];
-if (!token) throw new Error('login failed ' + res.status);
+const email = process.env.ALPHA_EMAIL;
+const password = process.env.ALPHA_PASSWORD;
+if (!email || !password) throw new Error('ALPHA_EMAIL/ALPHA_PASSWORD 가 필요합니다');
+const res = await fetch(`${BASE}/api/v1/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email, password }) });
+// getSetCookie 가 없는 런타임에서는 합쳐진 set-cookie 한 줄로 폴백한다(다른 alpha 스크립트와 동일).
+const raw = res.headers.getSetCookie?.() ?? [res.headers.get('set-cookie') ?? ''];
+const token = raw.map((c) => /teameet_v1_session=([^;]+)/.exec(c)).find(Boolean)?.[1];
+if (!token) throw new Error(`로그인 실패 HTTP ${res.status}`);
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ ...devices['Pixel 7'] });
 await ctx.addCookies([{ name: 'teameet_v1_session', value: token, domain: 'alpha.teameet.co.kr', path: '/', secure: true, sameSite: 'Lax' }]);

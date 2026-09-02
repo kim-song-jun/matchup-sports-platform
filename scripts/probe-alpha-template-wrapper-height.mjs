@@ -28,11 +28,13 @@ const CASES = [
 ];
 
 async function login(email) {
+  if (!PASSWORD) throw new Error('ALPHA_PASSWORD 가 필요합니다');
   const res = await fetch(`${API}/auth/login`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password: PASSWORD }),
   });
-  const hit = (res.headers.getSetCookie?.() ?? []).map((c) => /teameet_v1_session=([^;]+)/.exec(c)).find(Boolean);
+  const raw = res.headers.getSetCookie?.() ?? [res.headers.get('set-cookie') ?? ''];
+  const hit = raw.map((c) => /teameet_v1_session=([^;]+)/.exec(c)).find(Boolean);
   if (!hit) throw new Error(`로그인 실패 ${email} HTTP ${res.status}`);
   return hit[1];
 }

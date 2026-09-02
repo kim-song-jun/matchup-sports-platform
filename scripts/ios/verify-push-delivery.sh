@@ -58,8 +58,9 @@ xcrun simctl bootstatus "$DEVICE" -b >/dev/null
 mkdir -p "$OUTPUT"
 rm -rf "$OUTPUT/delivery.xcresult" "$OUTPUT/attachments"
 READY="$OUTPUT/device-registered"
-rm -f "$READY"
+rm -f "$READY" "$READY.terminated"
 TITLE="배달 확인 $(date +%H%M%S)"
+TERMINATED_TITLE="종료 상태 확인 $(date +%H%M%S)"
 
 # The test writes the ready file once the settings screen shows the device registered; the
 # simulator shares the host's file system, so this is how it says "send now" rather than
@@ -69,6 +70,14 @@ TITLE="배달 확인 $(date +%H%M%S)"
   [ -f "$READY" ] || { echo "[push-delivery] the device never reported itself registered; nothing was sent" >&2; exit 0; }
   for i in 1 2 3; do
     node "$ROOT/scripts/ios/send-admin-push.mjs" "$TITLE" "alpha API → APNs → 이 기기 경로 확인 #$i" /notifications || true
+    sleep 15
+  done
+  # Second phase: the test has killed the app and says so with a second marker. The same
+  # send, under a second title, has to reach a device with none of our code running.
+  for _ in $(seq 1 60); do [ -f "$READY.terminated" ] && break; sleep 5; done
+  [ -f "$READY.terminated" ] || { echo "[push-delivery] the test never reached the terminated phase; nothing more was sent" >&2; exit 0; }
+  for i in 1 2 3; do
+    node "$ROOT/scripts/ios/send-admin-push.mjs" "$TERMINATED_TITLE" "앱을 완전히 종료한 상태로 받는 알림 #$i" /notifications || true
     sleep 15
   done ) &
 SENDER=$!
@@ -87,6 +96,7 @@ xcodebuild test \
   TEAMEET_UITEST_EMAIL="$TEAMEET_UITEST_EMAIL" \
   TEAMEET_UITEST_PASSWORD="$TEAMEET_UITEST_PASSWORD" \
   TEAMEET_UITEST_BANNER_TITLE="$TITLE" \
+  TEAMEET_UITEST_TERMINATED_BANNER_TITLE="$TERMINATED_TITLE" \
   TEAMEET_UITEST_READY_FILE="$READY" || status=$?
 
 kill "$SENDER" 2>/dev/null || true
@@ -96,5 +106,5 @@ if [ -d "$OUTPUT/delivery.xcresult" ]; then
     --path "$OUTPUT/delivery.xcresult" --output-path "$OUTPUT/attachments" >/dev/null || true
 fi
 echo
-echo "screenshots (13-settings-after-opt-in, 14-banner) and trees: $OUTPUT/attachments"
+echo "screenshots (13-settings-after-opt-in, 14-banner, 15-banner-terminated) and trees: $OUTPUT/attachments"
 exit "$status"

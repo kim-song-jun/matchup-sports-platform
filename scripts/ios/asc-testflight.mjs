@@ -13,7 +13,11 @@
 //
 // Usage:
 //   node scripts/ios/asc-testflight.mjs status
-//   node scripts/ios/asc-testflight.mjs prepare "<group name>" <version> <build>
+//   node scripts/ios/asc-testflight.mjs prepare "<group name>" <build number>
+//
+// The second argument is the BUILD number (CFBundleVersion, e.g. 5), not the marketing
+// version: App Store Connect's `filter[version]` on builds means exactly that. Passing
+// "0.1.3" finds nothing and reports the build as not uploaded — measured.
 import { createSign } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 

@@ -74,6 +74,28 @@ export interface ManualPushSendResult {
     failed: number;
     /** VAPID 미설정으로 웹 푸시가 꺼져 있으면 true. */
     disabled: boolean;
+    /**
+     * 앱 기기(APNs / FCM) 쪽 결과. 웹과 **합치지 않고 나란히** 둔다 — 합치면 폰이 받았다는
+     * 사실이 깨진 브라우저 구독을 가린다.
+     *
+     * 이 필드가 없던 동안 `sendToUser` 가 돌려주던 native 요약은 여기서 버려졌고, 앱 기기만
+     * 가진 사용자에게 보낸 발송이 운영 화면에 "구독 0건 · 나가지 않음" 으로 찍혔다
+     * (2026-09-02 alpha 실측: 시뮬레이터에 배너가 도착했는데 응답은 delivered 0).
+     *
+     * Optional 인 이유: 브로드캐스트 재생(`claimBroadcast`)은 그때 저장된 응답을 그대로
+     * 돌려주는데, 이 필드가 없던 시점의 기록에는 앱 쪽 결과가 없다. 그 응답에 0 을 채우면
+     * "알 수 없음" 이 "안 나감" 으로 둔갑한다. 새 발송의 집계에는 항상 들어 있다.
+     */
+    native?: {
+      /** 수신자들에게 등록돼 있던 활성 기기 수 합계. */
+      devices: number;
+      /** APNs / FCM 이 접수한 수. */
+      delivered: number;
+      /** 전송 실패 수(영구·일시 모두). */
+      failed: number;
+      /** 앱 푸시 어댑터가 하나도 설정돼 있지 않으면 true. */
+      disabled: boolean;
+    };
   };
 }
 
@@ -516,15 +538,28 @@ export class AdminOpsService {
   }
 }
 
+/**
+ * `native` 는 비워 둔다 — 첫 수신자 결과가 더해질 때 생긴다. 한 명도 발송되지 않은
+ * 응답(전원 스킵)에 "앱 기기 0대" 를 적으면 집계하지 않은 것이 집계한 것처럼 보인다.
+ * 웹 칸은 예전부터 0 으로 내려가던 계약이라 그대로 둔다.
+ */
 function emptyPushTally(): ManualPushSendResult['push'] {
   return { subscriptions: 0, delivered: 0, failed: 0, disabled: false };
 }
 
-/** 수신자별 푸시 결과를 누적한다. disabled는 한 번이라도 꺼져 있었다면 true로 남긴다. */
+/**
+ * 수신자별 푸시 결과를 누적한다. disabled는 한 번이라도 꺼져 있었다면 true로 남긴다.
+ * 웹과 앱은 각자의 칸에 더한다 — 어느 한쪽이 0이어도 다른 쪽은 갔을 수 있다.
+ */
 function addPushTally(tally: ManualPushSendResult['push'], summary: PushDeliverySummary | null): void {
   if (!summary) return;
   tally.subscriptions += summary.subscriptions;
   tally.delivered += summary.delivered;
   tally.failed += summary.failed;
   if (summary.disabled) tally.disabled = true;
+  const native = (tally.native ??= { devices: 0, delivered: 0, failed: 0, disabled: false });
+  native.devices += summary.native.devices;
+  native.delivered += summary.native.delivered;
+  native.failed += summary.native.failed;
+  if (summary.native.disabled) native.disabled = true;
 }

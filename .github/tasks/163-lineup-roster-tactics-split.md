@@ -20,7 +20,7 @@
 | `apps/v1_api/src/games/dto/game-lineup.dto.ts:67` | `started!: boolean` — 제출 DTO 필수 |
 | `apps/v1_api/src/games/games.service.ts:2605-2628` | 대회 경기 라인업 **저장 시** 선발 인원 min~max + GK 정확히 1명 강제 (`LINEUP_SIZE_INVALID` · `LINEUP_GOALKEEPER_INVALID`) |
 | `apps/v1_api/src/team-matches/team-match-lineup.service.ts:834-858` | 팀매치 라인업 **저장 시** 같은 두 검증 |
-| `apps/v1_api/src/games/games.service.ts:1064, :2829` | 참가자 생성 — `started` 를 여기서 채운다. **`start` 커맨드(:1361)는 참가자를 안 만진다** |
+| `apps/v1_api/src/games/games.service.ts:1064` · `games.service.ts:2829` | 참가자 생성 — `started` 를 여기서 채운다. **`start` 커맨드(`games.service.ts:1361`)는 참가자를 안 만진다** |
 | `apps/v1_api/src/games/core/substitution.ts:73,121` | `started` 로 "피치 위" 집합을 만든다 — 교체의 기준 |
 | `apps/v1_api/src/team-lineups/team-tactics-board.service.ts:57` | `get(user, teamId, gameId)` — 전술보드 읽기. DTO 는 `started`·`goalkeeper`·`position`·`positionX/Y`·`formation` 전부 담는다 |
 | `apps/v1_web/src/app/team-matches/[id]/lineup/lineup-client.tsx:130,734-770` | <code>activeView: 'roster' &#124; 'pitch'</code> 두 탭. 피치 탭이 `PitchFormationEditor` 를 그린다 |
@@ -52,7 +52,7 @@
 ## Original Conditions
 
 - [ ] `SaveGameLineupDto.participants[].started` 를 **optional** 로 바꾸고, 저장 경로는 값을 **무시**한다 (있어도 안 쓴다). 대회 경기·팀매치 둘 다.
-- [ ] 참가자 생성(`:1064`, `:2829`, 팀매치 서비스)은 `started` 를 **채우지 않는다** — 스키마 기본값이 있으면 그 값, 없으면 `false`. kickoff 가 채운다.
+- [ ] 참가자 생성(`games.service.ts:1064`, `games.service.ts:2829`, 팀매치 서비스)은 `started` 를 **채우지 않는다** — 스키마 기본값이 있으면 그 값, 없으면 `false`. kickoff 가 채운다.
 - [ ] 저장 시 `LINEUP_SIZE_INVALID`·`LINEUP_GOALKEEPER_INVALID` 검증을 **두 서비스에서 제거**한다.
 - [ ] `start` 커맨드(SCHEDULED→LIVE 전이 트랜잭션 안)에 **선발 해석**을 넣는다:
   - [ ] 홈/원정 각 side 의 보드를 **`sideId` 로 직접** 읽는다 — `TeamTacticsBoardService.loadBoard(side)`(185행)는 `findUnique({ where: { sideId } })` 라 팀 권한과 무관하다. 권한 검사(`assertTeamLineupMember`)는 `get()` **입구**(58행)에만 있다. **트랜잭션 클라이언트를 인자로 받는 순수 함수** `loadTacticsBoardBySide(client, side)` 를 `team-lineups/tactics-board-read.ts` 에 두고, 기존 `loadBoard` 도 그것에 위임한다 — kickoff 는 `start` 트랜잭션 **안에서** 읽어야 같은 스냅샷을 보고(서비스 메서드의 `this.prisma` 는 밖이다), 서비스를 주입하면 모듈 배선이 커진다. 불변식(`board.teamId === side.teamId`)은 한 곳. 컨트롤러 노출 0. (**우회가 아니라 비경유** — 2026-09-02 피어 실측·구현, 마스터 확인)

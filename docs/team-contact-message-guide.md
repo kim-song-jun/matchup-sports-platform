@@ -89,7 +89,9 @@ flowchart LR
 채팅방 나가기를 쓰면 됩니다. 요청 중인 방에는 남은 시간이 표시됩니다(예: `6일 23시간 후 만료돼요`).
 실제 남은 시간보다 짧게 표시되도록 **내림** 하므로, 표시된 시간이 지나기 전에 답하면 됩니다.
 
-> 스크린샷은 alpha 배포 후 채팅 화면 기준으로 교체 예정입니다.
+| 요청 대기 (받는 팀) | 수락 뒤 (보낸 팀) | 채팅 목록 |
+|---|---|---|
+| <img src="https://raw.githubusercontent.com/kim-song-jun/matchup-sports-platform/9c940a88e941e60e4a6a8c9362b5805fb1cbee2c/.screenshots/team-contact-chat/requested-B-chat-room-light-mobile.png" width="240"> | <img src="https://raw.githubusercontent.com/kim-song-jun/matchup-sports-platform/9c940a88e941e60e4a6a8c9362b5805fb1cbee2c/.screenshots/team-contact-chat/accepted-A-chat-room-light-mobile.png" width="240"> | <img src="https://raw.githubusercontent.com/kim-song-jun/matchup-sports-platform/9c940a88e941e60e4a6a8c9362b5805fb1cbee2c/.screenshots/team-contact-chat/requested-B-chat-list-light-mobile.png" width="240"> |
 
 ---
 

@@ -23,7 +23,7 @@
 | `apps/v1_api/src/games/games.service.ts:1064, :2829` | 참가자 생성 — `started` 를 여기서 채운다. **`start` 커맨드(:1361)는 참가자를 안 만진다** |
 | `apps/v1_api/src/games/core/substitution.ts:73,121` | `started` 로 "피치 위" 집합을 만든다 — 교체의 기준 |
 | `apps/v1_api/src/team-lineups/team-tactics-board.service.ts:57` | `get(user, teamId, gameId)` — 전술보드 읽기. DTO 는 `started`·`goalkeeper`·`position`·`positionX/Y`·`formation` 전부 담는다 |
-| `apps/v1_web/src/app/team-matches/[id]/lineup/lineup-client.tsx:130,734-770` | `activeView: 'roster' \| 'pitch'` 두 탭. 피치 탭이 `PitchFormationEditor` 를 그린다 |
+| `apps/v1_web/src/app/team-matches/[id]/lineup/lineup-client.tsx:130,734-770` | <code>activeView: 'roster' &#124; 'pitch'</code> 두 탭. 피치 탭이 `PitchFormationEditor` 를 그린다 |
 
 ### ⚠️ 이미 있는 부채 — 후보 표현이 **두 벌**이다
 
@@ -63,7 +63,7 @@
   - [ ] 마이그레이션: `position = 'BENCH'` 인 `V1GameParticipant` 행을 `started = false, position = NULL` 로. **idempotent**(`WHERE position = 'BENCH'`).
   - [ ] `team-match-lineup.service.ts` 의 `BENCH_MARKER` 쓰기 경로 제거.
   - [ ] `TeamLineupHistoryService.list()` 의 소스별 분기 제거 — `started` 하나로.
-  - [ ] `BENCH_MARKER` export 를 **전수 grep** 해 소비처 0 확인 후 삭제 (테스트만 남으면 dead — [[test-only-consumer-hides-dead-code]]).
+  - [ ] `BENCH_MARKER` export 를 **전수 grep** 해 소비처 0 확인 후 삭제 (⚠️ **자기 테스트 파일만 남아도 dead 다** — 화면·서비스 소비처가 0 인데 `*.spec.ts` 가 import 하고 있으면 tsc·lint·테스트가 전부 green 이라 못 잡는다. `git grep -n "^import.*BENCH_MARKER\|from '.*team-match-lineup.service'"` 로 **import 문만** 세고, 결과가 스펙 파일뿐이면 삭제한다).
   - [ ] ⚠️ **`league-result-participants.ts:69` 의 `TEAM_MATCH_BENCH_POSITION = 'BENCH'` 복사본** — 리그 결과 입력이 이 관례로 후보를 가른다(주석: *"컬럼이 아니라 이 관례를 봐야 한다"*). 마이그레이션이 `position='BENCH'` 를 지우면 **이 판정이 근거를 잃어 전원 선발로 읽힌다.** `started` 컬럼을 읽도록 바꾸고 상수를 삭제한다. **이 파일은 작업 범위다.**
 - [ ] 교체(`substitution.ts`)·결과·공개 기록은 **변경 없음**을 테스트로 고정한다 — kickoff 이후의 `started` 가 예전과 같은 의미다.
 - [ ] 프론트 라인업 화면: 선발/후보 토글 UI 제거, `started` 를 보내지 않음, **피치 탭 줄 제거 + 팀장 전용 전술보드 링크 한 줄** (A안). `PitchFormationEditor` 라인업 쪽 소비처 제거 후 dead 여부 전수 grep.
@@ -116,11 +116,11 @@ Backend  ⟂  Frontend  ⟂  (Infra 없음)
 
 ## Risks & Dependencies
 
-- ⚠️ **통합 스펙은 tsc 범위 밖이다** — `tsconfig include` 가 `src·prisma·test/fixtures·test/helpers` 뿐이라 `test/**/*.integration-spec.ts` 의 타입 오류를 로컬 `tsc --noEmit` 이 못 잡는다(피어가 일부러 오류를 넣어 rc=0 확인). CI 의 ts-jest 가 유일한 게이트 — [[local-tsc-does-not-cover-test-dirs]].
-- ⚠️ **`test/team-matches/team-match-lineup.integration-spec.ts` 는 `testPathIgnorePatterns` 에 있어 아예 안 돈다** (선재 결함으로 명시 제외). 제거한 검증을 단언하던 5개 스펙 중 **4개만 실제로 돈다** — [[tests-that-never-run]].
+- ⚠️ **통합 스펙은 tsc 범위 밖이다** — `tsconfig include` 가 `src·prisma·test/fixtures·test/helpers` 뿐이라 `test/**/*.integration-spec.ts` 의 타입 오류를 로컬 `tsc --noEmit` 이 못 잡는다(피어가 일부러 오류를 넣어 rc=0 확인). CI 의 ts-jest 가 유일한 게이트다. 통합 스펙을 고쳤으면 **같은 tsconfig 옵션으로 그 파일을 직접** `tsc --noEmit` 하고, 그 방법이 오류를 잡는지 일부러 오류를 넣어 확인한다.
+- ⚠️ **`test/team-matches/team-match-lineup.integration-spec.ts` 는 `testPathIgnorePatterns` 에 있어 아예 안 돈다** (선재 결함으로 명시 제외). 제거한 검증을 단언하던 5개 스펙 중 **4개만 실제로 돈다.** "스펙 파일이 있다" 와 "스펙이 돈다" 는 다르다 — `apps/v1_api/jest.config.*` 의 `testPathIgnorePatterns` 를 먼저 본다.
 
 - **fallback(전원 선발)이 max 를 넘는다** — 사용자 수용. 다만 얼마나 자주 타는지 **표식 로그로 센다**.
-- alpha 의 기존 `BENCH` 행 — 마이그레이션이 만진다. **alpha 데이터 변경은 사용자 직접 승인** ([[alpha-data-changes-need-direct-user-approval]]). 마이그레이션은 배포에 실려 자동 적용되므로 **머지 전에** 승인을 받는다.
+- alpha 의 기존 `BENCH` 행 — 마이그레이션이 만진다. **alpha 데이터 변경은 사용자 직접 승인**이며 승인은 세션 간 전달이 안 된다 — 실행하는 세션이 직접 받는다(저장소 내 같은 규칙: `apps/v1_api/test/config/alpha-probe-readonly.contract.spec.ts:4-21`). 마이그레이션은 배포에 실려 자동 적용되므로 **머지 전에** 승인을 받는다.
 - FE-1 이 BE 보다 먼저 배포되면 `started` 없이 보내서 400 — **순서 강제**.
 
 ## Ambiguity Log

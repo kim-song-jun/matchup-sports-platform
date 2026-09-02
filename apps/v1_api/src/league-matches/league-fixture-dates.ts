@@ -27,6 +27,7 @@ export interface LeagueFixtureDateSchedule {
 }
 
 export type LeagueFixtureDateError =
+  | { readonly kind: 'invalid'; readonly dates: readonly string[] }
   | { readonly kind: 'past'; readonly dates: readonly string[] }
   | { readonly kind: 'insufficient'; readonly required: number; readonly provided: number };
 
@@ -39,6 +40,8 @@ export type LeagueFixtureDateError =
  * 두 배로 고르지 않는 한 항상 `insufficient` 가 난다. 예전 파라미터 이름이 그 오해를
  * 조장해서(Copilot 리뷰 지적) 이름과 문서를 실제 받는 값에 맞췄다.
  *
+ * - **달력에 없는 날짜는 거부한다** — `Date.UTC` 는 `2026-02-31` 을 거부하지 않고 다음 달로
+ *   굴린다. 그대로 두면 운영자가 없는 날을 골랐다는 것을 모른 채 사흘 뒤 경기가 생긴다.
  * - **중복 날짜는 제거한다** — 운영자가 같은 날을 두 번 고르는 것은 "그 날에 두 경기"가
  *   아니라 입력 실수다. 하루에 여러 경기를 넣는 것은 `timing`(한 구장 순차 진행)이 담당한다.
  * - **과거 날짜는 거부한다** — 이미 지난 날에 경기를 만들면 결과 입력 리마인더가 곧바로
@@ -57,6 +60,21 @@ export function resolveLeagueFixtureDates(
   // 정렬 전에 접는다 — 문자열 정렬이 곧 날짜 정렬이다('YYYY-MM-DD').
   const unique = [...new Set(schedule.dates)].sort();
   const [hours, minutes] = schedule.time.split(':').map(Number);
+
+  // **달력에 없는 날짜를 먼저 거른다.** DTO 정규식은 `2026-02-31` 을 통과시키고
+  // (`0[1-9]|[12]\d|3[01]` 은 월마다 며칠인지 모른다), `Date.UTC` 는 그걸 거부하는 대신
+  // **다음 달로 굴린다** — 실측 `2026-02-31 19:00 KST` → `2026-03-03`. 운영자는 없는 날을
+  // 골랐다는 말을 못 듣고, 사흘 뒤 경기가 조용히 생긴다(Copilot 리뷰 지적).
+  const invalid = unique.filter((date) => {
+    const [year, month, day] = date.split('-').map(Number);
+    const rolled = new Date(Date.UTC(year, month - 1, day));
+    return (
+      rolled.getUTCFullYear() !== year || rolled.getUTCMonth() !== month - 1 || rolled.getUTCDate() !== day
+    );
+  });
+  if (invalid.length > 0) {
+    return { ok: false, error: { kind: 'invalid', dates: invalid } };
+  }
 
   const startAts = unique.map((date) => {
     const [year, month, day] = date.split('-').map(Number);

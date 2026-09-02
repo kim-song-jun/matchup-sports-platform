@@ -63,6 +63,28 @@ const DEFAULT_FIXTURE_PLACE_NAME = '장소 미정';
  * 조용히 깨지기 때문**이다. 날짜 목록 경로(`matchdayStartAts`)는 이미 매치데이 수로 검증되고
  * 있어(`LEAGUE_SCHEDULE_SLOTS_INSUFFICIENT`), 폴백만 다른 단위를 쓰고 있었다.
  */
+/**
+ * 매치데이 시작 시각을 감사 로그용 **KST 날짜·시각**으로 되돌린다.
+ *
+ * 이 파일은 이미 "감사 로그는 요청 원문이 아니라 실제 결과와 일치해야 한다" 를 지키고
+ * 있다(`placeName`·`timing` 이 폴백·기본값까지 채운 값을 남긴다). `schedule` 만 `dto` 원문을
+ * 그대로 남기고 있었다 — 중복 제거·정렬·필요 개수만 자르기를 거친 **실제로 쓰인 날짜**와
+ * 다를 수 있다(Copilot 리뷰 지적). 운영자가 7개를 고르고 3개만 쓰였을 때 로그만 보면
+ * 어느 3개인지 알 수 없다.
+ */
+function toKstScheduleLog(startAts: readonly Date[]): { dates: string[]; time: string } | null {
+  if (startAts.length === 0) return null;
+  const parts = (at: Date) =>
+    new Intl.DateTimeFormat('sv-SE', {
+      timeZone: 'Asia/Seoul',
+      dateStyle: 'short',
+      timeStyle: 'short',
+    })
+      .format(at)
+      .split(' ');
+  return { dates: startAts.map((at) => parts(at)[0]), time: parts(startAts[0])[1] };
+}
+
 function totalRoundsOf(schedule: readonly RoundRobinFixture[]): number {
   return schedule.reduce((max, fixture) => (fixture.round > max ? fixture.round : max), 0);
 }
@@ -332,6 +354,13 @@ export class LeagueMatchAdminService {
     }
     const resolved = resolveLeagueFixtureDates(dto.schedule, matchdayCount, new Date());
     if (resolved.ok) return resolved.startAts;
+    if (resolved.error.kind === 'invalid') {
+      throw new UnprocessableEntityException({
+        code: 'LEAGUE_SCHEDULE_DATE_INVALID',
+        message: '달력에 없는 날짜가 있어요.',
+        details: { dates: resolved.error.dates },
+      });
+    }
     if (resolved.error.kind === 'past') {
       throw new UnprocessableEntityException({
         code: 'LEAGUE_SCHEDULE_DATE_PAST',
@@ -412,7 +441,7 @@ export class LeagueMatchAdminService {
           afterJson: {
             teamMatchIds: ids,
             weeksCount: dto.weeksCount,
-            schedule: dto.schedule ? { dates: [...dto.schedule.dates], time: dto.schedule.time } : null,
+            schedule: toKstScheduleLog(matchdayStartAts ?? []),
             // dto.placeName이 아니라 trim+기본값 폴백을 거쳐 실제로 저장된 placeName을 남긴다 —
             // 감사 로그가 요청 원문이 아니라 실제 결과와 일치해야 디버깅 시 혼선이 없다.
             placeName,

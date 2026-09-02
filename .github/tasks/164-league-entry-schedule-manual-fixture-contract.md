@@ -95,7 +95,10 @@ D8 순서 `expand → dual-write → backfill → read-swap → contract` 중 **
   - 두 군데를 실제와 맞춘 것이다: 상태코드는 400 이 아니라 **422**(`UnprocessableEntityException` —
     같은 파일의 다른 일정 검증도 전부 422 다), 비교 대상은 라운드 수가 아니라
     **`ceil(라운드 수 / timing.gamesPerTeamPerDay)`**. 팀당 하루 두 경기면 라운드 6 이 날짜 3 개다.
-- 같은 날짜 중복 입력 → 중복 제거 후 계산(에러 아님). 과거 날짜 → 400.
+- 같은 날짜 중복 입력 → 중복 제거 후 계산(에러 아님). 과거 날짜 → **422** `LEAGUE_SCHEDULE_DATE_PAST`.
+- **달력에 없는 날짜**(`2026-02-31` 등) → **422** `LEAGUE_SCHEDULE_DATE_INVALID`. DTO 정규식은
+  통과시키고 `Date.UTC` 는 거부 대신 **다음 달로 굴린다**(실측 `2026-02-31 19:00 KST` → `2026-03-03`) —
+  운영자가 없는 날을 골랐다는 말을 못 듣고 사흘 뒤 경기가 조용히 생긴다.
 - 수동 대진에 같은 팀 두 번 → **422 `LEAGUE_TEAM_INVALID`**. 이 리그에 등록되지 않은 팀 →
   **같은 422 `LEAGUE_TEAM_INVALID`**.
   ⚠️ 문서가 적고 있던 `LEAGUE_FIXTURE_SAME_TEAM` 은 **존재하지 않는 코드**였다(실측 grep 0건).

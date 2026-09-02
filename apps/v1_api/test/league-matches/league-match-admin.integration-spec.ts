@@ -12,7 +12,7 @@ const opsUserId = `t4-league-admin-ops-${suiteId}`;
 const regularUserId = `t4-league-admin-regular-${suiteId}`;
 
 /**
- * 대진 날짜는 **미래**여야 한다(Task 164 BE-2: 과거 날짜는 400). 고정 날짜를 박으면
+ * 대진 날짜는 **미래**여야 한다(Task 164 BE-2: 과거 날짜는 422 `LEAGUE_SCHEDULE_DATE_PAST`). 고정 날짜를 박으면
  * 그 날이 지나는 순간 이 스펙이 시간 때문에 깨지므로 오늘 기준으로 만든다.
  */
 const futureDates = [7, 14].map((days) => {

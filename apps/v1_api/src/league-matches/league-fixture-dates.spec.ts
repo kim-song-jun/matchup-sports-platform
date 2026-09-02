@@ -78,4 +78,40 @@ describe('resolveLeagueFixtureDates', () => {
     );
     expect(result.ok && result.startAts.map(kst)).toEqual(['2026-09-12 19:00', '2026-09-19 19:00']);
   });
+
+  it('달력에 없는 날짜는 거부한다 — Date.UTC 가 다음 달로 굴리기 전에 막는다', () => {
+    // 2026 은 평년이라 2월 31일도 30일도 29일도 없다. DTO 정규식(`3[01]`)은 전부 통과시키고
+    // `Date.UTC(2026, 1, 31)` 은 에러 대신 **2026-03-03** 을 준다 — 사흘 뒤 경기가 조용히 생긴다.
+    const result = resolveLeagueFixtureDates(
+      { dates: ['2026-02-31', '2026-09-12'], time: '19:00' },
+      1,
+      now,
+    );
+    expect(result).toEqual({ ok: false, error: { kind: 'invalid', dates: ['2026-02-31'] } });
+  });
+
+  it('굴러가는 방향이 달라도 잡는다 — 이 함수의 계약은 DTO 정규식보다 넓다', () => {
+    // 이건 방어가 아니라 **계약**이다. 이 함수는 exported 순수 함수라 DTO 를 안 지나는
+    // 호출자(스펙·다른 진입점·정규식 완화)가 얼마든지 생긴다. 세 필드를 다 비교하는
+    // 왕복 검사가 필요한 이유를 여기서 고정한다:
+    //   · 13월 → 다음 **해**로 구른다(연이 어긋난다)
+    //   · 0월/0일 → 이전 달로 구른다(연·월이 어긋난다)
+    // 월만 비교하면 13월이 통과한다.
+    for (const date of ['2026-13-01', '2026-00-10', '2026-01-00']) {
+      const result = resolveLeagueFixtureDates({ dates: [date], time: '19:00' }, 1, now);
+      expect(result).toEqual({ ok: false, error: { kind: 'invalid', dates: [date] } });
+    }
+  });
+
+  it('달력에 있는 경계 날짜는 통과한다 — 전부 거부하는 가드와 구분한다', () => {
+    // 막는 것만 보면 **모두 invalid 로 만들어도 통과**한다. 통과해야 할 것도 확인한다:
+    // 31일이 있는 달의 31일 · 윤년 2월 29일.
+    const result = resolveLeagueFixtureDates(
+      { dates: ['2026-10-31', '2028-02-29'], time: '19:00' },
+      2,
+      now,
+    );
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.startAts.map(kst)).toEqual(['2026-10-31 19:00', '2028-02-29 19:00']);
+  });
 });

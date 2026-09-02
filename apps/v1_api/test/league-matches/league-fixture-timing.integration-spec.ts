@@ -82,7 +82,7 @@ describe('리그 대진 timing(경기 시간·휴식·팀당 하루 경기 수)'
   }
 
   const kakaoTiming = { gameDurationMinutes: 15, breakMinutes: 5, gamesPerTeamPerDay: 3 };
-  // Task 164 BE-2: 요일이 아니라 **날짜 목록**이다. 과거 날짜는 400 이므로 오늘 기준 미래로
+  // Task 164 BE-2: 요일이 아니라 **날짜 목록**이다. 과거 날짜는 422 이므로 오늘 기준 미래로
   // 만든다 — 고정 날짜를 박으면 그 날이 지나는 순간 시간 때문에 깨진다.
   const futureDates = [7, 14, 21].map((days) =>
     new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date(Date.now() + days * 86_400_000)),
@@ -98,6 +98,26 @@ describe('리그 대진 timing(경기 시간·휴식·팀당 하루 경기 수)'
     `${futureDates[0]}T14:20:00.000Z`,
     `${futureDates[0]}T14:40:00.000Z`, // 23:40 KST
   ];
+
+  it('감사 로그에 요청 원문이 아니라 **실제로 쓰인 날짜**를 남긴다', async () => {
+    // 이 케이스는 날짜를 3개 주지만 gamesPerTeamPerDay=3 이라 매치데이는 1개다 —
+    // 2개는 안 쓰인다. 요청 원문을 남기면 로그만 보고는 어느 날에 경기를 만들었는지
+    // 알 수 없다(이 파일은 placeName·timing 에서 이미 "실제 결과를 남긴다"를 지키고 있다).
+    const leagueId = await createLeague('감사 로그 리그');
+    const res = await request(app.getHttpServer())
+      .post(`/api/v1/admin/league-matches/${leagueId}/fixtures`)
+      .set('x-v1-user-id', ownerUserId)
+      .send({ weeksCount: 1, schedule: wednesday22, placeName: '베이컨 풋살장', timing: kakaoTiming });
+    expect(res.status).toBe(201);
+
+    const log = await prisma.v1AdminActionLog.findFirst({
+      where: { action: 'league_match.generate_fixtures', targetId: leagueId },
+    });
+    expect(log).not.toBeNull();
+    const after = log!.afterJson as { schedule: { dates: string[]; time: string } | null };
+    // 3개를 보냈지만 쓰인 것은 첫 날 하나뿐이다.
+    expect(after.schedule).toEqual({ dates: [futureDates[0]], time: '22:00' });
+  });
 
   it('timing을 지정하면 하루 6경기가 20분 간격으로 저장되고 endAt·제목 순번까지 채워진다', async () => {
     const leagueId = await createLeague('타이밍 리그');

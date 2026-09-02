@@ -55,7 +55,7 @@
 - [ ] 참가자 생성(`:1064`, `:2829`, 팀매치 서비스)은 `started` 를 **채우지 않는다** — 스키마 기본값이 있으면 그 값, 없으면 `false`. kickoff 가 채운다.
 - [ ] 저장 시 `LINEUP_SIZE_INVALID`·`LINEUP_GOALKEEPER_INVALID` 검증을 **두 서비스에서 제거**한다.
 - [ ] `start` 커맨드(SCHEDULED→LIVE 전이 트랜잭션 안)에 **선발 해석**을 넣는다:
-  - [ ] `TeamTacticsBoardService.get` 으로 홈/원정 각 팀의 보드를 읽는다 (권한: 운영자 컨텍스트 — 팀 권한 검사 우회 필요, `team-lineup-access.ts` 확인).
+  - [ ] 홈/원정 각 side 의 보드를 **`sideId` 로 직접** 읽는다 — `TeamTacticsBoardService.loadBoard(side)`(185행)는 `findUnique({ where: { sideId } })` 라 팀 권한과 무관하다. 권한 검사(`assertTeamLineupMember`)는 `get()` **입구**(58행)에만 있다. 내부용 `loadBoardBySideId(sideId)` 한 줄이면 되고 컨트롤러 경로는 손대지 않는다. (**우회가 아니라 비경유** — 2026-09-02 피어 실측, 마스터 확인)
   - [ ] 보드가 있으면: 보드 엔트리 ↔ 참가자를 **`userId` 우선, 없으면 `displayName`** 으로 매칭해 `started`·`goalkeeper`·`position`·`positionX/Y` 복사. 보드에 없는 명단원은 `started = false`.
   - [ ] 보드가 없거나 **엔트리 0건**이면: 전원 `started = true`. 로그에 `LINEUP_FALLBACK_ALL_STARTED` 표식을 남기되 **`reason=no_board` / `reason=empty_board` 로 가른다** — 동작은 같아도 얼마나 자주 타는지 세는 게 목적이라 합치면 못 읽는다.
   - [ ] **어느 경로든 인원·GK 검증은 하지 않는다.** `LINEUP_SIZE_INVALID`·`LINEUP_GOALKEEPER_INVALID` **코드**는 두 저장 서비스에만 있어 dead 가 된다 → 삭제 (`competition-config.presets.ts:143` 의 주석 인용은 남겨도 된다 — grep 0 을 기대하지 마라). **`parseLineupLimits` 함수는 삭제하지 않는다** — 저장 경로 2곳의 호출만 제거한다. 전술보드(`team-tactics-board.service.ts:253`)·대회 관리자(`tournaments-admin.service.ts:231,570`)·config 파싱이 계속 쓴다(2026-09-02 전수 실측 6곳 중 4곳 생존).
@@ -80,7 +80,7 @@
 
 - **happy**: 시나리오 1 — kickoff 후 `started` 분포가 보드와 일치. 교체 1회 후 onPitch 집합이 옳다.
 - **edge**: 시나리오 3 (부분 매칭) · `displayName` 만 있는 게스트 매칭 · 보드는 있는데 엔트리 0건(→ fallback 과 같이 취급하나? **Ambiguity 3**).
-- **error**: 보드 조회가 **오류**로 실패하면(권한·DB) kickoff 는 500 — **보드 없음(fallback)과 갈라야 한다.** 없음은 정상 경로, 실패는 오류다.
+- **error**: 보드 조회가 **오류**로 실패하면(DB) kickoff 는 500 — **보드 없음(fallback)과 갈라야 한다.** 없음은 정상 경로, 실패는 오류다. (권한 오류는 이 경로에 없다 — `sideId` 직접 조회라 권한 검사를 안 지난다.)
 - **mock updates**: `games.service.spec.ts` 의 라인업 저장 스펙에서 `started` 검증 단언 제거 → kickoff 스펙으로 이동. `team-match-lineup.service` 스펙의 `BENCH` 단언 제거. `TeamLineupHistoryService` 스펙의 소스별 분기 제거. **`started` 를 보내는 프론트 fixture 8곳** 갱신.
 - **마이그레이션 replay**: 빈 DB 재생 + drift 0 (CI 게이트).
 
@@ -111,10 +111,13 @@ Backend  ⟂  Frontend  ⟂  (Infra 없음)
 
 ## Security Notes
 
-- kickoff 의 보드 조회는 **운영자 컨텍스트**에서 두 팀의 보드를 읽어야 한다. `team-lineup-access.ts` 는 팀 소속을 요구하므로 **서비스 내부용 조회 메서드**(권한 검사 없음, 컨트롤러에 노출 안 함)를 따로 둔다. 컨트롤러 경로는 그대로.
+- kickoff 의 보드 조회는 **`sideId` 로 직접** 한다. 팀 소속 검사(`assertTeamLineupMember`)는 `get()` 의 입구에만 있고 보드 로드 자체는 side 만 안다 — kickoff 는 경기에서 side 를 이미 알므로 **user 도 teamId 도 필요 없다.** 권한을 우회하는 게 아니라 **그 경로를 지나가지 않는다.** 내부용 `loadBoardBySideId` 는 컨트롤러에 노출하지 않는다.
 - 명단 제출에서 `started` 를 무시하므로 **클라이언트가 선발을 조작할 경로가 사라진다** — 오히려 좁아진다.
 
 ## Risks & Dependencies
+
+- ⚠️ **통합 스펙은 tsc 범위 밖이다** — `tsconfig include` 가 `src·prisma·test/fixtures·test/helpers` 뿐이라 `test/**/*.integration-spec.ts` 의 타입 오류를 로컬 `tsc --noEmit` 이 못 잡는다(피어가 일부러 오류를 넣어 rc=0 확인). CI 의 ts-jest 가 유일한 게이트 — [[local-tsc-does-not-cover-test-dirs]].
+- ⚠️ **`test/team-matches/team-match-lineup.integration-spec.ts` 는 `testPathIgnorePatterns` 에 있어 아예 안 돈다** (선재 결함으로 명시 제외). 제거한 검증을 단언하던 5개 스펙 중 **4개만 실제로 돈다** — [[tests-that-never-run]].
 
 - **fallback(전원 선발)이 max 를 넘는다** — 사용자 수용. 다만 얼마나 자주 타는지 **표식 로그로 센다**.
 - alpha 의 기존 `BENCH` 행 — 마이그레이션이 만진다. **alpha 데이터 변경은 사용자 직접 승인** ([[alpha-data-changes-need-direct-user-approval]]). 마이그레이션은 배포에 실려 자동 적용되므로 **머지 전에** 승인을 받는다.

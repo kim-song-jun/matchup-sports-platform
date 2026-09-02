@@ -83,7 +83,7 @@
 ## Acceptance Criteria
 
 - [ ] 행복 경로 API 호출 2회(제출·확인)로 OFFICIAL 도달(통합 스펙).
-- [ ] `git grep -c -w -e dispute -i -- apps/v1_api/src/league-matches apps/v1_api/src/tournament-operations apps/v1_web/src` → 0(장터 분쟁 `disputes/` 는 별개 도메인 — 경로로 구분).
+- [ ] `git grep -n -i -w -e dispute -- apps/v1_api/src/league-matches apps/v1_api/src/tournament-operations apps/v1_web/src | wc -l` → `0`(장터 분쟁 `disputes/` 는 별개 도메인 — 경로로 구분).
 - [ ] 롤링/제한 두 대회에서 교체 커맨드 결과가 갈리는 통합 스펙 2건.
 - [ ] 팀 전적 4탭 · 개인 기록 리그 구분이 alpha 공개 API 로 확인.
 - [ ] FE 항목마다 "3안 제시 → 선택" 기록.

@@ -114,7 +114,7 @@ D8 순서 `expand → dual-write → backfill → read-swap → contract` 중 **
 - **BE-2 ① 날짜 목록.** `LeagueFixtureScheduleDto` 를 `{ dates: 'YYYY-MM-DD'[], time: 'HH:mm' }` 로 바꾸고, 요일 입력은 **프론트에서 날짜 목록으로 전개**해 보낸다(서버는 요일을 모른다). preview 도 같은 DTO. 기존 `dayOfWeek` 는 삭제(호환 유지 없음 — 호출처는 어드민 화면 한 곳).
 - **BE-3 ② 신청(D7).** 리그 거울 행에 `status='open'` + `registrationDeadlineAt` 을 놓는 운영자 액션 `POST /admin/league-matches/:leagueId/open-registration`. 신청·제출·확정은 **대회 서비스 그대로**(추가 코드 0 이 목표). confirm 훅에서 contract 전까지 `V1LeagueTeam` 역방향 dual-write. 승계팀 자동 등록은 `league-series-admin.service.ts` 의 다음 시즌 생성에서 `confirmed` 등록을 함께 만든다.
 - **BE-4 ② 정원·사유(D9) + 자동 확정(D10).** `reason` 필수(리그 거울만). 시즌 시작 시각 크론(`DISABLE_LEAGUE_ROSTER_AUTOCONFIRM_CRON=true` 로 끔 — 기존 cron 선례) 이 미제출 팀 명단을 멤버 전원으로 생성하고 `autoConfirmed` 를 남긴다. 사전 리마인더(시작 24h 전) 알림 1종 + 확정 통보 1종.
-- **BE-5 ④ contract.** `v1League.*` / `v1LeagueTeam.*` 호출 12 파일 → `V1Tournament(kind='regular_league')` / `V1TournamentRegistration` 으로 재배선. 역방향 dual-write 제거. **`git grep -n -w -e v1League -e v1LeagueTeam -- apps/v1_api/src apps/v1_web/src → 0`** 이 된 뒤에만 drop 마이그레이션 PR 을 따로 연다. drop 은 idempotent(`DROP TABLE IF EXISTS`), alpha 실행 전 사용자 직접 승인.
+- **BE-5 ④ contract.** `v1League.*` / `v1LeagueTeam.*` 호출 12 파일 → `V1Tournament(kind='regular_league')` / `V1TournamentRegistration` 으로 재배선. 역방향 dual-write 제거. **`git grep -n -w -e v1League -e v1LeagueTeam -- apps/v1_api/src apps/v1_web/src | wc -l` → `0`** 이 된 뒤에만 drop 마이그레이션 PR 을 따로 연다. drop 은 idempotent(`DROP TABLE IF EXISTS`), alpha 실행 전 사용자 직접 승인.
 
 ### FE (BE 배포 뒤)
 
@@ -135,7 +135,7 @@ D8 순서 `expand → dual-write → backfill → read-swap → contract` 중 **
 - [ ] `POST /admin/league-matches/:leagueId/fixtures/manual` → 생성 경기가 `/tournaments/:id/schedule` 공개 API 에 나타나고, 결과 입력 후 `standings` 에 반영된다(alpha 실측).
 - [ ] 거부·티어 이동 `reason` 없이 400(리그 거울만). 대회는 기존 계약 유지 테스트.
 - [ ] 시즌 시작 크론이 미제출 팀에만 명단을 만들고 `autoConfirmed=true`; 제출 팀은 건드리지 않는다(변이: 조건 제거 시 red).
-- [ ] `git grep -c -w -e v1League -e v1LeagueTeam -- apps/v1_api/src apps/v1_web/src` → 0, 그 뒤 drop 마이그레이션. 마이그레이션 replay + drift 게이트 green.
+- [ ] `git grep -n -w -e v1League -e v1LeagueTeam -- apps/v1_api/src apps/v1_web/src | wc -l` → `0`, 그 뒤 drop 마이그레이션. 마이그레이션 replay + drift 게이트 green.
 - [ ] Task 163 과의 접점: 자동 확정 명단은 **출석 명단**(선발 정보 없음)이며, 전술보드가 없으면 킥오프 시 전원 선발(163 의 fallback 계약) — 통합 스펙 1건.
 - [ ] UI 항목(FE-1~3)은 각각 "3안 제시 → 사용자 선택" 기록이 PR 본문에 있다.
 

@@ -124,6 +124,12 @@ export class LeagueMatchAdminService {
       // 밖으로 빼면 리그만 생기고 거울이 없는 창이 열리고, 그 리그는 read-swap 뒤
       // **에러 없이 화면에서 사라진다**(운영자는 "방금 만든 리그가 안 보인다"고만 말할 수 있다).
       await tx.v1Tournament.create({ data: leagueMirrorCreateData(toMirrorSource(created)) });
+      // 로스터와 짝이 되는 confirmed 등록 — **거울 create 뒤여야 한다**(등록의
+      // tournamentId 가 거울 행을 가리킨다). 리그를 만들 때 함께 넣은 팀도 로스터에
+      // 들어가므로 여기가 다섯 번째 경로다(addTeam·시드·승계·신청 확정과 같은 불변식).
+      for (const teamId of uniqueTeamIds) {
+        await createLeagueRosterRegistration(tx, { leagueId: created.id, teamId, entrySource: 'seeded' });
+      }
       await this.adminContext.logAdminAction(
         admin,
         {

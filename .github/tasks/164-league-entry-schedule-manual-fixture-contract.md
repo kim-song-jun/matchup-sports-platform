@@ -95,7 +95,9 @@ D8 순서 `expand → dual-write → backfill → read-swap → contract` 중 **
 - 같은 날짜 중복 입력 → 중복 제거 후 계산(에러 아님). 과거 날짜 → 400.
 - 수동 대진에 같은 팀 두 번 → 400 `LEAGUE_FIXTURE_SAME_TEAM`. 참가 확정이 아닌 팀 → 400 `LEAGUE_TEAM_INVALID`.
 - 자동 등록(승계) 팀이 신청 API 를 부르면 409 `REGISTRATION_ALREADY_EXISTS` — 새 상태를 만들지 않는다.
-- 정원 초과 상태에서 confirm → **허용**(D9: 자동 규칙 없음). 어드민 화면은 경고만 띄운다.
+- **리그에는 정원 개념이 없다** — 거울의 `teamCount`(기본값 8)를 정원으로 쓰지 않는다(Ambiguity 4).
+  9번째·10번째 팀의 신청·제출·어드민 확정이 전부 통과해야 한다. 대회는 8팀에서 409
+  `TOURNAMENT_CAPACITY_FULL` 그대로(회귀 대조군).
 
 ### Error
 - 거부·티어 이동에 `reason` 없음 → 400. 기존 `admin/registrations/:id/cancel` 의 DTO 에 `reason` 필수화가 대회에도 적용되는지 — **대회는 선택 유지**, 리그 거울에만 필수(`kind` 로 분기). Ambiguity Log 1.
@@ -113,7 +115,17 @@ D8 순서 `expand → dual-write → backfill → read-swap → contract` 중 **
 - **BE-1 ③ 수동 대진.** `league-match-admin.service.ts:1156` 부근 생성 루프에서 한 경기 생성을 순수 함수 `createLeagueFixture(tx, league, home, away, startAt, round, placeName)` 로 뽑고, 자동 생성과 `POST /admin/league-matches/:leagueId/fixtures/manual` 이 **같은 함수**를 부른다. 자동 생성 경로의 스냅샷 테스트로 추출 전후 동일성을 증명한다.
 - **BE-2 ① 날짜 목록.** `LeagueFixtureScheduleDto` 를 `{ dates: 'YYYY-MM-DD'[], time: 'HH:mm' }` 로 바꾸고, 요일 입력은 **프론트에서 날짜 목록으로 전개**해 보낸다(서버는 요일을 모른다). preview 도 같은 DTO. 기존 `dayOfWeek` 는 삭제(호환 유지 없음 — 호출처는 어드민 화면 한 곳).
 - **BE-3 ② 신청(D7).** 리그 거울 행에 `status='open'` + `registrationDeadlineAt` 을 놓는 운영자 액션 `POST /admin/league-matches/:leagueId/open-registration`. 신청·제출·확정은 **대회 서비스 그대로**(추가 코드 0 이 목표). confirm 훅에서 contract 전까지 `V1LeagueTeam` 역방향 dual-write. 승계팀 자동 등록은 `league-series-admin.service.ts` 의 다음 시즌 생성에서 `confirmed` 등록을 함께 만든다.
-- **BE-4 ② 정원·사유(D9) + 자동 확정(D10).** `reason` 필수(리그 거울만). 시즌 시작 시각 크론(`DISABLE_LEAGUE_ROSTER_AUTOCONFIRM_CRON=true` 로 끔 — 기존 cron 선례) 이 미제출 팀 명단을 멤버 전원으로 생성하고 `autoConfirmed` 를 남긴다. 사전 리마인더(시작 24h 전) 알림 1종 + 확정 통보 1종.
+- **BE-4 ② 사유(D9) + 자동 확정(D10).** `reason` 필수(리그 거울만).
+  - **"정원 초과 경고" 는 뺀다** — 기댈 정원 값이 없다(Ambiguity 4). D9 에서 살리는 것은
+    "자동 규칙 없음 + 거부·티어 이동 사유 필수" 다.
+  - **D10 크론은 대진 생성보다 먼저 돌아야 한다.** `generateFixtures`·`regenerateFixtures` 가
+    거울 status 를 `in_progress` 로 옮기면 신청이 닫히므로, 그 뒤에 자동 확정이 돌면
+    확정할 대상이 이미 없다.
+  - **참가비 0원이면 입금 단계를 건너뛴다** (BE-3 에서 발견, 정본 §4 "스텝 최소"). 지금은
+    `submit` 이 `entryFee` 와 무관하게 `awaiting_payment` 로 보내고 `ADMIN_CONFIRMABLE_STATUSES`
+    에 그 상태가 없어서, **0원짜리 리그에도 운영자가 "입금 확인" 을 한 번 눌러야** 확정할 수
+    있다. 무료 대회도 오늘 똑같으므로 대회·리그 한 흐름으로 함께 고친다.
+    스펙: 유료는 그대로 `awaiting_payment`(회귀 대조군), 0원은 곧바로 확정 가능. 시즌 시작 시각 크론(`DISABLE_LEAGUE_ROSTER_AUTOCONFIRM_CRON=true` 로 끔 — 기존 cron 선례) 이 미제출 팀 명단을 멤버 전원으로 생성하고 `autoConfirmed` 를 남긴다. 사전 리마인더(시작 24h 전) 알림 1종 + 확정 통보 1종.
 - **BE-5 ④ contract.** `v1League.*` / `v1LeagueTeam.*` 호출 12 파일 → `V1Tournament(kind='regular_league')` / `V1TournamentRegistration` 으로 재배선. 역방향 dual-write 제거. **`git grep -n -w -e v1League -e v1LeagueTeam -- apps/v1_api/src apps/v1_web/src | wc -l` → `0`** 이 된 뒤에만 drop 마이그레이션 PR 을 따로 연다. drop 은 idempotent(`DROP TABLE IF EXISTS`), alpha 실행 전 사용자 직접 승인.
 
 ### FE (BE 배포 뒤)
@@ -165,5 +177,18 @@ D8 순서 `expand → dual-write → backfill → read-swap → contract` 중 **
 1. **거부 사유 필수를 대회에도 확장할지.** 원지시 D9 는 리그만 말한다 → 리그 거울만 필수, 대회는 선택 유지. (결정: 마스터, 2026-09-02)
 2. **요일 입력을 서버가 아는지.** 서버는 날짜 목록만 안다. 요일→날짜 전개는 프론트. 이유: 서버에 두 입력 형태를 두면 생성 규칙이 둘이 된다. (결정: 마스터)
 3. **수동 대진의 라운드 번호.** **받지 않는다.** `round` 는 저장되지 않는 값이다(`V1TeamMatch` 에 컬럼 없음, `league-standings.ts` 참조 0건 — 2026-09-02 피어·마스터 실측). 생성 시점에 제목(`N주차`)과 `startAt` 계산에만 쓰이는데 수동 대진은 일시를 직접 받으므로 필요 없다. 대신 `title` 을 선택 입력으로 두고, 없으면 자동 생성과 같은 규칙으로 짓는다. 화면의 "주차" 라벨은 `startAt` 순서에서 파생된다(`league-fixture-videos.service.ts:80`).
-4. **정원(capacity) 필드.** 리그 거울에 정원 값이 없으면 D9 경고를 띄울 기준이 없다. `V1Tournament.maxTeams` 가 있으면 재사용, 없으면 expand 로 추가 — BE-3 착수 시 확인.
+4. **정원(capacity) 필드 — 해소됨 (2026-09-03 BE-3 실측).** `maxTeams`·`capacity` 라는 **이름은
+   없지만 역할은 `V1Tournament.teamCount` 가 이미 하고 있었다.** 등록 스택 다섯 자리가
+   `reservedCount >= teamCount` 로 409 `TOURNAMENT_CAPACITY_FULL` 을 던진다
+   (`tournament-registrations.service.ts` 의 `assertCapacityAvailable` 호출 2곳 + 인라인 2곳,
+   `admin-registrations.service.ts` 인라인 2곳).
+   - 리그 거울은 `leagueMirrorCreateData` 가 `teamCount` 를 안 넣어 **스키마 기본값 8** 이 박힌다 —
+     운영자가 정한 값이 아니다(alpha 실측: 거울 89개 전부 `team_count=8`, 8팀 초과 1개·최대 10팀).
+     그대로 재사용하면 9번째 팀부터 신청이 막히고 이미 8팀을 넘긴 리그는 **어드민 확정까지** 막힌다.
+   - **BE-3 결정: 리그에서는 정원을 끈다.** `registration-capacity.ts` 의 `capacityLimitOf` 가
+     `regular_league` 면 `null` 을 돌려주고 다섯 자리가 전부 그 함수를 지난다. 분기를 다섯 번
+     복사하면 빠뜨린 한 경로만 조용히 409 가 되기 때문이다.
+   - **진짜 리그 정원은 별도 태스크**다 — 전용 컬럼(expand) + 어드민 입력 + 화면이 한 덩어리이고,
+     화면이 붙으므로 A·B·C 3안 대상이다. 그때 `capacityLimitOf` 가 그 컬럼을 읽는 자리가 된다
+     (지금 `null` 을 주는 자리에 값이 생기는 것뿐이라 호출부 다섯 곳은 그대로 남는다).
 5. **대회 fixture 의 팀 매치 수렴 시점.** 방향은 확정(원지시), 시점은 미정 → Phase 3 문서로 분리.

@@ -93,8 +93,12 @@ export function leagueAdmissionBlockerMessage(blocker: LeagueAdmissionBlocker): 
  * 세워 뒀다. 로스터를 만드는 경로가 등록을 안 만들면 그 불변식이 그날부터 썩는다 —
  * 그리고 백필은 **한 번 돌고 끝났으므로** 아무도 다시 맞춰 주지 않는다.
  *
- * 로스터를 만드는 길은 넷이다: 어드민 `addTeam` · 시즌 시드 · 승계(다음 시즌 생성) ·
- * 참가 신청 확정. 마지막 하나만 등록에서 출발하므로, 앞의 셋이 여기를 지난다.
+ * 로스터를 만드는 길은 **다섯**이다: 리그 생성(`create` 의 `teamIds`) · 어드민 `addTeam` ·
+ * 시즌 시드 · 승계(다음 시즌 생성) · 참가 신청 확정. 마지막 하나만 등록에서 출발하므로,
+ * 앞의 넷이 여기를 지난다.
+ *
+ * (처음엔 넷으로 셌다가 통합 스펙이 `create` 를 잡았다 — 유닛 fake 는 `v1League.create` 의
+ * 중첩 `teams.createMany` 를 그냥 통과시켜서 로스터가 생겼다는 사실 자체가 안 보인다.)
  *
  * ## `entrySource` 를 왜 나누나
  * enum 에 `applied`·`promoted`·`seeded` 가 이미 있는데 지금까지 `seeded` 만 쓰였다.

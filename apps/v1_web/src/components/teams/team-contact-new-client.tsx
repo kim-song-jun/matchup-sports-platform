@@ -19,12 +19,13 @@ const CONTACT_ERROR_MESSAGES: Record<string, string> = {
 type SubmitError = { message: string; href?: string };
 
 /**
- * `TEAM_CONTACT_ALREADY_ACTIVE` 응답의 `details.existingContactId` 를 방어적으로 꺼낸다.
+ * `TEAM_CONTACT_ALREADY_ACTIVE` 응답의 `details.existingChatRoomId` 를 방어적으로 꺼낸다.
+ * 컨택은 곧 채팅방이므로 "진행 중인 컨택 보기" 는 그 방으로 간다.
  * extractErrorDetails 는 unknown 을 돌려주므로, error-message.ts 의 extractErrorCode 와
  * 같은 스타일로 — 느슨한 모양으로 캐스팅한 뒤 실제 값의 typeof 를 확인하고서만 쓴다.
  */
-function extractExistingContactId(details: unknown): string | undefined {
-  const raw = (details as { existingContactId?: unknown } | null | undefined)?.existingContactId;
+function extractExistingChatRoomId(details: unknown): string | undefined {
+  const raw = (details as { existingChatRoomId?: unknown } | null | undefined)?.existingChatRoomId;
   return typeof raw === 'string' && raw ? raw : undefined;
 }
 
@@ -52,16 +53,17 @@ export function TeamContactNewPageClient({ teamId }: { teamId: string }) {
     createContact.mutate(
       { fromTeamId: selectedFromTeamId, message: trimmedMessage },
       {
-        onSuccess: () => {
-          router.push('/my/team-contacts');
+        onSuccess: (created) => {
+          // 컨택 = 채팅방. 보낸 직후 그 방으로 간다.
+          router.push(created.route);
         },
         onError: (err) => {
           const code = extractErrorCode(err);
           if (code === 'TEAM_CONTACT_ALREADY_ACTIVE') {
-            const existingContactId = extractExistingContactId(extractErrorDetails(err));
+            const existingChatRoomId = extractExistingChatRoomId(extractErrorDetails(err));
             setError({
               message: CONTACT_ERROR_MESSAGES.TEAM_CONTACT_ALREADY_ACTIVE,
-              href: existingContactId ? `/my/team-contacts/${existingContactId}` : '/my/team-contacts',
+              href: existingChatRoomId ? `/chat/${existingChatRoomId}` : '/chat?category=team_contact',
             });
             return;
           }

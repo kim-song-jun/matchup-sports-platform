@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
@@ -6,7 +6,6 @@ import {
   CreateContactBlockDto,
   CreateTeamContactDto,
   DeclineTeamContactDto,
-  ListTeamContactsQueryDto,
   UpdateContactPolicyDto,
 } from './dto/team-contact.dto';
 import { TeamContactsService } from './team-contacts.service';
@@ -25,20 +24,10 @@ export class TeamContactsController {
     return this.teamContactsService.create(user, teamId, dto);
   }
 
-  @Get('teams/:teamId/contacts')
+  @Get('me/team-contacts/summary')
   @UseGuards(V1AuthGuard)
-  list(
-    @CurrentUser() user: V1AuthUser,
-    @Param('teamId') teamId: string,
-    @Query() query: ListTeamContactsQueryDto,
-  ) {
-    return this.teamContactsService.listForTeam(user, teamId, query);
-  }
-
-  @Get('team-contacts/:contactId')
-  @UseGuards(V1AuthGuard)
-  detail(@CurrentUser() user: V1AuthUser, @Param('contactId') contactId: string) {
-    return this.teamContactsService.detail(user, contactId);
+  summary(@CurrentUser() user: V1AuthUser) {
+    return this.teamContactsService.summary(user);
   }
 
   @Patch('team-contacts/:contactId/accept')

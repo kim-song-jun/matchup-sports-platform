@@ -8,7 +8,7 @@ export interface SegmentedTabsItem {
   label: ReactNode;
   /** 있으면 라우팅 링크(next/link)로, 없으면 로컬 상태 버튼으로 렌더한다.
       reviews-page/competition-kind-segment/match-type-segment 는 링크,
-      bracket-page-client/team-records-content/my-team-contacts-client 는 버튼 —
+      bracket-page-client/team-records-content 는 버튼 —
       실제 소비처 10개가 두 형태로 섞여 있어 둘 다 지원한다. */
   href?: string;
   /** 버튼 항목에만 적용된다(link 항목에 disabled 를 주는 소비처는 아직 없다). */
@@ -60,7 +60,7 @@ export interface SegmentedTabsProps {
  *
  * ## 마이그레이션 범위 (2026-09-02)
  * competition-kind-segment/match-type-segment(링크)와 bracket-page-client/
- * team-records-content/my-team-contacts-client/reviews-page(버튼) 6개 소비처는
+ * team-records-content/reviews-page(버튼) 소비처는
  * 이 컴포넌트로 옮겼다. `app/tournaments/[id]/results/results-page-client.tsx`
  * 의 "결과/영상 탭 전환"은 **아직 옮기지 않았다** — `.tm-segment-row` + 원본
  * `.tm-review-tab`(배경 on/off, transition 없음)을 그대로 쓴다. 소비처 인벤토리에서

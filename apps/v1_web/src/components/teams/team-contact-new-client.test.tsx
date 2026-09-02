@@ -89,7 +89,19 @@ describe('TeamContactNewPageClient', () => {
     expect(screen.getByLabelText('보내는 팀')).toBeInTheDocument();
   });
 
-  it('TEAM_CONTACT_ALREADY_ACTIVE 에러면 기존 컨택으로 가는 링크가 보인다', () => {
+  it('보내기에 성공하면 응답의 route(새 채팅방)로 이동한다', () => {
+    createContactMutate.mockImplementation((_vars, opts) => {
+      opts.onSuccess({ id: 'contact-1', chatRoomId: 'room-1', route: '/chat/room-1' });
+    });
+
+    render(<TeamContactNewPageClient teamId="team-target" />);
+    fireEvent.change(screen.getByLabelText('메시지'), { target: { value: 'hi' } });
+    fireEvent.click(screen.getByRole('button', { name: '컨택 보내기' }));
+
+    expect(routerPush).toHaveBeenCalledWith('/chat/room-1');
+  });
+
+  it('TEAM_CONTACT_ALREADY_ACTIVE 에러면 기존 컨택 채팅방으로 가는 링크가 보인다', () => {
     createContactMutate.mockImplementation((_vars, opts) => {
       opts.onError(
         new V1ApiError({
@@ -97,7 +109,7 @@ describe('TeamContactNewPageClient', () => {
           statusCode: 409,
           code: 'TEAM_CONTACT_ALREADY_ACTIVE',
           message: '이미 진행 중인 컨택이 있어요.',
-          details: { existingContactId: 'contact-123' },
+          details: { existingContactId: 'contact-123', existingChatRoomId: 'room-123' },
           timestamp: new Date().toISOString(),
         }),
       );
@@ -108,7 +120,7 @@ describe('TeamContactNewPageClient', () => {
     fireEvent.click(screen.getByRole('button', { name: '컨택 보내기' }));
 
     const link = screen.getByRole('link', { name: '진행 중인 컨택 보기' });
-    expect(link).toHaveAttribute('href', '/my/team-contacts/contact-123');
+    expect(link).toHaveAttribute('href', '/chat/room-123');
   });
 
   it('TEAM_CONTACT_DAILY_LIMIT_EXCEEDED 등 다른 에러면 링크가 없다', () => {

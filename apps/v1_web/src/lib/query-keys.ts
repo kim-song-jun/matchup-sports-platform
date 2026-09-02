@@ -34,15 +34,8 @@ export const v1Keys = {
   teamMatch: (teamMatchId: string) => [...v1Keys.all, 'team-matches', teamMatchId] as const,
   /** 팀매치 목록·상세 공통 접두사 — 캐시 탐색용(`matchesAll` 과 같은 목적). */
   teamMatchesAll: () => [...v1Keys.all, 'team-matches'] as const,
-  teamContacts: (teamId: string, filters?: Record<string, unknown>) =>
-    [...v1Keys.team(teamId), 'contacts', filters ?? {}] as const,
-  /**
-   * 필터 없는 컨택 목록 접두사 — **무효화 전용**.
-   * `teamContacts()` 는 마지막 원소가 필터 객체라 prefix match 로 전체를 무효화할 수
-   * 없다(위 `tournamentOperationsBoard` / `tournamentOperationsBoardAll` 과 같은 이유).
-   */
-  teamContactsAll: (teamId: string) => [...v1Keys.team(teamId), 'contacts'] as const,
-  teamContact: (contactId: string) => [...v1Keys.all, 'team-contacts', contactId] as const,
+  /** 마이 메뉴·팀 관리 메뉴 배지용 대기 컨택 요약(`GET /me/team-contacts/summary`). */
+  teamContactSummary: () => [...v1Keys.all, 'me', 'team-contacts', 'summary'] as const,
   /**
    * 차단 목록 — 필터 인자가 없으므로 `teamContacts()` 와 달리 별도 `...All` 변형이
    * 필요 없다. 이 키 자체가 prefix match 로 무효화된다.

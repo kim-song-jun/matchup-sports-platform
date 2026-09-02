@@ -560,6 +560,7 @@ export const v1ChatRoomsFixture: CursorPage<V1ChatRoom> = {
     {
       roomId: 'chat-1',
       roomType: 'match',
+      teamContact: null,
       title: '성수 풋살장 동네 5:5',
       status: 'active',
       linkedTarget: { type: 'match', id: 'match-1', title: '성수 풋살장 동네 5:5', route: '/matches/match-1' },
@@ -595,6 +596,7 @@ v1ChatRoomsFixture.items = [
   {
     roomId: 'chat-match-1',
     roomType: 'match',
+    teamContact: null,
     title: '성수 풋살 5:5',
     status: 'active',
     linkedTarget: { type: 'match', id: 'match-1', title: '성수 풋살 5:5', route: '/matches/match-1' },
@@ -607,6 +609,7 @@ v1ChatRoomsFixture.items = [
   {
     roomId: 'chat-match-2',
     roomType: 'match',
+    teamContact: null,
     title: '강동 러닝 번개',
     status: 'active',
     linkedTarget: { type: 'match', id: 'match-2', title: '강동 러닝 번개', route: '/matches/match-2' },
@@ -619,6 +622,7 @@ v1ChatRoomsFixture.items = [
   {
     roomId: 'chat-team-1',
     roomType: 'team',
+    teamContact: null,
     title: '성수 러너스 FC',
     status: 'active',
     linkedTarget: { type: 'team', id: 'team-1', title: '성수 러너스 FC', route: '/teams/team-1' },
@@ -631,6 +635,7 @@ v1ChatRoomsFixture.items = [
   {
     roomId: 'chat-team-2',
     roomType: 'team',
+    teamContact: null,
     title: '강동 위클리 풋살',
     status: 'active',
     linkedTarget: { type: 'team', id: 'team-2', title: '강동 위클리 풋살', route: '/teams/team-2' },
@@ -643,6 +648,7 @@ v1ChatRoomsFixture.items = [
   {
     roomId: 'chat-team-match-1',
     roomType: 'team_match',
+    teamContact: null,
     title: '마포 FC 팀매치',
     status: 'active',
     linkedTarget: { type: 'team_match', id: 'team-match-1', title: '마포 FC 팀매치', route: '/team-matches/team-match-1' },
@@ -655,6 +661,7 @@ v1ChatRoomsFixture.items = [
   {
     roomId: 'chat-team-match-2',
     roomType: 'team_match',
+    teamContact: null,
     title: '잠실 교환매치',
     status: 'active',
     linkedTarget: { type: 'team_match', id: 'team-match-2', title: '잠실 교환매치', route: '/team-matches/team-match-2' },

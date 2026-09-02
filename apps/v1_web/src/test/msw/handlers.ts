@@ -574,6 +574,7 @@ export const v1MswHandlers = [
       roomType: room.roomType,
       status: room.status,
       title: room.title,
+      teamContact: room.teamContact,
       linkedTarget: room.linkedTarget,
       me: {
         participantId: 'chat-participant-1',

@@ -42,6 +42,35 @@ class UnparsableSqlError extends Error {}
 // the gate exists to catch does not apply. Keep this list SHORT: every entry
 // weakens the gate for exactly one (file, statement) pair and nothing else.
 const REVIEWED_NON_ADDITIVE = [
+  // --- team contact rooms backfill (PR #977, 2026-09-02) ---------------------
+  {
+    file: "apps/v1_api/prisma/migrations/20260902000000_v1_team_contact_rooms_backfill/migration.sql",
+    statement:
+      "UPDATE \"v1_chat_rooms\" AS room SET \"last_message_at\" = latest.\"max_sent_at\", \"updated_at\" = CURRENT_TIMESTAMP FROM ( SELECT \"chat_room_id\", MAX(\"sent_at\") AS \"max_sent_at\" FROM \"v1_chat_messages\" GROUP BY \"chat_room_id\" ) AS latest WHERE latest.\"chat_room_id\" = room.\"id\" AND room.\"team_contact_id\" IS NOT NULL AND (room.\"last_message_at\" IS NULL OR room.\"last_message_at\" < latest.\"max_sent_at\")",
+    reason:
+      "PR #977. Part 4 of 4: moves v1_chat_rooms.last_message_at forward to the room's newest sent_at for contact rooms only, guarded by IS NULL OR < so it never moves backwards and is a no-op on re-run. Ordering-only metadata that both old and new instances read the same way. Reviewed 2026-09-02.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260902000000_v1_team_contact_rooms_backfill/migration.sql",
+    statement:
+      "INSERT INTO \"v1_chat_messages\" (\"id\", \"chat_room_id\", \"sender_user_id\", \"body\", \"status\", \"message_type\", \"sent_at\", \"created_at\", \"updated_at\") SELECT gen_random_uuid()::text, room.\"id\", contact.\"requested_by_user_id\", contact.\"message\", 'sent', 'text', contact.\"created_at\", CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM \"v1_team_contacts\" AS contact JOIN \"v1_chat_rooms\" AS room ON room.\"team_contact_id\" = contact.\"id\" WHERE NOT EXISTS ( SELECT 1 FROM \"v1_chat_messages\" AS existing WHERE existing.\"chat_room_id\" = room.\"id\" AND existing.\"sender_user_id\" = contact.\"requested_by_user_id\" AND existing.\"sent_at\" = contact.\"created_at\" )",
+    reason:
+      "PR #977. Part 3 of 4: inserts the original contact request text as the first chat message (sender = requested_by_user_id, sent_at = contact.created_at) only when no such message exists (NOT EXISTS on sender + sent_at). Insert-only; no existing message is modified. Old instances render it as a normal text message. Second run inserts 0 rows (verified). Reviewed 2026-09-02.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260902000000_v1_team_contact_rooms_backfill/migration.sql",
+    statement:
+      "WITH target_participants AS ( SELECT DISTINCT room.\"id\" AS chat_room_id, membership.\"user_id\" AS user_id, contact.\"created_at\" AS visible_from_at FROM \"v1_team_contacts\" AS contact JOIN \"v1_chat_rooms\" AS room ON room.\"team_contact_id\" = contact.\"id\" JOIN \"v1_team_memberships\" AS membership ON membership.\"team_id\" IN (contact.\"from_team_id\", contact.\"to_team_id\") AND membership.\"status\" = 'active' AND membership.\"role\" IN ('owner', 'manager') ) INSERT INTO \"v1_chat_room_participants\" (\"id\", \"chat_room_id\", \"user_id\", \"status\", \"visible_from_at\", \"created_at\", \"updated_at\") SELECT gen_random_uuid()::text, tp.\"chat_room_id\", tp.\"user_id\", 'active', tp.\"visible_from_at\", CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM target_participants AS tp ON CONFLICT (\"chat_room_id\", \"user_id\") DO UPDATE SET \"visible_from_at\" = LEAST( COALESCE(\"v1_chat_room_participants\".\"visible_from_at\", EXCLUDED.\"visible_from_at\"), EXCLUDED.\"visible_from_at\" ), \"updated_at\" = CURRENT_TIMESTAMP",
+    reason:
+      "PR #977. Part 2 of 4: adds both teams' active owner/manager memberships as participants of each contact room, deduplicated in a DISTINCT CTE so a person managing both teams cannot make ON CONFLICT DO UPDATE touch the same row twice (SQLSTATE 21000 — reproduced and fixed). Existing participants only have visible_from_at lowered via LEAST(COALESCE(existing, EXCLUDED), EXCLUDED); no participant is removed or demoted. An old instance treats the extra participants like any other member (it already lists them on resolve); on rollback they are inert rows. Idempotent by construction. Reviewed 2026-09-02.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260902000000_v1_team_contact_rooms_backfill/migration.sql",
+    statement:
+      "INSERT INTO \"v1_chat_rooms\" (\"id\", \"team_contact_id\", \"status\", \"created_at\", \"updated_at\") SELECT gen_random_uuid()::text, contact.\"id\", 'active', contact.\"created_at\", CURRENT_TIMESTAMP FROM \"v1_team_contacts\" AS contact LEFT JOIN \"v1_chat_rooms\" AS room ON room.\"team_contact_id\" = contact.\"id\" WHERE room.\"id\" IS NULL AND contact.\"status\" IN ('requested', 'accepted')",
+    reason:
+      "PR #977 (team contact -> chat absorption). Data-only backfill, part 1 of 4: creates one v1_chat_rooms row per pre-existing requested/accepted team contact that has none (LEFT JOIN ... IS NULL), so it is insert-only and idempotent; rows that already have a room are untouched. The new app creates this room at request time; an old app instance ignores the row (its contact detail never resolved a room before accept), so both rolling-deploy directions are safe. The gate rejects INSERT as a category because it cannot PROVE additivity, not because these rows are unsafe. Verified on a throwaway Postgres 16 with the full migration chain replayed, seeded scenarios, and a second run producing 0 new rows. Reviewed 2026-09-02.",
+  },
   {
     file: 'apps/v1_api/prisma/migrations/20260821115900_v1_team_record_facts_played_at_compat/migration.sql',
     statement:

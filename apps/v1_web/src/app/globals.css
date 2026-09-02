@@ -693,6 +693,24 @@ button:disabled {
   font-weight: 700;
 }
 
+/* [모션 C안] 콘텐츠 전환을 걷어낸 대신 탭 자신이 반응한다 — "내가 눌러서
+   바뀌었다"는 신호를 pill 이동(.tm-bottom-nav-pill-slot, 기존)뿐 아니라 아이콘
+   에도 준다. 활성일 때 살짝 뜨고 커지고(translateY(-1px) scale(1.14)), 누르는
+   순간엔 즉시 눌린다(scale(.9)) — 눌림이 활성 확대보다 항상 이겨야 하므로 :active
+   규칙을 아래(소스 순서 뒤)에 둔다(동일 특이도, 나중 규칙이 이긴다). 이징은 신규
+   토큰 없이 기존 --ease-spring 재사용, duration 은 색 전환과 같은 축(--duration-fast)
+   대신 --duration-base — 목업에서 확정된 값 그대로다. transform 하나만 전환하므로
+   transition-all 금지 규칙과도 무관하다. */
+.tm-bottom-tab svg {
+  transition: transform var(--duration-base) var(--ease-spring);
+}
+.tm-bottom-tab[data-active="true"] svg {
+  transform: translateY(-1px) scale(1.14);
+}
+.tm-bottom-tab:active svg {
+  transform: scale(0.9);
+}
+
 /* 활성 탭을 색 말고 **형태로도** 표시한다(Material 3 의 active indicator 방식).
    아이콘의 --blue500 은 흰 배경에서 3.71:1 로 비텍스트 기준(3:1, WCAG 1.4.11)은
    통과하지만 텍스트 기준(4.5:1)에는 못 미친다 — 텍스트는 위에서 --blue700 으로
@@ -747,8 +765,13 @@ button:disabled {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  /* 아래 전역 규칙(*, ::before, ::after)이 이미 transition-duration 을 0.01ms 로 눌러
+     실제 모션은 여기 없어도 꺼진다. 그런데 이 블록은 하단탭의 전환을 **명시적으로**
+     끄려고 둔 것이라, 목록에서 빠진 선택자는 "일부러 남긴 것"으로 읽힌다. 아이콘
+     transform 전환을 추가했으니 svg 도 함께 적는다 — 의도와 목록을 어긋나게 두지 않는다. */
   .tm-bottom-tab,
-  .tm-bottom-tab span {
+  .tm-bottom-tab span,
+  .tm-bottom-tab svg {
     transition: none;
   }
 }
@@ -1011,13 +1034,11 @@ button:disabled {
   gap: 8px;
 }
 
+/* 트랙 공통 스펙(display·gap·padding·radius·background)은 .tm-seg-tabs 근처의
+   그룹 셀렉터(.tm-seg-tabs, .tm-review-tabs, .tm-auth-segmented)로 합쳤다 — 세 화면이
+   각자 베껴 쓴 값이 완전히 같아서 여기 남는 건 이 화면 전용인 열 수뿐이다. */
 .tm-auth-segmented {
-  display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  padding: 4px;
-  border-radius: var(--radius-field);
-  background: var(--grey100);
 }
 
 .tm-auth-segment {
@@ -2838,27 +2859,14 @@ label.tm-btn:focus-within {
 
 /* Toast entrance — referenced by admin toasts via animate-[fade-in_0.15s_ease-out]
  * (gated behind motion-safe: so it respects prefers-reduced-motion). */
-/* [모션] 탭을 바꿀 때 내용이 뚝 갈리던 것을 짧은 페이드로 잇는다.
- * role="tab" 을 쓰는 화면이 16곳인데 탭처럼 느껴지는 모션은 하나도 없었다.
+/* [모션 제거, 2026-09-02] .tm-tabpanel-enter 는 지웠다 — 탭 전환마다 진입 페이드를
+ * 거는 것 자체가 "다른 화면으로 대체됐다"는 신호를 만든다는 게 이번 변경의 결론이다
+ * (탭은 같은 화면 안에서 보는 각도를 바꾸는 것이지 대체가 아니다). 대체품은 새
+ * SegmentedTabs 컴포넌트(components/v1-ui/segmented-tabs.tsx)의 미끄러지는 thumb —
+ * 콘텐츠 자체는 더 이상 전환 없이 즉시 바뀐다.
  *
- * 이 클래스가 실제로 재생되려면 패널에 key={activeTab} 이 필요하다 — key 가 없으면
- * React 가 같은 노드를 diff-patch 해서 애니메이션이 처음 한 번만 걸린다.
- * key 리마운트는 패널 안 폼 상태를 날리므로, **탭 전환 시 이미 언마운트되는
- * 조건부 렌더 패널에만** 붙인다(현재 admin 4곳이 전부 그 형태다).
- *
- * translateY 는 쓰지 않는다 — 탭은 제자리에서 갈리는 것이지 올라오는 게 아니다. */
-.tm-tabpanel-enter {
-  animation: tm-tabpanel-in var(--duration-base) var(--ease-out) both;
-}
-
-@keyframes tm-tabpanel-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .tm-tabpanel-enter { animation: none; }
-}
+ * 소비처(app/admin/settings, content, league-matches, monitoring/monitoring-client)
+ * 의 className 도 같은 변경에서 모두 걷어냈다 — 참조 0건이다. 되살리지 말 것. */
 
 @keyframes fade-in {
   from {
@@ -4962,42 +4970,14 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   padding-bottom: 132px;
 }
 
-.tm-review-tabs {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  padding: 4px;
-  border-radius: var(--radius-field);
-  background: var(--grey100);
-}
-
-.tm-review-tab {
-  /* a11y: 터치 타깃 44px 확보 (시각 높이 유지, grid/place-items로 내용 중앙 정렬) */
-  min-height: 44px;
-  border-radius: var(--radius-control);
-  display: grid;
-  place-items: center;
-  color: var(--text-muted);
-  font-size: 14px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.tm-review-tab[data-active="true"] {
-  background: var(--surface);
-  color: var(--text-strong);
-  font-weight: 800;
-}
-
-/* [토큰 충돌 fix] 다크모드에서 --grey100(트랙, .tm-segment-row/.tm-review-tabs)과
-   --surface(활성 pill)가 둘 다 #1c1e24로 완전히 같은 값이라 활성 탭이 트랙에 녹아
-   사라진다(라이트모드는 #f2f4f6 vs #fff라 그런대로 구분됨 — main에도 있던 원래
-   패턴). .tm-match-type-segment의 dev 전용 오버라이드를 걷어내고서야 드러난, 이
-   컴포넌트를 쓰는 모든 곳(리뷰 탭 3열도 포함)의 근본 다크모드 결함이라 공유
-   셀렉터에서 한 번에 고친다 — --grey150(다크 #20222a)로 실제 구분되게. */
-:root.dark .tm-review-tab[data-active="true"] {
-  background: var(--grey150);
-}
+/* .tm-review-tabs/.tm-review-tab 정의는 .tm-seg-tabs 근처(세그먼트 탭 공통 블록)로
+   옮겨 합쳤다 — 트랙 스펙이 .tm-seg-tabs 와 완전히 같았고, 다크모드 fix 도 두 곳에
+   따로 나 있던 것을 하나로 합쳤다.
+   [2026-09-02 갱신] CompetitionKindSegment/MatchTypeSegment 는 이후 SegmentedTabs
+   로 이관돼 더 이상 이 클래스를 쓰지 않는다 — 지금 유일한 소비처는
+   `app/tournaments/[id]/results/results-page-client.tsx` 의 "결과/영상 탭 전환"
+   (`.tm-segment-row` + `.tm-review-tab`, 아직 SegmentedTabs 로 안 옮김)이다.
+   .tm-review-tab 클래스 자체는 그 소비처가 남아 있으므로 지우지 않는다. */
 
 .tm-tournament-widget-icon {
   background: var(--grey100);
@@ -7116,11 +7096,17 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   text-align: center;
 }
 
-/* 세그먼트 탭 — 트랙 배경 위에 선택된 항목만 떠오르는 형태.
-   나란한 두 버튼(파란 채움 + 회색)은 "탭"이 아니라 "버튼 두 개"로 읽힌다는 오너
-   지적에서 나왔다. .tm-review-tabs 가 이미 쓰던 시각 계약과 동일하되, 이름을 특정
-   화면에 묶지 않도록 일반화했다. 컬럼 수는 쓰는 쪽이 grid-template-columns 로 정한다. */
-.tm-seg-tabs {
+/* ── 세그먼트 탭 공통 블록 (2026-09-02, 하나로 합침) ───────────────────────────
+   .tm-seg-tabs · .tm-review-tabs · .tm-auth-segmented 는 같은 트랙 스펙(gap 8px ·
+   padding 4px · radius field · background grey100)을 세 화면이 각자 베껴 썼다 —
+   다크모드 fix 도 review/seg 두 곳에 따로 났었다(auth 는 활성 pill이 --bg 라 애초에
+   이 충돌이 없다: 다크에서 --grey100 #1c1e24 vs --bg #121317, 서로 다른 값).
+   트랙·항목 스펙이 실제로 같은 review/seg 는 여기서 완전히 합치고, 항목 폰트
+   크기·활성 시 굵기·활성 배색이 서로 다른(각자 이유가 있는) auth 는 트랙 5줄만
+   여기로 옮기고 나머지(.tm-auth-segment 등, 위쪽)는 그대로 둔다. */
+.tm-seg-tabs,
+.tm-review-tabs,
+.tm-auth-segmented {
   display: grid;
   gap: 8px;
   padding: 4px;
@@ -7128,39 +7114,151 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   background: var(--grey100);
 }
 
-.tm-seg-tab {
+/* 컬럼 수 — .tm-seg-tabs 는 쓰는 쪽이 인라인 style 로 정하므로(bracket-page-client
+   선례) 여기 정의가 없다. */
+.tm-review-tabs {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.tm-seg-tab,
+.tm-review-tab {
   /* a11y: 터치 타깃 44px 확보 (시각 높이 유지, grid/place-items 로 내용 중앙 정렬) */
   min-height: 44px;
   border-radius: var(--radius-control);
   display: grid;
   place-items: center;
   color: var(--text-muted);
-  /* [R-T1 타입 위계 정리] 14px → 15px — 이 페이지 전용 클래스(다른 화면 미사용)라
-     3단계(카드 핵심 정보, tm-bk2-score와 동일 15px)에 바로 편입. 탭 버튼은 폭
-     여유가 커서 축소 위험 없음(픽스처 실측: "순위 · 대진표"/"경기 일정" 모두
-     여유 있게 들어감). */
-  font-size: 15px;
   font-weight: 700;
   white-space: nowrap;
 }
 
-/* [R-T3 타입 위계 정리] 활성 상태 800 제거 — R-T3는 800 이상을 히어로 숫자·로고
-   전용으로 규정하고, 세그먼트 탭은 여기 해당하지 않는다. 선택 상태는 굵기가 아니라
-   배경(트랙 위로 떠오르는 pill) + 텍스트 색(muted → strong)으로 구분한다 —
-   font-weight는 비활성과 동일한 700 그대로 둬서 그 자체가 신호가 되지 않게 한다. */
-.tm-seg-tab[data-active='true'] {
+/* [R-T1 타입 위계 정리] .tm-seg-tab 만 14px → 15px — 이 클래스의 원 소비처(대진표
+   보기 전환 등)는 폭 여유가 커서 3단계(tm-bk2-score 와 동일 15px)로 바로 편입해도
+   축소 위험이 없었다(픽스처 실측). .tm-review-tab 은 14px 그대로 — 서로 다른 화면의
+   서로 다른 결정이라 값 자체는 합치지 않는다. */
+.tm-seg-tab {
+  font-size: 15px;
+}
+
+.tm-review-tab {
+  font-size: 14px;
+}
+
+.tm-seg-tab[data-active='true'],
+.tm-review-tab[data-active='true'] {
   background: var(--surface);
   color: var(--text-strong);
 }
 
-/* [토큰 충돌 fix] 다크모드에서 --grey100(트랙, .tm-seg-tabs)과 --surface(활성 pill)가
-   둘 다 #1c1e24로 완전히 같은 값이라 활성 탭이 트랙에 녹아 사라진다(라이트모드는
-   #f2f4f6 vs #fff라 구분됨). 위에서 font-weight 800을 걷어내 배경이 선택 상태를
-   나타내는 유일한 비색상 신호가 됐으므로, 이 충돌을 그대로 두면 다크모드에서 선택
-   상태가 사실상 안 보이게 된다 — .tm-review-tab[data-active]/.tm-match-type-segment에
-   이미 쓰인 동일 패턴(--grey150)으로 다크 전용 오버라이드. */
-:root.dark .tm-seg-tab[data-active='true'] {
+/* [R-T3 타입 위계 정리] .tm-review-tab 만 활성 시 700 → 800 — .tm-seg-tab 는 R-T3가
+   "800 이상은 히어로 숫자·로고 전용"으로 못박은 뒤, 배경(pill) + 텍스트 색만으로
+   선택 상태를 나타내도록 굵기 신호를 일부러 뺐다. 서로 다른 화면의 서로 다른
+   결정이라 .tm-seg-tab 는 위 700 그대로 유지된다. */
+.tm-review-tab[data-active='true'] {
+  font-weight: 800;
+}
+
+/* [토큰 충돌 fix, 하나로 합침] 다크모드에서 트랙 --grey100(#1c1e24)과 활성 pill
+   --surface(#1c1e24)가 완전히 같아 활성 탭이 트랙에 녹는다(라이트모드는 #f2f4f6 vs
+   #fff 라 구분됨). review/seg 두 곳에 따로 나 있던 --grey150(#20222a) 오버라이드를
+   한 셀렉터로 합쳤다. */
+:root.dark .tm-seg-tab[data-active='true'],
+:root.dark .tm-review-tab[data-active='true'] {
   background: var(--grey150);
+}
+
+/* ── SegmentedTabs 컴포넌트 (components/v1-ui/segmented-tabs.tsx, 2026-09-02 신규) ──
+   위 세 클래스는 활성 표시를 **항목마다 배경을 켜고 끄는 방식**으로 구현해서 전환이
+   없다(툭 켜졌다 꺼짐 — 세부탭이 하단탭 pill 보다 나빴던 이유 중 하나). 이 컴포넌트는
+   하단탭 pill(.tm-bottom-nav-pill-slot)과 같은 방식 — **미끄러지는 thumb 하나**가
+   트랙 위를 옮겨 다니는 형태로 통일한다. 같은 토큰(--duration-base·--ease-standard)을
+   써서 하단탭·세부탭이 한 모션 언어를 쓰게 한다. 위 세 클래스는 실제 소비처(10개
+   화면)가 아직 원본 마크업 그대로라 지우지 않았다 — 소비처를 이 컴포넌트로 옮기는
+   마이그레이션은 후속 작업이다. */
+.tm-segmented-tabs {
+  position: relative;
+  display: grid;
+  /* 항목 수를 CSS 에 하드코딩하지 않는다 — segmented-tabs.tsx 가 매 렌더마다
+     items.length 를 이 변수 하나에 실어, 그리드 열 수와 아래 thumb 폭 계산이 같은
+     값을 보게 한다(하단탭이 tabs.length 로 grid-template-columns 를 정하는 것과
+     같은 방식 — 다만 여기는 grid 와 thumb 폭 두 곳이 같은 값을 봐야 해서 인라인
+     style 대신 CSS 변수 하나로 both 를 먹인다). */
+  grid-template-columns: repeat(var(--tm-segmented-count, 1), minmax(0, 1fr));
+  gap: 8px;
+  padding: 4px;
+  border-radius: var(--radius-field);
+  background: var(--grey100);
+}
+
+.tm-segmented-thumb {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 4px; /* 트랙 padding(4px) 안쪽 콘텐츠 박스 시작점 — 그리드 항목과 같은 기준선. */
+  /* 트랙의 가로 비-항목 공간은 padding 좌우 합(8px) + gap*(N-1)(8px 씩)
+     = 8px*N 으로 정리된다(패딩·gap 값이 우연히 같은 8px 라 N 하나로 묶인다).
+     항목 1칸 폭은 그러므로 (100% - 8px*N) / N — %는 절대위치 요소의 포함 블록
+     (트랙의 padding box, 곧 트랙 전체 폭)을 기준으로 한다. index 별 이동 거리는
+     정적 CSS 만으로 못 푼다("몇 번째가 선택됐는지"는 렌더마다 바뀌는 상태라서) —
+     segmented-tabs.tsx 가 인라인 transform 으로 계산해 넣는다(공식의 회귀 테스트는
+     segmented-tabs.test.tsx). */
+  width: calc((100% - 8px * var(--tm-segmented-count, 1)) / var(--tm-segmented-count, 1));
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  /* transform 만 바뀌므로 transform 하나만 전환한다 — transition-all 금지.
+     하단탭 pill 과 같은 토큰 — 셸 전체가 "미끄러진다"는 하나의 모션 언어를 쓰게
+     한다. prefers-reduced-motion 은 전역 catch-all(*, *::before, *::after 에
+     transition-duration: 0.01ms !important)이 이미 처리하므로 여기서 다시
+     정의하지 않는다. */
+  transition: transform var(--duration-base) var(--ease-standard);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* [토큰 충돌 fix, thumb 한 곳에서만] 위 .tm-seg-tab/.tm-review-tab 과 같은 원인
+   (다크모드에서 --grey100 == --surface)이지만, 활성 표시가 thumb 하나뿐이라 고칠
+   곳도 하나뿐이다 — 이 통합이 얻는 실질 이득 중 하나. */
+:root.dark .tm-segmented-thumb {
+  background: var(--grey150);
+}
+
+.tm-segmented-tab {
+  /* thumb 이 absolute 로 먼저 그려지는데, 그리드 아이템은 z-index 를 position 값과
+     무관하게 적용받는다는 스펙 세부(항목이 DOM 순서상 thumb 뒤라 그 규칙만으로도
+     위에 그려지긴 한다)에 기대는 대신, 명시적으로 관계를 고정한다 — 브라우저별
+     그리드 z-index 처리 차이에 좌우되지 않게. */
+  position: relative;
+  z-index: 1;
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  border-radius: var(--radius-control);
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  /* [의도한 시각 변경] 대진표 탭은 15px → 14px 로 **작아진다**.
+     삭제된 .tm-seg-tab 은 R-T1 에서 14→15px 로 올렸는데, 그 근거가 명시적으로
+     "이 페이지 전용 클래스(다른 화면 미사용)라 3단계에 바로 편입" 이었다. 공용
+     컴포넌트로 합치면서 그 전제가 사라졌다 — 이제 같은 클래스를 매치 종류·대회
+     구분·리뷰·전적·컨택 등 여섯 곳이 함께 쓰고, 그쪽 기존 값이 14px 다. 한 화면을
+     위해 나머지 전부를 15px 로 올리는 쪽이 훨씬 큰 변경이므로 14px 로 모은다
+     (대진표는 R-T1 이전 값으로 돌아가는 것이라 폭 여유 문제도 없다). */
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  /* 배경은 thumb 이 담당하므로 항목 자신은 글자색만 전환한다. */
+  transition: color var(--duration-base) var(--ease-standard);
+}
+
+.tm-segmented-tab[data-active='true'] {
+  color: var(--text-strong);
+}
+
+/* auth 전용 40px 변형 — .tm-auth-segment 의 기존 결정(치수를 새로 만든 게 아니라
+   그대로 이식한 것)이다. */
+.tm-segmented-tabs-sm .tm-segmented-tab {
+  min-height: 40px;
+  font-size: 13px;
 }
 
 /* 대회 경기 라인업 명단: 모바일부터 한 줄에 두 선수씩 보여 긴 명단의 스크롤을 줄인다.
@@ -8039,12 +8137,25 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
 :root[data-nav-kind="pop"]  { --tm-slide-offset: 100%; }
 :root[data-nav-kind="pop"]  ::view-transition-new(page-content) { --tm-slide-offset: -24%; }
 
-/* 탭 전환은 슬라이드 없이 crossfade 만 -- 위 슬라이드 애니메이션을 덮어쓴다 */
+/* 탭 전환은 콘텐츠에 아무 전환도 걸지 않는다(C안 확정 -- 탭은 페이지가 아니다).
+   페이드조차 "다른 것으로 대체됐다"는 신호라 탭에는 맞지 않는다 -- 대신 탭 컨트롤
+   자신(BottomNav 아이콘/thumb)이 반응해 "내가 바꿨다"를 알린다.
+   VT 자체를 건너뛰는 방법(PageTransitionController 에서 kind==='tab' 이면
+   startViewTransition 호출 자체를 생략)도 검토했으나, 그 컨트롤러는 매 pathname
+   변경마다 template.tsx 마운트를 기다려 pending VT 를 resolve 하는 왕복 로직과
+   묶여 있어 이 좁은 CSS 전용 작업 범위 밖이다 -- animation:none 으로 이 이름-특정
+   선택자(::view-transition-old/new(page-content))가 UA 기본 크로스페이드
+   (::view-transition-old/new(*) 에 걸리는 -ua-view-transition-fade-*)를 그대로
+   덮어써 없애는 쪽이 이 파일만으로 완결되고, 스펙상 "기본 크로스페이드 끄기"의
+   표준 방법이기도 하다(오버레이 없이 old→new 가 그 자리에서 즉시 스왑).
+   ::view-transition-group(page-content) 의 기본 리사이즈 애니메이션도 실질적으로
+   no-op 이다 -- .tm-scroll-area 는 문서 흐름이 아니라 셸이 고정하는 뷰포트 박스라
+   old/new 캡처 rect 가 탭 전환 전후로 항상 같다(v1_web 은 window 로 스크롤하지
+   않는다: .tm-scroll-area 가 내부 스크롤러). */
 :root[data-nav-kind="tab"] ::view-transition-old(page-content),
 :root[data-nav-kind="tab"] ::view-transition-new(page-content) {
-  animation: var(--duration-base) var(--ease-standard) both tm-page-fade;
+  animation: none;
 }
-:root[data-nav-kind="tab"] ::view-transition-old(page-content) { animation-direction: reverse; }
 
 /* ── CSS 폴백 경로(VT 미지원 웹뷰) -- template.tsx 마운트 시 재생 ──
    iOS 16/17(Safari < 18)은 상시 이 경로만 본다 -- "미지원 대비 보험"이 아니라
@@ -8058,13 +8169,12 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
   from { opacity: 0; transform: translateX(-24px); }
   to   { opacity: 1; transform: translateX(0); }
 }
-@keyframes tm-page-fallback-tab {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
 .tm-page-transition-enter[data-nav-kind="push"] { animation: tm-page-fallback-push var(--duration-slower) var(--ease-out) both; }
 .tm-page-transition-enter[data-nav-kind="pop"]  { animation: tm-page-fallback-pop var(--duration-slower) var(--ease-out) both; }
-.tm-page-transition-enter[data-nav-kind="tab"]  { animation: tm-page-fallback-tab var(--duration-base) var(--ease-standard) both; }
+/* 탭은 VT 지원 경로와 마찬가지로 이 폴백(iOS 16/17 주 경로)에서도 애니메이션을
+   걸지 않는다 -- 규칙을 아예 안 두면 "빠뜨렸나"로 읽히므로 명시적으로 none 을
+   남긴다. 예전엔 여기서도 opacity 0→1 로 페이드했다(tm-page-fallback-tab, 삭제됨). */
+.tm-page-transition-enter[data-nav-kind="tab"] { animation: none; }
 /* data-nav-kind 가 아직 없는 최초 진입(딥링크·새로고침)은 애니메이션 없이 그대로
    보인다 -- 속성 선택자가 매칭 안 되므로 별도 처리가 필요 없다. */
 

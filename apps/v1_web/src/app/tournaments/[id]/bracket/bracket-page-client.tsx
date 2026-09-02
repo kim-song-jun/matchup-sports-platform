@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Trophy } from 'lucide-react';
 import { ErrorState } from '@/components/v1-ui/primitives';
+import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
 import { useV1MyTournamentFixtures, useV1Tournament } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { formatTournamentDateShort, formatTournamentDateTimeShort } from '@/lib/date-utils';
@@ -555,32 +556,20 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
       {/* 경기 일정 / 순위·대진표 탭.
           예전엔 파란 채움 버튼 + 회색 버튼 두 개를 나란히 뒀는데, 그러면 "선택된 탭"이
           아니라 "파란 버튼 하나와 회색 버튼 하나"로 읽혀 탭인 줄 모른다(오너 지적:
-          "탭인 것처럼 보이지가 않고"). 이 저장소가 이미 쓰는 세그먼트 컨트롤 형태
-          (트랙 배경 위에 선택 항목만 떠오르는 .tm-review-tabs 패턴)와 같은 시각 계약을
-          쓰되, 이름은 화면에 안 묶이도록 .tm-seg-* 로 일반화했다. */}
+          "탭인 것처럼 보이지가 않고"). 공용 SegmentedTabs(미끄러지는 thumb) 를 쓴다 —
+          패널(아래 activeTab 분기)엔 전환 애니메이션을 걸지 않는다: 탭은 페이지 이동이
+          아니라 같은 화면을 보는 각도를 바꾸는 것이라 즉시 교체가 맞다. */}
       <div style={{ padding: '16px 20px 0' }}>
-        <div role="tablist" aria-label="보기 방식" className="tm-seg-tabs" style={{ gridTemplateColumns: '1fr 1fr' }}>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === 'schedule'}
-            data-active={activeTab === 'schedule'}
-            className="tm-seg-tab"
-            onClick={() => setActiveTab('schedule')}
-          >
-            경기 일정
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === 'standings'}
-            data-active={activeTab === 'standings'}
-            className="tm-seg-tab"
-            onClick={() => setActiveTab('standings')}
-          >
-            {isRegularLeague ? '리그 순위' : '순위 · 대진표'}
-          </button>
-        </div>
+        <SegmentedTabs
+          items={[
+            { id: 'schedule', label: '경기 일정' },
+            { id: 'standings', label: isRegularLeague ? '리그 순위' : '순위 · 대진표' },
+          ]}
+          activeId={activeTab}
+          onSelect={(id) => setActiveTab(id as 'schedule' | 'standings')}
+          ariaLabel="보기 방식"
+          role="tablist"
+        />
       </div>
 
       {/* flex:1 — 위 minHeight:'100%'+flex column과 짝을 이뤄 탭 콘텐츠가 남는 세로

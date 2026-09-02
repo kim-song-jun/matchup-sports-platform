@@ -94,7 +94,6 @@ function SettingsHub() {
         id={`settings-panel-${activeTab}`}
         role="tabpanel"
         aria-labelledby={`settings-tab-${activeTab}`}
-        className="tm-tabpanel-enter"
       >
         {activeTab === 'integrations' ? <IntegrationsView /> : <ReviewPolicyView />}
       </div>

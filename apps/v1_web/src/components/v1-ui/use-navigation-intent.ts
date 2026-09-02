@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { TAB_CONTAINER_SELECTOR } from './navigation-tab-selectors';
 
 export type NavigationIntentKind = 'push' | 'pop' | 'tab';
+
 
 export interface NavigationIntentHandlers {
   /** 내부 네비게이션이 "시작"되는 순간(클릭/popstate) — 아직 URL은 안 바뀜. */
@@ -15,7 +17,8 @@ export interface NavigationIntentHandlers {
  * 로직을 복붙하면 한쪽만 고쳐지는 순간 두 기능이 갈린다 — 그래서 훅으로 뺀다.
  *
  * kind 판별 순서:
- *  1. `.tm-bottom-nav` 안의 앵커 클릭 → 'tab' (동위 전환, 슬라이드 없음)
+ *  1. `TAB_CONTAINER_SELECTOR`(하단 탭·데스크톱 상단 탭·화면 안 세부 탭) 안의 앵커 클릭
+ *     → 'tab' (동위 전환, 슬라이드 없음)
  *  2. `data-nav-back="true"` 앵커 클릭 → 'pop' (AppBackLink — 실제로는 history push지만
  *     사용자 멘탈모델은 "뒤로"이므로 시각적으로 pop 취급. app-back-link.tsx가 이 속성을 단다)
  *  3. 그 외 내부 앵커 클릭 → 'push'
@@ -49,7 +52,7 @@ export function useNavigationIntent({ onIntent }: NavigationIntentHandlers) {
       if (url.origin !== window.location.origin) return;
       if (url.pathname === window.location.pathname && url.search === window.location.search) return;
 
-      const kind: NavigationIntentKind = anchor.closest('.tm-bottom-nav')
+      const kind: NavigationIntentKind = anchor.closest(TAB_CONTAINER_SELECTOR)
         ? 'tab'
         : anchor.dataset.navBack === 'true'
           ? 'pop'

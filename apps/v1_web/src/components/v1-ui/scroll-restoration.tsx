@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { getCurrentRedirectPath } from '@/lib/session-storage';
 import { readScrollPosition, saveScrollPosition } from '@/lib/scroll-positions';
+import { TAB_LINK_SELECTOR } from './navigation-tab-selectors';
 
 const DESKTOP_QUERY = '(min-width: 1024px)'; // desktop/_shell.css 의 breakpoint 와 동일해야
   // 한다 — 이 값이 어긋나면 두 스크롤 모델(문서 vs .tm-scroll-area)이 서로 다른 지점에서
@@ -28,8 +29,6 @@ const SAVE_DEBOUNCE_MS = 150;
  */
 type NavType = 'push' | 'pop' | 'tab';
 
-/** 하단 탭(모바일) · 상단 탭(데스크톱). shell.tsx 가 붙이는 클래스와 같아야 한다. */
-const TAB_LINK_SELECTOR = '.tm-bottom-tab, .tm-desktop-nav-tab';
 const RESTORE_TIMEOUT_MS = 1500;
 
 type ScrollHost = Element | (Window & typeof globalThis);

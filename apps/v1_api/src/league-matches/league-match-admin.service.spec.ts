@@ -410,6 +410,19 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
       expect(state.teamMatchCreates[0].endAt).toBeUndefined();
     });
 
+    it('durationMinutes 가 null 이어도 미지정으로 본다 — 0분 경기를 만들지 않는다', async () => {
+      // `@IsOptional()` 은 null 을 통과시키고 `@Type(() => Number)` 도 null 을 숫자로
+      // 바꾸지 않는다(실측). `=== undefined` 만 보면 `null * 60_000 === 0` 이라
+      // **종료 = 시작**인 경기가 저장된다 — DTO 가 약속한 "이른 종료를 만들 입력을 두지
+      // 않는다" 가 그 자리에서 깨진다.
+      await service.createManualFixture(adminUser, 'league-1', {
+        ...manual,
+        durationMinutes: null as unknown as undefined,
+      });
+
+      expect(state.teamMatchCreates[0].endAt).toBeUndefined();
+    });
+
     it('장소 미지정·공백은 "장소 미정" 으로 — 일괄 생성과 같은 규칙', async () => {
       await service.createManualFixture(adminUser, 'league-1', { ...manual, placeName: '  ' });
       expect(state.teamMatchCreates[0].placeName).toBe('장소 미정');

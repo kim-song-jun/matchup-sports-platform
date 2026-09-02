@@ -968,7 +968,10 @@ export class LeagueMatchAdminService {
         title: trimmedTitle ? trimmedTitle : await this.defaultManualFixtureTitle(tx, league.id, league.title, startAt),
         placeName: trimmedPlaceName ? trimmedPlaceName : DEFAULT_FIXTURE_PLACE_NAME,
         startAt,
-        endAt: dto.durationMinutes === undefined ? null : new Date(startAt.getTime() + dto.durationMinutes * 60_000),
+        // `== null` 로 **null 도 미지정**으로 본다. `@IsOptional()` 은 null 을 통과시키고
+        // `@Type(() => Number)` 도 null 을 숫자로 바꾸지 않아서(실측), `=== undefined` 만
+        // 보면 `null * 60_000 === 0` 이 되어 **종료 = 시작인 0분 경기**가 저장된다.
+        endAt: dto.durationMinutes == null ? null : new Date(startAt.getTime() + dto.durationMinutes * 60_000),
         home,
         away,
       });

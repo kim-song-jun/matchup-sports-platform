@@ -20,7 +20,8 @@ import { scheduleLeagueResultEntryReminder } from '../jobs/league-reminders/leag
  * 5. **결과 입력 리마인더** — 시작 +24시간에도 결과가 없으면 운영자에게 1회
  *
  * 하나라도 빠지면 화면·알림·정산 중 한 곳이 조용히 비므로, 이 다섯을 각각 단언하는
- * 스펙이 `league-fixture-creation.integration-spec.ts` 에 있다.
+ * 스펙이 `league-match-admin.service.spec.ts` 에 있다(자동 경로 1건 + 수동 경로 1건).
+ * "행 수가 같다" 로 뭉뚱그리지 않는다 — 하나가 빠지고 다른 하나가 두 번 생기면 총계는 같다.
  */
 export interface LeagueFixtureCreationInput {
   leagueId: string;
@@ -174,7 +175,9 @@ export async function createLeagueFixture(
       status: 'approved',
       reviewedByUserId: input.adminUserId,
       reviewedAt: new Date(),
-      message: '리그 대진 자동 생성',
+      // 자동 생성과 수동 추가가 **같은 함수**를 쓰므로 경로를 단정하지 않는다 —
+      // 이 문구는 어드민 화면(팀매치 상세의 applications.message)에 그대로 노출된다.
+      message: '리그 대진 편성',
     },
   });
 

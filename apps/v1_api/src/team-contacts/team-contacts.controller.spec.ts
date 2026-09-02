@@ -13,8 +13,7 @@ const user = {
 describe('TeamContactsController', () => {
   const teamContactsService = {
     create: jest.fn(),
-    listForTeam: jest.fn(),
-    detail: jest.fn(),
+    summary: jest.fn(),
     accept: jest.fn(),
     decline: jest.fn(),
     withdraw: jest.fn(),
@@ -37,6 +36,12 @@ describe('TeamContactsController', () => {
       .useValue({ canActivate: jest.fn(() => true) })
       .compile();
     controller = moduleRef.get(TeamContactsController);
+  });
+
+  it('routes the pending-contact summary to the service', async () => {
+    teamContactsService.summary.mockResolvedValue({ pendingInbound: 1, byTeam: [{ teamId: 'team-1', pendingInbound: 1 }] });
+    await expect(controller.summary(user)).resolves.toEqual({ pendingInbound: 1, byTeam: [{ teamId: 'team-1', pendingInbound: 1 }] });
+    expect(teamContactsService.summary).toHaveBeenCalledWith(user);
   });
 
   it('routes block creation to the service', async () => {

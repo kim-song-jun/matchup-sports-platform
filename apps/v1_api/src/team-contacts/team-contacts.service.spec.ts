@@ -15,6 +15,7 @@ function makePrisma() {
       findUniqueOrThrow: jest.fn(),
       update: jest.fn(),
       updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      groupBy: jest.fn().mockResolvedValue([]),
     },
     // Task 2: 발신 가드(차단 + 수신정책)가 추가되면서 필요해진 mock.
     // 기본값은 "차단 없음 + 정책 open" — 기존 30개 테스트가 이 가드를 통과해야 하므로.
@@ -434,98 +435,33 @@ describe('TeamContactsService 응답 처리', () => {
   });
 });
 
-describe('TeamContactsService.listForTeam', () => {
-  it('inbound 는 받은 것만, outbound 는 보낸 것만 조회한다', async () => {
+describe('TeamContactsService.summary', () => {
+  it('운영 팀 전체의 대기 중 받은 컨택을 팀별로 세고, 세기 전에 만료 건을 정리한다', async () => {
     const prisma = makePrisma();
-    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
-    prisma.v1TeamContact.findMany.mockResolvedValue([]);
+    prisma.v1TeamMembership.findMany.mockResolvedValue([{ teamId: 'A' }, { teamId: 'B' }]);
+    prisma.v1TeamContact.groupBy.mockResolvedValue([{ toTeamId: 'A', _count: { _all: 2 } }]);
     const service = new TeamContactsService(prisma, makeNotifications());
 
-    await service.listForTeam(actor, 'B', { direction: 'inbound' });
-    expect(prisma.v1TeamContact.findMany.mock.calls[0][0].where).toMatchObject({ toTeamId: 'B' });
-
-    prisma.v1TeamContact.findMany.mockClear();
-    await service.listForTeam(actor, 'B', { direction: 'outbound' });
-    expect(prisma.v1TeamContact.findMany.mock.calls[0][0].where).toMatchObject({ fromTeamId: 'B' });
-  });
-
-  it('limit+1 을 가져와 hasNext 를 판정하고 초과분은 잘라낸다', async () => {
-    const prisma = makePrisma();
-    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
-    const rows = Array.from({ length: 3 }, (_, i) => ({
-      id: `c${i}`, status: 'requested', expiresAt: new Date(Date.now() + 86_400_000),
-      fromTeamId: 'A', toTeamId: 'B', message: 'hi', createdAt: new Date(),
-    }));
-    prisma.v1TeamContact.findMany.mockResolvedValue(rows);
-    const service = new TeamContactsService(prisma, makeNotifications());
-
-    const result = await service.listForTeam(actor, 'B', { direction: 'inbound', limit: 2 });
-    expect(prisma.v1TeamContact.findMany.mock.calls[0][0].take).toBe(3);
-    expect(result.items).toHaveLength(2);
-    expect(result.pageInfo.hasNext).toBe(true);
-    expect(result.pageInfo.nextCursor).toBe('c1');
-  });
-
-  it('만료 시각이 지난 requested 항목은 목록에서도 expired 로 보인다', async () => {
-    const prisma = makePrisma();
-    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
-    prisma.v1TeamContact.findMany.mockResolvedValue([{
-      id: 'c1', status: 'requested', expiresAt: new Date(Date.now() - 1000),
-      fromTeamId: 'A', toTeamId: 'B', message: 'hi', createdAt: new Date(),
-    }]);
-    const service = new TeamContactsService(prisma, makeNotifications());
-
-    const result = await service.listForTeam(actor, 'B', { direction: 'inbound' });
-    expect(result.items[0].status).toBe('expired');
-  });
-
-  // 이 정리가 없으면 status 필터가 원시 DB 값을 보기 때문에
-  // `status=expired` 가 표시상 만료된 행(DB 는 requested)을 통째로 놓친다.
-  it('목록 조회 전에 해당 팀·방향의 만료된 대기 건을 정리한다', async () => {
-    const prisma = makePrisma();
-    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
-    prisma.v1TeamContact.findMany.mockResolvedValue([]);
-    const service = new TeamContactsService(prisma, makeNotifications());
-
-    await service.listForTeam(actor, 'B', { direction: 'inbound' });
-
+    await expect(service.summary(actor)).resolves.toEqual({
+      pendingInbound: 2,
+      byTeam: [{ teamId: 'A', pendingInbound: 2 }, { teamId: 'B', pendingInbound: 0 }],
+    });
     expect(prisma.v1TeamContact.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({
-          toTeamId: 'B',
-          status: 'requested',
-          expiresAt: expect.objectContaining({ lt: expect.any(Date) }),
-        }),
+        where: expect.objectContaining({ toTeamId: { in: ['A', 'B'] }, status: 'requested' }),
         data: { status: 'expired' },
       }),
     );
   });
 
-  it('상세는 보낸 팀 운영진도 볼 수 있다', async () => {
+  it('운영 팀이 없으면 DB 를 쓰지 않고 0 을 돌려준다', async () => {
     const prisma = makePrisma();
-    prisma.v1TeamContact.findUnique.mockResolvedValue({
-      id: 'c1', fromTeamId: 'A', toTeamId: 'B', status: 'requested',
-      expiresAt: new Date(Date.now() + 86_400_000), message: 'hi', createdAt: new Date(),
-    });
-    // 받는 팀('B') 조회는 실패, 보낸 팀('A') 조회는 성공
-    prisma.v1TeamMembership.findFirst
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({ id: 'm1' });
+    prisma.v1TeamMembership.findMany.mockResolvedValue([]);
     const service = new TeamContactsService(prisma, makeNotifications());
 
-    await expect(service.detail(actor, 'c1')).resolves.toMatchObject({ id: 'c1' });
-  });
-
-  it('양쪽 어디에도 속하지 않으면 상세를 볼 수 없다', async () => {
-    const prisma = makePrisma();
-    prisma.v1TeamContact.findUnique.mockResolvedValue({
-      id: 'c1', fromTeamId: 'A', toTeamId: 'B', status: 'requested',
-      expiresAt: new Date(Date.now() + 86_400_000), message: 'hi', createdAt: new Date(),
-    });
-    prisma.v1TeamMembership.findFirst.mockResolvedValue(null);
-    const service = new TeamContactsService(prisma, makeNotifications());
-
-    await expect(service.detail(actor, 'c1')).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.summary(actor)).resolves.toEqual({ pendingInbound: 0, byTeam: [] });
+    expect(prisma.v1TeamContact.updateMany).not.toHaveBeenCalled();
+    expect(prisma.v1TeamContact.groupBy).not.toHaveBeenCalled();
   });
 });
 

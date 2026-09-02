@@ -32,24 +32,3 @@ export class UpdateContactPolicyDto {
   @IsIn(['open', 'recruiting_only', 'closed'])
   contactPolicy!: 'open' | 'recruiting_only' | 'closed';
 }
-
-export class ListTeamContactsQueryDto {
-  @IsOptional()
-  @IsIn(['inbound', 'outbound'])
-  direction?: 'inbound' | 'outbound';
-
-  @IsOptional()
-  @IsIn(['requested', 'accepted', 'declined', 'withdrawn', 'expired'])
-  status?: string;
-
-  @IsOptional()
-  @IsString()
-  cursor?: string;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(50)
-  limit?: number;
-}

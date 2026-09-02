@@ -276,7 +276,13 @@ export function PlayerCard({
   const needsConsent = card.nextUnlock?.reason.type === 'consent';
   const { left, right } = splitStats(card.stats);
   const [flipped, setFlipped] = useState(false);
-  const [photoLoaded, setPhotoLoaded] = useState(false);
+  /**
+   * 도착한 사진의 URL. boolean 이 아니라 URL 을 기억하는 이유: 재크롭으로 URL 이 바뀌면 이전
+   * 사진의 "도착함"이 새 사진에 남아 페이드가 건너뛰어진다 -- URL 을 비교하면 리셋 effect 없이
+   * 새 URL 은 자연히 미도착 상태다.
+   */
+  const [loadedPhotoUrl, setLoadedPhotoUrl] = useState<string | null>(null);
+  const photoLoaded = profileImageUrl !== null && loadedPhotoUrl === profileImageUrl;
   /**
    * 여정 면 (A안): 아직 한 경기도 안 뛰었고 열린 능력치도 없으면, 자물쇠 여섯 개의
    * 벽 대신 "시작하는 카드"를 그린다. 후기는 경기를 뛴 사람에게만 달리므로
@@ -363,7 +369,7 @@ export function PlayerCard({
                 fill
                 sizes="138px"
                 priority
-                onLoad={() => setPhotoLoaded(true)}
+                onLoad={() => setLoadedPhotoUrl(profileImageUrl)}
               />
             </div>
           ) : (

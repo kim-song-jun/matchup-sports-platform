@@ -72,7 +72,10 @@ describe('ProfilePhotoCropper', () => {
     await waitFor(() => expect(confirm).toBeEnabled());
     fireEvent.click(confirm);
 
-    await waitFor(() => expect(onCropped).toHaveBeenCalledWith(cropped));
+    // File 을 toHaveBeenCalledWith 로 딥 비교하면 CI(다른 Node/jsdom)에서 같은 객체인데도
+    // 불일치로 판정돼 1초 타임아웃으로 죽었다 -- 참조가 같은지만 본다(같은 객체를 넘기는 게 계약이다).
+    await waitFor(() => expect(onCropped).toHaveBeenCalled());
+    expect(onCropped.mock.calls[0][0]).toBe(cropped);
     // 내보내기는 컴포넌트가 계산한 기하로 호출된다 -- 초기 상태는 덮는 최소 배율의 1.15배
     const [, state, viewport] = exportCrop.mock.calls[0];
     expect(viewport).toBe(300);

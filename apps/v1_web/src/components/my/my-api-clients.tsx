@@ -1987,6 +1987,13 @@ function PlayerCardPhotoAdjust() {
     const data = profile.data;
     if (!data) return;
     setError(null);
+    // 서버 저장 API 는 성별이 필수다. 아직 성별을 고르지 않은(legacy) 계정에서 사진만 바꾸자고
+    // 임의의 값을 채워 보내면 개인정보를 조용히 바꾸는 셈이다 -- 프로필 수정으로 안내하고 멈춘다.
+    if (data.profile.gender !== 'male' && data.profile.gender !== 'female') {
+      setError('프로필 수정에서 성별을 먼저 골라 주세요. 그 다음 사진 위치를 맞출 수 있어요.');
+      setOpen(false);
+      return;
+    }
     try {
       const uploaded = await uploadImages.mutateAsync([file]);
       const nextUrl = uploaded.urls[0];
@@ -2001,7 +2008,7 @@ function PlayerCardPhotoAdjust() {
         phone: data.phone ?? null,
         // 서버는 8자리 숫자만 받는다 -- 시드로 들어간 옛 계정은 '1995-01-01' 형태가 남아 있다.
         birthDate: data.profile.birthDate ? data.profile.birthDate.replace(/\D/g, '') || null : null,
-        gender: data.profile.gender === 'female' ? 'female' : 'male',
+        gender: data.profile.gender,
       });
       setOpen(false);
     } catch (err) {

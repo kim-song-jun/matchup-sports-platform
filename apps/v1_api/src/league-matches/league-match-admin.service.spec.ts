@@ -65,6 +65,8 @@ interface FakeState {
   siblingStartAts: Date[];
   /** `v1TeamMatch.create` 에 실린 data — 제목·시각·장소를 그대로 본다. */
   teamMatchCreates: Array<{ title: string; startAt: Date; endAt?: Date; placeName: string }>;
+  /** 자동 승인 신청서에 실린 data — 어드민 화면에 그대로 노출되는 문구를 본다. */
+  applicationCreates: Array<{ message: string; status: string }>;
 }
 
 /** 리그에 등록된 두 팀 — 기존 스펙이 멤버십 이름으로 사이드 배정을 단언하므로 고정한다. */
@@ -79,6 +81,7 @@ function createFake() {
     // 기본: 서로 다른 두 경기일이 이미 있다(KST 9/5, 9/12).
     siblingStartAts: [new Date('2026-09-05T01:00:00.000Z'), new Date('2026-09-12T01:00:00.000Z')],
     teamMatchCreates: [],
+    applicationCreates: [],
   };
   let seq = 0;
   const next = (prefix: string) => {
@@ -145,7 +148,10 @@ function createFake() {
       findMany: track('v1TeamMatch.findMany', async () => state.siblingStartAts.map((startAt) => ({ startAt }))),
     },
     v1TeamMatchApplication: {
-      create: track('v1TeamMatchApplication.create', async () => ({ id: 'application-1' })),
+      create: track('v1TeamMatchApplication.create', async (args: { data: { message: string; status: string } }) => {
+        state.applicationCreates.push(args.data);
+        return { id: 'application-1' };
+      }),
     },
     // 리그 대진 생성이 "매치가 곧 팀일정" 불변식을 지키도록 양 팀 스케줄을
     // createTeamMatchScheduleInTx 로 함께 만든다(league-match-admin.service.ts).
@@ -366,6 +372,19 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
       expect(state.participants.every((row) => row.userId === null)).toBe(true);
       expect(state.calls.filter((call) => call === 'v1TeamMatchApplication.create')).toHaveLength(1);
       expect(state.calls.filter((call) => call === '$executeRaw')).toHaveLength(1);
+    });
+
+    /**
+     * 신청서 문구는 **어드민 화면에 그대로 노출된다**(팀매치 상세의 applications.message).
+     * 자동·수동이 같은 함수를 쓰므로 경로를 단정하면 수동으로 넣은 경기가 "자동 생성" 이라고
+     * 표시된다 — 운영자가 자기가 손으로 넣은 경기를 시스템이 만든 것으로 읽는다.
+     */
+    it('자동 승인 신청서 문구가 경로를 단정하지 않는다', async () => {
+      await service.createManualFixture(adminUser, 'league-1', { ...manual });
+
+      expect(state.applicationCreates).toHaveLength(1);
+      expect(state.applicationCreates[0].status).toBe('approved');
+      expect(state.applicationCreates[0].message).not.toContain('자동');
     });
 
     /**

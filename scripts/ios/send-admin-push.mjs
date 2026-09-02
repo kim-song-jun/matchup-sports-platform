@@ -29,8 +29,10 @@ async function session(email, password) {
     body: JSON.stringify({ email, password }),
     redirect: 'manual',
   });
-  const cookie = res.headers.getSetCookie().find((c) => c.startsWith('teameet_v1_session=')) ?? '';
-  const token = cookie.split(';')[0].split('=')[1];
+  // `getSetCookie()` is missing on older Node/undici; the joined header is the fallback there.
+  const setCookies = res.headers.getSetCookie?.() ?? (res.headers.get('set-cookie') ?? '').split(/,(?=\s*\w+=)/);
+  const cookie = setCookies.find((c) => c.trim().startsWith('teameet_v1_session=')) ?? '';
+  const token = cookie.trim().split(';')[0].split('=')[1];
   if (!token) throw new Error(`login failed for the ${email === process.env.TEAMEET_ADMIN_EMAIL ? 'admin' : 'recipient'} account: HTTP ${res.status}`);
   return `teameet_v1_session=${token}`;
 }

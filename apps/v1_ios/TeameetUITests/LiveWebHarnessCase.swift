@@ -26,8 +26,9 @@ class LiveWebHarnessCase: XCTestCase {
     func environmentValue(_ name: String) throws -> String {
         guard let value = ProcessInfo.processInfo.environment[name], !value.isEmpty else {
             throw XCTSkip("""
-                \(name) is not set. scripts/ios/verify-push-slice.sh passes it as an \
-                xcodebuild build setting, which the scheme forwards to this process.
+                \(name) is not set. The runners under scripts/ios/ (verify-push-slice.sh, \
+                verify-push-delivery.sh) pass it as an xcodebuild build setting, which the \
+                scheme forwards to this process.
                 """)
         }
         return value

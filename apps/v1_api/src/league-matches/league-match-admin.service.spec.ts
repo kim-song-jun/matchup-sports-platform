@@ -67,6 +67,8 @@ interface FakeState {
   teamMatchCreates: Array<{ title: string; startAt: Date; endAt?: Date; placeName: string }>;
   /** 자동 승인 신청서에 실린 data — 어드민 화면에 그대로 노출되는 문구를 본다. */
   applicationCreates: Array<{ message: string; status: string }>;
+  /** 잠금 뒤 재조회가 보는 **커밋된** 로스터. 기본은 등록된 두 팀. */
+  registeredTeamIds: Set<string>;
 }
 
 /** 리그에 등록된 두 팀 — 기존 스펙이 멤버십 이름으로 사이드 배정을 단언하므로 고정한다. */
@@ -82,6 +84,7 @@ function createFake() {
     siblingStartAts: [new Date('2026-09-05T01:00:00.000Z'), new Date('2026-09-12T01:00:00.000Z')],
     teamMatchCreates: [],
     applicationCreates: [],
+    registeredTeamIds: new Set(['team-a', 'team-b']),
   };
   let seq = 0;
   const next = (prefix: string) => {
@@ -135,6 +138,13 @@ function createFake() {
       // 내서 테스트가 통과한다(실측: 등록 검증을 지우는 변이가 green 이었다).
       findMany: track('v1Team.findMany', async (args: { where: { id: { in: string[] } } }) =>
         args.where.id.in.map((id) => KNOWN_TEAMS.get(id) ?? teamRow(id, `${id} 팀`, [`${id}-m1`, `${id}-m2`])),
+      ),
+    },
+    // 잠금 뒤 **커밋된** 로스터를 다시 읽는 자리. 테스트가 `state.registeredTeamIds` 를
+    // 갈아끼워 "그 사이 팀이 빠졌다" 를 재현한다.
+    v1LeagueTeam: {
+      findMany: track('v1LeagueTeam.findMany', async (args: { where: { teamId: { in: string[] } } }) =>
+        args.where.teamId.in.filter((id) => state.registeredTeamIds.has(id)).map((teamId) => ({ teamId })),
       ),
     },
     v1TeamMatch: {
@@ -455,6 +465,30 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
       // 검증 게이트를 통과한 뒤에야 쓰기가 시작돼야 한다 — 반쪽 생성이 남으면 안 된다.
       expect(state.calls.filter((call) => call === 'v1TeamMatch.create')).toHaveLength(0);
       expect(state.scheduleCreates).toHaveLength(0);
+    });
+
+    /**
+     * TOCTOU — 잠금 **밖** 스냅샷(`league.teams`)으로 판정하면, 그 사이 `removeTeam` 이
+     * 커밋됐을 때 **이미 리그에서 빠진 팀으로 대진이 생긴다.** 그 대진은 제거 경로가
+     * 취소할 목록을 읽을 때는 아직 없었으므로 로스터에 없는 팀을 가리킨 채 남는다.
+     *
+     * 여기서는 잠금 뒤 재조회가 보는 커밋된 로스터에서 원정 팀을 빼서 그 순간을 만든다.
+     * 잠금 밖 `league.teams` 에는 여전히 두 팀이 있으므로, 재조회를 안 하면 통과한다.
+     */
+    it('잠근 뒤 로스터를 다시 읽는다 — 그 사이 빠진 팀이면 422 이고 아무것도 만들지 않는다', async () => {
+      state.registeredTeamIds.delete('team-b');
+
+      await expect(
+        service.createManualFixture(adminUser, 'league-1', { ...manual }),
+      ).rejects.toMatchObject({ response: { code: 'LEAGUE_TEAM_INVALID' } });
+
+      expect(state.calls.filter((call) => call === 'v1TeamMatch.create')).toHaveLength(0);
+      expect(state.scheduleCreates).toHaveLength(0);
+      // 재조회는 **리그 행을 잠근 뒤**여야 한다 — 순서가 뒤집히면 잠금이 보호하는 게 없다.
+      const lockAt = state.calls.indexOf('$queryRaw');
+      const recheckAt = state.calls.indexOf('v1LeagueTeam.findMany');
+      expect(lockAt).toBeGreaterThanOrEqual(0);
+      expect(recheckAt).toBeGreaterThan(lockAt);
     });
 
     it('같은 팀끼리는 422 로 거부한다', async () => {

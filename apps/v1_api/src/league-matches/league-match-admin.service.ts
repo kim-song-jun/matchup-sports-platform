@@ -918,6 +918,9 @@ export class LeagueMatchAdminService {
    *   · 일괄은 라운드로빈이 짝을 정한다 — 수동은 운영자가 두 팀을 고른다
    * 그래서 **두 팀이 이 리그 소속인지**를 여기서 검증한다. 일괄 경로에는 그 검증이 없는데,
    * 짝이 `league.teams` 에서 나오므로 소속이 자명하기 때문이다.
+   *
+   * 그 검증은 **트랜잭션 안, 리그 행을 잠근 뒤**에 한다 — 잠금 밖 스냅샷으로 판정하면
+   * 그 사이 `removeTeam` 이 커밋됐을 때 이미 빠진 팀으로 대진이 생긴다.
    */
   async createManualFixture(user: V1AuthUser, leagueId: string, dto: CreateManualLeagueFixtureDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
@@ -926,13 +929,6 @@ export class LeagueMatchAdminService {
       throw new UnprocessableEntityException({
         code: 'LEAGUE_TEAM_INVALID',
         message: '같은 팀끼리 경기를 만들 수 없어요.',
-      });
-    }
-    const registered = new Set(league.teams.map((entry) => entry.teamId));
-    if (!registered.has(dto.homeTeamId) || !registered.has(dto.awayTeamId)) {
-      throw new UnprocessableEntityException({
-        code: 'LEAGUE_TEAM_INVALID',
-        message: '이 리그에 등록되지 않은 팀이에요.',
       });
     }
     const config = await resolveTeamMatchCompetitionConfig(this.prisma, league.sportId);
@@ -948,6 +944,24 @@ export class LeagueMatchAdminService {
       // 일괄 생성과 같은 락. 같은 리그에 동시에 손대는 두 요청이 서로의 주차 계산을
       // 어긋나게 만들지 않는다 — 아래 형제 목록 조회가 이 락 안에서 일어나야 한다.
       await tx.$queryRaw`SELECT id FROM "v1_leagues" WHERE id = ${leagueId} FOR UPDATE`;
+      // **잠근 뒤에** 로스터를 다시 읽는다. 잠금 밖에서 읽은 `league.teams` 로 판정하면
+      // TOCTOU 다 — 그 사이 `removeTeam` 이 커밋되면 **리그에서 이미 빠진 팀으로 대진이
+      // 생기고**, 그 대진은 로스터에 없는 팀을 가리킨 채 남는다(제거 경로가 취소할 대상
+      // 목록을 읽을 때는 아직 없던 대진이다).
+      //
+      // 락 순서는 `removeTeam`(:529)·`generateFixtures`(:307)·`regenerateFixtures`(:794)와
+      // 같다 — **리그 행 먼저**. 순서가 같으므로 서로 데드락하지 않는다.
+      const registeredNow = await tx.v1LeagueTeam.findMany({
+        where: { leagueId, teamId: { in: [dto.homeTeamId, dto.awayTeamId] } },
+        select: { teamId: true },
+      });
+      const registeredIds = new Set(registeredNow.map((row) => row.teamId));
+      if (!registeredIds.has(dto.homeTeamId) || !registeredIds.has(dto.awayTeamId)) {
+        throw new UnprocessableEntityException({
+          code: 'LEAGUE_TEAM_INVALID',
+          message: '이 리그에 등록되지 않은 팀이에요.',
+        });
+      }
       const teamsById = await this.loadTeamsWithMembers(tx, [dto.homeTeamId, dto.awayTeamId]);
       const home = teamsById.get(dto.homeTeamId);
       const away = teamsById.get(dto.awayTeamId);

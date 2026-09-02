@@ -144,12 +144,17 @@ async function pickTargets() {
 
 /**
  * 브라우저 안에서 도는 판정 — 여기서 읽은 값만 표에 들어간다.
- * `expectGroupName` 은 **API 가 준 순위 제목**이다(`/schedule` 의 `standings[].groupName`).
- * 화면이 그 이름을 안 쓰면 **같은 리그가 화면마다 다른 이름으로 불린다** — 티어 라벨을
- * 한쪽 화면에만 적용한 결함이 정확히 그 모양이었다(2026-09-01: `/schedule` 은 '2부',
+ *
+ * ⚠️ **API 가 준 순위 제목(`expectGroupName`)과의 비교는 여기서 하지 않는다.** 예전엔 이 함수가
+ * 그 값을 인자로 받았는데 본문에서 **한 번도 안 썼다** — 받기만 하고 버리는 인자는 *"여기서
+ * 비교하는구나"* 로 읽혀서, 정작 비교가 빠져도 눈치채기 어렵다. 실제 비교는 node 쪽
+ * `verdict()` 가 `r.expectGroupName` 과 `r.standingsAriaLabel` 로 한다(아래).
+ *
+ * 비교 자체의 이유는 그대로다: 화면이 API 이름을 안 쓰면 **같은 리그가 화면마다 다른 이름으로
+ * 불린다** — 티어 라벨을 한쪽에만 적용한 결함이 그 모양이었다(2026-09-01: `/schedule` 은 '2부',
  * `/bracket` 은 '리그 순위' 하드코딩). 티어 문자열을 하네스에 박지 않고 **두 화면을 맞대어** 잰다.
  */
-const READ = (expectGroupName) => {
+const READ = () => {
   const text = (document.body.innerText || '').replace(/\n{2,}/g, '\n').trim();
   const tabs = [...document.querySelectorAll('[role="tab"]')].map((e) => e.textContent.trim());
   // 순위표 행 세기. **빈 상태도 `tbody > tr` 이다** — alpha 실측(2026-09-01): 순위가 없을 때
@@ -234,7 +239,7 @@ async function capture(browser, { width, height }, url, file, isBracket, expectG
       return { status, read: null, note: why };
     }
     await page.waitForTimeout(SETTLE_MS);
-    let read = await page.evaluate(READ, expectGroupName);
+    let read = await page.evaluate(READ);
 
     /**
      * **`/bracket` 은 두 번 읽어야 한다.** 이 화면은 상위 탭이 둘(일정 / 순위)이고 기본이
@@ -258,7 +263,7 @@ async function capture(browser, { width, height }, url, file, isBracket, expectG
         return { status, read: null, note: '순위 탭을 못 찾았다 — 하네스가 판정할 수 없다' };
       }
       await page.waitForTimeout(2_000);
-      const standingsView = await page.evaluate(READ, expectGroupName);
+      const standingsView = await page.evaluate(READ);
       read = {
         ...read,
         standingsRows: standingsView.standingsRows,

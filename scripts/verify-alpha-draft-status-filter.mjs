@@ -81,16 +81,38 @@ async function main() {
       판정: a.status === 200 && a.items > 0 && onlyLeague ? '✅' : a.status !== 200 ? `❌ HTTP ${a.status}` : '❌ 리그 아닌 것이 섞였다',
     },
     {
+      /**
+       * ⚠️ **종류만 보면 반대 방향으로 샌 것을 못 잡는다.** 예전엔 `nonLeague === 0` 만 봤는데,
+       * 그러면 `kind=tournament` 필터가 깨져 **리그가 대회 탭에 섞여 들어와도** ✅ 가 된다
+       * (샌 게 리그라서 `nonLeague` 는 여전히 0 이다). 위 주석이 *"빈 목록"* 이라고 약속해 놓고
+       * 판정은 그걸 강제하지 않던 자리다 — **문장과 판정이 어긋나 있었다.**
+       * 그래서 둘 다 본다: **개수 0**(주석이 약속한 것) + **리그 아닌 것 0**(원래 축).
+       * `kind=tournament` 는 명시 필터라 기대 개수 0 이 표면 기본값과 무관하다.
+       */
       항목: 'kind=tournament&status=draft',
       값: b.status === 200 ? `200 · ${b.items}건 ${JSON.stringify(b.kinds)}` : `HTTP ${b.status}`,
-      기대: '리그 아닌 것 0',
-      판정: b.status !== 200 ? `❌ HTTP ${b.status}` : nonLeague(b) === 0 ? '✅' : `❌ 대회 draft 가 ${nonLeague(b)}건 샜다`,
+      기대: '빈 목록 (리그도 대회도 0)',
+      판정:
+        b.status !== 200
+          ? `❌ HTTP ${b.status}`
+          : b.items !== 0
+            ? `❌ ${b.items}건 나왔다 ${JSON.stringify(b.kinds)} — 대회 탭에 draft 가 보인다`
+            : nonLeague(b) === 0
+              ? '✅'
+              : `❌ 대회 draft 가 ${nonLeague(b)}건 샜다`,
     },
     {
       항목: 'status=draft (kind 없음)',
       값: c.status === 200 ? `200 · ${c.items}건 ${JSON.stringify(c.kinds)}` : `HTTP ${c.status}`,
-      기대: '리그 아닌 것 0',
-      판정: c.status !== 200 ? `❌ HTTP ${c.status}` : nonLeague(c) === 0 ? '✅' : `❌ 기본 surface 로 ${nonLeague(c)}건 샜다`,
+      기대: '빈 목록 (기본 표면은 대회다)',
+      판정:
+        c.status !== 200
+          ? `❌ HTTP ${c.status}`
+          : c.items !== 0
+            ? `❌ ${c.items}건 나왔다 ${JSON.stringify(c.kinds)} — 기본 표면이 바뀌었거나 draft 가 샜다`
+            : nonLeague(c) === 0
+              ? '✅'
+              : `❌ 기본 surface 로 ${nonLeague(c)}건 샜다`,
     },
     {
       항목: '대조군 · status=in_progress',

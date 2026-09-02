@@ -93,7 +93,10 @@ D8 순서 `expand → dual-write → backfill → read-swap → contract` 중 **
 ### Edge
 - 날짜 수 < 라운드 수 → 400 `LEAGUE_SCHEDULE_SLOTS_INSUFFICIENT { required, provided }`. 생성 없음.
 - 같은 날짜 중복 입력 → 중복 제거 후 계산(에러 아님). 과거 날짜 → 400.
-- 수동 대진에 같은 팀 두 번 → 400 `LEAGUE_FIXTURE_SAME_TEAM`. 참가 확정이 아닌 팀 → 400 `LEAGUE_TEAM_INVALID`.
+- 수동 대진에 같은 팀 두 번 → **422 `LEAGUE_TEAM_INVALID`**. 이 리그에 등록되지 않은 팀 →
+  **같은 422 `LEAGUE_TEAM_INVALID`**.
+  ⚠️ 문서가 적고 있던 `LEAGUE_FIXTURE_SAME_TEAM` 은 **존재하지 않는 코드**였다(실측 grep 0건).
+  구분 코드를 새로 만들지 않는다 — 소비처가 없고, 화면은 메시지로 두 경우를 이미 가른다.
 - 자동 등록(승계) 팀이 신청 API 를 부르면 409 `REGISTRATION_ALREADY_EXISTS` — 새 상태를 만들지 않는다.
 - 정원 초과 상태에서 confirm → **허용**(D9: 자동 규칙 없음). 어드민 화면은 경고만 띄운다.
 

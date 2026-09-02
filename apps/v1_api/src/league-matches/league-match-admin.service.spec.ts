@@ -67,6 +67,12 @@ interface FakeState {
   teamMatchCreates: Array<{ title: string; startAt: Date; endAt?: Date; placeName: string }>;
 }
 
+/** 리그에 등록된 두 팀 — 기존 스펙이 멤버십 이름으로 사이드 배정을 단언하므로 고정한다. */
+const KNOWN_TEAMS = new Map([
+  ['team-a', teamRow('team-a', 'A팀', ['membership-a1', 'membership-a2'])],
+  ['team-b', teamRow('team-b', 'B팀', ['membership-b1', 'membership-b2'])],
+]);
+
 function createFake() {
   const state: FakeState = {
     participants: [], sides: [], links: [], linkEvents: [], scheduleCreates: [], calls: [], mirrorUpdates: [],
@@ -120,10 +126,13 @@ function createFake() {
       })),
     },
     v1Team: {
-      findMany: track('v1Team.findMany', async () => [
-        teamRow('team-a', 'A팀', ['membership-a1', 'membership-a2']),
-        teamRow('team-b', 'B팀', ['membership-b1', 'membership-b2']),
-      ]),
+      // ⚠️ `where.id.in` 을 **실제로 지킨다.** 요청한 id 를 그대로 돌려주지 않고 고정 두 팀만
+      // 주면, "리그에 등록되지 않은 팀" 과 "비활성/삭제된 팀" 이 구분되지 않는다 — 둘 다
+      // 같은 코드(LEAGUE_TEAM_INVALID)로 거부되므로 앞 가드를 지워도 뒤 가드가 같은 응답을
+      // 내서 테스트가 통과한다(실측: 등록 검증을 지우는 변이가 green 이었다).
+      findMany: track('v1Team.findMany', async (args: { where: { id: { in: string[] } } }) =>
+        args.where.id.in.map((id) => KNOWN_TEAMS.get(id) ?? teamRow(id, `${id} 팀`, [`${id}-m1`, `${id}-m2`])),
+      ),
     },
     v1TeamMatch: {
       count: track('v1TeamMatch.count', async () => 0),

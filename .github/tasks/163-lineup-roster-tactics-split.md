@@ -1,5 +1,10 @@
 # Task 163 — 명단 제출과 선발 결정을 분리한다 (명단 → 출석, 선발 → 전술보드/kickoff)
 
+> **⚠️ 2026-09-02 정본 재조정** — `docs/design/competition-canonical-flow.md` §3 이 이 문서보다 우선한다. 바뀐 것:
+> **선후발 구분 자체가 없다**(명단 = 출전자). 따라서 **BE-2(kickoff 이 전술보드에서 `started` 를 해석)는 폐기**한다 — 전술보드는 팀 내부 도구로만 남고 kickoff 과 연결이 없다.
+> **BE-3 의 매핑은 `position='BENCH' → started=true, position=NULL`** 이다(후보를 후보로 옮기는 것이 아니라 후보 개념을 없앤다). `V1GameParticipant.started` 컬럼은 남기고 값을 `true` 로 고정한다. `V1GameResultParticipant.started` 는 출전자 전원 `true`, 어드민 결과 정정의 선발 체크박스는 제거. BE-1(검증 제거)과 FE(선발 토글·피치 탭 제거, `started` 미전송)는 유효하다.
+> 아래 본문 중 "전술보드에서 선발을 해석" 하는 서술은 이 재조정으로 무효다.
+
 ## Context
 
 지금 **명단 제출 한 화면**에 세 가지가 섞여 있다: 누가 오나(출석) · 누가 선발이고 누가 후보인가 · 피치 위 어디에 서나.

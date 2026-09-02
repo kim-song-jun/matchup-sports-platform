@@ -35,9 +35,69 @@ import type { V1TournamentListItem } from '@/types/api';
  */
 export default function TournamentsPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<TournamentsPageSkeleton />}>
       <TournamentsListContent />
     </Suspense>
+  );
+}
+
+/**
+ * Suspense 폴백 — **서버 HTML 에 실제로 들어가는 것**이라 로드된 화면과 같은 뼈대여야 한다.
+ *
+ * `fallback={null}` 이던 동안 SSR 본문이 통째로 비었다. useSearchParams 가 서버에서 suspend
+ * 되면 폴백이 곧 첫 HTML 인데 그게 null 이었다. 느린 기기(alpha 실측: 4G 400kbps · CPU 4배)는
+ * 하이드레이션까지 **7초 넘게 상단바·하단탭만 뜬 빈 화면**을 봤고, 하단 탭 전환은 그 빈
+ * 화면으로 슬라이드했다 — "로딩이 느리면 전환이 먼저 일어난다"는 지적의 실체다.
+ * /home·/teams·/matches 는 이미 SSR 스켈레톤이 있었고 /tournaments 와 /my 만 없었다.
+ *
+ * 구조를 로드된 화면과 맞추는 이유: 폴백과 실제가 다르면 하이드레이션 순간 그 차이만큼
+ * 화면이 밀린다(홈에서 같은 사고를 두 번 냈다). 프로모 캐러셀은 자체 로딩 상태를 그대로
+ * 쓰고, 이벤트 허브는 정적이라 실제 그대로, 목록은 이 페이지의 스켈레톤 목록을 쓴다.
+ */
+function TournamentsPageSkeleton() {
+  return (
+    <div className="tm-tournament-list" aria-busy="true">
+      <h1 className="sr-only">스포츠 대회</h1>
+      <TournamentPromoCarousel items={[]} loading />
+      <TournamentEventHubEntry />
+      <section aria-labelledby="tournament-list-heading" className="tm-tournament-list-section">
+        <SectionTitle title="대회 목록" />
+        <div id="tournament-list-heading" className="sr-only">진행 중인 대회 목록</div>
+        <CompetitionKindSegment active="all" />
+        <TournamentSkeletonList />
+      </section>
+    </div>
+  );
+}
+
+/** 이벤트 허브 진입 카드 — 정적이라 로드된 화면과 Suspense 폴백이 같은 것을 쓴다. */
+function TournamentEventHubEntry() {
+  return (
+  <div className="tm-tournament-event-hub-entry">
+    <Link
+      href="/events"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        background: 'var(--blue50)',
+        border: '1px solid var(--blue100)',
+        borderRadius: 'var(--radius-field)',
+        padding: '12px 16px',
+        textDecoration: 'none',
+      }}
+      aria-label="이벤트 허브 — 팀밋 주관 대회 캠페인 모아보기"
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <Sparkles size={18} style={{ color: 'var(--blue700)', flexShrink: 0 }} aria-hidden="true" />
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--blue700)' }}>이벤트 허브</div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 1 }}>팀밋 주관 대회 캠페인 모아보기</div>
+        </div>
+      </div>
+      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--blue700)', whiteSpace: 'nowrap' }}>바로가기 →</span>
+    </Link>
+  </div>
   );
 }
 
@@ -225,31 +285,7 @@ export function TournamentsListContent() {
       />
 
       {/* ── 이벤트 허브 배너 — 캠페인 발견 진입점 ── */}
-      <div className="tm-tournament-event-hub-entry">
-        <Link
-          href="/events"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            background: 'var(--blue50)',
-            border: '1px solid var(--blue100)',
-            borderRadius: 'var(--radius-field)',
-            padding: '12px 16px',
-            textDecoration: 'none',
-          }}
-          aria-label="이벤트 허브 — 팀밋 주관 대회 캠페인 모아보기"
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Sparkles size={18} style={{ color: 'var(--blue700)', flexShrink: 0 }} aria-hidden="true" />
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--blue700)' }}>이벤트 허브</div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 1 }}>팀밋 주관 대회 캠페인 모아보기</div>
-            </div>
-          </div>
-          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--blue700)', whiteSpace: 'nowrap' }}>바로가기 →</span>
-        </Link>
-      </div>
+      <TournamentEventHubEntry />
 
       {/* ── Tournament list (리스트 우선 — 대회 탭의 핵심) ── */}
       <section id="tournament-list" aria-labelledby="tournament-list-heading" className="tm-tournament-list-section">

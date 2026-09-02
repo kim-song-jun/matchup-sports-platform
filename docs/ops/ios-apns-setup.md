@@ -107,11 +107,17 @@
   버려 `delivered: 0`으로 보였다 — 그 날짜 이전에 저장된 브로드캐스트 재생 응답에는 `native`가
   없다. 최종 도달 여부는 여전히 기기에서 본다(위 스크립트가 그렇게 한다).
 
+- **백그라운드·완전 종료 상태에서도 도착한다.** 같은 스크립트의 2단계가 앱을 죽인 뒤
+  두 번째 발송을 기다린다 — 2026-09-02 실측에서 두 배너 모두 홈 화면에 떴다
+  (`.screenshots/ios-viewport-lock/push-delivery-banner-terminated.png`).
+
 ## 아직 검증되지 않은 것
 
 - 물리 기기에서의 수신 — TestFlight 빌드는 production 게이트웨이를 쓴다(아래 A안 참고,
-  `docs/design/apns-gateway-vs-deployment.md`).
-- background / terminated 상태 전달 동작.
+  `docs/design/apns-gateway-vs-deployment.md`). **주의:** 0.1.2 (4) 이전 TestFlight 빌드는
+  게이트웨이를 보고하지 않아 alpha 서버가 sandbox 로 보내고, Apple 이 `BadDeviceToken` 으로
+  답해 등록이 **폐기**된다 — 그 빌드에서는 어떤 설정으로도 알림이 오지 않는다. TestFlight 의
+  빌드 번호를 먼저 확인한다.
 
 ## 알림이 안 올 때 먼저 볼 것
 

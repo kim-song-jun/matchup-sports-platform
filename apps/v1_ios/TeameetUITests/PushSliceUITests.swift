@@ -137,17 +137,17 @@ final class PushSliceUITests: LiveWebHarnessCase {
         attach("05-app-still-usable")
     }
 
-    /// Finds the banner SpringBoard is showing.
+    /// Finds the banner SpringBoard is showing for a notification carrying `text`.
     ///
     /// Its identifier is not stable across iOS versions, so the text of the notification is
-    /// the reliable handle: it is what the reader sees, and it is what the payload set.
-    private func waitForNotificationBanner(timeout: TimeInterval) -> XCUIElement? {
-        let carriesOurTitle = NSPredicate(format: "label CONTAINS %@", "문의에 답변")
+    /// the reliable handle: it is what the reader sees, and it is what the payload set. Only
+    /// the text is trusted once more than one notification can be on screen — an earlier
+    /// banner still showing must not count as the one being waited for.
+    private func waitForNotificationBanner(containing text: String, timeout: TimeInterval) -> XCUIElement? {
+        let carriesText = NSPredicate(format: "label CONTAINS %@", text)
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
-            let byIdentifier = springboard.otherElements["NotificationShortLookView"]
-            if byIdentifier.exists { return byIdentifier }
-            let byText = springboard.descendants(matching: .any).matching(carriesOurTitle).firstMatch
+            let byText = springboard.descendants(matching: .any).matching(carriesText).firstMatch
             if byText.exists { return byText }
             _ = springboard.otherElements.firstMatch.waitForExistence(timeout: 2)
         }
@@ -253,7 +253,7 @@ final class PushSliceUITests: LiveWebHarnessCase {
         // foreground presentation decision.
         XCUIDevice.shared.press(.home)
 
-        guard let banner = waitForNotificationBanner(timeout: 180) else {
+        guard let banner = waitForNotificationBanner(containing: "문의에 답변", timeout: 180) else {
             attach("06-no-banner")
             attachSpringboard("06-no-banner-tree")
             return XCTFail("no notification banner arrived within the window")
@@ -312,16 +312,26 @@ final class PushSliceUITests: LiveWebHarnessCase {
 
         // Backgrounded, so what arrives is a banner rather than a foreground decision.
         XCUIDevice.shared.press(.home)
-        let carriesTitle = NSPredicate(format: "label CONTAINS %@", title)
-        let bannerDeadline = Date().addingTimeInterval(240)
-        var banner: XCUIElement?
-        while Date() < bannerDeadline, banner == nil {
-            let byText = springboard.descendants(matching: .any).matching(carriesTitle).firstMatch
-            if byText.exists { banner = byText; break }
-            _ = springboard.otherElements.firstMatch.waitForExistence(timeout: 3)
-        }
+        let banner = waitForNotificationBanner(containing: title, timeout: 240)
         attach(banner == nil ? "14-no-banner" : "14-banner")
         attachSpringboard("14-springboard-tree")
         XCTAssertNotNil(banner, "no server-sent notification reached this device within the window")
+
+        // Terminated, not merely backgrounded. Alert notifications are the OS's to show
+        // whether or not the app is running — but "whether" is what was still unmeasured,
+        // and a shell whose registration somehow depended on a live process would look fine
+        // right up to here. The app is killed, the runner is told to send again under a
+        // second title, and that banner has to arrive with no process of ours alive.
+        guard let terminatedTitle = ProcessInfo.processInfo.environment["TEAMEET_UITEST_TERMINATED_BANNER_TITLE"],
+              !terminatedTitle.isEmpty else { return }
+        app.terminate()
+        if let ready = ProcessInfo.processInfo.environment["TEAMEET_UITEST_READY_FILE"], !ready.isEmpty {
+            FileManager.default.createFile(atPath: ready + ".terminated", contents: Data())
+        }
+        let terminatedBanner = waitForNotificationBanner(containing: terminatedTitle, timeout: 240)
+        attach(terminatedBanner == nil ? "15-no-banner-terminated" : "15-banner-terminated")
+        XCTAssertNotNil(
+            terminatedBanner,
+            "no server-sent notification reached this device while the app was terminated")
     }
 }

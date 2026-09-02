@@ -18,6 +18,7 @@ Emit one structured Pino event for authenticated state-changing HTTP requests on
 - Included methods: `POST`, `PUT`, `PATCH`, `DELETE`
 - Excluded: reads, anonymous requests, admin/operation paths already covered by durable audits, and high-volume/noisy auth, chat, notification, upload, verification, and client-log paths
 - Stored data: event name, hashed actor ID, method, route template, outcome, status code, duration, request ID
+- Logger source: the Pino root logger, not the request-scoped child logger, so automatic request headers and IP metadata cannot be attached to this event
 - Never stored: request/response bodies, query strings, headers, cookies, tokens, email, phone, raw user ID, or concrete route parameter values
 - Persistence: existing rotating Docker JSON logs only (`10m` 횞 `5`); no DB table, migration, queue, analytics vendor, or new paid service
 
@@ -38,3 +39,4 @@ Emit one structured Pino event for authenticated state-changing HTTP requests on
 - 2026-09-02: Rebased the implementation onto fresh `origin/dev` in an isolated Task 162 worktree; focused Jest result: 1 suite, 10 tests passed, including the guarantee that a logger failure cannot break the mutation.
 - 2026-09-02: `tsc --noEmit` passed. The combined lint command then hit Windows `find.exe` incompatibility, so `v1-surface-check.mjs` was rerun under Git Bash and passed (498 files; all baselines unchanged).
 - 2026-09-02: Added the required `v1_api: patch` changeset. No Prisma schema, migration, DB query, or paid service was added.
+- 2026-09-02: ALPHA runtime verification found that the first implementation's request-scoped Pino child automatically appended request headers and IP metadata. Switched this event to the documented Pino root logger and added an exact allowlist assertion before redeploying.

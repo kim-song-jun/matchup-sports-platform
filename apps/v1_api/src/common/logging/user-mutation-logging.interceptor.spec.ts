@@ -1,5 +1,6 @@
 import { CallHandler, ExecutionContext, HttpException } from '@nestjs/common';
 import { createHash } from 'crypto';
+import { PinoLogger } from 'nestjs-pino';
 import { firstValueFrom, Observable, of, throwError } from 'rxjs';
 import { UserMutationLoggingInterceptor } from './user-mutation-logging.interceptor';
 
@@ -7,9 +8,25 @@ const USER_ID = 'ab200000-0000-4000-8000-000000000001';
 
 describe(UserMutationLoggingInterceptor.name, () => {
   const logger = { info: jest.fn(), warn: jest.fn() };
-  const interceptor = new UserMutationLoggingInterceptor(logger as never);
+  const interceptor = new UserMutationLoggingInterceptor();
+  const originalRootLogger = PinoLogger.root;
 
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    Object.defineProperty(PinoLogger, 'root', {
+      configurable: true,
+      value: logger,
+      writable: true,
+    });
+  });
+
+  afterAll(() => {
+    Object.defineProperty(PinoLogger, 'root', {
+      configurable: true,
+      value: originalRootLogger,
+      writable: true,
+    });
+  });
 
   it('logs one compact event for an authenticated mutation', async () => {
     const context = httpContext({
@@ -29,6 +46,7 @@ describe(UserMutationLoggingInterceptor.name, () => {
     expect(logger.info).toHaveBeenCalledWith(
       expect.objectContaining({
         event: 'user_mutation',
+        context: UserMutationLoggingInterceptor.name,
         actorUserIdHash: createHash('sha256').update(USER_ID).digest('hex').slice(0, 24),
         method: 'PATCH',
         route: '/api/v1/teams/:teamId',
@@ -40,6 +58,19 @@ describe(UserMutationLoggingInterceptor.name, () => {
     );
 
     const payload = logger.info.mock.calls[0][0];
+    expect(Object.keys(payload).sort()).toEqual(
+      [
+        'actorUserIdHash',
+        'context',
+        'durationMs',
+        'event',
+        'method',
+        'outcome',
+        'requestId',
+        'route',
+        'statusCode',
+      ].sort(),
+    );
     expect(JSON.stringify(payload)).not.toContain(USER_ID);
     expect(JSON.stringify(payload)).not.toContain('team-secret');
     expect(JSON.stringify(payload)).not.toContain('hidden@example.com');
@@ -63,6 +94,7 @@ describe(UserMutationLoggingInterceptor.name, () => {
     expect(logger.warn).toHaveBeenCalledWith(
       expect.objectContaining({
         event: 'user_mutation',
+        context: UserMutationLoggingInterceptor.name,
         method: 'DELETE',
         route: '/api/v1/reviews/:reviewId',
         outcome: 'failure',

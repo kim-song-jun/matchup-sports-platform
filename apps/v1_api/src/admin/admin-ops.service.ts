@@ -74,6 +74,24 @@ export interface ManualPushSendResult {
     failed: number;
     /** VAPID 미설정으로 웹 푸시가 꺼져 있으면 true. */
     disabled: boolean;
+    /**
+     * 앱 기기(APNs / FCM) 쪽 결과. 웹과 **합치지 않고 나란히** 둔다 — 합치면 폰이 받았다는
+     * 사실이 깨진 브라우저 구독을 가린다.
+     *
+     * 이 필드가 없던 동안 `sendToUser` 가 돌려주던 native 요약은 여기서 버려졌고, 앱 기기만
+     * 가진 사용자에게 보낸 발송이 운영 화면에 "구독 0건 · 나가지 않음" 으로 찍혔다
+     * (2026-09-02 alpha 실측: 시뮬레이터에 배너가 도착했는데 응답은 delivered 0).
+     */
+    native: {
+      /** 수신자들에게 등록돼 있던 활성 기기 수 합계. */
+      devices: number;
+      /** APNs / FCM 이 접수한 수. */
+      delivered: number;
+      /** 전송 실패 수(영구·일시 모두). */
+      failed: number;
+      /** 앱 푸시 어댑터가 하나도 설정돼 있지 않으면 true. */
+      disabled: boolean;
+    };
   };
 }
 
@@ -517,14 +535,27 @@ export class AdminOpsService {
 }
 
 function emptyPushTally(): ManualPushSendResult['push'] {
-  return { subscriptions: 0, delivered: 0, failed: 0, disabled: false };
+  return {
+    subscriptions: 0,
+    delivered: 0,
+    failed: 0,
+    disabled: false,
+    native: { devices: 0, delivered: 0, failed: 0, disabled: false },
+  };
 }
 
-/** 수신자별 푸시 결과를 누적한다. disabled는 한 번이라도 꺼져 있었다면 true로 남긴다. */
+/**
+ * 수신자별 푸시 결과를 누적한다. disabled는 한 번이라도 꺼져 있었다면 true로 남긴다.
+ * 웹과 앱은 각자의 칸에 더한다 — 어느 한쪽이 0이어도 다른 쪽은 갔을 수 있다.
+ */
 function addPushTally(tally: ManualPushSendResult['push'], summary: PushDeliverySummary | null): void {
   if (!summary) return;
   tally.subscriptions += summary.subscriptions;
   tally.delivered += summary.delivered;
   tally.failed += summary.failed;
   if (summary.disabled) tally.disabled = true;
+  tally.native.devices += summary.native.devices;
+  tally.native.delivered += summary.native.delivered;
+  tally.native.failed += summary.native.failed;
+  if (summary.native.disabled) tally.native.disabled = true;
 }

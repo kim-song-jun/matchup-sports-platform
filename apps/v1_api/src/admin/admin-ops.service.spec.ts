@@ -34,7 +34,7 @@ describe('AdminOpsService', () => {
   };
   const adminContext = { logAdminAction: jest.fn().mockResolvedValue({ actionLogId: 'log-1', statusChangeLogId: null }) };
   const realtimeGateway = { emitToUser: jest.fn() };
-  const webPushService = { sendToUser: jest.fn().mockResolvedValue({ subscriptions: 1, delivered: 1, failed: 0, disabled: false }) };
+  const webPushService = { sendToUser: jest.fn().mockResolvedValue({ subscriptions: 1, delivered: 1, failed: 0, disabled: false, native: { devices: 0, delivered: 0, failed: 0, disabled: false } }) };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -42,7 +42,7 @@ describe('AdminOpsService', () => {
     // same mock model object so individual model-mock assertions still work.
     prisma.$transaction.mockImplementation((cb: (tx: typeof prisma) => Promise<unknown>) => cb(prisma));
     adminContext.logAdminAction.mockResolvedValue({ actionLogId: 'log-1', statusChangeLogId: null });
-    webPushService.sendToUser.mockResolvedValue({ subscriptions: 1, delivered: 1, failed: 0, disabled: false });
+    webPushService.sendToUser.mockResolvedValue({ subscriptions: 1, delivered: 1, failed: 0, disabled: false, native: { devices: 0, delivered: 0, failed: 0, disabled: false } });
     prisma.v1Notification.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
       Promise.resolve({ id: 'notif-1', ...data }),
     );
@@ -261,7 +261,7 @@ describe('AdminOpsService', () => {
         admin,
       );
 
-      expect(result).toEqual({ sent: 1, skipped: 0, failed: 0, push: { subscriptions: 1, delivered: 1, failed: 0, disabled: false } });
+      expect(result).toEqual({ sent: 1, skipped: 0, failed: 0, push: { subscriptions: 1, delivered: 1, failed: 0, disabled: false, native: { devices: 0, delivered: 0, failed: 0, disabled: false } } });
       expect(prisma.v1Notification.create).toHaveBeenCalledWith({
         data: {
           recipientUserId: 'user-1',
@@ -305,7 +305,7 @@ describe('AdminOpsService', () => {
 
       const result = await service.sendManualPush({ target: 'user', userId: 'user-1', title: 'hi' }, admin);
 
-      expect(result).toEqual({ sent: 0, skipped: 1, failed: 0, push: { subscriptions: 0, delivered: 0, failed: 0, disabled: false } });
+      expect(result).toEqual({ sent: 0, skipped: 1, failed: 0, push: { subscriptions: 0, delivered: 0, failed: 0, disabled: false, native: { devices: 0, delivered: 0, failed: 0, disabled: false } } });
       expect(prisma.v1Notification.create).not.toHaveBeenCalled();
     });
 
@@ -315,13 +315,13 @@ describe('AdminOpsService', () => {
 
       const result = await service.sendManualPush({ target: 'user', userId: 'user-1', title: 'hi' }, admin);
 
-      expect(result).toEqual({ sent: 1, skipped: 0, failed: 0, push: { subscriptions: 1, delivered: 1, failed: 0, disabled: false } });
+      expect(result).toEqual({ sent: 1, skipped: 0, failed: 0, push: { subscriptions: 1, delivered: 1, failed: 0, disabled: false, native: { devices: 0, delivered: 0, failed: 0, disabled: false } } });
     });
 
     it('같은 내용의 전체 발송이 최근에 이미 나갔으면 다시 보내지 않고 그 결과를 돌려준다', async () => {
       // 전체 발송은 되돌릴 수 없고 대상이 전 사용자다 — 더블 클릭 한 번이면 모두가 같은
       // 공지를 두 번 받는다. 확인 절차도 멱등 키도 없어서 그 사고가 그대로 가능했다.
-      const first = { sent: 2, skipped: 0, failed: 0, push: { subscriptions: 2, delivered: 2, failed: 0, disabled: false } };
+      const first = { sent: 2, skipped: 0, failed: 0, push: { subscriptions: 2, delivered: 2, failed: 0, disabled: false, native: { devices: 0, delivered: 0, failed: 0, disabled: false } } };
       prisma.v1IdempotencyRecord.findUnique.mockResolvedValueOnce({
         responseStatus: 200,
         responseBody: first,
@@ -339,7 +339,7 @@ describe('AdminOpsService', () => {
     it('기록이 만료됐으면 다시 보낸다', async () => {
       // 창이 지나면 같은 문구를 다시 보내는 것은 정상 조작이다 — 영구 차단이 아니다.
       prisma.v1IdempotencyRecord.findUnique.mockResolvedValueOnce({
-        responseBody: { sent: 1, skipped: 0, failed: 0, push: { subscriptions: 0, delivered: 0, failed: 0, disabled: false } },
+        responseBody: { sent: 1, skipped: 0, failed: 0, push: { subscriptions: 0, delivered: 0, failed: 0, disabled: false, native: { devices: 0, delivered: 0, failed: 0, disabled: false } } },
         expiresAt: new Date(Date.now() - 1),
       });
       prisma.v1User.findMany.mockResolvedValueOnce([{ id: 'user-1' }]);
@@ -409,7 +409,7 @@ describe('AdminOpsService', () => {
         orderBy: { id: 'asc' },
         select: { id: true },
       });
-      expect(result).toEqual({ sent: 2, skipped: 1, failed: 0, push: { subscriptions: 2, delivered: 2, failed: 0, disabled: false } });
+      expect(result).toEqual({ sent: 2, skipped: 1, failed: 0, push: { subscriptions: 2, delivered: 2, failed: 0, disabled: false, native: { devices: 0, delivered: 0, failed: 0, disabled: false } } });
       expect(prisma.v1Notification.create).toHaveBeenCalledTimes(2);
       expect(adminContext.logAdminAction).toHaveBeenCalledWith(
         admin,
@@ -423,6 +423,42 @@ describe('AdminOpsService', () => {
      * 남지 않았다(실제 alpha 에서 재현된 증상). 전체 공지는 푸시 구독 여부와
      * 무관하게 인앱 알림이 전원에게 생성돼야 한다.
      */
+    /**
+     * 회귀 방지. `sendToUser` 는 웹과 앱 결과를 나란히 돌려주는데 집계가 웹 칸만 옮겨 담아서,
+     * 앱 기기만 가진 사용자에게 보낸 발송이 운영 화면에 "구독 0건 · 나가지 않음" 으로 찍혔다
+     * (2026-09-02 alpha 실측: 시뮬레이터에 배너가 도착했는데 응답은 delivered 0).
+     */
+    it('reports an app-device delivery in its own tally instead of dropping it behind zero web subscriptions', async () => {
+      prisma.v1User.findUnique.mockResolvedValue({ id: 'user-1' });
+      prisma.v1NotificationPreference.findUnique.mockResolvedValue({ noticeEnabled: true });
+      webPushService.sendToUser.mockResolvedValueOnce({
+        subscriptions: 0, delivered: 0, failed: 0, disabled: false,
+        native: { devices: 1, delivered: 1, failed: 0, disabled: false },
+      });
+
+      const result = await service.sendManualPush({ target: 'user', userId: 'user-1', title: '앱 전용' }, admin);
+
+      expect(result.push).toEqual({
+        subscriptions: 0, delivered: 0, failed: 0, disabled: false,
+        native: { devices: 1, delivered: 1, failed: 0, disabled: false },
+      });
+    });
+
+    it('keeps the two channels apart across a broadcast and remembers a disabled app adapter', async () => {
+      prisma.v1User.findMany.mockResolvedValueOnce([{ id: 'user-1' }, { id: 'user-2' }]);
+      prisma.v1NotificationPreference.findUnique.mockResolvedValue({ noticeEnabled: true });
+      webPushService.sendToUser
+        .mockResolvedValueOnce({ subscriptions: 1, delivered: 1, failed: 0, disabled: false, native: { devices: 2, delivered: 1, failed: 1, disabled: false } })
+        .mockResolvedValueOnce({ subscriptions: 0, delivered: 0, failed: 0, disabled: false, native: { devices: 0, delivered: 0, failed: 0, disabled: true } });
+
+      const result = await service.sendManualPush({ target: 'broadcast', title: '전체 공지' }, admin);
+
+      expect(result.push).toEqual({
+        subscriptions: 1, delivered: 1, failed: 0, disabled: false,
+        native: { devices: 2, delivered: 1, failed: 1, disabled: true },
+      });
+    });
+
     it('still delivers in-app notifications to users who have no push subscription at all', async () => {
       prisma.v1User.findMany.mockResolvedValueOnce([{ id: 'user-1' }, { id: 'user-2' }]);
       prisma.v1NotificationPreference.findUnique.mockResolvedValue({ noticeEnabled: true });
@@ -431,7 +467,7 @@ describe('AdminOpsService', () => {
 
       const result = await service.sendManualPush({ target: 'broadcast', title: '전체 공지' }, admin);
 
-      expect(result).toEqual({ sent: 2, skipped: 0, failed: 0, push: { subscriptions: 2, delivered: 2, failed: 0, disabled: false } });
+      expect(result).toEqual({ sent: 2, skipped: 0, failed: 0, push: { subscriptions: 2, delivered: 2, failed: 0, disabled: false, native: { devices: 0, delivered: 0, failed: 0, disabled: false } } });
       expect(prisma.v1Notification.create).toHaveBeenCalledTimes(2);
       // 대상 선정에 구독 테이블을 쓰지 않는다.
       expect(prisma.v1PushSubscription.findMany).not.toHaveBeenCalled();
@@ -445,7 +481,7 @@ describe('AdminOpsService', () => {
 
       const result = await service.sendManualPush({ target: 'broadcast', title: '전체 공지' }, admin);
 
-      expect(result).toEqual({ sent: 31, skipped: 0, failed: 0, push: { subscriptions: 31, delivered: 31, failed: 0, disabled: false } });
+      expect(result).toEqual({ sent: 31, skipped: 0, failed: 0, push: { subscriptions: 31, delivered: 31, failed: 0, disabled: false, native: { devices: 0, delivered: 0, failed: 0, disabled: false } } });
       expect(prisma.v1User.findMany).toHaveBeenNthCalledWith(2, {
         where: { accountStatus: 'active' },
         take: 30,
@@ -469,7 +505,7 @@ describe('AdminOpsService', () => {
 
       const result = await service.sendManualPush({ target: 'broadcast', title: '전체 공지' }, admin);
 
-      expect(result).toEqual({ sent: 1, skipped: 0, failed: 1, push: { subscriptions: 1, delivered: 1, failed: 0, disabled: false } });
+      expect(result).toEqual({ sent: 1, skipped: 0, failed: 1, push: { subscriptions: 1, delivered: 1, failed: 0, disabled: false, native: { devices: 0, delivered: 0, failed: 0, disabled: false } } });
     });
 
     it('does not fail the whole request when the audit log write fails after a successful send', async () => {
@@ -481,7 +517,7 @@ describe('AdminOpsService', () => {
 
       // The push was already sent — a failed audit log must not turn this into
       // an error response, or an operator could retry and duplicate-send.
-      expect(result).toEqual({ sent: 1, skipped: 0, failed: 0, push: { subscriptions: 1, delivered: 1, failed: 0, disabled: false } });
+      expect(result).toEqual({ sent: 1, skipped: 0, failed: 0, push: { subscriptions: 1, delivered: 1, failed: 0, disabled: false, native: { devices: 0, delivered: 0, failed: 0, disabled: false } } });
     });
   });
 });

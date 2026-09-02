@@ -102,8 +102,10 @@
   라우팅 자체가 미검증")은 틀렸다 — Apple silicon + macOS 13 이상에서는 시뮬레이터가 실제
   sandbox 토큰을 받고 실제 APNs 발송을 수신한다. ad-hoc 서명(`CODE_SIGN_IDENTITY=-`)으로
   `aps-environment`가 들어간 빌드여야 한다([`ios-release.md`](./ios-release.md)).
-- 어드민 수동 발송 응답의 `push` 집계는 **웹 구독만** 센다 — 앱 기기로 간 발송은 거기서
-  `delivered: 0`으로 보인다. 도달 여부는 기기에서 본다(위 스크립트가 그렇게 한다).
+- 어드민 수동 발송 응답의 `push` 집계는 웹 구독(`subscriptions`/`delivered`)과 앱 기기
+  (`native.devices`/`native.delivered`)를 **나란히** 준다. 2026-09-02 이전 응답은 앱 결과를
+  버려 `delivered: 0`으로 보였다 — 그 날짜 이전에 저장된 브로드캐스트 재생 응답에는 `native`가
+  없다. 최종 도달 여부는 여전히 기기에서 본다(위 스크립트가 그렇게 한다).
 
 ## 아직 검증되지 않은 것
 

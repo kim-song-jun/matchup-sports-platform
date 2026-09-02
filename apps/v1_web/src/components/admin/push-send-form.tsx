@@ -127,35 +127,67 @@ function ResultStat({ label, value, tone }: { label: string; value: number; tone
 }
 
 /**
- * 웹 푸시 도달 상황 한 줄 요약.
+ * 푸시 도달 상황 요약 — 웹 구독과 앱 기기를 **각각 한 줄씩**.
  *
  * "앱 알림 생성" 숫자만 보면 푸시까지 나간 것으로 읽히지만, 구독이 0건이면 푸시는
  * 한 건도 나가지 않는다(알림함에만 남는다). 그 상태를 숫자 대신 문장으로 밝힌다.
+ * 두 채널을 합치지 않는 이유: 합치면 폰이 받았다는 사실이 깨진 브라우저 구독을 가리고,
+ * 반대로 브라우저가 받았다는 사실이 앱 쪽 장애를 가린다.
  */
 function PushDeliveryNote({
   push,
 }: {
   push: NonNullable<V1AdminPushSendResult['push']>;
 }) {
-  const tone =
-    push.disabled || push.failed > 0
-      ? 'border-[var(--tint-red-border)] bg-[var(--red50)] text-[var(--red700)]'
+  const web = {
+    label: '웹 푸시',
+    tone: noteTone(push.disabled, push.failed, push.subscriptions),
+    message: push.disabled
+      ? '서버에 VAPID 키가 설정되지 않아 웹 푸시가 꺼져 있어요. 알림함에만 남았어요.'
       : push.subscriptions === 0
-        ? 'border-[var(--tint-orange-border)] bg-[var(--orange50)] text-[var(--orange700)]'
-        : 'border-[var(--tint-blue-border)] bg-[var(--blue50)] text-[var(--blue700)]';
-
-  const message = push.disabled
-    ? '서버에 VAPID 키가 설정되지 않아 웹 푸시가 꺼져 있어요. 알림함에만 남았어요.'
-    : push.subscriptions === 0
-      ? '브라우저 알림을 켠 사용자가 없어 푸시는 나가지 않았어요. 알림함에만 남았어요.'
-      : `구독 ${push.subscriptions}건 중 ${push.delivered}건 전송${push.failed > 0 ? `, ${push.failed}건 실패` : ''}`;
+        ? '브라우저 알림을 켠 사용자가 없어 푸시는 나가지 않았어요. 알림함에만 남았어요.'
+        : `구독 ${push.subscriptions}건 중 ${push.delivered}건 전송${push.failed > 0 ? `, ${push.failed}건 실패` : ''}`,
+  };
+  // 이 필드가 없던 서버(또는 그때 저장된 브로드캐스트 재생 응답)의 결과는 앱 줄을 그리지
+  // 않는다 — "앱 기기 0건" 이라고 쓰면 사실이 아닌 것을 사실처럼 말하게 된다.
+  const native = push.native
+    ? {
+        label: '앱 푸시',
+        tone: noteTone(push.native.disabled, push.native.failed, push.native.devices),
+        message: push.native.disabled
+          ? '서버에 APNs·FCM 키가 설정되지 않아 앱 푸시가 꺼져 있어요. 알림함에만 남았어요.'
+          : push.native.devices === 0
+            ? '앱에서 알림을 켠 기기가 없어 앱 푸시는 나가지 않았어요.'
+            : `기기 ${push.native.devices}대 중 ${push.native.delivered}대 전송${push.native.failed > 0 ? `, ${push.native.failed}대 실패` : ''}`,
+      }
+    : null;
 
   return (
-    <p className={`rounded-xl border px-3 py-3 text-[13px] leading-relaxed ${tone}`}>
-      <span className="font-semibold">웹 푸시 </span>
-      {message}
-    </p>
+    <div className="flex flex-col gap-2">
+      {[web, native].map((line) =>
+        line ? (
+          <p key={line.label} className={`rounded-xl border px-3 py-3 text-[13px] leading-relaxed ${line.tone}`}>
+            <span className="font-semibold">{line.label} </span>
+            {line.message}
+          </p>
+        ) : null,
+      )}
+    </div>
   );
+}
+
+function noteTone(disabled: boolean, failed: number, targets: number): string {
+  if (disabled || failed > 0) return 'border-[var(--tint-red-border)] bg-[var(--red50)] text-[var(--red700)]';
+  if (targets === 0) return 'border-[var(--tint-orange-border)] bg-[var(--orange50)] text-[var(--orange700)]';
+  return 'border-[var(--tint-blue-border)] bg-[var(--blue50)] text-[var(--blue700)]';
+}
+
+
+/** 웹 구독과 앱 기기 어느 쪽으로도 푸시가 접수되지 않았는가. */
+function pushReachedNobody(push: NonNullable<V1AdminPushSendResult['push']>): boolean {
+  const webNowhere = push.disabled || push.subscriptions === 0;
+  const nativeNowhere = !push.native || push.native.disabled || push.native.devices === 0;
+  return webNowhere && nativeNowhere;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────
@@ -196,10 +228,11 @@ export function PushSendForm() {
       onSuccess: (data) => {
         setResult(data);
         // 푸시가 한 건도 안 나간 경우를 성공 토스트로 덮지 않는다 — 상세는 아래 결과 카드에 있다.
-        const pushWentNowhere = data.push ? data.push.disabled || data.push.subscriptions === 0 : false;
+        // 웹과 앱 어느 한쪽으로라도 나갔으면 "나가지 않았다" 가 아니다.
+        const pushWentNowhere = data.push ? pushReachedNobody(data.push) : false;
         showToast(
           `발송 완료 — 앱 알림 ${data.sent}건 · 스킵 ${data.skipped}건 · 실패 ${data.failed}건` +
-            (pushWentNowhere ? ' (웹 푸시는 나가지 않았어요)' : ''),
+            (pushWentNowhere ? ' (푸시는 나가지 않았어요)' : ''),
           // 토스트는 success/error 두 가지뿐이라, 푸시가 아무 데도 안 간 경우도
           // '성공'으로 흘려보내지 않도록 error 로 띄워 눈에 걸리게 한다.
           data.failed > 0 || pushWentNowhere ? 'error' : 'success',

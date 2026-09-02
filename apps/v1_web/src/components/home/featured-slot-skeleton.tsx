@@ -40,8 +40,8 @@ export function FeaturedSlotSkeleton({ eyebrow, title }: { eyebrow: string; titl
         <div className="tm-featured-content tm-featured-content-with-cta">
           <div className="tm-featured-copy">
             {/* 두 막대의 합(20 + 8 + 24 = 52px)은 실제 카드 copy 의 실측 높이에 맞춘 값이다. */}
-            <div className="tm-skeleton" style={{ height: 20, borderRadius: 6, width: '72%' }} />
-            <div className="tm-skeleton" style={{ height: 24, borderRadius: 6, width: '54%', marginTop: 8 }} />
+            <div className="tm-skeleton" style={{ height: 20, borderRadius: 'var(--radius-tight)', width: '72%' }} />
+            <div className="tm-skeleton" style={{ height: 24, borderRadius: 'var(--radius-tight)', width: '54%', marginTop: 8 }} />
           </div>
           {/* CTA 는 실제와 같은 박스 모델(tm-btn + tm-btn-sm + tm-featured-cta)을 그대로 써서
               높이(44px)가 버튼 토큰을 따라가게 하고, 색만 자리표시로 바꾼다. */}

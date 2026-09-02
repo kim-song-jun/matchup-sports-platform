@@ -148,8 +148,14 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
           </div>
 
           {/* Featured recommendation hero — 가로 캐러셀(스와이프) */}
+          {/* aria-busy: 두 슬롯 중 **하나라도** 자리표시를 그리고 있으면 로딩이다.
+              tournaments 만 보면, 대회 목록은 캐시돼 있고 홈 응답만 늦은 경우(추천 매치
+              자리표시가 떠 있는데 aria-busy 는 꺼진 상태)를 놓친다. */}
           {hasFeaturedContent ? (
-          <div className="tm-home-featured-block" aria-busy={tournaments.isPending || undefined}>
+          <div
+            className="tm-home-featured-block"
+            aria-busy={tournaments.isPending || model.statsLoading || undefined}
+          >
             <div style={{ marginBottom: 12 }}>
               <div className="tm-text-label">오늘의 추천</div>
               <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 2 }}>지금 눈여겨볼 매치·대회</div>

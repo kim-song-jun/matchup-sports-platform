@@ -44,6 +44,7 @@ import {
   useV1Settings,
   useV1TeamDetail,
   useV1TeamJoinApplications,
+  useV1TeamContactSummary,
   useV1TeamMembers,
   useV1Tournament,
   useV1PlayerCardHidden,
@@ -113,6 +114,8 @@ export function MyHomePageClient() {
   // 대부분의 사용자는 스태프가 아니다 — "대회 운영" 메뉴는 유효한 배정이 있을 때만 노출해야
   // 하므로(스코프 밖 사용자에게 안 보여야 함) 항상 조회는 하되, 프로필 로딩 후에만 호출한다.
   const staffAssignments = useV1MyTournamentStaffAssignments({ enabled: Boolean(profile.data) });
+  // "채팅" 메뉴 배지 — 내가 운영하는 팀들이 아직 답하지 않은 컨택 수.
+  const contactSummary = useV1TeamContactSummary({ enabled: Boolean(profile.data) });
 
   const model = useMemo(() => {
     if (!profile.data) {
@@ -143,6 +146,7 @@ export function MyHomePageClient() {
       hasPendingReview(pendingReviews.data),
       phoneVerified,
       staffAssignments.data?.items.length ?? 0,
+      contactSummary.data?.pendingInbound ?? 0,
     );
   }, [
     profile.data,
@@ -152,6 +156,7 @@ export function MyHomePageClient() {
     pendingReviews.data,
     phoneVerified,
     staffAssignments.data,
+    contactSummary.data,
   ]);
 
   if (profile.isError) {
@@ -2339,6 +2344,7 @@ function toMyHomeModel(
   hasPendingReviews?: boolean,
   phoneVerified?: boolean,
   staffTournamentCount = 0,
+  pendingContactCount = 0,
 ): MyHomeViewModel {
   const nickname = profile.profile.nickname?.trim() || profile.profile.displayName;
   const totalMannerScore = activitySummary?.totals.mannerScore ?? profile.reputation.mannerScore;
@@ -2357,6 +2363,8 @@ function toMyHomeModel(
     });
   }
   const communitySection = sections.find((section) => section.title === '커뮤니티');
+  const chatItem = communitySection?.items.find((item) => item.href === '/chat');
+  if (chatItem && pendingContactCount > 0) chatItem.badge = pendingContactCount;
   if (communitySection && !communitySection.items.some((item) => item.href === '/my/reviews')) {
     communitySection.items.push({
       label: '리뷰',

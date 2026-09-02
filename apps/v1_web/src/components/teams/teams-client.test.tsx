@@ -17,6 +17,7 @@ const teamApiMocks = vi.hoisted(() => ({
   useV1LeagueMatches: vi.fn(),
   useV1TeamMembers: vi.fn(),
   useV1MyTeams: vi.fn(() => ({ data: undefined })),
+  useV1TeamContactSummary: vi.fn(() => ({ data: undefined })),
   useV1TeamJoinApplications: vi.fn(),
   useV1ChangeTeamMembershipRole: vi.fn(),
   useV1RemoveTeamMembership: vi.fn(),
@@ -303,6 +304,24 @@ describe('TeamDetailPageClient — 주요 멤버 미리보기', () => {
     teamApiMocks.useV1WithdrawTeamJoinApplication.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
     teamApiMocks.useV1ResolveChatRoom.mockReturnValue({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false });
     teamApiMocks.useV1TeamMatches.mockReturnValue({ data: { items: [] }, isLoading: false });
+  });
+
+  it('운영진이면 운영 메뉴에 "받은 컨택" 행이 팀컨택 필터 채팅 목록으로 연결되고 대기 건수가 배지로 붙는다', () => {
+    teamApiMocks.useV1TeamDetail.mockReturnValue({
+      data: baseTeamDetail({ viewer: { role: 'owner', membershipId: 'mem-owner', joinState: 'member', canRequestJoin: false, disabledReason: null, manageRoute: null } }),
+      isError: false,
+    });
+    teamApiMocks.useV1TeamContactSummary.mockReturnValue({
+      data: { pendingInbound: 3, byTeam: [{ teamId: 'team-1', pendingInbound: 2 }, { teamId: 'team-9', pendingInbound: 1 }] },
+    });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    const links = screen.getAllByRole('link', { name: /받은 컨택/ });
+    expect(links[0]).toHaveAttribute('href', '/chat?category=team_contact');
+    // 이 팀(team-1)의 대기 건수만 배지로 — 다른 팀 건은 섞지 않는다.
+    expect(screen.getAllByLabelText('답장을 기다리는 컨택 2건').length).toBeGreaterThan(0);
+    expect(screen.queryByLabelText('답장을 기다리는 컨택 3건')).not.toBeInTheDocument();
   });
 
   it('총원이 미리보기(8명)보다 많으면 정확한 남은 인원 수로 "+ n명 더보기" CTA가 뜨고 전체 멤버 목록으로 연결된다', () => {

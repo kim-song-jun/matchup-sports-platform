@@ -25,6 +25,8 @@ export type MyMenuItem = {
   sub: string;
   href: string;
   icon: string;
+  /** 라벨 옆 숫자 배지(예: 답장을 기다리는 컨택 수). 0 이거나 없으면 그리지 않는다. */
+  badge?: number;
 };
 
 export type MyMenuSection = {

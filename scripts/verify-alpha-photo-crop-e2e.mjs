@@ -4,7 +4,6 @@
  *  자격증명은 환경변수로만(ALPHA_PASSWORD). 대상 계정: player06(E2E 전용). */
 import { chromium } from 'playwright';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { execFileSync } from 'node:child_process';
 
 const BASE = process.env.ALPHA_BASE ?? 'https://alpha.teameet.co.kr';
 const PW = process.env.ALPHA_PASSWORD;
@@ -69,6 +68,9 @@ console.log('① 업로드 → 크롭 → 저장 (390)');
   const uploadBody = await uploadRes.json();
   const uploadedUrl = uploadBody.data?.urls?.[0];
   console.log('  업로드 응답', uploadRes.status(), uploadedUrl);
+  if (typeof uploadedUrl !== 'string' || !uploadedUrl.startsWith('/uploads/')) {
+    throw new Error(`업로드 응답에 /uploads URL 이 없다: ${JSON.stringify(uploadBody).slice(0, 300)}`);
+  }
   await dialog.waitFor({ state: 'detached', timeout: 10000 });
   await page.screenshot({ path: `${OUT}/profile-edit-after-crop-390.png` });
   const [patchRes] = await Promise.all([
@@ -77,15 +79,19 @@ console.log('① 업로드 → 크롭 → 저장 (390)');
   ]);
   const patched = await patchRes.json();
   console.log('  저장 응답', patchRes.status(), patched.data?.profile?.profileImageUrl, 'realName=', patched.data?.profile?.realName, 'birthDate=', patched.data?.profile?.birthDate);
-  await ctx.close();
-
-  // 저장본 검사: 정사각 768 인지 + 캐시 헤더
+  // 저장본 검사: 정사각 768 인지 + 캐시 헤더. 크기는 브라우저가 디코드한 naturalWidth 로 본다(OS 의존 없음).
   const img = await fetch(`${BASE}${uploadedUrl}`);
   const buf = Buffer.from(await img.arrayBuffer());
   await writeFile(`${OUT}/saved-profile-photo${uploadedUrl.slice(uploadedUrl.lastIndexOf('.'))}`, buf);
   console.log('  저장 파일', img.headers.get('content-type'), buf.length, 'bytes; cache-control:', img.headers.get('cache-control'));
-  const dims = execFileSync('sips', ['-g', 'pixelWidth', '-g', 'pixelHeight', `${OUT}/saved-profile-photo${uploadedUrl.slice(uploadedUrl.lastIndexOf('.'))}`]).toString();
-  console.log('  저장본 크기', dims.split('\n').filter((l) => l.includes('pixel')).map((l) => l.trim()).join(' / '));
+  const dims = await page.evaluate(async (url) => {
+    const el = new Image();
+    await new Promise((resolve, reject) => { el.onload = resolve; el.onerror = () => reject(new Error('저장본 디코드 실패')); el.src = url; });
+    return { width: el.naturalWidth, height: el.naturalHeight };
+  }, `${BASE}${uploadedUrl}`);
+  console.log('  저장본 크기', `${dims.width}x${dims.height}`);
+  if (dims.width !== 768 || dims.height !== 768) throw new Error(`저장본이 768² 가 아니다: ${dims.width}x${dims.height}`);
+  await ctx.close();
 }
 
 // ② 카드·설정·크롭 모달 갤러리 + next/image 실측

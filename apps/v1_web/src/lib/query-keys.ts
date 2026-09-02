@@ -43,6 +43,8 @@ export const v1Keys = {
    */
   teamContactsAll: (teamId: string) => [...v1Keys.team(teamId), 'contacts'] as const,
   teamContact: (contactId: string) => [...v1Keys.all, 'team-contacts', contactId] as const,
+  /** 마이 메뉴·팀 관리 메뉴 배지용 대기 컨택 요약(`GET /me/team-contacts/summary`). */
+  teamContactSummary: () => [...v1Keys.all, 'me', 'team-contacts', 'summary'] as const,
   /**
    * 차단 목록 — 필터 인자가 없으므로 `teamContacts()` 와 달리 별도 `...All` 변형이
    * 필요 없다. 이 키 자체가 prefix match 로 무효화된다.

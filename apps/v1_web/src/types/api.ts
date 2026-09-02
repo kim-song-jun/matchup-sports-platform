@@ -1806,11 +1806,26 @@ export type V1ReviewReceivedSummaryResponse = {
   availableMonths: string[];
 };
 
+/**
+ * 컨택 방의 상태 블록("팀 컨택의 채팅 흡수" 스펙 §5). 컨택 방이 아니면 null.
+ * `status` 는 만료를 반영한 표시값이고, `mySide` 는 호출자가 받는 팀 운영진이면 'to'.
+ */
+export type V1ChatRoomTeamContact = {
+  contactId: string;
+  status: 'requested' | 'accepted' | 'declined' | 'withdrawn' | 'expired';
+  expiresAt: string;
+  declineReason: string | null;
+  mySide: 'from' | 'to';
+  fromTeam: { id: string; name: string };
+  toTeam: { id: string; name: string };
+};
+
 export type V1ChatRoom = {
   roomId: string;
   roomType: 'match' | 'team' | 'team_match' | 'team_contact';
   title: string;
   status: string;
+  teamContact: V1ChatRoomTeamContact | null;
   linkedTarget: {
     type: 'match' | 'team' | 'team_match' | 'team_contact' | null;
     id: string | null;
@@ -1849,6 +1864,7 @@ export type V1ChatRoomDetail = {
   roomType: 'match' | 'team' | 'team_match' | 'team_contact';
   status: string;
   title: string;
+  teamContact: V1ChatRoomTeamContact | null;
   linkedTarget: V1ChatRoom['linkedTarget'];
   me: {
     participantId: string | null;

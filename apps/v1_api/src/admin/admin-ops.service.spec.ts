@@ -305,7 +305,9 @@ describe('AdminOpsService', () => {
 
       const result = await service.sendManualPush({ target: 'user', userId: 'user-1', title: 'hi' }, admin);
 
-      expect(result).toEqual({ sent: 0, skipped: 1, failed: 0, push: { subscriptions: 0, delivered: 0, failed: 0, disabled: false, native: { devices: 0, delivered: 0, failed: 0, disabled: false } } });
+      // 아무에게도 보내지 않았으면 앱 기기 집계는 아예 없다 — 0 으로 적으면 집계한 것처럼 읽힌다.
+      expect(result).toEqual({ sent: 0, skipped: 1, failed: 0, push: { subscriptions: 0, delivered: 0, failed: 0, disabled: false } });
+      expect(result.push.native).toBeUndefined();
       expect(prisma.v1Notification.create).not.toHaveBeenCalled();
     });
 

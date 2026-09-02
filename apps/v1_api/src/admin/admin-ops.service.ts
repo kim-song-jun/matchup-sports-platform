@@ -538,14 +538,13 @@ export class AdminOpsService {
   }
 }
 
+/**
+ * `native` 는 비워 둔다 — 첫 수신자 결과가 더해질 때 생긴다. 한 명도 발송되지 않은
+ * 응답(전원 스킵)에 "앱 기기 0대" 를 적으면 집계하지 않은 것이 집계한 것처럼 보인다.
+ * 웹 칸은 예전부터 0 으로 내려가던 계약이라 그대로 둔다.
+ */
 function emptyPushTally(): ManualPushSendResult['push'] {
-  return {
-    subscriptions: 0,
-    delivered: 0,
-    failed: 0,
-    disabled: false,
-    native: { devices: 0, delivered: 0, failed: 0, disabled: false },
-  };
+  return { subscriptions: 0, delivered: 0, failed: 0, disabled: false };
 }
 
 /**

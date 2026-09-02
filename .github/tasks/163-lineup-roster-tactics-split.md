@@ -57,13 +57,14 @@
 - [ ] `start` 커맨드(SCHEDULED→LIVE 전이 트랜잭션 안)에 **선발 해석**을 넣는다:
   - [ ] `TeamTacticsBoardService.get` 으로 홈/원정 각 팀의 보드를 읽는다 (권한: 운영자 컨텍스트 — 팀 권한 검사 우회 필요, `team-lineup-access.ts` 확인).
   - [ ] 보드가 있으면: 보드 엔트리 ↔ 참가자를 **`userId` 우선, 없으면 `displayName`** 으로 매칭해 `started`·`goalkeeper`·`position`·`positionX/Y` 복사. 보드에 없는 명단원은 `started = false`.
-  - [ ] 보드가 없으면: 전원 `started = true`. 로그에 `LINEUP_FALLBACK_ALL_STARTED` 표식 남김 (나중에 얼마나 자주 타는지 세기 위해).
-  - [ ] **어느 경로든 인원·GK 검증은 하지 않는다.** `LINEUP_SIZE_INVALID`·`LINEUP_GOALKEEPER_INVALID` 코드와 `parseLineupLimits` 소비처를 전수 grep 해 dead 가 되면 삭제한다.
+  - [ ] 보드가 없거나 **엔트리 0건**이면: 전원 `started = true`. 로그에 `LINEUP_FALLBACK_ALL_STARTED` 표식을 남기되 **`reason=no_board` / `reason=empty_board` 로 가른다** — 동작은 같아도 얼마나 자주 타는지 세는 게 목적이라 합치면 못 읽는다.
+  - [ ] **어느 경로든 인원·GK 검증은 하지 않는다.** `LINEUP_SIZE_INVALID`·`LINEUP_GOALKEEPER_INVALID` **코드**는 두 저장 서비스에만 있어 dead 가 된다 → 삭제 (`competition-config.presets.ts:143` 의 주석 인용은 남겨도 된다 — grep 0 을 기대하지 마라). **`parseLineupLimits` 함수는 삭제하지 않는다** — 저장 경로 2곳의 호출만 제거한다. 전술보드(`team-tactics-board.service.ts:253`)·대회 관리자(`tournaments-admin.service.ts:231,570`)·config 파싱이 계속 쓴다(2026-09-02 전수 실측 6곳 중 4곳 생존).
 - [ ] `BENCH` 센티널 폐기:
   - [ ] 마이그레이션: `position = 'BENCH'` 인 `V1GameParticipant` 행을 `started = false, position = NULL` 로. **idempotent**(`WHERE position = 'BENCH'`).
   - [ ] `team-match-lineup.service.ts` 의 `BENCH_MARKER` 쓰기 경로 제거.
   - [ ] `TeamLineupHistoryService.list()` 의 소스별 분기 제거 — `started` 하나로.
   - [ ] `BENCH_MARKER` export 를 **전수 grep** 해 소비처 0 확인 후 삭제 (테스트만 남으면 dead — [[test-only-consumer-hides-dead-code]]).
+  - [ ] ⚠️ **`league-result-participants.ts:69` 의 `TEAM_MATCH_BENCH_POSITION = 'BENCH'` 복사본** — 리그 결과 입력이 이 관례로 후보를 가른다(주석: *"컬럼이 아니라 이 관례를 봐야 한다"*). 마이그레이션이 `position='BENCH'` 를 지우면 **이 판정이 근거를 잃어 전원 선발로 읽힌다.** `started` 컬럼을 읽도록 바꾸고 상수를 삭제한다. **이 파일은 작업 범위다.**
 - [ ] 교체(`substitution.ts`)·결과·공개 기록은 **변경 없음**을 테스트로 고정한다 — kickoff 이후의 `started` 가 예전과 같은 의미다.
 - [ ] 프론트 라인업 화면: 선발/후보 토글 UI 제거, `started` 를 보내지 않음, **피치 탭 줄 제거 + 팀장 전용 전술보드 링크 한 줄** (A안). `PitchFormationEditor` 라인업 쪽 소비처 제거 후 dead 여부 전수 grep.
 
@@ -98,7 +99,7 @@ Backend  ⟂  Frontend  ⟂  (Infra 없음)
 ## Acceptance Criteria
 
 - [ ] alpha 에서 시나리오 1·2·3·4 를 **운영 API 로 직접 만들어** 확인 (`scripts/verify-alpha-period-break.mjs` 패턴 — takeover 토큰은 Socket.IO 로만).
-- [ ] `git grep BENCH_MARKER` → 0건.
+- [ ] `git grep -n "'BENCH'" -- apps/v1_api/src apps/v1_web/src` → **0건** (주석 제외). ⚠️ 센티널 **이름**(`BENCH_MARKER`)이 아니라 **값**을 센다 — `league-result-participants.ts` 가 이름을 import 하지 않고 값을 복사해 갖고 있어서, 이름만 세면 0 인데 값이 살아 리그 결과가 조용히 틀린다(2026-09-02 실측).
 - [ ] 저장 경로에 `started` 를 보내도/안 보내도 200.
 - [ ] kickoff 후 `GET /tournaments/:id/matches/:fixtureId` 의 참가자 `started` 가 보드와 일치 (공개 API 가 ground truth).
 - [ ] 마이그레이션 idempotent — 두 번 돌려도 같은 결과.
@@ -125,6 +126,6 @@ Backend  ⟂  Frontend  ⟂  (Infra 없음)
 |---|---|---|---|
 | 1 | 전술보드 없으면? | **명단 전원 선발, 교체는 콘솔, 검증 없음** | 사용자 확정 2026-09-02 |
 | 2 | 보드 선발이 min~max 위반이면? | **막지 않는다** — kickoff 통과, 콘솔 교체로 조정 | 사용자 확정 2026-09-02 |
-| 3 | 보드는 있는데 엔트리 0건이면? | **fallback 과 동일 취급**(전원 선발) — "안 짠 것"과 구별할 이유가 없다 | 내 판단. 사용자 확인 필요 |
+| 3 | 보드는 있는데 엔트리 0건이면? | **fallback 과 동일 취급**(전원 선발). 로그 표식만 `reason=empty_board` 로 갈라 센다 | 마스터·피어 합의 2026-09-02. 동작은 사용자 확정 1 과 동일 |
 | 4 | 보드 매칭 키 | `userId` 우선, 없으면 `displayName` | 게스트는 userId 가 없다 |
 | 5 | 피치 탭 제거 후 라인업 화면 | **A안 확정** — 탭 줄 제거, 명단만 남김, 상단에 팀장 전용 한 줄 링크 *"선발·배치는 전술보드에서 →"* (`/teams/:id/tactics/:gameId`). 기존 명단 컴포넌트 그대로. | 사용자 확정 2026-09-02 (3안 중 A). Task 164 로 분리하지 않고 FE-2 에 포함 |

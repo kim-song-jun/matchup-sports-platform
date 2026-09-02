@@ -295,7 +295,8 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
   const model: TeamMatchDetailViewModel = {
     ...fallback,
     match: {
-      ...fallback.match,
+      // `...fallback.match` 스프레드를 걷어냈다 — 확장 필드까지 전부 아래에서 채우므로
+      // 목업이 남을 자리가 없다(남아 있으면 새 필드를 추가할 때 조용히 다시 샌다).
       ...toTeamMatch(query.data, fallback.match),
       // fallback.match.description/address는 로딩 스켈레톤(fallback 전체를 그대로 보여주는
       // 케이스)에서만 써야 하는 하드코딩 목업이다 — 실제 매치가 로드된 뒤 API가 값을 안 주면

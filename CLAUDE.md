@@ -286,6 +286,14 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 - **팀 자동 구성 (Task 71)**: ELO snake-draft 기반 균등 팀 배정 — `TeamBalancingService`가 `UserSportProfile.eloRating`을 ELO 내림차순 정렬 후 snake-draft (A-B-B-A-A-B-... 또는 A-B-C-C-B-A-... 다팀 snake)로 배분. Preview API로 dry-run 확인 후 확정 시 `$transaction`으로 원자 교체. Cold-start(`UserSportProfile` 없음) 참가자는 eloRating=1000 fallback. 알고리즘 설계 문서: `docs/design/task-71-team-balancing.md`
 - **팀 자동 구성 v2 hardening (Task 72)**: preview→compose 간 **participant churn 감지** 추가. `computeParticipantHash()`(SHA-256 of sorted userIds, `apps/api/src/matches/matches.service.ts`)가 preview 응답에 `participantHash` 필드를 포함하고, compose 호출 시 stale hash 감지 → **409 `PARTICIPANTS_CHANGED`**. 프론트는 자동 재-preview + "참가자가 변경되어 다시 계산했어요" 토스트. Preview 엔드포인트에 **호스트 단위 rate limit** 적용(`@Throttle limit=20/60s`, `HostThrottlerGuard`가 `req.user.id`로 트래킹, 초과 시 429 + `Retry-After`). Modal은 `previewHistory` FIFO cap=2로 직전 preview 비교·재사용 지원. 기존 팀 배정이 있는 매치의 재확정은 `ConfirmReplaceModal`(alertdialog role)로 명시적 "교체" 확인. 4팀 그리드는 `sm:grid-cols-2 xl:grid-cols-3` responsive.
 
+### 대회 · 리그 · 매치 — 정본 (2026-09-02 사용자 확정)
+
+**`docs/design/competition-canonical-flow.md` 가 정본이다.** 대회·정규 리그·팀 매치·명단·결과 확정·전적에 관한
+설계·구현·리뷰는 그 문서를 먼저 읽고, 충돌하는 다른 문서(태스크 문서 포함)보다 그 문서를 따른다. 요지:
+대회 아래 정규 대회/정규 리그 · 모든 경기는 팀 대 팀 매치(공식/친선) · 참가는 신청제, 명단은 등번호+이름 ·
+명단 = 출전자(선후발 없음, 롤링 종목은 교체 기록 없음) · 결과는 "결과 보내기 → 어드민 확인" 한 단계(이의 없음) ·
+팀 전적 전체/대회/리그/친선 + 개인 기록. 바꾸려면 그 문서의 결정 이력 표에 먼저 적는다.
+
 ### 팀 역할 기반 권한 (Phase 1-5 추가)
 
 팀 멤버는 `TeamMembership` 모델로 관리되며, 역할 계층은 `owner > manager > member`.

@@ -179,3 +179,17 @@ describe('추천 매치 슬롯 — 홈 응답이 늦어도 자리를 먼저 잡�
     expect(rail?.querySelectorAll('.tm-featured-skeleton')).toHaveLength(1);
   });
 });
+
+describe('섹션 자체가 사라지는 경로 — 로컬 캐시 복원 + 홈 응답 지연', () => {
+  it('대회가 캐시로 이미 도착(홍보 0건)하고 홈만 늦어도 섹션은 남아 있다', () => {
+    // 이게 빠지면 슬롯 안에서 자리를 잡아 봐야 소용없다 — hasFeaturedContent 가 false 라
+    // 섹션이 통째로 사라졌다가, 홈 응답이 도착하며 다시 삽입되면서 그대로 이동이 된다.
+    // 이 조합(대회 resolved + 홍보 0건 + 홈 pending)에서만 갈리므로 여기서만 잡힌다.
+    tournamentsMock.mockReturnValue({ data: [], isPending: false, isLoading: false, isError: false, refetch: vi.fn() });
+    homeMock.mockReturnValue({ data: undefined, isError: false, refetch: vi.fn() });
+    const { container } = renderHome();
+
+    expect(container.querySelector('.tm-home-featured-block')).toBeInTheDocument();
+    expect(container.querySelector('.tm-featured-skeleton')).toBeInTheDocument();
+  });
+});

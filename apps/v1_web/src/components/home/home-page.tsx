@@ -47,7 +47,16 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
   // 아예 없다가 하이드레이션(느린 기기에서 10초)이 끝나는 순간 통째로 나타나 아래를 밀었다
   // (alpha 실측: CLS 0.549 중 0.319 가 이 한 번의 등장이다).
   // isPending 은 서버에서도 true 이므로 슬롯이 첫 HTML 부터 자리를 잡는다.
-  const hasFeaturedContent = model.network || Boolean(model.featuredMatch) || tournaments.isPending || tournaments.isError || hasHomePromo;
+  // model.statsLoading(= 홈 응답 미도착)도 "아직 모름"이다. 이게 빠지면, 로컬 캐시 복원으로
+  // tournaments.isPending 이 이미 false 인 재방문에서 홍보 대회가 하나도 없으면 섹션 자체가
+  // 사라졌다가 홈 응답이 도착하며 통째로 삽입된다 — 슬롯 안에서 자리를 잡아 봐야 소용없다.
+  const hasFeaturedContent =
+    model.network ||
+    Boolean(model.featuredMatch) ||
+    tournaments.isPending ||
+    tournaments.isError ||
+    model.statsLoading ||
+    hasHomePromo;
   const hasRecommendedMatches = model.network || model.recommendedMatches.length > 0;
   const weatherPermission = model.weatherPermission ?? 'prompt';
   const weatherPermissionCopy = getWeatherPermissionCopy(weatherPermission);

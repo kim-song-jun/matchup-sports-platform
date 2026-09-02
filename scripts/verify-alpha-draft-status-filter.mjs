@@ -29,8 +29,22 @@
 const BASE = 'https://alpha.teameet.co.kr';
 const API = `${BASE}/api/v1`;
 
+/**
+ * ⚠️ **403/429 는 화면 결함이 아니라 "못 쟀다" 다** — 그 자리에서 실행을 끊는다.
+ * alpha 는 과한 연속 요청에 **전면 403** 을 1분간 건다. 그걸 표에 `❌ HTTP 403` 으로 적으면
+ * *"기능이 막혔다"* 로 읽히고, 이 하네스가 주석으로 선언한 ⚠️/❌ 분리를 스스로 어긴다.
+ * 한 요청이 403 이면 그 뒤 요청도 거의 다 403 이라 **그 실행의 판정 전체를 못 쓴다** —
+ * 남은 행을 마저 채워 표를 그리는 것이 오히려 위험하다.
+ */
+function assertMeasurable(res, path) {
+  if (res.status === 403 || res.status === 429) {
+    throw new Error(`HARNESS: ${path} → HTTP ${res.status} (rate limit) — 못 쟀다. 화면에 대해 판정하지 마라.`);
+  }
+}
+
 async function query(qs) {
   const res = await fetch(`${API}/tournaments?limit=50&${qs}`);
+  assertMeasurable(res, `/tournaments?${qs}`);
   if (!res.ok) return { status: res.status, items: null, kinds: null };
   const d = (await res.json()).data;
   const kinds = {};

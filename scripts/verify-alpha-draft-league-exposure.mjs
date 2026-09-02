@@ -29,8 +29,17 @@ async function json(path) {
   if (!res.ok) throw new Error(`GET ${path} → HTTP ${res.status}`);
   return (await res.json()).data;
 }
+/**
+ * ⚠️ **403/429 는 화면 결함이 아니라 "못 쟀다" 다** — 그 자리에서 실행을 끊는다.
+ * 이 함수의 반환값은 아래에서 `❌ 눌러도 안 열린다` · `❌ 순위가 404` 같은 **화면 판정**으로
+ * 쓰인다. rate limit 숫자를 그대로 흘리면 멀쩡한 화면이 결함으로 기록된다 — 이 하네스가
+ * 주석으로 선언한 ⚠️/❌ 분리를 스스로 어기는 자리다. throw 하면 exit 2(하네스 실패)로 간다.
+ */
 async function status(path) {
   const res = await fetch(`${API}${path}`);
+  if (res.status === 403 || res.status === 429) {
+    throw new Error(`HARNESS: ${path} → HTTP ${res.status} (rate limit) — 못 쟀다. 화면에 대해 판정하지 마라.`);
+  }
   return res.status;
 }
 async function servingCommit() {

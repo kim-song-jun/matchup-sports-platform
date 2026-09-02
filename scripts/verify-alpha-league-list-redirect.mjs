@@ -47,9 +47,11 @@ async function servingCommit() {
 /** 쿼리를 정렬해 비교 가능한 형태로 — 순서에 기대지 않는다. */
 function normalize(url) {
   const [path, qs] = url.replace(BASE, '').split('?');
+  // 키만으로 정렬하면 **같은 키가 여러 번** 나올 때(중복 쿼리) 비교가 입력 순서에 의존한다.
+  // 값까지 정렬해 완전히 결정적으로 만든다 — 비교 대상이 흔들리면 판정도 흔들린다.
   const q = [...new URLSearchParams(qs ?? '').entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
     .map(([k, v]) => `${k}=${v}`)
+    .sort((a, b) => a.localeCompare(b))
     .join('&');
   return q === '' ? path : `${path}?${q}`;
 }

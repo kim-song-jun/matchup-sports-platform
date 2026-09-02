@@ -10,7 +10,10 @@ const sha=(await fetch(B+'/landing',{method:'HEAD'})).headers.get('x-teameet-com
 const b=await chromium.launch();
 const rows=[];
 for (const w of [390,1440]) {
-  const p=await (await b.newContext({viewport:{width:w,height:900}})).newPage();
+  // context 를 폭마다 열고 **닫지 않으면** 반복 실행에서 쌓인다. 내가 띄운 것은 내가 닫는다.
+  const ctx=await b.newContext({viewport:{width:w,height:900}});
+  try {
+  const p=await ctx.newPage();
   await p.goto(B+'/matches?q=zzzqqq없는검색어',{waitUntil:'domcontentloaded',timeout:60000});
   await p.waitForTimeout(4000);
   rows.push({폭:w, ...await p.evaluate(()=>{
@@ -29,6 +32,7 @@ for (const w of [390,1440]) {
       overflow:Math.max(0,Math.round(sc.scrollHeight-sc.clientHeight)),
     };
   })});
+  } finally { await ctx.close(); }
   await new Promise(r=>setTimeout(r,2500));
 }
 await b.close();

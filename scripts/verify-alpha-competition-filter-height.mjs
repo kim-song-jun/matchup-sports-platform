@@ -98,7 +98,16 @@ async function main() {
         const res = await page.goto(`${BASE}/tournaments`, { waitUntil: 'domcontentloaded', timeout: 60_000 });
         const status = res?.status() ?? 0;
         if (status >= 400) {
-          rows.push({ 폭: w.key, HTTP: status, 필터높이: '-', 기준선: w.baseline, 구성: '-', 판정: status === 403 ? '❌ 403 rate limit (화면 결함 아님)' : `❌ HTTP ${status}` });
+          /**
+           * ⚠️ 403/429 는 **못 쟀다**(⚠️)이지 화면 결함(❌)이 아니다. 예전엔 `❌ 403 rate limit
+           * (화면 결함 아님)` 이라고 적었는데 — **글로는 아니라면서 기호는 ❌ 였다.** 그래서
+           * 실패 집계와 exit code 가 화면 결함과 같아졌다. 문장이 아니라 **기호가 판정한다.**
+           */
+          const measurable = status !== 403 && status !== 429;
+          rows.push({
+            폭: w.key, HTTP: status, 필터높이: '-', 기준선: w.baseline, 구성: '-',
+            판정: measurable ? `❌ HTTP ${status}` : `⚠️ HTTP ${status} (rate limit) — 못 쟀다`,
+          });
           continue;
         }
         await page.waitForTimeout(SETTLE_MS);

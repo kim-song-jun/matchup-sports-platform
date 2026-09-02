@@ -341,12 +341,20 @@ async function main() {
           rows.push({ 화면: t.label, 폭: w.key, HTTP: '-', 순위행: '-', 판정: `⚠️ 하네스 실패 — ${error.message}` });
           continue;
         }
+        /**
+         * ⚠️ **읽지 못한 것을 화면 결함으로 적지 않는다.** 예전엔 `note` 를 무조건 `❌` 로
+         * 감쌌는데, 그 note 에는 *"403 rate limit"* 이나 *"하네스가 판정할 수 없다"* 처럼
+         * **못 쟀다** 는 사연이 섞여 들어온다. 그러면 실패 집계와 exit code 가 진짜 화면
+         * 결함과 같아진다 — 이 하네스가 위에서 선언한 ⚠️/❌ 분리를 스스로 어기는 자리다.
+         * 판별은 note 문구가 아니라 **상태코드**로 한다(문구는 바뀌지만 403 은 안 바뀐다).
+         */
+        const unmeasurable = r.status === 403 || r.status === 429 || r.status === 0;
         rows.push({
           화면: t.label,
           폭: w.key,
           HTTP: r.status,
           순위행: r.read ? r.read.standingsRows : '-',
-          판정: r.read ? verdict(t.kind, r.read) : `❌ ${r.note}`,
+          판정: r.read ? verdict(t.kind, r.read) : unmeasurable ? `⚠️ ${r.note} — 못 쟀다` : `❌ ${r.note}`,
           파일: r.read ? file : '-',
         });
         await new Promise((resolve) => setTimeout(resolve, PACE_MS)); // 403 회피용 간격

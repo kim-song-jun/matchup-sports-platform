@@ -74,6 +74,21 @@ describe('data-nav-kind 선택자 형태 — 형태가 틀리면 조용히 발�
     }
   });
 
+  it('CSS 폴백은 VT 미지원 환경에서만 적용된다(이중 재생 방지)', () => {
+    // 선택자 형태를 고치기 전에는 폴백이 아무 데서도 안 돌았다. 고치고 나니 VT 지원
+    // 브라우저에서도 함께 돌아 VT 슬라이드와 이중으로 겹쳤다(alpha 실측: push 이동에서
+    // tm-page-fallback-push 와 -ua-view-transition-* 동시 발화). @supports 밖으로
+    // 빠져나오면 그 이중 재생이 되살아난다.
+    const gate = rulesOnly.match(/@supports\s+not\s*\(view-transition-name:[^)]*\)\s*\{[\s\S]*?\n\}/);
+
+    expect(gate).not.toBeNull();
+    expect(gate?.[0]).toContain('tm-page-fallback-push');
+    expect(gate?.[0]).toContain('tm-page-fallback-pop');
+    // 게이트 **밖**에 폴백이 남아 있으면 안 된다.
+    const outside = rulesOnly.replace(/@supports\s+not\s*\(view-transition-name:[^)]*\)\s*\{[\s\S]*?\n\}/, '');
+    expect(outside).not.toContain('tm-page-fallback-push var(');
+  });
+
   it('view-transition 의사요소는 :root 에 붙여 쓴다(공백 금지)', () => {
     // 최소 재현(Chromium): `:root[x] ::view-transition-old(y)` 는 UA 애니메이션을 못 끄고
     // (2건 재생), `:root[x]::view-transition-old(y)` 만 끈다(0건). 공백은 자손 결합자인데

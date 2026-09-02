@@ -46,7 +46,7 @@ export function toHomeModel(
   chatUnreadCount: number,
   weather: HomeViewModel['weather'] | null,
 ): HomeViewModel {
-  const recommendedMatches = normalizeMatches(home, fallback);
+  const recommendedMatches = normalizeMatches(home);
   const unreadCount = home.notifications?.unreadCount ?? 0;
   const viewerName = home.viewer?.authenticated ? home.viewer.displayName : null;
 
@@ -59,7 +59,7 @@ export function toHomeModel(
     hasNewNotification: unreadCount > 0,
     chatUnreadCount,
     stats: normalizeStats(home, fallback),
-    featuredMatch: normalizeFeaturedMatch(home, recommendedMatches, fallback),
+    featuredMatch: normalizeFeaturedMatch(home, recommendedMatches),
     recommendedMatches,
     quickActions: normalizeShortcuts(home.shortcuts, fallback.quickActions),
     weather: weather ?? EMPTY_WEATHER,
@@ -119,13 +119,15 @@ function normalizeStats(home: V1Home, fallback: HomeViewModel): HomeStats {
   };
 }
 
-function normalizeFeaturedMatch(home: V1Home, recommendedMatches: HomeMatchCard[], fallback: HomeViewModel): HomeMatchCard | null {
+function normalizeFeaturedMatch(home: V1Home, recommendedMatches: HomeMatchCard[]): HomeMatchCard | null {
   if (!home.featuredMatch) return recommendedMatches[0] ?? null;
 
+  // 목업(home.view-model.ts)의 featuredMatch 를 베이스로 쓰지 않는다 — 추천 목록이 비어 있으면
+  // 서버가 고른 실제 매치의 제목 위에 목업의 장소('상암월드컵경기장 보조구장')·종목 아이콘·
+  // 인원이 그대로 남았다. featuredMatch 응답 자체에는 장소·날짜·종목이 없으므로, 베이스가 될
+  // **실제** 추천 카드가 없으면 히어로를 지어내지 않고 아예 보여주지 않는다.
   const recommended =
-    recommendedMatches.find((match) => match.id === home.featuredMatch?.matchId) ??
-    recommendedMatches[0] ??
-    fallback.featuredMatch;
+    recommendedMatches.find((match) => match.id === home.featuredMatch?.matchId) ?? recommendedMatches[0];
 
   if (!recommended) return null;
 
@@ -139,15 +141,18 @@ function normalizeFeaturedMatch(home: V1Home, recommendedMatches: HomeMatchCard[
   };
 }
 
-function normalizeMatches(home: V1Home, fallback: HomeViewModel) {
+function normalizeMatches(home: V1Home) {
+  // 실제 추천 매치를 목업 카드 위에 얹지 않는다. 예전에는 index 로 짝지은 목업이 베이스가 돼
+  // API 가 안 준 칸(종목 아이콘, 장소, 참가 인원)에 **다른 매치의 값**이 남았다 —
+  // 실제로 홈 카드에 "18/22명" 같은 목업 인원이 그대로 보였다.
   const legacyMatches = Array.isArray(home.recommendedMatches) ? home.recommendedMatches : [];
   if (legacyMatches.length) {
-    return legacyMatches.map((match, index) => toHomeMatch(match, fallback.recommendedMatches[index] ?? fallback.featuredMatch));
+    return legacyMatches.map((match) => toHomeMatch(match));
   }
 
   const recommendations = Array.isArray(home.recommendations) ? home.recommendations : [];
   return recommendations.length
-    ? recommendations.map((match, index) => toHomeRecommendation(match, fallback.recommendedMatches[index] ?? fallback.featuredMatch))
+    ? recommendations.map((match) => toHomeRecommendation(match))
     : [];
 }
 
@@ -189,8 +194,8 @@ function normalizeShortcuts(shortcuts: V1HomeShortcut[] | undefined, fallback: H
   });
 }
 
-function toHomeRecommendation(match: V1HomeRecommendation, fallback: HomeMatchCard | null): HomeMatchCard {
-  const base = fallback ?? emptyMatchCard();
+function toHomeRecommendation(match: V1HomeRecommendation): HomeMatchCard {
+  const base = emptyMatchCard();
   return {
     ...base,
     id: match.matchId,
@@ -205,11 +210,11 @@ function toHomeRecommendation(match: V1HomeRecommendation, fallback: HomeMatchCa
   };
 }
 
-function toHomeMatch(match: V1Match, fallback: HomeMatchCard | null): HomeMatchCard {
+function toHomeMatch(match: V1Match): HomeMatchCard {
   const capacity = parseCapacity(match.capacityText);
 
   return {
-    ...(fallback ?? emptyMatchCard()),
+    ...emptyMatchCard(),
     id: match.id,
     sportLabel: match.sportName,
     title: match.title,

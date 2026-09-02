@@ -236,6 +236,11 @@ type CardProps = {
   onPointerDown?: (event: PointerEvent<HTMLDivElement>) => void;
   onPointerUp?: (event: PointerEvent<HTMLDivElement>) => void;
   onPointerCancel?: (event: PointerEvent<HTMLDivElement>) => void;
+  /** 로딩 중인 영역임을 보조기기에 알린다. **명시적으로 받아서 넘겨야 한다** —
+   * JSX 는 하이픈이 든 속성명(aria-, data- 계열)을 초과 프로퍼티 검사에서 면제하므로,
+   * 이 선언이 없으면 `<Card aria-busy>` 가 tsc 를 통과하고도 DOM 에 닿지 않는다.
+   * 실제로 두 곳(홈 채팅 로딩 카드·대회 히어로 스켈레톤)이 그렇게 죽어 있었다. */
+  'aria-busy'?: boolean | 'true' | 'false';
 };
 
 export function Card({
@@ -246,6 +251,7 @@ export function Card({
   onPointerDown,
   onPointerUp,
   onPointerCancel,
+  'aria-busy': ariaBusy,
 }: CardProps) {
   return (
     <div
@@ -254,6 +260,7 @@ export function Card({
       onPointerDown={onPointerDown}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
+      aria-busy={ariaBusy}
     >
       {children}
     </div>

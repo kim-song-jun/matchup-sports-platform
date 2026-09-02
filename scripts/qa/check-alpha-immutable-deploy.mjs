@@ -19,6 +19,7 @@ const rollbackWorkflowPath = '.github/workflows/rollback-alpha.yml';
 const provisioningPath = 'scripts/infra/provision-alpha-immutable-deploy.sh';
 const policyRendererPath = 'scripts/infra/render-alpha-immutable-deploy-policies.mjs';
 const runtimeSyncPath = 'scripts/release/sync-alpha-inquiry-slack-env.sh';
+const firebaseRuntimeSyncPath = 'scripts/release/sync-alpha-firebase-env.sh';
 const manifestBuilderPath = 'scripts/release/create-alpha-release-manifest.sh';
 const ssmDeployPath = 'scripts/release/deploy-alpha-via-ssm.sh';
 const rollbackBasePath = 'scripts/release/resolve-alpha-rollback-base.sh';
@@ -35,6 +36,7 @@ const sources = new Map([
   [provisioningPath, readRequiredFile(provisioningPath)],
   [policyRendererPath, readRequiredFile(policyRendererPath)],
   [runtimeSyncPath, readRequiredFile(runtimeSyncPath)],
+  [firebaseRuntimeSyncPath, readRequiredFile(firebaseRuntimeSyncPath)],
   [manifestBuilderPath, readRequiredFile(manifestBuilderPath)],
   [ssmDeployPath, readRequiredFile(ssmDeployPath)],
   [rollbackBasePath, readRequiredFile(rollbackBasePath)],
@@ -51,6 +53,22 @@ requirePatterns(workflowPath, [
   [/imageTag="sha-\$\{RELEASE_SHA\}"/, 'must resolve immutable SHA image tags'],
   [/create-alpha-release-manifest\.sh/, 'must create or reuse the immutable manifest'],
   [/deploy-alpha-via-ssm\.sh/, 'must delegate the pinned release to SSM'],
+  [/sync-alpha-firebase-env\.sh/, 'must restore Firebase Admin credentials before deployment'],
+]);
+
+requirePatterns(firebaseRuntimeSyncPath, [
+  [/\/teameet\/alpha\/env\/FIREBASE_ADMIN_JSON/, 'must use the persistent scoped Firebase SecureString'],
+  [/readlink -f/, 'must follow the deploy env symlink before writing'],
+  [/\/home\/ec2-user\/\.teameet-alpha-runtime\/\.env/, 'must pin the protected runtime env target'],
+  [/\.project_id/, 'must validate the Firebase project identity'],
+  [/teameet-alpha/, 'must require the dedicated Alpha Firebase project'],
+  [/openssl pkey -noout/, 'must parse the Firebase private key before writing'],
+  [/FIREBASE_PROJECT_ID FIREBASE_CLIENT_EMAIL FIREBASE_PRIVATE_KEY/, 'must install all Firebase Admin fields'],
+]);
+
+forbidPatterns(firebaseRuntimeSyncPath, [
+  [/aws ssm put-parameter/, 'deploy sync must not overwrite the persistent operator-managed Firebase key'],
+  [/cat "\$\{env_file\}"/, 'must never print the protected runtime env'],
 ]);
 
 forbidPatterns(workflowPath, [

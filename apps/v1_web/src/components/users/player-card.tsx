@@ -1,10 +1,11 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { CalendarCheck, Camera, Clock, HeartHandshake, Lock, Settings, Share2, Sparkles, Target, Zap } from 'lucide-react';
-import { cssUrl } from '@/lib/assets';
+import { publicAssetPath } from '@/lib/assets';
 import { josa } from '@/lib/korean';
 import type { V1PlayerCard, V1PlayerCardStat } from '@/types/api';
 
@@ -276,6 +277,13 @@ export function PlayerCard({
   const { left, right } = splitStats(card.stats);
   const [flipped, setFlipped] = useState(false);
   /**
+   * 도착한 사진의 URL. boolean 이 아니라 URL 을 기억하는 이유: 재크롭으로 URL 이 바뀌면 이전
+   * 사진의 "도착함"이 새 사진에 남아 페이드가 건너뛰어진다 -- URL 을 비교하면 리셋 effect 없이
+   * 새 URL 은 자연히 미도착 상태다.
+   */
+  const [loadedPhotoUrl, setLoadedPhotoUrl] = useState<string | null>(null);
+  const photoLoaded = profileImageUrl !== null && loadedPhotoUrl === profileImageUrl;
+  /**
    * 여정 면 (A안): 아직 한 경기도 안 뛰었고 열린 능력치도 없으면, 자물쇠 여섯 개의
    * 벽 대신 "시작하는 카드"를 그린다. 후기는 경기를 뛴 사람에게만 달리므로
    * 0경기 + 열림 0 조합이 곧 "완전 신규"다.
@@ -350,7 +358,20 @@ export function PlayerCard({
       ) : (
         <div className="tm-pcard-render" aria-hidden="true">
           {profileImageUrl ? (
-            <div className="tm-pcard-render-photo" style={{ backgroundImage: cssUrl(profileImageUrl) }} />
+            /* background-image div 가 아니라 next/image: 900×1200 원본 JPEG 를 138px 상자에
+               그대로 받던 것을 276px WebP/AVIF 로 줄여 받고(sizes), 이 카드는 페이지 최상단
+               LCP 후보라 미리 불러온다(priority). 도착 전까지는 투명이고 CSS 가 페이드시킨다 --
+               사진이 한 박자 늦게 "툭" 나타나던 팝인이 사라진다. */
+            <div className="tm-pcard-render-photo" data-loaded={photoLoaded ? 'true' : undefined}>
+              <Image
+                src={publicAssetPath(profileImageUrl)}
+                alt=""
+                fill
+                sizes="138px"
+                priority
+                onLoad={() => setLoadedPhotoUrl(profileImageUrl)}
+              />
+            </div>
           ) : (
             <div className="tm-pcard-render-img">{initial}</div>
           )}

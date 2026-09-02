@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   compressImageForUpload,
   compressImagesForUpload,
+  encodeCanvasToBlob,
   fitWithin,
   IMAGE_TOO_LARGE_MESSAGE,
   UPLOAD_IMAGE_MAX_BYTES,
@@ -163,5 +164,34 @@ describe('compressImagesForUpload', () => {
     );
 
     expect(results.map((file) => file.name)).toEqual(['small.jpg', 'big.webp']);
+  });
+});
+
+describe('encodeCanvasToBlob', () => {
+  function fakeCanvas(supported: Set<string>) {
+    const calls: string[] = [];
+    const canvas = {
+      toBlob(callback: (blob: Blob | null) => void, type?: string) {
+        calls.push(type ?? '');
+        // 브라우저는 지원하지 않는 형식을 요청받으면 PNG 로 조용히 대체한다(Safari 의 WebP).
+        const actual = type && supported.has(type) ? type : 'image/png';
+        callback(makeBlob(10, actual));
+      },
+    };
+    return { canvas, calls };
+  }
+
+  it('WebP 를 지원하는 브라우저는 WebP 한 번으로 끝난다', async () => {
+    const { canvas, calls } = fakeCanvas(new Set(['image/webp', 'image/jpeg']));
+    const blob = await encodeCanvasToBlob(canvas, 0.8);
+    expect(blob?.type).toBe('image/webp');
+    expect(calls).toEqual(['image/webp']);
+  });
+
+  it('WebP 요청이 PNG 로 대체되는 브라우저(Safari)는 JPEG 로 다시 인코딩한다', async () => {
+    const { canvas, calls } = fakeCanvas(new Set(['image/jpeg']));
+    const blob = await encodeCanvasToBlob(canvas, 0.8);
+    expect(blob?.type).toBe('image/jpeg');
+    expect(calls).toEqual(['image/webp', 'image/jpeg']);
   });
 });

@@ -1,6 +1,7 @@
 'use client';
 
 import { PreferredPositionPicker } from './preferred-position-picker';
+import { ProfilePhotoCropper } from './profile-photo-cropper';
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -360,6 +361,8 @@ export function ProfileEditPageClient() {
   const [birthDateDigits, setBirthDateDigits] = useState('');
   const [gender, setGender] = useState<'male' | 'female' | ''>('');
   const [profileImageUrl, setProfileImageUrl] = useState('');
+  /** 방금 고른 원본 -- 크롭 모달이 열려 있는 동안만 값이 있다. 업로드는 크롭 확인 뒤에 한다. */
+  const [cropSource, setCropSource] = useState<File | null>(null);
   const [profileImageName, setProfileImageName] = useState('');
   const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<ProfileEditErrors>({});
@@ -495,20 +498,27 @@ export function ProfileEditPageClient() {
     });
   };
 
-  const selectProfileImage = async (event: ChangeEvent<HTMLInputElement>) => {
+  const selectProfileImage = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     setFieldErrors((current) => ({ ...current, profileImage: undefined, form: undefined }));
+    // 같은 파일을 다시 고를 수 있게 비운다 -- 크롭을 취소했다가 같은 사진을 다시 고르면
+    // change 이벤트가 안 나는 문제가 있다.
+    event.target.value = '';
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
       setFieldErrors((current) => ({ ...current, profileImage: '이미지 파일만 선택할 수 있어요.' }));
-      event.target.value = '';
       return;
     }
 
-    // 용량으로 거부하지 않는다(2026-08-25 사용자 확정). 2MB 를 넘는 사진은 업로드 훅이
-    // 자동으로 줄여 WebP 로 변환한다(`compressImagesForUpload`) -- 폰 사진(3~8MB)을
-    // 여기서 막으면 "사진을 올려도 안 된다"가 된다(실사용 보고).
+    // 용량으로 거부하지 않는다(2026-08-25 사용자 확정). 바로 올리지 않고 **크롭 모달**을
+    // 먼저 띄운다(사용자 선택 A안, 2026-09-02) -- 선수 카드가 사진의 얼굴 위치를 모르는
+    // 문제는 입력을 얼굴 중심 정사각으로 정규화하는 것이 유일한 근본 해결이다.
+    // 크롭 결과(768² WebP/JPEG)는 2MB 를 훨씬 밑돌아 업로드 훅의 재압축을 타지 않는다.
+    setCropSource(file);
+  };
+
+  const uploadCroppedProfileImage = async (file: File) => {
     setUploadingProfileImage(true);
     try {
       const result = await uploadImages.mutateAsync([file]);
@@ -517,13 +527,14 @@ export function ProfileEditPageClient() {
         throw new Error('업로드 응답에 이미지 URL이 없어요.');
       }
       setProfileImageUrl(nextUrl);
-      setProfileImageName(file.name);
+      setProfileImageName(cropSource?.name ?? file.name);
+      setCropSource(null);
     } catch (err) {
+      setCropSource(null);
       setFieldErrors((current) => ({
         ...current,
         profileImage: err instanceof Error ? err.message : '이미지를 업로드하지 못했어요. 다시 선택해 주세요.',
       }));
-      event.target.value = '';
     } finally {
       setUploadingProfileImage(false);
     }
@@ -637,11 +648,19 @@ export function ProfileEditPageClient() {
                   제거
                 </button>
               ) : null}
-              <span className="tm-text-caption">{profileImageName || '이미지 1장 — 큰 사진은 자동으로 줄여 올려요'}</span>
+              <span className="tm-text-caption">{profileImageName || '이미지 1장 — 얼굴 위치를 맞춘 뒤 올려요'}</span>
             </div>
             {fieldErrors.profileImage ? <div className="tm-text-caption tm-auth-field-helper-error" style={{ marginTop: 8 }}>{fieldErrors.profileImage}</div> : null}
           </div>
         </section>
+        {cropSource ? (
+          <ProfilePhotoCropper
+            source={cropSource}
+            pending={uploadingProfileImage}
+            onCancel={() => setCropSource(null)}
+            onCropped={uploadCroppedProfileImage}
+          />
+        ) : null}
         <label className="tm-create-field">
           <span className="tm-text-label">이름 <em className="tm-auth-optional">(선택)</em></span>
           <input
@@ -1939,8 +1958,119 @@ export function PlayerCardHiddenSettingsPageClient() {
           </div>
 
           <PlayerCardShapePicker />
+          <PlayerCardPhotoAdjust />
         </div>
       </div>
+  );
+}
+
+/**
+ * 카드 사진 위치 맞추기 (사용자 선택 A안 후속, 2026-09-02).
+ *
+ * 크롭은 업로드 입구(프로필 수정)에서 하지만, **이미 올려 둔 사진**은 그 입구를 다시
+ * 지나지 않는다 -- 그 사용자에게는 카드가 계속 엉뚱하게 잘린 채다. 여기서 같은 크롭
+ * 모달을 기존 사진으로 열고, 잘라낸 파일을 올린 뒤 프로필의 사진 URL 만 바꾼다.
+ * 프로필 수정 폼 전체를 다시 거치게 하지 않는 이유: 사진 하나 고치자고 닉네임 중복
+ * 확인·성별 필수 같은 폼 게이트를 다시 통과시키면 "저장이 안 된다"로 읽힌다.
+ */
+function PlayerCardPhotoAdjust() {
+  const profile = useV1Profile();
+  const uploadImages = useV1UploadImages();
+  const update = useV1UpdateProfile();
+  const [open, setOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const current = profile.data?.profile.profileImageUrl ?? null;
+  const pending = uploadImages.isPending || update.isPending;
+
+  const save = async (file: File) => {
+    const data = profile.data;
+    if (!data) return;
+    setError(null);
+    // 서버 저장 API 는 성별이 필수다. 아직 성별을 고르지 않은(legacy) 계정에서 사진만 바꾸자고
+    // 임의의 값을 채워 보내면 개인정보를 조용히 바꾸는 셈이다 -- 프로필 수정으로 안내하고 멈춘다.
+    if (data.profile.gender !== 'male' && data.profile.gender !== 'female') {
+      setError('프로필 수정에서 성별을 먼저 골라 주세요. 그 다음 사진 위치를 맞출 수 있어요.');
+      setOpen(false);
+      return;
+    }
+    try {
+      const uploaded = await uploadImages.mutateAsync([file]);
+      const nextUrl = uploaded.urls[0];
+      if (!nextUrl) throw new Error('업로드 응답에 이미지 URL이 없어요.');
+      // PATCH /me/profile 은 보내지 않은 필드를 null 로 덮는다(서버 실측 2026-09-02) --
+      // 사진만 바꾸더라도 나머지는 지금 값을 그대로 실어 보내야 한다.
+      await update.mutateAsync({
+        realName: data.profile.realName ?? null,
+        nickname: data.profile.nickname ?? '',
+        email: data.email ?? null,
+        profileImageUrl: nextUrl,
+        phone: data.phone ?? null,
+        // 서버는 8자리 숫자만 받는다 -- 시드로 들어간 옛 계정은 '1995-01-01' 형태가 남아 있다.
+        birthDate: data.profile.birthDate ? data.profile.birthDate.replace(/\D/g, '') || null : null,
+        gender: data.profile.gender,
+      });
+      setOpen(false);
+    } catch (err) {
+      setError(extractErrorMessage(err, '사진을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.'));
+      setOpen(false);
+    }
+  };
+
+  return (
+    <>
+      <Card pad={16} style={{ marginTop: 16, marginBottom: 8 }}>
+        <div className="tm-text-label">카드 사진</div>
+        <div className="tm-text-caption" style={{ marginTop: 4 }}>
+          카드에는 사진의 위쪽 가운데가 들어가요. 얼굴이 어긋나 보이면 위치를 다시 맞출 수 있어요.
+        </div>
+      </Card>
+      {error ? (
+        <Card pad={16} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
+          <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
+          <div className="tm-text-caption" style={{ marginTop: 4 }}>{error}</div>
+        </Card>
+      ) : null}
+      <div className="tm-card" style={{ padding: 0 }}>
+        {current ? (
+          <button
+            className="tm-my-menu-row tm-pressable"
+            type="button"
+            disabled={profile.isLoading || pending}
+            onClick={() => {
+              setError(null);
+              setOpen(true);
+            }}
+            style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}
+          >
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="tm-text-body">사진 위치 맞추기</div>
+              <div className="tm-text-caption" style={{ marginTop: 3 }}>
+                {pending ? '저장하는 중이에요…' : '지금 사진에서 카드에 넣을 부분을 다시 골라요'}
+              </div>
+            </div>
+            <ChevronRightIcon size={18} strokeWidth={2.2} aria-hidden="true" />
+          </button>
+        ) : (
+          <Link className="tm-my-menu-row tm-pressable" href="/my/profile/edit">
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="tm-text-body">사진 올리기</div>
+              <div className="tm-text-caption" style={{ marginTop: 3 }}>프로필 수정에서 사진을 올리면 카드에 들어가요</div>
+            </div>
+            <ChevronRightIcon size={18} strokeWidth={2.2} aria-hidden="true" />
+          </Link>
+        )}
+      </div>
+      {open && current ? (
+        <ProfilePhotoCropper
+          source={current}
+          title="카드 사진 위치 맞추기"
+          pending={pending}
+          onCancel={() => setOpen(false)}
+          onCropped={save}
+        />
+      ) : null}
+    </>
   );
 }
 

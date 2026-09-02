@@ -49,7 +49,13 @@
 
 ## Goal
 
-1. 명단 제출(팀매치·대회 둘 다)에서 **선발/후보 입력을 받지 않는다.** 옛 클라이언트가 `started` 를 보내도 400 내지 않고 무시한다.
+1. 명단 제출(팀매치·대회 둘 다)에서 **선발/후보 입력을 받지 않는다.** 옛 클라이언트가 `started` 를
+   보내면 **경로에 따라 다르다**(2026-09-03 alpha 실측):
+   - **대회 경로**(`game-lineup.dto.ts`)는 `started?: boolean` 을 **선언해 두었으므로** 200 이고
+     서버가 값을 무시한 채 `true` 로 저장한다.
+   - **팀매치 경로**(`team-match-lineup.dto.ts`)는 `started` 를 **선언한 적이 없다.** `main.ts` 의
+     `whitelist: true, forbidNonWhitelisted: true` 때문에 모르는 필드는 **400** 이다 — 이건 이 태스크가
+     만든 회귀가 아니라 원래 그랬던 것이고, 그대로 둔다(선언을 추가하면 없는 개념을 되살리는 셈이다).
 2. 저장 시 인원·GK 검증을 **제거**한다. 명단 = 출전자이므로 검증할 "선발" 이 없다.
 3. `BENCH` 센티널과 `started=false` 라인업 행을 **마이그레이션으로 정리**하고, 앞으로의 모든 쓰기는 `started=true`.
 4. 라인업 화면에서 선발 토글과 피치 탭을 제거한다 — **A안**: 탭 줄 삭제, 명단만, 팀장 전용 한 줄 링크 *"선발·배치는 전술보드에서 →"*.
@@ -93,7 +99,8 @@
 1. **팀장 — 명단 제출**: 등번호·이름으로 출석 명단만 제출. 선발/후보 토글이 없다. 제출 = 끝.
 2. **팀장 — 전술**: 상단 링크로 전술보드에 가서 팀 내부용 배치를 그린다. 대회 쪽은 이것을 읽지 않는다.
 3. **운영자 — kickoff**: 명단 전원이 출전자로 시작한다. 교체는 종목 설정에 따라(Task 166).
-4. **옛 클라이언트**: `started: false` 를 보내도 200, 저장값은 true.
+4. **옛 클라이언트**: `started: false` 를 보내도 200, 저장값은 true — **대회 경로만.** 팀매치 DTO 는
+   `started` 를 받지 않아 400(whitelist)이다.
 5. **상대팀 정정 요청**: 원본 리비전을 복사한 초안에서도 전원 `started=true` — 복사가 값을 싣는다.
 6. **운영자 — 결과 정정**: 선발 체크박스가 없다. 출전자 전원이 기록에 남는다.
 
@@ -121,7 +128,8 @@ Backend  ⟂  Frontend
 ## Acceptance Criteria
 
 - [ ] `git grep -n "'BENCH'" -- apps/v1_api/src apps/v1_web/src | wc -l` → `0`(주석 제외). 센티널 **이름**이 아니라 **값**을 센다 — `league-result-participants.ts` 가 값을 복사해 갖고 있어 이름만 세면 놓친다.
-- [ ] 저장 경로에 `started` 를 보내도/안 보내도/false 로 보내도 200, 저장값 true(통합 스펙).
+- [ ] 저장 경로에 `started` 를 보내도/안 보내도/false 로 보내도 200, 저장값 true(통합 스펙)
+      **(대회 경로; 팀매치 DTO 는 `started` 를 받지 않는다 — whitelist 400).**
 - [ ] 마이그레이션 idempotent + NOTICE 두 줄 출력이 PR 본문에.
 - [ ] alpha 에서 `GET /tournaments/:id/matches/:fixtureId` 의 참가자 `started` 가 전원 true(공개 API 가 ground truth).
 - [ ] FE PR 에 갤러리(머지 후 alpha 캡처) + "3안 중 A안 사용자 확정" 기록.

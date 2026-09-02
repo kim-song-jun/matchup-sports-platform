@@ -86,13 +86,12 @@ describe('ProfilePhotoCropper', () => {
 
   it('드래그하면 잘라내는 영역이 그만큼 옮겨진다 (이동은 리렌더 없이 ref 로 쌓인다)', async () => {
     const exportCrop = vi.fn<CropExporter>(async () => pickedFile());
-    const { container } = render(
-      <ProfilePhotoCropper source={pickedFile()} onCancel={() => {}} onCropped={() => {}} exportCrop={exportCrop} />,
-    );
+    render(<ProfilePhotoCropper source={pickedFile()} onCancel={() => {}} onCropped={() => {}} exportCrop={exportCrop} />);
     const confirm = screen.getByRole('button', { name: '이 사진으로 할게요' });
     await waitFor(() => expect(confirm).toBeEnabled());
 
-    const viewport = container.querySelector('.tm-photo-crop-viewport') as HTMLElement;
+    // 모달은 body 로 포털되므로 render 의 container 가 아니라 document 에서 찾는다.
+    const viewport = document.querySelector('.tm-photo-crop-viewport') as HTMLElement;
     viewport.setPointerCapture = vi.fn();
     viewport.getBoundingClientRect = () => ({ left: 0, top: 0, width: 300, height: 300, right: 300, bottom: 300, x: 0, y: 0, toJSON: () => ({}) });
     pointer(viewport, 'pointerdown', 1, 150, 150);

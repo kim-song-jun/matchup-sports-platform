@@ -108,6 +108,14 @@ final class WebShellViewController: UIViewController {
             source: NativeBridge.shimScript,
             injectionTime: .atDocumentStart,
             forMainFrameOnly: true))
+        // Pins the page at 1:1. Without it a 15px text field taking focus zooms the whole
+        // page in, and pinch and double-tap zoom are live. Document end, because the tag it
+        // rewrites is server-rendered into <head> and has to exist first; the script keeps
+        // watching for React rendering it again. See ViewportLock.
+        configuration.userContentController.addUserScript(WKUserScript(
+            source: ViewportLock.script,
+            injectionTime: .atDocumentEnd,
+            forMainFrameOnly: true))
         // Registered through a weak proxy. WKUserContentController retains its handlers, and
         // this controller owns the web view that owns the configuration that owns the
         // controller — registering `self` directly would keep the whole graph alive forever

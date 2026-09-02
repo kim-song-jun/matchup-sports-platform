@@ -16,7 +16,8 @@ import {
   AdminRegistrationListQueryDto,
   AdminRosterLockDto,
 } from './dto/admin-registration.dto';
-import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
+import { isCapacityFull } from './registration-capacity';
+import { ALL_COMPETITION_KINDS, findTournamentOnSurface } from './tournament-surface-lookup';
 
 /** 어드민이 취소 처리할 수 있는 신청 상태 목록. */
 const ADMIN_CANCELLABLE_STATUSES: V1TournamentRegistration['status'][] = [
@@ -66,7 +67,7 @@ export class AdminRegistrationsService {
     const limit = query.limit ?? 20;
 
     // 대회 존재 여부 간단 확인 (deleted 포함 어드민은 볼 수 있어야 함).
-    const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, { where: { id: tournamentId } });
+    const tournament = await findTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, { where: { id: tournamentId } });
     if (!tournament) {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     }
@@ -195,11 +196,11 @@ export class AdminRegistrationsService {
         const confirmedCount = await tx.v1TournamentRegistration.count({
           where: { tournamentId: registration.tournamentId, status: 'confirmed' },
         });
-        const tournament = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
+        const tournament = await findTournamentOnSurface(tx, ALL_COMPETITION_KINDS, {
           where: { id: registration.tournamentId },
-          select: { teamCount: true },
+          select: { teamCount: true, kind: true },
         });
-        if (tournament && confirmedCount >= tournament.teamCount) {
+        if (tournament && isCapacityFull(tournament, confirmedCount)) {
           throw new ConflictException({
             code: 'TOURNAMENT_CAPACITY_FULL',
             message: '정원이 모두 찼어요. 더 확정할 수 없어요.',
@@ -337,9 +338,9 @@ export class AdminRegistrationsService {
       // FOR UPDATE로 대회 row를 잠가 두 관리자가 동시에 마지막 자리를 처리해도 안전하게 만든다.
       if (CAPACITY_HOLD_STATUSES.includes(restoredStatus)) {
         await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${registration.tournamentId} FOR UPDATE`;
-        const tournament = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
+        const tournament = await findTournamentOnSurface(tx, ALL_COMPETITION_KINDS, {
           where: { id: registration.tournamentId, deletedAt: null },
-          select: { teamCount: true },
+          select: { teamCount: true, kind: true },
         });
         if (!tournament) {
           throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
@@ -351,7 +352,7 @@ export class AdminRegistrationsService {
             status: { in: CAPACITY_HOLD_STATUSES },
           },
         });
-        if (reservedCount >= tournament.teamCount) {
+        if (isCapacityFull(tournament, reservedCount)) {
           throw new ConflictException({
             code: 'TOURNAMENT_CAPACITY_FULL',
             message: '정원이 가득 차 취소 요청을 잔류 처리할 수 없어요.',
@@ -413,7 +414,7 @@ export class AdminRegistrationsService {
         });
       }
 
-      const tournament = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
+      const tournament = await findTournamentOnSurface(tx, ALL_COMPETITION_KINDS, {
         where: { id: registration.tournamentId },
         select: {
           genderCategory: true,

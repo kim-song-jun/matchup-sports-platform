@@ -5,7 +5,13 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, V1Tournament, V1TournamentPayment, V1TournamentRegistration } from '@prisma/client';
+import {
+  Prisma,
+  V1CompetitionKind,
+  V1Tournament,
+  V1TournamentPayment,
+  V1TournamentRegistration,
+} from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
@@ -16,7 +22,8 @@ import {
   CreateRegistrationDto,
   SubmitRegistrationDto,
 } from './dto/tournament-registration.dto';
-import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
+import { capacityLimitOf, isCapacityFull } from './registration-capacity';
+import { ALL_COMPETITION_KINDS, findTournamentOnSurface } from './tournament-surface-lookup';
 
 /** cancel-request로 어드민 처리가 필요한 상태(이미 운영에 반영됨). */
 const CANCELLABLE_VIA_REQUEST: V1TournamentRegistration['status'][] = [
@@ -104,7 +111,7 @@ export class TournamentRegistrationsService {
   }
 
   private async loadOpenTournament(tournamentId: string): Promise<V1Tournament> {
-    const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
+    const tournament = await findTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, {
       where: { id: tournamentId, deletedAt: null },
     });
     if (!tournament) {
@@ -119,14 +126,19 @@ export class TournamentRegistrationsService {
     return tournament;
   }
 
-  private async assertCapacityAvailable(tournamentId: string, teamCount: number) {
+  private async assertCapacityAvailable(
+    tournamentId: string,
+    competition: { kind: V1CompetitionKind | null; teamCount: number },
+  ) {
+    // 상한이 없으면(정규 리그) 세지도 않는다 — 결과를 안 쓸 COUNT 를 날릴 이유가 없다.
+    if (capacityLimitOf(competition) === null) return;
     const reservedCount = await this.prisma.v1TournamentRegistration.count({
       where: {
         tournamentId,
         status: { in: CAPACITY_HOLD_STATUSES },
       },
     });
-    if (reservedCount >= teamCount) {
+    if (isCapacityFull(competition, reservedCount)) {
       throw new ConflictException({
         code: 'TOURNAMENT_CAPACITY_FULL',
         message: '정원이 가득 차서 더 이상 신청할 수 없어요.',
@@ -144,7 +156,7 @@ export class TournamentRegistrationsService {
     });
     if (existing && existing.status !== 'cancelled') {
       if (existing.status === 'draft') {
-        await this.assertCapacityAvailable(tournamentId, tournament.teamCount);
+        await this.assertCapacityAvailable(tournamentId, tournament);
         return this.serialize(existing, null, await this.countPlayers(existing.id), tournament);
       }
       const [payment, playerCount] = await Promise.all([
@@ -153,7 +165,7 @@ export class TournamentRegistrationsService {
       ]);
       return this.serialize(existing, payment, playerCount, tournament);
     }
-    await this.assertCapacityAvailable(tournamentId, tournament.teamCount);
+    await this.assertCapacityAvailable(tournamentId, tournament);
 
     // 취소된 신청이 남아있으면(unique 제약) draft로 재활성화, 없으면 신규 생성.
     let registration: V1TournamentRegistration;
@@ -279,7 +291,7 @@ export class TournamentRegistrationsService {
       // **종류 조건은 트랜잭션 안에서도 걸어야 한다.** 밖의 `loadOpenTournament` 만 막으면
       // 이 재검증이 리그 행을 통과시키고, 그 사실이 밖에서는 드러나지 않는다 — 겉보기엔
       // 닫힌 것처럼 보이기 때문이다.
-      const lockedTournament = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
+      const lockedTournament = await findTournamentOnSurface(tx, ALL_COMPETITION_KINDS, {
         where: { id: tournamentId, deletedAt: null },
       });
       if (!lockedTournament || lockedTournament.status !== 'open') {
@@ -296,7 +308,7 @@ export class TournamentRegistrationsService {
           status: { in: CAPACITY_HOLD_STATUSES },
         },
       });
-      if (reservedCount >= lockedTournament.teamCount) {
+      if (isCapacityFull(lockedTournament, reservedCount)) {
         throw new ConflictException({
           code: 'TOURNAMENT_CAPACITY_FULL',
           message: '정원이 가득 차서 더 이상 신청할 수 없어요.',
@@ -470,15 +482,15 @@ export class TournamentRegistrationsService {
       // R16-001: lock tournament and re-check its status; an admin-cancelled tournament
       // must not have registrations restored to an active status.
       await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${tournamentId} FOR UPDATE`;
-      const tournament = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
+      const tournament = await findTournamentOnSurface(tx, ALL_COMPETITION_KINDS, {
         where: { id: tournamentId, deletedAt: null },
-        select: { id: true, status: true, teamCount: true },
+        select: { id: true, status: true, teamCount: true, kind: true },
       });
       if (!tournament) {
-        // **여기서 정하는 것은 "대회가 대회 표면에서 조회되지 않을 때" 하나뿐이다** —
+        // **여기서 정하는 것은 "대회·리그가 통합 표면에서 조회되지 않을 때" 하나뿐이다** —
         // 같은 not-found 를 두 자리에서 다르게 다룬다: **진입 검사 = 404, 잠금 후 재조회 = 409.**
         //
-        // *"행이 없을 때"가 아니다.* 위 조회는 `findTournamentOnSurface(tx, TOURNAMENT_KINDS, …)`
+        // *"행이 없을 때"가 아니다.* 위 조회는 `findTournamentOnSurface(tx, ALL_COMPETITION_KINDS, …)`
         // 라 **행이 남아 있어도 종류가 표면을 벗어나면** 여기로 온다.
         //
         // (이 파일의 409 전부가 경합이라는 뜻이 **아니다.** 권한·종목 불일치·마감·정원처럼
@@ -516,7 +528,7 @@ export class TournamentRegistrationsService {
             status: { in: CAPACITY_HOLD_STATUSES },
           },
         });
-        if (reservedCount >= tournament.teamCount) {
+        if (isCapacityFull(tournament, reservedCount)) {
           throw new ConflictException({
             code: 'TOURNAMENT_CAPACITY_FULL',
             message: '정원이 가득 차 취소 요청을 철회할 수 없어요.',
@@ -640,7 +652,7 @@ export class TournamentRegistrationsService {
   }
 
   private loadPaymentInstructionSource(tournamentId: string) {
-    return findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
+    return findTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, {
       where: { id: tournamentId, deletedAt: null },
       select: {
         entryFee: true,

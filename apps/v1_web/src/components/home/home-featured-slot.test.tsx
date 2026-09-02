@@ -119,6 +119,14 @@ describe('홈 추천 대회 슬롯 — 데이터가 아직 없을 때도 자리�
     expect(skeleton?.querySelector('.tm-featured-content-with-cta')).toBeInTheDocument();
     expect(skeleton?.querySelector('.tm-featured-cta')).toBeInTheDocument();
 
+    // 자리표시 막대·CTA 는 `.tm-skeleton` 이어야 한다. `.tm-review-skeleton` 은 리뷰 카드용
+    // 블록이라 `min-height: 92px` 를 갖고 있어 인라인 height 를 조용히 덮어쓴다 — 20px 막대가
+    // 92px 이 되어 스켈레톤이 실제 카드보다 188px 커지고, 데이터가 오는 순간 그만큼 밀린다
+    // (alpha 실측: 스켈레톤 483px vs 실제 295px). jsdom 에는 레이아웃이 없어 높이로는 못 잡으니
+    // 클래스 자체를 계약으로 고정한다.
+    expect(skeleton?.querySelectorAll('.tm-review-skeleton')).toHaveLength(0);
+    expect(skeleton?.querySelectorAll('.tm-skeleton').length).toBeGreaterThanOrEqual(3);
+
     // 스켈레톤 자체는 장식이라 숨기고, "로딩 중"은 **바깥 블록**이 알린다.
     // (안쪽에 aria-busy 를 달면 aria-hidden 서브트리라 보조기기에 닿지 않는다)
     expect(skeleton?.getAttribute('aria-hidden')).toBe('true');

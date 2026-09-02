@@ -23,10 +23,12 @@ import { resolveResultStage } from './league-result-stage';
 import { resolveIsForfeit } from './league-match-forfeit.service';
 import { FixtureScheduleTemplate, FixtureTimingOptions, generateRoundRobinFixtures, resolveFixtureStartAt, resolveFixtureTimeSlots, RoundRobinFixture } from './round-robin-schedule';
 import { createLeagueFixture, leagueFixtureTitle } from './league-fixture-creation';
+import { resolveLeagueWeekNumbers } from './league-week-number';
 import {
   AddLeagueTeamDto,
   CancelLeagueFixtureDto,
   CreateLeagueMatchDto,
+  CreateManualLeagueFixtureDto,
   GenerateLeagueFixturesDto,
   RegenerateLeagueFixturesDto,
   RevertLeagueCompletionDto,
@@ -902,6 +904,108 @@ export class LeagueMatchAdminService {
       teamMatchIds: result.ids,
       warnings: buildOddTeamCountWarning(teamIds.length),
     };
+  }
+
+  /**
+   * 운영자가 **한 경기씩** 직접 넣는다 (Task 164 BE-1).
+   *
+   * 일괄 생성과 **같은 함수**(`createLeagueFixture`)로 만든다 — 두 경로가 각자 팀매치를
+   * 만들면 한쪽에만 부수효과가 빠지는데, 실제로 그 사고가 있었다(리그 대진이 팀 일정을
+   * 안 만들어 참가 팀 캘린더에 한 건도 안 떴다).
+   *
+   * 일괄 생성과 다른 점은 **입구 조건뿐**이다:
+   *   · 일괄은 "대진이 하나도 없을 때만"(LEAGUE_FIXTURES_EXIST) — 수동은 언제든 더한다
+   *   · 일괄은 라운드로빈이 짝을 정한다 — 수동은 운영자가 두 팀을 고른다
+   * 그래서 **두 팀이 이 리그 소속인지**를 여기서 검증한다. 일괄 경로에는 그 검증이 없는데,
+   * 짝이 `league.teams` 에서 나오므로 소속이 자명하기 때문이다.
+   */
+  async createManualFixture(user: V1AuthUser, leagueId: string, dto: CreateManualLeagueFixtureDto) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const league = await this.loadLeague(leagueId);
+    if (dto.homeTeamId === dto.awayTeamId) {
+      throw new UnprocessableEntityException({
+        code: 'LEAGUE_TEAM_INVALID',
+        message: '같은 팀끼리 경기를 만들 수 없어요.',
+      });
+    }
+    const registered = new Set(league.teams.map((entry) => entry.teamId));
+    if (!registered.has(dto.homeTeamId) || !registered.has(dto.awayTeamId)) {
+      throw new UnprocessableEntityException({
+        code: 'LEAGUE_TEAM_INVALID',
+        message: '이 리그에 등록되지 않은 팀이에요.',
+      });
+    }
+    const config = await resolveTeamMatchCompetitionConfig(this.prisma, league.sportId);
+    if (config === null) {
+      throw new ConflictException({ code: 'COMPETITION_CONFIG_REQUIRED', message: '이 종목에 활성 경기 설정이 없어요.' });
+    }
+
+    const startAt = new Date(dto.startsAt);
+    const trimmedPlaceName = dto.placeName?.trim();
+    const trimmedTitle = dto.title?.trim();
+
+    const teamMatchId = await this.prisma.$transaction(async (tx) => {
+      // 일괄 생성과 같은 락. 같은 리그에 동시에 손대는 두 요청이 서로의 주차 계산을
+      // 어긋나게 만들지 않는다 — 아래 형제 목록 조회가 이 락 안에서 일어나야 한다.
+      await tx.$queryRaw`SELECT id FROM "v1_leagues" WHERE id = ${leagueId} FOR UPDATE`;
+      const teamsById = await this.loadTeamsWithMembers(tx, [dto.homeTeamId, dto.awayTeamId]);
+      const home = teamsById.get(dto.homeTeamId);
+      const away = teamsById.get(dto.awayTeamId);
+      if (home === undefined || away === undefined) {
+        // league.teams 에는 남아 있어도 그 사이 비활성/소프트삭제된 팀은 여기 없다
+        // (loadTeamsWithMembers 의 active 필터) — 일괄 생성과 같은 도메인 오류로 거부한다.
+        throw new UnprocessableEntityException({
+          code: 'LEAGUE_TEAM_INVALID',
+          message: '비활성화되었거나 삭제된 팀이 포함돼 있어요.',
+        });
+      }
+      return createLeagueFixture(tx, this.games, {
+        leagueId: league.id,
+        adminUserId: admin.userId,
+        sportId: league.sportId,
+        regionId: league.regionId,
+        competitionConfigId: config.id,
+        title: trimmedTitle ? trimmedTitle : await this.defaultManualFixtureTitle(tx, league.id, league.title, startAt),
+        placeName: trimmedPlaceName ? trimmedPlaceName : DEFAULT_FIXTURE_PLACE_NAME,
+        startAt,
+        endAt: dto.durationMinutes === undefined ? null : new Date(startAt.getTime() + dto.durationMinutes * 60_000),
+        home,
+        away,
+      });
+    });
+
+    return { leagueId, teamMatchId };
+  }
+
+  /**
+   * 수동 대진의 기본 제목. 주차는 **화면과 같은 규칙**으로 파생한다
+   * (`league-week-number.ts` — 그 리그의 서로 다른 KST 경기일을 세어 몇 번째 날인지).
+   *
+   * 저장된 제목을 흉내 내지 않는 이유가 그 모듈 docblock 에 있다: 재일정(`updateFixture`)은
+   * `startAt` 만 바꾸고 `title` 은 그대로 둬서 저장된 주차가 **낡는다**. 그래서 세 화면이
+   * 이미 `startAt` 에서 파생하고 있고, 여기서 다른 규칙을 쓰면 새로 넣은 경기만 화면과
+   * 다른 주차로 불린다.
+   *
+   * 새로 넣을 경기의 시각도 형제 목록에 포함해서 센다 — 아직 저장 전이라 조회에 안 잡힌다.
+   */
+  private async defaultManualFixtureTitle(
+    tx: Prisma.TransactionClient,
+    leagueId: string,
+    leagueTitle: string,
+    startAt: Date,
+  ): Promise<string> {
+    const siblings = await tx.v1TeamMatch.findMany({
+      // 취소된 대진도 센다 — 위 세 화면이 쓰는 조건(deletedAt: null 만)과 같아야 주차가
+      // 어긋나지 않는다(league-week-number.ts 의 siblingStartAtsByLeagueId 주석).
+      where: { leagueId, deletedAt: null },
+      select: { startAt: true },
+    });
+    const targetId = 'manual-fixture-being-created';
+    const week = resolveLeagueWeekNumbers(
+      new Map([[leagueId, [...siblings.map((row) => row.startAt), startAt]]]),
+      [{ id: targetId, leagueId, startAt }],
+    ).get(targetId);
+    return leagueFixtureTitle({ leagueTitle, round: week ?? 1 });
   }
 
   async updateFixture(user: V1AuthUser, leagueId: string, teamMatchId: string, dto: UpdateLeagueFixtureDto) {

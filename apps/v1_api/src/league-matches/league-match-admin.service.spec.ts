@@ -61,11 +61,18 @@ interface FakeState {
   calls: string[];
   /** dual-write 가 통합 축 거울에 보낸 `updateMany` 인자 — where·data 를 그대로 본다. */
   mirrorUpdates: Array<{ where: { id: string; kind: string }; data: { status: string } }>;
+  /** 수동 대진의 주차 파생이 읽는 형제 대진 시작 시각. 테스트가 갈아끼운다. */
+  siblingStartAts: Date[];
+  /** `v1TeamMatch.create` 에 실린 data — 제목·시각·장소를 그대로 본다. */
+  teamMatchCreates: Array<{ title: string; startAt: Date; endAt?: Date; placeName: string }>;
 }
 
 function createFake() {
   const state: FakeState = {
     participants: [], sides: [], links: [], linkEvents: [], scheduleCreates: [], calls: [], mirrorUpdates: [],
+    // 기본: 서로 다른 두 경기일이 이미 있다(KST 9/5, 9/12).
+    siblingStartAts: [new Date('2026-09-05T01:00:00.000Z'), new Date('2026-09-12T01:00:00.000Z')],
+    teamMatchCreates: [],
   };
   let seq = 0;
   const next = (prefix: string) => {
@@ -120,7 +127,13 @@ function createFake() {
     },
     v1TeamMatch: {
       count: track('v1TeamMatch.count', async () => 0),
-      create: track('v1TeamMatch.create', async () => ({ id: 'team-match-1' })),
+      create: track('v1TeamMatch.create', async (args: { data: { title: string; startAt: Date; endAt?: Date; placeName: string } }) => {
+        state.teamMatchCreates.push(args.data);
+        return { id: 'team-match-1' };
+      }),
+      // 수동 대진의 기본 제목이 주차를 파생할 때 읽는 형제 목록.
+      // 기본값은 "이미 두 경기일이 있는 리그" — 새로 넣는 경기가 3번째 날이면 3주차다.
+      findMany: track('v1TeamMatch.findMany', async () => state.siblingStartAts.map((startAt) => ({ startAt }))),
     },
     v1TeamMatchApplication: {
       create: track('v1TeamMatchApplication.create', async () => ({ id: 'application-1' })),
@@ -319,6 +332,96 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
 
     // ⑤ 결과입력 리마인더 — outbox 에 $executeRaw 로 넣는다.
     expect(state.calls.filter((call) => call === '$executeRaw')).toHaveLength(1);
+  });
+
+  describe('수동 대진 추가 (Task 164 BE-1)', () => {
+    const manual = {
+      homeTeamId: 'team-a',
+      awayTeamId: 'team-b',
+      startsAt: '2026-09-19T01:00:00.000Z',
+    } as const;
+
+    /**
+     * **핵심 계약**: 수동 추가가 자동 생성과 **같은 부수효과**를 낸다. 두 경로가 각자
+     * 팀매치를 만들면 한쪽에만 빠지는데, 그게 실제로 일어났던 사고다(리그 대진이 팀
+     * 일정을 안 만들어 참가 팀 캘린더에 한 건도 안 떴다).
+     */
+    it('자동 생성과 같은 다섯 부수효과를 낸다', async () => {
+      await service.createManualFixture(adminUser, 'league-1', { ...manual });
+
+      expect(state.calls.filter((call) => call === 'v1TeamMatch.create')).toHaveLength(1);
+      expect(state.scheduleCreates.map((row) => row.teamId).sort()).toEqual(['team-a', 'team-b']);
+      expect(new Set(state.scheduleCreates.map((row) => row.teamMatchId)).size).toBe(1);
+      expect(state.sides.map((side) => side.sideKey).sort()).toEqual([V1GameSideKey.AWAY, V1GameSideKey.HOME]);
+      expect(state.participants).toHaveLength(4);
+      expect(state.participants.every((row) => row.userId === null)).toBe(true);
+      expect(state.calls.filter((call) => call === 'v1TeamMatchApplication.create')).toHaveLength(1);
+      expect(state.calls.filter((call) => call === '$executeRaw')).toHaveLength(1);
+    });
+
+    /**
+     * 제목 기본값은 **화면과 같은 규칙**으로 주차를 파생한다(`league-week-number.ts`).
+     * 저장된 제목을 흉내 내면 안 되는 이유가 그 모듈에 있다 — 재일정은 `startAt` 만 바꾸고
+     * `title` 은 두므로 저장된 주차가 낡는다. 여기서 다른 규칙을 쓰면 새로 넣은 경기만
+     * 화면과 다른 주차로 불린다.
+     */
+    it('제목 미지정: 그 리그의 경기일을 세어 주차를 파생한다 (새 날짜 = 3번째 날 → 3주차)', async () => {
+      // 형제 경기일 두 개(9/5, 9/12) + 새 경기 9/19 → 3번째 날.
+      await service.createManualFixture(adminUser, 'league-1', { ...manual });
+
+      expect(state.teamMatchCreates[0].title).toBe('테스트 리그 3주차');
+    });
+
+    it('제목 미지정: 이미 경기가 있는 날에 넣으면 그 날의 주차를 쓴다 (9/5 → 1주차)', async () => {
+      await service.createManualFixture(adminUser, 'league-1', {
+        ...manual,
+        startsAt: '2026-09-05T08:00:00.000Z',
+      });
+
+      // 같은 KST 날짜에 이미 경기가 있으므로 새 날이 아니다 — 4주차가 되면 안 된다.
+      expect(state.teamMatchCreates[0].title).toBe('테스트 리그 1주차');
+    });
+
+    it('제목을 주면 그대로 쓴다 (공백만 준 것은 미지정으로 본다)', async () => {
+      await service.createManualFixture(adminUser, 'league-1', { ...manual, title: '  결승 재경기  ' });
+      expect(state.teamMatchCreates[0].title).toBe('결승 재경기');
+
+      state.teamMatchCreates.length = 0;
+      await service.createManualFixture(adminUser, 'league-1', { ...manual, title: '   ' });
+      expect(state.teamMatchCreates[0].title).toBe('테스트 리그 3주차');
+    });
+
+    it('durationMinutes 를 주면 종료 시각이 붙고, 안 주면 비운다', async () => {
+      await service.createManualFixture(adminUser, 'league-1', { ...manual, durationMinutes: 90 });
+      expect(state.teamMatchCreates[0].endAt).toEqual(new Date('2026-09-19T02:30:00.000Z'));
+
+      state.teamMatchCreates.length = 0;
+      await service.createManualFixture(adminUser, 'league-1', { ...manual });
+      // 종료 시각을 직접 받지 않으므로 "시작보다 이른 종료" 를 만들 입력 자체가 없다.
+      expect(state.teamMatchCreates[0].endAt).toBeUndefined();
+    });
+
+    it('장소 미지정·공백은 "장소 미정" 으로 — 일괄 생성과 같은 규칙', async () => {
+      await service.createManualFixture(adminUser, 'league-1', { ...manual, placeName: '  ' });
+      expect(state.teamMatchCreates[0].placeName).toBe('장소 미정');
+    });
+
+    it('이 리그에 등록되지 않은 팀은 422 로 거부하고 아무것도 만들지 않는다', async () => {
+      await expect(
+        service.createManualFixture(adminUser, 'league-1', { ...manual, awayTeamId: 'team-zzz' }),
+      ).rejects.toMatchObject({ response: { code: 'LEAGUE_TEAM_INVALID' } });
+
+      // 검증 게이트를 통과한 뒤에야 쓰기가 시작돼야 한다 — 반쪽 생성이 남으면 안 된다.
+      expect(state.calls.filter((call) => call === 'v1TeamMatch.create')).toHaveLength(0);
+      expect(state.scheduleCreates).toHaveLength(0);
+    });
+
+    it('같은 팀끼리는 422 로 거부한다', async () => {
+      await expect(
+        service.createManualFixture(adminUser, 'league-1', { ...manual, awayTeamId: 'team-a' }),
+      ).rejects.toMatchObject({ response: { code: 'LEAGUE_TEAM_INVALID' } });
+      expect(state.calls.filter((call) => call === 'v1TeamMatch.create')).toHaveLength(0);
+    });
   });
 
   it('제목 규칙은 자동·수동이 같은 함수를 쓴다 — 슬롯이 있으면 경기 순번까지 붙는다', () => {

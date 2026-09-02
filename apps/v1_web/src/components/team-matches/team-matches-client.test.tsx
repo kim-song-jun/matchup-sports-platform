@@ -251,6 +251,32 @@ describe('toTeamMatch — legacy/unmigrated condition fields never show mock dat
     expect(model.grade).toBe('C등급');
   });
 
+  it('maps live host-team manner and official wins instead of fallback statistics', () => {
+    const model = toTeamMatch(
+      realMatch({
+        hostTeam: {
+          teamId: 'team-live',
+          name: '실제 팀',
+          mannerScore: 4.75,
+          wins: 6,
+        },
+      }),
+      mockFallback,
+    );
+
+    expect(model.manner).toBe(4.75);
+    expect(model.wins).toBe(6);
+  });
+
+  // 프로덕션 회귀의 실제 모양: hostTeam 통계가 응답에 없으면 `...fallback` 스프레드가 목업
+  // 숫자(매너 4.8 · 승 23)를 그대로 흘려보내 **어느 팀 매치를 열어도 같은 가짜 전적**이 보였다.
+  it('leaves manner/wins null when the API carries no host-team statistics (no mock leak)', () => {
+    const model = toTeamMatch(realMatch({ hostTeam: { teamId: 'team-quiet', name: '조용한 팀' } }), mockFallback);
+
+    expect(model.manner).toBeNull();
+    expect(model.wins).toBeNull();
+  });
+
   it('never shows the mock fallback grade/format/style/uniform for a real match with empty structured fields', () => {
     const model = toTeamMatch(
       realMatch({ matchFormat: null, matchStyle: [], uniformColor: null, levelLabel: null }),

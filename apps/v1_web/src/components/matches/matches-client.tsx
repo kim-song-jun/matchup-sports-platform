@@ -181,11 +181,13 @@ export function MatchDetailPageClient({ matchId }: { matchId: string }) {
     ? {
         ...fallback,
         match: {
-          ...fallback.match,
+          // `...fallback.match` 스프레드를 걷어냈다 — 아래에서 모든 칸을 실제 값으로 채우므로
+          // 목업이 남을 자리가 없다. 특히 address 는 폴백이 걸리면 **다른 매치의 실제 주소**
+          // ('서울 양천구 안양천로 939')를 진짜 주소처럼 보여줬다.
           ...toMatchCard(query.data, fallback.match),
-          description: query.data.description ?? query.data.descriptionPreview ?? fallback.match.description,
-          address: query.data.place?.addressText ?? query.data.placeName ?? fallback.match.address,
-          rules: query.data.rulesText ? [query.data.rulesText] : fallback.match.rules,
+          description: query.data.description ?? query.data.descriptionPreview ?? '',
+          address: query.data.place?.addressText ?? query.data.placeName ?? '',
+          rules: query.data.rulesText ? [query.data.rulesText] : [],
           editHref: viewerState === 'host' ? `/matches/${matchId}/edit` : undefined,
           applicationsHref: viewerState === 'host' ? `/matches/${matchId}/applications` : undefined,
           participants: toParticipants(
@@ -230,25 +232,33 @@ export function MatchDetailPageClient({ matchId }: { matchId: string }) {
   return <MatchDetailPageView model={model} />;
 }
 
-function toMatchCard(match: V1Match, fallback: MatchCardModel): MatchCardModel {
-  const capacity = getCapacity(match, fallback);
+// 직접 유닛 커버리지를 붙이려고 export 한다(team-matches 의 toTeamMatch 와 같은 관행).
+export function toMatchCard(match: V1Match, fallback: MatchCardModel): MatchCardModel {
+  const capacity = getCapacity(match);
   const status = statusToCardStatus(getStatus(match), getViewerState(match));
 
+  // 화면 골격용 목업(matches.view-model.ts)을 **사실 값의 폴백으로 쓰지 않는다.** 예전에는
+  // 레벨·성별·지역·호스트가 비면 목업의 '초보-중수'·'성별 무관'·'목동'·'김정민'이 그대로
+  // 실제 매치 카드에 붙어, 있지도 않은 조건과 **실존하지 않는 사람 이름**을 보여줬다.
+  // 모르는 값은 지어내지 않고 "모른다"고 말한다 — 문자열 모양(비어 있지 않음)은 그대로라
+  // 렌더 쪽 가정을 깨지 않는다. 라벨은 이 저장소가 이미 쓰는 표현을 그대로 재사용한다
+  // (teams-client.tsx 의 '레벨 미설정' · '지역 미정', API 의 '호스트').
+  // image 는 예외다 — 사진 자리표시자는 사실 주장이 아니라 장식이고, 팀매치 카드도 같은
+  // 로컬 이미지를 폴백으로 쓰는 것이 의도된 동작이다(전용 테스트가 고정하고 있다).
   return {
-    ...fallback,
     id: match.matchId ?? match.id ?? fallback.id,
     title: match.title,
-    sport: match.sport?.name ?? match.sportName ?? fallback.sport,
-    venue: match.place?.name ?? match.placeName ?? fallback.venue,
-    region: match.region?.name ?? match.regionName ?? fallback.region,
+    sport: match.sport?.name ?? match.sportName,
+    venue: match.place?.name ?? match.placeName,
+    region: match.region?.name ?? match.regionName ?? '지역 미정',
     date: formatDate(match.startsAt),
     time: formatTime(match.startsAt),
     endTime: match.endsAt ? formatTime(match.endsAt) : undefined,
     current: capacity.current,
     capacity: capacity.capacity,
-    level: match.levelLabel ?? fallback.level,
-    gender: match.genderRule ?? fallback.gender,
-    host: match.host?.displayName ?? fallback.host,
+    level: match.levelLabel ?? '레벨 미설정',
+    gender: match.genderRule ?? '성별 미설정',
+    host: match.host?.displayName ?? '호스트',
     image: match.imageUrl ?? fallback.image,
     status,
     deadline: formatDeadline(match.deadlineAt, status),
@@ -391,15 +401,17 @@ function countToday(items: V1Match[]) {
   }).length;
 }
 
-function getCapacity(match: V1Match, fallback: MatchCardModel) {
+function getCapacity(match: V1Match) {
   if (typeof match.participantCount === 'number' && typeof match.capacity === 'number') {
     return { current: match.participantCount, capacity: match.capacity };
   }
 
   const [current, capacity] = match.capacityText?.match(/\d+/g)?.map(Number) ?? [];
+  // 인원을 못 읽으면 0 으로 둔다. 목업(18/22명)으로 메우면 실제 매치에 **다른 매치의 인원**이
+  // 붙어, 자리가 남았는지 없는지를 잘못 알려준다.
   return {
-    current: current ?? fallback.current,
-    capacity: capacity ?? match.capacity ?? fallback.capacity,
+    current: current ?? 0,
+    capacity: capacity ?? match.capacity ?? 0,
   };
 }
 

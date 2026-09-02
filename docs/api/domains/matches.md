@@ -33,6 +33,8 @@
 | `limit` | 1~50 | No | 기본 20 |
 
 - Response: `{ items, pageInfo }`
+- Each list item includes `host.userId`, `host.displayName`, `host.profileImageUrl`, and `host.trustState`.
+  `host.displayName` resolves the creator profile nickname first, then the profile display name, then the semantic `호스트` fallback.
 - Level response fields: `levelLabel`, `minLevel`, `maxLevel`
 
 ## POST /matches (CreateMatchDto)

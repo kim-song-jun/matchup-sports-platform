@@ -12,12 +12,23 @@ export type TeamMatchModel = {
   format: string;
   grade: string;
   style: string;
-  cost: number;
-  opponentCost: number;
+  /**
+   * 비용은 **모를 수 있다**(null). 호스트가 costNote 를 안 적은 매치가 있고(리그 대진이
+   * 대표적), 그때 목업 금액(280,000원 · 140,000원)을 그대로 보여주던 것이 원래 결함이다.
+   * 0 으로 채우는 것도 '무료초청'이라는 새 거짓말이라 null 로 두고 화면이 그 자리를 감춘다.
+   */
+  cost: number | null;
+  opponentCost: number | null;
   uniform: string;
   gender: string;
-  manner: number;
-  wins: number;
+  /**
+   * 매너 평점·승수는 **모를 수 있다**(null). 매너는 공개된 팀 후기가 한 건도 없으면 집계값이
+   * 없고, 승수는 API 를 못 받은 프리렌더/폴백 경로에서 비어 있다. 예전에는 이 자리를 화면
+   * 골격용 목업(매너 4.8 · 승 23)이 채워 **어느 팀 매치를 열어도 같은 가짜 숫자**가 보였다.
+   * null 을 허용하고 화면은 그 줄을 감춘다 — 모르는 값을 지어내지 않는다(dev 와 같은 계약).
+   */
+  manner: number | null;
+  wins: number | null;
   status: 'open' | 'pending' | 'approved' | 'closed' | 'mine';
 };
 

@@ -130,3 +130,40 @@ describe('팀매치 만들기 진행 표시줄 — 클릭 이동', () => {
     expect(screen.queryByRole('button', { name: /단계.*이동/ })).not.toBeInTheDocument();
   });
 });
+
+/**
+ * 팀 통계(매너·전적)는 호스트팀에 공개된 후기가 없으면 낼 수 없는 값이다.
+ * 원래 결함: 그 자리를 화면 골격용 목업(매너 4.8 · 승 23)이 채워 **어느 팀 매치를 열어도
+ * 같은 숫자**가 보였다. 0 으로 채우는 것도 새 거짓말이라(잘하는 팀이 최악으로 보인다)
+ * 계약은 "모르는 값은 null, 화면은 그 줄을 감춘다" 하나다 — dev 와 같은 계약이다.
+ */
+describe('팀 통계를 모를 때(null) 화면이 숫자를 지어내지 않는다', () => {
+  it('상세: 매너·전적이 null 이면 그 줄을 감춘다', () => {
+    const model = getTeamMatchDetailViewModel();
+    model.match.manner = null;
+    model.match.wins = null;
+
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    expect(screen.queryByText(/매너/)).not.toBeInTheDocument();
+  });
+
+  it('목록 카드: 매너·전적이 null 이면 그 줄을 감춘다', () => {
+    const model = getTeamMatchListViewModel();
+    model.matches = model.matches.map((match) => ({ ...match, manner: null, wins: null }));
+
+    renderPage(<TeamMatchListPageView model={model} />);
+
+    expect(screen.queryByText(/매너/)).not.toBeInTheDocument();
+  });
+
+  it('값이 있으면 그대로 보여준다(회귀 방지)', () => {
+    const model = getTeamMatchDetailViewModel();
+    model.match.manner = 4.75;
+    model.match.wins = 6;
+
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    expect(screen.getByText(/매너 4.75 · 승 6/)).toBeInTheDocument();
+  });
+});

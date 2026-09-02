@@ -222,10 +222,12 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
     ? {
         ...fallback,
         match: {
-          ...fallback.match,
+          // `...fallback.match` 스프레드를 걷어냈다 — 확장 필드까지 전부 아래에서 채운다.
           ...toTeamMatch(query.data, fallback.match),
-          description: query.data.description ?? query.data.descriptionPreview ?? fallback.match.description,
-          address: query.data.place?.addressText ?? query.data.placeName ?? fallback.match.address,
+          // 목업 폴백을 걷어냈다 — address 는 폴백이 걸리면 **다른 매치의 실제 주소**를
+          // 이 매치의 주소처럼 보여줬다. 모르면 빈 값으로 둔다.
+          description: query.data.description ?? query.data.descriptionPreview ?? '',
+          address: query.data.place?.addressText ?? query.data.placeName ?? '',
           hostTeamHref: query.data.hostTeam?.teamId ? `/teams/${query.data.hostTeam.teamId}` : undefined,
           hostTeamId: query.data.hostTeam?.teamId ?? null,
           hostTeamLogoUrl: query.data.hostTeam?.logoUrl ?? null,
@@ -319,7 +321,7 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
 // page-view component tree.
 export function toTeamMatch(match: V1TeamMatch, fallback: TeamMatchModel): TeamMatchModel {
   const status = statusToCardStatus(getStatus(match), getViewerState(match));
-  const costs = parseCosts(match.costNote, fallback);
+  const costs = parseCosts(match.costNote);
   const hasStructuredConditions = Boolean(match.matchFormat) || (match.matchStyle?.length ?? 0) > 0 || Boolean(match.uniformColor);
   const legacyNote = !hasStructuredConditions ? match.rulesText ?? '' : '';
 
@@ -328,10 +330,12 @@ export function toTeamMatch(match: V1TeamMatch, fallback: TeamMatchModel): TeamM
     id: match.teamMatchId ?? match.id ?? fallback.id,
     title: match.title,
     imageUrl: match.imageUrl ?? fallback.imageUrl,
-    sport: match.sport?.name ?? match.sportName ?? fallback.sport,
-    hostTeam: match.hostTeam?.name ?? match.hostTeamName ?? fallback.hostTeam,
-    venue: match.place?.name ?? match.placeName ?? fallback.venue,
-    region: match.region?.name ?? match.regionName ?? fallback.region,
+    // 목업(team-matches.view-model.ts)을 사실 값의 폴백으로 쓰지 않는다 — 폴백이 걸리면
+    // 실제 매치에 **존재하지 않는 팀 이름**('FC 발빠른놈들')과 남의 경기장·지역이 붙었다.
+    sport: match.sport?.name ?? match.sportName ?? '',
+    hostTeam: match.hostTeam?.name ?? match.hostTeamName ?? '',
+    venue: match.place?.name ?? match.placeName ?? '',
+    region: match.region?.name ?? match.regionName ?? '지역 미정',
     date: formatDate(match.startsAt),
     time: formatTime(match.startsAt),
     endTime: match.endsAt ? formatTime(match.endsAt) : undefined,
@@ -341,7 +345,9 @@ export function toTeamMatch(match: V1TeamMatch, fallback: TeamMatchModel): TeamM
     cost: costs.cost,
     opponentCost: costs.opponentCost,
     uniform: match.uniformColor || '',
-    gender: match.genderRule ?? fallback.gender,
+    gender: match.genderRule ?? '성별 미설정',
+    manner: match.hostTeam?.mannerScore ?? null,
+    wins: match.hostTeam?.wins ?? null,
     status,
   };
 }
@@ -697,11 +703,14 @@ function reasonLabel(reasonCode?: string) {
   return '팀을 만들고 신청할 수 있어요';
 }
 
-function parseCosts(value: string | null | undefined, fallback: TeamMatchModel) {
+function parseCosts(value: string | null | undefined) {
   const amounts = value?.match(/\d[\d,]*/g)?.map((item) => Number(item.replace(/,/g, ''))) ?? [];
+  // costNote 가 없으면(호스트가 비용을 안 적었으면) 이 매치의 실제 비용은 "모른다"이지, 다른
+  // 목업 매치의 280,000원/140,000원이 아니다. 0 으로 채우면 '무료초청' 배지가 붙어 "공짜다"라는
+  // 또 다른 거짓말이 되므로, 모르는 값은 null 로 두고 화면이 그 자리를 감추게 한다.
   return {
-    cost: amounts[0] ?? fallback.cost,
-    opponentCost: amounts[1] ?? fallback.opponentCost,
+    cost: amounts[0] ?? null,
+    opponentCost: amounts[1] ?? null,
   };
 }
 

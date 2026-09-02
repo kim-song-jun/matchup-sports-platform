@@ -435,6 +435,34 @@ describe('TeamContactsService 응답 처리', () => {
   });
 });
 
+describe('TeamContactsService 응답 시스템 메시지 — 세 전이 모두', () => {
+  const base = { id: 'c1', fromTeamId: 'A', toTeamId: 'B', status: 'requested', expiresAt: new Date(Date.now() + 86400000) };
+
+  it.each([
+    ['accepted', (s: TeamContactsService) => s.accept(actor, 'c1'), '컨택을 수락했어요', null],
+    ['declined', (s: TeamContactsService) => s.decline(actor, 'c1', { reason: '이번 주는 어려워요' }), '컨택을 거절했어요', '이번 주는 어려워요'],
+    ['withdrawn', (s: TeamContactsService) => s.withdraw(actor, 'c1'), '컨택을 철회했어요', null],
+  ] as const)('%s → 시스템 메시지 본문이 고정 문구이고 거절 사유는 컨택 행에만 저장된다', async (nextStatus, act, body, declineReason) => {
+    const prisma = makePrisma();
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
+    prisma.v1TeamContact.findUnique.mockResolvedValue(base);
+    prisma.v1TeamContact.updateMany.mockResolvedValue({ count: 1 });
+    prisma.v1TeamContact.findUniqueOrThrow.mockResolvedValue({ ...base, status: nextStatus, declineReason });
+    prisma.v1ChatRoom.findUnique.mockResolvedValue({ id: 'room-1' });
+    const service = new TeamContactsService(prisma, makeNotifications());
+
+    await act(service);
+
+    expect(prisma.v1TeamContact.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: nextStatus, declineReason }) }),
+    );
+    const message = prisma.v1ChatMessage.create.mock.calls[0][0].data;
+    expect(message).toMatchObject({ chatRoomId: 'room-1', messageType: 'system', systemEventType: null, body });
+    // 거절 사유가 시스템 메시지 본문으로 새지 않는다(스펙 결정 7)
+    expect(message.body).not.toContain('이번 주는 어려워요');
+  });
+});
+
 describe('TeamContactsService.summary', () => {
   it('운영 팀 전체의 대기 중 받은 컨택을 팀별로 세고, 세기 전에 만료 건을 정리한다', async () => {
     const prisma = makePrisma();

@@ -134,6 +134,13 @@ describe('팀 컨택 전체 흐름', () => {
     expect(count).toBe(1);
   });
 
+  it('3-1) B owner 의 대기 컨택 요약은 1건, A owner 는 0건이다', async () => {
+    const resB = await request(app.getHttpServer()).get('/api/v1/me/team-contacts/summary').set('x-v1-user-id', ids.ownerB).expect(200);
+    expect(resB.body.data).toEqual({ pendingInbound: 1, byTeam: [{ teamId: ids.teamB, pendingInbound: 1 }] });
+    const resA = await request(app.getHttpServer()).get('/api/v1/me/team-contacts/summary').set('x-v1-user-id', ids.ownerA).expect(200);
+    expect(resA.body.data).toEqual({ pendingInbound: 0, byTeam: [{ teamId: ids.teamA, pendingInbound: 0 }] });
+  });
+
   it('4) 같은 팀쌍에 다시 발신하면 409 TEAM_CONTACT_ALREADY_ACTIVE 이고 기존 방 id 를 알려준다', async () => {
     const res = await request(app.getHttpServer())
       .post(`/api/v1/teams/${ids.teamB}/contacts`)
@@ -170,6 +177,11 @@ describe('팀 컨택 전체 흐름', () => {
     }
     expect(notification).not.toBeNull();
     expect(notification?.deepLink).toBe(`/chat/${roomId}`);
+  });
+
+  it('5-1) 수락 뒤 B owner 의 대기 컨택 요약은 0건이다', async () => {
+    const res = await request(app.getHttpServer()).get('/api/v1/me/team-contacts/summary').set('x-v1-user-id', ids.ownerB).expect(200);
+    expect(res.body.data).toEqual({ pendingInbound: 0, byTeam: [{ teamId: ids.teamB, pendingInbound: 0 }] });
   });
 
   it('6) 수락 뒤에는 A owner 가 전송할 수 있다', async () => {

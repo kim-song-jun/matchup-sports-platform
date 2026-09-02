@@ -2350,7 +2350,9 @@ function toMyHomeModel(
   const totalMannerScore = activitySummary?.totals.mannerScore ?? profile.reputation.mannerScore;
   const activityCount = activitySummary?.totals.activityCount ?? '—';
   const monthlyMatchCount = activitySummary?.monthly.matchCount ?? '—';
-  const sections = myHomeModel.sections.map((section) => ({ ...section, items: [...section.items] }));
+  // 항목 객체까지 복사한다 — 얕은 복사면 아래 badge 쓰기가 모듈 싱글턴(my.view-model)을 오염시켜
+  // 배지가 영영 안 지워지고 로딩 셸·다른 계정에도 새어 나간다(최종 리뷰 Critical 1).
+  const sections = myHomeModel.sections.map((section) => ({ ...section, items: section.items.map((item) => ({ ...item })) }));
   // F3: 마이페이지에서 내 활동 기록(/users/:id/records)으로 가는 동선이 아예 없었다 —
   // 정적 myHomeModel엔 내 userId를 미리 넣을 수 없어 여기서 프로필 응답으로 동적으로 붙인다.
   const myActivitySection = sections.find((section) => section.title === '내 활동');
@@ -2364,7 +2366,7 @@ function toMyHomeModel(
   }
   const communitySection = sections.find((section) => section.title === '커뮤니티');
   const chatItem = communitySection?.items.find((item) => item.href === '/chat');
-  if (chatItem && pendingContactCount > 0) chatItem.badge = pendingContactCount;
+  if (chatItem) chatItem.badge = pendingContactCount > 0 ? pendingContactCount : undefined;
   if (communitySection && !communitySection.items.some((item) => item.href === '/my/reviews')) {
     communitySection.items.push({
       label: '리뷰',

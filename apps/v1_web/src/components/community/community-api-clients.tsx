@@ -43,21 +43,43 @@ function initialChatCategory(category: string | null): ChatCategory {
   return category === 'team_contact' ? '팀컨택' : '전체';
 }
 
+const CHAT_LIST_PAGE_SIZE = 50;
+const CATEGORY_ROOM_TYPE: Record<Exclude<ChatCategory, '전체'>, V1ChatRoom['roomType']> = {
+  개인매치: 'match',
+  팀매치: 'team_match',
+  팀: 'team',
+  팀컨택: 'team_contact',
+};
+
 function useChatListPageModel(): ChatListViewModel {
   const searchParams = useSearchParams();
   const [selectedCategory, setSelectedCategory] = useState<ChatCategory>(() => initialChatCategory(searchParams.get('category')));
-  const query = useV1ChatRooms();
+  // 서버 최대 페이지(50)로 받는다. 카테고리를 고르면 서버 roomType 필터로 다시 받는다 — 첫 페이지를
+  // 클라이언트에서 거르면 "받은 컨택 3" 배지를 눌렀는데 목록이 비는 일이 생긴다(최종 리뷰 Important 2).
+  const query = useV1ChatRooms(undefined, { limit: CHAT_LIST_PAGE_SIZE });
+  const filteredQuery = useV1ChatRooms(
+    { enabled: selectedCategory !== '전체' },
+    selectedCategory === '전체' ? undefined : { roomType: CATEGORY_ROOM_TYPE[selectedCategory], limit: CHAT_LIST_PAGE_SIZE },
+  );
   const updateMe = useV1UpdateChatRoomMe();
   const baseRooms = query.data?.items.map(toChatRoomModel) ?? [];
-  const rooms = baseRooms.map((room) => ({
+  const categoryRooms = filteredQuery.data?.items.map(toChatRoomModel);
+  const withActions = (room: ChatRoomModel) => ({
     ...room,
     actionPending: updateMe.isPending && updateMe.variables?.roomId === room.id,
     onTogglePin: () => updateMe.mutate({ roomId: room.id, pinned: !room.pinned }),
     // 앱 알림 등록 전까지 채팅방별 알림 설정은 비활성화한다.
     // 앱 푸시 연동 후 아래 콜백과 community-page.tsx의 버튼을 함께 복구한다.
     // onToggleMute: () => updateMe.mutate({ roomId: room.id, mutedUntil: room.muted ? null : mutedUntilIndefinite() }),
-  }));
-  const visibleRooms = selectedCategory === '전체' ? rooms : rooms.filter((room) => room.type === selectedCategory);
+  });
+  const rooms = baseRooms.map(withActions);
+  // 필터 응답이 아직 없으면(첫 로딩) 전체 목록을 클라이언트에서 걸러 보여 주고, 도착하면 서버 결과로 바꾼다.
+  const visibleRooms =
+    selectedCategory === '전체'
+      ? rooms
+      : categoryRooms
+        ? categoryRooms.map(withActions)
+        : rooms.filter((room) => room.type === selectedCategory);
   const categories: ChatCategory[] = ['전체', '개인매치', '팀매치', '팀', '팀컨택'];
   const isEmpty = visibleRooms.length === 0;
   const model: ChatListViewModel = {
@@ -69,7 +91,7 @@ function useChatListPageModel(): ChatListViewModel {
     })),
     pinnedRooms: visibleRooms.filter((room) => room.pinned),
     rooms: visibleRooms.filter((room) => !room.pinned),
-    status: query.isPending ? 'loading' : query.isError ? 'error' : 'ready',
+    status: query.isPending || (selectedCategory !== '전체' && filteredQuery.isPending) ? 'loading' : query.isError ? 'error' : 'ready',
     emptyTitle: query.isError ? '채팅방을 불러오지 못했어요' : isEmpty ? `${selectedCategory} 채팅방이 없어요` : undefined,
     emptyBody: query.isError ? '잠시 후 다시 시도해 주세요.' : isEmpty ? '매치에 참가하거나 팀에 가입하면 채팅방이 생겨요.' : undefined,
     emptyHref: query.isError || selectedCategory === '팀' || selectedCategory === '팀컨택' ? undefined : '/matches',

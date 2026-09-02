@@ -2470,10 +2470,17 @@ export function useV1SubmitReview() {
   });
 }
 
-export function useV1ChatRooms(options?: QueryOptions) {
+export type V1ChatRoomsFilters = { roomType?: V1ChatRoom['roomType']; limit?: number };
+
+/**
+ * 방 목록. `filters` 가 있으면 서버 필터(`roomType`)·페이지 크기를 그대로 넘긴다 — 목록 화면의
+ * 카테고리 칩은 클라이언트 필터가 아니라 이 서버 필터를 써야 첫 페이지 바깥의 방을 놓치지 않는다.
+ * 키는 `chatRooms()` 접두사를 공유하므로 기존 무효화가 필터 버전까지 함께 갱신한다.
+ */
+export function useV1ChatRooms(options?: QueryOptions, filters?: V1ChatRoomsFilters) {
   return useQuery({
-    queryKey: v1Keys.chatRooms(),
-    queryFn: () => v1Get<CursorPage<V1ChatRoom>>('/chat/rooms'),
+    queryKey: filters ? ([...v1Keys.chatRooms(), 'list', filters] as const) : v1Keys.chatRooms(),
+    queryFn: () => v1Get<CursorPage<V1ChatRoom>>('/chat/rooms', filters),
     enabled: options?.enabled ?? true,
   });
 }

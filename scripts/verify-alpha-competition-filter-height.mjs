@@ -100,7 +100,7 @@ async function main() {
       try {
         const res = await page.goto(`${BASE}/tournaments`, { waitUntil: 'domcontentloaded', timeout: 60_000 });
         const status = res?.status() ?? 0;
-        if (status >= 400) {
+        if (status >= 400 || status === 0) {
           /**
            * ⚠️ 403/429 는 **못 쟀다**(⚠️)이지 화면 결함(❌)이 아니다. 예전엔 `❌ 403 rate limit
            * (화면 결함 아님)` 이라고 적었는데 — **글로는 아니라면서 기호는 ❌ 였다.** 그래서
@@ -152,7 +152,7 @@ async function main() {
     try {
       const res = await page.goto(`${BASE}/tournaments?kind=tournament&status=draft`, { waitUntil: 'domcontentloaded', timeout: 60_000 });
       const status = res?.status() ?? 0;
-      if (status >= 400) {
+      if (status >= 400 || status === 0) {
         rows.push({ 폭: '요약누수', HTTP: status, 필터높이: '-', 기준선: '-', 구성: '-', 판정: `⚠️ HTTP ${status} — 못 쟀다` });
       } else {
         await page.waitForTimeout(SETTLE_MS);
@@ -186,7 +186,10 @@ async function main() {
   if (harness > 0) {
     console.log(`⚠️ 하네스 실패 ${harness}건 — 화면에 대해 판정하지 마라.`);
     process.exitCode = 2;
-  } else if (failed > 0 || headerMissing || before !== after) {
+  } else if (headerMissing || before !== after) {
+    // 배포 창의 숫자는 판정에 쓸 수 없다 — 결함(1)이 아니라 버려야 할 실행(2)이다.
+    process.exitCode = 2;
+  } else if (failed > 0) {
     process.exitCode = 1;
   }
 }

@@ -165,7 +165,10 @@ async function main() {
   if (harness > 0) {
     console.log(`⚠️ 못 잰 항목 ${harness}건 — 그 자리에 대해 판정하지 마라.`);
     process.exitCode = 2;
-  } else if (failed > 0 || headerMissing || before !== after) {
+  } else if (headerMissing || before !== after) {
+    // 배포 창의 숫자는 판정에 쓸 수 없다 — 결함(1)이 아니라 버려야 할 실행(2)이다.
+    process.exitCode = 2;
+  } else if (failed > 0) {
     process.exitCode = 1;
   }
 }

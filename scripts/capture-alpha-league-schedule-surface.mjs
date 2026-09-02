@@ -248,7 +248,7 @@ async function capture(browser, { width, height }, url, file, isBracket, expectG
     const status = res?.status() ?? 0;
     // **403 을 던지지 않고 결과로 남긴다.** alpha 는 과한 캡처에 1분간 전면 403 을 걸고,
     // 403 페이지도 PNG 로는 멀쩡해 보인다 — 던지면 앞선 폭의 정상 결과까지 잃는다.
-    if (status >= 400) {
+    if (status >= 400 || status === 0) {
       const why =
         status === 403
           ? '403 rate limit — 1분 뒤 이 폭만 다시 (화면 결함 아님)'

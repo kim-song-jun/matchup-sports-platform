@@ -154,7 +154,14 @@ async function main() {
   else if (before !== after) console.log('⚠️ 측정 도중 서빙본이 바뀌었다 — 버리고 다시 돌려라.');
 
   const failed = rows.filter((r) => String(r.판정).startsWith('❌')).length;
-  if (failed > 0 || headerMissing || before !== after) process.exitCode = 1;
+  /**
+   * ⚠️ **"이 실행을 버려야 한다" 와 "화면이 깨졌다" 는 다른 사건이다.** 서빙 커밋을 못 읽었거나
+   * 측정 도중 서빙본이 바뀌면 그 숫자는 **배포 창의 것**이라 판정에 쓸 수 없다 — 결함(1)이 아니라
+   * 하네스 실패(2)다. 예전엔 둘을 함께 exit 1 로 냈는데, 그러면 자동화가 **실제 회귀와 구별하지
+   * 못한다**(이 스크립트 머리의 "배포 창을 피한다" 서술과도 어긋난다).
+   */
+  if (headerMissing || before !== after) process.exitCode = 2;
+  else if (failed > 0) process.exitCode = 1;
 }
 
 main().catch((error) => {

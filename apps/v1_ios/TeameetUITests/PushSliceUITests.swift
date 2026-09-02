@@ -13,13 +13,7 @@ import XCTest
 ///
 /// Run: scripts/ios/verify-push-slice.sh
 @MainActor
-final class PushSliceUITests: XCTestCase {
-
-    private let app = XCUIApplication()
-    private let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
-
-    /// System alerts follow the device language, not the app's, so both labels are accepted.
-    private let allowLabels = ["허용", "Allow"]
+final class PushSliceUITests: LiveWebHarnessCase {
 
     /// The push row is a `role="switch"` button carrying `aria-label="푸시 알림 받기"`. An
     /// element with its own accessible name is a leaf, so the title and caption rendered
@@ -39,114 +33,6 @@ final class PushSliceUITests: XCTestCase {
 
     /// The row is disabled while a request is in flight, and while the OS has push blocked.
     private var isPushRowBusy: Bool { pushRow.exists && !pushRow.isEnabled }
-
-    override func setUpWithError() throws {
-        continueAfterFailure = false
-    }
-
-    // MARK: - Environment
-
-    private func environmentValue(_ name: String) throws -> String {
-        guard let value = ProcessInfo.processInfo.environment[name], !value.isEmpty else {
-            throw XCTSkip("""
-                \(name) is not set. scripts/ios/verify-push-slice.sh passes it as an \
-                xcodebuild build setting, which the scheme forwards to this process.
-                """)
-        }
-        return value
-    }
-
-    // MARK: - Web helpers
-
-    private var webView: XCUIElement { app.webViews.firstMatch }
-
-    @discardableResult
-    private func waitForWeb(_ timeout: TimeInterval = 60) -> XCUIElement {
-        XCTAssertTrue(webView.waitForExistence(timeout: timeout), "the shell showed no web view")
-        return webView
-    }
-
-    /// The tab bar is fixed along the bottom of every screen, so a row that sits under it
-    /// cannot be tapped safely: XCTest resolves the row's centre, and if the page is still
-    /// gliding when the tap lands, the tab bar is what receives it. Rows are kept this far
-    /// clear of the bottom edge before being tapped.
-    private let tabBarGuard: CGFloat = 140
-
-    /// Taps one of the fixed tabs. No scrolling: the tab bar does not move, and it is the
-    /// one control reachable from every screen, which is what makes it the recovery path.
-    @discardableResult
-    private func tapTab(_ label: String, timeout: TimeInterval = 30) -> Bool {
-        let tab = webView.links[label]
-        guard tab.waitForExistence(timeout: timeout), tab.isHittable else { return false }
-        tab.tap()
-        return true
-    }
-
-    /// Scrolls by about a third of the page with a controlled drag rather than a flick.
-    ///
-    /// `swipeUp()` keeps gliding after the gesture ends. That is what put the "계정 설정" row
-    /// under the tab bar mid-tap and sent the run to the home screen instead of settings.
-    private func scrollPage() {
-        let start = webView.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.72))
-        let end = webView.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.38))
-        start.press(forDuration: 0.1, thenDragTo: end)
-        settle()
-    }
-
-    /// Taps the first link or button whose accessible name starts with `name`.
-    ///
-    /// Prefix rather than exact match, because a settings row's accessible name is its title
-    /// followed by its subtitle. Scrolling, because a row below the fold is not in the
-    /// accessibility tree until it is on screen.
-    @discardableResult
-    private func tapRow(_ name: String, timeout: TimeInterval = 60) -> Bool {
-        tapMatching(NSPredicate(format: "label BEGINSWITH %@", name), timeout: timeout)
-    }
-
-    private func tapMatching(_ predicate: NSPredicate, timeout: TimeInterval) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        var lastTop: CGFloat = .greatestFiniteMagnitude
-        while Date() < deadline {
-            for query in [webView.buttons, webView.links, webView.switches] {
-                let element = query.matching(predicate).firstMatch
-                guard element.exists, element.isHittable else { continue }
-                if element.frame.maxY <= webView.frame.maxY - tabBarGuard {
-                    tapWhenStill(element)
-                    return true
-                }
-            }
-            let top = webView.staticTexts.firstMatch.frame.minY
-            scrollPage()
-            // Once the page stops moving there is nothing further down to reveal, so keep
-            // waiting for the network rather than dragging at a wall.
-            if abs(top - lastTop) < 1 { settle(2) }
-            lastTop = top
-        }
-        return false
-    }
-
-    /// Taps only once the element has stopped moving.
-    private func tapWhenStill(_ element: XCUIElement) {
-        var previous = element.frame
-        for _ in 0..<12 {
-            settle(0.25)
-            let current = element.frame
-            if current == previous { break }
-            previous = current
-        }
-        element.tap()
-    }
-
-    /// A short pause expressed as a query rather than a sleep, so it also gives the
-    /// accessibility tree a chance to refresh.
-    private func settle(_ seconds: TimeInterval = 1) {
-        _ = webView.staticTexts.firstMatch.waitForExistence(timeout: seconds)
-    }
-
-    private func linkExists(_ prefix: String, timeout: TimeInterval = 0) -> Bool {
-        let element = webView.links.matching(NSPredicate(format: "label BEGINSWITH %@", prefix)).firstMatch
-        return timeout > 0 ? element.waitForExistence(timeout: timeout) : element.exists
-    }
 
     /// Walks to the notification settings screen, checking arrival at every step.
     ///
@@ -173,113 +59,6 @@ final class PushSliceUITests: XCTestCase {
         attach("nav-gave-up")
         attachTree("nav-gave-up-tree")
         XCTFail("could not reach the notification settings screen", file: file, line: line)
-    }
-
-    private func waitForText(_ prefix: String, timeout: TimeInterval = 40) -> Bool {
-        webView.staticTexts
-            .matching(NSPredicate(format: "label BEGINSWITH %@", prefix))
-            .firstMatch
-            .waitForExistence(timeout: timeout)
-    }
-
-    private func attach(_ name: String) {
-        let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-        shot.name = name
-        shot.lifetime = .keepAlways
-        add(shot)
-    }
-
-    private func attachTree(_ name: String) {
-        let tree = XCTAttachment(string: app.debugDescription)
-        tree.name = name
-        tree.lifetime = .keepAlways
-        add(tree)
-    }
-
-    /// Signs in through the web app's own email form.
-    ///
-    /// This is the only way to get a session cookie into the shell's cookie store, which is
-    /// the store `PushDeviceClient` reads — an injected cookie would not prove that path.
-    private func signIn() throws {
-        let email = try environmentValue("TEAMEET_UITEST_EMAIL")
-        let password = try environmentValue("TEAMEET_UITEST_PASSWORD")
-
-        app.launch()
-        waitForWeb()
-
-        // Signed in already, from an earlier test against the same installation.
-        if webView.links["마이"].waitForExistence(timeout: 15), !webView.links["로그인하기"].exists {
-            return
-        }
-
-        XCTAssertTrue(tapRow("로그인하기"), "no sign-in entry point on the landing screen")
-        XCTAssertTrue(tapRow("이메일로 로그인"), "no email sign-in option")
-
-        let emailField = webView.textFields.element(boundBy: 0)
-        XCTAssertTrue(emailField.waitForExistence(timeout: 40), "the email form never appeared")
-        XCTAssertTrue(focus(emailField), "the email field never took keyboard focus")
-        emailField.typeText(email)
-
-        let passwordField = webView.secureTextFields.element(boundBy: 0)
-        XCTAssertTrue(passwordField.waitForExistence(timeout: 15), "no password field")
-        // Tab out of the email field rather than tapping the password one. Tapping it does
-        // not move focus here — measured: four attempts over sixteen seconds and
-        // `hasKeyboardFocus` stayed false — while the browser's own next-field behaviour
-        // does, because it is the page moving focus rather than a synthesised hit test.
-        //
-        // `typeKey` rather than `typeText("\t")`: the text form inserts a literal tab into
-        // the email instead of moving focus, and the sign-in then fails much later with
-        // "did not complete" — the corrupted address is invisible from that message.
-        if !hasKeyboardFocus(passwordField) {
-            emailField.typeKey(XCUIKeyboardKey.tab, modifierFlags: [])
-        }
-        // The address must be exactly what was typed. A stray tab here is why an earlier run
-        // reached the submit button and still failed to sign in.
-        XCTAssertEqual(emailField.value as? String, email, "the email field holds something else")
-        XCTAssertTrue(focus(passwordField), "the password field never took keyboard focus")
-        passwordField.typeText(password)
-
-        XCTAssertTrue(tapRow("로그인"), "no submit button on the sign-in form")
-        XCTAssertTrue(webView.links["마이"].waitForExistence(timeout: 90), "sign-in did not complete")
-        attach("01-signed-in")
-    }
-
-    /// Taps a field and waits until that field actually holds keyboard focus.
-    ///
-    /// A bare `tap()` followed by `typeText` fails intermittently with "Neither element nor
-    /// any descendant has keyboard focus": the tap is dispatched, but on a web form the field
-    /// can still be settling — the previous field's keyboard is dismissing, or the page has
-    /// not finished laying out — so the keystrokes arrive before focus does.
-    ///
-    /// Waiting for `app.keyboards` is not enough, and looked like it worked: a simulator with
-    /// a hardware keyboard attached reports a keyboards element the whole time, so the wait
-    /// returned immediately and the same failure came back at the same line. The element's own
-    /// `hasKeyboardFocus` is the thing that was actually false, so that is what is polled.
-    @discardableResult
-    private func focus(_ field: XCUIElement, attempts: Int = 4) -> Bool {
-        for attempt in 0..<attempts {
-            if hasKeyboardFocus(field) { return true }
-            // An element tap resolves to the element's own hit point, which a web input can
-            // report while the previous field's keyboard still owns focus. A coordinate tap
-            // goes to the same place by a different route and lands when the element tap does
-            // not, so the two are alternated rather than one being repeated.
-            if attempt % 2 == 0 {
-                field.tap()
-            } else {
-                field.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-            }
-            let deadline = Date().addingTimeInterval(4)
-            while Date() < deadline {
-                if hasKeyboardFocus(field) { return true }
-                settle(0.5)
-            }
-        }
-        return false
-    }
-
-    /// Exposed through KVC rather than the public API, which has no equivalent.
-    private func hasKeyboardFocus(_ field: XCUIElement) -> Bool {
-        (field.value(forKey: "hasKeyboardFocus") as? Bool) ?? false
     }
 
     // MARK: - Tests
@@ -373,13 +152,6 @@ final class PushSliceUITests: XCTestCase {
             _ = springboard.otherElements.firstMatch.waitForExistence(timeout: 2)
         }
         return nil
-    }
-
-    private func attachSpringboard(_ name: String) {
-        let tree = XCTAttachment(string: springboard.debugDescription)
-        tree.name = name
-        tree.lifetime = .keepAlways
-        add(tree)
     }
 
     private func waitUntilPushRowSettles(timeout: TimeInterval) -> Bool {
@@ -497,5 +269,59 @@ final class PushSliceUITests: XCTestCase {
         XCTAssertTrue(
             landed,
             "the tap did not land on inquiry \(inquiryId) — check DeepLinkRoute.safeRoute")
+    }
+
+    /// The real remote path, end to end: alpha's API signs a provider token, talks to Apple's
+    /// sandbox gateway, and the simulator shows the banner. Everything before this in the
+    /// bundle stops at the registration; `testB` proves the tap with a locally injected
+    /// payload. Neither says whether the server can actually reach a device — which is the
+    /// question that matters when "notifications don't arrive".
+    ///
+    /// The notification is sent from outside the process while this test waits (the runner
+    /// calls the admin push endpoint for this account), so what runs is the deployed API's
+    /// own send path. Fresh install required: the explainer only appears while the system
+    /// status is `notDetermined`, and the opt-in it records is what lets the token register.
+    func testEAServerSentNotificationReachesThisDevice() throws {
+        let title = try environmentValue("TEAMEET_UITEST_BANNER_TITLE")
+        try signIn()
+
+        // Opt in the way a reader does: the shell's explainer, then the system dialog.
+        let explainer = app.otherElements["알림 받기 안내"]
+        XCTAssertTrue(explainer.waitForExistence(timeout: 60), "the explainer never appeared")
+        app.buttons["push-prompt-accept"].tap()
+        let alert = springboard.alerts.firstMatch
+        XCTAssertTrue(alert.waitForExistence(timeout: 30), "the system permission prompt never appeared")
+        let allow = allowLabels.map { alert.buttons[$0] }.first { $0.exists }
+        XCTAssertNotNil(allow, "no allow button in the prompt")
+        allow?.tap()
+        attach("12-after-allow")
+
+        // The registration happens on the token callback; the settings row is the only place
+        // its outcome is visible, and ON means the origin stored this device.
+        openNotificationSettings()
+        let deadline = Date().addingTimeInterval(90)
+        while Date() < deadline, !isPushRowOn { settle(2) }
+        attach("13-settings-after-opt-in")
+        XCTAssertTrue(isPushRowOn, "the device did not register with the origin")
+
+        // Tells the runner the device is registered, so it sends now rather than on a guess
+        // about how long sign-in took. The simulator shares the host's file system.
+        if let ready = ProcessInfo.processInfo.environment["TEAMEET_UITEST_READY_FILE"], !ready.isEmpty {
+            FileManager.default.createFile(atPath: ready, contents: Data())
+        }
+
+        // Backgrounded, so what arrives is a banner rather than a foreground decision.
+        XCUIDevice.shared.press(.home)
+        let carriesTitle = NSPredicate(format: "label CONTAINS %@", title)
+        let bannerDeadline = Date().addingTimeInterval(240)
+        var banner: XCUIElement?
+        while Date() < bannerDeadline, banner == nil {
+            let byText = springboard.descendants(matching: .any).matching(carriesTitle).firstMatch
+            if byText.exists { banner = byText; break }
+            _ = springboard.otherElements.firstMatch.waitForExistence(timeout: 3)
+        }
+        attach(banner == nil ? "14-no-banner" : "14-banner")
+        attachSpringboard("14-springboard-tree")
+        XCTAssertNotNil(banner, "no server-sent notification reached this device within the window")
     }
 }

@@ -1,14 +1,13 @@
 import { ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
-import { Prisma, V1GameSideKey, V1GameSourceType } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { AdminContextService, type V1ActiveAdmin } from '../common/admin-context.service';
-import { canonicalGameCommandPayloadHash, GamesService } from '../games/games.service';
+import { GamesService } from '../games/games.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { NotificationsService } from '../notifications/notifications.service';
 import { resolveTeamMatchCompetitionConfig } from '../team-matches/resolve-team-match-competition-config';
 import {
   cascadeCancelTeamMatchSchedulesInTx,
-  createTeamMatchScheduleInTx,
   syncTeamMatchScheduleInTx,
 } from '../team-schedules/team-schedules.service';
 import { scheduleLeagueResultEntryReminder } from '../jobs/league-reminders/league-result-entry-reminder.service';
@@ -23,6 +22,7 @@ import { tierLabel } from './league-series-admin.service';
 import { resolveResultStage } from './league-result-stage';
 import { resolveIsForfeit } from './league-match-forfeit.service';
 import { FixtureScheduleTemplate, FixtureTimingOptions, generateRoundRobinFixtures, resolveFixtureStartAt, resolveFixtureTimeSlots, RoundRobinFixture } from './round-robin-schedule';
+import { createLeagueFixture, leagueFixtureTitle } from './league-fixture-creation';
 import {
   AddLeagueTeamDto,
   CancelLeagueFixtureDto,
@@ -1147,113 +1147,26 @@ export class LeagueMatchAdminService {
     for (const [index, { round, home, away }] of pairings.entries()) {
       const slot = slots?.[index];
       const startAt = slot !== undefined ? slot.startAt : resolveFixtureStartAt(input.leagueStartsOn, round, input.scheduleTemplate);
-      // 하루에 여러 경기가 서면 "N주차"만으로는 팀 화면에서 같은 제목이 반복되므로
-      // 그날의 경기 순번까지 제목에 담는다. timing 미지정이면 기존 제목 그대로.
-      const title = slot !== undefined
-        ? `${input.leagueTitle} ${slot.matchday}주차 ${slot.orderInDay}경기`
-        : `${input.leagueTitle} ${round}주차`;
-      const endAt = slot !== undefined ? slot.endAt : null;
-      const teamMatch = await tx.v1TeamMatch.create({
-        data: {
-          hostTeamId: home.id,
-          createdByUserId: input.adminUserId,
+      ids.push(
+        await createLeagueFixture(tx, this.games, {
+          leagueId: input.leagueId,
+          adminUserId: input.adminUserId,
           sportId: input.sportId,
           regionId: input.regionId,
-          title,
+          competitionConfigId: input.competitionConfigId,
+          title: leagueFixtureTitle({
+            leagueTitle: input.leagueTitle,
+            round,
+            matchday: slot?.matchday,
+            orderInDay: slot?.orderInDay,
+          }),
           placeName,
           startAt,
-          endAt: endAt ?? undefined,
-          status: 'matched',
-          approvedApplicantTeamId: away.id,
-          competitionConfigVersionId: input.competitionConfigId,
-          leagueId: input.leagueId,
-        },
-      });
-      // 그룹 B 감사 결함 5: "매치가 곧 팀일정" 불변식(team-schedules.service.ts:37-41)이
-      // 리그 대진에는 지켜지지 않고 있었다 — team-matches.service.ts의 create()/
-      // approveApplication()이 부르는 createTeamMatchScheduleInTx를 이 raw create 경로는
-      // 우회해서, 참가 팀 캘린더에 리그 경기가 한 건도 안 뜨고 용병 모집(스케줄의 자식
-      // 리소스)도 못 열고 D-1 일정 리마인더 대상에서도 빠졌다. 리그 대진은 생성 시점에
-      // 양 팀이 이미 확정(approved)이므로 일반 팀매치처럼 호스트 먼저·상대 나중이 아니라
-      // 두 팀 모두의 스케줄을 여기서 함께 만든다. title/startAt/endAt은 방금 create에 넘긴
-      // 것과 같은 로컬 변수를 그대로 재사용한다 — create() 반환 행에서 되읽지 않는다.
-      await createTeamMatchScheduleInTx(tx, home.id, teamMatch.id, title, startAt, endAt);
-      await createTeamMatchScheduleInTx(tx, away.id, teamMatch.id, title, startAt, endAt);
-      await this.games.createFromSourceInTransaction(
-        tx,
-        {
-          sourceType: V1GameSourceType.TEAM_MATCH,
-          sourceId: teamMatch.id,
-          competitionConfigVersionId: input.competitionConfigId,
-          sides: [
-            { sideKey: V1GameSideKey.HOME, teamId: home.id, displayNameSnapshot: home.name },
-            { sideKey: V1GameSideKey.AWAY, teamId: away.id, displayNameSnapshot: away.name },
-          ],
-          // 자동 로스터에는 **사람(userId)을 붙이지 않는다.** 이 목록은 팀이 이 경기를
-          // 위해 작성한 명단이 아니라 대진 생성 시점의 **팀 전체 활성 멤버 스냅샷**이다
-          // (loadTeamsWithMembers 의 `status: 'active'` 전원). 여기에 userId 를 실으면
-          // createFromSourceInTransaction 이 그 전원에게 신원 연결(ROSTER_ASSERTED)을
-          // 만드는데, 만들어진 사실이 전부 거짓이 된다:
-          //   · 선수 카드가 한 경기도 안 뛴 팀원에게 "기록 공개 동의를 켜면 골·도움·출전이
-          //     열려요"라고 안내한다. 정작 켜도 출전이 0이라 아무것도 열리지 않는다 —
-          //     2026-08-24 alpha 실측으로 잡은 '거짓 약속' 결함이다. **이 한 줄은 2026-08-26
-          //     에 카드 쪽에서 한 겹 막혔다**: 판정 필드가 옛 `hasRecordLinks`("연결이 있는가")
-          //     에서 `hasUnlockableRecords`("동의를 켜면 실제로 열릴 공식 결과가 있는가")로
-          //     바뀌어(games/public-records/player-card-stats.ts), 연결만 있고 공식 결과가
-          //     0건이면 카드는 이제 동의가 아니라 출전을 안내한다. 회귀는
-          //     profile/player-card.spec.ts 의 "동의를 켜도 열릴 기록이 없는 사용자" 블록이
-          //     못박는다. **그래도 여기서 userId 를 실어도 된다는 뜻은 아니다** — 아래 근거는
-          //     카드 수정과 무관하게 그대로 살아 있다.
-          //   · 상호평가 대상 로스터(reviews.service.ts 의 `userId: { not: null }` 조회)가
-          //     라인업이 아니라 이 행을 그대로 읽어, 뛰지 않은 팀원 전원이 평가 대상으로 뜬다.
-          //     이 조회는 손대지 않았으므로 **여전히 깨진다** — 카드가 고쳐졌으니 괜찮다고
-          //     읽지 말 것. 아래 본인 확인 경로 문단도 마찬가지로 유효하다.
-          // 개인 기록으로 이어지는 연결은 **팀이 실제로 작성한 라인업**에서만 생긴다
-          // (team-matches/team-match-lineup.service.ts 의 saveLineup — 새 리비전의 참가자
-          // 행마다 팀장 이름으로 연결을 만든다). 대회 쪽(tournament-bracket.service.ts)이
-          // `userId: player.userId` 를 싣는 것과 모순되지 않는다: 그 명단은 팀이 대회에
-          // 등록한 선수 명단(V1TournamentRegistrationPlayer)이라 이미 팀의 작성물이다.
-          //
-          // 연결이 없는 채로 두는 것이 오히려 본인 확인 경로를 연다 —
-          // listLeagueClaimableParticipants 는 "연결 없는 참가자"만 돌려주므로, 미리 연결을
-          // 만들어 두면 선수가 자기 기록을 신청(requestIdentityLink → 팀장 승인)할 길까지
-          // 함께 막힌다.
-          participants: [
-            ...home.memberships.map((m) => ({
-              sourceParticipantId: m.id,
-              sideKey: V1GameSideKey.HOME,
-              displayNameSnapshot: m.user.profile?.nickname ?? m.user.profile?.displayName ?? '팀원',
-            })),
-            ...away.memberships.map((m) => ({
-              sourceParticipantId: m.id,
-              sideKey: V1GameSideKey.AWAY,
-              displayNameSnapshot: m.user.profile?.nickname ?? m.user.profile?.displayName ?? '팀원',
-            })),
-          ],
-        },
-        {
-          actor: { actorType: 'USER', actorUserId: input.adminUserId, role: 'platform_ops' },
-          expectedVersion: 0,
-          durableCommandId: `league-fixture-create:${teamMatch.id}`,
-          payloadHash: canonicalGameCommandPayloadHash({ teamMatchId: teamMatch.id, leagueId: input.leagueId }),
-        },
+          endAt: slot !== undefined ? slot.endAt : null,
+          home,
+          away,
+        }),
       );
-      await tx.v1TeamMatchApplication.create({
-        data: {
-          teamMatchId: teamMatch.id,
-          applicantTeamId: away.id,
-          appliedByUserId: input.adminUserId,
-          status: 'approved',
-          reviewedByUserId: input.adminUserId,
-          reviewedAt: new Date(),
-          message: '리그 대진 자동 생성',
-        },
-      });
-      // 사용자 확정: 경기 시작 +24시간에도 결과 미입력이면 운영자 리마인더 1회.
-      // league-result-entry-reminder.service.ts 참고 — updateFixture()가 시작 시각을
-      // 바꾸면 새 세대로 다시 스케줄한다.
-      await scheduleLeagueResultEntryReminder(tx, { teamMatchId: teamMatch.id, startAt });
-      ids.push(teamMatch.id);
     }
     return { ids, placeName };
   }

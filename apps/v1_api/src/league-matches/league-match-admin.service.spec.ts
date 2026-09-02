@@ -20,6 +20,7 @@
  * 같은 하네스에서 직접 센다.
  */
 import { V1GameSideKey, V1GameSourceType } from '@prisma/client';
+import { leagueFixtureTitle } from './league-fixture-creation';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AdminContextService } from '../common/admin-context.service';
 import type { V1AuthUser } from '../auth/v1-auth-user';
@@ -282,6 +283,53 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
     expect(state.mirrorUpdates).toEqual([
       { where: { id: 'league-1', kind: 'regular_league' }, data: { status: 'in_progress' } },
     ]);
+  });
+
+  /**
+   * Task 164 BE-1 — 한 경기 생성을 `createLeagueFixture` 로 추출했다(자동·수동이 같은 함수).
+   * **추출 전후 동일성을 다섯 부수효과 각각으로 못 박는다.**
+   *
+   * "생성된 행 수가 같다" 로 뭉뚱그리면 아무것도 못 잡는다 — 하나가 빠지고 다른 하나가
+   * 두 번 생기면 총계는 같다. 그리고 이 다섯은 각각 **다른 화면·알림**을 켠다:
+   *   ① 팀매치         경기 자체
+   *   ② 팀 일정 2건    팀 캘린더 · 용병 모집(일정의 자식) · D-1 리마인더
+   *   ③ 게임/사이드/로스터  결과 입력 · 기록
+   *   ④ 승인된 신청서   재생성본과 최초 생성본의 계약 동일성
+   *   ⑤ 결과입력 리마인더  시작 +24h 미입력 시 운영자 알림
+   * 실제로 ②가 빠진 채로 배포돼 리그 경기가 팀 캘린더에 한 건도 안 뜬 적이 있다.
+   */
+  it('한 대진 생성이 다섯 부수효과를 모두 만든다 (추출 전후 동일성)', async () => {
+    await service.generateFixtures(adminUser, 'league-1', { weeksCount: 1 });
+
+    // ① 팀매치 — 2팀·1주차면 정확히 한 경기.
+    expect(state.calls.filter((call) => call === 'v1TeamMatch.create')).toHaveLength(1);
+
+    // ② 양 팀 팀 일정. 팀별로 정확히 하나씩이고 같은 대진을 가리킨다.
+    expect(state.scheduleCreates.map((row) => row.teamId).sort()).toEqual(['team-a', 'team-b']);
+    expect(new Set(state.scheduleCreates.map((row) => row.teamMatchId)).size).toBe(1);
+
+    // ③ 게임 사이드 2개 + 자동 로스터(양 팀 멤버 2명씩 = 4). 로스터에는 사람을 붙이지
+    //    않는다 — 붙이면 안 뛴 팀원 전원에게 신원 연결이 생긴다(그 근거는 함수 주석에).
+    expect(state.sides.map((side) => side.sideKey).sort()).toEqual([V1GameSideKey.AWAY, V1GameSideKey.HOME]);
+    expect(state.participants).toHaveLength(4);
+    expect(state.participants.every((row) => row.userId === null)).toBe(true);
+
+    // ④ 승인된 신청서 1건.
+    expect(state.calls.filter((call) => call === 'v1TeamMatchApplication.create')).toHaveLength(1);
+
+    // ⑤ 결과입력 리마인더 — outbox 에 $executeRaw 로 넣는다.
+    expect(state.calls.filter((call) => call === '$executeRaw')).toHaveLength(1);
+  });
+
+  it('제목 규칙은 자동·수동이 같은 함수를 쓴다 — 슬롯이 있으면 경기 순번까지 붙는다', () => {
+    // 문자열 템플릿을 두 곳에 복사하면 한쪽만 바뀌어 같은 리그 안에서 제목이 갈린다.
+    expect(leagueFixtureTitle({ leagueTitle: '가을 리그', round: 3 })).toBe('가을 리그 3주차');
+    expect(leagueFixtureTitle({ leagueTitle: '가을 리그', round: 3, matchday: 2, orderInDay: 4 })).toBe(
+      '가을 리그 2주차 4경기',
+    );
+    // 슬롯 정보가 반쪽만 있으면 순번을 붙이지 않는다 — "N주차 undefined경기" 를 만들지 않는다.
+    expect(leagueFixtureTitle({ leagueTitle: '가을 리그', round: 3, matchday: 2 })).toBe('가을 리그 3주차');
+    expect(leagueFixtureTitle({ leagueTitle: '가을 리그', round: 3, orderInDay: 4 })).toBe('가을 리그 3주차');
   });
 
   it('대진마다 홈/원정 팀 모두에 팀 일정이 생긴다 — "매치가 곧 팀일정" 불변식', async () => {

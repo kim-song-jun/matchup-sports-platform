@@ -560,3 +560,8 @@ The sections below fill project-specific gaps while preserving curated content a
   같은 수준을 적용한다.**
 - 작업을 다른 세션에 넘길 조건이 주어지면 분석만 주지 말고 **바로 붙여넣을 수 있는 완결형
   프롬프트**를 함께 낸다.
+
+## 대회 · 리그 · 매치 정본 (Codex 미러 — 정본은 CLAUDE.md 와 아래 문서)
+
+`docs/design/competition-canonical-flow.md` 가 대회·정규 리그·팀 매치·명단·결과 확정·전적의 정본이다(2026-09-02 사용자 확정).
+충돌하는 태스크 문서보다 이 문서를 따르고, 바꾸려면 그 문서의 결정 이력 표에 먼저 적는다.

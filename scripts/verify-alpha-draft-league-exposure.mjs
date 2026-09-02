@@ -110,7 +110,23 @@ async function main() {
   const rows = [
     { 항목: '리그 축 전체', 값: leagueAxis.length, 기대: '88', 판정: leagueAxis.length === 88 ? '✅' : '⚠️ 데이터가 바뀌었다' },
     { 항목: '그중 예정(draft)', 값: drafts.length, 기대: '35', 판정: drafts.length === 35 ? '✅' : '⚠️ 데이터가 바뀌었다' },
-    { 항목: '통합 목록의 리그', 값: unified.length, 기대: `${leagueAxis.length}`, 판정: unified.length === leagueAxis.length ? '✅' : `❌ ${leagueAxis.length - unified.length}건 빠짐` },
+    /**
+     * ⚠️ 빠짐과 초과를 **갈라서** 적는다. 예전엔 `leagueAxis.length - unified.length` 를 그대로
+     * 찍어 통합 목록이 더 많을 때 `-2건 빠짐` 이라는 말이 안 되는 문장이 나왔다. 판정은 맞는데
+     * **원인이 반대로 읽힌다** — 빠진 게 아니라 엉뚱한 게 들어온 것이고, 그건 아래 역방향 행이
+     * 잡는 결함이다. 숫자가 음수인 걸 눈치채기 전까지 없는 쪽을 찾게 된다.
+     */
+    {
+      항목: '통합 목록의 리그',
+      값: unified.length,
+      기대: `${leagueAxis.length}`,
+      판정:
+        unified.length === leagueAxis.length
+          ? '✅'
+          : unified.length < leagueAxis.length
+            ? `❌ ${leagueAxis.length - unified.length}건 빠짐`
+            : `❌ ${unified.length - leagueAxis.length}건 더 들어왔다 (역방향 행을 보라)`,
+    },
     { 항목: '예정 리그가 통합 목록에', 값: `${draftShown}/${drafts.length}`, 기대: '전부', 판정: draftShown === drafts.length ? '✅' : `❌ ${drafts.length - draftShown}건 안 보임` },
     { 항목: '예정 리그 상세(표본 3)', 값: detail.map((d) => d.상세).join(','), 기대: '200,200,200', 판정: detail.every((d) => d.상세 === 200) ? '✅' : '❌ 눌러도 안 열린다' },
     { 항목: '예정 리그 통합순위(표본 3)', 값: detail.map((d) => d.통합순위).join(','), 기대: '200,200,200', 판정: detail.every((d) => d.통합순위 === 200) ? '✅' : '❌ 상세는 열리는데 순위가 404' },

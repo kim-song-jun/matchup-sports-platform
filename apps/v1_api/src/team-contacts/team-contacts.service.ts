@@ -28,6 +28,17 @@ const EXPIRY_DAYS = 7;
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 50;
 
+/**
+ * 응답(수락/거절/철회)이 방에 남기는 시스템 메시지 본문 — 스펙 §3.4.
+ * `V1ChatSystemEventType` 은 joined|left 뿐이고 컬럼이 nullable이라 enum 을 늘리지 않고
+ * `systemEventType: null` + 이 본문 그대로를 쓴다.
+ */
+const CONTACT_SYSTEM_MESSAGE: Record<'accepted' | 'declined' | 'withdrawn', string> = {
+  accepted: '컨택을 수락했어요',
+  declined: '컨택을 거절했어요',
+  withdrawn: '컨택을 철회했어요',
+};
+
 // 공유 node_modules 의 생성된 Prisma 클라이언트가 origin/dev 의 schema.prisma 보다 오래됐다
 // (V1TeamContact 관련 타입이 아예 없음 — 2026-08-20 실측, 이 worktree 한정 환경 제약).
 // `@prisma/client` 에서 V1TeamContactStatus 를 import 하면 stale client 에 없어 깨지므로
@@ -199,7 +210,8 @@ export class TeamContactsService {
 
     // 멱등: 이미 목표 상태면 아무것도 쓰지 않고 그대로 돌려준다
     if (status === nextStatus) {
-      return { contact, alreadyProcessed: true };
+      const chatRoomId = await this.findContactRoomId(contactId);
+      return { contact, alreadyProcessed: true, chatRoomId };
     }
     if (status !== 'requested') {
       throw stateConflict(
@@ -209,17 +221,46 @@ export class TeamContactsService {
       );
     }
 
-    const result = await this.prisma.v1TeamContact.updateMany({
-      where: { id: contactId, status: 'requested' },
-      data: {
-        status: nextStatus,
-        respondedByUserId: user.id,
-        respondedAt: new Date(),
-        declineReason,
-      },
+    // updateMany + 응답 시스템 메시지(스펙 §3.4) + room.lastMessageAt 갱신을 하나의
+    // 트랜잭션으로 묶는다 — 상태 전이와 메시지 기록이 따로 커밋되면 "수락은 됐는데
+    // 시스템 메시지는 없는" 반쪽짜리 결과가 남을 수 있다.
+    const { count, chatRoomId } = await this.prisma.$transaction(async (tx) => {
+      const updateResult = await tx.v1TeamContact.updateMany({
+        where: { id: contactId, status: 'requested' },
+        data: {
+          status: nextStatus,
+          respondedByUserId: user.id,
+          respondedAt: new Date(),
+          declineReason,
+        },
+      });
+      if (updateResult.count === 0) {
+        return { count: 0, chatRoomId: null as string | null };
+      }
+
+      // 방이 없는 레거시 행(백필 이전 데이터) 방어 — 있으면 항상 있어야 정상이다.
+      const room = await tx.v1ChatRoom.findUnique({
+        where: { teamContactId: contactId },
+        select: { id: true },
+      });
+      if (room) {
+        const message = await tx.v1ChatMessage.create({
+          data: {
+            chatRoomId: room.id,
+            senderUserId: user.id,
+            body: CONTACT_SYSTEM_MESSAGE[nextStatus],
+            status: 'sent',
+            messageType: 'system',
+            systemEventType: null,
+            sentAt: new Date(),
+          },
+        });
+        await tx.v1ChatRoom.update({ where: { id: room.id }, data: { lastMessageAt: message.sentAt } });
+      }
+      return { count: updateResult.count, chatRoomId: room?.id ?? null };
     });
 
-    if (result.count === 0) {
+    if (count === 0) {
       // 우리가 requested 를 읽은 뒤 누군가 먼저 처리했다.
       // 최신 상태를 다시 읽어 멱등(같은 결과)과 충돌(다른 결과)을 가른다.
       const current = await this.prisma.v1TeamContact.findUnique({ where: { id: contactId } });
@@ -227,7 +268,8 @@ export class TeamContactsService {
         throw new NotFoundException({ code: 'TEAM_CONTACT_NOT_FOUND', message: '컨택을 찾을 수 없어요.' });
       }
       if (current.status === nextStatus) {
-        return { contact: current, alreadyProcessed: true };
+        const raceChatRoomId = await this.findContactRoomId(contactId);
+        return { contact: current, alreadyProcessed: true, chatRoomId: raceChatRoomId };
       }
       throw stateConflict('이미 처리된 컨택이에요.', 'TEAM_CONTACT_STATE_CONFLICT', {
         currentStatus: current.status,
@@ -237,13 +279,25 @@ export class TeamContactsService {
     const updated = await this.prisma.v1TeamContact.findUniqueOrThrow({ where: { id: contactId } });
     if (nextStatus === 'accepted' || nextStatus === 'declined') {
       // 응답 결과는 '보낸 팀' 이 알아야 한다. 철회는 상대가 아직 안 봤으므로 알리지 않는다.
+      // roomId 로 보낸다 — 딥링크가 /chat/{roomId} 라 알림 클릭이 바로 채팅방으로 가야 한다
+      // (create() 의 team_contact_received 와 같은 이유). roomId 가 없는 레거시 행 방어로
+      // contactId 로 폴백한다.
       this.notifyTeamManagers(
         contact.fromTeamId,
         nextStatus === 'accepted' ? 'team_contact_accepted' : 'team_contact_declined',
-        contactId,
+        chatRoomId ?? contactId,
       );
     }
-    return { contact: updated, alreadyProcessed: false };
+    return { contact: updated, alreadyProcessed: false, chatRoomId };
+  }
+
+  /** 컨택의 채팅방 id 조회. 백필 이전 레거시 행은 방이 없을 수 있어 null 을 허용한다. */
+  private async findContactRoomId(contactId: string): Promise<string | null> {
+    const room = await this.prisma.v1ChatRoom.findUnique({
+      where: { teamContactId: contactId },
+      select: { id: true },
+    });
+    return room?.id ?? null;
   }
 
   /**

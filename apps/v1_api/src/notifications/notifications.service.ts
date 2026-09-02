@@ -240,6 +240,16 @@ function targetTypeForEvent(type: NotificationEventType): V1NotificationTargetTy
   ) {
     return 'match';
   }
+  // team_contact_* — 컨택 = 채팅방(스펙 §1 결정 1). targetId 가 이제 contactId 가 아니라
+  // roomId 라 targetType 도 'team' 이 아니라 'chat' 이어야 GET /chat/rooms/:id 로 바로
+  // 이어진다(팀 목록/상세 API 는 아래 §3.2 에서 삭제됨). 'team' 분기보다 먼저 검사한다.
+  if (
+    type === 'team_contact_received' ||
+    type === 'team_contact_accepted' ||
+    type === 'team_contact_declined'
+  ) {
+    return 'chat';
+  }
   if (
     type === 'team_join_application_received' ||
     type === 'team_join_application_accepted' ||
@@ -247,10 +257,7 @@ function targetTypeForEvent(type: NotificationEventType): V1NotificationTargetTy
     type === 'team_invitation_received' ||
     type === 'team_invitation_accepted' ||
     type === 'schedule_rsvp_deadline_reminder' ||
-    type === 'schedule_guest_recruitment_close_reminder' ||
-    type === 'team_contact_received' ||
-    type === 'team_contact_accepted' ||
-    type === 'team_contact_declined'
+    type === 'schedule_guest_recruitment_close_reminder'
   ) {
     return 'team';
   }
@@ -348,15 +355,17 @@ function deepLinkForEvent(
   if (type === 'team_join_application_received' && targetId) {
     return `/teams/${targetId}/members`;
   }
-  // team_contact_* targetType은 'team' 이라 ROUTE_BASE_BY_TARGET_TYPE['team']='/teams' 로 폴백하면
-  // /teams/{contactId} 가 되어 404 링크가 만들어진다 — 컨택 상세 화면으로 명시적으로 보낸다.
+  // team_contact_* — 컨택 = 채팅방(스펙 §1 결정 1). targetId 는 이제 contactId 가 아니라
+  // roomId 다(TeamContactsService.notifyTeamManagers 가 roomId 를 넘긴다). targetType 도
+  // 'chat' 으로 바뀌었지만 ROUTE_BASE_BY_TARGET_TYPE 에 'chat' 항목이 없어 폴백하면
+  // `/${targetType}s` = '/chats' 라는 404 링크가 만들어진다 — 명시적으로 보낸다.
   if (
     (type === 'team_contact_received' ||
       type === 'team_contact_accepted' ||
       type === 'team_contact_declined') &&
     targetId
   ) {
-    return `/my/team-contacts/${targetId}`;
+    return `/chat/${targetId}`;
   }
   // 완료 알림은 본문이 "리뷰를 남겨보세요!"인데 링크는 매치 상세로 보내고 있었다 — 그 화면엔
   // 후기 CTA가 없어서 알림을 눌러도 후기를 쓸 수 없는 막다른 길이었다. 작성 화면으로 바로 보낸다.

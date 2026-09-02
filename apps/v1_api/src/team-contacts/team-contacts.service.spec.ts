@@ -410,6 +410,28 @@ describe('TeamContactsService 응답 처리', () => {
       response: { code: 'TEAM_CONTACT_STATE_CONFLICT', details: { currentStatus: 'declined' } },
     });
   });
+
+  // Task 2: 응답이 방에 시스템 메시지를 남기고 알림이 채팅방(roomId)으로 간다 — 스펙 §3.4·§6.
+  it('수락하면 방에 시스템 메시지를 남기고 lastMessageAt 을 갱신하며 roomId 로 알림을 보낸다', async () => {
+    const prisma = makePrisma();
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
+    const contact = { id: 'c1', fromTeamId: 'A', toTeamId: 'B', status: 'requested', expiresAt: new Date(Date.now() + 86400000) };
+    prisma.v1TeamContact.findUnique.mockResolvedValue(contact);
+    prisma.v1TeamContact.updateMany.mockResolvedValue({ count: 1 });
+    prisma.v1TeamContact.findUniqueOrThrow.mockResolvedValue({ ...contact, status: 'accepted' });
+    prisma.v1ChatRoom.findUnique.mockResolvedValue({ id: 'room-1' });
+    const notifications = makeNotifications();
+    const service = new TeamContactsService(prisma, notifications);
+
+    const result = await service.accept(actor, 'c1');
+
+    expect(result).toMatchObject({ alreadyProcessed: false, chatRoomId: 'room-1' });
+    expect(prisma.v1ChatMessage.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ chatRoomId: 'room-1', messageType: 'system', body: '컨택을 수락했어요' }) }),
+    );
+    expect(prisma.v1ChatRoom.update).toHaveBeenCalled();
+    expect(notifications.emitToManyDeferred).toHaveBeenCalledWith(expect.any(Function), 'team_contact_accepted', 'room-1', undefined);
+  });
 });
 
 describe('TeamContactsService.listForTeam', () => {

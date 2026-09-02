@@ -152,10 +152,33 @@ async function encodeWithCanvas(
     if (!context) return null;
     context.drawImage(bitmap, 0, 0, size.width, size.height);
 
-    return await new Promise<Blob | null>((resolve) => {
-      canvas.toBlob((blob) => resolve(blob), 'image/webp', quality);
-    });
+    return await encodeCanvasToBlob(canvas, quality);
   } finally {
     bitmap.close();
   }
+}
+
+/** `canvas.toBlob` 의 최소 형태 — 실제 캔버스 없이도(테스트) 인코딩 분기를 검증하려고 뗀다. */
+export interface BlobEncodable {
+  toBlob(callback: (blob: Blob | null) => void, type?: string, quality?: number): void;
+}
+
+/**
+ * 캔버스를 WebP 로, 안 되면 JPEG 로 인코딩한다.
+ *
+ * Safari(iOS 포함)는 `toBlob(..., 'image/webp')` 를 조용히 무시하고 **PNG** 를 돌려준다.
+ * PNG 는 사진을 원본 JPEG 보다 훨씬 크게 만들기 때문에, 위 재시도 루프의 "크기가 줄었을
+ * 때만 채택" 조건에 16번 전부 걸려 결국 원본을 그대로 보내거나(5MB 이하) 한도 초과
+ * 에러를 낸다(그 이상). 아이폰 사진은 3~8MB 라 후자가 잦다 — "사진을 올려도 저장이
+ * 안 된다"의 실제 원인이다. 돌아온 blob 의 type 이 요청한 것과 다르면 JPEG 로 다시 간다.
+ */
+export function encodeCanvasToBlob(canvas: BlobEncodable, quality: number): Promise<Blob | null> {
+  const encode = (type: string) =>
+    new Promise<Blob | null>((resolve) => {
+      canvas.toBlob((blob) => resolve(blob), type, quality);
+    });
+  return encode('image/webp').then((blob) => {
+    if (blob && blob.type === 'image/webp') return blob;
+    return encode('image/jpeg');
+  });
 }

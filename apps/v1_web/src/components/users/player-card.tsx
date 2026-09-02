@@ -1,10 +1,11 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { CalendarCheck, Camera, Clock, HeartHandshake, Lock, Settings, Share2, Sparkles, Target, Zap } from 'lucide-react';
-import { cssUrl } from '@/lib/assets';
+import { publicAssetPath } from '@/lib/assets';
 import { josa } from '@/lib/korean';
 import type { V1PlayerCard, V1PlayerCardStat } from '@/types/api';
 
@@ -275,6 +276,7 @@ export function PlayerCard({
   const needsConsent = card.nextUnlock?.reason.type === 'consent';
   const { left, right } = splitStats(card.stats);
   const [flipped, setFlipped] = useState(false);
+  const [photoLoaded, setPhotoLoaded] = useState(false);
   /**
    * 여정 면 (A안): 아직 한 경기도 안 뛰었고 열린 능력치도 없으면, 자물쇠 여섯 개의
    * 벽 대신 "시작하는 카드"를 그린다. 후기는 경기를 뛴 사람에게만 달리므로
@@ -350,7 +352,20 @@ export function PlayerCard({
       ) : (
         <div className="tm-pcard-render" aria-hidden="true">
           {profileImageUrl ? (
-            <div className="tm-pcard-render-photo" style={{ backgroundImage: cssUrl(profileImageUrl) }} />
+            /* background-image div 가 아니라 next/image: 900×1200 원본 JPEG 를 138px 상자에
+               그대로 받던 것을 276px WebP/AVIF 로 줄여 받고(sizes), 이 카드는 페이지 최상단
+               LCP 후보라 미리 불러온다(priority). 도착 전까지는 투명이고 CSS 가 페이드시킨다 --
+               사진이 한 박자 늦게 "툭" 나타나던 팝인이 사라진다. */
+            <div className="tm-pcard-render-photo" data-loaded={photoLoaded ? 'true' : undefined}>
+              <Image
+                src={publicAssetPath(profileImageUrl)}
+                alt=""
+                fill
+                sizes="138px"
+                priority
+                onLoad={() => setPhotoLoaded(true)}
+              />
+            </div>
           ) : (
             <div className="tm-pcard-render-img">{initial}</div>
           )}

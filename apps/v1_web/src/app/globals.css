@@ -765,8 +765,13 @@ button:disabled {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  /* 아래 전역 규칙(*, ::before, ::after)이 이미 transition-duration 을 0.01ms 로 눌러
+     실제 모션은 여기 없어도 꺼진다. 그런데 이 블록은 하단탭의 전환을 **명시적으로**
+     끄려고 둔 것이라, 목록에서 빠진 선택자는 "일부러 남긴 것"으로 읽힌다. 아이콘
+     transform 전환을 추가했으니 svg 도 함께 적는다 — 의도와 목록을 어긋나게 두지 않는다. */
   .tm-bottom-tab,
-  .tm-bottom-tab span {
+  .tm-bottom-tab span,
+  .tm-bottom-tab svg {
     transition: none;
   }
 }

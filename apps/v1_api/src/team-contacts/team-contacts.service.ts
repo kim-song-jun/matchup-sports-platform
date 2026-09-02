@@ -111,13 +111,13 @@ export class TeamContactsService {
             { OR: [{ status: 'accepted' }, { status: 'requested', expiresAt: { gt: now } }] },
           ],
         },
-        select: { id: true, status: true },
+        select: { id: true, status: true, chatRoom: { select: { id: true } } },
       });
       if (active) {
         throw stateConflict(
           '이미 이 팀과 진행 중인 컨택이 있어요.',
           'TEAM_CONTACT_ALREADY_ACTIVE',
-          { existingContactId: active.id, existingStatus: active.status },
+          { existingContactId: active.id, existingStatus: active.status, existingChatRoomId: active.chatRoom?.id ?? null },
         );
       }
 
@@ -137,19 +137,37 @@ export class TeamContactsService {
         );
       }
 
-      return tx.v1TeamContact.create({
-        data: {
-          fromTeamId: dto.fromTeamId,
-          toTeamId,
-          requestedByUserId: user.id,
-          message: dto.message,
-          expiresAt,
-        },
+      const contact = await tx.v1TeamContact.create({
+        data: { fromTeamId: dto.fromTeamId, toTeamId, requestedByUserId: user.id, message: dto.message, expiresAt },
       });
+      // 컨택 = 채팅방. 요청 시점에 방을 열고 양 팀 운영진 전원을 참가자로 넣는다(스펙 §3.2).
+      // visibleFromAt 을 now 로 두어 "들어왔습니다" 시스템 메시지 없이 첫 메시지가 바로 보이고,
+      // 수신자에게 미읽음 1 로 잡힌다.
+      const room = await tx.v1ChatRoom.create({ data: { teamContactId: contact.id, status: 'active' } });
+      const operatorIds = await this.operatorUserIds(tx, [dto.fromTeamId, toTeamId]);
+      await tx.v1ChatRoomParticipant.createMany({
+        data: operatorIds.map((userId) => ({ chatRoomId: room.id, userId, status: 'active', visibleFromAt: now })),
+        skipDuplicates: true,
+      });
+      const firstMessage = await tx.v1ChatMessage.create({
+        data: { chatRoomId: room.id, senderUserId: user.id, body: dto.message, status: 'sent', messageType: 'text', sentAt: now },
+      });
+      await tx.v1ChatRoom.update({ where: { id: room.id }, data: { lastMessageAt: firstMessage.sentAt } });
+      return { ...contact, chatRoomId: room.id, route: `/chat/${room.id}` };
     });
     // 트랜잭션 밖에서 쏜다 — 트랜잭션 안에서 쏘면 이후 커밋 실패로 롤백돼도 알림은 이미 나간 뒤다.
-    this.notifyTeamManagers(created.toTeamId, 'team_contact_received', created.id);
+    // roomId 로 보낸다 — 딥링크가 /chat/{roomId} 라 알림 클릭이 바로 채팅방으로 가야 한다.
+    this.notifyTeamManagers(created.toTeamId, 'team_contact_received', created.chatRoomId);
     return created;
+  }
+
+  /** 양 팀 owner/manager 활성 userId 중복 제거. 컨택 채팅방 참가자로 넣을 대상. */
+  private async operatorUserIds(tx: Prisma.TransactionClient, teamIds: string[]) {
+    const rows = await tx.v1TeamMembership.findMany({
+      where: { teamId: { in: teamIds }, status: 'active', role: { in: ['owner', 'manager'] } },
+      select: { userId: true },
+    });
+    return Array.from(new Set(rows.map((row) => row.userId)));
   }
 
   async accept(user: V1AuthUser, contactId: string) {

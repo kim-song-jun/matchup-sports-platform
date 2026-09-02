@@ -5,7 +5,7 @@ import { TeamContactsService } from './team-contacts.service';
 // 이 레포의 유닛 테스트 관례: Prisma 는 전체 jest.fn() mock. 실 DB 를 쓰지 않는다.
 function makePrisma() {
   const prisma: any = {
-    v1TeamMembership: { findFirst: jest.fn() },
+    v1TeamMembership: { findFirst: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
     v1TeamContact: {
       findFirst: jest.fn(),
       findMany: jest.fn(),
@@ -29,6 +29,10 @@ function makePrisma() {
       update: jest.fn(),
     },
     v1TeamMatch: { findFirst: jest.fn() },
+    // Task 1: 컨택 생성이 채팅방·참가자·첫 메시지를 함께 만든다 — 스펙 §3.2.
+    v1ChatRoom: { create: jest.fn().mockResolvedValue({ id: 'room-1' }), update: jest.fn(), findUnique: jest.fn() },
+    v1ChatRoomParticipant: { createMany: jest.fn() },
+    v1ChatMessage: { create: jest.fn().mockResolvedValue({ id: 'msg-1', sentAt: new Date() }) },
     $executeRaw: jest.fn(),
   };
   prisma.$transaction = jest.fn().mockImplementation((cb: any) => cb(prisma));
@@ -121,7 +125,7 @@ describe('TeamContactsService.create', () => {
     // 정리 후 재조회하면 활성 건이 없다(만료된 requested 는 활성이 아니므로)
     prisma.v1TeamContact.findFirst.mockResolvedValue(null);
     prisma.v1TeamContact.count.mockResolvedValue(0);
-    prisma.v1TeamContact.create.mockResolvedValue({ id: 'new', status: 'requested' });
+    prisma.v1TeamContact.create.mockResolvedValue({ id: 'new', status: 'requested', fromTeamId: 'A', toTeamId: 'B' });
     const service = new TeamContactsService(prisma, makeNotifications());
 
     await expect(service.create(actor, 'B', dto)).resolves.toMatchObject({ id: 'new' });
@@ -171,7 +175,7 @@ describe('TeamContactsService.create', () => {
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
     prisma.v1TeamContact.findFirst.mockResolvedValue(null);
     prisma.v1TeamContact.count.mockResolvedValue(9);
-    prisma.v1TeamContact.create.mockResolvedValue({ id: 'new', status: 'requested' });
+    prisma.v1TeamContact.create.mockResolvedValue({ id: 'new', status: 'requested', fromTeamId: 'A', toTeamId: 'B' });
     const service = new TeamContactsService(prisma, makeNotifications());
 
     await expect(service.create(actor, 'B', dto)).resolves.toMatchObject({ id: 'new' });
@@ -182,7 +186,7 @@ describe('TeamContactsService.create', () => {
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
     prisma.v1TeamContact.findFirst.mockResolvedValue(null);
     prisma.v1TeamContact.count.mockResolvedValue(0);
-    prisma.v1TeamContact.create.mockResolvedValue({ id: 'new', status: 'requested' });
+    prisma.v1TeamContact.create.mockResolvedValue({ id: 'new', status: 'requested', fromTeamId: 'A', toTeamId: 'B' });
     const service = new TeamContactsService(prisma, makeNotifications());
 
     const order: string[] = [];
@@ -210,6 +214,50 @@ describe('TeamContactsService.create', () => {
     const backward = JSON.stringify(prisma.$executeRaw.mock.calls[0]);
 
     expect(forward).toBe(backward);
+  });
+
+  it('생성 트랜잭션 안에서 채팅방·양 팀 운영진 참가자·첫 메시지를 함께 만든다', async () => {
+    const prisma = makePrisma();
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
+    prisma.v1TeamMembership.findMany.mockResolvedValue([
+      { userId: 'u1' }, { userId: 'u2' }, { userId: 'u2' }, // 중복 1개
+    ]);
+    prisma.v1TeamContact.findFirst.mockResolvedValue(null);
+    prisma.v1TeamContact.count.mockResolvedValue(0);
+    prisma.v1TeamContact.create.mockResolvedValue({ id: 'c1', fromTeamId: 'A', toTeamId: 'B', status: 'requested' });
+    prisma.v1ChatRoom.create.mockResolvedValue({ id: 'room-1' });
+    const service = new TeamContactsService(prisma, makeNotifications());
+
+    const result = await service.create(actor, 'B', dto);
+
+    expect(result).toMatchObject({ id: 'c1', chatRoomId: 'room-1', route: '/chat/room-1' });
+    expect(prisma.v1ChatRoom.create).toHaveBeenCalledWith({ data: { teamContactId: 'c1', status: 'active' } });
+    const participantRows = prisma.v1ChatRoomParticipant.createMany.mock.calls[0][0].data;
+    expect(participantRows.map((row: any) => row.userId).sort()).toEqual(['u1', 'u2']);
+    expect(participantRows.every((row: any) => row.visibleFromAt instanceof Date)).toBe(true);
+    expect(prisma.v1ChatMessage.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ chatRoomId: 'room-1', senderUserId: 'u1', body: dto.message, messageType: 'text' }),
+      }),
+    );
+    expect(prisma.v1ChatRoom.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'room-1' }, data: { lastMessageAt: expect.any(Date) } }),
+    );
+    // 알림은 roomId 로 간다 (딥링크가 /chat/{roomId})
+    expect(service['notifications'].emitToManyDeferred).toHaveBeenCalledWith(
+      expect.any(Function), 'team_contact_received', 'room-1', undefined,
+    );
+  });
+
+  it('진행 중인 컨택이 있으면 그 방 id 도 함께 알려준다', async () => {
+    const prisma = makePrisma();
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
+    prisma.v1TeamContact.findFirst.mockResolvedValue({ id: 'existing', status: 'requested', chatRoom: { id: 'room-9' } });
+    const service = new TeamContactsService(prisma, makeNotifications());
+
+    await expect(service.create(actor, 'B', dto)).rejects.toMatchObject({
+      response: { code: 'TEAM_CONTACT_ALREADY_ACTIVE', details: { existingContactId: 'existing', existingChatRoomId: 'room-9' } },
+    });
   });
 });
 
@@ -471,8 +519,9 @@ describe('TeamContactsService 알림 발송', () => {
 
     await service.create(actor, 'B', dto);
 
+    // Task 1 부터 알림은 컨택 id 가 아니라 채팅방 id 로 간다 (딥링크가 /chat/{roomId}).
     expect(notifications.emitToManyDeferred).toHaveBeenCalledWith(
-      expect.any(Function), 'team_contact_received', 'new', undefined,
+      expect.any(Function), 'team_contact_received', 'room-1', undefined,
     );
     // 수신자 해석 함수가 실제로 받는 팀의 owner/manager 를 조회하는지
     const resolveUserIds = notifications.emitToManyDeferred.mock.calls[0][0];

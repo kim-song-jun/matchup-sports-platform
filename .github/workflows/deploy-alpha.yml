@@ -193,6 +193,12 @@ jobs:
           SECRET_SLACK_INQUIRY_WEBHOOK_URL: ${{ secrets.SLACK_INQUIRY_WEBHOOK_URL }}
         run: bash scripts/release/sync-alpha-inquiry-slack-env.sh
 
+      - name: Sync Firebase Admin runtime env
+        env:
+          INSTANCE_ID: ${{ vars.ALPHA_EC2_INSTANCE_ID }}
+          AWS_REGION: ${{ vars.ALPHA_AWS_REGION }}
+        run: bash scripts/release/sync-alpha-firebase-env.sh
+
       # Skipped until the four APNs secrets are registered, rather than failing the deploy.
       # A push-less alpha is a working alpha; a blocked deploy is not. The step reports which
       # names are missing so the gap is visible in the run rather than only in a silent

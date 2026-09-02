@@ -40,7 +40,13 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
   // TournamentHeroCard owns the promoHomeEnabled filter + sort — this only needs
   // to know whether *any* eligible item exists, to decide the section's visibility.
   const hasHomePromo = tournamentItems.some((item) => item.status === 'open' && item.promoHomeEnabled);
-  const hasFeaturedContent = model.network || Boolean(model.featuredMatch) || tournaments.isLoading || tournaments.isError || hasHomePromo;
+  // `isLoading`(= isPending && isFetching) 이 아니라 `isPending`(= 아직 데이터가 없다)을 본다.
+  // 서버 렌더에서는 쿼리가 돌지 않아 isFetching 이 false → isLoading 도 false 라, 이 조건이
+  // **"아직 모름"을 "없음"으로** 읽고 섹션을 통째로 빼 버렸다. 그래서 서버 HTML 에 슬롯이
+  // 아예 없다가 하이드레이션(느린 기기에서 10초)이 끝나는 순간 통째로 나타나 아래를 밀었다
+  // (alpha 실측: CLS 0.549 중 0.319 가 이 한 번의 등장이다).
+  // isPending 은 서버에서도 true 이므로 슬롯이 첫 HTML 부터 자리를 잡는다.
+  const hasFeaturedContent = model.network || Boolean(model.featuredMatch) || tournaments.isPending || tournaments.isError || hasHomePromo;
   const hasRecommendedMatches = model.network || model.recommendedMatches.length > 0;
   const weatherPermission = model.weatherPermission ?? 'prompt';
   const weatherPermissionCopy = getWeatherPermissionCopy(weatherPermission);
@@ -142,7 +148,7 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
 
           {/* Featured recommendation hero — 가로 캐러셀(스와이프) */}
           {hasFeaturedContent ? (
-          <div className="tm-home-featured-block">
+          <div className="tm-home-featured-block" aria-busy={tournaments.isPending || undefined}>
             <div style={{ marginBottom: 12 }}>
               <div className="tm-text-label">오늘의 추천</div>
               <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 2 }}>지금 눈여겨볼 매치·대회</div>
@@ -161,7 +167,7 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
                   />
                 </Card>
               ) : (
-                <TournamentHeroCard items={tournamentItems} loading={tournaments.isLoading} />
+                <TournamentHeroCard items={tournamentItems} loading={tournaments.isPending} />
               )}
             </div>
           </div>

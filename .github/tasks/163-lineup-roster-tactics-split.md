@@ -65,7 +65,7 @@
   - [ ] `TeamLineupHistoryService.list()` 의 소스별 분기 제거 — `started` 하나로.
   - [ ] `BENCH_MARKER` export 를 **전수 grep** 해 소비처 0 확인 후 삭제 (테스트만 남으면 dead — [[test-only-consumer-hides-dead-code]]).
 - [ ] 교체(`substitution.ts`)·결과·공개 기록은 **변경 없음**을 테스트로 고정한다 — kickoff 이후의 `started` 가 예전과 같은 의미다.
-- [ ] 프론트 라인업 화면: 선발/후보 토글 UI 제거, `started` 를 보내지 않음. **피치 탭은 Task 164** (3안 선행).
+- [ ] 프론트 라인업 화면: 선발/후보 토글 UI 제거, `started` 를 보내지 않음, **피치 탭 줄 제거 + 팀장 전용 전술보드 링크 한 줄** (A안). `PitchFormationEditor` 라인업 쪽 소비처 제거 후 dead 여부 전수 grep.
 
 ## User Scenarios
 
@@ -88,7 +88,7 @@
 ```
 Backend  ⟂  Frontend  ⟂  (Infra 없음)
   BE-1 DTO optional + 저장 검증 제거 + 참가자 started 미기입
-  BE-2 kickoff 선발 해석 (보드 → 복사 / 없음 → 전원) + 검증 이동
+  BE-2 kickoff 선발 해석 (보드 → 복사 / 없음 → 전원). 검증은 어느 경로에도 없다
   BE-3 BENCH 마이그레이션 + 센티널 폐기 + history 분기 제거
   FE-1 라인업 화면 선발/후보 토글 제거, started 미전송      ← BE-1 머지·배포 **후**
   FE-2 피치 탭 제거 → A안 (탭 줄 삭제 + 전술보드 링크 한 줄)     ← BE 배포 후, FE-1 과 한 PR 가능

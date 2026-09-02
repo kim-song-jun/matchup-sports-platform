@@ -1,4 +1,3 @@
-import { HttpException } from '@nestjs/common';
 import { V1GameSideKey, V1GameSourceType } from '@prisma/client';
 import { OperationAuditWriterService } from '../../src/common/audit/operation-audit-writer.service';
 import { GameTakeoverService } from '../../src/games/game-takeover.service';
@@ -60,22 +59,6 @@ function creationContext(commandId: string, payload: unknown): GameCommandContex
     durableCommandId: commandId,
     payloadHash: canonicalGameCommandPayloadHash(payload),
   };
-}
-
-async function captureFailure(operation: () => Promise<unknown>) {
-  try {
-    await operation();
-  } catch (error) {
-    return error;
-  }
-  throw new Error('Expected operation to fail');
-}
-
-function expectHttpCode(error: unknown, status: number, code: string) {
-  expect(error).toBeInstanceOf(HttpException);
-  const exception = error as HttpException;
-  expect(exception.getStatus()).toBe(status);
-  expect(exception.getResponse()).toEqual(expect.objectContaining({ code }));
 }
 
 function guestStarter(index: number, goalkeeper = false) {
@@ -157,43 +140,36 @@ describe('team-match lineup roster-size gate follows the pinned competition conf
     await prisma.$disconnect();
   });
 
-  it('accepts a roster exactly at the pinned maxPlayers and rejects one more, with the count in the error message', async () => {
+  it('핀된 maxPlayers 를 넘겨도 저장된다 — 인원 상한을 막지 않는다 (Task 163)', async () => {
     expect(pinnedMaxPlayers).toBeGreaterThan(0);
 
-    const atCap = Array.from({ length: pinnedMaxPlayers }, (_, index) =>
+    // GamesService.createFromSourceInTransaction() 이 사이드마다 빈 revision-1 라인업을
+    // 미리 만든다 — CAS 토큰은 0 이 아니라 지금 getLineup() 이 보고하는 값이다.
+    const startVersion = (await service.getLineup(authUser(ids.hostOwner), ids.teamMatch)).version;
+    const overCap = Array.from({ length: pinnedMaxPlayers + 1 }, (_, index) =>
       guestStarter(index + 1, index === 0),
     );
-    // GamesService.createFromSourceInTransaction() already creates an empty
-    // revision-1 V1GameLineup per side as part of game/side creation (see
-    // games.service.ts's `sides` loop) — the CAS token to save against is
-    // whatever getLineup() reports *now*, not 0.
-    const startVersion = (await service.getLineup(authUser(ids.hostOwner), ids.teamMatch)).version;
-    const saved = await service.saveLineup(authUser(ids.hostOwner), ids.teamMatch, 'idem-lineup-size-at-cap', {
+    const saved = await service.saveLineup(authUser(ids.hostOwner), ids.teamMatch, 'idem-lineup-over-cap-ok', {
       expectedVersion: startVersion,
-      starters: atCap,
+      starters: overCap,
       bench: [],
     });
     expect(saved).toEqual(
       expect.objectContaining({ teamMatchId: ids.teamMatch, state: 'DRAFT', version: startVersion + 1 }),
     );
-    const atCapView = await service.getLineup(authUser(ids.hostOwner), ids.teamMatch);
-    expect(atCapView.starters).toHaveLength(pinnedMaxPlayers);
+    const view = await service.getLineup(authUser(ids.hostOwner), ids.teamMatch);
+    expect(view.starters).toHaveLength(pinnedMaxPlayers + 1);
+  });
 
-    const overCap = [...atCap, guestStarter(pinnedMaxPlayers + 1)];
-    const tooMany = await captureFailure(() =>
-      service.saveLineup(authUser(ids.hostOwner), ids.teamMatch, 'idem-lineup-size-over-cap', {
-        expectedVersion: saved.version,
-        starters: overCap,
-        bench: [],
-      }),
-    );
-    expectHttpCode(tooMany, 422, 'LINEUP_SIZE_INVALID');
-    expect((tooMany as HttpException).getResponse()).toEqual(
-      expect.objectContaining({ message: expect.stringContaining(`${pinnedMaxPlayers}명 이하`) }),
-    );
-
-    // The rejected attempt must not have created a new revision beyond the at-cap save.
-    const afterRejection = await service.getLineup(authUser(ids.hostOwner), ids.teamMatch);
-    expect(afterRejection.version).toBe(saved.version);
+  it('골키퍼가 없어도 저장된다 — 골키퍼 수를 막지 않는다 (Task 163)', async () => {
+    const startVersion = (await service.getLineup(authUser(ids.hostOwner), ids.teamMatch)).version;
+    // guestStarter 의 두 번째 인자가 골키퍼 표시다. 아무에게도 주지 않는다.
+    const noGoalkeeper = Array.from({ length: pinnedMaxPlayers }, (_, index) => guestStarter(index + 1, false));
+    const saved = await service.saveLineup(authUser(ids.hostOwner), ids.teamMatch, 'idem-lineup-gk-none-ok', {
+      expectedVersion: startVersion,
+      starters: noGoalkeeper,
+      bench: [],
+    });
+    expect(saved).toEqual(expect.objectContaining({ teamMatchId: ids.teamMatch, version: startVersion + 1 }));
   });
 });

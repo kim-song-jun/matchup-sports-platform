@@ -10,7 +10,7 @@ import type { V1AuthUser } from '../auth/v1-auth-user';
 import { OperationAuditWriterService } from '../common/audit/operation-audit-writer.service';
 import { canonicalGameCommandPayloadHash, createRosterAssertedIdentityLink } from '../games/games.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { parseLineupConfigForResponse, parseLineupLimits } from '../tournaments/competition-config/competition-config.parse';
+import { parseLineupConfigForResponse } from '../tournaments/competition-config/competition-config.parse';
 import {
   ChangeRequestTeamMatchLineupDto,
   SaveTeamMatchLineupDto,
@@ -823,42 +823,18 @@ export class TeamMatchLineupService {
     context: TeamMatchLineupContext,
     dto: SaveTeamMatchLineupDto,
   ) {
-    const config = await tx.v1CompetitionConfigVersion.findUnique({
-      where: { id: context.gameCompetitionConfigVersionId },
-      select: { lineup: true },
-    });
-    const lineupConfig = parseLineupLimits(config?.lineup ?? null);
-
-    if (dto.starters.length < lineupConfig.minPlayers || dto.starters.length > lineupConfig.maxPlayers) {
-      throw new UnprocessableEntityException({
-        code: 'LINEUP_SIZE_INVALID',
-        message: `선발 인원은 ${lineupConfig.minPlayers}명 이상 ${lineupConfig.maxPlayers}명 이하여야 해요.`,
-      });
-    }
-    if (
-      lineupConfig.substitutions === 'limited' &&
-      lineupConfig.maxSubstitutions !== null &&
-      dto.bench.length > lineupConfig.maxSubstitutions
-    ) {
-      throw new UnprocessableEntityException({
-        code: 'LINEUP_SIZE_INVALID',
-        message: `후보는 최대 ${lineupConfig.maxSubstitutions}명까지 등록할 수 있어요.`,
-      });
-    }
-
-    const goalkeeperCount = dto.starters.filter((entry) => entry.goalkeeper === true).length;
-    if (goalkeeperCount !== 1) {
-      throw new UnprocessableEntityException({
-        code: 'LINEUP_GOALKEEPER_INVALID',
-        message: '선발 라인업에는 골키퍼가 정확히 한 명 있어야 해요.',
-      });
-    }
-    if (dto.bench.some((entry) => entry.goalkeeper === true)) {
-      throw new UnprocessableEntityException({
-        code: 'LINEUP_GOALKEEPER_INVALID',
-        message: '후보 선수는 골키퍼로 지정할 수 없어요.',
-      });
-    }
+    // Task 163 — 제출 시점의 **인원·골키퍼 검증을 하지 않는다.**
+    //
+    // 명단 제출은 "누가 오나"만 받는다. 선발·골키퍼는 전술보드가 정하고 kickoff 이
+    // 참가자에 복사한다. 그래서 여기서 셀 "선발"이라는 개념 자체가 없다.
+    //
+    // 함께 사라지는 규칙이 하나 더 있다: `후보는 최대 N명`(교체 가능 인원 제한)도 같은
+    // `LINEUP_SIZE_INVALID` 로 막고 있었는데, 후보라는 구분이 제출에서 없어지므로 셀
+    // 대상이 없다. 교체 횟수 제한 자체는 콘솔 교체 경로가 계속 본다 — 여기서 미리
+    // 막던 것만 없어진다.
+    //
+    // 인원 규칙을 되살리려면 "kickoff 에서도 검증하지 않는다"는 사용자 확정부터
+    // 뒤집어야 한다(Task 163 Ambiguity 1·2).
 
     const jerseyNumbers = [...dto.starters, ...dto.bench]
       .map((entry) => entry.jerseyNumber)

@@ -43,7 +43,6 @@ import { cascadeCompleteTeamMatchSchedulesInTx } from '../team-schedules/team-sc
 import {
   parseLineupCatalog,
   parseLineupConfigForResponse,
-  parseLineupLimits,
   parsePeriodDurations,
   parseResultPolicy,
 } from '../tournaments/competition-config/competition-config.parse';
@@ -2594,38 +2593,15 @@ export class GamesService {
             details: { expectedVersion: dto.expectedVersion, currentVersion: currentLineupRevision },
           });
         }
-        // team-match-lineup.service.ts#resolveEntries enforces this same gate for the
-        // team-match lineup path (LINEUP_SIZE_INVALID against the pinned
-        // V1CompetitionConfigVersion.lineup.{min,max}Players) — this generic
-        // tournament-fixture route had no equivalent check at all, so a director/staff
-        // caller could save a roster of any size regardless of what the tournament's
-        // competition config (and, since Task N, the admin's chosen "출전 인원") actually
-        // allows. Only starters count toward the cap, matching resolveEntries' contract
-        // (bench size is a separate, unrelated concern this route doesn't otherwise gate).
-        const startedCount = dto.participants.filter((participant) => participant.started).length;
-        const config = await tx.v1CompetitionConfigVersion.findUnique({
-          where: { id: game.competitionConfigVersionId },
-          select: { lineup: true },
-        });
-        const lineupLimits = parseLineupLimits(config?.lineup ?? null);
-        if (startedCount < lineupLimits.minPlayers || startedCount > lineupLimits.maxPlayers) {
-          throw new UnprocessableEntityException({
-            code: 'LINEUP_SIZE_INVALID',
-            message: `선발 인원은 ${lineupLimits.minPlayers}명 이상 ${lineupLimits.maxPlayers}명 이하여야 해요.`,
-          });
-        }
-        const goalkeeperCode =
-          parseLineupCatalog(config?.lineup ?? null).positions.find((position) => position.goalkeeper === true)?.code ??
-          'GK';
-        const goalkeeperCount = dto.participants.filter(
-          (participant) => participant.started && participant.position === goalkeeperCode,
-        ).length;
-        if (goalkeeperCount !== 1) {
-          throw new UnprocessableEntityException({
-            code: 'LINEUP_GOALKEEPER_INVALID',
-            message: '선발 라인업에는 골키퍼를 정확히 한 명 지정해야 해요.',
-          });
-        }
+        // Task 163 — 여기서 **선발 인원·골키퍼를 검증하지 않는다.**
+        //
+        // 이 게이트는 명단 제출이 곧 선발 결정이던 시절의 것이다. 이제 선발은 전술보드가
+        // 정하고 kickoff 이 참가자에 복사한다. 제출 시점에는 "누가 오나"만 받으므로
+        // 선발 인원을 셀 대상 자체가 없다 — `dto.participants[].started` 는 무시된다.
+        //
+        // kickoff 에서도 검증하지 않는다(사용자 확정): 보드가 규칙을 어겨도 경기는
+        // 시작되고 콘솔 교체로 조정한다. 인원 규칙을 강제하던 자리가 통째로 사라지는
+        // 것이므로, 되살리려면 그 결정부터 뒤집어야 한다.
         // 라인업에 실려 온 계정(userId) 검증. 이 값이 저장되면 아래에서 신원 연결이
         // 자동으로 생기므로, 아무 계정이나 남의 경기 기록에 붙지 않게 여기서 막는다.
         //
@@ -2823,7 +2799,10 @@ export class GamesService {
                     position: participant.position,
                     positionX: participant.positionX,
                     positionY: participant.positionY,
-                    started: participant.started,
+                    // Task 163 — 제출은 선발을 정하지 않는다. **결정적인 초기값**만 둔다:
+                    // 옛 클라이언트가 보낸 false 가 재사용 행에 남아 있으면 kickoff 전
+                    // 상태가 제출자마다 달라진다. kickoff 이 어느 경로로든 덮어쓴다.
+                    started: true,
                   },
                 })
               : await tx.v1GameParticipant.create({
@@ -2837,7 +2816,9 @@ export class GamesService {
                     position: participant.position,
                     positionX: participant.positionX,
                     positionY: participant.positionY,
-                    started: participant.started,
+                    // Task 163 — 위 update 경로와 같은 이유. 스키마 기본값도 true 지만
+                    // **의도한 값**임을 남기려고 명시한다(기본값이 바뀌어도 뜻이 안 흔들린다).
+                    started: true,
                     // 제출본 위에 새 리비전을 여는 경로: 검인은 킥오프 직전이라 제출
                     // **뒤에** 일어나는 것이 정상이므로, 이월하지 않으면 뒤늦은 명단
                     // 수정 한 번에 이미 받아둔 검인이 통째로 사라진다.

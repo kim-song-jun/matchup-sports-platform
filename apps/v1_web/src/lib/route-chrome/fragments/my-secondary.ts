@@ -1,5 +1,5 @@
 // apps/v1_web/src/lib/route-chrome/fragments/my-secondary.ts
-// U38 — my-secondary(문의/내 리그/담당 경기/담당 대회 운영/팀 컨택함/휴대폰 본인인증).
+// U38 — my-secondary(문의/내 리그/담당 경기/담당 대회 운영/팀 컨택 리다이렉트/휴대폰 본인인증).
 //
 // 6개 파일 중 my-staff-fixtures-client.tsx 하나만 동적 제목이다 — 대회명이 fetch
 // (`GET /me/tournament-staff`) 의존이라 로딩/배정없음 상태에서는 "담당 경기" 기본값을
@@ -34,11 +34,12 @@ export const MY_SECONDARY_ROUTES: RouteChromeEntry[] = [
 
   {
     pattern: '/my/team-contacts',
-    chrome: { title: '팀 컨택함', activeTab: 'my', bottomNav: false, backHref: '/my', desktopHead: true },
+    // 컨택함은 채팅으로 흡수됐다 — 두 경로는 옛 딥링크 호환용 리다이렉트라 잠깐만 보인다.
+    chrome: { title: '채팅으로 이동 중', activeTab: 'my', bottomNav: false, backHref: '/my', desktopHead: true },
   },
   {
     pattern: '/my/team-contacts/:contactId',
-    chrome: { title: '컨택 상세', activeTab: 'my', bottomNav: false, backHref: '/my/team-contacts', desktopHead: true },
+    chrome: { title: '채팅으로 이동 중', activeTab: 'my', bottomNav: false, backHref: '/chat', desktopHead: true },
   },
 
   {

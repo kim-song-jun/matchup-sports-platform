@@ -17,7 +17,7 @@ const teamApiMocks = vi.hoisted(() => ({
   useV1LeagueMatches: vi.fn(),
   useV1TeamMembers: vi.fn(),
   useV1MyTeams: vi.fn(() => ({ data: undefined })),
-  useV1TeamContactSummary: vi.fn(() => ({ data: undefined })),
+  useV1TeamContactSummary: vi.fn((): { data: unknown } => ({ data: undefined })),
   useV1TeamJoinApplications: vi.fn(),
   useV1ChangeTeamMembershipRole: vi.fn(),
   useV1RemoveTeamMembership: vi.fn(),

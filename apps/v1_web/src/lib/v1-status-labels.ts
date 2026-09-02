@@ -98,7 +98,7 @@ export function onboardingStepLabel(step: string): string {
 
 /**
  * 문의 신고 사유(`V1InquiryReportReason`) — `category: 'report'` 문의에만 실린다.
- * 신고 작성 화면(my-team-contacts-client.tsx)과 어드민 문의 목록/상세가 공유하는 단일 소스다.
+ * 신고 작성 화면(community/team-contact-status-card.tsx)과 어드민 문의 목록/상세가 공유하는 단일 소스다.
  * 백엔드 순서(`admin.service.ts`의 `INQUIRY_REPORT_REASONS`)와 값을 그대로 맞춘다.
  */
 export const INQUIRY_REPORT_REASON_OPTIONS: { value: V1InquiryReportReason; label: string }[] = [

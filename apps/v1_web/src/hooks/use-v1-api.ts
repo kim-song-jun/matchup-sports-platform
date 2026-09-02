@@ -1153,30 +1153,6 @@ export type V1TeamContact = {
   createdAt: string;
 };
 
-export type V1TeamContactList = {
-  items: V1TeamContact[];
-  pageInfo: { nextCursor: string | null; hasNext: boolean };
-};
-
-export function useV1TeamContacts(
-  teamId: string,
-  filters?: { direction?: 'inbound' | 'outbound'; status?: string; cursor?: string; limit?: number },
-) {
-  return useQuery({
-    queryKey: v1Keys.teamContacts(teamId, filters),
-    queryFn: () => v1Get<V1TeamContactList>(`/teams/${teamId}/contacts`, filters),
-    enabled: Boolean(teamId),
-  });
-}
-
-export function useV1TeamContact(contactId: string) {
-  return useQuery({
-    queryKey: v1Keys.teamContact(contactId),
-    queryFn: () => v1Get<V1TeamContact>(`/team-contacts/${contactId}`),
-    enabled: Boolean(contactId),
-  });
-}
-
 /** 컨택 발신 응답 — 컨택 행 + 요청 시점에 함께 열린 채팅방("팀 컨택의 채팅 흡수" §4). */
 export type V1TeamContactCreated = V1TeamContact & { chatRoomId: string; route: string };
 
@@ -1199,8 +1175,7 @@ export function useV1CreateTeamContact(toTeamId: string) {
   return useMutation({
     mutationFn: (body: { fromTeamId: string; message: string }) =>
       v1Post<V1TeamContactCreated>(`/teams/${toTeamId}/contacts`, body),
-    onSuccess: (_result, variables) => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.teamContactsAll(variables.fromTeamId) });
+    onSuccess: () => {
       // 발신 = 새 채팅방. 목록에 바로 보여야 한다.
       queryClient.invalidateQueries({ queryKey: v1Keys.chatRooms() });
     },
@@ -1208,21 +1183,10 @@ export function useV1CreateTeamContact(toTeamId: string) {
 }
 
 /**
- * 컨택 상태가 바뀌면 단건과 **양쪽 팀의 컨택함**을 모두 무효화한다.
- * 전역 staleTime 이 30초라(providers.tsx) 목록을 안 건드리면 상세에서 수락한 뒤
- * 목록으로 돌아갔을 때 옛 상태가 그대로 서빙된다.
- * teamContactsAll 을 쓰는 이유: teamContacts() 는 마지막 요소가 필터 객체라 prefix match 가 안 된다.
+ * 컨택 상태가 바뀌면 그 방(상태 카드·입력 잠금)·방 목록(배지)·대기 건수 배지를 함께 무효화한다.
+ * 전역 staleTime 이 30초라(providers.tsx) 안 건드리면 옛 상태가 그대로 서빙된다.
  */
-function invalidateTeamContactCaches(
-  queryClient: QueryClient,
-  contactId: string,
-  contact: { fromTeamId: string; toTeamId: string },
-  chatRoomId: string | null,
-) {
-  queryClient.invalidateQueries({ queryKey: v1Keys.teamContact(contactId) });
-  queryClient.invalidateQueries({ queryKey: v1Keys.teamContactsAll(contact.fromTeamId) });
-  queryClient.invalidateQueries({ queryKey: v1Keys.teamContactsAll(contact.toTeamId) });
-  // 상태 카드·입력 잠금·목록 배지·대기 건수 배지가 모두 컨택 상태를 비추므로 함께 무효화한다.
+function invalidateTeamContactCaches(queryClient: QueryClient, chatRoomId: string | null) {
   queryClient.invalidateQueries({ queryKey: v1Keys.chatRooms() });
   queryClient.invalidateQueries({ queryKey: v1Keys.teamContactSummary() });
   if (chatRoomId) {
@@ -1237,7 +1201,7 @@ export function useV1AcceptTeamContact(contactId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: () => v1Patch<V1TeamContactRespondResult>(`/team-contacts/${contactId}/accept`),
-    onSuccess: (data) => invalidateTeamContactCaches(queryClient, contactId, data.contact, data.chatRoomId),
+    onSuccess: (data) => invalidateTeamContactCaches(queryClient, data.chatRoomId),
   });
 }
 
@@ -1246,7 +1210,7 @@ export function useV1DeclineTeamContact(contactId: string) {
   return useMutation({
     mutationFn: (body: { reason?: string }) =>
       v1Patch<V1TeamContactRespondResult>(`/team-contacts/${contactId}/decline`, body),
-    onSuccess: (data) => invalidateTeamContactCaches(queryClient, contactId, data.contact, data.chatRoomId),
+    onSuccess: (data) => invalidateTeamContactCaches(queryClient, data.chatRoomId),
   });
 }
 
@@ -1254,7 +1218,7 @@ export function useV1WithdrawTeamContact(contactId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: () => v1Post<V1TeamContactRespondResult>(`/team-contacts/${contactId}/withdraw`),
-    onSuccess: (data) => invalidateTeamContactCaches(queryClient, contactId, data.contact, data.chatRoomId),
+    onSuccess: (data) => invalidateTeamContactCaches(queryClient, data.chatRoomId),
   });
 }
 

@@ -53,7 +53,13 @@ const CATEGORY_ROOM_TYPE: Record<Exclude<ChatCategory, '전체'>, V1ChatRoom['ro
 
 function useChatListPageModel(): ChatListViewModel {
   const searchParams = useSearchParams();
-  const [selectedCategory, setSelectedCategory] = useState<ChatCategory>(() => initialChatCategory(searchParams.get('category')));
+  const categoryParam = searchParams.get('category');
+  const [selectedCategory, setSelectedCategory] = useState<ChatCategory>(() => initialChatCategory(categoryParam));
+  // 이미 /chat 에 있는 채로 쿼리만 바뀌는 이동(/chat → /chat?category=team_contact)은 컴포넌트가
+  // 남아 있어 useState 초기값이 다시 계산되지 않는다 — 파라미터 변화에 맞춰 동기화한다.
+  useEffect(() => {
+    setSelectedCategory(initialChatCategory(categoryParam));
+  }, [categoryParam]);
   // 서버 최대 페이지(50)로 받는다. 카테고리를 고르면 서버 roomType 필터로 다시 받는다 — 첫 페이지를
   // 클라이언트에서 거르면 "받은 컨택 3" 배지를 눌렀는데 목록이 비는 일이 생긴다(최종 리뷰 Important 2).
   const query = useV1ChatRooms(undefined, { limit: CHAT_LIST_PAGE_SIZE });

@@ -101,7 +101,10 @@ function renderWithClient(ui: ReactElement) {
       mutations: { retry: false },
     },
   });
-  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+  // wrapper 옵션이어야 rerender 도 같은 QueryClientProvider 안에서 다시 그려진다.
+  return render(ui, {
+    wrapper: ({ children }) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>,
+  });
 }
 
 describe('NotificationsPageClient', () => {
@@ -389,6 +392,17 @@ describe('ChatListPageClient — 팀컨택 필터·배지', () => {
     expect(screen.getAllByText('답장 필요').length).toBeGreaterThan(0);
     expect(screen.getAllByText('대기 중').length).toBeGreaterThan(0);
     expect(screen.getAllByText('수락됨').length).toBeGreaterThan(0);
+  });
+
+  it('/chat 에 있는 채로 ?category=team_contact 로 바뀌면 필터가 따라온다', () => {
+    hooks.chatRooms.mockReturnValue({ data: { items: [contactRoom('accepted', 'to')] }, isPending: false, isError: false, refetch: vi.fn() });
+    const { rerender } = renderWithClient(<ChatListPageClient />);
+    expect(screen.getAllByRole('button', { name: /^전체 / })[0]).toHaveAttribute('aria-pressed', 'true');
+
+    navigation.search = 'category=team_contact';
+    rerender(<ChatListPageClient />);
+
+    expect(screen.getAllByRole('button', { name: /^팀컨택 / })[0]).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('?category=team_contact 로 열면 팀컨택 필터가 선택돼 있고, 목록은 서버 roomType 필터로 받는다', () => {

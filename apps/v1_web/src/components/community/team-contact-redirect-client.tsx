@@ -11,7 +11,9 @@ import { extractErrorMessage } from '@/lib/error-message';
 
 /**
  * 옛 컨택 상세 경로(`/my/team-contacts/:contactId`) → 그 컨택의 채팅방.
- * 방은 요청 시점에 이미 만들어져 있으므로 resolve 는 get-or-create 의 get 경로를 탄다.
+ * 새 컨택은 요청 시점에 방이 생기고, 백필은 requested/accepted 컨택만 채운다. 그래서 백필
+ * 전에 이미 거절·철회·만료된 레거시 컨택은 여기서 resolve 가 create 경로를 타 요청 메시지 없는
+ * 방이 생긴다 — 상태 카드는 정상 렌더되므로 스펙 §3.7 대로 감수한다.
  */
 export function TeamContactRedirectClient({ contactId }: { contactId: string }) {
   const router = useRouter();

@@ -381,6 +381,14 @@ export class ChatService {
         where: { id: participant.id },
         data: { status: 'active', leftAt: null, lastReadMessageId: null, visibleFromAt: room.createdAt },
       });
+    } else if (!participant.visibleFromAt || participant.visibleFromAt > room.createdAt) {
+      // 이미 active 인데 열람 경계가 비어 있거나(옛 ensureResolvedParticipant 경로) 방 생성
+      // 시각보다 늦으면 같은 불변식으로 당긴다 — 백필 뒤엔 거의 없지만, 있으면 요청 메시지가
+      // 안 보이고 미읽음이 0 으로 잡히는 조용한 결함이 된다(PR #977 Copilot 지적).
+      await this.prisma.v1ChatRoomParticipant.update({
+        where: { id: participant.id },
+        data: { visibleFromAt: room.createdAt },
+      });
     }
     return { roomId: room.id, roomType: 'team_contact', created: !existing, route: chatRoomRoute(room.id) };
   }

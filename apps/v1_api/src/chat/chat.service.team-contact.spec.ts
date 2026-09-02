@@ -122,6 +122,30 @@ describe('ChatService — team_contact', () => {
     });
   });
 
+  it.each([
+    ['null', null],
+    ['방 생성 시각보다 늦은 값', new Date('2026-08-05T00:00:00.000Z')],
+  ])('이미 active 인 참가자의 visibleFromAt 이 %s 이면 방 생성 시각으로 당긴다', async (_label, visibleFromAt) => {
+    const createdAt = new Date('2026-08-01T00:00:00.000Z');
+    prisma.v1ChatRoom.findUnique.mockResolvedValue({ id: 'room-1', teamContactId: 'c1', status: 'active', createdAt });
+    prisma.v1ChatRoomParticipant.findUnique.mockResolvedValue({ id: 'p2', status: 'active', visibleFromAt });
+
+    await service.resolve(userU2, { targetType: 'team_contact', targetId: 'c1' });
+
+    expect(prisma.v1ChatRoomParticipant.create).not.toHaveBeenCalled();
+    expect(prisma.v1ChatRoomParticipant.update).toHaveBeenCalledWith({ where: { id: 'p2' }, data: { visibleFromAt: createdAt } });
+  });
+
+  it('이미 active 이고 visibleFromAt 이 방 생성 시각 이하면 건드리지 않는다', async () => {
+    const createdAt = new Date('2026-08-01T00:00:00.000Z');
+    prisma.v1ChatRoom.findUnique.mockResolvedValue({ id: 'room-1', teamContactId: 'c1', status: 'active', createdAt });
+    prisma.v1ChatRoomParticipant.findUnique.mockResolvedValue({ id: 'p2', status: 'active', visibleFromAt: createdAt });
+
+    await service.resolve(userU2, { targetType: 'team_contact', targetId: 'c1' });
+
+    expect(prisma.v1ChatRoomParticipant.update).not.toHaveBeenCalled();
+  });
+
   it('방 목록 항목에 teamContact 블록과 mySide 가 실린다 — 방마다 멤버십을 따로 조회하지 않는다', async () => {
     // u1 은 fromTeam(A) 의 owner 지 toTeam(B) 소속이 아니므로(include 된 toTeam.memberships 가 빈 배열) mySide 는 'from'.
     prisma.v1ChatRoom.findMany.mockResolvedValue([makeRoom('accepted')]);

@@ -14,25 +14,42 @@ import type { V1TournamentListItem } from '@/types/api';
  */
 export function TournamentHeroCard({ items, loading = false }: { items: V1TournamentListItem[]; loading?: boolean }) {
   if (loading) {
+    // 스켈레톤은 **실제 카드와 같은 DOM** 이어야 한다. 지금까지는 링크 래퍼도 CTA 도 없고
+    // `tm-featured-content-with-cta` 도 빠져 있어서, 자리를 잡아 주기는커녕 실제 카드보다
+    // 105px 크게 잡았다가 데이터가 오면 그만큼 줄며 화면을 당겼다(alpha 실측: 450px → 345px).
+    //
+    // 폭도 맞춘다. `.tm-home-featured-carousel > *:only-child` 는 카드가 하나뿐일 때 폭을
+    // 100% 로 늘리는데, 스켈레톤은 늘 하나라 항상 그 규칙에 걸렸다. 미디어가
+    // `aspect-ratio` 라 **폭이 곧 높이**여서, 이것만으로도 실제(88%)와 어긋난다.
+    // `tm-featured-skeleton` 을 달아 그 규칙에서 빼, 여러 장 캐러셀과 같은 폭으로 잡는다.
     return (
-      <Card pad={0} className="tm-featured-card" style={{ overflow: 'hidden' }} aria-busy="true">
-        <div
-          className="tm-featured-media"
-          style={{ background: 'linear-gradient(135deg, var(--blue500), var(--blue600))' }}
-        >
-          <div className="tm-featured-overlay" />
-          <div className="tm-featured-text">
-            <div className="tm-text-micro" style={{ color: 'var(--static-white)' }}>상금 대회 · 모집 중</div>
-            <div className="tm-text-subhead" style={{ color: 'var(--static-white)', marginTop: 4 }}>
-              추천 대회를 가져오고 있어요
+      <div className="tm-featured-link tm-featured-skeleton" aria-hidden="true">
+        {/* aria-busy 는 여기가 아니라 바깥 블록(.tm-home-featured-block)이 단다 —
+            이 안은 aria-hidden 서브트리라 무엇을 달아도 보조기기에 닿지 않는다. */}
+        <Card pad={0} className="tm-featured-card" style={{ overflow: 'hidden' }}>
+          <div
+            className="tm-featured-media"
+            style={{ background: 'linear-gradient(135deg, var(--blue500), var(--blue600))' }}
+          >
+            <div className="tm-featured-overlay" />
+            <div className="tm-featured-text">
+              <div className="tm-text-micro" style={{ color: 'var(--static-white)' }}>상금 대회 · 모집 중</div>
+              <div className="tm-text-subhead" style={{ color: 'var(--static-white)', marginTop: 4 }}>
+                추천 대회를 가져오고 있어요
+              </div>
             </div>
           </div>
-        </div>
-        <div className="tm-featured-content">
-          <div className="tm-review-skeleton" style={{ height: 20, borderRadius: 6, width: '72%' }} aria-hidden="true" />
-          <div className="tm-review-skeleton" style={{ height: 14, borderRadius: 6, width: '54%', marginTop: 8 }} aria-hidden="true" />
-        </div>
-      </Card>
+          <div className="tm-featured-content tm-featured-content-with-cta">
+            <div className="tm-featured-copy">
+              <div className="tm-review-skeleton" style={{ height: 20, borderRadius: 6, width: '72%' }} />
+              <div className="tm-review-skeleton" style={{ height: 14, borderRadius: 6, width: '54%', marginTop: 8 }} />
+            </div>
+            {/* 실제 카드의 CTA 와 같은 박스 모델(tm-btn + tm-btn-sm + tm-featured-cta)을 그대로 쓰고
+                색만 스켈레톤으로 바꾼다 — 높이를 숫자로 베끼면 버튼 높이가 바뀔 때 조용히 어긋난다. */}
+            <span className="tm-btn tm-btn-sm tm-featured-cta tm-review-skeleton">&nbsp;</span>
+          </div>
+        </Card>
+      </div>
     );
   }
 

@@ -73,31 +73,31 @@ function TournamentsPageSkeleton() {
 /** 이벤트 허브 진입 카드 — 정적이라 로드된 화면과 Suspense 폴백이 같은 것을 쓴다. */
 function TournamentEventHubEntry() {
   return (
-  <div className="tm-tournament-event-hub-entry">
-    <Link
-      href="/events"
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        background: 'var(--blue50)',
-        border: '1px solid var(--blue100)',
-        borderRadius: 'var(--radius-field)',
-        padding: '12px 16px',
-        textDecoration: 'none',
-      }}
-      aria-label="이벤트 허브 — 팀밋 주관 대회 캠페인 모아보기"
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <Sparkles size={18} style={{ color: 'var(--blue700)', flexShrink: 0 }} aria-hidden="true" />
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--blue700)' }}>이벤트 허브</div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 1 }}>팀밋 주관 대회 캠페인 모아보기</div>
+    <div className="tm-tournament-event-hub-entry">
+      <Link
+        href="/events"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          background: 'var(--blue50)',
+          border: '1px solid var(--blue100)',
+          borderRadius: 'var(--radius-field)',
+          padding: '12px 16px',
+          textDecoration: 'none',
+        }}
+        aria-label="이벤트 허브 — 팀밋 주관 대회 캠페인 모아보기"
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Sparkles size={18} style={{ color: 'var(--blue700)', flexShrink: 0 }} aria-hidden="true" />
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--blue700)' }}>이벤트 허브</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 1 }}>팀밋 주관 대회 캠페인 모아보기</div>
+          </div>
         </div>
-      </div>
-      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--blue700)', whiteSpace: 'nowrap' }}>바로가기 →</span>
-    </Link>
-  </div>
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--blue700)', whiteSpace: 'nowrap' }}>바로가기 →</span>
+      </Link>
+    </div>
   );
 }
 

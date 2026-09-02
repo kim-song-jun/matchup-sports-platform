@@ -1,6 +1,6 @@
-# Task 163 — 명단 제출과 선발 결정을 분리한다 (명단 → 출석, 선발 → 전술보드/kickoff)
+# Task 163 — 명단 제출과 선발 결정을 분리한다 (명단 = 출전자 — 정본 §3, 2026-09-02 재조정)
 
-> **⚠️ 2026-09-02 정본 재조정** — `docs/design/competition-canonical-flow.md` §3 이 이 문서보다 우선한다. 바뀐 것:
+> **⚠️ 2026-09-02 정본 재조정** — `docs/design/competition-canonical-flow.md` §3(PR #974 로 추가되는 문서 — #974 를 먼저 머지한다)이 이 문서보다 우선한다. 바뀐 것:
 > **선후발 구분 자체가 없다**(명단 = 출전자). 따라서 **BE-2(kickoff 이 전술보드에서 `started` 를 해석)는 폐기**한다 — 전술보드는 팀 내부 도구로만 남고 kickoff 과 연결이 없다.
 > **BE-3 의 매핑은 `position='BENCH' → started=true, position=NULL`** 이다(후보를 후보로 옮기는 것이 아니라 후보 개념을 없앤다). `V1GameParticipant.started` 컬럼은 남기고 값을 `true` 로 고정한다. `V1GameResultParticipant.started` 는 출전자 전원 `true`, 어드민 결과 정정의 선발 체크박스는 제거. BE-1(검증 제거)과 FE(선발 토글·피치 탭 제거, `started` 미전송)는 유효하다.
 > 아래 본문 중 "전술보드에서 선발을 해석" 하는 서술은 이 재조정으로 무효다.
@@ -16,7 +16,7 @@
 경기 기록     V1GameParticipant.started 는 그대로 남는다 — 교체·결과·공개기록이 읽는다
 ```
 
-즉 `started` 를 **없애는 게 아니라, "누가 언제 정하느냐"를 제출 시점에서 kickoff 시점으로 옮긴다.**
+즉 `started` 는 **결정 대상이 아니다** — 명단에 있으면 출전자이고 값은 항상 `true` 다(정본 §3). "누가 언제 정하느냐"라는 질문 자체가 사라진다.
 
 ### 지금 코드가 하는 일 (2026-09-02 실측, `origin/dev` = `b1c264039`)
 
@@ -42,7 +42,7 @@
 ## Goal
 
 1. 명단 제출(팀매치·대회 경기 둘 다)에서 **선발/후보 입력을 받지 않는다.** 기존 클라이언트가 `started` 를 보내도 400 내지 않고 **무시**한다.
-2. 선발은 **kickoff(`start` 커맨드) 시점**에 정한다:
+2. 선발은 **정하지 않는다** — 명단 전원이 출전자다. kickoff 은 `started` 를 건드리지 않는다(정본 §3):
    - 그 경기의 **전술보드가 있으면** 보드의 `started`·`goalkeeper`·`position` 을 참가자에 복사한다.
    - **없으면 명단 전원을 `started = true`** 로 둔다. 교체는 콘솔에서 한다.
 3. 저장 시 검증(min~max·GK)을 **제거한다.** kickoff 에서도 검증하지 않는다 — 보드가 규칙을 어겨도 경기는 시작되고 콘솔 교체로 조정한다 (사용자 확정 — 아래 Ambiguity Log 1·2).
@@ -65,7 +65,7 @@
   - [ ] 보드가 없거나 **엔트리 0건**이면: 전원 `started = true`. 로그에 `LINEUP_FALLBACK_ALL_STARTED` 표식을 남기되 **`reason=no_board` / `reason=empty_board` 로 가른다** — 동작은 같아도 얼마나 자주 타는지 세는 게 목적이라 합치면 못 읽는다.
   - [ ] **어느 경로든 인원·GK 검증은 하지 않는다.** `LINEUP_SIZE_INVALID`·`LINEUP_GOALKEEPER_INVALID` **코드**는 두 저장 서비스에만 있어 dead 가 된다 → 삭제 (`competition-config.presets.ts:143` 의 주석 인용은 남겨도 된다 — grep 0 을 기대하지 마라). **`parseLineupLimits` 함수는 삭제하지 않는다** — 저장 경로 2곳의 호출만 제거한다. 전술보드(`team-tactics-board.service.ts:253`)·대회 관리자(`tournaments-admin.service.ts:231,570`)·config 파싱이 계속 쓴다(2026-09-02 전수 실측 6곳 중 4곳 생존).
 - [ ] `BENCH` 센티널 폐기:
-  - [ ] 마이그레이션: `position = 'BENCH'` 인 `V1GameParticipant` 행을 `started = false, position = NULL` 로. **idempotent**(`WHERE position = 'BENCH'`).
+  - [ ] 마이그레이션: `position = 'BENCH'` 인 `V1GameParticipant` 행을 `started = true, position = NULL`(후보 개념 제거 — 정본 §3) 로. **idempotent**(`WHERE position = 'BENCH'`).
   - [ ] `team-match-lineup.service.ts` 의 `BENCH_MARKER` 쓰기 경로 제거.
   - [ ] `TeamLineupHistoryService.list()` 의 소스별 분기 제거 — `started` 하나로.
   - [ ] `BENCH_MARKER` export 를 **전수 grep** 해 소비처 0 확인 후 삭제 (⚠️ **자기 테스트 파일만 남아도 dead 다** — 화면·서비스 소비처가 0 인데 `*.spec.ts` 가 import 하고 있으면 tsc·lint·테스트가 전부 green 이라 못 잡는다. `git grep -n "^import.*BENCH_MARKER\|from '.*team-match-lineup.service'"` 로 **import 문만** 세고, 결과가 스펙 파일뿐이면 삭제한다).
@@ -93,7 +93,7 @@
 
 ```
 Backend  ⟂  Frontend  ⟂  (Infra 없음)
-  BE-1 DTO optional + 저장 검증 제거 + 참가자 started 미기입
+  BE-1 DTO optional + 저장 검증 제거 + 참가자 started 는 명시 `true`(정본 §3)
   BE-2 kickoff 선발 해석 (보드 → 복사 / 없음 → 전원). 검증은 어느 경로에도 없다
   BE-3 BENCH 마이그레이션 + 센티널 폐기 + history 분기 제거
   FE-1 라인업 화면 선발/후보 토글 제거, started 미전송      ← BE-1 머지·배포 **후**

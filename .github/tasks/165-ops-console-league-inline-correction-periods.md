@@ -61,7 +61,34 @@
 
 ### BE (순차)
 
-- **BE-1 게임 출처 해석기.** `tournament-operations` 안에 `resolveGameSource(game) → { kind: 'fixture', fixture } | { kind: 'teamMatch', teamMatch }` 순수 함수. `game.tournamentFixtureId` 를 직접 읽는 자리(4 파일)를 전부 이 함수로 재배선. 리그 게임의 대회 id 는 `teamMatch.leagueId`(= 거울 id). 변이: 한 자리라도 직접 읽기로 되돌리면 팀 매치 케이스가 red.
+- **BE-1 게임 출처 해석기.** `tournament-operations/resolve-game-source.ts` 의
+  `resolveGameSource(tx, game)` 이 두 출처를 해석한다 — fixture 는 `fixture.tournamentId`,
+  리그 팀매치는 `teamMatch.leagueId`(= 거울 id), 친선 팀매치(leagueId null)는 `null`
+  (대회 운영 권한 체계 밖이라 콘솔이 열면 안 된다).
+
+  **재배선 대상은 "4 파일" 이 아니다** — 착수 시 실측한 결과 `tournamentFixtureId` 를 읽는
+  9개 파일이 **주어로 세 갈래**로 갈렸다:
+
+  | 주어 | 파일 | 재배선 |
+  |---|---|---|
+  | `game.tournamentFixtureId` | `tournament-result-review.service.ts` · `games.service.ts` | 일부만 |
+  | `revision.tournamentFixtureId` | 브래킷·순위 투영, 대진 완료 알림, 공개 기록 | ❌ 결과 리비전 자기 컬럼 |
+  | 백필 스크립트 | `team-record-facts-backfill.ts` | ❌ |
+
+  그리고 첫 갈래의 대부분도 **대회 전용이 맞다**: 등록 명단 검증(리그엔 등록이 없다) ·
+  징계(이미 `sourceType` 으로 early-return) · 녹아웃 승부차기 · 브래킷 잠금(리그엔 브래킷이
+  없다). 그 자리들을 해석기로 바꾸면 없는 개념을 억지로 만든다.
+
+  **실제 경계는 하나였다**: `withResultCommand` 안의 출처 판별 한 줄. 다섯 개 공개 명령
+  (reviewDecision · supersedeAndSubmit · officializeResultRevision · voidResultRevision ·
+  createResultCorrection)이 전부 이 함수를 지난다.
+
+  ⚠️ **권한 리소스에서 `fixtureId` 는 키 자체를 빼야 한다.** `undefined` 를 담으면 정책
+  파서(`tournament-staff-policy.ts` 의 `parseOptionalStableId`)가 `hasOwn` 으로 "있다" 고
+  보고 stable id 가 아니라며 리소스 전체를 무효로 만들어, **플랫폼 관리자까지
+  `STAFF_SCOPE_DENIED`** 가 된다(실측).
+
+  변이: 경계를 직접 읽기로 되돌리면 3 red · 친선 팀매치 가드를 빼면 1 red.
 - **BE-2 콘솔 목록·권한.** 콘솔 대진 목록 API 가 `kind='regular_league'` 이면 팀 매치를 읽는다(`tournaments-read.service.ts:202` 가 이미 하는 방식 재사용 — 함수를 공유하고 복사하지 않는다). 스태프 권한 검사가 리그 거울에도 같은 규칙으로 걸리는지 통합 스펙 1건.
 - **BE-3 리그 전용 결과 입력 경로 제거.** `league-result-entry` 서비스가 하던 일 중 콘솔 경로에 없는 것(몰수 체크박스·득점자 선택)을 **콘솔 사후 입력 DTO 에 합친 뒤** 리그 전용 엔드포인트·모달을 삭제한다. `git grep -n 'league-result-entry' -- apps | wc -l` → `0`.
 

@@ -334,4 +334,38 @@ describe('Task 163 BE-3 — 팀 매치 라인업의 명단은 출전자 전원�
     expect(byName.get('팀장')?.position).toBe('GK');
     expect(byName.get('필드')?.position).toBe('FIXO');
   });
+  /**
+   * 인원 min~max 는 없앴지만 **빈 명단은 막는다** — 선발 규칙이 아니라 데이터 손실 가드다.
+   *
+   * 이 경로는 저장할 때마다 새 리비전을 만들어서 옛 행이 지워지지는 않는다. 그런데 읽는
+   * 쪽은 전부 **최신 리비전**을 본다(serializeLineup · league-result-participants) —
+   * 빈 리비전이 최신이 되면 그 팀 명단이 화면에서 사라지고 출전 기록도 안 만들어진다.
+   */
+  it('빈 명단으로 저장하면 400 이고 직전 명단이 최신으로 남는다', async () => {
+    const before = await currentRosterByName(hostSideId);
+    expect(before.byName.size).toBeGreaterThan(0);
+
+    await expect(
+      service.saveLineup(authUser(ids.hostOwner), ids.teamMatch, 'task163-be3-empty', {
+        expectedVersion: await currentVersion(ids.hostOwner),
+        participants: [],
+      }),
+    ).rejects.toMatchObject({ response: { code: 'LINEUP_EMPTY' } });
+
+    // 400 만 보고 끝내지 않는다 — 최신 리비전이 그대로인지가 본론이다.
+    const after = await currentRosterByName(hostSideId);
+    expect(after.revision).toBe(before.revision);
+    expect([...after.byName.keys()].sort()).toEqual([...before.byName.keys()].sort());
+  });
+
+  it('옛 두 칸을 모두 비워 보내도 같은 400 이다 — 배열이 어디에 있든 명단은 하나다', async () => {
+    await expect(
+      service.saveLineup(authUser(ids.hostOwner), ids.teamMatch, 'task163-be3-empty-legacy', {
+        expectedVersion: await currentVersion(ids.hostOwner),
+        starters: [],
+        bench: [],
+      }),
+    ).rejects.toMatchObject({ response: { code: 'LINEUP_EMPTY' } });
+  });
+
 });

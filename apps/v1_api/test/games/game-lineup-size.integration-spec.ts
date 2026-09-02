@@ -236,6 +236,56 @@ describe('GamesService.saveLineup 은 인원·골키퍼를 검증하지 않는�
   });
 
   /**
+   * 인원 min~max 는 없앴지만 **빈 명단은 막는다** — 이건 선발 규칙이 아니라
+   * **데이터 손실 가드**다.
+   *
+   * 재사용 경로는 이번 저장에서 짝을 못 찾은 기존 행을 "명단에서 빠진 사람" 으로 보고
+   * 지운다. 그래서 `participants: []` 로 저장하면 **그 사이드의 참가자 행이 통째로
+   * 사라진다** — 검인 기록도 함께. 인원 규칙을 없앤 것과는 다른 문제다.
+   */
+  it('빈 명단으로 저장하면 400 이고 기존 참가자 행이 그대로 남는다', async () => {
+    const before = await games.saveLineup(
+      authUser(ids.platformOpsUser),
+      gameId,
+      hostSideId,
+      'idem-game-lineup-empty-seed',
+      {
+        expectedVersion: await latestRevision(),
+        clientCommandId: 'idem-game-lineup-empty-seed',
+        participants: starters(pinnedMinPlayers),
+      },
+    );
+    const seeded = await prisma.v1GameParticipant.count({ where: { lineupId: before.lineupId } });
+    expect(seeded).toBe(pinnedMinPlayers);
+
+    await expect(
+      games.saveLineup(authUser(ids.platformOpsUser), gameId, hostSideId, 'idem-game-lineup-empty', {
+        expectedVersion: await latestRevision(),
+        clientCommandId: 'idem-game-lineup-empty',
+        participants: [],
+      }),
+    ).rejects.toMatchObject({ response: { code: 'LINEUP_EMPTY' } });
+
+    // 400 만 보고 끝내지 않는다 — **행이 살아 있는지**가 이 가드의 본론이다.
+    expect(await prisma.v1GameParticipant.count({ where: { lineupId: before.lineupId } })).toBe(seeded);
+  });
+
+  it('한 명만 있어도 저장된다 — 막는 것은 0명뿐이다', async () => {
+    const saved = await games.saveLineup(
+      authUser(ids.platformOpsUser),
+      gameId,
+      hostSideId,
+      'idem-game-lineup-single',
+      {
+        expectedVersion: await latestRevision(),
+        clientCommandId: 'idem-game-lineup-single',
+        participants: starters(1),
+      },
+    );
+    expect(await prisma.v1GameParticipant.count({ where: { lineupId: saved.lineupId } })).toBe(1);
+  });
+
+  /**
    * 인원 게이트는 없앴지만 **`position` 은 여전히 검증한다** — 없앤 것과 안 없앤 것을
    * 구분하는 자리다.
    *

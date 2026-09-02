@@ -131,7 +131,8 @@ type ResultRevisionContentInput = {
   actualParticipants: ReadonlyArray<{
     participantId: string;
     sideId: string;
-    started: boolean;
+    // `started` 는 여기 없다 — 정본 §3 이 선발/후보를 없앴고 결과 리비전은 출전자를
+    // 전부 true 로 기록한다. DTO 가 보내오는 값은 읽지 않으므로 타입에서도 뺀다.
     minutesPlayed?: number;
     goals: number;
     cards: { yellow: number; red: number };
@@ -382,7 +383,8 @@ export class TournamentResultReviewService {
             resultRevisionId: successor.id,
             participantId: participant.participantId,
             sideId: participant.sideId,
-            started: participant.started,
+            // **명단 = 출전자**(정본 §3) — 결과 행이 있다는 것이 곧 출전이다.
+            started: true,
             minutesPlayed: participant.minutesPlayed,
             goals: participant.goals,
             assists: participant.assists ?? 0,
@@ -782,7 +784,8 @@ export class TournamentResultReviewService {
             resultRevisionId: draft.id,
             participantId: participant.participantId,
             sideId: participant.sideId,
-            started: participant.started,
+            // **명단 = 출전자**(정본 §3) — 결과 행이 있다는 것이 곧 출전이다.
+            started: true,
             minutesPlayed: participant.minutesPlayed,
             goals: participant.goals,
             assists: participant.assists ?? 0,

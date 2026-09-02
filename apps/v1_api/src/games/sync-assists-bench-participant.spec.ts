@@ -149,7 +149,11 @@ describe('GamesService.syncAssistsIntoSubmittedRevision (private, via assignGoal
           participantId: 'p-bench',
           resultRevisionId: 'rev-2',
           sideId: 's-h',
-          started: false,
+          // 정본 §3 이후 **true** 다. 예전엔 라인업의 `started`(=false, 후보)를 그대로
+          // 실었지만 선발/후보 구분이 없어졌다 — 결과 행이 있다는 것 자체가 "뛰었다" 이고,
+          // 이 사람은 실제로 어시스트를 기록했으니 출전자다. 이 단언이 red 로 돌아오면
+          // 결과 리비전이 다시 라인업 값을 싣기 시작한 것이다.
+          started: true,
           assists: 1,
           goals: 0,
           fouls: 0,

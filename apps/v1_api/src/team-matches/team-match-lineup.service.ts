@@ -20,25 +20,34 @@ import {
 
 type Transaction = Prisma.TransactionClient;
 
-/** `V1GameParticipant.position` sentinel reserved for a bench entry. Chosen
- * because this write path never sets the `started` boolean column (it
- * defaults to `true` for every row it inserts) -- `position === BENCH_MARKER`
- * is the *only* signal that distinguishes bench from starter for rows this
- * service writes. Exported because `TeamLineupHistoryService` reads these
- * same rows across team-match and tournament-fixture sources and must use
- * this exact sentinel (not the generic `started` column) when the source
- * game is a team match -- see that service's `list()` for the branch (see
- * Task 14 report for the follow-up schema request that would let this write
- * path also start using the `started` column). */
-export const BENCH_MARKER = 'BENCH';
-/** Sentinel for the single starting goalkeeper, matching the convention
- * already used implicitly for `V1GameResultParticipant.goalkeeper`. Exported
- * for the same cross-service reason as `BENCH_MARKER`: team-match lineups
- * always store this literal string regardless of sport, while
- * tournament-fixture lineups store the sport dictionary's goalkeeper code
- * (e.g. futsal's `'GOLEIRO'`) -- `TeamLineupHistoryService` must compare
- * against this sentinel, not the dictionary code, for team-match sources. */
+/**
+ * 선발 골키퍼를 표시하는 `V1GameParticipant.position` 센티널.
+ * (`V1GameResultParticipant.goalkeeper` 가 암묵적으로 따르던 관례와 같다.)
+ *
+ * **종목과 무관하게 항상 이 리터럴**이다 — 대회 경기 라인업은 종목 사전의 코드를 그대로
+ * 저장하는데(풋살은 `'GOLEIRO'`) 팀 매치는 `goalkeeper: true` 를 받아 여기서 눌러 담는다.
+ * 그래서 읽는 쪽(`TeamLineupHistoryService`, `league-result-participants.ts`)은 팀 매치
+ * 소스에 대해 사전 코드가 아니라 이 센티널과 비교해야 한다 — export 하는 이유다.
+ *
+ * ⚠️ 선발/후보를 나타내던 짝 센티널 `BENCH_MARKER('BENCH')` 는 **없앴다**(Task 163 BE-3).
+ * 후보는 이제 `started = false` 라는 컬럼이고, 옛 행은 마이그레이션
+ * `20260902000000_v1_lineup_bench_to_started` 가 옮겼다. 한 컬럼(position)이 소스에 따라
+ * 다른 뜻을 갖던 상태가 사라졌으므로 **다시 만들지 마라** — 읽는 쪽마다 소스별 분기를
+ * 복제하게 되고, 실제로 한 곳은 상수를 import 하지 않고 값을 복사해 갖고 있었다.
+ */
 export const GOALKEEPER_MARKER = 'GK';
+
+/**
+ * 저장 요청이 실은 명단 **하나**임을 한 곳에서 확정한다.
+ *
+ * 정본 §3 이 선발/후보 구분을 없앴으므로 `participants` 가 정본 형태이고,
+ * `starters`/`bench` 는 프론트가 아직 보내는 옛 형태다 — 어느 쪽에 담겨 왔든 같은 명단에
+ * 합쳐지고, **담긴 위치가 저장 결과를 바꾸지 않는다.** 세 배열을 각자 훑는 코드가
+ * 생기면 그 순간 "어느 배열이었나" 가 다시 의미를 갖게 되므로 여기서만 편다.
+ */
+function rosterOf(dto: SaveTeamMatchLineupDto): TeamMatchLineupParticipantDto[] {
+  return [...(dto.participants ?? []), ...(dto.starters ?? []), ...(dto.bench ?? [])];
+}
 
 interface TeamMatchLineupContext {
   gameId: string;
@@ -176,6 +185,12 @@ export class TeamMatchLineupService {
                 displayNameSnapshot: entry.displayNameSnapshot,
                 jerseyNumber: entry.jerseyNumber ?? null,
                 position: entry.position,
+                // **명단 = 출전자**(정본 §3) — 이 경로가 만드는 행은 전부 출전자다.
+                // 스키마 기본값도 true 지만 명시한다: 값이 무엇인지 여기서 읽히지 않으면
+                // 다음 사람이 기본값을 바꿀 때 이 경로가 함께 뒤집히는 것을 못 본다.
+                // (그래서 이 줄을 지우는 변이는 지금 green 이다 — 기본값이 같은 값이라
+                //  관측 결과가 안 변한다. red 로 잡히는 것은 `false` 를 넣는 변이다.)
+                started: true,
                 positionX: entry.positionX ?? null,
                 positionY: entry.positionY ?? null,
               },
@@ -409,6 +424,11 @@ export class TeamMatchLineupService {
                 displayNameSnapshot: participant.displayNameSnapshot,
                 jerseyNumber: participant.jerseyNumber,
                 position: participant.position,
+                // 원본 행의 값을 **그대로** 옮긴다. 정본 §3 아래에서는 모두 true 라
+                // 지금은 결과가 같지만, 복사가 원본과 다른 값을 만들어 내는 경로를
+                // 남기지 않는다 — 이 복사본이 그 사이드의 최신 리비전이 되고 결과 입력의
+                // 모집단이 되므로, 여기서 값을 지어내면 공식 기록이 원본과 갈린다.
+                started: participant.started,
                 positionX: participant.positionX,
                 positionY: participant.positionY,
               },
@@ -836,7 +856,7 @@ export class TeamMatchLineupService {
     // 인원 규칙을 되살리려면 "kickoff 에서도 검증하지 않는다"는 사용자 확정부터
     // 뒤집어야 한다(Task 163 Ambiguity 1·2).
 
-    const jerseyNumbers = [...dto.starters, ...dto.bench]
+    const jerseyNumbers = rosterOf(dto)
       .map((entry) => entry.jerseyNumber)
       .filter((jerseyNumber): jerseyNumber is number => jerseyNumber !== undefined);
     if (new Set(jerseyNumbers).size !== jerseyNumbers.length) {
@@ -850,7 +870,7 @@ export class TeamMatchLineupService {
     // 클라이언트가 재수화(hydrate) 시점의 정체성 유실 버그(Task 15 blocker-1) 때문에, 또는
     // 어떤 클라이언트든 버그·경합으로 같은 userId를 두 번 실어 보내는 순간 한 사람에 대해
     // 두 개의 V1GameParticipant 행이 생겨버린다 — 서버가 최종 방어선이다.
-    const userIds = [...dto.starters, ...dto.bench]
+    const userIds = rosterOf(dto)
       .map((entry) => entry.userId)
       .filter((userId): userId is string => userId !== undefined);
     if (new Set(userIds).size !== userIds.length) {
@@ -860,15 +880,19 @@ export class TeamMatchLineupService {
       });
     }
 
-    const starterEntries = await Promise.all(
-      dto.starters.map((entry) =>
-        this.resolveEntry(tx, context, entry, entry.goalkeeper === true ? GOALKEEPER_MARKER : (entry.position ?? null)),
+    // **명단 = 출전자**이므로 갈래가 하나다(정본 §3). 예전엔 후보의 position 을 'BENCH' 로
+    // 덮어썼는데(센티널), 그러면 같은 컬럼이 대회 경기에서는 실제 포지션 코드를 뜻하고
+    // 팀 매치에서는 선발 여부를 뜻해 읽는 쪽마다 소스별 분기가 생겼다 — 그 관례를 없앴다.
+    return Promise.all(
+      rosterOf(dto).map((entry) =>
+        this.resolveEntry(
+          tx,
+          context,
+          entry,
+          entry.goalkeeper === true ? GOALKEEPER_MARKER : (entry.position ?? null),
+        ),
       ),
     );
-    const benchEntries = await Promise.all(
-      dto.bench.map((entry) => this.resolveEntry(tx, context, entry, BENCH_MARKER)),
-    );
-    return [...starterEntries, ...benchEntries];
   }
 
   private async resolveEntry(
@@ -967,31 +991,25 @@ export class TeamMatchLineupService {
             where: { lineupId: lineup.id },
             orderBy: { createdAt: 'asc' },
           });
-    const starters = participants
-      .filter((participant) => participant.position !== BENCH_MARKER)
-      .map((participant) => ({
-        // Task 17: the result-entry form needs the real `V1GameParticipant.id`
-        // to attribute a goal/card to a specific roster entry — this route was
-        // the only existing lineup read and previously erased the id.
-        id: participant.id,
-        // 저장된 사람 연결. 화면이 재수화할 때 이름 매칭 휴리스틱 대신 이 값을 쓰면
-        // 같은 이름의 다른 팀원을 혼동하지 않는다.
-        userId: participant.userId,
-        displayName: participant.displayNameSnapshot,
-        jerseyNumber: participant.jerseyNumber,
-        position: participant.position === GOALKEEPER_MARKER ? null : participant.position,
-        goalkeeper: participant.position === GOALKEEPER_MARKER,
-        positionX: participant.positionX,
-        positionY: participant.positionY,
-      }));
-    const bench = participants
-      .filter((participant) => participant.position === BENCH_MARKER)
-      .map((participant) => ({
-        id: participant.id,
-        userId: participant.userId,
-        displayName: participant.displayNameSnapshot,
-        jerseyNumber: participant.jerseyNumber,
-      }));
+    // **명단 = 출전자**라 갈래가 없다(정본 §3). 아래 `starters`/`bench` 는 아직 그 두 칸을
+    // 읽는 프론트를 위해 같은 값을 다른 모양으로 한 번 더 담는 것이고, `bench` 는 항상 빈
+    // 배열이다 — 프론트가 `participants` 로 넘어가면(FE-1) 둘 다 지운다.
+    const roster = participants.map((participant) => ({
+      // Task 17: the result-entry form needs the real `V1GameParticipant.id`
+      // to attribute a goal/card to a specific roster entry — this route was
+      // the only existing lineup read and previously erased the id.
+      id: participant.id,
+      // 저장된 사람 연결. 화면이 재수화할 때 이름 매칭 휴리스틱 대신 이 값을 쓰면
+      // 같은 이름의 다른 팀원을 혼동하지 않는다.
+      userId: participant.userId,
+      displayName: participant.displayNameSnapshot,
+      jerseyNumber: participant.jerseyNumber,
+      position: participant.position === GOALKEEPER_MARKER ? null : participant.position,
+      goalkeeper: participant.position === GOALKEEPER_MARKER,
+      positionX: participant.positionX,
+      positionY: participant.positionY,
+    }));
+
     return {
       teamMatchId: context.teamMatchId,
       gameId: context.gameId,
@@ -1003,8 +1021,11 @@ export class TeamMatchLineupService {
       version: lineup?.revision ?? 0,
       formation: lineup?.formation ?? null,
       publicLineupAt: publicLineupAt?.toISOString() ?? null,
-      starters,
-      bench,
+      participants: roster,
+      // 옛 두 칸 — 같은 명단을 프론트가 아직 읽는 모양으로 한 번 더 담는다.
+      // 명단 = 출전자이므로 `bench` 는 언제나 비어 있다.
+      starters: roster,
+      bench: [] as typeof roster,
     };
   }
 }

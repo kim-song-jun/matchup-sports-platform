@@ -3665,7 +3665,10 @@ export class GamesService {
             resultRevisionId: revision.id,
             participantId: participant.participantId,
             sideId: participant.sideId,
-            started: participant.started,
+            // **명단 = 출전자**(정본 §3) — 결과 행이 있다는 것이 곧 출전이다.
+            // DTO/라인업의 started 를 싣지 않는다: 선발/후보 구분이 없어졌으므로
+            // 그 값을 실으면 폐기된 개념이 공식 기록에 되살아난다.
+            started: true,
             minutesPlayed: participant.minutesPlayed,
             goals: participant.goals,
             assists: participant.assists ?? 0,
@@ -4068,7 +4071,10 @@ export class GamesService {
             resultRevisionId: revision.id,
             participantId: participant.participantId,
             sideId: participant.sideId,
-            started: participant.started,
+            // **명단 = 출전자**(정본 §3) — 결과 행이 있다는 것이 곧 출전이다.
+            // DTO/라인업의 started 를 싣지 않는다: 선발/후보 구분이 없어졌으므로
+            // 그 값을 실으면 폐기된 개념이 공식 기록에 되살아난다.
+            started: true,
             minutesPlayed: participant.minutesPlayed,
             goals: participant.goals,
             assists: participant.assists ?? 0,
@@ -6316,7 +6322,7 @@ export class GamesService {
     // 하드코딩 버그 수정: started/goalkeeper를 실제 라인업 값과 무관하게
     // 항상 true/false로 박아 넣었다 -- 후보로 저장한 선수도 결과 프로젝션에서는
     // 전부 선발로 보였고, 실제로 골키퍼였던 선수도 항상 goalkeeper:false였다.
-    // started는 라인업이 저장한 값(participant.started)을 그대로 쓴다.
+    // started 는 항상 true 다 — 명단 = 출전자(정본 §3).
     // goalkeeper는 이 대회 종목의 골키퍼 포지션 코드(competitionConfig의
     // lineup.positions 중 goalkeeper:true인 항목의 code -- 축구 'GK', 풋살
     // 'GOLEIRO' 등 종목마다 다르다. 프론트 formation-slots.ts의
@@ -6403,7 +6409,8 @@ export class GamesService {
           resultRevisionId: revision.id,
           participantId: participant.id,
           sideId: participant.sideId,
-          started: participant.started,
+          // **명단 = 출전자**(정본 §3) — 결과 행이 있다는 것이 곧 출전이다.
+          started: true,
           goals: goalCount.get(participant.id) ?? 0,
           assists: assistCount.get(participant.id) ?? 0,
           fouls: foulCount.get(participant.id) ?? 0,
@@ -6850,7 +6857,9 @@ export class GamesService {
         newParticipantRows.push({
           participantId: participant.id,
           sideId: participant.sideId,
-          started: participant.started,
+          // **명단 = 출전자**(정본 §3). 이 행은 라인업 증거로 **새로** 짓는 것이므로
+          // 승계(아래 predecessor 복사)와 달리 지금 규칙을 적용한다.
+          started: true,
           goals: 0,
           assists,
           fouls: 0,
@@ -6907,6 +6916,8 @@ export class GamesService {
           resultRevisionId: successorDraft.id,
           participantId: participant.participantId,
           sideId: participant.sideId,
+          // ⚠️ 승계는 **원본 그대로** 옮긴다. 정본 §3 이 앞으로의 쓰기를 true 로 고정했지만
+          // 이미 저장된 공식 기록의 값을 다시 쓰지는 않는다(마이그레이션 대상도 아니다).
           started: participant.started,
           minutesPlayed: participant.minutesPlayed,
           goals: participant.goals,

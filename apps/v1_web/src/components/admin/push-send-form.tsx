@@ -198,6 +198,12 @@ function pushReachedNobody(push: NonNullable<V1AdminPushSendResult['push']>): bo
   return webNowhere && nativeNowhere;
 }
 
+/** 웹이든 앱이든 어느 채널이 꺼져 있거나 전송에 실패했는가 — 결과 카드의 red 톤과 같은 기준. */
+function pushReportedTrouble(push: NonNullable<V1AdminPushSendResult['push']>): boolean {
+  if (push.disabled || push.failed > 0) return true;
+  return !!push.native && (push.native.disabled || push.native.failed > 0);
+}
+
 // ── Component ─────────────────────────────────────────────────────────────
 export function PushSendForm() {
   const [target, setTarget] = useState<V1AdminPushSendTarget>('user');
@@ -238,12 +244,15 @@ export function PushSendForm() {
         // 푸시가 한 건도 안 나간 경우를 성공 토스트로 덮지 않는다 — 상세는 아래 결과 카드에 있다.
         // 웹과 앱 어느 한쪽으로라도 나갔으면 "나가지 않았다" 가 아니다.
         const pushWentNowhere = data.push ? pushReachedNobody(data.push) : false;
+        // 결과 카드가 red 로 강조하는 것(꺼짐·전송 실패)은 토스트도 같은 톤이어야 한다 —
+        // 카드는 스크롤 아래에 있고, 운영자가 먼저 보는 건 토스트다.
+        const pushHadTrouble = data.push ? pushReportedTrouble(data.push) : false;
         showToast(
           `발송 완료 — 앱 알림 ${data.sent}건 · 스킵 ${data.skipped}건 · 실패 ${data.failed}건` +
-            (pushWentNowhere ? ' (푸시는 나가지 않았어요)' : ''),
-          // 토스트는 success/error 두 가지뿐이라, 푸시가 아무 데도 안 간 경우도
+            (pushWentNowhere ? ' (푸시는 나가지 않았어요)' : pushHadTrouble ? ' (푸시 일부가 실패했어요)' : ''),
+          // 토스트는 success/error 두 가지뿐이라, 푸시가 아무 데도 안 갔거나 실패한 경우도
           // '성공'으로 흘려보내지 않도록 error 로 띄워 눈에 걸리게 한다.
-          data.failed > 0 || pushWentNowhere ? 'error' : 'success',
+          data.failed > 0 || pushWentNowhere || pushHadTrouble ? 'error' : 'success',
         );
         setConfirmOpen(false);
         setTitle('');

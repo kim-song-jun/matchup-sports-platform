@@ -246,6 +246,33 @@ describe('PushSendForm', () => {
     });
   });
 
+  it('앱 푸시 일부가 실패하면 토스트도 error 톤으로 띄운다', async () => {
+    sendMutate.mockImplementation((_payload, options) => {
+      options.onSuccess({
+        sent: 2,
+        skipped: 0,
+        failed: 0,
+        push: {
+          subscriptions: 0,
+          delivered: 0,
+          failed: 0,
+          disabled: false,
+          native: { devices: 2, delivered: 1, failed: 1, disabled: false },
+        },
+      });
+    });
+    const user = userEvent.setup();
+    render(<PushSendForm />);
+
+    await pickUser(user);
+    await user.type(screen.getByLabelText(/제목/), '테스트 알림');
+    await user.click(screen.getByRole('button', { name: '발송하기' }));
+
+    const toast = await screen.findByText(/푸시 일부가 실패했어요/);
+    // 알림 생성은 전부 성공했지만(failed 0) 푸시 전송이 실패했으므로 success 로 흘려보내지 않는다.
+    expect(toast.closest('[role="status"]')?.querySelector('.bg-red-500') ?? toast.closest('.bg-red-500')).not.toBeNull();
+  });
+
   it('실제로 푸시가 전송되면 구독·전송 건수를 보여준다', async () => {
     sendMutate.mockImplementation((_payload, options) => {
       options.onSuccess({

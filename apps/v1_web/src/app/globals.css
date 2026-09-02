@@ -3931,6 +3931,24 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   overflow-y: hidden;
 }
 
+/*
+ * `.tm-chat-room` 의 height:100% 는 스크롤 영역(절대 배치라 높이가 확정)을 기준으로 삼는데,
+ * 2026-09-01 페이지 전환 래퍼(template.tsx 의 .tm-page-transition-enter, display:block,
+ * height:auto)가 그 사이에 끼면서 100% 가 auto 로 해석됐다. 그러면 채팅방이 콘텐츠 높이
+ * (스레드 전체 + 입력창)만큼 늘어나고, 위의 overflow-y:hidden 때문에 사용자는 아래로 내릴
+ * 수도 없다 — alpha 실측(2026-09-02): 입력창 bottom 이 뷰포트보다 Pixel 7 에서 441px,
+ * iPhone 14 에서 613px 아래. 즉 채팅방에서 입력창이 통째로 잘렸다.
+ *
+ * `.tm-list-empty` 와 같은 처방(4448행)이되 **height** 여야 한다 — min-height 로는 래퍼가
+ * 콘텐츠만큼 계속 자라 스레드가 스크롤러가 되지 못한다. 래퍼와 채팅방 사이의 pane 들은
+ * display:contents 라 박스가 없어, 이 래퍼가 곧 채팅방의 퍼센트 기준이다.
+ * 데스크톱(≥1024px)은 스크롤 영역이 static·height:auto 라 이 100% 도 auto 가 되고, 채팅방
+ * 높이는 .tm-chat-desktop-workspace 의 calc(100dvh - 112px) 가 정한다 — 실측 1440 에서 변화 0.
+ */
+.tm-scroll-area > .tm-page-transition-enter:has(.tm-chat-room) {
+  height: 100%;
+}
+
 .tm-chat-context {
   padding: 16px;
   border-bottom: 1px solid var(--grey100);

@@ -21,6 +21,7 @@ import { useV1AllTournaments, useV1LeagueMatches } from '@/hooks/use-v1-api';
 import type { V1TournamentListItem } from '@/types/api';
 import type { V1PublicLeagueListItem } from '@/types/league-match';
 import { TournamentHeroCard } from './tournament-hero-card';
+import { FeaturedSlotSkeleton } from './featured-slot-skeleton';
 import type { HomeChatRoom, HomeMatchCard, HomeQuickAction, HomeViewModel } from './home.types';
 
 export function HomePageView({ model }: { model: HomeViewModel }) {
@@ -154,8 +155,17 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
               <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 2 }}>지금 눈여겨볼 매치·대회</div>
             </div>
             <div className="tm-home-featured-carousel">
+              {/* 추천 매치 슬롯도 **자리를 먼저 잡는다**. 이 카드는 /api/v1/home 응답으로 나타나는데
+                  캐러셀의 0번 자리라, 늦게 끼어들면 이미 자리 잡은 대회 슬롯을 통째로 오른쪽으로
+                  밀어낸다 — alpha 실측에서 남아 있던 CLS 0.1286 이 전부 이것이었다(10.7초에
+                  자식 1개 → 2개로 바뀌는 중간 프레임을 포착했다).
+                  model.statsLoading 은 "홈 응답이 아직 안 왔다"는 뜻으로 모델이 이미 쓰는
+                  신호다(no-data fallback 경로에서만 true 로 설정된다).
+                  대가: 추천 매치가 없는 날엔 빈 자리가 잠깐 보였다가 접힌다(사용자 확정). */}
               {model.featuredMatch ? (
                 <FeaturedMatchCard match={model.featuredMatch} network={model.network} signedOut={model.signedOut} onRetry={model.retry} />
+              ) : model.statsLoading ? (
+                <FeaturedSlotSkeleton eyebrow="오늘의 매치" title="추천 매치를 가져오고 있어요" />
               ) : null}
               {tournaments.isError ? (
                 <Card pad={16}>

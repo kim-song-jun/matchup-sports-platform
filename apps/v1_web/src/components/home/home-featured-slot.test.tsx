@@ -51,6 +51,15 @@ type TournamentsResult = {
 };
 
 // 서버 렌더 그대로: 데이터 없음 + isPending true + isLoading **false**.
+// 홈 응답이 아직 안 온 상태를 만들 수 있게 스위치로 둔다. data 가 없으면 모델이
+// `statsLoading: true` 로 떨어지고, 그때 추천 매치 슬롯이 자리를 예약해야 한다.
+const HOME_DATA = { viewer: { authenticated: true, onboardingStatus: 'completed', displayName: '테스터' } };
+const homeMock = vi.fn<() => { data?: unknown; isError: boolean; refetch: () => void }>(() => ({
+  data: HOME_DATA,
+  isError: false,
+  refetch: vi.fn(),
+}));
+
 const tournamentsMock = vi.fn<() => TournamentsResult>(() => ({
   data: undefined,
   isPending: true,
@@ -63,11 +72,7 @@ vi.mock('@/hooks/use-v1-api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/hooks/use-v1-api')>();
   return {
     ...actual,
-    useV1Home: () => ({
-      data: { viewer: { authenticated: true, onboardingStatus: 'completed', displayName: '테스터' } },
-      isError: false,
-      refetch: vi.fn(),
-    }),
+    useV1Home: () => homeMock(),
     useV1ChatRooms: () => ({ data: { items: [] }, isPending: false, isError: false }),
     useV1PendingTournamentReviews: () => ({ data: undefined }),
     useV1AuthMe: () => authMe,
@@ -98,6 +103,7 @@ describe('홈 추천 대회 슬롯 — 데이터가 아직 없을 때도 자리�
   // mockReturnValue 는 영구적이라 다음 테스트까지 끌고 간다 — 매번 서버 렌더 상태로 되돌린다.
   afterEach(() => {
     tournamentsMock.mockReturnValue(PENDING);
+    homeMock.mockReturnValue({ data: HOME_DATA, isError: false, refetch: vi.fn() });
   });
 
   it('isPending 이면(= 서버 렌더처럼 isLoading 이 false 여도) 슬롯이 렌더된다', () => {
@@ -150,5 +156,26 @@ describe('홈 추천 대회 슬롯 — 데이터가 아직 없을 때도 자리�
     // 슬롯이 사라지고, 따라서 "불러오는 중"이 영원히 남는 일도 없다.
     expect(container.querySelector('.tm-home-featured-block')).toBeNull();
     expect(container.querySelector('[aria-busy="true"]')).toBeNull();
+  });
+});
+
+describe('추천 매치 슬롯 — 홈 응답이 늦어도 자리를 먼저 잡는다', () => {
+  it('홈 데이터가 아직 없으면 캐러셀에 자리표시가 두 칸 생긴다', () => {
+    // 추천 매치 카드는 /api/v1/home 응답으로 캐러셀 **0번 자리**에 나타난다. 자리를 미리
+    // 잡지 않으면 늦게 끼어들며 이미 자리 잡은 대회 슬롯을 통째로 오른쪽으로 밀어낸다 —
+    // alpha 실측에서 남아 있던 CLS 0.1286 이 전부 이것이었다.
+    homeMock.mockReturnValue({ data: undefined, isError: false, refetch: vi.fn() });
+    const { container } = renderHome();
+
+    const rail = container.querySelector('.tm-home-featured-carousel');
+    expect(rail?.querySelectorAll('.tm-featured-skeleton')).toHaveLength(2);
+  });
+
+  it('홈 데이터가 도착하고 추천 매치가 없으면 그 칸은 접힌다(감수하기로 한 대가)', () => {
+    homeMock.mockReturnValue({ data: HOME_DATA, isError: false, refetch: vi.fn() });
+    const { container } = renderHome();
+
+    const rail = container.querySelector('.tm-home-featured-carousel');
+    expect(rail?.querySelectorAll('.tm-featured-skeleton')).toHaveLength(1);
   });
 });

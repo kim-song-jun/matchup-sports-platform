@@ -41,12 +41,18 @@ export function TournamentHeroCard({ items, loading = false }: { items: V1Tourna
           </div>
           <div className="tm-featured-content tm-featured-content-with-cta">
             <div className="tm-featured-copy">
-              <div className="tm-review-skeleton" style={{ height: 20, borderRadius: 6, width: '72%' }} />
-              <div className="tm-review-skeleton" style={{ height: 14, borderRadius: 6, width: '54%', marginTop: 8 }} />
+              {/* `.tm-review-skeleton` 이 아니라 `.tm-skeleton` 이다. 전자는 리뷰 카드용 블록이라
+                  `min-height: 92px` 를 갖고 있어 **인라인 height 를 조용히 덮어쓴다** — 20px·14px
+                  막대가 둘 다 92px 이 되어 copy 가 52px 대신 192px 이 됐다(alpha 실측).
+                  두 막대의 합(20 + 8 + 24 = 52px)은 실제 카드 copy 의 실측 높이에 맞춘 값이다. */}
+              <div className="tm-skeleton" style={{ height: 20, borderRadius: 6, width: '72%' }} />
+              <div className="tm-skeleton" style={{ height: 24, borderRadius: 6, width: '54%', marginTop: 8 }} />
             </div>
             {/* 실제 카드의 CTA 와 같은 박스 모델(tm-btn + tm-btn-sm + tm-featured-cta)을 그대로 쓰고
                 색만 스켈레톤으로 바꾼다 — 높이를 숫자로 베끼면 버튼 높이가 바뀔 때 조용히 어긋난다. */}
-            <span className="tm-btn tm-btn-sm tm-featured-cta tm-review-skeleton">&nbsp;</span>
+            {/* CTA 도 같은 이유로 tm-skeleton 이다 — tm-review-skeleton 이면 min-height 92px 에
+                눌려 실제 버튼(44px)의 두 배가 된다. */}
+            <span className="tm-btn tm-btn-sm tm-featured-cta tm-skeleton">&nbsp;</span>
           </div>
         </Card>
       </div>

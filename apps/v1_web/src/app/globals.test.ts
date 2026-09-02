@@ -66,6 +66,7 @@ describe('data-nav-kind 선택자 형태 — 형태가 틀리면 조용히 발�
     // 최소 재현(Chromium): `:root[x] ::view-transition-old(y)` 는 UA 애니메이션을 못 끄고
     // (2건 재생), `:root[x]::view-transition-old(y)` 만 끈다(0건). 공백은 자손 결합자인데
     // view-transition 의사요소는 그 방식으로 매칭되지 않는다.
+    // 따옴표 종류(" vs ')는 이 규칙과 무관하다 — 형태만 본다.
     const spaced = rulesOnly.match(/:root\[data-nav-kind=[^\]]+\]\s+::view-transition-/g) ?? [];
 
     expect(spaced).toEqual([]);
@@ -77,6 +78,6 @@ describe('data-nav-kind 선택자 형태 — 형태가 틀리면 조용히 발�
     const onSelf = rulesOnly.match(/\.tm-page-transition-enter\[data-nav-kind=/g) ?? [];
 
     expect(onSelf).toEqual([]);
-    expect(rulesOnly).toMatch(/:root\[data-nav-kind="tab"\]\s+\.tm-page-transition-enter/);
+    expect(rulesOnly).toMatch(/:root\[data-nav-kind=["']tab["']\]\s+\.tm-page-transition-enter/);
   });
 });

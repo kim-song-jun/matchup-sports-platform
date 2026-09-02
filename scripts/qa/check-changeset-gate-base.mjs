@@ -46,16 +46,42 @@ function fail(message) {
   process.exit(1);
 }
 
-/** 워크플로에서 그 스텝의 `run:` 블록만 꺼낸다. 들여쓰기를 벗겨 그대로 실행 가능하게 만든다. */
+/**
+ * 워크플로에서 **그 스텝의** `run:` 블록만 꺼낸다. 들여쓰기를 벗겨 그대로 실행 가능하게 만든다.
+ *
+ * 검색 범위를 **스텝 경계 안으로** 가둔다. 처음엔 이름 뒤의 첫 `run: |` 를 파일 전체에서
+ * 찾았는데, 그러면 그 스텝의 run 형식이 바뀌거나(`>-`) 사라졌을 때 **다음 스텝의 셸을
+ * 집어온다**. 실측: 그 상태에서 이 가드는 red 이긴 했지만 *"base 해석 단계에서 죽었을 수
+ * 있다"* 고 **엉뚱한 원인을 지목**했다 — 배치가 조금만 달랐으면 그냥 통과했을 수도 있다.
+ *
+ * folded 스칼라(`>` / `>-`)는 줄바꿈을 접어 셸을 망가뜨리므로 **받지 않고 이름을 대며 죽는다.**
+ */
 function extractStepShell(path) {
   const lines = readFileSync(path, 'utf8').split('\n');
   const nameIdx = lines.findIndex((l) => l.includes(`- name: ${STEP_NAME}`));
   if (nameIdx < 0) fail(`워크플로에서 "${STEP_NAME}" 스텝을 못 찾았다: ${path}`);
-  const runIdx = lines.findIndex((l, i) => i > nameIdx && /^\s+run: \|/.test(l));
-  if (runIdx < 0) fail(`"${STEP_NAME}" 스텝에 run: 블록이 없다`);
+
+  // 스텝 경계: 같은 들여쓰기에서 다음 `- ` 항목이 시작하는 곳까지
+  const stepIndent = lines[nameIdx].match(/^\s*/)[0];
+  let endIdx = lines.length;
+  for (let i = nameIdx + 1; i < lines.length; i += 1) {
+    if (lines[i].startsWith(`${stepIndent}- `)) { endIdx = i; break; }
+  }
+
+  const runIdx = lines.findIndex((l, i) => i > nameIdx && i < endIdx && /^\s+run:/.test(l));
+  if (runIdx < 0) {
+    fail(`"${STEP_NAME}" 스텝 안에 run: 이 없다 — 스텝이 사라졌거나 이름이 바뀌었다.\n`
+      + '  이 가드는 그 스텝의 셸을 실행해서 검사하므로, 대상이 없으면 검사할 것도 없다.');
+  }
+  const scalar = lines[runIdx].slice(lines[runIdx].indexOf('run:') + 4).trim();
+  if (!/^\|[-+]?$/.test(scalar)) {
+    fail(`"${STEP_NAME}" 스텝의 run 이 literal 블록(\`|\`)이 아니다: run: ${scalar}\n`
+      + '  folded(`>`)는 줄바꿈을 접어 셸을 망가뜨린다. 한 줄 형식이면 이 가드가 못 읽는다.');
+  }
+
   const indent = lines[runIdx + 1].match(/^\s*/)[0];
   const body = [];
-  for (let i = runIdx + 1; i < lines.length; i += 1) {
+  for (let i = runIdx + 1; i < endIdx; i += 1) {
     const line = lines[i];
     if (line.trim() !== '' && !line.startsWith(indent)) break;
     body.push(line.slice(indent.length));

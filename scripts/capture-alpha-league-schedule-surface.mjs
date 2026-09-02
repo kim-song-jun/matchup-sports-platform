@@ -65,7 +65,14 @@ const GOTO_TIMEOUT = 60_000;
  * (2026-09-01). 403 은 화면 결함이 아니지만 **그 실행의 나머지 판정을 통째로 못 쓰게 만든다** —
  * 재측정 비용이 간격보다 훨씬 비싸다.
  */
-const PACE_MS = Number(process.env.PACE_MS ?? 4_000);
+/** ⚠️ 숫자가 아니면 기본값으로 — `PACE_MS=' '`·`'4s'` 는 NaN 이 되고 `setTimeout(NaN)` 은 **0ms** 다.
+ * 이 하네스는 **간격 자체가 rate limit 회피의 핵심**이라 그때 403 을 자초한다. */
+const PACE_MS = (() => {
+  const raw = String(process.env.PACE_MS ?? '').trim();
+  const n = Number(raw);
+  // `Number(' ')` 은 0 이라 `isFinite` 만으로는 공백이 통과하고, 간격 0 은 곧 403 이다.
+  return raw !== '' && Number.isFinite(n) && n > 0 ? n : 4_000;
+})();
 /** 순위는 클라이언트 조회라 렌더까지 시간이 걸린다. `networkidle` 은 폴링 때문에 안 끝난다. */
 const SETTLE_MS = 5_000;
 

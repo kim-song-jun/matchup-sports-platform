@@ -33,10 +33,18 @@
 import { chromium } from 'playwright';
 
 const BASE = 'https://alpha.teameet.co.kr';
+/** ⚠️ 숫자가 아니면 기본값으로 — `'164px'`·`' '` 은 NaN 이 되고, NaN 은 비교가 전부 false 라
+ * 기준선이 **조용히 무력화**된다(판정이 `❌ NaNpx 늘었다` 로 깨지거나 아예 안 걸린다). */
+const baselineOf = (raw, fallback) => {
+  const n = Number(String(raw ?? '').trim());
+  // ⚠️ `Number(' ')` 은 **0** 이라 `isFinite` 만으로는 공백이 통과한다 — 기준선 0 은 모든 측정을
+  // ❌ 로 만든다. 빈 문자열·0 이하도 무효로 본다.
+  return String(raw ?? '').trim() !== '' && Number.isFinite(n) && n > 0 ? n : fallback;
+};
 const WIDTHS = [
-  { key: 'mobile', width: 390, height: 844, baseline: Number(process.env.BASELINE_390 ?? 164) },
-  { key: 'tablet', width: 768, height: 1024, baseline: Number(process.env.BASELINE_768 ?? 164) },
-  { key: 'desktop', width: 1440, height: 900, baseline: Number(process.env.BASELINE_1440 ?? 164) },
+  { key: 'mobile', width: 390, height: 844, baseline: baselineOf(process.env.BASELINE_390, 164) },
+  { key: 'tablet', width: 768, height: 1024, baseline: baselineOf(process.env.BASELINE_768, 164) },
+  { key: 'desktop', width: 1440, height: 900, baseline: baselineOf(process.env.BASELINE_1440, 164) },
 ];
 const SETTLE_MS = 4_000;
 

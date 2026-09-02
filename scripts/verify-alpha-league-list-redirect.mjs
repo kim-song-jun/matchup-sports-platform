@@ -102,17 +102,23 @@ async function main() {
        */
       const status = res?.status() ?? 0;
       /**
-       * ⚠️ **403/429 만 거르면 부족하다.** 404·500 도 최종 URL 이 대개 원래 경로 그대로라,
-       * 그때 URL 만 비교하면 **하위 화면 행이 ✅ 로 vacuous-pass** 한다("안 넘어갔다"가 아니라
-       * "에러 페이지에 머물렀다"인데 둘이 구별되지 않는다). URL 비교는 **성공 응답에서만** 한다.
+       * ⚠️ **여기서 세 가지를 갈라야 한다 — 뭉뚱그리면 어느 쪽이든 틀린다.**
+       * ```
+       * 403 · 429 · 0   rate limit / 무응답 → **못 쟀다**. 실행을 끊는다(exit 2).
+       * 그 외 4xx · 5xx  경로가 닫혔거나 서버 에러 → **진짜 회귀다**. ❌ 로 표에 남긴다(exit 1).
+       * 2xx · 3xx       그때만 URL 을 비교한다.
+       * ```
+       * 처음엔 403/429 만 걸렀는데 404·500 이 URL 비교로 흘러가 **하위 화면이 vacuous-pass**
+       * 했다. 그걸 고치며 `>= 400` 을 통째로 하네스 실패로 돌렸더니 이번엔 **진짜 회귀를
+       * "못 쟀다"로 숨겼다.** URL 비교에서 빼는 것과 결함으로 세는 것은 다른 일이다.
        */
-      if (status >= 400 || status === 0) {
-        throw new Error(`HARNESS: ${path} → HTTP ${status} — 못 쟀다. 화면에 대해 판정하지 마라.`);
+      if (status === 403 || status === 429 || status === 0) {
+        throw new Error(`HARNESS: ${path} → HTTP ${status} (rate limit/무응답) — 못 쟀다. 화면에 대해 판정하지 마라.`);
       }
-      await page.waitForTimeout(SETTLE_MS);
-      const landed = normalize(page.url());
       await sleep(PACE_MS);
-      return landed;
+      if (status >= 400) return { landed: null, status };
+      await page.waitForTimeout(SETTLE_MS);
+      return { landed: normalize(page.url()), status };
     };
 
     // ── 목록은 넘어간다 + 아는 값만 옮긴다
@@ -122,8 +128,13 @@ async function main() {
       ['목록 ?sportId=쓰레기', '/league-matches?sportId=not-a-uuid', '/tournaments?kind=league'],
       ['목록 (쿼리 없음)', '/league-matches', '/tournaments?kind=league'],
     ]) {
-      const landed = await land(path);
-      rows.push({ 항목, 착지: landed, 기대, 판정: landed === 기대 ? '✅' : '❌' });
+      const { landed, status } = await land(path);
+      rows.push({
+        항목,
+        착지: landed ?? `HTTP ${status}`,
+        기대,
+        판정: landed === null ? `❌ HTTP ${status}` : landed === 기대 ? '✅' : '❌',
+      });
     }
 
     // ── 하위 화면은 **안 넘어간다** — 이 하네스의 핵심
@@ -133,8 +144,13 @@ async function main() {
     ];
     if (fixture !== undefined) subs.push(['경기 /:id/fixtures/:fid', `/league-matches/${id}/fixtures/${fixture.teamMatchId}`]);
     for (const [항목, path] of subs) {
-      const landed = await land(path);
-      rows.push({ 항목, 착지: landed === path ? '(그대로)' : landed, 기대: '그대로', 판정: landed === path ? '✅' : '❌ 넘어갔다' });
+      const { landed, status } = await land(path);
+      rows.push({
+        항목,
+        착지: landed === null ? `HTTP ${status}` : landed === path ? '(그대로)' : landed,
+        기대: '그대로',
+        판정: landed === null ? `❌ HTTP ${status} — 화면이 열리지 않는다` : landed === path ? '✅' : '❌ 넘어갔다',
+      });
     }
     if (fixture === undefined) {
       rows.push({ 항목: '경기 /:id/fixtures/:fid', 착지: '-', 기대: '그대로', 판정: fixtures === null ? '⚠️ 상세 API 실패 — 못 쟀다' : '⚠️ 이 리그에 대진이 없다 — 못 쟀다' });

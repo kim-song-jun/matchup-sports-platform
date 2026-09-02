@@ -6,8 +6,8 @@ must never be submitted as product evidence.
 
 ## Graphics
 
-- `graphics/play-icon-512.png`: 512×512 Play icon, derived from
-  `docs/reference/app-icons-v4/06-orbit-match-blue.png`.
+- `graphics/play-icon-512.png`: 512×512 Play icon, copied from the canonical Teameet brand asset
+  `apps/v1_web/public/brand/icon-512.png`.
 - `graphics/feature-graphic-1024x500.png`: 1024×500 Play feature graphic.
 - Device screenshots are intentionally absent until the physical-device matrix is complete.
 
@@ -24,5 +24,6 @@ Feature graphic generation prompt:
 > important elements inside a central safe area. Absolutely no text, no letters, no logos, no
 > app-store badges, no device frames, no gradients that reduce legibility, no photographic people.
 
-The generated source was center-cropped and downsampled to the exact Play Console dimensions. The
-launcher icon uses the existing project-owned v4 artwork and was not AI-edited.
+The generated feature-graphic source was center-cropped and downsampled to the exact Play Console
+dimensions. The launcher and Play icons reuse the existing project-owned canonical Teameet artwork
+and were not AI-edited.

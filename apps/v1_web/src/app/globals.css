@@ -8181,16 +8181,24 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
   from { opacity: 0; transform: translateX(-24px); }
   to   { opacity: 1; transform: translateX(0); }
 }
-:root[data-nav-kind="push"] .tm-page-transition-enter { animation: tm-page-fallback-push var(--duration-slower) var(--ease-out) both; }
-:root[data-nav-kind="pop"] .tm-page-transition-enter { animation: tm-page-fallback-pop var(--duration-slower) var(--ease-out) both; }
-/* 탭은 VT 지원 경로와 마찬가지로 이 폴백(iOS 16/17 주 경로)에서도 애니메이션을
-   걸지 않는다 -- 규칙을 아예 안 두면 "빠뜨렸나"로 읽히므로 명시적으로 none 을
-   남긴다. 예전엔 여기서도 opacity 0→1 로 페이드했다(tm-page-fallback-tab, 삭제됨). */
-/* [선택자 형태 주의] data-nav-kind 는 page-transition-controller 가 <html> 에만 단다.
-   .tm-page-transition-enter[data-nav-kind="..."] 는 그 속성을 **이 요소 자신**에서
-   찾으므로 영원히 매칭되지 않는다(template.tsx 는 이 요소에 그 속성을 달지 않는다).
-   여기서는 반대로 자손 결합자가 맞다 — <html> 아래의 실제 요소이기 때문이다. */
-:root[data-nav-kind="tab"] .tm-page-transition-enter { animation: none; }
+/* [적용 범위] 이 폴백은 **VT 미지원 환경 전용**이다. 선택자 형태를 고치기 전에는 아예
+   매칭되지 않아 아무 데서도 안 돌았는데, 고치고 나니 VT 지원 브라우저에서도 함께 돌아
+   VT 슬라이드와 **이중으로 겹쳤다**(alpha 실측: push 이동에서 tm-page-fallback-push 와
+   -ua-view-transition-* 가 동시에 발화). @supports 로 갈라 VT 가 없을 때만 쓴다 —
+   CSS.supports('view-transition-name','none') 가 참인 환경에서는 이 블록이 통째로
+   적용되지 않고, VT 쪽 규칙만 남는다(최소 재현으로 0건 확인). */
+@supports not (view-transition-name: none) {
+  :root[data-nav-kind="push"] .tm-page-transition-enter { animation: tm-page-fallback-push var(--duration-slower) var(--ease-out) both; }
+  :root[data-nav-kind="pop"] .tm-page-transition-enter { animation: tm-page-fallback-pop var(--duration-slower) var(--ease-out) both; }
+  /* 탭은 VT 지원 경로와 마찬가지로 이 폴백(iOS 16/17 주 경로)에서도 애니메이션을
+     걸지 않는다 -- 규칙을 아예 안 두면 "빠뜨렸나"로 읽히므로 명시적으로 none 을
+     남긴다. 예전엔 여기서도 opacity 0→1 로 페이드했다(tm-page-fallback-tab, 삭제됨). */
+  /* [선택자 형태 주의] data-nav-kind 는 page-transition-controller 가 <html> 에만 단다.
+     .tm-page-transition-enter[data-nav-kind="..."] 는 그 속성을 **이 요소 자신**에서
+     찾으므로 영원히 매칭되지 않는다(template.tsx 는 이 요소에 그 속성을 달지 않는다).
+     여기서는 반대로 자손 결합자가 맞다 — <html> 아래의 실제 요소이기 때문이다. */
+  :root[data-nav-kind="tab"] .tm-page-transition-enter { animation: none; }
+}
 /* data-nav-kind 가 아직 없는 최초 진입(딥링크·새로고침)은 애니메이션 없이 그대로
    보인다 -- 속성 선택자가 매칭 안 되므로 별도 처리가 필요 없다. */
 

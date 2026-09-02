@@ -83,7 +83,12 @@ function extractStepShell(path) {
       + '  folded(`>`)는 줄바꿈을 접어 셸을 망가뜨린다. 한 줄 형식이면 이 가드가 못 읽는다.');
   }
 
-  const indent = lines[runIdx + 1].match(/^\s*/)[0];
+  // 들여쓰기는 **첫 비어 있지 않은 줄**에서 잡는다. 빈 줄로 시작하는 블록도 합법인데,
+  // 거기서 잡으면 indent 가 '' 이 되어 `startsWith('')` 이 항상 참이라 스텝의 다른 YAML
+  // 필드까지 셸에 섞여 들어간다.
+  const firstBodyIdx = lines.findIndex((l, i) => i > runIdx && i < endIdx && l.trim() !== '');
+  if (firstBodyIdx < 0) fail('run: 블록이 비어 있다');
+  const indent = lines[firstBodyIdx].match(/^\s*/)[0];
   const body = [];
   for (let i = runIdx + 1; i < endIdx; i += 1) {
     const line = lines[i];
@@ -126,16 +131,26 @@ function makeFixture() {
 /** 스텝 셸을 픽스처에서 실행하고, 그 스텝이 만든 변경 목록을 돌려준다. */
 function runStep(shell, { repo, baseTip, head }) {
   if (existsSync(OUT_FILE)) rmSync(OUT_FILE);
+  let stderr = '';
   try {
     execFileSync('bash', ['-c', shell], {
       cwd: repo,
       env: { ...process.env, BASE_SHA: baseTip, HEAD_SHA: head, BASE_REF: '', HEAD_REF: '' },
       stdio: ['ignore', 'ignore', 'pipe'],
+      encoding: 'utf8',
     });
-  } catch {
+  } catch (error) {
     // 스텝 끝의 정책 스크립트는 픽스처에 없으므로 여기서 죽는다. 목록은 그 전에 쓰인다.
+    // **스텝이 그 전에 죽었다면 그 이유는 stderr 에 있다** — 버리지 않고 실어 나른다.
+    stderr = String(error?.stderr ?? '');
   }
-  if (!existsSync(OUT_FILE)) fail('스텝이 변경 목록 파일을 만들지 않았다 — base 해석 단계에서 죽었을 수 있다');
+  if (!existsSync(OUT_FILE)) {
+    const said = stderr.split('\n').filter((l) => l.trim() && !/^\s*at /.test(l)).slice(0, 3).join('\n    ');
+    fail(
+      '스텝이 변경 목록 파일을 만들지 않았다 — base 해석 단계에서 죽었다.\n'
+      + (said ? `    스텝이 한 말:\n    ${said}` : '    (스텝이 아무 말도 남기지 않았다)'),
+    );
+  }
   const list = readFileSync(OUT_FILE, 'utf8').split('\n').filter(Boolean);
   rmSync(OUT_FILE);
   return list;
@@ -200,6 +215,38 @@ function makeFallbackFixture() {
   return { repo, decoy, head, devTip };
 }
 
+/**
+ * 픽스처 3 — **push 로 브랜치를 새로 만든 상황**(`event.before` = all-zero).
+ *
+ * 핵심은 **HEAD 가 곧 `origin/dev` tip** 이라는 것이다. 그래야 일반 보강(`BASE_REF:-dev`)이
+ * 탔을 때 base 가 head 와 같아져 **diff 가 비는** 실패가 재현된다. 앞의 픽스처들은 head 가
+ * dev 보다 앞서 있어서 이 실패를 못 만든다 — 실제로 그것 때문에 첫 대조군이 헛돌았다.
+ */
+function makeZeroBaseFixture() {
+  const origin = mkdtempSync(join(tmpdir(), 'cs-gate-origin-'));
+  const work = mkdtempSync(join(tmpdir(), 'cs-gate-zero-'));
+  const gitIn = (repo) => (...a) => execFileSync('git', ['-C', repo, ...a], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  const commitIn = (repo, rel, content, message) => {
+    mkdirSync(join(repo, rel.split('/').slice(0, -1).join('/') || '.'), { recursive: true });
+    writeFileSync(join(repo, rel), `${content}\n`);
+    gitIn(repo)('add', '-A');
+    gitIn(repo)('-c', 'user.email=g@local', '-c', 'user.name=guard', 'commit', '-qm', message);
+    return gitIn(repo)('rev-parse', 'HEAD');
+  };
+  const g = gitIn(origin);
+  g('init', '-q', '-b', 'main', '.');
+  commitIn(origin, 'README.md', 'old main', 'main');
+  g('checkout', '-q', '-b', 'dev');
+  const devTip = commitIn(origin, 'scripts/mine.mjs', 'mine', 'dev: scripts only');
+
+  const w = gitIn(work);
+  w('init', '-q', '-b', 'dev', '.');
+  w('remote', 'add', 'origin', origin);
+  w('fetch', '-q', '--no-tags', 'origin', 'main', 'dev');
+  w('reset', '-q', '--hard', devTip);   // ← HEAD == origin/dev tip
+  return { repo: work, origin, head: devTip };
+}
+
 const fixture = makeFixture();
 try {
   if (args.includes('--self-test')) selfTest(fixture);
@@ -247,6 +294,35 @@ try {
       );
     }
     console.log('[changeset-gate-base] ①③ 통과 — merge-base 실패 시 실제 base 로 보강, 남의 changeset 0건');
+
+    /*
+     * all-zero base — push 로 브랜치를 새로 만들면 `event.before` 가 이 값이다.
+     *
+     * 여기서 "이전 상태가 없다" 를 보강 경로에 그냥 태우면 `BASE_REF` 가 '' 라 dev 를 받고,
+     * push 대상이 곧 dev 라 **base 가 head 와 같아져 diff 가 빈다** — 게이트가 있는데
+     * 아무것도 안 막는다. 실제로 이 PR 초안이 그 상태였다(실측: 파일 0건).
+     *
+     * 그래서 여기선 목록이 **비지 않는지**를 본다. 이 경우 "무엇이 새것인가" 의 기준은
+     * main 뿐이라 남의 changeset 이 함께 잡히는 건 정상이다 — 브랜치 생성이면 실제로
+     * 전부 새것이다. 그러니 위 두 케이스와 달리 foreign 0 을 요구하지 않는다.
+     */
+    const zero = makeZeroBaseFixture();
+    try {
+      const zeroList = runStep(shell, { repo: zero.repo, baseTip: '0'.repeat(40), head: zero.head });
+      if (zeroList.length === 0) {
+        fail(
+          'all-zero base 에서 변경 목록이 비었다 — 게이트가 아무것도 못 막는 상태다.\n'
+          + '  "이전 상태 없음" 을 일반 보강에 태우면 base 가 head 와 같아진다. 따로 다뤄야 한다.',
+        );
+      }
+      if (!zeroList.includes('scripts/mine.mjs')) {
+        fail(`all-zero base 에서 내 변경이 목록에 없다 — 받은 목록: ${zeroList.join(', ')}`);
+      }
+      console.log('[changeset-gate-base] all-zero 통과 — 목록이 비지 않고 내 변경을 담는다');
+    } finally {
+      rmSync(zero.repo, { recursive: true, force: true });
+      rmSync(zero.origin, { recursive: true, force: true });
+    }
   } finally {
     rmSync(fb.repo, { recursive: true, force: true });
   }

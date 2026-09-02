@@ -22,13 +22,16 @@ describe('채팅방 표시 정보', () => {
     ).not.toBe('채팅');
   });
 
-  it('team_contact 방의 링크는 컨택 상세로 간다', () => {
-    const target = getLinkedTarget({
-      ...base,
-      teamContactId: 'c1',
-      teamContact: { id: 'c1', fromTeam: { name: '가팀' }, toTeam: { name: '나팀' } },
-    });
+  it('team_contact 방의 링크는 상대 팀으로 간다', () => {
+    const target = getLinkedTarget(
+      {
+        ...base,
+        teamContactId: 'c1',
+        teamContact: { id: 'c1', fromTeam: { id: 'A', name: '가팀' }, toTeam: { id: 'B', name: '나팀' } },
+      },
+      'B',
+    );
     expect(target.type).toBe('team_contact');
-    expect(target.route).toBe('/my/team-contacts/c1');
+    expect(target.route).toBe('/teams/B');
   });
 });

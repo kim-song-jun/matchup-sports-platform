@@ -14,6 +14,18 @@ describe('currentChatEntitlementWhere — 팀매치 채팅 엔타이틀먼트는
   });
 });
 
+// "팀 컨택의 채팅 흡수" §3.6: 컨택 방은 요청 시점부터 양 팀 운영진에게 보여야 한다.
+// status: 'accepted' 필터가 남아 있으면 requested/declined/withdrawn/expired 컨택 방이
+// 방 목록에서 조용히 사라진다.
+describe('currentChatEntitlementWhere — team_contact 분기는 status 로 좁히지 않는다', () => {
+  it('teamContact 분기 where 에 status: accepted 가 없다', () => {
+    const where = currentChatEntitlementWhere('user-1');
+    const teamContactBranch = where.OR?.find((clause: any) => 'teamContact' in clause) as any;
+
+    expect(JSON.stringify(teamContactBranch)).not.toContain('"status":"accepted"');
+  });
+});
+
 describe('currentChatRecipientEntitlementWhere', () => {
   it('match 방이면 match 참가자로 좁힌다', () => {
     const where = currentChatRecipientEntitlementWhere({

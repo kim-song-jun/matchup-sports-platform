@@ -138,10 +138,21 @@ async function main() {
   if (headerMissing) console.log('⚠️ 서빙 커밋 헤더를 못 읽었다 — 배포 창인지 rate limit 인지 못 가른다.');
   else if (before !== after) console.log('⚠️ 측정 도중 서빙본이 바뀌었다 — 버리고 다시 돌려라.');
 
+  /**
+   * ⚠️ **exit code 가 표와 같은 말을 해야 한다.** 예전엔 `harness > 0` 일 때 문장만 찍고
+   * exit 는 0 으로 끝났다 — 표엔 *"못 쟀다"* 라고 적혀 있는데 CI·자동화는 **성공으로 읽는다.**
+   * 이 파일 안에 `exitCode = 2` 가 있긴 했지만 그건 `main().catch()` 쪽이라 이 경로와 무관했다.
+   * (`⚠️` 와 `exitCode = 2` 가 **같은 파일에 있다**는 것만 확인하면 이 결함을 못 잡는다 —
+   *  둘이 **연결됐는지**를 봐야 한다.)
+   */
   const harness = rows.filter((r) => String(r.판정).startsWith('⚠️')).length;
   const failed = rows.filter((r) => String(r.판정).startsWith('❌')).length;
-  if (harness > 0) console.log(`⚠️ 못 잰 항목 ${harness}건 — 그 자리에 대해 판정하지 마라.`);
-  if (failed > 0 || headerMissing || before !== after) process.exitCode = 1;
+  if (harness > 0) {
+    console.log(`⚠️ 못 잰 항목 ${harness}건 — 그 자리에 대해 판정하지 마라.`);
+    process.exitCode = 2;
+  } else if (failed > 0 || headerMissing || before !== after) {
+    process.exitCode = 1;
+  }
 }
 
 main().catch((e) => {

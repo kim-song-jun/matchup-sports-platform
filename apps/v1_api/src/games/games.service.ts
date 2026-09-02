@@ -47,6 +47,7 @@ import {
   parseResultPolicy,
 } from '../tournaments/competition-config/competition-config.parse';
 import { readIsKnockoutFixture, readKnockoutFixtureFacts } from '../tournaments/knockout-fixture';
+import { findRejectedLineupPosition, rejectedLineupPositionMessage } from './core/lineup-position';
 import { assertPenaltyShootoutPersistable } from './core/penalty-shootout-outcome';
 import { isCommandConcurrencyConflict } from './command-concurrency-error';
 import {
@@ -2602,6 +2603,25 @@ export class GamesService {
         // 인원이 규칙에 안 맞아도 경기는 시작되고 **운영 콘솔에서 조정한다**(사용자 확정).
         // 인원 규칙을 강제하던 자리가 통째로 사라지는 것이므로, 되살리려면 그 결정부터
         // 뒤집어야 한다.
+        // 지운 센티널이 **입력으로 되돌아오는 것**을 막는다. `position` 은 클라이언트가
+        // 보내는 자유 문자열이라, 마이그레이션이 정리한 'BENCH' 가 다음 저장 요청으로
+        // 그대로 다시 들어올 수 있다. 'BENCH' 만 막으면 '벤치'·'sub'·오타는 그대로
+        // 들어오므로 **카탈로그에 있는 값만** 통과시킨다(근거는 core/lineup-position.ts).
+        const lineupConfig = await tx.v1CompetitionConfigVersion.findUnique({
+          where: { id: game.competitionConfigVersionId },
+          select: { lineup: true },
+        });
+        const rejectedPosition = findRejectedLineupPosition(
+          dto.participants.map((participant) => participant.position),
+          parseLineupCatalog(lineupConfig?.lineup ?? null).positions.map((position) => position.code),
+        );
+        if (rejectedPosition !== null) {
+          throw new BadRequestException({
+            code: 'LINEUP_POSITION_INVALID',
+            message: rejectedLineupPositionMessage(rejectedPosition),
+          });
+        }
+
         // 라인업에 실려 온 계정(userId) 검증. 이 값이 저장되면 아래에서 신원 연결이
         // 자동으로 생기므로, 아무 계정이나 남의 경기 기록에 붙지 않게 여기서 막는다.
         //

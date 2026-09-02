@@ -235,6 +235,63 @@ describe('GamesService.saveLineup 은 인원·골키퍼를 검증하지 않는�
     expect(await prisma.v1GameParticipant.count({ where: { lineupId: saved.lineupId } })).toBe(belowMinCount);
   });
 
+  /**
+   * 인원 게이트는 없앴지만 **`position` 은 여전히 검증한다** — 없앤 것과 안 없앤 것을
+   * 구분하는 자리다.
+   *
+   * `position` 은 클라이언트가 보내는 자유 문자열이라, 마이그레이션이 정리한 후보 센티널
+   * `'BENCH'` 가 다음 저장 요청으로 그대로 다시 들어올 수 있다. 그러면 마이그레이션이
+   * 한 일이 조용히 되돌아간다. 'BENCH' 만 막으면 `'벤치'`·오타는 그대로 들어오므로
+   * **대회 설정 카탈로그에 있는 값만** 통과시킨다.
+   */
+  it('폐기한 BENCH 센티널을 position 으로 보내면 400 으로 거부한다', async () => {
+    const withSentinel = starters(pinnedMinPlayers).map((participant, index) =>
+      index === 1 ? { ...participant, position: 'BENCH' } : participant,
+    );
+    await expect(
+      games.saveLineup(authUser(ids.platformOpsUser), gameId, hostSideId, 'idem-game-lineup-bench-sentinel', {
+        expectedVersion: await latestRevision(),
+        clientCommandId: 'idem-game-lineup-bench-sentinel',
+        participants: withSentinel,
+      }),
+    ).rejects.toMatchObject({ response: { code: 'LINEUP_POSITION_INVALID' } });
+  });
+
+  it('카탈로그에 없는 다른 문자열도 400 이다 — 센티널 하나만 막는 게 아니다', async () => {
+    const withUnknown = starters(pinnedMinPlayers).map((participant, index) =>
+      index === 1 ? { ...participant, position: '벤치' } : participant,
+    );
+    await expect(
+      games.saveLineup(authUser(ids.platformOpsUser), gameId, hostSideId, 'idem-game-lineup-unknown-position', {
+        expectedVersion: await latestRevision(),
+        clientCommandId: 'idem-game-lineup-unknown-position',
+        participants: withUnknown,
+      }),
+    ).rejects.toMatchObject({ response: { code: 'LINEUP_POSITION_INVALID' } });
+  });
+
+  it('카탈로그에 있는 포지션은 그대로 저장된다 (풋살 FIXO)', async () => {
+    const withCatalogPosition = starters(pinnedMinPlayers).map((participant, index) =>
+      index === 1 ? { ...participant, position: 'FIXO' } : participant,
+    );
+    const saved = await games.saveLineup(
+      authUser(ids.platformOpsUser),
+      gameId,
+      hostSideId,
+      'idem-game-lineup-catalog-position',
+      {
+        expectedVersion: await latestRevision(),
+        clientCommandId: 'idem-game-lineup-catalog-position',
+        participants: withCatalogPosition,
+      },
+    );
+    const rows = await prisma.v1GameParticipant.findMany({
+      where: { lineupId: saved.lineupId },
+      select: { position: true },
+    });
+    expect(rows.map((row) => row.position).sort()).toEqual(['FIXO', 'GOLEIRO', null].sort());
+  });
+
   it('옛 클라이언트가 보낸 started 는 무시된다 — 400 이 아니라 200 이고 값은 안 쓰인다', async () => {
     const withStartedFalse = starters(pinnedMinPlayers).map((participant, index) => ({
       ...participant,

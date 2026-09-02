@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -10,7 +11,8 @@ import type { V1AuthUser } from '../auth/v1-auth-user';
 import { OperationAuditWriterService } from '../common/audit/operation-audit-writer.service';
 import { canonicalGameCommandPayloadHash, createRosterAssertedIdentityLink } from '../games/games.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { parseLineupConfigForResponse } from '../tournaments/competition-config/competition-config.parse';
+import { parseLineupCatalog, parseLineupConfigForResponse } from '../tournaments/competition-config/competition-config.parse';
+import { findRejectedLineupPosition, rejectedLineupPositionMessage } from '../games/core/lineup-position';
 import {
   ChangeRequestTeamMatchLineupDto,
   SaveTeamMatchLineupDto,
@@ -30,10 +32,11 @@ type Transaction = Prisma.TransactionClient;
  * 소스에 대해 사전 코드가 아니라 이 센티널과 비교해야 한다 — export 하는 이유다.
  *
  * ⚠️ 선발/후보를 나타내던 짝 센티널 `BENCH_MARKER('BENCH')` 는 **없앴다**(Task 163 BE-3).
- * 후보는 이제 `started = false` 라는 컬럼이고, 옛 행은 마이그레이션
- * `20260902000000_v1_lineup_bench_to_started` 가 옮겼다. 한 컬럼(position)이 소스에 따라
- * 다른 뜻을 갖던 상태가 사라졌으므로 **다시 만들지 마라** — 읽는 쪽마다 소스별 분기를
- * 복제하게 되고, 실제로 한 곳은 상수를 import 하지 않고 값을 복사해 갖고 있었다.
+ * 후보라는 개념 자체가 사라졌다 — 명단에 있으면 그 경기에 뛴 것이고 `started` 는 항상
+ * true 다(정본 §3). 옛 행은 마이그레이션 `20260902000000_v1_lineup_bench_to_started` 가
+ * 정리했다. 한 컬럼(position)이 소스에 따라 다른 뜻을 갖던 상태가 사라졌으므로
+ * **다시 만들지 마라** — 읽는 쪽마다 소스별 분기를 복제하게 되고, 실제로 한 곳은 상수를
+ * import 하지 않고 값을 복사해 갖고 있었다.
  */
 export const GOALKEEPER_MARKER = 'GK';
 
@@ -855,6 +858,32 @@ export class TeamMatchLineupService {
     //
     // 인원 규칙을 되살리려면 "인원이 안 맞아도 경기는 시작하고 운영 콘솔에서 조정한다"는
     // 사용자 확정부터 뒤집어야 한다(정본 §3).
+
+    // 지운 센티널이 **입력으로 되돌아오는 것**을 막는다. `position` 은 클라이언트가 보내는
+    // 자유 문자열이라, 마이그레이션이 정리한 'BENCH' 가 다음 저장 요청으로 그대로 다시
+    // 들어올 수 있다. 'BENCH' 만 막으면 '벤치'·'sub'·오타는 그대로 들어오므로 **카탈로그에
+    // 있는 값만** 통과시킨다(근거는 games/core/lineup-position.ts).
+    //
+    // BE-1 이 인원 검증과 함께 지웠던 config 조회를 여기서 되살린다 — 그때는 죽은 조회라
+    // 지운 것이고, 지금은 이 가드가 유일한 소비처다.
+    //
+    // ⚠️ 재는 것은 **클라이언트가 보낸 `entry.position` 뿐**이다. 골키퍼는 아래에서 서버가
+    // `GOALKEEPER_MARKER('GK')` 로 눌러 담는데, 풋살 카탈로그에는 'GK' 가 없고 'GOLEIRO'
+    // 가 있어서(실측) 그 리터럴까지 카탈로그로 재면 풋살 골키퍼 저장이 전부 막힌다.
+    const lineupConfig = await tx.v1CompetitionConfigVersion.findUnique({
+      where: { id: context.gameCompetitionConfigVersionId },
+      select: { lineup: true },
+    });
+    const rejectedPosition = findRejectedLineupPosition(
+      rosterOf(dto).map((entry) => entry.position),
+      parseLineupCatalog(lineupConfig?.lineup ?? null).positions.map((position) => position.code),
+    );
+    if (rejectedPosition !== null) {
+      throw new BadRequestException({
+        code: 'LINEUP_POSITION_INVALID',
+        message: rejectedLineupPositionMessage(rejectedPosition),
+      });
+    }
 
     const jerseyNumbers = rosterOf(dto)
       .map((entry) => entry.jerseyNumber)

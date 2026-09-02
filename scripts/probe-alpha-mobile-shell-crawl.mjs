@@ -15,7 +15,7 @@ const token = raw.map((c) => /teameet_v1_session=([^;]+)/.exec(c)).find(Boolean)
 if (!token) throw new Error(`로그인 실패 HTTP ${res.status}`);
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ ...devices['Pixel 7'] });
-await ctx.addCookies([{ name: 'teameet_v1_session', value: token, domain: 'alpha.teameet.co.kr', path: '/', secure: true, sameSite: 'Lax' }]);
+await ctx.addCookies([{ name: 'teameet_v1_session', value: token, domain: new URL(BASE).hostname, path: '/', secure: true, sameSite: 'Lax' }]);
 const page = await ctx.newPage();
 const out = new Set();
 for (const list of ['/tournaments', '/teams', '/matches', '/team-matches', '/my', '/chat', '/leagues']) {

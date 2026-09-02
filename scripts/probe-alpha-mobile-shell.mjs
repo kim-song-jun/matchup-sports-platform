@@ -64,9 +64,11 @@ const MEASURE = `(() => {
     return (p === 'fixed' || p === 'sticky') && seen(el);
   }).map((el) => ({ sel: el.className?.toString().split(' ').slice(0, 2).join('.'), r: rect(el) }));
   const scrollInfo = scroll ? { scrollTop: scroll.scrollTop, scrollHeight: scroll.scrollHeight, clientHeight: scroll.clientHeight, overflowY: getComputedStyle(scroll).overflowY, position: getComputedStyle(scroll).position } : null;
-  // 끝까지 스크롤한 뒤 마지막 콘텐츠 bottom 과 스크롤러 bottom 의 차이
+  // 끝까지 스크롤한 뒤 마지막 콘텐츠 bottom 과 스크롤러 bottom 의 차이.
+  // overflow-y:hidden 은 scrollTop 주입으로는 내려가지만 사용자는 못 내린다 — 그 경우를
+  // "닿는다"로 세면 채팅방 입력창 잘림(#970)을 놓친다. 사용자가 스크롤할 수 있는 값에서만 잰다.
   let reachEnd = null;
-  if (scroll && scrollInfo.overflowY !== 'visible') {
+  if (scroll && (scrollInfo.overflowY === 'auto' || scrollInfo.overflowY === 'scroll')) {
     scroll.scrollTop = scroll.scrollHeight;
     const kids = [...scroll.querySelectorAll('*')].filter(seen);
     const maxBottom = Math.max(...kids.map((k) => k.getBoundingClientRect().bottom), 0);
@@ -99,7 +101,7 @@ async function main() {
   for (const target of TARGETS) {
     const browser = await target.engine.launch();
     const context = await browser.newContext({ ...target.device, locale: 'ko-KR', colorScheme: 'light' });
-    await context.addCookies([{ name: 'teameet_v1_session', value: token, domain: 'alpha.teameet.co.kr', path: '/', secure: true, sameSite: 'Lax' }]);
+    await context.addCookies([{ name: 'teameet_v1_session', value: token, domain: new URL(BASE).hostname, path: '/', secure: true, sameSite: 'Lax' }]);
     const page = await context.newPage();
     for (const path of PAGES) {
       const res = await page.goto(`${BASE}${path}`, { waitUntil: 'domcontentloaded' });
@@ -113,6 +115,7 @@ async function main() {
       if (row.navBottomGap !== null && row.navBottomGap !== 0) flags.push(`navGap=${row.navBottomGap}`);
       if (row.navTopVsScroll !== null && row.navTopVsScroll !== 0) flags.push(`navOverlap=${row.navTopVsScroll}`);
       if (row.reachEnd !== null && row.reachEnd > 0) flags.push(`reachEnd=+${row.reachEnd}`);
+      if (row.scrollInfo && row.scrollInfo.overflowY === 'hidden' && row.scrollInfo.scrollHeight > row.scrollInfo.clientHeight + 1) flags.push(`scrollerHiddenButOverflows=${row.scrollInfo.scrollHeight - row.scrollInfo.clientHeight}`);
       for (const f of row.fixed) if (f.r && f.r.bottom > row.innerHeight) flags.push(`fixedOverflow:${f.sel}(${f.r.bottom}>${row.innerHeight})`);
       console.log(`${target.key} ${path} [${status}] inner=${row.innerHeight} vv=${row.vvHeight} var=${row.varVvh} frame=${row.frame?.height} nav=${row.nav?.top}-${row.nav?.bottom} scroll=${row.scroll?.top}-${row.scroll?.bottom} sh=${row.scrollInfo?.scrollHeight}/${row.scrollInfo?.clientHeight} ${flags.length ? '⚠ ' + flags.join(' ') : 'ok'}`);
       await page.screenshot({ path: `${OUT}/${target.key}${path.replace(/\//g, '_')}.png` });

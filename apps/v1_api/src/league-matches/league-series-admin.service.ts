@@ -25,6 +25,7 @@ import {
   UpdateLeagueSeriesDto,
 } from './dto/league-series.dto';
 import { createLeagueRosterRegistration } from './league-team-admission';
+import { tierLabel } from './league-tier-label';
 import {
   leagueMirrorCreateData,
   toMirrorSource,
@@ -32,11 +33,6 @@ import {
 
 const DEFAULT_TIE_BREAK_ORDER = ['points', 'goalDifference', 'goalsFor', 'headToHead'] as const;
 const SEASON_LENGTH_FALLBACK_DAYS = 90;
-
-/** 화면 문구는 A/B/C 가 아니라 국내 생활체육 관행대로 "N부"다. */
-export function tierLabel(tier: number): string {
-  return `${tier}부`;
-}
 
 @Injectable()
 export class LeagueSeriesAdminService {

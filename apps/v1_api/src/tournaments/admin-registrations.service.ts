@@ -20,7 +20,7 @@ import {
   findLeagueAdmissionBlocker,
   leagueAdmissionBlockerMessage,
 } from '../league-matches/league-team-admission';
-import { isCapacityFull } from './registration-capacity';
+import { capacityLimitOf, isCapacityFull } from './registration-capacity';
 import { ALL_COMPETITION_KINDS, findTournamentOnSurface, LEAGUE_KINDS } from './tournament-surface-lookup';
 
 /** 어드민이 취소 처리할 수 있는 신청 상태 목록. */
@@ -197,13 +197,17 @@ export class AdminRegistrationsService {
     const result = await this.prisma.$transaction(async (tx) => {
       // AREG-03: confirm 분기에서 정원 초과 여부 확인.
       if (dto.decision === 'confirm') {
-        const confirmedCount = await tx.v1TournamentRegistration.count({
-          where: { tournamentId: registration.tournamentId, status: 'confirmed' },
-        });
+        // 대회를 **먼저** 읽는다 — 상한이 없으면(정규 리그) COUNT 자체를 건너뛴다.
         const tournament = await findTournamentOnSurface(tx, ALL_COMPETITION_KINDS, {
           where: { id: registration.tournamentId },
           select: { teamCount: true, kind: true },
         });
+        const confirmedCount =
+          tournament === null || capacityLimitOf(tournament) === null
+            ? 0
+            : await tx.v1TournamentRegistration.count({
+                where: { tournamentId: registration.tournamentId, status: 'confirmed' },
+              });
         if (tournament && isCapacityFull(tournament, confirmedCount)) {
           throw new ConflictException({
             code: 'TOURNAMENT_CAPACITY_FULL',
@@ -384,13 +388,16 @@ export class AdminRegistrationsService {
         if (!tournament) {
           throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
         }
-        const reservedCount = await tx.v1TournamentRegistration.count({
-          where: {
-            tournamentId: registration.tournamentId,
-            id: { not: registrationId },
-            status: { in: CAPACITY_HOLD_STATUSES },
-          },
-        });
+        const reservedCount =
+          capacityLimitOf(tournament) === null
+            ? 0
+            : await tx.v1TournamentRegistration.count({
+                where: {
+                  tournamentId: registration.tournamentId,
+                  id: { not: registrationId },
+                  status: { in: CAPACITY_HOLD_STATUSES },
+                },
+              });
         if (isCapacityFull(tournament, reservedCount)) {
           throw new ConflictException({
             code: 'TOURNAMENT_CAPACITY_FULL',

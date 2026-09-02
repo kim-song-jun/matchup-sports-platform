@@ -1,7 +1,7 @@
 import { UnprocessableEntityException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { checkLeagueTeamAddAllowed } from './league-lifecycle-rules';
-import { tierLabel } from './league-series-admin.service';
+import { tierLabel } from './league-tier-label';
 
 /**
  * **팀을 리그 로스터에 넣어도 되는가** 를 DB 를 보고 판정하는 단일 경로 (Task 164 BE-3).
@@ -138,15 +138,27 @@ export async function createLeagueRosterRegistration(
       message: '없는 팀은 리그에 등록할 수 없어요.',
     });
   }
-  await tx.v1TournamentRegistration.create({
-    data: {
+  // `(tournamentId, teamId)` 는 `@@unique` 다 — **무조건 create 하면 P2002 로 500 이 난다.**
+  // 팀이 먼저 신청해 등록 행이 있는 상태에서 운영자가 `addTeam` 하는 것은 정상 운영이다
+  // ("신청은 들어왔는데 확정 절차 대신 그냥 넣자"). 그때 500 을 내보내면 운영자는 무엇이
+  // 잘못됐는지 알 수 없다(Copilot 리뷰 지적 — 통합 스펙으로 재현했다).
+  //
+  // `upsert` 로 **기존 행을 confirmed 로 올린다.** `create` 쪽 `entrySource` 는 운영자 경로의
+  // 값(`seeded`/`promoted`)이지만, **이미 신청이 있었으면 그 사실이 더 정확하므로**
+  // `update` 에서는 `entrySource` 를 건드리지 않는다 — 팀이 스스로 신청한 것을 나중에
+  // "운영자가 넣었다" 로 덮어쓰면 감사에서 사실이 뒤집힌다.
+  const confirmedAt = input.createdAt ?? new Date();
+  await tx.v1TournamentRegistration.upsert({
+    where: { tournamentId_teamId: { tournamentId: input.leagueId, teamId: input.teamId } },
+    create: {
       tournamentId: input.leagueId,
       teamId: input.teamId,
       appliedByUserId: team.ownerUserId,
       status: 'confirmed',
       entrySource: input.entrySource,
-      confirmedAt: input.createdAt ?? new Date(),
+      confirmedAt,
       ...(input.createdAt === undefined ? {} : { createdAt: input.createdAt }),
     },
+    update: { status: 'confirmed', confirmedAt },
   });
 }

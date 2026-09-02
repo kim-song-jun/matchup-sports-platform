@@ -302,12 +302,16 @@ export class TournamentRegistrationsService {
       }
       this.assertPaymentInstructions(lockedTournament, dto.paymentMethod);
 
-      const reservedCount = await tx.v1TournamentRegistration.count({
-        where: {
-          tournamentId,
-          status: { in: CAPACITY_HOLD_STATUSES },
-        },
-      });
+      // 상한이 없으면(정규 리그) 세지 않는다 — 결과를 안 쓸 COUNT 를 날릴 이유가 없다.
+      const reservedCount =
+        capacityLimitOf(lockedTournament) === null
+          ? 0
+          : await tx.v1TournamentRegistration.count({
+              where: {
+                tournamentId,
+                status: { in: CAPACITY_HOLD_STATUSES },
+              },
+            });
       if (isCapacityFull(lockedTournament, reservedCount)) {
         throw new ConflictException({
           code: 'TOURNAMENT_CAPACITY_FULL',
@@ -521,13 +525,16 @@ export class TournamentRegistrationsService {
       // R17-006: if the restored status holds a capacity slot, re-check capacity
       // before restoring so a withdrawal cannot exceed the tournament limit.
       if (CAPACITY_HOLD_STATUSES.includes(restoredStatus as typeof CAPACITY_HOLD_STATUSES[number])) {
-        const reservedCount = await tx.v1TournamentRegistration.count({
-          where: {
-            tournamentId,
-            id: { not: registrationId },
-            status: { in: CAPACITY_HOLD_STATUSES },
-          },
-        });
+        const reservedCount =
+          capacityLimitOf(tournament) === null
+            ? 0
+            : await tx.v1TournamentRegistration.count({
+                where: {
+                  tournamentId,
+                  id: { not: registrationId },
+                  status: { in: CAPACITY_HOLD_STATUSES },
+                },
+              });
         if (isCapacityFull(tournament, reservedCount)) {
           throw new ConflictException({
             code: 'TOURNAMENT_CAPACITY_FULL',

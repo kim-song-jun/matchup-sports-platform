@@ -14,7 +14,8 @@ const ADMIN_ID = 'admin-1';
 
 function makeHarness() {
   const tournamentCreate = jest.fn(async (args: { data: Record<string, unknown> }) => args.data);
-  const registrationCreate = jest.fn(async (args: { data: Record<string, unknown> }) => args.data);
+  // upsert 다 — `(tournamentId, teamId)` @@unique 라 무조건 create 면 P2002 다.
+  const registrationCreate = jest.fn(async (args: { create: Record<string, unknown> }) => args.create);
   let seq = 0;
   const tx = {
     v1League: {
@@ -46,7 +47,7 @@ function makeHarness() {
         ownerUserId: `owner-of-${args.where.id}`,
       })),
     },
-    v1TournamentRegistration: { create: registrationCreate },
+    v1TournamentRegistration: { upsert: registrationCreate },
   };
   const prisma = {
     v1LeagueSeries: {
@@ -154,7 +155,7 @@ describe('seedSeason — 통합 축 거울 dual-write', () => {
 
     const rows = registrationCreate.mock.calls.map(
       (call) =>
-        call[0].data as {
+        call[0].create as {
           tournamentId: string;
           teamId: string;
           status: string;

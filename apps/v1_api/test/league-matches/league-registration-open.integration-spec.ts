@@ -200,4 +200,59 @@ describe('리그 참가 신청 — 대회 스택 재사용', () => {
     const roster = await prisma.v1LeagueTeam.count({ where: { leagueId } });
     expect(roster).toBe(TEAM_COUNT);
   });
+
+  it('먼저 신청한 팀을 운영자가 addTeam 해도 500 이 아니라 등록 1건이 confirmed 로 남는다', async () => {
+    // `(tournamentId, teamId)` 는 @@unique 다. 무조건 create 하면 **P2002 -> 500** 이다.
+    // 운영자가 "신청은 들어왔는데 확정 절차 대신 그냥 넣자" 로 addTeam 하는 것은 정상 운영이다.
+    const registrations = new TournamentRegistrationsService(
+      prisma,
+      { emitNotification: jest.fn() } as never,
+      { resolveDecisions: jest.fn().mockResolvedValue({ acceptedCodes: new Set() }) } as never,
+    );
+    const n = TEAM_COUNT; // 이미 확정된 팀들과 겹치지 않게 새 팀을 하나 더 만든다
+    const extraTeam = `a4000000-0000-4000-8000-0000000003${String(n).padStart(2, '0')}`;
+    const extraOwner = `a4000000-0000-4000-8000-0000000004${String(n).padStart(2, '0')}`;
+    await prisma.v1User.create({
+      data: {
+        id: extraOwner,
+        email: `league-reg-extra-${n}@example.test`,
+        accountStatus: 'active',
+        onboardingStatus: 'completed',
+      },
+    });
+    await prisma.v1Team.create({
+      data: {
+        id: extraTeam,
+        name: `검증 팀 추가${n}`,
+        sportId: ids.sportId,
+        regionId: ids.regionId,
+        status: 'active',
+        ownerUserId: extraOwner,
+      },
+    });
+    await prisma.v1TeamMembership.create({
+      data: { teamId: extraTeam, userId: extraOwner, role: 'owner', status: 'active' },
+    });
+
+    // 1) 팀이 먼저 신청한다 → draft 등록 row 가 생긴다.
+    await registrations.create({ id: extraOwner } as never, leagueId, { teamId: extraTeam } as never);
+    const before = await prisma.v1TournamentRegistration.findMany({
+      where: { tournamentId: leagueId, teamId: extraTeam },
+      select: { status: true },
+    });
+    expect(before).toEqual([{ status: 'draft' }]);
+
+    // 2) 운영자가 addTeam 한다 → 예전엔 여기서 P2002.
+    await makeAdminService().addTeam(auth, leagueId, { teamId: extraTeam } as never);
+
+    const after = await prisma.v1TournamentRegistration.findMany({
+      where: { tournamentId: leagueId, teamId: extraTeam },
+      select: { status: true, entrySource: true },
+    });
+    // 새로 만들지 않고 **기존 행을 confirmed 로 올린다** — 두 행이 되면 unique 가 막는다.
+    // `entrySource` 는 **`applied` 그대로 둔다.** 팀이 스스로 신청한 사실이 더 정확하고,
+    // 나중에 운영자가 눌렀다고 `seeded` 로 덮으면 감사에서 사실이 뒤집힌다.
+    expect(after).toEqual([{ status: 'confirmed', entrySource: 'applied' }]);
+    expect(await prisma.v1LeagueTeam.count({ where: { leagueId, teamId: extraTeam } })).toBe(1);
+  });
 });

@@ -23,7 +23,7 @@ import {
   findLeagueAdmissionBlocker,
   leagueAdmissionBlockerMessage,
 } from './league-team-admission';
-import { tierLabel } from './league-series-admin.service';
+import { tierLabel } from './league-tier-label';
 import { resolveResultStage } from './league-result-stage';
 import { resolveIsForfeit } from './league-match-forfeit.service';
 import { FixtureScheduleTemplate, FixtureTimingOptions, generateRoundRobinFixtures, resolveFixtureStartAt, resolveFixtureTimeSlots, RoundRobinFixture } from './round-robin-schedule';

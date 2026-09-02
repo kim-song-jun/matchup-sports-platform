@@ -232,6 +232,39 @@ describe('TournamentRegistrationsService', () => {
       );
     });
 
+    it('리그는 정원 COUNT 자체를 날리지 않는다 — 결과를 안 쓸 쿼리다', async () => {
+      // 정원이 꺼진 것을 "409 가 안 난다" 로만 보면, COUNT 를 계속 날리면서 결과만 버리는
+      // 구현과 구분되지 않는다. 호출 자체가 없어야 한다(Copilot 리뷰 지적).
+      prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+      prisma.v1Tournament.findFirst.mockImplementation(
+        kindAwareFindFirst(openTournament({ kind: 'regular_league', teamCount: 8 })),
+      );
+      prisma.v1TournamentRegistration.update.mockResolvedValue(
+        registrationRow({ status: 'awaiting_payment' }),
+      );
+      prisma.v1TournamentPayment.upsert.mockResolvedValue(paymentRow());
+      prisma.v1TournamentRegistration.count.mockClear();
+
+      await service.submit(manager, 'league-1', 'reg-1', validSubmit);
+      expect(prisma.v1TournamentRegistration.count).not.toHaveBeenCalled();
+    });
+
+    it('대회는 정원 COUNT 를 그대로 날린다 — 리그만 끈 것이지 기능을 지운 게 아니다', async () => {
+      prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+      prisma.v1Tournament.findFirst.mockImplementation(
+        kindAwareFindFirst(openTournament({ kind: 'regular_tournament', teamCount: 8 })),
+      );
+      prisma.v1TournamentRegistration.update.mockResolvedValue(
+        registrationRow({ status: 'awaiting_payment' }),
+      );
+      prisma.v1TournamentPayment.upsert.mockResolvedValue(paymentRow());
+      prisma.v1TournamentRegistration.count.mockClear();
+      prisma.v1TournamentRegistration.count.mockResolvedValue(0);
+
+      await service.submit(manager, 'tournament-1', 'reg-1', validSubmit);
+      expect(prisma.v1TournamentRegistration.count).toHaveBeenCalled();
+    });
+
     it('내 신청 입금 안내: 리그도 입금 정보를 함께 받는다', async () => {
       // 예전엔 이 조회를 막았다 — 리그 백필 행의 계좌 필드가 채워지면 그대로 새기 때문이다.
       // D7 은 리그도 참가비를 받을 수 있는 구조이므로(거울의 `entryFee` 기본값이 0 이라

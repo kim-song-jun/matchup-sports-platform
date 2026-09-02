@@ -555,7 +555,7 @@ describe('LeagueMatchAdminService.addTeam — 형제 티어 중복 게이트', (
       },
       v1TeamMatch: { count: jest.fn().mockResolvedValue(0) },
       // 로스터와 짝이 되는 confirmed 등록(BE-3 ⑤) — `V1Team.ownerUserId` 를 읽는다.
-      v1TournamentRegistration: { create: jest.fn().mockResolvedValue({}) },
+      v1TournamentRegistration: { upsert: jest.fn().mockResolvedValue({}) },
       v1LeagueTeam: {
         create: jest.fn().mockResolvedValue({}),
         // `findLeagueAdmissionBlocker` 가 "이미 이 리그에 있나" 를 여기로 본다. 로스터를

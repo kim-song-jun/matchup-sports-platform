@@ -62,6 +62,18 @@ describe('data-nav-kind 선택자 형태 — 형태가 틀리면 조용히 발�
   // 실제로 그 상태로 배포돼 탭 전환에서 tm-page-slide 가 그대로 재생됐다(alpha 실측).
   // 화면 없이는 잡을 수 없는 결함이라 텍스트 계약으로 고정한다.
 
+  it('탭 경로는 old/new 뿐 아니라 group 까지 끈다(이름 지정만으로는 부족)', () => {
+    // 이름을 지정(page-content)하면 root 스냅샷 교차 페이드와 group 리사이즈가 남는다.
+    // 최소 재현: 기준 10건 · 이름 지정만 6건 · old/new(*) 2건 · group(*) 까지 0건.
+    // alpha 실측도 이름 지정 상태에서 정확히 6건이었다.
+    const tabRule = rulesOnly.match(/:root\[data-nav-kind=["']tab["']\][\s\S]*?\{[^}]*animation:\s*none[^}]*\}/);
+
+    expect(tabRule).not.toBeNull();
+    for (const part of ['old(*)', 'new(*)', 'group(*)']) {
+      expect(tabRule?.[0]).toContain(part);
+    }
+  });
+
   it('view-transition 의사요소는 :root 에 붙여 쓴다(공백 금지)', () => {
     // 최소 재현(Chromium): `:root[x] ::view-transition-old(y)` 는 UA 애니메이션을 못 끄고
     // (2건 재생), `:root[x]::view-transition-old(y)` 만 끈다(0건). 공백은 자손 결합자인데

@@ -101,8 +101,13 @@ async function main() {
        * 구별되지 않는다. 그래서 상태코드로 먼저 가른다(문구가 아니라 숫자로).
        */
       const status = res?.status() ?? 0;
-      if (status === 403 || status === 429 || status === 0) {
-        throw new Error(`HARNESS: ${path} → HTTP ${status} (rate limit/무응답) — 못 쟀다. 화면에 대해 판정하지 마라.`);
+      /**
+       * ⚠️ **403/429 만 거르면 부족하다.** 404·500 도 최종 URL 이 대개 원래 경로 그대로라,
+       * 그때 URL 만 비교하면 **하위 화면 행이 ✅ 로 vacuous-pass** 한다("안 넘어갔다"가 아니라
+       * "에러 페이지에 머물렀다"인데 둘이 구별되지 않는다). URL 비교는 **성공 응답에서만** 한다.
+       */
+      if (status >= 400 || status === 0) {
+        throw new Error(`HARNESS: ${path} → HTTP ${status} — 못 쟀다. 화면에 대해 판정하지 마라.`);
       }
       await page.waitForTimeout(SETTLE_MS);
       const landed = normalize(page.url());

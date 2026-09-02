@@ -38,3 +38,16 @@ for (const w of [390,1440]) {
 await b.close();
 console.log(`\n[${label}] 서빙 ${sha}`);
 console.table(rows);
+
+/**
+ * ⚠️ **못 잰 실행이 성공으로 끝나면 안 된다.** 이 스크립트는 배포 전/후 대조에 쓰이는데,
+ * `err: '요소 없음'` 이 나온 실행이 exit 0 이면 자동화가 **"측정했고 같았다"** 로 읽는다.
+ * 서빙 커밋을 못 읽은 실행도 마찬가지다 — 배포 창이었는지 rate limit 이었는지 못 가르므로
+ * 그 숫자를 대조에 쓰면 안 된다.
+ */
+const failed = rows.filter((r) => r.err).length;
+const shaMissing = sha === undefined || sha === null;
+if (failed > 0 || shaMissing) {
+  console.log(`⚠️ 못 잰 항목 ${failed}건${shaMissing ? ' · 서빙 커밋 못 읽음' : ''} — 이 실행의 숫자를 대조에 쓰지 마라.`);
+  process.exitCode = 2;
+}

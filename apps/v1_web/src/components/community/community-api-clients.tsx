@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { trackEvent } from '@/lib/analytics';
 import { normalizeNotificationHref } from '@/lib/notification-route';
 import { useV1ChatRoomSocket } from '@/hooks/use-v1-realtime-socket';
@@ -38,8 +38,14 @@ export function ChatListPageClient() {
   return <ChatListPageView model={model} />;
 }
 
+/** `/chat?category=team_contact` — 마이 메뉴·팀 관리 메뉴의 "받은 컨택" 입구가 팀컨택 필터로 바로 연다. */
+function initialChatCategory(category: string | null): ChatCategory {
+  return category === 'team_contact' ? '팀컨택' : '전체';
+}
+
 function useChatListPageModel(): ChatListViewModel {
-  const [selectedCategory, setSelectedCategory] = useState<ChatCategory>('전체');
+  const searchParams = useSearchParams();
+  const [selectedCategory, setSelectedCategory] = useState<ChatCategory>(() => initialChatCategory(searchParams.get('category')));
   const query = useV1ChatRooms();
   const updateMe = useV1UpdateChatRoomMe();
   const baseRooms = query.data?.items.map(toChatRoomModel) ?? [];
@@ -94,6 +100,15 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
   }, [lastMessageId]);
 
   const fallback = getChatRoomViewModel();
+  const contact = room.data?.teamContact ?? null;
+  // 컨택 방은 수락된 뒤에만 대화할 수 있다(서버 TEAM_CONTACT_NOT_ACCEPTED 게이트와 같은 규칙).
+  const inputLockedMessage = contact
+    ? contact.status === 'requested'
+      ? '수락하면 대화할 수 있어요'
+      : contact.status !== 'accepted'
+        ? '종료된 컨택이에요'
+        : undefined
+    : undefined;
   const isError = room.isError || messages.isError;
   const isLoading = room.isPending || messages.isPending;
   // fallback은 로딩 중 스켈레톤 배경용 placeholder일 뿐이다 — 조회 실패(isError) 시에도
@@ -110,10 +125,16 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
       : isLoading
         ? fallback.context
         : { title: '', sub: '', href: '/chat' },
+    teamContact: contact,
+    inputLockedMessage,
     messages: messageItems,
     status: isLoading ? 'loading' : isError ? 'error' : 'ready',
     emptyTitle: isError ? '채팅방을 불러오지 못했어요' : messages.data && items.length === 0 ? '아직 메시지가 없어요' : undefined,
-    emptyBody: isError ? '네트워크 상태를 확인하고 다시 시도해 주세요.' : messages.data && items.length === 0 ? '먼저 말을 걸어 대화를 시작해 보세요' : undefined,
+    emptyBody: isError
+      ? '네트워크 상태를 확인하고 다시 시도해 주세요.'
+      : messages.data && items.length === 0
+        ? inputLockedMessage ?? '먼저 말을 걸어 대화를 시작해 보세요'
+        : undefined,
     draft,
     sending: send.isPending,
     sendError: send.isError,
@@ -196,6 +217,8 @@ function toChatRoomModel(room: V1ChatRoom): ChatRoomModel {
     title: room.title,
     type,
     href: room.linkedTarget.route ?? '/chat',
+    contactStatus: room.teamContact?.status,
+    contactNeedsReply: room.teamContact?.status === 'requested' && room.teamContact.mySide === 'to',
     last: room.lastMessage?.contentPreview ?? '아직 메시지가 없어요',
     time: room.lastMessage ? formatChatListTimestamp(room.lastMessage.sentAt) : '',
     unread: room.unreadCount,

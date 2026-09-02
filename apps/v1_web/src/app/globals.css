@@ -3946,6 +3946,19 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   text-decoration: none;
 }
 
+.tm-chat-contact-card {
+  padding: 16px;
+}
+
+.tm-chat-contact-team-link {
+  color: var(--text-strong);
+  text-decoration: none;
+}
+
+.tm-chat-contact-team-link:hover {
+  text-decoration: underline;
+}
+
 .tm-chat-context-icon {
   width: 40px;
   height: 40px;

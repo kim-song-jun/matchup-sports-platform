@@ -13,6 +13,7 @@ import { formatChatDate, formatChatTime, shouldShowChatDate } from './chat-messa
 import { NotificationDetailSheet } from './notification-detail-sheet';
 import { NotificationTypeIcon, notificationTypeLabel } from './notification-visual';
 import type { ChatListViewModel, ChatRoomModel, ChatRoomViewModel, NotificationModel, NotificationsViewModel } from './community.types';
+import { TeamContactStatusCard, contactStatusLabel } from './team-contact-status-card';
 
 export function ChatListPageView({ model }: { model: ChatListViewModel }) {
   // 셸 승격(U34): title/activeTab/bottomNav/backHref/showNotifications 전부 정적이라
@@ -133,14 +134,18 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
       </div>
       <div className="tm-chat-room">
         <div className="tm-chat-context">
-          <Link className="tm-card tm-chat-context-card" href={model.context.href}>
-            <div className="tm-chat-context-icon"><ChatIcon size={20} strokeWidth={2} /></div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="tm-text-body-lg tm-chat-context-title">{model.context.title}</div>
-              <div className="tm-text-caption" style={{ marginTop: 3 }}>{model.context.sub}</div>
-            </div>
-            <ChevronRightIcon size={18} stroke="var(--text-caption)" />
-          </Link>
+          {model.teamContact ? (
+            <TeamContactStatusCard contact={model.teamContact} />
+          ) : (
+            <Link className="tm-card tm-chat-context-card" href={model.context.href}>
+              <div className="tm-chat-context-icon"><ChatIcon size={20} strokeWidth={2} /></div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="tm-text-body-lg tm-chat-context-title">{model.context.title}</div>
+                <div className="tm-text-caption" style={{ marginTop: 3 }}>{model.context.sub}</div>
+              </div>
+              <ChevronRightIcon size={18} stroke="var(--text-caption)" />
+            </Link>
+          )}
         </div>
         <div
           ref={threadRef}
@@ -208,13 +213,20 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
         {/* [P2 마이크로인터랙션] justSent: Send → Check 아이콘 + tm-complete-check 애니메이션 (0.4s) */}
         <div className="tm-chat-inputbar">
           <button className="tm-btn tm-btn-icon tm-btn-neutral" type="button" aria-label="이미지 첨부 (준비 중)" disabled><PlusIcon size={20} strokeWidth={2.2} /></button>
-          <input className="tm-chat-input-placeholder tm-create-native-input" value={model.draft ?? ''} onChange={(event) => model.onDraftChange?.(event.target.value)} placeholder="메시지 입력" aria-label="메시지 입력" disabled={model.status === 'error'} />
+          <input
+            className="tm-chat-input-placeholder tm-create-native-input"
+            value={model.draft ?? ''}
+            onChange={(event) => model.onDraftChange?.(event.target.value)}
+            placeholder={model.inputLockedMessage ?? '메시지 입력'}
+            aria-label="메시지 입력"
+            disabled={model.status === 'error' || Boolean(model.inputLockedMessage)}
+          />
           <button
             className="tm-btn tm-btn-icon tm-btn-primary"
             type="button"
             aria-label={justSent ? '전송 완료' : '전송'}
             aria-busy={model.sending}
-            disabled={!model.onSend || model.sending || model.status === 'error' || !model.draft?.trim()}
+            disabled={!model.onSend || model.sending || model.status === 'error' || Boolean(model.inputLockedMessage) || !model.draft?.trim()}
             onClick={model.onSend}
           >
             {model.sending ? '...' : justSent ? (
@@ -451,7 +463,16 @@ function ChatRoomRow({ room, selected = false }: { room: ChatRoomModel; selected
         <Link className="tm-chat-row-main" href={`/chat/${room.id}`} onClick={handleClick} aria-current={selected ? 'page' : undefined}>
           <div className="tm-chat-avatar" style={room.avatarUrl ? { backgroundImage: cssUrl(room.avatarUrl) } : undefined}>{room.avatarUrl ? null : room.initials}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}><div className="tm-text-body-lg tm-chat-row-title">{room.title}</div>{room.pinned ? <span className="tm-badge tm-badge-blue tm-chat-pinned-badge">고정</span> : null}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+              <div className="tm-text-body-lg tm-chat-row-title">{room.title}</div>
+              {room.pinned ? <span className="tm-badge tm-badge-blue tm-chat-pinned-badge">고정</span> : null}
+              {/* 팀컨택 방: 컨택 상태를 텍스트 배지로 병기한다(컬러만으로 구분 금지). 받는 팀의 미응답 요청은 "답장 필요". */}
+              {room.contactNeedsReply ? (
+                <span className="tm-badge tm-badge-orange tm-chat-pinned-badge">답장 필요</span>
+              ) : room.contactStatus ? (
+                <span className="tm-badge tm-badge-grey tm-chat-pinned-badge">{room.contactStatus === 'requested' ? '대기 중' : contactStatusLabel(room.contactStatus)}</span>
+              ) : null}
+            </div>
             <div className="tm-chat-last-line" style={{ marginTop: 3 }}>
               <span className="tm-chat-room-type">{room.type}</span>
               <span className={`tm-chat-last-message ${room.unread > 0 ? 'tm-chat-last-message-unread' : ''}`}>{room.last}</span>

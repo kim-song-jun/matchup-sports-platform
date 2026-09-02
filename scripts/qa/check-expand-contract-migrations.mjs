@@ -1330,16 +1330,58 @@ function mergeBaseOf(baseSha, headSha) {
     }).trim();
   } catch (error) {
     if (error?.status === 1) {
+      // rc 1 = git 이 정상적으로 답한 "공통 조상 없음". **원인은 여기서 단정하지 않는다** —
+      // 대신 그 순간의 저장소 상태를 찍는다. 예전엔 "얕은 클론이면 fetch 깊이를 늘려라"고
+      // 적어 뒀는데, 이 저장소에서 그 조언은 **틀렸다**: 이게 실제로 터진 두 번(2026-09-01
+      // #941 · 2026-09-02 #951) 모두 그 job 은 `fetch-depth: 0` 에 브랜치 630여 개를
+      // 받은 상태였다. 읽는 사람은 이미 0 인 깊이를 늘리려 하게 된다.
+      //
+      // 원인은 여전히 미상이고, 그래서 **추측 대신 측정값을 남긴다.** 세 번째 발생 때
+      // 이 줄들이 답을 준다.
       fail(
-        `base 와 head 의 공통 조상을 찾지 못했다: ${baseSha} / ${headSha}. `
-        + '두 이력이 정말 무관하거나, 이 저장소가 그 분기점까지 갖고 있지 않다 '
-        + '(얕은 클론이면 fetch 깊이를 늘려야 한다 — 평범한 fetch 로는 회복되지 않는다).',
+        `base 와 head 의 공통 조상을 찾지 못했다: ${baseSha} / ${headSha}\n`
+        + `  ${describeRepoState(baseSha, headSha)}\n`
+        + '  두 이력이 정말 무관하거나, 이 저장소가 분기점까지의 이력을 갖고 있지 않다.\n'
+        + '  위 상태값으로 어느 쪽인지 가른다 — 얕은 저장소면 깊이 문제이고,\n'
+        + '  얕지 않은데 양쪽 객체가 다 있으면 그건 아직 설명되지 않은 경우다.',
       );
     }
     fail(`git merge-base ${baseSha} ${headSha} failed${describeGitFailure(error)}`);
   }
   if (!out) fail(`git merge-base ${baseSha} ${headSha} 가 빈 값을 돌려줬다`);
   return out;
+}
+
+/**
+ * 실패한 그 순간의 저장소 상태를 한 줄로 만든다 — **추측을 대신할 측정값.**
+ *
+ * 이 함수 자체가 죽으면 원래 진단까지 못 보게 되므로, 각 항목은 실패해도 `?` 로 남기고
+ * 계속 간다. 진단을 돕는 코드가 진단을 가려서는 안 된다.
+ */
+function describeRepoState(baseSha, headSha) {
+  const probe = (args, fallback = '?') => {
+    try {
+      return execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() || fallback;
+    } catch {
+      return fallback;
+    }
+  };
+  const has = (sha) => {
+    try {
+      execFileSync('git', ['cat-file', '-e', `${sha}^{commit}`], { stdio: 'ignore' });
+      return 'yes';
+    } catch {
+      return 'no';
+    }
+  };
+  const shallow = probe(['rev-parse', '--is-shallow-repository']);
+  return [
+    `shallow=${shallow}`,
+    `base객체=${has(baseSha)}`,
+    `head객체=${has(headSha)}`,
+    `base에서닿는커밋=${probe(['rev-list', '--count', baseSha])}`,
+    `head에서닿는커밋=${probe(['rev-list', '--count', headSha])}`,
+  ].join(' · ');
 }
 
 function isAncestorOf(ancestor, descendant) {
@@ -1669,7 +1711,12 @@ function baseFailureDiagnosticsSelfTest() {
     gitIn(shallow)('init', '-q', '.');
     gitIn(shallow)('remote', 'add', 'origin', origin);
     gitIn(shallow)('fetch', '-q', '--depth=1', 'origin', 'mainline', 'feature');
-    expectMessage('분기점이 없는 저장소', gateRun(shallow, movedTip, featureHead), ['공통 조상']);
+    //     문구만 보면 부족하다 — **원인을 가를 상태값이 실제로 실려 있는지**까지 본다.
+    //     이게 없으면 다음 사람이 또 추측한다(예전 메시지는 '얕은 클론이면 깊이를 늘려라'
+    //     라고 단정했는데, 실제로 터진 두 번 다 그 job 은 fetch-depth: 0 이었다).
+    expectMessage('분기점이 없는 저장소', gateRun(shallow, movedTip, featureHead), [
+      '공통 조상', 'shallow=', 'base객체=', 'head객체=',
+    ]);
 
     console.log('[expand-contract-sql-v1] base failure diagnostics passed');
   } finally {

@@ -3931,6 +3931,24 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   overflow-y: hidden;
 }
 
+/*
+ * `.tm-chat-room` 의 height:100% 는 스크롤 영역(절대 배치라 높이가 확정)을 기준으로 삼는데,
+ * 2026-09-01 페이지 전환 래퍼(template.tsx 의 .tm-page-transition-enter, display:block,
+ * height:auto)가 그 사이에 끼면서 100% 가 auto 로 해석됐다. 그러면 채팅방이 콘텐츠 높이
+ * (스레드 전체 + 입력창)만큼 늘어나고, 위의 overflow-y:hidden 때문에 사용자는 아래로 내릴
+ * 수도 없다 — alpha 실측(2026-09-02): 입력창 bottom 이 뷰포트보다 Pixel 7 에서 441px,
+ * iPhone 14 에서 613px 아래. 즉 채팅방에서 입력창이 통째로 잘렸다.
+ *
+ * `.tm-list-empty` 와 같은 처방(4448행)이되 **height** 여야 한다 — min-height 로는 래퍼가
+ * 콘텐츠만큼 계속 자라 스레드가 스크롤러가 되지 못한다. 래퍼와 채팅방 사이의 pane 들은
+ * display:contents 라 박스가 없어, 이 래퍼가 곧 채팅방의 퍼센트 기준이다.
+ * 데스크톱(≥1024px)은 스크롤 영역이 static·height:auto 라 이 100% 도 auto 가 되고, 채팅방
+ * 높이는 .tm-chat-desktop-workspace 의 calc(100dvh - 112px) 가 정한다 — 실측 1440 에서 변화 0.
+ */
+.tm-scroll-area > .tm-page-transition-enter:has(.tm-chat-room) {
+  height: 100%;
+}
+
 .tm-chat-context {
   padding: 16px;
   border-bottom: 1px solid var(--grey100);
@@ -8101,13 +8119,17 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
    모르므로 입력을 정규화하는 것이 유일한 근본 해결이다(GitFut 가 GitHub 아바타를 받는 것과
    같은 구조). 스크림·패널의 페이드는 위 .tm-modal-scrim/.tm-modal-panel 규칙을 그대로 쓴다. */
 .tm-photo-crop-scrim {
-  position: fixed; inset: 0; z-index: 50;
-  display: flex; align-items: flex-end; justify-content: center; padding: 16px;
+  position: fixed; inset: 0; z-index: var(--z-modal);
+  display: flex; align-items: flex-end; justify-content: center;
+  /* 아래 여백은 홈 인디케이터(safe-area)만큼 더 준다 -- 확인 버튼이 그 밑에 깔리지 않게 */
+  padding: 16px 16px calc(16px + var(--v1-shell-safe-bottom, 0px));
   background: rgba(25, 31, 40, 0.48);
 }
 @media (min-width: 640px) { .tm-photo-crop-scrim { align-items: center; } }
 .tm-photo-crop-panel {
-  width: 100%; max-width: 360px; overflow: hidden;
+  width: 100%; max-width: 360px;
+  /* 화면이 낮으면(가로 폰·키보드) 패널 안에서 스크롤한다 -- 확인 버튼이 화면 밖으로 밀려나면 안 된다 */
+  max-height: calc(100dvh - 32px - var(--v1-shell-safe-bottom, 0px)); overflow-y: auto;
   background: var(--surface); border-radius: var(--radius-container);
   box-shadow: var(--shadow-modal);
   display: flex; flex-direction: column; align-items: center;

@@ -70,7 +70,8 @@ const MEASURE = `(() => {
   let reachEnd = null;
   if (scroll && (scrollInfo.overflowY === 'auto' || scrollInfo.overflowY === 'scroll')) {
     scroll.scrollTop = scroll.scrollHeight;
-    const kids = [...scroll.querySelectorAll('*')].filter(seen);
+    // fixed/sticky(고정 CTA 등)는 스크롤과 무관하게 항상 같은 자리라 '마지막 콘텐츠' 후보에서 뺀다.
+    const kids = [...scroll.querySelectorAll('*')].filter((k) => seen(k) && !['fixed', 'sticky'].includes(getComputedStyle(k).position));
     const maxBottom = Math.max(...kids.map((k) => k.getBoundingClientRect().bottom), 0);
     reachEnd = Math.round(maxBottom - scroll.getBoundingClientRect().bottom);
     scroll.scrollTop = 0;
@@ -101,7 +102,7 @@ async function main() {
   for (const target of TARGETS) {
     const browser = await target.engine.launch();
     const context = await browser.newContext({ ...target.device, locale: 'ko-KR', colorScheme: 'light' });
-    await context.addCookies([{ name: 'teameet_v1_session', value: token, domain: new URL(BASE).hostname, path: '/', secure: true, sameSite: 'Lax' }]);
+    await context.addCookies([{ name: 'teameet_v1_session', value: token, domain: new URL(BASE).hostname, path: '/', secure: new URL(BASE).protocol === 'https:', sameSite: 'Lax' }]);
     const page = await context.newPage();
     for (const path of PAGES) {
       const res = await page.goto(`${BASE}${path}`, { waitUntil: 'domcontentloaded' });

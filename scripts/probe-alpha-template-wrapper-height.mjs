@@ -74,7 +74,7 @@ for (const [engineName, engine, device] of [['pixel7', chromium, devices['Pixel 
     const token = await login(c.email);
     const browser = await engine.launch();
     const ctx = await browser.newContext({ ...device, locale: 'ko-KR' });
-    await ctx.addCookies([{ name: 'teameet_v1_session', value: token, domain: new URL(BASE).hostname, path: '/', secure: true, sameSite: 'Lax' }]);
+    await ctx.addCookies([{ name: 'teameet_v1_session', value: token, domain: new URL(BASE).hostname, path: '/', secure: new URL(BASE).protocol === 'https:', sameSite: 'Lax' }]);
     const page = await ctx.newPage();
     for (const path of c.pages) {
       const res = await page.goto(BASE + path, { waitUntil: 'domcontentloaded' });

@@ -41,7 +41,7 @@
 
   | 컬럼 | 기본값 | 처분 |
   |---|---|---|
-  | `V1GameParticipant.started` (라인업·kickoff·교체 엔진) | `true` | **컬럼은 남기고 값을 `true` 로 고정.** 읽기 21곳은 손대지 않는다. 마이그레이션은 `position='BENCH'` → `started=true, position=NULL` |
+  | `V1GameParticipant.started` (라인업·kickoff·교체 엔진) | `true` | **컬럼은 남기고 값을 `true` 로 고정.** 읽는 자리는 손대지 않는다. 마이그레이션은 `position='BENCH'` → `started=true, position=NULL` |
   | `V1GameResultParticipant.started` (결과 리비전 = 공식 기록) | `false` | 출전한 사람은 전부 `true` 로 쓴다(명단 = 출전자). 어드민 결과 정정 화면의 **선발 체크박스는 제거**한다 |
   | `V1TeamLineupPresetEntry` · `V1TeamTacticsBoardEntry.started` | `true` | 팀 내부 도구. 건드리지 않는다 |
 

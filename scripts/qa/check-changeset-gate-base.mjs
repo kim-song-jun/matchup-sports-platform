@@ -73,9 +73,13 @@ function extractStepShell(path) {
     fail(`"${STEP_NAME}" 스텝 안에 run: 이 없다 — 스텝이 사라졌거나 이름이 바뀌었다.\n`
       + '  이 가드는 그 스텝의 셸을 실행해서 검사하므로, 대상이 없으면 검사할 것도 없다.');
   }
-  const scalar = lines[runIdx].slice(lines[runIdx].indexOf('run:') + 4).trim();
+  // 블록 스칼라 지시자 뒤의 **인라인 주석은 YAML 에서 합법**이다(`run: | # 왜 이렇게 쓰는지`).
+  // 토큰만 떼어 보지 않으면 주석 한 줄에 CI 가 빨개지고, 그러면 다음 사람은 가드를 의심하는
+  // 대신 주석을 지우거나 가드를 끈다 — fail-closed 라도 그건 가드를 잃는 길이다.
+  const scalarField = lines[runIdx].slice(lines[runIdx].indexOf('run:') + 4).trim();
+  const scalar = scalarField.split(/\s+/)[0];
   if (!/^\|[-+]?$/.test(scalar)) {
-    fail(`"${STEP_NAME}" 스텝의 run 이 literal 블록(\`|\`)이 아니다: run: ${scalar}\n`
+    fail(`"${STEP_NAME}" 스텝의 run 이 literal 블록(\`|\`)이 아니다: run: ${scalarField}\n`
       + '  folded(`>`)는 줄바꿈을 접어 셸을 망가뜨린다. 한 줄 형식이면 이 가드가 못 읽는다.');
   }
 

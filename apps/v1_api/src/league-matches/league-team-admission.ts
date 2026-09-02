@@ -105,10 +105,16 @@ export function leagueAdmissionBlockerMessage(blocker: LeagueAdmissionBlocker): 
  * 승계로 들어온 팀과 운영자가 손으로 넣은 팀은 **운영상 다른 사건**이다 — 다음 시즌
  * 참가 통보·이의 처리에서 "이 팀은 왜 여기 있나" 의 답이 다르다.
  *
- * ## owner 가 없으면 던진다
- * `appliedByUserId` 는 필수이고 `onDelete: Restrict` 다. 조용히 건너뛰면 로스터엔 있는데
- * 등록엔 없는 팀이 생겨 불변식이 깨진 채로 성공 응답이 나간다 — 백필이 같은 이유로
- * 같은 선택을 했다(가드 2).
+ * ## `appliedByUserId` 는 `V1Team.ownerUserId` 에서 온다 (멤버십이 아니다)
+ * 백필은 `V1TeamMembership(role='owner', status='active')` 를 봤다. 그건 **한 번 도는
+ * 마이그레이션**이라 owner 를 못 찾으면 멈추는 게 맞았지만, 여기는 **리그를 만들 때마다
+ * 지나는 경로**다. 멤버십 행을 요구하면 멀쩡히 돌던 리그 생성이 데이터 모양 때문에 새로
+ * 실패할 수 있다(실제로 통합 스펙이 422 로 무너졌다 — 픽스처 팀엔 멤버십 행이 없다).
+ *
+ * `V1Team.ownerUserId` 는 **스키마상 non-null** 이고 `onDelete: Restrict` 라 가리키는 유저가
+ * 반드시 있다. 소유권 이전(`teams.service.ts` 의 transfer)이 멤버십 role 과 이 필드를
+ * **같은 트랜잭션에서** 함께 옮기므로 둘은 어긋나지 않는다. 즉 같은 답을 주면서 새 실패
+ * 모드가 없는 쪽이다.
  */
 export async function createLeagueRosterRegistration(
   tx: Prisma.TransactionClient,
@@ -120,21 +126,23 @@ export async function createLeagueRosterRegistration(
     createdAt?: Date;
   },
 ): Promise<void> {
-  const owner = await tx.v1TeamMembership.findFirst({
-    where: { teamId: input.teamId, role: 'owner', status: 'active' },
-    select: { userId: true },
+  const team = await tx.v1Team.findUnique({
+    where: { id: input.teamId },
+    select: { ownerUserId: true },
   });
-  if (owner === null) {
+  if (team === null) {
+    // 로스터 행이 같은 트랜잭션에서 이미 FK 를 통과했으므로 실질적으로 도달하지 않는다.
+    // 그래도 500 대신 도메인 코드로 남긴다 — 도달했다면 그건 팀이 사라졌다는 뜻이다.
     throw new UnprocessableEntityException({
       code: 'LEAGUE_TEAM_INVALID',
-      message: '팀장이 없는 팀은 리그에 등록할 수 없어요.',
+      message: '없는 팀은 리그에 등록할 수 없어요.',
     });
   }
   await tx.v1TournamentRegistration.create({
     data: {
       tournamentId: input.leagueId,
       teamId: input.teamId,
-      appliedByUserId: owner.userId,
+      appliedByUserId: team.ownerUserId,
       status: 'confirmed',
       entrySource: input.entrySource,
       confirmedAt: input.createdAt ?? new Date(),

@@ -39,7 +39,13 @@ function makeHarness() {
     v1LeagueSeries: { update: jest.fn() },
     // 로스터와 짝이 되는 confirmed 등록(BE-3 ⑤). owner 를 못 찾으면 서비스가 422 로
     // 던지므로 fake 도 실제처럼 owner 를 준다.
-    v1TeamMembership: { findFirst: jest.fn().mockResolvedValue({ userId: 'owner-1' }) },
+    // `createLeagueRosterRegistration` 이 `V1Team.ownerUserId` 에서 appliedByUserId 를 읽는다.
+    // 팀마다 다른 owner 를 줘서 "전부 같은 값" 으로 통과하는 단언을 못 쓰게 한다.
+    v1Team: {
+      findUnique: jest.fn(async (args: { where: { id: string } }) => ({
+        ownerUserId: `owner-of-${args.where.id}`,
+      })),
+    },
     v1TournamentRegistration: { create: registrationCreate },
   };
   const prisma = {
@@ -147,12 +153,23 @@ describe('seedSeason — 통합 축 거울 dual-write', () => {
     await service.seedSeason({ id: 'u-1' } as never, SERIES_ID, dto);
 
     const rows = registrationCreate.mock.calls.map(
-      (call) => call[0].data as { tournamentId: string; teamId: string; status: string; entrySource: string },
+      (call) =>
+        call[0].data as {
+          tournamentId: string;
+          teamId: string;
+          status: string;
+          entrySource: string;
+          appliedByUserId: string;
+        },
     );
     // dto 의 두 티어에 든 팀 전부.
     expect(rows).toHaveLength(4); // 1부 t1·t2 + 2부 t3·t4
     for (const row of rows) {
-      expect(row).toMatchObject({ status: 'confirmed', entrySource: 'seeded', appliedByUserId: 'owner-1' });
+      expect(row).toMatchObject({
+        status: 'confirmed',
+        entrySource: 'seeded',
+        appliedByUserId: `owner-of-${row.teamId}`,
+      });
     }
     // **거울 뒤에** 만들어져야 한다 — 등록의 tournamentId 가 거울 행을 가리키므로
     // 순서가 바뀌면 실제 DB 에서 FK 로 막힌다(fake 는 안 막아 주니 순서로 고정한다).

@@ -551,10 +551,10 @@ describe('LeagueMatchAdminService.addTeam — 형제 티어 중복 게이트', (
       },
       v1Team: {
         findFirst: jest.fn().mockResolvedValue({ id: NEW_TEAM_ID, sportId: 'sport-futsal' }),
+        findUnique: jest.fn().mockResolvedValue({ ownerUserId: 'owner-1' }),
       },
       v1TeamMatch: { count: jest.fn().mockResolvedValue(0) },
-      // 로스터와 짝이 되는 confirmed 등록(BE-3 ⑤).
-      v1TeamMembership: { findFirst: jest.fn().mockResolvedValue({ userId: 'owner-1' }) },
+      // 로스터와 짝이 되는 confirmed 등록(BE-3 ⑤) — `V1Team.ownerUserId` 를 읽는다.
       v1TournamentRegistration: { create: jest.fn().mockResolvedValue({}) },
       v1LeagueTeam: {
         create: jest.fn().mockResolvedValue({}),

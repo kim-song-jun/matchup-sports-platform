@@ -36,10 +36,12 @@ export function toTeamMatch(match: V1TeamMatch, fallback: TeamMatchModel): TeamM
     id: match.teamMatchId ?? match.id ?? fallback.id,
     title: match.title,
     imageUrl: match.imageUrl ?? fallback.imageUrl,
-    sport: match.sport?.name ?? match.sportName ?? fallback.sport,
-    hostTeam: match.hostTeam?.name ?? match.hostTeamName ?? fallback.hostTeam,
-    venue: match.place?.name ?? match.placeName ?? fallback.venue,
-    region: match.region?.name ?? match.regionName ?? fallback.region,
+    // 목업(team-matches.view-model.ts)을 사실 값의 폴백으로 쓰지 않는다 — 폴백이 걸리면
+    // 실제 매치에 **존재하지 않는 팀 이름**('FC 발빠른놈들')과 남의 경기장·지역이 붙었다.
+    sport: match.sport?.name ?? match.sportName ?? '',
+    hostTeam: match.hostTeam?.name ?? match.hostTeamName ?? '',
+    venue: match.place?.name ?? match.placeName ?? '',
+    region: match.region?.name ?? match.regionName ?? '지역 미정',
     date: formatDate(match.startsAt),
     time: formatTime(match.startsAt),
     endTime: match.endsAt ? formatTime(match.endsAt) : undefined,
@@ -50,7 +52,7 @@ export function toTeamMatch(match: V1TeamMatch, fallback: TeamMatchModel): TeamM
     opponentCost: costs.opponentCost,
     league: match.league ?? null,
     uniform: match.uniformColor || '',
-    gender: match.genderRule ?? fallback.gender,
+    gender: match.genderRule ?? '성별 미설정',
     // 매너 평점·승수는 이제 API 가 실제로 내려준다(hostTeam.mannerScore / hostTeam.wins —
     // team-matches.service.ts 의 computeRevealedTeamTrustBatch · loadOfficialWinCounts).
     // `...fallback` 스프레드에 맡겨두면 매치마다 다른 실제 팀인데도 항상 같은 목업

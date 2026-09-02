@@ -8,11 +8,11 @@ import { createV1IntegrationApp } from '../integration/integration-app';
 // 디스크에 있어도 CI 가 절대 실행하지 않는다. 같은 실수가 이 레포에서 4회 반복됐다
 // (team-schedules/team-match-series/team-lineups/team-matches — jest.config.ts 주석 참고).
 //
-// 실 DB(격리된 클론) 로 발신 → 중복 거부 → 수락 → 멱등 재수락 → 채팅방 resolve → resolve
-// 멱등 → 비참여자 거부까지 한 번에 왕복한다. TeamContactsController/Module 이 실제로
-// V1AuthGuard·ValidationPipe·TransformInterceptor·AllExceptionsFilter 전 파이프라인을
-// 통과하는지, 그리고 Task 7 의 채팅방 team_contact 연동이 accept 이후 실제로 열리는지를
-// 유닛 스펙(mock Prisma) 은 증명하지 못한다.
+// 실 DB(격리된 클론) 로 "팀 컨택의 채팅 흡수" 흐름을 한 번에 왕복한다:
+// 발신(=방·참가자·첫 메시지 생성) → 상대 목록 노출 → 수락 전 전송 차단 → 중복 거부 →
+// 수락(시스템 메시지·알림 딥링크) → 전송 허용 → 비참여자 거부.
+// 유닛 스펙(mock Prisma) 은 트랜잭션 안에서 네 테이블이 함께 쓰이는지와
+// 채팅 자격 where 가 실제 Postgres 에서 먹는지를 증명하지 못한다.
 
 const ids = {
   ownerA: '68880000-0000-4000-8000-000000000001',
@@ -83,29 +83,65 @@ describe('팀 컨택 전체 흐름', () => {
   afterAll(async () => cleanupApp?.());
 
   let contactId: string;
-  let firstRespondedAt: string;
   let roomId: string;
 
-  it('1) A owner 가 B 로 컨택을 발신하면 requested 로 생성된다', async () => {
+  it('1) A owner 가 B 로 컨택을 발신하면 requested 컨택과 함께 채팅방·양 팀 운영진 참가자·첫 메시지가 생긴다', async () => {
     const res = await request(app.getHttpServer())
       .post(`/api/v1/teams/${ids.teamB}/contacts`)
       .set('x-v1-user-id', ids.ownerA)
       .send({ fromTeamId: ids.teamA, message: '주말 경기 가능하실까요?' })
       .expect(201);
 
-    expect(res.body.data).toMatchObject({
-      fromTeamId: ids.teamA,
-      toTeamId: ids.teamB,
-      status: 'requested',
-    });
+    expect(res.body.data).toMatchObject({ fromTeamId: ids.teamA, toTeamId: ids.teamB, status: 'requested' });
     contactId = res.body.data.id;
-    expect(typeof contactId).toBe('string');
+    roomId = res.body.data.chatRoomId;
+    expect(typeof roomId).toBe('string');
+    expect(res.body.data.route).toBe(`/chat/${roomId}`);
 
-    const row = await prisma.v1TeamContact.findUniqueOrThrow({ where: { id: contactId } });
-    expect(row.status).toBe('requested');
+    const room = await prisma.v1ChatRoom.findUniqueOrThrow({ where: { id: roomId } });
+    expect(room.teamContactId).toBe(contactId);
+    const participants = await prisma.v1ChatRoomParticipant.findMany({ where: { chatRoomId: roomId } });
+    expect(participants.map((p) => p.userId).sort()).toEqual([ids.ownerA, ids.ownerB].sort());
+    expect(participants.every((p) => p.visibleFromAt !== null)).toBe(true);
+    const messages = await prisma.v1ChatMessage.findMany({ where: { chatRoomId: roomId } });
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toMatchObject({ senderUserId: ids.ownerA, body: '주말 경기 가능하실까요?', messageType: 'text' });
   });
 
-  it('2) 같은 팀쌍에 다시 발신하면 409 TEAM_CONTACT_ALREADY_ACTIVE', async () => {
+  it('2) B owner 의 채팅 목록에 요청 중인 컨택 방이 미읽음 1 로 보인다', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/chat/rooms')
+      .set('x-v1-user-id', ids.ownerB)
+      .expect(200);
+
+    const room = res.body.data.items.find((item: { roomId: string }) => item.roomId === roomId);
+    expect(room).toBeDefined();
+    expect(room.roomType).toBe('team_contact');
+    expect(room.unreadCount).toBe(1);
+    expect(room.teamContact).toMatchObject({ contactId, status: 'requested', mySide: 'to' });
+    expect(room.linkedTarget).toMatchObject({ type: 'team_contact', route: `/teams/${ids.teamA}` });
+  });
+
+  it('3) 수락 전에는 B owner 가 답장할 수 없다 — 409 TEAM_CONTACT_NOT_ACCEPTED', async () => {
+    const res = await request(app.getHttpServer())
+      .post(`/api/v1/chat/rooms/${roomId}/messages`)
+      .set('x-v1-user-id', ids.ownerB)
+      .send({ content: '네 가능해요' })
+      .expect(409);
+
+    expect(res.body.code).toBe('TEAM_CONTACT_NOT_ACCEPTED');
+    const count = await prisma.v1ChatMessage.count({ where: { chatRoomId: roomId } });
+    expect(count).toBe(1);
+  });
+
+  it('3-1) B owner 의 대기 컨택 요약은 1건, A owner 는 0건이다', async () => {
+    const resB = await request(app.getHttpServer()).get('/api/v1/me/team-contacts/summary').set('x-v1-user-id', ids.ownerB).expect(200);
+    expect(resB.body.data).toEqual({ pendingInbound: 1, byTeam: [{ teamId: ids.teamB, pendingInbound: 1 }] });
+    const resA = await request(app.getHttpServer()).get('/api/v1/me/team-contacts/summary').set('x-v1-user-id', ids.ownerA).expect(200);
+    expect(resA.body.data).toEqual({ pendingInbound: 0, byTeam: [{ teamId: ids.teamA, pendingInbound: 0 }] });
+  });
+
+  it('4) 같은 팀쌍에 다시 발신하면 409 TEAM_CONTACT_ALREADY_ACTIVE 이고 기존 방 id 를 알려준다', async () => {
     const res = await request(app.getHttpServer())
       .post(`/api/v1/teams/${ids.teamB}/contacts`)
       .set('x-v1-user-id', ids.ownerA)
@@ -113,81 +149,69 @@ describe('팀 컨택 전체 흐름', () => {
       .expect(409);
 
     expect(res.body.code).toBe('TEAM_CONTACT_ALREADY_ACTIVE');
-    expect(res.body.details).toMatchObject({ existingContactId: contactId });
-
-    // 새 row 가 만들어지지 않았는지 DB 로 직접 확인한다
-    const count = await prisma.v1TeamContact.count({
-      where: { fromTeamId: ids.teamA, toTeamId: ids.teamB },
-    });
+    expect(res.body.details).toMatchObject({ existingContactId: contactId, existingChatRoomId: roomId });
+    const count = await prisma.v1TeamContact.count({ where: { fromTeamId: ids.teamA, toTeamId: ids.teamB } });
     expect(count).toBe(1);
   });
 
-  it('3) B owner 가 수락하면 accepted 로 바뀐다', async () => {
+  it('5) B owner 가 수락하면 시스템 메시지가 남고 A 운영진 알림이 채팅방으로 간다', async () => {
     const res = await request(app.getHttpServer())
       .patch(`/api/v1/team-contacts/${contactId}/accept`)
       .set('x-v1-user-id', ids.ownerB)
       .expect(200);
 
-    expect(res.body.data.alreadyProcessed).toBe(false);
+    expect(res.body.data).toMatchObject({ alreadyProcessed: false, chatRoomId: roomId });
     expect(res.body.data.contact.status).toBe('accepted');
-    expect(res.body.data.contact.respondedByUserId).toBe(ids.ownerB);
-    firstRespondedAt = res.body.data.contact.respondedAt;
-    expect(firstRespondedAt).toBeTruthy();
 
-    const row = await prisma.v1TeamContact.findUniqueOrThrow({ where: { id: contactId } });
-    expect(row.status).toBe('accepted');
+    const messages = await prisma.v1ChatMessage.findMany({ where: { chatRoomId: roomId }, orderBy: { sentAt: 'asc' } });
+    expect(messages).toHaveLength(2);
+    expect(messages[1]).toMatchObject({ messageType: 'system', body: '컨택을 수락했어요', senderUserId: ids.ownerB });
+
+    // 알림은 emitToManyDeferred 로 트랜잭션 밖에서 비동기 발송된다 — 잠시 기다린다.
+    let notification = null;
+    for (let attempt = 0; attempt < 20 && !notification; attempt += 1) {
+      notification = await prisma.v1Notification.findFirst({
+        where: { recipientUserId: ids.ownerA, targetType: 'chat', targetId: roomId },
+      });
+      if (!notification) await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    expect(notification).not.toBeNull();
+    expect(notification?.deepLink).toBe(`/chat/${roomId}`);
   });
 
-  it('4) B owner 가 다시 수락하면 alreadyProcessed=true 이고 respondedAt 이 바뀌지 않는다', async () => {
+  it('5-1) 수락 뒤 B owner 의 대기 컨택 요약은 0건이다', async () => {
+    const res = await request(app.getHttpServer()).get('/api/v1/me/team-contacts/summary').set('x-v1-user-id', ids.ownerB).expect(200);
+    expect(res.body.data).toEqual({ pendingInbound: 0, byTeam: [{ teamId: ids.teamB, pendingInbound: 0 }] });
+  });
+
+  it('6) 수락 뒤에는 A owner 가 전송할 수 있다', async () => {
     const res = await request(app.getHttpServer())
-      .patch(`/api/v1/team-contacts/${contactId}/accept`)
-      .set('x-v1-user-id', ids.ownerB)
+      .post(`/api/v1/chat/rooms/${roomId}/messages`)
+      .set('x-v1-user-id', ids.ownerA)
+      .send({ content: '토요일 오후 어떠세요?' })
+      .expect(201);
+
+    expect(res.body.data).toMatchObject({ roomId, content: '토요일 오후 어떠세요?' });
+    const detail = await request(app.getHttpServer())
+      .get(`/api/v1/chat/rooms/${roomId}`)
+      .set('x-v1-user-id', ids.ownerA)
       .expect(200);
-
-    expect(res.body.data.alreadyProcessed).toBe(true);
-    expect(res.body.data.contact.status).toBe('accepted');
-    expect(res.body.data.contact.respondedAt).toBe(firstRespondedAt);
+    expect(detail.body.data.teamContact).toMatchObject({ contactId, status: 'accepted', mySide: 'from' });
   });
 
-  it('5) A owner 가 /chat/rooms/resolve 로 team_contact 채팅방 roomId 를 얻는다', async () => {
+  it('7) 두 팀 어디에도 속하지 않은 사용자는 방을 볼 수 없다 — 403', async () => {
     const res = await request(app.getHttpServer())
-      .post('/api/v1/chat/rooms/resolve')
-      .set('x-v1-user-id', ids.ownerA)
-      .send({ targetType: 'team_contact', targetId: contactId })
-      .expect(201);
+      .get(`/api/v1/chat/rooms/${roomId}`)
+      .set('x-v1-user-id', ids.outsider)
+      .expect(403);
+    expect(res.body.code).toBe('PERMISSION_DENIED');
 
-    expect(res.body.data.created).toBe(true);
-    expect(typeof res.body.data.roomId).toBe('string');
-    roomId = res.body.data.roomId;
-
-    const room = await prisma.v1ChatRoom.findUniqueOrThrow({ where: { id: roomId } });
-    expect(room.teamContactId).toBe(contactId);
-  });
-
-  it('6) 같은 호출을 반복해도 같은 roomId — 방이 파편화되지 않는다', async () => {
-    const res = await request(app.getHttpServer())
-      .post('/api/v1/chat/rooms/resolve')
-      .set('x-v1-user-id', ids.ownerA)
-      .send({ targetType: 'team_contact', targetId: contactId })
-      .expect(201);
-
-    expect(res.body.data.created).toBe(false);
-    expect(res.body.data.roomId).toBe(roomId);
-
-    const rooms = await prisma.v1ChatRoom.findMany({ where: { teamContactId: contactId } });
-    expect(rooms).toHaveLength(1);
-  });
-
-  it('7) 두 팀 어디에도 속하지 않은 사용자가 resolve 하면 403 PERMISSION_DENIED', async () => {
-    const res = await request(app.getHttpServer())
+    const resolveRes = await request(app.getHttpServer())
       .post('/api/v1/chat/rooms/resolve')
       .set('x-v1-user-id', ids.outsider)
       .send({ targetType: 'team_contact', targetId: contactId })
       .expect(403);
-
-    expect(res.body.code).toBe('PERMISSION_DENIED');
-
-    // 비참여자 시도로 새 방이 생기지 않았는지도 확인한다
+    expect(resolveRes.body.code).toBe('PERMISSION_DENIED');
     const rooms = await prisma.v1ChatRoom.findMany({ where: { teamContactId: contactId } });
     expect(rooms).toHaveLength(1);
   });

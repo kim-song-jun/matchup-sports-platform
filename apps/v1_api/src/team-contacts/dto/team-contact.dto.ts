@@ -1,5 +1,4 @@
-import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { IsIn, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
 
 export class CreateTeamContactDto {
   @IsUUID()
@@ -31,25 +30,4 @@ export class CreateContactBlockDto {
 export class UpdateContactPolicyDto {
   @IsIn(['open', 'recruiting_only', 'closed'])
   contactPolicy!: 'open' | 'recruiting_only' | 'closed';
-}
-
-export class ListTeamContactsQueryDto {
-  @IsOptional()
-  @IsIn(['inbound', 'outbound'])
-  direction?: 'inbound' | 'outbound';
-
-  @IsOptional()
-  @IsIn(['requested', 'accepted', 'declined', 'withdrawn', 'expired'])
-  status?: string;
-
-  @IsOptional()
-  @IsString()
-  cursor?: string;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(50)
-  limit?: number;
 }

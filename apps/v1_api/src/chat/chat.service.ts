@@ -31,8 +31,11 @@ type RoomWithRelations = Prisma.V1ChatRoomGetPayload<{
         id: true;
         fromTeamId: true;
         toTeamId: true;
+        status: true;
+        expiresAt: true;
+        declineReason: true;
         fromTeam: { select: { id: true; name: true } };
-        toTeam: { select: { id: true; name: true } };
+        toTeam: { select: { id: true; name: true; memberships: { select: { id: true } } } };
       };
     };
     participants: {
@@ -104,12 +107,14 @@ export class ChatService {
 
   async detail(user: V1AuthUser, roomId: string) {
     const room = await this.ensureEntered(user.id, await this.getActiveParticipantRoom(user.id, roomId));
+    const teamContact = this.toTeamContactBlock(room);
     return {
       roomId: room.id,
       roomType: getRoomType(room),
       status: room.status,
       title: getRoomTitle(room),
-      linkedTarget: getLinkedTarget(room),
+      linkedTarget: getLinkedTarget(room, counterpartTeamId(teamContact)),
+      teamContact,
       me: this.toMe(room, user.id),
       participants: room.participants.slice(0, 20).map((participant) => ({
         userId: participant.userId,
@@ -172,6 +177,10 @@ export class ChatService {
     const content = dto.content.trim();
     if (!content) throw validationError('content is required', 'content');
     const room = await this.getActiveParticipantRoom(user.id, roomId);
+    if (room.teamContact) {
+      const status = contactDisplayStatus(room.teamContact.status, room.teamContact.expiresAt);
+      if (status !== 'accepted') throw stateConflict('수락한 뒤에 대화할 수 있어요.', 'TEAM_CONTACT_NOT_ACCEPTED');
+    }
     if (room.status !== 'active') throw stateConflict('Chat room is not active');
 
     const { message, recipientUserIds } = await this.prisma.$transaction(async (tx) => {
@@ -357,7 +366,30 @@ export class ChatService {
   private async resolveTeamContactRoom(userId: string, teamContactId: string) {
     const existing = await this.prisma.v1ChatRoom.findUnique({ where: { teamContactId } });
     const room = existing ?? (await this.prisma.v1ChatRoom.create({ data: { teamContactId, status: 'active' } }));
-    await this.ensureResolvedParticipant(room.id, userId);
+    // ensureResolvedParticipant 대신 컨택 전용 분기를 둔다: 나중에 운영진이 된 사람이
+    // 들어와도 요청 메시지부터 전부 보여야 한다(§3.3). ensureResolvedParticipant 는
+    // visibleFromAt: null(입장 시점부터만 표시)을 쓰는 다른 방 종류에 그대로 남긴다.
+    const participant = await this.prisma.v1ChatRoomParticipant.findUnique({
+      where: { chatRoomId_userId: { chatRoomId: room.id, userId } },
+    });
+    if (!participant) {
+      await this.prisma.v1ChatRoomParticipant.create({
+        data: { chatRoomId: room.id, userId, status: 'active', visibleFromAt: room.createdAt },
+      });
+    } else if (participant.status === 'left') {
+      await this.prisma.v1ChatRoomParticipant.update({
+        where: { id: participant.id },
+        data: { status: 'active', leftAt: null, lastReadMessageId: null, visibleFromAt: room.createdAt },
+      });
+    } else if (!participant.visibleFromAt || participant.visibleFromAt > room.createdAt) {
+      // 이미 active 인데 열람 경계가 비어 있거나(옛 ensureResolvedParticipant 경로) 방 생성
+      // 시각보다 늦으면 같은 불변식으로 당긴다 — 백필 뒤엔 거의 없지만, 있으면 요청 메시지가
+      // 안 보이고 미읽음이 0 으로 잡히는 조용한 결함이 된다(PR #977 Copilot 지적).
+      await this.prisma.v1ChatRoomParticipant.update({
+        where: { id: participant.id },
+        data: { visibleFromAt: room.createdAt },
+      });
+    }
     return { roomId: room.id, roomType: 'team_contact', created: !existing, route: chatRoomRoute(room.id) };
   }
 
@@ -405,11 +437,14 @@ export class ChatService {
   }
 
   private async assertCanUseTeamContactChat(userId: string, teamContactId: string) {
+    // status 로 좁히지 않는다 — 요청 중·거절·철회·만료된 컨택 방도 양 팀 운영진은
+    // 열람할 수 있어야 한다("팀 컨택의 채팅 흡수" §3.6). 전송 가능 여부는
+    // sendMessage 의 TEAM_CONTACT_NOT_ACCEPTED 게이트가 따로 맡는다.
     const contact = await this.prisma.v1TeamContact.findFirst({
-      where: { id: teamContactId, status: 'accepted' },
+      where: { id: teamContactId },
       select: { fromTeamId: true, toTeamId: true },
     });
-    if (!contact) throw stateConflict('컨택이 수락된 뒤에 대화할 수 있어요.');
+    if (!contact) throw new NotFoundException({ code: 'TEAM_CONTACT_NOT_FOUND', message: '컨택을 찾을 수 없어요.' });
     const membership = await this.prisma.v1TeamMembership.findFirst({
       where: {
         userId, status: 'active',
@@ -546,7 +581,7 @@ export class ChatService {
     }).length;
   }
 
-  private roomInclude(_userId: string) {
+  private roomInclude(userId: string) {
     return {
       match: { select: { id: true, title: true } },
       team: { select: { id: true, name: true } },
@@ -556,8 +591,22 @@ export class ChatService {
           id: true,
           fromTeamId: true,
           toTeamId: true,
+          status: true,
+          expiresAt: true,
+          declineReason: true,
           fromTeam: { select: { id: true, name: true } },
-          toTeam: { select: { id: true, name: true } },
+          // 호출자의 받는 팀 운영진 여부(mySide)를 방마다 따로 묻지 않고 같은 조회에 싣는다 —
+          // 목록 50개 기준 +50 왕복이 나던 N+1 을 없앤다(PR #977 Copilot 지적).
+          toTeam: {
+            select: {
+              id: true,
+              name: true,
+              memberships: {
+                where: { userId, status: 'active', role: { in: ['owner', 'manager'] } },
+                select: { id: true },
+              },
+            },
+          },
         },
       },
       participants: {
@@ -587,18 +636,41 @@ export class ChatService {
         ...(visibleFromAt ? { sentAt: { gte: visibleFromAt, ...(lastReadMessage ? { gt: lastReadMessage.sentAt } : {}) } } : { id: '__never__' }),
       },
     });
+    const teamContact = this.toTeamContactBlock(room);
     return {
       roomId: room.id,
       roomType: getRoomType(room),
       title: getRoomTitle(room),
       status: room.status,
-      linkedTarget: getLinkedTarget(room),
+      linkedTarget: getLinkedTarget(room, counterpartTeamId(teamContact)),
+      teamContact,
       lastMessage: lastMessage
         ? { messageId: lastMessage.id, contentPreview: lastMessage.body.slice(0, 80), sentAt: lastMessage.sentAt }
         : null,
       unreadCount,
       pinned: Boolean(me?.pinnedAt),
       muted: Boolean(me?.mutedUntil && me.mutedUntil.getTime() > Date.now()),
+    };
+  }
+
+  /**
+   * 컨택 방의 상태 블록("팀 컨택의 채팅 흡수" §5). 컨택 방이 아니면 null.
+   * mySide 는 받는 팀 운영진이면 'to' — 양쪽 다 운영하는 경우 받는 쪽 액션(수락/거절)이
+   * 더 중요하므로 'to' 를 우선한다.
+   */
+  private toTeamContactBlock(room: RoomWithRelations) {
+    const contact = room.teamContact;
+    if (!contact) return null;
+    // roomInclude 가 호출자 기준으로 좁혀 실어 준 받는 팀 운영진 멤버십(0 또는 1건).
+    const toMembership = contact.toTeam.memberships.length > 0;
+    return {
+      contactId: contact.id,
+      status: contactDisplayStatus(contact.status, contact.expiresAt),
+      expiresAt: contact.expiresAt,
+      declineReason: contact.declineReason,
+      mySide: toMembership ? ('to' as const) : ('from' as const),
+      fromTeam: contact.fromTeam,
+      toTeam: { id: contact.toTeam.id, name: contact.toTeam.name },
     };
   }
 
@@ -639,28 +711,49 @@ export function getRoomTitle(room: {
   return room.match?.title ?? room.team?.name ?? room.teamMatch?.title ?? contactTitle ?? '채팅';
 }
 
-export function getLinkedTarget(room: {
-  matchId: string | null;
-  teamId: string | null;
-  teamMatchId: string | null;
-  teamContactId: string | null;
-  match: { id: string; title: string } | null;
-  team: { id: string; name: string } | null;
-  teamMatch: { id: string; title: string } | null;
-  teamContact: { id: string; fromTeam: { name: string }; toTeam: { name: string } } | null;
-}) {
+/**
+ * 컨택 방의 링크는 **상대 팀** 으로 간다(컨택 상세 화면은 채팅방으로 흡수돼 없어졌다).
+ * counterpartTeamId 는 호출자의 mySide 로 정해지므로 호출자 문맥이 있는 쪽이 넘긴다;
+ * 없으면 받는 팀(toTeam)을 상대로 본다.
+ */
+export function getLinkedTarget(
+  room: {
+    matchId: string | null;
+    teamId: string | null;
+    teamMatchId: string | null;
+    teamContactId: string | null;
+    match: { id: string; title: string } | null;
+    team: { id: string; name: string } | null;
+    teamMatch: { id: string; title: string } | null;
+    teamContact: { id: string; fromTeam: { id: string; name: string }; toTeam: { id: string; name: string } } | null;
+  },
+  counterpartTeamId?: string | null,
+) {
   if (room.match) return { type: 'match', id: room.match.id, title: room.match.title, route: `/matches/${room.match.id}` };
   if (room.team) return { type: 'team', id: room.team.id, title: room.team.name, route: `/teams/${room.team.id}` };
   if (room.teamMatch) return { type: 'team_match', id: room.teamMatch.id, title: room.teamMatch.title, route: `/team-matches/${room.teamMatch.id}` };
   if (room.teamContact) {
+    const counterpart =
+      counterpartTeamId === room.teamContact.fromTeam.id ? room.teamContact.fromTeam : room.teamContact.toTeam;
     return {
       type: 'team_contact',
       id: room.teamContact.id,
-      title: `${room.teamContact.fromTeam.name} ↔ ${room.teamContact.toTeam.name}`,
-      route: `/my/team-contacts/${room.teamContact.id}`,
+      title: counterpart.name,
+      route: `/teams/${counterpart.id}`,
     };
   }
   return { type: null, id: null, title: '채팅', route: null };
+}
+
+/** 컨택 표시 상태 — requested 인데 만료 시각이 지났으면 expired 로 본다(DB 는 lazy-flip). */
+export function contactDisplayStatus(status: string, expiresAt: Date) {
+  return status === 'requested' && expiresAt <= new Date() ? 'expired' : status;
+}
+
+/** mySide 기준 상대 팀 id. 컨택 방이 아니면 null. */
+function counterpartTeamId(block: { mySide: 'from' | 'to'; fromTeam: { id: string }; toTeam: { id: string } } | null) {
+  if (!block) return null;
+  return block.mySide === 'to' ? block.fromTeam.id : block.toTeam.id;
 }
 
 function validationError(message: string, field: string) {

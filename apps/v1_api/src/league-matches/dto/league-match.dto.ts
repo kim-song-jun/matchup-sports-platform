@@ -179,3 +179,49 @@ export class ListLeagueMatchesQueryDto {
   @Max(50)
   limit?: number;
 }
+
+/**
+ * 운영자가 **한 경기씩** 직접 넣는 리그 대진 (Task 164 BE-1).
+ *
+ * 라운드로빈 일괄 생성이 못 담는 경우를 위한 것이다 — 우천 순연 재편성, 팀이 늦게 합류해
+ * 생긴 잔여 경기, 조정된 재경기. 저장 경로는 자동 생성과 **완전히 같다**
+ * (`createLeagueFixture`) — 부수효과가 한쪽에만 빠지지 않게 하려는 것이다.
+ *
+ * ⚠️ **주차(round)를 받지 않는다.** `V1TeamMatch` 에 주차 컬럼이 없고 순위 계산도 쓰지
+ * 않는다 — 화면의 "N주차" 는 그 리그의 서로 다른 경기일을 세어 `startAt` 에서 파생한다
+ * (`league-week-number.ts`). 받아 봐야 저장되지 않는 값이라 API 표면에 두지 않는다
+ * (2026-09-02 사용자 확정, Task 164 Ambiguity 3).
+ */
+export class CreateManualLeagueFixtureDto {
+  @IsUUID()
+  homeTeamId!: string;
+
+  @IsUUID()
+  awayTeamId!: string;
+
+  @IsDateString()
+  startsAt!: string;
+
+  /**
+   * 경기 길이(분). 주면 `endAt = startsAt + durationMinutes`, 안 주면 종료 시각을 **비운다**.
+   * 종료 시각을 직접 받지 않는 이유: 시작보다 이른 종료를 만들 수 있는 입력을 애초에 두지
+   * 않기 위해서다(일괄 생성도 슬롯 계산으로 duration 을 거쳐 endAt 을 만든다).
+   */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(600)
+  durationMinutes?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  placeName?: string;
+
+  /** 미지정이면 일괄 생성과 **같은 규칙**으로 짓는다(`leagueFixtureTitle`). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  title?: string;
+}

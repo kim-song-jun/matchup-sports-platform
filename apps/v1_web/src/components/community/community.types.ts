@@ -1,8 +1,14 @@
+import type { V1ChatRoomTeamContact } from '@/types/api';
+
 export type ChatRoomModel = {
   id: string;
   title: string;
   type: '개인매치' | '팀매치' | '팀' | '팀컨택';
   href: string;
+  /** 팀컨택 방의 컨택 상태(표시값). 다른 방 종류는 undefined. */
+  contactStatus?: V1ChatRoomTeamContact['status'];
+  /** 받는 팀 운영진이 아직 답하지 않은 요청 — 목록에서 "답장 필요" 로 강조한다. */
+  contactNeedsReply?: boolean;
   last: string;
   time: string;
   unread: number;
@@ -30,6 +36,10 @@ export type ChatListViewModel = {
 export type ChatRoomViewModel = {
   title: string;
   context: { title: string; sub: string; href: string };
+  /** 팀컨택 방이면 상단 컨텍스트 카드 대신 상태 카드를 그린다. */
+  teamContact?: V1ChatRoomTeamContact | null;
+  /** 값이 있으면 입력창을 잠그고 이 문구를 placeholder 로 보여준다(수락 전·종료된 컨택). */
+  inputLockedMessage?: string;
   messages: Array<{ id: string; who: 'me' | 'other' | 'system'; senderId: string; label: string; body: string; sentAt: string; unreadCount?: number }>;
   status?: 'loading' | 'error' | 'ready';
   emptyTitle?: string;

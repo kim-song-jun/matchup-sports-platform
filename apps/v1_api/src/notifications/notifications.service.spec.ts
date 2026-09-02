@@ -526,7 +526,7 @@ describe('NotificationsService', () => {
     ['team_contact_accepted' as const, '팀 컨택이 수락됐어요', '이제 상대 팀과 대화할 수 있어요.'],
     ['team_contact_declined' as const, '팀 컨택이 거절됐어요', '아쉽지만 이번에는 성사되지 않았어요.'],
   ])('%s 알림 매핑', (eventType, expectedTitle, expectedBody) => {
-    it("targetType 이 'team' 이고 딥링크가 /my/team-contacts 로 간다 (폴백으로 새면 /teams/{id} 가 된다)", async () => {
+    it("targetType 이 'chat' 이고 딥링크가 /chat/{roomId} 로 간다", async () => {
       prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
       prisma.v1Notification.create.mockResolvedValue(makeNotification());
 
@@ -536,8 +536,8 @@ describe('NotificationsService', () => {
       expect(prisma.v1Notification.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            targetType: 'team',
-            deepLink: '/my/team-contacts/contact-1',
+            targetType: 'chat',
+            deepLink: '/chat/contact-1',
             title: expectedTitle,
             body: expectedBody,
           }),

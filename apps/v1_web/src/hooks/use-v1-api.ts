@@ -1153,27 +1153,20 @@ export type V1TeamContact = {
   createdAt: string;
 };
 
-export type V1TeamContactList = {
-  items: V1TeamContact[];
-  pageInfo: { nextCursor: string | null; hasNext: boolean };
+/** 컨택 발신 응답 — 컨택 행 + 요청 시점에 함께 열린 채팅방("팀 컨택의 채팅 흡수" §4). */
+export type V1TeamContactCreated = V1TeamContact & { chatRoomId: string; route: string };
+
+export type V1TeamContactSummary = {
+  pendingInbound: number;
+  byTeam: Array<{ teamId: string; pendingInbound: number }>;
 };
 
-export function useV1TeamContacts(
-  teamId: string,
-  filters?: { direction?: 'inbound' | 'outbound'; status?: string; cursor?: string; limit?: number },
-) {
+/** 내가 운영하는 모든 팀의 대기 중 받은 컨택 수. 마이 메뉴·팀 관리 메뉴 배지에 쓴다. */
+export function useV1TeamContactSummary(options?: QueryOptions) {
   return useQuery({
-    queryKey: v1Keys.teamContacts(teamId, filters),
-    queryFn: () => v1Get<V1TeamContactList>(`/teams/${teamId}/contacts`, filters),
-    enabled: Boolean(teamId),
-  });
-}
-
-export function useV1TeamContact(contactId: string) {
-  return useQuery({
-    queryKey: v1Keys.teamContact(contactId),
-    queryFn: () => v1Get<V1TeamContact>(`/team-contacts/${contactId}`),
-    enabled: Boolean(contactId),
+    queryKey: v1Keys.teamContactSummary(),
+    queryFn: () => v1Get<V1TeamContactSummary>('/me/team-contacts/summary'),
+    enabled: options?.enabled ?? true,
   });
 }
 
@@ -1181,34 +1174,34 @@ export function useV1CreateTeamContact(toTeamId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: { fromTeamId: string; message: string }) =>
-      v1Post<V1TeamContact>(`/teams/${toTeamId}/contacts`, body),
-    onSuccess: (_result, variables) => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.teamContactsAll(variables.fromTeamId) });
+      v1Post<V1TeamContactCreated>(`/teams/${toTeamId}/contacts`, body),
+    onSuccess: () => {
+      // 발신 = 새 채팅방. 목록에 바로 보여야 한다.
+      queryClient.invalidateQueries({ queryKey: v1Keys.chatRooms() });
     },
   });
 }
 
 /**
- * 컨택 상태가 바뀌면 단건과 **양쪽 팀의 컨택함**을 모두 무효화한다.
- * 전역 staleTime 이 30초라(providers.tsx) 목록을 안 건드리면 상세에서 수락한 뒤
- * 목록으로 돌아갔을 때 옛 상태가 그대로 서빙된다.
- * teamContactsAll 을 쓰는 이유: teamContacts() 는 마지막 요소가 필터 객체라 prefix match 가 안 된다.
+ * 컨택 상태가 바뀌면 그 방(상태 카드·입력 잠금)·방 목록(배지)·대기 건수 배지를 함께 무효화한다.
+ * 전역 staleTime 이 30초라(providers.tsx) 안 건드리면 옛 상태가 그대로 서빙된다.
  */
-function invalidateTeamContactCaches(
-  queryClient: QueryClient,
-  contactId: string,
-  contact: { fromTeamId: string; toTeamId: string },
-) {
-  queryClient.invalidateQueries({ queryKey: v1Keys.teamContact(contactId) });
-  queryClient.invalidateQueries({ queryKey: v1Keys.teamContactsAll(contact.fromTeamId) });
-  queryClient.invalidateQueries({ queryKey: v1Keys.teamContactsAll(contact.toTeamId) });
+function invalidateTeamContactCaches(queryClient: QueryClient, chatRoomId: string | null) {
+  queryClient.invalidateQueries({ queryKey: v1Keys.chatRooms() });
+  queryClient.invalidateQueries({ queryKey: v1Keys.teamContactSummary() });
+  if (chatRoomId) {
+    queryClient.invalidateQueries({ queryKey: v1Keys.chatRoom(chatRoomId) });
+    queryClient.invalidateQueries({ queryKey: v1Keys.chatMessages(chatRoomId) });
+  }
 }
+
+type V1TeamContactRespondResult = { contact: V1TeamContact; alreadyProcessed: boolean; chatRoomId: string | null };
 
 export function useV1AcceptTeamContact(contactId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => v1Patch<{ contact: V1TeamContact; alreadyProcessed: boolean }>(`/team-contacts/${contactId}/accept`),
-    onSuccess: (data) => invalidateTeamContactCaches(queryClient, contactId, data.contact),
+    mutationFn: () => v1Patch<V1TeamContactRespondResult>(`/team-contacts/${contactId}/accept`),
+    onSuccess: (data) => invalidateTeamContactCaches(queryClient, data.chatRoomId),
   });
 }
 
@@ -1216,16 +1209,16 @@ export function useV1DeclineTeamContact(contactId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: { reason?: string }) =>
-      v1Patch<{ contact: V1TeamContact; alreadyProcessed: boolean }>(`/team-contacts/${contactId}/decline`, body),
-    onSuccess: (data) => invalidateTeamContactCaches(queryClient, contactId, data.contact),
+      v1Patch<V1TeamContactRespondResult>(`/team-contacts/${contactId}/decline`, body),
+    onSuccess: (data) => invalidateTeamContactCaches(queryClient, data.chatRoomId),
   });
 }
 
 export function useV1WithdrawTeamContact(contactId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => v1Post<{ contact: V1TeamContact; alreadyProcessed: boolean }>(`/team-contacts/${contactId}/withdraw`),
-    onSuccess: (data) => invalidateTeamContactCaches(queryClient, contactId, data.contact),
+    mutationFn: () => v1Post<V1TeamContactRespondResult>(`/team-contacts/${contactId}/withdraw`),
+    onSuccess: (data) => invalidateTeamContactCaches(queryClient, data.chatRoomId),
   });
 }
 
@@ -2477,10 +2470,17 @@ export function useV1SubmitReview() {
   });
 }
 
-export function useV1ChatRooms(options?: QueryOptions) {
+export type V1ChatRoomsFilters = { roomType?: V1ChatRoom['roomType']; limit?: number };
+
+/**
+ * 방 목록. `filters` 가 있으면 서버 필터(`roomType`)·페이지 크기를 그대로 넘긴다 — 목록 화면의
+ * 카테고리 칩은 클라이언트 필터가 아니라 이 서버 필터를 써야 첫 페이지 바깥의 방을 놓치지 않는다.
+ * 키는 `chatRooms()` 접두사를 공유하므로 기존 무효화가 필터 버전까지 함께 갱신한다.
+ */
+export function useV1ChatRooms(options?: QueryOptions, filters?: V1ChatRoomsFilters) {
   return useQuery({
-    queryKey: v1Keys.chatRooms(),
-    queryFn: () => v1Get<CursorPage<V1ChatRoom>>('/chat/rooms'),
+    queryKey: filters ? ([...v1Keys.chatRooms(), 'list', filters] as const) : v1Keys.chatRooms(),
+    queryFn: () => v1Get<CursorPage<V1ChatRoom>>('/chat/rooms', filters),
     enabled: options?.enabled ?? true,
   });
 }

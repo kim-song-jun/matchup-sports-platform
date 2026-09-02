@@ -44,6 +44,7 @@ import {
   useV1Settings,
   useV1TeamDetail,
   useV1TeamJoinApplications,
+  useV1TeamContactSummary,
   useV1TeamMembers,
   useV1Tournament,
   useV1PlayerCardHidden,
@@ -113,6 +114,8 @@ export function MyHomePageClient() {
   // 대부분의 사용자는 스태프가 아니다 — "대회 운영" 메뉴는 유효한 배정이 있을 때만 노출해야
   // 하므로(스코프 밖 사용자에게 안 보여야 함) 항상 조회는 하되, 프로필 로딩 후에만 호출한다.
   const staffAssignments = useV1MyTournamentStaffAssignments({ enabled: Boolean(profile.data) });
+  // "채팅" 메뉴 배지 — 내가 운영하는 팀들이 아직 답하지 않은 컨택 수.
+  const contactSummary = useV1TeamContactSummary({ enabled: Boolean(profile.data) });
 
   const model = useMemo(() => {
     if (!profile.data) {
@@ -143,6 +146,7 @@ export function MyHomePageClient() {
       hasPendingReview(pendingReviews.data),
       phoneVerified,
       staffAssignments.data?.items.length ?? 0,
+      contactSummary.data?.pendingInbound ?? 0,
     );
   }, [
     profile.data,
@@ -152,6 +156,7 @@ export function MyHomePageClient() {
     pendingReviews.data,
     phoneVerified,
     staffAssignments.data,
+    contactSummary.data,
   ]);
 
   if (profile.isError) {
@@ -2339,12 +2344,15 @@ function toMyHomeModel(
   hasPendingReviews?: boolean,
   phoneVerified?: boolean,
   staffTournamentCount = 0,
+  pendingContactCount = 0,
 ): MyHomeViewModel {
   const nickname = profile.profile.nickname?.trim() || profile.profile.displayName;
   const totalMannerScore = activitySummary?.totals.mannerScore ?? profile.reputation.mannerScore;
   const activityCount = activitySummary?.totals.activityCount ?? '—';
   const monthlyMatchCount = activitySummary?.monthly.matchCount ?? '—';
-  const sections = myHomeModel.sections.map((section) => ({ ...section, items: [...section.items] }));
+  // 항목 객체까지 복사한다 — 얕은 복사면 아래 badge 쓰기가 모듈 싱글턴(my.view-model)을 오염시켜
+  // 배지가 영영 안 지워지고 로딩 셸·다른 계정에도 새어 나간다(최종 리뷰 Critical 1).
+  const sections = myHomeModel.sections.map((section) => ({ ...section, items: section.items.map((item) => ({ ...item })) }));
   // F3: 마이페이지에서 내 활동 기록(/users/:id/records)으로 가는 동선이 아예 없었다 —
   // 정적 myHomeModel엔 내 userId를 미리 넣을 수 없어 여기서 프로필 응답으로 동적으로 붙인다.
   const myActivitySection = sections.find((section) => section.title === '내 활동');
@@ -2357,6 +2365,8 @@ function toMyHomeModel(
     });
   }
   const communitySection = sections.find((section) => section.title === '커뮤니티');
+  const chatItem = communitySection?.items.find((item) => item.href === '/chat');
+  if (chatItem) chatItem.badge = pendingContactCount > 0 ? pendingContactCount : undefined;
   if (communitySection && !communitySection.items.some((item) => item.href === '/my/reviews')) {
     communitySection.items.push({
       label: '리뷰',

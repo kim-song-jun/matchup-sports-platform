@@ -7,6 +7,7 @@ import {
   AddLeagueTeamDto,
   CancelLeagueFixtureDto,
   CreateLeagueMatchDto,
+  CreateManualLeagueFixtureDto,
   GenerateLeagueFixturesDto,
   RegenerateLeagueFixturesDto,
   RevertLeagueCompletionDto,
@@ -109,6 +110,21 @@ export class LeagueMatchAdminController {
     @Body() dto: GenerateLeagueFixturesDto,
   ) {
     return this.service.generateFixtures(user, leagueId, dto);
+  }
+
+  /**
+   * 수동 대진 추가 (Task 164 BE-1) — 운영자가 한 경기씩 직접 넣는다.
+   *
+   * ⚠️ **`POST :leagueId/fixtures` 와 충돌하지 않는다** — 정적 세그먼트가 하나 더 붙어
+   * 경로 세그먼트 수가 다르다(regenerate 와 같은 이유). 라우트 순서에 기대지 않는다.
+   */
+  @Post(':leagueId/fixtures/manual')
+  createManualFixture(
+    @CurrentUser() user: V1AuthUser,
+    @Param('leagueId', leagueIdPipe) leagueId: string,
+    @Body() dto: CreateManualLeagueFixtureDto,
+  ) {
+    return this.service.createManualFixture(user, leagueId, dto);
   }
 
   // R13: 대진 재생성 — 기존 대진 전부를 취소하고 같은 팀 로스터로 새 라운드로빈 대진을 만든다.

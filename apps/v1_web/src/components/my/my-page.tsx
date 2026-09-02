@@ -10,6 +10,7 @@ import {
   LogOut,
   Mail,
   MapPin,
+  MessageCircle,
   Moon,
   Plus,
   Send,
@@ -51,6 +52,7 @@ import type {
 
 /** Lucide 아이콘 이름 → 컴포넌트 매핑. view-model의 icon 문자열을 참조함. */
 const MENU_ICON_MAP: Record<string, React.ComponentType<LucideProps>> = {
+  MessageCircle,
   Award,
   ListOrdered,
   ClipboardList,
@@ -506,7 +508,12 @@ function MenuSection({ section }: { section: { title: string; items: MyMenuItem[
                 ) : item.icon}
               </span>
               <span style={{ flex: 1, minWidth: 0 }}>
-                <span className="tm-text-body" style={{ color: 'var(--text-strong)', display: 'block' }}>{item.label}</span>
+                <span className="tm-text-body" style={{ color: 'var(--text-strong)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {item.label}
+                  {item.badge ? (
+                    <span className="tm-badge tm-badge-blue" aria-label={`답장을 기다리는 컨택 ${item.badge}건`}>{item.badge}</span>
+                  ) : null}
+                </span>
                 <span className="tm-text-caption" style={{ marginTop: 2, display: 'block' }}>{item.sub}</span>
               </span>
               <ChevronRightIcon size={17} stroke="var(--text-caption)" strokeWidth={2} />

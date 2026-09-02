@@ -39,6 +39,9 @@ export const myHomeModel: MyHomeViewModel = {
     {
       title: '커뮤니티',
       items: [
+        // 채팅(=매치·팀·팀컨택 대화)으로 가는 상시 입구. 하단탭엔 채팅이 없어 홈 위젯과 여기서만 닿는다.
+        // badge 는 my-api-clients 가 대기 중 받은 컨택 수로 채운다.
+        { label: '채팅', sub: '매치·팀·컨택 대화를 한곳에서 확인해요', href: '/chat', icon: 'MessageCircle' },
         { label: '내 팀', sub: '소속 팀과 운영 권한을 확인해요', href: '/my/teams', icon: 'Users' },
         // R4: 리그 참가는 운영자가 지정하므로(D-2) 팀이 참가 사실을 알 계기가 이 노출뿐이다.
         { label: '내 리그', sub: '내 팀이 참가 중인 리그를 확인해요', href: '/my/leagues', icon: 'ListOrdered' },

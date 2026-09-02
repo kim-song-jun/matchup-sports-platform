@@ -112,7 +112,7 @@ const CONFIRM_CANCEL_BUTTON_CLASS =
  *
  * 팀 정지·대리 차단 둘 다 되돌릴 수 있는 조치라 모달 대신 컨택 상세 차단 확인과 같은
  * 2단계 인라인 확인(`role="group"`)을 쓴다 — 되돌릴 수 있는 동작에 모달 기계장치를
- * 복제하지 않는다(같은 저장소 관용구, `my-team-contacts-client.tsx`).
+ * 복제하지 않는다(같은 저장소 관용구, `community/team-contact-status-card.tsx`).
  */
 function ReportedTeamSection({
   inquiryId,

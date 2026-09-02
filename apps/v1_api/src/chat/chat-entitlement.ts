@@ -70,9 +70,11 @@ export function currentChatEntitlementWhere(userId: string): Prisma.V1ChatRoomWh
         },
       },
       {
+        // status 로 좁히지 않는다 — 컨택 방은 요청 시점부터 양 팀 운영진에게 보여야 한다
+        // ("팀 컨택의 채팅 흡수" §3.6). 전송 가능 여부는 ChatService.sendMessage 의
+        // TEAM_CONTACT_NOT_ACCEPTED 게이트가 따로 맡는다.
         teamContact: {
           is: {
-            status: 'accepted',
             OR: [
               { fromTeam: { memberships: { some: { userId, status: 'active', role: { in: [...managerRoles] } } } } },
               { toTeam:   { memberships: { some: { userId, status: 'active', role: { in: [...managerRoles] } } } } },

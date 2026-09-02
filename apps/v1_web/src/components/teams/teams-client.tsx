@@ -18,6 +18,7 @@ import {
   useV1RemoveTeamMembership,
   useV1ResolveChatRoom,
   useV1SendTeamInvitation,
+  useV1TeamContactSummary,
   useV1TeamDetail,
   useV1TeamInvitations,
   useV1TeamJoinEligibility,
@@ -233,6 +234,10 @@ export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: 
   }, []);
   const myTeamsQuery = useV1MyTeams(undefined, { enabled: hasSessionHint });
   const operatorTeamCount = normalizeMyTeamsResponse(myTeamsQuery.data).filter((team) => isTeamOperatorRole(team.role)).length;
+  // 운영 메뉴 "받은 컨택 N" 배지 — 이 팀의 운영진일 때만 조회한다(다른 사용자에겐 메뉴 자체가 없다).
+  const contactSummary = useV1TeamContactSummary({ enabled: isTeamOperatorRole(query.data?.viewer.role) });
+  const pendingInboundContacts =
+    contactSummary.data?.byTeam.find((row) => row.teamId === teamId)?.pendingInbound ?? 0;
   /* R4: "내 리그" — 리그 목록 API 의 teamId 필터로 직접 가져온다.
    * 원래는 이 팀의 팀매치 목록에서 league 필드를 distinct 로 역산했는데, 그러면
    * **대진이 생기기 전에는 아무것도 안 뜬다** — 운영자가 팀을 리그에 넣은 시점부터
@@ -331,7 +336,7 @@ export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: 
       toDetailMode(query.data, eligibility.data) === 'pending'
         ? { requestedAtLabel: formatJoinRequestedAt(eligibility.data?.requestedAt) }
         : undefined,
-    operations: buildTeamOperations(query.data),
+    operations: buildTeamOperations(query.data, pendingInboundContacts),
     onShare: () => shareTeam(query.data),
     openMatches,
     openMatchesLoading: openMatchesQuery.isLoading,
@@ -790,7 +795,7 @@ function teamDetailCtaAction({
   return undefined;
 }
 
-function buildTeamOperations(team: V1TeamDetail): TeamDetailViewModel['operations'] {
+function buildTeamOperations(team: V1TeamDetail, pendingInboundContacts = 0): TeamDetailViewModel['operations'] {
   if (!isTeamOperatorRole(team.viewer.role)) return undefined;
   return [
     {
@@ -802,6 +807,13 @@ function buildTeamOperations(team: V1TeamDetail): TeamDetailViewModel['operation
       label: '멤버 관리',
       sub: '멤버 역할, 가입 신청, 초대를 관리해요.',
       href: `/teams/${team.teamId}/members`,
+    },
+    {
+      // 컨택은 채팅방으로 흡수됐다 — 팀컨택 필터가 걸린 채팅 목록으로 보낸다.
+      label: '받은 컨택',
+      sub: '다른 팀이 보낸 컨택을 확인하고 답해요.',
+      href: '/chat?category=team_contact',
+      badge: pendingInboundContacts,
     },
     {
       label: '컨택 설정',

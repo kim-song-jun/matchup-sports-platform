@@ -21,6 +21,9 @@
 #
 # Usage: scripts/ios/verify-push-delivery.sh
 set -euo pipefail
+# Everything written below — derived data, the result bundle, exported attachments — can
+# carry the password in clear text, so nothing here is created readable by other users.
+umask 077
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 IOS_DIR="$ROOT/apps/v1_ios"
@@ -72,6 +75,9 @@ SENDER=$!
 trap 'kill "$SENDER" 2>/dev/null || true' EXIT
 
 # Ad-hoc signed so the simulator build carries aps-environment; see verify-push-slice.sh.
+# The exit code is kept rather than letting `set -e` stop here: a failed run is exactly the
+# one whose attachments are needed, so the export below always happens.
+status=0
 xcodebuild test \
   -project "$IOS_DIR/Teameet.xcodeproj" -scheme "$SCHEME" \
   -destination "platform=iOS Simulator,id=$DEVICE" \
@@ -81,11 +87,14 @@ xcodebuild test \
   TEAMEET_UITEST_EMAIL="$TEAMEET_UITEST_EMAIL" \
   TEAMEET_UITEST_PASSWORD="$TEAMEET_UITEST_PASSWORD" \
   TEAMEET_UITEST_BANNER_TITLE="$TITLE" \
-  TEAMEET_UITEST_READY_FILE="$READY"
+  TEAMEET_UITEST_READY_FILE="$READY" || status=$?
 
 kill "$SENDER" 2>/dev/null || true
 mkdir -p "$OUTPUT/attachments"
-xcrun xcresulttool export attachments \
-  --path "$OUTPUT/delivery.xcresult" --output-path "$OUTPUT/attachments" >/dev/null
+if [ -d "$OUTPUT/delivery.xcresult" ]; then
+  xcrun xcresulttool export attachments \
+    --path "$OUTPUT/delivery.xcresult" --output-path "$OUTPUT/attachments" >/dev/null || true
+fi
 echo
 echo "screenshots (13-settings-after-opt-in, 14-banner) and trees: $OUTPUT/attachments"
+exit "$status"

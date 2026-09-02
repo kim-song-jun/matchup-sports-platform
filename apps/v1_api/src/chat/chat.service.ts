@@ -35,7 +35,7 @@ type RoomWithRelations = Prisma.V1ChatRoomGetPayload<{
         expiresAt: true;
         declineReason: true;
         fromTeam: { select: { id: true; name: true } };
-        toTeam: { select: { id: true; name: true } };
+        toTeam: { select: { id: true; name: true; memberships: { select: { id: true } } } };
       };
     };
     participants: {
@@ -107,7 +107,7 @@ export class ChatService {
 
   async detail(user: V1AuthUser, roomId: string) {
     const room = await this.ensureEntered(user.id, await this.getActiveParticipantRoom(user.id, roomId));
-    const teamContact = await this.toTeamContactBlock(room, user.id);
+    const teamContact = this.toTeamContactBlock(room);
     return {
       roomId: room.id,
       roomType: getRoomType(room),
@@ -573,7 +573,7 @@ export class ChatService {
     }).length;
   }
 
-  private roomInclude(_userId: string) {
+  private roomInclude(userId: string) {
     return {
       match: { select: { id: true, title: true } },
       team: { select: { id: true, name: true } },
@@ -587,7 +587,18 @@ export class ChatService {
           expiresAt: true,
           declineReason: true,
           fromTeam: { select: { id: true, name: true } },
-          toTeam: { select: { id: true, name: true } },
+          // 호출자의 받는 팀 운영진 여부(mySide)를 방마다 따로 묻지 않고 같은 조회에 싣는다 —
+          // 목록 50개 기준 +50 왕복이 나던 N+1 을 없앤다(PR #977 Copilot 지적).
+          toTeam: {
+            select: {
+              id: true,
+              name: true,
+              memberships: {
+                where: { userId, status: 'active', role: { in: ['owner', 'manager'] } },
+                select: { id: true },
+              },
+            },
+          },
         },
       },
       participants: {
@@ -617,7 +628,7 @@ export class ChatService {
         ...(visibleFromAt ? { sentAt: { gte: visibleFromAt, ...(lastReadMessage ? { gt: lastReadMessage.sentAt } : {}) } } : { id: '__never__' }),
       },
     });
-    const teamContact = await this.toTeamContactBlock(room, userId);
+    const teamContact = this.toTeamContactBlock(room);
     return {
       roomId: room.id,
       roomType: getRoomType(room),
@@ -639,13 +650,11 @@ export class ChatService {
    * mySide 는 받는 팀 운영진이면 'to' — 양쪽 다 운영하는 경우 받는 쪽 액션(수락/거절)이
    * 더 중요하므로 'to' 를 우선한다.
    */
-  private async toTeamContactBlock(room: RoomWithRelations, userId: string) {
+  private toTeamContactBlock(room: RoomWithRelations) {
     const contact = room.teamContact;
     if (!contact) return null;
-    const toMembership = await this.prisma.v1TeamMembership.findFirst({
-      where: { teamId: contact.toTeamId, userId, status: 'active', role: { in: ['owner', 'manager'] } },
-      select: { id: true },
-    });
+    // roomInclude 가 호출자 기준으로 좁혀 실어 준 받는 팀 운영진 멤버십(0 또는 1건).
+    const toMembership = contact.toTeam.memberships.length > 0;
     return {
       contactId: contact.id,
       status: contactDisplayStatus(contact.status, contact.expiresAt),
@@ -653,7 +662,7 @@ export class ChatService {
       declineReason: contact.declineReason,
       mySide: toMembership ? ('to' as const) : ('from' as const),
       fromTeam: contact.fromTeam,
-      toTeam: contact.toTeam,
+      toTeam: { id: contact.toTeam.id, name: contact.toTeam.name },
     };
   }
 

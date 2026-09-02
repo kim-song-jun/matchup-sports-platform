@@ -22,11 +22,11 @@ const userU1 = { id: 'u1', email: 'u1@teameet.v1', accountStatus: 'active' as co
 const userU2 = { id: 'u2', email: 'u2@teameet.v1', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
 
 /** team_contact 채팅방 fixture — chat.service.spec.ts 의 makeRoom() 패턴을 따른다. */
-function makeRoom(status: string, expiresAt = new Date(Date.now() + 86400000)) {
+function makeRoom(status: string, expiresAt = new Date(Date.now() + 86400000), toTeamMemberships: Array<{ id: string }> = []) {
   return {
     id: 'room-1', status: 'active', matchId: null, teamId: null, teamMatchId: null, teamContactId: 'c1',
     match: null, team: null, teamMatch: null,
-    teamContact: { id: 'c1', fromTeamId: 'A', toTeamId: 'B', status, expiresAt, declineReason: null, fromTeam: { id: 'A', name: '가팀' }, toTeam: { id: 'B', name: '나팀' } },
+    teamContact: { id: 'c1', fromTeamId: 'A', toTeamId: 'B', status, expiresAt, declineReason: null, fromTeam: { id: 'A', name: '가팀' }, toTeam: { id: 'B', name: '나팀', memberships: toTeamMemberships } },
     participants: [{ id: 'p1', userId: 'u1', status: 'active', visibleFromAt: new Date(0), pinnedAt: null, mutedUntil: null, lastReadMessageId: null, user: { id: 'u1', profile: null } }],
     messages: [],
   };
@@ -122,9 +122,8 @@ describe('ChatService — team_contact', () => {
     });
   });
 
-  it('방 목록 항목에 teamContact 블록과 mySide 가 실린다', async () => {
-    // u1 은 fromTeam(A) 의 owner 지 toTeam(B) 소속이 아니므로 mySide 는 'from'.
-    prisma.v1TeamMembership.findFirst.mockResolvedValue(null);
+  it('방 목록 항목에 teamContact 블록과 mySide 가 실린다 — 방마다 멤버십을 따로 조회하지 않는다', async () => {
+    // u1 은 fromTeam(A) 의 owner 지 toTeam(B) 소속이 아니므로(include 된 toTeam.memberships 가 빈 배열) mySide 는 'from'.
     prisma.v1ChatRoom.findMany.mockResolvedValue([makeRoom('accepted')]);
 
     const result = await service.rooms(userU1, {});
@@ -138,5 +137,19 @@ describe('ChatService — team_contact', () => {
       toTeam: { id: 'B', name: '나팀' },
     });
     expect(result.items[0].linkedTarget).toMatchObject({ type: 'team_contact', route: '/teams/B' });
+    expect(result.items[0].teamContact?.toTeam).toEqual({ id: 'B', name: '나팀' });
+    // N+1 방지: 목록 조회 include 가 호출자 기준 멤버십을 실어 오므로 별도 findFirst 가 없다.
+    expect(prisma.v1TeamMembership.findFirst).not.toHaveBeenCalled();
+    const include = prisma.v1ChatRoom.findMany.mock.calls[0][0].include;
+    expect(include.teamContact.select.toTeam.select.memberships.where).toMatchObject({ userId: 'u1', status: 'active' });
+  });
+
+  it('받는 팀 운영진이면 mySide 가 to 다', async () => {
+    prisma.v1ChatRoom.findMany.mockResolvedValue([makeRoom('requested', undefined, [{ id: 'm-to' }])]);
+
+    const result = await service.rooms(userU1, {});
+
+    expect(result.items[0].teamContact).toMatchObject({ mySide: 'to' });
+    expect(result.items[0].linkedTarget).toMatchObject({ route: '/teams/A' });
   });
 });

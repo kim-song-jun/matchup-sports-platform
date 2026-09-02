@@ -21,17 +21,23 @@ export function toMatchCard(match: V1Match, fallback: MatchCardModel): MatchCard
     ...fallback,
     id: match.matchId ?? match.id ?? fallback.id,
     title: match.title,
-    sport: match.sport?.name ?? match.sportName ?? fallback.sport,
-    venue: match.place?.name ?? match.placeName ?? fallback.venue,
-    region: match.region?.name ?? match.regionName ?? fallback.region,
+    // 화면 골격용 목업(matches.view-model.ts)을 **사실 값의 폴백으로 쓰지 않는다.** 폴백이
+    // 걸리면 실제 매치에 목업의 '초보-중수'·'성별 무관'·'목동'과 **실존하지 않는 사람 이름**
+    // ('김정민')이 붙었다. 모르는 값은 지어내지 않고 "모른다"고 말한다 — 문자열 모양(비어
+    // 있지 않음)이 그대로라 렌더 쪽 가정을 깨지 않고, 라벨은 이 저장소가 이미 쓰는 표현을
+    // 재사용한다(teams-client.tsx 의 '레벨 미설정'·'지역 미정', API 의 '호스트').
+    // image 는 예외다 — 사진 자리표시자는 사실 주장이 아니라 장식이다.
+    sport: match.sport?.name ?? match.sportName,
+    venue: match.place?.name ?? match.placeName,
+    region: match.region?.name ?? match.regionName ?? '지역 미정',
     date: formatDate(match.startsAt),
     time: formatTime(match.startsAt),
     endTime: match.endsAt ? formatTime(match.endsAt) : undefined,
     current: capacity.current,
     capacity: capacity.capacity,
-    level: match.levelLabel ?? fallback.level,
-    gender: match.genderRule ?? fallback.gender,
-    host: match.host?.displayName ?? fallback.host,
+    level: match.levelLabel ?? '레벨 미설정',
+    gender: match.genderRule ?? '성별 미설정',
+    host: match.host?.displayName ?? '호스트',
     image: match.imageUrl ?? fallback.image,
     status,
     deadline: formatDeadline(match.deadlineAt, status),
@@ -99,8 +105,10 @@ export function getCapacity(match: V1Match, fallback: MatchCardModel) {
 
   const [current, capacity] = match.capacityText?.match(/\d+/g)?.map(Number) ?? [];
   return {
-    current: current ?? fallback.current,
-    capacity: capacity ?? match.capacity ?? fallback.capacity,
+    // 인원을 못 읽으면 0 으로 둔다. 목업(18/22명)으로 메우면 실제 매치에 **다른 매치의 인원**이
+    // 붙어, 자리가 남았는지 없는지를 잘못 알려준다.
+    current: current ?? 0,
+    capacity: capacity ?? match.capacity ?? 0,
   };
 }
 

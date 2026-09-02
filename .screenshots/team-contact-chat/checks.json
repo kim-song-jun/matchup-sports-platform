@@ -1,0 +1,201 @@
+{
+  "roomId": "37ea35ae-8769-4eed-8134-98dd749973cc",
+  "contactId": "9d008185-4395-4e0a-96cf-61faf47e7635",
+  "requestedCaptured": true,
+  "checks": [
+    {
+      "name": "1) 발신 201 + chatRoomId",
+      "ok": true,
+      "detail": "status=201 code="
+    },
+    {
+      "name": "1) route 가 /chat/{roomId}",
+      "ok": true
+    },
+    {
+      "name": "2) B 목록에 방 노출",
+      "ok": true
+    },
+    {
+      "name": "2) B unreadCount=1",
+      "ok": true,
+      "detail": "unread=1"
+    },
+    {
+      "name": "2) B teamContact.status=requested, mySide=to",
+      "ok": true,
+      "detail": "{\"contactId\":\"9d008185-4395-4e0a-96cf-61faf47e7635\",\"status\":\"requested\",\"expiresAt\":\"2026-09-09T17:59:11.287Z\",\"declineReason\":null,\"mySide\":\"to\",\"fromTeam\":{\"id\":\"00620e9d-b432-4a59-98ef-68afcac31c8b\",\"name\":\"E2E 알파 A팀\"},\"toTeam\":{\"id\":\"ea0e4cf0-34ab-411c-ac89-5b931f25e781\",\"name\":\"E2E 알파 B팀\"}}"
+    },
+    {
+      "name": "2) linkedTarget → 상대 팀(A)",
+      "ok": true,
+      "detail": "/teams/00620e9d-b432-4a59-98ef-68afcac31c8b"
+    },
+    {
+      "name": "3) 수락 전 전송 409 TEAM_CONTACT_NOT_ACCEPTED",
+      "ok": true,
+      "detail": "status=409 code=TEAM_CONTACT_NOT_ACCEPTED"
+    },
+    {
+      "name": "3-1) B 대기 컨택 요약 ≥1",
+      "ok": true,
+      "detail": "{\"pendingInbound\":1,\"byTeam\":[{\"teamId\":\"ea0e4cf0-34ab-411c-ac89-5b931f25e781\",\"pendingInbound\":1}]}"
+    },
+    {
+      "name": "4) 중복 409 + existingChatRoomId",
+      "ok": true,
+      "detail": "status=409 details={\"existingContactId\":\"9d008185-4395-4e0a-96cf-61faf47e7635\",\"existingStatus\":\"requested\",\"existingChatRoomId\":\"37ea35ae-8769-4eed-8134-98dd749973cc\"}"
+    },
+    {
+      "name": "[requested/B] 채팅방 상태 카드 렌더",
+      "ok": true
+    },
+    {
+      "name": "[requested/B] 입력창 잠금 문구",
+      "ok": true,
+      "detail": "수락하면 대화할 수 있어요/true"
+    },
+    {
+      "name": "[requested/B/chat-room] 390 가로 오버플로 없음",
+      "ok": true,
+      "detail": "390/390"
+    },
+    {
+      "name": "[requested/B] 목록 \"답장 필요\" 배지",
+      "ok": true,
+      "detail": "[\"답장 필요\",\"답장 필요\"]"
+    },
+    {
+      "name": "[requested/B/chat-list] 390 가로 오버플로 없음",
+      "ok": true,
+      "detail": "390/390"
+    },
+    {
+      "name": "[requested/B] 마이 메뉴 채팅 배지(숫자)",
+      "ok": true,
+      "detail": "[\"이메일 로그인\",\"본인인증 완료\",\"1\"]"
+    },
+    {
+      "name": "[requested/B/my-home] 390 가로 오버플로 없음",
+      "ok": true,
+      "detail": "390/390"
+    },
+    {
+      "name": "[requested/B] 팀 운영 메뉴 받은 컨택 배지",
+      "ok": false,
+      "detail": "[\"모집 중\",\"현재 11명\",\"정규 리그\",\"정규 리그\",\"정규 리그\",\"정규 리그\",\"정규 리그\",\"정규 리그\",\"정규 리그\",\"정규 리그\",\"정규 리그\",\"정규 리그\"]"
+    },
+    {
+      "name": "[requested/B/team-detail-ops] 390 가로 오버플로 없음",
+      "ok": true,
+      "detail": "390/390"
+    },
+    {
+      "name": "[requested/A] 채팅방 상태 카드 렌더",
+      "ok": true
+    },
+    {
+      "name": "[requested/A] 입력창 잠금 문구",
+      "ok": true,
+      "detail": "수락하면 대화할 수 있어요/true"
+    },
+    {
+      "name": "[requested/A/chat-room] 390 가로 오버플로 없음",
+      "ok": true,
+      "detail": "390/390"
+    },
+    {
+      "name": "[requested/A/chat-list] 390 가로 오버플로 없음",
+      "ok": true,
+      "detail": "390/390"
+    },
+    {
+      "name": "5) 수락 200 + chatRoomId",
+      "ok": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "5) 시스템 메시지 \"컨택을 수락했어요\"",
+      "ok": true,
+      "detail": "system:컨택을 수락했어요 | text:[실측 2026-09-02T17:59] 이번 주말 친선전 어떠세요?"
+    },
+    {
+      "name": "5) A 알림 딥링크 /chat/{roomId}",
+      "ok": true,
+      "detail": "팀 컨택이 수락됐어요"
+    },
+    {
+      "name": "5-1) 수락 뒤 B 대기 요약 감소",
+      "ok": true,
+      "detail": "{\"pendingInbound\":0,\"byTeam\":[{\"teamId\":\"ea0e4cf0-34ab-411c-ac89-5b931f25e781\",\"pendingInbound\":0}]}"
+    },
+    {
+      "name": "6) 수락 뒤 전송 201",
+      "ok": true,
+      "detail": "status=201 code="
+    },
+    {
+      "name": "6) 상세 teamContact accepted, mySide from",
+      "ok": true,
+      "detail": "{\"contactId\":\"9d008185-4395-4e0a-96cf-61faf47e7635\",\"status\":\"accepted\",\"expiresAt\":\"2026-09-09T17:59:11.287Z\",\"declineReason\":null,\"mySide\":\"from\",\"fromTeam\":{\"id\":\"00620e9d-b432-4a59-98ef-68afcac31c8b\",\"name\":\"E2E 알파 A팀\"},\"toTeam\":{\"id\":\"ea0e4cf0-34ab-411c-ac89-5b931f25e781\",\"name\":\"E2E 알파 B팀\"}}"
+    },
+    {
+      "name": "[accepted/A] 채팅방 상태 카드 렌더",
+      "ok": true
+    },
+    {
+      "name": "[accepted/A] 입력창 열림",
+      "ok": true,
+      "detail": "메시지 입력/false"
+    },
+    {
+      "name": "[accepted/A/chat-room] 390 가로 오버플로 없음",
+      "ok": true,
+      "detail": "390/390"
+    },
+    {
+      "name": "[accepted/A/chat-list] 390 가로 오버플로 없음",
+      "ok": true,
+      "detail": "390/390"
+    },
+    {
+      "name": "[accepted/B] 채팅방 상태 카드 렌더",
+      "ok": true
+    },
+    {
+      "name": "[accepted/B] 입력창 열림",
+      "ok": true,
+      "detail": "메시지 입력/false"
+    },
+    {
+      "name": "[accepted/B/chat-room] 390 가로 오버플로 없음",
+      "ok": true,
+      "detail": "390/390"
+    },
+    {
+      "name": "[accepted/B/chat-list] 390 가로 오버플로 없음",
+      "ok": true,
+      "detail": "390/390"
+    },
+    {
+      "name": "[accepted/B/my-home] 390 가로 오버플로 없음",
+      "ok": true,
+      "detail": "390/390"
+    },
+    {
+      "name": "[accepted/B/team-detail-ops] 390 가로 오버플로 없음",
+      "ok": true,
+      "detail": "390/390"
+    },
+    {
+      "name": "7) /my/team-contacts/:id → /chat/:roomId",
+      "ok": true,
+      "detail": "https://alpha.teameet.co.kr/chat/37ea35ae-8769-4eed-8134-98dd749973cc"
+    },
+    {
+      "name": "7) /my/team-contacts → /chat?category=team_contact",
+      "ok": true,
+      "detail": "https://alpha.teameet.co.kr/chat?category=team_contact"
+    }
+  ]
+}

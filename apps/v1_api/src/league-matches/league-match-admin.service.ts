@@ -23,6 +23,7 @@ import { resolveResultStage } from './league-result-stage';
 import { resolveIsForfeit } from './league-match-forfeit.service';
 import { FixtureScheduleTemplate, FixtureTimingOptions, generateRoundRobinFixtures, resolveFixtureStartAt, resolveFixtureTimeSlots, RoundRobinFixture } from './round-robin-schedule';
 import { createLeagueFixture, leagueFixtureTitle } from './league-fixture-creation';
+import { resolveLeagueFixtureDates } from './league-fixture-dates';
 import { resolveLeagueWeekNumbers } from './league-week-number';
 import {
   AddLeagueTeamDto,
@@ -41,6 +42,57 @@ const TEAM_REMOVAL_CANCEL_REASON = '리그 참가팀에서 제외돼 자동으�
 
 const DEFAULT_TIE_BREAK_ORDER = ['points', 'goalDifference', 'goalsFor', 'headToHead'] as const;
 const DEFAULT_FIXTURE_PLACE_NAME = '장소 미정';
+
+/**
+ * 날짜를 고르지 않은 리그의 **기본 매치데이 리듬**: 시작일부터 매주 한 매치데이.
+ *
+ * Task 164 BE-2 이전엔 `resolveFixtureTimeSlots` 가 이 기본값을 스스로 갖고 있었다.
+ * 이제 그 함수는 받은 시각만 쓰므로, "timing 은 주고 날짜는 안 주는" 정상 입력에서
+ * 호출자가 이 리듬을 만들어 넘긴다.
+ */
+/**
+ * 대진 목록에서 **라운드 수**를 되찾는다.
+ *
+ * `weeklyMatchdayStartAts` 는 라운드 수를 받아 `ceil(라운드/G)` 개의 매치데이를 만드는데,
+ * 여기 넘기던 값이 `schedule.length`(=**경기 수**)였다. 4팀 1레그면 라운드 3 · 경기 6 이라
+ * 매치데이가 두 배로 만들어진다. 오늘은 결과가 같다 — 날짜가 `시작일 + index*1주` 로
+ * **인덱스만 보고** 정해지고, 쓰는 인덱스는 `ceil(round/G)-1` 까지뿐이라 뒤쪽 여분이 그냥
+ * 안 쓰이기 때문이다(실측: 배열 6 vs 3, 슬롯 결과 동일). 즉 우연히 무해했다.
+ *
+ * 그래도 고치는 이유는 **양이 틀린 인자는 그 함수가 길이 말고 다른 것에 쓰기 시작하는 순간
+ * 조용히 깨지기 때문**이다. 날짜 목록 경로(`matchdayStartAts`)는 이미 매치데이 수로 검증되고
+ * 있어(`LEAGUE_SCHEDULE_SLOTS_INSUFFICIENT`), 폴백만 다른 단위를 쓰고 있었다.
+ */
+/**
+ * 매치데이 시작 시각을 감사 로그용 **KST 날짜·시각**으로 되돌린다.
+ *
+ * 이 파일은 이미 "감사 로그는 요청 원문이 아니라 실제 결과와 일치해야 한다" 를 지키고
+ * 있다(`placeName`·`timing` 이 폴백·기본값까지 채운 값을 남긴다). `schedule` 만 `dto` 원문을
+ * 그대로 남기고 있었다 — 중복 제거·정렬·필요 개수만 자르기를 거친 **실제로 쓰인 날짜**와
+ * 다를 수 있다(Copilot 리뷰 지적). 운영자가 7개를 고르고 3개만 쓰였을 때 로그만 보면
+ * 어느 3개인지 알 수 없다.
+ */
+function toKstScheduleLog(startAts: readonly Date[]): { dates: string[]; time: string } | null {
+  if (startAts.length === 0) return null;
+  const parts = (at: Date) =>
+    new Intl.DateTimeFormat('sv-SE', {
+      timeZone: 'Asia/Seoul',
+      dateStyle: 'short',
+      timeStyle: 'short',
+    })
+      .format(at)
+      .split(' ');
+  return { dates: startAts.map((at) => parts(at)[0]), time: parts(startAts[0])[1] };
+}
+
+function totalRoundsOf(schedule: readonly RoundRobinFixture[]): number {
+  return schedule.reduce((max, fixture) => (fixture.round > max ? fixture.round : max), 0);
+}
+
+function weeklyMatchdayStartAts(leagueStartsOn: Date, totalRounds: number, timing: FixtureTimingOptions): Date[] {
+  const matchdayCount = Math.ceil(totalRounds / timing.gamesPerTeamPerDay);
+  return Array.from({ length: matchdayCount }, (_, index) => resolveFixtureStartAt(leagueStartsOn, index + 1));
+}
 
 // 총 라운드(주차 수 × 팀당 하루 경기 수) 상한. timing 없던 시절의 사실상 상한(weeksCount
 // Max 52)의 2배 — 대형 리그의 트랜잭션(팀 수 × 라운드 수만큼 팀매치·게임·참가자 행 생성,
@@ -281,6 +333,48 @@ export class LeagueMatchAdminService {
     return { totalRounds, timing };
   }
 
+  /**
+   * 날짜 목록을 **매치데이 시작 시각**으로 푼다. generate·preview·regenerate 가 공유한다.
+   *
+   * ⚠️ 필요한 날짜 수는 **라운드 수가 아니라 매치데이 수**다. "한 구장 순차 진행"(timing)이
+   * 팀당 하루 G경기를 넣으면 라운드 G개가 하루에 들어가므로, 6라운드·G=3 이면 날짜는 2개면
+   * 된다. 라운드 수로 요구하면 멀쩡한 입력을 거부한다.
+   */
+  private resolveScheduleStartAts(
+    dto: GenerateLeagueFixturesDto,
+    totalRounds: number,
+    timing: FixtureTimingOptions | undefined,
+  ): Date[] | undefined {
+    const matchdayCount = Math.ceil(totalRounds / (timing?.gamesPerTeamPerDay ?? 1));
+    if (dto.schedule === undefined) {
+      // 날짜를 안 고르면 **옛 기본 리듬**을 그대로 쓴다: 시작일부터 매주 한 매치데이.
+      // timing 만 주고 날짜를 안 주는 것도 정상 입력이라(하루 안의 간격만 바꾸는 경우)
+      // 여기서 매치데이 시작을 만들어 줘야 슬롯 계산이 계속 동작한다.
+      return undefined;
+    }
+    const resolved = resolveLeagueFixtureDates(dto.schedule, matchdayCount, new Date());
+    if (resolved.ok) return resolved.startAts;
+    if (resolved.error.kind === 'invalid') {
+      throw new UnprocessableEntityException({
+        code: 'LEAGUE_SCHEDULE_DATE_INVALID',
+        message: '달력에 없는 날짜가 있어요.',
+        details: { dates: resolved.error.dates },
+      });
+    }
+    if (resolved.error.kind === 'past') {
+      throw new UnprocessableEntityException({
+        code: 'LEAGUE_SCHEDULE_DATE_PAST',
+        message: '이미 지난 날짜가 있어요.',
+        details: { dates: resolved.error.dates },
+      });
+    }
+    throw new UnprocessableEntityException({
+      code: 'LEAGUE_SCHEDULE_SLOTS_INSUFFICIENT',
+      message: `경기 날짜가 모자라요. ${resolved.error.required}개가 필요한데 ${resolved.error.provided}개예요.`,
+      details: { required: resolved.error.required, provided: resolved.error.provided },
+    });
+  }
+
   async generateFixtures(user: V1AuthUser, leagueId: string, dto: GenerateLeagueFixturesDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const league = await this.loadLeague(leagueId);
@@ -297,6 +391,8 @@ export class LeagueMatchAdminService {
     const teamIds = league.teams.map((entry) => entry.teamId);
     const { totalRounds, timing } = this.resolveFixturePlan(dto);
     const schedule = generateRoundRobinFixtures(teamIds, totalRounds);
+    // 날짜 검증은 **트랜잭션 밖**에서 한다 — 도메인 거부가 락을 잡을 이유가 없다.
+    const matchdayStartAts = this.resolveScheduleStartAts(dto, totalRounds, timing);
 
     const createdIds = await this.prisma.$transaction(async (tx) => {
       // 락은 신 테이블(v1_leagues)에 건다. 재명명 때 Prisma 델리게이트만 바꾸고 이 raw SQL
@@ -320,7 +416,7 @@ export class LeagueMatchAdminService {
         competitionConfigId: config.id,
         teamsById,
         schedule,
-        scheduleTemplate: dto.schedule,
+        matchdayStartAts,
         placeNameInput: dto.placeName,
         timing,
       });
@@ -345,7 +441,7 @@ export class LeagueMatchAdminService {
           afterJson: {
             teamMatchIds: ids,
             weeksCount: dto.weeksCount,
-            schedule: dto.schedule ? { dayOfWeek: dto.schedule.dayOfWeek, time: dto.schedule.time } : null,
+            schedule: toKstScheduleLog(matchdayStartAts ?? []),
             // dto.placeName이 아니라 trim+기본값 폴백을 거쳐 실제로 저장된 placeName을 남긴다 —
             // 감사 로그가 요청 원문이 아니라 실제 결과와 일치해야 디버깅 시 혼선이 없다.
             placeName,
@@ -658,7 +754,10 @@ export class LeagueMatchAdminService {
     }
     const { totalRounds, timing } = this.resolveFixturePlan(dto);
     const schedule = generateRoundRobinFixtures(teamIds, totalRounds);
-    const slots = timing ? resolveFixtureTimeSlots(schedule, league.startsOn, timing, dto.schedule) : undefined;
+    const matchdayStartAts = this.resolveScheduleStartAts(dto, totalRounds, timing);
+    const slots = timing
+      ? resolveFixtureTimeSlots(schedule, matchdayStartAts ?? weeklyMatchdayStartAts(league.startsOn, totalRounds, timing), timing)
+      : undefined;
     const trimmedPlaceName = dto.placeName?.trim();
     const placeName = trimmedPlaceName ? trimmedPlaceName : DEFAULT_FIXTURE_PLACE_NAME;
 
@@ -681,7 +780,10 @@ export class LeagueMatchAdminService {
         orderInDay: slots !== undefined ? slots[index].orderInDay : null,
         homeTeamId: fixture.homeTeamId,
         awayTeamId: fixture.awayTeamId,
-        startAt: slots !== undefined ? slots[index].startAt : resolveFixtureStartAt(league.startsOn, fixture.round, dto.schedule),
+        startAt:
+          slots !== undefined
+            ? slots[index].startAt
+            : (matchdayStartAts?.[fixture.round - 1] ?? resolveFixtureStartAt(league.startsOn, fixture.round)),
         endAt: slots !== undefined ? slots[index].endAt : null,
       })),
       warnings: buildOddTeamCountWarning(teamIds.length),
@@ -788,6 +890,7 @@ export class LeagueMatchAdminService {
     }
     const teamIds = league.teams.map((entry) => entry.teamId);
     const { totalRounds, timing } = this.resolveFixturePlan(dto);
+    const matchdayStartAts = this.resolveScheduleStartAts(dto, totalRounds, timing);
     const schedule = generateRoundRobinFixtures(teamIds, totalRounds);
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -846,7 +949,7 @@ export class LeagueMatchAdminService {
         competitionConfigId: config.id,
         teamsById,
         schedule,
-        scheduleTemplate: dto.schedule,
+        matchdayStartAts,
         placeNameInput: dto.placeName,
         timing,
       });
@@ -1235,7 +1338,8 @@ export class LeagueMatchAdminService {
         }
       >;
       schedule: RoundRobinFixture[];
-      scheduleTemplate?: FixtureScheduleTemplate;
+      /** 매치데이 1..N 의 시작 시각(운영자가 고른 날짜 목록에서 푼 것). 미지정이면 주간 폴백. */
+      matchdayStartAts?: readonly Date[];
       placeNameInput?: string;
       timing?: FixtureTimingOptions;
     },
@@ -1262,12 +1366,22 @@ export class LeagueMatchAdminService {
     // 그대로 미리 계산한다 — preview(previewFixtures)와 같은 함수를 쓰므로 미리보기에서 본
     // 시각이 그대로 저장된다.
     const slots = input.timing
-      ? resolveFixtureTimeSlots(input.schedule, input.leagueStartsOn, input.timing, input.scheduleTemplate)
+      ? resolveFixtureTimeSlots(
+          input.schedule,
+          input.matchdayStartAts ??
+            weeklyMatchdayStartAts(input.leagueStartsOn, totalRoundsOf(input.schedule), input.timing),
+          input.timing,
+        )
       : undefined;
     const ids: string[] = [];
     for (const [index, { round, home, away }] of pairings.entries()) {
       const slot = slots?.[index];
-      const startAt = slot !== undefined ? slot.startAt : resolveFixtureStartAt(input.leagueStartsOn, round, input.scheduleTemplate);
+      // 날짜 목록이 있으면 라운드 순서대로 그 날짜를 쓰고, 없으면 옛 주간 폴백
+      // (schedule 미지정 = "시작일부터 매주" — 그 동작은 그대로 둔다).
+      const startAt =
+        slot !== undefined
+          ? slot.startAt
+          : (input.matchdayStartAts?.[round - 1] ?? resolveFixtureStartAt(input.leagueStartsOn, round));
       ids.push(
         await createLeagueFixture(tx, this.games, {
           leagueId: input.leagueId,

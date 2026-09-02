@@ -391,7 +391,7 @@ describe('ChatListPageClient — 팀컨택 필터·배지', () => {
     expect(screen.getAllByText('수락됨').length).toBeGreaterThan(0);
   });
 
-  it('?category=team_contact 로 열면 팀컨택 필터가 선택돼 있다', () => {
+  it('?category=team_contact 로 열면 팀컨택 필터가 선택돼 있고, 목록은 서버 roomType 필터로 받는다', () => {
     navigation.search = 'category=team_contact';
     hooks.chatRooms.mockReturnValue({ data: { items: [contactRoom('accepted', 'to')] }, isPending: false, isError: false, refetch: vi.fn() });
 
@@ -401,5 +401,8 @@ describe('ChatListPageClient — 팀컨택 필터·배지', () => {
     expect(chips[0]).toHaveAttribute('aria-pressed', 'true');
     const allChips = screen.getAllByRole('button', { name: /^전체 / });
     expect(allChips[0]).toHaveAttribute('aria-pressed', 'false');
+    // 첫 페이지를 클라이언트에서 거르지 않는다 — 서버에 roomType 필터와 최대 페이지를 요청해야 한다.
+    expect(hooks.chatRooms).toHaveBeenCalledWith({ enabled: true }, { roomType: 'team_contact', limit: 50 });
+    expect(hooks.chatRooms).toHaveBeenCalledWith(undefined, { limit: 50 });
   });
 });

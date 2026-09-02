@@ -73,7 +73,8 @@ function useChatListPageModel(): ChatListViewModel {
     // onToggleMute: () => updateMe.mutate({ roomId: room.id, mutedUntil: room.muted ? null : mutedUntilIndefinite() }),
   });
   const rooms = baseRooms.map(withActions);
-  // 필터 응답이 아직 없으면(첫 로딩) 전체 목록을 클라이언트에서 걸러 보여 주고, 도착하면 서버 결과로 바꾼다.
+  // 서버 필터 응답이 아직 없거나(첫 로딩) 실패했으면 전체 목록을 클라이언트에서 걸러 보여 주고,
+  // 도착하면 서버 결과로 바꾼다 — 카테고리를 고를 때 목록이 스켈레톤으로 비지 않게 한다.
   const visibleRooms =
     selectedCategory === '전체'
       ? rooms
@@ -85,13 +86,19 @@ function useChatListPageModel(): ChatListViewModel {
   const model: ChatListViewModel = {
     categories: categories.map((category) => ({
       label: category,
-      count: category === '전체' ? rooms.length : rooms.filter((room) => room.type === category).length,
+      // 선택된 카테고리는 서버 필터 결과로 센다 — 첫 50개 밖의 방도 목록과 같은 기준으로 잡힌다.
+      count:
+        category === '전체'
+          ? rooms.length
+          : category === selectedCategory && categoryRooms
+            ? categoryRooms.length
+            : rooms.filter((room) => room.type === category).length,
       active: selectedCategory === category,
       onSelect: () => setSelectedCategory(category),
     })),
     pinnedRooms: visibleRooms.filter((room) => room.pinned),
     rooms: visibleRooms.filter((room) => !room.pinned),
-    status: query.isPending || (selectedCategory !== '전체' && filteredQuery.isPending) ? 'loading' : query.isError ? 'error' : 'ready',
+    status: query.isPending ? 'loading' : query.isError ? 'error' : 'ready',
     emptyTitle: query.isError ? '채팅방을 불러오지 못했어요' : isEmpty ? `${selectedCategory} 채팅방이 없어요` : undefined,
     emptyBody: query.isError ? '잠시 후 다시 시도해 주세요.' : isEmpty ? '매치에 참가하거나 팀에 가입하면 채팅방이 생겨요.' : undefined,
     emptyHref: query.isError || selectedCategory === '팀' || selectedCategory === '팀컨택' ? undefined : '/matches',

@@ -1216,10 +1216,16 @@ export const v1MswHandlers = [
       revision: v1TeamMatchLineupFixture.revision + 1,
       version: v1TeamMatchLineupFixture.version + 1,
       formation: body.formation ?? null,
-      // 서버(`rosterOf`)와 같은 규칙: `participants` 가 오면 그것이 명단이고, 없을 때만
-      // 옛 `starters`+`bench` 를 합친다. 응답은 아직 `starters`/`bench` 모양이라
-      // 전원을 `starters` 에 싣고 `bench` 는 비운다(#978 이후의 실제 서버 동작).
-      starters: (body.participants ?? [...(body.starters ?? []), ...(body.bench ?? [])]).map((participant, index) => ({
+      // 서버(`rosterOf`)와 **같은 규칙**: `participants` 가 **비어 있지 않을 때만** 그것이
+      // 명단이고, 그 밖에는 옛 `starters`+`bench` 를 합친다. `??` 로 쓰면 빈 배열에서
+      // 갈린다 — 서버는 `length > 0` 을 보므로 `participants: []` 를 받으면 레거시 두
+      // 배열로 넘어가는데, mock 만 빈 명단을 만들어 화면 테스트가 서버와 다른 것을 본다.
+      // 응답은 아직 `starters`/`bench` 모양이라 전원을 `starters` 에 싣고 `bench` 는
+      // 비운다(#978 이후의 실제 서버 동작).
+      starters: (body.participants?.length
+        ? body.participants
+        : [...(body.starters ?? []), ...(body.bench ?? [])]
+      ).map((participant, index) => ({
         id: participant.userId ?? `guest-participant-${index + 1}`,
         displayName: participant.displayName ?? '이름 미확인',
         jerseyNumber: participant.jerseyNumber ?? null,

@@ -65,6 +65,54 @@ describe('useNavigationIntent — 탭으로 분류되는 클릭', () => {
   });
 });
 
+describe("useNavigationIntent — 'search' 분류(FS-1: pathname 동일·search 만 다른 이동)", () => {
+  // 필터 시트(칩 선택·열기/닫기)가 만드는 링크가 정확히 이 모양이다 — pathname 은
+  // 그대로고 쿼리스트링만 바뀐다. 이걸 'push'로 두면 필터 시트 자체 애니메이션 위에
+  // 페이지 전체 슬라이드+페이드가 겹쳐 재생된다(alpha 실측, FS-1).
+  it('탭 컨테이너 밖에서 pathname 동일·search 만 바뀌면 search 다', () => {
+    const onIntent = vi.fn();
+    render(<Harness onIntent={onIntent} />);
+    window.history.replaceState(null, '', '/tournaments?status=upcoming');
+
+    clickAnchor('<div><a href="/tournaments?status=ended">종료</a></div>', '/tournaments?status=ended');
+
+    expect(onIntent).toHaveBeenCalledWith('search');
+  });
+
+  it('쿼리 전체가 사라지는 이동(닫기)도 search 다', () => {
+    const onIntent = vi.fn();
+    render(<Harness onIntent={onIntent} />);
+    window.history.replaceState(null, '', '/tournaments?status=upcoming');
+
+    clickAnchor('<div><a href="/tournaments">닫기</a></div>', '/tournaments');
+
+    expect(onIntent).toHaveBeenCalledWith('search');
+  });
+
+  it('세부 탭(.tm-segmented-tabs) 안이면 pathname 동일·search 만 바뀌어도 여전히 tab — search 재분류가 tab 을 삼키지 않는다', () => {
+    // 이 케이스가 재분류 순서(반드시 tab 판별 뒤)의 핵심 회귀 방지 테스트다 — 재분류를
+    // tab 판별보다 앞에 두면 이 테스트가 깨진다(실제로 초안에서 한 번 이렇게 깨졌다).
+    const onIntent = vi.fn();
+    render(<Harness onIntent={onIntent} />);
+    window.history.replaceState(null, '', '/home');
+
+    clickAnchor('<nav class="tm-segmented-tabs"><a class="tm-segmented-tab" href="/home?kind=league">리그</a></nav>', '/home?kind=league');
+
+    expect(onIntent).toHaveBeenCalledWith('tab');
+    expect(onIntent).not.toHaveBeenCalledWith('search');
+  });
+
+  it('pathname 이 달라지는 이동은 search 만이 함께 바뀌어도 그대로 push 다', () => {
+    const onIntent = vi.fn();
+    render(<Harness onIntent={onIntent} />);
+    window.history.replaceState(null, '', '/tournaments');
+
+    clickAnchor('<div><a href="/tournaments/123?tab=bracket">대회 상세</a></div>', '/tournaments/123?tab=bracket');
+
+    expect(onIntent).toHaveBeenCalledWith('push');
+  });
+});
+
 describe('useNavigationIntent — popstate 는 셸에 따라 갈린다', () => {
   afterEach(() => { delete document.documentElement.dataset.teameetNativeApp; });
 

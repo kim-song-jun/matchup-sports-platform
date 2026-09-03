@@ -120,4 +120,98 @@ describe('data-nav-kind 선택자 형태 — 형태가 틀리면 조용히 발�
     expect(onSelf).toEqual([]);
     expect(rulesOnly).toMatch(/:root\[data-nav-kind=["']tab["']\]\s+\.tm-page-transition-enter/);
   });
+
+  it('push/pop 의 UA root leak 억제는 이름 없는 root 만 겨냥한다(와일드카드 금지 — F1)', () => {
+    // tab/native/search 는 (*) 와일드카드로 콘텐츠(page-content)까지 함께 죽이는 것이
+    // 의도(탭은 페이지가 아니다)지만, push/pop 은 콘텐츠 슬라이드+페이드를 우리가 직접
+    // 그린다 — 여기 (*) 를 쓰면 attribute 셀렉터의 specificity 가 이름-특정 규칙을 이겨
+    // push/pop 고유의 전환 자체가 사라진다(적대 검증에서 확인된 회귀). 'root' 이름만
+    // 명시적으로 좁혀야 한다.
+    for (const kind of ['push', 'pop']) {
+      for (const part of ['old(root)', 'new(root)', 'group(root)']) {
+        expect(rulesOnly).toContain(`:root[data-nav-kind="${kind}"]::view-transition-${part}`);
+      }
+      // 이 kind 에 대해서는 (*) 형태가 단 하나도 있으면 안 된다 — 있으면 회귀.
+      const wildcard = rulesOnly.match(
+        new RegExp(`:root\\[data-nav-kind="${kind}"\\]::view-transition-(old|new|group)\\(\\*\\)`, 'g'),
+      ) ?? [];
+      expect(wildcard).toEqual([]);
+    }
+  });
+
+  it("'search'(검색파라미터만 바뀌는 이동, FS-1)도 tab/native 와 같은 범위로 끈다", () => {
+    // VT 경로(old/new/group 전부)와 CSS 폴백 경로 양쪽에 search 가 있어야 한다 —
+    // 필터 시트 자체 애니메이션 위에 페이지 슬라이드+페이드가 겹치는 것을 막는다.
+    for (const part of ['old(*)', 'new(*)', 'group(*)']) {
+      expect(rulesOnly).toMatch(
+        new RegExp(`:root\\[data-nav-kind=["']search["']\\]::view-transition-${part.replace('(*)', '\\(\\*\\)')}`),
+      );
+    }
+    expect(rulesOnly).toMatch(/:root\[data-nav-kind=["']search["']\]\s+\.tm-page-transition-enter/);
+  });
+});
+
+describe('데스크톱(≥1024px) push/pop 은 슬라이드 없이 페이드 전용(D0안 B)', () => {
+  const rulesOnly = globalsCss.replace(/\/\*[\s\S]*?\*\//g, '');
+
+  it('VT 경로: --tm-slide-offset 을 push/pop(old/new) 양쪽에서 0으로 덮어쓴다', () => {
+    // globals.css 에는 nav-kind 와 무관한 `@media (min-width: 1024px)` 블록이 이미 여러 개
+    // 있다(레이아웃 등) — 파일 전체를 뒤지는 느슨한 정규식은 그 무관한 블록의 `{`부터
+    // 시작해 수백 줄 뒤의 `--tm-slide-offset: 0;`까지 lazy 하게 이어붙여 "매칭됐다"고
+    // 오판할 수 있다(이 미디어 쿼리 자체를 지워도 통과하는 vacuous 테스트가 된다). 그래서
+    // 이 선택자 4개가 **연속으로 붙어** `--tm-slide-offset: 0;` 앞에 오는지, 그리고 그
+    // 묶음이 `@media (min-width: 1024px) {` 로 시작하는지를 하나의 좁은 블록으로 검증한다.
+    const idx = rulesOnly.indexOf(
+      ':root[data-nav-kind="push"],\n  :root[data-nav-kind="push"]::view-transition-new(page-content),\n  :root[data-nav-kind="pop"],\n  :root[data-nav-kind="pop"]::view-transition-new(page-content) {\n    --tm-slide-offset: 0;',
+    );
+
+    expect(idx).toBeGreaterThan(-1);
+    const preceding = rulesOnly.slice(Math.max(0, idx - 80), idx);
+    expect(preceding).toMatch(/@media \(min-width:\s*1024px\)\s*\{\s*$/);
+  });
+
+  it('모바일(<1024px) 규칙(기본 --tm-slide-offset 값)은 그대로 남아 있다 — 미디어 쿼리 밖', () => {
+    // 데스크톱 override 를 추가하면서 모바일 기본값 자체를 지우면 안 된다.
+    expect(rulesOnly).toMatch(/:root\[data-nav-kind="push"\]\s*\{\s*--tm-slide-offset:\s*-24%;/);
+    expect(rulesOnly).toMatch(/:root\[data-nav-kind="pop"\]\s*\{\s*--tm-slide-offset:\s*100%;/);
+  });
+
+  it('CSS 폴백(VT 미지원) 경로도 같은 폭에서 translateX 0 이 되도록 --tm-fallback-slide-offset 을 덮어쓴다', () => {
+    // 폴백 keyframe 자체가 커스텀 프로퍼티를 참조하지 않으면(하드코딩 24px) 데스크톱에서
+    // 절대 0 이 될 수 없다 — 두 가지를 모두 본다.
+    expect(rulesOnly).toMatch(/@keyframes tm-page-fallback-push[\s\S]*?translateX\(var\(--tm-fallback-slide-offset,\s*24px\)\)/);
+    expect(rulesOnly).toMatch(/@keyframes tm-page-fallback-pop[\s\S]*?translateX\(var\(--tm-fallback-slide-offset,\s*-24px\)\)/);
+
+    // 이 override 는 반드시 VT 미지원 게이트(@supports not) **안**에 있어야 한다 — 밖에
+    // 있으면 무해하지만, 안에 있어야 이 값이 실제로 쓰이는 곳과 같은 조건부 블록임이
+    // 코드로 드러난다.
+    const fallbackGate = rulesOnly.match(/@supports\s+not\s*\(view-transition-name:[^)]*\)\s*\{[\s\S]*?\n\}/);
+    expect(fallbackGate).not.toBeNull();
+    expect(fallbackGate![0]).toMatch(/--tm-fallback-slide-offset:\s*0px;/);
+  });
+});
+
+describe('push/pop 콘텐츠 이중 페이드 억제(D2안 B, 그룹2/F2) — VT 지원 브라우저 한정', () => {
+  const rulesOnly = globalsCss.replace(/\/\*[\s\S]*?\*\//g, '');
+
+  it('VT 를 지원하는 브라우저에서만 .tm-content-enter 를 push/pop 에서 끈다', () => {
+    // "@supports (view-transition-name: none)" — "not" 없는 형태만 잡는다. "not" 이
+    // 있는 폴백 게이트와 혼동하면 이 테스트가 반대 걸 검증하게 된다.
+    const positiveGate = rulesOnly.match(/@supports\s*\(view-transition-name:[^)]*\)\s*\{[\s\S]*?\n\}/);
+
+    expect(positiveGate).not.toBeNull();
+    const body = positiveGate![0];
+    expect(body).toContain(':root[data-nav-kind="push"] .tm-content-enter');
+    expect(body).toContain(':root[data-nav-kind="pop"] .tm-content-enter');
+    expect(body).toMatch(/animation:\s*none;/);
+  });
+
+  it('VT 미지원 폴백 경로(@supports not)에서는 .tm-content-enter 를 절대 건드리지 않는다', () => {
+    // 폴백에서 .tm-content-enter 가 유일한 진입 페이드다 — 여기서 꺼지면 콘텐츠가
+    // 아예 페이드 없이 나타난다(이 저장소가 이미 겪은 사고의 반대 방향 재현).
+    const fallbackGate = rulesOnly.match(/@supports\s+not\s*\(view-transition-name:[^)]*\)\s*\{[\s\S]*?\n\}/);
+
+    expect(fallbackGate).not.toBeNull();
+    expect(fallbackGate![0]).not.toContain('.tm-content-enter');
+  });
 });

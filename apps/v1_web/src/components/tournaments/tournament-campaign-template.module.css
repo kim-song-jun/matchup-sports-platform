@@ -191,3 +191,19 @@
 @media (prefers-reduced-motion: reduce) {
   .heroImage { animation: none; transform: none; }
 }
+
+/* push/pop 진입에서 페이지 VT(globals.css, ::view-transition-new(page-content))가 이미
+   tm-page-fade 로 이 화면을 등장시킨 뒤인데, 이 800ms 정착 애니메이션(scale 1.025→1)이
+   별도로 더 돌아 "텍스트는 빨리 자리잡는데 히어로 사진만 유난히 오래(600ms+) 늘어져
+   정착하는" 체감을 만든다(그룹2/F2, alpha 실측). globals.css 의 .tm-content-enter 억제와
+   같은 게이트 -- VT 를 지원하는 브라우저에서만 끈다. iOS16/17 CSS 폴백 경로
+   (@supports not (view-transition-name: none))에서는 애초에 이 800ms 자체 정착
+   애니메이션이 유일한 히어로 등장 연출이므로 절대 건드리지 않는다.
+   :root[data-nav-kind] 는 <html> 에 붙는 전역 속성이라 :global() 로 참조해야 한다 --
+   CSS Modules 는 :global() 밖 선택자만 파일 스코프 해시를 붙인다(line 170 과 같은 패턴). */
+@supports (view-transition-name: none) {
+  :global(:root[data-nav-kind="push"]) .heroImage,
+  :global(:root[data-nav-kind="pop"]) .heroImage {
+    animation: none;
+  }
+}

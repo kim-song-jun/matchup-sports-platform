@@ -541,6 +541,47 @@ describe('TournamentRegistrationsService', () => {
     ).rejects.toMatchObject({ response: { code: 'AGREEMENTS_REQUIRED' } });
   });
 
+  it('submit: 제출 직전 유료 → 0원으로 바뀌면 계좌 안내가 없어도 통과한다 (반대 방향 TOCTOU)', async () => {
+    // 계좌 안내 검증을 **잠그기 전**에도 부르면, 그 사이 참가비가 0원이 됐을 때
+    // **잠근 뒤에는 통과할 요청을 사전 호출이 거짓으로 막는다** — 0원이면 낼 곳이 없으니
+    // 계좌가 필요 없다(Copilot 리뷰 지적).
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1Tournament.findFirst
+      // 트랜잭션 **밖**: 유료인데 계좌 정보가 비어 있다 (사전 호출이 있으면 여기서 409)
+      .mockImplementationOnce(
+        kindAwareFindFirst(
+          openTournament({
+            kind: 'regular_tournament',
+            entryFee: 120000,
+            bankName: null,
+            bankAccount: null,
+            bankHolder: null,
+          }),
+        ),
+      )
+      // 잠근 **뒤**: 그 사이 0원이 됐다 → 계좌가 필요 없다
+      .mockImplementationOnce(
+        kindAwareFindFirst(
+          openTournament({
+            kind: 'regular_tournament',
+            entryFee: 0,
+            bankName: null,
+            bankAccount: null,
+            bankHolder: null,
+          }),
+        ),
+      );
+    prisma.v1TournamentRegistration.update.mockImplementation(
+      async (args: { data: { status: string } }) => registrationRow({ status: args.data.status }),
+    );
+    prisma.v1TournamentPayment.upsert.mockResolvedValue(paymentRow());
+
+    await service.submit(manager, 'tournament-1', 'reg-1', validSubmit);
+    expect(prisma.v1TournamentRegistration.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'payment_checking' }) }),
+    );
+  });
+
   it('submit: 제출 직전 0원 → 유료로 바뀌면 입금자명을 요구한다 (TOCTOU)', async () => {
     // 가드가 **잠그기 전** 값으로 판단하면, 그 사이 운영자가 참가비를 올렸을 때
     // **가드는 건너뛰고 청구는 발생**한다 — 입금자명이 null 인 계좌이체 신청이 남고

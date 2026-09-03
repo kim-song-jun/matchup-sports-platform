@@ -272,7 +272,10 @@ export class TournamentRegistrationsService {
     // 제출 시점에 대회가 여전히 open·마감 전인지 재확인(draft 보관 중 마감됐을 수 있음).
     const tournament = await this.loadOpenTournament(tournamentId);
     this.assertTeamSportMatchesTournament(teamSportId, tournament.sportId);
-    this.assertPaymentInstructions(tournament, dto.paymentMethod);
+    // 계좌 안내 검증은 **잠근 뒤에만** 한다(아래 `lockedTournament` 기준). 여기서 한 번 더
+    // 부르면 반대 방향 TOCTOU 가 생긴다: 제출 직전에 유료 → 0원으로 바뀌면 잠근 뒤에는
+    // 통과할 요청을 **사전 호출이 거짓으로 막는다**(`entryFee <= 0` 이면 계좌가 필요 없다).
+    // 같은 이유로 정원·마감·상태·입금자명도 전부 잠근 뒤 값으로만 판단한다(Copilot 리뷰 지적).
 
 
     const result = await this.prisma.$transaction(async (tx) => {

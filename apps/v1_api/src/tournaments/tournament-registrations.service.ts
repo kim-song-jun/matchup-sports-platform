@@ -387,6 +387,12 @@ export class TournamentRegistrationsService {
           // 이미 있는 경우)에서 `status: 'paid'` 인데 `paidAt: null` 인 행이 나온다
           // (Copilot 리뷰가 잡았다. 내 첫 스펙은 `create` 만 단언해서 못 봤다).
           paidAt: settledAt,
+          // **과거 사이클의 운영자 id 를 지운다.** 결제 행을 재사용(upsert update)하면
+          // 이전 제출에서 "입금 확인" 을 누른 어드민 id 가 그대로 남고, 어드민 목록·상세
+          // 응답에 실려 나간다 — 이번 제출은 아무도 확인하지 않았는데 확인한 사람이
+          // 있는 것처럼 보인다(Copilot 리뷰 지적). `cancelledAt`·`refundedAt` 을 비우는
+          // 것과 같은 이유다: 새 사이클은 옛 사이클의 흔적을 물려받지 않는다.
+          confirmedByAdminUserId: null,
           cancelledAt: null,
           refundedAt: null,
         },

@@ -465,7 +465,7 @@ describe('TournamentRegistrationsService', () => {
       );
       const upsert = prisma.v1TournamentPayment.upsert.mock.calls[0][0] as {
         create: { status: string; paidAt: Date | null };
-        update: { status: string; paidAt: Date | null };
+        update: { status: string; paidAt: Date | null; confirmedByAdminUserId: string | null };
       };
       expect(upsert.create.status).toBe('paid');
       expect(upsert.update.status).toBe('paid');
@@ -474,6 +474,10 @@ describe('TournamentRegistrationsService', () => {
       // 못 잡고, 그 결과는 "paid 인데 결제 시각이 null" 이다(Copilot 리뷰 지적).
       expect(upsert.create.paidAt).toBeInstanceOf(Date);
       expect(upsert.update.paidAt).toBeInstanceOf(Date);
+      // **과거 사이클의 운영자 id 를 물려받지 않는다.** 결제 행을 재사용하면 이전 제출에서
+      // "입금 확인" 을 누른 어드민 id 가 남아 어드민 응답에 실린다 — 이번 제출은 아무도
+      // 확인하지 않았는데 확인한 사람이 있는 것처럼 보인다.
+      expect(upsert.update.confirmedByAdminUserId).toBeNull();
     });
 
     it('유료: 지금까지처럼 awaiting_payment 로 간다 — 리그 편의가 대회 회귀가 되면 안 된다', async () => {
@@ -485,10 +489,11 @@ describe('TournamentRegistrationsService', () => {
       );
       const upsert = prisma.v1TournamentPayment.upsert.mock.calls[0][0] as {
         create: { status: string; paidAt: Date | null };
-        update: { status: string; paidAt: Date | null };
+        update: { status: string; paidAt: Date | null; confirmedByAdminUserId: string | null };
       };
       expect(upsert.create.status).toBe('ready');
       expect(upsert.update.status).toBe('ready');
+      expect(upsert.update.confirmedByAdminUserId).toBeNull();
       // 낸 적 없는 돈에 결제 시각이 찍히면 정산·환불이 그것을 근거로 삼는다. 양쪽 다 본다.
       // `null` 이다(미설정이 아니라 **명시적으로 비움**) — 재제출에서 옛 결제의 시각이
       // 남아 있으면 안 되기 때문이다.

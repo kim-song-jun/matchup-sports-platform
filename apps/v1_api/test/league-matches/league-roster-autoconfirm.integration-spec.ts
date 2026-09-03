@@ -360,10 +360,18 @@ describe('D10 리그 명단 자동 확정', () => {
     expect(types).toContain(LEAGUE_ROSTER_REMINDER_TYPE);
   });
 
-  it.each(['completed', 'cancelled'] as const)('끝난 리그(%s)는 명단을 채우지 않는다', async (status) => {
+  it.each(['completed', 'cancelled'] as const)(
+    '끝난 리그(%s)는 명단을 채우지 않고 **알림도 보내지 않는다**',
+    async (status) => {
     // 예약(생성 시점)과 실행(시즌 시작) 사이에 리그가 끝날 수 있다. 그때 선수 row 를 새로
     // 세우면 이미 끝난 대회의 기록이 바뀐다.
-    const { league, registration, startsOn } = await seedLeague({ members: 3 });
+    const { league, registration, startsOn, team } = await seedLeague({ members: 3 });
+    // **알림 0건 단언이 무의미해지지 않도록 팀장을 심는다.** notify 는 owner/manager
+    // 멤버십을 받는 사람에게만 보내므로, 그 행이 없으면 어떤 동작에서도 0건이라 이 단언이
+    // 아무것도 못 잡는다(변이로 확인했다 — 팀장 없이는 옛 동작에서도 green 이었다).
+    await prisma.v1TeamMembership.create({
+      data: { teamId: team.id, userId: adminUserId, role: 'owner', status: 'active', joinedAt: new Date() },
+    });
     await prisma.v1Tournament.update({ where: { id: league.id }, data: { status } });
 
     await run(league.id, startsOn);
@@ -374,7 +382,16 @@ describe('D10 리그 명단 자동 확정', () => {
       SELECT roster_auto_confirmed_at AS at FROM v1_tournament_registrations WHERE id = ${registration.id}
     `;
     expect(row.at).toBeNull();
-  });
+
+    // 팀장이 잘못한 것도, 할 수 있는 일도 없다 — 알림을 보내면 안 된다. 예전엔 이
+    // 케이스가 `skipped: [{ userId: '-' }]` 센티널로 흘러 "팀원 1명이 제외됐어요" 로
+    // 잘못 통보됐다.
+      const notifications = await prisma.v1Notification.findMany({
+        where: { businessKey: { startsWith: `league-roster-autoconfirm:${registration.id}:` } },
+      });
+      expect(notifications).toHaveLength(0);
+    },
+  );
 
   it('아직 신청을 연 적 없는 draft 리그는 그대로 채운다 — 그게 가장 흔한 경로다', async () => {
     // `isRosterMutableTournamentStatus`(open·closed·in_progress)를 그대로 쓰면 이 케이스가

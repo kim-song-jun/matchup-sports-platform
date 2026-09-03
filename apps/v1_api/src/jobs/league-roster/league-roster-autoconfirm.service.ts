@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { Logger } from '@nestjs/common';
 import { Prisma, V1TournamentStatus } from '@prisma/client';
 import type { GameOperationHandler } from '../v1-game-operations-worker.service';
 import {
@@ -104,6 +105,13 @@ export async function scheduleLeagueRosterAutoConfirm(
 }
 
 interface AutoConfirmOutcome {
+  /**
+   * 이 팀에 무슨 일이 있었나. **`skipped` 배열로 대신 표현하지 않는다** — 예전에는
+   * "대회가 끝나서 아무것도 안 했다" 를 `skipped: [{ userId: '-' }]` 센티널로 담았는데,
+   * 알림이 그걸 **"팀원 1명이 제외됐다"** 로 집계해 팀장에게 거짓 문구를 보냈다.
+   * 사람이 제외된 것과 팀 전체가 대상이 아닌 것은 다른 사건이라 종류로 가른다.
+   */
+  readonly kind: 'filled' | 'skipped_terminal' | 'no_eligible';
   readonly registrationId: string;
   readonly teamId: string;
   readonly added: number;
@@ -128,6 +136,8 @@ interface AutoConfirmOutcome {
  * 없는 상태가 되고, 운영자는 그 사실을 알 방법이 없다.
  */
 export class LeagueRosterAutoConfirmService {
+  private readonly logger = new Logger(LeagueRosterAutoConfirmService.name);
+
   readonly handler: GameOperationHandler = async (claim, tx) => {
     if (!isLeagueRosterAutoConfirmEnabled()) return;
     const { leagueId, expectedStartsOn } = this.payload(claim.payload);
@@ -235,11 +245,17 @@ export class LeagueRosterAutoConfirmService {
       tournament.status !== V1TournamentStatus.completed &&
       tournament.status !== V1TournamentStatus.cancelled;
     if (!tournamentMutable) {
+      // 알림을 보내지 않는다(아래 notify 가 이 kind 를 거른다). 팀장이 잘못한 것이 없고
+      // 할 수 있는 일도 없다 — 사유는 로그에만 남긴다.
+      this.logger.warn(
+        `league-roster-autoconfirm: 리그 ${leagueId} 상태 ${tournament.status} — 등록 ${registration.id} 건너뜀`,
+      );
       return {
+        kind: 'skipped_terminal',
         registrationId: registration.id,
         teamId: registration.teamId,
         added: 0,
-        skipped: [{ userId: '-', reason: `대회 상태 ${tournament.status} — 명단을 채우지 않았어요` }],
+        skipped: [],
       };
     }
 
@@ -299,7 +315,13 @@ export class LeagueRosterAutoConfirmService {
         WHERE id = ${registration.id} AND roster_auto_confirmed_at IS NULL
       `;
     }
-    return { registrationId: registration.id, teamId: registration.teamId, added, skipped };
+    return {
+      kind: added > 0 ? 'filled' : 'no_eligible',
+      registrationId: registration.id,
+      teamId: registration.teamId,
+      added,
+      skipped,
+    };
   }
 
   private async notify(
@@ -307,8 +329,13 @@ export class LeagueRosterAutoConfirmService {
     league: { id: string; title: string },
     outcomes: readonly AutoConfirmOutcome[],
   ): Promise<void> {
+    // 대회가 끝나 아무것도 하지 않은 팀에는 알리지 않는다 — 팀장이 잘못한 것도, 할 수 있는
+    // 일도 없다. (예전엔 이 케이스가 센티널로 섞여 들어와 "1명 제외" 로 잘못 통보됐다.)
+    const notifiable = outcomes.filter((outcome) => outcome.kind !== 'skipped_terminal');
+    if (notifiable.length === 0) return;
+
     const owners = await tx.v1TeamMembership.findMany({
-      where: { teamId: { in: outcomes.map((o) => o.teamId) }, status: 'active', role: { in: ['owner', 'manager'] } },
+      where: { teamId: { in: notifiable.map((o) => o.teamId) }, status: 'active', role: { in: ['owner', 'manager'] } },
       select: { teamId: true, userId: true },
     });
     const ownersByTeam = new Map<string, string[]>();
@@ -316,7 +343,7 @@ export class LeagueRosterAutoConfirmService {
       ownersByTeam.set(row.teamId, [...(ownersByTeam.get(row.teamId) ?? []), row.userId]);
     }
 
-    for (const outcome of outcomes) {
+    for (const outcome of notifiable) {
       const total = outcome.added + outcome.skipped.length;
       // 통보는 **성공만 말하지 않는다.** 제외된 사람이 있으면 몇 명이 왜 빠졌는지 함께
       // 준다 — 팀장이 "왜 우리 팀만 인원이 적지" 를 화면 어디에서도 알 수 없으면 안 된다.

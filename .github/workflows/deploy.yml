@@ -148,6 +148,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Android Play policy contracts
+        run: node scripts/qa/check-android-play-policy.mjs
+
       - name: V1 DB guardrails
         run: pnpm qa:v1-db-guardrails
 

@@ -591,3 +591,35 @@ report, upgrade preservation, and the remaining OEM/foldable/multi-window matrix
 - Validation: v1 web targeted Vitest 2 files / 4 tests passed; v1 web `tsc --noEmit` passed; Gradle 9.2 `testAlphaDebugUnitTest assembleAlphaDebug --no-daemon --max-workers=1` passed against API 36.
 - Device evidence: `output/task156/android-korean-popup-qa/21-ko-notification.png`, `22-ko-gps.png`, `23-ko-image-picker.png`, `24-center-popup.png`, and `25-ko-kakao-in-app.png`.
 - Residual external gate remains unchanged: authenticated real FCM delivery (foreground/background/terminated) requires an Alpha QA account/session and server event.
+
+## Play policy follow-up: items 2-6 (2026-09-03)
+
+- Scope is limited to Data safety/privacy, account deletion, permissions, WebView quality, and technical
+  release requirements. Reviewer credentials and the closed-testing cohort are excluded.
+- Withdrawal now deletes browser push subscriptions and revokes active native push devices in the same
+  transaction that locks the account. This prevents a withdrawal-pending user from continuing to receive
+  service notifications.
+- Operator final deletion additionally removes remaining push identifiers, saved regions, sport
+  preferences, search history, and verification tokens, and clears gender, date of birth, display region,
+  and profile visibility signals.
+- The public deletion explanation and API contract documents now distinguish immediate request effects,
+  final PII cleanup, and records retained for transaction, dispute, security, or legal purposes.
+- Data safety language no longer assumes that external processors always count as Play “sharing” or that
+  every uploaded object is erased instantly. Product/legal must confirm classifications and retention
+  periods against the exact submitted AAB and active processor contracts.
+- `scripts/qa/check-android-play-policy.mjs` is wired into Android Alpha, Android Production Bundle, and
+  production deployment workflows. It fails on permission, WebView, deletion, public-route, or baseline
+  release drift. AAB workflows also verify 16 KB ZIP alignment for the existing transitive native libraries.
+- RED evidence: the focused profile withdrawal test failed before implementation because no web/native
+  push cleanup was called.
+- GREEN evidence: profile/admin Jest passed 48/48; account-deletion Vitest passed 1/1; v1 API and Web
+  `tsc --noEmit` passed; the Play source gate passed with exactly INTERNET, coarse location, and
+  notification permissions and target SDK 36.
+- Gradle 9.2 passed Alpha/Production debug JVM tests and the Alpha release AAB build (97 tasks). Build-tools
+  36 `zipalign -c -P 16 -v 4` verified all four DataStore native-library ABIs successfully.
+- Headed Chromium processed the public deletion route at 390/768/1280 (3/3, zero console errors, page
+  errors, failed responses, horizontal overflow, or blockers). The mobile auth scroll region reached its
+  bottom and kept the privacy link fully visible at y=759-803 within the 844 px viewport. Evidence is under
+  `output/playwright/visual-audit/task156-play-policy-followup/`.
+- External gates remain: Play Console declarations, production URL probes after deployment, signed Play
+  distribution, pre-launch report, and the physical OEM/device notification and WebView matrix.

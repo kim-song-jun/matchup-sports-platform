@@ -258,6 +258,12 @@ describe('AdminService.deleteUser — realtime disconnect side effect', () => {
     // finding #39: 탈퇴 시 사용자 단위 공개 기록 동의도 REVOKED로 함께 전환해야
     // 공개 기록 게이트(isParticipantPubliclyEligible)가 자연히 막아준다.
     v1UserRecordConsent: { updateMany: jest.Mock };
+    v1PushSubscription: { deleteMany: jest.Mock };
+    v1PushDevice: { deleteMany: jest.Mock };
+    v1UserRegion: { deleteMany: jest.Mock };
+    v1UserSportPreference: { deleteMany: jest.Mock };
+    v1SearchHistory: { deleteMany: jest.Mock };
+    v1VerificationToken: { deleteMany: jest.Mock };
     // 계정 비활성화 시 팀 권한 검사·명단 정리가 이 모델들을 쓴다.
     v1TeamMembership: { findFirst: jest.Mock; findMany: jest.Mock; update: jest.Mock };
     v1TournamentPlayer: { findMany: jest.Mock; updateMany: jest.Mock };
@@ -281,6 +287,12 @@ describe('AdminService.deleteUser — realtime disconnect side effect', () => {
       v1AuthIdentity: { findMany: jest.fn().mockResolvedValue([]), update: jest.fn() },
       v1UserProfile: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
       v1UserRecordConsent: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      v1PushSubscription: { deleteMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      v1PushDevice: { deleteMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      v1UserRegion: { deleteMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      v1UserSportPreference: { deleteMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      v1SearchHistory: { deleteMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      v1VerificationToken: { deleteMany: jest.fn().mockResolvedValue({ count: 1 }) },
       v1TeamMembership: {
         findFirst: jest.fn().mockResolvedValue(null),
         findMany: jest.fn().mockResolvedValue([]),
@@ -301,7 +313,7 @@ describe('AdminService.deleteUser — realtime disconnect side effect', () => {
         cb: (
           tx: Pick<
             typeof p,
-            'v1AdminUser' | 'v1User' | 'v1AdminActionLog' | 'v1StatusChangeLog' | 'v1AuthIdentity' | 'v1UserProfile' | 'v1UserRecordConsent' | 'v1TeamMembership' | 'v1Team' | 'v1TournamentPlayer' | '$queryRaw'
+            'v1AdminUser' | 'v1User' | 'v1AdminActionLog' | 'v1StatusChangeLog' | 'v1AuthIdentity' | 'v1UserProfile' | 'v1UserRecordConsent' | 'v1PushSubscription' | 'v1PushDevice' | 'v1UserRegion' | 'v1UserSportPreference' | 'v1SearchHistory' | 'v1VerificationToken' | 'v1TeamMembership' | 'v1Team' | 'v1TournamentPlayer' | '$queryRaw'
           >,
         ) => Promise<unknown>,
       ) =>
@@ -313,6 +325,12 @@ describe('AdminService.deleteUser — realtime disconnect side effect', () => {
           v1AuthIdentity: p.v1AuthIdentity,
           v1UserProfile: p.v1UserProfile,
           v1UserRecordConsent: p.v1UserRecordConsent,
+          v1PushSubscription: p.v1PushSubscription,
+          v1PushDevice: p.v1PushDevice,
+          v1UserRegion: p.v1UserRegion,
+          v1UserSportPreference: p.v1UserSportPreference,
+          v1SearchHistory: p.v1SearchHistory,
+          v1VerificationToken: p.v1VerificationToken,
           v1TeamMembership: p.v1TeamMembership,
           v1Team: p.v1Team,
           v1TournamentPlayer: p.v1TournamentPlayer,
@@ -364,6 +382,50 @@ describe('AdminService.deleteUser — realtime disconnect side effect', () => {
         data: expect.objectContaining({ state: 'REVOKED' }),
       }),
     );
+  });
+
+  it('deleteUser()가 웹 구독과 Android/iOS 기기 토큰을 영구 제거한다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValueOnce(actorAdminRecord).mockResolvedValueOnce(null);
+    prisma.v1User.findUnique.mockResolvedValue(targetUser('active'));
+    prisma.v1User.update.mockResolvedValue(targetUser('deleted'));
+
+    await service.deleteUser(actorAuthUser, targetUserId, { reason: '계정 삭제 요청 처리' });
+
+    expect(prisma.v1PushSubscription.deleteMany).toHaveBeenCalledWith({
+      where: { userId: targetUserId },
+    });
+    expect(prisma.v1PushDevice.deleteMany).toHaveBeenCalledWith({
+      where: { userId: targetUserId },
+    });
+  });
+
+  it('deleteUser()가 계정 운영용 기본 PII와 개인화 데이터를 제거한다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValueOnce(actorAdminRecord).mockResolvedValueOnce(null);
+    prisma.v1User.findUnique.mockResolvedValue(targetUser('active'));
+    prisma.v1User.update.mockResolvedValue(targetUser('deleted'));
+
+    await service.deleteUser(actorAuthUser, targetUserId, { reason: '계정 삭제 요청 처리' });
+
+    expect(prisma.v1UserProfile.updateMany).toHaveBeenCalledWith({
+      where: { userId: targetUserId },
+      data: expect.objectContaining({
+        realName: null,
+        gender: null,
+        birthDate: null,
+        displayRegion: null,
+        profileImageUrl: null,
+        visibility: 'private',
+        tournamentRealNameVisible: false,
+      }),
+    });
+    for (const model of [
+      prisma.v1UserRegion,
+      prisma.v1UserSportPreference,
+      prisma.v1SearchHistory,
+      prisma.v1VerificationToken,
+    ]) {
+      expect(model.deleteMany).toHaveBeenCalledWith({ where: { userId: targetUserId } });
+    }
   });
 
   it('a realtime gateway failure during deleteUser() is swallowed with a structured warn log and does not fail the deletion', async () => {

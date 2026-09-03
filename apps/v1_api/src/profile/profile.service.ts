@@ -1141,6 +1141,16 @@ export class ProfileService {
       // 완료된 대회는 기록 보존을 위해 건드리지 않는다(roster-cleanup.ts 주석 참조).
       const removedRosterCount = await removeUserFromActiveRosters(tx, user.id, { at: withdrawnAt });
 
+      // 탈퇴 요청이 수락되는 순간 계정은 더 이상 로그인할 수 없다. 이때 브라우저
+      // 구독과 네이티브 기기를 그대로 두면 운영자가 최종 삭제를 처리하기 전까지
+      // 채팅·경기 알림이 잠긴 계정의 기기로 계속 전달될 수 있다. 웹 구독은 제거하고,
+      // Android/iOS 토큰은 감사 가능한 revoke 상태로 즉시 전환한다.
+      await tx.v1PushSubscription.deleteMany({ where: { userId: user.id } });
+      await tx.v1PushDevice.updateMany({
+        where: { userId: user.id, revokedAt: null },
+        data: { revokedAt: withdrawnAt },
+      });
+
       await tx.v1StatusChangeLog.create({
         data: {
           targetType: 'user',

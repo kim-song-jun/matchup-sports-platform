@@ -72,12 +72,22 @@ export async function scheduleLeagueRosterAutoConfirm(
   const generation = input.startsOn.toISOString();
   const payload = JSON.stringify({ leagueId: input.leagueId, expectedStartsOn: generation });
   const reminderAt = new Date(input.startsOn.getTime() - REMINDER_LEAD_MS);
+  // **이미 지난 리마인더는 예약하지 않는다.** 시작이 24시간 안 남은 리그를 만들거나
+  // 승계하면 `reminderAt` 이 과거가 되고, 아웃박스는 `available_at <= now` 를 곧바로 집어
+  // 워커가 도는 즉시 발송한다 — 그러면 "시작까지 24시간 남았어요" 라는 문구가 **거짓**이
+  // 된다(몇 분 뒤 시작하는 리그에 그렇게 알린다). 자동 확정 예약은 그대로 두므로 명단이
+  // 비어 있으면 시작 시각에 채워지는 동작은 달라지지 않는다 — 사라지는 것은 사전 예고뿐,
+  // 그리고 그건 애초에 줄 수 없었던 예고다.
   const rows: Array<{ type: string; businessKey: string; availableAt: Date }> = [
-    {
-      type: LEAGUE_ROSTER_REMINDER_TYPE,
-      businessKey: `league-roster-reminder:${input.leagueId}:${generation}`,
-      availableAt: reminderAt,
-    },
+    ...(reminderAt.getTime() <= Date.now()
+      ? []
+      : [
+          {
+            type: LEAGUE_ROSTER_REMINDER_TYPE,
+            businessKey: `league-roster-reminder:${input.leagueId}:${generation}`,
+            availableAt: reminderAt,
+          },
+        ]),
     {
       type: LEAGUE_ROSTER_AUTOCONFIRM_TYPE,
       businessKey: `league-roster-autoconfirm:${input.leagueId}:${generation}`,
@@ -191,12 +201,33 @@ export class LeagueRosterAutoConfirmService {
       },
     });
 
+    // 감사 finding #50 과 같은 규칙 — **같은 리그의 다른 팀 명단에 이미 있는 사람**은
+    // 넣지 않는다. 수동 등록 경로(`tournament-players.service.ts`)가 지키는 불변식인데,
+    // 자동 확정이 이걸 `false` 로 고정해 두면 양 팀에 동시 소속된 사용자가 **두 팀 공식
+    // 명단에 함께** 올라간다 — 그것도 사람 손을 거치지 않고 조용히.
+    //
+    // 한 번에 읽고 Set 으로 판정한다(멤버마다 쿼리하면 팀 인원수만큼 왕복한다). 이 잡은
+    // 리그의 미제출 팀들을 **순서대로** 처리하므로, 앞 팀에서 방금 넣은 사람도 이 집합에
+    // 들어와야 한다 — 그래서 `fillRoster` 호출마다 다시 읽는다.
+    const takenUserIds = new Set(
+      (
+        await tx.v1TournamentPlayer.findMany({
+          where: {
+            removedAt: null,
+            registrationId: { not: registration.id },
+            registration: { tournamentId: leagueId },
+          },
+          select: { userId: true },
+        })
+      ).flatMap((row) => (row.userId === null ? [] : [row.userId])),
+    );
+
     const skipped: Array<{ userId: string; reason: string }> = [];
     let added = 0;
     for (const member of members) {
       const block = evaluateRosterCandidate({
         alreadyOnRoster: false,
-        alreadyOnOtherTeamInTournament: false,
+        alreadyOnOtherTeamInTournament: takenUserIds.has(member.userId),
         tournamentMutable: true,
         registrationMutable: true,
         rosterCount: added,

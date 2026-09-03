@@ -3,7 +3,12 @@ import type { INestApplication } from '@nestjs/common';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { ManagedTermsRuntimeService } from '../../src/terms/managed-terms-runtime.service';
 import { createV1IntegrationApp } from '../integration/integration-app';
-import { LeagueRosterAutoConfirmService } from '../../src/jobs/league-roster/league-roster-autoconfirm.service';
+import {
+  LEAGUE_ROSTER_AUTOCONFIRM_TYPE,
+  LEAGUE_ROSTER_REMINDER_TYPE,
+  LeagueRosterAutoConfirmService,
+  scheduleLeagueRosterAutoConfirm,
+} from '../../src/jobs/league-roster/league-roster-autoconfirm.service';
 
 /**
  * D10 (Task 164 BE-4b) — 시즌 시작 자동 명단 확정.
@@ -274,6 +279,85 @@ describe('D10 리그 명단 자동 확정', () => {
     await run(league.id, startsOn);
 
     expect(await prisma.v1TournamentPlayer.count({ where: { registrationId: registration.id } })).toBe(0);
+  });
+
+  it('같은 리그의 두 팀에 동시 소속된 사용자는 한쪽 명단에만 들어간다', async () => {
+    // 감사 finding #50 과 같은 규칙 — 수동 등록은 이미 막는다. 자동 확정이 그걸 건너뛰면
+    // 한 사람이 두 팀 공식 명단에 **사람 손을 거치지 않고** 동시에 올라간다.
+    const first = await seedLeague({ members: 2 });
+    // 같은 리그에 두 번째 팀을 붙이고, 첫 팀의 멤버 한 명을 그 팀에도 넣는다.
+    seq += 1;
+    const secondTeam = await prisma.v1Team.create({
+      data: { ownerUserId: adminUserId, sportId, regionId, name: `t164-team-${suiteId}-${seq}` },
+    });
+    const [shared] = await prisma.v1TeamMembership.findMany({
+      where: { teamId: first.team.id, role: 'member' },
+      orderBy: { joinedAt: 'asc' },
+      take: 1,
+    });
+    await prisma.v1TeamMembership.create({
+      data: { teamId: secondTeam.id, userId: shared.userId, role: 'member', status: 'active', joinedAt: new Date() },
+    });
+    await makeMember(secondTeam.id, { complete: true });
+    const secondRegistration = await prisma.v1TournamentRegistration.create({
+      data: {
+        tournamentId: first.league.id,
+        teamId: secondTeam.id,
+        appliedByUserId: adminUserId,
+        status: 'confirmed',
+      },
+    });
+
+    await run(first.league.id, first.startsOn);
+
+    const firstPlayers = await prisma.v1TournamentPlayer.findMany({
+      where: { registrationId: first.registration.id },
+      select: { userId: true },
+    });
+    const secondPlayers = await prisma.v1TournamentPlayer.findMany({
+      where: { registrationId: secondRegistration.id },
+      select: { userId: true },
+    });
+    const holders = [...firstPlayers, ...secondPlayers].filter((row) => row.userId === shared.userId);
+    expect(holders).toHaveLength(1);
+    // 나머지 사람들은 그대로 들어간다 — 한 명 때문에 팀 전체가 막히면 안 된다.
+    expect(firstPlayers.length + secondPlayers.length).toBeGreaterThan(1);
+  });
+
+  it('시작이 24시간 안 남았으면 사전 리마인더를 예약하지 않는다 (자동 확정은 그대로 예약)', async () => {
+    // `reminderAt` 이 과거면 아웃박스가 `available_at <= now` 로 곧바로 집어 워커가 도는
+    // 즉시 발송한다 — "시작까지 24시간 남았어요" 가 거짓이 된다(몇 분 뒤 시작하는 리그).
+    const { league } = await seedLeague({ members: 2 });
+    const soon = new Date(Date.now() + 60 * 60 * 1_000); // 1시간 뒤 시작
+
+    await prisma.$transaction((tx) =>
+      scheduleLeagueRosterAutoConfirm(tx, { leagueId: league.id, startsOn: soon }),
+    );
+
+    const scheduled = await prisma.$queryRaw<Array<{ type: string }>>`
+      SELECT type FROM v1_outbox_events
+      WHERE aggregate_id = ${league.id} AND business_key LIKE ${`%:${soon.toISOString()}`}
+    `;
+    const types = scheduled.map((row) => row.type);
+    expect(types).toContain(LEAGUE_ROSTER_AUTOCONFIRM_TYPE);
+    expect(types).not.toContain(LEAGUE_ROSTER_REMINDER_TYPE);
+  });
+
+  it('시작이 24시간 넘게 남았으면 리마인더와 자동 확정을 둘 다 예약한다', async () => {
+    const { league } = await seedLeague({ members: 2 });
+    const later = new Date(Date.now() + 72 * 60 * 60 * 1_000);
+
+    await prisma.$transaction((tx) =>
+      scheduleLeagueRosterAutoConfirm(tx, { leagueId: league.id, startsOn: later }),
+    );
+
+    const scheduled = await prisma.$queryRaw<Array<{ type: string }>>`
+      SELECT type FROM v1_outbox_events
+      WHERE aggregate_id = ${league.id} AND business_key LIKE ${`%:${later.toISOString()}`}
+    `;
+    const types = scheduled.map((row) => row.type);
+    expect(types).toContain(LEAGUE_ROSTER_AUTOCONFIRM_TYPE);
+    expect(types).toContain(LEAGUE_ROSTER_REMINDER_TYPE);
   });
 
   it('플래그가 꺼져 있으면(기본값) 아무것도 하지 않는다', async () => {

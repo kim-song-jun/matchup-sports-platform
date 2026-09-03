@@ -5425,17 +5425,6 @@ export function useV1RegenerateLeagueFixtures(leagueId: string) {
   });
 }
 
-// U1: 운영자 결과 입력 — POST /admin/league-matches/:leagueId/fixtures/:teamMatchId/result.
-// 아직 결과가 없는(not_entered/draft/change_requested) 대진 전용 — 서버가 이미 OFFICIAL 인
-// 대진에는 409로 거부하므로 화면은 정정(useV1CorrectLeagueResult)으로 안내한다.
-
-// U1 확장(2026-08-25): 득점자 선택 목록 — GET .../fixtures/:teamMatchId/participants.
-// 모달이 열릴 때만 가져온다(enabled). 로스터는 대진 생성 시 고정되므로 staleTime을 넉넉히 둔다.
-
-// U1: 운영자 결과 정정 — POST /admin/league-matches/:leagueId/fixtures/:teamMatchId/result/correct.
-// 이미 OFFICIAL 인 대진 전용 — 요청·응답 모양은 신규 입력과 완전히 같다
-// (league-match-result-entry.dto.ts RecordLeagueResultDto가 두 경로에 공용).
-
 // D2 (E4): 어드민 이의 목록 — GET /admin/league-match-disputes?status=. status가
 // 빈 문자열/undefined 면 쿼리 파라미터 자체를 생략해 전체를 받는다(다른 어드민 목록
 // 훅들과 동일 관례).

@@ -95,11 +95,6 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
   const [forfeitFixture, setForfeitFixture] = useState<V1LeagueFixture | null>(null);
   const forfeitHostTeam = useV1AdminTeam(forfeitFixture?.homeTeamId ?? '');
   const forfeitAwayTeam = useV1AdminTeam(forfeitFixture?.awayTeamId ?? '');
-  // U1(A안 "확정 다이얼로그") — 결과 입력·정정 모달. 어느 대진을 처리 중인지만 들고,
-  // 모드(entry/correction)는 그 대진의 resultStage에서 매번 파생한다 — 별도 state로
-  // 들고 있으면 모달이 열려 있는 동안 resultStage가 바뀔 일이 없으므로 사실상 동기화
-  // 부담만 늘어난다.
-  // U1 확장: 모달이 열린 대진의 득점자 선택 목록 — 대상이 없으면(enabled=false) 요청하지 않는다.
   const [weeksCount, setWeeksCount] = useState(7);
   const [dayOfWeek, setDayOfWeek] = useState<number | ''>('');
   const [time, setTime] = useState('18:00');

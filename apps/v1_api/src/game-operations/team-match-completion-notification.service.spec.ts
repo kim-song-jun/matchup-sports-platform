@@ -1,4 +1,5 @@
 import { TeamMatchCompletionNotificationService } from './team-match-completion-notification.service';
+import { notificationCopyFor } from '../notifications/notifications.service';
 import type { OfficialRevisionRow } from './game-result-official-projection.types';
 
 function revisionFixture(overrides: Partial<OfficialRevisionRow> = {}): OfficialRevisionRow {
@@ -130,7 +131,14 @@ describe('TeamMatchCompletionNotificationService', () => {
     const data = createMany.mock.calls[0][0].data as Array<Record<string, unknown>>;
     expect(data).toHaveLength(1);
     expect(data[0].title).toBe('리그 경기 결과가 확정됐어요');
-    expect(data[0].body).toBe('"리그 3주차 A vs B" 경기 결과가 확정됐어요. 7일 안에 이의를 제기할 수 있어요.');
+    // body 는 **문구 테이블의 `defaultBody` 를 단일 소스로** 조합한다. 여기에 문자열을
+    // 복사해 두면 테이블만 고쳤을 때 이 스펙이 그 드리프트를 놓친다 — 실제로 Task 166 이
+    // 테이블에 "문의는 리그 운영자에게" 를 넣었는데 발송 경로엔 빠져 두 문구가 어긋났고,
+    // 그때 이 스펙은 통과했다(Copilot 리뷰). 이제 같은 소스를 읽어 비교한다.
+    const leagueCopy = notificationCopyFor('league_team_match_completed', 'team_match', 'tm-league-1');
+    expect(data[0].body).toBe(`"리그 3주차 A vs B" ${leagueCopy.defaultBody}`);
+    // 그 문구가 이의 안내를 다시 들이지 않았는지는 값으로 따로 본다(정본 §4).
+    expect(leagueCopy.defaultBody).not.toContain('이의');
     expect(data[0].deepLink).toBe('/team-matches/tm-league-1/result');
     // businessKey 네임스페이스는 일반 팀매치와 동일 — 팀매치 하나는 생애주기 내내
     // 리그 아니면 일반 중 하나로 고정이라 나눌 이유가 없다.

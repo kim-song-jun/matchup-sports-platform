@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import type { GameOperationHandler } from '../v1-game-operations-worker.service';
-import { LEAGUE_RESULT_AUTO_APPROVE_SYSTEM_ACTOR_ID } from '../../league-matches/league-result-dispute.constants';
+import { LEAGUE_RESULT_AUTO_APPROVE_SYSTEM_ACTOR_ID } from '../../league-matches/league-result-auto-approve.constants';
 
 type SubmittedRevisionRow = {
   revisionId: string;

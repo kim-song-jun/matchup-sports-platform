@@ -84,7 +84,7 @@ describe('GameResultVoidProjectionService.handler -- 순위표 재계산 대칭'
           sourceHash: 'hash-void-1',
           playedAt: new Date('2026-07-31T09:00:00Z'),
           officialAt: new Date('2026-08-01T00:00:00Z'),
-          reason: 'DISPUTE_UPHELD',
+          reason: 'ADMIN_VOID',
           sourceType: 'TOURNAMENT_FIXTURE',
           currentOfficialRevisionId: REVISION_ID,
           tournamentId: TOURNAMENT_ID,

@@ -28,10 +28,6 @@ import {
   createTeamMatchScheduleInTx,
   syncTeamMatchScheduleInTx,
 } from '../team-schedules/team-schedules.service';
-import {
-  judgeLeagueDisputeEligibility,
-  type LeagueDisputeBlockedReason,
-} from '../league-matches/league-result-dispute-eligibility';
 import { resolveTeamMatchCompetitionConfig } from './resolve-team-match-competition-config';
 import { assertCreatorProfileComplete } from '../profile/creator-profile.guard';
 import { computeRevealedTeamTrustBatch } from '../reviews/team-trust-aggregation';
@@ -156,9 +152,6 @@ export class TeamMatchesService {
     const winsByHostTeam = await this.loadOfficialWinCounts([teamMatch.hostTeamId]);
     const viewer = await this.getViewer(teamMatch, user);
     const approvedApplication = teamMatch.applications.find((item) => item.status === 'approved');
-    // U3: 리그 대진일 때만 이의 제기 자격을 계산한다 -- 일반 팀 매치는 이 개념 자체가
-    // 없고, 추가 쿼리 3개(공식 리비전·승강 확정·열린 이의)를 매번 낼 이유도 없다.
-    const leagueDispute = teamMatch.league ? await this.getLeagueDisputeEligibility(teamMatch) : null;
 
     return {
       teamMatchId: teamMatch.id,
@@ -179,12 +172,14 @@ export class TeamMatchesService {
       displayState: this.getDisplayState(teamMatch),
       costNote: teamMatch.costNote,
       // null 이면 일반 팀 매치, 값이 있으면 리그전이다. 프론트는 이 값의 유무로 배지를 건다.
-      // U3: 리그전이면 이의 제기 자격(disputeDeadline/disputeBlockedReason/openDisputeExists)도
-      // 함께 싣는다 -- 기존 leagueId/title 필드는 그대로 두고 추가만 한다.
-      league:
-        teamMatch.league && leagueDispute
-          ? { leagueId: teamMatch.league.id, title: teamMatch.league.title, ...leagueDispute }
-          : null,
+      // Task 166: 여기 함께 싣던 이의 제기 자격 세 필드
+      // (disputeDeadline/disputeBlockedReason/openDisputeExists)를 뺐다 — 이의 경로가
+      // 사라졌으므로(정본 §4) 그 값을 계산할 근거도, 화면에서 쓸 자리도 없다. 덕분에
+      // 리그 대진 상세가 매번 내던 추가 쿼리 3개(공식 리비전·승강 확정·열린 이의)도
+      // 함께 사라진다.
+      league: teamMatch.league
+        ? { leagueId: teamMatch.league.id, title: teamMatch.league.title }
+        : null,
       levelLabel: formatLevelRange(teamMatch.minSportLevel, teamMatch.maxSportLevel, teamMatch.formatNote),
       minLevel: teamMatch.minSportLevel ? { code: teamMatch.minSportLevel.code, name: teamMatch.minSportLevel.name } : null,
       maxLevel: teamMatch.maxSportLevel ? { code: teamMatch.maxSportLevel.code, name: teamMatch.maxSportLevel.name } : null,
@@ -1422,52 +1417,6 @@ export class TeamMatchesService {
     }
 
     return teamMatch;
-  }
-
-  /**
-   * U3: 리그 대진 상세에 이의 제기 자격을 실어 보낸다 -- 화면이 서버 재요청 없이
-   * "지금 이의를 제기할 수 있는지"를 바로 판정할 수 있게 한다.
-   *
-   * 판정(기간 만료·승강 확정)은 `LeagueMatchDisputeService.fileDispute`가 실제로
-   * 이의를 거부하는 것과 **같은 순수 함수**(`judgeLeagueDisputeEligibility`)를
-   * 그대로 재사용한다 -- 여기서 새로 로직을 만들면 화면이 "제기 가능"이라고
-   * 보여주는데 서버는 거부하는(또는 그 반대) 드리프트가 생길 수 있다.
-   */
-  private async getLeagueDisputeEligibility(
-    teamMatch: Pick<TeamMatchWithRelations, 'id' | 'game'> & { league: { id: string; title: string } | null },
-  ): Promise<{
-    disputeDeadline: string | null;
-    disputeBlockedReason: LeagueDisputeBlockedReason;
-    openDisputeExists: boolean;
-  }> {
-    const leagueId = teamMatch.league!.id;
-    const [officialRevision, promotionCommitted, openDispute] = await Promise.all([
-      teamMatch.game
-        ? this.prisma.v1Game.findUnique({
-            where: { id: teamMatch.game.id },
-            select: { currentOfficialRevision: { select: { officialAt: true } } },
-          })
-        : Promise.resolve(null),
-      // E3: commitPromotions가 만드는 V1LeaguePromotion 행 존재 여부가 승강 확정 판정 근거다
-      // (league-series-admin.service.ts, LeagueMatchDisputeService.fileDispute와 동일).
-      this.prisma.v1LeaguePromotion.findFirst({ where: { fromLeagueId: leagueId }, select: { id: true } }),
-      this.prisma.v1LeagueMatchDispute.findFirst({
-        where: { teamMatchId: teamMatch.id, status: 'open' },
-        select: { id: true },
-      }),
-    ]);
-
-    const { disputeDeadline, blockedReason } = judgeLeagueDisputeEligibility({
-      officialAt: officialRevision?.currentOfficialRevision?.officialAt ?? null,
-      now: new Date(),
-      promotionCommitted: promotionCommitted !== null,
-    });
-
-    return {
-      disputeDeadline: disputeDeadline ? disputeDeadline.toISOString() : null,
-      disputeBlockedReason: blockedReason,
-      openDisputeExists: openDispute !== null,
-    };
   }
 
   private async loadOfficialWinCounts(teamIds: string[]): Promise<Map<string, number>> {

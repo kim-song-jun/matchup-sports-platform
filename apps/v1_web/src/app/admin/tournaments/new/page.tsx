@@ -675,9 +675,9 @@ function ScheduleStep({
   setField: SetField;
   clearError: (field: string) => void;
 }) {
-  // 대회 시작이 7일 이내면 D-7/D-3 자동 제안이 **지난 시각**이 된다. 그래서 자동 채움을
-  // 비우고(모델), 여기서는 왜 비었는지·무엇을 해야 하는지 알려 준다. 이 경고가 없으면
-  // 운영자는 필수 항목이 이유 없이 빈 것으로 본다.
+  // 대회 시작이 7일 이내면 D-7 자동 제안이 **지난 시각이 될 수 있다**(D-3 은 3일 이내일 때).
+  // 그때 모델이 자동 채움을 비우므로, 여기서는 왜 비었는지·무엇을 해야 하는지 알려 준다.
+  // 이 경고가 없으면 운영자는 필수 항목이 이유 없이 빈 것으로 본다.
   const shortLeadTime = isShortLeadTime(state.scheduledAt);
   return (
     <div className="grid gap-5">
@@ -686,8 +686,8 @@ function ScheduleStep({
           role="status"
           className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3 text-sm text-[var(--orange700)]"
         >
-          대회 시작이 7일 이내예요. 신청·명단 제출 마감을 직접 정해 주세요 — 자동 제안을 쓰면 이미 지난
-          시각이 돼서, 참가팀이 명단을 아예 낼 수 없어요.
+          대회 시작이 7일 이내예요. 신청·명단 제출 마감을 직접 정해 주세요 — 자동 제안(시작 D-7·D-3)이
+          이미 지난 시각이 될 수 있고, 그러면 참가팀이 명단을 아예 낼 수 없어요.
         </p>
       )}
       <div className="grid gap-4 md:grid-cols-2">
@@ -726,7 +726,7 @@ function ScheduleStep({
           error={errors.registrationDeadlineAt}
           hint={
             shortLeadTime
-              ? '대회 시작이 가까워 자동 제안이 지난 시각이 돼요. 마감을 직접 정해 주세요.'
+              ? '대회 시작이 가까워 자동 제안이 지난 시각이 될 수 있어요. 마감을 직접 정해 주세요.'
               : '대회 시작 D-3 23:59를 자동 제안해요. 직접 바꾸면 이후에는 덮어쓰지 않아요.'
           }
         />
@@ -743,7 +743,7 @@ function ScheduleStep({
           error={errors.rosterDeadlineAt}
           hint={
             shortLeadTime
-              ? '대회 시작이 가까워 자동 제안이 지난 시각이 돼요. 마감을 직접 정해 주세요.'
+              ? '대회 시작이 가까워 자동 제안이 지난 시각이 될 수 있어요. 마감을 직접 정해 주세요.'
               : '대회 시작 D-7 23:59를 자동 제안해요.'
           }
         />

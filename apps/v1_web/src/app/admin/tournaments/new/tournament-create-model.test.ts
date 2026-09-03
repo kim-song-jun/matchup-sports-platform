@@ -18,6 +18,10 @@ import {
 describe('대회 생성 — 마감 일시 하한', () => {
   // 2026-09-04(금) 10:00 KST = 01:00 UTC
   const NOW = new Date('2026-09-04T01:00:00.000Z');
+  const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
+  /** `datetime-local` 입력값 포맷(로컬 시각) — 화면이 넘기는 것과 같은 모양이어야 한다. */
+  const toDatetimeLocal = (at: Date) =>
+    new Date(at.getTime() - at.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -98,6 +102,11 @@ describe('대회 생성 — 마감 일시 하한', () => {
   it('시작이 7일 이내인지 알려 준다 — 화면이 경고 배너를 띄우는 근거', () => {
     expect(isShortLeadTime('2026-09-07T10:00')).toBe(true);
     expect(isShortLeadTime('2026-10-04T10:00')).toBe(false);
+    // 경계: 문구가 "7일 이내" 이므로 **정확히 7일**도 경고 대상이다.
+    // 리터럴 날짜로 쓰면 `datetime-local` 값이 **로컬 타임존으로 파싱**되므로 TZ 가 다른
+    // 환경(로컬 KST / CI UTC)에서 결과가 갈린다 — NOW 에서 계산해 로컬 포맷으로 만든다.
+    expect(isShortLeadTime(toDatetimeLocal(new Date(NOW.getTime() + SEVEN_DAYS)))).toBe(true);
+    expect(isShortLeadTime(toDatetimeLocal(new Date(NOW.getTime() + SEVEN_DAYS + 60_000)))).toBe(false);
     // 값이 없거나 형식이 깨지면 경고하지 않는다(입력 중에 배너가 깜빡이면 안 된다).
     expect(isShortLeadTime('')).toBe(false);
     expect(isShortLeadTime('not-a-date')).toBe(false);

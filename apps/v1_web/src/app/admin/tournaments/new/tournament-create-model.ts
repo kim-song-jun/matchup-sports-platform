@@ -782,7 +782,8 @@ function promoPayload(
 export function isShortLeadTime(scheduledAt: string) {
   const start = new Date(scheduledAt);
   if (!scheduledAt || Number.isNaN(start.getTime())) return false;
-  return start.getTime() - Date.now() < 7 * 24 * 60 * 60 * 1000;
+  // 문구가 "7일 이내" 이므로 경계(정확히 7일)도 포함한다 — `<` 이면 딱 7일일 때 경고가 안 뜬다.
+  return start.getTime() - Date.now() <= 7 * 24 * 60 * 60 * 1000;
 }
 
 function suggestDeadline(startValue: string, daysBefore: number) {

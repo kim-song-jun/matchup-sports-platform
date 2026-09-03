@@ -2656,6 +2656,12 @@ label.tm-btn:focus-within {
 .tm-match-sport-illustration {
   object-fit: contain;
   flex: none;
+  /* 파란 바탕 위에 파란 오브젝트(풋살공·러닝화·고글)가 묻힌다 — 흰 웰 안에 놓아 대비를 확보한다.
+     패널이 항상 --blue700 이라 웰은 테마와 무관하게 흰색(static-white). */
+  background: var(--static-white);
+  border-radius: var(--radius-hero);
+  padding: 12px;
+  box-sizing: border-box;
 }
 
 .tm-match-detail-hero-sport {

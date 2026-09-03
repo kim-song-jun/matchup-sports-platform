@@ -199,18 +199,16 @@
  * large empty canvas on desktop.
  */
 @media (min-width: 1024px) {
-  .tm-search-state-msg {
-    margin-top: 0 !important;
+  /* 상태 화면(EmptyState/ErrorState)은 결과 컬럼 안에서 패널처럼 보이게 — 모바일 기본
+     padding(60px 32px)은 그대로 두고 데스크톱에서만 테두리·배경을 준다. */
+  .tm-search-results-col .tm-empty-state {
     min-height: 280px;
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: center;
     justify-content: center;
     border: 1px solid var(--grey100);
     border-radius: var(--radius-container);
     padding: 40px 24px;
     background: var(--grey50);
-    text-align: center !important;
+    margin-top: 12px;
   }
 }
 

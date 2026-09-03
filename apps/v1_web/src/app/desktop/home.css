@@ -388,20 +388,12 @@
     padding: 0;
   }
 
-  .tm-home-matches-block .tm-empty-state {
-    min-height: 176px;
+  /* 채팅 빈 상태(EmptyState + chat-empty 그래픽)를 사이드 컬럼 폭에 맞춘 패널로.
+     예전 `.tm-home-matches-block .tm-empty-state` 는 매칭되는 마크업이 없던 dead 규칙이었다. */
+  .tm-home-chat-block .tm-empty-state {
     padding: 28px 24px;
     border: 1px solid var(--border);
     border-radius: var(--radius-field);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .tm-home-matches-block .tm-empty-icon {
-    width: 56px;
-    height: 56px;
-    margin-bottom: 12px;
   }
 }
 

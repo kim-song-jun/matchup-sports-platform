@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Eye, ShieldAlert, X } from 'lucide-react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { PendingReviewsCard } from '@/components/tournaments/pending-review-card';
@@ -14,7 +15,7 @@ import {
   TeamsIcon,
   TrophyIcon,
 } from '@/components/v1-ui/icons';
-import { Card, ErrorState, KPIStat, ListItem, NumberDisplay, SectionTitle, WeatherStrip } from '@/components/v1-ui/primitives';
+import { Card, EmptyState, ErrorState, KPIStat, ListItem, NumberDisplay, SectionTitle, WeatherStrip } from '@/components/v1-ui/primitives';
 import { cssUrl } from '@/lib/assets';
 import { formatTournamentDateRangeShort } from '@/lib/date-utils';
 import { useV1AllTournaments, useV1LeagueMatches } from '@/hooks/use-v1-api';
@@ -331,6 +332,7 @@ function getWeatherPermissionCopy(permission: NonNullable<HomeViewModel['weather
 }
 
 function HomeChatSummary({ model }: { model: HomeViewModel }) {
+  const router = useRouter();
   const unreadLabel = model.chatUnreadCount > 0 ? `읽지 않은 메시지 ${model.chatUnreadCount}개` : '새 메시지 없음';
   const body = (() => {
     if (model.signedOut) {
@@ -362,11 +364,15 @@ function HomeChatSummary({ model }: { model: HomeViewModel }) {
     }
 
     if (model.chatRooms.length === 0) {
+      // 빈 상태 = 그래픽(대화는 경기에서 시작된다) → 무슨 상태 → 다음 행동. 예전엔 테두리 카드 + 문구 2줄뿐이었다.
       return (
-        <Card pad={16} className="tm-home-chat-empty">
-          <div className="tm-text-body-lg">아직 열려 있는 채팅방이 없어요</div>
-          <div className="tm-text-caption" style={{ marginTop: 4 }}>매치에 참가하거나 팀에 가입하면 채팅방이 생겨요.</div>
-        </Card>
+        <EmptyState
+          illustration={{ name: 'chat-empty' }}
+          title="아직 열려 있는 채팅방이 없어요"
+          sub="매치에 참가하거나 팀에 가입하면 채팅방이 생겨요."
+          cta="매치 둘러보기"
+          onCta={() => router.push('/matches')}
+        />
       );
     }
 

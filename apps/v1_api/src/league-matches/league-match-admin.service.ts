@@ -1225,12 +1225,21 @@ export class LeagueMatchAdminService {
     // 때문에 그 매핑은 애초에 단사가 아니다. 대신 이 자리가 실제로 묻는 것("아직 시작하지
     // 않았나")을 status 로 직접 표현한다: `draft`(신청 열기 전) 와 `open`(이미 열어 둠,
     // 마감일 갱신) 둘 다 예전 `state === 'draft'` 에 해당한다.
+    // `deletedAt` 을 **필터가 아니라 값으로** 읽는다 — 소프트 삭제된 거울과 아예 없는 리그는
+    // 운영자에게 다른 사건이고(전자는 "복구하거나 다시 만들어라", 후자는 "id 가 틀렸다"),
+    // 이 엔드포인트는 예전부터 그 둘을 다른 코드로 갈라 왔다. 필터로 걸면 둘이 합쳐진다.
     const league = await findTournamentOnSurface(this.prisma, ['regular_league'], {
-      where: { id: leagueId, deletedAt: null },
-      select: { id: true, status: true },
+      where: { id: leagueId },
+      select: { id: true, status: true, deletedAt: true },
     });
     if (league === null) {
       throw new NotFoundException({ code: 'LEAGUE_NOT_FOUND', message: '리그를 찾을 수 없어요.' });
+    }
+    if (league.deletedAt !== null) {
+      throw new ConflictException({
+        code: 'LEAGUE_MIRROR_MISSING',
+        message: '이 리그는 아직 통합 대회 축에 올라오지 않아 신청을 열 수 없어요.',
+      });
     }
     if (league.status !== 'draft' && league.status !== 'open') {
       // 이미 시작했거나 끝난 리그에 신청을 열면, 대진이 짜인 뒤 팀이 들어오는 상태가 된다.

@@ -529,6 +529,16 @@ export function validateTournamentCreateStep(state: TournamentCreateState, step 
     if (start !== null && rosterDeadline !== null && rosterDeadline >= start) {
       errors.rosterDeadlineAt = '명단 제출 마감은 대회 시작 전이어야 해요.';
     }
+    // **지난 마감은 만들 수 없다.** "대회 시작 전" 만 보면 시작이 임박한 대회에서 과거 시각이
+    // 통과한다 — 그러면 팀이 명단을 아예 못 낸다(서버 409 ROSTER_DEADLINE_PASSED).
+    // 두 필드를 각각 본다: 같은 자동 제안 로직을 두 곳이 쓰므로 한쪽만 막으면 반쪽이다.
+    const nowTs = Date.now();
+    if (registrationDeadline !== null && registrationDeadline <= nowTs) {
+      errors.registrationDeadlineAt = '신청 마감은 지금 이후여야 해요.';
+    }
+    if (rosterDeadline !== null && rosterDeadline <= nowTs) {
+      errors.rosterDeadlineAt = '명단 제출 마감은 지금 이후여야 해요.';
+    }
   }
 
   if (step === 2) {
@@ -753,12 +763,35 @@ function promoPayload(
       };
 }
 
+/**
+ * 대회 시작 기준 D-N 23:59 을 제안한다. **이미 지난 시각이면 제안하지 않는다(빈 값).**
+ *
+ * 하한이 없던 동안, 시작이 임박한 대회를 만들면 명단 제출 마감이 **과거로 자동 입력되고
+ * 그대로 저장**됐다(2026-09-04 alpha 실측: 시작 +3일 대회의 명단 마감이 -4일). 서버는
+ * `assertRosterMutable` 에서 지난 마감을 409 `ROSTER_DEADLINE_PASSED` 로 하드 차단하므로,
+ * 그렇게 만들어진 대회는 **어떤 팀도 명단을 제출할 수 없다** — 운영자가 팀별 예외를 일일이
+ * 주기 전까지. 화면 어디에도 경고가 없었다.
+ *
+ * 빈 값을 돌려주면 그 필드는 필수 검증에 걸려 운영자가 **직접 정하게** 된다. 임박한 대회의
+ * 마감을 기계가 정할 수 있는 옳은 값은 없다 — 운영자만 안다.
+ */
+/**
+ * 대회 시작이 7일 이내인가 — 화면이 "마감을 직접 정해 주세요" 안내·경고 배너를 띄우는 근거다.
+ * 값이 없거나 형식이 깨졌으면 `false`(입력 중에 배너가 깜빡이지 않게).
+ */
+export function isShortLeadTime(scheduledAt: string) {
+  const start = new Date(scheduledAt);
+  if (!scheduledAt || Number.isNaN(start.getTime())) return false;
+  return start.getTime() - Date.now() < 7 * 24 * 60 * 60 * 1000;
+}
+
 function suggestDeadline(startValue: string, daysBefore: number) {
   const start = new Date(startValue);
   if (!startValue || Number.isNaN(start.getTime())) return '';
   const deadline = new Date(start);
   deadline.setDate(deadline.getDate() - daysBefore);
   deadline.setHours(23, 59, 0, 0);
+  if (deadline.getTime() <= Date.now()) return '';
   return formatDatetimeLocal(deadline);
 }
 

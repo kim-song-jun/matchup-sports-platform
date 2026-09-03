@@ -39,6 +39,13 @@ import {
  */
 const LINEUP_LOCK_ESCAPE_HINT = '꼭 바꿔야 하면 대회 설정 변경에서 소급 영향을 확인한 뒤 진행할 수 있어요.';
 
+/** 마감이 이미 지났는가. `null`(미설정)은 지난 것이 아니다. */
+function isPastDeadline(value: string | null | undefined) {
+  if (!value) return false;
+  const at = new Date(value);
+  return !Number.isNaN(at.getTime()) && at.getTime() <= Date.now();
+}
+
 export function TournamentInfoSection() {
   const { tournamentId: id, canWrite, showToast } = useTournamentAdmin();
   const { data: tournament } = useV1AdminTournament(id);
@@ -474,7 +481,15 @@ export function TournamentInfoSection() {
             { label: '대회 일정', value: scheduleLabel },
             { label: '장소', value: tournament.venue ?? '미정' },
             { label: '신청 마감', value: formatDate(tournament.registrationDeadlineAt) },
-            { label: '명단 마감', value: formatDate(tournament.rosterDeadlineAt) },
+            {
+              label: '명단 마감',
+              // **지난 마감은 그냥 날짜만 보여 주면 안 된다.** 서버가 지난 마감을 409
+              // ROSTER_DEADLINE_PASSED 로 하드 차단하므로, 그 상태의 대회는 **어떤 팀도 명단을
+              // 낼 수 없다**(팀별 예외를 주기 전까지). 운영자가 화면만 보고 알 방법이 없었다.
+              value: isPastDeadline(tournament.rosterDeadlineAt)
+                ? `${formatDate(tournament.rosterDeadlineAt)} · 지남 — 팀이 명단을 낼 수 없어요`
+                : formatDate(tournament.rosterDeadlineAt),
+            },
             { label: '참가비', value: formatCurrency(tournament.entryFee) },
             { label: '팀 수', value: `${tournament.teamCount}팀` },
             { label: '신청 수', value: `${tournament.registrationCount}팀` },

@@ -84,6 +84,9 @@ function buildService(options: {
 } = {}) {
   const teamMatches = options.teamMatches ?? makeTeamMatches();
   const fakePrisma = {
+    // BE-5: 일정 조회와 순위표 로스터가 **같은 테이블**을 읽는다(로스터 = confirmed 등록,
+    // `tieBreakJson` 은 상수화되어 더는 읽지 않는다 — `league-tie-break.ts`). 두 소비처가
+    // 서로 다른 필드를 select 하므로 합집합을 돌려준다.
     v1Tournament: {
       findFirst: async () => ({
         id: LEAGUE_ID,
@@ -92,13 +95,8 @@ function buildService(options: {
         status: 'in_progress',
         bracketPublishedAt: options.bracketPublishedAt ?? null,
         bracketPublishScheduledAt: null,
-      }),
-    },
-    v1League: {
-      findUnique: async () => ({
         tier: options.tier === undefined ? 1 : options.tier,
-        tieBreakJson: {},
-        teams: [
+        registrations: [
           { teamId: 'team-a', team: { name: '성수 FC', profile: { logoUrl: 'https://example.test/a.png' } } },
           { teamId: 'team-b', team: { name: '왕십리 유나이티드', profile: null } },
         ],

@@ -19,8 +19,8 @@
 | 확정 API | `POST /games/:gameId/result-revisions/:revisionId/{review-decision, supersede-and-submit, officialize, void}` + `POST /games/:gameId/corrections` (`tournament-operations/results/tournament-result-review.controller.ts`) |
 | 이의 | `v1_league_match_disputes` 테이블(`schema.prisma:2040`) · API 11 파일 · 웹 5 파일 · 알림 4종 · `league-match-dispute.service.ts` |
 | 교체 | 설정 `lineup.substitutions: 'rolling' \| 'limited'` + `maxSubstitutions` (`competition-config.parse.ts:78-79`) · API 16 파일 · 웹 21 파일 |
-| 팀 전적 탭 | `'전체'` · `'대회'` 만 존재(`apps/v1_web/src/app/teams`) — 리그·친선 탭 없음 |
-| 개인 기록 | `matchType: 'tournament' \| 'team_match'` — 리그 구분 없음(`public-user-records.service.ts`) |
+| 팀 전적 탭 | ~~`'전체'`·`'대회'` 만~~ → **2026-09-03 재실측: 전체·대회·리그·친선 4탭이 이미 완비**(D4-a `team-record-category.ts` + `?type=` 필터 + `summary.byType`). BE-4 는 팀 전적 쪽 할 일이 없다 |
+| 개인 기록 | ~~`matchType` 만~~ → **재실측: 아이템에 `type`(리그/대회/친선)이 이미 있다**(같은 분류 함수). 없던 것은 `?type=` **필터**와 `summary.byType`, 그리고 화면의 분류 탭이다 |
 
 ## Goal
 
@@ -141,7 +141,27 @@
     별도 PR 로 적었는데, 분리의 이유가 "버튼이 422 를 내는 창을 최소화" 였고 **같은 PR 이면
     그 창이 0** 이라 합쳤다(2026-09-03 확정). 롤링 전용이던 "빠른 교체 모드" 패널도 도달
     불가가 되어 함께 삭제했다.
-- **BE-4 전적 구분.** 팀 전적 집계에 리그/친선 축, 개인 기록 `matchType: 'league'`.
+- **BE-4 전적 구분.** ✅ 구현(2026-09-03). 실측이 착수 전제와 달랐다:
+  - **팀 전적은 이미 완비**돼 있었다(4탭·필터·`byType`). 할 일 없음.
+  - 개인 기록도 아이템 `type` 은 이미 있었다. **없던 것은 `?type=` 필터·`summary.byType`·화면 탭** —
+    그래서 이 태스크는 "BE 할 일 없음" 이 아니라 그 셋을 만드는 일이었다(내 첫 조사 정정).
+  - `matchType` 은 **값을 더하지 않는다.** 그건 게임 *소스 타입* 이분법의 구 별칭이고
+    (`type` 이 정본 분류다), 소비처 실측이 **0**이다(`apps/v1_ios` 0 · `apps/v1_android` 0 ·
+    웹 화면 0 · 테스트만 3). `@deprecated` 로 두고 **다음 정리 스윕에서 삭제**한다(아래 후속).
+  - `UserRecordsQueryDto` 를 **서브클래스로만** 넓혔다 — 공유 `PublicRecordsQueryDto` 는 여전히
+    frozen 이고, `type` 없이 부르면 응답 모양·내용이 그대로다(회귀 스펙).
+  - 화면 어휘(탭·라벨·빈 상태)는 `record-category-tabs.ts` 로 **끌어올려 두 화면이 공유**한다
+    — 서버가 같은 분류 함수를 쓰는데 화면 어휘만 갈리면 같은 경기가 다른 이름으로 불린다.
+
+#### 확정된 것 (2026-09-03)
+- **집계 SQL 의 `deletedAt` 미필터는 현행 유지.** 소프트 삭제된 팀매치도 조인돼 `leagueId` 를
+  주는데, 과거 기록 보존이 맞다고 판단했다.
+- **`V1GameSourceType` 의 `COMPETITION_FIXTURE`·`FRIENDLY_MATCH`(R1 expand)는 분류와 무관하다** —
+  분류 함수와 SQL 은 sourceType 을 보지 않고 `tournamentId`/`leagueId` 컬럼만 본다. R3 승격 때
+  `tournamentId` 채움 규칙이 바뀌면 그때 함께 본다.
+
+#### 후속 (이 태스크 범위 밖)
+- **`matchType` 별칭 삭제** — 소비처 0(위 실측). 다음 정리 스윕에서 제거한다.
 
 ### FE (BE 배포 뒤, 3안 선택 뒤)
 - **FE-1** "확정 전" 태그(경기 카드·상세·라이브 스코어) + 어드민 "확정 전 N건" 큐.

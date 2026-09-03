@@ -26,8 +26,8 @@ import {
 } from '../league-matches/league-fixture-list-source';
 import {
   calculateLeagueStandingsWithTieBreakInfo,
-  type LeagueTieBreakCriterion,
 } from '../league-matches/league-standings';
+import { LEAGUE_TIE_BREAK_ORDER } from '../league-matches/league-tie-break';
 
 /** `V1CompetitionConfigVersion.tieBreak`(Json)에 담긴 승리 승점 기본값 — 프리셋 전부가 3이다. */
 const DEFAULT_WIN_POINTS = 3;
@@ -356,10 +356,19 @@ export class TournamentsReadService {
    * 진행률이 영원히 100% 에 못 닿는다. 그 분류는 `bucketLeagueFixtures` 가 한다.
    */
   private async leagueOverallStandings(leagueId: string) {
-    const league = await this.prisma.v1League.findUnique({
-      where: { id: leagueId },
-      include: { teams: { select: { teamId: true, team: { select: { name: true } } } } },
+    const leagueRow = await findTournamentOnSurface(this.prisma, ['regular_league'], {
+      where: { id: leagueId, deletedAt: null },
+      select: {
+        id: true,
+        title: true,
+        // 로스터 = confirmed 등록.
+        registrations: {
+          where: { status: 'confirmed' },
+          select: { teamId: true, team: { select: { name: true } } },
+        },
+      },
     });
+    const league = leagueRow === null ? null : { ...leagueRow, teams: leagueRow.registrations };
     if (league === null) {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     }
@@ -398,12 +407,7 @@ export class TournamentsReadService {
 
     const buckets = bucketLeagueFixtures(teamMatches, factByGameId);
     const teamNameById = new Map(league.teams.map((entry) => [entry.teamId, entry.team.name]));
-    const tieBreakOrder = (league.tieBreakJson as { order?: LeagueTieBreakCriterion[] }).order ?? [
-      'points',
-      'goalDifference',
-      'goalsFor',
-      'headToHead',
-    ];
+    const tieBreakOrder = LEAGUE_TIE_BREAK_ORDER;
     const { standings: leagueStandings } = calculateLeagueStandingsWithTieBreakInfo({
       teamIds: league.teams.map((entry) => entry.teamId),
       fixtures: buckets.confirmed,

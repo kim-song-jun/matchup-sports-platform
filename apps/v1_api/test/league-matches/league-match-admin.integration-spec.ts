@@ -4,6 +4,7 @@ import request = require('supertest');
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { ManagedTermsRuntimeService } from '../../src/terms/managed-terms-runtime.service';
 import { createV1IntegrationApp } from '../integration/integration-app';
+import { leagueMirrorCreateData } from '../../src/tournaments/league-competition-mirror';
 
 const suiteId = randomUUID().slice(0, 8);
 const ownerUserId = `t4-league-admin-owner-${suiteId}`;
@@ -437,7 +438,7 @@ describe('POST /admin/league-matches + fixtures', () => {
   describe('POST /admin/league-matches/:leagueId/revert-completion', () => {
     async function createLeagueWithState(title: string, state: 'draft' | 'active' | 'completed') {
       const admin = await prisma.v1AdminUser.findUniqueOrThrow({ where: { userId: ownerUserId } });
-      return prisma.v1League.create({
+      const league = await prisma.v1League.create({
         data: {
           title,
           sportId,
@@ -449,6 +450,29 @@ describe('POST /admin/league-matches + fixtures', () => {
           state,
         },
       });
+      // BE-5: 리그 조회가 통합 축으로 옮겨졌다. 프로덕션에서는 리그 생성이 거울을 **항상**
+      // 함께 만들므로(dual-write) 픽스처도 짝을 맞춘다 — 거울 없이 레거시 행만 만들면
+      // 실제로는 존재할 수 없는 상태를 재고, 그 상태에서 404 가 나는 것은 정상이다.
+      // 손으로 적지 않고 프로덕션과 **같은 헬퍼**로 만든다(id 가 같다는 계약을 픽스처에서만
+      // 지키면 그 계약이 깨져도 이 테스트가 green 으로 남는다).
+      const sport = await prisma.v1Sport.findUniqueOrThrow({ where: { id: sportId }, select: { code: true } });
+      await prisma.v1Tournament.create({
+        data: leagueMirrorCreateData({
+          id: league.id,
+          sportId: league.sportId,
+          title: league.title,
+          state: league.state,
+          regionId: league.regionId,
+          startsOn: league.startsOn,
+          endsOn: league.endsOn,
+          seriesId: league.seriesId,
+          tier: league.tier,
+          seasonNo: league.seasonNo,
+          sportCode: sport.code,
+          createdAt: league.createdAt,
+        }),
+      });
+      return league;
     }
 
     it('completed 리그를 active로 되돌리고 감사 로그(admin 액션 로그 + 상태변경 로그)를 남긴다', async () => {

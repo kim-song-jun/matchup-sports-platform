@@ -310,6 +310,25 @@ describe('TeamRecordsContent — 종류 탭 (U2)', () => {
     ]);
   });
 
+  it('옛 응답(byType 없음)에서도 화면이 산다 — 배포 롤링 창에서 크래시하지 않는다', () => {
+    // 타입은 `byType` 을 non-optional 로 선언하지만 그건 **새 서버**의 계약이다. 배포가
+    // 도는 동안 새 화면이 옛 응답을 받으면 첨자 접근이 undefined 를 주고 KPI 렌더가 통째로
+    // 죽는다 — 그때 전체 summary 로 떨어뜨려 숫자만 잠깐 어긋나고 화면은 살아야 한다.
+    const legacy = withByType();
+    const { byType: _dropped, ...summaryWithoutByType } = legacy.summary;
+    render(
+      <TeamRecordsContent
+        data={{ ...legacy, summary: summaryWithoutByType } as typeof legacy}
+        activeType="league"
+        onChangeType={vi.fn()}
+      />,
+    );
+
+    // 전체 기준 값으로 그려진다(리그 기준 4경기가 아니라 12경기).
+    expect(screen.getByText('12')).toBeInTheDocument();
+    expect(screen.getByText('6·3·3')).toBeInTheDocument();
+  });
+
   it('정규 리그 탭을 고르면 KPI가 summary.byType.league 값으로 바뀐다 (전체 기준으로 새로 계산하지 않는다)', () => {
     render(<TeamRecordsContent data={withByType()} activeType="league" onChangeType={vi.fn()} />);
 
@@ -525,6 +544,13 @@ function makeUserRecords(overrides: Partial<PublicUserRecordsResponse> = {}): Pu
       mvpCount: 1,
       matchMvpCount: 1,
       tournamentAwardCount: 0,
+      // 이 픽스처의 유일한 아이템이 대회 경기다 — 합이 전체와 맞아야 화면의 탭 KPI 가
+      // 실제 데이터와 어긋나지 않는다.
+      byType: {
+        tournament: { appearances: 1, goals: 1, assists: 0, yellowCards: 0, redCards: 0, mvpCount: 1 },
+        league: { appearances: 0, goals: 0, assists: 0, yellowCards: 0, redCards: 0, mvpCount: 0 },
+        friendly: { appearances: 0, goals: 0, assists: 0, yellowCards: 0, redCards: 0, mvpCount: 0 },
+      },
     },
     tournamentAwards: [],
     items: [
@@ -556,6 +582,87 @@ function makeUserRecords(overrides: Partial<PublicUserRecordsResponse> = {}): Pu
     ...overrides,
   };
 }
+
+describe('UserRecordsContent — 종류 탭 (Task 166 BE-4)', () => {
+  // KPI 카드가 값만 렌더하므로 탭별 숫자를 서로 다르게 골라야 `getByText` 가
+  // "여러 요소 매치" 로 실패하지 않는다(팀 전적 탭 스펙과 같은 이유).
+  function withByType() {
+    return makeUserRecords({
+      summary: {
+        appearances: 12,
+        goals: 7,
+        assists: 3,
+        yellowCards: 1,
+        redCards: 0,
+        mvpCount: 2,
+        matchMvpCount: 2,
+        tournamentAwardCount: 1,
+        byType: {
+          league: { appearances: 4, goals: 6, assists: 1, yellowCards: 0, redCards: 0, mvpCount: 1 },
+          tournament: { appearances: 5, goals: 4, assists: 2, yellowCards: 1, redCards: 0, mvpCount: 1 },
+          friendly: { appearances: 3, goals: 1, assists: 0, yellowCards: 0, redCards: 0, mvpCount: 0 },
+        },
+      },
+    });
+  }
+
+  it('옛 응답(byType 없음)에서도 화면이 산다 — 배포 롤링 창에서 크래시하지 않는다', () => {
+    // 팀 전적의 같은 케이스와 같은 이유 — 배포가 도는 동안 새 화면이 옛 응답을 받는다.
+    const legacy = withByType();
+    const { byType: _dropped, ...summaryWithoutByType } = legacy.summary;
+    render(
+      <UserRecordsContent
+        data={{ ...legacy, summary: summaryWithoutByType } as typeof legacy}
+        activeType="league"
+        onChangeType={vi.fn()}
+      />,
+    );
+
+    // 전체 기준 값으로 그려진다(리그 기준 4출전이 아니라 12출전).
+    expect(screen.getByText('12')).toBeInTheDocument();
+  });
+
+  it('팀 전적과 같은 순서로 전체·대회·리그·친선 탭을 배치한다', () => {
+    render(<UserRecordsContent data={withByType()} activeType="all" onChangeType={vi.fn()} />);
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      '전체',
+      '대회',
+      '리그',
+      '친선',
+    ]);
+  });
+
+  it('리그 탭을 고르면 KPI 가 summary.byType.league 값으로 바뀐다 (전체로 새로 계산하지 않는다)', () => {
+    render(<UserRecordsContent data={withByType()} activeType="league" onChangeType={vi.fn()} />);
+    // 숫자는 서로 겹치지 않게 골랐다 — KPIStat 이 값만 렌더해서, 다른 카드(매치 MVP 2,
+    // 대회 수상 1)와 같은 숫자면 getByText 가 "여러 요소 매치" 로 실패한다.
+    expect(screen.getByText('4')).toBeInTheDocument(); // 엔트리 = byType.league.appearances
+    expect(screen.getByText('6')).toBeInTheDocument(); // 골 = byType.league.goals
+    // 전체 기준 숫자가 남아 있으면 탭이 아무것도 안 한 것이다.
+    expect(screen.queryByText('12')).not.toBeInTheDocument();
+    expect(screen.queryByText('7')).not.toBeInTheDocument();
+  });
+
+  it('전체 탭이면 KPI 가 summary(전체 기준) 그대로다', () => {
+    render(<UserRecordsContent data={withByType()} activeType="all" onChangeType={vi.fn()} />);
+    expect(screen.getByText('12')).toBeInTheDocument();
+    expect(screen.getByText('7')).toBeInTheDocument();
+  });
+
+  it('탭을 고른 상태에서 그 종류가 0건이면 그 종류를 짚는 빈 상태를 보여준다', () => {
+    // 전체 문구("아직 등록된 경기 기록이 없어요")를 그대로 쓰면, 다른 종류의 기록이
+    // 있는데도 "기록이 없다" 로 읽힌다.
+    render(
+      <UserRecordsContent data={makeUserRecords({ items: [] })} activeType="friendly" onChangeType={vi.fn()} />,
+    );
+    expect(screen.getByText('아직 친선 경기가 없어요')).toBeInTheDocument();
+  });
+
+  it('onChangeType 을 안 넘기면 탭을 그리지 않는다 — 탭 없이 쓰는 화면 회귀', () => {
+    render(<UserRecordsContent data={withByType()} />);
+    expect(screen.queryAllByRole('tab')).toHaveLength(0);
+  });
+});
 
 describe('UserRecordsContent — 기록 행', () => {
   it('출전·골·매치 MVP·대회 수상을 구분하고 실제 수상명을 표시한다', () => {
@@ -672,15 +779,35 @@ describe('UserRecordsContent — 본인 전용 공개 안내 배너', () => {
     expect(screen.queryByText('이 기록은 아직 나에게만 보여요')).not.toBeInTheDocument();
   });
 
-  it('본인 + 미동의여도 items가 0건이면(대회 라인업 연결 자체가 없음) 배너 대신 빈 상태만 보여준다', () => {
+  it('본인 + 미동의여도 기록이 0건이면(대회 라인업 연결 자체가 없음) 배너 대신 빈 상태만 보여준다', () => {
+    const empty = makeUserRecords({ viewerIsOwner: true, consentGranted: false, items: [] });
     render(
       <UserRecordsContent
-        data={makeUserRecords({ viewerIsOwner: true, consentGranted: false, items: [] })}
+        data={{
+          ...empty,
+          // 탭이 생기면서 `items: []` 만으로는 "기록이 아예 없다" 가 아니게 됐다(걸러진
+          // 결과일 수 있다). 진짜 0건은 집계까지 0이다 — 픽스처를 그렇게 맞춘다.
+          summary: { ...empty.summary, appearances: 0 },
+        }}
       />,
     );
     // "숨겨진 기록이 있다"는 배너와 "기록이 아예 없다"는 EmptyState가 동시에 뜨면 모순된다.
     expect(screen.queryByText('이 기록은 아직 나에게만 보여요')).not.toBeInTheDocument();
     expect(screen.getByText('아직 등록된 경기 기록이 없어요')).toBeInTheDocument();
+  });
+
+  it('탭 필터로 목록이 비어도 전체 기록이 있으면 배너를 유지한다', () => {
+    // 친선 경기만 있는 사람이 '리그' 탭을 누르면 items 가 0이 된다. 그때 배너가 사라지면
+    // 공개 여부가 그대로인데도 안내만 깜빡인다 — 공개 여부는 탭과 무관한 계정 단위
+    // 사실이라 탭에 흔들리면 안 된다.
+    render(
+      <UserRecordsContent
+        data={makeUserRecords({ viewerIsOwner: true, consentGranted: false, items: [] })}
+        activeType="league"
+        onChangeType={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('이 기록은 아직 나에게만 보여요')).toBeInTheDocument();
   });
 });
 

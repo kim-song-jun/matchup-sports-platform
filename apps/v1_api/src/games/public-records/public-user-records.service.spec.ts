@@ -70,9 +70,15 @@ function createFakePrisma(config: {
     },
     v1TournamentFixture: { findMany: findManyByIds(config.fixtures ?? []) },
     v1Team: { findMany: jest.fn().mockResolvedValue([]) },
-    v1Tournament: { findMany: findManyByIds(config.tournaments ?? []) },
+    // BE-5: 대회 제목과 리그 제목을 같은 테이블에서 읽는다 — `kind` 로 갈린다.
+    v1Tournament: {
+      findMany: jest.fn(async (args: { where: { kind?: string } }) =>
+        args.where.kind === 'regular_league'
+          ? findManyByIds(config.leagues ?? [])(args)
+          : findManyByIds(config.tournaments ?? [])(args),
+      ),
+    },
     v1TeamMatch: { findMany: findManyByIds(config.teamMatches ?? []) },
-    v1League: { findMany: findManyByIds(config.leagues ?? []) },
   } as unknown as PrismaService;
 }
 
@@ -307,6 +313,41 @@ describe('PublicUserRecordsService', () => {
     expect('consentGranted' in result).toBe(false);
   });
 
+  /** 리그·친선·대회 각 1건. Task 166 BE-4 의 세 스펙이 이 픽스처를 공유한다. */
+  function threeCategoryPrisma() {
+    return createFakePrisma({
+      links: [
+        { participantId: 'participant-league', linkId: 'link-league', userId: OWNER_ID },
+        { participantId: 'participant-friendly', linkId: 'link-friendly', userId: OWNER_ID },
+        { participantId: 'participant-tournament', linkId: 'link-tournament', userId: OWNER_ID },
+      ],
+      userConsents: [{ userId: OWNER_ID, state: 'GRANTED' }],
+      snapshots: [],
+      resultRows: [
+        sourcedResultRow({ suffix: 'league', participantId: 'participant-league', teamMatchId: 'team-match-league' }),
+        sourcedResultRow({
+          suffix: 'friendly',
+          participantId: 'participant-friendly',
+          teamMatchId: 'team-match-friendly',
+        }),
+        sourcedResultRow({
+          suffix: 'tournament',
+          participantId: 'participant-tournament',
+          tournamentFixtureId: 'fixture-1',
+        }),
+      ],
+      // 친선 팀매치도 팀매치 행 자체는 존재한다 -- 다른 점은 `leagueId`가 null이라는 것뿐이다.
+      teamMatches: [
+        { id: 'team-match-league', leagueId: 'league-1' },
+        { id: 'team-match-friendly', leagueId: null },
+      ],
+      leagues: [{ id: 'league-1', title: '2026 가을 정규 리그' }],
+      fixtures: [{ id: 'fixture-1', tournamentId: 'tournament-1', round: '결승' }],
+      tournaments: [{ id: 'tournament-1', title: '2026 여름 챔피언십' }],
+      viewerConsentState: 'GRANTED',
+    });
+  }
+
   it('리그 대진 행에는 리그 제목이 붙고, 리그가 아닌 친선 팀매치 행에는 붙지 않는다', async () => {
     const prisma = createFakePrisma({
       links: [
@@ -370,6 +411,87 @@ describe('PublicUserRecordsService', () => {
 
     // N+1 금지: 팀매치·리그 모두 행 수와 무관하게 단일 IN 조회 1회씩이다.
     expect((prisma.v1TeamMatch.findMany as jest.Mock).mock.calls).toHaveLength(1);
-    expect((prisma.v1League.findMany as jest.Mock).mock.calls).toHaveLength(1);
+    // BE-5: 대회 제목과 리그 제목이 같은 테이블에서 오므로 이 mock 은 둘을 함께 센다.
+    // 재려던 것은 "각각 단일 IN 조회 1회" 이므로 갈래별로 나눠 센다 — 합계만 보면 한쪽이
+    // 행마다 도는 회귀를 다른 쪽이 가려 준다.
+    const tournamentCalls = (prisma.v1Tournament.findMany as jest.Mock).mock.calls.filter(
+      ([args]) => args.where.kind !== 'regular_league',
+    );
+    const leagueCalls = (prisma.v1Tournament.findMany as jest.Mock).mock.calls.filter(
+      ([args]) => args.where.kind === 'regular_league',
+    );
+    expect(tournamentCalls).toHaveLength(1);
+    expect(leagueCalls).toHaveLength(1);
+  });
+  it('?type=league 는 리그 행만 돌려준다 — 팀 전적과 같은 우선순위(tournament > league > friendly)', async () => {
+    const service = new PublicUserRecordsService(threeCategoryPrisma());
+    const result = await service.getRecords(OWNER_ID, { type: 'league' }, 'someone-else');
+    expect(result.items.map((item) => item.gameId)).toEqual(['game-league']);
+    expect(result.items.every((item) => item.type === 'league')).toBe(true);
+  });
+
+  it('?type=friendly 는 리그도 대회도 아닌 행만 돌려준다', async () => {
+    const service = new PublicUserRecordsService(threeCategoryPrisma());
+    const result = await service.getRecords(OWNER_ID, { type: 'friendly' }, 'someone-else');
+    expect(result.items.map((item) => item.gameId)).toEqual(['game-friendly']);
+  });
+
+  it('summary.byType 의 합이 전체와 같고, 요약은 필터와 무관하게 전체 기준이다', async () => {
+    const service = new PublicUserRecordsService(threeCategoryPrisma());
+    const all = await service.getRecords(OWNER_ID, {}, 'someone-else');
+    const { byType } = all.summary;
+    // 합 == 전체. 한 행이 두 축에 세어지거나 어느 축에도 안 세어지면 여기서 깨진다.
+    expect(byType.league.appearances + byType.tournament.appearances + byType.friendly.appearances).toBe(
+      all.summary.appearances,
+    );
+    expect(byType.league.goals + byType.tournament.goals + byType.friendly.goals).toBe(all.summary.goals);
+    expect(byType.league.appearances).toBe(1);
+    expect(byType.tournament.appearances).toBe(1);
+    expect(byType.friendly.appearances).toBe(1);
+
+    // **필터를 걸어도 요약은 그대로다** — 화면이 탭을 바꿀 때 KPI 를 다시 받지 않고
+    // byType[탭] 을 읽는 계약(팀 전적과 동일). 여기가 뒤집히면 탭마다 전체 KPI 가 달라진다.
+    const filtered = await service.getRecords(OWNER_ID, { type: 'league' }, 'someone-else');
+    expect(filtered.summary.appearances).toBe(all.summary.appearances);
+    expect(filtered.summary.byType).toEqual(byType);
+  });
+
+  it('type 없이 부르면 응답 모양·내용이 그대로다 — 기존 클라이언트 무변경 (회귀)', async () => {
+    const service = new PublicUserRecordsService(threeCategoryPrisma());
+    const result = await service.getRecords(OWNER_ID, {}, 'someone-else');
+    expect(result.items).toHaveLength(3);
+    expect(result.summary.appearances).toBe(3);
+    // 구 클라이언트 호환 별칭도 그대로 실린다(166 문서 후속에서 정리 예정).
+    expect(result.items.every((item) => item.matchType !== undefined)).toBe(true);
+  });
+  it('대진 행의 tournamentId 를 못 찾아도 200 이다 — 빈 문자열을 조회에 넣지 않는다', async () => {
+    // 회귀: `?? ''` 로 폴백하면 그 빈 문자열이 `findMany({ id: { in: [...] } })` 로
+    // 들어가고 uuid 컬럼이라 DB 가 캐스트 에러를 던진다(Copilot 리뷰). "못 찾음" 은
+    // 빈 값이 아니라 **모른다(null)** 이고, 소비처가 이미 null 을 다룬다.
+    const prisma = threeCategoryPrisma();
+    // 이 결함은 **두 조회가 어긋날 때만** 난다: `classifyRows` 의 조회(1번째)가 그 대진을
+    // 못 돌려주고 `hydrate` 의 조회(2번째)는 돌려주면, hydrate 의 map 에 tournamentId 가
+    // 없어 폴백이 탄다. 그래서 첫 호출만 빈 배열로 만든다 — 둘 다 비우면 map 을 만드는
+    // 반복 자체가 안 돌아 결함에 **도달하지 못한다**(처음에 그렇게 써서 변이가 green 이었다).
+    const fixtureFindMany = prisma.v1TournamentFixture.findMany as jest.Mock;
+    const realImpl = fixtureFindMany.getMockImplementation()!;
+    let call = 0;
+    fixtureFindMany.mockImplementation((args: unknown) => {
+      call += 1;
+      return call === 1 ? Promise.resolve([]) : realImpl(args);
+    });
+    const service = new PublicUserRecordsService(prisma);
+
+    const result = await service.getRecords(OWNER_ID, {}, 'someone-else');
+
+    expect(result.items).toHaveLength(3);
+    // 대회 경기는 맥락을 잃되 **에러가 아니다**.
+    const tournamentItem = result.items.find((item) => item.gameId === 'game-tournament');
+    expect(tournamentItem?.tournamentId).toBeNull();
+    // 빈 문자열이 조회 인자에 실리지 않았다.
+    const tournamentCalls = (prisma.v1Tournament.findMany as jest.Mock).mock.calls;
+    for (const [arg] of tournamentCalls) {
+      expect(arg?.where?.id?.in ?? []).not.toContain('');
+    }
   });
 });

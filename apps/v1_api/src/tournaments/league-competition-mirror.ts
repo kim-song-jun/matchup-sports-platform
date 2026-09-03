@@ -8,16 +8,13 @@ import {
 /**
  * **리그 → 대회 거울(mirror) 매핑의 단일 소스.**
  *
- * 통합 축(`V1Tournament`)에 리그를 비추는 자리가 **셋**이고, 셋이 같은 값을 써야 한다:
+ * 통합 축(`V1Tournament`)에 리그를 비추는 자리에서 같은 값을 써야 한다. 한때 자리가 셋
+ * 이었다 — 기존 리그 88개를 옮기는 백필, 표시 필드를 채우는 백필, 그리고 새 리그·상태 변경의
+ * dual-write. 앞의 둘은 **한 번 돌고 끝났고**(alpha 실행 완료 2026-08-31, 재실행 금지)
+ * BE-5 에서 코드째 지웠다. 지금 남은 자리는 dual-write 하나다.
  *
- * ```
- * 기존 리그 88개   league-competition-backfill.ts            (한 번 도는 백필)
- * 표시 필드        league-competition-detail-backfill.ts     (한 번 도는 백필)
- * 새 리그·상태변경  league-matches/* 의 dual-write            (계속 돈다)
- * ```
- *
- * 매핑을 세 벌로 두면 갈라진다 — 그리고 갈라진 것이 **에러로 안 나타난다**(대회 행이 조용히
- * 다른 값을 갖는다). 그래서 여기 한 벌만 둔다.
+ * 매핑을 여러 벌로 두면 갈라지고, 갈라진 것이 **에러로 안 나타난다**(대회 행이 조용히 다른
+ * 값을 갖는다). 그래서 여기 한 벌만 둔다.
  *
  * ## `status` 매핑 — **D7 과 무관하다**
  * **오늘의 리그에는 신청 단계가 없다.** 운영자가 팀을 넣고 시즌이 돈다 — 그래서 `active` 는
@@ -32,6 +29,7 @@ export const STATUS_BY_LEAGUE_STATE: Record<V1LeagueState, V1TournamentStatus> =
   [V1LeagueState.active]: V1TournamentStatus.in_progress,
   [V1LeagueState.completed]: V1TournamentStatus.completed,
 };
+
 
 /**
  * 종목 코드 → 대회 설정 버전. 리그는 축구 계열만 있고(2026-08-30 실측 88개 전부 futsal),
@@ -233,3 +231,44 @@ export const LEAGUE_STATE_BY_STATUS: Record<V1TournamentStatus, V1LeagueState> =
   [V1TournamentStatus.completed]: V1LeagueState.completed,
   [V1TournamentStatus.cancelled]: V1LeagueState.completed,
 };
+
+/**
+ * 위 매핑의 역방향 — 리그 `state` 하나가 통합 축 `status` **여럿**에 대응한다
+ * (예: `draft` ← `draft`·`open`·`closed`). 상태로 거르는 목록 API 가 쓴다.
+ *
+ * **손으로 적지 않고 `LEAGUE_STATE_BY_STATUS` 에서 파생한다.** 두 방향을 따로 적으면
+ * 한쪽만 고쳐져 "목록엔 안 보이는데 상세는 열리는" 식으로 어긋난다.
+ */
+/**
+ * **리그 목록에 실을 수 있는 거울인가** (Task 164 BE-5).
+ *
+ * `V1Tournament` 에서 `scheduledAt`·`scheduledEndAt`·`regionId` 는 nullable 이지만 리그 거울은
+ * 셋 다 항상 채운다(원본이 non-null 이었다). 비어 있다면 그 행은 깨진 것이다.
+ *
+ * **목록에서는 끊지 않고 제외한다.** 단건 조회는 `LEAGUE_MIRROR_MISSING` 으로 끊는 게 맞지만
+ * (그 리그를 열려는 사람에게 사실을 말해야 한다), 목록에서 같은 판단을 하면 **깨진 행 하나
+ * 때문에 목록 전체가 500** 이 되어 운영자가 다른 리그도 못 본다. 대신 제외하면서 warn 로그와
+ * 개수를 남긴다 — 조용히 사라지면 아무도 모른다.
+ *
+ * 어드민 목록과 공개 목록이 **같은 기준**을 써야 한다(한쪽에만 보이는 리그를 만들지 않는다).
+ */
+export function isCompleteLeagueMirror<T extends {
+  scheduledAt: Date | null;
+  scheduledEndAt: Date | null;
+  regionId: string | null;
+}>(row: T): row is T & { scheduledAt: Date; scheduledEndAt: Date; regionId: string } {
+  return row.scheduledAt !== null && row.scheduledEndAt !== null && row.regionId !== null;
+}
+
+export const STATUSES_BY_LEAGUE_STATE: Record<V1LeagueState, V1TournamentStatus[]> =
+  Object.entries(LEAGUE_STATE_BY_STATUS).reduce(
+    (acc, [status, state]) => {
+      acc[state].push(status as V1TournamentStatus);
+      return acc;
+    },
+    {
+      [V1LeagueState.draft]: [] as V1TournamentStatus[],
+      [V1LeagueState.active]: [] as V1TournamentStatus[],
+      [V1LeagueState.completed]: [] as V1TournamentStatus[],
+    },
+  );

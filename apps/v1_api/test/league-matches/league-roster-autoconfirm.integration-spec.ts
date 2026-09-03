@@ -9,6 +9,7 @@ import {
   LeagueRosterAutoConfirmService,
   scheduleLeagueRosterAutoConfirm,
 } from '../../src/jobs/league-roster/league-roster-autoconfirm.service';
+import { seedLeagueOnTournamentAxis } from '../fixtures/league-on-tournament-axis.fixture';
 
 /**
  * D10 (Task 164 BE-4b) — 시즌 시작 자동 명단 확정.
@@ -112,37 +113,22 @@ describe('D10 리그 명단 자동 확정', () => {
     for (let i = 0; i < (opts.incompleteMembers ?? 0); i += 1) await makeMember(team.id, { complete: false });
 
     const startsOn = new Date('2026-10-01T00:00:00.000Z');
-    const league = await prisma.v1League.create({
-      data: {
-        title: `D10 리그 ${suiteId}-${seq}`,
-        sportId,
-        regionId,
-        createdByAdminUserId: adminId,
-        startsOn,
-        endsOn: new Date('2026-11-01T00:00:00.000Z'),
-        tieBreakJson: { order: ['points'] },
-        teams: { create: [{ teamId: team.id }] },
-      },
+    // BE-5 drop: 통합 축 행 하나가 리그다. `maxPlayers` 만 이 스펙이 따로 넣는다(정원 케이스).
+    const league = await seedLeagueOnTournamentAxis(prisma, {
+      title: `D10 리그 ${suiteId}-${seq}`,
+      sportId,
+      regionId,
+      createdByAdminUserId: adminId,
+      state: 'active',
+      startsOn,
+      endsOn: new Date('2026-11-01T00:00:00.000Z'),
     });
-    // 거울(통합 축) — 등록의 tournamentId 가 이 행을 가리킨다.
-    //
-    // **`scheduledAt` 을 반드시 넣는다.** BE-5 이후 D10 잡은 시작일을 통합 축에서 읽어
-    // 세대(예약 시점의 시작일)와 대조하는데, 비어 있으면 조기 반환해서 **아무것도 안 하고
-    // 조용히 통과한다** — 명단이 0건인 채로 스펙만 빨갛게 된다. 프로덕션의 거울은
-    // `leagueMirrorCreateData` 가 항상 채우므로 픽스처도 같은 모양이어야 한다.
-    await prisma.v1Tournament.create({
-      data: {
-        id: league.id,
-        kind: 'regular_league',
-        sportId,
-        regionId,
-        title: league.title,
-        status: 'open',
-        scheduledAt: startsOn,
-        scheduledEndAt: new Date('2026-11-01T00:00:00.000Z'),
-        ...(opts.maxPlayers === undefined ? {} : { maxPlayers: opts.maxPlayers }),
-      },
-    });
+    if (opts.maxPlayers !== undefined) {
+      await prisma.v1Tournament.update({
+        where: { id: league.id },
+        data: { maxPlayers: opts.maxPlayers },
+      });
+    }
     const registration = await prisma.v1TournamentRegistration.create({
       data: { tournamentId: league.id, teamId: team.id, appliedByUserId: adminUserId, status: 'confirmed' },
     });

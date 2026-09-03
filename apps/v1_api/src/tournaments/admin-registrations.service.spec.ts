@@ -101,7 +101,9 @@ describe('AdminRegistrationsService', () => {
     (prisma.$transaction as jest.Mock).mockImplementation((cb: (tx: typeof p) => Promise<unknown>) => cb(p));
 
     // 기본: 정원(teamCount=8) 충분, 현재 confirmed=0 → AREG-03 통과
-    prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1', teamCount: 8 });
+    prisma.v1Tournament.findFirst.mockImplementation(
+      kindAwareFindFirst({ id: 'tournament-1', teamCount: 8, kind: 'regular_tournament' }),
+    );
 
     notifications = { emitNotification: jest.fn().mockResolvedValue(undefined) };
 
@@ -265,7 +267,9 @@ describe('AdminRegistrationsService', () => {
     prisma.v1TournamentRegistration.findUnique.mockResolvedValue(registrationRow({ status: 'payment_checking' }));
     // 정원 8, 이미 confirmed 8팀 → 초과
     prisma.v1TournamentRegistration.count.mockResolvedValue(8);
-    prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1', teamCount: 8 });
+    prisma.v1Tournament.findFirst.mockImplementation(
+      kindAwareFindFirst({ id: 'tournament-1', teamCount: 8, kind: 'regular_tournament' }),
+    );
 
     await expect(service.confirm(opsAuth, 'reg-1', { decision: 'confirm' })).rejects.toMatchObject({
       response: { code: 'TOURNAMENT_CAPACITY_FULL' },
@@ -278,7 +282,9 @@ describe('AdminRegistrationsService', () => {
     prisma.v1TournamentRegistration.findUnique.mockResolvedValue(registrationRow({ status: 'paid' }));
     // 정원 초과 상태라도 waitlist는 통과
     prisma.v1TournamentRegistration.count.mockResolvedValue(8);
-    prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1', teamCount: 8 });
+    prisma.v1Tournament.findFirst.mockImplementation(
+      kindAwareFindFirst({ id: 'tournament-1', teamCount: 8, kind: 'regular_tournament' }),
+    );
     prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'waitlisted', confirmedAt: new Date() }));
     prisma.v1TournamentPayment.findUnique.mockResolvedValue(paymentRow({ status: 'paid' }));
 
@@ -337,7 +343,9 @@ describe('AdminRegistrationsService', () => {
     prisma.v1TournamentRegistration.findUnique.mockResolvedValue(
       registrationRow({ status: 'cancel_requested', cancelPreviousStatus: 'confirmed' }),
     );
-    prisma.v1Tournament.findFirst.mockResolvedValue({ teamCount: 8 });
+    prisma.v1Tournament.findFirst.mockImplementation(
+      kindAwareFindFirst({ teamCount: 8, kind: 'regular_tournament' }),
+    );
     // 다른 8팀이 이미 정원 점유 상태(confirmed 등) → 잔류시키면 9번째가 된다.
     prisma.v1TournamentRegistration.count.mockResolvedValue(8);
 
@@ -352,7 +360,9 @@ describe('AdminRegistrationsService', () => {
     prisma.v1TournamentRegistration.findUnique.mockResolvedValue(
       registrationRow({ status: 'cancel_requested', cancelPreviousStatus: 'confirmed' }),
     );
-    prisma.v1Tournament.findFirst.mockResolvedValue({ teamCount: 8 });
+    prisma.v1Tournament.findFirst.mockImplementation(
+      kindAwareFindFirst({ teamCount: 8, kind: 'regular_tournament' }),
+    );
     prisma.v1TournamentRegistration.count.mockResolvedValue(6);
     prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'confirmed' }));
 
@@ -614,15 +624,25 @@ describe('AdminRegistrationsService', () => {
   // ─── list ───────────────────────────────────────────────────────────────────
 
   // 대회 표면 봉쇄 — 리그 id 는 어드민 신청 목록으로 열리지 않는다.
-  it('list: 리그 id 로는 열리지 않는다', async () => {
+  it('list: 리그 id 도 열린다 (D7) — 운영자가 리그 신청을 볼 수 있어야 확정할 수 있다', async () => {
+    // 예전엔 여기서 404 로 막았다. 신청자 경로만 열고 이걸 닫아 두면 팀은 신청할 수 있는데
+    // **운영자가 그 신청을 보지도 확정하지도 못한다** — 신청이 영영 미확정으로 쌓인다.
     prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
     prisma.v1Tournament.findFirst.mockImplementation(
       kindAwareFindFirst({ id: 'league-1', kind: 'regular_league' }),
     );
-    // 봉쇄가 없으면 실제로 목록이 나오도록 채운다.
     prisma.v1TournamentRegistration.findMany.mockResolvedValue([]);
 
-    await expect(service.list(opsAuth, 'league-1', {})).rejects.toMatchObject({
+    await expect(service.list(opsAuth, 'league-1', {})).resolves.toBeDefined();
+    expect(prisma.v1TournamentRegistration.findMany).toHaveBeenCalled();
+  });
+
+  it('list: 없는 id 는 여전히 404 — 조회가 사라진 것은 아니다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1Tournament.findFirst.mockImplementation(kindAwareFindFirst(null));
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([]);
+
+    await expect(service.list(opsAuth, 'missing-1', {})).rejects.toMatchObject({
       response: { code: 'TOURNAMENT_NOT_FOUND' },
     });
     expect(prisma.v1TournamentRegistration.findMany).not.toHaveBeenCalled();

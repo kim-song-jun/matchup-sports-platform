@@ -299,7 +299,7 @@ describe('LeagueMatchFixturesClient', () => {
   it('대진이 없으면 요일/시각/장소를 선택하지 않아도 주차 수만으로 생성할 수 있다(기존 동작 보존)', async () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1AdminLeagueMatchMock.mockReturnValue({
-      data: { leagueId: 'league-1', title: '가을 풋살 리그', state: 'draft', teamIds: ['t1', 't2'], fixtures: [] },
+      data: { leagueId: 'league-1', title: '가을 풋살 리그', startsOn: '2026-09-01T00:00:00.000Z', state: 'draft', teamIds: ['t1', 't2'], fixtures: [] },
       isPending: false,
     } as never);
     const mutateAsync = vi.fn().mockResolvedValue({ leagueId: 'league-1', createdCount: 7, teamMatchIds: [] });
@@ -317,10 +317,47 @@ describe('LeagueMatchFixturesClient', () => {
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith({ weeksCount: 7 }));
   });
 
+  it('리그 시작일이 응답에 없으면 대진 생성·미리보기를 잠그고 이유를 알린다 — 조용히 틀린 날짜로 만들지 않는다', async () => {
+    // 화면은 요일을 **리그 시작일 기준**으로 날짜 목록으로 펼쳐 보낸다. 시작일이 없다고
+    // 오늘 기준으로 떨어뜨리면 다음 달에 시작하는 리그가 이번 주부터 경기를 갖게 되고,
+    // 서버는 그걸 막지 않는다(과거만 거부한다). 만들지 못하게 막는 쪽이 맞다.
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1AdminLeagueMatchMock.mockReturnValue({
+      // startsOn 없음 — 구버전 API 를 보고 있는 상황.
+      data: { leagueId: 'league-1', title: '가을 풋살 리그', state: 'draft', teamIds: ['t1', 't2'], fixtures: [] },
+      isPending: false,
+    } as never);
+    const mutateAsync = vi.fn();
+    const previewMutateAsync = vi.fn();
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync, isPending: false } as never);
+    useV1PreviewLeagueFixturesMock.mockReturnValue({ mutateAsync: previewMutateAsync, isPending: false } as never);
+    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    // 표·참가팀 같은 나머지 화면은 그대로 떠 있어야 한다 — 흰 화면이 되면 안 된다.
+    expect(screen.getByText('참가팀 관리')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('리그 시작일 정보를 불러오지 못했어요. 새로고침해 주세요.');
+
+    const generateButton = screen.getByRole('button', { name: '라운드로빈 대진 생성' });
+    const previewButton = screen.getByRole('button', { name: '미리보기' });
+    expect(generateButton).toBeDisabled();
+    expect(previewButton).toBeDisabled();
+
+    fireEvent.click(generateButton);
+    fireEvent.click(previewButton);
+    expect(mutateAsync).not.toHaveBeenCalled();
+    expect(previewMutateAsync).not.toHaveBeenCalled();
+  });
+
   it('요일·시각·장소를 채우고 생성하면 schedule과 placeName을 함께 전달한다', async () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1AdminLeagueMatchMock.mockReturnValue({
-      data: { leagueId: 'league-1', title: '가을 풋살 리그', state: 'draft', teamIds: ['t1', 't2'], fixtures: [] },
+      data: { leagueId: 'league-1', title: '가을 풋살 리그', startsOn: '2026-09-01T00:00:00.000Z', state: 'draft', teamIds: ['t1', 't2'], fixtures: [] },
       isPending: false,
     } as never);
     const mutateAsync = vi.fn().mockResolvedValue({ leagueId: 'league-1', createdCount: 7, teamMatchIds: [] });
@@ -364,7 +401,7 @@ describe('LeagueMatchFixturesClient', () => {
   it('요일을 고르고 시각을 비우면 서버 400 대신 안내 토스트를 보여주고 제출하지 않는다', async () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1AdminLeagueMatchMock.mockReturnValue({
-      data: { leagueId: 'league-1', title: '가을 풋살 리그', state: 'draft', teamIds: ['t1', 't2'], fixtures: [] },
+      data: { leagueId: 'league-1', title: '가을 풋살 리그', startsOn: '2026-09-01T00:00:00.000Z', state: 'draft', teamIds: ['t1', 't2'], fixtures: [] },
       isPending: false,
     } as never);
     const mutateAsync = vi.fn().mockResolvedValue({ leagueId: 'league-1', createdCount: 7, teamMatchIds: [] });
@@ -495,7 +532,7 @@ describe('LeagueMatchFixturesClient', () => {
   it('최근 사용한 장소가 없으면 칩 영역을 렌더링하지 않는다', () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1AdminLeagueMatchMock.mockReturnValue({
-      data: { leagueId: 'league-1', title: '가을 풋살 리그', state: 'draft', teamIds: ['t1', 't2'], fixtures: [], recentVenues: [] },
+      data: { leagueId: 'league-1', title: '가을 풋살 리그', startsOn: '2026-09-01T00:00:00.000Z', state: 'draft', teamIds: ['t1', 't2'], fixtures: [], recentVenues: [] },
       isPending: false,
     } as never);
     useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
@@ -1016,7 +1053,7 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
 
   it('참가팀이 2개 미만이면 "시간창" 경고를 띄우지 않는다(원인은 팀 부족이지 시간창이 아님)', () => {
     useV1AdminLeagueMatchMock.mockReturnValue({
-      data: { leagueId: 'league-1', title: '외로운 리그', state: 'draft', teamIds: ['t1'], fixtures: [] },
+      data: { leagueId: 'league-1', title: '외로운 리그', startsOn: '2026-09-01T00:00:00.000Z', state: 'draft', teamIds: ['t1'], fixtures: [] },
       isPending: false,
     } as never);
     useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);

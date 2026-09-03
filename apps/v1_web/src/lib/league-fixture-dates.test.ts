@@ -127,16 +127,14 @@ describe('expandWeeklyFixtureDates', () => {
     expect(new Set(dates).size).toBe(dates.length);
   });
 
-  it('시작일을 읽을 수 없으면 던지지 않고 오늘 기준으로 전개한다 — 어드민 화면 전체가 흰 화면이 되면 안 된다', () => {
-    // 배포 창에서 옛 API 가 startsOn 을 안 내려주는 경우가 실제로 있을 수 있다. 그때 이 함수가
-    // 던지면 대진 폼 하나 때문에 표·참가팀·취소까지 전부 못 쓰게 된다.
+  it('시작일을 읽을 수 없으면 던진다 — 오늘 기준으로 떨어뜨리면 조용히 틀린 날짜를 만든다', () => {
+    // 폴백은 매력적이지만, 다음 달에 시작하는 초안 리그가 이번 주부터 경기를 갖게 된다.
+    // 서버는 과거만 거부하므로 그 잘못된 대진이 **실제로 생성된다**. 호출 화면이 시작일
+    // 유무를 먼저 보고 폼을 잠그는 쪽이 맞다(league-match-fixtures-client.test.tsx 가 고정).
     for (const startsOn of ['', 'not-a-date', undefined as unknown as string]) {
       expect(() =>
         expandWeeklyFixtureDates({ startsOn, dayOfWeek: 6, time: '18:00', weeksCount: 2, now }),
-      ).not.toThrow();
-      expect(
-        expandWeeklyFixtureDates({ startsOn, dayOfWeek: 6, time: '18:00', weeksCount: 2, now }),
-      ).toEqual(['2026-09-05', '2026-09-12']);
+      ).toThrow(/리그 시작일/);
     }
   });
 

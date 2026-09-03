@@ -68,13 +68,18 @@ export function expandWeeklyFixtureDates(input: ExpandWeeklyFixtureDatesInput): 
   const { startsOn, dayOfWeek, time, weeksCount, now } = input;
   if (weeksCount <= 0) return [];
 
-  const nowKst = toKstDateString(now);
-  // **읽을 수 없는 시작일은 "제약 없음"으로 취급한다.** 기준일은 어차피
-  // `max(시작일, 오늘)` 이라, 시작일을 못 읽으면 오늘로 떨어뜨리는 것이 의미상 맞다.
-  // 여기서 던지면 **어드민 리그 화면이 통째로 흰 화면이 된다** — 대진 폼 하나 때문에
-  // 표·참가팀·취소까지 전부 못 쓰게 되는 건 과한 대가다(테스트로 고정).
+  // **시작일은 필수다. 읽을 수 없으면 던진다.**
+  // "못 읽으면 오늘 기준"으로 떨어뜨리고 싶어지지만 그건 **조용히 틀린 날짜**를 만든다 —
+  // 다음 달에 시작하는 초안 리그가 이번 주부터 경기를 갖게 되고, 서버는 그걸 막지 않는다
+  // (과거만 거부한다). 창이 짧아도 잘못된 대진이 실제로 생성되는 쪽이 더 나쁘다.
+  // 호출부(`league-match-fixtures-client.tsx`)가 시작일 유무를 먼저 판정해 폼을 잠그고
+  // 안내 문구를 띄운다 — 그래서 이 함수는 던져도 화면을 흰 화면으로 만들지 않는다.
   const startsOnAt = new Date(startsOn);
-  const startsOnKst = Number.isNaN(startsOnAt.getTime()) ? nowKst : toKstDateString(startsOnAt);
+  if (Number.isNaN(startsOnAt.getTime())) {
+    throw new Error(`expandWeeklyFixtureDates: 리그 시작일을 읽을 수 없다 (${String(startsOn)})`);
+  }
+  const nowKst = toKstDateString(now);
+  const startsOnKst = toKstDateString(startsOnAt);
   // 문자열 비교가 곧 날짜 비교다('YYYY-MM-DD').
   const anchorDate = startsOnKst > nowKst ? startsOnKst : nowKst;
 

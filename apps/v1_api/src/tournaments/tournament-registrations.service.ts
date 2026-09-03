@@ -327,6 +327,9 @@ export class TournamentRegistrationsService {
       //
       // `confirmedByAdminUserId` 는 비운다 — 아무도 확인하지 않았다는 것이 사실이다.
       const isFree = lockedTournament.entryFee <= 0;
+      // 무료면 제출 순간이 곧 정산 시점이고, 유료면 아직 낸 적이 없으므로 `null` 이다
+      // (재제출에서 옛 결제의 시각이 남아 있으면 안 된다 — 그래서 유료도 명시적으로 비운다).
+      const settledAt = isFree ? new Date() : null;
       const updated = await tx.v1TournamentRegistration.update({
         where: { id: registrationId },
         data: {
@@ -346,16 +349,19 @@ export class TournamentRegistrationsService {
           method: dto.paymentMethod,
           amount: lockedTournament.entryFee,
           status: isFree ? 'paid' : 'ready',
-          ...(isFree ? { paidAt: new Date() } : {}),
+          paidAt: settledAt,
           provider: dto.paymentMethod === 'pg' ? 'toss' : null,
         },
         update: {
           method: dto.paymentMethod,
           amount: lockedTournament.entryFee,
           status: isFree ? 'paid' : 'ready',
-          ...(isFree ? { paidAt: new Date() } : {}),
           provider: dto.paymentMethod === 'pg' ? 'toss' : null,
-          paidAt: null,
+          // `paidAt` 은 **한 번만** 적는다. 예전엔 여기 `paidAt: null` 이 뒤에 따로 있었고,
+          // 0원 분기를 스프레드로 앞에 얹었더니 **그 null 이 덮어썼다** — 재제출(결제 행이
+          // 이미 있는 경우)에서 `status: 'paid'` 인데 `paidAt: null` 인 행이 나온다
+          // (Copilot 리뷰가 잡았다. 내 첫 스펙은 `create` 만 단언해서 못 봤다).
+          paidAt: settledAt,
           cancelledAt: null,
           refundedAt: null,
         },

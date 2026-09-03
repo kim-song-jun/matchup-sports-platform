@@ -412,12 +412,16 @@ describe('TournamentRegistrationsService', () => {
         expect.objectContaining({ data: expect.objectContaining({ status: 'payment_checking' }) }),
       );
       const upsert = prisma.v1TournamentPayment.upsert.mock.calls[0][0] as {
-        create: { status: string; paidAt?: Date };
-        update: { status: string };
+        create: { status: string; paidAt: Date | null };
+        update: { status: string; paidAt: Date | null };
       };
       expect(upsert.create.status).toBe('paid');
       expect(upsert.update.status).toBe('paid');
+      // **`update` 쪽도 본다.** 결제 레코드가 이미 있는 재제출에서는 `create` 가 아니라
+      // 이쪽이 쓰인다 — `create` 만 단언하면 `update` 에서 `paidAt` 이 빠지는 회귀를
+      // 못 잡고, 그 결과는 "paid 인데 결제 시각이 null" 이다(Copilot 리뷰 지적).
       expect(upsert.create.paidAt).toBeInstanceOf(Date);
+      expect(upsert.update.paidAt).toBeInstanceOf(Date);
     });
 
     it('유료: 지금까지처럼 awaiting_payment 로 간다 — 리그 편의가 대회 회귀가 되면 안 된다', async () => {
@@ -428,11 +432,16 @@ describe('TournamentRegistrationsService', () => {
         expect.objectContaining({ data: expect.objectContaining({ status: 'awaiting_payment' }) }),
       );
       const upsert = prisma.v1TournamentPayment.upsert.mock.calls[0][0] as {
-        create: { status: string; paidAt?: Date };
+        create: { status: string; paidAt: Date | null };
+        update: { status: string; paidAt: Date | null };
       };
       expect(upsert.create.status).toBe('ready');
-      // 낸 적 없는 돈에 결제 시각이 찍히면 정산·환불이 그것을 근거로 삼는다.
-      expect(upsert.create.paidAt).toBeUndefined();
+      expect(upsert.update.status).toBe('ready');
+      // 낸 적 없는 돈에 결제 시각이 찍히면 정산·환불이 그것을 근거로 삼는다. 양쪽 다 본다.
+      // `null` 이다(미설정이 아니라 **명시적으로 비움**) — 재제출에서 옛 결제의 시각이
+      // 남아 있으면 안 되기 때문이다.
+      expect(upsert.create.paidAt).toBeNull();
+      expect(upsert.update.paidAt).toBeNull();
     });
   });
 

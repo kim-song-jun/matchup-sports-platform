@@ -74,7 +74,7 @@ export default function LandingPage() {
                   aria-hidden="true"
                   width={640}
                   height={640}
-                  sizes="(min-width: 1024px) 300px, 62vw"
+                  sizes="(min-width: 1024px) 248px, 62vw"
                   priority
                 />
               </div>

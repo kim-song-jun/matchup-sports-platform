@@ -469,8 +469,8 @@
     padding: 0;
   }
 
-  /* Hero: two-column layout — content left, stats right.
-     1fr minmax(0,360px): 텍스트 컬럼이 내용에 따라 충분히 확보되도록 우측 상한 설정 */
+  /* Hero: two-column layout — content left, graphic well + stat strip right.
+     1fr minmax(0,400px): 4:3 웰이 들어갈 우측 상한. 이미지는 웰 폭의 62%(≈248px)라 sizes 도 그 값. */
   .tm-landing-hero {
     padding: 80px 32px 88px;
   }

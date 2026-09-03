@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 
 /**
  * 무한 루프 CSS 애니메이션(광택 스윕·크레스트 숨쉬기·티어 발광 등)에 가시성 게이트를 건다.
@@ -12,23 +12,18 @@ import { useCallback, useEffect, useRef } from 'react';
  * 잡는다(phase2-result.json: pcard-infinite-loop-no-visibility-gate).
  *
  * IntersectionObserver 는 요소 자신이 화면에 보이는지, `visibilitychange` 는 탭/앱이
- * 백그라운드인지를 본다 — 둘 중 하나라도 "안 보임"이면 멈춘다. 콜백 ref 를 쓰는 이유는
- * `useInfiniteScroll` 과 동일: DOM 노드가 렌더 시점에 확정되므로 effect 안에서
- * ref.current 를 읽으면 되고, 여기서는 노드가 컴포넌트 생애주기 동안 바뀌지 않으므로
- * effect 는 마운트 시 한 번만 건다.
+ * 백그라운드인지를 본다 — 둘 중 하나라도 "안 보임"이면 멈춘다. 반환값은 콜백 ref 인데,
+ * 노드를 ref 가 아니라 **state** 에 담는다 — 마운트 시 한 번만 ref.current 를 읽으면
+ * 소비처가 조건부로 나중에 요소를 렌더할 때 옵저버가 영영 안 붙는다(Copilot 지적).
+ * 노드가 바뀔 때마다 effect 가 다시 돌아 이전 노드는 정리하고 새 노드에 건다.
  *
  * 1회성 진입 애니메이션(tmCardRise)은 대상이 아니다 — `animation-play-state: paused`
  * 는 이미 끝난 애니메이션에는 아무 영향을 주지 않는다(재생 중인 애니메이션에만 적용).
  */
 export function useLoopPause<T extends HTMLElement>() {
-  const nodeRef = useRef<T | null>(null);
-
-  const setNode = useCallback((node: T | null) => {
-    nodeRef.current = node;
-  }, []);
+  const [el, setNode] = useState<T | null>(null);
 
   useEffect(() => {
-    const el = nodeRef.current;
     if (!el || typeof document === 'undefined') return;
 
     // observer 콜백이 도착하기 전까지는 "보인다"고 가정한다 — 화면 밖 카드를 잠깐
@@ -65,7 +60,7 @@ export function useLoopPause<T extends HTMLElement>() {
       observer?.disconnect();
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
-  }, []);
+  }, [el]);
 
   return setNode;
 }

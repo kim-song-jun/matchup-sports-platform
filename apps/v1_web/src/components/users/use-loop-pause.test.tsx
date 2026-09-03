@@ -107,6 +107,21 @@ describe('useLoopPause', () => {
     expect(el).toHaveAttribute('data-loop-paused', 'true');
   });
 
+  it('대상 요소가 나중에 렌더돼도(조건부 렌더) 그때 observer 를 건다 — 마운트 시 한 번만 읽으면 영영 안 붙는다', () => {
+    function LateCard({ show }: { show: boolean }) {
+      const ref = useLoopPause<HTMLDivElement>();
+      return show ? <div ref={ref} data-testid="card" /> : <p>아직 없음</p>;
+    }
+    const { rerender, getByTestId } = render(<LateCard show={false} />);
+    expect(observeSpy).not.toHaveBeenCalled();
+
+    rerender(<LateCard show />);
+
+    expect(observeSpy).toHaveBeenCalledTimes(1);
+    fireIntersection(false);
+    expect(getByTestId('card')).toHaveAttribute('data-loop-paused', 'true');
+  });
+
   it('언마운트 시 observer 를 disconnect 하고 visibilitychange 리스너를 뗀다', () => {
     const { unmount } = render(<TestCard />);
     const removeSpy = vi.spyOn(document, 'removeEventListener');

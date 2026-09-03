@@ -7542,7 +7542,7 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   mix-blend-mode: overlay; pointer-events: none;
 }
 /* 광택 스윕 -- 넓은 반사 옆에 가는 하이라이트를 붙여 두 줄이 함께 지나가야 포일로 보인다.
-   `left` 는 정적이다(-85%, 이동하지 않는다) -- 매 프레임 이동은 `transform: translateX()`
+   `left` 는 정적이다(-80%, 이동하지 않는다) -- 매 프레임 이동은 `transform: translateX()`
    가 맡는다(phase2-result.json: pcard-sweep-animates-left-not-transform). `left` 보간은
    레이아웃 프로퍼티라 매 사이클 리플로우를 강제하지만 transform 은 컴포지터만 쓴다.
    translateX 는 자기 자신의 박스(위 width: 62%) 기준 %이므로, 예전 `left` 가 부모 기준으로

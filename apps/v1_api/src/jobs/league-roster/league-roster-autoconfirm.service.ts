@@ -6,6 +6,7 @@ import {
   normalizeGender,
 } from '../../tournaments/tournament-players.service';
 import { isPhoneVerificationEnforced } from '../../verification/phone-verification-access';
+import { findTournamentOnSurfaceOrThrow } from '../../tournaments/tournament-surface-lookup';
 
 export const LEAGUE_ROSTER_REMINDER_TYPE = 'LEAGUE_ROSTER_REMINDER';
 export const LEAGUE_ROSTER_AUTOCONFIRM_TYPE = 'LEAGUE_ROSTER_AUTOCONFIRM';
@@ -21,6 +22,14 @@ const REMINDER_LEAD_MS = 24 * 60 * 60 * 1_000;
  * 켜려면 `DISABLE_LEAGUE_ROSTER_AUTOCONFIRM_CRON=false` 를 명시적으로 넣어야 하고,
  * 그 env 변경 자체가 사용자 승인 대상이다.
  */
+/**
+ * 자동 확정·리마인더가 **같이 쓰는** 대상 조건. 위 doc 주석 참조 — `status: 'confirmed'`
+ * 와 `players: { none: {} }` 둘 다 좁히는 쪽이 계약이고, 두 잡이 갈라지면 알림과 실제
+ * 동작이 어긋난다.
+ */
+const PENDING_ROSTER_REGISTRATION_WHERE = (leagueId: string) =>
+  ({ tournamentId: leagueId, status: 'confirmed', players: { none: {} } }) satisfies Prisma.V1TournamentRegistrationWhereInput;
+
 export function isLeagueRosterAutoConfirmEnabled(): boolean {
   return process.env.DISABLE_LEAGUE_ROSTER_AUTOCONFIRM_CRON === 'false';
 }
@@ -37,6 +46,25 @@ export function isLeagueRosterAutoConfirmEnabled(): boolean {
  *
  * `ON CONFLICT DO NOTHING` 이 **멱등의 1차 방어**다 — 같은 시즌에 두 번 예약해도 행은 하나다.
  */
+/**
+ * **정규 리그 생성의 단일 진입점.** 거울(`v1Tournament`) 행을 만들면서 로스터 자동 확정을
+ * 같은 트랜잭션에서 예약한다.
+ *
+ * 왜 여기인가: 리그를 만드는 경로가 셋(운영자 단건 생성 · 시즌 시드 · 다음 시즌 승계)인데
+ * **셋 다 반드시 이 거울 생성을 지난다** — 안 지나면 read-swap 뒤 화면에서 리그가 사라지기
+ * 때문이다. 예약을 각 호출부에 흩어 두면 새 경로가 생길 때마다 빠뜨린다(실제로 시즌 쪽 두
+ * 곳이 빠져 있었다). 164 BE-5 가 `v1League` 를 걷어내면 이 거울 생성이 곧 리그 생성 자체가
+ * 되므로, 그때도 이 자리는 그대로 단일 진입점으로 남는다.
+ */
+export async function createLeagueMirrorWithRosterSchedule(
+  tx: Prisma.TransactionClient,
+  data: Prisma.V1TournamentUncheckedCreateInput,
+  schedule: { leagueId: string; startsOn: Date },
+): Promise<void> {
+  await tx.v1Tournament.create({ data });
+  await scheduleLeagueRosterAutoConfirm(tx, schedule);
+}
+
 export async function scheduleLeagueRosterAutoConfirm(
   tx: Prisma.TransactionClient,
   input: { leagueId: string; startsOn: Date },
@@ -115,14 +143,21 @@ export class LeagueRosterAutoConfirmService {
     await this.notify(tx, league, outcomes);
   };
 
-  /** 명단이 **비어 있는** confirmed 등록만. 한 명이라도 올린 팀은 손대지 않는다. */
+  /**
+   * **선수 row 가 아예 없는 confirmed 등록만.** 두 군데를 좁혔다:
+   *
+   * ① `status` — `notIn: ['cancelled','cancel_requested']` 는 `draft`·`submitted`·
+   *    `awaiting_payment` 처럼 **아직 참가가 확정되지도 않은** 등록까지 끌어와, 결제도 안
+   *    끝난 팀의 명단을 자동으로 채워 버렸다. 정본의 "미제출" 은 참가가 확정된 팀에만
+   *    해당한다.
+   * ② `players` — `none: { removedAt: null }` 은 "살아 있는 선수가 없다" 라서 **한 번
+   *    올렸다가 전원 뺀 팀**도 포함했다. 그건 운영자가 손대서 비운 명단이지 미제출이
+   *    아니다(2026-09-03 정책 확정: 대상 제외). `none: {}` 로 "선수 row 자체가 없다" 만
+   *    남긴다.
+   */
   private async pendingRegistrations(tx: Prisma.TransactionClient, leagueId: string) {
     const rows = await tx.v1TournamentRegistration.findMany({
-      where: {
-        tournamentId: leagueId,
-        status: { notIn: ['cancelled', 'cancel_requested'] },
-        players: { none: { removedAt: null } },
-      },
+      where: PENDING_ROSTER_REGISTRATION_WHERE(leagueId),
       select: { id: true, teamId: true },
     });
     return rows;
@@ -133,7 +168,10 @@ export class LeagueRosterAutoConfirmService {
     leagueId: string,
     registration: { id: string; teamId: string },
   ): Promise<AutoConfirmOutcome> {
-    const tournament = await tx.v1Tournament.findUniqueOrThrow({
+    // 원시 `v1Tournament` 조회 금지(v1-surface-check) — 이 잡은 **정규 리그만** 다루므로
+    // 표면 헬퍼가 그 종류 조건까지 함께 걸어 준다. 리그가 아닌 id 가 들어오면 여기서
+    // TOURNAMENT_NOT_FOUND 로 끊긴다.
+    const tournament = await findTournamentOnSurfaceOrThrow(tx, ['regular_league'], {
       where: { id: leagueId },
       select: { maxPlayers: true, genderCategory: true },
     });
@@ -290,12 +328,10 @@ export class LeagueRosterReminderService {
     if (league === null) return;
     if (league.startsOn.toISOString() !== value.expectedStartsOn) return;
 
+    // 자동 확정과 **같은 조건**이어야 한다 — 리마인더가 더 넓으면 하루 뒤 아무 일도
+    // 일어나지 않을 팀에게 "곧 자동으로 채워져요" 라고 알리게 된다.
     const pending = await tx.v1TournamentRegistration.findMany({
-      where: {
-        tournamentId: leagueId,
-        status: { notIn: ['cancelled', 'cancel_requested'] },
-        players: { none: { removedAt: null } },
-      },
+      where: PENDING_ROSTER_REGISTRATION_WHERE(leagueId),
       select: { id: true, teamId: true },
     });
     if (pending.length === 0) return;

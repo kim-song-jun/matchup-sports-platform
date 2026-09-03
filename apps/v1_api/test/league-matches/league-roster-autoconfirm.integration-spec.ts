@@ -190,6 +190,51 @@ describe('D10 리그 명단 자동 확정', () => {
     expect(row.at).toBeNull();
   });
 
+  it('한 번 올렸다가 전원 뺀 팀은 미제출로 보지 않는다 (제거된 선수 row 가 남아 있다)', async () => {
+    // `players: { none: { removedAt: null } }` 로 잡으면 이 팀이 "명단 0명" 으로 보여
+    // 자동 확정 대상이 된다 — 운영자가 손으로 비운 명단을 도로 채우는 셈이다. 정본의
+    // "미제출" 은 **선수 row 자체가 없는** 팀이다(2026-09-03 정책 확정).
+    const { league, registration, startsOn, team } = await seedLeague({ members: 3 });
+    const [firstMember] = await prisma.v1TeamMembership.findMany({ where: { teamId: team.id, role: 'member' }, take: 1 });
+    await prisma.v1TournamentPlayer.create({
+      data: {
+        registrationId: registration.id,
+        userId: firstMember.userId,
+        realName: '뺀 선수',
+        eligibilityStatus: 'non_pro',
+        removedAt: new Date(),
+      },
+    });
+
+    await run(league.id, startsOn);
+
+    const players = await prisma.v1TournamentPlayer.findMany({ where: { registrationId: registration.id } });
+    expect(players).toHaveLength(1);
+    expect(players[0].removedAt).not.toBeNull();
+    const [row] = await prisma.$queryRaw<Array<{ at: Date | null }>>`
+      SELECT roster_auto_confirmed_at AS at FROM v1_tournament_registrations WHERE id = ${registration.id}
+    `;
+    expect(row.at).toBeNull();
+  });
+
+  it('참가가 확정되지 않은 등록(submitted·awaiting_payment)은 채우지 않는다', async () => {
+    // `status: { notIn: ['cancelled','cancel_requested'] }` 로 잡으면 결제도 안 끝난 팀의
+    // 명단이 자동으로 선다. 자동 확정은 confirmed 등록에만 해당한다.
+    for (const status of ['submitted', 'awaiting_payment', 'waitlisted'] as const) {
+      const { league, registration, startsOn } = await seedLeague({ members: 3 });
+      await prisma.v1TournamentRegistration.update({ where: { id: registration.id }, data: { status } });
+
+      await run(league.id, startsOn);
+
+      const players = await prisma.v1TournamentPlayer.findMany({ where: { registrationId: registration.id } });
+      expect(players).toHaveLength(0);
+      const [row] = await prisma.$queryRaw<Array<{ at: Date | null }>>`
+        SELECT roster_auto_confirmed_at AS at FROM v1_tournament_registrations WHERE id = ${registration.id}
+      `;
+      expect(row.at).toBeNull();
+    }
+  });
+
   it('자격 통과 멤버가 0명이면 명단을 만들지 않고 표식도 남기지 않는다', async () => {
     const { league, registration, startsOn } = await seedLeague({ members: 0, incompleteMembers: 2 });
 

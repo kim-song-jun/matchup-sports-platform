@@ -181,8 +181,10 @@ D8 순서 `expand → dual-write → backfill → read-swap → contract` 중 **
       이 세션에서 재생성할 수 없다(CI 가 생성한다).
     - **기본은 꺼짐**: `DISABLE_LEAGUE_ROSTER_AUTOCONFIRM_CRON === 'false'` 일 때만 실행된다
       (없으면 안 돈다). 켜는 것 = alpha 데이터 자동 쓰기라 **사용자 직접 승인 뒤 env 변경**.
-    - ⚠️ **크론 활성화는 alpha 데이터 변경이다.** `DISABLE_LEAGUE_ROSTER_AUTOCONFIRM_CRON=true`
-      **기본 on 으로 배포**하고, 끄는 것은 **사용자 직접 승인** 뒤에 한다.
+    - ⚠️ **크론 활성화는 alpha 데이터 변경이다.** 그래서 **꺼진 채로 배포**하고,
+      `DISABLE_LEAGUE_ROSTER_AUTOCONFIRM_CRON=false` 를 넣어 **켜는 것**이 사용자 직접 승인
+      대상이다(위 줄과 같은 말 — 앞서 여기에 "기본 on 으로 배포" 라고 적혀 있었는데 바로 위
+      "기본은 꺼짐" 과 정반대였다).
     - **대진 생성보다 먼저 돌아야 한다** — `generateFixtures`·`regenerateFixtures` 가 거울 status 를
       `in_progress` 로 옮기면 신청이 닫히고, 그 뒤엔 자동 확정할 대상이 이미 없다.
 - **BE-5 ④ contract.** `v1League.*` / `v1LeagueTeam.*` 호출 12 파일 → `V1Tournament(kind='regular_league')` / `V1TournamentRegistration` 으로 재배선. 역방향 dual-write 제거. **`git grep -n -w -e v1League -e v1LeagueTeam -- apps/v1_api/src apps/v1_web/src | wc -l` → `0`** 이 된 뒤에만 drop 마이그레이션 PR 을 따로 연다. drop 은 idempotent(`DROP TABLE IF EXISTS`), alpha 실행 전 사용자 직접 승인.

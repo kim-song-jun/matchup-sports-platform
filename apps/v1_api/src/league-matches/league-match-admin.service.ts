@@ -27,7 +27,7 @@ import { tierLabel } from './league-tier-label';
 import { resolveResultStage } from './league-result-stage';
 import { resolveIsForfeit } from './league-match-forfeit.service';
 import { FixtureScheduleTemplate, FixtureTimingOptions, generateRoundRobinFixtures, resolveFixtureStartAt, resolveFixtureTimeSlots, RoundRobinFixture } from './round-robin-schedule';
-import { scheduleLeagueRosterAutoConfirm } from '../jobs/league-roster/league-roster-autoconfirm.service';
+import { createLeagueMirrorWithRosterSchedule } from '../jobs/league-roster/league-roster-autoconfirm.service';
 import { createLeagueFixture, leagueFixtureTitle } from './league-fixture-creation';
 import { resolveLeagueFixtureDates } from './league-fixture-dates';
 import { resolveLeagueWeekNumbers } from './league-week-number';
@@ -176,7 +176,10 @@ export class LeagueMatchAdminService {
       // dual-write — 통합 축(V1Tournament)에 같은 리그를 비춘다. **같은 트랜잭션 안이다**:
       // 밖으로 빼면 리그만 생기고 거울이 없는 창이 열리고, 그 리그는 read-swap 뒤
       // **에러 없이 화면에서 사라진다**(운영자는 "방금 만든 리그가 안 보인다"고만 말할 수 있다).
-      await tx.v1Tournament.create({ data: leagueMirrorCreateData(toMirrorSource(created)) });
+      await createLeagueMirrorWithRosterSchedule(tx, leagueMirrorCreateData(toMirrorSource(created)), {
+        leagueId: created.id,
+        startsOn,
+      });
       // 로스터와 짝이 되는 confirmed 등록 — **거울 create 뒤여야 한다**(등록의
       // tournamentId 가 거울 행을 가리킨다). 리그를 만들 때 함께 넣은 팀도 로스터에
       // 들어가므로 여기가 다섯 번째 경로다(addTeam·시드·승계·신청 확정과 같은 불변식).
@@ -187,7 +190,6 @@ export class LeagueMatchAdminService {
       // 예약한다. v1 스택엔 cron 데코레이터가 없고 아웃박스에 미래 시각으로 넣는 것이
       // 관용구다(`league-result-entry-reminder` 선례). "대진 생성 전에 돌아야 한다" 는
       // 제약은 잡이 "대진이 이미 있으면 skip" 을 스스로 판정해 지킨다.
-      await scheduleLeagueRosterAutoConfirm(tx, { leagueId: created.id, startsOn });
       await this.adminContext.logAdminAction(
         admin,
         {

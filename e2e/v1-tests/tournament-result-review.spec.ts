@@ -4,6 +4,7 @@ import { apiGet, apiPost, commandId, unwrap } from './helpers/v1-http';
 import {
   createTournamentFixtureGame,
   endGameToSubmittedRevision,
+  projectionPreviewHash,
 } from './helpers/tournament-fixture';
 
 /**
@@ -164,6 +165,16 @@ test.describe('[E2E-TOUR-01] 대회 결과 검토 (그 자리에서 고쳐 재�
     // predecessor 를 건드리지 않는다) 상태만 보면 확정 가능해 보인다 — officialize 가
     // `supersedesId` 로 따로 판정한다. 이게 없으면 어드민의 오래된 화면이 **고치기 전**
     // 결과를 공식으로 만들 수 있다.
+    //
+    // ⚠️ **hash 는 맞게 보낸다.** projection-preview 검사가 supersede 검사보다 먼저 걸리므로
+    // 아무 문자열이나 넣으면 `PROJECTION_PREVIEW_MISMATCH` 에서 멈춰 **정작 재려는 가드에
+    // 도달하지 못한다** — 상태 코드만 보면 둘 다 409 라 통과로 읽힌다. 그래서 base 리비전
+    // 내용으로 진짜 hash 를 만들고, **에러 코드까지** 단언한다.
+    const baseRevision = unwrap<Array<{ id: string; score: unknown; goalEvents: unknown; eventsHash: string; mvpParticipantId: string | null }>>(
+      await apiGet(request, `/api/v1/games/${gameId}/result-revisions`, { email }),
+    ).find((revision) => revision.id === submitted.revisionId);
+    expect(baseRevision, 'base 리비전을 목록에서 찾지 못했다').toBeTruthy();
+
     const staleOfficialId = commandId();
     const staleOfficialize = await apiPost(
       request,
@@ -174,10 +185,11 @@ test.describe('[E2E-TOUR-01] 대회 결과 검토 (그 자리에서 고쳐 재�
         data: {
           expectedVersion: resubmittedData.version,
           clientCommandId: staleOfficialId,
-          projectionPreviewHash: 'e2e-stale-official',
+          projectionPreviewHash: projectionPreviewHash(baseRevision!),
         },
       },
     );
     expect(staleOfficialize.status, JSON.stringify(staleOfficialize.body)).toBe(409);
+    expect((staleOfficialize.body as { code?: string }).code).toBe('REVISION_MUST_BE_SUPERSEDED');
   });
 });

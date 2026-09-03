@@ -99,6 +99,29 @@ describe('대회 생성 — 마감 일시 하한', () => {
     expect(errors.rosterDeadlineAt).toBeUndefined();
   });
 
+  it('시작일이 과거면 "7일 이내" 경고를 띄우지 않는다 — 남은 시간이 음수라 항상 참이 되던 자리', () => {
+    // `start - now <= 7일` 만 보면 **과거 시작일은 음수**라 무조건 통과한다. 그러면 이미 지난
+    // 대회를 불러오거나 날짜를 잘못 넣었을 때 "대회 시작이 7일 이내예요" 라는 엉뚱한 경고가 뜬다.
+    expect(isShortLeadTime('2026-09-01T10:00')).toBe(false);
+    expect(isShortLeadTime('2020-01-01T10:00')).toBe(false);
+  });
+
+  it('시작일이 과거면 검증이 막고, 마감 오류가 아니라 시작일 문제라고 말한다', () => {
+    // 마감 검증만 있으면 과거 시작일이 "마감은 대회 시작 전이어야 해요" 같은 **엉뚱한 필드의**
+    // 오류로 나타난다. 원인이 있는 필드에서 말해야 운영자가 고칠 곳을 안다.
+    const errors = validateTournamentCreateStep(
+      {
+        ...INITIAL_TOURNAMENT_CREATE_STATE,
+        step: 1,
+        scheduledAt: '2026-09-01T10:00',
+        registrationDeadlineAt: '2026-09-10T23:59',
+        rosterDeadlineAt: '2026-09-10T23:59',
+      },
+      1,
+    );
+    expect(errors.scheduledAt).toBe('대회 시작 일시는 지금 이후여야 해요.');
+  });
+
   it('시작이 7일 이내인지 알려 준다 — 화면이 경고 배너를 띄우는 근거', () => {
     expect(isShortLeadTime('2026-09-07T10:00')).toBe(true);
     expect(isShortLeadTime('2026-10-04T10:00')).toBe(false);

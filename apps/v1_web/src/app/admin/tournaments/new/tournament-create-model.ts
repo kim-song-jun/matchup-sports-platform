@@ -533,6 +533,12 @@ export function validateTournamentCreateStep(state: TournamentCreateState, step 
     // 통과한다 — 그러면 팀이 명단을 아예 못 낸다(서버 409 ROSTER_DEADLINE_PASSED).
     // 두 필드를 각각 본다: 같은 자동 제안 로직을 두 곳이 쓰므로 한쪽만 막으면 반쪽이다.
     const nowTs = Date.now();
+    // **시작일 자체가 과거면 거기서 말한다.** 이 검사가 없으면 과거 시작일이 "마감은 대회 시작
+    // 전이어야 해요" 처럼 **엉뚱한 필드의** 오류로 나타나 운영자가 고칠 곳을 못 찾는다.
+    // 이 마법사는 생성 전용이라(편집 경로가 이 검증을 쓰지 않는다) 지난 대회 편집을 막지 않는다.
+    if (start !== null && start <= nowTs) {
+      errors.scheduledAt = '대회 시작 일시는 지금 이후여야 해요.';
+    }
     if (registrationDeadline !== null && registrationDeadline <= nowTs) {
       errors.registrationDeadlineAt = '신청 마감은 지금 이후여야 해요.';
     }
@@ -782,8 +788,12 @@ function promoPayload(
 export function isShortLeadTime(scheduledAt: string) {
   const start = new Date(scheduledAt);
   if (!scheduledAt || Number.isNaN(start.getTime())) return false;
-  // 문구가 "7일 이내" 이므로 경계(정확히 7일)도 포함한다 — `<` 이면 딱 7일일 때 경고가 안 뜬다.
-  return start.getTime() - Date.now() <= 7 * 24 * 60 * 60 * 1000;
+  const remaining = start.getTime() - Date.now();
+  // **과거 시작일은 경고 대상이 아니다.** `remaining <= 7일` 만 보면 과거는 음수라 항상 참이 돼서
+  // 이미 지난 날짜를 넣었을 때 "대회 시작이 7일 이내예요" 라는 엉뚱한 경고가 뜬다.
+  // 과거 시작일은 아래 `scheduledAt` 검증이 원인 있는 필드에서 잡는다.
+  // 경계(정확히 7일)는 포함한다 — 문구가 "7일 이내" 이므로 `<` 이면 딱 7일일 때 경고가 안 뜬다.
+  return remaining >= 0 && remaining <= 7 * 24 * 60 * 60 * 1000;
 }
 
 function suggestDeadline(startValue: string, daysBefore: number) {

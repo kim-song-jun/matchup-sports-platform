@@ -7541,19 +7541,27 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
       rgba(255, 255, 255, 0.1) 0 1px, rgba(255, 255, 255, 0) 1px 6px);
   mix-blend-mode: overlay; pointer-events: none;
 }
-/* 광택 스윕 -- 넓은 반사 옆에 가는 하이라이트를 붙여 두 줄이 함께 지나가야 포일로 보인다. */
+/* 광택 스윕 -- 넓은 반사 옆에 가는 하이라이트를 붙여 두 줄이 함께 지나가야 포일로 보인다.
+   `left` 는 정적이다(-85%, 이동하지 않는다) -- 매 프레임 이동은 `transform: translateX()`
+   가 맡는다(phase2-result.json: pcard-sweep-animates-left-not-transform). `left` 보간은
+   레이아웃 프로퍼티라 매 사이클 리플로우를 강제하지만 transform 은 컴포지터만 쓴다.
+   translateX 는 자기 자신의 박스(위 width: 62%) 기준 %이므로, 예전 `left` 가 부모 기준으로
+   -80%→160%(240% 이동)이던 것과 같은 이동 거리를 내려면 240% ÷ 0.62 ≈ 387.1%를 쓴다.
+   순서가 중요하다: translateX 를 앞에(바깥) 써야 회전 없는 전역 X축을 따라 순수 수평으로
+   미끄러지고, rotate 를 뒤에(안쪽) 써야 그 자리에서 18도 기울어진 채 유지된다 -- 반대로
+   쓰면 원점을 중심으로 호를 그리며 도는 궤적이 된다. */
 .tm-pcard-face::after {
   content: ''; position: absolute; top: -60%; left: -85%;
   width: 62%; height: 240%;
   background: linear-gradient(90deg,
     rgba(255, 255, 255, 0) 0%, var(--tm-sheen) 38%,
     rgba(255, 255, 255, 0.55) 50%, var(--tm-sheen) 62%, rgba(255, 255, 255, 0) 100%);
-  transform: rotate(18deg);
+  transform: translateX(0%) rotate(18deg);
   animation: tmCardSweep 5.6s ease-in-out infinite;
   animation-delay: var(--tm-sweep-delay, 0s);
   pointer-events: none; z-index: 2;
 }
-@keyframes tmCardSweep { 0%, 62% { left: -80%; } 88%, 100% { left: 160%; } }
+@keyframes tmCardSweep { 0%, 62% { transform: translateX(0%) rotate(18deg); } 88%, 100% { transform: translateX(387.1%) rotate(18deg); } }
 /* 각인된 브랜드 마크 -- 색을 칠하지 않고 마스크로 뚫어 티어 잉크색을 그대로 쓴다. */
 .tm-pcard-crest-bg {
   position: absolute; right: -26px; top: -16px;
@@ -8022,6 +8030,20 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   .tm-pcard-frame, .tm-pcard-face::after, .tm-pcard-fx, .tm-pcard-crest, .tm-pcard-flip {
     animation: none !important; transition: none !important;
   }
+}
+
+/* 가시성 게이트 (use-loop-pause.ts) -- 카드가 뷰포트 밖으로 스크롤되거나 문서가
+   백그라운드면 루트에 data-loop-paused="true" 가 붙는다. 티어별 무한 루프 7종
+   (tmCardSweep/tmCrestBreathe/tmGoldBreathe/tmLegendPulse/tmSpecialPulse/tmCrestGlint/
+   tmAuroraDrift)이 걸리는 요소 4개(::after 스윕, 크레스트, 프레임 발광, fx 오로라)를
+   한 규칙으로 묶는다 -- 셀렉터가 달라도 animation-play-state 는 요소 단위로 적용되므로
+   실제로 애니메이션이 없는 요소에 걸어도 무해하다. 1회성 tmCardRise(진입)는 이미 끝난
+   뒤라 paused 를 걸어도 아무 영향이 없다(재생 중인 애니메이션에만 적용됨). */
+.tm-player-card[data-loop-paused="true"] .tm-pcard-face::after,
+.tm-player-card[data-loop-paused="true"] .tm-pcard-crest,
+.tm-player-card[data-loop-paused="true"] .tm-pcard-frame,
+.tm-player-card[data-loop-paused="true"] .tm-pcard-fx {
+  animation-play-state: paused;
 }
 
 /* ── 카드는 상자에 담지 않는다 (사용자 선택 A안, 2026-08-26) ──

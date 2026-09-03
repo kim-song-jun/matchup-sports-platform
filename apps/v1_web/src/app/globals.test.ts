@@ -121,3 +121,45 @@ describe('data-nav-kind 선택자 형태 — 형태가 틀리면 조용히 발�
     expect(rulesOnly).toMatch(/:root\[data-nav-kind=["']tab["']\]\s+\.tm-page-transition-enter/);
   });
 });
+
+describe('선수 카드 무한 루프 가시성 게이트 (pcard-infinite-loop-no-visibility-gate)', () => {
+  it('data-loop-paused="true" 규칙이 스윕·크레스트·프레임 발광·오로라 네 요소를 전부 잡는다', () => {
+    // use-loop-pause.ts 가 세팅하는 속성을 globals.css 가 실제로 소비하는지 —
+    // 훅만 있고 CSS 규칙이 없으면(또는 반대로) 아무 일도 일어나지 않는다.
+    const rule = globalsCss.match(
+      /\.tm-player-card\[data-loop-paused="true"\][^{]*\{([^}]*)\}/,
+    )?.[0];
+
+    expect(rule).toBeDefined();
+    expect(rule).toContain('.tm-pcard-face::after');
+    expect(rule).toContain('.tm-pcard-crest');
+    expect(rule).toContain('.tm-pcard-frame');
+    expect(rule).toContain('.tm-pcard-fx');
+    expect(rule).toMatch(/animation-play-state:\s*paused/);
+  });
+});
+
+describe('카드 광택 스윕(tmCardSweep)은 left 가 아니라 transform 을 보간한다 (pcard-sweep-animates-left-not-transform)', () => {
+  it('키프레임이 left 를 애니메이션하지 않는다 — 레이아웃 리플로우를 강제하지 않는다', () => {
+    const keyframe = globalsCss.match(/@keyframes tmCardSweep\s*\{([^}]*(?:\{[^}]*\}[^}]*)*)\}/)?.[0];
+
+    expect(keyframe).toBeDefined();
+    // 이 정규식은 `keyframe { ... left: ... }` 형태만 걸러낸다 — 정적 `left: -85%`
+    // 는 .tm-pcard-face::after 규칙(키프레임 밖)에 남아 있어도 되고, 이 검증 대상이 아니다.
+    expect(keyframe).not.toMatch(/left\s*:/);
+    expect(keyframe).toMatch(/translateX\(/);
+  });
+
+  it('정적 left 는 그대로 유지된다 — 시각적 시작 위치는 안 바뀐다', () => {
+    const rule = globalsCss.match(/\.tm-pcard-face::after\s*\{([^}]*)\}/)?.[1];
+
+    expect(rule).toBeDefined();
+    expect(rule).toMatch(/left:\s*-85%/);
+  });
+
+  it('translateX 가 rotate 보다 먼저(바깥쪽) 와야 순수 수평 이동이 된다 — 순서를 뒤집으면 원점을 도는 호가 된다', () => {
+    const rule = globalsCss.match(/\.tm-pcard-face::after\s*\{([^}]*)\}/)?.[1];
+
+    expect(rule).toMatch(/transform:\s*translateX\([^)]*\)\s*rotate\(18deg\)/);
+  });
+});

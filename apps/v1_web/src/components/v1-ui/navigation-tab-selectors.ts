@@ -17,6 +17,14 @@ const TAB_GROUPS = [
   { container: 'tm-desktop-nav-tabs', item: 'tm-desktop-nav-tab' },
   /** 화면 안 세부 탭 — 대회 구분·매치 종류·리뷰 등 (segmented-tabs.tsx) */
   { container: 'tm-segmented-tabs', item: 'tm-segmented-tab' },
+  /**
+   * 어드민 사이드바 최상위 섹션 전환 (admin-shell.tsx, MOTION-2).
+   * 사이드바 항목 전부가 이미 최상위 목적지다(대회 관리 상세처럼 "더 깊이 들어가는"
+   * 진입은 사이드바 자체엔 없다 — 그런 진입은 그 목적지 화면 안의 리스트 행 클릭으로
+   * 일어나고 이 그룹 밖이다) — 병렬 뷰 전환이지 스택이 아니므로 다른 탭 그룹과 같은
+   * 원칙(C안: 탭은 페이지가 아니다, 슬라이드 없음)을 적용한다.
+   */
+  { container: 'tm-admin-sidebar-nav', item: 'tm-admin-sidebar-link' },
 ] as const;
 
 /** 클릭한 앵커의 조상에서 찾는다 — 이 안이면 'tab' 이동이다. */

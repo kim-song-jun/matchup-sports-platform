@@ -1,6 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { AdminShell } from './admin-shell';
+import { TAB_CONTAINER_SELECTOR, TAB_LINK_SELECTOR } from '@/components/v1-ui/navigation-tab-selectors';
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/admin',
@@ -145,6 +146,39 @@ describe('AdminShell nav', () => {
     );
     for (const label of ['플랫폼', '콘텐츠', '운영', '설정']) {
       expect(screen.getAllByRole('group', { name: label }).length).toBeGreaterThan(0);
+    }
+  });
+
+  it('사이드바 내비게이션은 tab 그룹으로 등록돼 있다(MOTION-2 — 어드민 사이드바 이동은 스택 push 가 아니라 병렬 뷰 전환)', () => {
+    // 이 테스트가 실제로 잡는 것: navigation-tab-selectors.ts 의 TAB_GROUPS 에서
+    // 어드민 그룹이 빠지거나, admin-shell.tsx 에서 그 클래스가 누락되면 use-navigation-intent.ts
+    // 의 `anchor.closest(TAB_CONTAINER_SELECTOR)` 가 매칭에 실패해 어드민 사이드바 클릭이
+    // 다시 'push' 로 떨어진다(전체 페이지 슬라이드+페이드 회귀). CSS 선택자를 직접
+    // `container.querySelector` 에 넣어 실제 DOM 위에서 매칭되는지까지 확인한다 — 클래스
+    // 문자열이 우연히 같아 보여도 셀렉터 형태가 어긋나면(예: 자손결합자 대신 자식결합자)
+    // 이 테스트가 잡는다.
+    const { container } = render(
+      <AdminShell>
+        <div>content</div>
+      </AdminShell>,
+    );
+
+    // nav[aria-label="주 메뉴"] 자체가 TAB_CONTAINER_SELECTOR 에 매칭돼야 한다 — 그래야
+    // 그 안의 <a> 클릭이 anchor.closest(TAB_CONTAINER_SELECTOR) 로 잡힌다.
+    const navs = container.querySelectorAll(TAB_CONTAINER_SELECTOR);
+    expect(navs.length).toBeGreaterThan(0); // 데스크톱 사이드바 + 모바일 드로어, 최소 1개(드로어는 닫힘 상태일 수 있음)
+    for (const nav of navs) {
+      expect(nav.getAttribute('aria-label')).toBe('주 메뉴');
+    }
+
+    // 실제 사이드바 링크(예: 대시보드)가 TAB_LINK_SELECTOR 에도 매칭돼야 스크롤 복원이
+    // 'tab' 취급을 받는다(scroll-restoration.tsx — 병렬 뷰 전환이므로 보던 자리로 돌아간다,
+    // 지금까지는 매번 0으로 리셋됐다).
+    const dashboardLinks = screen.getAllByRole('link', { name: '대시보드' });
+    expect(dashboardLinks.length).toBeGreaterThan(0);
+    for (const link of dashboardLinks) {
+      expect(link.matches(TAB_LINK_SELECTOR)).toBe(true);
+      expect(link.closest(TAB_CONTAINER_SELECTOR)).not.toBeNull();
     }
   });
 });

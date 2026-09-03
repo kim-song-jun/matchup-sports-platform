@@ -90,3 +90,35 @@ describe('describeResultReviewError — 하네스 정상 동작 증명 (대조�
     );
   });
 });
+
+describe('describeResultReviewError — 재제출 거부 문구 (Task 166 contract)', () => {
+  it('없어진 상태 어휘로 안내하지 않는다 — 확인 대기 기준으로 말한다', () => {
+    // contract 가 `REJECTED`·`SUPPLEMENT_REQUESTED` 를 없앴다. 그 어휘로 안내하면 운영자가
+    // **있지도 않은 상태**를 화면에서 찾게 된다. base 는 이제 `SUBMITTED`(확인 대기) 뿐이다.
+    const message = describeResultReviewError({
+      response: { data: { code: 'RESULT_RESUBMISSION_NOT_ALLOWED' } },
+    });
+    expect(message).toContain('확인 대기');
+    expect(message).not.toContain('반려');
+    expect(message).not.toContain('보완');
+  });
+});
+
+describe('describeResultReviewError — RESULT_ALREADY_OFFICIAL (contract 신설 409)', () => {
+  it('영문 서버 원문 대신 한국어 안내로 노출되고, 다음 행동을 말한다', () => {
+    // 매핑이 없으면 `extractErrorMessage` 폴백이 서버 원문("This game already has an
+    // official result; use a correction instead")을 그대로 화면에 띄운다.
+    const message = describeResultReviewError({
+      response: {
+        data: {
+          code: 'RESULT_ALREADY_OFFICIAL',
+          message: 'This game already has an official result; use a correction instead',
+        },
+      },
+    });
+    expect(message).not.toContain('official result');
+    expect(message).toContain('공식 결과');
+    // 무엇을 하라는 안내가 있어야 한다 — 막혔다는 사실만으로는 운영자가 다음 수를 모른다.
+    expect(message).toContain('정정');
+  });
+});

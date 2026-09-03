@@ -456,6 +456,13 @@ export const gameSchemaSourceManifest = {
   // 다시 만든다. 데이터 이동은 별도 마이그레이션 파일
   // (20260902000000_v1_lineup_bench_to_started, UPDATE 한 줄)이고 바인딩된
   // 20260729000100_v1_game_operations 는 건드리지 않았으므로 migration 해시는 그대로다.
+  // 2026-09-03 재핀 (Task 166 contract): `V1GameResultRevisionState` 에서
+  // `SUPPLEMENT_REQUESTED`·`REJECTED` 두 값을 뺐다 — 정본 §4 가 "결과는 보내기 → 어드민
+  // 확인 한 단계" 로 확정하면서 그 둘로 들어가는 명령이 사라졌고(expand 단계), 이 contract
+  // 단계에서 남은 행을 옮긴 뒤 값을 지운다. 그 두 값 말고 모델·필드·relation·index 는
+  // 하나도 달라지지 않았다. 데이터 이동과 타입 교체는 별도 마이그레이션 파일
+  // (20260903150000_v1_result_revision_drop_review_states)이고 바인딩된
+  // 20260729000100_v1_game_operations 는 건드리지 않았으므로 migration 해시는 그대로다.
   // 이 브랜치의 파일에 sha256 을 다시 돌려 계산한 값이다.
   // 2026-09-03 재핀 (Task 164 BE-4b): `V1TournamentRegistration.roster_auto_confirmed_at`
   // (nullable DateTime) 하나가 추가됐다 — D10 시즌 시작 자동 명단 확정의 표식이다.
@@ -478,7 +485,11 @@ export const gameSchemaSourceManifest = {
   // game operations 계약이 바뀐 게 아니다. 바인딩된 20260729000100_v1_game_operations 는
   // 건드리지 않았으므로 migration 해시는 불변이다. 아래 값은 이 브랜치의 schema.prisma 에
   // shasum -a 256 을 돌려 계산했다.
-  schema: 'ced68324e5d0d0cb7fee220ad6a81316c79de0d6503210ba93f4087ac82901af',
+  // 2026-09-03 재핀 (병합): 위 BE-4b 컬럼 추가와 아래 enum 값 제거가 **한 파일에 함께**
+  // 들어 있다. 어느 한쪽 브랜치의 해시를 그대로 쓰면 병합 결과와 달라 SOURCE_SNAPSHOT_DRIFT
+  // 로 CI 가 깨진다 — 아래 값은 **병합된** schema.prisma 에 shasum 을 다시 돌려 계산했다.
+  //
+  schema: '7255e6601a41bd5f2fec6482fc5b8ac990e02b68a7e1e8419fc22dacff5c69e9',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

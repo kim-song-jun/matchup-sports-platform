@@ -265,20 +265,6 @@ export function GameResultReviewPanel({
         </div>
       ) : null}
 
-      {/* 레거시 행 전용. Task 166 이 이 두 상태로 **들어가는 경로**를 없앴지만, 그 전에
-          반려·보완 요청된 행은 contract 마이그레이션 전까지 남아 있다 — 이 카드를 지우면
-          그 경기들을 고칠 입구가 사라진다(서버도 같은 이유로 base 허용에 두 상태를 남겼다). */}
-      {latest && (latest.state === 'REJECTED' || latest.state === 'SUPPLEMENT_REQUESTED') && !readOnly ? (
-        <div className="tm-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <p className="tm-text-label" style={{ fontWeight: 600 }}>
-            {latest.state === 'REJECTED' ? '반려된 결과예요' : '보완이 필요한 결과예요'}
-          </p>
-          <Button variant="primary" size="md" onClick={() => setResubmitTarget(latest)}>
-            다시 제출
-          </Button>
-        </div>
-      ) : null}
-
       {latest && latest.state === 'OFFICIAL' ? (
         <AlertBanner
           tone="info"

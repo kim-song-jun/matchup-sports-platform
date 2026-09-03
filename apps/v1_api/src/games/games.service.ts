@@ -6596,7 +6596,7 @@ export class GamesService {
    * ## Deciding which revision state(s) this method acts on
    *
    * `V1GameResultRevisionState` has DRAFT / SUBMITTED / CHANGE_REQUESTED /
-   * SUPPLEMENT_REQUESTED / REJECTED / OFFICIAL / VOID (schema.prisma):
+   * OFFICIAL / VOID (schema.prisma):
    *
    *  - `SUBMITTED` (this method's only base): still awaiting a reviewer
    *    decision -- nothing has been confirmed or even provisionally decided
@@ -6624,7 +6624,7 @@ export class GamesService {
    *    the `state: SUBMITTED` filter below (and `assertRevisionSupersession`
    *    independently rejects `ASSIST_SYNC` from any base other than
    *    SUBMITTED -- see its unit tests).
-   *  - `CHANGE_REQUESTED` / `SUPPLEMENT_REQUESTED` / `REJECTED` are
+   *  - `CHANGE_REQUESTED` is
    *    terminal, already-decided snapshots (`TERMINAL_REVISION_STATES` in
    *    `games/core/revision-state-machine.ts`, which also models `SUBMITTED`
    *    participants as frozen via `assertRevisionMutationAllowed`'s
@@ -6648,13 +6648,13 @@ export class GamesService {
    * ## What happens to the predecessor SUBMITTED row
    *
    * Left completely untouched -- `supersedeAndSubmit` never mutates its own
-   * base row either (its REJECTED/SUPPLEMENT_REQUESTED bases are already
+   * base row either (its terminal bases are already
    * permanently frozen by `v1_block_terminal_revision_mutation`, so there is
    * nothing TO mutate there; SUBMITTED is not in that trigger's terminal
-   * set, so it technically COULD be mutated, but none of the seven
+   * set, so it technically COULD be mutated, but none of the five
    * `V1GameResultRevisionState` values honestly describes "auto-superseded
-   * by a system sync, no reviewer decision" -- REJECTED/CHANGE_REQUESTED/
-   * SUPPLEMENT_REQUESTED would misrepresent a human decision that never
+   * by a system sync, no reviewer decision" -- CHANGE_REQUESTED would
+   * misrepresent a human decision that never
    * happened, and the coordinator's decision for this fix was explicitly
    * schema-only-if-necessary, not "add a new enum value"). Leaving it
    * `SUBMITTED` forever, unguarded, would reopen exactly the stale-approval

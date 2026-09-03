@@ -174,8 +174,6 @@ export const RESULT_REVISION_STATE_LABEL: Record<V1GameResultRevisionState, stri
   DRAFT: '작성 중',
   SUBMITTED: '상대팀 승인 대기',
   CHANGE_REQUESTED: '정정 요청됨',
-  SUPPLEMENT_REQUESTED: '보완 요청됨',
-  REJECTED: '반려됨',
   OFFICIAL: '공식 확정',
   VOID: '무효 처리됨',
 };

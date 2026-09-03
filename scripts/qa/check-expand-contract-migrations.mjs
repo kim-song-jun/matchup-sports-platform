@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -95,6 +95,8 @@ const REVIEWED_NON_ADDITIVE = [
     statement: "CREATE OR REPLACE FUNCTION v1_block_terminal_revision_mutation() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF TG_OP = 'DELETE' THEN IF OLD.state IN ('CHANGE_REQUESTED','OFFICIAL','VOID') THEN RAISE EXCEPTION 'terminal result revisions are immutable' USING ERRCODE = '55000'; END IF; RETURN OLD; END IF; IF OLD.state IN ('CHANGE_REQUESTED','OFFICIAL','VOID') AND NEW IS DISTINCT FROM OLD THEN RAISE EXCEPTION 'terminal result revisions are immutable' USING ERRCODE = '55000'; END IF; IF OLD.state <> 'DRAFT' AND (NEW.game_id IS DISTINCT FROM OLD.game_id OR NEW.revision IS DISTINCT FROM OLD.revision OR NEW.score IS DISTINCT FROM OLD.score OR NEW.events_hash IS DISTINCT FROM OLD.events_hash OR NEW.missing_scorer IS DISTINCT FROM OLD.missing_scorer OR NEW.mvp_participant_id IS DISTINCT FROM OLD.mvp_participant_id OR NEW.reason IS DISTINCT FROM OLD.reason OR NEW.created_by_actor_type IS DISTINCT FROM OLD.created_by_actor_type OR NEW.created_by_user_id IS DISTINCT FROM OLD.created_by_user_id OR NEW.created_by_system_actor IS DISTINCT FROM OLD.created_by_system_actor OR NEW.supersedes_id IS DISTINCT FROM OLD.supersedes_id OR NEW.created_at IS DISTINCT FROM OLD.created_at) THEN RAISE EXCEPTION 'submitted result content is frozen' USING ERRCODE = '55000'; END IF; RETURN NEW; END $$",
     reason:
       "This is the contract half of Task 166's two-release removal of the REJECTED and SUPPLEMENT_REQUESTED result-revision states. The expand half (no code can produce either state any more) is already deployed on dev/alpha; this release moves the rows that are still stored in those states and then narrows the enum. Because it narrows an enum, the release order matters: deploy-alpha.sh runs prisma migrate deploy BEFORE it recreates containers, so an OLD container that still wrote 'REJECTED' would fail for that span. Verified on dev before writing this: Prisma code writing either value: 0; the only remaining readers were doc comments, removed in this same release. The migration is re-runnable by hand -- statements compare state::text and the type swap is guarded on the enum label still existing, so a second run reports 0 rows and changes nothing (measured locally on a seeded database: run 1 moved 4 rows, run 2 moved 0 and left every row unchanged). Rewrites the immutability trigger function with the new 3-value terminal list. The DISABLE/ENABLE pair only stops the trigger from FIRING; the function body still names REJECTED and SUPPLEMENT_REQUESTED as string literals, so leaving it alone would make the next UPDATE on this table raise 'invalid input value for enum'. CREATE OR REPLACE keeps the same trigger wiring. Reviewed 2026-09-03.",
+  },
+  {
     file: "apps/v1_api/prisma/migrations/20260903170000_v1_drop_league_match_disputes/migration.sql",
     statement: "DO $$ DECLARE dispute_count bigint; BEGIN IF to_regclass('public.v1_league_match_disputes') IS NULL THEN RAISE NOTICE 'task166-dispute-drop: \ud14c\uc774\ube14\uc774 \uc774\ubbf8 \uc5c6\ub2e4 \u2014 \uac74\ub108\ub6f4\ub2e4'; RETURN; END IF; EXECUTE 'SELECT count(*) FROM v1_league_match_disputes' INTO dispute_count; RAISE NOTICE 'task166-dispute-drop: v1_league_match_disputes \ud589 \uc218 = %', dispute_count; END $$",
     reason:
@@ -1782,6 +1784,25 @@ function selfTest() {
     fail('the allowlist must be scoped to its exact file, not match the same statement elsewhere');
   }
 
+  // **allowlist 의 객체가 닫혔는지 본다.** 이 파일은 한 배열에 항목을 모으는데, 양쪽
+  // 브랜치가 각각 항목을 추가하면 3-way merge 가 객체 하나를 닫지 않고 붙여 놓는 일이
+  // 생긴다(2026-09-04 실사고, #1004·#1007 에서 두 번). 그러면 뒤 항목의 키가 앞 항목을
+  // **덮어써 항목 하나가 조용히 죽는다** — 문법은 온전하니 `node --check` 도, 게이트 실행도
+  // (덮인 항목을 안 쓰는 PR 이면) 통과한다.
+  //
+  // 소스에서 `file:` 줄 수와 항목 수가 같은지 비교한다. 한 객체에 `file` 이 둘이면 항목 수가
+  // 줄어들어 여기서 걸린다.
+  {
+    const source = readFileSync(new URL(import.meta.url), 'utf8');
+    const fileKeyLines = (source.match(/^ {4}file: /gm) ?? []).length;
+    if (fileKeyLines !== REVIEWED_NON_ADDITIVE.length) {
+      fail(
+        `allowlist 항목이 뭉쳤다: 소스의 file: 줄 ${fileKeyLines}개 vs 배열 길이 ` +
+          `${REVIEWED_NON_ADDITIVE.length}개 — 닫히지 않은 객체가 있어 항목이 서로를 덮고 있다`,
+      );
+    }
+  }
+  console.log('[expand-contract-sql-v1] allowlist 객체 무결성 통과');
   console.log('[expand-contract-sql-v1] negative controls passed');
 
   baseResolutionSelfTest();

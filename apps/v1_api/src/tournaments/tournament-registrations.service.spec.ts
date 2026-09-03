@@ -489,6 +489,22 @@ describe('TournamentRegistrationsService', () => {
     ).rejects.toMatchObject({ response: { code: 'AGREEMENTS_REQUIRED' } });
   });
 
+  it('submit: 0원에 공백만 있는 입금자명은 null 로 저장한다 — 빈 문자열은 "이름이 있다"로 읽힌다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1Tournament.findFirst.mockImplementation(
+      kindAwareFindFirst(openTournament({ kind: 'regular_tournament', entryFee: 0 })),
+    );
+    prisma.v1TournamentRegistration.update.mockImplementation(
+      async (args: { data: { status: string } }) => registrationRow({ status: args.data.status }),
+    );
+    prisma.v1TournamentPayment.upsert.mockResolvedValue(paymentRow());
+
+    await service.submit(manager, 'tournament-1', 'reg-1', { ...validSubmit, depositorName: '   ' });
+    expect(prisma.v1TournamentRegistration.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ depositorName: null }) }),
+    );
+  });
+
   it('submit: 유료 bank_transfer 에 입금자명이 없으면 400 DEPOSITOR_NAME_REQUIRED', async () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
     // 이 가드는 이제 **대회를 읽은 뒤** 돈다(`entryFee` 를 알아야 하므로) — 그 전엔
@@ -516,9 +532,14 @@ describe('TournamentRegistrationsService', () => {
     );
     prisma.v1TournamentPayment.upsert.mockResolvedValue(paymentRow());
 
-    await service.submit(manager, 'tournament-1', 'reg-1', { ...validSubmit, depositorName: '   ' });
+    // **`undefined` 로 보낸다** — 공백 문자열(`'   '`)로 쓰면 `.trim()` 이 그냥 동작해서
+    // non-null 단언이 깨지는 자리를 못 잡는다(Copilot 리뷰가 그 구멍을 짚었다).
+    const { depositorName: _omitted, ...withoutDepositor } = validSubmit;
+    await service.submit(manager, 'tournament-1', 'reg-1', withoutDepositor as typeof validSubmit);
     expect(prisma.v1TournamentRegistration.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ status: 'payment_checking' }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({ status: 'payment_checking', depositorName: null }),
+      }),
     );
   });
 

@@ -334,7 +334,11 @@ export class TournamentRegistrationsService {
         where: { id: registrationId },
         data: {
           status: isFree ? 'payment_checking' : 'awaiting_payment',
-          depositorName: dto.paymentMethod === 'bank_transfer' ? dto.depositorName!.trim() : null,
+          // `!` 를 쓸 수 없다 — 입금자명 가드에 `entryFee > 0` 을 붙이면서 **"계좌이체면
+          // 반드시 있다" 는 전제가 깨졌다.** 0원 + 계좌이체 + 미전달이면 `undefined.trim()`
+          // 으로 500 이 난다(Copilot 리뷰 지적, 재현 확인). 공백·미전달은 `null` 로 저장한다.
+          depositorName:
+            dto.paymentMethod === 'bank_transfer' ? (dto.depositorName?.trim() || null) : null,
           agreedRules: termsDecisions.acceptedCodes.has('tournament_rules'),
           agreedPrivacy: termsDecisions.acceptedCodes.has('tournament_privacy'),
           agreedRefund: termsDecisions.acceptedCodes.has('tournament_refund'),

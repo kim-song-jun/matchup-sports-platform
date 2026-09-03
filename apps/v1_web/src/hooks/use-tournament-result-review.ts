@@ -308,7 +308,7 @@ export type SupersedeAndSubmitInput = {
 };
 
 /** `POST /games/:gameId/result-revisions/:revisionId/supersede-and-submit` --
- * base revision must be `REJECTED`/`SUPPLEMENT_REQUESTED` (server-enforced,
+ * base revision must be `SUBMITTED` (server-enforced,
  * `409 RESULT_RESUBMISSION_NOT_ALLOWED` otherwise); creates+submits a fresh
  * successor atomically with a new review SLA. */
 export function useSupersedeAndSubmitResult(gameId: string, tournamentId?: string) {

@@ -343,8 +343,8 @@ describe('Task 22 T-B: QA scenario gap coverage (Q-02/04/07/08/11/13)', () => {
     tournament: '86000000-0000-4000-8000-000000000105',
     fixtureQ02: '86000000-0000-4000-8000-000000000110',
     fixtureQ04: '86000000-0000-4000-8000-000000000111',
-    fixtureQ07: '86000000-0000-4000-8000-000000000112',
     fixtureQ08: '86000000-0000-4000-8000-000000000113',
+    fixtureQ10: '86000000-0000-4000-8000-000000000115',
     fixtureQ11A: '86000000-0000-4000-8000-000000000114',
     fixtureQ11B: '86000000-0000-4000-8000-000000000115',
     fixtureQ13: '86000000-0000-4000-8000-000000000116',
@@ -481,8 +481,8 @@ describe('Task 22 T-B: QA scenario gap coverage (Q-02/04/07/08/11/13)', () => {
       data: [
         { id: ids.fixtureQ02, tournamentId: ids.tournament, round: 'group', fixtureNumber: 1, competitionConfigVersionId: config.id },
         { id: ids.fixtureQ04, tournamentId: ids.tournament, round: 'group', fixtureNumber: 2, competitionConfigVersionId: config.id },
-        { id: ids.fixtureQ07, tournamentId: ids.tournament, round: 'group', fixtureNumber: 3, competitionConfigVersionId: config.id },
         { id: ids.fixtureQ08, tournamentId: ids.tournament, round: 'group', fixtureNumber: 4, competitionConfigVersionId: config.id },
+        { id: ids.fixtureQ10, tournamentId: ids.tournament, round: 'group', fixtureNumber: 6, competitionConfigVersionId: config.id },
         { id: ids.fixtureQ11A, tournamentId: ids.tournament, round: 'group', fixtureNumber: 5, competitionConfigVersionId: config.id },
         { id: ids.fixtureQ11B, tournamentId: ids.tournament, round: 'group', fixtureNumber: 6, competitionConfigVersionId: config.id },
         { id: ids.fixtureQ13, tournamentId: ids.tournament, round: 'group', fixtureNumber: 7, competitionConfigVersionId: config.id },
@@ -611,59 +611,13 @@ describe('Task 22 T-B: QA scenario gap coverage (Q-02/04/07/08/11/13)', () => {
     });
   });
 
-  it('Q-07: 레거시 SUPPLEMENT_REQUESTED 행은 **고칠 수는 있고 확정할 수는 없다**', async () => {
-    // Task 166 이 이 상태로 **들어가는 전이**를 없앴다(어드민이 팀에게 되돌려 보내는
-    // 왕복 제거, 정본 §4). 그렇다고 **이미 그 상태로 저장된 행**이 사라지는 것은 아니다 —
-    // enum 값과 그 행들은 후속 contract 마이그레이션이 옮긴 뒤에야 없어진다.
-    //
-    // 그 사이에 이 행들이 **변경 가능해지면** 확정된 결과를 덮어쓸 수 있다. 그래서
-    // producer 가 없어진 지금은 Q-08 과 같은 방식으로 DB 에 직접 시드해서 잰다
-    // (`v1_game_result_revisions` 에는 BEFORE INSERT 가드가 없고 UPDATE/DELETE 만 있다).
-    const gameId = await buildTournamentGame(ids.fixtureQ07);
-    const seeded = await prisma.v1GameResultRevision.create({
-      data: {
-        gameId,
-        revision: 1,
-        state: V1GameResultRevisionState.SUPPLEMENT_REQUESTED,
-        score: { home: 0, away: 0 },
-        eventsHash: 'task22tb-q07-seeded-hash',
-        createdByActorType: 'USER',
-        createdByUserId: ids.platformOps,
-        reason: 'seeded directly: Task 166 removed every producer of this state',
-      },
-    });
-
-    // ① 확정은 막힌다 — terminal 이므로. **재제출보다 먼저 잰다**: 재제출을 하고 나면
-    // 이 행은 '대체됨' 이 되어 다른 코드(REVISION_MUST_BE_SUPERSEDED)로 막히고, 그러면
-    // 정작 재려던 terminal 가드에 도달하지 못한다.
-    const officializeAttempt = await captureFailure(() =>
-      resultReview.officializeResultRevision(authUser(ids.platformOps), gameId, seeded.id, 'task22tb-q07-officialize', {
-        expectedVersion: 0,
-        clientCommandId: 'task22tb-q07-officialize',
-        projectionPreviewHash: previewHash(seeded),
-      }),
-    );
-    expectHttpCode(officializeAttempt, 409, 'TERMINAL_REVISION_IMMUTABLE');
-
-    // ② **그래도 고칠 수는 있어야 한다.** 재제출 base 허용에서 이 두 상태를 빼면 이미
-    // 반려·보완 요청된 경기가 영영 고쳐지지 않는다 — 다른 재작성 경로가 없다. 그래서
-    // 재제출이 **성공**하는 것이 계약이다(contract 마이그레이션이 이 행들을 옮긴 뒤에야
-    // base 허용에서 빠진다).
-    const successor = await resultReview.supersedeAndSubmit(authUser(ids.platformOps), gameId, seeded.id, 'task22tb-q07-resubmit', {
-      expectedVersion: 0,
-      clientCommandId: 'task22tb-q07-resubmit',
-      // 이 게임은 시드만 했고 골 이벤트가 없다 — 점수를 0:0 으로 맞춰야 한다.
-      score: { home: 0, away: 0 },
-      actualParticipants: [],
-      eventsHash: 'task22tb-q07-resubmit-hash',
-      reason: 'legacy supplement-requested row is still fixable',
-    });
-    expect(successor.revisionState).toBe(V1GameResultRevisionState.SUBMITTED);
-
-    const game = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } });
-    expect(game.currentOfficialRevisionId).toBeNull();
-  });
-
+  // Q-07 은 여기 있었다: "레거시 SUPPLEMENT_REQUESTED 행은 고칠 수는 있고 확정할 수는
+  // 없다". contract 마이그레이션(20260903150000)이 그 값을 없애면서 **시드할 대상 자체가
+  // 사라져** 삭제했다. 그 마이그레이션이 옛 행을 두 갈래로 나눠 보내고, 각 갈래의 계약은
+  // 이미 다른 케이스가 잡고 있다:
+  //   · 되살린 갈래(SUBMITTED)  → Q-02 (SUBMITTED base 재제출이 성공한다)
+  //   · 얼린 갈래(CHANGE_REQUESTED) → Q-08 (재제출 409·확정 409)
+  // 갈래를 나누는 판정 자체는 SQL 이라 여기서 못 잰다 — 시드 DB 실행 증거는 PR 본문에 있다.
   it('Q-08: a directly-seeded CHANGE_REQUESTED revision (a team-match-only state in real traffic) is still rejected as terminal on the tournament route', async () => {
     const gameId = await buildTournamentGame(ids.fixtureQ08);
     // CHANGE_REQUESTED is only ever produced by GamesService.decideResultRevision
@@ -716,6 +670,56 @@ describe('Task 22 T-B: QA scenario gap coverage (Q-02/04/07/08/11/13)', () => {
     expect(game.currentOfficialRevisionId).toBeNull();
     const revisionAfter = await prisma.v1GameResultRevision.findUniqueOrThrow({ where: { id: seeded.id } });
     expect(revisionAfter.state).toBe(V1GameResultRevisionState.CHANGE_REQUESTED);
+  });
+
+  it('Q-10: 이미 공식 결과가 있는 경기는 옛 SUBMITTED 행으로 다시 확정할 수 없다', async () => {
+    // Task 166 contract 가 발견한 구멍이다. STANDARD 흐름의 승계 검사는 "더 새 리비전이
+    // 이 행을 대체했나" 만 본다 — 그래서 **승계되지 않은** 옛 SUBMITTED 행은 경기에 이미
+    // 공식 결과가 있어도 확정을 통과했고, `currentOfficialRevisionId` 를 빼앗았다.
+    // (contract 마이그레이션이 옛 반려 행을 되살릴 때 이 구멍을 피해 조건을 걸었지만,
+    //  코드가 스스로 닫혀야 한다 — 이 케이스가 그 가드를 잡는다.)
+    const gameId = await buildTournamentGame(ids.fixtureQ10);
+    await endGameWithHomeGoal(gameId);
+    const submitted = await prisma.v1GameResultRevision.findFirstOrThrow({ where: { gameId } });
+
+    // ① 정상 확정 — 가드가 첫 확정을 막으면 안 된다.
+    await resultReview.officializeResultRevision(authUser(ids.platformOps), gameId, submitted.id, 'task166-q10-official', {
+      expectedVersion: 3,
+      clientCommandId: 'task166-q10-official',
+      projectionPreviewHash: previewHash(submitted),
+    });
+    const afterOfficial = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } });
+    expect(afterOfficial.currentOfficialRevisionId).toBe(submitted.id);
+
+    // ② 승계되지 않은 옛 SUBMITTED 행을 직접 심는다 — contract 마이그레이션이 옛 반려
+    //    행을 SUBMITTED 로 되살렸을 때 만들어질 수 있었던 바로 그 모양이다.
+    const stale = await prisma.v1GameResultRevision.create({
+      data: {
+        gameId,
+        revision: 99,
+        state: V1GameResultRevisionState.SUBMITTED,
+        score: { home: 9, away: 9 },
+        eventsHash: 'task166-q10-stale-hash',
+        createdByActorType: 'USER',
+        createdByUserId: ids.platformOps,
+        reason: 'seeded: an un-superseded SUBMITTED row on a game that already has an official result',
+      },
+    });
+
+    // ③ 이걸 확정하려 하면 막혀야 한다 — 막히지 않으면 9:9 가 공식 결과가 된다.
+    const attempt = await captureFailure(() =>
+      resultReview.officializeResultRevision(authUser(ids.platformOps), gameId, stale.id, 'task166-q10-steal', {
+        expectedVersion: afterOfficial.version,
+        clientCommandId: 'task166-q10-steal',
+        projectionPreviewHash: previewHash(stale),
+      }),
+    );
+    expectHttpCode(attempt, 409, 'RESULT_ALREADY_OFFICIAL');
+
+    const afterAttempt = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } });
+    expect(afterAttempt.currentOfficialRevisionId).toBe(submitted.id);
+    const staleAfter = await prisma.v1GameResultRevision.findUniqueOrThrow({ where: { id: stale.id } });
+    expect(staleAfter.state).toBe(V1GameResultRevisionState.SUBMITTED);
   });
 
   it('Q-11: cross-game current-pointer and supersedes corruption is rejected by the composite FKs at the database layer', async () => {

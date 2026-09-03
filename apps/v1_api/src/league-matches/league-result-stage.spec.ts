@@ -39,12 +39,10 @@ describe('resolveResultStage', () => {
     ).toBe('draft');
   });
 
-  // 셋 다 운영자에게는 같은 뜻이다 — "공이 홈팀에게 돌아가 있다".
-  it.each([
-    V1GameResultRevisionState.CHANGE_REQUESTED,
-    V1GameResultRevisionState.REJECTED,
-    V1GameResultRevisionState.SUPPLEMENT_REQUESTED,
-  ])('%s 는 정정 요청으로 묶는다', (state) => {
+  // 반려·보완 요청은 contract 마이그레이션이 CHANGE_REQUESTED 로 옮겨 더는 존재하지
+  // 않는다(2026-09-03). 셋을 한 단계로 묶던 계약 덕분에 그 이동으로 화면 값이 달라지지
+  // 않았다 — 원래도 셋 다 여기로 왔다.
+  it.each([V1GameResultRevisionState.CHANGE_REQUESTED])('%s 는 정정 요청으로 묶는다', (state) => {
     expect(resolveResultStage({ currentOfficialRevisionId: null, resultRevisions: [rev(state)] })).toBe('change_requested');
   });
 

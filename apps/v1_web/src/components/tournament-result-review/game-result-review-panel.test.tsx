@@ -260,8 +260,8 @@ describe('GameResultReviewPanel — 확정 결과 헤더의 승부차기 표기'
 describe('GameResultReviewPanel — 재제출 폼도 결선 승부차기 가드를 따른다', () => {
   const PENALTY_REVISION = {
     ...STALE_REVISION,
-    id: 'revision-rejected',
-    state: 'REJECTED',
+    id: 'revision-resubmittable',
+    state: 'SUBMITTED',
     score: { home: 1, away: 1, penalties: { home: 4, away: 3 } },
   };
   let supersedeMutate: ReturnType<typeof vi.fn>;

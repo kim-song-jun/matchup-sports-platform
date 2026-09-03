@@ -63,8 +63,6 @@ export const REVISION_STATE_LABELS: Record<GameResultRevisionState, string> = {
   DRAFT: '작성 중(정정 초안)',
   SUBMITTED: '제출됨 · 검토 대기',
   CHANGE_REQUESTED: '수정 요청됨',
-  SUPPLEMENT_REQUESTED: '보완 요청됨',
-  REJECTED: '반려됨',
   OFFICIAL: '공식 확정',
   VOID: '무효 처리됨',
 };
@@ -73,8 +71,6 @@ export const REVISION_STATE_BADGE_TONE: Record<GameResultRevisionState, 'blue' |
   DRAFT: 'grey',
   SUBMITTED: 'blue',
   CHANGE_REQUESTED: 'orange',
-  SUPPLEMENT_REQUESTED: 'orange',
-  REJECTED: 'red',
   OFFICIAL: 'green',
   VOID: 'red',
 };

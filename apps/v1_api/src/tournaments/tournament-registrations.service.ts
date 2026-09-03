@@ -257,17 +257,30 @@ export class TournamentRegistrationsService {
         message: '이미 제출된 신청이에요.',
       });
     }
-    if (dto.paymentMethod === 'bank_transfer' && !dto.depositorName?.trim()) {
+    // 제출 시점에 대회가 여전히 open·마감 전인지 재확인(draft 보관 중 마감됐을 수 있음).
+    const tournament = await this.loadOpenTournament(tournamentId);
+    this.assertTeamSportMatchesTournament(teamSportId, tournament.sportId);
+    this.assertPaymentInstructions(tournament, dto.paymentMethod);
+
+    // ## 입금자명은 **낼 돈이 있을 때만** 필요하다 (Task 164 BE-4a)
+    // 이 가드는 원래 대회를 읽기 **전**에 있었다 — 그래서 `entryFee` 를 모른 채 계좌이체면
+    // 무조건 입금자명을 요구했고, **0원짜리 대회·리그에서도** 막혔다. 화면이 안 물어도
+    // 옛 클라이언트나 API 직접 호출은 그대로 걸린다(정본 §4 "스텝 최소"는 화면이 아니라
+    // 계약의 문제다).
+    //
+    // 순서를 바꾼 것이 다른 에러의 우선순위를 바꾼다: 마감된 대회에 입금자명 없이 제출하면
+    // 이제 `DEPOSITOR_NAME_REQUIRED` 가 아니라 `TOURNAMENT_NOT_OPEN` 이 먼저 난다.
+    // **그게 맞는 순서다** — 입금자명을 채워 다시 보내도 어차피 마감이라 못 낸다.
+    if (
+      tournament.entryFee > 0 &&
+      dto.paymentMethod === 'bank_transfer' &&
+      !dto.depositorName?.trim()
+    ) {
       throw new BadRequestException({
         code: 'DEPOSITOR_NAME_REQUIRED',
         message: '계좌이체는 입금자명을 입력해 주세요.',
       });
     }
-
-    // 제출 시점에 대회가 여전히 open·마감 전인지 재확인(draft 보관 중 마감됐을 수 있음).
-    const tournament = await this.loadOpenTournament(tournamentId);
-    this.assertTeamSportMatchesTournament(teamSportId, tournament.sportId);
-    this.assertPaymentInstructions(tournament, dto.paymentMethod);
 
     const result = await this.prisma.$transaction(async (tx) => {
       // R17-005: acquire row lock on tournament before the capacity check so that

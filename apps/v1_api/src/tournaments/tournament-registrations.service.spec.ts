@@ -480,11 +480,37 @@ describe('TournamentRegistrationsService', () => {
     ).rejects.toMatchObject({ response: { code: 'AGREEMENTS_REQUIRED' } });
   });
 
-  it('submit: bank_transfer without depositorName → 400 DEPOSITOR_NAME_REQUIRED', async () => {
+  it('submit: 유료 bank_transfer 에 입금자명이 없으면 400 DEPOSITOR_NAME_REQUIRED', async () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    // 이 가드는 이제 **대회를 읽은 뒤** 돈다(`entryFee` 를 알아야 하므로) — 그 전엔
+    // 대회 fake 없이도 통과했다. 순서가 바뀌었다는 사실 자체가 여기 드러난다.
+    prisma.v1Tournament.findFirst.mockImplementation(
+      kindAwareFindFirst(openTournament({ kind: 'regular_tournament', entryFee: 120000 })),
+    );
     await expect(
       service.submit(manager, 'tournament-1', 'reg-1', { ...validSubmit, depositorName: '   ' }),
     ).rejects.toMatchObject({ response: { code: 'DEPOSITOR_NAME_REQUIRED' } });
+  });
+
+  it('submit: 0원이면 입금자명 없이도 제출된다 — 낼 돈이 없는데 입금자를 물을 이유가 없다', async () => {
+    // 화면이 안 물어도 옛 클라이언트·API 직접 호출은 그대로 걸렸다. 정본 §4 "스텝 최소" 는
+    // 화면이 아니라 **계약**의 문제다.
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    // **무료 대회**로 태운다. 무료 처리는 종류와 무관한 로직이고, 이 브랜치(dev 기준)는
+    // 아직 등록 스택이 리그를 안 보므로(#984 의 표면 확대 이전) 리그 행은 여기까지 오지도
+    // 못한다 — 그걸로 쓰면 이 스펙은 무료 경로가 아니라 표면 게이트를 시험하게 된다.
+    prisma.v1Tournament.findFirst.mockImplementation(
+      kindAwareFindFirst(openTournament({ kind: 'regular_tournament', entryFee: 0 })),
+    );
+    prisma.v1TournamentRegistration.update.mockImplementation(
+      async (args: { data: { status: string } }) => registrationRow({ status: args.data.status }),
+    );
+    prisma.v1TournamentPayment.upsert.mockResolvedValue(paymentRow());
+
+    await service.submit(manager, 'tournament-1', 'reg-1', { ...validSubmit, depositorName: '   ' });
+    expect(prisma.v1TournamentRegistration.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'payment_checking' }) }),
+    );
   });
 
   it('submit: paid bank transfer without account instructions is rejected before the payment clock starts', async () => {

@@ -72,13 +72,41 @@ export class TournamentFixtureLineupService {
         : { tournamentId, fixtureId };
     await this.access.assertAccess({ userId, action, resource });
 
-    if (fixture === null || fixture.game === null) {
+    if (fixture !== null) {
+      // 대진 행이 **있다** — 이건 대회 경기다. 게임이 아직 없으면 그건 리그일 가능성이
+      // 아니라 그냥 없는 것이므로, 팀매치를 뒤지지 않고 여기서 끝낸다(Copilot 리뷰 지적:
+      // 아래 fallback 이 `game === null` 인 대회 대진에도 돌아 불필요한 조회를 했다).
+      if (fixture.game !== null) return fixture.game.id;
       throw new NotFoundException({
         code: 'TOURNAMENT_FIXTURE_GAME_NOT_FOUND',
         message: '경기 정보를 찾을 수 없어요.',
       });
     }
-    return fixture.game.id;
+
+    // ## 정규 리그 거울이면 경기는 `V1TeamMatch` 다 (Task 165 BE-4)
+    // 정본 §4 가 "리그도 대회와 같은 콘솔" 로 확정했는데, 위 조회는 `V1TournamentFixture`
+    // 만 본다 — 리그 경기의 id 는 **팀매치 id** 라 그 행이 없어 콘솔이 통째로 404 였다.
+    //
+    // **`resolveGameSource` 를 쓰지 않는다** — 그 함수는 *게임 → 출처* 방향이고
+    // (`game.teamMatchId` 로 리그를 찾는다), 여기는 그 반대인 *출처 → 게임* 이다.
+    // 방향이 달라 재사용이 성립하지 않는다.
+    //
+    // **인가 뒤에 조회한다.** 위 `assertAccess` 가 이미 끝났으므로 존재 여부로 분기해도
+    // 권한 판정이 그것에 영향받지 않는다(이 함수 맨 위 주석의 불변식). 리그 거울에는
+    // 대진 스코프가 없어 `{ tournamentId, fixtureId }` 리소스로 걸리는데, 그건 대회
+    // 스태프·플랫폼 관리자만 통과하는 것과 같은 규칙이다(#982 의 결과 경계와 동일).
+    const leagueTeamMatch = await this.prisma.v1TeamMatch.findFirst({
+      where: { id: fixtureId, leagueId: tournamentId, deletedAt: null },
+      select: { game: { select: { id: true } } },
+    });
+    if (leagueTeamMatch?.game != null) {
+      return leagueTeamMatch.game.id;
+    }
+
+    throw new NotFoundException({
+      code: 'TOURNAMENT_FIXTURE_GAME_NOT_FOUND',
+      message: '경기 정보를 찾을 수 없어요.',
+    });
   }
 
   /**

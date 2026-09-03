@@ -525,6 +525,13 @@ function makeUserRecords(overrides: Partial<PublicUserRecordsResponse> = {}): Pu
       mvpCount: 1,
       matchMvpCount: 1,
       tournamentAwardCount: 0,
+      // 이 픽스처의 유일한 아이템이 대회 경기다 — 합이 전체와 맞아야 화면의 탭 KPI 가
+      // 실제 데이터와 어긋나지 않는다.
+      byType: {
+        tournament: { appearances: 1, goals: 1, assists: 0, yellowCards: 0, redCards: 0, mvpCount: 1 },
+        league: { appearances: 0, goals: 0, assists: 0, yellowCards: 0, redCards: 0, mvpCount: 0 },
+        friendly: { appearances: 0, goals: 0, assists: 0, yellowCards: 0, redCards: 0, mvpCount: 0 },
+      },
     },
     tournamentAwards: [],
     items: [
@@ -556,6 +563,71 @@ function makeUserRecords(overrides: Partial<PublicUserRecordsResponse> = {}): Pu
     ...overrides,
   };
 }
+
+describe('UserRecordsContent — 종류 탭 (Task 166 BE-4)', () => {
+  // KPI 카드가 값만 렌더하므로 탭별 숫자를 서로 다르게 골라야 `getByText` 가
+  // "여러 요소 매치" 로 실패하지 않는다(팀 전적 탭 스펙과 같은 이유).
+  function withByType() {
+    return makeUserRecords({
+      summary: {
+        appearances: 12,
+        goals: 7,
+        assists: 3,
+        yellowCards: 1,
+        redCards: 0,
+        mvpCount: 2,
+        matchMvpCount: 2,
+        tournamentAwardCount: 1,
+        byType: {
+          league: { appearances: 4, goals: 6, assists: 1, yellowCards: 0, redCards: 0, mvpCount: 1 },
+          tournament: { appearances: 5, goals: 4, assists: 2, yellowCards: 1, redCards: 0, mvpCount: 1 },
+          friendly: { appearances: 3, goals: 1, assists: 0, yellowCards: 0, redCards: 0, mvpCount: 0 },
+        },
+      },
+    });
+  }
+
+  it('팀 전적과 같은 순서로 전체·대회·리그·친선 탭을 배치한다', () => {
+    render(<UserRecordsContent data={withByType()} activeType="all" onChangeType={vi.fn()} />);
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      '전체',
+      '대회',
+      '리그',
+      '친선',
+    ]);
+  });
+
+  it('리그 탭을 고르면 KPI 가 summary.byType.league 값으로 바뀐다 (전체로 새로 계산하지 않는다)', () => {
+    render(<UserRecordsContent data={withByType()} activeType="league" onChangeType={vi.fn()} />);
+    // 숫자는 서로 겹치지 않게 골랐다 — KPIStat 이 값만 렌더해서, 다른 카드(매치 MVP 2,
+    // 대회 수상 1)와 같은 숫자면 getByText 가 "여러 요소 매치" 로 실패한다.
+    expect(screen.getByText('4')).toBeInTheDocument(); // 엔트리 = byType.league.appearances
+    expect(screen.getByText('6')).toBeInTheDocument(); // 골 = byType.league.goals
+    // 전체 기준 숫자가 남아 있으면 탭이 아무것도 안 한 것이다.
+    expect(screen.queryByText('12')).not.toBeInTheDocument();
+    expect(screen.queryByText('7')).not.toBeInTheDocument();
+  });
+
+  it('전체 탭이면 KPI 가 summary(전체 기준) 그대로다', () => {
+    render(<UserRecordsContent data={withByType()} activeType="all" onChangeType={vi.fn()} />);
+    expect(screen.getByText('12')).toBeInTheDocument();
+    expect(screen.getByText('7')).toBeInTheDocument();
+  });
+
+  it('탭을 고른 상태에서 그 종류가 0건이면 그 종류를 짚는 빈 상태를 보여준다', () => {
+    // 전체 문구("아직 등록된 경기 기록이 없어요")를 그대로 쓰면, 다른 종류의 기록이
+    // 있는데도 "기록이 없다" 로 읽힌다.
+    render(
+      <UserRecordsContent data={makeUserRecords({ items: [] })} activeType="friendly" onChangeType={vi.fn()} />,
+    );
+    expect(screen.getByText('아직 친선 경기가 없어요')).toBeInTheDocument();
+  });
+
+  it('onChangeType 을 안 넘기면 탭을 그리지 않는다 — 탭 없이 쓰는 화면 회귀', () => {
+    render(<UserRecordsContent data={withByType()} />);
+    expect(screen.queryAllByRole('tab')).toHaveLength(0);
+  });
+});
 
 describe('UserRecordsContent — 기록 행', () => {
   it('출전·골·매치 MVP·대회 수상을 구분하고 실제 수상명을 표시한다', () => {

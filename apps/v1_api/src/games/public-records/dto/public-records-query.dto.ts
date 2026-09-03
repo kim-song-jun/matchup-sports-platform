@@ -45,12 +45,29 @@ export class PublicRecordsQueryDto {
 
 /**
  * `GET /teams/:id/records` -- D4-a: adds an optional league/tournament/friendly
- * filter on top of the frozen cursor/season contract above. Kept as a subclass
- * rather than a new field on `PublicRecordsQueryDto` itself, because that DTO
- * is shared verbatim with `GET /users/:id/records` (which has no concept of a
- * team-side league/tournament/friendly split) and is documented as frozen.
+ * filter on top of the frozen cursor/season contract above.
+ *
+ * 서브클래스로 두는 이유는 그대로다: `PublicRecordsQueryDto` 자체는 두 엔드포인트가
+ * **그대로 공유**하는 frozen 계약이라, 거기에 필드를 더하면 그 필드를 쓰지 않는 쪽의
+ * 계약까지 넓어진다. 확장은 각 엔드포인트의 서브클래스에서만 한다.
  */
 export class TeamRecordsQueryDto extends PublicRecordsQueryDto {
+  @IsOptional()
+  @IsIn(['league', 'tournament', 'friendly'])
+  type?: TeamRecordCategory;
+}
+
+/**
+ * `GET /users/:id/records` -- Task 166 BE-4 (2026-09-03): 개인 기록에도 같은
+ * 리그/대회/친선 구분을 넣는다(정본 §5). 그전에는 이 엔드포인트가 위 frozen DTO 를
+ * 그대로 썼고 "개인 기록엔 그 구분 개념이 없다" 고 적혀 있었는데, 정본이 그 구분을
+ * 요구하면서 그 전제가 바뀌었다.
+ *
+ * **기존 클라이언트는 무변경이다** — `type` 은 optional 이고, 빼고 부르면 응답 모양·
+ * 내용이 그대로다(회귀 스펙으로 고정). 팀 전적과 같은 모양으로 서브클래스에서만 넓혀,
+ * 공유 DTO 는 여전히 frozen 이다.
+ */
+export class UserRecordsQueryDto extends PublicRecordsQueryDto {
   @IsOptional()
   @IsIn(['league', 'tournament', 'friendly'])
   type?: TeamRecordCategory;

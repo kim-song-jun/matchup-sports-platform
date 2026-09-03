@@ -307,6 +307,41 @@ describe('PublicUserRecordsService', () => {
     expect('consentGranted' in result).toBe(false);
   });
 
+  /** 리그·친선·대회 각 1건. Task 166 BE-4 의 세 스펙이 이 픽스처를 공유한다. */
+  function threeCategoryPrisma() {
+    return createFakePrisma({
+      links: [
+        { participantId: 'participant-league', linkId: 'link-league', userId: OWNER_ID },
+        { participantId: 'participant-friendly', linkId: 'link-friendly', userId: OWNER_ID },
+        { participantId: 'participant-tournament', linkId: 'link-tournament', userId: OWNER_ID },
+      ],
+      userConsents: [{ userId: OWNER_ID, state: 'GRANTED' }],
+      snapshots: [],
+      resultRows: [
+        sourcedResultRow({ suffix: 'league', participantId: 'participant-league', teamMatchId: 'team-match-league' }),
+        sourcedResultRow({
+          suffix: 'friendly',
+          participantId: 'participant-friendly',
+          teamMatchId: 'team-match-friendly',
+        }),
+        sourcedResultRow({
+          suffix: 'tournament',
+          participantId: 'participant-tournament',
+          tournamentFixtureId: 'fixture-1',
+        }),
+      ],
+      // 친선 팀매치도 팀매치 행 자체는 존재한다 -- 다른 점은 `leagueId`가 null이라는 것뿐이다.
+      teamMatches: [
+        { id: 'team-match-league', leagueId: 'league-1' },
+        { id: 'team-match-friendly', leagueId: null },
+      ],
+      leagues: [{ id: 'league-1', title: '2026 가을 정규 리그' }],
+      fixtures: [{ id: 'fixture-1', tournamentId: 'tournament-1', round: '결승' }],
+      tournaments: [{ id: 'tournament-1', title: '2026 여름 챔피언십' }],
+      viewerConsentState: 'GRANTED',
+    });
+  }
+
   it('리그 대진 행에는 리그 제목이 붙고, 리그가 아닌 친선 팀매치 행에는 붙지 않는다', async () => {
     const prisma = createFakePrisma({
       links: [
@@ -371,5 +406,46 @@ describe('PublicUserRecordsService', () => {
     // N+1 금지: 팀매치·리그 모두 행 수와 무관하게 단일 IN 조회 1회씩이다.
     expect((prisma.v1TeamMatch.findMany as jest.Mock).mock.calls).toHaveLength(1);
     expect((prisma.v1League.findMany as jest.Mock).mock.calls).toHaveLength(1);
+  });
+  it('?type=league 는 리그 행만 돌려준다 — 팀 전적과 같은 우선순위(tournament > league > friendly)', async () => {
+    const service = new PublicUserRecordsService(threeCategoryPrisma());
+    const result = await service.getRecords(OWNER_ID, { type: 'league' }, 'someone-else');
+    expect(result.items.map((item) => item.gameId)).toEqual(['game-league']);
+    expect(result.items.every((item) => item.type === 'league')).toBe(true);
+  });
+
+  it('?type=friendly 는 리그도 대회도 아닌 행만 돌려준다', async () => {
+    const service = new PublicUserRecordsService(threeCategoryPrisma());
+    const result = await service.getRecords(OWNER_ID, { type: 'friendly' }, 'someone-else');
+    expect(result.items.map((item) => item.gameId)).toEqual(['game-friendly']);
+  });
+
+  it('summary.byType 의 합이 전체와 같고, 요약은 필터와 무관하게 전체 기준이다', async () => {
+    const service = new PublicUserRecordsService(threeCategoryPrisma());
+    const all = await service.getRecords(OWNER_ID, {}, 'someone-else');
+    const { byType } = all.summary;
+    // 합 == 전체. 한 행이 두 축에 세어지거나 어느 축에도 안 세어지면 여기서 깨진다.
+    expect(byType.league.appearances + byType.tournament.appearances + byType.friendly.appearances).toBe(
+      all.summary.appearances,
+    );
+    expect(byType.league.goals + byType.tournament.goals + byType.friendly.goals).toBe(all.summary.goals);
+    expect(byType.league.appearances).toBe(1);
+    expect(byType.tournament.appearances).toBe(1);
+    expect(byType.friendly.appearances).toBe(1);
+
+    // **필터를 걸어도 요약은 그대로다** — 화면이 탭을 바꿀 때 KPI 를 다시 받지 않고
+    // byType[탭] 을 읽는 계약(팀 전적과 동일). 여기가 뒤집히면 탭마다 전체 KPI 가 달라진다.
+    const filtered = await service.getRecords(OWNER_ID, { type: 'league' }, 'someone-else');
+    expect(filtered.summary.appearances).toBe(all.summary.appearances);
+    expect(filtered.summary.byType).toEqual(byType);
+  });
+
+  it('type 없이 부르면 응답 모양·내용이 그대로다 — 기존 클라이언트 무변경 (회귀)', async () => {
+    const service = new PublicUserRecordsService(threeCategoryPrisma());
+    const result = await service.getRecords(OWNER_ID, {}, 'someone-else');
+    expect(result.items).toHaveLength(3);
+    expect(result.summary.appearances).toBe(3);
+    // 구 클라이언트 호환 별칭도 그대로 실린다(166 문서 후속에서 정리 예정).
+    expect(result.items.every((item) => item.matchType !== undefined)).toBe(true);
   });
 });

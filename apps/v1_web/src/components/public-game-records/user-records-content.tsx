@@ -7,6 +7,8 @@ import { formatTournamentDateShort } from '@/lib/date-utils';
 import { TournamentAwardIcon } from '@/components/tournaments/tournament-award-icon';
 import { userRecordResultLabel } from './format';
 import { resultChipStyle, resultStripeStyle } from './result-emphasis';
+import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
+import { RECORD_TYPE_TABS, recordEmptyCopy, type RecordTypeFilter } from './record-category-tabs';
 import type { PublicUserRecordItem, PublicUserRecordsResponse } from './types';
 
 /**
@@ -124,28 +126,51 @@ export function UserRecordsContent({
   hasNextPage,
   isFetchingNextPage,
   onLoadMore,
+  activeType,
+  onChangeType,
 }: {
   data: PublicUserRecordsResponse;
   hasNextPage?: boolean;
   isFetchingNextPage?: boolean;
   onLoadMore?: () => void;
+  /** Task 166 BE-4. 미전달이면 탭을 그리지 않는다 — 아직 탭 없이 이 컴포넌트를 쓰는
+   *  화면이 있을 수 있어 팀 전적(`onChangeType`)과 같은 방식으로 optional 이다. */
+  activeType?: RecordTypeFilter;
+  onChangeType?: (next: RecordTypeFilter) => void;
 }) {
   // items가 0건이면(대회 라인업에 아직 연결된 적 없음) 배너의 "이 기록은 아직
   // 나에게만 보여요" 문구가 바로 아래 EmptyState("아직 등록된 경기 기록이 없어요")와
   // 모순된다 — 숨겨진 기록이 실제로 있을 때만 보여준다.
   const showOwnerVisibilityBanner = data.viewerIsOwner && !data.consentGranted && data.items.length > 0;
+  const resolvedActiveType: RecordTypeFilter = activeType ?? 'all';
+  // 탭별 KPI 는 서버가 이미 계산해 보낸 `summary.byType[종류]` 를 읽는다 — 팀 전적과
+  // 같은 계약이라 탭을 바꿔도 KPI 를 다시 받지 않는다. '전체'만 최상위 summary 다.
+  const activeTotals =
+    resolvedActiveType === 'all' ? data.summary : data.summary.byType[resolvedActiveType];
 
   return (
     <div style={{ padding: '16px 20px 40px', display: 'flex', flexDirection: 'column', gap: 20 }}>
       {showOwnerVisibilityBanner ? <OwnerVisibilityBanner /> : null}
+
+      {onChangeType ? (
+        <SegmentedTabs
+          items={RECORD_TYPE_TABS.map((tab) => ({ id: tab.key, label: tab.label }))}
+          activeId={resolvedActiveType}
+          onSelect={(id) => onChangeType(id as RecordTypeFilter)}
+          ariaLabel="경기 종류"
+          role="tablist"
+        />
+      ) : null}
 
       <Card>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 12 }}>
           {/* "출전"이 아니라 "엔트리" — 이 숫자는 **명단에 이름이 오른 경기 수**다.
               명단에 오르면 곧 참가자로 집계되므로(D3), 벤치에 있었어도 세어진다.
               "출전"이라 부르면 뛰지 않은 경기까지 뛴 것처럼 말하게 된다. */}
-          <KPIStat label="엔트리" value={data.summary.appearances} unit="경기" />
-          <KPIStat label="골" value={data.summary.goals} unit="골" />
+          <KPIStat label="엔트리" value={activeTotals.appearances} unit="경기" />
+          <KPIStat label="골" value={activeTotals.goals} unit="골" />
+          {/* 매치 MVP·대회 수상은 탭과 무관하게 **전체 기준**이다 — 대회 수상은 애초에
+              대회에만 있고, 매치 MVP 를 탭별로 쪼개면 '친선 MVP 0회' 같은 칸이 생긴다. */}
           <KPIStat label="매치 MVP" value={data.summary.matchMvpCount} unit="회" />
           <KPIStat label="대회 수상" value={data.summary.tournamentAwardCount} unit="회" />
         </div>
@@ -208,7 +233,11 @@ export function UserRecordsContent({
       <section>
         <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>활동 기록</h3>
         {data.items.length === 0 ? (
-          data.viewerIsOwner ? (
+          // 탭이 걸려 있으면 "이 종류가 없다" 가 정확한 설명이다 — 전체 문구를 그대로
+          // 쓰면 기록이 있는데도 "아직 등록된 경기 기록이 없어요" 로 읽힌다.
+          resolvedActiveType !== 'all' ? (
+            <EmptyState {...recordEmptyCopy(resolvedActiveType, { title: '', sub: '' })} />
+          ) : data.viewerIsOwner ? (
             // 본인 페이지에서 0건이면 본인은 동의 여부와 무관하게 이미 자기 기록을 볼 수
             // 있으므로(showOwnerVisibilityBanner가 그 상태를 별도로 알린다), 남는 원인은
             // "대회 라인업에 아직 팀원으로 연결되지 않음" 하나뿐이다.

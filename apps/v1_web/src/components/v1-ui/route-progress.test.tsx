@@ -51,6 +51,15 @@ describe('RouteProgressBar — kind별 진행바 발화', () => {
     expect(container.querySelector('.tm-route-progress')).not.toBeNull();
   });
 
+  it("kind='search' 링크(같은 pathname 의 쿼리만 변경 — 필터 시트) 클릭에서는 진행바가 뜨지 않는다", () => {
+    window.history.replaceState(null, '', '/tournaments');
+    const { container } = render(<RouteProgressBar />);
+
+    clickAnchor('<div><a href="/tournaments?filter=1" aria-label="필터 열기">필터</a></div>', '/tournaments?filter=1');
+
+    expect(container.querySelector('.tm-route-progress')).toBeNull();
+  });
+
   it("kind='tab' 링크(하단 탭) 클릭에서도 진행바가 뜨지 않는다", () => {
     const { container } = render(<RouteProgressBar />);
 

@@ -226,6 +226,7 @@ function SidebarLink({ item, active }: { item: NavItem; active: boolean }) {
       aria-current={active ? 'page' : undefined}
       aria-label={hasBadge && item.badgeAriaLabel ? `${item.label} (${item.badgeAriaLabel})` : undefined}
       className={[
+        'tm-admin-sidebar-link',
         'flex items-center gap-3 px-4 py-3 min-h-[44px] text-sm transition-colors border-l-2',
         'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-[-2px]',
         active
@@ -402,7 +403,7 @@ function Drawer({
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 py-2 overflow-y-auto" aria-label="주 메뉴">
+        <nav className="tm-admin-sidebar-nav flex-1 py-2 overflow-y-auto" aria-label="주 메뉴">
           {navGroups.map((group, index) => (
             <div
               key={group.label ?? `nav-group-${index}`}
@@ -426,6 +427,7 @@ function Drawer({
                     aria-label={hasBadge && item.badgeAriaLabel ? `${item.label} (${item.badgeAriaLabel})` : undefined}
                     onClick={onClose}
                     className={[
+                      'tm-admin-sidebar-link',
                       'flex items-center gap-3 px-4 py-3 min-h-[44px] text-sm transition-colors border-l-2',
                       'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-[-2px]',
                       active
@@ -536,7 +538,7 @@ export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmin
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 py-2" aria-label="주 메뉴">
+        <nav className="tm-admin-sidebar-nav flex-1 py-2" aria-label="주 메뉴">
           {navGroups.map((group, index) => (
             <div
               key={group.label ?? `nav-group-${index}`}

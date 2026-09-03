@@ -7551,7 +7551,10 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
    미끄러지고, rotate 를 뒤에(안쪽) 써야 그 자리에서 18도 기울어진 채 유지된다 -- 반대로
    쓰면 원점을 중심으로 호를 그리며 도는 궤적이 된다. */
 .tm-pcard-face::after {
-  content: ''; position: absolute; top: -60%; left: -85%;
+  /* left 는 예전 키프레임의 0% 값(-80%)과 같다 — 스윕이 실제로 그리던 궤적(-80%→160%)의
+     기준점이다. 예전 정적값 -85% 를 그대로 두면 translateX 궤적 전체가 5%W 왼쪽으로
+     밀린다(적대 리뷰 지적). 딜레이 구간엔 어차피 카드 밖(오른쪽 끝 -18%)이라 보이지 않는다. */
+  content: ''; position: absolute; top: -60%; left: -80%;
   width: 62%; height: 240%;
   background: linear-gradient(90deg,
     rgba(255, 255, 255, 0) 0%, var(--tm-sheen) 38%,

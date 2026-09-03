@@ -1,0 +1,438 @@
+import { randomUUID } from 'node:crypto';
+import type { INestApplication } from '@nestjs/common';
+import { PrismaService } from '../../src/prisma/prisma.service';
+import { ManagedTermsRuntimeService } from '../../src/terms/managed-terms-runtime.service';
+import { createV1IntegrationApp } from '../integration/integration-app';
+import {
+  LEAGUE_ROSTER_AUTOCONFIRM_TYPE,
+  LEAGUE_ROSTER_REMINDER_TYPE,
+  LeagueRosterAutoConfirmService,
+  scheduleLeagueRosterAutoConfirm,
+} from '../../src/jobs/league-roster/league-roster-autoconfirm.service';
+
+/**
+ * D10 (Task 164 BE-4b) — 시즌 시작 자동 명단 확정.
+ *
+ * 이 잡이 만드는 것은 **대회 참가 자격 명단**(`V1TournamentPlayer`)이다. Task 163 이 다루는
+ * 경기별 출석 명단(`V1GameLineup`, 등번호가 붙는 그것)과 다른 층이다.
+ *
+ * 핸들러는 `DISABLE_LEAGUE_ROSTER_AUTOCONFIRM_CRON !== 'false'` 면 **즉시 return** 한다
+ * (배포 기본값 = 꺼짐). 그래서 모든 케이스가 그 env 를 명시적으로 켠 상태에서 돈다 —
+ * 끄고 도는 것 자체도 한 케이스로 잰다.
+ */
+describe('D10 리그 명단 자동 확정', () => {
+  const suiteId = randomUUID().slice(0, 8);
+  const adminUserId = `t164-autoconf-admin-${suiteId}`;
+  let app: INestApplication;
+  let cleanup: (() => Promise<void>) | undefined;
+  let prisma: PrismaService;
+  let sportId: string;
+  let adminId: string;
+  let regionId: string;
+  const service = new LeagueRosterAutoConfirmService();
+  const originalEnv = process.env.DISABLE_LEAGUE_ROSTER_AUTOCONFIRM_CRON;
+
+  beforeAll(async () => {
+    ({ app, cleanup } = await createV1IntegrationApp());
+    prisma = app.get(PrismaService);
+    await prisma.v1User.create({
+      data: {
+        id: adminUserId,
+        email: `${adminUserId}@integration.test`,
+        onboardingStatus: 'completed',
+        phoneVerifiedAt: new Date('2026-08-01T00:00:00.000Z'),
+        accountStatus: 'active',
+      },
+    });
+    const terms = app.get(ManagedTermsRuntimeService);
+    const signup = await terms.currentSignupTerms();
+    await terms.acceptSignupTerms(
+      adminUserId,
+      signup.items.filter((item) => item.requirement === 'required').map((item) => item.documentId),
+    );
+    // `V1League.createdByAdminUserId` 는 `V1AdminUser.id` 를 가리킨다(userId 가 아니다).
+    const admin = await prisma.v1AdminUser.create({ data: { userId: adminUserId, adminRole: 'owner' } });
+    adminId = admin.id;
+    const sport = await prisma.v1Sport.upsert({
+      where: { code: 'futsal' },
+      update: {},
+      create: { code: 'futsal', name: '풋살' },
+    });
+    sportId = sport.id;
+    const region = await prisma.v1Region.create({
+      data: { code: `t164-autoconf-region-${suiteId}`, name: 'D10 테스트 지역', level: 2 },
+    });
+    regionId = region.id;
+  });
+
+  afterAll(async () => {
+    process.env.DISABLE_LEAGUE_ROSTER_AUTOCONFIRM_CRON = originalEnv;
+    await cleanup?.();
+  });
+
+  beforeEach(() => {
+    process.env.DISABLE_LEAGUE_ROSTER_AUTOCONFIRM_CRON = 'false'; // 켬
+  });
+
+  let seq = 0;
+  /** 프로필이 완전한(=자격 통과) 멤버. */
+  async function makeMember(teamId: string, opts: { complete: boolean; gender?: 'male' | 'female' } = { complete: true }) {
+    seq += 1;
+    const userId = `t164-u-${suiteId}-${seq}`;
+    await prisma.v1User.create({
+      data: {
+        id: userId,
+        email: `${userId}@integration.test`,
+        accountStatus: 'active',
+        onboardingStatus: 'completed',
+        phone: opts.complete ? `0100000${String(seq).padStart(4, '0')}` : null,
+        phoneVerifiedAt: opts.complete ? new Date('2026-08-01T00:00:00.000Z') : null,
+        profile: {
+          create: {
+            nickname: `선수${seq}`,
+            realName: opts.complete ? `선수${seq}` : null,
+            birthDate: opts.complete ? '1995-01-01' : null,
+            gender: opts.gender ?? 'male',
+          },
+        },
+      },
+    });
+    await prisma.v1TeamMembership.create({
+      data: { teamId, userId, role: 'member', status: 'active', joinedAt: new Date(Date.now() + seq * 1000) },
+    });
+    return userId;
+  }
+
+  async function seedLeague(opts: { members: number; incompleteMembers?: number; maxPlayers?: number }) {
+    seq += 1;
+    const team = await prisma.v1Team.create({
+      data: { ownerUserId: adminUserId, sportId, regionId, name: `t164-team-${suiteId}-${seq}` },
+    });
+    for (let i = 0; i < opts.members; i += 1) await makeMember(team.id, { complete: true });
+    for (let i = 0; i < (opts.incompleteMembers ?? 0); i += 1) await makeMember(team.id, { complete: false });
+
+    const startsOn = new Date('2026-10-01T00:00:00.000Z');
+    const league = await prisma.v1League.create({
+      data: {
+        title: `D10 리그 ${suiteId}-${seq}`,
+        sportId,
+        regionId,
+        createdByAdminUserId: adminId,
+        startsOn,
+        endsOn: new Date('2026-11-01T00:00:00.000Z'),
+        tieBreakJson: { order: ['points'] },
+        teams: { create: [{ teamId: team.id }] },
+      },
+    });
+    // 거울(통합 축) — 등록의 tournamentId 가 이 행을 가리킨다.
+    //
+    // **`scheduledAt` 을 반드시 넣는다.** BE-5 이후 D10 잡은 시작일을 통합 축에서 읽어
+    // 세대(예약 시점의 시작일)와 대조하는데, 비어 있으면 조기 반환해서 **아무것도 안 하고
+    // 조용히 통과한다** — 명단이 0건인 채로 스펙만 빨갛게 된다. 프로덕션의 거울은
+    // `leagueMirrorCreateData` 가 항상 채우므로 픽스처도 같은 모양이어야 한다.
+    await prisma.v1Tournament.create({
+      data: {
+        id: league.id,
+        kind: 'regular_league',
+        sportId,
+        regionId,
+        title: league.title,
+        status: 'open',
+        scheduledAt: startsOn,
+        scheduledEndAt: new Date('2026-11-01T00:00:00.000Z'),
+        ...(opts.maxPlayers === undefined ? {} : { maxPlayers: opts.maxPlayers }),
+      },
+    });
+    const registration = await prisma.v1TournamentRegistration.create({
+      data: { tournamentId: league.id, teamId: team.id, appliedByUserId: adminUserId, status: 'confirmed' },
+    });
+    return { league, team, registration, startsOn };
+  }
+
+  const claimFor = (leagueId: string, startsOn: Date) =>
+    ({ payload: { leagueId, expectedStartsOn: startsOn.toISOString() } }) as never;
+
+  async function run(leagueId: string, startsOn: Date) {
+    await prisma.$transaction((tx) => service.handler(claimFor(leagueId, startsOn), tx as never) as Promise<void>);
+  }
+
+  it('명단 미제출 팀에 자격 통과 멤버만 등록하고 rosterAutoConfirmedAt 을 남긴다', async () => {
+    const { league, registration, startsOn } = await seedLeague({ members: 3, incompleteMembers: 2 });
+
+    await run(league.id, startsOn);
+
+    const players = await prisma.v1TournamentPlayer.findMany({ where: { registrationId: registration.id } });
+    // 프로필이 미비한 2명은 **빠진다** — 크론이 자격 가드를 우회하면 실명 없는 선수가
+    // 명단에 올라간다(그 가드는 사용자가 없앤 적 없는 규칙이다).
+    expect(players).toHaveLength(3);
+    expect(players.every((p) => p.eligibilityStatus === 'needs_review')).toBe(true);
+
+    const [row] = await prisma.$queryRaw<Array<{ at: Date | null }>>`
+      SELECT roster_auto_confirmed_at AS at FROM v1_tournament_registrations WHERE id = ${registration.id}
+    `;
+    expect(row.at).not.toBeNull();
+  });
+
+  it('두 번 돌아도 명단은 1건이다 (멱등)', async () => {
+    const { league, registration, startsOn } = await seedLeague({ members: 2 });
+
+    await run(league.id, startsOn);
+    await run(league.id, startsOn);
+
+    expect(await prisma.v1TournamentPlayer.count({ where: { registrationId: registration.id } })).toBe(2);
+  });
+
+  it('이미 명단을 제출한 팀은 건드리지 않는다', async () => {
+    const { league, registration, startsOn, team } = await seedLeague({ members: 3 });
+    const [firstMember] = await prisma.v1TeamMembership.findMany({ where: { teamId: team.id, role: 'member' }, take: 1 });
+    await prisma.v1TournamentPlayer.create({
+      data: { registrationId: registration.id, userId: firstMember.userId, realName: '직접 등록', eligibilityStatus: 'non_pro' },
+    });
+
+    await run(league.id, startsOn);
+
+    const players = await prisma.v1TournamentPlayer.findMany({ where: { registrationId: registration.id } });
+    // 한 명이라도 올린 팀은 대상이 아니다 — 자동으로 나머지를 채우면 팀이 의도적으로
+    // 뺀 사람이 도로 들어간다.
+    expect(players).toHaveLength(1);
+    expect(players[0].eligibilityStatus).toBe('non_pro');
+    const [row] = await prisma.$queryRaw<Array<{ at: Date | null }>>`
+      SELECT roster_auto_confirmed_at AS at FROM v1_tournament_registrations WHERE id = ${registration.id}
+    `;
+    expect(row.at).toBeNull();
+  });
+
+  it('한 번 올렸다가 전원 뺀 팀은 미제출로 보지 않는다 (제거된 선수 row 가 남아 있다)', async () => {
+    // `players: { none: { removedAt: null } }` 로 잡으면 이 팀이 "명단 0명" 으로 보여
+    // 자동 확정 대상이 된다 — 운영자가 손으로 비운 명단을 도로 채우는 셈이다. 정본의
+    // "미제출" 은 **선수 row 자체가 없는** 팀이다(2026-09-03 정책 확정).
+    const { league, registration, startsOn, team } = await seedLeague({ members: 3 });
+    const [firstMember] = await prisma.v1TeamMembership.findMany({ where: { teamId: team.id, role: 'member' }, take: 1 });
+    await prisma.v1TournamentPlayer.create({
+      data: {
+        registrationId: registration.id,
+        userId: firstMember.userId,
+        realName: '뺀 선수',
+        eligibilityStatus: 'non_pro',
+        removedAt: new Date(),
+      },
+    });
+
+    await run(league.id, startsOn);
+
+    const players = await prisma.v1TournamentPlayer.findMany({ where: { registrationId: registration.id } });
+    expect(players).toHaveLength(1);
+    expect(players[0].removedAt).not.toBeNull();
+    const [row] = await prisma.$queryRaw<Array<{ at: Date | null }>>`
+      SELECT roster_auto_confirmed_at AS at FROM v1_tournament_registrations WHERE id = ${registration.id}
+    `;
+    expect(row.at).toBeNull();
+  });
+
+  it('참가가 확정되지 않은 등록(submitted·awaiting_payment)은 채우지 않는다', async () => {
+    // `status: { notIn: ['cancelled','cancel_requested'] }` 로 잡으면 결제도 안 끝난 팀의
+    // 명단이 자동으로 선다. 자동 확정은 confirmed 등록에만 해당한다.
+    for (const status of ['submitted', 'awaiting_payment', 'waitlisted'] as const) {
+      const { league, registration, startsOn } = await seedLeague({ members: 3 });
+      await prisma.v1TournamentRegistration.update({ where: { id: registration.id }, data: { status } });
+
+      await run(league.id, startsOn);
+
+      const players = await prisma.v1TournamentPlayer.findMany({ where: { registrationId: registration.id } });
+      expect(players).toHaveLength(0);
+      const [row] = await prisma.$queryRaw<Array<{ at: Date | null }>>`
+        SELECT roster_auto_confirmed_at AS at FROM v1_tournament_registrations WHERE id = ${registration.id}
+      `;
+      expect(row.at).toBeNull();
+    }
+  });
+
+  it('자격 통과 멤버가 0명이면 명단을 만들지 않고 표식도 남기지 않는다', async () => {
+    const { league, registration, startsOn } = await seedLeague({ members: 0, incompleteMembers: 2 });
+
+    await run(league.id, startsOn);
+
+    // 빈 명단을 만들면 대진은 생기는데 뛸 사람이 없는 상태가 된다.
+    expect(await prisma.v1TournamentPlayer.count({ where: { registrationId: registration.id } })).toBe(0);
+    const [row] = await prisma.$queryRaw<Array<{ at: Date | null }>>`
+      SELECT roster_auto_confirmed_at AS at FROM v1_tournament_registrations WHERE id = ${registration.id}
+    `;
+    expect(row.at).toBeNull();
+  });
+
+  it('정원을 넘으면 가입 순 상위 N명만 등록한다', async () => {
+    const { league, registration, startsOn } = await seedLeague({ members: 5, maxPlayers: 3 });
+
+    await run(league.id, startsOn);
+
+    expect(await prisma.v1TournamentPlayer.count({ where: { registrationId: registration.id } })).toBe(3);
+  });
+
+  it('대진이 이미 생성된 리그는 건드리지 않는다 (대진 생성 전에만 돈다)', async () => {
+    const { league, registration, startsOn, team } = await seedLeague({ members: 3 });
+    await prisma.v1TeamMatch.create({
+      data: {
+        hostTeamId: team.id,
+        sportId,
+        regionId,
+        title: '이미 만든 대진',
+        startAt: startsOn,
+        placeName: '테스트 구장',
+        createdByUserId: adminUserId,
+        leagueId: league.id,
+      },
+    });
+
+    await run(league.id, startsOn);
+
+    expect(await prisma.v1TournamentPlayer.count({ where: { registrationId: registration.id } })).toBe(0);
+  });
+
+  it('같은 리그의 두 팀에 동시 소속된 사용자는 한쪽 명단에만 들어간다', async () => {
+    // 감사 finding #50 과 같은 규칙 — 수동 등록은 이미 막는다. 자동 확정이 그걸 건너뛰면
+    // 한 사람이 두 팀 공식 명단에 **사람 손을 거치지 않고** 동시에 올라간다.
+    const first = await seedLeague({ members: 2 });
+    // 같은 리그에 두 번째 팀을 붙이고, 첫 팀의 멤버 한 명을 그 팀에도 넣는다.
+    seq += 1;
+    const secondTeam = await prisma.v1Team.create({
+      data: { ownerUserId: adminUserId, sportId, regionId, name: `t164-team-${suiteId}-${seq}` },
+    });
+    const [shared] = await prisma.v1TeamMembership.findMany({
+      where: { teamId: first.team.id, role: 'member' },
+      orderBy: { joinedAt: 'asc' },
+      take: 1,
+    });
+    await prisma.v1TeamMembership.create({
+      data: { teamId: secondTeam.id, userId: shared.userId, role: 'member', status: 'active', joinedAt: new Date() },
+    });
+    await makeMember(secondTeam.id, { complete: true });
+    const secondRegistration = await prisma.v1TournamentRegistration.create({
+      data: {
+        tournamentId: first.league.id,
+        teamId: secondTeam.id,
+        appliedByUserId: adminUserId,
+        status: 'confirmed',
+      },
+    });
+
+    await run(first.league.id, first.startsOn);
+
+    const firstPlayers = await prisma.v1TournamentPlayer.findMany({
+      where: { registrationId: first.registration.id },
+      select: { userId: true },
+    });
+    const secondPlayers = await prisma.v1TournamentPlayer.findMany({
+      where: { registrationId: secondRegistration.id },
+      select: { userId: true },
+    });
+    const holders = [...firstPlayers, ...secondPlayers].filter((row) => row.userId === shared.userId);
+    expect(holders).toHaveLength(1);
+    // 나머지 사람들은 그대로 들어간다 — 한 명 때문에 팀 전체가 막히면 안 된다.
+    expect(firstPlayers.length + secondPlayers.length).toBeGreaterThan(1);
+  });
+
+  it('시작이 24시간 안 남았으면 사전 리마인더를 예약하지 않는다 (자동 확정은 그대로 예약)', async () => {
+    // `reminderAt` 이 과거면 아웃박스가 `available_at <= now` 로 곧바로 집어 워커가 도는
+    // 즉시 발송한다 — "시작까지 24시간 남았어요" 가 거짓이 된다(몇 분 뒤 시작하는 리그).
+    const { league } = await seedLeague({ members: 2 });
+    const soon = new Date(Date.now() + 60 * 60 * 1_000); // 1시간 뒤 시작
+
+    await prisma.$transaction((tx) =>
+      scheduleLeagueRosterAutoConfirm(tx, { leagueId: league.id, startsOn: soon }),
+    );
+
+    const scheduled = await prisma.$queryRaw<Array<{ type: string }>>`
+      SELECT type FROM v1_outbox_events
+      WHERE aggregate_id = ${league.id} AND business_key LIKE ${`%:${soon.toISOString()}`}
+    `;
+    const types = scheduled.map((row) => row.type);
+    expect(types).toContain(LEAGUE_ROSTER_AUTOCONFIRM_TYPE);
+    expect(types).not.toContain(LEAGUE_ROSTER_REMINDER_TYPE);
+  });
+
+  it('시작이 24시간 넘게 남았으면 리마인더와 자동 확정을 둘 다 예약한다', async () => {
+    const { league } = await seedLeague({ members: 2 });
+    const later = new Date(Date.now() + 72 * 60 * 60 * 1_000);
+
+    await prisma.$transaction((tx) =>
+      scheduleLeagueRosterAutoConfirm(tx, { leagueId: league.id, startsOn: later }),
+    );
+
+    const scheduled = await prisma.$queryRaw<Array<{ type: string }>>`
+      SELECT type FROM v1_outbox_events
+      WHERE aggregate_id = ${league.id} AND business_key LIKE ${`%:${later.toISOString()}`}
+    `;
+    const types = scheduled.map((row) => row.type);
+    expect(types).toContain(LEAGUE_ROSTER_AUTOCONFIRM_TYPE);
+    expect(types).toContain(LEAGUE_ROSTER_REMINDER_TYPE);
+  });
+
+  it.each(['completed', 'cancelled'] as const)(
+    '끝난 리그(%s)는 명단을 채우지 않고 **알림도 보내지 않는다**',
+    async (status) => {
+    // 예약(생성 시점)과 실행(시즌 시작) 사이에 리그가 끝날 수 있다. 그때 선수 row 를 새로
+    // 세우면 이미 끝난 대회의 기록이 바뀐다.
+    const { league, registration, startsOn, team } = await seedLeague({ members: 3 });
+    // **알림 0건 단언이 무의미해지지 않도록 팀장을 심는다.** notify 는 owner/manager
+    // 멤버십을 받는 사람에게만 보내므로, 그 행이 없으면 어떤 동작에서도 0건이라 이 단언이
+    // 아무것도 못 잡는다(변이로 확인했다 — 팀장 없이는 옛 동작에서도 green 이었다).
+    await prisma.v1TeamMembership.create({
+      data: { teamId: team.id, userId: adminUserId, role: 'owner', status: 'active', joinedAt: new Date() },
+    });
+    await prisma.v1Tournament.update({ where: { id: league.id }, data: { status } });
+
+    await run(league.id, startsOn);
+
+    const players = await prisma.v1TournamentPlayer.findMany({ where: { registrationId: registration.id } });
+    expect(players).toHaveLength(0);
+    const [row] = await prisma.$queryRaw<Array<{ at: Date | null }>>`
+      SELECT roster_auto_confirmed_at AS at FROM v1_tournament_registrations WHERE id = ${registration.id}
+    `;
+    expect(row.at).toBeNull();
+
+    // 팀장이 잘못한 것도, 할 수 있는 일도 없다 — 알림을 보내면 안 된다. 예전엔 이
+    // 케이스가 `skipped: [{ userId: '-' }]` 센티널로 흘러 "팀원 1명이 제외됐어요" 로
+    // 잘못 통보됐다.
+      const notifications = await prisma.v1Notification.findMany({
+        where: { businessKey: { startsWith: `league-roster-autoconfirm:${registration.id}:` } },
+      });
+      expect(notifications).toHaveLength(0);
+    },
+  );
+
+  it('아직 신청을 연 적 없는 draft 리그는 그대로 채운다 — 그게 가장 흔한 경로다', async () => {
+    // `isRosterMutableTournamentStatus`(open·closed·in_progress)를 그대로 쓰면 이 케이스가
+    // 빠진다. 리그 거울은 draft 로 생성되고 이 잡은 대진 생성보다 **먼저** 돌기 때문에,
+    // 그 집합을 쓰면 D10 이 가장 흔한 경로에서 아무 일도 하지 않는다.
+    const { league, registration, startsOn } = await seedLeague({ members: 3 });
+    await prisma.v1Tournament.update({ where: { id: league.id }, data: { status: 'draft' } });
+
+    await run(league.id, startsOn);
+
+    const players = await prisma.v1TournamentPlayer.findMany({ where: { registrationId: registration.id } });
+    expect(players).toHaveLength(3);
+  });
+
+  it('플래그가 꺼져 있으면(기본값) 아무것도 하지 않는다', async () => {
+    const { league, registration, startsOn } = await seedLeague({ members: 3 });
+    delete process.env.DISABLE_LEAGUE_ROSTER_AUTOCONFIRM_CRON; // 기본 = 꺼짐
+
+    await run(league.id, startsOn);
+
+    expect(await prisma.v1TournamentPlayer.count({ where: { registrationId: registration.id } })).toBe(0);
+  });
+
+  it('시작일이 바뀐 리그의 옛 세대 발화는 스스로 no-op 한다', async () => {
+    const { league, registration, startsOn } = await seedLeague({ members: 3 });
+    // BE-5: 잡이 시작일을 **통합 축에서** 읽는다. 레거시 축만 바꾸면 잡이 보는 값은
+    // 그대로라 세대가 안 바뀌고, 이 케이스가 재려던 no-op 이 일어나지 않는다.
+    await prisma.v1Tournament.update({
+      where: { id: league.id },
+      data: { scheduledAt: new Date('2026-10-15T00:00:00.000Z') },
+    });
+
+    await run(league.id, startsOn); // 옛 세대 시각으로 발화
+
+    expect(await prisma.v1TournamentPlayer.count({ where: { registrationId: registration.id } })).toBe(0);
+  });
+});

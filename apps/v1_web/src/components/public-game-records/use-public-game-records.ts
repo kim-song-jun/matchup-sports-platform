@@ -26,8 +26,8 @@ export const publicGameRecordsKeys = {
     [...publicGameRecordsKeys.all, 'match', tournamentId, fixtureId] as const,
   teamRecords: (teamId: string, season: string | undefined, type: TeamRecordCategory | null) =>
     [...publicGameRecordsKeys.all, 'team-records', teamId, season ?? null, type] as const,
-  userRecords: (userId: string, season: string | undefined) =>
-    [...publicGameRecordsKeys.all, 'user-records', userId, season ?? null] as const,
+  userRecords: (userId: string, season: string | undefined, type: TeamRecordCategory | null) =>
+    [...publicGameRecordsKeys.all, 'user-records', userId, season ?? null, type] as const,
   playerRecords: (tournamentId: string) =>
     [...publicGameRecordsKeys.all, 'player-records', tournamentId] as const,
 };
@@ -146,12 +146,15 @@ export function usePublicTeamRecords(teamId: string, season?: string, type?: Tea
 }
 
 /** `GET /users/:id/records` -- cursor-paginated consent-gated career record + summary. */
-export function usePublicUserRecords(userId: string, season?: string) {
+export function usePublicUserRecords(userId: string, season?: string, type?: TeamRecordCategory) {
   return useInfiniteQuery({
-    queryKey: publicGameRecordsKeys.userRecords(userId, season),
+    // `type` 이 키에 들어가야 탭을 바꿀 때 캐시가 갈린다 — 빠지면 다른 탭의 페이지가
+    // 그대로 재사용된다(팀 전적 키와 같은 이유·같은 모양).
+    queryKey: publicGameRecordsKeys.userRecords(userId, season, type ?? null),
     queryFn: ({ pageParam }: { pageParam: string | null }) =>
       v1Get<PublicUserRecordsResponse>(`/users/${userId}/records`, {
         ...(season ? { season } : {}),
+        ...(type ? { type } : {}),
         ...(pageParam ? { cursor: pageParam } : {}),
       }),
     initialPageParam: null as string | null,

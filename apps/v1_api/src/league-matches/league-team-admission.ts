@@ -35,7 +35,9 @@ export async function findLeagueAdmissionBlocker(
   // non-null 이고 `seriesId`·`seasonNo` 도 거울이 그대로 옮긴다 — 판정에 쓰는 네 필드가
   // 모두 통합 축에 있다.
   const league = await findTournamentOnSurface(tx, ['regular_league'], {
-    where: { id: input.leagueId },
+    // `deletedAt: null` — 다른 읽기 경로와 같은 조건이다. 빼면 **소프트 삭제된 리그에도
+    // 로스터를 넣을 수 있다**: 이 함수가 통과시키면 호출부가 곧바로 등록을 쓴다.
+    where: { id: input.leagueId, deletedAt: null },
     select: { id: true, sportId: true, seriesId: true, seasonNo: true },
   });
   if (league === null) return { kind: 'TEAM_INVALID' };
@@ -67,6 +69,7 @@ export async function findLeagueAdmissionBlocker(
   if (league.seriesId === null) return null;
   const sibling = await findTournamentOnSurface(tx, ['regular_league'], {
     where: {
+      deletedAt: null,
       seriesId: league.seriesId,
       seasonNo: league.seasonNo,
       id: { not: input.leagueId },

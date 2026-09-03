@@ -476,15 +476,25 @@ export interface PublicUserRecordItem {
  * 파울 누적치는 이 요약에 없다 — 서버가 공개 응답에서 아예 빼기 때문이다
  * (`PublicUserRecordsService`의 summary 주석 참조). 카드(경고/퇴장)만 공개된다.
  */
-export interface PublicUserRecordsSummary {
+/** 개인 기록 요약의 한 축(전체 또는 리그/대회/친선 하나). */
+export interface UserRecordSummaryTotals {
   readonly appearances: number;
   readonly goals: number;
   readonly assists: number;
   readonly yellowCards: number;
   readonly redCards: number;
   readonly mvpCount: number;
+}
+
+export interface PublicUserRecordsSummary extends UserRecordSummaryTotals {
   readonly matchMvpCount: number;
   readonly tournamentAwardCount: number;
+  /**
+   * Task 166 BE-4: 리그/대회/친선 4분면. 팀 전적(`PublicTeamRecordsSummary.byType`)과
+   * 같은 모양이라 화면이 탭을 바꿀 때 KPI 를 다시 받지 않고 여기서 읽는다.
+   * **필터(`?type=`)와 무관하게 항상 전체 기준**이다.
+   */
+  readonly byType: Readonly<Record<TeamRecordCategory, UserRecordSummaryTotals>>;
 }
 
 export interface PublicUserTournamentAward {

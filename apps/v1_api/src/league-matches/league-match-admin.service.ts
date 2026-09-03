@@ -1,4 +1,10 @@
-import { ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AdminContextService, type V1ActiveAdmin } from '../common/admin-context.service';
 import { GamesService } from '../games/games.service';
@@ -27,6 +33,7 @@ import { tierLabel } from './league-tier-label';
 import { resolveResultStage } from './league-result-stage';
 import { resolveIsForfeit } from './league-match-forfeit.service';
 import { FixtureScheduleTemplate, FixtureTimingOptions, generateRoundRobinFixtures, resolveFixtureStartAt, resolveFixtureTimeSlots, RoundRobinFixture } from './round-robin-schedule';
+import { createLeagueMirrorWithRosterSchedule } from '../jobs/league-roster/league-roster-autoconfirm.service';
 import { createLeagueFixture, leagueFixtureTitle } from './league-fixture-creation';
 import { resolveLeagueFixtureDates } from './league-fixture-dates';
 import { resolveLeagueWeekNumbers } from './league-week-number';
@@ -43,7 +50,7 @@ import {
 } from './dto/league-match.dto';
 import { LEAGUE_TIE_BREAK_ORDER } from './league-tie-break';
 import { findTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
-import { LEAGUE_STATE_BY_STATUS } from '../tournaments/league-competition-mirror';
+import { LEAGUE_STATE_BY_STATUS, isCompleteLeagueMirror } from '../tournaments/league-competition-mirror';
 import { randomUUID } from 'node:crypto';
 import { LeagueStateValue } from './league-state';
 
@@ -111,6 +118,8 @@ const MAX_TOTAL_ROUNDS = 104;
 
 @Injectable()
 export class LeagueMatchAdminService {
+  private readonly logger = new Logger(LeagueMatchAdminService.name);
+
   // game-result-official-projection.service.ts와 동일한 관례 — 이 프로젝터는 DI 상태가
   // 없고 tx만 받으므로 provider로 등록하지 않고 직접 인스턴스화한다.
   private readonly leagueCompletion = new LeagueCompletionProjectionService();
@@ -186,15 +195,23 @@ export class LeagueMatchAdminService {
         sportCode: sport.code,
         createdAt,
       };
-      await tx.v1Tournament.create({
-        data: { ...leagueMirrorCreateData(created), createdByAdminUserId: admin.id },
-      });
+      // 생성과 **D10 예약을 한 진입점**에서 한다(#1003). 예약을 호출부마다 흩어 두면 새
+      // 경로가 생길 때마다 빠뜨린다 — 실제로 시즌 쪽 두 곳이 빠져 있었다.
+      await createLeagueMirrorWithRosterSchedule(
+        tx,
+        { ...leagueMirrorCreateData(created), createdByAdminUserId: admin.id },
+        { leagueId: created.id, startsOn },
+      );
       // 로스터와 짝이 되는 confirmed 등록 — **거울 create 뒤여야 한다**(등록의
       // tournamentId 가 거울 행을 가리킨다). 리그를 만들 때 함께 넣은 팀도 로스터에
       // 들어가므로 여기가 다섯 번째 경로다(addTeam·시드·승계·신청 확정과 같은 불변식).
       for (const teamId of uniqueTeamIds) {
         await createLeagueRosterRegistration(tx, { leagueId: created.id, teamId, entrySource: 'seeded' });
       }
+      // D10(Task 164 BE-4b): 시즌 시작 24h 전 리마인더 + 시작 시각 자동 확정을 **여기서**
+      // 예약한다. v1 스택엔 cron 데코레이터가 없고 아웃박스에 미래 시각으로 넣는 것이
+      // 관용구다(`league-result-entry-reminder` 선례). "대진 생성 전에 돌아야 한다" 는
+      // 제약은 잡이 "대진이 이미 있으면 skip" 을 스스로 판정해 지킨다.
       await this.adminContext.logAdminAction(
         admin,
         {
@@ -230,6 +247,8 @@ export class LeagueMatchAdminService {
         status: true,
         scheduledAt: true,
         scheduledEndAt: true,
+        // 목록에 싣지는 않지만 `isCompleteLeagueMirror` 가 본다 — 지역이 빈 거울은 깨진 것이다.
+        regionId: true,
         seriesId: true,
         tier: true,
         seasonNo: true,
@@ -250,8 +269,18 @@ export class LeagueMatchAdminService {
     const fixtureCountByLeagueId = new Map(
       fixtureCounts.map((row) => [row.leagueId, row._count._all]),
     );
+    // 깨진 거울(일정·지역이 빈 행)은 **끊지 않고 제외한다** — 목록 하나 때문에 전체가 500 이
+    // 되면 운영자가 다른 리그도 못 본다. 대신 몇 건을 뺐는지 로그로 남긴다(조용히 사라지면
+    // 아무도 모른다). 단건 조회는 그대로 `LEAGUE_MIRROR_MISSING` 으로 끊는다.
+    const listable = rows.filter(isCompleteLeagueMirror);
+    if (listable.length !== rows.length) {
+      this.logger.warn(
+        `league list: 통합 축 일정·지역이 빈 리그 ${rows.length - listable.length}건을 목록에서 제외했다 ` +
+          `(ids: ${rows.filter((row) => !isCompleteLeagueMirror(row)).map((row) => row.id).join(', ')})`,
+      );
+    }
     return {
-      items: rows.map((row) => ({
+      items: listable.map((row) => ({
         leagueId: row.id,
         title: row.title,
         state: LEAGUE_STATE_BY_STATUS[row.status],

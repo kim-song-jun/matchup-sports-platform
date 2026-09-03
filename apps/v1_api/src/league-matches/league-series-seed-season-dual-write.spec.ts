@@ -16,6 +16,7 @@ const ADMIN_ID = 'admin-1';
 
 function makeHarness() {
   const tournamentCreate = jest.fn(async (args: { data: Record<string, unknown> }) => args.data);
+  const outboxInsert = jest.fn(async () => 1);
   // upsert 다 — `(tournamentId, teamId)` @@unique 라 무조건 create 면 P2002 다.
   const registrationCreate = jest.fn(async (args: { create: Record<string, unknown> }) => args.create);
   const tx = {
@@ -34,6 +35,10 @@ function makeHarness() {
       })),
     },
     v1TournamentRegistration: { upsert: registrationCreate },
+    // 거울 생성이 로스터 자동 확정 예약(D10)까지 함께 한다 — 그 예약은 아웃박스 행을
+    // `$executeRaw` 로 넣는다. fake 에 없으면 "tx.$executeRaw is not a function" 으로
+    // dual-write 단언에 닿기도 전에 죽는다(이 스펙이 재는 건 거울이지 예약이 아니다).
+    $executeRaw: outboxInsert,
   };
   const prisma = {
     v1LeagueSeries: {

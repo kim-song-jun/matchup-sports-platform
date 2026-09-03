@@ -40,7 +40,6 @@ import { ElapsedMatchClock } from './elapsed-match-clock';
 import { QueueStatusPanel, hasUnsettledQueueItems } from './queue-status-panel';
 import { RecordedEventList } from './recorded-event-list';
 import { AssistPickerSheet } from './assist-picker-sheet';
-import { QuickSubstitutionPanel } from './quick-substitution-panel';
 import { AbnormalEndDialog, type AbnormalEndReason } from './abnormal-end-dialog';
 import { ArrivalCheckinPanel } from './arrival-checkin-panel';
 import { RestTimer } from './rest-timer';
@@ -341,7 +340,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     }
     return bySide;
   }, [gameDetail.data?.sides, ops.liveEvents]);
-  const [quickSubstitutionMode, setQuickSubstitutionMode] = useState(false);
+
 
   // UX 감사 item 2 — 라인업 없이 경기를 시작하면 복구 불가능한 막다른 길이
   // 된다(시작 후에는 LineupGrid가 "제출된 선발 명단이 없어요"만 보여줄 뿐
@@ -525,7 +524,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   // 거치므로, 시계가 수상하다고 여기서 또 `confirm()`을 부르면 확인 모달이
   // 두 번(먼저 이 경고, 그다음 액션 확인) 뜬다 — 나쁜 UX다. 그래서 이 함수는
   // 더 이상 confirm을 부르지 않고 "경고가 필요한가/피리어드가 몇 분짜리인가"
-  // 만 계산해서 돌려주고, 호출부(`handleCommit`/`handleQuickSubstitute`)가
+  // 만 계산해서 돌려주고, 호출부(`handleCommit`)가
   // `commitActionConfirmCopy`에 이 값을 건네 **같은 모달 안에** 병합한다.
   // `currentPeriodDurationMinutes`가 `null`이면(설정을 못 읽음) 판단 근거가
   // 없으므로 경고 없이 통과시킨다 — 지어낸 기준으로 막지 않는다.
@@ -659,64 +658,16 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     [confirm, ops],
   );
 
-  // 빠른 교체 모드의 단일 확정 탭 — QuickSubstitutionPanel은 "지정 후 탭"
-  // 두 단계를 거쳐서만 이 콜백을 부르므로(오조작 방지 설계는 그 컴포넌트
-  // 문서 참고), 여기서는 시각을 이 탭 순간에 얼리고 바로 커밋한 뒤 되돌리기
-  // 액션이 달린 확인 토스트를 띄운다 — 기존 `ops.reverseEvent`(CORRECTION)
-  // 경로를 그대로 재사용한다(새 되돌리기 API를 만들지 않는다).
-  const handleQuickSubstitute = useCallback(
-    async (input: { sideId: string; outParticipant: GameLineupParticipant; inParticipant: GameLineupParticipant }) => {
-      if (currentPeriod === null || currentPeriod.startedAt === null) return;
-      const periodStartedAtMs = new Date(currentPeriod.startedAt).getTime();
-      const frozen = freezeCapture({
-        clientNowMs: Date.now(),
-        offsetMs: ops.clockOffsetMs,
-        period: currentPeriod.number,
-        periodStartedAtMs,
-        pausedTotalMs: currentPeriod.pausedTotalMs,
-        pausedAtMs: currentPeriod.pausedAt === null ? null : new Date(currentPeriod.pausedAt).getTime(),
-      });
-      // 사용자 결정("예외 없이 전부")으로 빠른 교체도 이제 확인을 거친다 —
-      // 예전엔 "지정 후 탭" 두 단계 자체가 오조작 방지라 확인창을 생략했지만,
-      // 그 설계는 이번 결정으로 폐기됐다(과제 1 doc, `confirm-copy.ts` 참고).
-      // `commitActionConfirmCopy`가 일반 교체(ActionTargetPicker 경로)와 정확히
-      // 같은 문구 형식을 쓰도록, 제출할 이벤트와 동일한 shape을 먼저 만든다.
-      const commitInput: EventCaptureCommitInput = {
-        type: 'SUBSTITUTION',
-        participantId: input.inParticipant.id,
-        sideId: input.sideId,
-        period: frozen.period,
-        clockMs: frozen.clockMs,
-        occurredAt: frozen.occurredAt,
-        payload: { outParticipantId: input.outParticipant.id },
-      };
-      const copy = commitActionConfirmCopy(
-        commitInput,
-        gameDetail.data?.sides ?? [],
-        fixtureLineup.data?.lineups ?? [],
-        clockWarningMinutes(frozen.clockMs),
-      );
-      if (!(await confirm(copy))) return;
-      void ops.submitEvent(commitInput);
-      const outParticipantId = input.outParticipant.id;
-      const inParticipantId = input.inParticipant.id;
-      const clockMs = frozen.clockMs;
-      showToast(`${input.outParticipant.displayNameSnapshot} → ${input.inParticipant.displayNameSnapshot} 교체 기록됨`, {
-        action: {
-          label: '되돌리기',
-          onClick: () => {
-            const match = findRecentSubstitutionEvent(liveEventsRef.current, {
-              inParticipantId,
-              outParticipantId,
-              clockMs,
-            });
-            if (match) void ops.reverseEvent({ eventId: match.id, reason: '빠른 교체 되돌리기' });
-          },
-        },
-      });
-    },
-    [currentPeriod, ops, showToast, confirm, gameDetail.data?.sides, fixtureLineup.data?.lineups, clockWarningMinutes],
+  // Task 166 BE-3: 롤링 교체 종목은 교체를 기록하지 않는다(정본 §3) — 서버가 422
+  // `SUBSTITUTION_NOT_TRACKED` 로 거부하므로 버튼을 남기면 **누를 수 있는데 항상 실패하는**
+  // 액션이 된다. 종목 목록을 화면에 하드코딩하지 않고 서버가 이미 내려주는
+  // `substitutionPolicy.mode` 로 가른다(`games.service.ts` 가 대회 설정에서 파생한다).
+  const substitutionTracked = gameDetail.data?.substitutionPolicy?.mode !== 'rolling';
+  const visibleActionButtons = useMemo(
+    () => (substitutionTracked ? ACTION_BUTTONS : ACTION_BUTTONS.filter((b) => b.type !== 'SUBSTITUTION')),
+    [substitutionTracked],
   );
+
 
   // 확인 모달은 더 이상 이 함수 안에서 뜨지 않는다 — 과제 1(사용자 결정:
   // "예외 없이 전부"에 확인)로 start/pause/resume/end-period/start-period/end
@@ -1355,9 +1306,12 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           균등 배치한다. 골만 2칸을 쓰면 총 7칸이 되어 마지막 액션이 홀로
           다음 줄로 밀리므로, 모든 액션의 크기와 터치 영역을 동일하게 둔다. */}
       <div className="grid grid-cols-2 gap-2 px-4 sm:grid-cols-6">
-        {ACTION_BUTTONS.map((button, index) => (
+        {visibleActionButtons.map((button) => (
           <Button
-            key={`${button.type}-${button.cardColor ?? index}`}
+            // key 에 index 를 쓰지 않는다 — 롤링/제한에 따라 목록이 갈리면 같은 버튼의
+            // index 가 달라져 React 가 remount 한다(Copilot 리뷰). CARD 두 개는
+            // cardColor 로 갈리므로 type+cardColor 조합이 이미 고유하다.
+            key={`${button.type}-${button.cardColor ?? 'none'}`}
             size="lg"
             variant="outline"
             className="h-16 flex-col gap-1 lg:h-20"
@@ -1426,30 +1380,8 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         />
       )}
 
-      {gameDetail.data?.substitutionPolicy?.mode === 'rolling' && (
-        <div className="flex flex-col gap-2 px-4">
-          <Button
-            size="sm"
-            variant={quickSubstitutionMode ? 'primary' : 'outline'}
-            block
-            disabled={!isTakeoverHeld(ops.takeover) || currentPeriod === null}
-            onClick={() => setQuickSubstitutionMode((current) => !current)}
-            aria-pressed={quickSubstitutionMode}
-          >
-            <ArrowLeftRight size={14} aria-hidden="true" />
-            빠른 교체 모드 {quickSubstitutionMode ? '끄기' : '켜기'}
-          </Button>
-          {quickSubstitutionMode && (
-            <QuickSubstitutionPanel
-              sides={sides}
-              lineups={lineups}
-              onPitchParticipantIds={onPitchParticipantIds}
-              disabled={!isTakeoverHeld(ops.takeover) || currentPeriod === null}
-              onSubstitute={handleQuickSubstitute}
-            />
-          )}
-        </div>
-      )}
+      {/* Task 166 BE-3: 여기 있던 "빠른 교체 모드"(롤링 종목 전용 패널)를 없앴다 —
+          롤링에서만 뜨던 UI 인데 그 종목의 교체 기록 자체가 사라졌으므로 도달 불가다. */}
 
       </div>
 

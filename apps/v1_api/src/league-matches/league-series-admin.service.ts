@@ -41,6 +41,7 @@ import { LEAGUE_TIE_BREAK_ORDER } from './league-tie-break';
 import { findTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
 import { randomUUID } from 'node:crypto';
 import { LeagueStateValue } from './league-state';
+import { createLeagueMirrorWithRosterSchedule } from '../jobs/league-roster/league-roster-autoconfirm.service';
 
 const SEASON_LENGTH_FALLBACK_DAYS = 90;
 
@@ -345,7 +346,10 @@ export class LeagueSeriesAdminService {
           sport: { code: seriesSportCode },
         };
         // dual-write — 통합 축에 같은 리그를 비춘다(같은 트랜잭션).
-        await tx.v1Tournament.create({ data: leagueMirrorCreateData(toMirrorSource(league)) });
+        await createLeagueMirrorWithRosterSchedule(tx, leagueMirrorCreateData(toMirrorSource(league)), {
+          leagueId: league.id,
+          startsOn,
+        });
         // 로스터와 짝이 되는 confirmed 등록. 거울을 만든 **뒤**여야 한다 — 등록의
         // tournamentId 가 거울 행을 가리키므로 순서가 바뀌면 FK 로 막힌다.
         for (const teamId of new Set(tier.teamIds)) {
@@ -697,7 +701,10 @@ export class LeagueSeriesAdminService {
           };
           // dual-write — 통합 축에 같은 리그를 비춘다(같은 트랜잭션). 없으면 이 리그는
           // read-swap 뒤 화면에서 에러 없이 사라진다.
-          await tx.v1Tournament.create({ data: leagueMirrorCreateData(toMirrorSource(league)) });
+          await createLeagueMirrorWithRosterSchedule(tx, leagueMirrorCreateData(toMirrorSource(league)), {
+            leagueId: league.id,
+            startsOn: nextStartsOn,
+          });
           // 승계로 들어온 팀은 `promoted` 다 — 운영자가 손으로 넣은 `seeded` 와 다른
           // 사건이고, 다음 시즌 참가 통보·이의 처리에서 "왜 여기 있나" 의 답이 갈린다.
           for (const teamId of teamIds) {

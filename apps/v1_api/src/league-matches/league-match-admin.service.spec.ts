@@ -629,6 +629,8 @@ describe('LeagueMatchAdminService.addTeam — 형제 티어 중복 게이트', (
     );
     expect(siblingCall).toBeDefined();
     expect(siblingCall[0].where.AND[1]).toEqual({
+      // 소프트 삭제된 형제 리그는 중복이 아니다 — 이미 없는 리그 때문에 추가를 막으면 안 된다.
+      deletedAt: null,
       seriesId: SERIES_ID,
       seasonNo: 1,
       id: { not: LEAGUE_ID },

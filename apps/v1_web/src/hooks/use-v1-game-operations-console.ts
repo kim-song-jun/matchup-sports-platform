@@ -1195,6 +1195,12 @@ export function gameOperationsErrorMessage(code: string): string {
       return '들어오는 선수가 이미 피치 위에 있어요. 새로고침 후 다시 확인해주세요.';
     case 'SUBSTITUTION_LIMIT_REACHED':
       return '이 대회의 교체 횟수를 모두 사용했어요.';
+    // 롤링(자유) 교체 종목은 교체를 기록하지 않는다(정본 §3). 콘솔은 그 종목에서 교체
+    // 버튼 자체를 숨기지만, **대기열에 남아 있던 재전송**과 **옛 클라이언트**는 여전히
+    // 이 커맨드를 보낸다 — 그때 여기 없으면 기본 문구가 뜨고, 아래 non-retryable 목록에도
+    // 없으면 영영 성공하지 않을 요청을 계속 재전송한다.
+    case 'SUBSTITUTION_NOT_TRACKED':
+      return '이 대회는 교체를 따로 기록하지 않아요. 교체 없이 진행해주세요.';
     case 'COMMAND_IDEMPOTENCY_KEY_MISMATCH':
     case 'IDEMPOTENCY_PAYLOAD_CONFLICT':
       return '같은 요청 번호로 다른 내용이 이미 처리됐어요. 새로고침 후 다시 기록해주세요.';
@@ -1240,6 +1246,7 @@ const NON_RETRYABLE_GAME_OPERATIONS_ERROR_CODES = new Set<string>([
   'SUBSTITUTION_OUT_NOT_ON_PITCH',
   'SUBSTITUTION_IN_ALREADY_ON_PITCH',
   'SUBSTITUTION_LIMIT_REACHED',
+  'SUBSTITUTION_NOT_TRACKED',
   'COMMAND_IDEMPOTENCY_KEY_MISMATCH',
   'IDEMPOTENCY_PAYLOAD_CONFLICT',
 ]);

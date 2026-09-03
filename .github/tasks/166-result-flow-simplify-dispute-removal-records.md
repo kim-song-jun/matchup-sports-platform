@@ -32,7 +32,7 @@
 - [ ] 어드민 확인 = `officialize` 한 번. 검토 요청·보완 요청·거부 상태는 **행복 경로에서 빠진다**. 세 상태의 실제 소비처를 실측해 0 이면 enum 값까지 제거, 있으면 Ambiguity Log 1 로 올린다.
 - [ ] 사용자 화면(경기 상세·일정·라이브 스코어)에 SUBMITTED 는 점수 + "확정 전" 태그, OFFICIAL 은 태그 없음. 순위·승점·전적은 OFFICIAL 만 집계(변이: SUBMITTED 를 세면 red).
 - [ ] 이의 테이블·서비스·컨트롤러·화면·알림 4종 제거. drop 마이그레이션은 사용자 직접 승인.
-- [ ] `lineup.substitutions === 'rolling'` 인 대회의 콘솔에서 교체 커맨드가 **노출되지 않고 서버도 거부**(400 `SUBSTITUTION_NOT_TRACKED`). `'limited'` 는 기존 동작·`maxSubstitutions` 검증 유지(회귀 스펙).
+- [ ] `lineup.substitutions === 'rolling'` 인 대회의 콘솔에서 교체 커맨드가 **노출되지 않고 서버도 거부**(422 `SUBSTITUTION_NOT_TRACKED` — 착수 시 400 으로 적었으나 형제 코드 4개와 맞춰 422 로 정정). `'limited'` 는 기존 동작·`maxSubstitutions` 검증 유지(회귀 스펙).
 - [ ] 팀 전적 탭 전체/대회/리그/친선. 개인 기록 `matchType` 에 `league` 추가.
 - [ ] 화면 변경(태그 · 탭 · 콘솔 교체 버튼 제거)은 **3안 → 사용자 선택** 뒤 구현.
 
@@ -118,7 +118,29 @@
     그 호출부가 사라지는 순간 서비스 전체가 도달 불가가 되므로 여기서 같이 지운다 —
     `league-match-result-entry.service.ts` · 그 spec 파일 부재, 식별자 0건.
   - 지우지 않는 것: `league-result-entry-reminder`(경기 시작 +24h 리마인더, 별개 기능).
-- **BE-3 롤링 교체 차단.** 교체 커맨드 핸들러가 대회 설정을 읽어 `'rolling'` 이면 400. `'limited'` 회귀 스펙.
+- **BE-3 롤링 교체 차단.** ✅ 구현(2026-09-03). 가드는 `games/core/substitution.ts` 의
+  `validateSubstitution` **맨 앞**에 둔다 — 그 함수가 이미 `substitutionMode` 를 받고 있고
+  모든 호출부가 지나는 단일 지점이다(설정 조회 경로는 `games.service.ts` 가 이미 갖고 있어
+  복사하지 않았다). 롤링에서는 뒤따르는 검사(같은 팀인가·피치 위인가)가 묻는 질문 자체가
+  의미 없으므로 그것들보다 **먼저** 던진다 — 순서가 뒤집히면 운영자가 "선수를 잘못 골랐다"
+  로 읽고 다른 조합을 계속 시도한다.
+  - **실측**: 친선 팀매치도 설정을 받는다(`team-matches.service.ts` 가 생성 시
+    `competitionConfigVersionId` 를 채운다). 프리셋은 **축구 `limited`(cap 5) / 풋살
+    `rolling`** 이므로, **풋살 친선 팀매치도 이 가드에 걸린다** — 정본 §3("롤링 종목은 교체
+    기록 없음")이 대회/친선을 가르지 않으므로 의도된 동작이다. 설정이 아예 없는 경기
+    (`competitionConfigVersionId = null`)는 기존 fail-closed 경로대로 `'limited'` 로 읽혀
+    **현행 유지**다.
+  - **이미 기록된 SUBSTITUTION 이벤트는 그대로 읽힌다**(`deriveOnPitchParticipantIds`) —
+    이 가드는 새 기록만 막는다.
+  - 에러 코드 `SUBSTITUTION_NOT_TRACKED` 는 **422** 다(2026-09-03 정정 — 조건 원문의 400 을
+    코드에 맞춰 고쳤다). 형제 4개(`SUBSTITUTION_INVALID`·`OUT_NOT_ON_PITCH`·
+    `IN_ALREADY_ON_PITCH`·`LIMIT_REACHED`)가 전부 422 인데 교체 실패 하나만 갈리면
+    클라이언트가 두 매핑을 갖게 된다 — 뜻의 차이("이 요청 내용이 틀렸다" vs "이 경기엔 그
+    명령이 없다")는 `code` 필드가 드러낸다.
+  - 콘솔 UI 의 교체 버튼 숨김은 **같은 PR 에서 처리**(3안 대상 아님 — 제거). 착수 시엔
+    별도 PR 로 적었는데, 분리의 이유가 "버튼이 422 를 내는 창을 최소화" 였고 **같은 PR 이면
+    그 창이 0** 이라 합쳤다(2026-09-03 확정). 롤링 전용이던 "빠른 교체 모드" 패널도 도달
+    불가가 되어 함께 삭제했다.
 - **BE-4 전적 구분.** ✅ 구현(2026-09-03). 실측이 착수 전제와 달랐다:
   - **팀 전적은 이미 완비**돼 있었다(4탭·필터·`byType`). 할 일 없음.
   - 개인 기록도 아이템 `type` 은 이미 있었다. **없던 것은 `?type=` 필터·`summary.byType`·화면 탭** —

@@ -89,3 +89,24 @@ describe('isRetryableGameOperationsErrorCode — 문구와의 정합성', () => 
     }
   });
 });
+
+describe('SUBSTITUTION_NOT_TRACKED — 롤링 교체 종목의 교체 커맨드', () => {
+  // 콘솔은 롤링 종목에서 교체 버튼을 숨기지만, **대기열에 남아 있던 재전송**과
+  // **옛 클라이언트**는 여전히 이 커맨드를 보낸다. 그때 매핑이 없으면 기본 문구가 뜨고
+  // (운영자는 왜 안 되는지 모른다), 재시도 분류에도 없으면 영영 성공하지 않을 요청을
+  // 계속 재전송한다 — 형제 코드 4개(SUBSTITUTION_INVALID·OUT_NOT_ON_PITCH·
+  // IN_ALREADY_ON_PITCH·LIMIT_REACHED)는 이미 둘 다 갖고 있었다.
+  it('자기 문구를 갖고, 그 문구가 이유를 말한다', () => {
+    const message = gameOperationsErrorMessage('SUBSTITUTION_NOT_TRACKED');
+    expect(message).not.toBe(gameOperationsErrorMessage('__NOT_A_REAL_CODE__'));
+    expect(message).toContain('교체');
+  });
+
+  it('재시도해도 항상 같은 이유로 거부되므로 비재시도로 분류된다', () => {
+    expect(isRetryableGameOperationsErrorCode('SUBSTITUTION_NOT_TRACKED')).toBe(false);
+  });
+
+  it('비재시도이므로 "다시 시도" 를 권하지 않는다', () => {
+    expect(gameOperationsErrorMessage('SUBSTITUTION_NOT_TRACKED')).not.toContain('다시 시도');
+  });
+});

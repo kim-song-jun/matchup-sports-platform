@@ -189,7 +189,7 @@ describe('Task 22 tournament result review, officialize, correction, and void', 
   let gameId: string;
   let homeSideId: string;
   let scorerId: string;
-  let rejectedRevisionId: string;
+  let supersededBaseRevisionId: string;
   let resubmittedRevisionId: string;
   let officialRevisionId: string;
   let correctionRevisionId: string;
@@ -323,21 +323,32 @@ describe('Task 22 tournament result review, officialize, correction, and void', 
     await prisma.$disconnect();
   });
 
-  it('rejects the submitted revision, closes its SLA, and rejects any further review of the terminal row', async () => {
+  it('제출된 결과를 어드민이 그 자리에서 고쳐 대체하고, 대체된 base 는 더 이상 확정되지 않는다', async () => {
+    // Task 166: 예전엔 여기서 `reviewDecision('reject')` 로 **팀에게 되돌려 보낸 뒤**에야
+    // 재제출이 가능했다(base = REJECTED). 정본 §4 가 그 왕복을 없애면서 base 가 SUBMITTED 가
+    // 됐다 — 어드민은 되돌려 보내지 않고 그 자리에서 고쳐 확정한다.
     const submitted = await prisma.v1GameResultRevision.findFirstOrThrow({ where: { gameId } });
     expect(submitted.state).toBe(V1GameResultRevisionState.SUBMITTED);
 
-    // wrong-base supersede-and-submit while still SUBMITTED writes zero rows.
+    // 음성: DRAFT base 는 여전히 거부되고 **한 행도 쓰지 않는다.** 이걸 같이 재지 않으면
+    // "SUBMITTED 를 허용" 이 "아무 base 나 허용" 으로 넓어져도 이 스펙이 통과한다.
+    const draft = await prisma.v1GameResultRevision.create({
+      data: {
+        gameId,
+        revision: 900,
+        state: V1GameResultRevisionState.DRAFT,
+        score: { home: 0, away: 0 },
+        eventsHash: 'draft-base-probe',
+        createdByActorType: 'USER',
+        createdByUserId: ids.platformOps,
+      },
+    });
     const before = await revisionCount(gameId);
     const wrongBase = await captureFailure(() =>
-      resultReview.supersedeAndSubmit(authUser(ids.platformOps), gameId, submitted.id, 'task22-wrong-base', {
+      resultReview.supersedeAndSubmit(authUser(ids.platformOps), gameId, draft.id, 'task166-draft-base', {
         expectedVersion: 3,
-        clientCommandId: 'task22-wrong-base',
+        clientCommandId: 'task166-draft-base',
         score: { home: 1, away: 0 },
-        // 실제 참가자를 담는다. 이 테스트가 노리는 것은 "base가 아직 SUBMITTED라
-        // 재제출이 거부된다"는 것뿐이고 참가자와는 무관하지만, 빈 배열을 남겨 두면
-        // "참가자 없는 결과가 정상 입력"이라는 잘못된 선례가 된다 — 빈
-        // actualParticipants는 그 경기의 개인기록을 0행으로 만드는 결함이다.
         actualParticipants: [
           {
             participantId: scorerId,
@@ -348,49 +359,26 @@ describe('Task 22 tournament result review, officialize, correction, and void', 
             goalkeeper: false,
           },
         ],
-        eventsHash: 'wrong-base',
-        reason: 'attempted before any review decision',
+        eventsHash: 'draft-base',
+        reason: 'draft base is not resubmittable',
       }),
     );
     expectHttpCode(wrongBase, 409, 'RESULT_RESUBMISSION_NOT_ALLOWED');
     expect(await revisionCount(gameId)).toBe(before);
+    await prisma.v1GameResultRevision.delete({ where: { id: draft.id } });
 
-    const rejected = await resultReview.reviewDecision(authUser(ids.platformOps), gameId, submitted.id, 'task22-reject', {
-      expectedVersion: 3,
-      clientCommandId: 'task22-reject',
-      decision: 'reject',
-      reason: 'missing lineup confirmation',
-    });
-    expect(rejected.revisionState).toBe(V1GameResultRevisionState.REJECTED);
-    rejectedRevisionId = rejected.revisionId;
-
-    const game = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } });
-    expect(game.currentOfficialRevisionId).toBeNull();
-    const escalations = await prisma.v1ResultEscalation.findMany({ where: { resultRevisionId: submitted.id } });
-    expect(escalations.length).toBeGreaterThan(0);
-    expect(escalations.every((row) => row.status === 'CLOSED')).toBe(true);
-
-    const rejectAgain = await captureFailure(() =>
-      resultReview.reviewDecision(authUser(ids.platformOps), gameId, submitted.id, 'task22-reject-again', {
-        expectedVersion: 4,
-        clientCommandId: 'task22-reject-again',
-        decision: 'reject',
-        reason: 'retried on a terminal revision',
-      }),
-    );
-    expectHttpCode(rejectAgain, 409, 'TERMINAL_REVISION_IMMUTABLE');
-
+    supersededBaseRevisionId = submitted.id;
     await drainOutbox();
   });
 
-  it('supersedes the rejected revision with a fresh submitted successor and a fresh review SLA', async () => {
+  it('SUBMITTED base 를 재제출로 대체하면 새 리비전이 서고 새 SLA 가 열린다', async () => {
     const successor = await resultReview.supersedeAndSubmit(
       authUser(ids.platformOps),
       gameId,
-      rejectedRevisionId,
+      supersededBaseRevisionId,
       'task22-supersede',
       {
-        expectedVersion: 4,
+        expectedVersion: 3,
         clientCommandId: 'task22-supersede',
         score: { home: 1, away: 0 },
         actualParticipants: [
@@ -409,6 +397,23 @@ describe('Task 22 tournament result review, officialize, correction, and void', 
     );
     expect(successor.revisionState).toBe(V1GameResultRevisionState.SUBMITTED);
     resubmittedRevisionId = successor.revisionId;
+
+    // 대체된 base 는 **확정할 수 없다.** base 의 `state` 는 SUBMITTED 그대로라
+    // (supersede 는 predecessor 를 건드리지 않는다) 상태만 보면 확정 가능해 보인다 —
+    // officialize 가 `supersedesId` 로 별도 판정한다. 이게 없으면 어드민의 오래된 화면이
+    // 고치기 **전**의 결과를 공식으로 만들 수 있다.
+    // **hash 는 맞게 넣는다.** projection-preview 검사가 supersede 검사보다 먼저 걸리므로,
+    // 틀린 hash 를 주면 PROJECTION_PREVIEW_MISMATCH 에서 멈춰 **정작 재려는 가드에 도달하지
+    // 못한다**(그 상태로도 "409 가 났다" 는 통과해 버린다 — 실제로 처음에 그렇게 썼다).
+    const baseRow = await prisma.v1GameResultRevision.findUniqueOrThrow({ where: { id: supersededBaseRevisionId } });
+    const staleOfficialize = await captureFailure(() =>
+      resultReview.officializeResultRevision(authUser(ids.platformOps), gameId, supersededBaseRevisionId, 'task166-stale-official', {
+        expectedVersion: 4,
+        clientCommandId: 'task166-stale-official',
+        projectionPreviewHash: previewHash(baseRow),
+      }),
+    );
+    expectHttpCode(staleOfficialize, 409, 'REVISION_MUST_BE_SUPERSEDED');
 
     const outbox = await prisma.v1OutboxEvent.findFirst({
       where: { businessKey: `game:${gameId}:revision:${successor.revision}:submitted` },
@@ -431,7 +436,7 @@ describe('Task 22 tournament result review, officialize, correction, and void', 
     const before = await prisma.v1GameResultRevision.findUniqueOrThrow({ where: { id: resubmittedRevisionId } });
     const mismatch = await captureFailure(() =>
       resultReview.officializeResultRevision(authUser(ids.platformOps), gameId, resubmittedRevisionId, 'task22-officialize-mismatch', {
-        expectedVersion: 5,
+        expectedVersion: 4,
         clientCommandId: 'task22-officialize-mismatch',
         projectionPreviewHash: 'not-the-real-hash',
       }),
@@ -449,7 +454,7 @@ describe('Task 22 tournament result review, officialize, correction, and void', 
       resubmittedRevisionId,
       'task22-officialize',
       {
-        expectedVersion: 5,
+        expectedVersion: 4,
         clientCommandId: 'task22-officialize',
         projectionPreviewHash: previewHash(revision),
       },
@@ -465,7 +470,7 @@ describe('Task 22 tournament result review, officialize, correction, and void', 
 
     const duplicate = await captureFailure(() =>
       resultReview.officializeResultRevision(authUser(ids.platformOps), gameId, officialRevisionId, 'task22-officialize-again', {
-        expectedVersion: 6,
+        expectedVersion: 5,
         clientCommandId: 'task22-officialize-again',
         projectionPreviewHash: previewHash(revision),
       }),
@@ -478,7 +483,7 @@ describe('Task 22 tournament result review, officialize, correction, and void', 
     expect(before.currentOfficialRevisionId).toBe(officialRevisionId);
 
     const correction = await resultReview.createResultCorrection(authUser(ids.platformOps), gameId, 'task22-correction', {
-      expectedVersion: 6,
+      expectedVersion: 5,
       clientCommandId: 'task22-correction',
       baseRevisionId: officialRevisionId,
       reason: 'scorer misattributed',
@@ -514,7 +519,7 @@ describe('Task 22 tournament result review, officialize, correction, and void', 
       correctionRevisionId,
       'task22-correction-officialize',
       {
-        expectedVersion: 7,
+        expectedVersion: 6,
         clientCommandId: 'task22-correction-officialize',
         projectionPreviewHash: previewHash(draft),
       },
@@ -570,7 +575,7 @@ describe('Task 22 tournament result review, officialize, correction, and void', 
 
   it('voids the current official revision, closes its SLA, and rejects a duplicate void', async () => {
     const voided = await resultReview.voidResultRevision(authUser(ids.platformOps), gameId, correctionOfficialId, 'task22-void', {
-      expectedVersion: 8,
+      expectedVersion: 7,
       clientCommandId: 'task22-void',
       reason: 'result void due to protest upheld',
     });
@@ -581,7 +586,7 @@ describe('Task 22 tournament result review, officialize, correction, and void', 
 
     const voidAgain = await captureFailure(() =>
       resultReview.voidResultRevision(authUser(ids.platformOps), gameId, voidRevisionId, 'task22-void-again', {
-        expectedVersion: 9,
+        expectedVersion: 8,
         clientCommandId: 'task22-void-again',
         reason: 'retried on an already-void pointer',
       }),

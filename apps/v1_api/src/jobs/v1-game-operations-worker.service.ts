@@ -114,27 +114,17 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
     // 만료를 확정하고 신청자에게 통보한다(identity-link-expiry.service.ts).
     const identityLinkExpiry = new IdentityLinkExpiryService(this.webPush);
     this.registerHandler(IDENTITY_LINK_EXPIRY_TYPE, identityLinkExpiry.handler);
-    // reject/request_supplement close their own review SLA synchronously in
-    // the API command (TournamentResultReviewService.closeReviewSla, Task
-    // 22); the durable audit handler here only needs to make the outbox's
-    // own business key idempotently durable, exactly like the CAS/flag
-    // audit trail.
-    this.registerDurableAuditHandler('GAME_RESULT_REJECTED');
-    this.registerDurableAuditHandler('GAME_RESULT_SUPPLEMENT_REQUESTED');
-    // GAME_RESULT_CHANGE_REQUESTED (GamesService.decideResultRevision's
-    // TEAM_MATCH change-request branch, games.service.ts) is the same kind
-    // of terminal review decision as REJECTED/SUPPLEMENT_REQUESTED above,
-    // and needed the identical durable-audit treatment — outbox-handler
-    // cleanup task found it writing but never claimed (retrying 6x then
-    // POISONED). Unlike REJECTED/SUPPLEMENT_REQUESTED, this branch does NOT
-    // yet synchronously close its own v1_result_escalations row the way
-    // TournamentResultReviewService.closeReviewSla() does; that's a
-    // pre-existing gap in the TEAM_MATCH review-decision flow, not something
-    // this handler causes or fixes — the async GAME_RESULT_REVIEW_REMINDER/
-    // ESCALATION handlers already guard on `revision.state !== 'SUBMITTED'`
-    // so no duplicate/incorrect notification can fire once a decision lands,
-    // it just leaves the escalation row's `status` sitting PENDING instead
-    // of flipping to CLOSED. Left out of this task's scope deliberately.
+    // Task 166: `GAME_RESULT_REJECTED`·`GAME_RESULT_SUPPLEMENT_REQUESTED` 핸들러를
+    // 없앴다 — 그 두 결정(어드민이 팀에게 되돌려 보내는 왕복)이 사라졌으므로 그 이름의
+    // 아웃박스 이벤트가 더는 만들어지지 않는다.
+    //
+    // `GAME_RESULT_CHANGE_REQUESTED`(GamesService.decideResultRevision 의 TEAM_MATCH
+    // 재작성 허용 분기)는 남는다. 이 핸들러는 아웃박스의 업무 키를 멱등하게 durable 하게
+    // 만드는 일만 한다 — 예전에 이게 없어 쓰이기만 하고 claim 되지 않아 6회 재시도 후
+    // POISONED 로 갔다. 이 분기는 `closeReviewSla()` 처럼 자기 escalation 행을 동기적으로
+    // 닫지는 않는데, 비동기 REVIEW_REMINDER/ESCALATION 핸들러가 이미
+    // `revision.state !== 'SUBMITTED'` 를 가드하므로 잘못된 알림은 나가지 않고 escalation
+    // 행의 status 만 PENDING 으로 남는다(의도적으로 이 태스크 범위 밖).
     this.registerDurableAuditHandler('GAME_RESULT_CHANGE_REQUESTED');
   }
 

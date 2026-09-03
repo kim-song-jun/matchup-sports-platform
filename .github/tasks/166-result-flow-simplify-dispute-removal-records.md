@@ -66,7 +66,34 @@
 ## Parallel Work Breakdown
 
 ### BE (순차)
-- **BE-1 상태 소비처 실측 + 행복 경로 단순화.** 세 중간 상태의 읽기/쓰기 자리 전수 목록 → 0 이면 enum·전이 코드 제거, 아니면 [ASK]. 공개 API 의 `resultStage` 에 "확정 전" 값 추가. 순위·전적 집계가 OFFICIAL 만 세는 것을 변이로 증명.
+- **BE-1 상태 소비처 실측 + 행복 경로 단순화.** ✅ 실측 결과 **소비처 0 아님**(주석·타 도메인
+  제외 51건/15파일 — 쓰기 2·게이트 2·공개 API 1·화면 8·인프라 3). 그래서 **expand / contract 로
+  나눈다**(2026-09-03 확정):
+
+  | | BE-1 (expand, 이 PR) | contract (후속 PR) |
+  |---|---|---|
+  | 쓰기 경로 | `standardSubmittedTargets` 에서 두 값 제거 → **더는 그 상태로 못 들어간다** | — |
+  | HTTP | `review-decision` 서비스·라우트·DTO 삭제 | — |
+  | 재제출 base | `SUBMITTED` **추가**, 레거시 두 상태 **유지** | 레거시 두 상태 제거 |
+  | `TERMINAL_REVISION_STATES` | 두 값 **유지**(레거시 행 불변성) | 두 값 제거 |
+  | `league-result-stage` 매핑 | 두 case **유지**(레거시 행 읽기) | 두 case 제거 |
+  | 화면 | 반려/보완 버튼 제거 · SUBMITTED 카드에 "확인"+"고치고 확인" · 레거시 카드 유지 | 레거시 카드 제거 |
+  | DB | — | 데이터 변환 마이그레이션 + enum 값 제거 (**사용자 승인**) |
+
+  **레거시 두 상태를 지금 빼면 안 되는 이유**가 둘이다. ① `TERMINAL_REVISION_STATES` 에서
+  빼면 이미 그 상태로 저장된 행이 **변경 가능**해져 확정 결과를 덮어쓸 수 있다(유닛 스펙이
+  실제로 잡았다). ② 재제출 base 허용에서 빼면 이미 반려·보완 요청된 경기를 **영영 고칠 수
+  없다**(다른 재작성 경로가 없다). `prisma generate` 는 모노레포 공유 클라이언트라 로컬에서
+  돌리지 않는다 — contract PR 의 enum 제거는 CI 가 생성한다.
+
+  `CHANGE_REQUESTED` 는 **남긴다.** 이름은 "요청" 이지만 실제 역할은 *운영자 재작성 허용
+  상태*(팀 왕복이 아니다)이고, `createResultRevision` 이 새 DRAFT 를 만들 수 있는 유일한
+  선행 상태다. enum rename 은 마이그레이션 비용 대비 가치가 없어 하지 않고 docblock 으로
+  뜻을 고정했다.
+
+  남은 BE-1 항목: 공개 API 의 `scoreStatus` 에 "확정 전" 값 추가(사용자 화면 태그 자체는
+  **FE-2**, 3안 대상). 순위·전적이 OFFICIAL 만 세는 것은 통합 스펙으로 고정했다
+  (`league-match-public.integration-spec.ts` — SUBMITTED 리비전만 있는 대진이 승점 0·pending 1).
 - **BE-2 이의 제거.** 서비스·컨트롤러·알림 4종·DTO 삭제 → 식별자 0건 → drop 마이그레이션 별도 PR(사용자 승인).
   - **`LeagueMatchResultEntryService` 를 같은 PR 에서 함께 삭제한다.** Task 165 BE-3 이 그 HTTP
     표면(컨트롤러·DTO·프론트 모달)을 이미 지웠고, **남은 호출부가 이의 수락(`correctResult`) 하나**다.

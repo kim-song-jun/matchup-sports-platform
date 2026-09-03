@@ -67,6 +67,13 @@ function useChatListPageModel(): ChatListViewModel {
     { enabled: selectedCategory !== '전체' },
     selectedCategory === '전체' ? undefined : { roomType: CATEGORY_ROOM_TYPE[selectedCategory], limit: CHAT_LIST_PAGE_SIZE },
   );
+  // 종료된 컨택(archived 방)은 요청했을 때만 받는다 — 기본 목록은 서버가 이미 치운 상태다.
+  const [showEnded, setShowEnded] = useState(false);
+  const endedEnabled = selectedCategory === '팀컨택' && showEnded;
+  const endedQuery = useV1ChatRooms(
+    { enabled: endedEnabled },
+    endedEnabled ? { roomType: 'team_contact', status: 'archived', limit: CHAT_LIST_PAGE_SIZE } : undefined,
+  );
   const updateMe = useV1UpdateChatRoomMe();
   const baseRooms = query.data?.items.map(toChatRoomModel) ?? [];
   const categoryRooms = filteredQuery.data?.items.map(toChatRoomModel);
@@ -92,13 +99,14 @@ function useChatListPageModel(): ChatListViewModel {
   const model: ChatListViewModel = {
     categories: categories.map((category) => ({
       label: category,
-      // 선택된 카테고리는 서버 필터 결과로 센다 — 첫 50개 밖의 방도 목록과 같은 기준으로 잡힌다.
+      // '전체' 와 선택된 카테고리(서버 필터 결과)만 센다. 나머지 칩은 첫 50개 안에서만 센 값이라
+      // 눌렀을 때 숫자가 바뀌어 보이므로 아예 보여 주지 않는다(후속 리뷰 Important 1).
       count:
         category === '전체'
           ? rooms.length
-          : category === selectedCategory && categoryRooms
-            ? categoryRooms.length
-            : rooms.filter((room) => room.type === category).length,
+          : category === selectedCategory
+            ? (categoryRooms ?? rooms.filter((room) => room.type === category)).length
+            : undefined,
       active: selectedCategory === category,
       onSelect: () => setSelectedCategory(category),
     })),
@@ -109,6 +117,15 @@ function useChatListPageModel(): ChatListViewModel {
     emptyBody: query.isError ? '잠시 후 다시 시도해 주세요.' : isEmpty ? '매치에 참가하거나 팀에 가입하면 채팅방이 생겨요.' : undefined,
     emptyHref: query.isError || selectedCategory === '팀' || selectedCategory === '팀컨택' ? undefined : '/matches',
     onRetry: query.isError ? () => query.refetch() : undefined,
+    endedContacts:
+      selectedCategory === '팀컨택'
+        ? {
+            visible: showEnded,
+            onToggle: () => setShowEnded((v) => !v),
+            rooms: showEnded ? (endedQuery.data?.items.map(toChatRoomModel) ?? []).map(withActions) : [],
+            status: !showEnded || endedQuery.data ? 'ready' : endedQuery.isError ? 'error' : 'loading',
+          }
+        : undefined,
   };
 
   return model;

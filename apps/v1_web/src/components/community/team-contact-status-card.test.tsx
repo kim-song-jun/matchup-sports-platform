@@ -99,6 +99,20 @@ describe('TeamContactStatusCard', () => {
   });
 });
 
+describe('TeamContactStatusCard — 종료 상태', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it.each([['withdrawn', '철회됨'], ['expired', '만료됨']] as const)('%s: 액션·카운트다운 없이 배지 "%s", 신고·차단은 계속 보인다', (status, label) => {
+    renderCard(<TeamContactStatusCard contact={contact({ status, mySide: 'from' })} />);
+    expect(screen.getByText(label)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '수락' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '컨택 철회' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/만료돼요/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '신고하기' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '차단하기' })).toBeInTheDocument();
+  });
+});
+
 describe('formatExpiresIn', () => {
   it('하루 이상 남으면 일 단위로 접고 내림한다', () => {
     const sixDays23h = new Date(Date.now() + (6 * 24 + 23) * 3600000 + 30 * 60000).toISOString();

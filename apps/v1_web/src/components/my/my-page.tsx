@@ -511,7 +511,7 @@ function MenuSection({ section }: { section: { title: string; items: MyMenuItem[
                 <span className="tm-text-body" style={{ color: 'var(--text-strong)', display: 'flex', alignItems: 'center', gap: 8 }}>
                   {item.label}
                   {item.badge ? (
-                    <span className="tm-badge tm-badge-blue" aria-label={`답장을 기다리는 컨택 ${item.badge}건`}>{item.badge}</span>
+                    <span className="tm-badge tm-badge-blue" aria-label={item.badgeLabel ?? `${item.badge}건`}>{item.badge}</span>
                   ) : null}
                 </span>
                 <span className="tm-text-caption" style={{ marginTop: 2, display: 'block' }}>{item.sub}</span>

@@ -394,6 +394,26 @@ describe('ChatListPageClient — 팀컨택 필터·배지', () => {
     expect(screen.getAllByText('수락됨').length).toBeGreaterThan(0);
   });
 
+  it('팀컨택 필터에서 "종료된 컨택 보기"를 켜면 archived 방을 서버에서 받아 별도 섹션에 보여준다', () => {
+    navigation.search = 'category=team_contact';
+    const ended = { ...contactRoom('accepted', 'to'), roomId: 'room-ended', status: 'archived', teamContact: { ...contactRoom('accepted', 'to').teamContact, status: 'declined' as const } };
+    hooks.chatRooms.mockImplementation((_opts: unknown, filters?: { status?: string }) =>
+      filters?.status === 'archived'
+        ? { data: { items: [ended] }, isPending: false, isError: false, refetch: vi.fn() }
+        : { data: { items: [contactRoom('accepted', 'to')] }, isPending: false, isError: false, refetch: vi.fn() },
+    );
+
+    renderWithClient(<ChatListPageClient />);
+
+    expect(screen.queryByText(/종료된 컨택 1/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: '종료된 컨택 보기' })[0]);
+
+    expect(hooks.chatRooms).toHaveBeenCalledWith({ enabled: true }, { roomType: 'team_contact', status: 'archived', limit: 50 });
+    expect(screen.getAllByText(/종료된 컨택 1/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText('거절됨').length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: '종료된 컨택 숨기기' }).length).toBeGreaterThan(0);
+  });
+
   it('/chat 에 있는 채로 ?category=team_contact 로 바뀌면 필터가 따라온다', () => {
     hooks.chatRooms.mockReturnValue({ data: { items: [contactRoom('accepted', 'to')] }, isPending: false, isError: false, refetch: vi.fn() });
     const { rerender } = renderWithClient(<ChatListPageClient />);

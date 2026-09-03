@@ -173,7 +173,7 @@ export function TeamContactStatusCard({ contact }: { contact: V1ChatRoomTeamCont
             {counterpart.name}
           </Link>
           <span style={{ color: 'var(--text-muted)' }}>
-            {mySide === 'to' ? ' 팀이 우리 팀에 보낸 컨택이에요' : ` 팀에 우리 팀(${myTeam.name})이 보낸 컨택이에요`}
+            {mySide === 'to' ? '에서 우리 팀에 보낸 컨택이에요' : `에 우리 팀(${myTeam.name})이 보낸 컨택이에요`}
           </span>
         </div>
 

@@ -51,8 +51,10 @@ export function RouteProgressBar() {
     failsafeRef.current = setTimeout(finish, 8000);
   };
 
-  // 시작 트리거: 내부 링크 클릭(capture) + 뒤로/앞으로 — 캡처 로직 자체는 use-navigation-intent.ts로 추출됨(동작 무변경)
-  useNavigationIntent({ onIntent: () => start() });
+  // 시작 트리거: 내부 링크 클릭(capture) + 뒤로/앞으로 — 캡처 로직 자체는 use-navigation-intent.ts로 추출됨.
+  // 'search'(같은 pathname 의 쿼리만 변경)는 pathname 완료 신호가 오지 않아 8초 failsafe 까지
+  // 바가 남는다 — 클라이언트 재요청이라 즉시 끝나므로 아예 켜지 않는다(Copilot 2차).
+  useNavigationIntent({ onIntent: (kind) => { if (kind !== 'search') start(); } });
 
   // 언마운트 시 타이머 정리(기존 클릭/popstate 리스너 cleanup에 함께 있던 것)
   useEffect(() => {

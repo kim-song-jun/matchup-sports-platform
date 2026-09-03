@@ -1285,7 +1285,7 @@ function PaymentGuideStep({
     registrationId,
     minPlayers: tournament.minPlayers,
     maxPlayers: tournament.maxPlayers,
-    isFreeEntry: tournament.entryFee === 0,
+    isFreeEntry,
   });
 
   function handleCopyAccount() {

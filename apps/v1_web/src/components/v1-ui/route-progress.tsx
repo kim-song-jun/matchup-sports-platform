@@ -52,9 +52,12 @@ export function RouteProgressBar() {
   };
 
   // 시작 트리거: 내부 링크 클릭(capture) + 뒤로/앞으로 — 캡처 로직 자체는 use-navigation-intent.ts로 추출됨.
-  // 'search'(같은 pathname 의 쿼리만 변경)는 pathname 완료 신호가 오지 않아 8초 failsafe 까지
-  // 바가 남는다 — 클라이언트 재요청이라 즉시 끝나므로 아예 켜지 않는다(Copilot 2차).
-  useNavigationIntent({ onIntent: (kind) => { if (kind !== 'search') start(); } });
+  // kind==='tab' (하단 탭·데스크톱 상단 탭·화면 안 세부 탭)은 진행바를 켜지 않는다 — "탭 전환은
+  // 동위 전환이라 전환 자체가 없다"는 원칙(globals.css data-nav-kind='tab')과 짝을 맞춘다. 세부 탭
+  // 재요청의 로딩 신호는 각 페이지의 isFetching 인라인 표시가 대신한다(tournaments/page.tsx 참조).
+  // 'search'(같은 pathname 의 쿼리만 변경)도 켜지 않는다 — pathname 완료 신호가 오지 않아 8초
+  // failsafe 까지 바가 남고, 클라이언트 재요청이라 즉시 끝난다(Copilot 2차).
+  useNavigationIntent({ onIntent: (kind) => { if (kind !== 'tab' && kind !== 'search') start(); } });
 
   // 언마운트 시 타이머 정리(기존 클릭/popstate 리스너 cleanup에 함께 있던 것)
   useEffect(() => {

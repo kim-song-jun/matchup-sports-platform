@@ -14,7 +14,9 @@ const KNOWN_ERROR_MESSAGES: Record<string, string> = {
   PROJECTION_PREVIEW_MISMATCH: '결과 내용이 방금 바뀌었어요. 최신 내용을 다시 확인한 뒤 시도해 주세요.',
   REVISION_MUST_BE_SUPERSEDED: '이 결과는 이미 다른 처리로 대체됐어요. 화면을 새로고침해 주세요.',
   NEXT_FIXTURE_CONFLICT: '다음 라운드 경기가 이미 진행돼서 무효화할 수 없어요.',
-  RESULT_RESUBMISSION_NOT_ALLOWED: '반려되거나 보완 요청된 결과만 다시 제출할 수 있어요.',
+  // contract 이후 base 는 `SUBMITTED` 뿐이다 — 반려·보완 요청 상태가 사라졌으므로
+  // 그 어휘로 안내하면 있지도 않은 상태를 찾게 만든다.
+  RESULT_RESUBMISSION_NOT_ALLOWED: '확인 대기 중인 결과만 다시 보낼 수 있어요.',
   RESULT_REVISION_NOT_FOUND: '결과 정보를 찾을 수 없어요. 화면을 새로고침해 주세요.',
   COMMAND_CONCURRENCY_CONFLICT: '다른 처리와 동시에 진행돼 반영하지 못했어요. 화면을 새로고침해 주세요.',
   VERSION_CONFLICT: '경기 정보가 그 사이 바뀌었어요. 화면을 새로고침해 주세요.',

@@ -29,13 +29,10 @@ final class WebShellModel: ObservableObject {
     /// Set by the view controller so the error screen's button can reach it.
     weak var controller: WebShellViewController?
 
-    /// How long a shell overlay takes to appear or leave. Matches the web app's
-    /// `--duration-base` (160ms, `apps/v1_web/src/app/tokens.css`) so the failure screen and
-    /// the notification explainer feel like the page's own panels rather than a different app.
-    static let shellTransitionDuration: TimeInterval = 0.16
-
     private let isReduceMotionEnabled: () -> Bool
-    private var reduceMotionObserver: NSObjectProtocol?
+    // `deinit` is nonisolated and the token is not Sendable; the token is only ever written in
+    // `init` and read in `deinit`, so there is no concurrent access to make unsafe.
+    nonisolated(unsafe) private var reduceMotionObserver: NSObjectProtocol?
 
     /// `isReduceMotionEnabled` is injectable so tests can drive the setting without touching
     /// the simulator's accessibility preferences; production reads `UIAccessibility`.
@@ -63,9 +60,9 @@ final class WebShellModel: ObservableObject {
 
     /// The animation the model opens around every overlay state change: `nil` (no transaction,
     /// so the transition below resolves to an instant swap) when the reader asked for reduced
-    /// motion, otherwise a short ease-out at the web app's base duration.
+    /// motion, otherwise a short ease-out at the web app's base duration (`ShellMotionPolicy`).
     var shellTransitionAnimation: Animation? {
-        reduceMotion ? nil : .easeOut(duration: Self.shellTransitionDuration)
+        ShellMotionPolicy.animationDuration(reduceMotion: reduceMotion).map { .easeOut(duration: $0) }
     }
 
     /// The transition the overlays declare. Kept next to the animation so the two can never

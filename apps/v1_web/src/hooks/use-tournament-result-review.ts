@@ -296,32 +296,6 @@ export async function computeProjectionPreviewHash(input: {
 
 // ── Mutations ────────────────────────────────────────────────────────────────
 
-export type ReviewResultDecisionInput = {
-  revisionId: string;
-  expectedVersion: number;
-  decision: 'reject' | 'request_supplement';
-  reason: string;
-};
-
-/** `POST /games/:gameId/result-revisions/:revisionId/review-decision` --
- * tournament_director/platform_ops only (enforced server-side); reject and
- * request_supplement are both terminal for the target revision. */
-export function useReviewResultDecision(gameId: string, tournamentId?: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (input: ReviewResultDecisionInput) =>
-      postGameCommand<GameRevisionMutationResult>(
-        `/games/${encodeURIComponent(gameId)}/result-revisions/${encodeURIComponent(input.revisionId)}/review-decision`,
-        {
-          expectedVersion: input.expectedVersion,
-          decision: input.decision,
-          reason: input.reason,
-        },
-      ),
-    onSuccess: () => invalidateGame(queryClient, gameId, tournamentId),
-  });
-}
-
 export type SupersedeAndSubmitInput = {
   revisionId: string;
   expectedVersion: number;

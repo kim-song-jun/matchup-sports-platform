@@ -169,6 +169,17 @@ projection, computed only when there is no official revision yet:
   restriction `official_only` already implied ("official numeric only") is
   preserved unchanged; `status_only` still never gets a score. `scoreStatus`
   reports `'live'` whenever this tally is used.
+- **`scoreStatus: 'pending'` (Task 166)** -- 경기가 끝나고 결과가 **제출됐지만 아직
+  어드민 확인 전**인 구간. 정본 §4 가 결과 흐름을 "종료 → 결과 보내기 → 어드민 확인"
+  한 단계로 확정하면서, 그 사이에 **점수를 보여주고 화면이 "확정 전" 태그를 붙이기로**
+  했다. 그전에는 이 구간이 `'unavailable'` 이라 경기가 끝났는데도 점수가 아예 안 보여
+  관전자에게 "결과 없음" 과 "확정 대기" 가 구분되지 않았다.
+  `mode === 'live'` 에서만 나간다 -- `official_only` 는 **확정 전 숫자를 일부러 내보내지
+  않는** 정책이므로(D-06, 위 `score` 항목과 같은 제약) 그 모드에까지 실으면 운영자가
+  명시적으로 고른 정책을 뒤집는 것이 된다. 규칙은
+  `public-score-presentation.ts` 한 곳이 갖고, `getMatch`/`getLeagueFixtureRecord`/
+  `presentScheduleEntry` 세 자리가 모두 그 함수를 지난다(예전엔 같은 삼항식을 각자 복사해
+  두고 있었다).
 - `clock` -- `{ periodNumber, elapsedMs, isPaused } | null`
   (`resolveLiveClock`, `public-clock.ts`), the pause-aware elapsed time of
   whichever `V1GamePeriod` row is currently `LIVE`, gated the same way as

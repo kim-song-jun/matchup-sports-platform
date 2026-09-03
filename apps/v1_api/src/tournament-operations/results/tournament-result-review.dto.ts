@@ -82,28 +82,6 @@ export class GameResultGoalEventDto {
   ownGoal!: boolean;
 }
 
-/**
- * `POST /games/:gameId/result-revisions/:revisionId/review-decision` body.
- * tournament_director/platform_ops only; reject/request_supplement always
- * require a reason since both close the current review SLA.
- */
-export class ReviewDecisionGameResultRevisionDto {
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  expectedVersion!: number;
-
-  @IsString()
-  @IsNotEmpty()
-  clientCommandId!: string;
-
-  @IsIn(['reject', 'request_supplement'])
-  decision!: 'reject' | 'request_supplement';
-
-  @IsString()
-  @IsNotEmpty()
-  reason!: string;
-}
 
 /**
  * `POST /games/:gameId/result-revisions/:revisionId/supersede-and-submit`

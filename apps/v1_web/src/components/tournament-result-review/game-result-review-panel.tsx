@@ -5,7 +5,6 @@ import Link from 'next/link';
 import {
   useGameResultRevisions,
   useOfficializeResultRevision,
-  useReviewResultDecision,
   useSupersedeAndSubmitResult,
   useTournamentGame,
   type GameResultRevision,
@@ -22,7 +21,6 @@ import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { Button } from '@/components/v1-ui/button';
 import { RevisionTimeline } from './revision-timeline';
 import { GameSummaryHeader } from './game-summary-header';
-import { ReasonModal } from './reason-modal';
 import { ResultEditModal, type ResultEditSubmitInput } from './result-edit-modal';
 import {
   canActOnResultReview,
@@ -31,7 +29,6 @@ import {
   officializeAlwaysAllowed,
 } from './result-review-copy';
 
-type ReasonAction = 'reject' | 'request_supplement';
 
 type DirectorGateStatus = 'unknown' | 'enabled' | 'disabled';
 
@@ -65,15 +62,10 @@ export function GameResultReviewPanel({
   // 이 조회는 이미 성공 중인 `useTournamentGame`(GET /games/:id)과 서버에서
   // 동일한 'read' 권한을 쓰므로 새 권한 리스크가 없다.
   const eventsQuery = useV1GameEventsBackfill(gameId, 0);
-  const reviewDecision = useReviewResultDecision(gameId, tournamentId);
   const supersedeAndSubmit = useSupersedeAndSubmitResult(gameId, tournamentId);
   const officialize = useOfficializeResultRevision(gameId, tournamentId);
   const { confirm, ConfirmModal: officializeConfirmModal } = useConfirm();
 
-  const [reasonAction, setReasonAction] = useState<{
-    type: ReasonAction;
-    revision: GameResultRevision;
-  } | null>(null);
   const [resubmitTarget, setResubmitTarget] = useState<GameResultRevision | null>(null);
   const [directorGateStatus, setDirectorGateStatus] = useState<DirectorGateStatus>('unknown');
 
@@ -235,7 +227,10 @@ export function GameResultReviewPanel({
 
       {latest && latest.state === 'SUBMITTED' && !readOnly ? (
         <div className="tm-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <p className="tm-text-label" style={{ fontWeight: 600 }}>이 결과를 검토해 주세요</p>
+          {/* Task 166: 반려·보완 요청 버튼을 없앴다 — 그 두 명령의 백엔드가 사라졌다
+              (정본 §4: 결과는 보내기 → 확인 한 단계, 팀에게 되돌려 보내는 왕복 없음).
+              틀린 결과는 되돌려 보내지 않고 **이 카드 안에서 고쳐서 확인**한다. */}
+          <p className="tm-text-label" style={{ fontWeight: 600 }}>이 결과를 확인해 주세요</p>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {showOfficializeCta ? (
               <Button
@@ -244,22 +239,13 @@ export function GameResultReviewPanel({
                 loading={officialize.isPending}
                 onClick={() => void handleOfficialize(latest)}
               >
-                결과 승인(확정)
+                확인
               </Button>
             ) : null}
-            <Button
-              variant="outline"
-              size="md"
-              onClick={() => setReasonAction({ type: 'request_supplement', revision: latest })}
-            >
-              보완 요청
-            </Button>
-            <Button
-              variant="danger"
-              size="md"
-              onClick={() => setReasonAction({ type: 'reject', revision: latest })}
-            >
-              반려
+            {/* 재제출 모달을 그대로 재사용한다(신규 컴포넌트 없음) — 저장하면 새 SUBMITTED
+                리비전이 서고 이 카드가 다시 떠서 "확인" 을 누르게 된다. */}
+            <Button variant="outline" size="md" onClick={() => setResubmitTarget(latest)}>
+              고치고 확인
             </Button>
           </div>
           {!officializeAlwaysVisible && directorGateStatus === 'disabled' ? (
@@ -279,6 +265,9 @@ export function GameResultReviewPanel({
         </div>
       ) : null}
 
+      {/* 레거시 행 전용. Task 166 이 이 두 상태로 **들어가는 경로**를 없앴지만, 그 전에
+          반려·보완 요청된 행은 contract 마이그레이션 전까지 남아 있다 — 이 카드를 지우면
+          그 경기들을 고칠 입구가 사라진다(서버도 같은 이유로 base 허용에 두 상태를 남겼다). */}
       {latest && (latest.state === 'REJECTED' || latest.state === 'SUPPLEMENT_REQUESTED') && !readOnly ? (
         <div className="tm-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
           <p className="tm-text-label" style={{ fontWeight: 600 }}>
@@ -316,37 +305,6 @@ export function GameResultReviewPanel({
       </div>
 
       {officializeConfirmModal}
-
-      <ReasonModal
-        open={reasonAction !== null}
-        title={reasonAction?.type === 'reject' ? '결과를 반려할까요?' : '보완을 요청할까요?'}
-        message={
-          reasonAction?.type === 'reject'
-            ? '반려하면 이 결과는 종료 처리되고, 담당자가 다시 제출해야 해요.'
-            : '보완 요청하면 이 결과는 종료 처리되고, 담당자가 보완 후 다시 제출해야 해요.'
-        }
-        reasonLabel="반려/보완 사유"
-        confirmLabel={reasonAction?.type === 'reject' ? '반려' : '보완 요청'}
-        tone={reasonAction?.type === 'reject' ? 'danger' : 'default'}
-        submitting={reviewDecision.isPending}
-        errorMessage={reviewDecision.isError ? describeResultReviewError(reviewDecision.error) : null}
-        onCancel={() => {
-          setReasonAction(null);
-          reviewDecision.reset();
-        }}
-        onConfirm={(reason) => {
-          if (!reasonAction) return;
-          reviewDecision.mutate(
-            {
-              revisionId: reasonAction.revision.id,
-              expectedVersion: game.version,
-              decision: reasonAction.type,
-              reason,
-            },
-            { onSuccess: () => setReasonAction(null) },
-          );
-        }}
-      />
 
       {resubmitTarget ? (
         <ResultEditModal

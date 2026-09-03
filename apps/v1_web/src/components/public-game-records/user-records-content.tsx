@@ -138,10 +138,17 @@ export function UserRecordsContent({
   activeType?: RecordTypeFilter;
   onChangeType?: (next: RecordTypeFilter) => void;
 }) {
-  // items가 0건이면(대회 라인업에 아직 연결된 적 없음) 배너의 "이 기록은 아직
-  // 나에게만 보여요" 문구가 바로 아래 EmptyState("아직 등록된 경기 기록이 없어요")와
-  // 모순된다 — 숨겨진 기록이 실제로 있을 때만 보여준다.
-  const showOwnerVisibilityBanner = data.viewerIsOwner && !data.consentGranted && data.items.length > 0;
+  // 기록이 0건이면(대회 라인업에 아직 연결된 적 없음) 배너의 "이 기록은 아직 나에게만
+  // 보여요" 문구가 바로 아래 EmptyState("아직 등록된 경기 기록이 없어요")와 모순된다 —
+  // 숨겨진 기록이 실제로 있을 때만 보여준다.
+  //
+  // **`items.length` 가 아니라 `summary.appearances` 로 센다.** 탭이 생기면서
+  // `items` 는 *현재 탭으로 걸러진* 목록이 됐다 — 친선 경기만 있는 사람이 '리그' 탭을
+  // 누르면 items 가 0이 되고, 그러면 숨김 상태는 그대로인데 배너만 사라진다(탭을 옮겼을
+  // 뿐인데 "공개 여부" 안내가 깜빡이는 셈). 공개 여부는 탭과 무관한 계정 단위 사실이므로
+  // 탭에 흔들리지 않는 전체 집계로 판정한다.
+  const showOwnerVisibilityBanner =
+    data.viewerIsOwner && !data.consentGranted && data.summary.appearances > 0;
   const resolvedActiveType: RecordTypeFilter = activeType ?? 'all';
   // 탭별 KPI 는 서버가 이미 계산해 보낸 `summary.byType[종류]` 를 읽는다 — 팀 전적과
   // 같은 계약이라 탭을 바꿔도 KPI 를 다시 받지 않는다. '전체'만 최상위 summary 다.

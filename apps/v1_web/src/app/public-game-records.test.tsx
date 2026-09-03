@@ -744,15 +744,35 @@ describe('UserRecordsContent — 본인 전용 공개 안내 배너', () => {
     expect(screen.queryByText('이 기록은 아직 나에게만 보여요')).not.toBeInTheDocument();
   });
 
-  it('본인 + 미동의여도 items가 0건이면(대회 라인업 연결 자체가 없음) 배너 대신 빈 상태만 보여준다', () => {
+  it('본인 + 미동의여도 기록이 0건이면(대회 라인업 연결 자체가 없음) 배너 대신 빈 상태만 보여준다', () => {
+    const empty = makeUserRecords({ viewerIsOwner: true, consentGranted: false, items: [] });
     render(
       <UserRecordsContent
-        data={makeUserRecords({ viewerIsOwner: true, consentGranted: false, items: [] })}
+        data={{
+          ...empty,
+          // 탭이 생기면서 `items: []` 만으로는 "기록이 아예 없다" 가 아니게 됐다(걸러진
+          // 결과일 수 있다). 진짜 0건은 집계까지 0이다 — 픽스처를 그렇게 맞춘다.
+          summary: { ...empty.summary, appearances: 0 },
+        }}
       />,
     );
     // "숨겨진 기록이 있다"는 배너와 "기록이 아예 없다"는 EmptyState가 동시에 뜨면 모순된다.
     expect(screen.queryByText('이 기록은 아직 나에게만 보여요')).not.toBeInTheDocument();
     expect(screen.getByText('아직 등록된 경기 기록이 없어요')).toBeInTheDocument();
+  });
+
+  it('탭 필터로 목록이 비어도 전체 기록이 있으면 배너를 유지한다', () => {
+    // 친선 경기만 있는 사람이 '리그' 탭을 누르면 items 가 0이 된다. 그때 배너가 사라지면
+    // 공개 여부가 그대로인데도 안내만 깜빡인다 — 공개 여부는 탭과 무관한 계정 단위
+    // 사실이라 탭에 흔들리면 안 된다.
+    render(
+      <UserRecordsContent
+        data={makeUserRecords({ viewerIsOwner: true, consentGranted: false, items: [] })}
+        activeType="league"
+        onChangeType={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('이 기록은 아직 나에게만 보여요')).toBeInTheDocument();
   });
 });
 

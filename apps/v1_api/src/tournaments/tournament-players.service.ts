@@ -928,12 +928,12 @@ export class TournamentPlayersService {
   }
 }
 
-function normalizeGender(value: string | null | undefined): 'male' | 'female' | null {
+export function normalizeGender(value: string | null | undefined): 'male' | 'female' | null {
   return value === 'male' || value === 'female' ? value : null;
 }
 
 /** 명단 후보의 프로필 사실. 멤버십이 없으면 null 을 넘긴다. */
-type RosterCandidateMember = {
+export type RosterCandidateMember = {
   realName: string | null;
   birthDate: string | null;
   phone: string | null;
@@ -941,7 +941,7 @@ type RosterCandidateMember = {
   phoneVerifiedAt: Date | null;
 };
 
-type RosterCandidateBlock = {
+export type RosterCandidateBlock = {
   /** 서버 에러 코드. add 경로가 그대로 던진다. */
   code: string;
   /** 소비자용 에러 메시지. */
@@ -962,7 +962,12 @@ type RosterCandidateBlock = {
  * 순서는 "그 사람에게 가장 구체적인 사유"부터다. 이미 명단에 있는 사람에게 정원이 찼다고
  * 말해 봐야 조치할 수 없다.
  */
-function evaluateRosterCandidate(input: {
+/**
+ * D10 자동 확정 크론(`league-roster-autoconfirm.service.ts`)이 **같은 판정**을 쓰도록
+ * export 한다 — 크론이 자체 판정을 만들면 화면이 "등록 불가" 라고 말한 멤버를 크론이
+ * 명단에 올릴 수 있다(실명 없는 선수·여성부의 남성 등).
+ */
+export function evaluateRosterCandidate(input: {
   alreadyOnRoster: boolean;
   /**
    * 같은 대회의 **다른** 팀(registration) 명단에 이미 활성 등록돼 있는가.

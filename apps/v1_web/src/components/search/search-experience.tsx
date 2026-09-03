@@ -1,6 +1,6 @@
 'use client';
 
-import { Search, X, ChevronLeft, Clock, AlertCircle } from 'lucide-react';
+import { Search, X, ChevronLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
@@ -9,6 +9,8 @@ import type { V1Match, V1Team, V1TeamMatch } from '@/types/api';
 import type { V1PublicLeagueListItem } from '@/types/league-match';
 import { formatTournamentDateRangeShort } from '@/lib/date-utils';
 import { trackEvent } from '@/lib/analytics';
+import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
+import { AUTH_NOTICE_STAGE } from '@/components/auth/auth-page';
 
 type SearchState = 'results' | 'new' | 'empty' | 'error' | 'stale';
 
@@ -16,25 +18,11 @@ type SearchExperienceProps = {
   state?: SearchState;
 };
 
-const quickFilters = [
-  ['오늘 참여 가능', '오늘 매치만 기준'],
-  ['마감임박', '24시간 이내'],
-  ['초보 환영', '레벨 필터 적용'],
-  ['팀매치 포함', '팀매치 결과 함께 보기'],
-];
-
-const baseResults = [
-  { type: '매치', title: '성수 저녁 풋살', meta: '성수 풋살파크 · 오늘 20:00 · 8/10명', href: '/matches/sample' },
-  { type: '팀매치', title: '마포 풋살 팀매치', meta: '마포 실내체육관 · 토요일 · 상대팀 모집 중', href: '/team-matches/sample' },
-  { type: '팀', title: '성수 러너스 FC', meta: '풋살 · 성동구 · 신입 환영', href: '/teams/sample' },
-];
-
 export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
   const router = useRouter();
   const initialQuery = getInitialQuery(state);
   const [query, setQuery] = useState(initialQuery);
   const [submittedQuery, setSubmittedQuery] = useState(initialQuery);
-  const [selectedQuickFilter, setSelectedQuickFilter] = useState<string | null>(null);
   const shouldSearch = state === 'results' && submittedQuery.trim().length > 0;
   const filters = useMemo(() => ({ query: submittedQuery.trim(), limit: 5, sort: 'recommended' }), [submittedQuery]);
   const recentSearches = useV1RecentSearches();
@@ -140,7 +128,7 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
       return;
     }
     router.replace(`/search?q=${encodeURIComponent(nextQuery)}`);
-    recordSearch.mutate({ query: nextQuery, filters: selectedQuickFilter ? { quickFilter: selectedQuickFilter } : undefined });
+    recordSearch.mutate({ query: nextQuery });
   }
 
   function clear() {
@@ -150,25 +138,21 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
   }
 
   function useChip(value: string) {
-    setSelectedQuickFilter(null);
     setQuery(value);
     setSubmittedQuery(value);
     router.replace(`/search?q=${encodeURIComponent(value)}`);
     recordSearch.mutate({ query: value, filters: { source: 'recent' } });
   }
 
-  function toggleQuickFilter(value: string) {
-    setSelectedQuickFilter(value);
-    setQuery(value);
-    setSubmittedQuery(value);
-    router.replace(`/search?q=${encodeURIComponent(value)}`);
-    recordSearch.mutate({ query: value, filters: { quickFilter: value } });
+  function retry() {
+    void Promise.all([matchesQuery.refetch(), teamMatchesQuery.refetch(), teamsQuery.refetch(), leagueMatchesQuery.refetch()]);
   }
 
-  const results = state === 'results' ? apiResults : baseResults;
+  // 결과는 API 에서 온 것만 그린다. 예전엔 /search/new 가 코드에 박힌 카드 3장(죽은 /…/sample
+  // 링크)을 그렸다(2026-09-04 감사 결함) — 가짜 데이터는 어떤 상태에서도 렌더하지 않는다.
+  const results = apiResults;
   const hasEmptyApiResults = shouldSearch && !loading && !errored && apiResults.length === 0;
   const effectiveViewState = viewState === 'results' && hasEmptyApiResults ? 'empty' : viewState;
-  const effectiveShowStateMessage = effectiveViewState === 'empty' || effectiveViewState === 'error' || effectiveViewState === 'stale';
 
   return (
     <div className="tm-search-frame tm-content-enter" style={{ width: 'min(100%, var(--v1-app-chrome-frame-width))', height: '100%', minHeight: 0, margin: '0 auto', background: 'var(--bg)', fontFamily: 'var(--font)', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
@@ -217,18 +201,6 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
               ) : null}
             </div>
 
-            <div className="tm-text-label" style={{ marginTop: 20 }}>빠른 조건</div>
-            <div className="tm-search-quick-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
-              {quickFilters.map(([title, sub]) => {
-                const selected = selectedQuickFilter === title;
-                return (
-                  <button key={title} type="button" onClick={() => toggleQuickFilter(title)} className="tm-card tm-card-interactive" aria-pressed={selected} style={{ textAlign: 'left', padding: 16, border: 0, background: selected ? 'var(--blue50)' : 'var(--bg)' }}>
-                    <div className="tm-text-label" style={{ color: selected ? 'var(--blue700)' : 'var(--text-strong)' }}>{title}</div>
-                    <div className="tm-text-micro" style={{ marginTop: 4, color: 'var(--text-caption)' }}>{sub}</div>
-                  </button>
-                );
-              })}
-            </div>
           </div>
 
           <div className="tm-search-results-col">
@@ -256,23 +228,33 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
               </div>
             ) : null}
 
+            {/* 상태 화면은 전부 공용 EmptyState/ErrorState — 예전의 회색 사각 아이콘 + 한 줄 문구(다음 행동 없음)를
+                그래픽 → 타이틀 → 다음 행동 순서로 통일한다. 나침반은 인증 안내와 같은 자산("다른 길이 있다"). */}
             {effectiveViewState === 'new' ? (
-              <div className="tm-search-state-msg" style={{ marginTop: 44, textAlign: 'center', color: 'var(--text-muted)' }}>
-                <div style={{ width: 48, height: 48, borderRadius: 'var(--radius-container)', background: 'var(--grey50)', display: 'grid', placeItems: 'center', margin: '0 auto 16px', color: 'var(--grey500)' }}>
-                  <Search size={22} />
-                </div>
-                <div className="tm-text-body-lg">검색어를 입력하거나 조건을 선택해 주세요</div>
-                <div className="tm-text-caption" style={{ marginTop: 8 }}>최근 검색과 빠른 조건은 검색 전에도 그대로 있어요.</div>
-              </div>
+              <EmptyState
+                illustration={{ name: AUTH_NOTICE_STAGE.illustration }}
+                title="무엇을 찾고 있나요?"
+                sub="매치·팀매치·팀·정규 리그를 검색어 하나로 한 번에 찾아요."
+              />
             ) : null}
 
-            {effectiveShowStateMessage ? (
-              <div className="tm-search-state-msg" style={{ marginTop: 44, textAlign: 'center', color: 'var(--text-muted)' }}>
-                <div style={{ width: 48, height: 48, borderRadius: 'var(--radius-container)', background: 'var(--grey50)', display: 'grid', placeItems: 'center', margin: '0 auto 16px', color: effectiveViewState === 'error' ? 'var(--red500)' : 'var(--grey500)' }}>
-                  {effectiveViewState === 'stale' ? <Clock size={22} /> : effectiveViewState === 'error' ? <AlertCircle size={22} /> : <Search size={22} />}
-                </div>
-                <div className="tm-text-body-lg">{effectiveViewState === 'stale' ? '최신 결과를 불러오는 중이에요.' : effectiveViewState === 'error' ? '검색 결과를 불러오지 못했어요.' : '검색 결과가 없어요.'}</div>
-                <div className="tm-text-caption" style={{ marginTop: 8 }}>검색어와 조건은 그대로 남아 있어요.</div>
+            {effectiveViewState === 'empty' ? (
+              <EmptyState
+                illustration={{ name: AUTH_NOTICE_STAGE.illustration }}
+                title="조건에 맞는 결과가 없어요"
+                sub="검색어를 바꾸거나 전체 매치를 둘러보면 다른 경기가 보여요."
+                cta="전체 매치 둘러보기"
+                onCta={() => router.push('/matches')}
+              />
+            ) : null}
+
+            {effectiveViewState === 'error' ? (
+              <ErrorState title="검색 결과를 불러오지 못했어요" message="검색어와 조건은 그대로 남아 있어요. 다시 불러올 수 있어요." onRetry={retry} retryLabel="다시 불러오기" />
+            ) : null}
+
+            {effectiveViewState === 'stale' ? (
+              <div className="tm-text-caption tm-search-state-loading" role="status" style={{ marginTop: 24, textAlign: 'center', color: 'var(--text-caption)' }}>
+                최신 결과를 불러오는 중이에요
               </div>
             ) : null}
           </div>

@@ -45,6 +45,15 @@ BEGIN
     RAISE EXCEPTION 'TASK164_BE5_ORPHAN: 통합 축에 대응 행이 없는 참조가 있다 (대진 % · 승강 %) — 재타깃하면 그 행들이 끊긴다. 거울 백필을 먼저 확인하라.',
       orphan_fixtures, orphan_promotions;
   END IF;
+
+  -- **거울 없는 리그가 있으면 그것도 멈춘다.** 위 orphan 검사는 *대진·승강이 가리키는* 리그만
+  -- 본다 — 대진이 하나도 없는 리그는 거울이 없어도 통과한다. 그런 리그를 그대로 DROP 하면
+  -- **그 리그 자체가 사라진다**(통합 축에 대응 행이 없으므로 어디에도 남지 않는다).
+  -- alpha 실측(2026-09-03)은 89/89 로 일치했지만, 배포 시점 데이터는 다를 수 있다.
+  IF matched_count <> league_count THEN
+    RAISE EXCEPTION 'TASK164_BE5_MIRROR_MISSING: 리그 % 건 중 통합 축 대응 행이 있는 것이 % 건뿐이다 — 나머지는 DROP 하면 사라진다. 거울 백필을 먼저 돌려라.',
+      league_count, matched_count;
+  END IF;
 END $$;
 
 -- ## DROP 전 백필 — 등록이 없는 로스터 행을 흡수한다

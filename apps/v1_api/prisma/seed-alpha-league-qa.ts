@@ -1023,11 +1023,10 @@ async function ensureLeague(
       scheduledAt: startsOn,
       scheduledEndAt: endsOn,
       competitionConfigVersionId: ALPHA_SEED_LEAGUE_CONFIG_ID,
-      // **원본 리그의 생성 시각을 그대로 쓴다.** 생략하면 `@default(now())` 가 시드 실행
-      // 시각을 박고, 그 값이 통합 목록 정렬(`createdAt desc`)을 지배해 시드 리그가 통째로
-      // 최신이 된다 — 실제 대회보다 앞에 서서 첫 페이지를 차지한다.
-      // 고정 id 시드라 create 는 최초 1회뿐이다 — 그때의 시각이 그대로 남아 통합 목록
-      // 정렬(`createdAt desc`)에서 시드 리그가 실제 대회보다 앞서지 않는다.
+      // **리그 시작일에 고정한다.** 생략하면 `@default(now())` 가 시드 실행 시각을 박고,
+      // 그 값이 통합 목록 정렬(`createdAt desc`)을 지배해 시드 리그가 통째로 최신이 된다 —
+      // 실제 대회보다 앞에 서서 첫 페이지를 차지한다. 고정 id 시드라 create 는 최초 1회뿐이니
+      // 한 번 박히면 그대로 남는다(계층 리그 시드도 같은 규칙).
       createdAt: startsOn,
       createdByAdminUserId,
     },

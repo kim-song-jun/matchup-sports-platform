@@ -5221,9 +5221,6 @@ import type {
   V1LeagueStandingsResponse,
   V1RecordLeagueForfeitPayload,
   V1RecordLeagueForfeitResult,
-  V1RecordLeagueResultPayload,
-  V1RecordLeagueResultResult,
-  V1LeagueFixtureParticipantsResponse,
   V1RegenerateLeagueFixturesPayload,
   V1RegenerateLeagueFixturesResult,
   V1RejectLeagueMatchDisputePayload,
@@ -5425,55 +5422,6 @@ export function useV1RegenerateLeagueFixtures(leagueId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
-    },
-  });
-}
-
-// U1: 운영자 결과 입력 — POST /admin/league-matches/:leagueId/fixtures/:teamMatchId/result.
-// 아직 결과가 없는(not_entered/draft/change_requested) 대진 전용 — 서버가 이미 OFFICIAL 인
-// 대진에는 409로 거부하므로 화면은 정정(useV1CorrectLeagueResult)으로 안내한다.
-export function useV1RecordLeagueResult(leagueId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ teamMatchId, body }: { teamMatchId: string; body: V1RecordLeagueResultPayload }) =>
-      v1Post<V1RecordLeagueResultResult>(`/admin/league-matches/${leagueId}/fixtures/${teamMatchId}/result`, body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
-    },
-  });
-}
-
-// U1 확장(2026-08-25): 득점자 선택 목록 — GET .../fixtures/:teamMatchId/participants.
-// 모달이 열릴 때만 가져온다(enabled). 로스터는 대진 생성 시 고정되므로 staleTime을 넉넉히 둔다.
-export function useV1LeagueFixtureParticipants(leagueId: string, teamMatchId: string | null) {
-  return useQuery({
-    queryKey: [...v1Keys.adminLeagueMatch(leagueId), 'fixture-participants', teamMatchId],
-    queryFn: () => {
-      // enabled 가드와 별개로 한 번 더 단언 — refactor 로 queryFn 이 직접 불리면
-      // '.../fixtures/null/participants' 같은 잘못된 요청이 나갈 수 있다(Copilot 리뷰).
-      if (teamMatchId === null) throw new Error('teamMatchId 없이 참가자 목록을 요청할 수 없어요.');
-      return v1Get<V1LeagueFixtureParticipantsResponse>(
-        `/admin/league-matches/${leagueId}/fixtures/${teamMatchId}/participants`,
-      );
-    },
-    enabled: teamMatchId !== null,
-    staleTime: 5 * 60 * 1000,
-  });
-}
-
-// U1: 운영자 결과 정정 — POST /admin/league-matches/:leagueId/fixtures/:teamMatchId/result/correct.
-// 이미 OFFICIAL 인 대진 전용 — 요청·응답 모양은 신규 입력과 완전히 같다
-// (league-match-result-entry.dto.ts RecordLeagueResultDto가 두 경로에 공용).
-export function useV1CorrectLeagueResult(leagueId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ teamMatchId, body }: { teamMatchId: string; body: V1RecordLeagueResultPayload }) =>
-      v1Post<V1RecordLeagueResultResult>(
-        `/admin/league-matches/${leagueId}/fixtures/${teamMatchId}/result/correct`,
-        body,
-      ),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
     },
   });
 }

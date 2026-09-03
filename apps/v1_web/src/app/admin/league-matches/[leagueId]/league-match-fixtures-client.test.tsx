@@ -8,11 +8,9 @@ import {
   useV1AdminLeagueTeams,
   useV1AdminTeam,
   useV1CancelLeagueFixture,
-  useV1CorrectLeagueResult,
   useV1GenerateLeagueFixtures,
   useV1PreviewLeagueFixtures,
   useV1RecordLeagueForfeit,
-  useV1RecordLeagueResult,
   useV1RegenerateLeagueFixtures,
   useV1RemoveLeagueTeam,
   useV1RevertLeagueCompletion,
@@ -32,15 +30,12 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1AddLeagueTeam: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useV1AdminLeagueMatch: vi.fn(),
   // U1 확장: 득점자 선택 목록 — 기본은 빈 데이터(섹션 숨김). 필요한 테스트만 값을 채운다.
-  useV1LeagueFixtureParticipants: vi.fn(() => ({ data: null, isPending: false })),
   useV1AdminLeagueTeams: vi.fn(),
   // R11(C-6): 몰수 모달이 열릴 때만 의미 있는 데이터를 쓴다 — 다른 테스트들은 모달을
   // 열지 않으므로 data: undefined인 기본값으로 충분하다.
   useV1AdminTeam: vi.fn(() => ({ data: undefined })),
   useV1CancelLeagueFixture: vi.fn(),
   // U1: 결과 입력·정정. 대부분의 테스트는 결과 처리를 다루지 않으므로 무해한 기본값.
-  useV1CorrectLeagueResult: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
-  useV1RecordLeagueResult: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useV1GenerateLeagueFixtures: vi.fn(),
   // 그룹 B 감사 결함 3: 최초 생성·재생성 공용 미리보기. 미리보기 자체를 다루는 테스트가
   // 없으므로 무해한 기본값.
@@ -65,8 +60,6 @@ const useV1AdminLeagueMatchMock = vi.mocked(useV1AdminLeagueMatch, { partial: tr
 const useV1AdminLeagueTeamsMock = vi.mocked(useV1AdminLeagueTeams, { partial: true });
 const useV1AdminTeamMock = vi.mocked(useV1AdminTeam, { partial: true });
 const useV1CancelLeagueFixtureMock = vi.mocked(useV1CancelLeagueFixture, { partial: true });
-const useV1CorrectLeagueResultMock = vi.mocked(useV1CorrectLeagueResult, { partial: true });
-const useV1RecordLeagueResultMock = vi.mocked(useV1RecordLeagueResult, { partial: true });
 const useV1PreviewLeagueFixturesMock = vi.mocked(useV1PreviewLeagueFixtures, { partial: true });
 const useV1RecordLeagueForfeitMock = vi.mocked(useV1RecordLeagueForfeit, { partial: true });
 const useV1GenerateLeagueFixturesMock = vi.mocked(useV1GenerateLeagueFixtures, { partial: true });
@@ -95,8 +88,6 @@ describe('LeagueMatchFixturesClient', () => {
     useV1CancelLeagueFixtureMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
     useV1RegenerateLeagueFixturesMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
     useV1RevertLeagueCompletionMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
-    useV1CorrectLeagueResultMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
-    useV1RecordLeagueResultMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
   });
 
   // D6(2026-08-24 확정): '상태' 열과 별개로 '결과' 열을 둔다. 이 열이 없던 동안 운영자는
@@ -840,160 +831,34 @@ describe('LeagueMatchFixturesClient', () => {
       </Providers>,
     );
 
-    expect(screen.getAllByRole('button', { name: '1주차 결과 입력' }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('button', { name: '2주차 결과 입력' }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('button', { name: '3주차 결과 입력' }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('button', { name: '4주차 결과 정정' }).length).toBeGreaterThan(0);
-    expect(screen.queryAllByRole('button', { name: '5주차 결과 입력' })).toHaveLength(0);
-    expect(screen.queryAllByRole('button', { name: '5주차 결과 정정' })).toHaveLength(0);
-    // voided는 '결과 정정'이 아니라 '결과 입력'으로 떠야 한다 — resultEntryMode가
-    // resultStage === 'official' 일 때만 'correction'이므로, 정정 레이블이 뜨면
-    // 백엔드의 재입력 흐름과 어긋난다(위 careful 경고).
-    expect(screen.getAllByRole('button', { name: '6주차 결과 입력' }).length).toBeGreaterThan(0);
-    expect(screen.queryAllByRole('button', { name: '6주차 결과 정정' })).toHaveLength(0);
+    // Task 165 BE-3: 모달 버튼이 아니라 **콘솔 딥링크**다. 레이블 규칙은 그대로 두되
+    // 링크가 어디로 가는지까지 본다 — 레이블만 보면 href 가 깨져도 통과한다.
+    expect(screen.getAllByRole('link', { name: '1주차 결과 입력' })[0]).toHaveAttribute(
+      'href',
+      '/admin/live/league-1/result-review?fixtureId=tm-not-entered',
+    );
+    expect(screen.getAllByRole('link', { name: '4주차 결과 정정' })[0]).toHaveAttribute(
+      'href',
+      '/admin/live/league-1/result-review?fixtureId=tm-official',
+    );
+    expect(screen.getAllByRole('link', { name: '2주차 결과 입력' }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('link', { name: '3주차 결과 입력' }).length).toBeGreaterThan(0);
+    // 승인대기(awaiting_approval)는 운영자 직접 입력 대상이 아니라 링크가 없다.
+    expect(screen.queryAllByRole('link', { name: '5주차 결과 입력' })).toHaveLength(0);
+    expect(screen.queryAllByRole('link', { name: '5주차 결과 정정' })).toHaveLength(0);
+    // voided 는 '결과 정정'이 아니라 '결과 입력'으로 떠야 한다 — 무효화된 결과는 재입력
+    // 대상이고, 정정 레이블이 뜨면 백엔드의 재입력 흐름과 어긋난다.
+    expect(screen.getAllByRole('link', { name: '6주차 결과 입력' }).length).toBeGreaterThan(0);
+    expect(screen.queryAllByRole('link', { name: '6주차 결과 정정' })).toHaveLength(0);
   });
 
   // U1: 요구사항 3 — 정정 모드는 확정 전 "전 → 후" 비교를 보여준다. 이게 이 안의 존재 이유라
   // 빼먹으면 안 된다.
-  it('결과 정정 버튼을 누르면 모달에 현재 공식 스코어("전")가 렌더된다', async () => {
-    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
-    useV1AdminLeagueMatchMock.mockReturnValue({
-      data: {
-        leagueId: 'league-1',
-        title: '가을 풋살 리그',
-        state: 'active',
-        teamIds: ['t1', 't2'],
-        fixtures: [
-          { teamMatchId: 'tm-1', title: '1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'completed', resultStage: 'official', homeScore: 3, awayScore: 1 },
-        ],
-      },
-      isPending: false,
-    } as never);
-    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
-    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
-
-    render(
-      <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
-      </Providers>,
-    );
-
-    fireEvent.click(screen.getAllByRole('button', { name: '1주차 결과 정정' })[0]);
-
-    const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByText('현재 공식 스코어와 비교')).toBeInTheDocument();
-
-    // 정정 전 현재 확정 스코어(3:1)가 "전" 칸에 그대로 보여야 한다. 칸을 지정해서 읽는다 —
-    // F5 프리필(2026-08-26) 이후 "후" 칸도 같은 3 : 1 을 렌더하므로 dialog 전체에서
-    // 텍스트만 찾으면 두 요소가 잡혀 어느 칸을 본 건지 알 수 없다.
-    const beforeCell = within(dialog).getByText('전').parentElement;
-    expect(beforeCell).not.toBeNull();
-    expect(within(beforeCell as HTMLElement).getByText('3 : 1')).toBeInTheDocument();
-
-    // "후" 칸은 열자마자 같은 스코어를 보여준다(프리필). '— : —' 로 남으면 득점자만
-    // 고치려는 정정에서도 스코어를 다시 타이핑해야만 제출되는 옛 동작이다.
-    const afterCell = within(dialog).getByText('후').parentElement;
-    expect(afterCell).not.toBeNull();
-    expect(within(afterCell as HTMLElement).getByText('3 : 1')).toBeInTheDocument();
-  });
 
   // U1: 요구사항 5 — mutation 훅은 다른 어드민 리그 훅들과 같은 패턴을 따른다. 여기서는
   // 엔드포인트·body가 서버 계약(RecordLeagueResultDto: homeScore/awayScore/reason)과
   // 정확히 맞는지 배선을 검증한다.
-  it('결과 입력 모달에서 스코어·사유를 입력해 제출하면 신규 입력 mutation을 올바른 body로 호출한다', async () => {
-    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
-    useV1AdminLeagueMatchMock.mockReturnValue({
-      data: {
-        leagueId: 'league-1',
-        title: '가을 풋살 리그',
-        state: 'active',
-        teamIds: ['t1', 't2'],
-        fixtures: [
-          { teamMatchId: 'tm-1', title: '1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched', resultStage: 'not_entered', homeScore: null, awayScore: null },
-        ],
-      },
-      isPending: false,
-    } as never);
-    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
-    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
-    const recordMutate = vi.fn();
-    useV1RecordLeagueResultMock.mockReturnValue({ mutate: recordMutate, isPending: false } as never);
-    const correctMutate = vi.fn();
-    useV1CorrectLeagueResultMock.mockReturnValue({ mutate: correctMutate, isPending: false } as never);
 
-    render(
-      <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
-      </Providers>,
-    );
-
-    fireEvent.click(screen.getAllByRole('button', { name: '1주차 결과 입력' })[0]);
-
-    const dialog = await screen.findByRole('dialog');
-    fireEvent.change(within(dialog).getByLabelText('홈팀'), { target: { value: '2' } });
-    fireEvent.change(within(dialog).getByLabelText('원정팀'), { target: { value: '0' } });
-    fireEvent.change(within(dialog).getByLabelText(/^사유/), { target: { value: '경기 종료 후 결과를 입력해요.' } });
-    fireEvent.click(within(dialog).getByRole('button', { name: '확인' }));
-
-    await waitFor(() =>
-      expect(recordMutate).toHaveBeenCalledWith(
-        { teamMatchId: 'tm-1', body: { homeScore: 2, awayScore: 0, reason: '경기 종료 후 결과를 입력해요.' } },
-        expect.anything(),
-      ),
-    );
-    expect(correctMutate).not.toHaveBeenCalled();
-  });
-
-  it('결과 정정 모달에서 새 스코어·사유를 입력해 제출하면 정정 mutation을 올바른 엔드포인트(body)로 호출한다', async () => {
-    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
-    useV1AdminLeagueMatchMock.mockReturnValue({
-      data: {
-        leagueId: 'league-1',
-        title: '가을 풋살 리그',
-        state: 'active',
-        teamIds: ['t1', 't2'],
-        fixtures: [
-          { teamMatchId: 'tm-1', title: '1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'completed', resultStage: 'official', homeScore: 3, awayScore: 1 },
-        ],
-      },
-      isPending: false,
-    } as never);
-    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
-    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
-    const recordMutate = vi.fn();
-    useV1RecordLeagueResultMock.mockReturnValue({ mutate: recordMutate, isPending: false } as never);
-    const correctMutate = vi.fn();
-    useV1CorrectLeagueResultMock.mockReturnValue({ mutate: correctMutate, isPending: false } as never);
-
-    render(
-      <Providers>
-        <LeagueMatchFixturesClient leagueId="league-1" />
-      </Providers>,
-    );
-
-    fireEvent.click(screen.getAllByRole('button', { name: '1주차 결과 정정' })[0]);
-
-    const dialog = await screen.findByRole('dialog');
-    fireEvent.change(within(dialog).getByLabelText('홈팀'), { target: { value: '2' } });
-    fireEvent.change(within(dialog).getByLabelText('원정팀'), { target: { value: '2' } });
-    fireEvent.change(within(dialog).getByLabelText(/^사유/), { target: { value: '오심으로 스코어를 정정해요.' } });
-    fireEvent.click(within(dialog).getByRole('button', { name: '확인' }));
-
-    // 감사 L-E finding 4 수정: 정정 모달은 몰수 체크박스를 항상 구체적인 boolean 으로
-    // 들고 있다가(기본값은 이 대진의 현재 isForfeit 승계 — 여기 fixture 는 없음/false)
-    // 제출 시 그대로 body 에 싣는다. 서버는 이 값을 "명시적 지정"으로 처리한다
-    // (RecordLeagueResultDto.isForfeit docblock — 미전송일 때만 base 를 승계).
-    await waitFor(() =>
-      expect(correctMutate).toHaveBeenCalledWith(
-        {
-          teamMatchId: 'tm-1',
-          body: { homeScore: 2, awayScore: 2, reason: '오심으로 스코어를 정정해요.', isForfeit: false },
-        },
-        expect.anything(),
-      ),
-    );
-    expect(recordMutate).not.toHaveBeenCalled();
-  });
 });
 
 // 대진 timing(경기 시간·휴식·팀당 하루 경기 수) — C안(시간창 역산) + B안(계산기 카드·타임라인) 결합.

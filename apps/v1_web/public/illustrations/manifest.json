@@ -1,6 +1,51 @@
 {
   "illustrations": [
     {
+      "name": "auth-notice",
+      "message": "막힌 게 아니라 다른 길이 있다",
+      "prompt": "SUBJECT:\nA chunky rounded compass with a Teameet-blue #3182F6 body and a light-tint #D6E7FF dial face, seen from a three-quarter angle with its needle pointing up-right, as the single main object, largest and nearest to camera.\nOne small training cone in light tint #D6E7FF with a #3182F6 band, about 45% of the compass's size, set back in depth and offset to the right to form a triangular arrangement with the main object; the eye lands on the compass first.\n\nSTYLE LOCK (do not edit):\nSoft matte clay 3D render in the style of Korean fintech app illustrations (Toss, KakaoPay). Rounded, chunky forms with thicker-than-real proportions; coins are thick cylinders with beveled rims, panels are plump, edges are softened. Single soft area light from the upper-left; clearly separated lit and shaded faces; gentle contact shadow only under each object, no cast shadow on a floor, no ground plane, no backdrop, no gradient background. Subtle ambient occlusion in crevices. No rim light, no glow, no bloom, no glossy chrome.\nPalette: primary Teameet blue #3182F6 with light tint #D6E7FF and deep shade #1B64DA for the main object; accent gold #FFC342 (with #E0A52E shade) for at most one small sub object; neutrals #F2F4F6 and #8B95A1. No other hues.\nComposition: three-quarter elevated camera, the object cluster fills about 70% of a square 1024x1024 canvas with even margins, main object slightly left of center, sub objects behind and to the right.\nStrictly no: faces, eyes, mouths, characters, mascots, people, hands, text, letters, numbers, logos, UI screens, phones, sparkles, confetti, stars in the air, floor, table, scenery.\nOutput: PNG with a fully transparent background (alpha channel), 1024x1024.",
+      "source_sha256": "6320bcdf1628973220f171306ac46abbf5c9d8d18d73bce4818a083da9bf95bd",
+      "sizes": {
+        "320": {
+          "bytes": 13550
+        },
+        "640": {
+          "bytes": 31444
+        }
+      },
+      "created_at": "2026-09-03T16:44:03Z"
+    },
+    {
+      "name": "auth-welcome",
+      "message": "같이 뛸 사람이 기다린다",
+      "prompt": "SUBJECT:\nA plump folded sports jersey in Teameet blue #3182F6 with a lighter #D6E7FF collar and hem, seen from a three-quarter angle, as the single main object, largest and nearest to camera.\nA second, smaller folded jersey in light tint #D6E7FF set behind and to the right, about 50% of the main jersey's size, and one small ball in neutral #F2F4F6 with #8B95A1 seams, about 40% of the main jersey's size, set further back to the right, together forming a triangular arrangement with the main object; the eye lands on the main jersey first.\n\nSTYLE LOCK (do not edit):\nSoft matte clay 3D render in the style of Korean fintech app illustrations (Toss, KakaoPay). Rounded, chunky forms with thicker-than-real proportions; coins are thick cylinders with beveled rims, panels are plump, edges are softened. Single soft area light from the upper-left; clearly separated lit and shaded faces; gentle contact shadow only under each object, no cast shadow on a floor, no ground plane, no backdrop, no gradient background. Subtle ambient occlusion in crevices. No rim light, no glow, no bloom, no glossy chrome.\nPalette: primary Teameet blue #3182F6 with light tint #D6E7FF and deep shade #1B64DA for the main object; accent gold #FFC342 (with #E0A52E shade) for at most one small sub object; neutrals #F2F4F6 and #8B95A1. No other hues.\nComposition: three-quarter elevated camera, the object cluster fills about 70% of a square 1024x1024 canvas with even margins, main object slightly left of center, sub objects behind and to the right.\nStrictly no: faces, eyes, mouths, characters, mascots, people, hands, text, letters, numbers, logos, UI screens, phones, sparkles, confetti, stars in the air, floor, table, scenery.\nOutput: PNG with a fully transparent background (alpha channel), 1024x1024.\n\nsame material, lighting and palette as the previous image",
+      "source_sha256": "432319de440b8191893c5baf3aca7fed86d39658bf757d02d43c52dd30b8a331",
+      "sizes": {
+        "320": {
+          "bytes": 13338
+        },
+        "640": {
+          "bytes": 30556
+        }
+      },
+      "created_at": "2026-09-03T16:44:07Z"
+    },
+    {
+      "name": "journey-done",
+      "message": "준비가 끝났다, 이제 경기장으로",
+      "prompt": "SUBJECT:\nA chunky trophy cup in accent gold #FFC342 (with #E0A52E shade) on a Teameet-blue #3182F6 rounded base, seen from a three-quarter angle, as the single main object, largest and nearest to camera.\nOne thick gold coin in #FFC342 with a #E0A52E beveled rim, about 40% of the trophy's size, set back in depth and offset to the right to form a triangular arrangement with the main object; the eye lands on the trophy first.\n\nSTYLE LOCK (do not edit):\nSoft matte clay 3D render in the style of Korean fintech app illustrations (Toss, KakaoPay). Rounded, chunky forms with thicker-than-real proportions; coins are thick cylinders with beveled rims, panels are plump, edges are softened. Single soft area light from the upper-left; clearly separated lit and shaded faces; gentle contact shadow only under each object, no cast shadow on a floor, no ground plane, no backdrop, no gradient background. Subtle ambient occlusion in crevices. No rim light, no glow, no bloom, no glossy chrome.\nPalette: primary Teameet blue #3182F6 with light tint #D6E7FF and deep shade #1B64DA for the main object; accent gold #FFC342 (with #E0A52E shade) for at most one small sub object; neutrals #F2F4F6 and #8B95A1. No other hues.\nComposition: three-quarter elevated camera, the object cluster fills about 70% of a square 1024x1024 canvas with even margins, main object slightly left of center, sub objects behind and to the right.\nStrictly no: faces, eyes, mouths, characters, mascots, people, hands, text, letters, numbers, logos, UI screens, phones, sparkles, confetti, stars in the air, floor, table, scenery.\nOutput: PNG with a fully transparent background (alpha channel), 1024x1024.\n\nsame material, lighting and palette as the previous image",
+      "source_sha256": "b6d9bd9a617cc8f648098b94b952c4fd31dbcec924690bf386dd7dce4a8d7415",
+      "sizes": {
+        "320": {
+          "bytes": 15076
+        },
+        "640": {
+          "bytes": 34156
+        }
+      },
+      "created_at": "2026-09-03T16:44:11Z"
+    },
+    {
       "name": "matches-empty",
       "message": "지금은 조용하지만, 휘슬만 불면 경기가 시작된다.",
       "prompt": "SUBJECT:\nA chunky rounded coach's whistle in Teameet blue, seen from a three-quarter angle with its mouthpiece pointing lower-left, as the single main object, largest and nearest to camera.\nOne small training cone in light tint #D6E7FF with a #3182F6 band and one thick gold coin, each about 45% of the whistle's size, set back in depth behind and to the right of the whistle so the three objects form a triangle; the eye lands on the whistle first.\n\nSTYLE LOCK (do not edit):\nSoft matte clay 3D render in the style of Korean fintech app illustrations (Toss, KakaoPay). Rounded, chunky forms with thicker-than-real proportions; coins are thick cylinders with beveled rims, panels are plump, edges are softened. Single soft area light from the upper-left; clearly separated lit and shaded faces; gentle contact shadow only under each object, no cast shadow on a floor, no ground plane, no backdrop, no gradient background. Subtle ambient occlusion in crevices. No rim light, no glow, no bloom, no glossy chrome.\nPalette: primary Teameet blue #3182F6 with light tint #D6E7FF and deep shade #1B64DA for the main object; accent gold #FFC342 (with #E0A52E shade) for at most one small sub object; neutrals #F2F4F6 and #8B95A1. No other hues.\nComposition: three-quarter elevated camera, the object cluster fills about 70% of a square 1024x1024 canvas with even margins, main object slightly left of center, sub objects behind and to the right.\nStrictly no: faces, eyes, mouths, characters, mascots, people, hands, text, letters, numbers, logos, UI screens, phones, sparkles, confetti, stars in the air, floor, table, scenery.\nOutput: PNG with a fully transparent background (alpha channel), 1024x1024.",

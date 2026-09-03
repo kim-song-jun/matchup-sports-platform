@@ -13,7 +13,7 @@ import {
 } from '@/hooks/use-v1-api';
 import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
 import type { V1FoundAccount } from '@/types/api';
-import { AuthFrame } from './auth-page';
+import { AUTH_NOTICE_STAGE, AuthFrame } from './auth-page';
 import { formatPhone, normalizeSeparatedDigits } from './signup-profile-validation';
 
 type Mode = 'find-id' | 'reset-password';
@@ -143,7 +143,7 @@ export function AccountRecoveryClient() {
   };
 
   return (
-    <AuthFrame topTitle="계정 찾기" backHref="/login/email">
+    <AuthFrame topTitle="계정 찾기" backHref="/login/email" stage={AUTH_NOTICE_STAGE}>
       <div className="tm-auth-body">
         <div className="tm-auth-segmented" role="tablist" aria-label="찾기 방법">
           <button

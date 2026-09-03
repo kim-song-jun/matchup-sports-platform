@@ -244,11 +244,10 @@ export class AdminRegistrationsService {
               message: leagueAdmissionBlockerMessage(blocker),
             });
           }
-          if (blocker === null) {
-            await tx.v1LeagueTeam.create({
-              data: { leagueId: registration.tournamentId, teamId: registration.teamId },
-            });
-          }
+          // BE-5 drop: 예전엔 확정과 함께 레거시 로스터 행을 만들었다. 이제 로스터 =
+          // confirmed 등록이라, 바로 아래에서 이 등록의 status 를 confirmed 로 옮기는 것이
+          // 곧 참가다 — 여기서 따로 만들 것이 없다. (`blocker` 검사는 그대로 남는다:
+          // 확정 직전에 팀이 해체됐거나 형제 티어에 들어간 경우를 여기서 막는다.)
         }
       }
 

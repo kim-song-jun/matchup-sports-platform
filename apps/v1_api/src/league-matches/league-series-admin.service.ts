@@ -39,6 +39,8 @@ import {
 } from '../tournaments/league-competition-mirror';
 import { LEAGUE_TIE_BREAK_ORDER } from './league-tie-break';
 import { findTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
+import { randomUUID } from 'node:crypto';
+import { LeagueStateValue } from './league-state';
 
 const SEASON_LENGTH_FALLBACK_DAYS = 90;
 
@@ -320,23 +322,28 @@ export class LeagueSeriesAdminService {
         seasonNo: number | null;
         state: string;
       }> = [];
+      // 종목 코드는 리그마다 같다(시리즈 종목) — 루프 밖에서 한 번만 읽는다.
+      const seriesSportCode = (
+        await tx.v1Sport.findUniqueOrThrow({ where: { id: series.sportId }, select: { code: true } })
+      ).code;
       for (const tier of tiers) {
-        const league = await tx.v1League.create({
-            data: {
-              title: tier.title,
-              sportId: series.sportId,
-              regionId: series.regionId,
-              createdByAdminUserId: admin.id,
-              startsOn,
-              endsOn,
-              tieBreakJson: { order: LEAGUE_TIE_BREAK_ORDER },
-              seriesId,
-              tier: tier.tier,
-              seasonNo: 1,
-              teams: { createMany: { data: [...new Set(tier.teamIds)].map((teamId) => ({ teamId })) } },
-            },
-            include: { sport: { select: { code: true } } },
-        });
+        // BE-5 drop: 통합 축이 정본이다. 예전엔 `V1League` 를 만들고 거울을 따라 썼는데,
+        // 그 테이블이 사라져 아래 create 하나가 리그 생성 자체다. 값 만드는 규칙은 여전히
+        // `leagueMirrorCreateData` 한 곳만 안다 — 여기서는 그 입력만 조립한다.
+        const league = {
+          id: randomUUID(),
+          title: tier.title,
+          sportId: series.sportId,
+          regionId: series.regionId,
+          state: LeagueStateValue.draft,
+          startsOn,
+          endsOn,
+          seriesId,
+          tier: tier.tier,
+          seasonNo: 1,
+          createdAt: new Date(),
+          sport: { code: seriesSportCode },
+        };
         // dual-write — 통합 축에 같은 리그를 비춘다(같은 트랜잭션).
         await tx.v1Tournament.create({ data: leagueMirrorCreateData(toMirrorSource(league)) });
         // 로스터와 짝이 되는 confirmed 등록. 거울을 만든 **뒤**여야 한다 — 등록의
@@ -668,23 +675,26 @@ export class LeagueSeriesAdminService {
       const createdLeagues: Array<{ id: string; tier: number; teamCount: number }> = [];
       {
         // 1팀 티어는 위에서 이미 422 로 막혔으므로 여기 남는 것은 2팀 이상 뿐이다.
+        // 종목 코드는 리그마다 같다(시리즈 종목) — 루프 밖에서 한 번만 읽는다.
+        const seriesSportCode = (
+          await tx.v1Sport.findUniqueOrThrow({ where: { id: series.sportId }, select: { code: true } })
+        ).code;
         for (const { tier, teamIds } of nextSeasonPlan.tiers) {
-          const league = await tx.v1League.create({
-            data: {
-              title: `${series.title} ${nextSeasonNo}시즌 ${tierLabel(tier)}`,
-              sportId: series.sportId,
-              regionId: series.regionId,
-              createdByAdminUserId: admin.id,
-              startsOn: nextStartsOn,
-              endsOn: nextEndsOn,
-              tieBreakJson: { order: LEAGUE_TIE_BREAK_ORDER },
-              seriesId,
-              tier,
-              seasonNo: nextSeasonNo,
-              teams: { createMany: { data: teamIds.map((teamId) => ({ teamId })) } },
-            },
-            include: { sport: { select: { code: true } } },
-          });
+          // BE-5 drop — 위 시즌 시드와 같은 이유(아래 create 하나가 리그 생성 자체다).
+          const league = {
+            id: randomUUID(),
+            title: `${series.title} ${nextSeasonNo}시즌 ${tierLabel(tier)}`,
+            sportId: series.sportId,
+            regionId: series.regionId,
+            state: LeagueStateValue.draft,
+            startsOn: nextStartsOn,
+            endsOn: nextEndsOn,
+            seriesId,
+            tier,
+            seasonNo: nextSeasonNo,
+            createdAt: new Date(),
+            sport: { code: seriesSportCode },
+          };
           // dual-write — 통합 축에 같은 리그를 비춘다(같은 트랜잭션). 없으면 이 리그는
           // read-swap 뒤 화면에서 에러 없이 사라진다.
           await tx.v1Tournament.create({ data: leagueMirrorCreateData(toMirrorSource(league)) });

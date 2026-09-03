@@ -678,7 +678,16 @@ describe('LeagueMatchAdminService.addTeam — 형제 티어 중복 게이트', (
     const result = await service.addTeam(adminUser, LEAGUE_ID, { teamId: NEW_TEAM_ID } as never);
 
     expect(result).toMatchObject({ leagueId: LEAGUE_ID, teamId: NEW_TEAM_ID });
-    expect(prisma.v1LeagueTeam.create).toHaveBeenCalledWith({ data: { leagueId: LEAGUE_ID, teamId: NEW_TEAM_ID } });
+    // BE-5 drop: 로스터 = confirmed 등록 하나다(레거시 로스터 테이블은 사라졌다).
+    expect(prisma.v1TournamentRegistration.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          tournamentId: LEAGUE_ID,
+          teamId: NEW_TEAM_ID,
+          status: 'confirmed',
+        }),
+      }),
+    );
   });
 });
 

@@ -99,19 +99,14 @@ export class LeagueCompletionProjectionService {
     // completed로 바뀐 걸 보고 0행 매치라 조용히 no-op한다 -- teams.service.ts
     // acceptInvitation()의 "조건부 update" 선례(R15-002)와 동일한 패턴이라 별도
     // SELECT ... FOR UPDATE가 필요 없다.
-    const result = await tx.v1League.updateMany({
-      where: { id: leagueId, state: 'active' },
-      data: { state: 'completed' },
-    });
-    if (result.count === 0) return false;
-
-    // dual-write — 거울의 status 도 completed 로. **`result.count === 0` 인 조기 반환 뒤에**
-    // 두는 것이 중요하다: 위 조건부 update 의 승자만 여기 도달하므로, 늦게 온 트랜잭션이
-    // 거울을 중복으로 건드리지 않는다(그 동시성 설계를 거울에도 그대로 승계한다).
-    await tx.v1Tournament.updateMany({
-      where: { id: leagueId, kind: 'regular_league' },
+    // BE-5 drop: 조건부 update 를 통합 축에 직접 건다. 위 동시성 설계는 그대로다 —
+    // `where` 에 현재 상태를 걸어 **먼저 커밋하는 쪽만** 1행을 잡고, 늦게 온 트랜잭션은
+    // 0행이라 조용히 no-op 한다. (`kind` 가드로 같은 id 의 진짜 대회를 제외한다.)
+    const result = await tx.v1Tournament.updateMany({
+      where: { id: leagueId, kind: 'regular_league', status: STATUS_BY_LEAGUE_STATE.active },
       data: { status: STATUS_BY_LEAGUE_STATE.completed },
     });
+    if (result.count === 0) return false;
 
     await tx.v1StatusChangeLog.create({
       data: {

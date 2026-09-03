@@ -999,24 +999,12 @@ async function ensureLeague(
   const commonLeagueData = { title: LEAGUE_TITLE, sportId, regionId, startsOn, endsOn };
   // state는 create에만 쓴다 — 스태프가 alpha에서 직접 리그를 완료 처리했다면 재배포가
   // 그 결정을 되돌리면 안 된다(위 팀매치 status와 같은 이유).
-  const league = await tx.v1League.upsert({
-    where: { id: LEAGUE_QA_ID },
-    update: commonLeagueData,
-    create: {
-      id: LEAGUE_QA_ID,
-      ...commonLeagueData,
-      createdByAdminUserId,
-      tieBreakJson: { order: ['points', 'goalDifference', 'goalsFor', 'headToHead'] },
-      state: 'active',
-    },
-  });
-  // dual-write — 통합 축의 거울도 같은 고정 id 로 upsert 한다. 리그당 정확히 한 행이
-  // 영원히 재사용되므로 고아가 생기지 않는다(이 시드는 지우지 않는다).
+  // BE-5 drop: 통합 축이 정본이라 upsert 하나가 리그 시드 전부다(예전엔 레거시 리그를
+  // 먼저 넣고 거울을 따라 넣었다).
   //
-  // **`status` 는 create 전용이다** — 바로 위 `state` 와 같은 이유다. 스태프가 alpha 에서
-  // 직접 바꾼 상태를 재배포가 되돌리면 안 된다. update 분기에 넣으면 **거울만 시드값으로
-  // 되돌아가고 리그는 스태프 값을 유지해 두 축이 반대 방향으로 갈라진다.**
-  await tx.v1Tournament.upsert({
+  // **`status` 는 create 전용이다** — 스태프가 alpha 에서 직접 바꾼 상태를 재배포가 되돌리면
+  // 안 된다(바로 위 팀매치 status 와 같은 이유).
+  const league = await tx.v1Tournament.upsert({
     where: { id: LEAGUE_QA_ID },
     update: {
       title: commonLeagueData.title,
@@ -1038,16 +1026,25 @@ async function ensureLeague(
       // **원본 리그의 생성 시각을 그대로 쓴다.** 생략하면 `@default(now())` 가 시드 실행
       // 시각을 박고, 그 값이 통합 목록 정렬(`createdAt desc`)을 지배해 시드 리그가 통째로
       // 최신이 된다 — 실제 대회보다 앞에 서서 첫 페이지를 차지한다.
-      createdAt: league.createdAt,
+      // 고정 id 시드라 create 는 최초 1회뿐이다 — 그때의 시각이 그대로 남아 통합 목록
+      // 정렬(`createdAt desc`)에서 시드 리그가 실제 대회보다 앞서지 않는다.
+      createdAt: startsOn,
+      createdByAdminUserId,
     },
   });
-  // 참가팀 연결(V1LeagueTeam) — 순위표·득점/도움 순위 둘 다 league.teams(이 조인)를 통해
-  // teamId 목록을 읽으므로 이게 없으면 리그가 빈 리그로 보인다.
+  // 참가팀 연결 — 로스터 = confirmed 등록이다. 순위표·득점/도움 순위가 이 목록으로 참가팀을
+  // 읽으므로 없으면 리그가 빈 리그로 보인다.
   for (const team of teams) {
-    await tx.v1LeagueTeam.upsert({
-      where: { leagueId_teamId: { leagueId: league.id, teamId: team.id } },
+    await tx.v1TournamentRegistration.upsert({
+      where: { tournamentId_teamId: { tournamentId: league.id, teamId: team.id } },
       update: {},
-      create: { leagueId: league.id, teamId: team.id },
+      create: {
+        tournamentId: league.id,
+        teamId: team.id,
+        appliedByUserId: createdByAdminUserId,
+        status: 'confirmed',
+        entrySource: 'seeded',
+      },
     });
   }
   return league;
@@ -1097,28 +1094,10 @@ async function ensureTierSeries(
       startsOn,
       endsOn,
     };
-    const tierLeague = await tx.v1League.upsert({
-      where: { id: leagueId },
-      update: commonData,
-      // state·tier·seasonNo 는 create 전용 — 단발 리그와 같은 이유로, 스태프가 alpha 에서
-      // 직접 바꾼 상태를 재배포가 되돌리면 안 된다.
-      create: {
-        id: leagueId,
-        ...commonData,
-        createdByAdminUserId,
-        tieBreakJson: { order: ['points', 'goalDifference', 'goalsFor', 'headToHead'] },
-        state: 'draft',
-        seriesId: LEAGUE_QA_SERIES_ID,
-        tier,
-        seasonNo: 1,
-      },
-    });
-    // dual-write — 통합 축의 거울도 같은 고정 id 로 upsert 한다. 리그당 정확히 한 행이
-    // 영원히 재사용되므로 고아가 생기지 않는다(이 시드는 지우지 않는다).
+    // BE-5 drop: 통합 축이 정본이라 upsert 하나가 티어 리그 시드 전부다.
     //
-    // **`status` 는 create 전용이다** — 바로 위 `state` 와 같은 이유다. 스태프가 alpha 에서
-    // 직접 바꾼 상태를 재배포가 되돌리면 안 된다. update 분기에 넣으면 **거울만 시드값으로
-    // 되돌아가고 리그는 스태프 값을 유지해 두 축이 반대 방향으로 갈라진다.**
+    // **`status`·`tier`·`seasonNo` 는 create 전용이다** — 스태프가 alpha 에서 직접 바꾼
+    // 상태를 재배포가 되돌리면 안 된다.
     await tx.v1Tournament.upsert({
       where: { id: leagueId },
       update: {
@@ -1141,16 +1120,23 @@ async function ensureTierSeries(
         tier,
         seasonNo: 1,
         competitionConfigVersionId: ALPHA_SEED_LEAGUE_CONFIG_ID,
-        // 단발 리그 거울과 같은 이유 — 원본 시각을 옮기지 않으면 시드 실행 시각이 박히고
-        // 그게 통합 목록 정렬을 지배한다.
-        createdAt: tierLeague.createdAt,
+        // 고정 id 시드라 create 는 최초 1회뿐이다 — 시드 실행 시각이 통합 목록 정렬을
+        // 지배하지 않도록 리그 시작일을 쓴다(단발 리그 시드와 같은 규칙).
+        createdAt: startsOn,
+        createdByAdminUserId,
       },
     });
     for (const team of tierTeams) {
-      await tx.v1LeagueTeam.upsert({
-        where: { leagueId_teamId: { leagueId, teamId: team.id } },
+      await tx.v1TournamentRegistration.upsert({
+        where: { tournamentId_teamId: { tournamentId: leagueId, teamId: team.id } },
         update: {},
-        create: { leagueId, teamId: team.id },
+        create: {
+          tournamentId: leagueId,
+          teamId: team.id,
+          appliedByUserId: createdByAdminUserId,
+          status: 'confirmed',
+          entrySource: 'seeded',
+        },
       });
     }
   }
@@ -1299,20 +1285,28 @@ async function main() {
         const allTeams = [...teams, showcase];
         const teamsByNo = new Map(allTeams.map((team, index) => [index + 1, team]));
         const league = await ensureLeague(tx, sport.id, region.id, admin.id, allTeams, now);
+        // BE-5 drop: `league` 가 `V1Tournament` 행이라 `regionId` 가 nullable 이다. 이 시드는
+        // 위에서 항상 채우므로 대진 생성엔 좁힌 모양을 넘긴다.
+        const leagueForFixtures = {
+          id: league.id,
+          title: league.title,
+          sportId: league.sportId,
+          regionId: region.id,
+        };
 
         let confirmedCount = 0;
         let pendingCount = 0;
         let cancelledCount = 0;
         let forfeitCount = 0;
         for (const spec of FIXTURES) {
-          await ensureFixture(tx, spec, league, teamsByNo, admin.userId, competitionConfig.id, now);
+          await ensureFixture(tx, spec, leagueForFixtures, teamsByNo, admin.userId, competitionConfig.id, now);
           if (spec.cancelled) cancelledCount += 1;
           else if (spec.result) confirmedCount += 1;
           else pendingCount += 1;
           if (spec.forfeit) forfeitCount += 1;
         }
         for (const spec of SHOWCASE_FIXTURES) {
-          await ensureFixture(tx, spec, league, teamsByNo, showcase.playerIds[0], competitionConfig.id, now);
+          await ensureFixture(tx, spec, leagueForFixtures, teamsByNo, showcase.playerIds[0], competitionConfig.id, now);
         }
         const showcaseReviews = await ensureShowcaseReviews(tx, sport.id, showcase, teams.slice(0, 3), now);
 

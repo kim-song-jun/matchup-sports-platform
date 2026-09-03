@@ -215,3 +215,68 @@ describe('push/pop 콘텐츠 이중 페이드 억제(D2안 B, 그룹2/F2) — VT
     expect(fallbackGate![0]).not.toContain('.tm-content-enter');
   });
 });
+
+describe('선수 카드 무한 루프 가시성 게이트 (pcard-infinite-loop-no-visibility-gate)', () => {
+  it('data-loop-paused="true" 규칙이 스윕·크레스트·프레임 발광·오로라 네 요소를 전부 잡는다', () => {
+    // use-loop-pause.ts 가 세팅하는 속성을 globals.css 가 실제로 소비하는지 —
+    // 훅만 있고 CSS 규칙이 없으면(또는 반대로) 아무 일도 일어나지 않는다.
+    const rule = globalsCss.match(
+      /\.tm-player-card\[data-loop-paused="true"\][^{]*\{([^}]*)\}/,
+    )?.[0];
+
+    expect(rule).toBeDefined();
+    expect(rule).toContain('.tm-pcard-face::after');
+    expect(rule).toContain('.tm-pcard-crest');
+    expect(rule).toContain('.tm-pcard-frame');
+    expect(rule).toContain('.tm-pcard-fx');
+    expect(rule).toMatch(/animation-play-state:\s*paused/);
+  });
+});
+
+describe('카드 광택 스윕(tmCardSweep)은 left 가 아니라 transform 을 보간한다 (pcard-sweep-animates-left-not-transform)', () => {
+  // `[^}]*` 류 정규식은 첫 번째 안쪽 블록에서 멈춘다(실측: 0%,62% 블록만 잡히고 88%,100% 는
+  // 빠짐) — 중괄호를 세어 @keyframes 블록 전체를 자른다. 안 그러면 뒤 블록의 left 보간이
+  // 남아 있어도 통과하는 vacuous 테스트가 된다.
+  const sweepKeyframes = (): string | undefined => {
+    const start = globalsCss.indexOf('@keyframes tmCardSweep');
+    if (start < 0) return undefined;
+    let depth = 0;
+    for (let i = globalsCss.indexOf('{', start); i < globalsCss.length; i++) {
+      if (globalsCss[i] === '{') depth++;
+      else if (globalsCss[i] === '}' && --depth === 0) return globalsCss.slice(start, i + 1);
+    }
+    return undefined;
+  };
+
+  it('키프레임이 left 를 애니메이션하지 않는다 — 레이아웃 리플로우를 강제하지 않는다', () => {
+    const keyframe = sweepKeyframes();
+
+    expect(keyframe).toBeDefined();
+    // 이 정규식은 `keyframe { ... left: ... }` 형태만 걸러낸다 — 정적 `left`
+    // 는 .tm-pcard-face::after 규칙(키프레임 밖)에 남아 있어도 되고, 이 검증 대상이 아니다.
+    expect(keyframe).not.toMatch(/left\s*:/);
+    expect(keyframe).toMatch(/translateX\(/);
+  });
+
+  it('정적 left + translateX 궤적이 예전 left 보간 궤적(-80% → 160%, 부모 폭 기준)과 일치한다', () => {
+    const rule = globalsCss.match(/\.tm-pcard-face::after\s*\{([^}]*)\}/)?.[1];
+    const keyframe = sweepKeyframes();
+
+    expect(rule).toBeDefined();
+    expect(keyframe).toBeDefined();
+    // 기준점: 예전 키프레임 0% 의 left 값. 예전 정적값(-85%)을 그대로 두면 궤적 전체가 5%W 밀린다.
+    const staticLeft = Number(rule!.match(/left:\s*(-?[\d.]+)%/)![1]);
+    const width = Number(rule!.match(/width:\s*([\d.]+)%/)![1]) / 100;
+    const xs = [...keyframe!.matchAll(/translateX\((-?[\d.]+)%\)/g)].map((m) => Number(m[1]));
+    // translateX 는 자기 폭(62%) 기준이므로 부모 기준으로 환산해 유효 위치를 구한다.
+    const effective = xs.map((x) => staticLeft + x * width);
+    expect(effective[0]).toBeCloseTo(-80, 0);
+    expect(effective[effective.length - 1]).toBeCloseTo(160, 0);
+  });
+
+  it('translateX 가 rotate 보다 먼저(바깥쪽) 와야 순수 수평 이동이 된다 — 순서를 뒤집으면 원점을 도는 호가 된다', () => {
+    const rule = globalsCss.match(/\.tm-pcard-face::after\s*\{([^}]*)\}/)?.[1];
+
+    expect(rule).toMatch(/transform:\s*translateX\([^)]*\)\s*rotate\(18deg\)/);
+  });
+});

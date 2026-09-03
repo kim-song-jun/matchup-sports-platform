@@ -130,7 +130,9 @@ describe('TeamMatchCompletionNotificationService', () => {
     const data = createMany.mock.calls[0][0].data as Array<Record<string, unknown>>;
     expect(data).toHaveLength(1);
     expect(data[0].title).toBe('리그 경기 결과가 확정됐어요');
-    expect(data[0].body).toBe('"리그 3주차 A vs B" 경기 결과가 확정됐어요. 7일 안에 이의를 제기할 수 있어요.');
+    // Task 166: "7일 안에 이의를 제기할 수 있어요" 를 뺐다 — 이의 경로가 사라졌으므로
+    // (정본 §4) 없는 기능을 안내하면 안 된다.
+    expect(data[0].body).toBe('"리그 3주차 A vs B" 경기 결과가 확정됐어요.');
     expect(data[0].deepLink).toBe('/team-matches/tm-league-1/result');
     // businessKey 네임스페이스는 일반 팀매치와 동일 — 팀매치 하나는 생애주기 내내
     // 리그 아니면 일반 중 하나로 고정이라 나눌 이유가 없다.

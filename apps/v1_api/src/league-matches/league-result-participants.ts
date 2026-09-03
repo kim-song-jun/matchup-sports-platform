@@ -1,7 +1,7 @@
 /**
  * 운영자 결과 입력·정정에 실린 선수별 득점·도움을 `actualParticipants`로 조립하는
  * 순수 규칙 모듈. 네트워크·Prisma 없이 단독 테스트 가능하도록 서비스에서 분리했다
- * (league-standings.ts / league-result-dispute-eligibility.ts 와 같은 관례).
+ * (league-standings.ts 와 같은 관례).
  *
  * 사이드는 클라이언트 입력이 아니라 participant 행에서 도출한다 — 홈/원정이 뒤바뀐
  * 채 저장되면 개인 기록이 상대 팀 선수에게 붙는 사고가 되는데, 그 검증을 화면에

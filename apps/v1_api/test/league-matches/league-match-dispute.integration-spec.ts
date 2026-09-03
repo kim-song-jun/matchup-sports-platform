@@ -9,6 +9,7 @@ import { LeagueMatchPublicService } from '../../src/league-matches/league-match-
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { ManagedTermsRuntimeService } from '../../src/terms/managed-terms-runtime.service';
 import type { V1AuthUser } from '../../src/auth/v1-auth-user';
+import { seedOfficialLeagueResult } from '../helpers/seed-official-league-result';
 import { createV1IntegrationApp } from '../integration/integration-app';
 
 // D2: 리그 경기 결과 이의 제기(E2) + 운영자 수락/거부(E4) + 승강 확정 게이트(E3).
@@ -112,12 +113,12 @@ describe('리그 결과 이의 제기 (D2)', () => {
       data: { teamId: teamMatch.hostTeamId, userId: hostOwnerUserId, role: 'owner', status: 'active' },
     });
 
-    const resultRes = await request(app.getHttpServer())
-      .post(`/api/v1/admin/league-matches/${leagueId}/fixtures/${teamMatchId}/result`)
-      .set('x-v1-user-id', adminUserId)
-      .send({ homeScore: 2, awayScore: 1, reason: 'D2 테스트용 결과 확정' });
-    expect(resultRes.status).toBe(201);
-    const revisionId = resultRes.body.data.resultRevisionId as string;
+    // 확정된 결과가 하나 있는 상태를 만든다 — 이 스펙의 검증 대상이 아니라 **전제**다.
+    // (Task 165 BE-3 이 리그 전용 결과 입력 엔드포인트를 지웠다. 헬퍼 docblock 참조.)
+    const { revisionId } = await seedOfficialLeagueResult(
+      { prisma, games: gamesService },
+      { teamMatchId, adminUserId, homeScore: 2, awayScore: 1, reason: 'D2 테스트용 결과 확정' },
+    );
 
     // 이 리그는 팀 2개·1주차라 대진이 정확히 1건 -- 유일한 대진이 확정되는 순간
     // LeagueCompletionProjectionService 가 리그를 completed 로 자동 전이한다(R6/D-3).

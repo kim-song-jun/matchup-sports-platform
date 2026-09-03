@@ -272,14 +272,17 @@ describe('V1GameOperationsWorkerService database lease contract', () => {
     // GAME_RESULT_CHANGE_REQUESTED, GAME_RESULT_LEAGUE_AUTO_APPROVE (D2, 리그
     // 결과 24시간 자동 승인), LEAGUE_RESULT_ENTRY_REMINDER (리그 대진 결과 미입력
     // +24시간 운영자 리마인더), IDENTITY_LINK_EXPIRY (신원 연결 요청 +24시간 만료
-    // 확정·신청자 통보) -- 9 total.
+    // 확정·신청자 통보), LEAGUE_ROSTER_AUTOCONFIRM·LEAGUE_ROSTER_REMINDER (D10, Task 164
+    // BE-4b — 시즌 시작 자동 명단 확정과 그 24h 전 리마인더. **핸들러는 항상 등록**하고
+    // 실행 여부만 env 로 가른다: 등록을 걸어 두지 않으면 예약된 잡이 핸들러 없이 6회
+    // 재시도 후 POISONED 로 가고, 나중에 켜는 순간 그 행들이 이미 죽어 있다) -- 11 total.
     //
     // Task 166 이 `GAME_RESULT_REJECTED`·`GAME_RESULT_SUPPLEMENT_REQUESTED` 둘을
     // 뺐다(11 → 9). 그 두 결정 — 어드민이 팀에게 결과를 되돌려 보내는 왕복 — 이
     // 사라져 그 이름의 아웃박스 이벤트가 더는 만들어지지 않는다(정본 §4).
     await expect(service.getHealth()).resolves.toMatchObject({
       status: 'healthy',
-      registeredHandlers: 9,
+      registeredHandlers: 11,
       queue: {
         pending: 0,
         retry: 0,
@@ -292,7 +295,7 @@ describe('V1GameOperationsWorkerService database lease contract', () => {
     service.registerDurableAuditHandler('GAME_OPERATION_FLAG_CHANGED');
     await expect(service.getHealth()).resolves.toMatchObject({
       status: 'healthy',
-      registeredHandlers: 10,
+      registeredHandlers: 12,
     });
 
     await insertJob({ status: 'POISONED', attempts: 6 });

@@ -1,3 +1,9 @@
+import {
+  LEAGUE_ROSTER_AUTOCONFIRM_TYPE,
+  LEAGUE_ROSTER_REMINDER_TYPE,
+  LeagueRosterAutoConfirmService,
+  LeagueRosterReminderService,
+} from './league-roster/league-roster-autoconfirm.service';
 import { Injectable, Logger, OnModuleDestroy, Optional } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
@@ -109,6 +115,14 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
     // updateFixture(시작 시각 변경)가 건다 — league-result-entry-reminder.service.ts 참고.
     const leagueResultEntryReminder = new LeagueResultEntryReminderService();
     this.registerHandler(LEAGUE_RESULT_ENTRY_REMINDER_TYPE, leagueResultEntryReminder.handler);
+    // D10(Task 164 BE-4b) — 시즌 시작 자동 명단 확정과 그 24h 전 리마인더.
+    // **기본은 꺼짐**이다: 핸들러가 `DISABLE_LEAGUE_ROSTER_AUTOCONFIRM_CRON !== 'false'`
+    // 이면 즉시 return 한다. 등록 자체는 항상 해 둔다 — 안 하면 예약된 잡이 핸들러 없이
+    // 6회 재시도 후 POISONED 로 가고, 켜는 순간 그 행들이 이미 죽어 있다.
+    const leagueRosterAutoConfirm = new LeagueRosterAutoConfirmService();
+    const leagueRosterReminder = new LeagueRosterReminderService();
+    this.registerHandler(LEAGUE_ROSTER_AUTOCONFIRM_TYPE, leagueRosterAutoConfirm.handler);
+    this.registerHandler(LEAGUE_ROSTER_REMINDER_TYPE, leagueRosterReminder.handler);
     // 신원 연결 요청은 24시간 뒤 만료된다 — 예전에는 다음 attest 시도 때에야 기록되는
     // lazy 처리라 아무도 손대지 않으면 신청자가 결말을 알 수 없었다. 신청 시각 +24h 에
     // 만료를 확정하고 신청자에게 통보한다(identity-link-expiry.service.ts).

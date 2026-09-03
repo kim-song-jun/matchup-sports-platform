@@ -1,4 +1,9 @@
-import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma, V1LeagueState } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { isParticipantPubliclyEligible, loadParticipantConsentEligibility } from '../games/public-records/public-consent';
@@ -20,7 +25,11 @@ import {
   leagueFixtureListWhere,
   toLeagueFixtureList,
 } from './league-fixture-list-source';
-import { LEAGUE_STATE_BY_STATUS, STATUSES_BY_LEAGUE_STATE } from '../tournaments/league-competition-mirror';
+import {
+  LEAGUE_STATE_BY_STATUS,
+  STATUSES_BY_LEAGUE_STATE,
+  isCompleteLeagueMirror,
+} from '../tournaments/league-competition-mirror';
 import { LEAGUE_TIE_BREAK_ORDER } from './league-tie-break';
 import { findTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
 
@@ -30,6 +39,8 @@ const LEAGUE_LIST_MAX_LIMIT = 50;
 
 @Injectable()
 export class LeagueMatchPublicService {
+  private readonly logger = new Logger(LeagueMatchPublicService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   // R5: 공개 리그 목록. team-matches.service.ts list()와 동일한 cursor 관례(take: limit+1,
@@ -80,6 +91,8 @@ export class LeagueMatchPublicService {
       // 대회 목록(V1TournamentListItem.sport)이 이미 같은 { code, name } 모양을
       // 쓰고 있어(apps/v1_web/src/types/api.ts) 같은 관례를 그대로 맞춘다.
       sport: { select: { id: true, code: true, name: true } },
+      // `isCompleteLeagueMirror` 가 본다 — 지역이 빈 거울은 깨진 것이다.
+      regionId: true,
       region: { select: { id: true, name: true } },
       // 티어는 목록에서도 필요하다 -- 이 목록은 "자기 수준의 리그를 고르는" 화면이라
       // 상세에 들어가야만 몇 부인지 알 수 있으면 고를 수가 없다(Task 153 시나리오 3).
@@ -113,7 +126,13 @@ export class LeagueMatchPublicService {
 
     return {
       items: pageItems
-        .filter((league) => league.region !== null)
+        // 어드민 목록과 **같은 기준**이다(`isCompleteLeagueMirror`) — 한쪽에만 보이는 리그를
+        // 만들지 않는다. 깨진 거울은 끊지 않고 제외하되 몇 건인지 로그로 남긴다.
+        .filter((league) => {
+          if (isCompleteLeagueMirror(league)) return true;
+          this.logger.warn(`public league list: 통합 축 일정·지역이 빈 리그 ${league.id} 를 제외했다`);
+          return false;
+        })
         .map((league) => ({
         leagueId: league.id,
         title: league.title,

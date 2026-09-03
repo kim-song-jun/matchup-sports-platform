@@ -239,6 +239,27 @@ export const LEAGUE_STATE_BY_STATUS: Record<V1TournamentStatus, V1LeagueState> =
  * **손으로 적지 않고 `LEAGUE_STATE_BY_STATUS` 에서 파생한다.** 두 방향을 따로 적으면
  * 한쪽만 고쳐져 "목록엔 안 보이는데 상세는 열리는" 식으로 어긋난다.
  */
+/**
+ * **리그 목록에 실을 수 있는 거울인가** (Task 164 BE-5).
+ *
+ * `V1Tournament` 에서 `scheduledAt`·`scheduledEndAt`·`regionId` 는 nullable 이지만 리그 거울은
+ * 셋 다 항상 채운다(원본이 non-null 이었다). 비어 있다면 그 행은 깨진 것이다.
+ *
+ * **목록에서는 끊지 않고 제외한다.** 단건 조회는 `LEAGUE_MIRROR_MISSING` 으로 끊는 게 맞지만
+ * (그 리그를 열려는 사람에게 사실을 말해야 한다), 목록에서 같은 판단을 하면 **깨진 행 하나
+ * 때문에 목록 전체가 500** 이 되어 운영자가 다른 리그도 못 본다. 대신 제외하면서 warn 로그와
+ * 개수를 남긴다 — 조용히 사라지면 아무도 모른다.
+ *
+ * 어드민 목록과 공개 목록이 **같은 기준**을 써야 한다(한쪽에만 보이는 리그를 만들지 않는다).
+ */
+export function isCompleteLeagueMirror<T extends {
+  scheduledAt: Date | null;
+  scheduledEndAt: Date | null;
+  regionId: string | null;
+}>(row: T): row is T & { scheduledAt: Date; scheduledEndAt: Date; regionId: string } {
+  return row.scheduledAt !== null && row.scheduledEndAt !== null && row.regionId !== null;
+}
+
 export const STATUSES_BY_LEAGUE_STATE: Record<V1LeagueState, V1TournamentStatus[]> =
   Object.entries(LEAGUE_STATE_BY_STATUS).reduce(
     (acc, [status, state]) => {

@@ -16,7 +16,12 @@ import {
   AdminRegistrationListQueryDto,
   AdminRosterLockDto,
 } from './dto/admin-registration.dto';
-import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
+import {
+  findLeagueAdmissionBlocker,
+  leagueAdmissionBlockerMessage,
+} from '../league-matches/league-team-admission';
+import { capacityLimitOf, isCapacityFull } from './registration-capacity';
+import { ALL_COMPETITION_KINDS, findTournamentOnSurface, LEAGUE_KINDS } from './tournament-surface-lookup';
 
 /** 어드민이 취소 처리할 수 있는 신청 상태 목록. */
 const ADMIN_CANCELLABLE_STATUSES: V1TournamentRegistration['status'][] = [
@@ -66,7 +71,7 @@ export class AdminRegistrationsService {
     const limit = query.limit ?? 20;
 
     // 대회 존재 여부 간단 확인 (deleted 포함 어드민은 볼 수 있어야 함).
-    const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, { where: { id: tournamentId } });
+    const tournament = await findTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, { where: { id: tournamentId } });
     if (!tournament) {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     }
@@ -192,18 +197,57 @@ export class AdminRegistrationsService {
     const result = await this.prisma.$transaction(async (tx) => {
       // AREG-03: confirm 분기에서 정원 초과 여부 확인.
       if (dto.decision === 'confirm') {
-        const confirmedCount = await tx.v1TournamentRegistration.count({
-          where: { tournamentId: registration.tournamentId, status: 'confirmed' },
-        });
-        const tournament = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
+        // 대회를 **먼저** 읽는다 — 상한이 없으면(정규 리그) COUNT 자체를 건너뛴다.
+        const tournament = await findTournamentOnSurface(tx, ALL_COMPETITION_KINDS, {
           where: { id: registration.tournamentId },
-          select: { teamCount: true },
+          select: { teamCount: true, kind: true },
         });
-        if (tournament && confirmedCount >= tournament.teamCount) {
+        const confirmedCount =
+          tournament === null || capacityLimitOf(tournament) === null
+            ? 0
+            : await tx.v1TournamentRegistration.count({
+                where: { tournamentId: registration.tournamentId, status: 'confirmed' },
+              });
+        if (tournament && isCapacityFull(tournament, confirmedCount)) {
           throw new ConflictException({
             code: 'TOURNAMENT_CAPACITY_FULL',
             message: '정원이 모두 찼어요. 더 확정할 수 없어요.',
           });
+        }
+      }
+
+      // 리그 확정은 **리그 축 로스터도 만든다** (D7, contract 전까지 역방향 dual-write).
+      //
+      // 리그 순위·대진·승강은 전부 `V1LeagueTeam` 을 읽는다 — 통합 축 등록만 `confirmed` 로
+      // 두면 운영자 화면엔 "확정" 이 뜨는데 **그 팀은 순위표에도 대진 생성 대상에도 없다.**
+      // 에러가 아니라 조용한 누락이라 대진을 짜고 나서야 드러난다.
+      //
+      // 판정은 `findLeagueAdmissionBlocker` 를 지난다 — 어드민 `addTeam` 과 같은 함수다.
+      // 신청 시점에 통과했어도 확정까지 사이에 팀이 해체되거나 형제 티어에 들어갈 수
+      // 있으므로 **여기서 다시** 본다.
+      if (dto.decision === 'confirm') {
+        const leagueMirror = await findTournamentOnSurface(tx, LEAGUE_KINDS, {
+          where: { id: registration.tournamentId },
+          select: { id: true },
+        });
+        if (leagueMirror !== null) {
+          const blocker = await findLeagueAdmissionBlocker(tx, {
+            leagueId: registration.tournamentId,
+            teamId: registration.teamId,
+          });
+          // 이미 로스터에 있으면 통과시킨다 — 백필로 들어온 팀이나 어드민이 손으로 넣은
+          // 팀의 신청을 확정하는 것은 정상이고, 그때 막으면 확정 자체가 불가능해진다.
+          if (blocker !== null && blocker.kind !== 'ALREADY_IN_LEAGUE') {
+            throw new ConflictException({
+              code: 'LEAGUE_TEAM_INVALID',
+              message: leagueAdmissionBlockerMessage(blocker),
+            });
+          }
+          if (blocker === null) {
+            await tx.v1LeagueTeam.create({
+              data: { leagueId: registration.tournamentId, teamId: registration.teamId },
+            });
+          }
         }
       }
 
@@ -337,21 +381,24 @@ export class AdminRegistrationsService {
       // FOR UPDATE로 대회 row를 잠가 두 관리자가 동시에 마지막 자리를 처리해도 안전하게 만든다.
       if (CAPACITY_HOLD_STATUSES.includes(restoredStatus)) {
         await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${registration.tournamentId} FOR UPDATE`;
-        const tournament = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
+        const tournament = await findTournamentOnSurface(tx, ALL_COMPETITION_KINDS, {
           where: { id: registration.tournamentId, deletedAt: null },
-          select: { teamCount: true },
+          select: { teamCount: true, kind: true },
         });
         if (!tournament) {
           throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
         }
-        const reservedCount = await tx.v1TournamentRegistration.count({
-          where: {
-            tournamentId: registration.tournamentId,
-            id: { not: registrationId },
-            status: { in: CAPACITY_HOLD_STATUSES },
-          },
-        });
-        if (reservedCount >= tournament.teamCount) {
+        const reservedCount =
+          capacityLimitOf(tournament) === null
+            ? 0
+            : await tx.v1TournamentRegistration.count({
+                where: {
+                  tournamentId: registration.tournamentId,
+                  id: { not: registrationId },
+                  status: { in: CAPACITY_HOLD_STATUSES },
+                },
+              });
+        if (isCapacityFull(tournament, reservedCount)) {
           throw new ConflictException({
             code: 'TOURNAMENT_CAPACITY_FULL',
             message: '정원이 가득 차 취소 요청을 잔류 처리할 수 없어요.',
@@ -413,7 +460,7 @@ export class AdminRegistrationsService {
         });
       }
 
-      const tournament = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
+      const tournament = await findTournamentOnSurface(tx, ALL_COMPETITION_KINDS, {
         where: { id: registration.tournamentId },
         select: {
           genderCategory: true,

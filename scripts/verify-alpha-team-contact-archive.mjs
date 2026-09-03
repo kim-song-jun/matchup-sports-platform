@@ -30,7 +30,8 @@ const teamB = process.env.ALPHA_TEAM_B_ID;
 async function login(email, password) {
   const res = await fetch(`${BASE}/api/v1/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email, password }) });
   if (!res.ok) throw new Error(`login failed ${res.status}`);
-  const token = (res.headers.getSetCookie?.() ?? []).map((c) => c.match(/teameet_v1_session=([^;]+)/)?.[1]).find(Boolean);
+  const cookies = res.headers.getSetCookie?.() ?? [res.headers.get('set-cookie') ?? ''];
+  const token = cookies.map((c) => c.match(/teameet_v1_session=([^;]+)/)?.[1]).find(Boolean);
   if (!token) throw new Error('세션 쿠키를 못 받았다');
   return token;
 }
@@ -109,7 +110,8 @@ for (const vp of VIEWPORTS) {
   const resp = await page.goto(`${BASE}/chat?category=team_contact`, { waitUntil: 'domcontentloaded', timeout: 45_000 });
   await page.waitForTimeout(3000);
   await page.screenshot({ path: path.join(OUT, `list-before-${vp.key}.png`) });
-  const toggle = page.getByRole('button', { name: '종료된 컨택 보기' }).locator('visible=true').first();
+  // getByRole 은 숨겨진 요소(모바일에서 감춰진 데스크톱 사본 등)를 기본으로 제외한다.
+  const toggle = page.getByRole('button', { name: '종료된 컨택 보기' }).first();
   const hasToggle = (await toggle.count()) > 0;
   if (hasToggle) await toggle.click();
   await page.waitForTimeout(2500);

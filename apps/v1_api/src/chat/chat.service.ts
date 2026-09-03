@@ -60,12 +60,15 @@ export class ChatService {
   async rooms(user: V1AuthUser, query: ChatRoomsQueryDto) {
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
     // 컨택 만료는 lazy-flip 이라 아무도 건드리지 않은 방은 requested 인 채로 목록에 남는다.
-    // 내가 참여한 컨택 방에 한해 만료를 반영하고 끝난 방을 보관한 뒤 읽는다(스펙 §3.5 세 경로 + 이곳).
-    await this.prisma.v1TeamContact.updateMany({
-      where: { status: 'requested', expiresAt: { lt: new Date() }, chatRoom: { participants: { some: { userId: user.id } } } },
-      data: { status: 'expired' },
-    });
-    await archiveEndedContactRooms(this.prisma, { chatRoom: { participants: { some: { userId: user.id } } } });
+    // 컨택 방이 섞여 나오는 조회(전체 또는 team_contact)에서만, 내가 참여한 컨택 방에 한해 만료를
+    // 반영하고 끝난 방을 보관한 뒤 읽는다(스펙 §3.5 세 경로 + 이곳). 다른 roomType 필터엔 쓰기 없음.
+    if (!query.roomType || query.roomType === 'team_contact') {
+      await this.prisma.v1TeamContact.updateMany({
+        where: { status: 'requested', expiresAt: { lt: new Date() }, chatRoom: { participants: { some: { userId: user.id } } } },
+        data: { status: 'expired' },
+      });
+      await archiveEndedContactRooms(this.prisma, { chatRoom: { participants: { some: { userId: user.id } } } });
+    }
     const rooms = await this.prisma.v1ChatRoom.findMany({
       where: {
         status: query.status ?? 'active',

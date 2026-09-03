@@ -191,6 +191,15 @@ describe('ChatService — team_contact', () => {
     expect(order[1]).toBeLessThan(order[2]);
   });
 
+  it('컨택이 섞이지 않는 roomType 조회(match)에서는 정리 쓰기를 하지 않는다', async () => {
+    prisma.v1ChatRoom.findMany.mockResolvedValue([]);
+
+    await service.rooms(userU1, { roomType: 'match' });
+
+    expect(prisma.v1TeamContact.updateMany).not.toHaveBeenCalled();
+    expect(prisma.v1ChatRoom.updateMany).not.toHaveBeenCalled();
+  });
+
   it('받는 팀 운영진이면 mySide 가 to 다', async () => {
     prisma.v1ChatRoom.findMany.mockResolvedValue([makeRoom('requested', undefined, [{ id: 'm-to' }])]);
 

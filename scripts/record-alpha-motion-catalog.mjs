@@ -74,9 +74,17 @@ function parseArgs(argv) {
   const out = { viewport: 'mobile', flows: FLOW_IDS.slice(), out: DEFAULT_OUT, slow: false, reduced: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (a === '--viewport') out.viewport = argv[++i];
-    else if (a === '--flows') out.flows = argv[++i].split(',').map((s) => s.trim()).filter(Boolean);
-    else if (a === '--out') out.out = argv[++i];
+    // 값을 받는 옵션은 다음 토큰이 없거나 또 다른 옵션이면 즉시 실패 — argv[++i] 가 undefined 인 채로
+    // .split 을 부르면 TypeError 로 원인이 가려진다(Copilot).
+    const value = () => {
+      const v = argv[i + 1];
+      if (v === undefined || v.startsWith('--')) throw new Error(`${a} 에 값이 없습니다`);
+      i += 1;
+      return v;
+    };
+    if (a === '--viewport') out.viewport = value();
+    else if (a === '--flows') out.flows = value().split(',').map((s) => s.trim()).filter(Boolean);
+    else if (a === '--out') out.out = value();
     else if (a === '--slow') out.slow = true;
     else if (a === '--reduced') out.reduced = true;
     else throw new Error(`알 수 없는 인자: ${a}`);
@@ -632,14 +640,14 @@ async function main() {
           const gifWidth = opts.viewport === 'desktop' ? 720 : 390;
           await ffmpegGif(finalVideoPath, gifPath, gifWidth);
         } catch (e) {
-          ffmpegNotes.push(`GIF 생성 실패: ${e.message}`);
+          ffmpegNotes.push(`GIF 생성 실패: ${errorMessage(e)}`);
         }
         if (flowResult?.transitionCenterSec != null) {
           try {
             const sheetWidth = opts.viewport === 'desktop' ? 480 : 260;
             await ffmpegContactSheet(finalVideoPath, sheetPath, flowResult.transitionCenterSec, sheetWidth);
           } catch (e) {
-            ffmpegNotes.push(`컨택트시트 생성 실패: ${e.message}`);
+            ffmpegNotes.push(`컨택트시트 생성 실패: ${errorMessage(e)}`);
           }
         } else if (status === 'ok') {
           ffmpegNotes.push('전환 시각(transitionCenterSec) 미기록 — 컨택트시트 생략');

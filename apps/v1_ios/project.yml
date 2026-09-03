@@ -110,6 +110,7 @@ targets:
       - path: Teameet/WebShell/WebShellSession.swift
       - path: Teameet/WebShell/WebShellSessionStore.swift
       - path: Teameet/WebShell/SafeAreaBridge.swift
+      - path: Teameet/WebShell/ShellMotionPolicy.swift
       - path: Teameet/WebShell/ViewportLock.swift
       - path: Teameet/WebShell/NativeBridgeMessage.swift
       - path: Teameet/WebShell/ChromeColour.swift

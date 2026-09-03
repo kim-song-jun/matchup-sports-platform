@@ -113,18 +113,18 @@ def main() -> None:
         written[str(size)] = {"bytes": target.stat().st_size}
 
     manifest_path = out_dir / "manifest.json"
-    manifest = json.loads(manifest_path.read_text()) if manifest_path.exists() else {"illustrations": []}
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8")) if manifest_path.exists() else {"illustrations": []}
     entry = {
         "name": args.name,
         "message": args.message,
-        "prompt": prompt_path.read_text().strip(),
+        "prompt": prompt_path.read_text(encoding="utf-8").strip(),
         "source_sha256": hashlib.sha256(src.read_bytes()).hexdigest(),
         "sizes": written,
         "created_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
     manifest["illustrations"] = [e for e in manifest["illustrations"] if e["name"] != args.name] + [entry]
     manifest["illustrations"].sort(key=lambda e: e["name"])
-    manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n")
+    manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
     print(f"OK coverage={coverage:.0%} bbox={bbox}")
     for size, meta in written.items():

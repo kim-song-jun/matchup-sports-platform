@@ -153,7 +153,6 @@ describe('콘솔의 라인업 읽기 — 리그 경기', () => {
     await prisma.v1TeamMatch.deleteMany({ where: { leagueId: ids.league } });
     await prisma.v1TournamentRegistration.deleteMany({ where: { tournamentId: ids.league } });
     await prisma.v1Tournament.deleteMany({ where: { id: ids.league } });
-    await prisma.v1Tournament.deleteMany({ where: { id: ids.league } });
     await prisma.v1TeamMembership.deleteMany({ where: { userId: ids.ownerUser } });
     await prisma.v1Team.deleteMany({ where: { sportId: ids.sport } });
     await prisma.v1AdminActionLog.deleteMany({ where: { adminUser: { userId: ids.adminUser } } });

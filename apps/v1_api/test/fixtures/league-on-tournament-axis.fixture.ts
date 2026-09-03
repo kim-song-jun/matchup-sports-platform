@@ -64,7 +64,11 @@ export async function seedLeagueOnTournamentAxis(
       ? {}
       : { createdByAdminUserId: input.createdByAdminUserId }),
   };
-  await prisma.v1Tournament.upsert({ where: { id }, update: data, create: data });
+  // `update` 에서 `createdAt` 을 뺀다 — 재사용 때 생성 시각이 밀리면 **목록 정렬과 대진 생성
+  // 순서가 달라진다**(그 두 곳이 createdAt 에 의존한다). 픽스처가 그 값을 흔들면 스펙이
+  // 재는 순서가 실행마다 바뀐다.
+  const { createdAt: _createdAtOnCreateOnly, ...updatable } = data;
+  await prisma.v1Tournament.upsert({ where: { id }, update: updatable, create: data });
 
   for (const teamId of input.teamIds ?? []) {
     await prisma.v1TournamentRegistration.upsert({

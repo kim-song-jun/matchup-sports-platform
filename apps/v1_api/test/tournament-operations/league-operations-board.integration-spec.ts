@@ -172,7 +172,6 @@ describe('운영 콘솔 목록 — 정규 리그', () => {
     await prisma.v1TournamentRegistration.deleteMany({ where: { tournamentId: ids.league } });
     await prisma.v1TournamentRegistration.deleteMany({ where: { tournamentId: ids.league } });
     await prisma.v1Tournament.deleteMany({ where: { id: ids.league } });
-    await prisma.v1Tournament.deleteMany({ where: { id: ids.league } });
     await prisma.v1Team.deleteMany({ where: { sportId: ids.sport } });
     await prisma.v1AdminUser.deleteMany({ where: { userId: ids.adminUser } });
     await prisma.v1User.deleteMany({ where: { id: { startsWith: 'b7000000' } } });

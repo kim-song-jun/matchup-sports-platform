@@ -162,9 +162,23 @@ export class LeagueSeriesAdminService {
       include: {
         sport: { select: { id: true, name: true } },
         region: { select: { id: true, name: true } },
-        _count: { select: { leagues: true } },
       },
     });
+    // BE-5 drop: `V1LeagueSeries.leagues` relation 이 사라져 `_count.leagues` 를 쓸 수 없다.
+    // 리그는 통합 축에 있으므로 `seriesId` 로 **따로 센다**(시리즈 수만큼 왕복하지 않도록
+    // groupBy 한 번).
+    const leagueCounts = await this.prisma.v1Tournament.groupBy({
+      by: ['seriesId'],
+      where: {
+        kind: 'regular_league',
+        deletedAt: null,
+        seriesId: { in: rows.map((row) => row.id) },
+      },
+      _count: { _all: true },
+    });
+    const leagueCountBySeriesId = new Map(
+      leagueCounts.flatMap((row) => (row.seriesId === null ? [] : [[row.seriesId, row._count._all]])),
+    );
     // 목록 응답은 배열이 아니라 { items } 로 감싼다 — 이 저장소의 다른 어드민 목록 API
     // (admin/league-matches 등)와 같은 형태이고, 프론트 훅도 data.items 를 읽는다.
     // 배열을 그대로 돌려주면 타입은 통과하지만(제네릭은 런타임을 검증하지 않는다) 화면은
@@ -174,7 +188,7 @@ export class LeagueSeriesAdminService {
         ...this.serializeSeries(row),
         sport: row.sport,
         region: row.region,
-        leagueCount: row._count.leagues,
+        leagueCount: leagueCountBySeriesId.get(row.id) ?? 0,
       })),
     };
   }

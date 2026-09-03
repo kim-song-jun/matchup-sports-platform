@@ -112,7 +112,6 @@ describe('리그 참가 신청 — 대회 스택 재사용', () => {
     await prisma.v1TournamentRegistration.deleteMany({ where: { tournamentId: leagueId } });
     await prisma.v1TournamentRegistration.deleteMany({ where: { tournamentId: leagueId } });
     await prisma.v1Tournament.deleteMany({ where: { id: leagueId } });
-    await prisma.v1Tournament.deleteMany({ where: { id: leagueId } });
     await prisma.v1TeamMembership.deleteMany({ where: { userId: { startsWith: 'a4000000' } } });
     await prisma.v1Team.deleteMany({ where: { sportId: ids.sportId } });
     await prisma.v1Sport.deleteMany({ where: { id: ids.sportId } });

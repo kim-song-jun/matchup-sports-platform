@@ -4508,6 +4508,25 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   justify-content: center;
 }
 
+/*
+ * 아이콘 원 대신 들어가는 3D 그래픽(agy-3d-graphic 스킬 산출물, 투명 webp). 크기는 여기
+ * 한 곳에서만 정한다 — 화면마다 다르면 빈 상태 사이의 리듬이 깨진다. 그래픽은 원본 안에
+ * 6% 여백을 이미 갖고 있어 별도 배경판을 깔지 않는다(다크모드에서 흰 판이 뜨는 원인).
+ */
+.tm-empty-illustration {
+  width: 160px;
+  height: 160px;
+  object-fit: contain;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 360px) {
+  .tm-empty-illustration {
+    width: 136px;
+    height: 136px;
+  }
+}
+
 @media (max-width: 360px) {
   :root {
     --v1-shell-page-x: 16px;

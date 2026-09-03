@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import type { CSSProperties, InputHTMLAttributes, PointerEvent, ReactNode, TextareaHTMLAttributes } from 'react';
 import { useRef } from 'react';
@@ -407,14 +408,32 @@ type EmptyStateProps = {
    * 카드·탭 안에 다른 내용과 섞여 나오는 빈 상태에는 쓰지 않는다.
    */
   fill?: boolean;
+  /**
+   * `agy-3d-graphic` 스킬로 만든 그래픽(`public/illustrations/<name>-640.webp`)을 아이콘 원
+   * 대신 보여준다. 그래픽은 장식이라 alt 없이 aria-hidden — 의미는 title/sub 가 전달한다.
+   * 표시 크기는 `.tm-empty-illustration`(globals.css) 한 곳에서 정한다.
+   */
+  illustration?: { name: string };
 };
 
-export function EmptyState({ title, sub, cta, onCta, icon, fill }: EmptyStateProps) {
+export function EmptyState({ title, sub, cta, onCta, icon, fill, illustration }: EmptyStateProps) {
   return (
     <div className={`tm-empty-state${fill ? ' tm-empty-state-fill' : ''}`}>
-      <div className="tm-empty-icon" aria-hidden="true">
-        {icon ?? <InboxIcon size={36} strokeWidth={1.5} />}
-      </div>
+      {illustration ? (
+        <Image
+          className="tm-empty-illustration"
+          src={`/illustrations/${illustration.name}-640.webp`}
+          alt=""
+          aria-hidden="true"
+          width={640}
+          height={640}
+          sizes="(max-width: 360px) 136px, 160px"
+        />
+      ) : (
+        <div className="tm-empty-icon" aria-hidden="true">
+          {icon ?? <InboxIcon size={36} strokeWidth={1.5} />}
+        </div>
+      )}
       <div className="tm-text-body-lg">{title}</div>
       <div className="tm-text-label" style={{ color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.5 }}>
         {sub}

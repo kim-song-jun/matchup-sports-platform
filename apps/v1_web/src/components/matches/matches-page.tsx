@@ -692,7 +692,7 @@ function SportSelector({ sports }: { sports: MatchListViewModel['sports'] }) {
 
 function MatchCardItem({ match }: { match: MatchCardModel }) {
   return (
-    <Link className="tm-match-list-card tm-pressable" href={`/matches/${match.id}`}>
+    <Link className="tm-match-list-card tm-card-interactive tm-pressable" href={`/matches/${match.id}`}>
       <div className="tm-match-list-media" style={{ backgroundImage: cssUrl(match.image) }}>
         <span className="tm-badge tm-badge-blue">{match.sport}</span>
         {/* [P1 숫자:단위 2:1 + tabular-nums] 현재/최대 인원 — 숫자(body-lg weight600) : 단위(caption) 2:1 */}

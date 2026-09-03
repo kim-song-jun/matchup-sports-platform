@@ -2665,6 +2665,9 @@ label.tm-btn:focus-within {
 }
 
 .tm-match-detail-hero-sport {
+  /* 히어로는 flex 가 아니라 block — 유일한 흐름 자식인 오버레이가 flex item 이 되면 내용 폭으로
+     줄어 그라디언트가 히어로 전폭을 못 덮는다(Copilot 리뷰). 그래픽은 absolute 라 영향 없음. */
+  display: block;
   position: relative;
 }
 

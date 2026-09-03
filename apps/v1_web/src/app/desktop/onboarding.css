@@ -61,6 +61,12 @@
      * (see _shell.css) — keep margins horizontal-only so the wizard card centers. */
     margin-block: 0;
   }
+
+  /* 2단 스테이지(auth.css §11)에서는 오른쪽 카드가 위저드 폭(560px)을 가진다. */
+  .tm-auth-frame.tm-onboarding-frame.tm-auth-frame-staged {
+    width: min(100%, 1160px);
+    grid-template-columns: minmax(0, 1fr) 560px;
+  }
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -258,7 +264,7 @@
     padding: 20px 36px 32px;
   }
 
-  .tm-onboarding-frame .tm-onboarding-desktop-nav {
+  .tm-onboarding-frame:not(.tm-auth-frame-staged) .tm-onboarding-desktop-nav {
     padding: 24px 36px 0;
   }
 }

@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Card } from '@/components/v1-ui/primitives';
@@ -9,12 +10,11 @@ import type { AuthAction, AuthExceptionViewModel, LoginProvider, LoginViewModel,
 
 export function LoginPageView({ model }: { model: LoginViewModel }) {
   const card = (
-    <AuthFrame>
+    <AuthFrame stage={AUTH_WELCOME_STAGE}>
       <div className="tm-auth-login">
         <div>
-          <div className="tm-auth-logo" style={{ background: 'var(--surface)', boxShadow: 'inset 0 0 0 1px var(--grey200)' }}>
-            <BrandMark size={42} alt="Teameet" />
-          </div>
+          {/* 데스크톱(≥1024)에서는 같은 그래픽이 왼쪽 스테이지에 크게 놓이므로 카드 안의 것은 숨긴다. */}
+          <AuthIllustration name={AUTH_WELCOME_STAGE.illustration} className="tm-hide-desktop" />
           <h1 className="tm-text-heading tm-auth-title">{model.heroTitle}</h1>
           <p className="tm-text-body tm-auth-sub">{model.heroSub}</p>
           <ul className="tm-auth-features">
@@ -70,15 +70,14 @@ export function LoginPageView({ model }: { model: LoginViewModel }) {
 
 export function AuthExceptionPageView({ model }: { model: AuthExceptionViewModel }) {
   return (
-    <AuthFrame topTitle="로그인 확인" backHref={model.backHref} fixedAction={<ExceptionActions model={model} />}>
+    <AuthFrame topTitle="로그인 확인" backHref={model.backHref} fixedAction={<ExceptionActions model={model} />} stage={AUTH_NOTICE_STAGE}>
       <div className="tm-auth-exception">
+        {/* 그래픽 → 배지 → 타이틀 → 본문. 예전의 "안내" 카드(7종 모두 같은 문구)는 자리 채우기였다 —
+            안심 문구는 스테이지 sub 로 옮기고, 그래픽이 "막힌 게 아니라 다른 길이 있다"는 메시지를 맡는다. */}
+        <AuthIllustration name={AUTH_NOTICE_STAGE.illustration} className="tm-hide-desktop" />
         <span className={`tm-badge ${model.tone === 'red' ? 'tm-badge-red' : 'tm-badge-orange'}`}>{model.badge}</span>
         <h1 className="tm-text-heading tm-auth-heading">{model.title}</h1>
         <p className="tm-text-body tm-auth-sub">{model.body}</p>
-        <Card pad={16} className={`tm-auth-exception-card tm-auth-exception-card-${model.tone}`}>
-          <div className="tm-text-label">안내</div>
-          <div className="tm-text-caption">입력하신 정보는 안전하게 유지돼요. 다시 시도해 주세요.</div>
-        </Card>
       </div>
     </AuthFrame>
   );
@@ -86,10 +85,10 @@ export function AuthExceptionPageView({ model }: { model: AuthExceptionViewModel
 
 export function SignupCompletePageView({ model }: { model: SignupCompleteViewModel }) {
   return (
-    <AuthFrame fixedAction={<SignupActions primary={model.primary} secondary={model.secondary} />}>
+    <AuthFrame fixedAction={<SignupActions primary={model.primary} secondary={model.secondary} />} stage={JOURNEY_DONE_STAGE}>
       <div className="tm-auth-complete">
-        {/* P2 마이크로인터랙션: .tm-complete-check 키프레임으로 완료 피드백 (globals.css 제공) */}
-        <div className="tm-auth-complete-icon tm-complete-check"><CheckMark checked /></div>
+        {/* 완료 순간의 그래픽(트로피). .tm-complete-check 키프레임은 그대로 살려 등장 피드백으로 쓴다. */}
+        <AuthIllustration name={JOURNEY_DONE_STAGE.illustration} className="tm-hide-desktop tm-complete-check" />
         <h1 className="tm-text-heading tm-auth-heading">{model.title}</h1>
         <p className="tm-text-body tm-auth-sub">{model.sub}</p>
         <div className="tm-auth-stack">
@@ -108,7 +107,59 @@ export function SignupCompletePageView({ model }: { model: SignupCompleteViewMod
   );
 }
 
-export function AuthFrame({ children, topTitle, backHref, onBack, backLabel, skipHref, fixedAction, className }: {
+/**
+ * 데스크톱(≥1024) 왼쪽 스테이지에 놓이는 문험(화면군) 단위 메시지 + 그래픽.
+ * 같은 문험은 같은 스테이지를 쓴다 — 화면마다 다른 그림을 만들지 않는다(agy-3d-graphic 스킬).
+ */
+export type AuthStage = {
+  eyebrow: string;
+  slogan: string;
+  sub: string;
+  /** public/illustrations/<name>-640.webp */
+  illustration: string;
+};
+
+export const AUTH_WELCOME_STAGE: AuthStage = {
+  eyebrow: 'Teameet',
+  slogan: '같이 뛸 사람이\n기다리고 있어요',
+  sub: '종목·실력·지역만 알려주면 딱 맞는 매치와 팀을 찾아드려요.',
+  illustration: 'auth-welcome',
+};
+
+export const AUTH_NOTICE_STAGE: AuthStage = {
+  eyebrow: '로그인 확인',
+  slogan: '다른 방법으로\n계속할 수 있어요',
+  sub: '입력하신 정보는 안전하게 유지돼요. 아래 안내를 따라 다시 시도해 주세요.',
+  illustration: 'auth-notice',
+};
+
+export const JOURNEY_DONE_STAGE: AuthStage = {
+  eyebrow: '준비 완료',
+  slogan: '이제 경기장으로\n나갈 차례예요',
+  sub: '설정은 언제든 마이 탭에서 바꿀 수 있어요.',
+  illustration: 'journey-done',
+};
+
+/**
+ * 인증·온보딩 화면의 그래픽 슬롯. 크기는 `.tm-auth-illustration`(globals.css) 한 곳에서 정한다 —
+ * 모바일 160px(≤360 은 136px), 데스크톱 스테이지에서는 `.tm-auth-stage-illustration` 이 280px 로 키운다.
+ * 장식이라 alt 없이 aria-hidden.
+ */
+export function AuthIllustration({ name, className }: { name: string; className?: string }) {
+  return (
+    <Image
+      className={`tm-auth-illustration${className ? ` ${className}` : ''}`}
+      src={`/illustrations/${name}-640.webp`}
+      alt=""
+      aria-hidden="true"
+      width={640}
+      height={640}
+      sizes="(min-width: 1024px) 280px, (max-width: 360px) 136px, 160px"
+    />
+  );
+}
+
+export function AuthFrame({ children, topTitle, backHref, onBack, backLabel, skipHref, fixedAction, className, stage }: {
   children: ReactNode;
   topTitle?: string;
   backHref?: string;
@@ -122,24 +173,26 @@ export function AuthFrame({ children, topTitle, backHref, onBack, backLabel, ski
   skipHref?: string;
   fixedAction?: ReactNode;
   className?: string;
+  /**
+   * 있으면 데스크톱(≥1024)에서 왼쪽 스테이지(슬로건·그래픽) + 오른쪽 카드의 2단으로 놓인다.
+   * 없으면 예전대로 가운데 폰 폭 카드 하나(약관·계정 삭제 안내 등 문험이 정해지지 않은 화면).
+   * 모바일에는 아무 영향이 없다 — 스테이지는 CSS 로 숨긴다.
+   */
+  stage?: AuthStage;
 }) {
   const hasBack = Boolean(backHref || onBack);
   return (
-    <div className={`tm-auth-frame${className ? ` ${className}` : ''}`}>
-      {topTitle || hasBack || skipHref ? (
-        <header className="tm-auth-topbar">
-          <div className="tm-auth-topbar-left">
-            {backHref ? (
-              <Link className="tm-btn tm-btn-icon tm-btn-ghost" href={backHref} aria-label={backLabel ?? '뒤로가기'}>
-                <ChevronLeftIcon size={22} strokeWidth={2.2} />
-              </Link>
-            ) : onBack ? (
-              <AuthBackButton className="tm-btn tm-btn-icon tm-btn-ghost" label={backLabel ?? '뒤로가기'} onClick={onBack} />
-            ) : null}
-            {topTitle ? <div className="tm-text-body-lg">{topTitle}</div> : null}
+    <div className={`tm-auth-frame${className ? ` ${className}` : ''}${stage ? ' tm-auth-frame-staged' : ''}`}>
+      {stage ? (
+        <aside className="tm-auth-stage tm-show-desktop">
+          <div className="tm-auth-stage-brand"><BrandMark size={28} alt="" /><span>teameet</span></div>
+          <div className="tm-auth-stage-eyebrow tm-text-label">{stage.eyebrow}</div>
+          <div className="tm-auth-stage-slogan">{stage.slogan}</div>
+          <p className="tm-auth-stage-sub tm-text-body">{stage.sub}</p>
+          <div className="tm-auth-stage-well">
+            <AuthIllustration name={stage.illustration} className="tm-auth-stage-illustration" />
           </div>
-          {skipHref ? <Link className="tm-btn tm-btn-sm tm-btn-ghost" href={skipHref}>건너뛰기</Link> : null}
-        </header>
+        </aside>
       ) : null}
       {/* 데스크톱(≥1024)에서는 desktop/auth.css 가 .tm-auth-topbar 를 통째로 숨긴다. 상단바에만
           뒤로가기를 두면 그 폭에서는 화면을 빠져나갈 컨트롤이 아예 사라지므로(로그인·약관·
@@ -158,10 +211,27 @@ export function AuthFrame({ children, topTitle, backHref, onBack, backLabel, ski
           {topTitle ? <span className="tm-onboarding-desktop-nav-title">{topTitle}</span> : null}
         </div>
       ) : null}
+      <div className="tm-auth-card">
+      {topTitle || hasBack || skipHref ? (
+        <header className="tm-auth-topbar">
+          <div className="tm-auth-topbar-left">
+            {backHref ? (
+              <Link className="tm-btn tm-btn-icon tm-btn-ghost" href={backHref} aria-label={backLabel ?? '뒤로가기'}>
+                <ChevronLeftIcon size={22} strokeWidth={2.2} />
+              </Link>
+            ) : onBack ? (
+              <AuthBackButton className="tm-btn tm-btn-icon tm-btn-ghost" label={backLabel ?? '뒤로가기'} onClick={onBack} />
+            ) : null}
+            {topTitle ? <div className="tm-text-body-lg">{topTitle}</div> : null}
+          </div>
+          {skipHref ? <Link className="tm-btn tm-btn-sm tm-btn-ghost" href={skipHref}>건너뛰기</Link> : null}
+        </header>
+      ) : null}
       <main className={`tm-auth-scroll ${fixedAction ? 'tm-auth-scroll-with-cta' : ''} ${topTitle || hasBack || skipHref ? '' : 'tm-auth-scroll-full'}`}>
         {children}
       </main>
       {fixedAction ? <div className="tm-auth-fixed-cta">{fixedAction}</div> : null}
+      </div>
     </div>
   );
 }

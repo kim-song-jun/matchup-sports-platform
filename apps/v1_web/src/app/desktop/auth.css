@@ -164,7 +164,7 @@
 @media (min-width: 1024px) {
   .tm-auth-exception {
     min-height: auto;
-    padding: 48px 28px 36px;
+    padding: 40px 32px 24px;
     justify-content: flex-start;
   }
 }
@@ -177,15 +177,8 @@
 @media (min-width: 1024px) {
   .tm-auth-complete {
     min-height: auto;
-    padding: 48px 28px 36px;
+    padding: 40px 32px 24px;
     justify-content: flex-start;
-  }
-
-  .tm-auth-complete-icon {
-    width: 64px;
-    height: 64px;
-    border-radius: var(--radius-hero);
-    margin-bottom: 20px;
   }
 }
 
@@ -246,5 +239,132 @@
 
   .tm-auth-option-card {
     min-height: 80px;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 11. Staged frame (.tm-auth-frame-staged) — 2단 레이아웃 (2026-09-04 사용자 결정 B안).
+ *     stage prop 이 있는 화면(로그인·이메일 로그인·회원가입·인증 안내·온보딩·완료)은
+ *     1024 이상에서 왼쪽 스테이지(브랜드 · 문험 슬로건 · 그래픽 280px) + 오른쪽 카드(폼·CTA).
+ *     "데스크톱 = 가운데 폰 카드" 원칙은 stage 가 없는 화면(약관·계정 삭제 안내)에만 남는다.
+ *
+ *     배치 규칙(감사에서 지적된 "그래픽 자리·버튼 위치"):
+ *     - 그래픽은 스테이지 안 틴트 웰(4:3, 최대 400px) 중앙에 280px. 카드 안에는 그리지 않는다.
+ *     - 액션 버튼은 카드 하단 sticky 영역(.tm-auth-fixed-cta) 한 곳. 스테이지에는 버튼을 두지 않는다.
+ *     - 뒤로가기는 프레임 좌상단 한 개(AuthFrame 의 in-card nav 를 absolute 로 끌어올린다).
+ * ───────────────────────────────────────────────────────────────────────────── */
+@media (min-width: 1024px) {
+  .tm-auth-frame.tm-auth-frame-staged {
+    position: relative;
+    width: min(100%, 1040px);
+    min-height: auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 440px;
+    column-gap: 64px;
+    align-items: center;
+    padding: 72px 24px 24px;
+    background: transparent;
+    box-shadow: none;
+    border-radius: 0;
+  }
+
+  :root.dark .tm-auth-frame.tm-auth-frame-staged {
+    border: 0;
+  }
+
+  .tm-auth-frame-staged .tm-onboarding-desktop-nav {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    padding: 0;
+  }
+
+  .tm-auth-frame-staged .tm-auth-card {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    background: var(--bg);
+    border-radius: var(--radius-container);
+    box-shadow: var(--shadow-dropdown);
+    overflow: hidden;
+  }
+
+  :root.dark .tm-auth-frame-staged .tm-auth-card {
+    border: 1px solid var(--border);
+  }
+
+  .tm-auth-stage {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    max-width: 460px;
+  }
+
+  .tm-auth-stage-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: var(--blue600);
+    margin-bottom: 28px;
+  }
+
+  .tm-auth-stage-eyebrow {
+    color: var(--blue700);
+    font-weight: 600;
+  }
+
+  .tm-auth-stage-slogan {
+    margin-top: 8px;
+    font-size: 32px;
+    font-weight: 800;
+    line-height: 1.25;
+    letter-spacing: -0.02em;
+    white-space: pre-line;
+    text-wrap: balance;
+  }
+
+  .tm-auth-stage-sub {
+    margin: 12px 0 0;
+    color: var(--text-muted);
+    max-width: 40ch;
+    line-height: 1.55;
+  }
+
+  .tm-auth-stage-well {
+    margin-top: 28px;
+    width: 100%;
+    max-width: 400px;
+    aspect-ratio: 4 / 3;
+    border-radius: var(--radius-hero);
+    background: var(--tint-blue);
+    display: grid;
+    place-items: center;
+  }
+
+  .tm-auth-illustration.tm-auth-stage-illustration {
+    width: 280px;
+    height: 280px;
+    margin: 0;
+  }
+
+  /* 카드 안 로그인 블록: 스테이지가 슬로건을 맡으므로 카드는 위에서부터 자연 높이로 쌓는다. */
+  .tm-auth-frame-staged .tm-auth-login {
+    flex: none;
+    padding: 40px 32px 32px;
+    justify-content: flex-start;
+  }
+}
+
+@media (min-width: 1440px) {
+  .tm-auth-frame.tm-auth-frame-staged {
+    grid-template-columns: minmax(0, 1fr) 460px;
+    column-gap: 96px;
+  }
+
+  .tm-auth-stage-slogan {
+    font-size: 36px;
   }
 }

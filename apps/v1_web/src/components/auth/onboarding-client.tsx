@@ -2,9 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
-import { ChevronLeftIcon } from '@/components/v1-ui/icons';
 import { SportGlyph } from '@/components/v1-ui/sport-glyph';
 import { trackEvent } from '@/lib/analytics';
 import { onboardingStepLabel } from '@/lib/v1-status-labels';
@@ -20,7 +18,7 @@ import {
   useV1SaveOnboardingPreferences,
 } from '@/hooks/use-v1-api';
 import type { V1OnboardingPreferencePayload, V1OnboardingStep, V1Region } from '@/types/api';
-import { AuthFrame } from './auth-page';
+import { AUTH_WELCOME_STAGE, AuthFrame, AuthIllustration, JOURNEY_DONE_STAGE } from './auth-page';
 
 type OnboardingRouteStep = 'resume' | Extract<V1OnboardingStep, 'sport' | 'level' | 'region' | 'confirm'>;
 
@@ -322,17 +320,11 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
       backHref={backHref}
       fixedAction={fixedAction}
       className="tm-onboarding-frame"
+      /* 1~3단계와 이어하기는 "같이 뛸 사람" 스테이지, 마지막 확인 단계만 "준비 완료" 스테이지. */
+      stage={step === 'confirm' ? JOURNEY_DONE_STAGE : AUTH_WELCOME_STAGE}
     >
-      {/* Desktop back-nav: replaces the hidden mobile topbar for wizard navigation.
-          .tm-show-desktop is display:none on mobile, display:block at ≥1024 (see _shell.css). */}
-      <div className="tm-onboarding-desktop-nav tm-show-desktop">
-        {backHref ? (
-          <Link className="tm-onboarding-desktop-back" href={backHref} aria-label="뒤로가기">
-            <ChevronLeftIcon size={22} strokeWidth={2.2} />
-          </Link>
-        ) : null}
-        <span className="tm-onboarding-desktop-nav-title">{topTitle}</span>
-      </div>
+      {/* 데스크톱 뒤로가기는 AuthFrame 이 backHref 로 한 벌 그린다 — 여기서 따로 그리면
+          데스크톱에서 화살표가 둘 생겼다(감사 실측). */}
       <div className="tm-auth-body">
         {/* 단계 전환 시 스크린리더에 현재 단계를 공지 */}
         <span
@@ -342,7 +334,9 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
         >
           {meta.stepNo > 0 ? `4단계 중 ${meta.stepNo}단계, ${meta.title}` : meta.title}
         </span>
-        <ProgressHeader stepNo={meta.stepNo} total={4} />
+        {/* 이어하기(stepNo 0)는 아직 시작 전이라 회색 빈 막대 4칸만 남았다 — 진행 정보가 없으니 숨긴다. */}
+        {meta.stepNo > 0 ? <ProgressHeader stepNo={meta.stepNo} total={4} /> : null}
+        {step === 'confirm' ? <AuthIllustration name={JOURNEY_DONE_STAGE.illustration} className="tm-hide-desktop" /> : null}
         <h1 className="tm-text-heading tm-auth-heading">{meta.title}</h1>
         <p className="tm-text-body tm-auth-sub">{meta.sub}</p>
         {skipAction ? <button className="tm-btn tm-btn-sm tm-btn-ghost" disabled={pending} onClick={skipAction} type="button">나중에 설정하기</button> : null}
@@ -689,7 +683,8 @@ function getBackHref(step: OnboardingRouteStep) {
   if (step === 'level') return '/onboarding/sport';
   if (step === 'region') return '/onboarding/level';
   if (step === 'confirm') return '/onboarding/region';
-  return undefined;
+  /* 이어하기 화면은 진입 전 화면이 정해져 있지 않다 — 홈으로 빠져나갈 길은 남긴다(실측: 뒤로가기 없음). */
+  return '/home';
 }
 
 function readDraft(userId: string): OnboardingDraft | null {

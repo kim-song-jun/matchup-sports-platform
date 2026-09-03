@@ -1,4 +1,6 @@
 import Foundation
+import SwiftUI
+import UIKit
 
 /// The small amount of state the shell itself owns: whether the web app failed to load, and
 /// any transient message about a download.
@@ -17,12 +19,26 @@ final class WebShellModel: ObservableObject {
     /// Set by the view controller so the error screen's button can reach it.
     weak var controller: WebShellViewController?
 
+    /// Every published change below drives a screen swap or a slide-in explainer, and both were
+    /// snapping instantly with no cross-fade or slide (Motion audit D7=A). All four call sites are
+    /// UIKit code (`WebShellViewController`), not a SwiftUI `View`, so there is no `@Environment`
+    /// to read `accessibilityReduceMotion` from — `UIAccessibility.isReduceMotionEnabled` is the
+    /// same underlying signal (SwiftUI's environment value wraps this exact API) and is safe to
+    /// read synchronously here on the main actor.
+    private var reduceMotionAnimation: Animation? {
+        UIAccessibility.isReduceMotionEnabled ? nil : .easeOut(duration: 0.2)
+    }
+
     func reportFailure(_ reason: WebShellFailureReason) {
-        failure = reason
+        withAnimation(reduceMotionAnimation) {
+            failure = reason
+        }
     }
 
     func clearFailure() {
-        failure = nil
+        withAnimation(reduceMotionAnimation) {
+            failure = nil
+        }
     }
 
     func retry() {
@@ -35,11 +51,15 @@ final class WebShellModel: ObservableObject {
     }
 
     func askAboutNotifications() {
-        isAskingAboutNotifications = true
+        withAnimation(reduceMotionAnimation) {
+            isAskingAboutNotifications = true
+        }
     }
 
     func stopAskingAboutNotifications() {
-        isAskingAboutNotifications = false
+        withAnimation(reduceMotionAnimation) {
+            isAskingAboutNotifications = false
+        }
     }
 
     func dismissNotice() {

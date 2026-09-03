@@ -133,6 +133,21 @@ export class UpdateLeagueFixtureDto {
 
 // R6: 결과 정정 등으로 completed -> active 역전이할 때, 왜 되돌렸는지 감사 로그에
 // 남기기 위한 선택 필드. 본문 없이 보내도(빈 객체) 유효하다.
+/**
+ * 참가 신청을 여는 운영자 액션의 body (D7).
+ *
+ * 리그 축에는 `open` 상태가 없다(`V1LeagueState` 는 draft·active·completed 셋뿐). 신청은
+ * **거울(`V1Tournament`)의 `status='open'`** 으로 열리고, `V1League.state` 는 `draft` 로
+ * 남는다 — `LEAGUE_STATE_BY_STATUS` 가 이미 `open → draft` 로 되돌리므로 목록·상세의
+ * 리그 축 표시는 그대로 "준비 중"이다. 두 축이 어긋나는 게 아니라, **신청 접수는 시작이
+ * 아니라는 것**이 두 축 모두에서 같은 뜻으로 표현된 것이다.
+ */
+export class OpenLeagueRegistrationDto {
+  /** 신청 마감 시각(ISO 8601). 과거면 거부한다 — 열자마자 닫힌 리그를 만들지 않는다. */
+  @IsDateString()
+  registrationDeadlineAt!: string;
+}
+
 export class RevertLeagueCompletionDto {
   @IsOptional()
   @IsString()

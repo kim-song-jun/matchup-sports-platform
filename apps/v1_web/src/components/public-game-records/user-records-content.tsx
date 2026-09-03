@@ -152,8 +152,15 @@ export function UserRecordsContent({
   const resolvedActiveType: RecordTypeFilter = activeType ?? 'all';
   // 탭별 KPI 는 서버가 이미 계산해 보낸 `summary.byType[종류]` 를 읽는다 — 팀 전적과
   // 같은 계약이라 탭을 바꿔도 KPI 를 다시 받지 않는다. '전체'만 최상위 summary 다.
+  //
+  // **`byType` 이 없을 수 있다.** 타입은 non-optional 이지만 그건 *새* 서버의 계약이고,
+  // 배포 롤링 창에서는 새 화면이 **옛 응답**(byType 없음)을 받는다 — 그때 첨자 접근이
+  // `undefined` 를 주고 아래 KPI 렌더가 통째로 크래시한다. 전체 summary 로 떨어뜨리면
+  // 숫자가 잠깐 탭과 어긋날 뿐 화면은 산다(그 창은 배포가 끝나면 닫힌다).
   const activeTotals =
-    resolvedActiveType === 'all' ? data.summary : data.summary.byType[resolvedActiveType];
+    resolvedActiveType === 'all'
+      ? data.summary
+      : (data.summary.byType?.[resolvedActiveType] ?? data.summary);
 
   return (
     <div style={{ padding: '16px 20px 40px', display: 'flex', flexDirection: 'column', gap: 20 }}>

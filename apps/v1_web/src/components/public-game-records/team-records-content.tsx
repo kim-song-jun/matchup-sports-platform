@@ -317,7 +317,11 @@ export function TeamRecordsContent({
   // U2 -- '전체'가 아닌 탭이면 KPI를 서버가 이미 계산해 보낸 `summary.byType[종류]`로
   // 교체한다. 새 계산 없이 그대로 꺼내 쓴다(과제 지시: "새 계산 없이 이미 온 값 그대로").
   const activeSummary: TeamRecordSummaryTotals =
-    resolvedActiveType === 'all' ? data.summary : data.summary.byType[resolvedActiveType];
+    resolvedActiveType === 'all'
+      ? data.summary
+      : // 개인 기록과 같은 이유의 폴백 — 배포 롤링 창에서 옛 응답(byType 없음)을 받으면
+        // 첨자 접근이 undefined 를 주고 KPI 렌더가 크래시한다.
+        (data.summary.byType?.[resolvedActiveType] ?? data.summary);
   const emptyStateCopy =
     recordEmptyCopy(resolvedActiveType, {
       title: '아직 공식 경기 기록이 없어요',

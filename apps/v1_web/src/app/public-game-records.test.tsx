@@ -310,6 +310,25 @@ describe('TeamRecordsContent — 종류 탭 (U2)', () => {
     ]);
   });
 
+  it('옛 응답(byType 없음)에서도 화면이 산다 — 배포 롤링 창에서 크래시하지 않는다', () => {
+    // 타입은 `byType` 을 non-optional 로 선언하지만 그건 **새 서버**의 계약이다. 배포가
+    // 도는 동안 새 화면이 옛 응답을 받으면 첨자 접근이 undefined 를 주고 KPI 렌더가 통째로
+    // 죽는다 — 그때 전체 summary 로 떨어뜨려 숫자만 잠깐 어긋나고 화면은 살아야 한다.
+    const legacy = withByType();
+    const { byType: _dropped, ...summaryWithoutByType } = legacy.summary;
+    render(
+      <TeamRecordsContent
+        data={{ ...legacy, summary: summaryWithoutByType } as typeof legacy}
+        activeType="league"
+        onChangeType={vi.fn()}
+      />,
+    );
+
+    // 전체 기준 값으로 그려진다(리그 기준 4경기가 아니라 12경기).
+    expect(screen.getByText('12')).toBeInTheDocument();
+    expect(screen.getByText('6·3·3')).toBeInTheDocument();
+  });
+
   it('정규 리그 탭을 고르면 KPI가 summary.byType.league 값으로 바뀐다 (전체 기준으로 새로 계산하지 않는다)', () => {
     render(<TeamRecordsContent data={withByType()} activeType="league" onChangeType={vi.fn()} />);
 
@@ -586,6 +605,22 @@ describe('UserRecordsContent — 종류 탭 (Task 166 BE-4)', () => {
       },
     });
   }
+
+  it('옛 응답(byType 없음)에서도 화면이 산다 — 배포 롤링 창에서 크래시하지 않는다', () => {
+    // 팀 전적의 같은 케이스와 같은 이유 — 배포가 도는 동안 새 화면이 옛 응답을 받는다.
+    const legacy = withByType();
+    const { byType: _dropped, ...summaryWithoutByType } = legacy.summary;
+    render(
+      <UserRecordsContent
+        data={{ ...legacy, summary: summaryWithoutByType } as typeof legacy}
+        activeType="league"
+        onChangeType={vi.fn()}
+      />,
+    );
+
+    // 전체 기준 값으로 그려진다(리그 기준 4출전이 아니라 12출전).
+    expect(screen.getByText('12')).toBeInTheDocument();
+  });
 
   it('팀 전적과 같은 순서로 전체·대회·리그·친선 탭을 배치한다', () => {
     render(<UserRecordsContent data={withByType()} activeType="all" onChangeType={vi.fn()} />);

@@ -360,7 +360,13 @@ export function toGameHttpException(error: GameContractError): HttpException {
     error.code === 'SUBSTITUTION_INVALID' ||
     error.code === 'SUBSTITUTION_OUT_NOT_ON_PITCH' ||
     error.code === 'SUBSTITUTION_IN_ALREADY_ON_PITCH' ||
-    error.code === 'SUBSTITUTION_LIMIT_REACHED'
+    error.code === 'SUBSTITUTION_LIMIT_REACHED' ||
+    // Task 166 BE-3: 롤링 종목의 교체 기록 거부. 뜻은 위 넷과 조금 다르지만
+    // ("이 요청 내용이 틀렸다" 가 아니라 "이 경기엔 그 명령이 없다") **같은 422 로
+    // 맞춘다** — 교체 실패 하나만 상태 코드가 갈리면 클라이언트가 두 매핑을 갖게
+    // 되고, 그 비용이 의미 차이를 코드로 드러내는 값어치보다 크다. 구분은
+    // `code` 필드가 한다.
+    error.code === 'SUBSTITUTION_NOT_TRACKED'
   ) {
     return new UnprocessableEntityException(body);
   }

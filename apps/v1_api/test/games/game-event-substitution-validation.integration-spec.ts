@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { OperationAuditWriterService } from '../../src/common/audit/operation-audit-writer.service';
 import { GameTakeoverService } from '../../src/games/game-takeover.service';
 import { GamesService, canonicalGameCommandPayloadHash } from '../../src/games/games.service';
-import { FOOTBALL_V1_CONFIG } from '../../src/tournaments/competition-config/competition-config.presets';
+import { FOOTBALL_V1_CONFIG, FUTSAL_V1_CONFIG } from '../../src/tournaments/competition-config/competition-config.presets';
 import type { GameActorScope, GameCommandContext, GameSourceCreationInput } from '../../src/games/games.types';
 import { PrismaService } from '../../src/prisma/prisma.service';
 
@@ -330,5 +330,59 @@ describe('POST /games/:gameId/events — SUBSTITUTION (live-substitution)', () =
       payload: { outParticipantId: homeStarter1Id },
     });
     expect(appended.sequence).toBeGreaterThan(0);
+  });
+
+  it('롤링 교체 종목에서는 교체 커맨드가 422 SUBSTITUTION_NOT_TRACKED 로 거부된다 (Task 166 BE-3)', async () => {
+    // 정본 §3: 롤링 종목은 교체 기록이 없다. 이 스위트의 나머지는 전부 축구
+    // (`substitutions: 'limited'`)이므로 **제한 교체 회귀**를 그대로 재고 있다 — 여기서만
+    // 같은 경기의 설정을 풋살(`'rolling'`)로 잠시 바꿔 실제 서비스 경로를 태운다.
+    // 픽스처를 통째로 복제하지 않는 이유: 재려는 것은 "설정 값에 따라 갈리는가" 하나뿐이고,
+    // 서비스는 커맨드 시점에 `game.competitionConfigVersionId` 로 설정을 다시 읽는다.
+    const rollingHash = createHash('sha256').update(JSON.stringify(FUTSAL_V1_CONFIG)).digest('hex');
+    const rollingConfig = await prisma.v1CompetitionConfigVersion.create({
+      data: {
+        sportCode: 'futsal',
+        name: 'futsal-v1-substitution-rolling-test',
+        version: 1,
+        status: 'ACTIVE',
+        periods: FUTSAL_V1_CONFIG.periods,
+        events: FUTSAL_V1_CONFIG.events,
+        lineup: FUTSAL_V1_CONFIG.lineup,
+        result: FUTSAL_V1_CONFIG.result,
+        tieBreak: FUTSAL_V1_CONFIG.tieBreak,
+        visibility: FUTSAL_V1_CONFIG.visibility,
+        contentHash: rollingHash,
+      },
+    });
+    // 전제를 값으로 확인한다 — 프리셋이 바뀌어 'limited' 가 되면 이 테스트는 아무것도
+    // 재지 않으면서 통과한다(그때 여기서 먼저 깨진다).
+    expect(FUTSAL_V1_CONFIG.lineup.substitutions).toBe('rolling');
+
+    await prisma.v1Game.update({ where: { id: gameId }, data: { competitionConfigVersionId: rollingConfig.id } });
+    try {
+      const token = await freshToken('sub-rolling-blocked');
+      const failure = await captureFailure(() =>
+        service.appendEvent(authUser(ids.operator), gameId, 'sub-rolling-blocked', {
+          expectedVersion: 4,
+          clientEventId: 'sub-rolling-blocked',
+          takeoverToken: token,
+          type: 'SUBSTITUTION' as never,
+          sideId: homeSideId,
+          participantId: homeBench2Id,
+          period: 1,
+          clockMs: 4000,
+          occurredAt: new Date().toISOString(),
+          payload: { outParticipantId: homeStarter2Id },
+        }),
+      );
+      expectHttpCode(failure, 422, 'SUBSTITUTION_NOT_TRACKED');
+
+      // 한 행도 쓰지 않는다 — 거부가 이벤트 append 앞에서 일어나야 한다.
+      const written = await prisma.v1GameEvent.findFirst({ where: { gameId, clientEventId: 'sub-rolling-blocked' } });
+      expect(written).toBeNull();
+    } finally {
+      await prisma.v1Game.update({ where: { id: gameId }, data: { competitionConfigVersionId: ids.config } });
+      await prisma.v1CompetitionConfigVersion.delete({ where: { id: rollingConfig.id } });
+    }
   });
 });

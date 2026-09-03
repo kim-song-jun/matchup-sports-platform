@@ -464,7 +464,20 @@ export const gameSchemaSourceManifest = {
   // (20260903150000_v1_result_revision_drop_review_states)이고 바인딩된
   // 20260729000100_v1_game_operations 는 건드리지 않았으므로 migration 해시는 그대로다.
   // 이 브랜치의 파일에 sha256 을 다시 돌려 계산한 값이다.
-  schema: '476ac32e777bc5eb2e22b1f3dab2ee85e2608413f06580c0f7ee2b7329185911',
+  // 2026-09-03 재핀 (Task 164 BE-4b): `V1TournamentRegistration.roster_auto_confirmed_at`
+  // (nullable DateTime) 하나가 추가됐다 — D10 시즌 시작 자동 명단 확정의 표식이다.
+  // **게임 도메인 밖이다**: v1_game_* 모델·enum·relation 을 하나도 건드리지 않았고, 이
+  // guard 가 schema.prisma **전체 바이트**를 결속하기 때문에 걸린 파일 해시 노이즈다
+  // (위 APNs·후기 재핀들과 같은 종류).
+  // 뒷받침 마이그레이션: 20260903120000_v1_registration_roster_auto_confirmed
+  // (ADD COLUMN 한 줄, 백필 없음 — 기존 행은 NULL 이 곧 "수동 확정" 이라는 사실이다).
+  // 바인딩된 20260729000100_v1_game_operations 는 건드리지 않았으므로 migration 해시는
+  // 그대로다. 이 브랜치의 파일에 `shasum -a 256` 을 돌려 새로 계산했다.
+  // 2026-09-03 재핀 (병합): 위 BE-4b 컬럼 추가와 아래 enum 값 제거가 **한 파일에 함께**
+  // 들어 있다. 어느 한쪽 브랜치의 해시를 그대로 쓰면 병합 결과와 달라 SOURCE_SNAPSHOT_DRIFT
+  // 로 CI 가 깨진다 — 아래 값은 **병합된** schema.prisma 에 shasum 을 다시 돌려 계산했다.
+  //
+  schema: '57ce6fbc807bf9c8147f619abb81b9783ce29ed0d083a9e2e10b4f6fcd7edf15',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

@@ -22,6 +22,7 @@ import {
 } from '../../common/audit/operation-audit-writer.service';
 import {
   canonicalGameCommandPayloadHash,
+  extractEndOutcome,
   extractEndPenalties,
   gameOperationAuditActor,
   toGameHttpException,
@@ -174,19 +175,27 @@ type ResultCommandBoundaryInput = {
 /**
  * 새 리비전의 몰수·중단 표식을 정한다 (Task 165 BE-3).
  *
- * **미전송이면 base 를 승계한다** — 그래야 몰수로 끝난 경기의 정정·재제출이 표식을 지우지
- * 않는다(그 승계가 원래 있던 이유이고, 이의 수락 경로가 그것에 기대고 있다).
- * 전송하면 그 값을 그대로 쓴다. `note` 미전송은 `null` 이다 — 표식만 바꾸고 옛 사유가
- * 남으면 "왜 몰수인가" 가 어긋난다.
+ * **미전송(또는 `null`)이면 base 를 승계한다** — 그래야 몰수로 끝난 경기의 정정·재제출이
+ * 표식을 지우지 않는다(그 승계가 원래 있던 이유이고, 이의 수락 경로가 그것에 기대고 있다).
+ *
+ * ## 사유 검증은 `extractEndOutcome` 을 그대로 지난다
+ * 이 저장소는 **몰수·중단에 사유를 필수**로 한다 — "나중에 왜 그 점수인지 설명할 수 있는
+ * 유일한 기록" 이라서다(`GamesService.extractEndOutcome` 의 docblock). 여기서 그 규칙을
+ * 다시 적으면 두 벌이 되고 한쪽만 바뀐다. **같은 순수 함수를 부른다**: 코드도
+ * `GAME_OUTCOME_NOTE_REQUIRED` 로 같고, 공백만 있는 사유도 같은 자리에서 걸린다.
+ *
+ * (첫 구현은 공백·미전송을 조용히 `null` 로 접어 그 규칙을 우회했고, `@IsOptional` 이라
+ * `null` 이 들어오면 `input.reason` 접근으로 500 이었다 — Copilot 리뷰가 잡았다.)
  */
 function resolveOutcome(
-  input: { reason: 'NORMAL' | 'FORFEIT' | 'ABANDONED'; note?: string } | undefined,
+  input: { reason: 'NORMAL' | 'FORFEIT' | 'ABANDONED'; note?: string } | null | undefined,
   base: { outcomeReason: V1GameOutcomeReason; outcomeNote: string | null },
 ): { outcomeReason: V1GameOutcomeReason; outcomeNote: string | null } {
-  if (input === undefined) {
+  if (input === undefined || input === null) {
     return { outcomeReason: base.outcomeReason, outcomeNote: base.outcomeNote };
   }
-  return { outcomeReason: input.reason, outcomeNote: input.note?.trim() || null };
+  const extracted = extractEndOutcome({ outcomeReason: input.reason, outcomeNote: input.note });
+  return { outcomeReason: extracted.outcomeReason, outcomeNote: extracted.note };
 }
 
 @Injectable()

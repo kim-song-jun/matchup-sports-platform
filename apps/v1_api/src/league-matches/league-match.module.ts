@@ -18,8 +18,10 @@ import { LeagueMatchForfeitController } from './league-match-forfeit.controller'
 import { LeagueMatchForfeitService } from './league-match-forfeit.service';
 import { LeagueMatchPublicController } from './league-match-public.controller';
 import { LeagueMatchPublicService } from './league-match-public.service';
-// D1-a: 운영자가 리그 결과를 직접 입력·정정하는 경로. LeagueMatchForfeitController/
-// -Service 와 같은 이유로 별도 파일로 추가해 여기서만 등록한다.
+// ⚠️ Task 165 BE-3 이 이 서비스의 **HTTP 표면을 지웠다**(컨트롤러·DTO·프론트 모달).
+// 남아 있는 이유는 하나뿐이다 — `LeagueMatchDisputeService` 의 이의 수락이
+// `correctResult` 를 부른다. 정본이 이의 자체를 제거하기로 확정했으므로
+// **Task 166 에서 그 호출부와 함께 삭제**된다. 여기에 새 소비처를 붙이지 마라.
 import { LeagueMatchResultEntryService } from './league-match-result-entry.service';
 import { LeagueSeriesAdminController } from './league-series-admin.controller';
 import { LeagueSeriesAdminService } from './league-series-admin.service';

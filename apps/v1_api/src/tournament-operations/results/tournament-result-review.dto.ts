@@ -38,7 +38,12 @@ export class GameResultOutcomeDto {
   @IsIn(['NORMAL', 'FORFEIT', 'ABANDONED'])
   reason!: 'NORMAL' | 'FORFEIT' | 'ABANDONED';
 
-  /** 운영자 메모. 미전송이면 `null` 로 저장한다 — 표식만 바뀌고 옛 사유가 남으면 어긋난다. */
+  /**
+   * 운영자 메모. **`FORFEIT`·`ABANDONED` 에는 필수**다 — 비우면 422
+   * `GAME_OUTCOME_NOTE_REQUIRED`(`GamesService.extractEndOutcome` 과 같은 규칙·같은 코드).
+   * "나중에 왜 그 점수인지 설명할 수 있는 유일한 기록" 이라 이 저장소가 몰수·중단에
+   * 사유를 강제한다. `NORMAL` 에는 의미가 없어 저장하지 않는다.
+   */
   @IsOptional()
   @IsString()
   @MaxLength(500)

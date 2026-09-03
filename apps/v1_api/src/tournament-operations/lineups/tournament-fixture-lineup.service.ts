@@ -72,8 +72,15 @@ export class TournamentFixtureLineupService {
         : { tournamentId, fixtureId };
     await this.access.assertAccess({ userId, action, resource });
 
-    if (fixture !== null && fixture.game !== null) {
-      return fixture.game.id;
+    if (fixture !== null) {
+      // 대진 행이 **있다** — 이건 대회 경기다. 게임이 아직 없으면 그건 리그일 가능성이
+      // 아니라 그냥 없는 것이므로, 팀매치를 뒤지지 않고 여기서 끝낸다(Copilot 리뷰 지적:
+      // 아래 fallback 이 `game === null` 인 대회 대진에도 돌아 불필요한 조회를 했다).
+      if (fixture.game !== null) return fixture.game.id;
+      throw new NotFoundException({
+        code: 'TOURNAMENT_FIXTURE_GAME_NOT_FOUND',
+        message: '경기 정보를 찾을 수 없어요.',
+      });
     }
 
     // ## 정규 리그 거울이면 경기는 `V1TeamMatch` 다 (Task 165 BE-4)

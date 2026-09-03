@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { V1AuthUser } from '../../src/auth/v1-auth-user';
 import { GamesService } from '../../src/games/games.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import type { SaveTeamMatchLineupDto } from '../../src/team-matches/dto/team-match-lineup.dto';
 import { TeamMatchLineupService } from '../../src/team-matches/team-match-lineup.service';
 import { TournamentFixtureLineupService } from '../../src/tournament-operations/lineups/tournament-fixture-lineup.service';
 import { createV1IntegrationApp } from '../integration/integration-app';
@@ -177,16 +178,18 @@ describe('콘솔의 라인업 읽기 — 리그 경기', () => {
 
   it('팀매치로 저장한 라인업을 콘솔의 listLineups 가 같은 명단으로 읽는다', async () => {
     // 팀 오너가 팀매치 경로로 저장한다 — 163 이후의 "명단 = 출전자" 모양.
-    const saved = await teamMatchLineup.saveLineup(ownerActor, teamMatchId, randomUUID(), {
+    // `as never` 를 쓰지 않는다 — 캐스팅은 DTO 가 바뀌어도 스펙이 조용히 통과하게 만든다.
+    // 포지션은 빼둔다: 이 픽스처의 설정 버전 카탈로그에 없는 코드면 #978 의
+    // `LINEUP_POSITION_INVALID` 가드에 걸린다. 이 스펙이 보는 것은 **명단이 콘솔에
+    // 읽히는가** 이지 포지션 검증이 아니다.
+    const lineupDto: SaveTeamMatchLineupDto = {
       expectedVersion: 0,
       participants: [
-        // 포지션은 빼둔다 — 이 픽스처의 설정 버전 카탈로그에 없는 코드면 #978 의
-        // `LINEUP_POSITION_INVALID` 가드에 걸린다. 이 스펙이 보는 것은 **명단이 콘솔에
-        // 읽히는가** 이지 포지션 검증이 아니다.
         { displayName: '가나다', jerseyNumber: 7 },
         { displayName: '라마바', jerseyNumber: 9 },
       ],
-    } as never);
+    };
+    const saved = await teamMatchLineup.saveLineup(ownerActor, teamMatchId, randomUUID(), lineupDto);
     expect(saved).toBeDefined();
 
     // 콘솔이 쓰는 읽기 — 게임 축이다.
@@ -226,5 +229,35 @@ describe('콘솔의 라인업 읽기 — 리그 경기', () => {
     await expect(
       consoleLineup.listLineups(adminActor, 'c9000000-0000-4000-8000-0000000000ff', teamMatchId),
     ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_FIXTURE_GAME_NOT_FOUND' } });
+  });
+
+  it('대진 행은 있는데 게임이 없으면 404 다 — 팀매치를 뒤지지 않는다', async () => {
+    // 리그 fallback 은 **대진 행이 없을 때만** 돈다. 대진이 있는데 게임만 없는 것은
+    // 대회 경기의 정상적인 "아직 게임 없음" 이지 리그일 가능성이 아니다(Copilot 리뷰).
+    const fixtureOnlyTournament = await prisma.v1Tournament.create({
+      data: {
+        kind: 'regular_tournament',
+        sportId: ids.sport,
+        regionId: ids.region,
+        title: 'BE4 게임 없는 대진',
+        status: 'in_progress',
+      },
+    });
+    const fixture = await prisma.v1TournamentFixture.create({
+      data: { tournamentId: fixtureOnlyTournament.id, round: 'R1', fixtureNumber: 1 },
+    });
+    const spy = jest.spyOn(prisma.v1TeamMatch, 'findFirst');
+    try {
+      await expect(
+        consoleLineup.listLineups(adminActor, fixtureOnlyTournament.id, fixture.id),
+      ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_FIXTURE_GAME_NOT_FOUND' } });
+      // 404 만 보면 fallback 이 돌고 못 찾아 404 인 경우와 구분되지 않는다 — 조회 자체가
+      // 없었다는 것까지 본다.
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+      await prisma.v1TournamentFixture.deleteMany({ where: { tournamentId: fixtureOnlyTournament.id } });
+      await prisma.v1Tournament.deleteMany({ where: { id: fixtureOnlyTournament.id } });
+    }
   });
 });

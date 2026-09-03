@@ -945,7 +945,6 @@ model V1Sport {
   teams           V1Team[]
   teamMatches     V1TeamMatch[]
   tournaments     V1Tournament[]
-  leagues         V1League[]         @relation("V1LeagueSport")
   leagueSeries    V1LeagueSeries[]   @relation("V1LeagueSeriesSport")
 
   @@index([isActive, sortOrder])
@@ -996,7 +995,6 @@ model V1Region {
   matches         V1Match[]
   teams           V1Team[]
   teamMatches     V1TeamMatch[]
-  leagues         V1League[]         @relation("V1LeagueRegion")
   tournaments     V1Tournament[]     @relation("V1TournamentRegion")
   leagueSeries    V1LeagueSeries[]   @relation("V1LeagueSeriesRegion")
 
@@ -1298,7 +1296,6 @@ model V1Team {
   postEventTeamReviewsReceived V1PostEventReview[]        @relation("V1PostEventReviewTargetTeam")
   tournamentRegistrations      V1TournamentRegistration[]
   tournamentReviews            V1TournamentReview[]       @relation("V1TournamentReviewTeam")
-  leagueEntries                V1LeagueTeam[]              @relation("V1LeagueTeamTeam")
   leaguePromotions             V1LeaguePromotion[]         @relation("V1LeaguePromotionTeam")
   lineupPresets                V1TeamLineupPreset[]
   tacticsBoards                V1TeamTacticsBoard[]        @relation("V1TeamTacticsBoardTeam")
@@ -1788,7 +1785,9 @@ model V1TeamMatch {
   game                  V1Game?                     @relation("V1GameTeamMatch")
   videos                V1TeamMatchVideo[]
   competitionConfig     V1CompetitionConfigVersion? @relation("V1TeamMatchCompetitionConfig", fields: [competitionConfigVersionId], references: [id], onDelete: Restrict, map: "v1_team_matches_competition_config_fk")
-  league                V1League?                   @relation("V1TeamMatchLeague", fields: [leagueId], references: [id], onDelete: SetNull, map: "v1_team_matches_league_fk")
+  /// BE-5 drop: 리그는 통합 축이 정본이라 이 FK 도 `V1Tournament` 를 가리킨다(id 는 두 축이
+  /// 같아서 컬럼 값은 그대로다). 리그가 지워져도 대진은 남아야 하므로 SET NULL 유지.
+  league                V1Tournament?               @relation("V1TeamMatchLeague", fields: [leagueId], references: [id], onDelete: SetNull, map: "v1_team_matches_league_fk")
 
   @@index([hostTeamId])
   @@index([createdByUserId])
@@ -1861,53 +1860,6 @@ model V1TeamMatchApplication {
 //                          시즌 종료 시 순위표 기반으로 승격·강등이 계산된다.
 // (a) 를 (b) 로 강제 이관하지 않는다 — 기존 리그는 그대로 동작해야 한다.
 
-enum V1LeagueState {
-  draft
-  active
-  completed
-}
-
-model V1League {
-  id                   String        @id @default(uuid())
-  title                String
-  sportId              String        @map("sport_id")
-  regionId             String        @map("region_id")
-  createdByAdminUserId String        @map("created_by_admin_user_id")
-  startsOn             DateTime      @map("starts_on")
-  endsOn               DateTime      @map("ends_on")
-  tieBreakJson         Json          @map("tie_break_json")
-  state                V1LeagueState @default(draft)
-  // 셋은 항상 함께 채워지거나 함께 null 이다. 단발 리그는 티어가 "1부"인 게 아니라
-  // 티어라는 개념 자체가 없으므로, 기본값 1 을 주지 않고 null 로 둔다 —
-  // 그래야 화면에서 단발 리그에 "1부" 뱃지가 잘못 붙지 않는다.
-  seriesId             String?       @map("series_id")
-  tier                 Int?
-  seasonNo             Int?          @map("season_no")
-  createdAt            DateTime      @default(now()) @map("created_at")
-  updatedAt            DateTime      @updatedAt @map("updated_at")
-
-  series         V1LeagueSeries? @relation("V1LeagueSeriesLeague", fields: [seriesId], references: [id], onDelete: SetNull, map: "v1_leagues_series_fk")
-  sport          V1Sport         @relation("V1LeagueSport", fields: [sportId], references: [id], onDelete: Restrict, map: "v1_leagues_sport_fk")
-  region         V1Region        @relation("V1LeagueRegion", fields: [regionId], references: [id], onDelete: Restrict, map: "v1_leagues_region_fk")
-  createdByAdmin V1AdminUser     @relation("V1LeagueAdmin", fields: [createdByAdminUserId], references: [id], onDelete: Restrict, map: "v1_leagues_admin_fk")
-  teams          V1LeagueTeam[]
-  teamMatches    V1TeamMatch[]   @relation("V1TeamMatchLeague")
-  promotions     V1LeaguePromotion[] @relation("V1LeaguePromotionFromLeague")
-
-  // seriesId 가 null 인 행은 Postgres 의 NULL 비교 규칙상 이 제약에 걸리지 않는다 —
-  // 기존 단발 리그끼리는 서로 충돌하지 않는다.
-  @@unique([seriesId, seasonNo, tier], map: "v1_leagues_series_season_tier_key")
-  @@index([sportId, state])
-  @@index([seriesId, seasonNo])
-  // 공개 리그 목록(league-match-public.service.ts list())이 실제로 쓰는 접근 경로 둘.
-  // 그 API 는 regionId 로 필터하고 createdAt desc + id desc 로 정렬·커서 페이지네이션을
-  // 하는데, 인덱스가 [sportId, state] 뿐이라 region 필터와 정렬이 둘 다 인덱스를 못 탔다
-  // (2026-08-21 재감사). sportId 쪽과 같은 모양으로 맞춘다.
-  @@index([regionId, state])
-  @@index([createdAt(sort: Desc), id(sort: Desc)])
-  @@map("v1_leagues")
-}
-
 // ── 리그 체계(Series) — 티어(1부/2부/3부) + 시즌 + 승강 ────────────────────────
 // 하나의 시리즈가 (종목 x 지역)의 리그 체계 하나를 뜻한다. 시리즈 아래에
 // 시즌(seasonNo) x 티어(tier) 조합마다 V1League 인스턴스가 하나씩 생긴다.
@@ -1938,7 +1890,6 @@ model V1LeagueSeries {
   sport          V1Sport     @relation("V1LeagueSeriesSport", fields: [sportId], references: [id], onDelete: Restrict, map: "v1_league_series_sport_fk")
   region         V1Region    @relation("V1LeagueSeriesRegion", fields: [regionId], references: [id], onDelete: Restrict, map: "v1_league_series_region_fk")
   createdByAdmin V1AdminUser @relation("V1LeagueSeriesAdmin", fields: [createdByAdminUserId], references: [id], onDelete: Restrict, map: "v1_league_series_admin_fk")
-  leagues        V1League[]  @relation("V1LeagueSeriesLeague")
   // R1 expand: 통합 후 시즌은 V1Tournament(kind=regular_league) 행이 된다. 아직 이 배열에
   // 담기는 행은 없고(백필은 R3), 시리즈 테이블 자체의 컬럼은 바뀌지 않는다 — 역참조뿐이다.
   tournaments    V1Tournament[] @relation("V1TournamentSeries")
@@ -1970,7 +1921,8 @@ model V1LeaguePromotion {
   decidedByAdminUserId String                @map("decided_by_admin_user_id")
   decidedAt            DateTime              @default(now()) @map("decided_at")
 
-  fromLeague     V1League    @relation("V1LeaguePromotionFromLeague", fields: [fromLeagueId], references: [id], onDelete: Cascade, map: "v1_league_promotions_league_fk")
+  /// BE-5 drop — 위 대진과 같은 이유. 승강 기록은 그 리그에 종속이라 CASCADE 유지.
+  fromLeague     V1Tournament @relation("V1LeaguePromotionFromLeague", fields: [fromLeagueId], references: [id], onDelete: Cascade, map: "v1_league_promotions_league_fk")
   team           V1Team      @relation("V1LeaguePromotionTeam", fields: [teamId], references: [id], onDelete: Restrict, map: "v1_league_promotions_team_fk")
   decidedByAdmin V1AdminUser @relation("V1LeaguePromotionAdmin", fields: [decidedByAdminUserId], references: [id], onDelete: Restrict, map: "v1_league_promotions_admin_fk")
 
@@ -1978,20 +1930,6 @@ model V1LeaguePromotion {
   @@unique([fromLeagueId, teamId], map: "v1_league_promotions_league_team_key")
   @@index([teamId])
   @@map("v1_league_promotions")
-}
-
-model V1LeagueTeam {
-  id        String   @id @default(uuid())
-  leagueId  String   @map("league_id")
-  teamId    String   @map("team_id")
-  createdAt DateTime @default(now()) @map("created_at")
-
-  league V1League @relation(fields: [leagueId], references: [id], onDelete: Cascade, map: "v1_league_teams_league_fk")
-  team   V1Team   @relation("V1LeagueTeamTeam", fields: [teamId], references: [id], onDelete: Restrict, map: "v1_league_teams_team_fk")
-
-  @@unique([leagueId, teamId], map: "v1_league_teams_league_team_key")
-  @@index([teamId])
-  @@map("v1_league_teams")
 }
 
 enum V1LeagueMatchDisputeStatus {
@@ -2336,7 +2274,6 @@ model V1AdminUser {
   recordedTournamentResults        V1TournamentFixtureResult[] @relation("V1TournamentFixtureResultRecordedByAdmin")
   inquiryReplies                   V1InquiryReply[]            @relation("V1InquiryReplyAdmin")
   contentAssets                    V1ContentAsset[]
-  createdLeagues                   V1League[]                       @relation("V1LeagueAdmin")
   createdLeagueSeries              V1LeagueSeries[]                 @relation("V1LeagueSeriesAdmin")
   decidedLeaguePromotions          V1LeaguePromotion[]              @relation("V1LeaguePromotionAdmin")
 
@@ -2660,6 +2597,10 @@ model V1Tournament {
   competitionConfig    V1CompetitionConfigVersion?          @relation("V1TournamentCompetitionConfig", fields: [competitionConfigVersionId], references: [id], onDelete: Restrict, map: "v1_tournaments_competition_config_fk")
   createdByAdmin       V1AdminUser?                         @relation("V1TournamentCreatedByAdmin", fields: [createdByAdminUserId], references: [id], onDelete: SetNull)
   registrations        V1TournamentRegistration[]
+  /// BE-5 drop: 리그 대진과 승강 기록이 `V1League` 대신 여기를 가리킨다(kind='regular_league'
+  /// 인 행에만 실제로 값이 온다 — 일반 대회는 자기 픽스처 테이블을 쓴다).
+  leagueTeamMatches    V1TeamMatch[]                        @relation("V1TeamMatchLeague")
+  leaguePromotions     V1LeaguePromotion[]                  @relation("V1LeaguePromotionFromLeague")
   groups               V1TournamentGroup[]
   fixtures             V1TournamentFixture[]
   announcements        V1TournamentAnnouncement[]

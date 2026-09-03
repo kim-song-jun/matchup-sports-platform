@@ -457,7 +457,16 @@ export const gameSchemaSourceManifest = {
   // (20260902000000_v1_lineup_bench_to_started, UPDATE 한 줄)이고 바인딩된
   // 20260729000100_v1_game_operations 는 건드리지 않았으므로 migration 해시는 그대로다.
   // 이 브랜치의 파일에 sha256 을 다시 돌려 계산한 값이다.
-  schema: '47bafb512b8abaf8c5d6aa0efa4e4483b7b24d72822b545aea5b2b7b9f631f01',
+  // 2026-09-03 재핀 (Task 164 BE-5 drop): `V1League`·`V1LeagueTeam` 모델과 `V1LeagueState`
+  // enum 을 **제거**했다. 리그는 통합 축(`V1Tournament(kind='regular_league')` +
+  // `V1TournamentRegistration`)이 정본이 됐고, 재배선(#1005)이 읽기를, 이 브랜치가 쓰기와
+  // 시드를 옮겼다. `V1TeamMatch.league`·`V1LeaguePromotion.fromLeague` 두 relation 은
+  // `V1Tournament` 로 재타깃했다(id 가 두 축에서 같아 컬럼 값은 그대로다).
+  //
+  // **game domain(V1Game*) 은 한 줄도 달라지지 않았다** — 이 guard 가 schema.prisma 전체
+  // 바이트를 결속하기 때문에 걸리는 것이지 game operations 계약이 바뀐 게 아니다. 바인딩된
+  // 20260729000100_v1_game_operations 는 건드리지 않았으므로 migration 해시는 불변이다.
+  schema: 'fe125a2fc4a4ec57f16a5fe4c9dce662de70823999e136fb729c03441ecd4094',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

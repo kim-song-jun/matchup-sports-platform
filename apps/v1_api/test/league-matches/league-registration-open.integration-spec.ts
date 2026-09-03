@@ -255,4 +255,27 @@ describe('리그 참가 신청 — 대회 스택 재사용', () => {
     expect(after).toEqual([{ status: 'confirmed', entrySource: 'applied' }]);
     expect(await prisma.v1LeagueTeam.count({ where: { leagueId, teamId: extraTeam } })).toBe(1);
   });
+
+  it('소프트 삭제된 거울은 열리지 않는다 — 200 을 주고 신청은 404 인 상태를 만들지 않는다', async () => {
+    // 오늘 `V1Tournament.deletedAt` 을 non-null 로 쓰는 코드 경로는 **0건**이다(전수 확인).
+    // 그래서 이 상황은 프로덕션 흐름으로는 아직 만들 수 없고, 여기서 직접 만든다 —
+    // 가드의 계약을 고정하는 것이지 오늘의 버그를 재현하는 것이 아니다.
+    //
+    // 이 자리에 가드가 없으면 `updateMany` 가 1행을 맞춰 **200 이 나가는데**, 등록 스택은
+    // 전부 `deletedAt: null` 로 조회하므로 **신청은 계속 404** 다. 운영자에게는
+    // "열었는데 안 열림" 이고, 화면 어디에도 이유가 안 나온다.
+    await prisma.v1Tournament.update({
+      where: { id: leagueId },
+      data: { deletedAt: new Date() },
+    });
+    try {
+      await expect(
+        makeAdminService().openRegistration(auth, leagueId, {
+          registrationDeadlineAt: new Date(Date.now() + 7 * 86_400_000).toISOString(),
+        }),
+      ).rejects.toMatchObject({ response: { code: 'LEAGUE_MIRROR_MISSING' } });
+    } finally {
+      await prisma.v1Tournament.update({ where: { id: leagueId }, data: { deletedAt: null } });
+    }
+  });
 });

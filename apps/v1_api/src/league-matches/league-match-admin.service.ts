@@ -1219,7 +1219,15 @@ export class LeagueMatchAdminService {
     // 덮어쓴다. 거울이 아직 없으면(백필 이전) 0행이고, 그건 조용한 성공이 아니라 오류다:
     // 신청 스택이 보는 행이 없으므로 열었다고 응답하면 거짓말이 된다.
     const opened = await this.prisma.v1Tournament.updateMany({
-      where: { id: leagueId, kind: 'regular_league' },
+      // `deletedAt: null` 이 필요한 이유는 **이 자리만 `count` 로 성공을 알리기 때문**이다.
+      // 등록 스택은 전부 `deletedAt: null` 로 조회하므로, 소프트 삭제된 거울을 열면
+      // 여기서는 1행이 맞아 200 이 나가는데 **신청은 계속 404 로 막힌다** — 운영자에게는
+      // "열었는데 안 열림" 이다(Copilot 리뷰 지적).
+      //
+      // 같은 파일의 다른 거울 `updateMany`(리그 상태 전이 dual-write)에는 이 가드가 없는데,
+      // 그쪽은 `count` 로 무엇을 알리지 않아 같은 거짓말이 생기지 않는다. 이 PR 에서는
+      // 새로 만든 이 자리만 고친다.
+      where: { id: leagueId, kind: 'regular_league', deletedAt: null },
       data: { status: 'open', registrationDeadlineAt: deadline },
     });
     if (opened.count === 0) {

@@ -444,8 +444,11 @@ export class LeagueMatchResultEntryService {
     gameId: string,
     dto: LeagueResultCorrectionInput,
   ): Promise<AssembledResultParticipant[]> {
-    // `?? []`: undefined 뿐 아니라 **명시적 null** 도 흡수해야 한다 — @IsOptional() 은 null 을
-    // 검증 없이 통과시키므로 undefined 만 걸러서는 `null.length` 500 이 난다(Copilot 리뷰).
+    // `?? []`: 미전송(`undefined`)과 명시적 `null` 을 같이 흡수한다. 이제 이 입력은 HTTP
+    // DTO 가 아니라 내부 타입(`LeagueResultCorrectionInput`)이고 **유일한 호출자는 이의
+    // 수락**인데, 그쪽이 이 필드를 아예 안 보낸다 — 그래도 `?? []` 를 남기는 이유는
+    // `null.length` 로 죽는 것과 "기록 없음"을 구분해서 다루기 위해서다(빈 배열은 아래에서
+    // "득점·도움 전부 0, 출전 기록은 유지"로 저장된다).
     const stats = dto.participants ?? [];
     const [gameParticipants, sides, roster] = await Promise.all([
       stats.length === 0

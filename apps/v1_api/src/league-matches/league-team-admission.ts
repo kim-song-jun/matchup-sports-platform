@@ -2,13 +2,14 @@ import { UnprocessableEntityException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { checkLeagueTeamAddAllowed } from './league-lifecycle-rules';
 import { tierLabel } from './league-tier-label';
+import { findTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
 
 /**
  * **팀을 리그 로스터에 넣어도 되는가** 를 DB 를 보고 판정하는 단일 경로 (Task 164 BE-3).
  *
  * ## 왜 뽑아냈나
  * 지금까지 리그 로스터에 팀이 들어오는 길은 어드민 `addTeam` 하나였다. D7 이 **참가 신청
- * 확정**이라는 두 번째 길을 여는데, 확정 훅이 `v1LeagueTeam.create` 만 부르면
+ * 확정**이라는 두 번째 길을 여는데, 확정 훅이 등록 행만 만들고 지나가면
  * `addTeam` 이 지키는 불변식을 **전부 우회한다.** 특히 형제 티어 중복은 조용히 깨진다:
  * 같은 시즌의 다른 티어에 이미 있는 팀이 확정되면
  *   · 공개 순위표에 같은 팀이 두 티어에 동시에 노출되고(로스터 기준이라 대진 없이 즉시),
@@ -30,16 +31,22 @@ export async function findLeagueAdmissionBlocker(
   tx: Prisma.TransactionClient,
   input: { leagueId: string; teamId: string },
 ): Promise<LeagueAdmissionBlocker | null> {
-  const league = await tx.v1League.findUnique({
+  // BE-5: 정본은 `V1Tournament(kind='regular_league')` 다. `sportId` 는 V1Tournament 에서
+  // non-null 이고 `seriesId`·`seasonNo` 도 거울이 그대로 옮긴다 — 판정에 쓰는 네 필드가
+  // 모두 통합 축에 있다.
+  const league = await findTournamentOnSurface(tx, ['regular_league'], {
     where: { id: input.leagueId },
     select: { id: true, sportId: true, seriesId: true, seasonNo: true },
   });
   if (league === null) return { kind: 'TEAM_INVALID' };
 
   const [alreadyInLeague, team] = await Promise.all([
-    tx.v1LeagueTeam.findUnique({
-      where: { leagueId_teamId: { leagueId: input.leagueId, teamId: input.teamId } },
-      select: { leagueId: true },
+    // 로스터 = `confirmed` 등록. 신청만 해 둔 팀(`draft`·`submitted` 등)은 아직 로스터가
+    // 아니므로 "이미 참가 중" 이 아니다 — 그 상태에서 운영자가 addTeam 하는 것은 정상
+    // 운영이고, `createLeagueRosterRegistration` 이 그 행을 confirmed 로 올린다.
+    tx.v1TournamentRegistration.findFirst({
+      where: { tournamentId: input.leagueId, teamId: input.teamId, status: 'confirmed' },
+      select: { tournamentId: true },
     }),
     tx.v1Team.findFirst({
       where: { id: input.teamId, status: 'active', deletedAt: null },
@@ -58,12 +65,13 @@ export async function findLeagueAdmissionBlocker(
 
   // 형제 티어 중복 — 무소속 리그(seriesId === null)엔 형제가 없으므로 볼 필요가 없다.
   if (league.seriesId === null) return null;
-  const sibling = await tx.v1League.findFirst({
+  const sibling = await findTournamentOnSurface(tx, ['regular_league'], {
     where: {
       seriesId: league.seriesId,
       seasonNo: league.seasonNo,
       id: { not: input.leagueId },
-      teams: { some: { teamId: input.teamId } },
+      // 로스터 기준 — 신청 중인 팀은 형제 티어 중복이 아니다(위와 같은 이유).
+      registrations: { some: { teamId: input.teamId, status: 'confirmed' } },
     },
     select: { tier: true },
   });
@@ -97,8 +105,8 @@ export function leagueAdmissionBlockerMessage(blocker: LeagueAdmissionBlocker): 
  * 시즌 시드 · 승계(다음 시즌 생성) · 참가 신청 확정. 마지막 하나만 등록에서 출발하므로,
  * 앞의 넷이 여기를 지난다.
  *
- * (처음엔 넷으로 셌다가 통합 스펙이 `create` 를 잡았다 — 유닛 fake 는 `v1League.create` 의
- * 중첩 `teams.createMany` 를 그냥 통과시켜서 로스터가 생겼다는 사실 자체가 안 보인다.)
+ * (처음엔 넷으로 셌다가 통합 스펙이 리그 생성을 잡았다 — 유닛 fake 는 생성 호출의 중첩
+ * 로스터 생성을 그냥 통과시켜서 로스터가 생겼다는 사실 자체가 안 보인다.)
  *
  * ## `entrySource` 를 왜 나누나
  * enum 에 `applied`·`promoted`·`seeded` 가 이미 있는데 지금까지 `seeded` 만 쓰였다.

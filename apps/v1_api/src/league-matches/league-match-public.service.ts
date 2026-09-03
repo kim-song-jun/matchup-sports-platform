@@ -21,6 +21,7 @@ import {
   toLeagueFixtureList,
 } from './league-fixture-list-source';
 import { LEAGUE_STATE_BY_STATUS } from '../tournaments/league-competition-mirror';
+import { LEAGUE_TIE_BREAK_ORDER } from './league-tie-break';
 
 const PLAYER_RECORDS_LIMIT = 30;
 const LEAGUE_LIST_DEFAULT_LIMIT = 20;
@@ -483,9 +484,7 @@ export class LeagueMatchPublicService {
       cancelledCount: cancelledFixtureCount,
     } = bucketLeagueFixtures(teamMatches, factByGameId);
 
-    const tieBreakOrder = (league.tieBreakJson as { order?: LeagueTieBreakCriterion[] }).order ?? [
-      'points', 'goalDifference', 'goalsFor', 'headToHead',
-    ];
+    const tieBreakOrder = LEAGUE_TIE_BREAK_ORDER;
     // calculateLeagueStandingsWithTieBreakInfo 는 calculateLeagueStandings 와 완전히 같은
     // 정렬을 하면서 tie-break 가 전부 소진돼 팀ID 사전순 폴백으로 갈린 그룹도 함께
     // 돌려준다(감사 H-5) -- "강등당한 팀이 왜 강등인지 납득할 근거가 없다"는 문제를

@@ -28,6 +28,7 @@ import {
   calculateLeagueStandingsWithTieBreakInfo,
   type LeagueTieBreakCriterion,
 } from '../league-matches/league-standings';
+import { LEAGUE_TIE_BREAK_ORDER } from '../league-matches/league-tie-break';
 
 /** `V1CompetitionConfigVersion.tieBreak`(Json)에 담긴 승리 승점 기본값 — 프리셋 전부가 3이다. */
 const DEFAULT_WIN_POINTS = 3;
@@ -398,12 +399,7 @@ export class TournamentsReadService {
 
     const buckets = bucketLeagueFixtures(teamMatches, factByGameId);
     const teamNameById = new Map(league.teams.map((entry) => [entry.teamId, entry.team.name]));
-    const tieBreakOrder = (league.tieBreakJson as { order?: LeagueTieBreakCriterion[] }).order ?? [
-      'points',
-      'goalDifference',
-      'goalsFor',
-      'headToHead',
-    ];
+    const tieBreakOrder = LEAGUE_TIE_BREAK_ORDER;
     const { standings: leagueStandings } = calculateLeagueStandingsWithTieBreakInfo({
       teamIds: league.teams.map((entry) => entry.teamId),
       fixtures: buckets.confirmed,

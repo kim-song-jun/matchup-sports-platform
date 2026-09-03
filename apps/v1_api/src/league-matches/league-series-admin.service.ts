@@ -36,8 +36,8 @@ import {
   leagueMirrorCreateData,
   toMirrorSource,
 } from '../tournaments/league-competition-mirror';
+import { LEAGUE_TIE_BREAK_ORDER } from './league-tie-break';
 
-const DEFAULT_TIE_BREAK_ORDER = ['points', 'goalDifference', 'goalsFor', 'headToHead'] as const;
 const SEASON_LENGTH_FALLBACK_DAYS = 90;
 
 @Injectable()
@@ -303,7 +303,7 @@ export class LeagueSeriesAdminService {
               createdByAdminUserId: admin.id,
               startsOn,
               endsOn,
-              tieBreakJson: { order: DEFAULT_TIE_BREAK_ORDER },
+              tieBreakJson: { order: LEAGUE_TIE_BREAK_ORDER },
               seriesId,
               tier: tier.tier,
               seasonNo: 1,
@@ -647,7 +647,7 @@ export class LeagueSeriesAdminService {
               createdByAdminUserId: admin.id,
               startsOn: nextStartsOn,
               endsOn: nextEndsOn,
-              tieBreakJson: { order: DEFAULT_TIE_BREAK_ORDER },
+              tieBreakJson: { order: LEAGUE_TIE_BREAK_ORDER },
               seriesId,
               tier,
               seasonNo: nextSeasonNo,

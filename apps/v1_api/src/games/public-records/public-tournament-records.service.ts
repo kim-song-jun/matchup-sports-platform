@@ -49,6 +49,7 @@ import {
   leagueFixtureListOrder,
   leagueFixtureListWhere,
 } from '../../league-matches/league-fixture-list-source';
+import { LEAGUE_TIE_BREAK_ORDER } from '../../league-matches/league-tie-break';
 
 /**
  * A fixture/match this route never returns individually and never lists in
@@ -873,12 +874,7 @@ export class PublicTournamentRecordsService {
       teamMatches,
       new Map(facts.map((fact) => [fact.gameId, fact])),
     );
-    const tieBreakOrder = (league.tieBreakJson as { order?: LeagueTieBreakCriterion[] }).order ?? [
-      'points',
-      'goalDifference',
-      'goalsFor',
-      'headToHead',
-    ];
+    const tieBreakOrder = LEAGUE_TIE_BREAK_ORDER;
     const teamNameById = new Map(league.teams.map((entry) => [entry.teamId, entry.team.name]));
     const teamLogoById = new Map(
       league.teams.map((entry) => [entry.teamId, entry.team.profile?.logoUrl ?? null]),

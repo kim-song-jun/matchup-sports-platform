@@ -41,12 +41,14 @@ import {
   RevertLeagueCompletionDto,
   UpdateLeagueFixtureDto,
 } from './dto/league-match.dto';
+import { LEAGUE_TIE_BREAK_ORDER } from './league-tie-break';
+import { findTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
+import { LEAGUE_STATE_BY_STATUS } from '../tournaments/league-competition-mirror';
 
 // 그룹 B 감사 결함 1: 팀 제외로 인한 대진 취소는 운영자 개별 사유가 아니라 시스템이
 // 판단한 부수효과다 — cancelFixture(운영자 사유 필수)와 구분되는 고정 사유 문자열.
 const TEAM_REMOVAL_CANCEL_REASON = '리그 참가팀에서 제외돼 자동으로 취소했어요.';
 
-const DEFAULT_TIE_BREAK_ORDER = ['points', 'goalDifference', 'goalsFor', 'headToHead'] as const;
 const DEFAULT_FIXTURE_PLACE_NAME = '장소 미정';
 
 /**
@@ -167,7 +169,7 @@ export class LeagueMatchAdminService {
           createdByAdminUserId: admin.id,
           startsOn,
           endsOn,
-          tieBreakJson: { order: DEFAULT_TIE_BREAK_ORDER },
+          tieBreakJson: { order: LEAGUE_TIE_BREAK_ORDER },
           teams: { createMany: { data: uniqueTeamIds.map((teamId) => ({ teamId })) } },
         },
         include: { sport: { select: { code: true } } },
@@ -206,28 +208,46 @@ export class LeagueMatchAdminService {
     // DTO 검증이 /i 라 'INDEPENDENT'·대문자 uuid 도 통과한다 — 소문자로 정규화해야
     // 리터럴 비교와 (소문자로 저장되는) uuid 매칭이 어긋나지 않는다.
     const normalized = seriesId?.toLowerCase();
-    const rows = await this.prisma.v1League.findMany({
-      where:
-        normalized === 'independent'
-          ? { seriesId: null }
-          : normalized
-            ? { seriesId: normalized }
-            : undefined,
+    const seriesFilter =
+      normalized === 'independent' ? { seriesId: null } : normalized ? { seriesId: normalized } : {};
+    const rows = await this.prisma.v1Tournament.findMany({
+      where: { kind: 'regular_league', deletedAt: null, ...seriesFilter },
       orderBy: { createdAt: 'desc' },
-      include: {
-        _count: { select: { teams: true, teamMatches: true } },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        scheduledAt: true,
+        scheduledEndAt: true,
+        seriesId: true,
+        tier: true,
+        seasonNo: true,
+        // 로스터 = confirmed 등록. 신청만 들어온 팀은 참가팀 수에 넣지 않는다 — 예전
+        // `_count.teams` 가 세던 `V1LeagueTeam` 이 정확히 그 집합이다.
+        _count: { select: { registrations: { where: { status: 'confirmed' } } } },
         series: { select: { title: true } },
       },
     });
+    // 대진 수는 따로 센다. `V1TeamMatch.leagueId` 는 아직 레거시 테이블을 가리켜
+    // (`V1Tournament` 쪽 relation 이 없다) `_count` 로 함께 셀 수 없다 — 그 FK 재타깃은
+    // BE-5 ④ drop 의 몫이다. id 는 두 축이 같으므로 leagueId 로 그대로 묶인다.
+    const fixtureCounts = await this.prisma.v1TeamMatch.groupBy({
+      by: ['leagueId'],
+      where: { leagueId: { in: rows.map((row) => row.id) } },
+      _count: { _all: true },
+    });
+    const fixtureCountByLeagueId = new Map(
+      fixtureCounts.map((row) => [row.leagueId, row._count._all]),
+    );
     return {
       items: rows.map((row) => ({
         leagueId: row.id,
         title: row.title,
-        state: row.state,
-        teamCount: row._count.teams,
-        fixtureCount: row._count.teamMatches,
-        startsOn: row.startsOn,
-        endsOn: row.endsOn,
+        state: LEAGUE_STATE_BY_STATUS[row.status],
+        teamCount: row._count.registrations,
+        fixtureCount: fixtureCountByLeagueId.get(row.id) ?? 0,
+        startsOn: row.scheduledAt,
+        endsOn: row.scheduledEndAt,
         seriesId: row.seriesId,
         seriesTitle: row.series?.title ?? null,
         // 단발 리그는 tier 가 null — "1부" 뱃지가 잘못 붙지 않도록 라벨도 null 로 내린다.
@@ -599,8 +619,15 @@ export class LeagueMatchAdminService {
       // 이 파일의 다른 파괴적 경로(:197 대진 생성, :523 재생성)와 동일하게 리그 행을 잠가
       // 동시 요청을 직렬화하고, 잠근 뒤의 **커밋된** 로스터로 다시 판정한다.
       await tx.$queryRaw`SELECT id FROM "v1_leagues" WHERE id = ${leagueId} FOR UPDATE`;
-      const remainingAfterRemoval = await tx.v1LeagueTeam.count({ where: { leagueId, teamId: { not: teamId } } });
-      const stillPresent = await tx.v1LeagueTeam.count({ where: { leagueId, teamId } });
+      // BE-5: 로스터 판정은 통합 축의 confirmed 등록으로 본다. 잠금은 위 `v1_leagues` 행
+      // 그대로다 — 두 축을 같은 트랜잭션에서 함께 쓰므로 직렬화 대상은 바뀌지 않는다
+      // (그 raw SQL 의 테이블 교체는 ④ drop 의 몫이다).
+      const remainingAfterRemoval = await tx.v1TournamentRegistration.count({
+        where: { tournamentId: leagueId, teamId: { not: teamId }, status: 'confirmed' },
+      });
+      const stillPresent = await tx.v1TournamentRegistration.count({
+        where: { tournamentId: leagueId, teamId, status: 'confirmed' },
+      });
       if (stillPresent === 0) {
         // 먼저 들어온 동시 요청이 이미 뺐다 — 같은 결과를 두 번 만들지 않는다.
         throw new NotFoundException({ code: 'LEAGUE_TEAM_NOT_FOUND', message: '이 리그에 참가 중인 팀이 아니에요.' });
@@ -1030,8 +1057,12 @@ export class LeagueMatchAdminService {
       //
       // 락 순서는 `removeTeam`(:529)·`generateFixtures`(:307)·`regenerateFixtures`(:794)와
       // 같다 — **리그 행 먼저**. 순서가 같으므로 서로 데드락하지 않는다.
-      const registeredNow = await tx.v1LeagueTeam.findMany({
-        where: { leagueId, teamId: { in: [dto.homeTeamId, dto.awayTeamId] } },
+      const registeredNow = await tx.v1TournamentRegistration.findMany({
+        where: {
+          tournamentId: leagueId,
+          teamId: { in: [dto.homeTeamId, dto.awayTeamId] },
+          status: 'confirmed',
+        },
         select: { teamId: true },
       });
       const registeredIds = new Set(registeredNow.map((row) => row.teamId));
@@ -1189,14 +1220,19 @@ export class LeagueMatchAdminService {
    */
   async openRegistration(user: V1AuthUser, leagueId: string, dto: OpenLeagueRegistrationDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
-    const league = await this.prisma.v1League.findUnique({
-      where: { id: leagueId },
-      select: { id: true, state: true },
+    // BE-5: 정본은 통합 축이다. **`status` 를 `state` 로 역매핑하지 않는다** — 바로 아래
+    // `openRegistration` 이 거울만 `open` 으로 올리고 `V1League.state` 는 `draft` 로 두기
+    // 때문에 그 매핑은 애초에 단사가 아니다. 대신 이 자리가 실제로 묻는 것("아직 시작하지
+    // 않았나")을 status 로 직접 표현한다: `draft`(신청 열기 전) 와 `open`(이미 열어 둠,
+    // 마감일 갱신) 둘 다 예전 `state === 'draft'` 에 해당한다.
+    const league = await findTournamentOnSurface(this.prisma, ['regular_league'], {
+      where: { id: leagueId, deletedAt: null },
+      select: { id: true, status: true },
     });
     if (league === null) {
       throw new NotFoundException({ code: 'LEAGUE_NOT_FOUND', message: '리그를 찾을 수 없어요.' });
     }
-    if (league.state !== 'draft') {
+    if (league.status !== 'draft' && league.status !== 'open') {
       // 이미 시작했거나 끝난 리그에 신청을 열면, 대진이 짜인 뒤 팀이 들어오는 상태가 된다.
       throw new ConflictException({
         code: 'LEAGUE_NOT_DRAFT',
@@ -1251,15 +1287,18 @@ export class LeagueMatchAdminService {
 
   async revertCompletion(user: V1AuthUser, leagueId: string, dto: RevertLeagueCompletionDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
-    const league = await this.prisma.v1League.findUnique({ where: { id: leagueId }, select: { id: true, state: true } });
+    const league = await findTournamentOnSurface(this.prisma, ['regular_league'], {
+      where: { id: leagueId, deletedAt: null },
+      select: { id: true, status: true },
+    });
     if (league === null) {
       throw new NotFoundException({ code: 'LEAGUE_NOT_FOUND', message: '리그를 찾을 수 없어요.' });
     }
-    if (league.state === 'active') {
+    if (league.status === STATUS_BY_LEAGUE_STATE.active) {
       // 이미 active면 멱등 처리 — Task 69/73의 accept/reject alreadyProcessed 계약과 동일.
       return { leagueId: league.id, state: 'active' as const, alreadyProcessed: true };
     }
-    if (league.state !== 'completed') {
+    if (league.status !== STATUS_BY_LEAGUE_STATE.completed) {
       // draft(대진조차 없는 리그)는 되돌릴 completed 상태 자체가 없다.
       throw new ConflictException({
         code: 'LEAGUE_NOT_COMPLETED',
@@ -1325,13 +1364,26 @@ export class LeagueMatchAdminService {
   }
 
   private async loadLeague(leagueId: string) {
-    const league = await this.prisma.v1League.findUnique({
-      where: { id: leagueId },
+    const league = await findTournamentOnSurface(this.prisma, ['regular_league'], {
+      where: { id: leagueId, deletedAt: null },
       // DB 반환 순서는 정렬을 보장하지 않는다(league-fixture-generator의 F1과 같은 문제).
       // 라운드로빈 커널의 홈 균형 tie-break가 입력 순서에 의존하므로 등록순(createdAt,
       // createMany 동시 등록 동률이면 teamId)으로 명시 정렬해 대진이 실행마다 흔들리지 않게 한다.
-      include: {
-        teams: {
+      //
+      // BE-5: 로스터의 정렬 기준이 그대로 보존된다 — 등록 행을 만드는 두 경로가 모두 로스터
+      // 행과 **같은 createdAt** 을 쓴다(`createLeagueRosterRegistration` 의 createdAt 인자,
+      // 그리고 백필이 옮긴 원본 시각). 그래서 이 정렬은 예전과 같은 순서를 낸다.
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        sportId: true,
+        regionId: true,
+        // 거울이 `startsOn` 을 여기 담는다(leagueMirrorCreateData).
+        scheduledAt: true,
+        registrations: {
+          // 로스터 = confirmed 등록. 신청만 들어온 팀은 대진 대상이 아니다.
+          where: { status: 'confirmed' },
           select: { teamId: true },
           orderBy: [{ createdAt: 'asc' }, { teamId: 'asc' }],
         },
@@ -1340,7 +1392,25 @@ export class LeagueMatchAdminService {
     if (league === null) {
       throw new NotFoundException({ code: 'LEAGUE_NOT_FOUND', message: '리그를 찾을 수 없어요.' });
     }
-    return league;
+    // `scheduledAt`·`regionId` 는 V1Tournament 에서 nullable 이지만 리그 거울은 둘 다 항상
+    // 채운다(`leagueMirrorCreateData`, 원본 V1League 에서 둘 다 non-null). 도달했다면 거울이
+    // 깨진 것이고, 날짜·지역 없이 대진을 생성하면 조용히 잘못된 데이터가 남는다.
+    if (league.scheduledAt === null || league.regionId === null) {
+      throw new ConflictException({
+        code: 'LEAGUE_MIRROR_MISSING',
+        message: '이 리그는 통합 대회 축의 일정·지역 정보가 비어 있어요.',
+      });
+    }
+    // 호출부는 `league.teams`·`league.state`·`league.startsOn` 을 그대로 쓴다 — 이름과
+    // 값만 맞춰 돌려주고 응답 계약은 건드리지 않는다(BE-5 는 저장소 축만 옮긴다).
+    const { registrations, scheduledAt, status, regionId, ...rest } = league;
+    return {
+      ...rest,
+      regionId,
+      state: LEAGUE_STATE_BY_STATUS[status],
+      startsOn: scheduledAt,
+      teams: registrations,
+    };
   }
 
   // 참가 팀들이 (이 리그든 다른 리그든, 일반 팀매치든) 과거에 실제로 썼던 장소를

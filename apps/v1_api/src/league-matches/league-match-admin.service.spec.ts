@@ -116,6 +116,19 @@ function createFake() {
     // `updateMany` 는 백필 전에는 0행이 정상이라(거울이 아직 없다) count 0 을 준다.
     // **인자를 잡아 둔다** — 호출 여부만 보면 `where` 에서 `kind` 가드가 빠져도 통과한다.
     v1Tournament: {
+      // BE-5: 읽기가 통합 축으로 옮겨졌다. 거울은 `startsOn`→`scheduledAt`,
+      // `state`→`status` 로 담으므로 fake 도 그 모양이어야 한다 — 옛 모양(`state`)을 그대로
+      // 두면 서비스가 `LEAGUE_STATE_BY_STATUS[undefined]` 를 읽어 조용히 통과한다.
+      findFirst: track('v1Tournament.findFirst', async () => ({
+        id: 'league-1',
+        title: '테스트 리그',
+        sportId: 'sport-futsal',
+        regionId: 'region-1',
+        scheduledAt: new Date('2026-09-05T00:00:00.000Z'),
+        scheduledEndAt: new Date('2026-11-05T00:00:00.000Z'),
+        status: 'draft',
+        registrations: [{ teamId: 'team-a' }, { teamId: 'team-b' }],
+      })),
       updateMany: track('v1Tournament.updateMany', async (args: FakeState['mirrorUpdates'][number]) => {
         state.mirrorUpdates.push(args);
         return { count: 0 };
@@ -146,6 +159,25 @@ function createFake() {
       findMany: track('v1LeagueTeam.findMany', async (args: { where: { teamId: { in: string[] } } }) =>
         args.where.teamId.in.filter((id) => state.registeredTeamIds.has(id)).map((teamId) => ({ teamId })),
       ),
+    },
+    // BE-5: 로스터 판정이 통합 축의 confirmed 등록으로 옮겨졌다. 같은 `registeredTeamIds`
+    // 를 본다 — 두 fake 가 다른 집합을 보면 어느 쪽이 진짜인지 스펙이 못 가른다.
+    v1TournamentRegistration: {
+      upsert: track('v1TournamentRegistration.upsert', async () => ({})),
+      findFirst: track('v1TournamentRegistration.findFirst', async (args: { where: { teamId: string } }) =>
+        state.registeredTeamIds.has(args.where.teamId) ? { tournamentId: 'league-1' } : null,
+      ),
+      findMany: track('v1TournamentRegistration.findMany', async (args: { where: { teamId: { in: string[] } } }) =>
+        args.where.teamId.in.filter((id) => state.registeredTeamIds.has(id)).map((teamId) => ({ teamId })),
+      ),
+      count: track('v1TournamentRegistration.count', async (args: { where: { teamId?: string | { not: string } } }) => {
+        const teamId = args.where.teamId;
+        if (typeof teamId === 'string') return state.registeredTeamIds.has(teamId) ? 1 : 0;
+        if (teamId !== undefined) {
+          return [...state.registeredTeamIds].filter((id) => id !== teamId.not).length;
+        }
+        return state.registeredTeamIds.size;
+      }),
     },
     v1TeamMatch: {
       count: track('v1TeamMatch.count', async () => 0),
@@ -486,7 +518,8 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
       expect(state.scheduleCreates).toHaveLength(0);
       // 재조회는 **리그 행을 잠근 뒤**여야 한다 — 순서가 뒤집히면 잠금이 보호하는 게 없다.
       const lockAt = state.calls.indexOf('$queryRaw');
-      const recheckAt = state.calls.indexOf('v1LeagueTeam.findMany');
+      // BE-5: 잠근 뒤 다시 읽는 대상이 통합 축의 confirmed 등록으로 옮겨졌다.
+      const recheckAt = state.calls.indexOf('v1TournamentRegistration.findMany');
       expect(lockAt).toBeGreaterThanOrEqual(0);
       expect(recheckAt).toBeGreaterThan(lockAt);
     });
@@ -549,20 +582,48 @@ describe('LeagueMatchAdminService.addTeam — 형제 티어 중복 게이트', (
         }),
         findFirst: jest.fn().mockResolvedValue(siblingLeague),
       },
+      // BE-5: 리그 조회와 형제 티어 조회가 둘 다 통합 축(`v1Tournament.findFirst`)으로
+      // 옮겨졌다. **호출 순서로 구분하지 않는다** — 경로마다 호출 횟수가 달라서 순서 기반
+      // mock 은 다른 케이스에서 조용히 어긋난다. `where` 모양으로 가른다:
+      // 형제 조회만 `registrations: { some }` 를 담는다.
+      // (`findTournamentOnSurface` 가 kind 조건과 AND 로 감싸므로 안쪽을 본다.)
+      v1Tournament: {
+        findFirst: jest.fn(async (args: { where: { AND?: Array<Record<string, unknown>> } }) => {
+          const inner = (args.where.AND?.[1] ?? {}) as Record<string, unknown>;
+          if ('registrations' in inner) return siblingLeague;
+          return {
+            id: LEAGUE_ID,
+            title: '테스트 리그',
+            sportId: 'sport-futsal',
+            regionId: 'region-1',
+            scheduledAt: new Date('2026-09-05T00:00:00.000Z'),
+            scheduledEndAt: new Date('2026-11-05T00:00:00.000Z'),
+            status: 'draft',
+            seriesId: SERIES_ID,
+            seasonNo: 1,
+            registrations: [{ teamId: 'team-a' }],
+          };
+        }),
+      },
       v1Team: {
         findFirst: jest.fn().mockResolvedValue({ id: NEW_TEAM_ID, sportId: 'sport-futsal' }),
         findUnique: jest.fn().mockResolvedValue({ ownerUserId: 'owner-1' }),
       },
       v1TeamMatch: { count: jest.fn().mockResolvedValue(0) },
-      // 로스터와 짝이 되는 confirmed 등록(BE-3 ⑤) — `V1Team.ownerUserId` 를 읽는다.
-      v1TournamentRegistration: { upsert: jest.fn().mockResolvedValue({}) },
       v1LeagueTeam: {
         create: jest.fn().mockResolvedValue({}),
-        // `findLeagueAdmissionBlocker` 가 "이미 이 리그에 있나" 를 여기로 본다. 로스터를
-        // 실제로 반영해야 한다 — 무조건 null 을 주면 중복 게이트가 항상 통과해서
-        // ALREADY_IN_LEAGUE 를 지워도 green 이 된다.
         findUnique: jest.fn(async (args: { where: { leagueId_teamId: { teamId: string } } }) =>
           args.where.leagueId_teamId.teamId === 'team-a' ? { leagueId: LEAGUE_ID } : null,
+        ),
+      },
+      // 로스터와 짝이 되는 confirmed 등록(BE-3 ⑤) — `V1Team.ownerUserId` 를 읽는다.
+      v1TournamentRegistration: {
+        upsert: jest.fn().mockResolvedValue({}),
+        // `findLeagueAdmissionBlocker` 가 "이미 이 리그에 있나" 를 여기로 본다(BE-5 이후
+        // confirmed 등록 기준). 로스터를 **실제로 반영해야** 한다 — 무조건 null 을 주면
+        // 중복 게이트가 항상 통과해서 ALREADY_IN_LEAGUE 를 지워도 green 이 된다.
+        findFirst: jest.fn(async (args: { where: { teamId: string } }) =>
+          args.where.teamId === 'team-a' ? { tournamentId: LEAGUE_ID } : null,
         ),
       },
     };
@@ -592,10 +653,20 @@ describe('LeagueMatchAdminService.addTeam — 형제 티어 중복 게이트', (
 
     // 거부됐으면 로스터에 아무것도 안 쓴다 — 검증 게이트를 통과한 뒤에야 create를 부른다.
     expect(prisma.v1LeagueTeam.create).not.toHaveBeenCalled();
-    expect(prisma.v1League.findFirst).toHaveBeenCalledWith({
-      where: { seriesId: SERIES_ID, seasonNo: 1, id: { not: LEAGUE_ID }, teams: { some: { teamId: NEW_TEAM_ID } } },
-      select: { tier: true },
+    // BE-5: 형제 조회가 통합 축으로 옮겨졌다. `findTournamentOnSurface` 가 kind 조건을
+    // AND 로 감싸므로 안쪽 조건을 본다 — 감싸는 부분까지 단언하면 헬퍼 구현에 묶인다.
+    const siblingCall = prisma.v1Tournament.findFirst.mock.calls.find(
+      ([args]: [{ where: { AND?: Array<Record<string, unknown>> } }]) =>
+        'registrations' in (args.where.AND?.[1] ?? {}),
+    );
+    expect(siblingCall).toBeDefined();
+    expect(siblingCall[0].where.AND[1]).toEqual({
+      seriesId: SERIES_ID,
+      seasonNo: 1,
+      id: { not: LEAGUE_ID },
+      registrations: { some: { teamId: NEW_TEAM_ID, status: 'confirmed' } },
     });
+    expect(siblingCall[0].select).toEqual({ tier: true });
   });
 
   it('형제 티어에 없으면 통과해서 로스터에 팀이 추가된다', async () => {
@@ -658,13 +729,31 @@ describe('LeagueMatchAdminService.removeTeam — 대진 취소 알림과 제외 
         update: jest.fn().mockResolvedValue({}),
       },
       v1LeagueTeam: {
+        deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      // BE-5: 로스터 판정이 통합 축의 confirmed 등록으로 옮겨졌다.
+      v1TournamentRegistration: {
         count: jest.fn().mockImplementation(async ({ where }: any) => {
           // remainingAfterRemoval: where.teamId = { not: teamId } → 제거 후 남는 팀 수(2).
           if (where.teamId && typeof where.teamId === 'object') return 2;
           // stillPresent: where.teamId = teamId(원시값) → 아직 로스터에 있음(1).
           return 1;
         }),
-        deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      // 리그 조회도 통합 축이다. `settle()` 이 조기 반환하도록 진행중이 아닌 status 를 둔다.
+      v1Tournament: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: LEAGUE_ID,
+          title: '테스트 리그',
+          sportId: 'sport-futsal',
+          regionId: 'region-1',
+          scheduledAt: new Date('2026-09-05T00:00:00.000Z'),
+          scheduledEndAt: new Date('2026-11-05T00:00:00.000Z'),
+          status: 'draft',
+          registrations: [{ teamId: REMOVED_TEAM }, { teamId: OPPONENT_TEAM }, { teamId: OTHER_HOST_TEAM }],
+        }),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
       v1TeamMatchApplication: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       v1TeamSchedule: { findMany: jest.fn().mockResolvedValue([]) },

@@ -33,6 +33,7 @@ export const STATUS_BY_LEAGUE_STATE: Record<V1LeagueState, V1TournamentStatus> =
   [V1LeagueState.completed]: V1TournamentStatus.completed,
 };
 
+
 /**
  * 종목 코드 → 대회 설정 버전. 리그는 축구 계열만 있고(2026-08-30 실측 88개 전부 futsal),
  * 그 외는 축구 설정으로 떨어진다.

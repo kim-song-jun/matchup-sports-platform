@@ -23,6 +23,7 @@ import {
   useV1UpdateLeagueFixture,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { expandWeeklyFixtureDates } from '@/lib/league-fixture-dates';
 import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
 import { fromDatetimeLocalValue, toDatetimeLocalValue } from '@/components/team-schedules/team-schedules.view-model';
 import { RecentVenueChips } from '@/components/v1-ui/create-form-fields';
@@ -198,20 +199,50 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
         })
       : null;
 
-  const buildFixtureFormPayload = (): V1GenerateLeagueFixturesPayload => ({
-    weeksCount,
-    ...(dayOfWeek === '' ? {} : { schedule: { dayOfWeek, time } }),
-    ...(placeName.trim() === '' ? {} : { placeName: placeName.trim() }),
-    ...(durationValue === null
-      ? {}
-      : {
-          timing: {
-            gameDurationMinutes: durationValue,
-            ...(breakValue === null ? {} : { breakMinutes: breakValue }),
-            ...(gamesPerDayValue === null ? {} : { gamesPerTeamPerDay: gamesPerDayValue }),
-          },
-        }),
-  });
+  // **요일을 날짜 목록으로 전개해서 보낸다.** 서버는 요일을 모른다(Task 164 BE-2) —
+  // `schedule` 은 `{ dates, time }` 이고, 요일로 고르는 편의는 화면이 제공한다.
+  // 전개 규칙(기준일 = max(리그 시작일, 오늘) · 정확히 weeksCount 개 · 첫 날의 시각이
+  // 이미 지났으면 한 주 밀어냄)은 `lib/league-fixture-dates.ts` 가 소유하고 그 테스트가 지킨다.
+  //
+  // **시작일이 없으면 대진 조작 자체를 잠근다.** 전개 함수는 시작일이 필수라 던지는데,
+  // 그걸 오늘로 떨어뜨려 넘기면 다음 달 시작 리그가 이번 주부터 경기를 갖는 **조용히 틀린
+  // 대진**이 실제로 생성된다(서버는 과거만 거부한다). 응답에 이 필드가 없는 건 서버가
+  // 구버전일 때뿐이므로, 만들지 못하게 막고 새로고침을 안내하는 쪽이 맞다. 표·참가팀·취소는
+  // 그대로 쓸 수 있다 — 잠그는 건 생성·미리보기·재생성 세 버튼뿐이다.
+  const leagueStartsOnAt = series.startsOn === undefined ? null : new Date(series.startsOn);
+  const hasLeagueStartsOn = leagueStartsOnAt !== null && !Number.isNaN(leagueStartsOnAt.getTime());
+
+  // **날짜는 렌더가 아니라 보내는 순간에 계산한다.** 렌더 시점 값을 들고 있으면 운영자가
+  // 화면을 열어 둔 채 시각이 지났을 때(예: 금 17:59 에 열어 두고 18:05 에 누름) 이미 지난
+  // 날짜를 보내 서버가 422 `LEAGUE_SCHEDULE_DATE_PAST` 로 거부한다 — 운영자는 값을 아무것도
+  // 바꾸지 않았는데 갑자기 실패한다. `buildFixtureFormPayload` 는 생성·재생성·미리보기
+  // 세 호출이 공유하므로 여기 한 곳만 옮기면 셋 다 클릭 시점 값을 쓴다.
+  const buildFixtureFormPayload = (): V1GenerateLeagueFixturesPayload => {
+    const dates =
+      !hasLeagueStartsOn || dayOfWeek === '' || time.trim() === ''
+        ? []
+        : expandWeeklyFixtureDates({
+            startsOn: series.startsOn,
+            dayOfWeek,
+            time,
+            weeksCount,
+            now: new Date(),
+          });
+    return {
+      weeksCount,
+      ...(dates.length === 0 ? {} : { schedule: { dates, time } }),
+      ...(placeName.trim() === '' ? {} : { placeName: placeName.trim() }),
+      ...(durationValue === null
+        ? {}
+        : {
+            timing: {
+              gameDurationMinutes: durationValue,
+              ...(breakValue === null ? {} : { breakMinutes: breakValue }),
+              ...(gamesPerDayValue === null ? {} : { gamesPerTeamPerDay: gamesPerDayValue }),
+            },
+          }),
+    };
+  };
 
   // 경기 시간 없이 휴식/팀당 경기 수만 채우면 서버가 400을 낸다(timing.gameDurationMinutes 필수) —
   // 요일-시각 짝 검증과 같은 방식으로 제출 전에 먼저 알려준다. 정수가 아닌 입력도 여기서 차단한다
@@ -609,7 +640,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
             <button
               type="button"
               onClick={onPreview}
-              disabled={previewFixtures.isPending}
+              disabled={previewFixtures.isPending || !hasLeagueStartsOn}
               className="min-h-[44px] rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--text-strong)] disabled:opacity-50"
             >
               미리보기
@@ -617,12 +648,13 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
             <button
               type="button"
               onClick={onGenerate}
-              disabled={generateFixtures.isPending}
+              disabled={generateFixtures.isPending || !hasLeagueStartsOn}
               className="min-h-[44px] rounded-xl bg-blue-500 px-4 text-sm font-semibold text-white disabled:opacity-50"
             >
               라운드로빈 대진 생성
             </button>
           </div>
+          {!hasLeagueStartsOn && <MissingStartsOnNotice />}
           <TimingSuggestionRow
             suggestion={timingSuggestion}
             showNoFit={showTimingNoFit}
@@ -718,7 +750,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
               <button
                 type="button"
                 onClick={onPreview}
-                disabled={previewFixtures.isPending}
+                disabled={previewFixtures.isPending || !hasLeagueStartsOn}
                 className="min-h-[44px] rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--text-strong)] disabled:opacity-50"
               >
                 미리보기
@@ -726,11 +758,13 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
               <button
                 type="button"
                 onClick={() => setRegenerateModalOpen(true)}
-                className="min-h-[44px] rounded-xl bg-[var(--button-fill-warning)] px-4 text-sm font-semibold text-white hover:bg-[var(--button-fill-warning-hover)] transition-colors"
+                disabled={!hasLeagueStartsOn}
+                className="min-h-[44px] rounded-xl bg-[var(--button-fill-warning)] px-4 text-sm font-semibold text-white hover:bg-[var(--button-fill-warning-hover)] transition-colors disabled:opacity-50"
               >
                 대진 재생성
               </button>
             </div>
+            {!hasLeagueStartsOn && <MissingStartsOnNotice />}
             <div className="mt-3 flex flex-col gap-3">
               <TimingSuggestionRow
                 suggestion={timingSuggestion}
@@ -1160,6 +1194,21 @@ function formatPreviewDateTime(value: string) {
  * 상태에서 "이 설정으로 만들면 이렇게 된다"를 그대로 보여준다. result가 null이면(아직
  * 안 눌렀거나 직전 생성/재생성이 성공해 초기화됐을 때) 아무것도 렌더하지 않는다.
  */
+/**
+ * 리그 시작일이 응답에 없을 때의 안내. 대진 생성·미리보기·재생성 버튼이 잠긴 이유를 알린다.
+ *
+ * 서버가 이 필드를 항상 내려주므로 정상 경로에서는 보이지 않는다 — 구버전 API 를 보고 있을 때만
+ * 나온다. 그때 **막지 않으면 요일 선택이 조용히 무시된 채 대진이 만들어진다.**
+ * `role="alert"` 로 스크린리더에도 알린다(버튼 disabled 만으로는 이유를 알 수 없다).
+ */
+function MissingStartsOnNotice() {
+  return (
+    <p role="alert" className="mt-2 text-sm text-[var(--orange700)]">
+      리그 시작일 정보를 불러오지 못했어요. 새로고침해 주세요.
+    </p>
+  );
+}
+
 function FixturePreviewPanel({
   result,
   teamNameById,

@@ -209,6 +209,33 @@ describe('POST /admin/league-matches + fixtures', () => {
     },
   );
 
+  it('상세 응답은 리그 시작일을 함께 내려준다 — 대진 폼이 요일을 날짜로 전개하는 기준일이다', async () => {
+    // 서버는 요일을 모르고 `schedule.dates` 를 받는다(BE-2). 그래서 요일로 고르는 화면은
+    // "리그 시작일 이후 매주 그 요일" 을 직접 펼쳐야 하는데, 이 값이 응답에 없으면 계산 자체가
+    // 불가능하다 — 실제로 그래서 화면이 옛 `{ dayOfWeek }` 를 보내 400 이 났다.
+    const startsOn = new Date(Date.now() + 3 * 86_400_000);
+    const createRes = await request(app.getHttpServer())
+      .post('/api/v1/admin/league-matches')
+      .set('x-v1-user-id', ownerUserId)
+      .send({
+        title: '시작일 노출 리그',
+        sportId,
+        regionId,
+        startsOn: startsOn.toISOString(),
+        endsOn: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+        teamIds: [teamAId, teamBId],
+      });
+    expect(createRes.status).toBe(201);
+
+    const detailRes = await request(app.getHttpServer())
+      .get(`/api/v1/admin/league-matches/${createRes.body.data.leagueId}`)
+      .set('x-v1-user-id', ownerUserId);
+    expect(detailRes.status).toBe(200);
+    expect(detailRes.body.data.startsOn).toBeDefined();
+    // 보낸 시작일과 같은 순간이어야 한다(문자열 포맷은 다를 수 있다).
+    expect(new Date(detailRes.body.data.startsOn).getTime()).toBe(startsOn.getTime());
+  });
+
   it('요일·시각·장소 템플릿을 지정하지 않으면 기존 동작(시작일 그대로, 장소 미정)을 유지한다', async () => {
     const createRes = await request(app.getHttpServer())
       .post('/api/v1/admin/league-matches')

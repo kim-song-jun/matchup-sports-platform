@@ -101,6 +101,7 @@ describe('LeagueMatchFixturesClient', () => {
         title: '가을 풋살 리그',
         state: 'active',
         teamIds: ['t1', 't2'],
+        startsOn: '2026-09-01T00:00:00.000Z',
         recentVenues: [],
         fixtures: [
           {
@@ -159,6 +160,7 @@ describe('LeagueMatchFixturesClient', () => {
         title: '가을 풋살 리그',
         state: 'active',
         teamIds: ['t1', 't2'],
+        startsOn: '2026-09-01T00:00:00.000Z',
         recentVenues: [],
         fixtures: [
           {
@@ -190,6 +192,7 @@ describe('LeagueMatchFixturesClient', () => {
         title: '가을 풋살 리그',
         state: 'active',
         teamIds: ['t1', 't2'],
+        startsOn: '2026-09-01T00:00:00.000Z',
         fixtures: [
           { teamMatchId: 'tm-1', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched' },
         ],
@@ -220,6 +223,7 @@ describe('LeagueMatchFixturesClient', () => {
         title: '가을 풋살 리그',
         state: 'active',
         teamIds: ['t1', 't2'],
+        startsOn: '2026-09-01T00:00:00.000Z',
         fixtures: [
           { teamMatchId: 'tm-1', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched' },
         ],
@@ -261,6 +265,7 @@ describe('LeagueMatchFixturesClient', () => {
         title: '가을 풋살 리그',
         state: 'active',
         teamIds: ['t1', 't2', 't3'],
+        startsOn: '2026-09-01T00:00:00.000Z',
         fixtures: [
           { teamMatchId: 'tm-1', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched' },
           { teamMatchId: 'tm-2', title: '가을 풋살 리그 1주차', homeTeamId: 't3', awayTeamId: null, startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched' },
@@ -294,7 +299,7 @@ describe('LeagueMatchFixturesClient', () => {
   it('대진이 없으면 요일/시각/장소를 선택하지 않아도 주차 수만으로 생성할 수 있다(기존 동작 보존)', async () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1AdminLeagueMatchMock.mockReturnValue({
-      data: { leagueId: 'league-1', title: '가을 풋살 리그', state: 'draft', teamIds: ['t1', 't2'], fixtures: [] },
+      data: { leagueId: 'league-1', title: '가을 풋살 리그', startsOn: '2026-09-01T00:00:00.000Z', state: 'draft', teamIds: ['t1', 't2'], fixtures: [] },
       isPending: false,
     } as never);
     const mutateAsync = vi.fn().mockResolvedValue({ leagueId: 'league-1', createdCount: 7, teamMatchIds: [] });
@@ -312,10 +317,47 @@ describe('LeagueMatchFixturesClient', () => {
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith({ weeksCount: 7 }));
   });
 
+  it('리그 시작일이 응답에 없으면 대진 생성·미리보기를 잠그고 이유를 알린다 — 조용히 틀린 날짜로 만들지 않는다', async () => {
+    // 화면은 요일을 **리그 시작일 기준**으로 날짜 목록으로 펼쳐 보낸다. 시작일이 없다고
+    // 오늘 기준으로 떨어뜨리면 다음 달에 시작하는 리그가 이번 주부터 경기를 갖게 되고,
+    // 서버는 그걸 막지 않는다(과거만 거부한다). 만들지 못하게 막는 쪽이 맞다.
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1AdminLeagueMatchMock.mockReturnValue({
+      // startsOn 없음 — 구버전 API 를 보고 있는 상황.
+      data: { leagueId: 'league-1', title: '가을 풋살 리그', state: 'draft', teamIds: ['t1', 't2'], fixtures: [] },
+      isPending: false,
+    } as never);
+    const mutateAsync = vi.fn();
+    const previewMutateAsync = vi.fn();
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync, isPending: false } as never);
+    useV1PreviewLeagueFixturesMock.mockReturnValue({ mutateAsync: previewMutateAsync, isPending: false } as never);
+    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    // 표·참가팀 같은 나머지 화면은 그대로 떠 있어야 한다 — 흰 화면이 되면 안 된다.
+    expect(screen.getByText('참가팀 관리')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('리그 시작일 정보를 불러오지 못했어요. 새로고침해 주세요.');
+
+    const generateButton = screen.getByRole('button', { name: '라운드로빈 대진 생성' });
+    const previewButton = screen.getByRole('button', { name: '미리보기' });
+    expect(generateButton).toBeDisabled();
+    expect(previewButton).toBeDisabled();
+
+    fireEvent.click(generateButton);
+    fireEvent.click(previewButton);
+    expect(mutateAsync).not.toHaveBeenCalled();
+    expect(previewMutateAsync).not.toHaveBeenCalled();
+  });
+
   it('요일·시각·장소를 채우고 생성하면 schedule과 placeName을 함께 전달한다', async () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1AdminLeagueMatchMock.mockReturnValue({
-      data: { leagueId: 'league-1', title: '가을 풋살 리그', state: 'draft', teamIds: ['t1', 't2'], fixtures: [] },
+      data: { leagueId: 'league-1', title: '가을 풋살 리그', startsOn: '2026-09-01T00:00:00.000Z', state: 'draft', teamIds: ['t1', 't2'], fixtures: [] },
       isPending: false,
     } as never);
     const mutateAsync = vi.fn().mockResolvedValue({ leagueId: 'league-1', createdCount: 7, teamMatchIds: [] });
@@ -333,17 +375,80 @@ describe('LeagueMatchFixturesClient', () => {
     fireEvent.change(screen.getByLabelText('기본 장소'), { target: { value: '상암 풋살파크' } });
     fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
 
-    await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith({
-      weeksCount: 7,
-      schedule: { dayOfWeek: 6, time: '19:30' },
-      placeName: '상암 풋살파크',
-    }));
+    // **서버는 요일을 모른다** — 화면이 날짜 목록으로 전개해 보내야 한다(Task 164 BE-2).
+    // 정확한 날짜 계산은 시계를 주입하는 `lib/league-fixture-dates.test.ts` 가 고정하고,
+    // 여기서는 **계약**을 지킨다: dates 배열이 오고 dayOfWeek 는 가지 않는다.
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalled());
+    const payload = mutateAsync.mock.calls[0][0] as {
+      weeksCount: number;
+      schedule: { dates: string[]; time: string };
+      placeName: string;
+    };
+    expect(payload.weeksCount).toBe(7);
+    expect(payload.placeName).toBe('상암 풋살파크');
+    expect(payload.schedule.time).toBe('19:30');
+    expect(payload.schedule).not.toHaveProperty('dayOfWeek');
+    // 주차 수만큼, 전부 토요일(KST), 전부 미래 — 서버가 거부하지 않는 값이어야 한다.
+    expect(payload.schedule.dates).toHaveLength(7);
+    // 기준 시각은 **루프 전에 한 번** 잡는다. 루프 안에서 매번 `Date.now()` 를 읽으면
+    // 기준선이 반복마다 앞으로 가서, 첫 날짜가 지금 직후인 경계에서 간헐적으로 깨진다.
+    // 서버의 과거 판정도 `startAt < now` 라 같은 순간은 통과한다 — 그래서 `>=` 다.
+    const sentAt = Date.now();
+    for (const date of payload.schedule.dates) {
+      expect(date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      const [y, m, d] = date.split('-').map(Number);
+      expect(new Date(Date.UTC(y, m - 1, d)).getUTCDay()).toBe(6);
+      expect(new Date(Date.UTC(y, m - 1, d, 19, 30) - 9 * 60 * 60 * 1000).getTime()).toBeGreaterThanOrEqual(sentAt);
+    }
+  });
+
+  it('화면을 열어 둔 채 시각이 지나면 밀린 날짜를 보낸다 — 날짜는 렌더가 아니라 전송 시점에 계산한다', async () => {
+    // 운영자가 금요일 17:59 에 폼을 채워 두고 18:05 에 [생성] 을 누르는 상황. 렌더 시점 값을
+    // 들고 있으면 이미 지난 그 날짜를 보내 서버가 422 LEAGUE_SCHEDULE_DATE_PAST 로 거부한다 —
+    // 운영자는 아무것도 안 바꿨는데 갑자기 실패한다.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      // 2026-09-04(금) 10:00 KST — 그날 18:00 은 아직 안 지났다.
+      vi.setSystemTime(new Date('2026-09-04T01:00:00.000Z'));
+      useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+      useV1AdminLeagueMatchMock.mockReturnValue({
+        data: {
+          leagueId: 'league-1', title: '가을 풋살 리그', startsOn: '2026-08-01T00:00:00.000Z',
+          state: 'draft', teamIds: ['t1', 't2'], fixtures: [],
+        },
+        isPending: false,
+      } as never);
+      const mutateAsync = vi.fn().mockResolvedValue({ leagueId: 'league-1', createdCount: 1, teamMatchIds: [], warnings: [] });
+      useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync, isPending: false } as never);
+      useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+
+      render(
+        <Providers>
+          <LeagueMatchFixturesClient leagueId="league-1" />
+        </Providers>,
+      );
+
+      fireEvent.change(screen.getByLabelText('주차 수'), { target: { value: '1' } });
+      fireEvent.change(screen.getByLabelText('요일'), { target: { value: '5' } });
+      fireEvent.change(screen.getByLabelText('시작 시각'), { target: { value: '18:00' } });
+      // 여기까지의 렌더 시점 계산이라면 첫 날은 2026-09-04 다.
+
+      // 같은 날 20:00 KST — 18:00 이 지났다. 폼 값은 아무것도 바꾸지 않아 재렌더도 없다.
+      vi.setSystemTime(new Date('2026-09-04T11:00:00.000Z'));
+      fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+
+      expect(mutateAsync).toHaveBeenCalledTimes(1);
+      const payload = mutateAsync.mock.calls[0][0] as { schedule: { dates: string[] } };
+      expect(payload.schedule.dates).toEqual(['2026-09-11']);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('요일을 고르고 시각을 비우면 서버 400 대신 안내 토스트를 보여주고 제출하지 않는다', async () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1AdminLeagueMatchMock.mockReturnValue({
-      data: { leagueId: 'league-1', title: '가을 풋살 리그', state: 'draft', teamIds: ['t1', 't2'], fixtures: [] },
+      data: { leagueId: 'league-1', title: '가을 풋살 리그', startsOn: '2026-09-01T00:00:00.000Z', state: 'draft', teamIds: ['t1', 't2'], fixtures: [] },
       isPending: false,
     } as never);
     const mutateAsync = vi.fn().mockResolvedValue({ leagueId: 'league-1', createdCount: 7, teamMatchIds: [] });
@@ -372,6 +477,7 @@ describe('LeagueMatchFixturesClient', () => {
         title: '가을 풋살 리그',
         state: 'draft',
         teamIds: ['t1', 't2'],
+        startsOn: '2026-09-01T00:00:00.000Z',
         fixtures: [],
         recentVenues: ['상암 풋살파크', '잠실 종합운동장'],
       },
@@ -444,6 +550,7 @@ describe('LeagueMatchFixturesClient', () => {
         title: '가을 풋살 리그',
         state: 'active',
         teamIds: ['t1', 't2'],
+        startsOn: '2026-09-01T00:00:00.000Z',
         fixtures: [
           { teamMatchId: 'tm-1', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched' },
         ],
@@ -472,7 +579,7 @@ describe('LeagueMatchFixturesClient', () => {
   it('최근 사용한 장소가 없으면 칩 영역을 렌더링하지 않는다', () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1AdminLeagueMatchMock.mockReturnValue({
-      data: { leagueId: 'league-1', title: '가을 풋살 리그', state: 'draft', teamIds: ['t1', 't2'], fixtures: [], recentVenues: [] },
+      data: { leagueId: 'league-1', title: '가을 풋살 리그', startsOn: '2026-09-01T00:00:00.000Z', state: 'draft', teamIds: ['t1', 't2'], fixtures: [], recentVenues: [] },
       isPending: false,
     } as never);
     useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
@@ -496,6 +603,7 @@ describe('LeagueMatchFixturesClient', () => {
         title: '가을 풋살 리그',
         state: 'active',
         teamIds: ['t1', 't2'],
+        startsOn: '2026-09-01T00:00:00.000Z',
         fixtures: [
           { teamMatchId: 'tm-1', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched' },
         ],
@@ -542,6 +650,7 @@ describe('LeagueMatchFixturesClient', () => {
         title: '가을 풋살 리그',
         state: 'active',
         teamIds: ['t1', 't2'],
+        startsOn: '2026-09-01T00:00:00.000Z',
         fixtures: [
           { teamMatchId: 'tm-1', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched' },
         ],
@@ -574,6 +683,7 @@ describe('LeagueMatchFixturesClient', () => {
         title: '가을 풋살 리그',
         state: 'active',
         teamIds: ['t1', 't2'],
+        startsOn: '2026-09-01T00:00:00.000Z',
         fixtures: [
           { teamMatchId: 'tm-1', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched' },
         ],
@@ -630,6 +740,7 @@ describe('LeagueMatchFixturesClient', () => {
         title: '가을 풋살 리그',
         state: 'active',
         teamIds: ['t1', 't2'],
+        startsOn: '2026-09-01T00:00:00.000Z',
         fixtures: [
           { teamMatchId: 'tm-1', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'cancelled' },
         ],
@@ -657,6 +768,7 @@ describe('LeagueMatchFixturesClient', () => {
         title: '가을 풋살 리그',
         state: 'active',
         teamIds: ['t1', 't2'],
+        startsOn: '2026-09-01T00:00:00.000Z',
         fixtures: [
           { teamMatchId: 'tm-1', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched' },
         ],
@@ -706,6 +818,7 @@ describe('LeagueMatchFixturesClient', () => {
         title: '가을 풋살 리그',
         state: 'active',
         teamIds: ['t1', 't2'],
+        startsOn: '2026-09-01T00:00:00.000Z',
         fixtures: [
           { teamMatchId: 'tm-1', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched' },
         ],
@@ -760,6 +873,7 @@ describe('LeagueMatchFixturesClient', () => {
         title: '가을 풋살 리그',
         state,
         teamIds: ['t1', 't2'],
+        startsOn: '2026-09-01T00:00:00.000Z',
         fixtures: [
           { teamMatchId: 'tm-1', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'completed' },
         ],
@@ -811,6 +925,7 @@ describe('LeagueMatchFixturesClient', () => {
         title: '가을 풋살 리그',
         state: 'active',
         teamIds: ['t1', 't2'],
+        startsOn: '2026-09-01T00:00:00.000Z',
         fixtures: [
           { teamMatchId: 'tm-not-entered', title: '1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched', resultStage: 'not_entered', homeScore: null, awayScore: null },
           { teamMatchId: 'tm-draft', title: '2주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-08T20:00:00.000Z', placeName: '장소 미정', status: 'matched', resultStage: 'draft', homeScore: null, awayScore: null },
@@ -879,6 +994,7 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
         title: '심야 풋살 리그',
         state: 'draft',
         teamIds: ['t1', 't2', 't3', 't4'],
+        startsOn: '2026-09-01T00:00:00.000Z',
         fixtures: [],
       },
       isPending: false,
@@ -916,7 +1032,8 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
     await waitFor(() =>
       expect(mutateAsync).toHaveBeenCalledWith({
         weeksCount: 7,
-        schedule: { dayOfWeek: 3, time: '22:00' },
+        // 수요일 7개가 전개돼 온다(정확한 날짜는 lib/league-fixture-dates.test.ts 가 고정).
+        schedule: { dates: expect.any(Array), time: '22:00' },
         timing: { gameDurationMinutes: 15, breakMinutes: 5, gamesPerTeamPerDay: 3 },
       }),
     );
@@ -983,7 +1100,7 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
 
   it('참가팀이 2개 미만이면 "시간창" 경고를 띄우지 않는다(원인은 팀 부족이지 시간창이 아님)', () => {
     useV1AdminLeagueMatchMock.mockReturnValue({
-      data: { leagueId: 'league-1', title: '외로운 리그', state: 'draft', teamIds: ['t1'], fixtures: [] },
+      data: { leagueId: 'league-1', title: '외로운 리그', startsOn: '2026-09-01T00:00:00.000Z', state: 'draft', teamIds: ['t1'], fixtures: [] },
       isPending: false,
     } as never);
     useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
@@ -1042,6 +1159,7 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
         title: '심야 풋살 리그',
         state: 'active',
         teamIds: ['t1', 't2'],
+        startsOn: '2026-09-01T00:00:00.000Z',
         fixtures: [
           { teamMatchId: 'tm-1', title: '심야 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched' },
         ],

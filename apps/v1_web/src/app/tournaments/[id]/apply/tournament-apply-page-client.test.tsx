@@ -275,6 +275,58 @@ describe('TournamentApplyPageClient GA events', () => {
     });
   });
 
+  it('참가비가 없는 대회는 신청 완료 화면에서 입금 안내를 그리지 않고 명단 등록으로 이끈다', async () => {
+    // 이 픽스처의 entryFee 는 0 이다. 그런데 완료 화면이 "아래 계좌로 참가비를 입금해 주세요" 를
+    // 무조건 그리고, 계좌 정보가 없으면 빨간 에러 "입금 계좌가 준비되지 않았어요" 까지 띄웠다
+    // (2026-09-04 alpha 실측 — 무료 대회 신청자 전원이 봤다). step 1·2 는 이미 entryFee 를
+    // 분기하는데 완료 화면만 빠져 있었다.
+    const createRegistrationMutateAsync = vi.fn().mockResolvedValue({ id: 'registration-1', status: 'draft' });
+    const submitRegistrationMutateAsync = vi.fn().mockResolvedValue({
+      id: 'registration-1',
+      status: 'awaiting_payment',
+      payment: null,
+      // 무료 대회라 서버가 계좌 정보를 주지 않는다 — 이게 정상이다.
+      paymentInstructions: null,
+      depositorName: '성수 풋살 크루',
+    });
+    tournamentApplyApiMocks.useV1CreateRegistration.mockReturnValue({
+      mutateAsync: createRegistrationMutateAsync,
+      isPending: false,
+    });
+    tournamentApplyApiMocks.useV1SubmitRegistration.mockReturnValue({
+      mutateAsync: submitRegistrationMutateAsync,
+      isPending: false,
+    });
+
+    render(<TournamentApplyPageClient tournamentId="tournament-1" />);
+
+    const [nextButton] = await screen.findAllByRole('button', { name: /^다음 단계/ });
+    fireEvent.click(nextButton);
+    await waitFor(() => expect(createRegistrationMutateAsync).toHaveBeenCalled());
+    fireEvent.click(await screen.findByLabelText('전체 동의'));
+    fireEvent.change(screen.getByLabelText('입금자명 *'), { target: { value: '성수 풋살 크루' } });
+    const [submitButton] = screen.getAllByRole('button', { name: '신청 제출하기' });
+    fireEvent.click(submitButton);
+    fireEvent.click(await screen.findByRole('button', { name: '확인하고 신청하기' }));
+
+    // 완료 화면에 도달했는지 먼저 확인한다 — 이게 없으면 아래 부재 단언이 공허해진다.
+    expect(await screen.findByText('신청했어요')).toBeInTheDocument();
+
+    // 돈 이야기는 하나도 나오면 안 된다.
+    expect(screen.queryByText('아래 계좌로 참가비를 입금해 주세요')).not.toBeInTheDocument();
+    expect(screen.queryByText('입금 계좌가 준비되지 않았어요. 운영팀에 문의해 주세요.')).not.toBeInTheDocument();
+    expect(screen.queryByText('입금 안내')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('입금이 확인되면 신청이 최종 확정돼요. 입금자명이 다르면 확인이 늦어질 수 있어요.'),
+    ).not.toBeInTheDocument();
+
+    // 대신 다음 할 일(명단 등록)로 이끈다 — 입금 섹션 안에 중첩돼 있어서 같이 사라지면 안 된다.
+    expect(screen.getByRole('link', { name: '선수 명단 등록' })).toBeInTheDocument();
+    expect(screen.getByText('선수 명단을 이어서 등록해요')).toBeInTheDocument();
+    // 그 안내 문구에도 결제가 남으면 안 된다 — "입금 확인을 기다리는 동안" 은 없는 절차다.
+    expect(screen.queryByText(/입금 확인을 기다리는 동안/)).not.toBeInTheDocument();
+  });
+
   describe('입금자명 입력', () => {
     it('입금자명을 비워두면 제출할 수 없고, 팀명이 자동으로 채워지지도 않는다', async () => {
       // 예전에는 선택한 팀명을 미리 채워서, 아무것도 입력하지 않아도 제출이 가능했다.

@@ -1275,6 +1275,8 @@ function PaymentGuideStep({
   const { data: registration } = useV1Registration(tournament.id, registrationId);
   const paymentInstructions =
     registration?.paymentInstructions ?? initialPaymentInstructions;
+  // 참가비 0원이면 입금 절차 자체가 없다 — 계좌 안내도, 계좌 미설정 경고도 그리지 않는다.
+  const isFreeEntry = tournament.entryFee === 0;
 
   // aria-live region ref for clipboard confirmation
   const copyLiveRef = useRef<HTMLSpanElement>(null);
@@ -1283,6 +1285,7 @@ function PaymentGuideStep({
     registrationId,
     minPlayers: tournament.minPlayers,
     maxPlayers: tournament.maxPlayers,
+    isFreeEntry: tournament.entryFee === 0,
   });
 
   function handleCopyAccount() {
@@ -1337,13 +1340,25 @@ function PaymentGuideStep({
           </svg>
         </div>
         <div className="tm-text-body-lg" style={{ color: 'var(--text-strong)', fontWeight: 700 }}>신청했어요</div>
-        <div className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>아래 계좌로 참가비를 입금해 주세요</div>
+        {/* **참가비가 없으면 돈 이야기를 하지 않는다.** step 1(요약)·step 2(안내)는 이미
+            `entryFee` 를 분기하는데 이 완료 화면만 빠져 있어서, 무료 대회 신청자 전원이
+            "계좌로 입금하라" + "입금 계좌가 준비되지 않았어요" 를 봤다(2026-09-04 alpha 실측).
+            같은 신청이 `/tournaments/{id}/my` 와 어드민 목록에서는 "결제 완료" 로 뜨는 상태였다. */}
+        <div className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+          {isFreeEntry ? '참가비가 없는 대회예요. 이제 명단을 등록해 주세요.' : '아래 계좌로 참가비를 입금해 주세요'}
+        </div>
       </div>
 
-      <section aria-labelledby="bank-guide-heading" style={{ marginTop: 12 }}>
-        <div style={{ marginLeft: -20, marginRight: -20 }}>
-          <SectionTitle id="bank-guide-heading" title="입금 안내" />
-        </div>
+      {/* 무료 대회에서는 입금 안내 제목·계좌 카드·입금 확인 안내를 모두 건너뛴다.
+          **명단 등록 섹션은 이 섹션 안에 중첩돼 있으므로 함께 숨기면 안 된다** — 무료 대회일수록
+          다음 할 일(명단 등록)로 이끄는 것이 이 화면의 유일한 역할이 된다. */}
+      <section aria-labelledby={isFreeEntry ? undefined : 'bank-guide-heading'} style={{ marginTop: 12 }}>
+        {!isFreeEntry && (
+          <div style={{ marginLeft: -20, marginRight: -20 }}>
+            <SectionTitle id="bank-guide-heading" title="입금 안내" />
+          </div>
+        )}
+        {!isFreeEntry && (
         <Card pad={0} style={{ marginTop: 8 }}>
           {paymentInstructions ? (
             <div style={{ padding: '0 16px' }}>
@@ -1398,12 +1413,15 @@ function PaymentGuideStep({
             </div>
           )}
         </Card>
+        )}
 
-        <Card pad={16} style={{ marginTop: 12, background: 'var(--grey50)' }}>
-          <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.65 }}>
-            입금이 확인되면 신청이 최종 확정돼요. 입금자명이 다르면 확인이 늦어질 수 있어요.
-          </p>
-        </Card>
+        {!isFreeEntry && (
+          <Card pad={16} style={{ marginTop: 12, background: 'var(--grey50)' }}>
+            <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.65 }}>
+              입금이 확인되면 신청이 최종 확정돼요. 입금자명이 다르면 확인이 늦어질 수 있어요.
+            </p>
+          </Card>
+        )}
 
         <section aria-labelledby="roster-next-step-heading" style={{ marginTop: 12, scrollMarginBottom: 144 }}>
           <Card pad={16}>

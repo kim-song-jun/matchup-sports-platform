@@ -91,6 +91,46 @@ export function toLeagueFixtureList(
   });
 }
 
+/**
+ * **"이 리그의 대진은 무엇이고 어떤 순서인가"** — 리그 축 팀매치 목록의 단일 술어.
+ *
+ * ## 왜 필요한가 (2026-09-03 실측)
+ * 같은 질문에 답하는 조회가 **세 벌**이었고 서로 달랐다:
+ *
+ * | 리더 | where | orderBy |
+ * |---|---|---|
+ * | 대회 상세 `/tournaments/:id` | `{ leagueId }` | `startAt asc` |
+ * | 공개 일정 `/tournaments/:id/schedule` | `{ leagueId, deletedAt: null }` | `startAt asc, id asc` |
+ * | 리그 자기 페이지 | `{ leagueId }` | `startAt asc` |
+ *
+ * `deletedAt` 차이는 **오늘은 관측되지 않는다** — 이 컬럼을 non-null 로 쓰는 코드 경로가
+ * 0건이다(전수 확인). 소프트 삭제가 실제로 구현되는 날 세 화면이 갈린다.
+ *
+ * **`id` tie-break 부재는 지금도 실재하는 문제다.** 같은 `startAt` 대진들(하루에 여러 경기를
+ * 넣는 `timing` 이 정확히 그 모양을 만든다)의 순서가 DB 반환 순서에 맡겨져 있고,
+ * **커서 페이지네이션을 붙이는 순간 그게 중복·누락으로 바뀐다.** 운영 콘솔이 그 커서를
+ * 붙이므로 여기서 결정적 순서를 못 박는다.
+ *
+ * ## 무엇을 공유하고 무엇을 공유하지 않나
+ * 공유하는 것은 **어느 행이 이 리그의 대진인가와 그 순서**뿐이다. `select` 는 공유하지
+ * 않는다 — 운영 콘솔은 게임 상태·버전·확정 리비전·라인업·에스컬레이션을 묻고, 위 세
+ * 화면은 공개 일정 표시(점수·몰수)를 묻는다. 이 파일이 `league-standings-source.ts` 를
+ * 재사용하지 않는 이유와 같다: **같은 테이블, 다른 질문.**
+ */
+export function leagueFixtureListWhere(leagueId: string): { leagueId: string; deletedAt: null } {
+  return { leagueId, deletedAt: null };
+}
+
+/**
+ * 결정적 정렬. `startAt` 만으로는 같은 날 같은 시각 경기들의 순서가 흔들린다 —
+ * `id` 가 최종 tie-break 이고, 커서도 같은 튜플을 쓴다.
+ */
+export function leagueFixtureListOrder(): [{ startAt: 'asc' }, { id: 'asc' }] {
+  // `as const` 배열 상수로 두면 Prisma 의 `orderBy`(가변 배열 타입)에 대입되지 않는다.
+  // 함수로 두면 호출부마다 새 배열을 받아 그 문제도 없고 공유 의도도 그대로다.
+  return [{ startAt: 'asc' }, { id: 'asc' }];
+}
+
 /** 두 호출부가 같은 select 를 손으로 적지 않도록 모아 둔다 — 필드가 늘면 여기만 고친다. */
 export const LEAGUE_FIXTURE_LIST_SELECT = {
   id: true,

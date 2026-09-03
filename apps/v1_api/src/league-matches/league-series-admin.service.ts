@@ -24,6 +24,8 @@ import {
   SeedSeasonDto,
   UpdateLeagueSeriesDto,
 } from './dto/league-series.dto';
+import { createLeagueRosterRegistration } from './league-team-admission';
+import { tierLabel } from './league-tier-label';
 import {
   leagueMirrorCreateData,
   toMirrorSource,
@@ -31,11 +33,6 @@ import {
 
 const DEFAULT_TIE_BREAK_ORDER = ['points', 'goalDifference', 'goalsFor', 'headToHead'] as const;
 const SEASON_LENGTH_FALLBACK_DAYS = 90;
-
-/** 화면 문구는 A/B/C 가 아니라 국내 생활체육 관행대로 "N부"다. */
-export function tierLabel(tier: number): string {
-  return `${tier}부`;
-}
 
 @Injectable()
 export class LeagueSeriesAdminService {
@@ -310,6 +307,15 @@ export class LeagueSeriesAdminService {
         });
         // dual-write — 통합 축에 같은 리그를 비춘다(같은 트랜잭션).
         await tx.v1Tournament.create({ data: leagueMirrorCreateData(toMirrorSource(league)) });
+        // 로스터와 짝이 되는 confirmed 등록. 거울을 만든 **뒤**여야 한다 — 등록의
+        // tournamentId 가 거울 행을 가리키므로 순서가 바뀌면 FK 로 막힌다.
+        for (const teamId of new Set(tier.teamIds)) {
+          await createLeagueRosterRegistration(tx, {
+            leagueId: league.id,
+            teamId,
+            entrySource: 'seeded',
+          });
+        }
         leagues.push({
           id: league.id,
           title: league.title,
@@ -630,6 +636,15 @@ export class LeagueSeriesAdminService {
           // dual-write — 통합 축에 같은 리그를 비춘다(같은 트랜잭션). 없으면 이 리그는
           // read-swap 뒤 화면에서 에러 없이 사라진다.
           await tx.v1Tournament.create({ data: leagueMirrorCreateData(toMirrorSource(league)) });
+          // 승계로 들어온 팀은 `promoted` 다 — 운영자가 손으로 넣은 `seeded` 와 다른
+          // 사건이고, 다음 시즌 참가 통보·이의 처리에서 "왜 여기 있나" 의 답이 갈린다.
+          for (const teamId of teamIds) {
+            await createLeagueRosterRegistration(tx, {
+              leagueId: league.id,
+              teamId,
+              entrySource: 'promoted',
+            });
+          }
           createdLeagues.push({ id: league.id, tier, teamCount: teamIds.length });
         }
       }

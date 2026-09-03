@@ -551,9 +551,20 @@ describe('LeagueMatchAdminService.addTeam — 형제 티어 중복 게이트', (
       },
       v1Team: {
         findFirst: jest.fn().mockResolvedValue({ id: NEW_TEAM_ID, sportId: 'sport-futsal' }),
+        findUnique: jest.fn().mockResolvedValue({ ownerUserId: 'owner-1' }),
       },
       v1TeamMatch: { count: jest.fn().mockResolvedValue(0) },
-      v1LeagueTeam: { create: jest.fn().mockResolvedValue({}) },
+      // 로스터와 짝이 되는 confirmed 등록(BE-3 ⑤) — `V1Team.ownerUserId` 를 읽는다.
+      v1TournamentRegistration: { upsert: jest.fn().mockResolvedValue({}) },
+      v1LeagueTeam: {
+        create: jest.fn().mockResolvedValue({}),
+        // `findLeagueAdmissionBlocker` 가 "이미 이 리그에 있나" 를 여기로 본다. 로스터를
+        // 실제로 반영해야 한다 — 무조건 null 을 주면 중복 게이트가 항상 통과해서
+        // ALREADY_IN_LEAGUE 를 지워도 green 이 된다.
+        findUnique: jest.fn(async (args: { where: { leagueId_teamId: { teamId: string } } }) =>
+          args.where.leagueId_teamId.teamId === 'team-a' ? { leagueId: LEAGUE_ID } : null,
+        ),
+      },
     };
     prisma.$transaction = async (fn: (tx: unknown) => Promise<unknown>) => fn(prisma);
     return prisma;

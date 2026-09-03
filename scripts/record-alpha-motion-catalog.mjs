@@ -524,7 +524,7 @@ async function main() {
   // 배포 중엔 502 — 시작 시 health 확인.
   const healthRes = await fetch(`${ORIGIN}/api/v1/health`).catch((e) => ({ ok: false, _err: e }));
   if (!healthRes.ok) {
-    throw new Error(`/api/v1/health 가 정상이 아니다(배포 중일 수 있음): ${healthRes.status ?? healthRes._err?.message}`);
+    throw new Error(`/api/v1/health 가 정상이 아니다(배포 중일 수 있음): ${healthRes._err !== undefined ? errorMessage(healthRes._err) : healthRes.status}`);
   }
 
   const browser = await chromium.launch();

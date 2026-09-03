@@ -528,6 +528,15 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 
 상세 디자인 가이드: `DESIGN.md` (`.impeccable.md`는 compatibility summary)
 
+### 레포 스킬 (`.claude/skills/`)
+
+- **`landing-rhythm`** — 랜딩·소개·온보딩·캠페인·빈 상태 카피처럼 *사용자가 훑어 읽는 화면*의
+  레이아웃·카피 기준(큰 타이틀 · 키워드→타이틀→본문→그래픽 모듈 반복 · 여백 · 강조 섹션 하나).
+  DESIGN.md 가 우선하고, 앱 셸 안 리스트/디테일/폼/유틸리티 페이지에는 쓰지 않는다.
+- **`agy-3d-graphic`** — 화면에 들어가는 3D 그래픽을 `agy`(alias `ag`) CLI 로 만들 때의 절차.
+  메시지→상징 오브젝트→style lock 프롬프트→`scripts/postprocess.py` 검증·webp·매니페스트→
+  `EmptyState illustration` 배치. 이 절차 밖에서 만든 이미지는 `public/illustrations/` 에 넣지 않는다.
+
 ### UI 착수 규칙 — A·B·C 3안 브레인스토밍 필수 (2026-08-23 사용자 지시)
 
 > **화면·컴포넌트·레이아웃을 새로 만들거나 바꾸는 작업은, 코드를 쓰기 전에 반드시

@@ -1,0 +1,19 @@
+{
+  "illustrations": [
+    {
+      "name": "matches-empty",
+      "message": "지금은 조용하지만, 휘슬만 불면 경기가 시작된다.",
+      "prompt": "SUBJECT:\nA chunky rounded coach's whistle in Teameet blue, seen from a three-quarter angle with its mouthpiece pointing lower-left, as the single main object, largest and nearest to camera.\nOne small training cone in light tint #D6E7FF with a #3182F6 band and one thick gold coin, each about 45% of the whistle's size, set back in depth behind and to the right of the whistle so the three objects form a triangle; the eye lands on the whistle first.\n\nSTYLE LOCK (do not edit):\nSoft matte clay 3D render in the style of Korean fintech app illustrations (Toss, KakaoPay). Rounded, chunky forms with thicker-than-real proportions; coins are thick cylinders with beveled rims, panels are plump, edges are softened. Single soft area light from the upper-left; clearly separated lit and shaded faces; gentle contact shadow only under each object, no cast shadow on a floor, no ground plane, no backdrop, no gradient background. Subtle ambient occlusion in crevices. No rim light, no glow, no bloom, no glossy chrome.\nPalette: primary Teameet blue #3182F6 with light tint #D6E7FF and deep shade #1B64DA for the main object; accent gold #FFC342 (with #E0A52E shade) for at most one small sub object; neutrals #F2F4F6 and #8B95A1. No other hues.\nComposition: three-quarter elevated camera, the object cluster fills about 70% of a square 1024x1024 canvas with even margins, main object slightly left of center, sub objects behind and to the right.\nStrictly no: faces, eyes, mouths, characters, mascots, people, hands, text, letters, numbers, logos, UI screens, phones, sparkles, confetti, stars in the air, floor, table, scenery.\nOutput: PNG with a fully transparent background (alpha channel), 1024x1024.",
+      "source_sha256": "2a760e36decee3537cfeecd2e45e6aa9da0bde30b1965478f0db9835eb0c6896",
+      "sizes": {
+        "320": {
+          "bytes": 13480
+        },
+        "640": {
+          "bytes": 31224
+        }
+      },
+      "created_at": "2026-09-03T15:57:00Z"
+    }
+  ]
+}

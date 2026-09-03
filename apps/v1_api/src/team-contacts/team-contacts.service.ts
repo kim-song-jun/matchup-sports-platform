@@ -10,6 +10,7 @@ import { Prisma } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { NotificationsService, type NotificationEventType } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { archiveEndedContactRooms } from './contact-room-archive';
 import {
   CreateContactBlockDto,
   CreateTeamContactDto,
@@ -101,6 +102,7 @@ export class TeamContactsService {
         where: { status: 'requested', expiresAt: { lt: now }, OR: directionOr },
         data: { status: 'expired' },
       });
+      await archiveEndedContactRooms(tx, { OR: directionOr });
 
       // 활성 = 수락된 것(만료 개념 없음) 또는 아직 만료 전인 대기 건.
       // 만료 시각이 지난 requested 는 화면에 expired 로 보이므로(그리고 위에서 이미 정리됐으므로)
@@ -245,7 +247,12 @@ export class TeamContactsService {
             sentAt: new Date(),
           },
         });
-        await tx.v1ChatRoom.update({ where: { id: room.id }, data: { lastMessageAt: message.sentAt } });
+        // 거절·철회된 컨택 방은 목록에서 치운다("종료된 컨택 보기" 로만 조회, 딥링크는 계속 열림).
+        // 수락은 대화가 시작되는 시점이라 그대로 active 다.
+        await tx.v1ChatRoom.update({
+          where: { id: room.id },
+          data: { lastMessageAt: message.sentAt, ...(nextStatus === 'accepted' ? {} : { status: 'archived' }) },
+        });
       }
       return { count: updateResult.count, chatRoomId: room?.id ?? null };
     });
@@ -305,6 +312,7 @@ export class TeamContactsService {
       where: { id: contact.id, status: 'requested', expiresAt: { lt: new Date() } },
       data: { status: 'expired' },
     });
+    await archiveEndedContactRooms(this.prisma, { id: contact.id });
     return 'expired';
   }
 
@@ -485,6 +493,7 @@ export class TeamContactsService {
       where: { toTeamId: { in: teamIds }, status: 'requested', expiresAt: { lt: new Date() } },
       data: { status: 'expired' },
     });
+    await archiveEndedContactRooms(this.prisma, { toTeamId: { in: teamIds } });
     const groups = await this.prisma.v1TeamContact.groupBy({
       by: ['toTeamId'],
       where: { toTeamId: { in: teamIds }, status: 'requested' },

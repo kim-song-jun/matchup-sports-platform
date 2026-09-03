@@ -448,4 +448,34 @@ describe('PublicUserRecordsService', () => {
     // 구 클라이언트 호환 별칭도 그대로 실린다(166 문서 후속에서 정리 예정).
     expect(result.items.every((item) => item.matchType !== undefined)).toBe(true);
   });
+  it('대진 행의 tournamentId 를 못 찾아도 200 이다 — 빈 문자열을 조회에 넣지 않는다', async () => {
+    // 회귀: `?? ''` 로 폴백하면 그 빈 문자열이 `findMany({ id: { in: [...] } })` 로
+    // 들어가고 uuid 컬럼이라 DB 가 캐스트 에러를 던진다(Copilot 리뷰). "못 찾음" 은
+    // 빈 값이 아니라 **모른다(null)** 이고, 소비처가 이미 null 을 다룬다.
+    const prisma = threeCategoryPrisma();
+    // 이 결함은 **두 조회가 어긋날 때만** 난다: `classifyRows` 의 조회(1번째)가 그 대진을
+    // 못 돌려주고 `hydrate` 의 조회(2번째)는 돌려주면, hydrate 의 map 에 tournamentId 가
+    // 없어 폴백이 탄다. 그래서 첫 호출만 빈 배열로 만든다 — 둘 다 비우면 map 을 만드는
+    // 반복 자체가 안 돌아 결함에 **도달하지 못한다**(처음에 그렇게 써서 변이가 green 이었다).
+    const fixtureFindMany = prisma.v1TournamentFixture.findMany as jest.Mock;
+    const realImpl = fixtureFindMany.getMockImplementation()!;
+    let call = 0;
+    fixtureFindMany.mockImplementation((args: unknown) => {
+      call += 1;
+      return call === 1 ? Promise.resolve([]) : realImpl(args);
+    });
+    const service = new PublicUserRecordsService(prisma);
+
+    const result = await service.getRecords(OWNER_ID, {}, 'someone-else');
+
+    expect(result.items).toHaveLength(3);
+    // 대회 경기는 맥락을 잃되 **에러가 아니다**.
+    const tournamentItem = result.items.find((item) => item.gameId === 'game-tournament');
+    expect(tournamentItem?.tournamentId).toBeNull();
+    // 빈 문자열이 조회 인자에 실리지 않았다.
+    const tournamentCalls = (prisma.v1Tournament.findMany as jest.Mock).mock.calls;
+    for (const [arg] of tournamentCalls) {
+      expect(arg?.where?.id?.in ?? []).not.toContain('');
+    }
+  });
 });

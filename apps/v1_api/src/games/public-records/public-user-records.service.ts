@@ -130,11 +130,9 @@ export class PublicUserRecordsService {
       friendly: totalsOf(eligibleRows.filter((row) => categoryOf(row) === 'friendly')),
     };
     const summary = {
-      appearances: eligibleRows.length,
-      goals: eligibleRows.reduce((sum, row) => sum + row.goals, 0),
-      assists: eligibleRows.reduce((sum, row) => sum + row.assists, 0),
-      yellowCards: eligibleRows.reduce((sum, row) => sum + row.cardsYellow, 0),
-      redCards: eligibleRows.reduce((sum, row) => sum + row.cardsRed, 0),
+      // 전체 합계도 `totalsOf` 를 쓴다 — 같은 계산을 두 벌로 두면 한쪽만 고쳐져
+      // `byType` 합과 전체가 어긋난다(Copilot 리뷰).
+      ...totalsOf(eligibleRows),
       byType,
       matchMvpCount,
       // 구 Web 클라이언트 호환용 별칭. 신규 화면은 matchMvpCount를 사용한다.
@@ -403,7 +401,11 @@ export class PublicUserRecordsService {
     const fixtures = fixtureRounds.map((row) => ({
       id: row.id,
       round: row.round,
-      tournamentId: prefetched.tournamentIdByFixtureId.get(row.id) ?? '',
+      // **`''` 로 폴백하지 않는다.** 빈 문자열은 아래 `tournamentIds` 를 거쳐
+      // `findMany({ id: { in: [...] } })` 에 들어가고, uuid 컬럼이라 DB 가 캐스트 에러를
+      // 던진다(Copilot 리뷰). 대진 행이 있는데 tournamentId 를 못 찾는 건 "그 값을 모른다"
+      // 이므로 null 이 맞고, 아래 소비처가 이미 null 을 다룬다.
+      tournamentId: prefetched.tournamentIdByFixtureId.get(row.id) ?? null,
     }));
 
     const sidesByGame = new Map<string, typeof sides>();
@@ -419,7 +421,7 @@ export class PublicUserRecordsService {
       new Set(sides.map((side) => side.teamId).filter((id): id is string => id !== null)),
     );
     const tournamentIds = Array.from(
-      new Set(fixtures.map((fixture) => fixture.tournamentId)),
+      new Set(fixtures.map((fixture) => fixture.tournamentId).filter((id): id is string => id !== null)),
     );
     const leagueIds = Array.from(
       new Set(Array.from(leagueIdByTeamMatchId.values()).filter((id): id is string => id !== null)),

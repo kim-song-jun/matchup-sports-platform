@@ -338,8 +338,11 @@ const FLOWS = {
     const notes = [];
     const status = await gotoChecked(page, '/tournaments');
     if (status !== 200) return { skipped: true, reason: `/tournaments → HTTP ${status}` };
-    const card = await page.$('.tm-scroll-area a[href^="/tournaments/"]');
-    if (!card) return { skipped: true, reason: '대회 카드 링크를 찾지 못함' };
+    // push-pop-tournament 와 같은 이유 — 느린 회선(--slow)에서는 1.5초 안에 카드가 안 온다.
+    const card = await page
+      .waitForSelector('.tm-scroll-area a[href^="/tournaments/"]', { state: 'visible', timeout: 20_000 })
+      .catch(() => null);
+    if (!card) return { skipped: true, reason: '대회 카드 링크가 20초 안에 보이지 않음' };
     await card.click();
     await page.waitForTimeout(1200);
     await resetTelemetry(page);

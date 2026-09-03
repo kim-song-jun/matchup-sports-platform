@@ -26,7 +26,7 @@ function registrationRow(overrides: Record<string, unknown> = {}) {
   return {
     id: 'reg-1',
     tournamentId: 'tournament-1',
-    tournament: { title: '테스트대회' },
+    tournament: { title: '테스트대회', kind: 'regular_tournament' },
     teamId: 'team-1',
     appliedByUserId: 'manager-user',
     status: 'awaiting_payment',
@@ -414,6 +414,40 @@ describe('AdminRegistrationsService', () => {
     expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ action: 'registration.cancel' }) }),
     );
+  });
+
+  it('cancel: 리그 거부는 사유가 없으면 400 — 팀에게 시즌을 못 뛰게 하는 조치다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(
+      registrationRow({ status: 'cancel_requested', tournament: { title: '리그', kind: 'regular_league' } }),
+    );
+
+    await expect(service.cancel(opsAuth, 'reg-1', {})).rejects.toMatchObject({
+      response: { code: 'LEAGUE_CANCEL_REASON_REQUIRED' },
+    });
+    // 막았으면 **아무것도 쓰지 않아야** 한다 — 던지기 전에 갱신이 나가면 사유 없는 취소가
+    // 그대로 남는다.
+    expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
+  });
+
+  it('cancel: 공백만 있는 사유도 사유가 아니다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(
+      registrationRow({ status: 'cancel_requested', tournament: { title: '리그', kind: 'regular_league' } }),
+    );
+
+    await expect(service.cancel(opsAuth, 'reg-1', { reason: '   ' })).rejects.toMatchObject({
+      response: { code: 'LEAGUE_CANCEL_REASON_REQUIRED' },
+    });
+  });
+
+  it('cancel: **대회**는 사유 없이도 그대로 취소된다 — 리그 규칙이 대회로 새면 안 된다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(registrationRow({ status: 'cancel_requested' }));
+    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'cancelled' }));
+    prisma.v1TournamentPayment.findUnique.mockResolvedValue(null);
+
+    await expect(service.cancel(opsAuth, 'reg-1', {})).resolves.toMatchObject({ status: 'cancelled' });
   });
 
   it('cancel: already-refunded payment is not double-cancelled', async () => {

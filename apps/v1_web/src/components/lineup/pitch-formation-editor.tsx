@@ -4,9 +4,13 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { Card } from '@/components/v1-ui/primitives';
 import { ConfirmModal } from '@/components/v1-ui/confirm-modal';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
-import { matchSlotsToEntries, type LineupEntryDraft } from '@/app/team-matches/[id]/lineup/lineup.view-model';
+import type { LineupEntryDraft } from '@/app/team-matches/[id]/lineup/lineup.view-model';
 import { PitchLines } from './pitch-lines';
-import { describeFormationChange, type FormationChangeSummary } from './formation-assignment';
+import {
+  describeFormationChange,
+  planFormationAssignment,
+  type FormationChangeSummary,
+} from './formation-assignment';
 import { GOALKEEPER_SLOT_CODE, slotsWithGoalkeeper, type FormationPreset, type FormationSlot } from './formation-slots';
 
 /**
@@ -41,6 +45,24 @@ import { GOALKEEPER_SLOT_CODE, slotsWithGoalkeeper, type FormationPreset, type F
  * 잘라내는 기준은 "팀명으로 시작하는가" 하나뿐이다 — 공백으로 쪼개 마지막 조각만
  * 쓰는 식은 "김 철수" 같은 이름에서 성을 지워 다른 사람으로 보이게 만든다.
  */
+
+/**
+ * 포메이션 자리 ↔ 명단 매칭. 원래 `lineup.view-model` 에 있었는데, Task 163 이 라인업
+ * 화면에서 배치를 들어내면서(정본 §3 — 포지션·좌표는 전술보드) 그 모듈의 슬롯 함수가
+ * 전부 사라졌다. **이 컴포넌트가 유일한 소비처**라 여기로 내렸다.
+ */
+function matchSlotsToEntries(
+  slots: FormationSlot[],
+  entries: LineupEntryDraft[],
+): Array<{ slot: FormationSlot; entry: LineupEntryDraft | null }> {
+  const plan = planFormationAssignment(slots, entries);
+  const entryByKey = new Map(entries.map((entry) => [entry.key, entry]));
+  return plan.slotAssignments.map(({ slot, entryKey }) => ({
+    slot,
+    entry: entryKey === null ? null : entryByKey.get(entryKey) ?? null,
+  }));
+}
+
 export function shortPitchLabel(displayName: string, teamName?: string | null): string {
   const team = teamName?.trim();
   if (team === undefined || team === '') return displayName;

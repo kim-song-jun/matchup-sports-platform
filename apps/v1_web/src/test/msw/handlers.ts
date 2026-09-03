@@ -1216,7 +1216,10 @@ export const v1MswHandlers = [
       revision: v1TeamMatchLineupFixture.revision + 1,
       version: v1TeamMatchLineupFixture.version + 1,
       formation: body.formation ?? null,
-      starters: body.starters.map((participant, index) => ({
+      // 서버(`rosterOf`)와 같은 규칙: `participants` 가 오면 그것이 명단이고, 없을 때만
+      // 옛 `starters`+`bench` 를 합친다. 응답은 아직 `starters`/`bench` 모양이라
+      // 전원을 `starters` 에 싣고 `bench` 는 비운다(#978 이후의 실제 서버 동작).
+      starters: (body.participants ?? [...(body.starters ?? []), ...(body.bench ?? [])]).map((participant, index) => ({
         id: participant.userId ?? `guest-participant-${index + 1}`,
         displayName: participant.displayName ?? '이름 미확인',
         jerseyNumber: participant.jerseyNumber ?? null,
@@ -1225,11 +1228,7 @@ export const v1MswHandlers = [
         positionX: participant.positionX ?? null,
         positionY: participant.positionY ?? null,
       })),
-      bench: body.bench.map((participant, index) => ({
-        id: participant.userId ?? `guest-bench-${index + 1}`,
-        displayName: participant.displayName ?? '이름 미확인',
-        jerseyNumber: participant.jerseyNumber ?? null,
-      })),
+      bench: [],
     };
     return ok({
       teamMatchId: v1TeamMatchLineupFixture.teamMatchId,

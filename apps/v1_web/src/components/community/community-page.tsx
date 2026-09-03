@@ -31,7 +31,10 @@ export function ChatListPageView({ model }: { model: ChatListViewModel }) {
 function ChatListContent({ model, selectedRoomId }: { model: ChatListViewModel; selectedRoomId?: string }) {
   const ended = model.endedContacts;
   const hasEndedRooms = Boolean(ended?.visible && ended.rooms.length > 0);
-  const hasRooms = model.pinnedRooms.length > 0 || model.rooms.length > 0 || hasEndedRooms;
+  // "종료된 컨택 보기" 가 켜져 있으면 목록이 (아직) 비어 있어도 빈 상태를 띄우지 않는다 — 보관 목록이
+  // 로딩 중이거나 0건일 때 "아직 채팅방이 없어요" 가 잠깐 겹쳐 보이던 결함(#992 Copilot).
+  const endedVisible = Boolean(ended?.visible);
+  const hasRooms = model.pinnedRooms.length > 0 || model.rooms.length > 0 || endedVisible;
 
   return (
     // 방이 없을 때만 tm-list-empty — 목록이 있는 평소 레이아웃은 그대로 둔다.
@@ -74,7 +77,7 @@ function ChatListContent({ model, selectedRoomId }: { model: ChatListViewModel; 
                   {model.pinnedRooms.map((room) => <ChatRoomRow key={room.id} room={room} selected={room.id === selectedRoomId} />)}
                 </ChatSection>
               ) : null}
-              {model.rooms.length > 0 || !hasEndedRooms ? (
+              {model.rooms.length > 0 || !endedVisible ? (
                 <ChatSection title={`채팅방 ${model.rooms.length}`}>
                   {model.rooms.map((room) => <ChatRoomRow key={room.id} room={room} selected={room.id === selectedRoomId} />)}
                 </ChatSection>

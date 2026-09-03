@@ -121,8 +121,9 @@ describe('리그 몰수패·부전승 결과 입력 (R11)', () => {
     // 실제 프로덕션과 동일하게 outbox 프로젝션까지 태워 공식 fact + 리그 자동완료를 검증한다.
     await projectOfficialResult(res.body.data.resultRevisionId);
 
-    const league = await prisma.v1League.findUniqueOrThrow({ where: { id: leagueId } });
-    expect(league.state).toBe('completed');
+    // BE-5 drop: 리그 상태는 통합 축의 status 다(`active`→`in_progress`, `completed`→`completed`).
+    const league = await prisma.v1Tournament.findUniqueOrThrow({ where: { id: leagueId } });
+    expect(league.status).toBe('completed');
 
     const standingsRes = await request(app.getHttpServer()).get(`/api/v1/league-matches/${leagueId}/standings`);
     const hostRow = standingsRes.body.data.standings.find((row: { teamId: string }) => row.teamId === teamMatch.hostTeamId);
@@ -177,8 +178,8 @@ describe('리그 몰수패·부전승 결과 입력 (R11)', () => {
     expect(revisionCount).toBe(1);
 
     // 대진이 2개인 리그에서 1개만 몰수 처리했으므로 아직 completed가 아니어야 한다.
-    const league = await prisma.v1League.findUniqueOrThrow({ where: { id: leagueId } });
-    expect(league.state).toBe('active');
+    const league = await prisma.v1Tournament.findUniqueOrThrow({ where: { id: leagueId } });
+    expect(league.status).toBe('in_progress');
   });
 
   it('이미 실제 결과가 공식 확정된 대진은 몰수 처리를 거부한다(409)', async () => {

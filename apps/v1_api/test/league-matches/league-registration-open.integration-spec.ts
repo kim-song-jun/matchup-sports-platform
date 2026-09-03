@@ -110,9 +110,9 @@ describe('리그 참가 신청 — 대회 스택 재사용', () => {
 
   afterAll(async () => {
     await prisma.v1TournamentRegistration.deleteMany({ where: { tournamentId: leagueId } });
-    await prisma.v1LeagueTeam.deleteMany({ where: { leagueId } });
+    await prisma.v1TournamentRegistration.deleteMany({ where: { tournamentId: leagueId } });
     await prisma.v1Tournament.deleteMany({ where: { id: leagueId } });
-    await prisma.v1League.deleteMany({ where: { id: leagueId } });
+    await prisma.v1Tournament.deleteMany({ where: { id: leagueId } });
     await prisma.v1TeamMembership.deleteMany({ where: { userId: { startsWith: 'a4000000' } } });
     await prisma.v1Team.deleteMany({ where: { sportId: ids.sportId } });
     await prisma.v1Sport.deleteMany({ where: { id: ids.sportId } });
@@ -198,7 +198,9 @@ describe('리그 참가 신청 — 대회 스택 재사용', () => {
 
     // 확정이 리그 축 로스터도 만들었는지 — 등록만 confirmed 이고 로스터가 비면
     // 순위·대진이 그 팀을 못 본다.
-    const roster = await prisma.v1LeagueTeam.count({ where: { leagueId } });
+    const roster = await prisma.v1TournamentRegistration.count({
+      where: { tournamentId: leagueId, status: 'confirmed' },
+    });
     expect(roster).toBe(TEAM_COUNT);
   });
 
@@ -268,7 +270,7 @@ describe('리그 참가 신청 — 대회 스택 재사용', () => {
       take: 1,
     });
 
-    await admin.removeTeam(auth, leagueId, seedTeam.teamId, { reason: '테스트 제외' } as never);
+    await admin.removeTeam(auth, leagueId, seedTeam.teamId);
     const afterRemove = await prisma.v1TournamentRegistration.findMany({
       where: { tournamentId: leagueId, teamId: seedTeam.teamId },
       select: { status: true },

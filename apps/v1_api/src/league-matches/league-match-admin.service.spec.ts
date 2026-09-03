@@ -100,18 +100,6 @@ function createFake() {
   };
 
   const tx = {
-    v1League: {
-      findUnique: track('v1League.findUnique', async () => ({
-        id: 'league-1',
-        title: '테스트 리그',
-        sportId: 'sport-futsal',
-        regionId: 'region-1',
-        startsOn: new Date('2026-09-05T00:00:00.000Z'),
-        state: 'scheduled',
-        teams: [{ teamId: 'team-a' }, { teamId: 'team-b' }],
-      })),
-      update: track('v1League.update', async () => ({ id: 'league-1' })),
-    },
     // dual-write 대상 — 리그 state 를 바꾸는 자리는 통합 축의 거울도 같이 고친다.
     // `updateMany` 는 백필 전에는 0행이 정상이라(거울이 아직 없다) count 0 을 준다.
     // **인자를 잡아 둔다** — 호출 여부만 보면 `where` 에서 `kind` 가드가 빠져도 통과한다.
@@ -155,11 +143,6 @@ function createFake() {
     },
     // 잠금 뒤 **커밋된** 로스터를 다시 읽는 자리. 테스트가 `state.registeredTeamIds` 를
     // 갈아끼워 "그 사이 팀이 빠졌다" 를 재현한다.
-    v1LeagueTeam: {
-      findMany: track('v1LeagueTeam.findMany', async (args: { where: { teamId: { in: string[] } } }) =>
-        args.where.teamId.in.filter((id) => state.registeredTeamIds.has(id)).map((teamId) => ({ teamId })),
-      ),
-    },
     // BE-5: 로스터 판정이 통합 축의 confirmed 등록으로 옮겨졌다. 같은 `registeredTeamIds`
     // 를 본다 — 두 fake 가 다른 집합을 보면 어느 쪽이 진짜인지 스펙이 못 가른다.
     v1TournamentRegistration: {
@@ -572,16 +555,6 @@ describe('LeagueMatchAdminService.addTeam — 형제 티어 중복 게이트', (
 
   function makePrisma(siblingLeague: { tier: number | null } | null) {
     const prisma: any = {
-      v1League: {
-        findUnique: jest.fn().mockResolvedValue({
-          id: LEAGUE_ID,
-          seriesId: SERIES_ID,
-          seasonNo: 1,
-          sportId: 'sport-futsal',
-          teams: [{ teamId: 'team-a' }],
-        }),
-        findFirst: jest.fn().mockResolvedValue(siblingLeague),
-      },
       // BE-5: 리그 조회와 형제 티어 조회가 둘 다 통합 축(`v1Tournament.findFirst`)으로
       // 옮겨졌다. **호출 순서로 구분하지 않는다** — 경로마다 호출 횟수가 달라서 순서 기반
       // mock 은 다른 케이스에서 조용히 어긋난다. `where` 모양으로 가른다:
@@ -610,12 +583,6 @@ describe('LeagueMatchAdminService.addTeam — 형제 티어 중복 게이트', (
         findUnique: jest.fn().mockResolvedValue({ ownerUserId: 'owner-1' }),
       },
       v1TeamMatch: { count: jest.fn().mockResolvedValue(0) },
-      v1LeagueTeam: {
-        create: jest.fn().mockResolvedValue({}),
-        findUnique: jest.fn(async (args: { where: { leagueId_teamId: { teamId: string } } }) =>
-          args.where.leagueId_teamId.teamId === 'team-a' ? { leagueId: LEAGUE_ID } : null,
-        ),
-      },
       // 로스터와 짝이 되는 confirmed 등록(BE-3 ⑤) — `V1Team.ownerUserId` 를 읽는다.
       v1TournamentRegistration: {
         upsert: jest.fn().mockResolvedValue({}),
@@ -651,8 +618,9 @@ describe('LeagueMatchAdminService.addTeam — 형제 티어 중복 게이트', (
       response: { code: 'LEAGUE_TEAM_INVALID', message: expect.stringContaining('2부') },
     });
 
-    // 거부됐으면 로스터에 아무것도 안 쓴다 — 검증 게이트를 통과한 뒤에야 create를 부른다.
-    expect(prisma.v1LeagueTeam.create).not.toHaveBeenCalled();
+    // 거부됐으면 로스터에 아무것도 안 쓴다 — 검증 게이트를 통과한 뒤에야 등록을 만든다.
+    // BE-5 drop: 로스터 = confirmed 등록이므로 그 upsert 를 겨냥한다.
+    expect(prisma.v1TournamentRegistration.upsert).not.toHaveBeenCalled();
     // BE-5: 형제 조회가 통합 축으로 옮겨졌다. `findTournamentOnSurface` 가 kind 조건을
     // AND 로 감싸므로 안쪽 조건을 본다 — 감싸는 부분까지 단언하면 헬퍼 구현에 묶인다.
     const siblingCall = prisma.v1Tournament.findFirst.mock.calls.find(
@@ -722,23 +690,11 @@ describe('LeagueMatchAdminService.removeTeam — 대진 취소 알림과 제외 
       },
     ];
     const prisma: any = {
-      v1League: {
-        // state를 'active'가 아닌 값으로 둔다 — LeagueCompletionProjectionService.settle()이
-        // 첫 조회에서 조기 반환해, 이 테스트의 관심사(취소·알림)와 무관한 추가 목을 안 늘려도 된다.
-        findUnique: jest.fn().mockResolvedValue({
-          id: LEAGUE_ID,
-          state: 'scheduled',
-          teams: [{ teamId: REMOVED_TEAM }, { teamId: OPPONENT_TEAM }, { teamId: OTHER_HOST_TEAM }],
-        }),
-      },
       // removeTeam은 트랜잭션 밖에서 한 번(초기 게이트 판정), 락을 잡은 트랜잭션 안에서
       // 다시 한 번(TOCTOU 재검증, :517) 같은 조건으로 대진을 읽는다 — 둘 다 이 목록을 본다.
       v1TeamMatch: {
         findMany: jest.fn().mockResolvedValue(fixtures),
         update: jest.fn().mockResolvedValue({}),
-      },
-      v1LeagueTeam: {
-        deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       // BE-5: 로스터 판정이 통합 축의 confirmed 등록으로 옮겨졌다.
       v1TournamentRegistration: {

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { GameResultSubmittedEscalationService } from '../../src/jobs/result-escalation/game-result-submitted-escalation.service';
+import { seedLeagueOnTournamentAxis } from '../fixtures/league-on-tournament-axis.fixture';
 
 const prisma = new PrismaService();
 
@@ -28,16 +29,12 @@ async function seedLeagueSubmittedRevision(submittedAt: Date, opts: { asLeague: 
   // 12시간 에스컬레이션이 안 생긴다 -- 실제로 이 테스트가 그 회귀를 잡았다.
   let leagueId: string | null = null;
   if (opts.asLeague) {
-    const league = await prisma.v1League.create({
-      data: {
-        title: `에스컬레이션 리그 ${suiteId}`,
-        sportId: sport.id,
-        regionId: region.id,
-        createdByAdminUserId: (await prisma.v1AdminUser.findUniqueOrThrow({ where: { userId: adminUserId } })).id,
-        startsOn: new Date(),
-        endsOn: new Date(Date.now() + 7 * 86_400_000),
-        tieBreakJson: { order: ['points', 'goalDifference', 'goalsFor', 'headToHead'] },
-      },
+    // BE-5 drop: 리그는 통합 축이 정본이다. 프로덕션과 같은 매핑 함수를 지나는 픽스처를 쓴다.
+    const league = await seedLeagueOnTournamentAxis(prisma, {
+      title: `에스컬레이션 리그 ${suiteId}`,
+      sportId: sport.id,
+      regionId: region.id,
+      createdByAdminUserId: (await prisma.v1AdminUser.findUniqueOrThrow({ where: { userId: adminUserId } })).id,
     });
     leagueId = league.id;
   }
@@ -89,7 +86,8 @@ async function cleanupLeagueSubmittedRevision(ctx: Awaited<ReturnType<typeof see
   await prisma.v1TeamMatchApplication.deleteMany({ where: { teamMatchId: ctx.teamMatch.id } });
   const teamMatch = await prisma.v1TeamMatch.findUnique({ where: { id: ctx.teamMatch.id } });
   await prisma.v1TeamMatch.delete({ where: { id: ctx.teamMatch.id } });
-  if (teamMatch?.leagueId) await prisma.v1League.delete({ where: { id: teamMatch.leagueId } }).catch(() => undefined);
+  if (teamMatch?.leagueId)
+    await prisma.v1Tournament.delete({ where: { id: teamMatch.leagueId } }).catch(() => undefined);
 }
 
 describe('GameResultSubmittedEscalationService — 리그 12시간 에스컬레이션', () => {

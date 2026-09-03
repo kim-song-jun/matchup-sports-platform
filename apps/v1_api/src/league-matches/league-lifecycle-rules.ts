@@ -159,7 +159,7 @@ export function findInactivePromotionTeamIds(
 /**
  * 리그 목록의 상태 우선순위: 진행 중 -> 준비 중 -> 종료.
  *
- * Prisma 의 enum 정렬(`state: 'asc'`)은 **선언 순서**를 쓰는데 V1LeagueState 는
+ * Prisma 의 enum 정렬(`state: 'asc'`)은 **선언 순서**를 쓰는데 리그 상태 목록은
  * `draft -> active -> completed` 라, 그대로 쓰면 아직 시작도 안 한 리그가 맨 위로 온다.
  * "지금 뛰는 리그"를 찾으러 온 사용자에게는 정확히 반대다(Copilot 리뷰가 잡은 결함).
  * DB 정렬로는 표현할 수 없으므로 우선순위를 여기서 명시한다.

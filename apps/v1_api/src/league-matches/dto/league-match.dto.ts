@@ -136,7 +136,7 @@ export class UpdateLeagueFixtureDto {
 /**
  * 참가 신청을 여는 운영자 액션의 body (D7).
  *
- * 리그 축에는 `open` 상태가 없다(`V1LeagueState` 는 draft·active·completed 셋뿐). 신청은
+ * 리그 축에는 `open` 상태가 없다(리그 상태는 draft·active·completed 셋뿐 — `league-state.ts`). 신청은
  * **거울(`V1Tournament`)의 `status='open'`** 으로 열리고, `V1League.state` 는 `draft` 로
  * 남는다 — `LEAGUE_STATE_BY_STATUS` 가 이미 `open → draft` 로 되돌리므로 목록·상세의
  * 리그 축 표시는 그대로 "준비 중"이다. 두 축이 어긋나는 게 아니라, **신청 접수는 시작이

@@ -142,8 +142,8 @@ describe('리그 승강 확정 (Task 153)', () => {
     for (const teamMatchId of teamMatchIds) {
       await officializeFixture(teamMatchId, { home: 3, away: 0 });
     }
-    const league = await prisma.v1League.findUniqueOrThrow({ where: { id: leagueId } });
-    expect(league.state).toBe('completed');
+    const league = await prisma.v1Tournament.findUniqueOrThrow({ where: { id: leagueId } });
+    expect(league.status).toBe('completed');
   }
 
   describe('시즌 종료 게이트', () => {
@@ -232,10 +232,11 @@ describe('리그 승강 확정 (Task 153)', () => {
       expect(commitRes.body.data).toMatchObject({ seasonNo: 1, nextSeasonNo: 2, decidedCount: 4, overriddenCount: 0 });
 
       // 다음 시즌 리그가 티어별로 생기고, 승강 결과대로 팀이 배치돼야 한다.
-      const nextLeagues = await prisma.v1League.findMany({
-        where: { seriesId, seasonNo: 2 },
+      const nextLeagues = await prisma.v1Tournament.findMany({
+        where: { kind: 'regular_league', seriesId, seasonNo: 2 },
         orderBy: { tier: 'asc' },
-        include: { teams: { select: { teamId: true } } },
+        // BE-5 drop: 로스터 = confirmed 등록. 호출부가 `teams` 로 읽으므로 이름을 맞춰 준다.
+        include: { registrations: { where: { status: 'confirmed' }, select: { teamId: true } } },
       });
       expect(nextLeagues).toHaveLength(2);
 
@@ -255,8 +256,8 @@ describe('리그 승강 확정 (Task 153)', () => {
         nextLeagues.map((league) => league.seasonNo),
       );
       expect(nextMirrors.every((mirror) => mirror.regionId !== null)).toBe(true);
-      const nextTier1TeamIds = nextLeagues[0].teams.map((t) => t.teamId).sort();
-      const nextTier2TeamIds = nextLeagues[1].teams.map((t) => t.teamId).sort();
+      const nextTier1TeamIds = nextLeagues[0].registrations.map((t) => t.teamId).sort();
+      const nextTier2TeamIds = nextLeagues[1].registrations.map((t) => t.teamId).sort();
       // 1부: 잔류 1팀 + 2부에서 승격한 1팀
       expect(nextTier1TeamIds).toEqual(
         [tier1.entries.find((e: { computedKind: string }) => e.computedKind === 'stayed').teamId, promoted.teamId].sort(),
@@ -365,7 +366,7 @@ describe('리그 승강 확정 (Task 153)', () => {
       expect(commitRes.body.code).toBe('PROMOTION_NEXT_SEASON_TIER_TOO_SMALL');
       // 확정이 막혔으므로 승강 이력도 다음 시즌 리그도 생기면 안 된다.
       expect(await prisma.v1LeaguePromotion.count({ where: { fromLeagueId: { in: leagueIds } } })).toBe(0);
-      expect(await prisma.v1League.count({ where: { seriesId, seasonNo: 2 } })).toBe(0);
+      expect(await prisma.v1Tournament.count({ where: { kind: 'regular_league', seriesId, seasonNo: 2 } })).toBe(0);
     });
 
     it('계산대로만 보내면 사유 없이도 확정된다 — 규칙이 곧 설명이라 물을 게 없다', async () => {
@@ -429,7 +430,7 @@ describe('리그 승강 확정 (Task 153)', () => {
       expect(res.body.code).toBe('PROMOTION_OVERRIDE_NOTE_REQUIRED');
       // 막혔으면 승강 이력도 다음 시즌 리그도 없어야 한다.
       expect(await prisma.v1LeaguePromotion.count({ where: { fromLeagueId: { in: leagueIds } } })).toBe(0);
-      expect(await prisma.v1League.count({ where: { seriesId, seasonNo: 2 } })).toBe(0);
+      expect(await prisma.v1Tournament.count({ where: { kind: 'regular_league', seriesId, seasonNo: 2 } })).toBe(0);
     });
 
     it('동시에 확정하면 한 건만 성공하고 나머지는 500 이 아니라 409 를 받는다', async () => {
@@ -469,7 +470,7 @@ describe('리그 승강 확정 (Task 153)', () => {
 
       // 경합이 데이터를 망가뜨리지 않았는지 — 승강 이력도 다음 시즌 리그도 정확히 한 벌.
       expect(await prisma.v1LeaguePromotion.count({ where: { fromLeagueId: { in: leagueIds } } })).toBe(4);
-      expect(await prisma.v1League.count({ where: { seriesId, seasonNo: 2 } })).toBe(2);
+      expect(await prisma.v1Tournament.count({ where: { kind: 'regular_league', seriesId, seasonNo: 2 } })).toBe(2);
     });
   });
 
@@ -656,7 +657,7 @@ describe('리그 승강 확정 (Task 153)', () => {
       expect(createRes.status).toBe(201);
       const leagueId = createRes.body.data.leagueId as string;
 
-      const league = await prisma.v1League.findUniqueOrThrow({ where: { id: leagueId } });
+      const league = await prisma.v1Tournament.findUniqueOrThrow({ where: { id: leagueId } });
       expect(league.seriesId).toBeNull();
       expect(league.tier).toBeNull();
       expect(league.seasonNo).toBeNull();

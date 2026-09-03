@@ -85,7 +85,6 @@ function buildPrismaMock(lineupRows: Array<{ sideId: string; state: string }> = 
     // 인자로 주면 그 상태를 그대로 쓴다(제출 완료 경기를 재현할 때).
     v1GameLineup: { findMany: jest.fn().mockResolvedValue(lineupRows) },
     // 리그 제목을 대진마다 따로 조회하면(N+1) 이 mock 이 호출되므로 잡힌다.
-    v1League: { findMany: jest.fn().mockResolvedValue([]), findUnique: jest.fn() },
   };
 }
 
@@ -150,8 +149,11 @@ describe('LineupTodoService — 리그 대진의 맥락', () => {
 
       // 할 일 조회 1회 + 리그 형제 대진 일괄 조회 1회. 대진마다 주차를 물어보면 늘어난다.
       expect(prisma.v1TeamMatch.findMany).toHaveBeenCalledTimes(2);
-      expect(prisma.v1League.findMany).not.toHaveBeenCalled();
-      expect(prisma.v1League.findUnique).not.toHaveBeenCalled();
+      // BE-5 drop: 리그 축이 사라졌다. 재려던 것("주차를 물으려고 리그를 따로 조회하지
+      // 않는다")은 이제 **fake 에 대회 조회가 아예 없다는 사실**이 증명한다 — 서비스가
+      // 조회하면 `undefined` 를 부르다 즉시 터진다(위 `listForUser` 가 성공했다는 것이
+      // 곧 그 왕복이 없었다는 뜻이다).
+      expect('v1Tournament' in prisma).toBe(false);
     } finally {
       await moduleRef.close();
     }

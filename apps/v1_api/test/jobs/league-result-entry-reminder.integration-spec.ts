@@ -10,6 +10,7 @@ import {
   LeagueResultEntryReminderService,
   scheduleLeagueResultEntryReminder,
 } from '../../src/jobs/league-reminders/league-result-entry-reminder.service';
+import { seedLeagueOnTournamentAxis } from '../fixtures/league-on-tournament-axis.fixture';
 
 const prisma = new PrismaService();
 
@@ -38,16 +39,12 @@ async function seedFixture(opts: { officialResult?: boolean; status?: 'matched' 
   await prisma.v1AdminUser.create({ data: { userId: creatorAdminUserId, adminRole: 'ops' } });
   const homeTeam = await prisma.v1Team.create({ data: { ownerUserId: homeOwnerId, sportId: sport.id, regionId: region.id, name: `lrer-home-${suiteId}` } });
   const awayTeam = await prisma.v1Team.create({ data: { ownerUserId: awayOwnerId, sportId: sport.id, regionId: region.id, name: `lrer-away-${suiteId}` } });
-  const league = await prisma.v1League.create({
-    data: {
-      title: `리마인더 리그 ${suiteId}`,
-      sportId: sport.id,
-      regionId: region.id,
-      createdByAdminUserId: (await prisma.v1AdminUser.findUniqueOrThrow({ where: { userId: creatorAdminUserId } })).id,
-      startsOn: new Date(),
-      endsOn: new Date(Date.now() + 7 * 86_400_000),
-      tieBreakJson: { order: ['points', 'goalDifference', 'goalsFor', 'headToHead'] },
-    },
+  // BE-5 drop: 리그는 통합 축이 정본이다.
+  const league = await seedLeagueOnTournamentAxis(prisma, {
+    title: `리마인더 리그 ${suiteId}`,
+    sportId: sport.id,
+    regionId: region.id,
+    createdByAdminUserId: (await prisma.v1AdminUser.findUniqueOrThrow({ where: { userId: creatorAdminUserId } })).id,
   });
   const startAt = new Date();
   const teamMatch = await prisma.v1TeamMatch.create({
@@ -98,7 +95,7 @@ async function cleanupFixture(ctx: Awaited<ReturnType<typeof seedFixture>>) {
     await prisma.v1Game.deleteMany({ where: { id: ctx.gameId } });
     await prisma.v1TeamMatchApplication.deleteMany({ where: { teamMatchId: ctx.teamMatchId } });
     await prisma.v1TeamMatch.delete({ where: { id: ctx.teamMatchId } });
-    await prisma.v1League.delete({ where: { id: ctx.leagueId } }).catch(() => undefined);
+    await prisma.v1Tournament.delete({ where: { id: ctx.leagueId } }).catch(() => undefined);
     // v1_admin_users는 v1_users FK가 Cascade라 유저 삭제로 함께 정리된다.
     await prisma.v1User.deleteMany({ where: { id: { in: [ctx.creatorAdminUserId] } } }).catch(() => undefined);
   } catch {

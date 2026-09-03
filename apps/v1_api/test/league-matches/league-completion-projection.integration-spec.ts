@@ -140,18 +140,18 @@ describe('리그 자동 completed 전이 (R6)', () => {
     const [fixture1Id, fixture2Id] = fixturesRes.body.data.teamMatchIds;
 
     // 대진 생성 자체가 이미 리그를 active로 전이시킨다(league-match-admin.service.ts).
-    expect((await prisma.v1League.findUniqueOrThrow({ where: { id: leagueId } })).state).toBe('active');
+    expect(await mirrorOf(leagueId)).toEqual({ kind: 'regular_league', status: 'in_progress' });
     expect(await mirrorOf(leagueId)).toEqual({ kind: 'regular_league', status: 'in_progress' });
 
     // 대진 1개만 확정 -- 아직 completed로 전이되면 안 된다.
     await officializeFixture(fixture1Id, { home: 2, away: 1 }, new Date('2026-08-10T12:00:00.000Z'));
-    expect((await prisma.v1League.findUniqueOrThrow({ where: { id: leagueId } })).state).toBe('active');
+    expect(await mirrorOf(leagueId)).toEqual({ kind: 'regular_league', status: 'in_progress' });
     expect(await mirrorOf(leagueId)).toEqual({ kind: 'regular_league', status: 'in_progress' });
 
     // 남은 마지막 대진까지 확정 -- 자동으로 completed 전이 + 시스템 상태변경 로그 1건.
     await officializeFixture(fixture2Id, { home: 0, away: 0 }, new Date('2026-08-17T12:00:00.000Z'));
-    const league = await prisma.v1League.findUniqueOrThrow({ where: { id: leagueId } });
-    expect(league.state).toBe('completed');
+    // BE-5 drop: 리그 상태는 통합 축의 status 하나다 — 아래 `mirrorOf` 가 그걸 잰다
+    // (예전엔 레거시 축을 먼저 보고 거울을 따라 봤다).
     // ⬅ R4-b 봉쇄의 본체. settle 의 dual-write 를 지우면 여기서 in_progress 가 남아 red 가 된다.
     expect(await mirrorOf(leagueId)).toEqual({ kind: 'regular_league', status: 'completed' });
 
@@ -189,8 +189,8 @@ describe('리그 자동 completed 전이 (R6)', () => {
 
     await officializeFixture(fixture1Id, { home: 1, away: 0 }, new Date('2026-08-11T12:00:00.000Z'));
 
-    const league = await prisma.v1League.findUniqueOrThrow({ where: { id: leagueId } });
-    expect(league.state).toBe('completed');
+    // BE-5 drop: 리그 상태는 통합 축의 status 하나다 — 아래 `mirrorOf` 가 그걸 잰다
+    // (예전엔 레거시 축을 먼저 보고 거울을 따라 봤다).
     expect(await mirrorOf(leagueId)).toEqual({ kind: 'regular_league', status: 'completed' });
   });
 
@@ -217,7 +217,7 @@ describe('리그 자동 completed 전이 (R6)', () => {
     const [fixtureId] = fixturesRes.body.data.teamMatchIds;
 
     const revision = await officializeFixture(fixtureId, { home: 3, away: 0 }, new Date('2026-08-05T12:00:00.000Z'));
-    expect((await prisma.v1League.findUniqueOrThrow({ where: { id: leagueId } })).state).toBe('completed');
+    expect(await mirrorOf(leagueId)).toEqual({ kind: 'regular_league', status: 'completed' });
     expect(await mirrorOf(leagueId)).toEqual({ kind: 'regular_league', status: 'completed' });
 
     // GAME_RESULT_OFFICIAL 핸들러는 실제 운영에서도 outbox 재시도로 같은 리비전에 대해
@@ -228,8 +228,8 @@ describe('리그 자동 completed 전이 (R6)', () => {
       await officialProjection.handler({ payload: { revisionId: revision.id } } as never, tx);
     });
 
-    const league = await prisma.v1League.findUniqueOrThrow({ where: { id: leagueId } });
-    expect(league.state).toBe('completed');
+    // BE-5 drop: 리그 상태는 통합 축의 status 하나다 — 아래 `mirrorOf` 가 그걸 잰다
+    // (예전엔 레거시 축을 먼저 보고 거울을 따라 봤다).
     // 재시도 뒤에도 거울이 그대로여야 한다 — settle 은 조건부 update 의 승자만 도달하므로
     // 늦게 온 트랜잭션이 거울을 중복으로 건드리지 않는다(그 동시성 설계를 거울도 승계한다).
     expect(await mirrorOf(leagueId)).toEqual({ kind: 'regular_league', status: 'completed' });

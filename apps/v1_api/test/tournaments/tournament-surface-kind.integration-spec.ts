@@ -7,6 +7,7 @@ import { AdminContextService } from '../../src/common/admin-context.service';
 import { PublicTournamentRecordsService } from '../../src/games/public-records/public-tournament-records.service';
 import { seedCompetitionConfigVersions } from '../../src/tournaments/competition-config/competition-config-backfill';
 import type { PrismaClient } from '@prisma/client';
+import { seedLeagueOnTournamentAxis } from '../fixtures/league-on-tournament-axis.fixture';
 
 /**
  * **"대회 조회는 대회만 본다" — 누출 회귀 테스트.**
@@ -154,18 +155,15 @@ describe('대회 표면은 정규 리그 시즌을 보여주지 않는다 (real 
     await prisma.v1Region.create({
       data: { id: ids.regionId, code: 'surface-kind-region', name: '표면테스트권역', level: 1 },
     });
-    await prisma.v1League.create({
-      data: {
-        id: ids.league,
-        title: '표면 테스트 리그 시즌',
-        sportId: ids.sportId,
-        regionId: ids.regionId,
-        createdByAdminUserId: ids.adminId,
-        state: 'active',
-        startsOn: new Date('2026-01-01T00:00:00.000Z'),
-        endsOn: new Date('2026-02-01T00:00:00.000Z'),
-        tieBreakJson: { order: ['points', 'goalDifference', 'goalsFor', 'headToHead'] },
-      },
+    await seedLeagueOnTournamentAxis(prisma, {
+      id: ids.league,
+      title: '표면 테스트 리그 시즌',
+      sportId: ids.sportId,
+      regionId: ids.regionId,
+      createdByAdminUserId: ids.adminId,
+      state: 'active',
+      startsOn: new Date('2026-01-01T00:00:00.000Z'),
+      endsOn: new Date('2026-02-01T00:00:00.000Z'),
     });
 
     // R1 이전 행 재현 — DEFAULT 가 채우지 못한 상태를 명시적으로 만든다.

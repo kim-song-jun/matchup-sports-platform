@@ -438,12 +438,12 @@ export class LeagueMatchAdminService {
     const matchdayStartAts = this.resolveScheduleStartAts(dto, totalRounds, timing);
 
     const createdIds = await this.prisma.$transaction(async (tx) => {
-      // 락은 신 테이블(v1_leagues)에 건다. 재명명 때 Prisma 델리게이트만 바꾸고 이 raw SQL
-      // 문자열을 놓쳐 구 테이블을 잠그고 있었다 -- 문자열 안의 테이블명은 타입 시스템이 못 본다.
-      // 구 테이블을 잠그면 두 겹으로 위험하다: ① 미러 행이 없는 리그에서는 SELECT ... FOR UPDATE
-      // 가 0행이라 아무것도 잠그지 않아 동시성 보호가 조용히 사라지고, ② 수축 릴리스가 그 테이블을
-      // 지우는 순간 relation does not exist 로 깨진다.
-      await tx.$queryRaw`SELECT id FROM "v1_leagues" WHERE id = ${leagueId} FOR UPDATE`;
+      // 락은 리그의 **정본 행**(`v1_tournaments`)에 건다. 문자열 안의 테이블명은 타입 시스템이
+      // 못 보므로, 저장 축을 옮길 때마다 이 raw SQL 을 함께 옮기지 않으면 두 겹으로 위험하다:
+      // ① 없는 행을 겨냥하면 `SELECT ... FOR UPDATE` 가 0행이라 아무것도 잠그지 않아 동시성
+      // 보호가 **조용히** 사라지고, ② 그 테이블이 사라지는 릴리스에서 relation does not exist
+      // 로 깨진다. BE-5 drop 이 정확히 ②를 일으켰다 — 통합 스펙이 500 으로 잡았다.
+      await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${leagueId} FOR UPDATE`;
       const existingCount = await tx.v1TeamMatch.count({ where: { leagueId } });
       if (existingCount > 0) {
         throw new ConflictException({ code: 'LEAGUE_FIXTURES_EXIST', message: '이미 대진이 생성된 리그예요.' });
@@ -626,8 +626,8 @@ export class LeagueMatchAdminService {
       // 못 하는 죽은 리그가 되고, 승강 확정도 같은 이유로 422 로 막힌다.
       // 이 파일의 다른 파괴적 경로(:197 대진 생성, :523 재생성)와 동일하게 리그 행을 잠가
       // 동시 요청을 직렬화하고, 잠근 뒤의 **커밋된** 로스터로 다시 판정한다.
-      await tx.$queryRaw`SELECT id FROM "v1_leagues" WHERE id = ${leagueId} FOR UPDATE`;
-      // BE-5: 로스터 판정은 통합 축의 confirmed 등록으로 본다. 잠금은 위 `v1_leagues` 행
+      await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${leagueId} FOR UPDATE`;
+      // BE-5: 로스터 판정은 통합 축의 confirmed 등록으로 본다. 잠금은 위 대회 행
       // 그대로다 — 두 축을 같은 트랜잭션에서 함께 쓰므로 직렬화 대상은 바뀌지 않는다
       // (그 raw SQL 의 테이블 교체는 ④ drop 의 몫이다).
       const remainingAfterRemoval = await tx.v1TournamentRegistration.count({
@@ -912,7 +912,7 @@ export class LeagueMatchAdminService {
     const schedule = generateRoundRobinFixtures(teamIds, totalRounds);
 
     const result = await this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM "v1_leagues" WHERE id = ${leagueId} FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${leagueId} FOR UPDATE`;
       const existingFixtures = await tx.v1TeamMatch.findMany({
         where: { leagueId },
         select: {
@@ -1062,7 +1062,7 @@ export class LeagueMatchAdminService {
     const teamMatchId = await this.prisma.$transaction(async (tx) => {
       // 일괄 생성과 같은 락. 같은 리그에 동시에 손대는 두 요청이 서로의 주차 계산을
       // 어긋나게 만들지 않는다 — 아래 형제 목록 조회가 이 락 안에서 일어나야 한다.
-      await tx.$queryRaw`SELECT id FROM "v1_leagues" WHERE id = ${leagueId} FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${leagueId} FOR UPDATE`;
       // **잠근 뒤에** 로스터를 다시 읽는다. 잠금 밖에서 읽은 `league.teams` 로 판정하면
       // TOCTOU 다 — 그 사이 `removeTeam` 이 커밋되면 **리그에서 이미 빠진 팀으로 대진이
       // 생기고**, 그 대진은 로스터에 없는 팀을 가리킨 채 남는다(제거 경로가 취소할 대상

@@ -773,7 +773,15 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                     row.resultStage === 'voided' ||
                     row.resultStage === 'official') ? (
                     <Link
-                      href={`/admin/live/${encodeURIComponent(leagueId)}/result-review?fixtureId=${encodeURIComponent(row.teamMatchId)}`}
+                      // 확정된 경기는 **정정 화면**으로 보낸다. `result-review` 는 *검토
+                      // 대기* 목록이라 확정된 경기가 거기 없다 — 라벨은 "결과 정정" 인데
+                      // 열리는 화면은 "검토할 결과가 없어요" 인 데드엔드였다(alpha 실측).
+                      // 두 화면 다 `?fixtureId=` 로 딥링크를 받는다.
+                      href={
+                        row.resultStage === 'official'
+                          ? `/admin/live/${encodeURIComponent(leagueId)}/records/corrections?fixtureId=${encodeURIComponent(row.teamMatchId)}`
+                          : `/admin/live/${encodeURIComponent(leagueId)}/result-review?fixtureId=${encodeURIComponent(row.teamMatchId)}`
+                      }
                       aria-label={`${row.title} ${row.resultStage === 'official' ? '결과 정정' : '결과 입력'}`}
                       className="inline-flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-lg bg-[var(--blue50)] px-3 text-sm font-medium text-[var(--blue700)] transition-colors hover:bg-[var(--blue100)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                     >

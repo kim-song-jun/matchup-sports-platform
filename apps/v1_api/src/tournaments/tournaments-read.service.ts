@@ -26,7 +26,6 @@ import {
 } from '../league-matches/league-fixture-list-source';
 import {
   calculateLeagueStandingsWithTieBreakInfo,
-  type LeagueTieBreakCriterion,
 } from '../league-matches/league-standings';
 import { LEAGUE_TIE_BREAK_ORDER } from '../league-matches/league-tie-break';
 

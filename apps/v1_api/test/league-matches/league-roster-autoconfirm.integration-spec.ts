@@ -125,6 +125,11 @@ describe('D10 리그 명단 자동 확정', () => {
       },
     });
     // 거울(통합 축) — 등록의 tournamentId 가 이 행을 가리킨다.
+    //
+    // **`scheduledAt` 을 반드시 넣는다.** BE-5 이후 D10 잡은 시작일을 통합 축에서 읽어
+    // 세대(예약 시점의 시작일)와 대조하는데, 비어 있으면 조기 반환해서 **아무것도 안 하고
+    // 조용히 통과한다** — 명단이 0건인 채로 스펙만 빨갛게 된다. 프로덕션의 거울은
+    // `leagueMirrorCreateData` 가 항상 채우므로 픽스처도 같은 모양이어야 한다.
     await prisma.v1Tournament.create({
       data: {
         id: league.id,
@@ -133,6 +138,8 @@ describe('D10 리그 명단 자동 확정', () => {
         regionId,
         title: league.title,
         status: 'open',
+        scheduledAt: startsOn,
+        scheduledEndAt: new Date('2026-11-01T00:00:00.000Z'),
         ...(opts.maxPlayers === undefined ? {} : { maxPlayers: opts.maxPlayers }),
       },
     });
@@ -417,9 +424,11 @@ describe('D10 리그 명단 자동 확정', () => {
 
   it('시작일이 바뀐 리그의 옛 세대 발화는 스스로 no-op 한다', async () => {
     const { league, registration, startsOn } = await seedLeague({ members: 3 });
-    await prisma.v1League.update({
+    // BE-5: 잡이 시작일을 **통합 축에서** 읽는다. 레거시 축만 바꾸면 잡이 보는 값은
+    // 그대로라 세대가 안 바뀌고, 이 케이스가 재려던 no-op 이 일어나지 않는다.
+    await prisma.v1Tournament.update({
       where: { id: league.id },
-      data: { startsOn: new Date('2026-10-15T00:00:00.000Z') },
+      data: { scheduledAt: new Date('2026-10-15T00:00:00.000Z') },
     });
 
     await run(league.id, startsOn); // 옛 세대 시각으로 발화

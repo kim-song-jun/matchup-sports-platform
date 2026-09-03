@@ -57,11 +57,13 @@ describe('PublicTeamRecordsService', () => {
         ]),
       },
       v1TeamRecordFact: { findMany: factFindMany },
+      // BE-5: 대회 제목과 리그 제목을 **같은 테이블**에서 읽는다 — `kind` 로 갈린다.
       v1Tournament: {
-        findMany: jest.fn().mockResolvedValue([{ id: 'tournament-1', title: '주말 리그' }]),
+        findMany: jest.fn(async ({ where }: { where: { kind?: string } }) =>
+          where.kind === 'regular_league' ? [] : [{ id: 'tournament-1', title: '주말 리그' }],
+        ),
       },
       v1TeamMatch: { findMany: jest.fn().mockResolvedValue([]) },
-      v1League: { findMany: jest.fn().mockResolvedValue([]) },
       v1GameEvent: { findMany: jest.fn().mockResolvedValue([]) },
       $queryRaw: queryRaw,
     } as unknown as PrismaService;
@@ -152,9 +154,13 @@ describe('PublicTeamRecordsService', () => {
         findMany: jest.fn().mockResolvedValue([{ id: 'team-2', name: '부산 FC', profile: null }]),
       },
       v1TeamRecordFact: { findMany: factFindMany },
-      v1Tournament: { findMany: jest.fn().mockResolvedValue([]) },
+      v1Tournament: {
+        // BE-5: 대회 제목과 리그 제목을 같은 테이블에서 읽는다 — `kind` 로 갈린다.
+        findMany: jest.fn(async (args: { where: { kind?: string } }) =>
+          args.where.kind === 'regular_league' ? leagueFindMany(args) : [],
+        ),
+      },
       v1TeamMatch: { findMany: teamMatchFindMany },
-      v1League: { findMany: leagueFindMany },
       v1GameEvent: { findMany: jest.fn().mockResolvedValue([]) },
       $queryRaw: queryRaw,
     } as unknown as PrismaService;
@@ -164,7 +170,11 @@ describe('PublicTeamRecordsService', () => {
     expect(teamMatchFindMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: { in: ['team-match-9'] } } }),
     );
-    expect(leagueFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: { id: { in: ['league-1'] } } }));
+    // BE-5: 리그도 통합 축에서 읽으므로 `kind` 조건이 함께 붙는다 — 그게 빠지면 리그가
+    // 아닌 대회가 리그 제목으로 붙을 수 있으니 조건도 함께 단언한다.
+    expect(leagueFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: { in: ['league-1'] }, kind: 'regular_league' } }),
+    );
     expect(result.items[0]).toEqual(
       expect.objectContaining({
         type: 'league',
@@ -221,9 +231,13 @@ describe('PublicTeamRecordsService', () => {
         findMany: jest.fn().mockResolvedValue([]),
       },
       v1TeamRecordFact: { findMany: factFindMany },
-      v1Tournament: { findMany: jest.fn() },
+      v1Tournament: {
+        // BE-5: 대회 제목과 리그 제목을 같은 테이블에서 읽는다 — `kind` 로 갈린다.
+        findMany: jest.fn(async (args: { where: { kind?: string } }) =>
+          args.where.kind === 'regular_league' ? leagueFindMany(args) : [],
+        ),
+      },
       v1TeamMatch: { findMany: teamMatchFindMany },
-      v1League: { findMany: leagueFindMany },
       v1GameEvent: { findMany: jest.fn().mockResolvedValue([]) },
       $queryRaw: queryRaw,
     } as unknown as PrismaService;
@@ -232,7 +246,7 @@ describe('PublicTeamRecordsService', () => {
 
     const pageQuery = queryRaw.mock.calls[0]?.[0] as { strings?: readonly string[] };
     expect(pageQuery.strings?.join(' ')).toContain('trf.tournament_id IS NULL AND tm.league_id IS NULL');
-    // leagueIds 는 전부 null 이었으니 v1League.findMany 는 아예 호출되지 않아야 한다
+    // leagueIds 는 전부 null 이었으니 v1Tournament.findMany 는 아예 호출되지 않아야 한다
     // (N+1 방지 배치 조회가 빈 배열일 때 여전히 왕복을 만들지 않는지 확인).
     expect(leagueFindMany).not.toHaveBeenCalled();
     expect(result.items[0]).toEqual(expect.objectContaining({ type: 'friendly', leagueId: null }));
@@ -290,9 +304,13 @@ describe('PublicTeamRecordsService', () => {
         findMany: jest.fn().mockResolvedValue([{ id: 'team-2', name: '부산 FC', profile: null }]),
       },
       v1TeamRecordFact: { findMany: factFindMany },
-      v1Tournament: { findMany: jest.fn().mockResolvedValue([{ id: 'tournament-1', title: '주말 리그' }]) },
+      v1Tournament: {
+        // BE-5: 대회 제목과 리그 제목을 같은 테이블에서 읽는다 — `kind` 로 갈린다.
+        findMany: jest.fn(async ({ where }: { where: { kind?: string } }) =>
+          where.kind === 'regular_league' ? [] : [{ id: 'tournament-1', title: '주말 리그' }],
+        ),
+      },
       v1TeamMatch: { findMany: jest.fn().mockResolvedValue([]) },
-      v1League: { findMany: jest.fn().mockResolvedValue([]) },
       // 이벤트 테이블은 비어 있다 — 골은 리비전 JSON 에만 있다.
       v1GameEvent: { findMany: jest.fn().mockResolvedValue([]) },
       v1ParticipantIdentityLinkCurrent: {

@@ -198,7 +198,10 @@ export class PublicTeamRecordsService {
     const leagues =
       leagueIds.length === 0
         ? []
-        : await this.prisma.v1League.findMany({ where: { id: { in: leagueIds } }, select: { id: true, title: true } });
+        : await this.prisma.v1Tournament.findMany({
+            where: { id: { in: leagueIds }, kind: 'regular_league' },
+            select: { id: true, title: true },
+          });
     const leagueTitleById = new Map(leagues.map((row) => [row.id, row.title]));
 
     const items = visibleRows.map((row) => {

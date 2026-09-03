@@ -10,6 +10,7 @@ import {
 } from '../tournaments/videos/fixture-video-url';
 import { MAX_VIDEOS_PER_FIXTURE } from '../tournaments/videos/tournament-fixture-videos.service';
 import type { CreateFixtureVideoDto } from '../tournaments/videos/dto/fixture-video.dto';
+import { findTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
 
 /**
  * 리그 대진(팀매치) 경기 영상 등록·삭제 — `V1TournamentFixtureVideo` 의 팀매치 판.
@@ -50,7 +51,10 @@ export class LeagueFixtureVideosService {
   async listLeagueVideos(user: V1AuthUser, leagueId: string) {
     // 조회 전용 — support 등급도 통과해야 한다. 등록·삭제(mutation)만 getMutationAdmin.
     await this.adminContext.getActiveAdmin(user.id);
-    const league = await this.prisma.v1League.findUnique({ where: { id: leagueId }, select: { id: true } });
+    const league = await findTournamentOnSurface(this.prisma, ['regular_league'], {
+      where: { id: leagueId, deletedAt: null },
+      select: { id: true },
+    });
     if (league === null) {
       throw new NotFoundException({ code: 'LEAGUE_NOT_FOUND', message: '리그를 찾을 수 없어요.' });
     }

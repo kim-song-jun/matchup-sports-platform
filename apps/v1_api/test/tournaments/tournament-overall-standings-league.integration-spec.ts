@@ -114,6 +114,15 @@ describe('통합 순위 — 정규 리그 거울 행 (real DB)', () => {
       }),
     });
 
+    // BE-5: 로스터의 정본이 `V1TournamentRegistration(status='confirmed')` 로 옮겨졌다.
+    // 프로덕션 경로(`createLeagueRosterRegistration`)가 로스터 행과 **짝으로** 만드는 것이라
+    // 픽스처도 짝을 맞춘다 — 안 맞추면 순위표의 참가팀이 0이 된다.
+    for (const teamId of [ids.teamA, ids.teamB, ids.teamC]) {
+      await prisma.v1TournamentRegistration.create({
+        data: { tournamentId: league.id, teamId, appliedByUserId: ids.adminUserId, status: 'confirmed' },
+      });
+    }
+
     await createConfirmedFixture('A-B 확정', ids.teamA, ids.teamB, 3, 1);
     await createVoidedFixture('B-C 무효', ids.teamB, ids.teamC);
     await prisma.v1TeamMatch.create({

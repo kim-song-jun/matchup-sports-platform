@@ -7,7 +7,10 @@ import {
   normalizeGender,
 } from '../../tournaments/tournament-players.service';
 import { isPhoneVerificationEnforced } from '../../verification/phone-verification-access';
-import { findTournamentOnSurfaceOrThrow } from '../../tournaments/tournament-surface-lookup';
+import {
+  findTournamentOnSurface,
+  findTournamentOnSurfaceOrThrow,
+} from '../../tournaments/tournament-surface-lookup';
 
 export const LEAGUE_ROSTER_REMINDER_TYPE = 'LEAGUE_ROSTER_REMINDER';
 export const LEAGUE_ROSTER_AUTOCONFIRM_TYPE = 'LEAGUE_ROSTER_AUTOCONFIRM';
@@ -142,13 +145,14 @@ export class LeagueRosterAutoConfirmService {
     if (!isLeagueRosterAutoConfirmEnabled()) return;
     const { leagueId, expectedStartsOn } = this.payload(claim.payload);
 
-    const league = await tx.v1League.findUnique({
-      where: { id: leagueId },
-      select: { id: true, title: true, startsOn: true, state: true },
+    // BE-5: 리그의 정본은 통합 축이다. `startsOn` 은 거울이 `scheduledAt` 에 담는다.
+    const league = await findTournamentOnSurface(tx, ['regular_league'], {
+      where: { id: leagueId, deletedAt: null },
+      select: { id: true, title: true, scheduledAt: true },
     });
-    if (league === null) return;
+    if (league === null || league.scheduledAt === null) return;
     // 더 새 세대(시작일 변경)로 다시 예약됐으면 이 발화는 무시한다.
-    if (league.startsOn.toISOString() !== expectedStartsOn) return;
+    if (league.scheduledAt.toISOString() !== expectedStartsOn) return;
 
     // 대진이 이미 생성된 리그는 건드리지 않는다 — 그 시점엔 신청이 닫혀 자동 확정 대상이
     // 없고, 명단을 뒤늦게 바꾸면 이미 만들어진 대진의 전제가 흔들린다.
@@ -407,12 +411,12 @@ export class LeagueRosterReminderService {
     }
     const leagueId = value.leagueId;
 
-    const league = await tx.v1League.findUnique({
-      where: { id: leagueId },
-      select: { id: true, title: true, startsOn: true },
+    const league = await findTournamentOnSurface(tx, ['regular_league'], {
+      where: { id: leagueId, deletedAt: null },
+      select: { id: true, title: true, scheduledAt: true },
     });
-    if (league === null) return;
-    if (league.startsOn.toISOString() !== value.expectedStartsOn) return;
+    if (league === null || league.scheduledAt === null) return;
+    if (league.scheduledAt.toISOString() !== value.expectedStartsOn) return;
 
     // 자동 확정과 **같은 조건**이어야 한다 — 리마인더가 더 넓으면 하루 뒤 아무 일도
     // 일어나지 않을 팀에게 "곧 자동으로 채워져요" 라고 알리게 된다.

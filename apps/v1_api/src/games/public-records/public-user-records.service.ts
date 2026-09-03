@@ -435,7 +435,10 @@ export class PublicUserRecordsService {
         : this.prisma.v1Tournament.findMany({ where: { id: { in: tournamentIds } }, select: { id: true, title: true } }),
       leagueIds.length === 0
         ? []
-        : this.prisma.v1League.findMany({ where: { id: { in: leagueIds } }, select: { id: true, title: true } }),
+        : this.prisma.v1Tournament.findMany({
+            where: { id: { in: leagueIds }, kind: 'regular_league' },
+            select: { id: true, title: true },
+          }),
     ]);
     const teamNameById = new Map(teams.map((team) => [team.id, team.name]));
     const tournamentTitleById = new Map(tournaments.map((tournament) => [tournament.id, tournament.title]));

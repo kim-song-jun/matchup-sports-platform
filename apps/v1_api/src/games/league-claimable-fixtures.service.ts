@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { resolveLeagueWeekNumbers } from '../league-matches/league-week-number';
 import { PrismaService } from '../prisma/prisma.service';
+import { findTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
 
 /**
  * 리그 상세(순위·득점·도움) 화면이 쓰는 **"이 리그에서 내가 연결할 수 있는 대진"** 목록
@@ -168,10 +169,19 @@ export class LeagueClaimableFixturesService {
     // 라벨용 리그명 + 주차 파생에 필요한 형제 경기일. 한 번의 조회로 둘 다 얻는다.
     // 형제 조건은 `deletedAt: null` 뿐이다 — 취소된 대진도 경기일로 세야 공개 경기기록·
     // 어드민 영상 화면과 주차가 어긋나지 않는다(league-week-number.ts 참고).
-    const league = await this.prisma.v1League.findUnique({
-      where: { id: leagueId },
-      select: { title: true, teamMatches: { where: { deletedAt: null }, select: { startAt: true } } },
-    });
+    // BE-5: 리그 제목은 통합 축에서 읽는다. 형제 대진은 `V1TeamMatch.leagueId` 로 직접
+    // 센다 — 그 FK 는 아직 레거시 테이블을 가리켜 통합 축에 relation 이 없다(재타깃은 ④).
+    const [leagueRow, siblingFixtures] = await Promise.all([
+      findTournamentOnSurface(this.prisma, ['regular_league'], {
+        where: { id: leagueId, deletedAt: null },
+        select: { title: true },
+      }),
+      this.prisma.v1TeamMatch.findMany({
+        where: { leagueId, deletedAt: null },
+        select: { startAt: true },
+      }),
+    ]);
+    const league = leagueRow === null ? null : { title: leagueRow.title, teamMatches: siblingFixtures };
     const weekNumbers = resolveLeagueWeekNumbers(
       new Map([[leagueId, (league?.teamMatches ?? []).map((sibling) => sibling.startAt)]]),
       fixtures.map((fixture) => ({ id: fixture.id, leagueId, startAt: fixture.startAt })),

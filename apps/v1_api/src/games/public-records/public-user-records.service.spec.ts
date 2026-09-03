@@ -70,9 +70,15 @@ function createFakePrisma(config: {
     },
     v1TournamentFixture: { findMany: findManyByIds(config.fixtures ?? []) },
     v1Team: { findMany: jest.fn().mockResolvedValue([]) },
-    v1Tournament: { findMany: findManyByIds(config.tournaments ?? []) },
+    // BE-5: 대회 제목과 리그 제목을 같은 테이블에서 읽는다 — `kind` 로 갈린다.
+    v1Tournament: {
+      findMany: jest.fn(async (args: { where: { kind?: string } }) =>
+        args.where.kind === 'regular_league'
+          ? findManyByIds(config.leagues ?? [])(args)
+          : findManyByIds(config.tournaments ?? [])(args),
+      ),
+    },
     v1TeamMatch: { findMany: findManyByIds(config.teamMatches ?? []) },
-    v1League: { findMany: findManyByIds(config.leagues ?? []) },
   } as unknown as PrismaService;
 }
 
@@ -405,7 +411,17 @@ describe('PublicUserRecordsService', () => {
 
     // N+1 금지: 팀매치·리그 모두 행 수와 무관하게 단일 IN 조회 1회씩이다.
     expect((prisma.v1TeamMatch.findMany as jest.Mock).mock.calls).toHaveLength(1);
-    expect((prisma.v1League.findMany as jest.Mock).mock.calls).toHaveLength(1);
+    // BE-5: 대회 제목과 리그 제목이 같은 테이블에서 오므로 이 mock 은 둘을 함께 센다.
+    // 재려던 것은 "각각 단일 IN 조회 1회" 이므로 갈래별로 나눠 센다 — 합계만 보면 한쪽이
+    // 행마다 도는 회귀를 다른 쪽이 가려 준다.
+    const tournamentCalls = (prisma.v1Tournament.findMany as jest.Mock).mock.calls.filter(
+      ([args]) => args.where.kind !== 'regular_league',
+    );
+    const leagueCalls = (prisma.v1Tournament.findMany as jest.Mock).mock.calls.filter(
+      ([args]) => args.where.kind === 'regular_league',
+    );
+    expect(tournamentCalls).toHaveLength(1);
+    expect(leagueCalls).toHaveLength(1);
   });
   it('?type=league 는 리그 행만 돌려준다 — 팀 전적과 같은 우선순위(tournament > league > friendly)', async () => {
     const service = new PublicUserRecordsService(threeCategoryPrisma());

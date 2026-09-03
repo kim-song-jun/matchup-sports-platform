@@ -144,7 +144,7 @@ export function createEmptyLineupEditorState(baseRevision: number): LineupEditor
 /** GET 응답으로부터 편집기 상태를 새로 만든다 — 페이지 최초 진입, 그리고 버전 충돌 시
  * "새로고침" 액션(applyVersionConflictReload) 둘 다 이 함수를 거친다. 서버가 돌려주는
  * starters/bench는 displayName 스냅샷뿐이라 userId는 전부 null로 재수화된다(위 LineupEntryDraft
- * 주석 참고) — 그래서 그대로 재저장하면 링크가 사라지는 게 아니라,애초에 저장 시점에
+ * 주석 참고) — 그래서 그대로 재저장하면 링크가 사라지는 게 아니라, 애초에 저장 시점에
  * 링크 여부를 다시 선택해야 하는 게 이 계약의 정직한 동작이다.
  */
 export function hydrateLineupEditorState(lineup: V1TeamMatchLineup): LineupEditorState {
@@ -313,8 +313,10 @@ export function setJerseyNumber(
   };
 }
 
-/** 명단에서 정확히 한 명만 골키퍼일 수 있다 — 지정한 key 를 켜면서 나머지는 전부 끈다
- * (라디오 버튼과 같은 의미론). */
+/** 골키퍼 지정은 **한 번에 한 명**이다 — 지정한 key 를 켜면서 나머지는 전부 끈다(라디오
+ * 버튼과 같은 의미론). "정확히 한 명" 이 아니다: 아무도 지정하지 않은 상태(전원 false)가
+ * 정상이고 제출도 통과한다 — 163 BE-1 이 서버에서 GK 검증을 지웠기 때문이다(정본 §3).
+ * 이 함수는 상한만 강제하고 하한은 강제하지 않는다. */
 export function setGoalkeeper(state: LineupEditorState, key: string): LineupEditorState {
   return {
     ...state,

@@ -404,6 +404,11 @@
  * 600px 프레임에서 모바일 단일 컬럼 → 2-up 그리드로 전환해 공간 활용 개선.
  */
 @media (min-width: 768px) and (max-width: 1023px) {
+  /* 히어로 그래픽 웰이 전폭(728px×546px)이면 타이틀보다 무거워진다(alpha 실측). 480px 로 캡. */
+  .tm-landing-hero-aside {
+    max-width: 480px;
+  }
+
   .tm-landing-features {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 16px;
@@ -505,32 +510,17 @@
     padding: 16px 20px;
   }
 
-  .tm-landing-stat {
-    text-align: left;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    padding: 16px 0;
-    border-bottom: 1px solid var(--grey150);
-  }
-
-  .tm-landing-stat:last-child {
-    border-bottom: none;
-  }
-
+  /* stat 스트립이 가로 3칸이 됐으므로(웰 아래) 각 칸은 모바일과 같은 세로 스택.
+     예전 세로 카드용 row 배치는 alpha 실측에서 "124 오늘 열린 매치4+ 운영 종목…" 처럼 한 줄로 뭉쳤다. */
   .tm-landing-stat-num {
-    font-size: 28px;
+    font-size: 26px;
   }
 
   .tm-landing-stat-label {
-    font-size: 13px;
-    text-align: right;
+    font-size: 12px;
   }
 
-  /* Hide horizontal dividers (now vertical stacking) */
-  .tm-landing-stat-divider {
-    display: none;
-  }
+
 
   /* Feature grid: 2 col at 1024, 3 col at 1440 */
   .tm-landing-features {

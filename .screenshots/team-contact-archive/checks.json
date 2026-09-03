@@ -1,0 +1,80 @@
+{
+  "roomId": "1833a865-4684-46ca-9601-2b888167b9a0",
+  "contactId": "195eda74-cc84-4dd4-9790-78d736818326",
+  "teamC": "9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da",
+  "checks": [
+    {
+      "name": "0) C 팀 생성",
+      "ok": true,
+      "detail": "status=201 code="
+    },
+    {
+      "name": "2) C→A 발신 201",
+      "ok": true,
+      "detail": "status=201 code="
+    },
+    {
+      "name": "2) A 거절 200 + chatRoomId",
+      "ok": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "3) 기본 목록에서 사라짐",
+      "ok": true
+    },
+    {
+      "name": "3) status=archived 목록에 있음",
+      "ok": true
+    },
+    {
+      "name": "3) teamContact declined + 사유 + mySide from",
+      "ok": true,
+      "detail": "{\"contactId\":\"195eda74-cc84-4dd4-9790-78d736818326\",\"status\":\"declined\",\"expiresAt\":\"2026-09-10T04:31:43.922Z\",\"declineReason\":\"이번 주는 어려워요\",\"mySide\":\"from\",\"fromTeam\":{\"id\":\"9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da\",\"name\":\"E2E 알파 C팀\"},\"toTeam\":{\"id\":\"00620e9d-b432-4a59-98ef-68afcac31c8b\",\"name\":\"E2E 알파 A팀\"}}"
+    },
+    {
+      "name": "3) 상세 200 + status archived",
+      "ok": true,
+      "detail": "status=200 room=archived"
+    },
+    {
+      "name": "3) 시스템 메시지 \"컨택을 거절했어요\"",
+      "ok": true
+    },
+    {
+      "name": "3) 보관된 방 전송 409",
+      "ok": true,
+      "detail": "status=409 code=TEAM_CONTACT_NOT_ACCEPTED"
+    },
+    {
+      "name": "3) A 기본 목록에서도 사라짐",
+      "ok": true
+    },
+    {
+      "name": "4) 토글 버튼 렌더",
+      "ok": true
+    },
+    {
+      "name": "4) 토글 뒤 \"종료된 컨택 N\" 섹션",
+      "ok": true,
+      "detail": "[\"종료된 컨택 1\",\"종료된 컨택 1\"]"
+    },
+    {
+      "name": "4) 종료 목록에 \"거절됨\" 배지",
+      "ok": true,
+      "detail": "[\"수락됨\",\"거절됨\",\"수락됨\",\"거절됨\"]"
+    },
+    {
+      "name": "4) 390 가로 오버플로 없음",
+      "ok": true
+    },
+    {
+      "name": "4) 보관된 방 상태 카드 + 거절 사유",
+      "ok": true
+    },
+    {
+      "name": "4) 보관된 방 입력 잠금 문구",
+      "ok": true,
+      "detail": "종료된 컨택이에요/true"
+    }
+  ]
+}

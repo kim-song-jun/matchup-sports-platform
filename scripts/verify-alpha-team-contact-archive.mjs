@@ -54,7 +54,7 @@ let teamC = null;
   teamC = items.find((t) => t.name === TEAM_C_NAME)?.teamId ?? null;
   if (!teamC) {
     const b = await api(tokenB, 'GET', `/teams/${teamB}`);
-    const created = await api(tokenB, 'POST', '/teams', { sportId: b.body.data.sport.sportId, regionId: b.body.data.region.regionId, name: TEAM_C_NAME, introduction: '컨택 보관 실측용 팀' });
+    const created = await api(tokenB, 'POST', '/teams', { sportId: b.body.data.sport.sportId, regionId: b.body.data.region.regionId, name: TEAM_C_NAME, joinPolicy: 'approval_required', introduction: '컨택 보관 실측용 팀' });
     check('0) C 팀 생성', created.status === 201, `status=${created.status} code=${created.body?.code ?? ''}`);
     teamC = created.body?.data?.teamId ?? created.body?.data?.id ?? null;
   } else {

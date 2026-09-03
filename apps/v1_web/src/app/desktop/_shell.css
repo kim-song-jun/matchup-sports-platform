@@ -255,6 +255,8 @@
     position: absolute;
     left: 0;
     bottom: 0;
+    /* 순수 시각 요소 — 탭 클릭 히트테스트에 끼어들지 않는다(.tm-bottom-nav-pill-slot·.tm-segmented-thumb 과 동일). */
+    pointer-events: none;
     height: 2.5px;
     background: var(--blue500);
     border-radius: var(--radius-pill) var(--radius-pill) 0 0;

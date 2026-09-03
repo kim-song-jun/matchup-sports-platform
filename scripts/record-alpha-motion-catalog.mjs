@@ -596,12 +596,21 @@ async function main() {
       }
 
       const videoHandle = page.video();
-      await page.close().catch(() => {});
+      const ffmpegNotes = [];
+      try {
+        await page.close();
+      } catch (closeErr) {
+        // 닫기 실패는 녹화 파일이 완결되지 않았을 수 있다는 뜻 — 조용히 삼키지 않고 기록한다.
+        console.warn(`  ⚠ ${flowId} page.close 실패: ${errorMessage(closeErr)}`);
+        ffmpegNotes.push(`page.close 실패: ${errorMessage(closeErr)}`);
+      }
       await ctx.close(); // recordVideo 는 컨텍스트가 닫혀야 파일이 완결된다
 
       // video.path() 는 page/context 가 닫힌 뒤 호출해야 완결된 파일 경로를 준다
       // (playwright 계약) — close 전에 호출하면 아직 안 끝난 파일을 가리킬 수 있다.
-      const videoPath = await videoHandle?.path().catch(() => null);
+      // page.video() 는 Video | null — null 이면 optional chaining 결과(undefined)에 .catch 를 붙이다
+      // TypeError 가 난다. path() 의 Promise 에만 catch 를 건다.
+      const videoPath = videoHandle ? await videoHandle.path().catch(() => null) : null;
       let resolvedVideoPath = videoPath;
       if (!resolvedVideoPath) {
         // 폴백: flowDir 안의 유일한 .webm 파일을 찾는다.
@@ -618,7 +627,6 @@ async function main() {
 
       const gifPath = resolve(flowDir, 'clip.gif');
       const sheetPath = resolve(flowDir, 'sheet.png');
-      let ffmpegNotes = [];
       if (status !== 'failed' && existsSync(finalVideoPath)) {
         try {
           const gifWidth = opts.viewport === 'desktop' ? 720 : 390;

@@ -7,7 +7,6 @@ import { AdminPageHeader, AdminDataTable, AdminReasonModal, AdminStatusPill, Adm
 import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-picker';
 import { GateConfirmModal } from '@/components/admin/operation-flag-gate-confirm-modal';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
-import { LeagueResultEntryModal } from '@/components/admin/league-result-entry-modal';
 import {
   useV1AddLeagueTeam,
   useV1AdminLeagueMatch,
@@ -15,12 +14,9 @@ import {
   useV1AdminLeagueTeams,
   useV1AdminTeam,
   useV1CancelLeagueFixture,
-  useV1CorrectLeagueResult,
-  useV1LeagueFixtureParticipants,
   useV1GenerateLeagueFixtures,
   useV1PreviewLeagueFixtures,
   useV1RecordLeagueForfeit,
-  useV1RecordLeagueResult,
   useV1RegenerateLeagueFixtures,
   useV1RemoveLeagueTeam,
   useV1Teams,
@@ -40,7 +36,6 @@ import {
 import type {
   V1GenerateLeagueFixturesPayload,
   V1LeagueFixture,
-  V1LeagueResultParticipantStat,
   V1PreviewLeagueFixturesResult,
 } from '@/types/league-match';
 
@@ -104,13 +99,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
   // 모드(entry/correction)는 그 대진의 resultStage에서 매번 파생한다 — 별도 state로
   // 들고 있으면 모달이 열려 있는 동안 resultStage가 바뀔 일이 없으므로 사실상 동기화
   // 부담만 늘어난다.
-  const [resultEntryFixture, setResultEntryFixture] = useState<V1LeagueFixture | null>(null);
-  const resultEntryMode: 'entry' | 'correction' =
-    resultEntryFixture?.resultStage === 'official' ? 'correction' : 'entry';
-  const recordResult = useV1RecordLeagueResult(leagueId);
-  const correctResult = useV1CorrectLeagueResult(leagueId);
   // U1 확장: 모달이 열린 대진의 득점자 선택 목록 — 대상이 없으면(enabled=false) 요청하지 않는다.
-  const fixtureParticipants = useV1LeagueFixtureParticipants(leagueId, resultEntryFixture?.teamMatchId ?? null);
   const [weeksCount, setWeeksCount] = useState(7);
   const [dayOfWeek, setDayOfWeek] = useState<number | ''>('');
   const [time, setTime] = useState('18:00');
@@ -405,64 +394,6 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
     );
   };
 
-  // U1: 결과 입력·정정 제출. 신규 입력(POST .../result)과 정정(POST .../result/correct)은
-  // 서버 계약이 완전히 같은 body(RecordLeagueResultDto)를 쓰지만 엔드포인트·멱등 의미가
-  // 달라 두 훅을 그대로 유지하고 여기서 모드로만 갈라 호출한다.
-  const onResultEntrySubmit = (
-    homeScore: number,
-    awayScore: number,
-    reason: string,
-    participantStats: V1LeagueResultParticipantStat[],
-    isForfeit: boolean | undefined,
-  ) => {
-    if (!resultEntryFixture) return;
-    const mutation = resultEntryMode === 'correction' ? correctResult : recordResult;
-    mutation.mutate(
-      {
-        teamMatchId: resultEntryFixture.teamMatchId,
-        body: {
-          homeScore,
-          awayScore,
-          reason,
-          // 정정 + 로스터 로딩 성공 시엔 빈 배열도 그대로 보낸다 — 모달이 현재 기록을
-          // 프리필한 상태라 화면이 곧 전체 진실이다(빈 배열 = 명시적 삭제). 그 외(신규
-          // 입력, 로스터 로딩 실패로 섹션 숨김)에는 미전송 — 서버 승계 규칙이 기존
-          // 기록을 보존한다.
-          ...(resultEntryMode === 'correction' && fixtureParticipants.data != null
-            ? { participants: participantStats }
-            : participantStats.length > 0
-              ? { participants: participantStats }
-              : {}),
-          // 감사 L-E finding 4 수정: 정정 모드에서만 싣는다(신규 입력은 모달이 항상
-          // undefined 를 넘긴다 — 몰수 개념이 없는 모드). 미전송이면 서버가 base를
-          // 승계하므로, 여기서도 undefined 를 그대로 흘려 "값 없음"과 "false"를
-          // 구분한다(?? 로 접으면 항상 boolean 이 되어 이 구분이 사라진다).
-          ...(isForfeit === undefined ? {} : { isForfeit }),
-        },
-      },
-      {
-        onSuccess: (result) => {
-          setResultEntryFixture(null);
-          showToast(
-            result.alreadyProcessed
-              ? '이미 같은 내용으로 확정돼 있어요.'
-              : resultEntryMode === 'correction'
-                ? '결과를 정정했어요.'
-                : '결과를 입력했어요.',
-            'success',
-          );
-        },
-        onError: (error) =>
-          showToast(
-            extractErrorMessage(
-              error,
-              resultEntryMode === 'correction' ? '결과를 정정하지 못했어요.' : '결과를 입력하지 못했어요.',
-            ),
-            'error',
-          ),
-      },
-    );
-  };
 
   // R6/D-3: 전 대진 확정 시 리그는 자동으로 completed 로 전이한다. 결과를 정정해야 하면
   // 운영자가 진행 중으로 되돌려야 하는데, 그동안 이 엔드포인트에 화면이 없어서 API 를 직접
@@ -830,12 +761,15 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                   {/* U1(A안): 상대팀이 확정된(awayTeamId not null) 대진만 결과 처리 대상이다.
                       resultStage 미확정 4단계(not_entered/draft/change_requested/voided)는
                       신규 입력, official 은 정정 — awaiting_approval(상대팀 승인 대기 중)만
-                      운영자 직접 입력 대상이 아니라 버튼을 내지 않는다.
-                      voided(무효화된 결과)는 감사 확인 결과 백엔드가 이미 신규 입력을
-                      허용하고 있었다(league-match-result-entry.service.ts의 VOID predecessor
-                      게이트) — 여기서 빼면 재입력 버튼 자체가 사라져 재입력이 불가능해진다.
-                      resultEntryMode는 resultStage === 'official' 일 때만 'correction'이므로
-                      voided는 자동으로 'entry'로 열린다. */}
+                      운영자 직접 입력 대상이 아니라 링크를 내지 않는다.
+                      voided(무효화된 결과)도 재입력 대상이라 포함한다 — 여기서 빼면
+                      무효화된 경기로 들어갈 입구가 사라진다.
+
+                      Task 165 BE-3: 이 자리는 이제 **콘솔 딥링크**다. 리그 전용 결과 입력
+                      모달·엔드포인트는 지웠고, 운영자는 대회와 같은 결과 검토 화면
+                      (`/admin/live/:leagueId/result-review?fixtureId=`)에서 입력·정정한다.
+                      그 화면이 리그를 볼 수 있는 것은 #985(콘솔 목록)와 #982(결과 명령
+                      경계)가 거울을 지원하기 때문이다. */}
                   {row.awayTeamId !== null &&
                   (row.resultStage === undefined ||
                     row.resultStage === 'not_entered' ||
@@ -843,14 +777,13 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                     row.resultStage === 'change_requested' ||
                     row.resultStage === 'voided' ||
                     row.resultStage === 'official') ? (
-                    <button
-                      type="button"
-                      onClick={() => setResultEntryFixture(row)}
+                    <Link
+                      href={`/admin/live/${encodeURIComponent(leagueId)}/result-review?fixtureId=${encodeURIComponent(row.teamMatchId)}`}
                       aria-label={`${row.title} ${row.resultStage === 'official' ? '결과 정정' : '결과 입력'}`}
                       className="inline-flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-lg bg-[var(--blue50)] px-3 text-sm font-medium text-[var(--blue700)] transition-colors hover:bg-[var(--blue100)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                     >
                       {row.resultStage === 'official' ? '결과 정정' : '결과 입력'}
-                    </button>
+                    </Link>
                   ) : null}
                   {/* R11(C-6): 상대팀이 확정된(matched) 대진만 몰수 처리 대상이다 — 아직 상대가
                       없거나(awayTeamId null) 이미 완료된 대진은 버튼을 숨긴다. */}
@@ -1046,25 +979,6 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
         onSubmit={onForfeitSubmit}
         onClose={() => setForfeitFixture(null)}
         pending={recordForfeit.isPending}
-      />
-
-      {/* U1(A안 "확정 다이얼로그") — 결과 입력·정정. 정정 모드는 현재 공식 스코어("전")를
-          함께 보여준다(요구사항 3). */}
-      <LeagueResultEntryModal
-        open={resultEntryFixture !== null}
-        mode={resultEntryMode}
-        homeTeamName={resultEntryFixture ? (teamNameById.get(resultEntryFixture.homeTeamId) ?? '홈팀') : ''}
-        awayTeamName={
-          resultEntryFixture?.awayTeamId ? (teamNameById.get(resultEntryFixture.awayTeamId) ?? '원정팀') : ''
-        }
-        weekLabel={resultEntryFixture?.title ?? ''}
-        currentHomeScore={resultEntryFixture?.homeScore ?? null}
-        currentAwayScore={resultEntryFixture?.awayScore ?? null}
-        currentIsForfeit={resultEntryFixture?.isForfeit}
-        participants={fixtureParticipants.data ?? null}
-        onSubmit={onResultEntrySubmit}
-        onClose={() => setResultEntryFixture(null)}
-        pending={resultEntryMode === 'correction' ? correctResult.isPending : recordResult.isPending}
       />
 
       <AdminToasts toasts={toasts} />

@@ -360,6 +360,35 @@ describe('D10 리그 명단 자동 확정', () => {
     expect(types).toContain(LEAGUE_ROSTER_REMINDER_TYPE);
   });
 
+  it.each(['completed', 'cancelled'] as const)('끝난 리그(%s)는 명단을 채우지 않는다', async (status) => {
+    // 예약(생성 시점)과 실행(시즌 시작) 사이에 리그가 끝날 수 있다. 그때 선수 row 를 새로
+    // 세우면 이미 끝난 대회의 기록이 바뀐다.
+    const { league, registration, startsOn } = await seedLeague({ members: 3 });
+    await prisma.v1Tournament.update({ where: { id: league.id }, data: { status } });
+
+    await run(league.id, startsOn);
+
+    const players = await prisma.v1TournamentPlayer.findMany({ where: { registrationId: registration.id } });
+    expect(players).toHaveLength(0);
+    const [row] = await prisma.$queryRaw<Array<{ at: Date | null }>>`
+      SELECT roster_auto_confirmed_at AS at FROM v1_tournament_registrations WHERE id = ${registration.id}
+    `;
+    expect(row.at).toBeNull();
+  });
+
+  it('아직 신청을 연 적 없는 draft 리그는 그대로 채운다 — 그게 가장 흔한 경로다', async () => {
+    // `isRosterMutableTournamentStatus`(open·closed·in_progress)를 그대로 쓰면 이 케이스가
+    // 빠진다. 리그 거울은 draft 로 생성되고 이 잡은 대진 생성보다 **먼저** 돌기 때문에,
+    // 그 집합을 쓰면 D10 이 가장 흔한 경로에서 아무 일도 하지 않는다.
+    const { league, registration, startsOn } = await seedLeague({ members: 3 });
+    await prisma.v1Tournament.update({ where: { id: league.id }, data: { status: 'draft' } });
+
+    await run(league.id, startsOn);
+
+    const players = await prisma.v1TournamentPlayer.findMany({ where: { registrationId: registration.id } });
+    expect(players).toHaveLength(3);
+  });
+
   it('플래그가 꺼져 있으면(기본값) 아무것도 하지 않는다', async () => {
     const { league, registration, startsOn } = await seedLeague({ members: 3 });
     delete process.env.DISABLE_LEAGUE_ROSTER_AUTOCONFIRM_CRON; // 기본 = 꺼짐

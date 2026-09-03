@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { Prisma } from '@prisma/client';
+import { Prisma, V1TournamentStatus } from '@prisma/client';
 import type { GameOperationHandler } from '../v1-game-operations-worker.service';
 import {
   evaluateRosterCandidate,
@@ -183,7 +183,7 @@ export class LeagueRosterAutoConfirmService {
     // TOURNAMENT_NOT_FOUND 로 끊긴다.
     const tournament = await findTournamentOnSurfaceOrThrow(tx, ['regular_league'], {
       where: { id: leagueId },
-      select: { maxPlayers: true, genderCategory: true },
+      select: { maxPlayers: true, genderCategory: true, status: true },
     });
     const members = await tx.v1TeamMembership.findMany({
       where: { teamId: registration.teamId, status: 'active' },
@@ -222,13 +222,37 @@ export class LeagueRosterAutoConfirmService {
       ).flatMap((row) => (row.userId === null ? [] : [row.userId])),
     );
 
+    // 끝난 리그는 명단을 만들지 않는다. 예약(생성 시점)과 실행(시즌 시작) 사이에 리그가
+    // 완료·취소될 수 있고, 그때 선수 row 를 새로 세우면 끝난 대회의 기록이 바뀐다.
+    //
+    // **`isRosterMutableTournamentStatus` 를 그대로 쓰지 않는다.** 그 집합은
+    // `open`·`closed`·`in_progress` 인데, 리그 거울은 `draft` 로 생성되고
+    // (`STATUS_BY_LEAGUE_STATE[draft]`) 이 잡은 **대진 생성보다 먼저** 돈다 — 즉 참가 신청을
+    // 연 적 없는 리그는 시작 시점에도 `draft` 다. 그 집합을 그대로 쓰면 D10 이 가장 흔한
+    // 경로에서 아무 일도 하지 않는다. 여기서 막아야 하는 것은 "아직 안 열린" 이 아니라
+    // "이미 끝난" 이다.
+    const tournamentMutable =
+      tournament.status !== V1TournamentStatus.completed &&
+      tournament.status !== V1TournamentStatus.cancelled;
+    if (!tournamentMutable) {
+      return {
+        registrationId: registration.id,
+        teamId: registration.teamId,
+        added: 0,
+        skipped: [{ userId: '-', reason: `대회 상태 ${tournament.status} — 명단을 채우지 않았어요` }],
+      };
+    }
+
     const skipped: Array<{ userId: string; reason: string }> = [];
     let added = 0;
     for (const member of members) {
       const block = evaluateRosterCandidate({
         alreadyOnRoster: false,
         alreadyOnOtherTeamInTournament: takenUserIds.has(member.userId),
-        tournamentMutable: true,
+        tournamentMutable,
+        // 대상 조회(`PENDING_ROSTER_REGISTRATION_WHERE`)가 `status: 'confirmed'` 로 이미
+        // 좁혔으므로 여기 도달한 등록은 취소 계열이 아니다. 조건 목록을 한 곳에 모아 두기
+        // 위해 그대로 넘긴다(수동 경로의 같은 자리와 같은 관례).
         registrationMutable: true,
         rosterCount: added,
         maxPlayers: tournament.maxPlayers,

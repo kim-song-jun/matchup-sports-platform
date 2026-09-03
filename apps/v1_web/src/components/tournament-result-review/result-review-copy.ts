@@ -17,6 +17,10 @@ const KNOWN_ERROR_MESSAGES: Record<string, string> = {
   // contract 이후 base 는 `SUBMITTED` 뿐이다 — 반려·보완 요청 상태가 사라졌으므로
   // 그 어휘로 안내하면 있지도 않은 상태를 찾게 만든다.
   RESULT_RESUBMISSION_NOT_ALLOWED: '확인 대기 중인 결과만 다시 보낼 수 있어요.',
+  // contract 가 새로 만든 409 다(`officializeResultRevision` STANDARD 흐름의 공식 탈취 가드).
+  // 매핑이 없으면 서버 원문(영문)이 그대로 화면에 뜬다.
+  RESULT_ALREADY_OFFICIAL:
+    '이미 공식 결과가 있는 경기예요. 결과를 바꾸려면 결과 정정으로 해주세요.',
   RESULT_REVISION_NOT_FOUND: '결과 정보를 찾을 수 없어요. 화면을 새로고침해 주세요.',
   COMMAND_CONCURRENCY_CONFLICT: '다른 처리와 동시에 진행돼 반영하지 못했어요. 화면을 새로고침해 주세요.',
   VERSION_CONFLICT: '경기 정보가 그 사이 바뀌었어요. 화면을 새로고침해 주세요.',

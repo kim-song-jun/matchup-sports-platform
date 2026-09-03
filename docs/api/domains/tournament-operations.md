@@ -237,7 +237,7 @@ Making bracket advancement actually reachable (the fix above) exposed a second, 
 
 | Method and route | Body | Result | Actor |
 |---|---|---|---|
-| `POST /api/v1/games/:gameId/result-revisions/:revisionId/supersede-and-submit` | `SupersedeAndSubmitGameResultRevisionDto {expectedVersion,clientCommandId,score,actualParticipants,eventsHash,mvpParticipantId?,reason}` | atomically creates and submits a same-game successor with a fresh 24h/48h review SLA; base must be `SUBMITTED` (또는 레거시 `REJECTED`/`SUPPLEMENT_REQUESTED` — contract 마이그레이션 전까지만), otherwise `409 RESULT_RESUBMISSION_NOT_ALLOWED` with zero new rows | `tournament_director`/`platform_ops` |
+| `POST /api/v1/games/:gameId/result-revisions/:revisionId/supersede-and-submit` | `SupersedeAndSubmitGameResultRevisionDto {expectedVersion,clientCommandId,score,actualParticipants,eventsHash,mvpParticipantId?,reason}` | atomically creates and submits a same-game successor with a fresh 24h/48h review SLA; base must be `SUBMITTED`, otherwise `409 RESULT_RESUBMISSION_NOT_ALLOWED` with zero new rows | `tournament_director`/`platform_ops` |
 | `POST /api/v1/games/:gameId/result-revisions/:revisionId/officialize` | `OfficializeGameResultRevisionDto {expectedVersion,clientCommandId,projectionPreviewHash}` | moves a `SUBMITTED` revision (STANDARD flow) or a correction `DRAFT` (CORRECTION flow) to `OFFICIAL`, atomically swaps `currentOfficialRevisionId`, writes `GAME_RESULT_OFFICIAL` outbox | `platform_ops`; `tournament_director` only while `DIRECTOR_OFFICIALIZE=on` (re-checked fresh on every call -- `403 DIRECTOR_OFFICIALIZE_DISABLED` otherwise) |
 | `POST /api/v1/games/:gameId/result-revisions/:revisionId/void` | `VoidGameResultRevisionDto {expectedVersion,clientCommandId,reason}` | appends an immutable `VOID` revision and swaps the current pointer; `revisionId` must be the game's CURRENT official revision (`409 REVISION_MUST_BE_SUPERSEDED` otherwise); `409 NEXT_FIXTURE_CONFLICT` before the pointer swap if a downstream bracket fixture already advanced past `scheduled` | same as officialize |
 | `POST /api/v1/games/:gameId/corrections` | `CreateGameResultCorrectionDto {expectedVersion,clientCommandId,baseRevisionId,reason,changes:{score,actualParticipants,eventsHash,mvpParticipantId?}}` | creates a same-game superseding `DRAFT`; creation alone never swaps the pointer. `baseRevisionId` 는 게임의 현재 포인터여야 하고, 그 리비전이 `OFFICIAL` 이면 정정(CORRECTION), `VOID` 면 무효 후 재입력(VOID_REENTRY)으로 동작해요 | `tournament_director`/`platform_ops` (not flag-gated) |
@@ -256,8 +256,9 @@ Every route requires `V1AuthGuard` and reuses the [game aggregate](./games.md)'s
 | `404` | `GAME_NOT_FOUND` | game not found, or not `TOURNAMENT_FIXTURE`-sourced |
 | `404` | `RESULT_REVISION_NOT_FOUND` | `revisionId`/`baseRevisionId` does not belong to this game |
 | `409` | `VERSION_CONFLICT` \| `IDEMPOTENCY_PAYLOAD_CONFLICT` \| `COMMAND_CONCURRENCY_CONFLICT` | standard versioned-mutation/idempotency races |
-| `409` | `TERMINAL_REVISION_IMMUTABLE` | the target revision is already terminal (`REJECTED`/`SUPPLEMENT_REQUESTED`/`OFFICIAL`/`VOID`/`CHANGE_REQUESTED`) |
-| `409` | `RESULT_RESUBMISSION_NOT_ALLOWED` | `supersede-and-submit` base is not `SUBMITTED`(또는 레거시 `REJECTED`/`SUPPLEMENT_REQUESTED`) |
+| `409` | `TERMINAL_REVISION_IMMUTABLE` | the target revision is already terminal (`CHANGE_REQUESTED`/`OFFICIAL`/`VOID`) |
+| `409` | `RESULT_RESUBMISSION_NOT_ALLOWED` | `supersede-and-submit` base is not `SUBMITTED` |
+| `409` | `RESULT_ALREADY_OFFICIAL` | `officialize` STANDARD flow: the game already has a current official revision — use a correction instead |
 | `409` | `PROJECTION_PREVIEW_MISMATCH` | `officialize`'s `projectionPreviewHash` does not match the revision's current content |
 | `409` | `REVISION_MUST_BE_SUPERSEDED` | a correction officialize no longer supersedes the current pointer; a void target is not the current official revision; or a correction's `baseRevisionId` is not the current official revision |
 | `409` | `NEXT_FIXTURE_CONFLICT` | void blocked because a downstream bracket fixture already advanced past `scheduled` |

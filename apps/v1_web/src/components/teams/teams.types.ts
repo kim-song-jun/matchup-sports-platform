@@ -102,7 +102,7 @@ export type TeamDetailViewModel = {
    * "무엇을 기다리는 중인지"는 화면에 계속 남아 있어야 한다.
    */
   joinRequest?: { requestedAtLabel?: string };
-  operations?: Array<{ label: string; sub: string; href: string; badge?: number }>;
+  operations?: Array<{ label: string; sub: string; href: string; badge?: number; badgeLabel?: string }>;
   /** Recruiting matches this team currently hosts — "이 팀의 열린 매치" section. */
   openMatches?: Array<{ id: string; title: string; dateLabel: string; venue: string }>;
   openMatchesLoading?: boolean;

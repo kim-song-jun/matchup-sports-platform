@@ -3968,6 +3968,12 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   padding: 16px;
 }
 
+.tm-chat-ended-toggle {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 16px 4px;
+}
+
 .tm-chat-contact-team-link {
   color: var(--text-strong);
   text-decoration: none;

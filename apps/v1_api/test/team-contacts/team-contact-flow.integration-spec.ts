@@ -21,6 +21,7 @@ const ids = {
   region: '68880000-0000-4000-8000-000000000011',
   teamA: '68880000-0000-4000-8000-000000000020',
   teamB: '68880000-0000-4000-8000-000000000021',
+  teamC: '68880000-0000-4000-8000-000000000022',
 } as const;
 
 describe('팀 컨택 전체 흐름', () => {
@@ -70,12 +71,15 @@ describe('팀 컨택 전체 흐름', () => {
       data: [
         { id: ids.teamA, ownerUserId: ids.ownerA, sportId: sport.id, regionId: ids.region, name: 'Task 8 team A' },
         { id: ids.teamB, ownerUserId: ids.ownerB, sportId: sport.id, regionId: ids.region, name: 'Task 8 team B' },
+        // 거절 → 보관 흐름용. A↔B 는 수락돼 재사용할 수 없다.
+        { id: ids.teamC, ownerUserId: ids.ownerB, sportId: sport.id, regionId: ids.region, name: 'Task 8 team C' },
       ],
     });
     await prisma.v1TeamMembership.createMany({
       data: [
         { teamId: ids.teamA, userId: ids.ownerA, role: 'owner', status: 'active' },
         { teamId: ids.teamB, userId: ids.ownerB, role: 'owner', status: 'active' },
+        { teamId: ids.teamC, userId: ids.ownerB, role: 'owner', status: 'active' },
       ],
     });
   });
@@ -136,7 +140,9 @@ describe('팀 컨택 전체 흐름', () => {
 
   it('3-1) B owner 의 대기 컨택 요약은 1건, A owner 는 0건이다', async () => {
     const resB = await request(app.getHttpServer()).get('/api/v1/me/team-contacts/summary').set('x-v1-user-id', ids.ownerB).expect(200);
-    expect(resB.body.data).toEqual({ pendingInbound: 1, byTeam: [{ teamId: ids.teamB, pendingInbound: 1 }] });
+    // ownerB 는 B·C 두 팀의 운영진이라 byTeam 이 두 줄이다 — B 줄만 본다.
+    expect(resB.body.data.pendingInbound).toBe(1);
+    expect(resB.body.data.byTeam).toEqual(expect.arrayContaining([{ teamId: ids.teamB, pendingInbound: 1 }, { teamId: ids.teamC, pendingInbound: 0 }]));
     const resA = await request(app.getHttpServer()).get('/api/v1/me/team-contacts/summary').set('x-v1-user-id', ids.ownerA).expect(200);
     expect(resA.body.data).toEqual({ pendingInbound: 0, byTeam: [{ teamId: ids.teamA, pendingInbound: 0 }] });
   });
@@ -181,7 +187,8 @@ describe('팀 컨택 전체 흐름', () => {
 
   it('5-1) 수락 뒤 B owner 의 대기 컨택 요약은 0건이다', async () => {
     const res = await request(app.getHttpServer()).get('/api/v1/me/team-contacts/summary').set('x-v1-user-id', ids.ownerB).expect(200);
-    expect(res.body.data).toEqual({ pendingInbound: 0, byTeam: [{ teamId: ids.teamB, pendingInbound: 0 }] });
+    expect(res.body.data.pendingInbound).toBe(0);
+    expect(res.body.data.byTeam).toEqual(expect.arrayContaining([{ teamId: ids.teamB, pendingInbound: 0 }]));
   });
 
   it('6) 수락 뒤에는 A owner 가 전송할 수 있다', async () => {
@@ -214,5 +221,51 @@ describe('팀 컨택 전체 흐름', () => {
     expect(resolveRes.body.code).toBe('PERMISSION_DENIED');
     const rooms = await prisma.v1ChatRoom.findMany({ where: { teamContactId: contactId } });
     expect(rooms).toHaveLength(1);
+  });
+
+  it('8) C→A 컨택을 A 가 거절하면 방이 보관돼 기본 목록에서 사라지고 status=archived 로만 보인다', async () => {
+    const created = await request(app.getHttpServer())
+      .post(`/api/v1/teams/${ids.teamA}/contacts`)
+      .set('x-v1-user-id', ids.ownerB)
+      .send({ fromTeamId: ids.teamC, message: '한 번 붙어볼까요?' })
+      .expect(201);
+    const endedRoomId = created.body.data.chatRoomId as string;
+    const endedContactId = created.body.data.id as string;
+
+    const declined = await request(app.getHttpServer())
+      .patch(`/api/v1/team-contacts/${endedContactId}/decline`)
+      .set('x-v1-user-id', ids.ownerA)
+      .send({ reason: '이번 주는 어려워요' })
+      .expect(200);
+    expect(declined.body.data.chatRoomId).toBe(endedRoomId);
+
+    const room = await prisma.v1ChatRoom.findUniqueOrThrow({ where: { id: endedRoomId } });
+    expect(room.status).toBe('archived');
+
+    const active = await request(app.getHttpServer())
+      .get('/api/v1/chat/rooms?roomType=team_contact&limit=50')
+      .set('x-v1-user-id', ids.ownerB)
+      .expect(200);
+    expect(active.body.data.items.map((r: { roomId: string }) => r.roomId)).not.toContain(endedRoomId);
+
+    const archived = await request(app.getHttpServer())
+      .get('/api/v1/chat/rooms?roomType=team_contact&status=archived&limit=50')
+      .set('x-v1-user-id', ids.ownerB)
+      .expect(200);
+    const endedRoom = archived.body.data.items.find((r: { roomId: string }) => r.roomId === endedRoomId);
+    expect(endedRoom).toBeDefined();
+    expect(endedRoom.teamContact).toMatchObject({ status: 'declined', declineReason: '이번 주는 어려워요', mySide: 'from' });
+
+    // 딥링크·상세는 계속 열리고(읽기 전용), 전송은 막힌다
+    const detail = await request(app.getHttpServer())
+      .get(`/api/v1/chat/rooms/${endedRoomId}`)
+      .set('x-v1-user-id', ids.ownerB)
+      .expect(200);
+    expect(detail.body.data.status).toBe('archived');
+    await request(app.getHttpServer())
+      .post(`/api/v1/chat/rooms/${endedRoomId}/messages`)
+      .set('x-v1-user-id', ids.ownerB)
+      .send({ content: '그래도 한 번만' })
+      .expect(409);
   });
 });

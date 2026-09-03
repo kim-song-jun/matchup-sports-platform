@@ -42,6 +42,14 @@ class UnparsableSqlError extends Error {}
 // the gate exists to catch does not apply. Keep this list SHORT: every entry
 // weakens the gate for exactly one (file, statement) pair and nothing else.
 const REVIEWED_NON_ADDITIVE = [
+  // --- team contact rooms: archive ended (2026-09-03) ------------------------
+  {
+    file: "apps/v1_api/prisma/migrations/20260903000000_v1_team_contact_rooms_archive_ended/migration.sql",
+    statement:
+      "UPDATE \"v1_chat_rooms\" AS room SET \"status\" = 'archived' FROM \"v1_team_contacts\" AS contact WHERE contact.\"id\" = room.\"team_contact_id\" AND room.\"status\" = 'active' AND contact.\"status\" IN ('declined', 'withdrawn', 'expired')",
+    reason:
+      "Follow-up to PR #977 (team contact -> chat absorption). One-shot data cleanup: marks v1_chat_rooms.status='archived' for rooms whose team contact already ended (declined/withdrawn/expired). Idempotent (WHERE room.status='active'). Rolling-deploy safe both ways: the old app still serves archived rooms via GET /chat/rooms/:id and /messages (only the default list hides them; sendMessage on a non-active room already returned 409 before this change), and the new app performs the same transition itself on decline/withdraw/expiry, so a rollback leaves nothing inconsistent. No schema change. Reviewed 2026-09-03.",
+  },
   // --- team contact rooms backfill (PR #977, 2026-09-02) ---------------------
   {
     file: "apps/v1_api/prisma/migrations/20260902000000_v1_team_contact_rooms_backfill/migration.sql",

@@ -29,12 +29,29 @@ export function ChatListPageView({ model }: { model: ChatListViewModel }) {
 }
 
 function ChatListContent({ model, selectedRoomId }: { model: ChatListViewModel; selectedRoomId?: string }) {
-  const hasRooms = model.pinnedRooms.length > 0 || model.rooms.length > 0;
+  const ended = model.endedContacts;
+  const hasEndedRooms = Boolean(ended?.visible && ended.rooms.length > 0);
+  // "종료된 컨택 보기" 가 켜져 있으면 목록이 (아직) 비어 있어도 빈 상태를 띄우지 않는다 — 보관 목록이
+  // 로딩 중이거나 0건일 때 "아직 채팅방이 없어요" 가 잠깐 겹쳐 보이던 결함(#992 Copilot).
+  const endedVisible = Boolean(ended?.visible);
+  const hasRooms = model.pinnedRooms.length > 0 || model.rooms.length > 0 || endedVisible;
 
   return (
     // 방이 없을 때만 tm-list-empty — 목록이 있는 평소 레이아웃은 그대로 둔다.
     <div className={`tm-chat-list${!hasRooms ? ' tm-list-empty' : ''}`}>
-          <div className="tm-sport-chip-row" role="group" aria-label="채팅 카테고리 필터">{model.categories.map((category) => <button key={category.label} className={`tm-chip ${category.active ? 'tm-chip-active' : ''}`} type="button" onClick={category.onSelect} aria-pressed={category.active}>{category.label} {category.count}</button>)}</div>
+          <div className="tm-sport-chip-row" role="group" aria-label="채팅 카테고리 필터">{model.categories.map((category) => <button key={category.label} className={`tm-chip ${category.active ? 'tm-chip-active' : ''}`} type="button" onClick={category.onSelect} aria-pressed={category.active}>{category.label}{category.count === undefined ? '' : ` ${category.count}`}</button>)}</div>
+          {ended ? (
+            <div className="tm-chat-ended-toggle">
+              <button
+                type="button"
+                className={`tm-btn tm-btn-sm ${ended.visible ? 'tm-btn-neutral' : 'tm-btn-ghost'}`}
+                aria-pressed={ended.visible}
+                onClick={ended.onToggle}
+              >
+                {ended.visible ? '종료된 컨택 숨기기' : '종료된 컨택 보기'}
+              </button>
+            </div>
+          ) : null}
           {model.status === 'loading' ? <PageSkeleton variant="list" /> : null}
           {model.status === 'error' && !hasRooms ? (
             <ErrorState
@@ -60,10 +77,24 @@ function ChatListContent({ model, selectedRoomId }: { model: ChatListViewModel; 
                   {model.pinnedRooms.map((room) => <ChatRoomRow key={room.id} room={room} selected={room.id === selectedRoomId} />)}
                 </ChatSection>
               ) : null}
-              <ChatSection title={`채팅방 ${model.rooms.length}`}>
-                {model.rooms.map((room) => <ChatRoomRow key={room.id} room={room} selected={room.id === selectedRoomId} />)}
-              </ChatSection>
+              {model.rooms.length > 0 || !endedVisible ? (
+                <ChatSection title={`채팅방 ${model.rooms.length}`}>
+                  {model.rooms.map((room) => <ChatRoomRow key={room.id} room={room} selected={room.id === selectedRoomId} />)}
+                </ChatSection>
+              ) : null}
+              {hasEndedRooms ? (
+                <ChatSection title={`종료된 컨택 ${ended!.rooms.length}`}>
+                  {ended!.rooms.map((room) => <ChatRoomRow key={room.id} room={room} selected={room.id === selectedRoomId} />)}
+                </ChatSection>
+              ) : null}
             </>
+          ) : null}
+          {ended?.visible && ended.status === 'loading' ? <PageSkeleton variant="list" /> : null}
+          {ended?.visible && ended.status === 'error' ? (
+            <div role="status" className="tm-text-caption" style={{ color: 'var(--orange700)', padding: '4px 16px' }}>종료된 컨택을 불러오지 못했어요.</div>
+          ) : null}
+          {ended?.visible && ended.status === 'ready' && ended.rooms.length === 0 ? (
+            <div role="status" className="tm-text-caption" style={{ color: 'var(--text-muted)', padding: '4px 16px' }}>종료된 컨택이 없어요.</div>
           ) : null}
     </div>
   );
@@ -219,14 +250,14 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
             onChange={(event) => model.onDraftChange?.(event.target.value)}
             placeholder={model.inputLockedMessage ?? '메시지 입력'}
             aria-label="메시지 입력"
-            disabled={model.status === 'error' || Boolean(model.inputLockedMessage)}
+            disabled={model.status !== 'ready' || Boolean(model.inputLockedMessage)}
           />
           <button
             className="tm-btn tm-btn-icon tm-btn-primary"
             type="button"
             aria-label={justSent ? '전송 완료' : '전송'}
             aria-busy={model.sending}
-            disabled={!model.onSend || model.sending || model.status === 'error' || Boolean(model.inputLockedMessage) || !model.draft?.trim()}
+            disabled={!model.onSend || model.sending || model.status !== 'ready' || Boolean(model.inputLockedMessage) || !model.draft?.trim()}
             onClick={model.onSend}
           >
             {model.sending ? '...' : justSent ? (

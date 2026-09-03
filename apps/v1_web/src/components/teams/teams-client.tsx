@@ -814,6 +814,7 @@ function buildTeamOperations(team: V1TeamDetail, pendingInboundContacts = 0): Te
       sub: '다른 팀이 보낸 컨택을 확인하고 답해요.',
       href: '/chat?category=team_contact',
       badge: pendingInboundContacts,
+      badgeLabel: pendingInboundContacts > 0 ? `답장을 기다리는 컨택 ${pendingInboundContacts}건` : undefined,
     },
     {
       label: '컨택 설정',

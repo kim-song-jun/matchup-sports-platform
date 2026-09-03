@@ -211,31 +211,38 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
   // 그대로 쓸 수 있다 — 잠그는 건 생성·미리보기·재생성 세 버튼뿐이다.
   const leagueStartsOnAt = series.startsOn === undefined ? null : new Date(series.startsOn);
   const hasLeagueStartsOn = leagueStartsOnAt !== null && !Number.isNaN(leagueStartsOnAt.getTime());
-  const fixtureDates =
-    !hasLeagueStartsOn || dayOfWeek === '' || time.trim() === ''
-      ? []
-      : expandWeeklyFixtureDates({
-          startsOn: series.startsOn,
-          dayOfWeek,
-          time,
-          weeksCount,
-          now: new Date(),
-        });
 
-  const buildFixtureFormPayload = (): V1GenerateLeagueFixturesPayload => ({
-    weeksCount,
-    ...(fixtureDates.length === 0 ? {} : { schedule: { dates: fixtureDates, time } }),
-    ...(placeName.trim() === '' ? {} : { placeName: placeName.trim() }),
-    ...(durationValue === null
-      ? {}
-      : {
-          timing: {
-            gameDurationMinutes: durationValue,
-            ...(breakValue === null ? {} : { breakMinutes: breakValue }),
-            ...(gamesPerDayValue === null ? {} : { gamesPerTeamPerDay: gamesPerDayValue }),
-          },
-        }),
-  });
+  // **날짜는 렌더가 아니라 보내는 순간에 계산한다.** 렌더 시점 값을 들고 있으면 운영자가
+  // 화면을 열어 둔 채 시각이 지났을 때(예: 금 17:59 에 열어 두고 18:05 에 누름) 이미 지난
+  // 날짜를 보내 서버가 422 `LEAGUE_SCHEDULE_DATE_PAST` 로 거부한다 — 운영자는 값을 아무것도
+  // 바꾸지 않았는데 갑자기 실패한다. `buildFixtureFormPayload` 는 생성·재생성·미리보기
+  // 세 호출이 공유하므로 여기 한 곳만 옮기면 셋 다 클릭 시점 값을 쓴다.
+  const buildFixtureFormPayload = (): V1GenerateLeagueFixturesPayload => {
+    const dates =
+      !hasLeagueStartsOn || dayOfWeek === '' || time.trim() === ''
+        ? []
+        : expandWeeklyFixtureDates({
+            startsOn: series.startsOn,
+            dayOfWeek,
+            time,
+            weeksCount,
+            now: new Date(),
+          });
+    return {
+      weeksCount,
+      ...(dates.length === 0 ? {} : { schedule: { dates, time } }),
+      ...(placeName.trim() === '' ? {} : { placeName: placeName.trim() }),
+      ...(durationValue === null
+        ? {}
+        : {
+            timing: {
+              gameDurationMinutes: durationValue,
+              ...(breakValue === null ? {} : { breakMinutes: breakValue }),
+              ...(gamesPerDayValue === null ? {} : { gamesPerTeamPerDay: gamesPerDayValue }),
+            },
+          }),
+    };
+  };
 
   // 경기 시간 없이 휴식/팀당 경기 수만 채우면 서버가 400을 낸다(timing.gameDurationMinutes 필수) —
   // 요일-시각 짝 검증과 같은 방식으로 제출 전에 먼저 알려준다. 정수가 아닌 입력도 여기서 차단한다

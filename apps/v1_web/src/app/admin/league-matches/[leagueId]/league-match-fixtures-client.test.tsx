@@ -390,11 +390,58 @@ describe('LeagueMatchFixturesClient', () => {
     expect(payload.schedule).not.toHaveProperty('dayOfWeek');
     // 주차 수만큼, 전부 토요일(KST), 전부 미래 — 서버가 거부하지 않는 값이어야 한다.
     expect(payload.schedule.dates).toHaveLength(7);
+    // 기준 시각은 **루프 전에 한 번** 잡는다. 루프 안에서 매번 `Date.now()` 를 읽으면
+    // 기준선이 반복마다 앞으로 가서, 첫 날짜가 지금 직후인 경계에서 간헐적으로 깨진다.
+    // 서버의 과거 판정도 `startAt < now` 라 같은 순간은 통과한다 — 그래서 `>=` 다.
+    const sentAt = Date.now();
     for (const date of payload.schedule.dates) {
       expect(date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       const [y, m, d] = date.split('-').map(Number);
       expect(new Date(Date.UTC(y, m - 1, d)).getUTCDay()).toBe(6);
-      expect(new Date(Date.UTC(y, m - 1, d, 19, 30) - 9 * 60 * 60 * 1000).getTime()).toBeGreaterThan(Date.now());
+      expect(new Date(Date.UTC(y, m - 1, d, 19, 30) - 9 * 60 * 60 * 1000).getTime()).toBeGreaterThanOrEqual(sentAt);
+    }
+  });
+
+  it('화면을 열어 둔 채 시각이 지나면 밀린 날짜를 보낸다 — 날짜는 렌더가 아니라 전송 시점에 계산한다', async () => {
+    // 운영자가 금요일 17:59 에 폼을 채워 두고 18:05 에 [생성] 을 누르는 상황. 렌더 시점 값을
+    // 들고 있으면 이미 지난 그 날짜를 보내 서버가 422 LEAGUE_SCHEDULE_DATE_PAST 로 거부한다 —
+    // 운영자는 아무것도 안 바꿨는데 갑자기 실패한다.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      // 2026-09-04(금) 10:00 KST — 그날 18:00 은 아직 안 지났다.
+      vi.setSystemTime(new Date('2026-09-04T01:00:00.000Z'));
+      useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+      useV1AdminLeagueMatchMock.mockReturnValue({
+        data: {
+          leagueId: 'league-1', title: '가을 풋살 리그', startsOn: '2026-08-01T00:00:00.000Z',
+          state: 'draft', teamIds: ['t1', 't2'], fixtures: [],
+        },
+        isPending: false,
+      } as never);
+      const mutateAsync = vi.fn().mockResolvedValue({ leagueId: 'league-1', createdCount: 1, teamMatchIds: [], warnings: [] });
+      useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync, isPending: false } as never);
+      useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+
+      render(
+        <Providers>
+          <LeagueMatchFixturesClient leagueId="league-1" />
+        </Providers>,
+      );
+
+      fireEvent.change(screen.getByLabelText('주차 수'), { target: { value: '1' } });
+      fireEvent.change(screen.getByLabelText('요일'), { target: { value: '5' } });
+      fireEvent.change(screen.getByLabelText('시작 시각'), { target: { value: '18:00' } });
+      // 여기까지의 렌더 시점 계산이라면 첫 날은 2026-09-04 다.
+
+      // 같은 날 20:00 KST — 18:00 이 지났다. 폼 값은 아무것도 바꾸지 않아 재렌더도 없다.
+      vi.setSystemTime(new Date('2026-09-04T11:00:00.000Z'));
+      fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+
+      expect(mutateAsync).toHaveBeenCalledTimes(1);
+      const payload = mutateAsync.mock.calls[0][0] as { schedule: { dates: string[] } };
+      expect(payload.schedule.dates).toEqual(['2026-09-11']);
+    } finally {
+      vi.useRealTimers();
     }
   });
 

@@ -541,6 +541,28 @@ describe('TournamentRegistrationsService', () => {
     ).rejects.toMatchObject({ response: { code: 'AGREEMENTS_REQUIRED' } });
   });
 
+  it('submit: 제출 직전 0원 → 유료로 바뀌면 입금자명을 요구한다 (TOCTOU)', async () => {
+    // 가드가 **잠그기 전** 값으로 판단하면, 그 사이 운영자가 참가비를 올렸을 때
+    // **가드는 건너뛰고 청구는 발생**한다 — 입금자명이 null 인 계좌이체 신청이 남고
+    // 운영자는 들어온 입금을 어느 팀 것인지 못 맞춘다(Copilot 리뷰 지적).
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1Tournament.findFirst
+      // 트랜잭션 **밖** 조회: 아직 0원
+      .mockImplementationOnce(kindAwareFindFirst(openTournament({ kind: 'regular_tournament', entryFee: 0 })))
+      // 잠근 **뒤** 재조회: 그 사이 유료로 바뀌었다
+      .mockImplementationOnce(
+        kindAwareFindFirst(openTournament({ kind: 'regular_tournament', entryFee: 120000 })),
+      );
+
+    const { depositorName: _omitted, ...withoutDepositor } = validSubmit;
+    await expect(
+      service.submit(manager, 'tournament-1', 'reg-1', withoutDepositor as typeof validSubmit),
+    ).rejects.toMatchObject({ response: { code: 'DEPOSITOR_NAME_REQUIRED' } });
+    // 막았으면 **아무것도 쓰지 않아야** 한다.
+    expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
+    expect(prisma.v1TournamentPayment.upsert).not.toHaveBeenCalled();
+  });
+
   it('submit: 0원에 공백만 있는 입금자명은 null 로 저장한다 — 빈 문자열은 "이름이 있다"로 읽힌다', async () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
     prisma.v1Tournament.findFirst.mockImplementation(

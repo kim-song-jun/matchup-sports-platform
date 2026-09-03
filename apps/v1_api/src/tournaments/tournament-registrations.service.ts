@@ -274,25 +274,6 @@ export class TournamentRegistrationsService {
     this.assertTeamSportMatchesTournament(teamSportId, tournament.sportId);
     this.assertPaymentInstructions(tournament, dto.paymentMethod);
 
-    // ## 입금자명은 **낼 돈이 있을 때만** 필요하다 (Task 164 BE-4a)
-    // 이 가드는 원래 대회를 읽기 **전**에 있었다 — 그래서 `entryFee` 를 모른 채 계좌이체면
-    // 무조건 입금자명을 요구했고, **0원짜리 대회·리그에서도** 막혔다. 화면이 안 물어도
-    // 옛 클라이언트나 API 직접 호출은 그대로 걸린다(정본 §4 "스텝 최소"는 화면이 아니라
-    // 계약의 문제다).
-    //
-    // 순서를 바꾼 것이 다른 에러의 우선순위를 바꾼다: 마감된 대회에 입금자명 없이 제출하면
-    // 이제 `DEPOSITOR_NAME_REQUIRED` 가 아니라 `TOURNAMENT_NOT_OPEN` 이 먼저 난다.
-    // **그게 맞는 순서다** — 입금자명을 채워 다시 보내도 어차피 마감이라 못 낸다.
-    if (
-      tournament.entryFee > 0 &&
-      dto.paymentMethod === 'bank_transfer' &&
-      !dto.depositorName?.trim()
-    ) {
-      throw new BadRequestException({
-        code: 'DEPOSITOR_NAME_REQUIRED',
-        message: '계좌이체는 입금자명을 입력해 주세요.',
-      });
-    }
 
     const result = await this.prisma.$transaction(async (tx) => {
       // R17-005: acquire row lock on tournament before the capacity check so that
@@ -314,6 +295,27 @@ export class TournamentRegistrationsService {
         throw new ConflictException({ code: 'REGISTRATION_DEADLINE_PASSED', message: '신청이 마감됐어요.' });
       }
       this.assertPaymentInstructions(lockedTournament, dto.paymentMethod);
+
+      // ## 입금자명은 **낼 돈이 있을 때만** 필요하다 — 그리고 **잠근 뒤의 값**으로 판단한다
+      // 원래 이 가드는 대회를 읽기 **전**에 있어서 `entryFee` 를 모른 채 계좌이체면 무조건
+      // 입금자명을 요구했다(0원 대회·리그에서도 막혔다). 화면이 안 물어도 옛 클라이언트·API
+      // 직접 호출은 그대로 걸린다 — 정본 §4 "스텝 최소" 는 화면이 아니라 **계약**의 문제다.
+      //
+      // **트랜잭션 밖의 `tournament.entryFee` 로 판단하면 TOCTOU 다**(Copilot 리뷰 지적).
+      // 실제 청구액은 아래에서 `lockedTournament.entryFee` 로 정해지므로, 제출 직전에
+      // 운영자가 0원 → 유료로 바꾸면 **가드는 건너뛰고 청구는 발생**해서 입금자명이 `null`
+      // 인 계좌이체 신청이 남는다 — 운영자가 들어온 입금을 어느 팀 것인지 못 맞춘다.
+      // 같은 이유로 `status`·마감·정원도 전부 잠근 뒤 다시 본다(바로 위 세 검사).
+      if (
+        lockedTournament.entryFee > 0 &&
+        dto.paymentMethod === 'bank_transfer' &&
+        !dto.depositorName?.trim()
+      ) {
+        throw new BadRequestException({
+          code: 'DEPOSITOR_NAME_REQUIRED',
+          message: '계좌이체는 입금자명을 입력해 주세요.',
+        });
+      }
 
       // 상한이 없으면(정규 리그) 세지 않는다 — 결과를 안 쓸 COUNT 를 날릴 이유가 없다.
       const reservedCount =

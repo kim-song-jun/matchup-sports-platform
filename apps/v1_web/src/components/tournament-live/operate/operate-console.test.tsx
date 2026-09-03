@@ -588,24 +588,22 @@ describe('OperateConsole — 선수 교체', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   });
 
-  it('substitutions === "rolling"일 때만 빠른 교체 모드 토글이 보인다', () => {
-    gameWithSubstitutionPolicy({ mode: 'limited', maxSubstitutions: 5 });
-    const { rerender } = render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
-    expect(screen.queryByRole('button', { name: /빠른 교체 모드/ })).toBeNull();
-
-    gameWithSubstitutionPolicy({ mode: 'rolling', maxSubstitutions: null });
-    rerender(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
-    expect(screen.getByRole('button', { name: /빠른 교체 모드 켜기/ })).toBeInTheDocument();
-  });
-
-  it('빠른 교체 모드를 켜면 실제 라인업 데이터로 피치 위 선수만 지정 가능한 목록이 뜬다', () => {
+  it('롤링 교체 종목에서는 "교체" 액션 버튼이 아예 없다 (Task 166 BE-3)', () => {
+    // 서버가 422 SUBSTITUTION_NOT_TRACKED 로 거부하므로(정본 §3), 버튼을 남기면
+    // **누를 수 있는데 항상 실패하는** 액션이 된다. 종목을 화면에 하드코딩하지 않고
+    // 서버가 내려주는 substitutionPolicy.mode 로만 가른다.
     gameWithSubstitutionPolicy({ mode: 'rolling', maxSubstitutions: null });
     render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    expect(screen.queryByRole('button', { name: /^교체$/ })).toBeNull();
+    // 롤링 전용이던 "빠른 교체 모드"도 함께 사라졌다.
+    expect(screen.queryByRole('button', { name: /빠른 교체 모드/ })).toBeNull();
+  });
 
-    fireEvent.click(screen.getByRole('button', { name: /빠른 교체 모드 켜기/ }));
-    // 선발(started: true)인 정우진만 지정 가능한 목록에 보이고, 벤치(이민호)는 안 보인다.
-    expect(screen.getByRole('button', { name: /정우진/ })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /이민호/ })).toBeNull();
+  it('제한 교체 종목에서는 "교체" 액션 버튼이 그대로 있다 (회귀)', () => {
+    // 음성 케이스가 없으면 "모든 경기에서 숨김" 으로 바뀌어도 위 테스트가 통과한다.
+    gameWithSubstitutionPolicy({ mode: 'limited', maxSubstitutions: 5 });
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    expect(screen.getByRole('button', { name: /^교체$/ })).toBeInTheDocument();
   });
 });
 

@@ -6,8 +6,9 @@ import { useEffect, useRef, useState, type MouseEvent, type RefObject } from 're
  * 모달 접근성 스캐폴딩 단일 소스 — focus 저장·복원(WCAG 2.4.3), 첫 컨트롤 포커스,
  * ESC 닫기, Tab focus trap, body 스크롤 잠금, backdrop 클릭 닫기.
  *
- * admin-reason-modal 을 기준으로 league-result-entry → league-dispute-resolve →
- * league-dispute-reject 가 같은 ~85줄을 "그대로 본떠" 복제해 왔다(각 파일 주석이 자인).
+ * admin-reason-modal 을 기준으로 여러 어드민 모달이 같은 ~85줄을 "그대로 본떠"
+ * 복제해 왔다(각 파일 주석이 자인). 그중 리그 결과 입력·이의 모달 셋은 Task 165·166
+ * 이 그 기능들을 없애며 함께 사라졌다.
  * 결함 수정이 네 벌로 갈라지는 구조라 훅으로 모은다 — 마크업(패널·헤더·푸터)은
  * 모달마다 다른 것이 정상이므로 여기서는 동작만 담당한다.
  */

@@ -25,7 +25,6 @@ import {
   X,
   Radio,
   Gauge,
-  Gavel,
 } from 'lucide-react';
 
 // ── Nav items (reviews/notifications removed per task-97 IA) ───────────────
@@ -81,9 +80,7 @@ const BASE_NAV_GROUPS: NavGroup[] = [
       { label: '팀', href: '/admin/teams', icon: <UsersRound size={18} /> },
       { label: '팀매치', href: '/admin/team-matches', icon: <Trophy size={18} /> },
       // '리그 체계'는 2026-08-25 리그 허브(B안)로 흡수 — /admin/league-matches?tab=series.
-      // '결과 이의'는 사용자 확정(2026-08-24)대로 독립 유지.
       { label: '정규 리그', href: '/admin/league-matches', icon: <ListOrdered size={18} /> },
-      { label: '결과 이의', href: '/admin/league-match-disputes', icon: <Gavel size={18} /> },
       { label: '대회', href: '/admin/tournaments', icon: <Medal size={18} /> },
     ],
   },

@@ -12,17 +12,10 @@ import { LeagueMatchAdminController } from './league-match-admin.controller';
 import { LeagueMatchAdminService } from './league-match-admin.service';
 // D2: 리그 결과 이의 제기(팀) + 수락/거부(운영자). LeagueMatchForfeitController/-Service와
 // 같은 이유로 별도 파일로 추가해 여기서만 등록한다.
-import { LeagueMatchDisputeController, LeagueMatchDisputeAdminController } from './league-match-dispute.controller';
-import { LeagueMatchDisputeService } from './league-match-dispute.service';
 import { LeagueMatchForfeitController } from './league-match-forfeit.controller';
 import { LeagueMatchForfeitService } from './league-match-forfeit.service';
 import { LeagueMatchPublicController } from './league-match-public.controller';
 import { LeagueMatchPublicService } from './league-match-public.service';
-// ⚠️ Task 165 BE-3 이 이 서비스의 **HTTP 표면을 지웠다**(컨트롤러·DTO·프론트 모달).
-// 남아 있는 이유는 하나뿐이다 — `LeagueMatchDisputeService` 의 이의 수락이
-// `correctResult` 를 부른다. 정본이 이의 자체를 제거하기로 확정했으므로
-// **Task 166 에서 그 호출부와 함께 삭제**된다. 여기에 새 소비처를 붙이지 마라.
-import { LeagueMatchResultEntryService } from './league-match-result-entry.service';
 import { LeagueSeriesAdminController } from './league-series-admin.controller';
 import { LeagueSeriesAdminService } from './league-series-admin.service';
 
@@ -37,8 +30,6 @@ import { LeagueSeriesAdminService } from './league-series-admin.service';
   imports: [AdminContextModule, GamesModule, NotificationsModule, UploadsModule],
   controllers: [
     LeagueMatchAdminController,
-    LeagueMatchDisputeController,
-    LeagueMatchDisputeAdminController,
     // #750 후속 등록 — import 구문만 있고 이 배열에 빠져 있어 라우트가 404 였다(alpha 실측).
     LeagueFixtureVideosController,
     LeagueMatchForfeitController,
@@ -48,10 +39,8 @@ import { LeagueSeriesAdminService } from './league-series-admin.service';
   providers: [
     LeagueFixtureVideosService,
     LeagueMatchAdminService,
-    LeagueMatchDisputeService,
     LeagueMatchForfeitService,
     LeagueMatchPublicService,
-    LeagueMatchResultEntryService,
     LeagueSeriesAdminService,
     OptionalV1AuthGuard,
     V1AuthGuard,

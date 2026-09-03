@@ -221,7 +221,7 @@ export class DecideGameResultRevisionDto extends SubmitGameResultRevisionDto {
 }
 
 /**
- * D2: TEAM_MATCH 전용 결과 무효화(void) 요청 -- 이의(dispute) 수락 시 운영자가
+ * TEAM_MATCH 전용 결과 무효화(void) 요청 -- 운영자가
  * 정정(correction) 대신 고를 수 있는 두 번째 경로. 대회 픽스처의
  * `VoidGameResultRevisionDto`(tournament-result-review.dto.ts)와 같은 모양이지만,
  * 대회 모듈에 대한 games 모듈의 역방향 의존을 만들지 않기 위해 여기 별도로 둔다.

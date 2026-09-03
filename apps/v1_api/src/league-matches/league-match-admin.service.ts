@@ -1277,9 +1277,8 @@ export class LeagueMatchAdminService {
   /**
    * `revertCompletion`의 tx-aware 핵심 로직(completed -> active 조건부 updateMany +
    * 감사로그) — 호출자가 이미 시작한 트랜잭션 안에서 다른 작업과 원자적으로 묶기
-   * 위해 공개한다. D2(리그 결과 이의 수락, `league-match-dispute.service.ts`)가
-   * "정정/무효 처리 후 completed 였던 리그를 active 로 되돌린다"는 요구사항을 위해
-   * 새 함수를 만들지 않고 이 메서드를 그대로 재사용한다.
+   * 위해 공개한다. (예전 D2 의 결과 이의 수락 흐름이 이 메서드를 재사용했는데, Task 166
+   * 이 그 흐름을 없앴다 — 남은 호출부는 `revertCompletion` 공개 엔드포인트 하나다.)
    *
    * `revertCompletion`(공개 엔드포인트)과 달리 `league.state`가 active/draft 인 경우를
    * 미리 구분해 던지지 않는다 — completed 가 아니면 updateMany 가 그냥 0행 매치로

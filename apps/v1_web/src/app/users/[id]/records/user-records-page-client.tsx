@@ -1,10 +1,13 @@
 'use client';
 
+import { useState } from 'react';
+
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { ErrorState } from '@/components/v1-ui/primitives';
 import { extractErrorMessage } from '@/lib/error-message';
 import { usePublicUserRecords } from '@/components/public-game-records/use-public-game-records';
 import { UserRecordsContent } from '@/components/public-game-records/user-records-content';
+import type { RecordTypeFilter } from '@/components/public-game-records/record-category-tabs';
 
 function RecordsSkeleton() {
   return (
@@ -16,8 +19,10 @@ function RecordsSkeleton() {
 }
 
 export function UserRecordsPageClient({ userId }: { userId: string }) {
+  // Task 166 BE-4: 팀 전적과 같은 4탭. '전체'는 로컬 값이라 서버로 보내지 않는다.
+  const [activeType, setActiveType] = useState<RecordTypeFilter>('all');
   const { data, isLoading, isError, error, refetch, hasNextPage, isFetchingNextPage, fetchNextPage } =
-    usePublicUserRecords(userId);
+    usePublicUserRecords(userId, undefined, activeType === 'all' ? undefined : activeType);
 
   const firstPage = data?.pages[0];
 
@@ -55,6 +60,8 @@ export function UserRecordsPageClient({ userId }: { userId: string }) {
       hasNextPage={hasNextPage}
       isFetchingNextPage={isFetchingNextPage}
       onLoadMore={() => void fetchNextPage()}
+      activeType={activeType}
+      onChangeType={setActiveType}
     />
   );
 }

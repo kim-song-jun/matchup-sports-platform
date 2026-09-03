@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { Card, EmptyState, KPIStat } from '@/components/v1-ui/primitives';
+import { RECORD_TYPE_TABS, recordEmptyCopy } from './record-category-tabs';
 import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { formatTournamentDateShort } from '@/lib/date-utils';
@@ -27,22 +28,8 @@ import type {
   TeamRecordTypeFilter,
 } from './types';
 
-/**
- * U2 -- 탭 4개, 순서 고정. '전체'만 로컬 전용 값(`'all'`)이고 나머지 세 값은
- * 서버가 그대로 받는 `type` 쿼리 값(`TeamRecordCategory`)과 동일하다.
- */
-const TEAM_RECORD_TYPE_TABS: readonly { readonly key: TeamRecordTypeFilter; readonly label: string }[] = [
-  { key: 'all', label: '전체' },
-  { key: 'tournament', label: '대회' },
-  { key: 'league', label: '리그' },
-  { key: 'friendly', label: '친선' },
-];
-
-const TEAM_RECORD_TYPE_LABEL: Readonly<Record<TeamRecordCategory, string>> = {
-  league: '리그',
-  tournament: '대회',
-  friendly: '친선',
-};
+// U2 의 탭·라벨은 개인 기록도 같은 4탭을 쓰게 되면서 `record-category-tabs.ts` 로
+// 끌어올렸다(Task 166 BE-4) — 두 화면이 같은 경기를 다른 이름으로 부르지 않게 한다.
 
 /**
  * F6 -- 행 상단 캡션에 붙일 대회/리그 이름. 대회 경기는 대회명을, 정규 리그 대진은 리그명을
@@ -330,20 +317,22 @@ export function TeamRecordsContent({
   // U2 -- '전체'가 아닌 탭이면 KPI를 서버가 이미 계산해 보낸 `summary.byType[종류]`로
   // 교체한다. 새 계산 없이 그대로 꺼내 쓴다(과제 지시: "새 계산 없이 이미 온 값 그대로").
   const activeSummary: TeamRecordSummaryTotals =
-    resolvedActiveType === 'all' ? data.summary : data.summary.byType[resolvedActiveType];
-  const emptyStateCopy =
     resolvedActiveType === 'all'
-      ? { title: '아직 공식 경기 기록이 없어요', sub: '대회·팀매치 결과가 확정되면 이곳에 표시돼요.' }
-      : {
-          title: `아직 ${TEAM_RECORD_TYPE_LABEL[resolvedActiveType]} 경기가 없어요`,
-          sub: `${TEAM_RECORD_TYPE_LABEL[resolvedActiveType]} 결과가 확정되면 이곳에 표시돼요.`,
-        };
+      ? data.summary
+      : // 개인 기록과 같은 이유의 폴백 — 배포 롤링 창에서 옛 응답(byType 없음)을 받으면
+        // 첨자 접근이 undefined 를 주고 KPI 렌더가 크래시한다.
+        (data.summary.byType?.[resolvedActiveType] ?? data.summary);
+  const emptyStateCopy =
+    recordEmptyCopy(resolvedActiveType, {
+      title: '아직 공식 경기 기록이 없어요',
+      sub: '대회·팀매치 결과가 확정되면 이곳에 표시돼요.',
+    });
 
   return (
     <div style={{ padding: '16px 20px 40px', display: 'flex', flexDirection: 'column', gap: 20 }}>
       {onChangeType ? (
         <SegmentedTabs
-          items={TEAM_RECORD_TYPE_TABS.map((tab) => ({ id: tab.key, label: tab.label }))}
+          items={RECORD_TYPE_TABS.map((tab) => ({ id: tab.key, label: tab.label }))}
           activeId={resolvedActiveType}
           onSelect={(id) => onChangeType(id as TeamRecordTypeFilter)}
           ariaLabel="경기 종류"

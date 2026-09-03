@@ -15,7 +15,9 @@ import { ListLeagueMatchesQueryDto } from './dto/league-match.dto';
 import { bucketLeagueFixtures } from './league-standings-source';
 import {
   LEAGUE_FIXTURE_FACT_SELECT,
+  leagueFixtureListOrder,
   LEAGUE_FIXTURE_LIST_SELECT,
+  leagueFixtureListWhere,
   toLeagueFixtureList,
 } from './league-fixture-list-source';
 import { LEAGUE_STATE_BY_STATUS } from '../tournaments/league-competition-mirror';
@@ -372,8 +374,8 @@ export class LeagueMatchPublicService {
   async detail(leagueId: string) {
     const league = await this.loadLeague(leagueId);
     const fixtures = await this.prisma.v1TeamMatch.findMany({
-      where: { leagueId },
-      orderBy: { startAt: 'asc' },
+      where: leagueFixtureListWhere(leagueId),
+      orderBy: leagueFixtureListOrder(),
       // select 를 손으로 적지 않는다 — 대회 표면의 리그 경로가 같은 목록을 만들어야 하고,
       // 두 곳이 서로 다른 select 를 쓰면 같은 대진이 화면마다 다른 모양으로 나온다.
       select: LEAGUE_FIXTURE_LIST_SELECT,

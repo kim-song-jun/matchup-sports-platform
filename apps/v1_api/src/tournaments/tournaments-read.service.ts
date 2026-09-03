@@ -19,7 +19,9 @@ import {
 import { bucketLeagueFixtures, leagueFixtureProgressInput } from '../league-matches/league-standings-source';
 import {
   LEAGUE_FIXTURE_FACT_SELECT,
+  leagueFixtureListOrder,
   LEAGUE_FIXTURE_LIST_SELECT,
+  leagueFixtureListWhere,
   toLeagueFixtureList,
 } from '../league-matches/league-fixture-list-source';
 import {
@@ -200,8 +202,8 @@ export class TournamentsReadService {
    */
   private async leagueCompetitionFixtures(leagueId: string) {
     const fixtures = await this.prisma.v1TeamMatch.findMany({
-      where: { leagueId },
-      orderBy: { startAt: 'asc' },
+      where: leagueFixtureListWhere(leagueId),
+      orderBy: leagueFixtureListOrder(),
       select: LEAGUE_FIXTURE_LIST_SELECT,
     });
 

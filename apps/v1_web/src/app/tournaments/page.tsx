@@ -320,6 +320,7 @@ export function TournamentsListContent() {
               role="list"
               aria-label="대회 목록"
               className="tm-tournament-list-grid"
+              aria-busy={isFetching || undefined}
             >
               {displayItems.map((item) => (
                 <TournamentCard key={item.id} item={item} />

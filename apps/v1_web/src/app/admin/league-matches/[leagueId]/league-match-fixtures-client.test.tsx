@@ -837,9 +837,13 @@ describe('LeagueMatchFixturesClient', () => {
       'href',
       '/admin/live/league-1/result-review?fixtureId=tm-not-entered',
     );
+    // 확정된 경기는 **정정 화면**으로 간다. `result-review` 는 *검토 대기* 목록이라
+    // 확정된 경기가 거기 없어, 라벨은 "결과 정정" 인데 "검토할 결과가 없어요" 가 열리는
+    // 데드엔드였다(alpha 실측). 라벨이 아니라 **href** 로 잰다 — 라벨만 보면 이 결함이
+    // 그대로 통과한다.
     expect(screen.getAllByRole('link', { name: '4주차 결과 정정' })[0]).toHaveAttribute(
       'href',
-      '/admin/live/league-1/result-review?fixtureId=tm-official',
+      '/admin/live/league-1/records/corrections?fixtureId=tm-official',
     );
     expect(screen.getAllByRole('link', { name: '2주차 결과 입력' }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('link', { name: '3주차 결과 입력' }).length).toBeGreaterThan(0);

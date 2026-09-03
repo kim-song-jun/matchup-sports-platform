@@ -72,10 +72,6 @@
   padding: 56px 20px;
 }
 
-.tm-landing-section-alt {
-  background: var(--grey50);
-}
-
 .tm-landing-section-inner {
   max-width: 1120px;
   margin-left: auto;
@@ -84,11 +80,22 @@
 }
 
 .tm-landing-section-header {
-  text-align: center;
-  margin-bottom: 36px;
+  text-align: left;
+  margin-bottom: 32px;
+}
+
+/* landing-rhythm 모듈: 키워드(라벨) → 타이틀 → 본문. 섹션마다 같은 순서·같은 간격. */
+.tm-landing-section-kw {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--blue700);
+  margin: 0 0 8px;
 }
 
 .tm-landing-section-header .tm-text-heading {
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
   margin-bottom: 12px;
 }
 
@@ -141,12 +148,32 @@
   margin: 0;
 }
 
+/* 히어로 그래픽 영역: 틴트 카드(4:3) 안에 그래픽이 카드 폭의 62% 만 차지한다 — 여백이 디자인.
+   stat 스트립은 그 아래 보조 정보. */
+.tm-landing-hero-aside {
+  margin-top: 36px;
+}
+
+.tm-landing-hero-graphic {
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius-hero);
+  background: var(--tint-blue);
+  display: grid;
+  place-items: center;
+}
+
+.tm-landing-hero-graphic img {
+  width: 62%;
+  height: 62%;
+  object-fit: contain;
+}
+
 /* Hero stats */
 .tm-landing-hero-stats {
   display: flex;
   align-items: center;
   gap: 0;
-  margin-top: 36px;
+  margin-top: 16px;
   padding: 20px 20px;
   background: var(--bg);
   border: 1px solid var(--grey150);
@@ -442,16 +469,16 @@
     padding: 0;
   }
 
-  /* Hero: two-column layout — content left, stats right.
-     1fr minmax(0,360px): 텍스트 컬럼이 내용에 따라 충분히 확보되도록 우측 상한 설정 */
+  /* Hero: two-column layout — content left, graphic well + stat strip right.
+     1fr minmax(0,400px): 4:3 웰이 들어갈 우측 상한. 이미지는 웰 폭의 62%(≈248px)라 sizes 도 그 값. */
   .tm-landing-hero {
     padding: 80px 32px 88px;
   }
 
   .tm-landing-hero .tm-landing-section-inner {
     display: grid;
-    grid-template-columns: 1fr minmax(0, 360px);
-    gap: 40px;
+    grid-template-columns: 1fr minmax(0, 400px);
+    gap: 56px;
     align-items: center;
   }
 
@@ -468,12 +495,14 @@
     margin-bottom: 32px;
   }
 
-  .tm-landing-hero-stats {
+  .tm-landing-hero-aside {
     margin-top: 0;
-    flex-direction: column;
-    padding: 28px 24px;
-    gap: 0;
-    align-items: stretch;
+  }
+
+  /* 오른쪽 컬럼: 그래픽 웰 아래 stat 스트립(가로). 예전엔 stat 카드 하나가 컬럼 전체였다. */
+  .tm-landing-hero-stats {
+    margin-top: 16px;
+    padding: 16px 20px;
   }
 
   .tm-landing-stat {

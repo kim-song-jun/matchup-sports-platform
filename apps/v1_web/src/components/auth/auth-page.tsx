@@ -184,7 +184,7 @@ export function AuthFrame({ children, topTitle, backHref, onBack, backLabel, ski
   return (
     <div className={`tm-auth-frame${className ? ` ${className}` : ''}${stage ? ' tm-auth-frame-staged' : ''}`}>
       {stage ? (
-        <aside className="tm-auth-stage tm-show-desktop" aria-hidden="true">
+        <aside className="tm-auth-stage tm-show-desktop">
           <div className="tm-auth-stage-brand"><BrandMark size={28} alt="" /><span>teameet</span></div>
           <div className="tm-auth-stage-eyebrow tm-text-label">{stage.eyebrow}</div>
           <div className="tm-auth-stage-slogan">{stage.slogan}</div>
@@ -193,22 +193,6 @@ export function AuthFrame({ children, topTitle, backHref, onBack, backLabel, ski
             <AuthIllustration name={stage.illustration} className="tm-auth-stage-illustration" />
           </div>
         </aside>
-      ) : null}
-      <div className="tm-auth-card">
-      {topTitle || hasBack || skipHref ? (
-        <header className="tm-auth-topbar">
-          <div className="tm-auth-topbar-left">
-            {backHref ? (
-              <Link className="tm-btn tm-btn-icon tm-btn-ghost" href={backHref} aria-label={backLabel ?? '뒤로가기'}>
-                <ChevronLeftIcon size={22} strokeWidth={2.2} />
-              </Link>
-            ) : onBack ? (
-              <AuthBackButton className="tm-btn tm-btn-icon tm-btn-ghost" label={backLabel ?? '뒤로가기'} onClick={onBack} />
-            ) : null}
-            {topTitle ? <div className="tm-text-body-lg">{topTitle}</div> : null}
-          </div>
-          {skipHref ? <Link className="tm-btn tm-btn-sm tm-btn-ghost" href={skipHref}>건너뛰기</Link> : null}
-        </header>
       ) : null}
       {/* 데스크톱(≥1024)에서는 desktop/auth.css 가 .tm-auth-topbar 를 통째로 숨긴다. 상단바에만
           뒤로가기를 두면 그 폭에서는 화면을 빠져나갈 컨트롤이 아예 사라지므로(로그인·약관·
@@ -226,6 +210,22 @@ export function AuthFrame({ children, topTitle, backHref, onBack, backLabel, ski
           )}
           {topTitle ? <span className="tm-onboarding-desktop-nav-title">{topTitle}</span> : null}
         </div>
+      ) : null}
+      <div className="tm-auth-card">
+      {topTitle || hasBack || skipHref ? (
+        <header className="tm-auth-topbar">
+          <div className="tm-auth-topbar-left">
+            {backHref ? (
+              <Link className="tm-btn tm-btn-icon tm-btn-ghost" href={backHref} aria-label={backLabel ?? '뒤로가기'}>
+                <ChevronLeftIcon size={22} strokeWidth={2.2} />
+              </Link>
+            ) : onBack ? (
+              <AuthBackButton className="tm-btn tm-btn-icon tm-btn-ghost" label={backLabel ?? '뒤로가기'} onClick={onBack} />
+            ) : null}
+            {topTitle ? <div className="tm-text-body-lg">{topTitle}</div> : null}
+          </div>
+          {skipHref ? <Link className="tm-btn tm-btn-sm tm-btn-ghost" href={skipHref}>건너뛰기</Link> : null}
+        </header>
       ) : null}
       <main className={`tm-auth-scroll ${fixedAction ? 'tm-auth-scroll-with-cta' : ''} ${topTitle || hasBack || skipHref ? '' : 'tm-auth-scroll-full'}`}>
         {children}

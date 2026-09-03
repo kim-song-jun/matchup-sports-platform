@@ -17,7 +17,7 @@
  * 옵션:
  *   --viewport mobile|desktop|tablet   (기본 mobile — 390x844 / 1440x900 / 768x1024)
  *   --flows a,b,c                      (기본: 전체 FLOW_IDS)
- *   --out <dir>                        (기본: 스크래치패드/motion-audit/recordings)
+ *   --out <dir>                        (기본: os.tmpdir()/teameet-motion-catalog)
  *   --slow                             (CDP Network throttling 으로 3G 급 재현)
  *   --reduced                          (prefers-reduced-motion: reduce 에뮬레이션)
  *

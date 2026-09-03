@@ -366,15 +366,15 @@ export function toGameHttpException(error: GameContractError): HttpException {
     error.code === 'SUBSTITUTION_INVALID' ||
     error.code === 'SUBSTITUTION_OUT_NOT_ON_PITCH' ||
     error.code === 'SUBSTITUTION_IN_ALREADY_ON_PITCH' ||
-    error.code === 'SUBSTITUTION_LIMIT_REACHED'
+    error.code === 'SUBSTITUTION_LIMIT_REACHED' ||
+    // Task 166 BE-3: 롤링 종목의 교체 기록 거부. 뜻은 위 넷과 조금 다르지만
+    // ("이 요청 내용이 틀렸다" 가 아니라 "이 경기엔 그 명령이 없다") **같은 422 로
+    // 맞춘다** — 교체 실패 하나만 상태 코드가 갈리면 클라이언트가 두 매핑을 갖게
+    // 되고, 그 비용이 의미 차이를 코드로 드러내는 값어치보다 크다. 구분은
+    // `code` 필드가 한다.
+    error.code === 'SUBSTITUTION_NOT_TRACKED'
   ) {
     return new UnprocessableEntityException(body);
-  }
-  // Task 166 BE-3: 롤링 종목의 교체 기록 거부는 **400** 이다(태스크 문서 명시). 위
-  // 422 무리와 다른 이유: 저 코드들은 "이 요청의 내용이 규칙에 어긋난다" 이고, 이건
-  // "이 경기에는 그 명령 자체가 없다" 다 — 다른 선수를 고른다고 통과하지 않는다.
-  if (error.code === 'SUBSTITUTION_NOT_TRACKED') {
-    return new BadRequestException(body);
   }
   return new ConflictException(body);
 }

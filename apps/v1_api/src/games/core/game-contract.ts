@@ -28,9 +28,10 @@ export type GameContractErrorCode =
   | 'SUBSTITUTION_OUT_NOT_ON_PITCH'
   | 'SUBSTITUTION_IN_ALREADY_ON_PITCH'
   | 'SUBSTITUTION_LIMIT_REACHED'
-  // Task 166 BE-3: 롤링 교체 종목은 교체를 기록하지 않는다(정본 §3). 위 네 코드와 달리
-  // **400** 으로 매핑된다 — 저것들은 "이 요청 내용이 규칙에 어긋난다" 이고 이건 "이
-  // 경기에는 그 명령 자체가 없다" 라서, 다른 선수를 골라도 통과하지 않는다.
+  // Task 166 BE-3: 롤링 교체 종목은 교체를 기록하지 않는다(정본 §3). 위 네 코드와 같은
+  // **422** 로 매핑된다 — 뜻은 조금 다르지만("이 요청 내용이 틀렸다" 가 아니라 "이
+  // 경기엔 그 명령이 없다") 교체 실패 하나만 상태 코드가 갈리면 클라이언트가 두 매핑을
+  // 갖게 된다. 구분은 이 `code` 값이 한다.
   | 'SUBSTITUTION_NOT_TRACKED'
   | 'TERMINAL_REVISION_IMMUTABLE'
   | 'VERSION_CONFLICT';

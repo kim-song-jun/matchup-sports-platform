@@ -32,7 +32,7 @@
 - [ ] 어드민 확인 = `officialize` 한 번. 검토 요청·보완 요청·거부 상태는 **행복 경로에서 빠진다**. 세 상태의 실제 소비처를 실측해 0 이면 enum 값까지 제거, 있으면 Ambiguity Log 1 로 올린다.
 - [ ] 사용자 화면(경기 상세·일정·라이브 스코어)에 SUBMITTED 는 점수 + "확정 전" 태그, OFFICIAL 은 태그 없음. 순위·승점·전적은 OFFICIAL 만 집계(변이: SUBMITTED 를 세면 red).
 - [ ] 이의 테이블·서비스·컨트롤러·화면·알림 4종 제거. drop 마이그레이션은 사용자 직접 승인.
-- [ ] `lineup.substitutions === 'rolling'` 인 대회의 콘솔에서 교체 커맨드가 **노출되지 않고 서버도 거부**(400 `SUBSTITUTION_NOT_TRACKED`). `'limited'` 는 기존 동작·`maxSubstitutions` 검증 유지(회귀 스펙).
+- [ ] `lineup.substitutions === 'rolling'` 인 대회의 콘솔에서 교체 커맨드가 **노출되지 않고 서버도 거부**(422 `SUBSTITUTION_NOT_TRACKED` — 착수 시 400 으로 적었으나 형제 코드 4개와 맞춰 422 로 정정). `'limited'` 는 기존 동작·`maxSubstitutions` 검증 유지(회귀 스펙).
 - [ ] 팀 전적 탭 전체/대회/리그/친선. 개인 기록 `matchType` 에 `league` 추가.
 - [ ] 화면 변경(태그 · 탭 · 콘솔 교체 버튼 제거)은 **3안 → 사용자 선택** 뒤 구현.
 
@@ -87,10 +87,11 @@
     **현행 유지**다.
   - **이미 기록된 SUBSTITUTION 이벤트는 그대로 읽힌다**(`deriveOnPitchParticipantIds`) —
     이 가드는 새 기록만 막는다.
-  - 에러 코드 `SUBSTITUTION_NOT_TRACKED` 는 **400** 이다. 형제 4개
-    (`SUBSTITUTION_INVALID`·`OUT_NOT_ON_PITCH`·`IN_ALREADY_ON_PITCH`·`LIMIT_REACHED`)는
-    전부 422 인데, 그것들은 "이 요청 내용이 규칙에 어긋난다" 이고 이건 "이 경기에는 그 명령
-    자체가 없다" 다(다른 선수를 골라도 통과하지 않는다).
+  - 에러 코드 `SUBSTITUTION_NOT_TRACKED` 는 **422** 다(2026-09-03 정정 — 조건 원문의 400 을
+    코드에 맞춰 고쳤다). 형제 4개(`SUBSTITUTION_INVALID`·`OUT_NOT_ON_PITCH`·
+    `IN_ALREADY_ON_PITCH`·`LIMIT_REACHED`)가 전부 422 인데 교체 실패 하나만 갈리면
+    클라이언트가 두 매핑을 갖게 된다 — 뜻의 차이("이 요청 내용이 틀렸다" vs "이 경기엔 그
+    명령이 없다")는 `code` 필드가 드러낸다.
   - 콘솔 UI 의 교체 버튼 숨김은 **FE PR 로 분리**(3안 대상 아님 — 제거).
 - **BE-4 전적 구분.** 팀 전적 집계에 리그/친선 축, 개인 기록 `matchType: 'league'`.
 

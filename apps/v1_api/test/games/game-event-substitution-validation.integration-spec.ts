@@ -332,7 +332,7 @@ describe('POST /games/:gameId/events — SUBSTITUTION (live-substitution)', () =
     expect(appended.sequence).toBeGreaterThan(0);
   });
 
-  it('롤링 교체 종목에서는 교체 커맨드가 400 SUBSTITUTION_NOT_TRACKED 로 거부된다 (Task 166 BE-3)', async () => {
+  it('롤링 교체 종목에서는 교체 커맨드가 422 SUBSTITUTION_NOT_TRACKED 로 거부된다 (Task 166 BE-3)', async () => {
     // 정본 §3: 롤링 종목은 교체 기록이 없다. 이 스위트의 나머지는 전부 축구
     // (`substitutions: 'limited'`)이므로 **제한 교체 회귀**를 그대로 재고 있다 — 여기서만
     // 같은 경기의 설정을 풋살(`'rolling'`)로 잠시 바꿔 실제 서비스 경로를 태운다.
@@ -375,7 +375,7 @@ describe('POST /games/:gameId/events — SUBSTITUTION (live-substitution)', () =
           payload: { outParticipantId: homeStarter2Id },
         }),
       );
-      expectHttpCode(failure, 400, 'SUBSTITUTION_NOT_TRACKED');
+      expectHttpCode(failure, 422, 'SUBSTITUTION_NOT_TRACKED');
 
       // 한 행도 쓰지 않는다 — 거부가 이벤트 append 앞에서 일어나야 한다.
       const written = await prisma.v1GameEvent.findFirst({ where: { gameId, clientEventId: 'sub-rolling-blocked' } });

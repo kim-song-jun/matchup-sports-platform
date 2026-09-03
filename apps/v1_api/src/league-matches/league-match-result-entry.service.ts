@@ -6,7 +6,6 @@ import { selectLineupParticipantsWithDraftFallback } from '../games/core/latest-
 import { PrismaService } from '../prisma/prisma.service';
 import { parseLineupCatalog } from '../tournaments/competition-config/competition-config.parse';
 import { V1AuthUser } from '../auth/v1-auth-user';
-import { RecordLeagueResultDto } from './dto/league-match-result-entry.dto';
 import { buildLeagueGoalEventSnapshot } from './league-goal-event-snapshot';
 import { FORFEIT_REASON_MARKER } from './league-match-forfeit.service';
 import { parseStoredScore } from './league-lifecycle-rules';
@@ -18,6 +17,24 @@ import {
 } from './league-result-participants';
 
 /**
+ * ⚠️ **이 서비스는 살아 있는 기능이 아니다 — Task 166 에서 이의와 함께 삭제된다.**
+ *
+ * Task 165 BE-3 이 **HTTP 표면을 지웠다**: `admin/league-matches/:leagueId/fixtures/
+ * :teamMatchId/{participants,result,result/correct}` 세 엔드포인트와 그 컨트롤러·DTO·
+ * 프론트 모달이 없다. 운영자의 리그 결과 입력은 이제 **대회와 같은 콘솔**을 지난다
+ * (정본 §4).
+ *
+ * 남아 있는 이유는 하나뿐이다 — `league-match-dispute.service.ts` 의 **이의 수락(정정)**
+ * 이 `correctResult` 를 부른다. 정본이 "팀의 이의 제기 경로는 없다 … 이의 테이블·화면·
+ * 알림 4종은 제거한다" 로 확정했으므로 **그 호출부와 이 파일이 Task 166 에서 함께
+ * 사라진다.** 그때까지 콘솔 정정으로 재배선하는 것은 곧 지워질 코드를 새로 쓰는 일이라
+ * 하지 않는다.
+ *
+ * **여기에 새 기능을 붙이지 마라.** 리그 결과 입력에 뭔가 필요하면
+ * `tournament-operations/results/` 로 간다.
+ *
+ * ---
+ *
  * D1-a: 운영자가 리그 대진 결과를 직접 입력·정정하는 경로 -- 사용자 확정 결정
  * "운영자가 기본 입력자, 팀은 확인만"의 백엔드.
  *
@@ -62,7 +79,7 @@ import {
  *
  * ## 몰수 표식 승계 (감사 L-E finding 4 수정)
  * 정정 대상 대진이 몰수(forfeit)로 확정돼 있었다면, 정정은 별다른 지정이 없는 한
- * 그 표식을 그대로 이어받는다 -- `RecordLeagueResultDto.isForfeit` docblock이 계약을
+ * 그 표식을 그대로 이어받는다 -- `LeagueResultCorrectionInput.isForfeit` docblock이 계약을
  * 정의한다. 판정·저장은 `V1GameResultRevision.outcomeReason` 컬럼으로 하고(과거
  * 문자열 마커 시절 리비전은 fallback으로만 인정), 운영자가 명시적으로 `isForfeit`을
  * 보내면 승계 대신 그 값을 따른다 -- 몰수팀을 반대로 지정한 오류를 정정으로 바로잡을
@@ -109,6 +126,21 @@ type MatchedFixture = {
   gameVersion: number;
 };
 
+/**
+ * `correctResult` 의 입력. 예전엔 HTTP DTO 를 그대로 썼지만
+ * **컨트롤러가 사라져 HTTP 계약이 아니다** — 이의 수락이 넘기는 세 필드뿐이다.
+ * 넓은 DTO 를 남겨 두면 없는 입력 경로가 있는 것처럼 보인다.
+ */
+type LeagueResultCorrectionInput = {
+  homeScore: number;
+  awayScore: number;
+  reason: string;
+  /** 몰수 표식. 이의 수락은 안 보내므로 항상 base 승계로 떨어진다. */
+  isForfeit?: boolean;
+  /** 선수별 득점·도움. 이의 수락은 안 보내므로 기존 리비전에서 승계된다. */
+  participants?: Array<{ participantId: string; goals: number; assists?: number }>;
+};
+
 @Injectable()
 export class LeagueMatchResultEntryService {
   constructor(
@@ -117,11 +149,8 @@ export class LeagueMatchResultEntryService {
     private readonly games: GamesService,
   ) {}
 
-  async recordResult(user: V1AuthUser, leagueId: string, teamMatchId: string, dto: RecordLeagueResultDto) {
-    return this.withRetry(() => this.recordResultOnce(user, leagueId, teamMatchId, dto));
-  }
-
-  async correctResult(user: V1AuthUser, leagueId: string, teamMatchId: string, dto: RecordLeagueResultDto) {
+  
+  async correctResult(user: V1AuthUser, leagueId: string, teamMatchId: string, dto: LeagueResultCorrectionInput) {
     return this.withRetry(() => this.correctResultOnce(user, leagueId, teamMatchId, dto));
   }
 
@@ -209,99 +238,7 @@ export class LeagueMatchResultEntryService {
    * 구분할 수 있게 한다 — 응답에 새 필드를 넣어도 지금 화면은 읽지 않으므로(프론트 계약
    * 변경 없이) 실제로 보이는 라벨에 담는다.
    */
-  async listFixtureParticipants(user: V1AuthUser, leagueId: string, teamMatchId: string) {
-    await this.adminContext.getActiveAdmin(user.id);
-    const fixture = await this.loadMatchedFixture(leagueId, teamMatchId);
-    const [sides, participants, lineups, game] = await Promise.all([
-      this.prisma.v1GameSide.findMany({
-        where: { gameId: fixture.gameId },
-        select: { id: true, sideKey: true, displayNameSnapshot: true },
-      }),
-      this.prisma.v1GameParticipant.findMany({
-        where: { gameId: fixture.gameId },
-        select: { id: true, sideId: true, lineupId: true, displayNameSnapshot: true, userId: true },
-        orderBy: { displayNameSnapshot: 'asc' },
-      }),
-      this.prisma.v1GameLineup.findMany({
-        where: { gameId: fixture.gameId },
-        // `state` 를 함께 읽는다. 다만 리그는 **폴백** 셀렉터를 쓴다 — 제출본이 있는
-        // 사이드는 제출본만, 한 번도 제출 안 한 사이드는 최신 DRAFT 를 인정한다.
-        // 리그는 대회와 달리 라이브 콘솔 시작 게이트를 안 거쳐서 "끝났으면 제출본이
-        // 있다"가 거짓이고, 팀장이 자동저장만 하고 끝내는 것이 흔한 경로다.
-        select: { id: true, sideId: true, revision: true, state: true },
-      }),
-      this.prisma.v1Game.findUnique({
-        where: { id: fixture.gameId },
-        select: { currentOfficialRevisionId: true },
-      }),
-    ]);
-    // 정정 모달이 기존 기록을 미리 채우는 데 쓴다 — 빈 화면이 "기록 없음"으로 오독돼
-    // 정정 한 번에 개인 기록이 지워지는 사고를 막는다. 기록이 있는 행만 싣는다
-    // (출전만 기록된 0-0 행까지 프리필하면 득점자 입력칸이 로스터 전체로 불어난다).
-    const storedStats =
-      game?.currentOfficialRevisionId == null
-        ? []
-        : await this.prisma.v1GameResultParticipant.findMany({
-            where: {
-              resultRevisionId: game.currentOfficialRevisionId,
-              OR: [{ goals: { gt: 0 } }, { assists: { gt: 0 } }],
-            },
-            select: { participantId: true, goals: true, assists: true },
-          });
-
-    const latestRows = selectLineupParticipantsWithDraftFallback(participants, lineups);
-    const latestIds = new Set(latestRows.map((row) => row.id));
-    // 같은 사이드·같은 사용자의 최신 행. `userId` 가 없는 게스트는 동일인 판정 근거가
-    // 없으므로(이름은 동명이인을 구분하지 못한다) 아예 넣지 않는다.
-    const latestIdByIdentity = new Map<string, string>();
-    for (const row of latestRows) {
-      if (row.userId == null) continue;
-      latestIdByIdentity.set(`${row.sideId}:${row.userId}`, row.id);
-    }
-    const participantById = new Map(participants.map((row) => [row.id, row]));
-    const canonicalIdOf = (participantId: string): string => {
-      const row = participantById.get(participantId);
-      if (row === undefined || row.userId == null) return participantId;
-      return latestIdByIdentity.get(`${row.sideId}:${row.userId}`) ?? participantId;
-    };
-
-    // 옛 행의 기록을 최신 행 id 로 옮겨 합친다. 같은 사람에게 두 행이 걸려 있던 경기
-    // (수정 전 드롭다운 중복 시절)는 여기서 한 줄로 접힌다.
-    const mergedStats = new Map<string, { participantId: string; goals: number; assists: number }>();
-    for (const stat of storedStats) {
-      const participantId = canonicalIdOf(stat.participantId);
-      const current = mergedStats.get(participantId);
-      mergedStats.set(participantId, {
-        participantId,
-        goals: (current?.goals ?? 0) + stat.goals,
-        assists: (current?.assists ?? 0) + stat.assists,
-      });
-    }
-    const currentStats = [...mergedStats.values()];
-    const recordedIds = new Set(currentStats.map((row) => row.participantId));
-
-    // participants 는 참가자 행 하나당 한 번씩만 나오므로 이 필터 뒤에도 participantId 중복은 없다.
-    const selectable = participants.filter((row) => latestIds.has(row.id) || recordedIds.has(row.id));
-    const bySide = (sideKey: 'HOME' | 'AWAY') => {
-      const side = sides.find((row) => row.sideKey === sideKey);
-      return {
-        teamName: side?.displayNameSnapshot ?? (sideKey === 'HOME' ? '홈 팀' : '원정 팀'),
-        players:
-          side === undefined
-            ? []
-            : selectable
-                .filter((row) => row.sideId === side.id)
-                .map((row) => ({
-                  participantId: row.id,
-                  name: latestIds.has(row.id)
-                    ? row.displayNameSnapshot
-                    : `${row.displayNameSnapshot} (이전 명단)`,
-                })),
-      };
-    };
-    return { leagueId, teamMatchId, home: bySide('HOME'), away: bySide('AWAY'), currentStats };
-  }
-
+  
   /**
    * 사이드별 "최신 라인업 참가자 + 팀이 실제로 작성한 라인업인가" 를 모은다.
    * 출전 기록(`V1GameResultParticipant` 행)과 started/goalkeeper 판정의 유일한 근거다 —
@@ -395,7 +332,7 @@ export class LeagueMatchResultEntryService {
   private async carryForwardFromRevision(
     gameId: string,
     revisionId: string,
-    dto: RecordLeagueResultDto,
+    dto: LeagueResultCorrectionInput,
   ): Promise<AssembledResultParticipant[]> {
     const [rows, sides, roster] = await Promise.all([
       this.prisma.v1GameResultParticipant.findMany({
@@ -417,50 +354,6 @@ export class LeagueMatchResultEntryService {
     ]);
     const result = carryForwardResultParticipants({
       rows,
-      sides: sides.map((side) => ({ id: side.id, sideKey: side.sideKey as 'HOME' | 'AWAY' })),
-      rosters: roster.rosters,
-      goalkeeperPositionCode: roster.goalkeeperPositionCode,
-      userIdByParticipantId: roster.userIdByParticipantId,
-      hasGameEvents: roster.hasGameEvents,
-      homeScore: dto.homeScore,
-      awayScore: dto.awayScore,
-    });
-    if (!result.ok) {
-      throw new BadRequestException({ code: result.code, message: result.message });
-    }
-    return result.actualParticipants;
-  }
-
-  /**
-   * dto.participants(선택)를 GamesService 가 받는 actualParticipants 로 변환한다.
-   * 검증(이 게임 소속·중복·사이드별 합 ≤ 스코어)과 출전 기록 규칙은 순수 모듈
-   * league-result-participants.ts 가 수행하고, 여기서는 조회와 예외 변환만 한다.
-   *
-   * **`participants` 를 안 보냈어도 로스터는 읽는다.** 스코어만 확정하는 입력에서도 팀이
-   * 라인업을 작성했다면 그 경기의 출전 기록은 남아야 한다 — 예전에는 여기서 곧장 `[]` 를
-   * 돌려줘서 득점자를 적지 않은 경기가 개인 전적에 아예 존재하지 않았다. 명시적 `[]` 도
-   * 같은 경로를 타며 "득점·도움 전부 0, 출전 기록은 유지"로 저장된다(순수 모듈 docblock).
-   */
-  private async resolveActualParticipants(
-    gameId: string,
-    dto: RecordLeagueResultDto,
-  ): Promise<AssembledResultParticipant[]> {
-    // `?? []`: undefined 뿐 아니라 **명시적 null** 도 흡수해야 한다 — @IsOptional() 은 null 을
-    // 검증 없이 통과시키므로 undefined 만 걸러서는 `null.length` 500 이 난다(Copilot 리뷰).
-    const stats = dto.participants ?? [];
-    const [gameParticipants, sides, roster] = await Promise.all([
-      stats.length === 0
-        ? Promise.resolve([])
-        : this.prisma.v1GameParticipant.findMany({
-            where: { gameId, id: { in: stats.map((stat) => stat.participantId) } },
-            select: { id: true, sideId: true },
-          }),
-      this.prisma.v1GameSide.findMany({ where: { gameId }, select: { id: true, sideKey: true } }),
-      this.loadSideRosters(gameId),
-    ]);
-    const result = assembleLeagueResultParticipants({
-      participants: stats,
-      gameParticipants,
       sides: sides.map((side) => ({ id: side.id, sideKey: side.sideKey as 'HOME' | 'AWAY' })),
       rosters: roster.rosters,
       goalkeeperPositionCode: roster.goalkeeperPositionCode,
@@ -537,157 +430,50 @@ export class LeagueMatchResultEntryService {
     if (updated.count === 0) throw finalized;
   }
 
-  // ─── 신규 입력 ──────────────────────────────────────────────────────────────
-
-  private async recordResultOnce(
-    user: V1AuthUser,
-    leagueId: string,
-    teamMatchId: string,
-    dto: RecordLeagueResultDto,
-  ) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
-    const teamMatch = await this.loadMatchedFixture(leagueId, teamMatchId);
-    const gameId = teamMatch.gameId;
-    const initialGameVersion = teamMatch.gameVersion;
-    const persistedReason = `${RESULT_ENTRY_REASON_MARKER} ${dto.reason.trim()}`;
-
-    const latestRevision = await this.prisma.v1GameResultRevision.findFirst({
-      where: { gameId },
-      orderBy: { revision: 'desc' },
-      select: { id: true, revision: true, state: true, reason: true, score: true },
-    });
-    const isOurEntry = latestRevision?.reason?.startsWith(RESULT_ENTRY_REASON_MARKER) ?? false;
-
-    if (latestRevision !== null && latestRevision.state === 'OFFICIAL') {
-      if (isOurEntry) {
-        // 멱등 응답은 저장된 값을 그대로 돌려준다(league-match-forfeit.service.ts 와
-        // 같은 이유) -- 재시도가 요청과 다른 스코어를 실었더라도 이미 확정된 값을
-        // 고쳤다고 착각하게 만들지 않는다. 스코어를 바꾸려면 별도의 정정
-        // (correctResult) 경로를 쓴다.
-        const stored = parseStoredScore(latestRevision.score);
-        return {
-          teamMatchId,
-          leagueId,
-          homeScore: stored?.home ?? dto.homeScore,
-          awayScore: stored?.away ?? dto.awayScore,
-          resultRevisionId: latestRevision.id,
-          alreadyProcessed: true,
-        };
-      }
-      throw new ConflictException({
-        code: 'LEAGUE_FIXTURE_RESULT_ALREADY_OFFICIAL',
-        message: '이미 공식 결과가 확정된 대진이에요. 정정이 필요하면 결과 정정 절차를 이용해 주세요.',
-      });
-    }
-
-    // 재시도 가능 지점: 직전 시도가 create(DRAFT)나 submit(SUBMITTED) 직후 decide 전에
-    // 끊긴 경우 -- 새 리비전을 또 만들지 않고 그 지점부터 이어간다.
-    const resumable =
-      latestRevision !== null &&
-      isOurEntry &&
-      (latestRevision.state === 'DRAFT' || latestRevision.state === 'SUBMITTED');
-    // 감사 L-E finding 2 수정: VOID(이의 수락으로 무효 처리된 결과)도 CHANGE_REQUESTED와
-    // 마찬가지로 새 신규 입력을 받아들인다 -- games.service.ts의 createResultRevision이
-    // 이제 VOID predecessor를 허용하는 것과 짝을 이루는 게이트다. 이걸 막아 두면 무효
-    // 처리된 대진은 순위표·완료 판정에서 미확정으로도, 확정으로도 정리되지 못한 채
-    // 재입력 자체가 영구히 막혀 그 시즌 승강 확정이 교착됐다.
-    if (
-      latestRevision !== null &&
-      latestRevision.state !== 'CHANGE_REQUESTED' &&
-      latestRevision.state !== 'VOID' &&
-      !resumable
-    ) {
-      throw new ConflictException({
-        code: 'LEAGUE_FIXTURE_RESULT_IN_PROGRESS',
-        message: '이미 처리 중이거나 이력이 있는 결과가 있어 입력할 수 없어요.',
-      });
-    }
-
-    const attempt = (latestRevision?.revision ?? 0) + (resumable ? 0 : 1);
-    const commandPrefix = `league-result-entry:${gameId}:${attempt}`;
-
-    let revisionId: string;
-    let revisionState: string;
-    let version: number;
-
-    if (resumable) {
-      revisionId = latestRevision!.id;
-      revisionState = latestRevision!.state;
-      version = (
-        await this.prisma.v1Game.findUniqueOrThrow({ where: { id: gameId }, select: { version: true } })
-      ).version;
-    } else {
-      const createCommandId = `${commandPrefix}:create`;
-      const created = await this.games.createResultRevision(user, gameId, createCommandId, {
-        expectedVersion: initialGameVersion,
-        clientCommandId: createCommandId,
-        score: { home: dto.homeScore, away: dto.awayScore },
-        // 선수별 득점·도움 + 팀이 작성한 라인업이 있으면 그 사이드의 출전자 전원.
-        // `V1GameEvent` 행은 계속 만들지 않는다 — TEAM_MATCH 무이벤트 면제
-        // (game-invariants.ts Task 17 Option A)가 참가자 합계를 권위로 받아 준다.
-        // (공개 타임라인용 goalEvents 스냅샷은 이벤트 행이 아니라 리비전의 JSON 칸이다 —
-        //  아래 snapshotGoalEvents 참고.)
-        actualParticipants: await this.resolveActualParticipants(gameId, dto),
-        eventsHash: canonicalGameCommandPayloadHash([]),
-        reason: persistedReason,
-      });
-      revisionId = created.revisionId;
-      revisionState = created.revisionState;
-      version = created.version;
-    }
-
-    // OFFICIAL 로 잠기기 전에 득점 스냅샷을 남긴다(위 snapshotGoalEvents docblock 참고).
-    // 재개(resumable) 분기도 함께 지난다 — 직전 시도가 create 직후에 끊겼다면 스냅샷만
-    // 빠진 리비전이 남아 있을 수 있다.
-    await this.snapshotGoalEvents(gameId, revisionId);
-
-    if (revisionState === 'DRAFT') {
-      const submitCommandId = `${commandPrefix}:submit`;
-      const submitted = await this.games.submitResultRevision(user, gameId, revisionId, submitCommandId, {
-        expectedVersion: version,
-        clientCommandId: submitCommandId,
-      });
-      revisionState = submitted.revisionState;
-      version = submitted.version;
-    }
-
-    if (revisionState === 'SUBMITTED') {
-      const decideCommandId = `${commandPrefix}:decide`;
-      const decided = await this.games.decideResultRevision(user, gameId, revisionId, decideCommandId, {
-        expectedVersion: version,
-        clientCommandId: decideCommandId,
-        decision: 'approve',
-        reason: persistedReason,
-      });
-      revisionState = decided.revisionState;
-      version = decided.version;
-    }
-
-    await this.adminContext.logAdminAction(admin, {
-      action: 'league_match.record_result',
-      targetType: 'team_match',
-      targetId: teamMatchId,
-      reason: dto.reason,
-      fromStatus: teamMatch.status,
-      toStatus: 'completed',
-      afterJson: {
-        leagueId,
-        gameId,
-        homeScore: dto.homeScore,
-        awayScore: dto.awayScore,
-        resultRevisionId: revisionId,
-      },
-    });
-
-    return {
-      teamMatchId,
-      leagueId,
+  /**
+   * dto.participants(선택)를 GamesService 가 받는 actualParticipants 로 변환한다.
+   * 검증(이 게임 소속·중복·사이드별 합 ≤ 스코어)과 출전 기록 규칙은 순수 모듈
+   * league-result-participants.ts 가 수행하고, 여기서는 조회와 예외 변환만 한다.
+   *
+   * **`participants` 를 안 보냈어도 로스터는 읽는다.** 스코어만 확정하는 입력에서도 팀이
+   * 라인업을 작성했다면 그 경기의 출전 기록은 남아야 한다 — 예전에는 여기서 곧장 `[]` 를
+   * 돌려줘서 득점자를 적지 않은 경기가 개인 전적에 아예 존재하지 않았다. 명시적 `[]` 도
+   * 같은 경로를 타며 "득점·도움 전부 0, 출전 기록은 유지"로 저장된다(순수 모듈 docblock).
+   */
+  private async resolveActualParticipants(
+    gameId: string,
+    dto: LeagueResultCorrectionInput,
+  ): Promise<AssembledResultParticipant[]> {
+    // `?? []`: undefined 뿐 아니라 **명시적 null** 도 흡수해야 한다 — @IsOptional() 은 null 을
+    // 검증 없이 통과시키므로 undefined 만 걸러서는 `null.length` 500 이 난다(Copilot 리뷰).
+    const stats = dto.participants ?? [];
+    const [gameParticipants, sides, roster] = await Promise.all([
+      stats.length === 0
+        ? Promise.resolve([])
+        : this.prisma.v1GameParticipant.findMany({
+            where: { gameId, id: { in: stats.map((stat) => stat.participantId) } },
+            select: { id: true, sideId: true },
+          }),
+      this.prisma.v1GameSide.findMany({ where: { gameId }, select: { id: true, sideKey: true } }),
+      this.loadSideRosters(gameId),
+    ]);
+    const result = assembleLeagueResultParticipants({
+      participants: stats,
+      gameParticipants,
+      sides: sides.map((side) => ({ id: side.id, sideKey: side.sideKey as 'HOME' | 'AWAY' })),
+      rosters: roster.rosters,
+      goalkeeperPositionCode: roster.goalkeeperPositionCode,
+      userIdByParticipantId: roster.userIdByParticipantId,
+      hasGameEvents: roster.hasGameEvents,
       homeScore: dto.homeScore,
       awayScore: dto.awayScore,
-      resultRevisionId: revisionId,
-      alreadyProcessed: false,
-    };
+    });
+    if (!result.ok) {
+      throw new BadRequestException({ code: result.code, message: result.message });
+    }
+    return result.actualParticipants;
   }
+
 
   // ─── 정정 ──────────────────────────────────────────────────────────────────
 
@@ -695,7 +481,7 @@ export class LeagueMatchResultEntryService {
     user: V1AuthUser,
     leagueId: string,
     teamMatchId: string,
-    dto: RecordLeagueResultDto,
+    dto: LeagueResultCorrectionInput,
   ) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const teamMatch = await this.loadMatchedFixture(leagueId, teamMatchId);
@@ -721,7 +507,7 @@ export class LeagueMatchResultEntryService {
       latestRevision.outcomeReason === 'FORFEIT' ||
       (latestRevision.reason?.includes(FORFEIT_REASON_MARKER) ?? false);
     // 운영자가 이번 정정의 몰수 여부를 명시하면 그 값을 따르고(몰수 아님으로 되돌리는
-    // 것도 포함), 미지정이면 base를 승계한다 -- RecordLeagueResultDto.isForfeit docblock의
+    // 것도 포함), 미지정이면 base를 승계한다 -- LeagueResultCorrectionInput.isForfeit docblock의
     // 계약. 이의(dispute) 수락 경로(league-match-dispute.service.ts)는 이 필드를 보내지
     // 않으므로 항상 승계로 떨어져, 정당한 몰수 경기의 이의를 정정으로 처리해도 표식이
     // 사라지지 않는다.

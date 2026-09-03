@@ -20,7 +20,6 @@ import { LeagueMatchPublicController } from './league-match-public.controller';
 import { LeagueMatchPublicService } from './league-match-public.service';
 // D1-a: 운영자가 리그 결과를 직접 입력·정정하는 경로. LeagueMatchForfeitController/
 // -Service 와 같은 이유로 별도 파일로 추가해 여기서만 등록한다.
-import { LeagueMatchResultEntryController } from './league-match-result-entry.controller';
 import { LeagueMatchResultEntryService } from './league-match-result-entry.service';
 import { LeagueSeriesAdminController } from './league-series-admin.controller';
 import { LeagueSeriesAdminService } from './league-series-admin.service';
@@ -42,7 +41,6 @@ import { LeagueSeriesAdminService } from './league-series-admin.service';
     LeagueFixtureVideosController,
     LeagueMatchForfeitController,
     LeagueMatchPublicController,
-    LeagueMatchResultEntryController,
     LeagueSeriesAdminController,
   ],
   providers: [

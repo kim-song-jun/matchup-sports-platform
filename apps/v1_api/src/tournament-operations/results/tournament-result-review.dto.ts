@@ -19,7 +19,7 @@ import { GameResultParticipantDto, GameScoreDto } from '../../games/dto/game-res
  *
  * ## 왜 콘솔이 이걸 받아야 하나
  * 지금까지 콘솔은 `outcomeReason` 을 **base 에서 승계만** 했다 — 새로 정할 입력이 없었다.
- * 몰수를 *지정* 하는 경로는 리그 전용 결과 입력(`RecordLeagueResultDto.isForfeit`)뿐이었고,
+ * 몰수를 *지정* 하는 경로는 리그 전용 결과 입력(삭제된 `RecordLeagueResultDto.isForfeit`)뿐이었고,
  * BE-3 가 그것을 지우면 **몰수를 새로 지정할 길이 사라진다.**
  *
  * ## 스코어를 건드리지 않는다 — 표식일 뿐이다

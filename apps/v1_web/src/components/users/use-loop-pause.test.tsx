@@ -55,6 +55,16 @@ describe('useLoopPause', () => {
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
+    // defineProperty 로 덮어쓴 own property 를 지워 prototype getter 로 되돌린다 —
+    // 마지막 테스트가 hidden 으로 끝나면 다른 스위트로 새어 나간다(Copilot).
+    delete (document as unknown as { visibilityState?: DocumentVisibilityState }).visibilityState;
+  });
+
+  it('문서가 처음부터 hidden 이면 마운트 직후 바로 paused 다 — visibilitychange 를 기다리지 않는다', () => {
+    setVisibility('hidden');
+    const { getByTestId } = render(<TestCard />);
+
+    expect(getByTestId('card')).toHaveAttribute('data-loop-paused', 'true');
   });
 
   it('마운트 시 observer 를 자신에게 건다', () => {

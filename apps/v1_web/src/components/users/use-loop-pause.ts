@@ -55,6 +55,9 @@ export function useLoopPause<T extends HTMLElement>() {
       apply();
     }
     document.addEventListener('visibilitychange', onVisibilityChange);
+    // 문서가 처음부터 hidden/prerender 상태면 visibilitychange 가 오기 전까지 루프가 돈다 —
+    // 설치 직후 현재 상태를 한 번 반영한다(Copilot).
+    apply();
 
     return () => {
       observer?.disconnect();

@@ -67,7 +67,25 @@
 
 ### BE (순차)
 - **BE-1 상태 소비처 실측 + 행복 경로 단순화.** 세 중간 상태의 읽기/쓰기 자리 전수 목록 → 0 이면 enum·전이 코드 제거, 아니면 [ASK]. 공개 API 의 `resultStage` 에 "확정 전" 값 추가. 순위·전적 집계가 OFFICIAL 만 세는 것을 변이로 증명.
-- **BE-2 이의 제거.** 서비스·컨트롤러·알림 4종·DTO 삭제 → 식별자 0건 → drop 마이그레이션 별도 PR(사용자 승인).
+- **BE-2 이의 제거.** ✅ 실측으로 갱신(2026-09-03):
+  - **알림은 4종이 아니라 5종**(`league_result_dispute_filed` + `league_match_dispute_{received,
+    corrected,voided,rejected}`). 전부 TS 유니온이라 마이그레이션 불필요.
+  - **`league-result-dispute-eligibility.ts` 는 이의 전용이 아니었다** — `team-matches.service.ts`
+    가 그것으로 팀매치 상세에 `disputeDeadline`·`disputeBlockedReason`·`openDisputeExists` 를
+    싣고, 웹이 그 값으로 "이의 D-day 카드"(U3, 08-24 A안)를 그렸다. 이의가 사라지므로 **셋 다
+    삭제**(2026-09-03 사용자 결정 A). 완료 알림 문구의 "N일 안에 이의…" 도 제거.
+  - **목록 밖 소비처 둘을 새로 찾았다**: ① 승강 확정의 "열린 이의 있으면 불가" 가드
+    (409 `LEAGUE_RESULT_DISPUTE_OPEN`) — 이의 쪽 가드와 쌍이라 함께 제거(그 쌍이 만들던
+    409 교착도 사라진다) ② `games.service.ts` 의 `assertTeamResultDisputeFileAuthority`
+    + `team_result_dispute_file` 액션 — 이의 서비스 전용 래퍼라 호출부 0.
+  - **`LeagueMatchResultEntryService` 동반 삭제**: 165 BE-3 이 HTTP 표면을 이미 지웠고 남은
+    유일한 호출부가 이의 수락의 `correctResult` 였다(모듈 주석이 이미 예고).
+  - **유지**: `LEAGUE_RESULT_AUTO_APPROVE_DELAY_MS`(24h 자동 승인 — 별개 기능. 파일만
+    `league-result-auto-approve.constants.ts` 로 옮기고 죽은 7일 창 상수 제거),
+    `revertCompletionInTx`(공개 엔드포인트가 계속 쓴다).
+  - AC: `git grep -i -w dispute -- apps/v1_api/src/league-matches apps/v1_api/src/tournament-operations`
+    → **0**. drop 마이그레이션(`v1_league_match_disputes` + enum 2)은 **별도 contract PR**
+    (사용자 승인).
   - **`LeagueMatchResultEntryService` 를 같은 PR 에서 함께 삭제한다.** Task 165 BE-3 이 그 HTTP
     표면(컨트롤러·DTO·프론트 모달)을 이미 지웠고, **남은 호출부가 이의 수락(`correctResult`) 하나**다.
     그 호출부가 사라지는 순간 서비스 전체가 도달 불가가 되므로 여기서 같이 지운다 —

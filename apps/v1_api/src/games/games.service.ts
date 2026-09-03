@@ -370,6 +370,12 @@ export function toGameHttpException(error: GameContractError): HttpException {
   ) {
     return new UnprocessableEntityException(body);
   }
+  // Task 166 BE-3: 롤링 종목의 교체 기록 거부는 **400** 이다(태스크 문서 명시). 위
+  // 422 무리와 다른 이유: 저 코드들은 "이 요청의 내용이 규칙에 어긋난다" 이고, 이건
+  // "이 경기에는 그 명령 자체가 없다" 다 — 다른 선수를 고른다고 통과하지 않는다.
+  if (error.code === 'SUBSTITUTION_NOT_TRACKED') {
+    return new BadRequestException(body);
+  }
   return new ConflictException(body);
 }
 

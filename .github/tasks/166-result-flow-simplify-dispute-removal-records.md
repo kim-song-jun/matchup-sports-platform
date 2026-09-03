@@ -73,7 +73,25 @@
     그 호출부가 사라지는 순간 서비스 전체가 도달 불가가 되므로 여기서 같이 지운다 —
     `league-match-result-entry.service.ts` · 그 spec 파일 부재, 식별자 0건.
   - 지우지 않는 것: `league-result-entry-reminder`(경기 시작 +24h 리마인더, 별개 기능).
-- **BE-3 롤링 교체 차단.** 교체 커맨드 핸들러가 대회 설정을 읽어 `'rolling'` 이면 400. `'limited'` 회귀 스펙.
+- **BE-3 롤링 교체 차단.** ✅ 구현(2026-09-03). 가드는 `games/core/substitution.ts` 의
+  `validateSubstitution` **맨 앞**에 둔다 — 그 함수가 이미 `substitutionMode` 를 받고 있고
+  모든 호출부가 지나는 단일 지점이다(설정 조회 경로는 `games.service.ts` 가 이미 갖고 있어
+  복사하지 않았다). 롤링에서는 뒤따르는 검사(같은 팀인가·피치 위인가)가 묻는 질문 자체가
+  의미 없으므로 그것들보다 **먼저** 던진다 — 순서가 뒤집히면 운영자가 "선수를 잘못 골랐다"
+  로 읽고 다른 조합을 계속 시도한다.
+  - **실측**: 친선 팀매치도 설정을 받는다(`team-matches.service.ts` 가 생성 시
+    `competitionConfigVersionId` 를 채운다). 프리셋은 **축구 `limited`(cap 5) / 풋살
+    `rolling`** 이므로, **풋살 친선 팀매치도 이 가드에 걸린다** — 정본 §3("롤링 종목은 교체
+    기록 없음")이 대회/친선을 가르지 않으므로 의도된 동작이다. 설정이 아예 없는 경기
+    (`competitionConfigVersionId = null`)는 기존 fail-closed 경로대로 `'limited'` 로 읽혀
+    **현행 유지**다.
+  - **이미 기록된 SUBSTITUTION 이벤트는 그대로 읽힌다**(`deriveOnPitchParticipantIds`) —
+    이 가드는 새 기록만 막는다.
+  - 에러 코드 `SUBSTITUTION_NOT_TRACKED` 는 **400** 이다. 형제 4개
+    (`SUBSTITUTION_INVALID`·`OUT_NOT_ON_PITCH`·`IN_ALREADY_ON_PITCH`·`LIMIT_REACHED`)는
+    전부 422 인데, 그것들은 "이 요청 내용이 규칙에 어긋난다" 이고 이건 "이 경기에는 그 명령
+    자체가 없다" 다(다른 선수를 골라도 통과하지 않는다).
+  - 콘솔 UI 의 교체 버튼 숨김은 **FE PR 로 분리**(3안 대상 아님 — 제거).
 - **BE-4 전적 구분.** 팀 전적 집계에 리그/친선 축, 개인 기록 `matchType: 'league'`.
 
 ### FE (BE 배포 뒤, 3안 선택 뒤)

@@ -28,6 +28,7 @@
 import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { tmpdir } from 'node:os';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
@@ -35,11 +36,19 @@ const execFileAsync = promisify(execFile);
 
 const ORIGIN = process.env.ALPHA_ORIGIN ?? 'https://alpha.teameet.co.kr';
 const SESSION_TOKEN = process.env.ALPHA_SESSION_TOKEN ?? '';
-const FFMPEG = process.env.FFMPEG_BIN ?? '/opt/homebrew/bin/ffmpeg';
+// PATH 의 ffmpeg 를 쓴다(macOS Homebrew 경로 고정은 다른 환경에서 깨진다). 필요하면 env 로만 덮어쓴다.
+const FFMPEG = process.env.FFMPEG_BIN ?? 'ffmpeg';
 
-const DEFAULT_OUT = resolve(
-  '/private/tmp/claude-501/-Users-sungjun-Dev-projects-matchup-sports-platform/e1742dfd-010d-48d8-aefa-1293133254f3/scratchpad/motion-audit/recordings',
-);
+// 산출물(webm·gif·png)은 크고 세션마다 다르므로 저장소 밖 임시 디렉터리를 기본으로 한다 — --out 으로 덮어쓴다.
+const DEFAULT_OUT = resolve(tmpdir(), 'teameet-motion-catalog');
+
+// 흐름마다 마지막 page.goto 의 HTTP 상태 — gotoChecked 가 갱신하고 summary 에 기록한다.
+let lastHttpStatus = null;
+
+/** throw 된 값이 Error 가 아닐 수도 있다(문자열·객체) — 메시지를 안전하게 문자열화한다. */
+function errorMessage(err) {
+  return err instanceof Error ? err.message : String(err);
+}
 
 const VIEWPORTS = {
   mobile: { width: 390, height: 844, isMobile: true },
@@ -94,6 +103,7 @@ async function gotoChecked(page, path, { waitMs = 1500 } = {}) {
     res = await page.goto(`${ORIGIN}${path}`, { waitUntil: 'domcontentloaded', timeout: 45_000 });
     status = res?.status() ?? 0;
   }
+  lastHttpStatus = status;
   await page.waitForTimeout(waitMs);
   return status;
 }
@@ -528,7 +538,7 @@ async function main() {
         {
           name: 'teameet_v1_session',
           value: SESSION_TOKEN,
-          domain: 'alpha.teameet.co.kr',
+          domain: new URL(ORIGIN).hostname, // ALPHA_ORIGIN 을 바꾸면 쿠키도 그 호스트를 따라간다
           path: '/',
           httpOnly: true,
           secure: true,
@@ -555,6 +565,7 @@ async function main() {
       const videoStart = Date.now();
       let flowResult;
       let httpStatus = null;
+      lastHttpStatus = null;
       let telemetry = null;
       let animationSeries = [];
       let finalScroll = null;
@@ -575,10 +586,10 @@ async function main() {
         }
       } catch (err) {
         status = 'failed';
-        error = err.message;
-        console.error(`  ✗ ${flowId} 실패: ${err.message}`);
+        error = errorMessage(err);
+        console.error(`  ✗ ${flowId} 실패: ${error}`);
         // alpha 403 레이트리밋 의심 시 60초 대기 후 나머지 흐름 계속.
-        if (/HTTP 403|403/.test(err.message)) {
+        if (/HTTP 403|403/.test(error)) {
           console.log('  403 감지 — 60초 대기 후 계속');
           await pace(60_000);
         }
@@ -646,6 +657,7 @@ async function main() {
       };
       writeFileSync(resolve(flowDir, 'telemetry.json'), JSON.stringify(telemetryOut, null, 2));
 
+      httpStatus = lastHttpStatus;
       summary.flows[flowId] = {
         status,
         httpStatus,
@@ -685,6 +697,6 @@ main()
     process.exit(0);
   })
   .catch((err) => {
-    console.error(`치명적 오류: ${err.message}`);
+    console.error(`치명적 오류: ${errorMessage(err)}`);
     process.exit(1);
   });

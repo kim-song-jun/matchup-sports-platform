@@ -48,16 +48,10 @@ export function resolveResultStage(game: LeagueFixtureResultSource | null): Leag
       return 'draft';
     case V1GameResultRevisionState.SUBMITTED:
       return 'awaiting_approval';
-    // Task 166: 반려·보완 요청은 **더 이상 만들어지지 않는다**(어드민이 팀에게 되돌려
-    // 보내는 왕복 제거, 정본 §4 — 상태 기계에서 두 전이를 지웠다). 그런데 두 case 를
-    // 여기서 같이 지우면 **이 변경 이전에 저장된 행이 어느 단계인지 못 읽는다** — enum
-    // 값과 그 행들은 후속 contract 마이그레이션이 CHANGE_REQUESTED 로 옮긴 뒤에야
-    // 사라진다(expand-contract: 쓰기를 먼저 끊고, 데이터를 옮기고, 그 다음 값을 뺀다).
-    // 그때까지 이 둘은 **읽기 전용 레거시**다. 셋 다 운영자에게는 같은 뜻이라
-    // ("공이 홈팀에게 돌아가 있다") 한 단계로 묶는 것은 그대로다.
+    // 반려·보완 요청은 contract 마이그레이션이 CHANGE_REQUESTED 로 옮겨 더는 존재하지
+    // 않는다(2026-09-03). 셋을 한 단계로 묶어 보여주던 계약 덕분에 **관전자·운영자가 보는
+    // 값은 그 이동으로 달라지지 않는다** — 원래도 셋 다 `change_requested` 였다.
     case V1GameResultRevisionState.CHANGE_REQUESTED:
-    case V1GameResultRevisionState.REJECTED:
-    case V1GameResultRevisionState.SUPPLEMENT_REQUESTED:
       return 'change_requested';
     // OFFICIAL 인데 currentOfficialRevisionId 가 비어 있는 것은 정상 상태가 아니다.
     // 확정으로 읽으면 운영자가 "끝난 경기"로 오해하므로, 손이 필요한 쪽으로 읽는다.

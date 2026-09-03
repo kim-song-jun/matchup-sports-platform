@@ -296,19 +296,10 @@ describe('"고치고 확인" — SUBMITTED 를 그 자리에서 고쳐 대체한
     );
   });
 
-  it('레거시 반려 행에서도 같은 모달로 고칠 수 있다 — 그 입구를 지우면 그 경기는 영영 못 고친다', () => {
-    // Task 166 이 이 상태로 **들어가는 경로**를 없앴지만, 그 전에 반려된 행은 contract
-    // 마이그레이션 전까지 남아 있다. 서버도 같은 이유로 재제출 base 허용에 이 상태를
-    // 남겼다(revision-state-machine.ts).
-    hookMocks.game.data = buildGame('platform_ops', { version: 4 });
-    hookMocks.revisions.data = [
-      buildRevision({ id: 'rev-2', revision: 2, state: 'REJECTED', supersedesId: 'rev-1', score: { home: 1, away: 0 } }),
-    ];
-    renderWithClient(<GameResultReviewPanel gameId="game-1" />);
-
-    expect(screen.getByText('반려된 결과예요')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '다시 제출' })).toBeInTheDocument();
-  });
+  // "레거시 반려 행에서도 같은 모달로 고칠 수 있다" 는 여기 있었다. contract
+  // 마이그레이션(20260903150000)이 REJECTED·SUPPLEMENT_REQUESTED 를 없애면서 그
+  // 전용 카드도 함께 지웠다 — 되살린 행은 SUBMITTED 로 오고, SUBMITTED 카드의
+  // "고치고 확인" 이 같은 재제출 모달을 연다(바로 위 케이스가 그걸 잡는다).
 });
 
 describe('officialize (approve) always available to platform_ops', () => {

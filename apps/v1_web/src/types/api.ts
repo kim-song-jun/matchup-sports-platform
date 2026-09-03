@@ -1275,8 +1275,6 @@ export type V1GameResultRevisionState =
   | 'DRAFT'
   | 'SUBMITTED'
   | 'CHANGE_REQUESTED'
-  | 'SUPPLEMENT_REQUESTED'
-  | 'REJECTED'
   | 'OFFICIAL'
   | 'VOID';
 

@@ -243,19 +243,14 @@ export class TournamentResultReviewService {
         }
         // The frozen contract names a dedicated code for this exact
         // precondition (distinct from the generic REVISION_MUST_BE_SUPERSEDED
-        // used by void/correction). Task 166 added SUBMITTED — 되돌려 보내는
-        // 왕복이 사라져 어드민이 그 자리에서 고친다. 레거시 두 상태는 **contract
-        // 마이그레이션 전까지 남긴다**: 이미 반려·보완 요청된 행이 alpha 에 있고,
-        // 여기서 빼면 그 경기들을 영영 고칠 수 없다. 그 밖에는 409
-        // RESULT_RESUBMISSION_NOT_ALLOWED with zero new rows.
-        if (
-          base.state !== V1GameResultRevisionState.SUBMITTED &&
-          base.state !== V1GameResultRevisionState.REJECTED &&
-          base.state !== V1GameResultRevisionState.SUPPLEMENT_REQUESTED
-        ) {
+        // used by void/correction). Task 166 added SUBMITTED — 되돌려 보내는 왕복이
+        // 사라져 어드민이 그 자리에서 고친다. 레거시 두 상태는 contract 마이그레이션이
+        // 그 행들을 CHANGE_REQUESTED 로 옮겨 base 가 될 행 자체가 없다(2026-09-03).
+        // 그 밖에는 409 RESULT_RESUBMISSION_NOT_ALLOWED with zero new rows.
+        if (base.state !== V1GameResultRevisionState.SUBMITTED) {
           throw new ConflictException({
             code: 'RESULT_RESUBMISSION_NOT_ALLOWED',
-            message: 'supersede-and-submit requires a SUBMITTED (or legacy reviewed) base revision',
+            message: 'supersede-and-submit requires a SUBMITTED base revision',
           });
         }
         try {
@@ -472,6 +467,22 @@ export class TournamentResultReviewService {
             throw new ConflictException({
               code: 'REVISION_MUST_BE_SUPERSEDED',
               message: 'This revision has already been superseded by a newer revision',
+            });
+          }
+          // Task 166 contract: 위 승계 검사는 "더 새 리비전이 이 행을 대체했나" 만 본다 —
+          // **이 경기에 이미 공식 결과가 있나** 는 보지 않는다. 그래서 승계되지 않은 옛
+          // 리비전이 SUBMITTED 로 남아 있으면 그대로 확정돼 `currentOfficialRevisionId` 를
+          // 빼앗을 수 있었다. 공식 결과가 이미 있는 경기를 다시 확정하는 정당한 경로는
+          // **정정(CORRECTION)** 뿐이고, 그쪽은 위 분기가 "base 가 현재 공식 리비전" 을
+          // 이미 강제한다. STANDARD 흐름은 첫 확정 전용이므로 여기서 닫는다.
+          //
+          // contract 마이그레이션(20260903150000)이 옛 반려 행을 되살릴지 얼릴지 가를 때
+          // 이 구멍을 조건으로 썼는데, 정책이 구멍에 기대는 건 한 번이면 족하다 — 코드가
+          // 스스로 닫는다.
+          if (game.currentOfficialRevisionId !== null) {
+            throw new ConflictException({
+              code: 'RESULT_ALREADY_OFFICIAL',
+              message: 'This game already has an official result; use a correction instead',
             });
           }
         }

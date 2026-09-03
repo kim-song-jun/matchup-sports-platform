@@ -7,7 +7,7 @@
 
 검사(하나라도 실패하면 exit 1, 파일을 쓰지 않는다):
   - RGBA 이고 알파 최솟값이 0 (진짜 투명 배경)
-  - 불투명 픽셀이 캔버스의 25~85% 를 차지 (너무 작거나 꽉 찬 그림 배제)
+  - 불투명 영역의 bbox(경계 사각형)가 캔버스의 25~85% 를 차지 (너무 작거나 꽉 찬 그림 배제)
   - 오브젝트 bbox 가 캔버스 가장자리에 닿지 않음 (잘림 배제)
   - 모서리 4곳이 완전 투명 (배경이 남아 있으면 다크모드에서 흰 판이 뜬다)
 
@@ -60,7 +60,16 @@ def main() -> None:
         fail("name 은 소문자 kebab-case 여야 한다")
 
     src = Path(args.src)
-    im = Image.open(src)
+    if not src.is_file():
+        fail(f"원본 PNG 가 없다: {src}")
+    prompt_path = Path(args.prompt_file)
+    if not prompt_path.is_file():
+        fail(f"프롬프트 파일이 없다: {prompt_path}")
+    try:
+        im = Image.open(src)
+        im.load()
+    except (OSError, Image.UnidentifiedImageError) as exc:
+        fail(f"이미지를 열 수 없다: {src} ({exc})")
     if im.mode != "RGBA":
         fail(f"RGBA 가 아니다: {im.mode}. 투명 배경으로 다시 생성한다")
     alpha = im.getchannel("A")
@@ -108,7 +117,7 @@ def main() -> None:
     entry = {
         "name": args.name,
         "message": args.message,
-        "prompt": Path(args.prompt_file).read_text().strip(),
+        "prompt": prompt_path.read_text().strip(),
         "source_sha256": hashlib.sha256(src.read_bytes()).hexdigest(),
         "sizes": written,
         "created_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),

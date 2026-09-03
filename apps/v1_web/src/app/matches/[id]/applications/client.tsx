@@ -10,7 +10,7 @@ import {
   useV1MatchApplicationsInfinite,
   useV1RejectMatchApplication,
 } from '@/hooks/use-v1-api';
-import { AlertBanner, Card, EmptyState } from '@/components/v1-ui/primitives';
+import { AlertBanner, Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { ChevronLeftIcon } from '@/components/v1-ui/icons';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -49,7 +49,7 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
       <>
         <DesktopPageHead matchId={matchId} />
         <div className="tm-match-list">
-          <ErrorCard message="매치 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요." />
+          <ErrorState title="매치 정보를 불러오지 못했어요" message="잠시 후 다시 시도해 주세요." onRetry={() => void matchQuery.refetch()} retryLabel="다시 불러오기" />
         </div>
       </>
     );
@@ -154,13 +154,16 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
           </div>
         ) : applicationsQuery.isError ? (
           <div style={{ marginTop: 16 }}>
-            <ErrorCard message="신청 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." />
+            <ErrorState title="신청 목록을 불러오지 못했어요" message="잠시 후 다시 시도해 주세요." onRetry={() => void applicationsQuery.refetch()} retryLabel="다시 불러오기" />
           </div>
         ) : items.length === 0 ? (
           <div style={{ marginTop: 16 }}>
             <EmptyState
+              illustration={{ name: 'matches-empty' }}
               title="신청자가 없어요"
-              sub="신청자가 생기면 여기서 바로 승인하거나 거절할 수 있어요."
+              sub="신청자가 생기면 여기서 바로 승인하거나 거절할 수 있어요. 매치 링크를 공유하면 더 빨리 모여요."
+              cta="매치 상세 보기"
+              ctaHref={`/matches/${matchId}`}
             />
           </div>
         ) : (
@@ -375,17 +378,6 @@ function ApplicationsSkeletonList() {
         />
       ))}
     </div>
-  );
-}
-
-function ErrorCard({ message }: { message: string }) {
-  return (
-    <Card pad={16} style={{ background: 'var(--grey50)' }}>
-      <div className="tm-text-label">{message}</div>
-      <div className="tm-text-caption" style={{ marginTop: 8, lineHeight: 1.55 }}>
-        새로고침 후에도 같은 문제가 반복되면 잠시 뒤 다시 시도해 주세요.
-      </div>
-    </Card>
   );
 }
 

@@ -13,6 +13,20 @@ import type { V1Match, V1MatchApiStatus, V1Sport, V1ViewerState } from '@/types/
 
 export const FIXED_MATCH_SPORT_NAMES = ['축구', '풋살', '러닝', '수영'] as const;
 
+/**
+ * 사진이 없는 매치의 카드·히어로에 쓰는 종목 그래픽 이름(public/illustrations/<name>-640.webp).
+ * 운영 4종목은 전용 그래픽, 그 외는 공용 스포츠 그래픽(스톱워치+공+콘). agy-3d-graphic 스킬 산출물.
+ */
+export function sportIllustration(sportName: string | null | undefined): string {
+  switch (sportName) {
+    case '축구': return 'sport-soccer';
+    case '풋살': return 'sport-futsal';
+    case '러닝': return 'sport-running';
+    case '수영': return 'sport-swimming';
+    default: return 'landing-hero';
+  }
+}
+
 export function toMatchCard(match: V1Match, fallback: MatchCardModel): MatchCardModel {
   const capacity = getCapacity(match, fallback);
   const status = statusToCardStatus(getStatus(match), getViewerState(match));
@@ -26,7 +40,9 @@ export function toMatchCard(match: V1Match, fallback: MatchCardModel): MatchCard
     // ('김정민')이 붙었다. 모르는 값은 지어내지 않고 "모른다"고 말한다 — 문자열 모양(비어
     // 있지 않음)이 그대로라 렌더 쪽 가정을 깨지 않고, 라벨은 이 저장소가 이미 쓰는 표현을
     // 재사용한다(teams-client.tsx 의 '레벨 미설정'·'지역 미정', API 의 '호스트').
-    // image 는 예외다 — 사진 자리표시자는 사실 주장이 아니라 장식이다.
+    // image 도 예외가 아니다 — alpha 실측(2026-09-04)에서 API 가 imageUrl:null 인 실제 매치에
+    // 목업의 옥상 풋살 사진이 붙어 그 매치의 사진처럼 보였다. 없으면 null 로 두고 화면이
+    // 종목 그래픽(sportIllustration)을 그린다.
     sport: match.sport?.name ?? match.sportName,
     venue: match.place?.name ?? match.placeName,
     region: match.region?.name ?? match.regionName ?? '지역 미정',
@@ -38,7 +54,7 @@ export function toMatchCard(match: V1Match, fallback: MatchCardModel): MatchCard
     level: match.levelLabel ?? '레벨 미설정',
     gender: match.genderRule ?? '성별 미설정',
     host: match.host?.displayName ?? '호스트',
-    image: match.imageUrl ?? fallback.image,
+    image: match.imageUrl ?? null,
     status,
     deadline: formatDeadline(match.deadlineAt, status),
     deadlineDetail: formatDeadlineDetail(match.deadlineAt, status),

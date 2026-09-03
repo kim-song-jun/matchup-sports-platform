@@ -400,6 +400,11 @@ type EmptyStateProps = {
   sub: string;
   cta?: string;
   onCta?: () => void;
+  /**
+   * 링크형 CTA. 서버 컴포넌트에서도 렌더되는 빈 상태(매치 목록 SSR 등)는 useRouter 를 쓸 수 없어
+   * 이동은 href 로 준다. onCta 와 함께 오면 href 가 우선(링크로 그린다).
+   */
+  ctaHref?: string;
   /** Lucide icon node rendered inside the blue circle. Defaults to InboxIcon. */
   icon?: ReactNode;
   /**
@@ -416,7 +421,7 @@ type EmptyStateProps = {
   illustration?: { name: string };
 };
 
-export function EmptyState({ title, sub, cta, onCta, icon, fill, illustration }: EmptyStateProps) {
+export function EmptyState({ title, sub, cta, onCta, ctaHref, icon, fill, illustration }: EmptyStateProps) {
   return (
     <div className={`tm-empty-state${fill ? ' tm-empty-state-fill' : ''}`}>
       {illustration ? (
@@ -438,7 +443,11 @@ export function EmptyState({ title, sub, cta, onCta, icon, fill, illustration }:
       <div className="tm-text-label" style={{ color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.5 }}>
         {sub}
       </div>
-      {cta ? (
+      {cta && ctaHref ? (
+        <Link className="tm-btn tm-btn-sm tm-btn-primary" href={ctaHref} style={{ marginTop: 24 }}>
+          {cta}
+        </Link>
+      ) : cta ? (
         <button className="tm-btn tm-btn-sm tm-btn-primary" type="button" style={{ marginTop: 24 }} onClick={onCta}>
           {cta}
         </button>

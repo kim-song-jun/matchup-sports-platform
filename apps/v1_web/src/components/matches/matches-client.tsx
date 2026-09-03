@@ -103,7 +103,7 @@ export function MatchListPageClient() {
   const sports = useV1MasterSports();
   const query = matchFilters ? filteredMatches : allMatches;
 
-  if (query.isError) return <MatchStatePageView model={getMatchStateViewModel('error')} />;
+  if (query.isError) return <MatchStatePageView model={{ ...getMatchStateViewModel('error'), retry: () => void query.refetch() }} />;
 
   const base = getMatchListViewModel();
   const pageItems = query.data?.items;
@@ -237,7 +237,7 @@ export function MatchDetailPageClient({ matchId, seed }: { matchId: string; seed
   }, [matchId, query.data, matchSportType]);
 
   if (query.isError) {
-    return <MatchStatePageView model={getMatchStateViewModel('error')} />;
+    return <MatchStatePageView model={{ ...getMatchStateViewModel('error'), retry: () => void query.refetch() }} />;
   }
 
   // 데이터가 오기 전에는 하드코딩 목업(`fallback`)을 화면 전체로 렌더하지 않는다 —

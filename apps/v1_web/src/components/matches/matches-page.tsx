@@ -1,16 +1,18 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { ChangeEvent } from 'react';
 import { useRef, useState } from 'react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
-import { Card, EmptyState, InfoRow, ListItem } from '@/components/v1-ui/primitives';
+import { Card, EmptyState, ErrorState, InfoRow, ListItem } from '@/components/v1-ui/primitives';
 import { Button } from '@/components/v1-ui/button';
 import { ChevronLeftIcon, FilterIcon, HomeIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { NotificationBellButton } from '@/components/v1-ui/notification-bell';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { cssUrl } from '@/lib/assets';
+import { sportIllustration } from './matches.card-model';
 import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
 import { CreateField, FieldErrorText, GenderRuleSelector, MissingFieldsBanner, RecentVenueChips } from '@/components/v1-ui/create-form-fields';
@@ -48,29 +50,6 @@ function sportDotColor(sportLabel: string): string {
  * [P2 마이크로인터랙션] 매치 만들기 완료 체크 아이콘 — globals.css .tm-complete-check 키프레임 활용.
  * reduced-motion 환경: 0.18s fade-in만 적용 (globals.css에서 자동 처리).
  */
-function CompletionCheckIcon() {
-  return (
-    <svg
-      className="tm-complete-check"
-      width="56"
-      height="56"
-      viewBox="0 0 56 56"
-      fill="none"
-      aria-hidden="true"
-      style={{ display: 'block', margin: '0 auto 4px' }}
-    >
-      <circle cx="28" cy="28" r="28" fill="var(--blue50)" />
-      <path
-        d="M16 28.5L23.5 36L40 20"
-        stroke="var(--blue500)"
-        strokeWidth="3"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 /**
  * [P0/P1 아이콘+컬러] 상태 아이콘 — 색상만으로 상태를 구분하지 않도록 아이콘+텍스트 병행 (WCAG 1.4.1).
  */
@@ -141,7 +120,14 @@ export function MatchListPageView({ model }: { model: MatchListViewModel }) {
              grid-item child gets confined to the first grid cell (~50%/33% width), reading
              as flush-left instead of centered across the full content column. Matches the
              pattern already used by teams-page.tsx / team-matches-page.tsx / tournaments page.tsx. */
-          <EmptyState fill illustration={{ name: 'matches-empty' }} title="조건에 맞는 매치가 없어요" sub="다른 종목을 선택하거나 전체 매치로 돌아가면 모집 중인 매치를 볼 수 있어요." />
+          <EmptyState
+            fill
+            illustration={{ name: 'matches-empty' }}
+            title="조건에 맞는 매치가 없어요"
+            sub="다른 종목을 선택하거나 전체 매치로 돌아가면 모집 중인 매치를 볼 수 있어요."
+            cta={model.filterCount > 0 || model.sports.some((sport) => sport.active && sport.label !== '전체') ? '전체 매치 보기' : undefined}
+            ctaHref="/matches"
+          />
         )}
         {/* 서버는 20건씩 커서로 자르는데(matches.service.ts) 예전엔 여기서 더 볼 방법이
             없었다(감사 결함) — tournaments/page.tsx 와 같은 "더 보기" 누적 패턴. */}
@@ -159,6 +145,26 @@ export function MatchListPageView({ model }: { model: MatchListViewModel }) {
       </div>
       {model.filterSheet?.open ? <MatchFilterSheet model={model} /> : null}
     </>
+  );
+}
+
+
+/**
+ * 사진 없는 매치의 종목 그래픽. 크기는 소비처(카드 112 / 히어로 160)가 정하고, 장식이라 aria-hidden.
+ * 이름 매핑은 matches.card-model.ts 의 sportIllustration — 운영 4종목 전용, 그 외 공용 스포츠 그래픽.
+ */
+function SportIllustration({ sport, size, className }: { sport: string; size: number; className?: string }) {
+  return (
+    <Image
+      className={`tm-match-sport-illustration${className ? ` ${className}` : ''}`}
+      src={`/illustrations/${sportIllustration(sport)}-640.webp`}
+      alt=""
+      aria-hidden="true"
+      width={640}
+      height={640}
+      sizes={`${size}px`}
+      style={{ width: size, height: size }}
+    />
   );
 }
 
@@ -187,16 +193,16 @@ export function MatchStatePageView({ model }: { model: MatchStateViewModel }) {
         </Link>
       </div>
       <div className="tm-match-list">
-        <EmptyState title={model.title} sub={model.description} />
+        {/* 오류는 ErrorState + 재시도(DESIGN.md §13). 예전엔 EmptyState + "목록으로 돌아가기" 카드뿐이라
+            다시 불러올 길이 없었다(2026-09-04 감사). */}
         {model.state === 'error' ? (
-          <Card pad={16} style={{ marginTop: 20, background: 'var(--grey50)' }}>
-            <div className="tm-text-label">목록으로 돌아가 다시 확인해 주세요</div>
-            <div className="tm-text-caption" style={{ marginTop: 8, lineHeight: 1.55 }}>
-              새로고침 후에도 같은 문제가 반복되면 잠시 뒤 다시 시도해 주세요.
-            </div>
-            <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href="/matches" style={{ marginTop: 16 }}>목록으로 돌아가기</Link>
-          </Card>
-        ) : null}
+          <>
+            <ErrorState title={model.title} message={model.description} onRetry={model.retry} retryLabel="다시 불러오기" />
+            <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href="/matches" style={{ marginTop: 12 }}>목록으로 돌아가기</Link>
+          </>
+        ) : (
+          <EmptyState title={model.title} sub={model.description} />
+        )}
         {model.state === 'joined' ? (
           <div className="tm-match-card-stack" style={{ marginTop: 20 }}>
             {model.matches.map((match) => <MatchCardItem key={match.id} match={match} />)}
@@ -270,7 +276,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
           </div>
         </div>
         <Link
-          className="tm-btn tm-btn-sm tm-btn-primary"
+          className="tm-btn tm-btn-sm tm-btn-outline"
           href={model.reviewAction.href}
           style={{ flexShrink: 0, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
         >
@@ -317,7 +323,8 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
       </div>
 
       <article className="tm-match-detail tm-content-enter">
-        <div className="tm-match-detail-hero" style={{ backgroundImage: cssUrl(match.image) }}>
+        <div className={`tm-match-detail-hero${match.image ? '' : ' tm-match-media-sport tm-match-detail-hero-sport'}`} style={match.image ? { backgroundImage: cssUrl(match.image) } : undefined}>
+          {match.image ? null : <SportIllustration sport={match.sport} size={160} className="tm-match-detail-hero-illustration" />}
           <div className="tm-match-detail-overlay">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               {/* Mobile back button — hidden on desktop (desktop back is in the page head above) */}
@@ -508,7 +515,6 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
   );
 }
 export function MatchCreatePageView({ model }: { model: MatchCreateViewModel }) {
-  if (model.step === 'complete') return <MatchComplete model={model} />;
   const edit = model.step === 'edit';
   const stepNo = edit ? 2 : stepToNumber(model.step);
   const primaryLabel = model.form?.submitLabel ?? (edit ? '변경사항 저장' : model.step === 'confirm' ? '매치 만들기' : '다음');
@@ -693,7 +699,8 @@ function SportSelector({ sports }: { sports: MatchListViewModel['sports'] }) {
 function MatchCardItem({ match }: { match: MatchCardModel }) {
   return (
     <Link className="tm-match-list-card tm-card-interactive tm-pressable" href={`/matches/${match.id}`}>
-      <div className="tm-match-list-media" style={{ backgroundImage: cssUrl(match.image) }}>
+      <div className={`tm-match-list-media${match.image ? '' : ' tm-match-media-sport'}`} style={match.image ? { backgroundImage: cssUrl(match.image) } : undefined}>
+        {match.image ? null : <SportIllustration sport={match.sport} size={112} />}
         <span className="tm-badge tm-badge-blue">{match.sport}</span>
         {/* [P1 숫자:단위 2:1 + tabular-nums] 현재/최대 인원 — 숫자(body-lg weight600) : 단위(caption) 2:1 */}
         <span className="tm-match-count-badge" style={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
@@ -1044,63 +1051,6 @@ function ConfirmStep({ model }: { model: MatchCreateViewModel }) {
   return <div><h1 className="tm-text-heading">입력한 내용을 확인해 주세요</h1><Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}><div className="tm-create-image-preview" style={{ backgroundImage: cssUrl(draft.image) }} /><div style={{ padding: 16 }}><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{model.selectedSport}</span><span className="tm-badge tm-badge-grey">{draft.minLevel}-{draft.maxLevel}</span><span className="tm-badge tm-badge-grey">{draft.gender}</span></div><div className="tm-text-subhead" style={{ marginTop: 12 }}>{draft.title}</div><div className="tm-text-caption" style={{ marginTop: 8 }}>{draft.description}</div></div></Card><Card pad={16} style={{ marginTop: 12 }}><InfoRow label="지역" value={regionName} sub="검색·추천에 사용돼요" /><InfoRow label="일시" value={timeRangeText} /><InfoRow label="신청 마감" value={deadlineText} /><InfoRow label="장소" value={draft.venue} sub={draft.address} /><InfoRow label="인원" value={`최대 ${draft.capacity}명`} /><InfoRow label="이미지" value="대표 이미지" sub="목록과 상세 화면에 표시돼요" /></Card></div>;
 }
 
-function MatchComplete({ model }: { model: MatchCreateViewModel }) {
-  const [shareMsg, setShareMsg] = useState('');
-  // 생성된 매치 상세 URL. matchId가 없으면(정적 데모 경로) 목록으로 fallback.
-  const detailHref = model.matchId ? `/matches/${model.matchId}` : '/matches';
-
-  const handleShare = async () => {
-    const url = typeof window !== 'undefined' ? new URL(detailHref, window.location.origin).toString() : detailHref;
-    const title = model.draft.title || '새 매치';
-    // navigator.share 지원 환경(모바일)에서는 네이티브 공유 시트 사용
-    if (typeof navigator !== 'undefined' && navigator.share) {
-      try {
-        await navigator.share({ title, url });
-        // null 반환: 네이티브 시트가 UX 직접 처리
-        return;
-      } catch {
-        // 취소(AbortError) 또는 미지원 → 클립보드 fallback
-      }
-    }
-    // 클립보드 복사 fallback
-    try {
-      await navigator.clipboard.writeText(url);
-      setShareMsg('링크를 복사했어요');
-    } catch {
-      setShareMsg('링크 복사에 실패했어요');
-    }
-    window.setTimeout(() => setShareMsg(''), 1800);
-  };
-
-  return (
-    <>
-      {/* Desktop page head */}
-      <div className="tm-desktop-page-head tm-show-desktop">
-        <Link className="tm-desktop-back" href="/matches" aria-label="매치 목록으로 돌아가기">
-          <ChevronLeftIcon size={20} strokeWidth={2.2} aria-hidden="true" />
-        </Link>
-        <h1 className="tm-text-heading" style={{ margin: 0 }}>매치 만들기 완료</h1>
-      </div>
-      <div className="tm-create-shell tm-match-create-shell">
-        {/* [P2 마이크로인터랙션] 완료 체크 애니메이션 — globals.css .tm-complete-check (reduced-motion 자동 처리) */}
-        <CompletionCheckIcon />
-        <EmptyState title="매치를 만들었어요" sub="팀원들에게 링크를 공유해 참여 의사를 확인해 보세요." />
-        <Card pad={16} style={{ marginTop: 24, background: 'var(--tint-blue)', borderColor: 'var(--tint-blue-border)' }}>
-          <div className="tm-text-body-lg">매치 공유</div>
-          <div className="tm-text-caption" style={{ marginTop: 4 }}>팀원들에게 링크와 일정을 알려보세요</div>
-        </Card>
-        {shareMsg ? <div className="tm-text-caption" role="status" style={{ marginTop: 12, textAlign: 'center', color: 'var(--text-caption)' }}>{shareMsg}</div> : null}
-      </div>
-      <div className="tm-fixed-cta">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
-          <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={detailHref}>상세 보기</Link>
-          <button className="tm-btn tm-btn-lg tm-btn-primary" type="button" onClick={() => { void handleShare(); }}>공유하기</button>
-        </div>
-      </div>
-    </>
-  );
-}
-
 function stepToNumber(step: MatchCreateViewModel['step']) {
   if (step === 'sport') return 1;
   if (step === 'info') return 2;
@@ -1119,8 +1069,9 @@ function nextCreateHref(step: MatchCreateViewModel['step']) {
   if (step === 'sport') return '/matches/new';
   if (step === 'info') return '/matches/new/place-time';
   if (step === 'place-time') return '/matches/new/confirm';
-  if (step === 'confirm') return '/matches/new/complete';
-  // 'complete'·'edit' 단계에선 이 함수가 호출되지 않음(onSubmit/onCancel 핸들러가 직접 라우팅).
+  // 확인 단계의 폴백 링크 — 실제 제출은 onSubmit 이 상세로 라우팅한다(완료 라우트는 도달 불가라 삭제).
+  if (step === 'confirm') return '/matches';
+  // 'edit' 단계에선 이 함수가 호출되지 않음(onSubmit/onCancel 핸들러가 직접 라우팅).
   // 만약 도달하면 안전하게 목록으로 복귀.
   return '/matches';
 }

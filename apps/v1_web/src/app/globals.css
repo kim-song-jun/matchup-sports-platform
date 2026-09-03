@@ -2641,6 +2641,40 @@ label.tm-btn:focus-within {
   background-size: cover;
 }
 
+/*
+ * 사진이 없는 매치의 미디어 영역 — 목업 사진 대신 종목 그래픽(sportIllustration). 히어로는 흰 글씨
+ * 오버레이를 그대로 쓰므로 바탕을 --blue700(흰 글씨 5.41:1 AA)으로 깔고 그래픽을 오른쪽에 둔다.
+ */
+.tm-match-media-sport {
+  background: var(--blue700);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.tm-match-sport-illustration {
+  object-fit: contain;
+  flex: none;
+}
+
+.tm-match-detail-hero-sport {
+  position: relative;
+}
+
+.tm-match-detail-hero-sport .tm-match-detail-hero-illustration {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.tm-match-detail-hero-sport .tm-match-detail-overlay {
+  position: relative;
+  background: linear-gradient(90deg, rgba(25, 31, 40, 0.42), rgba(25, 31, 40, 0.08));
+}
+
 .tm-match-list-media::after {
   content: "";
   position: absolute;

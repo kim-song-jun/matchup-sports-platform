@@ -499,33 +499,21 @@ describe('Task 22 T-B: QA scenario gap coverage (Q-02/04/07/08/11/13)', () => {
     await prisma.$disconnect();
   });
 
-  it('Q-02: resubmits successfully from a SUPPLEMENT_REQUESTED base, not just a REJECTED one', async () => {
+  it('Q-02: SUBMITTED base 를 곧바로 재제출로 대체하고 supersedesId 가 그 base 를 가리킨다', async () => {
+    // Task 166: 예전엔 base 가 SUPPLEMENT_REQUESTED/REJECTED 였다 — 즉 "어드민이 팀에게
+    // 되돌려 보냈다" 를 전제했다. 정본 §4 가 그 왕복을 없애 base 가 SUBMITTED 다.
     const gameId = await buildTournamentGame(ids.fixtureQ02);
     const { homeSideId, scorerId } = await endGameWithHomeGoal(gameId);
     const submitted = await prisma.v1GameResultRevision.findFirstOrThrow({ where: { gameId } });
     expect(submitted.state).toBe(V1GameResultRevisionState.SUBMITTED);
 
-    const supplementRequested = await resultReview.reviewDecision(
-      authUser(ids.platformOps),
-      gameId,
-      submitted.id,
-      'task22tb-q02-supplement',
-      {
-        expectedVersion: 3,
-        clientCommandId: 'task22tb-q02-supplement',
-        decision: 'request_supplement',
-        reason: 'need a lineup card photo before this can be reviewed',
-      },
-    );
-    expect(supplementRequested.revisionState).toBe(V1GameResultRevisionState.SUPPLEMENT_REQUESTED);
-
     const successor = await resultReview.supersedeAndSubmit(
       authUser(ids.platformOps),
       gameId,
-      supplementRequested.revisionId,
+      submitted.id,
       'task22tb-q02-resubmit',
       {
-        expectedVersion: 4,
+        expectedVersion: 3,
         clientCommandId: 'task22tb-q02-resubmit',
         score: { home: 1, away: 0 },
         actualParticipants: [
@@ -544,7 +532,12 @@ describe('Task 22 T-B: QA scenario gap coverage (Q-02/04/07/08/11/13)', () => {
     );
     expect(successor.revisionState).toBe(V1GameResultRevisionState.SUBMITTED);
     const successorRow = await prisma.v1GameResultRevision.findUniqueOrThrow({ where: { id: successor.revisionId } });
-    expect(successorRow.supersedesId).toBe(supplementRequested.revisionId);
+    expect(successorRow.supersedesId).toBe(submitted.id);
+    // base 는 그대로 SUBMITTED 다 — supersede 는 predecessor 를 건드리지 않는다.
+    // 그래서 "대체됐다" 는 사실은 `state` 가 아니라 `supersedesId` 로만 알 수 있고,
+    // officialize 가 그것으로 stale 확정을 막는다(tournament-officialize 스펙).
+    const baseAfter = await prisma.v1GameResultRevision.findUniqueOrThrow({ where: { id: submitted.id } });
+    expect(baseAfter.state).toBe(V1GameResultRevisionState.SUBMITTED);
   });
 
   it('Q-04: an outbox unique-key collision deep inside a successful-looking mutate() rolls the whole successor back atomically', async () => {
@@ -552,17 +545,12 @@ describe('Task 22 T-B: QA scenario gap coverage (Q-02/04/07/08/11/13)', () => {
     const { homeSideId, scorerId } = await endGameWithHomeGoal(gameId);
     const submitted = await prisma.v1GameResultRevision.findFirstOrThrow({ where: { gameId } });
 
-    const rejected = await resultReview.reviewDecision(authUser(ids.platformOps), gameId, submitted.id, 'task22tb-q04-reject', {
-      expectedVersion: 3,
-      clientCommandId: 'task22tb-q04-reject',
-      decision: 'reject',
-      reason: 'lineup mismatch',
-    });
-    expect(rejected.revisionState).toBe(V1GameResultRevisionState.REJECTED);
+    expect(submitted.state).toBe(V1GameResultRevisionState.SUBMITTED);
 
     // Pre-occupy the exact `v1_outbox_events.business_key` the successor's
-    // GAME_RESULT_SUBMITTED write will try to insert (revision 2 -- reject()
-    // mutated revision 1 in place, so the next revision number is 2). This
+    // GAME_RESULT_SUBMITTED write will try to insert (revision 2 -- the base
+    // stays revision 1 because supersede never mutates it, so the successor
+    // is revision 2 just as before Task 166 removed the reject step). This
     // is the *last* statement `supersedeAndSubmit`'s mutate() callback runs,
     // deep inside the same interactive transaction that already created the
     // successor DRAFT row, attached its participant, and bumped it to
@@ -583,8 +571,8 @@ describe('Task 22 T-B: QA scenario gap coverage (Q-02/04/07/08/11/13)', () => {
     const gameBefore = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } });
 
     const collided = await captureFailure(() =>
-      resultReview.supersedeAndSubmit(authUser(ids.platformOps), gameId, rejected.revisionId, 'task22tb-q04-resubmit', {
-        expectedVersion: 4,
+      resultReview.supersedeAndSubmit(authUser(ids.platformOps), gameId, submitted.id, 'task22tb-q04-resubmit', {
+        expectedVersion: 3,
         clientCommandId: 'task22tb-q04-resubmit',
         score: { home: 1, away: 0 },
         actualParticipants: [
@@ -623,47 +611,56 @@ describe('Task 22 T-B: QA scenario gap coverage (Q-02/04/07/08/11/13)', () => {
     });
   });
 
-  it('Q-07: a SUPPLEMENT_REQUESTED revision is terminal -- both reviewDecision and officialize retries are rejected', async () => {
+  it('Q-07: 레거시 SUPPLEMENT_REQUESTED 행은 **고칠 수는 있고 확정할 수는 없다**', async () => {
+    // Task 166 이 이 상태로 **들어가는 전이**를 없앴다(어드민이 팀에게 되돌려 보내는
+    // 왕복 제거, 정본 §4). 그렇다고 **이미 그 상태로 저장된 행**이 사라지는 것은 아니다 —
+    // enum 값과 그 행들은 후속 contract 마이그레이션이 옮긴 뒤에야 없어진다.
+    //
+    // 그 사이에 이 행들이 **변경 가능해지면** 확정된 결과를 덮어쓸 수 있다. 그래서
+    // producer 가 없어진 지금은 Q-08 과 같은 방식으로 DB 에 직접 시드해서 잰다
+    // (`v1_game_result_revisions` 에는 BEFORE INSERT 가드가 없고 UPDATE/DELETE 만 있다).
     const gameId = await buildTournamentGame(ids.fixtureQ07);
-    await endGameWithHomeGoal(gameId);
-    const submitted = await prisma.v1GameResultRevision.findFirstOrThrow({ where: { gameId } });
-
-    const supplementRequested = await resultReview.reviewDecision(
-      authUser(ids.platformOps),
-      gameId,
-      submitted.id,
-      'task22tb-q07-supplement',
-      {
-        expectedVersion: 3,
-        clientCommandId: 'task22tb-q07-supplement',
-        decision: 'request_supplement',
-        reason: 'need a lineup card photo',
+    const seeded = await prisma.v1GameResultRevision.create({
+      data: {
+        gameId,
+        revision: 1,
+        state: V1GameResultRevisionState.SUPPLEMENT_REQUESTED,
+        score: { home: 0, away: 0 },
+        eventsHash: 'task22tb-q07-seeded-hash',
+        createdByActorType: 'USER',
+        createdByUserId: ids.platformOps,
+        reason: 'seeded directly: Task 166 removed every producer of this state',
       },
-    );
-    expect(supplementRequested.revisionState).toBe(V1GameResultRevisionState.SUPPLEMENT_REQUESTED);
+    });
 
-    const reviewRetry = await captureFailure(() =>
-      resultReview.reviewDecision(authUser(ids.platformOps), gameId, submitted.id, 'task22tb-q07-review-retry', {
-        expectedVersion: 4,
-        clientCommandId: 'task22tb-q07-review-retry',
-        decision: 'reject',
-        reason: 'retried on a terminal supplement-requested revision',
+    // ① 확정은 막힌다 — terminal 이므로. **재제출보다 먼저 잰다**: 재제출을 하고 나면
+    // 이 행은 '대체됨' 이 되어 다른 코드(REVISION_MUST_BE_SUPERSEDED)로 막히고, 그러면
+    // 정작 재려던 terminal 가드에 도달하지 못한다.
+    const officializeAttempt = await captureFailure(() =>
+      resultReview.officializeResultRevision(authUser(ids.platformOps), gameId, seeded.id, 'task22tb-q07-officialize', {
+        expectedVersion: 0,
+        clientCommandId: 'task22tb-q07-officialize',
+        projectionPreviewHash: previewHash(seeded),
       }),
     );
-    expectHttpCode(reviewRetry, 409, 'TERMINAL_REVISION_IMMUTABLE');
+    expectHttpCode(officializeAttempt, 409, 'TERMINAL_REVISION_IMMUTABLE');
 
-    const revision = await prisma.v1GameResultRevision.findUniqueOrThrow({ where: { id: submitted.id } });
-    const officializeRetry = await captureFailure(() =>
-      resultReview.officializeResultRevision(authUser(ids.platformOps), gameId, submitted.id, 'task22tb-q07-officialize-retry', {
-        expectedVersion: 4,
-        clientCommandId: 'task22tb-q07-officialize-retry',
-        projectionPreviewHash: previewHash(revision),
-      }),
-    );
-    expectHttpCode(officializeRetry, 409, 'TERMINAL_REVISION_IMMUTABLE');
+    // ② **그래도 고칠 수는 있어야 한다.** 재제출 base 허용에서 이 두 상태를 빼면 이미
+    // 반려·보완 요청된 경기가 영영 고쳐지지 않는다 — 다른 재작성 경로가 없다. 그래서
+    // 재제출이 **성공**하는 것이 계약이다(contract 마이그레이션이 이 행들을 옮긴 뒤에야
+    // base 허용에서 빠진다).
+    const successor = await resultReview.supersedeAndSubmit(authUser(ids.platformOps), gameId, seeded.id, 'task22tb-q07-resubmit', {
+      expectedVersion: 0,
+      clientCommandId: 'task22tb-q07-resubmit',
+      // 이 게임은 시드만 했고 골 이벤트가 없다 — 점수를 0:0 으로 맞춰야 한다.
+      score: { home: 0, away: 0 },
+      actualParticipants: [],
+      eventsHash: 'task22tb-q07-resubmit-hash',
+      reason: 'legacy supplement-requested row is still fixable',
+    });
+    expect(successor.revisionState).toBe(V1GameResultRevisionState.SUBMITTED);
 
     const game = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } });
-    expect(game.version).toBe(4);
     expect(game.currentOfficialRevisionId).toBeNull();
   });
 
@@ -690,15 +687,20 @@ describe('Task 22 T-B: QA scenario gap coverage (Q-02/04/07/08/11/13)', () => {
       },
     });
 
-    const reviewAttempt = await captureFailure(() =>
-      resultReview.reviewDecision(authUser(ids.platformOps), gameId, seeded.id, 'task22tb-q08-review', {
+    // Task 166 이 반려·보완 요청 명령을 없애 review 레인에 남은 명령은 재제출이다.
+    // CHANGE_REQUESTED 는 base 가 될 수 없으므로 409 로 막힌다 — 이 코드는
+    // TERMINAL_REVISION_IMMUTABLE 이 아니라 재제출 전용 코드다(그 구분이 계약이다).
+    const resubmitAttempt = await captureFailure(() =>
+      resultReview.supersedeAndSubmit(authUser(ids.platformOps), gameId, seeded.id, 'task22tb-q08-resubmit', {
         expectedVersion: 0,
-        clientCommandId: 'task22tb-q08-review',
-        decision: 'reject',
-        reason: 'attempted review of a CHANGE_REQUESTED row',
+        clientCommandId: 'task22tb-q08-resubmit',
+        score: { home: 1, away: 0 },
+        actualParticipants: [],
+        eventsHash: 'task22tb-q08-resubmit-hash',
+        reason: 'attempted resubmission from a CHANGE_REQUESTED row',
       }),
     );
-    expectHttpCode(reviewAttempt, 409, 'TERMINAL_REVISION_IMMUTABLE');
+    expectHttpCode(resubmitAttempt, 409, 'RESULT_RESUBMISSION_NOT_ALLOWED');
 
     const officializeAttempt = await captureFailure(() =>
       resultReview.officializeResultRevision(authUser(ids.platformOps), gameId, seeded.id, 'task22tb-q08-officialize', {

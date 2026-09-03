@@ -91,7 +91,8 @@ type HarnessOptions = {
    * 정당하게 만들어진 경기의 정정을 막지 않기 위해).
    */
   readonly baseParticipantCount?: number;
-  /** base 리비전의 state. 재제출(supersede) 레인은 REJECTED base를 요구한다. */
+  /** base 리비전의 state. 재제출(supersede) 레인은 **SUBMITTED** base 를 요구한다
+   * (Task 166 — 되돌려 보내는 왕복이 사라져 어드민이 그 자리에서 고친다). */
   readonly baseState?: V1GameResultRevisionState;
   /**
    * base 리비전의 몰수·중단 표식. 정정·재제출·무효 세 레인 모두 base에서
@@ -559,9 +560,8 @@ describe('finding #67: goalEvents를 실어 보내는 정정·재제출도 missi
   });
 
   it('재제출(supersede)이 무득점자 GOAL을 anonymous 표식과 함께 보내도 missingScorer가 true다', async () => {
-    // supersede는 REJECTED/SUPPLEMENT_REQUESTED base에서만 허용된다(위
-    // '재제출 레인' describe 블록과 동일한 전제).
-    const harness = createHarness({ baseState: V1GameResultRevisionState.REJECTED });
+    // supersede 는 SUBMITTED base 에서만 허용된다(위 '재제출 레인' describe 와 동일 전제).
+    const harness = createHarness({ baseState: V1GameResultRevisionState.SUBMITTED });
 
     await harness.supersede({
       actualParticipants: [
@@ -983,10 +983,10 @@ describe('2-C 역방향: 승부차기로 결정된 결선 경기의 정정이 �
  * (`game-invariants.ts`) 같은 결함이 그대로 남는다.
  */
 describe('재제출(supersede) 레인도 같은 가드를 통과해야 한다', () => {
-  const rejectedBase = { baseState: V1GameResultRevisionState.REJECTED } as const;
+  const submittedBase = { baseState: V1GameResultRevisionState.SUBMITTED } as const;
 
   it('정상 재제출은 SUBMITTED 리비전과 참가자 행을 만든다(하네스 건전성 증거)', async () => {
-    const harness = createHarness(rejectedBase);
+    const harness = createHarness(submittedBase);
 
     await harness.supersede({});
 
@@ -1011,7 +1011,7 @@ describe('재제출(supersede) 레인도 같은 가드를 통과해야 한다', 
    * `public-user-records.service.ts`가 그것을 직접 읽는다.
    */
   it('2-F: 정상 참가자 옆에 남의 경기 participantId를 끼워 넣으면 422 PARTICIPANT_INVALID', async () => {
-    const harness = createHarness(rejectedBase);
+    const harness = createHarness(submittedBase);
 
     const error = await captureFailure(() =>
       harness.supersede({
@@ -1028,7 +1028,7 @@ describe('재제출(supersede) 레인도 같은 가드를 통과해야 한다', 
   });
 
   it('2-B: base에 개인기록이 있었으면 빈 actualParticipants 재제출을 422로 거부한다', async () => {
-    const harness = createHarness(rejectedBase);
+    const harness = createHarness(submittedBase);
 
     const error = await captureFailure(() => harness.supersede({ actualParticipants: [] }));
 
@@ -1037,7 +1037,7 @@ describe('재제출(supersede) 레인도 같은 가드를 통과해야 한다', 
   });
 
   it('2-C: 결선 무승부를 승부차기 없이 재제출하면 409 TOURNAMENT_PENALTY_REQUIRED', async () => {
-    const harness = createHarness({ ...rejectedBase, phase: 'semi', hasAdvancementEdge: true });
+    const harness = createHarness({ ...submittedBase, phase: 'semi', hasAdvancementEdge: true });
 
     const error = await captureFailure(() => harness.supersede({ score: { home: 1, away: 1 } }));
 
@@ -1046,7 +1046,7 @@ describe('재제출(supersede) 레인도 같은 가드를 통과해야 한다', 
   });
 
   it('2-G: 재제출 penalties가 null이면 422 TOURNAMENT_PENALTY_INVALID', async () => {
-    const harness = createHarness({ ...rejectedBase, phase: 'semi' });
+    const harness = createHarness({ ...submittedBase, phase: 'semi' });
 
     const error = await captureFailure(() =>
       harness.supersede({ score: { home: 1, away: 1, penalties: null } }),
@@ -1064,7 +1064,7 @@ describe('재제출(supersede) 레인도 같은 가드를 통과해야 한다', 
    * 스트림은 home 1골뿐이므로 아래 0-0은 두 검증 모두를 위반한다.
    */
   it('승부차기 가드가 이벤트 교차검증보다 먼저 걸린다', async () => {
-    const harness = createHarness({ ...rejectedBase, phase: 'semi', hasAdvancementEdge: true });
+    const harness = createHarness({ ...submittedBase, phase: 'semi', hasAdvancementEdge: true });
 
     const error = await captureFailure(() => harness.supersede({ score: { home: 0, away: 0 } }));
 
@@ -1073,7 +1073,7 @@ describe('재제출(supersede) 레인도 같은 가드를 통과해야 한다', 
 
   it('base의 승부차기를 승계해 결선 재제출도 통과한다', async () => {
     const harness = createHarness({
-      ...rejectedBase,
+      ...submittedBase,
       phase: 'semi',
       hasAdvancementEdge: true,
       baseScore: { home: 1, away: 1, penalties: { home: 5, away: 4 } },
@@ -1177,8 +1177,8 @@ describe('몰수·중단 표식(outcomeReason/outcomeNote) 승계', () => {
     expect(harness.createdRevisions[0].outcomeNote).toBeNull();
   });
 
-  it('재제출(supersede)은 REJECTED base의 몰수 표식을 새 리비전에 그대로 승계한다', async () => {
-    const harness = createHarness({ ...forfeitBase, baseState: V1GameResultRevisionState.REJECTED });
+  it('재제출(supersede)은 SUBMITTED base의 몰수 표식을 새 리비전에 그대로 승계한다', async () => {
+    const harness = createHarness({ ...forfeitBase, baseState: V1GameResultRevisionState.SUBMITTED });
 
     await harness.supersede({});
 

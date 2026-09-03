@@ -128,6 +128,57 @@ describe('GET /league-matches/:leagueId/standings', () => {
     expect(confirmedRes.body.data.standings[1]).toMatchObject({ teamId: awayTeamId, points: 0, position: 2 });
   });
 
+  it('제출만 된(SUBMITTED) 결과는 순위·승점에 세지 않는다 — 확정(OFFICIAL)만 집계한다 (Task 166)', async () => {
+    // 정본 §4: 결과는 "보내기 → 어드민 확인" 두 단계이고, **확인 전 점수는 관전자에게
+    // 보이되 순위에는 들어가지 않는다.** 기존 스펙은 "리비전이 아예 없을 때" 만 재고 있어
+    // 이 구간(점수는 입력됐지만 아직 확정 전)이 비어 있었다.
+    const teamA = await prisma.v1Team.create({ data: { ownerUserId, sportId, regionId, name: `pub-sub-a-${suiteId}` } });
+    const teamB = await prisma.v1Team.create({ data: { ownerUserId, sportId, regionId, name: `pub-sub-b-${suiteId}` } });
+    const createRes = await request(app.getHttpServer())
+      .post('/api/v1/admin/league-matches')
+      .set('x-v1-user-id', ownerUserId)
+      .send({
+        title: '확정 전 집계 테스트 리그',
+        sportId,
+        regionId,
+        startsOn: new Date().toISOString(),
+        endsOn: new Date(Date.now() + 7 * 86_400_000).toISOString(),
+        teamIds: [teamA.id, teamB.id],
+      });
+    const leagueId = createRes.body.data.leagueId;
+    const fixturesRes = await request(app.getHttpServer())
+      .post(`/api/v1/admin/league-matches/${leagueId}/fixtures`)
+      .set('x-v1-user-id', ownerUserId)
+      .send({ weeksCount: 1 });
+    const teamMatchId = fixturesRes.body.data.teamMatchIds[0];
+    const game = await prisma.v1Game.findUniqueOrThrow({ where: { teamMatchId } });
+
+    // **SUBMITTED 리비전만** 만든다 — 공식 포인터도, official fact 도 만들지 않는다.
+    // 이게 "결과 보내기는 했고 어드민 확인 전" 의 실제 저장 모양이다.
+    await prisma.v1GameResultRevision.create({
+      data: {
+        gameId: game.id,
+        revision: 1,
+        state: 'SUBMITTED',
+        score: { home: 3, away: 1 },
+        eventsHash: `t166-submitted-hash-${suiteId}`,
+        createdByActorType: 'SYSTEM',
+        createdBySystemActor: 'T166_PENDING_OFFICIAL_TEST',
+        submittedAt: new Date('2026-08-10T12:00:00.000Z'),
+      },
+    });
+
+    const res = await request(app.getHttpServer()).get(`/api/v1/league-matches/${leagueId}/standings`);
+    expect(res.status).toBe(200);
+    // 승점이 붙으면 안 된다. 3:1 이 세어졌다면 한 팀이 points 3 이 된다.
+    expect(res.body.data.standings).toHaveLength(2);
+    expect(res.body.data.standings.every((row: { played: number; points: number }) => row.played === 0 && row.points === 0)).toBe(true);
+    // 그리고 여전히 **미확정**으로 잡혀야 한다 — 순위에서 빠지면서 pending 에서도 빠지면
+    // 그 경기는 화면 어디에도 안 남는다(운영자가 리그가 멈춘 것을 모른다).
+    expect(res.body.data.pendingFixtures).toHaveLength(1);
+    expect(res.body.data.pendingFixtures[0]).toMatchObject({ teamMatchId });
+  });
+
   it('취소된 대진은 공식 결과 fact가 있어도 순위·pendingFixtures 어디에도 반영되지 않는다 (R8)', async () => {
     const teamA = await prisma.v1Team.create({ data: { ownerUserId, sportId, regionId, name: `pub-cancel-team-a-${suiteId}` } });
     const teamB = await prisma.v1Team.create({ data: { ownerUserId, sportId, regionId, name: `pub-cancel-team-b-${suiteId}` } });

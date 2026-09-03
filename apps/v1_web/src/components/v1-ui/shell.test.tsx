@@ -1,5 +1,5 @@
 import { render, screen, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useV1NotificationUnreadSummary } from '@/hooks/use-v1-api';
 import { AppChrome } from './shell';
 
@@ -156,6 +156,100 @@ describe('AppChrome 하단탭 모션(C안) — 아이콘이 CSS 모션 셀렉터
       .forEach((link) => {
         expect(link).toHaveAttribute('data-active', 'false');
       });
+  });
+});
+
+// motion-audit 그룹4(F2 desktop underline snap) — 탭마다 자기 ::after 를 갖던 예전 구조는
+// 활성 탭이 바뀌면 의사요소가 다른 DOM 부모 아래서 재생성돼 애초에 미끄러질 수 없었다.
+// 트랙에 하나뿐인 인디케이터(.tm-desktop-nav-tab-indicator)로 바꾸면서, 하단탭 pill 과
+// 달리 라벨 길이가 제각각이라(홈/매치/대회/팀/마이) index*100% 계산이 성립하지 않는다 —
+// 실제 offsetLeft/offsetWidth 를 읽는다(use-sliding-indicator.ts). jsdom 은 레이아웃 엔진이
+// 없어 offsetLeft/offsetWidth 가 항상 0 이므로, 탭마다 **일부러 다른 폭**을 흉내 낸
+// getter 로 프로토타입을 스텁한다 — 폭이 전부 같았다면(예전 index*100% 방식) 이 테스트가
+// 실제 결함(측정을 안 해도 우연히 통과)을 못 잡았을 것이다.
+const DESKTOP_TAB_HREFS = ['/home', '/matches', '/tournaments', '/teams', '/my'];
+const DESKTOP_TAB_WIDTHS = [48, 64, 64, 40, 64]; // 의도적으로 서로 다른 폭
+const DESKTOP_TAB_GAP = 4; // .tm-desktop-nav-tabs 의 flex gap
+
+function stubDesktopNavTabOffsets() {
+  const leftOf = (idx: number) =>
+    DESKTOP_TAB_WIDTHS.slice(0, idx).reduce((sum, w) => sum + w + DESKTOP_TAB_GAP, 0);
+
+  Object.defineProperty(HTMLElement.prototype, 'offsetLeft', {
+    configurable: true,
+    get(this: HTMLElement) {
+      if (!this.classList.contains('tm-desktop-nav-tab')) return 0;
+      const idx = DESKTOP_TAB_HREFS.indexOf(this.getAttribute('href') ?? '');
+      return idx < 0 ? 0 : leftOf(idx);
+    },
+  });
+  Object.defineProperty(HTMLElement.prototype, 'offsetWidth', {
+    configurable: true,
+    get(this: HTMLElement) {
+      if (!this.classList.contains('tm-desktop-nav-tab')) return 0;
+      const idx = DESKTOP_TAB_HREFS.indexOf(this.getAttribute('href') ?? '');
+      return idx < 0 ? 0 : DESKTOP_TAB_WIDTHS[idx];
+    },
+  });
+}
+
+const ORIGINAL_OFFSET_LEFT = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetLeft');
+const ORIGINAL_OFFSET_WIDTH = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetWidth');
+
+describe('AppChrome 데스크톱 상단 탭 — 밑줄이 트랙에 하나뿐인 슬라이딩 인디케이터다', () => {
+  afterEach(() => {
+    if (ORIGINAL_OFFSET_LEFT) Object.defineProperty(HTMLElement.prototype, 'offsetLeft', ORIGINAL_OFFSET_LEFT);
+    if (ORIGINAL_OFFSET_WIDTH) Object.defineProperty(HTMLElement.prototype, 'offsetWidth', ORIGINAL_OFFSET_WIDTH);
+  });
+
+  it('탭마다 밑줄이 하나씩 있는 게 아니라 nav 전체에 인디케이터가 하나뿐이다', () => {
+    stubDesktopNavTabOffsets();
+    const { container } = render(
+      <AppChrome title="테스트" activeTab="home" showNotifications={false}>
+        <div>본문</div>
+      </AppChrome>,
+    );
+
+    expect(container.querySelectorAll('.tm-desktop-nav-tab-indicator')).toHaveLength(1);
+  });
+
+  it('활성 탭이 바뀌면 인디케이터의 transform/width 가 실제 DOM 폭을 반영해 갱신된다', () => {
+    stubDesktopNavTabOffsets();
+    const { container: homeContainer } = render(
+      <AppChrome title="테스트" activeTab="home" showNotifications={false}>
+        <div>본문</div>
+      </AppChrome>,
+    );
+    const { container: matchesContainer } = render(
+      <AppChrome title="테스트" activeTab="matches" showNotifications={false}>
+        <div>본문</div>
+      </AppChrome>,
+    );
+
+    const homeIndicator = homeContainer.querySelector<HTMLElement>('.tm-desktop-nav-tab-indicator');
+    const matchesIndicator = matchesContainer.querySelector<HTMLElement>('.tm-desktop-nav-tab-indicator');
+
+    // home: offsetLeft=0, offsetWidth=48 → underline inset 16px 씩 → left+16=16px, width-32=16px
+    expect(homeIndicator?.style.transform).toBe('translateX(16px)');
+    expect(homeIndicator?.style.width).toBe('16px');
+    // matches: offsetLeft=48+4(gap)=52, offsetWidth=64 → left+16=68px, width-32=32px
+    expect(matchesIndicator?.style.transform).toBe('translateX(68px)');
+    expect(matchesIndicator?.style.width).toBe('32px');
+    // 폭이 서로 다른 탭이라 index*100% 로는 절대 같은 값이 안 나온다 — 실제 측정을 증명한다.
+    expect(homeIndicator?.style.transform).not.toBe(matchesIndicator?.style.transform);
+    expect(homeIndicator?.style.width).not.toBe(matchesIndicator?.style.width);
+  });
+
+  it('activeTab 이 없으면 인디케이터를 숨긴다(임의 탭 위의 거짓 활성 신호 방지)', () => {
+    stubDesktopNavTabOffsets();
+    const { container } = render(
+      <AppChrome title="검색" showNotifications={false}>
+        <div>본문</div>
+      </AppChrome>,
+    );
+
+    const indicator = container.querySelector<HTMLElement>('.tm-desktop-nav-tab-indicator');
+    expect(indicator?.style.opacity).toBe('0');
   });
 });
 

@@ -127,6 +127,16 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  transition: opacity var(--duration-fast);
+}
+
+/* 세부 탭(kind=all/tournament/league) 재클릭이 useV1Tournaments 를 client-side 재요청한다.
+ * placeholderData: keepPreviousData 라 카드 목록은 스크롤 보존을 위해 그대로 유지되는데(의도된
+ * 설계), 그동안 아무 신호도 없으면 화면이 멈춘 것처럼 보인다(motion-audit 그룹3, F1 subtab).
+ * route-progress.tsx 는 kind==='tab' 에서 진행바를 켜지 않으므로 이 opacity dim 이 유일한
+ * 재요청 신호다 — isFetching 이 켜져 있는 동안만 살짝 흐려진다. */
+.tm-tournament-list-grid[aria-busy='true'] {
+  opacity: 0.6;
 }
 
 /* 768 에서 그리드로 전환한다. 그 전에는 카드가 560px 폭을 혼자 쓰는데 내용은

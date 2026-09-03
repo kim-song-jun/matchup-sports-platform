@@ -112,8 +112,18 @@ export function ProfilePhotoCropper({
         setLoadError('사진을 읽지 못했어요. 다른 사진을 골라 주세요.');
         return;
       }
+      const size = { width: img.naturalWidth, height: img.naturalHeight };
+      /*
+       * 기하 상태는 **여기서** 초기화한다 — `setImageSize` 가 확인 버튼을 여는 렌더와 같은
+       * 배치에 들어가야 "버튼이 열려 있다 = 상태가 있다" 가 불변식이 된다. 아래 effect 에서만
+       * 채우면 커밋(버튼 활성) 과 passive effect(ref 채움) 사이에 틈이 생기고, 그 틈에 들어온
+       * 클릭·드래그는 `stateRef.current === null` 로 조용히 무시된다. 사람 손은 그 틈을 못
+       * 맞추지만 CI 는 맞췄다 — 2026-09-03 부하 걸린 러너에서 `onCropped` 가 안 불려 1초
+       * 타임아웃으로 죽은 flake 4건이 전부 이 사슬이었다(로컬 단독·전체 실행에선 재현 안 됨).
+       */
+      stateRef.current = initialCropState(size, VIEWPORT);
       setImageEl(img);
-      setImageSize({ width: img.naturalWidth, height: img.naturalHeight });
+      setImageSize(size);
     };
     img.onerror = () => {
       if (!cancelled) setLoadError('사진을 읽지 못했어요. 다른 사진을 골라 주세요.');
@@ -155,7 +165,9 @@ export function ProfilePhotoCropper({
 
   useEffect(() => {
     if (!imageSize) return;
-    const initial = initialCropState(imageSize, VIEWPORT);
+    // 로드 콜백이 이미 초기화했으면 그대로 둔다 — 여기서 덮어쓰면 커밋과 이 effect 사이에
+    // 들어온 드래그가 되돌아간다. 이 effect 의 몫은 페인트와 슬라이더 값뿐이다.
+    const initial = stateRef.current ?? initialCropState(imageSize, VIEWPORT);
     stateRef.current = initial;
     setZoomFraction(zoomFractionOf(initial, imageSize, VIEWPORT));
     paint();

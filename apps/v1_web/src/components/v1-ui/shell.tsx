@@ -7,7 +7,8 @@
 // 어차피 클라이언트 청크에 들어 있었고, 이 지시어는 404 화면의 셸도 같은 청크를 쓰게 할 뿐이다.
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { createContext, useContext } from 'react';
+import { createContext, useContext, useRef } from 'react';
+import { useSlidingIndicatorRect } from './use-sliding-indicator';
 import {
   ChevronLeftIcon,
   HomeIcon,
@@ -281,6 +282,15 @@ function DesktopNav({
   activeTab?: V1NavTab;
   hasNewNotification: boolean;
 }) {
+  const tabsRef = useRef<HTMLDivElement>(null);
+  const activeIndex = tabs.findIndex((tab) => tab.id === activeTab);
+  // 라벨 길이가 제각각(홈/매치/대회/팀/마이)이라 하단탭 pill 처럼 "index * 100%" 로
+  // 계산할 수 없다 — 실제 탭 요소의 offsetLeft/offsetWidth 를 측정한다(use-sliding-indicator).
+  const tabRect = useSlidingIndicatorRect(tabsRef, ':scope > a.tm-desktop-nav-tab', activeIndex);
+  // 밑줄은 탭 padding(16px)만큼 안쪽에서 시작·끝난다 — 이전 ::after(`left:16px; right:16px`)와
+  // 같은 시각 폭을 유지한다.
+  const UNDERLINE_INSET = 16;
+
   return (
     <nav className="tm-desktop-nav" aria-label="데스크톱 주요 메뉴">
       <Link
@@ -292,7 +302,22 @@ function DesktopNav({
         <BrandMark size={24} />
         teameet
       </Link>
-      <div className="tm-desktop-nav-tabs">
+      {/* data-indicator-ready 가 없는 동안(SSR HTML·하이드레이션 전)은 _shell.css 의
+          CSS 전용 밑줄(::after)이 대신 보인다 — 측정값이 들어오기 전까지 활성 탭 밑줄이
+          비어 보이는 FOUC 를 막는다(적대 리뷰 지적). */}
+      <div className="tm-desktop-nav-tabs" ref={tabsRef} data-indicator-ready={tabRect ? 'true' : undefined}>
+        {/* 활성 표시 밑줄 — 트랙에 하나뿐인 슬라이딩 인디케이터(하단탭 pill·세부탭
+            thumb과 같은 아키텍처). 선택 상태 자체는 각 탭의 aria-current 가 계속
+            담당하므로 스크린리더에서는 숨긴다. */}
+        <span
+          className="tm-desktop-nav-tab-indicator"
+          aria-hidden="true"
+          style={{
+            transform: tabRect ? `translateX(${tabRect.left + UNDERLINE_INSET}px)` : undefined,
+            width: tabRect ? `${Math.max(0, tabRect.width - UNDERLINE_INSET * 2)}px` : undefined,
+            opacity: tabRect ? 1 : 0,
+          }}
+        />
         {tabs.map(({ id, label, href }) => {
           const active = id === activeTab;
           return (

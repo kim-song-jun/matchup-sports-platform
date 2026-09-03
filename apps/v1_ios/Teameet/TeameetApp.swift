@@ -43,6 +43,9 @@ struct RootView: View {
             .overlay {
                 if let failure = model.failure {
                     LoadFailureView(reason: failure) { model.retry() }
+                        // The model owns both the transaction and the transition, so the two
+                        // agree about Reduce Motion (Motion audit D7=C).
+                        .transition(model.shellTransition)
                 }
             }
             .overlay(alignment: .bottom) {
@@ -58,7 +61,7 @@ struct RootView: View {
                     PushPromptView(
                         onAccept: { appDelegate.shell?.acceptNotificationPrompt() },
                         onDefer: { appDelegate.shell?.deferNotificationPrompt() })
-                        .transition(.opacity)
+                        .transition(model.shellTransition)
                 }
             }
             // A universal link. This is what brings the Kakao sign-in redirect back into the

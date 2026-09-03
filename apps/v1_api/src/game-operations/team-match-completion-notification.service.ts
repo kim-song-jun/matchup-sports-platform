@@ -110,9 +110,12 @@ export class TeamMatchCompletionNotificationService {
       teamMatchId,
     );
     const title = copy.title;
-    const body = isLeagueFixture
-      ? `"${teamMatch.title}" 경기 결과가 확정됐어요.`
-      : `"${teamMatch.title}" 팀매치 리뷰를 남겨보세요.`;
+    // body 는 **문구 테이블의 `defaultBody` 를 단일 소스로** 쓴다. 여기서 문장을 다시
+    // 조립하면(예전 방식) 테이블만 고쳤을 때 발송 문구가 조용히 갈린다 — 실제로
+    // Task 166 에서 테이블에 "문의는 리그 운영자에게" 를 넣었는데 여기 복사본엔 빠져
+    // 두 문구가 어긋났다(Copilot 리뷰). 동적인 부분은 경기 제목 인용 하나뿐이라
+    // 그것만 앞에 붙인다.
+    const body = `"${teamMatch.title}" ${copy.defaultBody}`;
     const deepLink = copy.deepLink;
     const businessKeyFor = (userId: string) => `team-match-completed:${teamMatchId}:${userId}`;
 

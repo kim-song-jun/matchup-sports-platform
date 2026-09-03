@@ -526,7 +526,7 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   league_promotion_relegated: '아쉽지만 다음 시즌은 하위 리그에서 시작해요.',
   league_promotion_stayed: '현재 리그에서 다음 시즌을 계속해요.',
   league_promotion_withdrawn: '이번 시즌을 끝으로 리그 참가가 종료됐어요.',
-  league_team_match_completed: '경기 결과가 확정됐어요. 문의는 대회 운영자에게 해주세요.',
+  league_team_match_completed: '경기 결과가 확정됐어요. 문의는 리그 운영자에게 해주세요.',
   team_match_identity_attest_requested: '경기 명단의 기록 연결 요청을 24시간 안에 확인해 주세요.',
   tournament_identity_attest_requested: '경기 명단의 기록 연결 요청을 24시간 안에 확인해 주세요.',
   team_match_identity_attest_expired: '24시간 안에 확인되지 않아 만료됐어요. 다시 신청할 수 있어요.',

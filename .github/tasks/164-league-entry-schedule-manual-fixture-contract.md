@@ -150,7 +150,20 @@ D8 순서 `expand → dual-write → backfill → read-swap → contract` 중 **
   넣으면 라운드 G개가 하루에 들어간다 — 6라운드·G=3 이면 날짜 2개면 된다. 라운드 수로
   요구하면 멀쩡한 입력을 거부한다.
 - **BE-3 ② 신청(D7).** 리그 거울 행에 `status='open'` + `registrationDeadlineAt` 을 놓는 운영자 액션 `POST /admin/league-matches/:leagueId/open-registration`. 신청·제출·확정은 **대회 서비스 그대로**(추가 코드 0 이 목표). confirm 훅에서 contract 전까지 `V1LeagueTeam` 역방향 dual-write. 승계팀 자동 등록은 `league-series-admin.service.ts` 의 다음 시즌 생성에서 `confirmed` 등록을 함께 만든다.
-- **BE-4 ② 정원·사유(D9) + 자동 확정(D10).** `reason` 필수(리그 거울만). 시즌 시작 시각 크론(`DISABLE_LEAGUE_ROSTER_AUTOCONFIRM_CRON=true` 로 끔 — 기존 cron 선례) 이 미제출 팀 명단을 멤버 전원으로 생성하고 `autoConfirmed` 를 남긴다. 사전 리마인더(시작 24h 전) 알림 1종 + 확정 통보 1종.
+- **BE-4 ② 사유(D9) + 자동 확정(D10) — PR 두 개로 나눈다.**
+  - **BE-4a(사유·무료, 크론 없음)**: 리그 거부(`admin/registrations/:id/cancel`)에 `reason` 필수
+    — **대회는 선택 유지**, `kind` 로 분기(DTO 에서 막으면 대회 운영이 함께 바뀐다). 승강 확정은
+    **계산 결과를 뒤집은 항목에만** `overrideNote` 필수(계산대로 두는 항목은 규칙이 곧 설명이다).
+    참가비 0원이면 `submit` 이 `awaiting_payment` 를 건너뛰고 `confirmPayment` 와 **같은 상태**
+    (`payment_checking` + 결제 `paid`)로 간다 — 확인할 입금이 없는데 운영자가 "입금 확인" 을
+    눌러야 했다(정본 §4 "스텝 최소"). **유료는 그대로**(회귀 대조군).
+    - **"정원 초과 경고" 는 뺀다** — 기댈 정원 값이 없다(Ambiguity 4).
+  - **BE-4b(D10 자동 확정, 크론)**: 시즌 시작 시각 크론이 미제출 팀 명단을 멤버 전원으로
+    생성하고 `autoConfirmed` 를 남긴다. 사전 리마인더(시작 24h 전) 알림 1종 + 확정 통보 1종.
+    - ⚠️ **크론 활성화는 alpha 데이터 변경이다.** `DISABLE_LEAGUE_ROSTER_AUTOCONFIRM_CRON=true`
+      **기본 on 으로 배포**하고, 끄는 것은 **사용자 직접 승인** 뒤에 한다.
+    - **대진 생성보다 먼저 돌아야 한다** — `generateFixtures`·`regenerateFixtures` 가 거울 status 를
+      `in_progress` 로 옮기면 신청이 닫히고, 그 뒤엔 자동 확정할 대상이 이미 없다. 시즌 시작 시각 크론(`DISABLE_LEAGUE_ROSTER_AUTOCONFIRM_CRON=true` 로 끔 — 기존 cron 선례) 이 미제출 팀 명단을 멤버 전원으로 생성하고 `autoConfirmed` 를 남긴다. 사전 리마인더(시작 24h 전) 알림 1종 + 확정 통보 1종.
 - **BE-5 ④ contract.** `v1League.*` / `v1LeagueTeam.*` 호출 12 파일 → `V1Tournament(kind='regular_league')` / `V1TournamentRegistration` 으로 재배선. 역방향 dual-write 제거. **`git grep -n -w -e v1League -e v1LeagueTeam -- apps/v1_api/src apps/v1_web/src | wc -l` → `0`** 이 된 뒤에만 drop 마이그레이션 PR 을 따로 연다. drop 은 idempotent(`DROP TABLE IF EXISTS`), alpha 실행 전 사용자 직접 승인.
 
 ### FE (BE 배포 뒤)

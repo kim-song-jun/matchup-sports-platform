@@ -128,6 +128,9 @@ function toEditable(record: GameResultParticipantRecord): EditableParticipant {
   return {
     participantId: record.participantId,
     sideId: record.sideId,
+    // Task 163: 명단에 선발 구분이 없다(정본 §3). 화면에서 이 값을 바꿀 방법을 없앴고,
+    // 서버가 준 값을 그대로 되돌려 보낸다 — DTO 필수 필드라 빼면 저장이 400 이고, 여기서
+    // 임의로 true 를 박으면 화면이 서버 데이터를 덮어쓰게 된다.
     started: record.started,
     minutesPlayed: record.minutesPlayed ?? undefined,
     goals: record.goals,
@@ -487,7 +490,6 @@ export function ResultEditModal({
           participant.fouls !== original.fouls ||
           participant.cards.yellow !== original.cards.yellow ||
           participant.cards.red !== original.cards.red ||
-          participant.started !== original.started ||
           participant.goalkeeper !== original.goalkeeper ||
           (participant.minutesPlayed ?? null) !== (original.minutesPlayed ?? null)
         );
@@ -816,14 +818,6 @@ export function ResultEditModal({
                     value={participant.cards.red}
                     onValueChange={(red) => updateParticipant(index, { cards: { ...participant.cards, red } })}
                   />
-                  <label className="tm-text-caption" style={{ display: 'flex', alignItems: 'center', gap: 4, minHeight: 44 }}>
-                    <input
-                      type="checkbox"
-                      checked={participant.started}
-                      onChange={(event) => updateParticipant(index, { started: event.target.checked })}
-                    />
-                    선발
-                  </label>
                   <label className="tm-text-caption" style={{ display: 'flex', alignItems: 'center', gap: 4, minHeight: 44 }}>
                     <input
                       type="checkbox"

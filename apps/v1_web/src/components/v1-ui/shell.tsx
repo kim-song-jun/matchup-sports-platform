@@ -302,7 +302,10 @@ function DesktopNav({
         <BrandMark size={24} />
         teameet
       </Link>
-      <div className="tm-desktop-nav-tabs" ref={tabsRef}>
+      {/* data-indicator-ready 가 없는 동안(SSR HTML·하이드레이션 전)은 _shell.css 의
+          CSS 전용 밑줄(::after)이 대신 보인다 — 측정값이 들어오기 전까지 활성 탭 밑줄이
+          비어 보이는 FOUC 를 막는다(적대 리뷰 지적). */}
+      <div className="tm-desktop-nav-tabs" ref={tabsRef} data-indicator-ready={tabRect ? 'true' : undefined}>
         {/* 활성 표시 밑줄 — 트랙에 하나뿐인 슬라이딩 인디케이터(하단탭 pill·세부탭
             thumb과 같은 아키텍처). 선택 상태 자체는 각 탭의 aria-current 가 계속
             담당하므로 스크린리더에서는 숨긴다. */}

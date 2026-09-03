@@ -7,6 +7,8 @@ import { PrismaService } from '../../src/prisma/prisma.service';
 import { TeamMatchesService } from '../../src/team-matches/team-matches.service';
 import { ManagedTermsRuntimeService } from '../../src/terms/managed-terms-runtime.service';
 import type { V1AuthUser } from '../../src/auth/v1-auth-user';
+import { GamesService } from '../../src/games/games.service';
+import { seedOfficialLeagueResult } from '../helpers/seed-official-league-result';
 import { createV1IntegrationApp } from '../integration/integration-app';
 
 // U3: 팀매치 상세(`TeamMatchesService.detail`)가 리그 대진에 실어 보내는 이의 제기
@@ -97,11 +99,11 @@ describe('팀매치 상세 - 리그 이의 제기 자격 (U3)', () => {
       data: { teamId: teamMatch.hostTeamId, userId: hostOwnerUserId, role: 'owner', status: 'active' },
     });
 
-    const resultRes = await request(app.getHttpServer())
-      .post(`/api/v1/admin/league-matches/${leagueId}/fixtures/${teamMatchId}/result`)
-      .set('x-v1-user-id', adminUserId)
-      .send({ homeScore: 3, awayScore: 0, reason: 'U3 테스트용 결과 확정' });
-    expect(resultRes.status).toBe(201);
+    // 확정된 결과가 하나 있는 상태를 만든다 — 검증 대상이 아니라 **전제**다.
+    await seedOfficialLeagueResult(
+      { prisma, games: app.get(GamesService) },
+      { teamMatchId, adminUserId, homeScore: 3, awayScore: 0, reason: 'U3 테스트용 결과 확정' },
+    );
 
     const game = await prisma.v1Game.findUniqueOrThrow({ where: { teamMatchId } });
     const officialRevision = await prisma.v1GameResultRevision.findUniqueOrThrow({

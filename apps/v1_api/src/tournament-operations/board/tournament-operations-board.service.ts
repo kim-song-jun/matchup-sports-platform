@@ -2,9 +2,18 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
 } from '@nestjs/common';
 import { createHash } from 'node:crypto';
-import { Prisma, V1EscalationStatus, V1GameSideKey, V1TournamentStaffRole } from '@prisma/client';
+import { Prisma, V1CompetitionKind, V1EscalationStatus, V1GameSideKey, V1TournamentStaffRole } from '@prisma/client';
+import {
+  leagueFixtureListOrder,
+  leagueFixtureListWhere,
+} from '../../league-matches/league-fixture-list-source';
+import {
+  ALL_COMPETITION_KINDS,
+  findTournamentOnSurface,
+} from '../../tournaments/tournament-surface-lookup';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { TournamentStaffPrincipal } from '../../tournaments/staff/tournament-staff-access.service';
 import type {
@@ -73,12 +82,33 @@ function canonicalizeForHash(value: unknown): unknown {
  * signed token (nothing in the tuple is a secret; tournamentId/round/fixtureNumber/id are already
  * visible in the very page whose `nextCursor` carries them), only a self-describing, opaque one.
  */
-interface OperationsBoardCursorPayload {
-  readonly tournamentId: string;
-  readonly round: string;
-  readonly fixtureNumber: number;
-  readonly id: string;
-}
+/**
+ * ## 리그(거울) 페이지는 정렬 축이 다르다 (Task 165 BE-2)
+ * 정규 리그의 경기는 `V1TournamentFixture` 가 아니라 `V1TeamMatch` 다. 그 테이블에는
+ * **`round` 도 `fixtureNumber` 도 컬럼이 없다**(라운드는 `title` 문자열 안에만 있다) —
+ * 그래서 팀매치에 대고 그 튜플을 지어낼 수 없다. 정렬은 `(startAt, id)` 이고, 이는 공개
+ * 일정(`/tournaments/:id/schedule`)이 쓰는 것과 **같은 순서**다.
+ *
+ * 커서 안에 `kind` 를 담고, **한 목록 요청은 한 종류만 낸다** — 거울은 팀매치만, 대회는
+ * 대진만이라 두 축이 한 페이지에서 섞이지 않는다. 종류가 어긋난 커서(예: 대회 커서를 리그
+ * id 에)는 `tournamentId` 불일치와 **같은 "빈 페이지" 분기**로 접힌다: 밖에서 보면
+ * 존재하지 않는 커서와 구분되지 않는다.
+ */
+type OperationsBoardCursorPayload =
+  | {
+      readonly kind: 'fixture';
+      readonly tournamentId: string;
+      readonly round: string;
+      readonly fixtureNumber: number;
+      readonly id: string;
+    }
+  | {
+      readonly kind: 'teamMatch';
+      readonly tournamentId: string;
+      /** ISO 8601. `Date` 는 JSON 왕복에서 문자열이 되므로 처음부터 문자열로 담는다. */
+      readonly startAt: string;
+      readonly id: string;
+    };
 
 function encodeOperationsBoardCursor(payload: OperationsBoardCursorPayload): string {
   return Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
@@ -96,22 +126,78 @@ function decodeOperationsBoardCursor(raw: string): OperationsBoardCursorPayload 
   }
   if (parsed === null || typeof parsed !== 'object') return null;
   const candidate = parsed as Record<string, unknown>;
-  if (
-    typeof candidate.tournamentId !== 'string' ||
-    typeof candidate.round !== 'string' ||
-    typeof candidate.fixtureNumber !== 'number' ||
-    !Number.isInteger(candidate.fixtureNumber) ||
-    typeof candidate.id !== 'string'
-  ) {
-    return null;
+  if (typeof candidate.tournamentId !== 'string' || typeof candidate.id !== 'string') return null;
+
+  // `kind` 가 없는 옛 커서는 대회 커서다. 이걸 없애면 이 배포를 사이에 두고 페이지를 넘기던
+  // 운영자의 커서가 전부 "빈 페이지" 가 된다 — 목록이 통째로 사라진 것처럼 보인다.
+  const kind = candidate.kind === undefined ? 'fixture' : candidate.kind;
+  if (kind === 'fixture') {
+    if (
+      typeof candidate.round !== 'string' ||
+      typeof candidate.fixtureNumber !== 'number' ||
+      !Number.isInteger(candidate.fixtureNumber)
+    ) {
+      return null;
+    }
+    return {
+      kind: 'fixture',
+      tournamentId: candidate.tournamentId,
+      round: candidate.round,
+      fixtureNumber: candidate.fixtureNumber,
+      id: candidate.id,
+    };
   }
-  return {
-    tournamentId: candidate.tournamentId,
-    round: candidate.round,
-    fixtureNumber: candidate.fixtureNumber,
-    id: candidate.id,
-  };
+  if (kind === 'teamMatch') {
+    // 문자열 존재만으로는 부족하다 — 파싱 불가능한 값이 그대로 `new Date()` 에 들어가면
+    // `Invalid Date` 가 되어 WHERE 가 조용히 아무것도 안 맞춘다(빈 목록이 "끝" 처럼 보인다).
+    if (typeof candidate.startAt !== 'string' || Number.isNaN(Date.parse(candidate.startAt))) {
+      return null;
+    }
+    return {
+      kind: 'teamMatch',
+      tournamentId: candidate.tournamentId,
+      startAt: candidate.startAt,
+      id: candidate.id,
+    };
+  }
+  return null;
 }
+
+/**
+ * 두 축(대회 대진 · 리그 팀매치)이 **같은 게임 정보**를 읽는다. 손으로 두 번 적으면 한쪽만
+ * 필드가 늘어 리그 행의 `currentScore`·`version` 이 조용히 비는 날이 온다.
+ */
+const BOARD_GAME_SELECT = {
+  id: true,
+  state: true,
+  version: true,
+  updatedAt: true,
+  currentOfficialRevisionId: true,
+  currentOfficialRevision: { select: { id: true, score: true, missingScorer: true } },
+} as const;
+
+/**
+ * 두 축을 하나로 만든 **정규화 행**. 이 아래의 경고 계산·해시·항목 매핑은 전부 이 모양만
+ * 본다 — 두 축을 끝까지 따로 끌고 가면 같은 계산이 두 벌이 되고, 한쪽만 고치는 날이 온다.
+ *
+ * 리그(팀매치)에서 `round`·`fixtureNumber`·`fieldId`·`field` 는 **항상 `null`** 이다.
+ * `V1TeamMatch` 에 그 컬럼들이 아예 없기 때문이지, 값이 안 채워진 것이 아니다.
+ */
+type BoardRow = {
+  id: string;
+  tournamentId: string;
+  round: string | null;
+  fixtureNumber: number | null;
+  fieldId: string | null;
+  field: { name: string; version: number } | null;
+  homeRegistrationId: string | null;
+  awayRegistrationId: string | null;
+  scheduledAt: Date | null;
+  updatedAt: Date;
+  game: Prisma.V1GameGetPayload<{ select: typeof BOARD_GAME_SELECT }> | null;
+  /** 리그 팀매치면 `true`. 필드·스태프 커버리지 경고를 낼 수 없는 축이라는 뜻이다. */
+  isLeague: boolean;
+};
 
 /**
  * Operations board snapshot/filter service (Task 18).
@@ -297,6 +383,8 @@ function decodeOperationsBoardCursor(raw: string): OperationsBoardCursorPayload 
  */
 @Injectable()
 export class TournamentOperationsBoardService {
+  private readonly logger = new Logger(TournamentOperationsBoardService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   /**
@@ -376,63 +464,53 @@ export class TournamentOperationsBoardService {
           query.cursor !== undefined &&
           (cursorPayload == null || cursorPayload.tournamentId !== tournamentId);
 
-        const cursorPredicate: Prisma.V1TournamentFixtureWhereInput | undefined =
-          cursorPayload != null && !cursorInvalid
-            ? {
-                OR: [
-                  { round: { gt: cursorPayload.round } },
-                  { round: cursorPayload.round, fixtureNumber: { gt: cursorPayload.fixtureNumber } },
-                  {
-                    round: cursorPayload.round,
-                    fixtureNumber: cursorPayload.fixtureNumber,
-                    id: { gt: cursorPayload.id },
-                  },
-                ],
-              }
-            : undefined;
+        // 이 대회가 **정규 리그 거울**인지 먼저 본다. 거울이면 경기는
+        // `V1TournamentFixture` 가 아니라 `V1TeamMatch` 이고, 거울에는 대진 행이 하나도
+        // 없어서 지금까지 콘솔 목록이 **빈 채로** 열렸다(정본 §4 가 "리그도 같은 콘솔" 로
+        // 확정했으므로 그건 결함이다).
+        // 원시 `v1Tournament.findUnique` 를 쓰지 않는다 — 표면 게이트
+        // (`scripts/v1-surface-check.mjs`)가 막는다. 여기서 묻는 것은 *"이 대회가 무엇인가"*
+        // 이므로 두 종류를 다 허용하고 `kind` 만 본다(`public-tournament-records` 의
+        // `getSchedule` 이 같은 이유로 같은 형태를 쓴다).
+        const competition = await findTournamentOnSurface(tx, ALL_COMPETITION_KINDS, {
+          where: { id: tournamentId },
+          select: { kind: true },
+        });
+        const isLeague = competition?.kind === V1CompetitionKind.regular_league;
 
-        const rawRows = cursorInvalid
+        // 종류가 어긋난 커서는 `tournamentId` 불일치와 **같은 분기**로 접는다 — 밖에서 보면
+        // 존재하지 않는 커서와 구분되지 않는다(그게 이 커서의 원래 계약이다).
+        const cursorKindMismatch =
+          cursorPayload != null && cursorPayload.kind !== (isLeague ? 'teamMatch' : 'fixture');
+
+        const rawRows: BoardRow[] = cursorInvalid || cursorKindMismatch
           ? []
-          : await tx.v1TournamentFixture.findMany({
-              where: cursorPredicate === undefined ? where : { ...where, ...cursorPredicate },
-              orderBy: [{ round: 'asc' }, { fixtureNumber: 'asc' }, { id: 'asc' }],
-              take: limit + 1,
-              select: {
-                id: true,
-                tournamentId: true,
-                round: true,
-                fixtureNumber: true,
-                fieldId: true,
-                field: { select: { name: true, version: true } },
-                homeRegistrationId: true,
-                awayRegistrationId: true,
-                scheduledAt: true,
-                updatedAt: true,
-                game: {
-                  select: {
-                    id: true,
-                    state: true,
-                    version: true,
-                    updatedAt: true,
-                    currentOfficialRevisionId: true,
-                    currentOfficialRevision: {
-                      select: { id: true, score: true, missingScorer: true },
-                    },
-                  },
-                },
-              },
-            });
+          : isLeague
+            ? await this.leagueBoardRows(tx, tournamentId, query, cursorPayload, limit)
+            : await this.fixtureBoardRows(tx, where, cursorPayload, limit);
 
         const hasNext = rawRows.length > limit;
         const pageRows = hasNext ? rawRows.slice(0, limit) : rawRows;
         const lastRow = pageRows[pageRows.length - 1];
         const nextCursor = hasNext
-          ? encodeOperationsBoardCursor({
-              tournamentId,
-              round: lastRow.round,
-              fixtureNumber: lastRow.fixtureNumber,
-              id: lastRow.id,
-            })
+          ? // 커서 튜플은 **그 페이지를 정렬한 축과 같아야 한다** — 리그는 `(startAt, id)`,
+            // 대회는 `(round, fixtureNumber, id)`. 한 목록 요청은 한 축만 내므로 섞이지 않는다.
+            lastRow.isLeague
+            ? encodeOperationsBoardCursor({
+                kind: 'teamMatch',
+                tournamentId,
+                // `scheduledAt` 은 팀매치의 `startAt` 이고 non-null 이다(정렬 키라 없으면
+                // 페이지가 성립하지 않는다). 대회 대진은 미정일 수 있어 타입이 nullable 이다.
+                startAt: (lastRow.scheduledAt ?? new Date(0)).toISOString(),
+                id: lastRow.id,
+              })
+            : encodeOperationsBoardCursor({
+                kind: 'fixture',
+                tournamentId,
+                round: lastRow.round ?? '',
+                fixtureNumber: lastRow.fixtureNumber ?? 0,
+                id: lastRow.id,
+              })
           : null;
 
         const gameIds = pageRows
@@ -450,7 +528,13 @@ export class TournamentOperationsBoardService {
           await Promise.all([
             this.latestLineupStateBySide(tx, gameIds),
             this.escalationSummaryByGameId(tx, gameIds),
-            this.staffCoverage(tx, tournamentId, now, pageFieldIds, pageFixtureIds),
+            // 리그 페이지에서는 **커버리지를 계산할 수 없다** — 팀매치엔 `fieldId` 컬럼이
+            // 없고, `V1TournamentStaffFixtureScope.fixtureId` 는 FK 가 `V1TournamentFixture`
+            // 라 팀매치 id 가 거기 있을 수 없다(실측). 결과가 반드시 빈 집합인 쿼리라
+            // 아예 날리지 않는다.
+            isLeague
+              ? Promise.resolve({ fieldIds: new Set<string>(), fixtureIds: new Set<string>() })
+              : this.staffCoverage(tx, tournamentId, now, pageFieldIds, pageFixtureIds),
           ]);
 
         return {
@@ -490,7 +574,10 @@ export class TournamentOperationsBoardService {
       // Stable: a pure function of persisted columns alone -- see the "Stable body vs.
       // time-relative part" doc section for the field-by-field persisted source of each code.
       const warnings: StableWarningCode[] = [];
-      if (row.fieldId === null) warnings.push('NO_FIELD_ASSIGNED');
+      // 리그에서는 필드 경고를 내지 않는다. `V1TeamMatch` 에 `fieldId` 컬럼이 **없어서**
+      // 항상 켜지는데, 운영자가 **영원히 해제할 수 없는 경고**는 신호가 아니라 소음이다 —
+      // 모든 행에 붙어 진짜 경고(MISSING_SCORER·RESULT_REVIEW_OVERDUE)를 덮는다.
+      if (!row.isLeague && row.fieldId === null) warnings.push('NO_FIELD_ASSIGNED');
       if (row.game?.currentOfficialRevision?.missingScorer === true) {
         warnings.push('MISSING_SCORER');
       }
@@ -501,7 +588,10 @@ export class TournamentOperationsBoardService {
       // Time-relative: additionally a function of `now` -- deliberately kept OUT of `warnings`
       // above and surfaced only via the separate `liveWarnings` array below.
       const liveWarnings: TimeRelativeWarningCode[] = [];
-      if (!this.isStaffCovered(row.id, row.fieldId, staffCoverageResult)) {
+      // 같은 이유로 리그에서는 스태프 커버리지 경고도 내지 않는다 — 두 판정 경로(필드 배정 ·
+      // 대진 스코프) 모두 리그 행을 **구조적으로** 맞출 수 없다. `LINEUP_NOT_SUBMITTED` 는
+      // 게임 축이라 두 종류에 똑같이 걸리므로 그대로 둔다.
+      if (!row.isLeague && !this.isStaffCovered(row.id, row.fieldId, staffCoverageResult)) {
         liveWarnings.push('NO_STAFF_ASSIGNED');
       }
       if (row.game !== null && this.isLineupOverdue(row.scheduledAt, row.game.id, lineupLatestBySideKey, now)) {
@@ -831,6 +921,152 @@ export class TournamentOperationsBoardService {
       for (const scope of assignment.fixtureScopes) fixtureIds.add(scope.fixtureId);
     }
     return { fieldIds, fixtureIds };
+  }
+
+  /**
+   * 대회 축 한 페이지. 지금까지의 동작 그대로다 — 정렬·커서 튜플 `(round, fixtureNumber, id)`.
+   */
+  private async fixtureBoardRows(
+    tx: Tx,
+    where: Prisma.V1TournamentFixtureWhereInput,
+    cursor: OperationsBoardCursorPayload | null | undefined,
+    limit: number,
+  ): Promise<BoardRow[]> {
+    const cursorPredicate: Prisma.V1TournamentFixtureWhereInput | undefined =
+      cursor != null && cursor.kind === 'fixture'
+        ? {
+            OR: [
+              { round: { gt: cursor.round } },
+              { round: cursor.round, fixtureNumber: { gt: cursor.fixtureNumber } },
+              { round: cursor.round, fixtureNumber: cursor.fixtureNumber, id: { gt: cursor.id } },
+            ],
+          }
+        : undefined;
+
+    const rows = await tx.v1TournamentFixture.findMany({
+      where: cursorPredicate === undefined ? where : { ...where, ...cursorPredicate },
+      orderBy: [{ round: 'asc' }, { fixtureNumber: 'asc' }, { id: 'asc' }],
+      take: limit + 1,
+      select: {
+        id: true,
+        tournamentId: true,
+        round: true,
+        fixtureNumber: true,
+        fieldId: true,
+        field: { select: { name: true, version: true } },
+        homeRegistrationId: true,
+        awayRegistrationId: true,
+        scheduledAt: true,
+        updatedAt: true,
+        game: { select: BOARD_GAME_SELECT },
+      },
+    });
+    return rows.map((row) => ({ ...row, isLeague: false }));
+  }
+
+  /**
+   * 리그(거울) 한 페이지 — 경기는 `V1TeamMatch` 다.
+   *
+   * ## 어느 행이 이 리그의 대진인가는 공유 술어가 정한다
+   * `leagueFixtureListWhere`/`leagueFixtureListOrder` 를 그대로 쓴다. 공개 일정
+   * (`/tournaments/:id/schedule`)·대회 상세·리그 자기 페이지가 **같은 함수**를 쓰므로,
+   * 콘솔이 보여주는 경기 집합이 관전자 화면과 어긋날 수 없다. 여기에 술어를 손으로 다시
+   * 적으면 그 보장이 사라진다(이 저장소는 실제로 세 벌이 서로 다른 상태였다).
+   *
+   * ## 필터 두 개는 축이 다르다
+   * - `fieldId`: 팀매치에 **필드 개념이 없다.** 필드로 거른 요청은 리그에서 **빈 페이지**다
+   *   — 없는 축으로 거른 결과가 "전체" 로 나오면 운영자가 필터가 먹은 줄 안다.
+   * - `status`: 게임 상태 필터라 두 축이 같다(`V1Game.state`). 그대로 건다.
+   *
+   * ## 등록 id 는 팀 id 로 되찾는다
+   * 항목 계약(`homeRegistrationId`/`awayRegistrationId`)은 FE 가 그대로 쓴다. 팀매치는 팀
+   * id 를 들고 있으므로 **페이지의 팀 id 집합으로 IN 조회 1회**를 붙인다(행마다 조회하면
+   * N+1 이다). 등록이 없으면 `null` + warn — 백필 이전 잔재를 조용히 삼키지 않는다.
+   */
+  private async leagueBoardRows(
+    tx: Tx,
+    leagueId: string,
+    query: ListTournamentOperationsQueryDto,
+    cursor: OperationsBoardCursorPayload | null | undefined,
+    limit: number,
+  ): Promise<BoardRow[]> {
+    // 필드는 리그에 없는 축이다 — 그걸로 거르면 맞는 행이 하나도 없다.
+    if (query.fieldId !== undefined) return [];
+
+    const cursorPredicate: Prisma.V1TeamMatchWhereInput | undefined =
+      cursor != null && cursor.kind === 'teamMatch'
+        ? {
+            OR: [
+              { startAt: { gt: new Date(cursor.startAt) } },
+              { startAt: new Date(cursor.startAt), id: { gt: cursor.id } },
+            ],
+          }
+        : undefined;
+
+    const base: Prisma.V1TeamMatchWhereInput = {
+      ...leagueFixtureListWhere(leagueId),
+      ...(query.status ? { game: { is: { state: query.status } } } : {}),
+    };
+
+    const rows = await tx.v1TeamMatch.findMany({
+      where: cursorPredicate === undefined ? base : { ...base, ...cursorPredicate },
+      orderBy: leagueFixtureListOrder(),
+      take: limit + 1,
+      select: {
+        id: true,
+        startAt: true,
+        updatedAt: true,
+        hostTeamId: true,
+        approvedApplicantTeamId: true,
+        game: { select: BOARD_GAME_SELECT },
+      },
+    });
+
+    const teamIds = [
+      ...new Set(
+        rows.flatMap((row) =>
+          row.approvedApplicantTeamId === null
+            ? [row.hostTeamId]
+            : [row.hostTeamId, row.approvedApplicantTeamId],
+        ),
+      ),
+    ];
+    const registrations =
+      teamIds.length === 0
+        ? []
+        : await tx.v1TournamentRegistration.findMany({
+            where: { tournamentId: leagueId, teamId: { in: teamIds } },
+            select: { id: true, teamId: true },
+          });
+    const registrationByTeamId = new Map(registrations.map((row) => [row.teamId, row.id]));
+
+    const missing = teamIds.filter((teamId) => !registrationByTeamId.has(teamId));
+    if (missing.length > 0) {
+      // 500 을 내지 않는다 — 등록 백필 이전에 만들어진 리그 로스터가 남아 있을 수 있고,
+      // 그것 때문에 콘솔 전체가 열리지 않으면 운영이 멈춘다. 대신 조용히 넘어가지도 않는다.
+      this.logger.warn(
+        `리그 참가 등록이 없는 팀이 콘솔 목록에 있다 — leagueId=${leagueId} teamIds=${missing.join(',')}`,
+      );
+    }
+
+    return rows.map((row) => ({
+      id: row.id,
+      tournamentId: leagueId,
+      // `V1TeamMatch` 에 없는 컬럼이다 — 안 채운 게 아니라 존재하지 않는다.
+      round: null,
+      fixtureNumber: null,
+      fieldId: null,
+      field: null,
+      homeRegistrationId: registrationByTeamId.get(row.hostTeamId) ?? null,
+      awayRegistrationId:
+        row.approvedApplicantTeamId === null
+          ? null
+          : registrationByTeamId.get(row.approvedApplicantTeamId) ?? null,
+      scheduledAt: row.startAt,
+      updatedAt: row.updatedAt,
+      game: row.game,
+      isLeague: true,
+    }));
   }
 
   private isStaffCovered(

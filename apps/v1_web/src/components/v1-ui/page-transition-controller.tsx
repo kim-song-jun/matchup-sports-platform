@@ -37,7 +37,15 @@ export function PageTransitionController() {
   };
 
   const beginTransition = (kind: NavigationIntentKind) => {
-    if (typeof document === 'undefined' || typeof document.startViewTransition !== 'function') {
+    if (typeof document === 'undefined') return;
+    // 같은 pathname 안에서 검색 파라미터만 바뀌는 이동(필터 시트·칩·페이지네이션)은
+    // template.tsx 가 리마운트되지 않는다 — VT 를 걸면 resolve 신호가 영영 안 와 MAX_PENDING_MS
+    // 동안 old 스냅샷이 정지 화면으로 남는다(Copilot 2차). kind 만 심고 전환은 걸지 않는다.
+    if (kind === 'search') {
+      document.documentElement.dataset.navKind = kind;
+      return;
+    }
+    if (typeof document.startViewTransition !== 'function') {
       // 미지원 웹뷰 — CSS 폴백이 template.tsx 마운트 시 자동 재생되므로 여기선 아무것도 안 한다.
       document.documentElement.dataset.navKind = kind;
       return;

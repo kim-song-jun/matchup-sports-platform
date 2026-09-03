@@ -39,24 +39,24 @@ describe('ChatService — team_contact', () => {
   const logger = { warn: jest.fn(), error: jest.fn(), info: jest.fn(), debug: jest.fn() };
 
   let prisma: {
-    v1ChatRoom: { findFirst: jest.Mock; findMany: jest.Mock; findUnique: jest.Mock; create: jest.Mock; update: jest.Mock };
+    v1ChatRoom: { findFirst: jest.Mock; findMany: jest.Mock; findUnique: jest.Mock; create: jest.Mock; update: jest.Mock; updateMany: jest.Mock };
     v1ChatMessage: { findMany: jest.Mock; findUnique: jest.Mock; create: jest.Mock; count: jest.Mock };
     v1ChatRoomParticipant: { create: jest.Mock; findUnique: jest.Mock; findMany: jest.Mock; update: jest.Mock; updateMany: jest.Mock };
     v1Notification: { createMany: jest.Mock };
     v1NotificationPreference: { findMany: jest.Mock };
-    v1TeamContact: { findFirst: jest.Mock };
+    v1TeamContact: { findFirst: jest.Mock; updateMany: jest.Mock };
     v1TeamMembership: { findFirst: jest.Mock };
     $transaction: jest.Mock;
   };
 
   beforeEach(async () => {
     prisma = {
-      v1ChatRoom: { findFirst: jest.fn(), findMany: jest.fn(), findUnique: jest.fn(), create: jest.fn(), update: jest.fn() },
+      v1ChatRoom: { findFirst: jest.fn(), findMany: jest.fn(), findUnique: jest.fn(), create: jest.fn(), update: jest.fn(), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       v1ChatMessage: { findMany: jest.fn(), findUnique: jest.fn(), create: jest.fn(), count: jest.fn().mockResolvedValue(0) },
       v1ChatRoomParticipant: { create: jest.fn(), findUnique: jest.fn(), findMany: jest.fn().mockResolvedValue([]), update: jest.fn(), updateMany: jest.fn() },
       v1Notification: { createMany: jest.fn().mockResolvedValue({ count: 0 }) },
       v1NotificationPreference: { findMany: jest.fn().mockResolvedValue([]) },
-      v1TeamContact: { findFirst: jest.fn().mockResolvedValue({ fromTeamId: 'A', toTeamId: 'B' }) },
+      v1TeamContact: { findFirst: jest.fn().mockResolvedValue({ fromTeamId: 'A', toTeamId: 'B' }), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       v1TeamMembership: { findFirst: jest.fn().mockResolvedValue({ id: 'membership-1' }) },
       $transaction: jest.fn(),
     };
@@ -166,6 +166,38 @@ describe('ChatService — team_contact', () => {
     expect(prisma.v1TeamMembership.findFirst).not.toHaveBeenCalled();
     const include = prisma.v1ChatRoom.findMany.mock.calls[0][0].include;
     expect(include.teamContact.select.toTeam.select.memberships.where).toMatchObject({ userId: 'u1', status: 'active' });
+  });
+
+  it('목록을 읽기 전에 내 컨택 방의 만료를 반영하고 끝난 방을 보관한다', async () => {
+    prisma.v1ChatRoom.findMany.mockResolvedValue([]);
+
+    await service.rooms(userU1, {});
+
+    expect(prisma.v1TeamContact.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ status: 'requested', chatRoom: { participants: { some: { userId: 'u1' } } } }),
+        data: { status: 'expired' },
+      }),
+    );
+    expect(prisma.v1ChatRoom.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ status: 'active', teamContact: { is: expect.objectContaining({ status: { in: ['declined', 'withdrawn', 'expired'] } }) } }),
+        data: { status: 'archived' },
+      }),
+    );
+    // 정리는 목록 조회보다 앞선다
+    const order = [prisma.v1TeamContact.updateMany, prisma.v1ChatRoom.updateMany, prisma.v1ChatRoom.findMany].map((m) => m.mock.invocationCallOrder[0]);
+    expect(order[0]).toBeLessThan(order[2]);
+    expect(order[1]).toBeLessThan(order[2]);
+  });
+
+  it('컨택이 섞이지 않는 roomType 조회(match)에서는 정리 쓰기를 하지 않는다', async () => {
+    prisma.v1ChatRoom.findMany.mockResolvedValue([]);
+
+    await service.rooms(userU1, { roomType: 'match' });
+
+    expect(prisma.v1TeamContact.updateMany).not.toHaveBeenCalled();
+    expect(prisma.v1ChatRoom.updateMany).not.toHaveBeenCalled();
   });
 
   it('받는 팀 운영진이면 mySide 가 to 다', async () => {

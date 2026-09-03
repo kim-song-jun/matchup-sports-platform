@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { TAB_CONTAINER_SELECTOR } from './navigation-tab-selectors';
 
-export type NavigationIntentKind = 'push' | 'pop' | 'tab' | 'native';
+export type NavigationIntentKind = 'push' | 'pop' | 'tab' | 'native' | 'search';
 
 /**
  * iOS 셸의 popstate 는 엣지 스와이프가 대부분이고, 그 스와이프는 **네이티브가 이미
@@ -33,7 +33,12 @@ export interface NavigationIntentHandlers {
  *     → 'tab' (동위 전환, 슬라이드 없음)
  *  2. `data-nav-back="true"` 앵커 클릭 → 'pop' (AppBackLink — 실제로는 history push지만
  *     사용자 멘탈모델은 "뒤로"이므로 시각적으로 pop 취급. app-back-link.tsx가 이 속성을 단다)
- *  3. 그 외 내부 앵커 클릭 → 'push'
+ *  3. 그 외 내부 앵커 클릭 → 'push', 단 pathname 이 그대로고 search 만 바뀌면 'search'로
+ *     재분류(FS-1) — 이 재분류는 **반드시 1·2번 뒤에** 온다. 세부 탭(`.tm-segmented-tabs`)도
+ *     "쿼리만 바뀌는" 이동이라, pathname 동일 여부를 먼저 보면 세부 탭까지 'search'로
+ *     잘못 삼켜 그 탭의 'tab' 분류(콘텐츠 VT 없음)가 깨진다 — 순서를 반드시 지킨다.
+ *     필터 시트(칩 선택·열기/닫기)처럼 시트 자체 애니메이션을 이미 갖고 있어 페이지
+ *     VT(슬라이드+페이드)가 그 위에 겹치면 안 되는 이동이 'search'의 실제 대상이다.
  *  4. popstate 이벤트(하드웨어 백버튼·엣지 스와이프·브라우저 뒤로) → 'pop'
  *     단 iOS 셸 안이면 'native' — 엣지 스와이프를 네이티브가 이미 그렸으므로 웹은 안 그린다
  *
@@ -65,11 +70,15 @@ export function useNavigationIntent({ onIntent }: NavigationIntentHandlers) {
       if (url.origin !== window.location.origin) return;
       if (url.pathname === window.location.pathname && url.search === window.location.search) return;
 
-      const kind: NavigationIntentKind = anchor.closest(TAB_CONTAINER_SELECTOR)
+      const baseKind: NavigationIntentKind = anchor.closest(TAB_CONTAINER_SELECTOR)
         ? 'tab'
         : anchor.dataset.navBack === 'true'
           ? 'pop'
           : 'push';
+      // 'search' 는 'push'의 하위분류다 — 반드시 tab/pop 판별 뒤에 온다(위 docstring 3번).
+      // 세부 탭도 pathname 이 같은 쿼리 이동이라, 순서를 앞당기면 'tab' 분류를 삼켜버린다.
+      const kind: NavigationIntentKind =
+        baseKind === 'push' && url.pathname === window.location.pathname ? 'search' : baseKind;
       handlersRef.current.onIntent(kind);
     };
 

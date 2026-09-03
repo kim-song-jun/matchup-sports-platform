@@ -11,6 +11,7 @@ import { randomUuid } from '@/lib/uuid';
 import type { GameLineup, GameLineupState } from '@/types/game-operations';
 import type { CompetitionKind } from '@/components/v1-ui/competition-kind-segment';
 import type {
+  V1ChatRoomTeamContact,
   V1AdminTournamentPlayerRecordsResponse,
   V1AdminRosterEligibleMembersResponse,
   AdminListFilters,
@@ -1140,7 +1141,8 @@ export function useV1LeaveTeam(teamId: string) {
 
 // ── Team contacts (Task 9) ────────────────────────────────────────────────
 // 팀 간 컨택 메시지. `toTeamId` 는 받는 팀(경로 파라미터), `fromTeamId` 는 보내는 팀(body).
-export type V1TeamContactStatus = 'requested' | 'accepted' | 'declined' | 'withdrawn' | 'expired';
+/** 컨택 상태 — 채팅방의 teamContact 블록과 같은 값 집합(단일 출처는 types/api.ts). */
+export type V1TeamContactStatus = V1ChatRoomTeamContact['status'];
 
 export type V1TeamContact = {
   id: string;
@@ -1186,13 +1188,12 @@ export function useV1CreateTeamContact(toTeamId: string) {
  * 컨택 상태가 바뀌면 그 방(상태 카드·입력 잠금)·방 목록(배지)·대기 건수 배지를 함께 무효화한다.
  * 전역 staleTime 이 30초라(providers.tsx) 안 건드리면 옛 상태가 그대로 서빙된다.
  */
-function invalidateTeamContactCaches(queryClient: QueryClient, chatRoomId: string | null) {
+function invalidateTeamContactCaches(queryClient: QueryClient) {
+  // `chatRooms()` 는 `chatRoom(id)`·`chatMessages(id)` 의 접두사라 prefix 매칭으로 지금 보고 있는
+  // 방과 메시지까지 함께 무효화된다 — 서버 응답의 chatRoomId 유무와 무관하게 항상 갱신된다
+  // (후속 리뷰 Important 2; 훅 테스트 use-v1-api.team-contact-invalidation 이 재조회를 못박는다).
   queryClient.invalidateQueries({ queryKey: v1Keys.chatRooms() });
   queryClient.invalidateQueries({ queryKey: v1Keys.teamContactSummary() });
-  if (chatRoomId) {
-    queryClient.invalidateQueries({ queryKey: v1Keys.chatRoom(chatRoomId) });
-    queryClient.invalidateQueries({ queryKey: v1Keys.chatMessages(chatRoomId) });
-  }
 }
 
 type V1TeamContactRespondResult = { contact: V1TeamContact; alreadyProcessed: boolean; chatRoomId: string | null };
@@ -1201,7 +1202,7 @@ export function useV1AcceptTeamContact(contactId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: () => v1Patch<V1TeamContactRespondResult>(`/team-contacts/${contactId}/accept`),
-    onSuccess: (data) => invalidateTeamContactCaches(queryClient, data.chatRoomId),
+    onSuccess: () => invalidateTeamContactCaches(queryClient),
   });
 }
 
@@ -1210,7 +1211,7 @@ export function useV1DeclineTeamContact(contactId: string) {
   return useMutation({
     mutationFn: (body: { reason?: string }) =>
       v1Patch<V1TeamContactRespondResult>(`/team-contacts/${contactId}/decline`, body),
-    onSuccess: (data) => invalidateTeamContactCaches(queryClient, data.chatRoomId),
+    onSuccess: () => invalidateTeamContactCaches(queryClient),
   });
 }
 
@@ -1218,7 +1219,7 @@ export function useV1WithdrawTeamContact(contactId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: () => v1Post<V1TeamContactRespondResult>(`/team-contacts/${contactId}/withdraw`),
-    onSuccess: (data) => invalidateTeamContactCaches(queryClient, data.chatRoomId),
+    onSuccess: () => invalidateTeamContactCaches(queryClient),
   });
 }
 
@@ -2470,7 +2471,7 @@ export function useV1SubmitReview() {
   });
 }
 
-export type V1ChatRoomsFilters = { roomType?: V1ChatRoom['roomType']; limit?: number };
+export type V1ChatRoomsFilters = { roomType?: V1ChatRoom['roomType']; status?: 'active' | 'archived'; limit?: number };
 
 /**
  * 방 목록. `filters` 가 있으면 서버 필터(`roomType`)·페이지 크기를 그대로 넘긴다 — 목록 화면의
@@ -5220,9 +5221,6 @@ import type {
   V1LeagueStandingsResponse,
   V1RecordLeagueForfeitPayload,
   V1RecordLeagueForfeitResult,
-  V1RecordLeagueResultPayload,
-  V1RecordLeagueResultResult,
-  V1LeagueFixtureParticipantsResponse,
   V1RegenerateLeagueFixturesPayload,
   V1RegenerateLeagueFixturesResult,
   V1RejectLeagueMatchDisputePayload,
@@ -5424,55 +5422,6 @@ export function useV1RegenerateLeagueFixtures(leagueId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
-    },
-  });
-}
-
-// U1: 운영자 결과 입력 — POST /admin/league-matches/:leagueId/fixtures/:teamMatchId/result.
-// 아직 결과가 없는(not_entered/draft/change_requested) 대진 전용 — 서버가 이미 OFFICIAL 인
-// 대진에는 409로 거부하므로 화면은 정정(useV1CorrectLeagueResult)으로 안내한다.
-export function useV1RecordLeagueResult(leagueId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ teamMatchId, body }: { teamMatchId: string; body: V1RecordLeagueResultPayload }) =>
-      v1Post<V1RecordLeagueResultResult>(`/admin/league-matches/${leagueId}/fixtures/${teamMatchId}/result`, body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
-    },
-  });
-}
-
-// U1 확장(2026-08-25): 득점자 선택 목록 — GET .../fixtures/:teamMatchId/participants.
-// 모달이 열릴 때만 가져온다(enabled). 로스터는 대진 생성 시 고정되므로 staleTime을 넉넉히 둔다.
-export function useV1LeagueFixtureParticipants(leagueId: string, teamMatchId: string | null) {
-  return useQuery({
-    queryKey: [...v1Keys.adminLeagueMatch(leagueId), 'fixture-participants', teamMatchId],
-    queryFn: () => {
-      // enabled 가드와 별개로 한 번 더 단언 — refactor 로 queryFn 이 직접 불리면
-      // '.../fixtures/null/participants' 같은 잘못된 요청이 나갈 수 있다(Copilot 리뷰).
-      if (teamMatchId === null) throw new Error('teamMatchId 없이 참가자 목록을 요청할 수 없어요.');
-      return v1Get<V1LeagueFixtureParticipantsResponse>(
-        `/admin/league-matches/${leagueId}/fixtures/${teamMatchId}/participants`,
-      );
-    },
-    enabled: teamMatchId !== null,
-    staleTime: 5 * 60 * 1000,
-  });
-}
-
-// U1: 운영자 결과 정정 — POST /admin/league-matches/:leagueId/fixtures/:teamMatchId/result/correct.
-// 이미 OFFICIAL 인 대진 전용 — 요청·응답 모양은 신규 입력과 완전히 같다
-// (league-match-result-entry.dto.ts RecordLeagueResultDto가 두 경로에 공용).
-export function useV1CorrectLeagueResult(leagueId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ teamMatchId, body }: { teamMatchId: string; body: V1RecordLeagueResultPayload }) =>
-      v1Post<V1RecordLeagueResultResult>(
-        `/admin/league-matches/${leagueId}/fixtures/${teamMatchId}/result/correct`,
-        body,
-      ),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
     },
   });
 }

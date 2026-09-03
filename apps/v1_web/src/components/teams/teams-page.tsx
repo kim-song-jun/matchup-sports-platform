@@ -382,7 +382,7 @@ function TeamOperationsSection({
             <span className="tm-text-label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {operation.label}
               {operation.badge ? (
-                <span className="tm-badge tm-badge-blue" aria-label={`답장을 기다리는 컨택 ${operation.badge}건`}>{operation.badge}</span>
+                <span className="tm-badge tm-badge-blue" aria-label={operation.badgeLabel ?? `${operation.badge}건`}>{operation.badge}</span>
               ) : null}
             </span>
             <span className="tm-text-caption">{operation.sub}</span>

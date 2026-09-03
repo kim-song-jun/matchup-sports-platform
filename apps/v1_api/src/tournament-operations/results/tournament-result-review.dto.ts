@@ -8,10 +8,47 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
 import { GameResultParticipantDto, GameScoreDto } from '../../games/dto/game-result.dto';
+
+/**
+ * 몰수·중단 표식 (Task 165 BE-3).
+ *
+ * ## 왜 콘솔이 이걸 받아야 하나
+ * 지금까지 콘솔은 `outcomeReason` 을 **base 에서 승계만** 했다 — 새로 정할 입력이 없었다.
+ * 몰수를 *지정* 하는 경로는 **리그 전용 결과 입력의 몰수 플래그** 하나뿐이었는데, BE-3 이
+ * 그 엔드포인트·DTO 를 지웠다 — 이 필드가 없으면 **몰수를 새로 지정할 길이 사라진다.**
+ *
+ * ## 스코어를 건드리지 않는다 — 표식일 뿐이다
+ * 리그 전용 경로의 `isForfeit` 도 정확히 그랬다: `outcomeReason` 컬럼과 사유 마커만 세우고
+ * 스코어는 운영자 입력 그대로 뒀다. **스코어를 1:0 으로 강제하는 것은 몰수 *선언* 서비스**
+ * (`league-match-forfeit.service.ts`, `noShowTeamId` 로 방향 결정)이고 그 서비스는 남는다.
+ * 순위 계산은 `{homeScore, awayScore}` 만 읽으므로(`league-standings-source.ts`), 두 경로가
+ * 같은 스코어를 쓰면 순위도 같다 — 여기서 스코어 규칙을 흉내 내면 없던 결합이 생긴다.
+ *
+ * ## 미전송은 승계다
+ * 필드를 안 보내면 지금처럼 base 의 표식을 이어받는다. 그래야 **몰수로 끝난 경기의 정정이
+ * 표식을 지우지 않는다**(그 승계가 원래 있던 이유다).
+ */
+export class GameResultOutcomeDto {
+  /** `NORMAL`(정상) · `FORFEIT`(몰수·기권) · `ABANDONED`(중단). 새 값을 만들지 않는다. */
+  @IsIn(['NORMAL', 'FORFEIT', 'ABANDONED'])
+  reason!: 'NORMAL' | 'FORFEIT' | 'ABANDONED';
+
+  /**
+   * 운영자 메모. **`FORFEIT`·`ABANDONED` 에는 필수**다 — 비우면 422
+   * `GAME_OUTCOME_NOTE_REQUIRED`(`GamesService.extractEndOutcome` 과 같은 규칙·같은 코드).
+   * "나중에 왜 그 점수인지 설명할 수 있는 유일한 기록" 이라 이 저장소가 몰수·중단에
+   * 사유를 강제한다. `NORMAL` 에는 의미가 없어 저장하지 않는다.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  note?: string;
+}
 
 export class GameResultGoalEventDto {
   @IsString()
@@ -123,6 +160,12 @@ export class SupersedeAndSubmitGameResultRevisionDto {
   @IsString()
   @IsNotEmpty()
   reason!: string;
+
+  /** 몰수·중단 표식. 미전송이면 base 승계 — `GameResultOutcomeDto` 참조. */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => GameResultOutcomeDto)
+  outcome?: GameResultOutcomeDto;
 }
 
 /**
@@ -190,6 +233,12 @@ export class GameResultCorrectionChangesDto {
   @IsOptional()
   @IsUUID()
   mvpParticipantId?: string;
+
+  /** 몰수·중단 표식. 미전송이면 base 승계 — `GameResultOutcomeDto` 참조. */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => GameResultOutcomeDto)
+  outcome?: GameResultOutcomeDto;
 }
 
 /**
@@ -223,3 +272,5 @@ export class CreateGameResultCorrectionDto {
   @Type(() => GameResultCorrectionChangesDto)
   changes!: GameResultCorrectionChangesDto;
 }
+
+

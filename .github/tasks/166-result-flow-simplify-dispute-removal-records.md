@@ -68,6 +68,11 @@
 ### BE (순차)
 - **BE-1 상태 소비처 실측 + 행복 경로 단순화.** 세 중간 상태의 읽기/쓰기 자리 전수 목록 → 0 이면 enum·전이 코드 제거, 아니면 [ASK]. 공개 API 의 `resultStage` 에 "확정 전" 값 추가. 순위·전적 집계가 OFFICIAL 만 세는 것을 변이로 증명.
 - **BE-2 이의 제거.** 서비스·컨트롤러·알림 4종·DTO 삭제 → 식별자 0건 → drop 마이그레이션 별도 PR(사용자 승인).
+  - **`LeagueMatchResultEntryService` 를 같은 PR 에서 함께 삭제한다.** Task 165 BE-3 이 그 HTTP
+    표면(컨트롤러·DTO·프론트 모달)을 이미 지웠고, **남은 호출부가 이의 수락(`correctResult`) 하나**다.
+    그 호출부가 사라지는 순간 서비스 전체가 도달 불가가 되므로 여기서 같이 지운다 —
+    `league-match-result-entry.service.ts` · 그 spec 파일 부재, 식별자 0건.
+  - 지우지 않는 것: `league-result-entry-reminder`(경기 시작 +24h 리마인더, 별개 기능).
 - **BE-3 롤링 교체 차단.** 교체 커맨드 핸들러가 대회 설정을 읽어 `'rolling'` 이면 400. `'limited'` 회귀 스펙.
 - **BE-4 전적 구분.** 팀 전적 집계에 리그/친선 축, 개인 기록 `matchType: 'league'`.
 

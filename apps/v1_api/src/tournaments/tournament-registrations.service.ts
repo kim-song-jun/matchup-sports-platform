@@ -5,7 +5,13 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, V1Tournament, V1TournamentPayment, V1TournamentRegistration } from '@prisma/client';
+import {
+  Prisma,
+  V1CompetitionKind,
+  V1Tournament,
+  V1TournamentPayment,
+  V1TournamentRegistration,
+} from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
@@ -16,7 +22,8 @@ import {
   CreateRegistrationDto,
   SubmitRegistrationDto,
 } from './dto/tournament-registration.dto';
-import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
+import { capacityLimitOf, isCapacityFull } from './registration-capacity';
+import { ALL_COMPETITION_KINDS, findTournamentOnSurface } from './tournament-surface-lookup';
 
 /** cancel-request로 어드민 처리가 필요한 상태(이미 운영에 반영됨). */
 const CANCELLABLE_VIA_REQUEST: V1TournamentRegistration['status'][] = [
@@ -104,7 +111,7 @@ export class TournamentRegistrationsService {
   }
 
   private async loadOpenTournament(tournamentId: string): Promise<V1Tournament> {
-    const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
+    const tournament = await findTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, {
       where: { id: tournamentId, deletedAt: null },
     });
     if (!tournament) {
@@ -119,14 +126,19 @@ export class TournamentRegistrationsService {
     return tournament;
   }
 
-  private async assertCapacityAvailable(tournamentId: string, teamCount: number) {
+  private async assertCapacityAvailable(
+    tournamentId: string,
+    competition: { kind: V1CompetitionKind | null; teamCount: number },
+  ) {
+    // 상한이 없으면(정규 리그) 세지도 않는다 — 결과를 안 쓸 COUNT 를 날릴 이유가 없다.
+    if (capacityLimitOf(competition) === null) return;
     const reservedCount = await this.prisma.v1TournamentRegistration.count({
       where: {
         tournamentId,
         status: { in: CAPACITY_HOLD_STATUSES },
       },
     });
-    if (reservedCount >= teamCount) {
+    if (isCapacityFull(competition, reservedCount)) {
       throw new ConflictException({
         code: 'TOURNAMENT_CAPACITY_FULL',
         message: '정원이 가득 차서 더 이상 신청할 수 없어요.',
@@ -144,7 +156,7 @@ export class TournamentRegistrationsService {
     });
     if (existing && existing.status !== 'cancelled') {
       if (existing.status === 'draft') {
-        await this.assertCapacityAvailable(tournamentId, tournament.teamCount);
+        await this.assertCapacityAvailable(tournamentId, tournament);
         return this.serialize(existing, null, await this.countPlayers(existing.id), tournament);
       }
       const [payment, playerCount] = await Promise.all([
@@ -153,7 +165,7 @@ export class TournamentRegistrationsService {
       ]);
       return this.serialize(existing, payment, playerCount, tournament);
     }
-    await this.assertCapacityAvailable(tournamentId, tournament.teamCount);
+    await this.assertCapacityAvailable(tournamentId, tournament);
 
     // 취소된 신청이 남아있으면(unique 제약) draft로 재활성화, 없으면 신규 생성.
     let registration: V1TournamentRegistration;
@@ -257,17 +269,14 @@ export class TournamentRegistrationsService {
         message: '이미 제출된 신청이에요.',
       });
     }
-    if (dto.paymentMethod === 'bank_transfer' && !dto.depositorName?.trim()) {
-      throw new BadRequestException({
-        code: 'DEPOSITOR_NAME_REQUIRED',
-        message: '계좌이체는 입금자명을 입력해 주세요.',
-      });
-    }
-
     // 제출 시점에 대회가 여전히 open·마감 전인지 재확인(draft 보관 중 마감됐을 수 있음).
     const tournament = await this.loadOpenTournament(tournamentId);
     this.assertTeamSportMatchesTournament(teamSportId, tournament.sportId);
-    this.assertPaymentInstructions(tournament, dto.paymentMethod);
+    // 계좌 안내 검증은 **잠근 뒤에만** 한다(아래 `lockedTournament` 기준). 여기서 한 번 더
+    // 부르면 반대 방향 TOCTOU 가 생긴다: 제출 직전에 유료 → 0원으로 바뀌면 잠근 뒤에는
+    // 통과할 요청을 **사전 호출이 거짓으로 막는다**(`entryFee <= 0` 이면 계좌가 필요 없다).
+    // 같은 이유로 정원·마감·상태·입금자명도 전부 잠근 뒤 값으로만 판단한다(Copilot 리뷰 지적).
+
 
     const result = await this.prisma.$transaction(async (tx) => {
       // R17-005: acquire row lock on tournament before the capacity check so that
@@ -279,7 +288,7 @@ export class TournamentRegistrationsService {
       // **종류 조건은 트랜잭션 안에서도 걸어야 한다.** 밖의 `loadOpenTournament` 만 막으면
       // 이 재검증이 리그 행을 통과시키고, 그 사실이 밖에서는 드러나지 않는다 — 겉보기엔
       // 닫힌 것처럼 보이기 때문이다.
-      const lockedTournament = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
+      const lockedTournament = await findTournamentOnSurface(tx, ALL_COMPETITION_KINDS, {
         where: { id: tournamentId, deletedAt: null },
       });
       if (!lockedTournament || lockedTournament.status !== 'open') {
@@ -290,24 +299,67 @@ export class TournamentRegistrationsService {
       }
       this.assertPaymentInstructions(lockedTournament, dto.paymentMethod);
 
-      const reservedCount = await tx.v1TournamentRegistration.count({
-        where: {
-          tournamentId,
-          status: { in: CAPACITY_HOLD_STATUSES },
-        },
-      });
-      if (reservedCount >= lockedTournament.teamCount) {
+      // ## 입금자명은 **낼 돈이 있을 때만** 필요하다 — 그리고 **잠근 뒤의 값**으로 판단한다
+      // 원래 이 가드는 대회를 읽기 **전**에 있어서 `entryFee` 를 모른 채 계좌이체면 무조건
+      // 입금자명을 요구했다(0원 대회·리그에서도 막혔다). 화면이 안 물어도 옛 클라이언트·API
+      // 직접 호출은 그대로 걸린다 — 정본 §4 "스텝 최소" 는 화면이 아니라 **계약**의 문제다.
+      //
+      // **트랜잭션 밖의 `tournament.entryFee` 로 판단하면 TOCTOU 다**(Copilot 리뷰 지적).
+      // 실제 청구액은 아래에서 `lockedTournament.entryFee` 로 정해지므로, 제출 직전에
+      // 운영자가 0원 → 유료로 바꾸면 **가드는 건너뛰고 청구는 발생**해서 입금자명이 `null`
+      // 인 계좌이체 신청이 남는다 — 운영자가 들어온 입금을 어느 팀 것인지 못 맞춘다.
+      // 같은 이유로 `status`·마감·정원도 전부 잠근 뒤 다시 본다(바로 위 세 검사).
+      if (
+        lockedTournament.entryFee > 0 &&
+        dto.paymentMethod === 'bank_transfer' &&
+        !dto.depositorName?.trim()
+      ) {
+        throw new BadRequestException({
+          code: 'DEPOSITOR_NAME_REQUIRED',
+          message: '계좌이체는 입금자명을 입력해 주세요.',
+        });
+      }
+
+      // 상한이 없으면(정규 리그) 세지 않는다 — 결과를 안 쓸 COUNT 를 날릴 이유가 없다.
+      const reservedCount =
+        capacityLimitOf(lockedTournament) === null
+          ? 0
+          : await tx.v1TournamentRegistration.count({
+              where: {
+                tournamentId,
+                status: { in: CAPACITY_HOLD_STATUSES },
+              },
+            });
+      if (isCapacityFull(lockedTournament, reservedCount)) {
         throw new ConflictException({
           code: 'TOURNAMENT_CAPACITY_FULL',
           message: '정원이 가득 차서 더 이상 신청할 수 없어요.',
         });
       }
 
+      // ## 참가비가 0 이면 입금 단계를 건너뛴다 (Task 164 BE-4, 정본 §4 "스텝 최소")
+      // 지금까지는 `entryFee` 와 무관하게 `awaiting_payment` 로 보냈고, 그 상태는
+      // `ADMIN_CONFIRMABLE_STATUSES` 에 없다. 그래서 **0원짜리 대회·리그에도 운영자가
+      // "입금 확인" 을 한 번 눌러야** 확정할 수 있었다 — 확인할 입금이 없는데.
+      //
+      // 착지 상태는 **`confirmPayment` 가 만드는 것과 정확히 같다**(등록 `payment_checking`
+      // + 결제 `paid`). 다른 상태로 보내면 그 뒤의 취소·환불·목록 필터가 0원 건만 다르게
+      // 다루게 되고, 그 차이는 여기가 아니라 먼 곳에서 드러난다.
+      //
+      // `confirmedByAdminUserId` 는 비운다 — 아무도 확인하지 않았다는 것이 사실이다.
+      const isFree = lockedTournament.entryFee <= 0;
+      // 무료면 제출 순간이 곧 정산 시점이고, 유료면 아직 낸 적이 없으므로 `null` 이다
+      // (재제출에서 옛 결제의 시각이 남아 있으면 안 된다 — 그래서 유료도 명시적으로 비운다).
+      const settledAt = isFree ? new Date() : null;
       const updated = await tx.v1TournamentRegistration.update({
         where: { id: registrationId },
         data: {
-          status: 'awaiting_payment',
-          depositorName: dto.paymentMethod === 'bank_transfer' ? dto.depositorName!.trim() : null,
+          status: isFree ? 'payment_checking' : 'awaiting_payment',
+          // `!` 를 쓸 수 없다 — 입금자명 가드에 `entryFee > 0` 을 붙이면서 **"계좌이체면
+          // 반드시 있다" 는 전제가 깨졌다.** 0원 + 계좌이체 + 미전달이면 `undefined.trim()`
+          // 으로 500 이 난다(Copilot 리뷰 지적, 재현 확인). 공백·미전달은 `null` 로 저장한다.
+          depositorName:
+            dto.paymentMethod === 'bank_transfer' ? (dto.depositorName?.trim() || null) : null,
           agreedRules: termsDecisions.acceptedCodes.has('tournament_rules'),
           agreedPrivacy: termsDecisions.acceptedCodes.has('tournament_privacy'),
           agreedRefund: termsDecisions.acceptedCodes.has('tournament_refund'),
@@ -321,15 +373,26 @@ export class TournamentRegistrationsService {
           registrationId,
           method: dto.paymentMethod,
           amount: lockedTournament.entryFee,
-          status: 'ready',
+          status: isFree ? 'paid' : 'ready',
+          paidAt: settledAt,
           provider: dto.paymentMethod === 'pg' ? 'toss' : null,
         },
         update: {
           method: dto.paymentMethod,
           amount: lockedTournament.entryFee,
-          status: 'ready',
+          status: isFree ? 'paid' : 'ready',
           provider: dto.paymentMethod === 'pg' ? 'toss' : null,
-          paidAt: null,
+          // `paidAt` 은 **한 번만** 적는다. 예전엔 여기 `paidAt: null` 이 뒤에 따로 있었고,
+          // 0원 분기를 스프레드로 앞에 얹었더니 **그 null 이 덮어썼다** — 재제출(결제 행이
+          // 이미 있는 경우)에서 `status: 'paid'` 인데 `paidAt: null` 인 행이 나온다
+          // (Copilot 리뷰가 잡았다. 내 첫 스펙은 `create` 만 단언해서 못 봤다).
+          paidAt: settledAt,
+          // **과거 사이클의 운영자 id 를 지운다.** 결제 행을 재사용(upsert update)하면
+          // 이전 제출에서 "입금 확인" 을 누른 어드민 id 가 그대로 남고, 어드민 목록·상세
+          // 응답에 실려 나간다 — 이번 제출은 아무도 확인하지 않았는데 확인한 사람이
+          // 있는 것처럼 보인다(Copilot 리뷰 지적). `cancelledAt`·`refundedAt` 을 비우는
+          // 것과 같은 이유다: 새 사이클은 옛 사이클의 흔적을 물려받지 않는다.
+          confirmedByAdminUserId: null,
           cancelledAt: null,
           refundedAt: null,
         },
@@ -470,15 +533,15 @@ export class TournamentRegistrationsService {
       // R16-001: lock tournament and re-check its status; an admin-cancelled tournament
       // must not have registrations restored to an active status.
       await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${tournamentId} FOR UPDATE`;
-      const tournament = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
+      const tournament = await findTournamentOnSurface(tx, ALL_COMPETITION_KINDS, {
         where: { id: tournamentId, deletedAt: null },
-        select: { id: true, status: true, teamCount: true },
+        select: { id: true, status: true, teamCount: true, kind: true },
       });
       if (!tournament) {
-        // **여기서 정하는 것은 "대회가 대회 표면에서 조회되지 않을 때" 하나뿐이다** —
+        // **여기서 정하는 것은 "대회·리그가 통합 표면에서 조회되지 않을 때" 하나뿐이다** —
         // 같은 not-found 를 두 자리에서 다르게 다룬다: **진입 검사 = 404, 잠금 후 재조회 = 409.**
         //
-        // *"행이 없을 때"가 아니다.* 위 조회는 `findTournamentOnSurface(tx, TOURNAMENT_KINDS, …)`
+        // *"행이 없을 때"가 아니다.* 위 조회는 `findTournamentOnSurface(tx, ALL_COMPETITION_KINDS, …)`
         // 라 **행이 남아 있어도 종류가 표면을 벗어나면** 여기로 온다.
         //
         // (이 파일의 409 전부가 경합이라는 뜻이 **아니다.** 권한·종목 불일치·마감·정원처럼
@@ -509,14 +572,17 @@ export class TournamentRegistrationsService {
       // R17-006: if the restored status holds a capacity slot, re-check capacity
       // before restoring so a withdrawal cannot exceed the tournament limit.
       if (CAPACITY_HOLD_STATUSES.includes(restoredStatus as typeof CAPACITY_HOLD_STATUSES[number])) {
-        const reservedCount = await tx.v1TournamentRegistration.count({
-          where: {
-            tournamentId,
-            id: { not: registrationId },
-            status: { in: CAPACITY_HOLD_STATUSES },
-          },
-        });
-        if (reservedCount >= tournament.teamCount) {
+        const reservedCount =
+          capacityLimitOf(tournament) === null
+            ? 0
+            : await tx.v1TournamentRegistration.count({
+                where: {
+                  tournamentId,
+                  id: { not: registrationId },
+                  status: { in: CAPACITY_HOLD_STATUSES },
+                },
+              });
+        if (isCapacityFull(tournament, reservedCount)) {
           throw new ConflictException({
             code: 'TOURNAMENT_CAPACITY_FULL',
             message: '정원이 가득 차 취소 요청을 철회할 수 없어요.',
@@ -640,7 +706,7 @@ export class TournamentRegistrationsService {
   }
 
   private loadPaymentInstructionSource(tournamentId: string) {
-    return findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
+    return findTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, {
       where: { id: tournamentId, deletedAt: null },
       select: {
         entryFee: true,

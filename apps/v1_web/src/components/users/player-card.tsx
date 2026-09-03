@@ -8,6 +8,7 @@ import { CalendarCheck, Camera, Clock, HeartHandshake, Lock, Settings, Share2, S
 import { publicAssetPath } from '@/lib/assets';
 import { josa } from '@/lib/korean';
 import type { V1PlayerCard, V1PlayerCardStat } from '@/types/api';
+import { useLoopPause } from './use-loop-pause';
 
 /**
  * 선수 카드 (Task 155 — 사용자 확정 목업 이식).
@@ -306,6 +307,12 @@ export function PlayerCard({
    */
   const sceneRef = useRef<HTMLDivElement>(null);
   const tiltEnabled = useRef(false);
+  /**
+   * 카드 루트가 화면 밖으로 스크롤되거나 탭/앱이 백그라운드로 가면 티어 장식 루프
+   * (스윕·숨쉬기·발광)를 멈춘다 — /my 처럼 반복적으로 여는 화면에서 무제한 GPU
+   * 소모를 막는다(phase2-result.json: pcard-infinite-loop-no-visibility-gate).
+   */
+  const loopPauseRef = useLoopPause<HTMLElement>();
   useEffect(() => {
     if (typeof window.matchMedia !== 'function') return;
     tiltEnabled.current =
@@ -509,6 +516,7 @@ export function PlayerCard({
 
   return (
     <section
+      ref={loopPauseRef}
       className="tm-player-card"
       // 형태·재질·엠블럼은 전부 CSS 가 그린다 -- 컴포넌트 로직에 티어/모양 분기를 넣으면
       // 새 티어·모양을 더할 때마다 이 파일을 고쳐야 한다.

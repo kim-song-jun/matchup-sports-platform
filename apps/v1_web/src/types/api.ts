@@ -1620,9 +1620,23 @@ export type V1TeamMatchLineupParticipantInput = {
 // 추가돼 이제 저장·응답 모두 반영된다.
 export type V1TeamMatchLineupSavePayload = {
   expectedVersion: number;
+  /**
+   * 전술보드가 정한 배치. 라인업 화면은 **편집하지 않고 그대로 되돌려 보낸다**(정본 §3 —
+   * 포지션·좌표는 팀 내부 도구의 몫). 빼고 보내면 저장 한 번에 배치가 지워진다.
+   */
   formation?: string;
-  starters: V1TeamMatchLineupParticipantInput[];
-  bench: V1TeamMatchLineupParticipantInput[];
+  /**
+   * **명단 = 출전자.** 선발/후보를 가르지 않는다(Task 163, 정본 §3).
+   *
+   * 서버(`rosterOf`)는 이 필드가 있으면 그것을 명단으로 쓰고, 없을 때만 아래 옛 두 배열을
+   * 합친다. 옛 필드를 지우지 않은 이유는 **배포 순서** 때문이다 — 서버가 먼저 나가고
+   * 화면이 나중에 나가는 창에서 옛 클라이언트가 계속 두 배열을 보낸다.
+   */
+  participants?: V1TeamMatchLineupParticipantInput[];
+  /** @deprecated `participants` 를 쓴다. 옛 클라이언트 호환으로만 남아 있다. */
+  starters?: V1TeamMatchLineupParticipantInput[];
+  /** @deprecated `participants` 를 쓴다. 옛 클라이언트 호환으로만 남아 있다. */
+  bench?: V1TeamMatchLineupParticipantInput[];
 };
 
 export type V1TeamMatchLineupSaveResult = {

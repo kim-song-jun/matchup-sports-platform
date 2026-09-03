@@ -14,8 +14,6 @@ struct LoadFailureView: View {
     let reason: WebShellFailureReason
     let onRetry: () -> Void
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     var body: some View {
         GeometryReader { proxy in
             ScrollView {
@@ -27,7 +25,8 @@ struct LoadFailureView: View {
             }
         }
         .background(Color(.systemBackground))
-        .transition(reduceMotion ? .identity : .opacity)
+        // The transition is applied by the parent from `WebShellModel.shellTransition` — the
+        // model is the single source for Reduce Motion, so this view no longer reads it.
         .accessibilityElement(children: .contain)
         .accessibilityLabel("\(reason.title). \(reason.message)")
     }

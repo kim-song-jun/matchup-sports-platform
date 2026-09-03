@@ -3968,6 +3968,12 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   padding: 16px;
 }
 
+.tm-chat-ended-toggle {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 16px 4px;
+}
+
 .tm-chat-contact-team-link {
   color: var(--text-strong);
   text-decoration: none;
@@ -7541,19 +7547,30 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
       rgba(255, 255, 255, 0.1) 0 1px, rgba(255, 255, 255, 0) 1px 6px);
   mix-blend-mode: overlay; pointer-events: none;
 }
-/* 광택 스윕 -- 넓은 반사 옆에 가는 하이라이트를 붙여 두 줄이 함께 지나가야 포일로 보인다. */
+/* 광택 스윕 -- 넓은 반사 옆에 가는 하이라이트를 붙여 두 줄이 함께 지나가야 포일로 보인다.
+   `left` 는 정적이다(-80%, 이동하지 않는다) -- 매 프레임 이동은 `transform: translateX()`
+   가 맡는다(phase2-result.json: pcard-sweep-animates-left-not-transform). `left` 보간은
+   레이아웃 프로퍼티라 매 사이클 리플로우를 강제하지만 transform 은 컴포지터만 쓴다.
+   translateX 는 자기 자신의 박스(위 width: 62%) 기준 %이므로, 예전 `left` 가 부모 기준으로
+   -80%→160%(240% 이동)이던 것과 같은 이동 거리를 내려면 240% ÷ 0.62 ≈ 387.1%를 쓴다.
+   순서가 중요하다: translateX 를 앞에(바깥) 써야 회전 없는 전역 X축을 따라 순수 수평으로
+   미끄러지고, rotate 를 뒤에(안쪽) 써야 그 자리에서 18도 기울어진 채 유지된다 -- 반대로
+   쓰면 원점을 중심으로 호를 그리며 도는 궤적이 된다. */
 .tm-pcard-face::after {
-  content: ''; position: absolute; top: -60%; left: -85%;
+  /* left 는 예전 키프레임의 0% 값(-80%)과 같다 — 스윕이 실제로 그리던 궤적(-80%→160%)의
+     기준점이다. 예전 정적값 -85% 를 그대로 두면 translateX 궤적 전체가 5%W 왼쪽으로
+     밀린다(적대 리뷰 지적). 딜레이 구간엔 어차피 카드 밖(오른쪽 끝 -18%)이라 보이지 않는다. */
+  content: ''; position: absolute; top: -60%; left: -80%;
   width: 62%; height: 240%;
   background: linear-gradient(90deg,
     rgba(255, 255, 255, 0) 0%, var(--tm-sheen) 38%,
     rgba(255, 255, 255, 0.55) 50%, var(--tm-sheen) 62%, rgba(255, 255, 255, 0) 100%);
-  transform: rotate(18deg);
+  transform: translateX(0%) rotate(18deg);
   animation: tmCardSweep 5.6s ease-in-out infinite;
   animation-delay: var(--tm-sweep-delay, 0s);
   pointer-events: none; z-index: 2;
 }
-@keyframes tmCardSweep { 0%, 62% { left: -80%; } 88%, 100% { left: 160%; } }
+@keyframes tmCardSweep { 0%, 62% { transform: translateX(0%) rotate(18deg); } 88%, 100% { transform: translateX(387.1%) rotate(18deg); } }
 /* 각인된 브랜드 마크 -- 색을 칠하지 않고 마스크로 뚫어 티어 잉크색을 그대로 쓴다. */
 .tm-pcard-crest-bg {
   position: absolute; right: -26px; top: -16px;
@@ -8024,6 +8041,20 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   }
 }
 
+/* 가시성 게이트 (use-loop-pause.ts) -- 카드가 뷰포트 밖으로 스크롤되거나 문서가
+   백그라운드면 루트에 data-loop-paused="true" 가 붙는다. 티어별 무한 루프 7종
+   (tmCardSweep/tmCrestBreathe/tmGoldBreathe/tmLegendPulse/tmSpecialPulse/tmCrestGlint/
+   tmAuroraDrift)이 걸리는 요소 4개(::after 스윕, 크레스트, 프레임 발광, fx 오로라)를
+   한 규칙으로 묶는다 -- 셀렉터가 달라도 animation-play-state 는 요소 단위로 적용되므로
+   실제로 애니메이션이 없는 요소에 걸어도 무해하다. 1회성 tmCardRise(진입)는 이미 끝난
+   뒤라 paused 를 걸어도 아무 영향이 없다(재생 중인 애니메이션에만 적용됨). */
+.tm-player-card[data-loop-paused="true"] .tm-pcard-face::after,
+.tm-player-card[data-loop-paused="true"] .tm-pcard-crest,
+.tm-player-card[data-loop-paused="true"] .tm-pcard-frame,
+.tm-player-card[data-loop-paused="true"] .tm-pcard-fx {
+  animation-play-state: paused;
+}
+
 /* ── 카드는 상자에 담지 않는다 (사용자 선택 A안, 2026-08-26) ──
    무대 상자를 거쳐(다크 → 화이트) 결국 **상자 자체를 없앴다**. 상자가 페이지 배경과
    거의 같은 톤이라 경계에 이유가 없었고, 모바일에서는 좌우 여백이 이중으로 들었으며,
@@ -8236,6 +8267,23 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
 :root[data-nav-kind="pop"]  { --tm-slide-offset: 100%; }
 :root[data-nav-kind="pop"]::view-transition-new(page-content) { --tm-slide-offset: -24%; }
 
+/* ── 데스크톱(≥1024px)은 슬라이드 없이 페이드 전용(D0안 B, 2026-09-03 확정) ──
+   모바일은 "스택에 화면이 쌓인다"는 엣지-슬라이드 감각이 자연스럽지만, 데스크톱은
+   마우스로 클릭하는 넓은 뷰포트라 같은 폭(-24%/100%)의 슬라이드가 "화면이 튄다"는
+   인상을 준다. kind 자체(push/pop)는 그대로 두고 슬라이드 거리만 0으로 죽여 duration-base
+   160ms 페이드(위 tm-page-fade, --ease-out)만 남긴다 -- 신규 duration/easing 토큰 0개.
+   JS matchMedia 로 kind 를 바꾸지 않는다: 판별은 이 CSS 미디어 쿼리 하나가 유일한
+   소스다(이중 소스 금지). 1024px 는 desktop/_shell.css 의 데스크톱 셸 브레이크포인트와
+   동일해야 한다 -- 어긋나면 셸은 데스크톱인데 전환만 모바일 슬라이드로 남는다. */
+@media (min-width: 1024px) {
+  :root[data-nav-kind="push"],
+  :root[data-nav-kind="push"]::view-transition-new(page-content),
+  :root[data-nav-kind="pop"],
+  :root[data-nav-kind="pop"]::view-transition-new(page-content) {
+    --tm-slide-offset: 0;
+  }
+}
+
 /* 탭 전환은 콘텐츠에 아무 전환도 걸지 않는다(C안 확정 -- 탭은 페이지가 아니다).
    페이드조차 "다른 것으로 대체됐다"는 신호라 탭에는 맞지 않는다 -- 대신 탭 컨트롤
    자신(BottomNav 아이콘/thumb)이 반응해 "내가 바꿨다"를 알린다.
@@ -8263,13 +8311,40 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
    전환 전체를 끈다. 최소 재현 결과: 기준 10건 · 이름 지정만 6건 · old/new(*) 2건 ·
    여기에 group(*) 까지 더해야 0건. */
 /* 'native' 도 같다 — iOS 셸의 엣지 스와이프는 네이티브가 이미 슬라이드를 그렸으므로
-   웹이 또 그리면 두 겹이 된다(use-navigation-intent 가 iOS popstate 를 native 로 분류). */
+   웹이 또 그리면 두 겹이 된다(use-navigation-intent 가 iOS popstate 를 native 로 분류).
+   'search' 도 여기 합류한다 — pathname 은 그대로고 검색파라미터만 바뀌는 이동(필터 시트
+   열기/닫기·칩 선택 등)이다. use-navigation-intent.ts 가 push 의 하위분류로만 내리므로
+   콘텐츠(page-content) 쪽 VT 는 tab/native 와 똑같이 전부 꺼야 한다 — 안 그러면 필터
+   시트 자체 애니메이션(tm-filter-sheet-up 등) 위에 페이지 슬라이드+페이드가 겹쳐 재생된다
+   (FS-1, alpha 실측: vtCalls 2, 열기·닫기 각각 page-content VT 가 시트 애니메이션과
+   같은 프레임에서 동시 발화). */
 :root[data-nav-kind="tab"]::view-transition-old(*),
 :root[data-nav-kind="tab"]::view-transition-new(*),
 :root[data-nav-kind="tab"]::view-transition-group(*),
 :root[data-nav-kind="native"]::view-transition-old(*),
 :root[data-nav-kind="native"]::view-transition-new(*),
-:root[data-nav-kind="native"]::view-transition-group(*) {
+:root[data-nav-kind="native"]::view-transition-group(*),
+:root[data-nav-kind="search"]::view-transition-old(*),
+:root[data-nav-kind="search"]::view-transition-new(*),
+:root[data-nav-kind="search"]::view-transition-group(*) {
+  animation: none;
+}
+
+/* push/pop 은 콘텐츠(page-content)는 우리가 그린다 -- 하지만 이름 없는 UA 기본 root
+   스냅샷 교차 페이드(mix-blend-mode:plus-lighter 포함 6종)는 여전히 우리 슬라이드+페이드
+   위에 겹쳐 재생된다(F1, alpha 실측 6건 — push/pop 6/6 인스턴스에서 -ua-view-transition-*
+   가 tm-page-slide/tm-page-fade 와 같은 t 에 나열됨). 위 tab/native/search 블록처럼
+   와일드카드(*)는 절대 쓰지 않는다 -- attribute 셀렉터가 포함돼 이름-특정 규칙
+   (::view-transition-old/new(page-content))보다 specificity 가 높아서 이겨버리므로,
+   push/pop 에 (*) 를 그대로 복사하면 root leak 은 잡히지만 push/pop 고유의 콘텐츠
+   슬라이드+페이드까지 함께 사라진다(전환 제거, 회귀 — 적대 검증에서 확인됨). View
+   Transitions 스펙이 문서 루트에 암묵 부여하는 이름 'root' 만 겨냥해 좁힌다. */
+:root[data-nav-kind="push"]::view-transition-old(root),
+:root[data-nav-kind="push"]::view-transition-new(root),
+:root[data-nav-kind="push"]::view-transition-group(root),
+:root[data-nav-kind="pop"]::view-transition-old(root),
+:root[data-nav-kind="pop"]::view-transition-new(root),
+:root[data-nav-kind="pop"]::view-transition-group(root) {
   animation: none;
 }
 
@@ -8277,12 +8352,15 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
    iOS 16/17(Safari < 18)은 상시 이 경로만 본다 -- "미지원 대비 보험"이 아니라
    iOS 사용자의 주 경로다. old 는 이미 사라진 상태(new 만 존재)라 §2.4 표대로
    거리를 16~24px 로 줄여 VT 경로와 같은 모션 언어를 유지한다. */
+/* --tm-fallback-slide-offset: VT 경로의 --tm-slide-offset 과 같은 이유로 커스텀 프로퍼티로
+   뺐다 -- 데스크톱(≥1024px)에서 0으로 덮어써 폴백 경로도 D0안(페이드 전용)을 따르게
+   하기 위해서다. 기본값(24px/-24px)은 var() 두 번째 인자로 남겨 값 자체는 그대로다. */
 @keyframes tm-page-fallback-push {
-  from { opacity: 0; transform: translateX(24px); }
+  from { opacity: 0; transform: translateX(var(--tm-fallback-slide-offset, 24px)); }
   to   { opacity: 1; transform: translateX(0); }
 }
 @keyframes tm-page-fallback-pop {
-  from { opacity: 0; transform: translateX(-24px); }
+  from { opacity: 0; transform: translateX(var(--tm-fallback-slide-offset, -24px)); }
   to   { opacity: 1; transform: translateX(0); }
 }
 /* [적용 범위] 이 폴백은 **VT 미지원 환경 전용**이다. 선택자 형태를 고치기 전에는 아예
@@ -8302,7 +8380,16 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
      찾으므로 영원히 매칭되지 않는다(template.tsx 는 이 요소에 그 속성을 달지 않는다).
      여기서는 반대로 자손 결합자가 맞다 — <html> 아래의 실제 요소이기 때문이다. */
   :root[data-nav-kind="tab"] .tm-page-transition-enter,
-  :root[data-nav-kind="native"] .tm-page-transition-enter { animation: none; }
+  :root[data-nav-kind="native"] .tm-page-transition-enter,
+  :root[data-nav-kind="search"] .tm-page-transition-enter { animation: none; }
+  /* 데스크톱은 VT 지원 경로(D0안, 위 --tm-slide-offset)와 같은 원칙 -- 폴백 경로도
+     슬라이드 거리를 0으로 죽여 페이드만 남긴다. */
+  @media (min-width: 1024px) {
+    :root[data-nav-kind="push"] .tm-page-transition-enter,
+    :root[data-nav-kind="pop"] .tm-page-transition-enter {
+      --tm-fallback-slide-offset: 0px;
+    }
+  }
 }
 /* data-nav-kind 가 아직 없는 최초 진입(딥링크·새로고침)은 애니메이션 없이 그대로
    보인다 -- 속성 선택자가 매칭 안 되므로 별도 처리가 필요 없다. */
@@ -8311,6 +8398,24 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
    VT 의 tm-page-fade keyframe 을 그대로 재사용한다(신규 keyframe 아님). ── */
 .tm-content-enter {
   animation: tm-page-fade var(--duration-base) var(--ease-out) both;
+}
+
+/* push/pop 진입은 이미 VT 의 ::view-transition-new(page-content) 가 같은 tm-page-fade
+   keyframe 을 (120ms 지연 후) 재생한다(위 §"VT 경로" 블록) -- 그 위에 콘텐츠 wrapper
+   자신의 .tm-content-enter 가 **별도로** 다시 opacity 0→1 을 도는 것이 두 번째 소유권
+   주장이다(그룹2/F2, alpha 실측: mobile 133ms·desktop 129ms 뒤에 두 번째 tm-page-fade
+   재발화, 캠페인 히어로처럼 자체 정착 애니메이션이 있는 화면은 텍스트가 먼저 자리잡고
+   히어로만 600ms+ 더 늘어지는 체감으로 드러남).
+   VT 를 지원하는 브라우저에서만 끈다 -- iOS16/17 의 CSS 폴백 경로(@supports not)에서는
+   .tm-content-enter 가 유일한 진입 페이드라 여기서 끄면 콘텐츠가 아예 페이드 없이
+   나타나 버린다(이 저장소가 정확히 같은 종류의 사고 -- 폴백과 VT 동시 재생 -- 를
+   이미 한 번 겪었다, 위 [적용 범위] 주석 참고 -- 이번엔 반대 방향 실수를 반복하지
+   않는다). */
+@supports (view-transition-name: none) {
+  :root[data-nav-kind="push"] .tm-content-enter,
+  :root[data-nav-kind="pop"] .tm-content-enter {
+    animation: none;
+  }
 }
 
 /* ── sticky/fixed 셸 요소는 VT 캡처 그룹에서 분리한다(§2.7) --

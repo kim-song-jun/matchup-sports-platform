@@ -23,7 +23,8 @@ export type ChatRoomModel = {
 };
 
 export type ChatListViewModel = {
-  categories: Array<{ label: ChatRoomModel['type'] | '전체'; count: number; active?: boolean; onSelect?: () => void }>;
+  /** count 는 '전체'와 선택된 카테고리에만 있다 — 나머지는 첫 페이지만 세는 값이라 목록과 어긋나 보여 주지 않는다. */
+  categories: Array<{ label: ChatRoomModel['type'] | '전체'; count?: number; active?: boolean; onSelect?: () => void }>;
   pinnedRooms: ChatRoomModel[];
   rooms: ChatRoomModel[];
   status?: 'loading' | 'error' | 'ready';
@@ -31,6 +32,16 @@ export type ChatListViewModel = {
   emptyBody?: string;
   emptyHref?: string;
   onRetry?: () => void;
+  /**
+   * 팀컨택 필터에서만 존재. 거절·철회·만료로 보관(archived)된 컨택 방을 "종료된 컨택 보기" 로
+   * 펼쳐 본다 — 기본 목록에서는 자동으로 치워지므로 이력은 여기서만 닿는다.
+   */
+  endedContacts?: {
+    visible: boolean;
+    onToggle: () => void;
+    rooms: ChatRoomModel[];
+    status: 'loading' | 'error' | 'ready';
+  };
 };
 
 export type ChatRoomViewModel = {

@@ -90,7 +90,46 @@
 
   변이: 경계를 직접 읽기로 되돌리면 3 red · 친선 팀매치 가드를 빼면 1 red.
 - **BE-2 콘솔 목록·권한.** 콘솔 대진 목록 API 가 `kind='regular_league'` 이면 팀 매치를 읽는다(`tournaments-read.service.ts:202` 가 이미 하는 방식 재사용 — 함수를 공유하고 복사하지 않는다). 스태프 권한 검사가 리그 거울에도 같은 규칙으로 걸리는지 통합 스펙 1건.
-- **BE-3 리그 전용 결과 입력 경로 제거.** `league-result-entry` 서비스가 하던 일 중 콘솔 경로에 없는 것(몰수 체크박스·득점자 선택)을 **콘솔 사후 입력 DTO 에 합친 뒤** 리그 전용 엔드포인트·모달을 삭제한다. `git grep -n 'league-result-entry' -- apps | wc -l` → `0`.
+- **BE-3 리그 전용 결과 입력 경로 제거.**
+  - **득점자는 합칠 게 없었다**(2026-09-03 실측). 콘솔의 `actualParticipants`(`GameResultParticipantDto`)가
+    `goals`·`assists`·`fouls`·`minutesPlayed` 를 이미 받고, `goalEvents`(분·전후반·자책골)와
+    `mvpParticipantId` 까지 있어 **리그보다 상위집합**이다.
+  - **몰수만 진짜 갭이었다.** 콘솔은 `outcomeReason` 을 base 에서 **승계만** 했고 새로 정할 입력이
+    없었다. `GameResultOutcomeDto { reason, note? }` 를 제출·정정에 더한다. **스코어는 건드리지
+    않는다** — 리그 전용 경로의 `isForfeit` 도 표식만 세웠고, 1:0 강제는 몰수 *선언* 서비스
+    (`league-match-forfeit.service.ts`)의 몫이며 그 서비스는 남는다.
+  - **삭제는 둘로 나눈다.** `league-match-dispute.service.ts` 의 이의 수락이 `correctResult` 를
+    부르는데, 정본이 **이의 자체를 Task 166 에서 제거**한다(§ "팀의 이의 제기 경로는 없다").
+    166 이 통째로 지울 코드를 콘솔 정정으로 재배선하는 것은 버려질 작업이라 하지 않는다.
+  - **AC 를 문자열 grep 으로 잡지 않는다.** `league-result-entry` 로 세면 **무관한
+    `league-result-entry-reminder`**(경기 시작 +24h 리마인더, 2026-08-24 사용자 확정)까지 지워야
+    한다 — 그 서비스는 이 엔드포인트를 소비하지 않고 자기 business key 문자열이 겹칠 뿐이다.
+
+- **BE-4 라이브 콘솔.** 165 의 (a) 조건 중 마지막 — 목록(#985)·결과 검토(#982)·정정(BE-3)은
+  됐고 **라이브 콘솔**이 남아 있었다. 보드가 리그 행을 보여주는데 그 행의 "운영" 링크
+  (`/fixtures/:id/operate`)가 **빈 화면**이었다.
+  - **막힌 곳은 한 자리였다** — `tournament-fixture-lineup.service.ts` 의
+    `authorizeAndResolveGameId` 가 `V1TournamentFixture` 만 본다. 리그 경기의 id 는 팀매치
+    id 라 그 행이 없어 404 로 끝났다. **인가 뒤에** 팀매치를 리그 스코프로 찾아 게임을
+    되돌려준다(권한 판정이 존재 여부에 영향받지 않는 기존 불변식 유지).
+  - **`resolveGameSource` 를 쓰지 않는다.** 그 함수는 *게임 → 출처* 방향이고 여기는 그
+    반대인 *출처 → 게임* 이다 — 방향이 달라 재사용이 성립하지 않는다.
+  - **FE 분기는 필요 없다(실측으로 접었다).** operate 콘솔은 라인업을 **읽기만** 한다
+    (`operate/` 전체에 저장 훅 0건). 그 읽기는 `GamesService.listLineups(gameId)` 로 게임
+    축이고, 팀매치 라인업도 **같은 `V1GameLineup` 테이블**에 저장된다 — 실제 DB 로
+    "팀매치로 저장 → 콘솔 경로로 읽기" 가 같은 명단을 주는 것을 확인했다. 따라서
+    `TEAM_MATCH_GENERIC_LINEUP_FORBIDDEN`(라인업 **저장** 가드)에 닿지 않는다.
+    **그 가드는 절대 열지 않는다** — 163 이 세운 로스터·자격·마감 불변식이 그 뒤에 있다.
+  - **없음 렌더**: 필드·스태프 스코프·조·라운드는 리그에 없는 개념이라 `null`(#985 선례).
+
+### 확정된 것 (재조사 불필요)
+
+- **소켓·takeover 는 이미 팀매치를 지원한다.** `use-v1-game-operations-console.ts` 가
+  `tournamentId: string | null` 이고 *"팀매치는 tournamentId/스태프 배정 개념이 없다"* 를
+  명시한다. takeover 도 `gameId` 기반이라 대진 id 를 전제하지 않는다 — BE-4 범위 밖.
+- **콘솔은 라인업을 저장하지 않는다.** 읽기 전용이라 라인업 편집 UI 를 리그용으로 만들
+  필요가 없다.
+
 
 ### FE (BE 배포 뒤, 각 3안 선택 뒤)
 
@@ -106,7 +145,14 @@
 
 - [ ] `tournament-operations` 에서 `tournamentFixtureId` 직접 읽기 0건(주석 제외). 팀 매치 기반 게임의 review/officialize/void/corrections 통합 스펙 통과.
 - [ ] 리그 거울 id 의 `/admin/live/:id/result-review` 가 alpha 에서 리그 경기를 목록에 보인다(실측 스크린샷 3폭 + 공개 API 대조).
-- [ ] `components/admin/league-result-entry-modal.tsx` 와 그 테스트, 서버 `league-result-entry` 경로 삭제. 대체 경로가 같은 기능(몰수·득점자)을 갖는 스펙.
+- [ ] **이번 PR**: `LeagueMatchResultEntryController` · `RecordLeagueResultDto` 식별자 **0건**,
+      `league-match-result-entry.controller.ts` · `dto/league-match-result-entry.dto.ts` **파일 부재**,
+      `components/admin/league-result-entry-modal.tsx` 와 그 테스트 삭제(FE 는 별도 PR).
+      콘솔이 몰수를 **지정**할 수 있다는 스펙(승계·입력 양쪽).
+- [ ] **Task 166**: `LeagueMatchResultEntryService` 식별자 **0건** + `league-match-result-entry.service.ts`
+      파일 부재 — 이의 제거와 **같은 PR**에서(그 호출부가 사라지는 순간 이 서비스도 도달 불가가 된다).
+- [ ] **건드리지 않는 것**: `league-result-entry-reminder`(별개 기능) · `game-result-league-auto-approve` ·
+      `identity-link-expiry` · `v1-game-operations-worker` · `league-fixture-creation.ts` 의 리마인더 예약.
 - [ ] 대회 설정 화면에서 피리어드를 바꾸면 설정 버전이 늘고 이후 게임에만 적용(통합 스펙).
 - [ ] FE-2·FE-3 은 PR 본문에 "3안 제시 → 사용자 선택" 기록.
 

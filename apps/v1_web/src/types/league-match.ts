@@ -506,61 +506,10 @@ export interface V1RecordLeagueForfeitResult {
   requestMatchesStored?: boolean;
 }
 
-// U1: 운영자 결과 입력·정정 — POST .../result 와 .../result/correct 가 완전히 같은 요청
-// 모양을 쓴다(league-match-result-entry.dto.ts RecordLeagueResultDto). 신규 입력·정정
-// 두 화면이 이 하나의 payload 타입을 공유한다.
-export interface V1RecordLeagueResultPayload {
-  homeScore: number;
-  awayScore: number;
-  /** 감사 로그·결과 리비전에 남기는 처리 사유. 필수. */
-  reason: string;
-  /**
-   * 선수별 득점·도움 (선택) — 리그 득점왕·도움왕 공급 경로(2026-08-25 사용자 확정).
-   * participantId는 참가자 조회(V1LeagueFixtureParticipantsResponse)에서 온 값만 유효하다.
-   */
-  participants?: V1LeagueResultParticipantStat[];
-  /**
-   * 감사 L-E finding 4 수정 — **정정(`.../result/correct`) 전용 필드**. 신규 입력은
-   * 무시한다(백엔드 `RecordLeagueResultDto.isForfeit` docblock과 동일 계약).
-   * 미전송 시 base(직전) 리비전의 몰수 여부를 그대로 승계한다 — `LeagueResultEntryModal`이
-   * 몰수 토글을 조작하지 않은 채 제출하면 이 필드를 아예 보내지 않는다.
-   */
-  isForfeit?: boolean;
-}
 
-export interface V1LeagueResultParticipantStat {
-  participantId: string;
-  goals: number;
-  assists?: number;
-}
 
-/** U1 모달 득점자 선택 목록 — GET /admin/league-matches/:leagueId/fixtures/:teamMatchId/participants */
-export interface V1LeagueFixturePlayerOption {
-  participantId: string;
-  name: string;
-}
 
-export interface V1LeagueFixtureParticipantsResponse {
-  leagueId: string;
-  teamMatchId: string;
-  home: { teamName: string; players: V1LeagueFixturePlayerOption[] };
-  away: { teamName: string; players: V1LeagueFixturePlayerOption[] };
-  /**
-   * 현재 공식 리비전의 개인 기록(기록이 있는 행만). 정정 모달이 미리 채우는 데 쓴다 —
-   * 빈 화면이 "기록 없음"으로 오독돼 정정 한 번에 기록이 지워지는 사고를 막는다.
-   */
-  currentStats: Array<{ participantId: string; goals: number; assists: number }>;
-}
 
-export interface V1RecordLeagueResultResult {
-  teamMatchId: string;
-  leagueId: string;
-  homeScore: number;
-  awayScore: number;
-  resultRevisionId: string;
-  /** true면 이미 같은 내용으로 확정돼 있어 이번 호출이 아무것도 바꾸지 않았다는 뜻. */
-  alreadyProcessed: boolean;
-}
 
 // D2 (E4): 어드민 이의 목록·처리. 백엔드가 leagueId/teamMatchId/raisedByTeamId를
 // 단일 IN 조회로 리그 제목·대진 팀 이름·제기 팀 이름까지 붙여서 내려준다

@@ -27,6 +27,8 @@ export type MyMenuItem = {
   icon: string;
   /** 라벨 옆 숫자 배지(예: 답장을 기다리는 컨택 수). 0 이거나 없으면 그리지 않는다. */
   badge?: number;
+  /** 배지의 스크린리더 문구. badge 를 넣는 쪽이 의미를 함께 넣는다. */
+  badgeLabel?: string;
 };
 
 export type MyMenuSection = {

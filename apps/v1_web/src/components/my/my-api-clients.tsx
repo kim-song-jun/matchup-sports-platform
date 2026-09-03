@@ -115,7 +115,10 @@ export function MyHomePageClient() {
   // 하므로(스코프 밖 사용자에게 안 보여야 함) 항상 조회는 하되, 프로필 로딩 후에만 호출한다.
   const staffAssignments = useV1MyTournamentStaffAssignments({ enabled: Boolean(profile.data) });
   // "채팅" 메뉴 배지 — 내가 운영하는 팀들이 아직 답하지 않은 컨택 수.
-  const contactSummary = useV1TeamContactSummary({ enabled: Boolean(profile.data) });
+  // 운영 팀이 하나도 없으면 대기 컨택이 있을 수 없다 — 요청 자체를 하지 않는다.
+  const contactSummary = useV1TeamContactSummary({
+    enabled: Boolean(profile.data) && (teams.data?.items ?? []).some((team) => team.role === 'owner' || team.role === 'manager'),
+  });
 
   const model = useMemo(() => {
     if (!profile.data) {
@@ -2370,7 +2373,10 @@ function toMyHomeModel(
   }
   const communitySection = sections.find((section) => section.title === '커뮤니티');
   const chatItem = communitySection?.items.find((item) => item.href === '/chat');
-  if (chatItem) chatItem.badge = pendingContactCount > 0 ? pendingContactCount : undefined;
+  if (chatItem) {
+    chatItem.badge = pendingContactCount > 0 ? pendingContactCount : undefined;
+    chatItem.badgeLabel = pendingContactCount > 0 ? `답장을 기다리는 컨택 ${pendingContactCount}건` : undefined;
+  }
   if (communitySection && !communitySection.items.some((item) => item.href === '/my/reviews')) {
     communitySection.items.push({
       label: '리뷰',

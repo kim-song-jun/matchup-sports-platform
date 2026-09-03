@@ -6645,10 +6645,10 @@ export class GamesService {
    * base row either (its terminal bases are already
    * permanently frozen by `v1_block_terminal_revision_mutation`, so there is
    * nothing TO mutate there; SUBMITTED is not in that trigger's terminal
-   * set, so it technically COULD be mutated, but none of the seven
+   * set, so it technically COULD be mutated, but none of the five
    * `V1GameResultRevisionState` values honestly describes "auto-superseded
-   * by a system sync, no reviewer decision" -- REJECTED/CHANGE_REQUESTED/
-   * SUPPLEMENT_REQUESTED would misrepresent a human decision that never
+   * by a system sync, no reviewer decision" -- CHANGE_REQUESTED would
+   * misrepresent a human decision that never
    * happened, and the coordinator's decision for this fix was explicitly
    * schema-only-if-necessary, not "add a new enum value"). Leaving it
    * `SUBMITTED` forever, unguarded, would reopen exactly the stale-approval

@@ -12,10 +12,17 @@ export type AppendOnlyEventOperation = 'APPEND' | 'UPDATE' | 'DELETE';
  * **그 자리에서 고쳐 확정한다**(supersede-and-submit 의 SUBMITTED base — 아래).
  *
  * `CHANGE_REQUESTED` 는 남는다. 이름이 "요청" 이라 왕복처럼 읽히지만 실제 역할은
- * **운영자 재작성 허용 상태**(팀 왕복이 아니다)다 — `createResultRevision` 이 새 DRAFT 를
- * 만들 수 있는 유일한 선행 상태이고, 이걸 없애면 결과를 다시 넣을 방법이 사라진다
+ * **팀 매치 레인의 재작성 허용 상태**(팀 왕복이 아니다)다 — 그 레인의
+ * `createResultRevision` 이 새 DRAFT 를 만들 수 있는 유일한 선행 상태이고, 이걸 없애면
+ * 결과를 다시 넣을 방법이 사라진다
  * (games.service.ts 의 같은 자리 주석에 "이의 수락으로 무효 처리된 리그 대진은 결과를 다시
  * 넣을 방법이 전혀 없어 시즌 승강이 영구히 막혔다" 는 실사고가 적혀 있다).
+ *
+ * **대회 픽스처 레인에서는 다르다.** 거기서 `CHANGE_REQUESTED` 는 아래 목록에 있는 그대로
+ * terminal(불변)이고, 재작성 경로가 아니다 — `createResultRevision` 은 대회 픽스처를 앞에서
+ * 거부하고, `supersedeAndSubmit` 의 base 는 contract 이후 `SUBMITTED` 뿐이다. 그래서
+ * contract 마이그레이션은 되살려야 할 옛 행을 `CHANGE_REQUESTED` 가 아니라 `SUBMITTED` 로
+ * 보낸다(조건 셋을 만족할 때만).
  *
  * contract 단계(2026-09-03)에서 두 값을 **여기서도** 뺐다. expand 때 남겨 둔 이유는 "이미
  * 그 상태로 저장된 행이 갑자기 변경 가능해지면 안 된다" 였는데, 그 행들을 마이그레이션이

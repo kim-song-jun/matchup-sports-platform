@@ -14,7 +14,7 @@ import { V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
 import { clearV1IdentityCache } from '@/lib/query-keys';
 import { sanitizeRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
-import { AuthFrame } from './auth-page';
+import { AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
 import { getEmailLoginViewModel } from './auth.view-model';
 
 function mapEmailLoginError(err: unknown): string {
@@ -72,7 +72,7 @@ export function EmailLoginClient() {
   };
 
   return (
-    <AuthFrame topTitle="이메일 로그인" backHref={model.backHref} className="tm-auth-email-frame">
+    <AuthFrame topTitle="이메일 로그인" backHref={model.backHref} className="tm-auth-email-frame" stage={AUTH_WELCOME_STAGE}>
       <form className="tm-auth-body" id="v1-email-login-form" onSubmit={submit}>
         <div className="tm-auth-logo" style={{ background: 'var(--surface)', boxShadow: 'inset 0 0 0 1px var(--grey200)' }}>
           <BrandMark size={42} alt="Teameet" />

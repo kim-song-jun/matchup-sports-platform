@@ -24,7 +24,7 @@ import {
   clearSignupTermsDocumentIds,
   readSignupTermsDocumentIds,
 } from '@/lib/signup-terms-storage';
-import { AuthFrame } from './auth-page';
+import { AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
 import {
   formatBirthDate,
   formatPhone,
@@ -401,6 +401,7 @@ export function SignupClient() {
 
   return (
     <AuthFrame
+      stage={AUTH_WELCOME_STAGE}
       // 이 화면만 상단바 없이 렌더돼 회원가입을 시작하면 빠져나갈 컨트롤이 없었다.
       // 뒤로가기 목적지는 이미 getSignupFormViewModel().backHref 로 선언돼 있던 '/terms?mode=signup'
       // (직전 단계)를 그대로 쓴다 — 약관 화면에 다시 /login 으로 나가는 뒤로가기가 있어

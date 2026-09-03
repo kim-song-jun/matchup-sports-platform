@@ -12,7 +12,7 @@ import { V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
 import { clearV1IdentityCache } from '@/lib/query-keys';
 import { saveStoredV1Session } from '@/lib/session-storage';
-import { AuthFrame } from './auth-page';
+import { AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
 import {
   formatBirthDate,
   formatPhone,
@@ -174,6 +174,7 @@ export function SocialSignupClient() {
 
   return (
     <AuthFrame
+      stage={AUTH_WELCOME_STAGE}
       topTitle="카카오 가입"
       onBack={() => void exitFlow.exit()}
       backLabel="가입 그만두기"

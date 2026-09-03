@@ -1213,28 +1213,48 @@ button:disabled {
   margin-top: 8px;
 }
 
+/*
+ * 상태 안내 화면(로그인 확인 7종). 예전엔 세로 중앙 정렬 + 하단 "안내" 카드로 가운데를
+ * 채웠는데(alpha 실측: 카드 아래 40% 가 빈 공간), 지금은 그래픽 → 배지 → 타이틀 → 본문을
+ * 위에서부터 놓고 아래는 고정 CTA 가 받는다. 여백은 콘텐츠 블록과 CTA 사이 한 곳에만 둔다.
+ */
 .tm-auth-exception {
   min-height: 100%;
-  padding: 72px 24px 44px;
+  padding: 24px 20px 32px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  align-items: flex-start;
+  justify-content: flex-start;
 }
 
-.tm-auth-exception-card {
-  margin-top: 24px;
+.tm-auth-exception .tm-badge {
+  margin-top: 4px;
 }
 
-.tm-auth-exception-card .tm-text-caption {
-  margin-top: 8px;
+/*
+ * 인증·온보딩 화면의 그래픽 슬롯(agy-3d-graphic 산출물). 모바일은 타이틀 위 왼쪽 정렬 160px —
+ * 로그인·상태 안내·완료 화면이 전부 같은 자리·같은 크기를 써서 화면 사이의 리듬을 맞춘다.
+ * 데스크톱에서는 카드 안의 것은 .tm-hide-desktop 으로 숨고 스테이지 쪽이 280px 로 그린다.
+ */
+.tm-auth-illustration {
+  display: block;
+  width: 160px;
+  height: 160px;
+  object-fit: contain;
+  margin: 0 0 20px;
 }
 
-.tm-auth-exception-card-orange {
-  background: rgba(254, 152, 0, .10);
+@media (max-width: 360px) {
+  .tm-auth-illustration {
+    width: 136px;
+    height: 136px;
+  }
 }
 
-.tm-auth-exception-card-red {
-  background: rgba(240, 68, 82, .08);
+/* 모바일에서 카드 래퍼는 레이아웃에 참여하지 않는다 — .tm-auth-scroll 의 absolute 기준은
+   그대로 .tm-auth-frame 이다. 데스크톱 2단(desktop/auth.css)에서만 실제 카드가 된다. */
+.tm-auth-card {
+  display: contents;
 }
 
 .tm-auth-agree-all {
@@ -1362,29 +1382,11 @@ button:disabled {
 
 .tm-auth-complete {
   min-height: 100%;
-  padding: 72px 24px 44px;
+  padding: 24px 20px 32px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-}
-
-.tm-auth-complete-icon {
-  width: 72px;
-  height: 72px;
-  border-radius: var(--radius-hero);
-  background: var(--blue500);
-  color: var(--static-white);
-  display: grid;
-  place-items: center;
-  margin-bottom: 24px;
-}
-
-.tm-auth-complete-icon .tm-auth-check {
-  width: 32px;
-  height: 32px;
-  border-color: var(--static-white);
-  background: var(--static-white);
-  color: var(--blue500);
+  align-items: flex-start;
+  justify-content: flex-start;
 }
 
 .tm-auth-step-card {

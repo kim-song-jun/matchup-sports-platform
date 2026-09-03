@@ -1,4 +1,7 @@
-import { Prisma, V1LeagueState, V1TournamentStatus } from '@prisma/client';
+import { Prisma, V1TournamentStatus } from '@prisma/client';
+// BE-5 drop: `V1LeagueState` enum 이 사라졌다. 응답 어휘는 손 유니온으로 남는다 —
+// **문자열 리터럴을 여기서 다시 선언하지 않는다**(league-state.ts 의 doc 참조).
+import { LeagueStateValue, type LeagueState } from '../league-matches/league-state';
 
 import {
   FOOTBALL_COMPETITION_CONFIG_ID,
@@ -24,10 +27,10 @@ import {
  * 신청제로 통일)이 도입할 때 생긴다. 즉 이 표는 D7 을 미리 정하는 것이 아니라 **현재 의미를
  * 그대로 옮기는 것**이고, `open` 이 비어 있는 것은 누락이 아니다.
  */
-export const STATUS_BY_LEAGUE_STATE: Record<V1LeagueState, V1TournamentStatus> = {
-  [V1LeagueState.draft]: V1TournamentStatus.draft,
-  [V1LeagueState.active]: V1TournamentStatus.in_progress,
-  [V1LeagueState.completed]: V1TournamentStatus.completed,
+export const STATUS_BY_LEAGUE_STATE: Record<LeagueState, V1TournamentStatus> = {
+  [LeagueStateValue.draft]: V1TournamentStatus.draft,
+  [LeagueStateValue.active]: V1TournamentStatus.in_progress,
+  [LeagueStateValue.completed]: V1TournamentStatus.completed,
 };
 
 
@@ -47,7 +50,7 @@ export interface LeagueMirrorSource {
   title: string;
   sportId: string;
   regionId: string;
-  state: V1LeagueState;
+  state: LeagueState;
   startsOn: Date;
   endsOn: Date;
   seriesId: string | null;
@@ -120,7 +123,7 @@ export function toMirrorSource(row: {
   title: string;
   sportId: string;
   regionId: string;
-  state: V1LeagueState;
+  state: LeagueState;
   startsOn: Date;
   endsOn: Date;
   seriesId: string | null;
@@ -154,7 +157,7 @@ export interface LeagueMirrorDetail {
 }
 
 export function leagueMirrorDetailData(league: {
-  state: V1LeagueState;
+  state: LeagueState;
   startsOn: Date;
   endsOn: Date;
   regionId: string;
@@ -223,13 +226,13 @@ export function mirrorDetailMatches(
  * > 있다. `scripts/v1-surface-check.mjs` 의 **"리그 허용" baseline 이 1 을 넘으면 여기를 다시
  * > 본다** — 봉쇄가 느슨해지는 순간 이 자리가 같이 걸리도록 게이트에 묶어 둔 것이다.
  */
-export const LEAGUE_STATE_BY_STATUS: Record<V1TournamentStatus, V1LeagueState> = {
-  [V1TournamentStatus.draft]: V1LeagueState.draft,
-  [V1TournamentStatus.open]: V1LeagueState.draft,
-  [V1TournamentStatus.closed]: V1LeagueState.draft,
-  [V1TournamentStatus.in_progress]: V1LeagueState.active,
-  [V1TournamentStatus.completed]: V1LeagueState.completed,
-  [V1TournamentStatus.cancelled]: V1LeagueState.completed,
+export const LEAGUE_STATE_BY_STATUS: Record<V1TournamentStatus, LeagueState> = {
+  [V1TournamentStatus.draft]: LeagueStateValue.draft,
+  [V1TournamentStatus.open]: LeagueStateValue.draft,
+  [V1TournamentStatus.closed]: LeagueStateValue.draft,
+  [V1TournamentStatus.in_progress]: LeagueStateValue.active,
+  [V1TournamentStatus.completed]: LeagueStateValue.completed,
+  [V1TournamentStatus.cancelled]: LeagueStateValue.completed,
 };
 
 /**
@@ -260,15 +263,15 @@ export function isCompleteLeagueMirror<T extends {
   return row.scheduledAt !== null && row.scheduledEndAt !== null && row.regionId !== null;
 }
 
-export const STATUSES_BY_LEAGUE_STATE: Record<V1LeagueState, V1TournamentStatus[]> =
+export const STATUSES_BY_LEAGUE_STATE: Record<LeagueState, V1TournamentStatus[]> =
   Object.entries(LEAGUE_STATE_BY_STATUS).reduce(
     (acc, [status, state]) => {
       acc[state].push(status as V1TournamentStatus);
       return acc;
     },
     {
-      [V1LeagueState.draft]: [] as V1TournamentStatus[],
-      [V1LeagueState.active]: [] as V1TournamentStatus[],
-      [V1LeagueState.completed]: [] as V1TournamentStatus[],
+      [LeagueStateValue.draft]: [] as V1TournamentStatus[],
+      [LeagueStateValue.active]: [] as V1TournamentStatus[],
+      [LeagueStateValue.completed]: [] as V1TournamentStatus[],
     },
   );

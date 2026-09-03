@@ -1,13 +1,15 @@
 import { LeagueSeriesAdminService } from './league-series-admin.service';
 
 /**
- * **시리즈 최초 생성(`seedSeason`)의 dual-write.**
+ * **시리즈 최초 생성(`seedSeason`)이 통합 축에 리그를 만든다.**
  *
- * `docs/ops/read-swap-preflight.md` 9절의 **필수 마감** 자리다 — 안 막히면 그 리그에
- * **거울이 아예 없고**, read-swap 뒤 **화면에서 에러 없이 사라진다.** 운영자는
- * "방금 만든 리그가 안 보인다" 밖에 말할 수 없다.
+ * 예전에는 `V1League` 를 만들고 거울을 함께 쓰는 dual-write 였고, 이 스펙은 "둘의 개수가
+ * 같은가" 를 지켰다. BE-5 drop 이 그 테이블을 없애면서 **통합 축 create 하나가 리그 생성
+ * 자체**가 됐다 — 이제 지킬 것은 개수 일치가 아니라 **그 한 번이 값을 다 채우고 같은
+ * 트랜잭션 안에서 일어나는가** 다.
  *
- * `--apply` 승인을 요청할 때 *"거울은 보호돼 있다"* 고 사실대로 말하려면 이게 있어야 한다.
+ * (`docs/ops/read-swap-preflight.md` 9절이 걱정하던 "거울 없는 리그" 는 구조적으로
+ * 불가능해졌다 — 거울이 곧 원본이라 빠질 대상이 없다.)
  */
 const SERIES_ID = 'series-1';
 const ADMIN_ID = 'admin-1';
@@ -17,26 +19,10 @@ function makeHarness() {
   const outboxInsert = jest.fn(async () => 1);
   // upsert 다 — `(tournamentId, teamId)` @@unique 라 무조건 create 면 P2002 다.
   const registrationCreate = jest.fn(async (args: { create: Record<string, unknown> }) => args.create);
-  let seq = 0;
   const tx = {
-    v1League: {
-      create: jest.fn(async (args: { data: Record<string, unknown> }) => {
-        seq += 1;
-        return {
-          id: `league-${seq}`,
-          title: args.data.title,
-          tier: args.data.tier,
-          seasonNo: args.data.seasonNo,
-          state: 'draft',
-          sportId: args.data.sportId,
-          regionId: args.data.regionId,
-          startsOn: args.data.startsOn,
-          endsOn: args.data.endsOn,
-          seriesId: args.data.seriesId,
-          sport: { code: 'futsal' },
-        };
-      }),
-    },
+    // BE-5 drop: `v1League` 는 사라졌다 — fake 에도 두지 않는다. 남겨 두면 서비스가 그걸
+    // 부르는 회귀가 들어와도 스펙이 통과한다.
+    v1Sport: { findUniqueOrThrow: jest.fn(async () => ({ code: 'futsal' })) },
     v1Tournament: { create: tournamentCreate },
     v1LeagueSeries: { update: jest.fn() },
     // 로스터와 짝이 되는 confirmed 등록(BE-3 ⑤). owner 를 못 찾으면 서비스가 422 로
@@ -67,7 +53,6 @@ function makeHarness() {
         createdAt: new Date(),
       }),
     },
-    v1League: { count: jest.fn().mockResolvedValue(0) },
     // BE-5: "이미 시딩됐나" 판정이 통합 축으로 옮겨졌다.
     v1Tournament: { count: jest.fn().mockResolvedValue(0) },
     v1Team: {
@@ -98,47 +83,46 @@ const dto = {
 } as never;
 
 describe('seedSeason — 통합 축 거울 dual-write', () => {
-  it('티어마다 리그와 거울을 같은 수만큼 만든다', async () => {
-    const { service, tx, tournamentCreate } = makeHarness();
+  it('티어마다 통합 축 대회 행을 하나씩 만든다', async () => {
+    const { service, tournamentCreate } = makeHarness();
 
     await service.seedSeason({ id: 'u-1' } as never, SERIES_ID, dto);
 
-    // **개수가 같아야 한다** — 하나라도 빠지면 그 리그가 read-swap 뒤 사라진다.
-    expect(tx.v1League.create).toHaveBeenCalledTimes(2);
     expect(tournamentCreate).toHaveBeenCalledTimes(2);
   });
 
-  it('거울이 리그 값을 그대로 받는다 — 행만 있고 값이 비면 화면이 잘못 그려진다', async () => {
+  it('만들어진 행에 값이 다 실린다 — 행만 있고 값이 비면 화면이 잘못 그려진다', async () => {
     const { service, tournamentCreate } = makeHarness();
 
     await service.seedSeason({ id: 'u-1' } as never, SERIES_ID, dto);
 
     const first = tournamentCreate.mock.calls[0][0].data;
+    // BE-5 drop: id 는 서버가 만든 uuid 다(예전엔 레거시 create 가 돌려준 값이었다).
+    expect(first.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
     expect(first).toMatchObject({
-      id: 'league-1',
       kind: 'regular_league',
       sportId: 'sport-futsal',
       // 새 FK 가 걸리는 자리다 — 비면 목록이 지역을 못 그린다.
       regionId: 'region-1',
       tier: 1,
       seasonNo: 1,
-      // 시즌 시작 전이므로 draft 다(리그 state 를 그대로 옮긴 값).
+      // 시즌 시작 전이므로 draft 다.
       status: 'draft',
     });
   });
 
-  it('같은 트랜잭션에서 만든다 — 리그만 남고 거울이 빠지는 창이 없다', async () => {
+  it('같은 트랜잭션에서 만든다 — 리그 생성과 등록이 갈라지는 창이 없다', async () => {
     const { service, tx, tournamentCreate } = makeHarness();
 
     await service.seedSeason({ id: 'u-1' } as never, SERIES_ID, dto);
 
-    // 거울을 `prisma` 가 아니라 **`tx`** 로 만들었는지가 핵심이다. 밖으로 빠지면 리그만
-    // 커밋되고 거울이 없는 창이 열린다 — 그 창에서 만들어진 리그는 영원히 거울이 없다.
+    // `prisma` 가 아니라 **`tx`** 로 만들었는지가 핵심이다. 밖으로 빠지면 리그만 커밋되고
+    // 로스터 등록이 없는 창이 열린다 — 그 리그는 참가팀 0으로 보인다.
     expect(tx.v1Tournament.create).toBe(tournamentCreate);
     expect(tournamentCreate).toHaveBeenCalled();
   });
 
-  it('응답은 기존 5개 필드만 담는다 — dual-write 때문에 넓힌 읽기가 새면 안 된다', async () => {
+  it('응답은 기존 5개 필드만 담는다 — 저장 축이 바뀌었다고 응답이 넓어지면 안 된다', async () => {
     // 거울에 `sport.code` 가 필요해서 `create` 를 `select` → `include` 로 넓혔다.
     // 그 행을 그대로 반환하면 **이 엔드포인트가 줄 생각이 없던 컬럼이 전부 나간다** —
     // 쓰기를 고치려다 읽기 계약이 조용히 커지는 모양이다(Copilot 이 잡았다).
@@ -154,10 +138,10 @@ describe('seedSeason — 통합 축 거울 dual-write', () => {
     }
   });
 
-  it('로스터 팀마다 confirmed 등록을 함께 만든다 — 백필이 세운 짝 불변식을 잇는다', async () => {
+  it('로스터 팀마다 confirmed 등록을 만든다 — 이제 그게 참가 그 자체다', async () => {
     // 백필은 한 번 돌고 끝났다. 여기서 등록을 안 만들면 이 경로로 만들어진 리그만
     // "로스터엔 있는데 등록엔 없는" 상태가 되고, 아무도 다시 맞춰 주지 않는다.
-    const { service, registrationCreate } = makeHarness();
+    const { service, registrationCreate, tournamentCreate } = makeHarness();
     await service.seedSeason({ id: 'u-1' } as never, SERIES_ID, dto);
 
     const rows = registrationCreate.mock.calls.map(
@@ -179,13 +163,19 @@ describe('seedSeason — 통합 축 거울 dual-write', () => {
         appliedByUserId: `owner-of-${row.teamId}`,
       });
     }
-    // **거울 뒤에** 만들어져야 한다 — 등록의 tournamentId 가 거울 행을 가리키므로
-    // 순서가 바뀌면 실제 DB 에서 FK 로 막힌다(fake 는 안 막아 주니 순서로 고정한다).
+    // **대회 행 뒤에** 만들어져야 한다 — 등록의 tournamentId 가 그 행을 가리키므로 순서가
+    // 바뀌면 실제 DB 에서 FK 로 막힌다(fake 는 안 막아 주니 값으로 고정한다).
+    //
+    // 고정 문자열 대신 **방금 만든 대회 행의 id** 와 대조한다. id 가 서버 생성 uuid 로
+    // 바뀌어서만이 아니라, 그래야 "등록이 그 티어의 행을 가리키는가" 를 실제로 재기
+    // 때문이다 — 고정 문자열은 두 값이 함께 틀려도 통과한다.
+    const createdIds = tournamentCreate.mock.calls.map((call) => call[0].data.id as string);
+    expect(createdIds).toHaveLength(2);
     expect(rows.map((row) => `${row.tournamentId}:${row.teamId}`)).toEqual([
-      'league-1:t1',
-      'league-1:t2',
-      'league-2:t3',
-      'league-2:t4',
+      `${createdIds[0]}:t1`,
+      `${createdIds[0]}:t2`,
+      `${createdIds[1]}:t3`,
+      `${createdIds[1]}:t4`,
     ]);
   });
 });

@@ -77,20 +77,21 @@ describe('통합 순위 — 정규 리그 거울 행 (real DB)', () => {
       });
     }
 
-    const league = await prisma.v1League.create({
-      data: {
-        id: ids.league,
-        title: '거울 순위 리그',
-        sportId: ids.sportId,
-        regionId: ids.regionId,
-        createdByAdminUserId: adminUser.id,
-        state: 'active',
-        startsOn: new Date('2026-09-01T00:00:00.000Z'),
-        endsOn: new Date('2026-09-30T00:00:00.000Z'),
-        tieBreakJson: { order: ['points', 'goalDifference', 'goalsFor', 'headToHead'] },
-        teams: { create: [{ teamId: ids.teamA }, { teamId: ids.teamB }, { teamId: ids.teamC }] },
-      },
-    });
+    // BE-5 drop: 통합 축 행 하나가 리그다. 아래 create 가 프로덕션과 **같은 매핑 함수**를
+    // 지나므로, 여기서는 그 입력만 조립한다.
+    const league = {
+      id: ids.league,
+      title: '거울 순위 리그',
+      sportId: ids.sportId,
+      regionId: ids.regionId,
+      state: 'active' as const,
+      startsOn: new Date('2026-09-01T00:00:00.000Z'),
+      endsOn: new Date('2026-09-30T00:00:00.000Z'),
+      seriesId: null,
+      tier: null,
+      seasonNo: null,
+      createdAt: new Date('2026-08-01T00:00:00.000Z'),
+    };
 
     // 거울 행은 **프로덕션과 같은 함수로** 만든다. 손으로 적으면 id 가 리그 id 와 같다는
     // 계약이 픽스처에서만 지켜지고, 그 계약이 깨져도 이 테스트는 green 으로 남는다.
@@ -107,9 +108,8 @@ describe('통합 순위 — 정규 리그 거울 행 (real DB)', () => {
         tier: league.tier,
         seasonNo: league.seasonNo,
         sportCode: 'futsal',
-        // **실물 값을 넘긴다** — `new Date()` 를 넣으면 이 픽스처가 만드는 거울이 실물과
-        // 달라진다(거울의 createdAt 은 원본 리그의 것이어야 한다는 게 이 헬퍼의 계약이다).
-        // 픽스처가 실물과 다르면 여기서 통과하는 것이 프로덕션을 증명하지 못한다.
+        // 리그 생성 시각을 그대로 넘긴다 — 이 값이 통합 목록 정렬을 지배하므로 픽스처가
+        // 실물과 다르면 여기서 통과하는 것이 프로덕션을 증명하지 못한다.
         createdAt: league.createdAt,
       }),
     });

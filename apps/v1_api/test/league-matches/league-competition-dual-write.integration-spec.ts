@@ -17,8 +17,11 @@ import { PrismaService } from '../../src/prisma/prisma.service';
  *    가 진짜로 걸린다. 이 저장소는 mock 으로 통과한 코드가 FK·인덱스 이름 길이 때문에
  *    CI 3연속·alpha 500 으로 터진 이력이 있다.
  *
- * **리그를 `prisma.v1League.create` 로 직접 만들지 않는다** — 그러면 dual-write 를 한 번도
- * 지나가지 않고, 통과하지만 아무것도 증명하지 않는다. 반드시 서비스 메서드로 만든다.
+ * **리그를 픽스처로 직접 만들지 않는다** — 그러면 서비스의 생성 경로를 한 번도 지나가지
+ * 않고, 통과하지만 아무것도 증명하지 않는다. 반드시 서비스 메서드로 만든다.
+ *
+ * BE-5 drop 이후 축이 하나(`V1Tournament`)라 "두 축이 같은가" 를 잴 대상은 없어졌다. 남은
+ * 계약은 **서비스 경로가 값을 다 채우고, 롤백 시 아무것도 남기지 않는가** 다.
  */
 const ids = {
   adminUserId: '9c000000-0000-4000-8000-000000000001',
@@ -117,9 +120,8 @@ describe('리그 dual-write (real DB)', () => {
     expect(mirror?.scheduledAt?.toISOString()).toBe(dto.startsOn);
     expect(mirror?.scheduledEndAt?.toISOString()).toBe(dto.endsOn);
 
-    // 리그와 거울이 **같은 키**로 묶인다(대응표를 따로 두지 않는 설계).
-    const league = await prisma.v1League.findUnique({ where: { id: created.leagueId } });
-    expect(league?.regionId).toBe(mirror?.regionId);
+    // 응답의 leagueId 가 곧 대회 행의 id 다(대응표를 따로 두지 않는 설계).
+    expect(mirror?.id).toBe(created.leagueId);
   });
 
   it('리그 쓰기가 롤백되면 거울도 남지 않는다 — **서비스 경로로** 증명한다', async () => {
@@ -139,7 +141,6 @@ describe('리그 dual-write (real DB)', () => {
     failing.adminContext.logAdminAction = () => Promise.reject(new Error('강제 실패'));
 
     const before = await prisma.v1Tournament.count({ where: { kind: 'regular_league' } });
-    const leaguesBefore = await prisma.v1League.count();
 
     try {
       await expect(
@@ -153,9 +154,8 @@ describe('리그 dual-write (real DB)', () => {
     }
 
     // 둘 다 없어야 한다. **거울만 남으면** dual-write 가 트랜잭션 밖에 있다는 뜻이고,
-    // 리그 없는 유령 대회가 생긴다.
+    // 실패한 생성이 행을 남기면 안 된다.
     expect(await prisma.v1Tournament.count({ where: { kind: 'regular_league' } })).toBe(before);
-    expect(await prisma.v1League.count()).toBe(leaguesBefore);
   });
 
   it('완료를 되돌리면 거울 status 도 함께 되돌아간다 (dual-write)', async () => {
@@ -165,12 +165,7 @@ describe('리그 dual-write (real DB)', () => {
       title: '되돌리기 검증 리그',
     } as never);
 
-    // 되돌리기의 조건부 update 는 `state: 'completed'` 인 행만 잡는다 — 그 상태를 만든다.
-    // 거울도 같은 상태로 맞춰 둬야 "되돌아갔다" 가 관측된다.
-    await prisma.v1League.update({
-      where: { id: created.leagueId },
-      data: { state: 'completed' },
-    });
+    // 되돌리기의 조건부 update 는 `status: 'completed'` 인 행만 잡는다 — 그 상태를 만든다.
     await prisma.v1Tournament.update({
       where: { id: created.leagueId },
       data: { status: 'completed' },
@@ -206,11 +201,16 @@ describe('리그 dual-write (real DB)', () => {
   // **이 red 를 독립 증거로 읽지 말 것.** 진짜 계약은 바로 위 롤백 케이스이고 이건 보조
   // 지표다. 단독으로 무엇을 잡는지 알려면 **불변식 단언만 겨냥한 변이**를 따로 한 번 돌려
   // 이 케이스만 red 인지 봐야 한다.
-  it('거울 수는 리그 수와 같다 — 백필 불변식이 실제 DB 에서도 성립한다', async () => {
-    const leagues = await prisma.v1League.count();
-    const mirrors = await prisma.v1Tournament.count({ where: { kind: 'regular_league' } });
-    // 이 스펙이 만든 리그는 전부 서비스 경로를 지났으므로 1:1 이어야 한다.
-    // 어긋나면 dual-write 가 빠진 쓰기 자리가 있다는 뜻이다.
-    expect(mirrors).toBe(leagues);
+  it('서비스로 만든 리그 수만큼 통합 축 행이 늘어난다', async () => {
+    // BE-5 drop 으로 축이 하나가 되어 "두 축의 수가 같은가" 는 잴 대상이 아니다. 전체
+    // 개수를 그냥 세는 것도 아무것도 못 잡는다(무엇과 비교할 대상이 없다). 대신 **이 케이스가
+    // 직접 만든 만큼 늘었는지**를 잰다 — 생성 경로가 조용히 행을 안 남기면 red 다.
+    const service = makeService();
+    const before = await prisma.v1Tournament.count({ where: { kind: 'regular_league' } });
+
+    await service.create({ id: ids.adminUserId } as never, { ...dto, title: '개수 검증 A' } as never);
+    await service.create({ id: ids.adminUserId } as never, { ...dto, title: '개수 검증 B' } as never);
+
+    expect(await prisma.v1Tournament.count({ where: { kind: 'regular_league' } })).toBe(before + 2);
   });
 });

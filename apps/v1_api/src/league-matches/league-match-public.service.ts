@@ -4,7 +4,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, V1LeagueState } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { isParticipantPubliclyEligible, loadParticipantConsentEligibility } from '../games/public-records/public-consent';
 import { LEAGUE_STATE_PRIORITY_ORDER, paginateByStatePriority, sortMyLeaguesByState } from './league-lifecycle-rules';
@@ -31,6 +31,7 @@ import {
   isCompleteLeagueMirror,
 } from '../tournaments/league-competition-mirror';
 import { LEAGUE_TIE_BREAK_ORDER } from './league-tie-break';
+import type { LeagueState } from './league-state';
 import { findTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
 
 const PLAYER_RECORDS_LIMIT = 30;
@@ -54,7 +55,7 @@ export class LeagueMatchPublicService {
   // 우선순위 정렬로 고쳐 놓았는데(league-lifecycle-rules.ts sortMyLeaguesByState) 공개
   // 목록만 옛 정렬로 남아 한 제품 안에서 두 화면이 다른 규칙을 쓰고 있었다.
   //
-  // state 우선순위는 V1LeagueState enum 선언 순서(draft -> active -> completed)와 달라
+  // state 우선순위는 리그 상태 선언 순서(draft -> active -> completed)와 달라
   // Prisma의 `orderBy: { state: 'asc' }`로 표현할 수 없다(listMine과 동일한 제약). 그래서
   // 상태별로 where 절을 나눠 우선순위 순서대로 순회하며 필요한 개수만큼만 채운다 --
   // 최악의 경우(query.state 미지정 + 앞쪽 그룹에 행이 얼마 없을 때) 페이지당 최대 3개
@@ -113,7 +114,7 @@ export class LeagueMatchPublicService {
         this.prisma.v1Tournament
           .findMany({
           // 리그 state 하나가 통합 축 status 여럿에 대응한다(draft ← draft·open·closed).
-          where: { ...baseWhere, status: { in: STATUSES_BY_LEAGUE_STATE[state as V1LeagueState] } },
+          where: { ...baseWhere, status: { in: STATUSES_BY_LEAGUE_STATE[state as LeagueState] } },
           orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
           take: page.take,
           ...(page.cursorId ? { cursor: { id: page.cursorId }, skip: 1 } : {}),

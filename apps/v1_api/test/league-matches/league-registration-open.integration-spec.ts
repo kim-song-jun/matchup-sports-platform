@@ -110,9 +110,7 @@ describe('리그 참가 신청 — 대회 스택 재사용', () => {
 
   afterAll(async () => {
     await prisma.v1TournamentRegistration.deleteMany({ where: { tournamentId: leagueId } });
-    await prisma.v1LeagueTeam.deleteMany({ where: { leagueId } });
     await prisma.v1Tournament.deleteMany({ where: { id: leagueId } });
-    await prisma.v1League.deleteMany({ where: { id: leagueId } });
     await prisma.v1TeamMembership.deleteMany({ where: { userId: { startsWith: 'a4000000' } } });
     await prisma.v1Team.deleteMany({ where: { sportId: ids.sportId } });
     await prisma.v1Sport.deleteMany({ where: { id: ids.sportId } });
@@ -152,8 +150,9 @@ describe('리그 참가 신청 — 대회 스택 재사용', () => {
     // 쓰지 않는다는 것을 증명한다.
     expect(mirror?.teamCount).toBe(8);
 
-    const league = await prisma.v1League.findUnique({ where: { id: leagueId }, select: { state: true } });
-    expect(league?.state).toBe('draft'); // 신청 접수는 시작이 아니다
+    // BE-5 drop: 리그 축이 따로 없다. "신청 접수는 시작이 아니다" 는 이제 거울의 status 가
+    // `open` 이고 `in_progress` 가 아니라는 것으로 나타난다(위 단언). 응답의 `state` 는
+    // `LEAGUE_STATE_BY_STATUS[open] = draft` 로 파생된다.
   });
 
   it('지난 마감으로는 열 수 없다 — 열자마자 닫힌 리그를 만들지 않는다', async () => {
@@ -197,7 +196,9 @@ describe('리그 참가 신청 — 대회 스택 재사용', () => {
 
     // 확정이 리그 축 로스터도 만들었는지 — 등록만 confirmed 이고 로스터가 비면
     // 순위·대진이 그 팀을 못 본다.
-    const roster = await prisma.v1LeagueTeam.count({ where: { leagueId } });
+    const roster = await prisma.v1TournamentRegistration.count({
+      where: { tournamentId: leagueId, status: 'confirmed' },
+    });
     expect(roster).toBe(TEAM_COUNT);
   });
 
@@ -253,7 +254,39 @@ describe('리그 참가 신청 — 대회 스택 재사용', () => {
     // `entrySource` 는 **`applied` 그대로 둔다.** 팀이 스스로 신청한 사실이 더 정확하고,
     // 나중에 운영자가 눌렀다고 `seeded` 로 덮으면 감사에서 사실이 뒤집힌다.
     expect(after).toEqual([{ status: 'confirmed', entrySource: 'applied' }]);
-    expect(await prisma.v1LeagueTeam.count({ where: { leagueId, teamId: extraTeam } })).toBe(1);
+    // BE-5 drop: 로스터 = confirmed 등록 하나뿐이다(위 `after` 가 곧 로스터다).
+  });
+
+  it('제외한 팀을 다시 넣으면 취소된 등록이 confirmed 로 되살아난다 — 행은 하나뿐이고 이력은 남는다', async () => {
+    // BE-5 drop 이 `removeTeam` 을 "로스터 행 삭제" 에서 "등록을 cancelled 로" 로 바꿨다.
+    // `(tournamentId, teamId)` 가 unique 라, 재추가 경로가 `create` 였다면 여기서 P2002 다.
+    const admin = makeAdminService();
+    const [seedTeam] = await prisma.v1TournamentRegistration.findMany({
+      where: { tournamentId: leagueId, status: 'confirmed' },
+      orderBy: { createdAt: 'asc' },
+      select: { teamId: true, appliedByUserId: true, createdAt: true },
+      take: 1,
+    });
+
+    await admin.removeTeam(auth, leagueId, seedTeam.teamId);
+    const afterRemove = await prisma.v1TournamentRegistration.findMany({
+      where: { tournamentId: leagueId, teamId: seedTeam.teamId },
+      select: { status: true },
+    });
+    expect(afterRemove).toEqual([{ status: 'cancelled' }]);
+
+    await admin.addTeam(auth, leagueId, { teamId: seedTeam.teamId } as never);
+
+    const afterReadd = await prisma.v1TournamentRegistration.findMany({
+      where: { tournamentId: leagueId, teamId: seedTeam.teamId },
+      select: { status: true, appliedByUserId: true, createdAt: true },
+    });
+    // 행은 **하나**다 — 두 행이 되면 unique 가 막는다.
+    expect(afterReadd).toHaveLength(1);
+    expect(afterReadd[0].status).toBe('confirmed');
+    // 신청 이력이 살아 있다 — 누가 언제 넣었는지가 재추가로 덮이지 않는다.
+    expect(afterReadd[0].appliedByUserId).toBe(seedTeam.appliedByUserId);
+    expect(afterReadd[0].createdAt.toISOString()).toBe(seedTeam.createdAt.toISOString());
   });
 
   it('소프트 삭제된 거울은 열리지 않는다 — 200 을 주고 신청은 404 인 상태를 만들지 않는다', async () => {

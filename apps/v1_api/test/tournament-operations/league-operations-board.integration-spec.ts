@@ -90,19 +90,7 @@ describe('운영 콘솔 목록 — 정규 리그', () => {
     const admin = await prisma.v1AdminUser.create({
       data: { userId: ids.adminUser, adminRole: 'owner', status: 'active' },
     });
-    await prisma.v1League.create({
-      data: {
-        id: ids.league,
-        title: 'BE-2 콘솔 검증 리그',
-        sportId: ids.sport,
-        regionId: ids.region,
-        createdByAdminUserId: admin.id,
-        startsOn: BASE_AT,
-        endsOn: new Date(BASE_AT.getTime() + 30 * 86_400_000),
-        tieBreakJson: { order: ['points'] },
-        teams: { createMany: { data: [1, 2, 3, 4].map((n) => ({ teamId: teamId(n) })) } },
-      },
-    });
+    // BE-5 drop: 통합 축 행 하나가 리그다(아래 create). 로스터는 confirmed 등록으로 만든다.
     // 거울 — 콘솔·공개 경로가 둘 다 이 행을 지난다.
     await prisma.v1Tournament.create({
       data: {
@@ -182,9 +170,7 @@ describe('운영 콘솔 목록 — 정규 리그', () => {
     await prisma.v1Game.deleteMany({ where: { id: { in: games.map((g) => g.id) } } });
     await prisma.v1TeamMatch.deleteMany({ where: { leagueId: ids.league } });
     await prisma.v1TournamentRegistration.deleteMany({ where: { tournamentId: ids.league } });
-    await prisma.v1LeagueTeam.deleteMany({ where: { leagueId: ids.league } });
     await prisma.v1Tournament.deleteMany({ where: { id: ids.league } });
-    await prisma.v1League.deleteMany({ where: { id: ids.league } });
     await prisma.v1Team.deleteMany({ where: { sportId: ids.sport } });
     await prisma.v1AdminUser.deleteMany({ where: { userId: ids.adminUser } });
     await prisma.v1User.deleteMany({ where: { id: { startsWith: 'b7000000' } } });

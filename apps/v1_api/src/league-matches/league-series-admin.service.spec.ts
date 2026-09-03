@@ -23,9 +23,6 @@ function makePrisma() {
         createdAt: new Date(),
       }),
     },
-    v1League: {
-      findMany: jest.fn().mockResolvedValue([]),
-    },
     // BE-5: 시즌 리그 목록이 통합 축으로 옮겨졌다 — `state` 는 `status` 에서 파생한다
     // (`completed` → `completed`). fake 도 저장되는 모양(`status`)을 줘야 파생이 실제로 돈다.
     v1Tournament: {

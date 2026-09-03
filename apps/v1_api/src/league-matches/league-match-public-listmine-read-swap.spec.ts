@@ -64,7 +64,6 @@ function makePrisma(mirrors: unknown[]) {
       v1TeamMembership: { findMany: jest.fn().mockResolvedValue([{ teamId: 'team-1' }]) },
       v1Tournament: { findMany },
       // 리그 축을 읽으면 이 mock 이 호출된다 — 되돌리기 변이를 잡는 축이다.
-      v1League: { findMany: leagueFindMany },
     } as never,
   };
 }

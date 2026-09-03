@@ -28,6 +28,7 @@ import { PrismaService } from '../../src/prisma/prisma.service';
 import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 import { TournamentResultReviewService } from '../../src/tournament-operations/results/tournament-result-review.service';
 import { resolveGameSource } from '../../src/tournament-operations/resolve-game-source';
+import { seedLeagueOnTournamentAxis } from '../fixtures/league-on-tournament-axis.fixture';
 
 const ids = {
   platformOps: '8b000000-0000-4000-8000-000000000001',
@@ -120,17 +121,15 @@ describe('Task 165 BE-1 — 콘솔 결과 명령 경계가 리그 경기를 해�
         { id: ids.awayTeam, ownerUserId: ids.teamOwner, sportId: ids.sport, regionId: ids.region, name: 'Task 165 Away' },
       ],
     });
-    await prisma.v1League.create({
-      data: {
-        id: ids.league,
-        title: 'Task 165 리그',
-        sportId: ids.sport,
-        regionId: ids.region,
-        startsOn: new Date('2026-09-05T00:00:00.000Z'),
-        endsOn: new Date('2026-12-05T00:00:00.000Z'),
-        createdByAdminUserId: admin.id,
-        tieBreakJson: ['points', 'goalDifference', 'goalsFor', 'headToHead'],
-      },
+    // BE-5 drop: 리그는 통합 축이 정본이다. 프로덕션과 같은 매핑 함수를 지나는 픽스처를 쓴다.
+    await seedLeagueOnTournamentAxis(prisma, {
+      id: ids.league,
+      title: 'Task 165 리그',
+      sportId: ids.sport,
+      regionId: ids.region,
+      startsOn: new Date('2026-09-05T00:00:00.000Z'),
+      endsOn: new Date('2026-12-05T00:00:00.000Z'),
+      createdByAdminUserId: admin.id,
     });
 
     const startAt = new Date(Date.now() + 3 * 60 * 60 * 1000);
@@ -195,7 +194,7 @@ describe('Task 165 BE-1 — 콘솔 결과 명령 경계가 리그 경기를 해�
     await prisma.v1GameSide.deleteMany({ where: { gameId: { in: gameIds } } });
     await prisma.v1Game.deleteMany({ where: { id: { in: gameIds } } });
     await prisma.v1TeamMatch.deleteMany({ where: { id: { in: [ids.leagueMatch, ids.friendlyMatch] } } });
-    await prisma.v1League.deleteMany({ where: { id: ids.league } });
+    await prisma.v1Tournament.deleteMany({ where: { id: ids.league } });
     await prisma.v1Team.deleteMany({ where: { id: { in: [ids.homeTeam, ids.awayTeam] } } });
     await prisma.v1Region.deleteMany({ where: { id: ids.region } });
     await prisma.v1Sport.deleteMany({ where: { id: ids.sport } });

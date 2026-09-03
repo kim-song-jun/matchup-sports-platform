@@ -57,7 +57,7 @@ export function isLeagueRosterAutoConfirmEnabled(): boolean {
  * 왜 여기인가: 리그를 만드는 경로가 셋(운영자 단건 생성 · 시즌 시드 · 다음 시즌 승계)인데
  * **셋 다 반드시 이 거울 생성을 지난다** — 안 지나면 read-swap 뒤 화면에서 리그가 사라지기
  * 때문이다. 예약을 각 호출부에 흩어 두면 새 경로가 생길 때마다 빠뜨린다(실제로 시즌 쪽 두
- * 곳이 빠져 있었다). 164 BE-5 가 `v1League` 를 걷어내면 이 거울 생성이 곧 리그 생성 자체가
+ * 곳이 빠져 있었다). 164 BE-5 가 `v1League` 를 걷어내면서 이 생성이 곧 리그 생성 자체가
  * 되므로, 그때도 이 자리는 그대로 단일 진입점으로 남는다.
  */
 export async function createLeagueMirrorWithRosterSchedule(

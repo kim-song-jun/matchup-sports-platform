@@ -19,5 +19,9 @@
   "prisma/cleanup-demo-data.ts": {
     "allowed": 2,
     "why": "데모 데이터 정리 스크립트의 CTE. 게이트가 prisma/ 를 안 봐서 이제껏 보이지 않던 자리다(2026-08-31 스캔 확대로 드러남). ⚠️ 리그 거울이 여기 걸릴 수 있다 — seed_tournaments 가 created_by_admin_user_id 와 seed_tournament_registrations 로 대회를 고르는데, 백필·dual-write 로 리그에도 등록 행이 생겼다. 거울만 지워지면 그 리그는 read-swap 뒤 화면에서 사라진다. --execute --confirm 이 둘 다 필요한 수동 스크립트라 즉시 위험은 아니지만, 실행 전 kind='regular_league' 를 제외하는지 확인해야 한다."
+  },
+  "src/league-matches/league-match-admin.service.ts": {
+    "allowed": 4,
+    "why": "BE-5 drop: 리그 정본 행에 거는 `SELECT id FROM \"v1_tournaments\" ... FOR UPDATE` 4곳(대진 생성·재생성·팀 추가·팀 제거). Prisma 로는 행 잠금을 걸 수 없어 raw SQL 이어야 하고, 이 자리는 잠금 대상 **한 행**을 id 로 특정하므로 종류 조건이 없어도 다른 대회를 건드리지 않는다(그 id 로 진행하는 리그 트랜잭션이 이미 kind 를 확인한 뒤다). 문자열 안의 테이블명은 타입 시스템이 못 보므로 저장 축을 옮길 때 함께 옮겨야 한다 — BE-5 drop 이 그 사고를 실제로 냈고(v1_leagues 를 겨냥한 채 남아 relation does not exist), 통합 스펙이 500 으로 잡았다."
   }
 }

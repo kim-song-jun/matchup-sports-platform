@@ -51,6 +51,8 @@ import {
 import { LEAGUE_TIE_BREAK_ORDER } from './league-tie-break';
 import { findTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
 import { LEAGUE_STATE_BY_STATUS, isCompleteLeagueMirror } from '../tournaments/league-competition-mirror';
+import { randomUUID } from 'node:crypto';
+import { LeagueStateValue } from './league-state';
 
 // 그룹 B 감사 결함 1: 팀 제외로 인한 대진 취소는 운영자 개별 사유가 아니라 시스템이
 // 판단한 부수효과다 — cancelFixture(운영자 사유 필수)와 구분되는 고정 사유 문자열.
@@ -170,26 +172,36 @@ export class LeagueMatchAdminService {
     }
 
     const league = await this.prisma.$transaction(async (tx) => {
-      const created = await tx.v1League.create({
-        data: {
-          title: dto.title,
-          sportId: dto.sportId,
-          regionId: dto.regionId,
-          createdByAdminUserId: admin.id,
-          startsOn,
-          endsOn,
-          tieBreakJson: { order: LEAGUE_TIE_BREAK_ORDER },
-          teams: { createMany: { data: uniqueTeamIds.map((teamId) => ({ teamId })) } },
-        },
-        include: { sport: { select: { code: true } } },
+      // BE-5 drop: 통합 축이 **정본**이다. 예전에는 `V1League` 를 만들고 거울을 함께 썼는데
+      // (dual-write), 그 테이블이 사라지면서 여기가 곧 리그 생성 자체가 됐다. 매핑은 여전히
+      // `leagueMirrorCreateData` 한 곳만 안다 — 값 만드는 규칙을 두 벌로 두지 않는다.
+      const sport = await tx.v1Sport.findUniqueOrThrow({
+        where: { id: dto.sportId },
+        select: { code: true },
       });
-      // dual-write — 통합 축(V1Tournament)에 같은 리그를 비춘다. **같은 트랜잭션 안이다**:
-      // 밖으로 빼면 리그만 생기고 거울이 없는 창이 열리고, 그 리그는 read-swap 뒤
-      // **에러 없이 화면에서 사라진다**(운영자는 "방금 만든 리그가 안 보인다"고만 말할 수 있다).
-      await createLeagueMirrorWithRosterSchedule(tx, leagueMirrorCreateData(toMirrorSource(created)), {
-        leagueId: created.id,
+      const leagueId = randomUUID();
+      const createdAt = new Date();
+      const created = {
+        id: leagueId,
+        title: dto.title,
+        sportId: dto.sportId,
+        regionId: dto.regionId,
+        state: LeagueStateValue.draft,
         startsOn,
-      });
+        endsOn,
+        seriesId: null,
+        tier: null,
+        seasonNo: null,
+        sportCode: sport.code,
+        createdAt,
+      };
+      // 생성과 **D10 예약을 한 진입점**에서 한다(#1003). 예약을 호출부마다 흩어 두면 새
+      // 경로가 생길 때마다 빠뜨린다 — 실제로 시즌 쪽 두 곳이 빠져 있었다.
+      await createLeagueMirrorWithRosterSchedule(
+        tx,
+        { ...leagueMirrorCreateData(created), createdByAdminUserId: admin.id },
+        { leagueId: created.id, startsOn },
+      );
       // 로스터와 짝이 되는 confirmed 등록 — **거울 create 뒤여야 한다**(등록의
       // tournamentId 가 거울 행을 가리킨다). 리그를 만들 때 함께 넣은 팀도 로스터에
       // 들어가므로 여기가 다섯 번째 경로다(addTeam·시드·승계·신청 확정과 같은 불변식).
@@ -455,12 +467,12 @@ export class LeagueMatchAdminService {
     const matchdayStartAts = this.resolveScheduleStartAts(dto, totalRounds, timing);
 
     const createdIds = await this.prisma.$transaction(async (tx) => {
-      // 락은 신 테이블(v1_leagues)에 건다. 재명명 때 Prisma 델리게이트만 바꾸고 이 raw SQL
-      // 문자열을 놓쳐 구 테이블을 잠그고 있었다 -- 문자열 안의 테이블명은 타입 시스템이 못 본다.
-      // 구 테이블을 잠그면 두 겹으로 위험하다: ① 미러 행이 없는 리그에서는 SELECT ... FOR UPDATE
-      // 가 0행이라 아무것도 잠그지 않아 동시성 보호가 조용히 사라지고, ② 수축 릴리스가 그 테이블을
-      // 지우는 순간 relation does not exist 로 깨진다.
-      await tx.$queryRaw`SELECT id FROM "v1_leagues" WHERE id = ${leagueId} FOR UPDATE`;
+      // 락은 리그의 **정본 행**(`v1_tournaments`)에 건다. 문자열 안의 테이블명은 타입 시스템이
+      // 못 보므로, 저장 축을 옮길 때마다 이 raw SQL 을 함께 옮기지 않으면 두 겹으로 위험하다:
+      // ① 없는 행을 겨냥하면 `SELECT ... FOR UPDATE` 가 0행이라 아무것도 잠그지 않아 동시성
+      // 보호가 **조용히** 사라지고, ② 그 테이블이 사라지는 릴리스에서 relation does not exist
+      // 로 깨진다. BE-5 drop 이 정확히 ②를 일으켰다 — 통합 스펙이 500 으로 잡았다.
+      await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${leagueId} FOR UPDATE`;
       const existingCount = await tx.v1TeamMatch.count({ where: { leagueId } });
       if (existingCount > 0) {
         throw new ConflictException({ code: 'LEAGUE_FIXTURES_EXIST', message: '이미 대진이 생성된 리그예요.' });
@@ -481,12 +493,10 @@ export class LeagueMatchAdminService {
         timing,
       });
       if (ids.length > 0) {
-        await tx.v1League.update({ where: { id: league.id }, data: { state: 'active' } });
-        // dual-write — 거울의 status 도 같이 옮긴다. `updateMany` + `kind` 가드인 이유:
+        // BE-5 drop: 통합 축이 정본이라 이 update 하나가 상태 전이 전부다(예전엔 레거시
+        // 테이블을 먼저 고치고 거울을 따라 고쳤다). `updateMany` + `kind` 가드인 이유:
         //   · `upsert` 는 `where` 에 unique 필드만 받아 `kind` 를 못 건다 — 같은 id 의 **진짜
         //     대회**가 있으면 덮어쓴다. 그 위험을 지우려면 이 형태여야 한다.
-        //   · 백필 `--apply` 전에는 거울이 아직 없어 **0행**이다. 그 구간에선 그게 정상이고,
-        //     백필 이후에는 항상 1행이다(새 리그는 위 create dual-write 가 거울을 만든다).
         await tx.v1Tournament.updateMany({
           where: { id: league.id, kind: 'regular_league' },
           data: { status: STATUS_BY_LEAGUE_STATE.active },
@@ -587,9 +597,8 @@ export class LeagueMatchAdminService {
 
     const existingFixtureCount = await this.prisma.v1TeamMatch.count({ where: { leagueId } });
     await this.prisma.$transaction(async (tx) => {
-      await tx.v1LeagueTeam.create({ data: { leagueId, teamId: dto.teamId } });
-      // 로스터 행과 짝이 되는 confirmed 등록 — D7 이후 참가의 정본은 등록 쪽이다.
-      // 안 만들면 백필이 세운 "로스터 행 ⟺ confirmed 등록" 불변식이 이 경로에서만 썩는다.
+      // BE-5 drop: 로스터 = confirmed 등록 하나다. 예전엔 레거시 로스터 행을 만들고 짝이
+      // 되는 등록을 함께 만들었는데, 그 테이블이 사라져 이 한 줄이 참가 그 자체가 됐다.
       await createLeagueRosterRegistration(tx, { leagueId, teamId: dto.teamId, entrySource: 'seeded' });
       await this.adminContext.logAdminAction(
         admin,
@@ -646,8 +655,8 @@ export class LeagueMatchAdminService {
       // 못 하는 죽은 리그가 되고, 승강 확정도 같은 이유로 422 로 막힌다.
       // 이 파일의 다른 파괴적 경로(:197 대진 생성, :523 재생성)와 동일하게 리그 행을 잠가
       // 동시 요청을 직렬화하고, 잠근 뒤의 **커밋된** 로스터로 다시 판정한다.
-      await tx.$queryRaw`SELECT id FROM "v1_leagues" WHERE id = ${leagueId} FOR UPDATE`;
-      // BE-5: 로스터 판정은 통합 축의 confirmed 등록으로 본다. 잠금은 위 `v1_leagues` 행
+      await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${leagueId} FOR UPDATE`;
+      // BE-5: 로스터 판정은 통합 축의 confirmed 등록으로 본다. 잠금은 위 대회 행
       // 그대로다 — 두 축을 같은 트랜잭션에서 함께 쓰므로 직렬화 대상은 바뀌지 않는다
       // (그 raw SQL 의 테이블 교체는 ④ drop 의 몫이다).
       const remainingAfterRemoval = await tx.v1TournamentRegistration.count({
@@ -717,7 +726,14 @@ export class LeagueMatchAdminService {
         });
         cancelled += 1;
       }
-      await tx.v1LeagueTeam.deleteMany({ where: { leagueId, teamId } });
+      // BE-5 drop: 로스터에서 뺀다 = confirmed 등록을 취소로 옮긴다. **행을 지우지 않는다**
+      // — 등록에는 신청 이력(누가 언제 넣었나)이 있고, 지우면 "이 팀이 있었다는 사실" 까지
+      // 사라져 취소된 대진의 근거를 설명할 수 없다. 로스터 판정은 어디서나
+      // `status: 'confirmed'` 로 하므로 취소된 행은 자동으로 빠진다.
+      await tx.v1TournamentRegistration.updateMany({
+        where: { tournamentId: leagueId, teamId, status: 'confirmed' },
+        data: { status: 'cancelled', cancelPreviousStatus: 'confirmed' },
+      });
       // cancelFixture의 D-3 보강과 동일한 이유 — 이 제거로 마지막 미확정 대진이 사라지면
       // 리그가 자동 완료 조건을 충족할 수 있다.
       const completed = await this.leagueCompletion.settle(tx, leagueId, 'remaining_fixture_cancelled');
@@ -925,7 +941,7 @@ export class LeagueMatchAdminService {
     const schedule = generateRoundRobinFixtures(teamIds, totalRounds);
 
     const result = await this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM "v1_leagues" WHERE id = ${leagueId} FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${leagueId} FOR UPDATE`;
       const existingFixtures = await tx.v1TeamMatch.findMany({
         where: { leagueId },
         select: {
@@ -987,12 +1003,10 @@ export class LeagueMatchAdminService {
       if (ids.length > 0) {
         // completed였던 리그(전 대진 확정)라도 재생성으로 새 미확정 대진이 생겼으니
         // active로 되돌린다 — revertCompletion을 별도로 먼저 호출할 필요가 없다.
-        await tx.v1League.update({ where: { id: league.id }, data: { state: 'active' } });
-        // dual-write — 거울의 status 도 같이 옮긴다. `updateMany` + `kind` 가드인 이유:
+        // BE-5 drop: 통합 축이 정본이라 이 update 하나가 상태 전이 전부다(예전엔 레거시
+        // 테이블을 먼저 고치고 거울을 따라 고쳤다). `updateMany` + `kind` 가드인 이유:
         //   · `upsert` 는 `where` 에 unique 필드만 받아 `kind` 를 못 건다 — 같은 id 의 **진짜
         //     대회**가 있으면 덮어쓴다. 그 위험을 지우려면 이 형태여야 한다.
-        //   · 백필 `--apply` 전에는 거울이 아직 없어 **0행**이다. 그 구간에선 그게 정상이고,
-        //     백필 이후에는 항상 1행이다(새 리그는 위 create dual-write 가 거울을 만든다).
         await tx.v1Tournament.updateMany({
           where: { id: league.id, kind: 'regular_league' },
           data: { status: STATUS_BY_LEAGUE_STATE.active },
@@ -1077,7 +1091,7 @@ export class LeagueMatchAdminService {
     const teamMatchId = await this.prisma.$transaction(async (tx) => {
       // 일괄 생성과 같은 락. 같은 리그에 동시에 손대는 두 요청이 서로의 주차 계산을
       // 어긋나게 만들지 않는다 — 아래 형제 목록 조회가 이 락 안에서 일어나야 한다.
-      await tx.$queryRaw`SELECT id FROM "v1_leagues" WHERE id = ${leagueId} FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${leagueId} FOR UPDATE`;
       // **잠근 뒤에** 로스터를 다시 읽는다. 잠금 밖에서 읽은 `league.teams` 로 판정하면
       // TOCTOU 다 — 그 사이 `removeTeam` 이 커밋되면 **리그에서 이미 빠진 팀으로 대진이
       // 생기고**, 그 대진은 로스터에 없는 팀을 가리킨 채 남는다(제거 경로가 취소할 대상
@@ -1370,19 +1384,13 @@ export class LeagueMatchAdminService {
   ): Promise<boolean> {
     // 동시 요청 대비 조건부 UPDATE — 이미 다른 요청이 되돌렸다면(또는 자동 전이 로직이
     // 마침 다시 completed로 돌려놨다면) 0행 매치로 조용히 no-op한다.
-    const reverted = await tx.v1League.updateMany({
-      where: { id: leagueId, state: 'completed' },
-      data: { state: 'active' },
+    // BE-5 drop: 조건부 update 가 **승자 판정 그 자체**다 — `where` 에 현재 상태를 걸어 한
+    // 요청만 1행을 잡는다. 예전엔 레거시 테이블에 그 조건을 걸고 거울을 따라 고쳤는데, 이제
+    // 통합 축이 정본이므로 조건도 여기 건다(`kind` 가드로 같은 id 의 진짜 대회를 제외).
+    const reverted = await tx.v1Tournament.updateMany({
+      where: { id: leagueId, kind: 'regular_league', status: STATUS_BY_LEAGUE_STATE.completed },
+      data: { status: STATUS_BY_LEAGUE_STATE.active },
     });
-    // dual-write — 되돌리기도 거울에 반영한다. **조건부 update 의 승자만 반영해야 한다**:
-    // 위 `where: { state: 'completed' }` 가 0행이면 이미 누가 되돌린 것이라 여기서 거울을
-    // 건드리면 남의 전이를 덮는다. 그래서 `reverted.count` 를 먼저 본다.
-    if (reverted.count > 0) {
-      await tx.v1Tournament.updateMany({
-        where: { id: leagueId, kind: 'regular_league' },
-        data: { status: STATUS_BY_LEAGUE_STATE.active },
-      });
-    }
     if (reverted.count === 0) return true;
 
     await this.adminContext.logAdminAction(

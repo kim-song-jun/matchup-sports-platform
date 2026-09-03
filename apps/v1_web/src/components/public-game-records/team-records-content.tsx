@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { Card, EmptyState, KPIStat } from '@/components/v1-ui/primitives';
-import { RECORD_TYPE_LABEL, RECORD_TYPE_TABS, recordEmptyCopy } from './record-category-tabs';
+import { RECORD_TYPE_TABS, recordEmptyCopy } from './record-category-tabs';
 import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { formatTournamentDateShort } from '@/lib/date-utils';

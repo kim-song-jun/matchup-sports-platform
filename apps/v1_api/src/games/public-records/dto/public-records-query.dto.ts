@@ -63,8 +63,10 @@ export class TeamRecordsQueryDto extends PublicRecordsQueryDto {
  * 그대로 썼고 "개인 기록엔 그 구분 개념이 없다" 고 적혀 있었는데, 정본이 그 구분을
  * 요구하면서 그 전제가 바뀌었다.
  *
- * **기존 클라이언트는 무변경이다** — `type` 은 optional 이고, 빼고 부르면 응답 모양·
- * 내용이 그대로다(회귀 스펙으로 고정). 팀 전적과 같은 모양으로 서브클래스에서만 넓혀,
+ * **기존 클라이언트는 무변경이다** — `type` 은 optional 이고, 빼고 부르면 **기존 필드는
+ * 값·모양 그대로**다. 응답 자체는 완전히 동일하지는 않다: `summary.byType` 처럼 **가산
+ * 필드가 더해진다**(기존 필드를 지우거나 바꾸지 않으므로 옛 클라이언트는 영향받지 않는다).
+ * 회귀 스펙이 그 구분을 고정한다. 팀 전적과 같은 모양으로 서브클래스에서만 넓혀,
  * 공유 DTO 는 여전히 frozen 이다.
  */
 export class UserRecordsQueryDto extends PublicRecordsQueryDto {

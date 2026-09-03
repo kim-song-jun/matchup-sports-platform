@@ -41,6 +41,10 @@ import {
   resolveParticipantProfileHref,
   type ParticipantNameProfileRow,
 } from './participant-name-gating';
+import {
+  leagueFixtureListOrder,
+  leagueFixtureListWhere,
+} from '../../league-matches/league-fixture-list-source';
 
 /**
  * A fixture/match this route never returns individually and never lists in
@@ -773,8 +777,10 @@ export class PublicTournamentRecordsService {
     }
 
     const teamMatches = await this.prisma.v1TeamMatch.findMany({
-      where: { leagueId, deletedAt: null },
-      orderBy: [{ startAt: 'asc' }, { id: 'asc' }],
+      // 술어는 손으로 적지 않는다 — 같은 질문("이 리그의 대진은 무엇인가")에 답하는
+      // 조회가 세 벌이었고 서로 달랐다. 이 파일의 것이 가장 옳아서 그것이 정본이 됐다.
+      where: leagueFixtureListWhere(leagueId),
+      orderBy: leagueFixtureListOrder(),
       select: LEAGUE_SCHEDULE_SELECT,
     });
 

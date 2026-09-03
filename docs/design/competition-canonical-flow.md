@@ -70,10 +70,10 @@
   사용자가 없앤 것이 정확히 이 둘. contract PR 에서 기존 행을 `CHANGE_REQUESTED` 로 변환한 뒤 enum 값 제거).
   **`CHANGE_REQUESTED` 는 유지** — 이름과 달리 "팀 왕복" 이 아니라 *운영자 재작성 허용 상태*(데이터 복구 장치)다.
   이것을 지우면 제출된 결과를 다시 쓸 방법이 사라져 시즌 승강이 막힌 실사고가 있다.
-- 공개 점수 상태(`PublicScoreStatus`)는 `unavailable | live | pending | official` — SUBMITTED 는 `pending`(점수 + "확정 전").
+- 공개 점수 상태(`PublicScoreStatus`)는 `unavailable | live | official | pending` — SUBMITTED 는 `pending`(점수 + "확정 전").
   단 대회 설정의 가시성 `official_only` 에서는 `pending` 을 내보내지 않는다(운영자가 고른 정책을 이 흐름이 뒤집지 않는다).
 - **순위·승점·전적은 OFFICIAL 만 센다.** SUBMITTED 는 사용자 화면에 점수와 "확정 전" 태그로 보이되 순위엔 들어가지 않는다.
-- **팀의 이의 제기 경로는 없다.** 확정 뒤 문제는 운영자에게 알려 운영자가 정정한다. 이의 테이블·화면·알림 4종은 제거한다.
+- **팀의 이의 제기 경로는 없다.** 확정 뒤 문제는 운영자에게 알려 운영자가 정정한다. 이의 테이블·화면·알림 5종은 제거한다(Task 166 실측: 5종).
 - 피리어드(전후반)는 대회 설정 `periods` 배열로 대회마다 정한다. 어드민 화면에서 입력할 수 있어야 한다(Task 165).
 
 ## 5. 전적과 기록

@@ -1,4 +1,10 @@
-import { ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AdminContextService } from '../common/admin-context.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -517,6 +523,30 @@ export class LeagueSeriesAdminService {
           entries: impossible.map((entry) => ({
             teamId: entry.teamId,
             tier: computedByTeamId.get(entry.teamId)!.tier,
+            kind: entry.kind,
+          })),
+        },
+      });
+    }
+
+    // ## 계산 결과를 뒤집으면 사유가 필수다 (D9)
+    // 계산대로 두는 항목은 설명할 게 없다 — 규칙이 이미 설명이다. **운영자가 뒤집은 항목**은
+    // 그 팀에게 시즌 티어가 달라지는 조치이고, 나중에 "왜 우리가 강등됐나" 를 답할 수 있어야
+    // 한다(정본: "운영자가 **사유와 함께** 조정"). `overrideNote` 는 이미 저장되고 조회에도
+    // 실리는데(`:605`) 비워 둘 수 있어서, 실제로는 대부분 비어 있었다.
+    const missingNote = dto.entries.filter(
+      (entry) =>
+        entry.kind !== computedByTeamId.get(entry.teamId)!.computedKind &&
+        !entry.overrideNote?.trim(),
+    );
+    if (missingNote.length > 0) {
+      throw new BadRequestException({
+        code: 'PROMOTION_OVERRIDE_NOTE_REQUIRED',
+        message: '계산 결과와 다르게 정하려면 사유를 입력해 주세요.',
+        details: {
+          entries: missingNote.map((entry) => ({
+            teamId: entry.teamId,
+            computedKind: computedByTeamId.get(entry.teamId)!.computedKind,
             kind: entry.kind,
           })),
         },

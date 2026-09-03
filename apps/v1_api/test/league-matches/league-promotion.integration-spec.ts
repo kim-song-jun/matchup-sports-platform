@@ -368,6 +368,70 @@ describe('리그 승강 확정 (Task 153)', () => {
       expect(await prisma.v1League.count({ where: { seriesId, seasonNo: 2 } })).toBe(0);
     });
 
+    it('계산 결과를 뒤집으면서 사유를 안 주면 400 — 계산대로 두는 항목은 사유가 필요 없다', async () => {
+      // D9: 규칙대로 나온 결과는 규칙이 곧 설명이다. **운영자가 뒤집은 항목**만 그 팀에게
+      // 시즌 티어가 달라지는 조치라, 나중에 "왜 우리가 강등됐나" 를 답할 수 있어야 한다.
+      const teams = [
+        await createTeam('note-a1'), await createTeam('note-a2'),
+        await createTeam('note-b1'), await createTeam('note-b2'),
+      ];
+      const { seriesId, leagueIds } = await seedSeries('사유-계산대로', [
+        [teams[0].id, teams[1].id],
+        [teams[2].id, teams[3].id],
+      ]);
+      for (const leagueId of leagueIds) await finishLeague(leagueId);
+
+      const preview = (
+        await asAdmin(http().post(`/api/v1/admin/league-series/${seriesId}/seasons/1/promotions/preview`))
+      ).body.data;
+      const entries = preview.tiers.flatMap(
+        (tier: { entries: Array<{ teamId: string; tier: number; computedKind: string }> }) =>
+          tier.entries.map((entry) => ({ teamId: entry.teamId, fromTier: entry.tier, kind: entry.computedKind })),
+      );
+
+      // 계산대로만 보내면 통과해야 한다 — 사유를 전부에게 요구하는 가드와 구분한다.
+      const asComputed = await asAdmin(
+        http().post(`/api/v1/admin/league-series/${seriesId}/seasons/1/promotions/commit`),
+      ).send({ entries, ruleFingerprint: preview.ruleFingerprint });
+      expect(asComputed.status).toBe(201);
+    });
+
+    it('사유 없이 계산 결과를 뒤집으면 400 이고 아무것도 확정되지 않는다', async () => {
+      const teams = [
+        await createTeam('note2-a1'), await createTeam('note2-a2'),
+        await createTeam('note2-b1'), await createTeam('note2-b2'),
+      ];
+      const { seriesId, leagueIds } = await seedSeries('사유-뒤집기', [
+        [teams[0].id, teams[1].id],
+        [teams[2].id, teams[3].id],
+      ]);
+      for (const leagueId of leagueIds) await finishLeague(leagueId);
+
+      const preview = (
+        await asAdmin(http().post(`/api/v1/admin/league-series/${seriesId}/seasons/1/promotions/preview`))
+      ).body.data;
+      const entries = preview.tiers.flatMap(
+        (tier: { entries: Array<{ teamId: string; tier: number; computedKind: string }> }) =>
+          tier.entries.map((entry) => ({ teamId: entry.teamId, fromTier: entry.tier, kind: entry.computedKind })),
+      );
+      // 계산이 'stayed' 라고 한 팀을 사유 없이 'withdrawn' 으로 뒤집는다.
+      const stayed = entries.find((entry: { kind: string }) => entry.kind === 'stayed');
+      expect(stayed).toBeDefined();
+      const flipped = entries.map((entry: { teamId: string }) =>
+        entry.teamId === stayed.teamId ? { ...entry, kind: 'withdrawn' } : entry,
+      );
+
+      const res = await asAdmin(
+        http().post(`/api/v1/admin/league-series/${seriesId}/seasons/1/promotions/commit`),
+      ).send({ entries: flipped, ruleFingerprint: preview.ruleFingerprint });
+
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe('PROMOTION_OVERRIDE_NOTE_REQUIRED');
+      // 막혔으면 승강 이력도 다음 시즌 리그도 없어야 한다.
+      expect(await prisma.v1LeaguePromotion.count({ where: { fromLeagueId: { in: leagueIds } } })).toBe(0);
+      expect(await prisma.v1League.count({ where: { seriesId, seasonNo: 2 } })).toBe(0);
+    });
+
     it('동시에 확정하면 한 건만 성공하고 나머지는 500 이 아니라 409 를 받는다', async () => {
       const teams = [
         await createTeam('race-a1'), await createTeam('race-a2'),

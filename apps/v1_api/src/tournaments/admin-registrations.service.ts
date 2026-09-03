@@ -1,10 +1,11 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, V1TournamentPayment, V1TournamentRegistration } from '@prisma/client';
+import { Prisma, V1CompetitionKind, V1TournamentPayment, V1TournamentRegistration } from '@prisma/client';
 import { AdminContextService } from '../common/admin-context.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -261,6 +262,19 @@ export class AdminRegistrationsService {
       throw new ConflictException({
         code: 'REGISTRATION_NOT_CANCELLABLE',
         message: '현재 상태에서는 취소할 수 없어요.',
+      });
+    }
+
+    // ## 정규 리그는 거부 사유가 필수다 (D9) — 대회는 선택 그대로
+    // DTO 에서 `@IsNotEmpty()` 로 막지 않는 이유는 **같은 DTO 를 대회도 쓰기 때문**이다.
+    // 거기서 막으면 대회 운영이 함께 바뀐다. `kind` 로 갈라 리그에서만 요구한다.
+    //
+    // 리그 거부는 팀이 그 시즌을 통째로 못 뛰게 되는 조치라, 나중에 "왜 떨어졌나" 를
+    // 답할 수 있어야 한다(정본: "정원 초과는 운영자가 **사유와 함께** 조정").
+    if (registration.tournament.kind === V1CompetitionKind.regular_league && !dto.reason?.trim()) {
+      throw new BadRequestException({
+        code: 'LEAGUE_CANCEL_REASON_REQUIRED',
+        message: '리그 참가를 거부하려면 사유를 입력해 주세요.',
       });
     }
 
@@ -577,10 +591,15 @@ export class AdminRegistrationsService {
 
   private async loadRegistration(
     registrationId: string,
-  ): Promise<V1TournamentRegistration & { tournament: { title: string } }> {
+  ): Promise<
+    V1TournamentRegistration & { tournament: { title: string; kind: V1CompetitionKind | null } }
+  > {
     const registration = await this.prisma.v1TournamentRegistration.findUnique({
       where: { id: registrationId },
-      include: { tournament: { select: { title: true } } },
+      // `kind` 를 함께 싣는다 — 리그에만 걸리는 규칙(D9 거부 사유)이 이 값을 봐야 하는데,
+      // 따로 조회하면 왕복이 하나 늘고 표면 게이트에 자리가 하나 더 생긴다. 이 조회는
+      // 등록 id 로 시작하므로 **종류를 게이트로 쓰는 자리가 아니다**(무엇인지만 묻는다).
+      include: { tournament: { select: { title: true, kind: true } } },
     });
     if (!registration) {
       throw new NotFoundException({

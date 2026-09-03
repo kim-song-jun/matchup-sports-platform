@@ -303,10 +303,21 @@ export class TournamentRegistrationsService {
         });
       }
 
+      // ## 참가비가 0 이면 입금 단계를 건너뛴다 (Task 164 BE-4, 정본 §4 "스텝 최소")
+      // 지금까지는 `entryFee` 와 무관하게 `awaiting_payment` 로 보냈고, 그 상태는
+      // `ADMIN_CONFIRMABLE_STATUSES` 에 없다. 그래서 **0원짜리 대회·리그에도 운영자가
+      // "입금 확인" 을 한 번 눌러야** 확정할 수 있었다 — 확인할 입금이 없는데.
+      //
+      // 착지 상태는 **`confirmPayment` 가 만드는 것과 정확히 같다**(등록 `payment_checking`
+      // + 결제 `paid`). 다른 상태로 보내면 그 뒤의 취소·환불·목록 필터가 0원 건만 다르게
+      // 다루게 되고, 그 차이는 여기가 아니라 먼 곳에서 드러난다.
+      //
+      // `confirmedByAdminUserId` 는 비운다 — 아무도 확인하지 않았다는 것이 사실이다.
+      const isFree = lockedTournament.entryFee <= 0;
       const updated = await tx.v1TournamentRegistration.update({
         where: { id: registrationId },
         data: {
-          status: 'awaiting_payment',
+          status: isFree ? 'payment_checking' : 'awaiting_payment',
           depositorName: dto.paymentMethod === 'bank_transfer' ? dto.depositorName!.trim() : null,
           agreedRules: termsDecisions.acceptedCodes.has('tournament_rules'),
           agreedPrivacy: termsDecisions.acceptedCodes.has('tournament_privacy'),
@@ -321,13 +332,15 @@ export class TournamentRegistrationsService {
           registrationId,
           method: dto.paymentMethod,
           amount: lockedTournament.entryFee,
-          status: 'ready',
+          status: isFree ? 'paid' : 'ready',
+          ...(isFree ? { paidAt: new Date() } : {}),
           provider: dto.paymentMethod === 'pg' ? 'toss' : null,
         },
         update: {
           method: dto.paymentMethod,
           amount: lockedTournament.entryFee,
-          status: 'ready',
+          status: isFree ? 'paid' : 'ready',
+          ...(isFree ? { paidAt: new Date() } : {}),
           provider: dto.paymentMethod === 'pg' ? 'toss' : null,
           paidAt: null,
           cancelledAt: null,

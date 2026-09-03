@@ -390,6 +390,52 @@ describe('TournamentRegistrationsService', () => {
 
   // ─── submit ───────────────────────────────────────────────────────────────────
 
+  describe('참가비 0원이면 입금 단계를 건너뛴다 (Task 164 BE-4)', () => {
+    function arrangeSubmit(entryFee: number) {
+      prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+      prisma.v1Tournament.findFirst.mockImplementation(
+        kindAwareFindFirst(openTournament({ kind: 'regular_tournament', entryFee })),
+      );
+      prisma.v1TournamentRegistration.update.mockImplementation(
+        async (args: { data: { status: string } }) => registrationRow({ status: args.data.status }),
+      );
+      prisma.v1TournamentPayment.upsert.mockResolvedValue(paymentRow());
+    }
+
+    it('0원: 등록은 payment_checking · 결제는 paid 로 곧바로 간다 — 확인할 입금이 없다', async () => {
+      arrangeSubmit(0);
+      await service.submit(manager, 'tournament-1', 'reg-1', validSubmit);
+
+      // 착지 상태는 `confirmPayment` 가 만드는 것과 **같아야** 한다. 다른 상태로 보내면
+      // 그 뒤의 취소·환불·목록 필터가 0원 건만 다르게 다루게 된다.
+      expect(prisma.v1TournamentRegistration.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ status: 'payment_checking' }) }),
+      );
+      const upsert = prisma.v1TournamentPayment.upsert.mock.calls[0][0] as {
+        create: { status: string; paidAt?: Date };
+        update: { status: string };
+      };
+      expect(upsert.create.status).toBe('paid');
+      expect(upsert.update.status).toBe('paid');
+      expect(upsert.create.paidAt).toBeInstanceOf(Date);
+    });
+
+    it('유료: 지금까지처럼 awaiting_payment 로 간다 — 리그 편의가 대회 회귀가 되면 안 된다', async () => {
+      arrangeSubmit(120000);
+      await service.submit(manager, 'tournament-1', 'reg-1', validSubmit);
+
+      expect(prisma.v1TournamentRegistration.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ status: 'awaiting_payment' }) }),
+      );
+      const upsert = prisma.v1TournamentPayment.upsert.mock.calls[0][0] as {
+        create: { status: string; paidAt?: Date };
+      };
+      expect(upsert.create.status).toBe('ready');
+      // 낸 적 없는 돈에 결제 시각이 찍히면 정산·환불이 그것을 근거로 삼는다.
+      expect(upsert.create.paidAt).toBeUndefined();
+    });
+  });
+
   it('submit: 본인인증을 안 한 신청자는 403 PHONE_NOT_VERIFIED 로 막고 약관 검증까지 가지 않는다', async () => {
     prisma.v1User.findUnique.mockResolvedValue({ phoneVerifiedAt: null });
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());

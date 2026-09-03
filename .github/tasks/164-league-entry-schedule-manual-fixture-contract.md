@@ -161,8 +161,26 @@ D8 순서 `expand → dual-write → backfill → read-swap → contract` 중 **
     눌러야 했다(정본 §4 "스텝 최소"). **유료는 그대로**(회귀 대조군).
     - **"정원 초과 경고" 는 뺀다** — 기댈 정원 값이 없다(Ambiguity 4). D9 에서 살리는 것은
       "자동 규칙 없음 + 거부·티어 이동 사유 필수" 다.
-  - **BE-4b(D10 자동 확정, 크론)**: 시즌 시작 시각 크론이 미제출 팀 명단을 멤버 전원으로
-    생성하고 `autoConfirmed` 를 남긴다. 사전 리마인더(시작 24h 전) 알림 1종 + 확정 통보 1종.
+  - **BE-4b(D10 자동 확정)**: ✅ 구현(2026-09-03). 착수 전 실측으로 세 가지가 전제와 달랐다:
+    - **"멤버 전원" 이 아니라 "자격 통과 멤버 전원" 이다.** 명단 추가에는 실명·생년월일·
+      휴대폰(+성별부·전화인증·정원) 가드가 걸려 있고 사용자가 없앤 적 없는 규칙이다. 크론이
+      우회하면 **실명 없는 선수·여성부의 남성**이 명단에 올라간다. 화면·수동 추가와 **같은
+      함수**(`evaluateRosterCandidate`)로 거른다. 통과자 0명이면 **명단을 만들지 않고**
+      "자동 확정 실패 — 프로필 미비 N명" 을 알린다(빈 명단은 대진만 생기고 뛸 사람이 없다).
+      정원 초과는 **가입 순 상위 N명**.
+    - **v1 스택엔 cron 데코레이터가 없다.** `DISABLE_MARKETPLACE_CRON` 류는 구 스택
+      (`apps/api`)의 것이다. 이 앱의 주기 작업은 **아웃박스에 미래 시각으로 예약**하고
+      워커가 꺼내는 방식이다(`league-result-entry-reminder` 선례). 리그 생성 시 두 잡
+      (시작 24h 전 리마인더 / 시작 시각 자동 확정)을 예약하고, 세대(시작일)를 business key 에
+      접어 넣어 시작일이 바뀌면 옛 세대가 스스로 no-op 한다.
+    - **명단 층 구분**: D10 이 만드는 것은 **대회 참가 자격 명단**(`V1TournamentPlayer`)이고,
+      Task 163 의 출석 명단(등번호가 붙는 `V1GameLineup`/`V1GameParticipant`)은 경기별이다.
+    - 표식은 **`V1TournamentRegistration.rosterAutoConfirmedAt`**(등록 단위, additive
+      마이그레이션). boolean 이 아니라 시각인 이유는 운영 문의가 늘 "언제" 를 함께 묻기
+      때문이다. 그 컬럼은 **raw SQL 로 쓴다** — 생성된 Prisma 클라이언트가 모노레포 공유라
+      이 세션에서 재생성할 수 없다(CI 가 생성한다).
+    - **기본은 꺼짐**: `DISABLE_LEAGUE_ROSTER_AUTOCONFIRM_CRON === 'false'` 일 때만 실행된다
+      (없으면 안 돈다). 켜는 것 = alpha 데이터 자동 쓰기라 **사용자 직접 승인 뒤 env 변경**.
     - ⚠️ **크론 활성화는 alpha 데이터 변경이다.** `DISABLE_LEAGUE_ROSTER_AUTOCONFIRM_CRON=true`
       **기본 on 으로 배포**하고, 끄는 것은 **사용자 직접 승인** 뒤에 한다.
     - **대진 생성보다 먼저 돌아야 한다** — `generateFixtures`·`regenerateFixtures` 가 거울 status 를

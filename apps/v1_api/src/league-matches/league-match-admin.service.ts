@@ -27,6 +27,7 @@ import { tierLabel } from './league-tier-label';
 import { resolveResultStage } from './league-result-stage';
 import { resolveIsForfeit } from './league-match-forfeit.service';
 import { FixtureScheduleTemplate, FixtureTimingOptions, generateRoundRobinFixtures, resolveFixtureStartAt, resolveFixtureTimeSlots, RoundRobinFixture } from './round-robin-schedule';
+import { scheduleLeagueRosterAutoConfirm } from '../jobs/league-roster/league-roster-autoconfirm.service';
 import { createLeagueFixture, leagueFixtureTitle } from './league-fixture-creation';
 import { resolveLeagueFixtureDates } from './league-fixture-dates';
 import { resolveLeagueWeekNumbers } from './league-week-number';
@@ -182,6 +183,11 @@ export class LeagueMatchAdminService {
       for (const teamId of uniqueTeamIds) {
         await createLeagueRosterRegistration(tx, { leagueId: created.id, teamId, entrySource: 'seeded' });
       }
+      // D10(Task 164 BE-4b): 시즌 시작 24h 전 리마인더 + 시작 시각 자동 확정을 **여기서**
+      // 예약한다. v1 스택엔 cron 데코레이터가 없고 아웃박스에 미래 시각으로 넣는 것이
+      // 관용구다(`league-result-entry-reminder` 선례). "대진 생성 전에 돌아야 한다" 는
+      // 제약은 잡이 "대진이 이미 있으면 skip" 을 스스로 판정해 지킨다.
+      await scheduleLeagueRosterAutoConfirm(tx, { leagueId: created.id, startsOn });
       await this.adminContext.logAdminAction(
         admin,
         {

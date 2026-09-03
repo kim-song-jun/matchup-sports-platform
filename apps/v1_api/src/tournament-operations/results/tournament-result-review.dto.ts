@@ -85,7 +85,7 @@ export class GameResultGoalEventDto {
 
 /**
  * `POST /games/:gameId/result-revisions/:revisionId/supersede-and-submit`
- * body. Base revision must be REJECTED or SUPPLEMENT_REQUESTED; creates and
+ * body. Base revision must be SUBMITTED; creates and
  * submits the successor atomically with a fresh review SLA.
  */
 export class SupersedeAndSubmitGameResultRevisionDto {

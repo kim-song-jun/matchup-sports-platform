@@ -34,8 +34,6 @@ describe('Game core contract', () => {
       'DRAFT',
       'SUBMITTED',
       'CHANGE_REQUESTED',
-      'SUPPLEMENT_REQUESTED',
-      'REJECTED',
       'OFFICIAL',
       'VOID',
     ]);
@@ -230,8 +228,6 @@ describe('Game core contract', () => {
 
     for (const terminal of [
       V1GameResultRevisionState.CHANGE_REQUESTED,
-      V1GameResultRevisionState.SUPPLEMENT_REQUESTED,
-      V1GameResultRevisionState.REJECTED,
       V1GameResultRevisionState.OFFICIAL,
       V1GameResultRevisionState.VOID,
     ]) {

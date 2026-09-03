@@ -260,8 +260,8 @@ describe('GameResultReviewPanel — 확정 결과 헤더의 승부차기 표기'
 describe('GameResultReviewPanel — 재제출 폼도 결선 승부차기 가드를 따른다', () => {
   const PENALTY_REVISION = {
     ...STALE_REVISION,
-    id: 'revision-rejected',
-    state: 'REJECTED',
+    id: 'revision-resubmittable',
+    state: 'SUBMITTED',
     score: { home: 1, away: 1, penalties: { home: 4, away: 3 } },
   };
   let supersedeMutate: ReturnType<typeof vi.fn>;
@@ -298,7 +298,9 @@ describe('GameResultReviewPanel — 재제출 폼도 결선 승부차기 가드�
       refetch: vi.fn(),
     });
     render(<GameResultReviewPanel gameId={GAME_ID} />);
-    fireEvent.click(screen.getByRole('button', { name: '다시 제출' }));
+    // SUBMITTED 카드의 입구는 "고치고 확인" 이다 — 레거시 반려 카드("다시 제출")는
+    // contract 마이그레이션과 함께 사라졌고, 열리는 모달은 같은 재제출 모달이다.
+    fireEvent.click(screen.getByRole('button', { name: '고치고 확인' }));
     return screen.getByRole('dialog');
   }
 

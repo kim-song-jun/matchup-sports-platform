@@ -67,7 +67,7 @@ D8 순서 `expand → dual-write → backfill → read-swap → contract` 중 **
 ## Original Conditions
 
 - [ ] ① 리그 대진 생성이 **날짜 목록**을 받는다. 요일 하나로도 만들 수 있지만 그것은 날짜 목록의 편의 입력일 뿐이다.
-- [ ] ② 팀장이 **정규 리그에 참가 신청**할 수 있다. 경로는 대회와 **같은 API·같은 화면**이다(D7). 승강 승계팀은 자동 등록된다(D7). 정원 초과는 운영자가 사유와 함께 직접 조정한다(D9). 명단 미제출 팀은 시즌 시작 시각에 현재 멤버 전원으로 자동 확정되고 `autoConfirmed` 표식이 남는다(D10).
+- [ ] ② 팀장이 **정규 리그에 참가 신청**할 수 있다. 경로는 대회와 **같은 API·같은 화면**이다(D7). 승강 승계팀은 자동 등록된다(D7). 정원 초과는 운영자가 사유와 함께 직접 조정한다(D9). 명단 미제출 팀은 시즌 시작 시각에 **자격 통과 멤버 전원**으로 자동 확정되고 `rosterAutoConfirmedAt` 표식이 남는다(D10 — 실명·생년월일·휴대폰·성별부·정원 가드는 그대로 적용된다).
 - [ ] ③ 운영자가 **대진 한 건을 수동으로** 만든다(홈팀·원정팀·일시·장소). 자동 생성과 섞여도 순위·일정·결과 경로가 같다.
 - [ ] ④ `V1League` · `V1LeagueTeam` 을 읽는 코드 0건 → 두 테이블 drop 마이그레이션(contract). alpha 실행은 **사용자 직접 승인**.
 - [ ] 결과 흐름은 **정본 §4**(결과 보내기 → 어드민 확인 한 단계, 이의 없음 — Task 166)를 따른다. 이 태스크의 검증 항목은 수동 대진·신청 팀의 경기도 **같은 경로**를 탄다는 것이다.
@@ -88,7 +88,7 @@ D8 순서 `expand → dual-write → backfill → read-swap → contract` 중 **
 - 신청 → 제출 → 운영자 confirm 시 `V1TournamentRegistration.status='confirmed'` 가 되고, contract 전까지는 `V1LeagueTeam` 도 같은 트랜잭션에서 생성된다(dual-write 역방향). 거울 수 불변식 통과.
 - 날짜 3개 + 4팀(3라운드) 생성 → 라운드 r 의 모든 경기 `startAt` 이 r 번째 날짜. 순서는 입력 순이 아니라 **날짜 오름차순**.
 - 수동 대진 1건 + 자동 대진 N건 → `/tournaments/:id/schedule` 과 순위표에 N+1 경기, 결과 입력 후 승점 반영.
-- 시즌 시작 시각 경과 → 미제출 팀 명단이 멤버 전원으로 생성, `autoConfirmed=true`, 알림 1건.
+- 시즌 시작 시각 경과 → 미제출 팀 명단이 **자격 통과 멤버**로 생성, `rosterAutoConfirmedAt` 기록, 알림 1건(통과자 0명이면 명단을 만들지 않고 실패 통보).
 
 ### Edge
 - 날짜 수 < **매치데이 수** → **422** `LEAGUE_SCHEDULE_SLOTS_INSUFFICIENT { required, provided }`. 생성 없음.
@@ -161,10 +161,30 @@ D8 순서 `expand → dual-write → backfill → read-swap → contract` 중 **
     눌러야 했다(정본 §4 "스텝 최소"). **유료는 그대로**(회귀 대조군).
     - **"정원 초과 경고" 는 뺀다** — 기댈 정원 값이 없다(Ambiguity 4). D9 에서 살리는 것은
       "자동 규칙 없음 + 거부·티어 이동 사유 필수" 다.
-  - **BE-4b(D10 자동 확정, 크론)**: 시즌 시작 시각 크론이 미제출 팀 명단을 멤버 전원으로
-    생성하고 `autoConfirmed` 를 남긴다. 사전 리마인더(시작 24h 전) 알림 1종 + 확정 통보 1종.
-    - ⚠️ **크론 활성화는 alpha 데이터 변경이다.** `DISABLE_LEAGUE_ROSTER_AUTOCONFIRM_CRON=true`
-      **기본 on 으로 배포**하고, 끄는 것은 **사용자 직접 승인** 뒤에 한다.
+  - **BE-4b(D10 자동 확정)**: ✅ 구현(2026-09-03). 착수 전 실측으로 세 가지가 전제와 달랐다:
+    - **"멤버 전원" 이 아니라 "자격 통과 멤버 전원" 이다.** 명단 추가에는 실명·생년월일·
+      휴대폰(+성별부·전화인증·정원) 가드가 걸려 있고 사용자가 없앤 적 없는 규칙이다. 크론이
+      우회하면 **실명 없는 선수·여성부의 남성**이 명단에 올라간다. 화면·수동 추가와 **같은
+      함수**(`evaluateRosterCandidate`)로 거른다. 통과자 0명이면 **명단을 만들지 않고**
+      "자동 확정 실패 — 프로필 미비 N명" 을 알린다(빈 명단은 대진만 생기고 뛸 사람이 없다).
+      정원 초과는 **가입 순 상위 N명**.
+    - **v1 스택엔 cron 데코레이터가 없다.** `DISABLE_MARKETPLACE_CRON` 류는 구 스택
+      (`apps/api`)의 것이다. 이 앱의 주기 작업은 **아웃박스에 미래 시각으로 예약**하고
+      워커가 꺼내는 방식이다(`league-result-entry-reminder` 선례). 리그 생성 시 두 잡
+      (시작 24h 전 리마인더 / 시작 시각 자동 확정)을 예약하고, 세대(시작일)를 business key 에
+      접어 넣어 시작일이 바뀌면 옛 세대가 스스로 no-op 한다.
+    - **명단 층 구분**: D10 이 만드는 것은 **대회 참가 자격 명단**(`V1TournamentPlayer`)이고,
+      Task 163 의 출석 명단(등번호가 붙는 `V1GameLineup`/`V1GameParticipant`)은 경기별이다.
+    - 표식은 **`V1TournamentRegistration.rosterAutoConfirmedAt`**(등록 단위, additive
+      마이그레이션). boolean 이 아니라 시각인 이유는 운영 문의가 늘 "언제" 를 함께 묻기
+      때문이다. 그 컬럼은 **raw SQL 로 쓴다** — 생성된 Prisma 클라이언트가 모노레포 공유라
+      이 세션에서 재생성할 수 없다(CI 가 생성한다).
+    - **기본은 꺼짐**: `DISABLE_LEAGUE_ROSTER_AUTOCONFIRM_CRON === 'false'` 일 때만 실행된다
+      (없으면 안 돈다). 켜는 것 = alpha 데이터 자동 쓰기라 **사용자 직접 승인 뒤 env 변경**.
+    - ⚠️ **크론 활성화는 alpha 데이터 변경이다.** 그래서 **꺼진 채로 배포**하고,
+      `DISABLE_LEAGUE_ROSTER_AUTOCONFIRM_CRON=false` 를 넣어 **켜는 것**이 사용자 직접 승인
+      대상이다(위 줄과 같은 말 — 앞서 여기에 "기본 on 으로 배포" 라고 적혀 있었는데 바로 위
+      "기본은 꺼짐" 과 정반대였다).
     - **대진 생성보다 먼저 돌아야 한다** — `generateFixtures`·`regenerateFixtures` 가 거울 status 를
       `in_progress` 로 옮기면 신청이 닫히고, 그 뒤엔 자동 확정할 대상이 이미 없다.
 - **BE-5 ④ contract.** `v1League.*` / `v1LeagueTeam.*` 호출 12 파일 → `V1Tournament(kind='regular_league')` / `V1TournamentRegistration` 으로 재배선. 역방향 dual-write 제거. **`git grep -n -w -e v1League -e v1LeagueTeam -- apps/v1_api/src apps/v1_web/src | wc -l` → `0`** 이 된 뒤에만 drop 마이그레이션 PR 을 따로 연다. drop 은 idempotent(`DROP TABLE IF EXISTS`), alpha 실행 전 사용자 직접 승인.
@@ -174,7 +194,7 @@ D8 순서 `expand → dual-write → backfill → read-swap → contract` 중 **
 - **FE-1** 대진 생성 모달: 캘린더 다중 선택(3안 → 선택 후 구현). 요일 편의 입력은 선택된 기간 안의 해당 요일을 날짜로 전개해 목록에 넣는다.
 - **FE-2** 수동 대진 폼(3안 → 선택 후 구현). 어드민 대진 표의 `result` 열·`status` 열 계약(D6 결정) 유지.
 - **FE-3** 신청 화면 공존(D7 의 "3안이 갈릴 축": 자동 등록 팀과 신청 팀이 한 화면에) — 3안 → 선택 후 구현. 통합 목록 카드에 "신청 접수 중" 상태 칩(기존 대회 칩 재사용).
-- **FE-4** 어드민 참가팀 탭: 신청 목록·사유 입력·`autoConfirmed` 배지.
+- **FE-4** 어드민 참가팀 탭: 신청 목록·사유 입력·**"자동 확정" 배지**(근거 필드는 `rosterAutoConfirmedAt`).
 
 ### Infra / QA
 
@@ -187,7 +207,7 @@ D8 순서 `expand → dual-write → backfill → read-swap → contract` 중 **
 - [ ] 자동 생성이 날짜 목록을 받고, 라운드 수 초과 시 400 + 부족 수. `dayOfWeek` 식별자가 `apps/` 아래 0건.
 - [ ] `POST /admin/league-matches/:leagueId/fixtures/manual` → 생성 경기가 `/tournaments/:id/schedule` 공개 API 에 나타나고, 결과 입력 후 `standings` 에 반영된다(alpha 실측).
 - [ ] 거부·티어 이동 `reason` 없이 400(리그 거울만). 대회는 기존 계약 유지 테스트.
-- [ ] 시즌 시작 크론이 미제출 팀에만 명단을 만들고 `autoConfirmed=true`; 제출 팀은 건드리지 않는다(변이: 조건 제거 시 red).
+- [ ] 시즌 시작 **아웃박스 예약 잡**이 미제출 팀에만 명단을 만들고 `rosterAutoConfirmedAt` 을 남긴다; 제출 팀은 건드리지 않는다(변이: 조건 제거 시 red). v1 스택엔 cron 데코레이터가 없어 아웃박스에 미래 시각으로 예약한다.
 - [ ] `git grep -n -w -e v1League -e v1LeagueTeam -- apps/v1_api/src apps/v1_web/src | wc -l` → `0`, 그 뒤 drop 마이그레이션. 마이그레이션 replay + drift 게이트 green.
 - [ ] Task 163 과의 접점: 자동 확정 명단은 **출석 명단**(선발 정보 없음)이며, 전술보드가 없으면 킥오프 시 전원 선발(163 의 fallback 계약) — 통합 스펙 1건.
 - [ ] UI 항목(FE-1~3)은 각각 "3안 제시 → 사용자 선택" 기록이 PR 본문에 있다.

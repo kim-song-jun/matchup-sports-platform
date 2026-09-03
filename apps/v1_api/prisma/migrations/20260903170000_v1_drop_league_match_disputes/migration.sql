@@ -17,7 +17,9 @@
 -- 이미 배포돼 있다는 것이 그 전제이고, 위 grep 0 이 그 근거다.
 DO $$
 DECLARE
-  dispute_count integer;
+  -- `count(*)` 는 bigint 다. integer 로 받으면 20억 행에서 넘치는데, 그보다 중요한 건
+  -- 타입이 실제 반환형과 다르면 읽는 사람이 무엇이 오는지 잘못 안다는 것이다.
+  dispute_count bigint;
 BEGIN
   IF to_regclass('public.v1_league_match_disputes') IS NULL THEN
     RAISE NOTICE 'task166-dispute-drop: 테이블이 이미 없다 — 건너뛴다';

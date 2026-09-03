@@ -2750,6 +2750,12 @@ model V1TournamentRegistration {
   /// 필수 여부는 서비스 계층에서 강제한다(몰수·정정이 이미 쓰는 방식과 같다) —
   /// 컬럼을 NOT NULL 로 걸면 사유가 필요 없는 기존/자동 등록 행까지 막힌다.
   adjustmentNote           String?                         @map("adjustment_note")
+  /// D10(Task 164 BE-4b) — 시즌 시작 시각에 명단 미제출 팀의 명단을 자동 생성한 시각.
+  /// **boolean 이 아니라 시각**인 이유: 어드민 배지는 "자동 확정됨" 만 물어보지만,
+  /// 운영 문의는 늘 "언제" 를 함께 묻는다(수동 확정과 시점이 겹칠 때 어느 쪽이 먼저였는지).
+  /// 선수 단위(누가 자동으로 들어왔는지)로 쪼개지 않는다 — 164 의 배지 요구가 팀 단위이고,
+  /// 선수 단위 구분을 쓸 화면이 아직 없다.
+  rosterAutoConfirmedAt    DateTime?                       @map("roster_auto_confirmed_at")
 
   tournament       V1Tournament            @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   team             V1Team                  @relation(fields: [teamId], references: [id], onDelete: Restrict)

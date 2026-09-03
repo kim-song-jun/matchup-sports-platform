@@ -1,11 +1,8 @@
 import { Prisma } from '@prisma/client';
-import { LEAGUE_RESULT_DISPUTE_WINDOW_MS } from '../league-matches/league-result-dispute.constants';
 import { notificationCopyFor } from '../notifications/notifications.service';
 import type { WebPushService } from '../notifications/web-push.service';
 import type { GameOperationClaim } from '../jobs/v1-game-operations-worker.service';
 import type { OfficialRevisionRow } from './game-result-official-projection.types';
-
-const LEAGUE_RESULT_DISPUTE_WINDOW_DAYS = LEAGUE_RESULT_DISPUTE_WINDOW_MS / (24 * 60 * 60 * 1_000);
 
 /**
  * 리그 감사 그룹 A / R1: `team_match_completed` 알림 타입은
@@ -33,8 +30,8 @@ const LEAGUE_RESULT_DISPUTE_WINDOW_DAYS = LEAGUE_RESULT_DISPUTE_WINDOW_MS / (24 
  *
  * **리그 알림 문구 전용화(2026-08-25)**: 리그 대진(`teamMatch.leagueId !== null`)은
  * 일반 팀매치와 문구·딥링크가 다르다 — 일반 팀매치는 "완료됐어요, 리뷰를 남겨보세요"로
- * 후기 작성 화면으로 보내지만, 리그는 이의 제기 기간이 있는 "확정" 이벤트라 결과
- * 영수증 화면(`/team-matches/:id/result`)으로 보내고 이의 제기 기간을 안내한다. 이
+ * 후기 작성 화면으로 보내지만, 리그는 순위에 반영되는 "확정" 이벤트라 결과 영수증
+ * 화면(`/team-matches/:id/result`)으로 보낸다. 이
  * 갈림은 `notifications.service.ts`의 `NotificationEventType`
  * `team_match_completed` vs `league_team_match_completed` 두 항목의 title/body/
  * deepLink와 정확히 같은 문구를 쓴다(그 파일이 단일 소스) — 여기서 문구를 고치면
@@ -104,17 +101,21 @@ export class TeamMatchCompletionNotificationService {
     // 제목·딥링크는 notifications.service.ts 의 단일 소스에서 읽는다 — 처음엔 여기 주석으로
     // "그 파일이 단일 소스다"라고만 적고 문자열을 복사해 뒀는데, 적대 리뷰가 그 복사본이
     // 컴파일·테스트 어느 것으로도 결속되지 않아 조용히 갈라질 수 있음을 지적했다.
-    // body 만 동적(경기 제목 인용 + 이의 기간 일수)이라 여기서 만든다 — 호출부 body 덮어쓰기는
-    // notifications.service.ts 가 문서화한 관례다.
+    // body 만 동적(경기 제목 인용)이라 여기서 만든다 — 호출부 body 덮어쓰기는
+    // notifications.service.ts 가 문서화한 관례다. Task 166 이 이의 경로를 없애면서
+    // "N일 안에 이의를 제기할 수 있어요" 를 뺐다 — 없는 기능을 안내하면 안 된다.
     const copy = notificationCopyFor(
       isLeagueFixture ? 'league_team_match_completed' : 'team_match_completed',
       'team_match',
       teamMatchId,
     );
     const title = copy.title;
-    const body = isLeagueFixture
-      ? `"${teamMatch.title}" 경기 결과가 확정됐어요. ${LEAGUE_RESULT_DISPUTE_WINDOW_DAYS}일 안에 이의를 제기할 수 있어요.`
-      : `"${teamMatch.title}" 팀매치 리뷰를 남겨보세요.`;
+    // body 는 **문구 테이블의 `defaultBody` 를 단일 소스로** 쓴다. 여기서 문장을 다시
+    // 조립하면(예전 방식) 테이블만 고쳤을 때 발송 문구가 조용히 갈린다 — 실제로
+    // Task 166 에서 테이블에 "문의는 리그 운영자에게" 를 넣었는데 여기 복사본엔 빠져
+    // 두 문구가 어긋났다(Copilot 리뷰). 동적인 부분은 경기 제목 인용 하나뿐이라
+    // 그것만 앞에 붙인다.
+    const body = `"${teamMatch.title}" ${copy.defaultBody}`;
     const deepLink = copy.deepLink;
     const businessKeyFor = (userId: string) => `team-match-completed:${teamMatchId}:${userId}`;
 

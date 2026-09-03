@@ -29,6 +29,10 @@ import { decodeRecordCursor, encodeRecordCursor } from './public-cursor';
 import { isParticipantPubliclyEligible, loadParticipantConsentEligibility, type ParticipantConsentEligibility } from './public-consent';
 import { resolveLiveClock, resolvePeriodBreak, type PublicGameClock, type PublicPeriodBreak } from './public-clock';
 import { tallyLiveScore } from './public-live-score';
+import {
+  resolvePublicScorePresentation,
+  type PublicScoreValue,
+} from './public-score-presentation';
 import { effectivePublicVisibilityMode, isLineupPublished, publicFixtureStatus, resolveResultState } from './public-visibility';
 import type { PublicTournamentScheduleQueryDto } from './dto/public-records-query.dto';
 import {
@@ -102,6 +106,14 @@ const FIXTURE_SCHEDULE_SELECT = {
       // 경기 상세(FIXTURE_MATCH_SELECT)에만 있던 동안, 목록만 훑는 관전자에게는 몰수 0:0 과
       // 실제 0:0 무승부가 같아 보였다(alpha 실측: 순위표에 세 팀이 나란히 2점인데 그중
       // 두 경기가 몰수라는 사실을 목록 어디에서도 알 수 없었다).
+      // Task 166: **확정 전(SUBMITTED) 점수**를 관전자에게 보여주려면 확정 포인터만으로는
+      // 부족하다 — SUBMITTED 리비전에는 포인터가 없다. 최신 1건만 가져와 그 상태가
+      // SUBMITTED 일 때 점수를 쓴다(`resolvePublicScorePresentation`).
+      resultRevisions: {
+        select: { state: true, score: true },
+        orderBy: { revision: 'desc' },
+        take: 1,
+      },
       currentOfficialRevision: {
         select: {
           state: true,
@@ -158,6 +170,14 @@ const GAME_MATCH_SELECT = {
       // 계속 select 하면 안 쓰는 값을 나르는 셈이고, 다음 사람이 "이미 있으니 써도
       // 되겠지" 하고 다시 노출시킬 여지를 남긴다.
     },
+  },
+  // Task 166: **확정 전(SUBMITTED) 점수**를 관전자에게 보여주려면 확정 포인터만으로는
+  // 부족하다 — SUBMITTED 리비전에는 포인터가 없다. 최신 1건만 가져와 그 상태가
+  // SUBMITTED 일 때 점수를 쓴다(`resolvePublicScorePresentation`).
+  resultRevisions: {
+    select: { state: true, score: true },
+    orderBy: { revision: 'desc' },
+    take: 1,
   },
   currentOfficialRevision: {
     // outcomeReason/outcomeNote — 몰수·중단으로 끝난 경기를 관전자 화면에서 정상 종료와
@@ -946,13 +966,21 @@ export class PublicTournamentRecordsService {
       !showOfficialResult && mode === 'live' && status === 'live' && fixture.game !== null
         ? await this.computeLiveScore(fixture.game.id, fixture.game.sides)
         : null;
-    const scoreStatus: 'unavailable' | 'live' | 'official' = showOfficialResult
-      ? 'official'
-      : liveScore !== null
-        ? 'live'
-        : 'unavailable';
-    const score: PublicScoreValue | null =
-      mode === 'status_only' ? null : showOfficialResult ? officialScore : liveScoreToPublicScore(liveScore);
+    // Task 166: 세 자리(대회 상세·리그 경기·일정 카드)가 같은 삼항식을 복사해 두고
+    // 있었다 — 한 곳만 고치면 나머지가 조용히 갈린다. 규칙은
+    // `public-score-presentation.ts` 한 곳이 갖는다.
+    const submittedScore = parseScore(
+      fixture.game?.resultRevisions?.[0]?.state === 'SUBMITTED'
+        ? fixture.game.resultRevisions[0].score
+        : null,
+    );
+    const { scoreStatus, score } = resolvePublicScorePresentation({
+      mode,
+      showOfficialResult,
+      officialScore,
+      liveScore: liveScoreToPublicScore(liveScore),
+      submittedScore,
+    });
     const clock: PublicGameClock | null =
       mode === 'live' && !showOfficialResult ? resolveLiveClock(fixture.game?.periods ?? [], new Date()) : null;
     // `clock`과 달리 `status === 'live'` 게이트가 하나 더 필요하다: `resolveLiveClock`은
@@ -1570,13 +1598,21 @@ export class PublicTournamentRecordsService {
       !showOfficialResult && mode === 'live' && status === 'live' && teamMatch.game !== null
         ? await this.computeLiveScore(teamMatch.game.id, teamMatch.game.sides)
         : null;
-    const scoreStatus: 'unavailable' | 'live' | 'official' = showOfficialResult
-      ? 'official'
-      : liveScore !== null
-        ? 'live'
-        : 'unavailable';
-    const score: PublicScoreValue | null =
-      mode === 'status_only' ? null : showOfficialResult ? officialScore : liveScoreToPublicScore(liveScore);
+    // Task 166: 세 자리(대회 상세·리그 경기·일정 카드)가 같은 삼항식을 복사해 두고
+    // 있었다 — 한 곳만 고치면 나머지가 조용히 갈린다. 규칙은
+    // `public-score-presentation.ts` 한 곳이 갖는다.
+    const submittedScore = parseScore(
+      teamMatch.game?.resultRevisions?.[0]?.state === 'SUBMITTED'
+        ? teamMatch.game.resultRevisions[0].score
+        : null,
+    );
+    const { scoreStatus, score } = resolvePublicScorePresentation({
+      mode,
+      showOfficialResult,
+      officialScore,
+      liveScore: liveScoreToPublicScore(liveScore),
+      submittedScore,
+    });
     const clock: PublicGameClock | null =
       mode === 'live' && !showOfficialResult ? resolveLiveClock(teamMatch.game?.periods ?? [], new Date()) : null;
     // getMatch 와 같은 이유로 status === 'live' 게이트가 하나 더 필요하다 — 그 주석 참고.
@@ -1947,11 +1983,17 @@ function presentScheduleEntry(
     !showOfficialResult && mode === 'live' && status === 'live' && fixture.game !== null
       ? (liveScoreByGameId.get(fixture.game.id) ?? null)
       : null;
-  const scoreStatus: 'unavailable' | 'live' | 'official' = showOfficialResult
-    ? 'official'
-    : liveScore !== null
-      ? 'live'
-      : 'unavailable';
+  // getMatch 의 트윈 — 규칙은 `public-score-presentation.ts` 한 곳이 갖는다(Task 166).
+  const submittedScore = parseScore(
+    fixture.game?.resultRevisions?.[0]?.state === 'SUBMITTED' ? fixture.game.resultRevisions[0].score : null,
+  );
+  const { scoreStatus, score } = resolvePublicScorePresentation({
+    mode,
+    showOfficialResult,
+    officialScore,
+    liveScore: liveScoreToPublicScore(liveScore),
+    submittedScore,
+  });
   const clock: PublicGameClock | null =
     mode === 'live' && !showOfficialResult ? resolveLiveClock(fixture.game?.periods ?? [], now) : null;
   // `status === 'live'` 게이트가 `clock`보다 하나 더 필요한 이유는 getMatch의 쌍둥이
@@ -2025,7 +2067,7 @@ function presentScheduleEntry(
       supersedesId: fixture.game?.currentOfficialRevision?.supersedesId ?? null,
     }),
     scoreStatus,
-    score: mode === 'status_only' ? null : showOfficialResult ? officialScore : liveScoreToPublicScore(liveScore),
+    score,
     clock,
     periodBreak,
     scorers,
@@ -2176,12 +2218,6 @@ function buildMvp(
  * `null` 이라 소비처가 "필드가 있는데 값이 null" 하나만 보면 된다(키 자체가 사라지는
  * 경우는 없다).
  */
-type PublicScoreValue = {
-  home: number;
-  away: number;
-  penalties: { home: number; away: number } | null;
-};
-
 /**
  * 라이브 집계 스코어(`tallyLiveScore`)는 정규시간 GOAL 이벤트만 센다 — 승부차기 킥은
  * `V1GameEvent` 로 아예 기록되지 않으므로(옵션 B, `apps/v1_web/src/lib/penalty-shootout.ts`

@@ -5,6 +5,24 @@ export type RevisionFlow = 'STANDARD' | 'CORRECTION';
 export type RevisionMutation = 'CONTENT' | 'PARTICIPANTS' | 'STATE' | 'DELETE';
 export type AppendOnlyEventOperation = 'APPEND' | 'UPDATE' | 'DELETE';
 
+/**
+ * Task 166: `SUPPLEMENT_REQUESTED` · `REJECTED` 를 없앴다. 그 둘은 **어드민이 팀에게
+ * 결과를 되돌려 보내는 왕복**이었고, 정본 §4 가 "결과는 보내기 → 확인 한 단계, 이의 없음"
+ * 으로 확정하면서 그 왕복 자체가 사라졌다. 어드민이 틀린 결과를 만나면 되돌려 보내지 않고
+ * **그 자리에서 고쳐 확정한다**(supersede-and-submit 의 SUBMITTED base — 아래).
+ *
+ * `CHANGE_REQUESTED` 는 남는다. 이름이 "요청" 이라 왕복처럼 읽히지만 실제 역할은
+ * **운영자 재작성 허용 상태**(팀 왕복이 아니다)다 — `createResultRevision` 이 새 DRAFT 를
+ * 만들 수 있는 유일한 선행 상태이고, 이걸 없애면 결과를 다시 넣을 방법이 사라진다
+ * (games.service.ts 의 같은 자리 주석에 "이의 수락으로 무효 처리된 리그 대진은 결과를 다시
+ * 넣을 방법이 전혀 없어 시즌 승강이 영구히 막혔다" 는 실사고가 적혀 있다).
+ *
+ * ⚠️ **이 목록에서는 두 값을 빼지 않는다.** 없앤 것은 *그 상태로 들어가는 전이*
+ * (`standardSubmittedTargets`)와 그것을 base 로 삼던 재제출이지, **이미 그 상태로 저장된
+ * 행**이 아니다. 여기서 빼면 그 레거시 행이 갑자기 **변경 가능**해져 확정된 결과를 덮어쓸
+ * 수 있다 — 유닛 스펙이 실제로 이걸 잡았다. 값 자체는 후속 contract 마이그레이션이
+ * 행을 CHANGE_REQUESTED 로 옮긴 뒤에 사라진다(expand-contract).
+ */
 export const TERMINAL_REVISION_STATES = Object.freeze([
   V1GameResultRevisionState.CHANGE_REQUESTED,
   V1GameResultRevisionState.SUPPLEMENT_REQUESTED,
@@ -40,8 +58,6 @@ export interface RevisionSupersessionInput {
 
 const standardSubmittedTargets = new Set<V1GameResultRevisionState>([
   V1GameResultRevisionState.CHANGE_REQUESTED,
-  V1GameResultRevisionState.SUPPLEMENT_REQUESTED,
-  V1GameResultRevisionState.REJECTED,
   V1GameResultRevisionState.OFFICIAL,
 ]);
 const correctionTargets = new Set<V1GameResultRevisionState>([
@@ -104,10 +120,24 @@ export function assertRevisionSupersession(input: RevisionSupersessionInput): vo
   const validBase =
     (input.purpose === 'TEAM_RESUBMISSION' &&
       input.baseState === V1GameResultRevisionState.CHANGE_REQUESTED) ||
+    // Task 166: base 에 `SUBMITTED` 가 **더해졌다**. 예전엔 REJECTED/SUPPLEMENT_REQUESTED
+    // 뿐이었는데, 그 두 상태는 "어드민이 팀에게 되돌려 보냈다" 는 뜻이라 팀이 다시
+    // 제출하는 왕복을 전제했다. 그 왕복이 사라진 지금(정본 §4) 어드민은 **제출된 결과를
+    // 그 자리에서 고쳐** 새 리비전으로 대체한다.
+    //
+    // ⚠️ 레거시 두 상태를 **여기서 빼지 않는다.** 이 변경 이전에 반려·보완 요청된 행이
+    // 실제로 남아 있고, 빼면 그 경기들은 **영영 고칠 수 없다**(다른 재작성 경로가 없다).
+    // 후속 contract 마이그레이션이 그 행들을 옮긴 뒤 여기서 두 값을 뺀다(expand-contract).
+    //
+    // 누가 할 수 있는지는 여기서 정하지 않는다 — `supersedeAndSubmit` 이
+    // `staffAccess.assertAccess({ action: 'result_review' })` 를 지나므로 팀 actor 는 그
+    // 경계에서 403 이다(이 함수는 상태만 본다).
     (input.purpose === 'TOURNAMENT_RESUBMISSION' &&
-      [V1GameResultRevisionState.REJECTED, V1GameResultRevisionState.SUPPLEMENT_REQUESTED].some(
-        (state) => state === input.baseState,
-      )) ||
+      [
+        V1GameResultRevisionState.SUBMITTED,
+        V1GameResultRevisionState.REJECTED,
+        V1GameResultRevisionState.SUPPLEMENT_REQUESTED,
+      ].some((state) => state === input.baseState)) ||
     (input.purpose === 'CORRECTION' && input.baseState === V1GameResultRevisionState.OFFICIAL) ||
     // 무효 처리(VOID)는 경기의 끝이 아니라 '현재 유효한 공식 결과 없음' 상태예요.
     // 권한자가 VOID 리비전을 base 로 새 DRAFT 를 만들어 다시 확정할 수 있어야

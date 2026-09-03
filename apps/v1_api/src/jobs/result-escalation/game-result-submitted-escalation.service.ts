@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import type { GameOperationHandler } from '../v1-game-operations-worker.service';
-import { LEAGUE_RESULT_AUTO_APPROVE_DELAY_MS } from '../../league-matches/league-result-dispute.constants';
+import { LEAGUE_RESULT_AUTO_APPROVE_DELAY_MS } from '../../league-matches/league-result-auto-approve.constants';
 
 const REMINDER_DELAY_MS = 24 * 60 * 60 * 1_000;
 const ESCALATION_DELAY_MS = 48 * 60 * 60 * 1_000;

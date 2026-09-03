@@ -53,7 +53,6 @@ function freshMutationMock(): MutationMock {
 const hookMocks = vi.hoisted(() => ({
   game: { data: undefined, isPending: false, isError: false, error: null, refetch: vi.fn() } as QueryMock<unknown>,
   revisions: { data: undefined, isPending: false, isError: false, error: null, refetch: vi.fn() } as QueryMock<unknown>,
-  reviewDecision: { mutate: vi.fn(), isPending: false, isError: false, error: null, reset: vi.fn() } as MutationMock,
   supersedeAndSubmit: { mutate: vi.fn(), isPending: false, isError: false, error: null, reset: vi.fn() } as MutationMock,
   officialize: { mutate: vi.fn(), isPending: false, isError: false, error: null, reset: vi.fn() } as MutationMock,
   voidRevision: { mutate: vi.fn(), isPending: false, isError: false, error: null, reset: vi.fn() } as MutationMock,
@@ -76,7 +75,6 @@ vi.mock('@/hooks/use-tournament-result-review', async () => {
     ...actual,
     useTournamentGame: () => hookMocks.game,
     useGameResultRevisions: () => hookMocks.revisions,
-    useReviewResultDecision: () => hookMocks.reviewDecision,
     useSupersedeAndSubmitResult: () => hookMocks.supersedeAndSubmit,
     useOfficializeResultRevision: () => hookMocks.officialize,
     useVoidResultRevision: () => hookMocks.voidRevision,
@@ -173,7 +171,6 @@ beforeEach(() => {
   vi.resetAllMocks();
   Object.assign(hookMocks.game, freshQueryMock());
   Object.assign(hookMocks.revisions, freshQueryMock());
-  Object.assign(hookMocks.reviewDecision, freshMutationMock());
   Object.assign(hookMocks.supersedeAndSubmit, freshMutationMock());
   Object.assign(hookMocks.officialize, freshMutationMock());
   Object.assign(hookMocks.voidRevision, freshMutationMock());
@@ -237,31 +234,31 @@ describe('actor visibility on a submitted revision (platform_ops / director / op
     hookMocks.revisions.data = [buildRevision({ id: 'rev-1', revision: 1, state: 'SUBMITTED' })];
   });
 
-  it('platform_ops sees officialize (approve), request-supplement, and reject', () => {
+  it('platform_ops 는 "확인" 과 "고치고 확인" 둘을 보고, 반려·보완 요청 버튼은 없다', () => {
     hookMocks.game.data = buildGame('platform_ops');
     renderWithClient(<GameResultReviewPanel gameId="game-1" />);
 
-    expect(screen.getByRole('button', { name: '결과 승인(확정)' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '보완 요청' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '반려' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '확인' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '고치고 확인' })).toBeInTheDocument();
+    // Task 166: 두 명령의 **백엔드가 사라졌다**. 버튼만 남으면 눌러서 404 를 받는다.
+    expect(screen.queryByRole('button', { name: '보완 요청' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '반려' })).not.toBeInTheDocument();
   });
 
-  it('tournament_director also sees officialize/reject/request-supplement (review itself is not flag-gated)', () => {
+  it('tournament_director 도 같은 두 버튼을 본다 (검토 자체는 플래그 게이트가 아니다)', () => {
     hookMocks.game.data = buildGame('tournament_director');
     renderWithClient(<GameResultReviewPanel gameId="game-1" />);
 
-    expect(screen.getByRole('button', { name: '결과 승인(확정)' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '보완 요청' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '반려' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '확인' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '고치고 확인' })).toBeInTheDocument();
   });
 
   it('field_operator ("operator") sees no review actions at all, only a read-only notice', () => {
     hookMocks.game.data = buildGame('field_operator');
     renderWithClient(<GameResultReviewPanel gameId="game-1" />);
 
-    expect(screen.queryByRole('button', { name: '결과 승인(확정)' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '보완 요청' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '반려' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '확인' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '고치고 확인' })).not.toBeInTheDocument();
     expect(screen.getByText('이 화면에서는 결과를 볼 수만 있어요. 검토·확정 권한이 없어요.')).toBeInTheDocument();
   });
 
@@ -269,89 +266,27 @@ describe('actor visibility on a submitted revision (platform_ops / director / op
     hookMocks.game.data = buildGame('support_readonly');
     renderWithClient(<GameResultReviewPanel gameId="game-1" />);
 
-    expect(screen.queryByRole('button', { name: '결과 승인(확정)' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '확인' })).not.toBeInTheDocument();
   });
 });
 
-describe('reject / request_supplement always require a captured reason', () => {
-  beforeEach(() => {
-    hookMocks.game.data = buildGame('platform_ops');
-    hookMocks.revisions.data = [buildRevision({ id: 'rev-1', revision: 1, state: 'SUBMITTED' })];
-  });
-
-  it('reject opens a confirmation that captures a reason before calling review-decision', async () => {
-    const user = userEvent.setup();
-    renderWithClient(<GameResultReviewPanel gameId="game-1" />);
-
-    await user.click(screen.getByRole('button', { name: '반려' }));
-    const dialog = screen.getByRole('dialog');
-    await user.type(within(dialog).getByLabelText('반려/보완 사유'), '오심으로 확인됨');
-    await user.click(within(dialog).getByRole('button', { name: '반려' }));
-
-    expect(hookMocks.reviewDecision.mutate).toHaveBeenCalledWith(
-      { revisionId: 'rev-1', expectedVersion: 3, decision: 'reject', reason: '오심으로 확인됨' },
-      expect.any(Object),
-    );
-  });
-
-  it('the reject confirm button stays disabled until a reason is typed', async () => {
-    const user = userEvent.setup();
-    renderWithClient(<GameResultReviewPanel gameId="game-1" />);
-
-    await user.click(screen.getByRole('button', { name: '반려' }));
-    const dialog = screen.getByRole('dialog');
-    expect(within(dialog).getByRole('button', { name: '반려' })).toBeDisabled();
-
-    await user.type(within(dialog).getByLabelText('반려/보완 사유'), '사유');
-    expect(within(dialog).getByRole('button', { name: '반려' })).toBeEnabled();
-  });
-
-  it('request_supplement calls review-decision with decision=request_supplement', async () => {
-    const user = userEvent.setup();
-    renderWithClient(<GameResultReviewPanel gameId="game-1" />);
-
-    await user.click(screen.getByRole('button', { name: '보완 요청' }));
-    const dialog = screen.getByRole('dialog');
-    await user.type(within(dialog).getByLabelText('반려/보완 사유'), '득점자 확인 필요');
-    await user.click(within(dialog).getByRole('button', { name: '보완 요청' }));
-
-    expect(hookMocks.reviewDecision.mutate).toHaveBeenCalledWith(
-      { revisionId: 'rev-1', expectedVersion: 3, decision: 'request_supplement', reason: '득점자 확인 필요' },
-      expect.any(Object),
-    );
-  });
-
-  it('surfaces a mapped STAFF_SCOPE_DENIED message when a permission was revoked mid-session', async () => {
-    hookMocks.reviewDecision.isError = true;
-    hookMocks.reviewDecision.error = { code: 'STAFF_SCOPE_DENIED', message: 'raw' };
-    const user = userEvent.setup();
-    renderWithClient(<GameResultReviewPanel gameId="game-1" />);
-
-    await user.click(screen.getByRole('button', { name: '반려' }));
-    const dialog = screen.getByRole('dialog');
-    expect(
-      within(dialog).getByText('이 대회의 담당자 권한이 없어졌거나 만료됐어요. 새로고침 후 다시 시도해 주세요.'),
-    ).toBeInTheDocument();
-  });
-});
-
-describe('resubmit after reject/supplement_requested (supersede-and-submit)', () => {
-  it('resubmits the rejected revision content by default and calls supersede-and-submit', async () => {
+describe('"고치고 확인" — SUBMITTED 를 그 자리에서 고쳐 대체한다 (Task 166)', () => {
+  it('SUBMITTED 카드의 "고치고 확인" 이 기존 재제출 모달을 열고 supersede-and-submit 을 부른다', async () => {
     hookMocks.game.data = buildGame('platform_ops', { version: 4 });
     hookMocks.revisions.data = [
-      buildRevision({ id: 'rev-2', revision: 2, state: 'REJECTED', supersedesId: 'rev-1', score: { home: 1, away: 0 } }),
+      buildRevision({ id: 'rev-1', revision: 1, state: 'SUBMITTED', score: { home: 1, away: 0 } }),
     ];
     const user = userEvent.setup();
     renderWithClient(<GameResultReviewPanel gameId="game-1" />);
 
-    await user.click(screen.getByRole('button', { name: '다시 제출' }));
+    await user.click(screen.getByRole('button', { name: '고치고 확인' }));
     const dialog = screen.getByRole('dialog');
     await user.type(within(dialog).getByLabelText('재제출 사유'), '득점자 정정 반영');
     await user.click(within(dialog).getByRole('button', { name: '다시 제출' }));
 
     expect(hookMocks.supersedeAndSubmit.mutate).toHaveBeenCalledWith(
       expect.objectContaining({
-        revisionId: 'rev-2',
+        revisionId: 'rev-1',
         expectedVersion: 4,
         score: { home: 1, away: 0 },
         eventsHash: 'hash-1',
@@ -359,6 +294,20 @@ describe('resubmit after reject/supplement_requested (supersede-and-submit)', ()
       }),
       expect.any(Object),
     );
+  });
+
+  it('레거시 반려 행에서도 같은 모달로 고칠 수 있다 — 그 입구를 지우면 그 경기는 영영 못 고친다', () => {
+    // Task 166 이 이 상태로 **들어가는 경로**를 없앴지만, 그 전에 반려된 행은 contract
+    // 마이그레이션 전까지 남아 있다. 서버도 같은 이유로 재제출 base 허용에 이 상태를
+    // 남겼다(revision-state-machine.ts).
+    hookMocks.game.data = buildGame('platform_ops', { version: 4 });
+    hookMocks.revisions.data = [
+      buildRevision({ id: 'rev-2', revision: 2, state: 'REJECTED', supersedesId: 'rev-1', score: { home: 1, away: 0 } }),
+    ];
+    renderWithClient(<GameResultReviewPanel gameId="game-1" />);
+
+    expect(screen.getByText('반려된 결과예요')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '다시 제출' })).toBeInTheDocument();
   });
 });
 
@@ -376,7 +325,7 @@ describe('officialize (approve) always available to platform_ops', () => {
     const user = userEvent.setup();
     renderWithClient(<GameResultReviewPanel gameId="game-1" />);
 
-    await user.click(screen.getByRole('button', { name: '결과 승인(확정)' }));
+    await user.click(screen.getByRole('button', { name: '확인' }));
 
     await waitFor(() => expect(hookMocks.officialize.mutate).toHaveBeenCalledTimes(1));
     expect(hookMocks.officialize.mutate).toHaveBeenCalledWith(
@@ -404,14 +353,14 @@ describe('officialize (approve) always available to platform_ops', () => {
     const user = userEvent.setup();
     const view = renderWithClient(<GameResultReviewPanel gameId="game-1" />);
 
-    await user.click(screen.getByRole('button', { name: '결과 승인(확정)' }));
+    await user.click(screen.getByRole('button', { name: '확인' }));
     // The mocked mutation object mutates in place rather than notifying React on
     // its own (unlike the real `useMutation`, which re-renders itself) -- force one
     // reconciliation pass so this render picks up the freshly mutated mock fields.
     view.rerender(<GameResultReviewPanel gameId="game-1" />);
 
     await screen.findByText(/경기 정보가 그 사이 바뀌었어요/);
-    expect(screen.getByRole('button', { name: '결과 승인(확정)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '확인' })).toBeInTheDocument();
     expect(screen.queryByText(/아직 활성화되지 않았어요/)).not.toBeInTheDocument();
   });
 });
@@ -428,31 +377,31 @@ describe('director officialize/void visibility follows the DIRECTOR_OFFICIALIZE 
     });
 
     renderWithClient(<GameResultReviewPanel gameId="game-1" />);
-    expect(screen.getByRole('button', { name: '결과 승인(확정)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '확인' })).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: '결과 승인(확정)' }));
+    await user.click(screen.getByRole('button', { name: '확인' }));
     await waitFor(() =>
-      expect(screen.queryByRole('button', { name: '결과 승인(확정)' })).not.toBeInTheDocument(),
+      expect(screen.queryByRole('button', { name: '확인' })).not.toBeInTheDocument(),
     );
     expect(screen.getByText(/아직 활성화되지 않았어요/)).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: '다시 확인' }));
-    expect(screen.getByRole('button', { name: '결과 승인(확정)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '확인' })).toBeInTheDocument();
     expect(screen.queryByText(/아직 활성화되지 않았어요/)).not.toBeInTheDocument();
 
     hookMocks.officialize.mutate.mockImplementationOnce((_input: unknown, callbacks?: OfficializeCallbacks) => {
       callbacks?.onSuccess?.();
     });
-    await user.click(screen.getByRole('button', { name: '결과 승인(확정)' }));
+    await user.click(screen.getByRole('button', { name: '확인' }));
     await waitFor(() => expect(hookMocks.officialize.mutate).toHaveBeenCalledTimes(2));
-    expect(screen.getByRole('button', { name: '결과 승인(확정)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '확인' })).toBeInTheDocument();
 
     hookMocks.officialize.mutate.mockImplementationOnce((_input: unknown, callbacks?: OfficializeCallbacks) => {
       callbacks?.onError?.({ code: 'DIRECTOR_OFFICIALIZE_DISABLED', message: 'off again' });
     });
-    await user.click(screen.getByRole('button', { name: '결과 승인(확정)' }));
+    await user.click(screen.getByRole('button', { name: '확인' }));
     await waitFor(() =>
-      expect(screen.queryByRole('button', { name: '결과 승인(확정)' })).not.toBeInTheDocument(),
+      expect(screen.queryByRole('button', { name: '확인' })).not.toBeInTheDocument(),
     );
     expect(screen.getByText(/아직 활성화되지 않았어요/)).toBeInTheDocument();
   });
@@ -645,7 +594,7 @@ describe('몰수·중단 경기의 검토·확정', () => {
     renderWithClient(<GameResultReviewPanel gameId="game-1" />);
 
     expect(screen.getByText('몰수·기권으로 종료된 경기예요. 사유: 원정팀 미출석')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '결과 승인(확정)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '확인' })).toBeInTheDocument();
   });
 
   it('정상 종료 경기에는 몰수 배너가 뜨지 않는다', () => {
@@ -715,7 +664,7 @@ describe('몰수·중단 경기의 검토·확정', () => {
     const user = userEvent.setup();
     renderWithClient(<GameResultReviewPanel gameId="game-1" />);
 
-    await user.click(screen.getByRole('button', { name: '결과 승인(확정)' }));
+    await user.click(screen.getByRole('button', { name: '확인' }));
 
     const message = hookMocks.confirm.mock.calls[0][0].message as string;
     expect(message).toContain('몰수·기권');

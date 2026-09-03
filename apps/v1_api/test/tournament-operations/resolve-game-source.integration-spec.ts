@@ -66,13 +66,20 @@ async function codeOf(operation: () => Promise<unknown>): Promise<string> {
   throw new Error('예외가 나지 않았다 — 이 프로브는 항상 실패해야 한다');
 }
 
-/** 이 게임에 아무 결과 명령이나 걸어 본다. 경계만 재는 것이 목적이다. */
+/** 이 게임에 아무 결과 명령이나 걸어 본다. 경계만 재는 것이 목적이다.
+ *
+ * Task 166 이 `reviewDecision`(반려/보완 요청)을 없애면서 `supersedeAndSubmit` 으로 바꿨다 —
+ * 둘 다 `withResultCommand` 를 지나므로 **재는 경계는 같다**. 존재하지 않는 리비전 id 를
+ * 주므로 경계를 통과하면 `RESULT_REVISION_NOT_FOUND` 에서 멈춘다(경계를 못 넘으면 그 앞의
+ * 코드가 나온다 — 이 프로브가 가르려는 것이 바로 그 차이다). */
 const probeBoundary = (userId: string, gameId: string) =>
   codeOf(() =>
-    resultReview.reviewDecision(authUser(userId), gameId, '8b000000-0000-4000-8000-0000000000ff', `t165-${gameId}-${userId}`, {
-      decision: 'reject',
+    resultReview.supersedeAndSubmit(authUser(userId), gameId, '8b000000-0000-4000-8000-0000000000ff', `t165-${gameId}-${userId}`, {
       expectedVersion: 0,
       clientCommandId: `t165-${gameId}-${userId}`,
+      score: { home: 1, away: 0 },
+      actualParticipants: [],
+      eventsHash: 'boundary-probe',
       reason: '경계 프로브',
     }),
   );

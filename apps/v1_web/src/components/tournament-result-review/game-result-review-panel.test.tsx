@@ -11,7 +11,7 @@ import type { TournamentGameDetail } from '@/hooks/use-tournament-result-review'
  * `useGameResultRevisions`/`useTournamentGame`이 최근 30초 내 한 번이라도
  * 불러온 적이 있으면 리마운트 없이는 재요청하지 않는다는 점이다.
  *
- * 이 테스트는 "결과 승인(확정)"을 눌렀을 때 훅의 캐시값을 그대로 믿지 않고
+ * 이 테스트는 "확인"을 눌렀을 때 훅의 캐시값을 그대로 믿지 않고
  * 반드시 `refetch()`로 최신값을 받아와, 그 값을 확인 문구와 실제 제출
  * payload 양쪽에 쓰는지를 검증한다 — 구현을 되읊는 게 아니라 "사용자가
  * 보는 숫자"와 "서버에 실제로 제출되는 숫자"가 최신값과 일치하는지를
@@ -21,7 +21,6 @@ import type { TournamentGameDetail } from '@/hooks/use-tournament-result-review'
 const mocks = vi.hoisted(() => ({
   useTournamentGame: vi.fn(),
   useGameResultRevisions: vi.fn(),
-  useReviewResultDecision: vi.fn(),
   useSupersedeAndSubmitResult: vi.fn(),
   useOfficializeResultRevision: vi.fn(),
 }));
@@ -29,7 +28,6 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/hooks/use-tournament-result-review', () => ({
   useTournamentGame: (...args: unknown[]) => mocks.useTournamentGame(...args),
   useGameResultRevisions: (...args: unknown[]) => mocks.useGameResultRevisions(...args),
-  useReviewResultDecision: (...args: unknown[]) => mocks.useReviewResultDecision(...args),
   useSupersedeAndSubmitResult: (...args: unknown[]) => mocks.useSupersedeAndSubmitResult(...args),
   useOfficializeResultRevision: (...args: unknown[]) => mocks.useOfficializeResultRevision(...args),
 }));
@@ -111,7 +109,7 @@ describe('GameResultReviewPanel — 결과 확정 확인 모달은 캐시가 아
     officializeMutate = vi.fn();
 
     // 렌더 시점(마운트 직후, 아직 refetch 전)엔 캐시된 STALE 값 — 여기서
-    // 사용자가 "결과 승인(확정)"을 누르는 시나리오를 재현한다.
+    // 사용자가 "확인"을 누르는 시나리오를 재현한다.
     mocks.useTournamentGame.mockReturnValue({
       data: gameDetail(),
       isPending: false,
@@ -124,7 +122,6 @@ describe('GameResultReviewPanel — 결과 확정 확인 모달은 캐시가 아
       isError: false,
       refetch: revisionsRefetch,
     });
-    mocks.useReviewResultDecision.mockReturnValue({ mutate: vi.fn(), isPending: false, isError: false });
     mocks.useSupersedeAndSubmitResult.mockReturnValue({ mutate: vi.fn(), isPending: false, isError: false });
     mocks.useOfficializeResultRevision.mockReturnValue({
       mutate: officializeMutate,
@@ -133,10 +130,10 @@ describe('GameResultReviewPanel — 결과 확정 확인 모달은 캐시가 아
     });
   });
 
-  it('"결과 승인(확정)"을 누르면 강제로 다시 불러온 최신 점수를 확인 문구에 보여준다', async () => {
+  it('"확인"을 누르면 강제로 다시 불러온 최신 점수를 확인 문구에 보여준다', async () => {
     render(<GameResultReviewPanel gameId={GAME_ID} />);
 
-    fireEvent.click(screen.getByRole('button', { name: '결과 승인(확정)' }));
+    fireEvent.click(screen.getByRole('button', { name: '확인' }));
 
     await waitFor(() => expect(revisionsRefetch).toHaveBeenCalled());
     await waitFor(() => expect(gameRefetch).toHaveBeenCalled());
@@ -150,7 +147,7 @@ describe('GameResultReviewPanel — 결과 확정 확인 모달은 캐시가 아
   it('확정을 누르면 화면에 보여준 것과 같은 최신 점수/버전으로 실제 제출한다', async () => {
     render(<GameResultReviewPanel gameId={GAME_ID} />);
 
-    fireEvent.click(screen.getByRole('button', { name: '결과 승인(확정)' }));
+    fireEvent.click(screen.getByRole('button', { name: '확인' }));
     const dialog = await screen.findByRole('dialog');
     fireEvent.click(within(dialog).getByRole('button', { name: '확정' }));
 
@@ -238,7 +235,6 @@ describe('GameResultReviewPanel — 확정 결과 헤더의 승부차기 표기'
       isError: false,
       refetch: vi.fn(),
     });
-    mocks.useReviewResultDecision.mockReturnValue({ mutate: vi.fn(), isPending: false, isError: false });
     mocks.useOfficializeResultRevision.mockReturnValue({ mutate: vi.fn(), isPending: false, isError: false });
     mocks.useSupersedeAndSubmitResult.mockReturnValue({
       mutate: vi.fn(),
@@ -285,7 +281,6 @@ describe('GameResultReviewPanel — 재제출 폼도 결선 승부차기 가드�
       isError: false,
       refetch: vi.fn(),
     });
-    mocks.useReviewResultDecision.mockReturnValue({ mutate: vi.fn(), isPending: false, isError: false });
     mocks.useOfficializeResultRevision.mockReturnValue({ mutate: vi.fn(), isPending: false, isError: false });
     mocks.useSupersedeAndSubmitResult.mockReturnValue({
       mutate: supersedeMutate,

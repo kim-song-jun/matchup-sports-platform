@@ -62,7 +62,6 @@ import type {
   CreateGameResultCorrectionDto,
   GameResultCorrectionChangesDto,
   OfficializeGameResultRevisionDto,
-  ReviewDecisionGameResultRevisionDto,
   SupersedeAndSubmitGameResultRevisionDto,
   VoidGameResultRevisionDto,
 } from './tournament-result-review.dto';
@@ -207,89 +206,16 @@ export class TournamentResultReviewService {
   ) {}
 
   /**
-   * Tournament review reject/request_supplement. Never approves -- approval
-   * for a tournament fixture goes through `officializeResultRevision`
-   * instead, because normal `end` already auto-derives+submits and the
-   * separate reviewer decides pass/reject/supplement from there.
-   */
-  async reviewDecision(
-    user: V1AuthUser,
-    gameId: string,
-    revisionId: string,
-    headerIdempotencyKey: string | undefined,
-    dto: ReviewDecisionGameResultRevisionDto,
-  ): Promise<GameRevisionMutationResult> {
-    return this.withResultCommand(
-      {
-        gameId,
-        action: `result_revision_${dto.decision}`,
-        staffAction: 'result_review',
-        userId: user.id,
-        expectedVersion: dto.expectedVersion,
-        headerIdempotencyKey,
-        bodyCommandId: dto.clientCommandId,
-        payload: { revisionId, ...dto },
-      },
-      async (tx, game, context) => {
-        await tx.$queryRaw`SELECT id FROM v1_game_result_revisions WHERE id = ${revisionId} FOR UPDATE`;
-        const revision = await tx.v1GameResultRevision.findFirst({ where: { id: revisionId, gameId } });
-        if (revision === null) {
-          throw this.notFound('RESULT_REVISION_NOT_FOUND');
-        }
-        const target =
-          dto.decision === 'reject'
-            ? V1GameResultRevisionState.REJECTED
-            : V1GameResultRevisionState.SUPPLEMENT_REQUESTED;
-        this.assertTransition({ from: revision.state, to: target, flow: 'STANDARD' });
-        const decided = await tx.v1GameResultRevision.update({
-          where: { id: revision.id },
-          data: { state: target },
-        });
-        await tx.v1GameResultDecision.create({
-          data: {
-            revisionId: revision.id,
-            decision: dto.decision,
-            reason: dto.reason,
-            actorType: 'USER',
-            actorUserId: user.id,
-          },
-        });
-        const updated = await tx.v1Game.update({
-          where: { id: game.id },
-          data: { version: { increment: 1 } },
-        });
-        // reject/request_supplement are both terminal for this revision: no
-        // public numeric result is exposed and currentOfficialRevisionId is
-        // left untouched, so the review SLA for this revision must close now
-        // rather than keep reminding/escalating a decided review.
-        await this.closeReviewSla(tx, decided.id, dto.reason);
-        await this.writeOutbox(
-          tx,
-          `game:${gameId}:revision:${decided.revision}:${dto.decision === 'reject' ? 'rejected' : 'supplement-requested'}`,
-          gameId,
-          dto.decision === 'reject' ? 'GAME_RESULT_REJECTED' : 'GAME_RESULT_SUPPLEMENT_REQUESTED',
-          { revisionId: decided.id },
-          decided.id,
-        );
-        return {
-          gameId,
-          state: updated.state,
-          version: updated.version,
-          durableCommandId: context.durableCommandId,
-          replayed: false,
-          revisionId: decided.id,
-          revision: decided.revision,
-          revisionState: decided.state,
-        };
-      },
-    );
-  }
-
-  /**
-   * Creates and submits a superseding revision atomically from a REJECTED
-   * or SUPPLEMENT_REQUESTED base, starting a fresh review SLA. A stale or
-   * wrong-state base writes zero new rows (the state check throws before
-   * any create()).
+   * 제출된(SUBMITTED) 결과를 **어드민·운영자가 그 자리에서 고쳐** 새 리비전으로 대체하고
+   * 곧바로 제출한다. Task 166 전에는 base 가 REJECTED/SUPPLEMENT_REQUESTED 였다 — 즉
+   * "어드민이 팀에게 되돌려 보냈고 팀이 다시 제출한다" 는 왕복을 전제했다. 정본 §4 가
+   * 그 왕복을 없앴으므로(결과는 보내기 → 확인 한 단계) 이제 base 는 SUBMITTED 다.
+   *
+   * **팀 actor 는 여전히 불가능하다.** 이 명령은 `withResultCommand` 의
+   * `staffAction: 'result_review'` 를 지나므로 스태프 배정 없는 팀장은 403 이다 — base
+   * 상태를 넓힌 것이 권한을 넓힌 것은 아니다(회귀 스펙으로 고정).
+   *
+   * 상태가 어긋난 base 는 **한 행도 쓰지 않는다**(상태 검사가 create() 앞에서 던진다).
    */
   async supersedeAndSubmit(
     user: V1AuthUser,
@@ -317,16 +243,19 @@ export class TournamentResultReviewService {
         }
         // The frozen contract names a dedicated code for this exact
         // precondition (distinct from the generic REVISION_MUST_BE_SUPERSEDED
-        // used by void/correction): base must be REJECTED or
-        // SUPPLEMENT_REQUESTED, otherwise 409 RESULT_RESUBMISSION_NOT_ALLOWED
-        // with zero new rows.
+        // used by void/correction). Task 166 added SUBMITTED — 되돌려 보내는
+        // 왕복이 사라져 어드민이 그 자리에서 고친다. 레거시 두 상태는 **contract
+        // 마이그레이션 전까지 남긴다**: 이미 반려·보완 요청된 행이 alpha 에 있고,
+        // 여기서 빼면 그 경기들을 영영 고칠 수 없다. 그 밖에는 409
+        // RESULT_RESUBMISSION_NOT_ALLOWED with zero new rows.
         if (
+          base.state !== V1GameResultRevisionState.SUBMITTED &&
           base.state !== V1GameResultRevisionState.REJECTED &&
           base.state !== V1GameResultRevisionState.SUPPLEMENT_REQUESTED
         ) {
           throw new ConflictException({
             code: 'RESULT_RESUBMISSION_NOT_ALLOWED',
-            message: 'supersede-and-submit requires a REJECTED or SUPPLEMENT_REQUESTED base revision',
+            message: 'supersede-and-submit requires a SUBMITTED (or legacy reviewed) base revision',
           });
         }
         try {

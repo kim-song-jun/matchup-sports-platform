@@ -158,13 +158,7 @@ type GameAuthorizationAction =
   // TEAM_MATCH 분기가 명시적으로 forbidden 을 던진다. 오직 admin 패스스루(이 함수보다
   // 먼저 검사된다)만 통과할 수 있다.
   | 'team_result_correction'
-  // D2: 이의(dispute) 제기 -- 참가 두 팀(host/opponent) 중 어느 쪽이든 owner/manager면
-  // 낼 수 있다. team_result_correction 과 달리 이 액션은 **명시적으로 특수 취급하지
-  // 않는다** -- resolveActor TEAM_MATCH 분기 맨 아래 공용 fallback
-  // (`managerRole(hostMembership) ?? managerRole(opponentMembership)`)이 정확히
-  // "두 팀 중 하나의 owner/manager" 규칙과 일치하므로 그대로 통과시킨다.
-  | 'team_result_dispute_file'
-  // D2: 이의 수락 시 운영자가 고르는 무효(void) 처리 -- team_result_correction 과
+  // 운영자가 고르는 무효(void) 처리 -- team_result_correction 과
   // 완전히 같은 이유로 팀 소속 fallback 을 명시적으로 차단해야 한다(그러지 않으면
   // 상대팀 매니저가 자기에게 불리한 결과를 스스로 무효화할 수 있는 구멍이 생긴다).
   | 'team_result_void'
@@ -4236,7 +4230,7 @@ export class GamesService {
 
   // ─── D2: TEAM_MATCH 전용 결과 무효화(void) ─────────────────────────────────
   //
-  // 이의(dispute) 수락 시 운영자가 정정(createTeamMatchResultCorrection) 대신 고를
+  // 운영자가 정정(createTeamMatchResultCorrection) 대신 고를
   // 수 있는 두 번째 경로(E4). 대회 픽스처의
   // `TournamentResultReviewService.voidResultRevision`과 완전히 같은 패턴을
   // 재사용한다 -- DRAFT/SUBMITTED 를 거치지 않고 새 리비전을 곧바로 VOID 상태로
@@ -4347,29 +4341,6 @@ export class GamesService {
     );
   }
 
-  /**
-   * D2: 이의(dispute) 제기 인가 게이트. `resolveActor`는 private 이라 외부 모듈
-   * (`league-matches/league-match-dispute.service.ts`)이 직접 부를 수 없으므로,
-   * 'team_result_dispute_file' 액션 하나만 노출하는 얇은 공개 래퍼를 둔다 --
-   * 인가 판정 자체는 여전히 `resolveActor` 단일 지점에서만 일어난다(이 래퍼는
-   * 그 결과를 그대로 돌려줄 뿐 스스로 아무것도 판단하지 않는다).
-   *
-   * admin(platform_ops)도 이 액션을 통과한다(위쪽 admin 패스스루가 TEAM_MATCH
-   * 분기 어떤 액션보다도 먼저 적용되기 때문 -- team_result_correction/
-   * team_result_void 의 명시적 deny 도 admin 을 막지 않는 것과 동일한 이유)만,
-   * 이의는 "팀이 내는 것"이라는 도메인 의미상 `teamId`가 없는 admin 액터는
-   * 여기서 별도로 거부한다.
-   */
-  async assertTeamResultDisputeFileAuthority(
-    user: V1AuthUser,
-    gameId: string,
-  ): Promise<{ actorUserId: string; teamId: string }> {
-    const actor = await this.resolveActor(this.prisma, gameId, user.id, 'team_result_dispute_file');
-    if (actor.teamId === undefined) {
-      throw this.forbidden();
-    }
-    return { actorUserId: actor.actorUserId, teamId: actor.teamId };
-  }
 
   // ─── Task 14: participant identity link + consent (append-only, ≤5s purge) ───
   //
@@ -5977,7 +5948,6 @@ export class GamesService {
       case 'team_result_submit':
       case 'opponent_result_decide':
       case 'team_result_correction':
-      case 'team_result_dispute_file':
       case 'team_result_void':
       case 'participant_identity':
         // Unreachable in practice: resolveActor special-cases
@@ -5989,10 +5959,9 @@ export class GamesService {
         // both reject a TOURNAMENT_FIXTURE game's sourceType before ever
         // resolving an actor for this action — so this arm denies-by-default
         // for the same "should never actually run" reason.
-        // 'team_result_dispute_file'/'team_result_void' (D2) are the same:
-        // the dispute service and the new void method both reject a
+        // 'team_result_void' is the same: the void method rejects a
         // TOURNAMENT_FIXTURE game's sourceType before ever resolving an
-        // actor for either action.
+        // actor for that action.
         return null;
     }
   }

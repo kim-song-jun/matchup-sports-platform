@@ -17,7 +17,18 @@ export type PublicVisibilityMode = 'status_only' | 'live' | 'official_only';
 /** `pending` covers both "no official revision yet" and "a correction draft is mid-review". */
 export type PublicResultState = 'pending' | 'official' | 'corrected' | 'void';
 
-export type PublicScoreStatus = 'unavailable' | 'live' | 'official';
+/**
+ * 서버(`apps/v1_api/src/games/public-records/public-score-presentation.ts`)의 미러.
+ *
+ * `'pending'` 은 **제출됐지만 아직 확정 전**이다(Task 166) — 점수는 함께 내려오고 화면은
+ * "확정 전" 태그를 붙인다. 그전에는 이 구간이 `'unavailable'` 이라 경기가 끝났는데도
+ * 관전자에게 점수가 아예 안 보였다. `official_only` 정책의 경기에는 이 값이 오지 않는다
+ * (그 모드는 확정 전 숫자를 일부러 감춘다 — D-06).
+ *
+ * 태그 렌더는 FE-2 가 붙인다. 타입을 먼저 맞추는 이유는, 서버가 이미 이 값을 보내는데
+ * 유니온에 없으면 소비처가 **런타임에만 모르는 값**을 만나기 때문이다.
+ */
+export type PublicScoreStatus = 'unavailable' | 'live' | 'official' | 'pending';
 
 /**
  * 승부차기 최종 스코어. 결선(knockout) 경기가 정규시간 동점으로 끝나 승부차기까지

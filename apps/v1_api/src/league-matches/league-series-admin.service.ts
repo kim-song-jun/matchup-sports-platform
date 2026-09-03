@@ -421,22 +421,14 @@ export class LeagueSeriesAdminService {
       });
     }
 
-    // league-match-dispute.service.ts의 resolveDispute는 "승강이 이미 확정된 리그의
-    // 이의는 수락할 수 없다"고 대칭적으로 막는다 — 그 가드만 있고 여기가 비어 있으면,
-    // 열린 이의가 있는 상태에서 운영자가 먼저 승강을 확정해 버릴 수 있고, 그 뒤 그
-    // 이의는 resolveDispute 가드에 걸려 영원히 처리(수락)가 불가능한 409 교착에 빠진다.
-    // 이의를 먼저 처리(수락/거부)하게 하면 순위표와 승강 결정이 항상 같은 시점의
-    // 결과를 기준으로 확정된다.
-    const openDispute = await this.prisma.v1LeagueMatchDispute.findFirst({
-      where: { leagueId: { in: tiers.map((t) => t.leagueId) }, status: 'open' },
-      select: { id: true },
-    });
-    if (openDispute !== null) {
-      throw new ConflictException({
-        code: 'LEAGUE_RESULT_DISPUTE_OPEN',
-        message: '처리되지 않은 이의가 있어요. 이의를 먼저 수락하거나 거부한 뒤 승강을 확정해 주세요.',
-      });
-    }
+    // Task 166: 여기 있던 "열린 이의가 있으면 승강 확정 불가" 가드(409
+    // `LEAGUE_RESULT_DISPUTE_OPEN`)를 뺐다. 그 가드는 **이의 쪽 가드와 쌍**이었다 —
+    // `resolveDispute` 가 "승강이 확정된 리그의 이의는 수락 불가" 로 막고 있어서, 여기가
+    // 비면 운영자가 먼저 승강을 확정한 뒤 그 이의가 영원히 처리 불가능한 409 교착에
+    // 빠졌다. 이의 경로 자체가 사라졌으므로(정본 §4) 막을 대상도, 교착도 없다.
+    //
+    // 승강 확정을 늦출 다른 이유(결과 미확정 등)는 이 가드가 하던 일이 아니다 — 그건
+    // 순위 집계가 OFFICIAL 만 세는 것으로 이미 다뤄진다.
 
     const rule = this.ruleOf(series);
 

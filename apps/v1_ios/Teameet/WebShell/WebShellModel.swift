@@ -16,27 +16,73 @@ final class WebShellModel: ObservableObject {
     /// which is the only thing that knows the permission status and whether a session exists.
     @Published private(set) var isAskingAboutNotifications = false
 
+    /// The system "Reduce Motion" setting, kept current for the lifetime of the model.
+    ///
+    /// This is the shell's single source for the setting (Motion audit D7=C). The views used to
+    /// read `@Environment(\.accessibilityReduceMotion)` themselves while the model — whose
+    /// callers are UIKit code with no environment to read — had nothing, so the declared
+    /// `.transition(.opacity)` never played: a transition only animates inside an animation
+    /// transaction, and the model's state changes opened none. Now the model both owns the
+    /// setting and opens the transaction, and the views ask it which transition to use.
+    @Published private(set) var reduceMotion: Bool
+
     /// Set by the view controller so the error screen's button can reach it.
     weak var controller: WebShellViewController?
 
-    /// Every published change below drives a screen swap or a slide-in explainer, and both were
-    /// snapping instantly with no cross-fade or slide (Motion audit D7=A). All four call sites are
-    /// UIKit code (`WebShellViewController`), not a SwiftUI `View`, so there is no `@Environment`
-    /// to read `accessibilityReduceMotion` from — `UIAccessibility.isReduceMotionEnabled` is the
-    /// same underlying signal (SwiftUI's environment value wraps this exact API) and is safe to
-    /// read synchronously here on the main actor.
-    private var reduceMotionAnimation: Animation? {
-        UIAccessibility.isReduceMotionEnabled ? nil : .easeOut(duration: 0.2)
+    /// How long a shell overlay takes to appear or leave. Matches the web app's
+    /// `--duration-base` (160ms, `apps/v1_web/src/app/tokens.css`) so the failure screen and
+    /// the notification explainer feel like the page's own panels rather than a different app.
+    static let shellTransitionDuration: TimeInterval = 0.16
+
+    private let isReduceMotionEnabled: () -> Bool
+    private var reduceMotionObserver: NSObjectProtocol?
+
+    /// `isReduceMotionEnabled` is injectable so tests can drive the setting without touching
+    /// the simulator's accessibility preferences; production reads `UIAccessibility`.
+    init(isReduceMotionEnabled: @escaping () -> Bool = { UIAccessibility.isReduceMotionEnabled }) {
+        self.isReduceMotionEnabled = isReduceMotionEnabled
+        self.reduceMotion = isReduceMotionEnabled()
+        reduceMotionObserver = NotificationCenter.default.addObserver(
+            forName: UIAccessibility.reduceMotionStatusDidChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            // The observer closure is not isolated; hop back onto the main actor before
+            // touching published state.
+            Task { @MainActor [weak self] in
+                self?.reduceMotion = self?.isReduceMotionEnabled() ?? false
+            }
+        }
+    }
+
+    deinit {
+        if let observer = reduceMotionObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
+
+    /// The animation the model opens around every overlay state change: `nil` (no transaction,
+    /// so the transition below resolves to an instant swap) when the reader asked for reduced
+    /// motion, otherwise a short ease-out at the web app's base duration.
+    var shellTransitionAnimation: Animation? {
+        reduceMotion ? nil : .easeOut(duration: Self.shellTransitionDuration)
+    }
+
+    /// The transition the overlays declare. Kept next to the animation so the two can never
+    /// disagree about reduced motion — a view that fades while the model opened no transaction
+    /// is exactly the dead declaration this replaces.
+    var shellTransition: AnyTransition {
+        reduceMotion ? .identity : .opacity
     }
 
     func reportFailure(_ reason: WebShellFailureReason) {
-        withAnimation(reduceMotionAnimation) {
+        withAnimation(shellTransitionAnimation) {
             failure = reason
         }
     }
 
     func clearFailure() {
-        withAnimation(reduceMotionAnimation) {
+        withAnimation(shellTransitionAnimation) {
             failure = nil
         }
     }
@@ -51,13 +97,13 @@ final class WebShellModel: ObservableObject {
     }
 
     func askAboutNotifications() {
-        withAnimation(reduceMotionAnimation) {
+        withAnimation(shellTransitionAnimation) {
             isAskingAboutNotifications = true
         }
     }
 
     func stopAskingAboutNotifications() {
-        withAnimation(reduceMotionAnimation) {
+        withAnimation(shellTransitionAnimation) {
             isAskingAboutNotifications = false
         }
     }

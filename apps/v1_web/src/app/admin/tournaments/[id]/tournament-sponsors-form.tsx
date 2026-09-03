@@ -17,14 +17,16 @@ const textareaCls = [
 ].join(' ');
 // active:scale press 피드백에는 transform 이 transition-property 에 포함돼야 부드럽게
 // 축소된다 — transition-colors 만으로는 scale 이 0ms 로 즉시 스냅한다(motion-audit F5).
+// transition-colors 와 transition-transform 을 나란히 쓰면 둘 다 transition-property 를
+// 덮어써 마지막 것만 남는다(Copilot) — 필요한 프로퍼티를 한 유틸에 전부 나열한다.
 const primaryBtnCls = [
   'inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-blue-500 px-4',
-  'text-[13px] font-semibold text-white transition-colors transition-transform hover:bg-blue-600 active:scale-[0.98]',
+  'text-[13px] font-semibold text-white transition-[color,background-color,border-color,transform] hover:bg-blue-600 active:scale-[0.98]',
   'disabled:cursor-not-allowed disabled:opacity-50',
 ].join(' ');
 const secondaryBtnCls = [
   'inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-[var(--border)]',
-  'bg-[var(--card-surface)] px-4 text-[13px] font-semibold text-[var(--text-body)] transition-colors transition-transform hover:bg-[var(--surface-soft)]',
+  'bg-[var(--card-surface)] px-4 text-[13px] font-semibold text-[var(--text-body)] transition-[color,background-color,border-color,transform] hover:bg-[var(--surface-soft)]',
   'active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50',
 ].join(' ');
 

@@ -52,11 +52,15 @@ describe('TournamentSponsorForm', () => {
   // transition-colors 안에만 있어 transform 이 transition-property 에서 빠져 있었다
   // (Tailwind의 transition-colors는 color/background-color/border-color 등만 대상으로
   // 하고 transform은 포함하지 않는다) → 눌렀다 뗄 때 스케일이 0ms 로 즉시 스냅했다.
-  it('제출 버튼이 transition-transform 을 가져 active:scale press 가 스냅하지 않는다', () => {
+  // transition-colors 와 transition-transform 을 나란히 두면 둘 다 transition-property 를
+  // 덮어써 마지막 것만 남는다(Copilot) — 색과 transform 이 **한 유틸** 안에 함께 있어야 한다.
+  it('제출 버튼의 transition-property 에 색과 transform 이 한 유틸 안에 함께 있어 press 가 스냅하지 않는다', () => {
     renderForm();
 
     const submitBtn = screen.getByRole('button', { name: '협찬 추가' });
-    expect(submitBtn).toHaveClass('transition-transform');
+    const transitionUtils = submitBtn.className.split(/\s+/).filter((c) => c.startsWith('transition-'));
+    expect(transitionUtils).toHaveLength(1);
+    expect(transitionUtils[0]).toMatch(/^transition-\[.*background-color.*transform.*\]$/);
     expect(submitBtn.className).toMatch(/active:scale-\[0\.98\]/);
   });
 

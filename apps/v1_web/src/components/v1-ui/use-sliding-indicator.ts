@@ -38,18 +38,25 @@ export function useSlidingIndicatorRect(
       return;
     }
 
+    const items = Array.from(container.querySelectorAll<HTMLElement>(itemSelector));
     const measure = () => {
-      const items = container.querySelectorAll<HTMLElement>(itemSelector);
       const target = items[activeIndex];
-      if (!target) return;
+      // 항목이 사라졌으면 이전 위치를 남기지 않는다 — stale 인디케이터가 엉뚱한 곳에 남는다(Copilot).
+      if (!target) {
+        setRect(null);
+        return;
+      }
       setRect({ left: target.offsetLeft, width: target.offsetWidth });
     };
 
     measure();
 
     if (typeof ResizeObserver === 'undefined') return;
+    // 컨테이너만 보면 flex:1 로 폭이 고정된 트랙에서 웹폰트 로드로 라벨 폭이 바뀌어도
+    // 콜백이 안 울린다 — 항목 자체도 함께 관찰한다(tournament-bracket.tsx 의 wrapper+content 패턴).
     const observer = new ResizeObserver(measure);
     observer.observe(container);
+    for (const item of items) observer.observe(item);
     return () => observer.disconnect();
   }, [containerRef, itemSelector, activeIndex]);
 

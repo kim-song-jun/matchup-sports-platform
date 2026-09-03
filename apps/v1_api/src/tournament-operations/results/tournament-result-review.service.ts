@@ -11,6 +11,7 @@ import { parseResultPolicy } from '../../tournaments/competition-config/competit
 import {
   Prisma,
   V1GameEventType,
+  V1GameOutcomeReason,
   V1GameResultRevisionState,
   V1GameSourceType,
   V1TournamentFixtureStatus,
@@ -170,6 +171,24 @@ type ResultCommandBoundaryInput = {
  * for actor resolution in place of `GamesService.resolveActor`'s
  * tournament branch.
  */
+/**
+ * 새 리비전의 몰수·중단 표식을 정한다 (Task 165 BE-3).
+ *
+ * **미전송이면 base 를 승계한다** — 그래야 몰수로 끝난 경기의 정정·재제출이 표식을 지우지
+ * 않는다(그 승계가 원래 있던 이유이고, 이의 수락 경로가 그것에 기대고 있다).
+ * 전송하면 그 값을 그대로 쓴다. `note` 미전송은 `null` 이다 — 표식만 바꾸고 옛 사유가
+ * 남으면 "왜 몰수인가" 가 어긋난다.
+ */
+function resolveOutcome(
+  input: { reason: 'NORMAL' | 'FORFEIT' | 'ABANDONED'; note?: string } | undefined,
+  base: { outcomeReason: V1GameOutcomeReason; outcomeNote: string | null },
+): { outcomeReason: V1GameOutcomeReason; outcomeNote: string | null } {
+  if (input === undefined) {
+    return { outcomeReason: base.outcomeReason, outcomeNote: base.outcomeNote };
+  }
+  return { outcomeReason: input.reason, outcomeNote: input.note?.trim() || null };
+}
+
 @Injectable()
 export class TournamentResultReviewService {
   constructor(
@@ -371,8 +390,7 @@ export class TournamentResultReviewService {
             // 몰수·중단 표식과 사유를 승계한다. 빠뜨리면 기본값 NORMAL 로 떨어져 몰수로
             // 끝난 경기가 재제출 한 번에 정상 종료로 둔갑한다(games.service.ts의
             // 어시스트 동기화 승계와 동일한 이유 — Copilot 리뷰 지적 재현).
-            outcomeReason: base.outcomeReason,
-            outcomeNote: base.outcomeNote,
+            ...resolveOutcome(dto.outcome, base),
             reason: dto.reason,
             createdByActorType: 'USER',
             createdByUserId: user.id,
@@ -772,8 +790,7 @@ export class TournamentResultReviewService {
             // 몰수·중단 표식과 사유를 승계한다. 빠뜨리면 기본값 NORMAL 로 떨어져 몰수로
             // 끝난 경기가 정정 한 번에 정상 종료로 둔갑한다(games.service.ts의
             // 어시스트 동기화 승계와 동일한 이유 — Copilot 리뷰 지적 재현).
-            outcomeReason: base.outcomeReason,
-            outcomeNote: base.outcomeNote,
+            ...resolveOutcome(dto.changes.outcome, base),
             reason: dto.reason,
             createdByActorType: 'USER',
             createdByUserId: user.id,

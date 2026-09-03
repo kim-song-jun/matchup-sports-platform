@@ -1119,6 +1119,37 @@ describe('몰수·중단 표식(outcomeReason/outcomeNote) 승계', () => {
     expect(harness.createdRevisions[0].outcomeNote).toBe('상대팀 미출전');
   });
 
+  it('정정에 outcome 을 실으면 base 승계 대신 그 값이 들어간다 (Task 165 BE-3)', async () => {
+    // BE-3 가 리그 전용 결과 입력을 지우면 **몰수를 새로 지정할 길이 여기뿐**이다.
+    // 승계만 하면 정상 종료로 끝난 경기를 몰수로 고칠 수 없다.
+    const harness = createHarness();
+
+    await harness.correct({ outcome: { reason: 'FORFEIT', note: '상대팀 미출전' } });
+
+    expect(harness.createdRevisions[0].outcomeReason).toBe('FORFEIT');
+    expect(harness.createdRevisions[0].outcomeNote).toBe('상대팀 미출전');
+  });
+
+  it('outcome 의 note 를 안 보내면 null 이다 — 표식만 바꾸고 옛 사유가 남으면 어긋난다', async () => {
+    const harness = createHarness(forfeitBase);
+
+    // 몰수 -> 정상으로 되돌리는 정정. 옛 사유('상대팀 미출전')가 남으면
+    // "정상 종료인데 상대팀 미출전" 이라는 모순된 행이 된다.
+    await harness.correct({ outcome: { reason: 'NORMAL' } });
+
+    expect(harness.createdRevisions[0].outcomeReason).toBe('NORMAL');
+    expect(harness.createdRevisions[0].outcomeNote).toBeNull();
+  });
+
+  it('공백만 있는 note 도 null 이다', async () => {
+    const harness = createHarness();
+
+    await harness.correct({ outcome: { reason: 'ABANDONED', note: '   ' } });
+
+    expect(harness.createdRevisions[0].outcomeReason).toBe('ABANDONED');
+    expect(harness.createdRevisions[0].outcomeNote).toBeNull();
+  });
+
   it('정정 base가 정상 종료(NORMAL)면 그대로 NORMAL을 승계한다(짝 증거 — 하드코딩된 상수를 리턴하는 거짓 초록 방지)', async () => {
     const harness = createHarness();
 

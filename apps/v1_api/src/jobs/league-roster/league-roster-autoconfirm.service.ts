@@ -249,6 +249,10 @@ export class LeagueRosterAutoConfirmService {
       const block = evaluateRosterCandidate({
         alreadyOnRoster: false,
         alreadyOnOtherTeamInTournament: takenUserIds.has(member.userId),
+        // **`isRosterMutableTournamentStatus(...)` 로 바꾸지 마라.** 그 헬퍼는 `draft` 를
+        // 가변으로 보지 않는데, 리그 거울은 draft 로 생성되고 이 잡은 대진 생성보다 먼저
+        // 돈다 — 헬퍼로 "통일" 하면 신청을 연 적 없는 리그에서 D10 이 통째로 죽는다.
+        // 계산 근거는 위 `tournamentMutable` 주석 참조(통합 스펙이 양방향으로 잡는다).
         tournamentMutable,
         // 대상 조회(`PENDING_ROSTER_REGISTRATION_WHERE`)가 `status: 'confirmed'` 로 이미
         // 좁혔으므로 여기 도달한 등록은 취소 계열이 아니다. 조건 목록을 한 곳에 모아 두기

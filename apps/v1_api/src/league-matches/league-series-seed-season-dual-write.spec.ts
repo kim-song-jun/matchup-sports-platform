@@ -63,6 +63,8 @@ function makeHarness() {
       }),
     },
     v1League: { count: jest.fn().mockResolvedValue(0) },
+    // BE-5: "이미 시딩됐나" 판정이 통합 축으로 옮겨졌다.
+    v1Tournament: { count: jest.fn().mockResolvedValue(0) },
     v1Team: {
       findMany: jest.fn().mockResolvedValue(
         ['t1', 't2', 't3', 't4'].map((id) => ({ id, sportId: 'sport-futsal' })),

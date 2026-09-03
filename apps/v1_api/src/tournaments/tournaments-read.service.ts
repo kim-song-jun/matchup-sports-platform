@@ -357,10 +357,19 @@ export class TournamentsReadService {
    * 진행률이 영원히 100% 에 못 닿는다. 그 분류는 `bucketLeagueFixtures` 가 한다.
    */
   private async leagueOverallStandings(leagueId: string) {
-    const league = await this.prisma.v1League.findUnique({
-      where: { id: leagueId },
-      include: { teams: { select: { teamId: true, team: { select: { name: true } } } } },
+    const leagueRow = await findTournamentOnSurface(this.prisma, ['regular_league'], {
+      where: { id: leagueId, deletedAt: null },
+      select: {
+        id: true,
+        title: true,
+        // 로스터 = confirmed 등록.
+        registrations: {
+          where: { status: 'confirmed' },
+          select: { teamId: true, team: { select: { name: true } } },
+        },
+      },
     });
+    const league = leagueRow === null ? null : { ...leagueRow, teams: leagueRow.registrations };
     if (league === null) {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     }

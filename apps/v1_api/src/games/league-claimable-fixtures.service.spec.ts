@@ -110,15 +110,18 @@ function makeService(seed: {
     },
     // 라벨용 리그명 + 주차 파생에 쓰는 형제 경기일. 실제 쿼리와 같은 조건(`deletedAt: null`)만
     // 건다 — 취소된 대진도 경기일로 세야 다른 화면과 주차가 어긋나지 않는다.
-    v1League: {
-      findUnique: jest.fn(async ({ where }: { where: { id: string } }) => {
+    // BE-5: 제목은 통합 축에서, 형제 대진은 `V1TeamMatch.leagueId` 로 직접 읽는다
+    // (통합 축에 대진 relation 이 없다 — 그 FK 재타깃은 ④ drop 의 몫).
+    v1Tournament: {
+      // `findTournamentOnSurface` 가 종류 조건과 AND 로 감싸므로 안쪽 조건을 읽는다.
+      findFirst: jest.fn(async ({ where }: { where: { AND?: Array<{ id?: string }> } }) => {
+        const leagueId = where.AND?.[1]?.id;
         const siblings = fixtures.filter(
-          (row) => row.leagueId === where.id && row.deletedAt === null,
+          (row) => row.leagueId === leagueId && row.deletedAt === null,
         );
-        if (siblings.length === 0 && where.id !== 'league-1') return null;
+        if (siblings.length === 0 && leagueId !== 'league-1') return null;
         return {
           title: seed.leagueTitle ?? '가을 리그',
-          teamMatches: siblings.map((row) => ({ startAt: row.startAt })),
         };
       }),
     },

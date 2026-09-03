@@ -780,12 +780,13 @@ export class PublicTournamentRecordsService {
     leagueTitle: string,
     query: PublicTournamentScheduleQueryDto,
   ) {
-    const league = await this.prisma.v1League.findUnique({
-      where: { id: leagueId },
+    const leagueRow = await findTournamentOnSurface(this.prisma, ['regular_league'], {
+      where: { id: leagueId, deletedAt: null },
       select: {
         tier: true,
-        tieBreakJson: true,
-        teams: {
+        // 로스터 = confirmed 등록.
+        registrations: {
+          where: { status: 'confirmed' },
           select: {
             teamId: true,
             team: { select: { name: true, profile: { select: { logoUrl: true } } } },
@@ -793,6 +794,7 @@ export class PublicTournamentRecordsService {
         },
       },
     });
+    const league = leagueRow === null ? null : { tier: leagueRow.tier, teams: leagueRow.registrations };
     if (league === null) {
       throw new NotFoundException(NOT_FOUND);
     }
@@ -1547,8 +1549,8 @@ export class PublicTournamentRecordsService {
    * /admin/league-matches/:leagueId/videos 에서 등록)에서 내린다.
    */
   async getLeagueFixtureRecord(leagueId: string, teamMatchId: string) {
-    const league = await this.prisma.v1League.findUnique({
-      where: { id: leagueId },
+    const league = await findTournamentOnSurface(this.prisma, ['regular_league'], {
+      where: { id: leagueId, deletedAt: null },
       select: { id: true, title: true },
     });
     if (league === null) {

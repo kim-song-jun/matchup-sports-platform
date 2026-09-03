@@ -96,7 +96,7 @@ export function leagueAdmissionBlockerMessage(blocker: LeagueAdmissionBlocker): 
  *
  * ## 왜 짝을 맞춰야 하나
  * D7 이후 리그 참가는 `V1TournamentRegistration` 이 정본이 되고, `V1LeagueTeam` 은
- * contract 까지 남는 거울이다. 백필(`league-team-registration-backfill.ts`)이 기존
+ * contract 까지 남는 거울이다. 한 번 돌고 끝난 백필(BE-5 에서 코드 삭제)이 기존
  * 로스터 전부에 `confirmed` 등록을 만들어 **"로스터 행 ⟺ confirmed 등록"** 불변식을
  * 세워 뒀다. 로스터를 만드는 경로가 등록을 안 만들면 그 불변식이 그날부터 썩는다 —
  * 그리고 백필은 **한 번 돌고 끝났으므로** 아무도 다시 맞춰 주지 않는다.

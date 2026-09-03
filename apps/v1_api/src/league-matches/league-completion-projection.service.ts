@@ -2,6 +2,8 @@ import { Prisma } from '@prisma/client';
 import type { OfficialRevisionRow } from '../game-operations/game-result-official-projection.types';
 import { shouldCompleteLeague } from './league-lifecycle-rules';
 import { STATUS_BY_LEAGUE_STATE } from '../tournaments/league-competition-mirror';
+import { LEAGUE_STATE_BY_STATUS } from '../tournaments/league-competition-mirror';
+import { findTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
 
 /**
  * `GameResultOfficialProjectionService.handler`가 여는 같은 트랜잭션(tx) 위에서
@@ -47,13 +49,17 @@ export class LeagueCompletionProjectionService {
     leagueId: string,
     reason: 'all_fixtures_confirmed' | 'remaining_fixture_cancelled' | 'remaining_fixture_voided',
   ): Promise<boolean> {
-    const league = await tx.v1League.findUnique({ where: { id: leagueId }, select: { state: true } });
+    // BE-5: 조기 반환 판정을 통합 축에서 읽는다(쓰기는 아래 dual-write 그대로).
+    const league = await findTournamentOnSurface(tx, ['regular_league'], {
+      where: { id: leagueId, deletedAt: null },
+      select: { status: true },
+    });
     // active 가 아니면 여기서 끝낸다. shouldCompleteLeague 도 같은 판정을 하지만, 그건
     // 아래 findMany 를 이미 돌린 뒤다 -- 이 조기 반환이 없으면 completed/draft 리그마다
     // 대진 전수 스캔이 헛돈다(결과 확정마다 호출되는 경로라 그냥 낭비가 아니다).
     // 멱등성·동시성 보장은 맨 아래 조건부 updateMany(WHERE state='active')가 담당하므로
     // 이 조회 자체엔 락이 필요 없다.
-    if (league === null || league.state !== 'active') return false;
+    if (league === null || LEAGUE_STATE_BY_STATUS[league.status] !== 'active') return false;
 
     // status까지 읽어 판정은 shouldCompleteLeague에 맡긴다 -- 취소 제외/빈 리그 배제
     // 규칙이 서비스 안에 인라인으로 있으면 그 규칙만 검증하는 테스트를 로컬에서 돌릴 수
@@ -78,7 +84,7 @@ export class LeagueCompletionProjectionService {
       },
     });
     const ready = shouldCompleteLeague({
-      state: league.state,
+      state: LEAGUE_STATE_BY_STATUS[league.status],
       fixtures: fixtures.map((fixture) => ({
         status: fixture.status,
         hasOfficialResult: fixture.game?.currentOfficialRevision?.state === 'OFFICIAL',

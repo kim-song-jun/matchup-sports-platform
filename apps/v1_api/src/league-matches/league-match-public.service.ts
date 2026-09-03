@@ -1,5 +1,5 @@
 import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, V1LeagueState } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { isParticipantPubliclyEligible, loadParticipantConsentEligibility } from '../games/public-records/public-consent';
 import { LEAGUE_STATE_PRIORITY_ORDER, paginateByStatePriority, sortMyLeaguesByState } from './league-lifecycle-rules';
@@ -20,8 +20,9 @@ import {
   leagueFixtureListWhere,
   toLeagueFixtureList,
 } from './league-fixture-list-source';
-import { LEAGUE_STATE_BY_STATUS } from '../tournaments/league-competition-mirror';
+import { LEAGUE_STATE_BY_STATUS, STATUSES_BY_LEAGUE_STATE } from '../tournaments/league-competition-mirror';
 import { LEAGUE_TIE_BREAK_ORDER } from './league-tie-break';
+import { findTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
 
 const PLAYER_RECORDS_LIMIT = 30;
 const LEAGUE_LIST_DEFAULT_LIMIT = 20;
@@ -55,10 +56,12 @@ export class LeagueMatchPublicService {
   async list(query: ListLeagueMatchesQueryDto) {
     const limit = Math.min(Math.max(query.limit ?? LEAGUE_LIST_DEFAULT_LIMIT, 1), LEAGUE_LIST_MAX_LIMIT);
 
-    const baseWhere: Prisma.V1LeagueWhereInput = {
+    const baseWhere: Prisma.V1TournamentWhereInput = {
+      kind: 'regular_league',
+      deletedAt: null,
       ...(query.sportId ? { sportId: query.sportId } : {}),
       ...(query.regionId ? { regionId: query.regionId } : {}),
-      ...(query.teamId ? { teams: { some: { teamId: query.teamId } } } : {}),
+      ...(query.teamId ? { registrations: { some: { teamId: query.teamId, status: 'confirmed' } } } : {}),
     };
 
     // query.state 필터가 있으면 애초에 상태 하나만 보므로 그룹핑이 필요 없다 -- 그
@@ -69,9 +72,10 @@ export class LeagueMatchPublicService {
     const leagueSelect = {
       id: true,
       title: true,
-      state: true,
-      startsOn: true,
-      endsOn: true,
+      // BE-5: 거울은 state→status, startsOn→scheduledAt, endsOn→scheduledEndAt 으로 담는다.
+      status: true,
+      scheduledAt: true,
+      scheduledEndAt: true,
       // code는 프론트의 getSportAccent(code)/SportGlyph가 요구하는 키다 --
       // 대회 목록(V1TournamentListItem.sport)이 이미 같은 { code, name } 모양을
       // 쓰고 있어(apps/v1_web/src/types/api.ts) 같은 관례를 그대로 맞춘다.
@@ -84,32 +88,43 @@ export class LeagueMatchPublicService {
       seasonNo: true,
       seriesId: true,
       series: { select: { id: true, title: true } },
-      _count: { select: { teams: true } },
-    } satisfies Prisma.V1LeagueSelect;
+      // 로스터 = confirmed 등록.
+      _count: { select: { registrations: { where: { status: 'confirmed' as const } } } },
+    } satisfies Prisma.V1TournamentSelect;
 
     const { items: pageItems, hasNext, nextCursor } = await paginateByStatePriority({
       stateGroups,
       limit,
       cursor: query.cursor,
       fetchGroup: (state, page) =>
-        this.prisma.v1League.findMany({
-          where: { ...baseWhere, state: state as Prisma.V1LeagueWhereInput['state'] },
+        this.prisma.v1Tournament
+          .findMany({
+          // 리그 state 하나가 통합 축 status 여럿에 대응한다(draft ← draft·open·closed).
+          where: { ...baseWhere, status: { in: STATUSES_BY_LEAGUE_STATE[state as V1LeagueState] } },
           orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
           take: page.take,
           ...(page.cursorId ? { cursor: { id: page.cursorId }, skip: 1 } : {}),
           select: leagueSelect,
-        }),
+          })
+          // 커서 페이지네이터는 `state` 로 그룹을 가른다 — 저장 모양(`status`)을 여기서
+          // 응답 어휘로 되돌려 준다.
+          .then((rows) => rows.map((row) => ({ ...row, state: LEAGUE_STATE_BY_STATUS[row.status] }))),
     });
 
     return {
-      items: pageItems.map((league) => ({
+      items: pageItems
+        .filter((league) => league.region !== null)
+        .map((league) => ({
         leagueId: league.id,
         title: league.title,
         state: league.state,
-        startsOn: league.startsOn,
-        endsOn: league.endsOn,
+        startsOn: league.scheduledAt,
+        endsOn: league.scheduledEndAt,
         sport: { sportId: league.sport.id, code: league.sport.code, name: league.sport.name },
-        region: { regionId: league.region.id, name: league.region.name },
+        // 거울의 `regionId` 는 nullable 이지만 리그는 항상 채운다(원본 non-null). 그래도
+        // 타입을 눌러 통과시키지 않고, 비면 목록에서 빼서 화면이 빈 지역을 그리지 않게
+        // 한다(아래 filter).
+        region: { regionId: league.region!.id, name: league.region!.name },
         // 단발 리그는 넷 다 null -- 티어가 "1부"인 게 아니라 티어 개념 자체가 없다는
         // 뜻이므로 상세 응답과 같은 규칙으로 null 을 유지하고, 화면은 null 이면 뱃지를
         // 아예 띄우지 않는다.
@@ -118,7 +133,7 @@ export class LeagueMatchPublicService {
         tierLabel: league.tier === null ? null : `${league.tier}부`,
         seasonNo: league.seasonNo,
         seriesTitle: league.series?.title ?? null,
-        teamCount: league._count.teams,
+        teamCount: league._count.registrations,
       })),
       // nextCursor는 "<state>:<id>" 복합값이다 -- 다음 요청이 어느 상태 그룹의 어디부터
       // 이어가야 하는지를 커서 하나로 복원할 수 있어야 한다(paginateByStatePriority 참고).
@@ -407,13 +422,22 @@ export class LeagueMatchPublicService {
     // 건너뛰어 빈 배열조차 만들지 않는다 — 무의미한 쿼리를 매 상세 조회마다 날리지 않는다.
     const siblings = league.seriesId === null
       ? []
-      : await this.prisma.v1League.findMany({
-          where: { seriesId: league.seriesId, id: { not: league.id } },
-          // 최신 시즌이 먼저, 같은 시즌 안에서는 1부부터 — 사용자가 "지금 시즌의 다른
-          // 티어"를 가장 먼저 찾는다는 전제(승강 체계는 시즌 단위로 갱신되므로).
-          orderBy: [{ seasonNo: 'desc' }, { tier: 'asc' }],
-          select: { id: true, tier: true, seasonNo: true, state: true },
-        });
+      : await this.prisma.v1Tournament
+          .findMany({
+            where: {
+              kind: 'regular_league',
+              deletedAt: null,
+              seriesId: league.seriesId,
+              id: { not: league.id },
+            },
+            // 최신 시즌이 먼저, 같은 시즌 안에서는 1부부터 — 사용자가 "지금 시즌의 다른
+            // 티어"를 가장 먼저 찾는다는 전제(승강 체계는 시즌 단위로 갱신되므로).
+            orderBy: [{ seasonNo: 'desc' }, { tier: 'asc' }],
+            select: { id: true, tier: true, seasonNo: true, status: true },
+          })
+          .then((rows) =>
+            rows.map(({ status, ...rest }) => ({ ...rest, state: LEAGUE_STATE_BY_STATUS[status] })),
+          );
 
     return {
       leagueId: league.id,
@@ -659,19 +683,45 @@ export class LeagueMatchPublicService {
   }
 
   private async loadLeague(leagueId: string) {
-    const league = await this.prisma.v1League.findUnique({
-      where: { id: leagueId },
-      include: {
-        teams: { select: { teamId: true, team: { select: { name: true, profile: { select: { logoUrl: true } } } } } },
+    const row = await findTournamentOnSurface(this.prisma, ['regular_league'], {
+      where: { id: leagueId, deletedAt: null },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        scheduledAt: true,
+        scheduledEndAt: true,
+        seriesId: true,
+        tier: true,
+        seasonNo: true,
+        sport: { select: { id: true, code: true, name: true } },
+        region: { select: { id: true, name: true } },
+        // 로스터 = confirmed 등록.
+        registrations: {
+          where: { status: 'confirmed' },
+          select: { teamId: true, team: { select: { name: true, profile: { select: { logoUrl: true } } } } },
+        },
         // promotionRuleJson 은 예상 승강 경계(감사 H-2) 계산에 쓴다 -- 시즌 중에도
         // "지금 순위라면 승격/강등권인가"를 알려주려면 확정 순위표뿐 아니라 이 시리즈의
         // 승강 규칙까지 필요하다.
         series: { select: { id: true, title: true, tierCount: true, promotionRuleJson: true } },
       },
     });
-    if (league === null) {
+    if (row === null) {
       throw new NotFoundException({ code: 'LEAGUE_NOT_FOUND', message: '리그를 찾을 수 없어요.' });
     }
-    return league;
+    if (row.scheduledAt === null || row.scheduledEndAt === null || row.region === null) {
+      // 거울이 깨졌다 — 일정·지역 없이 상세를 그리면 화면이 빈 값을 사실처럼 보여준다.
+      throw new NotFoundException({ code: 'LEAGUE_NOT_FOUND', message: '리그를 찾을 수 없어요.' });
+    }
+    // 호출부의 어휘(`state`·`startsOn`·`endsOn`·`teams`)는 그대로 둔다 — 응답 계약 불변.
+    const { registrations, scheduledAt, scheduledEndAt, status, ...rest } = row;
+    return {
+      ...rest,
+      state: LEAGUE_STATE_BY_STATUS[status],
+      startsOn: scheduledAt,
+      endsOn: scheduledEndAt,
+      teams: registrations,
+    };
   }
 }

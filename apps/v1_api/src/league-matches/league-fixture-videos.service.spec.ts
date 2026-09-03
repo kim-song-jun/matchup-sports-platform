@@ -27,7 +27,8 @@ function buildService(options: {
   const created: Array<Record<string, unknown>> = [];
   const videos = options.videos ?? [];
   const fakePrisma = {
-    v1League: { findUnique: async () => ({ id: LEAGUE_ID }) },
+    // BE-5: 리그 존재 확인이 통합 축으로 옮겨졌다.
+    v1Tournament: { findFirst: async () => ({ id: LEAGUE_ID }) },
     v1TeamMatch: {
       findFirst: async () => ({ id: TEAM_MATCH_ID }),
       findMany: async () => [

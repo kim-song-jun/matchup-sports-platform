@@ -80,8 +80,9 @@ function buildService(options: {
   revisions?: Array<{ revision: number; state: string; officialAt: Date | null; reason: string | null; supersedesId: string | null }>;
 }) {
   const fakePrisma = {
-    v1League: {
-      findUnique: async () => options.league === undefined ? { id: LEAGUE_ID, title: '가을 정규 리그' } : options.league,
+    // BE-5: 리그 제목 조회가 통합 축으로 옮겨졌다.
+    v1Tournament: {
+      findFirst: async () => (options.league === undefined ? { id: LEAGUE_ID, title: '가을 정규 리그' } : options.league),
     },
     v1TeamMatch: {
       findFirst: async () => options.fixture === undefined ? makeFixtureRow() : options.fixture,

@@ -24,10 +24,16 @@ function makePrisma() {
       }),
     },
     v1League: {
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+    // BE-5: 시즌 리그 목록이 통합 축으로 옮겨졌다 — `state` 는 `status` 에서 파생한다
+    // (`completed` → `completed`). fake 도 저장되는 모양(`status`)을 줘야 파생이 실제로 돈다.
+    v1Tournament: {
       findMany: jest.fn().mockResolvedValue([
-        { id: LEAGUE_TIER_1, tier: 1, state: 'completed' },
-        { id: LEAGUE_TIER_2, tier: 2, state: 'completed' },
+        { id: LEAGUE_TIER_1, tier: 1, status: 'completed' },
+        { id: LEAGUE_TIER_2, tier: 2, status: 'completed' },
       ]),
+      count: jest.fn().mockResolvedValue(0),
     },
     v1LeaguePromotion: {
       findFirst: jest.fn().mockResolvedValue(null),

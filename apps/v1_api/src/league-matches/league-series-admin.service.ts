@@ -35,8 +35,10 @@ import { tierLabel } from './league-tier-label';
 import {
   leagueMirrorCreateData,
   toMirrorSource,
+  LEAGUE_STATE_BY_STATUS,
 } from '../tournaments/league-competition-mirror';
 import { LEAGUE_TIE_BREAK_ORDER } from './league-tie-break';
+import { findTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
 
 const SEASON_LENGTH_FALLBACK_DAYS = 90;
 
@@ -119,8 +121,8 @@ export class LeagueSeriesAdminService {
 
     // 티어 수를 줄이면 이미 만들어진 그 티어의 리그가 고아가 된다 — 먼저 막는다.
     if (dto.tierCount !== undefined && dto.tierCount < series.tierCount) {
-      const orphaned = await this.prisma.v1League.count({
-        where: { seriesId, tier: { gt: dto.tierCount } },
+      const orphaned = await this.prisma.v1Tournament.count({
+        where: { kind: 'regular_league', deletedAt: null, seriesId, tier: { gt: dto.tierCount } },
       });
       if (orphaned > 0) {
         throw new ConflictException({
@@ -177,20 +179,42 @@ export class LeagueSeriesAdminService {
   async detail(user: V1AuthUser, seriesId: string) {
     await this.adminContext.getActiveAdmin(user.id);
     const series = await this.loadSeries(seriesId);
-    const leagues = await this.prisma.v1League.findMany({
-      where: { seriesId },
+    const rows = await this.prisma.v1Tournament.findMany({
+      where: { kind: 'regular_league', deletedAt: null, seriesId },
       orderBy: [{ seasonNo: 'desc' }, { tier: 'asc' }],
       select: {
         id: true,
         title: true,
         tier: true,
         seasonNo: true,
-        state: true,
-        startsOn: true,
-        endsOn: true,
-        _count: { select: { teams: true } },
+        status: true,
+        scheduledAt: true,
+        scheduledEndAt: true,
+        // 로스터 = confirmed 등록(예전 `_count.teams` 가 세던 집합).
+        _count: { select: { registrations: { where: { status: 'confirmed' } } } },
       },
     });
+    // 응답 계약은 그대로다 — 이름과 값만 예전 모양으로 되돌린다. `scheduledAt`·
+    // `scheduledEndAt` 은 V1Tournament 에서 nullable 이지만 리그 거울은 둘 다 항상 채운다
+    // (원본 `startsOn`·`endsOn` 이 non-null). 비어 있으면 거울이 깨진 것이라 시즌 묶음이
+    // 날짜 없이 그려지는 대신 여기서 끊는다.
+    const broken = rows.find((row) => row.scheduledAt === null || row.scheduledEndAt === null);
+    if (broken !== undefined) {
+      throw new ConflictException({
+        code: 'LEAGUE_MIRROR_MISSING',
+        message: '일부 리그의 통합 대회 축 일정 정보가 비어 있어요.',
+      });
+    }
+    const leagues = rows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      tier: row.tier,
+      seasonNo: row.seasonNo,
+      state: LEAGUE_STATE_BY_STATUS[row.status],
+      startsOn: row.scheduledAt!,
+      endsOn: row.scheduledEndAt!,
+      _count: { teams: row._count.registrations },
+    }));
 
     return {
       ...this.serializeSeries(series),
@@ -206,7 +230,9 @@ export class LeagueSeriesAdminService {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const series = await this.loadSeries(seriesId);
 
-    const existing = await this.prisma.v1League.count({ where: { seriesId } });
+    const existing = await this.prisma.v1Tournament.count({
+      where: { kind: 'regular_league', deletedAt: null, seriesId },
+    });
     if (existing > 0) {
       throw new ConflictException({
         code: 'LEAGUE_SERIES_ALREADY_SEEDED',
@@ -608,11 +634,15 @@ export class LeagueSeriesAdminService {
     }
 
     const nextSeasonNo = seasonNo + 1;
-    const lastSeason = await this.prisma.v1League.findFirst({
-      where: { seriesId, seasonNo },
-      orderBy: { endsOn: 'desc' },
-      select: { startsOn: true, endsOn: true },
+    const lastSeasonRow = await findTournamentOnSurface(this.prisma, ['regular_league'], {
+      where: { deletedAt: null, seriesId, seasonNo },
+      orderBy: { scheduledEndAt: 'desc' },
+      select: { scheduledAt: true, scheduledEndAt: true },
     });
+    const lastSeason =
+      lastSeasonRow === null || lastSeasonRow.scheduledAt === null || lastSeasonRow.scheduledEndAt === null
+        ? null
+        : { startsOn: lastSeasonRow.scheduledAt, endsOn: lastSeasonRow.scheduledEndAt };
     const spanMs =
       lastSeason === null
         ? SEASON_LENGTH_FALLBACK_DAYS * 24 * 60 * 60 * 1000
@@ -863,11 +893,16 @@ export class LeagueSeriesAdminService {
    */
 
   private async loadSeasonStandings(seriesId: string, seasonNo: number) {
-    const leagues = await this.prisma.v1League.findMany({
-      where: { seriesId, seasonNo },
+    const leagueRows = await this.prisma.v1Tournament.findMany({
+      where: { kind: 'regular_league', deletedAt: null, seriesId, seasonNo },
       orderBy: { tier: 'asc' },
-      select: { id: true, tier: true, state: true },
+      select: { id: true, tier: true, status: true },
     });
+    const leagues = leagueRows.map((row) => ({
+      id: row.id,
+      tier: row.tier,
+      state: LEAGUE_STATE_BY_STATUS[row.status],
+    }));
     if (leagues.length === 0) {
       throw new NotFoundException({
         code: 'LEAGUE_SEASON_NOT_FOUND',

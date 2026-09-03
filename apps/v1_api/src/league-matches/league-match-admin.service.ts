@@ -347,6 +347,11 @@ export class LeagueMatchAdminService {
       leagueId: league.id,
       title: league.title,
       state: league.state,
+      // **대진 일정 폼이 요일을 날짜로 전개하는 기준일이다.** BE-2 이후 서버는 요일을 모르고
+      // `schedule.dates` 를 받으므로, 화면이 "리그 시작일 이후 매주 그 요일" 을 직접 펼쳐야
+      // 한다 — 그 기준일이 응답에 없어서 화면은 계산할 수가 없었다(요일을 고르면 옛 형태를
+      // 그대로 보내 400 이 났다). 공개 상세가 이미 같은 값을 내려주고 있었다.
+      startsOn: league.startsOn,
       // 그룹 B 감사 결함 1: 참가팀 추가 화면이 "이 리그 종목과 같은 팀만" 검색을 좁히려면
       // 종목ID가 필요하다 — 지금까지는 대진 표에서 쓸 일이 없어 응답에 없었다.
       sportId: league.sportId,

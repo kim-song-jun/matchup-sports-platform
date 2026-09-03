@@ -23,6 +23,7 @@ import {
   useV1UpdateLeagueFixture,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { expandWeeklyFixtureDates } from '@/lib/league-fixture-dates';
 import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
 import { fromDatetimeLocalValue, toDatetimeLocalValue } from '@/components/team-schedules/team-schedules.view-model';
 import { RecentVenueChips } from '@/components/v1-ui/create-form-fields';
@@ -198,9 +199,24 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
         })
       : null;
 
+  // **요일을 날짜 목록으로 전개해서 보낸다.** 서버는 요일을 모른다(Task 164 BE-2) —
+  // `schedule` 은 `{ dates, time }` 이고, 요일로 고르는 편의는 화면이 제공한다.
+  // 전개 규칙(기준일 = max(리그 시작일, 오늘) · 정확히 weeksCount 개 · 첫 날의 시각이
+  // 이미 지났으면 한 주 밀어냄)은 `lib/league-fixture-dates.ts` 가 소유하고 그 테스트가 지킨다.
+  const fixtureDates =
+    dayOfWeek === '' || time.trim() === ''
+      ? []
+      : expandWeeklyFixtureDates({
+          startsOn: series.startsOn,
+          dayOfWeek,
+          time,
+          weeksCount,
+          now: new Date(),
+        });
+
   const buildFixtureFormPayload = (): V1GenerateLeagueFixturesPayload => ({
     weeksCount,
-    ...(dayOfWeek === '' ? {} : { schedule: { dayOfWeek, time } }),
+    ...(fixtureDates.length === 0 ? {} : { schedule: { dates: fixtureDates, time } }),
     ...(placeName.trim() === '' ? {} : { placeName: placeName.trim() }),
     ...(durationValue === null
       ? {}

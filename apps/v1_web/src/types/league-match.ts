@@ -159,6 +159,12 @@ export interface V1AdminLeagueDetail {
    * public 조회(V1PublicLeagueDetail)에는 없어서 optional.
    */
   recentVenues?: string[];
+  /**
+   * 리그 시작일(ISO). **대진 일정 폼이 요일을 날짜 목록으로 전개하는 기준일이다** —
+   * 서버는 요일을 모르고 `schedule.dates` 를 받으므로(Task 164 BE-2) 화면이 직접 펼친다.
+   * 공개 상세가 이미 같은 값을 갖고 있었고, 이제 어드민 상세도 내려준다.
+   */
+  startsOn: string;
   fixtures: V1LeagueFixture[];
 }
 
@@ -176,7 +182,8 @@ export interface V1LeagueSeriesSibling {
 }
 
 export interface V1PublicLeagueDetail extends V1AdminLeagueDetail {
-  startsOn: string;
+  // startsOn 은 V1AdminLeagueDetail 로 올라갔다(대진 폼이 기준일로 쓴다) — 여기서 다시
+  // 선언하면 두 곳이 갈릴 수 있어 상속만 받는다.
   endsOn: string;
   /**
    * 리그 체계(시리즈)에 속한 리그만 채워진다. 단발 리그는 넷 다 null 이고,
@@ -211,10 +218,18 @@ export interface V1CreateLeagueResult {
   state: 'draft' | 'active' | 'completed';
 }
 
+/**
+ * 서버 `LeagueFixtureScheduleDto` 와 동일 계약. **요일이 아니라 날짜 목록이다** —
+ * 서버는 요일을 모르고(Task 164 BE-2), 요일로 고르고 싶으면 화면이
+ * `lib/league-fixture-dates.ts` 로 전개해 보낸다.
+ *
+ * 예전엔 이 타입이 `{ dayOfWeek, time }` 이었다. 서버 DTO 만 바뀌고 이 타입이 남아
+ * **tsc 가 통과하는 채로 대진 생성이 400 으로 전면 불능**이었다(2026-09-04 alpha 실측).
+ */
 export interface V1LeagueFixtureScheduleTemplate {
-  /** 0(일)~6(토), KST 기준 요일. */
-  dayOfWeek: number;
-  /** 'HH:mm', KST 기준 24시간제 시각. */
+  /** `'YYYY-MM-DD'` (KST 달력 날짜). 오름차순·중복 없음 — 서버도 다시 정리한다. */
+  dates: string[];
+  /** 'HH:mm', KST 기준 24시간제 시각. 모든 날짜에 같은 시각을 쓴다. */
   time: string;
 }
 

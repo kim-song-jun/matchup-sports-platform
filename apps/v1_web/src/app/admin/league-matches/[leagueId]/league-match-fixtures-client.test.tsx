@@ -101,6 +101,7 @@ describe('LeagueMatchFixturesClient', () => {
         title: '가을 풋살 리그',
         state: 'active',
         teamIds: ['t1', 't2'],
+        startsOn: '2026-09-01T00:00:00.000Z',
         recentVenues: [],
         fixtures: [
           {
@@ -159,6 +160,7 @@ describe('LeagueMatchFixturesClient', () => {
         title: '가을 풋살 리그',
         state: 'active',
         teamIds: ['t1', 't2'],
+        startsOn: '2026-09-01T00:00:00.000Z',
         recentVenues: [],
         fixtures: [
           {
@@ -190,6 +192,7 @@ describe('LeagueMatchFixturesClient', () => {
         title: '가을 풋살 리그',
         state: 'active',
         teamIds: ['t1', 't2'],
+        startsOn: '2026-09-01T00:00:00.000Z',
         fixtures: [
           { teamMatchId: 'tm-1', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched' },
         ],
@@ -220,6 +223,7 @@ describe('LeagueMatchFixturesClient', () => {
         title: '가을 풋살 리그',
         state: 'active',
         teamIds: ['t1', 't2'],
+        startsOn: '2026-09-01T00:00:00.000Z',
         fixtures: [
           { teamMatchId: 'tm-1', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched' },
         ],
@@ -261,6 +265,7 @@ describe('LeagueMatchFixturesClient', () => {
         title: '가을 풋살 리그',
         state: 'active',
         teamIds: ['t1', 't2', 't3'],
+        startsOn: '2026-09-01T00:00:00.000Z',
         fixtures: [
           { teamMatchId: 'tm-1', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched' },
           { teamMatchId: 'tm-2', title: '가을 풋살 리그 1주차', homeTeamId: 't3', awayTeamId: null, startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched' },
@@ -333,11 +338,27 @@ describe('LeagueMatchFixturesClient', () => {
     fireEvent.change(screen.getByLabelText('기본 장소'), { target: { value: '상암 풋살파크' } });
     fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
 
-    await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith({
-      weeksCount: 7,
-      schedule: { dayOfWeek: 6, time: '19:30' },
-      placeName: '상암 풋살파크',
-    }));
+    // **서버는 요일을 모른다** — 화면이 날짜 목록으로 전개해 보내야 한다(Task 164 BE-2).
+    // 정확한 날짜 계산은 시계를 주입하는 `lib/league-fixture-dates.test.ts` 가 고정하고,
+    // 여기서는 **계약**을 지킨다: dates 배열이 오고 dayOfWeek 는 가지 않는다.
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalled());
+    const payload = mutateAsync.mock.calls[0][0] as {
+      weeksCount: number;
+      schedule: { dates: string[]; time: string };
+      placeName: string;
+    };
+    expect(payload.weeksCount).toBe(7);
+    expect(payload.placeName).toBe('상암 풋살파크');
+    expect(payload.schedule.time).toBe('19:30');
+    expect(payload.schedule).not.toHaveProperty('dayOfWeek');
+    // 주차 수만큼, 전부 토요일(KST), 전부 미래 — 서버가 거부하지 않는 값이어야 한다.
+    expect(payload.schedule.dates).toHaveLength(7);
+    for (const date of payload.schedule.dates) {
+      expect(date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      const [y, m, d] = date.split('-').map(Number);
+      expect(new Date(Date.UTC(y, m - 1, d)).getUTCDay()).toBe(6);
+      expect(new Date(Date.UTC(y, m - 1, d, 19, 30) - 9 * 60 * 60 * 1000).getTime()).toBeGreaterThan(Date.now());
+    }
   });
 
   it('요일을 고르고 시각을 비우면 서버 400 대신 안내 토스트를 보여주고 제출하지 않는다', async () => {
@@ -372,6 +393,7 @@ describe('LeagueMatchFixturesClient', () => {
         title: '가을 풋살 리그',
         state: 'draft',
         teamIds: ['t1', 't2'],
+        startsOn: '2026-09-01T00:00:00.000Z',
         fixtures: [],
         recentVenues: ['상암 풋살파크', '잠실 종합운동장'],
       },
@@ -444,6 +466,7 @@ describe('LeagueMatchFixturesClient', () => {
         title: '가을 풋살 리그',
         state: 'active',
         teamIds: ['t1', 't2'],
+        startsOn: '2026-09-01T00:00:00.000Z',
         fixtures: [
           { teamMatchId: 'tm-1', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched' },
         ],
@@ -496,6 +519,7 @@ describe('LeagueMatchFixturesClient', () => {
         title: '가을 풋살 리그',
         state: 'active',
         teamIds: ['t1', 't2'],
+        startsOn: '2026-09-01T00:00:00.000Z',
         fixtures: [
           { teamMatchId: 'tm-1', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched' },
         ],
@@ -542,6 +566,7 @@ describe('LeagueMatchFixturesClient', () => {
         title: '가을 풋살 리그',
         state: 'active',
         teamIds: ['t1', 't2'],
+        startsOn: '2026-09-01T00:00:00.000Z',
         fixtures: [
           { teamMatchId: 'tm-1', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched' },
         ],
@@ -574,6 +599,7 @@ describe('LeagueMatchFixturesClient', () => {
         title: '가을 풋살 리그',
         state: 'active',
         teamIds: ['t1', 't2'],
+        startsOn: '2026-09-01T00:00:00.000Z',
         fixtures: [
           { teamMatchId: 'tm-1', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched' },
         ],
@@ -630,6 +656,7 @@ describe('LeagueMatchFixturesClient', () => {
         title: '가을 풋살 리그',
         state: 'active',
         teamIds: ['t1', 't2'],
+        startsOn: '2026-09-01T00:00:00.000Z',
         fixtures: [
           { teamMatchId: 'tm-1', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'cancelled' },
         ],
@@ -657,6 +684,7 @@ describe('LeagueMatchFixturesClient', () => {
         title: '가을 풋살 리그',
         state: 'active',
         teamIds: ['t1', 't2'],
+        startsOn: '2026-09-01T00:00:00.000Z',
         fixtures: [
           { teamMatchId: 'tm-1', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched' },
         ],
@@ -706,6 +734,7 @@ describe('LeagueMatchFixturesClient', () => {
         title: '가을 풋살 리그',
         state: 'active',
         teamIds: ['t1', 't2'],
+        startsOn: '2026-09-01T00:00:00.000Z',
         fixtures: [
           { teamMatchId: 'tm-1', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched' },
         ],
@@ -760,6 +789,7 @@ describe('LeagueMatchFixturesClient', () => {
         title: '가을 풋살 리그',
         state,
         teamIds: ['t1', 't2'],
+        startsOn: '2026-09-01T00:00:00.000Z',
         fixtures: [
           { teamMatchId: 'tm-1', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'completed' },
         ],
@@ -811,6 +841,7 @@ describe('LeagueMatchFixturesClient', () => {
         title: '가을 풋살 리그',
         state: 'active',
         teamIds: ['t1', 't2'],
+        startsOn: '2026-09-01T00:00:00.000Z',
         fixtures: [
           { teamMatchId: 'tm-not-entered', title: '1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched', resultStage: 'not_entered', homeScore: null, awayScore: null },
           { teamMatchId: 'tm-draft', title: '2주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-08T20:00:00.000Z', placeName: '장소 미정', status: 'matched', resultStage: 'draft', homeScore: null, awayScore: null },
@@ -879,6 +910,7 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
         title: '심야 풋살 리그',
         state: 'draft',
         teamIds: ['t1', 't2', 't3', 't4'],
+        startsOn: '2026-09-01T00:00:00.000Z',
         fixtures: [],
       },
       isPending: false,
@@ -916,7 +948,8 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
     await waitFor(() =>
       expect(mutateAsync).toHaveBeenCalledWith({
         weeksCount: 7,
-        schedule: { dayOfWeek: 3, time: '22:00' },
+        // 수요일 7개가 전개돼 온다(정확한 날짜는 lib/league-fixture-dates.test.ts 가 고정).
+        schedule: { dates: expect.any(Array), time: '22:00' },
         timing: { gameDurationMinutes: 15, breakMinutes: 5, gamesPerTeamPerDay: 3 },
       }),
     );
@@ -1042,6 +1075,7 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
         title: '심야 풋살 리그',
         state: 'active',
         teamIds: ['t1', 't2'],
+        startsOn: '2026-09-01T00:00:00.000Z',
         fixtures: [
           { teamMatchId: 'tm-1', title: '심야 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched' },
         ],

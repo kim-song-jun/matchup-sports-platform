@@ -48,6 +48,18 @@ describe('TournamentSponsorForm', () => {
     expect(setField).toHaveBeenCalledWith('logoUrl', '');
   });
 
+  // motion-audit 그룹6(F5 admin button press) — active:scale-[0.98] 가
+  // transition-colors 안에만 있어 transform 이 transition-property 에서 빠져 있었다
+  // (Tailwind의 transition-colors는 color/background-color/border-color 등만 대상으로
+  // 하고 transform은 포함하지 않는다) → 눌렀다 뗄 때 스케일이 0ms 로 즉시 스냅했다.
+  it('제출 버튼이 transition-transform 을 가져 active:scale press 가 스냅하지 않는다', () => {
+    renderForm();
+
+    const submitBtn = screen.getByRole('button', { name: '협찬 추가' });
+    expect(submitBtn).toHaveClass('transition-transform');
+    expect(submitBtn.className).toMatch(/active:scale-\[0\.98\]/);
+  });
+
   it('blocks saving and reports the real error while the logo upload is unresolved', () => {
     renderForm({
       form: { ...emptySponsorForm, name: '파트너사' },

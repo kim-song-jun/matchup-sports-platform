@@ -94,6 +94,24 @@ describe('MatchListPageView — 매치 카드 종목 배지', () => {
   });
 });
 
+// motion-audit 그룹6(F1 desktop card hover) — 데스크톱 매치 리스트 카드는 tm-pressable
+// (:active 전용)만 쓰고 있어 마우스 hover 에 아무 피드백도 없었다(getAnimationsSnapshots
+// count:0 3회 확인). 이미 존재하는 .tm-card-interactive:hover(box-shadow elevation,
+// @media(hover:hover) 가드) 패턴을 카드에 붙이기만 하면 되는 국소 결함이다.
+describe('MatchListPageView — 매치 카드 hover 피드백(motion-audit F1)', () => {
+  it('카드 링크에 tm-card-interactive 가 붙어 데스크톱 hover 시 elevation 이 걸린다', () => {
+    const model = getMatchListViewModel();
+    const { container } = render(<MatchListPageView model={model} />);
+
+    const card = container.querySelector('.tm-match-list-card');
+    expect(card).not.toBeNull();
+    expect(card).toHaveClass('tm-card-interactive');
+    // tm-pressable(:active 눌림 피드백)은 그대로 남아 있어야 한다 — hover 추가가
+    // 기존 press 피드백을 대체한 게 아니라 나란히 쓰는 것이다.
+    expect(card).toHaveClass('tm-pressable');
+  });
+});
+
 // team-matches-page.test.tsx의 동일 계열 회귀 방지(#5)를 matches 쪽에도 적용한다 —
 // 로딩 중을 "조건에 맞는 매치가 없어요"로 잘못 그리던 결함(2026-08-27 감사).
 describe('MatchListPageView — 로딩 중 EmptyState 오표시 방지', () => {

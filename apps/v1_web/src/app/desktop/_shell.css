@@ -226,6 +226,26 @@
     list-style: none;
     margin: 0;
     padding: 0;
+    /* .tm-desktop-nav-tab-indicator 의 offsetParent — 인디케이터의 left/width 는
+       shell.tsx 의 use-sliding-indicator 가 이 컨테이너 기준 좌표로 측정해 넣는다. */
+    position: relative;
+  }
+
+  /* 활성 표시 밑줄 — 트랙에 하나뿐인 슬라이딩 인디케이터. 탭마다 자기 ::after 를
+   * 갖던 예전 구조(모바일 하단탭이 pill-slot 으로, 화면 안 세부탭이 segmented-thumb
+   * 으로 이미 마이그레이션한 것과 같은 이유)는 활성 탭이 바뀔 때 의사요소가 다른
+   * DOM 부모 아래서 재생성되므로 애초에 미끄러질 수 없었다(motion-audit 그룹4).
+   * left/width 는 shell.tsx 가 인라인으로 주입한다 — 라벨 길이가 제각각이라
+   * index*100% 계산이 성립하지 않기 때문이다(하단탭·세부탭과의 차이점). */
+  .tm-desktop-nav-tab-indicator {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    height: 2.5px;
+    background: var(--blue500);
+    border-radius: var(--radius-pill) var(--radius-pill) 0 0;
+    transition: transform var(--duration-base) var(--ease-standard),
+      width var(--duration-base) var(--ease-standard);
   }
 
   /*
@@ -253,18 +273,6 @@
   .tm-desktop-nav-tab[aria-current="page"] {
     color: var(--blue500);
     font-weight: 700;
-  }
-
-  /* Underline indicator — the desktop active affordance */
-  .tm-desktop-nav-tab[aria-current="page"]::after {
-    content: "";
-    position: absolute;
-    left: 16px;
-    right: 16px;
-    bottom: 0;
-    height: 2.5px;
-    background: var(--blue500);
-    border-radius: var(--radius-pill) var(--radius-pill) 0 0;
   }
 
   .tm-desktop-nav-tab:focus-visible {

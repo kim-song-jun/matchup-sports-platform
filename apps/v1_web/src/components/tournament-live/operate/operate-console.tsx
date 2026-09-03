@@ -1306,9 +1306,12 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           균등 배치한다. 골만 2칸을 쓰면 총 7칸이 되어 마지막 액션이 홀로
           다음 줄로 밀리므로, 모든 액션의 크기와 터치 영역을 동일하게 둔다. */}
       <div className="grid grid-cols-2 gap-2 px-4 sm:grid-cols-6">
-        {visibleActionButtons.map((button, index) => (
+        {visibleActionButtons.map((button) => (
           <Button
-            key={`${button.type}-${button.cardColor ?? index}`}
+            // key 에 index 를 쓰지 않는다 — 롤링/제한에 따라 목록이 갈리면 같은 버튼의
+            // index 가 달라져 React 가 remount 한다(Copilot 리뷰). CARD 두 개는
+            // cardColor 로 갈리므로 type+cardColor 조합이 이미 고유하다.
+            key={`${button.type}-${button.cardColor ?? 'none'}`}
             size="lg"
             variant="outline"
             className="h-16 flex-col gap-1 lg:h-20"

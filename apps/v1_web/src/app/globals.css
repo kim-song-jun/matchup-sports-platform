@@ -2671,17 +2671,34 @@ label.tm-btn:focus-within {
   position: relative;
 }
 
+/* 그래픽은 하단 우측에 고정 — 세로 중앙이면 우상단 아이콘 버튼 행(홈·공유·알림)과 겹친다
+   (alpha 실측 2026-09-04). 오버레이 텍스트에는 그래픽 폭만큼 우측 여백을 준다. */
 .tm-match-detail-hero-sport .tm-match-detail-hero-illustration {
   position: absolute;
-  right: 20px;
-  top: 50%;
-  transform: translateY(-50%);
+  right: 16px;
+  bottom: 16px;
+  width: 136px;
+  height: 136px;
   pointer-events: none;
 }
 
 .tm-match-detail-hero-sport .tm-match-detail-overlay {
   position: relative;
+  padding-right: 164px;
   background: linear-gradient(90deg, rgba(25, 31, 40, 0.42), rgba(25, 31, 40, 0.08));
+}
+
+@media (min-width: 1024px) {
+  .tm-match-detail-hero-sport .tm-match-detail-hero-illustration {
+    right: 24px;
+    bottom: 20px;
+    width: 160px;
+    height: 160px;
+  }
+
+  .tm-match-detail-hero-sport .tm-match-detail-overlay {
+    padding-right: 200px;
+  }
 }
 
 .tm-match-list-media::after {

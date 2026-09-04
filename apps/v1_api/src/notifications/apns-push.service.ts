@@ -236,6 +236,21 @@ export class ApnsPushService implements NativePushAdapter, OnModuleInit, OnModul
         );
         return { result: 'delivered', correctedEnvironment: corrected };
       }
+
+      // The probe is the tiebreaker, so a probe that could not answer settles nothing. If the
+      // other gateway was merely busy or unreachable, revoking on the first `BadDeviceToken`
+      // would unregister a device that is very likely fine — the exact failure this whole
+      // path exists to prevent, arrived at from the other side. Only a second *permanent*
+      // rejection means the token is gone.
+      const probeSettledIt =
+        second.kind === 'rejected' && ApnsPushService.PERMANENT_REASONS.has(second.reason);
+      if (!probeSettledIt) {
+        this.logger.warn(
+          { deviceId: device.id, reportedHost: host, probedHost: otherHost, probe: second.kind },
+          'APNs probe of the other gateway did not answer; keeping the device registered',
+        );
+        return { result: 'transient' };
+      }
     }
 
     if (ApnsPushService.PERMANENT_REASONS.has(first.reason)) {

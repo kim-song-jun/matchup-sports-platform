@@ -225,7 +225,12 @@ class LiveWebHarnessCase: XCTestCase {
     func dismissNotificationExplainerIfPresent(timeout: TimeInterval = 20) -> Bool {
         let explainer = app.otherElements["알림 받기 안내"]
         guard explainer.waitForExistence(timeout: timeout) else { return false }
-        app.buttons["push-prompt-defer"].tap()
+        // The container can be on screen a beat before its buttons are hittable, and a tap
+        // that lands early fails the test for a reason that has nothing to do with it.
+        let deferButton = app.buttons["push-prompt-defer"]
+        guard deferButton.waitForExistence(timeout: 10) else { return false }
+        for _ in 0..<20 where !deferButton.isHittable { settle(0.25) }
+        deferButton.tap()
         _ = explainer.waitForNonExistence(timeout: 10)
         return true
     }

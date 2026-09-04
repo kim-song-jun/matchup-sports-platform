@@ -52,6 +52,10 @@ final class KeyboardLayoutUITests: LiveWebHarnessCase {
         XCTAssertLessThan(
             gap, maximumGapPoints,
             "the composer is \(gap)pt above the keyboard — the page scrolled out from under it")
+        // A negative gap is the opposite failure and just as bad: the keyboard covering the
+        // composer would pass a one-sided check while leaving the reader unable to type.
+        XCTAssertGreaterThanOrEqual(
+            gap, -1, "the keyboard is covering the composer by \(-gap)pt")
 
         // The composer rising is correct — the viewport shrank under it. What must not happen
         // is the page sliding out from under the keyboard, and the header is the tell: in the

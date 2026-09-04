@@ -51,6 +51,7 @@ class ScriptedSession extends EventEmitter {
 }
 
 const BAD_TOKEN = { status: 400, body: JSON.stringify({ reason: 'BadDeviceToken' }) };
+const BUSY = { status: 503, body: JSON.stringify({ reason: 'ServiceUnavailable' }) };
 const UNREGISTERED = { status: 410, body: JSON.stringify({ reason: 'Unregistered' }) };
 const OK = { status: 200 };
 
@@ -161,6 +162,24 @@ describe('ApnsPushService gateway self-correction', () => {
     expect(summary).toEqual({ devices: 1, delivered: 0, failed: 1, disabled: false });
     expect(pushDevices.revokeTokens).toHaveBeenCalledWith(['d1']);
     expect(pushDevices.correctApnsEnvironment).not.toHaveBeenCalled();
+  });
+
+  /**
+   * A probe that cannot answer settles nothing. Revoking on the first `BadDeviceToken`
+   * because the other gateway happened to be busy would unregister a device that is fine —
+   * the same failure this path exists to prevent, reached from the other side.
+   */
+  it('keeps the device registered when the other gateway is merely busy', async () => {
+    const service = build({ [SANDBOX]: BAD_TOKEN, [PRODUCTION]: BUSY });
+
+    const summary = await service.send([device('d1', 'testflight-token', 'sandbox')], {
+      notificationId: 'n1',
+      title: '알림',
+    });
+
+    expect(summary).toEqual({ devices: 1, delivered: 0, failed: 1, disabled: false });
+    expect(pushDevices.revokeTokens).toHaveBeenCalledWith([]);
+    expect(pushDevices.recordTransientFailures).toHaveBeenCalledWith(['d1']);
   });
 
   /**

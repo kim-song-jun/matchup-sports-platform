@@ -343,6 +343,24 @@ describe('등번호 수정', () => {
     expect(updateJersey).not.toHaveBeenCalled();
   });
 
+  it('"07" 은 7 과 같은 값이라 저장 버튼이 살아나지 않는다', () => {
+    // 문자열로 비교하면 `"07" !== "7"` 이라 버튼이 살아나는데, 저장하면 보낼 값이 같아서
+    // **요청은 0건인데 패널만 닫힌다** — 팀장은 뭔가 저장됐다고 읽는다(Copilot 지적).
+    renderRow(7);
+    expect(screen.getByRole('button', { name: '저장' })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('등번호'), { target: { value: '07' } });
+    expect(screen.getByRole('button', { name: '저장' })).toBeDisabled();
+    // 값이 실제로 달라지면 살아난다(회귀 방지 — 항상 비활성이면 아무것도 못 고친다).
+    fireEvent.change(screen.getByLabelText('등번호'), { target: { value: '8' } });
+    expect(screen.getByRole('button', { name: '저장' })).not.toBeDisabled();
+  });
+
+  it('숫자가 아닌 입력은 버튼을 열어 둔다 — 눌러야 왜 안 되는지 알 수 있다', () => {
+    renderRow(7);
+    fireEvent.change(screen.getByLabelText('등번호'), { target: { value: 'e' } });
+    expect(screen.getByRole('button', { name: '저장' })).not.toBeDisabled();
+  });
+
   it('편집 중에 서버 값이 갱신돼도 오류 문구와 입력값이 살아 있다', async () => {
     // Copilot 리뷰가 잡은 자리다. 저장 하나가 **두 요청으로 갈릴 수 있어서**(등번호 /
     // 자격) 이 순서가 실제로 난다: 등번호는 성공해 목록이 갱신되고, 자격은 실패해 오류가

@@ -893,6 +893,16 @@ function PlayerRow({
     setEditError(null);
   }, [isEditing]);
 
+  // **변경 여부는 정규화한 값으로 본다.** 문자열로 비교하면 `"07"` 과 `7` 이 다르게 보여
+  // 버튼이 살아나는데, 저장하면 서버로 보낼 값이 같아서 **요청은 0건인데 패널만 닫힌다** —
+  // 팀장은 뭔가 저장됐다고 읽는다(Copilot 지적). 파싱에 실패한 입력(`"e"`)은 "바뀐 것" 으로
+  // 봐서 버튼을 열어 둔다 — 눌러야 왜 안 되는지 오류 문구가 나온다.
+  const parsedDraftJersey = parseJerseyInput(draftJersey);
+  const hasChanges =
+    draftEligibility !== player.eligibilityStatus ||
+    !parsedDraftJersey.ok ||
+    (parsedDraftJersey.value ?? null) !== player.jerseyNumber;
+
   async function handleSave() {
     // 로딩 중 재클릭 시 중복 제출 방지 — isPending 은 disabled 속성과 동일하게 리렌더
     // 이후에나 반영되는 값이라 동시 클릭까지 막지는 못하지만, 스피너가 보이는 동안의
@@ -1099,11 +1109,7 @@ function PlayerRow({
               className={`tm-btn tm-btn-sm ${isPrimary ? 'tm-btn-primary' : 'tm-btn-outline'}`}
               style={{ flex: 1 }}
               onClick={() => void handleSave()}
-              disabled={
-                isUpdating ||
-                (draftEligibility === player.eligibilityStatus &&
-                  draftJersey.trim() === (player.jerseyNumber === null ? '' : String(player.jerseyNumber)))
-              }
+              disabled={isUpdating || !hasChanges}
             >
               {isUpdating ? '저장 중…' : '저장'}
             </button>

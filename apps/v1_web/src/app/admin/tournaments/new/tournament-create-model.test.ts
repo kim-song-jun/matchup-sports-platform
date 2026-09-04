@@ -120,6 +120,10 @@ describe('대회 생성 — 마감 일시 하한', () => {
       1,
     );
     expect(errors.scheduledAt).toBe('대회 시작 일시는 지금 이후여야 해요.');
+    // 그리고 **마감 필드는 빨개지지 않아야 한다.** 시작일이 이미 틀렸는데 "마감은 대회 시작
+    // 전이어야 해요" 까지 함께 뜨면, 운영자는 멀쩡한 마감을 고치려 든다. 원인 하나에 오류 하나다.
+    expect(errors.registrationDeadlineAt).toBeUndefined();
+    expect(errors.rosterDeadlineAt).toBeUndefined();
   });
 
   it('시작이 7일 이내인지 알려 준다 — 화면이 경고 배너를 띄우는 근거', () => {

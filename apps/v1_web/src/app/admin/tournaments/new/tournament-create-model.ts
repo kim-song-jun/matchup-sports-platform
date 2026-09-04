@@ -523,22 +523,26 @@ export function validateTournamentCreateStep(state: TournamentCreateState, step 
     if (start !== null && end !== null && end < start) {
       errors.scheduledEndAt = '종료 일시는 시작 일시 이후여야 해요.';
     }
-    if (start !== null && registrationDeadline !== null && registrationDeadline >= start) {
+    const nowTs = Date.now();
+    // **시작일 자체가 과거면 거기서만 말한다.** 이 검사가 없으면 과거 시작일이 "마감은 대회 시작
+    // 전이어야 해요" 처럼 **엉뚱한 필드의** 오류로 나타나 운영자가 고칠 곳을 못 찾는다.
+    // 이 마법사는 생성 전용이라(편집 경로가 이 검증을 쓰지 않는다) 지난 대회 편집을 막지 않는다.
+    const startIsFuture = start !== null && start > nowTs;
+    if (start !== null && !startIsFuture) {
+      errors.scheduledAt = '대회 시작 일시는 지금 이후여야 해요.';
+    }
+    // **"마감 < 시작" 은 시작일이 유효할 때만 본다.** 시작일이 이미 틀렸는데 마감 필드까지
+    // 빨개지면, 운영자는 멀쩡한 마감을 고치려 든다 — 원인 하나에 오류 하나여야 한다.
+    if (startIsFuture && registrationDeadline !== null && registrationDeadline >= start) {
       errors.registrationDeadlineAt = '신청 마감은 대회 시작 전이어야 해요.';
     }
-    if (start !== null && rosterDeadline !== null && rosterDeadline >= start) {
+    if (startIsFuture && rosterDeadline !== null && rosterDeadline >= start) {
       errors.rosterDeadlineAt = '명단 제출 마감은 대회 시작 전이어야 해요.';
     }
     // **지난 마감은 만들 수 없다.** "대회 시작 전" 만 보면 시작이 임박한 대회에서 과거 시각이
     // 통과한다 — 그러면 팀이 명단을 아예 못 낸다(서버 409 ROSTER_DEADLINE_PASSED).
+    // 이 검사는 시작일 유효성과 무관하게 돈다 — 지난 마감은 그 자체로 틀렸다.
     // 두 필드를 각각 본다: 같은 자동 제안 로직을 두 곳이 쓰므로 한쪽만 막으면 반쪽이다.
-    const nowTs = Date.now();
-    // **시작일 자체가 과거면 거기서 말한다.** 이 검사가 없으면 과거 시작일이 "마감은 대회 시작
-    // 전이어야 해요" 처럼 **엉뚱한 필드의** 오류로 나타나 운영자가 고칠 곳을 못 찾는다.
-    // 이 마법사는 생성 전용이라(편집 경로가 이 검증을 쓰지 않는다) 지난 대회 편집을 막지 않는다.
-    if (start !== null && start <= nowTs) {
-      errors.scheduledAt = '대회 시작 일시는 지금 이후여야 해요.';
-    }
     if (registrationDeadline !== null && registrationDeadline <= nowTs) {
       errors.registrationDeadlineAt = '신청 마감은 지금 이후여야 해요.';
     }

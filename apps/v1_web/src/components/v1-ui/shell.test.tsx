@@ -13,7 +13,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
 
 const EXPECTED_TABS: Array<{ label: string; href: string }> = [
   { label: '홈', href: '/home' },
-  { label: '매치', href: '/matches' },
+  { label: '매치', href: '/team-matches' },
   { label: '대회', href: '/tournaments' },
   { label: '팀', href: '/teams' },
   { label: '마이', href: '/my' },
@@ -167,7 +167,7 @@ describe('AppChrome 하단탭 모션(C안) — 아이콘이 CSS 모션 셀렉터
 // 없어 offsetLeft/offsetWidth 가 항상 0 이므로, 탭마다 **일부러 다른 폭**을 흉내 낸
 // getter 로 프로토타입을 스텁한다 — 폭이 전부 같았다면(예전 index*100% 방식) 이 테스트가
 // 실제 결함(측정을 안 해도 우연히 통과)을 못 잡았을 것이다.
-const DESKTOP_TAB_HREFS = ['/home', '/matches', '/tournaments', '/teams', '/my'];
+const DESKTOP_TAB_HREFS = ['/home', '/team-matches', '/tournaments', '/teams', '/my'];
 const DESKTOP_TAB_WIDTHS = [48, 64, 64, 40, 64]; // 의도적으로 서로 다른 폭
 const DESKTOP_TAB_GAP = 4; // .tm-desktop-nav-tabs 의 flex gap
 

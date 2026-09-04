@@ -560,6 +560,19 @@ describe('TeamMatchesService', () => {
     }
   });
 
+  it('list: 기본 조회는 최신 생성순이며 시작·신청 마감이 지난 모집 행을 제외한다', async () => {
+    prisma.v1TeamMatch.findMany.mockResolvedValue([]);
+
+    await service.list(null, {});
+
+    const args = prisma.v1TeamMatch.findMany.mock.calls[0][0];
+    expect(args.orderBy).toEqual([{ createdAt: 'desc' }, { id: 'desc' }]);
+    expect(args.where.startAt).toEqual({ gte: expect.any(Date) });
+    expect(args.where.AND).toEqual(expect.arrayContaining([
+      { OR: [{ deadlineAt: null }, { deadlineAt: { gte: expect.any(Date) } }] },
+    ]));
+  });
+
   it('close: 모집 중 팀매치를 closed로 전환하고 pending 신청을 expired 처리한다', async () => {
     prisma.v1TeamMatch.findFirst.mockResolvedValue(
       teamMatchRow({ status: 'recruiting', startAt: FUTURE }),
@@ -768,6 +781,34 @@ describe('TeamMatchesService', () => {
 
     const result = await service.detail(null, 'tm-1');
     expect(result.status).toBe('expired');
+  });
+
+  it('detail: raw status가 recruiting이어도 신청 마감이 지났으면 displayState는 closed다', async () => {
+    const teamMatch = {
+      ...teamMatchRow({ status: 'recruiting', startAt: FUTURE, deadlineAt: PAST }),
+      sport: { id: 'sport-1', name: '풋살' },
+      region: { id: 'region-1', name: '서울' },
+      minSportLevel: null,
+      maxSportLevel: null,
+      hostTeam: {
+        id: 'team-host',
+        name: '호스트팀',
+        ownerUserId: manager.id,
+        status: 'active',
+        profile: null,
+        trustScore: null,
+        memberships: [],
+      },
+      approvedApplicantTeam: null,
+      applications: [],
+    };
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(teamMatch);
+    prisma.v1Team.findMany.mockResolvedValue([]);
+
+    const result = await service.detail(null, 'tm-1');
+
+    expect(result.status).toBe('recruiting');
+    expect(result.displayState).toBe('closed');
   });
 
   // Task 17: the result-entry/approval screens call `/games/:gameId/...` and

@@ -124,7 +124,6 @@ export type TeamMatchDetailViewModel = {
   chatError?: string | null;
   onChat?: () => void;
   onShare?: () => void;
-  onNotify?: () => void;
   /** 라인업 관리 화면(Task 15) 링크. 내가 owner/manager로 속한 팀(호스트팀 또는 승인된
    * 상대팀)이 이 매치에 관여할 때만 설정된다 — 그 외에는 undefined라 CTA 자체가 안 보인다. */
   lineupHref?: string;

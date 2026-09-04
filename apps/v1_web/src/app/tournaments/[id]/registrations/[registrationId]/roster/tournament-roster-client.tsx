@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { AlertBanner, Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
@@ -11,6 +11,7 @@ import {
   useV1Registration,
   useV1AddPlayer,
   useV1UpdatePlayer,
+  useV1UpdatePlayerJersey,
   useV1RemovePlayer,
 } from '@/hooks/use-v1-api';
 import { v1Get } from '@/lib/api-client';
@@ -845,6 +846,7 @@ function PlayerRow({
   isEditing,
   onToggleEdit,
   isPrimary,
+  onUpdateJersey,
 }: {
   player: V1TournamentPlayer;
   onUpdate: (playerId: string, eligibilityStatus: V1PlayerEligibilityStatus) => Promise<void>;
@@ -861,18 +863,45 @@ function PlayerRow({
    * 칸이 있거나 다른 행이 편집 중이면 이 행의 "저장"은 보조로 낮춘다. 부모가
    * `draftForms.length === 0 && editingPlayerId === player.id` 로 계산해 넘긴다. */
   isPrimary: boolean;
+  /** 등번호만 고치는 경로 — 자격과 서버 엔드포인트가 다르다. */
+  onUpdateJersey: (playerId: string, jerseyNumber: number | null) => Promise<unknown>;
 }) {
   const [draftEligibility, setDraftEligibility] = useState<V1PlayerEligibilityStatus>(player.eligibilityStatus);
+  // 문자열로 든다 — 빈 값("번호 없음")과 `0` 을 숫자로는 못 가른다.
+  const [draftJersey, setDraftJersey] = useState<string>(
+    player.jerseyNumber === null ? '' : String(player.jerseyNumber),
+  );
   const [editError, setEditError] = useState<string | null>(null);
 
   // 이 행이 (다시) 열릴 때마다 최신 서버 값으로 초기화한다 — 부모가 편집 상태를
   // 컨트롤하므로 "수정" 버튼 onClick 대신 여기서 동기화한다.
+  //
+  // **초기화는 패널이 열리는 순간에만 한다.** 예전엔 `player.eligibilityStatus`·
+  // `player.jerseyNumber` 도 의존성에 있어서, **편집 중에 서버 값이 바뀌면 그때마다 다시
+  // 초기화**됐다. 이 화면은 저장 하나가 두 요청으로 갈릴 수 있어서(등번호 / 자격) 실제로
+  // 이런 순서가 난다 — 등번호는 성공해 목록이 갱신되고, 자격은 실패해 `editError` 가
+  // 걸린다. 그러면 갱신이 도착하는 순간 **오류 문구가 지워져** 팀장은 무엇이 실패했는지
+  // 못 보고, 고치던 입력값도 함께 되돌아간다.
+  // 최신 값은 ref 로 읽는다 — 의존성에 넣지 않기 위해서지, 값이 필요 없어서가 아니다.
+  const playerRef = useRef(player);
+  playerRef.current = player;
   useEffect(() => {
-    if (isEditing) {
-      setDraftEligibility(player.eligibilityStatus);
-      setEditError(null);
-    }
-  }, [isEditing, player.eligibilityStatus]);
+    if (!isEditing) return;
+    const latest = playerRef.current;
+    setDraftEligibility(latest.eligibilityStatus);
+    setDraftJersey(latest.jerseyNumber === null ? '' : String(latest.jerseyNumber));
+    setEditError(null);
+  }, [isEditing]);
+
+  // **변경 여부는 정규화한 값으로 본다.** 문자열로 비교하면 `"07"` 과 `7` 이 다르게 보여
+  // 버튼이 살아나는데, 저장하면 서버로 보낼 값이 같아서 **요청은 0건인데 패널만 닫힌다** —
+  // 팀장은 뭔가 저장됐다고 읽는다(Copilot 지적). 파싱에 실패한 입력(`"e"`)은 "바뀐 것" 으로
+  // 봐서 버튼을 열어 둔다 — 눌러야 왜 안 되는지 오류 문구가 나온다.
+  const parsedDraftJersey = parseJerseyInput(draftJersey);
+  const hasChanges =
+    draftEligibility !== player.eligibilityStatus ||
+    !parsedDraftJersey.ok ||
+    (parsedDraftJersey.value ?? null) !== player.jerseyNumber;
 
   async function handleSave() {
     // 로딩 중 재클릭 시 중복 제출 방지 — isPending 은 disabled 속성과 동일하게 리렌더
@@ -880,8 +909,21 @@ function PlayerRow({
     // 재클릭은 막는다(동시 클릭 방지가 필요하면 ref 락을 따로 둔다).
     if (isUpdating) return;
     setEditError(null);
+    const jersey = parseJerseyInput(draftJersey);
+    if (!jersey.ok) {
+      setEditError('등번호는 0에서 99 사이 숫자로 입력해 주세요.');
+      return;
+    }
     try {
-      await onUpdate(player.id, draftEligibility);
+      // **바뀐 것만 보낸다.** 자격과 등번호는 축이 다르고 서버 경로도 다르다 —
+      // 등번호만 고쳤는데 자격까지 보내면 어드민 판정을 덮어쓸 여지가 생긴다.
+      if (draftEligibility !== player.eligibilityStatus) {
+        await onUpdate(player.id, draftEligibility);
+      }
+      const nextJersey = jersey.value ?? null;
+      if (nextJersey !== player.jerseyNumber) {
+        await onUpdateJersey(player.id, nextJersey);
+      }
       onToggleEdit();
     } catch (err) {
       setEditError(extractErrorMessage(err, '선수 정보를 수정하지 못했어요. 잠시 후 다시 시도해 주세요.'));
@@ -969,6 +1011,28 @@ function PlayerRow({
 
       {isEditing && !isLocked ? (
         <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--grey100)' }}>
+          {/* 등번호 수정. 이 경로가 없던 동안 번호를 잘못 넣으면 **선수를 지우고 다시
+              넣는 수밖에** 없었고, 그 우회는 되살린 행의 자격을 `needs_review` 로 되돌린다. */}
+          <FormField
+            id={`player-${player.id}-jersey`}
+            label="등번호"
+            hint="비우면 번호 없는 선수가 돼요."
+          >
+            <input
+              id={`player-${player.id}-jersey`}
+              // `type="number"` 는 `e`·`-` 를 `badInput` 으로 보고 값을 빈 문자열로 준다 —
+              // 화면엔 글자가 보이는데 코드는 "번호 없음" 으로 읽는다(추가 폼과 같은 이유).
+              type="text"
+              inputMode="numeric"
+              maxLength={2}
+              value={draftJersey}
+              onChange={(event) => setDraftJersey(event.target.value)}
+              placeholder="예: 7"
+              className="tm-input"
+              style={{ fontFamily: 'var(--font-pretendard)' }}
+            />
+          </FormField>
+
           <FormField id={`player-${player.id}-eligibility`} label="선출 여부" labelId={`player-${player.id}-eligibility-label`}>
             <div
               role="radiogroup"
@@ -1045,7 +1109,7 @@ function PlayerRow({
               className={`tm-btn tm-btn-sm ${isPrimary ? 'tm-btn-primary' : 'tm-btn-outline'}`}
               style={{ flex: 1 }}
               onClick={() => void handleSave()}
-              disabled={isUpdating || draftEligibility === player.eligibilityStatus}
+              disabled={isUpdating || !hasChanges}
             >
               {isUpdating ? '저장 중…' : '저장'}
             </button>
@@ -1077,6 +1141,7 @@ export function TournamentRosterPageClient({
 
   const addPlayer = useV1AddPlayer(tournamentId, registrationId);
   const updatePlayer = useV1UpdatePlayer(tournamentId, registrationId);
+  const updatePlayerJersey = useV1UpdatePlayerJersey(tournamentId, registrationId);
   const removePlayer = useV1RemovePlayer(tournamentId, registrationId);
   const { confirm: confirmRemove, ConfirmModal: RemoveConfirmModal } = useConfirm();
 
@@ -1257,6 +1322,10 @@ export function TournamentRosterPageClient({
     } catch (err) {
       setRemoveError(extractErrorMessage(err, '선수 삭제에 실패했어요. 잠시 후 다시 시도해 주세요.'));
     }
+  }
+
+  async function handleUpdatePlayerJersey(playerId: string, jerseyNumber: number | null) {
+    return updatePlayerJersey.mutateAsync({ playerId, jerseyNumber });
   }
 
   async function handleUpdatePlayer(playerId: string, eligibilityStatus: V1PlayerEligibilityStatus) {
@@ -1481,8 +1550,12 @@ export function TournamentRosterPageClient({
                 key={player.id}
                 player={player}
                 onUpdate={handleUpdatePlayer}
+                onUpdateJersey={handleUpdatePlayerJersey}
                 onRemove={handleRemovePlayer}
-                isUpdating={updatePlayer.isPending}
+                // **두 mutation 을 함께 본다.** 저장 하나가 자격/등번호 두 경로로 갈리므로
+                // `updatePlayer` 만 보면 **등번호 요청이 도는 동안 저장 버튼이 열려 있어**
+                // 같은 요청이 두 번 나간다(Copilot 지적).
+                isUpdating={updatePlayer.isPending || updatePlayerJersey.isPending}
                 isRemoving={removePlayer.isPending}
                 isLocked={!canEditRoster}
                 isEditing={editingPlayerId === player.id}

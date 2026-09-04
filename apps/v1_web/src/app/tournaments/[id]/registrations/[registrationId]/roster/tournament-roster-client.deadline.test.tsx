@@ -8,6 +8,7 @@ import {
   useV1Tournament,
   useV1TournamentPlayers,
   useV1UpdatePlayer,
+  useV1UpdatePlayerJersey,
 } from '@/hooks/use-v1-api';
 import {
   TournamentRosterPageClient,
@@ -25,6 +26,9 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1TournamentPlayers: vi.fn(),
   useV1AddPlayer: vi.fn(),
   useV1UpdatePlayer: vi.fn(),
+  // 기본 반환을 준다 — 화면이 이제 `isPending` 도 읽으므로(중복 제출 방지),
+  // `vi.fn()` 만 두면 이 mock 을 따로 세팅하지 않는 케이스가 `undefined.isPending` 으로 죽는다.
+  useV1UpdatePlayerJersey: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
   useV1RemovePlayer: vi.fn(),
 }));
 
@@ -274,6 +278,137 @@ describe('parseJerseyInput', () => {
   it('세 자리는 거부한다 — 서버 상한이 99 다', () => {
     expect(parseJerseyInput('100')).toEqual({ ok: false });
     expect(parseJerseyInput('99')).toEqual({ ok: true, value: 99 });
+  });
+});
+
+/**
+ * 등번호 수정 경로. 이게 없던 동안 번호를 잘못 넣으면 **선수를 지우고 다시 넣는 수밖에**
+ * 없었고, 그 우회는 되살린 행의 자격을 `needs_review` 로 되돌린다(2026-09-04 alpha 실측).
+ */
+describe('등번호 수정', () => {
+  const updateJersey = vi.fn().mockResolvedValue({});
+  const updatePlayer = vi.fn().mockResolvedValue({});
+
+  function renderRow(jerseyNumber: number | null, options: { jerseyPending?: boolean } = {}) {
+    updateJersey.mockClear();
+    updatePlayer.mockClear();
+    vi.mocked(useV1Tournament).mockReturnValue({
+      data: { minPlayers: 1, maxPlayers: 20, rosterDeadlineAt: null, status: 'open' },
+    } as never);
+    vi.mocked(useV1Registration).mockReturnValue({
+      data: { id: 'reg-1', teamId: 'team-1', status: 'confirmed', rosterLockedAt: null, rosterDeadlineOverrideAt: null },
+    } as never);
+    vi.mocked(useV1TournamentPlayers).mockReturnValue({
+      data: { players: [mockPlayer({ jerseyNumber })], belowMinimum: false },
+      isPending: false,
+    } as never);
+    vi.mocked(useV1AddPlayer).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    vi.mocked(useV1UpdatePlayer).mockReturnValue({ mutateAsync: updatePlayer, isPending: false } as never);
+    vi.mocked(useV1UpdatePlayerJersey).mockReturnValue({
+      mutateAsync: updateJersey,
+      isPending: options.jerseyPending ?? false,
+    } as never);
+    vi.mocked(useV1RemovePlayer).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    const view = render(<TournamentRosterPageClient tournamentId="t1" registrationId="reg-1" />);
+    fireEvent.click(screen.getByRole('button', { name: /수정/ }));
+    return view;
+  }
+
+  /** 위와 같되 `rerender` 를 쓰려는 케이스용 — 이름을 갈라 두면 의도가 보인다. */
+  const renderRowWithHandle = renderRow;
+
+  it('번호를 고치면 등번호 경로로만 보낸다 — 자격은 건드리지 않는다', async () => {
+    renderRow(7);
+    fireEvent.change(screen.getByLabelText('등번호'), { target: { value: '10' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    await waitFor(() => expect(updateJersey).toHaveBeenCalledWith({ playerId: 'player-1', jerseyNumber: 10 }));
+    // 자격을 함께 보내면 팀장이 어드민 판정을 덮어쓸 여지가 생긴다.
+    expect(updatePlayer).not.toHaveBeenCalled();
+  });
+
+  it('비우면 번호를 지운다 — null 로 보낸다', async () => {
+    renderRow(7);
+    fireEvent.change(screen.getByLabelText('등번호'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    await waitFor(() => expect(updateJersey).toHaveBeenCalledWith({ playerId: 'player-1', jerseyNumber: null }));
+  });
+
+  it('0 으로 고칠 수 있다 — falsy 로 거르면 사라지는 값이다', async () => {
+    renderRow(7);
+    fireEvent.change(screen.getByLabelText('등번호'), { target: { value: '0' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    await waitFor(() => expect(updateJersey).toHaveBeenCalledWith({ playerId: 'player-1', jerseyNumber: 0 }));
+  });
+
+  it('숫자가 아니면 보내지 않고 오류를 보여 준다', async () => {
+    renderRow(7);
+    fireEvent.change(screen.getByLabelText('등번호'), { target: { value: 'e' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    expect(await screen.findByText('등번호는 0에서 99 사이 숫자로 입력해 주세요.')).toBeInTheDocument();
+    expect(updateJersey).not.toHaveBeenCalled();
+  });
+
+  it('등번호 요청이 도는 동안에는 저장을 다시 누를 수 없다 — 같은 요청이 두 번 나간다', () => {
+    // 저장 하나가 **자격/등번호 두 경로로 갈리므로**, 화면이 `updatePlayer` 하나만 보면
+    // 등번호 요청 중에 버튼이 열려 있다(Copilot 지적). 여기서는 등번호 mutation 만
+    // pending 으로 두고, 그 값이 행까지 닿는지 본다.
+    // 패널을 먼저 연다 — pending 이면 "수정" 버튼부터 잠겨서 패널을 열 수 없다.
+    const { rerender } = renderRow(7);
+    // **값을 실제로 바꿔 둔다.** 안 그러면 버튼이 `!hasChanges` 때문에 어차피 잠겨 있어
+    // pending 을 안 봐도 이 테스트가 통과한다(처음에 그렇게 썼다가 변이 red 0 으로 잡았다).
+    fireEvent.change(screen.getByLabelText('등번호'), { target: { value: '8' } });
+    expect(screen.getByRole('button', { name: /저장/ })).not.toBeDisabled();
+    updateJersey.mockClear();
+    vi.mocked(useV1UpdatePlayerJersey).mockReturnValue({
+      mutateAsync: updateJersey,
+      isPending: true,
+    } as never);
+    rerender(<TournamentRosterPageClient tournamentId="t1" registrationId="reg-1" />);
+
+    const save = screen.getByRole('button', { name: /저장/ });
+    expect(save).toBeDisabled();
+    fireEvent.click(save);
+    expect(updateJersey).not.toHaveBeenCalled();
+  });
+
+  it('"07" 은 7 과 같은 값이라 저장 버튼이 살아나지 않는다', () => {
+    // 문자열로 비교하면 `"07" !== "7"` 이라 버튼이 살아나는데, 저장하면 보낼 값이 같아서
+    // **요청은 0건인데 패널만 닫힌다** — 팀장은 뭔가 저장됐다고 읽는다(Copilot 지적).
+    renderRow(7);
+    expect(screen.getByRole('button', { name: '저장' })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('등번호'), { target: { value: '07' } });
+    expect(screen.getByRole('button', { name: '저장' })).toBeDisabled();
+    // 값이 실제로 달라지면 살아난다(회귀 방지 — 항상 비활성이면 아무것도 못 고친다).
+    fireEvent.change(screen.getByLabelText('등번호'), { target: { value: '8' } });
+    expect(screen.getByRole('button', { name: '저장' })).not.toBeDisabled();
+  });
+
+  it('숫자가 아닌 입력은 버튼을 열어 둔다 — 눌러야 왜 안 되는지 알 수 있다', () => {
+    renderRow(7);
+    fireEvent.change(screen.getByLabelText('등번호'), { target: { value: 'e' } });
+    expect(screen.getByRole('button', { name: '저장' })).not.toBeDisabled();
+  });
+
+  it('편집 중에 서버 값이 갱신돼도 오류 문구와 입력값이 살아 있다', async () => {
+    // Copilot 리뷰가 잡은 자리다. 저장 하나가 **두 요청으로 갈릴 수 있어서**(등번호 /
+    // 자격) 이 순서가 실제로 난다: 등번호는 성공해 목록이 갱신되고, 자격은 실패해 오류가
+    // 걸린다. 초기화가 `player.*` 에 매달려 있으면 **갱신이 도착하는 순간 오류가 지워져**
+    // 팀장은 무엇이 실패했는지 못 본다.
+    const { rerender } = renderRowWithHandle(7);
+    fireEvent.change(screen.getByLabelText('등번호'), { target: { value: 'e' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    expect(await screen.findByText('등번호는 0에서 99 사이 숫자로 입력해 주세요.')).toBeInTheDocument();
+
+    // 서버 갱신이 도착한다 — 다른 요청이 등번호를 10 으로 바꿔 놓았다.
+    vi.mocked(useV1TournamentPlayers).mockReturnValue({
+      data: { players: [mockPlayer({ jerseyNumber: 10 })], belowMinimum: false },
+      isPending: false,
+    } as never);
+    rerender(<TournamentRosterPageClient tournamentId="t1" registrationId="reg-1" />);
+
+    expect(screen.getByText('등번호는 0에서 99 사이 숫자로 입력해 주세요.')).toBeInTheDocument();
+    // 고치던 입력값도 되돌아가지 않는다.
+    expect(screen.getByLabelText('등번호')).toHaveValue('e');
   });
 });
 

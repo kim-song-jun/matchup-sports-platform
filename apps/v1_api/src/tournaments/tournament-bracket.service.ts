@@ -58,6 +58,23 @@ import {
 } from './tournament-group-standings';
 import { recalculateAndUpsertOverallStandings } from './tournament-overall-standings';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
+import { readJerseyNumbers } from './tournament-player-jersey';
+
+/**
+ * 경기 참가자에 실을 이름. **닉네임이 먼저다** — 정본 §3 이 "명단은 등번호 + 이름(닉네임)"
+ * 이고 명단 공개도 등번호·이름이다. 예전엔 `realName` 을 그대로 실어서, 자격 가드에만 쓰라고
+ * 받은 실명이 경기 기록·관전 화면까지 흘렀다.
+ *
+ * 프로필이 없거나 닉네임이 비어 있으면 실명으로 폴백한다 — 이름 없는 참가자를 만드는 것보다
+ * 낫고, 명단에 오르려면 실명이 이미 필수다.
+ */
+function participantDisplayName(player: {
+  realName: string;
+  user?: { profile?: { nickname?: string | null; displayName?: string | null } | null } | null;
+}): string {
+  return player.user?.profile?.nickname ?? player.user?.profile?.displayName ?? player.realName;
+}
+
 
 @Injectable()
 export class TournamentBracketService {
@@ -462,7 +479,16 @@ export class TournamentBracketService {
             // userId 는 초기 라인업 참가자를 등록 명단의 그 사람과 잇는 열쇠다 — 이름만
             // 넘기면 동명이인을 구분할 수 없어 나중에 라인업 화면이 선발 표시를 엉뚱한
             // 사람에게 붙인다(V1GameParticipant.userId, 2026-08 추가).
-            select: { id: true, userId: true, realName: true, registrationId: true },
+            select: {
+              id: true,
+              userId: true,
+              realName: true,
+              registrationId: true,
+              // 닉네임으로 보여 준다 — 정본 §3 은 "명단은 등번호 + 이름(닉네임)" 이고
+              // 명단 공개도 등번호·이름이다. 실명은 자격 가드(실명·생년월일·휴대폰)에만
+              // 쓰이는 값이라 경기 참가자 표시에 그대로 실으면 안 된다.
+              user: { select: { profile: { select: { nickname: true, displayName: true } } } },
+            },
             orderBy: { id: 'asc' },
           },
         },
@@ -487,6 +513,22 @@ export class TournamentBracketService {
         });
       }
 
+      // **명단의 등번호를 경기 참가자로 잇는다** (Task 167 A1, 2026-09-04).
+      //
+      // 여기가 대회 경기의 참가자가 만들어지는 유일한 자리이고, 받는 쪽
+      // (`createFromSourceInTransaction`)은 이미 `jerseyNumber` 를 쓴다 — **보내는 쪽만
+      // 비어 있었다.** 그래서 팀장이 명단에 넣은 번호가 경기로 이어지지 않아
+      // "명단은 등번호와 이름"(정본 §3)이 반쪽이었다.
+      //
+      // 생성된 Prisma 클라이언트에 `jersey_number` 가 아직 없어 raw 헬퍼로 읽는다
+      // (`tournament-player-jersey.ts` — 컬럼이 클라이언트에 들어오면 그 파일과 함께 지운다).
+      // 번호를 안 단 선수는 맵에 아예 없으므로 `get` 이 `undefined` 를 주고, 그건
+      // "번호 없음" 으로 그대로 저장된다.
+      const [homeJerseys, awayJerseys] = await Promise.all([
+        home ? readJerseyNumbers(tx, home.id) : Promise.resolve(new Map<string, number>()),
+        away ? readJerseyNumbers(tx, away.id) : Promise.resolve(new Map<string, number>()),
+      ]);
+
       await this.games.createFromSourceInTransaction(
         tx,
         {
@@ -510,13 +552,15 @@ export class TournamentBracketService {
               sourceParticipantId: player.id,
               userId: player.userId,
               sideKey: V1GameSideKey.HOME,
-              displayNameSnapshot: player.realName,
+              displayNameSnapshot: participantDisplayName(player),
+              jerseyNumber: homeJerseys.get(player.id),
             })),
             ...(away?.players ?? []).map((player) => ({
               sourceParticipantId: player.id,
               userId: player.userId,
               sideKey: V1GameSideKey.AWAY,
-              displayNameSnapshot: player.realName,
+              displayNameSnapshot: participantDisplayName(player),
+              jerseyNumber: awayJerseys.get(player.id),
             })),
           ],
         },

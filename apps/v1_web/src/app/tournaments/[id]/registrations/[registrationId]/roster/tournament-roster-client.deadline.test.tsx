@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   useV1AddPlayer,
@@ -273,5 +274,49 @@ describe('parseJerseyInput', () => {
   it('세 자리는 거부한다 — 서버 상한이 99 다', () => {
     expect(parseJerseyInput('100')).toEqual({ ok: false });
     expect(parseJerseyInput('99')).toEqual({ ok: true, value: 99 });
+  });
+});
+
+/**
+ * `type="number"` 입력에 `e`·`-`·`.` 를 넣으면 브라우저가 `badInput` 으로 보고 **`el.value` 를
+ * 빈 문자열로** 준다 — 화면에는 `e` 가 보이는데 코드가 받는 값은 `''` 이라 "번호 없는 선수"
+ * 로 조용히 통과했다(2026-09-04 alpha 실측: `e` → 201, `jerseyNumber: null`).
+ *
+ * ⚠️ **이 동작은 jsdom 에서 재현되지 않는다** — jsdom 은 `type="number"` 에도 값을 그대로
+ * 보존해서 `parseJerseyInput('e')` 가 정상적으로 거부한다. 그래서 여기서는 **입력 종류가
+ * 되돌아가는 것만** 막고, 실제 증명은 alpha 화면 재검증으로 한다. 행동 테스트를 흉내 내면
+ * 통과하는데 버그는 살아 있는 가짜 초록이 된다.
+ */
+describe('등번호 입력 종류', () => {
+  it('type="number" 로 되돌리지 않는다 — 브라우저가 값을 비워 검증을 통과시킨다', () => {
+    vi.mocked(useV1Tournament).mockReturnValue({
+      data: { minPlayers: 5, maxPlayers: 20, rosterDeadlineAt: null, status: 'open' },
+    } as never);
+    vi.mocked(useV1Registration).mockReturnValue({
+      data: { id: 'reg-1', teamId: 'team-1', status: 'confirmed', rosterLockedAt: null, rosterDeadlineOverrideAt: null },
+    } as never);
+    vi.mocked(useV1TournamentPlayers).mockReturnValue({
+      data: { players: [], belowMinimum: true },
+      isPending: false,
+    } as never);
+    vi.mocked(useV1AddPlayer).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    vi.mocked(useV1UpdatePlayer).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    vi.mocked(useV1RemovePlayer).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+
+    // 추가 폼은 팀원 목록을 `useInfiniteQuery` 로 직접 부른다 — 이 파일의 훅 목킹으로는
+    // 안 덮이므로 QueryClient 를 붙여 준다.
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { container } = render(
+      <QueryClientProvider client={queryClient}>
+        <TournamentRosterPageClient tournamentId="t1" registrationId="reg-1" />
+      </QueryClientProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '선수 추가하기' }));
+
+    const jersey = container.querySelector('input[id$="-jersey"]');
+    expect(jersey).not.toBeNull();
+    expect(jersey?.getAttribute('type')).toBe('text');
+    // 숫자 키패드는 그대로 띄운다 — 입력 편의는 잃지 않는다.
+    expect(jersey?.getAttribute('inputmode')).toBe('numeric');
   });
 });

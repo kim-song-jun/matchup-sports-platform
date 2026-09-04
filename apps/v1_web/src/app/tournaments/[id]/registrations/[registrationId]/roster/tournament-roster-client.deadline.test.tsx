@@ -307,11 +307,20 @@ describe('등번호 입력 종류', () => {
     // 안 덮인다. QueryClient 만 붙이면 **실제로 `/teams/:id/members` 를 fetch 하려 들고**,
     // Node 에는 base URL 이 없어 상대 경로에서 TypeError 가 난다 — 테스트가 런타임 환경에
     // 의존하게 된다. fetch 를 그 범위에서만 스텁해 빈 결과로 끊는다.
+    // **실제 응답 형태 그대로** 돌려준다 — V1 봉투(`{status,data,timestamp}`) 안에
+    // `V1TeamMembersPage`. 아무 모양이나 주면 `body.data` 가 `undefined` 로 빠지고
+    // 화면이 폴백을 타 **우연히 통과**한다(그러면 이 스텁이 뭘 보장하는지 알 수 없다).
+    const membersPage = {
+      items: [],
+      summary: { ownerCount: 0, managerCount: 0, memberCount: 0 },
+      viewerRole: 'owner' as const,
+      pageInfo: { nextCursor: null, hasNext: false },
+    };
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(JSON.stringify({ items: [], nextCursor: null }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      }),
+      new Response(
+        JSON.stringify({ status: 'success', data: membersPage, timestamp: new Date().toISOString() }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ),
     );
     // **스텁은 unmount 까지 유지한다.** 클릭 직후 복구하면 React Query 가 뒤늦게 보내는
     // 요청이 실제 fetch 로 새어 플래키해진다 — 그때 실패는 이 테스트가 보는 것과 무관한

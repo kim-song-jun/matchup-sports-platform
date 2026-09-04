@@ -150,8 +150,10 @@ function OrderSummaryCard({
   step?: ApplyStep;
   compact?: boolean;
 }) {
-  // Hide payment-related rows on step 'team' (not yet entered)
-  const showPaymentRows = step !== 'team';
+  // Hide payment-related rows on step 'team' (not yet entered).
+  // **무료 대회에서는 아예 보여 주지 않는다** — 결제 수단·입금자명을 묻지 않는데 요약만
+  // "계좌이체" 라고 말하면, 참가자는 내지도 않을 돈의 결제 수단을 확인하게 된다.
+  const showPaymentRows = step !== 'team' && tournament.entryFee > 0;
 
   return (
     <Card
@@ -908,8 +910,10 @@ function AgreementsStep({
   const allRequired = visibleTerms.length > 0
     && visibleTerms.filter((term) => term.requirement === 'required').every(isChecked);
   const allAgreed = visibleTerms.length > 0 && visibleTerms.every(isChecked);
+  // 참가비 0원이면 입금이라는 절차 자체가 없다 — 결제 수단도, 입금자명도 묻지 않는다.
+  const isFreeEntry = tournament.entryFee === 0;
   const bankTransferValid =
-    state.paymentMethod !== 'bank_transfer' || state.depositorName.trim().length > 0;
+    isFreeEntry || state.paymentMethod !== 'bank_transfer' || state.depositorName.trim().length > 0;
   const canSubmit = allRequired && bankTransferValid;
   const toggleAllAgreements = (checked: boolean) => {
     onChange({
@@ -964,7 +968,10 @@ function AgreementsStep({
         </Card>
       </section>
 
-      {/* Payment method — bank transfer only */}
+      {/* Payment method — bank transfer only. 무료 대회에서는 통째로 그리지 않는다:
+          같은 화면에 "이 대회는 무료로 참가할 수 있어요." 를 띄우면서 결제 수단과 **필수**
+          입금자명을 함께 요구하면, 안내와 요구가 서로 모순된다(2026-09-04 alpha 실측). */}
+      {!isFreeEntry && (
       <section aria-labelledby="payment-method-heading" style={{ marginTop: 16 }}>
         <div style={{ marginLeft: -20, marginRight: -20 }}>
           <SectionTitle id="payment-method-heading" title="결제 수단" />
@@ -1044,8 +1051,10 @@ function AgreementsStep({
         </Card>
       </section>
 
+      )}
+
       {/* Free tournament notice */}
-      {tournament.entryFee === 0 ? (
+      {isFreeEntry ? (
         <Card pad={12} style={{ marginTop: 16, background: 'var(--grey50)' }}>
           <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6 }}>
             이 대회는 무료로 참가할 수 있어요.
@@ -1691,7 +1700,12 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
     .filter((term) => term.requirement === 'required')
     .every((term) => (agreements.acceptedTermsDocumentIds ?? []).includes(term.documentId));
   const bankTransferValid =
-    agreements.paymentMethod !== 'bank_transfer' || agreements.depositorName.trim().length > 0;
+    // 무료 대회는 입금자명을 묻지 않으므로 제출 조건에서도 빼야 한다. **여기가 페이지 레벨
+    // 게이트다** — `AgreementsStep` 안쪽 조건만 고치면 화면에는 필드가 없는데 제출 버튼은
+    // 계속 잠긴 채로 남는다(그 상태를 테스트가 잡았다).
+    tournament?.entryFee === 0
+    || agreements.paymentMethod !== 'bank_transfer'
+    || agreements.depositorName.trim().length > 0;
   const requiredTournamentTerms = tournamentTerms.data?.items.filter(
     (term) => term.requirement === 'required',
   ) ?? [];

@@ -77,6 +77,17 @@ function paymentMethodLabel(method: V1TournamentPaymentMethod): string {
   return method === 'pg' ? '카드 · 간편결제' : '계좌이체';
 }
 
+/**
+ * 참가비가 없으면 결제 수단 대신 **"무료"** 라고 말한다.
+ *
+ * 무료 대회인데 "계좌이체" 라고 적으면 참가자는 내지도 않을 돈의 결제 수단을 확인하게 된다
+ * (2026-09-04 alpha 실측 — 결함 #6). 신청 화면에서 결제 수단을 아예 묻지 않게 고쳤으므로
+ * 이 표기도 함께 맞춘다.
+ */
+function paymentSummaryLabel(method: V1TournamentPaymentMethod, isFreeEntry: boolean): string {
+  return isFreeEntry ? '무료' : paymentMethodLabel(method);
+}
+
 function paymentStatusLabel(status: string): string {
   switch (status) {
     case 'ready': return '결제 대기';
@@ -963,7 +974,10 @@ function RegistrationDetailView({
                   </div>
                   {registration.payment ? (
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <InfoRow label="결제 수단" value={paymentMethodLabel(registration.payment.method)} />
+                      <InfoRow
+                        label="결제 수단"
+                        value={paymentSummaryLabel(registration.payment.method, tournament.entryFee === 0)}
+                      />
                       <InfoRow label="결제 금액" value={formatEntryFee(registration.payment.amount)} />
                       <InfoRow
                         label="결제 상태"
@@ -1135,9 +1149,11 @@ function NoRegistrationState({ tournamentId }: { tournamentId: string }) {
 function MyRegistrationsList({
   tournamentId,
   registrations,
+  isFreeEntry,
 }: {
   tournamentId: string;
   registrations: V1TournamentRegistration[];
+  isFreeEntry: boolean;
 }) {
   return (
     <div style={{ padding: '0 20px 120px', marginTop: 16 }}>
@@ -1172,7 +1188,7 @@ function MyRegistrationsList({
                     </div>
                     <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 8 }}>
                       선수 {registration.playerCount}명
-                      {registration.payment ? ` · ${paymentMethodLabel(registration.payment.method)} · ${paymentStatusLabel(registration.payment.status)}` : ''}
+                      {registration.payment ? ` · ${paymentSummaryLabel(registration.payment.method, isFreeEntry)} · ${paymentStatusLabel(registration.payment.status)}` : ''}
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-muted)' }}>
@@ -1199,6 +1215,7 @@ function TeamRegistrationHub({
   registrations,
   capacity,
   blockReason,
+  isFreeEntry,
 }: {
   tournamentId: string;
   tournamentSportId: string | null;
@@ -1207,6 +1224,7 @@ function TeamRegistrationHub({
   registrations: V1TournamentRegistration[];
   capacity: TournamentCapacity | null;
   blockReason: TournamentRegistrationBlockReason | null;
+  isFreeEntry: boolean;
 }) {
   const registrationByTeamId = new Map(registrations.map((registration) => [registration.teamId, registration]));
   const emptyState = getTournamentTeamEmptyState(hasAnyTeam);
@@ -1311,7 +1329,7 @@ function TeamRegistrationHub({
             const reapplyBlockedNote =
               registration?.status === 'cancelled' && blockMessage ? ` · ${blockMessage}` : '';
             const meta = registration
-              ? `선수 ${registration.playerCount}명${registration.payment ? ` · ${paymentMethodLabel(registration.payment.method)} · ${paymentStatusLabel(registration.payment.status)}` : ''}${reapplyBlockedNote}`
+              ? `선수 ${registration.playerCount}명${registration.payment ? ` · ${paymentSummaryLabel(registration.payment.method, isFreeEntry)} · ${paymentStatusLabel(registration.payment.status)}` : ''}${reapplyBlockedNote}`
               : canStartNewRegistration
                 ? '아직 이 팀으로 신청하지 않았어요'
                 : blockMessage ?? '현재 새 신청을 받을 수 없어요';
@@ -1428,6 +1446,7 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
   if (!tournament) {
     return (
               <TeamRegistrationHub
+                isFreeEntry={false}
           tournamentId={tournamentId}
           tournamentSportId={null}
           teams={teams}
@@ -1447,6 +1466,7 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
     );
     return (
               <TeamRegistrationHub
+                isFreeEntry={tournament?.entryFee === 0}
           tournamentId={tournamentId}
           tournamentSportId={tournament.sportId}
           teams={visibleTeams}

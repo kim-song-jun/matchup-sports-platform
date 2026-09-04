@@ -217,6 +217,15 @@ describe('TournamentApplyPageClient GA events', () => {
   });
 
   it('tracks tournament_apply_complete once the registration is submitted', async () => {
+    // **유료 대회로 바꾼다.** 이 테스트는 입금자명·결제 수단 경로를 검증하는데, 기본 픽스처는
+    // 참가비 0원이라 무료 대회에서는 그 UI 가 아예 없다(결함 #6 수정). 결제 경로를 보려면
+    // 참가비가 있어야 한다.
+    tournamentApplyApiMocks.useV1Tournament.mockReturnValue({
+      data: makeTournament({ entryFee: 20000 }),
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
     const createRegistrationMutateAsync = vi.fn().mockResolvedValue({
       id: 'registration-1',
       status: 'draft',
@@ -304,7 +313,8 @@ describe('TournamentApplyPageClient GA events', () => {
     fireEvent.click(nextButton);
     await waitFor(() => expect(createRegistrationMutateAsync).toHaveBeenCalled());
     fireEvent.click(await screen.findByLabelText('전체 동의'));
-    fireEvent.change(screen.getByLabelText('입금자명 *'), { target: { value: '성수 풋살 크루' } });
+    // 무료 대회라 입금자명 입력 자체가 없다(결함 #6 수정) — 동의만 하면 제출할 수 있다.
+    expect(screen.queryByLabelText('입금자명 *')).not.toBeInTheDocument();
     const [submitButton] = screen.getAllByRole('button', { name: '신청 제출하기' });
     fireEvent.click(submitButton);
     fireEvent.click(await screen.findByRole('button', { name: '확인하고 신청하기' }));
@@ -327,8 +337,64 @@ describe('TournamentApplyPageClient GA events', () => {
     expect(screen.queryByText(/입금 확인을 기다리는 동안/)).not.toBeInTheDocument();
   });
 
+  it('참가비가 없는 대회는 2단계에서 결제 수단·입금자명을 요구하지 않는다', async () => {
+    // 이 픽스처의 entryFee 는 0 이다. 그런데 2단계가 "결제 수단(계좌이체)" 섹션과 **필수**
+    // 입금자명을 그대로 요구했다 — 같은 화면에 "이 대회는 무료로 참가할 수 있어요." 안내를
+    // 띄우면서 동시에 입금자명을 받아야 제출 버튼이 열렸다(2026-09-04 alpha 실측, 결함 #6).
+    tournamentApplyApiMocks.useV1CreateRegistration.mockReturnValue({
+      mutateAsync: vi.fn().mockResolvedValue({ id: 'registration-1', status: 'draft' }),
+      isPending: false,
+    });
+    tournamentApplyApiMocks.useV1SubmitRegistration.mockReturnValue({
+      mutateAsync: vi.fn(),
+      isPending: false,
+    });
+
+    render(<TournamentApplyPageClient tournamentId="tournament-1" />);
+
+    const [nextButton] = await screen.findAllByRole('button', { name: /^다음 단계/ });
+    fireEvent.click(nextButton);
+
+    // 2단계에 도달했는지 먼저 확인한다 — 이게 없으면 아래 부재 단언이 공허해진다.
+    expect(await screen.findByLabelText('전체 동의')).toBeInTheDocument();
+
+    expect(screen.queryByText('결제 수단')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('입금자명 *')).not.toBeInTheDocument();
+    // 무료라는 사실은 계속 알려 준다.
+    expect(screen.getByText('이 대회는 무료로 참가할 수 있어요.')).toBeInTheDocument();
+  });
+
+  it('참가비가 없는 대회는 입금자명 없이도 제출할 수 있다', async () => {
+    // 입금자명이 `canSubmit` 의 필수 조건이라 무료 대회에서도 버튼이 잠겨 있었다.
+    tournamentApplyApiMocks.useV1CreateRegistration.mockReturnValue({
+      mutateAsync: vi.fn().mockResolvedValue({ id: 'registration-1', status: 'draft' }),
+      isPending: false,
+    });
+    tournamentApplyApiMocks.useV1SubmitRegistration.mockReturnValue({
+      mutateAsync: vi.fn(),
+      isPending: false,
+    });
+
+    render(<TournamentApplyPageClient tournamentId="tournament-1" />);
+    const [nextButton] = await screen.findAllByRole('button', { name: /^다음 단계/ });
+    fireEvent.click(nextButton);
+    fireEvent.click(await screen.findByLabelText('전체 동의'));
+
+    const [submitButton] = screen.getAllByRole('button', { name: '신청 제출하기' });
+    expect(submitButton).toBeEnabled();
+  });
+
   describe('입금자명 입력', () => {
     it('입금자명을 비워두면 제출할 수 없고, 팀명이 자동으로 채워지지도 않는다', async () => {
+      // **유료 대회로 바꾼다.** 이 테스트는 입금자명·결제 수단 경로를 검증하는데, 기본 픽스처는
+      // 참가비 0원이라 무료 대회에서는 그 UI 가 아예 없다(결함 #6 수정). 결제 경로를 보려면
+      // 참가비가 있어야 한다.
+      tournamentApplyApiMocks.useV1Tournament.mockReturnValue({
+        data: makeTournament({ entryFee: 20000 }),
+        isLoading: false,
+        isError: false,
+        error: null,
+      });
       // 예전에는 선택한 팀명을 미리 채워서, 아무것도 입력하지 않아도 제출이 가능했다.
       // 실제 입금은 개인 이름으로 들어오므로 그 자동채움이 입금 확인 지연을 만들었다.
       tournamentApplyApiMocks.useV1CreateRegistration.mockReturnValue({
@@ -358,6 +424,15 @@ describe('TournamentApplyPageClient GA events', () => {
 
   describe('취소된 신청의 재신청', () => {
     it('취소된 신청이 있는 팀을 다시 골라도 새 신청을 생성한다 (취소된 registrationId를 이어받지 않음)', async () => {
+      // **유료 대회로 바꾼다.** 이 테스트는 입금자명·결제 수단 경로를 검증하는데, 기본 픽스처는
+      // 참가비 0원이라 무료 대회에서는 그 UI 가 아예 없다(결함 #6 수정). 결제 경로를 보려면
+      // 참가비가 있어야 한다.
+      tournamentApplyApiMocks.useV1Tournament.mockReturnValue({
+        data: makeTournament({ entryFee: 20000 }),
+        isLoading: false,
+        isError: false,
+        error: null,
+      });
       // 입금 미확인으로 자동 취소된 신청이 남아있는 상태 — 같은 팀으로 재신청이 가능해야 한다.
       tournamentApplyApiMocks.useV1MyRegistrations.mockReturnValue({
         data: [makeRegistration()],

@@ -1456,9 +1456,12 @@ function DailyPlanCard({ plan }: { plan: DailyPlan }) {
 /**
  * 리그 참가 신청 요약 + 관리 화면 입구.
  *
- * 신청 열기 폼과 신청 목록은 **별도 라우트**()에 둔다. 이 파일은 이미
- * 1,400줄이 넘고, 목록은 대회  을 재사용하는데 그게 훅을 여덟 개 넘게
- * 쓴다 — 여기 인라인으로 넣으면 이 화면의 기존 테스트가 전부 그 훅들을 목킹해야 한다
+ * 신청 열기 폼과 신청 목록은 **별도 라우트**
+ * `/admin/league-matches/:leagueId/registrations`
+ * (`registrations/league-registrations-client.tsx`)에 둔다. 이 파일은 이미
+ * 1,400줄이 넘고, 목록은 대회 화면의
+ * `RegistrationsTab`(`app/admin/tournaments/[id]/registrations-tab.tsx`)을 재사용하는데
+ * 그게 훅을 여덟 개 넘게 쓴다 — 여기 인라인으로 넣으면 이 화면의 기존 테스트가 전부 그 훅들을 목킹해야 한다
  * (실제로 30건이 깨졌다). 관심사도 다르다: 여기는 대진, 저기는 신청이다.
  */
 function LeagueRegistrationSummary({

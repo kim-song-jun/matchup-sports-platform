@@ -53,13 +53,13 @@ import { findTournamentOnSurface } from '../tournaments/tournament-surface-looku
 import { LEAGUE_STATE_BY_STATUS, isCompleteLeagueMirror } from '../tournaments/league-competition-mirror';
 import { randomUUID } from 'node:crypto';
 import { LeagueStateValue } from './league-state';
+import { isLeagueRegistrationOpen } from './league-registration-open';
 
 // 그룹 B 감사 결함 1: 팀 제외로 인한 대진 취소는 운영자 개별 사유가 아니라 시스템이
 // 판단한 부수효과다 — cancelFixture(운영자 사유 필수)와 구분되는 고정 사유 문자열.
 const TEAM_REMOVAL_CANCEL_REASON = '리그 참가팀에서 제외돼 자동으로 취소했어요.';
 
 const DEFAULT_FIXTURE_PLACE_NAME = '장소 미정';
-import { isLeagueRegistrationOpen } from './league-registration-open';
 
 /**
  * 날짜를 고르지 않은 리그의 **기본 매치데이 리듬**: 시작일부터 매주 한 매치데이.

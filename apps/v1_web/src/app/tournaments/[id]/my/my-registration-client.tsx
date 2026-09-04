@@ -88,6 +88,20 @@ function paymentSummaryLabel(method: V1TournamentPaymentMethod, isFreeEntry: boo
   return isFreeEntry ? '무료' : paymentMethodLabel(method);
 }
 
+/**
+ * 목록 카드 메타에 붙일 결제 조각. **무료 대회에서는 빈 문자열** — 결제 수단도 상태도 안 붙인다.
+ *
+ * "무료" 로만 바꾸면 뒤에 상태가 따라붙어 **"무료 · 결제 완료"** 가 된다. 내지도 않은 돈이
+ * "완료" 됐다는 말이라 참가자에게 의미가 없다. 참가 확정 여부는 같은 카드의 상태 배지가 말한다.
+ */
+function paymentMetaSuffix(
+  payment: { method: V1TournamentPaymentMethod; status: string } | null | undefined,
+  isFreeEntry: boolean,
+): string {
+  if (isFreeEntry || !payment) return '';
+  return ` · ${paymentMethodLabel(payment.method)} · ${paymentStatusLabel(payment.status)}`;
+}
+
 function paymentStatusLabel(status: string): string {
   switch (status) {
     case 'ready': return '결제 대기';
@@ -1188,7 +1202,7 @@ function MyRegistrationsList({
                     </div>
                     <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 8 }}>
                       선수 {registration.playerCount}명
-                      {registration.payment ? ` · ${paymentSummaryLabel(registration.payment.method, isFreeEntry)} · ${paymentStatusLabel(registration.payment.status)}` : ''}
+                      {paymentMetaSuffix(registration.payment, isFreeEntry)}
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-muted)' }}>
@@ -1329,7 +1343,7 @@ function TeamRegistrationHub({
             const reapplyBlockedNote =
               registration?.status === 'cancelled' && blockMessage ? ` · ${blockMessage}` : '';
             const meta = registration
-              ? `선수 ${registration.playerCount}명${registration.payment ? ` · ${paymentSummaryLabel(registration.payment.method, isFreeEntry)} · ${paymentStatusLabel(registration.payment.status)}` : ''}${reapplyBlockedNote}`
+              ? `선수 ${registration.playerCount}명${paymentMetaSuffix(registration.payment, isFreeEntry)}${reapplyBlockedNote}`
               : canStartNewRegistration
                 ? '아직 이 팀으로 신청하지 않았어요'
                 : blockMessage ?? '현재 새 신청을 받을 수 없어요';

@@ -190,6 +190,22 @@ describe('MyRegistrationPageClient — 셸 backHref override', () => {
   // 배선인 app-shell-frame.tsx는 AppShellFrame이 항상 페이지의 조상이라 이 문제가 없다).
   // 페이지를 먼저 완전히 커밋시킨 뒤(store가 이미 갱신된 상태) Probe를 별도 act로 마운트해
   // 첫 렌더에서 바로 최신 값을 읽게 한다.
+  it('참가비가 없는 대회의 목록 카드에는 결제 문구가 하나도 없다', () => {
+    // 무료 대회인데 카드 메타가 "무료 · 결제 완료" 로 나왔다 — 내지도 않은 돈이 "완료" 됐다는
+    // 말이라 참가자에게 의미가 없다(2026-09-04, 결함 #6 후속). 참가 확정 여부는 상태 배지가 말한다.
+    myRegistrationApiMocks.useV1MyRegistrations.mockReturnValue({
+      data: [makeRegistration({
+        payment: { method: 'bank_transfer', status: 'paid', amount: 0, paidAt: '2026-09-04T00:00:00.000Z' },
+      })],
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    const { container } = render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+    expect(container.textContent ?? '').not.toContain('결제');
+  });
+
   it('`?reg=` 없이 진입하면(목록 뷰) override를 밀어넣지 않아 테이블 기본값(대회 상세)이 유지된다', () => {
     myRegistrationApiMocks.useV1MyRegistrations.mockReturnValue({
       data: [makeRegistration()],

@@ -1358,7 +1358,15 @@ export class LeagueMatchAdminService {
       toStatus: undefined,
     });
 
-    return { leagueId, status: 'open' as const, registrationDeadlineAt: deadline.toISOString() };
+    // **`status` 를 돌려주지 않는다.** 이 호출은 status 를 저장하지 않는데 응답에 `'open'`
+    // 을 실으면 소비자가 그것을 **리그 상태**로 읽는다(대진이 있어 `in_progress` 인 리그도
+    // 여기서는 `open` 으로 보인다). 이 엔드포인트가 실제로 확정한 것은 하나다 — 지금부터
+    // 신청을 받는다는 것. 마감을 미래로 검증했으므로 그 값은 항상 참이다.
+    return {
+      leagueId,
+      registrationOpen: true as const,
+      registrationDeadlineAt: deadline.toISOString(),
+    };
   }
 
   async revertCompletion(user: V1AuthUser, leagueId: string, dto: RevertLeagueCompletionDto) {

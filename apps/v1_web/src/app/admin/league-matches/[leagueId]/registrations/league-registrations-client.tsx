@@ -5,8 +5,8 @@ import { useState } from 'react';
 import { AdminPageHeader, AdminToasts, useAdminToast } from '@/components/admin';
 import { RegistrationsTab } from '@/app/admin/tournaments/[id]/registrations-tab';
 import { useV1AdminLeagueMatch, useV1OpenLeagueRegistration } from '@/hooks/use-v1-api';
+import { describeLeagueRegistrationWindow } from '@/lib/league-registration-copy';
 import { extractErrorMessage } from '@/lib/error-message';
-import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { fromDatetimeLocalValue } from '@/components/team-schedules/team-schedules.view-model';
 
 /**
@@ -31,6 +31,7 @@ export default function LeagueRegistrationsClient({ leagueId }: { leagueId: stri
   const [deadline, setDeadline] = useState('');
   const openRegistration = useV1OpenLeagueRegistration(leagueId);
 
+  const state = league?.state ?? 'draft';
   const registrationOpen = league?.registrationOpen ?? false;
   const registrationDeadlineAt = league?.registrationDeadlineAt ?? null;
 
@@ -92,15 +93,17 @@ export default function LeagueRegistrationsClient({ leagueId }: { leagueId: stri
             <span className="tm-badge tm-badge-grey">신청 안 받는 중</span>
           )}
         </div>
-        {/* **판정자는 마감 하나다**(2026-09-04 사용자 확정). `status` 는 수명주기 표시
-            전용이 됐고, 정본 §6 이 대가를 명시한다 — "안 정하면(`null`) 그 리그는 신청을
-            안 받는다". 그래서 "기한 없이 열림" 상태는 없다. */}
+        {/* **판정자는 마감 하나이고, 닫힌 이유는 `state` 가 가른다.** 대진 화면의 요약
+            카드와 같은 문장이라 판정을 `describeLeagueRegistrationWindow` 한 곳에 뒀다 —
+            각자 갖고 있으면 한쪽만 고쳐진다(실제로 그랬다). */}
         <p className="mb-3 text-xs text-[var(--text-muted)]">
-          {registrationOpen && registrationDeadlineAt !== null
-            ? `${formatTournamentDateTimeShort(registrationDeadlineAt) ?? registrationDeadlineAt}까지 신청을 받아요.`
-            : registrationDeadlineAt === null
-              ? '마감을 정해야 신청을 받아요. 정하기 전에는 팀장 화면에 신청 입구가 보이지 않아요.'
-              : `신청이 마감됐어요. 마감은 ${formatTournamentDateTimeShort(registrationDeadlineAt) ?? registrationDeadlineAt} 였어요.`}
+          {describeLeagueRegistrationWindow({
+            state,
+            registrationOpen,
+            registrationDeadlineAt,
+            noDeadlineHint:
+              '마감을 정해야 신청을 받아요. 정하기 전에는 팀장 화면에 신청 입구가 보이지 않아요.',
+          })}
         </p>
         <div className="flex flex-wrap items-end gap-2">
           <label className="text-xs text-[var(--text-muted)]" htmlFor="league-registration-deadline">

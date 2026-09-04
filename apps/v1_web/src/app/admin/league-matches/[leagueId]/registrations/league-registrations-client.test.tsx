@@ -3,7 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import LeagueRegistrationsClient from './league-registrations-client';
 
 const openMutate = vi.fn();
-const leagueData: { registrationOpen: boolean; registrationDeadlineAt: string | null; title: string } = {
+const leagueData: {
+  state: 'draft' | 'active' | 'completed';
+  registrationOpen: boolean;
+  registrationDeadlineAt: string | null;
+  title: string;
+} = {
+  state: 'draft',
   registrationOpen: false,
   registrationDeadlineAt: null,
   title: '가을 리그',
@@ -24,8 +30,29 @@ vi.mock('@/app/admin/tournaments/[id]/registrations-tab', () => ({
 describe('리그 참가 신청 관리', () => {
   beforeEach(() => {
     openMutate.mockClear();
+    leagueData.state = 'draft';
     leagueData.registrationOpen = false;
     leagueData.registrationDeadlineAt = null;
+  });
+
+  it('끝난 리그는 마감이 미래여도 "마감됐어요" 라고 하지 않는다', () => {
+    // Copilot 리뷰가 잡은 자리다. 끝난 리그의 마감은 보통 미래로 남아 있는데, 닫힌 이유를
+    // 안 가르면 화면이 **마감 탓**으로 말한다 → 운영자는 마감을 다시 넣어 보고 서버가
+    // 409 `LEAGUE_REGISTRATION_NOT_ALLOWED` 로 막는다. 화면이 원인을 숨긴 것이다.
+    leagueData.state = 'completed';
+    leagueData.registrationOpen = false;
+    leagueData.registrationDeadlineAt = '2099-01-01T00:00:00.000Z';
+    render(<LeagueRegistrationsClient leagueId="league-1" />);
+    expect(screen.getByText('끝났거나 취소된 리그라 신청을 받지 않아요.')).toBeInTheDocument();
+    expect(screen.queryByText(/마감됐어요/)).not.toBeInTheDocument();
+  });
+
+  it('진행중 리그는 마감이 지났으면 마감 탓이라고 말한다 — 마감을 바꾸면 다시 열린다', () => {
+    leagueData.state = 'active';
+    leagueData.registrationOpen = false;
+    leagueData.registrationDeadlineAt = '2020-01-01T00:00:00.000Z';
+    render(<LeagueRegistrationsClient leagueId="league-1" />);
+    expect(screen.getByText(/신청이 마감됐어요/)).toBeInTheDocument();
   });
 
   it('안 받는 중이고 마감도 없으면, 왜 입구가 없는지 알려 준다', () => {

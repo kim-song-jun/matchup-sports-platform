@@ -2,92 +2,13 @@
 /* ─── List /tournaments ───────────────────────────────────────────────────────
  * Kill the stretched single-column. Convert .tm-tournament-card-stack to a
  * 2-up card grid at ≥1024 and 3-up at ≥1440.
- * Hero fills the full body width on desktop (2-col layout, taller strip).
  */
-
-/* ── Hero visual strip: mobile baseline ── */
-.tm-tournament-hero-visual {
-  background: linear-gradient(135deg, var(--blue500) 0%, var(--blue600) 100%);
-  height: 130px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  gap: 8px;
-}
-
-/* Hero body: mobile single-column */
-.tm-tournament-hero-body {
-  padding: 16px 20px 20px;
-}
-
-.tm-tournament-hero-copy {
-  /* Full-width on mobile */
-}
-
-/* Stats panel hidden on mobile — only shown via .tm-show-desktop */
-.tm-tournament-hero-stats {
-  display: none;
-}
-
-.tm-tournament-hero-stat-item {
-  padding: 12px 0;
-  border-bottom: 1px solid var(--grey100);
-}
-
-.tm-tournament-hero-stat-item:first-child {
-  border-top: 1px solid var(--grey100);
-}
 
 @media (min-width: 1024px) {
   /* Remove mobile side padding from the list wrapper — the scroll area already
      provides horizontal padding on desktop. */
   .tm-tournament-list {
     padding: 0 0 48px;
-  }
-
-  /* Hero card: fill the full desktop body width — remove the letterbox cap. */
-  .tm-tournament-hero-card {
-    max-width: unset;
-  }
-
-  /* Hero visual strip: taller on desktop, horizontal layout with icon left-aligned. */
-  .tm-tournament-hero-visual {
-    height: 200px;
-    flex-direction: row;
-    gap: 20px;
-    padding: 0 48px;
-    justify-content: flex-start;
-  }
-
-  /* Hero body: 2-column — copy left, stats/CTA panel right. */
-  .tm-tournament-hero-body {
-    display: flex;
-    flex-direction: row;
-    align-items: flex-start;
-    gap: 40px;
-    padding: 20px 32px 24px;
-  }
-
-  .tm-tournament-hero-copy {
-    flex: 1 1 0;
-    min-width: 0;
-  }
-
-  /* Stats panel: show on desktop, fixed width. */
-  .tm-tournament-hero-stats {
-    display: flex;
-    flex-direction: column;
-    flex: 0 0 240px;
-    width: 240px;
-  }
-}
-
-@media (min-width: 1440px) {
-  /* Slightly wider stats panel at 1440. */
-  .tm-tournament-hero-stats {
-    flex: 0 0 280px;
-    width: 280px;
   }
 }
 
@@ -350,118 +271,33 @@
   }
 }
 
+/*
+ * 대회 캠페인 미디어 폴백 — 실제 사진이 없거나(신청 전) 깨졌을 때 목업 사진 대신
+ * 종목 액센트 틴트 패널 + 종목 그래픽을 보여준다(tournament-campaign-media.tsx).
+ * 소비처(캠페인 히어로/이벤트 카드/하이라이트/스폰서 로고)가 각자 className 으로
+ * 크기·position 을 정하므로 이 클래스는 배경 틴트·정렬만 책임진다.
+ */
+.tm-campaign-media-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tm-campaign-media-illustration {
+  object-fit: contain;
+  width: 40%;
+  height: 40%;
+  min-width: 64px;
+  min-height: 64px;
+  max-width: 160px;
+  max-height: 160px;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
  * PROMO SECTIONS — .tm-tournament-promo-*
  * Prize-led marketing landing added above the existing tournament list.
  * Namespace: tm-tournament-promo-* only. Existing classes untouched.
  * ═══════════════════════════════════════════════════════════════════════════ */
-
-/* ── 1. Prize-led Hero ── */
-.tm-tournament-promo-hero {
-  background: linear-gradient(150deg, var(--blue500) 0%, var(--blue600) 100%);
-  padding: 28px 20px 32px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0;
-}
-
-.tm-tournament-promo-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 12px;
-  border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.18);
-  color: rgba(255, 255, 255, 0.92);
-  font-size: var(--font-size-caption);
-  font-weight: 600;
-  margin-bottom: 12px;
-  white-space: nowrap;
-}
-
-.tm-tournament-promo-tagline {
-  font-size: var(--font-size-label);
-  color: rgba(255, 255, 255, 0.82);
-  margin: 0 0 8px;
-  font-weight: 500;
-}
-
-.tm-tournament-promo-prize-row {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.tm-tournament-promo-prize-label {
-  font-size: var(--font-size-body-lg);
-  color: rgba(255, 255, 255, 0.88);
-  font-weight: 500;
-}
-
-.tm-tournament-promo-prize-amount {
-  font-size: 40px;
-  font-weight: 800;
-  color: var(--prize-gold);
-  line-height: 1.1;
-  letter-spacing: -0.5px;
-}
-
-.tm-tournament-promo-fallback-headline {
-  font-size: var(--font-size-heading);
-  font-weight: 700;
-  color: var(--static-white);
-  line-height: 1.35;
-  margin: 0 0 8px;
-}
-
-.tm-tournament-promo-featured-title {
-  font-size: var(--font-size-body-lg);
-  font-weight: 600;
-  color: var(--static-white);
-  margin: 0 0 4px;
-  line-height: 1.35;
-}
-
-.tm-tournament-promo-meta {
-  font-size: var(--font-size-caption);
-  color: rgba(255, 255, 255, 0.75);
-  margin: 0 0 20px;
-}
-
-.tm-tournament-promo-cta-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 4px;
-}
-
-.tm-tournament-promo-cta-primary {
-  background: var(--static-white);
-  color: var(--blue500);
-  font-weight: 700;
-  border: none;
-  min-height: 44px;
-}
-
-.tm-tournament-promo-cta-primary:hover {
-  background: rgba(255, 255, 255, 0.92);
-}
-
-.tm-tournament-promo-cta-ghost {
-  /* 어두운 네이비 오버레이 — 파란 히어로 위 흰 텍스트 대비 ≥4.5:1 확보(반투명 흰 fill은
-     텍스트 대비를 오히려 낮춰 AA 미달이었음). */
-  background: rgba(10, 30, 66, 0.4);
-  color: var(--static-white);
-  font-weight: 700;
-  border: 1.5px solid rgba(255, 255, 255, 0.7);
-  min-height: 44px;
-}
-
-.tm-tournament-promo-cta-ghost:hover {
-  background: rgba(10, 30, 66, 0.55);
-}
 
 /* ── 2. Shared section wrapper ── */
 .tm-tournament-promo-section {
@@ -513,64 +349,6 @@
      바로 아래 스텝 그리드와 붙어 보였다. 모바일 스텝퍼는 행 간격(12px)과 같은
      값으로 맞춰 세로 리듬을 통일한다(데스크탑 카드 그리드는 아래 ≥1024 override). */
   margin: 0 0 12px;
-}
-
-/* ── Prize Breakdown: 3-card grid ── */
-.tm-tournament-promo-prize-cards {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-.tm-tournament-promo-prize-card {
-  background: var(--orange50);
-  border-radius: var(--radius-field);
-  padding: 16px 12px 16px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  text-align: center;
-}
-
-.tm-tournament-promo-prize-card-rank {
-  font-size: var(--font-size-caption);
-  color: var(--text-muted);
-  font-weight: 500;
-  margin: 2px 0 0;
-}
-
-.tm-tournament-promo-prize-card-amount {
-  font-size: var(--font-size-body-lg);
-  font-weight: 700;
-  color: var(--text-strong);
-  margin: 2px 0 0;
-}
-
-/* Prize single card (fallback) */
-.tm-tournament-promo-prize-single {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  background: var(--orange50);
-  border-radius: var(--radius-field);
-  padding: 20px 16px;
-  margin-bottom: 20px;
-}
-
-.tm-tournament-promo-prize-single-label {
-  font-size: var(--font-size-body-lg);
-  font-weight: 700;
-  color: var(--text-strong);
-  margin: 0 0 2px;
-}
-
-.tm-tournament-promo-prize-single-desc {
-  font-size: var(--font-size-label);
-  color: var(--text-muted);
-  margin: 0;
-  line-height: 1.5;
 }
 
 /* ── 3. Process steps ── */
@@ -639,178 +417,8 @@
   line-height: 1.5;
 }
 
-/* Mini bracket preview */
-.tm-tournament-promo-bracket-preview {
-  background: var(--grey50);
-  border-radius: var(--radius-field);
-  padding: 16px 16px 16px;
-  margin-bottom: 20px;
-}
-
-.tm-tournament-promo-bracket {
-  display: flex;
-  align-items: center;
-  gap: 0;
-}
-
-.tm-tournament-promo-bracket-col {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  flex: 1;
-  min-width: 0;
-}
-
-.tm-tournament-promo-bracket-round {
-  font-size: var(--font-size-caption);
-  font-weight: 700;
-  color: var(--text-muted);
-  text-align: center;
-  margin: 0 0 8px;
-}
-
-.tm-tournament-promo-bracket-matches {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.tm-tournament-promo-bracket-match {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-chip);
-  padding: 8px 12px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  font-size: var(--font-size-caption);
-  color: var(--text-body);
-  font-weight: 500;
-}
-
-.tm-tournament-promo-bracket-match--final {
-  background: var(--orange50);
-  border-color: var(--orange500);
-  color: var(--text-strong);
-  gap: 4px;
-}
-
-.tm-tournament-promo-bracket-vs {
-  font-size: var(--font-size-micro);
-  color: var(--text-caption);
-  font-weight: 400;
-}
-
-/* Bracket connector between semi and final */
-.tm-tournament-promo-bracket-conn {
-  flex: 0 0 32px;
-  height: 80px;
-  position: relative;
-  /* Elbow: left bar + top/bottom stubs + horizontal arm */
-  background: linear-gradient(
-    transparent calc(50% - 1px),
-    var(--grey200) calc(50% - 1px),
-    var(--grey200) calc(50% + 1px),
-    transparent calc(50% + 1px)
-  );
-}
-
-.tm-tournament-promo-bracket-conn::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 20%;
-  width: 14px;
-  height: 60%;
-  border-left: 2px solid var(--grey200);
-  border-top: 2px solid var(--grey200);
-  border-bottom: 2px solid var(--grey200);
-}
-
-/* ── 4. How to join: 3-card grid ── */
-.tm-tournament-promo-how-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-.tm-tournament-promo-how-card {
-  background: var(--grey50);
-  border-radius: var(--radius-field);
-  padding: 16px 12px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.tm-tournament-promo-how-icon {
-  margin-bottom: 4px;
-}
-
-.tm-tournament-promo-how-step-num {
-  font-size: var(--font-size-micro);
-  font-weight: 700;
-  color: var(--blue500);
-  margin: 0;
-}
-
-.tm-tournament-promo-how-title {
-  font-size: var(--font-size-label);
-  font-weight: 700;
-  color: var(--text-strong);
-  margin: 0 0 2px;
-  line-height: 1.3;
-}
-
-.tm-tournament-promo-how-desc {
-  font-size: var(--font-size-caption);
-  color: var(--text-muted);
-  margin: 0;
-  line-height: 1.5;
-}
-
-/* ── 5. Final CTA ── */
-.tm-tournament-promo-final-cta {
-  margin: 8px 20px 16px;
-  background: var(--grey50);
-  border-radius: var(--radius-container);
-  padding: 20px 16px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  text-align: center;
-}
-
-.tm-tournament-promo-final-cta .tm-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 44px;
-}
-
-.tm-tournament-promo-final-cta-text {
-  font-size: var(--font-size-subhead);
-  font-weight: 700;
-  color: var(--text-strong);
-  margin: 0;
-}
-
 /* ─── Desktop overrides for promo sections (≥1024px) ─────────────────────── */
 @media (min-width: 1024px) {
-  /* Keep the column layout on desktop — a left-aligned hero. The previous row
-     layout laid every child (eyebrow·최대·금액·제목·CTA) side-by-side and squished
-     the big prize amount into a wrapping column. */
-  .tm-tournament-promo-hero {
-    padding: 44px 48px 48px;
-  }
-
-  .tm-tournament-promo-prize-amount {
-    font-size: 56px;
-  }
-
   .tm-tournament-promo-section {
     padding: 0;
   }
@@ -836,8 +444,6 @@
        박스가 자동으로 늘어나 텍스트가 잘리지 않는다(globals.css 토큰 주석 참고). */
     aspect-ratio: var(--tm-tournament-banner-ratio);
   }
-
-  /* Prize cards: stay 3-col on desktop (already set) */
 
   /* 데스크탑에선 아래가 배경이 있는 카드 그리드라 제목이 카드 상단 모서리에
      바로 붙으면 눌려 보인다. 그리드 gap(16px)과 같은 값으로 띄워 카드 사이
@@ -902,283 +508,13 @@
   .tm-tournament-promo-step-sub {
     display: none;
   }
-
-  .tm-tournament-promo-how-grid {
-    gap: 16px;
-  }
-
-  .tm-tournament-promo-how-card {
-    padding: 20px 16px 20px;
-  }
-
-  .tm-tournament-promo-final-cta {
-    flex-direction: row;
-    justify-content: space-between;
-    text-align: left;
-    padding: 20px 24px;
-    margin: 8px 0 16px;
-  }
-}
-
-@media (min-width: 1440px) {
-  .tm-tournament-promo-hero {
-    padding: 56px 64px 60px;
-  }
-
-  .tm-tournament-promo-prize-amount {
-    font-size: 60px;
-  }
-}
-
-/* ── Mobile: 3-col prize + how cards → 1-col on very small screens ── */
-@media (max-width: 359px) {
-  .tm-tournament-promo-prize-cards {
-    grid-template-columns: 1fr;
-  }
-
-  .tm-tournament-promo-how-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* ── prefers-reduced-motion: promo ── */
-@media (prefers-reduced-motion: reduce) {
-  .tm-tournament-promo-cta-primary,
-  .tm-tournament-promo-cta-ghost {
-    transition: none;
-  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
- * Knockout bracket (hand-authored — see components/tournaments/tournament-bracket)
- * Mobile: rounds stacked vertically. Desktop ≥768: columns fill the width L→R.
+ * Knockout bracket — 실제 사용 구현은 components/tournaments/tournament-bracket.tsx
+ * 의 tm-bk2 계열(globals.css). 여기 있던 tm-bracket 계열과 tm-bk 계열은 예전 구현으로,
+ * 대체된 뒤 어디서도 참조되지 않아 삭제했다(2026-09-04 웨이브5 정리).
  * ═══════════════════════════════════════════════════════════════════════════ */
-.tm-bracket-wrap {
-  margin-top: 4px;
-}
-
-.tm-bracket {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.tm-bracket-col-head {
-  font-size: var(--font-size-label);
-  font-weight: 700;
-  color: var(--text-muted);
-  padding: 4px 0 8px;
-}
-
-.tm-bracket-col-body {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-/* Mobile downward connector between rounds. */
-.tm-bracket-col:not(:last-child)::after {
-  content: '';
-  display: block;
-  width: 2px;
-  height: 18px;
-  margin: 8px 0 8px 24px;
-  background: var(--grey200);
-}
-
-.tm-bk-match {
-  border: 1px solid var(--grey200);
-  border-radius: var(--radius-control);
-  background: var(--bg);
-  overflow: hidden;
-}
-
-.tm-bk-match-live {
-  border-color: var(--green500);
-}
-
-.tm-bk-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 16px;
-}
-
-.tm-bk-row-win {
-  background: var(--blue50);
-}
-
-.tm-bk-divider {
-  height: 1px;
-  background: var(--grey100);
-}
-
-.tm-bk-team {
-  font-size: var(--font-size-body-sm);
-  font-weight: 600;
-  color: var(--text-strong);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.tm-bk-team-tbd {
-  color: var(--text-caption);
-  font-weight: 500;
-}
-
-.tm-bk-score {
-  font-size: var(--font-size-body);
-  font-weight: 700;
-  color: var(--text-strong);
-  flex-shrink: 0;
-}
-
-.tm-bk-row-win .tm-bk-team,
-.tm-bk-row-win .tm-bk-score {
-  color: var(--blue500);
-}
-
-.tm-bk-status {
-  font-size: var(--font-size-micro);
-  color: var(--text-caption);
-  text-align: center;
-  padding: 4px 0;
-  border-top: 1px solid var(--grey100);
-  background: var(--grey50);
-}
-
-/* Champion slot at the end of the bracket. */
-.tm-bk-champ {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  border: 1px solid var(--grey200);
-  border-radius: var(--radius-control);
-  background: var(--grey50);
-}
-
-.tm-bk-champ-decided {
-  background: var(--orange50, var(--grey50));
-  border-color: var(--orange500);
-}
-
-.tm-bk-champ-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-circle);
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  background: var(--grey200);
-  color: var(--text-caption);
-}
-
-.tm-bk-champ-decided .tm-bk-champ-icon {
-  background: linear-gradient(135deg, var(--orange500), var(--orange600));
-  color: var(--static-white);
-}
-
-.tm-bk-champ-name {
-  font-size: var(--font-size-body);
-  font-weight: 700;
-  color: var(--text-strong);
-}
-
-.tm-bk-champ:not(.tm-bk-champ-decided) .tm-bk-champ-name {
-  color: var(--text-caption);
-  font-weight: 600;
-}
-
-/* 3·4위전 — consolation match, separate from the main tree. */
-.tm-bracket-third {
-  margin-top: 20px;
-}
-
-.tm-bracket-third-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.tm-bracket-third-pill {
-  font-size: var(--font-size-caption);
-  font-weight: 700;
-  color: var(--text-muted);
-  padding: 3px 12px;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--grey200);
-  background: var(--grey50);
-}
-
-.tm-bracket-third-body {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  max-width: 360px;
-}
-
-@media (min-width: 768px) {
-  .tm-bracket {
-    flex-direction: row;
-    align-items: stretch;
-    gap: 0;
-  }
-
-  .tm-bracket-col {
-    flex: 1 1 0;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    position: relative;
-  }
-
-  .tm-bracket-col-head {
-    text-align: center;
-    border-bottom: 1px solid var(--grey100);
-    margin-bottom: 16px;
-  }
-
-  .tm-bracket-col-body {
-    flex: 1;
-    justify-content: center;
-    gap: 20px;
-    padding: 0 28px;
-  }
-
-  /* drop the mobile vertical connector on desktop */
-  .tm-bracket-col:not(:last-child)::after {
-    content: none;
-  }
-
-  /* horizontal arms joining each column to the next at mid-height */
-  .tm-bracket-col:not(:last-child) .tm-bracket-col-body::after,
-  .tm-bracket-col:not(:first-child) .tm-bracket-col-body::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    width: 26px;
-    height: 2px;
-    background: var(--grey300);
-    transform: translateY(-50%);
-  }
-
-  .tm-bracket-col:not(:last-child) .tm-bracket-col-body::after {
-    right: 0;
-  }
-
-  .tm-bracket-col:not(:first-child) .tm-bracket-col-body::before {
-    left: 0;
-  }
-
-  .tm-bracket-third-body {
-    max-width: 340px;
-    margin: 0 auto;
-  }
-}
 
 /* ── 대회 진행 방식 — numbered step timeline ─────────────────────────────── */
 .tm-tourn-flow-format {
@@ -1442,43 +778,8 @@
   }
 }
 
-/* ─── Fixture lineup /tournaments/:id/matches/:fixtureId/lineup ──────────────
- * Mobile/tablet (<1024): 탭으로 전환하는 단일 pane. 두 pane 모두 항상 DOM에 있고
- * (탭으로 마운트/언마운트하지 않음) CSS가 활성 탭만 보여준다 — 그래야 데스크톱에서
- * 같은 마크업을 두 pane 동시 노출로 그대로 승격할 수 있다.
- * Desktop (≥1024): 2컬럼 그리드로 두 pane을 항상 함께 보여준다(탭은 tm-hide-desktop으로
- * 숨김). DOM 순서상 피치 pane이 항상 먼저(왼쪽)다.
- *
- * COMPONENT CONTRACT:
- *   <div role="tablist" className="tm-hide-desktop">...</div>
- *   <div className="tm-fixture-lineup-grid">
- *     <section className={`tm-fixture-lineup-pane ${activeView==='pitch' ? 'is-active' : ''}`}>피치</section>
- *     <section className={`tm-fixture-lineup-pane ${activeView==='roster' ? 'is-active' : ''}`}>명단</section>
- *   </div>
- */
-.tm-fixture-lineup-pane {
-  display: none;
-}
-
-.tm-fixture-lineup-pane.is-active {
-  display: grid;
-  gap: 16px;
-}
-
+/* ─── Fixture lineup pitch board /tournaments/:id/matches/:fixtureId/lineup ── */
 @media (min-width: 1024px) {
-  .tm-fixture-lineup-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 24px;
-    align-items: start;
-  }
-
-  /* is-active 여부와 무관하게 두 pane 모두 강제 노출 — 탭 상태는 모바일/태블릿에서만 의미가 있다. */
-  .tm-fixture-lineup-pane {
-    display: grid !important;
-    gap: 16px;
-  }
-
   /* 2026-08 QA 지적: 피치는 maxWidth 420px 기준 세로 ~648px — 데스크톱 페이지 헤더·
    * 카드·탭 아래에 놓이면 900px 안팎 뷰포트에서 골 지역(피치 하단)이 화면 아래로
    * 잘리거나 하단 고정 CTA 바(.tm-fixed-cta) 밑에 가려 스크롤 없이는 전혀 안 보였다

@@ -4,7 +4,7 @@
 import type { RouteChromeEntry } from '../types';
 
 export const MISC_ROUTES: RouteChromeEntry[] = [
-  { pattern: '/events', chrome: { title: '이벤트', activeTab: 'tournaments', showNotifications: true } },
+  { pattern: '/events', chrome: { title: '이벤트', activeTab: 'tournaments', showNotifications: true, desktopHead: true } },
 
   { pattern: '/notices', chrome: { title: '공지사항', activeTab: 'home', bottomNav: false, backHref: '/home' } },
   { pattern: '/notices/:id', chrome: { title: '공지사항', activeTab: 'home', bottomNav: false, backHref: '/notices' } },

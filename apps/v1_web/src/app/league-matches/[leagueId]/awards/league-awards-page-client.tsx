@@ -95,10 +95,12 @@ function ChampionsHero({ champions }: { champions: V1LeagueChampionTeam[] }) {
  * 이 리스트가 "같은 팀 이야기"임을 스크롤해도 계속 알 수 있게 한다.
  */
 function FinalStandingsSection({
+  leagueId,
   standings,
   championTeamIds,
   hasConfirmedPromotion,
 }: {
+  leagueId: string;
   standings: V1LeagueStandingRow[];
   championTeamIds: Set<string>;
   hasConfirmedPromotion: boolean;
@@ -107,7 +109,13 @@ function FinalStandingsSection({
     return (
       <section className="mb-5">
         <h2 className="tm-hub-section-title mb-2">최종 순위</h2>
-        <EmptyState title="확정된 순위가 없어요" sub="리그 경기 결과가 확정되면 최종 순위가 나타나요." />
+        <EmptyState
+          title="확정된 순위가 없어요"
+          sub="리그 경기 결과가 확정되면 최종 순위가 나타나요."
+          illustration={{ name: 'journey-done' }}
+          cta="리그 순위표 보러가기"
+          ctaHref={`/league-matches/${leagueId}`}
+        />
       </section>
     );
   }
@@ -151,11 +159,13 @@ function FinalStandingsSection({
 
 /** 득점왕 / 도움왕 공용 섹션 — 공동 1위(동점) 전원을 트로피로 함께 강조한다. */
 function LeaderboardSection({
+  leagueId,
   title,
   rows,
   unit,
   emptySub,
 }: {
+  leagueId: string;
   title: string;
   rows: V1LeaguePlayerRecordRow[];
   unit: (row: V1LeaguePlayerRecordRow) => number;
@@ -166,7 +176,13 @@ function LeaderboardSection({
     return (
       <section className="mb-5">
         <h2 className="tm-hub-section-title mb-2">{title}</h2>
-        <EmptyState title="아직 기록이 없어요" sub={emptySub} />
+        <EmptyState
+          title="아직 기록이 없어요"
+          sub={emptySub}
+          illustration={{ name: 'journey-done' }}
+          cta="리그 순위표 보러가기"
+          ctaHref={`/league-matches/${leagueId}`}
+        />
       </section>
     );
   }
@@ -238,7 +254,7 @@ export function LeagueAwardsPageClient({ leagueId }: { leagueId: string }) {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
-      <h1 className="sr-only">{series.title} 시즌 결산</h1>
+      <h2 className="sr-only">{series.title} 시즌 결산</h2>
       <p className="mb-4 flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
         {series.tierLabel != null && <span className="tm-badge tm-badge-sm tm-badge-blue">{series.tierLabel}</span>}
         <span>{series.title}</span>
@@ -258,6 +274,7 @@ export function LeagueAwardsPageClient({ leagueId }: { leagueId: string }) {
         <>
           <ChampionsHero champions={standings.champions} />
           <FinalStandingsSection
+            leagueId={leagueId}
             standings={standings.standings}
             championTeamIds={new Set(standings.champions.map((c) => c.teamId))}
             hasConfirmedPromotion={standings.promotionDecided}
@@ -280,12 +297,14 @@ export function LeagueAwardsPageClient({ leagueId }: { leagueId: string }) {
             (leagueRecordEmptySub)를 거친다.
           */}
           <LeaderboardSection
+            leagueId={leagueId}
             title="득점왕"
             rows={records.goals}
             unit={(row) => row.goals}
             emptySub={leagueRecordEmptySub('goals', records.hiddenByEligibility)}
           />
           <LeaderboardSection
+            leagueId={leagueId}
             title="도움왕"
             rows={records.assists}
             unit={(row) => row.assists}

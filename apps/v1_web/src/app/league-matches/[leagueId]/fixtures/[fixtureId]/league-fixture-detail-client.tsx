@@ -155,7 +155,10 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
   if (fixture === null) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-6">
-        <ErrorState message="이 리그에서 해당 경기를 찾을 수 없어요. 대진이 재생성되었을 수 있어요." />
+        <ErrorState
+          message="이 리그에서 해당 경기를 찾을 수 없어요. 대진이 재생성되었을 수 있어요."
+          onRetry={() => void seriesQuery.refetch()}
+        />
         <Link href={`/league-matches/${leagueId}`} className="tm-btn tm-btn-lg tm-btn-neutral mt-4 w-full">
           리그 순위표·일정으로 이동
         </Link>

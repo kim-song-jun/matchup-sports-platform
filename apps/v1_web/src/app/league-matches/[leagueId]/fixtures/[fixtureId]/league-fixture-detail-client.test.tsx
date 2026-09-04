@@ -289,5 +289,7 @@ describe('LeagueFixtureDetailClient', () => {
 
     expect(screen.getByText(/해당 경기를 찾을 수 없어요/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '리그 순위표·일정으로 이동' })).toHaveAttribute('href', '/league-matches/lg-1');
+    // Wave 5 — 대진이 방금 재생성돼 목록이 갱신됐을 수 있으니 재시도 버튼도 함께 준다.
+    expect(screen.getByRole('button', { name: '다시 시도하기' })).toBeInTheDocument();
   });
 });

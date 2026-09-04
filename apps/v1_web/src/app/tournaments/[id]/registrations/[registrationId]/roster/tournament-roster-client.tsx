@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { AlertBanner, Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
@@ -448,6 +448,10 @@ function AddPlayerForm({
   const birthDateFieldId = `${formId}-birthdate`;
   const phoneFieldId = `${formId}-phone`;
   const eligibilityFieldId = `${formId}-eligibility`;
+  // 팀원이 아예 없으면 아래 실명·생년월일·휴대폰 필드는 전부 채울 값이 없는 빈 폼이라
+  // 제출도 불가능하다(canSubmit이 form.userId를 요구). 크리플드 폼을 보여주는 대신
+  // 폼 전체를 "먼저 멤버를 추가하라" 안내로 대체한다.
+  const noMembers = !membersLoading && !membersError && members.length === 0;
 
   /* #7a: Neutral solid card — no blue tint. Blue reserved for focus/active states only. */
   return (
@@ -468,6 +472,16 @@ function AddPlayerForm({
         </button>
       </div>
 
+      {noMembers ? (
+        <EmptyState
+          illustration={{ name: 'auth-welcome' }}
+          title="팀원이 없어요"
+          sub="먼저 팀에 멤버를 추가한 뒤 명단에 올릴 수 있어요."
+          cta={teamId ? '멤버 관리' : undefined}
+          ctaHref={teamId ? `/teams/${teamId}/members` : undefined}
+        />
+      ) : (
+      <>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {/* Team member picker — replaces raw userId text input */}
         <FormField id={memberFieldId} label="팀원 선택" required>
@@ -485,13 +499,6 @@ function AddPlayerForm({
               style={{ color: 'var(--red700)', display: 'flex', alignItems: 'center', minHeight: 44 }}
             >
               팀원 목록을 불러오지 못했어요.
-            </div>
-          ) : members.length === 0 ? (
-            <div
-              className="tm-input"
-              style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', minHeight: 44 }}
-            >
-              팀원이 없어요.
             </div>
           ) : (
             <>
@@ -713,6 +720,8 @@ function AddPlayerForm({
           {isSubmitting ? '추가 중…' : '추가'}
         </button>
       </div>
+      </>
+      )}
     </Card>
   );
 }
@@ -778,6 +787,9 @@ function PlayerRow({
   isUpdating,
   isRemoving,
   isLocked,
+  isEditing,
+  onToggleEdit,
+  isPrimary,
 }: {
   player: V1TournamentPlayer;
   onUpdate: (playerId: string, eligibilityStatus: V1PlayerEligibilityStatus) => Promise<void>;
@@ -785,10 +797,27 @@ function PlayerRow({
   isUpdating: boolean;
   isRemoving: boolean;
   isLocked: boolean;
+  /** 편집 패널 열림 여부 — 부모(TournamentRosterPageClient)가 한 번에 한 행만 열리도록
+   * 관리한다(editingPlayerId). 로컬 useState 로 두면 여러 행이 동시에 편집 모드로
+   * 들어갈 수 있어 "저장" 버튼이 화면에 여럿 primary 로 뜨는 상태가 가능했다. */
+  isEditing: boolean;
+  onToggleEdit: () => void;
+  /** [primary cap] 화면당 primary CTA 1개(DESIGN.md §14) — 위쪽에 열린 "선수 추가"
+   * 칸이 있거나 다른 행이 편집 중이면 이 행의 "저장"은 보조로 낮춘다. 부모가
+   * `draftForms.length === 0 && editingPlayerId === player.id` 로 계산해 넘긴다. */
+  isPrimary: boolean;
 }) {
-  const [isEditing, setIsEditing] = useState(false);
   const [draftEligibility, setDraftEligibility] = useState<V1PlayerEligibilityStatus>(player.eligibilityStatus);
   const [editError, setEditError] = useState<string | null>(null);
+
+  // 이 행이 (다시) 열릴 때마다 최신 서버 값으로 초기화한다 — 부모가 편집 상태를
+  // 컨트롤하므로 "수정" 버튼 onClick 대신 여기서 동기화한다.
+  useEffect(() => {
+    if (isEditing) {
+      setDraftEligibility(player.eligibilityStatus);
+      setEditError(null);
+    }
+  }, [isEditing, player.eligibilityStatus]);
 
   async function handleSave() {
     // 로딩 중 재클릭 시 중복 제출 방지 — isPending 은 disabled 속성과 동일하게 리렌더
@@ -798,7 +827,7 @@ function PlayerRow({
     setEditError(null);
     try {
       await onUpdate(player.id, draftEligibility);
-      setIsEditing(false);
+      onToggleEdit();
     } catch (err) {
       setEditError(extractErrorMessage(err, '선수 정보를 수정하지 못했어요. 잠시 후 다시 시도해 주세요.'));
     }
@@ -851,11 +880,7 @@ function PlayerRow({
               type="button"
               className="tm-btn tm-btn-sm tm-btn-neutral"
               style={{ minWidth: 44, padding: '0 12px' }}
-              onClick={() => {
-                setDraftEligibility(player.eligibilityStatus);
-                setEditError(null);
-                setIsEditing((prev) => !prev);
-              }}
+              onClick={onToggleEdit}
               disabled={isUpdating || isRemoving}
               aria-expanded={isEditing}
               aria-label={`${player.realName} 수정`}
@@ -944,18 +969,14 @@ function PlayerRow({
               type="button"
               className="tm-btn tm-btn-sm tm-btn-neutral"
               style={{ flex: 1 }}
-              onClick={() => {
-                setDraftEligibility(player.eligibilityStatus);
-                setEditError(null);
-                setIsEditing(false);
-              }}
+              onClick={onToggleEdit}
               disabled={isUpdating}
             >
               취소
             </button>
             <button
               type="button"
-              className="tm-btn tm-btn-sm tm-btn-primary"
+              className={`tm-btn tm-btn-sm ${isPrimary ? 'tm-btn-primary' : 'tm-btn-outline'}`}
               style={{ flex: 1 }}
               onClick={() => void handleSave()}
               disabled={isUpdating || draftEligibility === player.eligibilityStatus}
@@ -997,6 +1018,13 @@ export function TournamentRosterPageClient({
   const [draftErrors, setDraftErrors] = useState<Record<string, string>>({});
   const [addSuccess, setAddSuccess] = useState<string | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
+  // [primary cap] 한 번에 한 행만 편집 모드로 둔다 — PlayerRow가 각자 로컬 상태로
+  // isEditing을 가지면 여러 행이 동시에 열려 "저장" 버튼이 화면에 여럿 primary로
+  // 뜰 수 있었다(DESIGN.md §14, 화면당 primary CTA 1개).
+  const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null);
+  function handleToggleEdit(playerId: string) {
+    setEditingPlayerId((prev) => (prev === playerId ? null : playerId));
+  }
 
   const players = rosterData?.players ?? [];
   const belowMinimum = rosterData?.belowMinimum ?? false;
@@ -1306,7 +1334,9 @@ export function TournamentRosterPageClient({
           {canAddDraftForm ? (
             <button
               type="button"
-              className="tm-btn tm-btn-sm tm-btn-primary"
+              // [primary cap] 이미 열린 추가 칸이 있거나 어떤 행이 편집 중이면 그게 지금
+              // 활성 모드다 — 헤더 버튼은 보조로 낮춘다(화면당 primary CTA 1개, DESIGN.md §14).
+              className={`tm-btn tm-btn-sm ${draftForms.length > 0 || editingPlayerId !== null ? 'tm-btn-outline' : 'tm-btn-primary'}`}
               style={{ flexShrink: 0, minWidth: 64 }}
               onClick={handleAddDraftForm}
               aria-label="선수 추가하기"
@@ -1353,6 +1383,7 @@ export function TournamentRosterPageClient({
         {players.length === 0 ? (
           <Card pad={20}>
             <EmptyState
+              illustration={{ name: 'auth-welcome' }}
               title="등록된 선수가 없어요"
               sub={!canEditRoster ? '명단을 수정할 수 없는 상태예요.' : `최소 ${minPlayers}명 이상 등록해 주세요.`}
             />
@@ -1373,6 +1404,9 @@ export function TournamentRosterPageClient({
                 isUpdating={updatePlayer.isPending}
                 isRemoving={removePlayer.isPending}
                 isLocked={!canEditRoster}
+                isEditing={editingPlayerId === player.id}
+                onToggleEdit={() => handleToggleEdit(player.id)}
+                isPrimary={draftForms.length === 0 && editingPlayerId === player.id}
               />
             ))}
           </Card>

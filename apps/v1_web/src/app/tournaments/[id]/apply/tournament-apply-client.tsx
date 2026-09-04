@@ -7,7 +7,7 @@ import { UsersRound } from 'lucide-react';
 import { buildPhoneVerifyHref } from '@/components/auth/phone-verification/phone-verify-route';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
-import { AlertBanner, Card, EmptyState, InfoRow, SectionTitle } from '@/components/v1-ui/primitives';
+import { AlertBanner, Card, EmptyState, ErrorState, InfoRow, SectionTitle } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { getTournamentRosterNextStep } from '@/components/tournaments/tournament-roster-next-step';
 import { SponsorLogoStrip } from '@/components/tournaments/tournament-sponsor-logo-strip';
@@ -883,6 +883,7 @@ function AgreementsStep({
   onSubmit,
   isSubmitting,
   error,
+  termsError,
   terms,
 }: {
   tournament: V1TournamentDetail;
@@ -893,6 +894,9 @@ function AgreementsStep({
   onSubmit: () => void;
   isSubmitting: boolean;
   error: string | null;
+  /** 약관 조회 실패 — 제출 에러(error)와 원인이 달라(네트워크/설정 문제) 재시도가
+   * 의미 있다. 그래서 AlertBanner 가 아니라 ErrorState + onRetry 로 따로 그린다. */
+  termsError: { message: string; onRetry: () => void } | null;
   terms: V1CurrentTermsItem[];
 }) {
   const [activeConsentDocument, setActiveConsentDocument] = useState<TournamentConsentDocument | null>(null);
@@ -1069,6 +1073,12 @@ function AgreementsStep({
           compact
         />
       </div>
+
+      {termsError ? (
+        <div style={{ marginTop: 12 }}>
+          <ErrorState message={termsError.message} onRetry={termsError.onRetry} />
+        </div>
+      ) : null}
 
       {error ? (
         <div style={{ marginTop: 12 }}>
@@ -1492,7 +1502,13 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
   // client.tsx의 apply?team= 링크 참조)로 들어온 경우엔 셸 topbar 뒤로가기도 hubHref로
   // 가야 한다. 이미 콘텐츠 영역의 cancelHref가 쓰는 것과 같은 값을 override로 셸에 밀어넣는다.
   useShellOverride({ backHref: applyBackHref });
-  const { data: tournament, isLoading: loadingTournament, isError: tournamentError, error: tournamentErr } = useV1Tournament(tournamentId);
+  const {
+    data: tournament,
+    isLoading: loadingTournament,
+    isError: tournamentError,
+    error: tournamentErr,
+    refetch: refetchTournament,
+  } = useV1Tournament(tournamentId);
   const { data: myTeamsData, isLoading: loadingTeams } = useV1MyTeams();
   const { data: myRegistrations = [], isLoading: loadingMyRegistrations } = useV1MyRegistrations(tournamentId);
   const tournamentTerms = useV1CurrentTerms('tournament_application');
@@ -1713,7 +1729,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
     const msg = extractErrorMessage(tournamentErr, '대회 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
     return (
               <div style={{ padding: '0 20px', marginTop: 24 }}>
-          <AlertBanner message={msg} />
+          <ErrorState message={msg} onRetry={() => void refetchTournament()} />
           <Link
             href={`/tournaments/${tournamentId}`}
             className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
@@ -1912,14 +1928,13 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
                 onBack={handleAgreementsBack}
                 onSubmit={requestAgreementsSubmit}
                 isSubmitting={isSubmittingApplication}
-                error={
-                  submitError
-                  ?? newRegistrationBlockMessage
-                  ?? (tournamentTerms.isError
-                    ? '현재 대회 약관을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'
+                error={submitError ?? newRegistrationBlockMessage}
+                termsError={
+                  tournamentTerms.isError
+                    ? { message: '현재 대회 약관을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.', onRetry: () => void tournamentTerms.refetch() }
                     : tournamentTerms.data && !tournamentTerms.data.ready
-                      ? '현재 대회 필수 약관이 준비되지 않아 신청할 수 없어요.'
-                      : null)
+                      ? { message: '현재 대회 필수 약관이 준비되지 않아 신청할 수 없어요.', onRetry: () => void tournamentTerms.refetch() }
+                      : null
                 }
                 terms={tournamentTerms.data?.items ?? []}
               />

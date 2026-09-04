@@ -154,9 +154,12 @@ export function TournamentReviewsPageClient({ tournamentId }: { tournamentId: st
       <div className="tm-tourn-sub-page">
         <div className="tm-reviews-body" style={{ padding: '20px 20px 40px' }}>
           <header style={{ marginBottom: 16 }}>
-            <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: 'var(--text-strong)' }}>
+            {/* 셸이 이미 데스크톱 헤드에 "참가팀 후기" 제목을 그린다(tournaments-extra.ts
+                desktopHead:true) — 여기 h1을 그대로 두면 데스크톱에서 h1이 중복된다.
+                대회명을 포함한 실제 제목은 여기서만 나오는 정보라 h2로 낮춰 유지한다. */}
+            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: 'var(--text-strong)' }}>
               {tournament ? `${tournament.title} 참가팀 후기` : '참가팀 후기'}
-            </h1>
+            </h2>
             <p className="tm-text-caption" style={{ margin: '4px 0 0', color: 'var(--text-muted)', lineHeight: 1.5 }}>
               이 대회에 참가한 팀의 팀장·운영진이 남긴 후기예요.
             </p>
@@ -227,8 +230,11 @@ export function TournamentReviewsPageClient({ tournamentId }: { tournamentId: st
           ) : reviews.length === 0 ? (
             <Card pad={20} style={{ background: 'var(--grey50)', textAlign: 'center' }}>
               <EmptyState
+                illustration={{ name: 'chat-empty' }}
                 title={search ? '검색 결과가 없어요' : '아직 등록된 후기가 없어요'}
                 sub={search ? '다른 검색어로 다시 시도해보세요.' : '대회 참가팀의 후기가 등록되면 여기에서 볼 수 있어요.'}
+                cta={!search && canWrite ? '후기 쓰기' : undefined}
+                onCta={!search && canWrite ? () => setShowForm(true) : undefined}
               />
             </Card>
           ) : (

@@ -8,7 +8,7 @@
 import type { RouteChromeEntry } from '../types';
 
 export const TOURNAMENTS_CORE_ROUTES: RouteChromeEntry[] = [
-  { pattern: '/tournaments', chrome: { title: '대회', activeTab: 'tournaments', showNotifications: true } },
+  { pattern: '/tournaments', chrome: { title: '대회', activeTab: 'tournaments', showNotifications: true, desktopHead: true } },
   {
     // 로딩/에러 분기의 안전한 기본값. success 분기(tournament-detail-client.tsx)가
     // useShellOverride({ title: data.title, desktopHead: false, floatingSlot: <ApplyCTA/> })로

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Fragment, useState, type ReactNode } from 'react';
 import { ChevronDown } from 'lucide-react';
-import { Card } from '@/components/v1-ui/primitives';
+import { Card, EmptyState } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 
 /**
@@ -261,8 +261,8 @@ export function TournamentStandingsTable({
               })
             ) : (
               <tr>
-                <td colSpan={COLUMN_COUNT} style={{ padding: '20px 12px', textAlign: 'center', color: 'var(--text-caption)', fontSize: 13 }}>
-                  {emptyMessage}
+                <td colSpan={COLUMN_COUNT} style={{ padding: 0 }}>
+                  <EmptyState title={emptyMessage} sub="경기 결과가 등록되면 순위가 매겨져요." />
                 </td>
               </tr>
             )}

@@ -87,10 +87,13 @@ export class TeamMatchesService {
 
   async list(user: V1AuthUser | null, query: TeamMatchesQueryDto) {
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
+    const isDefaultDiscovery = query.status === undefined;
     const status = query.status ?? 'recruiting';
     const now = new Date();
     const constraints: Prisma.V1TeamMatchWhereInput[] = [
-      ...(status === 'recruiting'
+      // 일반 탐색은 마감 글도 경기 전까지 남기지만, 추천순은 즉시 신청할 수 있는
+      // 모집 글만 보여줘야 하므로 추천에서만 신청 마감 조건을 적용한다.
+      ...(status === 'recruiting' && query.sort === 'recommended'
         ? [{ OR: [{ deadlineAt: null }, { deadlineAt: { gte: now } }] } satisfies Prisma.V1TeamMatchWhereInput]
         : []),
       ...(query.query
@@ -111,7 +114,18 @@ export class TeamMatchesService {
         hostTeam: { status: 'active', deletedAt: null },
         ...(status === 'expired'
           ? { startAt: { lt: now } }
-          : status === 'recruiting'
+          : isDefaultDiscovery
+            ? {
+                // closed와 상대 팀 확정(matched) 글도 경기 전까지 일반 목록에 남겨
+                // 신청마감으로 보여준다. 추천순에서는 raw recruiting만 허용한다.
+                status: {
+                  in: query.sort === 'recommended'
+                    ? ['recruiting']
+                    : ['recruiting', 'closed', 'matched'],
+                },
+                startAt: { gte: now },
+              }
+            : status === 'recruiting'
             ? { status, startAt: { gte: now } }
             : { status }),
         ...(query.sportId ? { sportId: query.sportId } : {}),

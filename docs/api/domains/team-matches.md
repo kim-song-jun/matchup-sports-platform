@@ -36,9 +36,10 @@ Query:
 
 Rules:
 
-- `status`를 생략하면 기본값은 `recruiting`
+- `status`를 생략한 일반 탐색은 경기 시작 전인 `recruiting`, `closed`, `matched`를 포함한다.
 - 기본 목록은 `createdAt DESC, id DESC` 최신 생성순이다. 명시적인 `recommended`/`deadline`/`starts_at`은 경기 시작 임박순으로 처리한다.
-- 기본 모집 목록은 경기 시작 전이고, 신청 마감이 없거나 아직 지나지 않은 raw `recruiting` 항목만 포함한다. raw status가 `recruiting`이어도 상세 조회 시 신청 마감이 지났다면 `displayState=closed`다.
+- 일반 목록에서는 신청 마감이 지났거나 raw status가 `closed`/`matched`인 항목도 경기 시작 전까지 신청마감으로 노출하고, 경기 시작 시각 이후에는 제외한다.
+- `sort=recommended`는 경기 시작 전인 raw `recruiting` 중 신청 마감이 없거나 아직 지나지 않은 항목만 포함한다.
 - `teamId`는 `hostTeamId = teamId` 또는 `applications.some(applicantTeamId = teamId)` 둘 중 하나를 만족하면 포함
 - Level response fields: `levelLabel`, `minLevel`, `maxLevel`
 - List and detail responses include `hostTeam.mannerScore` and `hostTeam.wins`.

@@ -3508,6 +3508,12 @@ export type V1AdminTournamentRegistration = Omit<
   confirmedByAdminUserId: string | null;
   // 목록 응답에만 포함(team join). mutation 응답에는 없음 → optional.
   teamName?: string | null;
+  /**
+   * 명단이 **자동 확정**된 시각. 시즌 시작까지 명단을 안 낸 팀은 잡이 현재 멤버로 명단을
+   * 만든다 — 그건 **팀이 검토한 적 없는 명단**이라 운영 판단이 달라진다.
+   * `null` 이면 팀이 직접 낸 것이다. 목록 응답에만 있어 optional.
+   */
+  rosterAutoConfirmedAt?: string | null;
   payment:
     | (V1TournamentPaymentSummary & { confirmedByAdminUserId: string | null })
     | null;

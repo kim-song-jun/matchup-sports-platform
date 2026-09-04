@@ -351,12 +351,21 @@ export function RegistrationsTab({
   showToast,
   tournamentTeamCount,
   canWrite,
+  requireCancelReason = false,
 }: {
   tournamentId: string;
   showToast: (msg: string, v?: 'success' | 'error') => void;
   /** 정원(팀 수) — 참가 확정 시 정원 초과 경고에 사용. 로딩 중이면 undefined */
   tournamentTeamCount?: number;
   canWrite: boolean;
+  /**
+   * 거부 사유를 **반드시** 받아야 하는가. 정규 리그가 그렇다(D9 — 서버가
+   * `LEAGUE_CANCEL_REASON_REQUIRED` 로 400 을 준다). 대회는 선택 그대로다.
+   *
+   * `kind` 를 새로 조회하지 않고 prop 으로 받는 이유는 **호출부가 이미 안다**는 것이다 —
+   * 리그 화면이 이 탭을 리그 id 로 렌더하고, 대회 화면이 대회 id 로 렌더한다.
+   */
+  requireCancelReason?: boolean;
 }) {
   const { data, isPending, isError, error, refetch } = useV1AdminTournamentRegistrations(tournamentId);
   const confirmPayment = useV1ConfirmPayment();
@@ -370,6 +379,10 @@ export function RegistrationsTab({
   const [rosterRegistration, setRosterRegistration] = useState<V1AdminTournamentRegistration | null>(null);
   const [rosterOpen, setRosterOpen] = useState(false);
   const { confirm: confirmDialog, ConfirmModal } = useConfirm();
+  // 거부 사유 모달 — 대상이 있으면 열려 있다.
+  const [cancelTarget, setCancelTarget] = useState<V1AdminTournamentRegistration | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   // P1-2: 상태 필터
   const [statusFilter, setStatusFilter] = useState('all');
@@ -441,25 +454,35 @@ export function RegistrationsTab({
     handleConfirm(reg, overCapacity ? 'waitlist' : 'confirm');
   };
 
-  const handleCancel = async (reg: V1AdminTournamentRegistration) => {
-    const teamLabel = reg.teamName ? `"${reg.teamName}"` : '이 팀';
-    const reasonSuffix =
-      reg.status === 'cancel_requested' && reg.cancelReason
-        ? ` 팀이 남긴 취소 사유: "${reg.cancelReason}"`
-        : '';
-    const ok = await confirmDialog({
-      title: '신청 취소',
-      message: `${teamLabel}의 신청을 취소할까요? 이 작업은 되돌릴 수 없어요.${reasonSuffix}`,
-      confirmLabel: '취소 처리',
-      tone: 'danger',
-    });
-    if (!ok) return;
+  // **사유를 받는 전용 모달을 연다**(FE-4 B안). 예전에는 예/아니오 확인만 받고 사유 없이
+  // 보냈는데, 리그는 서버가 사유를 필수로 요구해서(`LEAGUE_CANCEL_REASON_REQUIRED`)
+  // **어드민이 리그 신청을 거부할 방법이 아예 없었다.**
+  const handleCancel = (reg: V1AdminTournamentRegistration) => {
+    setCancelTarget(reg);
+    setCancelReason('');
+    setCancelError(null);
+  };
+
+  const submitCancel = () => {
+    const target = cancelTarget;
+    if (target === null || cancelRegistration.isPending) return;
+    const reason = cancelReason.trim();
+    if (requireCancelReason && reason === '') {
+      // 서버도 막지만, 저장 순간에야 알면 운영자는 무엇이 빠졌는지 폼을 다시 훑어야 한다.
+      setCancelError('리그 참가를 거부하려면 사유를 입력해 주세요.');
+      return;
+    }
     cancelRegistration.mutate(
-      { registrationId: reg.id },
+      // 빈 사유는 **보내지 않는다** — 대회에서 빈 문자열을 보내면 팀이 남긴 취소 사유를
+      // 덮어쓸 여지가 생긴다(서버는 `dto.reason ?? 기존값` 으로 보존한다).
+      { registrationId: target.id, ...(reason === '' ? {} : { reason }) },
       {
-        onSuccess: () => showToast('취소했어요.', 'success'),
+        onSuccess: () => {
+          setCancelTarget(null);
+          showToast('취소했어요.', 'success');
+        },
         onError: (err) =>
-          showToast(extractErrorMessage(err, '취소에 실패했어요.'), 'error'),
+          setCancelError(extractErrorMessage(err, '취소에 실패했어요.')),
       },
     );
   };
@@ -691,6 +714,16 @@ export function RegistrationsTab({
               icon: <Users size={14} aria-hidden="true" />,
               label: r.playerCount > 0 ? `${r.playerCount}명` : '명단 미등록',
             },
+            // **자동 확정 명단임을 알린다.** 시즌 시작까지 명단을 안 낸 팀은 잡이 현재
+            // 멤버로 명단을 만든다 — 그건 **팀이 검토한 적 없는 명단**이라, 운영자가
+            // 인원·자격을 볼 때 판단이 달라진다. 그동안 이 사실이 화면 어디에도 없었다.
+            ...(r.rosterAutoConfirmedAt
+              ? [{
+                  icon: <Clock size={14} aria-hidden="true" />,
+                  label: `자동 확정 ${formatDate(r.rosterAutoConfirmedAt)}`,
+                  wrap: true,
+                }]
+              : []),
             ...(r.depositorName
               ? [
                   {
@@ -849,6 +882,67 @@ export function RegistrationsTab({
       />
 
       {/* Roster modal */}
+      <SimpleModal
+        open={cancelTarget !== null}
+        title="신청 거부"
+        onClose={() => setCancelTarget(null)}
+        pending={cancelRegistration.isPending}
+      >
+        <div className="flex flex-col gap-3">
+          <p className="text-sm text-[var(--text-muted)]">
+            {cancelTarget?.teamName ?? cancelTarget?.teamId}의 신청을 거부할까요? 되돌릴 수 없어요.
+          </p>
+          {cancelTarget?.status === 'cancel_requested' && cancelTarget.cancelReason ? (
+            <p className="text-xs text-[var(--text-muted)]">
+              팀이 남긴 취소 사유: “{cancelTarget.cancelReason}”
+            </p>
+          ) : null}
+          <label className="text-sm font-medium text-[var(--text-strong)]" htmlFor="cancel-reason">
+            사유{requireCancelReason ? '' : ' (선택)'}
+          </label>
+          <textarea
+            id="cancel-reason"
+            value={cancelReason}
+            onChange={(event) => {
+              setCancelReason(event.target.value);
+              setCancelError(null);
+            }}
+            rows={3}
+            placeholder={
+              requireCancelReason
+                ? '왜 거부하는지 적어 주세요. 팀에게 남는 기록이에요.'
+                : '필요하면 적어 주세요.'
+            }
+            className="rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 py-2 text-sm text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+          />
+          {cancelError !== null ? (
+            <p role="alert" className="text-xs text-[var(--red600,#dc2626)]">
+              {cancelError}
+            </p>
+          ) : null}
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setCancelTarget(null)}
+              disabled={cancelRegistration.isPending}
+              className="tm-btn tm-btn-sm tm-btn-ghost"
+              style={{ minHeight: 44 }}
+            >
+              닫기
+            </button>
+            <button
+              type="button"
+              onClick={submitCancel}
+              disabled={cancelRegistration.isPending}
+              className="tm-btn tm-btn-sm tm-btn-danger"
+              style={{ minHeight: 44 }}
+            >
+              {cancelRegistration.isPending ? '처리 중…' : '거부'}
+            </button>
+          </div>
+        </div>
+      </SimpleModal>
+
       <RosterModal
         open={rosterOpen}
         onClose={() => setRosterOpen(false)}

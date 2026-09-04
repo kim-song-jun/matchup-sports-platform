@@ -637,6 +637,80 @@ describe('AdminRegistrationsService', () => {
     expect(prisma.v1TournamentRegistration.findMany).toHaveBeenCalled();
   });
 
+  // ─── 자동 확정 명단 표시 (FE-4, 결함 #21) ────────────────────────────────────
+  //
+  // 시즌 시작까지 명단을 안 낸 팀은 잡이 현재 멤버로 명단을 만들고 `rosterAutoConfirmedAt`
+  // 을 남기는데, 그 값이 **어떤 응답에도 실리지 않아** 운영자가 "팀이 낸 명단" 과
+  // "시스템이 만든 명단" 을 구분할 수 없었다.
+
+  /** 신청 1건짜리 목록을 세팅한다. */
+  function arrangeOneRegistration() {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1Tournament.findFirst.mockImplementation(
+      kindAwareFindFirst({ id: 'league-1', kind: 'regular_league' }),
+    );
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([
+      {
+        id: 'reg-1',
+        tournamentId: 'league-1',
+        teamId: 'team-1',
+        appliedByUserId: 'user-1',
+        status: 'confirmed',
+        depositorName: null,
+        agreedRules: true,
+        agreedPrivacy: true,
+        agreedRefund: true,
+        agreedMediaConsent: true,
+        confirmedByAdminUserId: null,
+        confirmedAt: null,
+        rosterLockedAt: null,
+        rosterDeadlineOverrideAt: null,
+        cancelRequestedAt: null,
+        cancelReason: null,
+        createdAt: new Date('2026-08-01T00:00:00.000Z'),
+        updatedAt: new Date('2026-08-01T00:00:00.000Z'),
+        payment: null,
+        team: { name: 'A팀' },
+        _count: { players: 6 },
+      },
+    ]);
+  }
+
+  it('list: 자동 확정된 명단이면 그 시각을 함께 준다', async () => {
+    arrangeOneRegistration();
+    prisma.$queryRaw.mockResolvedValue([
+      { id: 'reg-1', roster_auto_confirmed_at: new Date('2026-09-01T00:00:00.000Z') },
+    ]);
+
+    const result = await service.list(opsAuth, 'league-1', {});
+    expect(result.items[0]).toMatchObject({
+      id: 'reg-1',
+      rosterAutoConfirmedAt: '2026-09-01T00:00:00.000Z',
+    });
+  });
+
+  it('list: 팀이 직접 낸 명단은 null 이다 — 배지가 잘못 붙으면 안 된다', async () => {
+    arrangeOneRegistration();
+    // 자동 확정 행이 없으면 raw 조회가 빈 배열을 준다(쿼리가 `IS NOT NULL` 로 거른다).
+    prisma.$queryRaw.mockResolvedValue([]);
+
+    const result = await service.list(opsAuth, 'league-1', {});
+    expect(result.items[0].rosterAutoConfirmedAt).toBeNull();
+  });
+
+  it('list: 신청이 하나도 없으면 자동 확정 조회를 아예 하지 않는다', async () => {
+    // 빈 배열로 `= ANY(...)` 를 만들면 헛돈다 — 물어볼 것이 없으면 묻지 않는다.
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1Tournament.findFirst.mockImplementation(
+      kindAwareFindFirst({ id: 'league-1', kind: 'regular_league' }),
+    );
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([]);
+    prisma.$queryRaw.mockClear();
+
+    await service.list(opsAuth, 'league-1', {});
+    expect(prisma.$queryRaw).not.toHaveBeenCalled();
+  });
+
   it('list: 없는 id 는 여전히 404 — 조회가 사라진 것은 아니다', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
     prisma.v1Tournament.findFirst.mockImplementation(kindAwareFindFirst(null));

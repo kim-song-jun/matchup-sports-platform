@@ -23,6 +23,7 @@ import {
 } from '../league-matches/league-team-admission';
 import { capacityLimitOf, isCapacityFull } from './registration-capacity';
 import { ALL_COMPETITION_KINDS, findTournamentOnSurface, LEAGUE_KINDS } from './tournament-surface-lookup';
+import { readRosterAutoConfirmedAt } from './registration-auto-confirm';
 
 /** 어드민이 취소 처리할 수 있는 신청 상태 목록. */
 const ADMIN_CANCELLABLE_STATUSES: V1TournamentRegistration['status'][] = [
@@ -97,10 +98,21 @@ export class AdminRegistrationsService {
     const hasNext = rows.length > limit;
     const pageItems = hasNext ? rows.slice(0, limit) : rows;
 
+    // **자동 확정 명단인지 알려 준다.** 시즌 시작까지 명단을 안 낸 팀은 잡이 현재 멤버로
+    // 명단을 만드는데(`rosterAutoConfirmedAt`), 그 값이 어떤 응답에도 없어서 운영자는
+    // 눈앞의 명단이 팀이 낸 것인지 시스템이 만든 것인지 구분할 수 없었다 — 자동 확정
+    // 명단은 "팀이 검토한 적 없는 명단" 이라 운영 판단이 달라진다.
+    const autoConfirmedAt = await readRosterAutoConfirmedAt(
+      this.prisma,
+      pageItems.map((row) => row.id),
+    );
+
     return {
       items: pageItems.map((row) => ({
         ...this.serialize(row, row.payment ?? null, row._count.players),
         teamName: row.team?.name ?? null,
+        // 자동 확정이 아니면 `null` — 맵에 없는 것이 곧 "팀이 직접 낸 명단" 이다.
+        rosterAutoConfirmedAt: autoConfirmedAt.get(row.id) ?? null,
       })),
       pageInfo: {
         nextCursor: hasNext ? (pageItems.at(-1)?.id ?? null) : null,

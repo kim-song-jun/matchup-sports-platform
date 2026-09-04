@@ -200,6 +200,12 @@ D8 순서 `expand → dual-write → backfill → read-swap → contract` 중 **
 - **FE-2** 수동 대진 폼(3안 → 선택 후 구현). 어드민 대진 표의 `result` 열·`status` 열 계약(D6 결정) 유지.
 - **FE-3** 신청 화면 공존(D7 의 "3안이 갈릴 축": 자동 등록 팀과 신청 팀이 한 화면에) — 3안 → 선택 후 구현. 통합 목록 카드에 "신청 접수 중" 상태 칩(기존 대회 칩 재사용).
 - **FE-4** 어드민 참가팀 탭: 신청 목록·사유 입력·**"자동 확정" 배지**(근거 필드는 `rosterAutoConfirmedAt`).
+  **2026-09-04 착수 시 결함 2건 확인**: ⓐ 리그 신청 거부가 화면에서 **항상 400** 이었다(서버는
+  사유 필수인데 호출부가 안 채웠다 — 결함 #20) ⓑ `rosterAutoConfirmedAt` 이 **어떤 API 응답에도
+  없었다**(잡은 쓰는데 아무도 안 읽음 — 결함 #21). 둘 다 이 항목에서 함께 고친다.
+  **후속 정리 후보**: `jerseyNumber` 는 이제 생성 클라이언트에 들어왔다(d.ts 실측) —
+  `tournament-player-jersey.ts` 의 raw 헬퍼를 지우고 일반 필드로 되돌릴 수 있다.
+  `rosterAutoConfirmedAt` 은 아직 없어서 `registration-auto-confirm.ts` 가 같은 이유로 남는다.
 
 ### Infra / QA
 

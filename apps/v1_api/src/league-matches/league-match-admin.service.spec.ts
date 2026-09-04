@@ -115,6 +115,10 @@ function createFake() {
         scheduledAt: new Date('2026-09-05T00:00:00.000Z'),
         scheduledEndAt: new Date('2026-11-05T00:00:00.000Z'),
         status: 'draft',
+        // `loadLeague` 가 신청 창을 판정하려고 함께 읽는다(2026-09-04). **행에 없으면
+        // `undefined` 라 `=== null` 가드를 그냥 지나가고 `.getTime()` 에서 터진다** —
+        // 이 스펙 12건이 그렇게 깨졌다. 실제 select 는 이 필드를 읽으므로 fake 도 준다.
+        registrationDeadlineAt: null,
         registrations: [{ teamId: 'team-a' }, { teamId: 'team-b' }],
       })),
       updateMany: track('v1Tournament.updateMany', async (args: FakeState['mirrorUpdates'][number]) => {
@@ -572,6 +576,7 @@ describe('LeagueMatchAdminService.addTeam — 형제 티어 중복 게이트', (
             scheduledAt: new Date('2026-09-05T00:00:00.000Z'),
             scheduledEndAt: new Date('2026-11-05T00:00:00.000Z'),
             status: 'draft',
+            registrationDeadlineAt: null,
             seriesId: SERIES_ID,
             seasonNo: 1,
             registrations: [{ teamId: 'team-a' }],
@@ -718,6 +723,7 @@ describe('LeagueMatchAdminService.removeTeam — 대진 취소 알림과 제외 
           scheduledAt: new Date('2026-09-05T00:00:00.000Z'),
           scheduledEndAt: new Date('2026-11-05T00:00:00.000Z'),
           status: 'draft',
+          registrationDeadlineAt: null,
           registrations: [{ teamId: REMOVED_TEAM }, { teamId: OPPONENT_TEAM }, { teamId: OTHER_HOST_TEAM }],
         }),
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),

@@ -1206,3 +1206,41 @@ describe('TournamentDetailView — 정규 리그 거울 행', () => {
     expect(screen.queryByText('상대팀 정보 없음')).not.toBeInTheDocument();
   });
 });
+
+/**
+ * 정원 진행바의 `aria-label` 은 **스크린리더 사용자가 듣는 유일한 문구**다. 화면 라벨만
+ * 고치고 여길 두면 무료 대회에서 "입금 대기" 를 듣게 된다 — 눈으로는 안 보이는 회귀라
+ * 테스트로만 잡힌다(2026-09-04 Copilot 리뷰가 짚은 자리).
+ */
+describe('정원 표시 — 무료 대회의 대기 낱말', () => {
+  it('무료 대회는 aria-label 에도 "입금" 을 쓰지 않는다', () => {
+    const tournament = makeTournament({
+      id: 't-free', status: 'open', format: 'group_knockout',
+      entryFee: 0, teamCount: 8, confirmedCount: 5, pendingPaymentCount: 3,
+    });
+    const { container } = render(
+      createElement(TournamentDetailView, { tournament, myRegistration: null }),
+    );
+    const labels = [...container.querySelectorAll('[aria-label]')].map((el) => el.getAttribute('aria-label') ?? '');
+    const capacity = labels.filter((label) => label.includes('정원'));
+    expect(capacity.length).toBeGreaterThan(0);
+    for (const label of capacity) {
+      expect(label).not.toContain('입금');
+      expect(label).toContain('확인대기');
+    }
+  });
+
+  it('유료 대회는 그대로 "입금 대기" 로 읽어 준다 — 무료 분기가 유료를 삼키면 안 된다', () => {
+    const tournament = makeTournament({
+      id: 't-paid', status: 'open', format: 'group_knockout',
+      entryFee: 20000, teamCount: 8, confirmedCount: 5, pendingPaymentCount: 3,
+    });
+    const { container } = render(
+      createElement(TournamentDetailView, { tournament, myRegistration: null }),
+    );
+    const capacity = [...container.querySelectorAll('[aria-label]')]
+      .map((el) => el.getAttribute('aria-label') ?? '')
+      .filter((label) => label.includes('정원'));
+    expect(capacity.some((label) => label.includes('입금대기'))).toBe(true);
+  });
+});

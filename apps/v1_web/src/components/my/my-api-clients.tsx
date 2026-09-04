@@ -171,6 +171,12 @@ export function MyHomePageClient() {
 export function MyTeamsPageClient() {
   const query = useV1MyTeams();
 
+  // 로딩 중: 데이터가 아직 없는데 KPI 0/0/0 + "소속 팀이 없어요" 빈 상태를 그대로 그리면
+  // 실제로 소속 팀이 없는 것처럼 보인다 — 스켈레톤으로 로딩 중임을 명시한다.
+  if (query.isPending) {
+    return <PageSkeleton variant="list" />;
+  }
+
   // 에러 상태: mock 폴백 없이 에러를 명시적으로 표시한다.
   if (query.isError) {
     return <ErrorState message="팀 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void query.refetch()} />;

@@ -241,7 +241,7 @@ export function MyTeamsPageView({ model }: { model: MyTeamsViewModel }) {
         <div className="tm-my-list-stack">
           {/* #14: 소속 팀이 없을 때 빈 상태 안내 */}
           {model.teams.length === 0
-            ? <EmptyState title="소속 팀이 없어요" sub="팀을 만들거나 가입 신청해서 함께 뛰어 보세요." cta="팀 찾기" onCta={() => { window.location.href = '/teams'; }} />
+            ? <EmptyState illustration={{ name: 'auth-welcome' }} title="소속 팀이 없어요" sub="팀을 만들거나 가입 신청해서 함께 뛰어 보세요." cta="팀 찾기" onCta={() => { window.location.href = '/teams'; }} />
             : model.teams.map((team) => <MyTeamCard key={team.id} team={team} />)}
         </div>
       </div>

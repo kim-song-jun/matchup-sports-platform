@@ -168,8 +168,9 @@
   object-fit: contain;
 }
 
-/* Hero stats */
-.tm-landing-hero-stats {
+/* Hero facts — 숫자 스트립이었던 자리. 근거 없는 수치를 검증 가능한 사실 문구로 바꾸면서
+   값이 짧은 숫자에서 여러 어절의 구로 바뀌었다(2026-09-04). 레이아웃 골격은 그대로다. */
+.tm-landing-hero-facts {
   display: flex;
   align-items: center;
   gap: 0;
@@ -181,29 +182,33 @@
   box-shadow: var(--shadow-card);
 }
 
-.tm-landing-stat {
+.tm-landing-fact {
   flex: 1;
   text-align: center;
   display: flex;
   flex-direction: column;
+  /* 값의 길이가 칸마다 달라 한 칸만 두 줄이 된다 — 세로 가운데로 모아 밑선을 맞춘다. */
+  justify-content: center;
   gap: 4px;
 }
 
-.tm-landing-stat-num {
-  font-size: 24px;
-  font-weight: 800;
+.tm-landing-fact-value {
+  /* 한 자리 숫자를 키우던 24px/800 은 여러 어절 구에 과했다. 라벨과의 대비는 유지한다. */
+  font-size: 15px;
+  font-weight: 700;
   color: var(--grey900);
-  letter-spacing: -0.5px;
-  line-height: 1;
+  letter-spacing: -0.2px;
+  line-height: 1.35;
+  text-wrap: balance;
 }
 
-.tm-landing-stat-label {
+.tm-landing-fact-label {
   font-size: 11px;
   color: var(--text-caption);
   font-weight: 500;
 }
 
-.tm-landing-stat-divider {
+.tm-landing-fact-divider {
   width: 1px;
   height: 32px;
   background: var(--grey200);
@@ -504,19 +509,19 @@
     margin-top: 0;
   }
 
-  /* 오른쪽 컬럼: 그래픽 웰 아래 stat 스트립(가로). 예전엔 stat 카드 하나가 컬럼 전체였다. */
-  .tm-landing-hero-stats {
+  /* 오른쪽 컬럼: 그래픽 웰 아래 사실 스트립(가로). 예전엔 카드 하나가 컬럼 전체였다. */
+  .tm-landing-hero-facts {
     margin-top: 16px;
     padding: 16px 20px;
   }
 
-  /* stat 스트립이 가로 3칸이 됐으므로(웰 아래) 각 칸은 모바일과 같은 세로 스택.
-     예전 세로 카드용 row 배치는 alpha 실측에서 "124 오늘 열린 매치4+ 운영 종목…" 처럼 한 줄로 뭉쳤다. */
-  .tm-landing-stat-num {
-    font-size: 26px;
+  /* 스트립이 가로 3칸이 됐으므로(웰 아래) 각 칸은 모바일과 같은 세로 스택.
+     예전 세로 카드용 row 배치는 alpha 실측에서 값과 라벨이 한 줄로 뭉쳤다. */
+  .tm-landing-fact-value {
+    font-size: 16px;
   }
 
-  .tm-landing-stat-label {
+  .tm-landing-fact-label {
     font-size: 12px;
   }
 

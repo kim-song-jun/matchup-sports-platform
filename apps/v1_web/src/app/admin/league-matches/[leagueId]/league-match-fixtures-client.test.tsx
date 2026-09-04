@@ -1310,4 +1310,29 @@ describe('수동 대진 추가 입구 — 대진 유무와 무관하게 보인�
     renderWithFixtures([]);
     expect(await screen.findByRole('button', { name: '경기 하나 추가' })).toBeInTheDocument();
   });
+
+  it('참가팀이 2팀 미만이면 누를 수 없고, 왜인지 말해 준다', async () => {
+    // 홈·어웨이를 **둘 다** 골라야 만들 수 있다. 1팀뿐인데 열면 피커 두 개가 같은 팀만
+    // 보여 주고 저장은 항상 막힌다 — 빈 약속이다.
+    useV1AdminLeagueTeamsMock.mockReturnValue({
+      data: { teams: [{ teamId: 't1', name: 'A팀' }] },
+    } as never);
+    renderWithFixtures([]);
+    expect(await screen.findByRole('button', { name: '경기 하나 추가' })).toBeDisabled();
+    expect(screen.getByText('참가팀이 2팀 이상이어야 경기를 추가할 수 있어요.')).toBeInTheDocument();
+  });
+
+  it('참가팀이 2팀이면 누를 수 있다 (회귀 방지 — 항상 비활성이면 아무것도 못 만든다)', async () => {
+    useV1AdminLeagueTeamsMock.mockReturnValue({
+      data: { teams: [{ teamId: 't1', name: 'A팀' }, { teamId: 't2', name: 'B팀' }] },
+    } as never);
+    renderWithFixtures([]);
+    expect(await screen.findByRole('button', { name: '경기 하나 추가' })).not.toBeDisabled();
+  });
+
+  it('참가팀이 아직 안 왔으면(로딩) 누를 수 없다 — 빈 피커를 "팀 없음" 으로 오해한다', async () => {
+    useV1AdminLeagueTeamsMock.mockReturnValue({ data: undefined } as never);
+    renderWithFixtures([]);
+    expect(await screen.findByRole('button', { name: '경기 하나 추가' })).toBeDisabled();
+  });
 });

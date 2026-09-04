@@ -124,6 +124,9 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
   // useV1AdminTeam을 부르면 훅 규칙 위반 + N+1이라, 리그 참가팀 목록(이미 재생성 카드에
   // 쓰고 있는 teamsData)으로 id -> name 맵을 한 번만 만들어 표 렌더에서 조회한다.
   const teamNameById = new Map((teamsData?.teams ?? []).map((team) => [team.teamId, team.name]));
+  // 수동 대진은 홈·어웨이 **둘 다** 골라야 만들 수 있다. 로딩 중(`teamsData === undefined`)도
+  // 같은 취급이다 — 그때 열면 피커가 비어 있어 운영자는 "팀이 없는 리그" 로 오해한다.
+  const canAddManualFixture = (teamsData?.teams.length ?? 0) >= 2;
   // 감사 결함 4: 인라인 편집(일시/구장/주소) 실패가 토스트에만 뜨고 필드에는 안 남아,
   // 토스트를 놓치면 실패를 알 방법이 없다. teamMatchId -> 실패한 필드 key 집합으로
   // 추적해 해당 입력에 aria-invalid + 시각 표시(테두리 + 아이콘, 컬러 단독 아님)를 남긴다.
@@ -587,22 +590,23 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
         />
       </div>
 
-      {/* **대진이 있든 없든 보여야 한다.** 이 버튼은 처음엔 "대진이 하나도 없을 때만" 그려지는
-          분기 안에 있었는데, 이 기능의 존재 이유가 **우천 순연 재편성·대체 경기**라 정작
-          대진이 이미 있는 리그에서 도달할 수 없었다(2026-09-04 alpha 실화면에서 발견 —
-          유닛은 리그 mock 의 `fixtures` 가 전부 빈 배열이라 못 잡았다).
-          일괄 생성과 별개 경로다: BE 는 `fixtures/manual` 을 진작에 갖고 있었는데 부르는
-          화면이 없었다(FE 호출 0건). */}
+      {/* 우천 순연 재편성·대체 경기는 대진이 **이미 있는** 리그에서 필요하므로 분기 밖에 둔다. */}
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <button
           type="button"
           onClick={() => setManualFixtureOpen(true)}
-          className="min-h-[44px] rounded-xl border border-[var(--border)] px-4 text-sm font-semibold text-[var(--text-strong)]"
+          // **팀을 못 고르는 모달을 열지 않는다.** 홈·어웨이를 골라야 하는데 참가팀이
+          // 아직 안 왔거나(로딩) 2팀 미만이면, 열어 봐야 빈 피커 두 개만 보이고 저장은
+          // 항상 막힌다 — 빈 약속이다. 그 상태를 버튼 옆에서 먼저 말한다.
+          disabled={!canAddManualFixture}
+          className="min-h-[44px] rounded-xl border border-[var(--border)] px-4 text-sm font-semibold text-[var(--text-strong)] disabled:opacity-50"
         >
           경기 하나 추가
         </button>
         <span className="text-xs text-[var(--text-muted)]">
-          우천 순연 재편성이나 대체 경기처럼 한 경기만 필요할 때 써요.
+          {canAddManualFixture
+            ? '우천 순연 재편성이나 대체 경기처럼 한 경기만 필요할 때 써요.'
+            : '참가팀이 2팀 이상이어야 경기를 추가할 수 있어요.'}
         </span>
       </div>
       {manualFixtureOpen && (

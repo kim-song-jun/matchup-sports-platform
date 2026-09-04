@@ -26,7 +26,9 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1TournamentPlayers: vi.fn(),
   useV1AddPlayer: vi.fn(),
   useV1UpdatePlayer: vi.fn(),
-  useV1UpdatePlayerJersey: vi.fn(),
+  // 기본 반환을 준다 — 화면이 이제 `isPending` 도 읽으므로(중복 제출 방지),
+  // `vi.fn()` 만 두면 이 mock 을 따로 세팅하지 않는 케이스가 `undefined.isPending` 으로 죽는다.
+  useV1UpdatePlayerJersey: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
   useV1RemovePlayer: vi.fn(),
 }));
 
@@ -287,7 +289,7 @@ describe('등번호 수정', () => {
   const updateJersey = vi.fn().mockResolvedValue({});
   const updatePlayer = vi.fn().mockResolvedValue({});
 
-  function renderRow(jerseyNumber: number | null) {
+  function renderRow(jerseyNumber: number | null, options: { jerseyPending?: boolean } = {}) {
     updateJersey.mockClear();
     updatePlayer.mockClear();
     vi.mocked(useV1Tournament).mockReturnValue({
@@ -302,7 +304,10 @@ describe('등번호 수정', () => {
     } as never);
     vi.mocked(useV1AddPlayer).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
     vi.mocked(useV1UpdatePlayer).mockReturnValue({ mutateAsync: updatePlayer, isPending: false } as never);
-    vi.mocked(useV1UpdatePlayerJersey).mockReturnValue({ mutateAsync: updateJersey, isPending: false } as never);
+    vi.mocked(useV1UpdatePlayerJersey).mockReturnValue({
+      mutateAsync: updateJersey,
+      isPending: options.jerseyPending ?? false,
+    } as never);
     vi.mocked(useV1RemovePlayer).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
     const view = render(<TournamentRosterPageClient tournamentId="t1" registrationId="reg-1" />);
     fireEvent.click(screen.getByRole('button', { name: /수정/ }));
@@ -340,6 +345,29 @@ describe('등번호 수정', () => {
     fireEvent.change(screen.getByLabelText('등번호'), { target: { value: 'e' } });
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
     expect(await screen.findByText('등번호는 0에서 99 사이 숫자로 입력해 주세요.')).toBeInTheDocument();
+    expect(updateJersey).not.toHaveBeenCalled();
+  });
+
+  it('등번호 요청이 도는 동안에는 저장을 다시 누를 수 없다 — 같은 요청이 두 번 나간다', () => {
+    // 저장 하나가 **자격/등번호 두 경로로 갈리므로**, 화면이 `updatePlayer` 하나만 보면
+    // 등번호 요청 중에 버튼이 열려 있다(Copilot 지적). 여기서는 등번호 mutation 만
+    // pending 으로 두고, 그 값이 행까지 닿는지 본다.
+    // 패널을 먼저 연다 — pending 이면 "수정" 버튼부터 잠겨서 패널을 열 수 없다.
+    const { rerender } = renderRow(7);
+    // **값을 실제로 바꿔 둔다.** 안 그러면 버튼이 `!hasChanges` 때문에 어차피 잠겨 있어
+    // pending 을 안 봐도 이 테스트가 통과한다(처음에 그렇게 썼다가 변이 red 0 으로 잡았다).
+    fireEvent.change(screen.getByLabelText('등번호'), { target: { value: '8' } });
+    expect(screen.getByRole('button', { name: /저장/ })).not.toBeDisabled();
+    updateJersey.mockClear();
+    vi.mocked(useV1UpdatePlayerJersey).mockReturnValue({
+      mutateAsync: updateJersey,
+      isPending: true,
+    } as never);
+    rerender(<TournamentRosterPageClient tournamentId="t1" registrationId="reg-1" />);
+
+    const save = screen.getByRole('button', { name: /저장/ });
+    expect(save).toBeDisabled();
+    fireEvent.click(save);
     expect(updateJersey).not.toHaveBeenCalled();
   });
 

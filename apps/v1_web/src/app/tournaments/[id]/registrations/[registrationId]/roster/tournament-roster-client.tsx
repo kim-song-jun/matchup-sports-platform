@@ -1552,7 +1552,10 @@ export function TournamentRosterPageClient({
                 onUpdate={handleUpdatePlayer}
                 onUpdateJersey={handleUpdatePlayerJersey}
                 onRemove={handleRemovePlayer}
-                isUpdating={updatePlayer.isPending}
+                // **두 mutation 을 함께 본다.** 저장 하나가 자격/등번호 두 경로로 갈리므로
+                // `updatePlayer` 만 보면 **등번호 요청이 도는 동안 저장 버튼이 열려 있어**
+                // 같은 요청이 두 번 나간다(Copilot 지적).
+                isUpdating={updatePlayer.isPending || updatePlayerJersey.isPending}
                 isRemoving={removePlayer.isPending}
                 isLocked={!canEditRoster}
                 isEditing={editingPlayerId === player.id}

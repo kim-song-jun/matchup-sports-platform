@@ -210,7 +210,6 @@ export function MatchDetailPageClient({ matchId }: { matchId: string }) {
             )
           : undefined,
         onShare: () => shareMatch(query.data),
-        onNotify: () => router.push('/notifications'),
         onApply: getApplyAction({
           viewerState,
           eligible: eligibility.data?.eligible,

@@ -49,22 +49,33 @@ export class MatchesService {
   async list(user: V1AuthUser | null, query: MatchesQueryDto) {
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
     const status = query.status ?? 'recruiting';
-    const where: Prisma.V1MatchWhereInput = {
-      deletedAt: null,
-      ...(status === 'expired' ? { startAt: { lt: new Date() } } : { status }),
-      ...(query.sportId ? { sportId: query.sportId } : {}),
-      ...(query.regionId ? { regionId: query.regionId } : {}),
-      ...(query.genderRule ? { genderRule: getGenderRuleWhere(query.genderRule) } : {}),
-      ...levelCodeWhere(parseLevelCodes(query.levelCodes)),
+    const now = new Date();
+    const constraints: Prisma.V1MatchWhereInput[] = [
+      ...(status === 'recruiting'
+        ? [{ OR: [{ deadlineAt: null }, { deadlineAt: { gte: now } }] } satisfies Prisma.V1MatchWhereInput]
+        : []),
       ...(query.query
-        ? {
+        ? [{
             OR: [
               { title: { contains: query.query, mode: 'insensitive' } },
               { description: { contains: query.query, mode: 'insensitive' } },
               { placeName: { contains: query.query, mode: 'insensitive' } },
             ],
-          }
-        : {}),
+          } satisfies Prisma.V1MatchWhereInput]
+        : []),
+    ];
+    const where: Prisma.V1MatchWhereInput = {
+      deletedAt: null,
+      ...(status === 'expired'
+        ? { startAt: { lt: now } }
+        : status === 'recruiting'
+          ? { status, startAt: { gte: now } }
+          : { status }),
+      ...(query.sportId ? { sportId: query.sportId } : {}),
+      ...(query.regionId ? { regionId: query.regionId } : {}),
+      ...(query.genderRule ? { genderRule: getGenderRuleWhere(query.genderRule) } : {}),
+      ...levelCodeWhere(parseLevelCodes(query.levelCodes)),
+      ...(constraints.length ? { AND: constraints } : {}),
     };
 
     const matches = await this.prisma.v1Match.findMany({
@@ -1098,7 +1109,7 @@ export class MatchesService {
 }
 
 function getOrderBy(sort: MatchesQueryDto['sort']): Prisma.V1MatchOrderByWithRelationInput[] {
-  if (sort === 'latest') return [{ createdAt: 'desc' }];
+  if (!sort || sort === 'latest') return [{ createdAt: 'desc' }, { id: 'desc' }];
   if (sort === 'deadline' || sort === 'starts_at') return [{ startAt: 'asc' }, { createdAt: 'desc' }];
   return [{ startAt: 'asc' }, { createdAt: 'desc' }];
 }

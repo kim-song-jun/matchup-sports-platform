@@ -23,7 +23,7 @@ const tabs: Array<{
   Icon: typeof HomeIcon;
 }> = [
   { id: 'home', label: '홈', href: '/home', Icon: HomeIcon },
-  { id: 'matches', label: '매치', href: '/matches', Icon: MatchIcon },
+  { id: 'matches', label: '매치', href: '/team-matches', Icon: MatchIcon },
   { id: 'tournaments', label: '대회', href: '/tournaments', Icon: TrophyIcon },
   { id: 'teams', label: '팀', href: '/teams', Icon: TeamsIcon },
   { id: 'my', label: '마이', href: '/my', Icon: MyIcon },

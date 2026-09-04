@@ -28,11 +28,14 @@
 | `regionId` | uuid | No | district region |
 | `levelCodes` | comma string | No | `beginner,novice,intermediate,advanced` 중 다중 선택 |
 | `genderRule` | string | No | `성별 무관`, `남`, `여` |
-| `sort` | recommended/latest/deadline | No | 기본 recommended |
+| `status` | recruiting/closed/completed/cancelled/expired | No | 기본 recruiting |
+| `sort` | recommended/latest/starts_at/deadline | No | 기본 latest |
 | `cursor` | string | No | cursor pagination |
 | `limit` | 1~50 | No | 기본 20 |
 
 - Response: `{ items, pageInfo }`
+- 기본 목록은 `createdAt DESC, id DESC` 최신 생성순이다. `deadline`/`starts_at`은 경기 시작 임박순이며 `recommended`는 현재 시작 임박순으로 처리한다.
+- `status`를 생략한 모집 목록은 raw `recruiting` 중 경기 시작 전이고, 신청 마감이 없거나 아직 지나지 않은 항목만 포함한다. 상세의 `displayState`도 같은 시작·마감 기준을 사용한다.
 - Each list item includes `host.userId`, `host.displayName`, `host.profileImageUrl`, and `host.trustState`.
   `host.displayName` resolves the creator profile nickname first, then the profile display name, then the semantic `호스트` fallback.
 - Level response fields: `levelLabel`, `minLevel`, `maxLevel`

@@ -85,11 +85,32 @@ export class TeamMatchesService {
   async list(user: V1AuthUser | null, query: TeamMatchesQueryDto) {
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
     const status = query.status ?? 'recruiting';
+    const now = new Date();
+    const constraints: Prisma.V1TeamMatchWhereInput[] = [
+      ...(status === 'recruiting'
+        ? [{ OR: [{ deadlineAt: null }, { deadlineAt: { gte: now } }] } satisfies Prisma.V1TeamMatchWhereInput]
+        : []),
+      ...(query.query
+        ? [{
+            OR: [
+              { title: { contains: query.query, mode: 'insensitive' } },
+              { description: { contains: query.query, mode: 'insensitive' } },
+              { placeName: { contains: query.query, mode: 'insensitive' } },
+              { hostTeam: { name: { contains: query.query, mode: 'insensitive' } } },
+              { region: { name: { contains: query.query, mode: 'insensitive' } } },
+            ],
+          } satisfies Prisma.V1TeamMatchWhereInput]
+        : []),
+    ];
     const teamMatches = await this.prisma.v1TeamMatch.findMany({
       where: {
         deletedAt: null,
         hostTeam: { status: 'active', deletedAt: null },
-        ...(status === 'expired' ? { startAt: { lt: new Date() } } : { status }),
+        ...(status === 'expired'
+          ? { startAt: { lt: now } }
+          : status === 'recruiting'
+            ? { status, startAt: { gte: now } }
+            : { status }),
         ...(query.sportId ? { sportId: query.sportId } : {}),
         ...(query.regionId ? { regionId: query.regionId } : {}),
         ...(query.teamId ? { hostTeamId: query.teamId } : {}),
@@ -98,17 +119,7 @@ export class TeamMatchesService {
         // 검색창 placeholder 가 "지역, 팀 이름, 경기조건"을 약속하므로 그 셋을 모두 훑는다.
         // hostTeam·region 이 빠져 있어서 팀 이름이나 지역명으로 검색하면 실제로 존재하는
         // 경기가 0건으로 나왔다.
-        ...(query.query
-          ? {
-              OR: [
-                { title: { contains: query.query, mode: 'insensitive' } },
-                { description: { contains: query.query, mode: 'insensitive' } },
-                { placeName: { contains: query.query, mode: 'insensitive' } },
-                { hostTeam: { name: { contains: query.query, mode: 'insensitive' } } },
-                { region: { name: { contains: query.query, mode: 'insensitive' } } },
-              ],
-            }
-          : {}),
+        ...(constraints.length ? { AND: constraints } : {}),
       },
       include: this.teamMatchInclude(user),
       orderBy: getOrderBy(query.sort),
@@ -1705,13 +1716,15 @@ export class TeamMatchesService {
   }
 
   private getDisplayState(teamMatch: V1TeamMatch) {
-    return this.getApiStatus(teamMatch);
+    const status = this.getApiStatus(teamMatch);
+    if (status === 'recruiting' && teamMatch.deadlineAt && teamMatch.deadlineAt < new Date()) return 'closed';
+    return status;
   }
 }
 
 function getOrderBy(sort: TeamMatchesQueryDto['sort']): Prisma.V1TeamMatchOrderByWithRelationInput[] {
-  if (sort === 'latest') return [{ createdAt: 'desc' }];
-  return [{ startAt: 'asc' }, { createdAt: 'desc' }];
+  if (!sort || sort === 'latest') return [{ createdAt: 'desc' }, { id: 'desc' }];
+  return [{ startAt: 'asc' }, { createdAt: 'desc' }, { id: 'desc' }];
 }
 
 function getGenderRuleWhere(genderRule: NonNullable<TeamMatchesQueryDto['genderRule']>) {

@@ -105,39 +105,46 @@ final class WebShellViewController: UIViewController {
     /// page's own layout in charge: the viewport shrinks, the composer lands on the keyboard,
     /// and WebKit has nothing left to reveal.
     private func observeKeyboard() {
+        // Selector-based, not the block form. A block observer hands back a token that has to
+        // be kept and removed by hand, and one that is dropped stays registered for the life
+        // of the process; a selector observer is torn down with its target. `observeBackgrounding`
+        // below was converted for the same reason.
         let centre = NotificationCenter.default
-        for name in [UIResponder.keyboardWillChangeFrameNotification, UIResponder.keyboardWillHideNotification] {
-            centre.addObserver(forName: name, object: nil, queue: .main) { [weak self] note in
-                // Read out of the notification here rather than inside the actor. The block
-                // is `@Sendable` and `Notification` is not, so only these values may cross —
-                // handing the notification itself over is a compile error under Swift 6.
-                let hiding = note.name == UIResponder.keyboardWillHideNotification
-                let endFrame = (note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue
-                let duration = note.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double
-                let curve = note.userInfo?[UIResponder.keyboardAnimationCurveUserInfoKey] as? UInt
-                MainActor.assumeIsolated {
-                    self?.keyboardChanged(hiding: hiding, endFrame: endFrame, duration: duration, curve: curve)
-                }
-            }
-        }
+        centre.addObserver(
+            self, selector: #selector(keyboardWillChangeFrame),
+            name: UIResponder.keyboardWillChangeFrameNotification, object: nil)
+        centre.addObserver(
+            self, selector: #selector(keyboardWillHide),
+            name: UIResponder.keyboardWillHideNotification, object: nil)
     }
 
-    private func keyboardChanged(hiding: Bool, endFrame: CGRect?, duration: Double?, curve: UInt?) {
+    @objc private func keyboardWillChangeFrame(_ note: Notification) {
+        applyKeyboard(note, hiding: false)
+    }
+
+    @objc private func keyboardWillHide(_ note: Notification) {
+        applyKeyboard(note, hiding: true)
+    }
+
+    private func applyKeyboard(_ note: Notification, hiding: Bool) {
         guard let window = view.window else { return }
 
         // The overlap, not the keyboard height: the web view starts below the status bar, and
         // a hardware keyboard parks the software one off-screen where it covers nothing.
         var overlap: CGFloat = 0
-        if !hiding, let endFrame {
-            let keyboard = view.convert(endFrame, from: window.screen.coordinateSpace)
+        if !hiding,
+           let end = (note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue {
+            let keyboard = view.convert(end, from: window.screen.coordinateSpace)
             overlap = max(0, view.bounds.maxY - keyboard.minY)
         }
         guard abs(overlap - keyboardOverlap) > 0.5 else { return }
         keyboardOverlap = overlap
         webViewBottom.constant = -overlap
 
-        let options = curve.map { UIView.AnimationOptions(rawValue: $0 << 16) } ?? .curveEaseInOut
-        UIView.animate(withDuration: duration ?? 0.25, delay: 0, options: options) {
+        let duration = note.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double ?? 0.25
+        let options = (note.userInfo?[UIResponder.keyboardAnimationCurveUserInfoKey] as? UInt)
+            .map { UIView.AnimationOptions(rawValue: $0 << 16) } ?? .curveEaseInOut
+        UIView.animate(withDuration: duration, delay: 0, options: options) {
             self.view.layoutIfNeeded()
         }
         // The page adds the home-indicator inset itself, and while the keyboard covers that
@@ -147,12 +154,12 @@ final class WebShellViewController: UIViewController {
 
     private func observeBackgrounding() {
         NotificationCenter.default.addObserver(
-            forName: UIApplication.willResignActiveNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.persistSession() }
-        }
+            self, selector: #selector(appWillResignActive),
+            name: UIApplication.willResignActiveNotification, object: nil)
+    }
+
+    @objc private func appWillResignActive() {
+        persistSession()
     }
 
     private func installWebView() {

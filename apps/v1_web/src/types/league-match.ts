@@ -543,3 +543,18 @@ export interface V1OpenLeagueRegistrationResult {
   status: 'open';
   registrationDeadlineAt: string;
 }
+
+/** 수동 대진 한 경기 — `POST /admin/league-matches/:leagueId/fixtures/manual` */
+export interface V1CreateManualLeagueFixturePayload {
+  homeTeamId: string;
+  awayTeamId: string;
+  /** ISO. 서버가 `@IsDateString` 로 받는다. */
+  startsAt: string;
+  /**
+   * 경기 길이(분). 주면 종료 시각을 `startsAt + durationMinutes` 로 만든다.
+   * **종료 시각을 직접 받지 않는다** — 시작보다 이른 종료를 만들 수 있는 입력을 두지 않는다.
+   */
+  durationMinutes?: number;
+  placeName?: string;
+  title?: string;
+}

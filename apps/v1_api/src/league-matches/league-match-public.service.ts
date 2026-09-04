@@ -33,6 +33,7 @@ import {
 import { LEAGUE_TIE_BREAK_ORDER } from './league-tie-break';
 import type { LeagueState } from './league-state';
 import { findTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
+import { isLeagueRegistrationOpen } from './league-registration-open';
 
 const PLAYER_RECORDS_LIMIT = 30;
 const LEAGUE_LIST_DEFAULT_LIMIT = 20;
@@ -754,9 +755,7 @@ export class LeagueMatchPublicService {
       // 조건(`status === 'open'` + 마감 미도과)과 **같은 규칙**이다 — 화면이 이 판정을
       // 복제하면 두 곳이 갈려 "버튼은 보이는데 누르면 409 `TOURNAMENT_NOT_OPEN`" 이 난다.
       // 마감이 `null` 이면 기한 없이 열려 있는 것이다(등록 서비스도 그렇게 읽는다).
-      registrationOpen:
-        status === 'open' &&
-        (registrationDeadlineAt === null || registrationDeadlineAt.getTime() > Date.now()),
+      registrationOpen: isLeagueRegistrationOpen(status, registrationDeadlineAt),
     };
   }
 }

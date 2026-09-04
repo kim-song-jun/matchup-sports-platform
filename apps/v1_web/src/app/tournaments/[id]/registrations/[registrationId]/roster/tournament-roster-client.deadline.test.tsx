@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -336,5 +337,90 @@ describe('등번호 수정', () => {
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
     expect(await screen.findByText('등번호는 0에서 99 사이 숫자로 입력해 주세요.')).toBeInTheDocument();
     expect(updateJersey).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * `type="number"` 입력에 `e`·`-`·`.` 를 넣으면 브라우저가 `badInput` 으로 보고 **`el.value` 를
+ * 빈 문자열로** 준다 — 화면에는 `e` 가 보이는데 코드가 받는 값은 `''` 이라 "번호 없는 선수"
+ * 로 조용히 통과했다(2026-09-04 alpha 실측: `e` → 201, `jerseyNumber: null`).
+ *
+ * ⚠️ **이 동작은 jsdom 에서 재현되지 않는다** — jsdom 은 `type="number"` 에도 값을 그대로
+ * 보존해서 `parseJerseyInput('e')` 가 정상적으로 거부한다. 그래서 여기서는 **입력 종류가
+ * 되돌아가는 것만** 막고, 실제 증명은 alpha 화면 재검증으로 한다. 행동 테스트를 흉내 내면
+ * 통과하는데 버그는 살아 있는 가짜 초록이 된다.
+ */
+describe('등번호 입력 종류', () => {
+  it('type="number" 로 되돌리지 않는다 — 브라우저가 값을 비워 검증을 통과시킨다', async () => {
+    vi.mocked(useV1Tournament).mockReturnValue({
+      data: { minPlayers: 5, maxPlayers: 20, rosterDeadlineAt: null, status: 'open' },
+    } as never);
+    vi.mocked(useV1Registration).mockReturnValue({
+      data: { id: 'reg-1', teamId: 'team-1', status: 'confirmed', rosterLockedAt: null, rosterDeadlineOverrideAt: null },
+    } as never);
+    vi.mocked(useV1TournamentPlayers).mockReturnValue({
+      data: { players: [], belowMinimum: true },
+      isPending: false,
+    } as never);
+    vi.mocked(useV1AddPlayer).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    vi.mocked(useV1UpdatePlayer).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    vi.mocked(useV1RemovePlayer).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+
+    // 추가 폼은 팀원 목록을 `useInfiniteQuery` 로 직접 부른다 — 이 파일의 훅 목킹으로는
+    // 안 덮인다. QueryClient 만 붙이면 **실제로 `/teams/:id/members` 를 fetch 하려 들고**,
+    // Node 에는 base URL 이 없어 상대 경로에서 TypeError 가 난다 — 테스트가 런타임 환경에
+    // 의존하게 된다. fetch 를 그 범위에서만 스텁해 빈 결과로 끊는다.
+    // **실제 응답 형태 그대로** 돌려준다 — V1 봉투(`{status,data,timestamp}`) 안에
+    // `V1TeamMembersPage`. 아무 모양이나 주면 `body.data` 가 `undefined` 로 빠지고
+    // 화면이 폴백을 타 **우연히 통과**한다(그러면 이 스텁이 뭘 보장하는지 알 수 없다).
+    const membersPage = {
+      items: [],
+      summary: { ownerCount: 0, managerCount: 0, memberCount: 0 },
+      viewerRole: 'owner' as const,
+      pageInfo: { nextCursor: null, hasNext: false },
+    };
+    // **URL 을 확인한다.** 모든 요청에 같은 응답을 주면 화면이 **엉뚱한 endpoint 를 불러도
+    // 조용히 통과**한다 — "팀원 목록을 부른다" 는 이 스텁의 전제 자체가 검증되지 않는다.
+    // 예상 밖 URL 은 그 자리에서 실패시켜 원인을 보이게 한다.
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      if (!url.includes('/teams/team-1/members')) {
+        return Promise.reject(new Error(`예상하지 않은 요청: ${url}`));
+      }
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({ status: 'success', data: membersPage, timestamp: new Date().toISOString() }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      );
+    });
+    // **스텁은 unmount 까지 유지한다.** 클릭 직후 복구하면 React Query 가 뒤늦게 보내는
+    // 요청이 실제 fetch 로 새어 플래키해진다 — 그때 실패는 이 테스트가 보는 것과 무관한
+    // 이유로 난다.
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    try {
+      const { container, unmount } = render(
+        <QueryClientProvider client={queryClient}>
+          <TournamentRosterPageClient tournamentId="t1" registrationId="reg-1" />
+        </QueryClientProvider>,
+      );
+      fireEvent.click(screen.getByRole('button', { name: '선수 추가하기' }));
+
+      const jersey = container.querySelector('input[id$="-jersey"]');
+      expect(jersey).not.toBeNull();
+      expect(jersey?.getAttribute('type')).toBe('text');
+      // 숫자 키패드는 그대로 띄운다 — 입력 편의는 잃지 않는다.
+      expect(jersey?.getAttribute('inputmode')).toBe('numeric');
+      // 스텁의 전제를 **단언**한다. URL 이 틀리면 스텁은 reject 하지만 그 실패는 React
+      // Query 상태로 흡수돼 테스트가 조용히 통과한다(실측: 거부해도 40 green) — 그래서
+      // 거부만으로는 부족하고, 화면이 실제로 이 endpoint 를 불렀는지 여기서 확인해야 한다.
+      await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
+      expect(String(fetchSpy.mock.calls[0][0])).toContain('/teams/team-1/members');
+      unmount();
+      // 남은 구독이 스텁 복구 뒤에 살아나지 않게 캐시도 함께 접는다.
+      queryClient.clear();
+    } finally {
+      fetchSpy.mockRestore();
+    }
   });
 });

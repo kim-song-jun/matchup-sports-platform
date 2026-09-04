@@ -1221,3 +1221,45 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
     expect(screen.getByText('독수리FC vs 호랑이FC')).toBeInTheDocument();
   });
 });
+
+/**
+ * 마감이 `null` 인 것은 계약상 **기한 없이 열림**이지 "안 받음" 이 아니다. 마감 유무로
+ * 받는지를 추론하면 이미 모집 중인 리그에 "마감을 정하면 신청할 수 있어요" 라고 반대로
+ * 말한다 — 같은 실수가 신청 관리 화면에도 있었다(#1028 리뷰 2회).
+ */
+describe('참가 신청 요약 카드', () => {
+  function renderWith(registrationOpen: boolean, registrationDeadlineAt: string | null) {
+    useV1AdminLeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1',
+        title: '가을 풋살 리그',
+        state: 'active',
+        teamIds: ['t1', 't2'],
+        startsOn: '2026-09-01T00:00:00.000Z',
+        recentVenues: [],
+        fixtures: [],
+        registrationOpen,
+        registrationDeadlineAt,
+      },
+      isPending: false,
+    } as never);
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+  }
+
+  it('열려 있고 마감이 없으면 "모집 중" 이고, 마감을 정하라고 말하지 않는다', async () => {
+    renderWith(true, null);
+    expect(await screen.findByText('모집 중')).toBeInTheDocument();
+    expect(screen.getByText('기한 없이 신청을 받는 중이에요.')).toBeInTheDocument();
+    expect(screen.queryByText(/신청 마감을 정하면/)).not.toBeInTheDocument();
+  });
+
+  it('안 받는 중이면 마감을 정하라고 안내한다', async () => {
+    renderWith(false, null);
+    expect(await screen.findByText('신청 안 받는 중')).toBeInTheDocument();
+    expect(screen.getByText('신청 마감을 정하면 팀장이 리그 화면에서 바로 신청할 수 있어요.')).toBeInTheDocument();
+  });
+});

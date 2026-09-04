@@ -65,7 +65,7 @@ export default function LandingPage() {
               </p>
             </div>
             {/* 그래픽 영역 — landing-rhythm 모듈의 네 번째 칸. 메시지 "오늘, 가장 빠르게 같이 뛴다"(스톱워치+공+콘).
-                stat 스트립은 그래픽 아래로 내려 보조 정보로 둔다. */}
+                사실 스트립은 그래픽 아래로 내려 보조 정보로 둔다. */}
             <div className="tm-landing-hero-aside">
               <div className="tm-landing-hero-graphic">
                 <Image
@@ -78,22 +78,26 @@ export default function LandingPage() {
                   priority
                 />
               </div>
-            {/* Hero stat strip */}
-              {/* P1 숫자:단위 2:1 + tabular-nums — stat-num(24px mobile/28px desktop) : label(11px/13px) ≈ 2.2:1. tabular-nums는 .tm-landing-stat-num CSS에 적용됨 */}
-              <div className="tm-landing-hero-stats" role="list">
-                <div className="tm-landing-stat" role="listitem">
-                  <span className="tm-landing-stat-num">124</span>
-                  <span className="tm-landing-stat-label">오늘 열린 매치</span>
+            {/* 히어로 사실 스트립.
+                예전에는 "124 오늘 열린 매치" · "4.8 평균 매너 점수" 처럼 근거 없는 숫자를
+                사실로 적고 있었다 — 이 페이지는 데이터를 전혀 조회하지 않는 정적 화면이라
+                저 값들은 어떤 집계도 아닌 하드코딩 리터럴이었고, 프로덕션에서도 같은 값이
+                나갔다. 방문자에게 확인해 줄 수 없는 수치는 싣지 않는다. 세 칸 모두 코드나
+                화면에서 바로 검증되는 사실로 바꿨다(2026-09-04 사용자 확정). */}
+              <div className="tm-landing-hero-facts" role="list">
+                <div className="tm-landing-fact" role="listitem">
+                  <span className="tm-landing-fact-value">축구·풋살·러닝·수영</span>
+                  <span className="tm-landing-fact-label">운영 중인 종목</span>
                 </div>
-                <div className="tm-landing-stat-divider" aria-hidden="true" />
-                <div className="tm-landing-stat" role="listitem">
-                  <span className="tm-landing-stat-num">4+</span>
-                  <span className="tm-landing-stat-label">운영 종목</span>
+                <div className="tm-landing-fact-divider" aria-hidden="true" />
+                <div className="tm-landing-fact" role="listitem">
+                  <span className="tm-landing-fact-value">매치·팀매치·대회</span>
+                  <span className="tm-landing-fact-label">참여 방식</span>
                 </div>
-                <div className="tm-landing-stat-divider" aria-hidden="true" />
-                <div className="tm-landing-stat" role="listitem">
-                  <span className="tm-landing-stat-num">4.8</span>
-                  <span className="tm-landing-stat-label">평균 매너 점수</span>
+                <div className="tm-landing-fact-divider" aria-hidden="true" />
+                <div className="tm-landing-fact" role="listitem">
+                  <span className="tm-landing-fact-value">무료</span>
+                  <span className="tm-landing-fact-label">가입도 매치 탐색도</span>
                 </div>
               </div>
             </div>

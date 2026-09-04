@@ -670,12 +670,18 @@ function AddPlayerForm({
               : '선택 입력이에요. 0~99 사이 숫자를 쓸 수 있어요.'
           }
         >
+          {/* **`type="number"` 가 아니라 `text` 다.** `type="number"` 입력에 `e`·`-`·`.` 를
+              넣으면 브라우저가 그것을 `badInput` 으로 보고 **`el.value` 를 빈 문자열로**
+              준다 — 화면에는 `e` 가 보이는데 코드가 받는 값은 `''` 이라, "번호 없는 선수"
+              로 조용히 통과한다(2026-09-04 alpha 실측: `e` 입력 → 201, `jerseyNumber: null`).
+              `1e2`·`100` 은 값이 비지 않아 걸리는데 이것만 빠져나갔다.
+              `text` 로 두면 사용자가 친 글자가 그대로 오고 `parseJerseyInput` 이 판정한다 —
+              같은 폼의 생년월일도 같은 이유로 `text` + `inputMode="numeric"` 이다. */}
           <input
             id={jerseyFieldId}
-            type="number"
+            type="text"
             inputMode="numeric"
-            min={0}
-            max={99}
+            maxLength={2}
             value={form.jerseyNumber}
             onChange={(event) => patch({ jerseyNumber: event.target.value })}
             placeholder="예: 7"

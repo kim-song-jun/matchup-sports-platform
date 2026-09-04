@@ -165,6 +165,17 @@ export interface V1AdminLeagueDetail {
    * 공개 상세가 이미 같은 값을 갖고 있었고, 이제 어드민 상세도 내려준다.
    */
   startsOn: string;
+  /**
+   * 참가 신청 마감. `null` 은 **기한 없이 열려 있음**이지 "안 받음" 이 아니다 —
+   * 받는지 여부는 `registrationOpen` 이 답한다.
+   */
+  registrationDeadlineAt: string | null;
+  /**
+   * 지금 참가 신청을 받는가. **서버가 판정해서 결과만 내려준다** — 등록 서비스가 실제로
+   * 던지는 조건(`status === 'open'` + 마감 미도과)과 같은 규칙이다. 화면이 복제하면
+   * "버튼은 보이는데 누르면 409" 로 갈린다. 공개 상세도 같은 함수를 쓴다.
+   */
+  registrationOpen: boolean;
   fixtures: V1LeagueFixture[];
 }
 
@@ -519,4 +530,16 @@ export interface V1RecordLeagueForfeitResult {
    * 화면이 성공으로 표시하면 안 된다.
    */
   requestMatchesStored?: boolean;
+}
+
+/** 리그 참가 신청 열기 — `POST /admin/league-matches/:leagueId/open-registration` */
+export interface V1OpenLeagueRegistrationPayload {
+  /** ISO. 이 시각까지 신청을 받는다(같은 순간은 아직 열려 있다). */
+  registrationDeadlineAt: string;
+}
+
+export interface V1OpenLeagueRegistrationResult {
+  leagueId: string;
+  status: 'open';
+  registrationDeadlineAt: string;
 }

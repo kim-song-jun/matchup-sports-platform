@@ -65,7 +65,7 @@ export default function LandingPage() {
               </p>
             </div>
             {/* 그래픽 영역 — landing-rhythm 모듈의 네 번째 칸. 메시지 "오늘, 가장 빠르게 같이 뛴다"(스톱워치+공+콘).
-                stat 스트립은 그래픽 아래로 내려 보조 정보로 둔다. */}
+                사실 스트립은 그래픽 아래로 내려 보조 정보로 둔다. */}
             <div className="tm-landing-hero-aside">
               <div className="tm-landing-hero-graphic">
                 <Image

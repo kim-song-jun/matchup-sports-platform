@@ -9,23 +9,12 @@
  * 확인하거나 특정 주를 빼는 것이 불가능했다. 달력은 그 목록을 **보이게** 만든다.
  *
  * ## 날짜는 KST 달력 날짜다
- * `'YYYY-MM-DD'` 는 한국 달력의 그 날이다. 브라우저 타임존으로 계산하면 해외에서 접속한
- * 운영자와 국내 운영자가 **다른 날을 고르게 된다** — 오프셋을 명시적으로 더하고 뺀다
- * (`league-fixture-dates.ts` 와 같은 관례).
+ * 계산 규칙은 `kst-calendar.ts` 한 곳에 있다 — 요일 전개(`league-fixture-dates.ts`)와
+ * **같은 함수**를 쓴다. 두 벌로 두면 한쪽만 고쳐져 "요일로 채우기" 가 넣은 날짜와 달력이
+ * 가리키는 날짜가 갈린다.
  */
 
-const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-/** UTC 인스턴트를 KST 달력 날짜 문자열로. */
-function toKstDateString(instant: Date): string {
-  return new Date(instant.getTime() + KST_OFFSET_MS).toISOString().slice(0, 10);
-}
-
-/** `'YYYY-MM-DD'`(KST 자정)의 UTC 인스턴트 밀리초. */
-function kstMidnightMs(date: string): number {
-  return Date.parse(`${date}T00:00:00.000Z`) - KST_OFFSET_MS;
-}
+import { DAY_MS, KST_OFFSET_MS, kstMidnightMs, toKstDateString } from './kst-calendar';
 
 export interface CalendarCell {
   /** `'YYYY-MM-DD'`. */

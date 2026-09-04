@@ -13,7 +13,8 @@ export type MatchCardModel = {
   level: string;
   gender: string;
   host: string;
-  image: string;
+  /** 업로드된 대표 사진. 없으면 null — 목업 사진으로 메우지 않는다(2026-09-04 감사). */
+  image: string | null;
   deadline: string;
   deadlineDetail?: string;
   status: 'open' | 'pending' | 'approved' | 'full' | 'mine';
@@ -69,6 +70,8 @@ export type MatchListViewModel = {
 
 export type MatchStateViewModel = MatchListViewModel & {
   state: 'empty' | 'error' | 'joined';
+  /** error 상태의 재시도(쿼리 refetch). 없으면 재시도 버튼을 그리지 않는다. */
+  retry?: () => void;
   title: string;
   description: string;
 };
@@ -106,7 +109,7 @@ export type MatchDetailViewModel = {
   onNotify?: () => void;
 };
 
-export type MatchCreateStep = 'sport' | 'info' | 'place-time' | 'confirm' | 'complete' | 'edit';
+export type MatchCreateStep = 'sport' | 'info' | 'place-time' | 'confirm' | 'edit';
 
 export type MatchCreateViewModel = {
   step: MatchCreateStep;

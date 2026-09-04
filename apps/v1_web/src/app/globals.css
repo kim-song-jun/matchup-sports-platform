@@ -2641,6 +2641,49 @@ label.tm-btn:focus-within {
   background-size: cover;
 }
 
+/*
+ * 사진이 없는 매치의 미디어 영역 — 목업 사진 대신 종목 그래픽(sportIllustration). 히어로는 흰 글씨
+ * 오버레이를 그대로 쓰므로 바탕을 --blue700(흰 글씨 5.41:1 AA)으로 깔고 그래픽을 오른쪽에 둔다.
+ */
+.tm-match-media-sport {
+  background: var(--blue700);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.tm-match-sport-illustration {
+  object-fit: contain;
+  flex: none;
+  /* 파란 바탕 위에 파란 오브젝트(풋살공·러닝화·고글)가 묻힌다 — 흰 웰 안에 놓아 대비를 확보한다.
+     패널이 항상 --blue700 이라 웰은 테마와 무관하게 흰색(static-white). */
+  background: var(--static-white);
+  border-radius: var(--radius-hero);
+  padding: 12px;
+  box-sizing: border-box;
+}
+
+.tm-match-detail-hero-sport {
+  /* 히어로는 flex 가 아니라 block — 유일한 흐름 자식인 오버레이가 flex item 이 되면 내용 폭으로
+     줄어 그라디언트가 히어로 전폭을 못 덮는다(Copilot 리뷰). 그래픽은 absolute 라 영향 없음. */
+  display: block;
+  position: relative;
+}
+
+.tm-match-detail-hero-sport .tm-match-detail-hero-illustration {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.tm-match-detail-hero-sport .tm-match-detail-overlay {
+  position: relative;
+  background: linear-gradient(90deg, rgba(25, 31, 40, 0.42), rgba(25, 31, 40, 0.08));
+}
+
 .tm-match-list-media::after {
   content: "";
   position: absolute;

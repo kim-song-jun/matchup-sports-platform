@@ -89,6 +89,66 @@
         }
       },
       "created_at": "2026-09-03T15:57:00Z"
+    },
+    {
+      "name": "sport-futsal",
+      "message": "실내에서 빠르게",
+      "prompt": "SUBJECT:\nA chunky futsal ball rendered in Teameet blue #3182F6 with plump light-tint #D6E7FF panels, seen from a three-quarter angle, as the single main object, largest and nearest to camera.\nOne small whistle in light tint #D6E7FF, about 45% of the ball's size, set back in depth and offset to the right to form a triangular arrangement with the main object; the eye lands on the ball first.\n\nSTYLE LOCK (do not edit):\nSoft matte clay 3D render in the style of Korean fintech app illustrations (Toss, KakaoPay). Rounded, chunky forms with thicker-than-real proportions; coins are thick cylinders with beveled rims, panels are plump, edges are softened. Single soft area light from the upper-left; clearly separated lit and shaded faces; gentle contact shadow only under each object, no cast shadow on a floor, no ground plane, no backdrop, no gradient background. Subtle ambient occlusion in crevices. No rim light, no glow, no bloom, no glossy chrome.\nPalette: primary Teameet blue #3182F6 with light tint #D6E7FF and deep shade #1B64DA for the main object; accent gold #FFC342 (with #E0A52E shade) for at most one small sub object; neutrals #F2F4F6 and #8B95A1. No other hues.\nComposition: three-quarter elevated camera, the object cluster fills about 70% of a square 1024x1024 canvas with even margins, main object slightly left of center, sub objects behind and to the right.\nStrictly no: faces, eyes, mouths, characters, mascots, people, hands, text, letters, numbers, logos, UI screens, phones, sparkles, confetti, stars in the air, floor, table, scenery.\nOutput: PNG with a fully transparent background (alpha channel), 1024x1024.\n\nSame material, lighting and palette as the previous image.",
+      "source_sha256": "feb8a36acf494dfcc20f905175c03b31ff2e82e3b27f082648b2e2151a2aae06",
+      "sizes": {
+        "320": {
+          "bytes": 12688
+        },
+        "640": {
+          "bytes": 28644
+        }
+      },
+      "created_at": "2026-09-03T23:43:43Z"
+    },
+    {
+      "name": "sport-running",
+      "message": "오늘 한 바퀴",
+      "prompt": "SUBJECT:\nA plump rounded running shoe in Teameet blue #3182F6 with a light-tint #D6E7FF sole and laces, seen from a three-quarter angle, as the single main object, largest and nearest to camera.\nOne small stopwatch in light tint #D6E7FF with a #3182F6 hand, about 45% of the shoe's size, set back in depth and offset to the right to form a triangular arrangement with the main object; the eye lands on the shoe first.\n\nSTYLE LOCK (do not edit):\nSoft matte clay 3D render in the style of Korean fintech app illustrations (Toss, KakaoPay). Rounded, chunky forms with thicker-than-real proportions; coins are thick cylinders with beveled rims, panels are plump, edges are softened. Single soft area light from the upper-left; clearly separated lit and shaded faces; gentle contact shadow only under each object, no cast shadow on a floor, no ground plane, no backdrop, no gradient background. Subtle ambient occlusion in crevices. No rim light, no glow, no bloom, no glossy chrome.\nPalette: primary Teameet blue #3182F6 with light tint #D6E7FF and deep shade #1B64DA for the main object; accent gold #FFC342 (with #E0A52E shade) for at most one small sub object; neutrals #F2F4F6 and #8B95A1. No other hues.\nComposition: three-quarter elevated camera, the object cluster fills about 70% of a square 1024x1024 canvas with even margins, main object slightly left of center, sub objects behind and to the right.\nStrictly no: faces, eyes, mouths, characters, mascots, people, hands, text, letters, numbers, logos, UI screens, phones, sparkles, confetti, stars in the air, floor, table, scenery.\nOutput: PNG with a fully transparent background (alpha channel), 1024x1024.\n\nSame material, lighting and palette as the previous image.",
+      "source_sha256": "a2bf8c0b9581b29960afb7f913d676aa37196e8453775ec6053058635d539bdf",
+      "sizes": {
+        "320": {
+          "bytes": 14094
+        },
+        "640": {
+          "bytes": 30926
+        }
+      },
+      "created_at": "2026-09-03T23:43:47Z"
+    },
+    {
+      "name": "sport-soccer",
+      "message": "잔디 위 첫 킥",
+      "prompt": "SUBJECT:\nA chunky classic soccer ball rendered in neutral #F2F4F6 with plump Teameet-blue #3182F6 pentagon panels, seen from a three-quarter angle, as the single main object, largest and nearest to camera.\nOne small training cone in light tint #D6E7FF with a #3182F6 band, about 45% of the ball's size, set back in depth and offset to the right to form a triangular arrangement with the main object; the eye lands on the ball first.\n\nSTYLE LOCK (do not edit):\nSoft matte clay 3D render in the style of Korean fintech app illustrations (Toss, KakaoPay). Rounded, chunky forms with thicker-than-real proportions; coins are thick cylinders with beveled rims, panels are plump, edges are softened. Single soft area light from the upper-left; clearly separated lit and shaded faces; gentle contact shadow only under each object, no cast shadow on a floor, no ground plane, no backdrop, no gradient background. Subtle ambient occlusion in crevices. No rim light, no glow, no bloom, no glossy chrome.\nPalette: primary Teameet blue #3182F6 with light tint #D6E7FF and deep shade #1B64DA for the main object; accent gold #FFC342 (with #E0A52E shade) for at most one small sub object; neutrals #F2F4F6 and #8B95A1. No other hues.\nComposition: three-quarter elevated camera, the object cluster fills about 70% of a square 1024x1024 canvas with even margins, main object slightly left of center, sub objects behind and to the right.\nStrictly no: faces, eyes, mouths, characters, mascots, people, hands, text, letters, numbers, logos, UI screens, phones, sparkles, confetti, stars in the air, floor, table, scenery.\nOutput: PNG with a fully transparent background (alpha channel), 1024x1024.",
+      "source_sha256": "d51c9cc024c197b3ecaeecb9eaa0a00d7d8002e51d0fa75cb0f9a4d7103427d6",
+      "sizes": {
+        "320": {
+          "bytes": 11930
+        },
+        "640": {
+          "bytes": 26108
+        }
+      },
+      "created_at": "2026-09-03T23:43:40Z"
+    },
+    {
+      "name": "sport-swimming",
+      "message": "물살 가르기",
+      "prompt": "SUBJECT:\nA chunky pair of swim goggles in Teameet blue #3182F6 with light-tint #D6E7FF lenses and the strap looped behind, seen from a three-quarter angle, as the single main object, largest and nearest to camera.\nOne small thick gold #FFC342 coin (medal-like, no text), about 45% of the goggles' size, set back in depth and offset to the right to form a triangular arrangement with the main object; the eye lands on the goggles first.\n\nSTYLE LOCK (do not edit):\nSoft matte clay 3D render in the style of Korean fintech app illustrations (Toss, KakaoPay). Rounded, chunky forms with thicker-than-real proportions; coins are thick cylinders with beveled rims, panels are plump, edges are softened. Single soft area light from the upper-left; clearly separated lit and shaded faces; gentle contact shadow only under each object, no cast shadow on a floor, no ground plane, no backdrop, no gradient background. Subtle ambient occlusion in crevices. No rim light, no glow, no bloom, no glossy chrome.\nPalette: primary Teameet blue #3182F6 with light tint #D6E7FF and deep shade #1B64DA for the main object; accent gold #FFC342 (with #E0A52E shade) for at most one small sub object; neutrals #F2F4F6 and #8B95A1. No other hues.\nComposition: three-quarter elevated camera, the object cluster fills about 70% of a square 1024x1024 canvas with even margins, main object slightly left of center, sub objects behind and to the right.\nStrictly no: faces, eyes, mouths, characters, mascots, people, hands, text, letters, numbers, logos, UI screens, phones, sparkles, confetti, stars in the air, floor, table, scenery.\nOutput: PNG with a fully transparent background (alpha channel), 1024x1024.\n\nSame material, lighting and palette as the previous image.",
+      "source_sha256": "93b7129accbcb00fc5b8b823d546d0065566d3e970dae4659b76ac9c4a476465",
+      "sizes": {
+        "320": {
+          "bytes": 16522
+        },
+        "640": {
+          "bytes": 38796
+        }
+      },
+      "created_at": "2026-09-03T23:43:51Z"
     }
   ]
 }

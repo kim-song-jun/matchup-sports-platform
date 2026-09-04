@@ -45,9 +45,10 @@ export const MATCHES_ROUTES: RouteChromeEntry[] = [
   // 매치 만들기 3단계 — matches-page.tsx:486(MatchCreatePageView, edit=false 분기).
   // 물리적으로 서로 다른 라우트 3개(app/matches/new/{sport,place-time,confirm}/page.tsx)라
   // 각각 등록한다 — 3곳 다 동일한 정적 props.
+  // 2단계(매치 정보)는 /matches/new 자체다. 등록이 빠져 있으면 세그먼트 수가 같은 /matches/:id 에
+  // 걸려 topBar:false 를 물려받아 모바일 상단바·뒤로가기가 사라졌다(2026-09-04 alpha 감사).
+  { pattern: '/matches/new', chrome: { title: '매치 만들기', activeTab: 'matches', bottomNav: false, backHref: '/matches' } },
   { pattern: '/matches/new/sport', chrome: { title: '매치 만들기', activeTab: 'matches', bottomNav: false, backHref: '/matches' } },
   { pattern: '/matches/new/place-time', chrome: { title: '매치 만들기', activeTab: 'matches', bottomNav: false, backHref: '/matches' } },
   { pattern: '/matches/new/confirm', chrome: { title: '매치 만들기', activeTab: 'matches', bottomNav: false, backHref: '/matches' } },
-  // 매치 만들기 완료 — matches-page.tsx:1041(MatchComplete, model.step==='complete' 분기).
-  { pattern: '/matches/new/complete', chrome: { title: '매치 만들기 완료', activeTab: 'matches', bottomNav: false, backHref: '/matches' } },
 ];

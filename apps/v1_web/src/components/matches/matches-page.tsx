@@ -150,7 +150,8 @@ export function MatchListPageView({ model }: { model: MatchListViewModel }) {
 
 
 /**
- * 사진 없는 매치의 종목 그래픽. 크기는 소비처(카드 112 / 히어로 160)가 정하고, 장식이라 aria-hidden.
+ * 사진 없는 매치의 종목 그래픽. 표시 크기는 CSS(.tm-match-sport-illustration, 히어로 변형)가 정한다 —
+ * 인라인 style 이면 뷰포트별 CSS 오버라이드가 먹지 않는다. `size` 는 next/image sizes 힌트만.
  * 이름 매핑은 matches.card-model.ts 의 sportIllustration — 운영 4종목 전용, 그 외 공용 스포츠 그래픽.
  */
 function SportIllustration({ sport, size, className }: { sport: string; size: number; className?: string }) {
@@ -163,7 +164,6 @@ function SportIllustration({ sport, size, className }: { sport: string; size: nu
       width={640}
       height={640}
       sizes={`${size}px`}
-      style={{ width: size, height: size }}
     />
   );
 }

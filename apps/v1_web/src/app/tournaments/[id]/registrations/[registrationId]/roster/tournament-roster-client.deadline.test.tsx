@@ -304,7 +304,15 @@ describe('등번호 입력 종류', () => {
     vi.mocked(useV1RemovePlayer).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
 
     // 추가 폼은 팀원 목록을 `useInfiniteQuery` 로 직접 부른다 — 이 파일의 훅 목킹으로는
-    // 안 덮이므로 QueryClient 를 붙여 준다.
+    // 안 덮인다. QueryClient 만 붙이면 **실제로 `/teams/:id/members` 를 fetch 하려 들고**,
+    // Node 에는 base URL 이 없어 상대 경로에서 TypeError 가 난다 — 테스트가 런타임 환경에
+    // 의존하게 된다. fetch 를 그 범위에서만 스텁해 빈 결과로 끊는다.
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ items: [], nextCursor: null }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const { container } = render(
       <QueryClientProvider client={queryClient}>
@@ -312,6 +320,7 @@ describe('등번호 입력 종류', () => {
       </QueryClientProvider>,
     );
     fireEvent.click(screen.getByRole('button', { name: '선수 추가하기' }));
+    fetchSpy.mockRestore();
 
     const jersey = container.querySelector('input[id$="-jersey"]');
     expect(jersey).not.toBeNull();

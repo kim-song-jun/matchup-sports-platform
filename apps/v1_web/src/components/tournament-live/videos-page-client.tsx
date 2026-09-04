@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Clapperboard, ExternalLink, Film, Trash2 } from 'lucide-react';
+import { AlertCircle, Clapperboard, ExternalLink, Film, Trash2 } from 'lucide-react';
 import { AdminEmpty } from '@/components/admin/admin-empty';
 import { AdminListSkeleton } from '@/components/admin/admin-skeleton';
 import { AdminToasts, useAdminToast } from '@/components/admin/admin-toast';
@@ -222,6 +222,8 @@ export function VideosPageClient({ tournamentId }: Props) {
         <AdminListSkeleton />
       ) : videos.isError ? (
         <AdminEmpty
+          icon={<AlertCircle size={40} />}
+          role="alert"
           title="영상 정보를 불러오지 못했어요"
           description={extractErrorMessage(videos.error, '잠시 후 다시 시도해 주세요.')}
           action={

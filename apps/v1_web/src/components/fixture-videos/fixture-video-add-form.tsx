@@ -99,13 +99,10 @@ export function FixtureVideoAddForm({
                 setMode(value);
                 setLocalError(null);
               }}
-              className={[
-                'inline-flex items-center gap-2 h-[44px] px-3 rounded-xl text-sm font-semibold transition-colors',
-                'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
-                active
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-[var(--surface-soft)] text-[var(--text-body)] hover:bg-[var(--border)]',
-              ].join(' ')}
+              /* 모드 전환은 제출("영상 등록")과 같은 파란 버튼이면 안 된다 — 한 폼 안에서
+                 "무엇을 고르는 자리"와 "실행하는 자리"가 구분되지 않는다. 이 저장소의 선택
+                 세그먼트 표기는 칩이다. */
+              className={`tm-chip${active ? ' tm-chip-active' : ''}`}
             >
               {value === 'link' ? <Link2 size={16} aria-hidden="true" /> : <Upload size={16} aria-hidden="true" />}
               {value === 'link' ? '링크 등록' : '파일 업로드'}

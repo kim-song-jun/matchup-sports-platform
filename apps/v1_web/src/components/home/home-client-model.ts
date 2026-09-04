@@ -58,7 +58,7 @@ export function toHomeModel(
     retry,
     hasNewNotification: unreadCount > 0,
     chatUnreadCount,
-    stats: normalizeStats(home, fallback),
+    stats: normalizeStats(home),
     featuredMatch: normalizeFeaturedMatch(home, recommendedMatches),
     recommendedMatches,
     quickActions: normalizeShortcuts(home.shortcuts, fallback.quickActions),
@@ -100,15 +100,25 @@ function formatRelative(value?: string) {
   return date.toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
-function normalizeStats(home: V1Home, fallback: HomeViewModel): HomeStats {
+/** summary 가 없을 때 쓰는 빈 통계 — 목업 숫자(12경기·+3·8)를 사용자 자기 기록으로 보여주면 안 된다. */
+const BLANK_STATS: HomeStats = {
+  monthlyActivity: '-',
+  monthlyActivitySub: '집계 준비 중',
+  mannerScore: '-',
+  mannerScoreSub: '-',
+  joined: '-',
+  trustState: '-',
+  pending: '-',
+};
+
+function normalizeStats(home: V1Home): HomeStats {
   const summary = home.summary;
-  if (!summary) return fallback.stats;
+  if (!summary) return BLANK_STATS;
 
   const monthlyMatches = summary.monthlyMatches ?? 0;
   const mannerScore = summary.mannerScore;
 
   return {
-    ...fallback.stats,
     monthlyActivity: monthlyMatches,
     monthlyActivitySub: summary.pendingLabel ?? '신청·참가 합산',
     mannerScore: mannerScore === null ? '-' : mannerScore.toFixed(1),
@@ -219,6 +229,7 @@ function toHomeMatch(match: V1Match): HomeMatchCard {
     sportLabel: match.sportName,
     title: match.title,
     venue: match.placeName,
+    imageUrl: match.imageUrl ?? null,
     date: formatDate(match.startsAt),
     time: formatTime(match.startsAt),
     currentParticipants: capacity.current,
@@ -239,7 +250,7 @@ function emptyMatchCard(): HomeMatchCard {
     currentParticipants: 0,
     maxParticipants: 1,
     actionLabel: '',
-    imageUrl: '/mock/generated/team-huddle.webp',
+    imageUrl: null,
   };
 }
 

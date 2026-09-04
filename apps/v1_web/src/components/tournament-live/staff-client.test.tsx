@@ -288,6 +288,10 @@ describe('StaffClient', () => {
     await user.type(screen.getByLabelText('경기장 이름'), 'A구장');
     await user.click(screen.getByRole('button', { name: '경기장 추가' }));
 
+    // 등록한 경기장은 고칠 수도 지울 수도 없어서 확인을 한 번 받는다(웨이브 8).
+    expect(mocks.createFieldMutate).not.toHaveBeenCalled();
+    await user.click(await screen.findByRole('button', { name: '등록하기' }));
+
     expect(mocks.createFieldMutate).toHaveBeenCalledTimes(1);
     expect(mocks.createFieldMutate.mock.calls[0][0]).toMatchObject({ name: 'A구장' });
   });

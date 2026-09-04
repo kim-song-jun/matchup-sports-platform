@@ -5,7 +5,8 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { queryImageBySrc } from '@/test/next-image';
-import { sportIllustration, toMatchCard } from './matches.card-model';
+import { toMatchCard } from './matches.card-model';
+import { sportIllustration } from '@/components/v1-ui/sport-illustration';
 import { getMatchListViewModel, getMatchStateViewModel } from './matches.view-model';
 import { MatchListPageView, MatchStatePageView } from './matches-page';
 import { resolveRouteChrome } from '@/lib/route-chrome';

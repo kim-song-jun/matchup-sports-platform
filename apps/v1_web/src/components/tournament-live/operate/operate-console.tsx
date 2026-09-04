@@ -1418,8 +1418,6 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       {pendingAction && (
         <ActionTargetPicker
           open
-          tournamentId={tournamentId}
-          fixtureId={fixtureId}
           actionLabel={pendingAction.actionLabel}
           actionType={pendingAction.actionType}
           cardColor={pendingAction.cardColor}

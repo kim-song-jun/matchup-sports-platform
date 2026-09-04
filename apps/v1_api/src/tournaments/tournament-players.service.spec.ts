@@ -222,23 +222,78 @@ describe('TournamentPlayersService', () => {
     );
   });
 
-  // 대회 표면 봉쇄 — 명단은 **쓰기**라 통과하면 리그 행에 선수가 실제로 붙는다.
-  it('addPlayer: 리그 id 로는 선수를 추가할 수 없다 — 선수 행이 만들어지지 않는다', async () => {
+  // 2026-08-31 커밋 `817e17eea` 는 이 자리에 **"리그 id 로는 선수를 추가할 수 없다"** 를 박았다
+  // (대회 표면 봉쇄 — 리그 id 로 대회 API 를 때리지 못하게). 그 판단은 그때 맞았다.
+  //
+  // **2026-09-02 정본 §3 이 "리그 명단은 대회와 같음" 으로 확정하면서 전제가 바뀌었다.**
+  // 명단 컨트롤러는 하나뿐이고 프론트는 리그 참가 등록에도 같은 링크를 그리는데, 봉쇄가
+  // 남아 있는 동안 **리그는 어느 경로로도 명단을 만들 수 없었다** — 수동은 404, 자동 확정
+  // 잡(`isLeagueRosterAutoConfirmEnabled`)은 기본이 꺼짐이다. 2026-09-04 alpha 실측에서
+  // 팀장 명단 화면이 통째로 `TOURNAMENT_NOT_FOUND` 로 떴다.
+  //
+  // 그래서 봉쇄를 **명단 표면에서만** 걷는다. bracket·admin-registrations 의 표면 봉쇄는
+  // 그대로 두므로, 이 파일의 변경이 그쪽까지 여는 것으로 읽히면 안 된다.
+  //
+  // 아래 세 테스트는 전부 **"404 가 아니다"가 아니라 "리그 행의 값을 실제로 썼다"** 를 단언한다.
+  // 단순히 통과 여부만 보면 게이트를 되돌려도 다른 이유로 던져 초록일 수 있다.
+  it('addPlayer: 리그도 대회와 같은 명단 규칙을 탄다 — 봉쇄가 아니라 리그의 정원에서 막힌다', async () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
-    prisma.v1TeamMembership.findFirst.mockResolvedValue({ role: 'manager', status: 'active' });
+    prisma.v1TeamMembership.findFirst
+      .mockResolvedValueOnce({ id: 'mem-1', role: 'manager' })
+      .mockResolvedValueOnce(teamPlayerMembershipRow());
     prisma.v1Tournament.findFirst.mockImplementation(
-      kindAwareFindFirst(tournamentRow({ kind: 'regular_league' })),
+      kindAwareFindFirst(tournamentRow({ id: 'league-1', kind: 'regular_league', maxPlayers: 3 })),
     );
-    // 봉쇄가 없으면 실제로 성공하도록 채운다.
-    prisma.v1TournamentPlayer.create.mockResolvedValue({ id: 'player-1' });
+    prisma.v1TournamentPlayer.count.mockResolvedValue(3); // 리그의 maxPlayers 에 도달
 
+    // `ROSTER_FULL` 이어야 한다 — 그 코드가 나왔다는 것은 조회가 리그 행을 찾았고(게이트 통과)
+    // **그 행의 maxPlayers 를 읽었다**는 뜻이다. 게이트를 되돌리면 `TOURNAMENT_NOT_FOUND` 다.
     await expect(
       service.addPlayer(manager, 'league-1', 'reg-1', {
         userId: 'player-user-id',
         realName: '홍길동',
       }),
-    ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_NOT_FOUND' } });
-    expect(prisma.v1TournamentPlayer.create).not.toHaveBeenCalled();
+    ).rejects.toMatchObject({ response: { code: 'ROSTER_FULL' } });
+  });
+
+  it('listPlayers: 리그 명단을 조회할 수 있다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ role: 'manager', status: 'active' });
+    prisma.v1Tournament.findFirst.mockImplementation(
+      kindAwareFindFirst(tournamentRow({ id: 'league-1', kind: 'regular_league', minPlayers: 6 })),
+    );
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([playerRow()]);
+
+    const result = await service.listPlayers(manager, 'league-1', 'reg-1');
+    expect(result.players).toHaveLength(1);
+    // 리그 행의 minPlayers 로 최소 인원 판정이 돈다 — 1명이라 아직 미달이다.
+    expect(result.belowMinimum).toBe(true);
+  });
+
+  it.each([
+    ['removePlayer', (s: TournamentPlayersService) => s.removePlayer(manager, 'league-1', 'reg-1', 'player-1')],
+    [
+      'updatePlayer',
+      (s: TournamentPlayersService) =>
+        s.updatePlayer(manager, 'league-1', 'reg-1', 'player-1', { eligibilityStatus: 'non_pro' }),
+    ],
+  ])('%s: 리그의 명단 마감 시각을 실제로 읽는다', async (_name, call) => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1Tournament.findFirst.mockImplementation(
+      kindAwareFindFirst(
+        tournamentRow({
+          id: 'league-1',
+          kind: 'regular_league',
+          rosterDeadlineAt: new Date('2020-01-01T00:00:00.000Z'), // 이미 지난 마감
+        }),
+      ),
+    );
+
+    // 마감 초과로 막히는 것이 곧 "리그 행을 찾아 그 rosterDeadlineAt 을 읽었다" 는 증거다.
+    await expect(call(service)).rejects.toMatchObject({
+      response: { code: 'ROSTER_DEADLINE_PASSED' },
+    });
   });
 
   // ─── 2. 등록 미발견 ─────────────────────────────────────────────────────────

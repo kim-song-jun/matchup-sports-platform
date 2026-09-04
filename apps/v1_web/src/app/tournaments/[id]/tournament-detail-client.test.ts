@@ -12,6 +12,7 @@ import {
   getParticipantTeamBuckets,
   getPrizeBreakdownChips,
   partitionTournamentSections,
+  FixtureCard,
   TournamentDetailView,
 } from './tournament-detail-client';
 import type {
@@ -1205,4 +1206,49 @@ describe('TournamentDetailView — 정규 리그 거울 행', () => {
     expect(await screen.findByText('상대팀 미정')).toBeInTheDocument();
     expect(screen.queryByText('상대팀 정보 없음')).not.toBeInTheDocument();
   });
+});
+
+/**
+ * 2026-09-04 alpha 실측 결함: 끝난 경기가 공개 대회 상세의 "조별 일정" 에서 **"예정"** 으로
+ * 보이고 점수가 없었다. 같은 대회의 `/bracket` 은 "종료 · 1 : 0" 을 보여줘 **두 공개 화면이
+ * 같은 경기를 두고 서로 다른 상태를 말했다.**
+ *
+ * 원인은 이 카드가 `status` 만 읽은 것이다. `status` 는 타입 주석이 이미 경고하듯
+ * **라이브 판정에 쓰면 안 된다** — 서버가 실제로 쓰는 값은 `scheduled`(생성)와
+ * `completed`(확정) 둘뿐이라 경기가 뛰는 중에도 `scheduled` 로 남는다. 진행 상태는
+ * `liveStatus`, 점수는 `result` 다.
+ */
+describe('FixtureCard — 진행 상태와 점수', () => {
+  it('경기가 끝났으면 status 가 scheduled 여도 "종료" 로 보인다', () => {
+    // alpha 가 실제로 준 모양: 확정 전이라 status 는 아직 scheduled 인데 경기는 끝났다.
+    render(
+      createElement(FixtureCard, {
+        fixture: makeFixture({ id: 'f1', status: 'scheduled', liveStatus: 'ended' }),
+      }),
+    );
+    expect(screen.getByText('종료')).toBeInTheDocument();
+    expect(screen.queryByText('예정')).not.toBeInTheDocument();
+  });
+
+  it('진행 중인 경기는 "진행 중" 으로 보인다 — status 로는 절대 알 수 없는 상태다', () => {
+    render(
+      createElement(FixtureCard, {
+        fixture: makeFixture({ id: 'f2', status: 'scheduled', liveStatus: 'live' }),
+      }),
+    );
+    expect(screen.getByText('진행 중')).toBeInTheDocument();
+  });
+
+  it('아직 안 시작한 경기는 그대로 "예정" 이다 (회귀 방지)', () => {
+    render(
+      createElement(FixtureCard, {
+        fixture: makeFixture({ id: 'f3', status: 'scheduled', liveStatus: 'scheduled' }),
+      }),
+    );
+    expect(screen.getByText('예정')).toBeInTheDocument();
+  });
+
+  // 점수·득점자는 **일부러 안 싣는다** — 오너 결정("몇 대 몇인지랑 누가 넣었는지 그건 빼주고
+  // 장소랑 누가 누구 하는지만"). 그 계약은 `fixture-card-goals.test.tsx` 가 지키므로 여기서
+  // 중복해서 단언하지 않는다. 이 결함의 범위는 **진행 상태 배지**뿐이다.
 });

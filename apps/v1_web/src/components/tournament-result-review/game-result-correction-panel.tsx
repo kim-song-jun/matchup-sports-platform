@@ -25,6 +25,7 @@ import {
   isDirectorOfficializeDisabledError,
   officializeAlwaysAllowed,
 } from './result-review-copy';
+import { AdminListSkeleton } from '@/components/admin/admin-skeleton';
 
 type DirectorGateStatus = 'unknown' | 'enabled' | 'disabled';
 
@@ -77,7 +78,9 @@ export function GameResultCorrectionPanel({
   const [directorGateStatus, setDirectorGateStatus] = useState<DirectorGateStatus>('unknown');
 
   if (gameQuery.isPending || revisionsQuery.isPending) {
-    return <p className="tm-text-label">불러오는 중…</p>;
+    // 텍스트 한 줄이면 로드가 끝나는 순간 레이아웃이 통째로 튀어나온다 — 같은 화면의
+    // 다른 패널과 같이 스켈레톤으로 자리를 먼저 잡는다.
+    return <AdminListSkeleton rows={4} />;
   }
   if (gameQuery.isError) {
     return (

@@ -11,7 +11,7 @@ import { Button } from '@/components/v1-ui/button';
 import { ChevronLeftIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { cssUrl } from '@/lib/assets';
-import { sportIllustration } from './matches.card-model';
+import { SportIllustration } from '@/components/v1-ui/sport-illustration';
 import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
 import { CreateField, FieldErrorText, GenderRuleSelector, MissingFieldsBanner, RecentVenueChips } from '@/components/v1-ui/create-form-fields';
@@ -147,25 +147,6 @@ export function MatchListPageView({ model }: { model: MatchListViewModel }) {
   );
 }
 
-
-/**
- * 사진 없는 매치의 종목 그래픽. 표시 크기는 CSS(.tm-match-sport-illustration, 히어로 변형)가 정한다 —
- * 인라인 style 이면 뷰포트별 CSS 오버라이드가 먹지 않는다. `sizes` 는 표시 크기와 같은 반응형 힌트.
- * 이름 매핑은 matches.card-model.ts 의 sportIllustration — 운영 4종목 전용, 그 외 공용 스포츠 그래픽.
- */
-function SportIllustration({ sport, sizes, className }: { sport: string; sizes: string; className?: string }) {
-  return (
-    <Image
-      className={`tm-match-sport-illustration${className ? ` ${className}` : ''}`}
-      src={`/illustrations/${sportIllustration(sport)}-640.webp`}
-      alt=""
-      aria-hidden="true"
-      width={640}
-      height={640}
-      sizes={sizes}
-    />
-  );
-}
 
 export function MatchStatePageView({ model }: { model: MatchStateViewModel }) {
   // 셸 승격(U27): 이 화면은 /matches(목록 에러)와 /matches/:id(상세 에러) 두 라우트에서

@@ -33,12 +33,6 @@ export interface LineupGridProps {
    * renders. Used by the "들어올 선수" step, which is scoped to the outgoing
    * player's own side. */
   readonly restrictSideId?: string;
-  /** UX 감사 item 2 — 제공되면 "제출된 선발 명단이 없어요" 빈 상태에 그 사이드의
-   * 라인업 화면으로 가는 링크를 함께 보여준다. 라인업 없이 이미 LIVE가 된
-   * 경기(막다른 길)도 이 자리에서 바로 복구할 수 있게 하기 위함이다. 둘 다
-   * 없으면(예: 팀매치 경량 콘솔, 기존 테스트) 링크 없이 문구만 보여준다. */
-  readonly tournamentId?: string;
-  readonly fixtureId?: string;
 }
 
 /** The latest lineup for a side is the highest `revision` row among
@@ -117,8 +111,6 @@ export function LineupGrid({
   disabled = false,
   filterParticipantIds,
   restrictSideId,
-  tournamentId,
-  fixtureId,
 }: LineupGridProps) {
   const visibleSides = restrictSideId === undefined ? sides : sides.filter((side) => side.id === restrictSideId);
   // 모바일(390px)에서는 두 사이드가 세로로 쌓여, 원정팀을 보려면 홈팀 전체를

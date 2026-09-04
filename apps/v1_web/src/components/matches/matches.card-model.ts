@@ -11,21 +11,7 @@ import type { MatchCardModel, MatchListViewModel } from './matches.types';
 import type { V1Match, V1MatchApiStatus, V1Sport, V1ViewerState } from '@/types/api';
 
 
-export const FIXED_MATCH_SPORT_NAMES = ['축구', '풋살', '러닝', '수영'] as const;
-
-/**
- * 사진이 없는 매치의 카드·히어로에 쓰는 종목 그래픽 이름(public/illustrations/<name>-640.webp).
- * 운영 4종목은 전용 그래픽, 그 외는 공용 스포츠 그래픽(스톱워치+공+콘). agy-3d-graphic 스킬 산출물.
- */
-export function sportIllustration(sportName: string | null | undefined): string {
-  switch (sportName) {
-    case '축구': return 'sport-soccer';
-    case '풋살': return 'sport-futsal';
-    case '러닝': return 'sport-running';
-    case '수영': return 'sport-swimming';
-    default: return 'landing-hero';
-  }
-}
+const FIXED_MATCH_SPORT_NAMES = ['축구', '풋살', '러닝', '수영'] as const;
 
 export function toMatchCard(match: V1Match, fallback: MatchCardModel): MatchCardModel {
   const capacity = getCapacity(match, fallback);

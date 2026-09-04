@@ -36,8 +36,6 @@ export interface ActionTargetPickerProps {
   /** UX 감사 item 2 — `LineupGrid`로 그대로 전달해, 라인업이 없는 사이드의
    * 빈 상태에 "라인업 제출하러 가기" 링크를 띄운다. 생략하면(예: 기존 테스트)
    * `LineupGrid`가 링크 없이 문구만 보여준다. */
-  readonly tournamentId?: string;
-  readonly fixtureId?: string;
   readonly actionLabel: string;
   readonly actionType: GameEventType;
   readonly cardColor?: GameCardColor;
@@ -84,8 +82,6 @@ export interface ActionTargetPickerProps {
  */
 export function ActionTargetPicker({
   open,
-  tournamentId,
-  fixtureId,
   actionLabel,
   actionType,
   cardColor,
@@ -246,8 +242,6 @@ export function ActionTargetPicker({
           {isSubstitution ? (
             substitutionOut === null ? (
               <LineupGrid
-                tournamentId={tournamentId}
-                fixtureId={fixtureId}
                 sides={sides}
                 lineups={lineups}
                 onSelectPlayer={setSubstitutionOut}
@@ -261,8 +255,6 @@ export function ActionTargetPicker({
                   </p>
                 ) : null}
                 <LineupGrid
-                  tournamentId={tournamentId}
-                  fixtureId={fixtureId}
                   sides={sides}
                   lineups={lineups}
                   onSelectPlayer={commitSubstitution}
@@ -282,7 +274,7 @@ export function ActionTargetPicker({
               </div>
             )
           ) : (
-            <LineupGrid tournamentId={tournamentId} fixtureId={fixtureId} sides={sides} lineups={lineups} onSelectPlayer={commitPlayer} />
+            <LineupGrid sides={sides} lineups={lineups} onSelectPlayer={commitPlayer} />
           )}
 
           {allowTeamOnly ? (

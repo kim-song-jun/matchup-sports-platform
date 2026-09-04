@@ -77,4 +77,19 @@ describe('LeagueManualFixtureModal', () => {
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
     expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('durationMinutes');
   });
+
+  it('제출 중에는 닫기(X)도 취소와 함께 잠근다', () => {
+    // 한쪽만 잠그면 운영자는 **잠긴 버튼 옆의 안 잠긴 버튼**을 눌러 같은 이탈을 한다 —
+    // 요청은 날아가는데 화면은 사라져, 경기가 만들어졌는지 알 수 없고 입력도 잃는다.
+    render(
+      <LeagueManualFixtureModal
+        teams={TEAMS}
+        isSubmitting
+        onSubmit={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('button', { name: '닫기' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '취소' })).toBeDisabled();
+  });
 });

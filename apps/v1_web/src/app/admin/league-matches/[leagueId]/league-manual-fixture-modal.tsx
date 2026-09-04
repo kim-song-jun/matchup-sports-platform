@@ -3,6 +3,9 @@
 import { useState } from 'react';
 import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-picker';
 import { fromDatetimeLocalValue } from '@/components/team-schedules/team-schedules.view-model';
+import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
+import { extractErrorMessage } from '@/lib/error-message';
+import type { V1CreateManualLeagueFixturePayload } from '@/types/league-match';
 
 /**
  * 리그에 **한 경기만** 추가하는 모달(사용자 B안, 2026-09-04 — 전체화면 모달 + EntityPicker 재사용).
@@ -27,13 +30,11 @@ export function LeagueManualFixtureModal({
   /** 리그 참가팀. 홈·어웨이 후보는 여기서만 고른다 — 리그 밖 팀은 서버가 거부한다. */
   teams: EntityPickerItem[];
   isSubmitting: boolean;
-  onSubmit: (payload: {
-    homeTeamId: string;
-    awayTeamId: string;
-    startsAt: string;
-    durationMinutes?: number;
-    placeName?: string;
-  }) => Promise<unknown>;
+  /**
+   * **계약 타입을 그대로 쓴다** — 인라인으로 다시 적으면 서버 DTO 가 바뀌었을 때
+   * 이 모달만 옛 모양으로 남아도 타입이 잡아 주지 않는다.
+   */
+  onSubmit: (payload: V1CreateManualLeagueFixturePayload) => Promise<unknown>;
   onClose: () => void;
 }) {
   const [home, setHome] = useState<EntityPickerItem | null>(null);
@@ -42,6 +43,17 @@ export function LeagueManualFixtureModal({
   const [duration, setDuration] = useState('');
   const [placeName, setPlaceName] = useState('');
   const [error, setError] = useState<string | null>(null);
+  // ESC·focus trap·body 스크롤 잠금은 어드민 모달 공용 훅이 담당한다. **`pending` 을 넘기는
+  // 것이 핵심** — 제출 중 ESC 로 닫히면 요청은 날아가는데 화면은 사라져, 운영자는 경기가
+  // 만들어졌는지 알 수 없고 입력도 잃는다.
+  // `initialFocusRef` 는 안 쓴다 — 훅이 패널 안 첫 focusable(홈 팀 입력)로 폴백한다.
+  // `onBackdropClick` 도 안 쓴다: 이 모달은 **전체화면**이라 backdrop 이 없고, 배경처럼
+  // 보이는 영역이 곧 패널이다. 붙이면 폼 여백을 클릭한 것이 닫기가 된다.
+  const { dialogRef } = useModalA11y({
+    open: true,
+    onClose,
+    pending: isSubmitting,
+  });
 
   const submit = async () => {
     if (isSubmitting) return;
@@ -82,19 +94,19 @@ export function LeagueManualFixtureModal({
       });
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : '경기를 만들지 못했어요.');
+      // 레포 표준 — axios 에러의 서버 메시지를 먼저 꺼낸다. `err.message` 만 보면
+      // "Request failed with status code 409" 같은 문자열이 그대로 운영자에게 간다.
+      setError(extractErrorMessage(err, '경기를 만들지 못했어요.'));
     }
   };
 
   return (
     <div
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
       aria-labelledby="manual-fixture-heading"
       className="fixed inset-0 z-50 flex flex-col bg-[var(--surface)]"
-      onKeyDown={(event) => {
-        if (event.key === 'Escape') onClose();
-      }}
     >
       <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
         <h2 id="manual-fixture-heading" className="text-base font-semibold text-[var(--text-strong)]">
@@ -103,6 +115,9 @@ export function LeagueManualFixtureModal({
         <button
           type="button"
           onClick={onClose}
+          // 제출 중에는 취소 버튼과 **같이** 잠근다. 한쪽만 잠그면 운영자는 잠긴 버튼 옆의
+          // 안 잠긴 버튼을 눌러 같은 이탈을 하게 된다.
+          disabled={isSubmitting}
           aria-label="닫기"
           className="tm-btn tm-btn-sm tm-btn-ghost"
           style={{ minHeight: 44, minWidth: 44 }}

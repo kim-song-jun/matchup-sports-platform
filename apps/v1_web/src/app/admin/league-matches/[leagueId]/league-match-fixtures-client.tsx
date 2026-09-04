@@ -24,6 +24,7 @@ import {
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { expandWeeklyFixtureDates } from '@/lib/league-fixture-dates';
+import { LeagueFixtureDatePicker } from './league-fixture-date-picker';
 import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
 import { fromDatetimeLocalValue, toDatetimeLocalValue } from '@/components/team-schedules/team-schedules.view-model';
 import { RecentVenueChips } from '@/components/v1-ui/create-form-fields';
@@ -98,6 +99,8 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
   const forfeitAwayTeam = useV1AdminTeam(forfeitFixture?.awayTeamId ?? '');
   const [weeksCount, setWeeksCount] = useState(7);
   const [dayOfWeek, setDayOfWeek] = useState<number | ''>('');
+  // **날짜 목록이 정본이다.** 요일은 그것을 채우는 편의일 뿐 — 서버는 요일을 모른다.
+  const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [time, setTime] = useState('18:00');
   const [placeName, setPlaceName] = useState('');
   // 대진 timing(2026-08-25 사용자 확정: C안 시간창 역산 + B안 계산기·타임라인). 기존 필드처럼
@@ -218,16 +221,20 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
   // 바꾸지 않았는데 갑자기 실패한다. `buildFixtureFormPayload` 는 생성·재생성·미리보기
   // 세 호출이 공유하므로 여기 한 곳만 옮기면 셋 다 클릭 시점 값을 쓴다.
   const buildFixtureFormPayload = (): V1GenerateLeagueFixturesPayload => {
+    // **고른 날짜가 있으면 그것을 보낸다.** 달력이 정본이고, 요일 전개는 그 목록을 채우는
+    // 수단이다. 둘 다 있을 때 요일을 다시 전개하면 운영자가 지운 날짜가 되살아난다.
     const dates =
-      !hasLeagueStartsOn || dayOfWeek === '' || time.trim() === ''
-        ? []
-        : expandWeeklyFixtureDates({
-            startsOn: series.startsOn,
-            dayOfWeek,
-            time,
-            weeksCount,
-            now: new Date(),
-          });
+      selectedDates.length > 0
+        ? selectedDates
+        : !hasLeagueStartsOn || dayOfWeek === '' || time.trim() === ''
+          ? []
+          : expandWeeklyFixtureDates({
+              startsOn: series.startsOn,
+              dayOfWeek,
+              time,
+              weeksCount,
+              now: new Date(),
+            });
     return {
       weeksCount,
       ...(dates.length === 0 ? {} : { schedule: { dates, time } }),
@@ -609,6 +616,37 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                 onChange={(e) => setTime(e.target.value)}
                 disabled={dayOfWeek === ''}
                 className={`${inputClass} w-36 disabled:opacity-50`}
+              />
+            </div>
+            <div className="w-full">
+              <p className="mb-1 block text-sm font-medium text-[var(--text-strong)]">경기 날짜</p>
+              {/* **날짜 목록이 서버로 나가는 값이다.** 위 요일·시각은 이 목록을 한 번에
+                  채우는 편의이고, 채운 뒤에는 개별 날짜를 지우거나 더할 수 있다 —
+                  명절·구장 사정으로 한 주를 건너뛰는 것이 그래야 표현된다. */}
+              <LeagueFixtureDatePicker
+                selectedDates={selectedDates}
+                onChange={setSelectedDates}
+                requiredCount={weeksCount}
+                today={new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)}
+                onFillByWeekday={
+                  hasLeagueStartsOn && dayOfWeek !== '' && time.trim() !== ''
+                    ? () =>
+                        setSelectedDates(
+                          expandWeeklyFixtureDates({
+                            startsOn: series.startsOn,
+                            dayOfWeek,
+                            time,
+                            weeksCount,
+                            now: new Date(),
+                          }),
+                        )
+                    : null
+                }
+                fillDisabledReason={
+                  !hasLeagueStartsOn
+                    ? '리그 시작일이 없어 요일로 채울 수 없어요.'
+                    : '요일과 시각을 고르면 한 번에 채울 수 있어요.'
+                }
               />
             </div>
             <FixtureTimingFields

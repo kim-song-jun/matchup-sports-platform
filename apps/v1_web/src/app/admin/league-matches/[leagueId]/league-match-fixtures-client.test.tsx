@@ -1221,3 +1221,43 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
     expect(screen.getByText('독수리FC vs 호랑이FC')).toBeInTheDocument();
   });
 });
+
+/**
+ * 달력이 **정본**이다. 요일 전개는 그 목록을 채우는 편의일 뿐이라, 달력에서 고른 날짜가
+ * 그대로 나가지 않으면 운영자가 지운 주가 되살아난다(사용자 A안의 요지).
+ */
+describe('대진 날짜 — 달력에서 고른 값이 그대로 나간다', () => {
+  it('달력에서 고른 날짜를 schedule.dates 로 보낸다', async () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1AdminLeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', title: '가을 풋살 리그', startsOn: '2026-09-01T00:00:00.000Z',
+        state: 'draft', teamIds: ['t1', 't2'], fixtures: [],
+      },
+      isPending: false,
+    } as never);
+    const mutateAsync = vi.fn().mockResolvedValue({ leagueId: 'league-1', createdCount: 2, teamMatchIds: [] });
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync, isPending: false } as never);
+    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    // 시각은 서버 계약상 날짜와 함께 가야 한다.
+    fireEvent.change(screen.getByLabelText('시작 시각'), { target: { value: '18:00' } });
+    fireEvent.click(await screen.findByLabelText('2026-09-12'));
+    fireEvent.click(screen.getByLabelText('2026-09-19'));
+    fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+
+    await waitFor(() =>
+      expect(mutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          schedule: { dates: ['2026-09-12', '2026-09-19'], time: '18:00' },
+        }),
+      ),
+    );
+  });
+});

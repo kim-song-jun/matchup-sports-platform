@@ -177,7 +177,10 @@ describe('TournamentPlayersService', () => {
       },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },
       $transaction: jest.fn(),
-      $queryRaw: jest.fn().mockResolvedValue(undefined),
+      // Prisma 의 `$queryRaw` 는 **행 배열**을 준다. `undefined` 로 두면 결과를 순회하는
+      // 코드가 mock 에서만 터진다 — 등번호 조회(raw)가 실제로 그랬다.
+      // `FOR UPDATE` 잠금처럼 결과를 안 쓰는 호출도 빈 배열이면 그대로 통과한다.
+      $queryRaw: jest.fn().mockResolvedValue([]),
     };
 
     const p = prisma;

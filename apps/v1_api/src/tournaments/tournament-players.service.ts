@@ -18,6 +18,11 @@ import { PrismaService } from '../prisma/prisma.service';
 import { isPhoneVerificationEnforced } from '../verification/phone-verification-access';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { AddPlayerDto, UpdatePlayerEligibilityDto } from './dto/tournament-player.dto';
+import {
+  assertJerseyAvailable,
+  readJerseyNumbers,
+  writeJerseyNumber,
+} from './tournament-player-jersey';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
 
 @Injectable()
@@ -168,8 +173,14 @@ export class TournamentPlayersService {
       orderBy: { addedAt: 'asc' },
     });
 
+    // 등번호는 raw 로 한 번에 읽어 붙인다 — 행마다 조회하면 N+1 이고, 생성된 클라이언트에
+    // 컬럼이 없어 애초에 위 findMany 의 select 로는 못 가져온다.
+    const jerseyByPlayerId = await readJerseyNumbers(this.prisma, registrationId);
+
     return {
-      players: players.map(this.serializePlayer),
+      players: players.map((player) =>
+        this.serializePlayer(player, jerseyByPlayerId.get(player.id) ?? null),
+      ),
       belowMinimum: players.length < tournament.minPlayers,
     };
   }
@@ -202,7 +213,7 @@ export class TournamentPlayersService {
     this.assertRosterMutable(registration, tournament);
 
     const player = await this.insertPlayerIntoRoster(tournamentId, registrationId, dto);
-    return this.serializePlayer(player);
+    return this.serializePlayer(player, dto.jerseyNumber ?? null);
   }
 
   /**
@@ -319,6 +330,13 @@ export class TournamentPlayersService {
         ? await this.hasAdminEligibilityRuling(tx, existingRow.id)
         : false;
 
+      // 등번호는 **저장 전에** 중복을 본다 — 인덱스가 최종 방어지만, 인덱스가 던지는
+      // 23505 를 사용자 문구로 되돌리는 것보다 여기서 읽히는 메시지를 주는 편이 낫다.
+      // 되살아나는 행(제외 후 재추가)은 자기 자신을 중복으로 세면 안 되므로 제외한다.
+      if (dto.jerseyNumber !== undefined) {
+        await assertJerseyAvailable(tx, registrationId, dto.jerseyNumber, existingRow?.id);
+      }
+
       const saved = await tx.v1TournamentPlayer.upsert({
         where: { registrationId_userId: { registrationId, userId: dto.userId } },
         create: {
@@ -365,6 +383,9 @@ export class TournamentPlayersService {
         await this.reconcileGenderQuotaAfterRosterChange(tx, registrationId, current.tournament);
       }
 
+      if (dto.jerseyNumber !== undefined) {
+        await writeJerseyNumber(tx, saved.id, dto.jerseyNumber);
+      }
       return saved;
     });
   }
@@ -811,9 +832,15 @@ export class TournamentPlayersService {
 
   // ─── 직렬화 ───────────────────────────────────────────────────────────────────
 
-  private serializePlayer(row: V1TournamentPlayer) {
+  /**
+   * `jerseyNumber` 는 인자로 받는다 — 생성된 Prisma 클라이언트에 아직 그 컬럼이 없어
+   * `row` 에서 읽을 수 없다(`tournament-player-jersey.ts` 주석 참조). 호출부가 raw 조회로
+   * 얻은 값을 넘긴다. 안 넘기면 `null` 이다.
+   */
+  private serializePlayer(row: V1TournamentPlayer, jerseyNumber: number | null = null) {
     return {
       id: row.id,
+      jerseyNumber,
       userId: row.userId,
       realName: row.realName,
       birthDateSnapshot: row.birthDateSnapshot ?? null,

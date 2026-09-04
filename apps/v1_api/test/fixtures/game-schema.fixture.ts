@@ -499,7 +499,20 @@ export const gameSchemaSourceManifest = {
   // **game domain(V1Game*) 은 한 줄도 달라지지 않았다** — 이 guard 가 schema.prisma 전체
   // 바이트를 결속하기 때문에 걸리는 것이지 game operations 계약이 바뀐 게 아니다. 바인딩된
   // 20260729000100_v1_game_operations 는 건드리지 않았으므로 migration 해시는 불변이다.
-  schema: '220d9083ee91f25089d04b594246e3ef9ccd6780718992c37b27259fca8664cb',
+  // 2026-09-04 재핀(Task 167): 대회 참가 명단에 등번호 —
+  // `V1TournamentPlayer.jerseyNumber`(Int?, nullable) 한 컬럼과 그 옆 설명 주석뿐이다.
+  // 정본 §3 "명단은 등번호와 이름" 을 실제 컬럼으로 만든 것이고, 전부 additive 라
+  // 기존 행은 NULL 로 남는다. 유일성은 부분 unique 인덱스로 마이그레이션 SQL 에만 있다
+  // (Prisma 스키마로는 부분 인덱스를 표현할 수 없다).
+  //
+  // **game domain(V1Game*) 은 한 줄도 달라지지 않았다** — 이 guard 가 schema.prisma 전체
+  // 바이트를 결속하기 때문에 걸리는 것이지 game operations 계약이 바뀐 게 아니다. 바인딩된
+  // 20260729000100_v1_game_operations 는 건드리지 않았으므로 migration 해시는 불변이다.
+  //
+  // 이 값은 **`origin/dev` 를 흡수한 뒤의** schema.prisma 로 재계산했다(게이트와 같은 방식 —
+  // CRLF→LF 정규화 후 sha256). 흡수 전 해시를 그대로 쓰면 병합 결과와 달라 그대로 다시 깨진다.
+  // 뒷받침 마이그레이션: 20260904120000_v1_tournament_player_jersey_number.
+  schema: '6ac9a8b580718e20ac49f6850a442fadb0d019229815554ae456c5034ff3e702',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

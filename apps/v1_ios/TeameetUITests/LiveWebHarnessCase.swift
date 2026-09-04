@@ -214,6 +214,22 @@ class LiveWebHarnessCase: XCTestCase {
         attach("01-signed-in")
     }
 
+    /// Dismisses the shell's own notification explainer if it is on screen.
+    ///
+    /// It appears over the page shortly after sign-in and swallows taps meant for the app, so
+    /// any test that is not about the explainer itself has to get it out of the way first —
+    /// measured: a chat-room walk that never left the home screen because every tap landed on
+    /// the overlay. `나중에` is used rather than `알림 받기` because it must not spend the one
+    /// system permission dialog iOS allows.
+    @discardableResult
+    func dismissNotificationExplainerIfPresent(timeout: TimeInterval = 20) -> Bool {
+        let explainer = app.otherElements["알림 받기 안내"]
+        guard explainer.waitForExistence(timeout: timeout) else { return false }
+        app.buttons["push-prompt-defer"].tap()
+        _ = explainer.waitForNonExistence(timeout: 10)
+        return true
+    }
+
     /// Taps a field and waits until that field actually holds keyboard focus.
     ///
     /// A bare `tap()` followed by `typeText` fails intermittently with "Neither element nor

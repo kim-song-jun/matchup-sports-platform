@@ -1,5 +1,4 @@
 ---
-"v1_api": patch
 "v1_web": patch
 ---
 

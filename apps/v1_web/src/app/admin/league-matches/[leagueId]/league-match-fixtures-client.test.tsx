@@ -1396,3 +1396,75 @@ describe('참가 신청 요약 카드', () => {
     expect(screen.getByText('신청 마감을 정하면 팀장이 리그 화면에서 바로 신청할 수 있어요.')).toBeInTheDocument();
   });
 });
+
+/**
+ * **대진이 이미 있는 리그에서 "경기 하나 추가" 가 보이는가.**
+ *
+ * 이 버튼은 처음엔 `series.fixtures.length === 0` 분기 안에 있었다 — 대진이 하나도 없는
+ * 리그에서만 보였다는 뜻이다. 그런데 이 기능의 존재 이유가 **우천 순연 재편성·대체 경기**라
+ * 대진이 이미 있는 리그가 정확히 대상이고, 정작 거기서 도달할 수 없었다.
+ *
+ * 유닛 6건이 못 잡은 이유가 여기 그대로 있다: 모달 테스트는 컴포넌트를 직접 렌더했고,
+ * 화면 테스트의 리그 mock 은 전부 `fixtures: []` 였다. 배선은 검증됐지만 **그 배선이 어느
+ * 분기에 있는지**는 아무도 안 봤다. alpha 실화면에서 발견됐다(2026-09-04).
+ */
+describe('수동 대진 추가 입구 — 대진 유무와 무관하게 보인다', () => {
+  function renderWithFixtures(fixtures: unknown[]) {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1AdminLeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', title: '가을 풋살 리그', startsOn: '2026-09-01T00:00:00.000Z',
+        state: 'active', teamIds: ['t1', 't2'], recentVenues: [], fixtures,
+      },
+      isPending: false,
+    } as never);
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+  }
+
+  it('대진이 이미 있어도 보인다 — 우천 순연·대체 경기가 바로 이 경우다', async () => {
+    renderWithFixtures([
+      {
+        teamMatchId: 'tm-1', title: '1주차', homeTeamId: 't1', awayTeamId: 't2',
+        startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched',
+        resultStage: 'official', homeScore: 3, awayScore: 1,
+      },
+    ]);
+    expect(await screen.findByRole('button', { name: '경기 하나 추가' })).toBeInTheDocument();
+  });
+
+  it('대진이 하나도 없어도 보인다 (회귀 방지 — 분기를 반대로 옮기면 안 된다)', async () => {
+    renderWithFixtures([]);
+    expect(await screen.findByRole('button', { name: '경기 하나 추가' })).toBeInTheDocument();
+  });
+
+  it('참가팀이 2팀 미만이면 누를 수 없고, 왜인지 말해 준다', async () => {
+    // 홈·어웨이를 **둘 다** 골라야 만들 수 있다. 1팀뿐인데 열면 피커 두 개가 같은 팀만
+    // 보여 주고 저장은 항상 막힌다 — 빈 약속이다.
+    useV1AdminLeagueTeamsMock.mockReturnValue({
+      data: { teams: [{ teamId: 't1', name: 'A팀' }] },
+    } as never);
+    renderWithFixtures([]);
+    expect(await screen.findByRole('button', { name: '경기 하나 추가' })).toBeDisabled();
+    expect(screen.getByText('참가팀이 2팀 이상이어야 경기를 추가할 수 있어요.')).toBeInTheDocument();
+  });
+
+  it('참가팀이 2팀이면 누를 수 있다 (회귀 방지 — 항상 비활성이면 아무것도 못 만든다)', async () => {
+    useV1AdminLeagueTeamsMock.mockReturnValue({
+      data: { teams: [{ teamId: 't1', name: 'A팀' }, { teamId: 't2', name: 'B팀' }] },
+    } as never);
+    renderWithFixtures([]);
+    expect(await screen.findByRole('button', { name: '경기 하나 추가' })).not.toBeDisabled();
+  });
+
+  it('참가팀이 아직 안 왔으면(로딩) 누를 수 없다 — 빈 피커를 "팀 없음" 으로 오해한다', async () => {
+    useV1AdminLeagueTeamsMock.mockReturnValue({ data: undefined } as never);
+    renderWithFixtures([]);
+    expect(await screen.findByRole('button', { name: '경기 하나 추가' })).toBeDisabled();
+  });
+});

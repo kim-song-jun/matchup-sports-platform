@@ -36,9 +36,11 @@ describe('채팅 목록 빈 상태', () => {
   });
 
   it('그래픽을 함께 보여준다', () => {
-    const { container } = renderWithClient(<ChatListPageView model={emptyChatList} />);
+    renderWithClient(<ChatListPageView model={emptyChatList} />);
 
-    expect(container.querySelector('.tm-empty-illustration')).not.toBeNull();
+    // 페이지 어딘가가 아니라 '이 빈 상태 블록 안'을 본다 — 옆 pane 의 그래픽을 잡으면 단언이 헛돈다.
+    const block = screen.getAllByText('아직 채팅방이 없어요')[0].closest('.tm-empty-state');
+    expect(block?.querySelector('.tm-empty-illustration')).not.toBeNull();
   });
 
   it('실패는 빈 상태가 아니라 경고 + 다시 불러오기로 나온다', () => {
@@ -61,12 +63,11 @@ const emptyRoom: ChatRoomViewModel = {
 
 describe('채팅방 빈 상태', () => {
   it('첫 메시지를 유도하는 그래픽을 보여준다', () => {
-    const { container } = renderWithClient(
-      <ChatRoomPageView listModel={emptyChatList} model={emptyRoom} roomId="room-1" />,
-    );
+    renderWithClient(<ChatRoomPageView listModel={emptyChatList} model={emptyRoom} roomId="room-1" />);
 
-    expect(screen.getByText('아직 메시지가 없어요')).toBeInTheDocument();
-    expect(container.querySelector('.tm-empty-illustration')).not.toBeNull();
+    // 이 뷰는 옆에 채팅 목록 pane 도 함께 그린다 — 그쪽 그래픽을 잡지 않도록 메시지 빈 상태 블록 안으로 좁힌다.
+    const block = screen.getByText('아직 메시지가 없어요').closest('.tm-empty-state');
+    expect(block?.querySelector('.tm-empty-illustration')).not.toBeNull();
   });
 
   it('메시지 로드 실패는 경고 + 다시 불러오기로 나온다', () => {
@@ -88,6 +89,8 @@ describe('알림 빈 상태', () => {
     renderWithClient(<NotificationsPageView model={emptyNotifications} />);
 
     expect(screen.getByRole('link', { name: '매치 둘러보기' })).toHaveAttribute('href', '/matches');
+    const block = screen.getByText('아직 알림이 없어요').closest('.tm-empty-state');
+    expect(block?.querySelector('.tm-empty-illustration')).not.toBeNull();
   });
 
   it('알림 로드 실패는 경고 + 다시 불러오기로 나온다', () => {

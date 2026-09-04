@@ -1284,6 +1284,39 @@ describe('대진 날짜 — 달력에서 고른 값이 그대로 나간다', () 
     expect(screen.getByLabelText('시작 시각')).not.toBeDisabled();
   });
 
+  it('요일을 골랐다 지운 뒤 "시작일 그대로" 로 되돌려도 빈 시각은 안 나간다', async () => {
+    // 리뷰가 지목한 **정확한 경로**다: 요일을 골라 시각을 지운 다음 요일을 되돌리면
+    // `dayOfWeek === ''` 가 되므로 **요일 기준 가드는 안 탄다.** 날짜는 달력에 남아 있어
+    // `schedule` 이 실릴 조건은 갖춰진다 — 가드가 `selectedDates` 기준이어야 하는 이유다.
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1AdminLeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', title: '가을 풋살 리그', startsOn: '2026-09-01T00:00:00.000Z',
+        state: 'draft', teamIds: ['t1', 't2'], fixtures: [],
+      },
+      isPending: false,
+    } as never);
+    const mutateAsync = vi.fn();
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync, isPending: false } as never);
+    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    // ① 요일을 고른다 → ② 시각을 지운다 → ③ 요일을 "시작일 그대로" 로 되돌린다
+    fireEvent.change(screen.getByLabelText('요일'), { target: { value: '6' } });
+    fireEvent.change(screen.getByLabelText('시작 시각'), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText('요일'), { target: { value: '' } });
+    // ④ 달력에서 날짜를 고른다 → ⑤ 제출
+    fireEvent.click(await screen.findByLabelText('2026-09-12'));
+    fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+
+    await waitFor(() => expect(mutateAsync).not.toHaveBeenCalled());
+  });
+
   it('달력에서 고른 날짜를 schedule.dates 로 보낸다', async () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1AdminLeagueMatchMock.mockReturnValue({

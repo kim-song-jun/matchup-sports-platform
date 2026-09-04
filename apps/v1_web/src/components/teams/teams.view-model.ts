@@ -3,6 +3,7 @@ import type {
   TeamFormViewModel,
   TeamListViewModel,
   TeamMembersViewModel,
+  TeamModel,
   TeamStateViewModel,
 } from './teams.types';
 
@@ -149,7 +150,7 @@ export function getTeamListViewModel(): TeamListViewModel {
 
 export function getTeamStateViewModel(state: TeamStateViewModel['state']): TeamStateViewModel {
   const base = getTeamListViewModel();
-  const copy = {
+  const copy: Record<TeamStateViewModel['state'], { title: string; description: string; query: string; teams: TeamModel[] }> = {
     empty: {
       title: '조건에 맞는 팀이 없어요',
       description: '지역, 종목, 모집 상태 조건을 줄이면 가입 가능한 팀을 다시 볼 수 있어요.',
@@ -168,26 +169,23 @@ export function getTeamStateViewModel(state: TeamStateViewModel['state']): TeamS
       query: '',
       teams: [],
     },
-    filter: {
-      title: '팀 필터',
-      description: '지역, 종목, 모집 상태를 선택해 나에게 맞는 팀을 찾아보세요.',
-      query: '',
-      teams,
-    },
-  }[state];
+  };
+  const stateCopy = copy[state];
 
   return {
     ...base,
     state,
-    title: copy.title,
-    description: copy.description,
-    query: copy.query,
-    teams: copy.teams,
+    title: stateCopy.title,
+    description: stateCopy.description,
+    query: stateCopy.query,
+    teams: stateCopy.teams,
     summary: {
       ...base.summary,
-      total: copy.teams.length,
-      recruiting: copy.teams.filter((team) => team.status === 'open').length,
-      nearby: state === 'empty' || state === 'error' || state === 'restricted' ? 0 : base.summary.nearby,
+      total: stateCopy.teams.length,
+      recruiting: stateCopy.teams.filter((team) => team.status === 'open').length,
+      // 'filter' state 제거(죽은 라우트) 이후 남은 3개 state(empty/error/restricted) 모두
+      // "내 주변" 개념이 없는 화면이라 항상 0 — base.summary.nearby(목업 7) 폴백은 불필요했다.
+      nearby: 0,
     },
   };
 }

@@ -1,5 +1,5 @@
 import { TeamListPageView } from './teams-page';
-import { buildTeamSportChips, toTeam } from './teams.card-model';
+import { buildTeamSportChips, deriveTeamScope, toTeam } from './teams.card-model';
 import { getTeamListViewModel } from './teams.view-model';
 import type { V1Sport, V1Team } from '@/types/api';
 
@@ -32,6 +32,8 @@ export function TeamListSsrView({
         chips: buildTeamSportChips(items, base, new URLSearchParams(), undefined, [...sports]),
         summary: {
           ...base.summary,
+          // SSR 목록은 종목 필터를 받지 않는다(searchParams 미사용) — 항상 미필터 scope.
+          scope: deriveTeamScope(),
           total: cards.length,
           recruiting: cards.filter((item) => item.status === 'open').length,
           nearby: undefined,

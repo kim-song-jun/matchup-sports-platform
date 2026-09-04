@@ -113,7 +113,7 @@
 |---|---|
 | BE-1 (선행) | 마이그레이션 `ALTER TABLE v1_tournament_players ADD COLUMN jersey_number INTEGER` (additive · nullable · 백필 없음) + `schema.prisma` |
 | BE-2 | 등록·수정 DTO 에 `jerseyNumber?: number` (`@IsInt` · `@Min(0)` · `@Max(99)` · optional) |
-| BE-3 | 유일성 가드 — `registrationId` 안에서 중복이면 `conflict: true` 로 409. 기존 `rosterCandidateBlock` 규약 재사용 |
+| BE-3 | 유일성 가드 — `registrationId` 안에서 중복이면 `conflict: true` 로 409. 기존 규약 재사용 — `evaluateRosterCandidate()` 가 `RosterCandidateBlock` 을 돌려주고 호출부가 `block.conflict` 로 409/400 을 가른다 |
 | BE-4 | 조회 경로에 필드 노출: 팀장 명단 · 어드민 검토 · **공개 명단** |
 | BE-5 | 라인업 자동 채움 순위를 **`불러온 라인업 → 참가 명단 → 팀 고정 → 직전 착용`** 으로 바꾼다(A1 확정) |
 | FE-1 | 팀장 명단 폼 등번호 입력(`<label htmlFor>` 연결 · 44px · 다크모드 · 409 메시지 표시). 옆에 **읽기 전용 힌트 "팀 등번호: N"** — 자동 채움이 아니다(A3 확정) |

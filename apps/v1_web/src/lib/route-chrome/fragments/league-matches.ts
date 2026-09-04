@@ -10,9 +10,10 @@ export const LEAGUE_MATCHES_ROUTES: RouteChromeEntry[] = [
   // 목록 — 원래 셸 밖의 맨 div라 하단 내비가 없었다(app/league-matches/page.tsx 기존 주석).
   { pattern: '/league-matches', chrome: { title: '정규 리그', activeTab: 'tournaments', showNotifications: true } },
   {
-    // 리그 상세(순위표) — 딥링크로 바로 들어와도 목록으로 나갈 수 있게 backHref 고정.
+    // 리그 상세(순위표) — /league-matches 목록은 이제 순수 redirect(→ /tournaments?kind=league)
+    // 라 그리로 되짚어 보내지 않는다. 딥링크로 바로 들어와도 통합 목록으로 나갈 수 있게 고정.
     pattern: '/league-matches/:leagueId',
-    chrome: { title: '정규 리그', activeTab: 'tournaments', backHref: '/league-matches' },
+    chrome: { title: '정규 리그', activeTab: 'tournaments', backHref: '/tournaments?kind=league', desktopHead: true },
   },
   {
     pattern: '/league-matches/:leagueId/fixtures/:fixtureId',
@@ -20,6 +21,7 @@ export const LEAGUE_MATCHES_ROUTES: RouteChromeEntry[] = [
       title: '리그 경기',
       activeTab: 'tournaments',
       backHref: (p) => `/league-matches/${p.leagueId}`,
+      desktopHead: true,
     },
   },
   {
@@ -28,6 +30,7 @@ export const LEAGUE_MATCHES_ROUTES: RouteChromeEntry[] = [
       title: '시즌 결산',
       activeTab: 'tournaments',
       backHref: (p) => `/league-matches/${p.leagueId}`,
+      desktopHead: true,
     },
   },
 ];

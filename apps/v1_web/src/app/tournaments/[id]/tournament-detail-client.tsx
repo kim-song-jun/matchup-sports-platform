@@ -1824,7 +1824,7 @@ function LeagueSections({ tournament }: { tournament: V1TournamentDetail }) {
           <div id="fixtures-empty-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
             일정 · 대진
           </div>
-          <EmptyState title="아직 등록된 경기가 없어요" sub="대진이 확정되면 경기 일정이 여기에 나타나요." />
+          <EmptyState illustration={{ name: 'matches-empty' }} title="아직 등록된 경기가 없어요" sub="대진이 확정되면 경기 일정이 여기에 나타나요." />
         </section>
       )}
     </>

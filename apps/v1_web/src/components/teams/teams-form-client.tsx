@@ -1,5 +1,7 @@
 'use client';
 
+import { ErrorState } from '@/components/v1-ui/primitives';
+
 import { useEffect, useRef, useState } from 'react';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -11,11 +13,39 @@ import { getRandomTeamLogoPreset } from '@/lib/team-logo-presets';
 import { labelToLevelCode } from '@/lib/v1-levels';
 import { toTeamRegionOptions } from '@/lib/v1-regions';
 import type { V1TeamMutationPayload } from '@/types/api';
-import { TeamFormPageView } from './teams-page';
+import { TeamDetailPageSkeleton, TeamFormPageView } from './teams-page';
 import type { TeamFormViewModel } from './teams.types';
 import { getTeamFormViewModel } from './teams.view-model';
 
 type TeamDraft = TeamFormViewModel['team'];
+
+/**
+ * 팀 수정 폼의 초기 draft — 실제 팀 데이터가 도착하기 전까지 잠깐이라도 렌더될 경우를 대비한
+ * 중립값이다. 예전에는 `getTeamFormViewModel('edit').team`(목업 "성수 러너스 FC")을 그대로
+ * 썼는데, `team.name`이 이 값을 바로 텍스트 입력의 value로 쓰기 때문에 실제 팀 정보가 오기
+ * 전 짧은 순간 편집 가능한 입력창에 남의 팀 이름이 채워져 있었다. 지금은 `!query.data`인
+ * 동안 폼 자체를 스켈레톤으로 가리므로 이 값이 실제로 렌더될 일은 없지만, 방어적으로도
+ * 목업이 아닌 빈 값을 쓴다.
+ */
+const EMPTY_TEAM_DRAFT: TeamDraft = {
+  name: '',
+  logoUrl: null,
+  coverImageUrl: null,
+  sport: '',
+  region: '',
+  description: '',
+  sports: [],
+  city: '',
+  county: '',
+  level: '',
+  genderRule: '성별 무관',
+  activityDays: [],
+  activityFrequency: '',
+  activityTimeSlots: [],
+  activityTypes: [],
+  activityMemo: '',
+  capacity: 0,
+};
 
 export function TeamCreatePageClient() {
   const router = useRouter();
@@ -133,7 +163,7 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
     if (!url) throw new Error('이미지를 올리지 못했어요. 다시 시도해 주세요.');
     return url;
   };
-  const [draft, setDraft] = useState<TeamDraft>(() => getTeamFormViewModel('edit').team);
+  const [draft, setDraft] = useState<TeamDraft>(() => EMPTY_TEAM_DRAFT);
   const [sportId, setSportId] = useState('');
   const [regionId, setRegionId] = useState('');
   const [joinPolicy, setJoinPolicy] = useState<'approval_required' | 'closed'>('approval_required');
@@ -158,7 +188,7 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
     if (!query.data) return;
     const hydratedRegionName = formatTeamRegionName(query.data.region);
     setDraft({
-      ...getTeamFormViewModel('edit').team,
+      ...EMPTY_TEAM_DRAFT,
       name: query.data.name,
       logoUrl: query.data.profile.logoUrl ?? null,
       coverImageUrl: query.data.profile.coverImageUrl ?? null,
@@ -190,6 +220,17 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
     setVersion(query.data.version ?? '');
   }, [query.data]);
 
+  // 데이터가 오기 전에는 draft(EMPTY_TEAM_DRAFT)를 실제 편집 입력창에 노출하지 않는다 —
+  // teams-client.tsx의 TeamDetailPageClient(`if (!query.data) return <TeamDetailPageSkeleton />`)와
+  // 동일 패턴. 이 gate가 hooks 아래(모든 useState/useEffect 호출 이후)에 있어야 한다.
+  // 오류를 먼저 — 로딩 게이트가 isError 까지 가리면 조회 실패 시 스켈레톤만 영원히 남는다(Copilot 리뷰).
+  if (query.isError) {
+    return <ErrorState title="팀 정보를 불러오지 못했어요" message="잠시 후 다시 시도해 주세요." onRetry={() => void query.refetch()} retryLabel="다시 불러오기" />;
+  }
+  if (!query.data) {
+    return <TeamDetailPageSkeleton />;
+  }
+
   const model = buildModel({
     mode: 'edit',
     uploadImage,
@@ -198,10 +239,11 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
     regionId,
     joinPolicy,
     membersVisibilityEnabled,
-    sports: sports.data?.map((sport) => ({ id: sport.id, name: sport.name })) ?? (query.data ? [{ id: query.data.sport.sportId, name: query.data.sport.name }] : []),
+    // query.data는 위 skeleton gate를 통과했으므로 여기서는 항상 정의돼 있다.
+    sports: sports.data?.map((sport) => ({ id: sport.id, name: sport.name })) ?? [{ id: query.data.sport.sportId, name: query.data.sport.name }],
     regions: regionOptions.length
       ? regionOptions
-      : query.data?.region
+      : query.data.region
         ? [toTeamRegionFallbackOption(query.data.region)]
         : [],
     error: query.isError ? '팀 정보를 불러오지 못했어요.' : error,
@@ -232,7 +274,7 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
 
   return (
     <TeamFormPageView
-      model={sports.isPending && sports.data === undefined && !query.data ? { ...model, form: undefined } : model}
+      model={sports.isPending && sports.data === undefined ? { ...model, form: undefined } : model}
       cancelHref={cancelHref}
     />
   );

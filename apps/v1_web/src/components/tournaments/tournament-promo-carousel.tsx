@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pause, Play } from 'lucide-react';
+import { ErrorState } from '@/components/v1-ui/primitives';
 import { TrophyIcon } from '@/components/v1-ui/icons';
 import { cssUrl } from '@/lib/assets';
 import { getSortedTournamentPromos, resolveTournamentImage } from '@/lib/tournament-promo';
@@ -100,13 +101,8 @@ export function TournamentPromoCarousel({
       {loading ? (
         <div className="tm-tournament-promo-carousel-skeleton" aria-busy="true" aria-label="추천 대회 불러오는 중" />
       ) : error ? (
-        <div className="tm-tournament-promo-carousel-error" role="alert">
-          <span className="tm-text-caption">추천 대회를 불러오지 못했어요.</span>
-          {onRetry ? (
-            <button type="button" className="tm-btn tm-btn-sm tm-btn-neutral" onClick={onRetry}>
-              다시 불러오기
-            </button>
-          ) : null}
+        <div className="tm-tournament-promo-carousel-error">
+          <ErrorState message="추천 대회를 불러오지 못했어요." onRetry={onRetry} retryLabel="다시 불러오기" />
         </div>
       ) : (
         <div

@@ -1116,7 +1116,7 @@ describe('LeagueMatchStandingsClient', () => {
     );
 
     expect(await screen.findByText('이번 시즌 요약')).toBeInTheDocument();
-    expect(await screen.findByText('시즌 요약을 불러오지 못했어요.')).toBeInTheDocument();
+    expect(await screen.findByText('시즌 요약을 불러오지 못했어요')).toBeInTheDocument();
   });
 
   // 기록이 입력됐지만 신원 연동·동의가 없어 집계에서 빠진 경우, "결과가 쌓이면
@@ -1346,7 +1346,7 @@ describe('LeagueMatchStandingsClient', () => {
     mockMyTeams([LEAGUE_TEAM_ID]);
     mockRecordConsent(NEVER_ASKED);
 
-    render(<LeagueMatchStandingsClient leagueId="league-1" />);
+    const { container } = render(<LeagueMatchStandingsClient leagueId="league-1" />);
 
     expect(await screen.findByText(CONSENT_CARD_TITLE)).toBeInTheDocument();
     // 연동 카드는 뜨지 않는다 — 이 사람에게 남은 일은 동의뿐이다.
@@ -1357,6 +1357,8 @@ describe('LeagueMatchStandingsClient', () => {
     );
     // 켜면 무엇이 달라지는지를 숫자로 말한다 — "설정에 가 보세요"로 끝내지 않는다.
     expect(screen.getByText(/경기 3건의 기록이 공개돼요/)).toBeInTheDocument();
+    // Wave 5 — 인라인 마크업 대신 공용 EmptyState(illustration)를 쓴다.
+    expect(queryImageBySrc(container, '/illustrations/auth-welcome-640.webp')).not.toBeNull();
   });
 
   it('연결할 대진과 동의가 모두 남았으면 두 안내를 함께 보여준다', async () => {

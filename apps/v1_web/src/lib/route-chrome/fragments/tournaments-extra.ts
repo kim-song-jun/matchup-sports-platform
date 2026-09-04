@@ -35,6 +35,7 @@ export const TOURNAMENTS_EXTRA_ROUTES: RouteChromeEntry[] = [
     chrome: {
       title: '내 신청',
       activeTab: 'tournaments',
+      bottomNav: false,
       backHref: (p) => `/tournaments/${p.id}`,
       desktopHead: true,
     },
@@ -44,6 +45,7 @@ export const TOURNAMENTS_EXTRA_ROUTES: RouteChromeEntry[] = [
     chrome: {
       title: '선수 명단',
       activeTab: 'tournaments',
+      bottomNav: false,
       backHref: (p) => `/tournaments/${p.id}/my`,
       desktopHead: true,
     },

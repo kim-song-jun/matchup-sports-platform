@@ -45,21 +45,14 @@ export function EventCampaignCard({
       aria-label={ariaLabel}
     >
       <div className={styles.media} aria-hidden="true">
-        {item.heroImageUrl ? (
-          <TournamentCampaignMedia
-            src={item.heroImageUrl}
-            sportCode={item.tournament.sport.code}
-            alt=""
-            className={styles.image}
-          />
-        ) : (
-          <div
-            className={styles.fallback}
-            style={{ background: `linear-gradient(135deg, ${sportAccent.dot}, ${sportAccent.gradientTo ?? sportAccent.dot})` }}
-          >
-            <Trophy size={40} aria-hidden="true" />
-          </div>
-        )}
+        {/* 사진이 없거나 로드에 실패하면 TournamentCampaignMedia 가 스스로 종목 그래픽
+            폴백을 그린다(목업 사진 없음) — 이 카드가 별도 폴백 마크업을 갖지 않는다. */}
+        <TournamentCampaignMedia
+          src={item.heroImageUrl}
+          sportCode={item.tournament.sport.code}
+          alt=""
+          className={styles.image}
+        />
         <span className={`tm-badge ${status.badgeClass} ${styles.status}`}>{status.label}</span>
       </div>
 

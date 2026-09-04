@@ -310,9 +310,11 @@ export function TournamentsListContent() {
           />
         ) : displayItems.length === 0 ? (
           <EmptyState
+            illustration={{ name: 'journey-done' }}
             title={activeSportLabel ? `${activeSportLabel} 모집 중인 대회가 없어요` : '현재 모집 중인 대회가 없어요'}
             sub={activeSportLabel ? '다른 종목을 선택하거나 새로운 대회 알림을 기다려 주세요.' : '새로운 대회가 열리면 앱 알림으로 안내드릴게요.'}
-            icon={<Trophy size={36} strokeWidth={1.5} />}
+            cta="이벤트 허브 보기"
+            ctaHref="/events"
           />
         ) : (
           <>

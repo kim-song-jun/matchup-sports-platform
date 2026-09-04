@@ -2,15 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
-
-const SPORT_IMAGE_FALLBACKS = {
-  badminton: '/mock/generated/badminton-club.webp',
-  basketball: '/mock/generated/basketball-hardwood.webp',
-  futsal: '/mock/generated/futsal-rooftop.webp',
-  hockey: '/mock/generated/ice-hockey-arena.webp',
-} as const;
-
-const DEFAULT_IMAGE_FALLBACK = '/mock/generated/team-huddle.webp';
+import { getSportAccent } from '@/lib/v1-sport-accent';
+import { sportIllustration } from '@/components/matches/matches.card-model';
 
 type TournamentCampaignMediaProps = {
   readonly src?: string | null;
@@ -20,6 +13,13 @@ type TournamentCampaignMediaProps = {
   readonly eager?: boolean;
 };
 
+/**
+ * 대회 캠페인 미디어 — 실제 사진이 없거나(신청 전) 로드 실패(깨진 URL)면 목업 사진
+ * (`/mock/generated/*.webp`) 대신 종목 액센트로 틴트한 패널 + 종목 그래픽을 보여준다.
+ * alpha 실측(2026-09-04)에서 실제 대회에 목업 사진(배드민턴 클럽·풋살 루프탑 등)이
+ * 그 대회의 사진처럼 붙어 있었다 — 없으면 없다고 보여준다(matches-page.tsx
+ * SportIllustration 패턴을 그대로 따른다).
+ */
 export function TournamentCampaignMedia({
   src,
   sportCode,
@@ -27,17 +27,33 @@ export function TournamentCampaignMedia({
   className,
   eager = false,
 }: TournamentCampaignMediaProps) {
-  const fallbackSrc = getSportImageFallback(sportCode);
-  const requestedSrc = src?.trim() || fallbackSrc;
+  const requestedSrc = src?.trim() || null;
   const [currentSrc, setCurrentSrc] = useState(requestedSrc);
-  const [hidden, setHidden] = useState(false);
+  const [errored, setErrored] = useState(false);
 
   useEffect(() => {
     setCurrentSrc(requestedSrc);
-    setHidden(false);
+    setErrored(false);
   }, [requestedSrc]);
 
-  if (hidden) return null;
+  if (!currentSrc || errored) {
+    const accent = getSportAccent(sportCode);
+    return (
+      <div
+        className={`tm-campaign-media-fallback${className ? ` ${className}` : ''}`}
+        style={{ background: `linear-gradient(135deg, ${accent.dot}, ${accent.gradientTo})` }}
+        aria-hidden="true"
+      >
+        <Image
+          className="tm-campaign-media-illustration"
+          src={`/illustrations/${sportIllustration(accent.label)}-640.webp`}
+          alt=""
+          width={640}
+          height={640}
+        />
+      </div>
+    );
+  }
 
   return (
     <Image
@@ -47,29 +63,7 @@ export function TournamentCampaignMedia({
       height={900}
       className={className}
       priority={eager}
-      onError={() => {
-        if (currentSrc === fallbackSrc) {
-          setHidden(true);
-          return;
-        }
-        setCurrentSrc(fallbackSrc);
-      }}
+      onError={() => setErrored(true)}
     />
   );
-}
-
-function getSportImageFallback(sportCode: string): string {
-  switch (sportCode) {
-    case 'badminton':
-      return SPORT_IMAGE_FALLBACKS.badminton;
-    case 'basketball':
-      return SPORT_IMAGE_FALLBACKS.basketball;
-    case 'futsal':
-      return SPORT_IMAGE_FALLBACKS.futsal;
-    case 'hockey':
-    case 'ice_hockey':
-      return SPORT_IMAGE_FALLBACKS.hockey;
-    default:
-      return DEFAULT_IMAGE_FALLBACK;
-  }
 }

@@ -35,7 +35,11 @@ export function toTeamMatch(match: V1TeamMatch, fallback: TeamMatchModel): TeamM
     ...fallback,
     id: match.teamMatchId ?? match.id ?? fallback.id,
     title: match.title,
-    imageUrl: match.imageUrl ?? fallback.imageUrl,
+    // image 도 목업의 폴백으로 쓰지 않는다(웨이브4, 2026-09-04) — 예전엔 `fallback.imageUrl`
+    // (목업 사진 team-huddle.webp/futsal-rooftop.webp)로 메워서 사진 없는 실제 팀매치에
+    // 다른 매치의 옥상 풋살 사진이 그대로 붙었다(matches.card-model.ts의 image와 같은 결함).
+    // 없으면 null 로 두고 화면이 종목 그래픽(sportIllustration)을 그린다.
+    imageUrl: match.imageUrl ?? null,
     // 목업(team-matches.view-model.ts)을 사실 값의 폴백으로 쓰지 않는다 — 폴백이 걸리면
     // 실제 매치에 **존재하지 않는 팀 이름**('FC 발빠른놈들')과 남의 경기장·지역이 붙었다.
     sport: match.sport?.name ?? match.sportName ?? '',
@@ -105,6 +109,17 @@ export function buildSportChips({
       ...(hasMasterSportIds ? { href: buildTeamMatchHref(params, { sportId: sport.id, filter: null }) } : {}),
     })),
   ];
+}
+
+/**
+ * 목록 요약 줄의 지역 라벨 — 예전엔 실제 선택 여부와 무관하게 "서울 전체"를 그대로 하드코딩
+ * 했다(2026-09-04 발견, matches.view-model.ts 의 같은 하드코딩과 짝). 목록에는 아직 지역
+ * 필터가 없어 `selectedRegionName`은 지금은 항상 undefined지만, 값이 없는 상태를 지어낸
+ * "서울"이 아니라 정직하게 "전체"로 보여준다 — 나중에 지역 필터가 추가돼도 이 함수만
+ * 인자를 받으면 되고 호출부를 다시 고칠 필요가 없다.
+ */
+export function buildTeamMatchSummaryLabel(selectedRegionName?: string | null): string {
+  return `${selectedRegionName ?? '전체'} · 팀매치`;
 }
 
 export function buildTeamMatchHref(params: URLSearchParams, overrides: Record<string, string | null>) {

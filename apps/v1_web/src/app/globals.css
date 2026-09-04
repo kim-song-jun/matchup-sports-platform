@@ -3409,6 +3409,44 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   gap: 12px;
 }
 
+/*
+ * 사진 없는 팀매치의 VS 카드/히어로 배경 — matches.tm-match-media-sport 와 같은 이유(웨이브4,
+ * 2026-09-04). 이쪽은 matches 히어로와 달리 양옆에 팀 이름 텍스트가 항상 있어(비어 있는 쪽이
+ * 없다) 그래픽을 우하단 모서리에 살짝 걸치듯 배치하고, overflow:hidden 으로 카드 밖 노출을
+ * 막는다. z-index 를 음수로 둬 흰 텍스트(비-포지션 콘텐츠)가 항상 그 위에 그려지게 한다 —
+ * CSS 페인트 순서상 음수 z-index 자식은 비-포지션 콘텐츠보다 아래에 그려진다(CSS2.1 Appendix E).
+ */
+.tm-team-vs-hero-sport,
+.tm-team-match-vs-sport {
+  background: var(--blue700);
+  position: relative;
+  overflow: hidden;
+  /* z-index:-1 그래픽이 부모 배경 뒤로 빠지지 않도록 여기서 stacking context 를 만든다 —
+     position:relative 만으로는 만들어지지 않아 그래픽이 통째로 보이지 않았다. */
+  isolation: isolate;
+}
+
+/* 팀 이름이 좌우에 있는 VS 레이아웃이라 그래픽은 하단 우측 안쪽에 두고(잘리지 않게) 텍스트 뒤(z-index:-1)에 깐다. */
+.tm-team-vs-hero-illustration {
+  position: absolute;
+  z-index: -1;
+  right: 16px;
+  bottom: 16px;
+  width: 120px;
+  height: 120px;
+  pointer-events: none;
+}
+
+.tm-team-match-vs-illustration {
+  position: absolute;
+  z-index: -1;
+  right: 12px;
+  bottom: 12px;
+  width: 88px;
+  height: 88px;
+  pointer-events: none;
+}
+
 .tm-team-create-preview {
   height: 132px;
   margin-top: 16px;
@@ -6157,7 +6195,7 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 /* [R-T1 타입 위계 정리] 22px 하드코딩 → --font-size-subhead(20px) 토큰 + weight 700
    명시(기존엔 미지정 → Tailwind preflight로 h1이 400 상속, 대회명이 본문보다 안 굵어
    보였다). 대진표 페이지 콘텐츠 중 가장 큰 tier(1단계: 대회명). */
-.tm-bracket-page-intro h1 {
+.tm-bracket-page-intro h2 {
   margin: 0;
   color: var(--text-strong);
   font-size: var(--font-size-subhead);

@@ -48,6 +48,7 @@ import { getTeamDetailViewModel, getTeamListViewModel, getTeamMembersViewModel, 
 import {
   buildTeamHref,
   buildTeamSportChips,
+  deriveTeamScope,
   formatTeamRegion,
   isTeamAtCapacity,
   splitTeamRegion,
@@ -92,6 +93,7 @@ export function TeamListPageClient() {
   const sportCounts = useV1Teams(sportCountFilters, { enabled: Boolean(selectedSportId) });
   const recentSearches = useV1RecentSearches();
   const recordSearch = useV1RecordSearch();
+  const selectedSportName = selectedSportId ? sports.data?.find((sport) => sport.id === selectedSportId)?.name : undefined;
 
   const base = getTeamListViewModel();
   const items = query.data?.items;
@@ -142,6 +144,7 @@ export function TeamListPageClient() {
     listLoading: isListLoading,
     summary: {
       ...base.summary,
+      scope: deriveTeamScope(selectedSportName),
       total: visibleTeams.length,
       recruiting: visibleTeams.filter((item) => item.status === 'open').length,
       nearby: undefined,
@@ -171,28 +174,6 @@ export function TeamListPageClient() {
   function updateTeamUrl(nextQuery: string) {
     router.replace(buildTeamHref(searchParams, { q: nextQuery || null, filter: null }), { scroll: false });
   }
-}
-
-export function TeamFilterPageClient() {
-  const query = useV1Teams({ joinPolicy: 'approval_required', sort: 'recommended', limit: 20 });
-  const base = getTeamStateViewModel('filter');
-
-  if (query.isError) return <TeamStatePageView model={getTeamStateViewModel('error')} />;
-
-  const items = query.data?.items;
-  const model = items
-    ? {
-        ...base,
-        teams: items.map((item, index) => toTeam(item, base.teams[index] ?? base.teams[0])),
-        summary: {
-          ...base.summary,
-          total: items.length,
-          recruiting: items.filter((item) => item.joinPolicy === 'approval_required').length,
-        },
-      }
-    : base;
-
-  return <TeamStatePageView model={model} />;
 }
 
 /**

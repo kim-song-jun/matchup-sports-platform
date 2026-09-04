@@ -1082,6 +1082,8 @@ describe('ProfileService withdrawal admin lockout', () => {
       },
       v1Team: { update: jest.fn().mockResolvedValue({}) },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },
+      v1PushSubscription: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      v1PushDevice: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       $queryRaw: jest.fn().mockResolvedValue([]),
       v1TournamentPlayer: { findMany: jest.fn().mockResolvedValue([]), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       $transaction: jest.fn(),
@@ -1145,6 +1147,13 @@ describe('ProfileService withdrawal admin lockout', () => {
     expect(prisma.v1User.update).toHaveBeenCalledWith({
       where: { id: user.id },
       data: { accountStatus: 'withdrawal_pending' },
+    });
+    expect(prisma.v1PushSubscription.deleteMany).toHaveBeenCalledWith({
+      where: { userId: user.id },
+    });
+    expect(prisma.v1PushDevice.updateMany).toHaveBeenCalledWith({
+      where: { userId: user.id, revokedAt: null },
+      data: { revokedAt: expect.any(Date) },
     });
   });
 

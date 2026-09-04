@@ -108,9 +108,10 @@
 
 - `reason`은 선택 문자열 또는 null, 최대 500자다.
 - 현재 `accountStatus=active`인 사용자만 `withdrawal_pending`으로 전이할 수 있다.
-- 서비스는 사용자 행을 `FOR UPDATE`로 잠근 뒤 최신 계정 상태와 운영자 상태를 다시 확인하고, 상태 변경과 `V1StatusChangeLog` 기록을 같은 트랜잭션에서 처리한다.
+- 서비스는 사용자 행을 `FOR UPDATE`로 잠근 뒤 최신 계정 상태와 운영자 상태를 다시 확인하고, 상태 변경·활성 멤버십/로스터 정리·웹 Push 구독 삭제·네이티브 Push 기기 revoke·`V1StatusChangeLog` 기록을 같은 트랜잭션에서 처리한다.
 - active 운영자는 이 self-service 경로로 사용자 계정을 비활성화할 수 없다. owner가 먼저 운영자 접근을 revoke해야 하며, 위반하면 `403 ADMIN_WITHDRAWAL_FORBIDDEN`이다.
 - 성공 응답은 `{ userId, accountStatus: "withdrawal_pending", requestedAt }`이다.
+- 관리자 최종 삭제는 FCM/APNs 토큰과 웹 Push endpoint를 영구 제거하고, 프로필의 실명·생년월일·성별·표시 지역 및 활동 지역·선호 종목·검색 기록·인증 토큰을 삭제 또는 비식별화한다. 완료 경기·결제·분쟁·감사 기록처럼 별도 보관 근거가 있는 데이터는 해당 정책을 따른다.
 
 ## Permission / Error Rules
 

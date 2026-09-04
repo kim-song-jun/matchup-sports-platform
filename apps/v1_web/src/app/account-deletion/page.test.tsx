@@ -16,6 +16,8 @@ describe('AccountDeletionPage', () => {
       expect.stringMatching(/^mailto:teameetsports@naver\.com\?/),
     );
     expect(screen.getByText(/본인 확인을 추가로 요청할 수 있어요/)).toBeInTheDocument();
+    expect(screen.getByText(/로그인과 푸시 알림 등록을 즉시 중지해요/)).toBeInTheDocument();
+    expect(screen.getByText(/활동 지역과 검색 기록을 삭제하거나 식별할 수 없게 처리해요/)).toBeInTheDocument();
     expect(screen.getByText(/제한적으로 보관될 수 있어요/)).toBeInTheDocument();
   });
 });

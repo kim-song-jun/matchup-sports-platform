@@ -91,3 +91,34 @@ An AAB or passing JVM suite is not delivery proof. Fresh-install permission allo
 background, terminated receipt, notification tap, token refresh, logout revoke, multi-device delivery,
 authenticated file download/opening, Samsung/stock Android coverage, and Alpha-versus-production negative
 control remain mandatory real-device verdicts.
+
+## Play policy gates: items 2-6
+
+This checklist covers Data safety/privacy, account deletion, permissions, WebView quality, and technical
+release requirements. Reviewer-account setup and the closed-testing cohort are tracked separately and
+are intentionally outside this follow-up.
+
+1. Run `node scripts/qa/check-android-play-policy.mjs`. It checks the shipped manifest permission set,
+   hardened WebView/file-picker rules, account-deletion cleanup hooks, public deletion route, and Data
+   safety worksheet against the current source tree.
+2. Reconcile every Play Console Data safety answer with
+   `apps/v1_android/play/data-safety.md`, the exact release AAB, and the active processors. Product/legal
+   must decide Play's “shared” classification and confirm retention periods; implementation evidence does
+   not replace that approval.
+3. Probe `https://teameet.co.kr/terms?document=privacy` and
+   `https://teameet.co.kr/account-deletion` after the production web deployment. Exercise both the
+   in-app withdrawal request and operator final-deletion path. A request immediately locks login and stops
+   push delivery; final deletion performs the broader PII and identifier cleanup.
+4. Inspect the merged release manifest. The application-owned permission set is limited to
+   `INTERNET`, `ACCESS_COARSE_LOCATION`, and `POST_NOTIFICATIONS`; any SDK-added permission is a
+   release blocker until the declaration and runtime behavior are reviewed.
+5. Repeat the WebView matrix on the Play-distributed build: status/navigation insets, IME resize,
+   centered feedback, renderer recovery, main-frame error UI, Kakao sign-in inside the reviewed origin
+   allowlist, system file picker, download/open, external maps, and notification deep links.
+6. Confirm `compileSdk`/`targetSdk` 36, monotonically increasing `versionCode`, production
+   debuggability disabled, TLS-only origin, signing/Firebase fail-closed gates, and the AAB checksum.
+   Current policy CI runs build-tools 36 `zipalign -c -P 16` against the AAB so the transitive DataStore
+   native libraries keep the 16 KB ZIP alignment required by the existing release baseline.
+
+Source gates and local JVM/UI checks reduce drift, but they do not replace Play Console declarations,
+pre-launch reports, signed-distribution checks, or physical OEM/device evidence.

@@ -50,9 +50,10 @@ export default function AccountDeletionPage() {
           <Card pad={16}>
             <h2 className="tm-text-body-lg" style={{ margin: 0 }}>처리 범위</h2>
             <ul className="tm-text-caption" style={{ margin: '10px 0 0', paddingLeft: 20, lineHeight: 1.7 }}>
-              <li>요청 확인 후 계정과 계정에 연결된 개인정보의 삭제 절차를 진행해요.</li>
+              <li>앱에서 탈퇴 요청이 접수되면 로그인과 푸시 알림 등록을 즉시 중지해요.</li>
+              <li>본인 확인 후 연락처, 로그인 연결 정보, 프로필 기본 정보, 활동 지역과 검색 기록을 삭제하거나 식별할 수 없게 처리해요.</li>
               <li>진행 중인 매치나 팀 운영 권한이 있으면 먼저 정리가 필요할 수 있어요.</li>
-              <li>법령 준수, 분쟁 대응, 부정 이용 방지를 위해 필요한 정보는 개인정보처리방침에 적힌 기간 동안 제한적으로 보관될 수 있어요.</li>
+              <li>완료된 경기 기록, 결제·환불, 분쟁·부정 이용 대응 기록은 개인정보처리방침에 적힌 목적과 기간에 한해 제한적으로 보관될 수 있어요.</li>
             </ul>
             <Link
               className="tm-btn tm-btn-md tm-btn-ghost tm-btn-block"

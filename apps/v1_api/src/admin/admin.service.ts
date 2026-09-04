@@ -393,8 +393,13 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
           nickname: buildDeletedNickname(userId),
           displayName: '탈퇴 회원',
           realName: null,
+          gender: null,
+          birthDate: null,
           bio: null,
           profileImageUrl: null,
+          displayRegion: null,
+          visibility: 'private',
+          tournamentRealNameVisible: false,
           deletedAt,
         },
       });
@@ -408,6 +413,15 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         where: { userId, state: 'GRANTED' },
         data: { state: 'REVOKED', effectiveAt: deletedAt },
       });
+      // 탈퇴 요청 단계에서는 기기 등록을 revoked 상태로 남겨 운영 이력을 보존하지만,
+      // 최종 삭제 단계에서는 FCM/APNs 토큰과 웹 Push endpoint 자체가 더 이상 필요하지
+      // 않다. 둘 다 재식별 가능한 기기 식별자이므로 계정 삭제 트랜잭션 안에서 제거한다.
+      await tx.v1PushSubscription.deleteMany({ where: { userId } });
+      await tx.v1PushDevice.deleteMany({ where: { userId } });
+      await tx.v1UserRegion.deleteMany({ where: { userId } });
+      await tx.v1UserSportPreference.deleteMany({ where: { userId } });
+      await tx.v1SearchHistory.deleteMany({ where: { userId } });
+      await tx.v1VerificationToken.deleteMany({ where: { userId } });
       const result = await this.writeAdminStatusLogs(
         admin,
         {

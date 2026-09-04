@@ -2306,8 +2306,12 @@ export function WithdrawalPageClient() {
                   <div className="tm-text-caption">탈퇴 신청 후 계정 확인 절차가 진행돼요</div>
                 </div>
                 <div>
+                  <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>알림 중지</div>
+                  <div className="tm-text-caption">요청 접수와 동시에 이 계정의 푸시 등록을 해제해요</div>
+                </div>
+                <div>
                   <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>보관 데이터</div>
-                  <div className="tm-text-caption">법령에 따른 보관 기간이 지나면 삭제돼요</div>
+                  <div className="tm-text-caption">완료 경기·결제·분쟁 기록은 정해진 목적과 기간에 한해 보관돼요</div>
                 </div>
               </div>
             ) : null}

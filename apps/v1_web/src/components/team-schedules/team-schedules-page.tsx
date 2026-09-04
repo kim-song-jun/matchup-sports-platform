@@ -907,7 +907,7 @@ export function MySchedulePageView({ model }: { model: MyScheduleViewModel }) {
         ) : model.loading ? (
           <PageSkeleton variant="list" />
         ) : model.items.length === 0 ? (
-          <EmptyState title={model.emptyTitle} sub={model.emptySub} />
+          <EmptyState fill illustration={{ name: 'landing-hero' }} title={model.emptyTitle} sub={model.emptySub} />
         ) : (
           <div className="tm-my-list-stack">
             {model.items.map((item) => (

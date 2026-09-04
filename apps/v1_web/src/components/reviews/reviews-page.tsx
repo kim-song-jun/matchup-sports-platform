@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
-import { Card, KPIStat } from '@/components/v1-ui/primitives';
+import { Card, EmptyState, ErrorState, KPIStat } from '@/components/v1-ui/primitives';
 import { ChevronRightIcon } from '@/components/v1-ui/icons';
 import { SegmentedTabs, type SegmentedTabsItem } from '@/components/v1-ui/segmented-tabs';
 import { cssUrl } from '@/lib/assets';
@@ -59,12 +59,13 @@ export function ReviewsPageView({
           <>
             {loading ? <ReviewSkeleton count={2} /> : null}
             {!loading && errorMessage ? (
-              <ReviewNotice title="리뷰를 불러오지 못했어요" sub={errorMessage} onRetry={onRetry} />
+              <ErrorState title="리뷰를 불러오지 못했어요" message={errorMessage} onRetry={onRetry} />
             ) : null}
             {/* 요약 카드는 집계 0건이면 스스로 렌더하지 않는다 — 개별 리뷰까지 0건이면 화면에
                 아무것도 남지 않으므로(실측: 완전 빈 화면) 여기서 빈 상태를 책임진다. */}
             {!loading && !errorMessage && !hasReceivedContent ? (
-              <ReviewEmpty
+              <EmptyState
+                illustration={{ name: 'journey-done' }}
                 title="아직 받은 리뷰가 없어요"
                 sub="경기가 끝나고 함께 뛴 사람들이 리뷰를 남기면 여기에 모여요."
               />
@@ -95,8 +96,15 @@ export function ReviewsPageView({
             <ReviewStats stats={model.stats} />
             <div style={{ display: 'grid', gap: 12 }}>
               {loading ? <ReviewSkeleton count={2} /> : null}
-              {!loading && errorMessage ? <ReviewNotice title="리뷰를 불러오지 못했어요" sub={errorMessage} onRetry={onRetry} /> : null}
-              {!loading && !errorMessage && model.cards.length === 0 ? <ReviewEmpty title={model.emptyTitle} sub={model.emptySub} /> : null}
+              {!loading && errorMessage ? <ErrorState title="리뷰를 불러오지 못했어요" message={errorMessage} onRetry={onRetry} /> : null}
+              {!loading && !errorMessage && model.cards.length === 0 ? (
+                <EmptyState
+                  illustration={{ name: 'journey-done' }}
+                  title={model.emptyTitle}
+                  sub={model.emptySub}
+                  {...(model.tab === 'pending' ? { cta: '매치 둘러보기', ctaHref: '/matches' } : {})}
+                />
+              ) : null}
               {!loading && !errorMessage ? model.cards.map((card) => (
                 <Link key={`${card.sourceType}:${card.sourceId}`} className="tm-review-schedule-card tm-pressable" href={card.href}>
                   <div className="tm-review-card-head">
@@ -172,7 +180,7 @@ export function ReviewSourcePageView({
     <>
       <div className="tm-review-shell tm-review-compose-shell tm-content-enter">
         {loading ? <ReviewSkeleton count={3} /> : null}
-        {!loading && errorMessage ? <ReviewNotice title="리뷰 대상을 불러오지 못했어요" sub={errorMessage} onRetry={onRetry} /> : null}
+        {!loading && errorMessage ? <ErrorState title="리뷰 대상을 불러오지 못했어요" message={errorMessage} onRetry={onRetry} /> : null}
         {!loading && !errorMessage && model ? (
           <>
             <Card pad={16}>
@@ -227,63 +235,6 @@ export function ReviewSourcePageView({
   );
 }
 
-export function ReviewsReceivedPageView({
-  errorMessage,
-  hasManagedTeam,
-  loading,
-  model,
-  onPeriodChange,
-  onRetry,
-  onTeamPeriodChange,
-  period,
-  summary,
-  summaryLoading,
-  teamPeriod,
-  teamSummary,
-  teamSummaryLoading,
-}: QueryStateProps & {
-  hasManagedTeam: boolean;
-  model: ReviewsReceivedPageModel;
-  onPeriodChange: (period: string | null) => void;
-  onTeamPeriodChange: (period: string | null) => void;
-  period: string | null;
-  summary: V1ReviewReceivedSummaryResponse | undefined;
-  summaryLoading: boolean;
-  teamPeriod: string | null;
-  teamSummary: V1ReviewReceivedSummaryResponse | undefined;
-  teamSummaryLoading: boolean;
-}) {
-  // 로딩·에러 중엔 아직 "레거시 리뷰가 없다"고 단정할 수 없으므로 섹션을 숨기지 않는다.
-  // (모델이 비어있는 것과 로딩/에러로 아직 모르는 것을 구분 — 그렇지 않으면 에러 상태가 조용히 사라진다.)
-  const hasReceivedContent = model.userGroups.length > 0 || model.teamGroups.length > 0;
-  return (
-    // #24: 뒤로가기는 received 탭으로 이동한다 (/my/reviews?tab=received 는 page.tsx에서 파싱됨,
-    // fragments/reviews.ts의 정적 backHref로 이관).
-    <div className="tm-review-shell tm-content-enter">
-      {/* 개별 리뷰가 주인공이고 요약은 보조다 — 예전엔 순서가 반대라 큰 대시보드 두 개를
-          지나야 정작 받은 리뷰 내용이 나왔다. 요약은 집계가 0건이면 스스로 렌더하지 않는다. */}
-      {hasReceivedContent ? <AnonymousReceivedContent model={model} /> : null}
-      <div style={{ display: 'grid', gap: 12, marginTop: hasReceivedContent ? 24 : 0 }}>
-        <ReviewsSummaryDashboard
-          summary={summary}
-          period={period}
-          onPeriodChange={onPeriodChange}
-          loading={summaryLoading}
-          title="내가 받은 리뷰 요약"
-        />
-        {hasManagedTeam ? (
-          <ReviewsSummaryDashboard
-            summary={teamSummary}
-            period={teamPeriod}
-            onPeriodChange={onTeamPeriodChange}
-            loading={teamSummaryLoading}
-            title="내 팀이 받은 리뷰 요약"
-          />
-        ) : null}
-      </div>
-    </div>
-  );
-}
 
 export function ReviewSubmitCompleteView({ model, onConfirm }: { model: ReviewSourcePageModel; onConfirm: () => void }) {
   const reviewed = model.targets.filter((target) => target.alreadySubmitted || target.review).length;
@@ -563,24 +514,7 @@ function ReviewSkeleton({ count }: { count: number }) {
   return Array.from({ length: count }, (_, index) => <div key={index} className="tm-review-skeleton" />);
 }
 
-function ReviewNotice({ onRetry, sub, title }: { onRetry: () => void; sub: string; title: string }) {
-  return (
-    <Card className="tm-review-notice-error" pad={16}>
-      <div className="tm-text-body-lg">{title}</div>
-      <div className="tm-text-caption" style={{ marginTop: 4 }}>{sub}</div>
-      <button className="tm-btn tm-btn-sm tm-btn-neutral" onClick={onRetry} style={{ marginTop: 12 }} type="button">다시 시도</button>
-    </Card>
-  );
-}
 
-function ReviewEmpty({ sub, title }: { sub: string; title: string }) {
-  return (
-    <Card pad={20} style={{ textAlign: 'center' }}>
-      <div className="tm-text-body-lg">{title}</div>
-      <div className="tm-text-caption" style={{ marginTop: 8 }}>{sub}</div>
-    </Card>
-  );
-}
 
 function targetKey(targetType: V1ReviewTargetType, targetUserId: string | null, targetTeamId: string | null) {
   return targetType === 'team' ? `team:${targetTeamId ?? 'unknown'}` : `user:${targetUserId ?? 'unknown'}`;

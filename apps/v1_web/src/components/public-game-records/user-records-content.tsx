@@ -250,12 +250,13 @@ export function UserRecordsContent({
           // 탭이 걸려 있으면 "이 종류가 없다" 가 정확한 설명이다 — 전체 문구를 그대로
           // 쓰면 기록이 있는데도 "아직 등록된 경기 기록이 없어요" 로 읽힌다.
           resolvedActiveType !== 'all' ? (
-            <EmptyState {...recordEmptyCopy(resolvedActiveType, { title: '', sub: '' })} />
+            <EmptyState illustration={{ name: 'journey-done' }} {...recordEmptyCopy(resolvedActiveType, { title: '', sub: '' })} />
           ) : data.viewerIsOwner ? (
             // 본인 페이지에서 0건이면 본인은 동의 여부와 무관하게 이미 자기 기록을 볼 수
             // 있으므로(showOwnerVisibilityBanner가 그 상태를 별도로 알린다), 남는 원인은
             // "대회 라인업에 아직 팀원으로 연결되지 않음" 하나뿐이다.
             <EmptyState
+              illustration={{ name: 'journey-done' }}
               title="아직 등록된 경기 기록이 없어요"
               sub="팀 매니저가 대회 라인업에 회원님을 팀원으로 연결하고, 대회 결과가 확정되면 이곳에 표시돼요."
             />
@@ -272,6 +273,7 @@ export function UserRecordsContent({
             // 그렇다고 "동의를 안 켰다"고 단정하지는 않는다 -- 서버가 원인을 구분해 주지
             // 않으므로 단정은 틀릴 수 있다. 가장 흔한 원인을 앞에 두되 나머지도 함께 적는다.
             <EmptyState
+              illustration={{ name: 'journey-done' }}
               title="공개된 경기 기록이 없어요"
               sub="이 선수가 경기 기록 공개를 켜면 이곳에 표시돼요. 대회 결과가 확정되기 전이거나 팀 라인업에 연결되지 않은 경기는 표시되지 않아요."
             />

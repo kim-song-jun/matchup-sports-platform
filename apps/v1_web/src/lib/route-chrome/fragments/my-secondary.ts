@@ -19,7 +19,12 @@ export const MY_SECONDARY_ROUTES: RouteChromeEntry[] = [
     chrome: { title: '문의 상세', activeTab: 'my', bottomNav: false, backHref: '/my/inquiries', desktopHead: true },
   },
 
-  { pattern: '/my/leagues', chrome: { title: '내 리그', activeTab: 'tournaments', backHref: '/my' } },
+  // 2026-09-04 감사: 이 항목만 activeTab 이 'tournaments' 였고 bottomNav·desktopHead 가 빠져
+  // 데스크톱에 제목·뒤로가기가 없었다(자체 헤드는 정의되지 않은 클래스를 쓰고 있었다).
+  {
+    pattern: '/my/leagues',
+    chrome: { title: '내 리그', activeTab: 'my', bottomNav: false, backHref: '/my', desktopHead: true },
+  },
 
   {
     pattern: '/my/tournament-staff',

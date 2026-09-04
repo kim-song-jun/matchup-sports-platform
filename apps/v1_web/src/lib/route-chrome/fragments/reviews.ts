@@ -18,13 +18,16 @@ export const REVIEWS_ROUTES: RouteChromeEntry[] = [
     chrome: {
       title: '리뷰',
       activeTab: 'my',
+      // 자식 두 라우트와 같이 하단 내비를 숨긴다 — /my 에서 들어온 상세 흐름이라 탭이 남으면
+      // 뒤로가기 스택과 어긋난다(2026-09-04 감사: 이 항목만 빠져 있었다).
+      bottomNav: false,
       backHref: '/my',
       desktopHead: true,
     },
   },
   {
-    // 받은 리뷰 — reviews-page.tsx:260. 뒤로가기는 목록의 받은리뷰 탭으로
-    // (`/my/reviews?tab=received`, page.tsx가 그 쿼리를 파싱).
+    // 받은 리뷰 — 라우트는 `/my/reviews?tab=received` 로 redirect 만 한다(중복 화면 정리,
+    // 2026-09-04). 리다이렉트 프레임에서도 셸이 깜빡이지 않도록 항목은 남긴다.
     pattern: '/my/reviews/received',
     chrome: {
       title: '받은 리뷰',

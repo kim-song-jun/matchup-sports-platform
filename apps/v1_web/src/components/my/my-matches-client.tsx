@@ -12,34 +12,16 @@ export function MyMatchesPageClient({ mode }: { mode: 'joined' | 'created' }) {
 
   const model: MyMatchesViewModel = {
     mode,
-    title: mode === 'joined' ? '참여한 매치' : '내가 만든 매치',
     matches,
     summary: buildSummary(mode, matches),
-    apiNotice: getApiNotice(query.isLoading, query.isError),
+    loading: query.isLoading,
+    error: query.isError,
+    onRetry: () => void query.refetch(),
   };
 
   return <MyMatchesPageView model={model} />;
 }
 
-function getApiNotice(isLoading: boolean, isError: boolean): MyMatchesViewModel['apiNotice'] {
-  if (isLoading) {
-    return {
-      title: '내 매치를 불러오고 있어요',
-      body: '잠깐만 기다려 주세요.',
-      tone: 'info',
-    };
-  }
-
-  if (isError) {
-    return {
-      title: '매치 목록을 불러오지 못했어요',
-      body: '잠시 후 다시 시도해 주세요. 계속되면 새로고침해 보세요.',
-      tone: 'warning',
-    };
-  }
-
-  return undefined;
-}
 
 function toMyMatch(match: V1Match): MyMatch {
   const status = toMyStatus(match);

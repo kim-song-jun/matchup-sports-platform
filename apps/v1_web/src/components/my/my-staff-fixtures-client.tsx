@@ -74,6 +74,7 @@ export function MyStaffFixturesPageClient({ tournamentId }: { tournamentId: stri
     return (
       <Shell>
         <EmptyState
+          illustration={{ name: 'journey-done' }}
           title="이 대회의 담당 배정이 없어요"
           sub="배정이 만료되었거나 해제됐어요. 대회 운영진에게 문의해 주세요."
         />
@@ -88,6 +89,7 @@ export function MyStaffFixturesPageClient({ tournamentId }: { tournamentId: stri
       </p>
       {mine.length === 0 ? (
         <EmptyState
+          illustration={{ name: 'journey-done' }}
           title="아직 담당 경기가 배정되지 않았어요"
           sub="대회 운영진이 담당 경기를 지정하면 여기에 표시돼요. 지정 전에는 경기 운영 화면에 들어갈 수 없어요."
         />

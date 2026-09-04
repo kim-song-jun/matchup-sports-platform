@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useV1MyTeams, useV1ReceivedReviews, useV1ReceivedReviewSummary, useV1Reviews, useV1ReviewSource, useV1SubmitReview } from '@/hooks/use-v1-api';
 import type { V1ReviewSourceType, V1ReviewTargetType } from '@/types/api';
-import { ReviewSourcePageView, ReviewsPageView, ReviewsReceivedPageView, ReviewSubmitCompleteView } from './reviews-page';
+import { ReviewSourcePageView, ReviewsPageView, ReviewSubmitCompleteView } from './reviews-page';
 import { DEFAULT_REVIEW_RATING, type ReviewMetricDraft, type ReviewTargetDraft, type ReviewsTab } from './reviews.types';
 import { toReviewSourcePageModel, toReviewsPageModel, toReviewsReceivedPageModel } from './reviews.view-model';
 
@@ -181,34 +181,6 @@ export function ReviewSourcePageClient({
   );
 }
 
-export function ReviewsReceivedPageClient() {
-  const [period, setPeriod] = useState<string | null>(null);
-  const [teamPeriod, setTeamPeriod] = useState<string | null>(null);
-  const query = useV1ReceivedReviews();
-  const summaryQuery = useV1ReceivedReviewSummary('user', period ?? undefined);
-  const teamsQuery = useV1MyTeams();
-  const hasManagedTeam = (teamsQuery.data?.items ?? []).some((team) => team.canManage);
-  const teamSummaryQuery = useV1ReceivedReviewSummary('team', teamPeriod ?? undefined, { enabled: hasManagedTeam });
-  const model = useMemo(() => toReviewsReceivedPageModel(query.data), [query.data]);
-
-  return (
-    <ReviewsReceivedPageView
-      errorMessage={query.error instanceof Error ? query.error.message : null}
-      hasManagedTeam={hasManagedTeam}
-      loading={query.isLoading}
-      model={model}
-      onPeriodChange={setPeriod}
-      onRetry={() => void query.refetch()}
-      onTeamPeriodChange={setTeamPeriod}
-      period={period}
-      summary={summaryQuery.data}
-      summaryLoading={summaryQuery.isLoading}
-      teamPeriod={teamPeriod}
-      teamSummary={teamSummaryQuery.data}
-      teamSummaryLoading={teamSummaryQuery.isLoading}
-    />
-  );
-}
 
 function targetKey(targetType: V1ReviewTargetType, targetUserId: string | null, targetTeamId: string | null) {
   return targetType === 'team' ? `team:${targetTeamId ?? 'unknown'}` : `user:${targetUserId ?? 'unknown'}`;

@@ -72,12 +72,11 @@ import {
   MyInvitationsPageView,
   MyJoinApplicationsPageView,
   SettingsPageView,
-  MyTeamMembersPageView,
   MyTeamsPageView,
 } from './my-page';
 import { ErrorState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
-import type { MyHomeViewModel, MyInvitationItem, MyJoinApplicationItem, MyJoinApplicationsViewModel, MyMember, MyTeam, MyTeamMembersViewModel, MyTeamsViewModel } from './my.types';
+import type { MyHomeViewModel, MyInvitationItem, MyJoinApplicationItem, MyJoinApplicationsViewModel, MyTeam, MyTeamsViewModel } from './my.types';
 import { myHomeModel, settingsModel } from './my.view-model';
 import { RECORD_CONSENT_POLICY_HASH } from '@/lib/record-consent';
 import { isNativePushAvailable, requestNativePush } from '@/lib/native-push';
@@ -295,64 +294,6 @@ export function MyJoinApplicationsPageClient() {
 }
 
 
-export function MyTeamMembersPageClient({ teamId }: { teamId: string }) {
-  const [activeTab, setActiveTab] = useState<MyTeamMembersViewModel['activeTab']>('members');
-  const team = useV1TeamDetail(teamId);
-  const canViewMembers = Boolean(team.data?.canViewMembers);
-  const members = useV1TeamMembers(teamId, { limit: 50 }, { enabled: canViewMembers });
-  const canReviewApplications = isTeamOperatorRole(team.data?.viewer.role);
-  const applications = useV1TeamJoinApplications(teamId, { status: 'requested', limit: 50 }, { enabled: canReviewApplications });
-  const changeRole = useV1ChangeTeamMembershipRole(teamId);
-  const removeMember = useV1RemoveTeamMembership(teamId);
-  const approveApplication = useV1ApproveTeamJoinApplication(teamId);
-  const rejectApplication = useV1RejectTeamJoinApplication(teamId);
-  const { confirm, ConfirmModal } = useConfirm();
-  const items = members.data?.items ?? [];
-  const requests = applications.data?.items ?? [];
-  const actionPending = changeRole.isPending || removeMember.isPending || approveApplication.isPending || rejectApplication.isPending;
-  const viewerRole = team.data?.viewer.role;
-  const canManageMembers = isTeamOperatorRole(viewerRole);
-  const canDelegateOwner = viewerRole === 'owner';
-  const model = {
-    teamName: team.data?.name ?? '팀',
-    activeTab,
-    tabs: [
-      { key: 'members' as const, label: '멤버', count: members.data?.summary.memberCount ?? items.length, onSelect: () => setActiveTab('members') },
-      { key: 'requests' as const, label: '가입 신청', count: requests.length, onSelect: () => setActiveTab('requests') },
-    ],
-    summary: [
-      { label: '전체', value: members.data?.summary.memberCount ?? items.length, unit: '명' },
-      { label: '운영진', value: members.data ? members.data.summary.ownerCount + members.data.summary.managerCount : 0, unit: '명' },
-      { label: '요청', value: requests.length, unit: '명' },
-    ],
-    members: items.map((member) =>
-      toMyMember(member, {
-        actionPending,
-        canManageMembers,
-        canDelegateOwner,
-        promote: () => confirmAction(confirm, { title: '운영진 지정', message: `${member.displayName}님을 운영진으로 지정할까요?` }, () => changeRole.mutate({ membershipId: member.membershipId, role: 'manager' })),
-        delegateOwner: () => confirmAction(confirm, { title: '팀장 위임', message: `${member.displayName}님에게 팀장을 위임할까요? 위임 후 현재 팀장은 운영진이 돼요.`, tone: 'danger' }, () => changeRole.mutate({ membershipId: member.membershipId, role: 'owner' })),
-        demote: () => confirmAction(confirm, { title: '멤버 강등', message: `${member.displayName}님을 멤버로 강등할까요?` }, () => changeRole.mutate({ membershipId: member.membershipId, role: 'member' })),
-        remove: () => confirmAction(confirm, { title: '멤버 내보내기', message: `${member.displayName}님을 팀에서 내보낼까요?`, tone: 'danger' }, () => removeMember.mutate({ membershipId: member.membershipId, reason: 'removed_from_v1_web_my_member_page' })),
-      }),
-    ),
-    requests: requests.map((application) =>
-      toMyJoinRequest(application, {
-        actionPending,
-        approve: () => confirmAction(confirm, { title: '가입 신청 승인', message: `${application.applicant.displayName}님의 가입 신청을 승인할까요?`, confirmLabel: '승인' }, () => approveApplication.mutate({ applicationId: application.applicationId, note: null })),
-        reject: () => confirmAction(confirm, { title: '가입 신청 거절', message: `${application.applicant.displayName}님의 가입 신청을 거절할까요?`, confirmLabel: '거절', tone: 'danger' }, () => rejectApplication.mutate({ applicationId: application.applicationId, reason: 'rejected_from_v1_web_my_member_page' })),
-      }),
-    ),
-  };
-
-  return (
-    <>
-      {/* 확인 모달 — window.confirm 대체 */}
-      {ConfirmModal}
-      <MyTeamMembersPageView model={model} backHref={`/teams/${teamId}`} />
-    </>
-  );
-}
 
 export function ProfileEditPageClient() {
   const router = useRouter();
@@ -2491,63 +2432,7 @@ function toTeamDetailModel(team: V1TeamDetail): MyTeam {
   };
 }
 
-function toMyMember(
-  member: V1TeamMember,
-  actions?: {
-    actionPending: boolean;
-    canManageMembers: boolean;
-    canDelegateOwner: boolean;
-    promote: () => void;
-    delegateOwner: () => void;
-    demote: () => void;
-    remove: () => void;
-  },
-): MyMember {
-  const itemActions: NonNullable<MyMember['actions']> = [];
-  if (actions?.canManageMembers && member.canChangeRole && member.role === 'member') {
-    itemActions.push({ label: '운영진 지정', onSelect: actions.promote });
-  }
-  if (actions?.canDelegateOwner && member.canChangeRole && member.role === 'manager') {
-    itemActions.push({ label: '팀장 지정', onSelect: actions.delegateOwner });
-    itemActions.push({ label: '멤버 강등', onSelect: actions.demote });
-  }
-  if (actions?.canManageMembers && member.canRemove && member.role !== 'owner') {
-    itemActions.push({ label: '내보내기', tone: 'danger', onSelect: actions.remove });
-  }
 
-  return {
-    id: member.membershipId,
-    name: member.displayName,
-    role: roleLabel(member.role),
-    meta: `${formatGender(member.gender)} · ${new Date(member.joinedAt).toLocaleDateString('ko-KR')}`,
-    status: teamMemberStatusLabel(member.status),
-    locked: member.role === 'owner',
-    actions: itemActions,
-    actionPending: actions?.actionPending,
-  };
-}
-
-function toMyJoinRequest(
-  application: V1TeamJoinApplication,
-  actions: {
-    actionPending: boolean;
-    approve: () => void;
-    reject: () => void;
-  },
-): MyMember {
-  return {
-    id: application.applicationId,
-    name: application.applicant.displayName,
-    role: '가입 신청',
-    meta: application.message ?? new Date(application.createdAt).toLocaleDateString('ko-KR'),
-    status: teamJoinApplicationStatusLabel(application.status),
-    actions: [
-      { label: '승인', onSelect: actions.approve },
-      { label: '거절', tone: 'danger', onSelect: actions.reject },
-    ],
-    actionPending: actions.actionPending,
-  };
-}
 
 /**
  * confirmAction — useConfirm()의 confirm 함수를 받아 모달 확인 후 action을 실행한다.

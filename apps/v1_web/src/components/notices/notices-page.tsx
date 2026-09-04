@@ -50,8 +50,11 @@ export function NoticeListPageView({ model }: { model: NoticeListViewModel }) {
           /* [P2 UX 라이팅] 능동형 + 해요체 */
           <EmptyState
             fill
+            illustration={{ name: 'chat-empty' }}
             title="아직 공지가 없어요"
             sub="새 공지가 올라오면 여기서 바로 확인할 수 있어요."
+            cta="홈으로"
+            ctaHref="/home"
           />
         )}
       </div>

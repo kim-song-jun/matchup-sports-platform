@@ -19,10 +19,7 @@
 .tm-my-desktop-layout,
 .tm-my-desktop-sidebar,
 .tm-my-desktop-main,
-.tm-my-desktop-menu-grid,
-.tm-my-team-detail-desktop,
-.tm-my-team-detail-left,
-.tm-my-team-detail-right {
+.tm-my-desktop-menu-grid {
   display: contents;
 }
 
@@ -31,8 +28,7 @@
  * display:contents makes them transparent — the children get the gap directly. */
 .tm-my-settings-desktop,
 .tm-my-withdrawal-desktop,
-.tm-my-location-desktop,
-.tm-my-members-desktop {
+.tm-my-location-desktop {
   display: contents;
 }
 
@@ -60,8 +56,7 @@
   .tm-my-settings-desktop,
   .tm-my-sports-desktop,
   .tm-my-location-desktop,
-  .tm-my-withdrawal-desktop,
-  .tm-my-members-desktop {
+  .tm-my-withdrawal-desktop {
     width: 100%;
   }
 
@@ -146,11 +141,6 @@
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 20px;
-  }
-
-  /* Team detail layout wrappers: override display:contents on desktop. */
-  .tm-my-team-detail-left {
-    display: grid;
   }
 
   /* Desktop page heading: use the shared .tm-desktop-page-head + .tm-desktop-back
@@ -337,88 +327,9 @@
   }
 }
 
-/* ─── /my/teams/[id]: 2-column layout ───────────────────────────────────────
- * LEFT: team hero + info card + recent matches grid.
- * RIGHT: sticky action menu + quick links.
- */
-
-@media (min-width: 1024px) {
-  /* Override display:contents for the team detail 2-column layout. */
-  .tm-my-team-detail-desktop {
-    display: grid;
-    grid-template-columns: 1fr 320px;
-    gap: 32px;
-    align-items: start;
-  }
-
-  /* Left column: hero + info + recent matches */
-  .tm-my-team-detail-left {
-    display: grid;
-    gap: 20px;
-    min-width: 0;
-  }
-
-  /* Right sticky panel: action menu */
-  .tm-my-team-detail-right {
-    display: grid;
-    gap: 16px;
-    position: sticky;
-    top: 80px;
-    align-self: start;
-  }
-
-  /* Recent matches inside team detail: 2-up grid */
-  .tm-my-team-detail-left .tm-my-list-stack {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
-  }
-
-  /* Fixed CTA (팀 채팅 / 팀 정보 buttons) pinned to right panel on desktop. */
-  .tm-my-team-detail-cta {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-container);
-    padding: 16px;
-    box-shadow: var(--shadow-card);
-  }
-}
-
-@media (min-width: 1440px) {
-  .tm-my-team-detail-desktop {
-    grid-template-columns: 1fr 360px;
-    gap: 40px;
-  }
-}
-
-/* ─── /my/teams/[id]/members: members list with desktop page head ────────────
- * Members and join requests in a constrained column.
- * On desktop show members 2-up when there are enough of them.
- */
-
-@media (min-width: 1024px) {
-  .tm-my-members-desktop {
-    display: grid;
-    gap: 16px;
-    max-width: 800px;
-    /* .tm-my-settings-desktop(184-186) 패턴과 동일하게 가운데 정렬 */
-    margin-left: auto;
-    margin-right: auto;
-  }
-
-  .tm-my-members-desktop .tm-my-list-stack {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-  }
-
-  /* Stat grid: already 3-col — keep on desktop. */
-
-  /* Tab row: constrain width for breathing room. */
-  .tm-my-members-desktop .tm-team-form-chip-row {
-    flex-wrap: nowrap;
-  }
-}
+/* /my/teams/[id] · /members 전용 데스크톱 블록은 삭제했다(2026-09-04 감사) — 두 라우트 모두
+   `redirect()` 뿐이라 이 셀렉터들(.tm-my-team-detail-*, .tm-my-members-desktop)은 어떤 마크업에도
+   붙지 않는 죽은 규칙이었다. 실제 렌더는 components/teams/** 가 담당하고 desktop/teams.css 를 쓴다. */
 
 /* ─── Withdrawal page: constrained centered column ──────────────────────────
  */
@@ -518,11 +429,6 @@
     grid-template-columns: 380px 1fr;
     gap: 40px;
   }
-
-  .tm-my-team-detail-desktop {
-    grid-template-columns: 1fr 380px;
-    gap: 48px;
-  }
 }
 
 /* 마이페이지 하단 로그아웃 버튼 여백.
@@ -576,12 +482,92 @@
 /* ─── /my/teams: KPI stat-grid 폭 제한 ──────────────────────────────────────
  * (4) my-teams KPI 3-grid가 데스크톱에서 1120px 풀폭으로 늘어나는 문제.
  * ≥1024px에서 max-width:360 + 좌측 정렬 — 콘텐츠 크기에 맞게 고정.
- * teams·members 두 페이지 모두 .tm-my-stat-grid를 공유하므로 공통 적용.
+ * (members 쪽 셀렉터는 라우트가 redirect 전용이라 함께 정리했다.)
  */
 @media (min-width: 1024px) {
-  .tm-my-teams-desktop .tm-my-stat-grid,
-  .tm-my-members-desktop .tm-my-stat-grid {
+  .tm-my-teams-desktop .tm-my-stat-grid {
     max-width: 360px;
     margin-left: 0;
   }
+}
+
+/* ─── /my/leagues — 형제 마이 화면과 같은 카드 리듬 (2026-09-04 웨이브6) ─────────────
+ * 이 화면만 raw Tailwind 로 짜여 있어 카드·간격·타이포가 다른 마이 화면과 어긋났다.
+ * 모든 뷰포트에 적용되는 기본 규칙이라 미디어 쿼리 밖에 둔다.
+ */
+.tm-my-league-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.tm-my-league-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.tm-my-league-title-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.tm-my-league-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.tm-my-league-sport {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tm-my-league-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-circle);
+}
+
+.tm-my-league-teams {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  padding: 12px 16px;
+}
+
+.tm-my-league-team-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.tm-my-league-next {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: var(--size-touch-min);
+  padding: 0 8px;
+  border-radius: var(--radius-chip);
+  color: var(--blue700);
+  font-size: var(--font-size-label);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* 문의 목록 상단 — 셸이 제목을 그리므로 본문은 설명 한 줄 + 보조 CTA 만 둔다(2026-09-04 웨이브6). */
+.tm-my-inquiries-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
 }

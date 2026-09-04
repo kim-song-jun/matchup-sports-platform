@@ -1218,7 +1218,7 @@ describe('TournamentDetailView — 정규 리그 거울 행', () => {
  * `completed`(확정) 둘뿐이라 경기가 뛰는 중에도 `scheduled` 로 남는다. 진행 상태는
  * `liveStatus`, 점수는 `result` 다.
  */
-describe('FixtureCard — 진행 상태와 점수', () => {
+describe('FixtureCard — 진행 상태 배지', () => {
   it('경기가 끝났으면 status 가 scheduled 여도 "종료" 로 보인다', () => {
     // alpha 가 실제로 준 모양: 확정 전이라 status 는 아직 scheduled 인데 경기는 끝났다.
     render(

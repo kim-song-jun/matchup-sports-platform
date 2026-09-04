@@ -2062,9 +2062,16 @@ function ScheduleNoticeCaption({ style }: { style?: React.CSSProperties }) {
 /* ── Fixture card ── */
 
 /**
- * 배지는 **`liveStatus`** 를 읽는다. 원본 `status` 는 서버가 `scheduled`(생성)와
- * `completed`(확정) 둘만 쓰므로 **경기가 뛰는 중에도 `scheduled` 로 남는다** — 그걸로
- * 판정하면 끝난 경기가 "예정" 으로 보인다(2026-09-04 alpha 실측 결함).
+ * 배지는 **`liveStatus`** 를 읽는다.
+ *
+ * **두 필드는 어휘가 다르다** — 섞어 읽으면 안 되니 나란히 적는다:
+ * ```
+ * status      scheduled | completed              ← 서버가 실제로 쓰는 값은 이 둘뿐(생성 / 결과 확정)
+ * liveStatus  scheduled | live | ended | cancelled  ← 진행 상태. 배지가 읽는 값
+ * ```
+ * 그래서 `status` 는 **경기가 뛰는 중에도 `scheduled` 로 남고**, 결과 확정 전에는 끝난
+ * 경기도 `scheduled` 다(2026-09-04 alpha 실측: `status:"scheduled"` · `liveStatus:"ended"`).
+ * `status` 로 판정하면 끝난 경기가 "예정" 으로 보인다 — 그게 이 결함이었다.
  *
  * 라벨은 공개 기록 화면과 **같은 함수**를 쓴다. 어휘가 같은데 표를 따로 두면 한쪽만
  * 고쳐져 같은 경기가 화면마다 다르게 읽힌다 — 이 결함이 정확히 그 모양이었다.

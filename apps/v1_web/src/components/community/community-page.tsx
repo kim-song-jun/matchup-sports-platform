@@ -197,6 +197,7 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
           ) : model.status !== 'loading' && model.status !== 'error' && model.messages.length === 0 ? (
             /* [P2 UX 라이팅] 능동형 */
             <EmptyState
+              fill
               illustration={{ name: 'chat-empty' }}
               title={model.emptyTitle ?? '아직 메시지가 없어요'}
               sub={model.emptyBody ?? '먼저 인사를 건네 대화를 시작해요.'}

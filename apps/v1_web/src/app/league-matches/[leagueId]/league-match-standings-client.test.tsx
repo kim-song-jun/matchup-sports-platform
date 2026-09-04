@@ -1533,3 +1533,60 @@ describe('LeagueMatchStandingsClient', () => {
     expect(useV1MyLeaguesMock).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * 리그 참가 신청 입구. BE 는 진작에 신청을 받을 수 있었는데(`open-registration` + 등록
+ * 서비스가 리그를 받음) **공개 화면에 입구가 없어** 팀장이 신청할 길이 아예 없었다
+ * (2026-09-04 alpha 실측: 리그 화면 버튼 전수가 `["전체","예정만"]`).
+ */
+describe('리그 참가 신청 입구', () => {
+  function mockLeague(extra: Record<string, unknown>) {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1LeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', title: '가을 리그', state: 'active',
+        startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z',
+        teamIds: [], fixtures: [], seriesId: null, tier: null, tierLabel: null, seasonNo: null,
+        seriesSiblings: [],
+        ...extra,
+      },
+      isPending: false,
+    } as never);
+  }
+
+  it('신청을 받는 중이면 모집 배지와 신청 버튼이 보인다 — 링크는 대회와 같은 신청 폼이다', async () => {
+    mockLeague({ registrationOpen: true, registrationDeadlineAt: '2026-09-20T14:59:00.000Z' });
+    const { container } = render(
+      <Providers>
+        <LeagueMatchStandingsClient leagueId="league-1" />
+      </Providers>,
+    );
+    await waitFor(() => expect(screen.getByText('모집 중')).toBeInTheDocument());
+    // A안: 리그 전용 신청 화면을 새로 만들지 않고 대회와 같은 폼으로 보낸다.
+    expect(container.querySelector('a[href="/tournaments/league-1/apply"]')).toBeInTheDocument();
+  });
+
+  it('신청을 안 받으면 입구를 아예 그리지 않는다 — 회색 버튼도 죽은 안내도 남기지 않는다', async () => {
+    mockLeague({ registrationOpen: false, registrationDeadlineAt: '2020-01-01T00:00:00.000Z' });
+    const { container } = render(
+      <Providers>
+        <LeagueMatchStandingsClient leagueId="league-1" />
+      </Providers>,
+    );
+    await waitFor(() => expect(screen.getByText('가을 리그')).toBeInTheDocument());
+    expect(screen.queryByText('모집 중')).not.toBeInTheDocument();
+    expect(container.querySelector('a[href="/tournaments/league-1/apply"]')).not.toBeInTheDocument();
+  });
+
+  it('마감이 없어도 신청 버튼은 보인다 — null 은 "안 받는다" 가 아니라 "기한이 없다" 다', async () => {
+    mockLeague({ registrationOpen: true, registrationDeadlineAt: null });
+    const { container } = render(
+      <Providers>
+        <LeagueMatchStandingsClient leagueId="league-1" />
+      </Providers>,
+    );
+    await waitFor(() => expect(screen.getByText('모집 중')).toBeInTheDocument());
+    expect(container.querySelector('a[href="/tournaments/league-1/apply"]')).toBeInTheDocument();
+    expect(screen.queryByText(/신청 마감/)).not.toBeInTheDocument();
+  });
+});

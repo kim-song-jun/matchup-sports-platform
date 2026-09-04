@@ -201,6 +201,17 @@ export interface V1PublicLeagueDetail extends V1AdminLeagueDetail {
    * optional 이 아니다.
    */
   seriesSiblings: V1LeagueSeriesSibling[];
+  /**
+   * 참가 신청 마감. `null` 이면 기한 없이 열려 있다는 뜻이고, **신청을 안 받는다는 뜻이 아니다**
+   * — 받는지 여부는 아래 `registrationOpen` 이 답한다(서버가 판정해서 결과만 내려준다).
+   */
+  registrationDeadlineAt: string | null;
+  /**
+   * 지금 참가 신청을 받는가. 등록 서비스가 실제로 던지는 조건(`status === 'open'` + 마감
+   * 미도과)과 **같은 규칙**을 서버가 계산해 준다 — 화면이 복제하면 "버튼은 보이는데 누르면
+   * 409" 로 갈린다.
+   */
+  registrationOpen: boolean;
 }
 
 export interface V1CreateLeaguePayload {

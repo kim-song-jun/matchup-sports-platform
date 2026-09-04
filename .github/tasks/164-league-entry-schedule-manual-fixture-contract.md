@@ -203,6 +203,12 @@ D8 순서 `expand → dual-write → backfill → read-swap → contract` 중 **
 
 ## Acceptance Criteria
 
+> **UI 3안 절차는 결정보드에서 이미 끝났다.** FE 항목은 각각 사용자가 고른 안이 있고, 구현은
+> **그 안의 범위 안에서** 한다. 범위를 넘는 신규 화면·레이아웃 재설계가 필요해지면 **거기서 멈추고
+> A·B·C 3안을 낸다.** FE-3 의 선택은 **A안**(팀장 행 CTA → 대회와 같은 신청 폼 · 요약 배지 ·
+> 어드민 신청 관리는 대회 `registrations` 탭 재사용)이다.
+
+
 - [ ] `POST /tournaments/:leagueId/registrations` 가 정규 리그 거울에서 201 을 준다(`status='open'` 일 때). 대회 코드 변경 없이.
 - [ ] 자동 생성이 날짜 목록을 받고, 라운드 수 초과 시 400 + 부족 수. `dayOfWeek` 식별자가 `apps/` 아래 0건.
 - [ ] `POST /admin/league-matches/:leagueId/fixtures/manual` → 생성 경기가 `/tournaments/:id/schedule` 공개 API 에 나타나고, 결과 입력 후 `standings` 에 반영된다(alpha 실측).

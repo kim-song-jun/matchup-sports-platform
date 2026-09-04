@@ -467,7 +467,8 @@ export class LeagueMatchPublicService {
       startsOn: league.startsOn,
       endsOn: league.endsOn,
       // 참가 신청 상태 — 화면이 "모집 중" 배지와 신청 버튼을 그리는 근거다. 이 값이 없어서
-      // 리그에는 **신청 입구가 아예 없었다**: BE 는 `POST /:leagueId/open-registration` 으로
+      // 리그에는 **신청 입구가 아예 없었다**: BE 는
+      // `POST /admin/league-matches/:leagueId/open-registration` 으로
       // 신청을 열 수 있고 등록 서비스도 리그를 받는데(`ALL_COMPETITION_KINDS`), 그 사실이
       // 공개 응답에 실리지 않아 화면이 알 방법이 없었다.
       registrationDeadlineAt: league.registrationDeadlineAt?.toISOString() ?? null,

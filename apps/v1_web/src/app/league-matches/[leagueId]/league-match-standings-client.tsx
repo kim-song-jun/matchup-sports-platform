@@ -478,7 +478,8 @@ function myTeamIdsOf(data: ReturnType<typeof useV1MyTeams>['data']): string[] {
 /**
  * 리그 참가 신청 입구.
  *
- * BE 는 진작에 신청을 받을 수 있었다 — `POST /:leagueId/open-registration` 이 마감을 놓고,
+ * BE 는 진작에 신청을 받을 수 있었다 — `POST /admin/league-matches/:leagueId/open-registration`
+ * 이 마감을 놓고,
  * 등록 서비스는 리그를 받는다(`ALL_COMPETITION_KINDS`). **없던 것은 화면의 입구뿐이었다.**
  * 2026-09-04 alpha 실측에서 공개 리그 화면의 버튼을 전수로 세어 보니 `["전체","예정만"]` 뿐이라
  * 팀장이 신청할 길이 아예 없었다.

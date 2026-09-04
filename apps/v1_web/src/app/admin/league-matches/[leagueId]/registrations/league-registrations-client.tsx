@@ -7,6 +7,7 @@ import { RegistrationsTab } from '@/app/admin/tournaments/[id]/registrations-tab
 import { useV1AdminLeagueMatch, useV1OpenLeagueRegistration } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
+import { fromDatetimeLocalValue } from '@/components/team-schedules/team-schedules.view-model';
 
 /**
  * 리그 참가 신청 관리 — **신청 열기(마감 지정) + 신청 목록**. 사용자 A안(Task 164 FE-3).
@@ -38,11 +39,14 @@ export default function LeagueRegistrationsClient({ leagueId }: { leagueId: stri
       showToast('신청 마감 일시를 입력해 주세요.', 'error');
       return;
     }
-    const at = new Date(deadline);
-    if (Number.isNaN(at.getTime())) {
+    // `datetime-local` → ISO 변환은 **공용 헬퍼**를 쓴다. 이 변환은 타임존이 걸린
+    // 자리라(입력은 로컬 벽시계, 저장은 UTC) 화면마다 따로 구현하면 한 곳만 고쳐진다.
+    const iso = fromDatetimeLocalValue(deadline);
+    if (iso === undefined) {
       showToast('신청 마감 일시를 읽을 수 없어요.', 'error');
       return;
     }
+    const at = new Date(iso);
     // 지난 시각으로 열면 **여는 즉시 닫힌 리그**가 된다.
     //
     // **서버와 같은 부등호를 쓴다(`<=`).** 서버는 `deadline <= now` 를 422
@@ -55,7 +59,7 @@ export default function LeagueRegistrationsClient({ leagueId }: { leagueId: stri
       return;
     }
     openRegistration.mutate(
-      { registrationDeadlineAt: at.toISOString() },
+      { registrationDeadlineAt: iso },
       {
         onSuccess: () => showToast('참가 신청을 열었어요.', 'success'),
         onError: (error) => showToast(extractErrorMessage(error, '참가 신청을 열지 못했어요.'), 'error'),

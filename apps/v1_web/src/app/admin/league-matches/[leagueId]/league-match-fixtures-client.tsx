@@ -237,7 +237,11 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
             });
     return {
       weeksCount,
-      ...(dates.length === 0 ? {} : { schedule: { dates, time } }),
+      // **시각이 비면 `schedule` 을 싣지 않는다.** 요일 경로는 위에서 `time` 이 비면
+      // `dates` 를 빈 배열로 만들어 자연히 빠졌는데, 달력 경로는 `dates` 가 채워져 있어
+      // **빈 `time` 이 그대로 나갔다** — 서버가 `time은 HH:mm 형식이어야 해요` 로 거부한다.
+      // 실을지 말지는 두 값이 **함께** 갖춰졌을 때만이다(서버 DTO 가 둘을 한 객체로 받는다).
+      ...(dates.length === 0 || time.trim() === '' ? {} : { schedule: { dates, time: time.trim() } }),
       ...(placeName.trim() === '' ? {} : { placeName: placeName.trim() }),
       ...(durationValue === null
         ? {}
@@ -282,6 +286,10 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
   const onGenerate = async () => {
     // 요일은 골랐는데 time input(type="time")을 비워 지운 상태로 제출하면 서버가 형식
     // 오류로 400을 내려 사용자는 이유를 모른 채 막힌다 — 제출 전에 여기서 먼저 알려준다.
+    if (selectedDates.length > 0 && time.trim() === '') {
+      showToast('날짜를 골랐으면 시각도 입력해 주세요.', 'error');
+      return false;
+    }
     if (dayOfWeek !== '' && time.trim() === '') {
       showToast('요일을 골랐으면 시각도 입력해 주세요.', 'error');
       return;
@@ -300,6 +308,10 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
   // 그대로 둔다 — generateFixtures가 던지는 것과 같은 검증 오류를 미리 보여주는 것도
   // 미리보기의 역할이라, 여기서도 같은 방식으로 토스트한다.
   const onPreview = async () => {
+    if (selectedDates.length > 0 && time.trim() === '') {
+      showToast('날짜를 골랐으면 시각도 입력해 주세요.', 'error');
+      return false;
+    }
     if (dayOfWeek !== '' && time.trim() === '') {
       showToast('요일을 골랐으면 시각도 입력해 주세요.', 'error');
       return;
@@ -476,6 +488,10 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
 
   // R13: 재생성은 리그의 대진 전체를 교체하는 조작이라 typedChallenge로 이중 확인을 받는다.
   const onConfirmRegenerate = (reason: string) => {
+    if (selectedDates.length > 0 && time.trim() === '') {
+      showToast('날짜를 골랐으면 시각도 입력해 주세요.', 'error');
+      return false;
+    }
     if (dayOfWeek !== '' && time.trim() === '') {
       showToast('요일을 골랐으면 시각도 입력해 주세요.', 'error');
       return;
@@ -614,7 +630,10 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                 type="time"
                 value={time}
                 onChange={(e) => setTime(e.target.value)}
-                disabled={dayOfWeek === ''}
+                // **달력으로 날짜를 골랐으면 요일이 없어도 시각을 넣을 수 있어야 한다.**
+                // 예전엔 요일 전용 입력이라 `dayOfWeek === ''` 이면 잠갔는데, 달력 경로에서는
+                // 그러면 날짜는 있는데 시각을 넣을 방법이 없어 **영영 제출할 수 없다.**
+                disabled={dayOfWeek === '' && selectedDates.length === 0}
                 className={`${inputClass} w-36 disabled:opacity-50`}
               />
             </div>

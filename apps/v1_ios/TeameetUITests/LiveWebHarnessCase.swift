@@ -230,6 +230,9 @@ class LiveWebHarnessCase: XCTestCase {
         let deferButton = app.buttons["push-prompt-defer"]
         guard deferButton.waitForExistence(timeout: 10) else { return false }
         for _ in 0..<20 where !deferButton.isHittable { settle(0.25) }
+        // Tapping something that never became hittable fails the caller for a reason that has
+        // nothing to do with what it was testing; report it instead.
+        guard deferButton.isHittable else { return false }
         deferButton.tap()
         _ = explainer.waitForNonExistence(timeout: 10)
         return true

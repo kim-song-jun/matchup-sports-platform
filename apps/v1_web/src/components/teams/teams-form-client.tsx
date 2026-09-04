@@ -1,5 +1,7 @@
 'use client';
 
+import { ErrorState } from '@/components/v1-ui/primitives';
+
 import { useEffect, useRef, useState } from 'react';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -221,6 +223,10 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
   // 데이터가 오기 전에는 draft(EMPTY_TEAM_DRAFT)를 실제 편집 입력창에 노출하지 않는다 —
   // teams-client.tsx의 TeamDetailPageClient(`if (!query.data) return <TeamDetailPageSkeleton />`)와
   // 동일 패턴. 이 gate가 hooks 아래(모든 useState/useEffect 호출 이후)에 있어야 한다.
+  // 오류를 먼저 — 로딩 게이트가 isError 까지 가리면 조회 실패 시 스켈레톤만 영원히 남는다(Copilot 리뷰).
+  if (query.isError) {
+    return <ErrorState title="팀 정보를 불러오지 못했어요" message="잠시 후 다시 시도해 주세요." onRetry={() => void query.refetch()} retryLabel="다시 불러오기" />;
+  }
   if (!query.data) {
     return <TeamDetailPageSkeleton />;
   }

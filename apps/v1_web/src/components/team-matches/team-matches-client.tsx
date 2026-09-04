@@ -280,7 +280,6 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
             )
           : undefined,
         onShare: () => shareTeamMatch(query.data),
-        onNotify: () => router.push('/notifications'),
         lineupHref: ownTeamId ? `/team-matches/${teamMatchId}/lineup` : undefined,
         onApply: getApplyAction({
           viewerState,

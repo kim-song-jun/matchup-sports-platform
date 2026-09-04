@@ -405,4 +405,17 @@ describe('MatchesService', () => {
     // assertActiveAccount fires before getHostMatch, so DB should never be queried
     expect(prisma.v1Match.findFirst).not.toHaveBeenCalled();
   });
+
+  it('list: 기본 조회는 최신 생성순이며 시작·신청 마감이 지난 모집 행을 제외한다', async () => {
+    prisma.v1Match.findMany.mockResolvedValue([]);
+
+    await service.list(null, {});
+
+    const args = prisma.v1Match.findMany.mock.calls[0][0];
+    expect(args.orderBy).toEqual([{ createdAt: 'desc' }, { id: 'desc' }]);
+    expect(args.where.startAt).toEqual({ gte: expect.any(Date) });
+    expect(args.where.AND).toEqual(expect.arrayContaining([
+      { OR: [{ deadlineAt: null }, { deadlineAt: { gte: expect.any(Date) } }] },
+    ]));
+  });
 });

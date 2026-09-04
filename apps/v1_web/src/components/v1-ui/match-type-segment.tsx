@@ -21,20 +21,20 @@ export function MatchTypeSegment({ active }: MatchTypeSegmentProps) {
   return (
     <nav className="tm-segment-row tm-match-type-segment" aria-label="매치 유형">
       <Link
-        href="/matches"
-        className="tm-review-tab"
-        data-active={active === 'personal'}
-        aria-current={active === 'personal' ? 'page' : undefined}
-      >
-        개인
-      </Link>
-      <Link
         href="/team-matches"
         className="tm-review-tab"
         data-active={active === 'team'}
         aria-current={active === 'team' ? 'page' : undefined}
       >
         팀
+      </Link>
+      <Link
+        href="/matches"
+        className="tm-review-tab"
+        data-active={active === 'personal'}
+        aria-current={active === 'personal' ? 'page' : undefined}
+      >
+        개인
       </Link>
     </nav>
   );

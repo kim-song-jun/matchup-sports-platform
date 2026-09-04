@@ -95,7 +95,6 @@ export type MatchDetailViewModel = {
   reviewAction?: { label: string; href: string } | null;
   onChat?: () => void;
   onShare?: () => void | string | null | Promise<void | string | null>;
-  onNotify?: () => void;
 };
 
 export type MatchCreateStep = 'sport' | 'info' | 'place-time' | 'confirm' | 'complete' | 'edit';

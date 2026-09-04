@@ -129,5 +129,9 @@ describe('목업(view-model)이 실제 개체의 폴백으로 새지 않는다',
     // costNote 가 없으면 목업 금액(280,000 / 140,000)이 아니라 "모른다"(null)다.
     expect(model.cost).toBeNull();
     expect(model.opponentCost).toBeNull();
+    // imageUrl 이 없으면 목업 사진(team-huddle.webp/futsal-rooftop.webp)이 아니라 null —
+    // 화면이 종목 그래픽을 그린다(웨이브4, 2026-09-04).
+    expect(model.imageUrl).not.toBe(mock.imageUrl);
+    expect(model.imageUrl).toBeNull();
   });
 });

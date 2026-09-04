@@ -221,6 +221,12 @@ describe('ApnsPushService', () => {
     const { service } = build([
       { status: 410, body: JSON.stringify({ reason: 'Unregistered' }) },
       { status: 400, body: JSON.stringify({ reason: 'BadDeviceToken' }) },
+      // The same rejection again, because `BadDeviceToken` now costs a second request: the
+      // service asks the other gateway before believing a token is dead. This fake serves
+      // every host from one queue, so the probe has to be scripted here or it would eat the
+      // next device's answer. Rejected at both gateways is what makes `bad` permanent —
+      // apns-gateway-selfheal.spec.ts covers the case where the other gateway accepts.
+      { status: 400, body: JSON.stringify({ reason: 'BadDeviceToken' }) },
       { status: 503, body: JSON.stringify({ reason: 'ServiceUnavailable' }) },
       { status: 429, body: JSON.stringify({ reason: 'TooManyRequests' }) },
       { status: 200 },

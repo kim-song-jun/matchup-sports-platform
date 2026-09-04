@@ -12,6 +12,7 @@ import {
   getParticipantTeamBuckets,
   getPrizeBreakdownChips,
   partitionTournamentSections,
+  FixtureCard,
   TournamentDetailView,
 } from './tournament-detail-client';
 import type {
@@ -1204,5 +1205,88 @@ describe('TournamentDetailView — 정규 리그 거울 행', () => {
 
     expect(await screen.findByText('상대팀 미정')).toBeInTheDocument();
     expect(screen.queryByText('상대팀 정보 없음')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * 2026-09-04 alpha 실측 결함: 끝난 경기가 공개 대회 상세의 "조별 일정" 에서 **"예정"** 으로
+ * 보이고 점수가 없었다. 같은 대회의 `/bracket` 은 "종료 · 1 : 0" 을 보여줘 **두 공개 화면이
+ * 같은 경기를 두고 서로 다른 상태를 말했다.**
+ *
+ * 원인은 이 카드가 `status` 만 읽은 것이다. `status` 는 타입 주석이 이미 경고하듯
+ * **라이브 판정에 쓰면 안 된다** — 서버가 실제로 쓰는 값은 `scheduled`(생성)와
+ * `completed`(확정) 둘뿐이라 경기가 뛰는 중에도 `scheduled` 로 남는다. 진행 상태는
+ * `liveStatus`, 점수는 `result` 다.
+ */
+describe('FixtureCard — 진행 상태 배지', () => {
+  it('경기가 끝났으면 status 가 scheduled 여도 "종료" 로 보인다', () => {
+    // alpha 가 실제로 준 모양: 확정 전이라 status 는 아직 scheduled 인데 경기는 끝났다.
+    render(
+      createElement(FixtureCard, {
+        fixture: makeFixture({ id: 'f1', status: 'scheduled', liveStatus: 'ended' }),
+      }),
+    );
+    expect(screen.getByText('종료')).toBeInTheDocument();
+    expect(screen.queryByText('예정')).not.toBeInTheDocument();
+  });
+
+  it('진행 중인 경기는 "진행 중" 으로 보인다 — status 로는 절대 알 수 없는 상태다', () => {
+    render(
+      createElement(FixtureCard, {
+        fixture: makeFixture({ id: 'f2', status: 'scheduled', liveStatus: 'live' }),
+      }),
+    );
+    expect(screen.getByText('진행 중')).toBeInTheDocument();
+  });
+
+  it('아직 안 시작한 경기는 그대로 "예정" 이다 (회귀 방지)', () => {
+    render(
+      createElement(FixtureCard, {
+        fixture: makeFixture({ id: 'f3', status: 'scheduled', liveStatus: 'scheduled' }),
+      }),
+    );
+    expect(screen.getByText('예정')).toBeInTheDocument();
+  });
+
+  // 점수·득점자는 **일부러 안 싣는다** — 오너 결정("몇 대 몇인지랑 누가 넣었는지 그건 빼주고
+  // 장소랑 누가 누구 하는지만"). 그 계약은 `fixture-card-goals.test.tsx` 가 지키므로 여기서
+  // 중복해서 단언하지 않는다. 이 결함의 범위는 **진행 상태 배지**뿐이다.
+});
+
+/**
+ * 정원 진행바의 `aria-label` 은 **스크린리더 사용자가 듣는 유일한 문구**다. 화면 라벨만
+ * 고치고 여길 두면 무료 대회에서 "입금 대기" 를 듣게 된다 — 눈으로는 안 보이는 회귀라
+ * 테스트로만 잡힌다(2026-09-04 Copilot 리뷰가 짚은 자리).
+ */
+describe('정원 표시 — 무료 대회의 대기 낱말', () => {
+  it('무료 대회는 aria-label 에도 "입금" 을 쓰지 않는다', () => {
+    const tournament = makeTournament({
+      id: 't-free', status: 'open', format: 'group_knockout',
+      entryFee: 0, teamCount: 8, confirmedCount: 5, pendingPaymentCount: 3,
+    });
+    const { container } = render(
+      createElement(TournamentDetailView, { tournament, myRegistration: null }),
+    );
+    const labels = [...container.querySelectorAll('[aria-label]')].map((el) => el.getAttribute('aria-label') ?? '');
+    const capacity = labels.filter((label) => label.includes('정원'));
+    expect(capacity.length).toBeGreaterThan(0);
+    for (const label of capacity) {
+      expect(label).not.toContain('입금');
+      expect(label).toContain('확인대기');
+    }
+  });
+
+  it('유료 대회는 그대로 "입금 대기" 로 읽어 준다 — 무료 분기가 유료를 삼키면 안 된다', () => {
+    const tournament = makeTournament({
+      id: 't-paid', status: 'open', format: 'group_knockout',
+      entryFee: 20000, teamCount: 8, confirmedCount: 5, pendingPaymentCount: 3,
+    });
+    const { container } = render(
+      createElement(TournamentDetailView, { tournament, myRegistration: null }),
+    );
+    const capacity = [...container.querySelectorAll('[aria-label]')]
+      .map((el) => el.getAttribute('aria-label') ?? '')
+      .filter((label) => label.includes('정원'));
+    expect(capacity.some((label) => label.includes('입금대기'))).toBe(true);
   });
 });

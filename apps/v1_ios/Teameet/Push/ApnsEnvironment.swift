@@ -22,14 +22,31 @@ enum ApnsEnvironment: String, Equatable, Sendable {
 
     /// What this build is actually signed for.
     ///
-    /// A simulator build has no embedded profile, and the simulator is a sandbox client, so
-    /// the absence is not a failure to report — it is the answer.
+    /// Three cases, and the third one was wrong until now. The simulator is always a sandbox
+    /// client and carries no profile, so it is answered without looking at anything. A build
+    /// installed from Xcode or ad hoc carries `embedded.mobileprovision`, and its
+    /// `aps-environment` is the answer. A build delivered by TestFlight or the App Store is
+    /// re-signed by Apple and its profile may not be readable here at all — on a device that
+    /// absence is not "unknown", it is the store, and the store is production.
+    ///
+    /// **Measured**: TestFlight 0.1.3 (5) registered as `sandbox`. Alpha therefore addressed
+    /// the sandbox gateway, Apple answered `BadDeviceToken`, and the reader saw nothing —
+    /// for two days, with no log line anywhere. The old fallback chose sandbox on the
+    /// reasoning that guessing production would get a working device revoked; the server now
+    /// tries the other gateway before revoking, so that cost is gone while this one was
+    /// certain.
     static var current: ApnsEnvironment {
-        resolve(profileAt: Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision"))
+        #if targetEnvironment(simulator)
+        return .sandbox
+        #else
+        return resolve(profileAt: Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision"))
+        #endif
     }
 
+    /// The environment a **device** build reports. Not reached on the simulator, where the
+    /// absence of a profile means sandbox rather than the store.
     static func resolve(profileAt url: URL?) -> ApnsEnvironment {
-        guard let url, let data = try? Data(contentsOf: url) else { return .sandbox }
+        guard let url, let data = try? Data(contentsOf: url) else { return .production }
         return resolve(profile: data)
     }
 
@@ -44,11 +61,13 @@ enum ApnsEnvironment: String, Equatable, Sendable {
               let root = parsed as? [String: Any],
               let entitlements = root["Entitlements"] as? [String: Any],
               let value = entitlements["aps-environment"] as? String
-        else { return .sandbox }
-        // Apple spells the sandbox value "development" in the entitlement. Anything else
-        // unrecognised falls back to sandbox: a wrong guess towards production would get a
-        // working device revoked, while a wrong guess towards sandbox only fails to deliver.
-        return value == "production" ? .production : .sandbox
+        else { return .production }
+        // Apple spells the sandbox gateway "development" in the entitlement. Only that word
+        // means sandbox; anything else — including a value this build does not recognise —
+        // is treated as the store, for the same reason as a missing profile above. A device
+        // build that reaches here at all was signed by somebody, and the only signer whose
+        // profile we cannot read is Apple's.
+        return value == "development" ? .sandbox : .production
     }
 
     private static func embeddedPlist(in data: Data) -> Data? {

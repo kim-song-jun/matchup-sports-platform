@@ -476,6 +476,51 @@ function myTeamIdsOf(data: ReturnType<typeof useV1MyTeams>['data']): string[] {
   return items.map((team) => team.teamId);
 }
 
+/**
+ * 리그 참가 신청 입구.
+ *
+ * BE 는 진작에 신청을 받을 수 있었다 — `POST /admin/league-matches/:leagueId/open-registration`
+ * 이 마감을 놓고,
+ * 등록 서비스는 리그를 받는다(`ALL_COMPETITION_KINDS`). **없던 것은 화면의 입구뿐이었다.**
+ * 2026-09-04 alpha 실측에서 공개 리그 화면의 버튼을 전수로 세어 보니 `["전체","예정만"]` 뿐이라
+ * 팀장이 신청할 길이 아예 없었다.
+ *
+ * 신청 폼은 **대회와 같은 화면**을 쓴다(사용자 A안). 리그 거울 행은 같은 테이블에 살고
+ * 신청 폼이 읽는 값(`entryFee`·`minPlayers`·`maxPlayers`)을 그대로 갖고 있으며, 그 화면은
+ * 대회 전용 개념인 **정원(`teamCount`)을 쓰지 않는다**(실측 0회) — 리그에 정원이 없어서
+ * 생겼던 "정원 2/8팀" 류 결함이 이 경로엔 없다.
+ *
+ * 열려 있지 않으면 **아무것도 그리지 않는다.** 닫힌 신청에 회색 버튼을 남겨 두면 "왜 안
+ * 눌리지" 를 만들고, 마감 문구만 남기면 지난 리그마다 죽은 안내가 붙는다.
+ */
+function LeagueRegistrationCta({
+  leagueId,
+  registrationOpen,
+  registrationDeadlineAt,
+}: {
+  leagueId: string;
+  registrationOpen: boolean;
+  registrationDeadlineAt: string | null;
+}) {
+  if (!registrationOpen) return null;
+  const deadlineLabel = formatTournamentDateTimeShort(registrationDeadlineAt);
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2">
+      <span className="tm-badge tm-badge-blue">모집 중</span>
+      {deadlineLabel !== null && (
+        <span className="tm-text-caption text-[var(--text-muted)]">신청 마감 {deadlineLabel}</span>
+      )}
+      <Link
+        href={`/tournaments/${leagueId}/apply`}
+        className="tm-btn tm-btn-sm tm-btn-primary"
+        style={{ minHeight: 44 }}
+      >
+        참가 신청
+      </Link>
+    </div>
+  );
+}
+
 export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: string }) {
   const seriesQuery = useV1LeagueMatch(leagueId);
   const standingsQuery = useV1LeagueMatchStandings(leagueId);
@@ -610,6 +655,11 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
         <h2 className="text-xl font-bold text-[var(--text-strong)]">{series.title}</h2>
         <span className={`tm-badge ${stateMeta.badgeClass}`}>{stateMeta.label}</span>
       </div>
+      <LeagueRegistrationCta
+        leagueId={leagueId}
+        registrationOpen={series.registrationOpen}
+        registrationDeadlineAt={series.registrationDeadlineAt}
+      />
       {/* 사용자 확정(2026-08-23) — 종료된 리그에만 뜬다. 진행 중·준비 중 리그에는
           이 자리에 아무것도 늘어나지 않는다(우승팀 개념이 아직 성립하지 않는다). */}
       {series.state === 'completed' && (

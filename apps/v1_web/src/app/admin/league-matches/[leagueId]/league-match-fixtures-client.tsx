@@ -22,6 +22,7 @@ import {
   useV1Teams,
   useV1UpdateLeagueFixture,
 } from '@/hooks/use-v1-api';
+import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import { expandWeeklyFixtureDates } from '@/lib/league-fixture-dates';
 import { LeagueFixtureDatePicker } from './league-fixture-date-picker';
@@ -547,6 +548,17 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
             )}
           </div>
         }
+      />
+
+      {/* 참가 신청 관리 — 사용자 A안(FE-3). BE 는 진작에 `open-registration` 을 갖고
+          있었는데 **부르는 화면이 없어** 리그는 신청을 열 방법이 API 직접 호출뿐이었다.
+          목록은 대회 `RegistrationsTab` 을 그대로 재사용한다 — 어드민 신청 API 는 이미
+          리그를 받으므로(`ALL_COMPETITION_KINDS`) 리그 id 를 그대로 넘기면 된다.
+          A안 범위는 "신청 열기 + 목록" 이다. 그 밖의 화면을 새로 만들지 않는다. */}
+      <LeagueRegistrationSummary
+        leagueId={leagueId}
+        registrationOpen={series?.registrationOpen ?? false}
+        registrationDeadlineAt={series?.registrationDeadlineAt ?? null}
       />
 
       {/* 그룹 B 감사 결함 1: 개설 후 참가팀 추가·제거. 대진이 이미 있어도 로스터 자체는
@@ -1494,6 +1506,58 @@ function DailyPlanCard({ plan }: { plan: DailyPlan }) {
           <dd className="m-0 text-lg font-bold tabular-nums text-[var(--blue700)]">{plan.gamesPerTeamPerDay}경기</dd>
         </div>
       </dl>
+    </div>
+  );
+}
+
+/**
+ * 리그 참가 신청 요약 + 관리 화면 입구.
+ *
+ * 신청 열기 폼과 신청 목록은 **별도 라우트**
+ * `/admin/league-matches/:leagueId/registrations`
+ * (`registrations/league-registrations-client.tsx`)에 둔다. 이 파일은 이미
+ * 1,400줄이 넘고, 목록은 대회 화면의
+ * `RegistrationsTab`(`app/admin/tournaments/[id]/registrations-tab.tsx`)을 재사용하는데
+ * 그게 훅을 여덟 개 넘게 쓴다 — 여기 인라인으로 넣으면 이 화면의 기존 테스트가 전부 그 훅들을 목킹해야 한다
+ * (실제로 30건이 깨졌다). 관심사도 다르다: 여기는 대진, 저기는 신청이다.
+ */
+function LeagueRegistrationSummary({
+  leagueId,
+  registrationOpen,
+  registrationDeadlineAt,
+}: {
+  leagueId: string;
+  registrationOpen: boolean;
+  registrationDeadlineAt: string | null;
+}) {
+  return (
+    <div className="mb-4 rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
+      <div className="mb-1 flex flex-wrap items-center gap-2">
+        <p className="text-sm font-semibold text-[var(--text-strong)]">참가 신청</p>
+        {registrationOpen ? (
+          <span className="tm-badge tm-badge-blue">모집 중</span>
+        ) : (
+          <span className="tm-badge tm-badge-grey">신청 안 받는 중</span>
+        )}
+      </div>
+      {/* **받는지는 `registrationOpen`, 마감 유무는 부가 문구다.** 마감이 `null` 인 것은
+          계약상 "기한 없이 열림" 이지 "안 받음" 이 아니다 — 마감 유무로 받는지를 추론하면
+          이미 모집 중인 리그에 "마감을 정하면 신청할 수 있어요" 라고 반대로 말한다.
+          같은 실수가 신청 관리 화면에도 있었다(#1028 리뷰 2회). 판정 축을 통일한다. */}
+      <p className="mb-3 text-xs text-[var(--text-muted)]">
+        {registrationOpen
+          ? registrationDeadlineAt === null
+            ? '기한 없이 신청을 받는 중이에요.'
+            : `${formatTournamentDateTimeShort(registrationDeadlineAt) ?? registrationDeadlineAt}까지 신청을 받아요.`
+          : '신청 마감을 정하면 팀장이 리그 화면에서 바로 신청할 수 있어요.'}
+      </p>
+      <Link
+        href={`/admin/league-matches/${leagueId}/registrations`}
+        className="tm-btn tm-btn-sm tm-btn-outline"
+        style={{ minHeight: 44 }}
+      >
+        신청 관리
+      </Link>
     </div>
   );
 }

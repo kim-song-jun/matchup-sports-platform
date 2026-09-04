@@ -170,6 +170,16 @@ export function RosterModal({
             >
               <div className="flex-1 min-w-0">
                 <div className="flex min-w-0 items-center gap-2">
+                  {/* 정본 §3 "명단 공개 = 등번호·이름". 번호 없는 선수는 자리를 비우지 않고
+                      "—" 로 둔다 — 열이 들쭉날쭉하면 번호가 있는지 없는지가 안 읽힌다.
+                      `0` 은 유효한 번호라 falsy 검사로 거르면 0번이 "—" 로 사라진다. */}
+                  <span
+                    className="shrink-0 tab-num text-sm font-semibold text-[var(--text-muted)]"
+                    style={{ minWidth: 24 }}
+                    aria-label={p.jerseyNumber === null ? '등번호 없음' : `등번호 ${p.jerseyNumber}번`}
+                  >
+                    {p.jerseyNumber === null ? '—' : p.jerseyNumber}
+                  </span>
                   <p className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--text-strong)]">{p.realName}</p>
                   {p.isTeamCaptain ? (
                     <span className="shrink-0 rounded-md bg-[var(--blue50)] px-2 py-0.5 text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)]">팀장</span>

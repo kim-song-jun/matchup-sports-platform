@@ -36,6 +36,7 @@ import {
 import { TournamentSponsorSection } from '@/components/tournaments/tournament-sponsor-section';
 import { TournamentInquirySection } from '@/components/tournaments/tournament-inquiry-section';
 import { getTournamentAnnouncementCategoryLabel } from '@/components/tournaments/tournament-announcement-category';
+import { fixtureStatusLabel } from '@/components/public-game-records/format';
 import { isLeagueCompetition } from '@/lib/competition-kind';
 import {
   formatTournamentDateShort,
@@ -49,6 +50,8 @@ import {
   describeTournamentRegistrationBlock,
   resolveTournamentCapacity,
   type TournamentRegistrationBlockReason,
+
+  pendingCapacityLabel,
 } from '@/lib/tournament-registration-availability';
 import type {
   V1TournamentDetail,
@@ -209,11 +212,14 @@ function CapacityProgressBar({
   pendingPaymentCount,
   teamCount,
   height = 5,
+  isFreeEntry = false,
 }: {
   confirmedCount: number;
   pendingPaymentCount: number;
   teamCount: number;
   height?: number;
+  /** 무료 대회는 기다리는 것이 입금이 아니라 운영자 확인이다 — `aria-label` 낱말이 갈린다. */
+  isFreeEntry?: boolean;
 }) {
   const max = Math.max(teamCount, 1);
   const confirmedPct = Math.min(100, (confirmedCount / max) * 100);
@@ -225,7 +231,9 @@ function CapacityProgressBar({
       aria-valuenow={Math.min(teamCount, confirmedCount + pendingPaymentCount)}
       aria-valuemin={0}
       aria-valuemax={teamCount}
-      aria-label={`정원 ${confirmedCount}팀 확정, ${pendingPaymentCount}팀 입금 대기, 총 ${teamCount}팀`}
+      // 스크린리더에는 이 문구만 들린다 — 화면 라벨만 고치고 여길 두면 무료 대회에서
+      // "입금 대기" 를 듣게 된다.
+      aria-label={`정원 ${confirmedCount}팀 확정, ${pendingPaymentCount}팀 ${pendingCapacityLabel(isFreeEntry)}, 총 ${teamCount}팀`}
       style={{ height, background: 'var(--grey100)', borderRadius: height, overflow: 'hidden', marginTop: 8, display: 'flex' }}
     >
       <div
@@ -361,6 +369,7 @@ function ApplyCTAButtons({
     const description = describeTournamentRegistrationBlock(
       blockReason,
       resolveTournamentCapacity(tournament),
+      tournament.entryFee === 0,
     );
     return (
       <button
@@ -830,11 +839,12 @@ export function TournamentDetailView({
               confirmedCount={tournament.confirmedCount}
               pendingPaymentCount={pendingPaymentCount}
               teamCount={tournament.teamCount}
+              isFreeEntry={tournament.entryFee === 0}
             />
             {pendingPaymentCount > 0 ? (
               <div className="tm-text-caption" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', color: 'var(--text-muted)', marginTop: 8 }}>
                 <span><b style={{ color: 'var(--blue700)', fontWeight: 600 }}>{tournament.confirmedCount}팀</b> 확정</span>
-                <span><b style={{ color: 'var(--orange700)', fontWeight: 600 }}>{pendingPaymentCount}팀</b> 입금 대기</span>
+                <span><b style={{ color: 'var(--orange700)', fontWeight: 600 }}>{pendingPaymentCount}팀</b> {pendingCapacityLabel(tournament.entryFee === 0)}</span>
               </div>
             ) : null}
             {(() => {
@@ -1157,13 +1167,16 @@ export function TournamentDetailView({
         </div>
         <div className="tm-text-caption" style={{ color: 'var(--text-caption)', marginBottom: 12 }}>
           {tournament.confirmedCount}/{tournament.teamCount}팀 확정
-          {pendingPaymentCount > 0 ? ` · 입금대기 ${pendingPaymentCount}팀` : ''}
+          {pendingPaymentCount > 0
+            ? ` · ${pendingCapacityLabel(tournament.entryFee === 0)} ${pendingPaymentCount}팀`
+            : ''}
         </div>
         <CapacityProgressBar
           confirmedCount={tournament.confirmedCount}
           pendingPaymentCount={pendingPaymentCount}
           teamCount={tournament.teamCount}
           height={6}
+          isFreeEntry={tournament.entryFee === 0}
         />
         <div style={{ marginTop: 20 }}>
           <ApplyCTAButtons tournament={tournament} blockReason={registrationBlock} myRegistration={myRegistration} />
@@ -2060,20 +2073,25 @@ function ScheduleNoticeCaption({ style }: { style?: React.CSSProperties }) {
 
 /* ── Fixture card ── */
 
-function fixtureStatusLabel(status: string): string {
-  switch (status) {
-    case 'scheduled': return '예정';
-    case 'in_progress': return '진행 중';
-    case 'completed': return '종료';
-    case 'cancelled': return '취소';
-    default: return '알 수 없음';
-  }
-}
-
-function fixtureStatusBadge(status: string): string {
-  switch (status) {
-    case 'in_progress': return 'tm-badge-green';
-    case 'completed': return 'tm-badge-grey';
+/**
+ * 배지는 **`liveStatus`** 를 읽는다.
+ *
+ * **두 필드는 어휘가 다르다** — 섞어 읽으면 안 되니 나란히 적는다:
+ * ```
+ * status      scheduled | completed              ← 서버가 실제로 쓰는 값은 이 둘뿐(생성 / 결과 확정)
+ * liveStatus  scheduled | live | ended | cancelled  ← 진행 상태. 배지가 읽는 값
+ * ```
+ * 그래서 `status` 는 **경기가 뛰는 중에도 `scheduled` 로 남고**, 결과 확정 전에는 끝난
+ * 경기도 `scheduled` 다(2026-09-04 alpha 실측: `status:"scheduled"` · `liveStatus:"ended"`).
+ * `status` 로 판정하면 끝난 경기가 "예정" 으로 보인다 — 그게 이 결함이었다.
+ *
+ * 라벨은 공개 기록 화면과 **같은 함수**를 쓴다. 어휘가 같은데 표를 따로 두면 한쪽만
+ * 고쳐져 같은 경기가 화면마다 다르게 읽힌다 — 이 결함이 정확히 그 모양이었다.
+ */
+function fixtureStatusBadge(liveStatus: V1TournamentFixture['liveStatus']): string {
+  switch (liveStatus) {
+    case 'live': return 'tm-badge-green';
+    case 'ended': return 'tm-badge-grey';
     case 'cancelled': return 'tm-badge-red';
     default: return 'tm-badge-grey';
   }
@@ -2083,12 +2101,12 @@ function fixtureStatusBadge(status: string): string {
  * D4: Scheduled 예정 뱃지 — 회색 배경 + 파란 점으로 종료(completed)와 시각 구분.
  * 점에만 의존하지 않고 '예정' 텍스트를 함께 유지 (a11y: 컬러+텍스트 병행).
  */
-function FixtureStatusBadge({ status }: { status: string }) {
-  const badgeClass = fixtureStatusBadge(status);
-  const label = fixtureStatusLabel(status);
+function FixtureStatusBadge({ liveStatus }: { liveStatus: V1TournamentFixture['liveStatus'] }) {
+  const badgeClass = fixtureStatusBadge(liveStatus);
+  const label = fixtureStatusLabel(liveStatus);
   return (
     <span className={`tm-badge ${badgeClass}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-      {status === 'scheduled' ? (
+      {liveStatus === 'scheduled' ? (
         <span
           aria-hidden="true"
           style={{
@@ -2130,10 +2148,13 @@ export function FixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
   return (
     <CompetitionFixtureCard
       header={{ label: roundLabel, caption: scheduledLabel ?? '시간 미정' }}
-      badge={<FixtureStatusBadge status={fixture.status} />}
+      badge={<FixtureStatusBadge liveStatus={fixture.liveStatus} />}
       homeLabel={homeLabel}
       awayLabel={awayLabel}
-      // 이 카드는 점수를 싣지 않는다 — 결선 대진표·경기 상세가 그 자리다.
+      // **이 카드는 점수를 싣지 않는다.** 오너가 실제 화면을 보고 걷어내라고 판단했다
+      // ("몇 대 몇인지랑 누가 넣었는지 그건 빼주고 장소랑 누가 누구 하는지만") — 대회 상세는
+      // "언제·어디서·누가 붙는지" 를 훑는 자리이고 결과는 `/bracket` 과 경기 상세가 담당한다.
+      // 그 결정은 `fixture-card-goals.test.tsx` 가 지킨다. **진행 상태 배지만** liveStatus 로 고친다.
       center={
         <div className="tm-text-label" style={{ color: 'var(--text-caption)', letterSpacing: 1 }}>
           vs
@@ -2143,7 +2164,6 @@ export function FixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
     />
   );
 }
-
 
 /* ── Announcement card ── */
 

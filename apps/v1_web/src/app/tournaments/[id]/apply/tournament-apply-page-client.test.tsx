@@ -284,6 +284,29 @@ describe('TournamentApplyPageClient GA events', () => {
     });
   });
 
+  it('참가비가 없는 대회는 단계 라벨에서도 결제를 예고하지 않는다', async () => {
+    // #1017 이 입력은 다 걷어냈는데 **라벨만 결제를 전제**하고 있었다 — 2026-09-04 alpha 실측:
+    // 본문이 "이 대회는 무료로 참가할 수 있어요" 인 화면의 진행 표시가 `동의 · 결제 수단` /
+    // `다음: 결제 안내` 였다. 없을 결제를 예고하는 잘못된 안내다.
+    render(<TournamentApplyPageClient tournamentId="tournament-1" />);
+    expect(await screen.findByText('팀 선택')).toBeInTheDocument();
+    expect(screen.getByText(/다음: 참가 동의/)).toBeInTheDocument();
+    expect(screen.queryByText(/결제 수단/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/결제 안내/)).not.toBeInTheDocument();
+  });
+
+  it('유료 대회는 결제 라벨을 그대로 쓴다 — 무료 분기가 유료를 삼키면 안 된다', async () => {
+    tournamentApplyApiMocks.useV1Tournament.mockReturnValue({
+      data: makeTournament({ entryFee: 20000 }),
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+    render(<TournamentApplyPageClient tournamentId="tournament-1" />);
+    expect(await screen.findByText('팀 선택')).toBeInTheDocument();
+    expect(screen.getByText(/다음: 동의 · 결제 수단/)).toBeInTheDocument();
+  });
+
   it('참가비가 없는 대회는 신청 완료 화면에서 입금 안내를 그리지 않고 명단 등록으로 이끈다', async () => {
     // 이 픽스처의 entryFee 는 0 이다. 그런데 완료 화면이 "아래 계좌로 참가비를 입금해 주세요" 를
     // 무조건 그리고, 계좌 정보가 없으면 빨간 에러 "입금 계좌가 준비되지 않았어요" 까지 띄웠다
@@ -502,8 +525,12 @@ describe('TournamentApplyPageClient GA events', () => {
 
     it('입금대기 팀이 정원을 채운 대회에서는 이유를 알려주고 신청을 만들지 않는다', async () => {
       // 확정 5 + 입금대기 3 = 정원 8 → 목록엔 "5 / 8"로 보여도 서버는 409로 막는다.
+      //
+      // **유료로 둔다.** 기본 픽스처는 참가비 0원인데, 무료 대회에서 기다리는 것은 입금이
+      // 아니라 운영자 확인이라 라벨이 "확인대기" 다. 이 테스트가 검증하려는 건 입금대기가
+      // 정원을 쥐는 시나리오이므로 참가비를 준다 — 안 그러면 테스트 이름과 화면이 어긋난다.
       tournamentApplyApiMocks.useV1Tournament.mockReturnValue({
-        data: makeTournament({ teamCount: 8, confirmedCount: 5, pendingPaymentCount: 3 }),
+        data: makeTournament({ teamCount: 8, confirmedCount: 5, pendingPaymentCount: 3, entryFee: 20000 }),
         isLoading: false,
         isError: false,
         error: null,

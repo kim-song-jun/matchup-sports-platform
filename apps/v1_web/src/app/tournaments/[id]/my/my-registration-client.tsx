@@ -1222,7 +1222,7 @@ function TeamRegistrationHub({
   // 정원이 입금대기 팀으로 차 있으면 "확정 5 / 8"만 보고 여유가 있다고 오해하게 된다.
   // 재신청이 막히는 이유를 이 화면에서 바로 읽을 수 있게 정원 구성을 그대로 노출한다.
   const blockMessage = blockReason && capacity
-    ? describeTournamentRegistrationBlock(blockReason, capacity)
+    ? describeTournamentRegistrationBlock(blockReason, capacity, isFreeEntry)
     : null;
 
   return (
@@ -1247,7 +1247,7 @@ function TeamRegistrationHub({
           }}
         >
           <span className="tm-text-caption" style={{ color: blockMessage ? 'var(--orange700)' : 'var(--text-strong)', fontWeight: 700 }}>
-            정원 {describeTournamentCapacity(capacity)}
+            정원 {describeTournamentCapacity(capacity, isFreeEntry)}
           </span>
           {blockMessage ? (
             <span className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.5 }}>

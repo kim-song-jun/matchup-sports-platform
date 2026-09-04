@@ -19,6 +19,10 @@ final class WebShellViewController: UIViewController {
     private var webView: WKWebView!
     private var downloads: DownloadHandler!
     private var publishedBottomInset: Int?
+    /// The web view's bottom, held so the keyboard can lift it. See `observeKeyboard`.
+    private var webViewBottom: NSLayoutConstraint!
+    /// How much of the web view the keyboard currently covers, in points.
+    private var keyboardOverlap: CGFloat = 0
     /// Supplied by the app delegate, which owns the APNs callbacks. Absent only in a build
     /// with no push at all, where the bridge honestly reports "not subscribed".
     private let push: PushCoordinator?
@@ -52,6 +56,7 @@ final class WebShellViewController: UIViewController {
         reachability.onPathRestored = { [weak self] in self?.retryAfterConnectivityReturned() }
         reachability.start()
         observeBackgrounding()
+        observeKeyboard()
         observeInPageNavigation()
 
         restoreOrLoadInitialRoute()
@@ -85,14 +90,76 @@ final class WebShellViewController: UIViewController {
         }
     }
 
+    /// Lifts the web view above the keyboard.
+    ///
+    /// `WKWebView` does not do this for you, and it does not tell the page either: with the
+    /// keyboard up, `window.innerHeight` and `visualViewport.height` both stay at the full
+    /// height, so a page that sizes itself to the visual viewport — which this one does —
+    /// never learns the keyboard exists. WebKit then reveals the focused field by scrolling
+    /// the whole page up instead, and a page that is exactly one viewport tall has nothing
+    /// below it to scroll into view. Measured in the chat room: the composer came to rest
+    /// 573pt above the keyboard, the header scrolled off the top, and a band of empty page
+    /// sat between them — precisely what the reader reported.
+    ///
+    /// Resizing the view is what `adjustResize` does for the Android shell, and it leaves the
+    /// page's own layout in charge: the viewport shrinks, the composer lands on the keyboard,
+    /// and WebKit has nothing left to reveal.
+    private func observeKeyboard() {
+        // Selector-based, not the block form. A block observer hands back a token that has to
+        // be kept and removed by hand, and one that is dropped stays registered for the life
+        // of the process; a selector observer is torn down with its target. `observeBackgrounding`
+        // below was converted for the same reason.
+        let centre = NotificationCenter.default
+        centre.addObserver(
+            self, selector: #selector(keyboardWillChangeFrame),
+            name: UIResponder.keyboardWillChangeFrameNotification, object: nil)
+        centre.addObserver(
+            self, selector: #selector(keyboardWillHide),
+            name: UIResponder.keyboardWillHideNotification, object: nil)
+    }
+
+    @objc private func keyboardWillChangeFrame(_ note: Notification) {
+        applyKeyboard(note, hiding: false)
+    }
+
+    @objc private func keyboardWillHide(_ note: Notification) {
+        applyKeyboard(note, hiding: true)
+    }
+
+    private func applyKeyboard(_ note: Notification, hiding: Bool) {
+        guard let window = view.window else { return }
+
+        // The overlap, not the keyboard height: the web view starts below the status bar, and
+        // a hardware keyboard parks the software one off-screen where it covers nothing.
+        var overlap: CGFloat = 0
+        if !hiding,
+           let end = (note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue {
+            let keyboard = view.convert(end, from: window.screen.coordinateSpace)
+            overlap = max(0, view.bounds.maxY - keyboard.minY)
+        }
+        guard abs(overlap - keyboardOverlap) > 0.5 else { return }
+        keyboardOverlap = overlap
+        webViewBottom.constant = -overlap
+
+        let duration = note.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double ?? 0.25
+        let options = (note.userInfo?[UIResponder.keyboardAnimationCurveUserInfoKey] as? UInt)
+            .map { UIView.AnimationOptions(rawValue: $0 << 16) } ?? .curveEaseInOut
+        UIView.animate(withDuration: duration, delay: 0, options: options) {
+            self.view.layoutIfNeeded()
+        }
+        // The page adds the home-indicator inset itself, and while the keyboard covers that
+        // strip adding it again would float the composer above the keys.
+        publishSafeAreaInset(force: true)
+    }
+
     private func observeBackgrounding() {
         NotificationCenter.default.addObserver(
-            forName: UIApplication.willResignActiveNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.persistSession() }
-        }
+            self, selector: #selector(appWillResignActive),
+            name: UIApplication.willResignActiveNotification, object: nil)
+    }
+
+    @objc private func appWillResignActive() {
+        persistSession()
     }
 
     private func installWebView() {
@@ -157,15 +224,17 @@ final class WebShellViewController: UIViewController {
 
         webView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(webView)
+        // Deliberately the view's own bottom, not the safe area's. The web app paints its
+        // bottom navigation edge to edge and consumes the inset itself through
+        // --v1-shell-safe-bottom; constraining to the safe area here would leave that surface
+        // floating above the home indicator instead. Held as a property because the keyboard
+        // moves it — see `observeKeyboard`.
+        webViewBottom = webView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         NSLayoutConstraint.activate([
             webView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             webView.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
             webView.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
-            // Deliberately the view's own bottom, not the safe area's. The web app paints
-            // its bottom navigation edge to edge and consumes the inset itself through
-            // --v1-shell-safe-bottom; constraining to the safe area here would leave that
-            // surface floating above the home indicator instead.
-            webView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            webViewBottom,
         ])
     }
 
@@ -203,7 +272,10 @@ final class WebShellViewController: UIViewController {
     /// `viewport-fit=cover`, so `env(safe-area-inset-bottom)` is `0` inside `WKWebView` and
     /// `--v1-shell-safe-bottom` resolves to whatever the shell writes.
     private func publishSafeAreaInset(force: Bool = false) {
-        let inset = Int(view.safeAreaInsets.bottom.rounded())
+        // Zero while the keyboard is up: the web view now ends at the keyboard, so the home
+        // indicator it would otherwise clear is covered anyway, and publishing it would push
+        // the composer a strip above the keys.
+        let inset = keyboardOverlap > 0 ? 0 : Int(view.safeAreaInsets.bottom.rounded())
         guard force || inset != publishedBottomInset else { return }
         publishedBottomInset = inset
         webView.evaluateJavaScript(

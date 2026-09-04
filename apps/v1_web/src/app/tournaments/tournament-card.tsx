@@ -1,6 +1,7 @@
 'use client';
 
 import { Trophy } from 'lucide-react';
+import { pendingCapacityLabel } from '@/lib/tournament-registration-availability';
 import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { formatTournamentDateRangeShort, formatEntryFee } from '@/lib/date-utils';
@@ -27,7 +28,7 @@ function getPendingPaymentCount(item: Pick<V1TournamentListItem, 'pendingPayment
  * 서버가 그 필드를 생략하므로, optional 을 여기서 풀지 않고 **호출부가 대회임을 확인한
  * 뒤 넘기게** 한다 — 여기서 `?? 0` 으로 메우면 리그가 "정원 0" 으로 조용히 흘러든다.
  */
-type WithCapacity = Pick<V1TournamentListItem, 'confirmedCount' | 'pendingPaymentCount'> & {
+type WithCapacity = Pick<V1TournamentListItem, 'confirmedCount' | 'pendingPaymentCount' | 'entryFee'> & {
   teamCount: number;
 };
 
@@ -71,7 +72,7 @@ function CapacityMiniBar({ item }: { item: WithCapacity }) {
       aria-valuenow={getReservedTeamCount(item)}
       aria-valuemin={0}
       aria-valuemax={item.teamCount}
-      aria-label={`정원 ${item.confirmedCount}팀 확정, ${pendingPaymentCount}팀 입금 대기, 총 ${item.teamCount}팀`}
+      aria-label={`정원 ${item.confirmedCount}팀 확정, ${pendingPaymentCount}팀 ${pendingCapacityLabel(item.entryFee === 0)}, 총 ${item.teamCount}팀`}
       style={{ height: 5, background: 'var(--grey100)', borderRadius: 5, overflow: 'hidden', display: 'flex' }}
     >
       <div aria-hidden="true" style={{ width: `${confirmedPct}%`, background: 'var(--blue500)' }} />
@@ -229,7 +230,7 @@ export function TournamentCard({
                 왜 신청을 못 받는지 알 수 없었다 — 대회 상세와 같은 낱말로 명시한다. */}
             {pendingPaymentCount > 0 ? (
               <span className="tm-badge tm-badge-grey" style={{ whiteSpace: 'nowrap' }}>
-                입금대기 {pendingPaymentCount}팀
+                {pendingCapacityLabel(item.entryFee === 0)} {pendingPaymentCount}팀
               </span>
             ) : null}
             <span className="tab-num">{item.confirmedCount}</span>

@@ -14,9 +14,9 @@ import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { CreateField, FieldErrorText, GenderRuleSelector, MissingFieldsBanner, MultiPresetChipSelector, PresetChipSelector, RecentVenueChips } from '@/components/v1-ui/create-form-fields';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
 import { cssUrl } from '@/lib/assets';
-// 사진 없는 팀매치의 종목 그래픽 이름 매핑 — matches.card-model.ts 와 같은 함수를 그대로
-// 재사용한다(웨이브4). CSS 클래스(tm-match-sport-illustration)도 새로 만들지 않고 그대로 쓴다.
-import { sportIllustration } from '@/components/matches/matches.card-model';
+// 사진 없는 팀매치의 종목 그래픽 — 매치·홈과 같은 공용 컴포넌트를 쓴다(웨이브8에서
+// 세 곳의 복사본을 하나로 모았다). 같은 종목이면 어느 화면에서든 같은 그래픽이 나온다.
+import { SportIllustration } from '@/components/v1-ui/sport-illustration';
 import type {
   TeamMatchCreateViewModel,
   TeamMatchDetailViewModel,
@@ -34,26 +34,6 @@ function teamMatchBackgroundImage(imageUrl: string) {
   return imageUrl && imageUrl !== TEAM_MATCH_IMAGE_FALLBACK
     ? `linear-gradient(rgba(17, 24, 39, 0.58), rgba(17, 24, 39, 0.72)), ${cssUrl(imageUrl)}, ${fallback}`
     : `linear-gradient(rgba(17, 24, 39, 0.58), rgba(17, 24, 39, 0.72)), ${fallback}`;
-}
-
-/**
- * 사진 없는 팀매치의 종목 그래픽 — matches-page.tsx 의 SportIllustration 과 동일한 이미지
- * 자산·CSS 클래스(tm-match-sport-illustration)를 재사용한다(웨이브4). 이름 매핑
- * (sportIllustration)도 그대로 가져와 두 화면이 같은 종목에 같은 그래픽을 그린다. 장식이라
- * aria-hidden — 크기는 소비처(카드/히어로)가 정한다.
- */
-function TeamMatchSportIllustration({ sport, sizes, className }: { sport: string; sizes: string; className?: string }) {
-  return (
-    <Image
-      className={`tm-match-sport-illustration${className ? ` ${className}` : ''}`}
-      src={`/illustrations/${sportIllustration(sport)}-640.webp`}
-      alt=""
-      aria-hidden="true"
-      width={640}
-      height={640}
-      sizes={sizes}
-    />
-  );
 }
 
 export function TeamMatchListPageView({ model }: { model: TeamMatchListViewModel }) {
@@ -392,7 +372,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
                 패턴(웨이브4, 2026-09-04). 사진이 있을 때만 teamMatchBackgroundImage 를 호출한다
                 (그 안의 TEAM_MATCH_IMAGE_FALLBACK 층은 "사진이 404" 케이스 전용이라 별개). */}
             <div className={`tm-team-vs-hero${match.imageUrl ? '' : ' tm-team-vs-hero-sport'}`} style={match.imageUrl ? { backgroundImage: teamMatchBackgroundImage(match.imageUrl) } : undefined}>
-              {match.imageUrl ? null : <TeamMatchSportIllustration sport={match.sport} sizes="120px" className="tm-team-vs-hero-illustration" />}
+              {match.imageUrl ? null : <SportIllustration sport={match.sport} sizes="120px" className="tm-team-vs-hero-illustration" />}
               {/* Mobile-only back + action buttons inside hero (hidden on desktop) */}
               <div className="tm-hide-desktop" style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <Link className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" href="/team-matches" aria-label="뒤로가기">
@@ -840,7 +820,7 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
   return (
     <Link className="tm-team-match-card tm-pressable" href={`/team-matches/${match.id}`}>
       <div className={`tm-team-match-vs${match.imageUrl ? '' : ' tm-team-match-vs-sport'}`} style={match.imageUrl ? { backgroundImage: teamMatchBackgroundImage(match.imageUrl) } : undefined}>
-        {match.imageUrl ? null : <TeamMatchSportIllustration sport={match.sport} sizes="88px" className="tm-team-match-vs-illustration" />}
+        {match.imageUrl ? null : <SportIllustration sport={match.sport} sizes="88px" className="tm-team-match-vs-illustration" />}
         <div>
           <div className="tm-text-caption">홈팀</div>
           <div className="tm-text-subhead">{match.hostTeam}</div>

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { getSportAccent } from '@/lib/v1-sport-accent';
-import { sportIllustration } from '@/components/matches/matches.card-model';
+import { sportIllustration } from '@/components/v1-ui/sport-illustration';
 
 type TournamentCampaignMediaProps = {
   readonly src?: string | null;

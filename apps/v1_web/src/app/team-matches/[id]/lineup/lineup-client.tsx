@@ -837,10 +837,11 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <span className="tm-text-label" style={{ flex: 1, fontWeight: 600 }}>{member.displayName}</span>
                         {/* Task 163: "선발 추가"/"후보 추가" 두 버튼을 하나로 — 명단에
-                            선발 구분이 없다(정본 §3). */}
+                            선발 구분이 없다(정본 §3). 행마다 반복되는 버튼이라 primary 가 아니라
+                            outline 이다 — 목록 전체가 파랗게 차면 주 행동(명단 제출)이 묻힌다. */}
                         <button
                           type="button"
-                          className="tm-btn tm-btn-sm tm-btn-primary"
+                          className="tm-btn tm-btn-sm tm-btn-outline"
                           onClick={() => setState((prev) => (prev ? addRosterMemberToLineup(prev, member) : prev))}
                         >
                           명단 추가
@@ -872,7 +873,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                           {/* Task 163: 추가 버튼도 하나다 — 명단에 선발 구분이 없다(정본 §3). */}
                           <button
                             type="button"
-                            className="tm-btn tm-btn-sm tm-btn-primary"
+                            className="tm-btn tm-btn-sm tm-btn-outline"
                             disabled
                             aria-label={`${member.displayName} 명단 추가 — 참석 확정 전이라 비활성화됨`}
                           >

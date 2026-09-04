@@ -2666,6 +2666,41 @@ label.tm-btn:focus-within {
   box-sizing: border-box;
 }
 
+/*
+ * 홈 추천 히어로(.tm-featured-media)의 사진 없음 변형 — 매치 상세 히어로와 같은 처방이다.
+ * 오버레이가 유일한 흐름 자식이라 flex 면 내용 폭으로 줄어 그라디언트가 전폭을 못 덮는다.
+ */
+.tm-home-featured-sport {
+  display: block;
+  position: relative;
+}
+
+.tm-home-featured-sport .tm-home-featured-illustration {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  width: 136px;
+  height: 136px;
+}
+
+@media (min-width: 1024px) {
+  .tm-home-featured-sport .tm-home-featured-illustration {
+    width: 160px;
+    height: 160px;
+  }
+}
+
+/* 그래픽 폭만큼 오버레이 텍스트에 우측 여백을 준다 — 겹치면 흰 글씨가 그래픽 위로 올라탄다. */
+.tm-home-featured-sport .tm-featured-overlay {
+  padding-right: 164px;
+}
+
+@media (min-width: 1024px) {
+  .tm-home-featured-sport .tm-featured-overlay {
+    padding-right: 188px;
+  }
+}
+
 .tm-match-detail-hero-sport {
   /* 히어로는 flex 가 아니라 block — 유일한 흐름 자식인 오버레이가 flex item 이 되면 내용 폭으로
      줄어 그라디언트가 히어로 전폭을 못 덮는다(Copilot 리뷰). 그래픽은 absolute 라 영향 없음. */

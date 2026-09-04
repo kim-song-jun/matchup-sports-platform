@@ -8,7 +8,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { queryImageBySrc } from '@/test/next-image';
-import { sportIllustration } from '@/components/matches/matches.card-model';
+import { sportIllustration } from '@/components/v1-ui/sport-illustration';
 import { toTeamMatch } from './team-matches.card-model';
 import { getTeamMatchListViewModel, getTeamMatchStateViewModel } from './team-matches.view-model';
 import { TeamMatchListPageView, TeamMatchStatePageView } from './team-matches-page';

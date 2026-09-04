@@ -26,6 +26,7 @@ import type {
   V1TournamentStaffAssignment,
   V1TournamentStaffRole,
 } from '@/types/api';
+import { useConfirm } from '@/components/v1-ui/confirm-modal';
 
 interface Props {
   tournamentId: string;
@@ -87,6 +88,7 @@ function TournamentFieldsSection({
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const { confirm, ConfirmModal } = useConfirm();
 
   const trimmedName = name.trim();
   // finding #76: 필드 이름에는 서버 유일성 제약이 없고(schema.prisma의 unique는
@@ -100,9 +102,17 @@ function TournamentFieldsSection({
   );
   const canSubmit = trimmedName.length > 0 && !isDuplicateName && !create.isPending;
 
-  function handleSubmit(e: React.FormEvent) {
+  // 한 번 만든 경기장은 고칠 수도 지울 수도 없다(수정·삭제 라우트 부재, finding #76).
+  // 오타가 그대로 영구히 남으므로 등록 전에 이름을 그대로 보여 주고 확인받는다.
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!canSubmit) return;
+    const ok = await confirm({
+      title: `'${trimmedName}' 경기장을 등록할까요?`,
+      message: '등록한 경기장은 이름을 고치거나 지울 수 없어요. 이름이 맞는지 확인해 주세요.',
+      confirmLabel: '등록하기',
+    });
+    if (!ok) return;
     setError(null);
     setNotice(null);
     create.mutate(
@@ -223,6 +233,7 @@ function TournamentFieldsSection({
           {notice}
         </p>
       )}
+      {ConfirmModal}
     </section>
   );
 }

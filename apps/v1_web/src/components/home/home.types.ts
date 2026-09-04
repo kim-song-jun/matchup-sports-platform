@@ -11,7 +11,11 @@ export type HomeMatchCard = {
   currentParticipants: number;
   maxParticipants: number;
   actionLabel: string;
-  imageUrl: string;
+  /**
+   * 매치가 실제로 가진 사진만. 없으면 null 로 두고 화면이 종목 그래픽을 그린다 —
+   * 예전엔 목업 사진 한 장을 모든 카드에 깔아, 서로 다른 실제 매치가 전부 같은 사진으로 보였다.
+   */
+  imageUrl: string | null;
   reason?: string;
 };
 

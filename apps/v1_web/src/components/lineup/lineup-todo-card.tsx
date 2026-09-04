@@ -14,10 +14,37 @@ import { formatMonthDay } from '@/lib/date-utils';
  *
  * 할 일이 없으면 아무것도 그리지 않는다. 빈 상태를 "지금 할 일이 없어요" 같은 카드로
  * 채우면 홈 화면에서 아무 일도 하지 않는 자리가 늘 한 칸 잡힌다.
+ *
+ * 실패는 다르다. 조회가 실패했는데 카드가 그냥 사라지면 "할 일이 없는 것"과 구별되지 않아,
+ * 경기 당일까지 라인업을 안 넣은 채로 지나갈 수 있다(웨이브 8 감사). 훅이 retry: false 라
+ * 자동 재시도도 없으므로 실패는 재시도 버튼과 함께 드러낸다.
  */
 export function LineupTodoCard({ enabled = true }: { enabled?: boolean }) {
   const query = useV1LineupTodos({ enabled });
   const items = query.data?.items ?? [];
+
+  if (query.isError) {
+    return (
+      <section aria-labelledby="lineup-todo-heading">
+        <Card pad={16}>
+          <div role="alert" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <div>
+              <h2 id="lineup-todo-heading" className="tm-text-body-lg" style={{ fontWeight: 700, margin: 0 }}>
+                라인업을 기다리는 경기
+              </h2>
+              <p className="tm-text-caption" style={{ color: 'var(--text-muted)', margin: '4px 0 0' }}>
+                목록을 불러오지 못했어요. 할 일이 남아 있을 수 있어요.
+              </p>
+            </div>
+            <button className="tm-btn tm-btn-sm tm-btn-outline" type="button" onClick={() => void query.refetch()}>
+              다시 불러오기
+            </button>
+          </div>
+        </Card>
+      </section>
+    );
+  }
+
   if (items.length === 0) return null;
 
   return (

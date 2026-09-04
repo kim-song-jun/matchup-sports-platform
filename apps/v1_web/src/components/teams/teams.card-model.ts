@@ -65,6 +65,16 @@ export function isTeamAtCapacity(memberCount: number, memberGoalCount?: number |
   return memberGoalCount != null && memberCount >= memberGoalCount;
 }
 
+/**
+ * 목록 상단 scope 문구("OO · 팀 둘러보기"). 예전엔 `teams.view-model.ts`의 목업
+ * `summary.scope`("서울 전체 · 팀 둘러보기")를 SSR/클라이언트 둘 다 스프레드로 그대로
+ * 흘려보내 실제 목록에도 그 문자열이 그려졌다 — 지역 필터는 이 목록에 없으므로(선택된
+ * 종목만 필터 가능) 실제로 걸린 종목 필터 하나만 반영한다.
+ */
+export function deriveTeamScope(sportName?: string | null): string {
+  return sportName ? `${sportName} · 팀 둘러보기` : '전체 · 팀 둘러보기';
+}
+
 export function buildTeamSportChips(
   items: V1Team[],
   fallback: TeamListViewModel,

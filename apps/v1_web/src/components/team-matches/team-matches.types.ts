@@ -1,7 +1,12 @@
 export type TeamMatchModel = {
   id: string;
   title: string;
-  imageUrl: string;
+  /**
+   * API 가 사진을 안 주면 null — matches.card-model.ts 의 `image` 와 같은 이유(웨이브4,
+   * 2026-09-04). 목업 사진(`/mock/generated/team-huddle.webp`)으로 메우면 실제 팀매치에
+   * 다른 매치의 사진이 그대로 붙는다. 화면은 null 이면 종목 그래픽(sportIllustration)을 그린다.
+   */
+  imageUrl: string | null;
   sport: string;
   hostTeam: string;
   venue: string;
@@ -75,6 +80,8 @@ export type TeamMatchStateViewModel = TeamMatchListViewModel & {
   state: 'empty' | 'error';
   title: string;
   description: string;
+  /** matches.types.ts 의 MatchStateViewModel 과 동일 — ErrorState 재시도 버튼이 호출한다. */
+  retry?: () => void;
 };
 
 export type TeamMatchDetailViewModel = {
@@ -113,7 +120,11 @@ export type TeamMatchDetailViewModel = {
   // Task 17: navigates to /team-matches/:id/result(/approval) — a matched/completed match
   // no longer has a standalone "complete" mutation (Task 16 removed it); completion is now
   // an atomic side effect of submitting a validated result revision on that screen.
-  resultAction?: { label: string; href: string; tone?: 'primary' | 'neutral' } | null;
+  // tone(웨이브4 이전): 이 행 하나의 primary/neutral 색을 골랐다. team-matches-page.tsx의
+  // 매치 관리 카드가 라인업→경기 결과→후기 순서로 "화면 전체에 primary 하나만" 규칙을
+  // 새로 적용하면서(2026-09-04) 행별 tone 은 더 이상 읽히지 않는다 — 죽은 필드로 남기지 않고
+  // 제거한다.
+  resultAction?: { label: string; href: string } | null;
   /** 경기 종료 후 후기 작성 화면(/my/reviews/team_match/:id) 링크. 참가팀 소속일 때만 설정된다.
    * 이 링크가 없던 동안 팀매치 후기는 /my/reviews 목록에 뜨기를 기다리는 수밖에 없었다. */
   reviewAction?: { label: string; href: string } | null;
@@ -129,7 +140,10 @@ export type TeamMatchDetailViewModel = {
   lineupHref?: string;
 };
 
-export type TeamMatchCreateStep = 'team' | 'sport' | 'info' | 'condition' | 'place-time' | 'confirm' | 'complete' | 'edit';
+// 'complete' 스텝(웨이브4 이전): /team-matches/new/complete 페이지가 썼는데, 실제 제출 성공
+// 경로는 항상 /team-matches/:id 로 바로 이동해(team-matches-create-client.tsx) 이 스텝에
+// 닿는 진짜 경로가 없었다(죽은 라우트, 2026-09-04 감사) — 라우트·컴포넌트와 함께 제거한다.
+export type TeamMatchCreateStep = 'team' | 'sport' | 'info' | 'condition' | 'place-time' | 'confirm' | 'edit';
 
 export type TeamMatchCreateViewModel = {
   step: TeamMatchCreateStep;

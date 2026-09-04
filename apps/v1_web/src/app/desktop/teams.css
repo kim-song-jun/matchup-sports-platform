@@ -178,35 +178,6 @@
   }
 }
 
-/* ─── Filter page /teams/filter ────────────────────────────────────────────────
- * Center the filter form content at ~600px.
- * Sport chips wrap; filter overlay sheet becomes a centered modal
- * (handled by _shell.css already, no extra override needed here).
- */
-
-@media (min-width: 1024px) {
-  /* Scope to teams filter via .tm-team-filter-shell */
-  .tm-team-filter-shell {
-    max-width: 600px;
-    margin-left: auto;
-    margin-right: auto;
-    padding-bottom: 120px;
-  }
-
-  .tm-team-filter-shell .tm-sport-chip-row {
-    flex-wrap: wrap;
-    overflow-x: visible;
-  }
-
-  /* Fixed CTA inside teams filter: stay in the centered 600px column */
-  .tm-team-filter-shell ~ .tm-fixed-cta,
-  .tm-team-filter-cta {
-    max-width: 600px;
-    margin-left: auto;
-    margin-right: auto;
-  }
-}
-
 /* ─── Detail /teams/[id] ──────────────────────────────────────────────────────
  * 2-column body:
  *   LEFT  (flex 1): hero identity card + intro/info rows + member card

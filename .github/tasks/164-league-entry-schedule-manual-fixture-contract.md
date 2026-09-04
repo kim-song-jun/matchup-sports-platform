@@ -185,8 +185,13 @@ D8 순서 `expand → dual-write → backfill → read-swap → contract` 중 **
       `DISABLE_LEAGUE_ROSTER_AUTOCONFIRM_CRON=false` 를 넣어 **켜는 것**이 사용자 직접 승인
       대상이다(위 줄과 같은 말 — 앞서 여기에 "기본 on 으로 배포" 라고 적혀 있었는데 바로 위
       "기본은 꺼짐" 과 정반대였다).
-    - **대진 생성보다 먼저 돌아야 한다** — `generateFixtures`·`regenerateFixtures` 가 거울 status 를
-      `in_progress` 로 옮기면 신청이 닫히고, 그 뒤엔 자동 확정할 대상이 이미 없다.
+    - ~~**대진 생성보다 먼저 돌아야 한다** — `generateFixtures`·`regenerateFixtures` 가 거울 status 를
+      `in_progress` 로 옮기면 신청이 닫히고, 그 뒤엔 자동 확정할 대상이 이미 없다.~~
+      **2026-09-04 폐기.** 사용자 확정으로 **리그도 명시적 신청 마감**(`registrationDeadlineAt`)을
+      쓴다 — 대진 생성은 신청 상태를 건드리지 않는다(정본 §6 결정 이력). 그래서 이 순서 제약도
+      사라진다. **이 규칙이 실제로 무엇을 막았는지 실측 기록**: 2026-09-04 QA 에서 대진을 먼저
+      만든 리그가 곧바로 `in_progress` 가 되어 **팀장 신청 화면이 열리지 않았다** — 신청 화면을
+      새로 만들어도 그 리그에서는 못 쓴다는 뜻이었다. 대체 규칙은 FE-3+BE-6 에서 구현한다.
 - **BE-5 ④ contract.** `v1League.*` / `v1LeagueTeam.*` 호출 12 파일 → `V1Tournament(kind='regular_league')` / `V1TournamentRegistration` 으로 재배선. 역방향 dual-write 제거. **`git grep -n -w -e v1League -e v1LeagueTeam -- apps/v1_api/src apps/v1_web/src | wc -l` → `0`** 이 된 뒤에만 drop 마이그레이션 PR 을 따로 연다. drop 은 idempotent(`DROP TABLE IF EXISTS`), alpha 실행 전 사용자 직접 승인.
 
 ### FE (BE 배포 뒤)

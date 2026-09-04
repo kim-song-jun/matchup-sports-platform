@@ -204,6 +204,7 @@ describe('TournamentBracketService', () => {
     v1StatusChangeLog: { create: jest.Mock };
     $transaction: jest.Mock;
     $executeRaw: jest.Mock;
+    $queryRaw: jest.Mock;
   };
   let games: { createFromSourceInTransaction: jest.Mock };
 
@@ -250,6 +251,9 @@ describe('TournamentBracketService', () => {
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },
       $transaction: jest.fn(),
       $executeRaw: jest.fn().mockResolvedValue(1),
+      // 명단 등번호는 raw 로 읽는다(생성된 클라이언트에 컬럼이 아직 없다).
+      // 기본은 빈 배열 — "아무도 번호를 안 달았다".
+      $queryRaw: jest.fn().mockResolvedValue([]),
     };
     games = { createFromSourceInTransaction: jest.fn().mockResolvedValue({ gameId: 'game-1' }) };
 
@@ -608,6 +612,138 @@ describe('TournamentBracketService', () => {
       fixtureNumber: 1,
       status: 'scheduled',
     });
+  });
+
+  // ─── 명단 등번호·이름이 경기 참가자로 이어지는가 (Task 167 A1) ─────────────────
+  //
+  // 여기가 대회 경기의 참가자가 만들어지는 **유일한 자리**다. 받는 쪽
+  // (`createFromSourceInTransaction`)은 진작에 `jerseyNumber` 를 썼는데 **보내는 쪽만
+  // 비어 있어서**, 팀장이 명단에 넣은 번호가 경기로 이어지지 않았다.
+
+  /** 홈·어웨이 각 1명씩 명단이 있는 대진을 만드는 준비. */
+  function arrangeFixtureWithRoster(options: {
+    jerseysByPlayerId?: Array<{ id: string; jersey_number: number | null }>;
+    homeNickname?: string | null;
+  } = {}) {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
+    prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupRow());
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue({ id: 'reg-home' });
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([
+      {
+        id: 'reg-home',
+        team: { id: 'team-home', name: '홈 팀' },
+        players: [
+          {
+            id: 'player-home',
+            userId: 'user-home',
+            realName: '홍길동',
+            registrationId: 'reg-home',
+            user: {
+              profile:
+                options.homeNickname === undefined
+                  ? { nickname: '길동이', displayName: null }
+                  : { nickname: options.homeNickname, displayName: null },
+            },
+          },
+        ],
+      },
+      {
+        id: 'reg-away',
+        team: { id: 'team-away', name: '어웨이 팀' },
+        players: [
+          {
+            id: 'player-away',
+            userId: 'user-away',
+            realName: '김철수',
+            registrationId: 'reg-away',
+            user: { profile: { nickname: '철수', displayName: null } },
+          },
+        ],
+      },
+    ]);
+    prisma.v1TournamentFixture.create.mockResolvedValue(
+      fixtureRow({ homeRegistrationId: 'reg-home', awayRegistrationId: 'reg-away' }),
+    );
+    prisma.$queryRaw.mockResolvedValue(options.jerseysByPlayerId ?? []);
+  }
+
+  /** `createFromSourceInTransaction` 에 넘어간 참가자 배열. */
+  function participantsSent() {
+    const call = games.createFromSourceInTransaction.mock.calls.at(-1);
+    return (call?.[1] as { participants: Array<Record<string, unknown>> }).participants;
+  }
+
+  it('명단에 적은 등번호가 경기 참가자로 넘어간다', async () => {
+    arrangeFixtureWithRoster({
+      jerseysByPlayerId: [
+        { id: 'player-home', jersey_number: 7 },
+        { id: 'player-away', jersey_number: 10 },
+      ],
+    });
+
+    await service.createFixture(ownerUser, 'tournament-1', {
+      groupId: 'group-1',
+      round: 'group_a',
+      fixtureNumber: 1,
+      homeRegistrationId: 'reg-home',
+      awayRegistrationId: 'reg-away',
+    } as never);
+
+    expect(participantsSent()).toEqual([
+      expect.objectContaining({ sourceParticipantId: 'player-home', jerseyNumber: 7 }),
+      expect.objectContaining({ sourceParticipantId: 'player-away', jerseyNumber: 10 }),
+    ]);
+  });
+
+  it('번호를 안 단 선수는 번호 없이 간다 — 0 으로 채우지 않는다', async () => {
+    // 맵에 아예 없는 것이 "번호 없음" 이다. `?? 0` 같은 폴백을 넣으면 **아무도 안 단 번호가
+    // 전원 0 번**이 되어 명단과 어긋난다.
+    arrangeFixtureWithRoster({ jerseysByPlayerId: [{ id: 'player-home', jersey_number: 7 }] });
+
+    await service.createFixture(ownerUser, 'tournament-1', {
+      groupId: 'group-1',
+      round: 'group_a',
+      fixtureNumber: 1,
+      homeRegistrationId: 'reg-home',
+      awayRegistrationId: 'reg-away',
+    } as never);
+
+    const sent = participantsSent();
+    expect(sent[0]).toMatchObject({ sourceParticipantId: 'player-home', jerseyNumber: 7 });
+    expect(sent[1].jerseyNumber).toBeUndefined();
+  });
+
+  it('참가자 이름은 닉네임이다 — 실명을 경기 기록에 싣지 않는다', async () => {
+    // 정본 §3: "명단은 등번호 + 이름(닉네임)", 명단 공개도 등번호·이름. 실명은 자격
+    // 가드에만 쓰라고 받은 값이라 관전 화면까지 흐르면 안 된다.
+    arrangeFixtureWithRoster();
+
+    await service.createFixture(ownerUser, 'tournament-1', {
+      groupId: 'group-1',
+      round: 'group_a',
+      fixtureNumber: 1,
+      homeRegistrationId: 'reg-home',
+      awayRegistrationId: 'reg-away',
+    } as never);
+
+    const sent = participantsSent();
+    expect(sent[0].displayNameSnapshot).toBe('길동이');
+    expect(sent[0].displayNameSnapshot).not.toBe('홍길동');
+  });
+
+  it('닉네임이 없으면 실명으로 폴백한다 — 이름 없는 참가자를 만들지 않는다', async () => {
+    arrangeFixtureWithRoster({ homeNickname: null });
+
+    await service.createFixture(ownerUser, 'tournament-1', {
+      groupId: 'group-1',
+      round: 'group_a',
+      fixtureNumber: 1,
+      homeRegistrationId: 'reg-home',
+      awayRegistrationId: 'reg-away',
+    } as never);
+
+    expect(participantsSent()[0].displayNameSnapshot).toBe('홍길동');
   });
 
   it('createFixture: missing source pin rejects before fixture persistence', async () => {

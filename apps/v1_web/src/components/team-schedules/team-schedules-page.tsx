@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { AlertBanner, Card, EmptyState, ErrorState, ListItem, TextField } from '@/components/v1-ui/primitives';
 import { ChevronLeftIcon, PlusIcon } from '@/components/v1-ui/icons';
@@ -18,7 +17,6 @@ import type {
 // ── 목록 (calendar/list 토글 + type/state 필터) ───────────────────────────────
 
 export function ScheduleListPageView({ model }: { model: ScheduleListViewModel }) {
-  const router = useRouter();
   // floatingSlot(일정 만들기 FAB)은 model.canManage(팀 상세 fetch 의존) 런타임 값이라
   // 정적 테이블(fragments/team-schedules.ts)에 못 넣는다 — 렌더 최상단에서 override로
   // 직접 밀어넣는다(app-shell-promotion.md §1.6, Hooks 규칙 — 조건부 return보다 위).
@@ -92,10 +90,11 @@ export function ScheduleListPageView({ model }: { model: ScheduleListViewModel }
           <PageSkeleton variant="list" />
         ) : model.visibleItems.length === 0 ? (
           <EmptyState
+            illustration={{ name: 'landing-hero' }}
             title={model.emptyTitle}
             sub={model.emptySub}
             cta={model.canManage ? '일정 만들기' : undefined}
-            onCta={model.canManage ? () => router.push(model.createHref) : undefined}
+            ctaHref={model.canManage ? model.createHref : undefined}
           />
         ) : (
           <div className="tm-team-open-match-list">

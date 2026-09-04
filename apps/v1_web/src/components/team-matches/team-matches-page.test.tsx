@@ -480,6 +480,16 @@ describe('상세 홈팀 카드·히어로 — 표기 결함 회귀(2026-08-25)',
     expect(screen.queryByText('estimated')).not.toBeInTheDocument();
   });
 
+  it('trustState=sample 은 실제 신뢰 신호가 아니므로 홈팀 카드에 노출하지 않는다', () => {
+    const model = getTeamMatchDetailViewModel('default');
+    model.match.hostTeamTrustState = 'sample';
+
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    expect(screen.queryByText('sample')).not.toBeInTheDocument();
+    expect(screen.queryByText('샘플')).not.toBeInTheDocument();
+  });
+
   it('등급이 비어 있으면 값 없는 "등급" 배지를 만들지 않고 정보 행은 미정으로 채운다', () => {
     const model = getTeamMatchDetailViewModel('default');
     model.match.grade = '';
@@ -498,6 +508,16 @@ describe('상세 홈팀 카드·히어로 — 표기 결함 회귀(2026-08-25)',
     renderPage(<TeamMatchDetailPageView model={model} />);
 
     expect(screen.getByText('브라보FC')).toBeInTheDocument();
+  });
+});
+
+describe('TeamMatchDetailPageView — 히어로 액션', () => {
+  it('이미지 우측 상단에는 공유만 노출한다', () => {
+    renderPage(<TeamMatchDetailPageView model={getTeamMatchDetailViewModel('default')} />);
+
+    expect(screen.getAllByRole('button', { name: '공유' }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('link', { name: '홈으로' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '알림' })).not.toBeInTheDocument();
   });
 });
 

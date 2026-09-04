@@ -8,6 +8,17 @@ import { MatchTypeSegment } from './match-type-segment';
  * 여기서 못박는다(구현 되읊기가 아니라 실제 네비게이션 계약 검증).
  */
 describe('MatchTypeSegment', () => {
+  it('팀 매치를 첫 번째 선택지로 보여준다', () => {
+    render(<MatchTypeSegment active="team" />);
+    const nav = screen.getByRole('navigation', { name: '매치 유형' });
+    const links = within(nav).getAllByRole('link');
+
+    expect(links[0]).toHaveTextContent('팀');
+    expect(links[0]).toHaveAttribute('href', '/team-matches');
+    expect(links[1]).toHaveTextContent('개인');
+    expect(links[1]).toHaveAttribute('href', '/matches');
+  });
+
   it('개인 매치를 보다가 팀 매치로 건너갈 수 있다', () => {
     render(<MatchTypeSegment active="personal" />);
     const nav = screen.getByRole('navigation', { name: '매치 유형' });

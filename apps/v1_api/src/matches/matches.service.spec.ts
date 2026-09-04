@@ -488,6 +488,18 @@ describe('MatchesService', () => {
     expect(where.startAt).toEqual({ gte: expect.any(Date) });
   });
 
+  it('list: 기본 조회는 최신 생성순이며 마감 시각이 지난 모집 행을 제외한다', async () => {
+    prisma.v1Match.findMany.mockResolvedValue([]);
+
+    await service.list(null, {});
+
+    const args = prisma.v1Match.findMany.mock.calls[0][0];
+    expect(args.orderBy).toEqual([{ createdAt: 'desc' }, { id: 'desc' }]);
+    expect(args.where.AND).toEqual(expect.arrayContaining([
+      { OR: [{ deadlineAt: null }, { deadlineAt: { gte: expect.any(Date) } }] },
+    ]));
+  });
+
   // 감사 결함 회귀 방지(2026-08-27): toListItem()이 host를 아예 내려주지 않아 프론트가
   // 항상 목업 호스트 이름으로 폴백했다(모든 카드가 '김정민' 등 동일 이름). detail()과 같은
   // hostUser include를 목록 직렬화에도 그대로 매핑하는지 고정한다.

@@ -2654,6 +2654,8 @@ label.tm-btn:focus-within {
 }
 
 .tm-match-sport-illustration {
+  width: 112px;
+  height: 112px;
   object-fit: contain;
   flex: none;
   /* 파란 바탕 위에 파란 오브젝트(풋살공·러닝화·고글)가 묻힌다 — 흰 웰 안에 놓아 대비를 확보한다.
@@ -2671,17 +2673,34 @@ label.tm-btn:focus-within {
   position: relative;
 }
 
+/* 그래픽은 하단 우측에 고정 — 세로 중앙이면 우상단 아이콘 버튼 행(홈·공유·알림)과 겹친다
+   (alpha 실측 2026-09-04). 오버레이 텍스트에는 그래픽 폭만큼 우측 여백을 준다. */
 .tm-match-detail-hero-sport .tm-match-detail-hero-illustration {
   position: absolute;
-  right: 20px;
-  top: 50%;
-  transform: translateY(-50%);
+  right: 16px;
+  bottom: 16px;
+  width: 136px;
+  height: 136px;
   pointer-events: none;
 }
 
 .tm-match-detail-hero-sport .tm-match-detail-overlay {
   position: relative;
+  padding-right: 164px;
   background: linear-gradient(90deg, rgba(25, 31, 40, 0.42), rgba(25, 31, 40, 0.08));
+}
+
+@media (min-width: 1024px) {
+  .tm-match-detail-hero-sport .tm-match-detail-hero-illustration {
+    right: 24px;
+    bottom: 20px;
+    width: 160px;
+    height: 160px;
+  }
+
+  .tm-match-detail-hero-sport .tm-match-detail-overlay {
+    padding-right: 200px;
+  }
 }
 
 .tm-match-list-media::after {
@@ -3388,6 +3407,44 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   grid-template-columns: minmax(0, 1fr) 44px minmax(0, 1fr);
   align-items: center;
   gap: 12px;
+}
+
+/*
+ * 사진 없는 팀매치의 VS 카드/히어로 배경 — matches.tm-match-media-sport 와 같은 이유(웨이브4,
+ * 2026-09-04). 이쪽은 matches 히어로와 달리 양옆에 팀 이름 텍스트가 항상 있어(비어 있는 쪽이
+ * 없다) 그래픽을 우하단 모서리에 살짝 걸치듯 배치하고, overflow:hidden 으로 카드 밖 노출을
+ * 막는다. z-index 를 음수로 둬 흰 텍스트(비-포지션 콘텐츠)가 항상 그 위에 그려지게 한다 —
+ * CSS 페인트 순서상 음수 z-index 자식은 비-포지션 콘텐츠보다 아래에 그려진다(CSS2.1 Appendix E).
+ */
+.tm-team-vs-hero-sport,
+.tm-team-match-vs-sport {
+  background: var(--blue700);
+  position: relative;
+  overflow: hidden;
+  /* z-index:-1 그래픽이 부모 배경 뒤로 빠지지 않도록 여기서 stacking context 를 만든다 —
+     position:relative 만으로는 만들어지지 않아 그래픽이 통째로 보이지 않았다. */
+  isolation: isolate;
+}
+
+/* 팀 이름이 좌우에 있는 VS 레이아웃이라 그래픽은 하단 우측 안쪽에 두고(잘리지 않게) 텍스트 뒤(z-index:-1)에 깐다. */
+.tm-team-vs-hero-illustration {
+  position: absolute;
+  z-index: -1;
+  right: 16px;
+  bottom: 16px;
+  width: 120px;
+  height: 120px;
+  pointer-events: none;
+}
+
+.tm-team-match-vs-illustration {
+  position: absolute;
+  z-index: -1;
+  right: 12px;
+  bottom: 12px;
+  width: 88px;
+  height: 88px;
+  pointer-events: none;
 }
 
 .tm-team-create-preview {

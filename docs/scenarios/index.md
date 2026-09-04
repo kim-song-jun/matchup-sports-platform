@@ -316,6 +316,16 @@ Todo 26 of `.omo/plans/teameet-team-tournament-operations-v1.md` requires this i
 
 ## How To Use
 
+## 2026-09-03 — Android Play policy follow-up (items 2-6)
+
+- Status: local implementation/validation PASS; Play Console and physical-device gates remain external.
+- Covered: Data safety wording, withdrawal/final-deletion cleanup, minimal permissions, hardened WebView
+  source contracts, target SDK/release gates, and the public account-deletion surface.
+- Explicitly excluded: reviewer/test credentials and closed-testing cohort management.
+- Canonical task: `.github/tasks/156-android-app-fcm-foundation.md`.
+- Evidence: policy source gate PASS; backend 48/48, public-page 1/1, API/Web typechecks PASS; Android
+  JVM/AAB build PASS; AAB 16 KB alignment PASS; headed public-route QA 3/3 with zero runtime errors.
+
 1. `index.md`에서 현재 우선순위와 열린 논점을 확인한다.
 2. 해당 기능 문서로 이동해 체크박스를 직접 갱신한다.
 3. 이슈가 생기면 개별 문서에도 적고, 최종 판단/논의는 `Discussion`에 요약한다.

@@ -49,6 +49,21 @@ export class MatchesService {
   async list(user: V1AuthUser | null, query: MatchesQueryDto) {
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
     const status = query.status ?? 'recruiting';
+    const now = new Date();
+    const constraints: Prisma.V1MatchWhereInput[] = [
+      ...(status === 'recruiting'
+        ? [{ OR: [{ deadlineAt: null }, { deadlineAt: { gte: now } }] } satisfies Prisma.V1MatchWhereInput]
+        : []),
+      ...(query.query
+        ? [{
+            OR: [
+              { title: { contains: query.query, mode: 'insensitive' } },
+              { description: { contains: query.query, mode: 'insensitive' } },
+              { placeName: { contains: query.query, mode: 'insensitive' } },
+            ],
+          } satisfies Prisma.V1MatchWhereInput]
+        : []),
+    ];
     const where: Prisma.V1MatchWhereInput = {
       deletedAt: null,
       // status='recruiting'인 raw DB 행에는 시작 시각이 이미 지난("만료") 매치도 섞여 있다 —
@@ -58,23 +73,15 @@ export class MatchesService {
       // completed/cancelled 등 나머지 status 조회는 과거 startAt을 의도적으로 포함해야 하므로
       // 그대로 둔다.
       ...(status === 'expired'
-        ? { startAt: { lt: new Date() } }
+        ? { startAt: { lt: now } }
         : status === 'recruiting'
-          ? { status, startAt: { gte: new Date() } }
+          ? { status, startAt: { gte: now } }
           : { status }),
       ...(query.sportId ? { sportId: query.sportId } : {}),
       ...(query.regionId ? { regionId: query.regionId } : {}),
       ...(query.genderRule ? { genderRule: getGenderRuleWhere(query.genderRule) } : {}),
       ...levelCodeWhere(parseLevelCodes(query.levelCodes)),
-      ...(query.query
-        ? {
-            OR: [
-              { title: { contains: query.query, mode: 'insensitive' } },
-              { description: { contains: query.query, mode: 'insensitive' } },
-              { placeName: { contains: query.query, mode: 'insensitive' } },
-            ],
-          }
-        : {}),
+      ...(constraints.length ? { AND: constraints } : {}),
     };
 
     const matches = await this.prisma.v1Match.findMany({
@@ -1134,7 +1141,7 @@ export class MatchesService {
 }
 
 function getOrderBy(sort: MatchesQueryDto['sort']): Prisma.V1MatchOrderByWithRelationInput[] {
-  if (sort === 'latest') return [{ createdAt: 'desc' }];
+  if (!sort || sort === 'latest') return [{ createdAt: 'desc' }, { id: 'desc' }];
   if (sort === 'deadline' || sort === 'starts_at') return [{ startAt: 'asc' }, { createdAt: 'desc' }];
   return [{ startAt: 'asc' }, { createdAt: 'desc' }];
 }

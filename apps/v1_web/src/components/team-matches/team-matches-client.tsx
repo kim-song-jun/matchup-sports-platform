@@ -114,7 +114,7 @@ export function TeamMatchListPageClient() {
   const recordSearch = useV1RecordSearch();
   const query = teamMatchFilters ? filteredQuery : allQuery;
 
-  if (query.isError) return <TeamMatchStatePageView model={getTeamMatchStateViewModel('error')} />;
+  if (query.isError) return <TeamMatchStatePageView model={{ ...getTeamMatchStateViewModel('error'), retry: () => void query.refetch() }} />;
 
   const base = getTeamMatchListViewModel();
   const pageItems = query.data?.items;
@@ -279,7 +279,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
     );
   }, [query.data, resolveChatRoom, teamMatchId, canManageHostTeam, canManageOpponentTeam]);
 
-  if (query.isError) return <TeamMatchStatePageView model={getTeamMatchStateViewModel('error')} />;
+  if (query.isError) return <TeamMatchStatePageView model={{ ...getTeamMatchStateViewModel('error'), retry: () => void query.refetch() }} />;
 
   // 데이터가 오기 전에는 하드코딩 목업(`fallback`)을 화면 전체로 렌더하지 않는다 —
   // 목업 제목·주소·참가자가 실제 값처럼 보여 사용자가 잘못 읽던 결함이었다.
@@ -368,7 +368,6 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
         }
       : undefined,
     onShare: () => shareTeamMatch(query.data),
-    onNotify: () => router.push('/notifications'),
     lineupHref: ownTeamId ? `/team-matches/${teamMatchId}/lineup` : undefined,
     onApply: seeding ? undefined : getApplyAction({
       viewerState,
@@ -627,14 +626,12 @@ function buildResultAction(
     return {
       label: status === 'completed' ? '경기 결과 보기' : '경기 결과 입력',
       href: `/team-matches/${teamMatchId}/result`,
-      tone: 'primary',
     };
   }
   if (canManageOpponentTeam) {
     return {
       label: status === 'completed' ? '경기 결과 확인/승인' : '경기 결과 대기',
       href: `/team-matches/${teamMatchId}/result/approval`,
-      tone: status === 'completed' ? 'primary' : 'neutral',
     };
   }
   return null;

@@ -46,6 +46,9 @@ jobs:
         with:
           gradle-version: '9.1.0'
 
+      - name: Verify Play policy source contracts
+        run: node scripts/qa/check-android-play-policy.mjs
+
       - name: Gate Alpha Firebase configuration
         id: firebase
         shell: bash
@@ -73,6 +76,12 @@ jobs:
 
       - name: Test and build alpha APK and release bundle contract
         run: gradle -p apps/v1_android --no-daemon testAlphaDebugUnitTest testProductionDebugUnitTest assembleAlphaDebug bundleAlphaRelease
+
+      - name: Verify alpha AAB 16 KB page alignment
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 -v 4 apps/v1_android/app/build/outputs/bundle/alphaRelease/app-alpha-release.aab
 
       - name: Verify production release gates fail closed
         shell: bash

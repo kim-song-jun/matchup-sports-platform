@@ -56,15 +56,51 @@ try {
       scrollHeight: document.documentElement.scrollHeight,
       clientHeight: document.documentElement.clientHeight,
     }));
+    const scrollRegion = page.locator('.tm-auth-scroll');
+    const scrollRegionDimensions = await scrollRegion.evaluate((element) => ({
+      scrollHeight: element.scrollHeight,
+      clientHeight: element.clientHeight,
+      scrollTop: element.scrollTop,
+    }));
     const screenshot = path.join(outputDir, `${viewport.name}.png`);
     await page.screenshot({ path: screenshot, fullPage: true });
+    let bottomScreenshot = null;
+    let bottomLayout = null;
+    let reachedScrollBottom = true;
+    if (scrollRegionDimensions.scrollHeight > scrollRegionDimensions.clientHeight + 1) {
+      reachedScrollBottom = await scrollRegion.evaluate((element) => {
+        element.scrollTop = element.scrollHeight;
+        return Math.abs(element.scrollHeight - element.clientHeight - element.scrollTop) <= 1;
+      });
+      bottomScreenshot = path.join(outputDir, `${viewport.name}-bottom.png`);
+      await page.screenshot({ path: bottomScreenshot });
+      bottomLayout = await page.evaluate(() => {
+        const bounds = (selector) => {
+          const rect = document.querySelector(selector)?.getBoundingClientRect();
+          return rect ? { top: rect.top, bottom: rect.bottom } : null;
+        };
+        return {
+          viewportHeight: window.innerHeight,
+          header: bounds('.tm-auth-topbar'),
+          scrollRegion: bounds('.tm-auth-scroll'),
+          privacyLink: bounds('a[href="/terms?document=privacy"]'),
+        };
+      });
+    }
 
     const blockers = [
       ...(response?.ok() ? [] : [`document status ${response?.status() ?? 'missing'}`]),
       ...(requestHref?.startsWith('mailto:teameetsports@naver.com?') ? [] : ['invalid public request link']),
       ...(inAppHref === '/my/settings/withdrawal' ? [] : ['invalid in-app request link']),
       ...(dimensions.scrollWidth <= dimensions.clientWidth ? [] : ['horizontal overflow']),
+      ...(reachedScrollBottom ? [] : ['auth scroll region cannot reach bottom']),
+      ...(bottomLayout?.header && bottomLayout.header.top < -1 ? ['top bar is clipped after scrolling'] : []),
+      ...(bottomLayout?.privacyLink && bottomLayout.privacyLink.bottom <= bottomLayout.viewportHeight + 1
+        ? []
+        : bottomLayout ? ['privacy link is not visible at scroll bottom'] : []),
+      ...consoleErrors.map((error) => `console error: ${error}`),
       ...pageErrors.map((error) => `page error: ${error}`),
+      ...failedResponses.map(({ status, url }) => `failed response ${status}: ${url}`),
     ];
 
     results.push({
@@ -73,10 +109,14 @@ try {
       requestHref,
       inAppHref,
       dimensions,
+      scrollRegionDimensions,
+      reachedScrollBottom,
+      bottomLayout,
       consoleErrors,
       pageErrors,
       failedResponses,
       screenshot,
+      bottomScreenshot,
       blockers,
     });
     await context.close();

@@ -25,8 +25,8 @@ export function MatchTypeSegment({ active }: MatchTypeSegmentProps) {
   return (
     <SegmentedTabs
       items={[
-        { id: 'personal', label: '개인', href: '/matches' },
         { id: 'team', label: '팀', href: '/team-matches' },
+        { id: 'personal', label: '개인', href: '/matches' },
       ]}
       activeId={active}
       ariaLabel="매치 유형"

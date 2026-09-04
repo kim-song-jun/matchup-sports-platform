@@ -45,6 +45,9 @@ jobs:
         with:
           gradle-version: '9.1.0'
 
+      - name: Verify Play policy source contracts
+        run: node scripts/qa/check-android-play-policy.mjs
+
       - name: Gate production release inputs
         shell: bash
         env:
@@ -78,6 +81,12 @@ jobs:
 
       - name: Test and build signed production AAB
         run: gradle -p apps/v1_android --no-daemon testProductionReleaseUnitTest bundleProductionRelease
+
+      - name: Verify production AAB 16 KB page alignment
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 -v 4 apps/v1_android/app/build/outputs/bundle/productionRelease/app-production-release.aab
 
       - name: Create production AAB checksum
         working-directory: apps/v1_android/app/build/outputs/bundle/productionRelease

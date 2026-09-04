@@ -104,7 +104,14 @@ export function TeamListPageView({ model }: { model: TeamListViewModel }) {
         ) : model.teams.length ? (
           <div className="tm-team-card-stack">{model.teams.map((team) => <TeamCard key={team.id} team={team} />)}</div>
         ) : (
-          <EmptyState fill title="조건에 맞는 팀이 없어요" sub="다른 종목을 선택하거나 필터를 초기화해 다시 확인해 주세요." />
+          <EmptyState
+            fill
+            illustration={{ name: 'auth-welcome' }}
+            title="조건에 맞는 팀이 없어요"
+            sub="다른 종목을 선택하거나 필터를 초기화해 다시 확인해 주세요."
+            cta={model.filterCount > 0 || model.chips.some((chip) => chip.active && chip.label !== '전체') ? '전체 팀 보기' : undefined}
+            ctaHref="/teams"
+          />
         )}
       </div>
       {model.filterSheet?.open ? <TeamFilterSheet model={model} /> : null}
@@ -137,7 +144,6 @@ export function TeamStatePageView({ model }: { model: TeamStateViewModel }) {
   // title만 override로 밀어넣고 activeTab/bottomNav/backHref는 그 라우트의 route-chrome
   // 테이블 값을 그대로 따른다(특별 규칙 불필요, 설계 문서 §1.9 "공유 에러 뷰" 절).
   useShellOverride({ title: model.title });
-  if (model.state === 'filter') return <TeamFilterPageView model={model} />;
 
   return (
     <>
@@ -160,51 +166,6 @@ export function TeamStatePageView({ model }: { model: TeamStateViewModel }) {
             <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href="/teams" style={{ marginTop: 16 }}>목록으로 돌아가기</Link>
           </Card>
         ) : null}
-      </div>
-    </>
-  );
-}
-
-function TeamFilterPageView({ model }: { model: TeamStateViewModel }) {
-  // 이 뷰는 어느 route-chrome 패턴에도 대응하지 않는다 — TeamListPageView가 이미 시트
-  // 기반 필터(TeamFilterSheet)를 담당하고 있어 이 전체화면 필터 뷰로 진입하는 실제 경로가
-  // 저장소에 없다(TeamFilterPageClient가 어디서도 호출되지 않는다, 죽은 경로). 그래도
-  // 렌더될 경우를 대비해 원래 static 값 그대로 override로 보존한다.
-  useShellOverride({ title: '필터' });
-  return (
-    <>
-      {/* Desktop back header */}
-      <div className="tm-desktop-page-head tm-show-desktop">
-        <Link className="tm-desktop-back" href="/teams" aria-label="팀 목록으로">
-          <ChevronLeftIcon size={22} strokeWidth={2.2} aria-hidden="true" />
-        </Link>
-        <h1 className="tm-text-heading">팀 조건 필터</h1>
-      </div>
-      <div className="tm-create-shell tm-team-filter-shell">
-        <section>
-          <h1 className="tm-text-heading">팀 조건</h1>
-          <p className="tm-text-body" style={{ marginTop: 8, lineHeight: 1.55 }}>{model.description}</p>
-        </section>
-        <Card pad={16}>
-          <div className="tm-text-body-lg">빠른 조건</div>
-          <div className="tm-sport-chip-row" role="group" aria-label="빠른 조건 선택" style={{ marginTop: 12 }}>
-            {model.chips.map((chip) => chip.href ? <Link key={chip.label} className={`tm-chip ${chip.active ? 'tm-chip-active' : ''}`} href={chip.href} aria-current={chip.active ? 'page' : undefined}>{chip.label}{typeof chip.count === 'number' ? <span className="tab-num"> {chip.count}</span> : null}</Link> : <button key={chip.label} className={`tm-chip ${chip.active ? 'tm-chip-active' : ''}`} type="button" aria-pressed={chip.active}>{chip.label}{typeof chip.count === 'number' ? <span className="tab-num"> {chip.count}</span> : null}</button>)}
-          </div>
-        </Card>
-        <Card pad={16}>
-          <div className="tm-text-body-lg">가입 조건</div>
-          <div className="tm-my-list-stack" style={{ marginTop: 12 }}>
-            <ListItem title="지역" sub="서울 전체" trailing="변경 가능" />
-            <ListItem title="가입 상태" sub="가입 신청 가능" trailing="1개" />
-            <ListItem title="활동 빈도" sub="주 1회 이상" trailing="1개" />
-          </div>
-        </Card>
-      </div>
-      <div className="tm-fixed-cta tm-team-filter-cta">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
-          <Link className="tm-btn tm-btn-lg tm-btn-neutral" href="/teams">초기화</Link>
-          <Link className="tm-btn tm-btn-lg tm-btn-primary" href="/teams">{model.teams.length}개 결과 보기</Link>
-        </div>
       </div>
     </>
   );
@@ -1592,7 +1553,7 @@ function InvitationSection({ invitations }: { invitations: NonNullable<TeamMembe
           onCta={onRetry}
         />
       ) : items.length === 0 ? (
-        <EmptyState title="보낸 초대가 없어요" sub="이메일로 팀원을 초대하면 여기에 표시돼요." />
+        <EmptyState illustration={{ name: 'chat-empty' }} title="보낸 초대가 없어요" sub="이메일로 팀원을 초대하면 여기에 표시돼요." />
       ) : (
         <div style={{ display: 'grid', gap: 12 }}>
           {items.map((item) => (

@@ -150,10 +150,11 @@ export function MatchListPageView({ model }: { model: MatchListViewModel }) {
 
 
 /**
- * 사진 없는 매치의 종목 그래픽. 크기는 소비처(카드 112 / 히어로 160)가 정하고, 장식이라 aria-hidden.
+ * 사진 없는 매치의 종목 그래픽. 표시 크기는 CSS(.tm-match-sport-illustration, 히어로 변형)가 정한다 —
+ * 인라인 style 이면 뷰포트별 CSS 오버라이드가 먹지 않는다. `sizes` 는 표시 크기와 같은 반응형 힌트.
  * 이름 매핑은 matches.card-model.ts 의 sportIllustration — 운영 4종목 전용, 그 외 공용 스포츠 그래픽.
  */
-function SportIllustration({ sport, size, className }: { sport: string; size: number; className?: string }) {
+function SportIllustration({ sport, sizes, className }: { sport: string; sizes: string; className?: string }) {
   return (
     <Image
       className={`tm-match-sport-illustration${className ? ` ${className}` : ''}`}
@@ -162,8 +163,7 @@ function SportIllustration({ sport, size, className }: { sport: string; size: nu
       aria-hidden="true"
       width={640}
       height={640}
-      sizes={`${size}px`}
-      style={{ width: size, height: size }}
+      sizes={sizes}
     />
   );
 }
@@ -324,7 +324,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
 
       <article className="tm-match-detail tm-content-enter">
         <div className={`tm-match-detail-hero${match.image ? '' : ' tm-match-media-sport tm-match-detail-hero-sport'}`} style={match.image ? { backgroundImage: cssUrl(match.image) } : undefined}>
-          {match.image ? null : <SportIllustration sport={match.sport} size={160} className="tm-match-detail-hero-illustration" />}
+          {match.image ? null : <SportIllustration sport={match.sport} sizes="(min-width: 1024px) 160px, 136px" className="tm-match-detail-hero-illustration" />}
           <div className="tm-match-detail-overlay">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               {/* Mobile back button — hidden on desktop (desktop back is in the page head above) */}
@@ -700,7 +700,7 @@ function MatchCardItem({ match }: { match: MatchCardModel }) {
   return (
     <Link className="tm-match-list-card tm-card-interactive tm-pressable" href={`/matches/${match.id}`}>
       <div className={`tm-match-list-media${match.image ? '' : ' tm-match-media-sport'}`} style={match.image ? { backgroundImage: cssUrl(match.image) } : undefined}>
-        {match.image ? null : <SportIllustration sport={match.sport} size={112} />}
+        {match.image ? null : <SportIllustration sport={match.sport} sizes="112px" />}
         <span className="tm-badge tm-badge-blue">{match.sport}</span>
         {/* [P1 숫자:단위 2:1 + tabular-nums] 현재/최대 인원 — 숫자(body-lg weight600) : 단위(caption) 2:1 */}
         <span className="tm-match-count-badge" style={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>

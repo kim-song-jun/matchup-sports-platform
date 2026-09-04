@@ -12,6 +12,7 @@ import {
   useV1AdminLeagueMatch,
   useV1RevertLeagueCompletion,
   useV1AdminLeagueTeams,
+  useV1CreateManualLeagueFixture,
   useV1AdminTeam,
   useV1CancelLeagueFixture,
   useV1GenerateLeagueFixtures,
@@ -23,6 +24,7 @@ import {
   useV1UpdateLeagueFixture,
 } from '@/hooks/use-v1-api';
 import { describeLeagueRegistrationWindow } from '@/lib/league-registration-copy';
+import { LeagueManualFixtureModal } from './league-manual-fixture-modal';
 import { extractErrorMessage } from '@/lib/error-message';
 import { expandWeeklyFixtureDates } from '@/lib/league-fixture-dates';
 import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
@@ -63,6 +65,8 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
   const cancelFixture = useV1CancelLeagueFixture(leagueId);
   const regenerateFixtures = useV1RegenerateLeagueFixtures(leagueId);
   const { data: teamsData } = useV1AdminLeagueTeams(leagueId);
+  const createManualFixture = useV1CreateManualLeagueFixture(leagueId);
+  const [manualFixtureOpen, setManualFixtureOpen] = useState(false);
   const recordForfeit = useV1RecordLeagueForfeit(leagueId);
   const { toasts, showToast } = useAdminToast();
 
@@ -666,7 +670,33 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
             >
               라운드로빈 대진 생성
             </button>
+            {/* **일괄 생성과 별개 경로다.** 우천 순연 재편성·대체 경기는 라운드로빈으로는
+                만들 수 없다 — BE 는 `fixtures/manual` 을 진작에 갖고 있었는데 부르는 화면이
+                없었다(FE 호출 0건). */}
+            <button
+              type="button"
+              onClick={() => setManualFixtureOpen(true)}
+              className="min-h-[44px] rounded-xl border border-[var(--border)] px-4 text-sm font-semibold text-[var(--text-strong)]"
+            >
+              경기 하나 추가
+            </button>
           </div>
+          {manualFixtureOpen && (
+            <LeagueManualFixtureModal
+              teams={(teamsData?.teams ?? []).map((team) => ({ id: team.teamId, label: team.name }))}
+              isSubmitting={createManualFixture.isPending}
+              onSubmit={async (payload) => {
+                try {
+                  await createManualFixture.mutateAsync(payload);
+                  showToast('경기를 만들었어요.', 'success');
+                } catch (error) {
+                  showToast(extractErrorMessage(error, '경기를 만들지 못했어요.'), 'error');
+                  throw error;
+                }
+              }}
+              onClose={() => setManualFixtureOpen(false)}
+            />
+          )}
           {!hasLeagueStartsOn && <MissingStartsOnNotice />}
           <TimingSuggestionRow
             suggestion={timingSuggestion}

@@ -5213,6 +5213,10 @@ import type {
   V1UpdateLeagueFixtureResult,
   V1OpenLeagueRegistrationPayload,
   V1OpenLeagueRegistrationResult,
+
+  V1CreateManualLeagueFixturePayload,
+
+  V1LeagueFixture,
 } from '@/types/league-match';
 import type {
   V1CommitPromotionsPayload,
@@ -5304,6 +5308,25 @@ export function useV1OpenLeagueRegistration(leagueId: string) {
   return useMutation({
     mutationFn: (body: V1OpenLeagueRegistrationPayload) =>
       v1Post<V1OpenLeagueRegistrationResult>(`/admin/league-matches/${leagueId}/open-registration`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
+    },
+  });
+}
+
+/**
+ * 리그에 **한 경기만** 만든다(수동 대진).
+ *
+ * BE 는 `POST /admin/league-matches/:leagueId/fixtures/manual` 로 진작에 있었는데 **부르는
+ * 화면이 없었다**(2026-09-04 실측: FE 호출 0건). 그래서 라운드로빈 일괄 생성 말고는 경기를
+ * 추가할 방법이 없었다 — 우천 순연 재편성이나 대체 경기가 그래서 불가능했다.
+ */
+export function useV1CreateManualLeagueFixture(leagueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1CreateManualLeagueFixturePayload) =>
+      v1Post<V1LeagueFixture>(`/admin/league-matches/${leagueId}/fixtures/manual`, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });

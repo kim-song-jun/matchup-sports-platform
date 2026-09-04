@@ -14,8 +14,8 @@ import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { CreateField, FieldErrorText, GenderRuleSelector, MissingFieldsBanner, MultiPresetChipSelector, PresetChipSelector, RecentVenueChips } from '@/components/v1-ui/create-form-fields';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
 import { cssUrl } from '@/lib/assets';
-// 사진 없는 팀매치의 종목 그래픽 이름 매핑 — matches.card-model.ts 와 같은 함수를 그대로
-// 재사용한다(웨이브4). CSS 클래스(tm-match-sport-illustration)도 새로 만들지 않고 그대로 쓴다.
+// 사진 없는 팀매치의 종목 그래픽 — 매치·홈과 같은 공용 컴포넌트를 쓴다(웨이브8에서
+// 세 곳의 복사본을 하나로 모았다). 같은 종목이면 어느 화면에서든 같은 그래픽이 나온다.
 import { SportIllustration } from '@/components/v1-ui/sport-illustration';
 import type {
   TeamMatchCreateViewModel,

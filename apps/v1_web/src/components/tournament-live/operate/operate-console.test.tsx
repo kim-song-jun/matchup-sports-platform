@@ -650,9 +650,8 @@ describe('OperateConsole — 라인업 게이트 (UX 감사 item 2)', () => {
 
     expect(screen.getByRole('button', { name: '경기 시작' })).toBeEnabled();
     expect(screen.getByText(/성수 풋살 클럽.*아직 선발 명단을 제출하지 않았어요/)).toBeInTheDocument();
-    // [P1-d] 배너의 제출 링크는 뗐다 -- 화면이 사라졌고, P1-c 로 제출 자체가
-    // 필요 없어졌다. **경고 문구는 남긴다**(운영자가 상황을 알아야 한다).
-    expect(screen.queryByRole('link', { name: '라인업 제출하러 가기' })).not.toBeInTheDocument();
+    // [P1-d/웨이브8] 제출 링크 단언은 뺐다 — 링크를 그릴 수 있는 코드가 남아 있지 않아
+    // 무조건 통과하는 단언이었다. 경고 문구 단언(위)이 이 계약의 실제 보호막이다.
   });
 
   it('양 팀 모두 라인업을 제출하면 "경기 시작"이 활성화되고 배너가 없다', () => {

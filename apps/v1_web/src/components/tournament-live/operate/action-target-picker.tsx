@@ -33,9 +33,6 @@ export interface EventCaptureCommitInput {
 
 export interface ActionTargetPickerProps {
   readonly open: boolean;
-  /** UX 감사 item 2 — `LineupGrid`로 그대로 전달해, 라인업이 없는 사이드의
-   * 빈 상태에 "라인업 제출하러 가기" 링크를 띄운다. 생략하면(예: 기존 테스트)
-   * `LineupGrid`가 링크 없이 문구만 보여준다. */
   readonly actionLabel: string;
   readonly actionType: GameEventType;
   readonly cardColor?: GameCardColor;

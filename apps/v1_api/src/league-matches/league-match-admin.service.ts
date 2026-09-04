@@ -59,6 +59,7 @@ import { LeagueStateValue } from './league-state';
 const TEAM_REMOVAL_CANCEL_REASON = '리그 참가팀에서 제외돼 자동으로 취소했어요.';
 
 const DEFAULT_FIXTURE_PLACE_NAME = '장소 미정';
+import { isLeagueRegistrationOpen } from './league-registration-open';
 
 /**
  * 날짜를 고르지 않은 리그의 **기본 매치데이 리듬**: 시작일부터 매주 한 매치데이.
@@ -364,6 +365,11 @@ export class LeagueMatchAdminService {
       // 한다 — 그 기준일이 응답에 없어서 화면은 계산할 수가 없었다(요일을 고르면 옛 형태를
       // 그대로 보내 400 이 났다). 공개 상세가 이미 같은 값을 내려주고 있었다.
       startsOn: league.startsOn,
+      // 참가 신청 상태 — 어드민이 "지금 신청을 받는가 / 마감이 언제인가" 를 보고 신청을
+      // 열 수 있어야 한다. 공개 상세와 **같은 판정 함수**를 쓴다(두 화면이 갈리면 어드민은
+      // 열었다고 보는데 사용자 화면엔 입구가 없다).
+      registrationDeadlineAt: league.registrationDeadlineAt?.toISOString() ?? null,
+      registrationOpen: league.registrationOpen,
       // 그룹 B 감사 결함 1: 참가팀 추가 화면이 "이 리그 종목과 같은 팀만" 검색을 좁히려면
       // 종목ID가 필요하다 — 지금까지는 대진 표에서 쓸 일이 없어 응답에 없었다.
       sportId: league.sportId,
@@ -1427,6 +1433,7 @@ export class LeagueMatchAdminService {
         id: true,
         title: true,
         status: true,
+        registrationDeadlineAt: true,
         sportId: true,
         regionId: true,
         // 거울이 `startsOn` 을 여기 담는다(leagueMirrorCreateData).
@@ -1460,6 +1467,10 @@ export class LeagueMatchAdminService {
       state: LEAGUE_STATE_BY_STATUS[status],
       startsOn: scheduledAt,
       teams: registrations,
+      // `state`(draft/active/completed)로는 신청 여부를 알 수 없다 — 거울의 원시 `status`
+      // 가 `'open'` 인지를 봐야 하고, 그 값은 여기서 destructure 되어 밖으로 안 나간다.
+      // 그래서 판정을 **여기서** 해 결과만 올려보낸다(공개 상세와 같은 함수).
+      registrationOpen: isLeagueRegistrationOpen(status, league.registrationDeadlineAt),
     };
   }
 

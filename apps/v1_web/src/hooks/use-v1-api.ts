@@ -5211,6 +5211,8 @@ import type {
   V1RevertLeagueCompletionResult,
   V1UpdateLeagueFixturePayload,
   V1UpdateLeagueFixtureResult,
+  V1OpenLeagueRegistrationPayload,
+  V1OpenLeagueRegistrationResult,
 } from '@/types/league-match';
 import type {
   V1CommitPromotionsPayload,
@@ -5284,6 +5286,24 @@ export function useV1GenerateLeagueFixtures(leagueId: string) {
   return useMutation({
     mutationFn: (body: V1GenerateLeagueFixturesPayload) =>
       v1Post<V1GenerateLeagueFixturesResult>(`/admin/league-matches/${leagueId}/fixtures`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
+    },
+  });
+}
+
+/**
+ * 리그 참가 신청을 연다 — 거울에 `status='open'` + 마감을 놓는다.
+ *
+ * BE 는 진작에 있었는데 **이 훅이 없어 부르는 화면이 하나도 없었다**(2026-09-04 실측:
+ * `open-registration` FE 호출 0건). 그래서 리그는 신청을 열 방법이 API 직접 호출뿐이었다.
+ */
+export function useV1OpenLeagueRegistration(leagueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1OpenLeagueRegistrationPayload) =>
+      v1Post<V1OpenLeagueRegistrationResult>(`/admin/league-matches/${leagueId}/open-registration`, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });

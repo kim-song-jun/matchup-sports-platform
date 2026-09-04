@@ -1,4 +1,4 @@
-import { IsIn, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
 
 export const PLAYER_ELIGIBILITY_STATUSES = ['non_pro', 'pro', 'needs_review'] as const;
 export type PlayerEligibilityStatus = (typeof PLAYER_ELIGIBILITY_STATUSES)[number];
@@ -17,6 +17,18 @@ export class AddPlayerDto {
   @IsOptional()
   @IsString()
   birthDate?: string;
+
+  /**
+   * 등번호(정본 §3 "명단은 등번호와 이름"). **선택 입력**이라 없어도 명단에 들어간다.
+   *
+   * 범위는 정수 `0~99` 다. **`0` 은 유효한 등번호다** — 하한을 1 로 잡으면 안 된다.
+   * 종목마다 세 자리를 쓰는 곳도 있지만 지금은 넓히지 않는다(넓혀야 하면 종목 설정으로 올린다).
+   */
+  @IsOptional()
+  @IsInt({ message: '등번호는 정수로 입력해 주세요.' })
+  @Min(0, { message: '등번호는 0에서 99 사이로 입력해 주세요.' })
+  @Max(99, { message: '등번호는 0에서 99 사이로 입력해 주세요.' })
+  jerseyNumber?: number;
 
   /** 미지정 시 needs_review 로 저장. */
   @IsOptional()

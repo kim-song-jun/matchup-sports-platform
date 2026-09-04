@@ -203,6 +203,22 @@ export function TournamentRosterDeadlineCard({
   );
 }
 
+/**
+ * 등번호 입력값을 보낼 값으로 바꾼다.
+ *
+ * **`Number()` 에 그냥 넘기면 안 된다.** `type="number"` 입력은 `e`·`1e2`·`-` 를 그대로
+ * 통과시키고, `Number('e')` 는 `NaN` 이며 **`NaN` 은 JSON 에서 `null` 로 직렬화된다** —
+ * 서버에서 "번호를 안 보냄" 과 구분되지 않아 번호가 조용히 사라진다(2026-09-04 Copilot 리뷰).
+ *
+ * 빈 값은 **번호 없는 선수**이지 오류가 아니다. `0` 은 유효한 등번호다.
+ */
+export function parseJerseyInput(raw: string): { ok: true; value?: number } | { ok: false } {
+  const trimmed = raw.trim();
+  if (trimmed === '') return { ok: true };
+  if (!/^\d{1,2}$/.test(trimmed)) return { ok: false };
+  return { ok: true, value: Number(trimmed) };
+}
+
 /* ── Add player form ── */
 
 type AddPlayerFormState = {
@@ -210,6 +226,8 @@ type AddPlayerFormState = {
   realName: string;
   birthDate: string;
   phone: string;
+  /** 등번호. 문자열로 들고 있다가 보낼 때만 숫자로 바꾼다 — 빈 값과 `0` 을 구분해야 한다. */
+  jerseyNumber: string;
   eligibilityStatus: V1PlayerEligibilityStatus;
 };
 
@@ -218,6 +236,7 @@ const EMPTY_FORM: AddPlayerFormState = {
   realName: '',
   birthDate: '',
   phone: '',
+  jerseyNumber: '',
   eligibilityStatus: 'non_pro',
 };
 
@@ -448,6 +467,9 @@ function AddPlayerForm({
   const birthDateFieldId = `${formId}-birthdate`;
   const phoneFieldId = `${formId}-phone`;
   const eligibilityFieldId = `${formId}-eligibility`;
+  const jerseyFieldId = `${formId}-jersey`;
+  // 팀 고정 등번호는 힌트로만 쓴다(A3) — 자동 채움 아님.
+  const memberJerseyNumber = selectedMember?.jerseyNumber ?? null;
   // 팀원이 아예 없으면 아래 실명·생년월일·휴대폰 필드는 전부 채울 값이 없는 빈 폼이라
   // 제출도 불가능하다(canSubmit이 form.userId를 요구). 크리플드 폼을 보여주는 대신
   // 폼 전체를 "먼저 멤버를 추가하라" 안내로 대체한다.
@@ -631,6 +653,33 @@ function AddPlayerForm({
             className="tm-input"
             aria-required="true"
             readOnly
+          />
+        </FormField>
+
+        {/* 정본 §3 "명단은 등번호와 이름". **선택 입력**이라 비워도 등록된다.
+            팀 고정 등번호는 **자동으로 채우지 않고 힌트로만** 보여준다(마스터 확정 A3) —
+            자동 채움은 "팀 번호 = 대회 번호" 라는 오해를 만들고, 두 번호를 분리한 A안의
+            취지를 화면이 되돌린다. 같게 쓸지는 사람이 고른다. */}
+        <FormField
+          id={jerseyFieldId}
+          label="등번호"
+          hint={
+            typeof memberJerseyNumber === 'number'
+              ? `선택 입력이에요. 이 팀원의 팀 등번호는 ${memberJerseyNumber}번이에요.`
+              : '선택 입력이에요. 0~99 사이 숫자를 쓸 수 있어요.'
+          }
+        >
+          <input
+            id={jerseyFieldId}
+            type="number"
+            inputMode="numeric"
+            min={0}
+            max={99}
+            value={form.jerseyNumber}
+            onChange={(event) => patch({ jerseyNumber: event.target.value })}
+            placeholder="예: 7"
+            className="tm-input"
+            style={{ fontFamily: 'var(--font-pretendard)' }}
           />
         </FormField>
 
@@ -863,6 +912,17 @@ function PlayerRow({
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            {/* 정본 §3 "명단 공개 = 등번호·이름". `0` 은 유효한 번호라 falsy 검사로
+                거르면 0번을 단 선수의 번호가 사라진다 — `null` 인지로만 가른다. */}
+            {player.jerseyNumber !== null && (
+              <span
+                className="tm-text-label tab-num"
+                style={{ color: 'var(--text-muted)', fontWeight: 700 }}
+                aria-label={`등번호 ${player.jerseyNumber}번`}
+              >
+                {player.jerseyNumber}
+              </span>
+            )}
             <span className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 600 }}>
               {player.realName}
             </span>
@@ -1117,6 +1177,8 @@ export function TournamentRosterPageClient({
     userId: string;
     realName: string;
     birthDate: string;
+    /** 문자열로 받는다 — 빈 값과 `0` 을 구분해야 한다. */
+    jerseyNumber: string;
     eligibilityStatus: V1PlayerEligibilityStatus;
   }) {
     // 로딩 중 재클릭 시 중복 제출 방지 — isPending 은 disabled 속성과 동일하게 리렌더
@@ -1140,10 +1202,23 @@ export function TournamentRosterPageClient({
     });
     setAddSuccess(null);
     try {
+      // 빈 문자열은 **보내지 않는다**(번호 없는 선수). `0` 은 유효한 등번호라
+      // truthy 검사로 거르면 0번이 사라진다 — 빈 값인지로만 가른다.
+      //
+      // 그리고 **`Number()` 에 그냥 넘기지 않는다.** `type="number"` 입력은 `e`·`1e2`·`-`
+      // 같은 값을 그대로 통과시키고, `Number('e')` 는 `NaN` 이며 `NaN` 은 **JSON 에서
+      // `null` 로 직렬화된다** — 서버 입장에서 "번호를 안 보냄" 과 구분되지 않아 번호가
+      // 조용히 사라진다. 숫자 두 자리만 값으로 인정한다.
+      const jersey = parseJerseyInput(formData.jerseyNumber);
+      if (!jersey.ok) {
+        setDraftErrors((prev) => ({ ...prev, [formId]: '등번호는 0에서 99 사이 숫자로 입력해 주세요.' }));
+        return;
+      }
       await addPlayer.mutateAsync({
         userId: formData.userId,
         realName: formData.realName,
         birthDate: formData.birthDate || undefined,
+        jerseyNumber: jersey.value,
         eligibilityStatus: formData.eligibilityStatus,
       });
       setDraftForms((prev) => prev.filter((form) => form.id !== formId));

@@ -50,6 +50,8 @@ import {
   describeTournamentRegistrationBlock,
   resolveTournamentCapacity,
   type TournamentRegistrationBlockReason,
+
+  pendingCapacityLabel,
 } from '@/lib/tournament-registration-availability';
 import type {
   V1TournamentDetail,
@@ -210,11 +212,14 @@ function CapacityProgressBar({
   pendingPaymentCount,
   teamCount,
   height = 5,
+  isFreeEntry = false,
 }: {
   confirmedCount: number;
   pendingPaymentCount: number;
   teamCount: number;
   height?: number;
+  /** 무료 대회는 기다리는 것이 입금이 아니라 운영자 확인이다 — `aria-label` 낱말이 갈린다. */
+  isFreeEntry?: boolean;
 }) {
   const max = Math.max(teamCount, 1);
   const confirmedPct = Math.min(100, (confirmedCount / max) * 100);
@@ -226,7 +231,9 @@ function CapacityProgressBar({
       aria-valuenow={Math.min(teamCount, confirmedCount + pendingPaymentCount)}
       aria-valuemin={0}
       aria-valuemax={teamCount}
-      aria-label={`정원 ${confirmedCount}팀 확정, ${pendingPaymentCount}팀 입금 대기, 총 ${teamCount}팀`}
+      // 스크린리더에는 이 문구만 들린다 — 화면 라벨만 고치고 여길 두면 무료 대회에서
+      // "입금 대기" 를 듣게 된다.
+      aria-label={`정원 ${confirmedCount}팀 확정, ${pendingPaymentCount}팀 ${pendingCapacityLabel(isFreeEntry)}, 총 ${teamCount}팀`}
       style={{ height, background: 'var(--grey100)', borderRadius: height, overflow: 'hidden', marginTop: 8, display: 'flex' }}
     >
       <div
@@ -362,6 +369,7 @@ function ApplyCTAButtons({
     const description = describeTournamentRegistrationBlock(
       blockReason,
       resolveTournamentCapacity(tournament),
+      tournament.entryFee === 0,
     );
     return (
       <button
@@ -831,11 +839,12 @@ export function TournamentDetailView({
               confirmedCount={tournament.confirmedCount}
               pendingPaymentCount={pendingPaymentCount}
               teamCount={tournament.teamCount}
+              isFreeEntry={tournament.entryFee === 0}
             />
             {pendingPaymentCount > 0 ? (
               <div className="tm-text-caption" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', color: 'var(--text-muted)', marginTop: 8 }}>
                 <span><b style={{ color: 'var(--blue700)', fontWeight: 600 }}>{tournament.confirmedCount}팀</b> 확정</span>
-                <span><b style={{ color: 'var(--orange700)', fontWeight: 600 }}>{pendingPaymentCount}팀</b> 입금 대기</span>
+                <span><b style={{ color: 'var(--orange700)', fontWeight: 600 }}>{pendingPaymentCount}팀</b> {pendingCapacityLabel(tournament.entryFee === 0)}</span>
               </div>
             ) : null}
             {(() => {
@@ -1158,13 +1167,16 @@ export function TournamentDetailView({
         </div>
         <div className="tm-text-caption" style={{ color: 'var(--text-caption)', marginBottom: 12 }}>
           {tournament.confirmedCount}/{tournament.teamCount}팀 확정
-          {pendingPaymentCount > 0 ? ` · 입금대기 ${pendingPaymentCount}팀` : ''}
+          {pendingPaymentCount > 0
+            ? ` · ${pendingCapacityLabel(tournament.entryFee === 0)} ${pendingPaymentCount}팀`
+            : ''}
         </div>
         <CapacityProgressBar
           confirmedCount={tournament.confirmedCount}
           pendingPaymentCount={pendingPaymentCount}
           teamCount={tournament.teamCount}
           height={6}
+          isFreeEntry={tournament.entryFee === 0}
         />
         <div style={{ marginTop: 20 }}>
           <ApplyCTAButtons tournament={tournament} blockReason={registrationBlock} myRegistration={myRegistration} />

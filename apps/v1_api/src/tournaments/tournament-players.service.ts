@@ -37,8 +37,12 @@ import { ALL_COMPETITION_KINDS, findTournamentOnSurface } from './tournament-sur
  * 이 상수를 그쪽으로 옮겨 쓰지 마라. 명단이 읽는 대회 필드(`minPlayers`·`maxPlayers`·
  * `rosterDeadlineAt`·`genderCategory`·`status`)는 리그 행에도 같은 뜻으로 들어 있다.
  * 옛 행(`kind: null`)은 `tournamentKindCondition` 이 대회 쪽에 붙여 그대로 통과한다.
+ *
+ * ⚠️ **별칭 상수로 묶지 마라.** `const X = ALL_COMPETITION_KINDS` 를 두고 호출부가 `X` 를
+ * 넘기면 `v1-surface-check` 의 리그 허용 카운터가 **이 파일 전체를 1건으로 센다** — 그러면
+ * 여기서 표면을 더 넓혀도 래칫이 못 잡는다. 그래서 호출부마다 `ALL_COMPETITION_KINDS` 를
+ * **직접** 넘겨 카운터가 호출부 수와 1:1 이 되게 한다(Copilot 리뷰 지적).
  */
-const ROSTER_SURFACE_KINDS = ALL_COMPETITION_KINDS;
 
 @Injectable()
 export class TournamentPlayersService {
@@ -176,7 +180,7 @@ export class TournamentPlayersService {
     await this.assertTeamMember(registration.teamId, user.id);
 
     // 리그도 최소 인원(`minPlayers`)으로 미달 여부를 판정한다.
-    const tournament = await findTournamentOnSurface(this.prisma, ROSTER_SURFACE_KINDS, {
+    const tournament = await findTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, {
       where: { id: tournamentId, deletedAt: null },
       select: { minPlayers: true },
     });
@@ -207,7 +211,7 @@ export class TournamentPlayersService {
     await this.assertTeamManager(registration.teamId, user.id);
 
     // 리그도 정원(`maxPlayers`)·마감(`rosterDeadlineAt`)·성별부·상태 가드를 그대로 받는다.
-    const tournament = await findTournamentOnSurface(this.prisma, ROSTER_SURFACE_KINDS, {
+    const tournament = await findTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, {
       where: { id: tournamentId, deletedAt: null },
       select: {
         maxPlayers: true,
@@ -403,7 +407,7 @@ export class TournamentPlayersService {
     await this.assertTeamManager(registration.teamId, user.id);
 
     // 삭제도 리그의 마감·상태 가드를 그대로 받는다.
-    const tournament = await findTournamentOnSurface(this.prisma, ROSTER_SURFACE_KINDS, {
+    const tournament = await findTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, {
       where: { id: tournamentId, deletedAt: null },
       select: { rosterDeadlineAt: true, status: true },
     });
@@ -445,7 +449,7 @@ export class TournamentPlayersService {
     await this.assertTeamManager(registration.teamId, user.id);
 
     // 수정도 리그의 마감·상태 가드를 그대로 받는다.
-    const tournament = await findTournamentOnSurface(this.prisma, ROSTER_SURFACE_KINDS, {
+    const tournament = await findTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, {
       where: { id: tournamentId, deletedAt: null },
       select: { rosterDeadlineAt: true, status: true },
     });
@@ -866,7 +870,7 @@ export class TournamentPlayersService {
       });
     }
     // 트랜잭션 재검증(TOCTOU)도 같은 표면이어야 한다 — 여기만 좁으면 바깥은 열리고 안에서 404 가 난다.
-    const tournament = await findTournamentOnSurface(tx, ROSTER_SURFACE_KINDS, {
+    const tournament = await findTournamentOnSurface(tx, ALL_COMPETITION_KINDS, {
       where: { id: tournamentId, deletedAt: null },
       select: {
         maxPlayers: true,

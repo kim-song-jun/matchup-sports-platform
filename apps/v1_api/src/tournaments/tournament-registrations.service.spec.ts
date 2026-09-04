@@ -147,6 +147,15 @@ describe('TournamentRegistrationsService', () => {
 
   afterEach(() => jest.clearAllMocks());
 
+  /**
+   * **리그는 마감이 있어야 열린다.** 2026-09-04 사용자 확정으로 리그의 신청 판정자는
+   * `registrationDeadlineAt` 하나가 됐고(`status` 는 수명주기 표시 전용), 정본 §6 이
+   * "안 정하면(`null`) 그 리그는 신청을 안 받는다" 를 그 대가로 명시한다.
+   * 그래서 아래 리그 픽스처들은 **미래 마감**을 갖는다 — 없으면 종류 게이트가 아니라
+   * 마감에서 막혀 이 테스트들이 보려는 것을 못 본다.
+   */
+  const LEAGUE_OPEN_DEADLINE = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
   // ─── 통합 표면 개방 (D7 — 리그도 같은 신청 스택을 쓴다) ──────────────────────
   // 예전엔 이 자리가 **봉쇄**였다. 통합 백필(R3)이 `v1_tournaments` 에 정규 리그 시즌을
   // 만들면서 리그 id 가 이 조회들을 통과하기 시작했고(#863 이 공개 경로에서 실측), 등록
@@ -156,9 +165,77 @@ describe('TournamentRegistrationsService', () => {
   // 그래서 종류 게이트를 열었다. 아래 테스트들은 그 반대 방향을 고정한다: 리그가 실제로
   // 통과하는지, 그리고 **종류 말고 남은 게이트들은 그대로인지**(상태·마감·권한·경합).
   describe('통합 표면 개방', () => {
+    /**
+     * 이번 변경의 요지 — **대진이 있어 `in_progress` 인 리그도 신청을 받는다.**
+     * 예전엔 `status === 'open'` 을 요구해서 `generateFixtures` 가 status 를 옮기는 순간
+     * 신청이 영영 닫혔다(2026-09-04 alpha 실측 409). 정본 §6: "대진 생성은 신청 상태를
+     * 건드리지 않는다."
+     */
+    it('create: 진행 중(in_progress) 리그도 마감이 남아 있으면 신청을 받는다', async () => {
+      prisma.v1Tournament.findFirst.mockImplementation(
+        kindAwareFindFirst(
+          openTournament({
+            kind: 'regular_league',
+            status: 'in_progress',
+            registrationDeadlineAt: LEAGUE_OPEN_DEADLINE,
+          }),
+        ),
+      );
+      prisma.v1TeamMembership.findFirst.mockResolvedValue(null);
+      // 종류·상태에서 막히면 Conflict 다. **팀 권한 403 까지 가야** 신청 게이트를 지났다는 증거다.
+      await expect(
+        service.create(manager, 'league-1', { teamId: 'team-1' }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('create: 마감이 없는 리그는 받지 않는다 — 아무도 연 적이 없는 리그다', async () => {
+      // 정본 §6 "안 정하면(null) 그 리그는 신청을 안 받는다". 판정에서 status 를 뺀 이상
+      // 열렸다는 신호는 마감밖에 없다.
+      prisma.v1Tournament.findFirst.mockImplementation(
+        kindAwareFindFirst(
+          openTournament({ kind: 'regular_league', status: 'in_progress', registrationDeadlineAt: null }),
+        ),
+      );
+      await expect(
+        service.create(manager, 'league-1', { teamId: 'team-1' }),
+      ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_NOT_OPEN' } });
+    });
+
+    it('create: 마감이 지난 리그는 마감으로 막는다 — 상태 문제와 구분된다', async () => {
+      prisma.v1Tournament.findFirst.mockImplementation(
+        kindAwareFindFirst(
+          openTournament({
+            kind: 'regular_league',
+            status: 'in_progress',
+            registrationDeadlineAt: new Date(Date.now() - 1000),
+          }),
+        ),
+      );
+      await expect(
+        service.create(manager, 'league-1', { teamId: 'team-1' }),
+      ).rejects.toMatchObject({ response: { code: 'REGISTRATION_DEADLINE_PASSED' } });
+    });
+
+    it('대회는 그대로다 — status 가 open 이 아니면 마감이 남아 있어도 안 받는다', async () => {
+      // 리그만 갈랐다는 것을 못박는다. 대회의 `status === 'open'` 요구를 건드리면 대회
+      // 신청 경로 전체가 회귀 범위에 들어온다.
+      prisma.v1Tournament.findFirst.mockImplementation(
+        kindAwareFindFirst(
+          openTournament({
+            kind: 'regular_tournament',
+            status: 'in_progress',
+            registrationDeadlineAt: LEAGUE_OPEN_DEADLINE,
+          }),
+        ),
+      );
+      await expect(
+        service.create(manager, 'tournament-1', { teamId: 'team-1' }),
+      ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_NOT_OPEN' } });
+    });
+
     it('create: 리그 id 도 열린다 — 종류 게이트를 지나 다음 게이트까지 간다', async () => {
       prisma.v1Tournament.findFirst.mockImplementation(
-        kindAwareFindFirst(openTournament({ kind: 'regular_league' })),
+        kindAwareFindFirst(openTournament({ kind: 'regular_league', registrationDeadlineAt: LEAGUE_OPEN_DEADLINE })),
       );
       prisma.v1TeamMembership.findFirst.mockResolvedValue(null);
       // 404 로 끝나면 종류에서 막힌 것이다. **팀 권한 403 까지 도달**해야 지났다는 증거가 된다
@@ -216,7 +293,7 @@ describe('TournamentRegistrationsService', () => {
       // 409 로 막힌다. 이 테스트가 그 자리를 지킨다.
       prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
       prisma.v1Tournament.findFirst.mockImplementation(
-        kindAwareFindFirst(openTournament({ kind: 'regular_league', teamCount: 8 })),
+        kindAwareFindFirst(openTournament({ kind: 'regular_league', registrationDeadlineAt: LEAGUE_OPEN_DEADLINE, teamCount: 8 })),
       );
       prisma.v1TournamentRegistration.count.mockResolvedValue(20);
       prisma.v1TournamentRegistration.update.mockResolvedValue(
@@ -237,7 +314,7 @@ describe('TournamentRegistrationsService', () => {
       // 구현과 구분되지 않는다. 호출 자체가 없어야 한다(Copilot 리뷰 지적).
       prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
       prisma.v1Tournament.findFirst.mockImplementation(
-        kindAwareFindFirst(openTournament({ kind: 'regular_league', teamCount: 8 })),
+        kindAwareFindFirst(openTournament({ kind: 'regular_league', registrationDeadlineAt: LEAGUE_OPEN_DEADLINE, teamCount: 8 })),
       );
       prisma.v1TournamentRegistration.update.mockResolvedValue(
         registrationRow({ status: 'awaiting_payment' }),
@@ -270,7 +347,7 @@ describe('TournamentRegistrationsService', () => {
       // D7 은 리그도 참가비를 받을 수 있는 구조이므로(거울의 `entryFee` 기본값이 0 이라
       // 지금은 무료지만) 조회를 막지 않고, **운영자가 채운 값만** 나가게 둔다.
       prisma.v1Tournament.findFirst.mockImplementation(
-        kindAwareFindFirst(openTournament({ kind: 'regular_league' })),
+        kindAwareFindFirst(openTournament({ kind: 'regular_league', registrationDeadlineAt: LEAGUE_OPEN_DEADLINE })),
       );
       prisma.v1TournamentRegistration.findMany.mockResolvedValue([
         { ...registrationRow({ status: 'awaiting_payment' }), payment: paymentRow(), team: null },

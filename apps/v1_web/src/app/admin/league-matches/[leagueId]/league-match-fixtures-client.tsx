@@ -23,7 +23,7 @@ import {
   useV1Teams,
   useV1UpdateLeagueFixture,
 } from '@/hooks/use-v1-api';
-import { formatTournamentDateTimeShort } from '@/lib/date-utils';
+import { describeLeagueRegistrationWindow } from '@/lib/league-registration-copy';
 import { LeagueManualFixtureModal } from './league-manual-fixture-modal';
 import { extractErrorMessage } from '@/lib/error-message';
 import { expandWeeklyFixtureDates } from '@/lib/league-fixture-dates';
@@ -562,6 +562,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
           A안 범위는 "신청 열기 + 목록" 이다. 그 밖의 화면을 새로 만들지 않는다. */}
       <LeagueRegistrationSummary
         leagueId={leagueId}
+        state={series.state}
         registrationOpen={series?.registrationOpen ?? false}
         registrationDeadlineAt={series?.registrationDeadlineAt ?? null}
       />
@@ -1556,10 +1557,12 @@ function DailyPlanCard({ plan }: { plan: DailyPlan }) {
  */
 function LeagueRegistrationSummary({
   leagueId,
+  state,
   registrationOpen,
   registrationDeadlineAt,
 }: {
   leagueId: string;
+  state: 'draft' | 'active' | 'completed';
   registrationOpen: boolean;
   registrationDeadlineAt: string | null;
 }) {
@@ -1573,16 +1576,18 @@ function LeagueRegistrationSummary({
           <span className="tm-badge tm-badge-grey">신청 안 받는 중</span>
         )}
       </div>
-      {/* **받는지는 `registrationOpen`, 마감 유무는 부가 문구다.** 마감이 `null` 인 것은
-          계약상 "기한 없이 열림" 이지 "안 받음" 이 아니다 — 마감 유무로 받는지를 추론하면
-          이미 모집 중인 리그에 "마감을 정하면 신청할 수 있어요" 라고 반대로 말한다.
-          같은 실수가 신청 관리 화면에도 있었다(#1028 리뷰 2회). 판정 축을 통일한다. */}
+      {/* **받는지는 `registrationOpen`, 닫혔다면 그 이유는 `state` 가 가른다.**
+          문장 판정은 `describeLeagueRegistrationWindow` 한 곳에 있다 — 예전엔 이 카드와
+          신청 관리 화면이 각자 삼항식을 갖고 있어서 **닫힌 이유를 가르는 수정이 한쪽에만
+          들어갔다.** 끝난 리그는 마감이 미래로 남아 있어서, 섞어 두면 "마감됐어요" 라고
+          거짓말한다. */}
       <p className="mb-3 text-xs text-[var(--text-muted)]">
-        {registrationOpen
-          ? registrationDeadlineAt === null
-            ? '기한 없이 신청을 받는 중이에요.'
-            : `${formatTournamentDateTimeShort(registrationDeadlineAt) ?? registrationDeadlineAt}까지 신청을 받아요.`
-          : '신청 마감을 정하면 팀장이 리그 화면에서 바로 신청할 수 있어요.'}
+        {describeLeagueRegistrationWindow({
+          state,
+          registrationOpen,
+          registrationDeadlineAt,
+          noDeadlineHint: '신청 마감을 정하면 팀장이 리그 화면에서 바로 신청할 수 있어요.',
+        })}
       </p>
       <Link
         href={`/admin/league-matches/${leagueId}/registrations`}

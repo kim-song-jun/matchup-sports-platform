@@ -166,8 +166,8 @@ export interface V1AdminLeagueDetail {
    */
   startsOn: string;
   /**
-   * 참가 신청 마감. `null` 은 **기한 없이 열려 있음**이지 "안 받음" 이 아니다 —
-   * 받는지 여부는 `registrationOpen` 이 답한다.
+   * 참가 신청 마감. **`null` 은 "안 받음" 이다** — 정본 §6 이 "마감을 안 정하면 그 리그는
+   * 신청을 받지 않는다" 로 확정했다(2026-09-04). 받는지 여부는 `registrationOpen` 이 답한다.
    */
   registrationDeadlineAt: string | null;
   /**
@@ -540,7 +540,12 @@ export interface V1OpenLeagueRegistrationPayload {
 
 export interface V1OpenLeagueRegistrationResult {
   leagueId: string;
-  status: 'open';
+  /**
+   * 이 호출이 확정한 사실 하나 — **지금부터 신청을 받는다.** 예전엔 `status: 'open'` 이었는데,
+   * 서버는 `status` 를 저장하지 않으므로 그건 리그 상태로 오해를 부르는 값이었다
+   * (대진이 있어 `in_progress` 인 리그도 `open` 으로 보였다).
+   */
+  registrationOpen: true;
   registrationDeadlineAt: string;
 }
 

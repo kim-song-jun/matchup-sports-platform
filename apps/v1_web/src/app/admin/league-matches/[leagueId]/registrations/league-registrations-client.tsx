@@ -5,8 +5,8 @@ import { useState } from 'react';
 import { AdminPageHeader, AdminToasts, useAdminToast } from '@/components/admin';
 import { RegistrationsTab } from '@/app/admin/tournaments/[id]/registrations-tab';
 import { useV1AdminLeagueMatch, useV1OpenLeagueRegistration } from '@/hooks/use-v1-api';
+import { describeLeagueRegistrationWindow } from '@/lib/league-registration-copy';
 import { extractErrorMessage } from '@/lib/error-message';
-import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { fromDatetimeLocalValue } from '@/components/team-schedules/team-schedules.view-model';
 
 /**
@@ -31,6 +31,7 @@ export default function LeagueRegistrationsClient({ leagueId }: { leagueId: stri
   const [deadline, setDeadline] = useState('');
   const openRegistration = useV1OpenLeagueRegistration(leagueId);
 
+  const state = league?.state ?? 'draft';
   const registrationOpen = league?.registrationOpen ?? false;
   const registrationDeadlineAt = league?.registrationDeadlineAt ?? null;
 
@@ -92,18 +93,17 @@ export default function LeagueRegistrationsClient({ leagueId }: { leagueId: stri
             <span className="tm-badge tm-badge-grey">신청 안 받는 중</span>
           )}
         </div>
-        {/* **마감 유무와 "받는 중인지" 는 다른 축이다.** 계약상 `registrationDeadlineAt === null`
-            은 "기한 없이 열림" 이지 "안 받음" 이 아니다 — 받는지 여부의 진실 소스는 서버가
-            판정해 내려주는 `registrationOpen` 이다(이 PR 에서 그렇게 정했다). 마감 유무로
-            받는지를 추론하면 기한 없이 열린 리그가 "안 받는 중" 으로 보인다. */}
+        {/* **판정자는 마감 하나이고, 닫힌 이유는 `state` 가 가른다.** 대진 화면의 요약
+            카드와 같은 문장이라 판정을 `describeLeagueRegistrationWindow` 한 곳에 뒀다 —
+            각자 갖고 있으면 한쪽만 고쳐진다(실제로 그랬다). */}
         <p className="mb-3 text-xs text-[var(--text-muted)]">
-          {registrationOpen
-            ? registrationDeadlineAt === null
-              ? '기한 없이 신청을 받는 중이에요. 마감을 정하면 그때까지만 받아요.'
-              : `${formatTournamentDateTimeShort(registrationDeadlineAt) ?? registrationDeadlineAt}까지 신청을 받아요.`
-            : registrationDeadlineAt === null
-              ? '아직 신청을 받지 않아요. 마감을 정하면 팀장 화면에 신청 입구가 보여요.'
-              : `신청을 받지 않아요. 마지막 마감은 ${formatTournamentDateTimeShort(registrationDeadlineAt) ?? registrationDeadlineAt} 였어요.`}
+          {describeLeagueRegistrationWindow({
+            state,
+            registrationOpen,
+            registrationDeadlineAt,
+            noDeadlineHint:
+              '마감을 정해야 신청을 받아요. 정하기 전에는 팀장 화면에 신청 입구가 보이지 않아요.',
+          })}
         </p>
         <div className="flex flex-wrap items-end gap-2">
           <label className="text-xs text-[var(--text-muted)]" htmlFor="league-registration-deadline">

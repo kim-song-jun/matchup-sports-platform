@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Providers } from '@/app/providers';
 import {
   useV1ActivePopup,
@@ -187,6 +187,20 @@ function goToParticipationStep() {
 }
 
 describe('AdminTournamentsNewPage four-step wizard', () => {
+  // **시계를 고정한다.** 이 스위트의 픽스처는 `2026-08-15` 같은 고정 날짜로 대회 시작을 넣고,
+  // 자동 제안된 마감(D-3/D-7)의 **정확한 값**을 단언한다. 그 날짜들이 과거가 되는 순간
+  // "마감은 지금 이후" 규칙에 걸려 step 1 을 못 넘고, 뒤 단계 요소를 못 찾아 12건이 한꺼번에
+  // 깨진다(2026-09-04 실측). 이건 새 규칙이 만든 문제라기보다 **시간이 흐르면 어차피 깨질
+  // 픽스처**였다 — 시계를 픽스처보다 앞선 시점에 고정해 단언을 그대로 살리고 결정적으로 만든다.
+  // `shouldAdvanceTime` 이 있어야 testing-library 의 `findBy*`/`waitFor` 가 멈추지 않는다.
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-08-01T00:00:00.000Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     searchParamsValue = new URLSearchParams();
@@ -552,6 +566,20 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
 });
 
 describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
+  // **시계를 고정한다.** 이 스위트의 픽스처는 `2026-08-15` 같은 고정 날짜로 대회 시작을 넣고,
+  // 자동 제안된 마감(D-3/D-7)의 **정확한 값**을 단언한다. 그 날짜들이 과거가 되는 순간
+  // "마감은 지금 이후" 규칙에 걸려 step 1 을 못 넘고, 뒤 단계 요소를 못 찾아 12건이 한꺼번에
+  // 깨진다(2026-09-04 실측). 이건 새 규칙이 만든 문제라기보다 **시간이 흐르면 어차피 깨질
+  // 픽스처**였다 — 시계를 픽스처보다 앞선 시점에 고정해 단언을 그대로 살리고 결정적으로 만든다.
+  // `shouldAdvanceTime` 이 있어야 testing-library 의 `findBy*`/`waitFor` 가 멈추지 않는다.
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-08-01T00:00:00.000Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     searchParamsValue = new URLSearchParams();

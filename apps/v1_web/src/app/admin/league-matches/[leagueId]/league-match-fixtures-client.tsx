@@ -25,6 +25,7 @@ import {
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import { expandWeeklyFixtureDates } from '@/lib/league-fixture-dates';
+import { toKstDateString } from '@/lib/kst-calendar';
 import { LeagueFixtureDatePicker } from './league-fixture-date-picker';
 import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
 import { fromDatetimeLocalValue, toDatetimeLocalValue } from '@/components/team-schedules/team-schedules.view-model';
@@ -658,7 +659,9 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                 selectedDates={selectedDates}
                 onChange={setSelectedDates}
                 requiredCount={weeksCount}
-                today={new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)}
+                // KST 변환은 `toKstDateString` 한 곳에만 둔다 — 여기서 `+9시간` 을 다시
+                // 적으면 이 PR 이 단일화한 규칙이 그 자리에서 갈린다(Copilot 지적).
+                today={toKstDateString(new Date())}
                 onFillByWeekday={
                   hasLeagueStartsOn && dayOfWeek !== '' && time.trim() !== ''
                     ? () =>

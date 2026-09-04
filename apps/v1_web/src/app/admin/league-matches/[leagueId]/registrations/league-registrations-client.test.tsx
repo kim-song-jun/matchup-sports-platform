@@ -28,12 +28,22 @@ describe('리그 참가 신청 관리', () => {
     leagueData.registrationDeadlineAt = null;
   });
 
-  it('마감이 없으면 "신청 안 받는 중" 이고, 왜 입구가 없는지 알려 준다', () => {
+  it('안 받는 중이고 마감도 없으면, 왜 입구가 없는지 알려 준다', () => {
     render(<LeagueRegistrationsClient leagueId="league-1" />);
     expect(screen.getByText('신청 안 받는 중')).toBeInTheDocument();
     expect(
-      screen.getByText('마감을 정해야 신청을 받아요. 정하기 전에는 팀장 화면에 신청 입구가 보이지 않아요.'),
+      screen.getByText('아직 신청을 받지 않아요. 마감을 정하면 팀장 화면에 신청 입구가 보여요.'),
     ).toBeInTheDocument();
+  });
+
+  it('마감이 없어도 열려 있으면 "기한 없이 받는 중" 이다 — null 은 "안 받음" 이 아니다', () => {
+    // 계약상 `registrationDeadlineAt === null` 은 **기한 없이 열림**이고, 받는지 여부의
+    // 진실 소스는 `registrationOpen` 이다. 마감 유무로 추론하면 이 상태가 "안 받는 중" 이 된다.
+    leagueData.registrationOpen = true;
+    leagueData.registrationDeadlineAt = null;
+    render(<LeagueRegistrationsClient leagueId="league-1" />);
+    expect(screen.getByText('모집 중')).toBeInTheDocument();
+    expect(screen.getByText('기한 없이 신청을 받는 중이에요. 마감을 정하면 그때까지만 받아요.')).toBeInTheDocument();
   });
 
   it('신청 목록에 리그 id 를 그대로 넘긴다 — 어드민 신청 API 는 이미 리그를 받는다', () => {

@@ -203,7 +203,32 @@ describe('MyRegistrationPageClient — 셸 backHref override', () => {
     });
 
     const { container } = render(<MyRegistrationPageClient tournamentId="tournament-1" />);
-    expect(container.textContent ?? '').not.toContain('결제');
+    const text = container.textContent ?? '';
+    for (const word of ['결제', '계좌이체', '카드 · 간편결제', '입금']) {
+      expect(text).not.toContain(word);
+    }
+  });
+
+  it('참가비가 있는 대회의 목록 카드에는 결제 수단·상태가 그대로 나온다 (위 부재 단언이 공허하지 않음을 증명)', () => {
+    // 부재 단언만 있으면 "카드가 아예 안 그려져도" 통과한다. 같은 렌더 경로에서 유료일 때는
+    // 그 문자열들이 **실제로 나타나는지**를 함께 못 박는다.
+    myRegistrationApiMocks.useV1Tournament.mockReturnValue({
+      data: makeTournament({ entryFee: 20000 }),
+      isLoading: false,
+    });
+    myRegistrationApiMocks.useV1MyRegistrations.mockReturnValue({
+      data: [makeRegistration({
+        payment: { method: 'bank_transfer', status: 'paid', amount: 20000, paidAt: '2026-09-04T00:00:00.000Z' },
+      })],
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    const { container } = render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+    const text = container.textContent ?? '';
+    expect(text).toContain('계좌이체');
+    expect(text).toContain('결제 완료');
   });
 
   it('`?reg=` 없이 진입하면(목록 뷰) override를 밀어넣지 않아 테이블 기본값(대회 상세)이 유지된다', () => {

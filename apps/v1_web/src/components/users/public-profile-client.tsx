@@ -311,14 +311,16 @@ function StatItem({ label, value, unit }: { readonly label: string; readonly val
  * 프로필 사진은 배경 이미지로만 깔려 있어서 URL 이 깨지면 이니셜도 없이 빈 원이 남았다
  * (2026-09-04 감사). 실제 <img> 로 그려 onError 때 이니셜로 되돌린다.
  */
-function ProfileAvatar({ imageUrl, initials }: { imageUrl?: string | null; initials: string }) {
-  const [failed, setFailed] = useState(false);
-  const showImage = Boolean(imageUrl) && !failed;
+export function ProfileAvatar({ imageUrl, initials }: { imageUrl?: string | null; initials: string }) {
+  // 실패는 URL 단위로 기억한다 — boolean 하나면 프로필을 갱신해 새 사진을 받아도
+  // 이전 실패가 남아 계속 이니셜만 보인다(#1027 Copilot).
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const showImage = Boolean(imageUrl) && failedUrl !== imageUrl;
   return (
     <div className="tm-my-avatar">
       {showImage ? (
         // eslint-disable-next-line @next/next/no-img-element -- 업로드 원본 URL 이 외부 호스트일 수 있어 최적화 로더를 태우지 않는다.
-        <img src={imageUrl ?? ''} alt="" aria-hidden="true" onError={() => setFailed(true)} />
+        <img src={imageUrl ?? ''} alt="" aria-hidden="true" onError={() => setFailedUrl(imageUrl ?? null)} />
       ) : (
         initials
       )}

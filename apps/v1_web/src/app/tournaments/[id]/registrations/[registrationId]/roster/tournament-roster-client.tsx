@@ -203,6 +203,22 @@ export function TournamentRosterDeadlineCard({
   );
 }
 
+/**
+ * 등번호 입력값을 보낼 값으로 바꾼다.
+ *
+ * **`Number()` 에 그냥 넘기면 안 된다.** `type="number"` 입력은 `e`·`1e2`·`-` 를 그대로
+ * 통과시키고, `Number('e')` 는 `NaN` 이며 **`NaN` 은 JSON 에서 `null` 로 직렬화된다** —
+ * 서버에서 "번호를 안 보냄" 과 구분되지 않아 번호가 조용히 사라진다(2026-09-04 Copilot 리뷰).
+ *
+ * 빈 값은 **번호 없는 선수**이지 오류가 아니다. `0` 은 유효한 등번호다.
+ */
+export function parseJerseyInput(raw: string): { ok: true; value?: number } | { ok: false } {
+  const trimmed = raw.trim();
+  if (trimmed === '') return { ok: true };
+  if (!/^\d{1,2}$/.test(trimmed)) return { ok: false };
+  return { ok: true, value: Number(trimmed) };
+}
+
 /* ── Add player form ── */
 
 type AddPlayerFormState = {
@@ -1188,12 +1204,21 @@ export function TournamentRosterPageClient({
     try {
       // 빈 문자열은 **보내지 않는다**(번호 없는 선수). `0` 은 유효한 등번호라
       // truthy 검사로 거르면 0번이 사라진다 — 빈 값인지로만 가른다.
-      const jerseyRaw = formData.jerseyNumber.trim();
+      //
+      // 그리고 **`Number()` 에 그냥 넘기지 않는다.** `type="number"` 입력은 `e`·`1e2`·`-`
+      // 같은 값을 그대로 통과시키고, `Number('e')` 는 `NaN` 이며 `NaN` 은 **JSON 에서
+      // `null` 로 직렬화된다** — 서버 입장에서 "번호를 안 보냄" 과 구분되지 않아 번호가
+      // 조용히 사라진다. 숫자 두 자리만 값으로 인정한다.
+      const jersey = parseJerseyInput(formData.jerseyNumber);
+      if (!jersey.ok) {
+        setDraftErrors((prev) => ({ ...prev, [formId]: '등번호는 0에서 99 사이 숫자로 입력해 주세요.' }));
+        return;
+      }
       await addPlayer.mutateAsync({
         userId: formData.userId,
         realName: formData.realName,
         birthDate: formData.birthDate || undefined,
-        jerseyNumber: jerseyRaw === '' ? undefined : Number(jerseyRaw),
+        jerseyNumber: jersey.value,
         eligibilityStatus: formData.eligibilityStatus,
       });
       setDraftForms((prev) => prev.filter((form) => form.id !== formId));

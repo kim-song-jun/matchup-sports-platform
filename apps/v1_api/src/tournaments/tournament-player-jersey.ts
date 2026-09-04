@@ -48,16 +48,30 @@ export async function assertJerseyAvailable(
   jerseyNumber: number,
   excludePlayerId?: string,
 ): Promise<void> {
-  const rows = await client.$queryRaw<Array<{ id: string }>>`
-    SELECT id
-    FROM "v1_tournament_players"
-    WHERE registration_id = ${registrationId}
-      AND removed_at IS NULL
-      AND jersey_number = ${jerseyNumber}
-    LIMIT 1
-  `;
-  const taken = rows.find((row) => row.id !== excludePlayerId);
-  if (taken !== undefined) {
+  // **제외는 SQL 에서 한다.** 예전엔 `LIMIT 1` 로 한 행만 받아 JS 에서 걸렀는데, 같은 번호를
+  // 가진 행이 둘(자기 + 남)일 때 **플래너가 자기 행을 먼저 주면 중복을 못 잡는다** —
+  // 정렬을 안 걸었으므로 어느 행이 오는지는 보장되지 않는다. 제외를 SQL 에 넣어야
+  // `LIMIT 1` 이 "제외하고도 남는 행" 을 뜻하게 된다.
+  const rows =
+    excludePlayerId === undefined
+      ? await client.$queryRaw<Array<{ id: string }>>`
+          SELECT id
+          FROM "v1_tournament_players"
+          WHERE registration_id = ${registrationId}
+            AND removed_at IS NULL
+            AND jersey_number = ${jerseyNumber}
+          LIMIT 1
+        `
+      : await client.$queryRaw<Array<{ id: string }>>`
+          SELECT id
+          FROM "v1_tournament_players"
+          WHERE registration_id = ${registrationId}
+            AND removed_at IS NULL
+            AND jersey_number = ${jerseyNumber}
+            AND id <> ${excludePlayerId}
+          LIMIT 1
+        `;
+  if (rows.length > 0) {
     throw new ConflictException({
       code: 'ROSTER_DUPLICATE_JERSEY_NUMBER',
       message: `${jerseyNumber}번은 이미 다른 선수가 달고 있어요.`,

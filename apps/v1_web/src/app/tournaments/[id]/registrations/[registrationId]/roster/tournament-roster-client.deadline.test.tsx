@@ -8,7 +8,11 @@ import {
   useV1TournamentPlayers,
   useV1UpdatePlayer,
 } from '@/hooks/use-v1-api';
-import { TournamentRosterPageClient, getRosterDeadlineState } from './tournament-roster-client';
+import {
+  TournamentRosterPageClient,
+  getRosterDeadlineState,
+  parseJerseyInput,
+} from './tournament-roster-client';
 
 vi.mock('@/components/v1-ui/shell', () => ({
   AppChrome: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -243,5 +247,31 @@ describe('명단 등번호 표시', () => {
   it('번호가 없으면 아무것도 그리지 않는다', () => {
     renderWith(mockPlayer({ jerseyNumber: null }));
     expect(screen.queryByLabelText(/등번호/)).not.toBeInTheDocument();
+  });
+});
+
+
+/**
+ * `type="number"` 입력은 `e`·`1e2`·`-` 를 그대로 통과시킨다. `Number('e')` 는 `NaN` 이고
+ * **`NaN` 은 JSON 에서 `null` 로 직렬화된다** — 서버에서 "번호를 안 보냄" 과 구분되지 않아
+ * 번호가 조용히 사라진다(2026-09-04 Copilot 리뷰).
+ */
+describe('parseJerseyInput', () => {
+  it('빈 값은 오류가 아니라 "번호 없음" 이다', () => {
+    expect(parseJerseyInput('')).toEqual({ ok: true });
+    expect(parseJerseyInput('   ')).toEqual({ ok: true });
+  });
+
+  it('0 은 유효한 등번호다', () => {
+    expect(parseJerseyInput('0')).toEqual({ ok: true, value: 0 });
+  });
+
+  it.each(['e', '1e2', '-', '-1', '7.5', '٧', '1 2'])('%s 는 거부한다 — NaN 이 null 로 나가면 안 된다', (raw) => {
+    expect(parseJerseyInput(raw)).toEqual({ ok: false });
+  });
+
+  it('세 자리는 거부한다 — 서버 상한이 99 다', () => {
+    expect(parseJerseyInput('100')).toEqual({ ok: false });
+    expect(parseJerseyInput('99')).toEqual({ ok: true, value: 99 });
   });
 });

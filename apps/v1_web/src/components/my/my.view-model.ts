@@ -45,6 +45,9 @@ export const myHomeModel: MyHomeViewModel = {
         { label: '내 팀', sub: '소속 팀과 운영 권한을 확인해요', href: '/my/teams', icon: 'Users' },
         // R4: 리그 참가는 운영자가 지정하므로(D-2) 팀이 참가 사실을 알 계기가 이 노출뿐이다.
         { label: '내 리그', sub: '내 팀이 참가 중인 리그를 확인해요', href: '/my/leagues', icon: 'ListOrdered' },
+        // 2026-09-04 감사: /my/schedule 은 앱 안에서 들어갈 링크가 한 곳도 없어 URL 직접 입력으로만
+        // 닿는 고아 라우트였다. 소속 팀 일정을 한 번에 보는 화면이라 팀 항목 옆에 둔다.
+        { label: '내 일정', sub: '소속 팀 일정을 한 번에 확인해요', href: '/my/schedule', icon: 'CalendarDays' },
         { label: '받은 초대', sub: '팀에서 보낸 초대를 확인하고 수락해요', href: '/my/invitations', icon: 'Mail' },
         { label: '보낸 가입 신청', sub: '승인 대기와 처리 결과를 확인해요', href: '/my/join-applications', icon: 'Send' },
         // 리뷰 항목은 my-api-clients.tsx의 toMyHomeModel에서 동적으로 추가됨

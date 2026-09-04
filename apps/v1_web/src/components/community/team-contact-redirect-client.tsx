@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ErrorState } from '@/components/v1-ui/primitives';
@@ -21,9 +21,10 @@ export function TeamContactRedirectClient({ contactId }: { contactId: string }) 
   const [error, setError] = useState<string | null>(null);
   const startedRef = useRef(false);
 
-  useEffect(() => {
-    if (startedRef.current) return;
-    startedRef.current = true;
+  // 첫 진입과 "다시 시도"가 같은 경로를 타도록 분리한다 — 예전엔 useEffect 안에만 있어
+  // 실패하면 다시 열 방법이 없었다(2026-09-04 감사).
+  const openRoom = useCallback(() => {
+    setError(null);
     resolveChatRoom.mutate(
       { targetType: 'team_contact', targetId: contactId },
       {
@@ -33,10 +34,16 @@ export function TeamContactRedirectClient({ contactId }: { contactId: string }) 
     );
   }, [contactId, resolveChatRoom, router]);
 
+  useEffect(() => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+    openRoom();
+  }, [openRoom]);
+
   if (error) {
     return (
       <div className="tm-my-shell" style={{ display: 'grid', gap: 12 }}>
-        <ErrorState message={error} />
+        <ErrorState title="컨택 대화방을 열지 못했어요" message={error} onRetry={openRoom} retryLabel="다시 시도" />
         <Link className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block" href="/chat?category=team_contact">채팅 목록으로</Link>
       </div>
     );

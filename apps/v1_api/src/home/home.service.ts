@@ -143,6 +143,8 @@ export class HomeService {
       // 노출한다(2026-08-27 감사 M-A-personal-match-state, matches.service.ts list()의 동일
       // 결함과 같은 근본 원인).
       startAt: { gte: new Date() },
+      // 홈 추천/대표 매치는 일반 탐색과 달리 지금 신청 가능한 모집 글만 노출한다.
+      OR: [{ deadlineAt: null }, { deadlineAt: { gte: new Date() } }],
       deletedAt: null,
       ...(input.sportId ? { sportId: input.sportId } : {}),
       ...(input.regionId ? { regionId: input.regionId } : {}),

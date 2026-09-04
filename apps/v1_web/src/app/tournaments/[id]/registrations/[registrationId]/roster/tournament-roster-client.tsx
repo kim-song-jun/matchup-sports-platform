@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { AlertBanner, Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
@@ -875,13 +875,23 @@ function PlayerRow({
 
   // 이 행이 (다시) 열릴 때마다 최신 서버 값으로 초기화한다 — 부모가 편집 상태를
   // 컨트롤하므로 "수정" 버튼 onClick 대신 여기서 동기화한다.
+  //
+  // **초기화는 패널이 열리는 순간에만 한다.** 예전엔 `player.eligibilityStatus`·
+  // `player.jerseyNumber` 도 의존성에 있어서, **편집 중에 서버 값이 바뀌면 그때마다 다시
+  // 초기화**됐다. 이 화면은 저장 하나가 두 요청으로 갈릴 수 있어서(등번호 / 자격) 실제로
+  // 이런 순서가 난다 — 등번호는 성공해 목록이 갱신되고, 자격은 실패해 `editError` 가
+  // 걸린다. 그러면 갱신이 도착하는 순간 **오류 문구가 지워져** 팀장은 무엇이 실패했는지
+  // 못 보고, 고치던 입력값도 함께 되돌아간다.
+  // 최신 값은 ref 로 읽는다 — 의존성에 넣지 않기 위해서지, 값이 필요 없어서가 아니다.
+  const playerRef = useRef(player);
+  playerRef.current = player;
   useEffect(() => {
-    if (isEditing) {
-      setDraftEligibility(player.eligibilityStatus);
-      setDraftJersey(player.jerseyNumber === null ? '' : String(player.jerseyNumber));
-      setEditError(null);
-    }
-  }, [isEditing, player.eligibilityStatus, player.jerseyNumber]);
+    if (!isEditing) return;
+    const latest = playerRef.current;
+    setDraftEligibility(latest.eligibilityStatus);
+    setDraftJersey(latest.jerseyNumber === null ? '' : String(latest.jerseyNumber));
+    setEditError(null);
+  }, [isEditing]);
 
   async function handleSave() {
     // 로딩 중 재클릭 시 중복 제출 방지 — isPending 은 disabled 속성과 동일하게 리렌더

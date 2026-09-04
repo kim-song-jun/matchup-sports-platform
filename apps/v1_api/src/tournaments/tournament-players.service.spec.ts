@@ -148,6 +148,7 @@ describe('TournamentPlayersService', () => {
     v1StatusChangeLog: { create: jest.Mock };
     $transaction: jest.Mock;
     $queryRaw: jest.Mock;
+    $executeRaw: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -181,6 +182,9 @@ describe('TournamentPlayersService', () => {
       // 코드가 mock 에서만 터진다 — 등번호 조회(raw)가 실제로 그랬다.
       // `FOR UPDATE` 잠금처럼 결과를 안 쓰는 호출도 빈 배열이면 그대로 통과한다.
       $queryRaw: jest.fn().mockResolvedValue([]),
+      // 등번호 쓰기는 raw UPDATE 다(생성된 클라이언트에 아직 컬럼이 없다). 영향 행 수를
+      // 돌려주므로 기본값을 숫자로 둔다.
+      $executeRaw: jest.fn().mockResolvedValue(1),
     };
 
     const p = prisma;
@@ -1636,5 +1640,128 @@ describe('TournamentPlayersService', () => {
       realName: null,
       eligible: false,
     });
+  });
+
+  // ─── 등번호 수정 (`PATCH :playerId/jersey-number`) ────────────────────────────
+  //
+  // 등번호는 **자격과 다른 엔드포인트**다. 자격 수정에 얹으면 팀장이 어드민 판정을
+  // 덮어쓸 수 있어서 갈랐다. 그래서 이 경로의 가드는 여기서 따로 증명해야 한다.
+
+  it('updatePlayerJersey: 번호를 저장하고, 자격은 건드리지 않는다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1Tournament.findFirst.mockImplementation(kindAwareFindFirst(tournamentRow({ kind: 'regular_tournament' })));
+    prisma.v1TournamentPlayer.findFirst.mockResolvedValue(playerRow());
+
+    const result = await service.updatePlayerJersey(manager, 'tournament-1', 'reg-1', 'player-1', 10);
+
+    expect(result).toMatchObject({ id: 'player-1', jerseyNumber: 10 });
+    // 자격은 `v1TournamentPlayer.update` 경로다 — 여기서 불리면 두 관심사가 섞인 것이다.
+    expect(prisma.v1TournamentPlayer.update).not.toHaveBeenCalled();
+    expect(prisma.$executeRaw).toHaveBeenCalled();
+  });
+
+  it('updatePlayerJersey: null 이면 번호를 지운다 — 중복 검사도 건너뛴다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1Tournament.findFirst.mockImplementation(kindAwareFindFirst(tournamentRow({ kind: 'regular_tournament' })));
+    prisma.v1TournamentPlayer.findFirst.mockResolvedValue(playerRow());
+    // 같은 팀에 이미 번호가 있어도(아래 행) "번호 없음" 은 그것과 부딪히지 않는다.
+    prisma.$queryRaw.mockResolvedValue([{ id: 'player-2' }]);
+
+    const result = await service.updatePlayerJersey(manager, 'tournament-1', 'reg-1', 'player-1', null);
+
+    expect(result).toMatchObject({ id: 'player-1', jerseyNumber: null });
+  });
+
+  it('updatePlayerJersey: 같은 번호로 다시 저장해도 통과한다 — 자기 자신은 중복이 아니다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1Tournament.findFirst.mockImplementation(kindAwareFindFirst(tournamentRow({ kind: 'regular_tournament' })));
+    prisma.v1TournamentPlayer.findFirst.mockResolvedValue(playerRow());
+    prisma.$queryRaw.mockResolvedValue([]);
+
+    await expect(
+      service.updatePlayerJersey(manager, 'tournament-1', 'reg-1', 'player-1', 7),
+    ).resolves.toMatchObject({ jerseyNumber: 7 });
+
+    // **통과했다는 것만으로는 부족하다.** 제외는 SQL 에서 하므로(`id <> $playerId`),
+    // mock 이 빈 배열을 주는 한 **제외 인자를 빼도 이 테스트는 통과한다** — 실제로 변이로
+    // 확인했다(자기 자신 제외 인자를 빼도 red 0). 그래서 **어떤 값으로 물었는지**를 본다.
+    const jerseyLookup = prisma.$queryRaw.mock.calls.find((call) =>
+      (call[0] as string[]).join('').includes('jersey_number'),
+    );
+    expect(jerseyLookup).toBeDefined();
+    // 값 순서: registrationId, jerseyNumber, excludePlayerId
+    expect((jerseyLookup as unknown[]).slice(1)).toEqual(['reg-1', 7, 'player-1']);
+  });
+
+  it('updatePlayerJersey: 같은 팀의 다른 선수가 쓰는 번호면 409 ROSTER_DUPLICATE_JERSEY_NUMBER', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1Tournament.findFirst.mockImplementation(kindAwareFindFirst(tournamentRow({ kind: 'regular_tournament' })));
+    prisma.v1TournamentPlayer.findFirst.mockResolvedValue(playerRow());
+    prisma.$queryRaw.mockResolvedValue([{ id: 'player-2' }]);
+
+    await expect(
+      service.updatePlayerJersey(manager, 'tournament-1', 'reg-1', 'player-1', 7),
+    ).rejects.toMatchObject({ response: { code: 'ROSTER_DUPLICATE_JERSEY_NUMBER' } });
+    // 막혔으면 쓰기도 없어야 한다 — 던지기 전에 UPDATE 가 나가면 롤백에 기대게 된다.
+    expect(prisma.$executeRaw).not.toHaveBeenCalled();
+  });
+
+  it('updatePlayerJersey: 팀 매니저가 아니면 403 — 번호만 바꾸는 경로도 같은 문이다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.updatePlayerJersey(nonManager, 'tournament-1', 'reg-1', 'player-1', 10),
+    ).rejects.toThrow(ForbiddenException);
+    expect(prisma.$executeRaw).not.toHaveBeenCalled();
+  });
+
+  it('updatePlayerJersey: 명단 제출 마감이 지났으면 409 — 인쇄된 명단과 어긋나지 않게', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1Tournament.findFirst.mockImplementation(
+      kindAwareFindFirst(tournamentRow({ kind: 'regular_tournament', rosterDeadlineAt: pastDeadline })),
+    );
+
+    await expect(
+      service.updatePlayerJersey(manager, 'tournament-1', 'reg-1', 'player-1', 10),
+    ).rejects.toMatchObject({ response: { code: 'ROSTER_DEADLINE_PASSED' } });
+    expect(prisma.$executeRaw).not.toHaveBeenCalled();
+    // **에러 코드만 보면 이 단언은 아무것도 안 지킨다** — 트랜잭션 안쪽 재검증
+    // (`lockAndLoadMutableRegistration`)이 같은 코드를 던지므로, 바깥 가드를 지워도
+    // 결과가 똑같다(변이로 확인: red 0). 바깥 가드가 실제로 사는 값은 **트랜잭션을 아예
+    // 열지 않는 것**이라, 그것을 단언한다.
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('updatePlayerJersey: 리그 명단에서도 번호를 고칠 수 있다 — 표면을 넓힌 이유', async () => {
+    // 이 경로가 `ALL_COMPETITION_KINDS` 로 여는 **6번째 리그 허용 지점**이다(래칫 baseline).
+    // 대회만 열어 두면 리그 팀장은 번호를 고칠 방법이 없어 **선수를 지우고 다시 넣는**
+    // 우회를 쓰게 되고, 그 우회는 되살린 행의 자격을 `needs_review` 로 되돌린다.
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1Tournament.findFirst.mockImplementation(
+      kindAwareFindFirst(tournamentRow({ kind: 'regular_league' })),
+    );
+    prisma.v1TournamentPlayer.findFirst.mockResolvedValue(playerRow());
+
+    await expect(
+      service.updatePlayerJersey(manager, 'tournament-1', 'reg-1', 'player-1', 10),
+    ).resolves.toMatchObject({ jerseyNumber: 10 });
+  });
+
+  it('updatePlayerJersey: 없는 선수면 404 PLAYER_NOT_FOUND', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1Tournament.findFirst.mockImplementation(kindAwareFindFirst(tournamentRow({ kind: 'regular_tournament' })));
+    prisma.v1TournamentPlayer.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.updatePlayerJersey(manager, 'tournament-1', 'reg-1', 'ghost', 10),
+    ).rejects.toMatchObject({ response: { code: 'PLAYER_NOT_FOUND' } });
   });
 });

@@ -304,9 +304,13 @@ describe('등번호 수정', () => {
     vi.mocked(useV1UpdatePlayer).mockReturnValue({ mutateAsync: updatePlayer, isPending: false } as never);
     vi.mocked(useV1UpdatePlayerJersey).mockReturnValue({ mutateAsync: updateJersey, isPending: false } as never);
     vi.mocked(useV1RemovePlayer).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
-    render(<TournamentRosterPageClient tournamentId="t1" registrationId="reg-1" />);
+    const view = render(<TournamentRosterPageClient tournamentId="t1" registrationId="reg-1" />);
     fireEvent.click(screen.getByRole('button', { name: /수정/ }));
+    return view;
   }
+
+  /** 위와 같되 `rerender` 를 쓰려는 케이스용 — 이름을 갈라 두면 의도가 보인다. */
+  const renderRowWithHandle = renderRow;
 
   it('번호를 고치면 등번호 경로로만 보낸다 — 자격은 건드리지 않는다', async () => {
     renderRow(7);
@@ -337,6 +341,28 @@ describe('등번호 수정', () => {
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
     expect(await screen.findByText('등번호는 0에서 99 사이 숫자로 입력해 주세요.')).toBeInTheDocument();
     expect(updateJersey).not.toHaveBeenCalled();
+  });
+
+  it('편집 중에 서버 값이 갱신돼도 오류 문구와 입력값이 살아 있다', async () => {
+    // Copilot 리뷰가 잡은 자리다. 저장 하나가 **두 요청으로 갈릴 수 있어서**(등번호 /
+    // 자격) 이 순서가 실제로 난다: 등번호는 성공해 목록이 갱신되고, 자격은 실패해 오류가
+    // 걸린다. 초기화가 `player.*` 에 매달려 있으면 **갱신이 도착하는 순간 오류가 지워져**
+    // 팀장은 무엇이 실패했는지 못 본다.
+    const { rerender } = renderRowWithHandle(7);
+    fireEvent.change(screen.getByLabelText('등번호'), { target: { value: 'e' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    expect(await screen.findByText('등번호는 0에서 99 사이 숫자로 입력해 주세요.')).toBeInTheDocument();
+
+    // 서버 갱신이 도착한다 — 다른 요청이 등번호를 10 으로 바꿔 놓았다.
+    vi.mocked(useV1TournamentPlayers).mockReturnValue({
+      data: { players: [mockPlayer({ jerseyNumber: 10 })], belowMinimum: false },
+      isPending: false,
+    } as never);
+    rerender(<TournamentRosterPageClient tournamentId="t1" registrationId="reg-1" />);
+
+    expect(screen.getByText('등번호는 0에서 99 사이 숫자로 입력해 주세요.')).toBeInTheDocument();
+    // 고치던 입력값도 되돌아가지 않는다.
+    expect(screen.getByLabelText('등번호')).toHaveValue('e');
   });
 });
 

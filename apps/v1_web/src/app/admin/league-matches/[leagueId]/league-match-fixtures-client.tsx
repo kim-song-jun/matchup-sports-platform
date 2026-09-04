@@ -1483,10 +1483,16 @@ function LeagueRegistrationSummary({
           <span className="tm-badge tm-badge-grey">신청 안 받는 중</span>
         )}
       </div>
+      {/* **받는지는 `registrationOpen`, 마감 유무는 부가 문구다.** 마감이 `null` 인 것은
+          계약상 "기한 없이 열림" 이지 "안 받음" 이 아니다 — 마감 유무로 받는지를 추론하면
+          이미 모집 중인 리그에 "마감을 정하면 신청할 수 있어요" 라고 반대로 말한다.
+          같은 실수가 신청 관리 화면에도 있었다(#1028 리뷰 2회). 판정 축을 통일한다. */}
       <p className="mb-3 text-xs text-[var(--text-muted)]">
-        {registrationDeadlineAt === null
-          ? '신청 마감을 정하면 팀장이 리그 화면에서 바로 신청할 수 있어요.'
-          : `현재 마감 ${formatTournamentDateTimeShort(registrationDeadlineAt) ?? registrationDeadlineAt}`}
+        {registrationOpen
+          ? registrationDeadlineAt === null
+            ? '기한 없이 신청을 받는 중이에요.'
+            : `${formatTournamentDateTimeShort(registrationDeadlineAt) ?? registrationDeadlineAt}까지 신청을 받아요.`
+          : '신청 마감을 정하면 팀장이 리그 화면에서 바로 신청할 수 있어요.'}
       </p>
       <Link
         href={`/admin/league-matches/${leagueId}/registrations`}

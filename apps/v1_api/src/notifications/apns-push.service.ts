@@ -20,6 +20,21 @@ import { resolvePushEnvironment } from './push-environment';
  * turning Apple's status codes into the permanent/transient buckets the device store
  * already understands.
  */
+/** What one request to one gateway came back as. */
+type AttemptResult =
+  | { kind: 'delivered' }
+  | { kind: 'rejected'; status: number; reason: string }
+  | { kind: 'error' };
+
+/**
+ * What became of one device, and — when the device was wrong about its own gateway — the
+ * one that actually answered.
+ */
+type DeliveryOutcome =
+  | { result: 'delivered'; correctedEnvironment?: V1ApnsEnvironment }
+  | { result: 'permanent' }
+  | { result: 'transient' };
+
 @Injectable()
 export class ApnsPushService implements NativePushAdapter, OnModuleInit, OnModuleDestroy {
   readonly platform = V1PushPlatform.ios;
@@ -112,14 +127,21 @@ export class ApnsPushService implements NativePushAdapter, OnModuleInit, OnModul
     const successIds: string[] = [];
     const permanentFailureIds: string[] = [];
     const transientFailureIds: string[] = [];
+    /** Devices whose token answered at a gateway other than the one they reported. */
+    const correctedIds = new Map<V1ApnsEnvironment, string[]>();
 
     // APNs has no multicast endpoint, so each device is its own request — but they share one
     // HTTP/2 connection, which is the whole point of the protocol here.
     for (const device of devices) {
       const outcome = await this.deliver(device, payload);
-      switch (outcome) {
+      switch (outcome.result) {
         case 'delivered':
           successIds.push(device.id);
+          if (outcome.correctedEnvironment) {
+            const ids = correctedIds.get(outcome.correctedEnvironment) ?? [];
+            ids.push(device.id);
+            correctedIds.set(outcome.correctedEnvironment, ids);
+          }
           break;
         case 'permanent':
           permanentFailureIds.push(device.id);
@@ -136,6 +158,9 @@ export class ApnsPushService implements NativePushAdapter, OnModuleInit, OnModul
       this.pushDevices.recordSuccessfulDeliveries(successIds),
       this.pushDevices.revokeTokens(permanentFailureIds),
       this.pushDevices.recordTransientFailures(transientFailureIds),
+      ...[...correctedIds].map(([environment, ids]) =>
+        this.pushDevices.correctApnsEnvironment(ids, environment),
+      ),
     ]).catch((err: unknown) => {
       this.logger.error(
         { permanentFailureCount: permanentFailureIds.length, transientFailureCount: transientFailureIds.length, err },
@@ -170,33 +195,119 @@ export class ApnsPushService implements NativePushAdapter, OnModuleInit, OnModul
     }
   }
 
-  private async deliver(
-    device: PushTarget,
-    payload: NativePushPayload,
-    isRetry = false,
-  ): Promise<'delivered' | 'permanent' | 'transient'> {
-    try {
-      const response = await this.request(this.hostFor(device), device.token, payload, this.providerToken!.current());
-      if (response.status === 200) return 'delivered';
+  /**
+   * One notification to one device, including the two retries that are worth making.
+   *
+   * Returns the gateway that actually answered when it is not the one the device reported,
+   * so the caller can write the correction back.
+   */
+  private async deliver(device: PushTarget, payload: NativePushPayload): Promise<DeliveryOutcome> {
+    const host = this.hostFor(device);
+    const first = await this.attempt(device, payload, host);
+    if (first.kind === 'delivered') return { result: 'delivered' };
+    if (first.kind === 'error') return { result: 'transient' };
 
-      const reason = this.reasonOf(response.body);
-      if (ApnsPushService.PERMANENT_REASONS.has(reason)) return 'permanent';
-
-      // A rejected provider token is our problem, not the device's: re-sign and try once.
-      // The token object refuses to re-issue inside Apple's minimum interval, so a retry
-      // storm cannot turn one rejection into a rate-limit ban — which also means a token
-      // signed moments ago is not retried at all. That is the right trade: a brand-new
-      // token being rejected points at the key or team id, not at expiry.
-      if (!isRetry && ApnsPushService.PROVIDER_TOKEN_REASONS.has(reason)) {
-        const { reissued } = this.providerToken!.refresh();
-        if (reissued) return this.deliver(device, payload, true);
+    // `BadDeviceToken` is not taken at face value for an Apple device, because it has two
+    // meanings that look identical: the token is dead, or it is alive at the *other*
+    // gateway. Which gateway a build talks to is something only the build itself knows, and
+    // it can be wrong — measured on TestFlight 0.1.3 (5), whose registrations reported
+    // `sandbox` while the build was production-signed. Every notification then went to the
+    // sandbox gateway, came back `BadDeviceToken`, and was written off as a dead device.
+    //
+    // So the other gateway is tried exactly once. A success there settles the ambiguity in a
+    // way the reason code never could: the token is alive and the report was wrong. Only a
+    // token rejected at *both* gateways is genuinely gone, which is also what makes it safe
+    // to keep revoking on that path — the objection that this design could not tell a dead
+    // token from a misrouted one is answered by asking both.
+    if (first.reason === 'BadDeviceToken' && device.platform === V1PushPlatform.ios) {
+      const otherHost =
+        host === ApnsPushService.PRODUCTION_HOST
+          ? ApnsPushService.SANDBOX_HOST
+          : ApnsPushService.PRODUCTION_HOST;
+      const second = await this.attempt(device, payload, otherHost);
+      if (second.kind === 'delivered') {
+        const corrected =
+          otherHost === ApnsPushService.PRODUCTION_HOST
+            ? V1ApnsEnvironment.production
+            : V1ApnsEnvironment.sandbox;
+        this.logger.warn(
+          { deviceId: device.id, reportedHost: host, deliveredHost: otherHost, corrected },
+          'APNs device reported the wrong gateway; delivered at the other one and corrected it',
+        );
+        return { result: 'delivered', correctedEnvironment: corrected };
       }
 
-      this.logger.warn({ deviceId: device.id, status: response.status, reason }, 'APNs rejected a notification');
-      return 'transient';
+      // The probe is the tiebreaker, so a probe that could not answer settles nothing. If the
+      // other gateway was merely busy or unreachable, revoking on the first `BadDeviceToken`
+      // would unregister a device that is very likely fine — the exact failure this whole
+      // path exists to prevent, arrived at from the other side. Only a second *permanent*
+      // rejection means the token is gone.
+      const probeSettledIt =
+        second.kind === 'rejected' && ApnsPushService.PERMANENT_REASONS.has(second.reason);
+      if (!probeSettledIt) {
+        this.logger.warn(
+          {
+            deviceId: device.id,
+            reportedHost: host,
+            probedHost: otherHost,
+            probe: second.kind,
+            // Carried through when the probe answered, because "it was rejected for reason X"
+            // and "it never answered" send a postmortem to different places.
+            probeStatus: second.kind === 'rejected' ? second.status : undefined,
+            probeReason: second.kind === 'rejected' ? second.reason : undefined,
+          },
+          'APNs probe of the other gateway was inconclusive; keeping the device registered',
+        );
+        return { result: 'transient' };
+      }
+    }
+
+    if (ApnsPushService.PERMANENT_REASONS.has(first.reason)) {
+      // Logged, and that is the point. This branch used to return in silence, so a fleet of
+      // devices failing on every notification produced no line anywhere — indistinguishable
+      // from a server that never tried. Two days of "the phone is broken" came from that.
+      this.logger.warn(
+        { deviceId: device.id, host, status: first.status, reason: first.reason },
+        'APNs permanently rejected a device; revoking its registration',
+      );
+      return { result: 'permanent' };
+    }
+
+    this.logger.warn(
+      { deviceId: device.id, host, status: first.status, reason: first.reason },
+      'APNs rejected a notification',
+    );
+    return { result: 'transient' };
+  }
+
+  /**
+   * A single POST to one gateway, with the one provider-token re-sign Apple's rules allow.
+   *
+   * A rejected provider token is our problem, not the device's: re-sign and try once. The
+   * token object refuses to re-issue inside Apple's minimum interval, so a retry storm
+   * cannot turn one rejection into a rate-limit ban — which also means a token signed
+   * moments ago is not retried at all. That is the right trade: a brand-new token being
+   * rejected points at the key or team id, not at expiry.
+   */
+  private async attempt(
+    device: PushTarget,
+    payload: NativePushPayload,
+    host: string,
+    isProviderRetry = false,
+  ): Promise<AttemptResult> {
+    try {
+      const response = await this.request(host, device.token, payload, this.providerToken!.current());
+      if (response.status === 200) return { kind: 'delivered' };
+
+      const reason = this.reasonOf(response.body);
+      if (!isProviderRetry && ApnsPushService.PROVIDER_TOKEN_REASONS.has(reason)) {
+        const { reissued } = this.providerToken!.refresh();
+        if (reissued) return this.attempt(device, payload, host, true);
+      }
+      return { kind: 'rejected', status: response.status, reason };
     } catch (err) {
-      this.logger.warn({ deviceId: device.id, err }, 'APNs request failed');
-      return 'transient';
+      this.logger.warn({ deviceId: device.id, host, err }, 'APNs request failed');
+      return { kind: 'error' };
     }
   }
 

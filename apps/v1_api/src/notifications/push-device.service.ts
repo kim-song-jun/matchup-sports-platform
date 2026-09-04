@@ -121,6 +121,24 @@ export class PushDeviceService {
     });
   }
 
+  /**
+   * Records the gateway a device's token actually answered at.
+   *
+   * Written only after a delivery succeeded there, so it replaces what the app *said* with
+   * what the send *proved*. Registration still re-reads the app's value on every launch, so
+   * a build that keeps reporting the wrong gateway will keep overwriting this — it pays one
+   * extra request per notification until that build is replaced, and still delivers. The
+   * value earns its keep in between: a notification arriving while the app is closed uses
+   * the corrected gateway on the first try.
+   */
+  async correctApnsEnvironment(deviceIds: string[], environment: V1ApnsEnvironment): Promise<void> {
+    if (deviceIds.length === 0) return;
+    await this.prisma.v1PushDevice.updateMany({
+      where: { id: { in: deviceIds } },
+      data: { apnsEnvironment: environment },
+    });
+  }
+
   async recordSuccessfulDeliveries(deviceIds: string[]): Promise<void> {
     if (deviceIds.length === 0) return;
     await this.prisma.v1PushDevice.updateMany({

@@ -38,24 +38,36 @@ final class ApnsEnvironmentTests: XCTestCase {
         XCTAssertEqual(ApnsEnvironment.resolve(profile: profile(withApsEnvironment: "development")), .sandbox)
     }
 
-    /// The simulator has no embedded profile, and it is a sandbox client — so the absence is
-    /// the answer rather than a failure to report.
-    func testTreatsAMissingProfileAsSandbox() {
-        XCTAssertEqual(ApnsEnvironment.resolve(profileAt: nil), .sandbox)
+    /// The case that was wrong, and cost the reader two days of silence.
+    ///
+    /// A **device** build with no readable profile is a store build: TestFlight and the App
+    /// Store re-sign the app, and what reaches the device may not be readable here. Reporting
+    /// sandbox there sent every notification to the wrong gateway, where Apple answered
+    /// `BadDeviceToken` and the server wrote the device off. The simulator, which also has no
+    /// profile, never reaches this function — `current` answers it before looking.
+    func testTreatsAMissingProfileOnADeviceAsProduction() {
+        XCTAssertEqual(ApnsEnvironment.resolve(profileAt: nil), .production)
     }
 
-    func testTreatsAProfileWithoutTheEntitlementAsSandbox() {
-        XCTAssertEqual(ApnsEnvironment.resolve(profile: profile(withApsEnvironment: nil)), .sandbox)
+    func testTreatsAProfileWithoutTheEntitlementAsProduction() {
+        XCTAssertEqual(ApnsEnvironment.resolve(profile: profile(withApsEnvironment: nil)), .production)
     }
 
-    /// Unrecognised values fall to sandbox deliberately. Guessing production for a sandbox
-    /// device gets it revoked; guessing sandbox for a production device only fails to deliver.
-    func testTreatsAnUnknownValueAsSandbox() {
-        XCTAssertEqual(ApnsEnvironment.resolve(profile: profile(withApsEnvironment: "staging")), .sandbox)
+    /// Only Apple's own spelling of the sandbox gateway means sandbox. Anything else is a
+    /// value this build does not understand, and on a device the safer reading is the store —
+    /// the server probes the other gateway before revoking anything.
+    func testTreatsAnUnknownValueAsProduction() {
+        XCTAssertEqual(ApnsEnvironment.resolve(profile: profile(withApsEnvironment: "staging")), .production)
     }
 
-    func testTreatsUnparseableBytesAsSandbox() {
-        XCTAssertEqual(ApnsEnvironment.resolve(profile: Data([0xDE, 0xAD, 0xBE, 0xEF])), .sandbox)
+    func testTreatsUnparseableBytesAsProduction() {
+        XCTAssertEqual(ApnsEnvironment.resolve(profile: Data([0xDE, 0xAD, 0xBE, 0xEF])), .production)
+    }
+
+    /// The simulator is always a sandbox client, and it is where this bundle runs — so the
+    /// assertion is about the value the shell would actually report here.
+    func testTheSimulatorReportsSandboxWithoutReadingAProfile() {
+        XCTAssertEqual(ApnsEnvironment.current, .sandbox)
     }
 
     /// The registration body is what the server actually reads.

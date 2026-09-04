@@ -587,6 +587,41 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
         />
       </div>
 
+      {/* **대진이 있든 없든 보여야 한다.** 이 버튼은 처음엔 "대진이 하나도 없을 때만" 그려지는
+          분기 안에 있었는데, 이 기능의 존재 이유가 **우천 순연 재편성·대체 경기**라 정작
+          대진이 이미 있는 리그에서 도달할 수 없었다(2026-09-04 alpha 실화면에서 발견 —
+          유닛은 리그 mock 의 `fixtures` 가 전부 빈 배열이라 못 잡았다).
+          일괄 생성과 별개 경로다: BE 는 `fixtures/manual` 을 진작에 갖고 있었는데 부르는
+          화면이 없었다(FE 호출 0건). */}
+      <div className="mb-3 flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setManualFixtureOpen(true)}
+          className="min-h-[44px] rounded-xl border border-[var(--border)] px-4 text-sm font-semibold text-[var(--text-strong)]"
+        >
+          경기 하나 추가
+        </button>
+        <span className="text-xs text-[var(--text-muted)]">
+          우천 순연 재편성이나 대체 경기처럼 한 경기만 필요할 때 써요.
+        </span>
+      </div>
+      {manualFixtureOpen && (
+        <LeagueManualFixtureModal
+          teams={(teamsData?.teams ?? []).map((team) => ({ id: team.teamId, label: team.name }))}
+          isSubmitting={createManualFixture.isPending}
+          onSubmit={async (payload) => {
+            try {
+              await createManualFixture.mutateAsync(payload);
+              showToast('경기를 만들었어요.', 'success');
+            } catch (error) {
+              showToast(extractErrorMessage(error, '경기를 만들지 못했어요.'), 'error');
+              throw error;
+            }
+          }}
+          onClose={() => setManualFixtureOpen(false)}
+        />
+      )}
+
       {series.fixtures.length === 0 ? (
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-end gap-3">
@@ -669,33 +704,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
             >
               라운드로빈 대진 생성
             </button>
-            {/* **일괄 생성과 별개 경로다.** 우천 순연 재편성·대체 경기는 라운드로빈으로는
-                만들 수 없다 — BE 는 `fixtures/manual` 을 진작에 갖고 있었는데 부르는 화면이
-                없었다(FE 호출 0건). */}
-            <button
-              type="button"
-              onClick={() => setManualFixtureOpen(true)}
-              className="min-h-[44px] rounded-xl border border-[var(--border)] px-4 text-sm font-semibold text-[var(--text-strong)]"
-            >
-              경기 하나 추가
-            </button>
           </div>
-          {manualFixtureOpen && (
-            <LeagueManualFixtureModal
-              teams={(teamsData?.teams ?? []).map((team) => ({ id: team.teamId, label: team.name }))}
-              isSubmitting={createManualFixture.isPending}
-              onSubmit={async (payload) => {
-                try {
-                  await createManualFixture.mutateAsync(payload);
-                  showToast('경기를 만들었어요.', 'success');
-                } catch (error) {
-                  showToast(extractErrorMessage(error, '경기를 만들지 못했어요.'), 'error');
-                  throw error;
-                }
-              }}
-              onClose={() => setManualFixtureOpen(false)}
-            />
-          )}
           {!hasLeagueStartsOn && <MissingStartsOnNotice />}
           <TimingSuggestionRow
             suggestion={timingSuggestion}

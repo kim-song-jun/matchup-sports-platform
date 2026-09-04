@@ -246,8 +246,17 @@ export class ApnsPushService implements NativePushAdapter, OnModuleInit, OnModul
         second.kind === 'rejected' && ApnsPushService.PERMANENT_REASONS.has(second.reason);
       if (!probeSettledIt) {
         this.logger.warn(
-          { deviceId: device.id, reportedHost: host, probedHost: otherHost, probe: second.kind },
-          'APNs probe of the other gateway did not answer; keeping the device registered',
+          {
+            deviceId: device.id,
+            reportedHost: host,
+            probedHost: otherHost,
+            probe: second.kind,
+            // Carried through when the probe answered, because "it was rejected for reason X"
+            // and "it never answered" send a postmortem to different places.
+            probeStatus: second.kind === 'rejected' ? second.status : undefined,
+            probeReason: second.kind === 'rejected' ? second.reason : undefined,
+          },
+          'APNs probe of the other gateway was inconclusive; keeping the device registered',
         );
         return { result: 'transient' };
       }

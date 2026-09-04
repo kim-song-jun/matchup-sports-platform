@@ -180,6 +180,12 @@ describe('ApnsPushService gateway self-correction', () => {
     expect(summary).toEqual({ devices: 1, delivered: 0, failed: 1, disabled: false });
     expect(pushDevices.revokeTokens).toHaveBeenCalledWith([]);
     expect(pushDevices.recordTransientFailures).toHaveBeenCalledWith(['d1']);
+    // The reason the probe gave, not just that it failed: "busy" and "never answered" send a
+    // postmortem to different places.
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ deviceId: 'd1', probeStatus: 503, probeReason: 'ServiceUnavailable' }),
+      expect.stringContaining('inconclusive'),
+    );
   });
 
   /**

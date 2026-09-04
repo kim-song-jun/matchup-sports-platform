@@ -5,7 +5,7 @@ import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { AlertBanner, Card, EmptyState, SectionTitle } from '@/components/v1-ui/primitives';
+import { AlertBanner, Card, EmptyState, ErrorState, SectionTitle } from '@/components/v1-ui/primitives';
 import { ChevronRight, UsersRound } from 'lucide-react';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { appRoute } from '@/lib/app-route';
@@ -1108,30 +1108,6 @@ function RegistrationDetailView({
   );
 }
 
-/* ── No registration state ── */
-
-function NoRegistrationState({ tournamentId }: { tournamentId: string }) {
-  return (
-    <div style={{ padding: '0 20px', marginTop: 16 }}>
-      <Card pad={32} style={{ textAlign: 'center' }}>
-        <div className="tm-text-body-lg" style={{ color: 'var(--text-strong)' }}>
-          신청 내역이 없어요
-        </div>
-        <p className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-          신청 완료 후 이 페이지에서 상태를 확인할 수 있어요.
-        </p>
-        <Link
-          href={`/tournaments/${tournamentId}/apply`}
-          className="tm-btn tm-btn-lg tm-btn-primary"
-          style={{ marginTop: 24, display: 'inline-block' }}
-        >
-          참가 신청하기
-        </Link>
-      </Card>
-    </div>
-  );
-}
-
 function MyRegistrationsList({
   tournamentId,
   registrations,
@@ -1380,6 +1356,7 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
     isLoading: loadingRegistrations,
     isError: registrationsError,
     error: registrationsErr,
+    refetch: refetchRegistrations,
   } = useV1MyRegistrations(tournamentId);
 
   const teams = normalizeMyTeams(myTeamsData);
@@ -1413,7 +1390,7 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
     const msg = extractErrorMessage(registrationsErr, '신청 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
     return (
               <div style={{ padding: '0 20px', marginTop: 24 }}>
-          <AlertBanner message={msg} />
+          <ErrorState message={msg} onRetry={() => void refetchRegistrations()} />
           <Link
             href={`/tournaments/${tournamentId}`}
             className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"

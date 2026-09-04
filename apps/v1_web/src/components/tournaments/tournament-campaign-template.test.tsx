@@ -269,13 +269,19 @@ describe('TournamentCampaignTemplate', () => {
     expect(screen.getByText('공식 파트너 공개 예정')).toBeInTheDocument();
   });
 
-  it('replaces a failed campaign image with a local sport fallback', () => {
-    render(<TournamentCampaignTemplate campaign={campaign('open')} />);
+  it('replaces a failed campaign image with a sport-tinted illustration panel — no mock photo', () => {
+    const { container } = render(<TournamentCampaignTemplate campaign={campaign('open')} />);
     const hero = screen.getByRole('img', { name: 'Teameet Summer Futsal Cup' });
 
     fireEvent.error(hero);
 
+    // 실패한 사진은 사라지고(목업 사진으로 바꿔치기하지 않는다) 종목 그래픽 폴백
+    // 패널로 대체된다 — 대회 sport.code='futsal' → sportIllustration('풋살')='sport-futsal'.
+    expect(screen.queryByRole('img', { name: 'Teameet Summer Futsal Cup' })).not.toBeInTheDocument();
+    const fallback = container.querySelector('.tm-campaign-media-fallback');
+    expect(fallback).toBeInTheDocument();
+    const illustration = fallback?.querySelector('img') ?? null;
     // next/image 전환(U15) 이후 실제 DOM src는 `/_next/image?url=...`로 재작성된다.
-    expect(resolveNextImageSrc(hero)).toBe('/mock/generated/futsal-rooftop.webp');
+    expect(resolveNextImageSrc(illustration)).toBe('/illustrations/sport-futsal-640.webp');
   });
 });

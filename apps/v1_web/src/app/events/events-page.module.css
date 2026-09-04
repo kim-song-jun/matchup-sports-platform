@@ -84,12 +84,6 @@
 
 .image,
 .fallback {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.fallback {
   display: grid;
   place-items: center;
   color: var(--static-white);
@@ -231,7 +225,6 @@
   font-weight: 700;
 }
 
-.paginationError,
 .moreButton {
   margin-top: 20px;
 }

@@ -6157,7 +6157,7 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 /* [R-T1 타입 위계 정리] 22px 하드코딩 → --font-size-subhead(20px) 토큰 + weight 700
    명시(기존엔 미지정 → Tailwind preflight로 h1이 400 상속, 대회명이 본문보다 안 굵어
    보였다). 대진표 페이지 콘텐츠 중 가장 큰 tier(1단계: 대회명). */
-.tm-bracket-page-intro h1 {
+.tm-bracket-page-intro h2 {
   margin: 0;
   color: var(--text-strong);
   font-size: var(--font-size-subhead);

@@ -1,8 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Trophy } from 'lucide-react';
-import { ErrorState } from '@/components/v1-ui/primitives';
+import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
 import { useV1MyTournamentFixtures, useV1Tournament } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -124,9 +123,10 @@ function TeamFixturesDetail({ teamId, fixtures }: { teamId: string | null; fixtu
 
   if (mine.length === 0) {
     return (
-      <p className="tm-text-caption" style={{ padding: '8px 0' }}>
-        이 조에서 배정된 경기가 아직 없어요.
-      </p>
+      <EmptyState
+        title="이 조에서 배정된 경기가 아직 없어요"
+        sub="대진이 확정되면 이 팀의 경기가 여기에 표시돼요."
+      />
     );
   }
 
@@ -254,6 +254,7 @@ function LeagueStandingsSection({
  * 없으면(스케줄 미정) 그 줄 자체를 렌더하지 않는다.
  */
 function BracketEmpty({
+  tournamentId,
   format,
   status,
   teamCount,
@@ -261,6 +262,7 @@ function BracketEmpty({
   registrationDeadlineAt,
   bracketPublishScheduledAt,
 }: {
+  tournamentId: string;
   format: 'knockout' | 'group_knockout';
   status: V1TournamentDetail['status'];
   teamCount: number;
@@ -277,44 +279,42 @@ function BracketEmpty({
   const publishLabel = formatTournamentDateTimeShort(bracketPublishScheduledAt);
 
   return (
-    <div className="tm-empty-state">
-      <div className="tm-empty-icon" aria-hidden="true">
-        <Trophy size={32} strokeWidth={1.6} />
-      </div>
-      <div className="tm-text-body-lg">대진표가 아직 공개되지 않았어요</div>
-      {/* [R-T1 타입 위계 정리] tm-text-label(13/600) → tm-text-caption(12/400) —
-          이 안내문은 의미상 보조 정보(4단계)라 tm-text-label(3단계 라벨용)보다
-          캡션 토큰이 더 맞는다. */}
-      <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.5 }}>
-        {sub}
-      </div>
+    <div>
       {/* 팀명이 아니라 팀 수 — "감출 때 없는 척하지 마라": 이름은 몰라도 몇 팀이
-          참가하는지는 정직하게 보여준다.
-          [R-T1] 13px → 12px(보조 정보 tier) — weight 600은 유지해 캡션류보다 한 단
-          더 강조. */}
+          참가하는지는 정직하게 보여준다. EmptyState 는 title/sub/cta 만 지원하므로
+          이 보강 정보는 그 위에 별도 블록으로 얹는다(요구사항 3, 조용히 드롭하지 않는다). */}
       <div
         style={{
-          marginTop: 16,
+          margin: '0 auto 16px',
+          maxWidth: 240,
           padding: '12px 16px',
           borderRadius: 10,
           background: 'var(--surface-soft)',
           fontSize: 12,
           color: 'var(--text-strong)',
           fontWeight: 600,
+          textAlign: 'center',
         }}
       >
         확정 {confirmedCount}/{teamCount}팀
+        {deadlineLabel ? (
+          <div className="tm-text-caption" style={{ color: 'var(--text-caption)', marginTop: 8, fontWeight: 400 }}>
+            모집 마감 {deadlineLabel}
+          </div>
+        ) : null}
+        {publishLabel ? (
+          <div className="tm-text-caption" style={{ color: 'var(--text-caption)', marginTop: deadlineLabel ? 2 : 8, fontWeight: 400 }}>
+            대진표 공개 예정 {publishLabel}
+          </div>
+        ) : null}
       </div>
-      {deadlineLabel ? (
-        <div className="tm-text-caption" style={{ color: 'var(--text-caption)', marginTop: 8 }}>
-          모집 마감 {deadlineLabel}
-        </div>
-      ) : null}
-      {publishLabel ? (
-        <div className="tm-text-caption" style={{ color: 'var(--text-caption)', marginTop: deadlineLabel ? 2 : 8 }}>
-          대진표 공개 예정 {publishLabel}
-        </div>
-      ) : null}
+      <EmptyState
+        illustration={{ name: 'landing-hero' }}
+        title="대진표가 아직 공개되지 않았어요"
+        sub={sub}
+        cta="대회 정보 보기"
+        ctaHref={`/tournaments/${tournamentId}`}
+      />
     </div>
   );
 }
@@ -532,7 +532,10 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
               같은 말을 두 번 하는 자리라 삭제했다. 안내 문단은 좁은 폭에서 숨긴다
               (globals.css의 .tm-bracket-page-intro p) — 390px에서 이 인트로 블록이
               스크롤 영역의 22%(159px)를 먹어 정작 경기가 2~3개밖에 안 보였다. */}
-          <h1>{tournament.title}</h1>
+          {/* 셸이 이미 데스크톱 헤드에 "순위·브래킷" 제목을 그린다(tournaments-core.ts
+              desktopHead:true) — 여기 h1을 그대로 두면 데스크톱에서 h1이 중복된다.
+              대회 실제 제목은 여기서만 나오는 정보라 h2로 낮춰 유지한다. */}
+          <h2>{tournament.title}</h2>
           {/* 리그엔 조별리그도 결선도 없다 — format 으로만 쓰면 거울 행에 이 문장이 그대로 뜬다. */}
           <p>
             {isLeague
@@ -615,7 +618,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
                   </h3>
                   {isRegularLeague && !leagueScheduleSettled ? (
                     leagueSchedule.isError ? (
-                      <div className="tm-hub-empty">순위를 불러오지 못했어요.</div>
+                      <ErrorState message="순위를 불러오지 못했어요." onRetry={() => void leagueSchedule.refetch()} />
                     ) : (
                       <div
                         className="tm-skeleton"
@@ -641,7 +644,11 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
               )}
 
               {isLeague && leagueHasNoFixtures && (
-                <div className="tm-hub-empty">경기 일정이 아직 없어요.</div>
+                <EmptyState
+                  illustration={{ name: 'landing-hero' }}
+                  title="경기 일정이 아직 없어요"
+                  sub="일정이 등록되면 여기에서 확인할 수 있어요."
+                />
               )}
             </div>
             ) : null}
@@ -662,6 +669,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
                     </div>
                   ) : (
                     <BracketEmpty
+                      tournamentId={tournament.id}
                       format={format}
                       status={tournament.status}
                       teamCount={tournament.teamCount}

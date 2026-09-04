@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { Star, ImagePlus, X, Trophy, Medal } from 'lucide-react';
-import { Card, ErrorState } from '@/components/v1-ui/primitives';
+import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -766,23 +766,27 @@ function ReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
 
         {reviews.length === 0 ? (
           <Card pad={20} style={{ background: 'var(--grey50)', textAlign: 'center' }}>
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--text-caption)', lineHeight: 1.6 }}>
-              {/* 왜 후기를 쓸 수 없는지(또는 어떻게 쓰는지)를 상태별로 안내한다 */}
-              {/* 실제 권한은 참가 확정 팀의 owner(팀장) + manager(운영진)다
-                  — tournaments/tournament-reviews.service.ts eligibleTeamWhere 참조.
-                  "팀 대표만"이라고 안내하면 운영진이 자기는 못 쓴다고 오해한다. */}
-              {isCompleted && isParticipant && !alreadyReviewed
-                ? '첫 번째 후기를 남겨보세요!'
-                : isCompleted && !hasSession
-                  ? '아직 등록된 후기가 없어요. 로그인하면 참가팀의 팀장·운영진은 후기를 작성할 수 있어요.'
-                  : isCompleted && hasSession && !isParticipant
-                    ? // 팀원(member)도 여기까지 온다 — 대회 완료 알림이 모든 활성 멤버에게
-                      // 가기 때문이다. 대회 후기는 설계상 팀장·운영진 전용이 맞지만, 팀원에게도
-                      // **쓸 수 있는 후기가 따로 있다**(상대 선수 후기). 그 사실을 함께 알려
-                      // 알림이 막다른 길로 끝나지 않게 한다 — 진입 카드는 이 섹션 위에 있다.
-                      '대회 후기는 참가팀의 팀장·운영진이 작성해요. 팀원은 맞붙은 상대 선수에 대한 후기를 남길 수 있어요.'
-                    : '아직 등록된 후기가 없어요.'}
-            </p>
+            {/* 왜 후기를 쓸 수 없는지(또는 어떻게 쓰는지)를 상태별로 안내한다.
+                실제 권한은 참가 확정 팀의 owner(팀장) + manager(운영진)다
+                — tournaments/tournament-reviews.service.ts eligibleTeamWhere 참조.
+                "팀 대표만"이라고 안내하면 운영진이 자기는 못 쓴다고 오해한다. */}
+            <EmptyState
+              illustration={{ name: 'journey-done' }}
+              title="아직 등록된 후기가 없어요"
+              sub={
+                isCompleted && isParticipant && !alreadyReviewed
+                  ? '첫 번째 후기를 남겨보세요!'
+                  : isCompleted && !hasSession
+                    ? '로그인하면 참가팀의 팀장·운영진은 후기를 작성할 수 있어요.'
+                    : isCompleted && hasSession && !isParticipant
+                      ? // 팀원(member)도 여기까지 온다 — 대회 완료 알림이 모든 활성 멤버에게
+                        // 가기 때문이다. 대회 후기는 설계상 팀장·운영진 전용이 맞지만, 팀원에게도
+                        // **쓸 수 있는 후기가 따로 있다**(상대 선수 후기). 그 사실을 함께 알려
+                        // 알림이 막다른 길로 끝나지 않게 한다 — 진입 카드는 이 섹션 위에 있다.
+                        '대회 후기는 참가팀의 팀장·운영진이 작성해요. 팀원은 맞붙은 상대 선수에 대한 후기를 남길 수 있어요.'
+                      : '참가팀의 후기가 등록되면 여기에서 볼 수 있어요.'
+              }
+            />
           </Card>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -852,21 +856,16 @@ function RetentionSection({ tournamentId }: { tournamentId: string }) {
 
 /* ── 아직 종료 전 안내 ── */
 function NotCompletedNotice({ status }: { status: string }) {
-  const msg =
+  const { title, sub } =
     status === 'open'
-      ? '대회가 시작되지 않았어요. 종료 후 시상 결과를 확인할 수 있어요.'
+      ? { title: '대회가 시작되지 않았어요', sub: '종료 후 시상 결과를 확인할 수 있어요.' }
       : status === 'in_progress'
-      ? '대회가 진행 중이에요. 종료 후 시상 결과가 공개돼요.'
-      : '시상 결과를 준비 중이에요.';
+      ? { title: '대회가 진행 중이에요', sub: '종료 후 시상 결과가 공개돼요.' }
+      : { title: '시상 결과를 준비 중이에요', sub: '잠시 후 다시 확인해 주세요.' };
 
   return (
     <Card pad={24} style={{ textAlign: 'center', margin: '0 0 20px' }}>
-      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }} aria-hidden="true">
-        <Medal size={32} className="tm-medal-gold" strokeWidth={1.8} />
-      </div>
-      <p style={{ margin: 0, fontSize: 13, color: 'var(--text-caption)', lineHeight: 1.6 }}>
-        {msg}
-      </p>
+      <EmptyState illustration={{ name: 'journey-done' }} title={title} sub={sub} />
     </Card>
   );
 }

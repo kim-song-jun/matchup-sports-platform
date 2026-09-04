@@ -55,7 +55,7 @@ function EventsContent() {
       <header className={styles.intro}>
         <div className={styles.titleRow}>
           <Sparkles size={20} aria-hidden="true" />
-          <h1 className="tm-text-heading">이벤트 허브</h1>
+          <h2 className="tm-text-heading">이벤트 허브</h2>
         </div>
         <p>
           지금 참가할 수 있는 대회부터 결과와 시상까지, 팀밋의 주요 이벤트를 한눈에 확인하세요.
@@ -99,9 +99,11 @@ function EventsContent() {
           />
         ) : items.length === 0 ? (
           <EmptyState
-            icon={<Sparkles size={36} />}
+            illustration={{ name: 'journey-done' }}
             title="등록된 이벤트가 없어요"
             sub="진행 예정 대회가 캠페인으로 등록되면 여기에 나타나요."
+            cta="대회 목록 보기"
+            ctaHref="/tournaments"
           />
         ) : (
           <>
@@ -113,11 +115,10 @@ function EventsContent() {
               ))}
             </ul>
             {isFetchNextPageError ? (
-              <div role="alert" className={`tm-card ${styles.paginationError}`}>
-                <p className="tm-text-caption" style={{ margin: 0 }}>
-                  {getEventErrorMessage(error, '다음 이벤트를 불러오지 못했어요.')}
-                </p>
-              </div>
+              <ErrorState
+                message={getEventErrorMessage(error, '다음 이벤트를 불러오지 못했어요.')}
+                onRetry={() => void fetchNextPage()}
+              />
             ) : null}
             {hasNextPage ? (
               <button

@@ -930,6 +930,7 @@ export function GroupStageFixtures({ tournament }: { tournament: V1TournamentDet
         <div id={panelId} style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 12 }}>
           {sections.length === 0 ? (
             <EmptyState
+              illustration={{ name: 'journey-done' }}
               title="조별리그 경기가 아직 등록되지 않았어요."
               sub="운영진이 조별 대진을 확정하면 이곳에서 경기를 확인할 수 있어요."
             />
@@ -1053,6 +1054,7 @@ export function ResultsPageContent({ tournament }: { tournament: V1TournamentDet
               <FinalStandingsTable rows={knockoutRows} fixtures={tournament.fixtures} />
             ) : (
               <EmptyState
+                illustration={{ name: 'journey-done' }}
                 title="최종 순위가 아직 등록되지 않았어요."
                 sub="운영진이 결과를 확정하면 이곳에서 순위를 확인할 수 있어요."
               />

@@ -213,8 +213,10 @@ function SeasonSummaryCard({
           요청이 실패해도 데이터는 undefined 라, 로딩을 먼저 검사하면 실패한 요청이 영원히
           스켈레톤으로 남고 아래 에러 분기에 도달하지 못한다(사용자는 계속 로딩 중으로 오해한다). */}
       {standingsError ? (
-        // 화면 전체를 막지 않는다 — 아래 순위표 섹션이 이 같은 요청의 재시도 버튼을 갖고 있다.
-        <p className="text-sm text-[var(--text-muted)]">시즌 요약을 불러오지 못했어요.</p>
+        // 재시도 버튼은 일부러 안 붙인다 — 아래 순위표 섹션이 같은 요청(standingsQuery)의
+        // ErrorState+재시도를 이미 갖고 있어, 여기서도 누르면 같은 쿼리가 화면에 두 번
+        // 뜬 재시도 버튼으로 중복 트리거된다.
+        <ErrorState title="시즌 요약을 불러오지 못했어요" message="아래 순위표에서 다시 시도할 수 있어요." />
       ) : standingsLoading ? (
         <div className="tm-skeleton" style={{ height: 44, borderRadius: 'var(--radius-chip)' }} />
       ) : (
@@ -355,21 +357,20 @@ function RecordConsentPointerCard({ tightTop }: { tightTop: boolean }) {
   if (consent.data?.hasResponded !== false || pendingCount === 0) return null;
 
   return (
-    // 위 연동 카드와 함께 뜰 때는 간격을 좁혀 **한 덩어리의 두 단계**로 읽히게 한다.
-    // 같은 무게의 dashed 카드 둘이 같은 간격으로 떨어져 있으면 순위표 밑에 서로 무관한
-    // 안내가 두 개 쌓인 것처럼 보인다(둘 다 필요한 사용자가 실제로 있다 — 연결도 동의도
-    // 남은 사람).
-    <Card pad={16} className={tightTop ? 'mt-2' : 'mt-4'} style={{ borderStyle: 'dashed' }}>
-      <div className="tm-text-body-lg">내 경기 기록이 아직 비공개예요</div>
-      <div className="mt-1 text-sm text-[var(--text-muted)]">
-        공개를 켜면 내 계정에 연결된 경기 {pendingCount}건의 기록이 공개돼요. 득점·도움이 있으면
-        이 리그 순위에도 이름이 나타나요.
-      </div>
-      <Link href={RECORD_CONSENT_SETTINGS_PATH} className="tm-btn tm-btn-sm tm-btn-outline mt-3">
-        기록 공개 설정 열기
-        <span aria-hidden="true"> →</span>
-      </Link>
-    </Card>
+    // 위 연동 카드와 함께 뜰 때는 간격을 좁혀 **한 덩어리의 두 단계**로 읽히게 한다
+    // (연결도 동의도 남은 사용자가 실제로 있다). Wave 5 — 인라인 마크업 대신 공용
+    // EmptyState 로 통일(illustration + CTA), 옛 dashed 카드 래퍼는 걷어냈다 — EmptyState
+    // 가 자체 여백을 갖고 있어 dashed 테두리로 무게를 맞추지 않아도 "연동/동의 두 단계"로
+    // 읽힌다(ClaimFixturesCard 는 배지 없는 배너라 그대로 둔다).
+    <div className={tightTop ? 'mt-2' : 'mt-4'}>
+      <EmptyState
+        title="내 경기 기록이 아직 비공개예요"
+        sub={`공개를 켜면 내 계정에 연결된 경기 ${pendingCount}건의 기록이 공개돼요. 득점·도움이 있으면 이 리그 순위에도 이름이 나타나요.`}
+        illustration={{ name: 'auth-welcome' }}
+        cta="기록 공개 설정 열기"
+        ctaHref={RECORD_CONSENT_SETTINGS_PATH}
+      />
+    </div>
   );
 }
 
@@ -606,7 +607,7 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
         </p>
       )}
       <div className="flex flex-wrap items-center gap-2">
-        <h1 className="text-xl font-bold text-[var(--text-strong)]">{series.title}</h1>
+        <h2 className="text-xl font-bold text-[var(--text-strong)]">{series.title}</h2>
         <span className={`tm-badge ${stateMeta.badgeClass}`}>{stateMeta.label}</span>
       </div>
       {/* 사용자 확정(2026-08-23) — 종료된 리그에만 뜬다. 진행 중·준비 중 리그에는
@@ -689,7 +690,13 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
         ) : standings === undefined ? (
           <div className="tm-skeleton" style={{ height: 160, borderRadius: 'var(--radius-control)' }} />
         ) : standings.standings.length === 0 ? (
-          <EmptyState title="아직 확정된 결과가 없어요" sub="리그 경기 결과가 확정되면 순위표가 나타나요." />
+          <EmptyState
+            title="아직 확정된 결과가 없어요"
+            sub="리그 경기 결과가 확정되면 순위표가 나타나요."
+            illustration={{ name: 'journey-done' }}
+            cta="경기 일정 보기"
+            ctaHref="#league-schedule"
+          />
         ) : preparingNoGames ? (
           <ParticipantTeamList teams={standings.standings} />
         ) : (
@@ -837,7 +844,7 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
         )}
       </section>
 
-      <section className="mt-8">
+      <section className="mt-8" id="league-schedule">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-semibold text-[var(--text-strong)]">경기 일정</h2>
           {/* 이슈 3 — 대진은 항상 오래된 순으로 오므로 시즌 중반 리그는 "다음 경기"가
@@ -866,9 +873,19 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
           )}
         </div>
         {fixtures.length === 0 ? (
-          <EmptyState title="아직 등록된 경기가 없어요" sub="대진이 확정되면 경기 일정이 여기에 나타나요." />
+          <EmptyState
+            title="아직 등록된 경기가 없어요"
+            sub="대진이 확정되면 경기 일정이 여기에 나타나요."
+            illustration={{ name: 'matches-empty' }}
+          />
         ) : visibleFixtures.length === 0 ? (
-          <EmptyState title="예정된 경기가 없어요" sub="'전체'를 눌러 지난 경기를 다시 볼 수 있어요." />
+          <EmptyState
+            title="예정된 경기가 없어요"
+            sub="'전체'를 눌러 지난 경기를 다시 볼 수 있어요."
+            illustration={{ name: 'matches-empty' }}
+            cta="전체 보기"
+            onCta={() => setShowUpcomingOnly(false)}
+          />
         ) : (
           <ul className="space-y-2">
             {visibleFixtures.map((fixture) => {
@@ -929,6 +946,9 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
           <EmptyState
             title="아직 기록이 없어요"
             sub={leagueRecordEmptySub('goals', records.hiddenByEligibility)}
+            illustration={{ name: 'journey-done' }}
+            cta="경기 일정 보기"
+            ctaHref="#league-schedule"
           />
         ) : (
           <ol className="space-y-1">
@@ -955,6 +975,9 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
           <EmptyState
             title="아직 기록이 없어요"
             sub={leagueRecordEmptySub('assists', records.hiddenByEligibility)}
+            illustration={{ name: 'journey-done' }}
+            cta="경기 일정 보기"
+            ctaHref="#league-schedule"
           />
         ) : (
           <ol className="space-y-1">

@@ -55,17 +55,21 @@ function ChatListContent({ model, selectedRoomId }: { model: ChatListViewModel; 
           {model.status === 'loading' ? <PageSkeleton variant="list" /> : null}
           {model.status === 'error' && !hasRooms ? (
             <ErrorState
-              message={model.emptyTitle ?? '채팅방을 불러오지 못했어요.'}
+              title={model.emptyTitle ?? '채팅방을 불러오지 못했어요'}
+              message={model.emptyBody ?? '잠시 후 다시 시도해 주세요.'}
               onRetry={model.onRetry}
+              retryLabel="다시 불러오기"
             />
           ) : model.status !== 'loading' && model.status !== 'error' && !hasRooms ? (
             /* [P2 UX 라이팅] cta 능동형 표현 */
             <EmptyState
               fill
+              illustration={{ name: 'chat-empty' }}
               title={model.emptyTitle ?? '아직 채팅방이 없어요'}
               sub={model.emptyBody ?? '매치에 참가하거나 팀에 가입하면 채팅방이 열려요.'}
               cta={model.emptyHref ? '매치 찾아보기' : undefined}
-              onCta={model.emptyHref ? () => { window.location.href = model.emptyHref!; } : undefined}
+              /* window.location.href 는 전체 새로고침이라 앱 셸까지 다시 그린다 — 링크로 SPA 이동한다. */
+              ctaHref={model.emptyHref}
             />
           ) : null}
           {hasRooms ? (
@@ -185,13 +189,15 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
           {model.status === 'loading' ? <PageSkeleton variant="list" /> : null}
           {model.status === 'error' && model.messages.length === 0 ? (
             <ErrorState
-              message={model.emptyTitle ?? '메시지를 불러오지 못했어요.'}
+              title={model.emptyTitle ?? '메시지를 불러오지 못했어요'}
+              message={model.emptyBody ?? '잠시 후 다시 시도해 주세요.'}
               onRetry={model.onRetry}
+              retryLabel="다시 불러오기"
             />
           ) : model.status !== 'loading' && model.status !== 'error' && model.messages.length === 0 ? (
             /* [P2 UX 라이팅] 능동형 */
             <EmptyState
-              fill
+              illustration={{ name: 'chat-empty' }}
               title={model.emptyTitle ?? '아직 메시지가 없어요'}
               sub={model.emptyBody ?? '먼저 인사를 건네 대화를 시작해요.'}
             />
@@ -356,12 +362,21 @@ export function NotificationsPageView({ model }: { model: NotificationsViewModel
             <PageSkeleton variant="list" />
           ) : model.status === 'error' ? (
             <ErrorState
-              message="알림을 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
+              title="알림을 불러오지 못했어요"
+              message="잠시 후 다시 시도해 주세요."
               onRetry={model.onRetry}
+              retryLabel="다시 불러오기"
             />
           ) : model.notifications.length === 0 ? (
             /* [P2 UX 라이팅] 능동형 */
-            <EmptyState fill title="아직 알림이 없어요" sub="매치, 팀매치, 채팅에 새 소식이 생기면 여기서 바로 알려드려요." />
+            <EmptyState
+              fill
+              illustration={{ name: 'chat-empty' }}
+              title="아직 알림이 없어요"
+              sub="매치, 팀매치, 채팅에 새 소식이 생기면 여기서 바로 알려드려요."
+              cta="매치 둘러보기"
+              ctaHref="/matches"
+            />
           ) : (
             groups.map((group) => {
               const items = model.notifications.filter((notification) => notification.group === group);

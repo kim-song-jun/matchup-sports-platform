@@ -55,11 +55,21 @@ function normalizeMyTeams(data: ReturnType<typeof useV1MyTeams>['data']): V1MyTe
 
 type ApplyStep = 'team' | 'agreements' | 'payment';
 
-const STEPS: Array<{ id: ApplyStep; label: string }> = [
-  { id: 'team', label: '팀 선택' },
-  { id: 'agreements', label: '동의 · 결제 수단' },
-  { id: 'payment', label: '결제 안내' },
-];
+/**
+ * 단계 라벨은 **참가비 유무로 갈린다.**
+ *
+ * 무료 대회는 결제 수단·입금자명을 아예 묻지 않는데(#1017) 라벨만 결제를 전제하고 있었다 —
+ * 2026-09-04 alpha 실측: 본문이 "이 대회는 무료로 참가할 수 있어요" 인 화면의 진행 표시가
+ * `동의 · 결제 수단` / `다음: 결제 안내` 였다. **없을 결제를 예고하는 잘못된 안내**이고,
+ * 완료 화면에서는 제목(`결제 안내`)과 본문(`참가비가 없는 대회예요`)이 서로 모순됐다.
+ */
+function stepsFor(isFreeEntry: boolean): Array<{ id: ApplyStep; label: string }> {
+  return [
+    { id: 'team', label: '팀 선택' },
+    { id: 'agreements', label: isFreeEntry ? '참가 동의' : '동의 · 결제 수단' },
+    { id: 'payment', label: isFreeEntry ? '신청 완료' : '결제 안내' },
+  ];
+}
 
 /** 위저드로 복원 가능한 단계 (팀 선택은 registration 없이 시작하는 최초 진입점이라 제외). */
 type ResumableApplyStep = Extract<ApplyStep, 'agreements' | 'payment'>;
@@ -94,7 +104,8 @@ function resolveResumableRegistrationId(
   return action === 'agreements' || action === 'payment' ? registration.id : null;
 }
 
-function StepIndicator({ current }: { current: ApplyStep }) {
+function StepIndicator({ current, isFreeEntry }: { current: ApplyStep; isFreeEntry: boolean }) {
+  const STEPS = stepsFor(isFreeEntry);
   const currentIndex = STEPS.findIndex((s) => s.id === current);
   const currentLabel = STEPS[currentIndex]?.label ?? '';
   const nextStep = STEPS[currentIndex + 1];
@@ -1540,6 +1551,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
     ? describeTournamentRegistrationBlock(
         newRegistrationBlockReason,
         resolveTournamentCapacity(tournament),
+        tournament.entryFee === 0,
       )
     : null;
 
@@ -1907,7 +1919,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
           모바일은 globals.css 기본값이 처리, 데스크톱은 tournaments.css의
           .tm-tournament-apply-body { max-width:unset } + .tm-tournament-form-grid 가 담당 */}
       <div className="tm-tournament-apply-body">
-        <StepIndicator current={step} />
+        <StepIndicator current={step} isFreeEntry={tournament.entryFee === 0} />
 
         {/* Desktop 2-column layout via .tm-tournament-form-grid */}
         <div className="tm-tournament-form-grid">

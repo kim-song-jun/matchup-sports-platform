@@ -361,6 +361,7 @@ function ApplyCTAButtons({
     const description = describeTournamentRegistrationBlock(
       blockReason,
       resolveTournamentCapacity(tournament),
+      tournament.entryFee === 0,
     );
     return (
       <button
@@ -1157,7 +1158,9 @@ export function TournamentDetailView({
         </div>
         <div className="tm-text-caption" style={{ color: 'var(--text-caption)', marginBottom: 12 }}>
           {tournament.confirmedCount}/{tournament.teamCount}팀 확정
-          {pendingPaymentCount > 0 ? ` · 입금대기 ${pendingPaymentCount}팀` : ''}
+          {pendingPaymentCount > 0
+            ? ` · ${tournament.entryFee === 0 ? '확인대기' : '입금대기'} ${pendingPaymentCount}팀`
+            : ''}
         </div>
         <CapacityProgressBar
           confirmedCount={tournament.confirmedCount}

@@ -74,11 +74,20 @@ export function canStartTournamentRegistration(
   return resolveTournamentRegistrationBlock(tournament, now) === null;
 }
 
-/** "확정 5팀 · 입금대기 3팀 / 총 8팀" — 세 화면이 같은 낱말을 쓰게 한다. */
-export function describeTournamentCapacity(capacity: TournamentCapacity): string {
+/**
+ * "확정 5팀 · 입금대기 3팀 / 총 8팀" — 세 화면이 같은 낱말을 쓰게 한다.
+ *
+ * **무료 대회에서는 "입금대기" 가 틀린 말이다.** 낼 돈이 없으니 기다리는 것은 입금이 아니라
+ * 운영자 확인이다. 서버 필드 이름(`pendingPaymentCount`)이 그대로 화면 낱말이 돼 있었고,
+ * 2026-09-04 alpha 실측에서 참가비 0원 대회의 요약줄이 "입금대기 1팀" 으로 떴다.
+ */
+export function describeTournamentCapacity(
+  capacity: TournamentCapacity,
+  isFreeEntry = false,
+): string {
   const parts = [`확정 ${capacity.confirmedCount}팀`];
   if (capacity.pendingPaymentCount > 0) {
-    parts.push(`입금대기 ${capacity.pendingPaymentCount}팀`);
+    parts.push(`${isFreeEntry ? '확인대기' : '입금대기'} ${capacity.pendingPaymentCount}팀`);
   }
   return `${parts.join(' · ')} / 총 ${capacity.teamCount}팀`;
 }
@@ -87,10 +96,12 @@ export function describeTournamentCapacity(capacity: TournamentCapacity): string
 export function describeTournamentRegistrationBlock(
   reason: TournamentRegistrationBlockReason,
   capacity: TournamentCapacity,
+  isFreeEntry = false,
 ): string {
   if (reason === 'not_open') return '지금은 참가 신청을 받지 않아요.';
   if (reason === 'deadline_passed') return '신청이 마감돼서 새로 신청할 수 없어요.';
+  const waiting = isFreeEntry ? '확인대기' : '입금대기';
   return capacity.pendingPaymentCount > 0
-    ? `정원이 가득 찼어요 — 입금대기 ${capacity.pendingPaymentCount}팀이 자리를 잡고 있어요. (${describeTournamentCapacity(capacity)})`
-    : `정원이 가득 차서 새로 신청할 수 없어요. (${describeTournamentCapacity(capacity)})`;
+    ? `정원이 가득 찼어요 — ${waiting} ${capacity.pendingPaymentCount}팀이 자리를 잡고 있어요. (${describeTournamentCapacity(capacity, isFreeEntry)})`
+    : `정원이 가득 차서 새로 신청할 수 없어요. (${describeTournamentCapacity(capacity, isFreeEntry)})`;
 }

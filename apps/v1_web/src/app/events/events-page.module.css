@@ -83,12 +83,6 @@
 }
 
 .image,
-.fallback {
-  display: grid;
-  place-items: center;
-  color: var(--static-white);
-}
-
 .status {
   position: absolute;
   top: 14px;

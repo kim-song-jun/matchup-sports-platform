@@ -4115,6 +4115,24 @@ export function useV1AddPlayer(tournamentId: string, registrationId: string) {
   });
 }
 
+/**
+ * 등번호만 고친다 — 자격 판정(`useV1UpdatePlayer`)과 **다른 엔드포인트**다.
+ *
+ * 자격 DTO 는 `eligibilityStatus` 가 필수라 등번호만 바꾸려 해도 자격을 함께 보내야 하고,
+ * 그러면 팀장이 어드민 판정을 덮어쓸 여지가 생긴다. 축이 다른 두 값을 한 요청에 묶지 않는다.
+ */
+export function useV1UpdatePlayerJersey(tournamentId: string, registrationId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ playerId, jerseyNumber }: { playerId: string; jerseyNumber: number | null }) =>
+      v1Patch<V1TournamentPlayer>(
+        `/tournaments/${tournamentId}/registrations/${registrationId}/players/${playerId}/jersey-number`,
+        { jerseyNumber },
+      ),
+    onSuccess: () => invalidateRosterViews(queryClient, tournamentId, registrationId),
+  });
+}
+
 export function useV1UpdatePlayer(tournamentId: string, registrationId: string) {
   const queryClient = useQueryClient();
   return useMutation({

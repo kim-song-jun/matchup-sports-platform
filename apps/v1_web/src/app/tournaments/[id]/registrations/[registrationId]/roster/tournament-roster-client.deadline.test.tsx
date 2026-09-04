@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   useV1AddPlayer,
@@ -7,6 +7,7 @@ import {
   useV1Tournament,
   useV1TournamentPlayers,
   useV1UpdatePlayer,
+  useV1UpdatePlayerJersey,
 } from '@/hooks/use-v1-api';
 import {
   TournamentRosterPageClient,
@@ -24,6 +25,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1TournamentPlayers: vi.fn(),
   useV1AddPlayer: vi.fn(),
   useV1UpdatePlayer: vi.fn(),
+  useV1UpdatePlayerJersey: vi.fn(),
   useV1RemovePlayer: vi.fn(),
 }));
 
@@ -273,5 +275,66 @@ describe('parseJerseyInput', () => {
   it('세 자리는 거부한다 — 서버 상한이 99 다', () => {
     expect(parseJerseyInput('100')).toEqual({ ok: false });
     expect(parseJerseyInput('99')).toEqual({ ok: true, value: 99 });
+  });
+});
+
+/**
+ * 등번호 수정 경로. 이게 없던 동안 번호를 잘못 넣으면 **선수를 지우고 다시 넣는 수밖에**
+ * 없었고, 그 우회는 되살린 행의 자격을 `needs_review` 로 되돌린다(2026-09-04 alpha 실측).
+ */
+describe('등번호 수정', () => {
+  const updateJersey = vi.fn().mockResolvedValue({});
+  const updatePlayer = vi.fn().mockResolvedValue({});
+
+  function renderRow(jerseyNumber: number | null) {
+    updateJersey.mockClear();
+    updatePlayer.mockClear();
+    vi.mocked(useV1Tournament).mockReturnValue({
+      data: { minPlayers: 1, maxPlayers: 20, rosterDeadlineAt: null, status: 'open' },
+    } as never);
+    vi.mocked(useV1Registration).mockReturnValue({
+      data: { id: 'reg-1', teamId: 'team-1', status: 'confirmed', rosterLockedAt: null, rosterDeadlineOverrideAt: null },
+    } as never);
+    vi.mocked(useV1TournamentPlayers).mockReturnValue({
+      data: { players: [mockPlayer({ jerseyNumber })], belowMinimum: false },
+      isPending: false,
+    } as never);
+    vi.mocked(useV1AddPlayer).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    vi.mocked(useV1UpdatePlayer).mockReturnValue({ mutateAsync: updatePlayer, isPending: false } as never);
+    vi.mocked(useV1UpdatePlayerJersey).mockReturnValue({ mutateAsync: updateJersey, isPending: false } as never);
+    vi.mocked(useV1RemovePlayer).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    render(<TournamentRosterPageClient tournamentId="t1" registrationId="reg-1" />);
+    fireEvent.click(screen.getByRole('button', { name: /수정/ }));
+  }
+
+  it('번호를 고치면 등번호 경로로만 보낸다 — 자격은 건드리지 않는다', async () => {
+    renderRow(7);
+    fireEvent.change(screen.getByLabelText('등번호'), { target: { value: '10' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    await waitFor(() => expect(updateJersey).toHaveBeenCalledWith({ playerId: 'player-1', jerseyNumber: 10 }));
+    // 자격을 함께 보내면 팀장이 어드민 판정을 덮어쓸 여지가 생긴다.
+    expect(updatePlayer).not.toHaveBeenCalled();
+  });
+
+  it('비우면 번호를 지운다 — null 로 보낸다', async () => {
+    renderRow(7);
+    fireEvent.change(screen.getByLabelText('등번호'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    await waitFor(() => expect(updateJersey).toHaveBeenCalledWith({ playerId: 'player-1', jerseyNumber: null }));
+  });
+
+  it('0 으로 고칠 수 있다 — falsy 로 거르면 사라지는 값이다', async () => {
+    renderRow(7);
+    fireEvent.change(screen.getByLabelText('등번호'), { target: { value: '0' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    await waitFor(() => expect(updateJersey).toHaveBeenCalledWith({ playerId: 'player-1', jerseyNumber: 0 }));
+  });
+
+  it('숫자가 아니면 보내지 않고 오류를 보여 준다', async () => {
+    renderRow(7);
+    fireEvent.change(screen.getByLabelText('등번호'), { target: { value: 'e' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    expect(await screen.findByText('등번호는 0에서 99 사이 숫자로 입력해 주세요.')).toBeInTheDocument();
+    expect(updateJersey).not.toHaveBeenCalled();
   });
 });

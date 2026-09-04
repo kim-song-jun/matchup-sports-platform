@@ -457,6 +457,65 @@ export class TournamentPlayersService {
     return this.serializePlayer(removed);
   }
 
+  // ─── 등번호 수정 ────────────────────────────────────────────────────────────
+
+  /**
+   * 등번호만 고친다.
+   *
+   * 자격 판정(`updatePlayer`)과 **경로를 나눈 이유**: 그쪽 DTO 는 `eligibilityStatus` 가
+   * 필수라 등번호만 바꾸려 해도 자격을 함께 보내야 하고, 그러면 팀장이 어드민 판정을
+   * 덮어쓸 여지가 생긴다(그 경로에 `ELIGIBILITY_ADMIN_REVIEWED` 가드가 따로 있는 이유다).
+   * 축이 다른 두 값을 한 요청에 묶지 않는다.
+   *
+   * 이 경로가 없던 동안 등번호를 잘못 넣으면 **선수를 지우고 다시 넣는 수밖에** 없었다
+   * (2026-09-04 alpha 실측). 그 우회는 명단 잠금 전에만 되고, 되살린 행의 자격이
+   * `needs_review` 로 리셋되는 부작용까지 있다.
+   *
+   * `null` 은 번호를 **지운다**(번호 없는 선수로).
+   */
+  async updatePlayerJersey(
+    user: V1AuthUser,
+    tournamentId: string,
+    registrationId: string,
+    playerId: string,
+    jerseyNumber: number | null,
+  ) {
+    const registration = await this.loadRegistration(tournamentId, registrationId);
+    await this.assertTeamManager(registration.teamId, user.id);
+
+    // 등번호도 명단이다 — 마감·잠금 가드를 그대로 받는다. 여기만 열어 두면 잠긴 명단의
+    // 번호가 바뀌어 이미 인쇄된 명단과 어긋난다.
+    const tournament = await findTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, {
+      where: { id: tournamentId, deletedAt: null },
+      select: { rosterDeadlineAt: true, status: true },
+    });
+    if (!tournament) {
+      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
+    }
+    this.assertRosterMutable(registration, {
+      rosterDeadlineAt: tournament.rosterDeadlineAt,
+      status: tournament.status,
+    });
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await this.lockAndLoadMutableRegistration(tx, tournamentId, registrationId);
+      const player = await tx.v1TournamentPlayer.findFirst({
+        where: { id: playerId, registrationId, removedAt: null },
+      });
+      if (!player) {
+        throw new NotFoundException({ code: 'PLAYER_NOT_FOUND', message: '선수를 찾을 수 없어요.' });
+      }
+      // **자기 자신은 중복이 아니다** — 같은 번호로 다시 저장하는 것은 통과해야 한다.
+      if (jerseyNumber !== null) {
+        await assertJerseyAvailable(tx, registrationId, jerseyNumber, playerId);
+      }
+      await writeJerseyNumber(tx, playerId, jerseyNumber);
+      return player;
+    });
+
+    return this.serializePlayer(updated, jerseyNumber);
+  }
+
   // ─── 팀 명단 선수 정보 수정 ─────────────────────────────────────────────────
 
   async updatePlayer(

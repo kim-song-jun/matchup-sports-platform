@@ -313,19 +313,28 @@ describe('등번호 입력 종류', () => {
         headers: { 'content-type': 'application/json' },
       }),
     );
+    // **스텁은 unmount 까지 유지한다.** 클릭 직후 복구하면 React Query 가 뒤늦게 보내는
+    // 요청이 실제 fetch 로 새어 플래키해진다 — 그때 실패는 이 테스트가 보는 것과 무관한
+    // 이유로 난다.
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const { container } = render(
-      <QueryClientProvider client={queryClient}>
-        <TournamentRosterPageClient tournamentId="t1" registrationId="reg-1" />
-      </QueryClientProvider>,
-    );
-    fireEvent.click(screen.getByRole('button', { name: '선수 추가하기' }));
-    fetchSpy.mockRestore();
+    try {
+      const { container, unmount } = render(
+        <QueryClientProvider client={queryClient}>
+          <TournamentRosterPageClient tournamentId="t1" registrationId="reg-1" />
+        </QueryClientProvider>,
+      );
+      fireEvent.click(screen.getByRole('button', { name: '선수 추가하기' }));
 
-    const jersey = container.querySelector('input[id$="-jersey"]');
-    expect(jersey).not.toBeNull();
-    expect(jersey?.getAttribute('type')).toBe('text');
-    // 숫자 키패드는 그대로 띄운다 — 입력 편의는 잃지 않는다.
-    expect(jersey?.getAttribute('inputmode')).toBe('numeric');
+      const jersey = container.querySelector('input[id$="-jersey"]');
+      expect(jersey).not.toBeNull();
+      expect(jersey?.getAttribute('type')).toBe('text');
+      // 숫자 키패드는 그대로 띄운다 — 입력 편의는 잃지 않는다.
+      expect(jersey?.getAttribute('inputmode')).toBe('numeric');
+      unmount();
+      // 남은 구독이 스텁 복구 뒤에 살아나지 않게 캐시도 함께 접는다.
+      queryClient.clear();
+    } finally {
+      fetchSpy.mockRestore();
+    }
   });
 });

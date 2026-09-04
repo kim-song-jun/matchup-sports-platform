@@ -61,14 +61,25 @@ describe('리그 참가 신청 관리', () => {
   it('마감이 지금과 정확히 같은 순간이면 막는다 — 서버가 그 순간을 422 로 거부한다', () => {
     // 서버 조건은 `deadline <= now` 다. 화면이 `<` 를 쓰면 이 한 순간만 통과시키고
     // 서버가 거부해, 운영자는 값을 바꾸지 않았는데 실패를 본다.
-    render(<LeagueRegistrationsClient leagueId="league-1" />);
-    const now = new Date();
-    const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
-    // `datetime-local` 은 분 단위라 "지금" 을 분으로 자르면 항상 현재 분의 00초 —
-    // 즉 지금보다 이르거나 같다. 어느 쪽이든 막혀야 한다.
-    fireEvent.change(screen.getByLabelText(/신청 마감/), { target: { value: local } });
-    fireEvent.click(screen.getByRole('button', { name: /신청 열기|마감 변경/ }));
-    expect(openMutate).not.toHaveBeenCalled();
+    //
+    // **시계를 고정해야 진짜 경계를 잡는다.** `datetime-local` 은 분 단위라 "지금" 을
+    // 분으로 자르면 초가 잘려 **항상 지금보다 이르다** — 그러면 `<` 로도 막혀서 이 테스트가
+    // 부등호를 구분하지 못한다(처음에 그렇게 썼다가 변이가 red 를 안 내서 잡았다).
+    // 초·밀리초가 0 인 시각으로 고정하면 입력값과 `Date.now()` 가 **정확히 같아진다**.
+    vi.useFakeTimers();
+    try {
+      const at = new Date(2026, 8, 20, 14, 59, 0, 0); // 로컬 시각, 초·밀리초 0
+      vi.setSystemTime(at);
+      render(<LeagueRegistrationsClient leagueId="league-1" />);
+      const local = new Date(at.getTime() - at.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+      // 전제 확인: 이 입력값이 정말 "지금" 과 같은 순간이다.
+      expect(new Date(local).getTime()).toBe(Date.now());
+      fireEvent.change(screen.getByLabelText(/신청 마감/), { target: { value: local } });
+      fireEvent.click(screen.getByRole('button', { name: /신청 열기|마감 변경/ }));
+      expect(openMutate).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('미래 시각이면 ISO 로 보낸다', () => {

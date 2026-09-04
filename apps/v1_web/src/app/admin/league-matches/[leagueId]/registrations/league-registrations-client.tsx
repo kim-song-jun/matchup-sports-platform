@@ -43,8 +43,14 @@ export default function LeagueRegistrationsClient({ leagueId }: { leagueId: stri
       showToast('신청 마감 일시를 읽을 수 없어요.', 'error');
       return;
     }
-    // 지난 시각으로 열면 **여는 즉시 닫힌 리그**가 된다 — 서버가 막지 않으므로 화면에서 막는다.
-    if (at.getTime() < Date.now()) {
+    // 지난 시각으로 열면 **여는 즉시 닫힌 리그**가 된다.
+    //
+    // **서버와 같은 부등호를 쓴다(`<=`).** 서버는 `deadline <= now` 를 422
+    // `LEAGUE_REGISTRATION_DEADLINE_PAST` 로 막는다(`league-match-admin.service.ts`) —
+    // 여기서 `<` 를 쓰면 **마감이 지금과 정확히 같은 순간**에만 화면은 통과시키고 서버가
+    // 거부해, 운영자는 값을 바꾸지 않았는데 실패를 본다. (앞서 공개 판정에서 고친 것과
+    // 방향만 반대인 같은 부류다.)
+    if (at.getTime() <= Date.now()) {
       showToast('신청 마감은 지금 이후여야 해요.', 'error');
       return;
     }

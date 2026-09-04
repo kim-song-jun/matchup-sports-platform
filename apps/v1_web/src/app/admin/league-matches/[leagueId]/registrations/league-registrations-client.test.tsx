@@ -58,6 +58,19 @@ describe('리그 참가 신청 관리', () => {
     expect(openMutate).not.toHaveBeenCalled();
   });
 
+  it('마감이 지금과 정확히 같은 순간이면 막는다 — 서버가 그 순간을 422 로 거부한다', () => {
+    // 서버 조건은 `deadline <= now` 다. 화면이 `<` 를 쓰면 이 한 순간만 통과시키고
+    // 서버가 거부해, 운영자는 값을 바꾸지 않았는데 실패를 본다.
+    render(<LeagueRegistrationsClient leagueId="league-1" />);
+    const now = new Date();
+    const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+    // `datetime-local` 은 분 단위라 "지금" 을 분으로 자르면 항상 현재 분의 00초 —
+    // 즉 지금보다 이르거나 같다. 어느 쪽이든 막혀야 한다.
+    fireEvent.change(screen.getByLabelText(/신청 마감/), { target: { value: local } });
+    fireEvent.click(screen.getByRole('button', { name: /신청 열기|마감 변경/ }));
+    expect(openMutate).not.toHaveBeenCalled();
+  });
+
   it('미래 시각이면 ISO 로 보낸다', () => {
     render(<LeagueRegistrationsClient leagueId="league-1" />);
     const future = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);

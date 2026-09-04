@@ -1268,8 +1268,13 @@ export class LeagueMatchAdminService {
    *
    * ## 닫는 액션이 따로 없는 이유
    * 마감은 `registrationDeadlineAt` 이 지나면 등록 서비스가 스스로 409
-   * `REGISTRATION_DEADLINE_PASSED` 로 닫고, 대진이 짜이면 `generateFixtures` 가 거울을
-   * `in_progress` 로 옮긴다. 즉 닫히는 경로가 이미 둘이라 세 번째를 만들지 않는다.
+   * `REGISTRATION_DEADLINE_PASSED` 로 닫는다. **그게 유일한 닫는 경로다.**
+   *
+   * 예전엔 여기 "대진이 짜이면 `generateFixtures` 가 거울을 `in_progress` 로 옮겨 닫는다"
+   * 고 적혀 있었는데, 그건 **폐기된 규칙**(Task 164 BE-3, "대진 생성 = 신청 창 닫힘")이다.
+   * 정본 §6 은 2026-09-04 사용자 확정으로 **대진 생성이 신청 상태를 건드리지 않는다**고
+   * 정했다. `generateFixtures` 의 status 전이는 그대로 두되(수명주기 표시), 신청 판정이
+   * status 를 안 보므로 **그 전이가 더는 신청을 닫지 않는다.**
    */
   async openRegistration(user: V1AuthUser, leagueId: string, dto: OpenLeagueRegistrationDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
@@ -1294,11 +1299,15 @@ export class LeagueMatchAdminService {
         message: '이 리그는 아직 통합 대회 축에 올라오지 않아 신청을 열 수 없어요.',
       });
     }
-    if (league.status !== 'draft' && league.status !== 'open') {
-      // 이미 시작했거나 끝난 리그에 신청을 열면, 대진이 짜인 뒤 팀이 들어오는 상태가 된다.
+    if (league.status === 'completed' || league.status === 'cancelled') {
+      // **되돌릴 수 없는 상태만 막는다.** 예전엔 `draft`·`open` 만 허용했는데,
+      // `generateFixtures` 가 거울을 `in_progress` 로 옮기기 때문에 **대진이 하나라도 있는
+      // 리그는 신청을 영영 못 열었다**(2026-09-04 alpha 실측 409 `LEAGUE_NOT_DRAFT`).
+      // 그건 폐기된 규칙("대진 생성 = 신청 창 닫힘", Task 164 BE-3)의 잔재였다 —
+      // 정본 §6 은 **대진 생성이 신청 상태를 건드리지 않는다**고 확정했다.
       throw new ConflictException({
-        code: 'LEAGUE_NOT_DRAFT',
-        message: '아직 시작하지 않은 리그만 참가 신청을 열 수 있어요.',
+        code: 'LEAGUE_REGISTRATION_NOT_ALLOWED',
+        message: '끝났거나 취소된 리그는 참가 신청을 열 수 없어요.',
       });
     }
 
@@ -1326,7 +1335,11 @@ export class LeagueMatchAdminService {
       // 그쪽은 `count` 로 무엇을 알리지 않아 같은 거짓말이 생기지 않는다. 이 PR 에서는
       // 새로 만든 이 자리만 고친다.
       where: { id: leagueId, kind: 'regular_league', deletedAt: null },
-      data: { status: 'open', registrationDeadlineAt: deadline },
+      // **`status` 는 건드리지 않는다.** 신청 여부의 판정자는 `registrationDeadlineAt`
+      // 하나이고(`isLeagueRegistrationOpen`), `status` 는 수명주기 표시 전용이 됐다.
+      // 여기서 `open` 으로 올리면 `LEAGUE_STATE_BY_STATUS`(open→draft) 때문에 **대진이 있는
+      // 리그가 "초안" 으로 표시**된다.
+      data: { registrationDeadlineAt: deadline },
     });
     if (opened.count === 0) {
       throw new ConflictException({
@@ -1340,8 +1353,9 @@ export class LeagueMatchAdminService {
       targetType: 'league_match',
       targetId: leagueId,
       reason: null,
-      fromStatus: 'draft',
-      toStatus: 'open',
+      // status 를 바꾸지 않으므로 상태 전이가 아니다 — 두 값을 비워 마감 설정임을 남긴다.
+      fromStatus: undefined,
+      toStatus: undefined,
     });
 
     return { leagueId, status: 'open' as const, registrationDeadlineAt: deadline.toISOString() };

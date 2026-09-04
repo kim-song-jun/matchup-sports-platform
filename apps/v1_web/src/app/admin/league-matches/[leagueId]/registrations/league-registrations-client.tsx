@@ -92,18 +92,15 @@ export default function LeagueRegistrationsClient({ leagueId }: { leagueId: stri
             <span className="tm-badge tm-badge-grey">신청 안 받는 중</span>
           )}
         </div>
-        {/* **마감 유무와 "받는 중인지" 는 다른 축이다.** 계약상 `registrationDeadlineAt === null`
-            은 "기한 없이 열림" 이지 "안 받음" 이 아니다 — 받는지 여부의 진실 소스는 서버가
-            판정해 내려주는 `registrationOpen` 이다(이 PR 에서 그렇게 정했다). 마감 유무로
-            받는지를 추론하면 기한 없이 열린 리그가 "안 받는 중" 으로 보인다. */}
+        {/* **판정자는 마감 하나다**(2026-09-04 사용자 확정). `status` 는 수명주기 표시
+            전용이 됐고, 정본 §6 이 대가를 명시한다 — "안 정하면(`null`) 그 리그는 신청을
+            안 받는다". 그래서 "기한 없이 열림" 상태는 없다. */}
         <p className="mb-3 text-xs text-[var(--text-muted)]">
-          {registrationOpen
-            ? registrationDeadlineAt === null
-              ? '기한 없이 신청을 받는 중이에요. 마감을 정하면 그때까지만 받아요.'
-              : `${formatTournamentDateTimeShort(registrationDeadlineAt) ?? registrationDeadlineAt}까지 신청을 받아요.`
+          {registrationOpen && registrationDeadlineAt !== null
+            ? `${formatTournamentDateTimeShort(registrationDeadlineAt) ?? registrationDeadlineAt}까지 신청을 받아요.`
             : registrationDeadlineAt === null
-              ? '아직 신청을 받지 않아요. 마감을 정하면 팀장 화면에 신청 입구가 보여요.'
-              : `신청을 받지 않아요. 마지막 마감은 ${formatTournamentDateTimeShort(registrationDeadlineAt) ?? registrationDeadlineAt} 였어요.`}
+              ? '마감을 정해야 신청을 받아요. 정하기 전에는 팀장 화면에 신청 입구가 보이지 않아요.'
+              : `신청이 마감됐어요. 마감은 ${formatTournamentDateTimeShort(registrationDeadlineAt) ?? registrationDeadlineAt} 였어요.`}
         </p>
         <div className="flex flex-wrap items-end gap-2">
           <label className="text-xs text-[var(--text-muted)]" htmlFor="league-registration-deadline">

@@ -1250,10 +1250,12 @@ describe('참가 신청 요약 카드', () => {
     );
   }
 
-  it('열려 있고 마감이 없으면 "모집 중" 이고, 마감을 정하라고 말하지 않는다', async () => {
-    renderWith(true, null);
+  it('마감이 있고 열려 있으면 언제까지 받는지 말한다', async () => {
+    // 2026-09-04 사용자 확정 이후 판정자는 마감 하나다 — "열려 있는데 마감이 없는" 상태는
+    // 더는 성립하지 않는다(정본 §6: 안 정하면 안 받는다). 앞선 PR 에서 내가 반대로 적었다.
+    renderWith(true, '2026-09-30T02:00:00.000Z');
     expect(await screen.findByText('모집 중')).toBeInTheDocument();
-    expect(screen.getByText('기한 없이 신청을 받는 중이에요.')).toBeInTheDocument();
+    expect(screen.getByText(/까지 신청을 받아요\./)).toBeInTheDocument();
     expect(screen.queryByText(/신청 마감을 정하면/)).not.toBeInTheDocument();
   });
 

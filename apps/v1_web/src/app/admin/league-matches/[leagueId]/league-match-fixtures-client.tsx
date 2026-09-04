@@ -1483,16 +1483,17 @@ function LeagueRegistrationSummary({
           <span className="tm-badge tm-badge-grey">신청 안 받는 중</span>
         )}
       </div>
-      {/* **받는지는 `registrationOpen`, 마감 유무는 부가 문구다.** 마감이 `null` 인 것은
-          계약상 "기한 없이 열림" 이지 "안 받음" 이 아니다 — 마감 유무로 받는지를 추론하면
-          이미 모집 중인 리그에 "마감을 정하면 신청할 수 있어요" 라고 반대로 말한다.
-          같은 실수가 신청 관리 화면에도 있었다(#1028 리뷰 2회). 판정 축을 통일한다. */}
+      {/* **받는지는 `registrationOpen`, 마감 유무는 그 이유다.**
+          2026-09-04 사용자 확정으로 리그의 신청 판정자는 `registrationDeadlineAt` 하나가
+          됐다(`status` 는 수명주기 표시 전용). 정본 §6 이 그 대가를 명시한다 —
+          **"안 정하면(`null`) 그 리그는 신청을 안 받는다."** 그래서 "기한 없이 열림" 이라는
+          상태는 이제 없다(앞선 PR 에서 내가 반대로 적었던 것을 정본대로 되돌린다). */}
       <p className="mb-3 text-xs text-[var(--text-muted)]">
-        {registrationOpen
-          ? registrationDeadlineAt === null
-            ? '기한 없이 신청을 받는 중이에요.'
-            : `${formatTournamentDateTimeShort(registrationDeadlineAt) ?? registrationDeadlineAt}까지 신청을 받아요.`
-          : '신청 마감을 정하면 팀장이 리그 화면에서 바로 신청할 수 있어요.'}
+        {registrationOpen && registrationDeadlineAt !== null
+          ? `${formatTournamentDateTimeShort(registrationDeadlineAt) ?? registrationDeadlineAt}까지 신청을 받아요.`
+          : registrationDeadlineAt === null
+            ? '신청 마감을 정하면 팀장이 리그 화면에서 바로 신청할 수 있어요.'
+            : `신청이 마감됐어요. 마감은 ${formatTournamentDateTimeShort(registrationDeadlineAt) ?? registrationDeadlineAt} 였어요.`}
       </p>
       <Link
         href={`/admin/league-matches/${leagueId}/registrations`}

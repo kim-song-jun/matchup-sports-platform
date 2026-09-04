@@ -7,9 +7,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { Card, EmptyState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
-import { ChevronLeftIcon, ChevronRightIcon, FilterIcon, HomeIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
+import { ChevronLeftIcon, ChevronRightIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
-import { NotificationBellButton } from '@/components/v1-ui/notification-bell';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { CreateField, FieldErrorText, GenderRuleSelector, MissingFieldsBanner, MultiPresetChipSelector, PresetChipSelector, RecentVenueChips } from '@/components/v1-ui/create-form-fields';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
@@ -349,17 +348,12 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
                   <ChevronLeftIcon size={22} strokeWidth={2.2} />
                 </Link>
                 <div style={{ display: 'flex', gap: 4 }}>
-                  {/* 이 화면은 topBar·bottomNav 를 모두 끄고 히어로를 쓰므로 AppChrome 의
-                      홈 단축 버튼이 렌더되지 않는다. 히어로 액션에 직접 홈 경로를 둔다. */}
-                  <Link className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" href="/home" aria-label="홈으로"><HomeIcon size={20} strokeWidth={2} /></Link>
                   <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="공유" onClick={() => runHeroAction(model.onShare, '링크를 복사했어요')}><ShareIcon size={20} /></button>
-                  <NotificationBellButton className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" ariaLabel="알림" onClick={model.onNotify} />
                 </div>
               </div>
-              {/* Desktop-only share + notify actions inside hero */}
+              {/* Desktop-only share action inside hero */}
               <div className="tm-team-match-hero-actions tm-show-desktop">
                 <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="공유" onClick={() => runHeroAction(model.onShare, '링크를 복사했어요')}><ShareIcon size={20} /></button>
-                <NotificationBellButton className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" ariaLabel="알림" onClick={model.onNotify} />
               </div>
               <div className="tm-team-vs-row">
                 <div>
@@ -1390,6 +1384,6 @@ function prevHref(step: TeamMatchCreateViewModel['step']) {
 function trustStateLabel(trustState: string): string | null {
   if (trustState === 'verified') return '인증팀';
   if (trustState === 'estimated') return '누적 중';
-  if (trustState === 'sample') return '샘플';
+  if (trustState === 'sample') return null;
   return null;
 }

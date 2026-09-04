@@ -294,7 +294,6 @@ export function MatchDetailPageClient({ matchId, seed }: { matchId: string; seed
         )
       : undefined,
     onShare: () => shareMatch(query.data),
-    onNotify: () => router.push('/notifications'),
     onApply: seeding ? undefined : getApplyAction({
       viewerState,
       eligible: eligibility.data?.eligible,

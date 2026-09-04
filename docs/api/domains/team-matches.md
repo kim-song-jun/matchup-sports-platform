@@ -28,16 +28,17 @@ Query:
 | `query` | string | No | title/description/place/team 검색 |
 | `genderRule` | string | No | `성별 무관`, `남`, `여` |
 | `levelCodes` | comma string | No | `beginner,novice,intermediate,advanced` 중 다중 선택 |
-| `status` | string | No | 단일 status 또는 comma-separated status list |
+| `status` | recruiting/closed/matched/cancelled/completed/expired | No | 기본 recruiting |
 | `teamId` | uuid | No | host 또는 applicant team 기준 |
-| `sort` | recommended/deadline/latest | No | 기본 recommended |
+| `sort` | recommended/latest/starts_at/deadline | No | 기본 latest |
 | `cursor` | string | No | cursor pagination |
-| `limit` | int(1~100) | No | default 20 |
+| `limit` | int(1~50) | No | default 20 |
 
 Rules:
 
 - `status`를 생략하면 기본값은 `recruiting`
-- `status=scheduled,completed,cancelled`처럼 다중 조회 가능
+- 기본 목록은 `createdAt DESC, id DESC` 최신 생성순이다. 명시적인 `recommended`/`deadline`/`starts_at`은 경기 시작 임박순으로 처리한다.
+- 기본 모집 목록은 경기 시작 전이고, 신청 마감이 없거나 아직 지나지 않은 raw `recruiting` 항목만 포함한다. raw status가 `recruiting`이어도 상세 조회 시 신청 마감이 지났다면 `displayState=closed`다.
 - `teamId`는 `hostTeamId = teamId` 또는 `applications.some(applicantTeamId = teamId)` 둘 중 하나를 만족하면 포함
 - Level response fields: `levelLabel`, `minLevel`, `maxLevel`
 - List and detail responses include `hostTeam.mannerScore` and `hostTeam.wins`.

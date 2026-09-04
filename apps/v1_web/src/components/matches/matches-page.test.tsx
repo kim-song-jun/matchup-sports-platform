@@ -58,6 +58,16 @@ describe('MatchDetailPageView — approved mode (실제 참가 확정자)', () =
   });
 });
 
+describe('MatchDetailPageView — 히어로 액션', () => {
+  it('이미지 우측 상단에는 공유만 노출한다', () => {
+    render(<MatchDetailPageView model={getMatchDetailViewModel('default')} />);
+
+    expect(screen.getAllByRole('button', { name: '공유' }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('link', { name: '홈으로' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '알림 목록' })).not.toBeInTheDocument();
+  });
+});
+
 describe('MatchDetailPageView — host management actions', () => {
   it('매치 수정과 신청자 관리를 서로 다른 실제 경로로 제공한다', () => {
     const model = getMatchDetailViewModel('mine');

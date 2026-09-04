@@ -368,7 +368,6 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
         }
       : undefined,
     onShare: () => shareTeamMatch(query.data),
-    onNotify: () => router.push('/notifications'),
     lineupHref: ownTeamId ? `/team-matches/${teamMatchId}/lineup` : undefined,
     onApply: seeding ? undefined : getApplyAction({
       viewerState,

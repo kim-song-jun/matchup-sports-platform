@@ -3519,6 +3519,12 @@ export type V1AdminTournamentRegistrationWithIdempotent =
 /** Serialized by TournamentPlayersService.serializePlayer */
 export type V1TournamentPlayer = {
   id: string;
+  /**
+   * 등번호(정본 §3 "명단은 등번호와 이름"). **선택 입력**이라 `null` 일 수 있고,
+   * `0` 은 유효한 값이다 — falsy 검사로 거르면 0번을 단 선수가 사라진다.
+   * 유일성은 **등록(팀) 단위**이므로 같은 대회의 다른 팀에 같은 번호가 있을 수 있다.
+   */
+  jerseyNumber: number | null;
   userId: string;
   realName: string;
   birthDateSnapshot: string | null;
@@ -3943,6 +3949,8 @@ export type V1AddPlayerPayload = {
   realName: string;
   birthDate?: string;
   eligibilityStatus?: V1PlayerEligibilityStatus;
+  /** 등번호(선택). 정수 0~99. 미전송이면 번호 없는 선수다. */
+  jerseyNumber?: number;
 };
 
 export type V1UpdatePlayerEligibilityPayload = {

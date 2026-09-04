@@ -62,14 +62,13 @@ export type MyMatch = {
 
 export type MyMatchesViewModel = {
   mode: 'joined' | 'created';
-  title: string;
   summary: Array<{ label: string; value: number; unit: string }>;
   matches: MyMatch[];
-  apiNotice?: {
-    title: string;
-    body: string;
-    tone: 'info' | 'warning';
-  };
+  /** 조회 중. 스켈레톤을 그리고 빈 상태는 띄우지 않는다. */
+  loading: boolean;
+  /** 조회 실패. ErrorState + 재시도를 그린다(예전엔 알림 카드뿐이라 다시 부를 길이 없었다). */
+  error: boolean;
+  onRetry: () => void;
 };
 
 export type MyTeamRole = 'owner' | 'manager' | 'admin' | 'member';
@@ -95,26 +94,7 @@ export type MyTeamsViewModel = {
   summary: Array<{ label: string; value: number | string; unit?: string }>;
 };
 
-export type MyMember = {
-  /** membershipId(멤버) 또는 applicationId(가입 요청) — React list key에 사용 */
-  id: string;
-  name: string;
-  role: string;
-  meta: string;
-  status: string;
-  actions?: Array<{ label: string; tone?: 'danger'; onSelect: () => void }>;
-  actionPending?: boolean;
-  locked?: boolean;
-};
 
-export type MyTeamMembersViewModel = {
-  teamName: string;
-  activeTab: 'members' | 'requests';
-  tabs: Array<{ key: 'members' | 'requests'; label: string; count: number; onSelect: () => void }>;
-  summary: Array<{ label: string; value: number; unit: string }>;
-  members: MyMember[];
-  requests: MyMember[];
-};
 
 export type ProfileEditViewModel = {
   user: MyUser;

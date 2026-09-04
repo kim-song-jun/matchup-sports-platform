@@ -585,3 +585,84 @@
     margin-left: 0;
   }
 }
+
+/* ─── /my/leagues — 형제 마이 화면과 같은 카드 리듬 (2026-09-04 웨이브6) ─────────────
+ * 이 화면만 raw Tailwind 로 짜여 있어 카드·간격·타이포가 다른 마이 화면과 어긋났다.
+ * 모든 뷰포트에 적용되는 기본 규칙이라 미디어 쿼리 밖에 둔다.
+ */
+.tm-my-league-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.tm-my-league-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.tm-my-league-title-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.tm-my-league-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.tm-my-league-sport {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tm-my-league-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-circle);
+}
+
+.tm-my-league-teams {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  padding: 12px 16px;
+}
+
+.tm-my-league-team-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.tm-my-league-next {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: var(--size-touch-min);
+  padding: 0 8px;
+  border-radius: var(--radius-chip);
+  color: var(--blue700);
+  font-size: var(--font-size-label);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* 문의 목록 상단 — 셸이 제목을 그리므로 본문은 설명 한 줄 + 보조 CTA 만 둔다(2026-09-04 웨이브6). */
+.tm-my-inquiries-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}

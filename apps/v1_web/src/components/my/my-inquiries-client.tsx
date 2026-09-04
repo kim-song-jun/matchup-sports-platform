@@ -82,17 +82,22 @@ export function MyInquiriesListClient() {
   return (
     <div className="tm-my-shell tm-content-enter">
       <div className="tm-my-settings-desktop">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-          <div>
-            <div className="tm-text-heading">{t.myInquiries}</div>
-            <div className="tm-text-caption" style={{ marginTop: 4 }}>{t.listSub}</div>
-          </div>
-          <Link className="tm-btn tm-btn-sm tm-btn-primary" href="/my/inquiries/new">{t.inquiryNew}</Link>
+        {/* 데스크톱 셸이 이미 "문의" 제목을 그린다 — 본문에 또 heading 을 두면 h1 이 두 벌이었다.
+            문의하기 CTA 는 목록이 있을 때만 보조로 두고, 비어 있을 때는 빈 상태가 그 행동을 맡는다(§14). */}
+        <div className="tm-my-inquiries-head">
+          <p className="tm-text-caption">{t.listSub}</p>
+          {items.length > 0 ? (
+            <Link className="tm-btn tm-btn-sm tm-btn-outline" href="/my/inquiries/new">{t.inquiryNew}</Link>
+          ) : null}
         </div>
         {items.length === 0 ? (
           <EmptyState
+            fill
+            illustration={{ name: 'chat-empty' }}
             title={t.emptyTitle}
             sub={t.emptySub}
+            cta={t.inquiryNew}
+            ctaHref="/my/inquiries/new"
           />
         ) : (
           <Card pad={0}>

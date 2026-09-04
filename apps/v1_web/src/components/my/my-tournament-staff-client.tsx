@@ -36,6 +36,8 @@ export function MyTournamentStaffPageClient() {
       <div className="tm-my-settings-desktop">
         {!query.isLoading && groups.length === 0 ? (
           <EmptyState
+            fill
+            illustration={{ name: 'journey-done' }}
             title="담당 중인 대회가 없어요"
             sub="배정이 만료되었거나 해제됐어요. 대회 운영진으로 새로 배정되면 다시 여기에 표시돼요."
           />

@@ -1,10 +1,11 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
 import { formatTournamentDateShort } from '@/lib/date-utils';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
+import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { useV1AuthMe, useV1PublicProfile } from '@/hooks/use-v1-api';
-import { cssUrl } from '@/lib/assets';
 import { PlayerCard } from './player-card';
 import { ShieldCheck, TrendingUp, Activity, Star, AlertCircle, ChevronRight } from 'lucide-react';
 import type { TrustState } from '@/types/api';
@@ -51,13 +52,8 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
   const authMe = useV1AuthMe({ retry: false });
 
   if (profile.isLoading) {
-    return (
-      <div className="tm-my-shell" aria-busy="true" aria-label="프로필 불러오는 중">
-        <div className="tm-review-skeleton" style={{ minHeight: 156, borderRadius: 'var(--radius-container)' }} />
-        <div className="tm-review-skeleton" style={{ minHeight: 112, borderRadius: 'var(--radius-container)', marginTop: 12 }} />
-        <div className="tm-review-skeleton" style={{ minHeight: 112, borderRadius: 'var(--radius-container)', marginTop: 12 }} />
-      </div>
-    );
+    // 다른 상세 화면과 같은 공용 스켈레톤 — 이 화면만 자체 div 세 개를 쌓고 있었다(2026-09-04 감사).
+    return <PageSkeleton variant="detail" />;
   }
 
   if (profile.isError || !profile.data) {
@@ -73,7 +69,6 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
   const data = profile.data;
   const { reputation, activitySummary } = data;
   const initials = Array.from(data.displayName || data.nickname || '?')[0] ?? '?';
-  const avatarStyle = data.profileImageUrl ? { backgroundImage: cssUrl(data.profileImageUrl) } : undefined;
   const trust = trustConfig(reputation.trustState);
   const mannerDisplay = reputation.mannerScore !== null
     ? reputation.mannerScore.toFixed(1)
@@ -102,7 +97,7 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
         />
     ) : (
       <section className="tm-my-profile-head" aria-label="사용자 정보">
-        <div className="tm-my-avatar" style={avatarStyle}>{data.profileImageUrl ? null : initials}</div>
+        <ProfileAvatar imageUrl={data.profileImageUrl} initials={initials} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <h1 className="tm-text-heading" style={{ margin: 0 }}>{data.displayName}</h1>
           {data.nickname ? (
@@ -308,6 +303,25 @@ function StatItem({ label, value, unit }: { readonly label: string; readonly val
         {value}
       </span>
       <span className="tm-text-caption">{label}</span>
+    </div>
+  );
+}
+
+/**
+ * 프로필 사진은 배경 이미지로만 깔려 있어서 URL 이 깨지면 이니셜도 없이 빈 원이 남았다
+ * (2026-09-04 감사). 실제 <img> 로 그려 onError 때 이니셜로 되돌린다.
+ */
+function ProfileAvatar({ imageUrl, initials }: { imageUrl?: string | null; initials: string }) {
+  const [failed, setFailed] = useState(false);
+  const showImage = Boolean(imageUrl) && !failed;
+  return (
+    <div className="tm-my-avatar">
+      {showImage ? (
+        // eslint-disable-next-line @next/next/no-img-element -- 업로드 원본 URL 이 외부 호스트일 수 있어 최적화 로더를 태우지 않는다.
+        <img src={imageUrl ?? ''} alt="" aria-hidden="true" onError={() => setFailed(true)} />
+      ) : (
+        initials
+      )}
     </div>
   );
 }

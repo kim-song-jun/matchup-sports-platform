@@ -36,6 +36,7 @@ export const MISC_ROUTES: RouteChromeEntry[] = [
   // (app-shell-promotion.md §1.9 "fetch된 제목" 패턴).
   {
     pattern: '/users/:id/records',
-    chrome: { title: '활동 기록', activeTab: 'teams', backHref: (p) => `/users/${p.id}`, desktopHead: true },
+    // /users/:id · /card 와 같이 하단 내비를 숨긴다 — 이 항목만 남아 있었다(2026-09-04 감사).
+    chrome: { title: '활동 기록', activeTab: 'teams', bottomNav: false, backHref: (p) => `/users/${p.id}`, desktopHead: true },
   },
 ];

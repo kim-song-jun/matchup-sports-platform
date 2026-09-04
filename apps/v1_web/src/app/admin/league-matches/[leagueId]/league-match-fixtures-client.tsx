@@ -27,6 +27,8 @@ import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { LeagueManualFixtureModal } from './league-manual-fixture-modal';
 import { extractErrorMessage } from '@/lib/error-message';
 import { expandWeeklyFixtureDates } from '@/lib/league-fixture-dates';
+import { toKstDateString } from '@/lib/kst-calendar';
+import { LeagueFixtureDatePicker } from './league-fixture-date-picker';
 import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
 import { fromDatetimeLocalValue, toDatetimeLocalValue } from '@/components/team-schedules/team-schedules.view-model';
 import { RecentVenueChips } from '@/components/v1-ui/create-form-fields';
@@ -103,6 +105,8 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
   const forfeitAwayTeam = useV1AdminTeam(forfeitFixture?.awayTeamId ?? '');
   const [weeksCount, setWeeksCount] = useState(7);
   const [dayOfWeek, setDayOfWeek] = useState<number | ''>('');
+  // **날짜 목록이 정본이다.** 요일은 그것을 채우는 편의일 뿐 — 서버는 요일을 모른다.
+  const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [time, setTime] = useState('18:00');
   const [placeName, setPlaceName] = useState('');
   // 대진 timing(2026-08-25 사용자 확정: C안 시간창 역산 + B안 계산기·타임라인). 기존 필드처럼
@@ -223,19 +227,27 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
   // 바꾸지 않았는데 갑자기 실패한다. `buildFixtureFormPayload` 는 생성·재생성·미리보기
   // 세 호출이 공유하므로 여기 한 곳만 옮기면 셋 다 클릭 시점 값을 쓴다.
   const buildFixtureFormPayload = (): V1GenerateLeagueFixturesPayload => {
+    // **고른 날짜가 있으면 그것을 보낸다.** 달력이 정본이고, 요일 전개는 그 목록을 채우는
+    // 수단이다. 둘 다 있을 때 요일을 다시 전개하면 운영자가 지운 날짜가 되살아난다.
     const dates =
-      !hasLeagueStartsOn || dayOfWeek === '' || time.trim() === ''
-        ? []
-        : expandWeeklyFixtureDates({
-            startsOn: series.startsOn,
-            dayOfWeek,
-            time,
-            weeksCount,
-            now: new Date(),
-          });
+      selectedDates.length > 0
+        ? selectedDates
+        : !hasLeagueStartsOn || dayOfWeek === '' || time.trim() === ''
+          ? []
+          : expandWeeklyFixtureDates({
+              startsOn: series.startsOn,
+              dayOfWeek,
+              time,
+              weeksCount,
+              now: new Date(),
+            });
     return {
       weeksCount,
-      ...(dates.length === 0 ? {} : { schedule: { dates, time } }),
+      // **시각이 비면 `schedule` 을 싣지 않는다.** 요일 경로는 위에서 `time` 이 비면
+      // `dates` 를 빈 배열로 만들어 자연히 빠졌는데, 달력 경로는 `dates` 가 채워져 있어
+      // **빈 `time` 이 그대로 나갔다** — 서버가 `time은 HH:mm 형식이어야 해요` 로 거부한다.
+      // 실을지 말지는 두 값이 **함께** 갖춰졌을 때만이다(서버 DTO 가 둘을 한 객체로 받는다).
+      ...(dates.length === 0 || time.trim() === '' ? {} : { schedule: { dates, time: time.trim() } }),
       ...(placeName.trim() === '' ? {} : { placeName: placeName.trim() }),
       ...(durationValue === null
         ? {}
@@ -280,6 +292,10 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
   const onGenerate = async () => {
     // 요일은 골랐는데 time input(type="time")을 비워 지운 상태로 제출하면 서버가 형식
     // 오류로 400을 내려 사용자는 이유를 모른 채 막힌다 — 제출 전에 여기서 먼저 알려준다.
+    if (selectedDates.length > 0 && time.trim() === '') {
+      showToast('날짜를 골랐으면 시각도 입력해 주세요.', 'error');
+      return false;
+    }
     if (dayOfWeek !== '' && time.trim() === '') {
       showToast('요일을 골랐으면 시각도 입력해 주세요.', 'error');
       return;
@@ -298,6 +314,10 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
   // 그대로 둔다 — generateFixtures가 던지는 것과 같은 검증 오류를 미리 보여주는 것도
   // 미리보기의 역할이라, 여기서도 같은 방식으로 토스트한다.
   const onPreview = async () => {
+    if (selectedDates.length > 0 && time.trim() === '') {
+      showToast('날짜를 골랐으면 시각도 입력해 주세요.', 'error');
+      return false;
+    }
     if (dayOfWeek !== '' && time.trim() === '') {
       showToast('요일을 골랐으면 시각도 입력해 주세요.', 'error');
       return;
@@ -474,6 +494,10 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
 
   // R13: 재생성은 리그의 대진 전체를 교체하는 조작이라 typedChallenge로 이중 확인을 받는다.
   const onConfirmRegenerate = (reason: string) => {
+    if (selectedDates.length > 0 && time.trim() === '') {
+      showToast('날짜를 골랐으면 시각도 입력해 주세요.', 'error');
+      return false;
+    }
     if (dayOfWeek !== '' && time.trim() === '') {
       showToast('요일을 골랐으면 시각도 입력해 주세요.', 'error');
       return;
@@ -623,8 +647,44 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                 type="time"
                 value={time}
                 onChange={(e) => setTime(e.target.value)}
-                disabled={dayOfWeek === ''}
+                // **달력으로 날짜를 골랐으면 요일이 없어도 시각을 넣을 수 있어야 한다.**
+                // 예전엔 요일 전용 입력이라 `dayOfWeek === ''` 이면 잠갔는데, 달력 경로에서는
+                // 그러면 날짜는 있는데 시각을 넣을 방법이 없어 **영영 제출할 수 없다.**
+                disabled={dayOfWeek === '' && selectedDates.length === 0}
                 className={`${inputClass} w-36 disabled:opacity-50`}
+              />
+            </div>
+            <div className="w-full">
+              <p className="mb-1 block text-sm font-medium text-[var(--text-strong)]">경기 날짜</p>
+              {/* **날짜 목록이 서버로 나가는 값이다.** 위 요일·시각은 이 목록을 한 번에
+                  채우는 편의이고, 채운 뒤에는 개별 날짜를 지우거나 더할 수 있다 —
+                  명절·구장 사정으로 한 주를 건너뛰는 것이 그래야 표현된다. */}
+              <LeagueFixtureDatePicker
+                selectedDates={selectedDates}
+                onChange={setSelectedDates}
+                requiredCount={weeksCount}
+                // KST 변환은 `toKstDateString` 한 곳에만 둔다 — 여기서 `+9시간` 을 다시
+                // 적으면 이 PR 이 단일화한 규칙이 그 자리에서 갈린다(Copilot 지적).
+                today={toKstDateString(new Date())}
+                onFillByWeekday={
+                  hasLeagueStartsOn && dayOfWeek !== '' && time.trim() !== ''
+                    ? () =>
+                        setSelectedDates(
+                          expandWeeklyFixtureDates({
+                            startsOn: series.startsOn,
+                            dayOfWeek,
+                            time,
+                            weeksCount,
+                            now: new Date(),
+                          }),
+                        )
+                    : null
+                }
+                fillDisabledReason={
+                  !hasLeagueStartsOn
+                    ? '리그 시작일이 없어 요일로 채울 수 없어요.'
+                    : '요일과 시각을 고르면 한 번에 채울 수 있어요.'
+                }
               />
             </div>
             <FixtureTimingFields

@@ -23,9 +23,7 @@
  * 서버와 같은 관례로 오프셋을 명시적으로 더하고 뺀다.
  */
 
-/** KST(+09:00). 이 저장소의 리그 일정은 전부 이 기준이다. */
-const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
-const DAY_MS = 24 * 60 * 60 * 1000;
+import { DAY_MS, KST_OFFSET_MS, toKstDateString } from './kst-calendar';
 
 export interface ExpandWeeklyFixtureDatesInput {
   /** 리그 시작일. `'YYYY-MM-DD'` 또는 ISO 인스턴트 문자열. */
@@ -38,11 +36,6 @@ export interface ExpandWeeklyFixtureDatesInput {
   readonly weeksCount: number;
   /** 지금. 테스트가 고정할 수 있게 주입받는다. */
   readonly now: Date;
-}
-
-/** KST 달력 기준 `'YYYY-MM-DD'` 로 만든다. */
-function toKstDateString(instant: Date): string {
-  return new Date(instant.getTime() + KST_OFFSET_MS).toISOString().slice(0, 10);
 }
 
 /** `'YYYY-MM-DD'` + `'HH:mm'`(KST 벽시계)를 UTC 인스턴트로. 서버와 같은 조립 방식이다. */

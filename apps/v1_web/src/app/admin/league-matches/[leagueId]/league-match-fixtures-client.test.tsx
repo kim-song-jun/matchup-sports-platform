@@ -1224,6 +1224,136 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
 });
 
 /**
+ * 달력이 **정본**이다. 요일 전개는 그 목록을 채우는 편의일 뿐이라, 달력에서 고른 날짜가
+ * 그대로 나가지 않으면 운영자가 지운 주가 되살아난다(사용자 A안의 요지).
+ */
+describe('대진 날짜 — 달력에서 고른 값이 그대로 나간다', () => {
+  it('날짜만 고르고 시각이 비면 요청을 보내지 않는다 — 빈 time 은 서버가 형식으로 거부한다', async () => {
+    // 요일 경로는 `time` 이 비면 `dates` 가 빈 배열이 돼 자연히 빠졌는데, 달력 경로는
+    // `dates` 가 채워져 있어 **빈 `time` 이 그대로 나갔다.**
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1AdminLeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', title: '가을 풋살 리그', startsOn: '2026-09-01T00:00:00.000Z',
+        state: 'draft', teamIds: ['t1', 't2'], fixtures: [],
+      },
+      isPending: false,
+    } as never);
+    const mutateAsync = vi.fn();
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync, isPending: false } as never);
+    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    // **시각 기본값은 `'18:00'` 이라 그냥 두면 재현되지 않는다** — 운영자가 시각을 지운
+    // 상태를 만들어야 한다(요일을 "시작일 그대로" 로 되돌린 뒤 시각을 비우는 흐름).
+    fireEvent.click(await screen.findByLabelText('2026-09-12'));
+    fireEvent.change(screen.getByLabelText('시작 시각'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+
+    // 요청이 안 나가는 것이 이 테스트의 계약이다. 토스트 문구는 그 다음이다.
+    await waitFor(() => expect(mutateAsync).not.toHaveBeenCalled());
+    expect(await screen.findByText('날짜를 골랐으면 시각도 입력해 주세요.')).toBeInTheDocument();
+  });
+
+  it('달력으로 날짜를 골랐으면 요일이 없어도 시각을 넣을 수 있다', async () => {
+    // 시각 입력이 요일에만 묶여 있으면, 달력만 쓴 운영자는 날짜는 있는데 시각을 넣을
+    // 방법이 없어 **영영 제출할 수 없다.**
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1AdminLeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', title: '가을 풋살 리그', startsOn: '2026-09-01T00:00:00.000Z',
+        state: 'draft', teamIds: ['t1', 't2'], fixtures: [],
+      },
+      isPending: false,
+    } as never);
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    expect(screen.getByLabelText('시작 시각')).toBeDisabled();
+    fireEvent.click(await screen.findByLabelText('2026-09-12'));
+    expect(screen.getByLabelText('시작 시각')).not.toBeDisabled();
+  });
+
+  it('요일을 골랐다 지운 뒤 "시작일 그대로" 로 되돌려도 빈 시각은 안 나간다', async () => {
+    // 리뷰가 지목한 **정확한 경로**다: 요일을 골라 시각을 지운 다음 요일을 되돌리면
+    // `dayOfWeek === ''` 가 되므로 **요일 기준 가드는 안 탄다.** 날짜는 달력에 남아 있어
+    // `schedule` 이 실릴 조건은 갖춰진다 — 가드가 `selectedDates` 기준이어야 하는 이유다.
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1AdminLeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', title: '가을 풋살 리그', startsOn: '2026-09-01T00:00:00.000Z',
+        state: 'draft', teamIds: ['t1', 't2'], fixtures: [],
+      },
+      isPending: false,
+    } as never);
+    const mutateAsync = vi.fn();
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync, isPending: false } as never);
+    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    // ① 요일을 고른다 → ② 시각을 지운다 → ③ 요일을 "시작일 그대로" 로 되돌린다
+    fireEvent.change(screen.getByLabelText('요일'), { target: { value: '6' } });
+    fireEvent.change(screen.getByLabelText('시작 시각'), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText('요일'), { target: { value: '' } });
+    // ④ 달력에서 날짜를 고른다 → ⑤ 제출
+    fireEvent.click(await screen.findByLabelText('2026-09-12'));
+    fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+
+    await waitFor(() => expect(mutateAsync).not.toHaveBeenCalled());
+  });
+
+  it('달력에서 고른 날짜를 schedule.dates 로 보낸다', async () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1AdminLeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', title: '가을 풋살 리그', startsOn: '2026-09-01T00:00:00.000Z',
+        state: 'draft', teamIds: ['t1', 't2'], fixtures: [],
+      },
+      isPending: false,
+    } as never);
+    const mutateAsync = vi.fn().mockResolvedValue({ leagueId: 'league-1', createdCount: 2, teamMatchIds: [] });
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync, isPending: false } as never);
+    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    // 시각은 서버 계약상 날짜와 함께 가야 한다.
+    fireEvent.change(screen.getByLabelText('시작 시각'), { target: { value: '18:00' } });
+    fireEvent.click(await screen.findByLabelText('2026-09-12'));
+    fireEvent.click(screen.getByLabelText('2026-09-19'));
+    fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+
+    await waitFor(() =>
+      expect(mutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          schedule: { dates: ['2026-09-12', '2026-09-19'], time: '18:00' },
+        }),
+      ),
+    );
+  });
+});
+
+/**
  * 마감이 `null` 인 것은 계약상 **기한 없이 열림**이지 "안 받음" 이 아니다. 마감 유무로
  * 받는지를 추론하면 이미 모집 중인 리그에 "마감을 정하면 신청할 수 있어요" 라고 반대로
  * 말한다 — 같은 실수가 신청 관리 화면에도 있었다(#1028 리뷰 2회).

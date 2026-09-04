@@ -85,7 +85,11 @@ export function LeagueFixtureDatePicker({
         )}
       </div>
 
-      <div className="grid grid-cols-7 gap-1" role="grid" aria-label="대진 날짜 선택">
+      {/* `role="grid"` 를 쓰지 않는다 — ARIA 의 grid 는 안에 `row`/`gridcell` 구조와
+          방향키 이동을 요구하는데 여기엔 둘 다 없다. 선언만 해 두면 스크린리더가 없는
+          구조를 있다고 알리게 되므로, **날짜 버튼들을 담은 이름 있는 묶음**으로만 둔다
+          (버튼 각각은 이미 `aria-pressed` + 날짜 라벨을 갖는다). */}
+      <div className="grid grid-cols-7 gap-1" aria-label="대진 날짜 선택">
         {WEEKDAY_HEADERS.map((label) => (
           <div key={label} className="py-1 text-center text-xs text-[var(--text-muted)]" aria-hidden="true">
             {label}

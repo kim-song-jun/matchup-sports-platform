@@ -56,7 +56,8 @@ describe('LeagueFixtureDatePicker', () => {
 
   it('달을 넘겨도 격자가 흔들리지 않는다 — 연속 클릭이 빗나가지 않게', () => {
     renderPicker();
-    const grid = screen.getByRole('grid');
+    // `role="grid"` 는 뗐다(안에 row/gridcell 이 없어 ARIA 로 부정확) — 라벨로 찾는다.
+    const grid = screen.getByLabelText('대진 날짜 선택');
     const before = within(grid).getAllByRole('button').length;
     fireEvent.click(screen.getByLabelText('다음 달'));
     expect(within(grid).getAllByRole('button')).toHaveLength(before);

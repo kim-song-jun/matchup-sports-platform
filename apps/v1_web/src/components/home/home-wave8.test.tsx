@@ -23,13 +23,20 @@ describe('홈 통계', () => {
 
   it('summary 가 오면 일곱 칸을 모두 그 값에서 만든다 — 목업이 섞이지 않는다', () => {
     const stats = model({
-      summary: { monthlyMatches: 3, mannerScore: 4.2, trustState: 'stable', pendingLabel: '신청 1건' },
+      // trustState 는 서버가 'verified' | 'estimated' 만 의미 있게 내려준다(그 외는 '-').
+      summary: { monthlyMatches: 3, mannerScore: 4.2, trustState: 'verified', pendingLabel: '신청 1건' },
     }).stats;
 
-    expect(stats.monthlyActivity).toBe(3);
-    expect(stats.mannerScore).toBe('4.2');
-    expect(stats.joined).toBe(3);
-    expect(stats.pending).toBe('신청 1건');
+    // 일곱 칸 전부를 단언한다 — 하나라도 빠지면 그 칸에 목업이 남아도 테스트가 통과한다.
+    expect(stats).toEqual({
+      monthlyActivity: 3,
+      monthlyActivitySub: '신청 1건',
+      mannerScore: '4.2',
+      mannerScoreSub: '인증 완료',
+      joined: 3,
+      trustState: '인증 완료',
+      pending: '신청 1건',
+    });
   });
 });
 

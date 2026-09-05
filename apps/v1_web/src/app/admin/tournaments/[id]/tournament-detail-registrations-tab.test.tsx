@@ -407,6 +407,11 @@ describe('RegistrationsTab — 거부 사유와 자동 확정 배지 (FE-4)', ()
       { registrationId: 'reg-1', reason: '정원 초과' },
       expect.anything(),
     );
+    // 결과 문구도 모달 제목("신청 거부")과 같은 말을 쓴다 — "취소" 로 알리면 팀이 스스로
+    // 취소한 것과 운영자가 거부한 것이 같은 말이 된다.
+    const onSuccess = (cancelMutate.mock.calls[0][1] as { onSuccess: () => void }).onSuccess;
+    onSuccess();
+    expect(showToast).toHaveBeenCalledWith('거부했어요.', 'success');
   });
 
   it('대회: 사유 없이도 보낼 수 있다 — 기존 계약을 바꾸지 않는다', () => {

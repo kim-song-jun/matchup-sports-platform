@@ -479,10 +479,10 @@ export function RegistrationsTab({
       {
         onSuccess: () => {
           setCancelTarget(null);
-          showToast('취소했어요.', 'success');
+          showToast('거부했어요.', 'success');
         },
         onError: (err) =>
-          setCancelError(extractErrorMessage(err, '취소에 실패했어요.')),
+          setCancelError(extractErrorMessage(err, '거부하지 못했어요.')),
       },
     );
   };
@@ -881,7 +881,7 @@ export function RegistrationsTab({
         }}
       />
 
-      {/* Roster modal */}
+      {/* 신청 거부 모달 — 사유를 받는다(리그는 필수). */}
       <SimpleModal
         open={cancelTarget !== null}
         title="신청 거부"

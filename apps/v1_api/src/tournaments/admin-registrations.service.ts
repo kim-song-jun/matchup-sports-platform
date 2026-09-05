@@ -102,10 +102,17 @@ export class AdminRegistrationsService {
     // 명단을 만드는데(`rosterAutoConfirmedAt`), 그 값이 어떤 응답에도 없어서 운영자는
     // 눈앞의 명단이 팀이 낸 것인지 시스템이 만든 것인지 구분할 수 없었다 — 자동 확정
     // 명단은 "팀이 검토한 적 없는 명단" 이라 운영 판단이 달라진다.
-    const autoConfirmedAt = await readRosterAutoConfirmedAt(
-      this.prisma,
-      pageItems.map((row) => row.id),
-    );
+    //
+    // **리그일 때만 묻는다.** 자동 확정 잡은 리그 전용이라 대회 신청에는 이 값이 절대
+    // 없는데, 그때도 raw 쿼리를 돌리면 목록을 열 때마다 헛도는 왕복이 하나씩 붙는다.
+    // 종류는 위에서 이미 읽었다 — 새로 조회하지 않는다.
+    const autoConfirmedAt =
+      tournament.kind === V1CompetitionKind.regular_league
+        ? await readRosterAutoConfirmedAt(
+            this.prisma,
+            pageItems.map((row) => row.id),
+          )
+        : new Map<string, string>();
 
     return {
       items: pageItems.map((row) => ({

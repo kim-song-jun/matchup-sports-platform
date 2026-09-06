@@ -66,6 +66,9 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
   let leagueGameId: string;
   let friendlyGameId: string;
   let draftGameId: string;
+  let leagueEnded: Awaited<ReturnType<typeof service.executeCommand>> | undefined;
+  let draftEnded: Awaited<ReturnType<typeof service.executeCommand>> | undefined;
+  let friendlyEndError: unknown;
 
   const createGame = async (teamMatchId: string, commandId: string): Promise<string> => {
     const input: GameSourceCreationInput = {
@@ -100,6 +103,10 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
   };
 
   beforeAll(async () => {
+    if (!process.env.DATABASE_URL) {
+      throw new Error('DATABASE_URL is required for the #29 league console-end integration suite');
+    }
+    await prisma.$connect();
     const config = await prisma.v1CompetitionConfigVersion.findFirst({
       where: { name: 'futsal-v1', status: 'ACTIVE' },
       orderBy: { version: 'desc' },
@@ -196,17 +203,29 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
     });
   });
 
+  /**
+   * **상태 전이는 전부 여기서 한 번만 한다.** 각 `it` 은 그 결과를 읽기만 하므로 순서·단독
+   * 실행에 흔들리지 않는다(Copilot 지적). 경기는 상태 기계라 "끝낸 뒤" 를 단언하려면 끝내는
+   * 행위 자체는 어딘가에서 일어나야 하는데, 그걸 테스트 본문에 두면 그 테스트만 돌릴 때
+   * 뒤따르는 단언들이 전제를 잃는다.
+   */
+  beforeAll(async () => {
+    await run(leagueGameId, 'start', 'console-end-league-start');
+    leagueEnded = await run(leagueGameId, 'end', 'console-end-league-end');
+
+    await run(draftGameId, 'start', 'console-end-draft-start');
+    draftEnded = await run(draftGameId, 'end', 'console-end-draft-end');
+
+    await run(friendlyGameId, 'start', 'console-end-friendly-start');
+    friendlyEndError = await captureFailure(() => run(friendlyGameId, 'end', 'console-end-friendly-end'));
+  });
+
   afterAll(async () => {
     await prisma.$disconnect();
   });
 
-  it('리그 대진은 콘솔에서 시작하고 끝낼 수 있다', async () => {
-    await run(leagueGameId, 'start', 'console-end-league-start');
-    const ended = await run(leagueGameId, 'end', 'console-end-league-end');
-    expect(ended.state).toBe(V1GameState.ENDED);
-
-    const stored = await prisma.v1Game.findUniqueOrThrow({ where: { id: leagueGameId } });
-    expect(stored.state).toBe(V1GameState.ENDED);
+  it('리그 대진은 콘솔에서 시작하고 끝낼 수 있다', () => {
+    expect(leagueEnded?.state).toBe(V1GameState.ENDED);
   });
 
   it('리그의 종료는 결과를 **잠정(SUBMITTED)** 으로 남긴다 — 어드민 확인 단계가 살아 있어야 한다', async () => {
@@ -254,9 +273,7 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
     // 예전엔 `revision: 1` 리터럴이라 `@@unique([gameId, revision])` 에 걸려 P2002 가 났고,
     // 그 P2002 는 경합 코드로 번역돼 **"reload and retry"** 라는 거짓 안내가 나갔다 —
     // 재시도해도 영원히 같은 답이다(원인이 경합이 아니다).
-    await run(draftGameId, 'start', 'console-end-draft-start');
-    const ended = await run(draftGameId, 'end', 'console-end-draft-end');
-    expect(ended.state).toBe(V1GameState.ENDED);
+    expect(draftEnded?.state).toBe(V1GameState.ENDED);
 
     const revisions = await prisma.v1GameResultRevision.findMany({
       where: { gameId: draftGameId },
@@ -270,15 +287,13 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
     ]);
   });
 
-  it('친선 팀매치는 여전히 콘솔로 끝낼 수 없다 (409) — 이 가드가 지키던 것', async () => {
-    await run(friendlyGameId, 'start', 'console-end-friendly-start');
-    const error = await captureFailure(() => run(friendlyGameId, 'end', 'console-end-friendly-end'));
-    expect(httpBody(error)).toEqual({ status: 409, code: 'TEAM_MATCH_GENERIC_COMMAND_FORBIDDEN' });
+  it('친선 팀매치는 여전히 콘솔로 끝낼 수 없다 (409) — 이 가드가 지키던 것', () => {
+    expect(httpBody(friendlyEndError)).toEqual({ status: 409, code: 'TEAM_MATCH_GENERIC_COMMAND_FORBIDDEN' });
   });
 
   it('친선은 종료 시도 뒤에도 완료되지 않는다 — 완료 부수효과가 새지 않았다', async () => {
-    // **순서가 중요하다.** 바로 위 테스트가 친선 `end` 를 실제로 시도한 뒤에 본다 —
-    // 시도 전에 보면 "아직 안 끝냈으니 당연히 미완료" 라 아무것도 증명하지 못한다.
+    // **시도가 선행돼야 의미가 있다.** `beforeAll` 이 친선 `end` 를 실제로 한 번 시도한다 —
+    // 시도 없이 보면 "아직 안 끝냈으니 당연히 미완료" 라 아무것도 증명하지 못한다.
     const friendly = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: ids.friendlyMatch } });
     expect(friendly.status).not.toBe('completed');
     expect(friendly.completedAt).toBeNull();

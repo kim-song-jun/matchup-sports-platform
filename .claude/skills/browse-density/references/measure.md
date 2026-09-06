@@ -2,11 +2,15 @@
 
 ## 재는 명령
 
-alpha 배포본에서 `ego-browser` 로 잰다. 로컬 next 서버는 띄우지 않는다.
+alpha 배포본에서 잰다. 로컬 next 서버는 띄우지 않는다.
+
+아래 블록은 **`ego-browser` 헤레독 안에서 실행하는 코드**다 — `cdp` · `gotoAndWait` · `wait` ·
+`js` · `cliLog` 는 그 런타임이 주는 헬퍼이고 브라우저 콘솔에 붙여넣는 코드가 아니다.
+`/ego-browser` 스킬을 먼저 호출한다.
 
 아래 예시는 **매치 목록 전용 선택자**(`.tm-match-list-card`)를 쓴다. 다른 목록에 옮길 때는
 그 화면의 카드 선택자로 바꾼다 — 팀은 `.tm-team-card`, 대회는 `.tm-card`, 매치 행은
-`.tm-match-row` 다. 선택자를 안 바꾸면 `cards[0]` 이 `undefined` 라 그대로 터진다.
+`.tm-match-row` 다(행 카드는 목록 밀도 변경과 함께 들어왔다). 선택자를 안 바꾸면 `cards[0]` 이 `undefined` 라 그대로 터진다.
 
 ```js
 await cdp('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true })

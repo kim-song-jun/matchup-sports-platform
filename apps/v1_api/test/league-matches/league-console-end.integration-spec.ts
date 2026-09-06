@@ -2,7 +2,7 @@ import { HttpException } from '@nestjs/common';
 import { V1GameSideKey, V1GameSourceType, V1GameState } from '@prisma/client';
 import { OperationAuditWriterService } from '../../src/common/audit/operation-audit-writer.service';
 import { GameTakeoverService } from '../../src/games/game-takeover.service';
-import { GamesService } from '../../src/games/games.service';
+import { GamesService, canonicalGameCommandPayloadHash } from '../../src/games/games.service';
 import type { GameActorScope, GameCommandContext, GameSourceCreationInput } from '../../src/games/games.types';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { seedLeagueOnTournamentAxis } from '../fixtures/league-on-tournament-axis.fixture';
@@ -30,14 +30,18 @@ const ids = {
 
 const prisma = new PrismaService();
 const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
-const authUser = (id: string) => ({ id, email: `${id}@example.test` });
+const authUser = (id: string) => ({
+  id,
+  email: `${id}@console-end.example.test`,
+  accountStatus: 'active' as const,
+  onboardingStatus: 'completed' as const,
+});
 
 const sourceContext = (actor: GameActorScope, commandId: string, payload: unknown): GameCommandContext => ({
   actor,
-  clientCommandId: commandId,
-  idempotencyKey: commandId,
-  payloadHash: null,
-  payload,
+  expectedVersion: 0,
+  durableCommandId: commandId,
+  payloadHash: canonicalGameCommandPayloadHash(payload),
 });
 
 const captureFailure = async (run: () => Promise<unknown>): Promise<unknown> => {
@@ -104,7 +108,9 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
     await prisma.v1User.create({
       data: { id: ids.admin, email: 'league-console-end@example.test', accountStatus: 'active', onboardingStatus: 'completed' },
     });
-    await prisma.v1AdminUser.create({ data: { userId: ids.admin, adminRole: 'ops', status: 'active' } });
+    const admin = await prisma.v1AdminUser.create({
+      data: { userId: ids.admin, adminRole: 'ops', status: 'active' },
+    });
     await prisma.v1Sport.create({ data: { id: ids.sport, code: 'futsal', name: '#29 Futsal' } });
     await prisma.v1Region.create({ data: { id: ids.region, code: 'CONSOLE_END_REGION', name: '#29 Region', level: 1 } });
     await prisma.v1Team.createMany({
@@ -119,7 +125,8 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
       sportId: ids.sport,
       sportCode: 'futsal',
       regionId: ids.region,
-      createdByAdminUserId: ids.admin,
+      // **유저 id 가 아니라 어드민 행 id 다** — `v1_tournaments_created_by_admin_user_id_fkey`.
+      createdByAdminUserId: admin.id,
       state: 'active',
     });
 

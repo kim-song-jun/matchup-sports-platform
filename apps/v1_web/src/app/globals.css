@@ -2635,10 +2635,12 @@ label.tm-btn:focus-within {
   color: inherit;
 }
 
+/* DESIGN.md 10절 '가로 카드' 규격 — 정사각형 썸네일 96px 좌측 + 텍스트 우측.
+   64px 로 만들었다가 문서에 없는 새 치수라 되돌렸다(문서는 96px 또는 100px 둘뿐이다). */
 .tm-match-row-thumb {
   flex: none;
-  width: 64px;
-  height: 64px;
+  width: 96px;
+  height: 96px;
   border-radius: var(--radius-control);
   background-position: center;
   background-size: cover;
@@ -2647,8 +2649,8 @@ label.tm-btn:focus-within {
 
 /* 썸네일 안의 종목 그래픽 — 목록 기본 크기(132px)를 이 자리 크기로 덮는다. */
 .tm-match-row-thumb .tm-match-sport-illustration {
-  width: 52px;
-  height: 52px;
+  width: 76px;
+  height: 76px;
 }
 
 .tm-match-row-main {
@@ -2681,9 +2683,12 @@ label.tm-btn:focus-within {
   margin-top: 8px;
 }
 
+/* --blue500 은 흰 카드 3.71:1 · 다크 카드 4.49:1 로 둘 다 AA 미달이다.
+   docs/design/a11y-decisions.md 는 그 값을 .tm-btn-primary(솔리드 배경 흰 글씨)에만
+   예외로 등재해 뒀다. 카드 위 파란 글씨는 --blue700 을 쓴다(5.41:1 / 6.88:1). */
 .tm-match-row-act {
   flex: none;
-  color: var(--blue500);
+  color: var(--blue700);
   font-weight: 600;
 }
 

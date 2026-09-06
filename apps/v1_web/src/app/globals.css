@@ -2696,7 +2696,7 @@ label.tm-btn:focus-within {
 .tm-match-row-headline {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
 }
 

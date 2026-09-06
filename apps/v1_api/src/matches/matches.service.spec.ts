@@ -478,23 +478,35 @@ describe('MatchesService', () => {
     expect(result.lockedReason).toBeNull();
   });
 
-  it('list: status 기본값(recruiting) 조회는 시작 시각이 지난 매치를 where에서 제외한다', async () => {
+  it('list: status 생략 기본 탐색은 시작 시각이 지난 매치를 where에서 제외한다', async () => {
     prisma.v1Match.findMany.mockResolvedValue([]);
 
     await service.list(null, {});
 
     const where = prisma.v1Match.findMany.mock.calls[0][0].where;
-    expect(where.status).toBe('recruiting');
+    expect(where.status).toEqual({ in: ['recruiting', 'closed'] });
     expect(where.startAt).toEqual({ gte: expect.any(Date) });
   });
 
-  it('list: 기본 조회는 최신 생성순이며 마감 시각이 지난 모집 행을 제외한다', async () => {
+  it('list: 기본 조회는 최신 생성순이며 경기 전 마감 행도 신청마감 상태로 노출한다', async () => {
     prisma.v1Match.findMany.mockResolvedValue([]);
 
     await service.list(null, {});
 
     const args = prisma.v1Match.findMany.mock.calls[0][0];
     expect(args.orderBy).toEqual([{ createdAt: 'desc' }, { id: 'desc' }]);
+    expect(args.where.status).toEqual({ in: ['recruiting', 'closed'] });
+    expect(args.where.startAt).toEqual({ gte: expect.any(Date) });
+    expect(args.where.AND).toBeUndefined();
+  });
+
+  it('list: 추천순은 신청 마감이 지나지 않은 모집 행만 조회한다', async () => {
+    prisma.v1Match.findMany.mockResolvedValue([]);
+
+    await service.list(null, { sort: 'recommended' });
+
+    const args = prisma.v1Match.findMany.mock.calls[0][0];
+    expect(args.where.status).toEqual({ in: ['recruiting'] });
     expect(args.where.AND).toEqual(expect.arrayContaining([
       { OR: [{ deadlineAt: null }, { deadlineAt: { gte: expect.any(Date) } }] },
     ]));

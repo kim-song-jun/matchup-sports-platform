@@ -405,6 +405,10 @@ describe('리그 참가 신청 — 대회 스택 재사용', () => {
     // 기대값을 만들면 TZ 가 다른 환경(로컬 KST / CI UTC)에서 결과가 갈린다.
     expect(marked?.rosterAutoConfirmedAt).toBe('2026-09-01T00:00:00.000Z');
     // 표식이 없는 등록에까지 배지가 붙으면 안 된다.
+    //
+    // **`every` 는 빈 배열에서 항상 true 다** — 비교 대상이 실제로 있는지 먼저 못 박지 않으면
+    // 이 단언은 아무것도 검증하지 않는다(Copilot 지적).
+    expect(others.length).toBeGreaterThan(0);
     expect(others.every((item) => item.rosterAutoConfirmedAt === null)).toBe(true);
   });
 

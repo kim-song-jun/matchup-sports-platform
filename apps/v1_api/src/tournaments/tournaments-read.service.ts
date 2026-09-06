@@ -5,7 +5,11 @@ import { buildPageInfo, paginationArgs } from '../common/pagination/page-args';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { TournamentStaffAccessService } from './staff/tournament-staff-access.service';
 import { presentTournamentCard } from './tournament-card.presenter';
-import { presentTournamentDetail, shouldHideParticipantIdentity } from './tournament-detail.presenter';
+import {
+  isPubliclyListedRegistration,
+  presentTournamentDetail,
+  shouldHideParticipantIdentity,
+} from './tournament-detail.presenter';
 import { TournamentListQueryDto } from './dto/tournament-read.dto';
 import { leagueProgressOf, magicNumberOf } from './league-progress';
 import { COMPETITION_LIST_SURFACE } from './tournament-surface';
@@ -197,7 +201,12 @@ export class TournamentsReadService {
       ? new Map<string, PublicRosterPlayer[]>()
       : await readPublicRostersForRegistrations(
           this.prisma,
-          row.registrations.map((registration) => registration.id),
+          // **화면에 그려지는 등록만** 읽는다. 조회에는 결제 진행 중 3개 상태까지 실리지만
+          // presenter 는 `confirmed`/`waitlisted` 두 개만 그린다 — 나머지 명단을 읽으면
+          // 이 변경이 없앤 "읽고 버린다" 가 규모만 작아진 채 남는다.
+          row.registrations
+            .filter((registration) => isPubliclyListedRegistration(registration.status))
+            .map((registration) => registration.id),
         );
 
     return presentTournamentDetail(row, new Date(), staffBypass, leagueFixtures, rosterByRegistrationId);

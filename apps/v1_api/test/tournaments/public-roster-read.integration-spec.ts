@@ -126,7 +126,15 @@ describe('공개 명단 raw 조회 (실제 DB)', () => {
   });
 
   it('빈 목록이면 쿼리를 아예 안 던진다', async () => {
-    const empty = await readPublicRostersForRegistrations(prisma, []);
-    expect(empty.size).toBe(0);
+    // **크기만 보면 이 이름을 증명하지 못한다** — 조기 반환을 지워도 빈 배열로 쿼리가 돌아
+    // 0행이 오고 map 크기는 그대로 0이다(green). 호출 자체를 세야 계약이 잠긴다.
+    const spy = jest.spyOn(prisma, '$queryRaw');
+    try {
+      const empty = await readPublicRostersForRegistrations(prisma, []);
+      expect(empty.size).toBe(0);
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

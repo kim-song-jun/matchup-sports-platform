@@ -99,6 +99,17 @@ function presentOfficialResult(
   };
 }
 
+/**
+ * **공개 참가팀 목록에 그려지는 등록 상태.** 조회에 실린 상태(`TOURNAMENT_DETAIL_INCLUDE` 는
+ * 결제 진행 중 3개까지 포함한다)와 **다르다** — 화면에 안 나오는 등록의 명단까지 읽지 않도록
+ * 호출부가 이 술어로 좁힌다. 두 곳이 각자 배열을 적으면 조용히 갈리므로 여기 하나만 둔다.
+ */
+const PUBLICLY_LISTED_REGISTRATION_STATUSES = ['confirmed', 'waitlisted'] as const;
+
+export function isPubliclyListedRegistration(status: string): boolean {
+  return (PUBLICLY_LISTED_REGISTRATION_STATUSES as readonly string[]).includes(status);
+}
+
 export function presentTournamentDetail(
   row: TournamentDetailRow,
   now: Date = new Date(),
@@ -225,7 +236,7 @@ export function presentTournamentDetail(
     participantTeams: hideIdentity
       ? []
       : row.registrations
-            .filter((registration) => ['confirmed', 'waitlisted'].includes(registration.status))
+            .filter((registration) => isPubliclyListedRegistration(registration.status))
             .sort((a, b) => {
               const aRank = a.status === 'confirmed' ? 0 : 1;
               const bRank = b.status === 'confirmed' ? 0 : 1;

@@ -778,6 +778,13 @@ describe('TournamentsReadService', () => {
           confirmedAt: null,
           team: { id: 'team-waitlisted', name: '대기 FC', profile: null, region: null },
         },
+        {
+          // 조회에는 실리지만 **화면에는 안 그려지는** 상태 — 이 등록의 명단은 읽지 않아야 한다.
+          id: 'reg-awaiting-payment',
+          status: 'awaiting_payment',
+          confirmedAt: null,
+          team: { id: 'team-awaiting', name: '입금대기 FC', profile: null, region: null },
+        },
       ],
     });
     prisma.v1Tournament.findFirst.mockResolvedValue(row);
@@ -816,6 +823,12 @@ describe('TournamentsReadService', () => {
     // **공개면 명단 조회가 정확히 한 번.** 팀마다 물으면 N+1 이고, 두 번이면 등번호를
     // 따로 읽던 옛 구조로 되돌아간 것이다.
     expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    // **화면에 그려지는 등록만 넘긴다.** 조회에는 결제 진행 중 상태까지 실리지만 presenter 는
+    // `confirmed`/`waitlisted` 두 개만 그린다 — 안 그리는 등록의 명단을 읽으면 이 변경이
+    // 없앤 "읽고 버린다" 가 규모만 작아진 채 남는다.
+    const rosterArgs = JSON.stringify(prisma.$queryRaw.mock.calls[0]);
+    expect(rosterArgs).toContain('reg-confirmed');
+    expect(rosterArgs).not.toContain('reg-awaiting-payment');
 
     const callArgs = prisma.v1Tournament.findFirst.mock.calls[0][0];
     // Merged registration lifecycle: 결제 진행(awaiting_payment/payment_checking/paid) 팀도 공개 참가팀에 포함.

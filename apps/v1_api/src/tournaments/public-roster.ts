@@ -21,36 +21,6 @@ export type PublicRosterPlayer = {
   nickname: string | null;
 };
 
-type RosterRow = {
-  id: string;
-  userId: string;
-  user?: {
-    // `displayName` 은 **일부러 없다** — 폴백에 쓰지 않으므로 타입에서도 뺀다.
-    // 타입에 남겨 두면 다음 사람이 "왜 안 쓰지" 하고 되살린다.
-    profile?: { nickname?: string | null } | null;
-  } | null;
-};
-
-/**
- * 명단 행 + 등번호 맵 → 공개 응답.
- *
- * 등번호 맵은 호출자가 **한 번에 배치로** 읽어 넘긴다(팀마다 따로 물으면 N+1 이다).
- */
-export function toPublicRoster(
-  rows: readonly RosterRow[],
-  jerseyByPlayerId: ReadonlyMap<string, number>,
-): PublicRosterPlayer[] {
-  return rows.map((row) => ({
-    id: row.id,
-    jerseyNumber: jerseyByPlayerId.get(row.id) ?? null,
-    // **`displayName` 으로 폴백하지 않는다.** 정본 §3 은 공개 명단을 "등번호 + 닉네임" 으로
-    // 못 박았는데 `displayName` 은 **실명이 들어갈 수 있는 자리**다(가입 경로에 따라 실명이
-    // 그대로 담긴다). 폴백을 두면 닉네임이 빈 사용자에게서 실명이 공개로 새 나간다 —
-    // 주석은 "없으면 null" 이라고 적어 두고 구현만 폴백하고 있었다(Copilot 지적).
-    nickname: row.user?.profile?.nickname ?? null,
-  }));
-}
-
 type RosterSqlClient = {
   $queryRaw: <T = unknown>(query: TemplateStringsArray, ...values: unknown[]) => Promise<T>;
 };
@@ -103,7 +73,7 @@ export async function readPublicRostersForRegistrations(
     bucket.push({
       id: row.id,
       jerseyNumber: row.jersey_number,
-      // **`displayName` 으로 폴백하지 않는다** — `toPublicRoster` 와 같은 규칙이다. 여기서
+      // **`displayName` 으로 폴백하지 않는다.** 여기서
       // raw 로 옮겼다고 `real_name`·`display_name` 을 SELECT 하고 싶어지면, 그게 정확히
       // 정본 §3 이 막은 자리다(실명이 공개로 새 나간다).
       nickname: row.nickname,

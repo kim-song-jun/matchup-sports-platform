@@ -2730,7 +2730,11 @@ label.tm-btn:focus-within {
    grey700 으로 올려 6.7:1 을 확보한다. 다크에서는 --grey700 이 --text-caption 과 같은
    값(#9aa4b2)이라 이 재정의가 아무것도 바꾸지 않는다.
    ──────────────────────────────────────────────────────────────────────────── */
-.tm-card-closed {
+/* .tm-team-match-card 는 이 파일에서 **아래쪽**에 선언돼 있어(3500번대) 같은 특이도
+   (0,1,0)로는 뒤 규칙이 이긴다 — alpha 실측에서 팀매치 마감 카드만 지면이 흰색으로
+   남아 있었다. 클래스를 겹쳐 특이도를 한 단계 올려 선언 순서에 기대지 않게 한다. */
+.tm-card-closed,
+.tm-team-match-card.tm-card-closed {
   background: var(--card-surface-muted);
   --text-caption: var(--grey700);
   --text-muted: var(--grey700);

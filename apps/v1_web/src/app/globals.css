@@ -2697,6 +2697,13 @@ label.tm-btn:focus-within {
   padding: 16px 16px 4px;
 }
 
+/* 오버레이만 static 으로 바꾸면 안쪽 .tm-featured-text 가 absolute 로 남아 카드 하단에
+   붙는다 — 그래픽과 겹치고 흰 글씨가 밝은 바탕 위에 놓인다(실측 확인, #1045 Copilot). */
+.tm-featured-overlay-stack .tm-featured-text {
+  position: static;
+  color: inherit;
+}
+
 .tm-featured-overlay-stack .tm-featured-eyebrow {
   color: var(--blue500);
   font-weight: 700;

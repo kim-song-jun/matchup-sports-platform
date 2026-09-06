@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render as rtlRender } from '@testing-library/react';
+import { render as rtlRender, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useShellOverrideForRoute } from '@/components/v1-ui/shell-override';
 import type { V1MyTeam, V1TournamentDetail, V1TournamentRegistration } from '@/types/api';
@@ -273,5 +273,79 @@ describe('MyRegistrationPageClient — 셸 backHref override', () => {
     const probe = render(<BackHrefProbe />);
 
     expect(probe.getByTestId('probe-backhref')).toHaveTextContent('(table-default)');
+  });
+});
+
+/**
+ * **#4 후속 — "수정 가능" 배지 오표시.**
+ *
+ * 이 카드는 잠금·신청상태만 보고 배지를 정했는데, 실제 명단 화면은 **대회 상태(완료·취소)와
+ * 명단 제출 마감**도 본다. 그래서 마감이 지난 명단에 카드가 **초록 "수정 가능"** 을 달아
+ * 두고, 눌러 들어가면 "제출 마감" 이라 아무것도 못 고치는 상태가 났다.
+ * 두 화면이 **같은 헬퍼**(`isTournamentRosterMutable` · `getRosterDeadlineState`)를 쓰게 했다.
+ */
+describe('MyRegistrationPageClient — 명단 수정 가능 배지', () => {
+  beforeEach(() => {
+    searchParams = new URLSearchParams('reg=registration-1');
+  });
+
+  function arrange(tournament: Partial<V1TournamentDetail>, registration: Partial<V1TournamentRegistration> = {}) {
+    myRegistrationApiMocks.useV1Tournament.mockReturnValue({
+      data: makeTournament(tournament),
+      isLoading: false,
+    });
+    myRegistrationApiMocks.useV1MyRegistrations.mockReturnValue({
+      data: [makeRegistration({ status: 'confirmed', ...registration })],
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+  }
+
+  it('명단 제출 마감이 지났으면 "수정 가능" 이라고 하지 않는다', () => {
+    arrange({ rosterDeadlineAt: '2020-01-01T00:00:00.000Z' });
+
+    const { container } = render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+
+    expect(container.textContent).toContain('제출 마감');
+    expect(container.textContent).not.toContain('수정 가능');
+    // **한 줄 안에서 두 말이 갈리지 않게** 표시 텍스트도 같은 조건을 쓴다 — 예전엔 이
+    // 문구만 잠금 여부를 봐서, 마감이 지났는데 "등록 완료" 라고 적혀 있었다(Copilot 지적).
+    expect(container.textContent).toContain('· 마감');
+    expect(container.textContent).not.toContain('등록 완료');
+    // **배지만 고치면 반쪽이다.** 편집 링크가 남아 있으면 눌러 들어가서 서버 409 를 만난다 —
+    // 배지가 "못 고친다" 고 말하는데 버튼은 열려 있는 상태가 그 자체로 결함이다.
+    expect(screen.queryByRole('link', { name: '선수 명단 수정하기' })).not.toBeInTheDocument();
+  });
+
+  it('어드민이 마감 예외를 줬으면 다시 "수정 가능" 이다 — 예외를 무시하면 안 된다', () => {
+    arrange(
+      { rosterDeadlineAt: '2020-01-01T00:00:00.000Z' },
+      { rosterDeadlineOverrideAt: '2020-01-02T00:00:00.000Z' },
+    );
+
+    const { container } = render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+
+    expect(container.textContent).toContain('수정 가능');
+    // 예외를 줬으면 **링크도 열려 있어야** 한다 — 배지만 되살리면 고칠 방법이 없다.
+    expect(screen.getAllByRole('link', { name: '선수 명단 수정하기' }).length).toBeGreaterThan(0);
+  });
+
+  it('대회가 끝났으면 "수정 불가" 다', () => {
+    arrange({ status: 'completed', rosterDeadlineAt: null });
+
+    const { container } = render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+
+    expect(container.textContent).toContain('수정 불가');
+    expect(container.textContent).not.toContain('수정 가능');
+    expect(screen.queryByRole('link', { name: '선수 명단 수정하기' })).not.toBeInTheDocument();
+  });
+
+  it('마감 전이고 대회도 진행 중이면 그대로 "수정 가능" 이다 (회귀 방지)', () => {
+    arrange({ rosterDeadlineAt: '2099-01-01T00:00:00.000Z' });
+
+    const { container } = render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+
+    expect(container.textContent).toContain('수정 가능');
   });
 });

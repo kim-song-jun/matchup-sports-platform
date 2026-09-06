@@ -508,7 +508,17 @@ function LeagueRegistrationCta({
   // 자기 신청 화면이 열려서 **눌린 건지 안 눌린 건지 알 수 없었다**(2026-09-05 alpha 실측).
   // 대회 상세는 이미 같은 방식으로 갈라 두고 있어(`tournament-detail-client.tsx`) 그
   // 판정 규칙을 그대로 쓴다 — 취소된 신청은 "없는 것" 으로 본다(다시 신청할 수 있다).
-  const myRegistrations = useV1MyRegistrations(leagueId, { enabled: registrationOpen });
+  // **비로그인에게 401 을 쏘지 않는다.** 이 순위표는 공개 화면이라 로그인하지 않은 사람도
+  // 연다 — `registrationOpen` 만으로 켜면 그때마다 인증 요청이 나가 실패한다.
+  // 대회 상세와 같은 방식으로, 저장된 세션 힌트를 `useEffect` 로 읽은 뒤에만 켠다
+  // (SSR 과 첫 렌더가 어긋나지 않게 초기값은 false 다).
+  const [hasSessionHint, setHasSessionHint] = useState(false);
+  useEffect(() => {
+    setHasSessionHint(hasStoredV1Session());
+  }, []);
+  const myRegistrations = useV1MyRegistrations(leagueId, {
+    enabled: registrationOpen && hasSessionHint,
+  });
   const activeRegistration =
     (myRegistrations.data ?? []).find((registration) => registration.status !== 'cancelled') ?? null;
 

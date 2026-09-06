@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Providers } from '@/app/providers';
 import {
   useV1ActivePopup,
@@ -1548,6 +1548,13 @@ describe('리그 참가 신청 입구', () => {
   beforeEach(() => {
     // 기본은 "신청 없음" — 케이스마다 필요할 때만 덮는다.
     useV1MyRegistrationsMock.mockReturnValue({ data: [] } as never);
+    // **세션 힌트가 있어야 내 신청을 조회한다.** 이 순위표는 공개 화면이라 비로그인도
+    // 열고, 힌트 없이 켜면 401 이 나간다. 힌트를 안 세우면 이 화면의 실제 동작과 다르다.
+    clearStoredV1Session();
+  });
+
+  afterEach(() => {
+    clearStoredV1Session();
   });
 
   function mockLeague(extra: Record<string, unknown>) {
@@ -1576,7 +1583,48 @@ describe('리그 참가 신청 입구', () => {
     expect(container.querySelector('a[href="/tournaments/league-1/apply"]')).toBeInTheDocument();
   });
 
+  it('비로그인에게는 내 신청을 조회하지 않는다 — 공개 화면에서 401 을 쏘지 않는다', async () => {
+    // 이 순위표는 **공개 화면**이라 로그인하지 않은 사람도 연다. `registrationOpen` 만으로
+    // 켜면 그때마다 인증 요청이 나가 실패한다(Copilot 지적).
+    //
+    // 훅이 mock 이라 `enabled` 가 반환값을 바꾸지 않는다 — 그래서 **호출 계약을 직접
+    // 단언한다.** 화면 텍스트로만 보면 게이트를 지워도 통과해서(변이 red 0 으로 확인)
+    // 아무것도 검증하지 못한다.
+    clearStoredV1Session();
+    mockLeague({ registrationOpen: true, registrationDeadlineAt: '2026-09-20T14:59:00.000Z' });
+    render(
+      <Providers>
+        <LeagueMatchStandingsClient leagueId="league-1" />
+      </Providers>,
+    );
+    await waitFor(() => expect(screen.getByText('모집 중')).toBeInTheDocument());
+
+    expect(useV1MyRegistrationsMock).toHaveBeenCalledWith(
+      'league-1',
+      expect.objectContaining({ enabled: false }),
+    );
+  });
+
+  it('로그인 힌트가 있으면 조회한다 — 게이트가 항상 닫혀 있으면 아무도 "내 신청" 을 못 본다', async () => {
+    saveStoredV1Session({ userId: 'captain' });
+    mockLeague({ registrationOpen: true, registrationDeadlineAt: '2026-09-20T14:59:00.000Z' });
+    render(
+      <Providers>
+        <LeagueMatchStandingsClient leagueId="league-1" />
+      </Providers>,
+    );
+    await waitFor(() => expect(screen.getByText('모집 중')).toBeInTheDocument());
+
+    await waitFor(() =>
+      expect(useV1MyRegistrationsMock).toHaveBeenCalledWith(
+        'league-1',
+        expect.objectContaining({ enabled: true }),
+      ),
+    );
+  });
+
   it('이미 신청한 팀장에게는 "내 신청" 으로 보낸다 — 결함 #22-a', async () => {
+    saveStoredV1Session({ userId: 'captain' });
     // 예전엔 조건 없이 `/apply` 로 보냈다. 신청이 있으면 그 화면이 `/my` 로 되돌리므로,
     // 팀장은 "참가 신청" 을 눌렀는데 자기 신청 화면이 열려 **눌린 건지 안 눌린 건지
     // 알 수 없었다**(2026-09-05 alpha 실측).
@@ -1595,6 +1643,7 @@ describe('리그 참가 신청 입구', () => {
   });
 
   it('취소한 신청은 없는 것으로 본다 — 다시 신청할 수 있어야 한다', async () => {
+    saveStoredV1Session({ userId: 'captain' });
     useV1MyRegistrationsMock.mockReturnValue({
       data: [{ id: 'reg-old', status: 'cancelled' }],
     } as never);

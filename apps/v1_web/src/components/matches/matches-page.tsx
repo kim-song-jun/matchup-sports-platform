@@ -110,9 +110,12 @@ export function MatchListPageView({ model }: { model: MatchListViewModel }) {
         {model.isLoading ? (
           <PageSkeleton />
         ) : model.matches.length ? (
-          <div className="tm-match-card-stack">
-            {model.matches.map((match) => <MatchCardItem key={match.id} match={match} />)}
-          </div>
+          <>
+            <MatchFeatureRail matches={model.matches.filter((match) => match.image).slice(0, 6)} />
+            <div className="tm-match-card-stack">
+              {model.matches.map((match) => <MatchRowItem key={match.id} match={match} />)}
+            </div>
+          </>
         ) : (
           /* EmptyState must be a sibling of .tm-match-card-stack, not nested inside it —
              the stack becomes a 2-up/3-up CSS grid on desktop (matches.css), and a single
@@ -185,7 +188,7 @@ export function MatchStatePageView({ model }: { model: MatchStateViewModel }) {
         )}
         {model.state === 'joined' ? (
           <div className="tm-match-card-stack" style={{ marginTop: 20 }}>
-            {model.matches.map((match) => <MatchCardItem key={match.id} match={match} />)}
+            {model.matches.map((match) => <MatchRowItem key={match.id} match={match} />)}
           </div>
         ) : null}
       </div>
@@ -676,6 +679,55 @@ function SportSelector({ sports }: { sports: MatchListViewModel['sports'] }) {
         );
       })}
     </div>
+  );
+}
+
+/**
+ * 목록의 기본 단위 — 좌측 64px 썸네일 + 비교 축(시간·장소·인원) 한 줄.
+ * 배너 카드는 미디어가 카드의 절반(146/286px)을 써서 390 폭에서 2.95장밖에 안 보였다.
+ * 목록은 이해시키는 화면이 아니라 비교시키는 화면이라 개수가 먼저다(browse-density 스킬).
+ */
+function MatchRowItem({ match }: { match: MatchCardModel }) {
+  return (
+    <Link className="tm-match-row tm-card-interactive tm-pressable" href={`/matches/${match.id}`}>
+      <div className={`tm-match-row-thumb${match.image ? '' : ' tm-match-media-sport'}`} style={match.image ? { backgroundImage: cssUrl(match.image) } : undefined}>
+        {match.image ? null : <SportIllustration sport={match.sport} sizes="52px" />}
+      </div>
+      <div className="tm-match-row-main">
+        <div className="tm-text-caption tm-match-row-meta">{match.sport} · {match.level} · {match.gender}</div>
+        <div className="tm-text-body-lg tm-match-row-title">{match.title}</div>
+        <div className="tm-text-caption tm-match-row-when">
+          <strong style={{ fontWeight: 600 }}>{match.date} {match.time}</strong>
+          {' · '}{match.venue}
+        </div>
+        <div className="tm-match-row-foot">
+          {/* [P1 숫자:단위 2:1 + tabular-nums] 배너에 있던 인원 배지를 텍스트로 내렸다 —
+              미디어 위에 겹치면 그래픽도 숫자도 안 읽힌다. */}
+          <span className="tm-text-caption">
+            <strong style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{match.current}</strong>
+            /{match.capacity}명 · {match.host}
+          </span>
+          <span className="tm-text-label tm-match-row-act">{match.actionLabel}</span>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+/**
+ * 상단 이벤트 레일 — 호스트가 사진을 올린 매치만 가로 스크롤 배너로 띄운다.
+ * 배너 카드를 없애지 않고 "몇 개만 눈에 띄는 자리"로 옮긴 것이라, 목록 본문은
+ * 행 하나로 통일되면서도 공들인 매치는 그대로 두드러진다.
+ */
+function MatchFeatureRail({ matches }: { matches: MatchCardModel[] }) {
+  if (matches.length === 0) return null;
+  return (
+    <section className="tm-match-rail-section" aria-labelledby="match-rail-heading">
+      <h2 className="tm-text-label tm-match-rail-heading" id="match-rail-heading">눈에 띄는 매치</h2>
+      <div className="tm-match-rail-h">
+        {matches.map((match) => <MatchCardItem key={`rail-${match.id}`} match={match} />)}
+      </div>
+    </section>
   );
 }
 

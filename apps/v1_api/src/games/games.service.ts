@@ -1295,12 +1295,42 @@ export class GamesService {
       },
       async (tx, game, context) => {
         // T3(기록 UX) 추가: 팀매치도 피리어드를 시작/전환해야 이벤트 시각이 찍힌다(T1-0).
-        // 끝맺음만 검증된 결과 제출 경로를 거쳐야 하므로 `end`만 계속 막는다.
+        //
+        // **이 가드가 지키는 것은 친선 팀매치다.** 친선은 양 팀이 결과를 제출하고 상대가
+        // 승인하는 검증된 경로(`submitResultRevision` → `decideResultRevision`)로만 끝나야
+        // 한다 — 여기서 `end` 를 허용하면 그 검증을 통째로 우회한다. **통째로 열지 마라.**
+        //
+        // **리그 대진은 예외다(결함 #29, 2026-09-06 alpha 실측).** 리그 대진의 게임도
+        // `TEAM_MATCH` 소스로 만들어지는데(`league-fixture-creation.ts`), 정본이 "리그도
+        // 대회와 **같은 경기 운영 콘솔**을 쓴다(Task 165)" 로 확정했고 사용자가 "**결과
+        // 보내기 = 경기 종료**, 별도 제출 단계를 만들지 않는다" 로 확정했다. 즉 리그에서는
+        // **콘솔의 `end` 가 곧 결과 보내기**다. 그런데 이 가드가 통째로 막고 있어서, 콘솔로
+        // 시작·득점·피리어드까지 전부 진행한 경기를 **끝낼 수 없었다** — alpha 에서 1:0
+        // 상태로 `정규 시간 종료` 에 갇혔다(409 `TEAM_MATCH_GENERIC_COMMAND_FORBIDDEN`).
+        //
+        // 판별은 `V1TeamMatch.leagueId` 다 — **이 저장소가 이미 쓰는 관용구**이고
+        // (`team-record-category.ts` 의 `leagueId !== null ? 'league' : 'friendly'` 등)
+        // 리그 대진만 값을 갖는다. 조회는 `end` 한 커맨드에서만 일어난다.
+        //
+        // 하류는 이미 열려 있다: `end` 가 만드는 리비전은 `SUBMITTED` 이고(즉시 공식이
+        // 아니다), 어드민 확정(`tournament-result-review.service.ts` 의 `withResultCommand`)
+        // 은 Task 165 BE-1 이 `resolveGameSource` 로 바꿔 대회·리그를 함께 받는다.
         if (game.sourceType === V1GameSourceType.TEAM_MATCH && command === 'end') {
-          throw new ConflictException({
-            code: 'TEAM_MATCH_GENERIC_COMMAND_FORBIDDEN',
-            message: 'Team matches end only through validated result submission',
-          });
+          const teamMatch =
+            game.teamMatchId === null
+              ? null
+              : await tx.v1TeamMatch.findUnique({
+                  where: { id: game.teamMatchId },
+                  select: { leagueId: true },
+                });
+          // 팀매치 행을 못 찾는 경우도 막는 쪽으로 둔다 — 리그 대진임을 **확인했을 때만**
+          // 연다(모르면 친선으로 취급하는 것이 안전한 기본값이다).
+          if (teamMatch === null || teamMatch.leagueId === null) {
+            throw new ConflictException({
+              code: 'TEAM_MATCH_GENERIC_COMMAND_FORBIDDEN',
+              message: 'Team matches end only through validated result submission',
+            });
+          }
         }
         assertClockNotDrifted(dto.occurredAt);
         this.requireTakeover(game.id, game.sourceType, context);
@@ -1438,6 +1468,34 @@ export class GamesService {
               where: { id: period.id },
               data: { state: V1GamePeriodState.ENDED, endedAt: now, ...(resolved ?? {}) },
             });
+          }
+          // **리그 대진은 여기가 결과 경계다(결함 #29).** 콘솔의 `end` 가 곧 결과 보내기이므로
+          // 친선의 결과 제출과 **같은 부수효과**를 태운다 — 안 그러면 `V1TeamMatch` 가
+          // `matched` 로 남아 `reviews.service.ts` 의 `isCompleted` 가 409
+          // `SOURCE_NOT_COMPLETED` 를 던지고 **상호평가에 영구히 못 들어간다**(평가 마감
+          // 창의 기준시각도 `completedAt` 이다). 양 팀 캘린더 일정도 SCHEDULED 로 남는다.
+          //
+          // 대회 픽스처(`TOURNAMENT_FIXTURE`)에는 팀매치가 없으므로 `teamMatchId` 가 null 이라
+          // 자연히 건너뛴다 — 즉 이 줄은 리그에만 작용한다.
+          if (updated.teamMatchId !== null) {
+            // **취소된 대진은 여기서 막는다(결함 #29 C-1).** 대진 취소 경로
+            // (`cancelFixture`/`regenerateFixtures`/`removeTeam`)는 **게임을 건드리지 않아서**
+            // LIVE 이던 게임이 그대로 남고, 콘솔의 "경기 종료" 가 눌린다. 그대로 두면
+            // 완료 처리가 `cancelled` 를 `completed` 로 바꾸고, 24시간 뒤 자동 승인 잡의
+            // `revision.teamMatchStatus === 'cancelled'` 가드가 **이미 바뀐 값을 읽어** 통과해
+            // **취소된 경기가 공식 결과가 된다**(그 가드의 주석이 정확히 이 시나리오다).
+            // 순위표의 `status === 'cancelled'` 필터도 같은 이유로 뚫린다.
+            //
+            // **완료 처리의 `where` 를 좁히는 것으론 부족하다** — 그러면 상태만 안 바뀌고
+            // 결과 리비전은 그대로 생겨 자동 승인 레인에 들어간다. 그래서 리비전을 만들기
+            // **전에** 제출 경로(`submitResultRevision`)와 **같은 계약**을 건다.
+            await this.assertTeamMatchMatched(tx, updated.teamMatchId);
+            await this.completeTeamMatchAtResultBoundary(
+              tx,
+              updated.teamMatchId,
+              context.actor.actorType === 'USER' ? context.actor.actorUserId : null,
+              'league_console_game_ended',
+            );
           }
           return this.deriveTournamentRevision(
             tx,
@@ -3835,32 +3893,12 @@ export class GamesService {
           // the TeamMatch already completed and skips the update); the log write
           // below is gated on `.count === 1` for the same reason, so a
           // no-op resubmit never writes a fromStatus==toStatus log row.
-          const completion = await tx.v1TeamMatch.updateMany({
-            where: { id: game.teamMatchId, status: { not: V1TeamMatchStatus.completed } },
-            data: { status: V1TeamMatchStatus.completed, completedAt: new Date() },
-          });
-          if (completion.count === 1) {
-            // assertTeamMatchMatched (above) already established that the TeamMatch's
-            // status is `matched` or `completed`; the guard on the updateMany above
-            // means a real transition only happens when it was `matched`, so
-            // `matched` is the only possible fromStatus here.
-            await tx.v1StatusChangeLog.create({
-              data: {
-                targetType: 'team_match',
-                targetId: game.teamMatchId,
-                fromStatus: V1TeamMatchStatus.matched,
-                toStatus: V1TeamMatchStatus.completed,
-                actorType: 'user',
-                actorUserId: user.id,
-                reason: 'team_match_result_submitted',
-              },
-            });
-            // 매치 ↔ 팀일정 연동(레인 schedule): 결과 제출이 팀 매치의 실질적 종료 시점이라는
-            // 바로 위 근거를 그대로 이어받아, 같은 트랜잭션 안에서 연결된 SCHEDULED 팀일정도
-            // COMPLETED로 cascade한다. `completion.count === 1` 가드 덕분에 이 블록도 재제출/
-            // 정정 루프에서 이미 완료 처리된 것을 다시 건드리지 않는다(자연히 idempotent).
-            await cascadeCompleteTeamMatchSchedulesInTx(tx, game.teamMatchId);
-          }
+          await this.completeTeamMatchAtResultBoundary(
+            tx,
+            game.teamMatchId,
+            user.id,
+            'team_match_result_submitted',
+          );
         }
         await this.writeOutbox(
           tx,
@@ -6303,6 +6341,82 @@ export class GamesService {
     };
   }
 
+  /**
+   * **경기의 결과 경계에서 `V1TeamMatch` 를 완료로 넘긴다.**
+   *
+   * 이 셋은 **함께 일어나야 한다** — 하나라도 빠지면 화면이 조용히 어긋난다:
+   *   ① `status = completed` + `completedAt`
+   *   ② `V1StatusChangeLog` 감사 행
+   *   ③ 양 팀 캘린더의 SCHEDULED 팀일정 완료(cascade)
+   *
+   * **왜 공용인가(결함 #29):** 예전엔 이 블록이 `submitResultRevision` 안에만 있었다.
+   * 그런데 리그 대진은 **콘솔의 `end` 가 결과 경계**다(정본 Task 165). 그 경로에 이 부수효과가
+   * 없으면 `V1TeamMatch.status` 가 `matched` 로 남고, `reviews.service.ts` 의 `isCompleted`
+   * 가 **409 `SOURCE_NOT_COMPLETED`** 를 던져 **상호평가에 영구히 못 들어간다**. 평가 마감
+   * 창의 기준시각도 `completedAt` 이라 그 값이 없으면 계산 자체가 성립하지 않는다. 양 팀
+   * 캘린더에도 끝난 경기가 SCHEDULED 로 남는다.
+   *
+   * **복사하지 말고 이 함수를 불러라.** 두 입구가 각자 적으면 한쪽만 고쳐져 갈라진다.
+   *
+   * 멱등이다 — `status: { not: completed }` 가드 덕분에 재제출·정정 루프에서 두 번째부터는
+   * 아무것도 하지 않는다(감사 행도 `count === 1` 일 때만 쓴다).
+   *
+   * `fromStatus` 는 **읽어서 적는다.** 예전 코드는 `matched` 를 상수로 적었는데, 그건 바로
+   * 위에서 `assertTeamMatchMatched` 를 부르는 제출 경로에서만 참이다 — 콘솔 `end` 는 그
+   * 단언을 지나지 않으므로 상수로 두면 감사 로그가 사실과 달라질 수 있다.
+   */
+  private async completeTeamMatchAtResultBoundary(
+    tx: Transaction,
+    teamMatchId: string,
+    /** 사람이 아닌 액터(시스템 레인)면 `null` — 스키마가 nullable 이다. */
+    actorUserId: string | null,
+    reason: string,
+  ): Promise<void> {
+    const before = await tx.v1TeamMatch.findUnique({
+      where: { id: teamMatchId },
+      select: { status: true },
+    });
+    if (before === null) return;
+    const completion = await tx.v1TeamMatch.updateMany({
+      where: { id: teamMatchId, status: { not: V1TeamMatchStatus.completed } },
+      data: { status: V1TeamMatchStatus.completed, completedAt: new Date() },
+    });
+    if (completion.count !== 1) return;
+    await tx.v1StatusChangeLog.create({
+      data: {
+        targetType: 'team_match',
+        targetId: teamMatchId,
+        fromStatus: before.status,
+        toStatus: V1TeamMatchStatus.completed,
+        // **액터에서 파생시킨다.** 시그니처가 `actorUserId: string | null` 을 받으면서
+        // 본문이 `'user'` 를 상수로 쓰면 **없는 경우를 받아들이는 척**하는 것이고, 나중에
+        // 시스템 레인에서 이 헬퍼를 부르면 "user 인데 userId 가 없는" 거짓 감사 행이 조용히
+        // 쌓인다. 지금은 두 입구가 다 USER 라 `null` 분기에 **도달하지 않으므로 동작은
+        // 하나도 안 바뀐다** — 시그니처와 본문을 일치시키는 것이 목적이다.
+        actorType: actorUserId === null ? 'system' : 'user',
+        actorUserId,
+        reason,
+      },
+    });
+    await cascadeCompleteTeamMatchSchedulesInTx(tx, teamMatchId);
+  }
+
+  /**
+   * 이 게임의 **다음 결과 리비전 번호**.
+   *
+   * `tournament-result-review.service.ts` 의 `nextRevisionNumber` 와 **같은 모양**이다 —
+   * 그쪽은 private 이라 가져다 쓸 수 없어 형태를 맞춘다. 둘이 갈리면 같은 게임에 두 규칙이
+   * 생기므로, 한쪽을 바꾸면 다른 쪽도 함께 본다.
+   */
+  private async nextGameRevisionNumber(tx: Transaction, gameId: string): Promise<number> {
+    const latest = await tx.v1GameResultRevision.findFirst({
+      where: { gameId },
+      orderBy: { revision: 'desc' },
+      select: { revision: true },
+    });
+    return (latest?.revision ?? 0) + 1;
+  }
+
   private async deriveTournamentRevision(
     tx: Transaction,
     game: LockedGame,
@@ -6381,7 +6495,22 @@ export class GamesService {
     const revision = await tx.v1GameResultRevision.create({
       data: {
         gameId: game.id,
-        revision: 1,
+        // **번호를 계산한다(결함 #31).** 예전엔 `1` 리터럴이었는데 스키마에
+        // `@@unique([gameId, revision])` 가 있어서, **이미 리비전이 하나라도 있으면
+        // `end` 가 P2002 로 죽는다.** 그런데 그 P2002 는
+        // `command-concurrency-error.ts` 의 경합 코드 목록에 걸려 409
+        // `COMMAND_CONCURRENCY_CONFLICT` "reload and retry" 로 번역된다 — **재시도해도
+        // 영원히 같은 답이 나오는 거짓 안내**다(원인이 경합이 아니다).
+        //
+        // 리그 대진은 호스트 팀장이 `createResultRevision` 으로 DRAFT 를 만들 수 있어
+        // 실제로 그 상태가 된다(그 경로엔 게임 상태 게이트가 없다).
+        //
+        // **대회 레인은 값이 안 바뀐다** — `end` 시점에 대회 픽스처의 리비전은 구조적으로
+        // 0건이다: `createResultRevision` 이 `TOURNAMENT_FIXTURE` 를 409
+        // `TOURNAMENT_RESULT_DERIVED_ONLY` 로 거부하고, 복구 레인은 기존 리비전이 0건일
+        // 때만 돌며, `end` 재호출은 전이 표(`TOURNAMENT_GAME_TRANSITIONS[ENDED]` = 빈 배열)가
+        // 막는다. 즉 이 함수는 대회에서 **항상 1** 을 돌려준다.
+        revision: await this.nextGameRevisionNumber(tx, game.id),
         // 몰수·중단이면 그 사실과 사유가 결과 리비전에 함께 박힌다 — 점수만 남기면
         // 정상 종료와 구분되지 않아 "왜 그 점수인지"를 나중에 설명할 수 없다.
         outcomeReason: outcome.outcomeReason,
@@ -6586,8 +6715,8 @@ export class GamesService {
    * `assistParticipantId` on an already-persisted GOAL event in place, but
    * nothing previously re-derived the game's result revision from that
    * change. `deriveTournamentRevision` only ever runs ONCE per game, at
-   * `end`/recovery time (its `revision: 1` literal above assumes exactly
-   * one call) -- every assist attach/detach AFTER that moment left the
+   * `end`/recovery time (it used to hard-code `revision: 1`, which assumed
+   * exactly one call; the number is computed now -- see #31) -- every assist attach/detach AFTER that moment left the
    * already-created revision's `V1GameResultParticipant` rows frozen at
    * whatever they were when the revision was derived, while the event
    * stream (and the "경기 세부 기록" event list the operate console renders

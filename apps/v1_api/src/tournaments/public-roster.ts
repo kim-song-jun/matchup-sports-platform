@@ -7,8 +7,10 @@
  * 가드에만 쓰라고 받은 값**이라 공개 화면에 그대로 내보내면 PII 유출이다. 그래서 그 함수를
  * 재사용하지 않고 **공개 전용 직렬화를 따로** 둔다.
  *
- * 실명 폴백도 두지 않는다. 닉네임을 못 찾으면(탈퇴·프로필 삭제) `null` 을 주고 **화면이
- * 자리표시자를 그린다** — 여기서 실명으로 떨어뜨리면 정본 위반이 조용히 살아난다.
+ * **어떤 폴백도 두지 않는다.** 닉네임을 못 찾으면(탈퇴·프로필 삭제·닉네임 미설정) `null` 을
+ * 주고 **화면이 자리표시자를 그린다**. `realName` 은 물론이고 `displayName` 도 쓰지 않는다 —
+ * 그 자리에는 가입 경로에 따라 실명이 그대로 담길 수 있어서, 폴백 하나로 정본 위반이
+ * 조용히 살아난다.
  */
 export type PublicRosterPlayer = {
   /** 명단 행 id. 화면 key 용이고 개인 식별에 쓰지 않는다. */
@@ -23,7 +25,9 @@ type RosterRow = {
   id: string;
   userId: string;
   user?: {
-    profile?: { nickname?: string | null; displayName?: string | null } | null;
+    // `displayName` 은 **일부러 없다** — 폴백에 쓰지 않으므로 타입에서도 뺀다.
+    // 타입에 남겨 두면 다음 사람이 "왜 안 쓰지" 하고 되살린다.
+    profile?: { nickname?: string | null } | null;
   } | null;
 };
 
@@ -39,6 +43,10 @@ export function toPublicRoster(
   return rows.map((row) => ({
     id: row.id,
     jerseyNumber: jerseyByPlayerId.get(row.id) ?? null,
-    nickname: row.user?.profile?.nickname ?? row.user?.profile?.displayName ?? null,
+    // **`displayName` 으로 폴백하지 않는다.** 정본 §3 은 공개 명단을 "등번호 + 닉네임" 으로
+    // 못 박았는데 `displayName` 은 **실명이 들어갈 수 있는 자리**다(가입 경로에 따라 실명이
+    // 그대로 담긴다). 폴백을 두면 닉네임이 빈 사용자에게서 실명이 공개로 새 나간다 —
+    // 주석은 "없으면 null" 이라고 적어 두고 구현만 폴백하고 있었다(Copilot 지적).
+    nickname: row.user?.profile?.nickname ?? null,
   }));
 }

@@ -255,6 +255,10 @@ function ParticipantTeamRow({
           onClick={() => setOpen((prev) => !prev)}
           aria-expanded={open}
           aria-controls={rosterId}
+          // **접근성 이름에 팀명을 넣는다.** 보이는 글자는 "명단" 이라 짧아도 되지만,
+          // 스크린리더 사용자는 버튼 목록을 훑기 때문에 팀마다 이름이 같으면 **어느 팀의
+          // 명단인지 구분할 수 없다**(Copilot 지적).
+          aria-label={`${team.teamName} 명단 ${open ? '접기' : '펼치기'}`}
           className="tm-text-caption tm-pressable"
           style={{
             minHeight: 44, minWidth: 44, padding: '0 10px',

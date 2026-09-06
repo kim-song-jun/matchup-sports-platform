@@ -641,13 +641,16 @@ describe('presentTournamentDetail — 공개 명단', () => {
               birthDateSnapshot: '1995-03-15',
               genderSnapshot: 'male',
               eligibilityStatus: 'pro',
-              user: { profile: { nickname: '길동이', displayName: null } },
+              user: { profile: { nickname: '길동이', displayName: '홍길동(실명)' } },
             },
             {
               id: 'player-2',
               userId: 'user-2',
               realName: '김철수',
-              user: { profile: null },
+              // **닉네임은 없고 `displayName` 만 있는 사용자.** 예전엔 여기서 `displayName`
+              // 으로 폴백했는데, 그 자리에는 가입 경로에 따라 **실명이 그대로 담길 수
+              // 있다** — 폴백 하나로 실명이 공개로 새 나간다(Copilot 지적).
+              user: { profile: { nickname: null, displayName: '김철수(실명)' } },
             },
           ],
         },
@@ -685,6 +688,9 @@ describe('presentTournamentDetail — 공개 명단', () => {
     expect(serialized).not.toContain('홍길동');
     expect(serialized).not.toContain('김철수');
     expect(serialized).not.toContain('1995-03-15');
+    // **`displayName` 값도 훑는다** — 폴백이 되살아나면 여기서 잡힌다.
+    expect(serialized).not.toContain('홍길동(실명)');
+    expect(serialized).not.toContain('김철수(실명)');
     expect(serialized).not.toContain('genderSnapshot');
     expect(serialized).not.toContain('eligibilityStatus');
   });

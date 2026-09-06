@@ -155,7 +155,9 @@ export const TOURNAMENT_DETAIL_INCLUDE = {
         select: {
           id: true,
           userId: true,
-          user: { select: { profile: { select: { nickname: true, displayName: true } } } },
+          // `displayName` 은 **select 하지 않는다** — 폴백에 안 쓰기로 했고(정본 §3),
+          // 안 쓰는 PII 인접 필드를 응답 경로에 싣지 않는다.
+          user: { select: { profile: { select: { nickname: true } } } },
         },
       },
     },

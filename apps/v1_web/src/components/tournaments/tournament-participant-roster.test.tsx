@@ -47,18 +47,22 @@ describe('참가팀 카드 — 공개 명단 펼치기', () => {
     // 접힌 상태에서는 명단이 화면에 없다 — 팀이 많으면 상세가 길어지기 때문이다.
     expect(screen.queryByText('길동이')).not.toBeInTheDocument();
 
-    const toggle = screen.getByRole('button', { name: '명단' });
+    // **시각 텍스트로 찾는다.** 접근성 이름(`aria-label`)에는 팀명이 들어가는데, 그걸
+    // 기준으로 찾으면 라벨 문구를 손볼 때마다 테스트가 함께 깨진다 — 둘은 독립이어야 한다.
+    const toggle = screen.getByText('명단');
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(toggle);
 
     expect(screen.getByText('길동이')).toBeInTheDocument();
     expect(screen.getByText('7')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '명단 접기' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('명단 접기')).toHaveAttribute('aria-expanded', 'true');
+    // 접근성 이름에는 팀명이 들어간다 — 팀이 여럿일 때 어느 팀 명단인지 구분된다.
+    expect(screen.getByLabelText('A팀 명단 접기')).toBeInTheDocument();
   });
 
   it('등번호가 없는 선수는 —, 닉네임이 없으면 자리표시자 — 실명을 대신 쓰지 않는다', () => {
     renderSection([team()]);
-    fireEvent.click(screen.getByRole('button', { name: '명단' }));
+    fireEvent.click(screen.getByText('명단'));
 
     // 0 으로 채우면 아무도 안 단 번호가 전원 0번이 된다.
     expect(screen.getByText('—')).toBeInTheDocument();
@@ -68,7 +72,7 @@ describe('참가팀 카드 — 공개 명단 펼치기', () => {
 
   it('명단을 안 낸 팀은 왜 비었는지 말해 준다 — 빈 칸만 남기지 않는다', () => {
     renderSection([team({ players: [] })]);
-    fireEvent.click(screen.getByRole('button', { name: '명단' }));
+    fireEvent.click(screen.getByText('명단'));
 
     expect(screen.getByText('아직 명단을 등록하지 않았어요.')).toBeInTheDocument();
   });

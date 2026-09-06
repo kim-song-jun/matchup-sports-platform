@@ -30,11 +30,14 @@ vi.mock('@/lib/analytics', () => ({
 // `?team=` 유무로 셸 backHref가 갈리는 테스트(아래 "셸 backHref override" describe)를 위해
 // 가변 변수로 뺀다 — admin/content/page.test.tsx의 기존 관례와 동일 패턴.
 let searchParams = new URLSearchParams();
+// **`replace` 를 고정 mock 으로 둔다.** 매번 새 `vi.fn()` 을 만들면 호출을 검사할 수 없어서,
+// "되돌리지 않는다" 를 단언하려는 테스트가 조용히 아무것도 검사하지 않게 된다.
+const routerReplaceMock = vi.fn();
 vi.mock('next/navigation', () => ({
   usePathname: () => '/tournaments/tournament-1/apply',
   useRouter: () => ({
     push: vi.fn(),
-    replace: vi.fn(),
+    replace: routerReplaceMock,
   }),
   useSearchParams: () => searchParams,
 }));
@@ -500,6 +503,62 @@ describe('TournamentApplyPageClient GA events', () => {
       await waitFor(() => {
         expect(submitRegistrationMutateAsync).toHaveBeenCalledWith(
           expect.objectContaining({ registrationIdOverride: 'registration-reactivated' }),
+        );
+      });
+    });
+  });
+
+
+  /**
+   * **결함 #22-b** — `/apply` 가 `confirmed`/`waitlisted`/`cancel_requested` 신청이
+   * **하나라도** 있으면 무조건 `/my` 로 되돌려서, **두 팀을 가진 팀장이 다른 팀으로 신청할
+   * 수 없었다**(2026-09-05 alpha 실측: 팀장B 가 B팀 확정 상태에서 C팀으로 신청할 경로가
+   * 아예 없었다). 1군을 넣은 클럽이 2군을 넣으려 하면 1군 신청 화면으로 튕긴다.
+   *
+   * 되돌리는 것이 옳은 경우는 하나다 — **더 넣을 팀이 없을 때.**
+   */
+  describe('여러 팀을 가진 팀장의 신청 (#22-b)', () => {
+    beforeEach(() => {
+      routerReplaceMock.mockClear();
+    });
+
+    it('아직 안 넣은 팀이 있으면 되돌리지 않고 폼을 연다 — 그 팀이 선택지에 있다', async () => {
+      tournamentApplyApiMocks.useV1MyTeams.mockReturnValue({
+        data: {
+          items: [
+            makeTeam(),
+            makeTeam({ teamId: 'team-2', membershipId: 'membership-2', name: '성수 2군' }),
+          ],
+        },
+        isLoading: false,
+      });
+      // team-1 은 이미 확정 — team-2 는 아직이다.
+      tournamentApplyApiMocks.useV1MyRegistrations.mockReturnValue({
+        data: [makeRegistration({ id: 'registration-confirmed', status: 'confirmed' })],
+        isLoading: false,
+      });
+
+      render(<TournamentApplyPageClient tournamentId="tournament-1" />);
+
+      expect(await screen.findByText('성수 2군')).toBeInTheDocument();
+      expect(routerReplaceMock).not.toHaveBeenCalled();
+    });
+
+    it('모든 팀을 이미 넣었으면 그대로 내 신청으로 보낸다 (대회 기존 동작 회귀)', async () => {
+      tournamentApplyApiMocks.useV1MyTeams.mockReturnValue({
+        data: { items: [makeTeam()] },
+        isLoading: false,
+      });
+      tournamentApplyApiMocks.useV1MyRegistrations.mockReturnValue({
+        data: [makeRegistration({ id: 'registration-confirmed', status: 'confirmed' })],
+        isLoading: false,
+      });
+
+      render(<TournamentApplyPageClient tournamentId="tournament-1" />);
+
+      await waitFor(() => {
+        expect(routerReplaceMock).toHaveBeenCalledWith(
+          expect.stringContaining('/tournaments/tournament-1/my?reg=registration-confirmed'),
         );
       });
     });

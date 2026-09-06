@@ -1644,9 +1644,26 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
       return;
     }
 
-    const needsRedirect = myManagedRegistrations.find(
-      (reg) => resolveRegistrationResumeAction(reg.status) === 'redirect',
+    // **신청할 팀이 아직 남아 있으면 되돌리지 않는다.**
+    //
+    // 예전엔 `confirmed`/`waitlisted`/`cancel_requested` 신청이 **하나라도** 있으면 무조건
+    // `/my` 로 보냈다. 그래서 **두 팀을 가진 팀장이 다른 팀으로 신청할 수 없었다** — 1군을
+    // 넣은 클럽이 2군을 넣으려 하면 1군 신청 화면으로 튕겼다(2026-09-05 alpha 실측:
+    // 팀장B 가 B팀 확정 상태에서 C팀으로 신청할 경로가 없었다).
+    //
+    // 되돌리는 것이 옳은 경우는 하나다 — **더 넣을 팀이 없을 때.** 그때 이 화면은 빈 팀
+    // 선택지만 보여 주므로, 자기 신청을 보여 주는 편이 낫다.
+    const registeredTeamIds = new Set(
+      myManagedRegistrations
+        .filter((reg) => resolveRegistrationResumeAction(reg.status) === 'redirect')
+        .map((reg) => reg.teamId),
     );
+    const hasTeamLeftToApply = managerTeams.some((team) => !registeredTeamIds.has(team.teamId));
+    const needsRedirect = hasTeamLeftToApply
+      ? undefined
+      : myManagedRegistrations.find(
+          (reg) => resolveRegistrationResumeAction(reg.status) === 'redirect',
+        );
 
     if (needsRedirect) {
       setIsRedirectingAway(true);

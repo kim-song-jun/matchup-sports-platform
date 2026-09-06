@@ -2711,7 +2711,8 @@ label.tm-btn:focus-within {
  * 구석 배치는 자리를 옮겨도 아이콘 버튼·오버레이 텍스트와 같은 면을 계속 나눠 써야 했다.
  * 영상 02 의 모듈(라벨 → 타이틀 → 본문 → 그래픽)을 세로 순서로 그대로 가져온다.
  */
-.tm-match-detail-hero-stack {
+.tm-match-detail-hero.tm-match-detail-hero-stack {
+  /* .tm-match-detail-hero 의 height:220px 가 파일 뒤쪽에 있어 단일 클래스로는 진다. */
   height: auto;
   display: block;
   position: relative;
@@ -2748,17 +2749,20 @@ label.tm-btn:focus-within {
   right: 12px;
 }
 
-/* 밝은 바탕이므로 흰 글씨 계열을 전부 본문 색으로 되돌린다. */
-.tm-match-detail-hero-stack .tm-hero-button,
-.tm-match-detail-hero-stack .tm-match-detail-meta {
+/* 사진 히어로(오버레이)의 기본 색 — 마크업에서 인라인 style 을 뺐으므로 여기서 준다.
+   .tm-text-caption 과 같은 단일 클래스면 선언 순서에 지므로 오버레이로 한정해 올린다. */
+.tm-match-detail-overlay .tm-match-detail-meta {
   color: var(--overlay-white-76);
 }
 
-.tm-match-detail-heromsg {
+.tm-match-detail-overlay .tm-match-detail-heromsg {
   color: var(--overlay-white-86);
 }
 
-.tm-match-detail-title {
+/* 밝은 바탕이므로 흰 글씨 계열을 전부 본문 색으로 되돌린다.
+   위 오버레이 규칙과 specificity 가 같아 순서로 이긴다 — 반드시 뒤에 둔다. */
+.tm-match-detail-hero-stack .tm-hero-button,
+.tm-match-detail-hero-stack .tm-match-detail-title {
   color: var(--text-strong);
 }
 

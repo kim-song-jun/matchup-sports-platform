@@ -28,6 +28,9 @@ const ids = {
   friendlyMatch: '96000000-0000-4000-8000-000000000041',
   draftMatch: '96000000-0000-4000-8000-000000000042',
   cancelledMatch: '96000000-0000-4000-8000-000000000043',
+  // 대조군: **대회 픽스처**. 같은 `deriveTournamentRevision` 을 지나지만 억제되면 안 된다.
+  tournamentFixture: '96000000-0000-4000-8000-000000000050',
+  director: '96000000-0000-4000-8000-000000000051',
 } as const;
 
 const prisma = new PrismaService();
@@ -79,6 +82,8 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
   let friendlyGameId: string;
   let draftGameId: string;
   let cancelledGameId: string;
+  let fixtureGameId: string;
+  let fixtureEnd: EndOutcome;
   type EndOutcome = Outcome<Awaited<ReturnType<typeof service.executeCommand>>>;
   let leagueEnd: EndOutcome;
   let draftEnd: EndOutcome;
@@ -104,6 +109,46 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
       ),
     );
     return created.gameId;
+  };
+
+  const createFixtureGame = async (): Promise<string> => {
+    const input: GameSourceCreationInput = {
+      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+      sourceId: ids.tournamentFixture,
+      competitionConfigVersionId: configId,
+      sides: [
+        { sideKey: V1GameSideKey.HOME, teamId: ids.homeTeam, displayNameSnapshot: '대조군 홈' },
+        { sideKey: V1GameSideKey.AWAY, teamId: ids.awayTeam, displayNameSnapshot: '대조군 원정' },
+      ],
+      participants: [],
+    };
+    const created = await prisma.$transaction((tx) =>
+      service.createFromSourceInTransaction(
+        tx,
+        input,
+        sourceContext({ actorType: 'USER', actorUserId: ids.admin, role: 'platform_ops' }, 'console-end-src-fixture', input),
+      ),
+    );
+    return created.gameId;
+  };
+
+  /**
+   * 대회 픽스처 커맨드는 **실제 takeover 토큰**이 필요하다(팀매치는 그 요구가 early-return
+   * 이라 아무 문자열이나 통과한다 — 그 차이 자체가 계약이다).
+   */
+  const runFixture = async (command: 'start' | 'end', commandId: string) => {
+    const { takeoverToken } = await service.requestTakeover(authUser(ids.admin), fixtureGameId, {
+      clientInstanceId: 'console-end-fixture-client',
+      lastSequence: 0,
+    });
+    const game = await prisma.v1Game.findUniqueOrThrow({ where: { id: fixtureGameId } });
+    return service.executeCommand(authUser(ids.admin), fixtureGameId, command, commandId, {
+      expectedVersion: game.version,
+      clientCommandId: commandId,
+      takeoverToken,
+      occurredAt: new Date().toISOString(),
+      payload: {},
+    });
   };
 
   const run = async (gameId: string, command: 'start' | 'end', commandId: string) => {
@@ -206,6 +251,18 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
     friendlyGameId = await createGame(ids.friendlyMatch, 'console-end-src-friendly');
     draftGameId = await createGame(ids.draftMatch, 'console-end-src-draft');
     cancelledGameId = await createGame(ids.cancelledMatch, 'console-end-src-cancelled');
+
+    // 대조군 — 리그 거울(`league.id`)이 곧 `V1Tournament` 이므로 그 아래 픽스처를 만든다.
+    await prisma.v1TournamentFixture.create({
+      data: {
+        id: ids.tournamentFixture,
+        tournamentId: league.id,
+        round: 'group',
+        fixtureNumber: 1,
+        competitionConfigVersionId: configId,
+      },
+    });
+    fixtureGameId = await createFixtureGame();
     // **초안을 미리 심는다(#31).** 호스트 팀장이 `createResultRevision` 으로 만들 수 있는
     // 상태다 — 그 경로엔 게임 상태 게이트가 없다. 예전 코드는 `revision: 1` 리터럴이라
     // 이 상태에서 `end` 가 P2002 로 죽고, 그게 409 "reload and retry" 로 번역됐다.
@@ -247,6 +304,9 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
       data: { status: 'cancelled', cancelledAt: new Date() },
     });
     cancelledEnd = await capture(() => run(cancelledGameId, 'end', 'console-end-cancelled-end'));
+
+    await runFixture('start', 'console-end-fixture-start');
+    fixtureEnd = await capture(() => runFixture('end', 'console-end-fixture-end'));
   });
 
   afterAll(async () => {
@@ -335,6 +395,27 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
     // 완료 처리만 막히고 **리비전은 그대로 생긴다**(그러면 자동 승인 레인에 그대로 들어간다).
     const revisions = await prisma.v1GameResultRevision.count({ where: { gameId: cancelledGameId } });
     expect(revisions).toBe(0);
+  });
+
+  it('리그 콘솔 종료는 GAME_RESULT_SUBMITTED 를 내지 않는다 — 상대팀 승인 레인에 넣지 않는다 (A-3)', async () => {
+    // 그 이벤트의 소비처는 **에스컬레이션 레인 하나뿐**이고, 그게 24시간 자동 승인 ·
+    // 12시간 재촉 · 상대팀 "확인해 주세요" 알림을 만든다. 리그 콘솔 결과는 **어드민 확인
+    // 한 단계**로만 공식이 되어야 하므로(정본 §4) 넷 다 없어야 한다.
+    const events = await prisma.v1OutboxEvent.count({
+      where: { type: 'GAME_RESULT_SUBMITTED', aggregateId: leagueGameId },
+    });
+    expect(events).toBe(0);
+  });
+
+  it('대회 픽스처는 그대로 낸다 — 억제가 너무 넓으면 대회가 깨진다 (A-3 대조군)', async () => {
+    // **같은 `deriveTournamentRevision` 을 지난다.** 대회는 이 이벤트로 비-리그 분기
+    // (리마인더·에스컬레이션)를 돌리므로 끊으면 대회 운영이 멈춘다. 이 단언이 없으면
+    // "억제가 너무 넓다" 를 아무도 못 잡는다.
+    expect(fixtureEnd.ok && fixtureEnd.value.state).toBe(V1GameState.ENDED);
+    const events = await prisma.v1OutboxEvent.count({
+      where: { type: 'GAME_RESULT_SUBMITTED', aggregateId: fixtureGameId },
+    });
+    expect(events).toBe(1);
   });
 
   it('친선 팀매치는 여전히 콘솔로 끝낼 수 없다 (409) — 이 가드가 지키던 것', () => {

@@ -6417,6 +6417,23 @@ export class GamesService {
     return (latest?.revision ?? 0) + 1;
   }
 
+  /**
+   * 이 게임이 **리그 대진**인가. 리그 대진의 게임도 `TEAM_MATCH` 소스로 만들어지므로
+   * (`league-fixture-creation.ts`) 소스 타입만으로는 친선과 갈리지 않는다 —
+   * `V1TeamMatch.leagueId` 로 가른다(이 저장소가 이미 쓰는 관용구다:
+   * `team-record-category.ts` 의 `leagueId !== null ? 'league' : 'friendly'` 등).
+   */
+  private async isLeagueTeamMatchGame(tx: Transaction, game: LockedGame): Promise<boolean> {
+    if (game.sourceType !== V1GameSourceType.TEAM_MATCH || game.teamMatchId === null) {
+      return false;
+    }
+    const teamMatch = await tx.v1TeamMatch.findUnique({
+      where: { id: game.teamMatchId },
+      select: { leagueId: true },
+    });
+    return teamMatch !== null && teamMatch.leagueId !== null;
+  }
+
   private async deriveTournamentRevision(
     tx: Transaction,
     game: LockedGame,
@@ -6589,14 +6606,38 @@ export class GamesService {
         submittedAt: new Date(),
       },
     });
-    await this.writeOutbox(
-      tx,
-      `game:${game.id}:revision:${submitted.revision}:submitted`,
-      game.id,
-      'GAME_RESULT_SUBMITTED',
-      { revisionId: submitted.id, sideCount: sides.length },
-      submitted.id,
-    );
+    // **리그 대진의 콘솔 결과는 이 이벤트를 내지 않는다(A-3, 2026-09-06 사용자 확정 B안).**
+    //
+    // `GAME_RESULT_SUBMITTED` 의 소비처는 **에스컬레이션 레인 하나뿐**이다
+    // (`GameResultSubmittedEscalationService`, 워커 등록 1곳). 그 레인이 24시간 자동 승인
+    // (`GAME_RESULT_LEAGUE_AUTO_APPROVE`)과 12시간 재촉(`GAME_RESULT_REVIEW_ESCALATION`)을
+    // 예약하고, 상대팀에게 "경기 결과를 확인해 주세요" 알림을 보낸다.
+    //
+    // **리그 콘솔 결과에는 그 넷이 전부 없어야 한다** — 운영자가 콘솔로 진행한 경기의 결과는
+    // **어드민 확인 한 단계**로만 공식이 된다(정본 §4). 상대팀은 승인할 것이 없고, 24시간
+    // 자동 승인은 어드민 확인 단계를 통째로 건너뛴다. 팀은 확정 뒤 기존
+    // `league_team_match_completed` 알림으로 안다.
+    //
+    // **이벤트를 안 내는 것으로 넷을 한 번에 끈다.** 예약 행을 만들고 나중에 거르는 방식은
+    // 판별자가 비동기 간극(워커가 나중에 읽는다)을 견뎌야 해서 계약 변경이 필요한데,
+    // 여기서는 **"행이 없다" 는 것 자체가 durable** 이라 그 문제가 성립하지 않는다.
+    //
+    // **대회는 반드시 그대로 둔다** — 이 함수는 대회도 지나고, 대회는 이 이벤트로 비-리그
+    // 분기(리마인더·에스컬레이션)를 돌린다. 끊으면 대회가 깨진다.
+    //
+    // 복구 레인(`RECOVERY`)도 같이 억제한다: 복구는 **콘솔로 끝난 경기의 결과를 재구성**하는
+    // 것이라 정책이 같아야 한다. 레인별로 갈라 두면 복구 한 번에 자동 승인이 되살아난다.
+    const suppressSubmittedEvent = await this.isLeagueTeamMatchGame(tx, game);
+    if (!suppressSubmittedEvent) {
+      await this.writeOutbox(
+        tx,
+        `game:${game.id}:revision:${submitted.revision}:submitted`,
+        game.id,
+        'GAME_RESULT_SUBMITTED',
+        { revisionId: submitted.id, sideCount: sides.length },
+        submitted.id,
+      );
+    }
     return {
       gameId: game.id,
       state: V1GameState.ENDED,

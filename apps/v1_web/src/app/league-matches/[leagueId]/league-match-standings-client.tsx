@@ -12,6 +12,7 @@ import {
   useV1LeagueMatchStandings,
   useV1MyTeams,
   useV1RecordConsent,
+  useV1MyRegistrations,
 } from '@/hooks/use-v1-api';
 import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
@@ -502,6 +503,15 @@ function LeagueRegistrationCta({
   registrationOpen: boolean;
   registrationDeadlineAt: string | null;
 }) {
+  // **이미 신청한 사람에게 "참가 신청" 이라고 말하지 않는다.** 예전엔 조건 없이 `/apply`
+  // 로 보냈는데, 신청이 있으면 그 화면이 `/my` 로 되돌린다 — 팀장은 "신청" 을 눌렀는데
+  // 자기 신청 화면이 열려서 **눌린 건지 안 눌린 건지 알 수 없었다**(2026-09-05 alpha 실측).
+  // 대회 상세는 이미 같은 방식으로 갈라 두고 있어(`tournament-detail-client.tsx`) 그
+  // 판정 규칙을 그대로 쓴다 — 취소된 신청은 "없는 것" 으로 본다(다시 신청할 수 있다).
+  const myRegistrations = useV1MyRegistrations(leagueId, { enabled: registrationOpen });
+  const activeRegistration =
+    (myRegistrations.data ?? []).find((registration) => registration.status !== 'cancelled') ?? null;
+
   if (!registrationOpen) return null;
   const deadlineLabel = formatTournamentDateTimeShort(registrationDeadlineAt);
   return (
@@ -511,11 +521,15 @@ function LeagueRegistrationCta({
         <span className="tm-text-caption text-[var(--text-muted)]">신청 마감 {deadlineLabel}</span>
       )}
       <Link
-        href={`/tournaments/${leagueId}/apply`}
-        className="tm-btn tm-btn-sm tm-btn-primary"
+        href={
+          activeRegistration === null
+            ? `/tournaments/${leagueId}/apply`
+            : `/tournaments/${leagueId}/my?reg=${activeRegistration.id}`
+        }
+        className={`tm-btn tm-btn-sm ${activeRegistration === null ? 'tm-btn-primary' : 'tm-btn-outline'}`}
         style={{ minHeight: 44 }}
       >
-        참가 신청
+        {activeRegistration === null ? '참가 신청' : '내 신청'}
       </Link>
     </div>
   );

@@ -145,6 +145,19 @@ export const TOURNAMENT_DETAIL_INCLUDE = {
           region: { select: { name: true } },
         },
       },
+      // 공개 명단(등번호 + 닉네임). **PII 는 select 하지 않는다** — `realName`·생년월일·
+      // 성별·자격판정은 자격 가드에만 쓰는 값이라 공개 응답에 실리면 안 된다(정본 §3).
+      // 등번호는 여기서 못 읽는다(생성 클라이언트에 컬럼이 없다) — presenter 가 raw 로
+      // 한 번에 배치 조회해 얹는다.
+      players: {
+        where: { removedAt: null },
+        orderBy: { id: 'asc' },
+        select: {
+          id: true,
+          userId: true,
+          user: { select: { profile: { select: { nickname: true, displayName: true } } } },
+        },
+      },
     },
   },
   _count: {

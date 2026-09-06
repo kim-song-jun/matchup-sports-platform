@@ -172,6 +172,8 @@ describe('TournamentsReadService', () => {
       findFirst: jest.Mock;
       count: jest.Mock;
     };
+    /** 공개 명단 등번호는 raw 로 읽는다(생성 클라이언트에 컬럼이 없다). */
+    $queryRaw: jest.Mock;
     // 참가팀 식별 정보 통일 정책(fix/v1-publish)의 운영자·스태프 우회는
     // TournamentStaffAccessService(실제 구현)를 그대로 배선하므로, 그게 의존하는
     // v1AdminUser/v1TournamentStaffAssignment도 이 같은 fake PrismaService 위에
@@ -198,6 +200,9 @@ describe('TournamentsReadService', () => {
         findFirst: jest.fn(),
         count: jest.fn().mockResolvedValue(0),
       },
+      // 기본은 "아무도 번호를 안 달았다" — 행 배열을 준다. `undefined` 로 두면 결과를
+      // 순회하는 코드가 mock 에서만 터진다.
+      $queryRaw: jest.fn().mockResolvedValue([]),
       v1AdminUser: {
         findUnique: jest.fn().mockResolvedValue(null),
       },
@@ -781,6 +786,9 @@ describe('TournamentsReadService', () => {
         teamRegionName: '서울 강남구',
         status: 'confirmed',
         confirmedAt: '2026-06-20T00:00:00.000Z',
+        // 공개 명단(2026-09-06). 이 픽스처의 등록에는 `players` 가 없어 빈 배열이다 —
+        // **`toEqual` 이라 새 필드가 그대로 드러난다**(그게 이 단언의 값어치다).
+        players: [],
       },
       {
         registrationId: 'reg-waitlisted',
@@ -790,6 +798,7 @@ describe('TournamentsReadService', () => {
         teamRegionName: null,
         status: 'waitlisted',
         confirmedAt: null,
+        players: [],
       },
     ]);
 

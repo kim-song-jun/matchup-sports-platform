@@ -5,7 +5,7 @@ import { buildPageInfo, paginationArgs } from '../common/pagination/page-args';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { TournamentStaffAccessService } from './staff/tournament-staff-access.service';
 import { presentTournamentCard } from './tournament-card.presenter';
-import { presentTournamentDetail } from './tournament-detail.presenter';
+import { presentTournamentDetail, shouldHideParticipantIdentity } from './tournament-detail.presenter';
 import { TournamentListQueryDto } from './dto/tournament-read.dto';
 import { leagueProgressOf, magicNumberOf } from './league-progress';
 import { COMPETITION_LIST_SURFACE } from './tournament-surface';
@@ -28,6 +28,7 @@ import {
   calculateLeagueStandingsWithTieBreakInfo,
 } from '../league-matches/league-standings';
 import { LEAGUE_TIE_BREAK_ORDER } from '../league-matches/league-tie-break';
+import { readJerseyNumbersForRegistrations } from './tournament-player-jersey';
 
 /** `V1CompetitionConfigVersion.tieBreak`(Json)에 담긴 승리 승점 기본값 — 프리셋 전부가 3이다. */
 const DEFAULT_WIN_POINTS = 3;
@@ -185,7 +186,17 @@ export class TournamentsReadService {
         ? await this.leagueCompetitionFixtures(tournamentId)
         : [];
 
-    return presentTournamentDetail(row, new Date(), staffBypass, leagueFixtures);
+    // 공개 명단의 등번호 — **참가팀 전부를 한 번에** 읽는다. 팀마다 물으면 팀 수만큼
+    // 쿼리가 나간다(N+1). 명단을 감추는 상태면 아예 묻지 않는다.
+    const hideIdentity = shouldHideParticipantIdentity(row.status, staffBypass);
+    const jerseyByPlayerId = hideIdentity
+      ? new Map<string, number>()
+      : await readJerseyNumbersForRegistrations(
+          this.prisma,
+          row.registrations.map((registration) => registration.id),
+        );
+
+    return presentTournamentDetail(row, new Date(), staffBypass, leagueFixtures, jerseyByPlayerId);
   }
 
   /**

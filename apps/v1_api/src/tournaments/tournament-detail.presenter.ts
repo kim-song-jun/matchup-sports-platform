@@ -6,6 +6,7 @@ import {
 import type { LeagueFixtureListItem } from '../league-matches/league-fixture-list-source';
 import type { TournamentDetailRow } from './tournaments-read.query';
 import { resolveTournamentFixtureOfficialResult } from './tournament-fixture-official-result';
+import { toPublicRoster } from './public-roster';
 
 /**
  * 어워드 수상자 표시 이름 -- 저장된 `recipientName`(명단 실명 스냅샷, `tournament-reviews.service.ts`의
@@ -113,6 +114,12 @@ export function presentTournamentDetail(
    * 된다 — 타입도 값도 정상으로 보인다. 그래서 별도 필드로 낸다.
    */
   leagueFixtures: LeagueFixtureListItem[] = [],
+  /**
+   * 공개 명단의 등번호(키: player id). **호출부가 배치로 한 번에 읽어 넘긴다** —
+   * `leagueFixtures` 와 같은 규약이고, presenter 는 조회하지 않는다.
+   * 생성 Prisma 클라이언트에 컬럼이 없어 raw 로만 읽을 수 있는 값이기도 하다.
+   */
+  jerseyByPlayerId: ReadonlyMap<string, number> = new Map(),
 ) {
   // Task 109 Track 6: bracketPublishedAt이 null이면 대진표(조/픽스처)를 관리자가 아직
   // 일괄 공개하지 않은 상태 — 공개 조회에서는 groups/fixtures를 빈 배열로 감춘다.
@@ -228,6 +235,14 @@ export function presentTournamentDetail(
               teamRegionName: registration.team.region?.name ?? null,
               status: registration.status,
               confirmedAt: registration.confirmedAt?.toISOString() ?? null,
+              // **팀 식별정보와 같은 게이트를 탄다** — `hideIdentity` 가 참이면 이 분기
+              // 자체가 안 돈다. 명단만 따로 게이트를 두면 "팀명은 가렸는데 선수는 보인다"
+              // 같은 어긋남이 생긴다(이 파일이 통일한 그 정책).
+              //
+              // **팀의 `membersVisible` 은 보지 않는다**(2026-09-06 사용자 확정) —
+              // 대회 명단은 팀의 멤버 목록이 아니라 **이 대회에 누가 나오는지**라는
+              // 대회의 사실이다.
+              players: toPublicRoster(registration.players ?? [], jerseyByPlayerId),
             })),
     pendingPaymentCount: row.registrations.filter((registration) =>
       ['awaiting_payment', 'payment_checking', 'paid'].includes(registration.status),

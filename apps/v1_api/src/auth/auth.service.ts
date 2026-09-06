@@ -2,6 +2,8 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import { V1AccountStatus, V1AuthProvider } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { buildOnboardingSummary, hasAcceptedRequiredTerms } from '../onboarding/onboarding-summary';
+import { AppleLoginDto } from './dto/apple-login.dto';
+import { AppleIdentityService } from './apple-identity.service';
 import { KakaoLoginDto } from './dto/kakao-login.dto';
 import { buildKakaoSignupPrefill, readKakaoSignupPrefill, type KakaoSignupPrefill } from './kakao-profile';
 import { isPendingSocialSignup } from './social-signup-access';
@@ -17,6 +19,17 @@ import { verifyPhoneProofToken } from '../verification/phone-proof-token';
 
 const SOCIAL_SIGNUP_TTL_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * Providers whose signup goes through the terms step rather than the email form.
+ *
+ * The two gates below used to name Kakao alone — true while it was the only social login,
+ * and silently wrong the moment a second one existed: an Apple signup could not have
+ * finished onboarding at all.
+ */
+// `as const` 를 붙이지 않는다 — Prisma 의 `in` 은 mutable 배열을 요구해서 readonly 튜플은
+// 타입이 맞지 않고, 그 자리에서 select 전체의 추론이 무너져 관계 필드까지 사라진다.
+const SOCIAL_AUTH_PROVIDERS: V1AuthProvider[] = [V1AuthProvider.kakao, V1AuthProvider.apple];
+
 type KakaoProfile = {
   providerUserKey: string;
   email: string | null;
@@ -28,6 +41,7 @@ type KakaoProfile = {
 @Injectable()
 export class AuthService {
   constructor(
+    private readonly appleIdentity: AppleIdentityService,
     private readonly prisma: PrismaService,
     private readonly managedTerms: ManagedTermsRuntimeService,
     private readonly phoneVerification: PhoneVerificationService,
@@ -426,6 +440,168 @@ export class AuthService {
     return this.sessionResponse(user.id, user.email, { social: true });
   }
 
+  /**
+   * Sign in with Apple, from the identity token the iOS shell collected.
+   *
+   * Required by App Store Review Guideline 4.8: an app that offers Kakao — a third-party
+   * social login — must offer an equivalent login that limits collection to name and email
+   * and lets the reader keep the address private. Apple's private relay is exactly that, so
+   * a `@privaterelay.appleid.com` address arriving here is the normal case, not a degraded one.
+   *
+   * The account is keyed on Apple's `sub`, never on the email: the reader can change or hide
+   * the relay address, and `sub` is the only value Apple promises stays stable for our team.
+   */
+  async appleSignIn(dto: AppleLoginDto) {
+    const claims = await this.appleIdentity.verifyIdentityToken(dto.identityToken, dto.nonce);
+    const now = new Date();
+    // Only a verified address may match an existing account. Linking on an unverified one
+    // would hand the account that owns the mailbox to whoever can mint that claim.
+    const email = claims.email && claims.emailVerified ? normalizeEmail(claims.email) : null;
+
+    const existingIdentity = await this.prisma.v1AuthIdentity.findUnique({
+      where: {
+        provider_providerUserKey: {
+          provider: V1AuthProvider.apple,
+          providerUserKey: claims.subject,
+        },
+      },
+      select: {
+        id: true,
+        status: true,
+        user: {
+          select: {
+            id: true,
+            email: true,
+            accountStatus: true,
+            onboardingStatus: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+      },
+    });
+
+    if (existingIdentity) {
+      if (existingIdentity.status !== 'active' || existingIdentity.user.accountStatus !== 'active') {
+        this.assertNotWithdrawalPending(existingIdentity.user.accountStatus);
+        throw new ForbiddenException({
+          code: 'PERMISSION_DENIED',
+          message: 'This account cannot sign in',
+        });
+      }
+
+      // A signup that was started and abandoned goes back to the terms step rather than
+      // straight into the app, exactly as the Kakao path does — the account exists but has
+      // agreed to nothing yet.
+      if (isExpiredSocialSignup(existingIdentity.user)) {
+        await this.prisma.$transaction([
+          this.prisma.v1AuthIdentity.update({
+            where: { id: existingIdentity.id },
+            data: { email, lastLoginAt: now },
+          }),
+          this.prisma.v1User.update({
+            where: { id: existingIdentity.user.id },
+            data: { onboardingStatus: 'social_terms_required', lastLoginAt: now },
+          }),
+          this.prisma.v1UserOnboardingProgress.upsert({
+            where: { userId: existingIdentity.user.id },
+            update: { currentStep: 'terms' },
+            create: { userId: existingIdentity.user.id, currentStep: 'terms' },
+          }),
+        ]);
+
+        return this.sessionResponse(existingIdentity.user.id, existingIdentity.user.email, { social: true });
+      }
+
+      await this.prisma.$transaction([
+        this.prisma.v1AuthIdentity.update({
+          where: { id: existingIdentity.id },
+          data: { email, lastLoginAt: now },
+        }),
+        this.prisma.v1User.update({
+          where: { id: existingIdentity.user.id },
+          data: { lastLoginAt: now },
+        }),
+      ]);
+
+      return this.sessionResponse(existingIdentity.user.id, existingIdentity.user.email, { social: true });
+    }
+
+    const existingUser = email
+      ? await this.prisma.v1User.findUnique({
+          where: { email },
+          select: { id: true, email: true, accountStatus: true },
+        })
+      : null;
+
+    if (existingUser) {
+      if (existingUser.accountStatus !== 'active') {
+        this.assertNotWithdrawalPending(existingUser.accountStatus);
+        throw new ForbiddenException({
+          code: 'PERMISSION_DENIED',
+          message: 'This account cannot sign in',
+        });
+      }
+
+      await this.prisma.$transaction([
+        this.prisma.v1AuthIdentity.create({
+          data: {
+            userId: existingUser.id,
+            provider: V1AuthProvider.apple,
+            providerUserKey: claims.subject,
+            email,
+            status: 'active',
+            lastLoginAt: now,
+          },
+        }),
+        this.prisma.v1User.update({
+          where: { id: existingUser.id },
+          data: { lastLoginAt: now },
+        }),
+      ]);
+
+      return this.sessionResponse(existingUser.id, existingUser.email, { social: true });
+    }
+
+    const displayName = dto.fullName?.trim();
+    const user = await this.prisma.v1User.create({
+      data: {
+        email,
+        accountStatus: 'active',
+        onboardingStatus: 'social_terms_required',
+        lastLoginAt: now,
+        authIdentities: {
+          create: {
+            provider: V1AuthProvider.apple,
+            providerUserKey: claims.subject,
+            email,
+            status: 'active',
+            lastLoginAt: now,
+          },
+        },
+        onboardingProgress: {
+          create: {
+            currentStep: 'terms',
+            // Apple sends the name on the **first** authorization only and never again — not
+            // even after a delete and reinstall. Storing it here is the only chance to have
+            // it; drop it and the reader retypes their own name during onboarding.
+            draftJson: displayName ? { appleName: displayName } : {},
+          },
+        },
+        notificationPreference: {
+          create: {
+            importantEnabled: true,
+            activityEnabled: true,
+            marketingEnabled: false,
+          },
+        },
+      },
+      select: { id: true, email: true },
+    });
+
+    return this.sessionResponse(user.id, user.email, { social: true });
+  }
+
   async completeSocialTerms(userId: string, dto: SocialTermsDto) {
     if (!dto.requiredTermsAccepted) {
       throw new BadRequestException({
@@ -447,7 +623,7 @@ export class AuthService {
           select: { draftJson: true },
         },
         authIdentities: {
-          where: { provider: V1AuthProvider.kakao, status: 'active' },
+          where: { provider: { in: SOCIAL_AUTH_PROVIDERS }, status: 'active' },
           select: { id: true },
         },
       },
@@ -552,7 +728,7 @@ export class AuthService {
         createdAt: true,
         updatedAt: true,
         authIdentities: {
-          where: { provider: V1AuthProvider.kakao, status: 'active' },
+          where: { provider: { in: SOCIAL_AUTH_PROVIDERS }, status: 'active' },
           select: { id: true },
         },
         termsConsents: {

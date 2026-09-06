@@ -21,14 +21,53 @@ final class NativeBridgeMessageTests: XCTestCase {
         XCTAssertEqual(NativeBridge.resultEventName, "teameet:native-push-result")
     }
 
-    /// The four strings in the web's `NativePushAction` union.
-    func testSupportsExactlyTheFourDeclaredActions() {
+    /// Every string the web can send. Four come from `NativePushAction`; the fifth is Apple
+    /// sign-in, which is native because Apple blocks its web flow inside an embedded browser.
+    func testSupportsExactlyTheDeclaredActions() {
         XCTAssertEqual(
             Set(NativeBridge.Action.allCases.map(\.rawValue)),
             ["get-push-state",
              "request-notification-permission",
              "open-notification-settings",
-             "revoke-push-device"])
+             "revoke-push-device",
+             "sign-in-with-apple"])
+    }
+
+    func testUsesTheEventNameTheAppleSignInWebCodeListensFor() {
+        XCTAssertEqual(NativeBridge.appleResultEventName, "teameet:native-apple-result")
+    }
+
+    /// The nonce comes from the server; a request that lost it must not look like a valid one.
+    func testCarriesTheNonceThroughForAppleSignIn() {
+        let parsed = message(#"{"type":"sign-in-with-apple","requestId":"r1","nonce":"a1.x.1.sig"}"#)
+
+        XCTAssertEqual(parsed?.action, .signInWithApple)
+        XCTAssertEqual(parsed?.nonce, "a1.x.1.sig")
+    }
+
+    func testLeavesTheNonceNilWhenThePageSendsNone() {
+        XCTAssertNil(message(#"{"type":"sign-in-with-apple","requestId":"r1"}"#)?.nonce)
+    }
+
+    // MARK: - Apple reply
+
+    func testAppleReplyCarriesTheTokenAndTheRequestId() {
+        let script = NativeBridge.appleResultScript(
+            requestId: "r1", identityToken: "jwt.value.here", fullName: "김선준", error: nil)
+
+        XCTAssertTrue(script.contains("teameet:native-apple-result"))
+        XCTAssertTrue(script.contains("\"requestId\":\"r1\""))
+        XCTAssertTrue(script.contains("\"ok\":true"))
+        XCTAssertTrue(script.contains("jwt.value.here"))
+    }
+
+    /// A cancelled sheet is reported as "nothing happened", not as a failure to show someone.
+    func testAppleReplyReportsCancellationWithoutAnError() {
+        let script = NativeBridge.appleResultScript(
+            requestId: "r1", identityToken: nil, fullName: nil, error: nil)
+
+        XCTAssertTrue(script.contains("\"ok\":false"))
+        XCTAssertFalse(script.contains("\"error\""))
     }
 
     // MARK: - Parsing
@@ -141,6 +180,29 @@ final class NativeBridgeMessageTests: XCTestCase {
     /// must not throw there, or it would break the page it was meant to serve.
     func testShimBailsOutWhenNoHandlerIsPresent() {
         XCTAssertTrue(NativeBridge.shimScript.contains("if (!handlers"))
+    }
+
+    /// The web offers a shell-only feature by what `supports` lists, not by whether the
+    /// global exists — Android installs the same global and answers push actions only. A
+    /// build that stopped advertising would silently hide Sign in with Apple, so the list is
+    /// checked here rather than trusted.
+    func testShimAdvertisesEveryActionTheShellAnswers() {
+        let shim = NativeBridge.shimScript
+        XCTAssertTrue(shim.contains("supports:"))
+        for action in NativeBridge.Action.allCases {
+            XCTAssertTrue(shim.contains("'\(action.rawValue)'"),
+                          "the shim does not advertise \(action.rawValue)")
+        }
+        XCTAssertTrue(shim.contains("'sign-in-with-apple'"))
+    }
+
+    /// Derived from `Action.allCases`, so an action added to the enum cannot be left off the
+    /// list the web reads.
+    func testAdvertisedActionsAreDerivedFromTheEnum() {
+        XCTAssertEqual(
+            NativeBridge.supportedActionsJSON,
+            "[" + NativeBridge.Action.allCases.map { "'\($0.rawValue)'" }.joined(separator: ",") + "]"
+        )
     }
 
     // MARK: - Permission mapping

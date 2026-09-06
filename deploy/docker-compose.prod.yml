@@ -85,6 +85,11 @@ services:
       FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
       FIREBASE_CLIENT_EMAIL: ${FIREBASE_CLIENT_EMAIL:-}
       FIREBASE_PRIVATE_KEY: ${FIREBASE_PRIVATE_KEY:-}
+      # Sign in with Apple 이 받아들일 audience(= 번들 id). 비밀이 아니라 앱 스토어에 찍히는
+      # 값이라 시크릿 동기화 없이 리터럴로 둔다. 비어 있으면(또는 V1_SESSION_SECRET 이 32자
+      # 미만이면) /auth/apple 과 /auth/apple/nonce 가 503 APPLE_SIGN_IN_NOT_CONFIGURED 로
+      # 답한다 — 나머지 로그인 경로는 영향받지 않는다.
+      APPLE_SIGN_IN_AUDIENCES: ${APPLE_SIGN_IN_AUDIENCES:-kr.co.teameet}
       APNS_KEY_ID: ${APNS_KEY_ID:-}
       APNS_TEAM_ID: ${APNS_TEAM_ID:-}
       APNS_BUNDLE_ID: ${APNS_BUNDLE_ID:-}
@@ -136,6 +141,11 @@ services:
       FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
       FIREBASE_CLIENT_EMAIL: ${FIREBASE_CLIENT_EMAIL:-}
       FIREBASE_PRIVATE_KEY: ${FIREBASE_PRIVATE_KEY:-}
+      # Sign in with Apple 이 받아들일 audience(= 번들 id). 비밀이 아니라 앱 스토어에 찍히는
+      # 값이라 시크릿 동기화 없이 리터럴로 둔다. 비어 있으면(또는 V1_SESSION_SECRET 이 32자
+      # 미만이면) /auth/apple 과 /auth/apple/nonce 가 503 APPLE_SIGN_IN_NOT_CONFIGURED 로
+      # 답한다 — 나머지 로그인 경로는 영향받지 않는다.
+      APPLE_SIGN_IN_AUDIENCES: ${APPLE_SIGN_IN_AUDIENCES:-kr.co.teameet}
       APNS_KEY_ID: ${APNS_KEY_ID:-}
       APNS_TEAM_ID: ${APNS_TEAM_ID:-}
       APNS_BUNDLE_ID: ${APNS_BUNDLE_ID:-}

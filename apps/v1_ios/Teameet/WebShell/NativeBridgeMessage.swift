@@ -19,7 +19,11 @@ enum NativeBridge {
     /// The event `requestNativePush` listens for.
     static let resultEventName = "teameet:native-push-result"
 
-    /// The four actions the web can ask for. Anything else is ignored rather than answered,
+    /// The event `requestNativeAppleSignIn` listens for. Separate from the push one so a
+    /// sign-in reply can never be mistaken for a push-state reply by a page listening to both.
+    static let appleResultEventName = "teameet:native-apple-result"
+
+    /// The actions the web can ask for. Anything else is ignored rather than answered,
     /// because answering an action we do not implement would resolve the page's promise with
     /// a state we did not actually check.
     enum Action: String, CaseIterable {
@@ -27,6 +31,9 @@ enum NativeBridge {
         case requestNotificationPermission = "request-notification-permission"
         case openNotificationSettings = "open-notification-settings"
         case revokePushDevice = "revoke-push-device"
+        /// Sign in with Apple. Native because Apple blocks its web flow inside an embedded
+        /// browser — see `apps/v1_web/src/lib/native-apple.ts`.
+        case signInWithApple = "sign-in-with-apple"
     }
 
     struct Message: Equatable {
@@ -35,6 +42,10 @@ enum NativeBridge {
         /// `requestId` does not match, so echoing it back verbatim is what makes concurrent
         /// calls safe.
         let requestId: String
+        /// Only `sign-in-with-apple` carries one. It comes from the server, never from the
+        /// app: a nonce the app could choose is a nonce an attacker could choose, and then a
+        /// captured identity token replays into a fresh sign-in.
+        var nonce: String?
     }
 
     /// Parses a message from the page.
@@ -53,7 +64,7 @@ enum NativeBridge {
         // `request.optString("requestId", "")`. The web ignores such an event, so the reply
         // is harmless, and the shell still performs the action the page asked for.
         let requestId = payload["requestId"] as? String ?? ""
-        return Message(action: action, requestId: requestId)
+        return Message(action: action, requestId: requestId, nonce: payload["nonce"] as? String)
     }
 
     /// Builds the JavaScript that hands a result back to the page.
@@ -72,6 +83,26 @@ enum NativeBridge {
             return ""
         }
         return "window.dispatchEvent(new CustomEvent('\(resultEventName)',{detail:\(json)}))"
+    }
+
+    /// The reply to `sign-in-with-apple`.
+    ///
+    /// A cancelled sheet is reported as `ok: false` with no error — the page treats it as
+    /// "nothing happened" rather than showing a failure to someone who chose to back out.
+    /// The identity token is passed straight through: it is a signed JWT the server verifies,
+    /// and nothing here is in a position to judge it.
+    static func appleResultScript(
+        requestId: String, identityToken: String?, fullName: String?, error: String?
+    ) -> String {
+        var detail: [String: Any] = ["requestId": requestId, "ok": identityToken != nil]
+        if let identityToken { detail["identityToken"] = identityToken }
+        if let fullName, !fullName.isEmpty { detail["fullName"] = fullName }
+        if let error { detail["error"] = error }
+        guard let data = try? JSONSerialization.data(withJSONObject: detail),
+              let json = String(data: data, encoding: .utf8) else {
+            return ""
+        }
+        return "window.dispatchEvent(new CustomEvent('\(appleResultEventName)',{detail:\(json)}))"
     }
 
     /// Whether a frame that sent a message is allowed to drive the bridge.
@@ -108,6 +139,22 @@ enum NativeBridge {
     ///
     /// The object is frozen and the property non-writable so page code cannot replace the
     /// bridge with one of its own and have the shell answer it.
+    ///
+    /// It carries `supports`, and that list is what the web tests before offering anything
+    /// shell-only. Merely finding `window.TeameetNative` is not enough: Android installs a
+    /// global with the very same name through `addWebMessageListener`, and it answers push
+    /// actions only — a page that took the global's presence as "Apple sign-in works here"
+    /// would show the button in the Android shell and hang until the request timed out. The
+    /// same reasoning covers an older iOS build, which advertises the actions it actually
+    /// has and so never offers one it would ignore.
+    ///
+    /// Android cannot grow this field — the object there is built by WebView itself — which
+    /// is exactly right: no list means no shell-only action.
+    static let supportedActionsJSON: String = {
+        let quoted = Action.allCases.map { "'\($0.rawValue)'" }.joined(separator: ",")
+        return "[\(quoted)]"
+    }()
+
     static let shimScript = """
     (function () {
       var handlers = window.webkit && window.webkit.messageHandlers;
@@ -117,7 +164,8 @@ enum NativeBridge {
         value: Object.freeze({
           postMessage: function (message) {
             handlers.\(handlerName).postMessage(String(message));
-          }
+          },
+          supports: Object.freeze(\(supportedActionsJSON))
         }),
         writable: false,
         configurable: false,

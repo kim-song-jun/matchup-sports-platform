@@ -962,6 +962,22 @@ button:disabled {
   gap: 8px;
 }
 
+/* Apple 로그인 버튼. Apple 의 표시 지침대로 밝은 배경에는 검정, 어두운 배경에는 흰색을 쓴다 —
+   토큰이 아니라 고정색인 이유는 이 색이 우리 테마가 아니라 Apple 의 규정이기 때문이다. */
+.tm-auth-apple {
+  background: var(--static-black);
+  color: var(--static-white);
+}
+
+:root.dark .tm-auth-apple {
+  background: var(--static-white);
+  color: var(--static-black);
+}
+
+.tm-auth-apple:disabled {
+  opacity: 0.58;
+}
+
 .tm-auth-provider-note {
   text-align: center;
   color: var(--text-caption);

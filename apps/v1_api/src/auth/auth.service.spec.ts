@@ -18,6 +18,7 @@ import {
 import { Test, TestingModule } from '@nestjs/testing';
 import { V1AuthProvider } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { AppleIdentityService } from './apple-identity.service';
 import { AuthService } from './auth.service';
 import type { RegisterDto } from './dto/register.dto';
 import { hashPassword } from './password-hash';
@@ -159,12 +160,17 @@ describe('AuthService', () => {
       },
     );
 
+    // Apple's half of the sign-in is verified by its own spec; here the service only needs a
+    // stand-in that yields claims, so the account logic can be asserted on its own.
+    const appleIdentity = { verifyIdentityToken: jest.fn(), issueNonce: jest.fn() };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
         { provide: PrismaService, useValue: prisma },
         { provide: ManagedTermsRuntimeService, useValue: managedTerms },
         { provide: PhoneVerificationService, useValue: phoneVerification },
+        { provide: AppleIdentityService, useValue: appleIdentity },
       ],
     }).compile();
 

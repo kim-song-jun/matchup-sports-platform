@@ -122,6 +122,7 @@ targets:
       - path: Teameet/Push/ApnsEnvironment.swift
       - path: Teameet/Push/PushDeviceRegistration.swift
       - path: Teameet/Push/PushCookieScope.swift
+      - path: Teameet/Auth/AppleNonceHash.swift
     settings:
       base:
         GENERATE_INFOPLIST_FILE: NO

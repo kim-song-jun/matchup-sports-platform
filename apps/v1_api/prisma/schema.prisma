@@ -43,6 +43,7 @@ enum V1AuthProvider {
   kakao
   naver
   email
+  apple
 }
 
 enum V1AuthIdentityStatus {

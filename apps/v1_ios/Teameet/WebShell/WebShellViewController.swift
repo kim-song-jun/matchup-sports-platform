@@ -13,6 +13,9 @@ final class WebShellViewController: UIViewController {
     private let model: WebShellModel
     private let sessionStore: WebShellSessionStore
     private let promptStore = PushPromptStore()
+    /// Created on demand: most sessions never sign in with Apple, and the controller holds a
+    /// pending continuation while a sheet is up.
+    private lazy var appleSignIn = AppleSignInController()
     private var urlObservation: NSKeyValueObservation?
     private let reachability = NetworkReachability()
 
@@ -545,6 +548,13 @@ extension WebShellViewController: WKScriptMessageHandler {
             return
         }
 
+        // Apple sign-in answers on its own event and returns; it must not fall through to the
+        // push reply below, which would resolve a promise the page never made.
+        if request.action == .signInWithApple {
+            await presentAppleSignIn(request)
+            return
+        }
+
         switch request.action {
         case .getPushState:
             break
@@ -554,6 +564,10 @@ extension WebShellViewController: WKScriptMessageHandler {
             openNotificationSettings()
         case .revokePushDevice:
             await push.revoke()
+        case .signInWithApple:
+            // Handled above, before this switch. Listed so a new action added to `Action`
+            // cannot be forgotten here — the compiler refuses an inexhaustive switch.
+            return
         }
 
         // Every action answers with freshly read state rather than what it just did. The
@@ -572,6 +586,46 @@ extension WebShellViewController: WKScriptMessageHandler {
         guard let url = URL(string: UIApplication.openSettingsURLString),
               UIApplication.shared.canOpenURL(url) else { return }
         UIApplication.shared.open(url)
+    }
+
+    /// Puts up Apple's sheet for a page that asked for it, and answers with what came back.
+    ///
+    /// The nonce is taken from the request rather than generated here: the server issued it
+    /// and will check it, and a nonce the app could choose would not stop a captured token
+    /// from being replayed. A request without one is refused rather than answered with a
+    /// sign-in nobody can verify.
+    private func presentAppleSignIn(_ request: NativeBridge.Message) async {
+        guard let nonce = request.nonce, !nonce.isEmpty else {
+            await replyToApple(request, identityToken: nil, fullName: nil, error: "missing nonce")
+            return
+        }
+
+        do {
+            let credential = try await appleSignIn.signIn(rawNonce: nonce, anchor: view.window)
+            await replyToApple(
+                request, identityToken: credential.identityToken, fullName: credential.fullName, error: nil)
+        } catch AppleSignInController.Failure.cancelled {
+            // Backing out of the sheet is a decision, not a failure. The page shows nothing.
+            await replyToApple(request, identityToken: nil, fullName: nil, error: nil)
+        } catch {
+            await replyToApple(
+                request, identityToken: nil, fullName: nil, error: "\(error)")
+        }
+    }
+
+    private func replyToApple(
+        _ request: NativeBridge.Message,
+        identityToken: String?,
+        fullName: String?,
+        error: String?
+    ) async {
+        let script = NativeBridge.appleResultScript(
+            requestId: request.requestId,
+            identityToken: identityToken,
+            fullName: fullName,
+            error: error)
+        guard !script.isEmpty else { return }
+        _ = try? await webView.evaluateJavaScript(script)
     }
 
     private func reply(

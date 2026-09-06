@@ -5,6 +5,7 @@ import { Card } from '@/components/v1-ui/primitives';
 import { AuthBackButton } from './auth-back-button';
 import { ChevronLeftIcon, MatchIcon, TeamMatchIcon, TrophyIcon } from '@/components/v1-ui/icons';
 import { BrandMark } from '@/components/v1-ui/brand-logo';
+import { AppleLoginButton } from './apple-login-button';
 import { KakaoLoginButton } from './kakao-login-button';
 import type { AuthAction, AuthExceptionViewModel, LoginProvider, LoginViewModel, SignupCompleteViewModel } from './auth.types';
 
@@ -33,26 +34,29 @@ export function LoginPageView({ model }: { model: LoginViewModel }) {
           </ul>
         </div>
         <div>
-          <Link className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block tm-auth-email-link" href={model.emailHref}>이메일로 로그인</Link>
+          {/* 소셜 로그인이 위, 이메일이 아래 — Apple 이 권장하는 배치이고, App Store 심사
+              가이드라인 4.8 이 요구하는 "동등한 선택지" 가 눈으로도 그렇게 보인다.
+              Apple 버튼은 네이티브 셸에서만 나타난다(웹 리다이렉트 흐름은 임베디드 웹뷰에서
+              막힌다) — 눌리지 않는 버튼을 "준비 중" 으로 두지 않는다. */}
+          <div className="tm-auth-provider-group">
+            <AppleLoginButton className="tm-btn tm-btn-lg tm-btn-block tm-auth-apple" />
+            {model.providers.length > 0 ? (
+              <div className="tm-auth-provider-row">
+                {model.providers.map((provider) => <ProviderButton key={provider.label} provider={provider} />)}
+              </div>
+            ) : null}
+            {model.providers.some((provider) => provider.disabled) ? (
+              <p className="tm-text-caption tm-auth-provider-note">
+                {model.providers.filter((provider) => provider.disabled).map((provider) => provider.label).join('·')} 로그인은 준비 중이에요
+              </p>
+            ) : null}
+          </div>
+          <AuthDivider />
+          <Link className="tm-btn tm-btn-lg tm-btn-outline tm-btn-block tm-auth-email-link" href={model.emailHref}>이메일로 로그인</Link>
           <Link className="tm-btn tm-btn-lg tm-btn-outline tm-btn-block tm-auth-guest-link" href={model.guestHref}>로그인 없이 시작하기</Link>
           <p className="tm-text-body tm-auth-center">
             아직 계정이 없나요? <Link href={model.signupHref}>회원가입</Link>
           </p>
-          {model.providers.length > 0 ? (
-            <>
-              <AuthDivider />
-              <div className="tm-auth-provider-group">
-                <div className="tm-auth-provider-row">
-                  {model.providers.map((provider) => <ProviderButton key={provider.label} provider={provider} />)}
-                </div>
-                {model.providers.some((provider) => provider.disabled) ? (
-                  <p className="tm-text-caption tm-auth-provider-note">
-                    {model.providers.filter((provider) => provider.disabled).map((provider) => provider.label).join('·')} 로그인은 준비 중이에요
-                  </p>
-                ) : null}
-              </div>
-            </>
-          ) : null}
           <p className="tm-text-caption tm-auth-policy">
             {/* P0 R-X2: 링크 텍스트 blue500(3.71:1 불통과) → blue700(#1b64da, 5.41:1 AA 통과). blue600은 4.49:1로 0.01 미달. */}
             로그인 또는 가입을 진행하면 <Link href="/terms?document=terms" style={{ color: 'var(--blue700)' }}>서비스 이용약관</Link>과{' '}

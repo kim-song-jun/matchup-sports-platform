@@ -30,13 +30,38 @@ describe('인증 안내 화면', () => {
   });
 });
 
+vi.mock('next/navigation', () => ({
+  // AppleLoginButton 이 훅을 조건 없이 호출하므로(훅 규칙) 라우터가 마운트돼 있어야 한다.
+  useRouter: () => ({ replace: vi.fn(), refresh: vi.fn(), push: vi.fn() }),
+}));
+
 describe('로그인 화면', () => {
-  it('로고 원 대신 auth-welcome 그래픽을 쓰고 CTA 순서는 그대로다', () => {
+  it('로고 원 대신 auth-welcome 그래픽을 쓰고 두 진입 CTA를 유지한다', () => {
     const { container } = render(<LoginPageView model={getLoginViewModel(null)} />);
     expect(container.querySelector('.tm-auth-logo')).toBeNull();
     expect([...container.querySelectorAll('img.tm-auth-illustration')].some((img) => srcOf(img).includes('auth-welcome-640.webp'))).toBe(true);
     expect(screen.getByRole('link', { name: '이메일로 로그인' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '로그인 없이 시작하기' })).toBeInTheDocument();
+  });
+
+  /**
+   * App Store 심사 가이드라인 4.8 이 요구하는 "동등한 선택지" 는 배치로도 보여야 한다 —
+   * 소셜 로그인이 위, 이메일이 아래. 순서가 뒤집히면 Apple 이 권장하는 배치가 아니게 된다.
+   */
+  it('소셜 로그인을 이메일 진입보다 위에 둔다', () => {
+    const { container } = render(<LoginPageView model={getLoginViewModel(null)} />);
+    const providerGroup = container.querySelector('.tm-auth-provider-group');
+    const emailLink = screen.getByRole('link', { name: '이메일로 로그인' });
+
+    expect(providerGroup).not.toBeNull();
+    expect(providerGroup!.compareDocumentPosition(emailLink) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .toBeTruthy();
+  });
+
+  /** 브라우저에는 브리지가 없으므로 Apple 버튼이 그려지지 않는다. */
+  it('브리지가 없는 브라우저에서는 Apple 버튼을 그리지 않는다', () => {
+    render(<LoginPageView model={getLoginViewModel(null)} />);
+    expect(screen.queryByRole('button', { name: 'Apple로 계속하기' })).toBeNull();
   });
 });
 

@@ -40,6 +40,30 @@ export class GameResultSubmittedEscalationService {
   readonly handler: GameOperationHandler = async (claim, tx) => {
     const revision = await this.lockRevision(tx, this.revisionId(claim.payload));
     if (revision.state !== 'SUBMITTED' || revision.submittedAt === null) return;
+    // **리그 결과는 이 레인에 들어오지 않는다(A-3, 2026-09-06 사용자 확정).**
+    //
+    // 이 레인이 하는 일이 곧 **상대팀 승인 절차**다 — 검토 큐 행 · 24시간 자동 승인
+    // (`GAME_RESULT_LEAGUE_AUTO_APPROVE`) · 12시간 재촉(`GAME_RESULT_REVIEW_ESCALATION`) ·
+    // 상대팀 "경기 결과를 확인해 주세요" 알림. 정본 §4 는 리그 결과를 **"결과 보내기 →
+    // 어드민 확인 한 단계(이의 없음)"** 로 못 박았고, 사용자가 그것을 다시 확정했다.
+    // 즉 상대팀 승인 레인은 **정본이 없앤 바로 그 단계**이고, 24시간 자동 승인은 어드민
+    // 확인 자체를 건너뛴다.
+    //
+    // **생산자가 아니라 여기서 막는 이유**: `GAME_RESULT_SUBMITTED` 를 내는 곳은 넷이다 —
+    // 콘솔 `end`(`deriveTournamentRevision`) · 팀 제출(`submitResultRevision`) ·
+    // **어드민 정정 후 재제출(`supersedeAndSubmit`)** · 어시스트 동기화
+    // (`syncAssistsIntoSubmittedRevision`). 생산자마다 조건을 복제하면 **다음에 하나가
+    // 조용히 빠진다** — 실제로 어드민 정정 재제출은 리그에서 정상 도달 가능한 동선이라,
+    // 생산자 한 곳만 막으면 어드민이 결과를 고치는 순간 레인이 통째로 되살아난다.
+    // 여기서 끊으면 `createQueue`·`scheduleDueDeliveries`·`notifyReviewer` 가 **아예 안
+    // 돌아** 예약 행이 만들어지지도 않고, 다섯 번째 생산자가 생겨도 자동으로 덮인다.
+    //
+    // 판별자는 생성 시 정해져 변하지 않으므로 비동기 간극 문제가 없다. `lockRevision` 이
+    // 이미 `team_match.league_id` 를 읽고 있어 **추가 조회도 새 컬럼도 필요 없다.**
+    //
+    // 대회 픽스처는 `team_match` 조인이 비어 `leagueId` 가 null 이고, 친선 팀매치도
+    // `leagueId` 가 null 이라 **둘 다 그대로 이 레인을 탄다.**
+    if (revision.teamMatchId !== null && revision.leagueId !== null) return;
     if (await this.guardSuperseded(tx, revision.revisionId)) return;
     await this.createQueue(tx, revision);
     await this.scheduleDueDeliveries(tx, revision);

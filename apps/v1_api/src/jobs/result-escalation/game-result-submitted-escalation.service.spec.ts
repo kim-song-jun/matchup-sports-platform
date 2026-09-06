@@ -157,6 +157,63 @@ describe('GameResultSubmittedEscalationService — ASSIST_SYNC supersession (#39
     });
   });
 
+  /**
+   * **리그 결과는 상대팀 승인 레인에 들어오지 않는다(A-3, 2026-09-06 사용자 확정).**
+   *
+   * 이 레인이 하는 일이 곧 그 절차다 — 검토 큐 · 24시간 자동 승인 · 12시간 재촉 · 상대팀 알림.
+   * 정본 §4 는 리그 결과를 "결과 보내기 → 어드민 확인 한 단계" 로 못 박았다.
+   *
+   * **대조군을 함께 둔다.** 억제가 넓으면 대회·친선이 조용히 멈추는데, 그건 이 레인이
+   * 사라졌다는 사실 자체가 화면에 안 보여서 **아무도 모른 채 지나간다.**
+   */
+  describe('리그 결과 억제 (A-3)', () => {
+    const ran = (tx: { $executeRaw: jest.Mock }) => tx.$executeRaw.mock.calls.map(sqlOf);
+
+    it('리그 팀매치면 아무것도 만들지 않는다 — 큐·예약·알림 전부', async () => {
+      const service = new GameResultSubmittedEscalationService();
+      const tx = fakeTx({
+        revisionRow: supersededRevision({ revisionId: 'rev-league', teamMatchId: 'tm-league', leagueId: 'league-1' }),
+        superseded: false,
+        reviewerRows: [{ userId: 'reviewer-1' }],
+      });
+
+      await service.handler(claim('rev-league'), tx as never);
+
+      // **한 줄도 안 나가야 한다.** 큐 INSERT 도, 예약 아웃박스도, 알림도.
+      expect(ran(tx)).toHaveLength(0);
+    });
+
+    it('대회 픽스처는 그대로 탄다 (대조군)', async () => {
+      const service = new GameResultSubmittedEscalationService();
+      const tx = fakeTx({
+        // 대회는 `team_match` 조인이 비어 teamMatchId·leagueId 가 둘 다 null 이다.
+        revisionRow: supersededRevision({ revisionId: 'rev-fixture', teamMatchId: null, tournamentId: 't1' }),
+        superseded: false,
+        reviewerRows: [{ userId: 'reviewer-1' }],
+      });
+
+      await service.handler(claim('rev-fixture'), tx as never);
+
+      const executed = ran(tx);
+      expect(executed.some((sql) => sql.includes('INSERT INTO v1_result_escalations'))).toBe(true);
+    });
+
+    it('친선 팀매치도 그대로 탄다 (대조군) — 팀매치라고 다 막으면 친선이 죽는다', async () => {
+      const service = new GameResultSubmittedEscalationService();
+      const tx = fakeTx({
+        // 친선은 팀매치이지만 `leagueId` 가 null 이다 — **그 한 칸이 판별자다.**
+        revisionRow: supersededRevision({ revisionId: 'rev-friendly', teamMatchId: 'tm-friendly', leagueId: null }),
+        superseded: false,
+        reviewerRows: [{ userId: 'reviewer-1' }],
+      });
+
+      await service.handler(claim('rev-friendly'), tx as never);
+
+      const executed = ran(tx);
+      expect(executed.some((sql) => sql.includes('INSERT INTO v1_result_escalations'))).toBe(true);
+    });
+  });
+
   describe('regression guard: non-superseded SUBMITTED revisions keep working', () => {
     it('handler still creates the REMINDER+ESCALATION queue rows, the matching outbox jobs, and notifies the reviewer when the revision has NOT been superseded', async () => {
       const service = new GameResultSubmittedEscalationService();

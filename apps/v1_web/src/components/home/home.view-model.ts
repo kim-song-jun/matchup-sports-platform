@@ -1,4 +1,5 @@
 import type { HomeMatchCard, HomeViewModel } from './home.types';
+import { homeCapacity } from './home-capacity';
 
 const matches: HomeMatchCard[] = [
   {
@@ -55,10 +56,14 @@ const matches: HomeMatchCard[] = [
   },
 ];
 
+/** 충원율 내림차순 정렬 키. 인원을 모르는 카드는 뒤로 보낸다(0/0 을 0% 로 세지 않는다). */
+function fillRate(card: HomeMatchCard) {
+  const capacity = homeCapacity(card.currentParticipants, card.maxParticipants);
+  return capacity ? capacity.current / capacity.max : -1;
+}
+
 export function getHomeViewModel(): HomeViewModel {
-  const sortedMatches = [...matches].sort(
-    (a, b) => b.currentParticipants / b.maxParticipants - a.currentParticipants / a.maxParticipants,
-  );
+  const sortedMatches = [...matches].sort((a, b) => fillRate(b) - fillRate(a));
 
   return {
     // 이 함수는 로그인 전/디자인용 정적 모델이다 -- 배너는 전부 인증 사용자 대상이라

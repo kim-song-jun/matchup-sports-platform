@@ -131,8 +131,24 @@ export function assertGameLifecycleTransition(input: GameLifecycleTransitionInpu
 
   let allowed = false;
   if (input.trigger === 'TOURNAMENT_COMMAND') {
+    // **팀 매치 출처도 콘솔로 진행한다.** 리그 대진의 게임은 `TEAM_MATCH` 소스로 만들어지는데
+    // (`league-fixture-creation.ts`), 예전엔 이 자리가 `TOURNAMENT_FIXTURE` 만 허용해서
+    // **리그 경기를 콘솔에서 시작조차 못 했다** — 2026-09-06 alpha 실측:
+    // `TEAM_MATCH/TOURNAMENT_COMMAND cannot transition SCHEDULED to LIVE`.
+    //
+    // 정본이 이미 정한 사안이다: "리그도 대회와 **같은 경기 운영 콘솔**을 쓴다(Task 165)."
+    // 그리고 §6 결정 이력이 대가까지 적어 뒀다 — **"잃는 것: 콘솔이 팀 매치 출처를 알아야
+    // 한다"**. 이 줄이 그 대가를 실제로 치르는 자리다.
+    //
+    // **전이 표는 그대로 공유한다.** 소스가 달라도 경기 진행의 단계(SCHEDULED→LIVE→…)는
+    // 같은 것이라, 표를 갈라 두면 두 벌이 어긋난다.
+    //
+    // **친선 팀매치 동작은 안 바뀐다.** `TOURNAMENT_COMMAND` 는 콘솔 경로만 발행하고,
+    // 누가 발행할 수 있는지는 인가 층(`resolveActor`)이 이미 막는다. 친선은 여전히
+    // `TEAM_RESULT_SUBMISSION` 으로 `→ ENDED` 만 한다(아래 분기).
     allowed =
-      input.sourceType === V1GameSourceType.TOURNAMENT_FIXTURE &&
+      (input.sourceType === V1GameSourceType.TOURNAMENT_FIXTURE ||
+        input.sourceType === V1GameSourceType.TEAM_MATCH) &&
       TOURNAMENT_GAME_TRANSITIONS[input.from].includes(input.to);
   } else if (input.trigger === 'TEAM_RESULT_SUBMISSION') {
     allowed =

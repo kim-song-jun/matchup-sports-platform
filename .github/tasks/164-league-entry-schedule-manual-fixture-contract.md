@@ -203,6 +203,20 @@ D8 순서 `expand → dual-write → backfill → read-swap → contract` 중 **
   **2026-09-04 착수 시 결함 2건 확인**: ⓐ 리그 신청 거부가 화면에서 **항상 400** 이었다(서버는
   사유 필수인데 호출부가 안 채웠다 — 결함 #20) ⓑ `rosterAutoConfirmedAt` 이 **어떤 API 응답에도
   없었다**(잡은 쓰는데 아무도 안 읽음 — 결함 #21). 둘 다 이 항목에서 함께 고친다.
+  > **raw SQL 에서 배열 조건은 `Prisma.join` 을 기본으로 쓴다** (2026-09-06 확정).
+  >
+  > `WHERE id = ANY($1::uuid[])` 로 썼다가 **alpha 어드민 리그 신청 목록이 통째로 500** 이 됐다
+  > (`operator does not exist: text = uuid`). `v1_tournament_registrations.id` 는 마이그레이션
+  > 원본에서 **`text`** 인데, 스키마의 `@default(uuid())` 를 컬럼 타입으로 오해한 것이다 —
+  > 그건 **값 생성 방식**이지 타입이 아니다.
+  >
+  > 이 저장소의 기존 관행은 `IN (${Prisma.join(ids)})` 이고(dev 실측 5곳), **값을 그대로
+  > 바인딩해 캐스팅을 안 쓰므로 이 사고가 원천적으로 안 난다.** 캐스팅이 꼭 필요하면
+  > **마이그레이션 원본에서 컬럼 타입을 확인한 경우에만** 쓴다.
+  >
+  > 그리고 그 SQL 은 **실 DB 통합 테스트로 한 번은 돌려 본다** — 유닛의 `$queryRaw` mock 은
+  > 쿼리가 실제로 도는지 증명하지 않는다. 이 사고가 정확히 그래서 났다(#1043 → #1047).
+
   **후속 정리 후보**: `jerseyNumber` 는 이제 생성 클라이언트에 들어왔다(d.ts 실측) —
   `tournament-player-jersey.ts` 의 raw 헬퍼를 지우고 일반 필드로 되돌릴 수 있다.
   `rosterAutoConfirmedAt` 은 아직 없어서 `registration-auto-confirm.ts` 가 같은 이유로 남는다.

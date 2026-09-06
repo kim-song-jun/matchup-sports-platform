@@ -8717,10 +8717,28 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
 /* data-nav-kind 가 아직 없는 최초 진입(딥링크·새로고침)은 애니메이션 없이 그대로
    보인다 -- 속성 선택자가 매칭 안 되므로 별도 처리가 필요 없다. */
 
-/* ── 스켈레톤 → 콘텐츠 1단 전환(§3.3) -- 176개 loading.tsx 소비처 공용 클래스.
+/* ── 스켈레톤 → 콘텐츠 1단 전환(§3.3) -- loading.tsx 소비처 공용 클래스.
    VT 의 tm-page-fade keyframe 을 그대로 재사용한다(신규 keyframe 아님). ── */
+/* **`backwards` 여야 한다 — `both` 는 모달을 셸 아래로 가둔다(결함 #27, 2026-09-06 alpha 실측).**
+   opacity 를 애니메이트하는 애니메이션은 도는 동안 **스태킹 컨텍스트를 만든다.** `both` 는
+   `forwards` 를 포함하므로 애니메이션이 **끝난 뒤에도 계속 "채우는(filling)" 상태**로 남고,
+   그래서 그 스태킹 컨텍스트가 **영구화된다**(실측: `playState:'finished', fill:'both'`).
+   그러면 이 래퍼 안에서 렌더되는 `position:fixed; z-index:50` 모달의 z-index 가 **래퍼
+   안에서만** 유효해져, 셸(어드민 사이드바 `z-30`·모바일 헤더 `z-20`)이 모달 **위에** 그려진다.
+   실측 피해: 1440 에서 사이드바가 모달 제목과 **모든 항목 라벨**을 덮어 폼을 쓸 수 없었고,
+   390·768 에서는 헤더가 제목을 덮고 헤더 버튼이 `aria-modal` 다이얼로그 위에서 눌렸다.
+
+   **`backwards` 로 바꿔도 보이는 것은 하나도 안 변한다.** `forwards` 가 하던 일은 "끝값을
+   유지" 인데 끝값이 `opacity:1` 로 **자연값과 같아** 애초에 시각 효과가 없었다. `backwards`
+   가 하는 일은 "지연 구간 동안 시작값 적용" 인데 **delay 가 0** 이라 이것도 무효다. 즉 남는
+   것은 등장 페이드(활성 구간)뿐이고, 그건 fill-mode 와 무관하게 그대로 돈다 — alpha 실측으로
+   확인했다(override 상태의 클라이언트 내비게이션에서 `opacity:0` + `playState:'running'`).
+
+   **`forwards`/`both` 로 되돌리지 마라.** 되돌리면 이 저장소의 모든 페이지 내 모달이 다시
+   셸 아래로 깔린다. 페이드가 끝난 뒤 값을 유지해야 하는 상황이 생기면, fill-mode 대신
+   그 자리에 실제 최종 스타일을 쓰거나 모달을 포털로 올려라. */
 .tm-content-enter {
-  animation: tm-page-fade var(--duration-base) var(--ease-out) both;
+  animation: tm-page-fade var(--duration-base) var(--ease-out) backwards;
 }
 
 /* push/pop 진입은 이미 VT 의 ::view-transition-new(page-content) 가 같은 tm-page-fade

@@ -369,4 +369,47 @@ describe('리그 참가 신청 — 대회 스택 재사용', () => {
       await prisma.v1Tournament.update({ where: { id: leagueId }, data: { deletedAt: null } });
     }
   });
+
+  it('어드민 신청 목록이 자동 확정 시각을 실제 DB 에서 읽어 온다 (2026-09-06 alpha 500 회귀)', async () => {
+    // **이 케이스가 없어서 alpha 가 죽었다.** 유닛 스펙은 `$queryRaw` 를 mock 으로 두고
+    // 반환값만 봤기 때문에, 그 SQL 이 진짜 Postgres 에서 도는지 아무도 확인하지 않았다.
+    //
+    // 실제 결함: `v1_tournament_registrations.id` 는 마이그레이션 원본에서 **`text`** 인데
+    // (`@default(uuid())` 는 값 생성 방식이지 컬럼 타입이 아니다) `::uuid[]` 로 캐스팅해서
+    // Postgres 가 `operator does not exist: text = uuid` 로 **목록 전체를 500** 으로 만들었다.
+    // 어드민이 리그 신청을 하나도 볼 수 없었다.
+    const adminRegistrations = new AdminRegistrationsService(
+      prisma,
+      new AdminContextService(prisma),
+      { emitNotification: jest.fn() } as never,
+    );
+
+    // 확정된 등록 하나에만 자동 확정 표식을 남긴다 — 잡이 하는 것과 같은 raw UPDATE.
+    const target = await prisma.v1TournamentRegistration.findFirst({
+      where: { tournamentId: leagueId, status: 'confirmed' },
+      orderBy: { teamId: 'asc' },
+    });
+    expect(target).not.toBeNull();
+    await prisma.$executeRaw`
+      UPDATE "v1_tournament_registrations"
+      SET roster_auto_confirmed_at = TIMESTAMP '2026-09-01 00:00:00'
+      WHERE id = ${target!.id}
+    `;
+
+    // **목록이 뜨는 것 자체가 이 테스트의 절반이다** — 캐스팅이 틀리면 여기서 500 이다.
+    const result = await adminRegistrations.list(auth, leagueId, {} as never);
+
+    const marked = result.items.find((item) => item.id === target!.id);
+    const others = result.items.filter((item) => item.id !== target!.id);
+    // 컬럼이 `timestamp without time zone` 이라 드라이버가 UTC 로 읽는다 — 로컬 타임존으로
+    // 기대값을 만들면 TZ 가 다른 환경(로컬 KST / CI UTC)에서 결과가 갈린다.
+    expect(marked?.rosterAutoConfirmedAt).toBe('2026-09-01T00:00:00.000Z');
+    // 표식이 없는 등록에까지 배지가 붙으면 안 된다.
+    //
+    // **`every` 는 빈 배열에서 항상 true 다** — 비교 대상이 실제로 있는지 먼저 못 박지 않으면
+    // 이 단언은 아무것도 검증하지 않는다(Copilot 지적).
+    expect(others.length).toBeGreaterThan(0);
+    expect(others.every((item) => item.rosterAutoConfirmedAt === null)).toBe(true);
+  });
+
 });

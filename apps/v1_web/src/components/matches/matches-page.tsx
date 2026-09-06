@@ -691,7 +691,7 @@ function MatchRowItem({ match }: { match: MatchCardModel }) {
   return (
     <Link className="tm-match-row tm-card-interactive tm-pressable" href={`/matches/${match.id}`}>
       <div className={`tm-match-row-thumb${match.image ? '' : ' tm-match-media-sport'}`} style={match.image ? { backgroundImage: cssUrl(match.image) } : undefined}>
-        {match.image ? null : <SportIllustration sport={match.sport} sizes="52px" />}
+        {match.image ? null : <SportIllustration sport={match.sport} sizes="76px" />}
       </div>
       <div className="tm-match-row-main">
         <div className="tm-text-caption tm-match-row-meta">{match.sport} · {match.level} · {match.gender}</div>

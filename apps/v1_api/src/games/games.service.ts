@@ -6625,8 +6625,12 @@ export class GamesService {
     // **대회는 반드시 그대로 둔다** — 이 함수는 대회도 지나고, 대회는 이 이벤트로 비-리그
     // 분기(리마인더·에스컬레이션)를 돌린다. 끊으면 대회가 깨진다.
     //
-    // 복구 레인(`RECOVERY`)도 같이 억제한다: 복구는 **콘솔로 끝난 경기의 결과를 재구성**하는
-    // 것이라 정책이 같아야 한다. 레인별로 갈라 두면 복구 한 번에 자동 승인이 되살아난다.
+    // **복구 레인은 억제 대상이 아니다** — `resultRecoveryDeriveAndSubmit` 이 `sourceType !==
+    // TOURNAMENT_FIXTURE` 를 409 `RESULT_RECOVERY_NOT_REQUIRED` 로 막아서(같은 파일)
+    // 리그 팀매치는 그 라우트에 **들어가지도 못한다.** 그래서 아래 조건은 복구 레인에서
+    // 언제나 false 이고, "복구가 자동 승인을 되살린다" 는 시나리오는 성립하지 않는다.
+    // (이 문장을 남기는 이유: 없는 경우를 방어하려다 **그 경로가 리그에서 가능하다고
+    // 거짓말하는 코드**를 넣을 뻔했다.)
     const suppressSubmittedEvent = await this.isLeagueTeamMatchGame(tx, game);
     if (!suppressSubmittedEvent) {
       await this.writeOutbox(

@@ -6,10 +6,10 @@ import XCTest
 /// output is the attachments. It lives in the UI bundle because that is the only place a
 /// screenshot of the running app can be taken at device scale, which is what App Store
 /// Connect's size requirement is about: on an iPhone 16 Pro Max the screen is exactly the
-/// 1290×2796 the store asks for, so the frames need no scaling and lose nothing.
+/// 1320×2868 the store accepts for 6.9", so the frames need no scaling and lose nothing.
 ///
 /// Run through `scripts/ios/capture-store-screenshots.sh`, which picks the right simulator,
-/// exports the attachments and strips the alpha channel App Store Connect refuses.
+/// exports the attachments and checks them for the alpha channel App Store Connect refuses.
 final class StoreScreenshotUITests: LiveWebHarnessCase {
 
     /// Taps a tab, retrying while the previous screen is still settling.

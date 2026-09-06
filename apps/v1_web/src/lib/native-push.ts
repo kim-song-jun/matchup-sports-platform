@@ -1,3 +1,5 @@
+import './native-bridge';
+
 export type NativePushAction =
   | 'get-push-state'
   | 'request-notification-permission'
@@ -8,16 +10,6 @@ export interface NativePushResult {
   requestId: string;
   permission: NotificationPermission;
   subscribed: boolean;
-}
-
-interface TeameetNativeBridge {
-  postMessage(message: string): void;
-}
-
-declare global {
-  interface Window {
-    TeameetNative?: TeameetNativeBridge;
-  }
 }
 
 const RESULT_EVENT = 'teameet:native-push-result';

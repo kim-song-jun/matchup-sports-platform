@@ -10,6 +10,8 @@
  * same `requestId`) so the shell has one bridge to implement rather than two.
  */
 
+import './native-bridge';
+
 export interface NativeAppleSignInResult {
   requestId: string;
   /** False when the reader cancelled the sheet or Apple refused — not an error to report. */
@@ -21,22 +23,18 @@ export interface NativeAppleSignInResult {
   error?: string;
 }
 
-interface TeameetNativeBridge {
-  postMessage(message: string): void;
-}
-
-declare global {
-  interface Window {
-    TeameetNative?: TeameetNativeBridge;
-  }
-}
-
 const RESULT_EVENT = 'teameet:native-apple-result';
 /** The reader has to read Apple's sheet, decide, and pass Face ID. Two minutes is not long. */
 const RESPONSE_TIMEOUT_MS = 120_000;
 
+/** The action name in the shared bridge contract; also what the shell lists in `supports`. */
+const APPLE_ACTION = 'sign-in-with-apple';
+
 export function isNativeAppleSignInAvailable(): boolean {
-  return typeof window !== 'undefined' && typeof window.TeameetNative?.postMessage === 'function';
+  if (typeof window === 'undefined') return false;
+  const bridge = window.TeameetNative;
+  if (typeof bridge?.postMessage !== 'function') return false;
+  return Array.isArray(bridge.supports) && bridge.supports.includes(APPLE_ACTION);
 }
 
 export function requestNativeAppleSignIn(nonce: string): Promise<NativeAppleSignInResult> {
@@ -70,7 +68,7 @@ export function requestNativeAppleSignIn(nonce: string): Promise<NativeAppleSign
     }, RESPONSE_TIMEOUT_MS);
 
     try {
-      bridge.postMessage(JSON.stringify({ type: 'sign-in-with-apple', requestId, nonce }));
+      bridge.postMessage(JSON.stringify({ type: APPLE_ACTION, requestId, nonce }));
     } catch (error) {
       cleanup();
       reject(error);

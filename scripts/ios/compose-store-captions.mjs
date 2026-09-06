@@ -7,12 +7,11 @@
 // caption looks like it came from the product instead of from a graphics tool.
 //
 // Input is whatever `capture-store-screenshots.sh` produced. Output goes to `captioned/`
-// beside it, at the same pixel size, with the alpha channel stripped — App Store Connect
-// refuses images that have one.
+// beside it, at the same pixel size, and is checked for the alpha channel App Store Connect
+// refuses — checked rather than stripped, for the reason spelled out in that script.
 //
 // Usage: node scripts/ios/compose-store-captions.mjs <directory of raw shots>
 import { chromium } from 'playwright';
-import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import url from 'node:url';
@@ -89,7 +88,10 @@ const shots = readdirSync(directory).filter((name) => name.endsWith('.png')).sor
 const browser = await chromium.launch();
 const context = await browser.newContext({ viewport: { width: WIDTH, height: HEIGHT } });
 
+const COLOR_TYPES = { 0: 'grey', 2: 'rgb', 3: 'palette', 4: 'grey+alpha', 6: 'rgba' };
+
 let captioned = 0;
+const rejected = [];
 for (const name of shots) {
   const caption = CAPTIONS[path.basename(name, '.png')];
   if (!caption) continue;
@@ -101,12 +103,20 @@ for (const name of shots) {
   await view.screenshot({ path: target });
   await view.close();
 
-  execFileSync('sips', ['-s', 'format', 'png', '--deleteColorManagementProperties', target],
-               { stdio: 'ignore' });
-  const size = execFileSync('sips', ['-g', 'pixelWidth', '-g', 'pixelHeight', target], { encoding: 'utf8' });
-  console.log(`${name}  ${size.match(/pixelWidth: (\d+)/)[1]} ${size.match(/pixelHeight: (\d+)/)[1]}`);
+  // Width, height and colour type are all in the PNG's first chunk.
+  const header = readFileSync(target).subarray(16, 26);
+  const width = header.readUInt32BE(0);
+  const height = header.readUInt32BE(4);
+  const colorType = header.readUInt8(9);
+  console.log(`${name}  ${width} ${height}  ${COLOR_TYPES[colorType] ?? colorType}`);
+  if (colorType === 4 || colorType === 6) rejected.push(name);
   captioned += 1;
 }
 
 await browser.close();
+
+if (rejected.length > 0) {
+  console.error(`\nThese carry an alpha channel and App Store Connect will refuse them: ${rejected.join(', ')}`);
+  process.exit(1);
+}
 console.log(`\n${captioned} captioned in ${outputDirectory}`);

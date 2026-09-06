@@ -30,7 +30,15 @@ export const APPLE_KEYS_URL = 'https://appleid.apple.com/auth/keys';
  */
 export const APPLE_AUDIENCES_VARIABLE = 'APPLE_SIGN_IN_AUDIENCES';
 
-/** Apple rotates keys; a `kid` we have never seen means refetch, not reject. */
+/**
+ * Apple rotates keys; a `kid` we have never seen means refetch, not reject.
+ *
+ * The floor is measured from the last **attempt**, not the last success. Measured from
+ * success it would not apply at all while Apple is unreachable: the cache stays empty (or
+ * stays past its age), every sign-in finds it stale, and each one sends its own request —
+ * turning an outage on Apple's side into a request per sign-in from ours, which is how a
+ * rate limit gets added to the outage.
+ */
 const KEY_REFETCH_FLOOR_MS = 60_000;
 const KEY_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 
@@ -40,13 +48,30 @@ type AppleKeysResponse = { keys?: unknown };
 export class AppleIdentityService {
   private keys: readonly AppleJsonWebKey[] = [];
   private keysFetchedAtMs = 0;
+  /** Set whether the fetch worked or not — see `KEY_REFETCH_FLOOR_MS`. */
+  private keysAttemptedAtMs = 0;
   private inFlight: Promise<readonly AppleJsonWebKey[]> | null = null;
 
   constructor(
     @InjectPinoLogger(AppleIdentityService.name) private readonly logger: PinoLogger,
-    private readonly now: () => number = () => Date.now(),
-    private readonly fetchKeys: (url: string) => Promise<Response> = (url) => fetch(url),
   ) {}
+
+  // The clock and the call to Apple are overridable methods rather than constructor
+  // parameters. Nest reads the constructor's emitted parameter types to inject it, and a
+  // `() => number` is emitted as `Function` — it looks for a provider called `Function`,
+  // finds none, and refuses to build the module. A default value does not help; nothing
+  // asks for one. It cost the whole integration suite (188 tests) to learn, because the
+  // unit specs all supply their own double for this service and never build it through Nest.
+
+  /** Overridden in tests. */
+  protected now(): number {
+    return Date.now();
+  }
+
+  /** Overridden in tests. */
+  protected fetchKeys(url: string): Promise<Response> {
+    return fetch(url);
+  }
 
   private get audiences(): readonly string[] {
     return (process.env[APPLE_AUDIENCES_VARIABLE] ?? '')
@@ -134,9 +159,11 @@ export class AppleIdentityService {
 
   private async signingKeys(options: { force?: boolean } = {}): Promise<readonly AppleJsonWebKey[]> {
     const age = this.now() - this.keysFetchedAtMs;
-    const stale = this.keys.length === 0 || age > KEY_MAX_AGE_MS;
-    const mayRefetch = options.force ? age > KEY_REFETCH_FLOOR_MS : stale;
-    if (!mayRefetch) return this.keys;
+    const wanted = options.force || this.keys.length === 0 || age > KEY_MAX_AGE_MS;
+    // Nothing refetches inside the floor, however badly it is wanted. The first call after a
+    // boot passes it because no attempt has been made yet.
+    const sinceAttempt = this.now() - this.keysAttemptedAtMs;
+    if (!wanted || sinceAttempt < KEY_REFETCH_FLOOR_MS) return this.keys;
 
     // One fetch at a time. A burst of sign-ins right after a rotation would otherwise send a
     // request per sign-in to Apple, which is how a rate limit turns one rotation into an
@@ -148,6 +175,7 @@ export class AppleIdentityService {
   }
 
   private async loadKeys(): Promise<readonly AppleJsonWebKey[]> {
+    this.keysAttemptedAtMs = this.now();
     try {
       const response = await this.fetchKeys(APPLE_KEYS_URL);
       if (!response.ok) throw new Error(`Apple key endpoint answered ${response.status}`);

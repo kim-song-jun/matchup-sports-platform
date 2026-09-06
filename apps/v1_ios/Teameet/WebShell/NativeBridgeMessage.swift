@@ -139,6 +139,22 @@ enum NativeBridge {
     ///
     /// The object is frozen and the property non-writable so page code cannot replace the
     /// bridge with one of its own and have the shell answer it.
+    ///
+    /// It carries `supports`, and that list is what the web tests before offering anything
+    /// shell-only. Merely finding `window.TeameetNative` is not enough: Android installs a
+    /// global with the very same name through `addWebMessageListener`, and it answers push
+    /// actions only — a page that took the global's presence as "Apple sign-in works here"
+    /// would show the button in the Android shell and hang until the request timed out. The
+    /// same reasoning covers an older iOS build, which advertises the actions it actually
+    /// has and so never offers one it would ignore.
+    ///
+    /// Android cannot grow this field — the object there is built by WebView itself — which
+    /// is exactly right: no list means no shell-only action.
+    static let supportedActionsJSON: String = {
+        let quoted = Action.allCases.map { "'\($0.rawValue)'" }.joined(separator: ",")
+        return "[\(quoted)]"
+    }()
+
     static let shimScript = """
     (function () {
       var handlers = window.webkit && window.webkit.messageHandlers;
@@ -148,7 +164,8 @@ enum NativeBridge {
         value: Object.freeze({
           postMessage: function (message) {
             handlers.\(handlerName).postMessage(String(message));
-          }
+          },
+          supports: Object.freeze(\(supportedActionsJSON))
         }),
         writable: false,
         configurable: false,

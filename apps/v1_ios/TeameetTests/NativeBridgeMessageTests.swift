@@ -182,6 +182,29 @@ final class NativeBridgeMessageTests: XCTestCase {
         XCTAssertTrue(NativeBridge.shimScript.contains("if (!handlers"))
     }
 
+    /// The web offers a shell-only feature by what `supports` lists, not by whether the
+    /// global exists — Android installs the same global and answers push actions only. A
+    /// build that stopped advertising would silently hide Sign in with Apple, so the list is
+    /// checked here rather than trusted.
+    func testShimAdvertisesEveryActionTheShellAnswers() {
+        let shim = NativeBridge.shimScript
+        XCTAssertTrue(shim.contains("supports:"))
+        for action in NativeBridge.Action.allCases {
+            XCTAssertTrue(shim.contains("'\(action.rawValue)'"),
+                          "the shim does not advertise \(action.rawValue)")
+        }
+        XCTAssertTrue(shim.contains("'sign-in-with-apple'"))
+    }
+
+    /// Derived from `Action.allCases`, so an action added to the enum cannot be left off the
+    /// list the web reads.
+    func testAdvertisedActionsAreDerivedFromTheEnum() {
+        XCTAssertEqual(
+            NativeBridge.supportedActionsJSON,
+            "[" + NativeBridge.Action.allCases.map { "'\($0.rawValue)'" }.joined(separator: ",") + "]"
+        )
+    }
+
     // MARK: - Permission mapping
     // Fixed by the web's NotificationPermission type. Real push registration does not change
     // any of it, which is why it is pinned before that lands.

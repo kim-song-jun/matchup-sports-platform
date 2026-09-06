@@ -4,9 +4,12 @@
 # 6.9" display, portrait. App Store Connect accepts either 1290x2796 or 1320x2868 at that
 # size, and the iPhone 16 Pro Max simulator's screen is exactly the second one — so the
 # frames are the real thing rather than something scaled. It takes 1 to 10 of them, PNG or
-# JPEG, and **refuses any image with an alpha channel**, which is what the flatten step at
-# the end is for: a simulator screenshot carries one, and the upload fails with a message
-# that does not mention transparency.
+# JPEG, and **refuses any image with an alpha channel**.
+#
+# The last step checks for that rather than claiming to fix it. A simulator screenshot is
+# opaque RGB already (measured: PNG colour type 2), so a flatten here would be a no-op that
+# reads like a safeguard — and the day something upstream starts producing RGBA, a comment
+# is not going to catch it. The check names the file and fails the run instead.
 #
 # Credentials come from the environment. This repository is public; do not paste them here.
 # xcodebuild records build settings, so the result bundle under the output directory contains
@@ -74,7 +77,7 @@ fi
 # The manifest is the only place an attachment's readable name survives; on disk they are
 # UUIDs. Copy the named ones out, then flatten.
 python3 - "$OUTPUT" <<'PY'
-import json, os, shutil, subprocess, sys
+import json, os, shutil, struct, sys
 output = sys.argv[1]
 manifest = os.path.join(output, 'attachments', 'manifest.json')
 if not os.path.exists(manifest):
@@ -94,16 +97,23 @@ for test in json.load(open(manifest)):
         shutil.copy(source, target)
         saved.append(target)
 
+# Width, height and colour type all live in the PNG's first chunk, so reading 26 bytes
+# answers both questions without shelling out to anything.
+COLOR_TYPES = {0: 'grey', 2: 'rgb', 3: 'palette', 4: 'grey+alpha', 6: 'rgba'}
+
+rejected = []
 for path in sorted(set(saved)):
-    # App Store Connect refuses images with an alpha channel, and a simulator screenshot has
-    # one. `--matchTo` against a plain RGB profile drops it and leaves the pixels alone.
-    subprocess.run(['sips', '-s', 'format', 'png', '--deleteColorManagementProperties', path],
-                   check=False, capture_output=True)
-    subprocess.run(['sips', '-s', 'formatOptions', 'best', path], check=False, capture_output=True)
-    size = subprocess.run(['sips', '-g', 'pixelWidth', '-g', 'pixelHeight', path],
-                          capture_output=True, text=True).stdout
-    dims = ' '.join(line.split(':')[-1].strip() for line in size.splitlines() if ':' in line and 'pixel' in line)
-    print(f'{os.path.basename(path)}  {dims}')
+    with open(path, 'rb') as handle:
+        width, height, _depth, color = struct.unpack('>IIBB', handle.read(26)[16:26])
+    print(f'{os.path.basename(path)}  {width} {height}  {COLOR_TYPES.get(color, color)}')
+    if color in (4, 6):
+        rejected.append(os.path.basename(path))
+
+if rejected:
+    print(f'\nThese carry an alpha channel and App Store Connect will refuse them: '
+          f'{", ".join(rejected)}', file=sys.stderr)
+    raise SystemExit(1)
+
 print(f'\n{len(set(saved))} screenshots in {output}')
 PY
 

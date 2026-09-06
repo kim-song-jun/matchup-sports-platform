@@ -596,3 +596,182 @@ describe('presentTournamentDetail — kind(종류)와 format(방식)은 독립�
     expect(presentTournamentDetail(rowWith(null, 'group_knockout')).kind).toBeNull();
   });
 });
+
+/**
+ * **공개 명단 (사용자 A안, 2026-09-06 확정).**
+ *
+ * 정본 §3: 명단 공개는 **등번호·이름(닉네임)** 이다. 기존 명단 응답은 `realName`·생년월일·
+ * 성별·자격판정까지 싣는데 그건 **자격 가드에만 쓰라고 받은 값**이라, 공개 화면에 그대로
+ * 내보내면 PII 유출이다. 그래서 공개 전용 직렬화를 따로 뒀다.
+ */
+describe('presentTournamentDetail — 공개 명단', () => {
+  function rowWithRoster(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'tournament-1',
+      sportId: 'sport-1',
+      sport: { code: 'football', name: '축구' },
+      title: '테스트 대회',
+      status: 'in_progress',
+      format: 'group_knockout',
+      registrationDeadlineAt: null,
+      rosterDeadlineAt: null,
+      bracketPublishedAt: new Date('2026-06-01T00:00:00Z'),
+      bracketPublishScheduledAt: null,
+      scheduledAt: null,
+      scheduledEndAt: null,
+      venue: null,
+      promoListTeamsText: null,
+      promoListLocationText: null,
+      promoListPrizeText: null,
+      promoListPriority: 0,
+      campaign: null,
+      _count: { registrations: 1, reviews: 0 },
+      registrations: [
+        {
+          id: 'reg-1',
+          status: 'confirmed',
+          confirmedAt: new Date('2026-06-02T00:00:00Z'),
+          team: { id: 'team-1', name: 'A팀', profile: null, region: null },
+          // **`players` 를 여기 두지 않는다.** 기본 조회의 include 에서 뺐기 때문이다 —
+          // row 에 남겨 두면 presenter 가 그걸 읽는지 명단 맵을 읽는지 구분되지 않아,
+          // 소비처를 안 고쳐도 통과하는 vacuous 스펙이 된다.
+        },
+      ],
+      groups: [],
+      fixtures: [],
+      announcements: [],
+      sponsors: [],
+      createdAt: new Date('2026-06-01T00:00:00Z'),
+      updatedAt: new Date('2026-06-01T00:00:00Z'),
+      reviews: [],
+      awards: [],
+      ...overrides,
+    } as unknown as Parameters<typeof presentTournamentDetail>[0];
+  }
+
+  /**
+   * 호출부(`tournaments-read.service.ts`)가 넘기는 **명단 맵**. 실명·생년월일 같은 값은
+   * 애초에 이 자리에 담기지 않는다 — `readPublicRostersForRegistrations` 가 `nickname` 만
+   * SELECT 하기 때문이다. 그래서 이 스펙의 PII 훑기는 **"presenter 가 다른 자리에서
+   * 끌어오지 않는가"** 를 보는 것이 된다.
+   */
+  const rosterMap = (jerseyOfPlayer1: number | null = 7) =>
+    new Map([
+      [
+        'reg-1',
+        [
+          { id: 'player-1', jerseyNumber: jerseyOfPlayer1, nickname: '길동이' },
+          // 번호를 안 단 선수 — 명단에서 사라지면 안 된다.
+          { id: 'player-2', jerseyNumber: null, nickname: null },
+        ],
+      ],
+    ]);
+
+  it('등번호와 닉네임만 내보낸다 — 실명·생년월일·성별·자격판정은 응답에 없다', () => {
+    const result = presentTournamentDetail(
+      rowWithRoster(),
+      new Date('2026-06-10T00:00:00Z'),
+      false,
+      [],
+      rosterMap(),
+    );
+
+    const players = result.participantTeams[0]?.players;
+    expect(players).toEqual([
+      { id: 'player-1', jerseyNumber: 7, nickname: '길동이' },
+      // 번호를 안 단 선수는 `null` — 0 으로 채우면 아무도 안 단 번호가 전원 0번이 된다.
+      { id: 'player-2', jerseyNumber: null, nickname: null },
+    ]);
+
+    // **응답 전체를 문자열로 훑는다.** 필드 이름을 바꿔 우회하거나 다른 자리에 실려도 잡는다.
+    const serialized = JSON.stringify(result);
+    expect(serialized).not.toContain('홍길동');
+    expect(serialized).not.toContain('김철수');
+    expect(serialized).not.toContain('1995-03-15');
+    // **`displayName` 값도 훑는다** — 폴백이 되살아나면 여기서 잡힌다.
+    expect(serialized).not.toContain('홍길동(실명)');
+    expect(serialized).not.toContain('김철수(실명)');
+    expect(serialized).not.toContain('genderSnapshot');
+    expect(serialized).not.toContain('eligibilityStatus');
+  });
+
+  it('닉네임이 없으면 null 이다 — 실명으로 떨어뜨리지 않는다', () => {
+    const result = presentTournamentDetail(
+      rowWithRoster(),
+      new Date('2026-06-10T00:00:00Z'),
+      false,
+      [],
+      rosterMap(),
+    );
+
+    // 화면이 이 `null` 을 보고 "(탈퇴한 선수)" 자리표시자를 그린다. 여기서 실명으로
+    // 폴백하면 정본 위반이 조용히 살아난다.
+    expect(result.participantTeams[0]?.players[1]?.nickname).toBeNull();
+  });
+
+  it('모집 중에는 명단도 안 보인다 — 팀 식별정보와 같은 게이트를 탄다', () => {
+    const result = presentTournamentDetail(
+      rowWithRoster({ status: 'open' }),
+      new Date('2026-06-10T00:00:00Z'),
+      false,
+      [],
+      rosterMap(),
+    );
+
+    // 팀 자체가 안 나오므로 명단도 함께 사라진다. 명단만 따로 게이트를 두면
+    // "팀명은 가렸는데 선수는 보인다" 가 가능해진다.
+    expect(result.participantTeams).toEqual([]);
+    expect(JSON.stringify(result)).not.toContain('길동이');
+  });
+
+  it('운영자는 모집 중에도 본다 — staffBypass 는 기존 정책 그대로', () => {
+    const result = presentTournamentDetail(
+      rowWithRoster({ status: 'open' }),
+      new Date('2026-06-10T00:00:00Z'),
+      true,
+      [],
+      rosterMap(),
+    );
+
+    expect(result.participantTeams[0]?.players[0]?.nickname).toBe('길동이');
+  });
+
+  it('명단은 **넘겨받은 맵**에서 온다 — row 에서 읽으면 include 를 빼는 순간 조용히 빈다', () => {
+    // 이 스펙의 핵심 방어다. presenter 가 `registration.players` 를 읽던 시절에는
+    // include 에서 조인을 빼도 `?? []` 가 삼켜 **명단이 빈 배열**이 되는데 tsc·lint 가
+    // 못 잡았다. 맵을 비우면 명단도 비고, 맵에 넣으면 그대로 나오는지를 양쪽으로 본다.
+    const withRoster = presentTournamentDetail(
+      rowWithRoster(),
+      new Date('2026-06-10T00:00:00Z'),
+      false,
+      [],
+      rosterMap(),
+    );
+    expect(withRoster.participantTeams[0]?.players).toHaveLength(2);
+
+    const withoutRoster = presentTournamentDetail(
+      rowWithRoster(),
+      new Date('2026-06-10T00:00:00Z'),
+      false,
+      [],
+      new Map(),
+    );
+    expect(withoutRoster.participantTeams[0]?.players).toEqual([]);
+  });
+
+  it('등번호를 안 단 선수도 명단에 남는다 — 거르면 통째로 사라진다', () => {
+    // 조회 쪽에서 `jersey_number IS NOT NULL` 을 걸면 이 선수가 사라진다. presenter 는
+    // 맵을 그대로 내보내야 하고, 번호 없음은 `null` 로 표현된다(0 이 아니다).
+    const result = presentTournamentDetail(
+      rowWithRoster(),
+      new Date('2026-06-10T00:00:00Z'),
+      false,
+      [],
+      rosterMap(null),
+    );
+    expect(result.participantTeams[0]?.players).toEqual([
+      { id: 'player-1', jerseyNumber: null, nickname: '길동이' },
+      { id: 'player-2', jerseyNumber: null, nickname: null },
+    ]);
+  });
+});

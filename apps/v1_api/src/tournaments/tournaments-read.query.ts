@@ -145,6 +145,15 @@ export const TOURNAMENT_DETAIL_INCLUDE = {
           region: { select: { name: true } },
         },
       },
+      // 공개 명단(등번호 + 닉네임). **PII 는 select 하지 않는다** — `realName`·생년월일·
+      // 성별·자격판정은 자격 가드에만 쓰는 값이라 공개 응답에 실리면 안 된다(정본 §3).
+      // 등번호는 여기서 못 읽는다(생성 클라이언트에 컬럼이 없다) — presenter 가 raw 로
+      // 한 번에 배치 조회해 얹는다.
+      // **`players` 는 여기서 조인하지 않는다.** 명단을 감추는 상태(모집 중 · 비스태프)에서도
+      // 무조건 명단 행과 닉네임 조인을 읽고 presenter 가 통째로 버리고 있었다. 안 쓰는 PII
+      // 인접 필드를 응답 경로에 싣지 않는다는 원칙은 **읽지도 않는다**까지 가는 것이 일관된다.
+      // 공개일 때만 `readPublicRostersForRegistrations`(public-roster.ts)가 등번호와 **한 번에**
+      // 읽는다 — 숨김이면 쿼리 1개, 공개면 2개로 예전과 같다.
     },
   },
   _count: {

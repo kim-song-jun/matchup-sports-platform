@@ -88,6 +88,7 @@ function makeParticipantTeam(
     teamLogoUrl: null,
     teamRegionName: null,
     confirmedAt: null,
+    players: [],
     ...overrides,
   };
 }

@@ -3292,6 +3292,20 @@ export type V1TournamentSponsor = {
   sortOrder: number;
 };
 
+/**
+ * 공개 명단의 한 줄 — **등번호와 이름(닉네임)뿐이다.**
+ *
+ * 정본 §3: "명단 공개는 등번호·이름". 실명·생년월일·성별·자격판정은 자격 가드에만 쓰는
+ * 값이라 이 응답에 **없다**(서버가 공개 전용으로 따로 직렬화한다).
+ */
+export type V1PublicRosterPlayer = {
+  id: string;
+  /** 없으면 `null` — 화면은 `—` 로 그린다. */
+  jerseyNumber: number | null;
+  /** 탈퇴·프로필 삭제로 못 찾으면 `null` — 화면이 자리표시자를 그린다(실명 폴백 금지). */
+  nickname: string | null;
+};
+
 export type V1TournamentParticipantTeam = {
   registrationId: string;
   teamId: string;
@@ -3300,6 +3314,12 @@ export type V1TournamentParticipantTeam = {
   teamRegionName: string | null;
   status: V1TournamentParticipantStatus;
   confirmedAt: string | null;
+  /**
+   * 그 팀의 공개 명단. 팀 식별정보와 **같은 게이트**를 타므로, 모집 중이라 팀이 감춰지면
+   * 이 배열도 함께 사라진다(`participantTeams` 자체가 비어 나온다).
+   * 아직 명단을 안 낸 팀은 빈 배열이다 — alpha 실측(2026-09-06)에 그런 팀이 실재한다.
+   */
+  players: V1PublicRosterPlayer[];
 };
 
 /** Serialized by TournamentsReadService.get — full public detail */

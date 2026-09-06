@@ -677,19 +677,21 @@ function FeaturedMatchCard({
       {/* 사진이 없으면 목업 사진을 깔지 않고 종목 그래픽을 그린다 — 예전엔 모든 추천 카드가
           같은 스톡 사진 한 장이라 서로 다른 실제 매치가 구분되지 않았다(웨이브 8). */}
       <div
-        className={`tm-featured-media${!network && !match.imageUrl ? ' tm-match-media-sport tm-home-featured-sport' : ''}`}
+        className={`tm-featured-media${!network && !match.imageUrl ? ' tm-home-featured-stack' : ''}`}
         style={network ? { background: 'var(--grey100)' } : match.imageUrl ? { background: `${cssUrl(match.imageUrl)} center/cover` } : undefined}
       >
         {!network && !match.imageUrl ? (
-          <SportIllustration className="tm-home-featured-illustration" sizes="(min-width: 1024px) 160px, 136px" sport={match.sportLabel} />
+          <div className="tm-match-hero-graphic">
+            <SportIllustration sizes="(min-width: 1024px) 208px, 176px" sport={match.sportLabel} />
+          </div>
         ) : null}
         {!network ? (
-          <div className="tm-featured-overlay">
+          <div className={`tm-featured-overlay${!match.imageUrl ? ' tm-featured-overlay-stack' : ''}`}>
             <div className="tm-featured-text">
-              <div className="tm-text-micro" style={{ color: 'var(--static-white)' }}>
+              <div className="tm-text-micro tm-featured-eyebrow">
                 {signedOut ? '랜덤 추천 매치' : match.reason ?? '관심 종목 기반 추천'}
               </div>
-              <div className="tm-text-subhead" style={{ color: 'var(--static-white)', marginTop: 4 }}>
+              <div className="tm-text-subhead tm-featured-headline" style={{ marginTop: 4 }}>
                 {match.title}
               </div>
             </div>
@@ -969,7 +971,7 @@ function RecommendedMatchRail({ matches }: { matches: HomeMatchCard[] }) {
             className={`tm-match-card-media${match.imageUrl ? '' : ' tm-match-media-sport'}`}
             style={match.imageUrl ? { background: `${cssUrl(match.imageUrl)} center/cover` } : undefined}
           >
-            {match.imageUrl ? null : <SportIllustration sizes="112px" sport={match.sportLabel} />}
+            {match.imageUrl ? null : <SportIllustration sizes="132px" sport={match.sportLabel} />}
           </div>
           <div style={{ padding: 16 }}>
             <div className="tm-text-micro" style={{ color: 'var(--blue700)' }}>{match.sportLabel}</div>

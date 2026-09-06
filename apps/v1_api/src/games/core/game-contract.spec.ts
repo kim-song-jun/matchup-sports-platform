@@ -102,27 +102,9 @@ describe('Game core contract', () => {
         }),
       ).not.toThrow();
     }
-    // **이 자리가 결함 #25 를 계약으로 박고 있었다** — 예전엔 `TEAM_MATCH` 의
-    // `TOURNAMENT_COMMAND` 를 통째로 막았고, 그래서 **리그 경기를 콘솔에서 시작조차 못
-    // 했다**(2026-09-06 alpha 실측). 정본이 "리그도 대회와 같은 콘솔" 로 정했으므로
-    // 이제 열린다. 지우지 않고 **새 계약으로 다시 적는다.**
-    expect(() =>
-      assertGameLifecycleTransition({
-        sourceType: V1GameSourceType.TEAM_MATCH,
-        trigger: 'TOURNAMENT_COMMAND',
-        from: V1GameState.SCHEDULED,
-        to: V1GameState.LIVE,
-      }),
-    ).not.toThrow();
-    // 다만 **표는 대회와 같은 것을 쓴다** — 콘솔이라고 아무 전이나 되는 것이 아니다.
-    expect(() =>
-      assertGameLifecycleTransition({
-        sourceType: V1GameSourceType.TEAM_MATCH,
-        trigger: 'TOURNAMENT_COMMAND',
-        from: V1GameState.SCHEDULED,
-        to: V1GameState.ENDED,
-      }),
-    ).toThrow(expect.objectContaining({ code: 'INVALID_STATE_TRANSITION' }));
+    // 콘솔 진행(`TOURNAMENT_COMMAND`)이 `TEAM_MATCH` 에서 무엇을 할 수 있는지는 이 테스트가
+    // 아니라 **아래 전용 describe(#25)** 가 한 벌로 맡는다 — 여기서 또 단언하면 같은 계약이
+    // 두 곳에 갈려 적히고, 나중에 한쪽만 고쳐져 서로 어긋난다.
   });
 
   it('permits a TEAM_RESULT_SUBMISSION resubmit from ENDED (the correction loop) but never from CANCELLED', () => {
